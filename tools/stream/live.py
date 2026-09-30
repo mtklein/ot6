@@ -289,11 +289,14 @@ async function tick(){
   let tgt = null;
   // (status.json streams a worker on THIS machine: a same-named worker on
   // another machine is not it)
+  // With no ?w and the tailed worker not live, follow the first worker with
+  // a picture on any machine, rather than wait for one here.
   if(grid){ tgt = wid ? (grid.find(w=>w.id===wid) || null)
-                      : (grid.find(w=>w.local && w.name===followed) || null); }
-  const targetName = wid ? (tgt ? tgt.name : null) : followed;
-  const isFollowed = !!st && !!targetName && targetName===st.test
-    && (!tgt || tgt.local);
+                      : (grid.find(w=>w.local && w.test===followed)
+                         || grid.find(w=>w.shot) || null); }
+  const targetName = tgt ? tgt.name : (wid ? null : followed);
+  const isFollowed = !!st && !!followed
+    && (tgt ? (tgt.local && tgt.test===followed) : !wid);
   $('who').textContent = (targetName || (wid ? '('+wid+')' : '(waiting)'))
     + (tgt ? ' \u00b7 ' + tgt.machine
        + (tgt.branch ? ' \u00b7 ' + tgt.branch : '') : '');
@@ -354,10 +357,8 @@ svg.addEventListener('click', ev=>{
   const e = n && last ? last.edges.find(x=>x.name===n) : null;
   document.getElementById('pick').textContent = e ? tip(e) : (n || ''); });
 function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
-// done here: green; done only on another machine (merged from a --peer):
-// teal; running anywhere: amber.  e.on lists the machines.
-function doneCol(e, j){ return (e.on && j.local && e.on.length
-  && !e.on.includes(j.local)) ? '#3a8f9d' : '#3f9d63'; }
+// done on any machine: green; running on any: amber.  e.on names the
+// machines, in the tooltip.
 function tip(e){ return e.name + (e.on && e.on.length
   ? ' \u2014 ' + e.status + ' on ' + e.on.join(', ') : ''); }
 function render(j){
@@ -366,10 +367,10 @@ function render(j){
     `${j.done}/${j.total} segments · ${j.elapsed_min} min elapsed · ~${j.eta_min} min left`;
   document.getElementById('cur').textContent =
     j.running.length ? ('now playing: ' + j.running.join(', ')) : '';
-  document.getElementById('legend').innerHTML = j.local ?
-    `<span style="color:#3f9d63">\u25cf</span> done on ${esc(j.local)} \u00b7 `
-    + `<span style="color:#3a8f9d">\u25cf</span> done only on another machine \u00b7 `
-    + `<span style="color:#e0a93e">\u25cf</span> running (machine named above)` : '';
+  document.getElementById('legend').innerHTML =
+    `<span style="color:#3f9d63">\u25cf</span> done \u00b7 `
+    + `<span style="color:#e0a93e">\u25cf</span> running (machine named above;`
+    + ` click a node for where it ran)`;
 }
 function renderWob(j){
   svg.setAttribute('viewBox','0 0 256 256');
@@ -388,7 +389,7 @@ function renderWob(j){
   j.edges.forEach((e,i)=>{
     const [x,y] = P[i];
     const rad = 1.5 + Math.min(2.2, Math.sqrt(e.dur||30)/8);
-    const col = e.status==='done' ? doneCol(e,j) : e.status==='running' ? '#e0a93e' : '#39413b';
+    const col = e.status==='done' ? '#3f9d63' : e.status==='running' ? '#e0a93e' : '#39413b';
     const pulse = e.status==='running' ? `<animate attributeName="r" values="${rad};${rad+1.4};${rad}" dur="1.2s" repeatCount="indefinite"/>` : '';
     // checkpoint-booted segments wear the dotted yellow ring, as in the
     // grid; the rest get a hairline dark rim so they read against the map
@@ -427,7 +428,7 @@ function renderGrid(j){
     const r = Math.floor(i/COLS), c = i%COLS;
     const x = 60 + (r%2 ? (COLS-1-c) : c)*DX, y = 30 + r*DY;
     const rad = R0 + Math.min(14, Math.sqrt(e.dur||30));
-    const col = e.status==='done' ? doneCol(e,j) : e.status==='running' ? '#e0a93e' : '#3a423c';
+    const col = e.status==='done' ? '#3f9d63' : e.status==='running' ? '#e0a93e' : '#3a423c';
     const pulse = e.status==='running' ? `<animate attributeName="r" values="${rad};${rad+4};${rad}" dur="1.2s" repeatCount="indefinite"/>` : '';
     // segments that boot from an SRAM save checkpoint rather than the
     // played chain wear a dotted yellow ring
@@ -645,6 +646,8 @@ class Scanner:
         self.sent = {}         # worker id -> hash8 of the PNG last handed out
         self.live_ref = live_ref
         self.prog = None       # progress inputs, loaded on first use
+        self.route_ts = 0      # commit time of ROOT's HEAD: the route's age
+        self.memo, self.memo_fp = {}, None   # stamp verdicts, and their inputs
         self.fresh = None      # a progress payload not yet handed out
         self.t0 = time.time()
         self.runs = {}         # worker id -> what one run has done so far
@@ -676,8 +679,22 @@ class Scanner:
                 spec.loader.exec_module(compose)
                 from pathlib import Path
                 self.prog = (states, xy, compose, Path(ROOT))
+                try:   # which machine's route is newest, for merge_progress
+                    self.route_ts = int(subprocess.run(
+                        ["git", "-C", ROOT, "log", "-1", "--format=%ct"],
+                        capture_output=True, text=True, timeout=5).stdout)
+                except (ValueError, OSError, subprocess.SubprocessError):
+                    self.route_ts = 0
             live_test = (self.live_ref or {}).get("test")
-            return build_progress(*self.prog, self.t0, live_test)
+            # The stamp checks cost seconds of CPU a pass (a whole core on
+            # px13), so their verdicts are kept until a file they read
+            # changes: the ROM, a state or stamp, or anything under
+            # tools/tests (generators, lib, the stamp tool, checkpoints).
+            fp = route_inputs()
+            if fp != self.memo_fp:
+                self.memo, self.memo_fp = {}, fp
+            return dict(build_progress(*self.prog, self.t0, live_test,
+                                       self.memo), route_ts=self.route_ts)
         except Exception as e:
             return {"error": f"{type(e).__name__}: {e}"[:200]}
 
@@ -1038,17 +1055,20 @@ class Board:
             self._dump("progress.json", prog)
 
     def merge_progress(self, m):
-        """The local route (its coords, ETA and done/running) with every other
-        machine's running and done folded in by edge name.  Each edge's "on"
-        lists the machines it is running or done on, so the map can tell a
-        segment done here from one done only elsewhere."""
-        base = m[self.names[0]]["progress"]
-        if not base or "edges" not in base:
+        """One route from every machine: the route definition (edges, coords,
+        ETA) of whichever machine's tree has the newest commit, every
+        machine's running and done folded in by edge name.  No machine is
+        special: each edge's "on" lists the machines it is running or done
+        on, and the map colours done as done wherever it happened."""
+        per_p = {n: m[n]["progress"] for n in self.names
+                 if m[n]["progress"] and "edges" in m[n]["progress"]}
+        if not per_p:
             return None
+        # max() keeps the first of equals, so ties go to flag order
+        base = per_p[max(per_p, key=lambda n: per_p[n].get("route_ts") or 0)]
         out = dict(base, edges=[dict(e) for e in base["edges"]], local=HOST)
-        per = {n: {e["name"]: e["status"] for e in m[n]["progress"]["edges"]}
-               for n in self.names
-               if m[n]["progress"] and "edges" in m[n]["progress"]}
+        per = {n: {e["name"]: e["status"] for e in p["edges"]}
+               for n, p in per_p.items()}
         running = []
         for e in out["edges"]:
             run = [n for n in self.names if per.get(n, {}).get(e["name"]) == "running"]
@@ -1172,7 +1192,27 @@ PLAIN = re.compile(r"^\[ot6\] (.*)")
 HINT = re.compile(r"(?:\bframe[= ]|[ (]f)(\d{3,})\b")
 
 
-def build_progress(states, xy, compose, rootp, t0, live_test):
+def route_inputs():
+    """(path, mtime, size) of every file a stamp check reads, as one hash."""
+    h = hashlib.sha1()
+    tops = [os.path.join(ROOT, "build/ot6.sfc")]
+    try:
+        tops += [e.path for e in os.scandir(os.path.join(ROOT, "build/states"))
+                 if e.is_file() and not e.name.endswith(".log")]
+    except OSError:
+        pass
+    for d, _dirs, files in os.walk(os.path.join(ROOT, "tools/tests")):
+        tops += [os.path.join(d, f) for f in files]
+    for p in sorted(tops):
+        try:
+            st = os.stat(p)
+            h.update(f"{p} {st.st_mtime_ns} {st.st_size}\n".encode())
+        except OSError:
+            pass
+    return h.hexdigest()
+
+
+def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
     """One progress.json payload: every graph edge's status (done when its
     stamp passes compose's freshness check, running when a live workspace
     bears its name, pending otherwise), WoB coords for the map, a
@@ -1186,6 +1226,13 @@ def build_progress(states, xy, compose, rootp, t0, live_test):
     is on the live view.  Its name may be an edge's primary state or one of
     its `also` artifacts, so the marked node is the primary edge either way.
     """
+    memo = {} if memo is None else memo
+
+    def fresh(x):   # compose's verdict, remembered while its inputs stand
+        if x not in memo:
+            memo[x] = compose.stamp_check(x, rootp) is None
+        return memo[x]
+
     dur, qdur = {}, {}
     try:
         with open(os.path.join(ROOT, "build/ninja/.ninja_log")) as f:
@@ -1222,8 +1269,7 @@ def build_progress(states, xy, compose, rootp, t0, live_test):
             try:
                 if all(os.path.exists(
                            os.path.join(ROOT, f"build/states/{x}.stamp"))
-                       and compose.stamp_check(x, rootp) is None
-                       for x in names):
+                       and fresh(x) for x in names):
                     st = "done"
             except Exception:
                 pass
