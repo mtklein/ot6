@@ -1160,11 +1160,17 @@ def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
     its `also` artifacts, so the marked node is the primary edge either way.
     """
     memo = {} if memo is None else memo
+    verdicts = memo.setdefault("fresh", {})
+    # compose's own memo, shared across the pass: each stamp's ancestors
+    # are checked once, not again for every descendant (a pass was
+    # quadratic in the chain: 300-400 s on the peers)
+    chain = memo.setdefault("stamp", {})
+    stale = (compose.STALE, compose.UNBOUND, compose.UNVERIFIED)
 
     def fresh(x):   # compose's verdict, remembered while its inputs stand
-        if x not in memo:
-            memo[x] = compose.stamp_check(x, rootp) is None
-        return memo[x]
+        if x not in verdicts:
+            verdicts[x] = compose.stamp_status(x, rootp, chain)[0] not in stale
+        return verdicts[x]
 
     dur, qdur = {}, {}
     try:
@@ -1246,10 +1252,10 @@ def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
     for name, secs in qdur.items():
         ok = os.path.join(ROOT, f"build/results/suite/{name}.ok")
         try:
-            fresh = os.path.exists(ok) and os.path.getmtime(ok) >= rom_m
+            passed = os.path.exists(ok) and os.path.getmtime(ok) >= rom_m
         except OSError:
-            fresh = False
-        if not fresh:
+            passed = False
+        if not passed:
             rem_suite += secs
     par = max((os.cpu_count() or 4) // 2, 1)
     eta = max(eta, (rem_state + rem_suite) / par)
