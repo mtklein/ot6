@@ -473,8 +473,13 @@ def emit_chain_edges(w, states, root, copy_if_changed_from):
         names = [P + n for n in [s] + list(e.get("also") or [])]
         outs = " ".join(f"build/states/{n}.mss.lua build/states/{n}.mss"
                         for n in names)
+        # Unlike qualification's generate edges, a chain_ copy depends on
+        # the lib halves too: the chain is where a tracked checkpoint is
+        # re-cut from, and checkpoint_drift.py refuses a capture sealed
+        # under older lib halves, so a lib edit has to re-run the chain.
         deps = [copy_if_changed_from(ROM),
-                copy_if_changed_from(f"tools/tests/{gen}.lua")]
+                copy_if_changed_from(f"tools/tests/{gen}.lua")] \
+            + [copy_if_changed_from(h) for h in LIB_HALVES]
         env = [f"OT6_STACK={P}",
                f"OT6_TIMEOUT={e.get('timeout') or 1800}"]
         explicit, extras = "", ""
@@ -557,6 +562,8 @@ def copy_if_changed_sources(states, root):
             for a in checkpoint_inputs(root, e["checkpoint"]):
                 if a not in out:
                     out.append(a)
+    if chain_plan(states) is not None:     # the chain_ copies' lib inputs
+        out += [h for h in LIB_HALVES if h not in out]
     return out
 
 
@@ -827,6 +834,14 @@ def selftest():
               "build/states/chain_q.mss" in edge("build/states/chain_r.mss.lua"))
         check("branches and checkpoint-only roots get no copy",
               "chain_x" not in text and "chain_z" not in text)
+        lib = [f"{COPY_IF_CHANGED_DIR}/{h}" for h in LIB_HALVES]
+        check("every chain_ copy depends on the lib halves",
+              all(h in edge(f"build/states/chain_{n}.mss.lua") for n in "pqr"
+                  for h in lib))
+        check("...and still no qualification generate edge does",
+              not any(h in l for l in lines
+                      if ": generate" in l and "build/states/chain_" not in l
+                      for h in lib))
         check("`chain` names the chain's last copy",
               "build chain: phony build/states/chain_r.mss.lua" in text)
         def body(i):
