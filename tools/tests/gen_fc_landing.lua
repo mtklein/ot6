@@ -106,6 +106,7 @@ local function kitSteps(char, name, pairs_)
   return steps
 end
 
+local u4Req = nil                         -- the ultros4_entry capture
 local DECK = { S = H.newPartySelect(PICK), helmT = 0, formed = false, careD = nil }
 local function deckDrive(untilKit)
     local S = DECK.S
@@ -356,6 +357,11 @@ H.run({ maxFrames = 600000 }, flatten({
   H.call(function()
     H.log(string.format("[deck] the Ultros teaser is up ($01F0) at f%d, at (%d,%d); walking to (22,6)", H.frame, H.fieldX(), H.fieldY()))
   end),
+  -- ultros4_entry: the deck, controllable, one walk from arming Ultros IV
+  -- (battle_ultros4 boots it).  Captured with no frames spent (H.saveState
+  -- waits 2, which moved every IAF battle after it and changed the play;
+  -- #329 review) and emitted after the landing save.
+  H.call(function() u4Req = H.requestSaveState() end),
   H.navTo(22, 6, { maxFrames = 6000, playBattles = "tactical", healer = TERRA, magic = FIGHT.magic,
                    nuke = FIGHT.nuke, items = true, bank = FIGHT.bank, healPercent = FIGHT.healPercent,
                    care = false, arrive = function() return not H.hasControl() or H.fieldX() == 22 end }),
@@ -397,6 +403,10 @@ H.run({ maxFrames = 600000 }, flatten({
     H.screenshot("fc_landing_q_tile")
   end),
   H.saveState("fc_landing.mss"),
+  H.call(function()
+    H.checkReq(u4Req, "ultros4_entry capture")
+    H.emitBlob("ultros4_entry.mss", u4Req.blob)
+  end),
   H.saveGame({ slot = 3, tag = "fc-landing-v1 save" }),
   H.call(function()
     H.assertExitContract("fc-landing-v1")

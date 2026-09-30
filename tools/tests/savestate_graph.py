@@ -120,8 +120,10 @@ STATES = [
     # failed experiment on the river replays 530 frames, not the whole hideout
     S("lete_river", gen="gen_lete", prev="banon_joined"),
     # gen_scenario: the river (steered past its vanilla loop), ULTROS, and
-    # the three-way split -- the entry point of the v0.3 arc
-    S("scenario_hub", gen="gen_scenario", prev="lete_river"),
+    # the three-way split -- the entry point of the v0.3 arc.  ultros1_entry
+    # is Ultros's battle as it loads (battle_ultros1).
+    S("scenario_hub", gen="gen_scenario", prev="lete_river",
+      also=["ultros1_entry"]),
     # one step PAST the hub: proves the split is dispatchable and hands the
     # v0.3 Locke chain its entry point.  The Sabin and Terra/Banon branches
     # start from scenario_hub the same way.
@@ -625,8 +627,10 @@ STATES = [
     #     OT6_CAPTURE_SRM=tools/tests/checkpoints/fc-landing-v1/fc-landing.sram \
     #     tools/tests/run.sh tools/tests/gen_fc_landing.lua
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/fc-landing-v1
+    # ultros4_entry is the deck at the Ultros teaser, one walk from arming
+    # Ultros IV (battle_ultros4).
     S("fc_landing", gen="gen_fc_landing", checkpoint="thamasa-done-v1",
-      timeout=3600),
+      timeout=3600, also=["ultros4_entry"]),
 
     # boundary Q -> boundary R (the continent's save alcove): cold-Continue
     # fc-landing-v1 at 394 (7,12), talk SHADOW in at (10,16), cross the

@@ -70,3 +70,11 @@ Now any Pummel ends the fight, Broken or not. The same rule covers every
 boss whose story ends the battle on a counter: a Broken boss still loses
 its counterattacks, but not the scene that ends the fight. At Esper Mountain, Relm now arrives
 when her cue comes even if Ultros is Broken.
+
+**Story scenes a boss answers you with play even while it is Broken.**
+Some bosses answer your hits with a scene rather than an attack. When the
+boss was Broken, that scene used to wait until it recovered, or until it
+died. Now it plays on cue: on the airship, Ultros calls Chupon in as soon
+as you have hurt him enough, Broken or not; on the Lete River, Fire on a
+Broken Ultros gets his "Seafood soup!", but not the attack that follows
+it. A Broken boss still gets no attacks and no turns.
