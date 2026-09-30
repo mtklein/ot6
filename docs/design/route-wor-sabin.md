@@ -1625,7 +1625,8 @@ Peepers x2 is 62.5%.
 | CELES + SABIN, `wor-sabin-v1` (both L27; SABIN IFRIT, Fire Knuckle x2 on the Genji Glove, Tiger Mask, Power Sash, Black Belt) | 36 | K = 0-11, shifts 0/23/41 | **36 / 0** | 33 | 1227-4661, median 2048 | 1 (SABIN) |
 | the same | 60 | K = 0, shifts 0-59 | **60 / 0** | 60 | 1235-2442, median 2106 | 0 |
 
-Across both arms: **CELES alone won 94 of 96 on the first attempt; the pair
+Across both arms: **CELES alone won 94 of 96 runs on the first attempt
+(64 of 66 distinct fights: the runs repeat battle keys); the pair
 won 96 of 96.** The solo runs drew 66 distinct keys and the pair runs 90.
 A seed shift that lands on the same `$021e` phase and the same encounter
 counters replays the same fight. The first solo set was rerun on the
@@ -1674,7 +1675,8 @@ grinding.
 reaches it: on the walk to Tzen's door in `gen_wor_tzen_door`, after the
 second Albrook stop and before the save. It meets the Black Drgn once
 and then carries the avoid set as what the party has learned. The
-measured first-attempt rate there is 94 of 96. Both losses are one
+measured first-attempt rate there is 94 of 96 runs (64 of 66 distinct
+fights). Both losses are one
 seed, entered below full HP, and a loss retries the segment. The cost is
 about 1.7 EarthGuard fights (about 1050 ticks each, most of them Poison
 and an Antidote), about 2700 ticks for the dragon, and about 0.2 Potions.
