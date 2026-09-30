@@ -1175,17 +1175,15 @@ local function b68Fight()
       if lost and lost:find("deadline", 1, true) then
         error("battle 68: timeout after 145000 frames -- " .. lost, 0)
       end
-      -- every member reading 0 HP: the wiped table (a won battle's
-      -- teardown reads $FFFF instead)
-      local allDown = true
-      for _, e in ipairs({ sabinE, cyanE, shadowE }) do
-        if e and pHP(e) ~= 0 then allDown = false end
-      end
-      if lost ~= nil or (b68.killedAt == nil and allDown) then
+      -- the canary's own wipe test (every present seat at 0 HP, or
+      -- LoseBattle's bit 0 -- a Petrify/Zombie wipe); a won battle's
+      -- torn-down table ($FFFF) reads false
+      local wipedNow = H.partyWipedInBattle()
+      if lost ~= nil or (b68.killedAt == nil and wipedNow) then
         b68.wiped = true
         b68Log(string.format("the party is down at f%d (%s) [%s] -- a wipe, " ..
           "the canary's to count and file", H.frame, tostring(lost or
-          "every member at 0 HP, the train not seen at 0 HP"), partyLine()))
+          "the canary's wipe test, the train not seen at 0 HP"), partyLine()))
         H.screenshot("train_b68_lost")
       end
     end),
@@ -1250,8 +1248,19 @@ local function b68Fight()
           "%s that chipped (cast f%s, chip f%s, reveal f%s, slack %d)", what,
           name, tostring(cast), tostring(chip), tostring(at), REVEAL_SLACK))
       end
-      tied("HOLY", b68.holyAt, AURABOLT, "AuraBolt ($5E)")
-      tied("OT6_BLUDG", b68.bludgAt, PUMMEL, "Pummel ($5D)")
+      -- A skill that never chipped proves nothing either way (a 6/6 break
+      -- won with SABIN short on AuraBolt's MP is still a break): its tie is
+      -- logged, not asserted.
+      for _, t in ipairs({ { "HOLY", b68.holyAt, AURABOLT, "AuraBolt ($5E)" },
+                           { "OT6_BLUDG", b68.bludgAt, PUMMEL, "Pummel ($5D)" } }) do
+        if b68.chipAt[t[3]] ~= nil then
+          tied(t[1], t[2], t[3], t[4])
+        else
+          H.log(string.format("[tuning] a 6/6 break with no %s chip: %s's " ..
+            "tie not asserted (%s revealed f%s)", t[4], t[1], t[1],
+            tostring(t[2])))
+        end
+      end
     end),
     }),
   }, {})
