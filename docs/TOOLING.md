@@ -19,6 +19,31 @@ real output path (`ninja ff6/rom/ff6-en.sfc`,
 when `configure.py`, the savestate graph, `VERSION`, or any globbed
 directory changes.
 
+### Cuts and the chain from power-on
+
+A `.mss` belongs to one ROM, so after a ROM change every generated state
+regenerates, each from the one before it. To keep that from being one long
+serial run, the World of Balance chain is cut at save points: an entry in
+`tools/tests/savestate_graph.py` with both `prev=` and `checkpoint=` is a
+cut. The leg before it ends by saving there through the real Save UI and
+asserting the checkpoint's contract as its exit
+(`H.saveAtCheckpoint`, `lib/ot6_contract.lua`); the leg after it
+Continues the save and asserts the same contract as its entry
+(`H.bootCheckpoint`). Qualification boots each cut leg from the tracked
+checkpoint in `tools/tests/checkpoints/`, which still loads after a ROM
+change, so the legs regenerate at once.
+
+`ninja chain` plays the whole chain from power-on instead: `chain_<state>`
+copies of every state from the first cut on, each booted from the copy
+before it and, at a cut, from the save the producing copy just made
+(captured with `OT6_CAPTURE_SRM` and sealed into
+`build/checkpoints/<key>/`). It is the one alias besides `release`,
+because the chain's last state moves as cuts and legs are added.
+`ninja release` depends on it. Run it too when a leg's exit contract
+fails in qualification: the chain says whether the story still plays
+through, and re-cutting a tracked checkpoint from current play is copying
+`build/checkpoints/<key>/` over `tools/tests/checkpoints/<key>/`.
+
 ## Installed pieces
 
 Homebrew pieces are in the root `Brewfile`; `brew bundle` installs them.

@@ -4,8 +4,10 @@
 Bare `ninja` builds and tests everything: the default targets are the
 ROM, every generated savestate, every suite test's result, every audit and
 every selftest.  `ninja release` is all of that plus the release
-preflights, the BPS patch and the zip.  `release` is the only alias; any
-partial need is a real output path
+preflights (the chain from power-on among them), the BPS patch and the
+zip.  `ninja chain` is the chain from power-on alone (savestate_ninja.py
+chain_plan).  Those are the only aliases; any partial need is a real
+output path
 (`ninja build/states/vargas_entry.mss.lua`,
 `ninja build/results/suite/battle_break.ok`, `ninja ff6/rom/ff6-en.sfc`).
 Parallelism is ninja's own, unbounded; emulator-running commands are
@@ -334,6 +336,11 @@ if errors:
         print(f"savestate_graph: {e}", file=sys.stderr)
     sys.exit(1)
 sn.emit_state_edges(w, states, ROOT, copy_if_changed_from)
+# The chain from power-on (savestate_ninja.py chain_plan): qualification
+# boots each cut leg from its tracked checkpoint; `ninja chain` plays the
+# whole chain from power-on as chain_<state> copies, each leg booted from
+# the save the one before it made.  `release` depends on it.
+chain_end = sn.emit_chain_edges(w, states, ROOT, copy_if_changed_from)
 # Every name a test can reference includes the `also=` siblings: a state
 # like figaro_cleared is emitted by gen_edgar's edge as an also-artifact,
 # and fixture_deps() filtering against primary names only would drop it,
@@ -643,6 +650,11 @@ check("release_readme",
 # notes, README) exists; `ninja release` (the zip) still requires both.
 release_pre = qual[qual_before_release:]
 del qual[qual_before_release:]
+# The chain from power-on is a release preflight too: the legs
+# qualification booted from tracked checkpoints must also play through
+# from power-on, each from the save the leg before it made.
+if chain_end:
+    release_pre.append(chain_end)
 
 bps = f"{rel_dir}/{BASE[:-len('.sfc')]}.bps"
 w.edge([bps], "sh", [BASE, "build/ot6.sfc"], implicit=qual + release_pre,
@@ -675,6 +687,10 @@ w.edge(["build.ninja"], "configure",
         "VERSION"])
 w()
 w.edge(["release"], "phony", [f"build/release/ot6-v{VERSION}.zip"])
+# `chain` is the one other alias: the chain from power-on's last state
+# moves whenever a cut or a leg is added, and this name does not.
+if chain_end:
+    w.edge(["chain"], "phony", [chain_end])
 w("default " + " ".join(esc(p) for p in qual))
 w()
 

@@ -6,8 +6,7 @@
 -- run.sh captures the battery (OT6_CAPTURE_SRM); seal folds the sidecar
 -- into tools/tests/checkpoints/world-sfigaro-v1/manifest.json.
 --
--- Save UI drive: gen_n024_save_checkpoint.lua's, on the world map (same as
--- gen_seed_worldnarshe.lua).
+-- Save UI drive: gen_n024_save_checkpoint.lua's, on the world map.
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")

@@ -1,0 +1,27 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "camp-escaped.sram",
+  "size": 32768,
+  "sha256": "224649852ec4b798995af984cd2e0c5581538fc47626d58384b0408671b9e939",
+  "slot": 3,
+  "milestone": "camp-escaped",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "x": 179,
+      "y": 71
+    }
+  },
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "224649852ec4b798995af984cd2e0c5581538fc47626d58384b0408671b9e939",
+    "generator_sig": "70c057b2b7ab730d772c3befb4ee6a39a9d34100635848138634aa51697e206d gen_sabin_magitek",
+    "ancestors": [
+      {
+        "path": "build/states/chain_doma_defended.stamp",
+        "sha256": "9187ef66520e4936afabbda513875ed05d6dc39bba2a2983d5f85ae8b399ba0b"
+      }
+    ]
+  }
+}

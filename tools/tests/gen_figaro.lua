@@ -1,10 +1,13 @@
--- gen_figaro.lua -- from worldmap_narshe.mss (LOCKE + TERRA on foot at
+-- gen_figaro.lua -- from the world-narshe-v1 save (LOCKE + TERRA on foot at
 -- WoB (84,34)): world-nav south across the plains to Figaro Castle's
 -- gate trigger, ride the entry event into the castle complex, and generate
 -- figaro_entry.mss at the first controllable interior moment.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local WORLD = "build/states/worldmap_narshe.mss.lua"
+-- Boots the world-narshe-v1 checkpoint: gen_worldmap saves there as worldmap_narshe ends,
+-- and this leg Continues that save (a cut in savestate_graph.py;
+-- the contract is lib/ot6_contract.lua's "world-narshe-v1").
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 
 local function calm(n, extra)
   local cnt = 0
@@ -16,7 +19,7 @@ local function calm(n, extra)
 end
 
 H.run({ maxFrames = 90000 }, {
-  H.loadState(WORLD),
+  H.bootCheckpoint("world-narshe-v1"),
   H.waitFrames(10),
   H.call(function()
     H.assertEq(H.worldMode(), true, "boot state is on the world map")

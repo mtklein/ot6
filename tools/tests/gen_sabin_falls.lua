@@ -345,4 +345,15 @@ H.run({ maxFrames = 250000, allowGameOver = true }, {
     return string.format("falls_done generated at frame %d map 159 (%d,%d)",
       H.frame, H.fieldX(), H.fieldY())
   end),
+  -- Off the shore by its y=14 edge onto the World of Balance, and a world
+  -- save where it lands the party: the cut gen_sabin_gau boots from
+  -- (savestate_graph.py; lib/ot6_contract.lua "falls-done-v1").
+  H.navTo(8, 14, { maxFrames = 6000, playBattles = "tactical", arrive = function()
+    return H.worldMode() end }),
+  H.waitUntil(function()
+    return H.worldMode() and H.worldHasControl() and H.worldAligned()
+       and (emu.getState()["ppu.screenBrightness"] or 0) >= 15
+  end, 3000, "on the world", 5),
+  H.waitFrames(30),
+  H.saveAtCheckpoint("falls-done-v1"),
 })

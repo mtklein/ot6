@@ -126,6 +126,9 @@ H.run({ maxFrames = 20000 }, {
   H.logStep(function()
     return string.format("worldmap_narshe generated at frame %d", H.frame)
   end),
+  -- The first world save, where the party stands: the cut gen_figaro boots
+  -- from (savestate_graph.py; lib/ot6_contract.lua "world-narshe-v1").
+  H.saveAtCheckpoint("world-narshe-v1"),
 
   -- ===================================================================== --
   -- Positive control (run after generation, so the saved state is

@@ -225,4 +225,8 @@ H.run({ maxFrames = 120000 }, {
     return string.format("camp_escaped generated at frame %d world (%d,%d)",
       H.frame, H.worldX(), H.worldY())
   end),
+  -- A world save where the escape leaves the party, the cut
+  -- gen_sabin_forest boots from (savestate_graph.py; lib/ot6_contract.lua
+  -- "camp-escaped-v1").
+  H.saveAtCheckpoint("camp-escaped-v1"),
 })

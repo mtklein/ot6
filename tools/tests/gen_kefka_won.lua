@@ -3,7 +3,9 @@
 -- whole win tail (the esper cliff on map 23, TERRA's morph, the flight
 -- across the world, the regroup in Arvis's house) through the party-select
 -- menu to the first controllable frame, and generate kefka_won.mss on map
--- 30 at (60,37).
+-- 30 at (60,37).  Then walk out of Narshe by its item shop and save on the
+-- world outside the south gate: the kefka-won-v1 cut gen_zozo1_submerge
+-- boots from.
 
 -- After the menu: _ccc1b5 reloads map 30 at {60,37} facing DOWN, sets
 -- $0602/$010B/$0048, set_parent_map 0 {84,33}, player_ctrl_on, return
@@ -19,6 +21,11 @@ local function sw(id)
   return (H.readByte(0x1E80 + math.floor(id / 8)) >> (id % 8)) & 1
 end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
+local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
+local ANTIDOTE, REMEDY = 0xF2, 0xF5
+local TINCTURE = 0xEB
+local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
+local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
 
 -- ------------------------------------------------------------ the fighter --
 -- KEFKA, with P1 = TERRA+EDGAR+CELES, is fought by the library's driver
@@ -242,4 +249,105 @@ H.run({ maxFrames = 400000 }, {
   H.logStep(function()
     return string.format("kefka_won generated at frame %d -- v0.4's first link", H.frame)
   end),
+
+  -- ===================================================================== --
+  -- Out of Narshe, by its item shop, and a world save outside the south
+  -- gate: the cut gen_zozo1_submerge boots from (savestate_graph.py;
+  -- lib/ot6_contract.lua "kefka-won-v1").  This walk was gen_zozo1's first
+  -- two steps.
+  -- ===================================================================== --
+
+  -- 1. Arvis's house -> Narshe town by the front door (55,35) -> map 20
+  --    {49,14}.  Tier 1's invisible door-NPC no longer stands there
+  --    (probe_n30: reachable in 9, tile unoccupied), and the tier-1
+  --    corridor exit's (53,8) clifftop position is isolated after the
+  --    battle (probe_n20 survey after full settle: zero reachable tiles),
+  --    so the front door is now the only way to the streets.
+  H.navTo(55, 35, { arrive = function() return map() == 20 end,
+                    maxFrames = 12000, playBattles = "tactical" }),
+  H.waitUntil(landed(20, 10), 1200, "landed on the streets", 1),
+  H.waitFrames(150),
+
+  -- 1b. Narshe's item shop on the way out (#176): the door (41,22) is eight
+  --     tiles from Arvis's front door, shop 3 on map 26 (shopkeeper (44,8);
+  --     _ccd28c opens 3 while $006B/$00A4 are clear, both clear here), rows
+  --     TONIC 0 / POTION 1 / FENIX DOWN 4.  Every town tops up, and this is
+  --     the last TONIC counter before the post-opera checkpoint: Jidoor's
+  --     shop 22 (gen_zozo2_arrival's stop after the L18 grind) sells none,
+  --     and the #158 chain walked the grind and the Zozo climb from 82 Tonics
+  --     to 14 (zozo_arrival attempt 3 "[west landing] ... tonic=82";
+  --     zozo_done "[care before leaving Zozo] ... tonic=14").  No Potion
+  --     line: Nikeah's stop (gen_sabin_trench) now carries 27 to here
+  --     (kefka_won potion=27, over the L14 band of 21) and Jidoor buys the
+  --     L18 band after the grind, so a POTION line here buys nothing.
+  H.call(function()
+    H.vars.shopStart = H.frame
+    H.assertEq(sw(0x006B), 0, "$006B clear -- the item shop opens as shop 3")
+    H.assertEq(sw(0x00A4), 0, "$00A4 clear -- the item shop opens as shop 3")
+    H.log(string.format("[shop] Narshe stop begins f%d: gil=%d tonic=%d potion=%d fenix=%d",
+      H.frame, H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
+  end),
+  H.crossDoor(41, 22, 26, 44, 13, "item shop door 20(41,22)->26(44,13)"),
+  H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 2400,
+    "shop interior settled", 10),
+  H.waitFrames(60),
+  H.shopTalk(44, 8, "Narshe item shop"),
+  H.call(function()
+    -- event command $9b parks the shop number at $0201 (field/event.asm:3656);
+    -- the rows come from the ROM table, since the menu fills its $7E9D89 row
+    -- list only once the buy list is drawn.
+    H.assertEq(H.readByte(0x0201), 3, "the counter opened shop 3 ($0201)")
+    H.assertEq(shopRow(3, 0), TONIC, "shop 3 row 0 is Tonic")
+    H.assertEq(shopRow(3, 1), POTION, "shop 3 row 1 is Potion")
+    H.assertEq(shopRow(3, 4), FENIX_DOWN, "shop 3 row 4 is Fenix Down")
+    H.assertEq(shopRow(3, 2), TINCTURE, "shop 3 row 2 is Tincture")
+  end),
+  H.buyItem(FENIX_DOWN, 4, function() return 15 - H.invCountOf(FENIX_DOWN) end,
+    "FENIX DOWN to 15"),
+  -- TINCTURE to 4 (#231): the MP column of the supply band, ~level / 4 at
+  -- the L14 this party holds (docs/design/supply.md).  This is the first
+  -- Tincture counter whose purse can carry them (Figaro Castle's could
+  -- not), and nothing from here to Jidoor sells one.  6000 gil of the
+  -- 16,871 kefka_won holds; after the revives and before the Tonic soak,
+  -- so a short purse shorts Tonics first.
+  H.buyItem(TINCTURE, 2, function() return 4 - H.invCountOf(TINCTURE) end,
+    "TINCTURE to 4"),
+  H.buyItem(TONIC, 0, function() return 99 - H.invCountOf(TONIC) end, "TONIC to 99"),
+  H.call(function()
+    H.log(string.format("[shop] Narshe item shop done: tonic=%d potion=%d fenix=%d tincture=%d gil=%d f%d",
+      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN),
+      H.invCountOf(TINCTURE), H.gil(), H.frame))
+  end),
+  H.shopClose("Narshe item shop"),
+  -- #197: the combat items back on top of the bag after every purchase
+  -- (the fight driver found the Potion at row 43 downstream of a stop
+  -- that did not re-arrange)
+  H.bagArrange({ POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY }, { tag = "bag: combat items on top (Narshe item shop)" }),
+  H.call(function()
+    H.assertEq(H.invCountOf(FENIX_DOWN) >= 15, true, "Fenix Downs at 15 for the Zozo stretch")
+    H.assertEq(H.invCountOf(TINCTURE) >= 4, true, "Tinctures at 4, the L14 MP band (#231)")
+    H.assertEq(H.invCountOf(TONIC) >= 90, true, "Tonics topped up for the field care")
+    H.log(string.format("[shop] leaving the shop: gil=%d tonics=%d potions=%d fenix=%d",
+      H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
+  end),
+  H.crossDoor(44, 14, 20, 41, 24, "item shop door 26(44,14)->20(41,24), return"),
+  H.call(function()
+    H.log(string.format("[shop] Narshe stop cost %d frames (f%d -> f%d)",
+      H.frame - H.vars.shopStart, H.vars.shopStart, H.frame))
+  end),
+
+  -- 2. the south gate at (38,61) (gen_worldmap's verified tile), then one
+  --    held step south onto the y=62 exit row -> the world
+  H.navTo(38, 61, { maxFrames = 20000, playBattles = "tactical" }),
+  H.driveUntil(function() return H.worldMode() end, 900, {
+    H.hold({ "down" }), H.waitFrames(4),
+  }, "off the south edge to the world"),
+  H.waitUntil(function()
+    return H.worldHasControl() and H.worldAligned() and bright() >= 15
+  end, 1200, "world control", 5),
+  H.waitFrames(30),
+  H.call(function()
+    H.log(string.format("[world] at (%d,%d)", H.worldX(), H.worldY()))
+  end),
+  H.saveAtCheckpoint("kefka-won-v1"),
 })

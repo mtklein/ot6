@@ -2,14 +2,27 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "kolts-summit.sram",
   "size": 32768,
-  "sha256": "491bbf65f69b6f4c23241605c36fcc4b81a934da08093bb54b7f8d240914cedd",
+  "sha256": "6c4571e0eb0cadc675412edeb4a018247d3a194c86bf8508249075ccfc61c49b",
   "slot": 3,
   "milestone": "kolts-summit",
   "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 103,
+      "x": 57,
+      "y": 8
+    }
+  },
   "provenance": {
-    "format": "ot6-provenance/v1",
-    "payload_sha256": "491bbf65f69b6f4c23241605c36fcc4b81a934da08093bb54b7f8d240914cedd",
-    "generator_sig": "769dbf8c7981ec6659d8fb7934da7dd06624406184a422fb2aee92209ae25b33 gen_seed_summit",
-    "ancestors": []
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "6c4571e0eb0cadc675412edeb4a018247d3a194c86bf8508249075ccfc61c49b",
+    "generator_sig": "b5941cd42dc011d4d4d7f62a0025c71861938aecca953c23a7a1c5eae899d5dd gen_kolts build/checkpoints/world-figaro-v1/manifest.json build/checkpoints/world-figaro-v1/world-figaro.sram",
+    "ancestors": [
+      {
+        "path": "build/checkpoints/world-figaro-v1/manifest.json",
+        "sha256": "4f9686b031a1a1d401fe420e6b91d8d28b0057eec397af8c8cb85b99cdb68f70"
+      }
+    ]
   }
 }

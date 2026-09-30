@@ -622,4 +622,24 @@ H.run({ maxFrames = 120000 }, {
   H.logStep(function()
     return string.format("figaro_cleared generated at frame %d", H.frame)
   end),
+
+  -- Off the chocobo, and a world save where it sets the party down: the
+  -- cut gen_kolts boots from (savestate_graph.py; lib/ot6_contract.lua
+  -- "world-figaro-v1").  B held while riding dismounts: LandAirship
+  -- stages the tile into $1F60/$1F61, ExitVehicle clears $11FA, and
+  -- InitWorld seeds $E0/$E2 (gen_kolts's header).
+  H.hold({ "b" }),
+  H.driveUntil(function() return H.readByte(0x11fa) & 3 == 0 end, 900, {
+    H.waitFrames(1),
+  }, "chocobo dismount ($11FA cleared)"),
+  H.release(),
+  H.advanceStory(worldCalm(30), 12000, { playBattles = "tactical" }),
+  H.waitFrames(30),
+  H.call(function()
+    H.assertEq(H.readByte(0x11fa) & 3, 0, "off the chocobo")
+    H.assertEq(H.worldX() ~= 0 or H.worldY() ~= 0, true,
+      "world position is live (InitWorld ran, not InitChoco)")
+    where("dismounted")
+  end),
+  H.saveAtCheckpoint("world-figaro-v1"),
 })

@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "sabin-done.sram",
+  "size": 32768,
+  "sha256": "844c2697d0979067dece1f76688e9110e86d98f569a2b75e364af6f3b99cc6b9",
+  "slot": 3,
+  "milestone": "sabin-done",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 9,
+      "x": 8,
+      "y": 6
+    }
+  },
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "844c2697d0979067dece1f76688e9110e86d98f569a2b75e364af6f3b99cc6b9",
+    "generator_sig": "a5c6fd648efbf9dd46a3041c8f60a128de1470231dd11956d292a5e6abc2a8f1 gen_sabin_trench",
+    "ancestors": [
+      {
+        "path": "build/states/chain_gau_joined.stamp",
+        "sha256": "28a233f5b580d7bd65010c4f56ec530a75f9093e3063ee1c129c1025cf3c2d7c"
+      }
+    ]
+  }
+}

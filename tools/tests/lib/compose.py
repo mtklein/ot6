@@ -487,6 +487,13 @@ def check_states(root):
         if not any(l.startswith("rom ") for l in s.read_text().splitlines()):
             legacy += 1
     tail = ""
+    # `ninja chain`'s chain_<state> copies (savestate_ninja.py chain_plan)
+    # are not qualification fixtures: nothing boots them but the chain.
+    copies = [s for s in orphans
+              if s.stem.startswith("chain_") and s.stem[6:] in declared]
+    orphans = [s for s in orphans if s not in copies]
+    if copies:
+        tail += f"; {len(copies)} chain_ copies (ninja chain) not checked"
     if orphans:
         tail += f"; {len(orphans)} obsolete build stamp(s) ignored"
     if legacy:

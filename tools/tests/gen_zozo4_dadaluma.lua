@@ -1,5 +1,5 @@
--- gen_zozo4_dadaluma.lua -- zozo_arrival (map 221 street) -> the crane
--- maze -> DADALUMA.  Generates dadaluma_entry.mss at (30,13), one A-press
+-- gen_zozo4_dadaluma.lua -- the zozo-outside-v1 save (one tile above
+-- Zozo's entrance) -> the map 221 street -> the crane maze -> DADALUMA.  Generates dadaluma_entry.mss at (30,13), one A-press
 -- from the fight, and dadaluma_won.mss on the same tile after battle 69's
 -- scripted win clears him off the tower porch.
 --
@@ -43,6 +43,8 @@
 -- at the fight site. This file writes no emulated game state anywhere,
 -- and every mid-route encounter on the climb is played by the library
 -- fighter -- see `encounters` below for what replaced blind A taps.
+--
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
@@ -1208,7 +1210,18 @@ end
 -- H.gameOverFired as a loss and the next attempt reloads.  An unswept
 -- encounters() still raises on it.
 H.run({ maxFrames = 400000, allowGameOver = true }, {
-  H.loadState("build/states/zozo_arrival.mss.lua"),
+  -- gen_zozo2_arrival saved one tile above Zozo's entrance {22,92} (a cut
+  -- in savestate_graph.py; lib/ot6_contract.lua "zozo-outside-v1"):
+  -- Continue that save and step onto the entrance, onto the street.
+  H.bootCheckpoint("zozo-outside-v1"),
+  H.worldNavTo(22, 92, { maxFrames = 12000, playBattles = "tactical",
+    arrive = function() return not H.worldMode() end }),
+  H.release(),
+  H.waitUntil(function()
+    return not H.worldMode() and map() == 221 and H.hasControl()
+       and H.tileAligned() and not H.battleLoadStarted()
+       and (emu.getState()["ppu.screenBrightness"] or 0) >= 15
+  end, 3000, "Zozo street up", 5),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(map(), 221, "booted on the Zozo street (map 221)")

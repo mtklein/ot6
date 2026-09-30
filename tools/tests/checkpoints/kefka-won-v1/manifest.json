@@ -1,0 +1,27 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "kefka-won.sram",
+  "size": 32768,
+  "sha256": "6583bc5c9843c98a58eec1678d172a21755ba4a3ecfc6458db3e9bcb46e9427c",
+  "slot": 3,
+  "milestone": "kefka-won",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "x": 84,
+      "y": 34
+    }
+  },
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "6583bc5c9843c98a58eec1678d172a21755ba4a3ecfc6458db3e9bcb46e9427c",
+    "generator_sig": "09f7793f1972be0736381419eea0dee2a26d8e65db68e43d154c2d8ee181c125 gen_kefka_won",
+    "ancestors": [
+      {
+        "path": "build/states/chain_kefka_entry.stamp",
+        "sha256": "f77182d34b1b9ea10276f2386d39e87c7420bda9394aa6231b2837be9b88aac3"
+      }
+    ]
+  }
+}

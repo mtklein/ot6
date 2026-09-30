@@ -43,7 +43,10 @@
 -- answer ends in a bare EventReturn and never returns control.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/scenario_hub.mss.lua"
+-- Boots the hub-v1 checkpoint: gen_scenario saves there as scenario_hub ends,
+-- and this leg Continues that save (a cut in savestate_graph.py;
+-- the contract is lib/ot6_contract.lua's "hub-v1").
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -122,7 +125,7 @@ local function talkToObj(obj, what, maxF)
 end
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState(DOOR),
+  H.bootCheckpoint("hub-v1"),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 9, "booted on map 9, the scenario hub")

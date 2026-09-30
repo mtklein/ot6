@@ -1048,4 +1048,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
   H.logStep(function()
     return string.format("locke_done generated at frame %d -- scenario complete", H.frame)
   end),
+  -- The hub's save point, the cut gen_sabin_world boots from
+  -- (savestate_graph.py; lib/ot6_contract.lua "locke-done-v1").
+  H.saveAtCheckpoint("locke-done-v1"),
 })

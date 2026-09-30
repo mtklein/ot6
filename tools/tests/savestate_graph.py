@@ -17,6 +17,19 @@
 #       lettered in the boundary comments below) is exactly this: prev=
 #       becomes checkpoint=.
 #
+#   S("figaro_entry", gen="gen_figaro", prev="worldmap_narshe",
+#     checkpoint="world-narshe-v1")
+#       a CUT: both fields.  gen_worldmap ends by saving where the party
+#       stands and asserts the world-narshe-v1 contract as its exit
+#       (lib/ot6_contract.lua); gen_figaro Continues that save and asserts
+#       it as its entry.  Qualification boots the TRACKED checkpoint, so
+#       figaro_entry no longer waits for the chain above it and the legs
+#       regenerate at once.  The chain from power-on stays buildable as
+#       `ninja chain` (savestate_ninja.py chain_plan): chain_<state> copies
+#       in which each cut's consumer Continues the save its producer's copy
+#       just made (build/checkpoints/<key>/), which is also how a tracked
+#       checkpoint is re-cut (docs/TESTING.md).
+#
 #   S("south_figaro", gen="gen_kolts", prev="figaro_cleared",
 #     also=["kolts_entry", "vargas_entry"])
 #       one generator run that publishes several states: one edge, one
@@ -83,16 +96,20 @@ STATES = [
     S("moogle_cleared", gen="gen_moogle", prev="moogle_entry",
       also=["moogle_defense"]),
     S("worldmap_narshe", gen="gen_worldmap", prev="moogle_cleared"),
-    S("figaro_entry", gen="gen_figaro", prev="worldmap_narshe"),
+    # A cut: gen_worldmap saves on the first world tile (world-narshe-v1).
+    S("figaro_entry", gen="gen_figaro", prev="worldmap_narshe",
+      checkpoint="world-narshe-v1"),
     S("figaro_intro", gen="gen_edgar", prev="figaro_entry",
       also=["figaro_matron", "figaro_cleared"]),
-    # gen_kolts: the chocobo dismount, the South Figaro cave, and the mountain
+    # gen_kolts: the South Figaro cave, the town, and the mountain up to the
+    # summit save point.  A cut: gen_edgar dismounts the chocobo and saves
+    # where it lands (world-figaro-v1), and gen_kolts Continues that save.
     # timeout=1800: gen_kolts gained the South Figaro stop (the paced grind
     # on the world map outside the gate, the other three shops and the inn)
     # on 2026-08-12 and now runs past 80000 emulated frames, which is over
     # run.sh's 600 s default on a loaded machine.
-    S("south_figaro", gen="gen_kolts", prev="figaro_cleared", timeout=1800,
-      also=["kolts_entry", "vargas_entry"]),
+    S("south_figaro", gen="gen_kolts", prev="figaro_cleared",
+      checkpoint="world-figaro-v1", timeout=1800, also=["kolts_entry"]),
     # gen_kolts_pool: one crossing past kolts_entry onto map 100 shelf F.
     # That map (95) is transit only and carries no encounter group --
     # 437 paced tiles there drew nothing -- so balance runs that want the
@@ -108,8 +125,11 @@ STATES = [
     # S/Q, and back) the run walks well past run.sh's 600 s default on a
     # loaded machine, same as gen_kolts above.
     S("kolts_cave", gen="gen_kolts_cave", prev="kolts_pool", timeout=1800),
-    # gen_vargas: the fight itself, finished by Pummel, and the reunion
-    S("vargas_won", gen="gen_vargas", prev="vargas_entry"),
+    # gen_vargas: a cut at the Mt. Kolts summit save point, which gen_kolts
+    # ends by saving at (kolts-summit-v1): the walk to VARGAS's ledge
+    # (vargas_entry), the fight itself, finished by Pummel, and the reunion
+    S("vargas_entry", gen="gen_vargas", prev="kolts_entry",
+      checkpoint="kolts-summit-v1", also=["vargas_won"]),
 
     # ---- tier 3: the road to the scenario split ----
     # gen_returner: off the mountain's north side and across the world map
@@ -128,7 +148,9 @@ STATES = [
     # one step PAST the hub: proves the split is dispatchable and hands the
     # v0.3 Locke chain its entry point.  The Sabin and Terra/Banon branches
     # start from scenario_hub the same way.
-    S("locke_scenario", gen="gen_scenario_locke", prev="scenario_hub"),
+    # A cut at the hub's save point: gen_scenario saves there (hub-v1).
+    S("locke_scenario", gen="gen_scenario_locke", prev="scenario_hub",
+      checkpoint="hub-v1"),
 
     # ---- the pinned scenario order (owner, 2026-08-26): LOCKE -> SABIN
     # -> TERRA, one run, nothing replayed.  One player, one
@@ -158,8 +180,10 @@ STATES = [
     # SHADOW's house (map 115) and the walk to the Imperial Camp.  Two states
     # from one script so an experiment on the house replays 700 frames, not
     # the hub as well.
+    # A cut at the hub's save point: gen_tunnelarmr saves there as LOCKE's
+    # scenario ends (locke-done-v1).
     S("sabin_world", gen="gen_sabin_world", prev="locke_done",
-      also=["sabin_camp"]),
+      checkpoint="locke-done-v1", also=["sabin_camp"]),
     # gen_sabin_camp: one step south of the camp gate hands the game to CYAN
     # on map 120 for ~9,000 frames (the Doma defence, name menu and all)
     # before SABIN gets it back.  cyan_defence is generated mid-run so an
@@ -188,7 +212,10 @@ STATES = [
     # the 132->133->134->135->140 chain (map 133's one-way recovery spring is
     # a MANDATORY conveyor past its back-exit), then boarding the Phantom
     # Train at 140 (72,11) -> map 145.  Generates forest_done on the train.
-    S("forest_done", gen="gen_sabin_forest", prev="camp_escaped"),
+    # A cut: gen_sabin_magitek saves on the world where the escape leaves
+    # the party (camp-escaped-v1).
+    S("forest_done", gen="gen_sabin_forest", prev="camp_escaped",
+      checkpoint="camp-escaped-v1"),
     # gen_sabin_train: the Phantom Train, boarding to the Ghost Train's fall
     # -- the maze decoded and driven, and battle 68 fought with real Blitz
     # inputs: the 6-shield OT6_BLUDG row chip-proven at runtime.  Ends on the
@@ -205,7 +232,10 @@ STATES = [
     # 5/8 end-of-battle roll, 160/256, after a normal battle won with two
     # standing), the meat fed to him through the battle Item menu, and his
     # recruit in that same encounter.
-    S("gau_joined", gen="gen_sabin_gau", prev="falls_done", timeout=1800),
+    # A cut: gen_sabin_falls walks off the shore and saves on the world
+    # (falls-done-v1).
+    S("gau_joined", gen="gen_sabin_gau", prev="falls_done",
+      checkpoint="falls-done-v1", timeout=1800),
     # gen_sabin_trench: Crescent Mountain's helmet chain (GAU-gated), the
     # Serpent Trench ridden as a real VEHICLE script, Nikeah, and the ferry's
     # option-1 prompt -- $0044=1 and the hub.  SABIN's scenario closes here.
@@ -216,8 +246,10 @@ STATES = [
     # Lete (the FORCED battle 8 plus two if_rand fights), spill onto the
     # world map.  Two states: rapids_start is the cheap entry point UPSTREAM
     # of the forced fight; rapids_done is on foot on the WoB NE of Narshe.
+    # A cut at the hub's save point: gen_sabin_trench saves there as
+    # SABIN's scenario ends (sabin-done-v1).
     S("rapids_start", gen="gen_rapids", prev="sabin_done",
-      also=["rapids_done"]),
+      checkpoint="sabin-done-v1", also=["rapids_done"]),
     # gen_terra_narshe: the world walk into Narshe and the townsfolk's
     # turn-away at the checkpoint (which shoves the party back south, $001F)
     S("terra_narshe", gen="gen_terra_narshe", prev="rapids_done"),
@@ -251,11 +283,13 @@ STATES = [
     S("kefka_won", gen="gen_kefka_won", prev="kefka_entry"),
 
     # ---- v0.4: the search for TERRA (kefka_won -> Zozo) --------------------
-    # gen_zozo1_submerge: Arvis's front door -> the south gate -> the EAST
-    # castle trigger world {64,76} ($010B, set by kefka_won's tail) -> keep
-    # -> the WEST engine-room door -> the attendant's Kohlingen choice ->
-    # the scripted crossing -> castle parked WEST ($010C).
-    S("figaro_submerged", gen="gen_zozo1_submerge", prev="kefka_won"),
+    # gen_zozo1_submerge: a cut outside Narshe's south gate, where
+    # gen_kefka_won walks (by the item shop) and saves (kefka-won-v1) ->
+    # the EAST castle trigger world {64,76} ($010B, set by kefka_won's
+    # tail) -> keep -> the WEST engine-room door -> the attendant's
+    # Kohlingen choice -> the scripted crossing -> castle parked WEST ($010C).
+    S("figaro_submerged", gen="gen_zozo1_submerge", prev="kefka_won",
+      checkpoint="kefka-won-v1"),
     # gen_zozo2_arrival: out of the west castle, the long south-then-north
     # world hook around Zozo's mountain ring (177 steps), onto {22,92} ->
     # map 221's street.
@@ -274,8 +308,10 @@ STATES = [
     # bandit conveyor, both jump rows, and the z-level loop onto the y=13
     # strip beside DADALUMA at (30,14).  Entry point = (30,13); the fight is
     # battle 69, won by writing the battle-clearing flag like Kefka/Vargas.
+    # A cut: gen_zozo2_arrival saves on the world one tile above Zozo's
+    # entrance before it walks in (zozo-outside-v1); this leg walks in too.
     S("dadaluma_entry", gen="gen_zozo4_dadaluma", prev="zozo_arrival",
-      also=["dadaluma_won"]),
+      checkpoint="zozo-outside-v1", also=["dadaluma_won"]),
     # gen_zozo5_ramuh: the tower door (33,9) -> map 226 -> TERRA (talked
     # from the WEST) -> the pure-dialog RAMUH scene -> the four magicite ->
     # the leave cutscene -> $0054=1 at {57,45}, v0.4's stop line.

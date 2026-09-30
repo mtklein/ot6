@@ -3,10 +3,11 @@
 --                    SABIN+CYAN+GAU.  The trench step starts from here.
 
 -- Every Crescent Mountain helmet-scene variant gates on $01AB (GAU in the
--- party), so the trench cannot open without him.  The route: off the shore
--- (159's y=14 edge row; its "map 0" long-entrance records return to the
--- parent slot, which this chain last pushed at Doma, so the landing is
--- (240,16) rather than the record's coords), Mobliz (world (220,115) -> map 157;
+-- party), so the trench cannot open without him.  The route: from the
+-- falls-done-v1 save past the shore (gen_sabin_falls leaves by 159's y=14
+-- edge row, whose "map 0" long-entrance records return to the parent slot
+-- the chain last pushed, so the landing is (192,105), not the record's
+-- coords), Mobliz (world (220,115) -> map 157;
 -- the item shop 164 via (26,21); keeper (29,48) talked across his counter
 -- from (29,50); shop 12 row 0 = DRIED MEAT, row 1 = TONIC, row 2 = POTION,
 -- row 5 = FENIX DOWN), then the
@@ -74,7 +75,10 @@
 -- fixture promises to its consumers.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/falls_done.mss.lua"
+-- Boots the falls-done-v1 checkpoint: gen_sabin_falls saves there, on the
+-- world past the Veldt shore, and this leg Continues that save (a cut in
+-- savestate_graph.py; the contract is lib/ot6_contract.lua's "falls-done-v1").
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local ZMENUSTATE, MAIN_MENU, CONFIG_MENU = 0x26, 0x05, 0x0E
 
 local function mapIdx() return H.readWord(0x1f64) & 0x3FF end
@@ -1783,19 +1787,14 @@ end
 -- H.gameOverFired as a loss and the next attempt reloads (a wipe after the
 -- party stopped dealing damage excepted: see loseWipe).
 H.run({ maxFrames = 500000, allowGameOver = true }, {
-  H.loadState(DOOR),
-  H.waitFrames(30),
+  -- gen_sabin_falls walked off the shore and saved on the world there
+  H.bootCheckpoint("falls-done-v1"),
   H.call(function()
-    H.assertEq(mapIdx(), 159, "boot on the shore, map 159")
     H.assertEq(sw(0x3F), 1, "$003F set -- GAU met at the falls")
     H.assertEq(inParty(11), false, "GAU not yet in the party")
   end),
 
-  -- off the shore, to Mobliz, buy the Dried Meat and the grind's Tonics
-  H.navTo(8, 14, { maxFrames = 6000, playBattles = "tactical", arrive = function()
-    return H.worldMode() end }),
-  H.waitUntil(function() return H.worldMode() and H.worldHasControl() end,
-    3000, "on the world", 5),
+  -- to Mobliz, buy the Dried Meat and the grind's Tonics
   H.fieldCare({ tag = "care before the Veldt crossing", threshold = 0.95,
                 maxFrames = 12000 }),
   H.waitUntil(function()

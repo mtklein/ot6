@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "locke-done.sram",
+  "size": 32768,
+  "sha256": "000a03a3fe43bc20b354d0082b6934b250960051127aaed0b610a449f9020aeb",
+  "slot": 3,
+  "milestone": "locke-done",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 9,
+      "x": 8,
+      "y": 6
+    }
+  },
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "000a03a3fe43bc20b354d0082b6934b250960051127aaed0b610a449f9020aeb",
+    "generator_sig": "276230e493022e714fa35b23f699cd1092619ddbae15d4ad42eb442dfc025f94 gen_tunnelarmr",
+    "ancestors": [
+      {
+        "path": "build/states/chain_celes_freed.stamp",
+        "sha256": "cee33da2431b87a07f2d9b038345e70c17efccccb54adb750614f0b7fd31b097"
+      }
+    ]
+  }
+}

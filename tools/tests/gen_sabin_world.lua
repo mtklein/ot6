@@ -52,7 +52,10 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 -- the pinned run: SABIN plays after LOCKE, so the hub dispatch
 -- boots LOCKE's ending (back at the hub, $001E set)
-local DOOR = "build/states/locke_done.mss.lua"
+-- Boots the locke-done-v1 checkpoint: gen_tunnelarmr saves there as locke_done ends,
+-- and this leg Continues that save (a cut in savestate_graph.py;
+-- the contract is lib/ot6_contract.lua's "locke-done-v1").
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -300,7 +303,7 @@ local function worldLeg(tx, ty, want, what, budget)
 end
 
 H.run({ maxFrames = 90000 }, {
-  H.loadState(DOOR),
+  H.bootCheckpoint("locke-done-v1"),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 9, "booted on map 9, the scenario hub")

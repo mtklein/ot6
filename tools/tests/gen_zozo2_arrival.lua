@@ -492,9 +492,19 @@ H.run({ maxFrames = 1200000 }, {
   H.driveUntil(function() return H.worldMode() end, 6000, {
     H.hold({ "down" }), H.waitFrames(4),
   }, "off Jidoor's south edge"),
-  H.waitUntil(function()
-    return H.worldHasControl() and H.worldAligned() and bright() >= 15
-  end, 2000, "world control", 5),
+  -- 30 settled frames in a row, not one: a single poll can land in the
+  -- town's fade-out with the world flags already up and $E0/$E2 still 0
+  -- (measured: satisfied after 15 frames, then world (0,0), where the
+  -- chain's run took 155; build/attempts/wt/chain-cut/)
+  (function()
+    local n = 0
+    return H.withReset(H.waitUntil(function()
+      local ok = H.worldHasControl() and H.worldAligned() and bright() >= 15
+         and (H.worldX() ~= 0 or H.worldY() ~= 0)
+      n = ok and n + 1 or 0
+      return n >= 30
+    end, 2000, "world control", 1), function() n = 0 end)
+  end)(),
   H.waitFrames(30),
   H.call(function() where("left Jidoor") end),
   -- The south edge puts the party back on the approach tile (27,129),
@@ -516,6 +526,11 @@ H.run({ maxFrames = 1200000 }, {
   walk(22, 91, "zozo approach",
        { arrive = function() return not H.worldMode() end }),
   care("outside Zozo", 0.95),
+  -- A world save one tile above the entrance, the grind done: the cut
+  -- gen_zozo4_dadaluma boots from (savestate_graph.py; lib/ot6_contract.lua
+  -- "zozo-outside-v1").  That leg walks in itself; this one still walks
+  -- in to generate zozo_arrival, which gen_zozo3_clock boots.
+  H.saveAtCheckpoint("zozo-outside-v1"),
   enterDoor("down", 221, "onto Zozo's entrance tile"),
   H.waitUntil(landed(221, 10), 1500, "Zozo street up", 1),
   H.waitFrames(30),

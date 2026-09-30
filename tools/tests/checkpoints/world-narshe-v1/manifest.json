@@ -2,14 +2,26 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "world-narshe.sram",
   "size": 32768,
-  "sha256": "147084bb7d895fe2d7c3c3a963f81c381c783b0889d24b1141a9378e7ae6a559",
+  "sha256": "9ab98198ca787b8d5f6811603061406a13078314899e9a89d51917a52480d249",
   "slot": 3,
   "milestone": "world-narshe",
   "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "x": 84,
+      "y": 34
+    }
+  },
   "provenance": {
-    "format": "ot6-provenance/v1",
-    "payload_sha256": "147084bb7d895fe2d7c3c3a963f81c381c783b0889d24b1141a9378e7ae6a559",
-    "generator_sig": "254fb97017e64943903f04b89388e10ddec489fc8d64e93987b3f835c28e3f82 gen_seed_worldnarshe",
-    "ancestors": []
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "9ab98198ca787b8d5f6811603061406a13078314899e9a89d51917a52480d249",
+    "generator_sig": "823859a8d094df1e4374089bd166bb09e8e7f71a3cd05a2c48c4b8f4dc79b7a1 gen_worldmap",
+    "ancestors": [
+      {
+        "path": "build/states/chain_moogle_cleared.stamp",
+        "sha256": "3ed777fb964af1a1dbd2c0923f08ddd0cfdc01af466099bfef769860f70570b1"
+      }
+    ]
   }
 }

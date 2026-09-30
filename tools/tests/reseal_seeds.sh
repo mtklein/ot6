@@ -6,7 +6,10 @@
 #
 #   tools/tests/reseal_seeds.sh            # sweep everything stale
 #
-# Each row: <cutter> <boot state> <checkpoint dir> <payload>.
+# Each row: <cutter> <boot state> <checkpoint dir> <payload>.  The
+# checkpoints a cut boots (savestate_graph.py, prev= with checkpoint=) are
+# not here: `ninja chain` captures each of those into
+# build/checkpoints/<key>/ (docs/TOOLING.md).
 set -u
 cd "$(dirname "$0")/../.." || exit 2
 
@@ -35,10 +38,7 @@ sweep() {
   fi
 }
 
-sweep gen_seed_worldnarshe  worldmap_narshe world-narshe-v1     world-narshe.sram
 sweep gen_seed_worldsfigaro south_figaro    world-sfigaro-v1    world-sfigaro.sram
-sweep gen_seed_summit       vargas_entry    kolts-summit-v1     kolts-summit.sram
-sweep gen_seed_hub          scenario_hub    hub-v1              hub.sram
 sweep gen_seed_basement     sfigaro_escape  sfigaro-basement-v1 sfigaro-basement.sram
 sweep gen_seed_train        train_done      train-engineer-v1   train-engineer.sram
 sweep gen_seed_terracave    terra_clifftop  terra-caves-v1      terra-caves.sram
