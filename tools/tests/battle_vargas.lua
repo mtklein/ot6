@@ -28,7 +28,7 @@
 --      $09 ran after it, and that the battle tears down with SABIN holding
 --      (no second Pummel) inside the same window as 6.  A Broken monster's
 --      counters are refused (Ot6MayAct); this one ends the battle, so it is
---      exempt (Ot6RetalEnds / Ot6AISkip, ot6_break.asm).
+--      exempt (Ot6RetalStory / Ot6AISkip, ot6_break.asm).
 
 -- BioBlaster's targeting byte is $6a = ONE_SIDE|INIT_GROUP|MULTI_TARGET|
 -- ENEMY without $01 MANUAL, so it aims at monster group A (the two Ipoohs)

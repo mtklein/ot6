@@ -356,6 +356,9 @@ H.run({ maxFrames = 600000 }, flatten({
   H.call(function()
     H.log(string.format("[deck] the Ultros teaser is up ($01F0) at f%d, at (%d,%d); walking to (22,6)", H.frame, H.fieldX(), H.fieldY()))
   end),
+  -- ultros4_entry: the deck, controllable, one walk from arming Ultros IV
+  -- (battle_ultros4 boots it)
+  H.saveState("ultros4_entry.mss"),
   H.navTo(22, 6, { maxFrames = 6000, playBattles = "tactical", healer = TERRA, magic = FIGHT.magic,
                    nuke = FIGHT.nuke, items = true, bank = FIGHT.bank, healPercent = FIGHT.healPercent,
                    care = false, arrive = function() return not H.hasControl() or H.fieldX() == 22 end }),

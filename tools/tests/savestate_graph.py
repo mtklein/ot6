@@ -625,8 +625,10 @@ STATES = [
     #     OT6_CAPTURE_SRM=tools/tests/checkpoints/fc-landing-v1/fc-landing.sram \
     #     tools/tests/run.sh tools/tests/gen_fc_landing.lua
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/fc-landing-v1
+    # ultros4_entry is the deck at the Ultros teaser, one walk from arming
+    # Ultros IV (battle_ultros4).
     S("fc_landing", gen="gen_fc_landing", checkpoint="thamasa-done-v1",
-      timeout=3600),
+      timeout=3600, also=["ultros4_entry"]),
 
     # boundary Q -> boundary R (the continent's save alcove): cold-Continue
     # fc-landing-v1 at 394 (7,12), talk SHADOW in at (10,16), cross the
