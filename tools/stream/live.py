@@ -869,10 +869,8 @@ class Board:
                 if self._remember(rec):
                     lines.append(json.dumps(rec) + "\n")
         if lines:
-            try:
-                os.makedirs(os.path.dirname(self.log), exist_ok=True)
-                with open(self.log, "a") as f:
-                    f.write("".join(lines))
+            try:   # under the lock the daily prune takes, so none is lost
+                self.pl.append(self.log, lines)
             except OSError as e:
                 print(f"live: {self.log}: {e}", file=sys.stderr)
 
@@ -1005,10 +1003,11 @@ class Board:
         if all("deps" in e for e in out["edges"]):
             # time left from the merged statuses, not the base tree's own: a
             # segment done on any machine is done.  The suite phase is the
-            # least any machine has left.
+            # least any machine that has run the suites has left.
             rem = sum((e["dur"] or 60) for e in out["edges"]
                       if e["status"] != "done")
-            suite = min(p.get("suite_s") or 0.0 for p in per_p.values())
+            suite = min((p.get("suite_s") or 0.0 for p in per_p.values()
+                         if p.get("suites")), default=0.0)
             eta = max(critical_path(out["edges"]),
                       (rem + suite) / (base.get("par") or 1))
             out["eta_min"] = int(eta / 60)
@@ -1293,7 +1292,10 @@ def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
             # or None when nothing is on the live view
             "live": owner.get(live_test) if live_test else None,
             "elapsed_min": int((time.time() - t0) / 60),
-            "eta_min": int(eta / 60), "suite_s": rem_suite, "par": par}
+            "eta_min": int(eta / 60), "suite_s": rem_suite, "par": par,
+            # suites this tree's ninja log knows: 0 means it never ran them,
+            # so its suite_s of 0 says nothing
+            "suites": len(qdur)}
 
 
 def critical_path(edges):

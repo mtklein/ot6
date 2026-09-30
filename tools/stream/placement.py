@@ -4,17 +4,22 @@ live.py appends one line per finished run to build/throughput.jsonl
 (machine, test, frames, wall, conc = emulators running beside it).  This
 module turns that log into, per machine:
 
-  speed     each run's frames/s over its test's own frames/s alone (the
-            median of that test's one-emulator runs, on any machine: alone,
-            the three machines run a test at about the same rate).  Speed
-            1.0 is "as fast as that test goes alone", so the test mix a
-            machine happens to run does not bend its curve.  A test never
-            run alone is left out.
-  shift     d, the emulators' worth of the machine something else is using
-            (other load, heat, the charger): a machine that slows down runs
-            like it has d more emulators already.  Each 6-hour window gets
-            its own d, and the current d is fitted to the recent runs,
-            weights halving every HALF_LIFE_H.
+  runs      only whole runs count: a pass, or at least WHOLE_FRAC of the
+            frames that test's passing runs reach.  A run cut off early
+            (killed, or a failure) says little about its level.
+  speed     each run's frames/s over the same test's frames/s alone on the
+            same machine (the median of its one-emulator runs there, the
+            quiet ones if any: load under QUIET_LOAD).  Speed 1.0 is "as
+            fast as that test goes alone here", so neither the test mix
+            nor a test's solo rate on another machine bends the curve.  A
+            test never run alone on the machine is left out of its curve.
+  shift     d >= 0, the emulators' worth of the machine something else is
+            using (other load, heat, the charger): a machine that slows
+            down runs like it has d more emulators already.  Each 6-hour
+            window gets its own d, and the current d is fitted to the
+            recent runs, weights halving every HALF_LIFE_H; it stays 0
+            until the last HALF_LIFE_H holds MIN_RECENT runs' worth of
+            frames, so one slow run cannot move the knee.
   shape     mean speed per emulator against occupancy: each run counted at
             conc + its window's d, weighted by its frames (capped) and by
             age (SHAPE_HALF_LIFE_D).  Counting a slowed run where it really
@@ -29,6 +34,8 @@ room = knee - active now - live claims (and, on a machine with a reserve,
 the reserve and the owner's load).  "order" lists machines for the next
 emulators, each machine's room in PREFER order.
 """
+import contextlib
+import fcntl
 import json
 import math
 import os
@@ -39,7 +46,12 @@ SHAPE_HALF_LIFE_D = 7.0   # the shape forgets over weeks
 FRAME_CAP = 30000         # a run weighs by its frames, up to this many, so
                           # a short run's start-up counts for little and one
                           # long run does not own a level
-MIN_RUNS = 2              # a level one run alone says nothing about
+MIN_RUNS = 3              # a level needs this many runs to count
+WHOLE_FRAC = 0.95         # a run without a pass counts once it reaches this
+                          # share of its test's passing runs' frames
+QUIET_LOAD = 2.0          # a solo run under this 1-min load is a quiet one
+MIN_RECENT = 3            # FRAME_CAP-frame runs' worth in the last
+                          # HALF_LIFE_H before the shift may move off 0
 PRUNE_DAYS = 60           # older records weigh < 0.3% in the shape: dropped
 PEAK_FRAC = 0.95          # the knee: fewest emulators within 5% of the best
 CLAIM_SEC = 120           # how long a --claim holds its emulators
@@ -106,15 +118,20 @@ def _shape(runs, now):
 
 
 def _shift(shape, runs, now=None):
-    """The d that best fits shape(conc + d) to the runs, weighted by frames
-    and (with now) by age, HALF_LIFE_H; among equally good d, the one
-    nearest 0."""
+    """The d >= 0 that best fits shape(conc + d) to the runs, weighted by
+    frames and (with now) by age, HALF_LIFE_H; among equally good d, the
+    one nearest 0.  0 when the runs (with now: those of the last
+    HALF_LIFE_H) hold fewer than MIN_RECENT runs' worth of frames: too
+    little to say the machine has changed."""
+    recent = [r for r in runs if now is None or now - r[3] < HALF_LIFE_H * 3600]
+    if sum(min(r[2], FRAME_CAP) for r in recent) < MIN_RECENT * FRAME_CAP:
+        return 0.0
     top = max(shape)
     ws = [(conc, sp, _weight(frames, 0 if now is None else now - ts,
                              HALF_LIFE_H * 3600))
           for conc, sp, frames, ts in runs]
     best = None
-    for i in range(-4 * top, 4 * top + 1):
+    for i in range(0, 4 * top + 1):
         d = i / 4
         err = sum(w * (sp - interp(shape, max(0.5, conc + d))) ** 2
                   for conc, sp, w in ws)
@@ -126,17 +143,29 @@ def _shift(shape, runs, now=None):
 
 def models(records, now):
     """{machine: {"shape", "counts", "runs", "d", "knee", "total"}}."""
-    solo = {}
+    length = {}
     for r in records:
-        if round(r["conc"]) == 1 and r["frames"] > 0:
-            solo.setdefault(r["test"], []).append(r["fps"])
-    base = {t: _median(v) for t, v in solo.items()}
+        if r.get("verdict") == "pass":
+            length.setdefault(r["test"], []).append(r["frames"])
+    length = {t: _median(v) for t, v in length.items()}
+    whole = [r for r in records if r["frames"] > 0 and (
+        r.get("verdict") == "pass"
+        or r["frames"] >= WHOLE_FRAC * (length.get(r["test"]) or math.inf))]
+    solo = {}
+    for r in whole:
+        if round(r["conc"]) == 1:
+            quiet = (r.get("load") or 0.0) < QUIET_LOAD
+            solo.setdefault((r["machine"], r["test"]), []).append((quiet, r["fps"]))
+    base = {}
+    for key, xs in solo.items():
+        q = [f for quiet, f in xs if quiet]
+        base[key] = _median(q or [f for _q, f in xs])
     out = {}
     win_s = HALF_LIFE_H * 3600
-    for m in sorted({r["machine"] for r in records}):
-        runs = [(r["conc"], r["fps"] / base[r["test"]], r["frames"], r["ts"])
-                for r in records
-                if r["machine"] == m and base.get(r["test"])]
+    for m in sorted({r["machine"] for r in whole}):
+        runs = [(r["conc"], r["fps"] / base[m, r["test"]], r["frames"], r["ts"])
+                for r in whole
+                if r["machine"] == m and base.get((m, r["test"]))]
         first, _ = _shape(runs, now)
         if not first:
             continue
@@ -225,34 +254,56 @@ def place_line(p):
             + " · python3 tools/stream/live.py --place N")
 
 
+@contextlib.contextmanager
+def locked(path):
+    """An exclusive lock on path (a <path>.lock beside it), held by every
+    writer: appenders of the run log, its prune, and --claim."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + ".lock", "w") as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
+        yield
+
+
+def append(path, lines):
+    """Append whole lines to the run log, under its lock."""
+    with locked(path):
+        with open(path, "a") as f:
+            f.write("".join(lines))
+
+
 def load_records(path, now):
     """The log's records, newest line per (machine, id); lines older than
-    PRUNE_DAYS are dropped, and the file rewritten without them."""
+    PRUNE_DAYS are dropped, and the file rewritten without them.  Read and
+    rewrite happen under the lock appenders take, so no append between
+    them is lost."""
     recs, seen, kept, old = [], set(), [], 0
-    try:
-        with open(path) as f:
-            lines = f.readlines()
-    except OSError:
+    if not os.path.exists(path):
         return recs, seen
-    for line in lines:
+    with locked(path):
         try:
-            r = json.loads(line)
-            key = (r["machine"], r["id"])
-        except (ValueError, KeyError, TypeError):
+            with open(path) as f:
+                lines = f.readlines()
+        except OSError:
+            return recs, seen
+        for line in lines:
+            try:
+                r = json.loads(line)
+                key = (r["machine"], r["id"])
+            except (ValueError, KeyError, TypeError):
+                kept.append(line)
+                continue
+            if now - r.get("ts", now) > PRUNE_DAYS * 86400:
+                old += 1
+                continue
             kept.append(line)
-            continue
-        if now - r.get("ts", now) > PRUNE_DAYS * 86400:
-            old += 1
-            continue
-        kept.append(line)
-        if key not in seen:
-            seen.add(key)
-            recs.append(r)
-    if old:
-        tmp = path + ".tmp"
-        with open(tmp, "w") as f:
-            f.writelines(kept)
-        os.replace(tmp, path)
+            if key not in seen:
+                seen.add(key)
+                recs.append(r)
+        if old:
+            tmp = path + ".tmp"
+            with open(tmp, "w") as f:
+                f.writelines(kept)
+            os.replace(tmp, path)
     return recs, seen
 
 
@@ -269,10 +320,7 @@ def claim(path, p, n, who):
     """--place N --claim WHO: under a lock on the claims file, take N from
     placement p less the claims p has not seen yet, record the claim, and
     return the machines taken.  Parallel callers queue on the lock."""
-    import fcntl
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path + ".lock", "w") as lk:
-        fcntl.flock(lk, fcntl.LOCK_EX)
+    with locked(path):
         now = time.time()
         live = read_claims(path, now)
         unseen = [c for c in live if c["ts"] > p["ts"]]
