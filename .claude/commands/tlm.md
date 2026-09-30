@@ -55,19 +55,21 @@ interpreting runs.
   live.py to see its workers.
 - **Where batches go:** measured, not remembered. live.py shows each
   machine's frames/s now and its room, and `python3 tools/stream/live.py
-  --place N` (on the Mac, where live.py runs) says where the next N
-  emulators should go and how many each machine can take now. It reads
+  --place N --claim <branch>` (on the Mac, where live.py runs) says where
+  the next N emulators should go and holds them for a couple of minutes,
+  so agents asking at once do not double-book. It reads
   `build/throughput.jsonl` in the main tree: one line per run live.py
   watched from its start (machine, test, frames, wall, concurrency), so
-  each machine's curve of frames/s per emulator against emulators running
-  builds up from normal work; recent runs weigh more, so it follows other
-  load, heat and power. A machine's room is its knee (the fewest emulators
-  within 5% of its best total, one more when that is the most it has run,
-  so it keeps learning) minus what it runs now. Batches fill px13 first,
+  each machine's curve of speed per emulator against emulators running
+  builds up from normal work, each run measured against its own test
+  alone; recent runs move the whole curve, so it follows other load, heat
+  and power. A machine's room is its knee (the fewest emulators within 5%
+  of its best total) minus what it runs now. Batches fill px13 first,
   then the Air, then the Pro, which keeps a reserve and backs off by the
-  owner's load (`PREFER` and `RESERVE` in live.py). Launch prompts give agents
-  that command rather than a cap, and agents run it before each batch; it
-  is a guide, and a machine an agent is told to leave alone stays alone.
+  owner's load (`PREFER` and `RESERVE` in tools/stream/placement.py).
+  Launch prompts give agents that command rather than a cap, and agents
+  run it before each batch; it is a guide, and a machine an agent is told
+  to leave alone stays alone.
   `tools/bench_throughput.py` (K copies of one test, K from 1 to 1.5x the
   cores) seeds concurrency levels normal work has not reached; run it with
   live.py watching the machine, on a quiet one or with `--quiet-load 2` on

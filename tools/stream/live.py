@@ -31,14 +31,13 @@ second, summed over its active emulators across the last 30 s.  Every run
 watched from its start on any machine appends one line to the main tree's
 build/throughput.jsonl when it finishes: machine, test, frames, wall seconds,
 and the concurrency it ran at (emulators, and the load average).  From that
-log each machine gets a curve of frames/s per emulator against emulators
-running, recent runs weighing more (6 h half-life), so it follows other load,
-heat and power as they change; and from
-the curve and what the machine runs right now, how many more emulators it
-can take before its total stops growing.  That is placement.json, one line on
-the page, and:
+log tools/stream/placement.py gives each machine a curve and a knee that
+follow other load, heat and power as they change, and from the knee and what
+the machine runs right now, how many more emulators it can take.  That is
+placement.json, one line on the page, and:
 
     python3 tools/stream/live.py --place 8     # where the next 8 should go
+    python3 tools/stream/live.py --place 8 --claim wt/foo   # and hold them
 """
 import argparse
 import base64
@@ -46,7 +45,6 @@ import collections
 import glob
 import hashlib
 import json
-import math
 import os
 import re
 import shlex
@@ -820,106 +818,10 @@ class Scanner:
 PEER_STALE_SEC = 20   # a peer silent this long is shown unreachable
 
 # ---- placement: where the next emulators should go ------------------------
-HALF_LIFE_H = 6.0   # a run this old weighs half as much as one finishing now
-PEAK_FRAC = 0.95    # the knee: the fewest emulators within 5% of the best total
-# Whose machines they are.  Batches fill px13 (ours alone) first, then the
-# Air (the owner's travel laptop, often away), then the Pro (the owner's
-# desk machine); a machine not named here comes after these, in --peer
-# order.  On a machine with a reserve, a batch leaves that many emulators'
-# worth of the knee free, and backs off further by the load its own
-# emulators do not explain (the owner's work).  Capacities stay measured.
-PREFER = ("px13", "air", "mbp")
-RESERVE = {"mbp": 4}
-
-
-def curve(records, now):
-    """{emulators: [frames/s per emulator, runs]} for one machine: each
-    finished run's frames/wall, bucketed by how many emulators ran beside it
-    (itself included, averaged over its life), averaged with weights halving
-    every HALF_LIFE_H.  So recent runs outweigh old ones, and the curve
-    follows whatever else slows the machine now (other load, heat, the
-    charger); a bucket nothing recent has reached keeps what it last
-    measured."""
-    acc = {}
-    for r in records:
-        k = max(1, int(round(r["conc"])))
-        w = 0.5 ** (max(0.0, now - r["ts"]) / (HALF_LIFE_H * 3600))
-        a = acc.setdefault(k, [0.0, 0.0, 0])
-        a[0] += w * r["fps"]
-        a[1] += w
-        a[2] += 1
-    return {k: [a[0] / a[1], a[2]] for k, a in acc.items() if a[1] > 0}
-
-
-def per_emulator(cv, x):
-    """Frames/s one emulator gets beside x-1 others: linear between measured
-    buckets; below the lowest, the lowest's; above the highest, the total
-    stays flat (nothing measured says it grows)."""
-    ks = sorted(cv)
-    if x <= ks[0]:
-        return cv[ks[0]][0]
-    if x >= ks[-1]:
-        return cv[ks[-1]][0] * ks[-1] / x
-    for a, b in zip(ks, ks[1:]):
-        if a <= x <= b:
-            return cv[a][0] + (cv[b][0] - cv[a][0]) * (x - a) / (b - a)
-
-
-def total(cv, x):
-    return x * per_emulator(cv, x) if x > 0 else 0.0
-
-
-def placement(machines, records, now):
-    """placement.json: per machine its curve, its knee (the fewest emulators
-    whose total is within 5% of the best measured total, one more when
-    that is the most ever measured, so the curve keeps learning), room =
-    knee - its active emulators now (less RESERVE and the owner's load where
-    a reserve is set); and "order", the machines for the next emulators:
-    each machine's room, in PREFER order."""
-    out = []
-    for m in machines:
-        mine = [r for r in records if r.get("machine") == m["name"]]
-        cv = curve(mine, now)
-        rec = {"name": m["name"], "up": m["up"], "active": m["active"],
-               "load1": (m["load"] or [None])[0], "ncpu": m["ncpu"],
-               "fps": m.get("fps"), "runs": len(mine),
-               "curve": {str(k): [round(v[0], 1), v[1]]
-                         for k, v in sorted(cv.items())}}
-        out.append(rec)
-        if not cv or not m["up"]:
-            continue
-        top = max(cv)
-        best = max(total(cv, k) for k in range(1, top + 1))
-        knee = min(k for k in range(1, top + 1)
-                   if total(cv, k) >= PEAK_FRAC * best)
-        if knee == top:
-            knee += 1
-        room = knee - m["active"]
-        if m["name"] in RESERVE:
-            # load our emulators do not account for; generous to the owner,
-            # since on macOS one emulator can add more than 1 to the load
-            owner = max(0.0, (rec["load1"] or 0.0) - m["active"])
-            room -= RESERVE[m["name"]] + math.ceil(owner)
-            rec.update(reserve=RESERVE[m["name"]], owner_load=round(owner, 1))
-        rec.update(peak=knee, room=max(0, room))
-    rank = {n: i for i, n in enumerate(PREFER)}
-    ranked = sorted((r for r in out if r.get("room")),
-                    key=lambda r: rank.get(r["name"], len(PREFER)))
-    order = [r["name"] for r in ranked for _ in range(r["room"])]
-    return {"ts": int(now), "half_life_h": HALF_LIFE_H, "prefer": PREFER,
-            "reserve": RESERVE, "machines": out, "order": order,
-            "room": len(order)}
-
-
-def place_line(p):
-    """The page's one line: each machine's room now."""
-    parts = []
-    for m in p["machines"]:
-        parts.append(f"{m['name']} {m['room']}" if "room" in m else
-                     f"{m['name']} (down)" if not m["up"] else
-                     f"{m['name']} (no runs logged yet)")
-    return ("room now: " + ", ".join(parts)
-            + " · python3 tools/stream/live.py --place N")
+# The model (curves, knees, claims, fill order) is tools/stream/placement.py;
+# only the viewer and --place need it, never a peer's emitter.
+def _placement():
+    return _load_stream_module("placement")
 
 
 class Board:
@@ -942,16 +844,12 @@ class Board:
         # viewer (whichever tree it runs from) adds to and reads one history.
         worktree_roots()
         self.log = os.path.join(_TREES["main"], "build", "throughput.jsonl")
-        self.records, self.seen = [], set()
-        try:
-            with open(self.log) as f:
-                for line in f:
-                    try:
-                        self._remember(json.loads(line))
-                    except (ValueError, KeyError, TypeError):
-                        pass
-        except OSError:
-            pass
+        self.claims = os.path.join(_TREES["main"], "build",
+                                   "placement-claims.jsonl")
+        self.pl = _placement()
+        self.records, self.seen = self.pl.load_records(self.log, t)
+        self.pruned = t
+        self.mods, self.mods_key = {}, None
 
     def _remember(self, rec):
         """Keep one finished-run record; False if it is already known (two
@@ -1057,13 +955,22 @@ class Board:
                 "active": len(mine), "frozen": sum(w["stuck"] for w in mine),
                 "trees": [{"branch": b, "tree": t, "tests": sorted(ts)}
                           for (b, t), ts in sorted(trees.items())]})
+        pl = self.pl
         with self.lock:
-            records = list(self.records)
-        place = placement(machines, records, now)
+            if now - self.pruned > 86400:   # once a day, as at start-up
+                self.records, self.seen = pl.load_records(self.log, now)
+                self.pruned = now
+            # the curves change only with a new record, or slowly with age
+            key = (len(self.records), int(now // 60))
+            if key != self.mods_key:
+                self.mods, self.mods_key = pl.models(self.records, now), key
+        place = pl.placement(machines, self.mods,
+                             pl.read_claims(self.claims, now), now)
         for mc, pm in zip(machines, place["machines"]):
             mc.update({k: pm[k] for k in ("room", "peak") if k in pm})
         out = {"workers": workers, "count": len(workers), "ts": int(now),
-               "machines": machines, "local": HOST, "place": place_line(place)}
+               "machines": machines, "local": HOST,
+               "place": pl.place_line(place)}
         self._dump("grid.json", out)
         self._dump("placement.json", place)
         prog = self.merge_progress(m)
@@ -1479,8 +1386,11 @@ def follow(log_path, webroot, test, stop, hop=False, live_ref=None):
         time.sleep(0.25)
 
 
-def place(n, port):
-    """--place N: the running viewer's placement.json, read for N emulators."""
+def place(n, port, who=None):
+    """--place N [--claim WHO]: the running viewer's placement.json, read for
+    N emulators.  With --claim, the N are also held for WHO (placement.py's
+    CLAIM_SEC, or until they show up running), so a parallel --place does
+    not hand out the same room."""
     import urllib.request
     try:
         with urllib.request.urlopen(
@@ -1488,26 +1398,33 @@ def place(n, port):
             p = json.load(r)
     except Exception as e:
         sys.exit(f"no placement: is live.py running on port {port}? ({e})")
-    counts = collections.Counter(p["order"][:n])   # keeps PREFER order
+    if who:
+        worktree_roots()
+        take = _placement().claim(os.path.join(
+            _TREES["main"], "build", "placement-claims.jsonl"), p, n, who)
+    else:
+        take = p["order"][:n]
+    counts = collections.Counter(take)   # keeps the fill order
     got = ", ".join(f"{m} {c}" for m, c in counts.items()) or "nowhere"
+    reserve = ", ".join(f"{k} {v}" for k, v in p["reserve"].items())
     print(f"place {n}: {got}  (fill order {', '.join(p['prefer'])}; "
-          f"reserve {', '.join(f'{k} {v}' for k, v in p['reserve'].items())})")
-    if n > p["room"]:
-        print(f"  only {p['room']} have room now; the other {n - p['room']} "
+          f"reserve {reserve}" + (f"; claimed for {who}" if who else "") + ")")
+    if n > len(take):
+        print(f"  only {len(take)} have room now; the other {n - len(take)} "
               "would slow every emulator where they land: queue them")
     for m in p["machines"]:
         if "room" not in m:
-            why = "down" if not m["up"] else "no runs logged yet"
+            why = ("down" if not m["up"] else "no runs logged yet"
+                   if not m.get("curve") else "no room figure")
             print(f"  {m['name']}: {why}")
             continue
-        cv = " ".join(f"{k}:{v[0]:.0f}" for k, v in m["curve"].items())
-        held = (f" - reserve {m['reserve']} - owner load {m['owner_load']}"
-                if "reserve" in m else "")
+        held = "".join(f" - {k.replace('_', ' ')} {m[k]}"
+                       for k in ("claimed", "reserve", "owner_load") if k in m)
+        cv = " ".join(f"{k}:{v[0]:.2f}" for k, v in m["curve"].items())
         print(f"  {m['name']}: room {m['room']} = knee {m['peak']} - "
-              f"{m['active']} running{held} (load {m['load1']}, "
-              f"{m['ncpu']} cores)"
-              f" · frames/s per emulator by emulators running: {cv} "
-              f"({m['runs']} runs)")
+              f"{m['active']} running{held} (shift {m['shift']}, load "
+              f"{m['load1']}, {m['ncpu']} cores) · speed per emulator (1 = "
+              f"the test alone) by emulators running: {cv} ({m['runs']} runs)")
     return 0
 
 
@@ -1522,12 +1439,15 @@ def main():
     ap.add_argument("--place", type=int, metavar="N",
                     help="ask the running viewer (on --port) where the next N "
                     "emulators should go, and exit")
+    ap.add_argument("--claim", metavar="WHO",
+                    help="with --place: hold those emulators for WHO for a "
+                    "couple of minutes, so parallel callers do not double-book")
     ap.add_argument("--emit", action="store_true", help=argparse.SUPPRESS)
     args = ap.parse_args()
     if args.emit:     # the far end of a --peer connection
         return emit()
     if args.place is not None:
-        return place(args.place, args.port)
+        return place(args.place, args.port, args.claim)
 
     ws = os.path.abspath(args.workspace) if args.workspace else newest_workspace()
     log = os.path.join(ws, "run.log") if ws else None
