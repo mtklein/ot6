@@ -387,9 +387,13 @@ TEST_ENV = {
     # ~115k; levelup's 40-battle step list ~85k -- at the ~100 frames/s a
     # loaded machine emulates, 11 to 19 minutes
     "battle_classtarget": "OT6_TIMEOUT=3600",
-    # up to six ~12k-frame rungs of battle 70 until one shows both a
-    # mid-break kill and #291's window (a queued turn meeting a break)
-    "battle_brokendeath": "OT6_TIMEOUT=3600",
+    # at worst four rungs of battle 70 (the ladder's derivation is in the
+    # suite): ~2,850 frames of prep and at most ~16,200 a rung (the longest
+    # of 60 measured fights ran 15,761 frames from its seed to its end, plus
+    # the reload and the phase hold) is ~67,500 frames; the slowest measured
+    # rate, the Air at load 25-48, was 80 frames/s: 844 s; 1200 leaves 40%
+    # (build/attempts/wt/suite-honesty/brokendeath/)
+    "battle_brokendeath": "OT6_TIMEOUT=1200",
     "battle_statuses": "OT6_TIMEOUT=3600",
     "battle_levelup": "OT6_TIMEOUT=3600",
 }

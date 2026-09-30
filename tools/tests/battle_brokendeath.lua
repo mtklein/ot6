@@ -43,15 +43,20 @@
 -- entities behind them, so the slot scan below prefers the lowest slot per
 -- species.
 local H = dofile("tools/tests/lib/ot6.lua")
--- Six rungs, not three: an attempt now counts only when it shows BOTH the
--- mid-break kill and #291's window (a standing monster's queued turn meeting
--- its break), and the window is a timeline event -- measured in some seed
--- shifts' first fight and not others (review of bb984713: shifts 7, 33 and
--- 55 saw none in the fight that ended the old three-rung ladder,
--- build/attempts/review-battle-fixes-023/).  The property is asserted over
+-- An attempt counts only when it shows BOTH the mid-break kill and #291's
+-- window (a standing monster's queued turn meeting its break), and that is a
+-- property of the draw.  Four rungs, ten phases apart, derived from a sweep
+-- of this door (build/attempts/wt/suite-honesty/brokendeath/): one rung
+-- drawn at each of the 60 game-clock phases lands on 30 distinct seeds
+-- (only those are drawable from here), 21 of which count; walking every
+-- ladder base over that map -- rung 1 draws its base minus 3, a later rung
+-- anything from its target minus 17 to minus 15, and a rung is credited
+-- only if every seed it could draw counts -- the worst base needs its 4th
+-- rung (N = 3 leaves bases with none).  The whole six-rung ladder, run from
+-- all 60 seed shifts, needed at most 3.  The property is asserted over
 -- every rung that ran, not only the one that counts.
-local ATTEMPTS = 6
-local L = H.newSeedSweep("battle 70", { attempts = ATTEMPTS })
+local ATTEMPTS, GAP = 4, 10
+local L = H.newSeedSweep("battle 70", { attempts = ATTEMPTS, gap = GAP })
 local rungs = {}   -- per attempt: { n, windows, scripts, kill } (the verdict's record)
 
 local STATE = "build/states/ifrit_entry.mss.lua"
@@ -285,7 +290,8 @@ local function attempt(n)
       end
       local kill = deathFrame and deathTicks ~= 0 and sawBreak[deathSlot]
       rungs[#rungs + 1] = { n = n, windows = nWin, scripts = nScr,
-                            kill = kill and true or false }
+                            kill = kill and true or false,
+                            startFrame = startFrame, upto = upto }
       H.log(string.format("attempt %d: %d window(s), %d broken-timer script "
         .. "turn(s) f%d..f%d", n, nWin, nScr, startFrame, upto))
       if kill and nWin == 0 then
@@ -376,8 +382,6 @@ H.run({ maxFrames = 250000 }, {
   attempt(2),
   attempt(3),
   attempt(4),
-  attempt(5),
-  attempt(6),
   L.report(),
 
   -- 4. The property under test: a mid-break kill happened, and the
@@ -445,32 +449,46 @@ H.run({ maxFrames = 250000 }, {
     -- CmdNoEffect, an rts.  A monster never mimics, so on a monster that
     -- dispatch is the turn being thrown away, not taken, and it is counted
     -- as consumed rather than as a leak.
-    local leaks, ending, monsterCmds, charCmds, noEntity = {}, {}, 0, 0, {}
-    local consumed = {}
-    for _, r in ipairs(cmds) do
-      if r.f >= won.startFrame then
-        if not isEntity(r.ent) then noEntity[#noEntity + 1] = r
-        elseif r.f > won.deathFrame then
-          if r.ent >= 0x08 and r.tk ~= 0 then ending[#ending + 1] = r end
-        elseif r.ent < 0x08 then charCmds = charCmds + 1
-        elseif r.tk == 0 then monsterCmds = monsterCmds + 1
-        elseif r.cmd == 0x12 then consumed[#consumed + 1] = r
-        else leaks[#leaks + 1] = r end
+    -- Every rung that was fought is checked, not only the one that counts:
+    -- each rung's fight window runs from its battle's start to its kill (or
+    -- to the battle's end, for a rung with no death), and a dispatch after
+    -- a rung's kill is that rung's `if_self_dead` ending.
+    local function rungOf(f)
+      for _, g in ipairs(rungs) do
+        if f >= g.startFrame and f <= g.upto then return g end
       end
     end
-    local byKind, windows = {}, 0
+    local first = rungs[1].startFrame
+    local leaks, ending, charCmds, noEntity = {}, {}, 0, {}
+    local consumed = {}
+    for _, g in ipairs(rungs) do g.monsterCmds, g.leaks = 0, 0 end
+    for _, r in ipairs(cmds) do
+      if r.f >= first then
+        local g = rungOf(r.f)
+        if not isEntity(r.ent) then noEntity[#noEntity + 1] = r
+        elseif not g then
+          if r.ent >= 0x08 and r.tk ~= 0 then ending[#ending + 1] = r end
+        elseif r.ent < 0x08 then charCmds = charCmds + 1
+        elseif r.tk == 0 then g.monsterCmds = g.monsterCmds + 1
+        elseif r.cmd == 0x12 then consumed[#consumed + 1] = r
+        else leaks[#leaks + 1] = r; g.leaks = g.leaks + 1 end
+      end
+    end
+    local byKind, winList = {}, {}
     for _, r in ipairs(execs) do
-      if r.f >= won.startFrame and r.f <= won.deathFrame
-         and isEntity(r.ent) and r.ent >= 0x08 and r.tk ~= 0 then
+      local g = rungOf(r.f)
+      if g and isEntity(r.ent) and r.ent >= 0x08 and r.tk ~= 0 then
         byKind[r.kind] = (byKind[r.kind] or 0) + 1
         -- #291's window: a standing monster's turn, queued before its
         -- break, reaching ExecAction with the timer running
-        if r.kind == "ExecAction" and r.up then windows = windows + 1 end
+        if r.kind == "ExecAction" and r.up then winList[#winList + 1] = { r = r, g = g } end
         H.log(string.format("  consumed and dropped: %-18s f%-6d ent=$%02X "
-          .. "timer=%d%s", r.kind, r.f, r.ent, r.tk,
-          r.kind == "ExecAction" and (r.up and " standing" or " down") or ""))
+          .. "timer=%d%s (attempt %d)", r.kind, r.f, r.ent, r.tk,
+          r.kind == "ExecAction" and (r.up and " standing" or " down") or "", g.n))
       end
     end
+    local monsterCmds = 0
+    for _, g in ipairs(rungs) do monsterCmds = monsterCmds + g.monsterCmds end
     for _, r in ipairs(ending) do
       H.log(string.format("  after the kill: ExecCmd f%-6d ent=$%02X cmd=$%02X "
         .. "timer=%d (the `if_self_dead` ending, outside the window)",
@@ -488,24 +506,31 @@ H.run({ maxFrames = 250000 }, {
       H.log(string.format("  no entity: ExecCmd f%-6d x=$%02X cmd=$%02X "
         .. "(the immediate-action caller; not attributable)", r.f, r.ent, r.cmd))
     end
-    H.log(string.format("f%d..f%d: %d command dispatches by monsters (%d by "
-      .. "characters); %d of the monster ones had a broken timer running, "
-      .. "%d more were a turn consumed ($12).  "
+    local per = {}
+    for _, g in ipairs(rungs) do
+      per[#per + 1] = string.format("%d:f%d..f%d %d unbroken/%d leaks", g.n,
+        g.startFrame, g.upto, g.monsterCmds, g.leaks)
+    end
+    H.log(string.format("%d rung(s) checked (%s): %d command dispatches by "
+      .. "monsters (%d by characters); %d of the monster ones had a broken "
+      .. "timer running, %d more were a turn consumed ($12).  "
       .. "%d turns began with the timer up "
       .. "(%d ExecAction, %d ExecRetal), %d of them after running the "
       .. "monster's AI script (#291 owes a zero here).  "
-      .. "%d dispatches by a broken actor after the kill (the ending), "
+      .. "%d dispatches by a broken actor after a kill (the ending), "
       .. "%d not attributable to an entity.",
-      won.startFrame, won.deathFrame, monsterCmds + #leaks, charCmds, #leaks,
+      #rungs, table.concat(per, ", "), monsterCmds + #leaks, charCmds, #leaks,
       #consumed, (byKind.ExecAction or 0) + (byKind.ExecRetal or 0),
       byKind.ExecAction or 0, byKind.ExecRetal or 0,
       byKind.ExecMonsterAction or 0, #ending, #noEntity))
-    -- The positive control.  Without it, a detector that never fired and a
-    -- gate that works report the same green.
-    H.assertEq(monsterCmds > 0, true,
-      "control: inside this same window the ExecCmd detector saw monsters "
-      .. "dispatch commands while unbroken, so a count of zero below means "
-      .. "the gate held rather than that nothing was watching")
+    -- The positive control, per rung.  Without it, a detector that never
+    -- fired and a gate that works report the same green.
+    for _, g in ipairs(rungs) do
+      H.assertEq(g.monsterCmds > 0, true, string.format("control: inside "
+        .. "attempt %d's window the ExecCmd detector saw monsters dispatch "
+        .. "commands while unbroken, so a count of zero below means the gate "
+        .. "held rather than that nothing was watching", g.n))
+    end
     -- #329's block rule.  IFRIT's and SHIVA's counter scripts hold a story
     -- command (the if_self_dead ending), so a Broken one's counter is
     -- queued on every hit; their living blocks (`if_hit` / `if_cmd MAGIC`:
@@ -516,27 +541,67 @@ H.run({ maxFrames = 250000 }, {
     -- variable command, $2E, fifteen times, one per such counter).
     local brokenRetals = 0
     for _, r in ipairs(retals) do
-      if r.f >= won.startFrame and r.f < won.deathFrame and r.ent >= 0x08
+      local g = rungOf(r.f)
+      if g and r.f < g.upto and r.ent >= 0x08
          and r.ent <= 0x12 and r.tk ~= 0 and r.hp > 0 then
         brokenRetals = brokenRetals + 1
       end
     end
     H.log(string.format("%d counter(s) of a Broken, living boss ran in the "
-      .. "window (their story-less blocks skipped: the leak count below)",
-      brokenRetals))
+      .. "rungs' windows (their story-less blocks skipped: the leak count "
+      .. "below)", brokenRetals))
     H.assertEq(brokenRetals > 0, true, "control: a Broken, living boss's "
-      .. "counter ran in the window, so the zero leaks below cover #329's "
+      .. "counter ran in a window, so the zero leaks below cover #329's "
       .. "block rule (a counter block with no story command is skipped)")
     H.assertEq(#leaks, 0,
-      "no monster dispatched a command while its broken timer was running "
-      .. "(issue #66: Ot6Gate answers at queue time, and before Ot6MayAct "
-      .. "nothing re-checked between the queue entry and the turn)")
+      "no monster dispatched a command while its broken timer was running, "
+      .. "in any rung (issue #66: Ot6Gate answers at queue time, and before "
+      .. "Ot6MayAct nothing re-checked between the queue entry and the turn)")
+    -- #291's window, from the trace: every standing monster's turn that met
+    -- its break at ExecAction must be thrown away there -- that monster's
+    -- next dispatch is the removed-action placeholder, $12 (CmdNoEffect),
+    -- with its timer still running, in the same frame, and no AI script
+    -- turn between.  Counted over every rung; the counting rung owes at
+    -- least one (it was chosen for having one, so that alone proves
+    -- nothing -- the match below is what can fail).
+    local matched, wonWin, wonMatched = 0, 0, 0
+    for _, w in ipairs(winList) do
+      local r, nextCmd, script = w.r, nil, false
+      for _, c in ipairs(cmds) do
+        if not nextCmd and c.ent == r.ent and c.f >= r.f then nextCmd = c end
+      end
+      for _, q in ipairs(execs) do
+        if q.kind == "ExecMonsterAction" and q.ent == r.ent and q.f >= r.f
+           and (nextCmd == nil or q.f <= nextCmd.f) then script = true end
+      end
+      local ok = nextCmd ~= nil and nextCmd.cmd == 0x12 and nextCmd.tk ~= 0
+                 and nextCmd.f == r.f and not script
+      if ok then matched = matched + 1 end
+      if w.g.startFrame == won.startFrame then
+        wonWin = wonWin + 1
+        if ok then wonMatched = wonMatched + 1 end
+      end
+      H.log(string.format("  window f%d ent=$%02X (attempt %d): next dispatch "
+        .. "%s%s -- %s", r.f, r.ent, w.g.n,
+        nextCmd and string.format("f%d cmd=$%02X timer=%d", nextCmd.f,
+          nextCmd.cmd, nextCmd.tk) or "none",
+        script and ", an AI script turn first" or "",
+        ok and "consumed" or "NOT CONSUMED"))
+    end
+    H.log(string.format("#291's windows: %d in all rungs, %d consumed; the "
+      .. "counting attempt's %d, %d consumed", #winList, matched, wonWin,
+      wonMatched))
+    H.assertEq(matched, #winList, "every window, in every rung, was consumed "
+      .. "at ExecAction: the monster's next dispatch was $12 (CmdNoEffect) "
+      .. "with its timer running, in the same frame, and no AI script ran")
+    H.assertEq(wonWin >= 1 and wonMatched == wonWin, true,
+      "the counting attempt's own trace holds #291's window, consumed")
     -- what became of each window's monster: its next turn with the timer
     -- down (ExecAction, then a real dispatch).  Logged, not asserted: the
     -- fight often ends before a consumed monster's break does
-    for _, r in ipairs(execs) do
-      if r.kind == "ExecAction" and r.up and r.tk ~= 0 and r.ent >= 0x08
-         and r.f >= won.startFrame and r.f <= won.deathFrame then
+    for _, w in ipairs(winList) do
+      local r = w.r
+      do
         local nextTurn, nextCmd = nil, nil
         for _, q in ipairs(execs) do
           if not nextTurn and q.kind == "ExecAction" and q.ent == r.ent
@@ -554,10 +619,6 @@ H.run({ maxFrames = 250000 }, {
             or "none before the log ends"))
       end
     end
-    H.assertEq(windows >= 1, true,
-      "#291's window happened in this fight: a standing monster's queued "
-      .. "turn reached ExecAction with its broken timer running (IFRIT and "
-      .. "SHIVA soak their breaks; measured once or twice a run)")
     -- #291.  This count was once bounded at <= 3 and called load-bearing:
     -- #85's two attempts (a break-time queue purge, a skipped queue add)
     -- were reverted when KEFKA at Narshe (battle 57) did not end on some
