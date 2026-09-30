@@ -67,9 +67,9 @@ interpreting runs.
   that command rather than a cap, and agents run it before each batch; it
   is a guide, and a machine an agent is told to leave alone stays alone.
   `tools/bench_throughput.py` (K copies of one test, K from 1 to 1.5x the
-  cores) seeds concurrency levels normal work has not reached; run it on a
-  quiet machine, with live.py watching it, after anything changes the
-  hardware.
+  cores) seeds concurrency levels normal work has not reached; run it with
+  live.py watching the machine, on a quiet one or with `--quiet-load 2` on
+  a shared one, after anything changes the hardware.
 
 # 1. Start: state of the world
 
