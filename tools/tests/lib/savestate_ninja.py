@@ -391,6 +391,24 @@ def chain_plan(states):
     return entries, seeds, end
 
 
+SEALED_FIELDS = ("size", "sha256", "provenance")
+
+
+def write_authored(manifest, out):
+    """A tracked manifest minus what `seal` writes (size, sha256,
+    provenance): the template the chain's capture is sealed against.  Written
+    only when it changed, so re-cutting the tracked checkpoint from the
+    chain's own capture does not make the chain stale (restat)."""
+    import json
+    m = json.loads(manifest.read_text())
+    text = json.dumps({k: v for k, v in m.items() if k not in SEALED_FIELDS},
+                      indent=2) + "\n"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if not (out.exists() and out.read_text() == text):
+        out.write_text(text)
+    return 0
+
+
 def emit_chain_edges(w, states, root, copy_if_changed_from):
     """The chain_ copies (see chain_plan).  Returns the chain's last
     output path, or None when there is no cut."""
@@ -411,6 +429,15 @@ def emit_chain_edges(w, states, root, copy_if_changed_from):
       "tools/tests/run.sh tools/tests/$gen.lua build/states/$state.log "
       "&& $stamps && $seal")
     w("  description = generate $state <- $gen (captures $key)")
+    w("")
+    w("rule checkpoint_authored")
+    w("  command = python3 tools/tests/lib/savestate_ninja.py --authored $in $out")
+    w("  description = checkpoint_authored $in")
+    w("  restat = 1")
+    w("")
+    for key in sorted(set(saves.values())):
+        w(f"build build/ninja/authored/{key}.json: checkpoint_authored "
+          f"tools/tests/checkpoints/{key}/manifest.json")
     w("")
     for s in seeds:
         w(f"build build/states/{P}{s}.mss.lua build/states/{P}{s}.mss "
@@ -461,11 +488,12 @@ def emit_chain_edges(w, states, root, copy_if_changed_from):
             env.append(f"OT6_CAPTURE_SRM={cdir}/{payload}")
             capture_outs = (f" {cdir}/manifest.json {cdir}/{payload}"
                             f" {cdir}/{payload}.provenance.json")
-            deps.append(copy_if_changed_from(tracked[0]))
+            authored = f"build/ninja/authored/{key}.json"
+            deps.append(authored)
             # the tracked manifest's authored fields (its `saved` above
             # all) judge the capture; seal refuses a battery holding
             # another save
-            seal = (f"cp {tracked[0]} {cdir}/manifest.json && "
+            seal = (f"cp {authored} {cdir}/manifest.json && "
                     f"python3 tools/tests/lib/sram_checkpoint.py seal {cdir} && "
                     f"python3 tools/tests/lib/sram_checkpoint.py validate {cdir}")
         w(f"build {outs} {stamp_outs}{capture_outs}: {rule}{explicit} | "
@@ -562,9 +590,14 @@ def main(argv):
     ap.add_argument("--list", action="store_true",
                     help="print state names in play order and exit")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--authored", nargs=2, metavar=("MANIFEST", "OUT"),
+                    help="write MANIFEST's authored fields to OUT, only "
+                         "when they changed (the chain's seal template)")
     args = ap.parse_args(argv)
     if args.selftest:
         return selftest()
+    if args.authored:
+        return write_authored(Path(args.authored[0]), Path(args.authored[1]))
 
     root = args.root.resolve()
     states = load(root)
@@ -751,6 +784,11 @@ def selftest():
               "build/checkpoints/good-v1/manifest.json" in edge("build/states/chain_p.mss.lua")
               and "OT6_CAPTURE_SRM=build/checkpoints/good-v1/a.sram" in text
               and "sram_checkpoint.py seal build/checkpoints/good-v1" in text)
+        check("the seal's template is the manifest's authored fields, so a "
+              "re-cut of the tracked checkpoint does not stale the chain",
+              "build/ninja/authored/good-v1.json" in edge("build/states/chain_p.mss.lua")
+              and "tools/tests/checkpoints/good-v1/manifest.json"
+                  not in edge("build/states/chain_p.mss.lua"))
         check("the consumer's copy Continues the captured save",
               "generate build/checkpoints/good-v1/manifest.json "
               "build/checkpoints/good-v1/a.sram" in edge("build/states/chain_q.mss.lua")
