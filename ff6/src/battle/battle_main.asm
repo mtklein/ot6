@@ -3844,6 +3844,8 @@ Cmd_13:
 @17af:  lda     $3ef8,y     ; clear dance status
         clrflg  STATUS3, DANCE
         sta     $3ef8,y
+        jsl     Ot6DanceStumble ; ot6: the stumble bought nothing, so it
+                                ;   charges nothing: no MP, no pips (#313)
         tyx
         lda     #$06        ; battle message $06 (stumbled!!)
         sta     $3401

@@ -48,6 +48,7 @@ tools/tests/battle_counterboost.lua	.writeByte(
 tools/tests/battle_counterboost.lua	.writeWord(
 tools/tests/battle_counterfold.lua	.writeByte(
 tools/tests/battle_dancemp.lua	.writeWord(
+tools/tests/battle_dancestumble.lua	.writeByte(	quarantine: #313 synthetic setup -- one off-terrain dance added to MOG's known-dance mask ($1D4C) between the defense's waves, because moogle_defense is the route's only MOG-with-Dance window and holds one terrain, so the vanilla stumble roll never runs by play; the property is that a stumbled boosted start charges no MP and spends no pips
 tools/tests/battle_dlgmenu.lua	.writeByte(	quarantine: #292 review, synthetic step -- one monster slot's shield-count upload planted pending mid-dialogue (OT6_SHWANT/OT6_SHPEND), because a count change landing while a battle dialogue is up is not a thing a fixture produces on cue; the property is that the nmi holds the upload until the dialogue and its re-lay are done
 tools/tests/battle_divines.lua	.writeByte(
 tools/tests/battle_divines.lua	.writeWord(
