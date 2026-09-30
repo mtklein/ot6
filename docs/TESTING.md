@@ -107,12 +107,15 @@ citation rather than dropping the number.
 
 ## Tests that survive any draw
 
-A fight's in-battle draw comes from one of 60 seeds: InitBattle seeds the
-battle RNG from the game clock's frame (`$021e`). So a sweep of 60 waits
-from one snapshot gives that state's exact first-attempt rate, and it is
-usually a better measure of a fight than a handful of K-encounter
-variation runs, which can land on a lucky or unlucky subset (the Edgar
-leg's unchanged generator measured 7/12 on one set and 13/15 on another).
+A fight's in-battle randomness starts from the game clock's frame
+(InitBattle: `lda $021e / asl2 / sta $be`), so there are few starting
+seeds, and different waits or seed shifts often land on the same one
+(shifts 4k+2 and 4k+3 share a frame; `BattleLoop` also advances `$be`, so
+a seed alone doesn't fix the fight). Count a fight's outcomes by distinct
+battle key (`$be` at the open plus the formation), not by runs: repeated
+keys aren't independent draws, and a sweep that reports "N of 60" usually
+covers fewer distinct fights. Varying the encounter history (K encounters
+used up) remains the main way to vary what the party meets.
 
 A test, generator or driver must cope with every encounter, formation and
 draw the game can deal at its point in the route, not the one its fixture
