@@ -1002,6 +1002,16 @@ class Board:
                 running.append(f"{e['name']} ({', '.join(run)})")
         out["running"] = running
         out["done"] = sum(e["status"] == "done" for e in out["edges"])
+        if all("deps" in e for e in out["edges"]):
+            # time left from the merged statuses, not the base tree's own: a
+            # segment done on any machine is done.  The suite phase is the
+            # least any machine has left.
+            rem = sum((e["dur"] or 60) for e in out["edges"]
+                      if e["status"] != "done")
+            suite = min(p.get("suite_s") or 0.0 for p in per_p.values())
+            eta = max(critical_path(out["edges"]),
+                      (rem + suite) / (base.get("par") or 1))
+            out["eta_min"] = int(eta / 60)
         return out
 
     def _dump(self, fname, obj):
@@ -1199,7 +1209,10 @@ def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
         if st == "done":
             done += 1
         ed = {"name": n, "dur": cost, "status": st,
-              "ckpt": bool(e.get("checkpoint"))}
+              "ckpt": bool(e.get("checkpoint")),
+              # what it waits on, so merge_progress can redo the ETA
+              "deps": [d for d in (e.get("prev"), e.get("seed"), e.get("after"))
+                       if d]}
         if n in xy:   # WoB world-tile coords for the map view
             ed["x"], ed["y"] = round(xy[n][0], 1), round(xy[n][1], 1)
         if live_test and live_test in names:
@@ -1211,21 +1224,9 @@ def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
     for e in states:
         for x in [e["state"]] + list(e.get("also") or []):
             owner[x] = e["state"]
-    fin = {}
-    idx = {e["state"]: d for e, d in zip(states, edges)}
-    def finish(e):
-        n = e["state"]
-        if n in fin:
-            return fin[n]
-        b = 0.0
-        for dep in (e.get("prev"), e.get("seed"), e.get("after")):
-            if dep:
-                b = max(b, finish(next(x for x in states
-                                       if x["state"] == owner[dep])))
-        mine = 0.0 if idx[n]["status"] == "done" else (idx[n]["dur"] or 60)
-        fin[n] = b + mine
-        return fin[n]
-    eta = max((finish(e) for e in states), default=0.0)
+    for ed in edges:
+        ed["deps"] = [owner[d] for d in ed["deps"] if d in owner]
+    eta = critical_path(edges)
     # `eta` so far is the savestate critical path -- the serial savestate
     # chain.  A full build has a phase the chain does not see: the suite
     # tests, many of which run in parallel once the ROM is built and their
@@ -1240,8 +1241,7 @@ def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
         rom_m = os.path.getmtime(os.path.join(ROOT, "build/ot6.sfc"))
     except OSError:
         rom_m = 0.0
-    rem_state = sum((idx[e["state"]]["dur"] or 60)
-                    for e in states if idx[e["state"]]["status"] != "done")
+    rem_state = sum((e["dur"] or 60) for e in edges if e["status"] != "done")
     rem_suite = 0.0
     for name, secs in qdur.items():
         ok = os.path.join(ROOT, f"build/results/suite/{name}.ok")
@@ -1259,7 +1259,25 @@ def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
             # or None when nothing is on the live view
             "live": owner.get(live_test) if live_test else None,
             "elapsed_min": int((time.time() - t0) / 60),
-            "eta_min": int(eta / 60)}
+            "eta_min": int(eta / 60), "suite_s": rem_suite, "par": par}
+
+
+def critical_path(edges):
+    """Seconds left on the longest chain of not-done edges: each edge's
+    ninja-log duration (60 s when it has none), after the edges it waits
+    on (its "deps")."""
+    by = {e["name"]: e for e in edges}
+    fin = {}
+
+    def finish(n):
+        if n not in fin:
+            fin[n] = 0.0                        # a cycle reads as no wait
+            e = by[n]
+            b = max((finish(d) for d in e.get("deps", []) if d in by),
+                    default=0.0)
+            fin[n] = b + (0.0 if e["status"] == "done" else (e["dur"] or 60))
+        return fin[n]
+    return max((finish(n) for n in by), default=0.0)
 
 
 def newest_workspace():
