@@ -13,7 +13,10 @@
 --   1b. The bag's Peace Rings on once Muddle has been seen, since every
 --      body in the cave Muddles: whoever lacks one, at each arrival in the
 --      cave and the basements; the usual relics back for the Tentacles and
---      the save (route-wor-edgar 12.4, #320).
+--      the save (route-wor-edgar 12.4, #320).  The bag's Back Guard on
+--      CELES from the cave's door (no back or pincer attacks), and a
+--      Muddled ally left to the monsters' hits, no cure-hit from a Genji
+--      pair (backGuard, CAVE_FIGHT; route-wor-edgar 12.5).
 --   2. The Figaro cave behind the thieves: map 68's three pieces by their
 --      links, the turtle scene on 90's arrival tile, the crossing (face up
 --      and hold A on (47,29)), 92, 53, and the castle's basement 61, where
@@ -24,7 +27,8 @@
 --      link is a leg of its own (the navigator plans within one piece).
 --   4. The stop before the Tentacles: no element in any hand (they absorb
 --      fire, ice and bolt between them, and the runner's absorb guard
---      refuses such a fight), the field care to full.
+--      refuses such a fight), the field care to full -- and again on the
+--      tile below Gerad, after the few steps up (route-wor-edgar 12.5).
 --   5. Gerad at the engines: EDGAR joins (dressed by the game's Optimum from
 --      the bag) and battle 84 opens: the Tentacles, fought by the tactical
 --      driver with SABIN's blitz set to Air Blade.  A loss is a game over,
@@ -46,6 +50,7 @@ local CAVE_DOOR = { 106, 98 }
 local REGALCUTLASS, METALKNUCKLE, MITHRIL_SHLD, ENHANCER = 0x0B, 0x53, 0x5C, 0x13
 local THUNDERBLADE, FIRE_KNUCKLE, SOUL_SABRE = 0x0F, 0x57, 0x16
 local JEWEL_RING, STAR_PENDANT, PEACE_RING, BLACK_BELT = 0xB5, 0xB1, 0xB2, 0xD5
+local BACK_GUARD = 0xE1                             -- no back or pincer attacks (ChooseBattleType @2e3a)
 local RAMUH = 0                                     -- esper index
 local AIR_BLADE = 0x62                              -- SABIN's blitz, learned at L30
 local TENTACLES_FORM = 454                          -- event battle 84
@@ -100,34 +105,70 @@ end
 local function wearsPeace(ch)
   return H.readByte(c(ch, 0x23)) == PEACE_RING or H.readByte(c(ch, 0x24)) == PEACE_RING
 end
+local function wearsBackGuard(ch)
+  return H.readByte(c(ch, 0x23)) == BACK_GUARD or H.readByte(c(ch, 0x24)) == BACK_GUARD
+end
+-- The Back Guard (the bag holds one, $E1) on CELES in place of her Jewel
+-- Ring for the cave and the basements: it takes the back and pincer
+-- attacks off the table, and a back attack or a pincer turns the pair's
+-- back row to the front, where the monsters' blows and a Muddled ally's
+-- Genji pair land in full.  The party has met that already (Tzen's house,
+-- where gen_wor_sabin wears it for the same reason, #250); a person with
+-- one in the bag wears it into a cave.  Measured on the re-cut chain's cave
+-- mouth (route-wor-edgar 12.5): without it 96 of 651 formation-232 fights
+-- were a back attack or a pincer and 4 of those were lost (2 of the 555
+-- normal ones); with it 330 fights, all normal, none lost.  CELES rather
+-- than SABIN: the Peace Ring goes to SABIN first (peaceRings), and nothing
+-- in the cave Petrifies (her Jewel Ring's guard).
+local function backGuard(what, hands)
+  local m = MEMBERS[3]
+  return H.cond(function()
+    return inParty(CELES) and not wearsBackGuard(CELES) and H.invCountOf(BACK_GUARD) > 0
+  end, { H.equipKit(CELES, { { 5, BACK_GUARD } }, { tag = "CELES: the Back Guard (" .. what .. ")" }),
+         hands and handsBack(m, hands[CELES], what) or H.seqStep({}) }, {})
+end
 local function peaceRings(what, hands)
   local steps = {}
   for _, m in ipairs(MEMBERS) do
     local keep = hands and hands[m[1]]
     steps[#steps + 1] = H.cond(function()
       return (H.statusSeen.Muddle or 0) > 0 and inParty(m[1]) and not wearsPeace(m[1])
-        and H.invCountOf(PEACE_RING) > 0
+        and not wearsBackGuard(m[1]) and H.invCountOf(PEACE_RING) > 0
     end, { H.equipKit(m[1], { { 5, PEACE_RING } }, { tag = m[2] .. ": a Peace Ring (" .. what
              .. ", Muddle seen this run)" }),
            keep and handsBack(m, keep, what) or H.seqStep({}) }, {})
   end
   return H.seqStep(steps)
 end
--- each member's own relic back in place of a Peace Ring (slot 5, where
--- peaceRings puts it), from the bag
+-- each member's own relic back in place of a Peace Ring or the Back Guard
+-- (slot 5, where peaceRings and backGuard put them), from the bag
 local USUAL_RELIC = { [SABIN] = BLACK_BELT, [EDGAR] = STAR_PENDANT, [CELES] = JEWEL_RING }
 local function usualRelics(what, hands)
   local steps = {}
   for _, m in ipairs(MEMBERS) do
     local keep = hands and hands[m[1]]
     steps[#steps + 1] = H.cond(function()
-      return inParty(m[1]) and H.readByte(c(m[1], 0x24)) == PEACE_RING
+      local r = H.readByte(c(m[1], 0x24))
+      return inParty(m[1]) and (r == PEACE_RING or r == BACK_GUARD)
         and H.invCountOf(USUAL_RELIC[m[1]]) > 0
-    end, { H.equipKit(m[1], { { 5, USUAL_RELIC[m[1]] } }, { tag = m[2] .. ": the Peace Ring off (" .. what .. ")" }),
+    end, { H.equipKit(m[1], { { 5, USUAL_RELIC[m[1]] } }, { tag = m[2] .. ": the usual relic back (" .. what .. ")" }),
            keep and handsBack(m, keep, what) or H.seqStep({}) }, {})
   end
   return H.seqStep(steps)
 end
+-- The cave's fights leave a Muddled ally to the monsters' hits, which clear
+-- Muddle the same way (CalcMaxDmg strips it from a physically damaged
+-- target), rather than the Muddle rule's cure-hit (#170): here the hitter
+-- carries a Genji pair, and its cure-hit is the party's biggest hit --
+-- SABIN's took 947 of CELES's 1038 with the Peace Ring on him, and a
+-- monster finished her (build/attempts/wt/edgar-regress/arms/
+-- new_ringnow_c68/er_k1_s0_c68_w41.log: `[unmuddle] actor 1 (char 5)'s hit
+-- on entity 0 took 947 (1038 -> 91)`).  Measured on the re-cut chain's
+-- cave mouth (formation 232, the pair, 33 runs of 6 battles an arm):
+-- SABIN's ring on once Muddle is seen, with the cure-hit, lost 4 of 159
+-- fights (7 with a death); the same without it lost 0 of 165 (2); bare,
+-- 1 of 162 (6) and 1 of 165 (3) (route-wor-edgar 12.5).
+local CAVE_FIGHT = { unmuddle = false }
 -- the hands the cave is walked in, put back after a ring's Optimum
 local CAVE_HANDS = { [SABIN] = { FIRE_KNUCKLE, FIRE_KNUCKLE }, [CELES] = { ENHANCER, THUNDERBLADE } }
 local function supplies()
@@ -206,7 +247,7 @@ local function walkInto(x, y, dst, what, avoid, story)
   return H.seqStep({
     H.repeatN(3, {
       H.cond(function() return not there() end, {
-        H.navTo(x, y, { maxFrames = 12000, playBattles = "tactical", avoid = avoid,
+        H.navTo(x, y, { maxFrames = 12000, playBattles = "tactical", fight = CAVE_FIGHT, avoid = avoid,
           arrive = function() return map() == dst end }),
         H.release(),
         H.waitUntil(function() return map() == dst end, 600, what .. ": onto map " .. dst, 5),
@@ -236,10 +277,14 @@ end
 -- build/attempts/wt/wor-edgar/leg3/ed9.log; a cave battle on the way to
 -- Siegfried, which the [outcome] count caught: `an [outcome] said for every
 -- battle fought ... got 28, want 29`, leg3/var_ed3/k3_s0.log).
-local function talkUp(x, y, started, what)
+-- `topUp`: the field care to full on the tile below, before the talk --
+-- for a talk that opens a boss, where a random battle on the few steps up
+-- would otherwise send the party in hurt.
+local function talkUp(x, y, started, what, topUp)
   local ph = 0
   return H.seqStep({
-    H.navTo(x, y + 1, { maxFrames = 6000, playBattles = "tactical" }),
+    H.navTo(x, y + 1, { maxFrames = 6000, playBattles = "tactical", fight = CAVE_FIGHT }),
+    topUp and H.fieldCare({ threshold = 1.0, tag = what .. ": topped up on the tile below" }) or H.seqStep({}),
     H.withReset(H.driveUntil(function()
       return started() or (H.eventRunning() and not H.battleLoadStarted() and H.dialogWaiting())
     end, 1200, {
@@ -258,7 +303,7 @@ end
 -- moved to the link's far side), fighting what comes on the way
 local function crossLink(x, y, across, what)
   return H.seqStep({
-    H.navTo(x, y, { maxFrames = 12000, playBattles = "tactical", arrive = across }),
+    H.navTo(x, y, { maxFrames = 12000, playBattles = "tactical", fight = CAVE_FIGHT, arrive = across }),
     H.release(),
     H.waitUntil(function() return across() and H.hasControl() and H.tileAligned() end, 900,
       what .. ": across", 5),
@@ -276,7 +321,8 @@ local function chest(x, y, bit, what, item)
     local sx, sy = x + c[1], y + c[2]
     steps[#steps + 1] = H.cond(function()
       return not H.chestOpen(bit) and H.bfsPath(sx, sy) ~= nil
-    end, { H.openChest({ stand = { sx, sy }, face = c[3], bit = bit, what = what, item = item }) }, {})
+    end, { H.openChest({ stand = { sx, sy }, face = c[3], bit = bit, what = what, item = item,
+             nav = { fight = CAVE_FIGHT } }) }, {})
   end
   steps[#steps + 1] = H.call(function()
     if not H.chestOpen(bit) then
@@ -365,6 +411,11 @@ H.run({ maxFrames = 600000 }, {
       H.invCountOf(PEACE_RING), H.statusSeen.Muddle or 0))
   end),
   peaceRings("before the cave", CAVE_HANDS),
+  H.call(function()
+    H.assertEq(H.invCountOf(BACK_GUARD) >= 1 or wearsBackGuard(CELES), true,
+      "the bag holds a Back Guard for the cave (wor-south-figaro-v1's bag: $E1 x1)")
+  end),
+  backGuard("before the cave", CAVE_HANDS),
 
   -- ---- 1. into the Figaro cave ------------------------------------------------------------
   H.worldNavTo(CAVE_DOOR[1], CAVE_DOOR[2], { maxFrames = 6000, playBattles = "tactical",
@@ -374,7 +425,7 @@ H.run({ maxFrames = 600000 }, {
   H.call(function() say("cave", "in the cave") end),
   H.cond(function() return sw(0x0398) == 1 end, {
     talkUp(14, 36, function() return sw(0x0399) == 1 end, "Siegfried at the cave's mouth (14,36)"),
-    H.advanceStory(function() return sw(0x0399) == 1 and H.hasControl() and not H.dialogWaiting() end, 3000, { playBattles = "tactical" }),
+    H.advanceStory(function() return sw(0x0399) == 1 and H.hasControl() and not H.dialogWaiting() end, 3000, { playBattles = "tactical", fight = CAVE_FIGHT }),
   }, {}),
   -- map 68 is three pieces joined by same-map links (route_data field-path
   -- 68 16 42 10 2: 70 steps through (14,33) -> (55,56) and (61,57) ->
@@ -391,13 +442,13 @@ H.run({ maxFrames = 600000 }, {
   walkInto(10, 2, MAP_CAVE2, "the cave: on to map 90", nil, true),
   H.advanceStory(function()
     return sw(0x0383) == 1 and H.hasControl() and H.tileAligned() and not H.dialogWaiting() and bright() >= 15
-  end, 12000, { playBattles = "tactical" }),
+  end, 12000, { playBattles = "tactical", fight = CAVE_FIGHT }),
   H.call(function()
     say("cave", "the turtle is fed")
     H.assertEq(sw(0x0383), 1, "the turtle scene ran ($0383, _ca76e1)")
   end),
   -- the crossing: (47,29) facing up with A held carries the party to (47,25)
-  H.navTo(47, 29, { maxFrames = 6000, playBattles = "tactical" }),
+  H.navTo(47, 29, { maxFrames = 6000, playBattles = "tactical", fight = CAVE_FIGHT }),
   H.faceAndHoldA("up", function() return H.fieldY() <= 25 and H.hasControl() and H.tileAligned() end,
     3000, "the turtle: face up and hold A on (47,29) -- _ca76b3"),
   H.release(),
@@ -415,13 +466,13 @@ H.run({ maxFrames = 600000 }, {
   walkInto(21, 56, MAP_B1, "the cave: into the castle's basement"),
   H.advanceStory(function()
     return map() == MAP_B1 and H.hasControl() and H.tileAligned() and not H.dialogWaiting() and bright() >= 15
-  end, 6000, { playBattles = "tactical" }),
+  end, 6000, { playBattles = "tactical", fight = CAVE_FIGHT }),
   H.call(function() say("castle", "basement 1") end),
-  H.navTo(35, 40, { maxFrames = 3000, playBattles = "tactical",
+  H.navTo(35, 40, { maxFrames = 3000, playBattles = "tactical", fight = CAVE_FIGHT,
     arrive = function() return sw(0x026E) == 1 end }),
   H.advanceStory(function()
     return sw(0x026E) == 1 and H.hasControl() and H.tileAligned() and not H.dialogWaiting()
-  end, 6000, { playBattles = "tactical" }),
+  end, 6000, { playBattles = "tactical", fight = CAVE_FIGHT }),
   H.call(function() say("castle", "Gerad went on ahead") end),
   peaceRings("basement 1", CAVE_HANDS),
   -- basement 1 is two rooms joined through the castle's lower hall, map 59:
@@ -447,11 +498,11 @@ H.run({ maxFrames = 600000 }, {
   chest(82, 14, 0x097, "X-Potion", 0xEA),
   chest(86, 14, 0x098, "Gravity Rod", 0x3A),
   chest(88, 14, 0x099, "Crystal Helm", 0x7E),
-  H.crossDoor(84, 3, MAP_B2, 8, 17, "basement 3's stairs 63(84,3)->62(8,17)"),
+  H.crossDoor(84, 3, MAP_B2, 8, 17, "basement 3's stairs 63(84,3)->62(8,17)", { fight = CAVE_FIGHT }),
   control("basement 2, the engine-room floor"),
   peaceRings("basement 2, the engine-room floor", CAVE_HANDS),
   H.call(function() say("castle", "basement 2, the engine-room floor") end),
-  H.crossDoor(8, 6, MAP_ENGINE, 29, 20, "the engine room's door 62(8,6)->64(29,20)"),
+  H.crossDoor(8, 6, MAP_ENGINE, 29, 20, "the engine room's door 62(8,6)->64(29,20)", { fight = CAVE_FIGHT }),
   control("the engine room"),
   H.call(function() say("castle", "the engine room") end),
   checkOutcomes("the cave and the basements"),
@@ -507,7 +558,14 @@ H.run({ maxFrames = 600000 }, {
     H.assertEq((H.readByte(0x1D28) & 0x20) ~= 0, true,
       string.format("SABIN knows Air Blade ($1D28 bit 5; SABIN L%d, BlitzLevelTbl 30)", level(SABIN)))
   end),
-  talkUp(29, 16, function() return sw(0x02F4) == 1 end, "Gerad at the engines (29,16)"),
+  -- The care to full again on the tile below Gerad: the three steps up from
+  -- the door can meet a random battle after the stop's care (measured on
+  -- the re-cut chain: a battle there in 8 of the 23 runs that reached it,
+  -- none in the old chain's 15, the party then
+  -- entering the Tentacles at 1129/1595 and 1263/1609 (build/attempts/wt/
+  -- edgar-regress/before_snap/k7_s0.log), and a lab draw that met one lost
+  -- the Tentacles from 1095/1319 (tent/new_base/er_k7_s0_e64p_w18.log)).
+  talkUp(29, 16, function() return sw(0x02F4) == 1 end, "Gerad at the engines (29,16)", true),
   H.advanceStory(function()
     return sw(0x00C6) == 1 and H.hasControl() and H.tileAligned() and not H.dialogWaiting()
       and bright() >= 15
@@ -530,6 +588,7 @@ H.run({ maxFrames = 600000 }, {
   H.fieldCare({ tag = "after the Tentacles" }),
   H.equipKit(EDGAR, { { 4, JEWEL_RING }, { 5, STAR_PENDANT } }, { tag = "EDGAR relics" }),
   peaceRings("after the Tentacles"),
+  backGuard("after the Tentacles"),
   H.equipKit(CELES, { { 0, ENHANCER }, { 1, THUNDERBLADE } }, { tag = "CELES: the ThunderBlade back" }),
   H.equipKit(SABIN, { { 0, FIRE_KNUCKLE }, { 1, FIRE_KNUCKLE } }, { tag = "SABIN: the Fire Knuckles back" }),
   H.equipEsper(function() return (H.readByte(0x1850 + EDGAR) >> 3) & 3 end, RAMUH,
@@ -539,9 +598,10 @@ H.run({ maxFrames = 600000 }, {
   end),
 
   -- ---- the Soul Sabre, behind the engines (64 (29,5) -> 65; chest bit $09B) ------------------
-  H.crossDoor(29, 5, 65, 68, 16, "behind the engines 64(29,5)->65(68,16)"),
-  H.openChest({ stand = { 68, 11 }, face = "up", bit = 0x09B, what = "Soul Sabre", item = SOUL_SABRE }),
-  H.navTo(68, 16, { maxFrames = 3000, playBattles = "tactical" }),
+  H.crossDoor(29, 5, 65, 68, 16, "behind the engines 64(29,5)->65(68,16)", { fight = CAVE_FIGHT }),
+  H.openChest({ stand = { 68, 11 }, face = "up", bit = 0x09B, what = "Soul Sabre", item = SOUL_SABRE,
+    nav = { fight = CAVE_FIGHT } }),
+  H.navTo(68, 16, { maxFrames = 3000, playBattles = "tactical", fight = CAVE_FIGHT }),
   (function()
     return H.seqStep({
       H.driveUntil(function() return map() == MAP_ENGINE end, 600, { H.hold({ "down" }) }, "back to the engine room"),
@@ -563,8 +623,8 @@ H.run({ maxFrames = 600000 }, {
   -- whose only way on is back to basement 3 (measured: from 62 (3,12) no
   -- path to (13,12) off its (2,13) door); the way to basement 1 is the
   -- east stairs (87,5) -> (56,14) and (53,5) -> 62 (13,7)
-  H.crossDoor(87, 5, MAP_B3, 56, 14, "basement 3's stairs 63(87,5)->63(56,14)"),
-  H.crossDoor(53, 5, MAP_B2, 13, 7, "basement 3's stairs 63(53,5)->62(13,7)"),
+  H.crossDoor(87, 5, MAP_B3, 56, 14, "basement 3's stairs 63(87,5)->63(56,14)", { fight = CAVE_FIGHT }),
+  H.crossDoor(53, 5, MAP_B2, 13, 7, "basement 3's stairs 63(53,5)->62(13,7)", { fight = CAVE_FIGHT }),
   control("basement 2"),
   peaceRings("the way back: basement 2's west", CAVE_HANDS),
   -- basement 2's other exits are on the way: a plan through (2,13) is back
@@ -574,12 +634,12 @@ H.run({ maxFrames = 600000 }, {
   H.call(function() say("castle", "back in basement 1") end),
   -- the engineer's trigger (5,35): with $00C6 set, "It's been fixed!
   -- Next stop, the surface!" (_ca69fd)
-  H.navTo(5, 35, { maxFrames = 6000, playBattles = "tactical",
+  H.navTo(5, 35, { maxFrames = 6000, playBattles = "tactical", fight = CAVE_FIGHT,
     arrive = function() return sw(0x00C7) == 1 or H.eventRunning() end }),
   H.advanceStory(function()
     return sw(0x00C7) == 1 and H.hasControl() and H.tileAligned() and not H.dialogWaiting()
       and bright() >= 15
-  end, 12000, { playBattles = "tactical" }),
+  end, 12000, { playBattles = "tactical", fight = CAVE_FIGHT }),
   H.call(function()
     say("castle", "the castle has surfaced")
     H.assertEq(sw(0x00C7), 1, "the castle surfaced ($00C7, _ca69fd)")
@@ -590,7 +650,8 @@ H.run({ maxFrames = 600000 }, {
   usualRelics("out of the cave", CAVE_HANDS),
   H.call(function()
     for _, m in ipairs(MEMBERS) do
-      H.assertEq(wearsPeace(m[1]), false, m[2] .. " leaves the cave in the usual relics, no Peace Ring")
+      H.assertEq(wearsPeace(m[1]) or wearsBackGuard(m[1]), false,
+        m[2] .. " leaves the cave in the usual relics, no Peace Ring or Back Guard")
     end
   end),
 
@@ -601,7 +662,7 @@ H.run({ maxFrames = 600000 }, {
   walkInto(11, 32, 59, "basement 1 -> the lower hall"),
   walkInto(12, 50, MAP_CASTLE, "the lower hall -> the castle"),
   H.call(function() say("castle", "in the castle") end),
-  H.navTo(28, 42, { maxFrames = 6000, playBattles = "tactical" }),
+  H.navTo(28, 42, { maxFrames = 6000, playBattles = "tactical", fight = CAVE_FIGHT }),
   H.driveUntil(function() return H.worldMode() end, 3000, { H.hold({ "down" }) }, "out of Figaro Castle to the world"),
   H.release(),
   (function()

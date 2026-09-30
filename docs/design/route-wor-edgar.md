@@ -1144,7 +1144,99 @@ in a pincer, CELES Muddled at f+327 and SABIN's cure-hit then taking
 actor 1 (char 5)'s hit on entity 0 took 898 (1132 -> 234)`); the same
 K passes in `final/`, whose frames part from it inside the cave (map 53 at f113218 against f112513).
 
+### 12.5 After the re-cut (#326, #317): the Back Guard, no cure-hit, a top-up below Gerad
+
+The re-cut chain (`wor-south-figaro-v1` at L29/28, CELES without Ice 2)
+passed the leg's variation set 7 of 12 (`build/attempts/wt/recut/var/
+var_edgar/`: formation 232 lost in 3, the Tentacles in 2), where the old
+chain had passed 15 of 15. Evidence under `build/attempts/wt/edgar-regress/`
+(`README.txt`), all on ROM `1ef410a3`, retries off.
+
+**The party is not what changed.** Both chains grind to L30/L30 and meet
+the cave with the same maximum HP and MP, stats, kit, espers and blitzes
+(`analysis/fixture_party.txt`: vigor, speed, stamina and magic
+34/34/31/36 and 47/37/39/28 on both fixtures): `[wor] grind done f50293
+after 17 legs: CELES L30 HP 1281/1495 MP 290/290 ...; SABIN L30 HP
+1509/1509 MP 278/278 ...; potion=59 fenix=29 ... gil=225443` against the
+old chain's `after 37 legs: CELES L30 HP 1495/1495 MP 290/290 ...;
+potion=56 fenix=28 ... gil=249815`. CELES's missing Ice 2 is never cast
+here: neither chain plans Magic in a cave fight (Fight, a Cure, an item or
+a deferred Muddled window; `analysis/cave_plans_*.txt`). The shorter grind
+leaves CELES at L31 rather than L32 at the Tentacles. On the same
+instrument the two chains' cave is the same: from the cave mouth, 33 runs
+of 6 battles, formation 232 won 161 of 162 (6 with a death) on the re-cut
+chain and 163 of 164 (9) on the old (`arms/new_base_c68`,
+`arms/old_base_c68`; the old chain's run reproduces #320's `base_c68`
+line for line). The old K = 0-10 set on this ROM passes 11 of 11 again
+(`oldchain_snap/`), the re-cut one 9 of 11, plus 4 of 4 at shifts 23/41
+(`before_snap/`). What moved is the draw: the frame phase each battle
+seeds from (InitBattle takes `$021e`, the game clock's frames, 0-59) and
+the encounter counter, and three things that draw finds:
+
+- **Back attacks and pincers.** They turn the pair's back row to the
+  front, and a Muddled ally's Genji pair and the monsters' blows land in
+  full. Across the re-cut chain's runs formation 232 lost 2 of its 11 back
+  attacks (5 with a death) against 2 of 139 normal fights
+  (`analysis/battle_type_*.txt`); in the lab 4 of 96 back attacks and
+  pincers were lost against 2 of 555 normal fights, and the old chain's
+  one loss is a back attack. The bag holds a Back Guard ($E1, the relic
+  #250 put on CELES for Tzen's house): on CELES in place of her Jewel Ring,
+  330 lab fights, all normal, none lost, 6 with a death
+  (`arms/new_bg_nocure_c68`, `arms/new_bg_ringnow_nocure_c68`).
+- **The cure-hit with the Peace Ring on.** With SABIN's ring on, Muddle
+  lands on CELES and SABIN's cure-hit is a Genji pair: `[unmuddle] actor 1
+  (char 5)'s hit on entity 0 took 947 (1038 -> 91)`, and a monster
+  finished her (`arms/new_ringnow_c68/er_k1_s0_c68_w41.log`). The ring on
+  as soon as Muddle is seen lost 4 of 159 with the cure-hit and 0 of 165
+  without it (7 fights with a death against 2); bare, 1 of 162 and 1 of
+  165. SABIN's measured cure-hits are mostly 175-277 but 739-988 in 10
+  of 80 (`analysis/cure_hits.txt`), against the rule's unmeasured floor
+  of a quarter of the ally's max HP (373-398). A monster's hit clears Muddle the same way.
+- **A random battle between the stop and Gerad.** The three steps up from
+  the engine room's door met one after the stop's care in 8 of the 23
+  re-cut runs that got there and none of the old chain's 26
+  (`analysis/tent_entry.txt`; `before_snap/k7_s0.log` opened the Tentacles
+  at `partyhp=1129,1263,1600`). From the engine room's snapshots the
+  Tentacles were won 24 of 24 without such a battle and 15 of 18 with one
+  (`tent/new_base/`); topped up on the tile below Gerad, 42 of 42
+  (`tent/new_topup/`).
+
+**What changed.** gen_wor_edgar wears the Back Guard on CELES from the
+cave's door to the stop before Edgar and again after the Tentacles (her
+Jewel Ring back for the Tentacles and the save; the Peace Rings go to
+SABIN and EDGAR), leaves a Muddled ally to the monsters in the cave and
+the basements (`unmuddle = false`, CAVE_FIGHT), and cares to full again on
+the tile below Gerad. The leg under the same variation (K = 0-10 at shift
+0, K = 0 and 3 at shifts 23 and 41; `after2/`): **13 of 15**; formation 232
+fought 57 times, all won, none with a death, every battle a normal layout
+(`analysis/cavestats_after2.txt`); the two losses are the Tentacles, from
+full HP with no battle before them (`k8_s0`: `battle $1C6 LOST after 18804
+ticks`, `k10_s0`: `LOST after 17612 ticks`). The same set with only the
+top-up and no cure-hit (`after1/`) passed 12 of 15: the Tentacles twice
+and formation 232 once, in the back attack every re-cut run with this
+draw meets (`k3_s23`: `[layout] battle type $01 (back attack)`, the same
+frames as the re-cut's). `wor-edgar-v1` is re-cut through the generator
+(`capture/capture_edgar.log`: `PASS (frame 101654) attempts=1/3`, sealed
+`bd3d3dce...`, `holds=slot 3 world 1 (81,86)`; the Continue probe passes).
+
+**The Tentacles stay a coin flip.** Every in-battle draw of the fight is
+one of 60 (`$021e`), so a sweep of 60 waits from one engine-room snapshot
+covers them: 59 of 60 and 54 of 60 from two re-cut states at
+L31/31/31 (`tent/sweep60_k0`, `tent/sweep60_k2`); across the re-cut
+chain's generator runs 45 of 52. Levels are not the lever at this
+size: a grind to L32 (48-52 legs against 17) meets the Tentacles at
+L33-34 and won 59 of 60 from its K = 2 state (`tent/sweep60_L32_k2`),
+while the old chain's L32/31/31 states lost 4 of 33 (`tent/old_base`);
+the cave at L32 lost 2 of 176 against 2 of 150 at L30 from the same two
+draws (`arms/L32_base_c68`, `arms/L30_k02_c68`). The grind stays at L30.
+
 ## 13. What is left, and what the owner may want to decide
+
+- **The Tentacles** (12.2, 12.5): lost from full HP in about one draw in
+  ten (1 and 6 of 60 in two states' sweeps; 7 of 52 re-cut generator
+  runs), most deaths the Seize's drain (`cmd $2D`). A lab on the Seize (who acts while a
+  member is held, and whether Air Blade's turns are the right ones) is the
+  next step; levels did not move it measurably.
 
 - **The cave's Muddle** (12.4): with the Peace Rings the pair still
   loses 1 or 2 formation-232 fights in about 165 in the lab, each with
