@@ -1187,7 +1187,17 @@ def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
 
     def fresh(x):   # compose's verdict, remembered while its inputs stand
         if x not in verdicts:
-            verdicts[x] = compose.stamp_status(x, rootp, chain)[0] not in stale
+            try:
+                verdicts[x] = (compose.stamp_status(x, rootp, chain)[0]
+                               not in stale)
+            except Exception:
+                # A check that raised (a checkpoint extra gone missing) is
+                # not fresh, and the in-progress marks it left in compose's
+                # memo would read as "nothing to check" next time: drop
+                # them.
+                for k in [k for k, v in chain.items() if v is None]:
+                    del chain[k]
+                verdicts[x] = False
         return verdicts[x]
 
     dur, qdur = {}, {}
