@@ -33,6 +33,12 @@ every step of that dance hits for the boosted amount (x2, x4 or x8)
 until the dance ends. The price is unchanged, paid once when the dance
 starts.
 
+**A Dance that stumbles costs nothing.** Away from its own terrain, a
+Dance still stumbles half the time, as in the original. A stumble used to
+take the Dance's MP and any boost pips even though no dance started. Now
+a stumble costs no MP and no pips, and Mog gains his pip for the turn as
+he would after any unboosted action.
+
 **Terra and Celes learn short spell lists, Espers give short ones, and stronger
 spells come only from boosting.** Nobody learns Fire 2, Ice 3, Cure 2 or any
 other stronger version by level, and no Esper gives one: boost the plain
@@ -70,3 +76,11 @@ Now any Pummel ends the fight, Broken or not. The same rule covers every
 boss whose story ends the battle on a counter: a Broken boss still loses
 its counterattacks, but not the scene that ends the fight. At Esper Mountain, Relm now arrives
 when her cue comes even if Ultros is Broken.
+
+**Story scenes a boss answers you with play even while it is Broken.**
+Some bosses answer your hits with a scene rather than an attack. When the
+boss was Broken, that scene used to wait until it recovered, or until it
+died. Now it plays on cue: on the airship, Ultros calls Chupon in as soon
+as you have hurt him enough, Broken or not; on the Lete River, Fire on a
+Broken Ultros gets his "Seafood soup!", but not the attack that follows
+it. A Broken boss still gets no attacks and no turns.

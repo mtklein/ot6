@@ -1763,9 +1763,10 @@ OT6_LIFE3_ID = $35
         ; turns queue through the same CreateAction (RandDanceAction,
         ; battle_main.asm:617), but by then Cmd_13 has set the actor's DANCE
         ; status ($3ef8 bit 0).  one payment starts the whole-battle state,
-        ; and every locked-in step is free.  a
-        ; stumbled start (Cmd_13's 50% @17af arm) clears the bit, so retrying the
-        ; commit pays again, because the payment moment is the commit moment.
+        ; and every locked-in step is free.  a stumbled start (Cmd_13's 50%
+        ; @17af arm) starts nothing and pays nothing: Ot6DanceStumble drops
+        ; the price this arm queued before the charge reads it (#313).  the
+        ; next commit is a fresh start and is priced here again.
         ; X = attacker entity at this hook (the site contract above).
         pla                     ; drop the parked cost (0 for dance)
         lda     $3ef8,x         ; status 3
@@ -1959,6 +1960,40 @@ Ot6ThiefCostTbl:
         sta     f:$7e0000+OT6_DANCETIER,x
         plx
 @go:    clc
+        rtl
+.endproc
+
+; [ a stumbled Dance start costs nothing ]
+;
+; Off its terrain a Dance start stumbles half the time (vanilla's roll in
+; Cmd_13, kept as it is): the DANCE status is cleared again, the dancer
+; spends the turn on the "Stumbled!!" self-action, and no dance begins, so
+; neither its multiplier nor its whole-battle state was bought (#313; the
+; boost pays once, or costs nothing).  Both prices are still only queued
+; here: the MP in $3a4c, charged by CalcAttackEffect when the stumble's
+; self-action executes, and the pips in the pending boost, spent by
+; Ot6ActionEnd at the end of this turn.  Dropping them now means neither is
+; charged, rather than charged and handed back, and the turn ends exactly
+; as an unboosted stumble would, regen pip included.  A locked-in step
+; that stumbles (a second dancer moved the background) already queued 0
+; and holds no pending boost, so this is a no-op there.
+;
+; The pending boost is gone, so this caster's magic rows fall back off
+; their folded prices, the same request Ot6ActionEnd's spend arm makes.
+;
+; entry: jsl from Cmd_13's stumble arm, a8/i8, y = attacker entity (a
+; character: only a character dances), db=$7e.  clobbers a; preserves x/y.
+.proc Ot6DanceStumble
+        .a8
+        stz     $3a4c           ; the queued MP: CalcAttackEffect charges 0
+                                ;   (8-bit, vanilla's own imp clear at
+                                ;   InitPlayerAction; $3a4d is never set)
+        lda     #$00
+        sta     OT6_BOOST_REVEALED,y    ; the queued pips: Ot6ActionEnd
+                                        ;   finds nothing pending
+        lda     $3204,y
+        ora     #$80            ; vanilla's "recheck enabled magic" request
+        sta     $3204,y
         rtl
 .endproc
 

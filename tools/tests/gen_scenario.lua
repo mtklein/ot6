@@ -229,6 +229,7 @@ local MENU, ACTOR = 0x7bca, 0x62ca -- battle menu open flag / whose menu
 local BP = 0x3e9c                  -- banked boost points, +slot*2
 local nBattles = 0
 local lost = nil                   -- set by the in-battle loss guards
+local u1Req = nil                  -- the ultros1_entry capture
 -- The per-turn action, built LIVE (the boost prefix depends on the actor's
 -- banked BP this instant).  BOOST IS THE SYSTEM'S OWN LEVER (battle_boost:
 -- R raises pending, cap 3, never past bp; a boosted action spends the
@@ -432,6 +433,11 @@ local function rideUntil(pred, what, budget, idle, tier)
                   "OT6_SLASH|OT6_PIERCE) -- fighting him for real", i,
                   monHp(i), monShields(i)))
                 H.screenshot("scenario_ultros")
+                -- ultros1_entry (battle_ultros1 boots it): his battle, three
+                -- frames into its load, captured with no frames spent and
+                -- emitted after the hub save; a lost attempt's capture is
+                -- replaced by the next attempt's
+                u1Req = H.requestSaveState()
               end
             end
           end
@@ -784,6 +790,10 @@ H.run({ maxFrames = 700000, allowGameOver = true }, {
     H.screenshot("scenario_hub")
   end),
   H.saveState("scenario_hub.mss"),
+  H.call(function()
+    H.checkReq(u1Req, "ultros1_entry capture")
+    H.emitBlob("ultros1_entry.mss", u1Req.blob)
+  end),
   H.logStep(function()
     return string.format("scenario_hub generated at frame %d", H.frame)
   end),

@@ -407,10 +407,23 @@ end
 -- corridor encounters by the library fighter (#183: they used to be fled,
 -- which earned no XP), the win-gated battle 47 by the custom boost
 -- machine plus wipe watch ("fight").
+-- A walk that meets random encounters charges its budget with WALKING
+-- frames only, navTo's rule (lib/ot6_field.lua's walk budget): the frames
+-- the walk fighter spends in a battle or its care stop do not count, and
+-- the driveUntil cap (budget + 80000) is the hard backstop.  The budget
+-- is for the steps: a random 60 frames into a 4000-frame "-> car B" took
+-- the rest of a whole-frame budget on a varied draw
+-- (build/attempts/wt/train-mp/: K=3 encounters used up, shift 41, old and
+-- new library alike).  The "fight" mode (battle 47) keeps its own budget:
+-- that walk IS the battle.
 local function holdDrive(dir, pred, what, budget, fightMode)
   local phase, hb = 0, -600
   local W = fightMode ~= "fight" and H.newWalkFighter("holdDrive " .. what) or nil
-  return H.driveUntil(pred, budget or 15000, {
+  budget = budget or 15000
+  local walked, started = 0, 0
+  return H.cond(function() return true end, {
+    H.call(function() walked, started = 0, H.frame end),
+    H.driveUntil(pred, W and budget + 80000 or budget, {
     H.call(function()
       phase = (phase + 1) % 8
       if H.frame - hb >= 600 then
@@ -427,6 +440,12 @@ local function holdDrive(dir, pred, what, budget, fightMode)
       end
       if W then
         if W.frame() then return end
+        walked = walked + 1
+        if walked > budget then
+          error(string.format("holdDrive %s: timeout after %d walk frames " ..
+            "(battle and care frames excluded; %d frames in all, %d fought)",
+            what, budget, H.frame - started, W.fought()), 0)
+        end
       elseif inBattle() or H.battleLoadStarted() then
         fightPulse(phase)
         return
@@ -435,7 +454,14 @@ local function holdDrive(dir, pred, what, budget, fightMode)
       if not H.hasControl() then H.setPad({}); return end
       H.setPad({ [dir] = true })
     end),
-  }, what)
+  }, what),
+    H.call(function()
+      if W then
+        H.log(string.format("[walk] %s: %d walk frames of %d, %d frames in all, " ..
+          "%d random(s) fought", what, walked, budget, H.frame - started, W.fought()))
+      end
+    end),
+  }, {})
 end
 
 -- facing-up+A until pred: the lever/valve/switch idiom ($01B0/$01B4 are

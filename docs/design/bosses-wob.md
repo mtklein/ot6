@@ -23,38 +23,62 @@ Stated once, assumed by every block:
   its charm. No cleanup pass removes it.
 
 - **Scripts run regardless of break state.** Vargas's Pummel finish,
-  Chupon's Sneeze and the espers interrupting Ultros on the bridge
-  all fire whether or not the boss is Broken. The gauge changes
+  Chupon's arrival and Sneeze, and the espers interrupting Ultros on the
+  bridge all fire whether or not the boss is Broken. The gauge changes
   combat, not scripted story events. (Kefka's camp flees used to head
   this list. They have no state to override, because they have no
-  monster and no gauge; see 6.) Vargas's finish is a counter, so it
-  rides the exception below; until #314 it did not, and a Pummel that
-  broke him or landed while he was Broken did not end the fight.
-- **Counters are disabled while Broken, except the one that ends the
-  battle.** A Broken enemy loses its counters along with its turns, so
-  Whelk's shell does not counter during the window. This matches
-  Octopath. `Ot6MayAct` (`ot6_break.asm`) asks the same question at
-  turn time that `Ot6Gate` asks at queue time, inside `CheckRetal`, and
-  `Ot6BrokenTurn` asks it at `ExecAction` for a turn queued before the
-  break (#291).
-  The exception is keyed on the script's own action, not on the
-  monster: a counter-script block that ends the battle
-  (`kill_monsters ALL`, `boss_death`, `end_battle`, `change_battle`,
-  or a block that holds one) still runs while Broken, and every other
-  block of that counter is skipped the way vanilla skips a Stopped
-  monster's counter commands (`Ot6RetalEnds`, `Ot6AISkip`). A dying
-  monster's counter (`if_self_dead`) runs in full, Broken or not, as
-  before. Measured for Vargas (`battle_vargas.lua` 7) and for Ultros ③,
-  whose interrupt block (`battle_event $16`, Relm joining) holds a
-  `kill_monsters ALL` and so runs while Broken: on main's ROM it fired
-  only after he recovered (s0 `battle_event $16 f14129 brk=0`, s20
-  f13812 brk=0), on the #314 ROM while Broken (s0 f13327 brk=4, s20
-  f13204 brk=1); every run beat him on attempt 1
-  (build/attempts/review-vargas-pummel/probe-ultros3-*). Only commands
-  up to the end action run (the scan is forward-only); no counter today
-  has anything after it. Phunbaba's `if_hit / if_hp<15360` block mixes
-  two BabaBreaths with its `end_battle`, so a Broken Phunbaba throws
-  them before the scripted end.
+  monster and no gauge; see 6.) The ones that ride on a counter do so
+  through the exception below.
+- **A Broken enemy loses its turns and its counterattacks, but not its
+  story.** Whelk's shell does not counter during the window, which
+  matches Octopath. `Ot6MayAct` (`ot6_break.asm`) asks the same question
+  at turn time that `Ot6Gate` asks at queue time, inside `CheckRetal`,
+  and `Ot6BrokenTurn` asks it at `ExecAction` for a turn queued before
+  the break (#291).
+  The exception is keyed on the counter script's own commands, never on
+  the monster (#314, widened by #329). Every AI command is one of:
+  *story* (`dlg`, `battle_event`, `change_battle`, `end_battle`,
+  `recruit_gau`, `end_veldt`, and the monster entry/exit op:
+  `restore_monsters`, `show_monsters`, `hide_monsters`, `kill_monsters`,
+  `boss_death`); *attack* (an attack, `set_target`, `cmd`, `use_item`,
+  `throw_item`); *scene* (battle and monster variables and switches, the
+  monster animations, timers, invincibility, targetability, `fill_atb`,
+  `set_status`/`clr_status`); or *control* (conditions, `wait`,
+  `end_if`, `end`). A counter block (the span vanilla's conditionmiss
+  skips, end_if to end_if) that holds a story command still runs while
+  its monster is Broken: its story, scene and control commands in order,
+  each attack skipped where it stands. Every other block of that counter
+  is skipped whole, the way vanilla skips a Stopped monster's counter
+  commands (`Ot6RetalStory`, `Ot6AIBlockStory`, `Ot6AISkip`). Scene
+  commands never make a block a story block on their own: a switch a
+  story block sets drives the scene; one an attack block sets tracks the
+  attacks, and waits for the break to end with them. A dying monster's
+  counter (`if_self_dead`, or 0 HP) runs in full, Broken or not, as
+  before. So Phunbaba's `if_hit / if_hp<15360` block ends the battle
+  without its two BabaBreaths when he is Broken, and the Lete Ultros
+  says his fire line without the Special behind it.
+  The monster's TURN is not covered: a Broken monster takes no turns,
+  so a story beat on a turn script (Whelk's shell dialogue, the Air
+  Force's, Tunnel Armor's opening event) plays when the break ends.
+  Measured (build/attempts/wt/story-while-broken/): Ultros ④'s Chupon
+  entry plays on cue while Ultros is Broken (`battle_ultros4.lua`; on
+  main's ROM it came only as his dying counter); the Lete Ultros's fire
+  line (`dlg $0b`) plays when Terra's Fire hits him Broken, and the
+  Special behind it does not follow (`battle_ultros1.lua`; on main's
+  ROM, no line until he died); a Broken Ifrit's or Shiva's story-less
+  counter blocks are skipped whole (`battle_brokendeath.lua`); Ultros
+  ③'s Relm interrupt runs while Broken on both ROMs, as #314 made it.
+  Two of the route's story counters did not come due while their
+  monster was Broken: Vargas's (below), and the South Figaro Merchant's,
+  whose Steal-for-clothes beat needs him alive and Broken, but LOCKE's
+  dagger hit that breaks him takes his last 92-93 HP (the unbroken hit
+  before it did 26-27), seven draws of seven
+  (fix/merchant-sweep-fix-s*.log, failed/merchant-*).
+  Two things shorten or sidestep a break around these beats: Haste on
+  the monster (Umaro's Green Cherry block, Doom's phase change) runs its
+  break timer about 24% faster (the #329 review's reading, not measured
+  here), and a body swap (the opera Ultros's slot
+  moves, Chadarnook's) brings in an unbroken body.
 - **A nameplate with no shields is itself information.** Scripted
   set-pieces (Tritoch, Guardian, the Imperial Camp Kefka) draw no
   gauge at all, which tells the player the fight is scripted.
@@ -229,6 +253,22 @@ fire + slashing.
   Pummel. The generator's route never reached the Broken case:
   `gen_vargas` plays no weakness hit before SABIN's first Pummel,
   which lands on 5 shields and takes him to 3 (measured, six runs).
+- **His other story on the route comes before any break (#329).** The
+  counter blocks that bring SABIN in (`battle_event $07`, under 10,880
+  HP) and the one after it (`battle_event $08`, under 10,368) would play
+  while Vargas is Broken, but the route's play reaches both lines
+  unbroken. In phase two, `$08` is not reachable Broken: SABIN's
+  MetalKnuckle is a claw (slashing) and chips nothing on Vargas's
+  bludgeoning row, AuraBolt's one chip cost 393 and 406 HP (10,850 ->
+  10,457 and 10,879 -> 10,473) against the ~480 above the line, and
+  Pummel ends the fight. MEASURED: SABIN's Fights took him from 10,850
+  to 10,230 HP with his shields at 4 throughout, and `$08` ran unbroken
+  (build/attempts/wt/story-while-broken/failed/vargas8-*;
+  fix/vargas-fix-s0-regress.log). In phase one the only key is
+  BioBlaster; `battle_vargas`'s first BioBlaster turn took him from
+  11,582 to 11,327 (the party's weapon hits in that stretch included),
+  and 720 HP lie above the `$07` line. Whether five BioBlasters with
+  the others holding back can break him above it was not measured.
 
 ## Lete River
 
@@ -931,6 +971,16 @@ must not be — `$168` absorbs water, as does every Ultros record
   inhales → **Sneeze**, and a character leaves the battle with no
   saving throw and no way to prevent it. The script runs regardless of
   break state, so the fight ends by script rather than by winning.
+  Chupon's arrival is Ultros's counter under 12,800 HP, and it comes on
+  cue even if Ultros is Broken (#329): `battle_ultros4.lua` breaks him
+  with unboosted Fights (one chip a hand) and dumps into the window;
+  the hit that crosses the line lands Broken (brk 14-15) and Chupon
+  enters 218-442 frames later, Ultros still Broken and alive (shifts
+  0/10/20/40). On main's ROM Chupon waited and came only as Ultros's
+  dying counter, 1,220 frames after the hit. Played the route's way
+  (the IAF driver's boosted Fights), the line falls before the break at
+  2 shields in all three draws measured, so the Broken case needs the
+  chip-first play.
 - **Break story:** this fight teaches not to hold BP. A sneezed
   character leaves with banked BP unspent, so spend it first. Break
   Ultros before the first Sneeze if you can (7 shields across three
