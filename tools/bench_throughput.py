@@ -10,7 +10,9 @@ each copy advanced (from its PASS line; every copy must PASS on the same
 frame, or the row says so), the wall seconds, frames/s per emulator, the
 total frames/s (all copies' frames over the batch's wall time), and the
 1-minute load average before and during the batch, with the most Mesen
-processes that were not this bench's.  A total that has fallen well below
+processes that were not this bench's.  On a shared machine, --quiet-load 2
+waits for quiet first and re-runs (up to 3 times) a batch that another
+job's emulators joined.  A total that has fallen well below
 the best for two K in a row ends the sweep early (--full to go on).
 
 Its runs are ordinary runs, so a live.py watching this machine records each
@@ -92,6 +94,8 @@ def batch(k, test, out, cap):
         for pr in procs:
             if pr[0].poll() is None:
                 os.killpg(pr[0].pid, signal.SIGTERM)
+        for pr in procs:   # run.sh traps TERM and tidies up; wait for it
+            pr[0].wait()
         raise
     makespan = time.time() - t0
     runs = []
@@ -135,6 +139,14 @@ def main():
                     help="per-run wall-clock cap, seconds (OT6_TIMEOUT)")
     ap.add_argument("--full", action="store_true",
                     help="do not stop once the total has fallen off")
+    ap.add_argument("--quiet-load", type=float, metavar="L",
+                    help="share-aware: wait for the 1-min load under L before "
+                    "the first batch and for no other Mesen before each; a "
+                    "batch another job's emulators joined is logged, marked "
+                    "shared, and run again once they are gone")
+    ap.add_argument("--max-wait", type=int, default=3 * 3600,
+                    help="with --quiet-load, give up after this many seconds "
+                    "of waiting in all")
     ap.add_argument("--out")
     a = ap.parse_args()
     ncpu = os.cpu_count()
@@ -153,8 +165,37 @@ def main():
     with open(os.path.join(out, "runs.jsonl"), "a") as jl, \
             open(os.path.join(out, "table.txt"), "a") as tl:
         tl.write(hdr + "\n")
-        for k in ks:
+        waited = [0.0]
+
+        def wait_for(ok, what):
+            t = time.time()
+            while not ok():
+                if waited[0] + time.time() - t > a.max_wait:
+                    print(f"gave up waiting for {what} after {a.max_wait}s",
+                          flush=True)
+                    sys.exit(3)
+                time.sleep(15)
+            if time.time() - t > 1:
+                print(f"  (waited {time.time() - t:.0f}s for {what}; load "
+                      f"{load1():.2f})", flush=True)
+            waited[0] += time.time() - t
+
+        if a.quiet_load is not None:
+            wait_for(lambda: load1() < a.quiet_load
+                     and foreign_mesen(set()) == 0,
+                     f"load < {a.quiet_load} and no other Mesen")
+        queue = list(ks)
+        redo = {}
+        while queue:
+            k = queue[0]
+            if a.quiet_load is not None:
+                wait_for(lambda: foreign_mesen(set()) == 0, "no other Mesen")
             row, runs = batch(k, a.test, out, a.cap)
+            shared = a.quiet_load is not None and row["foreign_max"]
+            if shared and redo.get(k, 0) < 3:
+                redo[k] = redo.get(k, 0) + 1
+            else:
+                queue.pop(0)
             for r in runs:
                 jl.write(json.dumps(dict(r, host=host, test=a.test)) + "\n")
             jl.write(json.dumps(dict(row, host=host, test=a.test, row=True)) + "\n")
@@ -164,10 +205,14 @@ def main():
                     f"{row['wall_min']:6.1f}-{row['wall_max']:<6.1f}  "
                     f"{row['per_emu']:10.1f}  {row['total']:14.1f}  "
                     f"{row['load_before']:10.2f}  {row['load_mean']:>7}/{row['load_max']:<7}"
-                    f"  {row['foreign_before']}/{row['foreign_max']}")
+                    f"  {row['foreign_before']}/{row['foreign_max']}"
+                    + ("  shared: run again" if shared and queue and queue[0] == k
+                       else "  shared" if shared else ""))
             print(line, flush=True)
             tl.write(line + "\n")
             tl.flush()
+            if shared:
+                continue
             best = max(best, row["total"])
             falling = falling + 1 if row["total"] < 0.85 * best else 0
             if falling >= 2 and not a.full:
