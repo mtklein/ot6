@@ -95,7 +95,11 @@ def batch(k, test, out, cap):
             if pr[0].poll() is None:
                 os.killpg(pr[0].pid, signal.SIGTERM)
         for pr in procs:   # run.sh traps TERM and tidies up; wait for it
-            pr[0].wait()
+            try:
+                pr[0].wait(timeout=60)
+            except subprocess.TimeoutExpired:
+                os.killpg(pr[0].pid, signal.SIGKILL)
+                pr[0].wait()
         raise
     makespan = time.time() - t0
     runs = []
@@ -151,6 +155,14 @@ def main():
                     "of waiting in all")
     ap.add_argument("--out")
     a = ap.parse_args()
+
+    # The runs sit in sessions of their own, so a signal to the bench does
+    # not reach them: TERM and HUP take the same way out as Ctrl-C, which
+    # stops every run and waits for it.
+    def stop(sig, _frame):
+        raise SystemExit(128 + sig)
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGHUP, stop)
     ncpu = os.cpu_count()
     ks = [int(x) for x in a.k.split(",")] if a.k else default_ks(ncpu)
     host = socket.gethostname().split(".")[0].lower()
