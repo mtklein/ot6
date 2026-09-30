@@ -144,6 +144,8 @@ def main():
                     "the first batch and for no other Mesen before each; a "
                     "batch another job's emulators joined is logged, marked "
                     "shared, and run again once they are gone")
+    ap.add_argument("--tolerate", type=int, default=0, metavar="N",
+                    help="with --quiet-load, up to N other Mesen count as quiet")
     ap.add_argument("--max-wait", type=int, default=3 * 3600,
                     help="with --quiet-load, give up after this many seconds "
                     "of waiting in all")
@@ -182,16 +184,18 @@ def main():
 
         if a.quiet_load is not None:
             wait_for(lambda: load1() < a.quiet_load
-                     and foreign_mesen(set()) == 0,
-                     f"load < {a.quiet_load} and no other Mesen")
+                     and foreign_mesen(set()) <= a.tolerate,
+                     f"load < {a.quiet_load} and at most {a.tolerate} other Mesen")
         queue = list(ks)
         redo = {}
         while queue:
             k = queue[0]
             if a.quiet_load is not None:
-                wait_for(lambda: foreign_mesen(set()) == 0, "no other Mesen")
+                wait_for(lambda: foreign_mesen(set()) <= a.tolerate,
+                         f"at most {a.tolerate} other Mesen")
             row, runs = batch(k, a.test, out, a.cap)
-            shared = a.quiet_load is not None and row["foreign_max"]
+            shared = (a.quiet_load is not None
+                      and (row["foreign_max"] or 0) > a.tolerate)
             if shared and redo.get(k, 0) < 3:
                 redo[k] = redo.get(k, 0) + 1
             else:
