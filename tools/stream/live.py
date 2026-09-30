@@ -25,9 +25,24 @@ file on stdin: the far side scans its own run logs with the code below and
 prints one JSON snapshot a second, and exits when the connection drops.
 Nothing is installed or left running there and no port is opened.  The local
 machine goes through the same snapshot path, minus the ssh.
+
+Throughput and placement.  Each machine's line shows its emulated frames per
+second, summed over its active emulators across the last 30 s.  Every run
+watched from its start on any machine appends one line to the main tree's
+build/throughput.jsonl when it finishes: machine, test, frames, wall seconds,
+and the concurrency it ran at (emulators, and the load average).  From that
+log each machine gets a curve of frames/s per emulator against emulators
+running, recent runs weighing more (6 h half-life), so it follows other load,
+heat and power as they change; and from
+the curve and what the machine runs right now, how many more emulators it
+can take before its total stops growing.  That is placement.json, one line on
+the page, and:
+
+    python3 tools/stream/live.py --place 8     # where the next 8 should go
 """
 import argparse
 import base64
+import collections
 import glob
 import hashlib
 import json
@@ -190,11 +205,14 @@ async function tick(){ try{
     let h = '<div><b>'+esc(m.name)+'</b> <span style="color:#8a8">'
       + m.active+' active \u00b7 '
       + '<span style="color:'+(m.frozen?'#e06060':'#8a8')+'">'+m.frozen+' frozen</span>'
-      + (m.load ? ' \u00b7 load '+m.load[0].toFixed(1)+' / '+m.ncpu+' cores' : '') + '</span></div>';
+      + (m.load ? ' \u00b7 load '+m.load[0].toFixed(1)+' / '+m.ncpu+' cores' : '')
+      + (m.fps!=null ? ' \u00b7 '+nf(Math.round(m.fps))+' frames/s' : '')
+      + (m.room!=null ? ' \u00b7 room '+m.room+' (peak '+m.peak+')' : '') + '</span></div>';
     m.trees.forEach(t=>{ h += '<div style="color:#8a9;padding-left:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
       + '<span style="color:#9bc">'+esc(t.branch)+'</span>'+(t.tree?' <span style="color:#687">@'+esc(t.tree)+'</span>':'')
       + ' \u00b7 '+t.tests.length+': '+esc(t.tests.join(', '))+'</div>'; });
-    return h; }).join('');
+    return h; }).join('')
+    + (j.place ? '<div style="color:#687">' + esc(j.place) + '</div>' : '');
   const seen = new Set();
   ws.forEach(w=>{
     seen.add(w.id);
@@ -567,6 +585,45 @@ def scan_worker(data, shots_stuck, frames_stuck):
     return (frame, png, h, stuck)
 
 
+# ---- throughput: frames emulated per second, and one record per run -------
+FRAME_B = re.compile(rb"^\[ot6(?:shot|pad|note)\] (\d+) ")
+FPS_WINDOW = 30.0      # seconds the per-machine frames/s figure averages over
+
+
+def run_progress(data):
+    """(latest frame, verdict) from a run.log tail.  The frame is M.frame on
+    the newest complete [ot6shot]/[ot6pad]/[ot6note] line: the harness's own
+    count of frames it has advanced, reset to 0 when an attempt restarts.  A
+    partial trailing line is skipped, since a half-written number would read
+    as a reset.  verdict is "pass", "fail" or None."""
+    lines = data.split(b"\n")[:-1]
+    frame = None
+    for line in reversed(lines):
+        m = FRAME_B.match(line)
+        if m:
+            frame = int(m.group(1))
+            break
+    verdict = None
+    p, f = data.rfind(b"\n[ot6] PASS (frame "), data.rfind(b"\n[ot6] FAIL: ")
+    if max(p, f) >= 0:
+        verdict = "pass" if p > f else "fail"
+    return frame, verdict
+
+
+def _run_start(ws):
+    """(start time, script name) of a run workspace: run.sh writes
+    composed_live.lua once, just before it launches the emulator, and its
+    third line names the script (compose.py's OT6_SCRIPT)."""
+    try:
+        path = os.path.join(ws, "composed_live.lua")
+        with open(path, "rb") as f:
+            head = f.read(400)
+        m = re.search(rb'^OT6_SCRIPT = "([^"]+)"', head, re.M)
+        return os.path.getmtime(path), (m.group(1).decode() if m else None)
+    except OSError:
+        return None, None
+
+
 class Scanner:
     """This machine's view, one JSON-able snapshot per call: every active run
     worker (build/test-runs/*/run.log touched within ACTIVE_SEC -- the same
@@ -590,6 +647,9 @@ class Scanner:
         self.prog = None       # progress inputs, loaded on first use
         self.fresh = None      # a progress payload not yet handed out
         self.t0 = time.time()
+        self.runs = {}         # worker id -> what one run has done so far
+        self.recorded = set()  # worker ids already finished and reported
+        self.incs = collections.deque()   # (ts, frames) advanced, all workers
         # the stamp checks take seconds, so the route has its own thread and
         # never holds up the 1s worker scan
         threading.Thread(target=self._progress_loop, daemon=True).start()
@@ -627,7 +687,8 @@ class Scanner:
         workers, pngs, active = [], {}, set()
         for log in run_logs():
             try:
-                if now - os.path.getmtime(log) > active_sec:
+                mtime = os.path.getmtime(log)
+                if now - mtime > active_sec:
                     continue
                 dirname = os.path.basename(os.path.dirname(log))
                 data = _tail_bytes(log, tail_n)
@@ -636,6 +697,7 @@ class Scanner:
             tag, branch = log_tree(log)
             wid = _safe_id((tag + "_" if tag else "") + dirname)
             frame, png, h, stuck = scan_worker(data, s_stuck, f_stuck)
+            self._track(wid, log, tag, branch, data, mtime, now)
             active.add(wid)
             if png is not None and h is not None and self.sent.get(wid) != h:
                 pngs[wid] = png
@@ -656,15 +718,175 @@ class Scanner:
             load = [round(x, 2) for x in os.getloadavg()]
         except OSError:
             load = None
+        done = self._settle(active, len(workers), load, now)
         snap = {"host": HOST, "ts": now, "load": load, "ncpu": os.cpu_count(),
-                "workers": workers, "pngs": pngs}
+                "workers": workers, "pngs": pngs, "fps": self._fps(now)}
+        if done:
+            snap["done"] = done
         fresh, self.fresh = self.fresh, None
         if fresh is not None:
             snap["progress"] = fresh
         return snap
 
+    def _track(self, wid, log, tag, branch, data, mtime, now):
+        """Fold one scan of one worker into its run: frames advanced since
+        the last scan (a drop in M.frame is a restarted attempt, counted from
+        0) and the newest log mtime, which is where the run ends."""
+        r = self.runs.get(wid)
+        if r is None:
+            if wid in self.recorded:   # a retained failed workspace, touched
+                return
+            ws = os.path.dirname(log)
+            start, script = _run_start(ws)
+            label = os.path.basename(ws).split(".")[0]
+            # a run is whole when it began after this scanner did, so every
+            # frame it advanced was seen; only whole runs are recorded
+            whole = start is not None and start >= self.t0 - 2
+            r = self.runs[wid] = {
+                "test": script or label, "label": label, "tree": tag,
+                "branch": branch, "start": start, "end": mtime, "whole": whole,
+                "last": None if not whole else 0, "frames": 0, "verdict": None,
+                "n": 0, "conc": 0.0, "load": 0.0, "busy": 0.0}
+        frame, verdict = run_progress(data)
+        if frame is not None:
+            if r["last"] is not None:
+                inc = frame - r["last"] if frame >= r["last"] else frame
+                r["frames"] += inc
+                self.incs.append((now, inc))
+            r["last"] = frame
+        r["end"] = max(r["end"], mtime)
+        r["verdict"] = verdict or r["verdict"]
+
+    def _settle(self, active, n_active, load, now):
+        """Sample the concurrency every live run is seeing, and turn the runs
+        that stopped (workspace deleted on a pass, or gone quiet) into
+        records."""
+        load1 = load[0] if load else 0.0
+        busy = max(n_active, load1)
+        done = []
+        for wid in list(self.runs):
+            r = self.runs[wid]
+            if wid in active:
+                r["n"] += 1
+                r["conc"] += n_active
+                r["load"] += load1
+                r["busy"] += busy
+                continue
+            del self.runs[wid]
+            self.recorded.add(wid)
+            wall = r["end"] - (r["start"] or r["end"])
+            if not r["whole"] or not r["n"] or r["frames"] <= 0 or wall <= 0:
+                continue
+            n = r["n"]
+            done.append({
+                "ts": int(r["end"]), "id": wid, "test": r["test"],
+                "label": r["label"], "tree": r["tree"], "branch": r["branch"],
+                "frames": r["frames"], "wall": round(wall, 1),
+                "fps": round(r["frames"] / wall, 1),
+                "conc": round(r["conc"] / n, 2), "busy": round(r["busy"] / n, 2),
+                "load": round(r["load"] / n, 2), "ncpu": os.cpu_count(),
+                "verdict": r["verdict"]})
+        return done
+
+    def _fps(self, now):
+        """Frames per second advanced by all of this machine's emulators over
+        the last FPS_WINDOW seconds (less while the scanner is younger)."""
+        while self.incs and self.incs[0][0] < now - FPS_WINDOW:
+            self.incs.popleft()
+        span = min(FPS_WINDOW, now - self.t0)
+        if span < 5:
+            return None
+        return round(sum(i for _t, i in self.incs) / span, 1)
+
 
 PEER_STALE_SEC = 20   # a peer silent this long is shown unreachable
+
+# ---- placement: where the next emulators should go ------------------------
+HALF_LIFE_H = 6.0   # a run this old weighs half as much as one finishing now
+PEAK_FRAC = 0.95    # the knee: the fewest emulators within 5% of the best total
+
+
+def curve(records, now):
+    """{emulators: [frames/s per emulator, runs]} for one machine: each
+    finished run's frames/wall, bucketed by how many emulators ran beside it
+    (itself included, averaged over its life), averaged with weights halving
+    every HALF_LIFE_H.  So recent runs outweigh old ones, and the curve
+    follows whatever else slows the machine now (other load, heat, the
+    charger); a bucket nothing recent has reached keeps what it last
+    measured."""
+    acc = {}
+    for r in records:
+        k = max(1, int(round(r["conc"])))
+        w = 0.5 ** (max(0.0, now - r["ts"]) / (HALF_LIFE_H * 3600))
+        a = acc.setdefault(k, [0.0, 0.0, 0])
+        a[0] += w * r["fps"]
+        a[1] += w
+        a[2] += 1
+    return {k: [a[0] / a[1], a[2]] for k, a in acc.items() if a[1] > 0}
+
+
+def per_emulator(cv, x):
+    """Frames/s one emulator gets beside x-1 others: linear between measured
+    buckets; below the lowest, the lowest's; above the highest, the total
+    stays flat (nothing measured says it grows)."""
+    ks = sorted(cv)
+    if x <= ks[0]:
+        return cv[ks[0]][0]
+    if x >= ks[-1]:
+        return cv[ks[-1]][0] * ks[-1] / x
+    for a, b in zip(ks, ks[1:]):
+        if a <= x <= b:
+            return cv[a][0] + (cv[b][0] - cv[a][0]) * (x - a) / (b - a)
+
+
+def total(cv, x):
+    return x * per_emulator(cv, x) if x > 0 else 0.0
+
+
+def placement(machines, records, now):
+    """placement.json: per machine its curve, its knee (the fewest emulators
+    whose total is within 5% of the best measured total, one more when
+    that is the most ever measured, so the curve keeps learning), room =
+    knee - its active emulators now; and "order", the machines for the next
+    emulators, greedily by how much each one adds to its machine's total."""
+    out, gains = [], []
+    for m in machines:
+        mine = [r for r in records if r.get("machine") == m["name"]]
+        cv = curve(mine, now)
+        rec = {"name": m["name"], "up": m["up"], "active": m["active"],
+               "load1": (m["load"] or [None])[0], "ncpu": m["ncpu"],
+               "fps": m.get("fps"), "runs": len(mine),
+               "curve": {str(k): [round(v[0], 1), v[1]]
+                         for k, v in sorted(cv.items())}}
+        out.append(rec)
+        if not cv or not m["up"]:
+            continue
+        top = max(cv)
+        best = max(total(cv, k) for k in range(1, top + 1))
+        knee = min(k for k in range(1, top + 1)
+                   if total(cv, k) >= PEAK_FRAC * best)
+        if knee == top:
+            knee += 1
+        busy = m["active"]
+        room = max(0, knee - busy)
+        rec.update(peak=knee, room=room)
+        for j in range(1, room + 1):
+            gains.append((total(cv, busy + j) - total(cv, busy + j - 1),
+                          m["name"]))
+    gains.sort(key=lambda g: -g[0])
+    return {"ts": int(now), "half_life_h": HALF_LIFE_H, "machines": out,
+            "order": [n for _g, n in gains], "room": len(gains)}
+
+
+def place_line(p):
+    """The page's one line: each machine's room now."""
+    parts = []
+    for m in p["machines"]:
+        parts.append(f"{m['name']} {m['room']}" if "room" in m else
+                     f"{m['name']} (down)" if not m["up"] else
+                     f"{m['name']} (no runs logged yet)")
+    return ("room now: " + ", ".join(parts)
+            + " · python3 tools/stream/live.py --place N")
 
 
 class Board:
@@ -683,6 +905,45 @@ class Board:
                       "down_since": t, "err": "connecting"} for n in names}
         self.pngs = {n: set() for n in names}   # PNG files on disk per machine
         self.procs = {}   # name -> its live ssh child (peer_thread)
+        # The run log lives in the main tree, like build/attempts, so every
+        # viewer (whichever tree it runs from) adds to and reads one history.
+        worktree_roots()
+        self.log = os.path.join(_TREES["main"], "build", "throughput.jsonl")
+        self.records, self.seen = [], set()
+        try:
+            with open(self.log) as f:
+                for line in f:
+                    try:
+                        self._remember(json.loads(line))
+                    except (ValueError, KeyError, TypeError):
+                        pass
+        except OSError:
+            pass
+
+    def _remember(self, rec):
+        """Keep one finished-run record; False if it is already known (two
+        viewers watching the same machine both report its runs)."""
+        key = (rec["machine"], rec["id"])
+        if key in self.seen:
+            return False
+        self.seen.add(key)
+        self.records.append(rec)
+        return True
+
+    def _log_runs(self, name, done):
+        lines = []
+        with self.lock:
+            for d in done:
+                rec = dict(d, machine=name)
+                if self._remember(rec):
+                    lines.append(json.dumps(rec) + "\n")
+        if lines:
+            try:
+                os.makedirs(os.path.dirname(self.log), exist_ok=True)
+                with open(self.log, "a") as f:
+                    f.write("".join(lines))
+            except OSError as e:
+                print(f"live: {self.log}: {e}", file=sys.stderr)
 
     def _png(self, name, wid):
         return os.path.join(self.gdir, _safe_id(f"{name}_{wid}") + ".png")
@@ -702,6 +963,8 @@ class Board:
         live = {w["id"] for w in snap.get("workers", [])}
         for wid in list(self.pngs[name] - live):   # finished workers
             self._drop_png(name, wid)
+        if snap.get("done"):
+            self._log_runs(name, snap["done"])
         with self.lock:
             st = self.m[name]
             st["snap"] = dict(snap, pngs=None)
@@ -757,12 +1020,19 @@ class Board:
                 "name": n, "local": n == HOST, "up": snap is not None,
                 "down_since": st["down_since"], "err": st["err"],
                 "load": (snap or {}).get("load"), "ncpu": (snap or {}).get("ncpu"),
+                "fps": (snap or {}).get("fps"),
                 "active": len(mine), "frozen": sum(w["stuck"] for w in mine),
                 "trees": [{"branch": b, "tree": t, "tests": sorted(ts)}
                           for (b, t), ts in sorted(trees.items())]})
+        with self.lock:
+            records = list(self.records)
+        place = placement(machines, records, now)
+        for mc, pm in zip(machines, place["machines"]):
+            mc.update({k: pm[k] for k in ("room", "peak") if k in pm})
         out = {"workers": workers, "count": len(workers), "ts": int(now),
-               "machines": machines, "local": HOST}
+               "machines": machines, "local": HOST, "place": place_line(place)}
         self._dump("grid.json", out)
+        self._dump("placement.json", place)
         prog = self.merge_progress(m)
         if prog is not None:
             self._dump("progress.json", prog)
@@ -1147,6 +1417,34 @@ def follow(log_path, webroot, test, stop, hop=False, live_ref=None):
         time.sleep(0.25)
 
 
+def place(n, port):
+    """--place N: the running viewer's placement.json, read for N emulators."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/placement.json", timeout=5) as r:
+            p = json.load(r)
+    except Exception as e:
+        sys.exit(f"no placement: is live.py running on port {port}? ({e})")
+    counts = collections.Counter(p["order"][:n])
+    got = ", ".join(f"{m} {c}" for m, c in counts.most_common()) or "nowhere"
+    print(f"place {n}: {got}")
+    if n > p["room"]:
+        print(f"  only {p['room']} have room now; the other {n - p['room']} "
+              "would slow every emulator where they land: queue them")
+    for m in p["machines"]:
+        if "room" not in m:
+            why = "down" if not m["up"] else "no runs logged yet"
+            print(f"  {m['name']}: {why}")
+            continue
+        cv = " ".join(f"{k}:{v[0]:.0f}" for k, v in m["curve"].items())
+        print(f"  {m['name']}: room {m['room']} = knee {m['peak']} - "
+              f"{m['active']} running (load {m['load1']}, {m['ncpu']} cores)"
+              f" · frames/s per emulator by emulators running: {cv} "
+              f"({m['runs']} runs)")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("workspace", nargs="?", help="a build/test-runs/<ws> dir "
@@ -1155,10 +1453,15 @@ def main():
     ap.add_argument("--peer", action="append", default=[], metavar="HOST[:PATH]",
                     help="also show this machine's workers, over ssh (repo at "
                     "~/ot6 there unless :PATH); repeatable")
+    ap.add_argument("--place", type=int, metavar="N",
+                    help="ask the running viewer (on --port) where the next N "
+                    "emulators should go, and exit")
     ap.add_argument("--emit", action="store_true", help=argparse.SUPPRESS)
     args = ap.parse_args()
     if args.emit:     # the far end of a --peer connection
         return emit()
+    if args.place is not None:
+        return place(args.place, args.port)
 
     ws = os.path.abspath(args.workspace) if args.workspace else newest_workspace()
     log = os.path.join(ws, "run.log") if ws else None

@@ -39,9 +39,8 @@ interpreting runs.
   `eval "$(/opt/homebrew/bin/brew shellenv zsh)"` in non-login shells;
   clean clone at `~/ot6`, which stays on main -- work runs in separate
   clones under `~/work/`). Agents default to the machine they start on,
-  so each launch prompt names where its batches run: draw-variation sets and
-  chain regeneration on the Air, single checks on the Mac; cap it at about
-  6 concurrent emulators (10 cores); run long jobs there under
+  so each launch prompt says where its batches run (see "Where batches go"
+  below); run long jobs there under
   `caffeinate -is` so it can't sleep mid-run. live.py's `--peer air.local`
   (in the `ot6-live` launch config) shows its workers on the same page and
   keeps it awake while watched. A closed lid on battery still sleeps.
@@ -50,10 +49,27 @@ interpreting runs.
   under `~/work/` as on the Air). It builds the Macs' ROM byte for byte and
   plays the same games from states it generates itself; its `.mss` bytes (and so state
   hashes) differ from the Macs' by compression alone (docs/TOOLING.md
-  "Linux worker"). Start at about 10 concurrent emulators (24 threads; not yet measured). No caffeinate
+  "Linux worker"). No caffeinate
   there: run long jobs under `systemd-inhibit --what=idle --who=ot6
   --why=<job>`; a closed lid still suspends it. Add `--peer px13.local` to
   live.py to see its workers.
+- **Where batches go:** measured, not remembered. live.py shows each
+  machine's frames/s now and its room, and `python3 tools/stream/live.py
+  --place N` (on the Mac, where live.py runs) says where the next N
+  emulators should go and how many each machine can take now. It reads
+  `build/throughput.jsonl` in the main tree: one line per run live.py
+  watched from its start (machine, test, frames, wall, concurrency), so
+  each machine's curve of frames/s per emulator against emulators running
+  builds up from normal work; recent runs weigh more, so it follows other
+  load, heat and power. A machine's room is its knee (the fewest emulators
+  within 5% of its best total, one more when that is the most it has run,
+  so it keeps learning) minus what it runs now. Launch prompts give agents
+  that command rather than a cap, and agents run it before each batch; it
+  is a guide, and a machine an agent is told to leave alone stays alone.
+  `tools/bench_throughput.py` (K copies of one test, K from 1 to 1.5x the
+  cores) seeds concurrency levels normal work has not reached; run it on a
+  quiet machine, with live.py watching it, after anything changes the
+  hardware.
 
 # 1. Start: state of the world
 
