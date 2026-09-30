@@ -7,14 +7,15 @@ boost-point turn economy.
 
 ## Status
 
-v0.22 is the current release
-([tag](https://github.com/mtklein/ot6/releases/tag/v0.22)); the World of
-Ruin's opening has designed break weaknesses, Gogo's Mimic is always free,
-and the Narshe Beginner's House explains OT6 in plain words (details in the
+v0.23 is the current release
+([tag](https://github.com/mtklein/ot6/releases/tag/v0.23)); Edgar's part of
+the World of Ruin has designed break weaknesses, a monster you break loses
+the turn it was about to take, and Terra, Celes and the Espers have short
+spell lists that stronger spells grow from by boosting (details in the
 release notes). The game is playable from the start through the end of
 the World of Balance: the whole Thamasa arc, the world tour aboard the
 repaired Blackjack, the IAF gauntlet, the Floating Continent and AtmaWeapon,
-and the escape — and into the World of Ruin as far as Sabin rejoining in Tzen.
+and the escape — and into the World of Ruin as far as Edgar rejoining at Figaro Castle.
 
 Break and boost are the two central systems. Enemies carry shields and hidden
 weaknesses, hitting a weakness chips a shield, and breaking drops defenses
