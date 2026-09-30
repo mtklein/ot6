@@ -15,8 +15,9 @@ evidence); this file does not restate it.
 The harness plays OT6 the way a competent person with a controller would.
 
 - **Fight rather than flee.** Win with levels, gear, kill order and
-  abilities; flee where the game calls for it, such as a random battle
-  inside a timed scene when the visible clock can't cover another fight.
+  abilities; flee where the game forces it, or from a random battle inside
+  a timed scene when the visible clock can't cover another fight (owner,
+  2026-09-28).
   Skipped fights are skipped XP, and the debt tends to surface at a later,
   harder fight. Grinding is normal play; "the party is too low for this" is
   a fine finding, and the answer is usually healthy levels at key points.
@@ -24,13 +25,13 @@ The harness plays OT6 the way a competent person with a controller would.
   optional characters, areas and sidequests, as much of the Colosseum as is
   practical, and the eight dragons.
 - **Aim for competence across the route.** Segments should be played
-  confidently; one the party can't usually win on the first attempt is a
-  good candidate for a lab.
+  confidently; one the party can't reliably win on the first attempt is
+  worth a lab until it can.
 - **A lost battle is normal.** A person who wipes reloads and goes again.
   Segments can retry from their boot checkpoint on a wipe, bounded and
   counted, with the seed, cause and boosts at death logged. A loss here and
-  there is just a line in the retry inventory; repeated losses suggest a
-  lab. Retry machinery built to re-roll a fight until it passes isn't play.
+  there is just a line in the retry inventory; repeated losses, or a loss
+  rate above the band, suggest a lab. Retry machinery built to re-roll a fight until it passes isn't play.
 - **Spend like a person watching their gil.** Choices between supplies
   (a Tent or Potions, which item heals) are best priced in gil from what the
   bag would actually spend, rather than fixed thresholds.
@@ -40,8 +41,9 @@ The harness plays OT6 the way a competent person with a controller would.
   across draws to learn how often that happens is useful: one fight in five
   and four in five call for different decisions.
 - **Classify wipes by boost at death.** An early one-shot usually means the
-  party is under-levelled; a wipe with pips still banked suggests the
-  abilities weren't used fully. A member one round from death with boost
+  party is under-levelled (a level/kit finding); a wipe with pips still
+  banked suggests the abilities weren't used fully (a driver/policy
+  finding). A member one round from death with boost
   banked would do well to spend it.
 - **Heal outside battles** as the default: field care after battles, with
   Tonics (stock about 99; where no shop sells Tonics, Potions sized to what
@@ -56,14 +58,17 @@ The harness plays OT6 the way a competent person with a controller would.
 - **Supply band, roughly:** about level × 5 Tonics and about level Fenix
   Downs (caps near 99 and 20), and about level × 1.5 Potions before a boss
   gauntlet. Below the band, a detour to town makes sense; a town stop tops
-  up and buys the scarcest item last.
+  up, buys the scarcest item last, and puts the combat items at the top of
+  the bag.
 - **Fenix Downs are a signal.** More than one or two in a hard fight, or
-  several in random battles, points to under-levelling or a fight worth a
-  lab. An occasional death to a vanilla mechanic is fine.
+  any in a random battle, points to under-levelling or a fight worth a lab.
+  An occasional death to a vanilla mechanic is fine; labs are for frequent
+  deaths, wipes, or heavy Fenix use.
 - **Boost-Fight through random battles** is a good default: unbroken enemies
   take about half damage and everyone starts with one pip, so a one-pip
-  boosted Fight restores vanilla pace. Break and boost are levers; try the
-  options and measure.
+  boosted Fight restores vanilla pace. Break and boost are levers, not
+  rules like "never boost the shield strip" or "never nuke before the
+  break"; try the options and measure.
 - **Relics matter**, the Genji Glove especially: a pair doubles the hits
   that land on a boosted Fight, so it usually belongs on the main
   boost-Fighter. Readiness-audit flags (an empty relic slot with a spare in
@@ -86,7 +91,7 @@ The harness plays OT6 the way a competent person with a controller would.
   safety net, not a design. Each area gets a design doc like
   [break-coverage-gate.md](design/break-coverage-gate.md) and a suite that
   checks the rows in the built ROM; `tools/audit_break_coverage.py`'s tuning
-  claim grows by play.
+  claim grows only as play backs it.
 - **Prefer not to retune vanilla enemies** (AI scripts, spells, one-shots)
   to dodge a hard fight. OT6 changes battle systems more than individual
   enemy quirks; a hard fight is usually answered with levels, gear, route or
@@ -112,19 +117,20 @@ The harness plays OT6 the way a competent person with a controller would.
 - **Save compatibility becomes a promise at v1.0.** While releases are v0.x,
   keeping older saves loading ([save-layout.md](design/save-layout.md)) is
   nice to have, not a constraint; design for what is current rather than
-  adding workarounds for old saves. A release is promoted to v1.0
+  adding workarounds for old saves (owner, 2026-09-29). A release is promoted to v1.0
   retroactively once it is fun and solid enough to keep that promise.
 - **Priorities, roughly:** release reliability, then labs on fights won by
   attrition or a coin flip (a measured success rate rather than a selected
-  win), then fun and the Octopath feel. Quality over time: there are no
+  win), then fun and the Octopath feel; take the highest of these with a
+  checkable unit ready. Quality over time: there are no
   deadlines, and slow protocols, controls or regenerations are worth their
   time.
 
 ## Testing and debugging
 
 - **Handle the encounters the game can deal.** A test, generator or driver
-  should cope with the encounters, formations and draws the game can deal at
-  that point, not just the one its fixture happened to draw. ROM changes
+  counts as correct when it copes with every encounter, formation and draw
+  the game can deal at that point, not just the one its fixture happened to draw. ROM changes
   regenerate the fixture chain and reshuffle encounters; fixing what that
   exposes is routine work. The evidence bar for test changes is in
   [TESTING.md](TESTING.md).
@@ -136,8 +142,8 @@ The harness plays OT6 the way a competent person with a controller would.
   When a suite goes red after an unrelated change, suspect the suite, then
   prove it. The good fix reaches the precondition and asserts it, rather
   than widening a timeout, re-rolling a seed, or weakening an assertion.
-- **A regression ships with its test** where practical: red on the
-  regressed build, green after. Tooling defects are simplest to fix
+- **A regression ships with its test**: red on the regressed build, green
+  after. Tooling defects are simplest to fix
   directly, without tests of the test tooling.
 - **Look at the screen.** Scripts watch what they're doing and fail fast
   with the failure frame; reading the frame and the log beats theorizing.
@@ -155,7 +161,7 @@ The harness plays OT6 the way a competent person with a controller would.
 
 - **The release bar** is a fluid, honest playthrough of the supported route
   with few game-overs. Retry sites in the qualification run are lab
-  candidates, and save points along it make good checkpoints.
+  candidates, and each save point along it gets a checkpoint.
 - **Release notes are for players**: what you'll notice, why to update,
   what to watch for, in play terms. Map numbers, addresses, harness and
   test names don't belong there, nor does what was meant to happen but
