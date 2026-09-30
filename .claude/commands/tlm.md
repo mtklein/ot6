@@ -48,9 +48,9 @@ interpreting runs.
 - **Third machine:** px13, an Ubuntu 26.04 laptop at `ssh px13.local`
   (key auth; 12 cores/24 threads, 29 GB; clone at `~/ot6`, work in clones
   under `~/work/` as on the Air). It builds the Macs' ROM byte for byte and
-  plays the same games from the same states; its `.mss` bytes (and so state
+  plays the same games from states it generates itself; its `.mss` bytes (and so state
   hashes) differ from the Macs' by compression alone (docs/TOOLING.md
-  "Linux worker"). Cap it at about 10 concurrent emulators. No caffeinate
+  "Linux worker"). Start at about 10 concurrent emulators (24 threads; not yet measured). No caffeinate
   there: run long jobs under `systemd-inhibit --what=idle --who=ot6
   --why=<job>`; a closed lid still suspends it. Add `--peer px13.local` to
   live.py to see its workers.

@@ -158,6 +158,7 @@ if [ "$(uname -s)" = Darwin ]; then
   BIN_SUB=/Contents/MacOS          # the executable's directory in the bundle
   file_stamp() { stat -Lf '%z %m' "$1"; }
   clone_cp() { cp -c "$@" 2>/dev/null || cp "$@"; }   # APFS clonefile
+  GATEKEEPER_NOTE="; expect a Gatekeeper scan"
 else
   SRC_APP="$ROOT/tools/Mesen-linux"
   MESEN_CACHE="${OT6_MESEN_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/ot6}"
@@ -199,7 +200,7 @@ if ! shared_app_ready; then
     # finished bundle down under every worker between its own look and its
     # exec (#242: three generate edges died that way on a cold cache).
     if ! shared_app_ready; then
-      echo "creating shared test emulator (one-time; expect a Gatekeeper scan)..."
+      echo "creating shared test emulator (one-time${GATEKEEPER_NOTE})..."
       TMP="$MESEN_CACHE/.build.$$"
       rm -rf "$TMP" "$SHARED_APP" "$SHARED_APP.stamp"
       # cp -c = APFS clonefile: instant and ~zero physical disk.  -L because

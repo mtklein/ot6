@@ -78,14 +78,19 @@ are git-ignored. Ripped assets are tracked.
 `px13` (`ssh px13.local`: Ubuntu 26.04, Ryzen AI 9 HX 370 12c/24t, 29 GB)
 runs the same scripts. At the same commit as a Mac it built the same ROM
 byte for byte, and its generators and suites played the same games: the same
-verdicts, frames, screenshots and log lines, and savestates whose emulated
-machine is byte-identical (build/attempts/wt/linux-px13/). Its `.mss` files
-are not byte-identical to the Macs', because Mesen compresses the state with
-miniz at level 1, which takes a different (equally valid) deflate path on
-x86-64 than on arm64. So a state's artifact hash, the stamps that record it,
+verdicts, frames and screenshots, log lines differing only in byte counts
+and state hashes, and savestates whose emulated machine is byte-identical
+(build/attempts/wt/linux-px13/). Its `.mss` files are not byte-identical to
+the Macs': the machine stream compresses differently, most likely because
+miniz (level 1) takes an x86-only deflate path; that hasn't been confirmed
+by compressing the same stream both ways. So a state's artifact hash, the stamps that record it,
 and the `sha=` in a log line naming a loaded state differ between the two
-machines. Copying fixtures from one machine to the other has not been
-tried; each machine has generated its own. To compare a state across
+machines. Each machine generates its own chain. A copied state still plays
+the same (battle_banner on a Mac from px13's battle_entry: same verdict and
+screenshots, build/attempts/review-linux-px13/xload-summary.txt), and a
+coherent copied set (each `.mss` with its stamp) verifies fresh; mixing a
+copied parent into a local chain marks its descendants stale and ninja
+regenerates them. To compare a state across
 the two, inflate its zlib streams (the screen, then the machine) and compare
 those.
 
