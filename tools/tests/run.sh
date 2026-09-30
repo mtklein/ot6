@@ -160,6 +160,7 @@ if [ "$(uname -s)" = Darwin ]; then
   clone_cp() { cp -c "$@" 2>/dev/null || cp "$@"; }   # APFS clonefile
   GATEKEEPER_NOTE="; expect a Gatekeeper scan"
 else
+  GATEKEEPER_NOTE=
   SRC_APP="$ROOT/tools/Mesen-linux"
   MESEN_CACHE="${OT6_MESEN_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/ot6}"
   SHARED_APP="$MESEN_CACHE/Mesen-test"
