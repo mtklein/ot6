@@ -1705,7 +1705,7 @@ Sand Storm opener, a boosted Fight that breaks all four shields, then
 1736 (e0:434x4) is short of its 3026 HP -- caring`, a Cure, a Fight that
 takes it to `monhp=s0:66/sh0` (24 with its shields back by the next
 sample), and BonePowder: `[death] f+3064 entity 0 char 6 from 1008/1211
-by slot 0 cmd $00 atk $EF` in all three. That is the care-policy lab
+by slot 0 cmd $00 atk $EF` (1008, 1041 and 1044 HP in the three runs). That is the care-policy lab
 named above (a Cure turn that gives the dragon its second cycle).
 The re-cut `wor-tzen-door-v1` met it in sand battle 5 and won in 2567
 ticks; CELES saves at L28.

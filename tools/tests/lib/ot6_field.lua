@@ -4398,7 +4398,7 @@ function M.setRows(spec, opts)
     -- $26 is the menu's state only while the menu runs; on the map it is
     -- field RAM and can read $05, then $0F, with the party still walkable.
     -- Measured (#326, the fire-out-v1 re-cut, build/attempts/wt/recut/
-    -- capture/fire-out-v1.log): X presses dropped after the Esper menu
+    -- capture/fire-out-v1.fail1-setrows.log): X presses dropped after the Esper menu
     -- closed, "field menu open" was satisfied 14 frames later by the
     -- field's $05, the LEFT presses walked the map, "Order screen" by its
     -- $0F, the slot table read "0,0,0,208", and "back to the field" was
