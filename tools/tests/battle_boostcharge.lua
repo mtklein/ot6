@@ -47,6 +47,21 @@
 -- step up and one A at the park.  Nothing here needs the boss to die or
 -- even to be hurt; the file measures a pool, so it leaves when its
 -- measurements are in and boots the fixture again for the second pip.
+--
+-- The pool is the instrument, and this battle can empty it.  NUMBER 024
+-- muddles, and a muddled ally casts what she knows at whoever the engine
+-- picks: measured on the n024_entry cut from a1254c65, CELES (muddled) cast
+-- Rasp on LOCKE right after the Drain arm and took his 65 to 0, so the
+-- folded Fire (20) was refused at every confirm until the run timed out;
+-- at another seed shift she cast Imp on him as the fold was queued, the
+-- Fire 2 never went out and his list greyed.  Each arm therefore re-checks
+-- its precondition for as long as it waits -- LOCKE can cast it and his
+-- live pool covers the price, until the charge lands -- and when something
+-- other than LOCKE's own queued action takes that away, the arm has not
+-- been measured, the battle is left, and the fixture is booted again (the
+-- reload a player would make) with the arms still owed, in the same order.
+-- A boot that measures nothing fails, naming what took the precondition: a
+-- reload would replay it.  Nothing is retried on a price that differs.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/n024_entry.mss.lua"
 
@@ -403,12 +418,83 @@ end
 
 -- ------------------------------------------------------- one measurement --
 local measured = {}
+-- This boot: its number, how many arms it measured, and -- once the arm's
+-- precondition was taken away by something other than that arm's own
+-- action -- why it was left.  Every abandoned boot's reason is kept for
+-- the final message.
+local boot = { n = 0, measured = 0, left = nil }
+local leftBoots = {}
+
+-- What stops LOCKE casting the arm for the rest of the battle, read off his
+-- status bytes: Imp and Mute grey the list (the confirm buzzes), Berserk,
+-- Zombie and Petrify hand his turns to the engine.  Measured at seed shift
+-- 12: Imp landed as the folded Fire was queued, the Fire 2 never went out
+-- and no charge came.  Nothing else is counted; the arm waits it out as it
+-- always has.  Muddle especially must not count: at shifts 2, 3, 10, 11,
+-- 14 and 15 NUMBER 024's opening Muddle lands on LOCKE after his summon is
+-- queued, and the summon still goes out and is charged under it (the
+-- charge write reads STATUS2=$20).
+local ST2_MUTE = 0x08                    -- STATUS2 bit 3 (Remedy's $48 = Mute|Sap)
+local function castBlocked(s)
+  local s1, s2 = H.readByte(0x3EE4 + s * 2), H.readByte(0x3EE5 + s * 2)
+  local s3, s4 = H.readByte(0x3EF8 + s * 2), H.readByte(0x3EF9 + s * 2)
+  if (s1 & H.ST1_IMP) ~= 0 then return "Imp" end
+  if (s2 & ST2_MUTE) ~= 0 then return "Mute" end
+  if (s1 & H.ST1_ZOMBIE) ~= 0 then return "Zombie" end
+  local d = H.turnDenied({ s1 = s1, s2 = s2, s3 = s3, s4 = s4 })
+  if d == "Petrify" or d == "Berserk" then return d end
+  return nil
+end
+
+-- The arm's precondition, re-read for as long as the arm waits: LOCKE can
+-- cast it (castBlocked) and his live pool covers the price.  An
+-- unaffordable or greyed cast is refused at the confirm (#219 ruling 2),
+-- and one that became unaffordable or was taken from him after the queue
+-- never executes; none of that is the measurement, and none of it is a
+-- price.  When the precondition is gone, the arm records what took it
+-- (the status, or LOCKE's pool writes since the arm was armed) and stops
+-- waiting.
+local function lost(where)
+  if rec.short then return true end
+  local what = castBlocked(rec.slot)
+  if what then
+    rec.short = string.format("[%s] %s, LOCKE is under %s (status $%02X $%02X "
+      .. "$%02X $%02X), so the arm's cast cannot go out", rec.tag, where, what,
+      H.readByte(0x3EE4 + rec.slot * 2), H.readByte(0x3EE5 + rec.slot * 2),
+      H.readByte(0x3EF8 + rec.slot * 2), H.readByte(0x3EF9 + rec.slot * 2))
+    return true
+  end
+  if mp(rec.slot) >= rec.want then return false end
+  local moves = {}
+  for i = rec.wArm + 1, #poolWrites do
+    if poolWrites[i].slot == rec.slot then moves[#moves + 1] = writeStr(poolWrites[i]) end
+  end
+  rec.short = string.format("[%s] %s, LOCKE's pool is %d, below the %d this "
+    .. "arm costs; his pool moved since the arm was armed (pool %d) by: %s",
+    rec.tag, where, mp(rec.slot), rec.want, rec.mpArm,
+    #moves > 0 and table.concat(moves, ", ") or "none")
+  return true
+end
+local function leave()
+  boot.left = rec.short
+  leftBoots[#leftBoots + 1] = string.format("boot %d: %s", boot.n, rec.short)
+  want.mode = "idle"
+  H.log(string.format("[boot %d] LEFT, %s arm(s) measured here: %s -- the arm "
+    .. "is still owed and a fresh boot of the fixture takes it", boot.n,
+    boot.measured, rec.short))
+end
+
 -- Arm the want, watch the queue take a price, watch the pool lose it, and
 -- assert both against a number derived from the ROM -- and against the
 -- number the OTHER rule would have produced, so the arm cannot pass under
--- the wrong one.
+-- the wrong one.  The arm runs in the first boot that reaches it with the
+-- boot still standing; a summon arm also needs this battle's divine unspent.
 local function measure(spec)
-  return H.repeatN(1, {
+  local function wanted()
+    return not spec.done and boot.left == nil
+      and not (spec.cmd == CMD_SUMMON and (H.readWord(SUMMONED) & (1 << locke)) ~= 0)
+  end
+  return H.cond(wanted, {
     H.call(function()
       local base = baseMp(spec.id)
       local price, notIt, why = spec.price(base)
@@ -416,65 +502,73 @@ local function measure(spec)
         "[%s] premise: the price under test (%d) and the price the other "
         .. "rule would charge (%d) must be different numbers, or this arm "
         .. "asserts nothing", spec.tag, price, notIt))
-      H.assertEq(mp(locke) >= price, true, string.format(
-        "[%s] premise: LOCKE's real pool (%d) covers the %d this costs -- an "
-        .. "unaffordable boost is greyed and refused at the confirm (#219 "
-        .. "ruling 2), which is a different measurement", spec.tag,
-        mp(locke), price))
       rec = { slot = locke, cmd = spec.cmd, stores = {}, queued = false,
               want = price, notIt = notIt, why = why, tag = spec.tag,
-              base = base, id = spec.id, pend = spec.pend }
+              base = base, id = spec.id, pend = spec.pend,
+              wArm = #poolWrites, mpArm = mp(locke) }
       armed = false
+      if lost("at arming") then return end
       want.slot, want.bank, want.pend = locke, spec.pend, spec.pend
       want.mode, want.spell = spec.mode, spec.id
-      H.log(string.format("[%s] arming: %s at boost %d -- base %d, the rule "
-        .. "says %d, the other rule would say %d; pool %d, bank %d, pending %d",
-        spec.tag, spec.name, spec.pend, base, price, notIt, mp(locke),
-        bp(locke), pend(locke)))
+      H.log(string.format("[%s] arming (boot %d): %s at boost %d -- base %d, "
+        .. "the rule says %d, the other rule would say %d; pool %d, bank %d, "
+        .. "pending %d", spec.tag, boot.n, spec.name, spec.pend, base, price,
+        notIt, mp(locke), bp(locke), pend(locke)))
     end),
     step("[" .. spec.tag .. "] the action reaches the queue",
-      function() return rec.queued end),
-    H.call(function()
-      H.log(string.format("[%s] drawn %s, queue stores {%s} -> %d, attack "
-        .. "$%02X, pool at queue %d", spec.tag, tostring(rec.drawn),
-        table.concat(rec.stores, ","), rec.qcost, rec.atk, rec.mp0))
-      H.assertEq(rec.drawn, rec.want, string.format(
-        "[%s] the number the list DREW beside %s at boost %d is %d -- %s",
-        spec.tag, spec.name, spec.pend, rec.want, rec.why))
-      H.assertEq(rec.qcost, rec.want, string.format(
-        "[%s] ...and the queue took the same %d, not the %d the other rule "
-        .. "would have charged (#219 ruling 3: one arithmetic authority)",
-        spec.tag, rec.want, rec.notIt))
-      if spec.queuedAs then
-        H.assertEq(rec.atk, spec.queuedAs, string.format(
-          "[%s] the queue carries attack $%02X -- %s", spec.tag,
-          spec.queuedAs, spec.queuedAsWhy))
-      end
-    end),
-    step("[" .. spec.tag .. "] the action resolves and its charge lands",
-      charged, 20000),
-    H.call(function()
-      local c = poolWrites[rec.charge]
-      local moves = {}
-      for i = rec.w0 + 1, rec.charge - 1 do
-        if poolWrites[i].slot == rec.slot then moves[#moves + 1] = writeStr(poolWrites[i]) end
-      end
-      H.log(string.format("[%s] CHARGE: LOCKE MP %d -> %d, spent %d (rule %d, "
-        .. "other rule %d, base %d); the pool was %d at the queue, moved before "
-        .. "the charge by: %s; the charge %s", spec.tag, c.old, c.new,
-        rec.spent, rec.want, rec.notIt, rec.base, rec.mp0,
-        #moves > 0 and table.concat(moves, ", ") or "none", writeStr(c)))
-      H.assertEq(c.cmd == rec.cmd and c.atk == rec.atk, true, string.format(
-        "[%s] the charge is made under the queued action's own $b5/$b6 "
-        .. "($%02X/$%02X)", spec.tag, rec.cmd, rec.atk))
-      H.assertEq(rec.spent, rec.want, string.format(
-        "[%s] %s at boost %d took exactly %d MP out of the pool -- %s.  It is "
-        .. "NOT %d, which is what %s would have charged", spec.tag, spec.name,
-        spec.pend, rec.want, rec.why, rec.notIt, spec.otherRule))
-      want.mode = "idle"
-      measured[#measured + 1] = string.format("%s@%d=%d", spec.name,
-        spec.pend, rec.spent)
-    end),
+      function() return rec.queued or lost("before the queue") end),
+    H.cond(function() return rec.short ~= nil end, { H.call(leave) }, {
+      H.call(function()
+        H.log(string.format("[%s] drawn %s, queue stores {%s} -> %d, attack "
+          .. "$%02X, pool at queue %d", spec.tag, tostring(rec.drawn),
+          table.concat(rec.stores, ","), rec.qcost, rec.atk, rec.mp0))
+        H.assertEq(rec.drawn, rec.want, string.format(
+          "[%s] the number the list DREW beside %s at boost %d is %d -- %s",
+          spec.tag, spec.name, spec.pend, rec.want, rec.why))
+        H.assertEq(rec.qcost, rec.want, string.format(
+          "[%s] ...and the queue took the same %d, not the %d the other rule "
+          .. "would have charged (#219 ruling 3: one arithmetic authority)",
+          spec.tag, rec.want, rec.notIt))
+        local queuedAs = spec.queuedAs and spec.queuedAs()
+        if queuedAs then
+          H.assertEq(rec.atk, queuedAs, string.format(
+            "[%s] the queue carries attack $%02X -- %s", spec.tag,
+            queuedAs, spec.queuedAsWhy))
+        end
+      end),
+      -- charged() is asked first, so the charge's own write never reads as
+      -- a lost precondition; only a write before it can.
+      step("[" .. spec.tag .. "] the action resolves and its charge lands",
+        function() return charged() or lost("between the queue and the charge") end,
+        20000),
+      H.cond(function() return rec.spent == nil end, { H.call(leave) }, {
+        H.call(function()
+          local c = poolWrites[rec.charge]
+          local moves = {}
+          for i = rec.w0 + 1, rec.charge - 1 do
+            if poolWrites[i].slot == rec.slot then moves[#moves + 1] = writeStr(poolWrites[i]) end
+          end
+          H.log(string.format("[%s] CHARGE: LOCKE MP %d -> %d, spent %d (rule %d, "
+            .. "other rule %d, base %d); the pool was %d at the queue, moved before "
+            .. "the charge by: %s; the charge %s", spec.tag, c.old, c.new,
+            rec.spent, rec.want, rec.notIt, rec.base, rec.mp0,
+            #moves > 0 and table.concat(moves, ", ") or "none", writeStr(c)))
+          H.assertEq(c.cmd == rec.cmd and c.atk == rec.atk, true, string.format(
+            "[%s] the charge is made under the queued action's own $b5/$b6 "
+            .. "($%02X/$%02X)", spec.tag, rec.cmd, rec.atk))
+          H.assertEq(rec.spent, rec.want, string.format(
+            "[%s] %s at boost %d took exactly %d MP out of the pool -- %s.  It is "
+            .. "NOT %d, which is what %s would have charged", spec.tag, spec.name,
+            spec.pend, rec.want, rec.why, rec.notIt, spec.otherRule))
+          want.mode = "idle"
+          spec.done = true
+          boot.measured = boot.measured + 1
+          measured[#measured + 1] = string.format("%s@%d=%d(boot %d)", spec.name,
+            spec.pend, rec.spent, boot.n)
+          if spec.after then spec.after() end
+        end),
+      }),
+    }),
   })
 end
 
@@ -611,75 +705,104 @@ H.run({ maxFrames = 260000 }, {
       "release notes v0.19: ...and 99 at two")
   end),
 
-  -- ===================================================== boot A: one pip ==
-  -- LOCKE's five turns, in the order his bank can pay for: the divine first
-  -- (a 172-MP pool, and it is the dearest thing here), then the family head
+  -- ================================================================ boots ==
+  -- LOCKE's turns, in the order his bank can pay for: the divine first (a
+  -- 172-MP pool, and it is the dearest thing here), then the family head
   -- unboosted as the control, then the non-tier spell boosted, then a plain
-  -- Fight to bank the pip the folded cast needs, then the fold.
-  bootPrologue("bootA"),
-  measure({ tag = "summon", name = "Inferno (IFRIT)", id = INFERNO,
-            cmd = CMD_SUMMON, mode = "summon", pend = 1,
-            price = escalate(1),
-            otherRule = "leaving summons unpriced by the boost, as they were "
-              .. "before #219" }),
-  H.call(function()
-    H.assertEq(H.readWord(SUMMONED) & (1 << locke) ~= 0, true,
-      "[summon] the engine really spent the once-per-battle divine ($3f2e) "
-      .. "-- the 65 bought a summon, not a refused menu press")
-    H.screenshot("boostcharge_summon_boost1")
-  end),
-  measure({ tag = "fold-control", name = "Fire", id = FIRE, cmd = CMD_MAGIC,
-            mode = "spell", pend = 0, price = flat(),
-            queuedAs = FIRE,
-            queuedAsWhy = "an unboosted head does not fold: it is queued as "
-              .. "itself",
-            otherRule = "a pending pip, which is the point of the control -- "
-              .. "the escalation is self-restoring at boost 0" }),
-  measure({ tag = "nontier", name = "Drain", id = DRAIN, cmd = CMD_MAGIC,
-            mode = "spell", pend = 1, price = escalate(1),
-            queuedAs = DRAIN,
-            queuedAsWhy = "a non-tier spell has no tier to fold into; only "
-              .. "its price moves",
-            otherRule = "the pre-#219 rule, where only tier-family magic "
-              .. "cost more under a boost" }),
-  measure({ tag = "fold", name = "Fire", id = FIRE, cmd = CMD_MAGIC,
-            mode = "spell", pend = 1, price = tierPrice(1, FIRE),
-            queuedAs = nil,       -- filled in below, from the ROM's own table
-            otherRule = "applying the 2.5x escalation to a spell that already "
-              .. "escalates by folding a tier -- which would charge twice for "
-              .. "one boost" }),
-  H.call(function()
-    H.assertEq(rec.atk, foldTo(FIRE, 1), string.format(
-      "[fold] the queue carries attack $%02X: the boost really folded Fire up "
-      .. "a tier, and the %d it charged is that tier's own vanilla MP",
-      foldTo(FIRE, 1), rec.want))
-    H.screenshot("boostcharge_fold_boost1")
-    H.log("[bootA] " .. table.concat(measured, " "))
-  end),
-
-  -- ===================================================== boot B: two pips ==
-  -- A divine is once per battle and this one is spent, so the second pip
-  -- needs a second battle: the fixture is booted again and battle 72 entered
-  -- again, which is the same fight a player who reloaded their save would
-  -- walk into.  LOCKE opens at 1 BP (Ot6InitBP), so one plain unboosted
-  -- Fight banks the second pip before the boost can be raised to two.
-  bootPrologue("bootB"),
-  measure({ tag = "summon2", name = "Inferno (IFRIT)", id = INFERNO,
-            cmd = CMD_SUMMON, mode = "summon", pend = 2,
-            price = escalate(2),
-            otherRule = "leaving summons unpriced by the boost, as they were "
-              .. "before #219" }),
-  H.call(function()
-    H.assertEq(rec.spent, ANCHOR, string.format(
-      "[summon2] two pips put Inferno on the ceiling: %d x 2.5^2 = %d, capped "
-      .. "to the %d a two-digit price drawer can render (#219 ruling 1)",
-      baseMp(INFERNO), math.floor(baseMp(INFERNO) * 6.25 + 0.5), ANCHOR))
-    H.assertEq(H.readWord(SUMMONED) & (1 << locke) ~= 0, true,
-      "[summon2] and the engine spent the divine for it")
-    H.screenshot("boostcharge_summon_boost2")
-    H.log("[measured] " .. table.concat(measured, " "))
-    H.log("PASSED: the drawn number, the queued price and the pool agree, "
-      .. "for a boosted summon, a boosted non-tier spell, and a folded "
-      .. "family head that pays its tier rather than 2.5x on top of it")
-  end),
+  -- Fight to bank the pip the folded cast needs, then the fold.  A divine is
+  -- once per battle, so the two-pip summon waits for the next boot: the
+  -- fixture is booted again and battle 72 entered again, which is the same
+  -- fight a player who reloaded their save would walk into, and LOCKE opens
+  -- at 1 BP (Ot6InitBP), so one plain unboosted Fight banks the second pip.
+  -- With nothing taking an arm's precondition that is two boots, the first
+  -- taking the first four arms; a boot left on a lost precondition hands
+  -- the arms it still owes to the next, in the same order.
+  H.repeatN(1, (function()
+    local arms = {
+      { tag = "summon", name = "Inferno (IFRIT)", id = INFERNO,
+        cmd = CMD_SUMMON, mode = "summon", pend = 1,
+        price = escalate(1),
+        otherRule = "leaving summons unpriced by the boost, as they were "
+          .. "before #219",
+        after = function()
+          H.assertEq(H.readWord(SUMMONED) & (1 << locke) ~= 0, true,
+            "[summon] the engine really spent the once-per-battle divine ($3f2e) "
+            .. "-- the 65 bought a summon, not a refused menu press")
+          H.screenshot("boostcharge_summon_boost1")
+        end },
+      { tag = "fold-control", name = "Fire", id = FIRE, cmd = CMD_MAGIC,
+        mode = "spell", pend = 0, price = flat(),
+        queuedAs = function() return FIRE end,
+        queuedAsWhy = "an unboosted head does not fold: it is queued as "
+          .. "itself",
+        otherRule = "a pending pip, which is the point of the control -- "
+          .. "the escalation is self-restoring at boost 0" },
+      { tag = "nontier", name = "Drain", id = DRAIN, cmd = CMD_MAGIC,
+        mode = "spell", pend = 1, price = escalate(1),
+        queuedAs = function() return DRAIN end,
+        queuedAsWhy = "a non-tier spell has no tier to fold into; only "
+          .. "its price moves",
+        otherRule = "the pre-#219 rule, where only tier-family magic "
+          .. "cost more under a boost" },
+      { tag = "fold", name = "Fire", id = FIRE, cmd = CMD_MAGIC,
+        mode = "spell", pend = 1, price = tierPrice(1, FIRE),
+        queuedAs = function() return foldTo(FIRE, 1) end,
+        queuedAsWhy = "the boost really folded Fire up a tier, and the price "
+          .. "it charges is that tier's own vanilla MP",
+        otherRule = "applying the 2.5x escalation to a spell that already "
+          .. "escalates by folding a tier -- which would charge twice for "
+          .. "one boost",
+        after = function() H.screenshot("boostcharge_fold_boost1") end },
+      { tag = "summon2", name = "Inferno (IFRIT)", id = INFERNO,
+        cmd = CMD_SUMMON, mode = "summon", pend = 2,
+        price = escalate(2),
+        otherRule = "leaving summons unpriced by the boost, as they were "
+          .. "before #219",
+        after = function()
+          H.assertEq(rec.spent, ANCHOR, string.format(
+            "[summon2] two pips put Inferno on the ceiling: %d x 2.5^2 = %d, capped "
+            .. "to the %d a two-digit price drawer can render (#219 ruling 1)",
+            baseMp(INFERNO), math.floor(baseMp(INFERNO) * 6.25 + 0.5), ANCHOR))
+          H.assertEq(H.readWord(SUMMONED) & (1 << locke) ~= 0, true,
+            "[summon2] and the engine spent the divine for it")
+          H.screenshot("boostcharge_summon_boost2")
+        end },
+    }
+    local function owed()
+      local n = 0
+      for _, a in ipairs(arms) do if not a.done then n = n + 1 end end
+      return n
+    end
+    -- One boot per arm at most: every boot measures at least one arm or
+    -- fails, so #arms boots always suffice.
+    local steps = {}
+    for b = 1, #arms do
+      local body = {
+        H.call(function() boot = { n = b, measured = 0, left = nil } end),
+        bootPrologue("boot" .. b),
+      }
+      for _, a in ipairs(arms) do body[#body + 1] = measure(a) end
+      body[#body + 1] = H.call(function()
+        H.log(string.format("[boot %d] %d arm(s) measured, %d still owed%s",
+          b, boot.measured, owed(), boot.left and " (left on a lost precondition)" or ""))
+        H.assertEq(boot.measured > 0, true, string.format(
+          "boot %d measured an arm -- a boot left before its first "
+          .. "measurement would be replayed by the next one from the same "
+          .. "fixture, so it is a failure, not a retry: %s", b,
+          tostring(boot.left)))
+      end)
+      steps[#steps + 1] = H.cond(function() return owed() > 0 end, body)
+    end
+    steps[#steps + 1] = H.call(function()
+      H.assertEq(owed(), 0, "every arm was measured; boots left on a "
+        .. "lost precondition: " .. (#leftBoots > 0 and table.concat(leftBoots, " | ") or "none"))
+      H.log("[measured] " .. table.concat(measured, " "))
+      H.log(string.format("[boots] %d boot(s); left on a lost precondition: %s",
+        boot.n, #leftBoots > 0 and table.concat(leftBoots, " | ") or "none"))
+      H.log("PASSED: the drawn number, the queued price and the pool agree, "
+        .. "for a boosted summon, a boosted non-tier spell, and a folded "
+        .. "family head that pays its tier rather than 2.5x on top of it")
+    end)
+    return steps
+  end)()),
 })
