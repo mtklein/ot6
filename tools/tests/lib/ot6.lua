@@ -691,16 +691,24 @@ M.ST2_MUDDLE = 0x20                   -- STATUS2::CONFUSE, $3ee5 + entity*2
 --   actor    the deciding entity 0..3
 --   status2  entity -> $3ee5 byte
 --   hp       entity -> HP;  maxhp  entity -> max HP (0 for an empty slot)
+--   floor    optional, entity -> HP at or under which the ally is NOT hit
+--            (the cure would kill it, #320: Driver:unmuddleFloor); such an
+--            ally comes back as the second value, `held`
 function M.muddleRule(o)
-  local st, hp, maxhp = o.status2 or {}, o.hp or {}, o.maxhp or {}
+  local st, hp, maxhp, floor = o.status2 or {}, o.hp or {}, o.maxhp or {}, o.floor or {}
   if ((st[o.actor] or 0) & M.ST2_MUDDLE) ~= 0 then return "defer" end
+  local held = nil
   for e = 0, 3 do
     if e ~= o.actor and ((st[e] or 0) & M.ST2_MUDDLE) ~= 0
        and (hp[e] or 0) > 0 and (maxhp[e] or 1) > 0 then
-      return e
+      if floor[e] ~= nil and hp[e] <= floor[e] then
+        held = held or e
+      else
+        return e
+      end
     end
   end
-  return nil
+  return nil, held
 end
 
 -- The turn-denying statuses (#187, #224), read off the same four bytes
@@ -5115,12 +5123,21 @@ function Driver:makePlan(actor)
   -- clears the status (CalcMaxDmg strips it from a physically damaged
   -- target; a Remedy does not carry the bit, M.itemStatus2).
   do
-    local s2, mx = {}, {}
+    local s2, mx, fl = {}, {}, {}
     for e = 0, 3 do
       s2[e] = M.readByte(BATTLE.ST2 + e * 2)
       mx[e] = maxOf(e)
+      if e ~= actor and mx[e] > 0 then fl[e] = self:unmuddleFloor(actor, e) end
     end
-    local r = M.muddleRule({ actor = actor, status2 = s2, hp = hpNow, maxhp = mx })
+    local r, held = M.muddleRule({ actor = actor, status2 = s2, hp = hpNow, maxhp = mx, floor = fl })
+    if held ~= nil then
+      local said = string.format("[%s] actor=%d: entity %d (%d/%d) is MUDDLED but at or under "
+        .. "this actor's unmuddle floor %d (%s) -- the Fight that cures would kill; planning on",
+        self.tag or "fight", actor, held, hpNow[held], mx[held], fl[held],
+        M.unmuddleHits[M.readByte(BATTLE.BCHID + actor * 2)] and "its largest measured unmuddle hit"
+          or "a quarter of max HP, unmeasured")
+      if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+    end
     if r == "defer" then
       local have = M.readByte(BATTLE.BP + actor * 2)
       local inRound = hpNow[actor] > 0 and (price[actor] or 0) > 0
@@ -5143,6 +5160,10 @@ function Driver:makePlan(actor)
       if said ~= self.healSaid then self.healSaid = said; M.log(said) end
       r = nil
     end
+    -- opts.unmuddle = false (#320): no cure-hit at all -- a monster's
+    -- physical hit clears Muddle the same way, and the turn goes on the
+    -- fight instead (the A/B lever against the rule)
+    if r ~= nil and self.opts.unmuddle == false then r = nil end
     local fight = r ~= nil and cmdRow(actor, BATTLE.CMD_FIGHT) or nil
     if fight ~= nil then
       self.healSaid = nil
@@ -7115,6 +7136,9 @@ function Driver:button(actor)
     -- on a raised member pays the top-up owed.
     if self.plan.ally then
       self.unmuddlePending = { e = self.plan.target, by = actor, tick = self.battleTick }
+      -- the hit itself, until the hitter's command runs (#320): it lands
+      -- even when something else cleared the Muddle first
+      self.unmuddleQueued = { e = self.plan.target, by = actor }
     elseif self.plan.kind == "item" and self.plan.item == BATTLE.FENIX_DOWN then
       self.raisePending = { e = self.plan.target, by = actor, tick = self.battleTick }
       self.raiseQueued[self.plan.target] = { by = actor, tick = self.battleTick }
@@ -7883,6 +7907,146 @@ function Driver:watchPendingCare()
   end
 end
 
+-- The party's own hand in a party death (#320).  With no monster action
+-- to attribute, a member's HP falling while a member's menu command
+-- executes (execActor), or inside DMG_SETTLE frames of one returning with
+-- nothing else executing, is that member's action: a Muddled ally's
+-- Fight or spell (the engine picks command and target, RandCharAction),
+-- the Muddle rule's own unmuddle hit, a reflected cast.  Measured on the
+-- Figaro basement's Drop x3 (build/attempts/review-wor-edgar/merged/
+-- merged_k3_s0.log): all three members died `by nobody (no monster
+-- action attributed)` while the Drops, whose script is Mad Signal and a
+-- counter, stood untouched at 1000/sh2.  Returns { e, cmd, atk, muddled }
+-- or nil; `muddled` is the actor's STATUS2 Muddle bit as its command
+-- began (Driver:watchAllyExec), or as the drop lands for a command begun
+-- unseen: a Muddled member's physical hit on ITSELF clears its own
+-- Muddle before the HP reads 0 (measured in the lab: SABIN's Pummel,
+-- cmd $0A atk $5D, killing him from 31/1509 read "its own action" with
+-- the bit already gone).
+-- M.ALLY_ATTRIBUTION = false switches it off (the negative control).
+M.ALLY_ATTRIBUTION = true
+-- A party command seen beginning (#320).  ExecCmd, SaveForMimic and the
+-- HP the command takes can all land inside one frame (measured: SABIN's
+-- unmuddle Fight on CELES at 75 HP, first seen on the frame she read 0),
+-- so a per-frame read of execActor can miss a command whole and the
+-- newest execDone entry is the other sighting, and what the command
+-- began from is the PREVIOUS frame's reading: the actor's Muddle bit
+-- (a Muddled member's hit on itself clears its own) and the target's HP
+-- (the hit ledger's partyHpLast, updated in watchHits after this runs).
+-- Each command is recorded once, at first sight.  Runs ahead of
+-- watchPendingCare, which forgets the Muddle rule's pending hit on the
+-- frame its target falls.
+function Driver:watchAllyExec()
+  if self.battleTick < 6 then self.allyExec, self.st2Last, self.unmuddleQueued = nil, {}, nil end
+  self.st2Last = self.st2Last or {}
+  local e, frame = nil, nil
+  if execActor ~= nil then
+    e = execActor
+  else
+    local d = execDone[#execDone]
+    if d ~= nil then e, frame = d.actor, d.frame end
+  end
+  local a = self.allyExec
+  if e == nil then
+    -- nothing to see
+  elseif a ~= nil and a.e == e and (execActor ~= nil and a.live or frame ~= nil and a.frame == frame) then
+    if frame ~= nil then a.live = false end
+  elseif a ~= nil and a.live and a.e == e and frame ~= nil then
+    -- the command seen live has returned: the same command, now done
+    a.live, a.frame = false, frame
+  else
+    local s2 = self.st2Last[e] or M.readByte(BATTLE.ST2 + e * 2)
+    self.allyExec = { e = e, live = execActor ~= nil, frame = frame,
+                      muddled = (s2 & M.ST2_MUDDLE) ~= 0 }
+    local q = self.unmuddleQueued
+    if q ~= nil and q.by == e then
+      local hp = self.partyHpLast[q.e] or M.readWord(0x3BF4 + q.e * 2)
+      self.unmuddleMeasure = { e = q.e, by = e, char = M.readByte(BATTLE.BCHID + e * 2),
+                               hp0 = hp, min = hp, until_ = self.battleTick + 3 * BATTLE.DMG_SETTLE }
+      self.unmuddleQueued = nil
+    end
+  end
+  for x = 0, 3 do self.st2Last[x] = M.readByte(BATTLE.ST2 + x * 2) end
+end
+-- What the Muddle rule's hit costs the ally it cures (#320), measured: from
+-- the frame the hitter's command is first seen (Driver:watchAllyExec) for
+-- three DMG_SETTLE windows, the lowest HP the target reads (a monster's
+-- hit in that window counts too, so the figure errs high).  Kept per
+-- hitting character for the run (M.unmuddleHits), the way a person
+-- remembers how hard SABIN's fists land; the Muddle rule's floor reads it.
+M.unmuddleHits = {}                   -- character id -> the largest measured unmuddle hit
+function Driver:watchUnmuddleHit()
+  if self.battleTick < 6 then self.unmuddleMeasure = nil end
+  local m = self.unmuddleMeasure
+  if m == nil then return end
+  local hp = M.readWord(0x3BF4 + m.e * 2)
+  if hp ~= 0xFFFF and hp < m.min then m.min = hp end
+  if self.battleTick > m.until_ then
+    local drop = math.max(0, m.hp0 - m.min)
+    M.unmuddleHits[m.char] = math.max(M.unmuddleHits[m.char] or 0, drop)
+    M.log(string.format("[%s] [unmuddle] actor %d (char %d)'s hit on entity %d took %d (%d -> %d); "
+      .. "char %d's largest this run: %d", self.tag or "fight", m.by, m.char, m.e, drop, m.hp0, m.min,
+      m.char, M.unmuddleHits[m.char]))
+    self.unmuddleMeasure = nil
+  end
+end
+
+-- The Muddle rule's floor (#320; opts.unmuddleGuard = false turns it off,
+-- the negative control): the HP at or under
+-- which `actor`'s plain Fight is not aimed at a Muddled ally -- the hit
+-- that cures would kill.  Measured in the lab (build/attempts/wt/
+-- figaro-muddle/): with the Peace Ring on SABIN, his unmuddle Fight on
+-- CELES at 75/1595 and 3/1495 killed her twice (`by entity 1 char 5 cmd
+-- $00 atk $FF (an ally's action)`), and both fights were lost.  The floor
+-- is this character's largest measured unmuddle hit this run, else a
+-- quarter of the ally's max HP (a Genji pair's two swings, unmeasured).
+-- nil with the guard off.  Measured on the cave's formation 232 (the
+-- pair, SABIN in the Peace Ring, 33 runs each): with the guard the same
+-- 164 fights spent no Fenix Down (2 without it) and lost 4 members (6),
+-- `peace_guard_c68` against `peace_c68`.
+function Driver:unmuddleFloor(actor, e)
+  if self.opts.unmuddleGuard == false then return nil end
+  local char = M.readByte(BATTLE.BCHID + actor * 2)
+  return M.unmuddleHits[char] or (M.readWord(0x3C1C + e * 2) // 4)
+end
+
+function Driver:allyAct()
+  if M.ALLY_ATTRIBUTION == false then return nil end
+  local e, cmd, atk = nil, nil, nil
+  if execActor ~= nil then
+    e, cmd, atk = execActor, execActorCmd and execActorCmd.cmd, execActorCmd and execActorCmd.atk
+  else
+    local d = execDone[#execDone]
+    if d ~= nil and execParty == nil and execMon == nil
+       and M.frame - d.frame <= BATTLE.DMG_SETTLE then
+      e, cmd, atk = d.actor, d.cmd, d.atk
+    end
+  end
+  if e == nil then return nil end
+  local muddled = (M.readByte(BATTLE.ST2 + e * 2) & M.ST2_MUDDLE) ~= 0
+  if self.allyExec ~= nil and self.allyExec.e == e then muddled = self.allyExec.muddled or muddled end
+  return { e = e, cmd = cmd or 0xFF, atk = atk or 0xFF, muddled = muddled }
+end
+
+-- The [death] line's "by" for a party action (Driver:allyAct), and what
+-- it was: a Muddled member's own action, the Muddle rule's hit on the
+-- ally it cures, or another ally's (or the member's own) action.
+function Driver:allyActSaid(a, victim)
+  local why
+  if a.muddled then why = "a MUDDLED member's action"
+  elseif (self.unmuddlePending and self.unmuddlePending.by == a.e and self.unmuddlePending.e == victim)
+      or (self.unmuddleMeasure and self.unmuddleMeasure.by == a.e and self.unmuddleMeasure.e == victim) then
+    -- the pending hit clears with the bit, on its first swing; the
+    -- measure (Driver:watchUnmuddleHit) holds through the hitter's command
+    why = "the Muddle rule's unmuddle hit"
+  elseif a.e == victim then why = "its own action"
+  else why = "an ally's action" end
+  local at = self.muddledAt and self.muddledAt[a.e]
+  if at and not a.muddled then why = why .. string.format("; it was Muddled at f+%d", at) end
+  return string.format("entity %d char %d cmd $%02X atk $%02X (%s)", a.e,
+    M.readByte(BATTLE.BCHID + a.e * 2), a.cmd, a.atk, why)
+end
+
 -- The hit ledger (#165): party HP falling while a monster's command
 -- executes (execMon, or within DMG_SETTLE frames of one returning
 -- with no party command running) is that monster's hit on that
@@ -7937,16 +8101,19 @@ function Driver:watchHits()
         self.monAct.kills = self.monAct.kills + 1
         if from >= maxhp then self.monAct.fullKills = self.monAct.fullKills + 1 end
       end
+      local ally = self.monAct == nil and self:allyAct() or nil
       local rec = { e = e, char = M.readByte(BATTLE.BCHID + e * 2), tick = self.battleTick,
                     from = from, maxhp = maxhp, bp = bp,
                     slot = self.monAct and self.monAct.slot, cmd = self.monAct and self.monAct.cmd,
-                    atk = self.monAct and self.monAct.atk, oneAction = oneAction }
+                    atk = self.monAct and self.monAct.atk, oneAction = oneAction,
+                    ally = ally and ally.e, allyMuddled = ally and ally.muddled }
       self.battleDeaths[#self.battleDeaths + 1] = rec
       M.log(string.format("[%s] [death] f+%d entity %d char %d from %d/%d "
         .. "by %s%s bp=%d party_bp=%s%s", self.tag or "fight", self.battleTick, e,
         rec.char, from, maxhp,
         self.monAct and string.format("slot %d cmd $%02X atk $%02X", self.monAct.slot,
-          self.monAct.cmd, self.monAct.atk) or "nobody (no monster action attributed)",
+          self.monAct.cmd, self.monAct.atk)
+          or (ally and self:allyActSaid(ally, e)) or "nobody (no monster action attributed)",
         oneAction and " (ONE ACTION from >= 80%)" or "", bp,
         table.concat(pbp, ","),
         bp >= BATTLE.BANKED_BP and string.format(" -- died holding %d BP", bp) or ""))
@@ -7970,8 +8137,9 @@ function Driver:watchHits()
     local pbp, ds = {}, {}
     for p = 0, 3 do pbp[#pbp + 1] = tostring(M.readByte(BATTLE.BP + p * 2)) end
     for _, d in ipairs(self.battleDeaths) do
-      ds[#ds + 1] = string.format("e%d@f+%d:%d/%d:bp%d%s", d.e, d.tick, d.from,
-        d.maxhp, d.bp, d.oneAction and ":one_action" or "")
+      ds[#ds + 1] = string.format("e%d@f+%d:%d/%d:bp%d%s%s", d.e, d.tick, d.from,
+        d.maxhp, d.bp, d.oneAction and ":one_action" or "",
+        d.ally and string.format(":by_%se%d", d.allyMuddled and "muddled_" or "", d.ally) or "")
     end
     local statues = 0
     for e = 0, 3 do
@@ -7985,6 +8153,61 @@ function Driver:watchHits()
     M.log(string.format("[%s] [wipe] f+%d party_bp=%s deaths=%s class=%s",
       self.tag or "fight", self.battleTick, table.concat(pbp, ","),
       #ds > 0 and table.concat(ds, ";") or "none", cls))
+  end
+end
+
+-- The status landers (#320): which species' actions put a turn-taking
+-- status on the party -- what a person reads off the screen (the
+-- NeckHunter's Mad Sickle, then SABIN's muddle animation) and carries
+-- into the next fight with that species.  A status bit that comes up on
+-- a member while a monster's action is being attributed (the hit
+-- ledger's monAct) is that slot's species' landing; the tally is kept
+-- for the run (M.statusLanders), the way a person remembers it.  Nothing
+-- hidden is read: the action and its status animation are on screen.
+-- Said as `[lander]` lines.  A kill order read off the tally (the
+-- landers first) was measured on the cave's formation 232 and changed
+-- nothing a person would notice -- 149 fights, 0 lost, 7 with a death,
+-- against the baseline's 164, 1 and 9 (build/attempts/wt/figaro-muddle/
+-- arms/lander_c68, base_c68) -- so no plan reads it; git has the lever
+-- (#320).
+M.statusLanders = {}                  -- species -> { [status] = landings this run }
+M.LANDER_STATUSES = {
+  { name = "Muddle", byte = 2, bit = M.ST2_MUDDLE },
+  { name = "Sleep", byte = 2, bit = M.ST2_SLEEP },
+  { name = "Berserk", byte = 2, bit = M.ST2_BERSERK },
+  { name = "Petrify", byte = 1, bit = M.ST1_PETRIFY },
+}
+function Driver:watchLanders()
+  if self.battleTick < 6 or self.landerLast == nil then
+    self.landerLast, self.muddledAt = {}, {}
+    return
+  end
+  for e = 0, 3 do
+    if M.readWord(0x3C1C + e * 2) > 0 then
+      local s = { [1] = M.readByte(BATTLE.ST1 + e * 2), [2] = M.readByte(BATTLE.ST2 + e * 2) }
+      local last = self.landerLast[e]
+      -- every Muddle landing on a member, attributed or not, for the
+      -- [death] line's "Muddled at" (Driver:allyActSaid)
+      if last ~= nil and (s[2] & M.ST2_MUDDLE) ~= 0 and (last[2] & M.ST2_MUDDLE) == 0 then
+        self.muddledAt[e] = self.battleTick
+      end
+      if last ~= nil and self.monAct ~= nil then
+        for _, st in ipairs(M.LANDER_STATUSES) do
+          if (s[st.byte] & st.bit) ~= 0 and (last[st.byte] & st.bit) == 0 then
+            local sp = M.readWord(M.FORMATION + self.monAct.slot * 2) & 0x1FF
+            local t = M.statusLanders[sp] or {}
+            M.statusLanders[sp] = t
+            t[st.name] = (t[st.name] or 0) + 1
+            M.log(string.format("[%s] [lander] f+%d slot %d species $%03X (cmd $%02X atk $%02X) "
+              .. "landed %s on entity %d (%d/%d); $%03X's %s landings this run: %d",
+              self.tag or "fight", self.battleTick, self.monAct.slot, sp, self.monAct.cmd,
+              self.monAct.atk, st.name, e, M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2),
+              sp, st.name, t[st.name]))
+          end
+        end
+      end
+      self.landerLast[e] = s
+    end
   end
 end
 
@@ -8073,8 +8296,11 @@ function Driver:frame()
   end
   self:watchHeal()
   self:watchDamage()
+  self:watchAllyExec()
   self:watchPendingCare()
+  self:watchUnmuddleHit()
   self:watchHits()
+  self:watchLanders()
   self:watchParts()
   local menu = M.readByte(BATTLE.MENU)
   self:logBattleLine(menu)
