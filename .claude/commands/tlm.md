@@ -65,8 +65,9 @@ interpreting runs.
   alone; recent runs move the whole curve, so it follows other load, heat
   and power. A machine's room is its knee (the fewest emulators within 5%
   of its best total) minus what it runs now. Batches fill px13 first,
-  then the Air, then the Pro, which keeps a reserve and backs off by the
-  owner's load (`PREFER` and `RESERVE` in tools/stream/placement.py).
+  then the Air, then the Pro; the owner's machines (the Air and the Pro)
+  back off by load our emulators don't explain, and the Pro also keeps a
+  reserve (`PREFER` and `RESERVE` in tools/stream/placement.py).
   Launch prompts give agents that command rather than a cap, and agents
   run it before each batch; it is a guide, and a machine an agent is told
   to leave alone stays alone.

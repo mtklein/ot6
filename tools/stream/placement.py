@@ -30,8 +30,8 @@ module turns that log into, per machine:
             keeps learning), less d: a slowdown moves it down by d, and a
             recovery moves it back.
 
-room = knee - active now - live claims (and, on a machine with a reserve,
-the reserve and the owner's load).  "order" lists machines for the next
+room = knee - active now - live claims (and, on the owner's machines, those
+in RESERVE, the reserve and the owner's load).  "order" lists machines for the next
 emulators, each machine's room in PREFER order.
 """
 import contextlib
@@ -59,10 +59,11 @@ CLAIM_SEC = 120           # how long a --claim holds its emulators
 # Air (the owner's travel laptop, often away), then the Pro (the owner's
 # desk machine); a machine not named comes after, in --peer order.
 PREFER = ("px13", "air", "mbp")
-# The owner's headroom policy, not a measurement: on these machines a batch
-# leaves this many emulators' worth of the knee free, and also backs off by
-# the load our own emulators there do not explain (the owner's own work).
-RESERVE = {"mbp": 4}
+# The owner's headroom policy, not a measurement: the owner's machines.  On
+# each a batch leaves this many emulators' worth of the knee free (0: none),
+# and backs off by the load our own emulators there do not explain (the
+# owner's own work, or macOS's).  px13 is ours alone and not listed.
+RESERVE = {"mbp": 4, "air": 0}
 
 
 def _median(xs):
