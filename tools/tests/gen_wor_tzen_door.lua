@@ -2,9 +2,10 @@
 -- world map outside Tzen: cold-Continue the `wor-start-v1` battery (CELES
 -- alone at (146,212), L25, Cid saved), dress her for a solo stretch on the
 -- world map's menu, stop in Albrook, fight the plains north of it up to
--- TARGET_LEVEL, stop in Albrook again, walk to Tzen off its desert, and
--- save one step east of Tzen's door, (131,179): the last save before the
--- timed house (docs/design/route-wor-sabin.md section 7).  Generates
+-- TARGET_LEVEL, stop in Albrook again, walk to Tzen off its desert, meet
+-- the Black Drgn once on the desert beside the door, and save one step
+-- east of Tzen's door, (131,179): the last save before the timed house
+-- (docs/design/route-wor-sabin.md sections 7 and 12).  Generates
 -- wor_tzen_door.mss, and its capture run (OT6_CAPTURE_SRM) cuts the
 -- `wor-tzen-door-v1` battery.
 --
@@ -25,9 +26,9 @@
 --      each; nothing flees.  The walk never steps on a tile whose pool
 --      deals a species outside the plains six the kit was designed and
 --      measured against (SOLO_OK): Tzen's desert (the Black Drgn, whose
---      BonePowder zombifies -- a lost fight alone) is avoided, and every
---      leg's pools are asserted from the ROM (H.worldPathGroups) before it
---      is walked.
+--      BonePowder zombifies) is avoided on every leg but the sand leg (7),
+--      and every leg's pools are asserted from the ROM (H.worldPathGroups)
+--      before it is walked.
 --   3. Albrook first, the stretch's one Remedy seller and no Tonic
 --      seller: the item shop tops up Potions (field care runs on them
 --      here), Fenix Downs to about her level and Remedies (the Lunaris's
@@ -38,7 +39,19 @@
 --      max(26, CELES's level) (norm_lvl), and the house's bodies are L26.
 --   5. Albrook again: the band at the new level, the inn if she is short.
 --   6. Tzen: the walk off the desert, with Tzen's door itself in the
---      avoid set, to (131,179), and the real Save UI into slot 3.
+--      avoid set, to (131,179).
+--   7. The sand (#317, route-wor-sabin section 12): onto the desert south
+--      of the door (world group 36, read from the ROM: EarthGuard +
+--      Peepers x2, or a lone Black Drgn), paced the way someone who does
+--      not know what it holds would, fighting what comes, until the Black
+--      Drgn's formation has been fought once -- within the most sand
+--      encounters any encounter-counter state needs to deal it
+--      (H.worstCaseEncounters), asserted at most SAND_CAP.  The three
+--      species are allowed for this leg only; afterwards the avoid set is
+--      what the party has learned, and the walk back to (131,179) and
+--      every later leg keep off the sand.  A loss there is a lost attempt,
+--      retried from the Continue like any other wipe.
+--   8. The real Save UI into slot 3.
 -- Every battle's [outcome] (lib/ot6.lua M.battleOutcome: a Mesosaur that
 -- escapes, a Chitonid that sneezes her out) is asserted said, judged on
 -- the battle's own end reading, and paid as due.
@@ -72,6 +85,21 @@ local GRIND = { { 141, 203 }, { 141, 196 }, { 136, 200 }, { 144, 199 } }
 -- walk here may meet.
 local SOLO_OK = { [0x021] = "Mesosaur", [0x031] = "Gilomantis", [0x07C] = "Chitonid",
                   [0x098] = "Gigan Toad", [0x0CA] = "Lunaris", [0x0E6] = "Osprey" }
+-- The sand leg's species (section 12's pool: world group 36 deals
+-- EarthGuard + Peepers x2 or a lone Black Drgn), allowed on that leg only.
+local BLACK_DRGN = 0x0D5
+local SAND_OK = { [0x072] = "Peepers", [0x0B2] = "EarthGuard", [BLACK_DRGN] = "Black Drgn" }
+for sp, name in pairs(SOLO_OK) do SAND_OK[sp] = name end
+local SAND_GROUP = 36                               -- the desert beside Tzen's door
+-- The most sand battles the leg may take to meet the dragon.  The leg's
+-- budget is the pool's own worst case (H.worstCaseEncounters over every
+-- encounter-counter state, decoded before the leg is walked), asserted at
+-- most SAND_CAP.  #317 guessed "about 15"; the ROM's group 36 says 19 (the
+-- dragon's slots 2 and 4 are 96/256 of the draws, and 73.2% of the states
+-- deal it within 3: build/attempts/wt/recut/t317/dev1/k0_s0.log), so the
+-- cap sits just above it and a ROM change that makes the dragon rarer
+-- goes red here.
+local SAND_CAP = 20
 -- the box the avoid set is read over: the continent from the landing to
 -- Tzen with a margin (world_corridor.txt: x 124..151, y 174..216)
 local BOX = { x0 = 118, y0 = 160, x1 = 159, y1 = 223 }
@@ -120,9 +148,13 @@ end
 -- ---- the pools ---------------------------------------------------------
 -- A group's formations, decoded from the ROM (H.encounterPool): ok when
 -- every species it can deal is one of SOLO_OK, else the first that is not.
+-- `allowed` is SOLO_OK unless given (the sand leg passes SAND_OK).
 local poolCache = {}
-local function poolVerdict(g)
-  if poolCache[g] == nil then
+local function poolVerdict(g, allowed)
+  allowed = allowed or SOLO_OK
+  poolCache[allowed] = poolCache[allowed] or {}
+  local cache = poolCache[allowed]
+  if cache[g] == nil then
     local bad = nil
     if g == 0xFF then
       bad = { species = 0, form = 0 }               -- a Veldt sector: not a four-word pool
@@ -131,14 +163,14 @@ local function poolVerdict(g)
       for slot = 1, 4 do
         for _, f in ipairs(pool[slot].formations) do
           for _, sp in ipairs(f.species) do
-            if not SOLO_OK[sp] and bad == nil then bad = { species = sp, form = f.id } end
+            if not allowed[sp] and bad == nil then bad = { species = sp, form = f.id } end
           end
         end
       end
     end
-    poolCache[g] = bad or false
+    cache[g] = bad or false
   end
-  return poolCache[g] == false, poolCache[g] or nil
+  return cache[g] == false, cache[g] or nil
 end
 
 -- The avoid set: every tile in BOX whose own zone's pool deals a species
@@ -181,19 +213,89 @@ local function avoid() return AVOID end
 -- the avoid set, and the entry pairings of the saved position's zone),
 -- asserted inside SOLO_OK before the walk: the any-encounter precondition
 -- for this kit, from the ROM rather than from what one run meets.
-local function assertLegPools(what, waypoints)
-  local order, entry = H.worldPathGroups(waypoints, AVOID)
+-- The sand leg passes its own avoid set and SAND_OK.
+local function assertLegPools(what, waypoints, avoidSet, allowed)
+  local order, entry = H.worldPathGroups(waypoints, avoidSet or AVOID)
   local zx, zy = H.worldZonePos()
   H.log(string.format("[route] %s: the walk can roll groups {%s}; its first encounter also {%s} "
     .. "(the saved position (%d,%d)'s zone)", what, table.concat(order, ", "),
     table.concat(entry, ", "), zx, zy))
   for _, list in ipairs({ order, entry }) do
     for _, g in ipairs(list) do
-      local ok, bad = poolVerdict(g)
-      H.assertEq(ok, true, string.format("%s: group %d deals only the plains six (not $%03X, formation %d)",
-        what, g, bad and bad.species or 0, bad and bad.form or 0))
+      local ok, bad = poolVerdict(g, allowed)
+      H.assertEq(ok, true, string.format("%s: group %d deals only the %s (not $%03X, formation %d)",
+        what, g, allowed and "plains six and the sand's three" or "plains six",
+        bad and bad.species or 0, bad and bad.form or 0))
     end
   end
+end
+
+-- ---- the sand (#317) ---------------------------------------------------------
+-- SAND: the tiles in BOX that roll SAND_GROUP from their own zone.  The
+-- beat: A, the sand tile nearest the save tile, and B, the sand tile
+-- farthest from A (in steps on the sand) within six -- a short walk back
+-- and forth, section 12's.  PACE_AVOID keeps the beat on the sand (every
+-- other walkable tile in BOX, and Tzen's door); SAND_AVOID is the leg's
+-- walk on and off it (the tiles whose pools deal a species outside
+-- SAND_OK, and the three doors).  The dragon's formations and the pool
+-- slots that deal them come from the ROM, and so does the budget: the most
+-- sand encounters any encounter-counter state needs to deal one
+-- (H.worstCaseEncounters), asserted at most SAND_CAP.
+local SAND, PACE_AVOID, SAND_AVOID, BEAT, DRGN_FORMS, SAND_BUDGET = nil, nil, nil, nil, nil, nil
+local function buildSand()
+  local sand, other, far = {}, {}, {}
+  for y = BOX.y0, BOX.y1 do
+    for x = BOX.x0, BOX.x1 do
+      local g = H.worldEncounterGroup(x, y, x, y)
+      if g == SAND_GROUP then sand[#sand + 1] = { x, y }
+      elseif H.worldPassable(x, y) then other[#other + 1] = { x, y } end
+      if g ~= nil and not poolVerdict(g, SAND_OK) then far[#far + 1] = { x, y } end
+    end
+  end
+  H.assertEq(#sand > 0, true, string.format("group %d's sand is in (%d..%d, %d..%d)", SAND_GROUP,
+    BOX.x0, BOX.x1, BOX.y0, BOX.y1))
+  other[#other + 1] = TZEN_DOOR
+  for _, t in ipairs({ ALBROOK_DOOR, ALBROOK_OTHER, TZEN_DOOR }) do far[#far + 1] = t end
+  SAND, PACE_AVOID, SAND_AVOID = sand, H.worldAvoidSet(other), H.worldAvoidSet(far)
+  local a, ad = nil, 1e9
+  for _, t in ipairs(sand) do
+    local d = math.abs(t[1] - SAVE_TILE[1]) + math.abs(t[2] - SAVE_TILE[2])
+    if d < ad then a, ad = t, d end
+  end
+  local b, bd = nil, -1
+  for _, t in ipairs(sand) do
+    local p = H.worldBfs(t[1], t[2], {}, a[1], a[2], PACE_AVOID)
+    if p and #p <= 6 and #p > bd then b, bd = t, #p end
+  end
+  H.assertEq(b ~= nil and bd > 0, true, "a second sand tile within six steps of the first")
+  BEAT = { a, b }
+  -- the pool: which slots deal the Black Drgn
+  local pool = H.encounterPool(SAND_GROUP)
+  local drgnSlot, forms, parts = {}, {}, {}
+  for slot = 1, 4 do
+    for _, f in ipairs(pool[slot].formations) do
+      local sp = {}
+      for _, x in ipairs(f.species) do
+        sp[#sp + 1] = string.format("%03X", x)
+        if x == BLACK_DRGN then drgnSlot[slot], forms[f.id] = true, true end
+      end
+      parts[#parts + 1] = string.format("slot%d(%d/256):%d[%s]", slot, pool[slot].odds, f.id,
+        table.concat(sp, " "))
+    end
+  end
+  DRGN_FORMS = forms
+  local worst, hist = H.worstCaseEncounters(function()
+    return function(slot) return drgnSlot[slot] == true end
+  end)
+  SAND_BUDGET = worst
+  H.log(string.format("[sand] %d tiles of group %d in (%d..%d, %d..%d); pool %s; the beat (%d,%d) <-> (%d,%d), "
+    .. "%d steps; the worst of the 65536 encounter-counter states needs %d sand encounter(s) to deal the "
+    .. "Black Drgn ($%03X), %.1f%% need no more than 3, %.2f%% no more than 15", #sand, SAND_GROUP, BOX.x0,
+    BOX.x1, BOX.y0, BOX.y1, table.concat(parts, " "), a[1], a[2], b[1], b[2], bd, worst, BLACK_DRGN,
+    100 * H.encounterShare(hist, 3), 100 * H.encounterShare(hist, 15)))
+  H.assertEq(next(forms) ~= nil, true, string.format("group %d deals the Black Drgn", SAND_GROUP))
+  H.assertEq(worst <= SAND_CAP, true, string.format("every encounter-counter state deals the Black Drgn "
+    .. "within %d sand encounters (worst %d)", SAND_CAP, worst))
 end
 
 -- ---- the battles --------------------------------------------------------
@@ -253,6 +355,69 @@ local function grind()
     end),
     checkOutcomes("the grind"),
   }, "the grind to L" .. TARGET_LEVEL), function() wpi, grindDone, legs = 1, false, 0 end)
+end
+
+-- ---- the sand leg (#317) ---------------------------------------------------
+-- From the save tile onto the sand's beat, then back and forth between its
+-- two tiles, a leg at a time (so each battle's field care runs inside its
+-- leg), until a battle of the dragon's formation has been fought; then off
+-- the sand to the save tile.  The level-crossing reads are between legs,
+-- the grind's shape.  Every sand battle is counted from the [outcome]
+-- lines; the dragon's must come within SAND_BUDGET of them.
+local sandBeat, sandDone, sandOutcome0, sandBattles, drgnAt = 1, false, 0, 0, nil
+local function sandCount()
+  sandBattles = #H.outcomes - sandOutcome0
+  for i = sandOutcome0 + 1, #H.outcomes do
+    if drgnAt == nil and DRGN_FORMS[H.outcomes[i].form & 0x1FF] then
+      drgnAt = i - sandOutcome0
+      local o = H.outcomes[i]
+      H.log(string.format("[sand] the Black Drgn ($%03X) fought in sand battle %d: %s after %d ticks; %s; %s",
+        o.form & 0x1FF, drgnAt, o.kind, o.tick or -1, whereLine(), supplies()))
+    end
+  end
+end
+local function sandLeg()
+  return H.seqStep({
+    H.waitUntil(function() return H.worldSettled() and H.worldAligned() end, 1200, "settled before the sand", 5),
+    H.call(function()
+      buildSand()
+      assertLegPools("onto the sand", { { H.worldX(), H.worldY() }, BEAT[1] }, SAND_AVOID, SAND_OK)
+      assertLegPools("the sand's beat", { BEAT[1], BEAT[2], BEAT[1] }, PACE_AVOID, SAND_OK)
+      sandOutcome0, sandBattles, drgnAt, sandDone, sandBeat = #H.outcomes, 0, nil, false, 1
+      H.log(string.format("[sand] onto the sand f%d from (%d,%d): %s; %s", H.frame, H.worldX(), H.worldY(),
+        whereLine(), supplies()))
+    end),
+    H.worldNavTo(function() return BEAT[1][1] end, function() return BEAT[1][2] end,
+      { maxFrames = 20000, playBattles = "tactical", avoid = function() return SAND_AVOID end }),
+    H.call(function() sandCount(); sandBeat = 2; sandDone = drgnAt ~= nil end),
+    H.withReset(H.driveUntil(function() return sandDone end, 600000, {
+      H.worldNavTo(function() return BEAT[sandBeat][1] end, function() return BEAT[sandBeat][2] end,
+        { maxFrames = 20000, playBattles = "tactical", avoid = function() return PACE_AVOID end }),
+      H.call(function()
+        sandBeat = sandBeat % 2 + 1
+        sandCount()
+        sandDone = drgnAt ~= nil
+        if not sandDone and sandBattles >= SAND_BUDGET then
+          error(string.format("the Black Drgn not dealt in %d sand battles (the pool's worst case is %d)",
+            sandBattles, SAND_BUDGET), 0)
+        end
+      end),
+      checkOutcomes("the sand"),
+    }, "the sand until the Black Drgn comes"), function() sandBeat, sandDone = 1, false end),
+    checkOutcomes("the sand"),
+    H.call(function()
+      H.assertEq(drgnAt ~= nil and drgnAt <= SAND_BUDGET, true, string.format(
+        "the Black Drgn fought within %d sand battles (in battle %s)", SAND_BUDGET, tostring(drgnAt)))
+      H.log(string.format("[sand] leaving the sand f%d at (%d,%d) after %d sand battle(s): %s; %s", H.frame,
+        H.worldX(), H.worldY(), sandBattles, whereLine(), supplies()))
+    end),
+    -- off the sand: the leg's own avoid set (the sand's three, no other
+    -- pool), since the way back crosses it
+    H.worldNavTo(SAVE_TILE[1], SAVE_TILE[2], { maxFrames = 20000, playBattles = "tactical",
+      avoid = function() return SAND_AVOID end }),
+    H.call(function() sandCount() end),
+    checkOutcomes("the sand"),
+  })
 end
 
 -- hold a direction onto an exit trigger until the map changes, paging any
@@ -480,7 +645,18 @@ H.run({ maxFrames = 600000 }, {
     H.assertEq(AVOID[SAVE_TILE[2] * 256 + SAVE_TILE[1]] == nil, true, "the save tile is off the sand")
   end),
 
-  -- ---- 7. the save --------------------------------------------------------------------
+  -- ---- 7. the sand: the Black Drgn once (#317) --------------------------------------
+  sandLeg(),
+  H.waitUntil(function() return H.worldSettled() and H.worldAligned() end, 1200, "back at Tzen's door", 5),
+  H.call(function()
+    H.log(string.format("[tzen] back at the door f%d: world %d (%d,%d); %s; %s", H.frame, H.worldId(),
+      H.worldX(), H.worldY(), whereLine(), supplies()))
+    H.assertEq(H.worldMode() and H.worldId() == 1, true, "on the World of Ruin map, not in Tzen")
+    H.assertEq(H.worldX() == SAVE_TILE[1] and H.worldY() == SAVE_TILE[2], true,
+      "one step east of Tzen's door (131,179) after the sand")
+  end),
+
+  -- ---- 8. the save --------------------------------------------------------------------
   H.saveGame({ slot = 3, tag = "wor-tzen-door-v1 save" }),
   H.call(function()
     H.assertSavedSlotWorld(SAVE_TILE[1], SAVE_TILE[2], "wor-tzen-door-v1", 3, 1)
