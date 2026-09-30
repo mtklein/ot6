@@ -48,8 +48,9 @@ local H = dofile("tools/tests/lib/ot6.lua")
 -- property of the draw.  Four rungs, ten phases apart, derived from this
 -- door's measured draws (build/attempts/wt/suite-honesty/brokendeath/
 -- round2/): 214 rungs, on three paths (rung 1 in place, a lab's one-rung
--- sweep, and rungs after a reload), drew only the 30 phases that are 0 or 3
--- mod 4, all of them measured, 22 counting in every measurement.  Rung 1
+-- sweep, and rungs after a reload), drew 32 distinct phases (the 30 that
+-- are 0 or 3 mod 4, plus 26 and 30 as rung 1s), all measured, 22 counting
+-- in every measurement (20 of the 30, plus 26 and 30).  Rung 1
 -- draws its base minus 3.  A later rung's target falls, in runs of four,
 -- on a phase q = 3 mod 4 or on q + 1, and which one follows rung 1's own
 -- residue mod 4 (all 88 later rungs measured: 60 in a sweep of every target

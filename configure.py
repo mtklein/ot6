@@ -390,8 +390,8 @@ TEST_ENV = {
     # at worst four rungs of battle 70 (the ladder's derivation is in the
     # suite): the longest prep measured is 2,663 frames and the longest rung
     # 21,147 (a rung's start to the next rung or the verdict, over 214
-    # rungs), so 2,663 + 4 x 21,147 = 87,251 frames.  The slowest whole-run
-    # rate measured is 80.7 frames/s (the Air, heavily loaded; the Mac at
+    # rungs), so 2,663 + 4 x 21,147 = 87,251 frames.  The slowest rate over
+    # the long runs is 80.7 frames/s (the Air, heavily loaded; the Mac at
     # load 12 ran 187.5-236.2): 1,081 s.  1800 is 1.67x that
     # (build/attempts/wt/suite-honesty/brokendeath/round2/)
     "battle_brokendeath": "OT6_TIMEOUT=1800",
