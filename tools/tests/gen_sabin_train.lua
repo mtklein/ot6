@@ -1016,8 +1016,8 @@ end
 -- One fight, played out.  A win is a win however many shields came off
 -- (the owner's ruling on #311, docs/guidelines.md "A win is a win and a
 -- loss is a loss"): a train killed before its break is logged as a
--- [tuning] line and the segment moves on; a 6/6 break asserts its
--- mechanism (each reveal tied to the chip its skill landed).  Only a loss
+-- [tuning] line and the segment moves on; every win asserts each reveal
+-- tied to the chip its skill landed.  Only a loss
 -- is a loss -- the party wiped -- and it is the canary's: allowGameOver
 -- ends with battle 47's ladder, so the wipe is counted and filed as class
 -- wipe, which the segment runner retries from the boot point, bounded and
@@ -1215,6 +1215,35 @@ local function b68Fight()
         "brokeAt=%s casts=%d chips=%d holy=%s bludg=%s", off,
         tostring(b68.killedAt), tostring(b68.brokeAt), b68.casts, #b68.chips,
         tostring(b68.holyRevealed), tostring(b68.bludgRevealed)))
+      -- Each reveal is tied to the chip its skill landed, on any win: the
+      -- tie is a property of the chip, not of the break.  HOLY is
+      -- AuraBolt's ($5E, the holy weakness), OT6_BLUDG is Pummel's ($5D,
+      -- the train's class row); the reveal banks at damage calc
+      -- (OT6_RVPEND_*) and the shield comes off on the same hit, so the two
+      -- are seen on one frame.  A skill that never chipped proves nothing
+      -- either way (SABIN short on MP, the train dead first): logged, with
+      -- "cast but never chipped" told apart from "never cast".
+      local function tied(what, at, skill, name)
+        local cast, chip = b68.castAt[skill], b68.chipAt[skill]
+        if chip == nil then
+          H.log(string.format("[b68] %s: %s %s -- the tie is not asserted " ..
+            "(%s revealed f%s)", what, name, cast and string.format(
+            "cast f%d but never chipped", cast) or "never cast", what,
+            tostring(at)))
+          return
+        end
+        local ok = at ~= nil and cast ~= nil
+          and at >= cast and math.abs(at - chip) <= REVEAL_SLACK
+        H.log(string.format("[b68] %s: %s cast f%s, its first chip f%s, " ..
+          "revealed f%s", what, name, tostring(cast), tostring(chip),
+          tostring(at)))
+        H.assertEq(ok, true, string.format("%d of 6 shields off: %s revealed " ..
+          "by the %s that chipped (cast f%s, chip f%s, reveal f%s, slack %d)",
+          off, what, name, tostring(cast), tostring(chip), tostring(at),
+          REVEAL_SLACK))
+      end
+      tied("HOLY", b68.holyAt, AURABOLT, "AuraBolt ($5E)")
+      tied("OT6_BLUDG", b68.bludgAt, PUMMEL, "Pummel ($5D)")
       if off < 6 then
         H.log(string.format("[tuning] battle 68 won with %d of 6 shields off " ..
           "-- the train died before its break (killedAt=f%s casts=%d " ..
@@ -1230,37 +1259,8 @@ local function b68Fight()
         tostring(b68.brokeHP), b68.brokeAt and b68.killedAt
           and tostring(b68.killedAt - b68.brokeAt) or "?",
         tostring(b68.brokeAt), tostring(b68.killedAt)))
-      -- The break happened, so its mechanism did: each reveal is tied to
-      -- the chip its skill landed.  HOLY is AuraBolt's ($5E, the holy
-      -- weakness), OT6_BLUDG is Pummel's ($5D, the train's class row); the
-      -- reveal banks at damage calc (OT6_RVPEND_*) and the shield comes off
-      -- on the same hit, so the two are seen within a few frames.
       H.assertEq(#b68.chips >= 2, true,
         "a 6/6 break: at least two shield chips landed")
-      local function tied(what, at, skill, name)
-        local cast, chip = b68.castAt[skill], b68.chipAt[skill]
-        local ok = at ~= nil and cast ~= nil and chip ~= nil
-          and at >= cast and math.abs(at - chip) <= REVEAL_SLACK
-        H.log(string.format("[b68] %s: %s cast f%s, its first chip f%s, " ..
-          "revealed f%s", what, name, tostring(cast), tostring(chip),
-          tostring(at)))
-        H.assertEq(ok, true, string.format("a 6/6 break: %s revealed by the " ..
-          "%s that chipped (cast f%s, chip f%s, reveal f%s, slack %d)", what,
-          name, tostring(cast), tostring(chip), tostring(at), REVEAL_SLACK))
-      end
-      -- A skill that never chipped proves nothing either way (a 6/6 break
-      -- won with SABIN short on AuraBolt's MP is still a break): its tie is
-      -- logged, not asserted.
-      for _, t in ipairs({ { "HOLY", b68.holyAt, AURABOLT, "AuraBolt ($5E)" },
-                           { "OT6_BLUDG", b68.bludgAt, PUMMEL, "Pummel ($5D)" } }) do
-        if b68.chipAt[t[3]] ~= nil then
-          tied(t[1], t[2], t[3], t[4])
-        else
-          H.log(string.format("[tuning] a 6/6 break with no %s chip: %s's " ..
-            "tie not asserted (%s revealed f%s)", t[4], t[1], t[1],
-            tostring(t[2])))
-        end
-      end
     end),
     }),
   }, {})
