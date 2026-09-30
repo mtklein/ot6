@@ -1,7 +1,11 @@
 -- @suite savestate=ultros1_entry slow
 -- battle_ultros1.lua -- a Broken monster's counter plays its story and holds
--- its attacks back (#329), on the Lete River.  Boots ultros1_entry (Ultros's
--- battle as it loads; gen_scenario), where Ultros ($12C, 5 shields,
+-- its attacks back (#329), on the Lete River.  Boots ultros1_entry (the
+-- dialog before Ultros's battle, waiting on a press; gen_scenario) and pages
+-- it into the battle, so the battle seeds its RNG from the clock after the
+-- boot and a seed shift is a different fight.  (The first cut booted three
+-- frames into the load, after InitBattle had seeded $be: every shift was
+-- the same fight.)  Ultros ($12C, 5 shields,
 -- slash|pierce, fire-weak) answers fire with a story block that carries an
 -- attack:
 --
@@ -148,6 +152,20 @@ end
 
 H.run({ maxFrames = 40000 }, {
   H.loadState(DOOR),
+  -- the fixture is the dialog before his battle, waiting on a press: page it
+  -- (A, edge-tapped, only while a dialog waits) until the battle loads.  How
+  -- long that press waits is what a seed shift varies, so the fight is drawn
+  -- here, not in the fixture ([seed] first battle, the runner's line)
+  (function()
+    local n = 0
+    return H.driveUntil(function() return H.battleLoadStarted() end, 3000, {
+      H.call(function()
+        n = H.dialogWaiting() and n + 1 or 0
+        H.setPad((n > 0 and n % 8 < 4) and { "a" } or {})
+      end),
+    }, "the dialog paged into Ultros's battle")
+  end)(),
+  H.release(),
   H.waitUntil(function() return H.battleActive() end, 3000, "Ultros's battle up", 10),
   H.call(function()
     for s = 0, 5 do

@@ -230,6 +230,17 @@ local BP = 0x3e9c                  -- banked boost points, +slot*2
 local nBattles = 0
 local lost = nil                   -- set by the in-battle loss guards
 local u1Req = nil                  -- the ultros1_entry capture
+-- ultros1_entry is taken BEFORE Ultros's battle seeds its RNG: on the last
+-- frame, since the previous battle ended, that a field dialog sat waiting
+-- for the press that lets the event go on (its third frame waiting, the
+-- frame this driver's own tap begins).  InitBattle seeds $be from the game
+-- clock ($021e), so a fixture inside the battle (the first cut: three
+-- frames into its load) is one fight at every seed shift, while from here
+-- a player who waits before pressing meets a different one.  Each capture
+-- is a request that spends no frames (H.requestSaveState), so the river's
+-- play is unchanged; a later candidate replaces an earlier one, every
+-- battle's rising edge clears it, and Ultros's rising edge promotes it.
+local u1Cand, u1CandF = nil, nil
 -- The per-turn action, built LIVE (the boost prefix depends on the actor's
 -- banked BP this instant).  BOOST IS THE SYSTEM'S OWN LEVER (battle_boost:
 -- R raises pending, cap 3, never past bp; a boosted action spends the
@@ -433,14 +444,19 @@ local function rideUntil(pred, what, budget, idle, tier)
                   "OT6_SLASH|OT6_PIERCE) -- fighting him for real", i,
                   monHp(i), monShields(i)))
                 H.screenshot("scenario_ultros")
-                -- ultros1_entry (battle_ultros1 boots it): his battle, three
-                -- frames into its load, captured with no frames spent and
-                -- emitted after the hub save; a lost attempt's capture is
-                -- replaced by the next attempt's
-                u1Req = H.requestSaveState()
+                -- ultros1_entry (battle_ultros1 boots it): the last dialog
+                -- wait before his battle (u1Cand, above), emitted after the
+                -- hub save; a lost attempt's capture is replaced by the
+                -- next attempt's
+                u1Req = u1Cand
+                H.log(string.format("river: ultros1_entry is the dialog " ..
+                  "wait at f%s, %s frames before this battle's rising edge",
+                  tostring(u1CandF),
+                  u1CandF and tostring(H.frame - u1CandF) or "?"))
               end
             end
           end
+          u1Cand, u1CandF = nil, nil      -- a candidate is for the NEXT battle
         end
         if bt then
           bt.gone = 0
@@ -531,8 +547,16 @@ local function rideUntil(pred, what, budget, idle, tier)
         end
       end
 
-      -- 3. plain dialog: edge-tap through it
-      if dlgN >= 3 then H.setPad(phase < 4 and { "a" } or {}); return end
+      -- 3. plain dialog: edge-tap through it.  Its third waiting frame is
+      --    also ultros1_entry's candidate (u1Cand, above): the request
+      --    fires at this frame's first instruction, before the press set
+      --    here is polled.
+      if dlgN >= 3 then
+        if dlgN == 3 and bt == nil and H.pendingStateReqs == 0 then
+          u1Cand, u1CandF = H.requestSaveState(), H.frame
+        end
+        H.setPad(phase < 4 and { "a" } or {}); return
+      end
 
       -- 4. anything else (the raft moving, fades, map loads): hands off,
       --    unless the caller has something to do with the idle frames --
@@ -791,6 +815,10 @@ H.run({ maxFrames = 700000, allowGameOver = true }, {
   end),
   H.saveState("scenario_hub.mss"),
   H.call(function()
+    assert(u1Req ~= nil, "ultros1_entry: no field dialog waited for a press " ..
+      "between the battle before Ultros's and his (u1Cand was never set " ..
+      "on that stretch), so there is no pre-seed point to capture; the " ..
+      "river's lead-in to Ultros changed")
     H.checkReq(u1Req, "ultros1_entry capture")
     H.emitBlob("ultros1_entry.mss", u1Req.blob)
   end),

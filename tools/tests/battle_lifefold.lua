@@ -36,7 +36,9 @@
 --
 -- No state is written.  fire-out-v1 has TERRA (Life at 18, kits.md) with a
 -- 204-MP pool, LOCKE and STRAGO by Thamasa.  The run walks to an encounter,
--- Defends until TERRA has 3 pips banked, snapshots her command window (T),
+-- Defends until TERRA has 3 pips banked with LOCKE standing below his max HP
+-- (if the draw has left him full by then, STRAGO Fights him), snapshots
+-- her command window (T),
 -- and restores T for each b case: TERRA presses R to the case's boost,
 -- opens Magic, casts Life on LOCKE; everyone else Defends.  Then, from T,
 -- TERRA's two-point Fire and STRAGO's Fight knock LOCKE out (the party's
@@ -270,7 +272,14 @@ end
 -- has the pips and Fights him when she does not, STRAGO Fights him, LOCKE
 -- passes (X).  Every press goes through the real menus and target cursor.
 local STRAGO, FIRE, CMD_FIGHT = 7, 0x00, 0x00
-local function killPulse()
+local function ko(s) return (H.readByte(STATUS1 + s * 2) & KO) ~= 0 end
+local function lockeFull()
+  return H.readWord(0x3BF4 + lockeS * 2) >= H.readWord(0x3C1C + lockeS * 2)
+end
+-- hurt == true: the banking policy for a LOCKE the draw left at full HP --
+-- STRAGO Fights him (unboosted, through the real target cursor) while he is
+-- full, and everyone else, STRAGO too once LOCKE is hurt, Defends.
+local function killPulse(hurt)
   tc.observe()
   if H.readByte(MENU) == 0 then H.setPad({}); return end
   mf = mf + 1
@@ -279,7 +288,11 @@ local function killPulse()
   if st ~= ST_TGT then tapNo = -1 end
   if st ~= ST_MAGIC then inMagic = 0 end
   local p
-  if a == terraS then
+  if hurt then
+    if a == stragoS and not ko(lockeS) and lockeFull() then
+      p = { cmd = CMD_FIGHT, boost = 0 }
+    end
+  elseif a == terraS then
     p = (bank(terraS) >= 2) and { cmd = CMD_MAGIC, spell = FIRE, boost = 2 }
         or { cmd = CMD_FIGHT, boost = 0 }
   elseif a == stragoS then
@@ -287,6 +300,8 @@ local function killPulse()
   end
   local btn
   if st == ST_TRANS then btn = nil
+  elseif p == nil and hurt then
+    btn = defend(st, edge)
   elseif p == nil then
     btn = edge and ((st == ST_CMD) and "x" or "b") or nil
   elseif st == ST_CMD then
@@ -320,7 +335,6 @@ local function killPulse()
   else btn = edge and "b" or nil end
   H.setPad(btn and { [btn] = true } or {})
 end
-local function ko(s) return (H.readByte(STATUS1 + s * 2) & KO) ~= 0 end
 
 -- ---- the run -------------------------------------------------------------------
 local snap, snapK = nil, nil
@@ -396,21 +410,39 @@ local steps = {
       .. "stamp %s", terraS, mp(terraS), bank(terraS), lockeS, tostring(cell), tostring(stamp)))
     assert(cell, "TERRA knows Life (kits.md: level 18)")
   end),
-  H.driveUntil(function() return snap ~= nil end, 40000, {
-    H.call(function()
-      if H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_CMD
-         and (H.readByte(ACTOR) & 3) == terraS and bank(terraS) >= 3 and pend(terraS) == 0 then
-        H.setPad({})
-        snap = H.requestSaveState()
-        H.log(string.format("[lifefold] snapshot f%d: TERRA bank %d MP %d HP %d; LOCKE HP %d "
-          .. "status1 $%02X status4 $%02X", H.frame, bank(terraS), mp(terraS),
-          H.readWord(0x3BF4 + terraS * 2), H.readWord(0x3BF4 + lockeS * 2),
-          H.readByte(STATUS1 + lockeS * 2), H.readByte(STATUS4 + lockeS * 2)))
-        return
-      end
-      pulse(nil)
-    end),
-  }, "TERRA's command window with 3 pips banked"),
+  -- T also needs LOCKE standing BELOW his max HP: the b cases' living-target
+  -- check ("LOCKE's HP not raised") can only see a heal leaking onto the
+  -- living if there is room to heal.  Whether a monster has hit him by the
+  -- time TERRA banks 3 pips is the draw's, so a LOCKE still full is hurt by
+  -- play: STRAGO Fights him (killPulse's hurt policy) while the rest Defend.
+  (function()
+    local hurtSeen = false
+    return H.driveUntil(function() return snap ~= nil end, 40000, {
+      H.call(function()
+        local full = not ko(lockeS) and lockeFull()
+        if H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_CMD
+           and (H.readByte(ACTOR) & 3) == terraS and bank(terraS) >= 3 and pend(terraS) == 0
+           and not ko(lockeS) and not full then
+          H.setPad({})
+          snap = H.requestSaveState()
+          H.log(string.format("[lifefold] snapshot f%d: TERRA bank %d MP %d HP %d; LOCKE HP "
+            .. "%d/%d status1 $%02X status4 $%02X%s", H.frame, bank(terraS), mp(terraS),
+            H.readWord(0x3BF4 + terraS * 2), H.readWord(0x3BF4 + lockeS * 2),
+            H.readWord(0x3C1C + lockeS * 2), H.readByte(STATUS1 + lockeS * 2),
+            H.readByte(STATUS4 + lockeS * 2),
+            hurtSeen and " (STRAGO's Fight put him below max)" or ""))
+          return
+        end
+        if full and bank(terraS) >= 3 and not hurtSeen then
+          hurtSeen = true
+          H.log(string.format("[lifefold] f%d: TERRA has %d pips and LOCKE is at full HP "
+            .. "(%d); STRAGO Fights him", H.frame, bank(terraS),
+            H.readWord(0x3BF4 + lockeS * 2)))
+        end
+        if hurtSeen then killPulse(true) else pulse(nil) end
+      end),
+    }, "TERRA's command window with 3 pips banked, LOCKE standing below max HP")
+  end)(),
   H.waitFrames(2),
   H.call(function()
     H.checkReq(snap, "snapshot")
@@ -468,6 +500,12 @@ for _, c in ipairs(CASES) do
     armed = c
     c.ko0 = ko(lockeS)
     H.assertEq(c.ko0, c.ko == true, c.ko and "LOCKE is KO'd" or "LOCKE is alive")
+    if not c.ko then
+      c.hpT, c.hpMaxT = H.readWord(0x3BF4 + lockeS * 2), H.readWord(0x3C1C + lockeS * 2)
+      H.assertEq(c.hpT < c.hpMaxT, true, string.format("precondition: LOCKE stands below his "
+        .. "max HP at T (%d/%d), so a heal leaking onto the living target has room to show",
+        c.hpT, c.hpMaxT))
+    end
     H.assertEq((H.readByte(STATUS4 + lockeS * 2) & LIFE3_STATUS) == 0, true,
       "LOCKE does not already carry Life 3")
     H.assertEq(mp(terraS) >= romPrice(LIFE3) and mp(terraS) >= romPrice(LIFE2), true,
@@ -648,7 +686,11 @@ steps[#steps + 1] = H.call(function()
       check(not c.koEnd, string.format("%s: LOCKE still standing", c.name))
       -- a living target is healed by none of the tiers: Life and Life 2
       -- miss him, and Life 3's revival is for a KO'd body only (#327).  A
-      -- monster may hit him in the window, so the pin is "no higher"
+      -- monster may hit him in the window, so the pin is "no higher".  It
+      -- sees a heal only if he was below max at the confirm (asserted at T;
+      -- rechecked here so the pin never passes on a full-HP body)
+      check(c.hp0 < c.hpMax, string.format("%s: precondition: LOCKE below max HP at the "
+        .. "confirm (%d/%d)", c.name, c.hp0, c.hpMax))
       check(c.hpEnd <= c.hp0 and c.hpEnd < c.hpMax, string.format("%s: LOCKE's HP not raised "
         .. "(%d at the confirm, %d/%d at TERRA's action end)", c.name, c.hp0, c.hpEnd, c.hpMax))
     end

@@ -121,7 +121,8 @@ STATES = [
     S("lete_river", gen="gen_lete", prev="banon_joined"),
     # gen_scenario: the river (steered past its vanilla loop), ULTROS, and
     # the three-way split -- the entry point of the v0.3 arc.  ultros1_entry
-    # is Ultros's battle as it loads (battle_ultros1).
+    # is the dialog before Ultros's battle, waiting on a press
+    # (battle_ultros1).
     S("scenario_hub", gen="gen_scenario", prev="lete_river",
       also=["ultros1_entry"]),
     # one step PAST the hub: proves the split is dispatchable and hands the
