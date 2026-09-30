@@ -67,7 +67,9 @@ now shows 7, and AtmaWeapon 11. From 10 up the count is two white numerals
 on a dark shield.
 
 **The Beginner's House no longer repeats how to use Blitz.** Sabin's first
-battle against Vargas walks you through it, where you first need it.
+battle against Vargas walks you through it, where you first need it. The House's lesson on what
+a boost buys now includes Dance, and says a boosted price is never less
+than the unboosted one.
 
 **Vargas: Pummel finishes him even while he is Broken.** Before, if
 Sabin's Pummel broke Vargas, or landed while he was already Broken, the

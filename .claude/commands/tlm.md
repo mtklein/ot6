@@ -130,7 +130,10 @@ paths checks that no assertion was weakened, removed or turned into a log
 line; that every state write is declared; that no timeout was widened or
 seed re-rolled; that every number in the commit messages is in a cited log
 and every cited path resolves; and that the change handles any draw. Its
-findings are fixed on the branch before the merge, not filed for later.
+findings are fixed on the branch before the merge, not filed for later. A fix
+round that changes the ROM or a play-lineage generator goes back to the
+reviewer before the merge, and a small branch still gets an independent
+reviewer, not only my read of the diff (2026-09-30 ombudsman).
 Meanwhile read the diff yourself (`git diff main...wt/<topic>`), not the
 report. Merge the exact commit the agent's final report names: check
 `git rev-parse` of what you merge equals the report's head sha, and push
