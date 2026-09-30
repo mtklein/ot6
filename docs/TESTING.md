@@ -107,6 +107,13 @@ citation rather than dropping the number.
 
 ## Tests that survive any draw
 
+A fight's in-battle draw comes from one of 60 seeds: InitBattle seeds the
+battle RNG from the game clock's frame (`$021e`). So a sweep of 60 waits
+from one snapshot gives that state's exact first-attempt rate, and it is
+usually a better measure of a fight than a handful of K-encounter
+variation runs, which can land on a lucky or unlucky subset (the Edgar
+leg's unchanged generator measured 7/12 on one set and 13/15 on another).
+
 A test, generator or driver must cope with every encounter, formation and
 draw the game can deal at its point in the route, not the one its fixture
 happens to hold. Every ROM change regenerates the fixture chain, and with it
