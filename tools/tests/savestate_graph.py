@@ -823,7 +823,10 @@ STATES = [
     # town's chests, SETZER at the inn, dressed from the bag and the town's
     # shops, and Save outside the town: the `wor-kohlingen-v1` checkpoint
     # (docs/design/route-wor-falcon.md section 11).
-    # timeout=3600: see route-wor-falcon section 11 for the measured frames.
+    # timeout=3600: an attempt ends at frame ~29.7k from the Continue (the
+    # capture) and up to ~65k in the variation set's longest (K=12
+    # encounters used up first); three ~30k attempts are ~90k frames,
+    # ~1100 s at a loaded machine's ~80 frames/s.
     # Re-cutting the SRAM:
     #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-edgar-v1 \
     #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-kohlingen-v1/wor-kohlingen.sram \

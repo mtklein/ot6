@@ -606,6 +606,19 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(H.readByte(c(SETZER, 0x1E)), UNICORN, "SETZER holds UNICORN")
     say("kohlingen", "SETZER dressed: " .. kit(SETZER))
   end),
+  -- SETZER's row: he joins in the front row, the trio stands in the back.
+  -- A weapon without the row penalty (ItemProp +19 bit 5; the Darts and
+  -- his cards have it) loses nothing in the back row, where physical hits
+  -- taken are halved (lib setRows), so he goes back when his weapon says so.
+  H.cond(function()
+    local w = H.readByte(c(SETZER, 0x1F))
+    local free = w ~= 0xFF and (prop(w, 19) & 0x20) ~= 0
+    H.log(string.format("[kit] SETZER's weapon $%02X %s the row penalty; party byte $%02X", w,
+      free and "ignores" or "carries", H.readByte(0x1850 + SETZER)))
+    return free
+  end, {
+    H.setRows({ [SETZER] = true }, { tag = "SETZER to the back row" }),
+  }, {}),
   control("the store, after the menu"),
   H.waitFrames(30),
   walkInto(12, 40, MAP_KOHLINGEN, "the store -> Kohlingen"),
