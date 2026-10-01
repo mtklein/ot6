@@ -24,14 +24,17 @@
 --      (37,58): the Czarina Gown and the Exp. Egg, (43,57) -> (76,19), the
 --      wall switch (76,10) facing up with A ($02B8) opens (79,3); back to
 --      the hub.  Whoever each armour improves most (defense plus magic
---      defense, read from the ROM) wears it.
+--      defense, read from the ROM) wears it; the relics are re-planned by
+--      the lib's relic rule (H.dressRelics) with what the chests and the
+--      drops brought.
 --   6. The hub -> (37,22) -> the turtle (56,14): facing down with A rides
 --      it to B3 (69,8) ($02B4); the switch (70,8) facing up with A moves
 --      B3's turtle ($02B5); from (71,9) facing right with A it carries the
 --      party to the far landing ($02B6); up through (79,3) -> the east room
 --      (122,28).
 --   7. The Man Eater (124,9); the monster chest (120,9) is left closed (the
---      Dullahan leg's); the field care (a Tent where it is worth one) and
+--      Dullahan leg's); the field care (a Tent where it is worth one), the
+--      relics re-planned once more, and
 --      the real Save UI on the save point (H.saveAtCheckpoint "wor-tomb-v1").
 -- Every battle's [outcome] is asserted said, judged on the battle's own end
 -- reading, and paid as due; every battle's draw is logged as a [key] line
@@ -83,6 +86,12 @@ local function kit(ch)
   return table.concat(t, " ")
 end
 local MEMBERS = { { CELES, "CELES" }, { SABIN, "SABIN" }, { EDGAR, "EDGAR" }, { SETZER, "SETZER" } }
+-- The statuses the arc's coming fights inflict, for the relic rule's guards
+-- (H.dressRelics opts.threats; an informed reading of route-wor-falcon 3.5,
+-- 4.2, 6 and 12.3-12.4): the tomb's Zombie, the Mad Oscar's Sour Mouth
+-- (Imp, Poison, Dark; Sleep, Muddle, Mute), the Sap seen there, and the
+-- monster chest's PetriBlast.  STATUS1 $67, STATUS2 $E8.
+local ARC_THREATS = { s1 = 0x67, s2 = 0xE8 }
 local function supplies()
   return string.format("tonic=%d potion=%d fenix=%d remedy=%d soft=%d revivify=%d greencherry=%d tent=%d gil=%d",
     H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX), H.invCountOf(REMEDY),
@@ -500,6 +509,9 @@ H.run({ maxFrames = 200000 }, {
   link(MAP_B2, 11, 55, 29, 26, "the Crystal Mail's room (11,55) -> the hub (29,26)"),
   checkOutcomes("the chests and the wall switch"),
   H.fieldCare({ tag = "before the turtles" }),
+  -- the relics re-planned with what the chests and the drops brought (the
+  -- lib's relic rule, H.dressRelics; an Amulet, say, guards Zombie)
+  H.dressRelics(MEMBERS, { threats = ARC_THREATS, tag = "relics after the chests" }),
 
   -- ---- 6. the turtles ---------------------------------------------------------------------------
   link(MAP_B2, 37, 22, 56, 12, "the hub (37,22) -> the turtle's landing (56,12)"),
@@ -531,6 +543,8 @@ H.run({ maxFrames = 200000 }, {
   -- pitches one when the party's hole is past a Tent's worth of Tonics)
   H.stepOntoSavePoint(SAVE_POINT[1], SAVE_POINT[2]),
   H.fieldCare({ threshold = 1.0, tag = "on the save point" }),
+  -- and once more before the save, for what the turtles' rooms dropped
+  H.dressRelics(MEMBERS, { threats = ARC_THREATS, tag = "relics on the save point" }),
   H.saveAtCheckpoint("wor-tomb-v1"),
   checkOutcomes("the stretch"),
   H.call(function()

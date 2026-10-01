@@ -1,6 +1,8 @@
 -- gen_wor_kohlingen.lua -- the World of Ruin from Figaro Castle to SETZER:
--- Continue the `wor-edgar-v1` battery (CELES, SABIN and EDGAR at world
--- (81,86), outside the surfaced castle), ride the castle to Kohlingen,
+-- Continue the `wor-figaro-sweep-v1` battery (CELES, SABIN and EDGAR at
+-- world (81,86), outside the surfaced castle, back from the South Figaro
+-- side trip wearing its relics: the Ribbon, the Hero Ring, the Hyper Wrist
+-- and the RunningShoes), ride the castle to Kohlingen,
 -- walk into town, take SETZER at the inn, dress him, and save on the world
 -- map outside Kohlingen: the `wor-kohlingen-v1` battery, the boot for the
 -- walk to Darill's Tomb.  Generates wor_kohlingen.mss; its capture run
@@ -9,8 +11,8 @@
 -- 11).
 --
 -- The route:
---   1. Field care at the boot (the checkpoint was saved hurt), and into the
---      castle from its world tile (81,85).
+--   1. Field care at the boot (nothing to do when the side trip saved
+--      whole), and into the castle from its world tile (81,85).
 --   2. Down to basement 1's west room by the court's stairs and the lower
 --      hall, and the Regal Crown (#322) off basement 2: 61 (2,37) -> 62,
 --      62 (4,6) -> 66, the chest (3,53), and back.  Basement 2 rolls the
@@ -26,7 +28,9 @@
 --      (200 GP) when anyone is short, SETZER at the inn (he joins: $00CA).
 --   6. SETZER joins with nothing on and no Esper; the game does not dress
 --      him (no opt_equip), so the party does, from the bag and the town's
---      shops (dressSetzer below), and stocks the item counter (stock below).
+--      shops (dressSetzer below), and stocks the item counter (stock below);
+--      his relics come from the lib's relic rule over all four
+--      (H.dressRelics), which leaves the trio's as they were.
 --   7. Out by the town's south edge, the field care, and the real Save UI
 --      into slot 3 on the world tile the exit returns the party to
 --      (H.saveAtCheckpoint "wor-kohlingen-v1").
@@ -42,7 +46,6 @@ local CELES, SABIN, EDGAR, SETZER = 6, 5, 4, 9
 local TONIC, POTION, FENIX, REMEDY, SOFT = 0xE8, 0xE9, 0xF0, 0xF5, 0xF4
 local REVIVIFY, GREEN_CHERRY, ELIXIR = 0xF1, 0xF8, 0xEE
 local REGAL_CROWN, GREEN_BERET = 0x7B, 0x72
-local STAR_PENDANT, JEWEL_RING = 0xB1, 0xB5
 local UNICORN = 23                                  -- esper index (GenjuProp order)
 local MAP_CASTLE, MAP_HALL, MAP_B1, MAP_B2, MAP_B3, MAP_CROWN = 55, 59, 61, 62, 63, 66
 local MAP_KOHLINGEN, MAP_INN, MAP_STORE = 189, 191, 194
@@ -88,6 +91,12 @@ local function kit(ch)
   return table.concat(t, " ")
 end
 local MEMBERS = { { CELES, "CELES" }, { SABIN, "SABIN" }, { EDGAR, "EDGAR" }, { SETZER, "SETZER" } }
+-- The statuses the arc's coming fights inflict, for the relic rule's guards
+-- (H.dressRelics opts.threats; an informed reading of route-wor-falcon 3.5,
+-- 4.2, 6 and 12.3-12.4): the tomb's Zombie, the Mad Oscar's Sour Mouth
+-- (Imp, Poison, Dark; Sleep, Muddle, Mute), the Sap seen there, and the
+-- monster chest's PetriBlast.  STATUS1 $67, STATUS2 $E8.
+local ARC_THREATS = { s1 = 0x67, s2 = 0xE8 }
 local function topLevel()
   local m = 0
   for _, p in ipairs(MEMBERS) do if inParty(p[1]) then m = math.max(m, level(p[1])) end end
@@ -313,9 +322,12 @@ end
 --     player's reading of the ROM's data, so the choice follows whichever
 --     break rows the ROM carries -- and the same GIL_SHARE bar for a bought
 --     one;
---   * the relics are the bag's spare guards (a Star Pendant and the Jewel
---     Ring: Poison, Dark, Petrify), not the Coin Toss (it turns Slot into
---     GP Rain, a verb the driver does not play);
+--   * the relics are the lib's relic rule over the whole party
+--     (H.dressRelics, lib/ot6_field.lua): the bag's acting relics first
+--     (Haste, damage, vigor, the Black Belt's counter), each to the member
+--     it helps most, then guards by the statuses they cover; the Coin Toss
+--     (it turns Slot into GP Rain, a verb the driver does not play) is not
+--     ranked;
 --   * the Esper is UNICORN: Pearl, the holy spell four of the tomb's five
 --     species are weak to, and Remedy (route-wor-falcon 4.2).
 local GIL_SHARE = 0.10
@@ -390,12 +402,6 @@ local function setzerPlan()
     local helmet = bagBest(4, defScore)
     local armor = bagBest(2, defScore)
     setzerKit = { { 0, weapon }, { 1, shield }, { 2, helmet }, { 3, armor } }
-    -- relics: the bag's spare guards
-    local r = {}
-    for _, id in ipairs({ STAR_PENDANT, JEWEL_RING }) do
-      if H.invCountOf(id) > 0 and wears(SETZER, id) then r[#r + 1] = id end
-    end
-    for i, id in ipairs(r) do setzerKit[#setzerKit + 1] = { 3 + i, id } end
     local t = {}
     for _, e in ipairs(setzerKit) do
       t[#t + 1] = string.format("slot %d $%02X", e[1], e[2] or 0xFF)
@@ -448,16 +454,16 @@ local function stock(shopId, what)
 end
 
 H.run({ maxFrames = 200000 }, {
-  -- ---- 0. Continue wor-edgar-v1 ----------------------------------------------------------
-  H.bootCheckpoint("wor-edgar-v1"),
+  -- ---- 0. Continue wor-figaro-sweep-v1 ---------------------------------------------------
+  H.bootCheckpoint("wor-figaro-sweep-v1"),
   keyWatch(),
   H.call(function()
     tallyReset()
     H.log(string.format("[wor] boot f%d: world %d (%d,%d), %s; kit CELES %s, SABIN %s, EDGAR %s; %s", H.frame,
       H.worldId(), H.worldX(), H.worldY(), whereLine(), kit(CELES), kit(SABIN), kit(EDGAR), supplies()))
   end),
-  -- the checkpoint was saved hurt (EDGAR 948/1600 and SABIN 75/291 MP at
-  -- the tracked save): the care before the castle
+  -- the care before the castle (the side trip saves after its care to
+  -- full; a draw that leaves someone short is cared for here)
   H.fieldCare({ tag = "care at the boot" }),
 
   -- ---- 1. into the castle --------------------------------------------------------------
@@ -598,6 +604,7 @@ H.run({ maxFrames = 200000 }, {
     { tag = "bag: combat items on top" }),
   setzerPlan(),
   lazy(function() return H.equipKit(SETZER, setzerKit, { tag = "SETZER dressed" }) end),
+  H.dressRelics(MEMBERS, { threats = ARC_THREATS, tag = "relics with SETZER" }),
   H.equipEsper(function() return (H.readByte(0x1850 + SETZER) >> 3) & 3 end, UNICORN,
     { tag = "UNICORN -> SETZER" }),
   H.call(function()
