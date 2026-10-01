@@ -1432,6 +1432,56 @@ M.contracts["wor-kohlingen-v1"] = {
   },
 }
 
+-- wor-tomb-v1: Darill's Tomb's save point, B3's east room (map 300
+-- (122,14)), after the door opened for SETZER ($00CB) and the switches and
+-- the turtles brought the party down to it ($02B1 the B2 switch, $02B3 the
+-- water, $02B8 the wall switch, $02B5/$02B6 the B3 turtle moved and ridden)
+-- (docs/design/route-wor-falcon.md sections 2.5-2.6, 7 and 12).  Dullahan
+-- ($02B2) and the monster chest beside the save point (treasure bit $0A1)
+-- are ahead: this is their retry point.  CELES, SABIN, EDGAR and SETZER,
+-- no timer.
+M.contracts["wor-tomb-v1"] = {
+  slot = 3,
+  field = { map = 300, x = 122, y = 14 },   -- the vanilla save point ($0632)
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00CA, 1, "SETZER joined (_cc3bf8, :85777)" },
+    { 0x00CB, 1, "the tomb's door opened for SETZER (_ca3f83)" },
+    { 0x02B1, 1, "B2's switch opened (28,38) (_ca41a3)" },
+    { 0x02B3, 1, "the water switch filled the turtle's channel (_ca41c3)" },
+    { 0x02B8, 1, "the wall switch opened (79,3) (_ca4216)" },
+    { 0x02B6, 1, "the B3 turtle carried the party to the far landing (_ca4299)" },
+    { 0x02B2, 0, "Dullahan not yet fought (_ca42f1)" },
+    { 0x00CC, 0, "the Falcon not yet risen (_ca4502)" },
+    { 0x00CD, 0, "the Falcon not yet risen (_ca4502)" },
+  },
+  party = {
+    size = 4,                     -- CELES, SABIN, EDGAR and SETZER
+    members = {
+      { 0x06, "CELES" },
+      { 0x05, "SABIN" },
+      { 0x04, "EDGAR" },
+      { 0x09, "SETZER" },
+    },
+  },
+  ram = {
+    { 0x1E40 + (0x0A1 >> 3), 1 << (0x0A1 & 7), 0,
+      "the monster chest (120,9) is closed (treasure bit $0A1)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+    { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
+    { 0x1190, 0xFF, 0x00, "timer 1 counter high" },
+    { 0x1195, 0xFF, 0x00, "timer 2 counter low" },
+    { 0x1196, 0xFF, 0x00, "timer 2 counter high" },
+    { 0x119B, 0xFF, 0x00, "timer 3 counter low" },
+    { 0x119C, 0xFF, 0x00, "timer 3 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
@@ -1705,19 +1755,37 @@ local function atBoundary(c)
 end
 
 -- Walk onto a field save point at (x,y): straight there when the map's
--- BFS reaches it, else to the tile below it (opts.from = {x, y, dir} for
--- another side) and a held step onto it, since the save point's sparkle
--- object blocks the BFS.  $01BF (the shared SavePoint script's switch)
--- is the arrival witness.
+-- BFS reaches it, else to a neighbour the party can reach and a held step
+-- onto it, since the save point's sparkle object blocks the BFS.  The
+-- neighbour is the tile below it when that one is reachable, else the
+-- first reachable of left, right and above, read where the party stands
+-- (Darill's Tomb's save point, 300 (122,14), is walled below and above and
+-- entered from (121,14)); opts.from = {x, y, dir} names one instead.
+-- $01BF (the shared SavePoint script's switch) is the arrival witness.
+local SAVE_SIDES = { { 0, 1, "up" }, { -1, 0, "right" }, { 1, 0, "left" }, { 0, -1, "down" } }
 function M.stepOntoSavePoint(x, y, opts)
   opts = opts or {}
-  local from = opts.from or { x, y + 1, "up" }
+  local from = opts.from
   local nav = { maxFrames = opts.maxFrames or 8000, playBattles = "tactical" }
   local ph, calm = 0, 0
+  local function pickFrom()
+    if from then return from end
+    for _, s in ipairs(SAVE_SIDES) do
+      if M.bfsPath(x + s[1], y + s[2]) ~= nil then
+        from = { x + s[1], y + s[2], s[3] }
+        break
+      end
+    end
+    from = from or { x, y + 1, "up" }
+    M.log(string.format("[save point] (%d,%d): approached from (%d,%d), pressing %s", x, y,
+      from[1], from[2], from[3]))
+    return from
+  end
   return M.seqStep({
+    M.call(function() from = opts.from end),
     M.cond(function() return M.bfsPath(x, y) ~= nil end,
       { M.navTo(x, y, nav) },
-      { M.navTo(from[1], from[2], nav),
+      { M.navTo(function() return pickFrom()[1] end, function() return pickFrom()[2] end, nav),
         M.withReset(M.driveUntil(function()
           calm = (onSaveTile(x, y) and M.tileAligned()
                   and not M.dialogWaiting()) and calm + 1 or 0
