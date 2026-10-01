@@ -26,6 +26,7 @@
 #     lib <path> <sha256(<path>'s token stream)>      (one per lib half)
 #     artifact <sha256(build/states/<state>.mss)>
 #     ancestor <path> <sha256(<path> file bytes)>        (non-root states only)
+#     emulator <sha256(the Mesen executable run.sh runs)>
 #
 # Provenance versus compatibility (docs/TESTING.md): the sig and lib lines
 # record exactly which harness sources produced the fixture.  They are kept
@@ -37,7 +38,10 @@
 # regenerating is detected.  The ancestor line binds stamp -> the
 # predecessor's stamp file (prev= edges) or the checkpoint's manifest.json
 # (checkpoint= edges), so the whole chain is verifiable transitively on disk
-# down to a power-on root.  compose.py's stamp_check verifies every line;
+# down to a power-on root.  The emulator line is provenance only, like sig
+# and lib: it records which Mesen build made the fixture (official or the
+# tools/mesen/ patched one) and nothing compares it, so swapping emulators
+# regenerates nothing.  compose.py's stamp_check verifies every line;
 # `compose.py --check-states` asks it of the whole tree.
 #
 # A stamp written before the rom/generator lines existed carries neither.
@@ -162,6 +166,18 @@ romsig() {
   shasum -a 256 "$ROM" | cut -c1-64
 }
 
+# sha256 of the Mesen executable run.sh runs (OT6_MESEN_APP, else the
+# tree's tools/Mesen-linux or tools/Mesen.app), or "unknown": provenance,
+# never a binding, so a missing binary does not stop a stamp.
+emusig() {
+  if [ "$(uname -s)" = Darwin ]; then
+    bin="${OT6_MESEN_APP:-$ROOT/tools/Mesen.app}/Contents/MacOS/Mesen"
+  else
+    bin="${OT6_MESEN_APP:-$ROOT/tools/Mesen-linux}/Mesen"
+  fi
+  if [ -f "$bin" ]; then shasum -a 256 "$bin" | cut -c1-64; else echo unknown; fi
+}
+
 # sha256 of one file, bare.  Used for the artifact and ancestor bindings.
 filehash() {
   shasum -a 256 "$1" | cut -c1-64
@@ -211,6 +227,7 @@ case "$cmd" in
     # computed; a stamp never records a guessed ROM.
     rom_hash=$(romsig) || exit 2
     gen_hash=$(gensig "$gen" "$@") || exit 2
+    emu_hash=$(emusig)
     # Everything is computed; only now may the old stamp be replaced.
     sigline=$(sig "$gen" "$@") || exit 2
     liblines=""
@@ -227,6 +244,7 @@ case "$cmd" in
       printf 'artifact %s\n' "$artifact"
       [ "$ancestor" = "-" ] ||
         printf 'ancestor %s %s\n' "$ancestor" "$anc_hash"
+      printf 'emulator %s\n' "$emu_hash"
     } > "$STATES/$state.stamp"
     ;;
   *)

@@ -18,6 +18,13 @@
 # * Exit code: 0 = pass, 1 = assertion/Lua error, 2 = frame budget exceeded.
 #   The [ot6] PASS/FAIL verdict in the log takes precedence over the raw
 #   process code.
+# * The emulator is tools/Mesen-linux (tools/Mesen.app on macOS), or the
+#   directory/bundle in OT6_MESEN_APP, which then needs its own
+#   OT6_MESEN_CACHE so the machine-wide shared copy is left alone.  Its
+#   sha256 is recorded as an `[emulator]` line at the end of the log.
+# * MESEN_SCRIPT_ONLY=1 is exported unless the run measures coverage: the
+#   patched build (tools/mesen/) then skips the debugger bookkeeping the
+#   harness never reads; the official binary ignores the variable.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ROM="${OT6_ROM:-$ROOT/build/ot6.sfc}"
@@ -120,6 +127,19 @@ PRELUDE="$WDIR/composed_live.lua"
   cat "$COMPOSED"; } > "$PRELUDE"
 COMPOSED="$PRELUDE"
 
+# Script-only Mesen (tools/mesen/README.md): the patched build stops keeping
+# the code/data log and access counters the debugger windows read, and the
+# harness reads neither -- except a coverage run, whose coverageFlush reads
+# the code/data log (emu.getCdlData).  So every run but a coverage run asks
+# for it; the official binary ignores the variable.  A coverage run is one
+# composed with OT6_COVERAGE set, whether here or in an already composed
+# script.  An explicit MESEN_SCRIPT_ONLY=0 opts a run out.
+if [ -n "${OT6_COVERAGE:-}" ] || grep -q '^OT6_COVERAGE = true' "$COMPOSED"; then
+  export MESEN_SCRIPT_ONLY=0
+else
+  export MESEN_SCRIPT_ONLY="${MESEN_SCRIPT_ONLY:-1}"
+fi
+
 # ------------------------------------------------------------ shared emulator
 # Every worker on this machine execs one read-only Mesen bundle, and nothing
 # ever writes inside it.  Workers are kept apart by giving each its own Mesen
@@ -152,7 +172,7 @@ COMPOSED="$PRELUDE"
 # OT6_MESEN_CACHE relocates the cache (shared_emulator_selftest.sh provisions
 # into a scratch one); the default is the machine-wide path above.
 if [ "$(uname -s)" = Darwin ]; then
-  SRC_APP="$ROOT/tools/Mesen.app"
+  SRC_APP="${OT6_MESEN_APP:-$ROOT/tools/Mesen.app}"
   MESEN_CACHE="${OT6_MESEN_CACHE:-$HOME/Library/Caches/ot6}"
   SHARED_APP="$MESEN_CACHE/Mesen-test.app"
   BIN_SUB=/Contents/MacOS          # the executable's directory in the bundle
@@ -161,7 +181,7 @@ if [ "$(uname -s)" = Darwin ]; then
   GATEKEEPER_NOTE="; expect a Gatekeeper scan"
 else
   GATEKEEPER_NOTE=
-  SRC_APP="$ROOT/tools/Mesen-linux"
+  SRC_APP="${OT6_MESEN_APP:-$ROOT/tools/Mesen-linux}"
   MESEN_CACHE="${OT6_MESEN_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/ot6}"
   SHARED_APP="$MESEN_CACHE/Mesen-test"
   BIN_SUB=
@@ -170,6 +190,11 @@ else
 fi
 # Rebuild the shared copy when the source bundle changes (a Mesen upgrade).
 # -L: in a worktree tools/Mesen.app is a symlink into the main tree.
+# Another emulator must not rebuild the machine-wide shared copy every other
+# worker execs: give it a cache of its own.
+if [ -n "${OT6_MESEN_APP:-}" ] && [ -z "${OT6_MESEN_CACHE:-}" ]; then
+  echo "OT6_MESEN_APP needs its own OT6_MESEN_CACHE"; exit 2
+fi
 SRC_STAMP=$(file_stamp "$SRC_APP$BIN_SUB/Mesen" 2>/dev/null) || {
   echo "no Mesen at $SRC_APP (run tools/worktree-setup.sh?)"; exit 2; }
 
@@ -230,6 +255,16 @@ shared_app_ready || { echo "shared test emulator missing at $SHARED_APP"; exit 2
 if [ -n "${OT6_PROVISION_PROBE_OUT:-}" ]; then
   printf '%s\n' "$SHARED_APP" > "$OT6_PROVISION_PROBE_OUT"
   exit 0
+fi
+# The emulator's identity for the log: a provenance record, not a binding.
+# Hashed once per shared copy; the file names the copy (its source stamp),
+# so a copy rebuilt by a run.sh that predates this is hashed again.
+EMULATOR_SHA=""
+[ -f "$SHARED_APP.sha256" ] && read -r EMULATOR_SHA EMULATOR_OF < "$SHARED_APP.sha256"
+if [ -z "$EMULATOR_SHA" ] || [ "${EMULATOR_OF:-}" != "$SRC_STAMP" ]; then
+  EMULATOR_SHA=$(shasum -a 256 "$SHARED_APP$BIN_SUB/Mesen" | cut -c1-64)
+  printf '%s %s\n' "$EMULATOR_SHA" "$SRC_STAMP" > "$SHARED_APP.sha256.$$" &&
+    mv -f "$SHARED_APP.sha256.$$" "$SHARED_APP.sha256"
 fi
 
 # Remove any stale per-worker bundle in build/.  Test -L as well as -e: it
@@ -370,6 +405,8 @@ while :; do
     "$elapsed" "$CAP" "$(( attempt + 1 ))" "$(( RETRIES + 1 ))" >&2
   sleep 5
 done
+
+printf '[emulator] %s MESEN_SCRIPT_ONLY=%s\n' "${EMULATOR_SHA:-unknown}" "$MESEN_SCRIPT_ONLY" >> "$RUN_LOG"
 
 python3 "$ROOT/tools/tests/lib/decode_b64.py" "$RUN_LOG" "$ART"
 

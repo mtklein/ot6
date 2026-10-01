@@ -8783,6 +8783,21 @@ local function coverageFlush()
     M.log("coverage: getCdlData unavailable (" .. tostring(cdl) .. ")")
     return
   end
+  -- A run that executed code has a non-empty code/data log.  An all-zero
+  -- one means the emulator kept none: a script-only Mesen
+  -- (tools/mesen/README.md; run.sh leaves MESEN_SCRIPT_ONLY off for coverage
+  -- runs, so this is the second guard).  Emitting it would report every
+  -- routine uncovered, so refuse.
+  local touched = false
+  for off = 0, #cdl do
+    if (cdl[off] or 0) ~= 0 then touched = true; break end
+  end
+  if not touched then
+    M.log("coverage: REFUSED -- the code/data log is all zero, so this "
+      .. "emulator kept none (a script-only Mesen with MESEN_SCRIPT_ONLY=1?); "
+      .. "no coverage.cdl emitted")
+    return
+  end
   local total = 0
   for _, r in ipairs(COVERAGE_RANGES) do total = total + r[2] end
   local nbytes = math.floor((total + 7) / 8)
