@@ -1033,7 +1033,7 @@ Holding BP counts the dying member's own `bp=` only (the first count read
 lost, 0 keys mixed; runs won 124/124`. With EDGAR it is not a wall and not
 a coin flip. It is still not a confident fight from the hurt boot: five
 `pace_00` draws lost members, eight Fenix Downs went into a random battle,
-and nine of the thirteen deaths held BP.
+and seven of the thirteen deaths held BP.
 
 **The cause is the driver's heal policy, not the rows.** The deaths are
 #312's heal-lock: the pair's Sand Storm and Clamp take up to 932 a round
