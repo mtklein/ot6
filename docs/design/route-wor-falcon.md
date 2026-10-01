@@ -144,7 +144,7 @@ put all three in the back row.
 |---|---|---|---|---|---|
 | 1 | the South Figaro continent (side items, #321, #322) | world (81,86) -> South Figaro (113,95); the cave (106,98); back to (81,85) | 51 + 14 + 48 (world) | world 41, 43, **44**; cave 68/90 (138, 140); 87 (WoB pool 65) | none (optional) |
 | 2 | the castle to Kohlingen | (81,85) -> 55 -> 59 -> 61, the engineer (6,33) | verify-on-arrival | none (maps 55, 59, 61 do not roll); **62 (137) for the Regal Crown** | `$0106=1` -> "Go to Kohlingen?" -> `$00DC=1 $0106=0` |
-| 3 | the walk to Kohlingen | castle exit (53,59), verify-on-arrival -> (38,45) | 29 | world **44**, 45, 47 | none |
+| 3 | the walk to Kohlingen | castle exit (53,58) (measured) -> (38,45) | 29 | world **44**, 45, 47 | none |
 | 4 | Kohlingen: SETZER | 189 -> inn 191, SETZER at (23,15) | verify-on-arrival | none (towns) | `$067F=1`; joins unless the party is full (`$01A3`) -> `$00CA=1` |
 | 5 | the walk to the tomb | (38,45) -> (25,52) | 32 | world 45, 46, 47 | none |
 | 6 | the tomb's door | 297 (8,12) -> trigger (8,10) -> stairs (7,8) | 2 + verify-on-arrival | none | SETZER in the party (`$01A9`) -> `$00CB=1`, the stairs drawn (`_caf1a2`) |
@@ -170,7 +170,7 @@ continent still holds:
 | Hyper Wrist, RunningShoes (#322) | map 89 region 1, by 74 (15,18) -> 81 (4,16) -> (27,10) -> 83 (7,5) -> (32,18) -> 89 (106,54) | `map 89 region 1 (71 tiles): (110,49) chest Hyper Wrist; (105,53) door -> 83 (31,17); (120,53) chest RunningShoes` |
 | Iron Armor, Earrings | map 87 (32,42), (33,56) | `map 87 region 0 ...`; closed |
 | Hero Ring (#322) | map 90 (52,14), by the cave's other door: 68 (4,4) -> 90 (41,13) | `map 90 region 2 (33 tiles): (41,14) door -> 68 (4,5); (52,14) chest Hero Ring`; `map 68 region 0 ...: (4,4) door -> 90 (41,13)` |
-| Regal Crown (#322) | map 66 (3,53), by 61 (2,37) -> 62 (12,13) -> (4,6) -> 66 (3,55) | `map 62 region 0 ...: (4,6) door -> 66 (3,55)`; `map 66 region 0 (15 tiles): (3,53) chest Regal Crown; (3,56) door -> 62 (4,8)` |
+| Regal Crown (#322) | map 66 (3,53), by 61 (2,37) -> 62 (12,13) -> (4,6) -> 66 (3,55); **measured: (4,6) is in a pocket of 62 only basement 3 reaches** (section 11) | `map 62 region 0 ...: (4,6) door -> 66 (3,55)`; `map 66 region 0 (15 tiles): (3,53) chest Regal Crown; (3,56) door -> 62 (4,8)` |
 
 All of it is **verify-on-arrival**: the offline model has no NPCs and no
 map-init tiles, and the Edgar arc found the Hero Ring "not reachable from
@@ -205,8 +205,8 @@ castle burrows from (81,85), and control returns in 61 (6,34) with the
 world parent at the castle's new tile; `$00DC=1 $02B9=0` (`:15690`). The
 castle's world trigger at Kohlingen is (53,58)/(54,58) (`_ca5f18`
 `:14233`, gated on `$00DC`). The castle's exit returns the party one tile
-below its trigger (measured at (81,86) in the Edgar arc), so (53,59) is
-expected: **verify-on-arrival**. The ride is reversible ("(Go to
+below its trigger (measured at (81,86) in the Edgar arc), so (53,59) was
+expected; **measured: (53,58)** (section 11). The ride is reversible ("(Go to
 Figaro?)", `_ca6986`), so South Figaro's shops stay one ride away.
 
 `_ca694f` (the "odd stratum", the Ancient Castle) runs only once `$00CD=1`,
@@ -234,7 +234,8 @@ back in 189 (16,25): `char_party SETZER, 1` unless the party is full
 $00CA=1` (`:85761-85777`). No `opt_equip`.
 
 The exit: 189's long edges lead to the world parent (38,46) / (37,45)
-(`maps.txt`); **verify-on-arrival**.
+(`maps.txt`); **measured**: the party comes out on the tile it stepped into
+the town from, (40,45) after a walk in from the castle's side (section 11).
 
 ### 2.5 The tomb's door (map 297)
 
@@ -646,7 +647,7 @@ in parallel (docs/TOOLING.md "Cuts and the chain from power-on").
 |---|---|---|
 | `wor-edgar-v1` (exists) | world (81,86), the Figaro desert | the start |
 | **`wor-figaro-sweep-v1`** (optional) | world (81,86) again, after leg 1 | the side items and the desert (#321, #322) cut off the story chain, so the Kohlingen legs need not replay a long optional leg; drop it if leg 1 is dropped |
-| **`wor-kohlingen-v1`** | world, outside Kohlingen's door ((38,46) by the town's exit; verify-on-arrival) | the first save with SETZER, dressed, after Kohlingen's shops; the boot for the tomb |
+| **`wor-kohlingen-v1`** | world (40,45), east of Kohlingen's door (sealed; section 11) | the first save with SETZER, dressed, after Kohlingen's shops; the boot for the tomb |
 | **`wor-tomb-v1`** | Darill's Tomb B3, the save point (122,14) | the last save before the monster chest and Dullahan: the retry point for both, and the World of Ruin's first save-point checkpoint |
 | **`wor-falcon-v1`** | world (25,160), landed beside the Falcon | the end of the arc; the hub the World of Ruin arcs boot from |
 
@@ -840,7 +841,144 @@ Not yet driven.
 
 ## 11. The castle's ride, Kohlingen and SETZER, played (legs 2-4, `gen_wor_kohlingen`, `wor-kohlingen-v1`)
 
-Not yet driven.
+Driven 2026-10-01 for #263 (and #322's Regal Crown). The segment
+Continues `wor-edgar-v1` (`H.bootCheckpoint`), takes the Regal Crown off
+the castle's basements, rides the castle to Kohlingen, walks into town,
+opens its two chests, rests at the inn, takes SETZER, dresses him from the
+bag and the town's shops, and saves east of the town's door through
+`H.saveAtCheckpoint`: the `wor-kohlingen-v1` checkpoint. Every number
+below is quoted from a log under `build/attempts/wt/wor-kohlingen/`
+(`capture/` the sealing run, `var2/` the shipped generator's variation set,
+`var1/` the same set one commit earlier, before SETZER's row step, `dev/`
+the failed runs that found the route). All on ROM `4411dfd2fea7` (main
+`720ebdea`, the Falcon arc's authored break rows) except `dev/run1-8`,
+which ran on the ROM before them. Nothing was measured by writing game
+state.
+
+### 11.1 The run (`capture/capture_wor-kohlingen-v1.log`)
+
+| step | what the log says |
+|---|---|
+| boot | `contract wor-edgar-v1 (entry): all 26 fields hold`; `[wor] boot f1019: world 1 (81,86), CELES L31 HP 1300/1595 ...; SABIN L31 HP 1384/1609 MP 75/291 ...; EDGAR L31 HP 948/1600 ...` (the care's policy leaves 948/1600: `[care at the boot] nothing to do`) |
+| the Regal Crown | `[route] basement 3 -> basement 2's west pocket: on map 62 at (3,12)`, `[chest] chest bit 154 (Regal Crown): OPENED`; `[kit] the Regal Crown on EDGAR: def+mdef 51 over his $76's 37 (gain 14)`, `on SABIN: ... over his $77's 34 (gain 17)`, `goes to SABIN` |
+| the engineer | `[choice] dlg $03D4: row 0 of 2`; `[castle] f13098 the castle has sailed for Kohlingen` (`$00DC=1`, `$0106=0` asserted) |
+| the walk | `[wor] out of Figaro Castle by Kohlingen f13651: world 1 (53,58)`; `wnav: planned 28 steps from (53,58)`; one battle, `battle $0EF WON after 2231 ticks` (Bogy x2) |
+| Kohlingen | the chests: `chest bit 65 (Green Beret): OPENED`, `chest bit 69 (Elixir): OPENED`; the inn (200 GP): `before the night: c4 1215/1600 hp ... c5 1192/1609 hp 75/291 mp` -> `after the night: ... gil=266477` |
+| SETZER | `[kohlingen] f25142 SETZER joined, kit FF FF FF FF FF FF FF ... SETZER L31 HP 1597/1597 MP 297/297` (`norm_lvl`: the trio's average, as section 4.1 read it) |
+| dressed | `[kit] SETZER's kit: slot 0 $4E, slot 1 $5F, slot 2 $7C, slot 3 $95, slot 4 $B1, slot 5 $B5 (weapon $4E keys 5 of the arc's 10 species, power 115)` (Darts, Diamond Shld, Diamond Helm, DiamondArmor, Star Pendant, Jewel Ring); `[UNICORN -> SETZER] verified`; `[SETZER to the back row] done: c4=back c5=back c6=back c9=back` |
+| the counter | `bought: tonic=4 potion=54 fenix=32 remedy=10 soft=18 revivify=10 greencherry=5 gil=220177 (spent 9800 GP)` |
+| the save | `[saved] wor-kohlingen-v1: slot 3 holds map 1 ($2001) world tile (40,45)`; `contract wor-kohlingen-v1 (exit): all 31 fields hold`; `[wor] the battles: 3 ($0E8 x1, $0E9 x1, $0EF x1): 3 won, 0 the party left, 0 monster escape(s)`; `PASS (frame 29880) attempts=1/3` |
+
+Sealed and validated (`capture/validate_wor-kohlingen-v1.txt`): `valid
+ot6.sram-checkpoint/v1: 32768 bytes sha256=51460c39... holds=slot 3 world 1
+(40,45) [$1F64=$2001] (saved: declared and checked)`. The graph's own edge
+(`nice ninja build/states/wor_kohlingen.mss`, `capture/ninja_wor_kohlingen.log`)
+plays the same run: `PASS (frame 29880) attempts=1/3`. The cold Continue
+(`capture/probe_kohlingen_continue.lua`, `capture/continue_kohlingen.log`):
+`contract wor-kohlingen-v1 (entry): all 31 fields hold`, `[continue] world
+1 at (40,45): CELES L32 HP 1696/1696 ...; SABIN L31 ... 01 57 57 7B 90 D1 D5;
+EDGAR L31 ...; SETZER L31 HP 1597/1597 MP 297/297 esper+kit 17 4E 5F 7C 95
+B1 B5; gil=220177`. The same probe on `wor-edgar-v1` is the contract's
+negative: `contract wor-kohlingen-v1 (entry) VIOLATED -- 10 field(s) differ`
+(the tile, `$00DC`, `$0106`, `$00CA`, `$02F9`, `$067F`, the crown's
+treasure bit, the party's size and SETZER;
+`capture/negative_contract_on_wor-edgar-v1.log`).
+
+**Spend.** SETZER's kit cost 36,500 GP (Darts 10,000, Diamond Shld 3,500,
+Diamond Helm 8,000, DiamondArmor 15,000: `gil 266477 -> 256477`, `-> 252977`,
+`-> 244977`, `-> 229977`), the counter 9,800, the inn 200; the purse went
+254,895 -> 220,177 with the battles' gold. The rule (`dressSetzer` in the
+generator): each slot takes the bag's best piece he can wear, and the
+counter's best is bought only when it beats the bag's and costs no more
+than a tenth of the purse at the counter. The weapon is ranked by how many
+of the arc's ten species its class keys, read from the ROM's shield rows,
+then by power: on this ROM the Darts (pierce) key 5, the Cards, Dice and
+Trump (¤) key none (`$51 scores 1001 against the bag's best 5030`, `$50
+scores 1133`, `$4E scores 5115`); on the ROM before the authored rows the
+same rule bought the Darts keying 1 (`dev/run5.log`: `keys 1 of the arc's
+10 species`). The Green Beret from the chest lost the helmet slot to the
+Diamond Helm (45 against 32); it is in the bag.
+
+What the plan did not know:
+
+- **The court's gate (28,38) reads impassable from below** to the walker's
+  map model; it is crossed the lib's way (`H.crossDoor`: staged below,
+  the direction held). `dev/run1.log`: `no path (28,42)->(28,38)`;
+  `dev/probe_castle.log`.
+- **The Regal Crown's door 62 (4,6) is in a pocket of basement 2 that only
+  basement 3 reaches.** From the arrival (12,13) there is no path once
+  map 62's other doors are kept off the plan (`dev/run2.log`: `no path
+  (12,13)->(4,7)`); the offline region graph had walked through door tiles.
+  The way: 62 (14,8) -> 63 (54,6), the link (56,15) -> (87,7), the stairs
+  (81,5) -> (44,14), (47,8) -> 62 (3,12), (4,6) -> 66; back by the pocket's
+  (2,13) -> 63 (46,9), the stairs (44,15) -> (81,7), and gen_wor_edgar's
+  way to basement 1 ((87,5), (53,5) -> 62 (13,7), (13,12) -> 61). It costs
+  basements 2 and 3's fights (groups 137, 138): in the set below, 45 of the
+  60 body battles (map 63 26, map 62 19; the world walk 15).
+- **The castle comes up with its exit at (53,58)**, the trigger's own row
+  (the ride's 28 diagonal steps from (81,85) put the castle at (53,57)).
+- **Kohlingen's exit returns the party to the tile it stepped in from**
+  ((40,45) from the castle's side, `dev/run8.log`: `standing on ... (40,45)`),
+  not the edge's (38,46); the save is made on a fixed tile, (40,45), walked
+  to with the town's entrances kept off the plan.
+- **The field reads stale map data for a moment after the menu closes**
+  (`dev/run6.log`'s grid: nothing reachable from where the party stood);
+  the walk out of the store waits for control first.
+
+### 11.2 Under real draw variation (`var2/`)
+
+`varlab.py` (after the Edgar arc's) derives the generator with a block
+after the boot that fights K encounters on the South Figaro continent
+(gen_wor_edgar's grind loop, only the doors kept off the plan: no path off
+the castle tile avoids the desert, so its fights count among the K) and
+walks back to (81,86); K is a floor. Retries off (`OT6_RETRIES=1`);
+`keys.py` pairs each battle's `[key]` line (the seed `$be` at InitBattle's
+store and the battle group) with its `[outcome]`. `var2/summary.txt`,
+`var2/keys.txt`:
+
+| variant | the body starts at (`$1FA1-5`) | body battles (key/formation) | lowest member HP (body) | verdict |
+|---|---|---|---|---|
+| K=0, shift 0 | the checkpoint | `be6C/$0E8`, `be0C/$0E9`, `be80/$0EF` | 584 | `PASS (frame 29880) attempts=1/1` |
+| K=0, shift 23 | the checkpoint | `beC0/$0E8`, `be60/$0E9`, `be44/$0EF` | 682 | `PASS (frame 28614)` |
+| K=0, shift 41 | the checkpoint | `be18/$0E8`, `be88/$0E9`, `beF0/$0EF` | 818 | `PASS (frame 30373)` |
+| K=1 | `8C 5E 5D 5D 5D` | `beB0/$0E7`, `beB8/$0E8`, `be74/$0E5` | 337 | `PASS (frame 36279)` |
+| K=2 | `BE 5F 5D 5D 5D` | `beE8/$0E4`, `be88/$0E5`, `be40/$0E8`, `be98/$0EF` | 948 | `PASS (frame 37713)` |
+| K=3, shifts 0 / 23 / 41 | `E0 60 5D 5D 5D` | `$0E5` x2, `$0E8`, `$0F1` each (`beB8 beB0 be28 be94` / `beBC beB8 be04 be8C` / `beD4 be60 beB4 beE8`) | 971 / 812 / 647 | `PASS (frame 43376)` / `(42801)` / `(42749)` |
+| K=4 | `FE 61 5D 5D 5D` | `be60/$0E5`, `beE4/$0E8`, `be40/$0E5`, `beB8/$0F1` | 1206 | `PASS (frame 44262)` |
+| K=5 (6 fought) | `30 63 5D 6E 5D` | `be30/$0E5`, `be2C/$0E8`, `beB0/$0E9` | 1410 | `PASS (frame 44894)` |
+| K=6, shifts 0 / 23 / 41 | `36 63 5D 6E 5D` | `$0E5`, `$0E8`, `$0E9` each (`be54 be94 be74` / `be9C be74 be9C` / `be98 beA4 beC8`) | 980 / 968 / 910 | `PASS (frame 48480)` / `(48671)` / `(49032)` |
+| K=7 (8 fought) | `52 65 5D 6E 5D` | `be88/$0E9` | 1256 | `PASS (frame 46494)` |
+| K=8 | `64 65 5D 6E 5D` | `beE4/$0E7`, `beAC/$0F3` | 798 | `PASS (frame 50246)` |
+| K=9, shifts 0 / 23 / 41 (10 fought) | `9E 67 5D 6E 5D` | `$0E9`, `$0EF` each (`be24 beA0` / `beCC be98` / `beE8 be14`) | 1592 / 1141 / 1526 | `PASS (frame 55277)` / `(57701)` / `(55092)` |
+| K=10 | `A2 67 5D 6E 5D` | `beE4/$0E9`, `be94/$0EF` | 957 | `PASS (frame 56032)` |
+| K=11 (12 fought) | `E8 69 5D 6E 5D` | `beE0/$0E5`, `beF0/$0EC` | 1136 | `PASS (frame 62337)` |
+| K=12 | `02 69 5D 7F 5D` | `be8C/$0E5`, `be7C/$0E9`, `be70/$0EF` | 1269 | `PASS (frame 64871)` |
+
+**21 of 21 `PASS attempts=1/1`**, each `contract wor-kohlingen-v1 (exit):
+all 31 fields hold` on `[saved] ... world tile (40,45)`; 180 `[outcome]`
+lines, 180 `paid as due`, 0 without an end reading. **The body fought 60
+battles over 56 distinct battle keys, all won, no death**: formation 229
+(Cruller, Humpty x2) 16 battles / 14 keys, 232 (NeckHunter, Cruller, Humpty
+x2) 13 / 13, 233 (Dante) 13 / 12, 239 (Bogy x2) 9 / 8, 241 (Deep Eye x2,
+Muus x2) 4 / 4, 231 2 / 2, 228, 236 and 243 one each; by place, map 63 25
+keys, map 62 17, the world 14. Four keys repeat across runs (`be60-g00E5`
+K=3 s41 and K=4; `be88-g00E9` K=0 s41 and K=7; `be98-g00EF` K=2 and K=9 s23;
+`beB8-g00E5` K=3 s0 and s23). No Fenix Down was spent (`fenix=29` on every
+run's arrival in town, `fenix=32` after the counter). The lowest member HP on the
+body's battle lines is 337 (K=1). Frames 28,614-64,871 from the Continue,
+the body ~29k of them.
+
+**The desert did not come up in the body**: the walk crosses five desert
+tiles at the castle's door and none of the 21 bodies rolled a fight there.
+It came up in the prefixes (the castle tile's desert on the way out to the
+grass and back): formation 222 (the Sand Horse pair, #312) once (K=5:
+`battle $0DE WON after 1663 ticks`), 223 eight times over four keys, 138
+once, all won by the trio. So #312 did not block this leg; one draw of 222
+with three members is not a measurement of it.
+
+`var1/` is the same set one commit earlier (no row step for SETZER): the
+same 21 PASS and the same 60 body battles key for key (`var1/keys.txt`),
+since the step comes after the last fight.
 
 ## 12. Darill's Tomb to its save point, played (legs 5-8, `gen_wor_tomb`, `wor-tomb-v1`)
 
