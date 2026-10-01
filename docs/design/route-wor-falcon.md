@@ -513,7 +513,7 @@ member's experience.
 
 | character | planned (kits.md) | what this arc has | where it bites |
 |---|---|---|---|
-| SETZER | Slot ✦; Coin Toss, Hired Help (gil-priced); divine Jackpot | Slot only (vanilla); the Coin Toss *relic* in the bag turns Slot into GP Rain | his first arc: one verb, and a ¤ weapon class (Cards, Trump) that keys almost nothing here (section 8) |
+| SETZER | Slot ✦; Coin Toss, Hired Help (gil-priced); divine Jackpot | Slot only (vanilla); the Coin Toss *relic* in the bag turns Slot into GP Rain | his first arc: one verb; his ¤ weapons (Cards, Trump, Dice) key six of the arc's twelve species since the re-cut (section 8.7) |
 | EDGAR | 8 Tools (AutoCrossbow, NoiseBlaster, Bio Blaster, Flash, Drill, Chain Saw, Debilitator, Overclock) | 3: AutoCrossbow, NoiseBlaster, Bio Blaster | Drill (pierce x2, "answers armored bosses") and Debilitator are in Figaro's World of Ruin shop 84, which refuses a party with EDGAR or SABIN (`_ca67c0`): both are in every party this arc fields; Chain Saw is a Zozo chest (after the Falcon); Overclock is not built. Dullahan is the armored boss Drill was planned for |
 | CELES | RunicBlade (divine): Runic that also reflects | Runic | Dullahan is a caster boss: Runic takes his Ice 2, Ice 3, Pearl, N. Cross and his own Cure 2 (section 5) |
 | SABIN | through Air Blade (L30) | Air Blade held; Spiraler L42 | — |
@@ -682,7 +682,7 @@ unless it draws no gauge (the Presenter), a key for the party that meets
 it (the trio on the Kohlingen continent, the four in the tomb); that each
 of the four holds a key on the Bogy (SETZER's Cards) and on Dullahan
 (SETZER's Darts), who still absorbs ice; and that the Narshe Whelk's rows
-are unchanged. Evidence in `build/attempts/wt/falcon-breaks/rows/`
+are unchanged. (The suite as re-cut for ¤ is in section 8.7.) Evidence in `build/attempts/wt/falcon-breaks/rows/`
 (`commands.txt` one level up): green on the authored ROM on px13 and on
 the Air (`px13/`, `air/` `suite_battle_breakwor_falcon.log`: `checked 12
 designed rows`, `checked 20 formations, 27 formation-species pairs`, `PASS
@@ -710,7 +710,7 @@ claim is unchanged and grows only by play.
 |---|---|---|---|---|
 | `$089` Harpiai | a winged woman, floating | 1418 | wind | **3 · slash, pierce** |
 | `$0DB` Muus | a small shelled beast; nulls five elements | 900 | — | **2 · slash, bludg** |
-| `$0A7` Deep Eye | a floating eye, in crowds of up to six | 1334 | fire | **2 · pierce** |
+| `$0A7` Deep Eye | a floating eye, in crowds of up to six | 1334 | fire | **2 · pierce, special ¤** |
 | `$0D3` Bogy | a ghost behind Safe, no weakness | 1318 | — | **3 · slash, special ¤** |
 
 - **Harpiai**: a flier (pierce, the WoB convention) and a blade for the
@@ -721,10 +721,11 @@ claim is unchanged and grows only by play.
   not sweep the Muus x3.
 - **Deep Eye**: a point in the eye. Two shields so the AutoCrossbow's one
   chip a body cracks six of them in two sweeps: the crossbow's crowd.
-  Vanilla fire is CELES's and SABIN's.
+  Vanilla fire is CELES's and SABIN's. A magic eye (its Dreamland sleeps
+  whoever meets its gaze), so ¤ too (section 8.7).
 - **Bogy**: no vanilla weakness, so the row is its only key: the blade for
-  the trio (who meet it before Kohlingen) and **¤ for SETZER's cards**,
-  the one body on the arc that gives his class a key. An owner decision.
+  the trio (who meet it before Kohlingen) and **¤ for SETZER's cards**: a
+  ghost. An owner decision.
 - **Teaches:** *the crossbow sweeps the crowd* (Deep Eye x6) and *wind for
   the harpy*.
 
@@ -732,19 +733,19 @@ claim is unchanged and grows only by play.
 
 | id | body | HP | weak | row |
 |---|---|---|---|---|
-| `$005` Orog | a zombie mass | 1584 | fire, holy | **3 · slash, bludg** |
-| `$010` Osteosaur | a skeleton | 1584 | fire, holy | **3 · bludg** |
-| `$06F` PowerDemon | a demon, the tomb's tank | 2058 | fire, holy | **3 · slash, pierce** |
+| `$005` Orog | a zombie mass | 1584 | fire, holy | **3 · slash, bludg, special ¤** |
+| `$010` Osteosaur | a skeleton | 1584 | fire, holy | **3 · bludg, special ¤** |
+| `$06F` PowerDemon | a demon, the tomb's tank | 2058 | fire, holy | **3 · slash, pierce, special ¤** |
 | `$061` Mad Oscar | a man-eating plant | 2900 | fire | **4 · slash** |
 | `$091` Exoray | a spore plant behind Shell | 1200 | fire, holy | **2 · slash, pierce** |
 
 - **Orog**: a body a blade or a blow opens; broken, it neither Zombies nor
-  counters.
+  counters. Cursed flesh: ¤ (8.7).
 - **Osteosaur**: bones are broken, not cut or stuck: SABIN's fists (the
   floor's pierce was the wrong class). EDGAR's key is the vanilla fire
-  someone else holds; the Bio Blaster heals it.
+  someone else holds; the Bio Blaster heals it. Risen bones: ¤ (8.7).
 - **PowerDemon**: the tomb's tank, a blade or a point; it appears in all
-  three basements.
+  three basements. A demon: ¤ (8.7).
 - **Mad Oscar**: the plant is cut; four shields (miniboss-grade, 2,900 HP)
   so the break lands before Sour Mouth's second turn.
 - **Exoray**: trash at two; the AutoCrossbow sweeps the Exoray x3.
@@ -757,12 +758,13 @@ claim is unchanged and grows only by play.
 Party: CELES, SABIN, EDGAR, SETZER. Formation 455.
 
 **Shields:** 10 (8-12 the range considered) · **Weak:** fire (vanilla) +
-piercing, bludgeoning · **Absorbs:** ice.
+piercing, bludgeoning, special ¤ · **Absorbs:** ice.
 
 - **Keys:** an armored knight: the point through the joints, the blow on
-  the plate. CELES holds fire (MADUIN), SABIN bludg and fire, EDGAR pierce
-  (and the AutoCrossbow's one chip a turn), SETZER pierce with Darts or
-  the Man Eater; with Cards or Trump he has no key (`design_keys.txt`:
+  the plate, and ¤ for the headless spirit inside (the third key, 8.7).
+  CELES holds fire (MADUIN), SABIN bludg and fire, EDGAR pierce (and the
+  AutoCrossbow's one chip a turn), SETZER pierce with Darts or the Man
+  Eater and ¤ with Cards, Trump or Dice (before the re-cut, `design_keys.txt`:
   `SETZER (Cards): today Dullahan:n | designed Dullahan:n`).
 - **Telegraph (proposed):** Absolute 0. Vanilla's own fuse is the hit
   counter (nine hits, then the ice combo); the contract's one telegraph
@@ -805,7 +807,74 @@ party meets formation 433, so the rows change no WoB fight.
 298-300 and event groups 85 and 116 with the hands that meet it. Under the
 draft every formation is keyed for the trio and for the four; SETZER alone
 keys only the Bogy with Cards, and the Sand Horse, Harpiai, Deep Eye,
-PowerDemon, Exoray, Dullahan and Whelk Head with Darts.
+PowerDemon, Exoray, Dullahan and Whelk Head with Darts. Since the re-cut
+(8.7) his Cards key the Bogy, the Deep Eye, the Orog, the Osteosaur, the
+PowerDemon and Dullahan.
+
+### 8.7 Special as a common key (re-cut, owner 2026-10-01)
+
+Owner direction: "lean a little harder into making special a common
+weakness, to encourage using characters that support special weapons"
+(guidelines, "Special (¤) is a common key"). Before the re-cut only the
+Bogy took ¤ here. Six of the twelve species now do, chosen by body:
+spirits, magical things and cursed things take ¤ beside their keys; the
+plants, the beasts, the harpy and the chest pair do not. Every row keeps
+its shield count and its existing classes, so nothing the trio relied on
+moved.
+
+| id | body | row before | row now | why ¤ |
+|---|---|---|---|---|
+| `$0D3` Bogy | a ghost | 3 · slash, ¤ | unchanged | a spirit (the row it had) |
+| `$0A7` Deep Eye | a floating eye whose Dreamland sleeps | 2 · pierce | **2 · pierce, ¤** | a magic eye |
+| `$005` Orog | a zombie mass | 3 · slash, bludg | **3 · slash, bludg, ¤** | cursed flesh |
+| `$010` Osteosaur | a skeleton | 3 · bludg | **3 · bludg, ¤** | risen bones |
+| `$06F` PowerDemon | a demon | 3 · slash, pierce | **3 · slash, pierce, ¤** | a demon |
+| `$11C` Dullahan | a headless knight | 10 · pierce, bludg | **10 · pierce, bludg, ¤** | the headless spirit in the armor (its third key) |
+
+Left without ¤: the Harpiai (a harpy, a flier), the Muus (a shelled
+beast), the Mad Oscar and the Exoray (plants), the Presenter (no gauge)
+and the Whelk Head (a shellfish).
+
+**What it changes.** By formation (`design_keys.py`, the re-cut's copy:
+`build/attempts/wt/special-weak/design_keys.py`; `px13/design_keys.recut.txt`
+and `px13/design_keys.main-rom.txt` under the same directory): SETZER with
+Cards held a key on every body of 1 of the arc's 20 formations and on none
+of 19 (`SETZER (Cards): every body 1, some body 0, none 19`, main's ROM);
+now on every body of 7, some of 3, none of 10 (`SETZER (Cards): every body
+7, some body 3, none 10`). In the tomb his cards key every body of the
+Osteosaur, Orog and PowerDemon formations and the PowerDemon of 248, and
+none of the plants' (249, 250, 251), so the plants stay pierce, slash and
+fire. Darts are unchanged (`SETZER (Darts): every body 8, some body 5, none
+7`). The trio and the four are keyed on every formation, as before (`CELES
++ SABIN + EDGAR: every body 10, some body 0, none 0`; `the four: every body
+20, some body 0, none 0`), and the ROM's rows equal the re-cut on every
+hand line (`px13/design_keys.compare.txt`: `hand lines 130, today !=
+designed on 0`).
+
+**A ripple into the Kohlingen leg.** `gen_wor_kohlingen` dresses SETZER
+with the weapon whose class keys the most of its ten arc species, then by
+power (section 11.1). Read statically from the re-cut ROM with the same rule
+(`build/attempts/wt/special-weak/setzer_weapon.py`,
+`px13/setzer_weapon.txt`): `$50 Trump: class special, power 133, price
+13000; keys 6 of 10 ... score 6133` against `$4E Darts: class pierce, power
+115, price 10000; keys 5 of 10 ... score 5115`, and the bag's Cards score
+6104. On main's ROM the Darts led (`$50 Trump ... keys 1 of 10 (Bogy);
+score 1133`). So a regenerated wor-kohlingen chain should dress SETZER
+with the Trump where the purse allows it (a reading of the rule, not a
+run; the cut checkpoint `wor-kohlingen-v1` keeps its Darts until it is
+re-cut).
+
+**The check.** `battle_breakwor_falcon.lua` carries the re-cut rows in
+WANT and checks that SETZER's Cards hold a key on each of the six and on
+Dullahan, with the Bogy and Dullahan checks of 8.6 kept. Evidence in
+`build/attempts/wt/special-weak/px13/` (`commands.txt` one level up):
+green on the re-cut ROM (`suite_battle_breakwor_falcon.log`: `special:
+SETZER (Cards) holds a key on 6 of 12 designed species`, `Dullahan: SETZER
+(Cards) holds a key`, `PASS (frame 31) attempts=1/1`), red on main's ROM
+with the suite copied in (`suite.red.main-rom.log`: `special: SETZER
+(Cards) holds a key on 1 of 12 designed species`, `got 11 ($B), want 0`).
+`shield_rows`, `break_coverage_ratchet`, `break_reach`, `boss_rows` and the
+other break suites pass on the re-cut ROM (`ninja_checks.log`).
 
 ---
 
@@ -994,9 +1063,9 @@ Not yet driven.
   2026-10-01), Dullahan at 10, the Bogy's ¤ and the chest pair included;
   authored (section 8). WoB world group 13's formation 433 is never dealt
   (8.5).
-- **SETZER's class on the arc**: his ¤ weapons key one body here (the
-  Bogy, by its row); Darts (pierce) key seven. Whether ¤-weak bodies
-  should appear where he joins.
+- **SETZER's class on the arc**: decided (owner, 2026-10-01): ¤ is a
+  common key. His ¤ weapons key six of the twelve species since the
+  re-cut (8.7); Darts (pierce) key seven.
 - **#319 before or after this arc**: SETZER joins with Slot alone; EDGAR's
   Drill and Debilitator sit in a shop that refuses this party (vanilla's
   "I can't take money from the King!"). Keep the refusal (vanilla) or let
