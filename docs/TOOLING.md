@@ -174,6 +174,24 @@ What differs from macOS:
   lid-switch locks need interactive polkit auth). A closed lid still
   suspends the machine. live.py's `--peer px13.local` uses the same wrapper.
 
+**Fast cores.** px13 has four fast cores (Zen 5, CPUs 0-3 with SMT twins
+12-15) and eight slow ones (Zen 5c), about 1.4x apart. On a hybrid Linux
+machine (found from sysfs `cpufreq/cpuinfo_max_freq`) run.sh starts Mesen
+through `tools/tests/lib/cores.py`: each fast core holds one emulator,
+pinned to it; the rest are pinned to the slow cores and queue, and a fast
+core that frees up goes to the longest-waiting emulator. Cores pinned to
+other work by hand (`taskset -c`) are left alone. Run logs say where each
+emulator ran in `[cores]` lines, never `[ot6]` ones. `OT6_FAST_CORES=N`
+caps it at N fast cores; `off` turns it off. On px13 it cut qualification's
+longest leg, zozo_arrival, from 934-984 s to 719-830 s but not
+qualification's wall (1539-1719 s either way), which is total work over
+twelve emulators plus the long legs ninja starts last; a leg alone on an
+idle px13 already lands on a fast core
+(build/attempts/wt/fast-cores/px13/analysis.txt). On a Mac it is off unless
+`OT6_FAST_CORES=N` asks for it: there the only lever, a QoS clamp, holds the
+clamped emulators to the efficiency cores at about half speed
+(build/attempts/wt/fast-cores/air/air_qos.txt).
+
 ## Reference docs for the asm work (see research/)
 
 - [battle-code-map.md](research/battle-code-map.md) — verified C2 hook

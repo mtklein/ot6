@@ -325,6 +325,7 @@ CAP="${OT6_TIMEOUT:-600}"
 # that died well short of the cap is not retried either: that is a Lua load
 # error, which is deterministic and will fail identically.
 RETRIES="${OT6_TIMEOUT_RETRIES:-1}"
+CORES_MOVE=0; [ "$(uname -s)" = Linux ] && CORES_MOVE=1
 attempt=0
 retried=0
 while :; do
@@ -340,13 +341,29 @@ while :; do
   # its first seconds (the tiles record at frame 21 at the latest), so a
   # log with no [ot6] line after OT6_LOAD_GRACE seconds is that death:
   # kill it and say so as a FAIL, which is deterministic and never retried.
-  run_mesen "$SHARED_APP$BIN_SUB/Mesen" --testrunner --timeout="$CAP" --enableStdout \
+  #
+  # lib/cores.py puts the emulator on a free fast core (Linux: pinned to it;
+  # macOS, with OT6_FAST_CORES=N: default QoS), or else on the slow ones,
+  # and on Linux the loop below moves it as fast cores free up or are taken
+  # by work pinned by hand.  It logs [cores] lines.
+  run_mesen python3 "$ROOT/tools/tests/lib/cores.py" exec "$MESEN_CACHE/cores" -- \
+    "$SHARED_APP$BIN_SUB/Mesen" --testrunner --timeout="$CAP" --enableStdout \
     "$ROM" "$COMPOSED" > "$RUN_LOG" 2>&1 &
   mesen_pid=$!
   load_grace="${OT6_LOAD_GRACE:-120}"
   load_dead=0
+  ticks=0
+  : > "$WDIR/cores.log"
   while kill -0 "$mesen_pid" 2>/dev/null; do
     sleep 5
+    # Every 5 s while it waits for a fast core, every 30 s while it holds one.
+    ticks=$(( ticks + 1 ))
+    if [ "$CORES_MOVE" = 1 ] && { [ -e "$MESEN_CACHE/cores/queue/$mesen_pid" ] ||
+                                  [ $(( ticks % 6 )) -eq 0 ]; }; then
+      python3 "$ROOT/tools/tests/lib/cores.py" move "$MESEN_CACHE/cores" "$mesen_pid" |
+        while IFS= read -r l; do
+          printf '[cores] %s after %ss\n' "$l" $(( $(date +%s) - t0 )); done >> "$WDIR/cores.log"
+    fi
     if [ "$load_dead" -eq 0 ] && [ $(( $(date +%s) - t0 )) -ge "$load_grace" ] \
        && ! grep -q '^\[ot6' "$RUN_LOG" 2>/dev/null; then
       load_dead=1
@@ -357,6 +374,7 @@ while :; do
   done
   wait "$mesen_pid"
   code=$?
+  cat "$WDIR/cores.log" >> "$RUN_LOG"
   if [ "$load_dead" -eq 1 ]; then
     printf '[ot6] FAIL: the script printed nothing in %ss -- a Lua LOAD error (a nil table key or an undefined name at file scope); the emulator ran the game unscripted and was killed.  Load the composed script with `luac -p` for syntax, then read its file-scope code: this is deterministic and is not retried.\n' \
       "$load_grace" >> "$RUN_LOG"
