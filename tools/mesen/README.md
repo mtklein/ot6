@@ -15,6 +15,10 @@ a window is open: access counters, the code/data log, call-stack tracking,
 the event log, and step and break checks. Our runs use none of it; on px13 it
 is 28% of an emulator's samples.
 
+With both patches and `build.sh`'s flags, px13 (one fast core, quiet) ran
+battle_rage at 407 fps against stock's 290, and the full gen_zozo2_arrival
+leg in 475 s against 693 s, with identical results.
+
 ## mesen-script-only.patch
 
 **Script-only mode.** It is on when the environment has `MESEN_SCRIPT_ONLY=1`
