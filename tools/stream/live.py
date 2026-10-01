@@ -903,6 +903,7 @@ class Board:
                 print(f"live: {time.strftime('%H:%M:%S')} {name} up "
                       f"(down since {time.strftime('%H:%M:%S', time.localtime(st['down_since']))})",
                       file=sys.stderr, flush=True)
+                st["up_since"] = time.time()
             st.update(ok_ts=time.time(), down_since=None, err=None)
 
     def _drop_png(self, name, wid):
@@ -953,6 +954,7 @@ class Board:
                 trees.setdefault((w["branch"], w["tree"]), []).append(w["test"])
             machines.append({
                 "name": n, "local": n == HOST, "up": snap is not None,
+                "up_since": None if n == HOST else st.get("up_since"),
                 "down_since": st["down_since"], "err": st["err"],
                 "load": (snap or {}).get("load"), "ncpu": (snap or {}).get("ncpu"),
                 "fps": (snap or {}).get("fps"),
