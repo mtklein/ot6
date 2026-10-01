@@ -1,37 +1,32 @@
 # Mesen 2.1.1, script-only build
 
-`mesen-script-only.patch` applies to the official Mesen 2.1.1 source
-(github.com/SourMesen/Mesen2, tag `2.1.1`, commit `137ae7ce`). `build.sh`
-clones that tag, applies the patch and builds it with the flags of upstream's
-own release workflow for the official Linux binary. Mesen's source isn't
-vendored here.
+Two patches for the official Mesen 2.1.1 source (github.com/SourMesen/Mesen2,
+tag `2.1.1`, commit `137ae7ce`), and `build.sh`, which clones that tag,
+applies them and builds with the flags of upstream's own release workflow for
+the official Linux binary, plus `-fno-semantic-interposition`. Mesen's source
+isn't vendored here. Evidence: `build/attempts/wt/mesen-lean/`.
 
 ## Why
 
 The harness's Lua needs Mesen's debugger: Mesen only runs scripts through it.
 In stock Mesen the debugger also does per-access bookkeeping for its own
 windows on every CPU and audio-processor (SPC) memory access, whether or not
-a window is open:
-- access counters
-- the code/data log
-- call-stack tracking
-- the event log
-- step and break checks
+a window is open: access counters, the code/data log, call-stack tracking,
+the event log, and step and break checks. Our runs use none of it; on px13 it
+is 28% of an emulator's samples.
 
-Our runs use none of it. On px13 it is 28% of an emulator's cycles. Script-only
-mode cuts instructions per frame by 20-25% on our legs, with the same results
-(`build/attempts/wt/mesen-lean/`).
-
-## What the patch does
+## mesen-script-only.patch
 
 **Script-only mode.** It is on when the environment has `MESEN_SCRIPT_ONLY=1`
-and no debugger window is open; opening a debugger window turns it off. In
-this mode the SNES CPU and SPC debuggers record only the last memory
-operation per access, which the Lua callbacks read. They still stop for a
-break request between instructions, which is how savestates and other
-threads reach the emulator. Any step request, breakpoint or trace logger
-drops a CPU back to the full path. Per-PPU-cycle debugger work is skipped
-unless a PPU step is pending.
+and no debugger window is open; opening one turns it off.
+- For the SNES CPU (and SA-1) and the SPC, while that CPU has no step request,
+  pending break, breakpoint or trace log, the Debugger doesn't call into the
+  CPU's debugger on a memory access at all. It only records the access and
+  runs the Lua callbacks, when that CPU has any.
+- Each instruction still goes through the CPU's debugger when a break request
+  is pending (how savestates and other threads stop the emulator) or the CPU
+  has Lua callbacks; there it records the instruction and nothing else.
+- Per-PPU-cycle debugger work is skipped unless a PPU step is pending.
 
 **Two changes that are always on.** Neither changes which callbacks run:
 - A per-callback-type bitmap of 256-byte pages lets most accesses skip the
@@ -52,25 +47,36 @@ unless a PPU step is pending.
 Without `MESEN_SCRIPT_ONLY` the patched binary behaves like stock, apart from
 the two always-on changes.
 
+## mesen-screenshot-sync.patch
+
+The emulation thread hands each finished frame to a decode thread, which
+converts it into the buffer `emu.takeScreenshot()` copies. A script's
+`startFrame` callback runs right after the hand-off, so a screenshot taken
+there sometimes copied the previous frame. The patch makes the screenshot
+wait for the pending decode, so it is always the frame the emulation thread
+just finished. It applies on its own to a stock build too.
+
 ## Building (Linux x64)
 
 ```
 sudo apt install git make clang lld zip libsdl2-dev zlib1g-dev dotnet-sdk-10.0 dotnet-sdk-aot-10.0
-tools/mesen/build.sh ~/work/mesen-build            # patched
-tools/mesen/build.sh ~/work/mesen-build --stock    # stock, for comparison
+tools/mesen/build.sh ~/work/mesen-build            # both patches, -fno-semantic-interposition
+tools/mesen/build.sh ~/work/mesen-build --stock    # stock, as upstream builds it
+PATCHES=mesen-screenshot-sync.patch EXTRA_CFLAGS= tools/mesen/build.sh ~/work/x   # a subset
 ```
 
 The output is one self-contained binary,
 `<workdir>/Mesen2/bin/linux-x64/Release/linux-x64/publish/Mesen`, shaped
 like the official zip's.
 - Each build is clean: the makefile tracks no header dependencies.
+- `-fno-semantic-interposition`: MesenCore.so is built `-fPIC` with default
+  visibility, so otherwise every call between its source files goes through
+  the PLT and can't be inlined. It changed no results and saved 14-19% of
+  cycles per frame. `-fvisibility=hidden` saved less and wasn't kept.
 - On Ubuntu 26.04 the compiler is clang 21; the official build used clang 14
-  on Ubuntu 22.04.
-- The .NET 10 SDK builds the net8.0 UI with NativeAOT 8.0.31; the official
-  build used 8.0.15.
-- Built this way, stock 2.1.1 played the same as the official binary: the
-  same `[ot6]` lines, RAM hashes and screenshots
-  (`build/attempts/wt/mesen-lean/`).
+  on Ubuntu 22.04. The .NET 10 SDK builds the net8.0 UI with NativeAOT
+  8.0.31; the official build used 8.0.15. Built this way, stock 2.1.1 played
+  the same as the official binary.
 
 Nothing here installs the binary. To try it with the harness:
 - Point a tree's `tools/Mesen-linux` at a directory holding it.
@@ -83,10 +89,10 @@ Nothing here installs the binary. To try it with the harness:
 Upstream's workflow builds the Mac app on macos-14 with `USE_AOT=true make`.
 The makefile turns LTO and static linking off on Darwin. The steps would be:
 - Install SDL2 (already in the Brewfile), Xcode's clang and a .NET 8 SDK.
-- Apply the patch and run `USE_AOT=true make`.
+- Apply the patches and run `USE_AOT=true make CXX="clang++ -fno-semantic-interposition"`.
 - Sign the app ad hoc: `codesign --force --deep -s - Mesen.app`.
 
 The output is `bin/osx-arm64/Release/osx-arm64/publish/Mesen.app`.
 `build.sh` is Linux-only as written: it uses the Linux make flags,
-`sha256sum` and the Linux output path. The patch is plain C++ and isn't
+`sha256sum` and the Linux output path. The patches are plain C++ and aren't
 platform-specific.

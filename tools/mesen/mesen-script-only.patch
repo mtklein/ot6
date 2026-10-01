@@ -1,16 +1,54 @@
 diff --git a/Core/Debugger/Debugger.cpp b/Core/Debugger/Debugger.cpp
-index 786fe876..2c4ff820 100644
+index 786fe876..011d2a84 100644
 --- a/Core/Debugger/Debugger.cpp
 +++ b/Core/Debugger/Debugger.cpp
-@@ -106,6 +106,7 @@ Debugger::Debugger(Emulator* emu, IConsole* console)
+@@ -104,8 +104,11 @@ Debugger::Debugger(Emulator* emu, IConsole* console)
+ 		}
+ 
  		_debuggers[(int)type].Evaluator.reset(new ExpressionEvaluator(this, _debuggers[(int)type].Debugger.get(), type));
++		_debuggers[(int)type].Breakpoints = debugger->GetBreakpointManager();
++		_debuggers[(int)type].TraceLogger = debugger->GetTraceLogger();
  	}
  
 +	UpdateScriptOnly();
  	for(CpuType type : _cpuTypes) {
  		_debuggers[(int)type].Debugger->Init();
  		_debuggers[(int)type].Debugger->ProcessConfigChange();
-@@ -240,7 +241,7 @@ void Debugger::ProcessInstruction()
+@@ -208,6 +211,21 @@ bool Debugger::ProcessStepBack(IDebugger* debugger)
+ 	}
+ }
+ 
++template<CpuType type>
++bool Debugger::CanSkipCpuDebugger()
++{
++	//Script-only mode, for the CPUs whose debuggers it covers, while no step, break, breakpoint or
++	//trace log is pending on this CPU: the per-CPU debugger has nothing to do for a memory access
++	if constexpr(type == CpuType::Snes || type == CpuType::Sa1 || type == CpuType::Spc) {
++		CpuInfo& cpu = _debuggers[(int)type];
++		StepRequest* step = cpu.Debugger->GetStepRequest();
++		return _scriptOnly && !step->HasRequest && step->BreakNeeded == BreakType::None &&
++			!cpu.Breakpoints->HasBreakpoints() && !cpu.TraceLogger->IsEnabled();
++	} else {
++		return false;
++	}
++}
++
+ template<CpuType type>
+ void Debugger::ProcessInstruction()
+ {
+@@ -219,6 +237,11 @@ void Debugger::ProcessInstruction()
+ 		return;
+ 	}
+ 
++	if(CanSkipCpuDebugger<type>() && !HasPendingBreak() && !_scriptManager->HasCpuMemoryCallbacks(type)) {
++		//Nothing to record and no break to service
++		return;
++	}
++
+ 	debugger->IgnoreBreakpoints = false;
+ 	debugger->AllowChangeProgramCounter = true;
+ 
+@@ -240,7 +263,7 @@ void Debugger::ProcessInstruction()
  
  	debugger->AllowChangeProgramCounter = false;
  	
@@ -19,7 +57,23 @@ index 786fe876..2c4ff820 100644
  		MemoryOperationInfo memOp = debugger->InstructionProgress.LastMemOperation;
  		AddressInfo relAddr = { (int32_t)memOp.Address, memOp.MemType };
  		uint8_t value = (uint8_t)memOp.Value;
-@@ -276,7 +277,7 @@ void Debugger::ProcessMemoryRead(uint32_t addr, T& value, MemoryOperationType op
+@@ -256,6 +279,15 @@ void Debugger::ProcessMemoryRead(uint32_t addr, T& value, MemoryOperationType op
+ 		return;
+ 	}
+ 
++	if(CanSkipCpuDebugger<type>()) {
++		//Only the Lua callbacks need this access: skip the per-CPU debugger
++		if(_scriptManager->HasCpuMemoryCallbacks(type)) {
++			_debuggers[(int)type].Debugger->InstructionProgress.LastMemOperation = MemoryOperationInfo(addr, value, opType, DebugUtilities::GetCpuMemoryType(type));
++			ProcessScripts<type>(addr, value, opType);
++		}
++		return;
++	}
++
+ 	switch(type) {
+ 		case CpuType::Snes: GetDebugger<CpuType::Snes, SnesDebugger>()->ProcessRead(addr, value, opType); break;
+ 		case CpuType::Spc: GetDebugger<CpuType::Spc, SpcDebugger>()->ProcessRead<flags>(addr, value, opType); break;
+@@ -276,7 +308,7 @@ void Debugger::ProcessMemoryRead(uint32_t addr, T& value, MemoryOperationType op
  			break;
  	}
  
@@ -28,7 +82,23 @@ index 786fe876..2c4ff820 100644
  		ProcessScripts<type>(addr, value, opType);
  	}
  }
-@@ -309,7 +310,7 @@ bool Debugger::ProcessMemoryWrite(uint32_t addr, T& value, MemoryOperationType o
+@@ -289,6 +321,15 @@ bool Debugger::ProcessMemoryWrite(uint32_t addr, T& value, MemoryOperationType o
+ 		return !_debuggers[(int)type].Debugger->GetFrozenAddressManager().IsFrozenAddress(addr);
+ 	}
+ 
++	if(CanSkipCpuDebugger<type>()) {
++		//Only the Lua callbacks (and frozen addresses) need this access: skip the per-CPU debugger
++		if(_scriptManager->HasCpuMemoryCallbacks(type)) {
++			_debuggers[(int)type].Debugger->InstructionProgress.LastMemOperation = MemoryOperationInfo(addr, value, opType, DebugUtilities::GetCpuMemoryType(type));
++			ProcessScripts<type>(addr, value, opType);
++		}
++		return !_debuggers[(int)type].Debugger->GetFrozenAddressManager().IsFrozenAddress(addr);
++	}
++
+ 	switch(type) {
+ 		case CpuType::Snes: GetDebugger<CpuType::Snes, SnesDebugger>()->ProcessWrite(addr, value, opType); break;
+ 		case CpuType::Spc: GetDebugger<CpuType::Spc, SpcDebugger>()->ProcessWrite<flags>(addr, value, opType); break;
+@@ -309,7 +350,7 @@ bool Debugger::ProcessMemoryWrite(uint32_t addr, T& value, MemoryOperationType o
  			break;
  	}
  	
@@ -37,7 +107,7 @@ index 786fe876..2c4ff820 100644
  		ProcessScripts<type>(addr, value, opType);
  	}
  	
-@@ -342,7 +343,7 @@ void Debugger::ProcessMemoryAccess(uint32_t addr, T& value)
+@@ -342,7 +383,7 @@ void Debugger::ProcessMemoryAccess(uint32_t addr, T& value)
  		case CpuType::Ws: GetDebugger<CpuType::Ws, WsDebugger>()->ProcessMemoryAccess<opType, T>(addr, value, memType); break;
  	}
  
@@ -46,7 +116,47 @@ index 786fe876..2c4ff820 100644
  		ProcessScripts<cpuType>(addr, value, memType, opType);
  	}
  
-@@ -451,6 +452,11 @@ void Debugger::ProcessPpuCycle()
+@@ -358,6 +399,9 @@ void Debugger::ProcessIdleCycle()
+ 	}
+ 
+ 	_debuggers[(int)type].Debugger->InstructionProgress.LastMemOperation.Type = MemoryOperationType::Idle;
++	if(CanSkipCpuDebugger<type>()) {
++		return;
++	}
+ 
+ 	switch(type) {
+ 		case CpuType::Snes: GetDebugger<type, SnesDebugger>()->ProcessIdleCycle(); break;
+@@ -409,6 +453,14 @@ void Debugger::ProcessPpuRead(uint16_t addr, T& value, MemoryType memoryType, Me
+ 		return;
+ 	}
+ 
++	if(CanSkipCpuDebugger<type>()) {
++		//Only the Lua callbacks need this access: skip the per-CPU debugger
++		if(_scriptManager->HasPpuMemoryCallbacks()) {
++			ProcessScripts<type>(addr, value, memoryType, opType);
++		}
++		return;
++	}
++
+ 	switch(type) {
+ 		case CpuType::Snes: GetDebugger<type, SnesDebugger>()->ProcessPpuRead(addr, value, memoryType); break;
+ 		case CpuType::Gameboy: GetDebugger<type, GbDebugger>()->ProcessPpuRead(addr, value, memoryType); break;
+@@ -430,6 +482,14 @@ void Debugger::ProcessPpuWrite(uint16_t addr, T& value, MemoryType memoryType)
+ 		return;
+ 	}
+ 
++	if(CanSkipCpuDebugger<type>()) {
++		//Only the Lua callbacks need this access: skip the per-CPU debugger
++		if(_scriptManager->HasPpuMemoryCallbacks()) {
++			ProcessScripts<type>(addr, value, memoryType, MemoryOperationType::Write);
++		}
++		return;
++	}
++
+ 	switch(type) {
+ 		case CpuType::Snes: GetDebugger<type, SnesDebugger>()->ProcessPpuWrite(addr, value, memoryType); break;
+ 		case CpuType::Gameboy: GetDebugger<type, GbDebugger>()->ProcessPpuWrite(addr, value, memoryType); break;
+@@ -451,6 +511,11 @@ void Debugger::ProcessPpuCycle()
  		return;
  	}
  
@@ -58,7 +168,7 @@ index 786fe876..2c4ff820 100644
  	switch(type) {
  		case CpuType::Snes: GetDebugger<type, SnesDebugger>()->ProcessPpuCycle(); break;
  		case CpuType::Gameboy: GetDebugger<type, GbDebugger>()->ProcessPpuCycle(); break;
-@@ -636,8 +642,18 @@ void Debugger::ProcessScripts(uint32_t addr, T& value, MemoryType memType, Memor
+@@ -636,8 +701,18 @@ void Debugger::ProcessScripts(uint32_t addr, T& value, MemoryType memType, Memor
  	_scriptManager->ProcessMemoryOperation(relAddr, value, opType, type, false);
  }
  
@@ -78,10 +188,19 @@ index 786fe876..2c4ff820 100644
  		if(_debuggers[i].Debugger) {
  			_debuggers[i].Debugger->ProcessConfigChange();
 diff --git a/Core/Debugger/Debugger.h b/Core/Debugger/Debugger.h
-index 3f78502f..86c172ef 100644
+index 3f78502f..0ab43b54 100644
 --- a/Core/Debugger/Debugger.h
 +++ b/Core/Debugger/Debugger.h
-@@ -85,7 +85,14 @@ private:
+@@ -48,6 +48,8 @@ struct CpuInfo
+ {
+ 	unique_ptr<IDebugger> Debugger;
+ 	unique_ptr<ExpressionEvaluator> Evaluator;
++	BreakpointManager* Breakpoints = nullptr; //cached for the script-only check
++	ITraceLogger* TraceLogger = nullptr;
+ };
+ 
+ class Debugger
+@@ -85,7 +87,15 @@ private:
  	DebugControllerState _inputOverrides[8] = {};
  
  	bool _waitForBreakResume = false;
@@ -93,11 +212,12 @@ index 3f78502f..86c172ef 100644
 +	//and keep only what Lua callbacks and break requests need.
 +	bool _scriptOnly = false;
 +	void UpdateScriptOnly();
++	template<CpuType type> __forceinline bool CanSkipCpuDebugger();
 +
  	void Reset();
  
  	__noinline bool ProcessStepBack(IDebugger* debugger);
-@@ -127,6 +134,9 @@ public:
+@@ -127,6 +137,9 @@ public:
  
  	void ProcessConfigChange();
  
@@ -242,7 +362,7 @@ index 9277d478..2c257a09 100644
  	bool CheckInitDone();
  	bool IsSaveStateAllowed();
 diff --git a/Core/SNES/Debugger/SnesDebugger.cpp b/Core/SNES/Debugger/SnesDebugger.cpp
-index c1017d23..90631803 100644
+index c1017d23..0d4b1845 100644
 --- a/Core/SNES/Debugger/SnesDebugger.cpp
 +++ b/Core/SNES/Debugger/SnesDebugger.cpp
 @@ -142,16 +142,36 @@ void SnesDebugger::ResetPrevOpCode()
@@ -283,37 +403,7 @@ index c1017d23..90631803 100644
  	if(addressInfo.Address >= 0) {
  		uint8_t cpuFlags = state.PS & (ProcFlags::IndexMode8 | ProcFlags::MemoryMode8);
  		if(addressInfo.Type == MemoryType::SnesPrgRom) {
-@@ -203,9 +223,13 @@ void SnesDebugger::ProcessInstruction()
- 
- void SnesDebugger::ProcessRead(uint32_t addr, uint8_t value, MemoryOperationType type)
- {
--	AddressInfo addressInfo = GetAbsoluteAddress(addr);
- 	MemoryOperationInfo operation(addr, value, type, _cpuMemType);
- 	InstructionProgress.LastMemOperation = operation;
-+	if(IsScriptOnly()) {
-+		return;
-+	}
-+
-+	AddressInfo addressInfo = GetAbsoluteAddress(addr);
- 	SnesCpuState& state = GetCpuState();
- 
- 	if(IsRegister(addr)) {
-@@ -262,9 +286,13 @@ void SnesDebugger::ProcessRead(uint32_t addr, uint8_t value, MemoryOperationType
- 
- void SnesDebugger::ProcessWrite(uint32_t addr, uint8_t value, MemoryOperationType type)
- {
--	AddressInfo addressInfo = GetAbsoluteAddress(addr);
- 	MemoryOperationInfo operation(addr, value, type, _cpuMemType);
- 	InstructionProgress.LastMemOperation = operation;
-+	if(IsScriptOnly()) {
-+		return;
-+	}
-+
-+	AddressInfo addressInfo = GetAbsoluteAddress(addr);
- 	if(addressInfo.Address >= 0 && (addressInfo.Type == MemoryType::SnesWorkRam || addressInfo.Type == MemoryType::SnesSaveRam)) {
- 		_disassembler->InvalidateCache(addressInfo, _cpuType);
- 	}
-@@ -371,6 +399,12 @@ void SnesDebugger::ProcessCallStackUpdates(AddressInfo& destAddr, uint32_t destP
+@@ -371,6 +391,12 @@ void SnesDebugger::ProcessCallStackUpdates(AddressInfo& destAddr, uint32_t destP
  
  void SnesDebugger::ProcessInterrupt(uint32_t originalPc, uint32_t currentPc, bool forNmi)
  {
@@ -326,26 +416,6 @@ index c1017d23..90631803 100644
  	AddressInfo ret = _memoryMappings->GetAbsoluteAddress(originalPc);
  	AddressInfo dest = _memoryMappings->GetAbsoluteAddress(currentPc);
  
-@@ -396,6 +430,9 @@ void SnesDebugger::ProcessInterrupt(uint32_t originalPc, uint32_t currentPc, boo
- 
- void SnesDebugger::ProcessPpuRead(uint16_t addr, uint8_t value, MemoryType memoryType)
- {
-+	if(IsScriptOnly()) {
-+		return;
-+	}
- 	MemoryOperationInfo operation(addr, value, MemoryOperationType::Read, memoryType);
- 	AddressInfo addressInfo { addr, memoryType };
- 	_debugger->ProcessBreakConditions(CpuType::Snes, *_step.get(), _breakpointManager.get(), operation, addressInfo);
-@@ -404,6 +441,9 @@ void SnesDebugger::ProcessPpuRead(uint16_t addr, uint8_t value, MemoryType memor
- 
- void SnesDebugger::ProcessPpuWrite(uint16_t addr, uint8_t value, MemoryType memoryType)
- {
-+	if(IsScriptOnly()) {
-+		return;
-+	}
- 	MemoryOperationInfo operation(addr, value, MemoryOperationType::Write, memoryType);
- 	AddressInfo addressInfo { addr, memoryType };
- 	_debugger->ProcessBreakConditions(CpuType::Snes, *_step.get(), _breakpointManager.get(), operation, addressInfo);
 diff --git a/Core/SNES/Debugger/SnesDebugger.h b/Core/SNES/Debugger/SnesDebugger.h
 index 69a0dedf..40d41774 100644
 --- a/Core/SNES/Debugger/SnesDebugger.h
@@ -359,7 +429,7 @@ index 69a0dedf..40d41774 100644
  public:
  	SnesDebugger(Debugger* debugger, CpuType cpuType);
 diff --git a/Core/SNES/Debugger/SpcDebugger.cpp b/Core/SNES/Debugger/SpcDebugger.cpp
-index c06f50cf..190774a5 100644
+index c06f50cf..04e300e7 100644
 --- a/Core/SNES/Debugger/SpcDebugger.cpp
 +++ b/Core/SNES/Debugger/SpcDebugger.cpp
 @@ -50,16 +50,32 @@ void SpcDebugger::ProcessConfigChange()
@@ -396,26 +466,6 @@ index c06f50cf..190774a5 100644
  	_disassembler->BuildCache(addressInfo, 0, CpuType::Spc);
  
  	if(SpcDisUtils::IsJumpToSub(_prevOpCode)) {
-@@ -114,6 +130,9 @@ void SpcDebugger::ProcessRead(uint32_t addr, uint8_t value, MemoryOperationType
- {
- 	MemoryOperationInfo operation(addr, value, type, MemoryType::SpcMemory);
- 	InstructionProgress.LastMemOperation = operation;
-+	if(IsScriptOnly()) {
-+		return;
-+	}
- 
- 	if constexpr(flags == MemoryAccessFlags::None) {
- 		//SPC read
-@@ -156,6 +175,9 @@ void SpcDebugger::ProcessWrite(uint32_t addr, uint8_t value, MemoryOperationType
- 	AddressInfo addressInfo { (int32_t)addr, MemoryType::SpcRam }; //Writes never affect the IPL ROM
- 	MemoryOperationInfo operation(addr, value, type, MemoryType::SpcMemory);
- 	InstructionProgress.LastMemOperation = operation;
-+	if(IsScriptOnly()) {
-+		return;
-+	}
- 
- 	//Always invalidate cache, even if DSP writes are ignored
- 	_disassembler->InvalidateCache(addressInfo, CpuType::Spc);
 diff --git a/Core/SNES/Debugger/SpcDebugger.h b/Core/SNES/Debugger/SpcDebugger.h
 index aae17177..2d4d136d 100644
 --- a/Core/SNES/Debugger/SpcDebugger.h
