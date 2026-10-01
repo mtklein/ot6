@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-kohlingen.sram",
+  "size": 32768,
+  "sha256": "51460c39e468ede4877896acd457582243ef7c4b70e9eac8f0794f2bd5b984e6",
+  "slot": 3,
+  "milestone": "wor-kohlingen",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "map": 1,
+      "x": 40,
+      "y": 45
+    }
+  },
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "51460c39e468ede4877896acd457582243ef7c4b70e9eac8f0794f2bd5b984e6",
+    "generator_sig": "0a29b36b804f4f037edb62f79a04fd6b005667def57d595dfc934e44391f73a5 gen_wor_kohlingen tools/tests/checkpoints/wor-edgar-v1/manifest.json tools/tests/checkpoints/wor-edgar-v1/wor-edgar.sram",
+    "ancestors": [
+      {
+        "path": "tools/tests/checkpoints/wor-edgar-v1/manifest.json",
+        "sha256": "1be8fa6f7b9c7504b43cd22d90b9c5b59ac063bd602282c02739f178e5929cb6"
+      }
+    ]
+  }
+}
