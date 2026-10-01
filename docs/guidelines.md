@@ -76,6 +76,10 @@ power, write like a human (owner, 2026-09-30).
   that land on a boosted Fight, so it usually belongs on the main
   boost-Fighter. Readiness-audit flags (an empty relic slot with a spare in
   the bag, a better weapon on offer) are worth acting on.
+- **Ribbons are worth going out of your way for** (owner, 2026-10-01), and
+  so is gear like them: a detour for a Ribbon is what a player does, and
+  it goes on the moment it's in the bag. Route and kit choices follow what
+  a player would do; the cost in chain length or re-cuts is ours to absorb.
 - **Use the commands the game offers.** A menu the driver doesn't know is a
   verb left on the table (Throw, Rage, Slot, Dance, Sketch, Morph...):
   implement it, measuring the menu on a fixture first.

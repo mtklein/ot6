@@ -189,10 +189,15 @@ AutoCrossbow both horses at once. Leg 1 plays the desert on the way to
 South Figaro and back, and a lab measures formation 222's first-attempt rate
 over distinct battle keys with the trio (section 9). The arc meets the
 desert again at Kohlingen (5 steps) and on every later castle ride.
+**Measured** (section 10.3): 124 of 124 over 60 distinct keys with the trio;
+the deaths it still costs from a hurt start are the driver's heal-lock.
 
 **#322 fits here too**: the Hero Ring and the passage on leg 1, the Regal
 Crown on leg 2's walk to the engineer. If the owner prefers the side items
 out of the story chain, leg 1 is the one to drop: legs 2-11 do not need it.
+**Played** as a side branch off `wor-edgar-v1` (section 10): every chest
+above but the Regal Crown (leg 2's), plus South Figaro's (2,43) Elixir; the
+rich man's house is a warp maze from its door, not one region.
 
 ### 2.3 The castle's ride (leg 2)
 
@@ -646,7 +651,7 @@ in parallel (docs/TOOLING.md "Cuts and the chain from power-on").
 | checkpoint | where | why |
 |---|---|---|
 | `wor-edgar-v1` (exists) | world (81,86), the Figaro desert | the start |
-| **`wor-figaro-sweep-v1`** (optional) | world (81,86) again, after leg 1 | the side items and the desert (#321, #322) cut off the story chain, so the Kohlingen legs need not replay a long optional leg; drop it if leg 1 is dropped |
+| **`wor-figaro-sweep-v1`** (sealed, a side branch; section 10) | world (81,86) again, after leg 1 | the side items and the desert (#321, #322) cut off the story chain, so the Kohlingen legs need not replay a long optional leg; drop it if leg 1 is dropped |
 | **`wor-kohlingen-v1`** | world (40,45), east of Kohlingen's door (sealed; section 11) | the first save with SETZER, dressed, after Kohlingen's shops; the boot for the tomb |
 | **`wor-tomb-v1`** | Darill's Tomb B3, the save point (122,14) | the last save before the monster chest and Dullahan: the retry point for both, and the World of Ruin's first save-point checkpoint |
 | **`wor-falcon-v1`** | world (25,160), landed beside the Falcon | the end of the arc; the hub the World of Ruin arcs boot from |
@@ -894,7 +899,7 @@ other break suites pass on the re-cut ROM (`ninja_checks.log`).
 | **flying and landing the Falcon** | the end | "PARTIAL — contract assertions only" | a land verb (A over land) and a contract; a suite for the new mechanic |
 | a scripted cutscene with walking in the middle | 301 (the flashback) | none needed beyond talks and a step-on trigger | talk, step, talk |
 | a party member joining undressed | SETZER | `M.equipKit` and the world menu helpers (#255) | dress him from the bag and Kohlingen's shops |
-| the desert's Sand Horse pair | group 44, both castle tiles | the driver heal-locks (#312); lost 2 of 8 with two members | a lab: formation 222 with the trio |
+| the desert's Sand Horse pair | group 44, both castle tiles | the driver heal-locks (#312); lost 2 of 8 with two members; **won 124 of 124 over 60 keys with the trio** (section 10.3) | the heal policy's fix (#312), measured there as a lever |
 | map-init `mod_bg_tiles` and turtles | the tomb, 297's stairs, 66, 89 | the lib reads live RAM | offline counts are verify-on-arrival |
 | the draw | everywhere | save data (`$1FA1-$1FA5`) | vary it by using up encounters (varlab), not by seeds |
 
@@ -906,7 +911,176 @@ Out of scope, noted: the World of Ruin Colosseum is on foot from Kohlingen
 
 ## 10. The South Figaro continent, played (leg 1, `gen_wor_figaro_sweep`, `wor-figaro-sweep-v1`)
 
-Not yet driven.
+Driven 2026-10-01 for #321 and #322, as a side branch off the chain: the
+segment Continues `wor-edgar-v1`, walks the desert and the plain to South
+Figaro, takes the basement passage's chests by both of its ways in, takes
+the Hero Ring through the Figaro cave's other door, walks back through the
+desert and saves on the castle's tile again through `H.saveAtCheckpoint`:
+the `wor-figaro-sweep-v1` checkpoint. Nothing boots it (`wor_kohlingen`
+boots `wor-edgar-v1`), so the leg sits beside the chain, not on its
+critical path; the relics go to the bag, the kit is unchanged, and the
+Regal Crown is left for the Kohlingen leg. Every number below is quoted
+from a log under `build/attempts/wt/wor-figaro-sweep/` (`capture/` the
+sealing run, the graph edge, the Continue and its negative; `var1/` the
+variation set; `pace1*`, `lab222_*` the formation-222 lab; `dev/` the
+first runs; `lab/` the scripts), all on ROM `86018dd9ac20` (main
+`b2e68aa0`), run on px13. Nothing was measured by writing game state.
+
+### 10.1 The run (`capture/capture_wor-figaro-sweep-v1.log`)
+
+| step | what the log says |
+|---|---|
+| boot | `contract wor-edgar-v1 (entry): all 26 fields hold`; `[care at the boot] nothing to do: c4 948/1600 hp 270/294 mp  c5 1384/1609 hp 75/291 mp  c6 1300/1595 hp 303/303 mp` |
+| the walk to town | one battle, `battle $0DC WON after 2231 ticks` (key `beE4-g00DC`); the desert did not come up |
+| South Figaro | `chest bit 230 (Elixir): OPENED` at (2,43) (the bit the World of Balance's Soft there shares; never opened before) |
+| Duncan's way | `South Figaro -> Duncan's house 74(48,37)->86(52,29): DONE`, `Duncan's stairs 86(48,32)->87(56,49): DONE`; the passage (map 87, the World of Balance's pool 65): `chest bit 32 (Iron Armor): OPENED`, `chest bit 33 (Earrings): OPENED`, four battles; `the passage -> its cellar 87(33,51)->89(96,42): DONE`; `chest bit 253 (X-Potion): OPENED`, `chest bit 254 (Ribbon): OPENED`, `chest bit 255 (Ether): OPENED`; back the same way |
+| the rich man's way | `74(15,18)->81(4,16)`, the warps `81(3,5)->81(5,54)` and `81(13,51)->81(39,17)`, `the rich man's stairs 81(27,10)->83(7,5)`, `83(8,12)->83(18,5)`, `the rich man's cellar 83(32,18)->89(106,54): DONE`; `chest bit 252 (Hyper Wrist): OPENED`, `chest bit 256 (RunningShoes): OPENED`; back by `83(17,4)->83(7,11)`, `83(8,4)->81(28,9)`, `81(39,18)->81(13,53)`, `81(6,55)->81(4,6)`, `81(4,17)->74(15,20)` |
+| the cave's other door | the links (14,33) and (61,57), `the cave: the other door (4,4) -> 90 (41,13): on map 90 at (41,13)`, `chest bit 19 (Hero Ring): OPENED`, `map 90 -> the cave (68 (4,5))`, back by the links (17,20) and (55,57); two battles (`$0E8`, `$0E9`) |
+| the walk back | `battle $0DC WON after 2738 ticks` |
+| the save | `[saved] wor-figaro-sweep-v1: slot 3 holds map 1 ($2001) world tile (81,86)`; `contract wor-figaro-sweep-v1 (exit): all 29 fields hold`; `[wor] the battles: 10 ($0DC x2, $07D x1, $176 x2, $175 x2, $086 x1, $0E8 x1, $0E9 x1): 10 won, 0 the party left, 2 monster escape(s)`; `PASS (frame 40859) attempts=1/3` |
+
+Sealed and validated (`capture/validate_wor-figaro-sweep-v1.txt`): `valid
+ot6.sram-checkpoint/v1: 32768 bytes sha256=0f0537cf3a8f... holds=slot 3
+world 1 (81,86) [$1F64=$2001] (saved: declared and checked)`. The graph's
+own edge (`nice -n 10 ninja build/states/wor_figaro_sweep.mss`,
+`capture/ninja_wor_figaro_sweep.log`) plays the same run: `PASS (frame
+40859) attempts=1/3`. The cold Continue (`lab/probe_sweep_continue.lua`,
+`capture/continue_figaro_sweep.log`): `contract wor-figaro-sweep-v1
+(entry): all 29 fields hold`; `[continue] chests: Hero Ring OPEN, Iron
+Armor OPEN, Earrings OPEN, Hyper Wrist OPEN, X-Potion OPEN, Ribbon OPEN,
+Ether OPEN, RunningShoes OPEN, Elixir OPEN, Regal Crown closed; bag: Ribbon
+1, Hero Ring 1, Hyper Wrist 1, RunningShoes 1`. The same probe on
+`wor-edgar-v1` is the contract's negative: `contract wor-figaro-sweep-v1
+(entry) VIOLATED -- 4 field(s) differ` (the four chest bits the contract
+pins; `capture/negative_contract_on_wor-edgar-v1.log`).
+
+What the plan did not know:
+
+- **The rich man's house is a warp maze from both doors.** Straight from
+  the door the stairs do not reach: `FAIL: navTo: no path (4,16)->(27,11)`
+  (`dev/dev1.log`); the World of Balance's way through it (gen_celes) does.
+  The offline region graph had walked through same-map warps as links.
+- **South Figaro's (2,43) chest opens in the World of Ruin** (an Elixir on
+  the bit the World of Balance's unreachable Soft shares).
+- The Hero Ring's door (4,4) is in the cave's third piece, with the
+  turtle's door (10,2), as planned.
+
+### 10.2 Under real draw variation (`var1/`)
+
+`lab/varlab.py` (gen_wor_kohlingen's, re-anchored) fights K encounters on
+the continent's grass, forest and plain before the body (the desert's
+fights count among them), walks back to (81,86), and plays the body;
+retries off. `var1/summary.txt`; the per-key list is regenerated by `lab/keys.py` (build/attempts/wt/wor-figaro-sweep-review/var1_keys_rerun.txt):
+
+| variant | verdict |
+|---|---|
+| K=0, shifts 0 / 23 / 41 | `PASS (frame 40859)` / `(42450)` / `(41839)` |
+| K=1, 2 | `PASS (frame 43076)`, `(55020)` |
+| K=3, shifts 0 / 23 / 41 | `PASS (frame 54497)` / `(54927)` / `(52444)` |
+| K=4, 5 | `PASS (frame 58837)`, `(58167)` |
+| K=6, shifts 0 / 23 / 41 | `PASS (frame 62397)` / `(66208)` / `(63760)` |
+| K=7, 8 | `PASS (frame 71699)`, `(63427)` |
+
+**15 of 15 `PASS attempts=1/1`**, each `contract wor-figaro-sweep-v1
+(exit): all 29 fields hold`. `body: 152 battles, 132 distinct battle keys
+(seed+group+formation); outcomes {'WON': 152}`, no death in any body
+(`deaths(body) 0` on every run; the lowest member HP on a body battle line
+217, K=2). The desert in the bodies: formation 223 (Sand Horse, Maliga x2)
+12 battles over 11 keys, 138 (Maliga x3) 4, 222 (the Sand Horse pair) 1
+(`k2_s0 | body | be80-g00DE | 0DE | Sand Horse x2 | WON`); in the prefixes
+222 once more and 223 twice, all won.
+
+### 10.3 The Sand Horse pair with the trio (#321, #312): a lab
+
+The variation set meets formation 222 rarely (the walks cross 18 and 19
+desert steps), so it is measured as a lab. `lab/lab_pace.lua` Continues
+`wor-edgar-v1`, runs the boot's care, and paces two desert tiles
+((81,92), (75,87); every non-desert tile kept off the plan), fighting
+everything with the walkers' tactical driver and the field care after
+each, and snapshots the world map after each battle's care
+(`pace1.log`): 24 battles, all won, formation 222 at battles 1, 3, 6 and
+24 (`[pace] after battle 1 ($0DE won)`, `3 ($0DE won)`, `6 ($0DE won)`,
+`24 ($0DE won)`). Which formation comes next is save data, so each
+snapshot before a 222 (`pace_00`, `pace_02`, `pace_05`, `pace_23`) meets
+222 again whatever the wait; `lab/lab_222.lua` idles LAB_WAIT frames (the
+battle's seed is the frame counter) and walks the same pace to that one
+battle, retries off (`lab/labrun.py`, `lab/turns.py`). The entry states
+(`[lab222] start` lines):
+
+| snapshot | the party at the walk's start |
+|---|---|
+| `pace_00` (the boot, after its care) | CELES L31 1300/1595, SABIN L31 1384/1609 MP 75/291, EDGAR L31 948/1600 |
+| `pace_02` | CELES L32 1696/1696, SABIN 1541/1609, EDGAR 1600/1600 |
+| `pace_05` | all three at full HP |
+| `pace_23` | L33: CELES 1262/1798, SABIN 1498/1812, EDGAR 1803/1803 |
+
+**Formation 222 with the trio** (`lab222_base/summary.txt`, `turns.txt`):
+
+| snapshot | waits | runs won | distinct keys | care turns / attack turns | runs with a death | deaths (holding BP) | Fenix Downs |
+|---|---|---|---|---|---|---|---|
+| `pace_00` | 1-64 | 64/64 | 60 | 106 / 196 | 5 | 13 (7) | 8 |
+| `pace_02` | 1-20 | 20/20 | 20 | 1 / 74 | 0 | 0 | 0 |
+| `pace_05` | 1-20 | 20/20 | 20 | 0 / 70 | 0 | 0 | 0 |
+| `pace_23` | 1-20 | 20/20 | 20 | 29 / 62 | 0 | 0 | 0 |
+| all | | **124/124** | **60** | 136 / 402 | 5 | 13 (7) | 8 |
+
+Counts are over runs; waits 61-64 repeat waits 1-4's battle keys, so by
+distinct key `pace_00` is 4 runs with a death, 9 deaths, 6 Fenix Downs.
+Holding BP counts the dying member's own `bp=` only (the first count read
+`party_bp=` too; build/attempts/wt/wor-figaro-sweep-review/lab222_deaths_recount.txt).
+
+`formation $0DE: 124 runs, 60 distinct battle keys: 60 keys won, 0 keys
+lost, 0 keys mixed; runs won 124/124`. With EDGAR it is not a wall and not
+a coin flip. It is still not a confident fight from the hurt boot: five
+`pace_00` draws lost members, eight Fenix Downs went into a random battle,
+and seven of the thirteen deaths held BP.
+
+**The cause is the driver's heal policy, not the rows.** The deaths are
+#312's heal-lock: the pair's Sand Storm and Clamp take up to 932 a round
+off the member being covered (the driver's measured round cost on its
+"covering an ally" lines: 396-932), a Potion gives 250, and the heal
+policy's "covering an ally" clause spends the turn on a Potion even when
+the ally stays inside one round of death after it: 32 of the base set's
+51 such Potions did (hp + 250 not above the round's cost; `lab222_base/covering.txt`). From
+`lab222_base/pace_00_w5.log`:
+
+    [worldNavTo] actor=1 heal entity 2 (523/1600) with $E9 -- restores 250, a round costs 905 (covering an ally)
+    [worldNavTo] actor=2 heal entity 2 (336/1600) with $E9 -- restores 250, a round costs 425 (covering an ally)
+    [worldNavTo] actor=1 SPEND (care): 290/1609 is inside one round of death (930) holding 3 BP, and no heal saves it (item $E9 +250 = 540) -- Fight at 3 BP ...
+    [worldNavTo] [death] f+3217 entity 1 char 5 from 290/1609 by slot 0 cmd $02 atk $69 bp=3 party_bp=1,3,2,1 -- died holding 3 BP
+
+(523 + 250 = 773 under a 905 round, 336 + 250 = 586 above a 425 one:
+the first heal only delays.) That run took
+11 care turns to 4 attack turns and 7398 ticks; `pace_00_w18` 15 care
+turns to 2, three deaths and three Fenix Downs. With full HP (`pace_02`,
+`pace_05`) no one is ever inside one round of death and the fight ends in
+1600-1900 ticks with almost no care.
+
+**The proposed fix, measured as a lab lever** (`lab/lever_lift.lua`,
+not shipped): "covering an ally" heals only when the heal lifts the ally
+out of one round's reach (hp + restore > the round's cost); otherwise the
+actor acts, and the spend rule (which counts only the heals the care lines
+would take) then spends a doomed member's pips. On the same snapshot and
+waits 1-42, so the same 42 battle keys (`pair_base_lift_pace00.txt`):
+
+| arm | won | mean ticks | care / attack turns | runs with a death | deaths (holding BP) | Fenix Downs |
+|---|---|---|---|---|---|---|
+| base | 42/42 | 2575 | 72 / 131 | 4 | 9 (6) | 6 |
+| lift | 42/42 | 2102 | 33 / 134 | **0** | **0** | **0** |
+
+e.g. `pace_00_w18: be74-g00DE | base WON 9209t care 15 atk 2 deaths 3(3
+BP) fenix 3 | lever WON 3137t care 2 atk 4 deaths 0(0 BP) fenix 0`.
+
+**Verdict for #321:** the Sand Horse pair is not a wall with the trio
+(124 of 124 over 60 distinct keys; the walks' own desert fights 20 of 20,
+build/attempts/wt/wor-figaro-sweep-review/var1_keys_rerun.txt). The losses #321 recorded with CELES and SABIN alone
+(both `class=died with 3 BP banked`, the horses untouched) and the trio's
+deaths here have one cause: a driver policy problem (#312), the
+"covering an ally" heal that does not lift the ally clear. The Sand Horse
+row (`2 · slash|pierce`) and its vanilla script need no change; the fix
+belongs in `M.healDecision` (#312, v0.26) and is measured above. Not
+measured: CELES and SABIN alone against 222 (the leg never fields the
+pair), and the lever's effect on other fights.
 
 ## 11. The castle's ride, Kohlingen and SETZER, played (legs 2-4, `gen_wor_kohlingen`, `wor-kohlingen-v1`)
 
@@ -1378,8 +1552,13 @@ Not yet driven.
 - **Dullahan's telegraph** (Absolute 0 proposed) and whether the policy may
   set the gil's last digit against L? Pearl (an informed reading, a
   human input).
-- **The side items' place**: leg 1 in this arc's chain with its own cut, or
-  a side leg off `wor-edgar-v1`.
+- **The side items' place**: played as a side leg off `wor-edgar-v1`
+  (section 10; `wor-figaro-sweep-v1`, which nothing boots yet). The
+  Ribbon, Hero Ring, Hyper Wrist and RunningShoes are in that branch's bag
+  only: the tomb's legs, booted from `wor-kohlingen-v1` off `wor-edgar-v1`,
+  do not carry them. Moving the Kohlingen leg to boot the sweep's
+  checkpoint would put them on the chain (and the Ribbon against the
+  tomb's Zombie) at the cost of making leg 1 critical path again.
 
 ---
 
