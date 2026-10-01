@@ -105,7 +105,7 @@ else
   OFFICIAL_SHA=ae43f1438282aaaff90a009aa8ada648bc5d631b070656285d7de9cbff513b41   # Mesen_2.1.1_Linux_x64.zip's Mesen
   DEFAULT_REFERENCE="$TREE/tools/Mesen-linux/Mesen"
 fi
-for t in git make clang dotnet sdl2-config; do
+for t in git make clang dotnet sdl2-config unzip; do
   command -v "$t" >/dev/null 2>&1 || { echo "build.sh: $t not found (see Needs, above)"; exit 2; }
 done
 
