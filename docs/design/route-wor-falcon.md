@@ -883,7 +883,7 @@ other break suites pass on the re-cut ROM (`ninja_checks.log`).
 | mechanic | where | coverage today | what the driving needs |
 |---|---|---|---|
 | Dullahan: an event battle whose loss is a game over | the grave | the runner retries a lost segment from its boot | the lab (section 5): level target, Shell/Haste/Slow, SETZER's arms |
-| Zombie on several members, in battle | the tomb (four species) | field cure HANDLED (#190); the battle raise refuses a Fenix Down on a zombie (#245); an in-battle Revivify not seen | measure: zombies per fight, whether a zombied member costs the fight; the Amulets and the Ribbon as levers |
+| Zombie on several members, in battle | the tomb (four species) | field cure HANDLED (#190); the battle raise refuses a Fenix Down on a zombie (#245); **the battle cure HANDLED (#263, 12.3)** | measured (12.3): members Zombied at a battle's end 12 -> 3 over 102 tomb battles; the Amulets and the Ribbon remain levers |
 | Sour Mouth (six statuses) | Mad Oscar, B2/B3 | Muddle HANDLED (route-wor-edgar 12.4); Sleep "planned around / not measured live" | Remedy in battle; the Ribbon |
 | L? Pearl and the gil digit | Dullahan | not read by the driver | read `$1860-$1862` at the grave; the digit is a lever a person can move (selling an odd-priced item) |
 | Frozen (N. Cross) | Dullahan | planned around / not measured live | — |
@@ -1049,9 +1049,243 @@ with three members is not a measurement of it.
 same 21 PASS and the same 60 body battles key for key (`var1/keys.txt`),
 since the step comes after the last fight.
 
+### 11.3 Re-cut on the special-weak ROM (`build/attempts/wt/wor-tomb/kohlingen-recut/`)
+
+The special-weak rows (main `942cf222`: Deep Eye, Orog, Osteosaur,
+PowerDemon and Dullahan also take ¤) changed this leg's play, so the
+checkpoint was re-cut from the generator on ROM `86018dd9ac20`, with two
+review follow-ups: the Fenix Down purchase is capped at the band (about
+20; `FENIX_CAP`), and the contract pins SABIN's Regal Crown (`$16DA =
+$7B`) and SETZER's UNICORN (`$176B = $17`). The capture
+(`capture_wor-kohlingen-v1.log`): `[kit] SETZER's weapon: shop 65's $50
+scores 6133 against the bag's best 6104` (the Trump over the bag's Cards;
+the Darts score 5115), `SETZER's kit: slot 0 $50, ... (weapon $50 keys 6
+of the arc's 10 species, power 133)`, `FENIX DOWN to the level, capped at
+the band: ... already there (0 wanted)`, `bought: tonic=4 potion=54
+fenix=29 remedy=10 soft=18 revivify=10 greencherry=5 gil=218677 (spent
+8300 GP)`, `contract wor-kohlingen-v1 (exit): all 33 fields hold`, `PASS
+(frame 29814) attempts=1/3`; sealed `sha256=577024055a54...`
+(`../capture/validate_wor-kohlingen-v1.txt`).
+
+Under draw variation (`var/`, the leg's own `varlab.py`, retries off):
+**11 of 11 `PASS attempts=1/1`** (K = 0, 2, 4, 6, 8, 10, 12 at shift 0;
+K = 0 and 6 at shifts 23 and 41), each `contract wor-kohlingen-v1 (exit):
+all 33 fields hold`, 33 of 33 `[outcome]` lines `paid as due`, no death
+in a body (`var/summary.txt`); the bodies fought **33 battles over 33
+distinct battle keys**, all won (`var/keys.txt`: formations 229 x7, 232
+x8, 233 x8, 239 x6, 228, 231, 241, 243 one each); the lowest member HP on
+a body's battle lines was 584.
+
 ## 12. Darill's Tomb to its save point, played (legs 5-8, `gen_wor_tomb`, `wor-tomb-v1`)
 
-Not yet driven.
+Driven 2026-10-01 for #263. The segment Continues `wor-kohlingen-v1`
+(`H.bootCheckpoint`), walks to the tomb, opens its door with SETZER, works
+the switches and the turtles down through B1-B3, opens the chests on the
+way (all but the monster chest), and saves on the save point in B3's east
+room through `H.saveAtCheckpoint`: the `wor-tomb-v1` checkpoint. Every
+number below is quoted from a log under `build/attempts/wt/wor-tomb/`
+(`capture/` the sealing run, the cold Continue and the negative; `var1/`
+the variation set; `var0/` the same set with the in-battle Zombie cure
+off; `zombie/` the cure's lab and suite; `dev/` and `pilot1/` the runs that
+found the route; `plan/` the offline pockets). All on ROM `86018dd9ac20`
+(main `942cf222`, the special-weak rows) except `dev/run1-3`, which ran on
+`4411dfd2fea7`. Nothing was measured by writing game state.
+
+### 12.1 The run (`capture/capture_wor-tomb-v1.log`)
+
+| step | what the log says |
+|---|---|
+| boot | `contract wor-kohlingen-v1 (entry): all 33 fields hold`; `[wor] SETZER's Esper byte $17`; the leg asserts its own needs: Revivify and Remedy in the bag |
+| the walk | `[key] battle key beE4-g00EF f1199 map 1`, `be78-g00EF`: two Bogy pairs, both won |
+| the door | `[tomb] f6091 the door opened map 297 (8,10)` (`$00CB`); `the stairs (7,8) -> B1: on map 298 at (13,12)` |
+| B2's switch, the water | `the switch (28,43): $02B1`; `the opened way (28,38) -> B3 (61,44)`; `the water switch (61,33): $02B3` |
+| chests | `chest bit 156 (Genji Helmet): OPENED`, `157 (Crystal Mail)`, `158 (Czarina Gown)`, `159 (Exp. Egg)`, `160 (Man Eater)`; `[kit] the Genji Helmet ($81) goes to EDGAR` (gain 37 over SETZER 29, CELES 26, SABIN 23), `the Crystal Mail ($98) goes to EDGAR` (gain 46) |
+| the wall switch | `the wall switch (76,10): $02B8` |
+| the turtles | `[tomb] f27801 down on the turtle map 300 (69,8)`; `the turtle switch (70,8): $02B5`; `f28382 across on the turtle map 300 (79,5)` |
+| the save | `[on the save point] plan: heal ... with $E9` x5; `[saved] wor-tomb-v1: slot 3 holds map 300 ($012C) tile (122,14)`; `contract wor-tomb-v1 (exit): all 30 fields hold`; `[wor] the battles: 7 ($0EF x2, $0FA x1, $0F8 x3, $0F9 x1): 7 won`; `PASS (frame 32905) attempts=1/3` |
+
+Sealed and validated (`capture/validate_wor-tomb-v1.txt`): `valid
+ot6.sram-checkpoint/v1: 32768 bytes sha256=468ec180c10c... holds=slot 3
+map 300 (122,14) [$1F64=$012C] (saved: declared and checked)`. The cold
+Continue (`capture/continue_tomb.log`, `probe_tomb_continue.lua`):
+`contract wor-tomb-v1 (entry): all 30 fields hold`, `[continue] map 300 at
+(122,14): CELES L32 HP 1696/1696 ...; SABIN L32 ...; EDGAR L31 ... esper+kit
+00 11 5C 81 98 B5 B1; SETZER L31 ... esper+kit 17 50 5F 7C 95 B1 B5;
+gil=242571; revivify=20 remedy=10 potion=47 fenix=29 tent=10`. The same
+probe on `wor-kohlingen-v1` is the contract's negative: `contract
+wor-tomb-v1 (entry) VIOLATED -- 8 field(s) differ` (the map and tile,
+`$00CB`, `$02B1`, `$02B3`, `$02B8`, `$02B6`;
+`capture/negative_contract_on_wor-kohlingen-v1.log`). The graph's own edge
+plays the same run (`capture/ninja_wor_tomb_generate.log`: `PASS (frame
+32905) attempts=1/3`).
+
+The contract pins the party, the door and the switches the route sets,
+`$02B2=0` (Dullahan not fought), the monster chest closed (treasure bit
+`$0A1`), no timer, and the codex; a later leg that needs a level or an
+item asserts it itself.
+
+What the plan did not know (every **verify-on-arrival** in 2.6 held
+otherwise; the order of 2.6 is the order walked):
+
+- **The save point is walled above and below**: 300 (122,14) is entered
+  from (121,14) (`plan/grid_save_point.txt`: `122,13:#`, `122,15:#`,
+  `121,14:RL`). `H.stepOntoSavePoint` approached from below only
+  (`dev/run2.log`: `navTo: no path (124,10)->(122,15)`); it now picks a
+  reachable side where the party stands (`lib/ot6_contract.lua`).
+- **Each room of maps 299 and 300 is its own pocket**, joined by same-map
+  doors (`plan/nolinks.txt`), so the walk is a chain of door crossings
+  rather than one path; B2's hub (37,12) holds five of them.
+- **B3's turtle switch reads `$02B5=0` on arrival**; one press moves the
+  turtle (`_ca41e0`), and the ride from (71,9) facing right lands at
+  (79,5), below the opened (79,3).
+- **The tomb pays its Revivifies back**: the bag went from 10 at the boot
+  to 13-22 at the save across the set below (the drops).
+
+### 12.2 Under real draw variation (`var1/`)
+
+`varlab.py` derives the generator with a block after the boot that fights
+K encounters on the Kohlingen continent (four waypoints in groups 45-47,
+Kohlingen's doors, the castle's tiles and the tomb's door kept off the
+plan) and walks back to (40,45); retries off. `analyze.py` pairs each
+`[key]` with its `[outcome]` (`var1/summary.txt`, `var1/analysis.txt`):
+
+| variant | the body starts at (`$1FA1-5`) | battles after the boot | verdict |
+|---|---|---|---|
+| K=0, shifts 0 / 23 / 41 | the checkpoint | 7 (`$0EF x2, $0FA x1, $0F8 x3, $0F9 x1`) | `PASS (frame 32905)` / `(38256)` / `(34361)` |
+| K=1 | `7C 6C 6B 6B 6B` | 6 (`$0EF x1, $0FA x3, $0F8 x2`) | `PASS (frame 29051)` |
+| K=2 | `96 6D 6B 6B 6B` | 6 (`$0F6 x1, $0F8 x2, $0FA x2, $0FB x1`) | `PASS (frame 30510)` |
+| K=3, shifts 0 / 23 / 41 | `C6 6E 6B 6B 6B` | 7 (`$0F2 x1, $0F8 x1, $0F9 x1, $0FA x1, $0FB x3`) | `PASS (frame 37278)` / `(38198)` / `(37208)` |
+| K=4 | `E2 6F 6B 6B 6B` | 6 (`$0EF x1, $0F9 x1, $0FA x1, $0F7 x2, $0FB x1`) | `PASS (frame 34140)` |
+| K=5 | `FE 70 6B 6B 6B` | 7 (`$0F0 x1, $0FA x1, $0FB x4, $0F7 x1`) | `PASS (frame 35726)` |
+| K=6, shifts 0 / 23 / 41 | `1A 71 6B 7C 6B` | 6 (`$0F1 x1, $0F7 x2, $0FB x3`) | `PASS (frame 38595)` / `(38631)` / `(37319)` |
+| K=7 | `42 72 6B 7C 6B` | 6 (`$0EF x1, $0F7 x3, $0FB x1, $0FA x1`) | `PASS (frame 41014)` |
+| K=8 | `60 73 6B 7C 6B` | 6 (`$0EE x1, $0F7 x2, $0FB x2, $0F9 x1`) | `PASS (frame 45238)` |
+| K=9 | `76 74 6B 7C 6B` | 6 (`$0F6 x1, $0F7 x2, $0FA x1, $0FB x1, $0F8 x1`) | `PASS (frame 44026)` |
+| K=10 | `AA 75 6B 7C 6B` | 6 (`$0EC x1, $0F6 x1, $0F9 x1, $0FB x1, $0F8 x1, $0F7 x1`) | `PASS (frame 49305)` |
+| K=11 | `BC 76 6B 7C 6B` | 6 (`$0EE x1, $0FA x1, $0F7 x1, $0F8 x1, $0FB x2`) | `PASS (frame 51782)` |
+| K=12 | `DE 77 6B 7C 6B` | 6 (`$0F9 x1, $0F7 x2, $0FA x1, $0FB x2`) | `PASS (frame 50854)` |
+
+**19 of 19 `PASS attempts=1/1`**, each `contract wor-tomb-v1 (exit): all
+30 fields hold`. **The bodies fought 121 battles over 102 distinct battle
+keys, all won** (`body: 121 battles over 102 distinct battle keys
+(seed+group+formation); outcomes {'WON': 121}`): in the tomb formation 251
+(Mad Oscar) 33 battles / 28 keys, 247 (PowerDemon) 20 / 16, 248
+(PowerDemon, Exoray x2) 19 / 16, 250 (Mad Oscar, Exoray) 17 / 14, 249
+(Exoray x3) 10 / 9, 246 (Osteosaur) 3 / 3; on the world 239 (Bogy x2) 9 /
+7 and five others; by place map 300 48 keys, 299 35, 298 3, the world 16.
+Eighteen keys repeat across runs (mostly the shifts at one K). **The Orog
+(formations 244, 245) never came up**: B1 is 12 steps (3.4: P(0) 0.958),
+and its three battles were all 246. The party reached the save point at
+L31-L33 (`[wor] the stretch`); one Fenix Down was spent in a battle over
+the 19 runs (12.4); Potions went 54 -> 34-52; three runs pitched a Tent on
+the save point; the purse ended 242,571-274,041.
+
+### 12.3 Zombie
+
+Four of the five species Zombie a member, and the field care's Revivify
+(#190) already cleared it after a fight; in battle the driver left the
+zombie standing to the end (`raiseDecision` refuses a Fenix Down on one,
+#245). That never cost a battle, but a zombied member's turns are the
+engine's and **a won battle pays it nothing**: the first runs paid `char
+6 +0 (due 0)` and `char 9 +0 (due 0)` beside `+1383 (due 1383)` for the
+standing pair (`dev/run2.log`). The driver now cures it in battle
+(`Driver:cureFor`: the bag's item whose STATUS1 record carries the bit,
+Revivify; `[status] ... is under ZOMBIE` says it; `opts.zombieCure =
+false` is the lever). The same 19 variants with the lever off and on
+(`var0/analysis.txt`, `var1/analysis.txt`):
+
+| | battles in the tomb | ended with a member Zombied | member-battles Zombied at the end | XP unpaid to members down or Zombied |
+|---|---|---|---|---|
+| cure off (`var0/`) | 102 | 10 | 12 | 14,505 over 13 member-battles |
+| cure on (`var1/`) | 102 | 3 | 3 | 3,537 over 4 member-battles |
+
+Both arms 19 of 19 PASS. With the cure on, 19 Zombie landings were said
+(`is under ZOMBIE`) and 16 cleared in battle (`Zombie is CLEARED`); the
+three left at a battle's end had a plan the last blow beat
+(`var1/k0_s41.log`: `actor=2 cure entity 1's Zombie with $F1` at f+1207,
+the last monster dead at f+2700 before the item ran). `battle_zombiecure`
+(fixture `tomb_zombie`, `gen_tomb_zombie`: the frame a Zombie lands in the
+grave room, 299, whose pool holds two of the casters) holds it:
+`zombie/suite/suite_on.log`: `cure entity 3's Zombie with $F1` ->
+`entity 3's Zombie cleared in battle, 1562 frames after the fixture` ->
+`char 9 +673 (due 673)`, `PASS`. The lever off (`suite_off.log`) fails at
+`the driver planned a Revivify on the Zombied entity 3`; with that
+assertion dropped, at `entity 3's Zombie cleared while the battle was up`
+(`suite_off_m2.log`); with both dropped, at `the battle paid the
+once-Zombied entity 3 its share (got 0, due 0)` (`suite_off_m3.log`). A
+fixture rather than a walk, because pacing B3's east room landed 1-2
+Zombies in 20 battles a shift and pacing the grave room 0 in one shift's
+15 (`zombie/lab/`). After the change, `ninja` ran the suites the driver
+touches (`battle_zombiecure`, `battle_zombieraise`, `battle_healpolicy`,
+`battle_statuses`, `battle_healerdown`, `field_zombiecure`,
+`battle_magicite`, `field_care_emptybag`, `battle_breakwor_falcon`), each
+fixture regenerated on this ROM: exit 0 (`zombie/suite/ninja_suites.log`).
+
+### 12.4 Sour Mouth
+
+The Mad Oscar's Sour Mouth landed on CELES in one battle key
+(`beB4-g00FA`, in three runs), five statuses at once (`STATUS1/2
+$25/$A8`: Imp, Poison, Blind; Sleep, Muddle, Mute); the driver said each,
+its Muddle rule planned the curing hit ahead of the Imp's Green Cherry,
+and the field care cleared the rest after the fight (`used $F2 ... status1
+25 -> 21`, `used $F5 ... 21 -> 00`). All three battles were won. In one
+(`var1/k3_s41.log`) the curing hit killed her: `[death] f+2836 entity 0
+char 6 from 989/1696 by entity 3 char 9 cmd $00 atk $FF (an ally's
+action)` -- SETZER's Fight with the Trump on a sleeping Imp at 989 HP,
+above the unmuddle floor's unmeasured quarter (424) -- and a Fenix Down
+raised her. That is #320's class (the floor reads a measured hit, and
+SETZER's was not yet measured); a lab candidate. The other landings said
+over the set: Sleep 26, Slow 14, Poison 7, Blind 3, Sap 2 (`[status]`
+lines).
+
+### 12.5 The break rows, measured (`var1/analysis.txt`)
+
+These are the first battle measurements of section 8's rows. The `[brk]`
+lines read each gauge every frame and the ROM's own gates by exec hooks:
+`Ot6Gate` (a broken monster's full gauge queues no turn), `Ot6BrokenTurn`
+(a turn queued before the break consumed without running), `Ot6MayAct` (a
+counter refused), and vanilla's `ExecMonsterAction` as the independent
+witness (a broken monster reaching it acts after all). Body battles:
+
+| species (row today) | met | broken by the killing blow | broken alive | windows over 60 frames: turns denied at the gate / queued turns consumed / counters refused / actions run | window length, frames (min / median / max) |
+|---|---|---|---|---|---|
+| Mad Oscar (4 · slash) | 50 | 19 | 13 | 9: 11 / 1 / 5 / **0** | 169 / 417 / 596 |
+| PowerDemon (3 · slash, pierce, ¤) | 39 | 11 | 32 | 23: 40 / 10 / 1 / **0** | 172 / 253 / 848 |
+| Exoray (2 · slash, pierce) | 85 | 44 | 27 | 19: 37 / 3 / 4 / **0** | 90 / 265 / 1579 |
+| Bogy (3 · slash, ¤) | 18 | 5 | 11 | 2: 2 / 0 / 2 / **0** | 270 / 334 / 334 |
+| Muus (2 · slash, bludg) | 15 | 3 | 3 | 2: 9 / 1 / 0 / **0** | 369 / 750 / 750 |
+| Deep Eye (2 · pierce, ¤) | 14 | 7 | 0 | — | — |
+| Harpiai (3 · slash, pierce) | 3 | 1 | 2 | — | — |
+| Osteosaur (3 · bludg, ¤) | 3 | 0 | 0 | — | — |
+| Orog (3 · slash, bludg, ¤) | 0 | — | — | — | — |
+
+- **Breaks land on every species met but the Osteosaur** (3 met, killed
+  unbroken), and **a broken monster never acted**: no `ACTS WHILE BROKEN`
+  line in `var1/`, while over the body battles 100 turns were denied at
+  the gate, 16 queued turns were consumed unrun (`a turn queued before the
+  break is consumed without running`) and 12 counters were refused. The
+  rows skip turns as designed.
+- **No break ever recovered**: every window ended in the monster's death,
+  the longest 1,579 frames (an Exoray). Half the breaks in the tomb's
+  species landed with the killing blow (74 of 146), where the break buys
+  nothing; the Mad Oscar's four shields (8.3: "so the break lands before
+  Sour Mouth's second turn") broke alive 13 times in 50, and Sour Mouth
+  landed in one battle key (12.4).
+- The Orog was not met: its row and its broken rule (neither Zombite nor
+  the counter) are unmeasured.
+
+### 12.6 What was left
+
+- **The monster chest** (120,9) stays closed for the Dullahan leg (the
+  contract pins it). Reaching it: from the save point the chest is up the
+  room's west column, (121,14) -> (120,14) -> (120,10), a dead end below
+  the chest (`plan/grid_save_point.txt`: `120,10:D`), opened facing up
+  from (120,10).
+- **The kit**: the Man Eater and the Exp. Egg are in the bag, unequipped;
+  the Genji Helmet and the Crystal Mail went on EDGAR by the defense-gain
+  rule. Arming for Dullahan (the Man Eater's pierce, the Egg) is that
+  leg's.
+- **The tombstone puzzle** (299 (12,39), the Exp. Egg hint) was not done.
 
 ## 13. Dullahan and the Falcon, played (legs 9-11, `gen_wor_falcon`, `wor-falcon-v1`)
 

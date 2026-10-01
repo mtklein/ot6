@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "468ec180c10ca1103b522f249e54cb71a586d4301317f516d8188c2e796904f1",
+  "generator_sig": "a7a0ec0547fa0723f8524b5cdfb5fecd11162322aa007732147c5758ecac2343 gen_wor_tomb tools/tests/checkpoints/wor-kohlingen-v1/manifest.json tools/tests/checkpoints/wor-kohlingen-v1/wor-kohlingen.sram",
+  "ancestors": [
+    {
+      "path": "tools/tests/checkpoints/wor-kohlingen-v1/manifest.json",
+      "sha256": "be9643fc2015d451fa9ffba729a25f612a8db2410cc1cb3b0a18796ecd7a4515"
+    }
+  ]
+}
