@@ -416,6 +416,8 @@ end
 -- tomb's scripts, route-wor-falcon 3.5 and 4.4).  The scarcest-by-price
 -- item last.
 local FIELD_CARE_POTIONS, TOMB_CURES = 6, 10
+-- Fenix Downs: about the level, capped near 20 (guidelines "Supply band")
+local FENIX_CAP = 20
 local function potionBand() return math.ceil(topLevel() * 1.5) + FIELD_CARE_POTIONS end
 local function stock(shopId, what)
   local gil0 = 0
@@ -428,8 +430,8 @@ local function stock(shopId, what)
       "POTION to the band"),
     H.buyItem(REVIVIFY, function() return math.max(0, TOMB_CURES - H.invCountOf(REVIVIFY)) end,
       "REVIVIFY for the tomb"),
-    H.buyItem(FENIX, function() return math.max(0, topLevel() - H.invCountOf(FENIX)) end,
-      "FENIX DOWN to the level"),
+    H.buyItem(FENIX, function() return math.max(0, math.min(FENIX_CAP, topLevel()) - H.invCountOf(FENIX)) end,
+      "FENIX DOWN to the level, capped at the band"),
     H.buyItem(REMEDY, function() return math.max(0, TOMB_CURES - H.invCountOf(REMEDY)) end,
       "REMEDY for the tomb"),
     H.call(function()
@@ -438,7 +440,7 @@ local function stock(shopId, what)
     H.shopClose(what),
     H.call(function()
       H.assertEq(H.invCountOf(POTION) >= potionBand(), true, "Potions at the band")
-      H.assertEq(H.invCountOf(FENIX) >= math.min(20, topLevel()), true, "Fenix Downs at about the level")
+      H.assertEq(H.invCountOf(FENIX) >= math.min(FENIX_CAP, topLevel()), true, "Fenix Downs at about the level")
       H.assertEq(H.invCountOf(REMEDY) >= TOMB_CURES, true, "Remedies for the tomb")
       H.assertEq(H.invCountOf(REVIVIFY) >= TOMB_CURES, true, "Revivifies for the tomb")
     end),

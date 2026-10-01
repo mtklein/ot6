@@ -52,6 +52,9 @@ local TOMB_TILE = { 25, 52 }
 local BIT_GENJI, BIT_CRYSTAL, BIT_CZARINA, BIT_EGG, BIT_MAN_EATER, BIT_MONSTER =
   0x09C, 0x09D, 0x09E, 0x09F, 0x0A0, 0x0A1
 local SAVE_POINT = { 122, 14 }
+-- the fight driver's options for every walk here: the defaults (the
+-- status cure line Revivifies a zombie in battle, Driver:cureFor)
+local FIGHT = {}
 
 local function map() return H.mapId() & 0x1ff end
 -- a step built when it is first reached, for a step whose arguments are
@@ -194,6 +197,19 @@ local function watches()
     local turn = H.sym("Ot6BrokenTurn")
     emu.addMemoryCallback(function()
       if not brk.on then return end
+      -- a member's turn while Zombied (STATUS1 $02 without the Wound bit):
+      -- the engine's, said with what it was (the command list's head)
+      local px = emu.getState()["cpu.x"] & 0xFF
+      if px < 8 and (px & 1) == 0 then
+        local s1 = H.readByte(0x3EE4 + px)
+        if (s1 & 0x02) ~= 0 and (s1 & 0x80) == 0 then
+          local head = H.readByte(0x32CC + px)
+          H.log(string.format("[zombie] f%d entity %d (char %d) takes a turn while Zombied (command $%02X)",
+            H.frame, px // 2, H.readByte(0x3ED8 + px),
+            head < 0x80 and H.readByte(0x3420 + head * 2) or 0xFF))
+        end
+        return
+      end
       local s, x = slotOfX()
       if s == nil then return end
       local b = brk.slot[s]
@@ -226,8 +242,27 @@ local function watches()
       if s == nil then return end
       if H.readByte(0x3E88 + x) ~= 0 then brk.slot[s].refused = brk.slot[s].refused + 1 end
     end, emu.callbackType.exec, may, may)
+    -- a break's close: said once, when the gauge reads unbroken again, when
+    -- the monster is gone from the field while broken, or when the battle
+    -- ends with it broken
+    local function closeBreak(s, how)
+      local b = brk.slot[s]
+      if not b.broken then return end
+      b.broken = false
+      H.log(string.format("[brk] f%d slot %d $%03X the break ends after %d frames (%s): while broken "
+        .. "%d turn(s) denied at the gate, %d queued turn(s) consumed, %d counter(s) refused, %d action(s) "
+        .. "run; shields %d/%d", H.frame, s, speciesAt(s), H.frame - b.bf, how,
+        b.gated - b.gated0, b.purged - b.purged0, b.refused - b.refused0, b.acted - b.acted0,
+        H.readByte(0x3E40 + s * 2), H.readByte(0x3E41 + s * 2)))
+    end
     emu.addEventCallback(function()
-      if not (H.battleLoadStarted() and H.monstersPresent() > 0) then return end
+      if not (H.battleLoadStarted() and H.monstersPresent() > 0) then
+        if brk.on and not brk.closed then
+          brk.closed = true
+          for s = 0, 5 do closeBreak(s, "the battle ended") end
+        end
+        return
+      end
       if not brk.on then brkReset() end
       local any = false
       for s = 0, 5 do if (H.readByte(0x3AA8 + s * 2) & 1) == 1 then any = true end end
@@ -249,26 +284,35 @@ local function watches()
         local sh = H.readByte(0x3E40 + s * 2)
         local broken = H.readByte(0x3E90 + s * 2) ~= 0
         local present = (H.readByte(0x3AA8 + s * 2) & 1) == 1
+        local dead = (H.readByte(0x3EEC + s * 2) & 0xC2) ~= 0 or H.readWord(0x3BFC + s * 2) == 0
         if present and b.sh ~= nil and sh < b.sh and not broken then
           H.log(string.format("[brk] f%d slot %d $%03X chipped %d -> %d of %d (HP %d)", H.frame, s,
             speciesAt(s), b.sh, sh, H.readByte(0x3E41 + s * 2), H.readWord(0x3BFC + s * 2)))
         end
-        if broken and not b.broken then
-          b.breaks = b.breaks + 1
-          b.bf, b.acted0, b.purged0, b.gated0, b.refused0 = H.frame, b.acted, b.purged, b.gated, b.refused
-          H.log(string.format("[brk] f%d slot %d $%03X BROKEN (break %d; ticks %d; HP %d)", H.frame, s,
-            speciesAt(s), b.breaks, H.readByte(0x3E90 + s * 2), H.readWord(0x3BFC + s * 2)))
-        elseif b.broken and not broken then
-          H.log(string.format("[brk] f%d slot %d $%03X the break ends after %d frames (%s): while broken "
-            .. "%d turn(s) denied at the gate, %d queued turn(s) consumed, %d counter(s) refused, %d action(s) "
-            .. "run; shields %d/%d",
-            H.frame, s, speciesAt(s), H.frame - b.bf,
-            ((H.readByte(0x3EEC + s * 2) & 0xC2) ~= 0 or H.readWord(0x3BFC + s * 2) == 0) and "it died"
-              or "it recovered",
-            b.gated - b.gated0, b.purged - b.purged0, b.refused - b.refused0, b.acted - b.acted0,
-            sh, H.readByte(0x3E41 + s * 2)))
+        if dead or not present then
+          -- the gauge of a dead monster is not watched: a break that lands
+          -- with the killing blow is said as such, once
+          if b.broken then
+            closeBreak(s, "it died")
+          elseif broken and present and not b.dead then
+            b.breaks = b.breaks + 1
+            H.log(string.format("[brk] f%d slot %d $%03X BROKEN by the killing blow (break %d; HP %d)",
+              H.frame, s, speciesAt(s), b.breaks, H.readWord(0x3BFC + s * 2)))
+          end
+          b.dead = present
+        else
+          b.dead = false
+          if broken and not b.broken then
+            b.broken = true
+            b.breaks = b.breaks + 1
+            b.bf, b.acted0, b.purged0, b.gated0, b.refused0 = H.frame, b.acted, b.purged, b.gated, b.refused
+            H.log(string.format("[brk] f%d slot %d $%03X BROKEN (break %d; ticks %d; HP %d)", H.frame, s,
+              speciesAt(s), b.breaks, H.readByte(0x3E90 + s * 2), H.readWord(0x3BFC + s * 2)))
+          elseif b.broken and not broken then
+            closeBreak(s, "it recovered")
+          end
         end
-        b.sh, b.broken = present and sh or b.sh, broken
+        b.sh = present and sh or b.sh
       end
     end, emu.eventType.endFrame)
   end)
@@ -289,10 +333,10 @@ local function walkInto(x, y, dst, what, avoid)
     H.repeatN(3, {
       H.cond(function() return not there() end, {
         H.cond(function() return H.bfsPath(x, y) ~= nil end, {
-          H.navTo(x, y, { maxFrames = 12000, playBattles = "tactical", avoid = avoid,
+          H.navTo(x, y, { maxFrames = 12000, playBattles = "tactical", fight = FIGHT, avoid = avoid,
             arrive = function() return map() == dst end }),
         }, {
-          H.crossDoor(x, y, dst, -1, -1, what, { avoid = avoid }),
+          H.crossDoor(x, y, dst, -1, -1, what, { avoid = avoid, fight = FIGHT }),
         }),
         H.release(),
         H.waitUntil(function() return map() == dst end, 600, what .. ": onto map " .. dst, 5),
@@ -310,7 +354,7 @@ end
 -- a door within the map: crossed until the party stands on its far side
 local function link(m, x, y, dx, dy, what)
   return H.seqStep({
-    H.crossDoor(x, y, m, dx, dy, what),
+    H.crossDoor(x, y, m, dx, dy, what, { fight = FIGHT }),
     H.call(function()
       H.assertEq(H.fieldX() == dx and H.fieldY() == dy, true, string.format(
         "%s: on the far side (%d,%d) (standing on (%d,%d))", what, dx, dy, H.fieldX(), H.fieldY()))
@@ -326,7 +370,8 @@ local function chest(x, y, bit, what, item)
     local sx, sy = x + d[1], y + d[2]
     steps[#steps + 1] = H.cond(function()
       return not H.chestOpen(bit) and H.bfsPath(sx, sy) ~= nil
-    end, { H.openChest({ stand = { sx, sy }, face = d[3], bit = bit, what = what, item = item }) }, {})
+    end, { H.openChest({ stand = { sx, sy }, face = d[3], bit = bit, what = what, item = item,
+      nav = { fight = FIGHT } }) }, {})
   end
   steps[#steps + 1] = H.call(function()
     H.assertEq(H.chestOpen(bit), true, string.format("%s (%d,%d) bit $%03X: opened from a reachable "
@@ -338,7 +383,7 @@ end
 -- tile, then turn and press until the switch it sets reads `want`.
 local function examine(x, y, dir, pred, what)
   return H.seqStep({
-    H.navTo(x, y, { maxFrames = 12000, playBattles = "tactical" }),
+    H.navTo(x, y, { maxFrames = 12000, playBattles = "tactical", fight = FIGHT }),
     H.faceAndHoldA(dir, pred, 3000, what),
     H.release(),
     H.waitUntil(function()
@@ -401,7 +446,7 @@ H.run({ maxFrames = 200000 }, {
   H.fieldCare({ tag = "care at the boot" }),
 
   -- ---- 1. the walk to the tomb ---------------------------------------------------------------
-  H.worldNavTo(TOMB_TILE[1], TOMB_TILE[2], { maxFrames = 20000, playBattles = "tactical",
+  H.worldNavTo(TOMB_TILE[1], TOMB_TILE[2], { maxFrames = 20000, playBattles = "tactical", fight = FIGHT,
     arrive = function() return not H.worldMode() end }),
   H.waitUntil(function() return map() == MAP_DOOR end, 2400, "Darill's Tomb: map 297", 5),
   control("Darill's Tomb: control"),
@@ -458,7 +503,7 @@ H.run({ maxFrames = 200000 }, {
 
   -- ---- 6. the turtles ---------------------------------------------------------------------------
   link(MAP_B2, 37, 22, 56, 12, "the hub (37,22) -> the turtle's landing (56,12)"),
-  H.navTo(56, 14, { maxFrames = 6000, playBattles = "tactical" }),
+  H.navTo(56, 14, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT }),
   H.faceAndHoldA("down", function() return map() == MAP_B3 and sw(0x02B4) == 1 end, 3000,
     "the B2 turtle: face down and hold A on (56,14) -- _ca422e"),
   H.release(),
@@ -467,7 +512,7 @@ H.run({ maxFrames = 200000 }, {
   H.cond(function() return sw(0x02B5) == 0 end, {
     examine(70, 8, "up", function() return sw(0x02B5) == 1 end, "the turtle switch (70,8): $02B5"),
   }, {}),
-  H.navTo(71, 9, { maxFrames = 6000, playBattles = "tactical" }),
+  H.navTo(71, 9, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT }),
   H.faceAndHoldA("right", function()
     return sw(0x02B6) == 1 and H.hasControl() and H.tileAligned()
   end, 3000, "the B3 turtle: face right and hold A on (71,9) -- _ca4278"),

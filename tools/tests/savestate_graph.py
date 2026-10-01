@@ -846,4 +846,9 @@ STATES = [
     #     tools/tests/run.sh tools/tests/gen_wor_tomb.lua
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-tomb-v1
     S("wor_tomb", gen="gen_wor_tomb", checkpoint="wor-kohlingen-v1", timeout=3600),
+
+    # wor_tomb -> the frame a Zombie lands on a member in a battle in the
+    # tomb's grave room (battle_zombiecure's fixture): paced until it
+    # lands, at most 40 battles.
+    S("tomb_zombie", gen="gen_tomb_zombie", prev="wor_tomb", timeout=3600),
 ]

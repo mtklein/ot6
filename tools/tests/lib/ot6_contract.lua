@@ -1417,6 +1417,9 @@ M.contracts["wor-kohlingen-v1"] = {
   ram = {
     { 0x1E40 + (0x09A >> 3), 1 << (0x09A & 7), 1 << (0x09A & 7),
       "the Regal Crown's chest is open (treasure bit $09A, map 66 (3,53))" },
+    { 0x1600 + 37 * 5 + 0x21, 0xFF, 0x7B,
+      "SABIN wears the Regal Crown (his helmet slot; the crown goes to whichever of EDGAR and SABIN it improves most)" },
+    { 0x1600 + 37 * 9 + 0x1E, 0xFF, 0x17, "SETZER holds UNICORN (esper 23)" },
     { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
     { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
     { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
