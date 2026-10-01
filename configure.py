@@ -430,7 +430,10 @@ for f in glob("tools/tests/*.lua"):
     t = Path(f).stem
     suite_tests.append(t)
     attrs = m.group(1)
-    deps = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(f)]
+    # the emulator pin too: a test result is the emulator's as much as the
+    # ROM's, so a new emulator re-runs every test, as it regenerates every state
+    deps = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR),
+            copy_if_changed_from(f)]
     deps += [copy_if_changed_from(h) for h in LIBS] + HARNESS
     deps += fixture_deps(f)
     fm = re.search(r"savestate=([A-Za-z0-9_]+)", attrs)
@@ -583,20 +586,23 @@ check("checkpoint_drift_selftest",
       ["tools/tests/lib/checkpoint_drift.py", "tools/tests/lib/sram_checkpoint.py"])
 check("checkpoint_negatives", "nice sh tools/tests/lib/checkpoint_negatives.sh",
       ["tools/tests/lib/checkpoint_negatives.sh", "tools/tests/run.sh",
-       copy_if_changed_from("build/ot6.sfc")] + LIBS + checkpoint_files)
+       copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR)]
+      + LIBS + checkpoint_files)
 # the segment runner's negative control (#178, #200): a contract failure
 # fails on attempt 1 of 3 with no replay -- a red run a suite cannot expect
 check("retry_negative", "nice sh tools/tests/lib/retry_negative.sh",
       ["tools/tests/lib/retry_negative.sh", "tools/tests/run.sh",
        "tools/tests/lib/compose.py",
        copy_if_changed_from("tools/tests/probe_retry_negative.lua"),
-       copy_if_changed_from("build/ot6.sfc")] + [copy_if_changed_from(h) for h in LIBS])
+       copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR)]
+      + [copy_if_changed_from(h) for h in LIBS])
 # #309: every instrument left in tools/tests (`-- @manual`) composes and
 # starts (docs/TESTING.md "Scripts that stay in the tree").
 instruments = [f for f in glob("tools/tests/*.lua")
                if re.search(r"^-- @manual", (ROOT / f).read_text(errors="replace"), re.M)]
 check("instruments", "nice python3 tools/check_instruments.py",
-      ["tools/check_instruments.py", copy_if_changed_from("build/ot6.sfc")]
+      ["tools/check_instruments.py", copy_if_changed_from("build/ot6.sfc"),
+       copy_if_changed_from(sn.EMULATOR)]
       + [copy_if_changed_from(f) for f in instruments] + HARNESS
       + [copy_if_changed_from(h) for h in LIBS]
       + [d for f in instruments for d in fixture_deps(f)])
