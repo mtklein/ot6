@@ -555,14 +555,16 @@ publish_emulator() {
 if [ "$verdict" -eq 0 ] && [ -z "${OT6_NO_PUBLISH:-}" ]; then
   if [ -n "${OT6_EXPECT_ARTIFACT:-}" ]; then
     for src in $OT6_EXPECT_ARTIFACT; do
-      publish_file "$ART/$src" "$PUBLISH/$src"
-      publish_emulator "$PUBLISH/$src"
+      pub="$PUBLISH/$src"   # before publish_file, which reuses $src
+      publish_file "$ART/$src" "$pub"
+      publish_emulator "$pub"
     done
   else
     for src in "$ART"/*; do
       [ -f "$src" ] || continue
-      publish_file "$src" "$PUBLISH/$(basename "$src")"
-      publish_emulator "$PUBLISH/$(basename "$src")"
+      pub="$PUBLISH/$(basename "$src")"
+      publish_file "$src" "$pub"
+      publish_emulator "$pub"
     done
   fi
   for src in "$ART/shots"/*; do
