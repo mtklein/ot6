@@ -82,3 +82,9 @@ Relm's Sketch carries Final Fantasy VI 1.0's most famous bug, deliberately
 left in place: when a Sketch misses, the game can rarely corrupt your
 inventory or save. Save before experimenting with Sketch; the world map
 saves anywhere.
+
+## License
+
+OT6's own code is MIT (see [LICENSE](LICENSE)). The Final Fantasy VI
+disassembly under `ff6/` is GPL v3, and so are the built ROM and release
+patch that include it.
