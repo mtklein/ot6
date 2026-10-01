@@ -816,4 +816,18 @@ STATES = [
     #     tools/tests/run.sh tools/tests/gen_wor_edgar.lua
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-edgar-v1
     S("wor_edgar", gen="gen_wor_edgar", checkpoint="wor-south-figaro-v1", timeout=7200),
+
+    # wor-edgar-v1 -> the World of Ruin map outside Kohlingen: the Regal
+    # Crown off the castle's basement 2 (#322), the engineer's ride to
+    # Kohlingen, the walk to town (the castle's desert at its door), the
+    # town's chests, SETZER at the inn, dressed from the bag and the town's
+    # shops, and Save outside the town: the `wor-kohlingen-v1` checkpoint
+    # (docs/design/route-wor-falcon.md section 11).
+    # timeout=3600: see route-wor-falcon section 11 for the measured frames.
+    # Re-cutting the SRAM:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-edgar-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-kohlingen-v1/wor-kohlingen.sram \
+    #     tools/tests/run.sh tools/tests/gen_wor_kohlingen.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-kohlingen-v1
+    S("wor_kohlingen", gen="gen_wor_kohlingen", checkpoint="wor-edgar-v1", timeout=3600),
 ]

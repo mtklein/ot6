@@ -1382,6 +1382,56 @@ M.contracts["wor-edgar-v1"] = {
   },
 }
 
+-- wor-kohlingen-v1: the World of Ruin map outside Kohlingen, where the
+-- town's south edge returns the party, after the castle's ride to Kohlingen
+-- ($00DC, $0106 cleared) and SETZER's joining at the inn ($00CA, $02F9;
+-- $067F cleared), dressed from the bag and the town's shops
+-- (docs/design/route-wor-falcon.md sections 2.3-2.4, 7 and 11).  The
+-- Regal Crown's chest (#322) is open.  The tomb ($00CB) and the Falcon
+-- ($00CC, $00CD) are ahead.  CELES, SABIN, EDGAR and SETZER, no timer.
+M.contracts["wor-kohlingen-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 40, y = 45 },   -- east of the door (38,45), the walk in's side
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00C6, 1, "the Tentacles are beaten (:16121)" },
+    { 0x00C7, 1, "the castle surfaced (_ca69fd)" },
+    { 0x00DC, 1, "the castle stands by Kohlingen (_ca6908, :15690)" },
+    { 0x0106, 0, "the castle no longer stands by South Figaro (_ca6908)" },
+    { 0x00CA, 1, "SETZER joined (_cc3bf8, :85777)" },
+    { 0x02F9, 1, "SETZER is available (:85766)" },
+    { 0x067F, 0, "SETZER no longer waits in Kohlingen's inn (:85775)" },
+    { 0x00CB, 0, "the tomb's door not yet opened (_ca3f83)" },
+    { 0x00CC, 0, "the Falcon not yet risen (_ca4502)" },
+    { 0x00CD, 0, "the Falcon not yet risen (_ca4502)" },
+  },
+  party = {
+    size = 4,                     -- CELES, SABIN, EDGAR and SETZER
+    members = {
+      { 0x06, "CELES" },
+      { 0x05, "SABIN" },
+      { 0x04, "EDGAR" },
+      { 0x09, "SETZER" },
+    },
+  },
+  ram = {
+    { 0x1E40 + (0x09A >> 3), 1 << (0x09A & 7), 1 << (0x09A & 7),
+      "the Regal Crown's chest is open (treasure bit $09A, map 66 (3,53))" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+    { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
+    { 0x1190, 0xFF, 0x00, "timer 1 counter high" },
+    { 0x1195, 0xFF, 0x00, "timer 2 counter low" },
+    { 0x1196, 0xFF, 0x00, "timer 2 counter high" },
+    { 0x119B, 0xFF, 0x00, "timer 3 counter low" },
+    { 0x119C, 0xFF, 0x00, "timer 3 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
