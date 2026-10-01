@@ -1382,6 +1382,58 @@ M.contracts["wor-edgar-v1"] = {
   },
 }
 
+-- wor-figaro-sweep-v1: the World of Ruin map outside Figaro Castle again
+-- (the castle's exit tile, as wor-edgar-v1), after the South Figaro
+-- continent's side leg: the basement passage's chests by both ways in
+-- (Duncan's house and the rich man's), and the Hero Ring through the Figaro
+-- cave's other door (#322; docs/design/route-wor-falcon.md sections 2.2, 7
+-- and 10).  A side branch: the castle has not sailed ($00DC), and the Regal
+-- Crown (the Kohlingen leg's) is still closed.  CELES, SABIN and EDGAR.
+M.contracts["wor-figaro-sweep-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 81, y = 86 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x02F4, 1, "Edgar's joining ran (:15934)" },
+    { 0x00C6, 1, "the Tentacles are beaten (:16121)" },
+    { 0x00C7, 1, "the castle surfaced (_ca69fd)" },
+    { 0x0106, 1, "the castle stands by South Figaro (_ca69fd)" },
+    { 0x00DC, 0, "the castle has not yet sailed for Kohlingen" },
+  },
+  party = {
+    size = 3,                     -- CELES, SABIN and EDGAR
+    members = {
+      { 0x06, "CELES" },
+      { 0x05, "SABIN" },
+      { 0x04, "EDGAR" },
+    },
+  },
+  ram = {
+    { 0x1E40 + (0x013 >> 3), 1 << (0x013 & 7), 1 << (0x013 & 7),
+      "the Hero Ring's chest is open (treasure bit $013, map 90 (52,14))" },
+    { 0x1E40 + (0x0FC >> 3), 1 << (0x0FC & 7), 1 << (0x0FC & 7),
+      "the Hyper Wrist's chest is open (treasure bit $0FC, map 89 (110,49), the rich man's way)" },
+    { 0x1E40 + (0x0FE >> 3), 1 << (0x0FE & 7), 1 << (0x0FE & 7),
+      "the Ribbon's chest is open (treasure bit $0FE, map 89 (101,43), Duncan's way)" },
+    { 0x1E40 + (0x100 >> 3), 1 << (0x100 & 7), 1 << (0x100 & 7),
+      "the RunningShoes' chest is open (treasure bit $100, map 89 (120,53), the rich man's way)" },
+    { 0x1E40 + (0x09A >> 3), 1 << (0x09A & 7), 0,
+      "the Regal Crown's chest is closed (treasure bit $09A; the Kohlingen leg's)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+    { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
+    { 0x1190, 0xFF, 0x00, "timer 1 counter high" },
+    { 0x1195, 0xFF, 0x00, "timer 2 counter low" },
+    { 0x1196, 0xFF, 0x00, "timer 2 counter high" },
+    { 0x119B, 0xFF, 0x00, "timer 3 counter low" },
+    { 0x119C, 0xFF, 0x00, "timer 3 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- wor-kohlingen-v1: the World of Ruin map outside Kohlingen, where the
 -- town's south edge returns the party, after the castle's ride to Kohlingen
 -- ($00DC, $0106 cleared) and SETZER's joining at the inn ($00CA, $02F9;
