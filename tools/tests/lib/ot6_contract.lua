@@ -509,6 +509,13 @@ M.contracts["narshe-mission-v1"] = {
       { 0x09, "SETZER" },
     },
   },
+  -- #349: the Sealed Gate cave ahead holds the walked WoB route's one
+  -- Zombie pool (Zombone, maps 384/385) and no counter sells a cure
+  -- between Jidoor and the cave (Nikeah's 15 has none), so the step G->H
+  -- leaves with the Zombie cure gen_narshe_mission's Jidoor stop bought.
+  items = {
+    { 0xF1, 1, "Revivify (the Zombie cure for the cave's Zombones, #349)" },
+  },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
