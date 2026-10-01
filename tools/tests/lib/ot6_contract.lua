@@ -1394,8 +1394,10 @@ M.contracts["wor-edgar-v1"] = {
 -- continent's side leg: the basement passage's chests by both ways in
 -- (Duncan's house and the rich man's), and the Hero Ring through the Figaro
 -- cave's other door (#322; docs/design/route-wor-falcon.md sections 2.2, 7
--- and 10).  A side branch: the castle has not sailed ($00DC), and the Regal
--- Crown (the Kohlingen leg's) is still closed.  CELES, SABIN and EDGAR.
+-- and 10), the finds worn (the lib's relic rule, H.dressRelics: CELES wears
+-- the Ribbon).  The boot for the Kohlingen leg: the castle has not sailed
+-- ($00DC), and the Regal Crown (the Kohlingen leg's) is still closed.
+-- CELES, SABIN and EDGAR.
 M.contracts["wor-figaro-sweep-v1"] = {
   slot = 3,
   world = { map = 1, x = 81, y = 86 },
@@ -1426,6 +1428,8 @@ M.contracts["wor-figaro-sweep-v1"] = {
       "the RunningShoes' chest is open (treasure bit $100, map 89 (120,53), the rich man's way)" },
     { 0x1E40 + (0x09A >> 3), 1 << (0x09A & 7), 0,
       "the Regal Crown's chest is closed (treasure bit $09A; the Kohlingen leg's)" },
+    { 0x1600 + 37 * 6 + 0x24, 0xFF, 0xCA,
+      "CELES wears the Ribbon (relic 2; the relic rule gives the widest guard to the party's caster)" },
     { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
     { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
     { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
@@ -1479,6 +1483,8 @@ M.contracts["wor-kohlingen-v1"] = {
     { 0x1600 + 37 * 5 + 0x21, 0xFF, 0x7B,
       "SABIN wears the Regal Crown (his helmet slot; the crown goes to whichever of EDGAR and SABIN it improves most)" },
     { 0x1600 + 37 * 9 + 0x1E, 0xFF, 0x17, "SETZER holds UNICORN (esper 23)" },
+    { 0x1600 + 37 * 6 + 0x24, 0xFF, 0xCA,
+      "CELES wears the Ribbon (relic 2; from wor-figaro-sweep-v1, the side trip on the chain)" },
     { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
     { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
     { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
@@ -1529,6 +1535,8 @@ M.contracts["wor-tomb-v1"] = {
   ram = {
     { 0x1E40 + (0x0A1 >> 3), 1 << (0x0A1 & 7), 0,
       "the monster chest (120,9) is closed (treasure bit $0A1)" },
+    { 0x1600 + 37 * 6 + 0x24, 0xFF, 0xCA,
+      "CELES wears the Ribbon (relic 2; from wor-figaro-sweep-v1, the side trip on the chain)" },
     { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
     { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
     { 0x118F, 0xFF, 0x00, "timer 1 counter low" },

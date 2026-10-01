@@ -817,15 +817,15 @@ STATES = [
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-edgar-v1
     S("wor_edgar", gen="gen_wor_edgar", checkpoint="wor-south-figaro-v1", timeout=7200),
 
-    # wor-edgar-v1 -> wor-figaro-sweep-v1, a SIDE BRANCH off the chain (the
-    # Falcon arc's optional leg 1): the castle's desert to South Figaro, the
-    # basement passage's chests by both ways in (Duncan's house: the Ribbon,
-    # X-Potion, Ether; the rich man's: the Hyper Wrist, RunningShoes), the
-    # Hero Ring through the Figaro cave's other door (#322), the desert
-    # again (#321), and Save on the castle's tile (81,86) again
-    # (docs/design/route-wor-falcon.md sections 2.2 and 10).  Nothing boots
-    # its checkpoint: wor_kohlingen below boots wor-edgar-v1, so the side leg
-    # is off the main chain's critical path and regenerates beside it.
+    # wor-edgar-v1 -> wor-figaro-sweep-v1, the Falcon arc's leg 1, on the
+    # chain since 2026-10-01 (guidelines "Ribbons are worth going out of your
+    # way for"): the castle's desert to South Figaro, the basement passage's
+    # chests by both ways in (Duncan's house: the Ribbon, X-Potion, Ether;
+    # the rich man's: the Hyper Wrist, RunningShoes), the Hero Ring through
+    # the Figaro cave's other door (#322), each relic put on as it comes
+    # (H.dressRelics), the desert again (#321), and Save on the castle's
+    # tile (81,86) again (docs/design/route-wor-falcon.md sections 2.2 and
+    # 10).  wor_kohlingen below boots its checkpoint.
     # timeout=3600: the capture ended at frame 40859 from the Continue (10
     # battles); three such attempts are ~123k frames, ~1500 s at ~80 frames/s.
     # Re-cutting the SRAM:
@@ -835,7 +835,7 @@ STATES = [
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-figaro-sweep-v1
     S("wor_figaro_sweep", gen="gen_wor_figaro_sweep", checkpoint="wor-edgar-v1", timeout=3600),
 
-    # wor-edgar-v1 -> the World of Ruin map outside Kohlingen: the Regal
+    # wor-figaro-sweep-v1 -> the World of Ruin map outside Kohlingen: the Regal
     # Crown off the castle's basement 2 (#322), the engineer's ride to
     # Kohlingen, the walk to town (the castle's desert at its door), the
     # town's chests, SETZER at the inn, dressed from the bag and the town's
@@ -846,11 +846,11 @@ STATES = [
     # encounters used up first); three ~30k attempts are ~90k frames,
     # ~1100 s at a loaded machine's ~80 frames/s.
     # Re-cutting the SRAM:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-edgar-v1 \
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-figaro-sweep-v1 \
     #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-kohlingen-v1/wor-kohlingen.sram \
     #     tools/tests/run.sh tools/tests/gen_wor_kohlingen.lua
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-kohlingen-v1
-    S("wor_kohlingen", gen="gen_wor_kohlingen", checkpoint="wor-edgar-v1", timeout=3600),
+    S("wor_kohlingen", gen="gen_wor_kohlingen", checkpoint="wor-figaro-sweep-v1", timeout=3600),
 
     # wor-kohlingen-v1 -> Darill's Tomb's save point: the walk to the tomb,
     # the door SETZER opens, the switches and the turtles down through the

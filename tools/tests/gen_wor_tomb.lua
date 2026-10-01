@@ -31,8 +31,11 @@
 --      party to the far landing ($02B6); up through (79,3) -> the east room
 --      (122,28).
 --   7. The Man Eater (124,9); the monster chest (120,9) is left closed (the
---      Dullahan leg's); the field care (a Tent where it is worth one) and
---      the real Save UI on the save point (H.saveAtCheckpoint "wor-tomb-v1").
+--      Dullahan leg's); the field care (a Tent where it is worth one), the
+--      relics re-planned by the lib's relic rule (H.dressRelics) with what
+--      the chests and the drops brought (the Exp. Egg is not ranked; an
+--      Amulet is a Zombie guard), and the real Save UI on the save point
+--      (H.saveAtCheckpoint "wor-tomb-v1").
 -- Every battle's [outcome] is asserted said, judged on the battle's own end
 -- reading, and paid as due; every battle's draw is logged as a [key] line
 -- (the seed $be at InitBattle's store and the battle group $11E0), and every
@@ -83,6 +86,12 @@ local function kit(ch)
   return table.concat(t, " ")
 end
 local MEMBERS = { { CELES, "CELES" }, { SABIN, "SABIN" }, { EDGAR, "EDGAR" }, { SETZER, "SETZER" } }
+-- The statuses the arc's coming fights inflict, for the relic rule's guards
+-- (H.dressRelics opts.threats; an informed reading of route-wor-falcon 3.5,
+-- 4.2, 6 and 12.3-12.4): the tomb's Zombie, the Mad Oscar's Sour Mouth
+-- (Imp, Poison, Dark; Sleep, Muddle, Mute), the Sap seen there, and the
+-- monster chest's PetriBlast.  STATUS1 $67, STATUS2 $E8.
+local ARC_THREATS = { s1 = 0x67, s2 = 0xE8 }
 local function supplies()
   return string.format("tonic=%d potion=%d fenix=%d remedy=%d soft=%d revivify=%d greencherry=%d tent=%d gil=%d",
     H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX), H.invCountOf(REMEDY),
@@ -531,6 +540,13 @@ H.run({ maxFrames = 200000 }, {
   -- pitches one when the party's hole is past a Tent's worth of Tonics)
   H.stepOntoSavePoint(SAVE_POINT[1], SAVE_POINT[2]),
   H.fieldCare({ threshold = 1.0, tag = "on the save point" }),
+  -- The relics re-planned with what the chests and the drops brought (the
+  -- lib's relic rule, H.dressRelics; an Amulet, say, guards Zombie), here on
+  -- the save point, whose step-on waits out the field's stale map after a
+  -- menu (H.stepOntoSavePoint).  Not at the B2 hub after the chests: a
+  -- Relic menu at (29,26) left the walker no path to (37,23) for the 900
+  -- frames of its retries (build/attempts/wt/ribbon-chain/var_tomb_a/k1_s0.log).
+  H.dressRelics(MEMBERS, { threats = ARC_THREATS, tag = "relics on the save point" }),
   H.saveAtCheckpoint("wor-tomb-v1"),
   checkOutcomes("the stretch"),
   H.call(function()
