@@ -186,8 +186,8 @@ What differs from macOS:
 
 ## OT6's Mesen
 
-The harness runs OT6's build of MesenCE 2.2.1: branch `ot6` of OT6's fork,
-github.com/mtklein/mesen, which adds three small commits to MesenCE's
+The harness runs OT6's build of MesenCE 2.2.1: tag `ot6-2.2.1-1` of OT6's fork,
+github.com/mtklein/mesen, which adds four small commits to MesenCE's
 `2.2.1` tag. `tools/mesen/EMULATOR` pins the commit and
 `tools/mesen/build.sh` builds it (README.md there). The script-only change
 stops Mesen's debugger keeping the per-access records only its windows

@@ -2,7 +2,7 @@
 
 OT6's harness runs its own build of Mesen: MesenCE 2.2.1
 (github.com/nesdev-org/MesenCE, tag `2.2.1`, commit `20ba206c`) with three
-small changes, kept as commits on branch `ot6` of OT6's fork,
+small changes, kept as commits (tag `ot6-2.2.1-1`) on OT6's fork,
 github.com/mtklein/mesen (GPL v3, in Mesen's fork network; its
 `OT6-CHANGES.md` is the change notice):
 
