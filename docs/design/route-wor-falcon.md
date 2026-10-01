@@ -1065,7 +1065,12 @@ the band: ... already there (0 wanted)`, `bought: tonic=4 potion=54
 fenix=29 remedy=10 soft=18 revivify=10 greencherry=5 gil=218677 (spent
 8300 GP)`, `contract wor-kohlingen-v1 (exit): all 33 fields hold`, `PASS
 (frame 29814) attempts=1/3`; sealed `sha256=577024055a54...`
-(`../capture/validate_wor-kohlingen-v1.txt`).
+(`../capture/validate_wor-kohlingen-v1.txt`). The two new pins each fail
+alone on a copy of the battery with that byte changed
+(`../review/neg/`): `ram $16DA & $FF (SABIN wears the Regal Crown ...):
+expected 0x7B, read 0x76` and `ram $176B & $FF (SETZER holds UNICORN
+(esper 23)): expected 0x17, read 0xFF`, each `VIOLATED -- 1 field(s)
+differ`.
 
 Under draw variation (`var/`, the leg's own `varlab.py`, retries off):
 **11 of 11 `PASS attempts=1/1`** (K = 0, 2, 4, 6, 8, 10, 12 at shift 0;
@@ -1122,16 +1127,36 @@ plays the same run (`capture/ninja_wor_tomb_generate.log`: `PASS (frame
 The contract pins the party, the door and the switches the route sets,
 `$02B2=0` (Dullahan not fought), the monster chest closed (treasure bit
 `$0A1`), no timer, and the codex; a later leg that needs a level or an
-item asserts it itself.
+item asserts it itself. The two pins for the next leg each fail alone on a
+copy of the battery with that one bit set (the slot checksum and sha256
+recomputed; `review/make_neg.py`, `review/neg/`): `ram $1E54 & $02 (the
+monster chest (120,9) is closed (treasure bit $0A1)): expected 0x00, read
+0x02` and `switch $02B2 (Dullahan not yet fought (_ca42f1)): expected 0,
+read 1`, each `VIOLATED -- 1 field(s) differ`.
 
 What the plan did not know (every **verify-on-arrival** in 2.6 held
 otherwise; the order of 2.6 is the order walked):
 
-- **The save point is walled above and below**: 300 (122,14) is entered
-  from (121,14) (`plan/grid_save_point.txt`: `122,13:#`, `122,15:#`,
-  `121,14:RL`). `H.stepOntoSavePoint` approached from below only
-  (`dev/run2.log`: `navTo: no path (124,10)->(122,15)`); it now picks a
-  reachable side where the party stands (`lib/ot6_contract.lua`).
+- **The field's map reads stale for a while after a menu closes.**
+  `dev/run2.log` (the field care's menu, then the save point) failed with
+  `navTo: no path (124,10)->(122,15)`: the save point (122,14) is walled
+  above and below (`plan/grid_save_point.txt`: `122,13:#`, `122,15:#`,
+  `121,14:RL`), and right after the menu closed the BFS reached nothing --
+  measured from (124,10), every tile `n` for 39 frames with `ctl=true
+  algn=true`, then (122,14) and (121,14) `y` (`review/probe_savepoint.log`).
+  `H.stepOntoSavePoint` now waits for the map to reach the tile or a side
+  before it chooses (`review/probe_savepoint_now.log`: `waitUntil 'the
+  field's map reaches the save point (122,14) or a side' satisfied after 39
+  frames`, then `[probe] on (122,14)`, `PASS`); the same probe on the
+  lib of `d3eaeb7c` fails as run2 did (`review/probe_savepoint_now_on_
+  d3eaeb7c.log`: `approached from (122,15), pressing up`, `FAIL: navTo: no
+  path (124,10)->(122,15)`). Its other change, approaching from a
+  reachable side when the tile itself reads blocked, has not run: no
+  measured case had the tile blocked with a side open. Another
+  generator's field save point under the new step: `gen_kolts` (57,8),
+  `waitUntil ... satisfied after 0 frames`, `contract kolts-summit-v1
+  (exit): all 12 fields hold`, `PASS (frame 91741)`
+  (`review/review2/gen_kolts.log`).
 - **Each room of maps 299 and 300 is its own pocket**, joined by same-map
   doors (`plan/nolinks.txt`), so the walk is a chain of door crossings
   rather than one path; B2's hub (37,12) holds five of them.
@@ -1196,26 +1221,72 @@ false` is the lever). The same 19 variants with the lever off and on
 
 | | battles in the tomb | ended with a member Zombied | member-battles Zombied at the end | XP unpaid to members down or Zombied |
 |---|---|---|---|---|
-| cure off (`var0/`) | 102 | 10 | 12 | 14,505 over 13 member-battles |
+| cure off (`var0/`, `var0b/`) | 102 | 10 | 12 | 14,505 over 13 member-battles |
 | cure on (`var1/`) | 102 | 3 | 3 | 3,537 over 4 member-battles |
 
 Both arms 19 of 19 PASS. With the cure on, 19 Zombie landings were said
 (`is under ZOMBIE`) and 16 cleared in battle (`Zombie is CLEARED`); the
 three left at a battle's end had a plan the last blow beat
 (`var1/k0_s41.log`: `actor=2 cure entity 1's Zombie with $F1` at f+1207,
-the last monster dead at f+2700 before the item ran). `battle_zombiecure`
-(fixture `tomb_zombie`, `gen_tomb_zombie`: the frame a Zombie lands in the
-grave room, 299, whose pool holds two of the casters) holds it:
-`zombie/suite/suite_on.log`: `cure entity 3's Zombie with $F1` ->
-`entity 3's Zombie cleared in battle, 1562 frames after the fixture` ->
-`char 9 +673 (due 673)`, `PASS`. The lever off (`suite_off.log`) fails at
-`the driver planned a Revivify on the Zombied entity 3`; with that
-assertion dropped, at `entity 3's Zombie cleared while the battle was up`
-(`suite_off_m2.log`); with both dropped, at `the battle paid the
-once-Zombied entity 3 its share (got 0, due 0)` (`suite_off_m3.log`). A
-fixture rather than a walk, because pacing B3's east room landed 1-2
-Zombies in 20 battles a shift and pacing the grave room 0 in one shift's
-15 (`zombie/lab/`). After the change, `ninja` ran the suites the driver
+the last monster dead at f+2700 before the item ran). After review the lever
+was made to restore the whole pre-#263 driver (the patient test and the
+pending-cure bookkeeping as well as the cure line), and the off arm re-run
+as `var0b/`: 19 of 19 PASS, the same 121 battles, `102 tomb battles; 10
+ended with a member Zombied, 12 member-battles Zombied at the end; XP
+unpaid ... 14505 over 13 member-battles`, every run's `[outcome]` lines
+identical to `var0/`'s (`review/var0_vs_var0b.txt`).
+
+`battle_zombiecure` holds it. Its fixture, `tomb_zombie`
+(`gen_tomb_zombie`), is the frame a Zombie lands in the grave room (299,
+whose pool holds two of the casters) **with a turn to spare**: the landing
+is captured and held, the battle plays on, and the capture is emitted only
+if another standing member's command window opened while the zombie stood
+and the battle was still up 900 frames after it; the suite asserts the
+same precondition by name before the property (3 of var1's 19 landings
+had a plan the last blow beat, `build/attempts/wt/wor-tomb-review/uncured_landings.txt`). Every battle's
+`[key]` and every landing is logged with its key. Twelve fixtures
+regenerated under draw variation (`review/zfix/`: SKIP 0 and 1 qualifying
+landings passed over, seed shifts 0, 7, 13, 21, 29, 37): 141 grave-room
+battles over 57 distinct battle keys, 18 landings over 10 of them, all 18
+with a turn to spare; the twelve fixtures stand in 10 distinct battle keys
+(two keys hold two fixtures, a different member Zombied in each). **The
+suite passes on all twelve** (`zfix/suite2_k*_s*.log`), e.g. `PASSED:
+entity 3 (char 9) Zombied at the fixture, the cure planned at f901, the
+Zombie cleared at f1565, the list one fewer at f1233, the battle won, its
+share paid (673)`; in one (`k0_s21`) the cured member was Zombied again
+and the battle ended with it down: `down again at f1994 after the cure:
+share 0`. The graph's own edge: `ninja build/results/suite/battle_zombiecure.ok`,
+exit 0 (`review/zmut/ninja_zombiecure.log`). The suite also ties the clear
+to the Revivify spent: the battle's item list ($2686, the list the Item
+menu shows) must read one fewer after the plan and before the battle's
+end; it updates at the next menu, not on the use (`k1_s21`: cleared f459,
+`$F1 40 -> 39` at f624).
+
+Negative control and mutants, all on the graph's fixture
+(`review/zmut/`): the lever off fails at `the driver planned a Revivify on
+the Zombied entity 3`; with that assertion dropped, at `entity 3's Zombie
+cleared while the battle was up`; with that dropped too, at `the battle's
+item list lost a $F1 after the cure was planned (fnil) ...`; and with that
+dropped, at `the battle paid the once-Zombied entity 3 its share (got 0,
+due 0), or it went down again after the cure (no)`. With the lever on:
+the captured log without the driver's ZOMBIE line fails at `the driver
+said [status] ... is under ZOMBIE for entity 3`; counting Remedy for
+Revivify fails at `the battle's item list lost a $F5 ...`; a SPARE no
+battle meets fails at `the precondition: the battle was still up 100000
+frames after that window`.
+
+Elsewhere on the route, with the cure on (`review/others/`, retries off,
+shifts 0, 23, 41): `gen_vector_crash`, `gen_esper_tubes` and
+`gen_wor_nikeah` 9 of 9 `PASS attempts=1/1`. Only `gen_vector_crash`
+shift 23 met a Zombie (LOCKE: one landing, then `is under ZOMBIE` at the
+opening of three later battles, 4 lines over its 8 battles), with no
+Revivify in the bag: `entity 1 is ZOMBIE and nothing in
+the bag carries the bit (Green Cherry 4, Remedy 1, Revivify 0) -- no cure
+to plan; planning on`, so the cure never fired there (and the field care
+could not: `[care after battle (navTo)] nothing to do: ... c1 0/968 hp 207/207
+mp status1=02`; he walked on Zombied, a supply gap that predates the cure).
+
+After the change, `ninja` ran the suites the driver
 touches (`battle_zombiecure`, `battle_zombieraise`, `battle_healpolicy`,
 `battle_statuses`, `battle_healerdown`, `field_zombiecure`,
 `battle_magicite`, `field_care_emptybag`, `battle_breakwor_falcon`), each

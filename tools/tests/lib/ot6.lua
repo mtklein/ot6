@@ -5279,7 +5279,9 @@ function Driver:makePlan(actor)
     for e = 0, 3 do if e ~= actor then order[#order + 1] = e end end
     for _, e in ipairs(order) do
       -- a zombie reads 0 HP without the Wound bit, and is a patient here
+      -- (unless opts.zombieCure = false: then the line is the driver before #263)
       local zombie = status1Has(e, M.ST1_ZOMBIE) and not status1Has(e, 0x80)
+        and self.opts.zombieCure ~= false
       if (hpNow[e] > 0 or zombie) and maxOf(e) > 0 then
         local item, what = self:cureFor(e)
         local queued = self.cureQueued[e]
@@ -7951,8 +7953,10 @@ function Driver:watchPendingCare()
   for e, q in pairs(self.cureQueued) do
     local s1, s2 = M.readByte(BATTLE.ST1 + e * 2), M.readByte(BATTLE.ST2 + e * 2)
     local still = (M.itemStatus1(q.item) & s1) ~= 0 or (M.itemStatus2(q.item) & s2) ~= 0
-    -- a zombie's 0 HP is the patient's, not a fall
-    local fell = M.readWord(0x3BF4 + e * 2) == 0 and (s1 & M.ST1_ZOMBIE) == 0
+    -- a zombie's 0 HP is the patient's, not a fall (with the Zombie cure
+    -- off, opts.zombieCure = false, any 0 HP is a fall, as before #263)
+    local fell = M.readWord(0x3BF4 + e * 2) == 0
+      and (self.opts.zombieCure == false or (s1 & M.ST1_ZOMBIE) == 0)
     if not still or fell
        or self.battleTick - q.tick > BATTLE.RAISE_WAIT + 600 then
       self.cureQueued[e] = nil
