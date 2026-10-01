@@ -92,6 +92,11 @@ gh issue list --limit 50 --json number,title,labels -q '.[] | "\(.number) \(.tit
 ```bash
 git worktree list; tools/critic.sh --check; curl -s --max-time 3 http://127.0.0.1:8611/grid.json | head -c 200
 ```
+```bash
+ssh px13.local 'tail -1 /var/log/unattended-upgrades/unattended-upgrades.log; [ -f /var/run/reboot-required ] && cat /var/run/reboot-required.pkgs'
+```
+(Weekly, owner 2026-10-01: px13 installs security updates itself but never
+reboots; when it lists packages needing a reboot, restart it at a quiet moment.)
 
 Then list, as findings: uncommitted work and which branch it belongs on;
 unpushed commits; release drift (VERSION and README claim a version that
