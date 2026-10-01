@@ -35,6 +35,18 @@ starts at Narshe.  Under it is a WARNING; the fix is a `TINCTURE to N`
 line at a counter that sells them (Narshe 3, Jidoor 22, Albrook 24,
 Thamasa 35).
 
+The Revivify band (docs/design/supply.md, #231 and #349): Revivify is the
+Zombie cure, in the field and in battle, and nothing else in a WoB bag
+clears the bit (a Fenix Down never lands on a zombie, Remedy's mask leaves
+it).  It is carried at 3 from the first counter that sells it -- Jidoor's
+shop 22, bought in `gen_zozo2_arrival`'s run (the `zozo_arrival` row) --
+to the same WoR landing.  The WoB's one Zombie pool on the walked route is
+the Sealed Gate cave's Zombones (maps 384/385); #349 was a chain that
+walked it with none, because the checkpoint it booted was cut before the
+Jidoor stop bought any.  Under the band is a WARNING; the fix is a
+`REVIVIFY to N` line at a counter that sells them (Jidoor 22, Albrook 24,
+Thamasa 35), or a re-cut of a checkpoint cut before the line existed.
+
 Usage:  python3 tools/audit_supplies.py [--repo .] [--selftest] [-v]
 Exit 0 clean, 1 if a fixture dropped to no revives across a boundary, or if a
 waiver has gone stale.
@@ -58,6 +70,7 @@ FENIX_DOWN = 0xF0                      # the WoB's only revival, item id $F0
 POTION = 0xE9                          # the in-combat heal, item id $E9
 TONIC = 0xE8                           # the field-care heal, item id $E8
 TINCTURE = 0xEB                        # the field-care MP restore, item id $EB
+REVIVIFY = 0xF1                        # the Zombie cure, item id $F1
 INV_IDS = 0x1869 - 0x1600             # inventory ids, offset past the char table
 INV_QTY = 0x1969 - 0x1600             # inventory counts, one byte each
 
@@ -73,6 +86,10 @@ TONIC_BAND_CAP = 99
 # The graph row whose run first buys Tinctures (Narshe's shop 3, after the
 # Battle for Narshe).
 FIRST_TINCTURE_SHOP_ROW = "figaro_submerged"
+# The graph row whose run first buys Revivifies (Jidoor's shop 22, on the
+# way to Zozo), and the band it is carried at (supply.md section 4).
+FIRST_REVIVIFY_SHOP_ROW = "zozo_arrival"
+REVIVIFY_BAND = 3
 # The band is a WoB band: the graph row that generates this state (with its
 # `also=` artifacts, escape_start today) and everything downstream of it is
 # the World of Ruin, out of band.
@@ -137,6 +154,7 @@ def bag_of_mss(path: str):
     return {"fenix": revives_in(raw, cb), "potion": count_in(raw, cb, POTION),
             "tonic": count_in(raw, cb, TONIC),
             "tincture": count_in(raw, cb, TINCTURE),
+            "revivify": count_in(raw, cb, REVIVIFY),
             "level": party_level(raw, cb)}, None
 
 
@@ -236,6 +254,18 @@ def in_tincture_band(name: str, states: dict) -> bool:
             and not in_world_of_ruin(name, states))
 
 
+def in_revivify_band(name: str, states: dict) -> bool:
+    """The Revivify band applies from Jidoor's shop 22 (the Zozo stop) to
+    the WoR landing."""
+    return (past_row(name, states, FIRST_REVIVIFY_SHOP_ROW)
+            and not in_world_of_ruin(name, states))
+
+
+def revivify_short(have: int) -> bool:
+    """Fewer Zombie cures than the band."""
+    return have < REVIVIFY_BAND
+
+
 def in_world_of_ruin(name: str, states: dict) -> bool:
     """Whether the fixture lies at or past the WoR landing: it is generated
     by WOR_LANDING's graph row (its `also=` siblings included) or its `prev`
@@ -319,6 +349,10 @@ def selftest(repo: str = ".") -> int:
     check("4 Tinctures at L14 is not (negative control)",
           4 < tincture_band(14), False)
     check("9 Tinctures at L28 is not", 9 < tincture_band(28), False)
+    # the Revivify band: a flat 3 (#349: the cave legs booted with 0)
+    check("0 Revivifies is under the band", revivify_short(0), True)
+    check("2 Revivifies is under the band", revivify_short(2), True)
+    check("3 Revivifies is not (negative control)", revivify_short(3), False)
 
     # Checked against mrf-save-room-v1, which carries two Fenix Downs.
     cps = dict(checkpoint_payloads(repo))
@@ -394,6 +428,17 @@ def selftest(repo: str = ".") -> int:
               in_tincture_band("fc_alcove", states), True)
         check("but not the WoR landing (wor_landing)",
               in_tincture_band("wor_landing", states), False)
+        # the Revivify band starts at Jidoor's counter, gen_zozo2_arrival's
+        # row: none before it, the Sealed Gate cave legs inside it
+        check("no Revivify band before Jidoor (figaro_submerged)",
+              in_revivify_band("figaro_submerged", states), False)
+        check("the Revivify band starts with gen_zozo2_arrival's own artifact "
+              "(zozo_arrival)", in_revivify_band("zozo_arrival", states), True)
+        check("and covers the Sealed Gate cave legs (gate_cave_save)",
+              in_revivify_band("gate_cave_save", states), True)
+        check("and vector_crash", in_revivify_band("vector_crash", states), True)
+        check("but not the WoR landing (wor_landing)",
+              in_revivify_band("wor_landing", states), False)
 
     print("audit_supplies selftest: " + ("ok" if ok else "FAILED"))
     return 0 if ok else 1
@@ -435,7 +480,7 @@ def main() -> int:
             return n, f"checkpoint {cp}", err
         return None, "root", "no predecessor"
 
-    scanned, skipped, cliffs, short, tshort, mpshort = 0, [], [], [], [], []
+    scanned, skipped, cliffs, short, tshort, mpshort, zshort = 0, [], [], [], [], [], []
     for name in sorted(declared):
         path = os.path.join(args.dir, name + ".mss")
         if not os.path.exists(path):
@@ -458,6 +503,8 @@ def main() -> int:
             mband = tincture_band(bag["level"])
             if bag["tincture"] < mband:
                 mpshort.append((name, bag["tincture"], mband, bag["level"]))
+        if in_revivify_band(name, states) and revivify_short(bag["revivify"]):
+            zshort.append((name, bag["revivify"]))
         edge = states.get(name, {"prev": None, "checkpoint": None})
         pred, label, perr = predecessor_revives(edge)
         if perr:
@@ -529,6 +576,20 @@ def main() -> int:
                       f"< band {band} (L{level})")
         else:
             print("    " + " ".join(n for n, _, _, _ in mpshort))
+
+    if zshort:
+        print(f"  WARNING: {len(zshort)} fixture(s) under the Revivify band "
+              f"({REVIVIFY_BAND}; the Zombie cure, docs/design/supply.md) -- "
+              f"top up with a REVIVIFY to N line at a counter that sells them "
+              f"(Jidoor 22, Albrook 24, Thamasa 35), or re-cut a checkpoint "
+              f"cut before that line"
+              + ("" if args.verbose else "; -v lists them") + ":")
+        if args.verbose:
+            for name, have in zshort:
+                print(f"    REVIVIFY SHORT {name:25s} revivify={have:2d} "
+                      f"< band {REVIVIFY_BAND}")
+        else:
+            print("    " + " ".join(n for n, _ in zshort))
 
     stale = sorted(waivers - used)
     if stale:

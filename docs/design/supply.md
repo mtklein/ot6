@@ -239,3 +239,62 @@ like the Potion line: a short purse shorts the soak, then the Tinctures,
 never the revives.  `tools/audit_supplies.py` warns under the Tincture band
 from Narshe's counter (the `figaro_submerged` row) to the WoR landing,
 beside the Tonic and Potion warnings.
+
+## 5. The Zombie cure for the Sealed Gate cave (#349)
+
+Where a Zombie can land on the walked World of Balance route, off the
+ROM: thirteen species carry it in their special (`MonsterProp+31` low
+bits = 1), and crossing them with the random pool of every field map the
+WoB generators stood on (their regeneration logs' `[tiles] map=` lines)
+and with every formation they fought leaves one: Zombone (`$082`, special
+'Bone', `$41`: no damage, inflicts Zombie) in the Sealed Gate cave, map 384
+(formations `$024` Zombone x2 and `$097` Zombone + Ing x2, 80/256 each)
+and map 385 (`$096`, `$097`).  Two legs walk it: `gen_gate_cave_save`
+(the cave mouth to the save point on 386) and `gen_vector_crash` (the
+save point to the gate and out by the shortcut).  The last counter that
+sells the cure before them is Jidoor 22, `gen_narshe_mission`'s departure
+stop: `gen_gate_cave_save`'s Nikeah 15 sells none, Vector after the
+crash sells nothing usable, and the next is Albrook 24 (`gen_voyage`).
+Nothing else in the bag clears the bit: a Fenix Down never lands on a
+zombie (#245) and Remedy's mask leaves it.  Ing (`$048`, the pool's third
+formation) drops Revivify (`monster_items.asm`), so the cave also pays
+some back: one Ing x3 fight took the bag from 0 to 3.
+
+How often it lands, by distinct battle key, with a read-only watch on
+each member's battle STATUS1 (`build/attempts/wt/vector-revivify/`,
+`zlab.py`; K encounters used up on 384 or on the grass south of Narshe
+before the body, seed shifts 0-61, retries off): 534 Zombone battles
+over 113 distinct Zombone keys in 42 runs, all passing, 4 landings on 3
+keys, at most one in a run (`all_keys.txt`).  So the cave spends about
+one Revivify in ten runs, and the band's 3 covers the worst run measured
+three times over for 900 of the ~114,000 gil the party leaves Jidoor
+with.  The band stays at 3.
+
+What went wrong in #349 was the chain, not the line.  `REVIVIFY to 3`
+went into `gen_narshe_mission` on 2026-09-21 (#231, 7b8ad630), four days
+after `narshe-mission-v1` was last cut (3f6fb96e), and both cave legs
+boot checkpoints cut from that older run, so `gate-cave-save-v1` held
+none and at seed shift 23 LOCKE walked four fights zombied, each paying
+him `+0 (due 0)` (`pre_vc/k0_s23`, the review's draw).  The fix:
+
+- the departure stop also fires when the bag is under the Revivify band
+  (it fired only on Potions or Fenix Downs), and the plains exit asserts
+  it;
+- `narshe-mission-v1`'s contract requires a Revivify, so the step into
+  the cave (and `school.lua`, which boots the same battery) refuses a
+  battery without one: the old one fails with `item $F1 (Revivify ...)
+  in inventory: expected 1, read 0`;
+- `narshe-mission-v1`, `gate-cave-save-v1` and `vector-crash-v1` are
+  re-cut through their generators (each manifest now declares its save);
+- `tools/audit_supplies.py` warns under the Revivify band from Jidoor's
+  first counter (the `zozo_arrival` row) to the WoR landing.
+
+On the re-cut chain each of the three landings was cured the fight it
+landed.  One came with turns to spare and was cleared in battle
+(`post_vc3/k8_s33`, key be60-g0024: `actor=3 cure entity 0's Zombie with
+$F1 (3 in the bag)`, the watch's `Zombie CLEARS on char 0`, and TERRA paid
+`+1072 (due 1072)`).  Two came on a fight's last blows: once the driver
+planned the Revivify and the fight ended before it ran, and the field care
+used one right after both (`used $F1 on char 5: 0 -> 112 hp, ... status1
+02 -> 00, 2 left`), so those two fights paid the zombie nothing and the
+next one paid it in full.
