@@ -29,6 +29,7 @@
 14	map 59 Figaro shop alcove, Tonic (43,12)
 15	map 59 Figaro shop alcove, Antidote (44,12)
 18	map 68 Figaro cave (World of Ruin; bits shared with maps 69 and 72), X-Potion (3,18)
+19	map 90 Figaro cave (World of Ruin), Hero Ring (52,14) -- by the cave's other door 68 (4,4)
 20	map 75 South Figaro, Fenix Down (22,18)
 21	map 75 South Figaro, Tonic (32,16)
 22	map 75 South Figaro, Antidote (15,45)
@@ -41,6 +42,8 @@
 29	map 84 Figaro cave, empty chest (22,55) -- a human opens it too
 30	map 86 grandson's house, Tonic (15,10)
 31	map 86 rich man's house, Elixir (7,31)
+32	map 87 Figaro basement (South Figaro's passage), Iron Armor (32,42)
+33	map 87 Figaro basement (South Figaro's passage), Earrings (33,56)
 34	map 87 Figaro basement, RegalCutlass (47,33)
 35	map 87 Figaro basement, Heavy Shld (48,33)
 37	maps 96/97 Mt. Kolts, Tent (27,14) -- shared bit, two copies
@@ -51,8 +54,10 @@
 42	map 110 hideout west, Fenix Down (28,49)
 48	map 110 hideout east, Potion (55,48)
 50	map 117 Imperial Camp, Star Pendant (45,5) -- the sealed-chest gag, kicked
+65	map 195 Kohlingen house (World of Ruin), Green Beret (37,53)
 66	map 209 Owzer's House, Tincture (125,11)
 68	map 386 gate cave, Tent (77,52)
+69	map 197 Kohlingen west house (World of Ruin), Elixir (42,10)
 77	map 250 Vector, Back Guard (24,48)
 78	map 250 Vector, X-Potion (25,48)
 81	map 252 banquet hall, Tincture (42,55) -- opened inside the timed window
@@ -79,7 +84,14 @@
 151	map 63 Figaro Castle basement 3, X-Potion (82,14)
 152	map 63 Figaro Castle basement 3, Gravity Rod (86,14)
 153	map 63 Figaro Castle basement 3, Crystal Helm (88,14)
+154	map 66 Figaro Castle (World of Ruin), Regal Crown (3,53) -- off basement 2's west pocket
 155	map 65 Figaro Castle engine room, Soul Sabre (68,10)
+156	map 299 Darill's Tomb B2, Genji Helmet (43,42)
+157	map 299 Darill's Tomb B2, Crystal Mail (9,59)
+158	map 300 Darill's Tomb B3, Czarina Gown (43,60)
+159	map 300 Darill's Tomb B3, Exp. Egg (55,58)
+160	map 300 Darill's Tomb B3, Man Eater (124,9)
+230	map 74 South Figaro (World of Ruin; bit shared with map 75's Soft), Elixir (2,43)
 231	map 75 South Figaro, Warp Stone (11,23)
 239	map 225 Zozo clock shelf, Tincture (104,9)
 240	map 225 Zozo clock shelf, Potion (105,9)
@@ -88,3 +100,8 @@
 248	map 343 Thamasa town, Soft (43,30)
 249	map 343 Thamasa town, Eyedrop (31,37)
 250	map 343 Thamasa town, Fenix Down (14,18)
+252	map 89 South Figaro's cellar, Hyper Wrist (110,49) -- the rich man's way in
+253	map 89 South Figaro's cellar, X-Potion (101,39) -- Duncan's way in
+254	map 89 South Figaro's cellar, Ribbon (101,43) -- Duncan's way in
+255	map 89 South Figaro's cellar, Ether (92,53) -- Duncan's way in
+256	map 89 South Figaro's cellar, RunningShoes (120,53) -- the rich man's way in
