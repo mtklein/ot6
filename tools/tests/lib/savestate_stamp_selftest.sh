@@ -122,7 +122,8 @@ check "GATE_CONTRACT version participates in the sig" DIFF \
 #    provenance bindings: line 1 is byte-identical to `sig` (the side
 #    compose.py re-derives), line 2 binds the ROM, line 3 the generator's own
 #    sig, lines 4-6 name each lib half's hash, line 7 binds the artifact,
-#    line 8 binds the ancestor.
+#    line 8 binds the ancestor, and the last line records the emulator
+#    (provenance only).
 printf 'generated state bytes v1\n' > "$TMP/build/states/fake.mss"
 sh "$GATE" write fake gen_fake - "$extra"
 [ "$(head -n 1 "$TMP/build/states/fake.stamp")" = "$(sh "$GATE" sig gen_fake "$extra")" ] &&
@@ -146,9 +147,28 @@ want_art="artifact $(shasum -a 256 "$TMP/build/states/fake.mss" | cut -c1-64)"
 [ "$(sed -n 7p "$TMP/build/states/fake.stamp")" = "$want_art" ] &&
   echo "  pass write binds the generated artifact's hash" ||
   { echo "  FAIL artifact binding wrong or missing"; ok=0; }
-[ "$(wc -l < "$TMP/build/states/fake.stamp" | tr -d ' ')" = 7 ] &&
+[ "$(wc -l < "$TMP/build/states/fake.stamp" | tr -d ' ')" = 8 ] &&
+  ! grep -q '^ancestor ' "$TMP/build/states/fake.stamp" &&
   echo "  pass a root state (ancestor -) carries no ancestor line" ||
   { echo "  FAIL unexpected ancestor line on a root state"; ok=0; }
+# The emulator line: copied from the [emulator] line run.sh publishes beside
+# the .mss (<state>.mss.emulator); "unknown" with no such record, or with one
+# older than the .mss (provenance never stops a stamp).
+[ "$(sed -n 8p "$TMP/build/states/fake.stamp")" = "emulator unknown" ] &&
+  echo "  pass write records 'emulator unknown' with no [emulator] record" ||
+  { echo "  FAIL emulator line wrong or missing (no record)"; ok=0; }
+esha=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+printf '[emulator] %s MESEN_SCRIPT_ONLY requested=1\n' "$esha" > "$TMP/build/states/fake.mss.emulator"
+sh "$GATE" write fake gen_fake - "$extra"
+[ "$(sed -n 8p "$TMP/build/states/fake.stamp")" = "emulator $esha" ] &&
+  echo "  pass write copies the run's [emulator] sha into the stamp" ||
+  { echo "  FAIL emulator line does not match the published [emulator] record"; ok=0; }
+touch -t 200001010000 "$TMP/build/states/fake.mss.emulator"
+sh "$GATE" write fake gen_fake - "$extra"
+[ "$(sed -n 8p "$TMP/build/states/fake.stamp")" = "emulator unknown" ] &&
+  echo "  pass an [emulator] record older than the .mss is not believed" ||
+  { echo "  FAIL a stale [emulator] record was copied"; ok=0; }
+rm -f "$TMP/build/states/fake.mss.emulator"
 # The ROM line is the ROM that RAN: OT6_ROM (run.sh's override) is honored.
 printf 'other rom\n' > "$TMP/build/other.sfc"
 OT6_ROM="$TMP/build/other.sfc" sh "$GATE" write fake gen_fake - "$extra"
@@ -169,6 +189,7 @@ printf 'child state bytes v1\n' > "$TMP/build/states/child.mss"
 sh "$GATE" write child gen_fake build/states/fake.stamp
 want_anc="ancestor build/states/fake.stamp $(shasum -a 256 "$TMP/build/states/fake.stamp" | cut -c1-64)"
 [ "$(sed -n 8p "$TMP/build/states/child.stamp")" = "$want_anc" ] &&
+  [ "$(sed -n 9p "$TMP/build/states/child.stamp")" = "emulator unknown" ] &&
   echo "  pass chained write binds the ancestor stamp's hash" ||
   { echo "  FAIL ancestor binding wrong or missing"; ok=0; }
 

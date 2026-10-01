@@ -77,7 +77,8 @@ The non-brew pieces need the manual steps at each bullet.
 - **Flips CLI** — binary at `tools/bin/flips` (git-ignored). Rebuild:
   clone github.com/Alcaro/Flips, `make CFLAGS=-O2`, copy `flips` in.
 - **Mesen 2.1.1** — official macOS ARM64 release zip from
-  github.com/SourMesen/Mesen2, unpacked to `tools/Mesen.app`. Debugger has
+  github.com/SourMesen/Mesen2, unpacked to `tools/Mesen.app`
+  (`Contents/MacOS/Mesen` sha256 `bddfea2f...1b09`). Debugger has
   breakpoints/memory watch/trace and ca65 symbol integration; the build
   emits `ff6/rom/ff6-en.dbg` for source-level debugging.
 - **sdl2** — via Homebrew; a hard Mesen runtime dependency.
@@ -140,13 +141,16 @@ those.
 
 - **Packages** (apt): `git cc65 ninja-build python3 python3-numpy
   libsdl2-2.0-0 unzip`. No compiler is needed: nothing in the build or the
-  harness compiles C. `ninja release` also wants `tools/bin/flips`, which
+  harness compiles C (building the patched Mesen does; see Patched Mesen). `ninja release` also wants `tools/bin/flips`, which
   would need a compiler to build (see the Flips bullet above), so release
   packaging stays on a Mac.
 - **Mesen 2.1.1**: the official `Mesen_2.1.1_Linux_x64.zip` from
   github.com/SourMesen/Mesen2's 2.1.1 release (sha256 `7a994757...1ce9`),
-  one self-contained binary, unzipped to `tools/Mesen-linux/Mesen`. It needs
-  `libsdl2-2.0-0` and nothing else extra.
+  one self-contained binary, unzipped to `tools/Mesen-linux/Mesen` (sha256
+  `ae43f143...3b41`). It needs `libsdl2-2.0-0` and nothing else extra.
+  Every run log names the binary that ran (`[emulator] <sha256>`), and so
+  does every generated fixture's stamp (`emulator <sha256>`, a record, not
+  a binding).
 - **Settings**: `mkdir -p ~/.config/Mesen2 && echo '{}' >
   ~/.config/Mesen2/settings.json`. That is the source profile
   `pin_test_saves.py` copies, as the Mac's `~/Library/Application
@@ -173,6 +177,29 @@ What differs from macOS:
   <command>` is what an ssh session is allowed without a password (sleep and
   lid-switch locks need interactive polkit auth). A closed lid still
   suspends the machine. live.py's `--peer px13.local` uses the same wrapper.
+
+## Patched Mesen
+
+`tools/mesen/` holds two patches for Mesen 2.1.1 and `build.sh`, which builds
+them from the official tag (README.md there). The script-only patch stops
+Mesen's debugger keeping the per-access records only its windows read (the
+code/data log, access counters, call stack, event log) when
+`MESEN_SCRIPT_ONLY=1`; the screenshot patch makes `emu.takeScreenshot`
+return the frame just finished instead of sometimes the one before. On
+px13 the result plays every leg tested identically to the official binary
+and runs about 1.4x as fast (build/attempts/wt/mesen-lean/).
+
+- run.sh exports `MESEN_SCRIPT_ONLY=1` for every run except a coverage run
+  (OT6_COVERAGE), which needs the code/data log; the official binary ignores
+  the variable, so the Macs are unaffected.
+- `OT6_MESEN_APP=<dir> OT6_MESEN_CACHE=<own cache>` runs another emulator
+  for one invocation without touching the shared copy.
+- Building needs a compiler and the .NET SDK (Linux: apt `clang lld zip
+  libsdl2-dev zlib1g-dev dotnet-sdk-10.0 dotnet-sdk-aot-10.0`); the build
+  ends with a smoke test against the official binary.
+- A worker uses it once `tools/Mesen-linux/Mesen` in its main tree is
+  replaced by the build (README.md, "Deploying"). The Macs keep the
+  official binary until a .NET SDK is installed there.
 
 ## Reference docs for the asm work (see research/)
 

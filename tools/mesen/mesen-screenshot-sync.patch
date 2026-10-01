@@ -1,0 +1,17 @@
+diff --git a/Core/Shared/Video/VideoDecoder.cpp b/Core/Shared/Video/VideoDecoder.cpp
+index 82637955..bee8e331 100644
+--- a/Core/Shared/Video/VideoDecoder.cpp
++++ b/Core/Shared/Video/VideoDecoder.cpp
+@@ -251,6 +251,12 @@ void VideoDecoder::TakeScreenshot()
+ 
+ void VideoDecoder::TakeScreenshot(std::stringstream &stream)
+ {
++	//The emulation thread hands each finished frame to the decode thread, which converts it into
++	//the filter's output buffer. A screenshot taken before that conversion is done (e.g. from a
++	//script's startFrame callback) would copy the previous frame: wait for the pending frame first.
++	while(_frameChanged && !_stopFlag) {
++	}
++
+ 	if(_videoFilter) {
+ 		_videoFilter->TakeScreenshot(_videoFilterType, "", &stream);
+ 	}

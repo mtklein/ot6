@@ -719,7 +719,9 @@ def adoption_proof(base, root, records, rom_now, rom_copy_sha):
             fields.setdefault(parts[0], []).append(parts[1:])
     if "rom" in fields and "generator" in fields:
         return "full", None
-    unexpected = sorted(set(fields) - {"artifact", "ancestor"})
+    # (the emulator line is provenance only, written since the tools/mesen/
+    # build; it binds nothing either way)
+    unexpected = sorted(set(fields) - {"artifact", "ancestor", "emulator"})
     if unexpected:
         return "refused", (
             f"its stamp carries {', '.join(unexpected)} line(s) but not the "

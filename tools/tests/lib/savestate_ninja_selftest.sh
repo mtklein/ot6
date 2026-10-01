@@ -234,7 +234,8 @@ want=$(cd "$TMP" && OT6_ROOT="$TMP" sh tools/tests/lib/savestate_stamp.sh sig ge
   "ancestor build/states/a.stamp $(shasum -a 256 "$TMP/build/states/a.stamp" | cut -c1-64)" ] &&
   echo "  pass chained stamp binds its predecessor's stamp (#75)" ||
   { echo "  FAIL ancestor binding wrong or missing"; ok=0; }
-[ "$(wc -l < "$TMP/build/states/a.stamp" | tr -d ' ')" = 7 ] &&
+[ "$(wc -l < "$TMP/build/states/a.stamp" | tr -d ' ')" = 8 ] &&
+  ! grep -q '^ancestor ' "$TMP/build/states/a.stamp" &&
   echo "  pass root stamp carries no ancestor line" ||
   { echo "  FAIL root stamp shape wrong"; ok=0; }
 grep -q '^ancestor tools/tests/checkpoints/toy-v1/manifest.json ' \

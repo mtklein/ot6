@@ -8783,6 +8783,26 @@ local function coverageFlush()
     M.log("coverage: getCdlData unavailable (" .. tostring(cdl) .. ")")
     return
   end
+  -- A run that executed code has a full code/data log: 600 frames from
+  -- power-on mark 135167 PRG-ROM bytes.  A script-only Mesen
+  -- (tools/mesen/README.md) keeps none -- the same 600 frames leave one
+  -- byte, the reset entry point -- and run.sh leaves MESEN_SCRIPT_ONLY off
+  -- for coverage runs, so this is the second guard.  Emitting that log
+  -- would report every routine uncovered, so refuse it.
+  local CDL_FLOOR = 256
+  local marked = 0
+  for off = 0, #cdl do
+    if (cdl[off] or 0) ~= 0 then
+      marked = marked + 1
+      if marked >= CDL_FLOOR then break end
+    end
+  end
+  if marked < CDL_FLOOR then
+    M.log(string.format("coverage: REFUSED -- the code/data log marks only "
+      .. "%d PRG-ROM byte(s), so this emulator kept none (a script-only "
+      .. "Mesen with MESEN_SCRIPT_ONLY=1?); no coverage.cdl emitted", marked))
+    return
+  end
   local total = 0
   for _, r in ipairs(COVERAGE_RANGES) do total = total + r[2] end
   local nbytes = math.floor((total + 7) / 8)
