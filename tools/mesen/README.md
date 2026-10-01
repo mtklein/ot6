@@ -3,8 +3,10 @@
 Two patches for the official Mesen 2.1.1 source (github.com/SourMesen/Mesen2,
 tag `2.1.1`, commit `137ae7ce`), and `build.sh`, which clones that tag,
 applies them and builds with the flags of upstream's own release workflow for
-the official Linux binary, plus `-fno-semantic-interposition`. Mesen's source
-isn't vendored here. Evidence: `build/attempts/wt/mesen-lean/`.
+the official Linux binary or Mac app, plus `-fno-semantic-interposition` and
+frame pointers.
+Mesen's source isn't vendored here. Evidence: `build/attempts/wt/mesen-lean/`
+(Linux) and `build/attempts/wt/mesen-mac/` (macOS).
 
 ## Why
 
@@ -71,7 +73,7 @@ just finished. It applies on its own to a stock build too.
 
 ```
 sudo apt install git make clang lld zip libsdl2-dev zlib1g-dev dotnet-sdk-10.0 dotnet-sdk-aot-10.0
-tools/mesen/build.sh ~/work/mesen-build            # both patches, -fno-semantic-interposition
+tools/mesen/build.sh ~/work/mesen-build            # both patches, -fno-semantic-interposition, frame pointers
 tools/mesen/build.sh ~/work/mesen-build --stock    # stock, as upstream builds it
 tools/mesen/build.sh ~/work/x --patches mesen-screenshot-sync.patch --cflags ""   # a subset
 ```
@@ -93,6 +95,9 @@ pass `--reference ~/mesen-official/Mesen`. `--no-smoke` skips it.
   visibility, so otherwise every call between its source files goes through
   the PLT and can't be inlined. It changed no results and saved 14-19% of
   cycles per frame. `-fvisibility=hidden` saved less and wasn't kept.
+- `-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer` are part of every
+  patched build on both platforms (owner, 2026-10-01), so a profile can be
+  taken any time; they cost about 1-3%.
 - On Ubuntu 26.04 the compiler is clang 21; the official build used clang 14
   on Ubuntu 22.04. The .NET 10 SDK builds the net8.0 UI with NativeAOT
   8.0.31; the official build used 8.0.15. Built this way, stock 2.1.1 played
@@ -108,9 +113,11 @@ run.sh refuses the machine-wide cache for it and names that app's shared
 copy after its sha256.
 
 Every run log ends with `[emulator] <sha256> MESEN_SCRIPT_ONLY
-requested=<v>`. run.sh also publishes that line beside each `.mss` it
-publishes (`<state>.mss.emulator`), and `savestate_stamp.sh` copies its
-sha into the stamp's `emulator <sha256>` line, so the two agree. Both are
+requested=<v> core=<sha256>`: the executable, and the MesenCore that run
+loaded (macOS: "Which core a Mac bundle runs", below). run.sh also
+publishes that line beside each `.mss` it publishes
+(`<state>.mss.emulator`), and `savestate_stamp.sh` copies its first sha
+into the stamp's `emulator <sha256>` line, so the two agree. Both are
 records of which binary ran, never compatibility bindings, so swapping the
 emulator regenerates nothing.
 
@@ -134,21 +141,83 @@ The next run.sh then rebuilds the shared copy and logs the new
 `[emulator]` sha. To roll back, install `~/mesen-official/Mesen` the same
 way. Nothing regenerates either way.
 
-## macOS arm64 (untried)
+## Building (macOS arm64)
 
-Upstream's workflow builds the Mac app on macos-14 with `USE_AOT=true make`.
-The makefile turns LTO and static linking off on Darwin. The steps would be:
-- Install SDL2 (already in the Brewfile), Xcode's clang and a .NET 8 SDK.
-- Apply the patches and run `USE_AOT=true make CXX="clang++ -fno-semantic-interposition"`.
-- Sign the app ad hoc: `codesign --force --deep -s - Mesen.app`.
+```
+xcode-select --install                      # clang, codesign (the command line tools are enough)
+brew bundle                                 # sdl2 and dotnet@8 (keg-only; build.sh finds it)
+caffeinate -is tools/mesen/build.sh ~/work/mesen-build
+```
 
-The output is `bin/osx-arm64/Release/osx-arm64/publish/Mesen.app`.
-`build.sh` is Linux-only as written: it uses the Linux make flags,
-`sha256sum` and the Linux output path. The patches are plain C++ and aren't
-platform-specific.
+`build.sh` follows upstream's macOS job (`USE_AOT=true make`; the makefile
+turns LTO and static linking off on Darwin), then signs the bundle ad hoc
+(`codesign --force --deep -s -`; upstream signs with its own certificate
+and the hardened runtime, which an ad hoc signature doesn't need). The
+output is `<workdir>/Mesen2/bin/osx-arm64/Release/osx-arm64/publish/Mesen.app`
+with `Mesen.app.buildinfo` beside it, and the smoke test's reference is the
+tree's `tools/Mesen.app` while its executable is the official one (sha256
+`bddfea2f...1b09`), else `--reference ~/mesen-official/Mesen.app`. On the
+Air (M4, 10 cores) a build takes about four minutes.
+- `-fno-semantic-interposition` does nothing on Mach-O: clang's driver
+  drops it ("argument unused during compilation"), and objects compiled with
+  and without it are byte-identical. It stays so both platforms record the
+  same flags.
+- arm64 macOS keeps frame pointers in non-leaf functions by ABI; the
+  frame-pointer flags are accepted without a warning and add the leaf
+  functions (clang's `-mframe-pointer=all` in place of `non-leaf`).
+- macOS's make is GNU make 3.81, so there's no `-O`, and only the core is
+  built in parallel: under `make -j` the C# compiler server that `dotnet
+  publish` starts inherits make's jobserver pipe, and make never exits.
+  `build.sh` also turns the compiler server and MSBuild node reuse off, so
+  the build leaves no process behind.
+- The core is built for the host's macOS (`minos` 27.0 on the Macs today);
+  the official one targets 14.0. A build runs on a Mac with the same or a
+  newer macOS.
+- A build is not bit-reproducible: `InteropDLL/EmuApiWrapper.cpp` embeds
+  `__DATE__` and `__TIME__`, so two builds of the same source differ in
+  MesenCore and so in the executable.
 
-Open until a Mac build exists: the official Mac bundle carries
-MesenCore.dylib loose in `Contents/MacOS` as well as packed in the
-executable, and run.sh's `[emulator]` sha covers only
-`Contents/MacOS/Mesen`. Before the Macs switch, check which dylib a
-patched Mac app actually loads and make the recorded identity cover it.
+**Which core a Mac bundle runs.** The executable packs MesenCore.dylib
+inside it (Dependencies.zip, embedded at build time), and Mesen loads the
+copy in its home folder, unpacking it there when that copy is missing or
+its size or mtime differs. The patched bundle has no loose core. The
+official bundle's loose `Contents/MacOS/MesenCore.dylib` is only what Mesen
+unpacked there while the bundle was portable (a settings.json beside the
+executable puts the home folder there), the same bytes as its packed one.
+run.sh doesn't pre-seed a worker's home with a core, so every run loads the
+packed one, which the executable's sha256 covers, and the `[emulator]` line
+also carries the core that run loaded (`core=<sha256>`, hashed in the home
+afterwards): `bbe30ced...09e3` for the official bundle, and the
+`packed_mesencore_sha256` of `Mesen.app.buildinfo` for a build.
+
+## Deploying on a Mac
+
+run.sh runs the main tree's `tools/Mesen.app` (worktrees link to it) through
+a machine-wide shared copy, refreshed when the executable's size or mtime
+changes; a new bundle path costs a Gatekeeper scan of a few seconds on its
+first run. A bundle used by hand in portable mode keeps that profile inside
+it (settings.json, Saves, SaveStates, RecentGames ...), so the new bundle
+takes those along, but not the dependencies Mesen unpacked there. While no
+ninja or run.sh is alive on the machine (other agents' included):
+
+```
+cd ~/ot6
+B=~/work/mesen-build/Mesen2/bin/osx-arm64/Release/osx-arm64/publish/Mesen.app   # or a copy from another Mac
+mkdir -p ~/mesen-official && ditto tools/Mesen.app ~/mesen-official/Mesen.app    # keep the official one, profile and all
+mkdir -p ~/mesen-patched && ditto "$B" ~/mesen-patched/Mesen.app && cp -p "$B.buildinfo" ~/mesen-patched/
+ditto "$B" tools/Mesen.app.new
+for f in tools/Mesen.app/Contents/MacOS/*; do
+  n=$(basename "$f")
+  [ -e "tools/Mesen.app.new/Contents/MacOS/$n" ] && continue
+  case "$n" in MesenCore.dylib|MesenNesDB.txt) continue ;; esac   # unpacked by Mesen, not profile
+  ditto "$f" "tools/Mesen.app.new/Contents/MacOS/$n"
+done
+mv tools/Mesen.app tools/Mesen.app.old && mv tools/Mesen.app.new tools/Mesen.app && rm -rf tools/Mesen.app.old
+shasum -a 256 tools/Mesen.app/Contents/MacOS/Mesen   # = sha256 in ~/mesen-patched/Mesen.app.buildinfo
+```
+
+The next run.sh rebuilds the shared copy and logs the new `[emulator]` sha.
+Later rebuilds smoke-test with `--reference ~/mesen-official/Mesen.app`. To
+roll back, put `~/mesen-official/Mesen.app` back the same way (its own
+profile is the one from deployment day; carry anything newer across with
+the same loop). Nothing regenerates either way.
