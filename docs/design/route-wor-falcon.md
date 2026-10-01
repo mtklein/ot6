@@ -1,0 +1,860 @@
+# World of Ruin: Edgar to the Falcon (Kohlingen, Setzer, Darill's Tomb)
+
+The route from the first save after Edgar joins (`wor-edgar-v1`: CELES,
+SABIN and EDGAR on the World of Ruin map outside the surfaced Figaro
+Castle, (81,86)) to the Falcon rising out of Darill's Tomb, and on to the
+first save beside it. It is planned from the game's own data, like
+[route-wor-edgar.md](route-wor-edgar.md), whose shape it follows: findings,
+the start state, the legs, the pools, the party, the bosses, the save points
+and checkpoint cuts, the break data, the risks, then one "played" section per
+leg, empty until it is driven. Milestone v0.24, #263; the side items #321
+and #322 are placed in section 2.2.
+
+Line numbers are into `ff6/src/event/event_main.asm` unless a path is given.
+Decodes come from `tools/route_data.py` and the small scripts kept with their
+output under `build/attempts/wt/wor-falcon-plan/route/` (the scripts run from
+a tree root; `decode.sh` regenerates every file; ROM `1ef410a37c44`, main
+`5f3b3d0b`). The labels are route-wor-sabin's: **verify-on-arrival** marks an
+offline decode that holds unless the data moved (every field step count
+here: the offline model has no NPCs, no turtles and no map-init
+`mod_bg_tiles`), **UNVERIFIED** marks a claim that needs a live read, and
+**estimate** marks a number the driving will replace with a measurement. No
+emulator run was made for this plan.
+
+---
+
+## 0. Findings
+
+1. **The story is four gates, each a switch the one before it sets**
+   (section 2): the castle's engineer takes Figaro Castle to Kohlingen's
+   desert (`$0106=1` -> `$00DC=1`, `_ca6908` `:15665`); SETZER joins in
+   Kohlingen's inn when talked to (`$067F`, `_cc3bf8` `:85517`, `char_party
+   SETZER, 1` `:85759`); the tomb's door opens only with SETZER in the party
+   (`_ca3f83` `:9899`: `if_switch $01A9=0, EventReturn`); and reading the
+   grave "DARYL SLEEPS HERE" starts **Dullahan, an event battle whose loss
+   is a game over** (`battle 85` `:10537`, `_ca5ea9`). The grave's room then
+   opens on the flashback and the Falcon (`_ca435d`, `_ca4502` `:10723`),
+   which hands control back in flight over world (25,160) (`:11280`).
+2. **The walks are short, and both ends of the castle's ride are desert.**
+   Castle to Kohlingen is 29 steps, Kohlingen to the tomb 32 (`walks.txt`);
+   each meets about half a battle by the pool odds. No on-foot path off
+   either castle tile avoids world group 44, the Sand Horse desert
+   (`[off group 44]: no path` both sides), so #321's fight is on the route
+   whatever the plan does, now with EDGAR.
+3. **The levels come from the tomb, not the walk.** The party is L31
+   (`EDGAR: L31 HP 948/1600`, `SABIN: L31 ...`, `CELES: L31 ...`,
+   `party_wor_edgar.txt`); Dullahan is **L37, 23,450 HP** (`pools.txt`).
+   L33 is 9,715-16,904 XP away per member (`levels.txt`); the tomb's
+   fights pay 970-2,960 per battle as randoms, split four ways. The level
+   for Dullahan is a lab's to set (section 5), not this plan's.
+4. **Every species met is new and rides the generated floor, except the
+   desert's two** (Sand Horse, Maliga: authored in the Edgar arc). Twelve
+   need designed rows (section 8, a draft): four on the Kohlingen
+   continent, five in the tomb, Dullahan, and the chest pair beside the
+   tomb's save point. None of the nine random species appears in a World
+   of Balance pool; the chest pair's formation 433 does (WoB world group 13,
+   its 16/256 slot), so its rows would move that encounter too.
+5. **The tomb is the Zombie dungeon.** Four of its five species inflict
+   Zombie (Orog's Zombite is its whole turn script; Osteosaur's Fossil and
+   ChokeSmoke; PowerDemon's Soul Out; Exoray's DoomPollen; `ai.txt`), four
+   absorb poison (EDGAR's Bio Blaster heals them), and all five are weak to
+   fire, four to holy. The Mad Oscar's Sour Mouth carries Dark, Poison,
+   Imp, Mute, Muddle and Sleep at once.
+6. **SETZER joins with nothing equipped and no Esper** (the WoB ending's
+   `remove_equip SETZER`; `SETZER: L25 ... gear: -, -, -, -, -, -; ...
+   esper -`), and his join runs no `opt_equip`: the player dresses him.
+   `norm_lvl SETZER` (`:85762`) lifts him to the trio's average level
+   (L31 today; section 4.1).
+7. **#319's kit gaps bite here** (section 4.3): SETZER joins with Slot
+   alone (Coin Toss, Hired Help, Jackpot not built); EDGAR has 3 of his 8
+   Tools, and Figaro's World of Ruin tool shop (84: Flash, Drill,
+   Debilitator) refuses any party holding EDGAR or SABIN (`_ca67c0`), which
+   is every party this arc can field.
+8. **The South Figaro continent holds #322's three items and more**, all
+   still closed at the checkpoint (`chests.txt`): the Hero Ring (map 90)
+   is in a pocket the cave's *other* door reaches (`map 90 region 2: (41,14)
+   door -> 68 (4,5); (52,14) chest Hero Ring`, and map 68's (4,4) is in the
+   cave's main region), the Regal Crown (map 66) is off basement 2 of the
+   castle the party must walk through to travel, and South Figaro's
+   basement passage holds a **Ribbon**, a Hyper Wrist and RunningShoes
+   (map 89) behind Duncan's house (86 (48,32) -> 87 -> 89). The Ribbon
+   answers the tomb's Zombie and the Mad Oscar's Sour Mouth in one relic.
+9. **One save point on the arc**, in the tomb's third basement beside the
+   last chests and two rooms before the grave (map 300 (122,14), shown by
+   `$0632`, which is set). It is the Dullahan retry point and the first
+   field save-point checkpoint of the World of Ruin chain (section 7).
+
+---
+
+## 1. The start state (`wor-edgar-v1`)
+
+The tracked battery (`tools/tests/checkpoints/wor-edgar-v1`), validated and
+decoded from its slot 3 (`validate_wor-edgar-v1.txt`, `party_wor_edgar.py`):
+
+```
+valid ot6.sram-checkpoint/v1: 32768 bytes sha256=bd3d3dce9ca1... holds=slot 3 world 1 (81,86) [$1F64=$2001] (saved: declared and checked)
+  EDGAR: L31 HP 948/1600 MP 270/294 XP 83184 party byte $71
+    gear: Break Blade, Mithril Shld, Gold Helmet, Mithril Vest, Jewel Ring, Star Pendant; weapon class slash; esper Ramuh
+  SABIN: L31 HP 1384/1609 MP 75/291 XP 86953 party byte $69
+    gear: Fire Knuckle, Fire Knuckle, Tiger Mask, Power Sash, Genji Glove, Black Belt; weapon class slash; esper Ifrit
+  CELES: L31 HP 1300/1595 MP 303/303 XP 90373 party byte $E1
+    gear: Enhancer, ThunderBlade, Crystal Helm, Gold Armor, Genji Glove, Jewel Ring; weapon class slash; esper Maduin
+    spells (6): Ice, Scan, Safe, Imp, Cure, Antdot
+  SETZER: L25 HP 1045/1045 MP 221/221 XP 44072 party byte $00
+    gear: -, -, -, -, -, -; weapon class bludg; esper -
+```
+
+The save was made without care: EDGAR at 948/1600 HP and SABIN at 75/291
+MP. The first thing the arc does is field care.
+
+| member | level | kit | commands |
+|---|---|---|---|
+| CELES | L31, xp 90,373 (L32 at 91,384) | MADUIN; Enhancer (slash, runic) + ThunderBlade (slash, bolt) on the Genji Glove, Crystal Helm, Gold Armor, Jewel Ring | Fight, Runic, Magic (Ice, Scan, Safe, Imp, Cure, Antdot; Fire/Ice/Bolt from Maduin; Haste at L32), Item |
+| SABIN | L31 | IFRIT; Fire Knuckle x2 (slash, fire) on the Genji Glove, Tiger Mask, Power Sash, Black Belt | Fight, Blitz (Pummel, AuraBolt, Suplex, Fire Dance, Mantra, Air Blade), Magic (Fire, Drain), Item |
+| EDGAR | L31 | RAMUH; Break Blade (slash), Mithril Shld, Gold Helmet, Mithril Vest, Jewel Ring, Star Pendant | Fight, Tools (AutoCrossbow, NoiseBlaster, Bio Blaster), Magic (Bolt, Rasp), Item |
+| SETZER (not yet in the party) | L25 | nothing | Fight, Slot, Magic, Item |
+
+Bag (64 rows): Potion 53, Fenix Down 29, Remedy 5, Soft 18, Revivify 4,
+Green Cherry 5, Tonic 4, Tincture 7, Elixir 5, X-Potion 5, Ether 4, Tent 10,
+Sleeping Bag 3, Warp Stone 1, Smoke Bomb 1; relics Czarina Ring, Jewel
+Ring, Back Guard, Coin Toss, Star Pendant x3, Peace Ring, Memento Ring;
+weapons for the arc: Soul Sabre, Blizzard, RegalCutlass, MithrilBlade x2,
+Mithril Pike, MetalKnuckle, **Cards** (SETZER's), the rods; armor Ninja
+Gear, Kung Fu Suit, Silk Robe, shields and hats; **254,895 GP**. Espers:
+the thirteen of the World of Balance route (Ramuh, Ifrit, Shiva, Siren,
+Shoat, Maduin, Bismark, Stray, Kirin, Carbunkl, Phantom, Sraphim, Unicorn),
+ten of them spare.
+
+The switches the arc reads (`party_wor_edgar.txt`): `$00C6=1 $00C7=1
+$0106=1` (Edgar's scene done, the castle surfaced at South Figaro), `$00DC=0`
+(not yet at Kohlingen), `$067E=1 $067F=1` (Kohlingen's World of Ruin people
+and SETZER in the inn, set at the World of Ruin's start `:113035`),
+`$00CA=0 $00CB=0 $00CC=0 $00CD=0` (no Setzer, tomb shut, no Falcon),
+`$02B1-$02B8=0` (the tomb's switches), `$0632=1` (the tomb's save point
+shown). Encounter counters `$1FA1-$1FA5`: `94 66 4F 82 4F`. The party bytes
+put all three in the back row.
+
+---
+
+## 2. The legs and the story's gates
+
+### 2.1 The whole arc
+
+| # | leg | from -> to | steps | pools | gate |
+|---|---|---|---|---|---|
+| 1 | the South Figaro continent (side items, #321, #322) | world (81,86) -> South Figaro (113,95); the cave (106,98); back to (81,85) | 51 + 14 + 48 (world) | world 41, 43, **44**; cave 68/90 (138, 140); 87 (WoB pool 65) | none (optional) |
+| 2 | the castle to Kohlingen | (81,85) -> 55 -> 59 -> 61, the engineer (6,33) | verify-on-arrival | none (maps 55, 59, 61 do not roll); **62 (137) for the Regal Crown** | `$0106=1` -> "Go to Kohlingen?" -> `$00DC=1 $0106=0` |
+| 3 | the walk to Kohlingen | castle exit (53,59), verify-on-arrival -> (38,45) | 29 | world **44**, 45, 47 | none |
+| 4 | Kohlingen: SETZER | 189 -> inn 191, SETZER at (23,15) | verify-on-arrival | none (towns) | `$067F=1`; joins unless the party is full (`$01A3`) -> `$00CA=1` |
+| 5 | the walk to the tomb | (38,45) -> (25,52) | 32 | world 45, 46, 47 | none |
+| 6 | the tomb's door | 297 (8,12) -> trigger (8,10) -> stairs (7,8) | 2 + verify-on-arrival | none | SETZER in the party (`$01A9`) -> `$00CB=1`, the stairs drawn (`_caf1a2`) |
+| 7 | B1, B2, B3: the switches and the turtles | 298 -> 299 -> 300 | verify-on-arrival | field 149, 150, 151 | `$02B1`, `$02B3`, `$02B5`, `$02B6`, `$02B8` (section 2.6) |
+| 8 | the east room and the save point | 300 (122,28) -> (122,14) | 22 | field 151 | none |
+| 9 | the grave: Dullahan | 300 (122,7) -> 299 (100,28) -> (100,14) | 23 + 13 | field 151, 150; event group 85 | facing up + A -> `battle 85` (a loss is a game over) -> `$02B2=1` |
+| 10 | the flashback and the Falcon | 299 (100,7) -> 301; SETZER (28,6), the trigger (17,16), SETZER again | verify-on-arrival | none | `$01F0-$01F3` -> `_ca4502`: `$00CC=1 $00CD=1 $039B=1`, control in flight at world (25,160) |
+| 11 | land and save | world (25,160) | 0 | world 49 (the next arcs') | none |
+
+### 2.2 The South Figaro continent (leg 1; optional; #321, #322)
+
+The arc starts in the desert outside the surfaced castle: `(81,86) prop
+$0246 walk group 44` (`tiles.txt`). Everything on the continent is
+reachable on foot before the castle leaves, and nothing in the story needs
+it. A player would go: the castle's shops refuse this party, and the
+continent still holds:
+
+| what | where | evidence |
+|---|---|---|
+| the desert's fights (#321) | world group 44, 18 steps of the walk to South Figaro and 19 back | `wor-edgar-v1 (81,86) -> South Figaro door (113,95) [#321, #322] [shortest]: 51 steps; steps by group: 41: 5, 43: 27, 44: 18`; `budget: mean 1.13 battles` |
+| shops: Amulet 5000 (relic 62), Potions, Remedy (item 63), Enhancer (60) | South Figaro (route-wor-edgar 2.4) | `shop 62 ... $B3 Amulet: 5000 GP` (`shops.txt`) |
+| **Ribbon**, X-Potion, Ether (#322) | map 89 region 0, by 74 (48,37) -> 86 (52,29) -> (48,32) -> 87 (56,49) -> (33,51) -> 89 (96,42) | `map 86 region 1 ...: (52,29) trigger _ca8973; (48,32) door -> 87 (56,49)`; `map 89 region 0 (81 tiles): (101,39) chest X-Potion; (97,41) door -> 87 (34,50); (101,43) chest Ribbon; (92,53) chest Ether` (`sfig_graph.txt`); all closed (`chests.txt`) |
+| Hyper Wrist, RunningShoes (#322) | map 89 region 1, by 74 (15,18) -> 81 (4,16) -> (27,10) -> 83 (7,5) -> (32,18) -> 89 (106,54) | `map 89 region 1 (71 tiles): (110,49) chest Hyper Wrist; (105,53) door -> 83 (31,17); (120,53) chest RunningShoes` |
+| Iron Armor, Earrings | map 87 (32,42), (33,56) | `map 87 region 0 ...`; closed |
+| Hero Ring (#322) | map 90 (52,14), by the cave's other door: 68 (4,4) -> 90 (41,13) | `map 90 region 2 (33 tiles): (41,14) door -> 68 (4,5); (52,14) chest Hero Ring`; `map 68 region 0 ...: (4,4) door -> 90 (41,13)` |
+| Regal Crown (#322) | map 66 (3,53), by 61 (2,37) -> 62 (12,13) -> (4,6) -> 66 (3,55) | `map 62 region 0 ...: (4,6) door -> 66 (3,55)`; `map 66 region 0 (15 tiles): (3,53) chest Regal Crown; (3,56) door -> 62 (4,8)` |
+
+All of it is **verify-on-arrival**: the offline model has no NPCs and no
+map-init tiles, and the Edgar arc found the Hero Ring "not reachable from
+where the crossing leaves the party" only because it came in by 68 (10,2)
+-> 90 (55,31), the turtle's side. The passage's map 87 rolls the World of
+Balance's pool 65 (Vector Pup, Commander; a claimed WoB map), the castle's
+basement 2 the cave's Muddle pool 137 (route-wor-edgar 3.3, 12.4: the Peace
+Ring answer). The WoB clock in map 84 (`_ca7913`, `$01D1`) does not gate
+either route into map 89.
+
+**#321 fits here, with EDGAR.** The pair that walls CELES and SABIN (route-
+wor-edgar 12.1: formation 222 won 6 and lost 2, both losses `class=died
+with 3 BP banked` with both horses untouched, the driver heal-locked, #312)
+now meets three, and the authored row (`2 · slash|pierce`) gives EDGAR's
+AutoCrossbow both horses at once. Leg 1 plays the desert on the way to
+South Figaro and back, and a lab measures formation 222's first-attempt rate
+over distinct battle keys with the trio (section 9). The arc meets the
+desert again at Kohlingen (5 steps) and on every later castle ride.
+
+**#322 fits here too**: the Hero Ring and the passage on leg 1, the Regal
+Crown on leg 2's walk to the engineer. If the owner prefers the side items
+out of the story chain, leg 1 is the one to drop: legs 2-11 do not need it.
+
+### 2.3 The castle's ride (leg 2)
+
+In from the world tile (81,85) (`_ca5f0b`, `$0106=1`) to map 55 (28,42);
+(28,38) -> 59 (12,49); (9,49) -> 61 (10,33); the engineer NPC_6 at (6,33)
+(`maps.txt`). His talk (`_ca682f` `:15575`, in the World of Ruin `_ca68dc`
+`:15646`) with `$00C6=1`, `$026F=0` and `$0106=1` offers "(Go to
+Kohlingen?)" (`_ca68e6` `:15651`); choice 0 runs `_ca6908` (`:15665`): the
+castle burrows from (81,85), and control returns in 61 (6,34) with the
+world parent at the castle's new tile; `$00DC=1 $02B9=0` (`:15690`). The
+castle's world trigger at Kohlingen is (53,58)/(54,58) (`_ca5f18`
+`:14233`, gated on `$00DC`). The castle's exit returns the party one tile
+below its trigger (measured at (81,86) in the Edgar arc), so (53,59) is
+expected: **verify-on-arrival**. The ride is reversible ("(Go to
+Figaro?)", `_ca6986`), so South Figaro's shops stay one ride away.
+
+`_ca694f` (the "odd stratum", the Ancient Castle) runs only once `$00CD=1`,
+which the Falcon's scene sets: not on this arc.
+
+### 2.4 Kohlingen (map 189; no random battles, no save point)
+
+The World of Ruin Kohlingen is map 189 (the WoB town is 188); its interiors
+are shared and return to 189 while `$00A4=1` (`_cc6999`, `_cc697f`,
+`_cc698c`).
+
+| what | where | event |
+|---|---|---|
+| weapon 65, armor 66, item 67 | 194 NPC_1/2/3 (9,35), (15,35), (19,35), door 189 (11,11)/(14,13) | `_cc69a6` `:92679` (`shop_menu 65/66/67` in the World of Ruin) |
+| inn, 200 GP | inn 191 NPC_4 (17,11), door 189 (16,22) | `_cc69ca` `:92700` |
+| **SETZER** | inn 191 NPC_6 (23,15), `$067F` | `_cc3bf8` `:85517` |
+| chests | 195 (37,53) Green Beret; 197 (42,10) Elixir | bits `$041`, `$045`, both closed |
+| an old man who unequips the absent | 189 NPC_9 (9,17), `$06B6` | `_cc3510` `:84460` (hidden when SETZER joins) |
+
+**SETZER** (`_cc3bf8`): "CELES: SETZER! / SETZER: You're alive!?", the talk
+("I've lost my wings…"), a short flight cutscene over world (38,48), and
+back in 189 (16,25): `char_party SETZER, 1` unless the party is full
+(`if_switch $01A3=1` `:85757`; three members here, so he joins), then
+`norm_lvl SETZER`, `max_hp`, `max_mp`, `$02F9=1`, `$067F=0 $06B6=0
+$00CA=1` (`:85761-85777`). No `opt_equip`.
+
+The exit: 189's long edges lead to the world parent (38,46) / (37,45)
+(`maps.txt`); **verify-on-arrival**.
+
+### 2.5 The tomb's door (map 297)
+
+World (25,52) -> 297 (8,12). The trigger (8,10) (`_ca3f83` `:9899`) runs
+once (`$01B5`, `$00CB`) and only with SETZER in the party (`set_case
+PARTY_CHARS` / `if_switch $01A9=0, EventReturn`): "CELES: This person… She
+was your friend? SETZER: Yeah.", the tomb shakes, `$00CB=1`, and `_caf1a2`
+draws the stairs at (7,8) (the long entrance (7,8) -> 298 (13,12)). Without
+SETZER the door does nothing.
+
+### 2.6 Darill's Tomb (maps 298-300): the switches and the turtles
+
+Every switch is a step-on trigger read with the facing and A held (the
+`$01B0`-`$01B4` control byte, the Figaro turtle's "face and hold A",
+`H.faceAndHoldA`). Read from the scripts:
+
+| where | event | needs | does |
+|---|---|---|---|
+| 299 (28,43) | `_ca41a3` `:10298` | facing up + A, `$02B1=0` | `$02B1=1`, opens (28,38) -> 300 (61,44) |
+| 300 (61,33) | `_ca41c3` `:10316` | facing up + A, `$02B3=0` | `$02B3=1`: the water (enables the B2 turtle) |
+| 299 (56,14) | `_ca422e` `:10373` | facing **down** + A, `$02B3=1` | rides the turtle down to 300 (69,8), `$02B4=1` |
+| 300 (70,8) | `_ca41e0` `:10331` | facing up + A | toggles `$02B5` (and `$0396`): moves the B3 turtle |
+| 300 (71,9)/(71,10) | `_ca4278`/`_ca428d` `:10424` | facing **right** + A, `$02B5=1`, `$02B6=0` | rides it right 7, up 3; `$02B6=1` |
+| 300 (79,6) | `_ca42c0` `:10473` | facing down + A, `$02B6=1` | rides it back; `$02B6=0` |
+| 300 (76,10) | `_ca4216` `:10359` | facing up + A, `$02B8=0` | `$02B8=1`, opens (79,3) -> 300 (122,28) |
+| 299 (100,14) | `_ca42f1` `:10508` | facing up + A | "DARYL SLEEPS HERE"; first time: Dullahan |
+| 299 (12,39) | `_ca4037` `:10014` | facing up + A | the blank tombstone: carve the four found words (the B2 room (75..79,38..43), `$00C2-$00C5`) in the right order for a hint to the Exp. Egg (`$0112`); optional |
+
+The regions the offline model finds (`tomb_graph.txt`), with what each
+switch opens, give this order (**verify-on-arrival**, the order and every
+count):
+
+1. B1 (298): in (13,12) -> (13,24), 12 steps, to B2 (37,12).
+2. B2's hub (299 region 5) holds the Genji Helmet (43,42), the Crystal
+   Mail (9,59), the switch (28,43), the turtle (56,14), the tombstone and
+   the stairs (17,61). The switch opens (28,38) -> B3 (61,44), whose small
+   room (300 region 1) holds the water switch (61,33). Back up.
+3. B2 (17,61) -> B3 (37,58) (300 region 3): the Czarina Gown (43,60; RELM's
+   only), the **Exp. Egg** (55,58), and by (43,57) -> (76,19) the corridor
+   to the wall switch (76,10), which opens (79,3).
+4. Back to B2; the turtle (56,14) down to B3 (69,8) (300 region 2); the
+   turtle switch (70,8); the ride from (71,9) to the far landing by (79,6)
+   (300 region 4); up through (79,3) -> (122,28), the east room.
+5. The east room (300 region 4): the **Man Eater** (124,9), the **monster
+   chest** (120,9) (event group 116: Presenter and Whelk Head), the **save
+   point** (122,14), and (122,7) -> B2 (100,28), the grave's room (299
+   region 2): (100,14) the grave, (100,7) the way on once Dullahan falls.
+6. 300 (69,17) -> 299 (77,34) is the carved-letters room (299 region 4),
+   the tombstone puzzle's words.
+
+Offline counts where the model reaches: `map 298 (13, 12) -> (13, 24) ...:
+12 steps`; `map 299 (37, 12) -> (17, 61) ...: 31 steps`; `map 300 (122,
+28) -> (122, 14) ...: 22 steps`; `map 300 (122, 14) -> (122, 7) ...: 23
+steps`; `map 299 (100, 28) -> (100, 15) ...: 13 steps`; the switch rooms
+and the turtles' landings say `NO PATH` (`walks.txt`).
+
+### 2.7 Dullahan, then the flashback and the Falcon
+
+```
+event_main.asm:10508  _ca42f1: if_any $01B0=0 / $01B4=0 -> return   ; facing up, A held
+               :10513         dlg $09A0 "DARYL SLEEPS HERE"
+               :10516         if_switch $02B2=1, EventReturn
+               :10537         battle 85
+               :10538         call _ca5ea9          ; if_b_switch $40 (won), else call GameOver
+               :10550         switch $02B2=1
+               :10551         call _caf1ed          ; draws (100,7) open
+```
+
+The grave's room then leads up through (100,7) (`_ca435d` `:10565`):
+SETZER leaves the party for the flashback (`char_party SETZER, 0`), map
+301; control returns there. Talk to SETZER (NPC_5, (28,6); `_ca43d9`
+`:10632`: "Watch your step", `$01F0`, the room redrawn), step on (17,16)
+(`_ca44ba` `:10683`: Daryl's "If something should happen to me, the
+Falcon's yours!", `$01F2`, `$01F3`), talk to him again (`_ca4502`
+`:10723`): `char_party SETZER, 1`, the flight flashback, the Falcon in its
+hangar (map 11), the first flight (map 17, "SETZER: But first we need to
+find our friends!"), "CELES: Hey! A bird!", and the switches `$00CC=1
+$00CD=1 $01B8=1 $01B9=1 ... $039B=1` (`:11257-11276`), `ResetTurtles`, and
+`load_map 1, {25, 160}, ... AIRSHIP` (`:11280`): the party is aboard the
+Falcon, flying, over `(25,160) prop $0544 walk group 49` (`tiles.txt`). `$039B`
+shows Palidor on the Solitary Island's beach (magicite.md): the next arcs'.
+
+### 2.8 Where the World of Ruin opens
+
+Before the Falcon the party walks three landmasses joined by the castle and
+the Nikeah ferry: the South Figaro continent, the Tzen continent (Tzen,
+Albrook, Nikeah, **Mobliz**), and the Kohlingen continent, whose component
+(`components.txt`: 1,704 tiles from (53,59)) also holds the World of Ruin
+**Colosseum** (50,17), 52 steps from Kohlingen, and a chocobo stable
+(62,39). The Colosseum is v0.35's and Mobliz v0.27's; this arc does not go
+in. The Falcon opens the rest: Jidoor, Zozo, Maranda, Narshe, Thamasa, the
+Veldt's cave, Doma, the Solitary Island's Palidor, and the castle's
+stratum.
+
+---
+
+## 3. The pools
+
+Decoded by `route_data.py pool` (`pools.txt`). Slot odds 80/80/80/16 of
+256; XP is vanilla and a random battle pays x2 (`Ot6RewardMulW`). Every rate
+on the arc is code 0 (world `$0060`/step, field `$0038`/step after
+`Ot6DangerMulW`; a field battle every 44.8 steps on average).
+
+### 3.1 The castle's desert (world group 44; both sides)
+
+| p | formation | contents | XP |
+|---|---|---|---|
+| 31.25 % | 222 | Sand Horse x2 | 950 |
+| 31.25 % | 223 | Sand Horse, Maliga x2 | 1195 |
+| 37.5 % | 138 | Maliga x3 | 1080 |
+
+### 3.2 The Kohlingen continent (world groups 45-47)
+
+| group | terrain | p | formation | contents | XP |
+|---|---|---|---|---|---|
+| 45 | grass | 62.5 % | 236 | Harpiai | 449 |
+| | | 37.5 % | 243 | Muus | 189 |
+| 46 | forest | 37.5 % | 238 | Harpiai, Deep Eye x2 | 1219 |
+| | | 31.25 % | 240 | **Deep Eye x6** (may pincer) | 2310 |
+| | | 31.25 % | 242 | Muus x3 | 567 |
+| 47 | plain | 62.5 % | 239 | Bogy x2 | 1064 |
+| | | 37.5 % | 241 | Deep Eye x2, Muus x2 | 1148 |
+
+(Group 46's slots 0 and 3 are both 238: 80 + 16 of 256.) Groups 45 and 47
+are the tables of the World of Ruin's sectors x 0-95, y 0-95 beyond this
+continent's tiles (`tiles.txt`: `group 45 tiles by sector (x0,y0): (0,0):
+975, ...`), so other land there deals the same bodies (which land:
+UNVERIFIED); the rows designed here carry to it.
+
+### 3.3 Darill's Tomb
+
+| group | map | p | formation | contents | XP |
+|---|---|---|---|---|---|
+| 149 | 298 (B1) | 62.5 % | 246 | Osteosaur | 770 |
+| | | 31.25 % | 244 | Orog x2 (may pincer) | 1020 |
+| | | 6.25 % | 245 | Orog, PowerDemon x2 | 1480 |
+| 150 | 299 (B2) | 31.25 % | 247 | PowerDemon | 485 |
+| | | 31.25 % | 249 | Exoray x3 (may pincer) | 1347 |
+| | | 37.5 % | 250 | Mad Oscar, Exoray | 1229 |
+| 151 | 300 (B3) | 31.25 % | 251 | Mad Oscar | 780 |
+| | | 31.25 % | 250 | Mad Oscar, Exoray | 1229 |
+| | | 37.5 % | 248 | PowerDemon, Exoray x2 | 1383 |
+| event 85 | the grave | — | 455 | **Dullahan** `$11C` | 0 |
+| event 116 | the chest (120,9) | — | 433 | **Presenter** `$101`, **Whelk Head** `$135` | 0 |
+
+### 3.4 The encounter budgets
+
+`walks.txt` (the draw byte modelled uniform: a pool-odds budget, not a
+prediction for one save; the real draw is save data, `$1FA1-$1FA5`):
+
+| leg | steps | mean battles | P(0) |
+|---|---|---|---|
+| (81,86) -> South Figaro | 51 | 1.13 (0.20 of them the desert) | 0.161 |
+| the cave door -> the castle (81,85) | 48 | 1.07 (0.58 the desert) | 0.186 |
+| castle exit -> Kohlingen | 29 | 0.43 | 0.598 |
+| Kohlingen -> the tomb | 32 | 0.52 | 0.528 |
+| B1, in -> B2 | 12 | 0.04 | 0.958 |
+| B2, in -> the stairs to B3 | 31 | 0.32 | 0.693 |
+| B3, the east room -> the save point | 22 | 0.16 | 0.841 |
+| the save point -> the grave | 23 + 13 | 0.18 + 0.05 | — |
+
+The tomb's whole walk (both switch rooms, the chest room, the turtles) is
+not in the offline model; the leg's count is **estimate**: 5-8 battles by
+the pool rate over 200-350 steps, plus any grind.
+
+### 3.5 The species
+
+`pools.txt`, `ai.txt` (the scripts whole, with their lines in
+`ai_script.asm`), `boss_attacks.txt`. "Today" is the row the ROM ships.
+
+| id | name | L | HP | def/mdef | weak | absorb / null | the script | today |
+|---|---|---|---|---|---|---|---|---|
+| `$05F` | Sand Horse | 27 | 1025 | 135/155 | ice, water | — | Sand Storm; Clamp (x5); **alone: B/B/Clamp** `:2020` | authored 2 slash\|pierce |
+| `$097` | Maliga | 26 | 952 | 110/145 | ice, bolt, water | — | B; B/B/Scissors; **alone: Scissors x2** `:2005` | authored 2 slash\|bludg |
+| `$089` | Harpiai | 29 | 1418 | 102/153 | wind | — | B/B; B/B/**Aero (wind 125)**; B/B/Pearl Wind; B/B/Nail `:2103`; starts Float | floor 5 slash |
+| `$0DB` | Muus | 28 | 900 | 110/105 | — | null poison, wind, holy, earth, water | B/Gunk (Slow)/Pep Up; **counter to Magic: Pep Up** `:2118`; starts Shell | floor 5 slash |
+| `$0A7` | Deep Eye | 28 | 1334 | 100/150 | fire | — | B/B/**Dreamland (Sleep)**; Escape `:2149` | floor 5 slash |
+| `$0D3` | Bogy | 29 | 1318 | 102/153 | — | — | B/B; B/B/Oogyboog (x2) `:2138`; starts Safe | floor 5 slash |
+| `$005` | Orog | 30 | 1584 | 105/140 | fire, holy | poison | **Zombite (Zombie)** and nothing else, up to three a turn; counter: Bio to Magic, Battle to a hit `:2179` | floor 5 bludg |
+| `$010` | Osteosaur | 30 | 1584 | 115/155 | fire, holy | poison | B/**Fossil (Zombie)**; B/B/**ChokeSmoke (Zombie)**; B/B/Fossil `:2197` | floor 5 pierce |
+| `$06F` | PowerDemon | 29 | 2058 | 145/140 | fire, holy | poison | B/B/Daze Dance (drain); B/B/**Soul Out (Zombie)** `:2223`; speed 40 | floor 5 slash |
+| `$061` | Mad Oscar | 30 | 2900 | 95/145 | fire | poison, water | B; B/B/**Sour Mouth** (Dark, Poison, Imp, Mute, Muddle, Sleep); B/Drool (Sap) `:2210` | floor 5 slash |
+| `$091` | Exoray | 29 | 1200 | 105/105 | fire, holy | poison | B/B/**DoomPollen (Zombie)**; alone: B/B/Virite `:2234`; starts Shell | floor 5 slash |
+| `$11C` | **Dullahan** | 37 | **23450** | 130/160, evade 10 | fire | **ice** | section 5 `:5431`; starts Haste, Float; speed 55 | floor 6 slash |
+| `$101` | Presenter | 19 | 9230 | 160/195 | fire | ice, bolt, water | section 6 `:4329`; starts Float | floor 4 slash |
+| `$135` | Whelk Head | 31 | 9845 | 80/150 | fire | ice, bolt, water / null poison | section 6 `:6419` | floor 5 slash |
+
+Notes the driving will need:
+
+- **Zombie** is the tomb's status (finding 5). The field care cures it with
+  Revivify (#190); in battle a zombied member attacks the party and a
+  Fenix Down cannot land on it (#245). The Amulet (South Figaro, 5000) and
+  the passage's Ribbon block it.
+- The **Orog** acts only to Zombie a member, and counters a hit with a
+  Battle and Magic with Bio; broken, it does neither (bosses-wob "the boss
+  contract").
+- The **Muus** turns Magic into a Pep Up on its own side and nulls five
+  elements: a Fight body.
+- The **Deep Eye** sleeps a member and can Escape (no XP for an escaped
+  body; `Driver:watchLeavers`, #255). Six of them can pincer.
+- The **Bogy** starts with Safe (physical damage down), the **Exoray** and
+  the **Muus** with Shell (magic damage down).
+- The **Mad Oscar**'s Sour Mouth is six statuses in one: Remedy cures it,
+  the Ribbon blocks it.
+- **Last-stand bodies** again: the Sand Horse and Maliga (route-wor-edgar
+  3.5), the Exoray (Virite when alone), the Muus.
+
+---
+
+## 4. The party and its kit
+
+### 4.1 Levels
+
+The trio is L31; the arc's random bodies are L28-L30, Dullahan L37. From
+`levels.txt`:
+
+```
+L32: 91384 xp; EDGAR needs 8200; SABIN needs 4431; CELES needs 1011
+L33: 100088 xp; EDGAR needs 16904; SABIN needs 13135; CELES needs 9715
+L34: 109344 xp; EDGAR needs 26160; SABIN needs 22391; CELES needs 18971
+```
+
+and a tomb battle pays 970-2,960 XP as a random (`Orog + PowerDemon x2
+(245): vanilla 1480; as a random x2 = 2960; ... of four 740`). CELES
+reaches L32 (Haste) in the first fight or two. The tomb's own walk (5-8
+battles, estimate) brings the four about one level; anything beyond that
+is a grind, and its target is set by the Dullahan lab (section 5), as the
+Tentacles' L30 was.
+
+**SETZER's join level** (`norm_lvl`, `field/event.asm` `EventCmd_77`): the
+average level of the characters available, if higher than his own.
+"Available" is `$1EDE`, the event switches `$02F0-$02FF` (characters 0-13
+count); today it holds EDGAR, SABIN and CELES (`0x8070`: characters 4, 5,
+6 and 15, which the loop skips). SETZER's own `$02F9=1` comes after
+`norm_lvl` (`:85762`, `:85766`), so he joins at the trio's average: L31
+at today's levels, **estimate** the trio's average when he is met. The
+**Exp. Egg** (B3 (55,58), on the way to the wall switch) doubles one
+member's experience.
+
+### 4.2 Kit levers (to be measured)
+
+- **Zombie** (the tomb): Revivify (4 in the bag; Kohlingen's item shop 67
+  sells it at 300), the Amulet (Dark, Zombie, Poison; 5000 in South
+  Figaro's relic shop 62, none in Kohlingen), the passage's **Ribbon**.
+  The relic slots are spoken for (two Genji Gloves, CELES's and EDGAR's
+  Jewel Rings, SABIN's Black Belt, EDGAR's Star Pendant), so each Amulet is
+  a choice against one of those. Breaking a Zombie-caster before its turn
+  (route-wor-edgar 8.2, the Bloompire) is the class answer.
+- **Sour Mouth / Muddle / Sleep**: Remedy (5; Kohlingen sells it), the
+  Ribbon, the Peace Ring (1 in the bag) for Muddle alone.
+- **Fire and holy are everywhere in the tomb**: SABIN's Knuckles, Fire
+  Dance and AuraBolt, MADUIN's and IFRIT's Fire, and UNICORN's Pearl
+  (holy; `Unicorn: Pearl, Remedy`, `espers.txt`) on whoever carries it.
+  EDGAR's **Bio Blaster heals four of the five** tomb species; the runner's
+  absorb guard knows absorbs (route-wor-edgar 12.1).
+- **Weapons in reach**: the Gold Lance (EDGAR, pierce 139, 12,000 GP,
+  Kohlingen 65), the **Man Eater** (pierce 146; EDGAR, CELES or SETZER; the
+  east-room chest), Darts (SETZER, pierce 115, 10,000) or Trump (SETZER,
+  special 133, 13,000), the Soul Sabre in the bag (slash 125). `items.txt`.
+- **Armor**: Kohlingen's 66 (Diamond Shld/Helm/Vest/Armor, Bard's Hat,
+  Green Beret); the tomb's Genji Helmet and Crystal Mail (EDGAR, CELES,
+  SETZER).
+- **Espers**: MADUIN on CELES, IFRIT on SABIN, RAMUH on EDGAR; SETZER takes
+  one of the ten spare stones. Read from `GenjuProp` (`espers.txt`):
+  Shiva (Ice, Osmose, **Shell**), Bismark (**Haste, Slow**), Unicorn (Pearl,
+  Remedy), Kirin (Cure, Regen), Sraphim (Cure, Life), Carbunkl (Rflect,
+  Safe), Shoat (Break, Doom), Phantom (Vanish, Demi), Siren (Mute, Sleep),
+  Stray (Muddle, Imp). No new Esper on the arc; Palidor is the first World
+  of Ruin stone, on the Solitary Island once the Falcon flies.
+- **Genji pairs** stay on CELES (Enhancer + ThunderBlade) and SABIN (Fire
+  Knuckles). The ThunderBlade is bolt: the chest pair absorbs bolt
+  (section 6), Dullahan does not.
+
+### 4.3 Kit gaps (#319, milestone v0.25) where they bite
+
+| character | planned (kits.md) | what this arc has | where it bites |
+|---|---|---|---|
+| SETZER | Slot ✦; Coin Toss, Hired Help (gil-priced); divine Jackpot | Slot only (vanilla); the Coin Toss *relic* in the bag turns Slot into GP Rain | his first arc: one verb, and a ¤ weapon class (Cards, Trump) that keys almost nothing here (section 8) |
+| EDGAR | 8 Tools (AutoCrossbow, NoiseBlaster, Bio Blaster, Flash, Drill, Chain Saw, Debilitator, Overclock) | 3: AutoCrossbow, NoiseBlaster, Bio Blaster | Drill (pierce x2, "answers armored bosses") and Debilitator are in Figaro's World of Ruin shop 84, which refuses a party with EDGAR or SABIN (`_ca67c0`): both are in every party this arc fields; Chain Saw is a Zozo chest (after the Falcon); Overclock is not built. Dullahan is the armored boss Drill was planned for |
+| CELES | RunicBlade (divine): Runic that also reflects | Runic | Dullahan is a caster boss: Runic takes his Ice 2, Ice 3, Pearl, N. Cross and his own Cure 2 (section 5) |
+| SABIN | through Air Blade (L30) | Air Blade held; Spiraler L42 | — |
+| all | #328 (Esper stat packages, growth) | the WoB stones' packages | — |
+
+### 4.4 The supply band and the shops
+
+`shops.txt`; South Figaro's 60, 61 and 63 as route-wor-edgar 4.3 decodes
+them. No shop on the arc sells Tonics (4 in the bag): field care runs on
+Potions, as on the last two stretches.
+
+| shop | where | stock (GP) |
+|---|---|---|
+| 62 relic | South Figaro (leg 1, or one castle ride back) | Goggles 500, Star Pendant 500, Fairy Ring 1500, **Amulet 5000**, RunningShoes 7000, Wall Ring 6000, Cure Ring 8000, Czarina Ring 3000 |
+| 63 item | South Figaro | Potion 300, Tincture 1500, Eyedrop 50, Echo Screen 120, Fenix Down 500, Revivify 300, Remedy 1000, Tent 1200 |
+| 64 item, 84 tools | Figaro Castle | refuse a party with SABIN or EDGAR (`_ca67de`/`_ca67e2`) |
+| 65 weapon | Kohlingen | Darts 10000, Dice 5000, Trump 13000, Enhancer 10000, Gold Lance 12000 |
+| 66 armor | Kohlingen | Diamond Shld 3500, Bard's Hat 3000, Green Beret 3000, Diamond Helm 8000, Diamond Vest 12000, DiamondArmor 15000 |
+| 67 item | Kohlingen | Potion 300, Tincture 1500, Antidote 50, Fenix Down 500, Revivify 300, Remedy 1000, Sleeping Bag 500, Tent 1200 |
+| inn | Kohlingen 191 | 200 GP |
+
+The band at L31-L33 (guidelines "Supply band"): Potions at level x 1.5
+(47-50) before Dullahan on top of the field care (53 in the bag); Fenix
+Downs about the level, capped near 20 (29); Remedy 5 against Sour Mouth
+and Muddle, Revivify 4 against the tomb's Zombie: the two the tomb spends,
+and Kohlingen is the last shop before it, so the top-up of both is sized
+there from what the walk to it spent (**estimate**: about ten of each).
+Tents (10) restore the whole party at a save point or on the world map
+(supply.md): the tomb's save point is the pre-Dullahan stop. Gil is not
+the limit (254,895): SETZER's whole kit, the Gold Lance and four Amulets
+come to under 70,000.
+
+---
+
+## 5. Dullahan (the grave, event group 85)
+
+Formation 455, Dullahan alone, met by the four (CELES, SABIN, EDGAR,
+SETZER). A loss is a game over (`_ca5ea9`); the retry point is the save
+point two rooms back (section 7).
+
+- **L37, HP 23,450** (vanilla's; OT6's HP transform is 1x for every band,
+  `Ot6HpMulTbl`), def 130, **mdef 160**, evade 10, **speed 55, starts Haste
+  and Float**. Weak **fire**; **absorbs ice**. Immune Zombie, Poison, Imp,
+  Petrify, Death, Condemned, Near Fatal, Mute, Berserk, Muddle, Sleep,
+  Stop; **not Slow** (Bismark's Slow lands; UNVERIFIED live).
+- **The script** (`ai_script.asm:5431`, `ai.txt`):
+  - opens with **L? Pearl** (holy, power 120) once (`monster switch 0`);
+  - **Cure 2** on itself below 10,240 HP, once per rotation (`monster
+    switch 2`, cleared with switch 1 at the rotation's end);
+  - every hit it takes adds 1 to `battle var 1` and counters with a Battle
+    one time in three; above 8, the next turns run **N. Cross (Frozen) +
+    Morn Star / Ice 2 + Morn Star / L? Pearl + Absolute 0 / Ice 2 +
+    Absolute 0** (one pick of three a turn), and the counter resets;
+  - if every member is Reflected, **Reflect???** (Dark, Mute, Slow), once
+    per rotation;
+  - otherwise a four-turn rotation of **Ice 3, Ice 2 and Pearl**, one pick
+    of three a turn (some picks are nothing).
+- **Attacks** (`boss_attacks.txt`): `L? Pearl: target $6E elem holy power
+  120 runic no`; `Absolute 0: target $6B elem ice power 110 runic no`;
+  `Ice 3: target $61 elem ice power 122 runic yes`; `Ice 2: ... power 62
+  runic yes`; `Pearl: target $41 elem holy power 108 runic yes`; `N.
+  Cross: ... elem ice power 0 runic yes status Frozen`; `Cure 2: ... runic
+  yes`; Special Morn Star (x2 damage, physical).
+- **L? Pearl** hits the members whose level the last digit of the party's
+  gil divides (`AttackerEffect_1d`, `battle_main.asm:10842`; the check
+  `@22ec`: `level / digit`, a miss on any remainder). The gil today ends in
+  5 (`gil 254895`): L30 and L35 members are hit, L31-L34 are not. A digit
+  of 1 hits everyone. A digit of 0 divides by zero; the SNES divider then
+  returns the dividend as the remainder, so it should hit no one
+  (**UNVERIFIED**). Gil moves with every battle's GP and with SETZER's
+  GP Rain, so the digit at the grave is the draw's.
+- **Runic is the fight's handle.** Five of its spells are runic (Ice 2,
+  Ice 3, Pearl, N. Cross, its own Cure 2); CELES's Runic takes one, pays MP
+  and +1 BP once a round, and a boosted Runic stands for 1-3 of her turns
+  (kits.md). L? Pearl and Absolute 0 are not runic.
+- **Elements**: fire is CELES's (MADUIN) and SABIN's (Knuckles, Fire Dance,
+  IFRIT); ice heals him: the Blizzard, Shiva's Ice and CELES's own Ice stay
+  out of hand (the runner's absorb guard refuses a weapon he absorbs).
+  **Shell** (Shiva) halves Ice 2/3, Absolute 0 and both Pearls; **Haste**
+  (CELES at L32, Bismark) and **Slow** on him (Bismark) are the tempo
+  levers against speed 55 and Haste.
+- **OT6**: unbroken, he takes about half damage; broken, he loses his
+  turns and his counters (the boss contract). The hit counter lives in the
+  counter block (`if_hit: attack NOTHING, NOTHING, BATTLE / add_battle_var
+  1, 1`), which holds no story command, so a Broken Dullahan skips it whole
+  and the hits landed in the break window do not feed the ice combo
+  (read from the contract, **UNVERIFIED** live).
+- **Lab candidate: yes.** An event battle lost to a game over, a level gap
+  of six, a party-wide 110-power ice spell behind a hit counter, and a
+  level-lore opener whose targets the gil decides. Measure the
+  first-attempt rate over distinct battle keys from the save point, by
+  level (the grind's target), with and without Shell and Haste, and with
+  SETZER's Esper and weapon as the arms.
+
+---
+
+## 6. The monster chest (300 (120,9), event group 116)
+
+The east room's left chest is a battle (`chest (120,9) bit $0A1 monster:
+event battle group 116 (EventCmd_8e): formations [433, 433]`), closed at the
+checkpoint. Formation 433 is the World of Ruin's Whelk: the **Presenter**
+(the shell, `$101`, 9,230 HP, def/mdef 160/195, starts Float) and the
+**Whelk Head** (`$135`, 9,845 HP). Both are weak fire and absorb ice, bolt
+and water.
+
+- **The shell answers every hit with Giga Volt** (bolt, power 110, runic:
+  CELES's Runic takes it). Its turns: Magnitude8 (earth, 100; a floating
+  member is not hit) while the head is hidden, else Battle, Mega Volt,
+  Blow Fish.
+- **The head** hides after three hits (`if_battle_var_greater 36, 2`) and
+  comes back on a 20-count timer; its turns are Battle, Mega Volt, El
+  Nino (water, 61, the party) and **PetriBlast** (Petrify: the Jewel Rings
+  CELES and EDGAR wear, and the Softs, 18).
+- The AutoCrossbow hits both bodies: each crossbow turn draws a Giga Volt.
+  The ThunderBlade (bolt) heals both; the absorb guard refuses it.
+- It pays no XP. It is optional, beside the save point, and a person
+  would open it. **Lab candidate** if it is played: it is the same lesson
+  as the Narshe Whelk (hit the head, not the shell) at L19/L31 with
+  19,000 HP between them.
+
+---
+
+## 7. Save points and checkpoint cuts
+
+One field save point (map 300 (122,14), `npc NPC_3 at (122, 14)
+show-switch $0632 gfx SAVE_POINT`); the rest are world-map saves at the
+natural pauses. Arcs after this one boot from these checkpoints and can run
+in parallel (docs/TOOLING.md "Cuts and the chain from power-on").
+
+| checkpoint | where | why |
+|---|---|---|
+| `wor-edgar-v1` (exists) | world (81,86), the Figaro desert | the start |
+| **`wor-figaro-sweep-v1`** (optional) | world (81,86) again, after leg 1 | the side items and the desert (#321, #322) cut off the story chain, so the Kohlingen legs need not replay a long optional leg; drop it if leg 1 is dropped |
+| **`wor-kohlingen-v1`** | world, outside Kohlingen's door ((38,46) by the town's exit; verify-on-arrival) | the first save with SETZER, dressed, after Kohlingen's shops; the boot for the tomb |
+| **`wor-tomb-v1`** | Darill's Tomb B3, the save point (122,14) | the last save before the monster chest and Dullahan: the retry point for both, and the World of Ruin's first save-point checkpoint |
+| **`wor-falcon-v1`** | world (25,160), landed beside the Falcon | the end of the arc; the hub the World of Ruin arcs boot from |
+
+Each cut asserts its preconditions in a contract in `lib/ot6_contract.lua`
+(the party, the story switches the leg set, no live timer, the kit), as
+`wor-edgar-v1` does. `wor-falcon-v1`'s contract carries the airship's cells
+(`$1F62/$1F63`, `$1F64` bit 13; mechanics-coverage "Vehicles — airship")
+and `$00CC $00CD $039B`.
+
+---
+
+## 8. Break data for the arc (a draft; the ROM is unchanged)
+
+Owner direction (guidelines "Design break data for the encounters players
+meet"): every species the route meets gets an authored row designed from its
+body, its vanilla elements and the party that meets it, so the party holds a
+key and the area teaches something. The house curve: **1** pests, **2**
+trash, **3** tanks, **4** miniboss-grade; bosses by bosses-wob's curve
+(no WoB gauge above 11; "12 and above is reserved for the WoR"). Vanilla
+element bits stay; no `Ot6ElemAddTbl` rows. Today's floor (4-6 shields)
+puts every break here on a corpse, as it did on the Edgar stretch.
+
+`design_keys.py` holds the draft and checks it against the hands that meet
+each formation (`design_keys.txt`); nothing below is in `Ot6ShieldTbl`.
+Once the owner has reviewed it, the rows go in as one block ("the world of
+ruin: edgar to the falcon") with a suite like `battle_breakwor_edgar.lua`.
+
+### 8.1 Who holds what
+
+| hand | classes | elements |
+|---|---|---|
+| CELES | slash (Enhancer, ThunderBlade; the Soul Sabre in the bag) | fire, ice, bolt (MADUIN), bolt (the blade) |
+| SABIN | slash (claws), bludg (Pummel, Suplex) | fire (Knuckles, Fire Dance, IFRIT), holy (AuraBolt), wind (Air Blade) |
+| EDGAR | slash (Break Blade) or pierce (Mithril Pike, Gold Lance, Man Eater); pierce on every body (AutoCrossbow) | bolt (RAMUH), poison (Bio Blaster) |
+| SETZER (from Kohlingen) | special ¤ (Cards, Trump, Dice) or pierce (Darts) | his Esper's (Unicorn holy, Shiva ice) |
+
+### 8.2 The Kohlingen continent (world groups 45-47)
+
+| id | body | HP | weak | draft row |
+|---|---|---|---|---|
+| `$089` Harpiai | a winged woman, floating | 1418 | wind | **3 · slash, pierce** |
+| `$0DB` Muus | a small shelled beast; nulls five elements | 900 | — | **2 · slash, bludg** |
+| `$0A7` Deep Eye | a floating eye, in crowds of up to six | 1334 | fire | **2 · pierce** |
+| `$0D3` Bogy | a ghost behind Safe, no weakness | 1318 | — | **3 · slash, special ¤** |
+
+- **Harpiai**: a flier (pierce, the WoB convention) and a blade for the
+  slash-handed pair; vanilla wind is SABIN's Air Blade, the one wind key
+  the party has. Its Aero (wind 125) is the plain's hardest hit.
+- **Muus**: a Fight body (its nulls and its Pep Up counter turn spells
+  away); the blade and the fist, not the point, so the AutoCrossbow does
+  not sweep the Muus x3.
+- **Deep Eye**: a point in the eye. Two shields so the AutoCrossbow's one
+  chip a body cracks six of them in two sweeps: the crossbow's crowd.
+  Vanilla fire is CELES's and SABIN's.
+- **Bogy**: no vanilla weakness, so the row is its only key: the blade for
+  the trio (who meet it before Kohlingen) and **¤ for SETZER's cards**,
+  the one body on the arc that gives his class a key. An owner decision.
+- **Teaches:** *the crossbow sweeps the crowd* (Deep Eye x6) and *wind for
+  the harpy*.
+
+### 8.3 Darill's Tomb (groups 149-151)
+
+| id | body | HP | weak | draft row |
+|---|---|---|---|---|
+| `$005` Orog | a zombie mass | 1584 | fire, holy | **3 · slash, bludg** |
+| `$010` Osteosaur | a skeleton | 1584 | fire, holy | **3 · bludg** |
+| `$06F` PowerDemon | a demon, the tomb's tank | 2058 | fire, holy | **3 · slash, pierce** |
+| `$061` Mad Oscar | a man-eating plant | 2900 | fire | **4 · slash** |
+| `$091` Exoray | a spore plant behind Shell | 1200 | fire, holy | **2 · slash, pierce** |
+
+- **Orog**: a body a blade or a blow opens; broken, it neither Zombies nor
+  counters.
+- **Osteosaur**: bones are broken, not cut or stuck: SABIN's fists (the
+  floor's pierce was the wrong class). EDGAR's key is the vanilla fire
+  someone else holds; the Bio Blaster heals it.
+- **PowerDemon**: the tomb's tank, a blade or a point; it appears in all
+  three basements.
+- **Mad Oscar**: the plant is cut; four shields (miniboss-grade, 2,900 HP)
+  so the break lands before Sour Mouth's second turn.
+- **Exoray**: trash at two; the AutoCrossbow sweeps the Exoray x3.
+- **Teaches:** *the dead burn*: fire on all five and holy on four, Zombie
+  on four, poison absorbed by four. Break the Zombie-caster before it acts;
+  keep the Bio Blaster in the bag.
+
+### 8.4 Dullahan (event group 85), in bosses-wob's style
+
+Party: CELES, SABIN, EDGAR, SETZER. Formation 455.
+
+**Shields:** 10 (draft; 8-12 the range considered) · **Weak:** fire (vanilla) +
+piercing, bludgeoning · **Absorbs:** ice.
+
+- **Keys:** an armored knight: the point through the joints, the blow on
+  the plate. CELES holds fire (MADUIN), SABIN bludg and fire, EDGAR pierce
+  (and the AutoCrossbow's one chip a turn), SETZER pierce with Darts or
+  the Man Eater; with Cards or Trump he has no key (`design_keys.txt`:
+  `SETZER (Cards): today Dullahan:n | designed Dullahan:n`).
+- **Telegraph (proposed):** Absolute 0. Vanilla's own fuse is the hit
+  counter (nine hits, then the ice combo); the contract's one telegraph
+  would make Absolute 0 a charged move a break cancels.
+- **Break story:** CELES on Runic through the ice rotation (BP from his
+  own spells), the rest chipping on fire, pierce and bludg; spend the break
+  on the fuse; Shell on the party for L? Pearl and Absolute 0.
+- **Jank ✦:** L? Pearl's gil digit stays as vanilla has it; the hit-counted
+  combo stays.
+
+### 8.5 The monster chest (event group 116)
+
+| id | body | HP | draft row |
+|---|---|---|---|
+| `$101` Presenter | the shell | 9230 | **0** (no gauge: hitting the shell is the mistake) |
+| `$135` Whelk Head | the head | 9845 | **6 · pierce** |
+
+The Narshe Whelk's rows (`$0100` 0 shields, `$0134` 4 · pierce,
+`ot6_hud.asm` `Ot6ShieldTbl`) grown for the World of Ruin, the way Ultros
+keeps one row and grows its count. Formation 433 is also the 16/256 slot of
+**World of Balance world group 13** (`pools.txt`: `slot 3: 16/256 word
+$01B1 formation 433: Presenter $101 x1, Whelk Head $135 x1`), beside Red
+Fangs and Mind Candies (L14-L15); these rows would change that encounter
+too. Whether that slot is ever rolled is UNVERIFIED (out of scope here).
+
+### 8.6 The check
+
+`design_keys.txt` lists every formation of world groups 44-47, maps
+298-300 and event groups 85 and 116 with the hands that meet it. Under the
+draft every formation is keyed for the trio and for the four; SETZER alone
+keys only the Bogy with Cards, and the Sand Horse, Harpiai, Deep Eye,
+PowerDemon, Exoray, Dullahan and Whelk Head with Darts.
+
+---
+
+## 9. Risks and unknowns
+
+| mechanic | where | coverage today | what the driving needs |
+|---|---|---|---|
+| Dullahan: an event battle whose loss is a game over | the grave | the runner retries a lost segment from its boot | the lab (section 5): level target, Shell/Haste/Slow, SETZER's arms |
+| Zombie on several members, in battle | the tomb (four species) | field cure HANDLED (#190); the battle raise refuses a Fenix Down on a zombie (#245); an in-battle Revivify not seen | measure: zombies per fight, whether a zombied member costs the fight; the Amulets and the Ribbon as levers |
+| Sour Mouth (six statuses) | Mad Oscar, B2/B3 | Muddle HANDLED (route-wor-edgar 12.4); Sleep "planned around / not measured live" | Remedy in battle; the Ribbon |
+| L? Pearl and the gil digit | Dullahan | not read by the driver | read `$1860-$1862` at the grave; the digit is a lever a person can move (selling an odd-priced item) |
+| Frozen (N. Cross) | Dullahan | planned around / not measured live | — |
+| a chest that opens a battle (`EventCmd_8e`) | 300 (120,9) | not in mechanics-coverage | open it after the save; the runner's battle handling |
+| the Whelk pattern: a shell that counters, a head that hides | the chest | the Narshe Whelk's driver | the kill order (head only) |
+| face-and-hold-A switches and turtle rides, three directions | the tomb | HANDLED (`H.faceAndHoldA`, up at the Figaro turtle) | down (56,14) and right (71,9) are new directions for it |
+| the castle's ride (a dialog choice and a scripted move) | leg 2 | the Edgar arc's surfacing is the same scene family | choice 0 at "(Go to Kohlingen?)" |
+| **flying and landing the Falcon** | the end | "PARTIAL — contract assertions only" | a land verb (A over land) and a contract; a suite for the new mechanic |
+| a scripted cutscene with walking in the middle | 301 (the flashback) | none needed beyond talks and a step-on trigger | talk, step, talk |
+| a party member joining undressed | SETZER | `M.equipKit` and the world menu helpers (#255) | dress him from the bag and Kohlingen's shops |
+| the desert's Sand Horse pair | group 44, both castle tiles | the driver heal-locks (#312); lost 2 of 8 with two members | a lab: formation 222 with the trio |
+| map-init `mod_bg_tiles` and turtles | the tomb, 297's stairs, 66, 89 | the lib reads live RAM | offline counts are verify-on-arrival |
+| the draw | everywhere | save data (`$1FA1-$1FA5`) | vary it by using up encounters (varlab), not by seeds |
+
+Out of scope, noted: the World of Ruin Colosseum is on foot from Kohlingen
+(v0.35); Mobliz (v0.27) is on the Tzen continent; the castle's stratum
+(`$00CD`) and Palidor (`$039B`) open with the Falcon; formation 433 in WoB
+world group 13 (8.5).
+
+---
+
+## 10. The South Figaro continent, played (leg 1, `gen_wor_figaro_sweep`, `wor-figaro-sweep-v1`)
+
+Not yet driven.
+
+## 11. The castle's ride, Kohlingen and SETZER, played (legs 2-4, `gen_wor_kohlingen`, `wor-kohlingen-v1`)
+
+Not yet driven.
+
+## 12. Darill's Tomb to its save point, played (legs 5-8, `gen_wor_tomb`, `wor-tomb-v1`)
+
+Not yet driven.
+
+## 13. Dullahan and the Falcon, played (legs 9-11, `gen_wor_falcon`, `wor-falcon-v1`)
+
+Not yet driven.
+
+## 14. What the owner may want to decide
+
+- **The draft rows** (section 8): the counts and classes; in particular
+  Dullahan's count (10 drafted, 8-12 considered), the Bogy's ¤ (SETZER's
+  only key on the arc), and the chest pair's rows (they also move WoB world
+  group 13's rare formation 433).
+- **SETZER's class on the arc**: his ¤ weapons key one body here (the
+  Bogy, by the draft); Darts (pierce) key seven. Whether ¤-weak bodies
+  should appear where he joins.
+- **#319 before or after this arc**: SETZER joins with Slot alone; EDGAR's
+  Drill and Debilitator sit in a shop that refuses this party (vanilla's
+  "I can't take money from the King!"). Keep the refusal (vanilla) or let
+  this arc's EDGAR buy them.
+- **Dullahan's telegraph** (Absolute 0 proposed) and whether the policy may
+  set the gil's last digit against L? Pearl (an informed reading, a
+  human input).
+- **The side items' place**: leg 1 in this arc's chain with its own cut, or
+  a side leg off `wor-edgar-v1`.
+
+---
+
+## Appendix — key addresses
+
+| thing | citation |
+|---|---|
+| the engineer, to Kohlingen | 61 NPC_6 `_ca682f` `:15575`; `_ca68e6` `:15651`; `_ca6908` `:15665` (`$0106=0`, `$00DC=1` `:15690`); back `_ca6986` `:15724` |
+| the castle on the world at Kohlingen | trigger (53,58)/(54,58) `_ca5f18` `:14233` (`$00DC`) |
+| SETZER | inn 191 NPC_6 `_cc3bf8` `:85517`; `char_party` `:85759`; `norm_lvl` `:85762`; `$067F=1` at the World of Ruin's start `:113035` |
+| Kohlingen's shops and inn | `_cc69a6` `:92679` (65/66/67); inn `_cc69ca` `:92700` (200 GP) |
+| the tomb's door | 297 (8,10) `_ca3f83` `:9899` (`$01A9`, `$00CB`); stairs `_caf1a2` `:35732` |
+| the tomb's switches | `_ca41a3` `:10298`, `_ca41c3` `:10316`, `_ca41e0` `:10331`, `_ca4216` `:10359`, `_ca422e` `:10373`, `_ca4259` `:10400`, `_ca4278` `:10424`, `_ca428d` `:10436`, `_ca42c0` `:10473` |
+| the tombstone | `_ca4037` `:10014` (`$00C2-$00C5`, `$0112`) |
+| the grave, Dullahan | 299 (100,14) `_ca42f1` `:10508`; `battle 85` `:10537`; `_ca5ea9` `:14173`; (100,7) drawn by `_caf1ed` `:35756` |
+| the flashback and the Falcon | `_ca435d` `:10565`; `_ca43d9` `:10632`; `_ca44ba` `:10683`; `_ca4502` `:10723`; switches `:11257-11276`; control at (25,160) `:11280` |
+| Figaro's World of Ruin tool shop | `_ca67c0` (refuses EDGAR/SABIN), `shop_menu 84` |
+| L? Pearl | `AttackerEffect_1d` `battle_main.asm:10842`; the level check `@22ec` |
+| Dullahan's script | `ai_script.asm:5431` |
+| norm_lvl | `field/event.asm` `EventCmd_77`, `CalcAverageLevel` |
