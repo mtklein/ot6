@@ -18,10 +18,12 @@
 --      before SETZER joins); in the tomb, the four.  A row of 0 shields
 --      (the Presenter) draws no gauge by design; its formation must hold
 --      a gauged body the party keys;
---   3. the bodies the design hangs a lesson on: the Bogy is the one body
---      SETZER's special class (Cards) keys, and every member of the four
---      holds a key on it; every member of the four holds a key on
---      Dullahan, who absorbs ice; the Narshe Whelk's rows, which the
+--   3. the bodies the design hangs a lesson on: special is a common key
+--      (guidelines, owner 2026-10-01), so SETZER's Cards key each of the
+--      six special bodies (the Bogy, the Deep Eye, the Orog, the
+--      Osteosaur, the PowerDemon, Dullahan); every member of the four
+--      holds a key on the Bogy, and on Dullahan, who absorbs ice, with
+--      either of SETZER's weapons; the Narshe Whelk's rows, which the
 --      chest pair grows from, are unchanged.
 --
 -- All mismatches are logged before the verdict, so a red run names every
@@ -36,16 +38,16 @@ local WANT = {
   -- the Kohlingen continent (world groups 45-47)
   [0x089] = { "Harpiai",    3, SLASH | PIERCE,   WIND },
   [0x0DB] = { "Muus",       2, SLASH | BLUDG,    0 },
-  [0x0A7] = { "Deep Eye",   2, PIERCE,           FIRE },
+  [0x0A7] = { "Deep Eye",   2, PIERCE | SPECIAL, FIRE },
   [0x0D3] = { "Bogy",       3, SLASH | SPECIAL,  0 },
   -- Darill's Tomb (groups 149-151)
-  [0x005] = { "Orog",       3, SLASH | BLUDG,    FIRE | HOLY },
-  [0x010] = { "Osteosaur",  3, BLUDG,            FIRE | HOLY },
-  [0x06F] = { "PowerDemon", 3, SLASH | PIERCE,   FIRE | HOLY },
+  [0x005] = { "Orog",       3, SLASH | BLUDG | SPECIAL,  FIRE | HOLY },
+  [0x010] = { "Osteosaur",  3, BLUDG | SPECIAL,          FIRE | HOLY },
+  [0x06F] = { "PowerDemon", 3, SLASH | PIERCE | SPECIAL, FIRE | HOLY },
   [0x061] = { "Mad Oscar",  4, SLASH,            FIRE },
   [0x091] = { "Exoray",     2, SLASH | PIERCE,   FIRE | HOLY },
   -- the grave (event group 85)
-  [0x11C] = { "Dullahan",  10, PIERCE | BLUDG,   FIRE },
+  [0x11C] = { "Dullahan",  10, PIERCE | BLUDG | SPECIAL, FIRE },
   -- the monster chest beside the save point (event group 116)
   [0x101] = { "Presenter",  0, 0,                FIRE },
   [0x135] = { "Whelk Head", 6, PIERCE,           FIRE },
@@ -204,6 +206,22 @@ H.run({ maxFrames = 600 }, {
     H.log(string.format("checked %d formations, %d formation-species pairs", #order, pairs_))
 
     -- 3. the bodies the design hangs a lesson on
+    local special = { 0x0D3, 0x0A7, 0x005, 0x010, 0x06F, 0x11C }
+    for _, sp in ipairs(special) do
+      local ok = keys(sp, CARDS[2], CARDS[3])
+      H.log(string.format("special: %s %s on $%03X %s", CARDS[1],
+        ok and "holds a key" or "holds NO key", sp, WANT[sp][1]))
+      if not ok then
+        problem("special: %s holds no key on $%03X %s (class $%02X, weak $%02X)",
+          CARDS[1], sp, WANT[sp][1], classOf(sp), weakOf(sp))
+      end
+    end
+    local cardsKeyed = 0
+    for _, sp in ipairs(ids) do
+      if keys(sp, CARDS[2], CARDS[3]) then cardsKeyed = cardsKeyed + 1 end
+    end
+    H.log(string.format("special: %s holds a key on %d of %d designed species",
+      CARDS[1], cardsKeyed, #ids))
     local four = { CELES, SABIN, EDGAR, CARDS }
     for _, m in ipairs(four) do
       local ok = keys(0x0D3, m[2], m[3])
@@ -212,7 +230,7 @@ H.run({ maxFrames = 600 }, {
         problem("the Bogy: %s holds no key (class $%02X, weak $%02X)", m[1], classOf(0x0D3), weakOf(0x0D3))
       end
     end
-    local dullahan = { CELES, SABIN, EDGAR, DARTS }
+    local dullahan = { CELES, SABIN, EDGAR, DARTS, CARDS }
     for _, m in ipairs(dullahan) do
       local ok = keys(0x11C, m[2], m[3])
       H.log(string.format("Dullahan: %s %s", m[1], ok and "holds a key" or "holds NO key"))

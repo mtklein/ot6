@@ -95,6 +95,11 @@ power, write like a human (owner, 2026-09-30).
   [break-coverage-gate.md](design/break-coverage-gate.md) and a suite that
   checks the rows in the built ROM; `tools/audit_break_coverage.py`'s tuning
   claim grows only as play backs it.
+- **Special (¤) is a common key.** Setzer's cards and dice and Relm's
+  brushes do best with plenty to break: spirits, magical and cursed bodies
+  and some bosses can take ¤ beside their other keys, often enough that
+  bringing Setzer or Relm is a real choice, without ¤ becoming the answer
+  to every fight (owner, 2026-10-01).
 - **Prefer not to retune vanilla enemies** (AI scripts, spells, one-shots)
   to dodge a hard fight. OT6 changes battle systems more than individual
   enemy quirks; a hard fight is usually answered with levels, gear, route or
