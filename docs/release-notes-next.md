@@ -10,8 +10,8 @@ release's notes.
 
 **The World of Ruin from Figaro Castle to the Falcon has designed break
 weaknesses.** The monsters around Kohlingen and in Darill's Tomb used to
-carry generic weaknesses and five shields, so a break usually landed on a
-monster that was already dying. Now each has two to four shields and a
+carry generic weaknesses and five shields, so a break could take most of
+a fight to land. Now each has two to four shields and a
 weakness the party holds: Edgar's crossbow cracks a crowd of Deep Eyes or
 Exorays, Sabin's fists break the Osteosaur's bones, and the Bogy, a ghost
 with no weakness of its own, is the one monster here Setzer's cards

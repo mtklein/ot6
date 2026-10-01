@@ -2147,7 +2147,7 @@ Ot6ShieldTbl:
         ; Vanilla element bits stay.  House curve: 2 trash, 3 tanks, 4
         ; miniboss-grade; Dullahan by bosses-wob's curve.  None of the
         ; random species is met in the WoB; the chest pair's formation 433
-        ; is also the 16/256 slot of WoB world group 13.
+        ; is also the 16/256 slot of WoB world group 13, a slot no WoB tile deals.
         ; tools/tests/battle_breakwor_falcon.lua reads them back from the ROM.
         ; -- the kohlingen continent (world groups 45-47) --
         .word   $0089
