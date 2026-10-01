@@ -91,12 +91,9 @@ local function kit(ch)
   return table.concat(t, " ")
 end
 local MEMBERS = { { CELES, "CELES" }, { SABIN, "SABIN" }, { EDGAR, "EDGAR" }, { SETZER, "SETZER" } }
--- The statuses the arc's coming fights inflict, for the relic rule's guards
--- (H.dressRelics opts.threats; an informed reading of route-wor-falcon 3.5,
--- 4.2, 6 and 12.3-12.4): the tomb's Zombie, the Mad Oscar's Sour Mouth
--- (Imp, Poison, Dark; Sleep, Muddle, Mute), the Sap seen there, and the
--- monster chest's PetriBlast.  STATUS1 $67, STATUS2 $E8.
-local ARC_THREATS = { s1 = 0x67, s2 = 0xE8 }
+-- the statuses the arc's coming fights inflict, for the relic rule's
+-- guards (lib/ot6_field.lua M.ARC_THREATS, shared by the arc's generators)
+local ARC_THREATS = H.ARC_THREATS["wor-falcon"]
 local function topLevel()
   local m = 0
   for _, p in ipairs(MEMBERS) do if inParty(p[1]) then m = math.max(m, level(p[1])) end end

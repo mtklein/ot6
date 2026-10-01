@@ -5178,15 +5178,18 @@ end
 -- descriptions would, and M.dressRelics(members) puts the plan on through
 -- the Relic menu (M.equipKit).  The rule (guidelines "Relics matter",
 -- "Ribbons are worth going out of your way for"):
---   1. A two-weapon relic (Genji Glove, Gauntlet, Merit Award: +12 bits
---      $38) stays where it is: it decides the hands, and the Relic menu
---      runs Optimum when one comes or goes.  A worn relic the rule does
---      not rank (Coin Toss, Exp. Egg, ...) stays too.
+--   1. A worn two-weapon relic (Genji Glove, Gauntlet, Merit Award: +12
+--      bits $38) stays where it is: it decides the hands.  A spare one in
+--      the bag goes on the main boost-Fighter not wearing one (the highest
+--      vigor), and the Relic menu's Optimum arms the second hand.  A worn
+--      relic the rule does not rank (Coin Toss, Exp. Egg, ...) stays too.
 --   2. The widest guard (status protection, +6/+7, and nothing else; the
---      Ribbon's ten statuses) goes first, to the party's caster: the member
---      with the most spells learned ($1A6E).  Mute and Imp take a caster's
---      Magic (and Imp her Runic) while the others keep their verbs, and
---      Sleep, Muddle and Zombie cost every member alike.
+--      Ribbon's ten statuses) goes next, to the party's caster: the member
+--      with the most spells learned ($1A6E; characters 0-11 have a row).
+--      Mute and Imp take a caster's Magic (and Imp her Runic) while the
+--      others keep their verbs, and Sleep, Muddle and Zombie cost every
+--      member alike.  When she cannot wear it or has no free slot it goes
+--      to the next member by spells learned who can.
 --   3. Then every other ranked relic, in rank order, each to a free slot
 --      of the member it helps most:
 --        Haste (+8 bit 3: RunningShoes)            rank 5, the slowest member
@@ -5209,6 +5212,15 @@ end
 -- Acting relics outrank guards because a guard only matters when its
 -- status lands, and the Ribbon (which covers every status the plain guards
 -- do) is already on.  Reads only; the dressing is the Relic menu's presses.
+-- The statuses an arc's coming fights inflict, for the rule's guards
+-- (opts.threats), one entry per arc its generators share.
+-- "wor-falcon": the Falcon arc (route-wor-falcon 3.5, 4.2, 6 and
+-- 12.3-12.4, an informed reading): the tomb's Zombie, the Mad Oscar's Sour
+-- Mouth (Imp, Poison, Dark; Sleep, Muddle, Mute), the Sap seen there, and
+-- the monster chest's PetriBlast.  STATUS1 $67, STATUS2 $E8.
+M.ARC_THREATS = {
+  ["wor-falcon"] = { s1 = 0x67, s2 = 0xE8 },
+}
 local RELIC_NAMES = {
   [0xB0] = "Goggles", [0xB1] = "Star Pendant", [0xB2] = "Peace Ring", [0xB3] = "Amulet",
   [0xB5] = "Jewel Ring", [0xBA] = "RunningShoes", [0xC3] = "Earrings", [0xC4] = "Atlas Armlet",
@@ -5252,7 +5264,10 @@ function M.relicClass(id, threats)
 end
 
 local function charByte(ch, off) return M.readByte(0x1600 + 37 * ch + off) end
+-- the spell table ($1A6E, 54 bytes a character) has rows for characters
+-- 0-11 only; GOGO's and UMARO's would read the Rage bytes after it
 local function spellsLearned(ch)
+  if ch > 11 then return 0 end
   local n = 0
   for i = 0, 53 do if M.readByte(0x1A6E + 54 * ch + i) == 0xFF then n = n + 1 end end
   return n
@@ -5284,8 +5299,9 @@ function M.relicPlan(members, opts)
       ms[#ms + 1] = m
     end
   end
-  -- the pool: the bag's ranked relics and every worn one not kept in place
-  local count, ids = {}, {}
+  -- the pool: the bag's ranked relics and every worn one not kept in place;
+  -- a spare two-weapon relic in the bag is planned apart (step 1)
+  local count, ids, spareHands = {}, {}, {}
   local function add(id, n)
     if not count[id] then count[id] = 0; ids[#ids + 1] = id end
     count[id] = count[id] + n
@@ -5295,6 +5311,7 @@ function M.relicPlan(members, opts)
     if id ~= 0xFF and q > 0 then
       local cl = M.relicClass(id, opts.threats)
       if cl and not cl.hands then add(id, q) end
+      if cl and cl.hands then spareHands[#spareHands + 1] = { id = id, n = q } end
     end
   end
   for _, m in ipairs(ms) do
@@ -5326,11 +5343,29 @@ function M.relicPlan(members, opts)
     return false
   end
   local function wearing(m, id) return m.cur[4] == id or m.cur[5] == id end
-  -- 2. the widest guard to the caster
-  local caster = nil
-  for _, m in ipairs(ms) do
-    if m.spells > 0 and (caster == nil or m.spells > caster.spells) then caster = m end
+  -- 1. a spare two-weapon relic in the bag (a Genji Glove, Gauntlet or
+  -- Merit Award) goes on the main boost-Fighter not already wearing one:
+  -- the highest vigor (guidelines "Relics matter, the Genji Glove
+  -- especially").  The Relic menu's own Optimum then arms the second hand
+  -- (dressRelics keeps that re-equip rather than putting the gear back).
+  for _, sp in ipairs(spareHands) do
+    for _ = 1, sp.n do
+      local best = nil
+      for _, m in ipairs(ms) do
+        if not m.twoWeapons and hasFree(m) and wearsItem(m.ch, sp.id)
+            and (best == nil or m.vigor > best.vigor) then best = m end
+      end
+      if best then
+        count[sp.id] = (count[sp.id] or 0) + 1
+        take(best, sp.id, string.format("a spare two-weapon relic to the main boost-Fighter without one (vigor %d)",
+          best.vigor))
+        best.twoWeapons, best.handCome = true, true
+      end
+    end
   end
+  -- 2. the widest guard to the caster (the most spells learned); when she
+  -- cannot wear it or has no free slot, to the next member by spells
+  -- learned (then the order of `members`) who can: never left in the bag
   local wide, wcover = nil, 0
   for _, id in ipairs(ids) do
     local cl = M.relicClass(id, opts.threats)
@@ -5345,16 +5380,29 @@ function M.relicPlan(members, opts)
       take(to, wide, string.format("the widest guard (%d of the threatened statuses) to %s: opts.guardTo, a lab's lever",
         wcover, to.name))
     end
-    caster = nil
-  end
-  if caster and wide and hasFree(caster) and wearsItem(caster.ch, wide) then
+  elseif wide then
+    local byspells = {}
+    for _, m in ipairs(ms) do byspells[#byspells + 1] = m end
+    table.sort(byspells, function(a, b)
+      if a.spells ~= b.spells then return a.spells > b.spells end
+      return a.order < b.order
+    end)
     local others = {}
-    for _, m in ipairs(ms) do
-      if m ~= caster then others[#others + 1] = string.format("%s %d", m.name, m.spells) end
+    for _, m in ipairs(byspells) do others[#others + 1] = string.format("%s %d", m.name, m.spells) end
+    local first = byspells[1]
+    for _, m in ipairs(byspells) do
+      if hasFree(m) and wearsItem(m.ch, wide) then
+        if m == first and m.spells > 0 then
+          take(m, wide, string.format("the widest guard (%d of the threatened statuses) to the party's caster "
+            .. "(spells learned: %s): Mute and Imp take her Magic and Runic, Sleep, Muddle and Zombie every member's turns",
+            wcover, table.concat(others, ", ")))
+        else
+          take(m, wide, string.format("the widest guard (%d of the threatened statuses) to %s, the first by spells "
+            .. "learned (%s) who can wear it with a free slot", wcover, m.name, table.concat(others, ", ")))
+        end
+        break
+      end
     end
-    take(caster, wide, string.format("the widest guard (%d of the threatened statuses) to the party's caster (%d spells learned; %s): "
-      .. "Mute and Imp take her Magic and Runic, Sleep, Muddle and Zombie every member's turns",
-      wcover, caster.spells, table.concat(others, ", ")))
   end
   -- 3. the rest, by rank
   local order = {}
@@ -5441,7 +5489,7 @@ function M.relicPlan(members, opts)
     end
     lines[#lines + 1] = string.format("%s: slot 4 %s, slot 5 %s (%d change%s)", m.name,
       relicName(m.want[4] or m.cur[4]), relicName(m.want[5] or m.cur[5]), #changes, #changes == 1 and "" or "s")
-    plan[#plan + 1] = { ch = m.ch, name = m.name, want = m.want, changes = changes }
+    plan[#plan + 1] = { ch = m.ch, name = m.name, want = m.want, changes = changes, handCome = m.handCome }
   end
   for _, l in ipairs(lines) do M.log(string.format("[%s] %s", tag, l)) end
   return plan
@@ -5499,6 +5547,12 @@ function M.dressRelics(members, opts)
             M.equipKit(p.ch, p.changes, { tag = string.format("%s: %s", tag, p.name) }),
             {
               tick = function()
+                if restore == nil and p.handCome then
+                  M.log(string.format("[%s] %s: a two-weapon relic came on; the Relic menu's Optimum re-equip "
+                    .. "stands (gear now %02X %02X %02X %02X)", tag, p.name, charByte(p.ch, 0x1F), charByte(p.ch, 0x20),
+                    charByte(p.ch, 0x21), charByte(p.ch, 0x22)))
+                  return "done"
+                end
                 if restore == nil then
                   local back = {}
                   for s = 0, 3 do

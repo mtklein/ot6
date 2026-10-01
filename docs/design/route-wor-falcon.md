@@ -1108,11 +1108,16 @@ Nothing was measured by writing game state.
 (`lib/ot6_field.lua`; #351), read from the ROM's item records (ItemProp
 +6/+7 status protection, +8 bit 3 Haste, +9 the Atlas/Earring bits, +11
 bit 7 the Hyper Wrist, +12 the Black Belt's counter and the two-weapon
-bits) and the threats the caller states (`ARC_THREATS`, this arc: the
-tomb's Zombie, Sour Mouth's Imp, Poison, Dark, Sleep, Muddle and Mute, the
-Sap seen there, the chest's PetriBlast). A Genji Glove stays where it is.
-The widest guard goes first, to the party's caster (the member with the
-most spells learned); then Haste, +25% damage, vigor, counter and magic
+bits) and the threats the caller states (`H.ARC_THREATS["wor-falcon"]`, one
+entry the arc's three generators share: the tomb's Zombie, Sour Mouth's
+Imp, Poison, Dark, Sleep, Muddle and Mute, the Sap seen there, the
+chest's PetriBlast). A worn Genji Glove stays where it is; a spare one in
+the bag goes on the main boost-Fighter not wearing one (the highest vigor),
+and the Relic menu's own re-equip arms the second hand. The widest guard
+goes next, to the party's caster (the member with the most spells
+learned, counted only for the twelve characters with a spell-table row),
+or, when she cannot wear it or has no free slot, to the next member by
+spells learned who can; then Haste, +25% damage, vigor, counter and magic
 outrank plain guards, each to the member it helps most (Haste the
 slowest, damage and vigor the two-weapon Fighters first, then by vigor);
 a guard fills a slot nothing better took, by the threatened statuses it
@@ -1147,7 +1152,11 @@ Award sits in the old or new pair, one that stays put included
 (`CheckReequipRelics`, `menu/equip.asm`). The first run lost CELES's
 ThunderBlade to the Blizzard, which Dullahan absorbs
 (`dev/sweep1_optimum_finding.txt`: `before=13 0F 7E 8F D1 B5`,
-`after=13 0E 7E 8F D1 CA`). `H.dressRelics` notes the gear before each
+`after=13 0E 7E 8F D1 CA`; that run was killed and its log lost, so the
+file quotes the lines as read during it; the finding is live in the
+capture log, `capture/capture_wor-figaro-sweep-v1.log`: `[relics after
+the Ribbon] CELES: the Relic menu's re-equip moved slot 1 $0F -> $0E;
+putting it back`). `H.dressRelics` notes the gear before each
 Relic session and re-equips it after: `[relics after the Ribbon] CELES:
 the Relic menu's re-equip moved slot 1 $0F -> $0E; putting it back`, then
 `CELES's gear slot 1 holds $0F as before the relics`.
@@ -1173,6 +1182,47 @@ first sealing run (`capture-first/`) dressed EDGAR with two Star Pendants
 for a moment (a tie between equal guards went by item number); the
 re-cut's rule keeps the worn guard on a tie and gives a guard only to a
 member it adds a threatened status to.
+
+**The leg under draw variation** (`var_sweep/`, `lab/varlab_sweep.py`, the
+first driving's varlab with the shipped generator: K encounters used up
+on the continent's grass, forest and plain before the body, retries off;
+`summary.txt`, `keys.txt`):
+
+| K | 0 | 1 | 2 | 3 | 4 | 5 (6 fought) | 6 | 7 (8 fought) | 8 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| PASS frame | 42972 | 45812 | 57120 | 55355 | 69437 | 59535 | 65808 | 74621 | 66478 | 76346 |
+| lowest member HP (body) | 948 | 992 | 217 | 794 | 524 | 1010 | 259 | 842 | 1110 | 920 |
+
+**10 of 10 `PASS attempts=1/1`**, each `contract wor-figaro-sweep-v1
+(exit): all 30 fields hold`; every `[outcome]` line `paid as due` (150 of
+150), no death in a body. `body: 102 battles, 90 distinct battle keys
+(seed+group+formation); outcomes {'WON': 102}`: by place map 87 (the
+passage) 34 keys, the world 27, map 68 (the cave) 25, map 90 5. The desert
+in the bodies: the Sand Horse pair (222) once (`k2_s0 | body | be80-g00DE
+| 0DE | Sand Horse x2 | WON`, 4176 ticks), formation 223 six times. In
+every run the three Relic-menu stops ended in the same kit (`[relics after
+the Hero Ring] CELES wears Genji Glove $D1, Ribbon $CA`, `SABIN wears Genji
+Glove $D1, Hero Ring $C9`, `EDGAR wears RunningShoes $BA, Hyper Wrist
+$D2`) with one Optimum put-back (`putting it back`, 1 a run).
+
+**After the review's generality fixes** (a spare two-weapon relic
+planned, spells counted only where a spell-table row exists, the widest
+guard passed to the next member who can wear it, the threats in one
+place), the three captures were re-run from the same tracked boots
+(`recheck/`): `PASS (frame 42972)`, `(26324)`, `(26573)`, each
+`attempts=1/3` with `all 30` / `all 34` / `all 31 fields hold`, and the
+payloads are the same batteries byte for byte (`recheck/validate_*.txt`:
+`sha256=2d716d50536d...`, `b0c2de780704...`, `cd0d052614f6...`); only the
+provenance signatures were re-sealed. The cold Continues hold (`all 30`,
+`all 34`, `all 31 fields hold`). A plan-only probe on the battery from
+before the re-cut (`recheck/probe_relic_plan.log`, `lab/probe_relic_plan.lua`;
+the Ribbon still in the bag) exercises the fallback: `[probe] the Ribbon
+goes to: the trio CELES; without CELES SABIN; CELES listed last CELES`
+(`Ribbon $CA goes to SABIN's slot 5 (over Black Belt $D5): the widest
+guard ... to SABIN, the first by spells learned (SABIN 0, EDGAR 0) who can
+wear it with a free slot`). No battery on this arc holds a spare Genji
+Glove, Gauntlet or Merit Award, or GOGO or UMARO, so those two paths have
+not run.
 
 ## 11. The castle's ride, Kohlingen and SETZER, played (legs 2-4, `gen_wor_kohlingen`, `wor-kohlingen-v1`)
 
@@ -1707,7 +1757,13 @@ the relics at B2's hub after the chests. Where an Amulet had dropped the
 Relic menu opened there, and afterwards the walker found no path from
 (29,26) to (37,23) for the 900 frames of its retries: `FAIL: navTo: no path
 (29,26)->(37,23) [0 edges blocklisted, 20 retries]` in K=1 and K=6 (8 of 10
-PASS). The re-plan now runs only on the save point, whose step-on waits
+PASS), and a third time in the lab arm's first set before it was
+re-derived (`var_tomb_armE_a/k1_s0.log`, the same line). Every run whose
+Relic menu opened at the hub failed there and no other did
+(`build/attempts/wt/ribbon-chain-review/hub_menus.txt`); the field care at
+the same tile never opened a menu in any set (`[before the turtles]
+nothing to do`, 39 runs), so the defect predates the relic rule and is
+filed apart. The re-plan now runs only on the save point, whose step-on waits
 out the field's stale map after a menu. The capture never opened that
 menu, so its re-capture is the same battery byte for byte (payload
 `cd0d052614f6...` both times; `capture-tomb-first/`); only the provenance
@@ -1753,11 +1809,15 @@ death):
   in the arm EDGAR said nothing and CELES 6 (`POISON 4, ZOMBIE 2`). Sour
   Mouth now lands on whoever else it picks (`SETZER ... is an IMP` in K=1
   and K=10).
-- **The party's Zombie outcomes did not move measurably.** Zombie lands on
-  the other three (`SABIN 5, EDGAR 8, SETZER 9` lines), and three of 57
-  tomb battles still ended with a member Zombied (2.9% before, 5.3% here,
-  3.5% in the arm: three, three and two battles, inside each other's
-  noise). The arms share 21 of their ~58 distinct body keys
+- **Zombie landings per tomb battle roughly doubled while the
+  end-of-battle outcomes held.** Zombie was said 22 times over 57 tomb
+  battles here against 19 over 102 before (0.39 against 0.19 a battle;
+  the arm 15 over 57), all of it on the other three (`SABIN 5, EDGAR 8,
+  SETZER 9` lines); the in-battle cure (12.3) cleared most (`Zombie
+  cleared in battle 19`, `status.txt`), and the
+  battles that ended with a member Zombied held at three of 57 against
+  three of 102 (2.9% before, 5.3% here, 3.5% in the arm: three, three and
+  two battles, inside each other's noise). The arms share 21 of their ~58 distinct body keys
   (`arms_keys.txt`), so ten runs each cannot tell them apart; the choice
   of wearer stands on the reason in 10.4, not on these numbers.
 - **The deaths are the party's own** in both arms. Ribbon on CELES: a
