@@ -2144,6 +2144,9 @@ Ot6ShieldTbl:
         ; Celes (slash), Sabin (slash, bludg) and Edgar (slash, pierce; the
         ; AutoCrossbow's pierce on every body); Setzer joins at Kohlingen
         ; with the special class (Cards, Trump, Dice) or pierce (Darts).
+        ; Special is a common key (guidelines, owner 2026-10-01): the
+        ; spirits, the magical and the cursed bodies take it beside their
+        ; other keys (six of the twelve), the plants and beasts do not.
         ; Vanilla element bits stay.  House curve: 2 trash, 3 tanks, 4
         ; miniboss-grade; Dullahan by bosses-wob's curve.  None of the
         ; random species is met in the WoB; the chest pair's formation 433
@@ -2160,28 +2163,32 @@ Ot6ShieldTbl:
                                 ;   body, the blade and the fist, so the
                                 ;   crossbow does not sweep the muus x3
         .word   $00a7
-        .byte   2, OT6_PIERCE   ; deep eye: a point in the eye; two shields
-                                ;   so the autocrossbow cracks six in two
-                                ;   sweeps.  fire vanilla
+        .byte   2, OT6_PIERCE|OT6_SPECIAL ; deep eye: a point in the eye;
+                                ;   two shields so the autocrossbow cracks
+                                ;   six in two sweeps.  a magic eye that
+                                ;   sleeps whoever meets its gaze: special
+                                ;   too.  fire vanilla
         .word   $00d3
         .byte   3, OT6_SLASH|OT6_SPECIAL ; bogy: a ghost behind safe with no
                                 ;   vanilla weakness, so this row is its
                                 ;   only key: the blade for the trio, and
-                                ;   setzer's cards (the one body on the
-                                ;   arc his special class keys)
+                                ;   setzer's cards: a spirit
         ; -- darill's tomb (groups 149-151): fire on all five, holy on four,
         ; zombie on four, poison absorbed by four --
         .word   $0005
-        .byte   3, OT6_SLASH|OT6_BLUDG  ; orog: a zombie mass a blade or a
-                                ;   blow opens; broken, it neither zombies
-                                ;   nor counters.  fire|holy vanilla
+        .byte   3, OT6_SLASH|OT6_BLUDG|OT6_SPECIAL ; orog: a zombie mass a
+                                ;   blade or a blow opens, and cursed
+                                ;   flesh (special); broken, it neither
+                                ;   zombies nor counters.  fire|holy vanilla
         .word   $0010
-        .byte   3, OT6_BLUDG    ; osteosaur: bones are broken, not cut or
-                                ;   stuck (the floor's pierce was wrong).
-                                ;   fire|holy vanilla
+        .byte   3, OT6_BLUDG|OT6_SPECIAL ; osteosaur: bones are broken,
+                                ;   not cut or stuck (the floor's pierce
+                                ;   was wrong); risen bones are cursed
+                                ;   (special).  fire|holy vanilla
         .word   $006f
-        .byte   3, OT6_SLASH|OT6_PIERCE ; powerdemon: the tomb's tank, in all
-                                ;   three basements.  fire|holy vanilla
+        .byte   3, OT6_SLASH|OT6_PIERCE|OT6_SPECIAL ; powerdemon: the
+                                ;   tomb's tank, in all three basements; a
+                                ;   demon (special).  fire|holy vanilla
         .word   $0061
         .byte   4, OT6_SLASH    ; mad oscar: the plant is cut; four so the
                                 ;   break lands before sour mouth's second
@@ -2192,9 +2199,11 @@ Ot6ShieldTbl:
                                 ;   fire|holy vanilla
         ; -- the grave (event group 85, formation 455) --
         .word   $011c
-        .byte   10, OT6_PIERCE|OT6_BLUDG ; dullahan: an armored knight, the
-                                ;   point through the joints, the blow on
-                                ;   the plate.  fire vanilla; absorbs ice
+        .byte   10, OT6_PIERCE|OT6_BLUDG|OT6_SPECIAL ; dullahan: an armored
+                                ;   knight, the point through the joints,
+                                ;   the blow on the plate; a headless
+                                ;   spirit in it (special, the third key).
+                                ;   fire vanilla; absorbs ice
         ; -- the monster chest beside the save point (event group 116,
         ; formation 433): the narshe whelk's rows grown for the WoR --
         .word   $0101
