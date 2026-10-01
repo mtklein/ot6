@@ -182,9 +182,9 @@ local function bagLine(tag)
     t[#t + 1] = string.format("c%d %d/%d hp %d/%d mp", c, H.charHp(c),
       H.charMaxHp(c), H.charMp(c), H.charMaxMp(c))
   end
-  return string.format("[%s] %s | tonic=%d potion=%d fenix=%d tent=%d gil=%d",
+  return string.format("[%s] %s | tonic=%d potion=%d fenix=%d revivify=%d tent=%d gil=%d",
     tag, table.concat(t, "  "), H.invCountOf(TONIC), H.invCountOf(POTION),
-    H.invCountOf(FENIX), H.invCountOf(TENT), gil())
+    H.invCountOf(FENIX), H.invCountOf(REVIVIFY), H.invCountOf(TENT), gil())
 end
 -- the lowest living member's HP fraction (a dead member is the fight
 -- driver's and the care stop's business, not the Tent's)
@@ -606,10 +606,15 @@ H.run({ maxFrames = 600000 }, {
     H.log(bagLine("grind done"))
     H.assertEq(maxLvl() >= 22, true, "the plains grind reached at least L22")
   end),
-  -- the departure stock, bought at the same counter (the header)
+  -- the departure stock, bought at the same counter (the header); the
+  -- Revivifies too, since the Sealed Gate cave's Zombones are the walked
+  -- WoB route's one Zombie pool and no counter on the way sells the cure
+  -- (#349: a chain that reached the cave without them walked a zombied
+  -- LOCKE through four fights that paid him nothing)
   H.cond(function()
     return H.invCountOf(POTION) < DEPART_BAND.potion
         or H.invCountOf(FENIX) < DEPART_BAND.fenix
+        or H.invCountOf(REVIVIFY) < DEPART_BAND.revivify
   end, jidoorRestock("departure", DEPART_BAND), {}),
   -- back to the ship on foot, fighting what the walk meets like the legs do
   H.worldNavTo(24, 121, { maxFrames = 45000, playBattles = "tactical",
@@ -624,6 +629,8 @@ H.run({ maxFrames = 600000 }, {
     H.assertEq(H.invCountOf(POTION) >= DEPART_BAND.potion - 10, true,
       "the party leaves the plains near the departure Potion stock")
     H.assertEq(H.invCountOf(FENIX) >= 20, true, "Fenix Downs at ~level")
+    H.assertEq(H.invCountOf(REVIVIFY) >= DEPART_BAND.revivify, true,
+      "Revivifies at the departure band for the Sealed Gate cave's Zombones (#349)")
   end),
 
   -- ---- the Tonic top-up on the way to Narshe (#210) ----------------------
