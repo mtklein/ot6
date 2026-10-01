@@ -365,6 +365,11 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1",
     "battle_slots":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1",
+    # #346: Setzer's party on a natural boot, as battle_slots.  Its runs end
+    # between 7,389 and 43,474 frames (14 runs), about 7 minutes at the
+    # ~100 frames/s a loaded machine emulates, close to the 600 s default
+    "battle_slotcancel": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1",
     # Mimic (#260): no fixture has Gogo, so the test Continues fire-out-v1
     # and declares a two-byte command expedient (state_write_waivers.txt)
     "battle_mimic":

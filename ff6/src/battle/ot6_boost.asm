@@ -169,7 +169,7 @@
                                 ;   than the action's own end
         txa                     ; width-neutral character test
         cmp     #$08
-        bcs     done            ; monsters have no bp
+        jcs     done            ; monsters have no bp
         longa                   ; #236: where this actor stands as its OWN
         lda     $3bf4,x         ;   turn ends is the line a later hit is
         sta     f:$7e0000+OT6_HPMARK,x  ;   measured against.  Drawn on both
@@ -194,7 +194,39 @@
         sta     f:$7e0000+OT6_RUNICPAID  ;   Separate ledger from COVERPAID
                                 ;   on purpose: see OT6_RUNICPAID in
                                 ;   ot6_memory.inc.
-        lda     OT6_BOOST_REVEALED,x         ; pending boost spent this action?
+        ; #346: an action that never ran buys nothing, so it costs nothing.
+        ; ExecAction's placeholder ($b5 = $12, CmdNoEffect; battle_main.asm
+        ; @0100) is what runs when the entity's command list was emptied
+        ; after its entry reached the action queue: RemoveAllActions on a
+        ; fall, a petrify or a sleep clears the command list and the advance
+        ; wait queue but not $3820, so the stale entry still comes up and
+        ; lands here.  Real commands overwrite $b5 in InitPlayerAction, and a
+        ; Mimic is rewritten to the command it copies before that, so $12
+        ; here means the turn did nothing.  Its pending boost is dropped
+        ; rather than spent, and the turn ends as an unboosted one would,
+        ; regen pip included -- the settlement Ot6DanceStumble gives a
+        ; stumbled start.  Measured before this, in play: a fallen Setzer's
+        ; queued spin ran as $12 and took the 3 pips it was boosted with
+        ; (battle_slotcancel; build/attempts/wt/slots-followups/).
+        ; Whatever is pending here is not a committed action's: a command he
+        ; commits after a raise lands in his command list, and ExecAction
+        ; runs it from this same stale entry (charged as it ends) instead of
+        ; reaching @0183.  At most a window of his is open with a boost
+        ; raised and nothing chosen; that goes back to 0, in view, and can
+        ; be raised again.  (A Slot spin already latched its tier at the
+        ; first reel press and re-banks it at the commit, Ot6SlotCommit.)
+        lda     $b5
+        cmp     #$12
+        bne     @spend
+        lda     OT6_BOOST_REVEALED,x
+        beq     @gain
+        lda     #$00
+        sta     OT6_BOOST_REVEALED,x    ; nothing bought: the pips stay banked
+        lda     $3204,x
+        ora     #$80            ; the folded prices fall back, as on the
+        sta     $3204,x         ;   spend arm below
+        bra     @gain
+@spend: lda     OT6_BOOST_REVEALED,x         ; pending boost spent this action?
         beq     @gain
         sta     OT6_SCR_BIT     ; consume it: bp -= pending
         lda     OT6_BP_CLASS,x

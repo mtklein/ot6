@@ -21,3 +21,9 @@ Deep Eyes on the way there; the tomb's plants still want blades, points
 and fire. Dullahan has ten shields, broken by spears, darts, the
 crossbow, fists, fire and Setzer's cards. In the tomb's monster chest,
 as in Narshe, the shell has no shields at all: break the head.
+
+**A boosted action that never happens no longer spends its boost
+points.** When a character is knocked out or put to sleep after choosing
+a boosted action but before it goes off, the action is lost, as in the
+original game. The points used to be spent anyway, so Setzer could pay
+for a Slot spin that never turned. Now they stay in the bank.
