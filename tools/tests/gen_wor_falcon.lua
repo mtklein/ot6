@@ -18,17 +18,23 @@
 --      (120,14) -> (120,10), facing up with A.  Kill order: the Whelk Head
 --      (6 · pierce, weak fire); the Presenter has no gauge and answers hits
 --      with Giga Volt.  Either one's death ends the fight (boss_death).
---   3. Field care and Save on the save point, as a person does after it.
---   4. The grave room: (122,7) -> 299 (100,28) -> (100,15); care; the gil's
---      last digit is read against every member's level (L? Pearl, the
---      opener, hits a member whose level it divides) and moved, where it
---      would hit someone, by a random battle's purse (the tomb has no shop).
+--   3. The gil's last digit is read against every member's level (L? Pearl,
+--      Dullahan's opener, hits a member whose level it divides) and moved,
+--      where it would hit someone, by a random battle's purse in the east
+--      room (the tomb has no shop to buy or sell in: settleDigit); then
+--      field care and Save on the save point, as a person does before a
+--      boss.
+--   4. The grave room: (122,7) -> 299 (100,28) -> (100,15); the walk's own
+--      battles can move the digit back, so it is read again there and
+--      settled in the grave room's pool if it must be; care.
 --   5. Dullahan at (100,14), facing up with A, with DULL_FIGHT.
 --   6. Up through (100,7) to map 301: talk to SETZER (NPC_5), step on
 --      (17,16), talk to him again; the Falcon's hangar, its first flight,
---      and control in flight over world (25,160).
---   7. Land (the B button over a landable tile, world ctrl.asm
---      LandAirship) and Save where the party stands: H.saveAtCheckpoint.
+--      and the rising, whose own scripted flight leaves the Falcon over
+--      world (68,187) with the pilot's controls.
+--   7. Fly to (25,160), the tile the rising loads (H.flyTo: Left/Right to
+--      the bearing, A, a coast, B over a landable tile), land, and Save
+--      there: H.saveAtCheckpoint.
 -- Every battle's [outcome] is asserted said, judged on its own end reading
 -- and paid as due; its draw is a [key] line (the seed $be at InitBattle's
 -- store and the battle group $11E0); every monster action is a [monact]

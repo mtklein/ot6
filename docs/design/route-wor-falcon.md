@@ -322,6 +322,10 @@ $00CD=1 $01B8=1 $01B9=1 ... $039B=1` (`:11257-11276`), `ResetTurtles`, and
 `load_map 1, {25, 160}, ... AIRSHIP` (`:11280`): the party is aboard the
 Falcon, flying, over `(25,160) prop $0544 walk group 49` (`tiles.txt`). `$039B`
 shows Palidor on the Solitary Island's beach (magicite.md): the next arcs'.
+**Measured** (section 13): the load is followed by the rising's own
+`move_vehicle` script (`:11287-11298`), which flies the Falcon on to
+(68,187) before the pilot has the controls; leg 11 flies it back to
+(25,160) and lands there.
 
 ### 2.8 Where the World of Ruin opens
 
