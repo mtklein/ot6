@@ -681,14 +681,18 @@ unless it draws no gauge (the Presenter), a key for the party that meets
 it (the trio on the Kohlingen continent, the four in the tomb); that each
 of the four holds a key on the Bogy (SETZER's Cards) and on Dullahan
 (SETZER's Darts), who still absorbs ice; and that the Narshe Whelk's rows
-are unchanged. Evidence in `build/attempts/wt/falcon-breaks/rows/`:
-green on the authored ROM on px13 and on the Air (`checked 12 designed
-rows`, `checked 20 formations, 27 formation-species pairs`, `PASS (frame
-31) attempts=1/1`), red on main's ROM (`got 37 ($25), want 0`), red on a
-mutant ROM with a line per mutant (`mutate.py`, eleven mutants: `got 23
-($17), want 0`). `audit_break_coverage.py` no longer lists the twelve as
-unauthored (`audit.before.txt`, `audit.after.txt`); the tuning claim is
-unchanged and grows only by play.
+are unchanged. Evidence in `build/attempts/wt/falcon-breaks/rows/`
+(`commands.txt` one level up): green on the authored ROM on px13 and on
+the Air (`px13/`, `air/` `suite_battle_breakwor_falcon.log`: `checked 12
+designed rows`, `checked 20 formations, 27 formation-species pairs`, `PASS
+(frame 31) attempts=1/1`), red on main's ROM (`px13/suite.red.main-rom.log`:
+`got 37 ($25), want 0`), red on a mutant ROM with a line per mutant
+(`mutate.py`, eleven mutants; `px13/suite.mutant.log`: `got 23 ($17), want
+0`). The ROM's rows equal the approved draft on every hand line of
+`design_keys.py` (`px13/design_keys.compare.txt`: `hand lines 130, today
+!= designed on 0`). `audit_break_coverage.py` no longer lists the twelve as
+unauthored (`px13/audit.before.txt`, `px13/audit.after.txt`); the tuning
+claim is unchanged and grows only by play.
 
 ### 8.1 Who holds what
 
