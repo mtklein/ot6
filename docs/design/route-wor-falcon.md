@@ -892,8 +892,8 @@ generator): each slot takes the bag's best piece he can wear, and the
 counter's best is bought only when it beats the bag's and costs no more
 than a tenth of the purse at the counter. The weapon is ranked by how many
 of the arc's ten species its class keys, read from the ROM's shield rows,
-then by power: on this ROM the Darts (pierce) key 5, the Cards, Dice and
-Trump (¤) key none (`$51 scores 1001 against the bag's best 5030`, `$50
+then by power: on this ROM the Darts (pierce) key 5, the Dice and Trump (¤)
+key 1 each, the Bogy (the score is keys x 1000 + power: `$51 scores 1001 against the bag's best 5030`, `$50
 scores 1133`, `$4E scores 5115`); on the ROM before the authored rows the
 same rule bought the Darts keying 1 (`dev/run5.log`: `keys 1 of the arc's
 10 species`). The Green Beret from the chest lost the helmet slot to the
