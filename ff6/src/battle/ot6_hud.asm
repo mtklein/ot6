@@ -2138,6 +2138,71 @@ Ot6ShieldTbl:
         .word   $013e
         .byte   5, OT6_SLASH|OT6_PIERCE ; tentacle (4000): no weakness,
                                 ;   absorbs earth|water
+        ; ---- the world of ruin: edgar to the falcon (the kohlingen
+        ; continent, darill's tomb, dullahan, the tomb's monster chest;
+        ; docs/design/route-wor-falcon.md section 8) -------------------------
+        ; Celes (slash), Sabin (slash, bludg) and Edgar (slash, pierce; the
+        ; AutoCrossbow's pierce on every body); Setzer joins at Kohlingen
+        ; with the special class (Cards, Trump, Dice) or pierce (Darts).
+        ; Vanilla element bits stay.  House curve: 2 trash, 3 tanks, 4
+        ; miniboss-grade; Dullahan by bosses-wob's curve.  None of the
+        ; random species is met in the WoB; the chest pair's formation 433
+        ; is also the 16/256 slot of WoB world group 13.
+        ; tools/tests/battle_breakwor_falcon.lua reads them back from the ROM.
+        ; -- the kohlingen continent (world groups 45-47) --
+        .word   $0089
+        .byte   3, OT6_SLASH|OT6_PIERCE ; harpiai: a winged woman, a flier
+                                ;   (pierce, the WoB convention) and a
+                                ;   blade.  wind vanilla: sabin's air blade
+        .word   $00db
+        .byte   2, OT6_SLASH|OT6_BLUDG  ; muus: nulls five elements and
+                                ;   counters magic with pep up: a fight
+                                ;   body, the blade and the fist, so the
+                                ;   crossbow does not sweep the muus x3
+        .word   $00a7
+        .byte   2, OT6_PIERCE   ; deep eye: a point in the eye; two shields
+                                ;   so the autocrossbow cracks six in two
+                                ;   sweeps.  fire vanilla
+        .word   $00d3
+        .byte   3, OT6_SLASH|OT6_SPECIAL ; bogy: a ghost behind safe with no
+                                ;   vanilla weakness, so this row is its
+                                ;   only key: the blade for the trio, and
+                                ;   setzer's cards (the one body on the
+                                ;   arc his special class keys)
+        ; -- darill's tomb (groups 149-151): fire on all five, holy on four,
+        ; zombie on four, poison absorbed by four --
+        .word   $0005
+        .byte   3, OT6_SLASH|OT6_BLUDG  ; orog: a zombie mass a blade or a
+                                ;   blow opens; broken, it neither zombies
+                                ;   nor counters.  fire|holy vanilla
+        .word   $0010
+        .byte   3, OT6_BLUDG    ; osteosaur: bones are broken, not cut or
+                                ;   stuck (the floor's pierce was wrong).
+                                ;   fire|holy vanilla
+        .word   $006f
+        .byte   3, OT6_SLASH|OT6_PIERCE ; powerdemon: the tomb's tank, in all
+                                ;   three basements.  fire|holy vanilla
+        .word   $0061
+        .byte   4, OT6_SLASH    ; mad oscar: the plant is cut; four so the
+                                ;   break lands before sour mouth's second
+                                ;   turn.  fire vanilla
+        .word   $0091
+        .byte   2, OT6_SLASH|OT6_PIERCE ; exoray: trash behind shell; the
+                                ;   autocrossbow sweeps the exoray x3.
+                                ;   fire|holy vanilla
+        ; -- the grave (event group 85, formation 455) --
+        .word   $011c
+        .byte   10, OT6_PIERCE|OT6_BLUDG ; dullahan: an armored knight, the
+                                ;   point through the joints, the blow on
+                                ;   the plate.  fire vanilla; absorbs ice
+        ; -- the monster chest beside the save point (event group 116,
+        ; formation 433): the narshe whelk's rows grown for the WoR --
+        .word   $0101
+        .byte   0, $00          ; presenter (the shell): no gauge; hitting
+                                ;   the shell is the mistake
+        .word   $0135
+        .byte   6, OT6_PIERCE   ; whelk head (the WoR head): the narshe
+                                ;   head's 4 * pierce, grown.  fire vanilla
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian

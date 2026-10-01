@@ -49,11 +49,11 @@ emulator run was made for this plan.
    for Dullahan is a lab's to set (section 5), not this plan's.
 4. **Every species met is new and rides the generated floor, except the
    desert's two** (Sand Horse, Maliga: authored in the Edgar arc). Twelve
-   need designed rows (section 8, a draft): four on the Kohlingen
+   needed designed rows (section 8, now authored): four on the Kohlingen
    continent, five in the tomb, Dullahan, and the chest pair beside the
    tomb's save point. None of the nine random species appears in a World
-   of Balance pool; the chest pair's formation 433 does (WoB world group 13,
-   its 16/256 slot), so its rows would move that encounter too.
+   of Balance pool; the chest pair's formation 433 sits in WoB world group
+   13's 16/256 slot, which no World of Balance tile deals (section 8.5).
 5. **The tomb is the Zombie dungeon.** Four of its five species inflict
    Zombie (Orog's Zombite is its whole turn script; Osteosaur's Fossil and
    ChokeSmoke; PowerDemon's Soul Out; Exoray's DoomPollen; `ai.txt`), four
@@ -658,7 +658,7 @@ and `$00CC $00CD $039B`.
 
 ---
 
-## 8. Break data for the arc (a draft; the ROM is unchanged)
+## 8. Break data for the arc (authored)
 
 Owner direction (guidelines "Design break data for the encounters players
 meet"): every species the route meets gets an authored row designed from its
@@ -669,10 +669,26 @@ trash, **3** tanks, **4** miniboss-grade; bosses by bosses-wob's curve
 element bits stay; no `Ot6ElemAddTbl` rows. Today's floor (4-6 shields)
 puts every break here on a corpse, as it did on the Edgar stretch.
 
-`design_keys.py` holds the draft and checks it against the hands that meet
-each formation (`design_keys.txt`); nothing below is in `Ot6ShieldTbl`.
-Once the owner has reviewed it, the rows go in as one block ("the world of
-ruin: edgar to the falcon") with a suite like `battle_breakwor_edgar.lua`.
+`design_keys.py` held the draft and checked it against the hands that meet
+each formation (`design_keys.txt`). The owner approved it as written
+(2026-10-01), and the twelve rows are one block in `Ot6ShieldTbl`
+(`ff6/src/battle/ot6_hud.asm`, "the world of ruin: edgar to the falcon").
+`tools/tests/battle_breakwor_falcon.lua` (`@suite`) reads them back from
+the built ROM: each row, its vanilla weak byte and the absence of an
+`Ot6ElemAddTbl` row; that every species of every formation of world groups
+44-47, maps 298-300 and event groups 85 and 116 has an authored row and,
+unless it draws no gauge (the Presenter), a key for the party that meets
+it (the trio on the Kohlingen continent, the four in the tomb); that each
+of the four holds a key on the Bogy (SETZER's Cards) and on Dullahan
+(SETZER's Darts), who still absorbs ice; and that the Narshe Whelk's rows
+are unchanged. Evidence in `build/attempts/wt/falcon-breaks/rows/`:
+green on the authored ROM on px13 and on the Air (`checked 12 designed
+rows`, `checked 20 formations, 27 formation-species pairs`, `PASS (frame
+31) attempts=1/1`), red on main's ROM (`got 37 ($25), want 0`), red on a
+mutant ROM with a line per mutant (`mutate.py`, eleven mutants: `got 23
+($17), want 0`). `audit_break_coverage.py` no longer lists the twelve as
+unauthored (`audit.before.txt`, `audit.after.txt`); the tuning claim is
+unchanged and grows only by play.
 
 ### 8.1 Who holds what
 
@@ -685,7 +701,7 @@ ruin: edgar to the falcon") with a suite like `battle_breakwor_edgar.lua`.
 
 ### 8.2 The Kohlingen continent (world groups 45-47)
 
-| id | body | HP | weak | draft row |
+| id | body | HP | weak | row |
 |---|---|---|---|---|
 | `$089` Harpiai | a winged woman, floating | 1418 | wind | **3 · slash, pierce** |
 | `$0DB` Muus | a small shelled beast; nulls five elements | 900 | — | **2 · slash, bludg** |
@@ -709,7 +725,7 @@ ruin: edgar to the falcon") with a suite like `battle_breakwor_edgar.lua`.
 
 ### 8.3 Darill's Tomb (groups 149-151)
 
-| id | body | HP | weak | draft row |
+| id | body | HP | weak | row |
 |---|---|---|---|---|
 | `$005` Orog | a zombie mass | 1584 | fire, holy | **3 · slash, bludg** |
 | `$010` Osteosaur | a skeleton | 1584 | fire, holy | **3 · bludg** |
@@ -735,7 +751,7 @@ ruin: edgar to the falcon") with a suite like `battle_breakwor_edgar.lua`.
 
 Party: CELES, SABIN, EDGAR, SETZER. Formation 455.
 
-**Shields:** 10 (draft; 8-12 the range considered) · **Weak:** fire (vanilla) +
+**Shields:** 10 (8-12 the range considered) · **Weak:** fire (vanilla) +
 piercing, bludgeoning · **Absorbs:** ice.
 
 - **Keys:** an armored knight: the point through the joints, the blow on
@@ -754,7 +770,7 @@ piercing, bludgeoning · **Absorbs:** ice.
 
 ### 8.5 The monster chest (event group 116)
 
-| id | body | HP | draft row |
+| id | body | HP | row |
 |---|---|---|---|
 | `$101` Presenter | the shell | 9230 | **0** (no gauge: hitting the shell is the mistake) |
 | `$135` Whelk Head | the head | 9845 | **6 · pierce** |
@@ -765,7 +781,18 @@ keeps one row and grows its count. Formation 433 is also the 16/256 slot of
 **World of Balance world group 13** (`pools.txt`: `slot 3: 16/256 word
 $01B1 formation 433: Presenter $101 x1, Whelk Head $135 x1`), beside Red
 Fangs and Mind Candies (L14-L15); these rows would change that encounter
-too. Whether that slot is ever rolled is UNVERIFIED (out of scope here).
+too, if it were ever dealt. **It is not**
+(`build/attempts/wt/falcon-breaks/wob433/where.txt`): group 13 fills only
+terrain slot 3 of nine WoB sectors (`WorldBattleGroup indices (WoB) holding
+group 13: [3, 7, 35, 39, 67, 99, 103, 131, 135]`); slot 3 is battle bg 5
+(`BattleBGGroupTbl (bg -> terrain slot): [0, 1, 2, 1, 0, 3, 0, 0]`), the
+World of Ruin's wasteland, and the WoB map has no battle tile with bg 5
+(`world 0: battle-enabled tiles by bg: {0: 53912, 2: 889, 3: 1076, 6:
+1238}`; `group 13 battle tiles by sector (x0,y0): {}`). The Veldt cannot
+deal it either: a fought formation joins the Veldt's list only through a
+monster below index 256 (`battle_main.asm` `@49e9`), and both of 433's are
+above it. No World of Balance
+party meets formation 433, so the rows change no WoB fight.
 
 ### 8.6 The check
 
@@ -799,8 +826,7 @@ PowerDemon, Exoray, Dullahan and Whelk Head with Darts.
 
 Out of scope, noted: the World of Ruin Colosseum is on foot from Kohlingen
 (v0.35); Mobliz (v0.27) is on the Tzen continent; the castle's stratum
-(`$00CD`) and Palidor (`$039B`) open with the Falcon; formation 433 in WoB
-world group 13 (8.5).
+(`$00CD`) and Palidor (`$039B`) open with the Falcon.
 
 ---
 
@@ -822,12 +848,12 @@ Not yet driven.
 
 ## 14. What the owner may want to decide
 
-- **The draft rows** (section 8): the counts and classes; in particular
-  Dullahan's count (10 drafted, 8-12 considered), the Bogy's ¤ (SETZER's
-  only key on the arc), and the chest pair's rows (they also move WoB world
-  group 13's rare formation 433).
+- **The draft rows** (section 8): decided, approved as written (owner,
+  2026-10-01), Dullahan at 10, the Bogy's ¤ and the chest pair included;
+  authored (section 8). WoB world group 13's formation 433 is never dealt
+  (8.5).
 - **SETZER's class on the arc**: his ¤ weapons key one body here (the
-  Bogy, by the draft); Darts (pierce) key seven. Whether ¤-weak bodies
+  Bogy, by its row); Darts (pierce) key seven. Whether ¤-weak bodies
   should appear where he joins.
 - **#319 before or after this arc**: SETZER joins with Slot alone; EDGAR's
   Drill and Debilitator sit in a shop that refuses this party (vanilla's
