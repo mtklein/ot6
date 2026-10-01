@@ -40,6 +40,11 @@ and no debugger window is open; opening one turns it off.
   callback dispatch when only SNES callbacks exist.
 
 **What script-only mode gives up.**
+- The code/data log and the access counters, so in Lua `emu.getCdlData`
+  and `emu.getAccessCounters` return (nearly) empty data. The harness reads
+  only the code/data log, for coverage (`coverageFlush`, OT6_COVERAGE):
+  run.sh leaves script-only off for a coverage run, and `coverageFlush`
+  refuses a log with fewer than 256 marked bytes.
 - The `[CPU] Uninitialized memory read` stdout lines; they come from the
   access counters.
 - The data behind the debugger's views: call stack, code/data log, access
@@ -48,8 +53,10 @@ and no debugger window is open; opening one turns it off.
 - Up-to-date disassembly of code in RAM if a debugger window is opened
   partway through a session.
 
-Without `MESEN_SCRIPT_ONLY` the patched binary behaves like stock, apart from
-the two always-on changes.
+Without `MESEN_SCRIPT_ONLY=1` the patched binary behaves like stock, apart
+from the two always-on changes. run.sh exports `MESEN_SCRIPT_ONLY=1` for
+every run but a coverage run; the official binary never reads it (its
+MesenCore has no such string).
 
 ## mesen-screenshot-sync.patch
 
@@ -66,12 +73,17 @@ just finished. It applies on its own to a stock build too.
 sudo apt install git make clang lld zip libsdl2-dev zlib1g-dev dotnet-sdk-10.0 dotnet-sdk-aot-10.0
 tools/mesen/build.sh ~/work/mesen-build            # both patches, -fno-semantic-interposition
 tools/mesen/build.sh ~/work/mesen-build --stock    # stock, as upstream builds it
-PATCHES=mesen-screenshot-sync.patch EXTRA_CFLAGS= tools/mesen/build.sh ~/work/x   # a subset
+tools/mesen/build.sh ~/work/x --patches mesen-screenshot-sync.patch --cflags ""   # a subset
 ```
 
 The output is one self-contained binary,
 `<workdir>/Mesen2/bin/linux-x64/Release/linux-x64/publish/Mesen`, shaped
-like the official zip's.
+like the official zip's, and `Mesen.buildinfo` beside it: the upstream
+commit, each patch's sha256, the flags, the binary's and MesenCore's
+sha256 and the toolchain. The same identity line is the binary's
+`BuildSha.txt`, which Mesen's About box shows. The build ends with a smoke
+test: battle_banner through run.sh on the tree's official binary and on the
+new one, failing unless their `[ot6]` lines match (`--no-smoke` skips it).
 - Each build is clean: the makefile tracks no header dependencies.
 - `-fno-semantic-interposition`: MesenCore.so is built `-fPIC` with default
   visibility, so otherwise every call between its source files goes through
@@ -82,11 +94,35 @@ like the official zip's.
   8.0.31; the official build used 8.0.15. Built this way, stock 2.1.1 played
   the same as the official binary.
 
-Nothing here installs the binary. To try it with the harness:
-- Point a tree's `tools/Mesen-linux` at a directory holding it.
-- Use a private `OT6_MESEN_CACHE`, so the shared copy other workers use is
-  left alone.
-- Export `MESEN_SCRIPT_ONLY=1`; run.sh passes its environment through to Mesen.
+To try a build with the harness without installing it:
+
+```
+OT6_MESEN_APP=<dir holding Mesen> OT6_MESEN_CACHE=<a cache of its own> tools/tests/run.sh <script>
+```
+
+Every run log ends with `[emulator] <sha256> MESEN_SCRIPT_ONLY=<v>`, and
+every generated fixture's stamp with `emulator <sha256>`: records of which
+binary ran, never compatibility bindings, so swapping the emulator
+regenerates nothing.
+
+## Deploying on a Linux worker (px13), after this branch is merged
+
+run.sh runs `tools/Mesen-linux/Mesen` of the main tree (`~/ot6`; worktrees
+link to it) through one machine-wide shared copy, which it refreshes when
+the binary's size or mtime changes. So deploying is replacing that file,
+with no worker running:
+
+```
+cd ~/ot6
+tools/mesen/build.sh ~/work/mesen-build        # builds and smoke-tests against the official binary
+mkdir -p ~/mesen-official && cp -p tools/Mesen-linux/Mesen ~/mesen-official/Mesen   # keep the official one
+install -m 755 ~/work/mesen-build/Mesen2/bin/linux-x64/Release/linux-x64/publish/Mesen tools/Mesen-linux/Mesen
+sha256sum tools/Mesen-linux/Mesen               # = sha256 in Mesen.buildinfo
+```
+
+The next run.sh then rebuilds the shared copy and logs the new
+`[emulator]` sha. To roll back, install `~/mesen-official/Mesen` the same
+way. Nothing regenerates either way.
 
 ## macOS arm64 (untried)
 
