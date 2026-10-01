@@ -1,11 +1,11 @@
 {
-  "format": "ot6-provenance/v1",
-  "payload_sha256": "7db4fd6ade8f1146a6ed2123bc02316cec3c8349509755b889c6c6a79b888a93",
-  "generator_sig": "130a3d2f3c8fe1720e1833559b3c301e53ca9ca444b5b37f34253306dbd8949d gen_gate_cave_save tools/tests/checkpoints/narshe-mission-v1/manifest.json tools/tests/checkpoints/narshe-mission-v1/narshe-mission.sram",
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "6abe614f19ddb3e30a73055d0596307cb50a0153e35731341d55662c59cfeb1d",
+  "generator_sig": "1c39488d65fe136436258c9eb1721b23f907a8b9a94eea650b3355f9d8b867e5 gen_gate_cave_save tools/tests/checkpoints/narshe-mission-v1/manifest.json tools/tests/checkpoints/narshe-mission-v1/narshe-mission.sram",
   "ancestors": [
     {
       "path": "tools/tests/checkpoints/narshe-mission-v1/manifest.json",
-      "sha256": "093282fe22556d1783430ae24990c02f21a7f2a633f7a3fa647f0c37f55d7564"
+      "sha256": "2eb9b9dd119e09600ac3bbd63ff4d99f9e0e54afb3539ed3a207cedde40a38ba"
     }
   ]
 }

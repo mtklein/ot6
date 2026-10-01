@@ -166,7 +166,11 @@ end
 -- the banquet and the voyage.  gen_narshe_mission already tops TONIC to 99
 -- at Nikeah on its departure (#210), so a run cut after that arrives
 -- stocked and flies straight on; this stop fires only when the bag is short
--- (the seeded narshe-mission-v1 boots tonic=0 potion=0).  Same threshold
+-- (the narshe-mission-v1 cut on 2026-09-17 booted tonic=0 potion=0; the
+-- #349 re-cut boots tonic=98 potion=60 revivify=3).  Nikeah sells no
+-- Zombie cure: the Revivifies for the cave's Zombones are bought at
+-- Jidoor by gen_narshe_mission, and narshe-mission-v1's contract holds
+-- this step to them (#349).  Same threshold
 -- as #210's: 3/4 of the band for Tonics, the L25 Potion band (38) for
 -- Potions.  Nikeah (shop 15: Tonic, Potion, Fenix Down) coordinates are
 -- probe_tonic_airship's (deleted in 895b8e67; last version at 437e9105):
@@ -177,9 +181,11 @@ local ANTIDOTE, REMEDY = 0xF2, 0xF5
 local TONIC_BAND = 99
 local TONIC_TRIP = TONIC_BAND * 3 // 4
 local POTION_BAND = 38
+local REVIVIFY = 0xF1
 local function bagLine(tag)
-  return string.format("[%s] tonic=%d potion=%d fenix=%d gil=%d f%d", tag,
-    H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX), H.gil(), H.frame)
+  return string.format("[%s] tonic=%d potion=%d fenix=%d revivify=%d gil=%d f%d", tag,
+    H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX), H.invCountOf(REVIVIFY),
+    H.gil(), H.frame)
 end
 local function nikeahStop()
   local what = "Nikeah stop"
