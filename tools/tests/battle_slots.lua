@@ -287,12 +287,13 @@ local function otherWindowsReset() W.actor, W.plan = nil, nil end
 -- Setzer falling.  A character who falls with a command queued never runs
 -- it: measured at MesenCE 2.2.1 shift 0 (the old suite), Setzer committed
 -- the tier-2 spin at 34/556 HP and died at f11701 with pend 2 / bp 2, which
--- stayed so to the timeout.  And the bank does not survive it: in a
--- fault-injected lab (his HP written to 1 after the H2 commit; not play)
--- the cancelled spin reached Ot6ActionEnd as CmdNoEffect while he lay
--- dead and was charged there, pend 2 / bp 2 -> 0
--- (build/attempts/wt/suites-2.2.1/).  So a fall costs that battle its
--- tiers, and battleHalf plays a fresh one.
+-- stayed so to the timeout (the spin was still in its advance wait).  A
+-- spin already in the action queue comes up as CmdNoEffect while he lies
+-- dead; before #346 Ot6ActionEnd charged its tier there (a fault-injected
+-- lab, build/attempts/wt/suites-2.2.1/: pend 2 / bp 2 -> 0), and now it is
+-- settled as an unboosted turn (battle_slotcancel).  Either way the spin
+-- never ran, so a fall costs that battle its tiers, and battleHalf plays a
+-- fresh one.
 local lostBattle, lostBattles, MAX_LOST = false, 0, 3
 local function watchFall(tag)
   if not lostBattle and actor and H.battleLoadStarted() and seated(actor)
@@ -317,6 +318,23 @@ local function partyTurn()
   else
     otherWindowsReset()
     H.setPad({})
+  end
+end
+-- One frame of the party after Setzer's fall, until he stands past
+-- CARE_PCT: every window, his own included, plays its care plan.  His own
+-- window used to be left alone here, so a raised Setzer whose window
+-- opened before anyone else's held the menu with nobody healing him, and
+-- the recovery waited out its budget (#346).  carePlan puts him first, so
+-- his own window drinks a Potion (or Defends once he is past CARE_PCT).
+local function recoveryTurn()
+  if H.readByte(MENU) == 0 then
+    otherWindowsReset()
+    H.setPad(H.frame % 8 < 4 and { a = true } or {})
+  elseif H.readByte(ACTOR) == actor and php(actor) == 0 then
+    otherWindowsReset()                -- his window, closing as he falls
+    H.setPad({})
+  else
+    otherWindow()
   end
 end
 
@@ -605,15 +623,36 @@ end
 -- resolved when his action has ended (Ot6ActionEnd with his entity) and his
 -- books have moved -- the pending tier spent (a boosted spin) or the bank
 -- regenerated (a plain one) -- and the caller then asserts the exact
--- numbers.  His window coming back with the books unmoved and no action
--- of his ended means the spin was dropped: it never reached execution
--- (measured: a plain spin at shift 13, and at shift 7 with the other
--- windows handed on by X, came back 1,500-1,900 frames after the commit
--- with no Ot6ActionEnd for him), and it is played again from that turn.
--- One that ended and moved nothing is an economy defect, asserted.
--- Meanwhile every window that is not his gets care or a Defend, so no
--- window sits open while the party bleeds.
+-- numbers.  A spin can also fail to run, two ways, both vanilla's handling
+-- of a character who loses his turn (RemoveAllActions, battle_main.asm:
+-- it empties his command list and the advance-wait queue, not the action
+-- queue $3820), measured with the queues traced
+-- (build/attempts/wt/slots-followups/):
+--   * dropped: a monster put him to sleep while the spin still sat in its
+--     advance wait (Slot's is about 26 frames).  The entry is gone, no
+--     action of his ends, and his window comes back once he wakes and his
+--     gauge refills, 1,500-1,900 frames later (shift 13: "RemoveAllActions
+--     e2 from C2:0893 | st=0080/0000 ... 32cc=7E", $3ee5 bit 7 = Sleep).
+--   * cancelled: the sleep (or a fall) landed after the entry reached the
+--     action queue, so it still comes up and runs as ExecAction's
+--     placeholder, CmdNoEffect ($b5 = $12): his action ends and nothing
+--     happened (shift 3).
+-- Either way the spin is played again from his next turn, at most
+-- MAX_REPLAYS times in a run.  One that ran ($0F) and moved nothing is an
+-- economy defect, asserted.  Meanwhile every window that is not his gets
+-- care or a Defend, so no window sits open while the party bleeds.
 local spinVoid, spinDone = false, false
+local CMD_SLOT, CMD_NOEFFECT = 0x0F, 0x12
+local replays = { dropped = 0, cancelled = 0 }
+local MAX_REPLAYS = 2
+local resolvedB0 = nil       -- the bank at the commit of the spin that resolved
+local function replayed(kind, tag)
+  replays[kind] = replays[kind] + 1
+  local n = replays.dropped + replays.cancelled
+  H.assertEq(n <= MAX_REPLAYS, true, string.format("%s: %d spins replayed in " ..
+    "this run (%d dropped, %d cancelled; the bound is %d): a committed spin " ..
+    "keeps failing to run", tag, n, replays.dropped, replays.cancelled, MAX_REPLAYS))
+end
 local function resolveLoop(tag)
   local hb, p0, b0, r0, away, res = -600, nil, nil, nil, false, nil
   return H.withReset(H.driveUntil(function()
@@ -636,15 +675,40 @@ local function resolveLoop(tag)
     end
     if not H.battleLoadStarted() or watchFall(tag) then return true end
     local ran = (actEnd[actor * 2] or 0) - r0
+    local cmd = actEndCmd[actor * 2] or 0xFF
+    if ran > 0 and cmd ~= CMD_SLOT then
+      -- His action ended without the spin running: ExecAction's placeholder
+      -- ($b5 = $12, CmdNoEffect) is what a queued action runs as once its
+      -- command list was emptied after it queued (a plain spin at MesenCE
+      -- 2.2.1 shift 3 did, build/attempts/review/suites-2.2.1/).  That is a
+      -- cancelled spin, not a resolution.  It is settled as an unboosted
+      -- turn that bought nothing -- no pips spent, the pending tier handed
+      -- back, the regen pip ("boost pays once": a boost that buys nothing
+      -- costs nothing) -- and played again.
+      H.assertEq(cmd, CMD_NOEFFECT, string.format("%s: his action ended as " ..
+        "command $%02X, neither the spin ($0F) nor a cancelled action ($12)", tag, cmd))
+      H.assertEq(pend(actor) == 0 and bp(actor) == math.min(b0 + 1, 5), true,
+        string.format("%s: a cancelled spin (pend %d, bp %d at the commit) " ..
+          "costs nothing and regenerates as an unboosted turn: pend %d -> %d " ..
+          "(want 0), bp %d -> %d (want %d)", tag, p0, b0, p0, pend(actor), b0,
+          bp(actor), math.min(b0 + 1, 5)))
+      H.log(string.format("[%s] f%d CANCELLED: his action ended as command $%02X " ..
+        "(pend %d -> %d, bp %d -> %d; commit wrote %s): the spin never ran; " ..
+        "played again", tag, H.frame, cmd, p0, pend(actor), b0, bp(actor), res))
+      replayed("cancelled", tag)
+      spinVoid = true
+      return true
+    end
     if pend(actor) ~= p0 or bp(actor) ~= b0 then
       H.assertEq(ran > 0, true, string.format("%s: Setzer's books moved (pend %d " ..
         "-> %d, bp %d -> %d) at the end of an action of his", tag, p0,
         pend(actor), b0, bp(actor)))
       spinDone = true
+      resolvedB0 = b0
       H.log(string.format("[%s] f%d resolved: pend %d -> %d, bp %d -> %d; his " ..
         "action ended %d time(s) since the commit, the last as command $%02X; " ..
         "commit wrote %s", tag, H.frame, p0, pend(actor), b0, bp(actor), ran,
-        actEndCmd[actor * 2] or 0xFF, res))
+        cmd, res))
       return true
     end
     if away and setzerWindow() then
@@ -657,6 +721,7 @@ local function resolveLoop(tag)
       H.log(string.format("[%s] f%d SETZER's window is back and his spin never " ..
         "ran (pend=%d bp=%d; commit wrote %s): it was dropped; played again " ..
         "from this turn", tag, H.frame, pend(actor), bp(actor), res))
+      replayed("dropped", tag)
       return true
     end
     return false
@@ -679,7 +744,7 @@ local function resolvedSpin(tag, checks, want)
   body[#body + 1] = H.call(function()
     if spinVoid then
       spinVoid = false
-      H.log(tag .. ": the spin was dropped; playing it again")
+      H.log(tag .. ": the spin never ran (dropped or cancelled); playing it again")
     end
   end)
   return H.cond(function() return true end, {
@@ -718,7 +783,7 @@ local function battleHalf(tag, phases)
     H.driveUntil(function()
       return (php(actor) > 0 and php(actor) * 100 >= pmax(actor) * CARE_PCT)
         or not H.battleLoadStarted()
-    end, 9000, { H.call(function() partyTurn() end), H.waitFrames(1) },
+    end, 9000, { H.call(function() recoveryTurn() end), H.waitFrames(1) },
       tag .. ": SETZER raised and healed after his fall"),
     H.fleeBattle(12000),
     H.waitUntil(function()
@@ -736,12 +801,11 @@ add({
   H.call(function()
     -- and every action that ends, by entity (Ot6ActionEnd's X, where the
     -- bank is charged or regenerated), with its command ($b5): the resolve
-    -- loop tells a spin that came to its end from one that never did.  A
-    -- spin can end as CmdNoEffect ($b5 = $12, ExecAction's placeholder for
-    -- an action removed from the queue): a plain spin at shift 3 did, with
-    -- no Cmd_0f for him, and still regenerated its pip.  So did the
-    -- cancelled spin of a fallen Setzer (watchFall), which is why a fall is
-    -- caught before the books are read.
+    -- loop tells a spin that ran ($0F) from one that ended as CmdNoEffect
+    -- ($b5 = $12, ExecAction's placeholder for an action its character lost
+    -- after it was queued: a plain spin at shift 3, Setzer asleep), which
+    -- it replays.  A fallen Setzer's cancelled spin ends that way too, which
+    -- is why a fall (watchFall) is caught before the books are read.
     local ae = H.sym("Ot6ActionEnd")
     emu.addMemoryCallback(function()
       local x = emu.getState()["cpu.x"] & 0xffff
@@ -814,14 +878,18 @@ add(battleHalf("H1 battle", {
   }, 1),
   H.waitFrames(60),
   H.call(function()
-    H.assertEq(bp(actor), 0,
-      "H1: 1 bp - 1 spent = 0, regen skipped on a boosted turn")
+    -- the bank at the commit of the spin that ran (a replayed spin's
+    -- cancelled predecessor settled as an unboosted turn, +1)
+    H.assertEq(bp(actor), resolvedB0 - 1, string.format(
+      "H1: %d bp - 1 spent = %d, regen skipped on a boosted turn",
+      resolvedB0, resolvedB0 - 1))
   end),
   -- --------------------------- bank the first pip back with a plain spin
   menuFor(SETZER, "setzer menu (bank spin 1)"),
   resolvedSpin("bank1", {}, 0),
   H.call(function()
-    H.assertEq(bp(actor), 1, "bank1: unboosted spin regens 0 -> 1")
+    H.assertEq(bp(actor), math.min(resolvedB0 + 1, 5), string.format(
+      "bank1: unboosted spin regens %d -> %d", resolvedB0, math.min(resolvedB0 + 1, 5)))
   end),
 }))
 
@@ -847,7 +915,8 @@ add(battleHalf("H2 battle", {
   menuFor(SETZER, "setzer menu (bank spin 2)"),
   resolvedSpin("bank2", {}, 0),
   H.call(function()
-    H.assertEq(bp(actor), 2, "bank2: unboosted spin regens 1 -> 2")
+    H.assertEq(bp(actor), math.min(resolvedB0 + 1, 5), string.format(
+      "bank2: unboosted spin regens %d -> %d", resolvedB0, math.min(resolvedB0 + 1, 5)))
   end),
   -- ---------------------------------------------- H2: the tier-2 spin
   menuFor(SETZER, "setzer menu (H2)"),
@@ -885,7 +954,8 @@ add(battleHalf("H2 battle", {
   }, 2),
   H.waitFrames(60),
   H.call(function()
-    H.assertEq(bp(actor), 0, "H2: 2 bp - 2 spent = 0")
+    H.assertEq(bp(actor), resolvedB0 - 2, string.format("H2: %d bp - 2 spent = %d",
+      resolvedB0, resolvedB0 - 2))
     H.assertEq(#mulHits, 0,
       "EXEMPTION (unrigged half): the damage multiplier never ran under cmd "
       .. "$0f across all four natural resolutions")
