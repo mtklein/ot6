@@ -899,6 +899,10 @@ class Board:
             st["snap"] = dict(snap, pngs=None)
             if snap.get("progress") is not None:
                 st["progress"] = snap["progress"]
+            if st["down_since"] is not None:   # a transition: say when
+                print(f"live: {time.strftime('%H:%M:%S')} {name} up "
+                      f"(down since {time.strftime('%H:%M:%S', time.localtime(st['down_since']))})",
+                      file=sys.stderr, flush=True)
             st.update(ok_ts=time.time(), down_since=None, err=None)
 
     def _drop_png(self, name, wid):
@@ -913,6 +917,8 @@ class Board:
             st = self.m[name]
             if st["down_since"] is None:
                 st["down_since"] = st["ok_ts"] or time.time()
+                print(f"live: {time.strftime('%H:%M:%S')} {name} down: {err}",
+                      file=sys.stderr, flush=True)
             st.update(snap=None, progress=None, err=err)
         for wid in list(self.pngs[name]):
             self._drop_png(name, wid)
