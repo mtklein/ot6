@@ -1770,6 +1770,15 @@ death):
   party cure landing on a member Zombied after it was planned is a driver
   class for a lab (out of this re-cut's scope).
 
+The graph's own edges on the merged tree (`ninja/ninja_edges.log`, `nice
+ninja -j4 build/states/wor_figaro_sweep.mss build/states/wor_kohlingen.mss
+build/states/wor_tomb.mss build/results/suite/battle_zombiecure.ok`) play
+the same runs (`PASS (frame 42972)`, `(26324)`, `(26573)`, each
+`attempts=1/3` with its exit contract holding), regenerate
+`battle_zombiecure`'s fixture on the new `wor_tomb` (`tomb_zombie
+generated: battle be54-g00F9, entity 3 (char 9) Zombied at f6620`), and the
+suite passes on it (`[23/23] suite battle_zombiecure`, no FAILED).
+
 ## 13. Dullahan and the Falcon, played (legs 9-11, `gen_wor_falcon`, `wor-falcon-v1`)
 
 Not yet driven.
