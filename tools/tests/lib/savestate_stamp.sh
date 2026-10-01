@@ -26,7 +26,7 @@
 #     lib <path> <sha256(<path>'s token stream)>      (one per lib half)
 #     artifact <sha256(build/states/<state>.mss)>
 #     ancestor <path> <sha256(<path> file bytes)>        (non-root states only)
-#     emulator <sha256(the Mesen executable run.sh runs)>
+#     emulator <sha256 of the Mesen executable that made the .mss, or unknown>
 #
 # Provenance versus compatibility (docs/TESTING.md): the sig and lib lines
 # record exactly which harness sources produced the fixture.  They are kept
@@ -41,7 +41,9 @@
 # down to a power-on root.  The emulator line is provenance only, like sig
 # and lib: it records which Mesen build made the fixture (official or the
 # tools/mesen/ patched one) and nothing compares it, so swapping emulators
-# regenerates nothing.  compose.py's stamp_check verifies every line;
+# regenerates nothing.  It is copied from <state>.mss.emulator, the run's
+# own `[emulator] <sha256> ...` log line that run.sh publishes beside the
+# .mss, so the log and the stamp agree by construction.  compose.py's stamp_check verifies every line;
 # `compose.py --check-states` asks it of the whole tree.
 #
 # A stamp written before the rom/generator lines existed carries neither.
@@ -166,16 +168,18 @@ romsig() {
   shasum -a 256 "$ROM" | cut -c1-64
 }
 
-# sha256 of the Mesen executable run.sh runs (OT6_MESEN_APP, else the
-# tree's tools/Mesen-linux or tools/Mesen.app), or "unknown": provenance,
-# never a binding, so a missing binary does not stop a stamp.
+# The emulator that made <state>.mss: the sha in the `[emulator] <sha256>
+# ...` line run.sh published beside it (<state>.mss.emulator), provided
+# that sidecar is no older than the .mss (else an older run.sh replaced the
+# state without one).  "unknown" otherwise: provenance, never a binding, so
+# a missing record does not stop a stamp.
 emusig() {
-  if [ "$(uname -s)" = Darwin ]; then
-    bin="${OT6_MESEN_APP:-$ROOT/tools/Mesen.app}/Contents/MacOS/Mesen"
-  else
-    bin="${OT6_MESEN_APP:-$ROOT/tools/Mesen-linux}/Mesen"
+  side="$STATES/$1.mss.emulator"
+  sha=""
+  if [ -f "$side" ] && [ ! "$side" -ot "$STATES/$1.mss" ]; then
+    sha=$(sed -n 's/^\[emulator\] \([0-9a-f]\{64\}\) .*/\1/p' "$side" | head -n 1)
   fi
-  if [ -f "$bin" ]; then shasum -a 256 "$bin" | cut -c1-64; else echo unknown; fi
+  echo "${sha:-unknown}"
 }
 
 # sha256 of one file, bare.  Used for the artifact and ancestor bindings.
@@ -227,7 +231,7 @@ case "$cmd" in
     # computed; a stamp never records a guessed ROM.
     rom_hash=$(romsig) || exit 2
     gen_hash=$(gensig "$gen" "$@") || exit 2
-    emu_hash=$(emusig)
+    emu_hash=$(emusig "$state")
     # Everything is computed; only now may the old stamp be replaced.
     sigline=$(sig "$gen" "$@") || exit 2
     liblines=""

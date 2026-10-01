@@ -80,10 +80,14 @@ The output is one self-contained binary,
 `<workdir>/Mesen2/bin/linux-x64/Release/linux-x64/publish/Mesen`, shaped
 like the official zip's, and `Mesen.buildinfo` beside it: the upstream
 commit, each patch's sha256, the flags, the binary's and MesenCore's
-sha256 and the toolchain. The same identity line is the binary's
-`BuildSha.txt`, which Mesen's About box shows. The build ends with a smoke
-test: battle_banner through run.sh on the tree's official binary and on the
-new one, failing unless their `[ot6]` lines match (`--no-smoke` skips it).
+sha256 and the toolchain, including the NativeAOT compiler the build
+restored. The binary carries the patch record too, as BuildInfo.txt beside
+the bare-commit `BuildSha.txt` that Mesen's About box links to. The build
+ends with a smoke test: battle_banner through run.sh on a reference binary
+and on the new one, failing unless their `[ot6]` lines match. The
+reference is the tree's `tools/Mesen-linux/Mesen` while that is the
+official 2.1.1 binary (checked by sha256); once a worker has been deployed,
+pass `--reference ~/mesen-official/Mesen`. `--no-smoke` skips it.
 - Each build is clean: the makefile tracks no header dependencies.
 - `-fno-semantic-interposition`: MesenCore.so is built `-fPIC` with default
   visibility, so otherwise every call between its source files goes through
@@ -100,21 +104,27 @@ To try a build with the harness without installing it:
 OT6_MESEN_APP=<dir holding Mesen> OT6_MESEN_CACHE=<a cache of its own> tools/tests/run.sh <script>
 ```
 
-Every run log ends with `[emulator] <sha256> MESEN_SCRIPT_ONLY=<v>`, and
-every generated fixture's stamp with `emulator <sha256>`: records of which
-binary ran, never compatibility bindings, so swapping the emulator
-regenerates nothing.
+run.sh refuses the machine-wide cache for it and names that app's shared
+copy after its sha256.
+
+Every run log ends with `[emulator] <sha256> MESEN_SCRIPT_ONLY
+requested=<v>`. run.sh also publishes that line beside each `.mss` it
+publishes (`<state>.mss.emulator`), and `savestate_stamp.sh` copies its
+sha into the stamp's `emulator <sha256>` line, so the two agree. Both are
+records of which binary ran, never compatibility bindings, so swapping the
+emulator regenerates nothing.
 
 ## Deploying on a Linux worker (px13), after this branch is merged
 
 run.sh runs `tools/Mesen-linux/Mesen` of the main tree (`~/ot6`; worktrees
 link to it) through one machine-wide shared copy, which it refreshes when
-the binary's size or mtime changes. So deploying is replacing that file,
-with no worker running:
+the binary's size or mtime changes. So deploying is replacing that file
+while no ninja or run.sh is alive on the machine (other agents' included):
 
 ```
 cd ~/ot6
 tools/mesen/build.sh ~/work/mesen-build        # builds and smoke-tests against the official binary
+                                               # (later rebuilds: add --reference ~/mesen-official/Mesen)
 mkdir -p ~/mesen-official && cp -p tools/Mesen-linux/Mesen ~/mesen-official/Mesen   # keep the official one
 install -m 755 ~/work/mesen-build/Mesen2/bin/linux-x64/Release/linux-x64/publish/Mesen tools/Mesen-linux/Mesen
 sha256sum tools/Mesen-linux/Mesen               # = sha256 in Mesen.buildinfo
@@ -136,3 +146,9 @@ The output is `bin/osx-arm64/Release/osx-arm64/publish/Mesen.app`.
 `build.sh` is Linux-only as written: it uses the Linux make flags,
 `sha256sum` and the Linux output path. The patches are plain C++ and aren't
 platform-specific.
+
+Open until a Mac build exists: the official Mac bundle carries
+MesenCore.dylib loose in `Contents/MacOS` as well as packed in the
+executable, and run.sh's `[emulator]` sha covers only
+`Contents/MacOS/Mesen`. Before the Macs switch, check which dylib a
+patched Mac app actually loads and make the recorded identity cover it.

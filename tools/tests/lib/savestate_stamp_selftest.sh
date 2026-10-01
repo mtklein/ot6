@@ -151,19 +151,24 @@ want_art="artifact $(shasum -a 256 "$TMP/build/states/fake.mss" | cut -c1-64)"
   ! grep -q '^ancestor ' "$TMP/build/states/fake.stamp" &&
   echo "  pass a root state (ancestor -) carries no ancestor line" ||
   { echo "  FAIL unexpected ancestor line on a root state"; ok=0; }
-# The emulator line: "unknown" in a tree with no Mesen (provenance never
-# stops a stamp); the executable's sha256 when there is one (OT6_MESEN_APP
-# or the tree's own tools/Mesen-linux / tools/Mesen.app).
+# The emulator line: copied from the [emulator] line run.sh publishes beside
+# the .mss (<state>.mss.emulator); "unknown" with no such record, or with one
+# older than the .mss (provenance never stops a stamp).
 [ "$(sed -n 8p "$TMP/build/states/fake.stamp")" = "emulator unknown" ] &&
-  echo "  pass write records 'emulator unknown' with no Mesen in the tree" ||
-  { echo "  FAIL emulator line wrong or missing (no Mesen)"; ok=0; }
-if [ "$(uname -s)" = Darwin ]; then fakebin="$TMP/emu/Mesen.app/Contents/MacOS"; fakeapp="$TMP/emu/Mesen.app"
-else fakebin="$TMP/emu/Mesen-linux"; fakeapp="$TMP/emu/Mesen-linux"; fi
-mkdir -p "$fakebin" && printf 'not really mesen\n' > "$fakebin/Mesen"
-OT6_MESEN_APP="$fakeapp" sh "$GATE" write fake gen_fake - "$extra"
-[ "$(sed -n 8p "$TMP/build/states/fake.stamp")" = "emulator $(shasum -a 256 "$fakebin/Mesen" | cut -c1-64)" ] &&
-  echo "  pass write records the emulator executable's sha256 (OT6_MESEN_APP)" ||
-  { echo "  FAIL emulator line does not hash OT6_MESEN_APP's Mesen"; ok=0; }
+  echo "  pass write records 'emulator unknown' with no [emulator] record" ||
+  { echo "  FAIL emulator line wrong or missing (no record)"; ok=0; }
+esha=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+printf '[emulator] %s MESEN_SCRIPT_ONLY requested=1\n' "$esha" > "$TMP/build/states/fake.mss.emulator"
+sh "$GATE" write fake gen_fake - "$extra"
+[ "$(sed -n 8p "$TMP/build/states/fake.stamp")" = "emulator $esha" ] &&
+  echo "  pass write copies the run's [emulator] sha into the stamp" ||
+  { echo "  FAIL emulator line does not match the published [emulator] record"; ok=0; }
+touch -t 200001010000 "$TMP/build/states/fake.mss.emulator"
+sh "$GATE" write fake gen_fake - "$extra"
+[ "$(sed -n 8p "$TMP/build/states/fake.stamp")" = "emulator unknown" ] &&
+  echo "  pass an [emulator] record older than the .mss is not believed" ||
+  { echo "  FAIL a stale [emulator] record was copied"; ok=0; }
+rm -f "$TMP/build/states/fake.mss.emulator"
 # The ROM line is the ROM that RAN: OT6_ROM (run.sh's override) is honored.
 printf 'other rom\n' > "$TMP/build/other.sfc"
 OT6_ROM="$TMP/build/other.sfc" sh "$GATE" write fake gen_fake - "$extra"
