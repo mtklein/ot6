@@ -25,5 +25,6 @@ SOFTWARE.
 Exceptions: ff6/ is a Final Fantasy VI disassembly licensed under the GNU
 GPL v3 (ff6/LICENSE). Changes to its files stay under the GPL v3, and the
 built ROM and release patch, which combine OT6's code with it, are
-distributed under the GPL v3. tools/mesen/ carries changes to Mesen, also
-GPL v3. MIT-licensed OT6 code is GPL-compatible.
+distributed under the GPL v3. OT6's changes to Mesen live in its fork,
+github.com/mtklein/mesen (branch ot6), also GPL v3; tools/mesen/ builds it.
+MIT-licensed OT6 code is GPL-compatible.

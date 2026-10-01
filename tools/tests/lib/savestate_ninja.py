@@ -2,9 +2,9 @@
 """savestate_ninja.py -- emit the savestate graph
 (tools/tests/savestate_graph.py) as build/build.ninja.
 
-Every compatibility input to a generated state (the ROM, the generator
-.lua, checkpoint manifests and payloads) is routed through a copy_if_changed
-edge:
+Every compatibility input to a generated state (the ROM, the emulator pin
+tools/mesen/EMULATOR, the generator .lua, checkpoint manifests and
+payloads) is routed through a copy_if_changed edge:
 
     build build/ninja/src/<path>: copy_if_changed <path>   (cmp -s || cp; restat=1)
 
@@ -61,6 +61,12 @@ SELF = "tools/tests/lib/savestate_ninja.py"
 GRAPH = "tools/tests/savestate_graph.py"
 OUT = "build/build.ninja"
 ROM = "build/ot6.sfc"
+# The emulator the fixtures are made with: the fork commit tools/mesen/build.sh
+# builds (tools/mesen/README.md).  An input of every generate and chain_ edge,
+# like the ROM: a machine snapshot is only as good as the emulator that played
+# it, so changing the pin regenerates every state (and, through the chain's
+# captures, makes checkpoint_drift.py ask for a re-cut).
+EMULATOR = "tools/mesen/EMULATOR"
 COPY_IF_CHANGED_DIR = "build/ninja/src"
 # The three lib halves compose.py inlines into every composed generator, in
 # inline order.  They are provenance (the stamp records their hashes), not
@@ -277,10 +283,11 @@ def emit_state_edges(w, states, root, copy_if_changed_from):
             w(f"  src = {src}")
             continue
         gen = e["gen"]
-        # Compatibility inputs only: the ROM and this state's own generator
-        # (plus its checkpoint inputs below).  The lib halves are deliberately
-        # absent -- see the module header.
-        deps = [copy_if_changed_from(ROM), copy_if_changed_from(f"tools/tests/{gen}.lua")]
+        # Compatibility inputs only: the ROM, the emulator pin and this
+        # state's own generator (plus its checkpoint inputs below).  The lib
+        # halves are deliberately absent -- see the module header.
+        deps = [copy_if_changed_from(ROM), copy_if_changed_from(EMULATOR),
+                copy_if_changed_from(f"tools/tests/{gen}.lua")]
         # Wall-clock default for generation edges: 1800 s rather than run.sh's
         # 600 s, because bare `ninja` fans every runnable generator out at
         # once and equally-niced emulators stretch each other's wall clock.
@@ -477,7 +484,7 @@ def emit_chain_edges(w, states, root, copy_if_changed_from):
         # the lib halves too: the chain is where a tracked checkpoint is
         # re-cut from, and checkpoint_drift.py refuses a capture sealed
         # under older lib halves, so a lib edit has to re-run the chain.
-        deps = [copy_if_changed_from(ROM),
+        deps = [copy_if_changed_from(ROM), copy_if_changed_from(EMULATOR),
                 copy_if_changed_from(f"tools/tests/{gen}.lua")] \
             + [copy_if_changed_from(h) for h in LIB_HALVES]
         env = [f"OT6_STACK={P}",
@@ -551,8 +558,9 @@ def copy_rule(src, states):
 
 def copy_if_changed_sources(states, root):
     """Every source path the state edges route through a copy_if_changed
-    edge, in first-use order: the ROM, each generator, each checkpoint input."""
-    out = [ROM]
+    edge, in first-use order: the ROM, the emulator pin, each generator, each
+    checkpoint input."""
+    out = [ROM, EMULATOR]
     for e in states:
         if e.get("gen"):
             g = f"tools/tests/{e['gen']}.lua"
@@ -842,6 +850,12 @@ def selftest():
               not any(h in l for l in lines
                       if ": generate" in l and "build/states/chain_" not in l
                       for h in lib))
+        emu = f"{COPY_IF_CHANGED_DIR}/{EMULATOR}"
+        check("every generate edge, qualification's and the chain's, "
+              "depends on the emulator pin",
+              all(emu in l for l in lines if ": generate" in l)
+              and len([l for l in lines if ": generate" in l]) == 9
+              and f"build {emu}: copy_if_changed {EMULATOR}" in text)
         check("`chain` names the chain's last copy",
               "build chain: phony build/states/chain_r.mss.lua" in text)
         def body(i):

@@ -11,7 +11,7 @@ trap 'rm -rf "$TMP"' EXIT
 ok=1
 
 # ---- the mock tree ---------------------------------------------------------
-mkdir -p "$TMP/tools/tests/lib" "$TMP/tools/tests/checkpoints/toy-v1" "$TMP/build"
+mkdir -p "$TMP/tools/tests/lib" "$TMP/tools/tests/checkpoints/toy-v1" "$TMP/build" "$TMP/tools/mesen"
 cp "$REAL/tools/tests/lib/savestate_ninja.py" "$TMP/tools/tests/lib/"
 cp "$REAL/tools/tests/lib/savestate_stamp.sh" "$TMP/tools/tests/lib/"
 cp "$REAL/tools/tests/lib/lua_fingerprint.py" "$TMP/tools/tests/lib/"
@@ -21,6 +21,7 @@ printf 'contract v1\n' > "$TMP/tools/tests/lib/ot6_contract.lua"
 for g in a b c e h; do printf 'gen %s v1\n' "$g" > "$TMP/tools/tests/gen_$g.lua"; done
 printf 'gen g v1\ngenerates: g1 g2\n' > "$TMP/tools/tests/gen_g.lua"
 printf 'rom v1\n' > "$TMP/build/ot6.sfc"
+printf 'emulator v1\n' > "$TMP/tools/mesen/EMULATOR"
 printf '{}\n'     > "$TMP/tools/tests/checkpoints/toy-v1/manifest.json"
 printf 'sram v1'  > "$TMP/tools/tests/checkpoints/toy-v1/toy.sram"
 
@@ -129,7 +130,7 @@ check "third run is still quiescent (#30 cascade class)" "" "$ran"
 
 # 3. mtime-only touches (a checkout, a worktree cp): nothing re-runs.
 sleep 1
-touch "$TMP/build/ot6.sfc" "$TMP/tools/tests/gen_a.lua" \
+touch "$TMP/build/ot6.sfc" "$TMP/tools/mesen/EMULATOR" "$TMP/tools/tests/gen_a.lua" \
       "$TMP/tools/tests/lib/ot6.lua" "$TMP/tools/tests/lib/ot6_field.lua" \
       "$TMP/tools/tests/lib/ot6_contract.lua" \
       "$TMP/tools/tests/checkpoints/toy-v1/toy.sram"
@@ -145,6 +146,16 @@ check "ROM content change regenerates EVERY step" "a b c e g1 g2 h " "$ran"
 cmp -s "$TMP/build/states/d.mss" "$TMP/build/states/b.mss" &&
   echo "  pass seed d refreshed with its regenerated source" ||
   { echo "  FAIL seed d stale after the source regenerated"; ok=0; }
+
+# 4a. Emulator pin change (tools/mesen/EMULATOR): every step re-runs, as
+#     for the ROM, and the seed refreshes.
+sleep 1
+edit tools/mesen/EMULATOR "emulator v2"
+run
+check "emulator pin change regenerates EVERY step" "a b c e g1 g2 h " "$ran"
+cmp -s "$TMP/build/states/d.mss" "$TMP/build/states/b.mss" &&
+  echo "  pass seed d refreshed after the emulator pin moved" ||
+  { echo "  FAIL seed d stale after the emulator pin moved"; ok=0; }
 
 # 5. one generator edit: its step regenerates, the seed off it refreshes, the
 #    stacked step downstream regenerates, and the unrelated steps do not.

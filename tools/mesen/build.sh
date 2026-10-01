@@ -1,13 +1,14 @@
 #!/bin/sh
-# tools/mesen/build.sh <workdir> [options] -- build Mesen 2.1.1 from the
-# official repository's tag with this directory's patches, using the flags of
-# upstream's own release workflow (.github/workflows/build.yml, compiler
-# clang_aot) for this machine's official build:
+# tools/mesen/build.sh <workdir> [options] -- build OT6's Mesen: the commit
+# tools/mesen/EMULATOR pins in github.com/mtklein/mesen (MesenCE 2.2.1 plus
+# OT6's changes, branch ot6; README.md), using the flags of upstream's own
+# release workflow (.github/workflows/build.yml, compiler clang_aot) for this
+# machine's build:
 #     Linux (job linux):  make USE_AOT=true LTO=true STATICLINK=true SYSTEM_LIBEVDEV=false
 #     macOS (job macos):  make USE_AOT=true   (the makefile turns LTO and static
 #                         linking off on Darwin)
-# then smoke-test it against the tree's official binary.  The result is shaped
-# like the official release zip, plus a record:
+# then smoke-test it against a stock MesenCE 2.2.1 build.  The result is
+# shaped like upstream's release artifacts, plus a record:
 #     Linux: <workdir>/Mesen2/bin/linux-x64/Release/linux-x64/publish/Mesen
 #            (one self-contained binary) and Mesen.buildinfo beside it
 #     macOS: <workdir>/Mesen2/bin/osx-arm64/Release/osx-arm64/publish/Mesen.app
@@ -15,12 +16,14 @@
 # Nothing here installs it anywhere; README.md says how a build is deployed.
 #
 # Options (the environment is not read; every choice is on the command line):
-#   --stock            no patches and no extra compiler flags (upstream as is)
-#   --patches "A B"    apply exactly these patches from this directory, in order
-#                      (default: mesen-script-only.patch mesen-screenshot-sync.patch;
-#                      "" for none)
-#   --cflags "..."     compiler flags added for the C/C++ core (default for a
-#                      patched build: -fno-semantic-interposition
+#   --stock            build stock MesenCE 2.2.1 (github.com/nesdev-org/MesenCE,
+#                      tag 2.2.1) with no extra compiler flags: the smoke
+#                      test's reference.  Its UI/global.json gets the fork's
+#                      SDK roll-forward (rollForward latestMajor), which picks
+#                      the .NET SDK and changes no code, so the .NET 10 SDK
+#                      can build it too.
+#   --cflags "..."     compiler flags added for the C/C++ core (default for
+#                      OT6's build: -fno-semantic-interposition
 #                      -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer).
 #                      -fno-semantic-interposition: on Linux MesenCore.so is
 #                      built -fPIC with default visibility, so without it
@@ -35,20 +38,20 @@
 #                      macOS keeps them in non-leaf functions by ABI anyway,
 #                      and the flags add the leaf ones (-mframe-pointer=all)
 #   --jobs N           make -j (default 8)
-#   --reference APP    the official Mesen the smoke test compares against: the
-#                      binary on Linux, the .app bundle on macOS (default: the
-#                      tree's tools/Mesen-linux/Mesen or tools/Mesen.app, only
-#                      while its executable's sha256 is the official 2.1.1
-#                      release's -- after a deployment that is a patched
-#                      build, so pass the kept official copy, e.g.
-#                      ~/mesen-official/Mesen or ~/mesen-official/Mesen.app)
+#   --reference APP    the stock build the smoke test compares against: the
+#                      binary on Linux, the .app bundle on macOS (default:
+#                      ~/mesen-reference/Mesen or ~/mesen-reference/Mesen.app,
+#                      accepted only when the .buildinfo beside it records a
+#                      --stock build of this script's stock tag and the
+#                      executable's sha256)
 #   --no-smoke         skip the smoke test
 #
 # The smoke test runs tools/tests/battle_banner.lua through this tree's
-# tools/tests/run.sh twice, on the reference binary and on the new one (each
+# tools/tests/run.sh twice, on the reference and on the new build (each
 # through OT6_MESEN_APP with a cache under <workdir>), and fails the build
 # unless their [ot6] lines match.  It needs the tree's build/ot6.sfc and
-# battle_banner's fixture.
+# battle_banner's fixture.  A --stock build with no reference yet skips it:
+# that build is the reference (README.md, "The reference build").
 #
 # Needs (Ubuntu 26.04, apt): git make clang lld zip libsdl2-dev zlib1g-dev
 # dotnet-sdk-10.0 dotnet-sdk-aot-10.0.  The UI targets net8.0; the .NET 10 SDK
@@ -60,18 +63,17 @@
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
 TREE=$(cd "$HERE/../.." && pwd)
-usage() { echo "usage: build.sh <workdir> [--stock] [--patches \"A B\"] [--cflags \"...\"] [--jobs N] [--reference APP] [--no-smoke]" >&2; exit 2; }
+usage() { echo "usage: build.sh <workdir> [--stock] [--cflags \"...\"] [--jobs N] [--reference APP] [--no-smoke]" >&2; exit 2; }
 [ $# -ge 1 ] || usage
 WORK=$1; shift
-PATCHES="mesen-script-only.patch mesen-screenshot-sync.patch"
+STOCK=0
 CFLAGS_EXTRA="-fno-semantic-interposition -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer"
 JOBS=8
 SMOKE=1
 REFERENCE=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    --stock) PATCHES=""; CFLAGS_EXTRA="" ;;
-    --patches) [ $# -ge 2 ] || usage; PATCHES=$2; shift ;;
+    --stock) STOCK=1; CFLAGS_EXTRA="" ;;
     --cflags) [ $# -ge 2 ] || usage; CFLAGS_EXTRA=$2; shift ;;
     --jobs) [ $# -ge 2 ] || usage; JOBS=$2; shift ;;
     --reference) [ $# -ge 2 ] || usage; REFERENCE=$2; shift ;;
@@ -80,17 +82,25 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
-REPO=https://github.com/SourMesen/Mesen2
-TAG=2.1.1
-TAG_COMMIT=137ae7ce3bf3f539d007e2c4ef3cb3b6c97672a1   # what the 2.1.1 tag points at
+# The stock base: what OT6's fork branches from and what the reference is.
+STOCK_REPO=https://github.com/nesdev-org/MesenCE
+STOCK_TAG=2.2.1
+STOCK_COMMIT=20ba206cef5ba207c21203176d02cb9f43dda9fb   # what MesenCE's 2.2.1 tag points at
+# OT6's build: one line, "<repository> <tag> <commit>".  The same file is an
+# input of every generate and suite edge (configure.py), so changing the pin
+# regenerates every fixture.
+read -r FORK_REPO FORK_TAG FORK_COMMIT < "$HERE/EMULATOR"
+if [ "$STOCK" = 1 ]; then
+  REPO=$STOCK_REPO; TAG=$STOCK_TAG; COMMIT=$STOCK_COMMIT
+else
+  REPO=$FORK_REPO; TAG=$FORK_TAG; COMMIT=$FORK_COMMIT
+fi
 
 sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -c1-64; }
 if [ "$(uname -s)" = Darwin ]; then
   MAC=1
   case "$(uname -m)" in arm64) PLATFORM=osx-arm64 ;; *) PLATFORM=osx-x64 ;; esac
-  # Mesen_2.1.1_macOS_ARM64_AppleSilicon.zip's Mesen.app/Contents/MacOS/Mesen
-  OFFICIAL_SHA=bddfea2fb864f4613314a6f2f4b93f3f0de2ca1d0a044e27e83555b4048e1b09
-  DEFAULT_REFERENCE="$TREE/tools/Mesen.app"
+  DEFAULT_REFERENCE="$HOME/mesen-reference/Mesen.app"
   # A non-login shell (ssh <mac> <command>) has no Homebrew on PATH, and
   # dotnet@8 is keg-only either way.
   BREW=/opt/homebrew/bin/brew; [ -x "$BREW" ] || BREW=/usr/local/bin/brew
@@ -102,8 +112,7 @@ if [ "$(uname -s)" = Darwin ]; then
 else
   MAC=0
   PLATFORM=linux-x64
-  OFFICIAL_SHA=ae43f1438282aaaff90a009aa8ada648bc5d631b070656285d7de9cbff513b41   # Mesen_2.1.1_Linux_x64.zip's Mesen
-  DEFAULT_REFERENCE="$TREE/tools/Mesen-linux/Mesen"
+  DEFAULT_REFERENCE="$HOME/mesen-reference/Mesen"
 fi
 for t in git make clang dotnet sdl2-config unzip; do
   command -v "$t" >/dev/null 2>&1 || { echo "build.sh: $t not found (see Needs, above)"; exit 2; }
@@ -112,35 +121,44 @@ done
 mkdir -p "$WORK"
 WORK=$(cd "$WORK" && pwd)
 SRC="$WORK/Mesen2"
-if [ ! -d "$SRC/.git" ]; then
-  git clone --quiet "$REPO" "$SRC"
-fi
+[ -d "$SRC/.git" ] || git init --quiet "$SRC"
 cd "$SRC"
-git fetch --quiet --tags origin
-git checkout --quiet --force "$TAG"
+# Fetched by URL, so one workdir can build either repository in turn.
+git fetch --quiet --no-tags "$REPO" "+refs/tags/$TAG:refs/tags/$TAG"
+git checkout --quiet --force "$COMMIT"
 # Always a clean build: the makefile has no header dependencies, so objects kept
-# from an earlier build (stock or patched) would mix struct layouts silently.
+# from an earlier build (stock or OT6's) would mix struct layouts silently.
 git clean --quiet -fdx
-[ "$(git rev-parse HEAD)" = "$TAG_COMMIT" ] || {
-  echo "tag $TAG is $(git rev-parse HEAD), expected $TAG_COMMIT: refusing to build"; exit 2; }
+[ "$(git rev-parse HEAD)" = "$COMMIT" ] && [ "$(git rev-parse "refs/tags/$TAG^{commit}")" = "$COMMIT" ] || {
+  echo "$REPO tag $TAG is $(git rev-parse "refs/tags/$TAG^{commit}"), expected $COMMIT: refusing to build"; exit 2; }
+if [ "$STOCK" = 0 ]; then
+  # The reference is stock $STOCK_TAG, so OT6's build must be built on it.
+  git fetch --quiet --no-tags "$STOCK_REPO" "+refs/tags/$STOCK_TAG:refs/tags/stock-$STOCK_TAG"
+  git merge-base --is-ancestor "$STOCK_COMMIT" "$COMMIT" || {
+    echo "$COMMIT is not built on $STOCK_REPO $STOCK_TAG ($STOCK_COMMIT): refusing to build"; exit 2; }
+fi
 
-# What this binary is: the upstream commit, each patch by content hash, the
-# extra flags.  BuildSha.txt stays the bare commit, exactly as upstream's
-# workflow writes it: Mesen's About box reads the whole file into its
-# commit link and its updater takes the first 7 characters for backup names.
-# The patch record goes beside it in BuildInfo.txt (embedded in the binary
-# the same way, Dependencies/Internal/) and into the .buildinfo below.
+# What this binary is: the repository, tag and commit, and the extra flags.
+# BuildSha.txt stays the bare commit, exactly as upstream's workflow writes
+# it: Mesen's About box reads the whole file into its commit link and its
+# updater takes the first 7 characters for backup names.  The record goes
+# beside it in BuildInfo.txt (embedded in the binary the same way,
+# Dependencies/Internal/) and into the .buildinfo below.
 ident=""
-for p in $PATCHES; do
-  git apply "$HERE/$p"
-  echo "applied $p"
-  ident="${ident}patch $p $(sha256 "$HERE/$p")
+if [ "$STOCK" = 1 ]; then
+  # MesenCE pins the .NET SDK to 8.0.x; the fork's UI/global.json commit lets
+  # it roll forward (the .NET 10 SDK on Ubuntu 26.04).  It picks the SDK and
+  # changes no code.
+  sed 's/"rollForward": *"latestFeature"/"rollForward": "latestMajor"/' UI/global.json > UI/global.json.new
+  mv UI/global.json.new UI/global.json
+  grep -q '"rollForward": "latestMajor"' UI/global.json || { echo "UI/global.json: no rollForward to change"; exit 2; }
+  ident="stock UI/global.json rollForward latestMajor
 "
-done
+fi
 [ -z "$CFLAGS_EXTRA" ] || ident="${ident}cflags $CFLAGS_EXTRA
 "
 git rev-parse HEAD | tr -d '\n' > UI/Dependencies/Internal/BuildSha.txt
-printf 'mesen %s %s\n%s' "$TAG" "$TAG_COMMIT" "$ident" > UI/Dependencies/Internal/BuildInfo.txt
+printf 'mesen %s %s %s\n%s' "$REPO" "$TAG" "$COMMIT" "$ident" > UI/Dependencies/Internal/BuildInfo.txt
 
 # The makefile sets CC/CXX with :=, so extra flags ride on the compiler name.
 if [ "$MAC" = 1 ]; then
@@ -216,13 +234,24 @@ echo "built ${APP:-$OUT}"
 cat "$RECORD"
 
 [ "$SMOKE" = 1 ] || { echo "smoke test skipped (--no-smoke)"; exit 0; }
-# --- smoke test: battle_banner on the reference (official) binary and on this one.
+# --- smoke test: battle_banner on the reference (stock) build and on this one.
 ref_exe() { if [ "$MAC" = 1 ]; then echo "$1/Contents/MacOS/Mesen"; else echo "$1"; fi; }
 if [ -z "$REFERENCE" ]; then
   REFERENCE=$DEFAULT_REFERENCE
-  [ -f "$(ref_exe "$REFERENCE")" ] && [ "$(sha256 "$(ref_exe "$REFERENCE")")" = "$OFFICIAL_SHA" ] || {
-    echo "smoke test: $REFERENCE is not the official 2.1.1 build (executable sha256 $OFFICIAL_SHA);"
-    echo "  pass --reference <official Mesen> (e.g. the copy kept in ~/mesen-official at deployment) or --no-smoke"
+  if [ "$STOCK" = 1 ] && [ ! -e "$REFERENCE" ]; then
+    echo "smoke test skipped: no reference at $REFERENCE yet; this stock build is one (README.md, \"The reference build\")"
+    exit 0
+  fi
+  # The default reference must be what --stock builds: its record names the
+  # stock tag and commit, and the executable is the one recorded.
+  info="$REFERENCE.buildinfo"
+  [ -f "$(ref_exe "$REFERENCE")" ] && [ -f "$info" ] &&
+    [ "$(head -n 1 "$info")" = "mesen $STOCK_REPO $STOCK_TAG $STOCK_COMMIT" ] &&
+    [ "$(sed -n 2p "$info")" = "stock UI/global.json rollForward latestMajor" ] &&
+    grep -qx "sha256 $(sha256 "$(ref_exe "$REFERENCE")")" "$info" || {
+    echo "smoke test: $REFERENCE is not a stock $STOCK_TAG build with its $info beside it"
+    echo "  (build one with --stock and install it there, README.md \"The reference build\";"
+    echo "  or pass --reference <a stock build> or --no-smoke)"
     exit 2; }
 fi
 [ -f "$TREE/build/ot6.sfc" ] && [ -f "$(ref_exe "$REFERENCE")" ] || {
@@ -238,7 +267,7 @@ else
   cp -p "$REFERENCE" "$S/reference/Mesen"; cp -p "$OUT" "$S/built/Mesen"
   REF_APP="$S/reference"; BUILT_APP="$S/built"
 fi
-echo "smoke test: reference $(sha256 "$(ref_exe "$REF_APP")") ($REFERENCE)"
+echo "smoke test: reference $(sha256 "$(ref_exe "$REFERENCE")") ($REFERENCE)"
 cd "$TREE"
 OT6_NO_PUBLISH=1 OT6_WORKER=mesen_smoke_reference OT6_ARTIFACT_DIR="$S/art_reference" \
   OT6_MESEN_APP="$REF_APP" OT6_MESEN_CACHE="$WORK/cache" \
@@ -249,12 +278,12 @@ OT6_NO_PUBLISH=1 OT6_WORKER=mesen_smoke_built OT6_ARTIFACT_DIR="$S/art_built" \
 grep -a '^\[ot6\]' "$S/reference.log" > "$S/reference.ot6" || true
 grep -a '^\[ot6\]' "$S/built.log" > "$S/built.ot6" || true
 grep -qE '^\[ot6\] PASS \(frame ' "$S/reference.ot6" || {
-  echo "smoke test: the reference binary did not PASS battle_banner (see $S/reference.log)"; exit 1; }
+  echo "smoke test: the reference build did not PASS battle_banner (see $S/reference.log)"; exit 1; }
 if cmp -s "$S/reference.ot6" "$S/built.ot6"; then
-  echo "smoke test: OK -- battle_banner's $(wc -l < "$S/built.ot6" | tr -d ' ') [ot6] lines match the reference binary's"
+  echo "smoke test: OK -- battle_banner's $(wc -l < "$S/built.ot6" | tr -d ' ') [ot6] lines match the reference build's"
   grep -a '^\[emulator\]' "$S/reference.log" "$S/built.log"
 else
-  echo "smoke test: FAILED -- battle_banner's [ot6] lines differ from the reference binary's:"
+  echo "smoke test: FAILED -- battle_banner's [ot6] lines differ from the reference build's:"
   diff "$S/reference.ot6" "$S/built.ot6" | head -20
   exit 1
 fi
