@@ -18,9 +18,9 @@ a window is open:
 - the event log
 - step and break checks
 
-Our runs use none of it, and it costs about a third of an emulator's work.
-The evidence is under `build/attempts/wt/emu-profile/` and
-`build/attempts/wt/mesen-lean/`.
+Our runs use none of it. On px13 it is 28% of an emulator's cycles. Script-only
+mode cuts instructions per frame by 20-25% on our legs, with the same results
+(`build/attempts/wt/mesen-lean/`).
 
 ## What the patch does
 
