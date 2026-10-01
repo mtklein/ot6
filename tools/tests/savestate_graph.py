@@ -833,4 +833,22 @@ STATES = [
     #     tools/tests/run.sh tools/tests/gen_wor_kohlingen.lua
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-kohlingen-v1
     S("wor_kohlingen", gen="gen_wor_kohlingen", checkpoint="wor-edgar-v1", timeout=3600),
+
+    # wor-kohlingen-v1 -> Darill's Tomb's save point: the walk to the tomb,
+    # the door SETZER opens, the switches and the turtles down through the
+    # three basements and their chests, and Save on the save point in B3's
+    # east room (map 300 (122,14)): the `wor-tomb-v1` checkpoint, the retry
+    # point for the monster chest and Dullahan
+    # (docs/design/route-wor-falcon.md section 12).
+    # Re-cutting the SRAM:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-kohlingen-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-tomb-v1/wor-tomb.sram \
+    #     tools/tests/run.sh tools/tests/gen_wor_tomb.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-tomb-v1
+    S("wor_tomb", gen="gen_wor_tomb", checkpoint="wor-kohlingen-v1", timeout=3600),
+
+    # wor_tomb -> the frame a Zombie lands on a member in a battle in the
+    # tomb's grave room (battle_zombiecure's fixture): paced until it
+    # lands, at most 40 battles.
+    S("tomb_zombie", gen="gen_tomb_zombie", prev="wor_tomb", timeout=3600),
 ]

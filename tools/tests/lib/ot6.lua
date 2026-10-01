@@ -796,6 +796,9 @@ end
 --   items  the candidates in order (optional)
 M.GREEN_CHERRY, M.REMEDY, M.SOFT = 0xF8, 0xF5, 0xF4
 M.ANTIDOTE, M.EYEDROP = 0xF2, 0xF3
+-- Revivify ($F1: STATUS1 $02, Zombie) is the Zombie cure, in battle as in
+-- the field care (Driver:cureFor; #190, #245)
+M.REVIVIFY = 0xF1
 -- The over-time statuses (#255): Blind (STATUS1 bit 0) halves the
 -- attacker's physical hit rate, Poison (STATUS1 bit 2) and Sap (STATUS2
 -- bit 6) drain on the dot trigger, Slow (STATUS3 bit 2) halves the ATB
@@ -1074,8 +1077,8 @@ function M.raiseDecision(o)
   local raiseHp = (maxhp * power) >> 4
   if o.zombie then
     return raiseHp, false, "a ZOMBIE (STATUS1 $02): a Fenix Down never lands on one "
-      .. "(vector_crash spent 8 that way, #220); the field care's Revivify clears it "
-      .. "after the fight"
+      .. "(vector_crash spent 8 that way, #220); the cure line's Revivify clears it, "
+      .. "else the field care's after the fight"
   end
   if raiseHp <= 0 then return raiseHp, false, "nothing to raise to" end
   local hit = o.smallestHit
@@ -4820,10 +4823,23 @@ end
 -- through M.statusCure and the reserve-aware battInvIdx.  A statue
 -- first: it is dead to the engine until the Soft, and a party of
 -- statues is a game over.
+--
+-- Zombie (#263, the Darill's Tomb leg) comes next: a zombied member reads
+-- 0 HP without the Wound bit, the ATB-full check hands its turns to the
+-- engine (@0941's list carries ZOMBIE), no Fenix Down lands on it (#245),
+-- and a won battle pays it nothing (measured in the tomb: "char 6 +0 (due
+-- 0)" beside "+1383 (due 1383)" for the standing pair).  Revivify's record
+-- carries the bit (STATUS1 $02), so it is the cure M.statusCure finds;
+-- opts.zombieCure = false leaves the zombie to the field care's Revivify
+-- after the fight, as before.
 function Driver:cureFor(e)
   if status1Has(e, M.ST1_PETRIFY) then
     return M.statusCure({ byte = 1, bit = M.ST1_PETRIFY, items = { M.SOFT, M.REMEDY },
       has = function(item) return self:battInvIdx(item) ~= nil end }), "Petrify"
+  end
+  if status1Has(e, M.ST1_ZOMBIE) and not status1Has(e, 0x80) and self.opts.zombieCure ~= false then
+    return M.statusCure({ byte = 1, bit = M.ST1_ZOMBIE, items = { M.REVIVIFY, M.REMEDY },
+      has = function(item) return self:battInvIdx(item) ~= nil end }), "Zombie"
   end
   if status1Has(e, M.ST1_IMP) then
     return M.statusCure({ byte = 1, bit = M.ST1_IMP,
@@ -5262,7 +5278,11 @@ function Driver:makePlan(actor)
     local order = { actor }
     for e = 0, 3 do if e ~= actor then order[#order + 1] = e end end
     for _, e in ipairs(order) do
-      if hpNow[e] > 0 and maxOf(e) > 0 then
+      -- a zombie reads 0 HP without the Wound bit, and is a patient here
+      -- (unless opts.zombieCure = false: then the line is the driver before #263)
+      local zombie = status1Has(e, M.ST1_ZOMBIE) and not status1Has(e, 0x80)
+        and self.opts.zombieCure ~= false
+      if (hpNow[e] > 0 or zombie) and maxOf(e) > 0 then
         local item, what = self:cureFor(e)
         local queued = self.cureQueued[e]
         if what ~= nil and queued ~= nil then
@@ -5276,7 +5296,9 @@ function Driver:makePlan(actor)
           if item ~= nil and open then
             M.log(string.format("[%s] actor=%d cure entity %d's %s with $%02X "
               .. "(%d in the bag): %s", self.tag or "fight", actor, e, what, item,
-              bagCount(item), e == actor and "its own turn is worth nothing as "
+              bagCount(item), what == "Zombie" and "a zombie's turns are the engine's, "
+              .. "it attacks where the engine aims it, and a won battle pays it nothing"
+              or e == actor and "its own turn is worth nothing as "
               .. "it stands" or "an ally's turn is worth nothing as it stands"))
             return { kind = "item", item = item, target = e,
                      row = cmdRow(actor, BATTLE.CMD_ITEM), idx = self:battInvIdx(item),
@@ -5284,10 +5306,10 @@ function Driver:makePlan(actor)
           end
           local said = item == nil
             and string.format("[%s] actor=%d: entity %d is %s and nothing in "
-              .. "the bag carries the bit (Green Cherry %d, Remedy %d) -- no "
+              .. "the bag carries the bit (Green Cherry %d, Remedy %d, Revivify %d) -- no "
               .. "cure to plan; planning on", self.tag or "fight", actor, e,
-              what == "Imp" and "an IMP" or "BERSERK", bagCount(M.GREEN_CHERRY),
-              bagCount(M.REMEDY))
+              what == "Imp" and "an IMP" or what:upper(), bagCount(M.GREEN_CHERRY),
+              bagCount(M.REMEDY), bagCount(M.REVIVIFY))
             or string.format("[%s] actor=%d: entity %d's %s cure ($%02X) waits for "
               .. "the round's care turn (actor %d's)", self.tag or "fight", actor, e,
               what, item, self.careActor)
@@ -7693,6 +7715,7 @@ function Driver:watchStatuses()
         local den = M.turnDenied({ s1 = s1, s2 = s2, s3 = s3, s4 = s4 })
         if den then names[#names + 1] = den end
         if (s1 & M.ST1_IMP) ~= 0 then names[#names + 1] = "Imp" end
+        if (s1 & M.ST1_ZOMBIE) ~= 0 and (s1 & 0x80) == 0 then names[#names + 1] = "Zombie" end
         -- the statuses that cost a solo fighter over time rather than a
         -- turn (#255): planned around, each said with the engine's reading
         if (s1 & M.ST1_BLIND) ~= 0 then names[#names + 1] = "Blind" end
@@ -7770,6 +7793,16 @@ function Driver:watchStatuses()
               what = string.format("its ATB constant is recomputed at half rate (SetStatus_12 -> "
                 .. "$3AC8, now $%04X) and every gauge ETA the driver reads already carries it; no "
                 .. "item cures it; planned around", M.readWord(BATTLE.ATB_CONST + e * 2))
+            elseif name == "Zombie" then
+              local item = self:cureFor(e)
+              what = "the engine takes its turns (the ATB-full check @0941 carries ZOMBIE) and "
+                .. "aims them, no Fenix Down lands on it (#245), and a won battle pays it "
+                .. "nothing; cure: " .. (self.opts.zombieCure == false
+                  and "the cure line is off (opts.zombieCure = false): the field care's "
+                    .. "Revivify after the fight"
+                  or item and string.format("$%02X x%d (planned at the round's care turn)",
+                    item, bagCount(item))
+                  or string.format("none in the bag (Revivify %d)", bagCount(M.REVIVIFY)))
             elseif name == "Condemned" then
               what = string.format("the count reads %d (one count = %d frames; Doom at 0; "
                 .. "no item clears the bit): heals on it stop once the clock beats its "
@@ -7795,7 +7828,7 @@ function Driver:watchStatuses()
           end
         end
         for _, name in ipairs({ "Stop", "Frozen", "Petrify", "Sleep", "Berserk",
-                                "Imp", "Condemned", "Blind", "Poison", "Sap", "Slow" }) do
+                                "Imp", "Zombie", "Condemned", "Blind", "Poison", "Sap", "Slow" }) do
           local key = e .. ":" .. name
           if self.statusSaid[key] == "on" and not on[name] then
             self.statusSaid[key] = "off"
@@ -7920,7 +7953,11 @@ function Driver:watchPendingCare()
   for e, q in pairs(self.cureQueued) do
     local s1, s2 = M.readByte(BATTLE.ST1 + e * 2), M.readByte(BATTLE.ST2 + e * 2)
     local still = (M.itemStatus1(q.item) & s1) ~= 0 or (M.itemStatus2(q.item) & s2) ~= 0
-    if not still or M.readWord(0x3BF4 + e * 2) == 0
+    -- a zombie's 0 HP is the patient's, not a fall (with the Zombie cure
+    -- off, opts.zombieCure = false, any 0 HP is a fall, as before #263)
+    local fell = M.readWord(0x3BF4 + e * 2) == 0
+      and (self.opts.zombieCure == false or (s1 & M.ST1_ZOMBIE) == 0)
+    if not still or fell
        or self.battleTick - q.tick > BATTLE.RAISE_WAIT + 600 then
       self.cureQueued[e] = nil
     end

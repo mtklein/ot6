@@ -1,7 +1,7 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "51460c39e468ede4877896acd457582243ef7c4b70e9eac8f0794f2bd5b984e6",
-  "generator_sig": "0a29b36b804f4f037edb62f79a04fd6b005667def57d595dfc934e44391f73a5 gen_wor_kohlingen tools/tests/checkpoints/wor-edgar-v1/manifest.json tools/tests/checkpoints/wor-edgar-v1/wor-edgar.sram",
+  "payload_sha256": "577024055a54b23c730657f420b369ec7ea8b749e37a9ec91b38b7cf3779b42e",
+  "generator_sig": "4231bb806cbfe56e02397abe82981f5af2462cf46b8218da8b960e4e147bb025 gen_wor_kohlingen tools/tests/checkpoints/wor-edgar-v1/manifest.json tools/tests/checkpoints/wor-edgar-v1/wor-edgar.sram",
   "ancestors": [
     {
       "path": "tools/tests/checkpoints/wor-edgar-v1/manifest.json",
