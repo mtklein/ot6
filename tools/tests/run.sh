@@ -21,9 +21,10 @@
 # * The emulator is tools/Mesen-linux (tools/Mesen.app on macOS), or the
 #   directory/bundle in OT6_MESEN_APP, which then needs an OT6_MESEN_CACHE
 #   other than the machine-wide one.  Its sha256 is recorded as an
-#   `[emulator]` line at the end of the log, and beside every published
-#   .mss as <state>.mss.emulator (that same line), where savestate_stamp.sh
-#   reads it for the stamp.
+#   `[emulator]` line at the end of the log, with the sha256 of the core
+#   that run loaded (core=), and beside every published .mss as
+#   <state>.mss.emulator (that same line), where savestate_stamp.sh reads
+#   the first sha for the stamp.
 # * MESEN_SCRIPT_ONLY=1 is exported unless the run measures coverage: the
 #   patched build (tools/mesen/) then skips the debugger bookkeeping the
 #   harness never reads; the official binary ignores the variable.
@@ -270,6 +271,11 @@ if [ -n "${OT6_PROVISION_PROBE_OUT:-}" ]; then
   exit 0
 fi
 # The emulator's identity for the log: a provenance record, not a binding.
+# It is the executable's sha256, and that covers the emulation core too:
+# the core is packed in the executable (Dependencies.zip), and the only copy
+# Mesen loads is the one it unpacks into the worker's fresh home, because the
+# seeding below never pre-seeds a core.  The [emulator] line also names the
+# core that actually ran (core=, hashed in the home after the run).
 # Hashed once per shared copy; the file names the copy (its source stamp),
 # so a copy rebuilt by a run.sh that predates this is hashed again.
 EMULATOR_SHA=""
@@ -289,8 +295,12 @@ if [ -L "$STALE_APP" ] || [ -e "$STALE_APP" ]; then rm -rf "$STALE_APP"; fi
 # them (cp -c again, so eight worker homes cost eight sets of pointers rather
 # than 232MB) and Mesen leaves them alone, because its copy is copy-if-missing
 # and -p keeps the mtimes it stamps them with.  Re-seed from scratch when the
-# emulator changes, so a home cannot serve a stale MesenCore.dylib to a newer
-# binary.
+# emulator changes.
+# Never MesenCore.dylib: a loose one in a bundle is only what Mesen unpacked
+# there while the bundle was portable (the official tools/Mesen.app, played
+# by hand), and Mesen keeps a home's copy whenever its size and mtime match
+# the packed one's, so seeding it would run a core the executable's sha256
+# does not cover.  Mesen unpacks its own (~9MB) instead, as it does on Linux.
 if [ "$(uname -s)" = Darwin ]; then
   MESEN2="$MESEN_HOME/Library/Application Support/Mesen2"
   USER_SETTINGS="$HOME/Library/Application Support/Mesen2/settings.json"
@@ -308,7 +318,7 @@ else
 fi
 if [ "$(cat "$MESEN_HOME/.stamp" 2>/dev/null)" != "$SRC_STAMP" ]; then
   rm -rf "$MESEN_HOME"; mkdir -p "$MESEN2"
-  for f in MesenCore.dylib MesenNesDB.txt libHarfBuzzSharp.dylib libSkiaSharp.dylib Satellaview; do
+  for f in MesenNesDB.txt libHarfBuzzSharp.dylib libSkiaSharp.dylib Satellaview; do
     [ -e "$SHARED_APP$BIN_SUB/$f" ] || continue   # let Mesen seed it itself
     clone_cp -Rp "$SHARED_APP$BIN_SUB/$f" "$MESEN2/$f"
   done
@@ -419,7 +429,12 @@ while :; do
   sleep 5
 done
 
-printf '[emulator] %s MESEN_SCRIPT_ONLY requested=%s\n' "${EMULATOR_SHA:-unknown}" "$MESEN_SCRIPT_ONLY" >> "$RUN_LOG"
+# core=: the MesenCore this run loaded, as Mesen unpacked it into the home.
+CORE_SHA=unknown
+for f in "$MESEN2/MesenCore.dylib" "$MESEN2/MesenCore.so"; do
+  [ -f "$f" ] && CORE_SHA=$(shasum -a 256 "$f" | cut -c1-64)
+done
+printf '[emulator] %s MESEN_SCRIPT_ONLY requested=%s core=%s\n' "${EMULATOR_SHA:-unknown}" "$MESEN_SCRIPT_ONLY" "$CORE_SHA" >> "$RUN_LOG"
 
 python3 "$ROOT/tools/tests/lib/decode_b64.py" "$RUN_LOG" "$ART"
 
