@@ -9,11 +9,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "64e115dc9a7dd3ee85b249d166f6840c86afe461e85661f5488aa36fbf391010",
-    "generator_sig": "7c290f8a4d2f44c633e6a9cdb5afea8f2c322627181ce92c015bc95181074bdf gen_terra_returned_checkpoint",
+    "generator_sig": "b61c5527e00d336d4f462e7ad5a30b394b43fbde9233f6e706aa10153325df6f gen_terra_returned_checkpoint",
     "ancestors": [
       {
         "path": "build/states/chain_n128_won.stamp",
-        "sha256": "829e1f43b24738950f571fa02c3163164459b03de37f03a98d1688bc688e89da"
+        "sha256": "5c4ade665b1b1becd6ef7f31fd3ef7fa5c1ba2bbb8dfa4e0cb321f0735839b91"
       }
     ]
   }

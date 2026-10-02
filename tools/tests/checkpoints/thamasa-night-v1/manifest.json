@@ -9,11 +9,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "63ebc06eed06b6cb91ebc3d1676af7e9cafc7a438661d9dde33d551e2b3d6a53",
-    "generator_sig": "6bd2d9dfb5811a6a39df4807a0ee1eef461df021902734d1e43501f12301f5a8 gen_thamasa_arrive",
+    "generator_sig": "e9934712dc0f0af96c899e37e3220f571739d2d81c8342390d49d89cee5f0a39 gen_thamasa_arrive",
     "ancestors": [
       {
         "path": "build/states/chain_crescent_landing.stamp",
-        "sha256": "7b67058b5e060d48f56e547dc16a3a4489c27c4a923291ed9d2b5b953fcda083"
+        "sha256": "c92b864fd9b2c6daba5a26ede7416efbe3ffd9bfbf7fdb1c65e9f91811fc1d7e"
       }
     ]
   }

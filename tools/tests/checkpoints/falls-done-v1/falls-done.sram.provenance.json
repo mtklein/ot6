@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
   "payload_sha256": "4695476eebaa18918c568d9d899079b21f6e057a2740190d6c19ce49a7340c19",
-  "generator_sig": "6fa9bf9060653c2c5b0374048e2b95c05d1a7cdae9400f7d89958d6d0d21190f gen_sabin_falls",
+  "generator_sig": "d5ad426e6e84720cb10dc776086c5ea2a9c8a4f09ac8b2b416d7ac2d845d0993 gen_sabin_falls",
   "ancestors": [
     {
       "path": "build/states/chain_train_done.stamp",
-      "sha256": "38d600964e09ae6468df7983b6a5880183a5dfc40b4c8680a357ff1f07a1cd6d"
+      "sha256": "838425c32aba6096cc5b3698a3cb7d1d816d4010931641ed28effffa1be6f42c"
     }
   ]
 }

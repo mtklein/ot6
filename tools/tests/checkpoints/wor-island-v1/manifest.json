@@ -17,11 +17,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "1e30d53b872eeb36587a3ed50f579de22c3fe7412c7e040c5661b75d07073e95",
-    "generator_sig": "01436666a6687d4ae5170c4996a8f88df578cac6592d4f9db2d7eb2b2d9fd3e0 gen_wor_island",
+    "generator_sig": "90b330622edf8d44f2c5d179de1fae57188534fe54bc17b20574bbb315b052ff gen_wor_island",
     "ancestors": [
       {
         "path": "build/states/chain_wor_landing.stamp",
-        "sha256": "dd96b6a3a26df266679adf3c47cc3b961f7c8a07dcad7546655a838ce52be4d3"
+        "sha256": "e14665b783e9aca03c3f87d35cbb10d3f6d27327cdbd032846cf4cb2b459fc05"
       }
     ]
   }

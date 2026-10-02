@@ -17,11 +17,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "5dbde98c43e4028bab4afaa12e056291e61afd6e1a78d9b31d0972d3a6f9201d",
-    "generator_sig": "d4900ad145573a306d3e19a7d35950815b60f854d81b7dcacbe11d2d2b0ae41a gen_tunnelarmr",
+    "generator_sig": "3729f7be6761f5987e61301dd07275156503c954f9ed07a943a9b58625de74ad gen_tunnelarmr",
     "ancestors": [
       {
         "path": "build/states/chain_celes_freed.stamp",
-        "sha256": "65bff3ce171d341010d576ef66b317f7720d6c4bfbdeeec1fc15169fdac8fc2b"
+        "sha256": "1d89e6eeaede1c5fafa4a814428e8ddc0fef75a56df951539d1c7b4e64ad740f"
       }
     ]
   }

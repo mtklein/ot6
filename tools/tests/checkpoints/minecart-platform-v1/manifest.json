@@ -9,11 +9,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "578c662106f050489cc252b2ed112ec4af3f2c66a0a0399512d66d39e9bf7a2c",
-    "generator_sig": "9b110ee5b186a7d0aeffebbdaca6e8421a6f836bec77bb14668469b3a931ec12 gen_minecart_platform_checkpoint",
+    "generator_sig": "9c7a9deb3cdbfb34e9a5a111b4935f03e37e2856ef534a81b4af8af7cf714226 gen_minecart_platform_checkpoint",
     "ancestors": [
       {
         "path": "build/states/chain_minecart_entry.stamp",
-        "sha256": "0885cb6c9b561eb057b7078c3fc4a62f7a997c063d7a36f7133014769c514d96"
+        "sha256": "5eb94ec395cdc387d514bd86925679a9a1864d4d86087a44e5871eeb0eb29133"
       }
     ]
   }
