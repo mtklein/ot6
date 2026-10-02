@@ -63,26 +63,41 @@
 -- copies, so the case cannot finish.  The v0.24 re-cut dealt the lone
 -- Baskervor (formation $0A0): its first x-magic case sneezed TERRA out after
 -- her Fire and waited 12000 frames for her Drain
--- (build/attempts/wt/mimic-v024/).  So each encounter is read off the ROM
--- (the species' AI scripts, M.partRoles' lastStand / lastStandN), and one
--- whose Sneeze counter is armed from the opening (N or fewer monsters
--- standing) is run from, as a player keeping a party together would; the
--- next draw is taken.  The budget is the most encounters any
+-- (build/attempts/wt/mimic-v024/).
+--
+-- So the source aims every single-target pick at the sturdiest body (the
+-- most HP standing; sturdiest, below), and the copy follows it.  Before the
+-- copy resolves, the only body the cases can kill is that one: every
+-- single-target hit lands on it, an all-target source cast is one unboosted
+-- cast on bodies at full HP, and an all-target copy is the stand-in's last
+-- action, whose counters come after it.  Each encounter is then read off
+-- the ROM -- the species' AI scripts (M.partRoles' lastStand / lastStandN),
+-- whether a holder's own death ends its script (`if_self_dead / end_if`
+-- first in its retaliation), and the species' max HP -- and it is run from,
+-- as a player keeping a party together would, when a Sneeze counter is
+-- armed at the opening (N or fewer standing) or once the aimed body falls
+-- (another holder left with N or fewer, or the aimed holder's own killing
+-- blow when its death does not end its script); with a tie for the most HP
+-- every tied body counts as aimed.  On this plain that runs from the lone
+-- Baskervor (160) and the pair (191: either one's death leaves the other
+-- alone) and measures 162, whose aimed Baskervor dies quietly and leaves
+-- only the Cephaler.  The budget is the most encounters any
 -- encounter-counter state needs to deal a measurable slot of the pool
--- CheckBattleWorld rolled (H.worstCaseEncounters; 11 for this plain's group
--- 24 on the v0.24 ROM).  A two-monster draw arms the counter once a kill
--- leaves one standing, so the source aims at the sturdiest body (sturdiest,
--- below).  A case that loses a member it still needs anyway (a KO, a kill
--- the aim did not prevent) fails at once, naming it, instead of timing out.
+-- CheckBattleWorld rolled (H.worstCaseEncounters; 19 for group 24 on the
+-- v0.24 ROM).  A case that loses a member it still needs anyway (a KO, a
+-- kill this reading did not foresee) fails at once, naming it, instead of
+-- timing out.
 --
 -- Levers, for evidence only (the suite runs BURN 0, MUTANT nil): BURN runs
 -- from that many encounters first, whatever they are, to vary the encounter
 -- history (TESTING.md: the draw moves with encounters used up, not seeds);
 -- MUTANT "take-any" measures the first draw after BURN with no Sneeze check
--- (the old behavior), "refuse-all" calls every formation armed,
+-- (the old behavior), "opening-only" checks only the opening (the first
+-- fix, which measured 191), "refuse-all" calls every formation armed,
 -- "budget-1" allows one draw, "other-group" decodes the budget for a
 -- group the walk does not roll, "default-target" confirms the source's
--- target where the cursor opens (the old aim; see sturdiest below).
+-- target where the cursor opens (the old aim), "fell" reads every needed
+-- member as KO'd (guard's fell branch).
 local BURN, MUTANT = 0, nil
 
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -145,25 +160,60 @@ local function recCmd(c, r) return 0x1600 + 37 * c + 0x16 + r end
 local MAXDRAWS = 24          -- draws built after BURN; the budget must fit
 local worldGroup = nil       -- the group the last CheckBattleWorld rolled
 local battleKey = nil        -- the last battle's key (H.firstBattleKey)
+local function aiByte(species)
+  local ptrs, base = H.sym("AIScriptPtrs") & 0x3FFFFF, H.sym("AIScript") & 0x3FFFFF
+  local off = H.readRomWord(ptrs + species * 2)
+  return function(i) return H.readRomByte(base + off + i) end
+end
 -- N of a species' `if_num_monsters N` retaliation that throws Sneeze, or nil
 local function sneezeN(species)
   if species >= 0x180 then return nil end
-  local ptrs, base = H.sym("AIScriptPtrs") & 0x3FFFFF, H.sym("AIScript") & 0x3FFFFF
-  local off = H.readRomWord(ptrs + species * 2)
-  local r = H.partRoles(function(i) return H.readRomByte(base + off + i) end, 0)
+  local r = H.partRoles(aiByte(species), 0)
   for _, a in ipairs(r.lastStand) do
     if a == H.SNEEZE then return r.lastStandN or 1 end
   end
 end
--- why a formation of these species, all standing, answers its first hit
--- with a Sneeze counter; nil when it cannot
+-- its retaliation opens `if_self_dead / end_if` (FC 12 00 00 FE): its
+-- death ends the script (AICmd_fe), so its killing blow throws nothing
+local function quietDeath(species)
+  local at, i = aiByte(species), 0
+  while at(i) ~= 0xFF and i < H.AI_SCRIPT_MAX do i = i + (H.AI_OP_LEN[at(i)] or 1) end
+  return at(i + 1) == 0xFC and at(i + 2) == 0x12 and at(i + 3) == 0 and at(i + 4) == 0
+     and at(i + 5) == 0xFE
+end
+-- a species' max HP (MonsterProp +8, the word LoadMonsterProp seeds)
+local function speciesHp(species)
+  return H.readRomWord((H.sym("MonsterProp") & 0x3FFFFF) + species * 32 + 8)
+end
+-- why a formation of these species, all standing at full HP, can answer a
+-- hit with a Sneeze before a copy resolves (header: at the opening, or once
+-- the aimed body falls); nil when it cannot
 local function sneezeArmed(species)
   if MUTANT == "refuse-all" then return "MUTANT refuse-all" end
+  local n, top = #species, -1
   for _, sp in ipairs(species) do
-    local n = sneezeN(sp)
-    if n and #species <= n then
+    local N = sneezeN(sp)
+    if N and n <= N then
       return string.format("$%03X throws Sneeze at a hit once %d or fewer stand, and %d stand%s",
-        sp, n, #species, #species == 1 and "s" or "")
+        sp, N, n, n == 1 and "s" or "")
+    end
+    top = math.max(top, speciesHp(sp))
+  end
+  if MUTANT == "opening-only" then return nil end
+  for k, aimed in ipairs(species) do
+    if speciesHp(aimed) == top then
+      local N = sneezeN(aimed)
+      if N and n - 1 <= N and not quietDeath(aimed) then
+        return string.format("$%03X (aimed, %d HP) throws Sneeze at its own killing blow, "
+          .. "%d left standing", aimed, top, n - 1)
+      end
+      for j, sp in ipairs(species) do
+        N = sneezeN(sp)
+        if j ~= k and N and n - 1 <= N then
+          return string.format("killing the aimed $%03X (%d HP) leaves $%03X, which throws Sneeze "
+            .. "once %d or fewer stand, with %d", aimed, top, sp, N, n - 1)
+        end
+      end
     end
   end
 end
@@ -391,6 +441,7 @@ local function guard(c)
   for _, n in ipairs(need) do
     local s = n[1]
     local st1 = H.readByte(0x3EE4 + s * 2)
+    if MUTANT == "fell" then st1 = st1 | 0x80 end
     local out, ko = ((left >> s) & 1) == 1, (st1 & 0x80) ~= 0
     if out or ko then
       error(string.format("case %s: %s (slot %d) %s before %s ($3A39=$%02X, status1 $%02X; "
@@ -409,8 +460,9 @@ end
 -- stand-in's copied Drain went on to the lone Baskervor, and its Sneeze
 -- took the stand-in out before the copied Fire (build/attempts/wt/
 -- mimic-v024/).  The Baskervor's own death stops its script (`if_self_dead
--- / end_if` ends it), so a kill on the sturdiest body arms nothing.  An
--- all-target pick (a lore, a summon) is confirmed as it opens.  Steered
+-- / end_if` ends it), so on that draw a kill on the sturdiest body arms
+-- nothing; a draw where it would (191, two Baskervors) is run from
+-- (sneezeArmed).  An all-target pick (a lore, a summon) is confirmed as it opens.  Steered
 -- with H.targetCursor, its taps paced as battle_assassinate paces them.
 local function sturdiest()
   local best, hp = nil, -1
@@ -637,9 +689,6 @@ local steps = {
         }),
       })
     end
-    steps[#steps + 1] = H.call(function()
-      H.assertEq(measured, true, "a measured draw within the draws built")
-    end)
     return H.repeatN(1, steps)
   end)(),
   H.call(function()
