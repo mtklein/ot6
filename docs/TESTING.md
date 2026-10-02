@@ -76,7 +76,9 @@ when its persistent layout remains compatible; test that compatibility rather
 than assuming it.
 
 The Ninja graph and stamp checker implement that separation. Each generated
-fixture's stamp records the ROM it was captured on, its generator's own
+fixture's stamp records the ROM it was captured on (its identity: the ROM
+with its version fields masked, `tools/build/rom_version.py`, so the release
+commit's VERSION bump alone stales nothing), its generator's own
 signature, its artifact and ancestor bindings (compatibility), and the
 signature and per-file hashes of the shared harness sources that produced it
 (provenance). A fixture is stale when the ROM or its generator changed or a

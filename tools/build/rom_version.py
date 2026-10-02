@@ -8,7 +8,8 @@ from the repo's VERSION file:
 
     Ot6VersionText  c0/ffa0, 16 bytes   "OT6 v<VERSION>" in the menu font's
                     encoding, $00-terminated and $00-padded.  The Config
-                    screen draws it (config.asm DrawConfigVersion).
+                    screen (menu/ot6_version.asm) and the boot splash
+                    (cutscene/ot6_version.asm) draw it.
     SnesHeader      c0/ffc0, 21 bytes   the internal header title, ASCII
                     "OT6 V<VERSION>", space-padded, for tools that read it.
 
@@ -21,7 +22,8 @@ bind to (savestate_stamp.sh romsig; the ROM copy edge below), so the release
 commit's VERSION bump, which changes only these bytes, stales nothing that
 was qualified, while any other byte change still changes the identity.  The
 version text itself is checked on the shipped bytes by the
-menu_configversion suite, which depends on the ROM file, not the identity.
+menu_configversion and title_version suites, which depend on the ROM file
+and VERSION, not only the identity.
 
 Usage:
     rom_version.py stamp ROM VERSION DBG

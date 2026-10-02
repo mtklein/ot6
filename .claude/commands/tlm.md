@@ -232,6 +232,11 @@ back. Steps, in order, none skipped:
    (version bump + release notes)`; fast-forward release/vX.Y to it.
 5. `ninja release` (qualification is up to date, so this is the
    preflights, the patch and the zip): `build/release/ot6-vX.Y.zip` must build.
+   The bump relinks the ROM with the new version in its two version fields
+   (tools/build/rom_version.py); fixtures, checkpoints and results bind to
+   the ROM's identity, which masks those fields, so nothing regenerates but
+   the two suites that read them (menu_configversion, title_version), which
+   re-run on the bytes that ship.
 6. `git tag -a vX.Y -m "OT6 vX.Y -- <Name>"`, `git push origin main
    release/vX.Y vX.Y`, then
    `gh release create vX.Y build/release/ot6-vX.Y.zip --title "OT6 vX.Y — <Name>" --notes-file docs/release-notes-vX.Y.md`.

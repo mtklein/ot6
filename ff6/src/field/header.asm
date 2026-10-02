@@ -37,7 +37,7 @@ JmpIRQ:
 
 ; ------------------------------------------------------------------------------
 
-; [ ot6: the build's version, shown on the Config screen ]
+; [ ot6: the build's version, shown on the Config screen and the boot splash ]
 
 ; A fixed-size field at a fixed address (c0/ffa0, the ot6_version segment in
 ; cfg/ff6-en.cfg), filled after the link by tools/build/rom_version.py from

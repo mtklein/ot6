@@ -28,3 +28,8 @@ character is knocked out or put to sleep after choosing a boosted action
 but before it goes off, the action is lost, as in the original game, and
 the points stay in the bank: a Slot spin that never turns costs Setzer
 nothing.
+
+**The game shows which OT6 it is.** The splash at power-on shows "OT6 v"
+and the version number under the FINAL FANTASY III logo, and the Config
+screen shows it in a tab in its top-left corner, on both of its pages, so
+you can tell which build a device is running without leaving the game.

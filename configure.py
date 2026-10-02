@@ -424,7 +424,7 @@ TEST_ENV = {
 # everything else binds to the ROM's identity, which leaves those fields
 # out, so these also depend on the ROM's bytes and on VERSION, and the
 # release commit's VERSION bump re-runs them on the bytes that ship.
-VERSION_TESTS = {"menu_configversion"}
+VERSION_TESTS = {"menu_configversion", "title_version"}
 
 # any <name>.mss reference, path-qualified or bare -- compose.py resolves
 # both against build/states, so both are fixture dependencies; the filter
