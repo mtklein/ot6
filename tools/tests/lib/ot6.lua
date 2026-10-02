@@ -6530,7 +6530,7 @@ function Driver:button(actor)
     end
     self.steerDead, self.steerLast, self.tgtVisited, self.tgtCycled = {}, nil, {}, false
   end
-  if st == BATTLE.ST_CMD then self.tgtSpin = 0 end
+  if st == BATTLE.ST_CMD then self.tgtSpin, self.confirmed = 0, nil end
   -- Unknown-menu-state stall guard, on EVERY path (plan or no plan): the
   -- Phantom Train wipe was SHADOW's Throw list ($24), a state this driver
   -- does not know, holding its menu open while the ghosts chipped the
@@ -6720,28 +6720,83 @@ function Driver:button(actor)
   end
   if self.plan == nil or self.planActor ~= actor then
     if st == BATTLE.ST_TGT then
-      -- Backstop for a refused confirm: a confirm clears the plan
-      -- optimistically and presses A, and when the A is REFUSED (e.g.
-      -- the target cursor's rest mask sits on a corpse) the state stays
-      -- ST_TGT with no plan.  Below the threshold this waits silently,
-      -- since a landed confirm's tail also passes through here for a
-      -- tick or two.  tgtSpin resets only at ST_CMD (a genuine menu
-      -- restart), not on any off-ST_TGT flicker.  Past the threshold:
-      -- walk the cursor (the focus steer's own rotation) between
-      -- confirms until any live target lets the A land.
+      -- A target window with no plan behind it is one of two things, told
+      -- apart by self.confirmed (written at every confirm, cleared at
+      -- ST_CMD with tgtSpin).  tgtSpin resets only at ST_CMD (a genuine
+      -- menu restart), not on any off-ST_TGT flicker.
+      local chars, mons = M.readByte(BATTLE.TGTCHARS), M.readByte(BATTLE.TGTMONS)
+      local c = self.confirmed
       self.tgtSpin = self.tgtSpin + 1
+      if c == nil or c.actor ~= actor then
+        -- A window this driver pressed no confirm in: a fixture captured
+        -- while another driver held the cursor (tomb_zombie, 2026-10-01:
+        -- SETZER's Fight window open on a live monster at the capture
+        -- frame, menu=01 state=38 chars=00 mons=01), or a window whose
+        -- plan went away without a B.  Which command opened it is not
+        -- known here, so neither side can be called right: back out to
+        -- the command window, where a plan is made, the way a person
+        -- handed a cursor they did not aim would.  (The refused-confirm
+        -- walk below used to run here too, on no side at all: it walked
+        -- SETZER's Fight RIGHT onto the party and confirmed it on CELES,
+        -- 1696 of 1696 -- the member whose Revivify was the battle's
+        -- cure.)  Two pulses first: a B pressed with the plan's drop has
+        -- its own closing tail.
+        if self.tgtSpin < 3 then return nil end
+        if self.tgtSpin == 3 then
+          M.log(string.format("[%s] actor=%d's target window (chars=%02X mons=%02X) is open "
+            .. "with no plan and no confirm of this driver's in it -- backing out to the "
+            .. "command window to plan", self.tag or "fight", actor, chars, mons))
+        end
+        return { "b" }
+      end
+      -- The backstop for a refused confirm (#111, 2026-08-19): a confirm
+      -- records the side it aimed at, clears the plan optimistically and
+      -- presses A, and when the A is REFUSED (the target cursor's rest
+      -- mask sat on the corpse of monster slot 0, sfigaro_escape) the
+      -- state stays ST_TGT with no plan.  Below the threshold this waits
+      -- silently, since a landed confirm's tail also passes through here
+      -- for a tick or two.  Past it the cursor walks (the focus steer's
+      -- old rotation), and A is pressed only on a target on the side the
+      -- confirm aimed at -- a live monster for an attack, the named member for a
+      -- care line or a Muddle cure: a walk that crosses over (RIGHT from
+      -- the monster column is the party in a normal layout) is crossed
+      -- back, never confirmed.  A walk that finds nothing in two
+      -- rotations backs out to plan afresh.
       if self.tgtSpin < 8 then return nil end
-      if self.tgtSpin == 8 then
-        M.log(string.format("[%s] tgt confirm is being refused " ..
-          "(chars=%02X mons=%02X) -- walking the cursor to a live " ..
-          "target", self.tag or "fight",
-          M.readByte(BATTLE.TGTCHARS), M.readByte(BATTLE.TGTMONS)))
+      local live = liveMonMask()
+      if not c.said then
+        c.said = true
+        M.log(string.format("[%s] tgt confirm is being refused (chars=%02X mons=%02X, "
+          .. "actor=%d's %s aimed at the %s) -- walking the cursor to a %s", self.tag or "fight",
+          chars, mons, actor, c.kind, c.side, c.side == "monsters" and "live monster" or "member"))
       end
-      local dirs = { "left", "right", "down", "up" }
-      if (self.tgtSpin % 6) < 3 then
-        return { dirs[1 + ((self.tgtSpin // 6) % 4)] }
+      if self.tgtSpin >= 8 + 6 * 4 * 2 then
+        M.log(string.format("[%s] refused-confirm walk found no %s target in %d pulses "
+          .. "(chars=%02X mons=%02X live monsters %02X) -- backing out to plan afresh",
+          self.tag or "fight", c.side, self.tgtSpin - 8, chars, mons, live))
+        self.confirmed = nil
+        return { "b" }
       end
-      return { "a" }
+      if c.side == "monsters" and mons == 0 then return self:cross("monsters") end
+      if c.side == "chars" and (mons ~= 0 or chars == 0) then return self:cross("chars") end
+      if c.side == "chars" and c.target ~= nil then
+        -- a party-side confirm names its member (a cure, a raise, the
+        -- Muddle rule's Fight): the A lands on that member or not at all,
+        -- since an attack walked onto the wrong member is the accident
+        -- this backstop exists to avoid
+        local want = 1 << c.target
+        if chars == want then
+          if (self.tgtSpin % 6) >= 3 then return { "a" } end
+          return nil
+        end
+        local cur = 0
+        for e = 0, 3 do if chars & (1 << e) ~= 0 then cur = e; break end end
+        return self:steer(cur < c.target and "down" or "up")
+      end
+      local ok = c.side == "chars" or (mons & live) ~= 0
+      if ok and (self.tgtSpin % 6) >= 3 then return { "a" } end
+      local dirs = c.side == "monsters" and M.TGT_DIRS or { "down", "up" }
+      return self:steer(dirs[1 + ((self.tgtSpin // 6) % #dirs)])
     end
     -- No plan, but a selection window is open: a dropped plan's B out
     -- of target select lands in the window that opened it (btlgfx
@@ -7006,6 +7061,7 @@ function Driver:button(actor)
       self.tag or "fight", actor, M.readByte(BATTLE.TGTCHARS)))
     if self.recovery then self.recovery.confirm(actor, M.frame,
       M.readByte(BATTLE.TGTCHARS), M.readByte(BATTLE.TGTMONS)) end
+    self.confirmed = { actor = actor, side = "chars", kind = self.plan.kind }
     self:dropPlan("confirm_attempt")
     return { "a" }
   end
@@ -7262,6 +7318,11 @@ function Driver:button(actor)
     -- backstop; the optimistic clear here is what routes it there.
     if self.recovery then self.recovery.confirm(actor, M.frame,
       M.readByte(BATTLE.TGTCHARS), M.readByte(BATTLE.TGTMONS)) end
+    -- the side this confirm aims at, for the refused-confirm backstop (the
+    -- plan-nil ST_TGT head): the same split the steer above makes
+    local ally = self.plan.kind == "item" or self.plan.kind == "heal" or self.plan.ally
+    self.confirmed = { actor = actor, kind = self.plan.kind, side = ally and "chars" or "monsters",
+      target = ally and not self.plan.all and self.plan.target or nil }
     self:dropPlan("confirm_attempt")
     return { "a" }
   end
@@ -7298,7 +7359,7 @@ function Driver:idle()
     recoveryFlush()
   end
   self.menuStreak, self.tick, self.battleTick = 0, 0, 0
-  self.plan, self.planActor, self.held = nil, nil, {}
+  self.plan, self.planActor, self.held, self.confirmed = nil, nil, {}, nil
   self.parkDropN = 0
   self.layout, self.layoutUnreadSaid, self.steerLast, self.steerDead = nil, false, nil, {}
   self.parts, self.partsLast, self.partsFell, self.partsSwitch = nil, {}, {}, {}
@@ -8537,6 +8598,7 @@ M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end)
     plan = nil, planActor = nil, held = {},
     heldFast = false,                  -- the live steer asked for 3 presses/pulse
     tgtSpin = 0,                       -- frames spent undecided in ST_TGT
+    confirmed = nil,                   -- { actor, side, kind } of the last confirm, until ST_CMD
     unknownSt = nil, unknownN = 0,     -- unknown-menu-state stall guard
     unknownSeen = {},                  -- st -> true once logged this battle (#188)
     sideWindowN = 0,                   -- Row/Def. windows backed out of this battle
