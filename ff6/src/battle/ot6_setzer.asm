@@ -849,7 +849,7 @@ OT6_SW_SHADOW_SAVED  = $1e80 + ($37d >> 3)
 ;
 ; Each pass is its own animation command, so the walk-out belongs to the
 ; first and the walk-back to the last (F and L in $b7); between passes the
-; slot waits out of the way showing Setzer.  After the last, Setzer's pose
+; slot waits out of the way, hidden, showing Setzer.  After the last, Setzer's pose
 ; is put back as it was at the action's start (OT6_HIREPOSE).  Nothing here
 ; draws a Rand: the battle's $be is left as it was; the longer action moves
 ; the frame clock and the ATB fill during it, so later draws move.
@@ -857,8 +857,9 @@ OT6_SW_SHADOW_SAVED  = $1e80 + ($37d >> 3)
 ; entry: a8/i16, db=$7e, ($76) the script command, ($78) its parameters.
 
 OT6_HIRE_OFF   = 96             ; pixels past home that a slot waits: off screen
-OT6_HIRE_LIFT  = 24             ; a pincer: how far past the top edge the
-                                ;   slot's anchor goes (Ot6HireOut)
+OT6_HIRE_LIFT  = 32             ; a pincer: how far past the top edge the
+                                ;   slot's anchor goes (Ot6HireOut): its two
+                                ;   16-px rows at -32 and -16, off the top
 OT6_HIRE_STEP  = 8              ; pixels a walking frame (12 frames a walk)
 
 ; the figures' battle graphics (CHAR_GFX); figure 4, Interceptor, has none
@@ -963,6 +964,8 @@ Ot6HireBitTbl:
         shorta0
         lda     #$03            ; walking away from the enemies
         jsr     Ot6HireWalk
+        lda     #$00
+        jsr     Ot6HireShow     ; out of sight, hidden too until a hire comes
 :       lda     $03,s
         and     #$70
         cmp     #$40
@@ -978,6 +981,8 @@ Ot6HireBitTbl:
         plx
         jsr     Ot6HireSwap     ; the figure, out of sight
         pha                     ; [1,s] the slot's own graphics, [2,s] home, [4,s] the mark
+        lda     #$01
+        jsr     Ot6HireShow
         longa
         lda     $02,s
         tay
@@ -1005,9 +1010,24 @@ Ot6HireBitTbl:
         lda     #$00
         sta     ($76),y         ; the right hand (byte 2)
         phx
+        longa
+        lda     $61d4,x
+        pha                     ; the x offset before the strike
+        shorta0
         hire_strike FightCmdAnim        ; the strike
+        longa
+        pla
+        tay
+        shorta0
         plx
-        ldy     #$0003
+        lda     OT6_HIREAXIS    ; a pincer walks off upward, so the strike's
+        beq     :+              ;   step forward is stepped back here
+        stz     OT6_HIREAXIS    ;   (sideways, the walk-out takes it)
+        lda     #$03
+        jsr     Ot6HireWalk
+        lda     #$02
+        sta     OT6_HIREAXIS
+:       ldy     #$0003
         pla
         sta     ($76),y
         dey
@@ -1020,6 +1040,8 @@ Ot6HireBitTbl:
         shorta0
         lda     #$03            ; walking away from the enemies
         jsr     Ot6HireWalk
+        lda     #$00
+        jsr     Ot6HireShow
         pla                     ; the slot's own graphics
         jsr     Ot6HireSwap
         bra     @back
@@ -1049,6 +1071,8 @@ Ot6HireBitTbl:
         lda     $01,s
         tay
         shorta0
+        lda     #$01
+        jsr     Ot6HireShow
         lda     #$02            ; walking toward them: Setzer comes back home
         jsr     Ot6HireWalk
         lda     f:$7e0000+OT6_HIREPOSE+1
@@ -1192,6 +1216,35 @@ Ot6HireBitTbl:
         pla
         sta     $61c1,x
         stz     $61c0,x
+        rts
+.endproc
+
+; [ show or hide a character slot ]
+; A = 1 show, 0 hide; X = the slot's wCharGfxData offset.  w7e61ac, the
+; characters-shown mask AnimCmd_e1 drives.  a8/i16, db=$7e.  preserves x, y.
+.proc Ot6HireShow
+        .a8
+        .i16
+        phx
+        pha
+        longa
+        txa
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        tax
+        shorta
+        pla
+        beq     @hide
+        lda     f:Ot6HireBitTbl,x
+        tsb     $61ac
+        plx
+        rts
+@hide:  lda     f:Ot6HireBitTbl,x
+        trb     $61ac
+        plx
         rts
 .endproc
 
