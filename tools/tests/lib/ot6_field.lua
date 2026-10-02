@@ -1046,14 +1046,24 @@ end
 --          $F0, else 4 -- 80, 80, 80 and 16 in 256.  A word with bit 15
 --          set deals formation (word & $1FF) plus a battle-RNG 0..3
 --          (battle_main.asm @30f3, after the CondBattle swaps).
--- UpdateBattleGrpRng steps a SAVE-DATA counter once per encounter:
+-- UpdateBattleGrpRng steps a WRAM counter once per encounter:
 --   $1fa2 += 1 (and on its wrap $1fa3 += $17); v = RNGTbl[$1fa2] + $1fa3.
 -- Steps ($1fa1/$1fa4) decide only WHEN an encounter comes, never which,
--- and OT6_SEED_SHIFT (battle RNG $be) moves neither: a fixture's coming
--- formations are fixed by two bytes, and every regeneration of the chain
+-- and OT6_SEED_SHIFT (battle RNG $be) moves neither.  Where the counter
+-- starts depends on how the run boots.  A savestate carries $1fa1-$1fa5
+-- as they were.  A Continue does not use the saved counters at all: it
+-- re-seeds them from SRAM's random seed $307ff1, which GameLoadMenu adds
+-- 1 to (menu_common.asm @016f) and EventCmd_ab adds $0D to and copies
+-- into $1f6d and all five of $1fa1-$1fa5 (event.asm @b91b).  So a
+-- Continue's coming formations are fixed by that one SRAM byte, with
+-- $1fa2 == $1fa3 at the first walk, and every regeneration of the chain
 -- deals it different ones.  A test that must reach a formation budgets
 -- its encounters over every counter state (M.worstCaseEncounters), not
--- the one its fixture happens to carry.
+-- the one its fixture happens to carry.  That bound is conservative
+-- for a first walk after a Continue (only the $1fa2 == $1fa3 diagonal
+-- occurs there: for battle_slotsboot's group 10 its worst is 15
+-- encounters against 21 over all states), and it is the right one for
+-- a later walk, which can stand anywhere on the counter's path.
 M.ENCOUNTER_ODDS = { 80, 80, 80, 16 }     -- in 256, slots 1..4
 
 function M.encounterSlot(v)
@@ -1170,6 +1180,346 @@ function M.encounterShare(hist, n)
   local k = 0
   for m, c in pairs(hist) do if m <= n then k = k + c end end
   return k / 65536
+end
+
+-- ---- statuses that take a member's command (the Slot suites) -----------
+-- Every status that takes away a member's control of their own turn, as
+-- the battle reads them ($3ee4/$3ee5/$3ef8/$3ef9 + entity*2): the engine
+-- takes the window (Death, Petrify, Zombie, Sleep, Muddle, Berserk: the
+-- @0941 list M.turnDenied describes), holds the gauge under a kept window
+-- (Stop, Frozen), or greys every command but Fight/Item/Magic (Imp).
+-- How a person standing beside the member gives the turn back: cure =
+-- "hit", a plain physical hit (CalcMaxDmg @0c45 strips Sleep and Muddle
+-- from a physically damaged target); or `items`, in order, of which the
+-- first the bag holds and whose ItemProp cure byte carries the bit
+-- (M.statusCure) is used -- Fenix Down for Death, Soft/Remedy for
+-- Petrify, Revivify/Remedy for Zombie, Green Cherry/Remedy for Imp,
+-- Remedy for Berserk (whose record does not carry it in this ROM, so
+-- Berserk has none); neither = only time clears it.
+M.CONTROL_STATUSES = {
+  { byte = 1, bit = 0x80, name = "Death",   items = { 0xF0 } },
+  { byte = 1, bit = 0x40, name = "Petrify", items = { 0xF4, 0xF5 } },
+  { byte = 1, bit = 0x02, name = "Zombie",  items = { 0xF1, 0xF5 } },
+  { byte = 1, bit = 0x20, name = "Imp",     items = { 0xF8, 0xF5 } },
+  { byte = 2, bit = 0x80, name = "Sleep",   cure = "hit" },
+  { byte = 2, bit = 0x20, name = "Muddle",  cure = "hit" },
+  { byte = 2, bit = 0x10, name = "Berserk", items = { 0xF5 } },
+  { byte = 3, bit = 0x10, name = "Stop" },
+  { byte = 4, bit = 0x02, name = "Frozen" },
+}
+local CONTROL_ST = { 0x3EE4, 0x3EE5, 0x3EF8, 0x3EF9 }
+
+-- The first control-taking status a party entity (0..3) carries, as its
+-- M.CONTROL_STATUSES row, or nil.  A seated member at 0 HP reads as Death.
+function M.controlTaken(e)
+  for _, c in ipairs(M.CONTROL_STATUSES) do
+    if (M.readByte(CONTROL_ST[c.byte] + e * 2) & c.bit) ~= 0 then return c end
+  end
+  if M.readWord(0x3C1C + e * 2) > 0 and M.readWord(0x3BF4 + e * 2) == 0 then
+    return M.CONTROL_STATUSES[1]
+  end
+  return nil
+end
+
+-- The control-taking statuses one attack can inflict, by name: the
+-- species' special ($EF; MonsterProp+31, a status index when its low six
+-- bits are under $20) or a spell (MagicProp+10..13, the four status bytes
+-- it sets, unless MagicProp+4 bit 2 says it removes them).  $EE (Battle)
+-- and $FE (nothing) inflict none.
+local function attackControl(attack, species)
+  local out = {}
+  if attack == 0xEE or attack == 0xFE then return out end
+  if attack == 0xEF then
+    local sp = M.readRomByte((M.sym("MonsterProp") & 0x3FFFFF) + species * 32 + 31) & 0x3F
+    if sp < 0x20 then
+      local byte, bit = (sp >> 3) + 1, 1 << (sp & 7)
+      for _, c in ipairs(M.CONTROL_STATUSES) do
+        if c.byte == byte and c.bit == bit then out[#out + 1] = c.name end
+      end
+    end
+    return out
+  end
+  local mp = (M.sym("MagicProp") & 0x3FFFFF) + attack * 14
+  if (M.readRomByte(mp + 4) & 0x04) ~= 0 then return out end
+  for _, c in ipairs(M.CONTROL_STATUSES) do
+    if (M.readRomByte(mp + 9 + c.byte) & c.bit) ~= 0 then out[#out + 1] = c.name end
+  end
+  return out
+end
+
+-- What in a species' AI script (AIScriptPtrs / AIScript, walked with
+-- M.AI_OP_LEN as M.partRoles walks it) can take a member's control:
+-- { { status, attack, anyTurn, counter } ... }.  An attack inside a block
+-- that opens with conditions ($FC ... up to its $FE: the Iron Fist's
+-- `if_num_monsters 1 / attack BATTLE, STONE, STONE`) has anyTurn false;
+-- one outside any block can come on any of the monster's turns (the Mind
+-- Candy's `attack BATTLE, BATTLE, SPECIAL`, SleepSting).  The second
+-- section is the retaliation script (counter true).
+function M.speciesControl(species)
+  local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
+  local off = M.readRomWord(ptrs + species * 2)
+  local function at(i) return M.readRomByte(base + off + i) end
+  local out, seen = {}, {}
+  local i, section, inBlock, conds = 0, 0, false, false
+  local function add(a)
+    for _, name in ipairs(attackControl(a, species)) do
+      local key = string.format("%s/%02X/%s/%d", name, a, tostring(not inBlock), section)
+      if not seen[key] then
+        seen[key] = true
+        out[#out + 1] = { status = name, attack = a, anyTurn = not inBlock, counter = section == 1 }
+      end
+    end
+  end
+  while section < 2 and i < M.AI_SCRIPT_MAX do
+    local op = at(i)
+    local len = M.AI_OP_LEN[op] or 1
+    if op == 0xFC then
+      if not conds then conds, inBlock = true, true end
+    else
+      conds = false
+      if op < 0xF0 then add(op)
+      elseif op == 0xF0 then add(at(i + 1)); add(at(i + 2)); add(at(i + 3))
+      elseif op == 0xFE then inBlock = false
+      elseif op == 0xFF then section, inBlock = section + 1, false end
+    end
+    i = i + len
+  end
+  return out
+end
+
+-- A formation judged from the ROM for a fight a member must keep their
+-- turns through: suits when it has at least minBodies bodies and minHp
+-- max HP among them (MonsterProp+8) and no species can take a member's
+-- control on any of its turns (M.speciesControl anyTurn).  Conditional
+-- sources are let through and reported; answering them is the fight's
+-- (battle_slotsboot cures with M.controlTaken / M.CONTROL_STATUSES).
+-- Returns suits, hp, and a description of every control source.
+function M.judgeFormation(species, minBodies, minHp)
+  local hp, anyTurn, srcs = 0, false, {}
+  local mp = M.sym("MonsterProp") & 0x3FFFFF
+  local done = {}
+  for _, sp in ipairs(species) do
+    hp = hp + M.readRomWord(mp + sp * 32 + 8)
+    if not done[sp] then
+      done[sp] = true
+      for _, c in ipairs(M.speciesControl(sp)) do
+        anyTurn = anyTurn or c.anyTurn
+        srcs[#srcs + 1] = string.format("%03X %s via $%02X%s%s", sp, c.status, c.attack,
+          c.counter and " (counter)" or "", c.anyTurn and " ANY TURN" or " (conditional)")
+      end
+    end
+  end
+  return #species >= minBodies and hp >= minHp and not anyTurn, hp, srcs
+end
+
+-- ---- reaching a formation by its pool (the Slot suites) ----------------
+-- M.newEncounterDraw(opts) paces a stretch of the world row the party
+-- stands on whose every tile rolls one encounter group from any saved
+-- position (as battle_steal's desert), and meets encounters until the
+-- pool deals a formation M.judgeFormation accepts, budgeted over every
+-- counter state (M.worstCaseEncounters) from the group CheckBattleWorld
+-- really rolls.  Each encounter asserts the group rolled and the word the
+-- counter chose, the word captured where CheckBattleWorld stores it
+-- (`sta f:$0011e0`): LoadBattleProp rewrites $11e0 in battle (a
+-- CondBattle swap, and bit 15's +Rand&3), so the battle's copy is the
+-- formation, not the word.  Unsuitable encounters are run from, or fought
+-- out when the pack cannot be run from (M.fleeBattle's onCantRun =
+-- "fight": $b1 bit 1, a pincer, or the formation's no-run bit $2f4b
+-- bit 0), with field care after each.
+--   opts.tag        log tag
+--   opts.minBodies, opts.minHp   the M.judgeFormation floors
+--   opts.maxTries   encounters built (the budget must fit; default 24)
+--   opts.pace       tiles each way from the start tile (default 4)
+-- D.steps() returns the step list; afterwards D.suitable, D.n (encounters
+-- met), D.group, D.budget, D.msPresent (the live monster slots).
+function M.newEncounterDraw(opts)
+  local D = { tag = opts.tag or "draw", maxTries = opts.maxTries or 24,
+              pace = opts.pace or 4, n = 0, suitable = false }
+  local CBW, CBW_END = M.sym("CheckBattleWorld"), M.sym("GetVeldtBattle")
+  local RNG = M.sym("RNGTbl") & 0x3FFFFF
+  local armed = false
+  local function arm()
+    if armed then return end
+    armed = true
+    emu.addMemoryCallback(function() D.worldGroup = M.worldCheckGroup() end,
+      emu.callbackType.exec, CBW, CBW)
+    -- CheckBattleWorld's own store of the word (16-bit, so the high byte
+    -- is written second); a write from anywhere else (LoadBattleProp's
+    -- rewrite, an event battle) is not it.  GetVeldtBattle follows
+    -- CheckBattleWorld in the ROM, so it bounds the proc.
+    for _, hi in ipairs({ 0x0011E1, 0x7E11E1 }) do
+      emu.addMemoryCallback(function(_, v)
+        local s = emu.getState()
+        local pc = (s["cpu.k"] << 16) | s["cpu.pc"]
+        if pc >= CBW and pc < CBW_END then
+          D.storedWord = M.readByte(0x11E0) | (v << 8)
+        end
+      end, emu.callbackType.write, hi, hi)
+    end
+  end
+
+  function D.planPace()
+    local x0, y0 = M.worldX(), M.worldY()
+    local function own(x) return M.worldEncounterGroup(x, y0, x, y0) end
+    local g = own(x0)
+    local lo, hi = x0, x0
+    while lo > x0 - D.pace and M.worldPassable(lo - 1, y0) and own(lo - 1) == g do lo = lo - 1 end
+    while hi < x0 + D.pace and M.worldPassable(hi + 1, y0) and own(hi + 1) == g do hi = hi + 1 end
+    local zx, zy = M.worldZonePos()
+    local groups = {}
+    for x = lo, hi do
+      for z = lo, hi do
+        local gg = M.worldEncounterGroup(x, y0, z, y0)
+        if gg ~= nil then groups[gg] = true end
+      end
+      local gg = M.worldEncounterGroup(x, y0, zx, zy)
+      if gg ~= nil then groups[gg] = true end
+    end
+    local list = {}
+    for gg in pairs(groups) do list[#list + 1] = tostring(gg) end
+    table.sort(list)
+    M.log(string.format("[%s] pace: row %d, x %d..%d (start x %d, saved position "
+      .. "(%d,%d)); the groups it can roll: %s", D.tag, y0, lo, hi, x0, zx, zy,
+      table.concat(list, ",")))
+    M.assertEq(hi - lo >= 2, true, string.format("%s: the start row gives a stretch "
+      .. "of at least three tiles that roll group %s (x %d..%d)", D.tag, tostring(g), lo, hi))
+    M.assertEq(#list == 1 and list[1] == tostring(g), true, string.format("%s: every "
+      .. "encounter on the stretch rolls group %s, whatever the saved position (rolls %s)",
+      D.tag, tostring(g), table.concat(list, ",")))
+    D.row, D.lo, D.hi, D.group, D.dir = y0, lo, hi, g, "left"
+  end
+
+  function D.planDraws()
+    local pool = M.encounterPool(D.group)
+    local ok, any, parts = {}, {}, {}
+    for slot = 1, 4 do
+      ok[slot], any[slot] = true, false
+      local names = {}
+      for _, f in ipairs(pool[slot].formations) do
+        local suits, hp, srcs = M.judgeFormation(f.species, opts.minBodies, opts.minHp)
+        f.suits = suits
+        ok[slot] = ok[slot] and suits
+        any[slot] = any[slot] or suits
+        local sp = {}
+        for _, s in ipairs(f.species) do sp[#sp + 1] = string.format("%03X", s) end
+        names[#names + 1] = string.format("%d [%s] %d HP%s", f.id, table.concat(sp, " "),
+          hp, #srcs > 0 and (" {" .. table.concat(srcs, "; ") .. "}") or "")
+      end
+      parts[#parts + 1] = string.format("slot %d (%d/256, $%04X) %s%s", slot,
+        pool[slot].odds, pool[slot].word, table.concat(names, ", "), ok[slot] and " SUITS" or "")
+    end
+    local worst, hist = M.worstCaseEncounters(function()
+      return function(slot) return ok[slot] end
+    end)
+    M.log(string.format("[%s] budget: group %d (floor %d bodies, %d max HP, no "
+      .. "control-taking attack on any turn): %s -- the worst of the 65536 "
+      .. "encounter-counter states needs %d encounter(s); %.1f%% need no more than 6",
+      D.tag, D.group, opts.minBodies, opts.minHp, table.concat(parts, "; "), worst,
+      100 * M.encounterShare(hist, 6)))
+    M.assertEq(worst <= D.maxTries, true, string.format("%s: group %d deals a "
+      .. "suitable formation within the %d encounters built (worst state: %d)",
+      D.tag, D.group, D.maxTries, worst))
+    local a, b = M.readByte(0x1FA2), M.readByte(0x1FA3)
+    local seq, lo, hi = {}, nil, nil
+    for n = 1, D.maxTries do
+      a = (a + 1) & 0xFF                     -- UpdateBattleGrpRng
+      if a == 0 then b = (b + 0x17) & 0xFF end
+      seq[n] = M.encounterSlot((M.readRomByte(RNG + a) + b) & 0xFF)
+      if lo == nil and any[seq[n]] then lo = n end
+      if hi == nil and ok[seq[n]] then hi = n end
+    end
+    D.budget, D.pool, D.seq, D.n, D.suitable = worst, pool, seq, 0, false
+    M.log(string.format("[%s] the counter ($1fa2=$%02X $1fa3=$%02X) deals slots %s: "
+      .. "a suitable formation at encounter %s", D.tag, M.readByte(0x1FA2),
+      M.readByte(0x1FA3), table.concat(seq, ","),
+      lo == hi and tostring(lo) or (tostring(lo) .. ".." .. tostring(hi))))
+  end
+
+  local function paceWalk(what)
+    return M.driveUntil(function() return M.battleLoadStarted() end, 25000, {
+      M.call(function()
+        if not M.worldMode() or not M.worldHasControl() then M.setPad({}); return end
+        if M.worldAligned() then
+          local x = M.worldX()
+          if x <= D.lo then D.dir = "right" elseif x >= D.hi then D.dir = "left" end
+        end
+        M.setPad({ [D.dir] = true })
+      end),
+    }, what)
+  end
+
+  local survey = M.call(function()
+    D.n = D.n + 1
+    local n, slot = D.n, D.seq[D.n]
+    local e = D.pool[slot]
+    M.assertEq(D.worldGroup, D.group, string.format("%s: encounter %d was dealt by "
+      .. "group %d, the pool its budget was decoded from", D.tag, n, D.group))
+    M.assertEq(D.storedWord, e.word, string.format("%s: encounter %d dealt slot %d's "
+      .. "word, as the counter said (the word CheckBattleWorld stored)", D.tag, n, slot))
+    D.msPresent = {}
+    for m = 0, 5 do
+      if M.readByte(0x3AA8 + m * 2) % 2 == 1 then D.msPresent[#D.msPresent + 1] = m end
+    end
+    local live = {}
+    for _, s in ipairs(M.formationSpecies()) do live[#live + 1] = s.species end
+    local suits, _, srcs = M.judgeFormation(live, opts.minBodies, opts.minHp)
+    local mhp = 0
+    for _, m in ipairs(D.msPresent) do mhp = mhp + M.readWord(0x3BFC + m * 2) end
+    D.suitable = suits and #D.msPresent >= opts.minBodies and mhp >= opts.minHp
+    table.sort(live)
+    local romSuits = nil
+    for _, f in ipairs(e.formations) do
+      local sp = {}
+      for _, s in ipairs(f.species) do sp[#sp + 1] = s end
+      table.sort(sp)
+      if table.concat(sp, ",") == table.concat(live, ",") then romSuits = f.suits end
+    end
+    M.log(string.format("[%s] draw %d: slot %d $%04X (battle $11e0 $%04X), %d bodies, "
+      .. "%d total max HP%s -> %s", D.tag, n, slot, e.word, M.readWord(0x11E0),
+      #D.msPresent, mhp, #srcs > 0 and (" {" .. table.concat(srcs, "; ") .. "}") or "",
+      D.suitable and "FIGHT" or "pass"))
+    M.assertEq(romSuits, D.suitable, string.format("%s: encounter %d's live formation "
+      .. "is one of slot %d's, judged as the ROM's data judged it", D.tag, n, slot))
+  end)
+
+  local function attempt(n)
+    return M.cond(function() return not D.suitable and n <= D.budget end, {
+      M.call(function() D.storedWord = nil end),
+      paceWalk(D.tag .. ": a real world encounter fires (draw " .. n .. ")"),
+      M.release(),
+      M.waitUntil(function() return M.battleActive() end, 900,
+        D.tag .. ": battle active (draw " .. n .. ")", 30),
+      M.waitFrames(240),
+      survey,
+      M.cond(function() return not D.suitable end, {
+        M.fleeBattle(9000, { onCantRun = "fight" }),
+        M.call(function()
+          M.log(string.format("[%s] draw %d: %s", D.tag, n, tostring(M.fleeOutcome)))
+        end),
+        M.waitUntil(function()
+          return M.worldMode() and M.worldHasControl()
+        end, 1200, D.tag .. ": back on the plain after draw " .. n, 10),
+        M.waitFrames(30),
+        M.careStop(D.tag .. ": care after draw " .. n),
+      }, {}),
+    }, {})
+  end
+
+  function D.steps()
+    local steps = {
+      M.waitUntil(function() return M.worldSettled() end, 1500,
+        D.tag .. ": the world map settled", 5),
+      M.call(function() arm(); D.planPace(); D.planDraws() end),
+    }
+    for n = 1, D.maxTries do steps[#steps + 1] = attempt(n) end
+    steps[#steps + 1] = M.call(function()
+      M.assertEq(D.suitable, true, string.format("%s: a suitable formation was "
+        .. "dealt within %d encounters, the most any encounter-counter state needs "
+        .. "from group %d", D.tag, D.budget, D.group))
+    end)
+    return steps
+  end
+  return D
 end
 
 local function worldEdgeKey(x, y, dir)
