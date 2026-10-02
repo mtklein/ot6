@@ -5622,7 +5622,12 @@ function M.relicPlan(members, opts)
           end
           id = id or held
         end
-        if id then take(m, id, "a slot nothing above took: kept filled") end
+        if id then
+          take(m, id, "a slot nothing above took: kept filled")
+          -- read by field_relicplan: a slot step 4 filled was open before it
+          m.filler = m.filler or {}
+          m.filler[id] = true
+        end
       end
     end
   end
@@ -5651,7 +5656,8 @@ function M.relicPlan(members, opts)
     end
     lines[#lines + 1] = string.format("%s: slot 4 %s, slot 5 %s (%d change%s)", m.name,
       relicName(m.want[4] or m.cur[4]), relicName(m.want[5] or m.cur[5]), #changes, #changes == 1 and "" or "s")
-    plan[#plan + 1] = { ch = m.ch, name = m.name, want = m.want, changes = changes, handCome = m.handCome }
+    plan[#plan + 1] = { ch = m.ch, name = m.name, want = m.want, changes = changes, handCome = m.handCome,
+      filler = m.filler or {} }
   end
   for _, l in ipairs(lines) do M.log(string.format("[%s] %s", tag, l)) end
   return plan

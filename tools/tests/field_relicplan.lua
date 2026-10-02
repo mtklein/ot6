@@ -62,6 +62,13 @@ local function planned(plan, ch, s)
   end
   return nil
 end
+-- the relics step 4 put in a member's slots as leftovers (plan[i].filler)
+local function filled(plan, ch, id)
+  for _, p in ipairs(plan) do
+    if p.ch == ch then return p.filler ~= nil and p.filler[id] == true end
+  end
+  return false
+end
 local function covers(id, threats)
   return (prop(id, 6) & (threats.s1 or 0)) | (prop(id, 7) & (threats.s2 or 0))
 end
@@ -80,7 +87,9 @@ local function eggChecks(plan, plan0, threats, what)
   for _, p in ipairs(MEMBERS) do
     for s = 4, 5 do
       local base, after = planned(plan0, p[1], s), planned(plan, p[1], s)
-      if after == EGG and base ~= EGG and base ~= 0xFF then
+      -- a slot the Egg-less plan filled only in step 4 (a leftover kept
+      -- filled, "a slot nothing above took") was open when the Egg's pass ran
+      if after == EGG and base ~= EGG and base ~= 0xFF and not filled(plan0, p[1], base) then
         -- a displacement: never over a threat-critical relic
         H.assertEq(shell(base) and threats.magic == true, false, string.format(
           "%s: the Egg did not displace %s's ward $%02X against this fight's magic", what, p[2], base))
