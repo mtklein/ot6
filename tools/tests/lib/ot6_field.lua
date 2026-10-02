@@ -5231,9 +5231,9 @@ end
 --      learned.  Ties go to the member already wearing the relic, then to
 --      the order of `members`.
 --   3b. The Exp. Egg (+13 bit 3) to the member furthest behind on levels,
---      in a free slot or in place of a relic planned there that is not
---      threat-critical (a ward for this fight, a guard adding a threatened
---      status); opts.egg = false leaves it to step 4 (#351).
+--      in a free slot or in place of a guard or spare that is not
+--      threat-critical, never over an acting relic and never when arming
+--      for a boss (threats.boss); opts.egg = false leaves it to step 4.
 --   4. A slot nothing above took keeps what it holds, else the leftover
 --      the member can wear.
 -- Arm per fight (#351): a generator calls this before a fight with that
@@ -5267,7 +5267,7 @@ M.ARC_THREATS = {
 -- cut Potions 37 -> 21 and Fenix Downs 2 -> 0 on the same four entry
 -- states (dullczar/ against dull/, 32/32 won either way).
 M.FIGHT_THREATS = {
-  dullahan = { s1 = 0x00, s2 = 0x00, magic = true },
+  dullahan = { s1 = 0x00, s2 = 0x00, magic = true, boss = true },
 }
 local RELIC_NAMES = {
   [0xB0] = "Goggles", [0xB1] = "Star Pendant", [0xB2] = "Peace Ring", [0xB3] = "Amulet",
@@ -5544,10 +5544,12 @@ function M.relicPlan(members, opts)
   end
   -- 3b. the Exp. Egg (#351): to the member furthest behind on levels
   -- (below the party's highest; the lowest, then the order of `members`),
-  -- into a free slot, else in place of a relic planned there that is not
-  -- threat-critical -- a ward for this fight's damage, or a guard covering
-  -- a threatened status the member would not otherwise have -- which goes
-  -- back to the pool for step 4.  Nobody behind: it is left to step 4.
+  -- into a free slot, else in place of a guard or a spare ward planned
+  -- there that is not threat-critical (a guard adding a threatened status
+  -- the member would not otherwise have is) -- never over an acting relic
+  -- (Haste, damage, counter: the first cut took SETZER's Black Belt in 11
+  -- of 13 tomb runs and EDGAR's RunningShoes in 2, review of f8f9ad66), and
+  -- never when arming for a boss (threats.boss).  Nobody behind: step 4.
   local function critical(m, s)
     local w = m.want[s]
     if w == nil then return false end
@@ -5566,7 +5568,7 @@ function M.relicPlan(members, opts)
   for _, m in ipairs(ms) do if m.level > top then top = m.level end end
   for _, id in ipairs(order) do
     local cl = M.relicClass(id, opts.threats)
-    if cl.aff == "behind" and opts.egg ~= false then
+    if cl.aff == "behind" and opts.egg ~= false and not (opts.threats and opts.threats.boss) then
       local behind = {}
       for _, m in ipairs(ms) do
         if m.level < top and wearsItem(m.ch, id) then behind[#behind + 1] = m end
@@ -5584,7 +5586,9 @@ function M.relicPlan(members, opts)
               .. "highest L%d), a free slot", m.level, top))
           else
             for _, s in ipairs(m.free) do
-              if count[id] > 0 and m.want[s] ~= nil and m.want[s] ~= id and not critical(m, s) then
+              local wc = m.want[s] ~= nil and M.relicClass(m.want[s], opts.threats) or nil
+              local soft = wc ~= nil and (wc.aff == "guard" or wc.aff == "spare")
+              if count[id] > 0 and m.want[s] ~= nil and m.want[s] ~= id and soft and not critical(m, s) then
                 local w = m.want[s]
                 m.want[s] = nil
                 count[w] = count[w] + 1
@@ -5604,12 +5608,19 @@ function M.relicPlan(members, opts)
   for _, m in ipairs(ms) do
     for _, s in ipairs(m.free) do
       if not m.want[s] then
+        -- arming for a boss, the Egg keeps a slot only when nothing else
+        -- the member can wear is left (3b)
+        local boss = opts.threats and opts.threats.boss
+        local function egg(x) return x ~= 0xFF and M.relicClass(x, opts.threats) ~= nil
+          and M.relicClass(x, opts.threats).aff == "behind" end
         local id = m.cur[s]
-        if id == 0xFF or (count[id] or 0) < 1 then
+        if id == 0xFF or (count[id] or 0) < 1 or (boss and egg(id)) then
+          local held = id ~= 0xFF and (count[id] or 0) >= 1 and id or nil
           id = nil
           for _, x in ipairs(order) do
-            if id == nil and count[x] > 0 and wearsItem(m.ch, x) then id = x end
+            if id == nil and count[x] > 0 and wearsItem(m.ch, x) and not (boss and egg(x)) then id = x end
           end
+          id = id or held
         end
         if id then take(m, id, "a slot nothing above took: kept filled") end
       end

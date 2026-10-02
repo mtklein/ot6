@@ -438,8 +438,41 @@ H.run({ maxFrames = 3000 }, {
     base.tBackRow = true
     H.assertEq(H.allyFightMax(base).max, 158, "the ally in the back row halves it")
     base.tBackRow = nil
-    base.hands = { { bp = 100, casts = true } }
-    H.assertEq(H.allyFightMax(base).top, 948, "a hand that casts its weapon spell: the floor x3")
+    -- every row of the weapon-effect class (review of f8f9ad66, M2): the
+    -- same swing, worked by hand from the engine's paths (the comment at
+    -- M.allyFightMax names each)
+    local function fx(hand, extra)
+      local o = { hands = { hand }, level = 30, vigor2 = 80, def = 100, magpow = 60 }
+      for k, v in pairs(extra or {}) do o[k] = v end
+      return H.allyFightMax(o)
+    end
+    -- a weapon spell (CheckWeaponMagic, 1 swing in 4): power 20 at magic
+    -- power 60, L30: 80 + 60 x 20 x 30 / 32 = 1205, x255/256 + 1 = 1201,
+    -- x255/256 + 1 (magic defense 0) = 1197, halved for an ally: 598, on
+    -- top of the critical swing's 632
+    f = fx({ bp = 100, spell = { power = 20, elem = 0 } })
+    H.assertEq(f.max * 10000 + f.top, 3161230, "a hand that casts: max 316, the floor 632 + its spell 598")
+    f = fx({ bp = 100, effect = 13 })
+    H.assertEq(f.lethal ~= nil, true, "Scimitar/Zantetsuken (effect 13): instant death, lethal at any HP")
+    f = fx({ bp = 100, effect = 9, dice = 2 })
+    H.assertEq(f.max * 10000 + f.top, 21602160, "Dice (effect 9): no damage modification, 6 x 6 x L30 x 2 = 2160")
+    f = fx({ bp = 100, effect = 9, dice = 3 })
+    H.assertEq(f.top, 9999, "Fixed Dice, three dice: 216 x 7 (a triple) x L30 x 2 -> the 9999 cap")
+    f = fx({ bp = 100, effect = 11, windSlash = { power = 60, elem = 0 } })
+    H.assertEq(f.max * 10000 + f.top, 3161793,
+      "Tempest (effect 11): 1 swing in 2 a Wind Slash (power 60: 1793) in place of the swing")
+    f = fx({ bp = 100, effect = 12 })
+    H.assertEq(f.top, 0, "Heal Rod (effect 12): heals, nothing to price")
+    f = fx({ bp = 100, effect = 4 }, { human = true })
+    H.assertEq(f.max * 10000 + f.top, 6320948, "Man Eater (effect 4) on a human: $bc+2, x2; a critical x3")
+    f = fx({ bp = 100, effect = 7 })
+    H.assertEq(f.max * 10000 + f.top, 6320632, "an MP critical (effect 7): x2 always, no second critical")
+    f = fx({ bp = 100, effect = 2 }, { hp = 1600, maxhp = 1600 })
+    H.assertEq(f.max * 10000 + f.top, 2450245, "Atma Weapon (effect 2): no defense, no critical, x(HP+1)L/(MaxHP+1)/64")
+    f = fx({ bp = 100, effect = 10 }, { hp = 600, maxhp = 1600 })
+    H.assertEq(f.max * 10000 + f.top, 10202040, "Valiant Knife (effect 10): no defense, + its missing 1000 HP")
+    f = fx({ bp = 100, effect = 8 }, { tFloat = true })
+    H.assertEq(f.max * 10000 + f.top, 9481264, "Sniper (effect 8) on a floater: $bc+4, x3; a critical x4")
     base.hands = { { bp = 100, effect = 3 } }
     H.assertEq(H.allyFightMax(base).lethal ~= nil, true,
       "the Trump's instant death (effect 3): lethal at any HP (the tomb's CELES, from 989/1696)")
