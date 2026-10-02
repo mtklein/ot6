@@ -610,12 +610,13 @@ doubled once it is Broken, capped at 9,999. Null-break: the Fixed Dice
 are the outliers, so it chips nothing and ignores the row. **It is a
 gamble, and the boost buys more of it** (owner, 2026-10-02: Jackpot is a
 gamble, and every point must land something under the cap): each roll is
-a face 1-6 at near-even odds (one battle Rand, drawn again past 251, mod
-6; the redraw takes the table's next byte, a fixed successor, so over the
-256 places a roll can start each face is 42-44 of 256, consistent with
-the measurement below), and the boost buys another roll a point -- 1 + boost passes, each its own triple
-and its own hit. A pass that finds no body left (the rolls before felled
-the last) is skipped: no triple, no dice, no draw (round 4). *Reason: a hit that can be a dud is the gambler's verb,
+a face 1-6 at near-even odds, 42-44 of 256 a face, consistent with the
+measurement below (one battle Rand, drawn again past 251, mod 6; the
+redraw takes the table's next byte, a fixed successor), and the boost buys
+another roll a point -- 1 + boost passes, each its own triple and its own
+hit. A pass that finds no body left (the rolls before felled the last) is
+skipped: no triple, no dice, no draw. *Reason: a hit that can be a dud is
+the gambler's verb,
 and an extra roll is a purchase that always lands, at any level and
 shield state; playtesting tunes the power.* What one roll lands (the
 means at even odds; the 42-44 weights move them by under 2%):
@@ -680,7 +681,7 @@ kill leaves a pass empty and one that redraws past 251; `battle_setzergrey`
 prices two, three and four throws against the purse. Negative controls:
 the mutant ROMs (`mutants5.py`, same-size edits for the savestate suite)
 and the no-edit control built by the same pipeline, in
-`build/attempts/wt/kit-setzer/m5/`; the earlier `px13/m2/` set that
+`build/attempts/wt/kit-setzer/m6/`; the earlier `px13/m2/` set that
 c9fccbd6 cites (the floor curve's mutants) was lost with px13's worktree
 before it was copied, and the curve it tested is gone.
 
