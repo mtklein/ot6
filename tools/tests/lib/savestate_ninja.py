@@ -36,12 +36,16 @@ schedules by.
 
 A cut (prev= with checkpoint=) boots the tracked checkpoint here; the
 chain from power-on (chain_plan, emit_chain_edges) keeps the prev= path as
-chain_<state> copies, built by `ninja chain`.
+chain_<state> copies, built by `ninja chain`.  Every tracked checkpoint
+something boots is made by one run on that chain, which captures it for
+checkpoint_drift.py's release gate (coverage() is the check).
 
 Usage:
     python3 tools/tests/lib/savestate_ninja.py             # (re)write build/build.ninja
     python3 tools/tests/lib/savestate_ninja.py --list      # state names, play order
     python3 tools/tests/lib/savestate_ninja.py --selftest  # validation negatives
+    python3 tools/tests/lib/savestate_ninja.py --coverage [--booted KEY...]
+        # every tracked checkpoint is captured by the chain (or NOT_GATED)
 
 The write is compare-and-conditionally-write, so an unchanged graph leaves
 build/build.ninja's mtime alone.  Emitted paths are relative to the repo
@@ -82,7 +86,11 @@ LIB_HALVES = (
 NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
 STACK_RE = re.compile(r"^[A-Za-z0-9]+_$")
 FIELDS = {"state", "gen", "prev", "checkpoint", "seed", "stack", "after",
-          "timeout", "also"}
+          "timeout", "also", "saves", "cutter"}
+# The wall-clock cap of a cutter's capture run in the chain (cutter=, see
+# chain_producers).  The longest cutter, gen_terra_returned_checkpoint,
+# allows itself 160000 frames: ~2000 s at a loaded machine's ~80 frames/s.
+CUTTER_TIMEOUT = 3600
 
 
 def checkpoint_inputs(root, key):
@@ -138,16 +146,32 @@ def validate(states, root):
             err(e, f"prev {prev!r} is not an earlier state")
         if after and after not in seen:
             err(e, f"after {after!r} is not an earlier state")
-        if checkpoint:
+        for field in ("checkpoint", "saves"):
+            key = e.get(field)
+            if not key:
+                continue
             # Dirs named negative-* are deliberately-wrong fixtures; no
             # generated state may ever name one.
-            if checkpoint.startswith("negative"):
-                err(e, f"checkpoint {checkpoint!r} is a negative fixture")
-            elif not (root / "tools/tests/checkpoints" / checkpoint /
+            if key.startswith("negative"):
+                err(e, f"{field} {key!r} is a negative fixture")
+            elif not (root / "tools/tests/checkpoints" / key /
                       "manifest.json").is_file():
-                err(e, f"checkpoint {checkpoint!r} has no manifest.json")
-            elif not checkpoint_inputs(root, checkpoint)[1:]:
-                err(e, f"checkpoint {checkpoint!r} has no *.sram payload")
+                err(e, f"{field} {key!r} has no manifest.json")
+            elif not checkpoint_inputs(root, key)[1:]:
+                err(e, f"{field} {key!r} has no *.sram payload")
+        # saves=: this state's own run ends by saving the checkpoint, though
+        # no cut boots it (the frontier); the chain captures it all the same.
+        if e.get("saves") and not gen:
+            err(e, "saves= requires gen=")
+        # cutter=: on a cut, the save is made by this capture-only script
+        # booted from prev's savestate, not by prev's own run.  The chain
+        # runs it; qualification never does.
+        cutter = e.get("cutter")
+        if cutter:
+            if not (prev and checkpoint):
+                err(e, "cutter= is only for a cut (prev= with checkpoint=)")
+            if not (root / "tools/tests" / f"{cutter}.lua").is_file():
+                err(e, f"no such cutter tools/tests/{cutter}.lua")
         # timeout=: run.sh's wall-clock cap for THIS edge only (default 600 s).
         timeout = e.get("timeout")
         if timeout is not None and not (isinstance(timeout, int)
@@ -180,20 +204,67 @@ def validate(states, root):
         for a in (e.get("also") or []):
             seen.add(a)
     # A cut's producer run saves once, so it can stand for one checkpoint,
-    # and the power-on chain captures that checkpoint's one payload.
-    owner = _owners(states)
-    made = {}
-    for e in states:
-        if not (e.get("prev") and e.get("checkpoint")):
-            continue
-        key = e["checkpoint"]
-        if len(checkpoint_inputs(root, key)) != 2:
-            err(e, f"a cut's checkpoint {key!r} must hold exactly one *.sram")
-        p = owner.get(e["prev"])
-        if p is not None and made.setdefault(p, key) != key:
-            err(e, f"{p}'s run already saves checkpoint {made[p]!r}; "
-                   f"one run cannot also stand for {key!r}")
+    # and the power-on chain captures that checkpoint's one payload; and one
+    # checkpoint is made by one run.
+    if not errors:
+        for e, msg in _producer_conflicts(states):
+            err(e, msg)
+        for e in states:
+            for key in {e.get("checkpoint") if e.get("prev") else None,
+                        e.get("saves")} - {None}:
+                if len(checkpoint_inputs(root, key)) != 2:
+                    err(e, f"a captured checkpoint {key!r} must hold exactly "
+                           f"one *.sram")
     return errors
+
+
+def _run_of(e, owner):
+    """The run that saves a cut's checkpoint: ("run", entry) when prev's
+    own run does, ("cutter", gen, prev) when a cutter= script does."""
+    if e.get("cutter"):
+        return ("cutter", e["cutter"], e["prev"])
+    return ("run", owner[e["prev"]])
+
+
+def _producer_conflicts(states):
+    """(entry, message) for every run asked to stand for two checkpoints
+    and every checkpoint asked to come from two runs."""
+    owner = _owners(states)
+    made, by_key, out = {}, {}, []
+    for e in states:
+        pairs = []
+        if e.get("prev") and e.get("checkpoint"):
+            pairs.append((_run_of(e, owner), e["checkpoint"]))
+        if e.get("saves"):
+            pairs.append((("run", e["state"]), e["saves"]))
+        for run, key in pairs:
+            name = run[1] if run[0] == "run" else f"{run[1]} (from {run[2]})"
+            if made.setdefault(run, key) != key:
+                out.append((e, f"{name}'s run already saves checkpoint "
+                               f"{made[run]!r}; one run cannot also stand "
+                               f"for {key!r}"))
+            if by_key.setdefault(key, run) != run:
+                other = by_key[key]
+                oname = other[1] if other[0] == "run" else \
+                    f"{other[1]} (from {other[2]})"
+                out.append((e, f"checkpoint {key!r} is already made by "
+                               f"{oname}'s run; {name} cannot make it too"))
+    return out
+
+
+def chain_producers(states):
+    """{checkpoint key: the run that saves it}, for every cut and saves=:
+    ("run", entry) when that entry's own run saves it (the chain_ copy
+    captures it), ("cutter", gen, prev) when a capture-only cutter booted
+    from prev's savestate does (its own chain edge captures it)."""
+    owner = _owners(states)
+    out = {}
+    for e in states:
+        if e.get("prev") and e.get("checkpoint"):
+            out.setdefault(e["checkpoint"], _run_of(e, owner))
+        if e.get("saves"):
+            out.setdefault(e["saves"], ("run", e["state"]))
+    return out
 
 
 def _owners(states):
@@ -373,7 +444,10 @@ def chain_plan(states):
     cuts = [e for e in states if e.get("prev") and e.get("checkpoint")]
     if not cuts:
         return None
-    producers = {owner[e["prev"]] for e in cuts}
+    # the runs the copies must hold: each cut's prev (its own run saves, or
+    # a cutter boots its savestate), and each saves= state
+    producers = {owner[e["prev"]] for e in cuts} \
+        | {e["state"] for e in states if e.get("saves")}
 
     def ancestry(name):
         line = []
@@ -421,22 +495,82 @@ def write_authored(manifest, out):
     return 0
 
 
+def capture_record(key, run):
+    """The file whose `rom ` line names the ROM the capturing run played on
+    (checkpoint_drift.py's freshness check): the chain_ copy's stamp, or,
+    for a cutter (which publishes no state), the record its edge writes."""
+    if run[0] == "cutter":
+        return f"{CAPTURE_DIR}/{key}.rom"
+    return f"build/states/{CHAIN_PREFIX}{run[1]}.stamp"
+
+
 def chain_captures(states, root):
     """{checkpoint key: [the paths `ninja chain` seals it into]} for every
-    cut on the chain from power-on; {} with no cut."""
+    checkpoint a run on the chain from power-on saves (each cut's, each
+    saves='s); {} with no cut."""
     plan = chain_plan(states)
     if plan is None:
         return {}
     names = {e["state"] for e in plan[0]}
     owner = _owners(states)
     out = {}
-    for e in states:
-        if e.get("prev") and e.get("checkpoint") and owner[e["prev"]] in names:
-            key = e["checkpoint"]
-            payload = Path(checkpoint_inputs(root, key)[1]).name
-            out[key] = [f"{CAPTURE_DIR}/{key}/manifest.json",
-                        f"{CAPTURE_DIR}/{key}/{payload}"]
+    for key, run in chain_producers(states).items():
+        boot = run[1] if run[0] == "run" else owner[run[2]]
+        if boot not in names:
+            continue
+        payload = Path(checkpoint_inputs(root, key)[1]).name
+        out[key] = [f"{CAPTURE_DIR}/{key}/manifest.json",
+                    f"{CAPTURE_DIR}/{key}/{payload}"]
+        if run[0] == "cutter":
+            out[key].append(capture_record(key, run))
     return out
+
+
+def coverage(states, root, booted=(), not_gated=None):
+    """Errors, one per tracked checkpoint the release gate would not
+    check: every tools/tests/checkpoints/<key>/ (negative-* fixtures
+    aside) must be captured by a run on the chain from power-on
+    (chain_captures, which checkpoint_drift.py --strict compares), or be
+    named in NOT_GATED with its reason -- and a NOT_GATED one must be
+    booted by nothing (no graph state, no suite in `booted`)."""
+    not_gated = dict(not_gated or {})
+    captured = chain_captures(states, root)
+    users = {}
+    for e in states:
+        if e.get("checkpoint"):
+            users.setdefault(e["checkpoint"], []).append(e["state"])
+    for key in booted:
+        users.setdefault(key, []).append("a suite")
+    tracked = sorted(p.parent.name for p in
+                     (root / "tools/tests/checkpoints").glob("*/manifest.json")
+                     if not p.parent.name.startswith("negative"))
+    errors = []
+    for key in tracked:
+        by = ", ".join(users.get(key, [])) or "nothing"
+        if key in captured:
+            if key in not_gated:
+                errors.append(f"{key}: captured by the chain and also listed "
+                              f"in NOT_GATED; drop it from NOT_GATED")
+            continue
+        if key in not_gated:
+            if key in users:
+                errors.append(f"{key}: NOT_GATED, but booted by {by}; a "
+                              f"booted checkpoint must be captured by the "
+                              f"chain")
+            continue
+        boot_only = [e["state"] for e in states
+                     if e.get("checkpoint") == key and not e.get("prev")]
+        why = (f"{', '.join(boot_only)} boots it with no prev=, so no chain "
+               f"run makes it" if boot_only else
+               f"no run on the chain from power-on saves it")
+        errors.append(f"{key}: not covered by the drift gate -- {why} "
+                      f"(booted by {by}); make it a cut with its true prev= "
+                      f"(cutter= when a separate script saves it), saves= on "
+                      f"the state whose run saves it, or name it in "
+                      f"NOT_GATED with the reason")
+    for key in sorted(set(not_gated) - set(tracked)):
+        errors.append(f"{key}: in NOT_GATED but not a tracked checkpoint")
+    return errors
 
 
 def emit_chain_edges(w, states, root, copy_if_changed_from):
@@ -447,9 +581,13 @@ def emit_chain_edges(w, states, root, copy_if_changed_from):
         return None
     entries, seeds, end = plan
     owner = _owners(states)
-    # the producer entry whose run saves each cut's checkpoint
-    saves = {owner[e["prev"]]: e["checkpoint"]
-             for e in states if e.get("prev") and e.get("checkpoint")}
+    on_line = {e["state"] for e in entries}
+    producers = chain_producers(states)
+    # the entry whose own run saves each checkpoint, and the cutters (a
+    # capture-only script booted from a copy) that save the rest
+    saves = {run[1]: key for key, run in producers.items() if run[0] == "run"}
+    cutters = {key: run for key, run in producers.items()
+               if run[0] == "cutter" and owner[run[2]] in on_line}
     P = CHAIN_PREFIX
     w("# The chain from power-on (savestate_ninja.py chain_plan): chain_<state>")
     w("# copies, each booted from the previous copy, and at a cut from the save")
@@ -465,10 +603,57 @@ def emit_chain_edges(w, states, root, copy_if_changed_from):
     w("  description = checkpoint_authored $in")
     w("  restat = 1")
     w("")
-    for key in sorted(set(saves.values())):
+    if cutters:
+        # A cutter publishes no state (OT6_NO_PUBLISH): its edge yields the
+        # sealed capture and a record of the ROM it played on, which
+        # checkpoint_drift.py reads where a copy's stamp would be.
+        w("rule capture")
+        w("  command = OT6_WORKER=$worker $env tools/tests/run.sh "
+          "tools/tests/$gen.lua $log && $seal && "
+          "echo \"rom $$(sh tools/tests/lib/savestate_stamp.sh romsig)\" "
+          "> $record")
+        w("  description = capture $key <- $gen from $boot")
+        w("")
+    for key in sorted(set(saves.values()) | set(cutters)):
         w(f"build build/ninja/authored/{key}.json: checkpoint_authored "
           f"tools/tests/checkpoints/{key}/manifest.json")
     w("")
+
+    def seal_cmd(key, cdir, authored):
+        # the tracked manifest's authored fields (its `saved` above all)
+        # judge the capture; seal refuses a battery holding another save
+        # ...and the drift report prints how far the tracked checkpoint is
+        # from this capture (report only; `ninja release` gates on it,
+        # configure.py)
+        return (f"cp {authored} {cdir}/manifest.json && "
+                f"python3 tools/tests/lib/sram_checkpoint.py seal {cdir} && "
+                f"python3 tools/tests/lib/sram_checkpoint.py validate {cdir} && "
+                f"python3 tools/tests/lib/checkpoint_drift.py {key}")
+    for key, run in sorted(cutters.items()):
+        _, gen, boot = run
+        payload = Path(checkpoint_inputs(root, key)[1]).name
+        cdir = f"{CAPTURE_DIR}/{key}"
+        authored = f"build/ninja/authored/{key}.json"
+        record = capture_record(key, run)
+        b = P + boot
+        deps = [copy_if_changed_from(ROM), copy_if_changed_from(EMULATOR),
+                copy_if_changed_from(f"tools/tests/{gen}.lua")] \
+            + [copy_if_changed_from(h) for h in LIB_HALVES] + [authored]
+        w(f"build {cdir}/manifest.json {cdir}/{payload} "
+          f"{cdir}/{payload}.provenance.json {record}: capture "
+          f"build/states/{b}.mss.lua build/states/{b}.mss "
+          f"build/states/{b}.stamp | {' '.join(deps)}")
+        w(f"  worker = {P}{key.replace('-', '_')}")
+        w(f"  gen = {gen}")
+        w(f"  key = {key}")
+        w(f"  boot = {b}")
+        w(f"  log = build/states/{P}{key.replace('-', '_')}.log")
+        w(f"  record = {record}")
+        w(f"  env = OT6_STACK={P} OT6_TIMEOUT={CUTTER_TIMEOUT} OT6_NO_PUBLISH=1 "
+          f"OT6_CAPTURE_SRM={cdir}/{payload}")
+        w(f"  seal = {seal_cmd(key, cdir, authored)}")
+    if cutters:
+        w("")
     for s in seeds:
         w(f"build build/states/{P}{s}.mss.lua build/states/{P}{s}.mss "
           f"build/states/{P}{s}.stamp: seed build/states/{s}.mss.lua "
@@ -525,16 +710,7 @@ def emit_chain_edges(w, states, root, copy_if_changed_from):
                             f" {cdir}/{payload}.provenance.json")
             authored = f"build/ninja/authored/{key}.json"
             deps.append(authored)
-            # the tracked manifest's authored fields (its `saved` above
-            # all) judge the capture; seal refuses a battery holding
-            # another save
-            # ...and the drift report prints how far the tracked checkpoint
-            # is from this capture (report only; `ninja release` gates on
-            # it, configure.py)
-            seal = (f"cp {authored} {cdir}/manifest.json && "
-                    f"python3 tools/tests/lib/sram_checkpoint.py seal {cdir} && "
-                    f"python3 tools/tests/lib/sram_checkpoint.py validate {cdir} && "
-                    f"python3 tools/tests/lib/checkpoint_drift.py {key}")
+            seal = seal_cmd(key, cdir, authored)
         w(f"build {outs} {stamp_outs}{capture_outs}: {rule}{explicit} | "
           f"{' '.join(deps)}")
         w(f"  state = {names[0]}")
@@ -552,7 +728,8 @@ def emit_chain_edges(w, states, root, copy_if_changed_from):
 def copy_rule(src, states):
     """The copy rule for one copy_if_changed source: a generator the graph
     runs is copied by its Lua token stream, anything else by its bytes."""
-    gens = {f"tools/tests/{e['gen']}.lua" for e in states if e.get("gen")}
+    gens = {f"tools/tests/{e[k]}.lua" for e in states
+            for k in ("gen", "cutter") if e.get(k)}
     return "copy_if_lua_changed" if src in gens else "copy_if_changed"
 
 
@@ -572,6 +749,10 @@ def copy_if_changed_sources(states, root):
                     out.append(a)
     if chain_plan(states) is not None:     # the chain_ copies' lib inputs
         out += [h for h in LIB_HALVES if h not in out]
+        for e in states:                   # and the cutters the chain runs
+            c = e.get("cutter") and f"tools/tests/{e['cutter']}.lua"
+            if c and c not in out:
+                out.append(c)
     return out
 
 
@@ -624,6 +805,38 @@ def load(root):
     return ns["STATES"]
 
 
+def load_not_gated(root):
+    """The graph's NOT_GATED: {tracked checkpoint key: why the release gate
+    does not check it}."""
+    return runpy.run_path(str(root / GRAPH)).get("NOT_GATED", {})
+
+
+def coverage_report(states, root, booted):
+    """--coverage: one line per tracked checkpoint, then the verdict."""
+    captured = chain_captures(states, root)
+    producers = chain_producers(states)
+    not_gated = load_not_gated(root)
+    for key in sorted(p.parent.name for p in
+                      (root / "tools/tests/checkpoints").glob("*/manifest.json")
+                      if not p.parent.name.startswith("negative")):
+        if key in captured:
+            run = producers[key]
+            how = (f"{CHAIN_PREFIX}{run[1]}'s run" if run[0] == "run" else
+                   f"cutter {run[1]} from {CHAIN_PREFIX}{run[2]}")
+            print(f"gated      {key}: captured by {how}")
+        elif key in not_gated:
+            print(f"NOT_GATED  {key}: {not_gated[key]}")
+        else:
+            print(f"UNCOVERED  {key}")
+    errors = coverage(states, root, booted, not_gated)
+    for e in errors:
+        print(f"checkpoint coverage: {e}", file=sys.stderr)
+    print(f"checkpoint coverage: {len(captured)} tracked checkpoint(s) "
+          f"captured by the chain and compared by the drift gate, "
+          f"{len(not_gated)} NOT_GATED, {len(errors)} error(s)")
+    return 1 if errors else 0
+
+
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", type=Path, default=ROOT,
@@ -635,6 +848,13 @@ def main(argv):
     ap.add_argument("--authored", nargs=2, metavar=("MANIFEST", "OUT"),
                     help="write MANIFEST's authored fields to OUT, only "
                          "when they changed (the chain's seal template)")
+    ap.add_argument("--coverage", action="store_true",
+                    help="check that every tracked checkpoint is captured by "
+                         "the chain (so the drift gate compares it) or named "
+                         "in NOT_GATED")
+    ap.add_argument("--booted", nargs="*", default=[], metavar="KEY",
+                    help="with --coverage: checkpoints suites boot "
+                         "(configure.py's TEST_ENV)")
     args = ap.parse_args(argv)
     if args.selftest:
         return selftest()
@@ -652,6 +872,8 @@ def main(argv):
         for e in states:
             print(e["state"])
         return 0
+    if args.coverage:
+        return coverage_report(states, root, args.booted)
     text = emit(states, root)
     out = root / OUT
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -869,6 +1091,122 @@ def selftest():
                   if l.startswith("build build/states/chain_") and ": generate" in l]
         check("every copy runs stacked", len(copies) == 3 and all(
             "OT6_STACK=chain_" in body(i) for i in copies))
+
+    # Coverage: every tracked checkpoint is captured by the chain, so the
+    # drift gate compares it.  A fresh mock tree, so its checkpoint dirs are
+    # exactly the ones named here.
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        for key in ("k1-v1", "k2-v1", "k3-v1", "k4-v1", "seed-v1",
+                    "negative-x-v1"):
+            d = root / "tools/tests/checkpoints" / key
+            d.mkdir(parents=True)
+            (d / "manifest.json").write_text("{}")
+            (d / f"{key[:-3]}.sram").write_text("x")
+        for g in ("gen_ok", "gen_cut"):
+            (root / f"tools/tests/{g}.lua").write_text("-- ok")
+
+        def s(**kw):
+            e = {"state": None, "gen": None, "prev": None, "checkpoint": None,
+                 "seed": None, "stack": None, "after": None}
+            e.update(kw)
+            return e
+        # o (power-on) saves k1; p Continues k1.  A cutter booted from p
+        # saves k2, which q Continues; r Continues k3, which q's own run
+        # saves; r's run saves k4, which nothing boots (the frontier).
+        full = [s(state="o", gen="gen_ok"),
+                s(state="p", gen="gen_ok", prev="o", checkpoint="k1-v1"),
+                s(state="q", gen="gen_ok", prev="p", checkpoint="k2-v1",
+                  cutter="gen_cut"),
+                s(state="q2", gen="gen_ok", prev="p", checkpoint="k2-v1",
+                  cutter="gen_cut"),
+                s(state="r", gen="gen_ok", prev="q", checkpoint="k3-v1",
+                  saves="k4-v1")]
+        gated = {"seed-v1": "booted by nothing"}
+        check("a cutter cut and a saves= frontier validate",
+              validate(full, root) == [])
+        check("every tracked checkpoint covered: no coverage error",
+              coverage(full, root, (), gated) == [])
+        check("the drift gate's keys are every captured checkpoint",
+              sorted(chain_captures(full, root)) ==
+              ["k1-v1", "k2-v1", "k3-v1", "k4-v1"])
+        text = emit(full, root)
+        lines = text.splitlines()
+
+        def edge(out):
+            return next((l for l in lines if l.startswith(f"build {out}")), "")
+        cap = edge("build/checkpoints/k2-v1/manifest.json")
+        check("the cutter's capture edge boots the copy of its prev",
+              ": capture build/states/chain_p.mss.lua build/states/chain_p.mss "
+              "build/states/chain_p.stamp" in cap
+              and "build/ninja/src/tools/tests/gen_cut.lua" in cap)
+        check("...publishes no state and records the ROM it played on",
+              "OT6_NO_PUBLISH=1 OT6_CAPTURE_SRM=build/checkpoints/k2-v1/k2.sram"
+              in text and "build/checkpoints/k2-v1.rom" in cap
+              and "romsig" in text)
+        check("...once, though two cuts boot its save",
+              sum(1 for l in lines
+                  if l.startswith("build build/checkpoints/k2-v1/")) == 1)
+        check("the cutter cut's copy Continues the captured save",
+              "generate_capture build/checkpoints/k2-v1/manifest.json "
+              "build/checkpoints/k2-v1/k2.sram |" in
+              edge("build/states/chain_q.mss.lua")
+              and "OT6_SRAM_CHECKPOINT=build/checkpoints/k2-v1" in text)
+        check("a saves= frontier's copy captures its save",
+              "build/checkpoints/k4-v1/manifest.json" in
+              edge("build/states/chain_r.mss.lua")
+              and "OT6_CAPTURE_SRM=build/checkpoints/k4-v1/k4.sram" in text)
+        check("qualification boots the tracked save; the cutter never runs "
+              "outside the chain",
+              "build/states/p.mss" not in edge("build/states/q.mss.lua")
+              and "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/k2-v1" in text
+              and not any("gen_cut" in l for l in lines
+                          if ": generate" in l))
+
+        def cov(graph, gated=gated, booted=()):
+            return coverage(graph, root, booted, gated)
+        # the negatives: each must name the checkpoint left out
+        root_only = full[:4] + [s(state="r", gen="gen_ok",
+                                  checkpoint="k3-v1", saves="k4-v1")]
+        errs = cov(root_only)
+        check("NEGATIVE a checkpoint-only boot (no prev=) is left out of the "
+              "gate, and coverage names it",
+              any(e.startswith("k3-v1:") and "r boots it with no prev=" in e
+                  for e in errs))
+        errs = cov(full, gated={})
+        check("NEGATIVE a tracked checkpoint nothing makes or lists fails "
+              "coverage", any(e.startswith("seed-v1:") for e in errs))
+        errs = cov(full, booted=("seed-v1",))
+        check("NEGATIVE a NOT_GATED checkpoint a suite boots fails coverage",
+              any(e.startswith("seed-v1:") and "booted by a suite" in e
+                  for e in errs))
+        errs = cov(full[:4] + [s(state="r", gen="gen_ok", prev="q",
+                                 checkpoint="k3-v1")])
+        check("NEGATIVE a frontier save with no saves= fails coverage",
+              any(e.startswith("k4-v1:") for e in errs))
+        check("negative-* fixtures are never asked for", not any(
+            "negative" in e for e in cov(full, gated={})))
+        bad = [
+            ("cutter= off a cut",
+             full[:1] + [s(state="p", gen="gen_ok", cutter="gen_cut")]),
+            ("a missing cutter",
+             full[:2] + [s(state="q", gen="gen_ok", prev="p",
+                           checkpoint="k2-v1", cutter="gen_nope")]),
+            ("saves= without gen=",
+             full[:1] + [s(state="d", seed="o", saves="k4-v1")]),
+            ("saves= naming a negative fixture",
+             full[:1] + [s(state="d", gen="gen_ok", prev="o",
+                           saves="negative-x-v1")]),
+            ("one checkpoint made by two runs",
+             full + [s(state="t", gen="gen_ok", prev="o", saves="k4-v1")]),
+            ("a run saving one checkpoint and standing for another",
+             full[:2] + [s(state="q", gen="gen_ok", prev="p",
+                           checkpoint="k2-v1", saves="k3-v1"),
+                         s(state="r", gen="gen_ok", prev="q",
+                           checkpoint="k4-v1")]),
+        ]
+        for label, graph in bad:
+            check(label, validate(graph, root) != [])
     print("savestate_ninja selftest:", "ok" if ok else "FAILED")
     return 0 if ok else 1
 

@@ -588,7 +588,19 @@ check("checkpoint_saves", "sh tools/tests/lib/checkpoint_saves.sh",
        "tools/tests/lib/sram_checkpoint.py"] + checkpoint_files)
 check("checkpoint_drift_selftest",
       "python3 tools/tests/lib/checkpoint_drift.py --selftest",
-      ["tools/tests/lib/checkpoint_drift.py", "tools/tests/lib/sram_checkpoint.py"])
+      ["tools/tests/lib/checkpoint_drift.py", "tools/tests/lib/sram_checkpoint.py",
+       "tools/tests/lib/savestate_ninja.py", sn.GRAPH])
+# #354: every tracked checkpoint a state or a suite boots is captured by a
+# run on the chain from power-on, so `ninja release`'s drift gate compares
+# it; the rest are the graph's NOT_GATED, each with its reason.
+suite_checkpoints = sorted({m for env in TEST_ENV.values() for m in re.findall(
+    r"OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/(\S+)", env)})
+check("checkpoint_coverage",
+      "python3 tools/tests/lib/savestate_ninja.py --coverage --booted "
+      + " ".join(suite_checkpoints),
+      ["tools/tests/lib/savestate_ninja.py", sn.GRAPH, "configure.py"]
+      + glob("tools/tests/checkpoints/*/manifest.json"),
+      desc="every booted checkpoint is in the drift gate")
 check("checkpoint_negatives", "nice sh tools/tests/lib/checkpoint_negatives.sh",
       ["tools/tests/lib/checkpoint_negatives.sh", "tools/tests/run.sh",
        copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR)]
@@ -667,7 +679,8 @@ del qual[qual_before_release:]
 # The chain from power-on is a release preflight too: the legs
 # qualification booted from tracked checkpoints must also play through
 # from power-on, each from the save the leg before it made.  And every
-# tracked cut checkpoint must be the save that chain makes today
+# tracked checkpoint the chain captures (every one something boots,
+# checkpoint_coverage above) must be the save that chain makes today
 # (checkpoint_drift.py: levels, gear, gil, the bag, story switches); the fix
 # for a drifted one is `checkpoint_drift.py --recut`, then qualify again.
 if chain_end:
@@ -691,7 +704,7 @@ if chain_end:
            cmd="python3 tools/tests/lib/checkpoint_drift.py --strict "
                + " ".join(sorted(captures))
                + f" && mkdir -p build/checks && touch {out}",
-           desc="tracked cut checkpoints are today's play")
+           desc="tracked checkpoints are today's play")
     release_pre.append(out)
 
 bps = f"{rel_dir}/{BASE[:-len('.sfc')]}.bps"
