@@ -28,3 +28,20 @@ character is knocked out or put to sleep after choosing a boosted action
 but before it goes off, the action is lost, as in the original game, and
 the points stay in the bank: a Slot spin that never turns costs Setzer
 nothing.
+
+**Setzer has his whole kit.** His Slot command now opens a short list.
+Slot is the first entry and spins the reels as before. Coin Toss throws
+Gil at every monster, Setzer's level × 30 of it, for twice that in damage
+shared among them; the coins count as his special weapon type, so they
+chip a shield off every monster weak to cards and dice. Hired Help pays a
+sellsword Setzer's level × 50 Gil for one blow at a single monster, dealt
+with whichever weapon type that monster is weak to (slashing, piercing
+or bludgeoning), so Setzer can break what his own weapon can't. Both cost
+Gil instead of MP, and each Boost Point doubles both the Gil and the
+damage. Once he rejoins in the World of Ruin he also has **Jackpot**: for
+99 MP, once a battle, the dice come up three of a kind for a huge hit
+(it chips no shields, but a Broken target takes it doubled). Each Boost Point raises the lowest face it can
+roll, and three points guarantee sixes. The rows grey out when you can't
+pay or Jackpot is spent. Wearing the Coin Toss relic still swaps Slot for
+plain GP Rain, which now chips like Coin Toss and grows with boosting too.
+The Narshe school's skills advisor has two new pages about it.

@@ -7551,7 +7551,9 @@ end
 -- An entry { row = "defend" } is a Defend, which banks a point.  Everyone
 -- else Defends while the plan has turns left, then everyone, SETZER too,
 -- Fights its default target until the battle ends; the victory text is
--- pressed through.  Nothing is written.
+-- pressed through (opts.untilPlanDone ends the step instead, mid-battle,
+-- once the plan is spent and its last row has resolved).  Nothing is
+-- written.
 --
 -- What it records, per played row, in M.vars.setzer (one record each),
 -- read at the action's own edges: `pre` at Ot6SetzerExec (the row's
@@ -7625,14 +7627,19 @@ function M.setzerBattle(plan, opts)
     emu.addMemoryCallback(function()
       if not live() then return end
       local x = emu.getState()["cpu.x"] & 0xff
-      if Z.rec and Z.entity and x == Z.entity then Z.rec.ended = M.frame end
+      if Z.rec and Z.entity and x == Z.entity and not Z.rec.ended then
+        Z.rec.ended = M.frame
+        Z.rec.endBank, Z.rec.endPend = M.readByte(0x3E9C + x), M.readByte(0x3E9D + x)
+      end
     end, emu.callbackType.exec, e, e)
   end
-  -- the record closes on the frame after SETZER's Ot6ActionEnd, which has
-  -- charged the bank by then (its entry, where the hook sees it, has not)
+  -- the record closes two frames after SETZER's Ot6ActionEnd is entered:
+  -- its entry, where the hook sees it, has not charged the bank yet, and a
+  -- frame boundary can fall inside the proc (measured: entered at f4390,
+  -- the charge written at f4391, after that frame's first look)
   local function close()
     local r = Z.rec
-    if r and r.ended and M.frame > r.ended then
+    if r and r.ended and M.frame > r.ended + 1 then
       local x = Z.entity
       do
         r.gil1, r.mp1, r.bank1 = gil(), M.readWord(0x3C08 + x), M.readByte(0x3E9C + x)
@@ -7644,6 +7651,8 @@ function M.setzerBattle(plan, opts)
           r.level, r.gil0, r.gil1, tostring(r.cost), r.mp0, r.mp1, r.bank0, r.bank1, r.divine0, r.divine1,
           r.targets, #r.chips, r.dmg and string.format(", dice b6=%02X b7=%02X dmg %d class %02X", r.b6, r.b7,
           r.dmg, r.class) or ""))
+        M.log(string.format("[setzer]   exec f%d, Ot6ActionEnd f%d (bank %d, pending %d at its entry), closed f%d",
+          r.f, r.ended, r.endBank, r.endPend, M.frame))
         for s = 0, 5 do
           local o, n = r.mon0[s], r.mon1[s]
           if o.present then
@@ -7672,7 +7681,17 @@ function M.setzerBattle(plan, opts)
       for s = 0, 5 do
         if M.readWord(0x3BFC + s * 2) > 0 and (M.readByte(0x3AA8 + s * 2) & 1) == 1 then alive = true end
       end
-      if not alive then pulse("a") else M.setPad({}) end
+      if not alive then
+        if not Z.endSaid then
+          Z.endSaid = true
+          local t = {}
+          for e2 = 0, 3 do
+            t[#t + 1] = string.format("e%d HP %d st %02X", e2, M.readWord(0x3BF4 + e2 * 2), M.readByte(0x3EE4 + e2 * 2))
+          end
+          M.log(string.format("[setzer] f%d no monster stands: %s", M.frame, table.concat(t, ", ")))
+        end
+        pulse("a")
+      else M.setPad({}) end
       return
     end
     local a = M.readByte(ACTOR) & 3
@@ -7684,6 +7703,11 @@ function M.setzerBattle(plan, opts)
     end
     Z.entity = a * 2
     local entity = Z.entity
+    if st == 0x05 and Z.turnSaid ~= k .. ":" .. M.readByte(0x3E9C + entity) and cool == 0 then
+      Z.turnSaid = k .. ":" .. M.readByte(0x3E9C + entity)
+      M.log(string.format("[setzer] f%d SETZER's window: plan entry %d of %d (%s), bank %d, MP %d", M.frame, k,
+        #plan, p and tostring(p.row) or "done", M.readByte(0x3E9C + entity), M.readWord(0x3C08 + entity)))
+    end
     if p == nil then fight(a, st); return end
     if p.row == "defend" then
       if st == 0x27 and cool == 0 then k = k + 1 end
@@ -7760,11 +7784,15 @@ function M.setzerBattle(plan, opts)
   end
   return M.seqStep({
     M.waitUntil(function() return M.battleActive() end, 1200, "the battle is up", 2),
-    M.driveUntil(function() return not M.battleLoadStarted() end, opts.maxFrames or 40000, {
+    M.driveUntil(function()
+      if opts.untilPlanDone and k > #plan and Z.rec == nil then return true end
+      return not M.battleLoadStarted()
+    end, opts.maxFrames or 40000, {
       { tick = function() tick(); return "frame" end, reset = function() end },
     }, "the battle with SETZER's plan ends"),
     M.call(function()
-      M.log(string.format("[setzer] the battle is over: %d row(s) played of %d planned", #M.vars.setzer, #plan))
+      M.log(string.format("[setzer] the battle is over: %d row(s) played of %d planned (entry %d next)",
+        #M.vars.setzer, #plan, k))
     end),
   })
 end

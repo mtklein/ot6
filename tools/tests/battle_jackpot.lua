@@ -1,18 +1,17 @@
--- @suite slow
+-- @suite savestate=wor_grave slow
 -- battle_jackpot.lua -- SETZER's divine, Jackpot (#319, kits.md "Setzer"):
 -- the Fixed Dice come up a triple, the boost floors the face, 99 MP, once a
 -- battle, and no chip.
 --
--- Played, not staged: Continue the wor-tomb-v1 battery (SETZER rejoined in
--- the World of Ruin: event switch $00CA, so Jackpot is learned), walk
--- Darill's Tomb's east room until the game deals a battle (field group
--- 151), and play SETZER's turns through the real menu (H.setzerBattle):
--- two Defends to bank three points, Jackpot at 3 BP, then Jackpot again,
--- which must be refused; a later battle (the first one's refusal may be
--- cut short by the kill) throws it at 1 BP.  Every assertion is derived
--- from the battle's own state, so any formation the room deals is a valid
--- draw; SETZER_SKIP (default 0) battles are fought out first to vary it.
---
+-- Played, not staged: wor_grave is gen_wor_falcon's own frame on Daryl's
+-- grave (the party armed and cared for, the gil's digit settled, before
+-- the press), reached by play from the wor-tomb-v1 battery; SETZER rejoined
+-- in the World of Ruin there (event switch $00CA), so Jackpot is learned.
+-- Two passes from that frame, each pressing the grave and playing SETZER
+-- through the real menu (H.setzerBattle) against Dullahan, whose 23,450 HP
+-- and ten shields outlast one Jackpot, so the second try comes:
+--   pass 1: Defend twice (the bank to 3), Jackpot at 3 BP, Jackpot again;
+--   pass 2: Jackpot at 1 BP, Jackpot again.
 -- What it holds, per Jackpot (at Ot6SetzerExec's entry and SETZER's
 -- Ot6ActionEnd; the dice as the effect sets the dice animation):
 --   * three dice of one face (b7 = face-1 in both nybbles, b6 = face-1),
@@ -25,27 +24,18 @@
 --     shields move;
 --   * 99 MP, no gil, the bank less the boost, and the once-a-battle flag
 --     (OT6_DIVINE_USED) set for SETZER by it;
---   * a second Jackpot in the same battle is refused at the list (three A
---     presses, the list stays up), when the battle lasts that long.
+--   * the second Jackpot of the battle is refused at the list: three A
+--     presses, the list stays up, nothing is queued.
+-- The run ends once the plan is spent; Dullahan's fight is not finished.
 -- Negative controls: the mutant ROMs in build/attempts/wt/kit-setzer/.
--- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/wor_grave.mss.lua"
 
-SETZER_SKIP = SETZER_SKIP or 0
 local JACKPOT = 0x5B
 local FLOOR = { [0] = 1, 3, 5, 6 }
+local DULLAHAN = 0x11C
 
-local function walkToBattle()
-  local wp = 1
-  local WPS = { { 124, 26 }, { 120, 11 } }
-  return H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
-    H.navTo(function() return WPS[wp][1] end, function() return WPS[wp][2] end,
-      { maxFrames = 8000, arrive = function() return H.battleLoadStarted() end }),
-    H.call(function() wp = wp % #WPS + 1 end),
-  }, "a random battle in the east room")
-end
-
-local function checkJackpot(r, i, setzerBit)
+local function checkJackpot(r, i)
   H.log(string.format("[jackpot] %d at %d BP, L%d: dice b6=%s b7=%s dmg %s class %s; MP %d -> %d, purse %d -> %d, "
     .. "bank %d -> %d, divine %02X -> %02X", i, r.boost, r.level, tostring(r.b6), tostring(r.b7), tostring(r.dmg),
     tostring(r.class), r.mp0, r.mp1, r.gil0, r.gil1, r.bank0, r.bank1, r.divine0, r.divine1))
@@ -60,8 +50,8 @@ local function checkJackpot(r, i, setzerBit)
   H.assertEq(r.mp0 - r.mp1, 99, string.format("Jackpot %d: 99 MP", i))
   H.assertEq(r.gil1, r.gil0, string.format("Jackpot %d: no gil", i))
   H.assertEq(r.bank1, r.bank0 - r.boost, string.format("Jackpot %d: the bank less the boost", i))
-  H.assertEq(r.divine0 & setzerBit, 0, string.format("Jackpot %d: unspent before", i))
-  H.assertEq(r.divine1 & setzerBit, setzerBit, string.format("Jackpot %d: spent by it", i))
+  H.assertEq(r.divine0 & r.setzerBit, 0, string.format("Jackpot %d: unspent before", i))
+  H.assertEq(r.divine1 & r.setzerBit, r.setzerBit, string.format("Jackpot %d: spent by it", i))
   local s = nil
   for b = 0, 5 do if (r.targets >> b) & 1 == 1 then H.assertEq(s, nil, "one target"); s = b end end
   H.assertEq(s ~= nil, true, string.format("Jackpot %d hit a monster", i))
@@ -79,62 +69,39 @@ local function checkJackpot(r, i, setzerBit)
   H.assertEq(o.hp - m.hp, d, string.format("Jackpot %d: the hit on slot %d", i, s))
 end
 
--- battle 1: bank three, Jackpot at 3, then again (refused); battle 2: at 1
-local PLANS = {
-  { { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3 }, { row = JACKPOT, refused = true } },
-  { { row = JACKPOT, boost = 1 }, { row = JACKPOT, refused = true } },
-}
-local jackpots, refusals, battles = {}, 0, 0
-local planNow = nil
-local setzerBit = nil
-
-H.run({ maxFrames = 240000 }, {
-  H.bootCheckpoint("wor-tomb-v1"),
-  H.call(function()
-    H.assertEq(H.readByte(0x1E99) & 0x04, 0x04, "SETZER has rejoined in the World of Ruin (switch $00CA)")
-  end),
-  H.repeatN(SETZER_SKIP, { walkToBattle(), H.setzerBattle({}) }),
-  H.driveUntil(function() return #jackpots >= 2 and refusals >= 1 end, 200000, {
+local function pass(n, plan, wantBoost)
+  local recs
+  return H.seqStep({
+    H.loadState(STATE),
     H.call(function()
-      battles = battles + 1
-      H.assertEq(battles <= 3, true, string.format("two Jackpots and a refusal within three battles "
-        .. "(%d Jackpot(s), %d refusal(s) so far)", #jackpots, refusals))
-      local base = PLANS[math.min(battles, 2)]
-      planNow = {}
-      for _, p in ipairs(base) do
-        local c = {}
-        for kk, v in pairs(p) do c[kk] = v end
-        planNow[#planNow + 1] = c
-      end
+      H.assertEq(H.mapId() & 0x1ff, 299, "wor_grave stands in the grave's room (map 299)")
+      H.assertEq(H.readByte(0x1E99) & 0x04, 0x04, "SETZER has rejoined in the World of Ruin (switch $00CA)")
     end),
-    walkToBattle(),
-    (function()
-      local step
-      return { tick = function()
-        step = step or H.setzerBattle(planNow, { shot = "jackpot_table" })
-        local r = step:tick()
-        if r == "done" then
-          for _, rec in ipairs(H.vars.setzer) do
-            H.assertEq(rec.row, JACKPOT, "only Jackpots resolve from the plan")
-            jackpots[#jackpots + 1] = rec
-          end
-          H.assertEq(#H.vars.setzer <= 1, true, "at most one Jackpot a battle")
-          for _, p in ipairs(planNow) do if p.refusedSeen then refusals = refusals + 1 end end
-          step = nil
-        end
-        return r
-      end, reset = function() step = nil end }
-    end)(),
-  }, "two Jackpots and one refusal"),
+    H.faceAndHoldA("up", function() return H.battleLoadStarted() end, 3000, "the grave (100,14): face up, A"),
+    H.release(),
+    H.setzerBattle(plan, { untilPlanDone = true, shot = "jackpot_table_" .. n }),
+    H.call(function()
+      local ids = {}
+      for _, s in ipairs(H.formationSpecies()) do ids[#ids + 1] = s.species end
+      H.assertEq(ids[1], DULLAHAN, "the grave's fight is Dullahan")
+      recs = H.vars.setzer
+      H.assertEq(#recs, 1, string.format("pass %d: exactly one Jackpot resolved", n))
+      H.assertEq(recs[1].row, JACKPOT, string.format("pass %d: the row is Jackpot", n))
+      H.assertEq(recs[1].boost, wantBoost, string.format("pass %d: at %d BP", n, wantBoost))
+      checkJackpot(recs[1], n)
+      H.assertEq(plan[#plan].refusedSeen == true, true,
+        string.format("pass %d: the second Jackpot was refused at the list", n))
+      H.log(string.format("[jackpot] pass %d held: face %d at %d BP; the second Jackpot refused", n,
+        recs[1].b6 + 1, wantBoost))
+    end),
+  })
+end
+
+H.run({ maxFrames = 60000 }, {
+  pass(1, { { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3 },
+            { row = JACKPOT, refused = true } }, 3),
+  pass(2, { { row = JACKPOT, boost = 1 }, { row = JACKPOT, refused = true } }, 1),
   H.call(function()
-    H.assertEq(#jackpots >= 2, true, "two Jackpots")
-    H.assertEq(refusals >= 1, true, "a second Jackpot in a battle was refused at the list")
-    for i, r in ipairs(jackpots) do
-      checkJackpot(r, i, r.setzerBit)
-    end
-    H.assertEq(jackpots[1].boost, 3, "the first Jackpot ran at 3 BP")
-    H.assertEq(jackpots[1].b6, 5, "...and 3 BP fixed sixes")
-    H.log(string.format("[jackpot] PASSED: %d Jackpots, %d refusal(s), over %d battle(s)", #jackpots, refusals,
-      battles))
+    H.log("[jackpot] PASSED: 3 BP fixed sixes, the 1 BP floor, 99 MP, no chip, once a battle")
   end),
 })

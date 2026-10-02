@@ -657,10 +657,11 @@ Ot6JackpotCubeTbl:
         stz     $3414           ; damage modification off (the effect's own)
         lda     #$20
         tsb     $11a4           ; can't dodge (the effect's own)
-        lda     #$26
-        sta     $b5             ; the dice-roll animation
         lda     #OT6_SPECIAL|OT6_NULLBRK
         sta     f:$7e0000+OT6_ATKCLASS  ; no chip: the Fixed Dice teach nothing
+        lda     #$26
+        sta     $b5             ; the dice-roll animation (last: a watcher
+                                ;   on $b5 sees the whole triple set)
         lda     $3018,y         ; the attacker's bit
         tsb     OT6_DIVINE_USED ; the divine is spent this battle
         plx
