@@ -415,19 +415,87 @@ H.run({ maxFrames = 300000 }, {
     -- MP for (or plan ones it cannot pay).  The complementary check is
     -- battle_costtable's, which asks the same question of the ROM's own
     -- price arms; this one asks it of the driver.
-    local gate = {}
+    --
+    -- The gate is DECODED, instruction by instruction from the proc's first
+    -- byte, not scanned for byte patterns: a `$C9 xx $F0` triple can sit
+    -- inside any operand (`lda f:Ot6FoldTbl,x`, the table at $F0:11C9,
+    -- reads as `cmp #$11 / beq`), and the layout moves with every ROM
+    -- change.  The walk tracks the M/X widths through rep/sep, finds
+    -- `lda $b5`, and reads the gate as exactly what follows it: `beq done`
+    -- (cmd $00), then every `cmp #imm / beq done` pair that branches to the
+    -- SAME place, ending at the first instruction that is not one -- which
+    -- must be the queued-command test `lda $3a7c` the proc's comment names.
+    -- `done` must be the proc's exit (`plp / rtl`), so a gate entry is an
+    -- exemption and not some other branch.
+    local gate, gateList = {}, {}
     do
-      local ofs = H.sym("Ot6BoostDmg") & 0x3FFFFF
-      -- scan the proc's opening command gate: `cmp #imm` ($C9) followed by
-      -- `beq` ($F0), up to the first `lda OT6_BOOST_REVEALED,x` that ends it
-      for i = 0, 96 do
-        if H.readRomByte(ofs + i) == 0xC9 and H.readRomByte(ofs + i + 2) == 0xF0 then
-          gate[H.readRomByte(ofs + i + 1)] = true
-        end
+      local IMM_M = { [0x09]=1, [0x29]=1, [0x49]=1, [0x69]=1, [0x89]=1,
+                      [0xA9]=1, [0xC9]=1, [0xE9]=1 }
+      local IMM_X = { [0xA0]=1, [0xA2]=1, [0xC0]=1, [0xE0]=1 }
+      local function opLen(op, m8, x8)         -- 65816 instruction length
+        local lo = op & 0x0F
+        if IMM_M[op] then
+          assert(m8 ~= nil, string.format("width-dependent $%02X before "
+            .. "the accumulator width is known", op))
+          return m8 and 2 or 3
+        elseif IMM_X[op] then
+          assert(x8 ~= nil, string.format("width-dependent $%02X before "
+            .. "the index width is known", op))
+          return x8 and 2 or 3
+        elseif op == 0x20 or op == 0x62 or op == 0x82 or op == 0x44
+            or op == 0x54 or op == 0xF4 then return 3      -- jsr per brl mv* pea
+        elseif op == 0x22 or op == 0x5C then return 4      -- jsl jml
+        elseif lo == 0x00 then                             -- branches, rti, rts
+          return (op == 0x40 or op == 0x60) and 1 or 2
+        elseif lo == 0x08 or lo == 0x0A or lo == 0x0B then return 1
+        elseif lo == 0x09 then return 3                    -- abs,y
+        elseif lo == 0x0C or lo == 0x0D or lo == 0x0E then return 3
+        elseif lo == 0x0F then return 4
+        else return 2 end                                  -- dp / sr forms
       end
-      -- cmd $00 is the `beq` off `lda $b5` itself, not a cmp, so it never
-      -- appears as an immediate: add it the way the ROM's comment does.
-      gate[0x00] = true
+      local base = H.sym("Ot6BoostDmg") & 0x3FFFFF
+      local stop = H.sym("Ot6FoldCmdTbl") & 0x3FFFFF   -- the table after
+      local function rd(o) return H.readRomByte(o) end
+      local function beqTarget(o) -- `beq rel` at o, or nil
+        if rd(o) ~= 0xF0 then return nil end
+        local r = rd(o + 1); if r >= 0x80 then r = r - 0x100 end
+        return o + 2 + r
+      end
+      local pc, m8, x8, gateAt = base, nil, nil, nil
+      while pc < stop do
+        local op = rd(pc)
+        if op == 0xA5 and rd(pc + 1) == 0xB5 then gateAt = pc break end
+        if op == 0xC2 or op == 0xE2 then             -- rep / sep
+          local v, on = rd(pc + 1), op == 0xE2
+          if v & 0x20 ~= 0 then m8 = on end
+          if v & 0x10 ~= 0 then x8 = on end
+        elseif op == 0x28 then m8, x8 = nil, nil end -- plp: widths unknown
+        pc = pc + opLen(op, m8, x8)
+      end
+      H.assertEq(gateAt ~= nil, true,
+        "Ot6BoostDmg loads the current command (`lda $b5`) before its end")
+      H.assertEq(m8, true, "Ot6BoostDmg's gate runs with an 8-bit accumulator")
+      local done = beqTarget(gateAt + 2)
+      H.assertEq(done ~= nil, true,
+        "`lda $b5` is followed by `beq done` (cmd $00, fight)")
+      H.assertEq(rd(done) == 0x28 and rd(done + 1) == 0x6B, true, string.format(
+        "the gate's `done` ($%06X) is the proc's exit, `plp / rtl`", done))
+      gate[0x00] = true; gateList[1] = 0x00
+      pc = gateAt + 4
+      while rd(pc) == 0xC9 and beqTarget(pc + 2) == done do
+        local cmd = rd(pc + 1)
+        gate[cmd] = true; gateList[#gateList + 1] = cmd
+        pc = pc + 4
+      end
+      H.assertEq(rd(pc) == 0xAD and rd(pc + 1) == 0x7C and rd(pc + 2) == 0x3A,
+        true, string.format("the gate ends at the queued-command test "
+          .. "`lda $3a7c` (+%d holds $%02X $%02X $%02X)", pc - base, rd(pc),
+          rd(pc + 1), rd(pc + 2)))
+      local s = {}
+      for _, c in ipairs(gateList) do s[#s + 1] = string.format("$%02X", c) end
+      H.log(string.format("[boostprice] decoded Ot6BoostDmg's gate: lda $b5 at "
+        .. "+%d, done at +%d, ends at +%d: %s", gateAt - base, done - base,
+        pc - base, table.concat(s, " ")))
     end
     for cmd in pairs(gate) do
       H.assertEq(H.boostEscalates(cmd), false, string.format(

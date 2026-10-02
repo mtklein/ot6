@@ -102,12 +102,12 @@
         phx
         ldx     #$0003          ; only a spell command can have bought a
 @cmd:   lda     $3a7c           ;   tier: Ot6QueueFold's own four, mirrored
-        cmp     f:Ot6FoldCmdTbl,x  ; in Ot6FoldCmdTbl.  A table and not a
-        beq     @spell          ;   `cmp #imm / beq` chain: battle_boostprice
-        dex                     ;   reads every `cmp #imm / beq` in this
-        bpl     @cmd            ;   proc's first 96 bytes as a command the
-        plx                     ;   multiplier EXEMPTS, and these four are
-        bra     @plain          ;   the opposite of exempt
+        cmp     f:Ot6FoldCmdTbl,x  ; in Ot6FoldCmdTbl.  battle_boostprice
+        beq     @spell          ;   decodes the `cmp #imm / beq done` run
+        dex                     ;   after `lda $b5`, up to the `lda $3a7c`
+        bpl     @cmd            ;   above, as the commands the multiplier
+        plx                     ;   EXEMPTS; these four are the opposite of
+        bra     @plain          ;   exempt, so they stay out of that run
 @spell: ldx     #$0000
 @scan:  lda     f:Ot6FoldTbl,x  ; tier-family spell? tiers are the boost
         cmp     $3a7d           ; the queued attack (see the header)
