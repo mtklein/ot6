@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""checkpoint_drift.py -- how far a tracked cut checkpoint has drifted from
-the play the chain from power-on makes today, and the re-cut.
+"""checkpoint_drift.py -- how far a tracked checkpoint has drifted from the
+play the chain from power-on makes today, and the re-cut.
 
 A cut (tools/tests/savestate_graph.py, prev= with checkpoint=) boots its leg
 from the TRACKED checkpoint in tools/tests/checkpoints/<key>/.  `ninja
 chain` captures and seals a fresh one at the same save into
-build/checkpoints/<key>/ (savestate_ninja.py chain_plan).
+build/checkpoints/<key>/ (savestate_ninja.py chain_plan): from the run of
+prev's copy, from a cutter= script booted from it, or, for a frontier
+checkpoint nothing boots yet, from the copy whose state says saves=.
+Every tracked checkpoint something boots is one of these
+(savestate_ninja.py --coverage).
 
 The verdict is byte for byte: the chain is deterministic, so a tracked
 battery that is today's play is the fresh capture's bytes.  Only each save
@@ -233,15 +237,16 @@ def stamp_tool(*args) -> str:
 
 
 def producer_stamp(key: str) -> Path | None:
-    """build/states/chain_<state>.stamp of the chain copy whose run saves
-    `key` (savestate_ninja.py chain_plan), or None."""
+    """The record of the chain run that saves `key` (savestate_ninja.py
+    chain_producers): build/states/chain_<state>.stamp of the copy whose
+    run saves it, or build/checkpoints/<key>.rom for a cutter, which
+    publishes no state.  Both carry a `rom <sha>` line.  None when no run
+    on the graph saves `key`."""
     import savestate_ninja as sn
-    states = sn.load(ROOT)
-    owner = sn._owners(states)
-    for e in states:
-        if e.get("prev") and e.get("checkpoint") == key:
-            return ROOT / "build" / "states" / f"{sn.CHAIN_PREFIX}{owner[e['prev']]}.stamp"
-    return None
+    run = sn.chain_producers(sn.load(ROOT)).get(key)
+    if run is None:
+        return None
+    return ROOT / sn.capture_record(key, run)
 
 
 def stale_reason(key: str, fresh_root=FRESH) -> str | None:
@@ -265,7 +270,9 @@ def stale_reason(key: str, fresh_root=FRESH) -> str | None:
     stamp = producer_stamp(key) if fresh_root == FRESH else None
     if fresh_root == FRESH:
         if stamp is None or not stamp.exists():
-            return "no chain_ stamp names the run that captured it"
+            return ("no chain run's record (a chain_ stamp, or a cutter's "
+                    "build/checkpoints/<key>.rom) names the run that "
+                    "captured it")
         rom = next((l.split()[1] for l in stamp.read_text().splitlines()
                     if l.startswith("rom ")), None)
         now_rom = stamp_tool("romsig")
@@ -431,6 +438,18 @@ def selftest() -> int:
         except sc.CheckpointError:
             refused = True
         check("--recut refuses a stale capture", refused)
+    # where each capture's ROM record lives, on this tree's graph: a copy's
+    # stamp, or a cutter's own record (it publishes no state)
+    rec = {k: producer_stamp(k) for k in ("wor-tomb-v1", "post-opera-v1",
+                                          "wor-falcon-v1")}
+    check("a WoR leg's capture is recorded by the copy that saved it",
+          str(rec["wor-tomb-v1"]).endswith("build/states/chain_wor_tomb.stamp"))
+    check("a cutter's capture is recorded beside it",
+          str(rec["post-opera-v1"]).endswith("build/checkpoints/post-opera-v1.rom"))
+    check("the frontier's capture is recorded by its saves= copy",
+          str(rec["wor-falcon-v1"]).endswith("build/states/chain_wor_falcon.stamp"))
+    check("a checkpoint no chain run saves has no record",
+          producer_stamp("negative-stale-check-v1") is None)
     print("checkpoint_drift selftest:", "ok" if ok else "FAILED")
     return 0 if ok else 1
 

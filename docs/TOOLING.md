@@ -23,11 +23,12 @@ directory changes.
 
 A `.mss` belongs to one ROM, so after a ROM change every generated state
 regenerates, each from the one before it. To keep that from being one long
-serial run, the World of Balance chain is cut where the play saves (at a
+serial run, the chain is cut where the play saves (at a
 save point, or on the world map, where the game lets you save anywhere):
 an entry in
 `tools/tests/savestate_graph.py` with both `prev=` and `checkpoint=` is a
-cut. The leg before it ends by saving there through the real Save UI and
+cut, and `prev=` names the state whose play ends where the save begins.
+The leg before it ends by saving there through the real Save UI and
 asserting the checkpoint's contract as its exit
 (`H.saveAtCheckpoint`, `lib/ot6_contract.lua`); the leg after it
 Continues the save and asserts the same contract as its entry
@@ -35,18 +36,44 @@ Continues the save and asserts the same contract as its entry
 checkpoint in `tools/tests/checkpoints/`, which still loads after a ROM
 change, so the legs regenerate at once.
 
+Two variants. In the Vector arc the save is made by a separate,
+capture-only script booted from `prev`'s savestate rather than by
+`prev`'s own run: `cutter=` names it (`gen_post_opera_checkpoint` from
+blackjack, `gen_mrf_save_room_checkpoint`, `gen_n024_save_checkpoint`,
+`gen_minecart_platform_checkpoint`, `gen_terra_returned_checkpoint` from
+n128_won). Qualification never runs a cutter. And `saves=` marks a run
+that ends by saving a tracked checkpoint no cut boots yet: the frontier
+(`wor-falcon-v1`) and `crescent-landing-v1` (thamasa_night boots the
+savestate).
+
 `ninja chain` plays the whole chain from power-on instead: `chain_<state>`
 copies of every state from the first cut on, each booted from the copy
 before it and, at a cut, from the save the producing copy just made
 (captured with `OT6_CAPTURE_SRM` and sealed into
-`build/checkpoints/<key>/`). It is the one alias besides `release`,
+`build/checkpoints/<key>/`); a cutter runs from the copy of its `prev`,
+publishes no state, and records the ROM it played on in
+`build/checkpoints/<key>.rom`. The line runs from power-on through the
+Opera, the Vector arc, the Floating Continent and every World of Ruin leg
+to wor_falcon. No boundary on it lacks a state to chain from: the World of
+Balance -> World of Ruin crossing is a plain savestate link (wor_landing ->
+wor_island, no save between), and wor-start-v1 is made by wor_start's own
+run from wor_island's save. It is the one alias besides `release`,
 because the chain's last state moves as cuts and legs are added.
 `ninja release` depends on it. Run it too when a leg's exit contract
 fails in qualification: the chain says whether the story still plays
-through.
+through. It is long and serial (the World of Ruin legs alone carry
+3600-7200 s caps); bare `ninja` never runs it.
+
+Every tracked checkpoint something boots (a state, or a suite in
+`configure.py`'s `TEST_ENV`) is captured on that line. The rest are named
+in the graph's `NOT_GATED` with the reason (today: the four
+`reseal_seeds.sh` seeds and `vector-escape-v1`, which nothing boots).
+Qualification's `checkpoint_coverage` check
+(`savestate_ninja.py --coverage`) refuses any other tracked checkpoint, so
+a new leg that boots a checkpoint with no `prev=` fails `ninja`.
 
 A tracked checkpoint drifts from today's play as the route changes above
-it. At each cut the chain prints the drift (`tools/tests/lib/checkpoint_drift.py`),
+it. At each capture the chain prints the drift (`tools/tests/lib/checkpoint_drift.py`),
 explained in play terms: every character's level, experience, HP/MP and
 gear, gil and the bag, story switches, encounter counters, spells and
 skills, the OT6 codex, and any other differing byte by address.
@@ -59,7 +86,8 @@ report shows a material change:
     ninja chain
     python3 tools/tests/lib/checkpoint_drift.py --recut <key>...
 
-`--recut` copies the chain's sealed capture over the tracked checkpoint;
+`--recut` copies the chain's sealed capture over the tracked checkpoint
+(any key the chain captures, World of Ruin legs and cutters included);
 then commit and qualify again. The contracts stay light: a suite that
 needs a level or an item asserts its own precondition.
 

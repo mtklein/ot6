@@ -10,25 +10,38 @@
 #       the plain form: boot the predecessor's savestate, run the generator,
 #       publish <state>.mss + <state>.mss.lua through tools/tests/run.sh.
 #
-#   S("vector_entry", gen="gen_vector_entry", checkpoint="post-opera-v1")
-#       generated from a CHECKPOINT: cold-boot the tracked SRAM checkpoint in
-#       tools/tests/checkpoints/<key>/ instead of a predecessor savestate.
-#       The Vector-area boundaries (the A-F sequence lettered in the
-#       comments below) were cut this way by hand; the cut form below keeps
-#       prev= as well, so the chain from power-on still joins the legs.
-#
 #   S("figaro_entry", gen="gen_figaro", prev="worldmap_narshe",
 #     checkpoint="world-narshe-v1")
 #       a CUT: both fields.  gen_worldmap ends by saving where the party
 #       stands and asserts the world-narshe-v1 contract as its exit
 #       (lib/ot6_contract.lua); gen_figaro Continues that save and asserts
-#       it as its entry.  Qualification boots the TRACKED checkpoint, so
-#       figaro_entry no longer waits for the chain above it and the legs
-#       regenerate at once.  The chain from power-on stays buildable as
-#       `ninja chain` (savestate_ninja.py chain_plan): chain_<state> copies
-#       in which each cut's consumer Continues the save its producer's copy
-#       just made (build/checkpoints/<key>/), which is also how a tracked
-#       checkpoint is re-cut (docs/TOOLING.md).
+#       it as its entry.  Qualification boots the TRACKED checkpoint in
+#       tools/tests/checkpoints/<key>/, so figaro_entry no longer waits for
+#       the chain above it and the legs regenerate at once.  The chain from
+#       power-on stays buildable as `ninja chain` (savestate_ninja.py
+#       chain_plan): chain_<state> copies in which each cut's consumer
+#       Continues the save its producer's copy just made
+#       (build/checkpoints/<key>/), which is how the release gate checks a
+#       tracked checkpoint and how one is re-cut (docs/TOOLING.md).
+#       prev= names the state whose play ends where the checkpoint begins.
+#
+#   S("vector_entry", gen="gen_vector_entry", prev="blackjack",
+#     checkpoint="post-opera-v1", cutter="gen_post_opera_checkpoint")
+#       a cut whose save prev's own run does not make: the cutter, a
+#       capture-only script booted from prev's savestate, walks to the save
+#       and makes it.  Qualification never runs it; the chain runs it from
+#       chain_<prev> and captures its save.  The Vector-area boundaries (the
+#       A-F sequence lettered in the comments below) are cut this way.
+#
+#   S("wor_falcon", ..., saves="wor-falcon-v1")
+#       this state's own run ends by saving a tracked checkpoint that no
+#       cut boots yet (the frontier), so the chain captures it too.
+#
+# Every tracked checkpoint something boots is captured by a run on the chain
+# from power-on and compared by the drift gate; the others are NOT_GATED,
+# at the bottom, each with its reason (savestate_ninja.py --coverage, a
+# qualification check).  A boot from a checkpoint with no prev= is a hole
+# in that gate, and the coverage check refuses it.
 #
 #   S("figaro_intro", gen="gen_edgar", prev="figaro_entry",
 #     also=["figaro_matron", "figaro_cleared"])
@@ -44,8 +57,8 @@
 # generator's copy-if-changed edges -- a checkout's mtime bump regenerates nothing):
 #   * the ROM (build/ot6.sfc),
 #   * the generator .lua,
-#   * for checkpoint-booted states, the checkpoint's manifest.json and every
-#     *.sram payload,
+#   * for checkpoint-booted states (cuts), the checkpoint's manifest.json
+#     and every *.sram payload,
 #   * the predecessor's generated state, transitively.
 # The lib halves (lib/ot6.lua, lib/ot6_field.lua, lib/ot6_contract.lua) are
 # NOT inputs: a lib edit re-runs the suites and is recorded as provenance
@@ -57,10 +70,10 @@
 
 
 def S(state, *, gen=None, prev=None, checkpoint=None, seed=None, stack=None,
-      after=None, timeout=None, also=None):
+      after=None, timeout=None, also=None, saves=None, cutter=None):
     return {"state": state, "gen": gen, "prev": prev, "checkpoint": checkpoint,
             "seed": seed, "stack": stack, "after": after, "timeout": timeout,
-            "also": also}
+            "also": also, "saves": saves, "cutter": cutter}
 
 
 STATES = [
@@ -352,14 +365,18 @@ STATES = [
     S("blackjack", gen="gen_opera7_blackjack", prev="ultros2_entry"),
 
     # ---- v0.6: the raid on Vector and the Magitek Research Facility --------
-    # The chain hangs off the tracked 32 KiB post-Opera SRAM checkpoint rather
-    # than off blackjack.mss: gen_vector_entry cold-boots, drives vanilla
-    # Continue into slot 3, and walks the world from there.  Every later link
-    # is an ordinary savestate chain.  run.sh's persistent_layout check
-    # refuses the checkpoint load BEFORE boot if the generator does not
-    # declare its layout; the manifest + payload ride the dependency set,
-    # so editing either regenerates every state hung off the checkpoint.
-    S("vector_entry", gen="gen_vector_entry", checkpoint="post-opera-v1"),
+    # A cut at the post-Opera save: qualification boots the tracked 32 KiB
+    # post-opera-v1 checkpoint rather than blackjack.mss: gen_vector_entry
+    # cold-boots, drives vanilla Continue into slot 3, and walks the world
+    # from there.  blackjack's own run does not save; the cutter
+    # gen_post_opera_checkpoint does, booted from blackjack (cutter=), and
+    # `ninja chain` runs it from chain_blackjack and captures its save.
+    # run.sh's persistent_layout check refuses the checkpoint load BEFORE
+    # boot if the generator does not declare its layout; the manifest +
+    # payload ride the dependency set, so editing either regenerates every
+    # state hung off the checkpoint.
+    S("vector_entry", gen="gen_vector_entry", prev="blackjack",
+      checkpoint="post-opera-v1", cutter="gen_post_opera_checkpoint"),
     # gen_vector_sneak: the Returner sympathizer's choice dialog ($01F0) and
     # the FACING-GATED ledge on {43,38} -> control at {57,34}.
     S("vector_sneak", gen="gen_vector_sneak", prev="vector_entry"),
@@ -380,13 +397,14 @@ STATES = [
     # ---- boundary B: the map-270 save room ---------------------------------
     # ifrit_entry above is the terminal of step A->B; gen_ifrit_entry
     # also walks the save room and asserts B's exit contract pre-save, and
-    # gen_mrf_save_room_checkpoint (run by hand, never by this graph) cut the
-    # tracked SRAM checkpoint from it.  The step OUT of B starts from that
+    # gen_mrf_save_room_checkpoint (qualification never runs it; `ninja
+    # chain` does, as this cut's cutter=) cuts the SRAM checkpoint from it.
+    # The step OUT of B starts from that
     # checkpoint: gen_ifrit_magicite cold-Continues it, asserts the entry
     # contract, walks back to the alcove, then battle 70 and the
     # four-interaction hand-off -> both magicite ($1A69's give_genju bits).
-    S("magicite_ifrit_shiva", gen="gen_ifrit_magicite",
-      checkpoint="mrf-save-room-v1"),
+    S("magicite_ifrit_shiva", gen="gen_ifrit_magicite", prev="ifrit_entry",
+      checkpoint="mrf-save-room-v1", cutter="gen_mrf_save_room_checkpoint"),
     # gen_n024_entry: 264 -> 269 -> 271 -> 273, the NEW #10 save point
     # at {26,53} (boundary C: exit contract pre-save + sparkle check),
     # then parked at {25,52} facing NUMBER 024, one A-press from battle 72.
@@ -394,13 +412,15 @@ STATES = [
     S("n024_entry", gen="gen_n024_entry", prev="magicite_ifrit_shiva"),
     # ---- boundary C: the NEW 273 save point --------------------------------
     # The step OUT of C starts from a checkpoint for BOTH of gen_esper_tubes'
-    # states: one script, one cold-Continue boot, two states -- a prev= edge
-    # on the second would claim a predecessor the boot never loads.  battle
-    # 72, then the {25,50} door into map 274 and the entry point for the
-    # facing+A-gated BIG_SWITCH trigger.
-    S("n024_won", gen="gen_esper_tubes", checkpoint="n024-entry-save-v1"),
-    S("esper_tubes_entry", gen="gen_esper_tubes",
-      checkpoint="n024-entry-save-v1"),
+    # states: one script, one cold-Continue boot, two states -- so both are
+    # cuts at the same save, which gen_n024_save_checkpoint makes from
+    # n024_entry (the chain captures it once).  battle 72, then the {25,50}
+    # door into map 274 and the entry point for the facing+A-gated
+    # BIG_SWITCH trigger.
+    S("n024_won", gen="gen_esper_tubes", prev="n024_entry",
+      checkpoint="n024-entry-save-v1", cutter="gen_n024_save_checkpoint"),
+    S("esper_tubes_entry", gen="gen_esper_tubes", prev="n024_entry",
+      checkpoint="n024-entry-save-v1", cutter="gen_n024_save_checkpoint"),
     # gen_esper_tubes_done: the Cid/Kefka set piece -- six espers, and CELES
     # leaves the roster ($02F6=0).
     S("esper_tubes", gen="gen_esper_tubes_done", prev="esper_tubes_entry"),
@@ -414,15 +434,19 @@ STATES = [
     # boundary E, the $06AE-revealed save point 240 {58,7}.  gen_n128 boots
     # this checkpoint everywhere: `make smoke` hands it the same SRAM via
     # the Makefile's SMOKE_CHECKPOINT_* map (the dual-boot probe is retired).
-    S("n128_won", gen="gen_n128", checkpoint="minecart-platform-v1"),
+    # gen_minecart_platform_checkpoint saves it from minecart_entry.
+    S("n128_won", gen="gen_n128", prev="minecart_entry",
+      checkpoint="minecart-platform-v1",
+      cutter="gen_minecart_platform_checkpoint"),
     # ---- boundaries E and F ------------------------------------------------
-    # gen_vector_escape_checkpoint cuts E's tracked SRAM checkpoint from n128_won.
+    # gen_vector_escape_checkpoint cuts E's tracked SRAM checkpoint from
+    # n128_won; nothing boots it (NOT_GATED, below).
     # The E->F step (Cranes -> Terra's return -> the Esper-World flashback ->
     # takeoff -> the grounded-Blackjack world save at (24,121)) lives WHOLE
     # in gen_terra_returned_checkpoint -- §5 forbids splitting it (a save inside
     # the flashback would save as the WEDGE-actor Maduin) -- and cuts F's
     # checkpoint, `terra-returned-v1`: the v0.6 stop line and the checkpoint
-    # v0.7's first step will hang from.
+    # v0.7's first step hangs from (narshe_mission's cutter=, below).
 
     # ---- v0.7: the Sealed Gate area (issue #31) ----------------------------
     # ---- boundary F -> boundary G ------------------------------------------
@@ -432,12 +456,8 @@ STATES = [
     # back out, and save at the Narshe exit spawn, world (84,34) -- boundary
     # G, `narshe-mission-v1`.  ONE generator does the step AND cuts the
     # checkpoint, gen_terra_returned_checkpoint's shape, because the boundary is a
-    # world SRAM save with nothing to author.  Re-cutting the SRAM itself is
-    # still a deliberate by-hand operation:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/narshe-mission-v1/narshe-mission.sram \
-    #     tools/tests/run.sh tools/tests/gen_narshe_mission.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/narshe-mission-v1
+    # world SRAM save with nothing to author.  Re-cut by `ninja chain` and
+    # checkpoint_drift.py --recut.
     # This graph edge runs the same generator for its savestate and its
     # contract verdict; run.sh only captures SRAM when OT6_CAPTURE_SRM is
     # set, so generating a state can never quietly rewrite a tracked
@@ -445,7 +465,8 @@ STATES = [
     # timeout=3600: the Vector-plains grind is ~75 fought battles plus the
     # Jidoor supply stops; at the 1800 s default the v0.17 requal attempt was
     # killed once by the wall-clock cap before its retry.
-    S("narshe_mission", gen="gen_narshe_mission", checkpoint="terra-returned-v1",
+    S("narshe_mission", gen="gen_narshe_mission", prev="n128_won",
+      checkpoint="terra-returned-v1", cutter="gen_terra_returned_checkpoint",
       timeout=3600),
     # ---- boundary G -> boundary H ------------------------------------------
     # Step G->H, whole in one generator (gen_narshe_mission's shape): cold-
@@ -457,13 +478,10 @@ STATES = [
     # (3,2), window (6,2)->(7,2), arm B at (11,3), three windows down the
     # east half), 384's south loop to the (62,11) face-UP+A door switch
     # ($0173), and the map-386 vanilla save point (74,53) -- boundary H,
-    # `gate-cave-save-v1`, the area's only interior save.  Re-cutting the
-    # SRAM is a deliberate by-hand operation:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/gate-cave-save-v1/gate-cave-save.sram \
-    #     tools/tests/run.sh tools/tests/gen_gate_cave_save.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/gate-cave-save-v1
-    S("gate_cave_save", gen="gen_gate_cave_save", checkpoint="narshe-mission-v1"),
+    # `gate-cave-save-v1`, the area's only interior save.  Re-cut by `ninja
+    # chain` and checkpoint_drift.py --recut.
+    S("gate_cave_save", gen="gen_gate_cave_save", prev="narshe_mission",
+      checkpoint="narshe-mission-v1"),
     # ---- boundary H -> boundary I ------------------------------------------
     # Step H->I, whole in one generator: cold-boot the gate-cave-save-v1
     # checkpoint, back down to BASEMENT 3, the WEST traverse (two levers --
@@ -475,13 +493,10 @@ STATES = [
     # spared, the
     # scripted crash flight), off the wreck via the map-7 hatch (8,36),
     # and the world SRAM save at the crash site (83,239) -- boundary I,
-    # `vector-crash-v1`.  Re-cutting the SRAM is a deliberate by-hand
-    # operation:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/gate-cave-save-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/vector-crash-v1/vector-crash.sram \
-    #     tools/tests/run.sh tools/tests/gen_vector_crash.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/vector-crash-v1
-    S("vector_crash", gen="gen_vector_crash", checkpoint="gate-cave-save-v1"),
+    # `vector-crash-v1`.  Re-cut by `ninja chain` and
+    # checkpoint_drift.py --recut.
+    S("vector_crash", gen="gen_vector_crash", prev="gate_cave_save",
+      checkpoint="gate-cave-save-v1"),
     # ---- boundary I -> boundary J ------------------------------------------
     # Step I->J, whole in one generator (banquet-decode.md is the script;
     # #10 forbids any boundary inside the banquet block, so the step is
@@ -503,12 +518,9 @@ STATES = [
     # nothing -- live, the first question's $0231 record bit never sets
     # (banquet-decode 4's recall model is unverified; probe_banquet_qa
     # asserts it but boots a fixture that never existed -- open on #75).
-    # Re-cutting the SRAM is a deliberate by-hand operation:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/vector-crash-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/banquet-done-v1/banquet-done.sram \
-    #     tools/tests/run.sh tools/tests/gen_banquet_done.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/banquet-done-v1
-    S("banquet_done", gen="gen_banquet_done", checkpoint="vector-crash-v1"),
+    # Re-cut by `ninja chain` and checkpoint_drift.py --recut.
+    S("banquet_done", gen="gen_banquet_done", prev="vector_crash",
+      checkpoint="vector-crash-v1"),
     # ---- boundary J -> boundary K (v0.12: sealed-gate-route.md seg 7) ------
     # Step J->K, whole in one generator: cold-boot the banquet-done-v1
     # checkpoint (world (120,188)), the 33-step walk to Albrook, the port,
@@ -520,14 +532,13 @@ STATES = [
     # world SRAM save -- boundary K, `crescent-landing-v1`.  timeout=1800:
     # the run is a whole story segment (two town crossings, five scripted
     # scenes, two sails) and runs past run.sh's 600 s default on a loaded
-    # machine, gen_kolts's precedent.  Re-cutting the SRAM is a deliberate
-    # by-hand operation:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/banquet-done-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/crescent-landing-v1/crescent-landing.sram \
-    #     tools/tests/run.sh tools/tests/gen_voyage.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/crescent-landing-v1
-    S("crescent_landing", gen="gen_voyage", checkpoint="banquet-done-v1",
-      timeout=1800),
+    # machine, gen_kolts's precedent.  Re-cut by `ninja chain` and
+    # checkpoint_drift.py --recut.
+    # saves=: the run ends by saving crescent-landing-v1, which no cut boots
+    # (thamasa_night boots this savestate), so the chain captures it and the
+    # drift gate checks it like the rest.
+    S("crescent_landing", gen="gen_voyage", prev="banquet_done",
+      checkpoint="banquet-done-v1", saves="crescent-landing-v1", timeout=1800),
 
     # ---- v0.13: docs/design/thamasa-route.md section 1, segments 1-2 ------
     # boundary K -> boundary L (issue #127, "the Thamasa wave"): the
@@ -537,12 +548,8 @@ STATES = [
     # `thamasa-night-v1` checkpoint.  timeout=1800: six chests, two
     # doors/stairs, two naming screens and two world crossings is a whole
     # story segment, past run.sh's 600s default on a loaded machine
-    # (gen_kolts/gen_voyage precedent).  Re-cutting the SRAM is a deliberate
-    # by-hand operation:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/crescent-landing-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/thamasa-night-v1/thamasa-night.sram \
-    #     tools/tests/run.sh tools/tests/gen_thamasa_arrive.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/thamasa-night-v1
+    # (gen_kolts/gen_voyage precedent).  Re-cut by `ninja chain` and
+    # checkpoint_drift.py --recut.
     S("thamasa_night", gen="gen_thamasa_arrive", prev="crescent_landing",
       timeout=1800),
 
@@ -550,18 +557,15 @@ STATES = [
     # inn sleep, the fire, Strago's house-door talk into the join, the
     # burning house (map 351: Fire Rod + Ice Rod chests, the wandering
     # flames, the (21,22) ambush, FlameEater battle 79), the win tail, and
-    # Shadow's goodbye -- the `fire-out-v1` checkpoint.  checkpoint=, not
-    # prev=, the same vector_crash shape: this state cold-Continues the
-    # tracked thamasa-night-v1 SRAM checkpoint rather than a savestate link,
-    # so a clean run always starts from the real Continue screen.
+    # Shadow's goodbye -- the `fire-out-v1` checkpoint.  A cut, the same
+    # vector_crash shape: this state cold-Continues the thamasa-night-v1
+    # save (the tracked one in qualification, chain_thamasa_night's in the
+    # chain) rather than a savestate link, so a clean run always starts from
+    # the real Continue screen.
     # timeout=1800: a scripted town scene, a boss fight behind a 5-rung seed
     # ladder, and two world crossings is well past run.sh's 600s default on
-    # a loaded machine (gen_kolts/gen_tunnelarmr precedent).  Re-cutting the
-    # SRAM is a deliberate by-hand operation:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/thamasa-night-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/fire-out-v1/fire-out.sram \
-    #     tools/tests/run.sh tools/tests/gen_thamasa_fire.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/fire-out-v1
+    # a loaded machine (gen_kolts/gen_tunnelarmr precedent).  Re-cut by
+    # `ninja chain` and checkpoint_drift.py --recut.
     # fire_out LANDED (issue #127, tenth pass): the burning-house ambush and
     # FlameEater both win now that the party is actually prepped like a
     # player would prep it -- gear, ice espers, BACK ROW (the owner's own
@@ -573,26 +577,22 @@ STATES = [
     # bounces a physical Fight, elemental or not.  Checkpoint M
     # (fire-out-v1) captured and sealed from a clean run (verdict 0,
     # generated-state verify passed).
-    S("fire_out", gen="gen_thamasa_fire", checkpoint="thamasa-night-v1",
-      timeout=1800),
+    S("fire_out", gen="gen_thamasa_fire", prev="thamasa_night",
+      checkpoint="thamasa-night-v1", timeout=1800),
 
     # boundary M -> boundary N (issue #127, "the Esper Mountain approach"):
     # the world walk from M's (249,128) to the Esper Mountain world entrance
     # (229,130) -> map 375 (55,31), the SW crossing of the exterior to the
     # vanilla save point at 375 (8,44) (fighting group-90 fire-weak trash with
     # TERRA's boosted Fire), and the real Save UI -- the `esper-mtn-save-v1`
-    # checkpoint.  checkpoint=, not prev=: this state cold-Continues the
-    # tracked fire-out-v1 SRAM checkpoint rather than a savestate link, the
+    # checkpoint.  A cut: this state cold-Continues the fire-out-v1 save
+    # rather than a savestate link, the
     # gen_thamasa_fire / gen_gate_cave_save shape.  timeout=1800: a world
     # crossing plus a mountain crossing with real tactical fights is past
-    # run.sh's 600s default on a loaded machine.  Re-cutting the SRAM is a
-    # deliberate by-hand operation:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fire-out-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/esper-mtn-save-v1/esper-mtn-save.sram \
-    #     tools/tests/run.sh tools/tests/gen_esper_mtn.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/esper-mtn-save-v1
-    S("esper_mtn_save", gen="gen_esper_mtn", checkpoint="fire-out-v1",
-      timeout=1800),
+    # run.sh's 600s default on a loaded machine.  Re-cut by `ninja chain` and
+    # checkpoint_drift.py --recut.
+    S("esper_mtn_save", gen="gen_esper_mtn", prev="fire_out",
+      checkpoint="fire-out-v1", timeout=1800),
 
     # boundary N -> boundary O (issue #127, "the statue room and Ultros III"):
     # cold-Continue the tracked esper-mtn-save-v1 SRAM checkpoint (map 375
@@ -601,8 +601,8 @@ STATES = [
     # WEST door 375 (2,45)->371 (9,9) into the statue room, the (15,20) lore
     # scene ($0096/$0097) and the (15,22) Ultros III fight (battle 125, RELM
     # joins), then back out 371 (10,9)->375 (3,45) to the save point and the
-    # real Save UI -- the `ultros-won-v1` checkpoint.  checkpoint=, not prev=:
-    # this state cold-Continues the tracked esper-mtn-save-v1 battery rather
+    # real Save UI -- the `ultros-won-v1` checkpoint.  A cut: this state
+    # cold-Continues the esper-mtn-save-v1 battery rather
     # than a savestate link, the gen_esper_mtn / gen_gate_cave_save shape.
     #
     # THE FIGHT IS ENDED ON HP, NEVER BY SKETCH (#123): Ultros III's scripted
@@ -617,14 +617,10 @@ STATES = [
     # arms.  A 5-rung seed sweep (H.newSeedSweep) retries a loss from a
     # savestate taken just after the lore scene.  timeout=1800: the 22000-HP
     # fight behind a seed sweep plus two warp-maze crossings runs past
-    # run.sh's 600s default on a loaded machine.  Re-cutting the SRAM is a
-    # deliberate by-hand operation:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/esper-mtn-save-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/ultros-won-v1/ultros-won.sram \
-    #     tools/tests/run.sh tools/tests/gen_ultros.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/ultros-won-v1
-    S("ultros_won", gen="gen_ultros", checkpoint="esper-mtn-save-v1",
-      timeout=1800),
+    # run.sh's 600s default on a loaded machine.  Re-cut by `ninja chain` and
+    # checkpoint_drift.py --recut.
+    S("ultros_won", gen="gen_ultros", prev="esper_mtn_save",
+      checkpoint="esper-mtn-save-v1", timeout=1800),
 
     # boundary O -> boundary P (issue #127, "the massacre block"), the v0.13
     # route TERMINAL: cold-Continue the tracked ultros-won-v1 SRAM checkpoint
@@ -636,18 +632,14 @@ STATES = [
     # pre-fight savestate with a GameOver read-canary), the scripted theater
     # battles 105/97, Leo's death, the party restore, the burial and the
     # Blackjack's return, and the real world Save at the stop line world
-    # (249,128) -- the `thamasa-done-v1` checkpoint.  checkpoint=, not prev=:
-    # this state cold-Continues the tracked ultros-won-v1 battery rather than a
+    # (249,128) -- the `thamasa-done-v1` checkpoint.  A cut: this state
+    # cold-Continues the ultros-won-v1 battery rather than a
     # savestate link, the gen_ultros / gen_esper_mtn shape.  timeout=1800: the
     # warp-maze climb, a seed-swept solo fight, and the long scripted tail run
-    # past run.sh's 600s default on a loaded machine.  Re-cutting the SRAM is a
-    # deliberate by-hand operation:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/ultros-won-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/thamasa-done-v1/thamasa-done.sram \
-    #     tools/tests/run.sh tools/tests/gen_massacre.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/thamasa-done-v1
-    S("thamasa_done", gen="gen_massacre", checkpoint="ultros-won-v1",
-      timeout=1800),
+    # past run.sh's 600s default on a loaded machine.  Re-cut by `ninja
+    # chain` and checkpoint_drift.py --recut.
+    S("thamasa_done", gen="gen_massacre", prev="ultros_won",
+      checkpoint="ultros-won-v1", timeout=1800),
 
     # boundary P -> boundary Q (the Floating Continent landing): cold-Continue
     # the tracked thamasa-done-v1 SRAM (world (249,128)), do the Thamasa prep
@@ -656,44 +648,39 @@ STATES = [
     # fight the whole IAF gauntlet (six Sky Armor / Spit Fire waves, Ultros IV
     # + Chupon, the Air Force -- every loss a real Game Over, no ladder), land
     # on 394 and Save at the landing SavePoint 394 (7,12) -- the
-    # `fc-landing-v1` checkpoint.  checkpoint=, not prev=: the gen_massacre /
+    # `fc-landing-v1` checkpoint.  A cut: the gen_massacre /
     # gen_ultros shape.  timeout=3600: fourteen fought battles plus the deck
-    # scenes run past 1800 s on a loaded machine.  Re-cutting the SRAM is a
-    # deliberate by-hand operation:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/thamasa-done-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/fc-landing-v1/fc-landing.sram \
-    #     tools/tests/run.sh tools/tests/gen_fc_landing.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/fc-landing-v1
+    # scenes run past 1800 s on a loaded machine.  Re-cut by `ninja chain` and
+    # checkpoint_drift.py --recut.
     # ultros4_entry is the deck at the Ultros teaser, one walk from arming
     # Ultros IV (battle_ultros4).
-    S("fc_landing", gen="gen_fc_landing", checkpoint="thamasa-done-v1",
-      timeout=3600, also=["ultros4_entry"]),
+    S("fc_landing", gen="gen_fc_landing", prev="thamasa_done",
+      checkpoint="thamasa-done-v1", timeout=3600, also=["ultros4_entry"]),
 
     # boundary Q -> boundary R (the continent's save alcove): cold-Continue
     # fc-landing-v1 at 394 (7,12), talk SHADOW in at (10,16), cross the
     # continent by the route doc's validated reveal/chute order to the (90,43)
     # drop into the encounter-free alcove 358, and Save at 358 (8,10) -- the
     # `fc-alcove-v1` checkpoint.  Every FC random is fought (7 of the 12
-    # formations cannot be fled).  Re-cutting the SRAM:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fc-landing-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/fc-alcove-v1/fc-alcove.sram \
-    #     tools/tests/run.sh tools/tests/gen_fc_alcove.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/fc-alcove-v1
-    S("fc_alcove", gen="gen_fc_alcove", checkpoint="fc-landing-v1",
-      timeout=3600),
+    # formations cannot be fled).  Re-cut by `ninja chain` and
+    # checkpoint_drift.py --recut.
+    S("fc_alcove", gen="gen_fc_alcove", prev="fc_landing",
+      checkpoint="fc-landing-v1", timeout=3600),
 
     # boundary R -> the World of Ruin (the end of the World of Balance):
     # cold-Continue fc-alcove-v1, climb back to AtmaWeapon's plateau, beat
     # him, ride the statue scene onto the escape map 393, beat Nerapa under
     # the 6:00 clock, wait for Shadow at the ledge, and ride the airship's
     # flight into the RUIN cutscene down to solo Celes at the Solitary
-    # Island bedside (map 397).  No battery cut: nothing between the alcove
-    # and the landing is a save point, so this is a plain savestate link.
+    # Island bedside (map 397).  A cut at the alcove's save (fc-alcove-v1);
+    # the run itself saves nothing: nothing between the alcove and the
+    # landing is a save point, so the World of Balance -> World of Ruin
+    # crossing is a plain savestate link (wor_island, below).
     # escape_start: gen_fc_escape's second artifact, first control on the
     # escape map 393 with the 6:00 master clock and Shadow's 5:55 clock
     # running -- the escape-policy lab's fixture (one run, both states).
-    S("wor_landing", gen="gen_fc_escape", checkpoint="fc-alcove-v1",
-      also=["escape_start"], timeout=3600),
+    S("wor_landing", gen="gen_fc_escape", prev="fc_alcove",
+      checkpoint="fc-alcove-v1", also=["escape_start"], timeout=3600),
 
     # ---- the World of Ruin ----------------------------------------------------
     # wor_landing -> the World of Ruin's first save: dress CELES (the opening
@@ -701,11 +688,8 @@ STATES = [
     # island's west edge onto its own World of Ruin tile (76,239), and Save
     # there -- the `wor-island-v1` checkpoint (docs/design/wor-start.md).
     # prev=, not checkpoint=: nothing between the alcove and the island is a
-    # save point, so this link boots the wor_landing savestate.  Re-cutting
-    # the SRAM is a deliberate by-hand operation:
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-island-v1/wor-island.sram \
-    #     tools/tests/run.sh tools/tests/gen_wor_island.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-island-v1
+    # save point, so this link boots the wor_landing savestate.  Re-cut by
+    # `ninja chain` and checkpoint_drift.py --recut.
     S("wor_island", gen="gen_wor_island", prev="wor_landing"),
 
     # wor-island-v1 -> the first save after the island: cold-Continue the
@@ -720,12 +704,9 @@ STATES = [
     # slowest recovery under the shipped policy, 83k, plus the raft and the
     # save), three of them replay from the Continue, and a loaded machine
     # emulates ~80-100 frames/s.
-    # Re-cutting the SRAM:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-island-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-start-v1/wor-start.sram \
-    #     tools/tests/run.sh tools/tests/gen_wor_start.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-start-v1
-    S("wor_start", gen="gen_wor_start", checkpoint="wor-island-v1", timeout=7200),
+    # Re-cut by `ninja chain` and checkpoint_drift.py --recut.
+    S("wor_start", gen="gen_wor_start", prev="wor_island",
+      checkpoint="wor-island-v1", timeout=7200),
 
     # wor-start-v1 -> the last save before Tzen's timed house: cold-Continue
     # the landing save (CELES alone at world (146,212)), dress her for the
@@ -734,16 +715,14 @@ STATES = [
     # desert, then pace the desert beside the door (the Black Drgn's pool)
     # until the Black Drgn has been fought once (#317), and Save one step
     # east of the door, world (131,179): the `wor-tzen-door-v1` checkpoint
-    # (docs/design/route-wor-sabin.md sections 10 and 12).  checkpoint=, not prev=: this
-    # segment regenerates from the landing battery, independently of the
-    # World of Balance chain.  Every random is fought; a wipe retries from
+    # (docs/design/route-wor-sabin.md sections 10 and 12).  A cut: in
+    # qualification this segment regenerates from the tracked landing
+    # battery, in parallel with the chain above it; `ninja chain` plays it
+    # from wor_start's save.  Every random is fought; a wipe retries from
     # the Continue (the runner's default 3 attempts).
-    # Re-cutting the SRAM:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-start-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-tzen-door-v1/wor-tzen-door.sram \
-    #     tools/tests/run.sh tools/tests/gen_wor_tzen_door.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-tzen-door-v1
-    S("wor_tzen_door", gen="gen_wor_tzen_door", checkpoint="wor-start-v1", timeout=3600),
+    # Re-cut by `ninja chain` and checkpoint_drift.py --recut.
+    S("wor_tzen_door", gen="gen_wor_tzen_door", prev="wor_start",
+      checkpoint="wor-start-v1", timeout=3600),
 
     # wor-tzen-door-v1 -> the first save after Sabin joins: cold-Continue
     # the save outside Tzen's door (CELES alone at world (131,179)), walk
@@ -752,35 +731,29 @@ STATES = [
     # the house (map 311; "face up and hold A" at (117,12)), ride Sabin's
     # joining, dress him from Tzen's shops and the bag, and Save on the
     # World of Ruin map outside Tzen, (131,179): the `wor-sabin-v1`
-    # checkpoint (docs/design/route-wor-sabin.md section 11).  checkpoint=:
-    # it regenerates from the battery, independently of the chain.  A
+    # checkpoint (docs/design/route-wor-sabin.md section 11).  A cut: in
+    # qualification it regenerates from the tracked battery.  A
     # house lost to a fight or to the clock (class `lost`) retries from the
     # Continue (the runner's default 3 attempts).
-    # Re-cutting the SRAM:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tzen-door-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-sabin-v1/wor-sabin.sram \
-    #     tools/tests/run.sh tools/tests/gen_wor_sabin.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-sabin-v1
-    S("wor_sabin", gen="gen_wor_sabin", checkpoint="wor-tzen-door-v1", timeout=3600),
+    # Re-cut by `ninja chain` and checkpoint_drift.py --recut.
+    S("wor_sabin", gen="gen_wor_sabin", prev="wor_tzen_door",
+      checkpoint="wor-tzen-door-v1", timeout=3600),
 
     # wor-sabin-v1 -> the World of Ruin map one step east of Nikeah's door:
     # cold-Continue the save outside Tzen (CELES and SABIN at world
     # (131,179)), walk north across the continent -- the Black Drgn's desert
     # included, which no on-foot path avoids -- fighting everything, and
     # Save at (148,76): the `wor-nikeah-v1` checkpoint
-    # (docs/design/route-wor-edgar.md section 10).  checkpoint=: it
-    # regenerates from the battery, independently of the chain.
+    # (docs/design/route-wor-edgar.md section 10).  A cut: in
+    # qualification it regenerates from the tracked battery.
     # timeout=3600: an attempt runs ~24k frames from the Continue (the graph
     # run: `PASS (frame 24350)`) and up to ~68k in the variation set's
     # longest (K=20 encounters used up first, `frame 67702`); three such
     # attempts are ~200k frames, ~2500 s at a loaded machine's ~80
     # frames/s.
-    # Re-cutting the SRAM:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-sabin-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-nikeah-v1/wor-nikeah.sram \
-    #     tools/tests/run.sh tools/tests/gen_wor_nikeah.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-nikeah-v1
-    S("wor_nikeah", gen="gen_wor_nikeah", checkpoint="wor-sabin-v1", timeout=3600),
+    # Re-cut by `ninja chain` and checkpoint_drift.py --recut.
+    S("wor_nikeah", gen="gen_wor_nikeah", prev="wor_sabin",
+      checkpoint="wor-sabin-v1", timeout=3600),
 
     # wor-nikeah-v1 -> the World of Ruin map outside South Figaro: Nikeah
     # (the item seller, the cafe's four thieves, Gerad's three talks), the
@@ -791,12 +764,9 @@ STATES = [
     # runs 26k-44k frames (the variation set, `PASS (frame 26029)` from the
     # Continue to `frame 43905` with K=6 used up first); three are ~132k
     # frames, ~1650 s at ~80 frames/s.
-    # Re-cutting the SRAM:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-nikeah-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-south-figaro-v1/wor-south-figaro.sram \
-    #     tools/tests/run.sh tools/tests/gen_wor_south_figaro.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-south-figaro-v1
-    S("wor_south_figaro", gen="gen_wor_south_figaro", checkpoint="wor-nikeah-v1", timeout=3600),
+    # Re-cut by `ninja chain` and checkpoint_drift.py --recut.
+    S("wor_south_figaro", gen="gen_wor_south_figaro", prev="wor_nikeah",
+      checkpoint="wor-nikeah-v1", timeout=3600),
 
     # wor-south-figaro-v1 -> the World of Ruin map outside the surfaced
     # Figaro Castle: a grind on the South Figaro continent's grass, forest and
@@ -810,12 +780,9 @@ STATES = [
     # set; the capture `PASS (frame 173383)`), ~1040 s at the ~158 frames/s
     # the review's merged run emulated on the Air; three attempts are
     # ~520k frames, ~6500 s at a loaded machine's ~80 frames/s.
-    # Re-cutting the SRAM:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-south-figaro-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-edgar-v1/wor-edgar.sram \
-    #     tools/tests/run.sh tools/tests/gen_wor_edgar.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-edgar-v1
-    S("wor_edgar", gen="gen_wor_edgar", checkpoint="wor-south-figaro-v1", timeout=7200),
+    # Re-cut by `ninja chain` and checkpoint_drift.py --recut.
+    S("wor_edgar", gen="gen_wor_edgar", prev="wor_south_figaro",
+      checkpoint="wor-south-figaro-v1", timeout=7200),
 
     # wor-edgar-v1 -> wor-figaro-sweep-v1, the Falcon arc's leg 1, on the
     # chain since 2026-10-01 (guidelines "Ribbons are worth going out of your
@@ -828,12 +795,9 @@ STATES = [
     # 10).  wor_kohlingen below boots its checkpoint.
     # timeout=3600: the capture ended at frame 40859 from the Continue (10
     # battles); three such attempts are ~123k frames, ~1500 s at ~80 frames/s.
-    # Re-cutting the SRAM:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-edgar-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-figaro-sweep-v1/wor-figaro-sweep.sram \
-    #     tools/tests/run.sh tools/tests/gen_wor_figaro_sweep.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-figaro-sweep-v1
-    S("wor_figaro_sweep", gen="gen_wor_figaro_sweep", checkpoint="wor-edgar-v1", timeout=3600),
+    # Re-cut by `ninja chain` and checkpoint_drift.py --recut.
+    S("wor_figaro_sweep", gen="gen_wor_figaro_sweep", prev="wor_edgar",
+      checkpoint="wor-edgar-v1", timeout=3600),
 
     # wor-figaro-sweep-v1 -> the World of Ruin map outside Kohlingen: the Regal
     # Crown off the castle's basement 2 (#322), the engineer's ride to
@@ -845,12 +809,9 @@ STATES = [
     # capture) and up to ~65k in the variation set's longest (K=12
     # encounters used up first); three ~30k attempts are ~90k frames,
     # ~1100 s at a loaded machine's ~80 frames/s.
-    # Re-cutting the SRAM:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-figaro-sweep-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-kohlingen-v1/wor-kohlingen.sram \
-    #     tools/tests/run.sh tools/tests/gen_wor_kohlingen.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-kohlingen-v1
-    S("wor_kohlingen", gen="gen_wor_kohlingen", checkpoint="wor-figaro-sweep-v1", timeout=3600),
+    # Re-cut by `ninja chain` and checkpoint_drift.py --recut.
+    S("wor_kohlingen", gen="gen_wor_kohlingen", prev="wor_figaro_sweep",
+      checkpoint="wor-figaro-sweep-v1", timeout=3600),
 
     # wor-kohlingen-v1 -> Darill's Tomb's save point: the walk to the tomb,
     # the door SETZER opens, the switches and the turtles down through the
@@ -858,12 +819,9 @@ STATES = [
     # east room (map 300 (122,14)): the `wor-tomb-v1` checkpoint, the retry
     # point for the monster chest and Dullahan
     # (docs/design/route-wor-falcon.md section 12).
-    # Re-cutting the SRAM:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-kohlingen-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-tomb-v1/wor-tomb.sram \
-    #     tools/tests/run.sh tools/tests/gen_wor_tomb.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-tomb-v1
-    S("wor_tomb", gen="gen_wor_tomb", checkpoint="wor-kohlingen-v1", timeout=3600),
+    # Re-cut by `ninja chain` and checkpoint_drift.py --recut.
+    S("wor_tomb", gen="gen_wor_tomb", prev="wor_kohlingen",
+      checkpoint="wor-kohlingen-v1", timeout=3600),
 
     # wor_tomb -> the frame a Zombie lands on a member in a battle in the
     # tomb's grave room (battle_zombiecure's fixture): paced until it
@@ -881,12 +839,31 @@ STATES = [
     # the one run: wor_chest (the party armed, below the monster chest,
     # before the press) and wor_grave (on the grave, before the press): the
     # chest and Dullahan labs' fixtures; and wor_flight (the pilot's first
-    # control after the rising): field_flyto's fixture.
-    # Re-cutting the SRAM:
-    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1 \
-    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-falcon-v1/wor-falcon.sram \
-    #     tools/tests/run.sh tools/tests/gen_wor_falcon.lua
-    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-falcon-v1
-    S("wor_falcon", gen="gen_wor_falcon", checkpoint="wor-tomb-v1", timeout=3600,
+    # control after the rising): field_flyto's fixture.  saves=: the
+    # frontier; no leg boots wor-falcon-v1 yet, and the chain captures it
+    # all the same.  Re-cut by `ninja chain` and checkpoint_drift.py --recut.
+    S("wor_falcon", gen="gen_wor_falcon", prev="wor_tomb",
+      checkpoint="wor-tomb-v1", saves="wor-falcon-v1", timeout=3600,
       also=["wor_chest", "wor_grave", "wor_flight"]),
 ]
+
+# Tracked checkpoints the release gate does not check, each with its reason.
+# Only a checkpoint nothing boots -- no state above, no suite in
+# configure.py's TEST_ENV -- may stand here; savestate_ninja.py --coverage
+# refuses a booted one, and any tracked checkpoint that is neither captured
+# by the chain nor named here.  These are by-hand cuts from qualification
+# states (tools/tests/reseal_seeds.sh, or the cutter named), kept for
+# by-hand use; one becomes gated the day something boots it (a cut with its
+# cutter=).
+NOT_GATED = {
+    "vector-escape-v1": "booted by nothing; gen_vector_escape_checkpoint "
+                        "cuts it from n128_won by hand",
+    "sfigaro-basement-v1": "booted by nothing; gen_seed_basement cuts it "
+                           "from sfigaro_escape (reseal_seeds.sh)",
+    "train-engineer-v1": "booted by nothing; gen_seed_train cuts it from "
+                         "train_done (reseal_seeds.sh)",
+    "terra-caves-v1": "booted by nothing; gen_seed_terracave cuts it from "
+                      "terra_clifftop (reseal_seeds.sh)",
+    "world-sfigaro-v1": "booted by nothing; gen_seed_worldsfigaro cuts it "
+                        "from south_figaro (reseal_seeds.sh)",
+}
