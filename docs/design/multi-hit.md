@@ -540,9 +540,14 @@ spliced data bytes. No new RAM.
   - with no monster standing, the pass lands nowhere (a Fight's on the
     corpse), and so does a pass that then starts empty: never vanilla's
     Retarget, which picks the side by the attacker's status and sends a
-    muddled actor at its party (`battle_passside` stages that with a
-    declared Muddle write at the action's start: mechanism staging, since a
-    really Muddled actor is engine-driven);
+    muddled actor at its party. `battle_passside` stages that with a
+    declared Muddle write at the action's start (mechanism staging: the
+    engine's SetStatus does not run). Play reaches it too: an action queued
+    before its actor turned Zombie or Muddled still runs, its targets
+    cleared by InitPlayerAction, and vanilla's Retarget picks its first
+    pass's side by the new status (measured: a Zombie SETZER's queued Coin
+    Toss went to the party, `battle_passretarget`'s k4 draw), so a Zombie
+    with a queued boosted row is a natural route to this guard;
   - a party member who fell (a muddled actor's pick, or the player's aim
     at an ally) is not replaced: the pass lands on that member or nowhere.
   Vanilla's own multi-pass actions keep their rules: an unboosted Genji

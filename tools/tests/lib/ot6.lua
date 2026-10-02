@@ -8171,7 +8171,9 @@ function M.passWatch()
     end
     a.passes[#a.passes + 1] = { pre = M.readByte(0xB8) | (M.readByte(0xB9) << 8), stand = M.passStanding(),
       a70 = M.readByte(0x3A70), b5 = M.readByte(0xB5), ba = M.readByte(0xBA), bb = M.readByte(0xBB),
-      mark = M.readByte(M.PASS_MARK), foes = M.readByte(0x3A40), pstand = M.passPartyStanding() }
+      mark = M.readByte(M.PASS_MARK), foes = M.readByte(0x3A40), pstand = M.passPartyStanding(),
+      st1 = M.readByte(0x3EE4 + x), st2 = M.readByte(0x3EE5 + x), charm = M.readByte(0x3395 + x),
+      abit = M.readByte(0x3018 + x) }
   end, emu.callbackType.exec, pre, pre)
   local post = M.sym("Ot6Oblivion")
   emu.addMemoryCallback(function()
@@ -8189,6 +8191,24 @@ function M.passWatch()
     if #a.passes >= 1 then W.acts[#W.acts + 1] = a end
   end, emu.callbackType.exec, fin, fin)
   return W
+end
+
+-- The side vanilla's Retarget picks for a character attacker (battle_main
+-- Retarget, @5937): from the enemy default ($bb bit 6), flipped once each
+-- by Charm ($3395+x bit 7 clear), by the attacker fighting as an enemy
+-- ($3018+x in $3A40) and by Muddle ($3EE5+x bit 5); both sides for a
+-- Zombie ($3EE4+x bit 1) or an auto-all target ($bb & $0C = $04).
+-- "monsters", "party", "both", or nil where Retarget takes its $ba bit 4
+-- arm, which this does not model.
+function M.passVanillaSide(q)
+  if q.st1 == nil or (q.ba & 0x10) ~= 0 then return nil end
+  local flip = false
+  if (q.charm & 0x80) == 0 then flip = not flip end
+  if (q.abit & q.foes) ~= 0 then flip = not flip end
+  if (q.bb & 0x40) ~= 0 then flip = not flip end
+  if (q.st2 & 0x20) ~= 0 then flip = not flip end
+  if (q.bb & 0x0C) == 0x04 or (q.st1 & 0x02) ~= 0 then return "both" end
+  return flip and "monsters" or "party"
 end
 
 -- M.passCheck(a, check, note, tag): log act a and hold each pass after its
@@ -8216,9 +8236,11 @@ end
 --      empty after one that landed nowhere;
 --   I. the action's first pass that targets (an empty hand's never does),
 --      when the target it was queued at has fallen, is retargeted as
---      vanilla's first pass is: it lands on a body (vanilla's Retarget
---      picks the side, so a Zombie's lands on either -- measured, a zombie
---      SETZER's queued Coin Toss went to the party, round3/sweep k4);
+--      vanilla's first pass is: it lands on a body on the side vanilla's
+--      Retarget picks for the attacker's state (M.passVanillaSide: the
+--      monsters for a normal actor; either side for a Zombie -- measured,
+--      a Zombie SETZER's queued Coin Toss went to the party,
+--      round3/sweep-strictI/r4_new_k4.log);
 --   H. a pass that starts on a party member spreads to no other one: it
 --      lands on that member or nowhere;
 --   E. a Setzer row runs 1 + boost passes.
@@ -8248,8 +8270,16 @@ function M.passCheck(a, check, note, tag)
       local what = string.format("%s by e%d at %d BP, its first targeting pass (key %s; queued on $%04X, standing "
         .. "$%02X, landed on $%04X)", a.kind, a.e, a.boost, a.key or "?", q.pre, q.stand, q.post)
       note("first", k0, a.key, what)
-      check(q.post ~= 0, true, "I: the first targeting pass of an action OT6 extended, its queued target "
-        .. "fallen, is retargeted as vanilla's first pass is (it lands on a body) -- " .. what, a.kind, a.key)
+      local side = M.passVanillaSide(q)
+      local foes = q.foes or 0
+      local onMon = (q.post >> 8) ~= 0 or (q.post & 0xFF & foes) ~= 0
+      local onPty = (q.post & 0xFF & ~foes) ~= 0
+      local ok = q.post ~= 0
+      if side == "monsters" then ok = ok and not onPty elseif side == "party" then ok = ok and not onMon end
+      check(ok, true, string.format("I: the first targeting pass of an action OT6 extended, its queued target "
+        .. "fallen, is retargeted as vanilla's first pass is, onto %s (the attacker's status %02X/%02X, charm "
+        .. "%02X) -- %s", side == "both" and "either side" or side == nil and "a body" or ("the " .. side), q.st1 or 0,
+        q.st2 or 0, q.charm or 0, what), a.kind, a.key)
     end
     if p >= 2 and a.ext and q.b5 ~= 0x02 and q.post ~= nil and q.pre == 0 and q.stand == 0 then
       local what = string.format("%s by e%d at %d BP, pass %d of %d (key %s; started empty, no monster standing, "

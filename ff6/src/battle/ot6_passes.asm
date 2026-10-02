@@ -62,7 +62,14 @@
 ; jsl from CalcAttackEffect right after ChooseTarget (and the divine gates
 ; behind it): once the action has passes OT6 added (a nonzero mark), set
 ; the mark's bit 7, so Ot6PassRetarget applies OT6's rule from the next
-; pass on.  Preserves every register and flag.  Any width.
+; pass on.  A bit of OT6's own, set at the one point every targeting pass
+; goes through, rather than a reading of vanilla's state: the backup
+; targets ($3a4e) are written by _setupoldtarget only on its 16-bit
+; `lda $3414 / bmi` arm (so by $3415's top bit, which commands set
+; differently) and zeroed by CalcCmdDelay for an action queued without a
+; target; they record targets kept for a Fight's emptied mask, not whether
+; this action has targeted yet.  Preserves every register and flag.  Any
+; width.
 .proc Ot6PassTargeted
         php
         sep     #$20

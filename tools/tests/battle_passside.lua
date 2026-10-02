@@ -25,28 +25,36 @@
 --               fells a monster and the next goes to another (F, A, B, C),
 --               and the swings after the last land on no party member (G).
 --   emptystart: every monster's HP is set to 1 and SETZER's bank to 3; he
---               throws Coin Toss at 3 BP over the group: the first toss
---               fells them all, the second (starting on the fallen) lands
---               nowhere, and the third and fourth start empty and land
---               nowhere too (G) -- the branch where vanilla, seeing an empty
---               start, would Retarget.
+--               throws Coin Toss at 3 BP over the group, and the tosses
+--               fell the crowd with tosses to spare: the toss after the last
+--               body falls starts on the fallen and lands nowhere (G), and
+--               the one after that starts empty and lands nowhere too (G) --
+--               the branch where vanilla, seeing an empty start, would
+--               Retarget.  (Measured: toss 1 felled two of three, toss 2
+--               the third, toss 3 started on the fallen, and toss 4 was the
+--               one empty start -- round3/side/r5_passside.log.)
 --   offhand:    SETZER's weapon moves to his off hand (the per-hand battle
 --               bytes swapped: power $3B68, element $3B90, props $3BA4, hit
 --               rate $3B7C, spellcast $3D34, special $3CBC, item $3CA8), and
 --               he Fights at 1 BP; as the action starts its queued target is
 --               felled (HP 0, Wound).  The main hand's passes never reach
 --               ChooseTarget, so the first that does is one down the count:
---               it must still retarget onto a standing monster (I).  Then 2
---               BP.
+--               it must still get vanilla's first-pass retarget, onto the
+--               side vanilla's Retarget picks for SETZER's state -- the
+--               monsters (I).  Then 2 BP.
 -- In emptied and emptystart SETZER is also Muddled as his action starts
 -- ($3EE5 bit 5 written at ExecCmd): the bit vanilla's Retarget reads to
 -- turn an attacker on its own party, so a pass that fell through to it
--- would land there.  That write is mechanism staging only: the engine's
--- SetStatus_0d does not run, and a really Muddled (or Zombied) actor is
--- engine-driven -- InitPlayerAction would have picked its action and
--- targets -- so no played action reaches these passes in that state.  A
--- really Zombied actor's engine-driven Fight never starts a pass empty
--- (its emptied mask goes back to its backup targets, $3a4e), by the code.
+-- would land there.  That write is mechanism staging: the engine's
+-- SetStatus_0d does not run.  Play reaches the same state another way: an
+-- action queued before its actor's status changed keeps running, with its
+-- targets cleared by InitPlayerAction, so its first pass starts empty and
+-- vanilla's Retarget picks the side by the new status -- measured, a
+-- Zombie SETZER's queued 1 BP Coin Toss (battle_passretarget's draw,
+-- round3/sweep-strictI/r4_new_k4.log: `p1 ... in $0000 ... -> $0007`, the
+-- party).  A Zombie with a queued boosted row is so a natural route to
+-- the empty-start guard; that draw went to the party on its first pass,
+-- so its later pass started on the party (H), not empty.
 -- (Muddling an ally at the battle's start instead did not take: it kept
 -- its command window and Defended at 3 BP --
 -- build/attempts/wt/pass-retarget/round2/side/passside_menumuddle.log.)
@@ -57,7 +65,8 @@
 -- pass to the party once no monster stands fails G (emptied); one whose
 -- empty-start pass falls through to vanilla's Retarget fails G
 -- (emptystart); one whose "first pass" is the pass count, as 71224074's
--- was, fails I (offhand).
+-- was, fails I (offhand); one that sends a normal actor's first pass to
+-- the party side fails I (round4/mutants/).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
