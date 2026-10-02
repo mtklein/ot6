@@ -4818,12 +4818,14 @@ end
 -- Slot (the reels), Coin Toss (level x 30 gil at every enemy, special),
 -- Hired Help (level x 50 gil, one enemy, the class its row names first
 -- among slashing / piercing / bludgeoning) and Jackpot (99 MP, once a
--- battle, a dice triple whose face the boost floors).  The row ids are the
+-- battle, a dice triple, one more roll a Boost Point).  The row ids are the
 -- list's wItemList ids.  M.setzerGil / M.setzerJackpot are the ROM's
--- arithmetic, for the policy below and for the suites that check it.
+-- arithmetic, for the policy below and for the suites that check it: a
+-- coin row's boost buys one more toss or hire a point at the same price
+-- each, so the most it can cost is level x rate x (1 + boost).
 BATTLE.SETZER = { COIN = 0x59, HIRE = 0x5A, JACKPOT = 0x5B, SLOT = 0x5C }
 function M.setzerGil(level, rate, boost)
-  return level * rate * (1 << (boost or 0))
+  return level * rate * (1 + (boost or 0))
 end
 function M.setzerJackpot(face, level)
   return math.min(65535, face * face * face * level * 2 * face)

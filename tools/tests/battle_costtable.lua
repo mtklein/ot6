@@ -545,7 +545,7 @@ H.run({ maxFrames = 20000 }, {
     H.assertEq(zN, 1, "one Ot6SetzerCost call in Ot6AbilityCost (the @slot arm, #319)")
     H.assertEq(zHit, 0,
       "the @slot arm does NOT reach Ot6BoostPriceFor: cmd $0f is in the gate, "
-      .. "so Setzer's table is flat -- Jackpot's boost buys its face, and the "
+      .. "so Setzer's table is flat -- Jackpot's boost buys rolls, and the "
       .. "coin rows are paid in gil, not MP")
 
     local dHit, dN = armEscalates("Ot6DanceCost")

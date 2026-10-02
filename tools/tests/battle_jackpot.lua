@@ -1,6 +1,6 @@
 -- @suite savestate=wor_grave slow
 -- battle_jackpot.lua -- SETZER's divine, Jackpot (#319, kits.md "Setzer"):
--- the Fixed Dice come up a triple, the boost floors the face, 99 MP, once a
+-- the Fixed Dice come up a triple, a roll more a Boost Point, 99 MP, once a
 -- battle, and no chip.
 --
 -- Played, not staged: wor_grave is gen_wor_falcon's own frame on Daryl's

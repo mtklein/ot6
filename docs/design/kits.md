@@ -668,7 +668,8 @@ shields' halving or the Broken double, capped at 9,999 and the target's
 HP), with as many rolls as the HP wants and the bank holds, when the
 throw is expected to land 4,000 on a target of 4,000 HP or more; Slot
 at 3 BP in a random battle against two or more (a chosen triple); Coin
-Toss when its revealed ¤ chips two or more bodies; Hired Help when the
+Toss when its revealed ¤ chips two or more bodies, with a toss a point up
+to the most shields among them; Hired Help when the
 target's revealed row holds a physical class his own Fight does not key,
 with a hire a point up to the shields left (bank and purse allowing).
 Gil is spent only above a 20,000 reserve, and only in event battles (a
