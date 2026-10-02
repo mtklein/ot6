@@ -609,6 +609,17 @@ reads). Jackpot greys for MP or once spent. One authority each:
 `Ot6SetzerCost` (MP, flat, Ot6AbilityCost's `@slot` arm) and `Ot6CoinGil`
 (gil). Tests: `battle_cointoss`, `battle_hiredhelp`, `battle_jackpot`.
 
+**The route's driver plays the table** (`Driver:setzerLine`, lib/ot6.lua;
+#353), reading what an informed player would: Jackpot on a target of
+4,000 HP or more at the smallest boost whose lowest face reaches its HP
+(or the 9,999 cap) after the shields' halving or the Broken double; Slot
+at 3 BP in a random battle against two or more (a chosen triple); Coin
+Toss when its revealed ¤ chips two or more bodies; Hired Help when the
+target's revealed row holds a physical class his own Fight does not key.
+Gil is spent only above a 20,000 reserve. `opts.setzer = false` is the
+old behaviour (the control arm of the Falcon arc's labs,
+route-wor-falcon.md 13.10).
+
 ---
 
 ## Sketches (join order, WoB)
