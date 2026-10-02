@@ -204,10 +204,12 @@
         ; (OT6_NOACTION bit 7; $b5 = $12 cannot say it, Empowerer writes $12
         ; there mid-turn).  The pending boost is dropped rather than spent.
         ; The turn's regen pip then follows the TLM's ruling (#346): a
-        ; character still standing (put to sleep, stopped) earns it as on any
-        ; unboosted turn, the settlement Ot6DanceStumble gives a stumbled
-        ; start; one lying KO'd ($3ee4 bit 7) earns nothing, as when the fall
-        ; came before the entry reached the queue and no turn end ran at all.
+        ; character still in the fight (put to sleep, stopped) earns it as on
+        ; any unboosted turn, the settlement Ot6DanceStumble gives a stumbled
+        ; start; one out of the fight at the turn's end -- KO'd or petrified,
+        ; $3ee4 & $c0, FF6's own "died or escaped" grouping at :1144 less its
+        ; zombie bit, and neither takes turns -- earns nothing, as when the
+        ; fall came before the entry reached the queue and no turn end ran.
         ; Measured before this, in play: a fallen Setzer's queued spin came up
         ; as $12 and took the pips it was boosted with (battle_slotcancel;
         ; build/attempts/wt/slots-followups/).
@@ -231,8 +233,9 @@
         lda     $3204,x
         ora     #$80            ; the folded prices fall back, as on the
         sta     $3204,x         ;   spend arm below
-@lost:  lda     $3ee4,x         ; status 1, bit 7 = wound
-        bmi     done            ; KO'd: the lost turn earns no regen pip
+@lost:  lda     $3ee4,x         ; status 1: bit 7 wound, bit 6 petrify
+        bit     #$c0
+        bne     done            ; out of the fight: the lost turn earns no pip
         bra     @gain
 @spend: lda     OT6_BOOST_REVEALED,x         ; pending boost spent this action?
         beq     @gain

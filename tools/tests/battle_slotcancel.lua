@@ -14,9 +14,13 @@
 -- played here).  Now the ROM marks such a turn at ExecAction's head
 -- (Ot6NoActionMark, OT6_NOACTION bit 7: a fresh turn with nothing to run)
 -- and Ot6ActionEnd drops the pending tier there instead of spending it.
--- The lost turn's regen pip follows the TLM's ruling: earned if he still
--- stands at the turn's end (a sleep), not if he lies KO'd.  A natural fall
--- is enough; the Fenix Down that raises him plays no part.
+-- The lost turn's regen pip follows the TLM's ruling: earned if he is still
+-- in the fight at the turn's end (a sleep), not if he is out of it (KO'd or
+-- petrified, $3ee4 & $c0).  A natural fall is enough; the Fenix Down that
+-- raises him plays no part.  The cap hides the pip at bank 5, so the moment
+-- the test waits for is a cancel below it: Setzer, whose Defends would hold
+-- the bank at 5, spends a pip on a boosted spin whenever his window opens on
+-- a full bank outside a branch point.
 --
 -- Played, not written: a natural boot of the terra-returned-v1 checkpoint,
 -- a drawn battle, and real inputs only.  The party plays a policy a person
@@ -40,11 +44,12 @@
 -- frames longer there, then banks one pip with R, spins and commits as fast
 -- as a person taps, and is played on, the members now only caring and
 -- guarding, until the spin's own turn ends (Ot6ActionEnd with his entity;
--- the no-action mark, the command that ran and his KO bit read there).  Whether the blow lands before the commit (no
--- spin), in the spin's advance wait (vanilla drops the spin with him: no
--- end of its own), or once the spin waits in the action queue (it comes up
--- with the no-action mark) is the draw's business.  When no branch of a
--- point came up marked, the snapshot is restored and play goes on from
+-- the no-action mark, the command that ran and his out-of-the-fight bits
+-- read there).  Whether the blow lands before the commit (no spin), in the
+-- spin's advance wait (vanilla drops the spin with him: no end of its own),
+-- or once the spin waits in the action queue (it comes up with the
+-- no-action mark) is the draw's business.  When no branch of a point came
+-- up marked below bank 5, the snapshot is restored and play goes on from
 -- it (Setzer Defends in that window) to the next branch point, at most
 -- MAX_POINTS of them.
 -- Asserted, per branch:
@@ -52,11 +57,11 @@
 --      pending -> 0 and the bank down by the tier (the boost is still
 --      charged when it buys the spin);
 --   2. a boosted spin whose turn came up marked: pending -> 0, nothing
---      charged, and the bank UNCHANGED when he lies KO'd at the turn's end
---      (up one, capped at 5, if he stands -- a raise came first);
+--      charged, and the bank UNCHANGED when he is out of the fight at the
+--      turn's end (up one, capped at 5, if he is in it -- a raise came first);
 --   3. (no assertion) a spin dropped before it reached the queue ends no
 --      turn of its own; the branch is logged and counted, nothing more;
--- and at least one of each of 1 (the control) and 2.
+-- and at least one of each of 1 (the control) and 2, 2 below bank 5.
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -317,6 +322,7 @@ local function branchPoint()
   return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor
     and H.readByte(MSTATE) == ST_CMD and php(actor) > 0 and low() and bp(actor) >= 1
     and threatOn(actor) ~= nil and php(actor) < blow() and ctlDone
+    and bp(actor) < 5                     -- below the cap, where the pip shows
     and aheadOf(threatOn(actor)) == nil   -- the blow is still in its advance wait
 end
 
@@ -400,6 +406,8 @@ local function approachFrame()
     if not ctlDone and (ctl == nil or not ctl.commit) and not low() and bp(actor) >= 1 then
       ctl = ctl or {}
       setzerSpin()
+    elseif ctlDone and bp(actor) >= 5 then
+      setzerSpin()      -- a full bank hides the pip: spend one on a boosted spin
     else
       setzerDefend()
     end
@@ -511,7 +519,7 @@ local function branch(j, wait)
         H.log(string.format("[cancel] branch %d %s: commit f%d pending %d bank %d | turn end " ..
           "f%d no-action mark %s $b5=$%02X hp %d%s -> pending %d bank %d (fell f%s, raised f%s)",
           k, what, c.f, c.p, c.b, d.f, d.kind == "cancelled" and "SET" or "clear", d.cmd,
-          d.hp, d.ko and " KO'd" or "", d.p, d.b, tostring(rec.fell), tostring(rec.raised)))
+          d.hp, d.ko and " out of the fight" or "", d.p, d.b, tostring(rec.fell), tostring(rec.raised)))
       end
       rec.logged = true
     end),
@@ -583,10 +591,15 @@ end
 -- as at any other) to the next branch point, at most MAX_POINTS of them.
 local battles, atPoint = 0, false
 local BRANCHES_PER_POINT, MAX_POINTS = 2, 10
-local function found()
-  local _, cancelled = tally()
-  return cancelled >= 1
+local function belowCap()
+  local n = 0
+  for _, r in ipairs(recs) do
+    if r.logged and r.done and r.done.kind == "cancelled" and r.commit.p > 0
+       and r.commit.b < 5 then n = n + 1 end
+  end
+  return n
 end
+local function found() return belowCap() >= 1 end
 local function backToPlain()
   local ph = 0
   return H.driveUntil(function()
@@ -666,10 +679,11 @@ local steps = {
       if x == actor * 2 then
         -- what ended: the ROM's own record of a fresh turn with nothing to
         -- run (OT6_NOACTION bit 7, written at ExecAction's head by
-        -- Ot6NoActionMark), the command that ran, and whether he lay KO'd
+        -- Ot6NoActionMark), the command that ran, and whether he was out of
+        -- the fight (KO'd or petrified)
         endHit = { cmd = H.readByte(0xB5), hp = php(actor),
                    noaction = (H.readByte(NOACTION) & 0x80) ~= 0,
-                   ko = (H.readByte(0x3EE4 + x) & 0x80) ~= 0 }
+                   ko = (H.readByte(0x3EE4 + x) & 0xC0) ~= 0 }   -- KO'd or petrified
       end
     end, emu.callbackType.exec, ae, ae)
     local ea = H.sym("ExecAction")
@@ -737,8 +751,8 @@ steps[#steps + 1] = H.call(function()
           fails[#fails + 1] = string.format("branch %d: a spin that never ran (no-action " ..
             "mark set, pending %d, bank %d at its commit, %s at its end) left pending %d, " ..
             "bank %d (want 0, %d: nothing charged, %s)", r.k, c.p, c.b,
-            d.ko and "KO'd" or "standing", d.p, d.b, wantB,
-            d.ko and "no regen for a KO'd character" or "the unboosted regen")
+            d.ko and "out of the fight" or "in the fight", d.p, d.b, wantB,
+            d.ko and "no regen out of the fight" or "the unboosted regen")
         end
       end
     end
@@ -754,8 +768,9 @@ steps[#steps + 1] = H.call(function()
   H.assertEq(d.p == 0 and d.b == c.b - c.p, true, string.format("the control: a boosted " ..
     "spin that ran paid its tier: pending %d -> %d (want 0), bank %d -> %d (want %d)",
     c.p, d.p, c.b, d.b, c.b - c.p))
-  H.assertEq(cancelled >= 1, true, "precondition: at least one branch's boosted spin " ..
-    "came up with nothing to run (the no-action mark) -- Setzer fell with it queued")
+  H.assertEq(belowCap() >= 1, true, string.format("precondition: at least one branch's " ..
+    "boosted spin came up with nothing to run (the no-action mark) below bank 5, where the " ..
+    "regen pip shows -- Setzer fell with it queued (%d marked in all)", cancelled))
 end)
 
 H.run({ maxFrames = 400000 }, steps)
