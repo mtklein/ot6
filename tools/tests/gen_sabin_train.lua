@@ -577,7 +577,7 @@ local function closeShop()
 end
 
 local b68 = {
-  casts = 0, chips = {}, plan = nil, planActor = nil, impCure = {}, chipAt = {}, castAt = {},
+  casts = 0, chips = {}, plan = nil, planActor = nil, impCure = {}, reviveFor = {}, chipAt = {}, castAt = {},
   brokeAt = nil, impossible = nil, itemsOut = false,
   lastSH, lastHP,
 }
@@ -607,13 +607,28 @@ local function makePlan(actor)
   -- target select initializes on the dead ally, and the steer never
   -- confirms on the monster side, so the undead throw cannot happen),
   -- cure own poison, heal under 50%.
+  -- One revive per fallen member in flight (#341), the imp cure's rule
+  -- below: a Fenix Down an ally has planned on a member stands until that
+  -- ally's next command menu (its queued action has run by then), its
+  -- death, or the member standing again.  Two allies spent two Fenix
+  -- Downs on one corpse in the Ghost Train's losses (sweep4
+  -- tw_k0_s0_pre68_w29: `revive: e2 is down` twice, both landing).
+  for e, rec in pairs(b68.reviveFor) do
+    if rec.by == actor or pHP(rec.by) == 0 or pHP(e) > 0 then b68.reviveFor[e] = nil end
+  end
   for e = 0, 3 do
     if pMaxHP(e) > 0 and pHP(e) == 0 and itemRow
        and battInvIdx(FENIX_DOWN) then
-      b68Log(string.format("revive: e%d is down -- FENIX DOWN [%s]",
-        e, partyLine()))
-      return { kind = "item", item = FENIX_DOWN, target = e,
-               row = itemRow }
+      if b68.reviveFor[e] then
+        b68Log(string.format("no revive on e%d: e%d's Fenix Down on it is in flight [%s]",
+          e, b68.reviveFor[e].by, partyLine()))
+      else
+        b68Log(string.format("revive: e%d is down -- FENIX DOWN [%s]",
+          e, partyLine()))
+        b68.reviveFor[e] = { by = actor }
+        return { kind = "item", item = FENIX_DOWN, target = e,
+                 row = itemRow }
+      end
     end
   end
   local st1 = H.readByte(0x3EE4 + actor * 2)
@@ -1059,7 +1074,7 @@ local function b68Fight()
       b68.lastSH, b68.lastHP = nil, nil
       b68.tornDown, b68.mstreak = 0, 0
       b68.oddState, b68.oddN, b68.impSaid = nil, 0, false
-      b68.impCure = {}
+      b68.impCure, b68.reviveFor = {}, {}
       gSlot, sabinE, cyanE, shadowE = nil, nil, nil, nil
       b68Watch.reset()
     end),

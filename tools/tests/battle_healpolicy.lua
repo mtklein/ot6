@@ -74,12 +74,34 @@ local CASES = {
   { name = "the same drink, but it is keeping an ally up",
     hp = 100, maxhp = 168, restore = 50, roundCost = 112, allies = 1,
     threshold = 60, want = "covering an ally" },
-  -- A party still covers an ally the drink cannot lift clear of the WORST
-  -- round: 40 + 50 loses to a 112 round and survives the 55 the same soldier
-  -- also throws, and roundCost is the worst seen rather than the usual one.
-  { name = "an ally the drink cannot lift clear of the worst round",
+  -- The lift (#312): a drink that leaves the ally inside the round spends
+  -- the turn and only delays the death -- 40 + 50 = 90 is still inside a
+  -- 112 round -- so the actor acts instead (and the spend rule, counting
+  -- only heals this policy takes, sees none that saves).  The Sand Horse
+  -- lab lever: deaths 9 -> 0 over 42 keys.  (Before #312 this case read
+  -- "covering an ally".)
+  { name = "an ally the drink cannot lift clear of the round",
     hp = 40, maxhp = 168, restore = 50, roundCost = 112, allies = 1,
+    threshold = 60, want = nil },
+  -- ...one that it does lift clear is still covered: 70 + 50 = 120 > 112
+  { name = "an ally the drink lifts clear of the round",
+    hp = 70, maxhp = 168, restore = 50, roundCost = 112, allies = 1,
     threshold = 60, want = "covering an ally" },
+  -- ...and the boundary: 62 + 50 = 112 is exactly the round, still dead
+  { name = "an ally the drink lifts to exactly the round",
+    hp = 62, maxhp = 168, restore = 50, roundCost = 112, allies = 1,
+    threshold = 60, want = nil },
+  -- the lift binds a cast as it binds a drink: a cure that leaves an
+  -- endangered ally inside the round is a delay too (under the threshold
+  -- or not), so `mp` does not reopen it
+  { name = "a cure on an endangered ally that does not lift them",
+    hp = 40, maxhp = 168, restore = 50, roundCost = 112, allies = 1,
+    threshold = 60, mp = true, want = nil },
+  -- Dullahan's opening priced at the old two-Pearls figure (2172 against
+  -- a 1798 max): no Potion lifts anybody clear of that, so nobody drinks
+  { name = "a round above max HP: no lift is possible",
+    hp = 1175, maxhp = 1798, restore = 250, roundCost = 2166, allies = 3,
+    threshold = 60, want = nil },
   -- Alone, the same character swings: the drink costs more attacking time
   -- than it buys, and there is nobody else's turns to buy back.
   { name = "the same character alone",
@@ -390,6 +412,43 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(H.muddleRule({ actor = 1, status2 = { [0] = 0x20, [1] = 0, [2] = 0, [3] = 0 },
       hp = { [0] = 399, [1] = 1509, [2] = 0, [3] = 0 }, maxhp = { [0] = 1595, [1] = 1609, [2] = 0, [3] = 0 },
       floor = { [0] = 398 } }), 0, "one HP above the floor: hit it")
+    -- one cure-hit in flight (#348): the tomb's EDGAR planned a second
+    -- hit on CELES while SETZER's was still queued, and SETZER's killed
+    -- her; an ally whose hit is in flight is neither hit again nor held,
+    -- and the next muddled ally is the one planned for
+    local q4 = { [0] = 1000, [1] = 1500, [2] = 1200, [3] = 1400 }
+    local m4 = { [0] = 1696, [1] = 1609, [2] = 1600, [3] = 1500 }
+    r, held = H.muddleRule({ actor = 2, status2 = { [0] = 0x20, [1] = 0, [2] = 0, [3] = 0 },
+      hp = q4, maxhp = m4, inFlight = { [0] = true } })
+    H.assertEq(tostring(r) .. "/" .. tostring(held), "nil/nil",
+      "a muddled ally with another member's cure-hit in flight: no second hit, not held")
+    H.assertEq(H.muddleRule({ actor = 2, status2 = { [0] = 0x20, [1] = 0x20, [2] = 0, [3] = 0 },
+      hp = q4, maxhp = m4, inFlight = { [0] = true } }), 1,
+      "...and another muddled ally beside it is the one this actor hits")
+    H.assertEq(H.muddleRule({ actor = 2, status2 = { [0] = 0x20, [1] = 0, [2] = 0, [3] = 0 },
+      hp = q4, maxhp = m4 }), 0, "the same ally with nothing in flight: hit it")
+    -- the floor's price (#348, H.allyFightMax), the engine's arithmetic
+    -- worked by hand: bp 100, L30, vigor x2 80, defense 100 -- attack 180,
+    -- 180 x 30 x 30 / 256 = 632, 100 + 1.5 x 632 = 1048, x255/256 + 1 =
+    -- 1044, x155/256 + 1 = 633, halved for one party member on another: 316
+    local base = { hands = { { bp = 100 } }, level = 30, vigor2 = 80, def = 100 }
+    local f = H.allyFightMax(base)
+    H.assertEq(f.max * 10000 + f.crit, 3160632, "a plain Fight on an ally priced at 316, a critical 632")
+    H.assertEq(f.top, 632, "...and the floor is the critical's")
+    base.tBackRow = true
+    H.assertEq(H.allyFightMax(base).max, 158, "the ally in the back row halves it")
+    base.tBackRow = nil
+    base.hands = { { bp = 100, casts = true } }
+    H.assertEq(H.allyFightMax(base).top, 948, "a hand that casts its weapon spell: the floor x3")
+    base.hands = { { bp = 100, effect = 3 } }
+    H.assertEq(H.allyFightMax(base).lethal ~= nil, true,
+      "the Trump's instant death (effect 3): lethal at any HP (the tomb's CELES, from 989/1696)")
+    base.deathProof = true
+    H.assertEq(H.allyFightMax(base).lethal, nil, "...unless the ally is proof against instant death")
+    base.deathProof = nil
+    base.hands = { { bp = 100, elem = 0x01 } }
+    base.absorb = 0x01
+    H.assertEq(H.allyFightMax(base).max, 0, "a weapon element the ally absorbs: nothing to price")
     H.log("battle_healpolicy: refined raise gate, ATB read and Muddle rule checked")
   end),
 
@@ -570,6 +629,25 @@ H.run({ maxFrames = 3000 }, {
       .. "a gauge that cannot fill (Stop) adds nothing (" .. why .. ")")
     c, n = H.roundCost({ window = 250, enemies = { { slot = 0, eta = 30, period = 300 } } })
     H.assertEq(c * 10 + n, 1, "nothing measured anywhere: the action is counted, priced at 0")
+    -- one enemy acting twice in the window (#312's Dullahan finding): its
+    -- worst once and its typical action for the second.  The numbers are
+    -- var1_k6_s0_w1's: a 202-tick window, his gauge full with a 139-tick
+    -- period, Pearl 1086 his worst, and the mean of his landed actions
+    -- there (195, 197, 460, 299, 202, 1083, 623, 1086) 518
+    c, n, why = H.roundCost({ window = 202,
+      enemies = { { slot = 0, eta = 0, period = 139, worst = 1086, typical = 518 } } })
+    H.assertEq(c * 10 + n, 16042, "Dullahan twice in a window: 1086 + 518 = 1604, not 2 x 1086 = 2172 ("
+      .. why .. ")")
+    H.assertEq(c < 1798 and 2172 > 1798, true, "...under his targets' max HP, where the old price was above it")
+    c, n = H.roundCost({ window = 202,
+      enemies = { { slot = 0, eta = 0, period = 139, worst = 1086 } } })
+    H.assertEq(c * 10 + n, 21722, "no typical measured: every action at the worst, as before")
+    c, n = H.roundCost({ window = 100,
+      enemies = { { slot = 0, eta = 0, period = 139, worst = 1086, typical = 518 } } })
+    H.assertEq(c * 10 + n, 10861, "one action in the window: the worst alone")
+    c, n = H.roundCost({ window = 500,
+      enemies = { { slot = 0, eta = 40, period = 227, worst = 149, typical = 200 } } })
+    H.assertEq(c * 10 + n, 4473, "a typical above the worst (a mean of misreads) never raises the price")
     H.log("battle_healpolicy: round price (#206, #194) checked")
   end),
 
