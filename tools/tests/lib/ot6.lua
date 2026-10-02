@@ -924,8 +924,8 @@ end
 --            with nothing measured (the largest single action any enemy
 --            has landed this battle); nil = such an action adds nothing
 --   each enemy may also carry `typical`: the mean of the actions it has
---            landed (each action's largest loss on one member), nil =
---            not measured
+--            taken (each action's largest loss on one member, a miss or a
+--            buff a zero; Driver:commitMonAct), nil = not measured
 --
 -- A gauge that fills at or inside the window acts once, plus once per
 -- full period that still fits.  One enemy acting twice is priced at its
@@ -4931,6 +4931,24 @@ end
 -- against 12 and no frames gained (8127 vs 8126), because the 55-HP
 -- raise never survives the next Flare either.  main's gate stands.
 function Driver:commitMonAct(act)
+  -- the slot's typical action (M.roundCost: a second action in one
+  -- window is priced at this rather than at the worst again) is the mean
+  -- of every action it closes, a miss, a buff or a counter that took
+  -- nothing a zero -- the script's own bookkeeping ($2E/$2F) aside.  The
+  -- first cut averaged only the actions that landed, and Dullahan's
+  -- [round-check] priced 433 enemy actions over 236 turns where 223
+  -- damaging ones closed (build/attempts/wt/care-policy/dull/): his L?
+  -- Pearl misses by design and his counters, Haste and Cure 2 take
+  -- nothing, yet each was charged at his typical hit.
+  if act.cmd ~= 0x2E and act.cmd ~= 0x2F then
+    local L0 = self.hitLedger[act.slot] or { on = {} }
+    self.hitLedger[act.slot] = L0
+    local per0, size = {}, 0
+    for _, d in ipairs(act.drops) do per0[d.e] = (per0[d.e] or 0) + d.drop end
+    for _, v in pairs(per0) do if v > size then size = v end end
+    L0.actSum, L0.actN = (L0.actSum or 0) + size, (L0.actN or 0) + 1
+    self.monActN = (self.monActN or 0) + 1
+  end
   if #act.drops == 0 then return end
   local L = self.hitLedger[act.slot] or { on = {} }
   self.hitLedger[act.slot] = L
@@ -4939,16 +4957,10 @@ function Driver:commitMonAct(act)
   L.maxOn = L.maxOn or {}
   local per = {}
   for _, d in ipairs(act.drops) do per[d.e] = (per[d.e] or 0) + d.drop end
-  local size = 0
   for e, v in pairs(per) do
     if L.maxOn[e] == nil or v > L.maxOn[e] then L.maxOn[e] = v end
     if L.max == nil or v > L.max then L.max = v end
-    if v > size then size = v end
   end
-  -- the slot's typical action (M.roundCost: a second action in one
-  -- window is priced at this rather than at the worst again)
-  L.actSum, L.actN = (L.actSum or 0) + size, (L.actN or 0) + 1
-  self.monActN = (self.monActN or 0) + 1
   for _, d in ipairs(act.drops) do
     if L.on[d.e] == nil or d.drop < L.on[d.e] then L.on[d.e] = d.drop end
     if L.min == nil or d.drop < L.min then
@@ -8405,7 +8417,8 @@ function M.allyFightMax(o)
     elseif e ~= 0 and ((o.weak or 0) & e) ~= 0 then d, how = d * 2, " weak" end
     -- the weapon's own special effect (ItemProp +27's high nibble; the
     -- TargetEffectTbl / AttackerEffectTbl rows a Fight runs): 3 kills
-    -- outright, 1 swing in 4 (ScimitarEffect: the Trump, the Scimitar)
+    -- outright: 1 swing in 4, then past the target's stamina roll (ScimitarEffect,
+    -- _c223b2: the Trump, the Scimitar)
     -- unless the target is proof against instant death ($3AA1 bit 2) --
     -- the tomb's SETZER killed CELES from 989/1696 with his Trump's cure-hit
     -- (#348); 4 doubles on a human (the Man Eater); 7 spends MP on a
@@ -8415,7 +8428,7 @@ function M.allyFightMax(o)
     -- scales with the hitter's HP and is priced at its double
     local fx = h.effect or 0
     if fx == 3 and not o.deathProof then
-      lethal = lethal or string.format("hand %d's weapon kills outright, 1 swing in 4", i)
+      lethal = lethal or string.format("hand %d's weapon can kill outright (1 swing in 4, past a stamina roll)", i)
       how = how .. " +instant death"
     elseif fx == 4 and o.human then d, how = d * 2, how .. " x2 (human)"
     elseif fx == 7 or fx == 14 or fx == 2 then d, how = d * 2, how .. " x2 (its critical)"
