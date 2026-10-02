@@ -189,7 +189,17 @@ H.run({ maxFrames = 150000 }, {
   pass(1, { { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3 } }, 3),
   pass(2, { { row = JACKPOT, boost = 1 }, { row = JACKPOT, refused = true } }, 1),
   pass(3, { { row = "defend" }, { row = JACKPOT, boost = 0 }, { row = JACKPOT, refused = true } }, 0),
+  -- the draws lab_jackpass.lua found from this frame (round 4,
+  -- build/attempts/wt/kit-setzer/labs-r4/): stand 57 frames, press, act at
+  -- once -- key beDC: faces 5, 6, 4 fell Dullahan and the fourth pass found
+  -- no body; stand 25 -- key be5C: the first roll's $be 50 met a byte past
+  -- 251 and drew again
+  pass(4, { { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3 } }, 3,
+    { wait = 57, stand = 0, wantEmpty = true, why = "key beDC, measured: three rolls fell him" }),
+  pass(5, { { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3 } }, 3,
+    { wait = 25, stand = 0, wantRedraw = true, why = "key be5C, measured: the first roll redraws" }),
   H.call(function()
-    H.log("[jackpot] PASSED: 1 + boost rolls at 3, 1 and 0 BP, 99 MP, no chip, once a battle")
+    H.log("[jackpot] PASSED: 1 + boost passes at 3, 1 and 0 BP, a pass with no body rolls nothing, the draw rule "
+      .. "(a redraw past 251 included), 99 MP, no chip, once a battle")
   end),
 })
