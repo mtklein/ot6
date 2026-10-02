@@ -11,10 +11,12 @@
 -- $12): nothing happens.  Ot6ActionEnd charged the pending boost there, so a
 -- Setzer felled with a boosted spin queued paid for a spin that never ran
 -- (first seen in a fault-injected lab, build/attempts/wt/suites-2.2.1/;
--- played here).  Now a cancelled action is settled as an unboosted turn:
--- the pending tier is dropped, nothing is spent, and the regen pip lands
--- (Ot6DanceStumble's settlement for a stumbled Dance start).  A natural
--- fall is enough; the Fenix Down that raises him plays no part.
+-- played here).  Now the ROM marks such a turn at ExecAction's head
+-- (Ot6NoActionMark, OT6_NOACTION bit 7: a fresh turn with nothing to run)
+-- and Ot6ActionEnd drops the pending tier there instead of spending it.
+-- The lost turn's regen pip follows the TLM's ruling: earned if he still
+-- stands at the turn's end (a sleep), not if he lies KO'd.  A natural fall
+-- is enough; the Fenix Down that raises him plays no part.
 --
 -- Played, not written: a natural boot of the terra-returned-v1 checkpoint,
 -- a drawn battle, and real inputs only.  The party plays a policy a person
@@ -37,20 +39,21 @@
 -- snapshotted and branched BRANCHES_PER_POINT times: each branch idles 4
 -- frames longer there, then banks one pip with R, spins and commits as fast
 -- as a person taps, and is played on, the members now only caring and
--- guarding, until the spin's own turn ends (Ot6ActionEnd with his entity,
--- $b5 the command that ran).  Whether the blow lands before the commit (no
+-- guarding, until the spin's own turn ends (Ot6ActionEnd with his entity;
+-- the no-action mark, the command that ran and his KO bit read there).  Whether the blow lands before the commit (no
 -- spin), in the spin's advance wait (vanilla drops the spin with him: no
 -- end of its own), or once the spin waits in the action queue (it comes up
--- as the placeholder) is the draw's business.  When no branch of a point
--- ended as the placeholder, the snapshot is restored and play goes on from
+-- with the no-action mark) is the draw's business.  When no branch of a
+-- point came up marked, the snapshot is restored and play goes on from
 -- it (Setzer Defends in that window) to the next branch point, at most
 -- MAX_POINTS of them.
 -- Asserted, per branch:
---   1. a spin that ran ($0F), the control's and any branch's: pending -> 0
---      and the bank down by the tier (the boost is still charged when it
---      buys the spin);
---   2. a boosted spin that ended as the placeholder ($12): pending -> 0 and
---      the bank UP one (capped at 5) -- nothing charged, the unboosted regen;
+--   1. a spin that ran ($0F, unmarked), the control's and any branch's:
+--      pending -> 0 and the bank down by the tier (the boost is still
+--      charged when it buys the spin);
+--   2. a boosted spin whose turn came up marked: pending -> 0, nothing
+--      charged, and the bank UNCHANGED when he lies KO'd at the turn's end
+--      (up one, capped at 5, if he stands -- a raise came first);
 --   3. (no assertion) a spin dropped before it reached the queue ends no
 --      turn of its own; the branch is logged and counted, nothing more;
 -- and at least one of each of 1 (the control) and 2.
@@ -71,6 +74,7 @@ local LOW_PCT = 15          -- the control spins only while he stands above this
 local CARE_PCT = 40         -- ...and give a Potion to any other member below this
 local MAX_BATTLES = 6
 
+local NOACTION = nil        -- OT6_NOACTION's WRAM offset (H.sym, at the first step)
 local function bp(s)   return H.readByte(0x3E9C + s * 2) end
 local function pend(s) return H.readByte(0x3E9D + s * 2) end
 local function chid(s) return H.readByte(0x3ED8 + s * 2) end
@@ -377,15 +381,15 @@ local function approachFrame()
     local e = endHit
     endHit = nil
     if ctl and ctl.commit and not ctl.done then
-      if e.cmd == CMD_SLOT then
+      if e.cmd == CMD_SLOT and not e.noaction then
         ctl.done = { f = H.frame, cmd = e.cmd, hp = e.hp, p = pend(actor), b = bp(actor) }
         ctlDone = true
         H.log(string.format("[cancel] control f%d: a boosted spin RAN: commit f%d pending %d " ..
           "bank %d | turn end $b5=$0F -> pending %d bank %d", H.frame, ctl.commit.f,
           ctl.commit.p, ctl.commit.b, ctl.done.p, ctl.done.b))
       else
-        H.log(string.format("[cancel] control f%d: the spin ended as $%02X, not run; again",
-          H.frame, e.cmd))
+        H.log(string.format("[cancel] control f%d: the spin ended as $%02X (no-action mark " ..
+          "%s), not run; again", H.frame, e.cmd, tostring(e.noaction)))
         ctl = nil
       end
     end
@@ -420,8 +424,9 @@ local function branchFrame()
     local e = endHit
     endHit = nil
     if rec.commit and rec.done == nil and rec.dropped == nil then
-      if e.cmd == CMD_SLOT or e.cmd == CMD_NOEFFECT then
-        rec.done = { f = H.frame, cmd = e.cmd, hp = e.hp, p = pend(actor), b = bp(actor) }
+      if e.noaction or e.cmd == CMD_SLOT then
+        rec.done = { f = H.frame, cmd = e.cmd, hp = e.hp, p = pend(actor), b = bp(actor),
+                     kind = e.noaction and "cancelled" or "ran", ko = e.ko }
       else
         -- a later turn of his (the Defend after a raise) ended first: the
         -- spin was dropped with him before it reached the action queue
@@ -456,8 +461,8 @@ local function tally()
   local ran, cancelled = 0, 0
   for _, r in ipairs(recs) do
     -- counted once the branch has been logged (the outer drive stops on it)
-    if r.logged and r.done and r.done.cmd == CMD_SLOT and r.commit.p > 0 then ran = ran + 1 end
-    if r.logged and r.done and r.done.cmd == CMD_NOEFFECT and r.commit.p > 0 then
+    if r.logged and r.done and r.done.kind == "ran" and r.commit.p > 0 then ran = ran + 1 end
+    if r.logged and r.done and r.done.kind == "cancelled" and r.commit.p > 0 then
       cancelled = cancelled + 1
     end
   end
@@ -502,11 +507,11 @@ local function branch(j, wait)
           rec.dropped.cmd, rec.dropped.f) or "3000 frames passed", tostring(rec.fell),
           tostring(rec.raised), pend(actor), bp(actor)))
       else
-        local what = d.cmd == CMD_SLOT and "RAN" or (d.cmd == CMD_NOEFFECT and "CANCELLED"
-          or string.format("ENDED AS $%02X", d.cmd))
+        local what = d.kind == "ran" and "RAN" or "CANCELLED"
         H.log(string.format("[cancel] branch %d %s: commit f%d pending %d bank %d | turn end " ..
-          "f%d $b5=$%02X hp %d -> pending %d bank %d (fell f%s, raised f%s)", k, what,
-          c.f, c.p, c.b, d.f, d.cmd, d.hp, d.p, d.b, tostring(rec.fell), tostring(rec.raised)))
+          "f%d no-action mark %s $b5=$%02X hp %d%s -> pending %d bank %d (fell f%s, raised f%s)",
+          k, what, c.f, c.p, c.b, d.f, d.kind == "cancelled" and "SET" or "clear", d.cmd,
+          d.hp, d.ko and " KO'd" or "", d.p, d.b, tostring(rec.fell), tostring(rec.raised)))
       end
       rec.logged = true
     end),
@@ -650,6 +655,7 @@ end
 
 local steps = {
   H.call(function()
+    NOACTION = H.sym("OT6_NOACTION")
     local cmt = H.sym("Ot6SlotCommit")
     emu.addMemoryCallback(function() commitHit = true end, emu.callbackType.exec, cmt, cmt)
     local ae = H.sym("Ot6ActionEnd")
@@ -657,7 +663,14 @@ local steps = {
       local x = emu.getState()["cpu.x"] & 0xffff
       if x == monsterActing then monsterActing = nil end
       if actor == nil then return end
-      if x == actor * 2 then endHit = { cmd = H.readByte(0xB5), hp = php(actor) } end
+      if x == actor * 2 then
+        -- what ended: the ROM's own record of a fresh turn with nothing to
+        -- run (OT6_NOACTION bit 7, written at ExecAction's head by
+        -- Ot6NoActionMark), the command that ran, and whether he lay KO'd
+        endHit = { cmd = H.readByte(0xB5), hp = php(actor),
+                   noaction = (H.readByte(NOACTION) & 0x80) ~= 0,
+                   ko = (H.readByte(0x3EE4 + x) & 0x80) ~= 0 }
+      end
     end, emu.callbackType.exec, ae, ae)
     local ea = H.sym("ExecAction")
     emu.addMemoryCallback(function()
@@ -710,22 +723,23 @@ steps[#steps + 1] = H.call(function()
     local c, d = r.commit, r.done
     if c and d then
       n = n + 1
-      if d.cmd == CMD_SLOT then
+      if d.kind == "ran" then
         local wantB = c.p > 0 and c.b - c.p or math.min(c.b + 1, 5)
         if not (d.p == 0 and d.b == wantB) then
           fails[#fails + 1] = string.format("branch %d: a spin that ran (pending %d, bank %d " ..
             "at its commit) left pending %d, bank %d (want 0, %d)", r.k, c.p, c.b, d.p, d.b, wantB)
         end
-      elseif d.cmd == CMD_NOEFFECT then
-        local wantB = math.min(c.b + 1, 5)
-        if not (d.p == 0 and d.b == wantB) then
-          fails[#fails + 1] = string.format("branch %d: a spin that never ran (ended as " ..
-            "$12, pending %d, bank %d at its commit) left pending %d, bank %d (want 0, %d: " ..
-            "nothing charged, the unboosted regen)", r.k, c.p, c.b, d.p, d.b, wantB)
-        end
       else
-        fails[#fails + 1] = string.format("branch %d: his turn ended as $%02X, neither the " ..
-          "spin ($0F) nor the placeholder ($12)", r.k, d.cmd)
+        -- the TLM's ruling (#346): nothing charged either way; a lost turn
+        -- earns the regen pip only if he still stands at its end
+        local wantB = d.ko and c.b or math.min(c.b + 1, 5)
+        if not (d.p == 0 and d.b == wantB) then
+          fails[#fails + 1] = string.format("branch %d: a spin that never ran (no-action " ..
+            "mark set, pending %d, bank %d at its commit, %s at its end) left pending %d, " ..
+            "bank %d (want 0, %d: nothing charged, %s)", r.k, c.p, c.b,
+            d.ko and "KO'd" or "standing", d.p, d.b, wantB,
+            d.ko and "no regen for a KO'd character" or "the unboosted regen")
+        end
       end
     end
   end
@@ -741,7 +755,7 @@ steps[#steps + 1] = H.call(function()
     "spin that ran paid its tier: pending %d -> %d (want 0), bank %d -> %d (want %d)",
     c.p, d.p, c.b, d.b, c.b - c.p))
   H.assertEq(cancelled >= 1, true, "precondition: at least one branch's boosted spin " ..
-    "ended as the placeholder ($12) -- Setzer fell with it queued")
+    "came up with nothing to run (the no-action mark) -- Setzer fell with it queued")
 end)
 
 H.run({ maxFrames = 400000 }, steps)

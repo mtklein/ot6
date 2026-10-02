@@ -195,35 +195,44 @@
                                 ;   on purpose: see OT6_RUNICPAID in
                                 ;   ot6_memory.inc.
         ; #346: an action that never ran buys nothing, so it costs nothing.
-        ; ExecAction runs a turn whose command list is empty -- the action
-        ; was removed after its entry reached the action queue: a fall, a
-        ; petrify or a sleep runs RemoveAllActions, which clears the command
-        ; list and the advance-wait queue but not $3820, so the stale entry
-        ; still comes up -- as the placeholder CmdNoEffect, and reaches here.
-        ; Ot6NoActionMark recorded that at the turn's head (OT6_NOACTION bit
-        ; 7; $b5 = $12 cannot say it, Empowerer writes $12 there mid-turn).
-        ; Its pending boost is dropped rather than spent, and the turn ends
-        ; as an unboosted one would, regen pip included -- the settlement
-        ; Ot6DanceStumble gives a stumbled start.  Measured before this, in
-        ; play: a fallen Setzer's queued spin came up as $12 and took the
-        ; pips it was boosted with (battle_slotcancel;
+        ; ExecAction runs a fresh turn whose command list is empty -- the
+        ; action was removed after its entry reached the action queue: a
+        ; fall, a petrify or a sleep runs RemoveAllActions, which clears the
+        ; command list and the advance-wait queue but not $3820, so the stale
+        ; entry still comes up -- as the placeholder CmdNoEffect, and reaches
+        ; here.  Ot6NoActionMark recorded that at the turn's head
+        ; (OT6_NOACTION bit 7; $b5 = $12 cannot say it, Empowerer writes $12
+        ; there mid-turn).  The pending boost is dropped rather than spent.
+        ; The turn's regen pip then follows the TLM's ruling (#346): a
+        ; character still standing (put to sleep, stopped) earns it as on any
+        ; unboosted turn, the settlement Ot6DanceStumble gives a stumbled
+        ; start; one lying KO'd ($3ee4 bit 7) earns nothing, as when the fall
+        ; came before the entry reached the queue and no turn end ran at all.
+        ; Measured before this, in play: a fallen Setzer's queued spin came up
+        ; as $12 and took the pips it was boosted with (battle_slotcancel;
         ; build/attempts/wt/slots-followups/).
-        ; Whatever is pending here is not a committed action's: a command he
+        ; What the dropped pending can belong to: the action that was lost
+        ; (the case above), or a window of his open with a boost raised and
+        ; nothing chosen yet (he was raised before the stale entry came up),
+        ; which goes back to 0 in view and can be raised again.  A command he
         ; commits after a raise lands in his command list, and ExecAction
-        ; runs it from this same stale entry (charged as it ends) instead of
-        ; reaching @0183.  At most a window of his is open with a boost
-        ; raised and nothing chosen; that goes back to 0, in view, and can
-        ; be raised again.  (A Slot spin already latched its tier at the
-        ; first reel press and re-banks it at the commit, Ot6SlotCommit.)
+        ; runs it from the stale entry itself, unmarked, charged as it ends.
+        ; Nor is the second half of a two-entry list marked (X-Magic, or a
+        ; Mimic of it): ExecAction resumes it from $3406, not from the queue,
+        ; and if a counter between the halves felled or slept the caster the
+        ; boost already bought the first spell, so it is charged there as
+        ; before (Ot6NoActionMark marks fresh turns only).
         lda     f:$7e0000+OT6_NOACTION
         bpl     @spend
         lda     OT6_BOOST_REVEALED,x
-        beq     @gain
+        beq     @lost
         lda     #$00
         sta     OT6_BOOST_REVEALED,x    ; nothing bought: the pips stay banked
         lda     $3204,x
         ora     #$80            ; the folded prices fall back, as on the
         sta     $3204,x         ;   spend arm below
+@lost:  lda     $3ee4,x         ; status 1, bit 7 = wound
+        bmi     done            ; KO'd: the lost turn earns no regen pip
         bra     @gain
 @spend: lda     OT6_BOOST_REVEALED,x         ; pending boost spent this action?
         beq     @gain
@@ -276,10 +285,21 @@ done:   jsr     Ot6PipPending
 
 ; called from ExecAction's head (battle_main.asm @0100), right after the
 ; command-list pointer is read (Ot6BrokenTurn) and before the bmi that sends
-; an empty list to the placeholder CmdNoEffect: records the pointer's bit 7
-; in OT6_NOACTION for Ot6ActionEnd at the end of this turn (#346).  Every
-; pass through @0100 rewrites it (the random-attack loop included), so the
-; byte always speaks for the turn now running.
+; an empty list to the placeholder CmdNoEffect: records in OT6_NOACTION, for
+; Ot6ActionEnd at the end of this turn, whether it is a fresh turn with
+; nothing to run (#346).
+;
+; Fresh, not resumed: ExecAction's first instruction is `sec / ror $3406`.
+; The battle loop resumes an entity whose command list held a second entry
+; (X-Magic's second spell) through $3406 = its entity offset (0-$12, bit 7
+; clear), and the ror leaves $80 | x>>1 (bit 6 clear).  A turn taken from
+; the action queue enters with $3406 invalid (bit 7 set: $ff, or the $80 |
+; x>>1 a resumed turn left), and the ror leaves bit 6 set.  A resumed turn
+; whose list is empty lost only its second half -- the boost already bought
+; the first -- so it is not marked and Ot6ActionEnd charges it.
+;
+; Every pass through @0100 rewrites the byte (the random-attack loop
+; included), and $3406 does not move between those passes.
 ;
 ; entry: jsl, a8, A = the pointer with N set from it; A, X, Y and every
 ; flag are preserved, so the caller's bmi still sees N.
@@ -288,7 +308,11 @@ done:   jsr     Ot6PipPending
         php
         pha
         and     #$80
-        sta     f:$7e0000+OT6_NOACTION
+        beq     @store          ; an action to run: 0
+        lda     f:$7e3406       ; bit 6 set = a fresh turn (see above)
+        and     #$40
+        asl                     ; -> bit 7
+@store: sta     f:$7e0000+OT6_NOACTION
         pla
         plp
         rtl

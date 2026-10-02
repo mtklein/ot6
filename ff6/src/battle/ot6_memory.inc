@@ -380,9 +380,11 @@ OT6_DANCETIER        := $eda1   ; 8 bytes (4 characters, stride 2)
 
 ; whether the turn ExecAction is running has an action to run (#346).
 ; Ot6NoActionMark writes it at every pass of ExecAction's head, from the
-; command-list pointer the bmi there tests: bit 7 set = the list was empty,
-; the turn takes the placeholder CmdNoEffect path (an action removed after
-; it was queued), and Ot6ActionEnd at that turn's end charges no boost.
+; command-list pointer the bmi there tests and $3406: bit 7 set = a fresh
+; turn from the action queue whose list was empty (an action removed after
+; it was queued), which takes the placeholder CmdNoEffect path; Ot6ActionEnd
+; at that turn's end charges no boost.  A resumed second half (X-Magic)
+; with an empty list is not marked: the first half already used the boost.
 ; ($b5 = $12 is not that test: Empowerer's attacker effect writes $12 to
 ; $b5 during a real Bushido turn.)  Written before every read; InitBP need
 ; not clear it.

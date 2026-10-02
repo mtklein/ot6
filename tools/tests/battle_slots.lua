@@ -290,8 +290,9 @@ local function otherWindowsReset() W.actor, W.plan = nil, nil end
 -- stayed so to the timeout (the spin was still in its advance wait).  A
 -- spin already in the action queue comes up as CmdNoEffect while he lies
 -- dead; before #346 Ot6ActionEnd charged its tier there (a fault-injected
--- lab, build/attempts/wt/suites-2.2.1/: pend 2 / bp 2 -> 0), and now it is
--- settled as an unboosted turn (battle_slotcancel).  Either way the spin
+-- lab, build/attempts/wt/suites-2.2.1/: pend 2 / bp 2 -> 0), and now
+-- nothing is charged and, as he lies KO'd, no regen pip lands either
+-- (battle_slotcancel).  Either way the spin
 -- never ran, so a fall costs that battle its tiers, and battleHalf plays a
 -- fresh one.
 local lostBattle, lostBattles, MAX_LOST = false, 0, 3
