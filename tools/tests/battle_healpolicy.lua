@@ -365,6 +365,22 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(ok, true, "...unless the kill is in reach, when the raise costs nothing")
     raiseHp, ok = H.raiseDecision({ maxhp = 358, power = 2, smallestHit = 44 })
     H.assertEq(ok, false, "Rizopas seed $64 unchanged: 44 into 44, nothing else known, refused")
+    -- the top-up branch prices against the round the lift rule will use
+    -- (review of 4ff9b236; arms/armGL_dullB/genlab_base_k0_s0_w9.log.gz:
+    -- SABIN 1710 to 213, smallest hit 299, a round costs 1083)
+    local needs
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 1710, power = 2, smallestHit = 299,
+                                                topUpFirst = true, topUp = 250, roundCost = 1083 })
+    H.assertEq(tostring(ok) .. "/" .. tostring(needs), "false/nil",
+      "213 + 250 = 463 does not clear the 1083 round: no raise on a top-up the lift rule will refuse (" .. why .. ")")
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 1710, power = 2, smallestHit = 299,
+                                                topUpFirst = true, topUp = 250, roundCost = 400 })
+    H.assertEq(tostring(ok) .. "/" .. tostring(needs), "true/true",
+      "463 clears a 400 round: the raise stands and owes its top-up (" .. why .. ")")
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 1710, power = 2, smallestHit = 150,
+                                                topUpFirst = true, topUp = 250, roundCost = 1083 })
+    H.assertEq(tostring(ok) .. "/" .. tostring(needs), "true/nil",
+      "213 survives the 150 hit alone: raised, and no top-up is owed (" .. why .. ")")
     -- the ATB read behind topUpFirst: $3218,x is the 16-bit gauge the
     -- engine adds $3ac8,x to every tick and reads as full when its high
     -- byte is 0 (battle_main.asm `lda $3219,x / beq` "branch if atb
@@ -1036,11 +1052,15 @@ H.run({ maxFrames = 3000 }, {
     L = H.ledgerCommit(L, { cmd = 0x00, counter = true, party = 0x01 }, {})
     H.assertEq(L.actN, n0, "a counterattack that lands nothing is no action of the typical mean (never a zero)")
     L = H.ledgerCommit(L, { cmd = 0x00, counter = true, party = 0x01 }, { { e = 0, drop = 90, last = 500, hp = 410 } })
-    H.assertEq(L.actN .. "/" .. L.maxOn[0], (n0 + 1) .. "/90",
+    H.assertEq(tostring(L.actN) .. "/" .. tostring(L.maxOn and L.maxOn[0]), (n0 + 1) .. "/90",
       "a counterattack that lands counts at its hit (Dullahan's Battle is his counter, $B1 bit 0)")
     n0 = L.actN
-    L = H.ledgerCommit(L, { cmd = 0x02, party = 0x00 }, {})
-    H.assertEq(L.actN, n0, "a buff on its own side (no party bit, nothing dropped) is no action of the mean")
+    L = H.ledgerCommit(L, { cmd = 0x02, party = 0x00, mon = 0x01 }, {})
+    H.assertEq(L.actN, n0, "a buff on its own side (monster targets only, nothing dropped) is no action of the mean")
+    L = H.ledgerCommit(L, { cmd = 0x12, party = 0x00, mon = 0x00 }, {})
+    H.assertEq(L.actN .. "/" .. L.actSum, (n0 + 1) .. "/" .. L.actSum,
+      "a do-nothing turn aimed at nobody is a turn that took nothing: a zero in the mean")
+    n0 = L.actN
     L = H.ledgerCommit(L, { cmd = 0x2E, party = 0x01 }, {})
     H.assertEq(L.actN, n0, "the script's $2E is no action of the mean")
     local T = H.ledgerCommit(nil, { cmd = 0x00, party = 0x01 }, { { e = 0, drop = 100, last = 500, hp = 400 } })

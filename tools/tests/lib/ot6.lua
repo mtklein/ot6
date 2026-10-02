@@ -1023,13 +1023,14 @@ function M.healDecision(o)
   local hp, maxhp = o.hp or 0, o.maxhp or 0
   local gain, cost = o.restore or 0, o.roundCost or 0
   if hp <= 0 or maxhp <= 0 then return nil end
-  -- the top-up a raise was planned on (#168: "an ally tops up first: 213 +
-  -- 250 = 463 does"): the raise already weighed it against the smallest
-  -- hit, and refusing it under the lift rule leaves the raise to die.
-  -- Dullahan arm B, genlab_base_k0_s0_w9 (review of ad048b29): raised to
-  -- 213/1710 on that premise, then "not healing entity 1 (213/1710): $E9
-  -- restores 250 and a round costs 1083" from every actor, and "[death]
-  -- f+7969 entity 1 char 5 from 213/1710"
+  -- the top-up a raise was planned on (#168): raiseOk now weighs it
+  -- against the same round this rule prices (M.raiseDecision's roundCost),
+  -- so an owed top-up is one the raise really needs, and refusing it here
+  -- would leave the raise to die.  build/attempts/wt/care-policy/arms/
+  -- armGL_dullB/genlab_base_k0_s0_w9.log.gz (review of ad048b29): raised to
+  -- 213/1710 on "213 + 250 = 463 does", then "not healing entity 1
+  -- (213/1710): $E9 restores 250 and a round costs 1083" from every actor,
+  -- and "[death] f+7969 entity 1 char 5 from 213/1710"
   if o.owed then return "the raise's top-up (#168)" end
   local pct = hp * 100 // maxhp
   local endangered = hp <= cost         -- one round could finish them
@@ -1133,16 +1134,26 @@ function M.raiseDecision(o)
     return raiseHp, true, string.format("%d HP would not survive the %d hit, but a "
       .. "kill is in reach: the raise is free", raiseHp, hit)
   end
+  -- (a) is priced against the round the heal policy's lift rule will price
+  -- the top-up against (o.roundCost, the raised member's window), not the
+  -- smallest hit alone: Dullahan arm B k0_s0_w9 (arms/armGL_dullB/
+  -- genlab_base_k0_s0_w9.log.gz) raised on "213 + 250 = 463 does" against
+  -- a 299 hit, and every actor then refused that Potion because "a round
+  -- costs 1083" (review of 4ff9b236).  The fourth value says the raise
+  -- needs its top-up (Driver: topUpOwed), true only on this branch.
   local topUp = o.topUp or 0
-  if o.topUpFirst and raiseHp + topUp > hit then
+  local bar = math.max(hit, o.roundCost or 0)
+  if o.topUpFirst and raiseHp + topUp > bar then
     return raiseHp, true, string.format("%d HP alone would not survive the %d hit, "
-      .. "but an ally tops up first: %d + %d = %d does", raiseHp, hit, raiseHp,
-      topUp, raiseHp + topUp)
+      .. "but an ally tops up first: %d + %d = %d clears %s", raiseHp, hit, raiseHp,
+      topUp, raiseHp + topUp, (o.roundCost or 0) > hit
+        and string.format("the %d round", o.roundCost) or string.format("the %d hit", hit)), true
   end
   if o.topUpFirst then
     return raiseHp, false, string.format("%d HP, and even an ally's top-up first "
-      .. "(%d + %d = %d) does not survive the %d hit", raiseHp, raiseHp, topUp,
-      raiseHp + topUp, hit)
+      .. "(%d + %d = %d) does not clear %s", raiseHp, raiseHp, topUp,
+      raiseHp + topUp, (o.roundCost or 0) > hit
+        and string.format("the %d round", o.roundCost) or string.format("the %d hit", hit))
   end
   return raiseHp, false, string.format("%d HP does not survive the %d hit, no kill "
     .. "is in reach, and the enemy acts before anyone can top up", raiseHp, hit)
@@ -3832,7 +3843,7 @@ local execMonCmd, execMonAtk = nil, nil
 -- bit 0) and the party target bits ($B8 low nibble) as it entered: one
 -- monAct per entry (Driver:watchHits), so a counter run straight after the
 -- same slot's own action is not merged into it
-local execMonSeq, execMonB1, execMonB8 = 0, 0, 0
+local execMonSeq, execMonB1, execMonB8, execMonB9 = 0, 0, 0, 0
 
 -- ------------------------------------------------------ a loud fizzle --
 -- A boosted action the caster could not pay for looks EXACTLY like a turn
@@ -3976,7 +3987,7 @@ local function execActivate()
     elseif x < 20 and x % 2 == 0 then
       execMon = x // 2 - 4
       execMonSeq = execMonSeq + 1
-      execMonB1, execMonB8 = M.readByte(0xB1), M.readByte(0xB8)
+      execMonB1, execMonB8, execMonB9 = M.readByte(0xB1), M.readByte(0xB8), M.readByte(0xB9)
       execMonCmd, execMonAtk = M.readByte(0xB5), M.readByte(0xB6)
     end
   end, emu.callbackType.exec, a, a)
@@ -5024,9 +5035,14 @@ function M.ledgerCommit(L, act, drops)
     if not d.status then hits[#hits + 1] = d end
   end
   local counted
-  if act.cmd == 0x2E or act.cmd == 0x2F then counted = false
+  if act.cmd == 0x2E or act.cmd == 0x2F or act.nocount then counted = false
   elseif act.counter then counted = M.MONACT_OLD ~= true and #hits > 0
-  else counted = (act.party or 0) ~= 0 or #(drops or {}) > 0 end
+  -- (a buff is a turn aimed at monsters only: party bits clear, monster
+  -- bits set ($B9), nothing dropped.  A turn aimed at nobody -- a
+  -- do-nothing $12 with $B8/$B9 clear, as gen_tunnelarmr's $071/$036 ran
+  -- them -- is a turn that took nothing, a zero; the engine's own count in
+  -- truth_hook.lua and battle_typicalgate reads it the same way)
+  else counted = (act.party or 0) ~= 0 or #(drops or {}) > 0 or (act.mon or 0) == 0 end
   if counted then
     local per0, size = {}, 0
     for _, d in ipairs(hits) do per0[d.e] = (per0[d.e] or 0) + d.drop end
@@ -5090,18 +5106,81 @@ function Driver:commitMonAct(act)
   for _, d in ipairs(act.drops) do
     all[#all + 1] = { e = d.e, drop = d.drop, last = d.last, hp = d.hp, status = statusDrop(act, d) }
   end
-  local before = self.hitLedger[act.slot] and self.hitLedger[act.slot].actN or 0
-  local L = M.ledgerCommit(self.hitLedger[act.slot], { cmd = act.cmd, counter = act.counter, party = act.party },
-    all)
-  self.hitLedger[act.slot] = L
+  -- A monster's turn is every non-counter action it ExecCmds while its
+  -- gauge stays full: the engine resets the gauge only once the actor has
+  -- no pending actions left (battle_main.asm @01b7, "branch if target
+  -- still has pending actions" past the reset), and an AI block with two
+  -- attack lines and no wait queues two (review of 4ff9b236: 112 such
+  -- places in ai_script.asm).  One ExecCmd entry a turn priced those
+  -- monsters at half a turn, worst and typical both.  The turn closes
+  -- when the gauge has left full (here, or Driver:watchHits); a counter,
+  -- the script's $2E/$2F and the M.MONACT_OLD reading stay single units.
+  self.lastSeq = { slot = act.slot, seq = act.seq }
+  if act.cont and self.monTurn[act.slot] ~= nil and not act.counter then
+    for _, d in ipairs(all) do self.monTurn[act.slot].drops[#self.monTurn[act.slot].drops + 1] = d end
+    if etaOf(8 + act.slot * 2) ~= 0 then self:closeMonTurn(act.slot) end
+    return
+  end
+  if act.counter or act.cmd == 0x2E or act.cmd == 0x2F or M.MONACT_OLD or act.cont then
+    self:commitUnit(act.slot, { cmd = act.cmd, counter = act.counter, party = act.party, mon = act.mon,
+      nocount = act.cont }, all, 1)
+    return
+  end
+  local t = self.monTurn[act.slot] or { drops = {}, party = 0, mon = 0, cmd = act.cmd, n = 0, cmds = {} }
+  for _, d in ipairs(all) do t.drops[#t.drops + 1] = d end
+  t.party, t.mon, t.n = t.party | (act.party or 0), t.mon | (act.mon or 0), t.n + 1
+  t.cmds[#t.cmds + 1] = string.format("$%02X/$%02X", act.cmd or 0, act.atk or 0)
+  self.monTurn[act.slot] = t
+  if etaOf(8 + act.slot * 2) ~= 0 then self:closeMonTurn(act.slot) end
+end
+-- one unit into its slot's ledger (M.ledgerCommit), and its lines
+function Driver:commitUnit(slot, act, all, n)
+  local before = self.hitLedger[slot] and self.hitLedger[slot].actN or 0
+  local L = M.ledgerCommit(self.hitLedger[slot], act, all)
+  self.hitLedger[slot] = L
   if (L.actN or 0) > before then self.monActN = (self.monActN or 0) + 1 end
   if L.minNew ~= nil then
     local d = L.minNew
     L.minNew = nil
     M.log(string.format("[%s] slot %d's smallest hit this fight so far: "
-      .. "%d, on entity %d (%d -> %d)", self.tag or "fight", act.slot, d.drop, d.e,
+      .. "%d, on entity %d (%d -> %d)", self.tag or "fight", slot, d.drop, d.e,
       d.last, d.hp))
   end
+end
+function Driver:closeMonTurn(slot)
+  local t = self.monTurn[slot]
+  if t == nil then return end
+  self.monTurn[slot] = nil
+  if t.n > 1 then
+    local per = {}
+    for _, d in ipairs(t.drops) do if not d.status then per[d.e] = (per[d.e] or 0) + d.drop end end
+    local parts = {}
+    for e = 0, 3 do if per[e] then parts[#parts + 1] = string.format("e%d %d", e, per[e]) end end
+    M.log(string.format("[%s] [turn] slot %d's turn ran %d actions (%s): one turn in the ledger (%s)",
+      self.tag or "fight", slot, t.n, table.concat(t.cmds, " "),
+      #parts > 0 and table.concat(parts, ", ") or "nothing landed"))
+  end
+  self:commitUnit(slot, { cmd = t.cmd, counter = false, party = t.party, mon = t.mon }, t.drops, t.n)
+end
+-- the drops a slot's still-open turn and action hold, hits only (no status
+-- landings), for the raise gate and the round price to read provisionally
+function Driver:openDrops()
+  local by = {}
+  for slot, t in pairs(self.monTurn) do
+    for _, d in ipairs(t.drops) do
+      if not d.status then by[slot] = by[slot] or {}; by[slot][#by[slot] + 1] = d end
+    end
+  end
+  if self.monAct ~= nil then
+    for _, d in ipairs(self.monAct.drops) do
+      if not statusDrop(self.monAct, d) then
+        local slot = self.monAct.slot
+        by[slot] = by[slot] or {}
+        by[slot][#by[slot] + 1] = d
+      end
+    end
+  end
+  return by
 end
 
 function Driver:raiseOk(e, actor)
@@ -5116,17 +5195,16 @@ function Driver:raiseOk(e, actor)
   -- Measured on map 269 (fix1_boostfight_s36): the recurring Flare took
   -- the pair from 405/424 at f+9681, two raises were planned at f+9993
   -- against an empty ledger, and the floor was only committed after.
-  local openL = nil
-  if self.monAct ~= nil and #self.monAct.drops > 0 then
-    local base = self.hitLedger[self.monAct.slot] or { on = {} }
-    openL = { on = {}, min = base.min, minE = base.minE }
+  -- (and a monster's turn still open: its earlier actions' drops)
+  local openLs = {}
+  for oslot, ods in pairs(self:openDrops()) do
+    local base = self.hitLedger[oslot] or { on = {} }
+    local openL = { on = {}, min = base.min, minE = base.minE }
     for k, v in pairs(base.on) do openL.on[k] = v end
     openL.lbOn, openL.lb, openL.lbE = {}, base.lb, base.lbE
     for k, v in pairs(base.lbOn or {}) do openL.lbOn[k] = v end
-    for _, d in ipairs(self.monAct.drops) do
-      if statusDrop(self.monAct, d) then
-        -- a status landing: no hit
-      elseif d.hp == 0 then
+    for _, d in ipairs(ods) do
+      if d.hp == 0 then
         if openL.lbOn[d.e] == nil or d.drop > openL.lbOn[d.e] then openL.lbOn[d.e] = d.drop end
         if openL.lb == nil or d.drop > openL.lb then openL.lb, openL.lbE = d.drop, d.e end
       else
@@ -5134,10 +5212,11 @@ function Driver:raiseOk(e, actor)
         if openL.min == nil or d.drop < openL.min then openL.min, openL.minE = d.drop, d.e end
       end
     end
+    openLs[oslot] = openL
   end
   for s = 0, 5 do
     local L = self.hitLedger[s]
-    if openL ~= nil and s == self.monAct.slot then L = openL end
+    if openLs[s] ~= nil then L = openLs[s] end
     if L and monAlive(s) then
       local v, on = L.on[e], e
       if v == nil then v, on = L.min, L.minE end
@@ -5209,8 +5288,48 @@ function Driver:raiseOk(e, actor)
         .. "(slot %d is %d ticks from acting)", lethalSlot, lethalEta)
     end
   end
-  local _, ok, why = M.raiseDecision(o)
-  return ok, raiseHp, hit, hitSlot, hitOn, why .. detail
+  o.roundCost = self:roundPriceFor(e)
+  local _, ok, why, needsTopUp = M.raiseDecision(o)
+  return ok, raiseHp, hit, hitSlot, hitOn, why .. detail, needsTopUp
+end
+
+-- what one enemy round costs member e over a full gauge of its own (a
+-- raised member's gauge starts empty), priced as makePlan prices the
+-- living: the ledger's worst per turn on e (else anybody), the open turn
+-- read provisionally, the typical action for repeats
+function Driver:roundPriceFor(e)
+  local const = M.readWord(BATTLE.ATB_CONST + e * 2)
+  if const == 0 or const == 0xFFFF then return nil end
+  local window = math.ceil(0xFF00 / const)
+  local fallback = nil
+  for s2 = 0, 5 do
+    local L = self.hitLedger[s2]
+    if L and L.max and (fallback == nil or L.max > fallback) then fallback = L.max end
+  end
+  local openBy = {}
+  for oslot, ods in pairs(self:openDrops()) do
+    local o = {}
+    for _, d in ipairs(ods) do o[d.e] = (o[d.e] or 0) + d.drop end
+    openBy[oslot] = o
+    for _, v in pairs(o) do if fallback == nil or v > fallback then fallback = v end end
+  end
+  local enemies = {}
+  for s2 = 0, 5 do
+    if monAlive(s2) then
+      local L = self.hitLedger[s2]
+      local worst = L and L.maxOn and L.maxOn[e] or (L and L.max) or nil
+      local open = openBy[s2]
+      if open ~= nil then
+        local v = open[e]
+        if v == nil then for _, w in pairs(open) do if v == nil or w > v then v = w end end end
+        if v ~= nil and (worst == nil or v > worst) then worst = v end
+      end
+      local mconst = M.readWord(BATTLE.ATB_CONST + 8 + s2 * 2)
+      enemies[#enemies + 1] = { slot = s2, eta = etaOf(8 + s2 * 2),
+        period = mconst > 0 and math.ceil(0xFF00 / mconst) or nil, worst = worst, typical = M.typicalOf(L) }
+    end
+  end
+  return (M.roundCost({ window = window, enemies = enemies, fallback = fallback }))
 end
 
 function Driver:loreDiagnose(actor, want)
@@ -5309,15 +5428,16 @@ function Driver:makePlan(actor)
       end
     end
     -- the action still open is read provisionally, as the raise gate does
-    local open = {}
-    if self.monAct ~= nil then
-      -- a status landing (a Zombie touch reading as the whole HP bar) is no
-      -- hit here either: tomb_zombie priced "s1 1x1710 (worst)" off the
-      -- still-open touch before it closed and left the ledger
-      for _, d in ipairs(self.monAct.drops) do
-        if not statusDrop(self.monAct, d) then open[d.e] = (open[d.e] or 0) + d.drop end
-      end
-      for _, v in pairs(open) do
+    -- (a status landing -- a Zombie touch reading as the whole HP bar -- is
+    -- no hit here either: tomb_zombie priced "s1 1x1710 (worst)" off the
+    -- still-open touch before it closed and left the ledger; a monster's
+    -- turn still open counts its earlier actions with the open one)
+    local openBy = {}
+    for oslot, ods in pairs(self:openDrops()) do
+      local o = {}
+      for _, d in ipairs(ods) do o[d.e] = (o[d.e] or 0) + d.drop end
+      openBy[oslot] = o
+      for _, v in pairs(o) do
         any = true
         if fallback == nil or v > fallback then fallback = v end
       end
@@ -5342,7 +5462,8 @@ function Driver:makePlan(actor)
             if monAlive(s2) then
               local L = self.hitLedger[s2]
               local worst = L and L.maxOn and L.maxOn[e] or (L and L.max) or nil
-              if self.monAct ~= nil and self.monAct.slot == s2 then
+              local open = openBy[s2]
+              if open ~= nil then
                 local v = open[e]
                 if v == nil then for _, w in pairs(open) do if v == nil or w > v then v = w end end end
                 if v ~= nil and (worst == nil or v > worst) then worst = v end
@@ -6130,7 +6251,7 @@ function Driver:makePlan(actor)
           if said ~= self.healSaid then self.healSaid = said; M.log(said) end
         elseif maxOf(e) > 0 and hpNow[e] == 0
            and self:battInvIdx(BATTLE.FENIX_DOWN) then
-          local ok, raiseHp, hit, hitSlot, hitOn, why = self:raiseOk(e, actor)
+          local ok, raiseHp, hit, hitSlot, hitOn, why, needsTopUp = self:raiseOk(e, actor)
           local hitStr = hit and string.format("%d (slot %d on entity %d)", hit, hitSlot, hitOn)
             or "none measured"
           if ok then
@@ -6139,7 +6260,8 @@ function Driver:makePlan(actor)
               .. "-- %s", self.tag or "fight", actor, e, raiseHp,
               maxOf(e), hitStr, why))
             return { kind = "item", item = BATTLE.FENIX_DOWN, target = e, row = row,
-                     idx = self:battInvIdx(BATTLE.FENIX_DOWN), reason = "revive" }
+                     idx = self:battInvIdx(BATTLE.FENIX_DOWN), reason = "revive",
+                     needsTopUp = needsTopUp == true }
           end
           local said = string.format("[%s] actor=%d no raise: Fenix Down would put "
             .. "entity %d at %d HP (1/8 of %d), the living enemy's smallest hit %s "
@@ -7640,7 +7762,8 @@ function Driver:button(actor)
       self.unmuddleQueued = self.unmuddleQueued or {}
       self.unmuddleQueued[actor] = { e = self.plan.target, tick = self.battleTick }
     elseif self.plan.kind == "item" and self.plan.item == BATTLE.FENIX_DOWN then
-      self.raisePending = { e = self.plan.target, by = actor, tick = self.battleTick }
+      self.raisePending = { e = self.plan.target, by = actor, tick = self.battleTick,
+                            needsTopUp = self.plan.needsTopUp == true }
       self.raiseQueued[self.plan.target] = { by = actor, tick = self.battleTick }
     elseif self.plan.kind == "item" and self.plan.target
        and type(self.plan.reason) == "string" and self.plan.reason:sub(1, 5) == "cure " then
@@ -7747,6 +7870,7 @@ function Driver:idle()
   self.dmgWatch, self.dmgSeen, self.monHpLast = {}, {}, {}
   self.dmgHit, self.hitLedger, self.partyHpLast = {}, {}, {}
   self.monAct, self.deathSaid, self.battleDeaths, self.wipeSaid = nil, {}, {}, false
+  self.monTurn = {}
   self.raisePending, self.topUpOwed, self.unmuddlePending = nil, {}, nil
   self.raiseQueued, self.cureQueued = {}, {}
   self.statusSaid, self.cureSaid, self.freeRoundSaid = {}, nil, false
@@ -8442,11 +8566,15 @@ function Driver:watchPendingCare()
   if self.raisePending then
     local hp = M.readWord(0x3BF4 + self.raisePending.e * 2)
     if hp > 0 and hp ~= 0xFFFF then
-      self.topUpOwed[self.raisePending.e] = self.battleTick
+      -- owed only when the raise was planned on its top-up (raiseOk's
+      -- fourth value; review of 4ff9b236): a raise judged to survive alone
+      -- owes nothing
+      if self.raisePending.needsTopUp then self.topUpOwed[self.raisePending.e] = self.battleTick end
       M.log(string.format("[%s] actor %d's Fenix Down landed: entity %d is at %d/%d "
-        .. "at tick %d -- a top-up is owed (the care budget opens for it)",
-        self.tag or "fight", self.raisePending.by, self.raisePending.e, hp,
-        M.readWord(0x3C1C + self.raisePending.e * 2), self.battleTick))
+        .. "at tick %d -- %s", self.tag or "fight", self.raisePending.by, self.raisePending.e, hp,
+        M.readWord(0x3C1C + self.raisePending.e * 2), self.battleTick,
+        self.raisePending.needsTopUp and "a top-up is owed (the care budget opens for it)"
+          or "it was judged to survive alone; no top-up is owed"))
       self.raisePending = nil
     elseif self.battleTick - self.raisePending.tick > BATTLE.RAISE_WAIT + 600 then
       M.log(string.format("[%s] actor %d's Fenix Down on entity %d never landed "
@@ -8901,11 +9029,21 @@ function Driver:watchHits()
     if self.monAct ~= nil then self:commitMonAct(self.monAct) end
     self.monAct = nil
   end
+  for ts, _ in pairs(self.monTurn) do
+    if (self.monAct == nil or self.monAct.slot ~= ts) and (etaOf(8 + ts * 2) ~= 0 or not monAlive(ts)) then
+      self:closeMonTurn(ts)
+    end
+  end
   if slot ~= nil and self.monAct == nil then
-    self.monAct = { slot = slot, cmd = execMonCmd or 0, atk = execMonAtk or 0,
+    -- the same ExecCmd entry read again (its window closed while a party
+    -- command ran, and reopened inside DMG_SETTLE of its return): a
+    -- continuation, its drops the same action's, never a second action
+    -- (the lab's [ledger-trace] showed "slot 2 seq 39" twice, an extra zero)
+    local cont = not M.MONACT_OLD and self.lastSeq ~= nil and self.lastSeq.slot == slot and self.lastSeq.seq == execMonSeq
+    self.monAct = { slot = slot, cmd = execMonCmd or 0, atk = execMonAtk or 0, cont = cont,
                tick = self.battleTick, hp0 = {}, kills = 0, fullKills = 0, drops = {},
                seq = execMonSeq, b1 = execMonB1, b8 = execMonB8,
-               counter = (execMonB1 & 0x01) ~= 0, party = execMonB8 & 0x0F }
+               counter = (execMonB1 & 0x01) ~= 0, party = execMonB8 & 0x0F, mon = execMonB9 & 0x3F }
     for e = 0, 3 do self.monAct.hp0[e] = self.partyHpLast[e] or M.readWord(0x3BF4 + e * 2) end
     self.monAct.st1 = {}
     self.monAct.st2 = {}
@@ -8922,6 +9060,7 @@ function Driver:watchHits()
   -- before the queue's next normal action)
   if self.monAct ~= nil and execMon ~= nil and execMon == self.monAct.slot then
     self.monAct.party = (self.monAct.party or 0) | (M.readByte(0xB8) & 0x0F)
+    self.monAct.mon = (self.monAct.mon or 0) | (M.readByte(0xB9) & 0x3F)
     if M.MONACT_OLD and (M.readByte(0xB1) & 0x01) ~= 0 then self.monAct.counter = true end
   end
   for e = 0, 3 do
@@ -9260,6 +9399,13 @@ function Driver:frame()
   else M.setPad(held < 6 and self.held or {}) end
 end
 
+-- commit what the hit ledger still holds open (the action being read and
+-- every monster's open turn): a test's or a lab's reading at a battle's end
+function Driver:flushLedger()
+  if self.monAct ~= nil then self:commitMonAct(self.monAct); self.monAct = nil end
+  for ts, _ in pairs(self.monTurn or {}) do self:closeMonTurn(ts) end
+end
+
 function M.newFightDriver(tag, opts)
   opts = opts or {}
   local D = setmetatable({
@@ -9312,6 +9458,7 @@ M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end)
     -- in the fight rather than assumed.  See the policy note in makePlan.
     roundCost = {},                    -- entity -> worst HP lost per own turn
     turnSnap = {},                     -- actor -> party HP at its last turn
+    monTurn = {},                      -- slot -> its open turn (Driver:commitMonAct)
     turnSnapSL = {},                   -- actor -> statusLost (below) at its last turn
     statusLost = {},                   -- entity -> HP its status landings took (a Zombie touch)
     roundCheck = {},                   -- actor -> its priced round, checked at its next turn (#312)
@@ -9417,6 +9564,7 @@ M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end)
     seatXp = nil, seatChar = nil, filled = nil,
     leftSaid = {}, escSaid = {}, reward = nil, outcomeSaid = false, watchFrame = nil,
   }, Driver)
+  M.lastFightDriver = D                -- a lab's ground-truth hook reads its ledger
   local F = { driver = D }
   function F.idle() D:idle() end
   function F.frame() D:frame() end
