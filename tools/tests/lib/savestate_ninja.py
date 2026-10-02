@@ -13,7 +13,11 @@ differ, and `restat = 1` prunes everything downstream when it did not move.
 A generator is copied by `copy_if_lua_changed` instead (lua_fingerprint.py
 copy-if-changed): the copy takes the new bytes but keeps its mtime when the
 Lua token stream did not move, so a comment or whitespace edit regenerates
-nothing, the same rule the stamps' generator hash follows (#247).
+nothing, the same rule the stamps' generator hash follows (#247).  The ROM
+is copied by `copy_if_rom_identity_changed` (tools/build/rom_version.py): the
+same shape, keyed on the ROM identity, the ROM with its version fields
+masked, so a VERSION bump regenerates nothing, the same rule the stamps'
+`rom` line follows.
 Generated states themselves are not copied this way: a regenerated .mss is
 new bytes, and everything booted from it must replay.
 
@@ -331,6 +335,16 @@ def emit_state_rules(w):
     w("  command = python3 tools/tests/lib/lua_fingerprint.py "
       "copy-if-changed $in $out")
     w("  description = copy_if_lua_changed $in")
+    w("  restat = 1")
+    w("")
+    w("# The ROM's copy, the same shape: the new bytes always land, but the")
+    w("# old mtime is kept when the ROM identity (the ROM with its version")
+    w("# fields masked, tools/build/rom_version.py) did not move, so a VERSION")
+    w("# bump alone regenerates and re-runs nothing behind it.")
+    w("rule copy_if_rom_identity_changed")
+    w("  command = python3 tools/build/rom_version.py "
+      "copy-if-identity-changed $in $out")
+    w("  description = copy_if_rom_identity_changed $in")
     w("  restat = 1")
     w("")
 
@@ -727,7 +741,11 @@ def emit_chain_edges(w, states, root, copy_if_changed_from):
 
 def copy_rule(src, states):
     """The copy rule for one copy_if_changed source: a generator the graph
-    runs is copied by its Lua token stream, anything else by its bytes."""
+    runs is copied by its Lua token stream, the ROM by its identity
+    (rom_version.py: the version fields masked), anything else by its
+    bytes."""
+    if src == ROM:
+        return "copy_if_rom_identity_changed"
     gens = {f"tools/tests/{e[k]}.lua" for e in states
             for k in ("gen", "cutter") if e.get(k)}
     return "copy_if_lua_changed" if src in gens else "copy_if_changed"

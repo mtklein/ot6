@@ -173,8 +173,9 @@ def generator_own_sig(gen, root, extras=()):
 
 
 def rom_identity(root):
-    """The sha256 of the ROM a run in this tree boots (`romsig`: OT6_ROM if
-    set, else build/ot6.sfc), and the path it named.  (None, path) when no
+    """The identity of the ROM a run in this tree boots (`romsig`: OT6_ROM
+    if set, else build/ot6.sfc; the sha256 of the ROM with its version
+    fields masked, tools/build/rom_version.py), and the path it named.  (None, path) when no
     ROM is there to hash: the checker then reports UNVERIFIED rather than
     guessing."""
     path = os.environ.get("OT6_ROM") or "build/ot6.sfc"
@@ -363,13 +364,13 @@ def _own_stamp_status(base, root):
         if have is None:
             return UNVERIFIED, (
                 f"fixture {base} is UNVERIFIED -- it was generated on ROM "
-                f"sha {rom[0][:12]} but this tree has no {rom_path} to "
+                f"identity {rom[0][:12]} but this tree has no {rom_path} to "
                 f"compare against; build it (ninja build/ot6.sfc) and "
                 f"re-check")
         if have != rom[0]:
             return STALE, (
-                f"fixture {base} is STALE -- generated on ROM sha "
-                f"{rom[0][:12]}, but {rom_path} is sha {have[:12]}: a "
+                f"fixture {base} is STALE -- generated on ROM identity "
+                f"{rom[0][:12]}, but {rom_path} is {have[:12]}: a "
                 f"machine snapshot of a different ROM; {regen}")
         cur_own = generator_own_sig(gen, root, extras)
         if cur_own != own[0]:
@@ -608,13 +609,14 @@ def check_states(root):
 #      extras (savestate_stamp.sh `sig`).  Then the generator's own sig and
 #      the lib-half hashes at generation time are the current ones, and can
 #      be written as `generator` and `lib` lines.
-#   2. The ROM at generation time equals the current ROM.  Every generate
-#      edge depends on the ROM through its copy_if_changed edge
+#   2. The ROM at generation time has the current ROM's identity (the ROM
+#      with its version fields masked, tools/build/rom_version.py).  Every
+#      generate edge depends on the ROM through its copy edge
 #      build/ninja/src/build/ot6.sfc (configure.py / savestate_ninja.py:
-#      `cmp -s || cp`, restat = 1), so when ninja started the edge the
-#      copy was byte-equal to build/ot6.sfc, the ROM run.sh boots.
-#      The copy is rewritten only when the ROM's content changes, and
-#      only by the copy_if_changed edge.  ninja's build log (build/ninja/.ninja_log;
+#      copy_if_rom_identity_changed, restat = 1), so when ninja started the
+#      edge the copy had the identity of build/ot6.sfc, the ROM run.sh
+#      boots.  The copy's mtime moves only when the ROM's identity changes,
+#      and only by that copy edge.  ninja's build log (build/ninja/.ninja_log;
 #      builddir = build/ninja) records each edge run as
 #      `start_ms end_ms mtime_ns output hash`: start/end are relative to
 #      that ninja invocation, but the third column is absolute -- for a
@@ -704,7 +706,8 @@ def adoption_proof(base, root, records, rom_now, rom_copy_sha):
     full-format text to write and a one-line account of the evidence.
     `records` is ninja_log_records()'s table (or None with rom_now/rom_copy_sha
     unused); `rom_now` the sha of build/ot6.sfc (None when absent);
-    `rom_copy_sha` the sha of the ROM copy (None when absent)."""
+    `rom_copy_sha` the identity of the ROM copy (None when absent); both
+    are rom_version.py identities, as the stamps' `rom` lines are."""
     stamp = root / "build" / "states" / (base + ".stamp")
     regen = f"regenerate it: ninja build/states/{base}.mss.lua"
     lines = stamp.read_text().splitlines()
@@ -763,8 +766,8 @@ def adoption_proof(base, root, records, rom_now, rom_copy_sha):
                            f"copied the ROM in this tree")
     if rom_copy_sha != rom_now:
         return "refused", (
-            f"the ROM copy {ROM_COPY} (sha {rom_copy_sha[:12]}) is not "
-            f"the current ROM (sha {rom_now[:12]}): the ROM changed since "
+            f"the ROM copy {ROM_COPY} (identity {rom_copy_sha[:12]}) is not "
+            f"the current ROM (identity {rom_now[:12]}): the ROM changed since "
             f"ninja last copied it, so a state generated on the copied "
             f"ROM is a snapshot of a different ROM; {regen}")
     if records is None:
@@ -837,7 +840,11 @@ def adopt_stamps(root):
                           env={"OT6_ROM": str(root / "build" / "ot6.sfc")})
     rom_now = rom_now.strip() if rom_now else None
     rom_copy = root / ROM_COPY
-    rom_copy_sha = _sha(rom_copy) if rom_copy.exists() else None
+    rom_copy_sha = None
+    if rom_copy.exists():
+        rom_copy_sha = _stamp_tool(root, "romsig", check=False,
+                                   env={"OT6_ROM": str(rom_copy)})
+        rom_copy_sha = rom_copy_sha.strip() if rom_copy_sha else None
 
     adopted, refused, full, rebound = [], [], 0, 0
 
@@ -2075,6 +2082,12 @@ def main() -> int:
     #                   shift across one 60-frame period and log each first
     #                   battle's RNG key (#208; seed_sweep.py --probe)
     preamble.append('OT6_SCRIPT = "%s"\n' % script_path.stem)
+    # The tree's VERSION file, for a script that checks the version the ROM
+    # shows against the one the tree says (menu_configversion): Mesen's
+    # sandbox cannot read files.
+    version = (ROOT / "VERSION").read_text().strip()
+    preamble.append('OT6_VERSION = "%s"\n'
+                    % version.replace("\\", "\\\\").replace('"', '\\"'))
     for var, name in (("OT6_RETRIES", "OT6_RETRIES"),
                       ("OT6_SEED_SHIFT", "OT6_SEED_SHIFT"),
                       ("OT6_SHIFT_PROBE", "OT6_SHIFT_PROBE"),

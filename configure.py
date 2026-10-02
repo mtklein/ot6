@@ -28,9 +28,14 @@ from the root):
   ff6 objects    ca65 with --create-dep; depfiles are rebased to root-relative
                  paths (tools/build/rebase_depfile.py) because ca65 runs with
                  cwd=ff6 and ninja resolves depfile paths against the root.
-  ROM            ff6-en.sfc via tools/build/link_rom.sh.
+  ROM            ff6-en.sfc via tools/build/link_rom.sh, which stamps the
+                 version fields from VERSION (tools/build/rom_version.py).
   build/ot6.sfc  copy_if_changed of ff6-en.sfc: mtime bumps with unchanged
-                 bytes prune everything downstream (restat).
+                 bytes prune everything downstream (restat).  Everything
+                 that binds to the ROM (states, suite results, checks)
+                 depends on its identity copy instead
+                 (copy_if_rom_identity_changed: the version fields masked),
+                 so a VERSION bump re-runs only what reads those fields.
   savestates     the story-chain graph, embedded from
                  tools/tests/lib/savestate_ninja.py (the same data file,
                  tools/tests/savestate_graph.py, drives it).
@@ -306,7 +311,8 @@ def rom_edge(out, objs):
     w.edge([out, out[:-len(".sfc")] + ".dbg", out[:-len(".sfc")] + ".map"],
            "sh", ["ff6/cfg/ff6-en.cfg"] + objs,
            implicit=["tools/build/link_rom.sh", "ff6/tools/encode_cutscene.py",
-                     "ff6/tools/fix_checksum.py"],
+                     "ff6/tools/fix_checksum.py", "tools/build/rom_version.py",
+                     "VERSION"],
            cmd=f"tools/build/link_rom.sh cfg/ff6-en.cfg {out[len('ff6/'):]} "
                + " ".join(rel),
            desc=f"link {Path(out).name}")
@@ -384,6 +390,9 @@ TEST_ENV = {
     # #327: TERRA knows Life and pays Life 3 here; no write needed
     "battle_lifefold":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fire-out-v1",
+    # the Config screen's version tab, from the Narshe exit spawn
+    "menu_configversion":
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1",
     # walks from the Narshe exit spawn into the Beginner's House
     "school":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1",
@@ -410,6 +419,12 @@ TEST_ENV = {
     "battle_statuses": "OT6_TIMEOUT=3600",
     "battle_levelup": "OT6_TIMEOUT=3600",
 }
+
+# Tests about the version fields themselves (tools/build/rom_version.py):
+# everything else binds to the ROM's identity, which leaves those fields
+# out, so these also depend on the ROM's bytes and on VERSION, and the
+# release commit's VERSION bump re-runs them on the bytes that ship.
+VERSION_TESTS = {"menu_configversion"}
 
 # any <name>.mss reference, path-qualified or bare -- compose.py resolves
 # both against build/states, so both are fixture dependencies; the filter
@@ -441,6 +456,8 @@ for f in glob("tools/tests/*.lua"):
             copy_if_changed_from(f)]
     deps += [copy_if_changed_from(h) for h in LIBS] + HARNESS
     deps += fixture_deps(f)
+    if t in VERSION_TESTS:
+        deps += ["build/ot6.sfc", "VERSION"]
     fm = re.search(r"savestate=([A-Za-z0-9_]+)", attrs)
     if fm and f"build/states/{fm.group(1)}.mss" not in deps:
         fx = fm.group(1)
@@ -470,8 +487,13 @@ test_luas = glob("tools/tests/*.lua") + glob("tools/tests/lib/*.lua")
 check("compose_selftest", "python3 tools/tests/lib/compose.py --selftest",
       ["tools/tests/lib/compose.py", "tools/tests/lib/decode_b64.py",
        "tools/tests/lib/savestate_stamp.sh",
-       "tools/tests/lib/lua_fingerprint.py"]
+       "tools/tests/lib/lua_fingerprint.py", "tools/build/rom_version.py"]
       + LIBS)
+# The version fields and the ROM identity that masks them (one mutant per
+# property: a flip outside the fields moves the identity, inside does not).
+check("rom_version_selftest", "python3 tools/build/rom_version.py selftest",
+      ["tools/build/rom_version.py"]
+      + glob("tools/char_table/*_en.json", "ff6"))
 check("sram_selftest", "python3 tools/tests/lib/sram_checkpoint.py selftest",
       ["tools/tests/lib/sram_checkpoint.py"])
 check("verdict_selftest", "sh tools/tests/run.sh --verdict-selftest",
@@ -568,11 +590,11 @@ check("ninja_sh_selftest", "sh tools/tests/lib/savestate_ninja_selftest.sh",
       ["tools/tests/lib/savestate_ninja_selftest.sh",
        "tools/tests/lib/savestate_ninja.py",
        "tools/tests/lib/savestate_stamp.sh",
-       "tools/tests/lib/lua_fingerprint.py"])
+       "tools/tests/lib/lua_fingerprint.py", "tools/build/rom_version.py"])
 check("stamp_selftest", "sh tools/tests/lib/savestate_stamp_selftest.sh",
       ["tools/tests/lib/savestate_stamp_selftest.sh",
        "tools/tests/lib/savestate_stamp.sh",
-       "tools/tests/lib/lua_fingerprint.py"])
+       "tools/tests/lib/lua_fingerprint.py", "tools/build/rom_version.py"])
 check("runner_isolation", "sh tools/tests/lib/runner_isolation_selftest.sh",
       ["tools/tests/lib/runner_isolation_selftest.sh", "tools/tests/run.sh"])
 check("shared_emulator", "sh tools/tests/lib/shared_emulator_selftest.sh",
@@ -630,7 +652,7 @@ check("instruments", "nice python3 tools/check_instruments.py",
 # use, so the check re-runs exactly when its answer can move.
 check("check_states", "python3 tools/tests/lib/compose.py --check-states",
       ["tools/tests/lib/compose.py", "tools/tests/lib/savestate_stamp.sh",
-       "tools/tests/lib/lua_fingerprint.py",
+       "tools/tests/lib/lua_fingerprint.py", "tools/build/rom_version.py",
        sn.GRAPH, copy_if_changed_from("build/ot6.sfc")]
       + [copy_if_changed_from(f"tools/tests/{e['gen']}.lua") for e in states if e.get("gen")]
       + [copy_if_changed_from(h) for h in LIBS] + all_stamps)

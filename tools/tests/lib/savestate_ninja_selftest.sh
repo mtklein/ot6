@@ -11,8 +11,9 @@ trap 'rm -rf "$TMP"' EXIT
 ok=1
 
 # ---- the mock tree ---------------------------------------------------------
-mkdir -p "$TMP/tools/tests/lib" "$TMP/tools/tests/checkpoints/toy-v1" "$TMP/build" "$TMP/tools/mesen"
+mkdir -p "$TMP/tools/tests/lib" "$TMP/tools/tests/checkpoints/toy-v1" "$TMP/build" "$TMP/tools/mesen" "$TMP/tools/build"
 cp "$REAL/tools/tests/lib/savestate_ninja.py" "$TMP/tools/tests/lib/"
+cp "$REAL/tools/build/rom_version.py" "$TMP/tools/build/"
 cp "$REAL/tools/tests/lib/savestate_stamp.sh" "$TMP/tools/tests/lib/"
 cp "$REAL/tools/tests/lib/lua_fingerprint.py" "$TMP/tools/tests/lib/"
 printf 'lib v1\n'      > "$TMP/tools/tests/lib/ot6.lua"
@@ -157,6 +158,29 @@ cmp -s "$TMP/build/states/d.mss" "$TMP/build/states/b.mss" &&
   echo "  pass seed d refreshed after the emulator pin moved" ||
   { echo "  FAIL seed d stale after the emulator pin moved"; ok=0; }
 
+# 4b. The ROM is copied by its identity (tools/build/rom_version.py: the
+#     version fields and the header checksum masked).  A version-only
+#     change -- the release commit's VERSION bump -- regenerates nothing;
+#     one flipped byte anywhere else regenerates everything.
+romfill() { # <version-field byte> <code byte at $1234>: a 64 KB mock ROM
+  python3 -c "import sys; b = bytearray(b'\xa5' * 0x10000); b[0xFFA5] = int(sys.argv[1]); b[0xFFC5] = int(sys.argv[1]); b[0xFFDC] = int(sys.argv[1]); b[0x1234] = int(sys.argv[2]); open(sys.argv[3], 'wb').write(b)" "$1" "$2" "$TMP/build/ot6.sfc"
+}
+sleep 1
+romfill 1 1
+run
+check "a ROM content change (to the 64 KB mock) regenerates EVERY step" "a b c e g1 g2 h " "$ran"
+sleep 1
+romfill 2 1
+run
+check "a version-field-only ROM change regenerates NOTHING" "" "$ran"
+cmp -s "$TMP/build/ot6.sfc" "$TMP/build/ninja/src/build/ot6.sfc" &&
+  echo "  pass ...while the ROM copy still takes the new bytes" ||
+  { echo "  FAIL the ROM copy kept the old version's bytes"; ok=0; }
+sleep 1
+romfill 2 2
+run
+check "one byte flipped outside the version fields regenerates EVERY step" "a b c e g1 g2 h " "$ran"
+
 # 5. one generator edit: its step regenerates, the seed off it refreshes, the
 #    stacked step downstream regenerates, and the unrelated steps do not.
 sleep 1
@@ -230,7 +254,7 @@ want=$(cd "$TMP" && OT6_ROOT="$TMP" sh tools/tests/lib/savestate_stamp.sh sig ge
   echo "  pass generate-edge stamp matches sig" ||
   { echo "  FAIL stamp/sig disagree"; ok=0; }
 [ "$(sed -n 2p "$TMP/build/states/b.stamp")" = \
-  "rom $(shasum -a 256 "$TMP/build/ot6.sfc" | cut -c1-64)" ] &&
+  "rom $(python3 "$REAL/tools/build/rom_version.py" identity "$TMP/build/ot6.sfc")" ] &&
   echo "  pass generate-edge stamp records the ROM it booted" ||
   { echo "  FAIL rom line wrong or missing"; ok=0; }
 [ "$(sed -n 3p "$TMP/build/states/b.stamp")" = \

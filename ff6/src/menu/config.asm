@@ -11,7 +11,7 @@
 ; | created: 9/23/2022                                                         |
 ; +----------------------------------------------------------------------------+
 
-.import CharProp, WindowGfx
+.import CharProp, WindowGfx, Ot6VersionText
 
 .segment "menu_code"
 
@@ -96,6 +96,8 @@ DrawConfigMenu:
         jsr     DrawWindow
         ldy     #near ConfigLabelWindow
         jsr     DrawWindow
+        ldy     #near ConfigVersionWindow
+        jsr     DrawWindow
         jsr     TfrBG2ScreenAB
         jsr     LoadColorBarPal
         jsr     ClearBG1ScreenA
@@ -106,6 +108,7 @@ DrawConfigMenu:
         sta     zTextColor
         ldy     #near ConfigTitleText
         jsr     DrawPosKana
+        jsr     DrawConfigVersion
         lda     #BG1_TEXT_COLOR::TEAL
         sta     zTextColor
         ldx     #near ConfigLabelTextList2
@@ -277,6 +280,42 @@ ConfigLabelWindow:                      make_window BG2A, {23, 1}, {6, 2}
 .else
 ConfigLabelWindow:                      make_window BG2A, {24, 1}, {5, 2}
 .endif
+; ot6: the version tab, the "Config" tab's mirror in the top-left corner.
+; Its inner width is the longest version text it shows: rom_version.py
+; refuses a VERSION whose "OT6 v<VERSION>" is wider than this window.
+CONFIG_VERSION_TEXT_WIDTH = 10
+ConfigVersionWindow:                    make_window BG2A, {1, 1}, {CONFIG_VERSION_TEXT_WIDTH, 2}
+
+; ------------------------------------------------------------------------------
+
+; [ ot6: draw the build version in the version tab ]
+
+; Ot6VersionText (c0/ffa0, field/header.asm) is the build's "OT6 v<VERSION>",
+; menu-encoded and $00-terminated, stamped after the link.  It is copied with
+; its screen position into the text buffer and drawn on BG3, which does not
+; scroll between the two Config pages, so it shows on both.
+
+DrawConfigVersion:
+        lda     #BG3_TEXT_COLOR::DEFAULT
+        sta     zTextColor
+        longa
+        lda_pos BG3A, {2, 2}
+        sta     $7e9e89                 ; screen position
+        shorta
+        ldx     z0
+@copy:  lda     f:Ot6VersionText,x
+        sta     $7e9e8b,x
+        beq     @draw
+        inx
+        cpx     #CONFIG_VERSION_TEXT_WIDTH
+        bne     @copy
+        clr_a                           ; never draw past the tab
+        sta     $7e9e8b,x
+@draw:  ldy     #near $7e9e89
+        sty     $e7
+        lda     #^$7e9e89
+        sta     $e9
+        jmp     DrawPosTextFar
 
 ; ------------------------------------------------------------------------------
 

@@ -21,7 +21,7 @@
 #
 #     <sha256(GATE_CONTRACT ++ gen ++ ot6.lua ++ ot6_field.lua ++
 #             ot6_contract.lua ++ extras...)> <gen> [extras...]
-#     rom <sha256(the ROM the run booted)>
+#     rom <identity of the ROM the run booted (rom_version.py identity)>
 #     generator <sha256(GATE_CONTRACT ++ gen ++ extras...)>
 #     lib <path> <sha256(<path>'s token stream)>      (one per lib half)
 #     artifact <sha256(build/states/<state>.mss)>
@@ -72,6 +72,9 @@ ROOT="${OT6_ROOT:-$(cd "$(dirname "$0")/../../.." && pwd)}"
 # The normalizer lives beside this script, not under OT6_ROOT: a mock tree
 # is hashed by the same definition as the real one.
 FINGERPRINT="$(cd "$(dirname "$0")" && pwd)/lua_fingerprint.py"
+# The ROM identity's one definition, found the same way (lib -> tests ->
+# tools -> tools/build).
+ROM_VERSION="$(cd "$(dirname "$0")/../../build" && pwd)/rom_version.py"
 STATES="$ROOT/build/states"
 # The ROM a generation run boots: run.sh's own default, overridable the same
 # way (OT6_ROM), so the stamp records the ROM that actually ran.  compose.py
@@ -158,14 +161,18 @@ $ex"
   digest_of "$files" || exit 2
 }
 
-# sha256 of the ROM the run boots: the compatibility binding for "is this
-# fixture a snapshot of the machine this tree builds?"  Changed ROM
-# code/layout can invalidate a machine snapshot.  A missing ROM is a hard
-# error; a stamp must never guess its ROM.
+# The identity of the ROM the run boots: the compatibility binding for "is
+# this fixture a snapshot of the machine this tree builds?"  Changed ROM
+# code/layout can invalidate a machine snapshot.  The identity is the
+# sha256 of the ROM with its version fields masked (tools/build/rom_version.py
+# identity: Ot6VersionText, the header title and the header checksum), so
+# the release commit's VERSION bump stales nothing; any other byte moves it.
+# A missing ROM is a hard error; a stamp must never guess its ROM.
 romsig() {
   [ -f "$ROM" ] ||
     { echo "savestate_stamp: no ROM at '$ROM' to identify" >&2; exit 2; }
-  shasum -a 256 "$ROM" | cut -c1-64
+  python3 "$ROM_VERSION" identity "$ROM" ||
+    { echo "savestate_stamp: could not identify the ROM at '$ROM'" >&2; exit 2; }
 }
 
 # The emulator that made <state>.mss: the sha in the `[emulator] <sha256>
