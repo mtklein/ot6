@@ -28,6 +28,27 @@ fully restore HP and MP.
 See [docs/DESIGN.md](docs/DESIGN.md) for the mechanics design and
 [docs/TOOLING.md](docs/TOOLING.md) for tool installation.
 
+## Playing on Android
+
+Each release carries `ot6-vX.Y.apk`, OT6 Patcher: a small app that makes
+`OT6.sfc` from your own ROM and keeps it current. To get updates without
+lifting a finger, subscribe in [Obtainium](https://obtainium.imranr.dev/):
+
+1. Add an app with the URL `https://github.com/mtklein/ot6`, and under
+   "Filter APKs by regular expression" enter `ot6-.*\.apk`.
+2. Install it and open OT6 Patcher once: choose your own Final Fantasy III
+   (USA) v1.0 ROM (it's never included, and never changed), then the folder
+   to write `OT6.sfc` into.
+3. From then on, each update Obtainium installs rewrites `OT6.sfc` and
+   posts a notification; there's no need to open the app.
+
+`OT6.sfc` keeps its name across updates, so your saves and save states
+carry over. RetroArch: choose the folder its playlist scans, and re-scan it
+once so OT6.sfc shows up. If you used to soft-patch, delete the
+`Final Fantasy III (USA).bps` beside your vanilla ROM so vanilla stays
+vanilla, and keep any `OT6.bps` (or `.ips`/`.ups`) out of OT6.sfc's folder,
+since RetroArch would apply it on top; the app warns if it sees one.
+
 ## Contributing
 
 See [AGENTS.md](AGENTS.md).

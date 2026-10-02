@@ -120,6 +120,62 @@ The non-brew pieces need the manual steps at each bullet.
   dies on first launch as DllNotFoundException → Abort trap 6.
 - **dotnet@8** — via Homebrew (keg-only); only for building OT6's Mesen
   (`tools/mesen/build.sh` finds it), not for running it.
+- **openjdk@21** and **android-commandlinetools** — via Homebrew; only
+  for the Android patcher APK (below), which only `ninja release` builds.
+
+## Android patcher
+
+`android/` is OT6 Patcher, a small Android app (plain Java, no libraries)
+shipped as `ot6-vX.Y.apk` on each GitHub release so Obtainium can keep a
+handheld current. It carries the release's .bps, applies it to the
+player's own ROM (checking the source and target CRC32s; a 512-byte copier
+header is stripped) and writes `OT6.sfc` into a folder they chose, again
+after every update (a `MY_PACKAGE_REPLACED` receiver).
+
+Built with the plain SDK tools by `tools/android/build_apk.sh` (aapt2,
+javac, d8, zipalign, apksigner; no Gradle). The pieces, as installed on
+the Macs on 2026-10-02:
+
+```sh
+brew bundle    # openjdk@21 (21.0.12.1), cask android-commandlinetools
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 sdkmanager \
+  --sdk_root=/opt/homebrew/share/android-commandlinetools \
+  "build-tools;35.0.1" "platforms;android-35"
+```
+
+`tools/android/env.sh` pins those versions (minSdk 26, targetSdk 35) and
+finds them through `JAVA_HOME` and `ANDROID_HOME` when set; a missing
+piece stops the build with the line above. The ninja edges:
+
+- `build/checks/android_bps.ok` runs the app's BPS code
+  (`android/src/.../Bps.java`) on the JVM: the patch must rebuild
+  `build/ot6.sfc` from the base ROM byte for byte, and a corrupted patch,
+  a wrong ROM and a short ROM must be refused (`android/test/BpsTest.java`).
+  It needs a JDK only, and no qualification.
+- `build/release/ot6-vX.Y.apk` carries the release .bps; versionName is
+  VERSION, versionCode is major×10000 + minor×100 + patch (0.23 → 2300).
+- `build/checks/android_apk.ok` (`tools/android/verify_apk.sh`):
+  `apksigner verify --print-certs` must show the certificate pinned in
+  `android/release-cert.sha256`, `aapt2 dump badging` the versionCode,
+  versionName, minSdk and targetSdk, and the APK must carry the patch the
+  host check tested.
+
+`ninja release` builds all three, so a release needs the JDK, the SDK and
+the signing key; bare `ninja` builds none of them.
+
+**The signing key.** Installed copies accept updates signed with one key
+only, forever. It lives outside the repo at
+`~/.config/ot6/android-release.jks` (PKCS12, alias `ot6`, certificate
+SHA-256 `e27bba94…0a9d49`, the full digest in `android/release-cert.sha256`);
+its password is the login Keychain item `ot6-android-release` (account
+`ot6`), which the build reads with `security find-generic-password -w`.
+Back both up. A missing keystore stops the build rather than making a new
+key; `tools/android/new_keystore.sh` made the first one and refuses to
+replace it.
+
+**Test builds** install beside a player's copy when built with
+`OT6_APK_PACKAGE=io.github.mtklein.ot6patcher.test`: their own settings,
+their own update broadcasts.
 
 Only the ROMs, `build/`, `build.ninja`, `tools/Mesen.app`, and `tools/bin`
 are git-ignored. Ripped assets are tracked.

@@ -4,8 +4,8 @@
 Bare `ninja` builds and tests everything: the default targets are the
 ROM, every generated savestate, every suite test's result, every audit and
 every selftest.  `ninja release` is all of that plus the release
-preflights (the chain from power-on among them), the BPS patch and the
-zip.  `ninja chain` is the chain from power-on alone (savestate_ninja.py
+preflights (the chain from power-on among them), the BPS patch, the
+zip and the Android patcher APK.  `ninja chain` is the chain from power-on alone (savestate_ninja.py
 chain_plan).  Those are the only aliases; any partial need is a real
 output path
 (`ninja build/states/vargas_entry.mss.lua`,
@@ -41,7 +41,9 @@ from the root):
   checks         the selftests and audits, each with its real inputs, so an
                  unchanged tree re-runs none of them.
   release        preflights (branch, README version, real notes), the BPS
-                 patch, and the zip (`ninja release`).
+                 patch, the zip, and the Android patcher APK with its
+                 checks (`ninja release`; needs the JDK, the Android SDK
+                 and the signing key, which bare `ninja` does not).
 
 Regeneration: the `configure` edge below re-runs this script when it, the
 graph data, VERSION, or any globbed directory changes (the depfile lists
@@ -722,6 +724,43 @@ w.edge([f"build/release/ot6-v{VERSION}.zip"], "sh",
            f' "ot6-v{VERSION}/RELEASE_NOTES.md"',
        desc=f"release zip v{VERSION}")
 
+# The OT6 Patcher APK (android/, docs/TOOLING.md "Android patcher"): carries
+# the release .bps and writes the patched ROM on the player's device.  Only
+# `ninja release` builds it, so bare `ninja` never needs the JDK, the Android
+# SDK or the signing key; the scripts say what is missing.  The host check
+# runs the app's BPS code on the JVM against a patch made the same way as
+# the release one (so it needs no qualification), and verify_apk.sh proves
+# the APK carries that same tested patch.
+android_bps = "build/android/ot6.bps"
+w.edge([android_bps], "sh", [BASE, "build/ot6.sfc"],
+       cmd=f'mkdir -p build/android && tools/bin/flips --create --bps'
+           f' "{BASE}" build/ot6.sfc {android_bps} >/dev/null',
+       desc="bps patch for the android host check")
+w.edge(["build/checks/android_bps.ok"], "sh", [BASE, android_bps, "build/ot6.sfc"],
+       implicit=["tools/android/bps_check.sh", "tools/android/env.sh",
+                 "android/src/io/github/mtklein/ot6patcher/Bps.java",
+                 "android/test/BpsTest.java"],
+       cmd=f'tools/android/bps_check.sh "{BASE}" {android_bps} build/ot6.sfc'
+           f' && mkdir -p build/checks && touch build/checks/android_bps.ok',
+       desc="android BPS applier on the JVM")
+# versionCode orders releases: major*10000 + minor*100 + patch (0.23 -> 2300)
+_v = [int(x) for x in VERSION.split(".")] + [0, 0]
+apk_code = _v[0] * 10000 + _v[1] * 100 + _v[2]
+apk = f"build/release/ot6-v{VERSION}.apk"
+w.edge([apk], "sh", [bps],
+       implicit=["build/checks/android_bps.ok", "tools/android/build_apk.sh",
+                 "tools/android/env.sh", "android/AndroidManifest.xml"]
+                + glob("android/src/io/github/mtklein/ot6patcher/*.java")
+                + glob("android/res/*/*.xml"),
+       cmd=f'tools/android/build_apk.sh "{bps}" {VERSION} {apk_code} {apk}',
+       desc=f"android apk v{VERSION}")
+w.edge(["build/checks/android_apk.ok"], "sh", [apk, android_bps],
+       implicit=["tools/android/verify_apk.sh", "tools/android/env.sh",
+                 "android/release-cert.sha256"],
+       cmd=f'tools/android/verify_apk.sh {apk} {VERSION} {apk_code} {android_bps}'
+           f' && touch build/checks/android_apk.ok',
+       desc=f"verify android apk v{VERSION}")
+
 # ----------------------------------------------- copy_if_changed + regen ---
 w()
 for dep, src in sorted(copy_if_changed_edges.items()):
@@ -737,7 +776,8 @@ w.edge(["build.ninja"], "configure",
        ["configure.py", sn.GRAPH, "tools/tests/lib/savestate_ninja.py",
         "VERSION"])
 w()
-w.edge(["release"], "phony", [f"build/release/ot6-v{VERSION}.zip"])
+w.edge(["release"], "phony", [f"build/release/ot6-v{VERSION}.zip", apk,
+                              "build/checks/android_apk.ok"])
 # `chain` is the one other alias: the chain from power-on's last state
 # moves whenever a cut or a leg is added, and this name does not.
 if chain_end:
