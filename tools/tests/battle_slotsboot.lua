@@ -140,10 +140,10 @@ local function fallen() return monstersDown() or not H.battleLoadStarted() end
 -- of control; no ally left in control).  The party then ends it with a
 -- Fight (care.fightOut) rather than spin into Stone, cares, and the
 -- draw deals a fresh battle (Ot6InitBP's 1 again) for the spins to be
--- played over, at most MAX_BATTLES in the run (three lost): in the
--- round-3 sweep (build/attempts/wt/slotsboot-v024/runs4/n6_*, 30 runs) no
--- run lost more than one.
-local lost, battles, MAX_BATTLES = false, 0, 4
+-- played over, at most MAX_BATTLES in the run (two lost): in the round-3
+-- sweep (build/attempts/wt/slotsboot-v024/runs4/n6_*, 30 runs) no run lost
+-- more than one.
+local lost, battles, MAX_BATTLES = false, 0, 3
 local done, armedOnce, spin3Resolved = false, false, false
 local function markLost(what, why)
   if not lost then
@@ -156,6 +156,7 @@ end
 -- until it is read (spin 3's own triple can fell the formation as it
 -- resolves, and that is the spin resolving, not the battle lost)
 local spinInFlight = false
+local endedInFlight = false      -- the battle ended under the resolve loop
 local function checkLost(what)
   if lost or spinInFlight or not H.battleLoadStarted() then return lost end
   if monstersDown() then markLost(what, "the formation fell before spin 3 resolved")
@@ -376,7 +377,7 @@ local function resolveLoop(tag)
         tag, H.frame, pend(), bp(), H.readByte(MENU), H.readByte(ACTOR),
         H.readByte(MSTATE), tostring(H.battleLoadStarted()), partyLine()))
     end
-    if not H.battleLoadStarted() then return true end
+    if not H.battleLoadStarted() then endedInFlight = true; return true end
     local ran = (actEnd[actor * 2] or 0) - r0
     local cmd = actEndCmd[actor * 2] or 0xFF
     if php(actor) == 0 and ran == 0 then
@@ -443,7 +444,7 @@ local function resolvedSpin(tag, checks, want, onResolved)
     if spinVoid then spinVoid = false end
   end)
   return H.repeatN(1, {
-    H.call(function() spinVoid, spinDone, spinInFlight = false, false, false end),
+    H.call(function() spinVoid, spinDone, spinInFlight, endedInFlight = false, false, false, false end),
     H.driveUntil(function()
       return spinDone or bankShort or (lost and not spinInFlight) or not H.battleLoadStarted()
     end, 60000, body, tag .. ": the spin resolves"),
@@ -451,7 +452,12 @@ local function resolvedSpin(tag, checks, want, onResolved)
       if spinDone and onResolved then onResolved() end
       spinInFlight = false
       if bankShort then return end
-      if not spinDone then markLost(tag, "the battle ended before the spin resolved") end
+      -- a battle that ends with his committed spin unresolved is a bug or
+      -- a wipe, not a battle lost to the test: the lost point never ends a
+      -- spin in flight, and spin 3's own felling triple resolves first
+      H.assertEq(endedInFlight, false, tag .. ": the battle did not end with the "
+        .. "committed spin unresolved")
+      if not spinDone then markLost(tag, "the battle ended before a spin was committed") end
     end),
   })
 end
