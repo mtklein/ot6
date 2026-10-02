@@ -3,7 +3,8 @@
 -- the terra-returned-v1 SRAM checkpoint (party LOCKE EDGAR SABIN SETZER,
 -- save-point boundary F, lettered in tools/tests/savestate_graph.py; the
 -- Continue restores the party on foot at the grounded Blackjack's tile),
--- walk the plain south of Zozo into a world encounter, and drive real Slot
+-- pace the plain south of Zozo into a world encounter the spins can run in
+-- (fleeing the rest, budgeted from the pool's decode below), and drive real Slot
 -- spins with real button presses. No pokes on either side: BP accumulates
 -- through Ot6ActionEnd's own regen (battle opens at 1, +1 per unboosted
 -- turn), boost is spent with real R presses, and the reels are stopped by
@@ -133,6 +134,221 @@ local function waitStop(r, what)
   return H.waitUntil(function() return H.readByte(STOP[r]) ~= 0 end, 900, what, 2)
 end
 
+-- ---- reaching a formation the spins can run in -------------------------
+-- The spins need a fight that outlasts three of them (at least two bodies
+-- and 600 max HP between them) and a spinner who stays awake: a sleeping
+-- spinner's slot window is torn down mid-spin and the reel presses land
+-- in the next ready ally's menu (measured on the v0.23 re-cut: SleepSting
+-- put SETZER to sleep in spin 2, aea0cbe5).  Mind Candy's special is
+-- SleepSting, so a pack holding one is fled, not fought: the property
+-- here is the tier promise across three whole spins, which a slept
+-- spinner cannot show.  Sleep is read from each species' special
+-- (MonsterProp+31), not from a species list.
+--
+-- Which pool slot the next encounter deals is fixed by the save's
+-- encounter counter ($1fa2/$1fa3, lib/ot6_field.lua above
+-- M.worstCaseEncounters), and every re-cut of the chain hands this
+-- checkpoint a different one.  On the v0.24 ROM the Blackjack's plain
+-- (zone 96, grass) rolls group 10: Vulture + Iron Fist (80/256), Mind
+-- Candy x4 (80/256), Iron Fist x2 + Mind Candy x2 (96/256).  Only one
+-- slot in 80/256 suits, so the old budget of six draws missed it in 15%
+-- of counter states, and the v0.24 re-cut's counter is one of them: its
+-- draws 1-6 were slots 3,3,2,4,4,2 (build/attempts/wt/slotsboot-v024/).
+-- The budget is now the most encounters ANY counter state needs to deal a
+-- suitable slot (H.worstCaseEncounters, decoded at run time from the
+-- group CheckBattleWorld rolls), and this save's own counter says where
+-- in that budget the fight comes (logged; each encounter asserts the
+-- word the counter chose, which pins it).
+--
+-- The budget holds only while every encounter rolls from the one pool.
+-- The old walk drifted south and east by the clock and crossed into the
+-- forest (group 11) and other pools, so the walk now paces a stretch of
+-- the disembark row whose every tile rolls one group, whatever the saved
+-- position (planPace, as battle_steal's desert), and each battle asserts
+-- the group its CheckBattleWorld rolled and the word the counter chose.
+local MAXTRIES = 24                -- encounters built; the budget must fit
+local PACE = 4                     -- tiles each way from the disembark tile
+local MIN_BODIES, MIN_HP = 2, 600
+local MONPROP = H.sym("MonsterProp") & 0x3FFFFF
+local RNGTBL = H.sym("RNGTbl") & 0x3FFFFF
+local worldGroup = nil             -- the group the last CheckBattleWorld rolled
+local pace = nil                   -- { y, lo, hi, group, dir }
+local draws = { n = 0 }            -- budget, pool, seq, lo, hi; n = met so far
+
+-- MonsterProp+31, the species' special: low six bits below $20 index a
+-- status (battle_main.asm @3300-@3345, route_data.special_text), and $0F
+-- is status 2 bit 7, Sleep.
+local function sleepSpecial(sp)
+  return (H.readRomByte(MONPROP + sp * 32 + 31) & 0x3F) == 0x0F
+end
+local function romMaxHp(sp) return H.readRomWord(MONPROP + sp * 32 + 8) end
+local function suits(bodies, hp, sleepy)
+  return bodies >= MIN_BODIES and hp >= MIN_HP and not sleepy
+end
+
+local function planPace()
+  local x0, y0 = H.worldX(), H.worldY()
+  local function own(x) return H.worldEncounterGroup(x, y0, x, y0) end
+  local g = own(x0)
+  local lo, hi = x0, x0
+  while lo > x0 - PACE and H.worldPassable(lo - 1, y0) and own(lo - 1) == g do
+    lo = lo - 1
+  end
+  while hi < x0 + PACE and H.worldPassable(hi + 1, y0) and own(hi + 1) == g do
+    hi = hi + 1
+  end
+  local zx, zy = H.worldZonePos()
+  local groups = {}
+  for x = lo, hi do
+    for z = lo, hi do
+      local gg = H.worldEncounterGroup(x, y0, z, y0)
+      if gg ~= nil then groups[gg] = true end
+    end
+    local gg = H.worldEncounterGroup(x, y0, zx, zy)
+    if gg ~= nil then groups[gg] = true end
+  end
+  local list = {}
+  for gg in pairs(groups) do list[#list + 1] = tostring(gg) end
+  table.sort(list)
+  H.log(string.format("[test] pace: row %d, x %d..%d (disembark x %d, saved "
+    .. "position (%d,%d)); the groups it can roll: %s", y0, lo, hi, x0, zx, zy,
+    table.concat(list, ",")))
+  H.assertEq(hi - lo >= 2, true, string.format("the disembark row gives a "
+    .. "stretch of at least three tiles that roll group %d (x %d..%d)", g, lo, hi))
+  H.assertEq(#list == 1 and list[1] == tostring(g), true, string.format(
+    "every encounter on the stretch rolls group %d, whatever the saved "
+    .. "position (rolls %s)", g, table.concat(list, ",")))
+  pace = { y = y0, lo = lo, hi = hi, group = g, dir = "left" }
+end
+
+-- The pool's slots judged from the ROM, the budget over every counter
+-- state, and this save's own coming slots: lo is the first encounter whose
+-- slot CAN deal a suitable formation, hi the first whose every formation
+-- suits (equal unless a +rand word mixes them).
+local function planDraws()
+  local pool = H.encounterPool(pace.group)
+  local ok, any, parts = {}, {}, {}
+  for slot = 1, 4 do
+    ok[slot], any[slot] = true, false
+    local names = {}
+    for _, f in ipairs(pool[slot].formations) do
+      local hp, sleepy = 0, false
+      for _, sp in ipairs(f.species) do
+        hp = hp + romMaxHp(sp)
+        sleepy = sleepy or sleepSpecial(sp)
+      end
+      f.suits = suits(#f.species, hp, sleepy)
+      ok[slot] = ok[slot] and f.suits
+      any[slot] = any[slot] or f.suits
+      local sp = {}
+      for _, s in ipairs(f.species) do sp[#sp + 1] = string.format("%03X", s) end
+      names[#names + 1] = string.format("%d [%s] %d HP%s", f.id,
+        table.concat(sp, " "), hp, sleepy and " sleep" or "")
+    end
+    parts[#parts + 1] = string.format("slot %d (%d/256, $%04X) %s%s", slot,
+      pool[slot].odds, pool[slot].word, table.concat(names, ", "),
+      ok[slot] and " SUITS" or "")
+  end
+  local worst, hist = H.worstCaseEncounters(function()
+    return function(slot) return ok[slot] end
+  end)
+  H.log(string.format("[test] budget: group %d: %s -- the worst of the 65536 "
+    .. "encounter-counter states needs %d encounter(s); %.1f%% need no more "
+    .. "than 6", pace.group, table.concat(parts, "; "), worst,
+    100 * H.encounterShare(hist, 6)))
+  H.assertEq(worst <= MAXTRIES, true, string.format("group %d deals a "
+    .. "suitable formation within the %d encounters built (worst state: %d)",
+    pace.group, MAXTRIES, worst))
+  local a, b = H.readByte(0x1FA2), H.readByte(0x1FA3)
+  local seq, lo, hi = {}, nil, nil
+  for n = 1, MAXTRIES do
+    a = (a + 1) & 0xFF                       -- UpdateBattleGrpRng
+    if a == 0 then b = (b + 0x17) & 0xFF end
+    seq[n] = H.encounterSlot((H.readRomByte(RNGTBL + a) + b) & 0xFF)
+    if lo == nil and any[seq[n]] then lo = n end
+    if hi == nil and ok[seq[n]] then hi = n end
+  end
+  draws = { budget = worst, pool = pool, seq = seq, lo = lo, hi = hi, n = 0 }
+  H.log(string.format("[test] this save's counter ($1fa2=$%02X $1fa3=$%02X) "
+    .. "deals slots %s: a suitable formation at encounter %s",
+    H.readByte(0x1FA2), H.readByte(0x1FA3), table.concat(seq, ","),
+    lo == hi and tostring(lo) or (tostring(lo) .. ".." .. tostring(hi))))
+end
+
+-- one walk until an encounter opens, pacing the stretch
+local function paceWalk(tag)
+  return H.driveUntil(function() return H.battleLoadStarted() end, 25000, {
+    H.call(function()
+      if not H.worldMode() or not H.worldHasControl() then
+        H.setPad({}); return
+      end
+      if H.worldAligned() then
+        local x = H.worldX()
+        if x <= pace.lo then pace.dir = "right"
+        elseif x >= pace.hi then pace.dir = "left" end
+      end
+      H.setPad({ [pace.dir] = true })
+    end),
+  }, tag)
+end
+
+local surveyStep = H.call(function()
+  draws.n = draws.n + 1
+  local n, slot = draws.n, draws.seq[draws.n]
+  local e = draws.pool[slot]
+  H.assertEq(worldGroup, pace.group, string.format("encounter %d was dealt "
+    .. "by group %d, the pool its budget was decoded from", n, pace.group))
+  H.assertEq(H.readWord(0x11E0), e.word, string.format("encounter %d dealt "
+    .. "slot %d's word, as the save's counter said", n, slot))
+  msPresent = {}
+  for m = 0, 5 do
+    if H.readByte(0x3AA8 + m * 2) % 2 == 1 then
+      msPresent[#msPresent + 1] = m
+    end
+  end
+  local mhp = 0
+  for _, m in ipairs(msPresent) do mhp = mhp + H.readWord(0x3BFC + m * 2) end
+  H.vars.mhpTotal = mhp
+  local live, sleepy = {}, false
+  for _, s in ipairs(H.formationSpecies()) do
+    live[#live + 1] = s.species
+    sleepy = sleepy or sleepSpecial(s.species)
+  end
+  table.sort(live)
+  H.vars.suitable = suits(#msPresent, mhp, sleepy)
+  -- the live formation is one of the slot's, and the ROM judged it the same
+  local romSuits = nil
+  for _, f in ipairs(e.formations) do
+    local sp = {}
+    for _, s in ipairs(f.species) do sp[#sp + 1] = s end
+    table.sort(sp)
+    if table.concat(sp, ",") == table.concat(live, ",") then romSuits = f.suits end
+  end
+  H.log(string.format("draw %d: slot %d $%04X, %d bodies, %d total max HP%s -> %s",
+    n, slot, e.word, #msPresent, mhp, sleepy and " (sleep-capable pack)" or "",
+    H.vars.suitable and "FIGHT" or "flee"))
+  H.assertEq(romSuits, H.vars.suitable, string.format("encounter %d's live "
+    .. "formation is one of slot %d's, judged as the ROM's data judged it", n, slot))
+end)
+
+local function attempt(n)
+  return H.cond(function() return not H.vars.suitable and n <= draws.budget end, {
+    paceWalk("a real world encounter fires (draw " .. n .. ")"),
+    H.release(),
+    H.waitUntil(function() return H.battleActive() end, 900,
+      "battle active (draw " .. n .. ")", 30),
+    H.waitFrames(240),
+    surveyStep,
+    H.cond(function() return not H.vars.suitable end, {
+      H.fleeBattle(9000),
+      H.waitUntil(function()
+        return H.worldMode() and H.worldHasControl()
+      end, 1200, "back on the plain after fleeing draw " .. n, 10),
+      H.waitFrames(30),
+    }, {}),
+  }, {})
+end
+
 H.run({ maxFrames = 400000 }, {
   -- cold Continue (the checkpoint's $307ff0=3 preselects slot 3), using the
   -- probe_mp_universal boot unchanged
@@ -166,66 +382,23 @@ H.run({ maxFrames = 400000 }, {
   H.release(),
   H.waitFrames(30),
 
+  H.waitUntil(function() return H.worldSettled() end, 1500,
+    "the world map settled", 5),
+  H.call(function()
+    local check = H.sym("CheckBattleWorld")
+    emu.addMemoryCallback(function() worldGroup = H.worldCheckGroup() end,
+      emu.callbackType.exec, check, check)
+    planPace()
+    planDraws()
+  end),
   (function()
-    local ph = 0
-    local pattern = { "down", "down", "right", "right", "down", "down",
-                      "left", "left" }
-    local walkStep = function()
-      return H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
-        H.call(function()
-          ph = ph + 1
-          local dir = pattern[(math.floor(ph / 20) % #pattern) + 1]
-          H.setPad({ [dir] = true })
-        end),
-      }, "a real world encounter fires")
-    end
-    local surveyStep = H.call(function()
-      msPresent = {}
-      for m = 0, 5 do
-        if H.readByte(0x3AA8 + m * 2) % 2 == 1 then
-          msPresent[#msPresent + 1] = m
-        end
-      end
-      local mhp = 0
-      for _, m in ipairs(msPresent) do mhp = mhp + H.readWord(0x3BFC + m * 2) end
-      H.vars.mhpTotal = mhp
-      -- Mind Candy ($8C) opens with SleepSting, and a sleeping spinner's
-      -- slot window is torn down mid-spin -- the A presses then land in
-      -- the next ready ally's command menu (measured on the re-cut F:
-      -- spin2's reel-2 presses fell into LOCKE's Fight menu and timed
-      -- out).  A menu-driving test needs a spinner who stays awake, so a
-      -- sleep-capable pack redraws like an unsurvivable one.
-      local sleepy = false
-      for _, s in ipairs(H.formationSpecies()) do
-        if s.species == 0x8C then sleepy = true end
-      end
-      H.vars.suitable = (#msPresent >= 2 and mhp >= 600 and not sleepy)
-      H.log(string.format("draw: %d bodies, %d total max HP%s -> %s",
-        #msPresent, mhp, sleepy and " (sleep-capable pack)" or "",
-        H.vars.suitable and "FIGHT" or "flee"))
-    end)
-    local attempt = function(n)
-      return H.cond(function() return not H.vars.suitable end, {
-        walkStep(),
-        H.release(),
-        H.waitUntil(function() return H.battleActive() end, 900,
-          "battle active (draw " .. n .. ")", 30),
-        H.waitFrames(240),
-        surveyStep,
-        H.cond(function() return not H.vars.suitable end, {
-          H.fleeBattle(9000),
-          H.waitUntil(function()
-            return H.worldMode() and H.worldHasControl()
-          end, 1200, "back on the plain after fleeing draw " .. n, 10),
-          H.waitFrames(30),
-        }, {}),
-      }, {})
-    end
     local steps = {}
-    for n = 1, 6 do steps[#steps + 1] = attempt(n) end
+    for n = 1, MAXTRIES do steps[#steps + 1] = attempt(n) end
     steps[#steps + 1] = H.call(function()
-      H.assertEq(H.vars.suitable, true,
-        "the pool dealt a survivable formation within six draws")
+      H.assertEq(H.vars.suitable, true, string.format("a formation the "
+        .. "spins can run in was dealt within %d encounters, the most any "
+        .. "encounter-counter state needs from group %d", draws.budget,
+        pace.group))
     end)
     return H.repeatN(1, steps)
   end)(),
