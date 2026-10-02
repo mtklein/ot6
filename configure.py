@@ -4,8 +4,8 @@
 Bare `ninja` builds and tests everything: the default targets are the
 ROM, every generated savestate, every suite test's result, every audit and
 every selftest.  `ninja release` is all of that plus the release
-preflights (the chain from power-on among them), the BPS patch and the
-zip.  `ninja chain` is the chain from power-on alone (savestate_ninja.py
+preflights (the chain from power-on among them), the BPS patch, the
+zip and the Android patcher APK.  `ninja chain` is the chain from power-on alone (savestate_ninja.py
 chain_plan).  Those are the only aliases; any partial need is a real
 output path
 (`ninja build/states/vargas_entry.mss.lua`,
@@ -41,7 +41,9 @@ from the root):
   checks         the selftests and audits, each with its real inputs, so an
                  unchanged tree re-runs none of them.
   release        preflights (branch, README version, real notes), the BPS
-                 patch, and the zip (`ninja release`).
+                 patch, the zip, and the Android patcher APK with its
+                 checks (`ninja release`; needs the JDK, the Android SDK
+                 and the signing key, which bare `ninja` does not).
 
 Regeneration: the `configure` edge below re-runs this script when it, the
 graph data, VERSION, or any globbed directory changes (the depfile lists
@@ -388,13 +390,15 @@ TEST_ENV = {
     # battery cut on its save point (SETZER back in the World of Ruin, so
     # Jackpot is learned).  A run is the Continue, a walk and one to four
     # battles: 6-30k frames (battle_jackpot plays Dullahan from wor_grave)
-    "battle_cointoss": "OT6_TIMEOUT=1800 "
+    # battle_jackpot: three passes and a bounded search (at most 192 throws)
+    "battle_jackpot": "OT6_TIMEOUT=3600",
+    "battle_cointoss": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
     "battle_hiredhelp": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
     "battle_setzergrey": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
-    "battle_gprain": "OT6_TIMEOUT=1800 "
+    "battle_gprain": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
     "battle_hirerefund": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
@@ -736,6 +740,71 @@ w.edge([f"build/release/ot6-v{VERSION}.zip"], "sh",
            f' "ot6-v{VERSION}/RELEASE_NOTES.md"',
        desc=f"release zip v{VERSION}")
 
+# The OT6 Patcher APK (android/, docs/TOOLING.md "Android patcher"): carries
+# the patch and writes the patched ROM on the player's device.  Only `ninja
+# release` (or an explicit path) builds it, so bare `ninja` never needs the
+# JDK, the Android SDK or the signing key; the scripts say what is missing.
+#
+# The APK carries build/android/ot6.bps, made by the release patch's own
+# flips command from the same inputs, so the APK, the host check and the
+# signing checks run without qualification
+# (`ninja build/release/ot6-vX.Y.apk build/checks/android_apk.ok`); the
+# release itself also requires android_apk_release.ok, which compares that
+# patch with the qualified release .bps byte for byte.
+android_bps = "build/android/ot6.bps"
+w.edge([android_bps], "sh", [BASE, "build/ot6.sfc"],
+       cmd=f'mkdir -p build/android && tools/bin/flips --create --bps'
+           f' "{BASE}" build/ot6.sfc {android_bps} >/dev/null',
+       desc="bps patch for the android apk")
+w.edge(["build/checks/android_bps.ok"], "sh", [BASE, android_bps, "build/ot6.sfc"],
+       implicit=["tools/android/bps_check.sh", "tools/android/env.sh",
+                 "android/src/io/github/mtklein/ot6patcher/Bps.java",
+                 "android/src/io/github/mtklein/ot6patcher/RomScan.java",
+                 "android/test/BpsTest.java"],
+       cmd=f'tools/android/bps_check.sh "{BASE}" {android_bps} build/ot6.sfc'
+           f' && mkdir -p build/checks && touch build/checks/android_bps.ok',
+       desc="android BPS applier on the JVM")
+
+
+def apk_version_code(version):
+    """versionCode for VERSION, ordering releases and their candidates:
+    major*1000000 + minor*10000 + patch*100 + (N for -rcN, else 99), so
+    0.24-rc1 -> 240001 < 0.24 -> 240099 < 0.24.1 -> 240199.  None when
+    VERSION has another shape (the APK edge then fails saying so; nothing
+    else in the graph depends on it)."""
+    m = re.fullmatch(r"(\d+)\.(\d+)(?:\.(\d+))?(?:-rc([1-9]\d?))?", version)
+    if not m or int(m.group(2)) > 99 or int(m.group(3) or 0) > 99:
+        return None
+    major, minor, patch, rc = (int(g) if g else 0 for g in m.groups())
+    return major * 1000000 + minor * 10000 + patch * 100 + (rc or 99)
+
+
+apk_code = apk_version_code(VERSION)
+apk = f"build/release/ot6-v{VERSION}.apk"
+apk_inputs = ["build/checks/android_bps.ok", "tools/android/build_apk.sh",
+              "tools/android/env.sh", "android/AndroidManifest.xml"] \
+    + glob("android/src/io/github/mtklein/ot6patcher/*.java") \
+    + glob("android/res/*/*.xml")
+if apk_code is None:
+    w.edge([apk], "sh", [android_bps], implicit=apk_inputs,
+           cmd=f"echo 'ERROR: VERSION {VERSION} is not major.minor[.patch][-rcN];"
+               f" the APK needs one to make its versionCode' && exit 1",
+           desc=f"android apk v{VERSION}")
+else:
+    w.edge([apk], "sh", [android_bps], implicit=apk_inputs,
+           cmd=f'tools/android/build_apk.sh {android_bps} {VERSION} {apk_code} {apk}',
+           desc=f"android apk v{VERSION}")
+w.edge(["build/checks/android_apk.ok"], "sh", [apk, android_bps],
+       implicit=["tools/android/verify_apk.sh", "tools/android/env.sh",
+                 "android/release-cert.sha256"],
+       cmd=f'tools/android/verify_apk.sh {apk} {VERSION} {apk_code} {android_bps}'
+           f' && touch build/checks/android_apk.ok',
+       desc=f"verify android apk v{VERSION}")
+w.edge(["build/checks/android_apk_release.ok"], "sh", [android_bps, bps],
+       cmd=f'cmp {android_bps} "{bps}"'
+           f' && touch build/checks/android_apk_release.ok',
+       desc=f"android apk carries the release patch v{VERSION}")
+
 # ----------------------------------------------- copy_if_changed + regen ---
 w()
 for dep, src in sorted(copy_if_changed_edges.items()):
@@ -751,7 +820,9 @@ w.edge(["build.ninja"], "configure",
        ["configure.py", sn.GRAPH, "tools/tests/lib/savestate_ninja.py",
         "VERSION"])
 w()
-w.edge(["release"], "phony", [f"build/release/ot6-v{VERSION}.zip"])
+w.edge(["release"], "phony", [f"build/release/ot6-v{VERSION}.zip", apk,
+                              "build/checks/android_apk.ok",
+                              "build/checks/android_apk_release.ok"])
 # `chain` is the one other alias: the chain from power-on's last state
 # moves whenever a cut or a leg is added, and this name does not.
 if chain_end:

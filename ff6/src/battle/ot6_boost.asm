@@ -1900,9 +1900,10 @@ OT6_LIFE3_ID = $35
         ; $3a7b (FixPlayerAttack's Slot arm keeps a row id rather than mapping
         ; it as a reel), and a reel spin's $3a7b is its mapped attack, which
         ; the leaf prices 0, as Slot always was.  Flat at every boost level:
-        ; cmd $0f is in Ot6BoostDmg's gate.  Jackpot's boost buys its face,
-        ; and Coin Toss and Hired Help are paid in gil (Ot6CoinGil), so no
-        ; MP price here escalates.
+        ; cmd $0f is in Ot6BoostDmg's gate.  Every row's boost buys passes
+        ; (Jackpot's rolls, Coin Toss's tosses, Hired Help's hires), and Coin
+        ; Toss and Hired Help are paid in gil (Ot6CoinGil), so no MP price
+        ; here escalates.
         pla                     ; drop the parked cost (0 for slot)
         lda     $3a7b
         jsl     Ot6SetzerCost

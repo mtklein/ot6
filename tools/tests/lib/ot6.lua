@@ -7596,8 +7596,9 @@ end
 -- relic's GP Rain, $18: no table, target select straight away; recorded
 -- with row = $18).  L takes back a pending boost the entry does not want.
 -- An entry { row = "defend" } is a Defend, which banks a point.  Everyone
--- else Defends while the plan has turns left, then everyone, SETZER too,
--- Fights its default target until the battle ends; the victory text is
+-- else Defends while the plan has turns left (or Fights, opts.othersFight),
+-- then everyone, SETZER too, Fights its default target until the battle
+-- ends; the victory text is
 -- pressed through (opts.untilPlanDone ends the step instead, mid-battle,
 -- once the plan is spent and its last row has resolved).  Nothing is
 -- written.
@@ -7629,9 +7630,14 @@ function M.setzerBattle(plan, opts)
   local function mons()
     local t = {}
     for s = 0, 5 do
+      -- alive: the engine's own monster mask ($3A75, rebuilt where it
+      -- counts $3A77): a Wound, Petrify or Zombie body is out of it, even
+      -- one that keeps its HP (kit-setzer round 5: a petrified Mad Oscar
+      -- at 2,647 HP read alive by HP and held the victory text)
       t[s] = { hp = M.readWord(0x3BFC + s * 2), sh = M.readByte(0x3E40 + s * 2),
         brk = M.readByte(0x3E90 + s * 2), cls = M.readByte(0x3EA4 + s * 2),
-        present = (M.readByte(0x3AA8 + s * 2) & 1) == 1 }
+        present = (M.readByte(0x3AA8 + s * 2) & 1) == 1,
+        alive = ((M.readByte(0x3A75) >> s) & 1) == 1 }
     end
     return t
   end
@@ -7655,7 +7661,7 @@ function M.setzerBattle(plan, opts)
       Z.rec = { row = row, boost = M.readByte(0x3E9D + e), level = M.readByte(0x3B18 + e),
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
-        entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {} }
+        entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {}, passes = {} }
     end, emu.callbackType.exec, a, a)
     -- the Coin Toss relic's GP Rain (command $18, no table): its own record
     local g = M.sym("Cmd_18")
@@ -7666,7 +7672,7 @@ function M.setzerBattle(plan, opts)
       Z.rec = { row = 0x18, boost = M.readByte(0x3E9D + e), level = M.readByte(0x3B18 + e),
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
-        entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {} }
+        entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {}, passes = {} }
     end, emu.callbackType.exec, g, g)
     local t = M.sym("TakeGil")
     emu.addMemoryCallback(function()
@@ -7694,6 +7700,26 @@ function M.setzerBattle(plan, opts)
         for s2 = 0, 5 do Z.rec.dice[#Z.rec.dice].hp[s2] = M.readWord(0x3BFC + s2 * 2) end
       end
     end, emu.callbackType.write, 0x0000B5, 0x0000B5)
+    -- Jackpot's passes: each entry to Ot6JackpotDice for the row, with the
+    -- pass's target mask and the battle Rand's index ($be) there, and $be
+    -- again as the dice effect returns (AttackerEffect_09's rts after the
+    -- hook's bcc: jsl 4 bytes, bcc 2), so a pass that rolled nothing can be
+    -- seen to have drawn nothing
+    local jd = M.sym("Ot6JackpotDice")
+    emu.addMemoryCallback(function()
+      if live() and Z.rec and Z.rec.row == 0x5B and M.readByte(0x3A7C) == 0x0F then
+        Z.rec.passes[#Z.rec.passes + 1] = { mask = M.readByte(0xB8) | (M.readByte(0xB9) << 8), be0 = M.readByte(0xBE),
+          dice = #Z.rec.dice }
+      end
+    end, emu.callbackType.exec, jd, jd)
+    local jr = M.sym("AttackerEffect_09") + 6
+    emu.addMemoryCallback(function()
+      local ps = live() and Z.rec and Z.rec.passes
+      local q = ps and ps[#ps]
+      if q and q.be1 == nil then
+        q.be1, q.rolled = M.readByte(0xBE), #Z.rec.dice - q.dice
+      end
+    end, emu.callbackType.exec, jr, jr)
     local e = M.sym("Ot6ActionEnd")
     emu.addMemoryCallback(function()
       if not live() then return end
@@ -7724,6 +7750,10 @@ function M.setzerBattle(plan, opts)
           r.dmg, r.class) or ""))
         M.log(string.format("[setzer]   exec f%d, Ot6ActionEnd f%d (bank %d, pending %d at its entry), closed f%d",
           r.f, r.ended, r.endBank, r.endPend, M.frame))
+        for k, q in ipairs(r.passes) do
+          M.log(string.format("[setzer]   pass %d: targets $%04X, $be %02X -> %s, %s roll(s)", k, q.mask, q.be0,
+            q.be1 and string.format("%02X", q.be1) or "?", tostring(q.rolled)))
+        end
         for s = 0, 5 do
           local o, n = r.mon0[s], r.mon1[s]
           if o.present then
@@ -7748,10 +7778,10 @@ function M.setzerBattle(plan, opts)
     arm()
     close()
     if M.readByte(MENU) == 0 then
-      local alive = false
-      for s = 0, 5 do
-        if M.readWord(0x3BFC + s * 2) > 0 and (M.readByte(0x3AA8 + s * 2) & 1) == 1 then alive = true end
-      end
+      -- the engine's own count of enemies still in the fight ($3A77): a
+      -- petrified body that keeps its HP is out of it, as the battle's end
+      -- test (`lda $3a77`) has it
+      local alive = M.readByte(0x3A77) > 0
       if not alive then
         if not Z.endSaid then
           Z.endSaid = true
@@ -7759,7 +7789,15 @@ function M.setzerBattle(plan, opts)
           for e2 = 0, 3 do
             t[#t + 1] = string.format("e%d HP %d st %02X", e2, M.readWord(0x3BF4 + e2 * 2), M.readByte(0x3EE4 + e2 * 2))
           end
-          M.log(string.format("[setzer] f%d no monster stands: %s", M.frame, table.concat(t, ", ")))
+          local m = {}
+          for s2 = 0, 5 do
+            if (M.readByte(0x3AA8 + s2 * 2) & 1) == 1 then
+              m[#m + 1] = string.format("s%d HP %d st %02X", s2, M.readWord(0x3BFC + s2 * 2),
+                M.readByte(0x3EEC + s2 * 2))
+            end
+          end
+          M.log(string.format("[setzer] f%d no monster stands ($3A77 = 0, $3A75 = %02X): %s; %s", M.frame,
+            M.readByte(0x3A75), table.concat(t, ", "), #m > 0 and table.concat(m, ", ") or "no body present"))
         end
         pulse("a")
       else M.setPad({}) end
@@ -7769,7 +7807,7 @@ function M.setzerBattle(plan, opts)
     local st = M.readByte(MSTATE)
     local p = plan[k]
     if M.readByte(0x3ED8 + a * 2) ~= 9 then
-      if p ~= nil then defend(st) else fight(a, st) end
+      if p ~= nil and not opts.othersFight then defend(st) else fight(a, st) end
       return
     end
     Z.entity = a * 2
@@ -7835,6 +7873,12 @@ function M.setzerBattle(plan, opts)
       end
       pulse("a")
     elseif st == 0x38 then
+      -- an entry planned refused whose A was pressed in the list must not get
+      -- here (the previous entry's own target select lingers a frame or two
+      -- after k moves on, before this entry has pressed anything)
+      M.assertEq(p.refused and (p.presses or 0) >= 1 or false, false, string.format("row $%02X at %d BP, planned "
+        .. "refused, is refused at the list (its confirm must not reach target select)", type(p.row) == "number"
+        and p.row or 0, p.boost or 0))
       if p.slot ~= nil then
         local want = 1 << p.slot
         local mons = M.readByte(0x7B7E)
@@ -7872,6 +7916,156 @@ function M.setzerBattle(plan, opts)
         #M.vars.setzer, #plan, k))
     end),
   })
+end
+
+-- M.speciesClassRow(sp): the class-weakness row the break seed gives a
+-- species (ot6_break.asm's seed): its Ot6ShieldTbl record's (4 bytes:
+-- species word, shields, classes; $FFFF ends the table), else
+-- OT6_FLOOR_CLASS[species].  Read from the ROM.
+function M.speciesClassRow(sp)
+  local t = M.sym("Ot6ShieldTbl") & 0x3FFFFF
+  local i = 0
+  while i < 1024 do
+    local id = M.readRomWord(t + i * 4)
+    if id == 0xFFFF then break end
+    if id == sp then return M.readRomByte(t + i * 4 + 3) end
+    i = i + 1
+  end
+  return M.readRomByte((M.sym("OT6_FLOOR_CLASS") & 0x3FFFFF) + sp)
+end
+
+-- M.setzerCrowdBudget(group, tag): how many encounters the coin suites may
+-- take to meet their next crowd (two or more monsters, one special-weak:
+-- the formations of a pool slot all so), decoded from the group's pool and
+-- the ROM's class rows, the worst over all 65,536 encounter-counter states
+-- (M.worstCaseEncounters; the next formation is fixed by the counter, not
+-- rolled fresh).  On the 2026-10-02 ROM the tomb's east room rolls group
+-- 151 (Mad Oscar; Mad Oscar + Exoray; PowerDemon + 2 Exorays twice), only
+-- the PowerDemon slots qualify, and the worst state needs 19 (kit-setzer
+-- round 5 review: 8 covered 95.7%).  Logs the decode.
+function M.setzerCrowdBudget(group, tag)
+  local pool = M.encounterPool(group)
+  local ok, parts = {}, {}
+  for slot = 1, 4 do
+    ok[slot] = true
+    local names = {}
+    for _, f in ipairs(pool[slot].formations) do
+      local weak = 0
+      for _, sp in ipairs(f.species) do
+        if (M.speciesClassRow(sp) & 0x08) ~= 0 then weak = weak + 1 end
+      end
+      ok[slot] = ok[slot] and #f.species >= 2 and weak >= 1
+      names[#names + 1] = string.format("%d (%d bodies, %d special-weak)", f.id, #f.species, weak)
+    end
+    parts[#parts + 1] = string.format("slot %d (%d/256) %s%s", slot, pool[slot].odds, table.concat(names, ", "),
+      ok[slot] and " a crowd" or "")
+  end
+  local worst, hist = M.worstCaseEncounters(function()
+    return function(slot) return ok[slot] end
+  end)
+  M.log(string.format("[%s] budget: group %d: %s -- the worst of the 65536 encounter-counter states needs %d "
+    .. "encounter(s) to the next crowd; %.1f%% need no more than 8", tag, group, table.concat(parts, "; "), worst,
+    100 * M.encounterShare(hist, 8)))
+  M.assertEq(worst < 1024, true, string.format("group %d deals a crowd at all", group))
+  return worst
+end
+
+-- M.setzerCrowdBattles(o): the coin suites' walk.  From the field, walk
+-- the waypoints o.wps into random battles until every throw in o.want
+-- has been played and checked.  A battle that deals a crowd (two or more
+-- monsters in the engine's alive mask $3A75, one special-weak -- its class
+-- row holds $08 -- and shielded) plays SETZER's remaining plan through the
+-- real menu (M.setzerBattle, o.setzerOpts); any other is fought out by the
+-- route's fight driver (tactical, boost, items; SETZER's table off, so no
+-- gil moves), and every battle is followed by the field care stop.  Each
+-- throw is checked the moment its record closes (o.check(rec, i), whose
+-- result is kept in S.all[i]), so a mutant that only slows the fight fails
+-- at its own assertion.  The budget is M.setzerCrowdBudget's, decoded from
+-- the group the room rolls: at most that many encounters from one crowd
+-- to the next, and each crowd must give at least one throw, so the run is
+-- bounded by budget x the throws.  o.onBattle(n), when given, runs once a
+-- battle is up.  Returns the step and S = { done, all, battles, crowds }.
+function M.setzerCrowdBattles(o)
+  local S = { done = {}, all = {}, battles = 0, crowds = 0, since = 0 }
+  local W, wp = nil, 1
+  local tag = o.tag
+  local function remaining()
+    local t = {}
+    for i = #S.done + 1, #o.want do t[#t + 1] = o.want[i] end
+    return t
+  end
+  local function crowdHere()
+    local alive, weak = 0, 0
+    local mask = M.readByte(0x3A75)
+    for b = 0, 5 do
+      if (mask >> b) & 1 == 1 then
+        alive = alive + 1
+        if (M.readByte(0x3EA4 + b * 2) & 0x08) ~= 0 and M.readByte(0x3E40 + b * 2) > 0 then weak = weak + 1 end
+      end
+    end
+    local yes = alive >= 2 and weak >= 1
+    M.log(string.format("[%s] battle %d (encounter %d since the last crowd, budget %d): %d monster(s), %d "
+      .. "special-weak and shielded -- %s", tag, S.battles, S.since, W, alive, weak,
+      yes and "throw here" or "fight it out, then care"))
+    return yes
+  end
+  local function play()
+    local step, F, seen, crowdBattle = nil, nil, 0, nil
+    return { tick = function()
+      if step == nil and F == nil then
+        M.vars.setzer = {}     -- no record of an earlier battle is read again
+        if crowdHere() then
+          S.crowds, S.since, crowdBattle = S.crowds + 1, 0, S.battles
+          step = M.setzerBattle(remaining(), o.setzerOpts or {})
+        else
+          F = M.newFightDriver(tag .. " fight-out " .. S.battles,
+            { tactical = true, boost = true, items = true, bank = 0, healPercent = 55, setzer = false })
+        end
+      end
+      if F then
+        if not M.battleLoadStarted() then F = nil; return "done" end
+        F.frame()
+        return "frame"
+      end
+      local r = step:tick()
+      local recs = M.vars.setzer or {}
+      while seen < #recs do
+        seen = seen + 1
+        local rec, i = recs[seen], #S.done + 1
+        S.all[i] = o.check(rec, i)
+        S.done[i] = rec
+      end
+      if r == "done" then
+        M.assertEq(seen > 0, true, string.format("%s: crowd battle %d gave at least one throw", tag, crowdBattle))
+        seen, step = 0, nil
+      end
+      return r
+    end, reset = function() step, F, seen = nil, nil, 0 end }
+  end
+  local steps = {
+    M.call(function()
+      S.battles, S.since = S.battles + 1, S.since + 1
+      M.assertEq(S.since <= W, true, string.format("%s: a crowd within %d encounters of the last (the worst of the "
+        .. "65536 counter states); this is encounter %d since", tag, W, S.since))
+    end),
+    M.driveUntil(function() return M.battleLoadStarted() end, 40000, {
+      M.navTo(function() return o.wps[wp][1] end, function() return o.wps[wp][2] end,
+        { maxFrames = 8000, arrive = function() return M.battleLoadStarted() end }),
+      M.call(function() wp = wp % #o.wps + 1 end),
+    }, "a random battle"),
+    M.waitUntil(function() return M.battleActive() end, 1200, "the battle is up", 2),
+  }
+  if o.onBattle then steps[#steps + 1] = M.call(function() o.onBattle(S.battles) end) end
+  steps[#steps + 1] = play()
+  steps[#steps + 1] = M.waitFrames(60)
+  steps[#steps + 1] = M.careStop(tag .. " care after the battle")
+  return M.seqStep({
+    M.call(function()
+      W = M.setzerCrowdBudget(M.fieldEncounterGroup(M.mapId() & 0x1ff), tag)
+    end),
+    M.driveUntil(function() return #S.done >= #o.want end, 1100000, steps,
+      tag .. ": every throw, a crowd at a time"),
+  }), S
 end
 
 -- M.setzerReplay(r, classOf): replay a coin row's passes (Coin Toss, Hired
@@ -7946,10 +8140,12 @@ function M.setzerCheckCoins(r, i, rate, classOf, tag)
   end
   M.assertEq(#passes >= 1 and #passes <= 1 + r.boost, true, string.format("%s %d: 1 + boost passes at most", tag, i))
   if #passes < 1 + r.boost then
+    -- fallen as the engine counts it: out of its alive mask ($3A75), which
+    -- a petrified body that keeps its HP is too
     for b = 0, 5 do
       if r.mon0[b].present then
-        M.assertEq(r.mon1[b].hp, 0, string.format("%s %d: %d of %d passes paid, so slot %d fell", tag, i, #passes,
-          1 + r.boost, b))
+        M.assertEq(r.mon1[b].alive, false, string.format("%s %d: %d of %d passes paid, so slot %d is out of the "
+          .. "fight (HP %d, $3A75 bit clear)", tag, i, #passes, 1 + r.boost, b, r.mon1[b].hp))
       end
     end
   end

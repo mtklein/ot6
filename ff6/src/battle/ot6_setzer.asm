@@ -53,7 +53,8 @@ OT6_CHAR_SETZER    = $09
 OT6_JACKPOT_SW     = $1e80 + ($ca >> 3)
 OT6_JACKPOT_BIT    = 1 << ($ca & 7)
 
-; the coins' rates: gil per level, before the boost doubles them
+; the coins' rates: gil per level, one toss or one hire (the boost buys more
+; of them, each at this price)
 OT6_COIN_RATE      = 30         ; Coin Toss and GP Rain (vanilla's level x 30)
 OT6_HIRE_RATE      = 50         ; Hired Help
 
@@ -513,10 +514,10 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ;
 ; Replaces AttackerEffect_51's `lda $3b18,y / xba / lda #$1e / jsr MultAB`
 ; (level x 30, into the 16-bit accumulator): the same product for a monster,
-; and for a character Ot6CoinGil's, which doubles it per boost point -- the
-; boost buys coins, and the coins are the damage.  Before this a boosted GP
-; Rain (the Coin Toss relic's) bought nothing: Ot6BoostDmg's multiplier runs
-; in CalcDmg, and this effect overwrites the damage after it.
+; and for a character Ot6CoinGil's level x rate, one toss's or one hire's,
+; whatever the boost -- the boost buys passes (Ot6SetzerEffect,
+; Ot6RainPasses), each paying this price.  A pass that finds no body left
+; standing pays nothing: carry set, and the effect returns before TakeGil.
 ;
 ; The class (OT6_ATKCLASS), set here because nothing on GP Rain's path loads
 ; one (no MagicProp, no weapon, no item) and the per-target chip runs after
@@ -529,7 +530,8 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ;   a monster's GP Rain: none (it is vanilla's, and hits the party).
 ;
 ; entry: jsl from AttackerEffect_51, a8/i8, db=$7e, y = the attacker.
-; out: the 16-bit price in B:A, a8.  preserves X and Y.
+; out: carry clear = a body to pay for, the 16-bit price in B:A, a8; carry
+; set = no body (the effect returns, nothing paid).  preserves X and Y.
 .proc Ot6CoinPrice
         .a8
         tya                     ; width-neutral
@@ -1075,8 +1077,10 @@ Ot6HireWeapTbl:
 ; level x 2, times the face again for the triple, saturating at 65,535 as the
 ; effect's own loop does -- and carry set, so the effect returns at once.
 ;
-; The face is a gamble, even odds on 1-6 (one battle Rand, redrawn past 251,
-; mod 6: each face 42 of 252), and the boost buys more of it: Ot6SetzerEffect adds the
+; The face is a gamble, near-even odds on 1-6 (one battle Rand, redrawn past
+; 251, mod 6; the redraw takes the table's next byte, a fixed successor, so
+; over the 256 places a roll can start each face is 42-44 of 256, consistent
+; with the measurement in kits.md), and the boost buys more of it: Ot6SetzerEffect adds the
 ; boost to the action's attack count, so 1 + boost passes each roll their own
 ; triple and land their own hit (owner, 2026-10-02: a gamble, and every point
 ; must land something under the 9,999 cap on one hit; playtesting tunes it).
@@ -1088,6 +1092,11 @@ Ot6HireWeapTbl:
 ; once-per-battle flag (OT6_DIVINE_USED) is spent here, where the triple
 ; lands (can't dodge).  The dice faces go to $b6/$b7 and $b5 = $26, the
 ; dice-roll animation vanilla's effect queues.
+;
+; A roll that finds no body left standing (ChooseTarget's mask is empty: the
+; rolls before felled them all) is skipped: no triple, no Rand, and the pass
+; queues no dice ($b5 = $12, vanilla's own "nothing landed" placeholder,
+; where the last roll left $26), carry set as for a roll.
 ;
 ; entry: jsl from AttackerEffect_09's head, a8/i8, db=$7e, y = the attacker,
 ; x = the effect index.  out: carry set = handled.  preserves y.
@@ -1106,14 +1115,22 @@ Ot6JackpotCubeTbl:
         clc
         rtl
 @jackpot:
-        php
+        lda     $b8             ; no body left for this roll: skip it
+        ora     $b9
+        bne     @aimed
+        lda     #$12            ; the pass queues no dice
+        sta     $b5
+        sec
+        rtl
+@aimed: php
         shortai
         .a8
         .i8
         phx
 @draw:  ot6_rand                ; A = 0-255
         cmp     #252            ; 252 = 42 x 6: a draw past it is drawn
-        bcs     @draw           ;   again, so the six faces are even exactly
+        bcs     @draw           ;   again (the table's next byte: near-even,
+                                ;   42-44 of 256 a face)
 @mod6:  cmp     #$06
         bcc     @rolled
         sbc     #$06            ; (carry is set: the cmp above)
