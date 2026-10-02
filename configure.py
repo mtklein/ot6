@@ -407,6 +407,8 @@ TEST_ENV = {
     # re-split takes its ten crowds
     "battle_passretarget": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    "battle_setzeraim": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
     # walks from the Narshe exit spawn into the Beginner's House
     "school":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1",

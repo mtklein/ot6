@@ -7591,7 +7591,9 @@ end
 -- entry's boost (only what the bank holds), A on the Slot command, the
 -- list's cursor onto the entry's row ($5c Slot, $59 Coin Toss, $5a Hired
 -- Help, $5b Jackpot), A, and A again at target select (Hired Help and
--- Jackpot aim at the entry's `slot`, a monster slot, when it gives one).
+-- Jackpot aim at the entry's `slot`, a monster slot, when it gives one;
+-- every confirm is read off the cursor and lands on that slot, or with no
+-- slot on a live monster, never on the party: see aimStep).
 -- An entry with `cmd` uses that command row instead of Slot's (the Coin Toss
 -- relic's GP Rain, $18: no table, target select straight away; recorded
 -- with row = $18).  L takes back a pending boost the entry does not want.
@@ -7764,10 +7766,79 @@ function M.setzerBattle(plan, opts)
       end
     end
   end
+  -- Target select, read and not assumed (the fight driver's rule since
+  -- 43462e7d: a confirm lands only on the side it aimed at).  The cursor's
+  -- target is $7B7D (party) / $7B7E (monsters); a monster the engine counts
+  -- alive is in $3A75.  `want` is a monster mask (one slot), or nil for any
+  -- live monster.  Returns "confirm" when the cursor is on what was asked
+  -- for; else presses the next step of a deliberate walk -- the crossing
+  -- the battle's layout names (M.battleLayout) when the cursor is on the
+  -- party, then a route over the observed cursor graph (M.newTargetGraph,
+  -- the party crossing tried last) -- and returns "walk"; or returns
+  -- "refuse" and the reason when no walk can get there: the slot asked for
+  -- is not a live monster, the graph has no untried step left, or the walk
+  -- ran past its bound.  It never presses A itself.  (Before this the slot
+  -- aim pressed down/up/right/left twelve times and then A wherever the
+  -- cursor stood: once a party member, and a 2 BP Jackpot wiped the party,
+  -- build/attempts/wt/pass-retarget/iterations/.)
+  local function aimStep(A, want, walkOk)
+    local chars, mons, alive = M.readByte(0x7B7D), M.readByte(0x7B7E), M.readByte(0x3A75)
+    local node = M.tgtNodeName(chars, mons)
+    if A.last then A.g.record(A.last.node, A.last.dir, node); A.last = nil end
+    local function isGoal(n)
+      if n:sub(1, 5) ~= "mons=" then return false end
+      local m = tonumber(n:sub(6), 16)
+      if want then return m == want end
+      return m & alive ~= 0
+    end
+    if chars == 0 and mons ~= 0 and isGoal(node) and (mons & alive) ~= 0 then return "confirm" end
+    if want and (alive & want) == 0 then
+      return "refuse", string.format("the slot asked for (mask $%02X) is not a live monster ($3A75 = $%02X)", want,
+        alive)
+    end
+    if walkOk == false then
+      return "refuse", string.format("the cursor stands on %s, not the target asked for, and walking is off", node)
+    end
+    if A.presses >= 24 then
+      return "refuse", string.format("%d presses walked the cursor and never reached the target (it stands on %s)",
+        A.presses, node)
+    end
+    local L = M.battleLayout()
+    local dir
+    if chars ~= 0 or mons == 0 then
+      A.cross = (A.cross or 0) + 1
+      dir = L.toMonsters[1 + (A.cross - 1) % #L.toMonsters]
+    else
+      local last = {}
+      for _, d in ipairs(L.toChars) do last[d] = true end
+      dir = A.g.route(node, isGoal, function(n) return n:sub(1, 5) == "mons=" end, M.TGT_DIRS, last)
+      if dir == nil then
+        return "refuse", string.format("no step from %s is left untried toward the target (walked %d presses)", node,
+          A.presses)
+      end
+    end
+    A.presses = A.presses + 1
+    A.last = { node = node, dir = dir }
+    pulse(dir)
+    return "walk"
+  end
+  local fightAim = nil
   local function fight(a, st)
     if st == 0x05 then
+      fightAim = nil
       if (M.readByte(0x890F + a) & 3) ~= 0 then pulse("up") else pulse("a") end
-    elseif st == 0x38 then pulse("a")
+    elseif st == 0x38 then
+      -- a Fight at the default target: any live monster, never the party
+      if cool > 0 then pulse("a"); return end
+      fightAim = fightAim or { g = M.newTargetGraph(), presses = 0 }
+      local r, why = aimStep(fightAim, nil)
+      if r == "confirm" then fightAim = nil; pulse("a")
+      elseif r == "refuse" then
+        M.log(string.format("[setzer] f%d actor %d's Fight finds no live monster to confirm on (%s) -- backing out",
+          M.frame, a, why))
+        fightAim = nil
+        pulse("b")
+      end
     elseif st == 0x30 or st == 0x0E or st == 0x0A or st == 0x08 then pulse("b")
     else M.setPad({}) end
   end
@@ -7879,16 +7950,33 @@ function M.setzerBattle(plan, opts)
       M.assertEq(p.refused and (p.presses or 0) >= 1 or false, false, string.format("row $%02X at %d BP, planned "
         .. "refused, is refused at the list (its confirm must not reach target select)", type(p.row) == "number"
         and p.row or 0, p.boost or 0))
-      if p.slot ~= nil then
-        local want = 1 << p.slot
-        local mons = M.readByte(0x7B7E)
-        if mons ~= want and (p.spin or 0) < 12 then
-          if cool == 0 then p.spin = (p.spin or 0) + 1 end
-          pulse(({ "down", "up", "right", "left" })[1 + ((p.spin or 0) // 3) % 4])
-          return
-        end
+      -- the confirm lands on the entry's slot (or, with none, on a live
+      -- monster) or not at all: aimStep walks the cursor there, and a
+      -- target no walk reaches fails the battle with the reason, or with
+      -- opts.aimRefusedOk backs out and skips the entry (p.aimRefused)
+      if cool > 0 then pulse("a"); return end
+      p.aim = p.aim or { g = M.newTargetGraph(), presses = 0 }
+      local slot = p.slot
+      local walkOk = opts.aimWalk
+      if p.aimWalk ~= nil then walkOk = p.aimWalk end
+      local r, why = aimStep(p.aim, slot ~= nil and (1 << slot) or nil, walkOk)
+      if r == "walk" then return end
+      if r == "refuse" then
+        local what = string.format("row $%02X at %d BP aimed at %s: %s", type(p.row) == "number" and p.row or 0,
+          p.boost or 0, slot ~= nil and ("monster slot " .. slot) or "a live monster", why)
+        M.log(string.format("[setzer] f%d %s -- not confirmed", M.frame, what))
+        M.assertEq(opts.aimRefusedOk == true, true, "SETZER's target select confirms only the target asked for: "
+          .. what)
+        p.aimRefused = why
+        k = k + 1
+        pulse("b")
+        return
       end
-      if cool == 0 then k = k + 1 end
+      if p.aim.presses > 0 then
+        M.log(string.format("[setzer] f%d the aim reached %s in %d press(es)", M.frame,
+          M.tgtNodeName(M.readByte(0x7B7D), M.readByte(0x7B7E)), p.aim.presses))
+      end
+      k = k + 1
       pulse("a")
     elseif st == 0x08 then
       if cool == 0 and M.readByte(0x7B92) == 0 then k = k + 1 end
@@ -7904,7 +7992,9 @@ function M.setzerBattle(plan, opts)
     M.driveUntil(function()
       if opts.untilPlanDone and k > #plan and Z.rec == nil then
         local rows = 0
-        for _, p2 in ipairs(plan) do if type(p2.row) == "number" and not p2.refused then rows = rows + 1 end end
+        for _, p2 in ipairs(plan) do
+          if type(p2.row) == "number" and not p2.refused and not p2.aimRefused then rows = rows + 1 end
+        end
         if #(M.vars.setzer or {}) >= rows then return true end
       end
       return not M.battleLoadStarted()
