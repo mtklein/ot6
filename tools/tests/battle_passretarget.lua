@@ -1,0 +1,385 @@
+-- @suite slow
+-- battle_passretarget.lua -- a pass OT6 added to an action goes to another
+-- body when the one it was on has fallen (guidelines.md "Boost pays once";
+-- kits.md "a hire that outlives its target goes to another body").
+--
+-- OT6 buys extra passes of an action through the engine's multi-hit counter
+-- $3a70: a boosted Fight or Capture (two swings a point), Setzer's Coin Toss,
+-- Hired Help and Jackpot (one toss, hire or roll a point), Pummel, Bum Rush
+-- and Drill (Ot6HitCountTbl).  Vanilla's loop does not retarget a pass whose
+-- body died on the pass before, so after a kill the next pass landed nowhere
+-- while a body still stood (wt/hire-sprite's lab: a 3 BP Hired Help on three
+-- bodies landed passes 1 and 3 and left the third body at 2,058 HP).
+--
+-- Played, no writes: Continue the wor-tomb-v1 battery, walk Darill's Tomb's
+-- east room into random battles (field group 151: a Mad Oscar; a Mad Oscar
+-- and an Exoray; a PowerDemon and two Exorays), fight every battle out with
+-- the route's fight driver (boost on: every member boost-Fights, blitzes and
+-- tools at what it has banked), and in a battle that deals a crowd play
+-- SETZER's next plan through the real menu first (H.setzerBattle):
+--   hire:    Defend twice (the bank to 3), Hired Help at 3 BP on the
+--            weakest body (a hire kills an Exoray, so the next hire must
+--            find another);
+--   jackpot: the same with Jackpot (four rolls, a face of 3 or more kills);
+--   coin:    the same with Coin Toss aimed at the weakest body;
+--   resplit: Hired Help unboosted on the weakest body, Defend, Coin Toss at
+--            3 BP over the group, so a toss can fell one body of several.
+-- PASS_SKIP (default 0) crowds are fought out first, to vary the draw: the
+-- encounters they use up move the formations and seeds every later battle
+-- meets.
+--
+-- The instrument, every action of every character: each pass of the
+-- action at CalcAttackEffect's ChooseTarget (the mask it starts with, read
+-- at Ot6Life3Targeting's entry just before; the mask it chose, at
+-- Ot6Oblivion's entry just after) and which monsters stand there (present,
+-- in $3A78, not Wounded and not hidden: CheckTargetsPresent's own test).
+-- An action OT6 extended is a Fight or Capture at 1 BP or more, a Setzer
+-- row or a character's GP Rain at 1 BP or more, or a Blitz or Tool whose
+-- id has a row in the ROM's Ot6HitCountTbl.  For each of its passes after
+-- the first (a weapon's follow-up spell, command $02, keeps vanilla's
+-- "same target" rule and is not one), while a monster stands:
+--   A. the pass lands on a body (its mask is not empty);
+--   B. on standing bodies only;
+--   C. one body, for the one-body actions (Fight, Capture, Hired Help,
+--      Jackpot, Pummel, Bum Rush, Drill);
+--   D. a pass that starts on a group with a fallen body in it lands on the
+--      group's survivors: the coins re-split over the bodies left;
+--   E. a Setzer row runs 1 + boost passes: the retarget buys no pass.
+-- And vanilla's own: a Fight unboosted that swings twice (a Genji pair)
+-- keeps vanilla's rule, its second hand landing nowhere after the first
+-- hand's kill, whenever the run sees one.
+-- The draws the property needs (each kind must meet one, or the suite
+-- fails naming it): a pass whose starting body has fallen while another
+-- stands -- for Hired Help, Jackpot, Coin Toss and a boosted Fight -- and
+-- a Coin Toss pass whose group lost a body and kept another.  The budget:
+-- a crowd within M.setzerCrowdBudget's decoded worst case of the last, and
+-- at most two crowds a plan.  Every battle's key ($be at the open and the
+-- formation) is logged, and the kinds' draws are counted by distinct key.
+-- Negative controls: the ROM before the fix and the mutant ROMs in
+-- build/attempts/wt/pass-retarget/.
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+local H = dofile("tools/tests/lib/ot6.lua")
+
+PASS_SKIP = PASS_SKIP or 0
+local COIN, HIRE, JACKPOT = 0x59, 0x5A, 0x5B
+local SETZERROW = 0xEDCD               -- OT6_SETZERROW (ot6_memory.inc)
+local MARK = 0xEDCE                    -- OT6_PASSRETARGET: logged, never asserted
+local TAG = "passretarget"
+
+local function bits(m)
+  local n = 0
+  while m ~= 0 do n = n + (m & 1); m = m >> 1 end
+  return n
+end
+
+-- the monsters ChooseTarget would keep: present ($3AA0+x bit 0), in the
+-- battle's target mask ($3A78 high byte), not Wounded, Petrified or Zombie
+-- ($3EE4+x & $C2: a monster's test) and not hidden ($3EF9+x bit 5) --
+-- CheckTargetsPresent's test, x = 8 + 2s.  (A petrified body keeps its HP
+-- and stays present: measured, a Mad Oscar at 1,266 HP with $3EE4 = $40.)
+local function standing()
+  local m, tm = 0, H.readByte(0x3A79)
+  for s = 0, 5 do
+    local x = 8 + s * 2
+    if (H.readByte(0x3AA0 + x) & 1) == 1 and ((tm >> s) & 1) == 1 and (H.readByte(0x3EE4 + x) & 0xC2) == 0
+        and (H.readByte(0x3EF9 + x) & 0x20) == 0 then
+      m = m | (1 << s)
+    end
+  end
+  return m
+end
+
+-- the weakest standing monster slot, read when the cursor needs it
+local function weakest()
+  local best, hp = nil, nil
+  local m = standing()
+  for s = 0, 5 do
+    if (m >> s) & 1 == 1 then
+      local h = H.readWord(0x3BFC + s * 2)
+      if hp == nil or h < hp then best, hp = s, h end
+    end
+  end
+  return best
+end
+local function aimed(t)
+  return setmetatable(t, { __index = function(_, k) if k == "slot" then return weakest() end end })
+end
+
+-- ---- the instrument ------------------------------------------------------
+local hitTbl = nil
+local function hitCountIds()
+  if hitTbl then return hitTbl end
+  hitTbl = {}
+  local t = H.sym("Ot6HitCountTbl") & 0x3FFFFF
+  for i = 0, 63 do
+    local id = H.readRomByte(t + i * 2)
+    if id == 0xFF then break end
+    hitTbl[id] = H.readRomByte(t + i * 2 + 1)
+  end
+  return hitTbl
+end
+
+local acts, open, key = {}, {}, nil
+local KIND = { [0x00] = "fight", [0x06] = "capture", [0x0A] = "blitz", [0x09] = "tool", [0x18] = "gprain" }
+local function kindOf(a)
+  if a.cmd == 0x0F then
+    return ({ [COIN] = "coin", [HIRE] = "hire", [JACKPOT] = "jackpot" })[a.row] or "slot"
+  end
+  return KIND[a.cmd] or string.format("cmd%02X", a.cmd or 0xFF)
+end
+local ONE = { fight = true, capture = true, hire = true, jackpot = true, blitz = true, tool = true }
+-- a Fight's or Capture's own count: one pass a hand, eight with Offering
+-- (FightAttack: $3a70 = 1, or 7 when $3C58 bit 0); what the first pass
+-- finds above that is OT6's, two a point -- the player's boost or an
+-- engine-driven actor's dumped bank (Ot6Retaliate), which the pending byte
+-- at ExecCmd does not show
+local function fightBase(a) return a.offering and 7 or 1 end
+local function extended(a)
+  local k = a.kind
+  if k == "fight" or k == "capture" then return a.passes[1].a70 > fightBase(a) end
+  if k == "gprain" or k == "coin" or k == "hire" or k == "jackpot" then return a.boost >= 1 end
+  if k == "blitz" or k == "tool" then return a.ab ~= nil and hitCountIds()[a.ab] ~= nil end
+  return false
+end
+
+local seen = { hire = {}, jackpot = {}, coin = {}, fight = {}, resplit = {}, vanilla = {} }
+local checked = { acts = 0, passes = 0 }
+local function note(k, key0) seen[k][key0 or "?"] = (seen[k][key0 or "?"] or 0) + 1 end
+
+local function judge(a)
+  a.kind = kindOf(a)
+  local ext = extended(a)
+  if a.kind == "fight" or a.kind == "capture" then a.boost = (a.passes[1].a70 - fightBase(a)) // 2 end
+  local lines = {}
+  for p, q in ipairs(a.passes) do
+    lines[#lines + 1] = string.format("p%d $3A70=%d mark=%d b5=%02X ba=%02X bb=%02X in $%04X stand %02X -> $%04X", p,
+      q.a70, q.mark, q.b5, q.ba, q.bb, q.pre, q.stand, q.post or 0xFFFF)
+  end
+  H.log(string.format("[%s] %s by e%d at %d BP%s%s, %d pass(es), key %s: %s", TAG, a.kind, a.e, a.boost,
+    a.ab and string.format(" (id $%02X)", a.ab) or "", a.offering and " (Offering)" or "", #a.passes, a.key or "?",
+    table.concat(lines, "; ")))
+  if a.cmd == 0x0F and a.row and a.row >= COIN and a.row <= JACKPOT and a.boost >= 1 then
+    H.assertEq(#a.passes, 1 + a.boost, string.format("E: %s at %d BP runs 1 + boost passes", a.kind, a.boost))
+  end
+  local fam = a.passes[1].b5
+  local famN = 0
+  for _, q in ipairs(a.passes) do if q.b5 == fam then famN = famN + 1 end end
+  for p, q in ipairs(a.passes) do
+    -- a pass after the first, of the action's own command (a weapon's
+    -- follow-up spell, $b5 = $02, keeps vanilla's "same target"), starting
+    -- on monsters only, while a monster stands
+    if p >= 2 and q.b5 == fam and q.post ~= nil and q.pre ~= 0 and (q.pre & 0xFF) == 0 and q.stand ~= 0 then
+      local pre, post, stand = q.pre >> 8, q.post >> 8, q.stand
+      local fell = pre & ~stand & 0x3F
+      local what = string.format("%s by e%d at %d BP, pass %d of %d (key %s; started on $%02X, standing $%02X, "
+        .. "landed on $%04X)", a.kind, a.e, a.boost, p, #a.passes, a.key or "?", pre, stand, q.post)
+      if ext then
+        checked.passes = checked.passes + 1
+        H.assertEq(post ~= 0, true, "A: a pass OT6 added lands on a body while one stands -- " .. what)
+        H.assertEq(q.post & 0xFF, 0, "F: on the side its target was on (the monsters) -- " .. what)
+        if bits(pre) >= 2 and (pre & stand) ~= 0 then
+          H.assertEq(post, pre & stand, "D: a group pass lands on the group's survivors -- " .. what)
+        end
+        H.assertEq(post & ~stand & 0x3F, 0, "B: it lands on standing bodies only -- " .. what)
+        if ONE[a.kind] then
+          H.assertEq(bits(post), 1, "C: a one-body action's pass lands on one body -- " .. what)
+        end
+        if (pre & stand) == 0 then
+          if seen[a.kind == "capture" and "fight" or a.kind] then note(a.kind == "capture" and "fight" or a.kind, a.key) end
+          H.log(string.format("[%s]   retarget: %s", TAG, what))
+        end
+        if a.kind == "coin" and bits(pre) >= 2 and fell ~= 0 and (pre & stand) ~= 0 then
+          note("resplit", a.key)
+          H.log(string.format("[%s]   re-split: %s", TAG, what))
+        end
+      elseif a.kind == "fight" and famN == 2 and (q.ba & 0x40) == 0 and (pre & stand) == 0 then
+        -- vanilla's own two passes (a Genji pair, one a hand): Fight's
+        -- targeting ($ba bit 5, CmdTargetTbl) puts an emptied mask back on
+        -- the backup targets ($3a4e), so the second hand swings at the body
+        -- the first hand felled
+        H.assertEq(q.post, q.pre, "vanilla: an unboosted two-hand Fight's second hand swings at the body the first "
+          .. "hand felled -- " .. what)
+        note("vanilla", a.key)
+        H.log(string.format("[%s]   vanilla: %s", TAG, what))
+      end
+    end
+  end
+  if ext then checked.acts = checked.acts + 1 end
+end
+
+-- the battle's seed as InitBattle sets it ($021e << 2 into $be, just before
+-- its jsr LoadBattleProp): with the formation, the battle's key
+local seed0 = nil
+local function arm()
+  local lb = H.sym("LoadBattleProp")
+  emu.addMemoryCallback(function() seed0 = H.readByte(0xBE) end, emu.callbackType.exec, lb, lb)
+  local ec = H.sym("ExecCmd@battle_code")
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xff
+    if x >= 8 then return end
+    open[x] = { e = x, boost = H.readByte(0x3E9D + x), passes = {}, key = key, f = H.frame,
+      offering = (H.readByte(0x3C58 + x) & 1) == 1 }
+  end, emu.callbackType.exec, ec, ec)
+  -- the Blitz or Tool id, as Cmd_0a / Cmd_09 hand it to Ot6HitCount (A; y =
+  -- the attacker): a failed Blitz input arrives as Pummel's
+  local hc = H.sym("Ot6HitCount")
+  emu.addMemoryCallback(function()
+    local y = emu.getState()["cpu.y"] & 0xff
+    if open[y] then open[y].ab = emu.getState()["cpu.a"] & 0xff end
+  end, emu.callbackType.exec, hc, hc)
+  local pre = H.sym("Ot6Life3Targeting")
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xff
+    local a = open[x]
+    if not a then return end
+    if a.cmd == nil then
+      a.cmd = H.readByte(0x3A7C)
+      if a.cmd == 0x0F then a.row = H.readByte(SETZERROW) end
+    end
+    a.passes[#a.passes + 1] = { pre = H.readByte(0xB8) | (H.readByte(0xB9) << 8), stand = standing(),
+      a70 = H.readByte(0x3A70), b5 = H.readByte(0xB5), ba = H.readByte(0xBA), bb = H.readByte(0xBB),
+      mark = H.readByte(MARK) }
+  end, emu.callbackType.exec, pre, pre)
+  local post = H.sym("Ot6Oblivion")
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xff
+    local a = open[x]
+    local q = a and a.passes[#a.passes]
+    if q and q.post == nil then q.post = H.readByte(0xB8) | (H.readByte(0xB9) << 8) end
+  end, emu.callbackType.exec, post, post)
+  local fin = H.sym("Ot6ActionEnd")
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xff
+    local a = open[x]
+    if not a then return end
+    open[x] = nil
+    if #a.passes >= 1 then acts[#acts + 1] = a end
+  end, emu.callbackType.exec, fin, fin)
+end
+
+-- judged off the callbacks (an assertion inside one would not stop the run)
+local judgedN = 0
+local function judgeNew()
+  while judgedN < #acts do
+    judgedN = judgedN + 1
+    judge(acts[judgedN])
+  end
+end
+
+-- ---- the walk ------------------------------------------------------------
+local PLANS = {
+  { kind = "hire", plan = function() return { { row = "defend" }, { row = "defend" }, aimed({ row = HIRE, boost = 3 }) } end },
+  { kind = "jackpot", plan = function() return { { row = "defend" }, { row = "defend" }, aimed({ row = JACKPOT, boost = 3 }) } end },
+  { kind = "resplit", plan = function() return { aimed({ row = HIRE, boost = 0 }), { row = "defend" }, { row = COIN, boost = 3 } } end },
+}
+local MAXTRIES = 2
+local tries = {}
+local function count(t) local n = 0 for _ in pairs(t) do n = n + 1 end return n end
+local function nextPlan()
+  for _, p in ipairs(PLANS) do
+    if count(seen[p.kind]) == 0 then
+      tries[p.kind] = tries[p.kind] or 0
+      H.assertEq(tries[p.kind] < MAXTRIES, true, string.format("%s: the draw this needs (a pass whose body fell "
+        .. "while another stands) within %d crowd plans", p.kind, MAXTRIES))
+      tries[p.kind] = tries[p.kind] + 1
+      return p
+    end
+  end
+  return nil
+end
+local function allSeen()
+  for _, k in ipairs({ "hire", "jackpot", "resplit", "fight" }) do
+    if count(seen[k]) == 0 then return false end
+  end
+  return true
+end
+
+local W, since, battles, crowds = nil, 0, 0, 0
+local wp = 1
+local WPS = { { 124, 26 }, { 120, 11 } }
+
+local function crowdHere()
+  local alive, weak = 0, 0
+  local mask = H.readByte(0x3A75)
+  for b = 0, 5 do
+    if (mask >> b) & 1 == 1 then
+      alive = alive + 1
+      if (H.readByte(0x3EA4 + b * 2) & 0x08) ~= 0 and H.readByte(0x3E40 + b * 2) > 0 then weak = weak + 1 end
+    end
+  end
+  return alive >= 2 and weak >= 1, alive
+end
+
+local function play()
+  local step, F, plan = nil, nil, nil
+  return { tick = function()
+    if step == nil and F == nil and plan == nil then
+      local crowd, alive = crowdHere()
+      local p = (crowd and crowds >= PASS_SKIP) and nextPlan() or nil
+      H.log(string.format("[%s] battle %d, key %s: %d monster(s)%s -- %s", TAG, battles, key, alive,
+        crowd and ", a crowd" or "", p and ("SETZER plays " .. p.kind) or "fight it out"))
+      if crowd then crowds, since = crowds + 1, 0 end
+      if p then
+        plan = p
+        step = H.setzerBattle(p.plan(), { untilPlanDone = true })
+      end
+    end
+    if step then
+      local r = step:tick()
+      judgeNew()
+      if r ~= "done" then return r end
+      step = nil
+      if not H.battleLoadStarted() then judgeNew(); plan = nil; return "done" end
+    end
+    if F == nil then
+      F = H.newFightDriver(TAG .. " fight " .. battles,
+        { tactical = true, boost = true, items = true, bank = 0, healPercent = 55, setzer = false })
+    end
+    judgeNew()
+    if not H.battleLoadStarted() then F, plan = nil, nil; return "done" end
+    F.frame()
+    return "frame"
+  end, reset = function() step, F, plan = nil, nil, nil end }
+end
+
+local steps = {
+  H.call(function()
+    battles, since = battles + 1, since + 1
+    H.assertEq(since <= W, true, string.format("a crowd within %d encounters of the last (the worst of the 65536 "
+      .. "counter states); this is encounter %d since", W, since))
+  end),
+  H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
+    H.navTo(function() return WPS[wp][1] end, function() return WPS[wp][2] end,
+      { maxFrames = 8000, arrive = function() return H.battleLoadStarted() end }),
+    H.call(function() wp = wp % #WPS + 1 end),
+  }, "a random battle"),
+  H.waitUntil(function() return H.battleActive() end, 1200, "the battle is up", 2),
+  H.call(function()
+    key = string.format("%02X/%03X", seed0 or 0xFF, H.readWord(0x11E0))
+  end),
+  play(),
+  H.waitFrames(60),
+  H.call(judgeNew),
+  H.careStop(TAG .. " care after the battle"),
+}
+
+H.run({ maxFrames = 2400000 }, {
+  H.bootCheckpoint("wor-tomb-v1"),
+  H.call(function()
+    arm()
+    W = H.setzerCrowdBudget(H.fieldEncounterGroup(H.mapId() & 0x1ff), TAG)
+  end),
+  H.driveUntil(function() return allSeen() end, 2200000, steps,
+    "every kind meets a pass whose body fell while another stands"),
+  H.call(function()
+    judgeNew()
+    local t = {}
+    for _, k in ipairs({ "hire", "jackpot", "coin", "fight", "resplit", "vanilla" }) do
+      local n, d = 0, 0
+      for _, c in pairs(seen[k]) do n, d = n + c, d + 1 end
+      t[#t + 1] = string.format("%s %d pass(es) over %d distinct key(s)", k, n, d)
+    end
+    H.log(string.format("[%s] PASSED: %d extended action(s), %d later pass(es) held while a body stood, over %d "
+      .. "battle(s) (%d crowds); %s", TAG, checked.acts, checked.passes, battles, crowds, table.concat(t, "; ")))
+  end),
+})

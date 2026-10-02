@@ -15081,9 +15081,12 @@ ChooseTarget:
         bra     @58f6
 @58b3:  jsl     Ot6PassRetarget ; ot6: $ba bit 2 ("don't retarget"), except
                                 ;   a later pass OT6 added, whose body fell
-                                ;   to an earlier pass (ot6_passes.asm)
+                                ;   to an earlier pass: carry set, and its
+                                ;   side is in $b8/$b9 (ot6_passes.asm)
         bne     @58c8
+        bcs     @ot6side
 @58b9:  jsr     Retarget
+@ot6side:
         jsr     _c258fa
         lda     $ba
         bit     #$08
