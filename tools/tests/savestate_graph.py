@@ -869,4 +869,24 @@ STATES = [
     # tomb's grave room (battle_zombiecure's fixture): paced until it
     # lands, at most 40 battles.
     S("tomb_zombie", gen="gen_tomb_zombie", prev="wor_tomb", timeout=3600),
+
+    # wor-tomb-v1 -> the World of Ruin map beside the landed Falcon: the
+    # monster chest by the tomb's save point (the Presenter and the Whelk
+    # Head), a Save, the gil's last digit moved off every member's level
+    # (L? Pearl), Dullahan at the grave (event battle 85, a game over when
+    # lost: the runner retries from the checkpoint), SETZER's flashback in
+    # map 301, the Falcon's rising, a flight to world (25,160), the landing
+    # and Save there: the `wor-falcon-v1` checkpoint
+    # (docs/design/route-wor-falcon.md section 13).  Three more artifacts of
+    # the one run: wor_chest (the party armed, below the monster chest,
+    # before the press) and wor_grave (on the grave, before the press): the
+    # chest and Dullahan labs' fixtures; and wor_flight (the pilot's first
+    # control after the rising): field_flyto's fixture.
+    # Re-cutting the SRAM:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-falcon-v1/wor-falcon.sram \
+    #     tools/tests/run.sh tools/tests/gen_wor_falcon.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-falcon-v1
+    S("wor_falcon", gen="gen_wor_falcon", checkpoint="wor-tomb-v1", timeout=3600,
+      also=["wor_chest", "wor_grave", "wor_flight"]),
 ]

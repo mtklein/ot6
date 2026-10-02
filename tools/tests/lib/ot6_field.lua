@@ -1335,6 +1335,126 @@ function M.waitWorldSettled(what, maxFrames, n)
   end, maxFrames or 3000, what or "world settled", 1), function() run = 0 end)
 end
 
+-- ---- the airship (the Falcon; world/ctrl.asm GetVehicleInput) ------------
+-- Aboard, $11FA reads 1 and the on-foot tile cells $E0/$E2 read 0; the
+-- vehicle's position is $34/$38 in 1/16 tiles (LandAirship parks it at
+-- ($34 >> 4, $38 >> 4)), its heading $73 in degrees (0..359), its forward
+-- speed $26 (A adds $40 a frame up to $0800, released it loses $80 a
+-- frame), its turn rate $29 (signed: Left adds $20 a frame up to +$200,
+-- Right subtracts, released it decays by $10 a frame toward 0).  Measured
+-- from the Falcon's first control (build/attempts/wt/wor-falcon/flight/
+-- probe_flight.log): heading 316 flies north-east (+55, -57 in 1/16
+-- tiles over 10 frames), 220 south-east (+51, +61), so the heading as a
+-- compass-free math angle (x east, y north) is $73 - 270; Left turns it
+-- counter-clockwise ($73 up), Right clockwise; at full speed it covers
+-- about a third of a tile a frame and coasts about three tiles to a stop.
+-- B over a tile whose property byte $C2 has bit 1 clear lands it
+-- (LandAirship): the party steps off on that tile and the airship is
+-- parked there ($1F62/$1F63).
+local AIRSHIP_VEHICLE = 0x11FA
+function M.aboardAirship() return M.worldMode() and M.readByte(AIRSHIP_VEHICLE) == 1 end
+-- the pilot's: aboard, the world lit, no world or vehicle event script
+-- running ($E7 bits 0 and 1; a scripted flight moves the airship itself)
+function M.airshipControl()
+  return M.aboardAirship() and M.worldHasControl()
+     and (M.readByte(0x00e7) & 0x03) == 0
+     and (emu.getState()["ppu.screenBrightness"] or 0) >= 15
+end
+function M.airshipPos() return M.readWord(0x34) / 16, M.readWord(0x38) / 16 end
+function M.airshipTile() return (M.readWord(0x34) >> 4) & 0xFF, (M.readWord(0x38) >> 4) & 0xFF end
+function M.airshipCanLand() return (M.readByte(0x00c2) & 0x02) == 0 end
+-- the same bit of a tile's property word (its low byte is what the world
+-- engine copies to $C2 for the tile under the vehicle)
+function M.airshipCanLandAt(x, y) return (M.worldTileProp(x, y) & 0x0002) == 0 end
+local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
+local function wrapDelta(d) return ((d + 128) % 256) - 128 end
+local function wrapAngle(a) return ((a + 180) % 360) - 180 end
+
+-- Fly the airship to world tile (tx, ty) and land it there, with the
+-- buttons a pilot has: steer with Left/Right toward the target's bearing
+-- (letting go early enough that the turn's own momentum, $29^2/(2*$10)/256
+-- degrees, carries it onto the bearing), hold A while the bearing is ahead
+-- and the target farther than the airship coasts, let it coast to a stop,
+-- and, stopped short, nudge it with A presses sized to the distance left.
+-- Over the target tile and stopped, B lands; the step ends on foot, the
+-- world settled, on (tx, ty).  The world wraps at 256 tiles, so the
+-- bearing is taken the short way round.  opts.maxFrames (default 6000).
+function M.flyTo(tx, ty, opts)
+  opts = opts or {}
+  local what = opts.what or string.format("fly to (%d,%d) and land", tx, ty)
+  local hb, pulse, landed, presses = -600, 0, false, 0
+  local function heading() return M.readWord(0x73) - 270 end
+  local function pressFor()
+    local x, y = M.airshipPos()
+    local dx, dy = wrapDelta(tx + 0.5 - x), wrapDelta(ty + 0.5 - y)
+    local d = math.sqrt(dx * dx + dy * dy)
+    local speed, rate = M.readWord(0x26), s16(M.readWord(0x29))
+    local bearing = math.deg(math.atan(-dy, dx))
+    local err = wrapAngle(bearing - heading())
+    -- where the turn's momentum alone would carry the heading
+    local coast = rate * math.abs(rate) / (2 * 16 * 256)
+    local resid = wrapAngle(err - coast)
+    local pad = {}
+    local cx, cy = M.airshipTile()
+    if not (cx == tx and cy == ty) and math.abs(resid) > 2 then pad[#pad + 1] = resid > 0 and "left" or "right" end
+    -- the coast at this speed: $26 / ($80 a frame) frames at a mean of half
+    -- the speed, in tiles (2048 covers ~5.5/16 tile a frame)
+    local stopping = (speed / 128) * (speed / 2) / 372 / 16
+    if M.frame - hb >= 60 then
+      hb = M.frame
+      M.log(string.format("[fly] f%d (%.2f,%.2f) tile (%d,%d) -> (%d,%d): %.1f tiles, bearing %.0f, heading %d "
+        .. "(err %.0f, turn %d), speed %d (coasts %.1f)%s", M.frame, x, y, cx, cy, tx, ty, d, bearing,
+        M.readWord(0x73), err, rate, speed, stopping, pulse > 0 and string.format(", a nudge of %d", pulse) or ""))
+    end
+    if cx == tx and cy == ty and speed == 0 and math.abs(rate) == 0 then
+      -- over the target and still: land (B, edge-pressed)
+      if not M.airshipCanLand() then
+        error(string.format("%s: (%d,%d) is not a tile the airship can land on ($C2=%02X, bit 1 set)", what,
+          tx, ty, M.readByte(0x00c2)), 0)
+      end
+      presses = presses + 1
+      return (presses % 16) < 4 and { "b" } or {}
+    end
+    if pulse > 0 then
+      pulse = pulse - 1
+      pad[#pad + 1] = "a"
+      return pad
+    end
+    if math.abs(err) < 20 and d - stopping > 1.5 then
+      pad[#pad + 1] = "a"
+    elseif speed == 0 and math.abs(err) < 6 and math.abs(rate) == 0 and not (cx == tx and cy == ty) then
+      -- stopped short: a nudge whose run-up and coast cover what is left
+      -- (about 0.13 n^2 sixteenths for n frames of A)
+      pulse = math.max(1, math.min(30, math.floor(math.sqrt(d * 16 / 0.13) + 0.5)))
+    end
+    return pad
+  end
+  return M.withReset(M.seqStep({
+    M.waitUntil(function() return M.airshipControl() end, 600, what .. ": the pilot's controls", 1),
+    M.call(function()
+      M.assertEq(M.airshipCanLandAt(tx, ty), true, string.format("%s: (%d,%d) is a tile the airship can land on "
+        .. "(its property word $%04X, bit 1 clear)", what, tx, ty, M.worldTileProp(tx, ty)))
+    end),
+    M.driveUntil(function()
+      landed = M.worldMode() and M.readByte(AIRSHIP_VEHICLE) == 0 and M.worldHasControl()
+      return landed
+    end, opts.maxFrames or 6000, {
+      M.call(function()
+        if not M.airshipControl() then M.setPad({}); return end
+        M.setPad(pressFor())
+      end),
+    }, what),
+    M.release(),
+    M.waitWorldSettled(what .. ": on foot", 1200, 30),
+    M.call(function()
+      M.log(string.format("[fly] %s: on foot at (%d,%d), the airship parked at (%d,%d)", what, M.worldX(),
+        M.worldY(), M.readByte(0x1F62), M.readByte(0x1F63)))
+      M.assertEq(M.worldX() == tx and M.worldY() == ty, true, string.format("%s: landed on (%d,%d) "
+        .. "(standing on (%d,%d))", what, tx, ty, M.worldX(), M.worldY()))
+    end),
+  }), function() hb, pulse, landed, presses = -600, 0, false, 0 end)
+end
+
 -- Walk to world tile (tx,ty): the field navTo's verified-step loop on
 -- the world engine.  Differences:
 --  * hold-through: input is read only at tile boundaries, so the walker

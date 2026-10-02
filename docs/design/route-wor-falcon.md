@@ -83,6 +83,12 @@ emulator run was made for this plan.
    last chests and two rooms before the grave (map 300 (122,14), shown by
    `$0632`, which is set). It is the Dullahan retry point and the first
    field save-point checkpoint of the World of Ruin chain (section 7).
+10. **Played (section 13):** the chest and Dullahan are won at L31-L33 in
+   every measured draw with the route's policy (80 of 80 each, 49 and 52
+   battle keys); the gil's digit is the lever that matters at Dullahan (30
+   of 32 left at 1); SETZER lands four of Dullahan's breaks in five; the
+   rising leaves the Falcon over (68,187), and `H.flyTo` flies it to
+   (25,160), where `wor-falcon-v1` is cut.
 
 ---
 
@@ -323,6 +329,10 @@ $00CD=1 $01B8=1 $01B9=1 ... $039B=1` (`:11257-11276`), `ResetTurtles`, and
 `load_map 1, {25, 160}, ... AIRSHIP` (`:11280`): the party is aboard the
 Falcon, flying, over `(25,160) prop $0544 walk group 49` (`tiles.txt`). `$039B`
 shows Palidor on the Solitary Island's beach (magicite.md): the next arcs'.
+**Measured** (section 13): the load is followed by the rising's own
+`move_vehicle` script (`:11287-11298`), which flies the Falcon on to
+(68,187) before the pilot has the controls; leg 11 flies it back to
+(25,160) and lands there.
 
 ### 2.8 Where the World of Ruin opens
 
@@ -889,17 +899,17 @@ other break suites pass on the re-cut ROM (`ninja_checks.log`).
 
 | mechanic | where | coverage today | what the driving needs |
 |---|---|---|---|
-| Dullahan: an event battle whose loss is a game over | the grave | the runner retries a lost segment from its boot | the lab (section 5): level target, Shell/Haste/Slow, SETZER's arms |
+| Dullahan: an event battle whose loss is a game over | the grave | **measured (13.6)**: 80 of 80 over 52 keys at L31-L33 with the digit settled; 30 of 32 with it at 1 | the runner retries a lost segment from its boot |
 | Zombie on several members, in battle | the tomb (four species) | field cure HANDLED (#190); the battle raise refuses a Fenix Down on a zombie (#245); **the battle cure HANDLED (#263, 12.3)** | measured (12.3): members Zombied at a battle's end 12 -> 3 over 102 tomb battles; with CELES in the Ribbon (12.7) 3 over 57: Zombie lands on the other three; the Amulet goes on by the relic rule when one drops |
 | Sour Mouth (six statuses) | Mad Oscar, B2/B3 | Muddle HANDLED (route-wor-edgar 12.4); Sleep "planned around / not measured live" | Remedy in battle; the Ribbon (worn by CELES since 10.4; she said no status in 12.7's ten runs) |
-| L? Pearl and the gil digit | Dullahan | not read by the driver | read `$1860-$1862` at the grave; the digit is a lever a person can move (selling an odd-priced item) |
+| L? Pearl and the gil digit | Dullahan | **HANDLED (13.3)**: `gen_wor_falcon` reads it after the chest and at the grave and moves it with a Mad Oscar's purse (no shop in the tomb) | — |
 | Frozen (N. Cross) | Dullahan | planned around / not measured live | — |
-| a chest that opens a battle (`EventCmd_8e`) | 300 (120,9) | not in mechanics-coverage | open it after the save; the runner's battle handling |
-| the Whelk pattern: a shell that counters, a head that hides | the chest | the Narshe Whelk's driver | the kill order (head only) |
+| a chest that opens a battle (`EventCmd_8e`) | 300 (120,9) | **HANDLED (13.5)**: faced and pressed like a chest, the fight played by the driver | — |
+| the Whelk pattern: a shell that counters, a head that hides | the chest | **measured (13.5)**: the head first; 80 of 80 over 49 keys; Giga Volt one counter in three | — |
 | face-and-hold-A switches and turtle rides, three directions | the tomb | HANDLED (`H.faceAndHoldA`, up at the Figaro turtle) | down (56,14) and right (71,9) are new directions for it |
 | the castle's ride (a dialog choice and a scripted move) | leg 2 | the Edgar arc's surfacing is the same scene family | choice 0 at "(Go to Kohlingen?)" |
-| **flying and landing the Falcon** | the end | "PARTIAL — contract assertions only" | a land verb (A over land) and a contract; a suite for the new mechanic |
-| a scripted cutscene with walking in the middle | 301 (the flashback) | none needed beyond talks and a step-on trigger | talk, step, talk |
+| **flying and landing the Falcon** | the end | **HANDLED (13.8)**: `H.flyTo` (steer, A, coast, B over a landable tile), `field_flyto`, `wor-falcon-v1`'s contract | — |
+| a scripted cutscene with walking in the middle | 301 (the flashback) | **HANDLED (13.1)**: talk, step, talk (`H.talkToObj` on NPC_5, the trigger (17,16)) | — |
 | a party member joining undressed | SETZER | `M.equipKit` and the world menu helpers (#255) | dress him from the bag and Kohlingen's shops |
 | the desert's Sand Horse pair | group 44, both castle tiles | the driver heal-locks (#312); lost 2 of 8 with two members; **won 124 of 124 over 60 keys with the trio** (section 10.3) | the heal policy's fix (#312), measured there as a lever |
 | map-init `mod_bg_tiles` and turtles | the tomb, 297's stairs, 66, 89 | the lib reads live RAM | offline counts are verify-on-arrival |
@@ -1841,7 +1851,247 @@ suite passes on it (`[23/23] suite battle_zombiecure`, no FAILED).
 
 ## 13. Dullahan and the Falcon, played (legs 9-11, `gen_wor_falcon`, `wor-falcon-v1`)
 
-Not yet driven.
+Driven 2026-10-01 for #263. The segment Continues `wor-tomb-v1` (the
+re-cut with the Ribbon on CELES, payload `cd0d0526...`), arms for the two
+fights ahead, opens the monster chest, moves the gil's last digit off the
+party's levels, saves, beats Dullahan, plays the flashback, flies the
+Falcon to (25,160), lands it and saves: the `wor-falcon-v1` checkpoint.
+Every number below is quoted from a log under
+`build/attempts/wt/wor-falcon/final/` (`capture2/` the sealing run,
+`continue/` the cold Continue, `neg/` the contract's negatives, `suite/`
+the graph's own edge, `field_flyto` and its mutants, `var1/` and `var0/`
+the variation sets, `chest/`, `dull/`, `dullctl/` and `dullczar/` the
+labs, `interrupted/` three lab runs stopped when the base moved; their
+scripts one level up). The development runs, on the pre-Ribbon
+`wor-tomb-v1` (`468ec180...`), are kept in `dev/`. All on ROM
+`86018dd9ac20`, px13. Nothing was measured by writing game state.
+
+### 13.1 The run (`capture2/capture_wor-falcon-v1.log`)
+
+| step | what the log says |
+|---|---|
+| boot | `contract wor-tomb-v1 (entry): all 31 fields hold`; `kit CELES 06 13 0F 7E 8F D1 CA` (the ThunderBlade in her left hand, the Ribbon) |
+| the kit | `[kit] CELES hand 1: holds $0F (keys 0 of the fights' species, power 108, ABSORBED by one of them); the best for the fights ahead is $16 (keys 0, power 125)`; `[kit] EDGAR hand 0: holds $11 (keys 0 ...); the best ... is $06 (keys 2, power 146)` (the Man Eater: pierce keys the Whelk Head and Dullahan); SETZER keeps the Trump (`keys 1`), SABIN his Fire Knuckles (`keys 2`) |
+| the chest | `[key] battle key beC4-g01B1`; `[outcome] battle $1B1 WON after 5913 ticks: killed s0:$101` |
+| the purse | `[pearl] after the chest: gil 248857, last digit 7: L? Pearl would hit no one` (no walk needed on this draw) |
+| the save | `[saved] the save after the chest: slot 3 holds map 300 ($012C) tile (122,14)` |
+| the grave | one battle on the walk (`$0F8 WON after 3625 ticks`); `[pearl] pressing the grave: gil 251107, last digit 7: L? Pearl would hit no one` |
+| Dullahan | `[key] battle key be14-g01C7`; `[monact] ... cmd $0C atk $98 L? Pearl`; `[outcome] battle $1C7 WON after 6906 ticks` |
+| the flashback | `[falcon] f22536 in the flashback map 301 (28,6)`; `[falcon] f23416 Daryl's promise seen map 301 (17,16)` |
+| the rising | `[falcon] f32617 in flight over world 1 (68,187): vehicle 1` |
+| the flight | `[fly] f32619 (68.06,187.56) tile (68,187) -> (25,160): 50.4 tiles, bearing 148, heading 316 (err 102, turn 0)`; `[fly] f32739 (45.12,172.38) ... speed 2048 (coasts 2.8)`; `[fly] the Falcon to (25,160): on foot at (25,160), the airship parked at (25,160)` |
+| the save | `[saved] wor-falcon-v1: slot 3 holds map 1 ($0401) world tile (25,160)`; `contract wor-falcon-v1 (exit): all 30 fields hold`; `[wor] the battles: 3 ($1B1 x1, $0F8 x1, $1C7 x1): 3 won`; `PASS (frame 33362) attempts=1/3` |
+
+Sealed and validated (`capture2/validate_wor-falcon-v1.txt`): `valid
+ot6.sram-checkpoint/v1: 32768 bytes sha256=eeee5c8ccd1d... holds=slot 3
+world 1 (25,160) [$1F64=$0401] (saved: declared and checked)`. The cold
+Continue (`continue/continue_falcon.log`): `contract wor-falcon-v1 (entry):
+all 30 fields hold`, `[continue] world 1 at (25,160), ... the airship parked
+at (25,160): CELES L32 ... SETZER L31 ...; gil=251107; potion=52 fenix=29`.
+The graph's own edge plays the same run (`suite/ninja_field_flyto.log`:
+`[3/5] generate wor_falcon <- gen_wor_falcon`, `PASS (frame 33362)
+attempts=1/3`). The contract's negatives (`neg/`): the same probe on
+`wor-tomb-v1` reads `contract wor-falcon-v1 (entry) VIOLATED -- 10
+field(s) differ`; and copies of the battery with one cell changed (the
+slot checksum recomputed; `make_neg.py`) each fail alone: `switch $02B2
+(Dullahan is beaten ...): expected 1, read 0`, `switch $00CC (the Falcon
+has risen ...): expected 1, read 0`, `ram $1F62 & $FF (the Falcon parked at
+x 25 ...): expected 0x19, read 0x1A`, each `VIOLATED -- 1 field(s) differ`.
+The flashback's `$01F0-$01F3` are the scene's own temporaries (measured 0
+again at the landing; the first contract pinned `$01F3` and failed on it,
+`dev/gl1/k0_s0.log`). The ROM clears switches `$01F0-$01FF` on every new
+map (`ff6/src/field/init.asm:470-471`, `stz $1ebe / stz $1ebf`).
+
+What the plan did not know:
+
+- **The rising flies the Falcon itself.** After `load_map 1, {25, 160}`
+  the event's `move_vehicle` script (`event_main.asm:11287-11298`) carries
+  it to (68,187) before the pilot has it; the plan's "control in flight
+  over (25,160)" was the load, not the control. Leg 11 flies back to
+  (25,160), the tile the next arcs were planned from (2.7).
+- **The tomb moves the digit only through the Mad Oscar.** Of the
+  formations the east room and the grave room deal (groups 151 and 150:
+  247-251) only the Mad Oscar's pay a purse that does not end in 0 (`$061
+  Mad Oscar ... GP 2292`, x2 as a random: +4 to the digit); the Exoray and
+  PowerDemon formations' end in 0 (`dev/dev/run1.log`: six grave-room
+  battles, each `$0F9` or `$0F7`, the digit `1` throughout), the chest
+  pays 1000, and GP Rain costs level x 30 (`AttackerEffect_51`). There is
+  no shop.
+- **A Genji Glove's Relic menu re-equips**, so a relic lever has to put the
+  hands back (the relic rule's own lesson, ribbon-chain); `lab_grave.lua`'s
+  `LAB_RELIC` does.
+
+### 13.2 Arming, and the route's policy
+
+`armForFights` reads the ROM: for each weapon hand, the weapon from the
+hand and the bag that scores best on the two fights' species, power scaled
+up by the share of their gauged species it keys (its class in the shield
+row, or its element among their vanilla weaknesses), never one whose
+element any of them absorbs; EDGAR, SETZER and SABIN first, CELES last.
+The first draft scored keys first and power second and handed the bag's
+30-power MithrilKnife to SETZER and CELES (`dev/dev/run1.log`: `the best
+for the fights ahead is $01 (keys 2, power 30)`); the power-scaled score is
+what shipped. No relic moves: `wor-tomb-v1` was dressed by the relic rule
+for the arc's threats on that save point, and the chest and Dullahan add
+none it does not cover.
+
+The fights' options: the chest `{ focus = { { species = WHELK_HEAD } } }`
+(the head first; the shell has no gauge and answers hits), Dullahan
+`{ runic = true }` (CELES raises Runic: Ice 2, Ice 3, Pearl, N. Cross and
+his own Cure 2 are runic), everything else the driver's defaults (break,
+the keyed line, boost banked and spent, Potions and CELES's Cure for care).
+Two levers were measured on the pre-Ribbon base and not shipped:
+- the chest with CELES on Runic too (Giga Volt is runic): 48 of 48 won
+  either way over 31 keys, with 1 death (focus alone, `dev/c0/`) against 7
+  (with Runic, `dev/c1/`): `runs: {'WON': 48}; deaths 1` / `deaths 7 (bp at
+  death: Counter({1: 4, 3: 2, 5: 1}))`;
+- Dullahan with SETZER the only healer and no Cure (`{ runic = true, cure
+  = false, healer = 9 }`, `dev/p1c/`) on 16 draws with the digit at 1: `runs:
+  {'LOST': 2, 'WON': 14}; deaths 13`, against the shipped options' 16 of 16
+  on the same snapshots (`dev/p0c/`).
+
+### 13.3 L? Pearl and the purse
+
+L? Pearl opens every Dullahan fight (`L? Pearl casts 80 in 80 runs`,
+`dull/`). With the digit at 1 it hits all four: `[monact] f493 slot 0 cmd
+$0C atk $98 L? Pearl partyhp 1798,1710,1701,1597`, then `partyhp=1219,1075,
+1263,1156` (`dullctl/var0_k1_s0_w1.log`); with it at 5, nobody
+(`dull/var1_k1_s0_w1.log`: `partyhp=1798,1710,1701,1597` after it). It
+comes back in the hit-counter combo (L? Pearl + Absolute 0), at whatever HP
+the party has then: of the control arm's 29 deaths, 3 are to it
+(`dullctl/var0_k1_s0_w9.log`: three members at once, `[death] f+13359 ...
+atk $98`).
+
+The policy (`settleDigit`): read the digit after the chest and again at
+the grave; while L? Pearl would hit someone (or the digit is 0, whose
+divide-by-zero is unmeasured), walk the room for a battle's purse, at most
+8 battles. On the policy arm (`var1/`) the digit after the chest was 1 on 4
+of 10 draws and 9 or 7 on the rest; the walk cost 1-3 battles each (K=1 took 3: two purses ending in 0, then a Mad Oscar), and on
+one draw (K=7) the walk to the grave moved a safe 9 to 3 (`at the grave:
+gil 277673, last digit 3: L? Pearl would hit CELES L33, SABIN L33`) and one
+grave-room battle moved it on. Every press of the grave on the policy arm
+read `L? Pearl would hit no one`.
+
+### 13.4 Under real draw variation (`var1/`, `var0/`)
+
+`genlab.py` derives the generator with a block after the boot that fights
+K encounters in the east room's own pool and steps back onto the save
+point (`varlab.py`'s shape); retries off. `var1/summary.txt` (the policy)
+and `var0/summary.txt` (`DIGIT_POLICY = false`, the control):
+
+| arm | runs | verdicts | chest | digit at the press | Dullahan | KOs / Zombie landings / Fenix Downs | Potions spent |
+|---|---|---|---|---|---|---|---|
+| policy, K=0-7 at shift 0, K=0 at 23 and 41 | 10 | `10 PASS` | 10 won, 10 keys | 7, 7, 7, 5, 5, 5, 5, 9, 9, 7 | 10 won, 10 keys, 5821-10149 ticks | 4 / 2 / 3 | 1-17 a run |
+| control, K=0-5 | 6 | `6 PASS` | 6 won | 7, 1, 1, 1, 1, 9 | 6 won, 6443-11766 ticks | 3 / 1 / 2 | 1-28 a run (28 and 25 at digit 1) |
+
+Every run landed at (25,160) and held the exit contract. The KOs and
+Zombie landings are the tomb's random battles (the Exoray's Zombie, 12.3)
+but one: a KO in Dullahan's fight on the policy arm (`var1/k3_s0.log`:
+`[death] f+4224 entity 1 char 5 from 300/1710 by slot 0 cmd $00 atk $EE
+bp=1`), raised and won.
+
+### 13.5 The monster chest, a lab (`chest/`, `lab_chestsnap.lua`)
+
+From the frame below the chest in each of the ten `var1/` runs
+(`wor_chest.mss`: armed, on (120,10)), eight waits each before the press
+(the event battle's draw is the frame counter at its start), retries off,
+the generator's own options. `chest/analysis.txt`:
+
+| | runs | distinct battle keys | won | deaths (boost at death) | Fenix Downs | Potions | ticks (min / median / max) |
+|---|---|---|---|---|---|---|---|
+| the chest | 80 | 49 | **80** (`groups won in every run: 49 of 49`) | 5 (bp 1, 1, 1, 0, 0) | 4 | 77 | 1549 / 4093 / 9509 |
+
+Not a coin flip and not attrition at this level: every key won. The fight
+ends on the first boss_death, the shell's or the head's, **40 and 40**
+(`killed s0:$101` / `killed s1:$135`). The head was never broken: its six
+pierce shields took 82 chips, all EDGAR's (the AutoCrossbow), and the fight
+ended first in every run. The shell's counter is Giga Volt one hit in three,
+as its script says (`attack NOTHING, NOTHING, GIGA_VOLT`), not on every
+hit: **73 Giga Volts over 213 counters weighed** on the shell
+(`Ot6MayAct`, `[retal]` lines). The head hid 46 times (`cmd $24 atk $08`),
+and Magnitude8 came 34 times. The four keys with deaths: `beB4` (1, no
+Fenix), `beB0` (2), `beF0` (1), `be28` (1). It is worth opening at this
+level; it pays no XP and holds nothing but the fight.
+
+### 13.6 Dullahan, a lab (`dull/`, `dullctl/`, `dullczar/`, `lab_grave.lua`)
+
+From the frame on the grave in each `var1/` run (`wor_grave.mss`), eight
+waits each before the press, retries off, the generator's own options; a
+loss is a game over (`FAIL: GAME OVER fired`), counted, not retried.
+
+| arm | runs | distinct keys | won | deaths (boost at death) | Fenix Downs | Potions | ticks (min / median / max) |
+|---|---|---|---|---|---|---|---|
+| **the route** (digit settled, `dull/`) | 80 | 52 | **80** (`groups won in every run: 52 of 52`) | 4 (all bp 1) | 4 | 98 | 5485 / 6588 / 13168 |
+| control: the digit at 1, all four hit (`var0/` K=1-4, `dullctl/`) | 32 | 27 | **30** (`groups with a loss: 2`: `beD0`, `beC4`) | 29 (bp 0 x17, 1 x8, 2 x4) | 10 | 233 | 5958 / 8821 / 16500 (wins) |
+| lever: the Czarina Ring (Safe, Shell) for CELES's Ribbon (`var1/` K=0-3, `dullczar/`) | 32 | 20 | 32 | 0 | 0 | 21 | 5428 / 6184 / 10771 |
+
+On the same four entry states the route's own arm spent 37 Potions and 2
+Fenix Downs with 2 deaths over its 32 runs (both in var1_k0_s0_w9); the Czarina arm, 21, 0 and 0
+(the relic's menu moves the press's frame, so the keys differ). Both
+losses in the control are wipes late in long fights, the party worn down
+with little boost banked (`dullctl/var0_k1_s0_w9.log`: `[death] f+13359
+entity 0 char 6 from 224/1798 by slot 0 cmd $0C atk $98 bp=0`, three
+members to the combo's L? Pearl); the policy's settled digit removes both
+L? Pearls' damage. **Measured rate with the route's policy: 80 of 80, 52 of
+52 keys.** The hit-counter combo barely fires (Absolute 0: 0 in `dull/`, 2
+in `dullctl/`): the break and the kill come first.
+
+Two notes for the driver, not shipped: the heal model prices Dullahan's
+round at two of his worst single actions (`inside one round of death
+(2172)`, two 1086-HP Pearls under Haste), above every member's maximum, so
+every member is always "in danger" and many turns go to +250 Potions
+(`dev/grave0/w37.log`); and an auto-Shell relic is not ranked by the relic
+rule (`H.relicClass` returns nil for the Czarina Ring), so the lever above
+cannot be the rule's choice today.
+
+### 13.7 SETZER on arrival (owner, 2026-10-01: "every recruit should feel amazing")
+
+`credit.lua` credits each frame's fall in a monster's HP, shields, broken
+ticks and life to the party member whose action is running (ExecCmd);
+`analyze.py` sums it. SETZER fights with the Trump (¤) throughout; Slot is
+not in the driver's plan here.
+
+| fight | SETZER's damage (share of all; per-run median) | chips | breaks | fight-ending blows | the others |
+|---|---|---|---|---|---|
+| Dullahan (`dull/`, 80 runs, 1,876,390 damage) | 399,666 (**21%**; median 21%) | 349 of 886 | **68 of 84** | 7 of 80 | SABIN 61% and 46 blows, EDGAR 17% and 26, CELES 1% (Runic) |
+| the chest (`chest/`, 80 runs) | 195,523 (19%; median 10%) | 0 | 0 (no break landed by anyone) | 21 of 80 | SABIN 42% and 30, CELES 21% and 26, EDGAR 17% and 3 |
+
+In Dullahan he is the breaker: four breaks in five are his (`breaks landed
+by: {'SETZER': 68, 'SABIN': 11, 'EDGAR': 5}`), the ¤ key of 8.7 at work,
+and the break is where SABIN's Blitzes land their damage. He lands one
+kill in eleven. In the chest neither part keys ¤ (the shell has no gauge,
+the head is pierce), and he is a fifth of the damage. Not a passenger; his
+share is the break, not the damage.
+
+### 13.8 Flying and landing (`H.flyTo`, `field_flyto`)
+
+`H.flyTo(tx, ty)` (lib/ot6_field.lua) flies the airship with the pilot's
+buttons, measured from the Falcon's first control (`dev/dev/probe_flight.log`):
+heading `$73` (the math angle is `$73 - 270`; Left turns it up), position
+`$34/$38` in 1/16 tiles, A for speed `$26` (to `$0800`, about a third of a
+tile a frame), a coast of about three tiles, B to land on a tile whose
+property bit 1 is clear. It steers to the bearing, letting go early enough
+for the turn's momentum, holds A while the target is ahead and farther than
+the coast, nudges with A when stopped short, and lands over the target;
+it refuses a target the airship cannot land on. `field_flyto` (suite,
+fixture `wor_flight`, the pilot's first control) flies to the route's
+(25,160) (a turn of 102 degrees left) and to (128,171) (31 degrees right),
+asserting the party on foot on each target and the airship parked there
+(`suite/suite_field_flyto.log`: `[flyto] PASSED (25,160): on foot there at
+f341`, `[flyto] PASSED (128,171): on foot there at f665`, `PASS (frame 665)
+attempts=1/1`). Its mutants fail where they should (`suite/`): with the
+flight taken out, `assertEq failed: (25,160): on foot ($11FA): got 1, want
+0`; with an unlandable target, `(100,170) is a tile the airship can land on
+(its property word $0753, bit 1 clear): got false, want true`.
+
+### 13.9 What was left
+
+- **The Exp. Egg** (from the tomb) is still in the bag; the relic rule does
+  not rank it and no member wears it.
+- **SETZER's Slot** is not played in these fights (the driver's `opts.slot`
+  is off); the Coin Toss relic stays in the bag.
+- **The tombstone puzzle** (299 (12,39)) was not done.
+- The Dullahan care-model and the auto-Shell relic notes above (13.6).
 
 ## 14. What the owner may want to decide
 
@@ -1856,9 +2106,22 @@ Not yet driven.
   Drill and Debilitator sit in a shop that refuses this party (vanilla's
   "I can't take money from the King!"). Keep the refusal (vanilla) or let
   this arc's EDGAR buy them.
-- **Dullahan's telegraph** (Absolute 0 proposed) and whether the policy may
-  set the gil's last digit against L? Pearl (an informed reading, a
-  human input).
+- **Dullahan's telegraph** (Absolute 0 proposed): open. The hit-counter
+  combo that holds Absolute 0 fired twice in 144 lab fights (13.6);
+  the break and the kill come first. The gil's last digit against L? Pearl:
+  decided fair play (the TLM, 2026-10-01); with no shop in the tomb the
+  route moves it with a Mad Oscar's purse (13.3). Left unmoved, the fight
+  was lost 2 times in 32 at digit 1 (13.6).
+- **An auto-Shell relic for a caster boss** (13.6): the Czarina Ring on
+  CELES in place of the Ribbon spent 21 Potions and no Fenix Down over 32
+  Dullahan fights, against the route's 37 and 2 on the same entry states;
+  both won every fight. The relic rule does not rank Safe/Shell relics, so
+  the route does not wear it; ranking them for a fight whose damage is
+  spells is a rule change for the owner.
+- **SETZER on arrival** (13.7): in Dullahan he lands four breaks in five
+  and a fifth of the damage; in the chest, where ¤ keys nothing, a fifth of
+  the damage and no breaks. His Slot is not played (#319's verbs); whether
+  the driver should spin it at bosses is open.
 - **The side items' place**: decided (owner, 2026-10-01: "you gotta use a
   ribbon when you have one"): the side leg is on the chain and its relics
   are worn (10.4, 11.4, 12.7). Before that, the Ribbon, Hero Ring, Hyper

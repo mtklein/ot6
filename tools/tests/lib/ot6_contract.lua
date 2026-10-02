@@ -1552,6 +1552,57 @@ M.contracts["wor-tomb-v1"] = {
   },
 }
 
+-- wor-falcon-v1: the World of Ruin map, on foot beside the landed Falcon,
+-- after Dullahan ($02B2), SETZER's flashback (its $01F0-$01F3 are the
+-- scene's own temporaries: measured 0 again at the landing) and the Falcon's
+-- rising ($00CC, $00CD; Palidor shown, $039B) (docs/design/route-wor-falcon.md
+-- sections 2.7, 7 and 13).  The monster chest beside the tomb's save point
+-- is open.  The party is on foot ($11FA = 0) and not aboard ($1F64 bit 13
+-- clear), with the Falcon parked on the party's tile ($1F62/$1F63): the hub
+-- the World of Ruin arcs boot from.  CELES, SABIN, EDGAR and SETZER, no
+-- timer.
+M.contracts["wor-falcon-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 25, y = 160 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00CA, 1, "SETZER joined (_cc3bf8, :85777)" },
+    { 0x00CB, 1, "the tomb's door opened for SETZER (_ca3f83)" },
+    { 0x02B2, 1, "Dullahan is beaten (_ca42f1, :10550)" },
+    { 0x00CC, 1, "the Falcon has risen (_ca4502, :11257)" },
+    { 0x00CD, 1, "the Falcon has risen (_ca4502, :11258)" },
+    { 0x039B, 1, "Palidor shown on the Solitary Island (_ca4502, :11276)" },
+  },
+  party = {
+    size = 4,                     -- CELES, SABIN, EDGAR and SETZER
+    members = {
+      { 0x06, "CELES" },
+      { 0x05, "SABIN" },
+      { 0x04, "EDGAR" },
+      { 0x09, "SETZER" },
+    },
+  },
+  ram = {
+    { 0x1E40 + (0x0A1 >> 3), 1 << (0x0A1 & 7), 1 << (0x0A1 & 7),
+      "the monster chest (120,9) is open (treasure bit $0A1)" },
+    { 0x1F62, 0xFF, 25, "the Falcon parked at x 25 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 160, "the Falcon parked at y 160 (save-block cell $1F63)" },
+    { 0x1F65, 0x20, 0x00, "on foot, not aboard the airship ($1F64 bit 13)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+    { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
+    { 0x1190, 0xFF, 0x00, "timer 1 counter high" },
+    { 0x1195, 0xFF, 0x00, "timer 2 counter low" },
+    { 0x1196, 0xFF, 0x00, "timer 2 counter high" },
+    { 0x119B, 0xFF, 0x00, "timer 3 counter low" },
+    { 0x119C, 0xFF, 0x00, "timer 3 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
