@@ -421,5 +421,15 @@ OT6_SETZERROW        := $edcd
 .assert OT6_SETZERROW = OT6_SHPEND + 1, error, "setzer's row must follow the shield-tile mask without a gap"
 .assert OT6_SETZERROW <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
+; the passes OT6 added to the executing action (Ot6PassRetarget, ot6_boost.asm):
+; 0 = none (vanilla's own count), else $3a70 as it stood once OT6's adders had
+; added to it, before the first pass ran.  InitGfxScript zeroes it with $3a70
+; at every action's start; Ot6PassesAdded writes it right after an adder
+; (a boosted Fight or Capture, Blitz/Tool hit counts, a dumped Throw, Setzer's
+; rows, a character's GP Rain).
+OT6_PASSRETARGET     := $edce
+.assert OT6_PASSRETARGET = OT6_SETZERROW + 1, error, "the added-pass mark must follow setzer's row without a gap"
+.assert OT6_PASSRETARGET <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
 
 .endif

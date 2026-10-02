@@ -6478,6 +6478,7 @@ _initanima:
 @2639:  php
         stz     $3a72       ; clear battle script command queue pointer
         stz     $3a70       ; clear number of attacks (0 = 1 attack)
+        stz     OT6_PASSRETARGET ; ot6: and no passes OT6 added (ot6_passes.asm)
         longa
         stz     $3a32       ; clear pointer to battle script data
         stz     $3a34       ; clear counter for damage variables
@@ -15078,8 +15079,9 @@ ChooseTarget:
         bit     #$2c
         beq     @58ed
         bra     @58f6
-@58b3:  lda     $ba
-        bit     #$04
+@58b3:  jsl     Ot6PassRetarget ; ot6: $ba bit 2 ("don't retarget"), except
+                                ;   a later pass OT6 added, whose body fell
+                                ;   to an earlier pass (ot6_passes.asm)
         bne     @58c8
 @58b9:  jsr     Retarget
         jsr     _c258fa
