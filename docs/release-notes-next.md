@@ -11,16 +11,17 @@ release's notes.
 **The World of Ruin from Figaro Castle to the Falcon has designed break
 weaknesses.** The monsters around Kohlingen and in Darill's Tomb used to
 carry generic weaknesses and five shields, so a break could take most of
-a fight to land. Now each has two to four shields and a
-weakness the party holds: Edgar's crossbow cracks a crowd of Deep Eyes or
-Exorays, Sabin's fists break the Osteosaur's bones, and the Bogy, a ghost
-with no weakness of its own, breaks to Setzer's cards. Setzer's cards,
-Trump and dice now break more of the tomb too: the undead and the demon
-(the Orog, the Osteosaur, the PowerDemon) and Dullahan himself, and the
-Deep Eyes on the way there; the tomb's plants still want blades, points
-and fire. Dullahan has ten shields, broken by spears, darts, the
-crossbow, fists, fire and Setzer's cards. In the tomb's monster chest,
-as in Narshe, the shell has no shields at all: break the head.
+a fight to land. Now each has two to four shields and a weakness the
+party holds: Edgar's crossbow chips Deep Eyes and Exorays, Sabin's fists
+suit the Osteosaur's bones, and the Bogy, a ghost with no weakness of its
+own, answers to Setzer's cards. Setzer's cards, Trump and dice also key
+the tomb's undead and its demon (the Orog, the Osteosaur, the PowerDemon)
+and Dullahan himself; the tomb's plants still want blades, points and
+fire. Dullahan has ten shields, open to spears, darts, the crossbow,
+fists, fire and Setzer's cards, and Setzer is the one who breaks him most
+often. In the tomb's monster chest the shell has no shields and takes
+full damage from the start, and felling either the shell or the head
+ends the fight.
 
 **A boosted action that never happens keeps its boost points.** When a
 character is knocked out or put to sleep after choosing a boosted action
