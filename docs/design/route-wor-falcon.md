@@ -2161,6 +2161,39 @@ the chest, hence 198 MP), and hires against the shields before the ¤ cell
 is revealed (`SETZER Hired Help on slot 0 at 2 BP: 3 hire(s) at 1550 gil
 ...`).  Three keys is few: the share is a direction, not a rate.
 
+### 13.12 The driver's table on the generators that seat SETZER
+
+The coordinator's review asked what the driver's table does on the
+generators that seat SETZER, where nothing had measured it: the World of
+Balance grind (`gen_narshe_mission`, from `terra-returned-v1`, LOCKE EDGAR
+SABIN SETZER) and this arc's tomb and Falcon legs.  Each generator twice
+(in-battle seeds 0 and 23, retries off) with the policy and with
+`SETZER_POLICY_OFF` (the control), ROM `0a95b57fd7bd`;
+`build/attempts/wt/kit-setzer/gm/gm_summary.txt`:
+
+| generator | arm | battles won | deaths | Fenix Downs (bag) | gil | rows chosen |
+|---|---|---|---|---|---|---|
+| narshe_mission | control s0 / s23 | 18 / 18 | 0 / 0 | 20 -> 23 | 122,167 -> 113,497 / 113,797 | — |
+| narshe_mission | policy s0 / s23 | 17 / 18 | **2** / 0 | 20 -> 23 | 122,167 -> **84,253 / 78,797** | Hired Help 28 / 28 |
+| wor_tomb | control | 6 / 6 | 0 / 0 | 29 -> 29 | 231,655 -> 247,857 | — |
+| wor_tomb | policy | 6 / 6 | **1 / 2** | 29 -> 29 | 231,655 -> 244,757 / 241,657 | Hired Help 2 / 3 |
+| wor_falcon | control | 3 / 3 | 0 / 0 | 29 -> 29 | 247,857 -> 251,107 | — |
+| wor_falcon | policy | 3 / 3 | 0 / 0 | 29 -> 29 | 247,857 -> 248,007 | Jackpot 2 / 2, Hired Help 2 / 1 |
+
+(`nm_pol_s0: ... battles 17 won 17 | deaths 2 (bp {'0': 2}) | ... gil 122167
+-> 84253 | SETZER plans {'Hired Help': 28}`; `tomb_pol_s23: ... deaths 2 (bp
+{'1': 2}) ... gil 231655 -> 241657 | SETZER plans {'Hired Help': 3}`.)  Hired
+Help in random battles bought nothing the free Fight did not: some 30,000
+gil a WoB run and deaths the control did not take.  So the gil rows now
+wait for an event battle (kits.md), and the policy arms again
+(`gm/gm2_summary.txt`): the grind and the tomb play exactly as the control
+(`nm_pol_s0: PASS (frame 106028) ... deaths 0 ... gil 122167 -> 113497 |
+SETZER plans {}`, `tomb_pol_s0: ... gil 231655 -> 247857 | SETZER plans {}`),
+and the Falcon leg keeps its Jackpots and hires (`fal_pol_s0: ... deaths 1
+(bp {'1': 1}) ... gil 247857 -> 251107 | SETZER plans {'Jackpot': 2, 'Hired
+Help': 1}`, `fal_pol_s23: ... deaths 0 ... gil 247857 -> 246457`).  Two
+seeds an arm is a direction, not a rate.
+
 ## 14. What the owner may want to decide
 
 - **The draft rows** (section 8): decided, approved as written (owner,

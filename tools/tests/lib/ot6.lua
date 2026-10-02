@@ -4865,7 +4865,9 @@ end
 --     holds a physical class, and SETZER's own Fight keys none of it: a hire
 --     a point, as many as the shields want, the bank holds and the purse
 --     pays.
--- Gil is spent only above o.gilFloor (20,000: a town's shopping kept back).
+-- Gil is spent only above o.gilFloor (20,000: a town's shopping kept back),
+-- and only in event battles (a boss, a monster chest): random battles get
+-- the free Fight.
 -- opts.setzer = false turns all of it off; a table overrides the numbers
 -- (jackpot/slot/coin/hire = false drop one line).
 function Driver:setzerLine(actor, have)
@@ -4917,9 +4919,15 @@ function Driver:setzerLine(actor, have)
       livingMonsters()))
     return { kind = "slot", row = row, skill = BATTLE.SETZER.SLOT, boostLeft = 3, reason = "slot" }
   end
+  -- the gil rows are for the fights that matter: a random battle is won
+  -- with the free Fight (measured, gm.sh: in the WoB grind Hired Help took
+  -- 28 turns and ~35,000 gil a run more than the control, and the tomb arm
+  -- lost members the control did not), so they wait for an event battle
+  -- (o.gilInRandoms = true lifts that)
+  local gilRows = M.readByte(M.RANDBTL) == 0 or o.gilInRandoms
   -- Coin Toss
   local coinPrice = M.setzerGil(level, 30, 0)
-  if o.coin ~= false and gil - coinPrice >= floorGil then
+  if o.coin ~= false and gilRows and gil - coinPrice >= floorGil then
     local n = 0
     for s = 0, 5 do
       if monAlive(s) and M.readByte(BATTLE.SH_CUR + s * 2) > 0
@@ -4937,7 +4945,7 @@ function Driver:setzerLine(actor, have)
   -- Hired Help: a hire a point, one chip each, so as many as the shields
   -- still want (and the bank and the purse allow)
   local fee = M.setzerGil(level, 50, 0)
-  if o.hire ~= false and gil - fee >= floorGil and sh > 0 and not broken
+  if o.hire ~= false and gilRows and gil - fee >= floorGil and sh > 0 and not broken
      and hitChips(slot, 0x07, 0) > 0 and fightChips(actor, slot, have) == 0 then
     local b = math.max(0, math.min(have, 3, sh - 1))
     while b > 0 and gil - fee * (1 + b) < floorGil do b = b - 1 end

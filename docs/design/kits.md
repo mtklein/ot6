@@ -660,7 +660,10 @@ at 3 BP in a random battle against two or more (a chosen triple); Coin
 Toss when its revealed ¤ chips two or more bodies; Hired Help when the
 target's revealed row holds a physical class his own Fight does not key,
 with a hire a point up to the shields left (bank and purse allowing).
-Gil is spent only above a 20,000 reserve. `opts.setzer = false` is the
+Gil is spent only above a 20,000 reserve, and only in event battles (a
+boss, a monster chest): measured, Hired Help in the World of Balance grind
+cost about 35,000 gil a run against the control and bought no fewer deaths
+(route-wor-falcon.md 13.12), so random battles get his free Fight. `opts.setzer = false` is the
 old behaviour (the control arm of the Falcon arc's labs,
 route-wor-falcon.md 13.10).
 
