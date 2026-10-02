@@ -34,9 +34,12 @@
 -- A charmed actor is not exercised: nothing in this room charms, and
 -- vanilla's Retarget turns on the party by the Muddle bit and by $3395
 -- (Charm) alike, the one branch check G holds shut.
--- Negative controls: the mutant ROMs in build/attempts/wt/pass-retarget/
--- (party: the pass spreads to the party side; emptied: the pass falls
--- through to vanilla's Retarget) fail H and G.
+-- Negative controls (build/attempts/wt/pass-retarget/round2/mutants/): a
+-- ROM whose pass spreads to the party side fails H here; one whose OT6
+-- pass falls through to vanilla's Retarget fails F here (the muddled
+-- SETZER's second swing went to the party while a monster stood); one
+-- that retargets to the party side fails G in battle_passretarget.  The
+-- ROM before the fix fails A here (its second swing landed nowhere).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 

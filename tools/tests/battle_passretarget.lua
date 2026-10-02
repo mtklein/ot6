@@ -126,14 +126,17 @@ end
 -- re-split.  A kind that misses its draw in every candidate -- the kill
 -- came on the last pass, a counter felled the crowd, SETZER was turned to a
 -- zombie before his turn -- tries again in the next crowd, up to its
--- `crowds`.  The bounds' basis (the eight-variation sweep in
--- build/attempts/wt/pass-retarget/sweep/):
+-- `crowds`.  The bounds' basis (the eight-variation sweep with the read
+-- aim, build/attempts/wt/pass-retarget/round2/sweep/):
 --   hire, 4: the first hire kills the weakest body whenever SETZER has his
---     first turn on the crowd (the damage arithmetic above); met in the
---     first crowd in 8 of 8 variations;
---   jackpot, 6: a face of 3+ is 4 of 6; met in the first crowd in 7 of 8;
---   resplit, 10: met in 6 of 12 crowds tried (by key), so a miss within ten
---     is about 0.5^10 = 0.1%.
+--     first turn on the crowd (the damage arithmetic above), so a crowd
+--     misses only when he cannot act first; met in the first crowd in 8 of
+--     8 variations;
+--   jackpot, 6: a face of 3+ is 4 of 6; met in 8 of 11 crowds tried, so a
+--     miss within six is about (3/11)^6 = 0.04%;
+--   resplit, 10: met in 8 of 9 crowds tried (the blind-aim sweep before it:
+--     6 of 12 by key); at the worse rate a miss within ten is about
+--     0.5^10 = 0.1%.
 local function aim(e, how)
   if how == nil then return e end
   return aimed(e, how == "strong")
@@ -158,9 +161,10 @@ local function pending()
 end
 local W, since, battles, crowds = nil, 0, 0, 0
 -- a boosted Fight's draw (a swing whose body fell while another stands)
--- within FIGHTAFTER battles of SETZER's kinds: the sweep met it before
--- SETZER's kinds were done in every variation (the fight-outs between his
--- crowds deal it), so 8 is a stated margin, not a measured tail
+-- within FIGHTAFTER battles of SETZER's kinds: the sweep met it by battle 4
+-- in every variation, at worst one battle after SETZER's kinds were done
+-- (k0: done in battle 3, the draw in battle 4); 8 is a stated margin over
+-- that worst case, not a measured tail
 local FIGHTAFTER = 8
 local setzerDoneAt = nil
 local function allSeen()
