@@ -6,55 +6,70 @@
 -- OT6 buys extra passes of an action through the engine's multi-hit counter
 -- $3a70: a boosted Fight or Capture (two swings a point), Setzer's Coin Toss,
 -- Hired Help and Jackpot (one toss, hire or roll a point), Pummel, Bum Rush
--- and Drill (Ot6HitCountTbl).  Vanilla's loop does not retarget a pass whose
--- body died on the pass before, so after a kill the next pass landed nowhere
--- while a body still stood (wt/hire-sprite's lab: a 3 BP Hired Help on three
--- bodies landed passes 1 and 3 and left the third body at 2,058 HP).
+-- and Drill (Ot6HitCountTbl), a dumped Throw.  Vanilla's loop does not
+-- retarget a pass whose body fell on the pass before: a hire's next pass
+-- landed nowhere and the one after retargeted (wt/hire-sprite: a 3 BP Hired
+-- Help on three bodies landed passes 1 and 3), and a Fight's every later
+-- swing went to the corpse (Fight's targeting puts an emptied mask back on
+-- the backup targets, $3a4e), while a body still stood.
 --
 -- Played, no writes: Continue the wor-tomb-v1 battery, walk Darill's Tomb's
 -- east room into random battles (field group 151: a Mad Oscar; a Mad Oscar
--- and an Exoray; a PowerDemon and two Exorays), fight every battle out with
--- the route's fight driver (boost on: every member boost-Fights, blitzes and
--- tools at what it has banked), and in a battle that deals a crowd play
--- SETZER's next plan through the real menu first (H.setzerBattle):
---   hire:    Defend twice (the bank to 3), Hired Help at 3 BP on the
---            weakest body (a hire kills an Exoray, so the next hire must
---            find another);
---   jackpot: the same with Jackpot (four rolls, a face of 3 or more kills);
---   coin:    the same with Coin Toss aimed at the weakest body;
---   resplit: Hired Help unboosted on the weakest body, Defend, Coin Toss at
---            3 BP over the group, so a toss can fell one body of several.
--- PASS_SKIP (default 0) crowds are fought out first, to vary the draw: the
--- encounters they use up move the formations and seeds every later battle
--- meets.
+-- and an Exoray; a PowerDemon and two Exorays) and fight each out with the
+-- route's fight driver (boost on: every member boost-Fights at what it has
+-- banked), care after each.  In a crowd (two or more monsters, one
+-- special-weak) past the first PASS_SKIP, SETZER first plays each kind still
+-- unmet through the real menu (H.setzerBattle), each from the battle's
+-- opening snapshot (TESTING.md: branch one legitimately reached state):
+--   hire:    Hired Help at 1 BP on the weakest body (a hire kills an Exoray,
+--            1,200 HP, so the next must find another body);
+--   jackpot: Jackpot at 1 BP on the default target (a face of 3 or more
+--            kills any body of the crowd);
+--   resplit: Hired Help unboosted on the strongest body (2,058 -> 458 on a
+--            PowerDemon), then Coin Toss at 2 BP over the group, so a toss
+--            fells one body and the next splits over the rest; or Coin Toss
+--            at 1 BP over a crowd the party's swings have worn down.
+-- A kind gets two candidates a crowd (three for the re-split): the rest of
+-- the party Defends until SETZER has thrown, or Fights (moving the battle
+-- RNG and the bodies' HP).  What does not move a throw (measured, the
+-- suite's own labs): the frames the party stands before its first input
+-- (the battle waits while a command window is open), and SETZER Defending
+-- first (in the tomb's crowds his second turn rarely came).  The last
+-- candidate played goes on to the fight driver.  PASS_SKIP (default 0)
+-- crowds are fought out first, to vary the draw: the encounters they use
+-- up move the formations and keys every later battle meets.
 --
--- The instrument, every action of every character: each pass of the
--- action at CalcAttackEffect's ChooseTarget (the mask it starts with, read
--- at Ot6Life3Targeting's entry just before; the mask it chose, at
--- Ot6Oblivion's entry just after) and which monsters stand there (present,
--- in $3A78, not Wounded and not hidden: CheckTargetsPresent's own test).
--- An action OT6 extended is a Fight or Capture at 1 BP or more, a Setzer
--- row or a character's GP Rain at 1 BP or more, or a Blitz or Tool whose
--- id has a row in the ROM's Ot6HitCountTbl.  For each of its passes after
--- the first (a weapon's follow-up spell, command $02, keeps vanilla's
--- "same target" rule and is not one), while a monster stands:
+-- The instrument, every action of every character: each pass at
+-- CalcAttackEffect's ChooseTarget (the mask it starts with, at
+-- Ot6Life3Targeting's entry just before; the mask it chose, at
+-- Ot6Oblivion's entry just after) and which monsters stand there
+-- (CheckTargetsPresent's test).  An action OT6 extended is a Fight or
+-- Capture whose first pass counts above vanilla's (one, or seven with
+-- Offering: the player's boost or an engine-driven actor's dumped bank), a
+-- Setzer row or a character's GP Rain at 1 BP or more, or a Blitz or Tool
+-- with a row in the ROM's Ot6HitCountTbl.  For each of its passes after the
+-- first that starts on monsters while a monster stands (a weapon's
+-- follow-up spell, $b5 = $02, keeps vanilla's "same target" and is not one):
 --   A. the pass lands on a body (its mask is not empty);
+--   F. on the side its target was on, the monsters (a muddled actor's
+--      Retarget would turn on the party);
+--   D. a pass that starts on a group with a fallen body lands on the
+--      group's survivors: the coins re-split over the bodies left;
 --   B. on standing bodies only;
 --   C. one body, for the one-body actions (Fight, Capture, Hired Help,
 --      Jackpot, Pummel, Bum Rush, Drill);
---   D. a pass that starts on a group with a fallen body in it lands on the
---      group's survivors: the coins re-split over the bodies left;
 --   E. a Setzer row runs 1 + boost passes: the retarget buys no pass.
--- And vanilla's own: a Fight unboosted that swings twice (a Genji pair)
--- keeps vanilla's rule, its second hand landing nowhere after the first
--- hand's kill, whenever the run sees one.
--- The draws the property needs (each kind must meet one, or the suite
--- fails naming it): a pass whose starting body has fallen while another
--- stands -- for Hired Help, Jackpot, Coin Toss and a boosted Fight -- and
--- a Coin Toss pass whose group lost a body and kept another.  The budget:
--- a crowd within M.setzerCrowdBudget's decoded worst case of the last, and
--- at most two crowds a plan.  Every battle's key ($be at the open and the
--- formation) is logged, and the kinds' draws are counted by distinct key.
+-- And vanilla's own, whenever the run meets one: an unboosted two-hand
+-- Fight (a Genji pair, two passes) keeps vanilla's rule, its second hand
+-- swinging at the body the first hand felled.
+-- The draws the property needs, each kind or the suite fails naming it: a
+-- pass whose starting body has fallen while another stands, for Hired
+-- Help, Jackpot and a boosted Fight, and a Coin Toss pass whose group lost
+-- a body and kept another.  The budget: a crowd within
+-- M.setzerCrowdBudget's decoded worst case of the last; MAXCROWDS crowds a
+-- kind; a boosted Fight's within FIGHTAFTER battles of SETZER's last.  Each
+-- battle's key ($be at the open and the formation) is logged, and the
+-- draws are counted by distinct key.
 -- Negative controls: the ROM before the fix and the mutant ROMs in
 -- build/attempts/wt/pass-retarget/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
@@ -286,8 +301,10 @@ local function aim(e, how)
   if how == nil then return e end
   return aimed(e, how == "strong")
 end
-local function cands(fn)
-  return { { others = "defend", fn = fn }, { others = "fight", fn = fn } }
+local function cands(fn, more)
+  local t = { { others = "defend", fn = fn }, { others = "fight", fn = fn } }
+  if more then t[#t + 1] = more end
+  return t
 end
 local MAXCROWDS = 4
 local PLANS = {
@@ -299,9 +316,11 @@ local PLANS = {
   -- back to confirming where the cursor stands: once a party member)
   { kind = "jackpot", cands = cands(function() return { { row = JACKPOT, boost = 1 } } end) },
   -- a hire takes most of the strongest body (2,058 -> 458 on a
-  -- PowerDemon), so a toss over the group fells it and the next splits
+  -- PowerDemon), so a toss over the group fells it and the next splits;
+  -- or, on SETZER's first turn, two tosses over a crowd the party's swings
+  -- have worn down
   { kind = "resplit", cands = cands(function() return { aim({ row = HIRE, boost = 0 }, "strong"),
-    { row = COIN, boost = 2 } } end) },
+    { row = COIN, boost = 2 } } end, { others = "fight", fn = function() return { { row = COIN, boost = 1 } } end }) },
 }
 local tries, throws, crowdsFor = {}, {}, {}
 local function count(t) local n = 0 for _ in pairs(t) do n = n + 1 end return n end
@@ -310,6 +329,7 @@ local function pending()
   for _, p in ipairs(PLANS) do if count(seen[p.kind]) == 0 then t[#t + 1] = p end end
   return t
 end
+local W, since, battles, crowds = nil, 0, 0, 0
 local FIGHTAFTER = 8
 local setzerDoneAt = nil
 local function allSeen()
@@ -322,7 +342,6 @@ local function allSeen()
   return false
 end
 
-local W, since, battles, crowds = nil, 0, 0, 0
 local wp = 1
 local WPS = { { 124, 26 }, { 120, 11 } }
 
