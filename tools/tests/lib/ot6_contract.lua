@@ -1902,31 +1902,12 @@ function M.stepOntoSavePoint(x, y, opts)
       from[1], from[2], from[3]))
     return from
   end
-  -- The field reads stale map data for a while after a menu closes: the BFS
-  -- reaches nothing though the party has control (measured off Darill's
-  -- Tomb's save point from (124,10): every tile "n" for 39 frames after the
-  -- main menu closed, ctl=true algn=true; build/attempts/wt/wor-tomb/
-  -- review/probe_savepoint.log).  dev/run2 picked its approach in that
-  -- window and failed; so the choice waits until the tile or a side reads
-  -- reachable.
-  local waited = 0
-  local function settled()
-    waited = waited + 1
-    if M.bfsPath(x, y) ~= nil then return true end
-    for _, s in ipairs(SAVE_SIDES) do
-      if M.bfsPath(x + s[1], y + s[2]) ~= nil then return true end
-    end
-    return false
-  end
+  -- The approach is chosen on a loaded map: a menu's close wait
+  -- (H.hasControl) lasts until the field has reloaded the map the menu
+  -- wrote over (M.mapLoaded; build/attempts/wt/walker-after-menu/), so the
+  -- choice needs no wait of its own.
   return M.seqStep({
-    M.call(function() from, waited = opts.from, 0 end),
-    M.waitUntil(settled, 600, string.format("the field's map reaches the save point (%d,%d) or a side",
-      x, y), 1),
-    M.call(function()
-      if waited > 1 then
-        M.log(string.format("[save point] (%d,%d): the field's map reached it after %d frames", x, y, waited))
-      end
-    end),
+    M.call(function() from = opts.from end),
     M.cond(function() return M.bfsPath(x, y) ~= nil end,
       { M.navTo(x, y, nav) },
       { M.navTo(function() return pickFrom()[1] end, function() return pickFrom()[2] end, nav),

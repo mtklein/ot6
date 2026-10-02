@@ -97,10 +97,17 @@ Addresses (from the vendored disassembly):
 | `$E5`-`$E7` | 24-bit event script PC; idle = `$CA0000`, real scripts run in banks `$CA`-`$CC` |
 | `$BA` / `$D3` | both `1` = a dialog is open, waiting for a keypress |
 | `$B2` | party z-level (bit 0 upper, bit 1 lower) |
+| `$0058` | reload the same map: set as a menu or battle hands back, cleared at the end of `LoadMap` |
+| `$1500`-`$1503` | the running module's NMI jump; `JML FieldNMI` once the field has the machine back |
 
 Events can walk the party while `$1EB9`/`$0084`/`$0059` all read normal, so
-`H.hasControl()` tests the movement type and event PC too. Two event-PC
-details:
+`H.hasControl()` tests the movement type and event PC too. After a menu
+every one of those reads clear for most of the ~40-50 frames the field
+takes to reload the map (a battle hands back through the same reload),
+while the object map at `$7E2000` still holds the menu's scratch bytes, so
+it also requires the map loaded (`H.mapLoaded()`: `$0058` clear and the
+field's NMI installed). A door to another map is not covered: `$0058`
+stays clear through that load. Two event-PC details:
 
 - On maps with ambient NPC activity the event PC reads `$80xxxx` for one
   frame at a time, every few frames, forever; `H.eventRunning()` therefore

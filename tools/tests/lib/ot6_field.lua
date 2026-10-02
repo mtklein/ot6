@@ -2497,8 +2497,9 @@ end
 --   exists for.
 --   Field -> raw single frame plus the caller's own ZM guard: on the
 --   field hasControl() reads false for the entire menu lifetime and
---   becomes true only when the field module is back, so the
---   first true frame is correct.  Debouncing it hangs instead (every
+--   becomes true only when the field module is back with its map
+--   reloaded (M.mapLoaded), so the first true frame is correct.
+--   Debouncing it hangs instead (every
 --   B tap the close driver sends drops control for a frame; 4-of-12
 --   tapping never leaves 30 clean frames in a row).
 local function careClose(zmExtra)
@@ -6387,12 +6388,21 @@ function M.saveGame(opts)
         ~= nil, true, tag .. ": slot region readable")
       M.log(string.format("[%s] real Save UI wrote slot %d", tag, slot))
     end),
-    -- close the menu; field and world settle differently, so accept either
+    -- close the menu; field and world settle differently.  The world map
+    -- is debounced (20 calm frames).  The field is not: hasControl is
+    -- true from the first frame the field is back with its map reloaded
+    -- (careClose's rule), and a save point's tile re-fires the SavePoint
+    -- script under the party every 4th frame, so 20 calm frames there
+    -- never come (build/attempts/wt/walker-after-menu/save_close/).  They
+    -- used to come only from the reload itself, when hasControl read true
+    -- through LoadMap.
     (function() local calm = 0
       return M.driveUntil(function()
         local closed = not menuOpen()
-        local settled = M.worldMode() and M.worldHasControl()
-            or (M.hasControl() and M.tileAligned())
+        if not M.worldMode() then
+          return closed and M.hasControl() and M.tileAligned()
+        end
+        local settled = M.worldHasControl() or (M.hasControl() and M.tileAligned())
         calm = (closed and settled) and calm + 1 or 0
         return calm >= 20
       end, 1200, {

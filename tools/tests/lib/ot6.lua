@@ -2912,6 +2912,16 @@ end
 -- and the event PC.  Deliberately cheap: RAM reads only, no screenshots
 -- (battleLoadStarted is the battle gate, and battleActive()'s screen check
 -- is too expensive for a per-frame poll).
+--
+-- It also requires the field's map to be loaded (M.mapLoaded).  Every
+-- flag above reads "control" for most of the ~50 frames the field takes to
+-- reload the map after a menu closes: the menu returns, the field restores
+-- its direct page and runs LoadMap with the screen off, and only LoadMap's
+-- InitNPCMap rewrites the object map at $7E2000, which the menu used as
+-- scratch.  Until then the walker's step check reads the menu's bytes and
+-- BFS reaches nothing (Darill's Tomb B2 hub (29,26): no tile reachable
+-- from +11 to +48 frames after the main menu's B, then everything;
+-- build/attempts/wt/walker-after-menu/).
 function M.hasControl()
   return (M.readByte(0x1eb9) & 0x80) == 0
      and M.readByte(0x0084) == 0
@@ -2919,6 +2929,25 @@ function M.hasControl()
      and (M.readByte(0x087c + pobj()) & 0x0F) == 2
      and not M.eventRunning()
      and not M.battleLoadStarted()
+     and M.mapLoaded()
+end
+
+-- The field is past its map load: the field's own interrupt handler is
+-- installed and no same-map reload is pending.  A menu (and the battle
+-- module, the world map, a cutscene) installs its own NMI at $1500-$1503;
+-- the field reinstalls JML FieldNMI only after it has restored its direct
+-- page, and sets $58 ("reload the same map") in the same breath, which
+-- LoadMap clears only at its end, after InitNPCMap and the startup event
+-- (field/menu.asm OpenMenu, field/battle.asm ExecBattle, field/init.asm
+-- LoadMap, field/reset.asm InitInterrupts).  RAM only: the PPU's forced
+-- blank is no witness, since the field's IRQ sets it at 30 Hz for its
+-- BG animation DMA (field/anim.asm TfrBGAnimGfx) and NMI clears it.
+local fieldNmi
+function M.mapLoaded()
+  fieldNmi = fieldNmi or M.sym("FieldNMI")
+  return M.readByte(0x0058) == 0
+     and M.readWord(0x1501) == (fieldNmi & 0xFFFF)
+     and M.readByte(0x1503) == (fieldNmi >> 16) & 0xFF
 end
 
 -- Six formation species words for the current battle ($57c0+2i); the

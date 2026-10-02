@@ -1532,6 +1532,12 @@ otherwise; the order of 2.6 is the order walked):
   `waitUntil ... satisfied after 0 frames`, `contract kolts-summit-v1
   (exit): all 12 fields hold`, `PASS (frame 91741)`
   (`review/review2/gen_kolts.log`).
+  The cause, found later (`build/attempts/wt/walker-after-menu/`): every
+  flag `H.hasControl` read came back clear while the field was still
+  reloading the map after the menu, and the object map the walker reads
+  held the menu's scratch bytes until LoadMap rebuilt it. `H.hasControl`
+  now also requires the map loaded (`H.mapLoaded`), so every menu's close
+  wait outlasts the reload, and this step's own wait is gone.
 - **Each room of maps 299 and 300 is its own pocket**, joined by same-map
   doors (`plan/nolinks.txt`), so the walk is a chain of door crossings
   rather than one path; B2's hub (37,12) holds five of them.
@@ -1769,12 +1775,18 @@ Relic menu opened at the hub failed there and no other did
 (`build/attempts/wt/ribbon-chain-review/hub_menus.txt`); the field care at
 the same tile never opened a menu in any set (`[before the turtles]
 nothing to do`, 39 runs), so the defect predates the relic rule and is
-filed apart. The re-plan now runs only on the save point, whose step-on waits
+filed apart. The re-plan then ran only on the save point, whose step-on waited
 out the field's stale map after a menu. The capture never opened that
 menu, so its re-capture is the same battery byte for byte (payload
 `cd0d052614f6...` both times; `capture-tomb-first/`); only the provenance
-signature changed. Why the hub's map stays unwalkable after a menu is not
-diagnosed (the B2 pocket joins of 2.6 and the z-level are the suspects).
+signature changed. Diagnosed later (`build/attempts/wt/walker-after-menu/`):
+the hub's map recovers on time; the walker's choice does not. The Relic
+menu's close wait ended while the field was still reloading the map, the
+next step's door crossing picked its staging tile from a BFS on the
+unloaded map, found none of (37,22)'s neighbours reachable, and fell back
+to (37,23), a tile no walk reaches. With `H.hasControl` waiting out the
+reload the crossing stages at (37,21), and the re-plan runs at the hub
+again (and once more on the save point).
 
 **Under draw variation** (`var_tomb/`, `lab/varlab_tomb.py`: K encounters
 used up on the Kohlingen continent before the body, retries off;
