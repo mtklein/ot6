@@ -1,19 +1,19 @@
 {
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "fc-landing.sram",
-  "size": 32768,
-  "sha256": "f2238590de689398b4173b27ec821d48b2f2fb5d1738378d1333a769fd09ce47",
   "slot": 3,
   "milestone": "fc-landing",
   "persistent_layout": "ot6-codex-o8-v1",
+  "size": 32768,
+  "sha256": "a6d2fa391a33aa426ba865ebf1e51fa943cf71097daf0198e2dea289517bdc0c",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "f2238590de689398b4173b27ec821d48b2f2fb5d1738378d1333a769fd09ce47",
-    "generator_sig": "c8a3c7da8db43b6ad984ce47b0603c03b544a7c6e23813041754991bde89f34e gen_fc_landing tools/tests/checkpoints/thamasa-done-v1/manifest.json tools/tests/checkpoints/thamasa-done-v1/thamasa-done.sram",
+    "payload_sha256": "a6d2fa391a33aa426ba865ebf1e51fa943cf71097daf0198e2dea289517bdc0c",
+    "generator_sig": "86d7b1804e75a6101076871b04e9dc978f287d38f970b9ae1e45baf73e8ec71e gen_fc_landing build/checkpoints/thamasa-done-v1/manifest.json build/checkpoints/thamasa-done-v1/thamasa-done.sram",
     "ancestors": [
       {
-        "path": "tools/tests/checkpoints/thamasa-done-v1/manifest.json",
-        "sha256": "9990f5a2d375986276892c2b7c6cf41d02d456bad2a654b09f12f2568e40c7ac"
+        "path": "build/checkpoints/thamasa-done-v1/manifest.json",
+        "sha256": "3fa6d38a4b21c7eb60d97a4889a2d9372e43b3e1f3f87c05efde9d25d46d76fb"
       }
     ]
   }

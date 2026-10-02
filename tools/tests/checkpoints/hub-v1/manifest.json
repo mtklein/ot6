@@ -17,11 +17,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "f829f90e30b48492456fb51fb7eb9ab5dd79e0ec0f27c1cebcb22d13674fc49c",
-    "generator_sig": "53eb3bf3349fc4429800a137530a7a7d86cbddc995f5ac61368242dbac4ba647 gen_scenario",
+    "generator_sig": "a5c4f2ba591e8d2b3d618c936e0ff8c64b16d5fc85afeb7f342d5dab8a57f291 gen_scenario",
     "ancestors": [
       {
         "path": "build/states/chain_lete_river.stamp",
-        "sha256": "1748f2fd71a76547510ee598032d2d1888b2a79c9e157f741b63b21fea45e237"
+        "sha256": "3fefb682288a488352e7bbe75eae0bf4e0686ceae992a36c9725b4044440f146"
       }
     ]
   }

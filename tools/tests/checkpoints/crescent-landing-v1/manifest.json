@@ -1,19 +1,19 @@
 {
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "crescent-landing.sram",
-  "size": 32768,
   "slot": 3,
   "milestone": "crescent-landing",
   "persistent_layout": "ot6-codex-o8-v1",
-  "sha256": "b59da16718b28bd061a26037e211f4d76212c2c6781c652d3f6a1cac650225f6",
+  "size": 32768,
+  "sha256": "a1e886f2285d871cee6d3df632b6f7da56916dc427713588833cc1cb592a6d3b",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "b59da16718b28bd061a26037e211f4d76212c2c6781c652d3f6a1cac650225f6",
-    "generator_sig": "7e3b0dd26e398bbbc78f00b7c8123480a15c3e43b261fa9ccd6cefd48d9f0584 gen_voyage tools/tests/checkpoints/banquet-done-v1/manifest.json tools/tests/checkpoints/banquet-done-v1/banquet-done.sram",
+    "payload_sha256": "a1e886f2285d871cee6d3df632b6f7da56916dc427713588833cc1cb592a6d3b",
+    "generator_sig": "14740b5ac3b39939c46202daa73f2bdd21e8dfbc31533c487385c64adaa8d90d gen_voyage build/checkpoints/banquet-done-v1/manifest.json build/checkpoints/banquet-done-v1/banquet-done.sram",
     "ancestors": [
       {
-        "path": "tools/tests/checkpoints/banquet-done-v1/manifest.json",
-        "sha256": "aebf232b358df4e05300a5323e7bd65c4d2e17fd6d03291edea55a01da69c58b"
+        "path": "build/checkpoints/banquet-done-v1/manifest.json",
+        "sha256": "54cebb251f059e29cd08c80043df8fc572341dbfe02e7905eee806a9afaa15d5"
       }
     ]
   }

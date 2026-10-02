@@ -1,8 +1,6 @@
 {
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "wor-start.sram",
-  "size": 32768,
-  "sha256": "2414544b908f2e1b6fa33a8a237959e42e0ed715a51b6f7e8a52768fb167af29",
   "slot": 3,
   "milestone": "wor-start",
   "persistent_layout": "ot6-codex-o8-v1",
@@ -14,14 +12,16 @@
       "y": 212
     }
   },
+  "size": 32768,
+  "sha256": "8ea15212a8c623b7d977c2f9c29d491389096d963e6d4bf9cff263cdc81ae477",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "2414544b908f2e1b6fa33a8a237959e42e0ed715a51b6f7e8a52768fb167af29",
-    "generator_sig": "ba686617c3f991916aee1957d4f8d5000820ec1b3b8074837c8a01c38196fadb gen_wor_start tools/tests/checkpoints/wor-island-v1/manifest.json tools/tests/checkpoints/wor-island-v1/wor-island.sram",
+    "payload_sha256": "8ea15212a8c623b7d977c2f9c29d491389096d963e6d4bf9cff263cdc81ae477",
+    "generator_sig": "63b41f32c2ab11dba6f1a62071a97f6f9f9d99f8c030036af307ac39367e730c gen_wor_start build/checkpoints/wor-island-v1/manifest.json build/checkpoints/wor-island-v1/wor-island.sram",
     "ancestors": [
       {
-        "path": "tools/tests/checkpoints/wor-island-v1/manifest.json",
-        "sha256": "2ecac07b6be67c605f9753891b382b48d0552568c6addb7a0c3db4f39956f855"
+        "path": "build/checkpoints/wor-island-v1/manifest.json",
+        "sha256": "4f8dc6d66522060ad22f8bb799175907031d3bd433240e61fa7d3d82297d7bac"
       }
     ]
   }

@@ -1,23 +1,19 @@
 {
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "thamasa-night.sram",
-  "size": 32768,
   "slot": 3,
   "milestone": "thamasa-night",
   "persistent_layout": "ot6-codex-o8-v1",
-  "sha256": "f86b967301022453adbd63815b40582d795b1d23170733ce6556530b40b21f60",
+  "size": 32768,
+  "sha256": "63ebc06eed06b6cb91ebc3d1676af7e9cafc7a438661d9dde33d551e2b3d6a53",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "f86b967301022453adbd63815b40582d795b1d23170733ce6556530b40b21f60",
-    "generator_sig": "ef078d3043f2a93f9aedfd3c14895b4ee9bcdac08395879b36d8ec153d456de5 gen_thamasa_arrive tools/tests/checkpoints/crescent-landing-v1/manifest.json tools/tests/checkpoints/crescent-landing-v1/crescent-landing.sram",
+    "payload_sha256": "63ebc06eed06b6cb91ebc3d1676af7e9cafc7a438661d9dde33d551e2b3d6a53",
+    "generator_sig": "6bd2d9dfb5811a6a39df4807a0ee1eef461df021902734d1e43501f12301f5a8 gen_thamasa_arrive",
     "ancestors": [
       {
-        "path": "tools/tests/checkpoints/crescent-landing-v1/manifest.json",
-        "sha256": "3f92680ce91c495ba2e5f426dc14145d7c72cee0064c87580763d297743728b9"
-      },
-      {
-        "path": "build/states/crescent_landing.stamp",
-        "sha256": "5b686f859821394928a54bc6c1dfd90f9f25ac78d861f1a9b7e693e64ae46889"
+        "path": "build/states/chain_crescent_landing.stamp",
+        "sha256": "7b67058b5e060d48f56e547dc16a3a4489c27c4a923291ed9d2b5b953fcda083"
       }
     ]
   }

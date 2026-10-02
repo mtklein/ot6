@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "ebd880b343ccc087cb63442258141d0329946dcb5e09d55096519c4e95dd5751",
-  "generator_sig": "36cd8a98e5e24f5e65a51ceca68226f2e8ffb82cd31ec2227c4f8a7a17ac29df gen_wor_nikeah tools/tests/checkpoints/wor-sabin-v1/manifest.json tools/tests/checkpoints/wor-sabin-v1/wor-sabin.sram",
+  "payload_sha256": "1ced805970aac312d1bff92c924b1b8a650766573002a204460c92e962f9f69d",
+  "generator_sig": "9764af2af69b44139067496caa61d240d29fdae3e44543922397fc8849338da0 gen_wor_nikeah build/checkpoints/wor-sabin-v1/manifest.json build/checkpoints/wor-sabin-v1/wor-sabin.sram",
   "ancestors": [
     {
-      "path": "tools/tests/checkpoints/wor-sabin-v1/manifest.json",
-      "sha256": "3c9bdacfc6c5742e6558944b87ababaf212890f78c8ce5311cc92f6e93541a50"
+      "path": "build/checkpoints/wor-sabin-v1/manifest.json",
+      "sha256": "a58c88cb82c7c3633bff671e8d439a12b34148cb1883ebec3ad26dca62631b30"
     }
   ]
 }

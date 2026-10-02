@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
   "payload_sha256": "6e9f8ab0512c1d221fde8807cfab60aeb7d4ef10fd4ad81ea0362abee023db30",
-  "generator_sig": "5ac71b0090c2011f0ea9255bbce5a824aa2272d208a6948f846cfcd907f127f1 gen_sabin_magitek",
+  "generator_sig": "e0a650e82749f35ec364dcfd40b86d220625429cf0d945d094ec2e8a186ec609 gen_sabin_magitek",
   "ancestors": [
     {
       "path": "build/states/chain_doma_defended.stamp",
-      "sha256": "335d2fd2e346896d015382e9a682dac3910a60d616e785dfc3a197aec657f3d5"
+      "sha256": "48d128bdada88f9fa81b0d6806356ccadb7a55a6fa8afae6aec292161fa90e57"
     }
   ]
 }

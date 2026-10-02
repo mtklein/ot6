@@ -1,11 +1,11 @@
 {
-  "format": "ot6-provenance/v1",
-  "payload_sha256": "8b9df2b14bf628a9f0f092cd348b49437a0b27bd8318024bc964f406d60dade5",
-  "generator_sig": "979093f89e812a6a70e75812cfde1c7e91bd5e40f9fa0b58eaa69be7d3b8510e gen_seed_terracave",
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "108451fab88468a724391914cd1d37833ed4d981cbce5217c8191985c64bb16a",
+  "generator_sig": "121bda3caf5ccdc73c8f21d05f0e13c262418bac0b0b3297e8d01e029b0a0de4 gen_seed_terracave",
   "ancestors": [
     {
       "path": "build/states/terra_clifftop.stamp",
-      "sha256": "95e690953a89d251866952e86ecbea1c3bce9e071cc4e0a53847eedccbb9c461"
+      "sha256": "436c50bf40bb26d59cfdd626c715713ea1c5465d5fa188c9c3fbb09582799f39"
     }
   ]
 }

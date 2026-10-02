@@ -1,8 +1,6 @@
 {
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "wor-edgar.sram",
-  "size": 32768,
-  "sha256": "bd3d3dce9ca12b2ad2150380d5d8c35a42e2ab3dd094fc3a78ebba0b3556a727",
   "slot": 3,
   "milestone": "wor-edgar",
   "persistent_layout": "ot6-codex-o8-v1",
@@ -14,14 +12,16 @@
       "y": 86
     }
   },
+  "size": 32768,
+  "sha256": "3498c74681b25ef050905a784206c91d9961ae17bdf134c207e16d58ac433950",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "bd3d3dce9ca12b2ad2150380d5d8c35a42e2ab3dd094fc3a78ebba0b3556a727",
-    "generator_sig": "556b126f320b11597642adbc39747d30aa98bb02ff1bab48803ba6b06f9f8265 gen_wor_edgar tools/tests/checkpoints/wor-south-figaro-v1/manifest.json tools/tests/checkpoints/wor-south-figaro-v1/wor-south-figaro.sram",
+    "payload_sha256": "3498c74681b25ef050905a784206c91d9961ae17bdf134c207e16d58ac433950",
+    "generator_sig": "451fda7ca5475e617a9f5491f74115d1f7393cc192fa2a3749b455c535c79575 gen_wor_edgar build/checkpoints/wor-south-figaro-v1/manifest.json build/checkpoints/wor-south-figaro-v1/wor-south-figaro.sram",
     "ancestors": [
       {
-        "path": "tools/tests/checkpoints/wor-south-figaro-v1/manifest.json",
-        "sha256": "66b14ed82f336ef9ca6c41d474c7f1256bb5cf29e0a19ab4301a85f8be032f0d"
+        "path": "build/checkpoints/wor-south-figaro-v1/manifest.json",
+        "sha256": "9cf0a661b10bada84b980d1842c849ff5bb7ce530106b6e78f7e828c72c7ad8d"
       }
     ]
   }

@@ -1,11 +1,11 @@
 {
-  "format": "ot6-provenance/v1",
-  "payload_sha256": "3acfe81f2eae8cf5ed3e1cb2cf9896bd5937f9259cef9e34ae7a3886ce291b3c",
-  "generator_sig": "f43b36a94d5b84d53772ed69ce4b9818c2aeede9139d04ab370085b187a733d5 gen_post_opera_checkpoint",
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "d4f7b83ab501345eddd42fc01e8bb075a601b7f6a391c8d46047fce07a3d2d18",
+  "generator_sig": "b1ec8b555c0645dc11973b970c08dfba697195ad9544619853d04320b2e57bfa gen_post_opera_checkpoint",
   "ancestors": [
     {
-      "path": "build/states/blackjack.stamp",
-      "sha256": "2425571d5dc6c92f003a6017b14c6f982823e4f19f0e465894fee19d97b35d4a"
+      "path": "build/states/chain_blackjack.stamp",
+      "sha256": "6f226328c9739d76776127f9b21164720aefe080e37bbca9f52c479ea24abea7"
     }
   ]
 }

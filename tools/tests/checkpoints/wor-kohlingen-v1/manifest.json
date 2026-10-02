@@ -1,8 +1,6 @@
 {
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "wor-kohlingen.sram",
-  "size": 32768,
-  "sha256": "b0c2de78070434c34d48b0893c32ea5f74505ac0da3874568da8b6dcc38e8603",
   "slot": 3,
   "milestone": "wor-kohlingen",
   "persistent_layout": "ot6-codex-o8-v1",
@@ -14,14 +12,16 @@
       "y": 45
     }
   },
+  "size": 32768,
+  "sha256": "2ef61607bf1ea9adb691aac6cd318618a4ae5f1f793dd4dcd971da020b1041b7",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "b0c2de78070434c34d48b0893c32ea5f74505ac0da3874568da8b6dcc38e8603",
-    "generator_sig": "2f87e46794196112d7c5d071e5edbe952ca5936f2adb86429f3ed69fe8a2f896 gen_wor_kohlingen tools/tests/checkpoints/wor-figaro-sweep-v1/manifest.json tools/tests/checkpoints/wor-figaro-sweep-v1/wor-figaro-sweep.sram",
+    "payload_sha256": "2ef61607bf1ea9adb691aac6cd318618a4ae5f1f793dd4dcd971da020b1041b7",
+    "generator_sig": "b1dc8b423c9a7f523f402ecc927ee301a135975a3f2b7d9e2f9a174cd6166b85 gen_wor_kohlingen build/checkpoints/wor-figaro-sweep-v1/manifest.json build/checkpoints/wor-figaro-sweep-v1/wor-figaro-sweep.sram",
     "ancestors": [
       {
-        "path": "tools/tests/checkpoints/wor-figaro-sweep-v1/manifest.json",
-        "sha256": "934a98b5cfcab19b34e6157eed1e539a3a3d4fb256b600908d5e8a723dfdaa5e"
+        "path": "build/checkpoints/wor-figaro-sweep-v1/manifest.json",
+        "sha256": "a9b57d4e9ebe43201dfadcd16e1dc9402dcc0a16085c02a95c5cccc5039a5133"
       }
     ]
   }
