@@ -16,10 +16,10 @@
 --   2. Coin Toss at 2 BP (three, 2,790): refused;
 --   3. Hired Help at 1 BP (two hires, 3,100): refused;
 --   4. Coin Toss at 1 BP (two, 1,860): taken -- the purse falls to 140;
---   5. Coin Toss unboosted (930 > 140): refused.
--- (A draw whose first throw fells the last body pays one throw and leaves
--- 1,070, so step 5 would be taken and "exactly one row" fails: the draw,
--- not the grey, changed.)
+--   5. Coin Toss unboosted: its expectation is derived from the purse step
+--      4 actually left -- 140 (930 > 140): refused; or, when step 4's first
+--      throw fells the last body and the second pays nothing, 1,070: taken
+--      in the next battle, and the purse falls to 140.
 -- The prices are derived from the battle's own level, so the arithmetic is
 -- asserted rather than assumed; a battle that ends before all five is
 -- followed by another (two Defends again first), at most four.
@@ -94,7 +94,7 @@ H.run({ maxFrames = 200000 }, {
               PURSE))
           end
           -- the steps this battle settled, in order
-          local n = 0
+          local n, ti = 0, 0
           for _, p in ipairs(plan) do
             if p.row == "defend" then
               -- the bank's Defends, not steps
@@ -102,11 +102,21 @@ H.run({ maxFrames = 200000 }, {
               if not p.refusedSeen then break end
               H.log(string.format("[grey] step %d: row $%02X at %d BP refused at the list", k, p.row, p.boost))
             else
-              local rec = H.vars.setzer[1]
+              local rec = H.vars.setzer[ti + 1]
               if rec == nil then break end
+              ti = ti + 1
               took[#took + 1] = rec
               H.log(string.format("[grey] step %d: row $%02X at %d BP taken, purse %d -> %d", k, p.row, p.boost,
                 rec.gil0, rec.gil1))
+              if k == 4 then
+                -- step 5's expectation, from the purse step 4 left
+                WANT[5].refused = rec.gil1 < rec.level * 30 or nil
+                H.log(string.format("[grey] step 4 left %d in the purse: step 5 (one throw, %d) is %s", rec.gil1,
+                  rec.level * 30, WANT[5].refused and "refused" or "taken"))
+                for _, q in ipairs(plan) do
+                  if q.row == COIN and q.boost == 0 then q.refused = WANT[5].refused end
+                end
+              end
             end
             if p.row ~= "defend" then k, n = k + 1, n + 1 end
           end
@@ -117,13 +127,22 @@ H.run({ maxFrames = 200000 }, {
     end)(),
   }, "the five steps settle"),
   H.call(function()
-    H.assertEq(#took, 1, "exactly one row was taken")
     local r = took[1]
-    H.assertEq(r.row, COIN, "the taken row is Coin Toss")
+    H.assertEq(r ~= nil and r.row, COIN, "step 4's taken row is Coin Toss")
     H.assertEq(r.gil0, PURSE, "with the whole purse in hand")
     H.assertEq(r.boost, 1, "at 1 BP")
-    H.assertEq(#r.costs >= 1 and #r.costs <= 2, true, "one or two throws paid (two, unless the first felled the last body)")
+    H.assertEq(#r.costs >= 1 and #r.costs <= 2, true,
+      "one or two throws paid (two, unless the first felled the last body)")
     H.assertEq(r.gil0 - r.gil1, r.level * 30 * #r.costs, string.format("it took %d throw(s)' gil", #r.costs))
+    local want5 = r.gil1 >= r.level * 30
+    H.assertEq(#took, want5 and 2 or 1, string.format("step 4 left %d: step 5 (%d) %s", r.gil1, r.level * 30,
+      want5 and "is taken too" or "is refused, so one row was taken"))
+    if want5 then
+      local r5 = took[2]
+      H.assertEq(r5.row == COIN and r5.boost == 0, true, "step 5 is Coin Toss unboosted")
+      H.assertEq(r5.gil0, r.gil1, "with what step 4 left")
+      H.assertEq(r5.gil0 - r5.gil1, r5.level * 30, "one throw's gil")
+    end
     H.log("[grey] PASSED: a row the purse cannot pay at the pending boost is refused; one it can is taken")
   end),
 })

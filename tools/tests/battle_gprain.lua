@@ -9,11 +9,13 @@
 -- Played, no writes: Continue the wor-tomb-v1 battery, put the bag's Coin
 -- Toss relic on SETZER through the Relic menu (H.equipKit), walk Darill's
 -- Tomb's east room into random battles, and throw GP Rain from the command
--- row (H.setzerBattle's `cmd` entries) at 1 BP and unboosted in the first
--- battles that deal a crowd (two or more monsters, one special-weak:
--- crowdHere; the rest are fought out with the free Fight), at most eight
--- battles, so a toss splits across bodies and chips the special-weak one
--- (asserted: coverage).  Per throw (Cmd_18's entry and
+-- row (H.setzerBattle's `cmd` entries) at 1 BP and unboosted in the
+-- battles that deal a crowd (two or more monsters, one special-weak), so a
+-- toss splits across bodies and chips the special-weak one (asserted:
+-- coverage); any other battle is fought out by the route's fight driver
+-- and followed by field care, within the budget decoded from the room's
+-- pool (H.setzerCrowdBattles: the worst encounter-counter state's
+-- encounters to the next crowd, per crowd the throws need).  Per throw (Cmd_18's entry and
 -- SETZER's Ot6ActionEnd): the command list holds GP Rain and no Slot; 1 +
 -- boost tosses, each that finds a body paying level x 30; every toss
 -- replayed (H.setzerCheckCoins: twice its gil over the bodies it hit, the
@@ -21,24 +23,6 @@
 -- shield off a special-weak body).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
-
--- a crowd worth the coins: two or more monsters standing, one of them
--- special-weak (its class row holds $08) and shielded.  A battle without
--- one is fought out with the free Fight (an empty plan) and the walk goes
--- on, as a player saving the coins would; the draws are the room's own.
-local function crowdHere(tag, n)
-  local alive, weak = 0, 0
-  for s = 0, 5 do
-    if H.readWord(0x3BFC + s * 2) > 0 and (H.readByte(0x3AA8 + s * 2) & 1) == 1 then
-      alive = alive + 1
-      if (H.readByte(0x3EA4 + s * 2) & 0x08) ~= 0 and H.readByte(0x3E40 + s * 2) > 0 then weak = weak + 1 end
-    end
-  end
-  local yes = alive >= 2 and weak >= 1
-  H.log(string.format("[%s] battle %d: %d monster(s), %d special-weak and shielded -- %s", tag, n, alive, weak,
-    yes and "throw here" or "fight it out"))
-  return yes
-end
 
 -- the draw this suite needs (kit-setzer round 4: a lone Mad Oscar had
 -- crept in, and the split across bodies and the special chip stopped
@@ -59,30 +43,33 @@ end
 
 local SETZER, COIN_TOSS_RELIC = 9, 0xD6
 
-
-local function walkToBattle()
-  local wp = 1
-  local WPS = { { 124, 26 }, { 120, 11 } }
-  return H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
-    H.navTo(function() return WPS[wp][1] end, function() return WPS[wp][2] end,
-      { maxFrames = 8000, arrive = function() return H.battleLoadStarted() end }),
-    H.call(function() wp = wp % #WPS + 1 end),
-  }, "a random battle in the east room")
-end
-
 local function checkRain(r, i)
   return H.setzerCheckCoins(r, i, 30, function() return 0x08 end, "gprain")
 end
 
 local WANT = { { cmd = 0x18, boost = 1 }, { cmd = 0x18, boost = 0 } }
-local done, battles, all, seen = {}, 0, {}, 0
-local function remaining()
-  local t = {}
-  for i = #done + 1, #WANT do t[#t + 1] = WANT[i] end
-  return t
-end
+local walk, S = H.setzerCrowdBattles({
+  tag = "gprain", want = WANT, wps = { { 124, 26 }, { 120, 11 } },
+  onBattle = function()
+    local slot = nil
+    for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == SETZER then slot = s end end
+    H.assertEq(slot ~= nil, true, "SETZER is seated")
+    local cmds = {}
+    for r = 0, 3 do cmds[#cmds + 1] = H.readByte(0x202E + slot * 12 + r * 3) end
+    local rain, slotCmd = false, false
+    for _, c in ipairs(cmds) do if c == 0x18 then rain = true elseif c == 0x0F then slotCmd = true end end
+    H.log(string.format("[gprain] SETZER's commands: $%02X $%02X $%02X $%02X", cmds[1], cmds[2], cmds[3], cmds[4]))
+    H.assertEq(rain, true, "the relic gives SETZER GP Rain")
+    H.assertEq(slotCmd, false, "in place of Slot")
+  end,
+  check = function(rec, i)
+    H.assertEq(rec.row, 0x18, string.format("record %d is a GP Rain", i))
+    H.assertEq(rec.boost, WANT[i].boost, string.format("record %d ran at its planned boost", i))
+    return checkRain(rec, i)
+  end,
+})
 
-H.run({ maxFrames = 400000 }, {
+H.run({ maxFrames = 1200000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
   H.call(function()
     H.assertEq(H.invCountOf(COIN_TOSS_RELIC) > 0, true, "the bag holds the Coin Toss relic")
@@ -91,52 +78,11 @@ H.run({ maxFrames = 400000 }, {
   H.call(function()
     H.assertEq(H.readByte(0x1600 + 37 * SETZER + 0x23), COIN_TOSS_RELIC, "SETZER wears the Coin Toss relic")
   end),
-  H.driveUntil(function() return #done >= #WANT end, 360000, {
-    H.call(function()
-      battles = battles + 1
-      H.assertEq(battles <= 8, true, "both throws within eight battles")
-    end),
-    walkToBattle(),
-    H.waitUntil(function() return H.battleActive() end, 1200, "the battle is up", 2),
-    H.call(function()
-      local slot = nil
-      for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == SETZER then slot = s end end
-      H.assertEq(slot ~= nil, true, "SETZER is seated")
-      local cmds = {}
-      for r = 0, 3 do cmds[#cmds + 1] = H.readByte(0x202E + slot * 12 + r * 3) end
-      local rain, slotCmd = false, false
-      for _, c in ipairs(cmds) do if c == 0x18 then rain = true elseif c == 0x0F then slotCmd = true end end
-      H.log(string.format("[gprain] SETZER's commands: $%02X $%02X $%02X $%02X", cmds[1], cmds[2], cmds[3], cmds[4]))
-      H.assertEq(rain, true, "the relic gives SETZER GP Rain")
-      H.assertEq(slotCmd, false, "in place of Slot")
-    end),
-    (function()
-      local step
-      return { tick = function()
-        if step == nil then H.vars.setzer = {} end   -- no record of an earlier battle is read again
-        step = step or H.setzerBattle(crowdHere("gprain", battles) and remaining() or {}, {})
-        local r = step:tick()
-        -- each throw is checked the moment its record closes
-        local recs = H.vars.setzer or {}
-        while seen < #recs do
-          seen = seen + 1
-          local rec, i = recs[seen], #done + 1
-          H.assertEq(rec.row, 0x18, string.format("record %d is a GP Rain", i))
-          H.assertEq(rec.boost, WANT[i].boost, string.format("record %d ran at its planned boost", i))
-          all[i] = checkRain(rec, i)
-          done[i] = rec
-        end
-        if r == "done" then
-          seen = 0
-          step = nil
-        end
-        return r
-      end, reset = function() step = nil; seen = 0 end }
-    end)(),
-  }, "both GP Rains resolve"),
+  walk,
   H.call(function()
-    H.assertEq(#done, #WANT, "two GP Rains resolved")
-    coverage(all, "gprain")
-    H.log(string.format("[gprain] PASSED: %d GP Rains over %d battle(s)", #done, battles))
+    H.assertEq(#S.done, #WANT, "two GP Rains resolved")
+    coverage(S.all, "gprain")
+    H.log(string.format("[gprain] PASSED: %d GP Rains over %d battle(s), %d of them crowds", #S.done, S.battles,
+      S.crowds))
   end),
 })

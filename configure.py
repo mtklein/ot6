@@ -390,13 +390,15 @@ TEST_ENV = {
     # battery cut on its save point (SETZER back in the World of Ruin, so
     # Jackpot is learned).  A run is the Continue, a walk and one to four
     # battles: 6-30k frames (battle_jackpot plays Dullahan from wor_grave)
-    "battle_cointoss": "OT6_TIMEOUT=1800 "
+    # battle_jackpot: three passes and a bounded search (at most 192 throws)
+    "battle_jackpot": "OT6_TIMEOUT=3600",
+    "battle_cointoss": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
     "battle_hiredhelp": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
     "battle_setzergrey": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
-    "battle_gprain": "OT6_TIMEOUT=1800 "
+    "battle_gprain": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
     "battle_hirerefund": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",

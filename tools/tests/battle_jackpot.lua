@@ -13,11 +13,10 @@
 --   pass 1: Defend twice (the bank to 3), Jackpot at 3 BP: four rolls;
 --   pass 2: Jackpot at 1 BP (two rolls), then Jackpot again;
 --   pass 3: Defend once, Jackpot unboosted (one roll), then Jackpot again;
---   pass 4: pass 1's plan from a draw (frames stood before the press and in
---     the battle, both inputs) whose early rolls fell Dullahan, so the
---     passes after find no body;
---   pass 5: pass 1's plan from a draw whose roll meets a table byte past
---     251 and draws again.
+--   then a bounded search (below) for two draws the passes above may not
+--     meet: one whose early rolls fell Dullahan, so the passes after find
+--     no body, and one whose roll meets a table byte past 251 and draws
+--     again.  Every candidate it plays is held to everything below.
 -- What it holds, per Jackpot (at Ot6SetzerExec's entry and SETZER's
 -- Ot6ActionEnd; each pass at Ot6JackpotDice's entry and the dice effect's
 -- return; each roll as the effect sets the dice animation):
@@ -60,7 +59,7 @@ local function checkJackpot(r, i)
   H.assertEq(r.divine1 & r.setzerBit, r.setzerBit, string.format("Jackpot %d: spent by it", i))
   H.assertEq(r.targets ~= 0, true, string.format("Jackpot %d was aimed at the monsters", i))
   local alive = 0
-  for b = 0, 5 do if r.mon1[b].present and r.mon1[b].hp > 0 then alive = alive + 1 end end
+  for b = 0, 5 do if r.mon1[b].present and r.mon1[b].alive then alive = alive + 1 end end
   -- the passes: 1 + boost of them; one that finds a body rolls once, by the
   -- draw rule (the first byte of the battle RNG table below 252 after $be,
   -- mod 6; $be stops there), and one that finds none -- the rolls before it
@@ -185,19 +184,116 @@ local function pass(n, plan, wantBoost, o)
   return H.seqStep(steps)
 end
 
-H.run({ maxFrames = 150000 }, {
+-- ---- the search for the two draws ------------------------------------
+-- A throw is a fixed function of its battle's state, and the state is
+-- picked by inputs: frames stood on the grave before the press (the battle
+-- key: from this grave $be steps $10 every four frames, so 16 waits are the
+-- 16 keys), frames the party stands in the battle before acting (Dullahan's
+-- turns go on, moving the draws), and SETZER's Defends before the throw.
+-- Candidates, in order: two Defends then three, each over the stands 0,
+-- 330, 420, 520, 640, 760 (a stand under ~300 ends inside the load and
+-- changes nothing: labs-r4), each over the 16 keys -- 192 at most.  The
+-- entry shift (OT6_SEED_SHIFT, the runner's own idle at the boot point) is
+-- added to every wait, so a varied entry walks the same keys in another
+-- order.  Each candidate is a full throw at 3 BP, checked by checkJackpot
+-- like the passes above; the search stops once both draws are met.
+--
+-- The bound, for the redraw (the rarer): the table holds 4 bytes past 251
+-- of 256, a throw is four rolls, so a throw redraws with p = 1 - (252/256)^4
+-- = 6.1%.  Throws that repeat one state repeat one outcome, so what counts
+-- is the distinct throws among the candidates: with D distinct, the chance
+-- none redraws is 0.939^D -- 1% at D = 73, 0.1% at D = 110.  The lab over
+-- the whole set (build/attempts/wt/kit-setzer/labs-r5/) measures D; the
+-- empty pass is the commoner (about one distinct throw in eight at 3 BP).
+-- A search that meets neither, or only one, fails by name.
+local ENTRY = (type(OT6_SEED_SHIFT) == "number" and OT6_SEED_SHIFT or 0)
+local CAND = {}
+for _, d in ipairs({ 2, 3 }) do
+  for _, st in ipairs({ 0, 330, 420, 520, 640, 760 }) do
+    for i = 0, 15 do CAND[#CAND + 1] = { wait = ENTRY + 1 + 4 * i, stand = st, defends = d } end
+  end
+end
+local S = { i = 0, cur = nil, found = {}, seen = {}, distinct = 0 }
+
+local function waitFor(fn)
+  local c, n = 0, nil
+  return { tick = function()
+    if n == nil then n = fn() end
+    if c < n then c = c + 1; return "frame" end
+    return "done"
+  end, reset = function() c, n = 0, nil end }
+end
+
+local function candidateBattle()
+  local step
+  return { tick = function()
+    if step == nil then
+      local plan = {}
+      for _ = 1, S.cur.defends do plan[#plan + 1] = { row = "defend" } end
+      plan[#plan + 1] = { row = JACKPOT, boost = 3 }
+      step = H.setzerBattle(plan, { untilPlanDone = true })
+    end
+    return step:tick()
+  end, reset = function() step = nil end }
+end
+
+local search = H.seqStep({
+  H.driveUntil(function()
+    return (S.found.empty and S.found.redraw) or S.i >= #CAND
+  end, 2000000, {
+    H.call(function()
+      S.i = S.i + 1
+      S.cur = CAND[S.i]
+    end),
+    H.loadState(STATE),
+    waitFor(function() return S.cur.wait end),
+    H.faceAndHoldA("up", function() return H.battleLoadStarted() end, 3000, "the grave (100,14): face up, A"),
+    H.release(),
+    waitFor(function() return S.cur.stand end),
+    candidateBattle(),
+    H.call(function()
+      local c, recs = S.cur, H.vars.setzer
+      local label = string.format("search %d (wait %d, stand %d, %d Defends)", S.i, c.wait, c.stand, c.defends)
+      H.assertEq(#recs, 1, label .. ": one Jackpot resolved")
+      H.assertEq(recs[1].row == JACKPOT and recs[1].boost == 3, true, label .. ": a Jackpot at 3 BP")
+      local got = checkJackpot(recs[1], S.i + 3)
+      local sig = {}
+      for _, q in ipairs(recs[1].passes) do sig[#sig + 1] = string.format("%04X:%02X", q.mask, q.be0) end
+      sig = table.concat(sig, " ")
+      if not S.seen[sig] then S.seen[sig] = true; S.distinct = S.distinct + 1 end
+      H.log(string.format("[jackpot] %s: %d empty pass(es), %d redraw(s) | %s | %d distinct of %d", label,
+        got.empty, got.redraws, sig, S.distinct, S.i))
+      if got.empty > 0 and not S.found.empty then S.found.empty = label end
+      if got.redraws > 0 and not S.found.redraw then S.found.redraw = label end
+      if JACKPOT_SEARCH_ALL then S.found = {} ; S.foundAll = S.foundAll or {}
+        if got.empty > 0 then S.foundAll.empty = (S.foundAll.empty or 0) + 1 end
+        if got.redraws > 0 then S.foundAll.redraw = (S.foundAll.redraw or 0) + 1 end
+      end
+    end),
+  }, "the search for an empty pass and a redraw"),
+  H.call(function()
+    if JACKPOT_SEARCH_ALL then
+      H.log(string.format("[jackpot] search, the whole set: %d candidates, %d distinct throws, %d with an empty "
+        .. "pass, %d with a redraw (entry shift %d)", S.i, S.distinct, (S.foundAll or {}).empty or 0,
+        (S.foundAll or {}).redraw or 0, ENTRY))
+      return
+    end
+    H.assertEq(S.found.empty ~= nil, true, string.format("the search met a throw whose early rolls fell "
+      .. "Dullahan, leaving a pass with no body, within its %d candidates (%d distinct throws tried)", #CAND,
+      S.distinct))
+    H.assertEq(S.found.redraw ~= nil, true, string.format("the search met a throw that redraws past 251 within "
+      .. "its %d candidates (%d distinct throws tried; none redrawing has p = 0.939^%d = %.4f)", #CAND,
+      S.distinct, S.distinct, 0.939 ^ S.distinct))
+    H.log(string.format("[jackpot] search: an empty pass at %s, a redraw at %s; %d candidate(s), %d distinct "
+      .. "(entry shift %d)", S.found.empty, S.found.redraw, S.i, S.distinct, ENTRY))
+  end),
+})
+
+H.run({ maxFrames = 2500000 }, {
   pass(1, { { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3 } }, 3),
   pass(2, { { row = JACKPOT, boost = 1 }, { row = JACKPOT, refused = true } }, 1),
   pass(3, { { row = "defend" }, { row = JACKPOT, boost = 0 }, { row = JACKPOT, refused = true } }, 0),
-  -- the draws lab_jackpass.lua found from this frame (round 4,
-  -- build/attempts/wt/kit-setzer/labs-r4/): stand 57 frames, press, act at
-  -- once -- key beDC: faces 5, 6, 4 fell Dullahan and the fourth pass found
-  -- no body; stand 25 -- key be5C: the first roll's $be 50 met a byte past
-  -- 251 and drew again
-  pass(4, { { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3 } }, 3,
-    { wait = 57, stand = 0, wantEmpty = true, why = "key beDC, measured: three rolls fell him" }),
-  pass(5, { { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3 } }, 3,
-    { wait = 25, stand = 0, wantRedraw = true, why = "key be5C, measured: the first roll redraws" }),
+  search,
   H.call(function()
     H.log("[jackpot] PASSED: 1 + boost passes at 3, 1 and 0 BP, a pass with no body rolls nothing, the draw rule "
       .. "(a redraw past 251 included), 99 MP, no chip, once a battle")

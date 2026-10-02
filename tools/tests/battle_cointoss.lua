@@ -4,16 +4,19 @@
 --
 -- Played, not staged: Continue the wor-tomb-v1 battery (CELES, SABIN,
 -- EDGAR and SETZER on Darill's Tomb's B3 save point; SETZER back in the
--- World of Ruin, so his Jackpot is learned), walk the east room until the
--- game deals a battle (field group 151: a Mad Oscar; a Mad Oscar and an
--- Exoray; a PowerDemon and two Exorays), and play SETZER's turns through
--- the real menu (H.setzerBattle), in the first battles that deal a crowd
--- (two or more monsters, one special-weak: crowdHere; the rest are fought
--- out with the free Fight), so a toss splits across bodies and chips the
--- special-weak one -- asserted (coverage), since a lone Mad Oscar dealt
--- first had quietly stopped both from running.  Every other assertion is
--- derived from the battle's own state; SETZER_SKIP (default 0) battles are
--- fought out first to vary the draw.
+-- World of Ruin, so his Jackpot is learned), walk the east room into
+-- random battles (field group 151: a Mad Oscar; a Mad Oscar and an Exoray;
+-- a PowerDemon and two Exorays), and play SETZER's turns through the real
+-- menu (H.setzerBattle) in the battles that deal a crowd -- two or more
+-- monsters, one special-weak -- so a toss splits across bodies and chips
+-- the special-weak one, asserted (coverage), since a lone Mad Oscar dealt
+-- first had quietly stopped both from running.  Any other battle is fought
+-- out by the route's fight driver and followed by field care
+-- (H.setzerCrowdBattles).  The budget is decoded from the room's pool: the
+-- most encounters any encounter-counter state needs to the next crowd (19
+-- on this ROM), per crowd the throws need -- at most two, since each crowd
+-- battle gives at least one throw.  Every other assertion is derived from
+-- the battle's own state.
 --
 -- What it holds, per throw (the action's own edges: Ot6SetzerExec's entry
 -- and SETZER's Ot6ActionEnd):
@@ -36,24 +39,6 @@
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
--- a crowd worth the coins: two or more monsters standing, one of them
--- special-weak (its class row holds $08) and shielded.  A battle without
--- one is fought out with the free Fight (an empty plan) and the walk goes
--- on, as a player saving the coins would; the draws are the room's own.
-local function crowdHere(tag, n)
-  local alive, weak = 0, 0
-  for s = 0, 5 do
-    if H.readWord(0x3BFC + s * 2) > 0 and (H.readByte(0x3AA8 + s * 2) & 1) == 1 then
-      alive = alive + 1
-      if (H.readByte(0x3EA4 + s * 2) & 0x08) ~= 0 and H.readByte(0x3E40 + s * 2) > 0 then weak = weak + 1 end
-    end
-  end
-  local yes = alive >= 2 and weak >= 1
-  H.log(string.format("[%s] battle %d: %d monster(s), %d special-weak and shielded -- %s", tag, n, alive, weak,
-    yes and "throw here" or "fight it out"))
-  return yes
-end
-
 -- the draw this suite needs (kit-setzer round 4: a lone Mad Oscar had
 -- crept in, and the split across bodies and the special chip stopped
 -- running): at least one toss over two or more bodies, and at least one
@@ -71,19 +56,7 @@ local function coverage(all, tag)
   H.assertEq(chip > 0, true, tag .. ": a toss chipped a special-weak body")
 end
 
-SETZER_SKIP = SETZER_SKIP or 0
 local COIN = 0x59
-
-
-local function walkToBattle()
-  local wp = 1
-  local WPS = { { 124, 26 }, { 120, 11 } }
-  return H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
-    H.navTo(function() return WPS[wp][1] end, function() return WPS[wp][2] end,
-      { maxFrames = 8000, arrive = function() return H.battleLoadStarted() end }),
-    H.call(function() wp = wp % #WPS + 1 end),
-  }, "a random battle in the east room")
-end
 
 local function checkList(l)
   local want = { [0] = 0x5C, 0xFF, 0x59, 0xFF, 0x5A, 0xFF, 0x5B, 0xFF }
@@ -102,54 +75,23 @@ local function checkThrow(r, i)
 end
 
 local WANT = { { row = COIN, boost = 1 }, { row = COIN, boost = 0 } }
-local done, battles, all, seen = {}, 0, {}, 0
-local function remaining()
-  local t = {}
-  for i = #done + 1, #WANT do t[#t + 1] = WANT[i] end
-  return t
-end
+local walk, S = H.setzerCrowdBattles({
+  tag = "cointoss", want = WANT, wps = { { 124, 26 }, { 120, 11 } },
+  setzerOpts = { onList = checkList, shot = "cointoss_table" },
+  check = function(rec, i)
+    H.assertEq(rec.row, COIN, string.format("record %d is a Coin Toss", i))
+    H.assertEq(rec.boost, WANT[i].boost, string.format("record %d ran at its planned boost", i))
+    return checkThrow(rec, i)
+  end,
+})
 
-H.run({ maxFrames = 400000 }, {
+H.run({ maxFrames = 1200000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
-  H.repeatN(SETZER_SKIP, { walkToBattle(), H.setzerBattle({}) }),
-  -- both throws, in as many battles as the draws take (at most four)
-  H.driveUntil(function() return #done >= #WANT end, 360000, {
-    H.call(function()
-      battles = battles + 1
-      H.assertEq(battles <= 8, true, "both throws within eight battles")
-    end),
-    walkToBattle(),
-    H.waitUntil(function() return H.battleActive() end, 1200, "the battle is up", 2),
-    H.cond(function() return true end, {
-      (function()
-        local step
-        return { tick = function()
-          if step == nil then H.vars.setzer = {} end   -- no record of an earlier battle is read again
-          step = step or H.setzerBattle(crowdHere("cointoss", battles) and remaining() or {},
-            { onList = checkList, shot = "cointoss_table" })
-          local r = step:tick()
-          -- each throw is checked the moment its record closes
-          local recs = H.vars.setzer or {}
-          while seen < #recs do
-            seen = seen + 1
-            local rec, i = recs[seen], #done + 1
-            H.assertEq(rec.row, COIN, string.format("record %d is a Coin Toss", i))
-            H.assertEq(rec.boost, WANT[i].boost, string.format("record %d ran at its planned boost", i))
-            all[i] = checkThrow(rec, i)
-            done[i] = rec
-          end
-          if r == "done" then
-            seen = 0
-            step = nil
-          end
-          return r
-        end, reset = function() step = nil; seen = 0 end }
-      end)(),
-    }),
-  }, "both Coin Tosses resolve"),
+  walk,
   H.call(function()
-    H.assertEq(#done, #WANT, "two Coin Tosses resolved")
-    coverage(all, "cointoss")
-    H.log(string.format("[cointoss] PASSED: %d throws over %d battle(s)", #done, battles))
+    H.assertEq(#S.done, #WANT, "two Coin Tosses resolved")
+    coverage(S.all, "cointoss")
+    H.log(string.format("[cointoss] PASSED: %d throws over %d battle(s), %d of them crowds", #S.done, S.battles,
+      S.crowds))
   end),
 })
