@@ -4935,21 +4935,91 @@ end
 -- bar as the drop: tomb_zombie's "a round costs 1589 ... s0 1x1589
 -- (worst)"), or a spell with no power (Doom, X-Zone).  Such a drop is no
 -- HP a heal could lift anybody clear of; it stays out of the ledger.
-local function statusDrop(act, d)
-  local was = act.st1 and act.st1[d.e] or 0
-  local now = M.readByte(BATTLE.ST1 + d.e * 2)
-  if (now & ~was & (M.ST1_ZOMBIE | M.ST1_PETRIFY)) ~= 0 then return true end
-  if act.cmd == 0x02 and act.atk ~= nil and act.atk < 0x100
-     and M.readRomByte((M.sym("MagicProp") & 0x3FFFFF) + act.atk * 14 + 6) == 0 then
+-- M.statusDrop(was, now, cmd, atk): was/now the victim's STATUS1 byte
+-- before the action and after it, cmd/atk the action.  Pure but for the
+-- ROM read of a spell's power, so battle_healpolicy puts cases through it.
+function M.statusDrop(was, now, cmd, atk)
+  if ((now or 0) & ~(was or 0) & (M.ST1_ZOMBIE | M.ST1_PETRIFY)) ~= 0 then return true end
+  if cmd == 0x02 and atk ~= nil and atk < 0x100
+     and M.readRomByte((M.sym("MagicProp") & 0x3FFFFF) + atk * 14 + 6) == 0 then
     return true
   end
   return false
 end
+local function statusDrop(act, d)
+  return M.statusDrop(act.st1 and act.st1[d.e] or 0, M.readByte(BATTLE.ST1 + d.e * 2), act.cmd, act.atk)
+end
 M.TYPICAL_MIN = 3   -- actions a slot must have taken before its mean prices anything
+-- a ledger's typical action: the mean, once M.TYPICAL_MIN actions are in
+function M.typicalOf(L)
+  if L == nil or (L.actN or 0) < M.TYPICAL_MIN then return nil end
+  return L.actSum // L.actN
+end
+-- A cure-hit queued on a muddled ally that will not run (review of
+-- f8f9ad66, item 5), as arithmetic for battle_healpolicy: q = { tick },
+-- o = { hp (the hitter's), denied (its turn-denying status or nil),
+-- muddled, ownWindow (the hitter's own window is open again), tick }.
+-- Returns why the record is stale, or nil while it is in flight.
+function M.queuedHitStale(q, o)
+  if (o.hp or 0) == 0 then return "it fell" end
+  if o.denied ~= nil then return "it is under " .. o.denied end
+  if o.muddled then return "it is Muddled" end
+  if o.ownWindow then return "its own window is open again" end
+  if (o.tick or 0) - (q.tick or 0) > BATTLE.RAISE_WAIT + 600 then return "it never ran" end
+  return nil
+end
+
+-- M.ledgerCommit(L, act, drops): one closed monster action into its slot's
+-- hit ledger L (nil = a new one), as plain tables so battle_healpolicy can
+-- assert it.  act = { cmd, counter, party }; each drop = { e, drop, last,
+-- hp, status } with status true for a status landing (M.statusDrop).
+-- Returns L and the drops that were hits (the smallest-hit lines are the
+-- caller's to say).  The rules (review of f8f9ad66, M4a/M4b and item 4):
+--   a status landing is no hit and no part of the typical action;
+--   a killing blow (hp 0) is a censored floor: L.lbOn/L.lb, never L.min;
+--   the typical action (L.actSum / L.actN) counts an action aimed at the
+--   party, a miss a zero -- not a counterattack, nor a buff on its own
+--   side (no party bit, nothing dropped), nor the script's $2E/$2F.
+function M.ledgerCommit(L, act, drops)
+  L = L or { on = {} }
+  local hits = {}
+  for _, d in ipairs(drops or {}) do
+    if not d.status then hits[#hits + 1] = d end
+  end
+  if act.cmd ~= 0x2E and act.cmd ~= 0x2F and not act.counter
+     and ((act.party or 0) ~= 0 or #(drops or {}) > 0) then
+    local per0, size = {}, 0
+    for _, d in ipairs(hits) do per0[d.e] = (per0[d.e] or 0) + d.drop end
+    for _, v in pairs(per0) do if v > size then size = v end end
+    L.actSum, L.actN = (L.actSum or 0) + size, (L.actN or 0) + 1
+  end
+  if #hits == 0 then return L, hits end
+  L.maxOn = L.maxOn or {}
+  local per = {}
+  for _, d in ipairs(hits) do per[d.e] = (per[d.e] or 0) + d.drop end
+  for e, v in pairs(per) do
+    if L.maxOn[e] == nil or v > L.maxOn[e] then L.maxOn[e] = v end
+    if L.max == nil or v > L.max then L.max = v end
+  end
+  L.lbOn = L.lbOn or {}
+  for _, d in ipairs(hits) do
+    if d.hp == 0 then
+      if L.lbOn[d.e] == nil or d.drop > L.lbOn[d.e] then L.lbOn[d.e] = d.drop end
+      if L.lb == nil or d.drop > L.lb then L.lb, L.lbE = d.drop, d.e end
+    else
+      if L.on[d.e] == nil or d.drop < L.on[d.e] then L.on[d.e] = d.drop end
+      if L.min == nil or d.drop < L.min then L.min, L.minE, L.minNew = d.drop, d.e, d end
+    end
+  end
+  return L, hits
+end
+
 function Driver:commitMonAct(act)
   local drops = {}
   for _, d in ipairs(act.drops) do
     if statusDrop(act, d) then
+      -- what the inter-turn and opening losses leave out (makePlan)
+      self.statusLost[d.e] = (self.statusLost[d.e] or 0) + d.drop
       if not self.statusSaid["sdrop:" .. act.slot .. ":" .. d.e .. ":" .. d.last] then
         self.statusSaid["sdrop:" .. act.slot .. ":" .. d.e .. ":" .. d.last] = true
         M.log(string.format("[%s] slot %d's action on entity %d (%d -> %d, cmd $%02X atk $%02X) is a status "
@@ -4960,60 +5030,28 @@ function Driver:commitMonAct(act)
       drops[#drops + 1] = d
     end
   end
-  -- The slot's typical action (M.roundCost: a second action in one
-  -- window is priced at this rather than at the worst again) is the mean
-  -- of the actions it aims at the party, a miss or a status landing a
-  -- zero -- not its counterattacks ($B1 bit 0 as it ran: the ATB does not
-  -- schedule them) nor what it aims at itself or its side (a buff, a
-  -- cure: no party bit in $B8), nor the script's own bookkeeping
-  -- ($2E/$2F).  Dullahan's first-cut [round-check] priced 433 enemy
-  -- actions over 236 turns where 223 damaging ones closed
-  -- (build/attempts/wt/care-policy/dull/); the review of f8f9ad66 asked
-  -- that counters and buffs stay out of the mean, and that the mean wait
-  -- for M.TYPICAL_MIN actions.
-  if act.cmd ~= 0x2E and act.cmd ~= 0x2F and not act.counter
-     and ((act.party or 0) ~= 0 or #act.drops > 0) then
-    local L0 = self.hitLedger[act.slot] or { on = {} }
-    self.hitLedger[act.slot] = L0
-    local per0, size = {}, 0
-    for _, d in ipairs(drops) do per0[d.e] = (per0[d.e] or 0) + d.drop end
-    for _, v in pairs(per0) do if v > size then size = v end end
-    L0.actSum, L0.actN = (L0.actSum or 0) + size, (L0.actN or 0) + 1
-    self.monActN = (self.monActN or 0) + 1
+  -- The slot's typical action, its largest one action on each member and
+  -- its smallest hit, by M.ledgerCommit's rules (the reasons are there):
+  -- Dullahan's first-cut [round-check] priced 433 enemy actions over 236
+  -- turns where 223 damaging ones closed (build/attempts/wt/care-policy/
+  -- dull/); vector_entry's "slot 2's smallest hit this fight so far: 75, on
+  -- entity 2 (75 -> 0)" let a 77-HP raise "survive the smallest hit, 75"
+  -- under a 544 Bolt 2.
+  local all = {}
+  for _, d in ipairs(act.drops) do
+    all[#all + 1] = { e = d.e, drop = d.drop, last = d.last, hp = d.hp, status = statusDrop(act, d) }
   end
-  if #drops == 0 then return end
-  local L = self.hitLedger[act.slot] or { on = {} }
+  local before = self.hitLedger[act.slot] and self.hitLedger[act.slot].actN or 0
+  local L = M.ledgerCommit(self.hitLedger[act.slot], { cmd = act.cmd, counter = act.counter, party = act.party },
+    all)
   self.hitLedger[act.slot] = L
-  -- the largest ONE action on each member (a two-hit Battle is one
-  -- action): what the round price (M.roundCost) charges per action; a
-  -- killing blow counts at the HP it took, a floor on the hit
-  L.maxOn = L.maxOn or {}
-  local per = {}
-  for _, d in ipairs(drops) do per[d.e] = (per[d.e] or 0) + d.drop end
-  for e, v in pairs(per) do
-    if L.maxOn[e] == nil or v > L.maxOn[e] then L.maxOn[e] = v end
-    if L.max == nil or v > L.max then L.max = v end
-  end
-  -- The smallest hit (the raise rule's) counts only the hits that left
-  -- their victim standing: a killing blow says only that the hit was at
-  -- least the HP taken (censored, review of f8f9ad66 M4b) -- vector_entry's
-  -- "slot 2's smallest hit this fight so far: 75, on entity 2 (75 -> 0)"
-  -- let a 77-HP raise "survive the smallest hit, 75" under a 544 Bolt 2.
-  -- Those floors are kept apart (L.lbOn, L.lb) for a slot with no other.
-  L.lbOn = L.lbOn or {}
-  for _, d in ipairs(drops) do
-    if d.hp == 0 then
-      if L.lbOn[d.e] == nil or d.drop > L.lbOn[d.e] then L.lbOn[d.e] = d.drop end
-      if L.lb == nil or d.drop > L.lb then L.lb, L.lbE = d.drop, d.e end
-    else
-      if L.on[d.e] == nil or d.drop < L.on[d.e] then L.on[d.e] = d.drop end
-      if L.min == nil or d.drop < L.min then
-        L.min, L.minE = d.drop, d.e
-        M.log(string.format("[%s] slot %d's smallest hit this fight so far: "
-          .. "%d, on entity %d (%d -> %d)", self.tag or "fight", act.slot, d.drop, d.e,
-          d.last, d.hp))
-      end
-    end
+  if (L.actN or 0) > before then self.monActN = (self.monActN or 0) + 1 end
+  if L.minNew ~= nil then
+    local d = L.minNew
+    L.minNew = nil
+    M.log(string.format("[%s] slot %d's smallest hit this fight so far: "
+      .. "%d, on entity %d (%d -> %d)", self.tag or "fight", act.slot, d.drop, d.e,
+      d.last, d.hp))
   end
 end
 
@@ -5174,10 +5212,25 @@ function Driver:makePlan(actor)
   local function inFight(e) return (leftMask >> e) & 1 == 0 end
   local function maxOf(e) return inFight(e) and M.readWord(0x3C1C + e * 2) or 0 end
   for e = 0, 3 do hpNow[e] = inFight(e) and M.readWord(0x3BF4 + e * 2) or 0 end
+  -- HP a status landing took (a Zombie touch reads the whole bar as lost:
+  -- tomb_r3 k10_s0 priced "a round costs 1548 (no enemy action attributed
+  -- yet: the measured inter-turn loss ...)" off a 1548 -> 0 touch and spent
+  -- and declined heals on it; review of bcf5240f) is no round's cost: the
+  -- inter-turn and opening losses leave it out, the open action's included
+  local sl = {}
+  for e = 0, 3 do sl[e] = self.statusLost[e] or 0 end
+  if self.monAct ~= nil then
+    for _, d in ipairs(self.monAct.drops) do
+      if statusDrop(self.monAct, d) then sl[d.e] = sl[d.e] + d.drop end
+    end
+  end
+  local function noteLoss(e, lost, why)
+    if lost > (self.roundCost[e] or 0) then self.roundCost[e] = lost end
+  end
   if self.turnSnap[actor] then
+    local was = self.turnSnapSL[actor] or {}
     for e = 0, 3 do
-      local lost = self.turnSnap[actor][e] - hpNow[e]
-      if lost > (self.roundCost[e] or 0) then self.roundCost[e] = lost end
+      noteLoss(e, self.turnSnap[actor][e] - hpNow[e] - (sl[e] - (was[e] or 0)))
     end
   end
   -- Before this actor's second turn there is no per-turn sample, but the
@@ -5186,11 +5239,11 @@ function Driver:makePlan(actor)
   -- turn two while every ally had already lost ~250 to the opening move.
   if self.startSnap ~= nil and not self.turnSnap[actor] then
     for e = 0, 3 do
-      local lost = self.startSnap[e] - hpNow[e]
-      if lost > (self.roundCost[e] or 0) then self.roundCost[e] = lost end
+      noteLoss(e, self.startSnap[e] - hpNow[e] - sl[e])
     end
   end
   self.turnSnap[actor] = hpNow
+  self.turnSnapSL[actor] = sl
   -- The price every care line below reads (#206, #194): what one enemy
   -- round costs each member before their next turn, off the gauges and
   -- the hit ledger (M.roundCost).  The measured inter-turn loss above
@@ -5230,6 +5283,8 @@ function Driver:makePlan(actor)
           local eta = etaOf(e * 2)
           local period = const > 0 and math.ceil(0xFF00 / const) or nil
           local window = (eta == 0 or eta == nil) and period or eta
+          -- to the member's next action landing, not its gauge (watchLanding)
+          if window ~= nil then window = window + self:landLag() end
           local enemies = {}
           for s2 = 0, 5 do
             if monAlive(s2) then
@@ -5243,7 +5298,7 @@ function Driver:makePlan(actor)
               local mconst = M.readWord(BATTLE.ATB_CONST + 8 + s2 * 2)
               enemies[#enemies + 1] = { slot = s2, eta = etaOf(8 + s2 * 2),
                 period = mconst > 0 and math.ceil(0xFF00 / mconst) or nil, worst = worst,
-                typical = (L and (L.actN or 0) >= M.TYPICAL_MIN) and L.actSum // L.actN or nil }
+                typical = M.typicalOf(L) }
             end
           end
           if window == nil then
@@ -5354,13 +5409,9 @@ function Driver:makePlan(actor)
     -- queued command), its own window is open again (the command ran or
     -- was dropped), or RAISE_WAIT + 600 ticks have passed.
     for by, q in pairs(self.unmuddleQueued or {}) do
-      local why = nil
-      if hpNow[by] == 0 then why = "it fell"
-      elseif denied(by) ~= nil then why = "it is under " .. denied(by)
-      elseif (M.readByte(BATTLE.ST2 + by * 2) & M.ST2_MUDDLE) ~= 0 then why = "it is Muddled"
-      elseif by == actor then why = "its own window is open again"
-      elseif self.battleTick - (q.tick or 0) > BATTLE.RAISE_WAIT + 600 then why = "it never ran"
-      end
+      local why = M.queuedHitStale(q, { hp = hpNow[by], denied = denied(by),
+        muddled = (M.readByte(BATTLE.ST2 + by * 2) & M.ST2_MUDDLE) ~= 0, ownWindow = by == actor,
+        tick = self.battleTick })
       if why ~= nil then
         self.unmuddleQueued[by] = nil
         M.log(string.format("[%s] actor %d's cure-hit on entity %d (confirmed at tick %d) is no longer "
@@ -5707,9 +5758,9 @@ function Driver:makePlan(actor)
       end
       if cureRow ~= nil then
         for _, spell in ipairs(type(self.opts.cure) == "table" and self.opts.cure or BATTLE.CURES) do
-          if spellCell(actor, spell, true) and taken(self.castRestore[spell], true) then
-            heals[#heals + 1] = { what = string.format("cure $%02X", spell),
-                                  restore = self.castRestore[spell] }
+          local r = self:castRestoreOf(spell, actor, actor)
+          if spellCell(actor, spell, true) and taken(r, true) then
+            heals[#heals + 1] = { what = string.format("cure $%02X", spell), restore = r }
           end
         end
       end
@@ -6207,11 +6258,12 @@ function Driver:makePlan(actor)
             cell = nil
           end
           if cell ~= nil then
-            local gain = self.castRestore[spell]
+            local gain, src = self:castRestoreOf(spell, actor, c.e)
             local why = gain == nil and "not yet measured"
               or M.healDecision({ hp = c.hp, maxhp = c.maxhp, restore = gain,
                    roundCost = cost, allies = allies, threshold = threshold,
                    mp = true })
+            if why and src ~= "measured" and gain ~= nil then why = why .. "; " .. src end
             if why then
               self.healSaid = nil
               M.log(string.format("[%s] actor=%d cure entity %d (%d/%d) with "
@@ -7508,7 +7560,8 @@ function Driver:button(actor)
        and self.castRestore[self.plan.spell] == nil then
       -- an all-ally cast is boosted and spread, so its per-head number
       -- would poison the single-cast ledger; it goes unmeasured
-      watch = { into = self.castRestore, id = self.plan.spell, what = "cure" }
+      watch = { into = self.castRestore, id = self.plan.spell, what = "cure",
+                rom = (self:castRestoreOf(self.plan.spell, actor, self.plan.target)) }
     end
     if watch then
       watch.target, watch.by = self.plan.target, actor
@@ -7628,6 +7681,8 @@ function Driver:idle()
   -- carrying a round cost across the boundary would let one attempt's
   -- damage decide the next attempt's first turns.
   self.roundCost, self.turnSnap = {}, {}
+  self.statusLost, self.turnSnapSL = {}, {}
+  self.atbPrev, self.atbClock, self.fullAt, self.landMax, self.landN = {}, 0, {}, nil, 0
   self.roundCheck, self.monActN = {}, 0
   self.itemRestore, self.castRestore = {}, {}
   self.healWatch, self.healSaid, self.finisherSaid, self.inertSaid = nil, nil, nil, {}
@@ -8169,34 +8224,60 @@ end
 -- clipped heal is not recorded; it stays unmeasured, which falls back
 -- to the item's power byte or to offering the cast, and the next use
 -- on somebody with room measures it properly.
+-- One frame of the heal watch, as plain arithmetic (battle_healpolicy
+-- asserts it).  w = { hp, maxhp, until_ }, hp the target's HP now, tick
+-- the battle tick.  Returns what the frame means:
+--   "fell"      the target is down: no heal of this watch's is coming, and
+--               a later raise is not it (vector_entry measured "cure $2D
+--               restored 77 hp on entity 2" off another member's Fenix Down
+--               raising the cure's target from 0; review of f8f9ad66, M4c)
+--   "full"      a rise to max HP: the number is capped, not measured
+--   "measured"  a rise: the heal, whoever's command the frame shows.  The
+--               first M4c cut also required the healer's own command to be
+--               in ExecCmd, and the measured-heal lines fell 35 -> 28 in the
+--               chain and 21 -> 5 in the tomb (review of bcf5240f, item 4):
+--               the HP word moves after the healer's command has left
+--               ExecCmd, often inside the next member's -- tomb_r7 k10_s0:
+--               "entity 2 rose 212 -> 462 during entity 2's command: not the
+--               watched item $E9 (entity 3's)", entity 3's Potion, 250.
+--               The raise case is the "fell" line's.
+--   "lower"     a drop: the baseline moves
+--   "expired"   no rise inside the watch's ticks
+--   nil         nothing yet
+function M.healWatchStep(w, hp, tick)
+  if hp == 0 or hp == 0xFFFF then return "fell" end
+  if hp > w.hp then
+    if hp >= w.maxhp then return "full" end
+    return "measured"
+  end
+  if hp < w.hp then return "lower" end
+  if tick > w.until_ then return "expired" end
+  return nil
+end
 function Driver:watchHeal()
-  if self.healWatch then
-    local hp = M.readWord(0x3BF4 + self.healWatch.target * 2)
-    -- Only a rise while the healer's own command runs is the heal's (the
-    -- ally attribution, Driver:allyAct): vector_entry measured "cure $2D
-    -- restored 77 hp on entity 2" off another member's Fenix Down raising
-    -- the cure's target from 0 (review of f8f9ad66, M4c).  A target that
-    -- falls has no heal coming: the watch ends.
+  local w = self.healWatch
+  if not w then return end
+  local hp = M.readWord(0x3BF4 + w.target * 2)
+  local step = M.healWatchStep(w, hp, self.battleTick)
+  if step == "fell" or step == "full" then
+    M.log(string.format("[%s] [heal-watch] %s $%02X on entity %d: %s", self.tag or "fight", w.what, w.id,
+      w.target, step == "fell" and "the target fell first; not measured" or "a rise to max HP, capped; not measured"))
+    self.healWatch = nil
+  elseif step == "measured" then
     local a = self:allyAct()
-    local mine = self.healWatch.by == nil or (a ~= nil and a.e == self.healWatch.by)
-    if hp == 0 or hp == 0xFFFF then
-      self.healWatch = nil
-    elseif hp > self.healWatch.hp and not mine then
-      self.healWatch.hp = hp
-    elseif hp > self.healWatch.hp and hp >= self.healWatch.maxhp then
-      self.healWatch = nil
-    elseif hp > self.healWatch.hp then
-      self.healWatch.into[self.healWatch.id] = hp - self.healWatch.hp
-      M.log(string.format("[%s] %s $%02X restored %d hp on entity %d " ..
-        "(measured; the heal policy uses this from here on)",
-        self.tag or "fight", self.healWatch.what, self.healWatch.id, hp - self.healWatch.hp,
-        self.healWatch.target))
-      self.healWatch = nil
-    elseif hp < self.healWatch.hp then
-      self.healWatch.hp = hp
-    elseif self.battleTick > self.healWatch.until_ then
-      self.healWatch = nil
-    end
+    w.into[w.id] = hp - w.hp
+    M.log(string.format("[%s] %s $%02X restored %d hp on entity %d " ..
+      "(measured; the heal policy uses this from here on) [entity %d's; the frame shows %s]%s",
+      self.tag or "fight", w.what, w.id, hp - w.hp, w.target, w.by or -1,
+      a == nil and "no party command" or string.format("entity %d's command", a.e),
+      w.rom ~= nil and string.format(" [the ROM's least: %d]", w.rom) or ""))
+    self.healWatch = nil
+  elseif step == "lower" then
+    w.hp = hp
+  elseif step == "expired" then
+    M.log(string.format("[%s] [heal-watch] %s $%02X on entity %d: no rise inside the watch; not measured",
+      self.tag or "fight", w.what, w.id, w.target))
+    self.healWatch = nil
   end
 end
 
@@ -8645,6 +8726,41 @@ function Driver:allyFightEstimate(actor, e)
   return r
 end
 
+-- A cure the party has not yet landed this battle, priced from the ROM
+-- (review of bcf5240f, item 5: vector_entry's "no spend (care): cure $2D
+-- is not yet measured; it may save (measure it)" for a 75-HP member under a
+-- 544 round).  CalcMagicDmg @2b69: power x 4 + magic power ($3B41) x power
+-- x level / 32; CalcDmgMod @0c9e: variance 224..255/256 (the low end here:
+-- what it restores at least), then -- unless the spell ignores defense
+-- (MagicProp +$02 bit 5, $11a2) -- the target's magic defense and Shell;
+-- the party-on-party halving skips a heal ($11a4 bit 0, @0d22).
+--   o = { power, flags2 (+$02), heal (+$04 bit 0), level, magpow, mdef, shell }
+-- Returns the least it restores, or nil when the spell is no heal.
+function M.cureRestoreMin(o)
+  local p = o.power or 0
+  if p == 0 or not o.heal then return nil end
+  local d = p * 4 + (((o.magpow or 0) * p * (o.level or 1)) >> 5)
+  d = ((d * 224) >> 8) + 1
+  if ((o.flags2 or 0) & 0x20) == 0 then
+    local mdef = o.mdef or 0
+    d = mdef >= 255 and 1 or ((d * (255 - mdef)) >> 8) + 1
+    if o.shell then d = ((d * 170) >> 8) + 1 end
+  end
+  return math.min(9999, d)
+end
+-- measured this battle, else the ROM's least; and which it was
+function Driver:castRestoreOf(spell, actor, target)
+  if self.castRestore[spell] ~= nil then return self.castRestore[spell], "measured" end
+  if spell == nil or spell > 0xFF or actor == nil then return nil, "no spell" end
+  local base = (M.sym("MagicProp") & 0x3FFFFF) + spell * 14
+  local x, y = actor * 2, (target or actor) * 2
+  local v = M.cureRestoreMin({ power = M.readRomByte(base + 6), flags2 = M.readRomByte(base + 2),
+    heal = (M.readRomByte(base + 4) & 0x01) ~= 0, level = M.readByte(0x3B18 + x),
+    magpow = M.readByte(0x3B41 + x), mdef = M.readByte(0x3BB9 + y),
+    shell = (M.readByte(BATTLE.ST3 + y) & 0x20) ~= 0 })
+  return v, v and "ROM-priced, not yet measured" or "no heal"
+end
+
 function Driver:allyAct()
   if M.ALLY_ATTRIBUTION == false then return nil end
   local e, cmd, atk = nil, nil, nil
@@ -8914,10 +9030,91 @@ function Driver:logBattleLine(menu)
   end
 end
 
+-- The ATB clock and an action's landing (review of bcf5240f, item 5).
+-- The round price asked which enemy gauges fill before a member's gauge
+-- does, but an action lands only after its gauge fills and its command
+-- waits its turn in the queue (and, for a member, the menus).  vector_entry
+-- priced entity 2 (75/619) at "a round costs 0 (0 enemy action(s) inside
+-- 164 ticks [s2 eta 177/248])", 13 ticks of margin, and slot 2's Bolt 2
+-- killed it before its own cure landed.  The clock counts ATB ticks (the
+-- largest whole-tick advance of any gauge running this frame: the gauges
+-- stand still through the animations, so frames are not ticks).  A lag is
+-- the ticks from a gauge filling to its action entering ExecCmd, measured
+-- for the party and for the monsters; the round price compares landings,
+-- so a member's window runs on by the party's median lag less the
+-- monsters' (makePlan: window + self:landLag()).  Measured over the tomb
+-- (K 0..12) and vector_entry's generator (build/attempts/wt/care-policy/
+-- tomb/tomb_r7, chain/vector_r7): the party's 684 actions landed 7..961
+-- ticks after their gauges (median 276, quartiles 131/395), the monsters'
+-- 384 at 0..874 (median 156, quartiles 2/355) -- the queue, not the gauge,
+-- sets when an action lands.  A first cut ran the window to the battle's
+-- LONGEST party lag (tomb_r5): every window took four or five actions of
+-- each slot and the tomb's members SPENT at 1557/1710 against "a round
+-- costs 3984"; kept as a failed attempt.  Before a run has measured both
+-- sides, the default is those medians' difference.
+M.LAND_LAG_DEFAULT = 120      -- 276 - 156: the medians above
+M.landSamples = M.landSamples or { party = {}, mon = {} }
+local function median(t)
+  if #t == 0 then return nil end
+  local c = {}
+  for i, v in ipairs(t) do c[i] = v end
+  table.sort(c)
+  return c[(#c + 1) // 2]
+end
+local function landNote(kind, v)
+  local t = M.landSamples[kind]
+  t[#t + 1] = v
+  if #t > 400 then table.remove(t, 1) end
+end
+function Driver:watchLanding()
+  local adv = 0
+  for x = 0, 18, 2 do
+    local g, c = M.readWord(BATTLE.ATB + x), M.readWord(BATTLE.ATB_CONST + x)
+    local p = self.atbPrev[x]
+    if p ~= nil and c > 0 and c ~= 0xFFFF and (g >> 8) ~= 0 and (p >> 8) ~= 0 and g > p then
+      local t = (g - p) // c
+      if t > adv then adv = t end
+    end
+    self.atbPrev[x] = g
+  end
+  self.atbClock = self.atbClock + adv
+  for x = 0, 18, 2 do
+    local party = x < 8
+    if party or monAlive(x // 2 - 4) then
+      local eta = etaOf(x)
+      local running = party and execActor == x // 2 or (not party and execMon == x // 2 - 4)
+      if eta == 0 and not running and self.fullAt[x] == nil and (not party or M.readWord(0x3BF4 + x) > 0) then
+        self.fullAt[x] = self.atbClock
+      elseif eta ~= 0 and not running then
+        self.fullAt[x] = nil
+      end
+      if running and self.fullAt[x] ~= nil then
+        local lag = self.atbClock - self.fullAt[x]
+        self.fullAt[x] = nil
+        landNote(party and "party" or "mon", lag)
+        M.log(string.format("[%s] [land] %s's action entered ExecCmd %d ATB tick(s) after its gauge "
+          .. "filled (medians this run: party %s, monsters %s)", self.tag or "fight",
+          party and string.format("entity %d", x // 2) or string.format("slot %d", x // 2 - 4), lag,
+          tostring(median(M.landSamples.party)), tostring(median(M.landSamples.mon))))
+      end
+    else
+      self.fullAt[x] = nil
+    end
+  end
+end
+-- how much later than its gauge a member's action lands, against an
+-- enemy's: the party's median lag less the monsters' (never below 0)
+function Driver:landLag()
+  local p, m = median(M.landSamples.party), median(M.landSamples.mon)
+  if p == nil or m == nil then return M.LAND_LAG_DEFAULT end
+  return math.max(0, p - m)
+end
+
 function Driver:frame()
   if self.recovery then recoveryActivate(self.recovery); recoveryFlush() end
   execActivate()
   self.battleTick = self.battleTick + 1
+  self:watchLanding()
   -- The party's HP as the battle opened, for the first-turn danger floor
   -- in makePlan.  Taken a beat after the table goes live so every entity
   -- is written (the f+1 log line already reads every entity); no monster
@@ -9108,6 +9305,10 @@ M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end)
     -- in the fight rather than assumed.  See the policy note in makePlan.
     roundCost = {},                    -- entity -> worst HP lost per own turn
     turnSnap = {},                     -- actor -> party HP at its last turn
+    turnSnapSL = {},                   -- actor -> statusLost (below) at its last turn
+    statusLost = {},                   -- entity -> HP its status landings took (a Zombie touch)
+    atbPrev = {}, atbClock = 0,        -- the ATB clock (Driver:watchLanding)
+    fullAt = {}, landMax = nil, landN = 0,
     roundCheck = {},                   -- actor -> its priced round, checked at its next turn (#312)
     monActN = 0,                       -- monster actions closed this battle (commitMonAct)
     itemRestore = {},                  -- item  -> HP a landed use put back
