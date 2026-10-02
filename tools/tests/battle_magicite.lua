@@ -1128,8 +1128,11 @@ H.run({ maxFrames = 150000 }, {
   H.waitFrames(60),
   H.call(function() pinPool("bootB", POOL) end),
   equipOn(3, SHIVA, 6, "B/celes-shiva"),
+  -- item-only for HP, as the comment at [drain] says: no Tincture or Tent
+  -- (the 15a54c03 chain's n024_entry ships 2 Tinctures, and the care stop
+  -- drank one: "used $EB on char 6: ... 31 -> 81 mp")
   H.fieldCare({ tag = "before battle 72 (boot B)", threshold = 0.95,
-                magic = false }),
+                magic = false, tincture = false, tent = false }),
   enterBoss("bootB"),
   H.call(function()
     -- 7. the re-offer half of once-per-battle: a fresh battle offers the

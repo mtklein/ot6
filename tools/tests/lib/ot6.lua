@@ -4938,8 +4938,18 @@ end
 -- M.statusDrop(was, now, cmd, atk): was/now the victim's STATUS1 byte
 -- before the action and after it, cmd/atk the action.  Pure but for the
 -- ROM read of a spell's power, so battle_healpolicy puts cases through it.
-function M.statusDrop(was, now, cmd, atk)
+-- was2/now2 the victim's STATUS2 byte: a Condemned count running out
+-- (bit 0 cleared, Wound newly set) is the Doom, not whatever monster
+-- action the frame shows -- battle_doom, regenerated at 15a54c03, read
+-- "[death] f+235 entity 1 char 1 from 172/249 by slot 4 cmd $00 atk $EE"
+-- as a 172 hit and priced "s3 2x172 ... s4 1x172 (worst)", so a member at
+-- 241/241 SPENT "inside one round of death (541)".
+function M.statusDrop(was, now, cmd, atk, was2, now2)
   if ((now or 0) & ~(was or 0) & (M.ST1_ZOMBIE | M.ST1_PETRIFY)) ~= 0 then return true end
+  if ((was2 or 0) & 0x01) ~= 0 and ((now2 or 0) & 0x01) == 0
+     and ((now or 0) & ~(was or 0) & 0x80) ~= 0 then
+    return true
+  end
   if cmd == 0x02 and atk ~= nil and atk < 0x100
      and M.readRomByte((M.sym("MagicProp") & 0x3FFFFF) + atk * 14 + 6) == 0 then
     return true
@@ -4947,7 +4957,8 @@ function M.statusDrop(was, now, cmd, atk)
   return false
 end
 local function statusDrop(act, d)
-  return M.statusDrop(act.st1 and act.st1[d.e] or 0, M.readByte(BATTLE.ST1 + d.e * 2), act.cmd, act.atk)
+  return M.statusDrop(act.st1 and act.st1[d.e] or 0, M.readByte(BATTLE.ST1 + d.e * 2), act.cmd, act.atk,
+    act.st2 and act.st2[d.e] or 0, M.readByte(BATTLE.ST2 + d.e * 2))
 end
 M.TYPICAL_MIN = 3   -- actions a slot must have taken before its mean prices anything
 -- a ledger's typical action: the mean, once M.TYPICAL_MIN actions are in
@@ -8827,7 +8838,11 @@ function Driver:watchHits()
                tick = self.battleTick, hp0 = {}, kills = 0, fullKills = 0, drops = {} }
     for e = 0, 3 do self.monAct.hp0[e] = self.partyHpLast[e] or M.readWord(0x3BF4 + e * 2) end
     self.monAct.st1 = {}
-    for e = 0, 3 do self.monAct.st1[e] = M.readByte(BATTLE.ST1 + e * 2) end
+    self.monAct.st2 = {}
+    for e = 0, 3 do
+      self.monAct.st1[e] = M.readByte(BATTLE.ST1 + e * 2)
+      self.monAct.st2[e] = M.readByte(BATTLE.ST2 + e * 2)
+    end
   end
   -- what the action is, as it runs (commitMonAct's typical action): the
   -- party bits of its targets ($B8 low byte: entities 0-3) and the

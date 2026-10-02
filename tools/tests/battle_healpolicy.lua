@@ -1004,6 +1004,10 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(H.statusDrop(0x02, 0x02, 0x00, 0xEF), false,
       "a hit on a member already ZOMBIE is no status landing")
     H.assertEq(H.statusDrop(0x00, 0x40, 0x02, 0x00), true, "PETRIFY newly set is a status landing")
+    H.assertEq(H.statusDrop(0x00, 0x80, 0x00, 0xEE, 0x01, 0x00), true,
+      "a Condemned count running out (Condemned cleared, Wound set) is the Doom, a status landing")
+    H.assertEq(H.statusDrop(0x00, 0x80, 0x00, 0xEE, 0x00, 0x00), false,
+      "a killing blow on a member not Condemned is a hit (censored by the ledger, not dropped)")
     local mp = H.sym("MagicProp") & 0x3FFFFF
     local nopower = nil
     for id = 0, 0x35 do
