@@ -49,3 +49,12 @@ which now chips like Coin Toss and throws once more for each Boost Point.
 A throw or a blow that finds no monster left standing costs nothing,
 and Jackpot stops rolling once no monster is left. The Narshe
 school's skills advisor has two new pages about it.
+**Extra hits move on to another monster when theirs falls.** When a
+boosted Fight or Capture kills its target with swings still to come,
+the rest now go to another monster instead of beating the fallen one.
+The same goes for the second blow of Pummel and Drill, the later blows
+of Bum Rush, and Setzer's extra hires, tosses and Jackpot rolls: the
+Boost Points you spend always land on a monster while one is standing.
+A Coin Toss that fells one monster splits its next toss among the rest.
+Without boost, a Genji Glove's second swing still follows the first, as
+in the original game.

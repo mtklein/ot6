@@ -513,6 +513,29 @@ spliced data bytes. No new RAM.
   end the break loop. (`kits.md` proposes an *Overcharge* passive, "+1
   AutoCrossbow hit per 2 BP", which is a per-character exception a passive
   channel could carry later, and it is out of scope here.)
+- **A pass OT6 added goes to another body when its own has fallen**
+  (`Ot6PassRetarget`, `ot6_passes.asm`; `battle_passretarget`). Every
+  extra pass OT6 buys rides vanilla's one loop (`$3a70`): a boosted Fight
+  or Capture, Pummel, Bum Rush and Drill (`Ot6HitCount`), a dumped Throw,
+  Setzer's Coin Toss, Hired Help and Jackpot and a character's GP Rain, and
+  a Mimic of any of them (it re-runs the copied command's handler). That
+  loop never retargets a later pass whose body fell on the pass before: it
+  sets "don't retarget" ($ba bit 2) on every pass after the first and
+  starts each on the previous pass's targets, so a Fight's remaining
+  swings beat the corpse (Fight's targeting puts an emptied mask back on
+  `$3a4e`) and a hire's or a roll's next pass landed nowhere, the one after
+  retargeting (wt/hire-sprite). Boost paid for hits that never landed while
+  a body still stood. Now, once the action's first pass has run, a pass of
+  an action OT6 added passes to whose targets all fell takes every body on
+  their side (not the side Retarget picks, which turns a muddled actor on
+  its party) and ChooseTarget narrows it as usual: one body for a one-body
+  action, the group for Coin Toss, nothing when no body stands there.
+  Vanilla's own multi-pass actions keep their rules: an unboosted Genji
+  pair's second hand still swings at the body the first hand felled,
+  Offering, Quadra Slam/Slice and the Dragon Horn pick at random every pass
+  ($ba bit 6), and a weapon's follow-up spell keeps its target ($ba bit 3).
+  A group pass that loses a body was never affected: ChooseTarget masks the
+  fallen out, so the next toss splits over the survivors.
 - **SwdTech is already excluded from `Ot6BoostDmg`** because the BP bought the
   tech. Multi-hit does not change that.
 - **Break window caps every curve identically.** Rate (§1.2), duration

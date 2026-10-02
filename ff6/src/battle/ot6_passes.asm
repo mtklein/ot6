@@ -13,20 +13,23 @@
 ; (@31c5).  A pass starts with the previous pass's mask ($3a30, restored at
 ; @3243 and saved by _setupoldtarget), so after a kill the next pass starts
 ; on the dead body: ChooseTarget masks it out, finds bit 2 set and skips
-; Retarget, and the pass lands nowhere.  Its empty mask is saved, so the pass
-; after that starts empty and retargets.  Passes alternate dead / retarget,
-; and half of what a boost bought after a kill hits nothing while a body
-; still stands (wt/hire-sprite: a 3 BP Hired Help on three bodies landed
+; Retarget.  A hire's or a roll's pass then lands nowhere; its empty mask is
+; saved, so the pass after that starts empty and retargets: passes alternate
+; dead / retarget (wt/hire-sprite: a 3 BP Hired Help on three bodies landed
 ; passes 1 and 3, passes 2 and 4 found nothing, and the third body kept its
-; 2,058 HP; build/attempts/wt/hire-sprite/retarget/).
+; 2,058 HP; build/attempts/wt/hire-sprite/retarget/).  A Fight's pass never
+; empties: Fight's targeting ($ba bit 5, CmdTargetTbl) puts an emptied mask
+; back on the backup targets ($3a4e), so every swing after a kill beat the
+; corpse while a body still stood (battle_passretarget, the base ROM).
 ;
-; Vanilla's own multi-pass actions keep their rules: an unboosted two-hand
-; Fight's second hand still swings at nothing after the first hand's kill,
-; Empowerer's second pass stays on its body, and actions that pick at random
-; every pass (Offering, Quadra Slam/Slice, the Dragon Horn's extra jumps:
-; $ba bit 6) or may hit a fallen body (a weapon's follow-up spell: $ba bit
-; 3) never reach this branch with a choice to make.  Only an action OT6
-; added passes to retargets, and only after its first pass.
+; Vanilla's own multi-pass actions keep their rules: an unboosted Genji
+; pair's second hand still swings at the body the first hand felled
+; (measured, battle_passretarget), Empowerer's second pass is vanilla's,
+; and actions that pick at random every pass (Offering, Quadra Slam/Slice,
+; the Dragon Horn's extra jumps: $ba bit 6) or may hit a fallen body (a
+; weapon's follow-up spell: $ba bit 3) never reach this branch with a
+; choice to make.  Only an action OT6 added passes to retargets, and only
+; after its first pass.
 ; ------------------------------------------------------------------------------
 
 .segment "ot6_code"

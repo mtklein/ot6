@@ -50,9 +50,9 @@
 -- with a row in the ROM's Ot6HitCountTbl.  For each of its passes after the
 -- first that starts on monsters while a monster stands (a weapon's
 -- follow-up spell, $b5 = $02, keeps vanilla's "same target" and is not one):
---   A. the pass lands on a body (its mask is not empty);
---   F. on the side its target was on, the monsters (a muddled actor's
---      Retarget would turn on the party);
+--   F. the pass stays on the side its target was on, the monsters (a
+--      muddled actor's Retarget would turn on the party);
+--   A. it lands on a body (its mask is not empty);
 --   D. a pass that starts on a group with a fallen body lands on the
 --      group's survivors: the coins re-split over the bodies left;
 --   B. on standing bodies only;
@@ -77,6 +77,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 PASS_SKIP = PASS_SKIP or 0
 local COIN, HIRE, JACKPOT = 0x59, 0x5A, 0x5B
+local DRILL = 0xA8                     -- the Drill's item id (Ot6HitCountTbl: x2)
 local SETZERROW = 0xEDCD               -- OT6_SETZERROW (ot6_memory.inc)
 local MARK = 0xEDCE                    -- OT6_PASSRETARGET: logged, never asserted
 local TAG = "passretarget"
@@ -158,7 +159,8 @@ local function extended(a)
   return false
 end
 
-local seen = { hire = {}, jackpot = {}, coin = {}, fight = {}, resplit = {}, vanilla = {} }
+local seen = { hire = {}, jackpot = {}, coin = {}, fight = {}, resplit = {}, vanilla = {}, blitz = {}, tool = {},
+  gprain = {} }
 local checked = { acts = 0, passes = 0 }
 local function note(k, key0) seen[k][key0 or "?"] = (seen[k][key0 or "?"] or 0) + 1 end
 
@@ -192,8 +194,9 @@ local function judge(a)
         .. "landed on $%04X)", a.kind, a.e, a.boost, p, #a.passes, a.key or "?", pre, stand, q.post)
       if ext then
         checked.passes = checked.passes + 1
-        H.assertEq(post ~= 0, true, "A: a pass OT6 added lands on a body while one stands -- " .. what)
-        H.assertEq(q.post & 0xFF, 0, "F: on the side its target was on (the monsters) -- " .. what)
+        H.assertEq(q.post & 0xFF, 0, "F: a pass OT6 added stays on the side its target was on (the monsters) -- "
+          .. what)
+        H.assertEq(post ~= 0, true, "A: it lands on a body while one stands -- " .. what)
         if bits(pre) >= 2 and (pre & stand) ~= 0 then
           H.assertEq(post, pre & stand, "D: a group pass lands on the group's survivors -- " .. what)
         end
@@ -430,8 +433,11 @@ local function play()
       if not H.battleLoadStarted() then return "done" end
     end
     if S.F == nil then
-      S.F = H.newFightDriver(TAG .. " fight " .. battles,
-        { tactical = true, boost = true, items = true, bank = 0, healPercent = 55, setzer = false })
+      -- the route's driver, but SABIN's Blitz is Pummel (x2) and EDGAR's
+      -- Tool the Drill (x2) when the bag holds one, whatever the chip model
+      -- would key (keyed = false), so their OT6 passes meet the draws too
+      S.F = H.newFightDriver(TAG .. " fight " .. battles, { tactical = true, boost = true, items = true, bank = 0,
+        healPercent = 55, setzer = false, keyed = false, tool = DRILL })
     end
     judgeNew()
     if not H.battleLoadStarted() then return "done" end
@@ -472,7 +478,7 @@ H.run({ maxFrames = 2400000 }, {
   H.call(function()
     judgeNew()
     local t = {}
-    for _, k in ipairs({ "hire", "jackpot", "coin", "fight", "resplit", "vanilla" }) do
+    for _, k in ipairs({ "hire", "jackpot", "coin", "fight", "resplit", "blitz", "tool", "vanilla" }) do
       local n, d = 0, 0
       for _, c in pairs(seen[k]) do n, d = n + c, d + 1 end
       t[#t + 1] = string.format("%s %d pass(es) over %d distinct key(s)", k, n, d)
