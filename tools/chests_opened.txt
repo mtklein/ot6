@@ -91,6 +91,7 @@
 158	map 300 Darill's Tomb B3, Czarina Gown (43,60)
 159	map 300 Darill's Tomb B3, Exp. Egg (55,58)
 160	map 300 Darill's Tomb B3, Man Eater (124,9)
+161	map 300 Darill's Tomb B3, the monster chest (Presenter + Whelk Head, event battle group 116) (120,9)
 230	map 74 South Figaro (World of Ruin; bit shared with map 75's Soft), Elixir (2,43)
 231	map 75 South Figaro, Warp Stone (11,23)
 239	map 225 Zozo clock shelf, Tincture (104,9)
