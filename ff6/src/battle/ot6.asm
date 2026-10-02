@@ -57,3 +57,7 @@
 ; multi-hit hit counts, appended after the block above rather than inserted
 ; into it, so no existing symbol in bank $f0 moves.
         .include "ot6_hitcount.asm"
+
+; setzer's kit (his table behind Slot, Coin Toss, Hired Help, Jackpot),
+; appended for the same reason: nothing already in bank $f0 moves.
+        .include "ot6_setzer.asm"

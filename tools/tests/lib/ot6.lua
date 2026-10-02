@@ -4813,6 +4813,114 @@ function Driver:pressTarget()
   return soleTarget()
 end
 
+-- ---- SETZER's table (#319, #353) ---------------------------------------
+-- The Slot row opens a list behind it (ot6_setzer.asm, kits.md "Setzer"):
+-- Slot (the reels), Coin Toss (level x 30 gil at every enemy, special),
+-- Hired Help (level x 50 gil, one enemy, the class its row names first
+-- among slashing / piercing / bludgeoning) and Jackpot (99 MP, once a
+-- battle, a dice triple whose face the boost floors).  The row ids are the
+-- list's wItemList ids.  M.setzerGil / M.setzerJackpot are the ROM's
+-- arithmetic, for the policy below and for the suites that check it.
+BATTLE.SETZER = { COIN = 0x59, HIRE = 0x5A, JACKPOT = 0x5B, SLOT = 0x5C }
+BATTLE.SETZER_FLOOR = { [0] = 1, 3, 5, 6 }      -- Jackpot's lowest face per point
+function M.setzerGil(level, rate, boost)
+  return level * rate * (1 << (boost or 0))
+end
+function M.setzerJackpot(face, level)
+  return math.min(65535, face * face * face * level * 2 * face)
+end
+
+-- Which of SETZER's lines pays this turn, or nil (the lines below it: the
+-- keyed Fight, the plain boost-Fight).  An informed policy, and what it
+-- reads: the target's HP, shields and Broken timer, the classes the HUD
+-- has revealed on each monster (the keyed line's own rule: an unrevealed
+-- axis holds no key), the party's gil, SETZER's MP and bank, whether his
+-- Jackpot is spent (OT6_DIVINE_USED) and learned (event switch $00CA), and
+-- whether this is a random battle (OT6_RANDBTL).
+--   Jackpot: a target with at least o.jackpotHp HP (4000), at the smallest
+--     boost whose lowest face reaches min(HP, 9999) after the shields'
+--     halving (or the Broken double); held while the bank is short of it.
+--   Slot at 3 BP in a random battle against two or more: a chosen triple,
+--     whatever reel 1 stops on (ot6_slot.asm), never a miss.
+--   Coin Toss when it chips two or more bodies (revealed special on each
+--     living, shielded, unbroken monster).
+--   Hired Help when the target is shielded and unbroken, its revealed row
+--     holds a physical class, and SETZER's own Fight keys none of it.
+-- Gil is spent only above o.gilFloor (20,000: a town's shopping kept back).
+-- opts.setzer = false turns all of it off; a table overrides the numbers
+-- (jackpot/slot/coin/hire = false drop one line).
+function Driver:setzerLine(actor, have)
+  local o = self.opts.setzer
+  if o == false or M.readByte(BATTLE.BCHID + actor * 2) ~= 9 then return nil end
+  o = type(o) == "table" and o or {}
+  local row = cmdRow(actor, BATTLE.CMD_SLOT)
+  if row == nil or self.skillDead[BATTLE.CMD_SLOT] then return nil end
+  local e = actor * 2
+  local level = M.readByte(0x3B18 + e)
+  local mp = M.readWord(BATTLE.CURMP + e)
+  local gil = M.readWord(0x1860) + M.readByte(0x1862) * 65536
+  local floorGil = o.gilFloor or 20000
+  local tag = self.tag or "fight"
+  local slot = self:pressTarget()
+  if slot == nil then for s = 0, 5 do if monAlive(s) then slot = s; break end end end
+  if slot == nil then return nil end
+  local sh = M.readByte(BATTLE.SH_CUR + slot * 2)
+  local broken = M.readByte(BATTLE.BRK_TICKS + slot * 2) ~= 0
+  -- Jackpot
+  local learned = (M.readByte(0x1E99) & 0x04) ~= 0
+  local spent = (M.readByte(0x3ECB) & M.readByte(0x3018 + e)) ~= 0
+  local hp = M.readWord(BATTLE.MON_HP + slot * 2)
+  if o.jackpot ~= false and learned and not spent and mp >= 99 and hp >= (o.jackpotHp or 4000) then
+    local need = math.min(hp, 9999)
+    local want = 3
+    for b = 0, 3 do
+      local d = M.setzerJackpot(BATTLE.SETZER_FLOOR[b], level)
+      if broken then d = d * 2 elseif sh > 0 then d = d // 2 end
+      if d >= need then want = b; break end
+    end
+    if want <= math.min(have, 3) then
+      M.log(string.format("[%s] actor=%d SETZER Jackpot on slot %d (%d HP, %d shield(s)%s) at %d BP "
+        .. "(lowest face %d), 99 MP of %d", tag, actor, slot, hp, sh, broken and ", Broken" or "",
+        want, BATTLE.SETZER_FLOOR[want], mp))
+      return { kind = "skill", cmd = BATTLE.CMD_SLOT, skill = BATTLE.SETZER.JACKPOT, row = row,
+               boostLeft = want, aim = slot, reason = "jackpot" }
+    end
+  end
+  -- Slot at 3 BP in a random battle
+  if o.slot ~= false and have >= 3 and M.readByte(M.RANDBTL) ~= 0 and livingMonsters() >= 2 then
+    M.log(string.format("[%s] actor=%d SETZER Slot at 3 BP: a chosen triple against %d", tag, actor,
+      livingMonsters()))
+    return { kind = "slot", row = row, skill = BATTLE.SETZER.SLOT, boostLeft = 3, reason = "slot" }
+  end
+  -- Coin Toss
+  local coinPrice = M.setzerGil(level, 30, 0)
+  if o.coin ~= false and gil - coinPrice >= floorGil then
+    local n = 0
+    for s = 0, 5 do
+      if monAlive(s) and M.readByte(BATTLE.SH_CUR + s * 2) > 0
+         and M.readByte(BATTLE.BRK_TICKS + s * 2) == 0 then
+        n = n + hitChips(s, 0x08, 0)
+      end
+    end
+    if n >= 2 then
+      M.log(string.format("[%s] actor=%d SETZER Coin Toss: %d gil of %d, special chips %d bodies",
+        tag, actor, coinPrice, gil, n))
+      return { kind = "skill", cmd = BATTLE.CMD_SLOT, skill = BATTLE.SETZER.COIN, row = row,
+               boostLeft = 0, reason = "coin" }
+    end
+  end
+  -- Hired Help
+  local hirePrice = M.setzerGil(level, 50, 0)
+  if o.hire ~= false and gil - hirePrice >= floorGil and sh > 0 and not broken
+     and hitChips(slot, 0x07, 0) > 0 and fightChips(actor, slot, have) == 0 then
+    M.log(string.format("[%s] actor=%d SETZER Hired Help on slot %d: %d gil of %d; his Fight keys "
+      .. "nothing there", tag, actor, slot, hirePrice, gil))
+    return { kind = "skill", cmd = BATTLE.CMD_SLOT, skill = BATTLE.SETZER.HIRE, row = row,
+             boostLeft = 0, aim = slot, reason = "hire" }
+  end
+  return nil
+end
+
 function Driver:dmgWatchOf(e)
   for i, w in ipairs(self.dmgWatch) do if w.actor == e then return i, w end end
   return nil
@@ -6266,7 +6374,13 @@ function Driver:makePlan(actor)
   -- so Slot is free at every level ("Slot would join them, but Slot is
   -- unpriced today", mp-economy.md).  Nothing to step down.
   if self.opts.slot and id == 9 and not self.skillDead[BATTLE.CMD_SLOT] and cmdRow(actor, BATTLE.CMD_SLOT) then
-    return { kind = "slot", row = cmdRow(actor, BATTLE.CMD_SLOT), boostLeft = boost }
+    return { kind = "slot", row = cmdRow(actor, BATTLE.CMD_SLOT), skill = BATTLE.SETZER.SLOT,
+             boostLeft = boost }
+  end
+  -- SETZER's table, when a row of it pays (#353; Driver:setzerLine)
+  if id == 9 then
+    local line = self:setzerLine(actor, have)
+    if line then return line end
   end
   if self.opts.bushido and id == 2 and not self.skillDead[BATTLE.CMD_SWDTECH]
      and cmdRow(actor, BATTLE.CMD_SWDTECH) and have >= 1
@@ -6997,8 +7111,25 @@ function Driver:button(actor)
     if cc ~= wc then return { wc > cc and "right" or "left" } end
     return { wr > cr and "down" or "up" }
   end
-  if (st == BATTLE.ST_TOOLS_OPEN or st == BATTLE.ST_TOOLS_CLOSE) and self.plan.kind == "skill" then
+  if (st == BATTLE.ST_TOOLS_OPEN or st == BATTLE.ST_TOOLS_CLOSE)
+     and (self.plan.kind == "skill" or self.plan.kind == "slot") then
     return nil                       -- the shell is building / closing; wait
+  end
+  -- SETZER's Slot row (ot6_setzer.asm): the Slot command opens his table,
+  -- whose first row closes it and opens the reels ($30 -> $01 -> $06 ...
+  -- -> $08), where the reel state below spins.  Another Slot user's reels
+  -- open straight away and never reach here.
+  if st == BATTLE.ST_TOOLS and self.plan.kind == "slot" then
+    local want
+    for i = 0, 7 do
+      if M.readByte(BATTLE.ITEMLIST + i * 3) == BATTLE.SETZER.SLOT then want = i; break end
+    end
+    if want == nil then self:dropPlan("slot_row_missing"); return { "b" } end
+    local wc, wr = want % 2, want // 2
+    local cc, cr = M.readByte(BATTLE.BLCOL + actor), M.readByte(BATTLE.BLROW + actor)
+    if cc ~= wc then return { wc > cc and "right" or "left" } end
+    if cr ~= wr then return { wr > cr and "down" or "up" } end
+    return { "a" }
   end
   if st == BATTLE.ST_TOOLS and self.plan.kind == "skill" then
     local noTarget = self.plan.cmd == BATTLE.CMD_BLITZ or self.plan.cmd == BATTLE.CMD_SWDTECH

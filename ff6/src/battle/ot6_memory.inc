@@ -411,5 +411,15 @@ OT6_SHPEND           := $edcc
 .assert OT6_SHPEND = OT6_SHWANT + 6, error, "shield-tile pending mask must follow want without overlap"
 .assert OT6_SHPEND <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
+; the row of Setzer's table the executing Slot-command action is (ot6_setzer.asm):
+; Coin Toss, Hired Help or Jackpot's id, or 0 for a reel spin.  Ot6SetzerExec
+; writes it at the head of every command-$0f action, before anything reads it,
+; and the two readers (Ot6CoinPrice, Ot6JackpotDice) consult it only while the
+; queued command ($3a7c) is $0f, so a stale byte is never read and InitBP
+; need not clear it.
+OT6_SETZERROW        := $edcd
+.assert OT6_SETZERROW = OT6_SHPEND + 1, error, "setzer's row must follow the shield-tile mask without a gap"
+.assert OT6_SETZERROW <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
 
 .endif

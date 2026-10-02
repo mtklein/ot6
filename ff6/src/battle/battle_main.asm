@@ -3742,6 +3742,13 @@ _1720:  sta     $b6
 ; [ command $0f: slot ]
 
 Cmd_0f:
+        jsl     Ot6SetzerExec   ; ot6: Slot is the first row of Setzer's table;
+        bcc     @1726           ;   a Coin Toss, Hired Help or Jackpot row
+        tyx                     ;   rode in as $b6.  carry set = one of them,
+        jsr     _c2298d         ;   A = the command whose targeting it takes:
+        jsl     Ot6SetzerEffect ;   InitTarget as that, then its props and
+        sta     $11a9           ;   its attacker effect (GP Rain's coins or
+        jmp     ExecAttack      ;   the dice), and attack.  ot6_setzer.asm
 @1726:  lda     #$10
         trb     $b0
         lda     $b6
@@ -10682,10 +10689,11 @@ _3fb6:  rts
 ; [ attacker special effect $51: gp rain ]
 
 AttackerEffect_51:
-@3fb7:  lda     $3b18,y
-        xba
-        lda     #$1e
-        jsr     MultAB
+@3fb7:  jsl     Ot6CoinPrice    ; ot6: was level x 30 (lda $3b18,y / xba /
+                                ;   lda #$1e / jsr MultAB): the same for a
+                                ;   monster; a character's coins double per
+                                ;   boost point, Hired Help pays level x 50,
+                                ;   and the coins' break class is set
         longa
         cpy     #$08
         bcs     @3fd3
@@ -10993,6 +11001,9 @@ AttackerEffect_29:
 ; [ attacker special effect $09: dice/fixed dice ]
 
 AttackerEffect_09:
+        jsl     Ot6JackpotDice  ; ot6: Setzer's Jackpot throws a fixed triple
+        bcc     @4158           ;   (carry set: done, damage and dice set)
+        rts
 @4158:  stz     $3414       ; disable damage modification
         lda     #$20
         tsb     $11a4       ; can't dodge
@@ -13045,6 +13056,8 @@ FixPlayerAttack:
         xba
 @4db4:  cmp     #$0f
         bne     @4ddb       ; branch if not slot
+        jsl     Ot6SlotKitRow   ; ot6: a row of Setzer's table is no reel
+        bcs     @4ddb           ;   result: keep its id (carry set)
         pha
         xba
         tax

@@ -28,6 +28,13 @@ CODE_EXT_INC = 1
                                            ;   stored-tier charge at commit
 .global Ot6ThiefListOpen         ; #55 locke's kit: steal -> tools-shell submenu
 .global Ot6ThiefExec             ;   Cmd_05's execute-side dispatch (filch/bestow)
+.global Ot6SetzerListOpen        ; setzer's kit: slot -> tools-shell table
+.global Ot6SetzerConfirm         ;   the Slot row chains to the reels
+.global Ot6SetzerExec            ;   Cmd_0f's dispatch (coin toss/hired help/jackpot)
+.global Ot6SetzerEffect          ;   the row's attack props + special effect
+.global Ot6SlotKitRow            ;   FixPlayerAttack: a kit row maps to no reel
+.global Ot6CoinPrice             ;   GP Rain's gil: rate x level x 2^boost, + class
+.global Ot6JackpotDice           ;   the dice effect's Jackpot arm: a fixed triple
 .global Ot6BlitzListOpen         ; v0.3 blitz-as-menu: _c1776b -> tools shell
 .global Ot6BushidoListOpen       ; v0.5 bushido submenu (#8): swdtech -> tools shell
 .global Ot6BushidoConfirm        ;   confirm shim: row r -> boost r + commit tech

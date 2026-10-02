@@ -532,6 +532,83 @@ ice/order/tempo. The pairing is clearer here than in vanilla.
   reaction (reflect as well as absorb) and takes duration from boost
   like any other reactive verb.
 
+### Setzer — Gambler/Merchant (special ¤: cards, dice; darts = piercing)
+
+Slot ✦ is the signature; Coin Toss and Hired Help carry the merchant house
+(paid in gil, not MP); the divine is **Jackpot**, a Fixed-Dice triple
+payoff, never Slot itself ✦. His cards, Trump and Dice chip ¤ on Fight;
+the Fixed Dice are null-break (large numbers, no chip, row ignored, vanilla
+behaviour preserved ✦). Decisions below were made as the TLM's delegate
+for #319 (2026-10-02), each with its reason.
+
+| # | Ability | Price | Chip | Boost buys | Source |
+|---|---|---|---|---|---|
+| 1 | Slot ✦ | free | the reel's attack | the rig's certainty (see Steal's ladder; `ot6_slot.asm`) | join |
+| 2 | Coin Toss | level × 30 gil | ¤, one per body (every enemy) | twice the coins per point: the gil and the damage both ×2/×4/×8 | join |
+| 3 | Hired Help | level × 50 gil | the target's own physical class (slashing, else piercing, else bludgeoning), one | the same: twice the fee and the hit per point | join |
+| 4 | **Jackpot** (divine) | 99 MP, once a battle | null-break | the dice's face: any at 0, 3+ at 1, 5+ at 2, sixes at 3 | his World of Ruin return (Kohlingen, switch `$00CA`) |
+
+**The table behind Slot.** Setzer's rows are FIGHT, SLOT, MAGIC, ITEM and
+the menu is four rows, so like Locke he has no spare slot, and his third
+row is the Magic an Esper gives him. The ladder goes behind the row he has:
+`OpenCmdMenuTbl[$0f]` opens a Tools-shell list (mode `$6168 = 4`) whose
+first row is Slot itself; Slot's row closes the list and opens the reels
+exactly as the command window did, so the reels, their boost ladder and
+their charge are unchanged. *Reason: Locke's thief list is the precedent,
+and it keeps Magic.* A Coin Toss relic still turns Slot into GP Rain (no
+table), as a Thief Glove turns Steal into Capture; a Gogo with Slot gets
+the reels straight away (the table is Setzer's job). The row ids are the
+last AttackName pad slots: Coin Toss `$59`, Hired Help `$5a`, Jackpot
+`$5b`, Slot `$5c` (Slot never queues, and `$5c` is the id Ot6Oblivion keys
+Cleave on). `ot6_setzer.asm` has the machinery.
+
+**Coin Toss is GP Rain as a kit row.** It runs vanilla's GP Rain effect:
+it takes level × 30 gil and deals twice that, ignoring defense, split over
+the targets (the enemy side). *Reason: the relic named Coin Toss already
+is this verb in FF6; the kit row makes it Setzer's own without a relic
+slot.* Coins are ¤, like his cards and dice, so it chips one shield on each
+body whose row holds ¤: the wide ¤ key the guideline asks for ("Special is
+a common key"). **Boost pays once, in coins**: the damage is the gil, so a
+point throws twice the coins, and the bigger price and the bigger hit are
+one purchase (×2 per point, not MP's ×2.5, because the coins are the
+damage). The same rule now applies to the Coin Toss relic's GP Rain, whose
+boost used to buy nothing (Ot6BoostDmg's multiplier runs before GP Rain's
+effect overwrites the damage).
+
+**Hired Help is a sellsword whose weapon fits the target.** One enemy, the
+same coin arithmetic at level × 50 gil (twice the fee as damage), and its
+break class is the first physical class in the target's weakness row
+(slashing, then piercing, then bludgeoning); a target with none takes an
+unkeyed hit. *Reason: the merchant buys the key the party lacks; it is
+priced in the resource a WoR party has a lot of, but a player feels
+(about 1,550 gil a hire at L31; 12,400 at three points), and it is one
+chip a turn, never ¤ (that is Coin Toss's and the cards').* It reveals the
+class it chips, as any chip does.
+
+**Jackpot (divine): the Fixed Dice come up a triple.** One enemy, by
+vanilla's dice arithmetic: face³ × level × 2 for the three dice, times the
+face again for the triple (so 62 at a triple of ones and the 9,999 cap from
+fours up at L31). Null-break: the Fixed Dice are the outliers, so it chips
+nothing and ignores the row. **Boost buys the face**, the chance-verb canon
+(each point narrows the gamble, three remove it): the lowest face is 1 / 3 /
+5 / 6 at 0 / 1 / 2 / 3 points. Nothing else is bought: no multiplier (cmd
+`$0f` is in Ot6BoostDmg's gate) and the MP is flat. **Price 99 MP, once a
+battle** (`OT6_DIVINE_USED`): 99 is the shared ultimate ceiling, and the
+once-a-battle flag (Cleave's and Assassinate's) keeps a 9,999 hit a boss
+answer rather than a loop (33% of his L31 pool, above the baseline's band:
+the cap is the reason, and once a battle bounds it). **Learned on his World
+of Ruin return** (switch `$00CA`, set when he rejoins in Kohlingen's inn).
+*Reason: divines come by story, and his arc is the tomb and the Falcon; in
+the WoB his L16-25 Jackpot would be a 9,999 hit against bosses of 5-10k HP,
+so it waits for the WoR, where it makes him a recruit that matters at once.*
+
+**Prices.** Slot stays free. Coin Toss and Hired Help cost gil only (the
+row draws no MP; it greys and is refused when the purse cannot pay the
+price at the pending boost, `Ot6SetzerRowGrey`, the same grey the confirm
+reads). Jackpot greys for MP or once spent. One authority each:
+`Ot6SetzerCost` (MP, flat, Ot6AbilityCost's `@slot` arm) and `Ot6CoinGil`
+(gil). Tests: `battle_cointoss`, `battle_hiredhelp`, `battle_jackpot`.
+
 ---
 
 ## Sketches (join order, WoB)
@@ -542,12 +619,7 @@ ice/order/tempo. The pairing is clearer here than in vanilla.
   dies -- and so does a hit of his on an enemy someone else already
   Broke. A boss is only Broken, and the divine is kept for a body it can
   kill (owner ruling, #239). Interceptor is a passive.
-- **Setzer — Gambler/Merchant (special ¤: dice, cards; darts =
-  piercing)**: Slot ✦ signature; Coin Toss, Hired Help (pay GP for
-  effects) carry the merchant house; divine **Jackpot**, a
-  Fixed-Dice triple payoff, never Slot itself ✦. Ordinary dice and
-  cards chip ¤; the outliers (Fixed Dice) are null-break: large
-  numbers, no chip, row ignored (vanilla behaviour, preserved ✦).
+- **Setzer — Gambler/Merchant**: built; see "Setzer" above (#319).
 - **Mog — Dancer (piercing: spear)**: the 8 Dances verbatim ✦,
   learned by dancing on each terrain ✦; divine **Water Rondo**, kept
   WoB-missable, vanilla-style. This kit needs no further design work.
