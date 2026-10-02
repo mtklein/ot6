@@ -57,6 +57,34 @@
 
 ; ------------------------------------------------------------------------------
 
+; [ the action's last pass is done: its mark goes ]
+
+; jsl from ExecAttack's tail where `dec $3a70 / bmi` finds no pass left.
+; The mark is the action's, and ChooseTarget is also called between
+; actions with $3a70 at 0 and $3a30 left over: CalcCmdDelay's, as a muddled,
+; zombied or monster actor's action is queued with no target yet (`lda #$04
+; / trb $ba` there, then ChooseTarget).  A mark left standing until the next
+; ExecCmd's InitGfxScript read such a call as a later OT6 pass and gave it
+; the monster side -- measured on battle_cointoss: a Defend queued after a
+; 1 BP Coin Toss reached this hook with the toss's mark (`Ot6PassRetarget
+; x=00 mark=1 $3a70=255 $3a30=0700`), RandBit drew a target for it, the
+; battle's draws moved, and the suite went red on its second toss
+; (build/attempts/wt/pass-retarget/round2/cointoss/).  Preserves every
+; register and flag.  Any width.
+.proc Ot6PassesDone
+        php
+        sep     #$20
+        .a8
+        pha
+        lda     #$00
+        sta     f:$7e0000+OT6_PASSRETARGET
+        pla
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ ChooseTarget's empty mask: retarget it, and where? ]
 
 ; jsl from ChooseTarget where its mask has come out empty (@58b3), replacing

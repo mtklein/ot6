@@ -8451,8 +8451,12 @@ ExecAttack:
         sta     $3416
 @3288:  plx                 ; next attack
         dec     $3a70
-        bmi     @3291
+        bmi     @ot6last
         pea     ExecAttack-1
+        rts
+@ot6last:
+        jsl     Ot6PassesDone   ; ot6: the last pass is done, and the passes
+                                ;   OT6 added with it (ot6_passes.asm)
 @3291:  rts
 
 ; ------------------------------------------------------------------------------
