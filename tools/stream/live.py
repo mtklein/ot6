@@ -1483,6 +1483,9 @@ def place(n, port, who=None):
                    if not m.get("curve") else "no room figure")
             print(f"  {m['name']}: {why}")
             continue
+        if "settling" in m:    # back from sleep: no room until it stays up
+            print(f"  {m['name']}: room 0 (settling, {m['settling']} s more)")
+            continue
         held = "".join(f" - {k.replace('_', ' ')} {m[k]}"
                        for k in ("claimed", "reserve", "owner_load") if k in m)
         cv = " ".join(f"{k}:{v[0]:.2f}" for k, v in m["curve"].items())
