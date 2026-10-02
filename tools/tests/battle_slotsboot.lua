@@ -153,7 +153,8 @@ end
 -- Candy x4 (80/256), Iron Fist x2 + Mind Candy x2 (96/256).  Only one
 -- slot in 80/256 suits, so the old budget of six draws missed it in 15%
 -- of counter states, and the v0.24 re-cut's counter is one of them: its
--- draws 1-6 were slots 3,3,2,4,4,2 (build/attempts/wt/slotsboot-v024/).
+-- draws 1-6 are slots 3,3,2,4,4,2 and its first suitable one is draw 10
+-- (build/attempts/wt/slotsboot-v024/worstcase.txt, runs/new_k0_s0.log.gz).
 -- The budget is now the most encounters ANY counter state needs to deal a
 -- suitable slot (H.worstCaseEncounters, decoded at run time from the
 -- group CheckBattleWorld rolls), and this save's own counter says where
@@ -161,8 +162,9 @@ end
 -- word the counter chose, which pins it).
 --
 -- The budget holds only while every encounter rolls from the one pool.
--- The old walk drifted south and east by the clock and crossed into the
--- forest (group 11) and other pools, so the walk now paces a stretch of
+-- The old walk turned by the clock and drifted south, into the forest
+-- (group 11: the v0.24 qual's first draw was its word $0062) and once into
+-- a town (runs/new1_mut_oldwalk.log.gz), so the walk now paces a stretch of
 -- the disembark row whose every tile rolls one group, whatever the saved
 -- position (planPace, as battle_steal's desert), and each battle asserts
 -- the group its CheckBattleWorld rolled and the word the counter chose.
