@@ -12,15 +12,15 @@
     }
   },
   "size": 32768,
-  "sha256": "e53d707b94dfc4b470cba068c0e1359f8a656972291fb75bdf37112ed1d63ca4",
+  "sha256": "68982318e157615d885c539b5de9b3018f21cc8300bcba20902137ec6ef5f9e3",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "e53d707b94dfc4b470cba068c0e1359f8a656972291fb75bdf37112ed1d63ca4",
-    "generator_sig": "844f907758f80e45e3a84154419c4115651f96e4e52988e3074b06077551ad60 gen_edgar",
+    "payload_sha256": "68982318e157615d885c539b5de9b3018f21cc8300bcba20902137ec6ef5f9e3",
+    "generator_sig": "8bd251b31bfb0730abe0307ec8d87504044fbc308b9cb2b58af680520e9cfe6c gen_edgar",
     "ancestors": [
       {
         "path": "build/states/chain_figaro_entry.stamp",
-        "sha256": "2cbd91eba948c6369cc183e13f75e188405a57784da9b30ac1f4c5abd30ceab7"
+        "sha256": "678bef51240b9b2c43bd2bd8647a1790a858130987ad455d0ef564cc8660e31a"
       }
     ]
   }
