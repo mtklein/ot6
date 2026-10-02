@@ -2194,6 +2194,53 @@ and the Falcon leg keeps its Jackpots and hires (`fal_pol_s0: ... deaths 1
 Help': 1}`, `fal_pol_s23: ... deaths 0 ... gil 247857 -> 246457`).  Two
 seeds an arm is a direction, not a rate.
 
+### 13.13 Dullahan on the final kit, by distinct battle key (round 3)
+
+ROM `049ee079d85e` (Coin Toss buys tosses, a pass with no body pays
+nothing, Jackpot's rejection draw), the grave frame `wor_grave`, the
+policy arm (`{ runic = true }`) and the control (`{ runic = true, setzer =
+false }`) over the same entries; `build/attempts/wt/kit-setzer/labs-r3/`.
+A fight is fixed by its battle key (the in-battle seed shift only moves the
+entry frame, so shifts 0 / 7 / 13 met keys the waits already met), so the
+16 runs an arm are 8 distinct keys, and `dull_perkey.txt` sets the arms
+side by side a key:
+
+| key | policy ticks | SETZER (policy) | control ticks | SETZER (control) |
+|---|---|---|---|---|
+| be0C | 4,015 | 86%, Hired Help 1, Jackpot 1, the kill | 6,893 | 26% |
+| be1C | 6,186 | 68%, Hired Help 2, Jackpot 1 | 9,615 | 8% |
+| be3C | 6,454 | 54%, Hired Help 2, Jackpot 1 | 6,814 | 26% |
+| be5C | 9,542 | 18%, Jackpot 1 | 6,024 | 25% |
+| be7C | 9,179 | 56%, Hired Help 1, Jackpot 1, the kill | 6,704 | 12% |
+| be9C | 7,483 | 70%, Hired Help 1, Jackpot 1, the kill | 6,119 | 30% |
+| beBC | 5,705 | 73%, Hired Help 2, Jackpot 1 | 8,728 | 8% |
+| beDC | 5,340 | 73%, Hired Help 2, Jackpot 1 | 6,416 | 17% |
+
+(`be0C-g01C7 | policy 4015t SETZER actions 2 ($15A:1 $15B:1), damage 20218
+(86%), chips 1, breaks 0, kills 1`; `| control 6893t SETZER actions 4
+($00:4), damage 6109 (26%), chips 4, breaks 1, kills 0`.)  Both arms win
+every fight (`groups won in every run: 8 of 8`) with no death and no Fenix
+Down.  With his table SETZER deals a median 69% a key against 21% without
+it, and the fight is shorter at 5 keys of 8 (53,904 ticks over the 8
+against 57,313).  The cost is Potions: `potions spent 55 over 16 runs`
+against `potions spent 20 over 16 runs` (run-weighted; by key, 19 against
+12), most of it at be5C and be7C, the two keys where the policy fight ran
+longer.  His Fight's own breaks go (6 against 10 in the run-weighted
+credit): the Jackpot is null-break and the hires chip what his Fight does
+not key.
+
+**What the Falcon leg spends in gil** with the gil rows kept to event
+battles: `gen_wor_falcon` from `wor-tomb-v1`, policy and control at four
+in-battle seeds, every fall of the purse logged (`labs-r3/gm3_summary.txt`,
+`gilwatch.lua`; the falls to 0 and back are the generator's save and
+reload, not spending).  Seeds 0 and 13 spend nothing (`fal_pol_s0: ...
+gil 247857 -> 251107`, the control's own end; seed 0's one planned hire,
+in the chest, never ran: the battle ended, `killed s0:$101`, before
+SETZER's turn came); seeds 7 and 23 spend 4,650 gil, three hires at 1,550 in Dullahan
+(`[gilwatch] f12550 gil 251107 -> 249557 (-1550)`, `[gilwatch] f13963 gil
+249557 -> 246457 (-3100)`; `fal_pol_s7: ... gil 247857 -> 246457`), under
+2% of a purse of 247,857.  No random battle spends gil in any of the eight.
+
 ## 14. What the owner may want to decide
 
 - **The draft rows** (section 8): decided, approved as written (owner,

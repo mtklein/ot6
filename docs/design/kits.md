@@ -631,7 +631,18 @@ shield state; playtesting tunes the power.* What one roll lands:
 so a throw's mean is (1 + boost) times the roll's, and the spread is the
 sum of 1 + boost independent rolls (the lab in
 `build/attempts/wt/kit-setzer/jackpot-dist/` measures the faces and what
-each lands, and tabulates the throws per boost). Nothing else is bought:
+each lands, and tabulates the throws per boost). The odds are even by
+construction: the battle Rand walks a 256-byte table that holds every byte
+once, so its 252 draws below 252 give each face 42. Measured in play
+(`build/attempts/wt/kit-setzer/labs-r3/`, round 3): a fight, dice
+included, is fixed by its battle key and the inputs, and from the grave
+the key takes 16 values, so runs repeat throws and the labs count each
+distinct throw once. Played throws at 3 BP, the fight varied by 15 keys and
+six in-battle stands: 30 distinct throws of 96, 120 rolls, faces 1-6
+14 / 24 / 19 / 27 / 19 / 17, chi2 5.6 (5 df; 11.07 is p = .05). The
+earlier fault-injected lab's 3-BP fives (34 of 320, chi2 14.0) were in
+part repeats: 64 distinct throws of 80, 256 rolls, 43 / 54 / 50 / 36 / 30
+/ 43, chi2 9.1. Nothing else is bought:
 no multiplier (cmd `$0f` is in Ot6BoostDmg's gate) and the MP is flat.
 (Two earlier curves were set aside the same day: a floor the boost raised
 to certain sixes at 3 BP, then a floor of 1 / 2 / 3 / 4 with even odds
