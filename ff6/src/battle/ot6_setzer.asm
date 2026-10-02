@@ -768,8 +768,8 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ;
 ; entry: a8/i16, db=$7e, ($76) the script command, ($78) its parameters.
 
-OT6_HIRE_WALK  = 16             ; frames a walk takes
-OT6_HIRE_STEP  = 6              ; pixels a frame (96: past the right edge)
+OT6_HIRE_OFF   = 96             ; pixels past home that a slot waits: off screen
+OT6_HIRE_STEP  = 8              ; pixels a walking frame (12 frames a walk)
 
 ; the figures' battle graphics (CHAR_GFX)
 Ot6HireGfxTbl:
@@ -813,14 +813,28 @@ Ot6HireWeapTbl:
         asl
         asl
         tax                     ; X = the slot's wCharGfxData offset
+        lda     $61d4,x         ; home: where Setzer stood (the first pass),
+        pha                     ;   [1,s] home, [3,s] the mark
         shorta0
-        lda     $01,s
+        lda     $03,s
         lsr
-        bcc     :+              ; not the first pass: Setzer is already out
-        lda     #$03            ; walking right: Setzer steps out
-        ldy     #OT6_HIRE_STEP
+        bcs     @first
+        longa                   ; a later pass: the slot waits off screen,
+        lda     $01,s           ;   so home is OT6_HIRE_OFF back from it
+        sec
+        sbc     #OT6_HIRE_OFF
+        sta     $01,s
+        shorta0
+        bra     :+
+@first: longa                   ; the first: Setzer steps out
+        lda     $01,s
+        clc
+        adc     #OT6_HIRE_OFF
+        tay
+        shorta0
+        lda     #$03            ; walking right
         jsr     Ot6HireWalk
-:       lda     $01,s
+:       lda     $03,s
         and     #$70
         cmp     #$40
         beq     @dog
@@ -833,9 +847,12 @@ Ot6HireWeapTbl:
         lda     f:Ot6HireGfxTbl,x
         plx
         jsr     Ot6HireSwap     ; the figure, off screen
-        pha                     ; [1,s] the slot's own graphics, [2,s] the mark
+        pha                     ; [1,s] the slot's own graphics, [2,s] home, [4,s] the mark
+        longa
+        lda     $02,s
+        tay
+        shorta0
         lda     #$02            ; walking left: the hire walks in
-        ldy     #.loword(-OT6_HIRE_STEP)
         jsr     Ot6HireWalk
         jsr_c1  CheckNullTarget ; carry clear: nobody left to strike
         bcc     @out
@@ -844,9 +861,9 @@ Ot6HireWeapTbl:
         pha                     ; [1,s] byte 2
         iny
         lda     ($76),y
-        pha                     ; [1,s] byte 3, [2,s] byte 2, [3,s] gfx, [4,s] mark
-        lda     $04,s
-        and     #$7c            ; fffcc00: figure x 4 + class, x 4
+        pha                     ; [1,s] byte 3, [2,s] byte 2, [3,s] gfx, [4,s] home, [6,s] mark
+        lda     $06,s
+        and     #$7c            ; 0fffcc00: (figure x 4 + class) x 4
         lsr
         lsr
         phx
@@ -866,15 +883,20 @@ Ot6HireWeapTbl:
         dey
         pla
         sta     ($76),y
-@out:   lda     #$03            ; walking right: the hire leaves
-        ldy     #OT6_HIRE_STEP
+@out:   longa                   ; the hire leaves (from wherever the strike
+        lda     $02,s           ;   left it: the Fight animation steps
+        clc                     ;   forward and leaves the step to the turn)
+        adc     #OT6_HIRE_OFF
+        tay
+        shorta0
+        lda     #$03            ; walking right
         jsr     Ot6HireWalk
         pla                     ; the slot's own graphics
         jsr     Ot6HireSwap
         bra     @back
 
 @dog:   lda     ($78)
-        pha                     ; [1,s] the flags, [2,s] the mark
+        pha                     ; [1,s] the flags, [2,s] home, [4,s] the mark
         ora     #$10            ; no pre-magic swirl
         sta     ($78)
         ldy     #$0002
@@ -891,35 +913,61 @@ Ot6HireWeapTbl:
         pla
         sta     ($78)
 
-@back:  pla                     ; the mark
+@back:  lda     $03,s           ; [1,s] home, [3,s] the mark
         and     #$02
         beq     :+              ; not the last pass: Setzer stays out
-        lda     #$02            ; walking left: Setzer comes back
-        ldy     #.loword(-OT6_HIRE_STEP)
+        longa
+        lda     $01,s
+        tay
+        shorta0
+        lda     #$02            ; walking left: Setzer comes back home
         jsr     Ot6HireWalk
-:       jml     f:GfxCmd_00
+:       longa
+        pla                     ; home
+        shorta0
+        pla                     ; the mark
+        jml     f:GfxCmd_00
 .endproc
 
-; [ walk a character slot sideways for OT6_HIRE_WALK frames ]
+; [ walk a character slot sideways to an x offset ]
 ; A = the walking action (wCharGfxData secondary action: 2 left, 3 right),
-; Y = pixels a frame (signed), X = the slot's wCharGfxData offset.  a8/i16,
-; db=$7e.  preserves x and y.
+; Y = the x offset to stop at, X = the slot's wCharGfxData offset.
+; OT6_HIRE_STEP pixels a frame, the walking frames drawn (the slot's pose
+; override is lifted for the walk and put back).  a8/i16, db=$7e.
+; preserves x and y.
 .proc Ot6HireWalk
         .a8
         .i16
         sta     $61c0,x         ; secondary graphical action
-        lda     #OT6_HIRE_WALK
-@frame: pha
-        longa
+        lda     $61c1,x
+        pha                     ; [1,s] the pose override
+        stz     $61c1,x
+@frame: longa
         tya
+        sec
+        sbc     $61d4,x         ; target - offset
+        beq     @there
+        bmi     @left
+        cmp     #OT6_HIRE_STEP+1
+        bcc     @snap
+        lda     $61d4,x
         clc
-        adc     $61d4,x         ; the slot's x offset
-        sta     $61d4,x
+        adc     #OT6_HIRE_STEP
+        bra     @set
+@left:  cmp     #.loword(-OT6_HIRE_STEP)
+        bcs     @snap
+        lda     $61d4,x
+        sec
+        sbc     #OT6_HIRE_STEP
+        bra     @set
+@snap:  tya
+@set:   sta     $61d4,x         ; the slot's x offset
         shorta0
         jsl     WaitFrame_far
+        bra     @frame
+@there: shorta0
         pla
-        dec
-        bne     @frame
+        sta     $61c1,x
         stz     $61c0,x
         rts
 .endproc
