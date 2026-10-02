@@ -55,7 +55,7 @@ local stage, battles, recs = 1, 0, {}
 
 H.run({ maxFrames = 300000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
-  H.call(function() H.hireCrewArm() end),
+  H.call(function() H.hireCrewArm(); H.log("[hirecrew] ROM " .. H.romIdentity()) end),
   H.repeatN(SETZER_SKIP, { walkToBattle(), H.setzerBattle({}) }),
   H.driveUntil(function() return stage > #STAGES end, 280000, {
     H.call(function()
@@ -74,6 +74,9 @@ H.run({ maxFrames = 300000 }, {
           for _, rec in ipairs(H.vars.setzer) do if rec.row == HIRE then got = rec end end
           if got then
             recs[#recs + 1] = got
+            local want = ({ 3, 2 })[#recs]   -- held as the battle ends, before the next one
+            H.assertEq(got.boost, want, string.format("record %d ran at %d BP", #recs, want))
+            H.hireCrewCheck(got, string.format("hire %d (%d BP)", #recs, got.boost))
             stage = stage + 1
           else
             H.log(string.format("[hirecrew] stage %d: the battle ended before the hire; again", stage))
@@ -85,12 +88,6 @@ H.run({ maxFrames = 300000 }, {
     end)(),
   }, "the 3 and 2 BP hires resolve"),
   H.call(function()
-    H.log("[hirecrew] ROM " .. H.romIdentity())
-    local want = { 3, 2 }
-    for i, r in ipairs(recs) do
-      H.assertEq(r.boost, want[i], string.format("record %d ran at %d BP", i, want[i]))
-      H.hireCrewCheck(r, string.format("hire %d (%d BP)", i, r.boost))
-    end
     H.log(string.format("[hirecrew] PASSED: %d hires (3 and 2 BP) over %d battle(s)", #recs, battles))
   end),
 })

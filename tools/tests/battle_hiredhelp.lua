@@ -76,7 +76,7 @@ end
 
 H.run({ maxFrames = 200000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
-  H.call(function() H.hireCrewArm() end),
+  H.call(function() H.hireCrewArm(); H.log("[hiredhelp] ROM " .. H.romIdentity()) end),
   H.repeatN(SETZER_SKIP, { walkToBattle(), H.setzerBattle({}) }),
   H.driveUntil(function() return #done >= #WANT end, 160000, {
     H.call(function()
@@ -90,7 +90,14 @@ H.run({ maxFrames = 200000 }, {
         step = step or H.setzerBattle(remaining(), { shot = "hiredhelp_table" })
         local r = step:tick()
         if r == "done" then
-          for _, rec in ipairs(H.vars.setzer) do done[#done + 1] = rec end
+          for _, rec in ipairs(H.vars.setzer) do
+            done[#done + 1] = rec
+            local i = #done      -- held as the battle ends, before the next one
+            H.assertEq(rec.row, HIRE, string.format("record %d is a Hired Help", i))
+            H.assertEq(rec.boost, WANT[i].boost, string.format("record %d ran at its planned boost", i))
+            checkHire(rec, i)
+            H.hireCrewCheck(rec, string.format("hire %d (%d BP)", i, rec.boost))
+          end
           step = nil
         end
         return r
@@ -98,14 +105,7 @@ H.run({ maxFrames = 200000 }, {
     end)(),
   }, "both hires resolve"),
   H.call(function()
-    H.log("[hiredhelp] ROM " .. H.romIdentity())
     H.assertEq(#done, #WANT, "two hires resolved")
-    for i, r in ipairs(done) do
-      H.assertEq(r.row, HIRE, string.format("record %d is a Hired Help", i))
-      H.assertEq(r.boost, WANT[i].boost, string.format("record %d ran at its planned boost", i))
-      checkHire(r, i)
-      H.hireCrewCheck(r, string.format("hire %d (%d BP)", i, r.boost))
-    end
     H.log(string.format("[hiredhelp] PASSED: %d hires over %d battle(s)", #done, battles))
   end),
 })
