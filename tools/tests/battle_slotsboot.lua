@@ -340,11 +340,31 @@ local function attempt(n)
     H.waitFrames(240),
     surveyStep,
     H.cond(function() return not H.vars.suitable end, {
-      H.fleeBattle(9000),
+      -- A pack that cannot be run from ($b1 bit 1: a pincer, which this
+      -- pool's Mind Candy packs can roll; or the formation's own no-L+R
+      -- bit $2f4b bit 0) is fought out through the Fight menu instead:
+      -- held L+R there is "Can't run away!!" until the pack wipes the
+      -- party (seed shift 1, draw 7's Mind Candy x4 under "$B1=22":
+      -- build/attempts/wt/slotsboot-v024/runs/new1_k0_s1.log.gz; the old
+      -- suite at K=3: runs/old_k3.log.gz).
+      H.cond(function()
+        return (H.readByte(0x00B1) & 0x02) ~= 0 or (H.readByte(0x2F4B) & 0x01) ~= 0
+      end, {
+        H.call(function()
+          H.log(string.format("draw %d cannot be run from ($b1=%02X $2f4b=%02X): "
+            .. "fighting it out", n, H.readByte(0x00B1), H.readByte(0x2F4B)))
+        end),
+        H.fightBattleByMenu(30000),
+      }, {
+        H.fleeBattle(9000),
+      }),
       H.waitUntil(function()
         return H.worldMode() and H.worldHasControl()
-      end, 1200, "back on the plain after fleeing draw " .. n, 10),
+      end, 3000, "back on the plain after draw " .. n, 10),
       H.waitFrames(30),
+      -- field care after every battle, fled or fought, as a player walks
+      -- into the next one (docs/guidelines.md, "Heal outside battles")
+      H.careStop("care after draw " .. n),
     }, {}),
   }, {})
 end
