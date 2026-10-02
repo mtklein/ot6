@@ -26,16 +26,31 @@
 -- a spin that never ran (its window lost, his action cancelled or
 -- dropped) is played again from his next turn, as battle_slots plays them.
 
--- Setzer's control.  The fight the draw reaches can take his turn: the
--- Iron Fist casts Stone (Muddle) once it stands alone (ai_script.asm
--- `if_num_monsters 1 / attack BATTLE, STONE, STONE`), which a spin that
--- kills the Vulture first leaves it.  Before each of his windows, and
--- whenever the reels go, the drive reads what takes his command
--- (H.controlTaken: Death, Petrify, Zombie, Imp, Sleep, Muddle, Berserk,
--- Stop, Frozen) and the party gives it back the way a person would: an
--- ally's plain Fight on him for Sleep and Muddle, or the item the ROM's
--- records say cures it (Fenix Down, Soft, Revivify, Green Cherry,
--- Remedy).  A status with no cure in reach fails at once, naming it.
+-- Setzer's control (H.newSpinnerCare, shared with battle_slots).  Before
+-- each of his windows, and whenever the reels go, the drive reads what
+-- takes his command (H.controlTaken: Death, Petrify, Zombie, Imp, Sleep,
+-- Muddle, Berserk, Stop, Frozen) and the party gives it back the way a
+-- person would: an ally's plain Fight on him for Sleep and Muddle, or the
+-- item the ROM's records say cures it.  A status with no cure in reach
+-- (for a hit: no ally in control with a Fight row) fails at once, naming
+-- it.  The fight is given up instead -- lost to the test, Fought out, a
+-- fresh battle drawn -- at the lost point: Setzer fallen; the formation
+-- down to a monster whose conditional control attack is now live (the
+-- Iron Fist casts an all-target Stone, Muddle, once it stands alone:
+-- `if_num_monsters 1 / attack BATTLE, STONE, STONE`); two or more members
+-- out of control; no ally left in control.  Spinning on into the lone
+-- Stone wiped the party in the hold lab (h3_k9_s15 at 3c0d68d8).
+--
+-- The resolve loop's void branches need a status or a fall to land in the
+-- few frames between his commit and his spin running, which this pool's
+-- fights do not deal.  "dropped" is reached by the candy lab (the draw
+-- blind to any-turn control attacks, so it fights Mind Candy packs:
+-- build/attempts/wt/slotsboot-v024/runs4/cd6_k0_s8, its control
+-- mut6_drop1).  Untested here: "cancelled" (reached by the same lab one
+-- version earlier, lab4_attempts/cd5_k0_s7, not at this one) and the fall
+-- with the spin queued, which asserts his books unmoved (the fellsetzer
+-- lab, allies Fighting Setzer down, 8 shifts, did not reach it:
+-- lab4_attempts/fs5_*).
 
 -- The Ot6BoostDmg exemption rides the whole run as a write-watch: the
 -- multiplier's $f0-bank OT6_SCR_BIT store must never happen under cmd $0f.
@@ -90,240 +105,18 @@ end
 local draw = H.newEncounterDraw({ tag = "slotsboot", minBodies = 2, minHp = 600 })
 
 -- ---- the party around the spinner --------------------------------------
--- The other members' windows (battle_slots' care, with the cures added):
---   * Setzer's control taken: Fenix Down on him for Death; an ally's plain
---     Fight on him for Sleep or Muddle (healed first when the hit could
---     drop him: under HIT_FLOOR of his max HP, the fight driver's
---     unmeasured unmuddle floor, a quarter); the cure item the ROM's
---     records name for Petrify, Zombie or Imp; then an ally asleep or
---     muddled gets the same hit;
---   * else a dead member raised with a Fenix Down, one raise in flight;
---   * else a living member under CARE_PCT gets a Potion (a Tonic without);
---   * else Defend.  Nobody but Setzer attacks: the formation has to stand
---     through the spins.
-local CARE_PCT, HIT_FLOOR = 50, 25
-local TONIC, POTION, FENIX = 0xE8, 0xE9, 0xF0
-local CMD_FIGHT, CMD_ITEM = 0x00, 0x01
-local ST_CMD, ST_ITEM, ST_TGT, ST_DEF = 0x05, 0x0A, 0x38, 0x27
-local BATTINV, ITEMSCR, ITEMROW = 0x2686, 0x8947, 0x894F
-local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
+-- The other members' windows and Setzer's control, from the library
+-- (H.newSpinnerCare, lib/ot6_field.lua, shared with battle_slots): care
+-- or a Defend, and when his control is taken (H.controlTaken) the cure a
+-- person beside him gives -- an ally's plain Fight for Sleep or Muddle, the
+-- item the ROM's records name for the rest -- with a fail-fast naming any
+-- status nothing in reach cures.
 local DENY_MAX = 6000            -- frames his control may stay taken with a cure in reach
-local function chid(s) return H.readByte(0x3ED8 + s * 2) end
+local care = H.newSpinnerCare({ spinner = function() return actor end, denyMax = DENY_MAX })
+local partyLine, otherWindow, otherWindowsReset = care.partyLine, care.window, care.reset
+local setzerTaken, watchControl, cmdCell = care.spinnerTaken, care.watch, care.cmdCell
+local taken, cared = care.taken, care.cared
 local function php(s) return H.readWord(0x3BF4 + s * 2) end
-local function pmax(s) return H.readWord(0x3C1C + s * 2) end
-local function seated(s) return chid(s) ~= 0xFF and pmax(s) > 0 end
-local function partyLine()
-  local t = {}
-  for s = 0, 3 do
-    if seated(s) then
-      local c = H.controlTaken(s)
-      t[#t + 1] = string.format("%02X:%d/%d bp%d%s", chid(s), php(s), pmax(s),
-        H.readByte(0x3E9C + s * 2), c and (" " .. c.name) or "")
-    end
-  end
-  return table.concat(t, " ")
-end
-local function invIdx(item)
-  for i = 0, 251 do
-    if H.readByte(BATTINV + i * 5) == item and H.readByte(BATTINV + i * 5 + 3) > 0 then
-      return i
-    end
-  end
-end
-local function invCount(item)
-  local i = invIdx(item)
-  return i and H.readByte(BATTINV + i * 5 + 3) or 0
-end
-local function cmdCell(a, cmd)
-  for r = 0, 3 do
-    if H.readByte(0x202E + a * 12 + r * 3) == cmd then return r end
-  end
-end
-local function setzerTaken() return actor ~= nil and H.controlTaken(actor) or nil end
--- the cure in reach for a control-taking status: "hit", an item id, or nil
-local function cureOf(c)
-  if c.cure == "hit" then return "hit" end
-  if c.items == nil then return nil end
-  return H.statusCure({ byte = c.byte, bit = c.bit, items = c.items,
-    has = function(item) return invIdx(item) ~= nil end })
-end
-
-local inFlight = {}                       -- e -> { f, kind, hp }: a care action confirmed
-local cared = { heal = 0, raise = 0, cure = 0, hit = 0 }
-local W = { actor = nil, n = 0, plan = nil }
-local function carePlan(a)
-  -- a confirmed action is in flight until it lands, 900 frames pass, or
-  -- what it answered is gone or has become something else (a Fight on a
-  -- muddled member who then falls leaves him needing a Fenix Down)
-  for e, h in pairs(inFlight) do
-    local now = H.controlTaken(e)
-    if H.frame - h.f > 900 or (h.kind == "heal" and php(e) > h.hp)
-       or (h.kind ~= "heal" and (now == nil or now.name ~= h.st)) then
-      inFlight[e] = nil
-    end
-  end
-  local itemCell, fightCell = cmdCell(a, CMD_ITEM), cmdCell(a, CMD_FIGHT)
-  -- Setzer's control first, then a muddled or sleeping ally's (a muddled
-  -- ally's own turns are the engine's to aim, at the formation or the
-  -- party, so a person hits them out of it too)
-  local order = { actor }
-  for s = 0, 3 do if s ~= actor then order[#order + 1] = s end end
-  for _, e in ipairs(order) do
-    local c = seated(e) and H.controlTaken(e) or nil
-    if c and e ~= a and inFlight[e] == nil and (e == actor or c.cure == "hit") then
-      local cure = cureOf(c)
-      if c.name == "Death" and cure and itemCell then
-        return { plan = "raise", tgt = e, idx = invIdx(cure), cell = itemCell, item = cure, why = c.name }
-      elseif cure == "hit" and fightCell then
-        if php(e) * 100 < pmax(e) * HIT_FLOOR and itemCell then
-          local item = invIdx(POTION) and POTION or (invIdx(TONIC) and TONIC or nil)
-          if item then
-            return { plan = "heal", tgt = e, idx = invIdx(item), cell = itemCell, item = item,
-                     why = c.name .. " (healed before the hit that cures it)" }
-          end
-        end
-        return { plan = "hit", tgt = e, cell = fightCell, why = c.name }
-      elseif cure and itemCell then
-        return { plan = "cure", tgt = e, idx = invIdx(cure), cell = itemCell, item = cure, why = c.name }
-      end
-    end
-  end
-  if itemCell == nil then return { plan = "defend" } end
-  if invIdx(FENIX) then
-    for s = 0, 3 do
-      if seated(s) and php(s) == 0 and inFlight[s] == nil and s ~= a then
-        return { plan = "raise", tgt = s, idx = invIdx(FENIX), cell = itemCell, item = FENIX, why = "Death" }
-      end
-    end
-  end
-  local item = invIdx(POTION) and POTION or (invIdx(TONIC) and TONIC or nil)
-  if item == nil then return { plan = "defend" } end
-  local pick, pickPct = nil, nil
-  for s = 0, 3 do
-    local pct = seated(s) and php(s) * 100 // math.max(pmax(s), 1) or 100
-    if seated(s) and php(s) > 0 and pct < CARE_PCT and inFlight[s] == nil then
-      if pick == nil or (s == actor) or (pick ~= actor and pct < pickPct) then
-        pick, pickPct = s, pct
-      end
-    end
-  end
-  if pick then
-    return { plan = "heal", tgt = pick, idx = invIdx(item), cell = itemCell, item = item, why = "HP" }
-  end
-  return { plan = "defend" }
-end
--- One frame of a window that is not a Slot spin (MENU open): another
--- member's, or his own while his control is taken (an Imp's, a Stopped
--- one's), which Defends.
-local function otherWindow()
-  local a = H.readByte(ACTOR) & 3
-  if W.actor ~= a then
-    W.actor, W.via, W.n = a, nil, 0
-    W.p = carePlan(a)
-    if W.p.plan ~= "defend" then
-      H.log(string.format("[care] f%d actor %d (%02X): %s slot %d (%02X)%s for %s | party %s",
-        H.frame, a, chid(a), W.p.plan, W.p.tgt, chid(W.p.tgt),
-        W.p.item and string.format(" with $%02X (%d in the bag)", W.p.item, invCount(W.p.item)) or "",
-        W.p.why, partyLine()))
-    end
-  end
-  W.n = W.n + 1
-  local ph = W.n % 10
-  local st = H.readByte(MSTATE)
-  local p = W.p
-  local function tap(b) H.setPad(ph < 5 and { [b] = true } or {}) end
-  -- a window open for a member whose control is taken (a Muddle that
-  -- landed as it opened) is passed on with X, as the fight driver's
-  -- muddled actor defers (#170): a command confirmed there is the
-  -- engine's to re-aim
-  local own = H.controlTaken(a)
-  if own then
-    if W.n == 1 then
-      H.log(string.format("[care] f%d actor %d (%02X)'s window is open under %s: passed on (X)",
-        H.frame, a, chid(a), own.name))
-    end
-    if st == ST_CMD then tap("x") else tap("b") end
-    return
-  end
-  if p.plan == "defend" then
-    if st == ST_CMD then
-      if H.readByte(0x3E9D + a * 2) > 0 then tap("l") else tap("right") end
-    elseif st == ST_DEF then tap("a")
-    elseif st == 0x0A or st == 0x30 or st == 0x16 or st == 0x24 or st == 0x0E
-        or st == ST_TGT or st == 0x08 then tap("b")
-    else H.setPad({}) end
-    return
-  end
-  if st == ST_CMD then
-    local cur = H.readByte(0x890F + a)
-    if cur ~= p.cell then tap(cur < p.cell and "down" or "up"); return end
-    if H.readByte(0x3E9D + a * 2) > 0 then tap("l"); return end   -- care goes unboosted
-    W.via = p.plan == "hit" and "fight" or "cmd"
-    tap("a")
-  elseif st == ST_ITEM and p.idx then
-    local cur = H.readByte(ITEMSCR + a) + H.readByte(ITEMROW + a)
-    if cur ~= p.idx then tap(cur < p.idx and "down" or "up"); return end
-    W.via = "item"
-    tap("a")
-  elseif st == ST_TGT then
-    if W.via ~= "item" and W.via ~= "fight" and W.via ~= "confirmed" then tap("b"); return end
-    local chars = H.readByte(TGTCHARS)
-    if H.readByte(TGTMONS) ~= 0 or chars == 0 then
-      tap(H.battleLayout().toChars[1])
-      return
-    end
-    if chars ~= (1 << p.tgt) then
-      local cur = 0
-      for s = 3, 0, -1 do if chars & (1 << s) ~= 0 then cur = s end end
-      tap(cur < p.tgt and "down" or "up")
-      return
-    end
-    if ph < 5 and (W.via == "item" or W.via == "fight") then
-      W.via = "confirmed"
-      local now = H.controlTaken(p.tgt)
-      inFlight[p.tgt] = { f = H.frame, kind = p.plan, hp = php(p.tgt), st = now and now.name }
-      cared[p.plan] = (cared[p.plan] or 0) + 1
-      H.log(string.format("[care] f%d actor %d confirms the %s on slot %d (%s; #%d)",
-        H.frame, a, p.plan == "hit" and "Fight" or p.plan, p.tgt, p.why, cared[p.plan]))
-    end
-    tap("a")
-  elseif st == 0x30 or st == 0x16 or st == 0x24 or st == 0x27 or st == 0x0E or st == 0x08 then
-    tap("b")                                  -- a window care never means to be in
-  else
-    H.setPad({})
-  end
-end
-local function otherWindowsReset() W.actor, W.p = nil, nil end
-
--- What takes his command, said when it lands and when it lifts, and the
--- fail-fast: a status no cure in reach answers (Berserk, Stop, Frozen; an
--- empty bag), or one still on him DENY_MAX frames after it landed.
-local taken = { since = nil, name = nil, n = 0 }
-local function watchControl(what)
-  local c = setzerTaken()
-  if c then
-    if taken.since == nil then
-      taken.since, taken.name, taken.n = H.frame, c.name, taken.n + 1
-      H.log(string.format("[control] f%d %s: SETZER cannot take a command: %s (#%d) | party %s",
-        H.frame, what, c.name, taken.n, partyLine()))
-    end
-    local cure = cureOf(c)
-    if cure == nil then
-      error(string.format("%s: SETZER cannot take a command: %s, and nothing in reach "
-        .. "cures it (%s)", what, c.name, c.items and "none of its cure items in the bag"
-        or "only time clears it"), 0)
-    end
-    if H.frame - taken.since > DENY_MAX then
-      error(string.format("%s: SETZER cannot take a command: %s, still %d frames after it "
-        .. "landed (cures confirmed: %d hit, %d item, %d raise)", what, c.name,
-        H.frame - taken.since, cared.hit, cared.cure, cared.raise), 0)
-    end
-  elseif taken.since ~= nil then
-    H.log(string.format("[control] f%d %s: SETZER's %s is gone after %d frames; resuming | party %s",
-      H.frame, what, taken.name, H.frame - taken.since, partyLine()))
-    taken.since, taken.name = nil, nil
-  end
-end
 
 local function setzerWindow()
   return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor
@@ -332,10 +125,54 @@ local function reelsLive()
   return setzerWindow() and H.readByte(MSTATE) == 0x08
 end
 
+local function monstersDown()
+  for m = 0, 5 do
+    if (H.readByte(0x3AA8 + m * 2) & 1) == 1 and H.readWord(0x3BFC + m * 2) > 0 then
+      return false
+    end
+  end
+  return true
+end
+local function fallen() return monstersDown() or not H.battleLoadStarted() end
+-- The battle is lost to the test when its formation falls before spin 3
+-- resolves, or at the lost point (care.lostPoint: the formation down to
+-- the lone Iron Fist, whose Stone is then live; two or more members out
+-- of control; no ally left in control).  The party then ends it with a
+-- Fight (care.fightOut) rather than spin into Stone, cares, and the
+-- draw deals a fresh battle (Ot6InitBP's 1 again) for the spins to be
+-- played over, at most MAX_BATTLES in the run (three lost): in the
+-- round-3 sweep (build/attempts/wt/slotsboot-v024/runs4/n6_*, 30 runs) no
+-- run lost more than one.
+local lost, battles, MAX_BATTLES = false, 0, 4
+local done, armedOnce, spin3Resolved = false, false, false
+local function markLost(what, why)
+  if not lost then
+    lost = true
+    H.log(string.format("[slotsboot] f%d %s: %s (battle #%d) -- this battle is lost to the "
+      .. "test | party %s", H.frame, what, why, battles, partyLine()))
+  end
+end
+-- a committed spin not yet read by the resolve loop: the lost point waits
+-- until it is read (spin 3's own triple can fell the formation as it
+-- resolves, and that is the spin resolving, not the battle lost)
+local spinInFlight = false
+local function checkLost(what)
+  if lost or spinInFlight or not H.battleLoadStarted() then return lost end
+  if monstersDown() then markLost(what, "the formation fell before spin 3 resolved")
+  else
+    local why = care.lostPoint()
+    if why then markLost(what, why) end
+  end
+  return lost
+end
+
 -- One frame of the party while Setzer waits: messages paged with A, the
 -- other windows played, his own left alone unless his control is taken.
 local function partyTurn(what)
-  watchControl(what)
+  -- the lost point is marked here but ends nothing in flight: a spin queued
+  -- as the formation thins is still played to its resolution, and the
+  -- windows keep their care meanwhile
+  if not checkLost(what) then watchControl(what) end
   if H.readByte(MENU) == 0 then
     otherWindowsReset()
     H.setPad(H.frame % 8 < 4 and { a = true } or {})
@@ -348,30 +185,11 @@ local function partyTurn(what)
 end
 
 -- wait for Setzer's own window with his control his: the other windows get
--- care, a cure or a Defend; a formation that falls first ends the wait,
--- and the battle is lost to the test (see `lost` below)
-local function monstersDown()
-  for m = 0, 5 do
-    if (H.readByte(0x3AA8 + m * 2) & 1) == 1 and H.readWord(0x3BFC + m * 2) > 0 then
-      return false
-    end
-  end
-  return true
-end
-local function fallen() return monstersDown() or not H.battleLoadStarted() end
--- The battle is lost to the test when its formation falls before spin 3
--- resolves: the spins and the party's cures (a muddled member's own
--- turns, a retaliation dump: Ot6Retaliate) can end a 745-HP fight early,
--- most of all once the Iron Fist stands alone.  The party then wins it,
--- cares, and the draw deals a fresh battle (Ot6InitBP's 1 again) for the
--- spins to be played over, at most MAX_BATTLES in the run -- as
--- battle_slots plays a fresh battle after Setzer falls.
-local lost, battles, MAX_BATTLES = false, 0, 3
-local done, armedOnce = false, false
+-- care, a cure or a Defend; the lost point ends the wait
 local function menuFor(what)
   local hb = nil
   return H.withReset(H.driveUntil(function()
-    return (setzerWindow() and setzerTaken() == nil) or fallen()
+    return (setzerWindow() and setzerTaken() == nil) or lost or fallen()
   end, 30000, {
     H.call(function()
       if hb == nil or H.frame - hb >= 600 then
@@ -382,6 +200,7 @@ local function menuFor(what)
         end
         hb = H.frame
       end
+      if checkLost(what) then H.setPad({}); return end
       watchControl(what)
       if H.readByte(MENU) ~= 0 and (H.readByte(ACTOR) ~= actor or setzerTaken()) then
         otherWindow()
@@ -392,16 +211,8 @@ local function menuFor(what)
     end),
   }, what), function() hb = nil; otherWindowsReset() end)
 end
-local function markLost(what)
-  if not lost then
-    lost = true
-    H.log(string.format("[slotsboot] f%d %s: the formation fell before spin 3 resolved "
-      .. "(battle #%d) -- this battle is lost to the test | party %s", H.frame, what,
-      battles, partyLine()))
-  end
-end
 local function stillOn(what)
-  return H.call(function() if fallen() then markLost(what) end end)
+  return H.call(function() checkLost(what) end)
 end
 
 -- Bank boost pips with real R presses, by feedback (battle_slots'
@@ -468,7 +279,7 @@ end
 local spinVoid, spinDone, resolvedB0 = false, false, nil
 -- a tier the bank no longer covers (a muddled turn dumped it: Ot6Retaliate)
 local bankShort = false
-local replays, MAX_REPLAYS = { lost = 0, dropped = 0, cancelled = 0, fell = 0 }, 3
+local replays, MAX_REPLAYS = { lost = 0, dropped = 0, cancelled = 0, fell = 0 }, 2  -- battle_slots' bound
 local MAX_BANK = 4               -- unboosted bank spins: 2 from Ot6InitBP's 1, and a re-bank
 local function replayed(kind, tag)
   replays[kind] = replays[kind] + 1
@@ -519,7 +330,7 @@ local function playedSpin(tag, checks, want)
     live({
       H.call(function() results = {} end),
       tapA(function()
-        if #results > 0 then committed = true end
+        if #results > 0 then committed, spinInFlight = true, true end
         return committed
       end, tag .. " commit"),
     }),
@@ -540,7 +351,7 @@ local function playedSpin(tag, checks, want)
     end, 30000, attempt, tag .. ": a spin played to its commit"),
     H.call(function()
       if bankShort then return end
-      if not committed then markLost(tag); return end
+      if not committed then markLost(tag, "the battle ended before the spin committed"); return end
       H.log(string.format("%s: committed on spin %d", tag, spins))
       if checks.afterCommit then checks.afterCommit() end
     end),
@@ -569,6 +380,11 @@ local function resolveLoop(tag)
     local ran = (actEnd[actor * 2] or 0) - r0
     local cmd = actEndCmd[actor * 2] or 0xFF
     if php(actor) == 0 and ran == 0 then
+      -- a fall with the spin queued: it never ran, and nothing was charged
+      -- for it (Ot6ActionEnd never took his action: battle_slots' #346)
+      H.assertEq(pend() == p0 and bp() == b0, true, string.format("%s: he fell with the "
+        .. "spin queued and his books unmoved (pend %d -> %d, bp %d -> %d)", tag, p0,
+        pend(), b0, bp()))
       H.log(string.format("[%s] f%d SETZER fell with the spin queued (pend %d bp %d): "
         .. "it never ran; raised, then played again", tag, H.frame, pend(), bp()))
       replayed("fell", tag)
@@ -606,7 +422,7 @@ local function resolveLoop(tag)
       return true
     end
     return false
-  end, 15000, {
+  end, 9000, {
     H.call(function() partyTurn(tag) end),
     H.waitFrames(1),
   }, tag), function()
@@ -614,27 +430,34 @@ local function resolveLoop(tag)
     otherWindowsReset()
   end)
 end
-local function resolvedSpin(tag, checks, want)
+-- onResolved runs when the spin resolved, before the in-flight mark is
+-- cleared, so a lost point marked while it was in flight cannot end the
+-- caller's wait first
+local function resolvedSpin(tag, checks, want, onResolved)
   local body = {}
   for _, s in ipairs(playedSpin(tag, checks, want)) do body[#body + 1] = s end
-  body[#body + 1] = H.cond(function() return not bankShort and not lost end,
+  body[#body + 1] = H.cond(function() return not bankShort and (spinInFlight or not lost) end,
     { resolveLoop(tag .. " resolve") }, {})
+  body[#body + 1] = H.call(function() if not spinDone then spinInFlight = false end end)
   body[#body + 1] = H.call(function()
     if spinVoid then spinVoid = false end
   end)
   return H.repeatN(1, {
-    H.call(function() spinVoid, spinDone = false, false end),
+    H.call(function() spinVoid, spinDone, spinInFlight = false, false, false end),
     H.driveUntil(function()
-      return spinDone or bankShort or lost or not H.battleLoadStarted()
+      return spinDone or bankShort or (lost and not spinInFlight) or not H.battleLoadStarted()
     end, 60000, body, tag .. ": the spin resolves"),
     H.call(function()
+      if spinDone and onResolved then onResolved() end
+      spinInFlight = false
       if bankShort then return end
-      if not spinDone then markLost(tag) end
+      if not spinDone then markLost(tag, "the battle ended before the spin resolved") end
     end),
   })
 end
 
 -- ------------------------------- spin 3: real R presses, the icon chosen
+local spin3Done = false
 local SPIN3 = resolvedSpin("spin3", {
     afterPress1 = function()
       H.assertEq(pend(), 3, "spin3: real R presses banked pending 3")
@@ -672,7 +495,7 @@ local SPIN3 = resolvedSpin("spin3", {
       H.assertEq(pend(), 3, "spin3: the commit banked the stored tier")
       H.screenshot("slotsboot_chosen")
     end,
-  }, 3)
+  }, 3, function() spin3Done, spin3Resolved = true, true end)
 
 H.run({ maxFrames = 400000 }, {
   -- every action that ends, by entity (Ot6ActionEnd's X), with its
@@ -807,7 +630,7 @@ H.run({ maxFrames = 400000 }, {
       -- (Ot6Retaliate), so spin 3 finding it short banks again; the unboosted
       -- spins are bounded by MAX_BANK.
       (function()
-        local banks, spin3Done = 0, false
+        local banks = 0
         local bankSpin = H.repeatN(1, {
           H.call(function()
             banks = banks + 1
@@ -824,29 +647,26 @@ H.run({ maxFrames = 400000 }, {
         })
         return H.repeatN(1, {
           H.call(function() banks, spin3Done = 0, false end),
-          H.driveUntil(function() return spin3Done or lost end, 200000, {
+          H.driveUntil(function()
+            return spin3Done or (lost and not spin3Resolved and not spinInFlight)
+          end, 200000, {
             H.cond(function() return bp() < 3 end, { bankSpin }, {
               H.call(function() bankShort = false end),
               SPIN3,
-              H.call(function()
-                if bankShort then bankShort = false elseif not lost then spin3Done = true end
-              end),
+              H.call(function() bankShort = false end),
             }),
           }, "the bank holds 3 and spin 3 is played"),
         })
       end)(),
     }, {}),
-    H.cond(function() return lost end, {
-      -- the party wins the battle the spins could not finish, and cares
-      H.driveUntil(function()
+    H.cond(function() return lost and not spin3Resolved end, {
+      -- the party Fights out the battle the spins could not finish
+      -- (care.fightOut: every member with control Fights the first
+      -- monster standing), and cares
+      care.fightOut("slotsboot"),
+      H.waitUntil(function()
         return H.worldMode() and H.worldHasControl()
-      end, 30000, {
-        H.call(function()
-          if H.battleLoadStarted() and not monstersDown() then partyTurn("lost battle")
-          else H.setPad(H.frame % 8 < 4 and { a = true } or {}) end
-        end),
-        H.waitFrames(1),
-      }, "the lost battle ends"),
+      end, 1200, "back on the plain after the lost battle", 10),
       H.release(),
       H.waitFrames(30),
       H.careStop("care after lost battle"),
@@ -860,7 +680,8 @@ H.run({ maxFrames = 400000 }, {
       "EXEMPTION: the damage multiplier never ran under cmd $0f (natural run)")
     H.log(string.format("battle_slotsboot complete: encounters %d, control taken %d "
       .. "time(s), cures confirmed %d hit / %d item / %d raise, spins replayed %d lost "
-      .. "/ %d dropped / %d cancelled / %d fell", draw.n, taken.n, cared.hit, cared.cure,
-      cared.raise, replays.lost, replays.dropped, replays.cancelled, replays.fell))
+      .. "/ %d dropped / %d cancelled / %d fell, battles lost to the test %d",
+      draw.n, taken.n, cared.hit, cared.cure, cared.raise, replays.lost, replays.dropped,
+      replays.cancelled, replays.fell, battles - 1))
   end),
 })

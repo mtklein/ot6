@@ -1254,19 +1254,30 @@ end
 -- `if_num_monsters 1 / attack BATTLE, STONE, STONE`) has anyTurn false;
 -- one outside any block can come on any of the monster's turns (the Mind
 -- Candy's `attack BATTLE, BATTLE, SPECIAL`, SleepSting).  The second
--- section is the retaliation script (counter true).
+-- section is the retaliation script (counter true).  ifMonsters is N when
+-- the block's only condition is `if_num_monsters N`: the attack is live
+-- once N or fewer monsters stand (M.newSpinnerCare's lost point).
+local speciesControlCache = {}
 function M.speciesControl(species)
+  if speciesControlCache[species] then return speciesControlCache[species] end
+  local r = M.speciesControlUncached(species)
+  speciesControlCache[species] = r
+  return r
+end
+function M.speciesControlUncached(species)
   local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
   local off = M.readRomWord(ptrs + species * 2)
   local function at(i) return M.readRomByte(base + off + i) end
   local out, seen = {}, {}
   local i, section, inBlock, conds = 0, 0, false, false
+  local ifMonsters, otherConds = nil, false     -- the open block's conditions
   local function add(a)
     for _, name in ipairs(attackControl(a, species)) do
       local key = string.format("%s/%02X/%s/%d", name, a, tostring(not inBlock), section)
       if not seen[key] then
         seen[key] = true
-        out[#out + 1] = { status = name, attack = a, anyTurn = not inBlock, counter = section == 1 }
+        out[#out + 1] = { status = name, attack = a, anyTurn = not inBlock, counter = section == 1,
+                          ifMonsters = inBlock and not otherConds and ifMonsters or nil }
       end
     end
   end
@@ -1274,7 +1285,12 @@ function M.speciesControl(species)
     local op = at(i)
     local len = M.AI_OP_LEN[op] or 1
     if op == 0xFC then
-      if not conds then conds, inBlock = true, true end
+      if not conds then conds, inBlock, ifMonsters, otherConds = true, true, nil, false end
+      -- `if_num_monsters N` (FC 13 01 N, M.partRoles' lastStand): the
+      -- block runs once N or fewer monsters stand; any other condition
+      -- leaves the block's trigger unmodelled (ifMonsters nil)
+      if at(i + 1) == 0x13 and at(i + 2) == 0x01 then ifMonsters = at(i + 3)
+      else otherConds = true end
     else
       conds = false
       if op < 0xF0 then add(op)
@@ -1310,6 +1326,383 @@ function M.judgeFormation(species, minBodies, minHp)
     end
   end
   return #species >= minBodies and hp >= minHp and not anyTurn, hp, srcs
+end
+
+-- ---- the party around a spinner (the Slot suites) ----------------------
+-- M.newSpinnerCare(o): the other members' windows while one member (the
+-- spinner: Setzer in battle_slotsboot and battle_slots) plays a command
+-- the test is about.  Nobody but the spinner attacks: the formation has
+-- to stand through it.  Each window, once, picks:
+--   * the spinner's control taken (M.controlTaken): a Fenix Down on him
+--     for Death; an ally's plain Fight on him for Sleep or Muddle (healed
+--     first when the hit could drop him: under hitFloor % of his max HP,
+--     the fight driver's unmeasured unmuddle floor, a quarter); the item
+--     the ROM's records say cures Petrify, Zombie, Imp or Berserk; then
+--     an ally asleep or muddled gets the same hit (a muddled ally's own
+--     turns are the engine's to aim, at the formation or the party);
+--   * else a dead member raised with a Fenix Down;
+--   * else a living member under carePct % gets a Potion (a Tonic
+--     without), the spinner first, else the most hurt;
+--   * else Defend.
+-- A window open for a member whose own control is taken (a Muddle that
+-- landed as it opened) is passed on with X, as the fight driver's
+-- muddled actor defers (#170).  A confirmed action is in flight until it
+-- lands, 900 frames pass, or what it answered is gone or has become
+-- something else (a Fight on a muddled member who then falls leaves him
+-- needing a Fenix Down).
+-- C.watch(what) says when the spinner's control is taken and given back,
+-- and fails at once, naming it, on a status no cure in reach answers
+-- (Berserk, Stop, Frozen; an empty bag; a hit with no ally in control
+-- holding a Fight row), or one still on him o.denyMax frames after it
+-- landed.  C.lostPoint() (below) is when a fight is no longer one the
+-- test can finish; the caller checks it before C.watch.
+--   o.spinner()   the spinner's party entity (0..3), or nil
+--   o.name        his name for the messages (default "SETZER")
+--   o.carePct, o.hitFloor, o.denyMax   (50, 25, 6000)
+-- C.window() plays one frame of a window that is not the spinner's own
+-- spin (MENU open); C.reset() forgets the window; C.taken = { since,
+-- name, n }; C.cared = { heal, raise, cure, hit }; C.partyLine().
+function M.newSpinnerCare(o)
+  local C = { taken = { since = nil, name = nil, n = 0 },
+              cared = { heal = 0, raise = 0, cure = 0, hit = 0 } }
+  local NAME = o.name or "SETZER"
+  local CARE_PCT, HIT_FLOOR = o.carePct or 50, o.hitFloor or 25
+  local DENY_MAX = o.denyMax or 6000
+  local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
+  local TONIC, POTION, FENIX = 0xE8, 0xE9, 0xF0
+  local CMD_FIGHT, CMD_ITEM = 0x00, 0x01
+  local ST_CMD, ST_ITEM, ST_TGT, ST_DEF = 0x05, 0x0A, 0x38, 0x27
+  local BATTINV, ITEMSCR, ITEMROW = 0x2686, 0x8947, 0x894F
+  local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
+  local inFlight, W = {}, { actor = nil, n = 0 }
+  local taken, cared = C.taken, C.cared
+  local function chid(s) return M.readByte(0x3ED8 + s * 2) end
+  local function php(s) return M.readWord(0x3BF4 + s * 2) end
+  local function pmax(s) return M.readWord(0x3C1C + s * 2) end
+  local function seated(s) return chid(s) ~= 0xFF and pmax(s) > 0 end
+  function C.partyLine()
+    local t = {}
+    for s = 0, 3 do
+      if seated(s) then
+        local c = M.controlTaken(s)
+        t[#t + 1] = string.format("%02X:%d/%d bp%d%s", chid(s), php(s), pmax(s),
+          M.readByte(0x3E9C + s * 2), c and (" " .. c.name) or "")
+      end
+    end
+    return table.concat(t, " ")
+  end
+  local partyLine = C.partyLine
+  local function invIdx(item)
+    for i = 0, 251 do
+      if M.readByte(BATTINV + i * 5) == item and M.readByte(BATTINV + i * 5 + 3) > 0 then
+        return i
+      end
+    end
+  end
+  local function invCount(item)
+    local i = invIdx(item)
+    return i and M.readByte(BATTINV + i * 5 + 3) or 0
+  end
+  local function cmdCell(a, cmd)
+    for r = 0, 3 do
+      if M.readByte(0x202E + a * 12 + r * 3) == cmd then return r end
+    end
+  end
+  C.cmdCell = cmdCell
+  function C.spinnerTaken()
+    local s = o.spinner()
+    return s ~= nil and M.controlTaken(s) or nil
+  end
+  -- the members other than `but` whose control is their own
+  local function inControl(but)
+    local t = {}
+    for s = 0, 3 do
+      if s ~= but and seated(s) and M.controlTaken(s) == nil then t[#t + 1] = s end
+    end
+    return t
+  end
+  -- the cure in reach for a control-taking status on entity e: "hit" (an
+  -- ally whose control is their own and who has a Fight row), an item id
+  -- the bag holds, or nil
+  local function cureOf(c, e)
+    if c.cure == "hit" then
+      for _, s in ipairs(inControl(e)) do
+        if cmdCell(s, CMD_FIGHT) then return "hit" end
+      end
+      return nil
+    end
+    if c.items == nil then return nil end
+    return M.statusCure({ byte = c.byte, bit = c.bit, items = c.items,
+      has = function(item) return invIdx(item) ~= nil end })
+  end
+
+  -- The lost point (review of 3c0d68d8: h3_k9_s15, one all-target Stone
+  -- muddled three members, nobody attacked the lone 333-HP Iron Fist, and
+  -- the party wiped with banks of 4, 2 and 5 standing): the moment the
+  -- fight stops being one the spins can be played through.  Returns why,
+  -- or nil:
+  --   * the spinner fell (battle_slots' rule: a fall costs that battle;
+  --     raising him in it burned the bag in the fellsetzer lab);
+  --   * the formation is down to a monster whose conditional control
+  --     attack is now live (M.speciesControl ifMonsters: the Iron Fist's
+  --     `if_num_monsters 1 / Stone` once it stands alone);
+  --   * two or more members have lost control (M.controlTaken);
+  --   * no member but the spinner has control left.
+  -- The caller marks the battle lost to the test and ends it with Fights
+  -- (C.fightOut) rather than spin into it.
+  function C.lostPoint()
+    local spinner = o.spinner()
+    if spinner ~= nil and seated(spinner) and php(spinner) == 0 then
+      return NAME .. " fell"
+    end
+    local standing, species = 0, {}
+    for m = 0, 5 do
+      if (M.readByte(0x3AA8 + m * 2) & 1) == 1 and M.readWord(0x3BFC + m * 2) > 0 then
+        standing = standing + 1
+        species[#species + 1] = M.readWord(0x57C0 + m * 2)
+      end
+    end
+    if standing > 0 then
+      for _, sp in ipairs(species) do
+        if sp < 0x180 then
+          for _, c in ipairs(M.speciesControl(sp)) do
+            if not c.anyTurn and not c.counter and c.ifMonsters and standing <= c.ifMonsters then
+              return string.format("the formation is down to %d monster(s) and $%03X's %s "
+                .. "($%02X, if_num_monsters %d) is live", standing, sp, c.status, c.attack,
+                c.ifMonsters)
+            end
+          end
+        end
+      end
+    end
+    local lostN, names = 0, {}
+    for s = 0, 3 do
+      local c = seated(s) and M.controlTaken(s) or nil
+      if c then lostN = lostN + 1; names[#names + 1] = string.format("%02X %s", chid(s), c.name) end
+    end
+    if lostN >= 2 then
+      return string.format("%d members have lost control (%s)", lostN, table.concat(names, ", "))
+    end
+    local spin = o.spinner()
+    if spin ~= nil and #inControl(spin) == 0 then
+      return "no member but " .. NAME .. " has control left"
+    end
+    return nil
+  end
+
+  local function carePlan(a)
+    local actor = o.spinner()
+    if C.fightingOut then
+      -- the battle is lost to the test: every member with control Fights
+      -- the first monster standing (C.fightOut)
+      local fightCell = cmdCell(a, CMD_FIGHT)
+      for m = 0, 5 do
+        if fightCell and (M.readByte(0x3AA8 + m * 2) & 1) == 1 and M.readWord(0x3BFC + m * 2) > 0 then
+          return { plan = "kill", mon = m, tgt = a, cell = fightCell,
+                   why = string.format("the battle is lost to the test: a Fight on monster slot %d", m) }
+        end
+      end
+      return { plan = "defend" }
+    end
+    for e, h in pairs(inFlight) do
+      local now = M.controlTaken(e)
+      if M.frame - h.f > 900 or (h.kind == "heal" and php(e) > h.hp)
+         or (h.kind ~= "heal" and (now == nil or now.name ~= h.st)) then
+        inFlight[e] = nil
+      end
+    end
+    local itemCell, fightCell = cmdCell(a, CMD_ITEM), cmdCell(a, CMD_FIGHT)
+    local order = { actor }
+    for s = 0, 3 do if s ~= actor then order[#order + 1] = s end end
+    for _, e in ipairs(order) do
+      local c = seated(e) and M.controlTaken(e) or nil
+      if c and e ~= a and inFlight[e] == nil and (e == actor or c.cure == "hit") then
+        local cure = cureOf(c, e)
+        if c.name == "Death" and cure and itemCell then
+          return { plan = "raise", tgt = e, idx = invIdx(cure), cell = itemCell, item = cure, why = c.name }
+        elseif cure == "hit" and fightCell then
+          if php(e) * 100 < pmax(e) * HIT_FLOOR and itemCell then
+            local item = invIdx(POTION) and POTION or (invIdx(TONIC) and TONIC or nil)
+            if item then
+              return { plan = "heal", tgt = e, idx = invIdx(item), cell = itemCell, item = item,
+                       why = c.name .. " (healed before the hit that cures it)" }
+            end
+          end
+          return { plan = "hit", tgt = e, cell = fightCell, why = c.name }
+        elseif cure and itemCell then
+          return { plan = "cure", tgt = e, idx = invIdx(cure), cell = itemCell, item = cure, why = c.name }
+        end
+      end
+    end
+    if itemCell == nil then return { plan = "defend" } end
+    if invIdx(FENIX) then
+      for s = 0, 3 do
+        if seated(s) and php(s) == 0 and inFlight[s] == nil and s ~= a then
+          return { plan = "raise", tgt = s, idx = invIdx(FENIX), cell = itemCell, item = FENIX, why = "Death" }
+        end
+      end
+    end
+    local item = invIdx(POTION) and POTION or (invIdx(TONIC) and TONIC or nil)
+    if item == nil then return { plan = "defend" } end
+    local pick, pickPct = nil, nil
+    for s = 0, 3 do
+      local pct = seated(s) and php(s) * 100 // math.max(pmax(s), 1) or 100
+      if seated(s) and php(s) > 0 and pct < CARE_PCT and inFlight[s] == nil then
+        if pick == nil or (s == actor) or (pick ~= actor and pct < pickPct) then
+          pick, pickPct = s, pct
+        end
+      end
+    end
+    if pick then
+      return { plan = "heal", tgt = pick, idx = invIdx(item), cell = itemCell, item = item, why = "HP" }
+    end
+    return { plan = "defend" }
+  end
+
+  function C.window()
+    local a = M.readByte(ACTOR) & 3
+    if W.actor ~= a then
+      W.actor, W.via, W.n = a, nil, 0
+      W.p = carePlan(a)
+      if W.p.plan ~= "defend" then
+        M.log(string.format("[care] f%d actor %d (%02X): %s slot %d (%02X)%s for %s | party %s",
+          M.frame, a, chid(a), W.p.plan, W.p.tgt, chid(W.p.tgt),
+          W.p.item and string.format(" with $%02X (%d in the bag)", W.p.item, invCount(W.p.item)) or "",
+          W.p.why, partyLine()))
+      end
+    end
+    W.n = W.n + 1
+    local ph = W.n % 10
+    local st = M.readByte(MSTATE)
+    local p = W.p
+    local function tap(b) M.setPad(ph < 5 and { [b] = true } or {}) end
+    local own = M.controlTaken(a)
+    if own then
+      if W.n == 1 then
+        M.log(string.format("[care] f%d actor %d (%02X)'s window is open under %s: passed on (X)",
+          M.frame, a, chid(a), own.name))
+      end
+      if st == ST_CMD then tap("x") else tap("b") end
+      return
+    end
+    if p.plan == "defend" then
+      if st == ST_CMD then
+        if M.readByte(0x3E9D + a * 2) > 0 then tap("l") else tap("right") end
+      elseif st == ST_DEF then tap("a")
+      elseif st == 0x0A or st == 0x30 or st == 0x16 or st == 0x24 or st == 0x0E
+          or st == ST_TGT or st == 0x08 then tap("b")
+      else M.setPad({}) end
+      return
+    end
+    if st == ST_CMD then
+      local cur = M.readByte(0x890F + a)
+      if cur ~= p.cell then tap(cur < p.cell and "down" or "up"); return end
+      if M.readByte(0x3E9D + a * 2) > 0 then tap("l"); return end   -- care goes unboosted
+      W.via = (p.plan == "hit" or p.plan == "kill") and "fight" or "cmd"
+      tap("a")
+    elseif st == ST_ITEM and p.idx then
+      local cur = M.readByte(ITEMSCR + a) + M.readByte(ITEMROW + a)
+      if cur ~= p.idx then tap(cur < p.idx and "down" or "up"); return end
+      W.via = "item"
+      tap("a")
+    elseif st == ST_TGT and p.plan == "kill" then
+      -- a Fight on a monster: the cursor walked onto its slot, then A
+      if W.via ~= "fight" and W.via ~= "confirmed" then tap("b"); return end
+      local mons, chars = M.readByte(TGTMONS), M.readByte(TGTCHARS)
+      if chars ~= 0 or mons == 0 then tap(M.battleLayout().toMonsters[1]); return end
+      if mons ~= (1 << p.mon) and W.n < 120 then
+        local dirs = { "down", "up", "left", "right" }
+        tap(dirs[1 + ((W.n // 10) % 4)])
+        return
+      end
+      if ph < 5 and W.via == "fight" then
+        W.via = "confirmed"
+        M.log(string.format("[care] f%d actor %d confirms a Fight on monster slot %d (%s)",
+          M.frame, a, p.mon, p.why))
+      end
+      tap("a")
+    elseif st == ST_TGT then
+      if W.via ~= "item" and W.via ~= "fight" and W.via ~= "confirmed" then tap("b"); return end
+      local chars = M.readByte(TGTCHARS)
+      if M.readByte(TGTMONS) ~= 0 or chars == 0 then
+        tap(M.battleLayout().toChars[1])
+        return
+      end
+      if chars ~= (1 << p.tgt) then
+        local cur = 0
+        for s = 3, 0, -1 do if chars & (1 << s) ~= 0 then cur = s end end
+        tap(cur < p.tgt and "down" or "up")
+        return
+      end
+      if ph < 5 and (W.via == "item" or W.via == "fight") then
+        W.via = "confirmed"
+        local now = M.controlTaken(p.tgt)
+        inFlight[p.tgt] = { f = M.frame, kind = p.plan, hp = php(p.tgt), st = now and now.name }
+        cared[p.plan] = (cared[p.plan] or 0) + 1
+        M.log(string.format("[care] f%d actor %d confirms the %s on slot %d (%s; #%d)",
+          M.frame, a, p.plan == "hit" and "Fight" or p.plan, p.tgt, p.why, cared[p.plan]))
+      end
+      tap("a")
+    elseif st == 0x30 or st == 0x16 or st == 0x24 or st == 0x27 or st == 0x0E or st == 0x08 then
+      tap("b")                                  -- a window care never means to be in
+    else
+      M.setPad({})
+    end
+  end
+  function C.reset() W.actor, W.p = nil, nil end
+
+  -- A step that ends a battle lost to the test with Fights: every window
+  -- whose member has control (the spinner's included) Fights the first
+  -- monster standing; a member out of control is passed on (X); pages
+  -- are turned with A.  Ends when the battle does.
+  function C.fightOut(tag)
+    return M.withReset(M.driveUntil(function()
+      if not M.battleLoadStarted() then C.fightingOut = false; return true end
+      return false
+    end, 30000, {
+      M.call(function()
+        if not C.fightingOut then
+          C.fightingOut = true
+          C.reset()
+          M.log(string.format("[%s] f%d the party Fights the battle out | party %s", tag,
+            M.frame, partyLine()))
+        end
+        if M.readByte(MENU) == 0 then
+          C.reset()
+          M.setPad(M.frame % 8 < 4 and { a = true } or {})
+        else
+          C.window()
+        end
+      end),
+    }, tag .. ": the lost battle fought out"), function() C.fightingOut = false; C.reset() end)
+  end
+
+  function C.watch(what)
+    local c = C.spinnerTaken()
+    if c then
+      if taken.since == nil then
+        taken.since, taken.name, taken.n = M.frame, c.name, taken.n + 1
+        M.log(string.format("[control] f%d %s: %s cannot take a command: %s (#%d) | party %s",
+          M.frame, what, NAME, c.name, taken.n, partyLine()))
+      end
+      if cureOf(c, o.spinner()) == nil then
+        error(string.format("%s: %s cannot take a command: %s, and nothing in reach "
+          .. "cures it (%s)", what, NAME, c.name, c.cure == "hit"
+          and "no ally with control has a Fight row" or c.items
+          and "none of its cure items in the bag" or "only time clears it"), 0)
+      end
+      if M.frame - taken.since > DENY_MAX then
+        error(string.format("%s: %s cannot take a command: %s, still %d frames after it "
+          .. "landed (cures confirmed: %d hit, %d item, %d raise)", what, NAME, c.name,
+          M.frame - taken.since, cared.hit, cared.cure, cared.raise), 0)
+      end
+    elseif taken.since ~= nil then
+      M.log(string.format("[control] f%d %s: %s's %s is gone after %d frames; resuming | party %s",
+        M.frame, what, NAME, taken.name, M.frame - taken.since, partyLine()))
+      taken.since, taken.name = nil, nil
+    end
+  end
+  return C
 end
 
 -- ---- reaching a formation by its pool (the Slot suites) ----------------
