@@ -195,19 +195,19 @@
                                 ;   on purpose: see OT6_RUNICPAID in
                                 ;   ot6_memory.inc.
         ; #346: an action that never ran buys nothing, so it costs nothing.
-        ; ExecAction's placeholder ($b5 = $12, CmdNoEffect; battle_main.asm
-        ; @0100) is what runs when the entity's command list was emptied
-        ; after its entry reached the action queue: RemoveAllActions on a
-        ; fall, a petrify or a sleep clears the command list and the advance
-        ; wait queue but not $3820, so the stale entry still comes up and
-        ; lands here.  Real commands overwrite $b5 in InitPlayerAction, and a
-        ; Mimic is rewritten to the command it copies before that, so $12
-        ; here means the turn did nothing.  Its pending boost is dropped
-        ; rather than spent, and the turn ends as an unboosted one would,
-        ; regen pip included -- the settlement Ot6DanceStumble gives a
-        ; stumbled start.  Measured before this, in play: a fallen Setzer's
-        ; queued spin ran as $12 and took the 3 pips it was boosted with
-        ; (battle_slotcancel; build/attempts/wt/slots-followups/).
+        ; ExecAction runs a turn whose command list is empty -- the action
+        ; was removed after its entry reached the action queue: a fall, a
+        ; petrify or a sleep runs RemoveAllActions, which clears the command
+        ; list and the advance-wait queue but not $3820, so the stale entry
+        ; still comes up -- as the placeholder CmdNoEffect, and reaches here.
+        ; Ot6NoActionMark recorded that at the turn's head (OT6_NOACTION bit
+        ; 7; $b5 = $12 cannot say it, Empowerer writes $12 there mid-turn).
+        ; Its pending boost is dropped rather than spent, and the turn ends
+        ; as an unboosted one would, regen pip included -- the settlement
+        ; Ot6DanceStumble gives a stumbled start.  Measured before this, in
+        ; play: a fallen Setzer's queued spin came up as $12 and took the
+        ; pips it was boosted with (battle_slotcancel;
+        ; build/attempts/wt/slots-followups/).
         ; Whatever is pending here is not a committed action's: a command he
         ; commits after a raise lands in his command list, and ExecAction
         ; runs it from this same stale entry (charged as it ends) instead of
@@ -215,9 +215,8 @@
         ; raised and nothing chosen; that goes back to 0, in view, and can
         ; be raised again.  (A Slot spin already latched its tier at the
         ; first reel press and re-banks it at the commit, Ot6SlotCommit.)
-        lda     $b5
-        cmp     #$12
-        bne     @spend
+        lda     f:$7e0000+OT6_NOACTION
+        bpl     @spend
         lda     OT6_BOOST_REVEALED,x
         beq     @gain
         lda     #$00
@@ -267,6 +266,30 @@
         ; issued no numeral at all, or a $ffff "hide numerals" one, the same
         ; hole Ot6RevealCommit is called at the top of this proc to plug.
 done:   jsr     Ot6PipPending
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ does this turn have an action to run? ]
+
+; called from ExecAction's head (battle_main.asm @0100), right after the
+; command-list pointer is read (Ot6BrokenTurn) and before the bmi that sends
+; an empty list to the placeholder CmdNoEffect: records the pointer's bit 7
+; in OT6_NOACTION for Ot6ActionEnd at the end of this turn (#346).  Every
+; pass through @0100 rewrites it (the random-attack loop included), so the
+; byte always speaks for the turn now running.
+;
+; entry: jsl, a8, A = the pointer with N set from it; A, X, Y and every
+; flag are preserved, so the caller's bmi still sees N.
+.proc Ot6NoActionMark
+        .a8
+        php
+        pha
+        and     #$80
+        sta     f:$7e0000+OT6_NOACTION
+        pla
         plp
         rtl
 .endproc

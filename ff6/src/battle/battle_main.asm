@@ -236,6 +236,8 @@ ExecAction:
                             ;   below exactly as a removed action does: no
                             ;   AI script, no command, the gauge reset at
                             ;   @01b7 (#291; see Ot6BrokenTurn)
+        jsl     Ot6NoActionMark ; ot6 #346: whether this turn has an action
+                            ;   to run, for Ot6ActionEnd (A and flags kept)
         bmi     @0183       ; branch if not valid
         asl
         tay
