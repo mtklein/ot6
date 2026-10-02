@@ -407,6 +407,13 @@ TEST_ENV = {
     # load 12 ran 187.5-236.2): 1,081 s.  1800 is 1.67x that
     # (build/attempts/wt/suite-honesty/brokendeath/round2/)
     "battle_brokendeath": "OT6_TIMEOUT=1800",
+    # the bench and its gate lengthen the measured battle: the longest bodies
+    # measured are 27,432 frames for the first half (K6) and 9,790 for the
+    # Rage half (K4), ~37k frames, 461 s at the 80.7 frames/s above, and a
+    # draw that needs more fight retries spends a round (up to 3,345 frames
+    # measured) per try; 1800 is 3.9x the measured body
+    # (build/attempts/wt/procboost-v024/summary.txt)
+    "battle_procboost": "OT6_TIMEOUT=1800",
     "battle_statuses": "OT6_TIMEOUT=3600",
     "battle_levelup": "OT6_TIMEOUT=3600",
 }
