@@ -747,8 +747,8 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ; command animation $24, the coins.
 ;
 ; A hire (Ot6HireMark's $b7, third byte of the script; the row's id second):
-; the hire walks in from the right edge where Setzer walked out, strikes,
-; and walks off again.  The figure is drawn by Setzer's own sprite slot: the
+; the hire walks in from the screen's edge behind the party, where Setzer
+; walked out, strikes, and walks off again.  The figure is drawn by Setzer's own sprite slot: the
 ; battle graphics engine draws a character slot from that slot's graphics
 ; buffer, and the ROM holds the merchant, soldier, Leo and Shadow as full
 ; battle sprite sets (Locke's disguises, Leo's Thamasa fight, Shadow), so
@@ -845,19 +845,21 @@ Ot6HireWeapTbl:
         lsr
         bcs     @first
         longa                   ; a later pass: the slot waits off screen,
-        lda     $01,s           ;   so home is OT6_HIRE_OFF back from it
-        sec
-        sbc     #OT6_HIRE_OFF
+        lda     #$0000          ;   so home is OT6_HIRE_OFF back from it
+        jsr     Ot6HireOut
+        eor     #$ffff
+        inc
+        clc
+        adc     $01,s
         sta     $01,s
         shorta0
         bra     :+
 @first: longa                   ; the first: Setzer steps out
         lda     $01,s
-        clc
-        adc     #OT6_HIRE_OFF
+        jsr     Ot6HireOut
         tay
         shorta0
-        lda     #$03            ; walking right
+        lda     #$03            ; walking away from the enemies
         jsr     Ot6HireWalk
 :       lda     $03,s
         and     #$70
@@ -878,7 +880,7 @@ Ot6HireWeapTbl:
         lda     $02,s
         tay
         shorta0
-        lda     #$02            ; walking left: the hire walks in
+        lda     #$02            ; walking toward them: the hire walks in
         jsr     Ot6HireWalk
         jsr_c1  CheckNullTarget ; carry clear: nobody left to strike
         bcc     @out
@@ -911,11 +913,10 @@ Ot6HireWeapTbl:
         sta     ($76),y
 @out:   longa                   ; the hire leaves (from wherever the strike
         lda     $02,s           ;   left it: the Fight animation steps
-        clc                     ;   forward and leaves the step to the turn)
-        adc     #OT6_HIRE_OFF
+        jsr     Ot6HireOut      ;   forward)
         tay
         shorta0
-        lda     #$03            ; walking right
+        lda     #$03            ; walking away from the enemies
         jsr     Ot6HireWalk
         pla                     ; the slot's own graphics
         jsr     Ot6HireSwap
@@ -946,7 +947,7 @@ Ot6HireWeapTbl:
         lda     $01,s
         tay
         shorta0
-        lda     #$02            ; walking left: Setzer comes back home
+        lda     #$02            ; walking toward them: Setzer comes back home
         jsr     Ot6HireWalk
 :       longa
         pla                     ; home
@@ -955,8 +956,40 @@ Ot6HireWeapTbl:
         jml     f:GfxCmd_00
 .endproc
 
+; [ the off-screen spot behind a slot ]
+; A (16 bits) = an x offset -> A = it plus OT6_HIRE_OFF away from the
+; enemies: right for a slot facing left (w7e7b10 = 0, the usual side), left
+; for one facing right (the party's left side in a pincer or side attack),
+; as the turn's step back (GfxCmd_0d) reads w7e7b10.  ($78) the script's
+; parameters, the attacker's slot second.  a16/i16, db=$7e.  preserves y.
+.proc Ot6HireOut
+        .a16
+        .i16
+        phy
+        pha                     ; [1,s] the offset
+        ldy     #$0001
+        lda     ($78),y         ; the attacker's slot (and the byte after)
+        and     #$0003
+        tay
+        shorta
+        lda     $7b10,y         ; w7e7b10: the slot's facing
+        longa
+        bne     @left
+        pla
+        clc
+        adc     #OT6_HIRE_OFF
+        ply
+        rts
+@left:  pla
+        sec
+        sbc     #OT6_HIRE_OFF
+        ply
+        rts
+.endproc
+
 ; [ walk a character slot sideways to an x offset ]
-; A = the walking action (wCharGfxData secondary action: 2 left, 3 right),
+; A = the walking action (wCharGfxData secondary action: 2 toward the enemies,
+; 3 away; the frames are drawn in the slot's own facing),
 ; Y = the x offset to stop at, X = the slot's wCharGfxData offset.
 ; OT6_HIRE_STEP pixels a frame, the walking frames drawn (the slot's pose
 ; override is lifted for the walk and put back).  a8/i16, db=$7e.

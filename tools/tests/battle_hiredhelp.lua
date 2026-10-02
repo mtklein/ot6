@@ -118,7 +118,10 @@ local function armCrew()
   emu.addMemoryCallback(function()
     if script(2) ~= HIRE or script(3) & 0x80 == 0 then cur = nil; return end
     local slot = H.readByte(H.readWord(0x78) + 1) & 3
-    cur = { f = H.frame, mark = script(3), slot = slot, x0 = H.readWord(0x61D4 + slot * 32), xmax = -32768,
+    local x0 = H.readWord(0x61D4 + slot * 32)
+    local first = script(3) & 1 ~= 0
+    cur = { f = H.frame, mark = script(3), slot = slot, x0 = x0, xmax = 0,
+      home = (not first and crew.passes[#crew.passes]) and crew.passes[#crew.passes].home or x0,
       shadow = shadowFielded() }
     crew.passes[#crew.passes + 1] = cur
   end, emu.callbackType.exec, an, an)
@@ -136,9 +139,9 @@ local function armCrew()
   emu.addMemoryCallback(strike("dog"), emu.callbackType.exec, ma, ma)
   emu.addEventCallback(function()
     if cur then
-      local x = H.readWord(0x61D4 + cur.slot * 32)
-      if x >= 0x8000 then x = x - 0x10000 end
-      if x > cur.xmax then cur.xmax = x end
+      local x, h = H.readWord(0x61D4 + cur.slot * 32), cur.home or cur.x0
+      local d = math.abs(((x - h + 0x8000) & 0xFFFF) - 0x8000)   -- either way: a slot facing right walks out left
+      if d > cur.xmax then cur.xmax = d end
     end
   end, emu.eventType.endFrame)
   local ae = H.sym("Ot6ActionEnd")
@@ -164,13 +167,13 @@ local function checkCrew(r, i)
     local fig = (p.mark >> 4) & 7
     local want = math.min(k - 1, 3)
     if want == 3 and p.shadow then want = 4 end
-    H.log(string.format("[hiredhelp] %s pass %d: mark $%02X -- the %s, class bits %d%s%s; slot %d went to %+d (home %d)",
+    H.log(string.format("[hiredhelp] %s pass %d: mark $%02X -- the %s, class bits %d%s%s; slot %d went %d px from home %d",
       tag, k, p.mark, FIG_NAME[fig] or "?", (p.mark >> 2) & 3, p.mark & 1 ~= 0 and ", first" or "",
-      p.mark & 2 ~= 0 and ", last" or "", p.slot, p.xmax - (home >= 0x8000 and home - 0x10000 or home), home))
+      p.mark & 2 ~= 0 and ", last" or "", p.slot, p.xmax, home))
     H.assertEq(fig, want, string.format("%s pass %d: the %s comes", tag, k, FIG_NAME[want]))
     H.assertEq(p.mark & 1 ~= 0, k == 1, string.format("%s pass %d: SETZER steps out on the first pass only", tag, k))
     H.assertEq(p.mark & 2 ~= 0, k == #passes, string.format("%s pass %d: SETZER comes back after the last only", tag, k))
-    H.assertEq(p.xmax - (home >= 0x8000 and home - 0x10000 or home) >= 96, true,
+    H.assertEq(p.xmax >= 96, true,
       string.format("%s pass %d: SETZER's slot went off screen (96 px past home)", tag, k))
   end
   H.assertEq(#strikes, #r.costs, string.format("%s: every paid hire was drawn as its figure's strike (%d strikes, %d paid)",

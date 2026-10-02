@@ -603,7 +603,8 @@ another body, as a multi-hit Blitz's swing does, and one that finds none
 pays nothing.
 
 **Each hire is somebody new** (owner, 2026-10-02: a growing crew, not the
-same guy again). Setzer walks off the right edge, and each hire walks in
+same guy again). Setzer walks off the edge of the screen behind him, and
+each hire walks in
 where he stood, swings the weapon that fits the target and walks off: the
 0 BP hire is a merchant, and each point brings the next, tougher figure,
 an Imperial soldier, then General Leo, then Shadow, FF6's own mercenary
