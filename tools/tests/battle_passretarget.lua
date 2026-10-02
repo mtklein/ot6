@@ -161,10 +161,11 @@ local function pending()
 end
 local W, since, battles, crowds = nil, 0, 0, 0
 -- a boosted Fight's draw (a swing whose body fell while another stands)
--- within FIGHTAFTER battles of SETZER's kinds: the sweep met it before
--- SETZER's kinds were done in seven variations and one battle after in the
--- eighth (k0: done in battle 2, the draw in battle 3); 8 is a stated margin
--- over that worst case, not a measured tail
+-- within FIGHTAFTER battles of SETZER's kinds: the round-2 sweep met it
+-- before SETZER's kinds were done in six variations, one battle after in k0
+-- (done in battle 2, the draw in 3) and two after in k2 (done in 4, the
+-- draw in 6); 8 is a stated margin over that worst case, not a measured
+-- tail
 local FIGHTAFTER = 8
 local setzerDoneAt = nil
 local function allSeen()

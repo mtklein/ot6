@@ -57,6 +57,28 @@
 
 ; ------------------------------------------------------------------------------
 
+; [ a pass of the action has targeted ]
+
+; jsl from CalcAttackEffect right after ChooseTarget (and the divine gates
+; behind it): once the action has passes OT6 added (a nonzero mark), set
+; the mark's bit 7, so Ot6PassRetarget applies OT6's rule from the next
+; pass on.  Preserves every register and flag.  Any width.
+.proc Ot6PassTargeted
+        php
+        sep     #$20
+        .a8
+        pha
+        lda     f:$7e0000+OT6_PASSRETARGET
+        beq     :+
+        ora     #$80
+        sta     f:$7e0000+OT6_PASSRETARGET
+:       pla
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ the action's last pass is done: its mark goes ]
 
 ; jsl from ExecAttack's tail where `dec $3a70 / bmi` finds no pass left.
@@ -91,13 +113,19 @@
 ; `lda $ba / bit #$04`; a `bne` after it skips Retarget, and a `bcs` skips
 ; only Retarget itself.
 ;
-; Vanilla's own passes, and the first pass of any action, keep vanilla's
-; rule: retarget unless $ba bit 2 ("don't retarget") is set.
+; Vanilla's own passes, and an action's passes until one of them has
+; targeted, keep vanilla's rule: retarget unless $ba bit 2 ("don't
+; retarget") is set.  "Has targeted" is the mark's bit 7 (Ot6PassTargeted,
+; after ChooseTarget), not the pass count: an empty hand's pass never
+; reaches ChooseTarget (ExecAttack's `lda $11a6 / jeq @3275`), so a Fight
+; with its weapon in the off hand only first targets one pass down the
+; count, and a queued target that fell before the action must still get
+; vanilla's first-pass retarget there (wt/pass-retarget round 3: with the
+; count test that pass took `keep` and every swing landed nowhere).
 ;
-; A later pass of an action OT6 added passes to ($3a70 has counted down from
-; the mark Ot6PassesAdded left) found its targets fallen to an earlier pass
-; of the same action, or found nothing at all after such a pass landed
-; nowhere (ExecAttack's @31c5 clears bit 2 for a pass that STARTS empty, and
+; A later pass of an action OT6 added passes to found its targets fallen to
+; an earlier pass of the same action, or found nothing at all after such a
+; pass landed nowhere (ExecAttack's @31c5 clears bit 2 for a pass that STARTS empty, and
 ; vanilla would Retarget it).  It goes to another monster or nowhere:
 ;   * the previous pass's targets ($3a30) were on the monster side -- a
 ;     monster, or a character fighting as an enemy ($3a40) -- so $b8/$b9 get
@@ -122,9 +150,9 @@
 .proc Ot6PassRetarget
         .a8
         lda     f:$7e0000+OT6_PASSRETARGET
-        beq     vanilla         ; no passes OT6 added: vanilla's rule
-        cmp     f:$7e0000+$3a70
-        beq     vanilla         ; the action's first pass: vanilla's rule
+        bpl     vanilla         ; no passes OT6 added (0), or none of this
+                                ;   action's passes has targeted yet (bit 7,
+                                ;   Ot6PassTargeted): vanilla's rule
         lda     f:$7e0000+$3a31 ; the previous pass's monsters...
         bne     monsters
         lda     f:$7e0000+$3a30 ; ... or characters fighting as enemies

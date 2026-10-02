@@ -8076,12 +8076,18 @@ function M.passStanding()
   return m
 end
 
--- the party members standing (bit e for the character in slot e): HP
--- above 0 and not Wounded, Petrified or a Zombie
+-- the party members ChooseTarget would keep (bit e for the character in
+-- slot e): CheckTargetsPresent's test for a character -- present ($3AA0+x
+-- bit 0), not Wounded ($3EE4+x bit 7; a Zombie or a Petrified member stays
+-- a target) and not hidden ($3EF9+x bit 5)
 function M.passPartyStanding()
   local m = 0
   for e = 0, 3 do
-    if M.readWord(0x3BF4 + e * 2) > 0 and (M.readByte(0x3EE4 + e * 2) & 0xC2) == 0 then m = m | (1 << e) end
+    local x = e * 2
+    if (M.readByte(0x3AA0 + x) & 1) == 1 and (M.readByte(0x3EE4 + x) & 0x80) == 0
+        and (M.readByte(0x3EF9 + x) & 0x20) == 0 then
+      m = m | (1 << e)
+    end
   end
   return m
 end
@@ -8117,8 +8123,14 @@ function M.passClassify(a)
   else a.kind = PASS_CMD[a.cmd] or string.format("cmd%02X", a.cmd or 0xFF) end
   local k = a.kind
   if k == "fight" or k == "capture" then
-    a.boost = (a.passes[1].a70 - passFightBase(a)) // 2
-    a.ext = a.passes[1].a70 > passFightBase(a)
+    -- the count the action started at: the first recorded pass's, or one
+    -- more when an empty hand's pass came first (it never reaches
+    -- ChooseTarget) -- the mark says so when OT6 set one
+    local q1 = a.passes[1]
+    local cnt, mk = q1.a70, (q1.mark or 0) & 0x7F
+    if mk > cnt and mk <= cnt + 1 then cnt = mk end
+    a.boost = (cnt - passFightBase(a)) // 2
+    a.ext = cnt > passFightBase(a)
   elseif k == "gprain" or k == "coin" or k == "hire" or k == "jackpot" then a.ext = a.boost >= 1
   elseif k == "blitz" or k == "tool" then a.ext = a.ab ~= nil and M.passHitCountIds()[a.ab] ~= nil
   else a.ext = false end
@@ -8185,7 +8197,9 @@ end
 -- what, kind, key) asserts (or tallies); note(event, kind, key, what) is
 -- told each draw: "retarget" (a pass whose starting bodies fell while a
 -- monster stands), "resplit" (a Coin Toss pass whose group lost a body and
--- kept one), "emptied" (a pass after the monster side emptied), "party" (a
+-- kept one), "emptied" (a pass after the monster side emptied, starting on
+-- the fallen), "emptystart" (one starting empty after it), "first" (an
+-- extended action's first targeting pass whose queued target fell), "party" (a
 -- pass that started on a party member who had fallen), "vanilla" (an unboosted two-hand
 -- Fight's second hand after the first hand's kill).  The side masks: the
 -- monster side is the monster slots and the characters fighting as
@@ -8197,7 +8211,12 @@ end
 --      group's survivors (the coins re-split);
 --   B. on standing bodies only;
 --   C. one body, for the one-body actions;
---   G. once the monster side has emptied it lands on no party member;
+--   G. once the monster side has emptied it lands on no party member --
+--      a pass that starts on the fallen bodies, and a pass that starts
+--      empty after one that landed nowhere;
+--   I. the action's first pass that targets (an empty hand's never does),
+--      when the target it was queued at has fallen, lands on a standing
+--      monster (vanilla's first-pass retarget, kept);
 --   H. a pass that starts on a party member spreads to no other one: it
 --      lands on that member or nowhere;
 --   E. a Setzer row runs 1 + boost passes.
@@ -8221,6 +8240,23 @@ function M.passCheck(a, check, note, tag)
   local famN = 0
   for _, q in ipairs(a.passes) do if q.b5 ~= 0x02 then famN = famN + 1 end end
   for p, q in ipairs(a.passes) do
+    local k0 = a.kind == "capture" and "fight" or a.kind
+    if q.b5 ~= 0x02 and q.post ~= nil and a.ext and (q.pre & 0xFF & ~(q.foes or 0)) == 0
+        and ((q.pre >> 8) & q.stand) == 0 and q.stand ~= 0 and p == 1 then
+      local what = string.format("%s by e%d at %d BP, its first targeting pass (key %s; queued on $%04X, standing "
+        .. "$%02X, landed on $%04X)", a.kind, a.e, a.boost, a.key or "?", q.pre, q.stand, q.post)
+      note("first", k0, a.key, what)
+      check(((q.post >> 8) & q.stand) ~= 0 and (q.post & 0xFF & ~(q.foes or 0)) == 0, true, "I: the first "
+        .. "targeting pass of an action OT6 extended, its queued target fallen, lands on a standing monster -- "
+        .. what, a.kind, a.key)
+    end
+    if p >= 2 and a.ext and q.b5 ~= 0x02 and q.post ~= nil and q.pre == 0 and q.stand == 0 then
+      local what = string.format("%s by e%d at %d BP, pass %d of %d (key %s; started empty, no monster standing, "
+        .. "landed on $%04X)", a.kind, a.e, a.boost, p, #a.passes, a.key or "?", q.post)
+      note("emptystart", k0, a.key, what)
+      check(q.post & 0xFF & ~(q.foes or 0), 0, "G: once the monster side has emptied, a pass OT6 added lands on no "
+        .. "party member -- " .. what, a.kind, a.key)
+    end
     if p >= 2 and q.b5 ~= 0x02 and q.post ~= nil and q.pre ~= 0 then
       local foes = q.foes or 0
       local preMon, prePty = q.pre >> 8, (q.pre & 0xFF) & ~foes

@@ -423,7 +423,8 @@ OT6_SETZERROW        := $edcd
 
 ; the passes OT6 added to the executing action (Ot6PassRetarget, ot6_passes.asm):
 ; 0 = none (vanilla's own count), else $3a70 as it stood once OT6's adders had
-; added to it, before the first pass ran.  InitGfxScript zeroes it with $3a70
+; added to it, before the first pass ran, with bit 7 set once a pass of the
+; action has targeted (Ot6PassTargeted); Ot6PassesDone clears it.  InitGfxScript zeroes it with $3a70
 ; at every action's start; Ot6PassesAdded writes it right after an adder
 ; (a boosted Fight or Capture, Blitz/Tool hit counts, a dumped Throw, Setzer's
 ; rows, a character's GP Rain).

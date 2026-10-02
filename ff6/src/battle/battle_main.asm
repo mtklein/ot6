@@ -8478,6 +8478,7 @@ CalcAttackEffect:
                                 ;   x=attacker, $3a7d=attack id, props still editable.
         jsl     Ot6Assassinate  ; ot6: Shadow's divine -- same hook point, Broken non-boss
                                 ;   instant kill (dormant until Shadow is fielded).
+        jsl     Ot6PassTargeted ; ot6: this pass has targeted (ot6_passes.asm)
         phx
         lda     $b8         ; targets
         jsr     CountBits
