@@ -610,13 +610,14 @@ doubled once it is Broken, capped at 9,999. Null-break: the Fixed Dice
 are the outliers, so it chips nothing and ignores the row. **It is a
 gamble, and the boost buys more of it** (owner, 2026-10-02: Jackpot is a
 gamble, and every point must land something under the cap): each roll is
-a face 1-6 at exactly even odds (one battle Rand, drawn again past 251, mod
-6: 42 of 252 each; a plain mod 6 on the byte would have favoured 1-4, 43
-of 256 against 42), and the
-boost buys another roll a point -- 1 + boost passes, each its own triple
+a face 1-6 at near-even odds (one battle Rand, drawn again past 251, mod
+6; the redraw takes the table's next byte, a fixed successor, so over the
+256 places a roll can start each face is 42-44 of 256, consistent with
+the measurement below), and the boost buys another roll a point -- 1 + boost passes, each its own triple
 and its own hit. *Reason: a hit that can be a dud is the gambler's verb,
 and an extra roll is a purchase that always lands, at any level and
-shield state; playtesting tunes the power.* What one roll lands:
+shield state; playtesting tunes the power.* What one roll lands (the
+means at even odds; the 42-44 weights move them by under 2%):
 
 | face | L31 shielded | L31 unshielded | L31 Broken | L50 shielded | L50 unshielded |
 |---|---|---|---|---|---|
@@ -631,9 +632,10 @@ shield state; playtesting tunes the power.* What one roll lands:
 so a throw's mean is (1 + boost) times the roll's, and the spread is the
 sum of 1 + boost independent rolls (the lab in
 `build/attempts/wt/kit-setzer/jackpot-dist/` measures the faces and what
-each lands, and tabulates the throws per boost). The odds are even by
-construction: the battle Rand walks a 256-byte table that holds every byte
-once, so its 252 draws below 252 give each face 42. Measured in play
+each lands, and tabulates the throws per boost). The battle Rand walks a
+256-byte table that holds every byte once, so its 252 bytes below 252 give
+each face 42; the four above redraw onto their successors, which is where
+the 43s and 44 come from. Measured in play
 (`build/attempts/wt/kit-setzer/labs-r3/`, round 3): a fight, dice
 included, is fixed by its battle key and the inputs, and from the grave
 the key takes 16 values, so runs repeat throws and the labs count each
@@ -685,7 +687,7 @@ target's revealed row holds a physical class his own Fight does not key,
 with a hire a point up to the shields left (bank and purse allowing).
 Gil is spent only above a 20,000 reserve, and only in event battles (a
 boss, a monster chest): measured, Hired Help in the World of Balance grind
-cost about 35,000 gil a run against the control and bought no fewer deaths
+cost some 30,000 gil a run against the control and bought no fewer deaths
 (route-wor-falcon.md 13.12), so random battles get his free Fight. `opts.setzer = false` is the
 old behaviour (the control arm of the Falcon arc's labs,
 route-wor-falcon.md 13.10).

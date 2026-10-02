@@ -7655,7 +7655,7 @@ function M.setzerBattle(plan, opts)
       Z.rec = { row = row, boost = M.readByte(0x3E9D + e), level = M.readByte(0x3B18 + e),
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
-        entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {} }
+        entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {}, passes = {} }
     end, emu.callbackType.exec, a, a)
     -- the Coin Toss relic's GP Rain (command $18, no table): its own record
     local g = M.sym("Cmd_18")
@@ -7666,7 +7666,7 @@ function M.setzerBattle(plan, opts)
       Z.rec = { row = 0x18, boost = M.readByte(0x3E9D + e), level = M.readByte(0x3B18 + e),
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
-        entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {} }
+        entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {}, passes = {} }
     end, emu.callbackType.exec, g, g)
     local t = M.sym("TakeGil")
     emu.addMemoryCallback(function()
@@ -7694,6 +7694,26 @@ function M.setzerBattle(plan, opts)
         for s2 = 0, 5 do Z.rec.dice[#Z.rec.dice].hp[s2] = M.readWord(0x3BFC + s2 * 2) end
       end
     end, emu.callbackType.write, 0x0000B5, 0x0000B5)
+    -- Jackpot's passes: each entry to Ot6JackpotDice for the row, with the
+    -- pass's target mask and the battle Rand's index ($be) there, and $be
+    -- again as the dice effect returns (AttackerEffect_09's rts after the
+    -- hook's bcc: jsl 4 bytes, bcc 2), so a pass that rolled nothing can be
+    -- seen to have drawn nothing
+    local jd = M.sym("Ot6JackpotDice")
+    emu.addMemoryCallback(function()
+      if live() and Z.rec and Z.rec.row == 0x5B and M.readByte(0x3A7C) == 0x0F then
+        Z.rec.passes[#Z.rec.passes + 1] = { mask = M.readByte(0xB8) | (M.readByte(0xB9) << 8), be0 = M.readByte(0xBE),
+          dice = #Z.rec.dice }
+      end
+    end, emu.callbackType.exec, jd, jd)
+    local jr = M.sym("AttackerEffect_09") + 6
+    emu.addMemoryCallback(function()
+      local ps = live() and Z.rec and Z.rec.passes
+      local q = ps and ps[#ps]
+      if q and q.be1 == nil then
+        q.be1, q.rolled = M.readByte(0xBE), #Z.rec.dice - q.dice
+      end
+    end, emu.callbackType.exec, jr, jr)
     local e = M.sym("Ot6ActionEnd")
     emu.addMemoryCallback(function()
       if not live() then return end
@@ -7724,6 +7744,10 @@ function M.setzerBattle(plan, opts)
           r.dmg, r.class) or ""))
         M.log(string.format("[setzer]   exec f%d, Ot6ActionEnd f%d (bank %d, pending %d at its entry), closed f%d",
           r.f, r.ended, r.endBank, r.endPend, M.frame))
+        for k, q in ipairs(r.passes) do
+          M.log(string.format("[setzer]   pass %d: targets $%04X, $be %02X -> %s, %s roll(s)", k, q.mask, q.be0,
+            q.be1 and string.format("%02X", q.be1) or "?", tostring(q.rolled)))
+        end
         for s = 0, 5 do
           local o, n = r.mon0[s], r.mon1[s]
           if o.present then
@@ -7835,6 +7859,8 @@ function M.setzerBattle(plan, opts)
       end
       pulse("a")
     elseif st == 0x38 then
+      M.assertEq(p.refused and true or false, false, string.format("row $%s at %s BP, planned refused, is refused at "
+        .. "the list (its confirm must not reach target select)", tostring(p.row), tostring(p.boost)))
       if p.slot ~= nil then
         local want = 1 << p.slot
         local mons = M.readByte(0x7B7E)

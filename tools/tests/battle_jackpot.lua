@@ -49,19 +49,45 @@ local function checkJackpot(r, i)
   H.assertEq(r.divine0 & r.setzerBit, 0, string.format("Jackpot %d: unspent before", i))
   H.assertEq(r.divine1 & r.setzerBit, r.setzerBit, string.format("Jackpot %d: spent by it", i))
   H.assertEq(r.targets ~= 0, true, string.format("Jackpot %d was aimed at the monsters", i))
-  for b = 0, 5 do
-    if r.mon0[b].present then
-      H.assertEq(r.mon1[b].sh, r.mon0[b].sh, string.format("Jackpot %d: slot %d's shields do not move", i, b))
-    end
-  end
   local alive = 0
   for b = 0, 5 do if r.mon1[b].present and r.mon1[b].hp > 0 then alive = alive + 1 end end
-  if alive > 0 then
-    H.assertEq(#r.dice, 1 + r.boost, string.format("Jackpot %d: 1 + boost rolls (%d BP)", i, r.boost))
-  else
-    H.assertEq(#r.dice >= 1 and #r.dice <= 1 + r.boost, true, string.format("Jackpot %d: rolls until the last "
-      .. "body fell", i))
+  -- the passes: 1 + boost of them; one that finds a body rolls once, by the
+  -- draw rule (the first byte of the battle RNG table below 252 after $be,
+  -- mod 6; $be stops there), and one that finds none -- the rolls before it
+  -- felled the last body -- rolls nothing and draws nothing
+  H.assertEq(#r.passes, 1 + r.boost, string.format("Jackpot %d: 1 + boost passes (%d BP)", i, r.boost))
+  local rng = H.sym("RNGTbl") & 0x3FFFFF
+  local aimed, empty, redraws = 0, 0, 0
+  for k, q in ipairs(r.passes) do
+    if q.mask == 0 then
+      empty = empty + 1
+      H.assertEq(alive, 0, string.format("Jackpot %d, pass %d found no body: the last one has fallen", i, k))
+      H.assertEq(q.rolled, 0, string.format("Jackpot %d, pass %d found no body: no roll, no dice", i, k))
+      H.assertEq(q.be1, q.be0, string.format("Jackpot %d, pass %d found no body: no Rand drawn ($be)", i, k))
+      H.log(string.format("[jackpot]   pass %d: no body left -- no roll, $be stays %02X", k, q.be0))
+    else
+      aimed = aimed + 1
+      H.assertEq(empty, 0, string.format("Jackpot %d, pass %d: no body-less pass before a roll", i, k))
+      H.assertEq(q.rolled, 1, string.format("Jackpot %d, pass %d: one roll", i, k))
+      local idx, v, n = q.be0, nil, 0
+      repeat
+        idx = (idx + 1) & 0xff
+        v = H.readRomByte(rng + idx)
+        n = n + 1
+      until v < 252
+      redraws = redraws + n - 1
+      local d = r.dice[aimed]
+      H.assertEq(d ~= nil and d.b6, v % 6, string.format("Jackpot %d, pass %d: the face is the first table byte "
+        .. "below 252 after $be %02X (byte %d at %02X, %d draw(s)), mod 6", i, k, q.be0, v, idx, n))
+      H.assertEq(q.be1, idx, string.format("Jackpot %d, pass %d: $be stops on the byte it used", i, k))
+      if n > 1 then
+        H.log(string.format("[jackpot]   pass %d: $be %02X drew %d past 251, redrawn %d time(s) onto %d at %02X: "
+          .. "face %d", k, q.be0, H.readRomByte(rng + ((q.be0 + 1) & 0xff)), n - 1, v, idx, v % 6 + 1))
+      end
+    end
   end
+  H.assertEq(#r.dice, aimed, string.format("Jackpot %d: one roll a pass that found a body", i))
+  if alive > 0 then H.assertEq(empty, 0, string.format("Jackpot %d: a body stands, so every pass rolled", i)) end
   for k, d in ipairs(r.dice) do
     local f = d.b6 + 1
     H.assertEq(d.b7, (d.b6 << 4) | d.b6, string.format("Jackpot %d, roll %d: three dice of one face", i, k))
@@ -90,20 +116,37 @@ local function checkJackpot(r, i)
       k, f, d.dmg, hit, d.hp[hit], post[hit], want, o.sh, o.brk))
     H.assertEq(drop, want, string.format("Jackpot %d, roll %d: what it landed on slot %d", i, k, hit))
   end
+  -- (after the rolls' class check, so a mutant that loses null-break fails
+  -- there, on the class, before it fails here, on what the class did)
+  for b = 0, 5 do
+    if r.mon0[b].present then
+      H.assertEq(r.mon1[b].sh, r.mon0[b].sh, string.format("Jackpot %d: slot %d's shields do not move", i, b))
+    end
+  end
+  return { empty = empty, redraws = redraws }
 end
 
-local function pass(n, plan, wantBoost)
+local function pass(n, plan, wantBoost, o)
+  o = o or {}
   local recs
-  return H.seqStep({
+  -- o.wait: frames stood on the grave before the press (the battle key);
+  -- o.stand: frames the party stands in the battle before acting (a player
+  -- slow to the menu; Dullahan's turns go on).  Both are inputs, and pick
+  -- the draw a pass needs; passes 1-3 take neither.
+  local steps = {
     H.loadState(STATE),
     H.call(function()
       H.assertEq(H.mapId() & 0x1ff, 299, "wor_grave stands in the grave's room (map 299)")
       H.assertEq(H.readByte(0x1E99) & 0x04, 0x04, "SETZER has rejoined in the World of Ruin (switch $00CA)")
     end),
-    H.faceAndHoldA("up", function() return H.battleLoadStarted() end, 3000, "the grave (100,14): face up, A"),
-    H.release(),
-    H.setzerBattle(plan, { untilPlanDone = true, shot = "jackpot_table_" .. n }),
-    H.call(function()
+  }
+  if o.wait then steps[#steps + 1] = H.waitFrames(o.wait) end
+  steps[#steps + 1] = H.faceAndHoldA("up", function() return H.battleLoadStarted() end, 3000,
+    "the grave (100,14): face up, A")
+  steps[#steps + 1] = H.release()
+  if o.stand then steps[#steps + 1] = H.waitFrames(o.stand) end
+  steps[#steps + 1] = H.setzerBattle(plan, { untilPlanDone = true, shot = "jackpot_table_" .. n })
+  steps[#steps + 1] = H.call(function()
       local ids = {}
       for _, s in ipairs(H.formationSpecies()) do ids[#ids + 1] = s.species end
       H.assertEq(ids[1], DULLAHAN, "the grave's fight is Dullahan")
@@ -111,7 +154,15 @@ local function pass(n, plan, wantBoost)
       H.assertEq(#recs, 1, string.format("pass %d: exactly one Jackpot resolved", n))
       H.assertEq(recs[1].row, JACKPOT, string.format("pass %d: the row is Jackpot", n))
       H.assertEq(recs[1].boost, wantBoost, string.format("pass %d: at %d BP", n, wantBoost))
-      checkJackpot(recs[1], n)
+      local got = checkJackpot(recs[1], n)
+      if o.wantEmpty then
+        H.assertEq(got.empty > 0, true, string.format("pass %d: this draw fells Dullahan before the last roll, "
+          .. "so a pass finds no body (%s)", n, o.why))
+      end
+      if o.wantRedraw then
+        H.assertEq(got.redraws > 0, true, string.format("pass %d: this draw meets a table byte past 251 and "
+          .. "redraws (%s)", n, o.why))
+      end
       if plan[#plan].refused then
         H.assertEq(plan[#plan].refusedSeen == true, true,
           string.format("pass %d: the second Jackpot was refused at the list", n))
@@ -120,8 +171,8 @@ local function pass(n, plan, wantBoost)
       for _, d in ipairs(recs[1].dice) do faces[#faces + 1] = d.b6 + 1 end
       H.log(string.format("[jackpot] pass %d held: faces %s at %d BP%s", n, table.concat(faces, ","), wantBoost,
         plan[#plan].refused and "; the second Jackpot refused" or ""))
-    end),
-  })
+    end)
+  return H.seqStep(steps)
 end
 
 H.run({ maxFrames = 90000 }, {

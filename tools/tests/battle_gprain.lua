@@ -19,7 +19,26 @@
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
+-- the draw this suite needs (kit-setzer round 4: a lone Mad Oscar had
+-- crept in, and the split across bodies and the special chip stopped
+-- running): at least one toss over two or more bodies, and at least one
+-- chip on a special-weak body
+local function coverage(all, tag)
+  local split, chip = 0, 0
+  for _, ps in ipairs(all) do
+    for _, p in ipairs(ps) do
+      if #p.hits >= 2 then split = split + 1 end
+      for _, h in ipairs(p.hits) do if h.chip then chip = chip + 1 end end
+    end
+  end
+  H.log(string.format("[%s] coverage: %d toss(es) split over two or more bodies, %d special chip(s)", tag, split, chip))
+  H.assertEq(split > 0, true, tag .. ": a toss split across two or more bodies (the draw deals a crowd)")
+  H.assertEq(chip > 0, true, tag .. ": a toss chipped a special-weak body")
+end
+
 local SETZER, COIN_TOSS_RELIC = 9, 0xD6
+-- frames stood at the save point before the walk: picks the room's draw
+SETZER_WAIT = SETZER_WAIT or 0
 
 
 local function walkToBattle()
@@ -53,6 +72,7 @@ H.run({ maxFrames = 200000 }, {
   H.call(function()
     H.assertEq(H.readByte(0x1600 + 37 * SETZER + 0x23), COIN_TOSS_RELIC, "SETZER wears the Coin Toss relic")
   end),
+  H.waitFrames(SETZER_WAIT),
   H.driveUntil(function() return #done >= #WANT end, 160000, {
     H.call(function()
       battles = battles + 1
@@ -86,12 +106,14 @@ H.run({ maxFrames = 200000 }, {
     end)(),
   }, "both GP Rains resolve"),
   H.call(function()
+    local all = {}
     H.assertEq(#done, #WANT, "two GP Rains resolved")
     for i, r in ipairs(done) do
       H.assertEq(r.row, 0x18, string.format("record %d is a GP Rain", i))
       H.assertEq(r.boost, WANT[i].boost, string.format("record %d ran at its planned boost", i))
-      checkRain(r, i)
+      all[#all + 1] = checkRain(r, i)
     end
+    coverage(all, "gprain")
     H.log(string.format("[gprain] PASSED: %d GP Rains over %d battle(s)", #done, battles))
   end),
 })
