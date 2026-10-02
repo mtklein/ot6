@@ -1029,9 +1029,36 @@ def selftest():
         check("seed consumes both halves of its source AND its stamp (#75)",
               "seed build/states/b.mss.lua build/states/b.mss "
               "build/states/b.stamp" in text)
-        check("seed copies the stamp with the state (#75)",
-              "for x in mss mss.lua stamp;" in text
-              and "cp build/states/$src.$$x build/states/$state.$$x" in text)
+        check("seed copies the halves and the stamp through seed_copy (#75)",
+              "savestate_ninja.py --seed $src $state" in text)
+        # seed_copy itself: a fresh seed is a verbatim copy; a provenance-
+        # only change to the source's stamp leaves the seed's stamp alone;
+        # a binding change (or a moved half) rewrites it.
+        sd = root / "seedcopy"
+        sd.mkdir()
+        (sd / "s.mss").write_bytes(b"half")
+        (sd / "s.mss.lua").write_bytes(b"lua")
+        stamp = "sig gen_s\nrom r1\ngenerator g1\nlib x l1\nartifact a1\n"
+        (sd / "s.stamp").write_text(stamp)
+        seed_copy(sd, "s", "c")
+        check("seed_copy: a fresh seed is a verbatim copy of halves and stamp",
+              all((sd / f"c.{x}").read_bytes() == (sd / f"s.{x}").read_bytes()
+                  for x in ("mss", "mss.lua", "stamp")))
+        (sd / "s.stamp").write_text(stamp.replace("lib x l1", "lib x l2")
+                                    .replace("sig gen_s", "sig2 gen_s"))
+        seed_copy(sd, "s", "c")
+        check("seed_copy: a provenance-only change leaves the seed's stamp alone",
+              (sd / "c.stamp").read_text() == stamp)
+        (sd / "s.stamp").write_text(stamp.replace("artifact a1", "artifact a2"))
+        seed_copy(sd, "s", "c")
+        check("seed_copy: a binding change rewrites the seed's stamp",
+              (sd / "c.stamp").read_bytes() == (sd / "s.stamp").read_bytes())
+        (sd / "s.stamp").write_text(stamp.replace("lib x l1", "lib x l3"))
+        (sd / "s.mss").write_bytes(b"half2")
+        seed_copy(sd, "s", "c")
+        check("seed_copy: a moved half rewrites the seed's stamp too",
+              (sd / "c.stamp").read_bytes() == (sd / "s.stamp").read_bytes()
+              and (sd / "c.mss").read_bytes() == b"half2")
         check("seed rewrites only changed bytes (restat)",
               text.split("rule seed")[1].split("rule ")[0].count("restat = 1") == 1)
         # provenance ancestors: what each edge tells savestate_stamp.sh to
