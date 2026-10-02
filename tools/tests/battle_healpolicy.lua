@@ -1033,9 +1033,12 @@ H.run({ maxFrames = 3000 }, {
       "the killing blow 75 -> 0 stays a floor (lb 75); the smallest hit stays 544")
     -- item 4: counters and buffs stay out of the typical mean; the mean waits
     local n0 = L.actN
+    L = H.ledgerCommit(L, { cmd = 0x00, counter = true, party = 0x01 }, {})
+    H.assertEq(L.actN, n0, "a counterattack that lands nothing is no action of the typical mean (never a zero)")
     L = H.ledgerCommit(L, { cmd = 0x00, counter = true, party = 0x01 }, { { e = 0, drop = 90, last = 500, hp = 410 } })
-    H.assertEq(L.actN, n0, "a counterattack is no action of the typical mean")
-    H.assertEq(L.maxOn[0], 90, "...but its hit is still in the worst on that member")
+    H.assertEq(L.actN .. "/" .. L.maxOn[0], (n0 + 1) .. "/90",
+      "a counterattack that lands counts at its hit (Dullahan's Battle is his counter, $B1 bit 0)")
+    n0 = L.actN
     L = H.ledgerCommit(L, { cmd = 0x02, party = 0x00 }, {})
     H.assertEq(L.actN, n0, "a buff on its own side (no party bit, nothing dropped) is no action of the mean")
     L = H.ledgerCommit(L, { cmd = 0x2E, party = 0x01 }, {})
@@ -1064,6 +1067,13 @@ H.run({ maxFrames = 3000 }, {
     local cw = { hp = 300, maxhp = 619, by = 2, until_ = 1000, lo = 202, hi = 230 }
     H.assertEq(H.healWatchStep(cw, 550, 10), "outside", "a +250 rise outside the cure's 202..230 is another heal")
     H.assertEq(H.healWatchStep(cw, 520, 10), "measured", "a +220 rise inside 202..230 is the cure")
+    -- an item's band is its power byte exactly: the r10 labs read "item $E9
+    -- restored 490" (two Potions summed) and "restored 236"
+    local pw = H.itemPower(0xE9)
+    local iw = { hp = 300, maxhp = 1600, by = 3, until_ = 1000, lo = pw, hi = pw }
+    H.assertEq(H.healWatchStep(iw, 300 + pw, 10), "measured", string.format("a Potion's +%d is the Potion", pw))
+    H.assertEq(H.healWatchStep(iw, 790, 10), "outside", "a +490 rise is not one Potion")
+    H.assertEq(H.healWatchStep(iw, 536, 10), "outside", "a +236 rise is not one Potion")
     -- item 5 of f8f9ad66: a queued cure-hit that will not run is stale
     local q = { tick = 100 }
     H.assertEq(H.queuedHitStale(q, { hp = 0, tick = 110 }), "it fell", "a hitter who fell")
@@ -1076,6 +1086,12 @@ H.run({ maxFrames = 3000 }, {
     -- review of bcf5240f, item 5: an unmeasured cure priced from the ROM's
     -- formula, at variance's low end: power 10, magic power 40, level 20
     -- -> 40 + 40 x 10 x 20 / 32 = 290, x 224/256 + 1 = 254
+    -- the top-up a raise was planned on goes through whatever the round
+    -- costs (#168; Dullahan arm B k0_s0_w9, review of ad048b29)
+    H.assertEq(H.healDecision({ hp = 213, maxhp = 1710, restore = 250, roundCost = 1083, allies = 3, owed = true }),
+      "the raise's top-up (#168)", "a raised member at 213/1710 owed its top-up gets it under a 1083 round")
+    H.assertEq(H.healDecision({ hp = 213, maxhp = 1710, restore = 250, roundCost = 1083, allies = 3 }), nil,
+      "...and without the raise behind it the lift rule refuses the same Potion")
     local lo, hi = H.cureRestoreMin({ power = 10, heal = true, flags2 = 0x20, level = 20, magpow = 40 })
     H.assertEq(lo .. ".." .. hi, "254..289", "a cure that ignores defense: 254 at least, 289 at most (290 x 255/256 + 1)")
     H.assertEq(H.cureRestoreMin({ power = 10, heal = true, flags2 = 0x00, level = 20, magpow = 40, mdef = 51 }),
