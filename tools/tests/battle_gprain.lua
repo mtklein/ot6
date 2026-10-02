@@ -1,26 +1,26 @@
 -- @suite slow
 -- battle_gprain.lua -- the Coin Toss relic's GP Rain since #319: Slot gives
 -- way to GP Rain (no table), and its coins are now special (one chip on a
--- special-weak body) and boostable (the boost doubles the coins, as Coin
--- Toss's does; before, GP Rain's boost bought nothing, because Ot6BoostDmg's
--- multiplier runs in CalcDmg and GP Rain's effect overwrites the damage).
+-- special-weak body) and boostable (the boost buys another toss a point, as
+-- Coin Toss's does; before, GP Rain's boost bought nothing, because
+-- Ot6BoostDmg's multiplier runs in CalcDmg and GP Rain's effect overwrites
+-- the damage).
 --
 -- Played, no writes: Continue the wor-tomb-v1 battery, put the bag's Coin
 -- Toss relic on SETZER through the Relic menu (H.equipKit), walk Darill's
 -- Tomb's east room into a random battle, and throw GP Rain from the command
 -- row (H.setzerBattle's `cmd` entries) at 1 BP and unboosted, as many
 -- battles as the draws take (at most four).  Per throw (Cmd_18's entry and
--- SETZER's Ot6ActionEnd): the command list holds GP Rain and no Slot; the
--- gil is level x 30 x 2^boost and the purse falls by it; the damage is twice
--- that over the targets, halved while a body's shields hold, doubled once
--- Broken, capped at 9,999 and the HP; every chip call carries special ($08)
--- and a special-weak shielded body loses one shield.
+-- SETZER's Ot6ActionEnd): the command list holds GP Rain and no Slot; 1 +
+-- boost tosses, each that finds a body paying level x 30; every toss
+-- replayed (H.setzerCheckCoins: twice its gil over the bodies it hit, the
+-- shields' halving, the Broken double, the cap, special on every hit, a
+-- shield off a special-weak body).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SETZER, COIN_TOSS_RELIC = 9, 0xD6
 
-local function bits(m) local n = 0; while m > 0 do n = n + (m & 1); m = m >> 1 end; return n end
 
 local function walkToBattle()
   local wp = 1
@@ -33,33 +33,7 @@ local function walkToBattle()
 end
 
 local function checkRain(r, i)
-  local want = r.level * 30 * (1 << r.boost)
-  H.log(string.format("[gprain] rain %d at %d BP, L%d: TakeGil %s, purse %d -> %d, targets $%02X", i, r.boost,
-    r.level, tostring(r.cost), r.gil0, r.gil1, r.targets))
-  H.assertEq(r.cost, want, string.format("rain %d: the gil thrown is level x 30 x 2^boost", i))
-  H.assertEq(r.gil0 - r.gil1, want, string.format("rain %d: the purse falls by that", i))
-  local n = bits(r.targets)
-  for _, c in ipairs(r.chips) do
-    if c.y >= 8 then H.assertEq(c.class, 0x08, string.format("rain %d: the coins are special", i)) end
-  end
-  for s = 0, 5 do
-    if (r.targets >> s) & 1 == 1 then
-      local o, m = r.mon0[s], r.mon1[s]
-      local d = (2 * want) // n
-      local sh = o.sh
-      local chip = o.sh > 0 and o.brk == 0 and (o.cls & 0x08) ~= 0
-      if chip then sh = sh - 1 end
-      if o.brk == 0 and sh > 0 then d = (d * 8) >> 4
-      elseif (o.brk ~= 0 or (chip and sh == 0)) and d < 32768 then d = d * 2 end
-      d = math.min(d, 9999, o.hp)
-      H.log(string.format("[gprain]   slot %d: HP %d -> %d (want -%d), shields %d -> %d (row $%02X)", s, o.hp, m.hp,
-        d, o.sh, m.sh, o.cls))
-      H.assertEq(o.hp - m.hp, d, string.format("rain %d: slot %d's share of the coins", i, s))
-      if not (chip and sh == 0) then
-        H.assertEq(o.sh - m.sh, chip and 1 or 0, string.format("rain %d: slot %d's shields", i, s))
-      end
-    end
-  end
+  return H.setzerCheckCoins(r, i, 30, function() return 0x08 end, "gprain")
 end
 
 local WANT = { { cmd = 0x18, boost = 1 }, { cmd = 0x18, boost = 0 } }

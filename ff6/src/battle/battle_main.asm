@@ -4143,6 +4143,7 @@ _189e:  tyx
 Cmd_18:
 @1907:  tyx
         jsr     _c2298a
+        jsl     Ot6RainPasses   ; ot6: a character's boost buys tosses
         inc     $11a6
         lda     #$60
         tsb     $11a2
@@ -10691,10 +10692,11 @@ _3fb6:  rts
 AttackerEffect_51:
 @3fb7:  jsl     Ot6CoinPrice    ; ot6: was level x 30 (lda $3b18,y / xba /
                                 ;   lda #$1e / jsr MultAB): the same for a
-                                ;   monster; a character's coins double per
-                                ;   boost point, Hired Help pays level x 50,
-                                ;   and the coins' break class is set
-        longa
+                                ;   monster, level x 50 for Hired Help, and
+                                ;   the coins' break class is set; carry set
+        bcc     :+              ;   = a character's pass with no body left
+        rts                     ;   standing: nothing to pay for or hit
+:       longa
         cpy     #$08
         bcs     @3fd3
         jsr     TakeGil

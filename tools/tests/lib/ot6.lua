@@ -4860,7 +4860,8 @@ end
 --   Slot at 3 BP in a random battle against two or more: a chosen triple,
 --     whatever reel 1 stops on (ot6_slot.asm), never a miss.
 --   Coin Toss when it chips two or more bodies (revealed special on each
---     living, shielded, unbroken monster).
+--     living, shielded, unbroken monster): a toss a point, as many as the
+--     most shields among them want, the bank holds and the purse pays.
 --   Hired Help when the target is shielded and unbroken, its revealed row
 --     holds a physical class, and SETZER's own Fight keys none of it: a hire
 --     a point, as many as the shields want, the bank holds and the purse
@@ -4928,18 +4929,23 @@ function Driver:setzerLine(actor, have)
   -- Coin Toss
   local coinPrice = M.setzerGil(level, 30, 0)
   if o.coin ~= false and gilRows and gil - coinPrice >= floorGil then
-    local n = 0
+    local n, most = 0, 0
     for s = 0, 5 do
       if monAlive(s) and M.readByte(BATTLE.SH_CUR + s * 2) > 0
-         and M.readByte(BATTLE.BRK_TICKS + s * 2) == 0 then
-        n = n + hitChips(s, 0x08, 0)
+         and M.readByte(BATTLE.BRK_TICKS + s * 2) == 0 and hitChips(s, 0x08, 0) > 0 then
+        n = n + 1
+        most = math.max(most, M.readByte(BATTLE.SH_CUR + s * 2))
       end
     end
     if n >= 2 then
-      M.log(string.format("[%s] actor=%d SETZER Coin Toss: %d gil of %d, special chips %d bodies",
-        tag, actor, coinPrice, gil, n))
+      -- a toss a point, one chip a special-weak body each: as many as the
+      -- most shields among them want (bank and purse allowing)
+      local b = math.max(0, math.min(have, 3, most - 1))
+      while b > 0 and gil - coinPrice * (1 + b) < floorGil do b = b - 1 end
+      M.log(string.format("[%s] actor=%d SETZER Coin Toss at %d BP: %d toss(es) at %d gil of %d, special chips "
+        .. "%d bodies", tag, actor, b, 1 + b, coinPrice, gil, n))
       return { kind = "skill", cmd = BATTLE.CMD_SLOT, skill = BATTLE.SETZER.COIN, row = row,
-               boostLeft = 0, reason = "coin" }
+               boostLeft = b, reason = "coin" }
     end
   end
   -- Hired Help: a hire a point, one chip each, so as many as the shields
@@ -7647,7 +7653,7 @@ function M.setzerBattle(plan, opts)
       Z.rec = { row = row, boost = M.readByte(0x3E9D + e), level = M.readByte(0x3B18 + e),
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
-        entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {} }
+        entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {} }
     end, emu.callbackType.exec, a, a)
     -- the Coin Toss relic's GP Rain (command $18, no table): its own record
     local g = M.sym("Cmd_18")
@@ -7658,20 +7664,23 @@ function M.setzerBattle(plan, opts)
       Z.rec = { row = 0x18, boost = M.readByte(0x3E9D + e), level = M.readByte(0x3B18 + e),
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
-        entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {} }
+        entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {} }
     end, emu.callbackType.exec, g, g)
     local t = M.sym("TakeGil")
     emu.addMemoryCallback(function()
       if live() and Z.rec then
         local c = emu.getState()["cpu.a"] & 0xffff
         Z.rec.cost = Z.rec.cost or c
-        Z.rec.costs[#Z.rec.costs + 1] = c          -- one per pass: a hire each
+        Z.rec.costs[#Z.rec.costs + 1] = c          -- one per pass that pays
+        Z.rec.seq[#Z.rec.seq + 1] = { t = "pay", c = c }
       end
     end, emu.callbackType.exec, t, t)
     local c = M.sym("Ot6ClassChip")
     emu.addMemoryCallback(function()
       if live() and Z.rec then
-        Z.rec.chips[#Z.rec.chips + 1] = { y = emu.getState()["cpu.y"] & 0xff, class = M.readByte(0x57B8) }
+        local ev = { y = emu.getState()["cpu.y"] & 0xff, class = M.readByte(0x57B8) }
+        Z.rec.chips[#Z.rec.chips + 1] = ev
+        Z.rec.seq[#Z.rec.seq + 1] = { t = "hit", y = ev.y, class = ev.class }
       end
     end, emu.callbackType.exec, c, c)
     emu.addMemoryCallback(function(_, v)
@@ -7861,6 +7870,99 @@ function M.setzerBattle(plan, opts)
         #M.vars.setzer, #plan, k))
     end),
   })
+end
+
+-- M.setzerReplay(r, classOf): replay a coin row's passes (Coin Toss, Hired
+-- Help, the relic's GP Rain) from the record's opening state, in the order
+-- the engine ran them (r.seq: each paying pass's TakeGil, then one
+-- Ot6ClassChip call a body it hit).  A pass deals twice its gil over the
+-- bodies it hit; a body whose row holds the pass's class (classOf(row), the
+-- class the ROM should have used) and stands shielded and unbroken loses a
+-- shield, Broken when the last goes; the hit is halved while its shields
+-- hold, doubled once Broken, capped at 9,999 and at its HP.  Returns the
+-- replayed bodies { [slot] = { hp, sh, brk, cls } }, the passes { { cost,
+-- hits = { {slot, class, want, d, chip} } } }, and every class the ROM used
+-- that classOf did not name (a list of strings, empty when they agree).
+function M.setzerReplay(r, classOf)
+  local st = {}
+  for b = 0, 5 do local o = r.mon0[b]; st[b] = { hp = o.hp, sh = o.sh, brk = o.brk ~= 0, cls = o.cls } end
+  local passes, cur, bad = {}, nil, {}
+  for _, ev in ipairs(r.seq or {}) do
+    if ev.t == "pay" then
+      cur = { cost = ev.c, hits = {} }
+      passes[#passes + 1] = cur
+    elseif ev.t == "hit" and ev.y >= 8 and cur then
+      cur.hits[#cur.hits + 1] = { slot = (ev.y - 8) // 2, class = ev.class }
+    end
+  end
+  for pi, p in ipairs(passes) do
+    local n = math.max(1, #p.hits)
+    for _, h in ipairs(p.hits) do
+      local t = st[h.slot]
+      h.want = classOf(t.cls)
+      if h.class ~= h.want then
+        bad[#bad + 1] = string.format("pass %d slot %d: class $%02X, want $%02X (row $%02X)", pi, h.slot, h.class,
+          h.want, t.cls)
+      end
+      h.chip = h.want ~= 0 and (t.cls & h.want) ~= 0 and t.sh > 0 and not t.brk
+      if h.chip then t.sh = t.sh - 1; if t.sh == 0 then t.brk = true end end
+      local d = (2 * p.cost) // n
+      if not t.brk and t.sh > 0 then d = (d * 8) >> 4 elseif t.brk and d < 32768 then d = d * 2 end
+      d = math.min(d, 9999, t.hp)
+      t.hp = t.hp - d
+      h.d = d
+    end
+  end
+  return st, passes, bad
+end
+
+-- M.setzerCheckCoins(r, i, rate, classOf, tag): a coin row's record held to
+-- the design (kits.md "Setzer"): 1 + boost passes, each that found a body
+-- paying level x rate (a pass past the last standing body pays nothing,
+-- and then every body has fallen), the purse falling by exactly those, no
+-- MP, the bank charged the boost (or +1 unboosted), the ROM's class on every
+-- hit the one classOf names, and every body's HP and shields at the end the
+-- M.setzerReplay of the passes.  Logs one line a pass.
+function M.setzerCheckCoins(r, i, rate, classOf, tag)
+  local fee = r.level * rate
+  local st, passes, bad = M.setzerReplay(r, classOf)
+  local paid = r.gil0 - r.gil1
+  M.log(string.format("[%s] %d at %d BP, L%d: %d paying pass(es) of %d, purse %d -> %d (paid %d), targets $%02X", tag,
+    i, r.boost, r.level, #passes, 1 + r.boost, r.gil0, r.gil1, paid, r.targets))
+  for pi, p in ipairs(passes) do
+    local t = {}
+    for _, h in ipairs(p.hits) do
+      t[#t + 1] = string.format("slot %d -%d%s", h.slot, h.d, h.chip and " chip" or "")
+    end
+    M.log(string.format("[%s]   pass %d: TakeGil %d; %s", tag, pi, p.cost, table.concat(t, ", ")))
+  end
+  local sum = 0
+  for pi, p in ipairs(passes) do
+    M.assertEq(p.cost, fee, string.format("%s %d, pass %d: level x %d, whatever the boost", tag, i, pi, rate))
+    M.assertEq(#p.hits >= 1, true, string.format("%s %d, pass %d paid and hit a body", tag, i, pi))
+    sum = sum + p.cost
+  end
+  M.assertEq(#passes >= 1 and #passes <= 1 + r.boost, true, string.format("%s %d: 1 + boost passes at most", tag, i))
+  if #passes < 1 + r.boost then
+    for b = 0, 5 do
+      if r.mon0[b].present then
+        M.assertEq(r.mon1[b].hp, 0, string.format("%s %d: %d of %d passes paid, so slot %d fell", tag, i, #passes,
+          1 + r.boost, b))
+      end
+    end
+  end
+  M.assertEq(paid, sum, string.format("%s %d: the purse falls by every paying pass and no other", tag, i))
+  M.assertEq(r.mp1, r.mp0, string.format("%s %d: no MP", tag, i))
+  M.assertEq(r.bank1, r.boost == 0 and math.min(5, r.bank0 + 1) or r.bank0 - r.boost,
+    string.format("%s %d: the bank (%d before, %d BP)", tag, i, r.bank0, r.boost))
+  M.assertEq(#bad, 0, string.format("%s %d: the class on every hit (%s)", tag, i, table.concat(bad, "; ")))
+  for b = 0, 5 do
+    if r.mon0[b].present then
+      M.assertEq(r.mon1[b].hp, st[b].hp, string.format("%s %d: slot %d's HP after every pass", tag, i, b))
+      M.assertEq(r.mon1[b].sh, st[b].sh, string.format("%s %d: slot %d's shields after every pass", tag, i, b))
+    end
+  end
+  return passes
 end
 
 -- ---- what leaves a battle alive, and what the battle paid (#255) ----

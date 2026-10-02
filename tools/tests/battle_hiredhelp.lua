@@ -50,65 +50,7 @@ local function sellsword(row)
 end
 
 local function checkHire(r, i)
-  local fee = r.level * 50
-  local paid = r.gil0 - r.gil1
-  H.log(string.format("[hiredhelp] hire %d at %d BP, L%d: TakeGil %s, purse %d -> %d, targets $%02X", i,
-    r.boost, r.level, table.concat((function() local t = {} for _, c in ipairs(r.costs) do t[#t + 1] = c end
-    return t end)(), "/"), r.gil0, r.gil1, r.targets))
-  H.assertEq(#r.costs, 1 + r.boost, string.format("hire %d: 1 + boost hires (%d BP)", i, r.boost))
-  for k, c in ipairs(r.costs) do
-    H.assertEq(c, fee, string.format("hire %d, hit %d: the fee is level x 50, whatever the boost", i, k))
-  end
-  H.assertEq(paid, fee * (1 + r.boost), string.format("hire %d: the purse falls by every fee", i))
-  H.assertEq(r.mp1, r.mp0, string.format("hire %d: no MP", i))
-  local bank = r.boost == 0 and math.min(5, r.bank0 + 1) or r.bank0 - r.boost
-  H.assertEq(r.bank1, bank, string.format("hire %d: the bank (%d before, %d BP)", i, r.bank0, r.boost))
-  H.assertEq(r.targets ~= 0, true, string.format("hire %d was aimed at the monsters", i))
-  -- every hire lands on the body its chip call names (the first on the
-  -- target; one that outlives its target re-targets), with the class that
-  -- body's row names first: replay them in order from the opening state
-  local st = {}
-  for b = 0, 5 do local o = r.mon0[b]; st[b] = { hp = o.hp, sh = o.sh, brk = o.brk ~= 0, cls = o.cls } end
-  local hits = {}
-  for _, c in ipairs(r.chips) do if c.y >= 8 then hits[#hits + 1] = c end end
-  if #hits < 1 + r.boost then
-    -- a hire past the last standing body lands nowhere
-    for bb = 0, 5 do
-      if r.mon0[bb].present then
-        H.assertEq(r.mon1[bb].hp, 0, string.format("hire %d: %d of %d hires landed, so slot %d fell", i, #hits,
-          1 + r.boost, bb))
-      end
-    end
-  end
-  H.assertEq(#hits >= 1 and #hits <= 1 + r.boost, true, string.format("hire %d: a hit a hire", i))
-  -- one body a hire: the first lands on a body the queued mask named (the
-  -- single-target ChooseTarget picks within it)
-  local s0 = (hits[1].y - 8) // 2
-  H.assertEq((r.targets >> s0) & 1, 1, string.format("hire %d: the first lands inside the aimed mask $%02X (slot %d)",
-    i, r.targets, s0))
-  for k, c in ipairs(hits) do
-    local b = (c.y - 8) // 2
-    local t = st[b]
-    local class = sellsword(t.cls)
-    H.assertEq(c.class, class, string.format("hire %d, hit %d: the sellsword's class on slot %d (row $%02X)", i, k, b,
-      t.cls))
-    local chip = class ~= 0 and t.sh > 0 and not t.brk
-    if chip then t.sh = t.sh - 1; if t.sh == 0 then t.brk = true end end
-    local d = 2 * fee
-    if not t.brk and t.sh > 0 then d = (d * 8) >> 4 elseif t.brk and d < 32768 then d = d * 2 end
-    d = math.min(d, 9999, t.hp)
-    t.hp = t.hp - d
-    H.log(string.format("[hiredhelp]   hit %d on slot %d: -%d (%s), HP now %d, shields %d", k, b, d,
-      chip and "chips" or "no chip", t.hp, t.sh))
-  end
-  for b = 0, 5 do
-    if r.mon0[b].present then
-      H.assertEq(r.mon1[b].hp, st[b].hp, string.format("hire %d: slot %d's HP after every hit", i, b))
-      if r.mon1[b].brk == 0 or r.mon0[b].brk ~= 0 then
-        H.assertEq(r.mon1[b].sh, st[b].sh, string.format("hire %d: slot %d's shields after every hit", i, b))
-      end
-    end
-  end
+  return H.setzerCheckCoins(r, i, 50, sellsword, "hiredhelp")
 end
 
 local WANT = { { row = HIRE, boost = 1 }, { row = HIRE, boost = 0 } }   -- two hires, then one

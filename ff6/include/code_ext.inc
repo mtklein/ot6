@@ -33,7 +33,8 @@ CODE_EXT_INC = 1
 .global Ot6SetzerExec            ;   Cmd_0f's dispatch (coin toss/hired help/jackpot)
 .global Ot6SetzerEffect          ;   the row's attack props + special effect
 .global Ot6SlotKitRow            ;   FixPlayerAttack: a kit row maps to no reel
-.global Ot6CoinPrice             ;   GP Rain's gil: rate x level x 2^boost, + class
+.global Ot6CoinPrice             ;   GP Rain's gil: rate x level, + class
+.global Ot6RainPasses            ;   the relic's GP Rain: the boost buys tosses
 .global Ot6JackpotDice           ;   the dice effect's Jackpot arm: a fixed triple
 .global Ot6BlitzListOpen         ; v0.3 blitz-as-menu: _c1776b -> tools shell
 .global Ot6BushidoListOpen       ; v0.5 bushido submenu (#8): swdtech -> tools shell

@@ -174,24 +174,25 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 
 ; ------------------------------------------------------------------------------
 
-; [ the coins' gil: rate x level, doubled per boost point ]
+; [ one throw's or one hire's gil: rate x level ]
 ;
 ; GP Rain's own price is the thrower's level x 30 (AttackerEffect_51) and its
-; damage is twice the gil thrown, split over the targets.  The coins are the
-; damage, so the boost buys more coins: x2 / x4 / x8 for 1 / 2 / 3 points,
-; and that one purchase is both the bigger price and the bigger hit (boost
-; pays once).  Hired Help's fee (rate 50) is one hire's and never doubles:
-; its boost buys more hires, each paying its own fee (Ot6SetzerEffect,
-; Ot6CoinTotal).  A monster's GP Rain is vanilla's: level x 30, no boost.
+; damage is twice the gil thrown, split over the targets; Hired Help's fee is
+; level x 50, twice it the hit.  The boost never makes one dearer: it buys
+; more of them -- another toss or another hire a point, one pass of the
+; action each (Ot6SetzerEffect; the relic's GP Rain, Ot6RainPasses), each
+; paying this price when it lands (owner, 2026-10-02: boost pays through
+; more hits, so a point never runs into the 9,999 cap on one hit).  A
+; monster's GP Rain is vanilla's.  At the ceiling (L99, rate 50) 4,950, so
+; the damage, twice it, cannot wrap.
 ;
-; The one price authority: the row's grey (Ot6SetzerRowGrey), the confirm's
-; refusal (the same grey), and the gil the action takes (Ot6CoinPrice) all
-; come through here, so they cannot disagree.
+; The one price authority: the row's grey (through Ot6CoinTotal), the
+; confirm's refusal (the same grey) and the gil each pass takes
+; (Ot6CoinPrice) all come through here, so they cannot disagree.
 ;
 ; in: A = the rate (gil per level), X = the payer's entity offset, db=$7e, a8,
 ; either index width.  out: the price in the whole 16-bit accumulator (B:A),
-; a8 and the caller's index width.  preserves X and Y.  At the game's
-; ceilings (level 99, rate 50, 3 points) it is 39,600: no overflow.
+; a8 and the caller's index width.  preserves X and Y.
 .proc Ot6CoinGil
         .a8
         php
@@ -200,26 +201,14 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         phx
         phy
         pha                     ; [1,s] the rate
-        txa                     ; width-neutral: the entity offset fits a byte
-        cmp     #$08
-        lda     #$00
-        bcs     :+              ; a monster: no boost
-        lda     $01,s
-        cmp     #OT6_HIRE_RATE
-        lda     #$00
-        bcs     :+              ; Hired Help: the boost buys hires, one fee
-                                ;   each, never a dearer one (Ot6CoinTotal)
-        lda     OT6_BOOST_REVEALED,x    ; the pending boost
-        and     #$03
-:       pha                     ; [1,s] the boost, [2,s] the rate
         lda     $3b18,x         ; the payer's level
         longa
         .a16
         and     #$00ff
         tay                     ; Y = the level, counted down
-        lda     $02,s
+        lda     $01,s
         and     #$00ff
-        pha                     ; [1,s] rate16, [3,s] boost, [4,s] rate
+        pha                     ; [1,s] rate16, [3,s] rate
         lda     #$0000
 @mul:   cpy     #$0000
         beq     @mulled
@@ -228,23 +217,16 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         dey
         bra     @mul
 @mulled:
-        tay                     ; Y = level x rate
-        lda     $03,s
-        and     #$0003
-        tax                     ; X = the boost
-        tya
-@dbl:   cpx     #$0000
-        beq     @done
-        asl                     ; one point: twice the coins
-        bcc     :+
-        lda     #$ffff          ; (out of reach: saturate rather than wrap)
-        bra     @done
-:       dex
-        bra     @dbl
-@done:  tay                     ; Y = the price
+        tay                     ; Y = level x rate (at most 99 x 50 = 4,950)
         pla                     ; drop rate16
-        pla                     ; drop the boost and the rate
-        tya                     ; C = the price
+        shorta
+        .a8
+        pla                     ; drop the rate
+        longa
+        .a16
+        tya
+        shorta                  ; C = the price (B keeps the high byte)
+        .a8
         ply
         plx
         plp
@@ -255,10 +237,10 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 
 ; [ the gil a coin row's whole action takes, at the pending boost ]
 ;
-; Coin Toss: one throw, Ot6CoinGil's (the boost doubles the coins).  Hired
-; Help: one fee a hire and 1 + boost hires (Ot6SetzerEffect adds the boost to
-; the action's attack count, and each pass pays its fee at AttackerEffect_51),
-; so the purse must hold them all.  At the ceilings (L99, 4 hires) 19,800.
+; Coin Toss and Hired Help alike: one price a pass and 1 + boost passes
+; (Ot6SetzerEffect adds the boost to the action's attack count, and each pass
+; that finds a body pays at AttackerEffect_51), so the purse must hold them
+; all.  At the ceilings (L99, rate 50, four passes) 19,800.
 ; in: A = the row id, X = the payer's entity offset, a8, i16.  out: the gil
 ; in the 16-bit accumulator (B:A), a8.  preserves X and Y.
 .proc Ot6CoinTotal
@@ -269,9 +251,7 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         jsl     Ot6CoinRate
         jsl     Ot6CoinGil      ; C = one throw's / one hire's gil
         tay                     ; Y = it (all 16 bits under i16)
-        pla                     ; the row
-        cmp     #OT6_SETZER_HIRE
-        bne     @one
+        pla                     ; the row (either coin row: 1 + boost passes)
         lda     OT6_BOOST_REVEALED,x
         and     #$03
         beq     @one            ; one hire
@@ -510,18 +490,15 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         stz     $3414           ; damage modification off
         lda     #$60
         sta     $11a2           ; ignore defense, don't split
+        lda     OT6_BOOST_REVEALED,x    ; every row: the boost buys more hits --
+        and     #$03                    ;   one more pass of the attack a point
+        clc                             ;   (Ot6HitCount's counter), each its own
+        adc     $3a70                   ;   toss, hire or roll, so no point is
+        sta     $3a70                   ;   lost to the 9,999 cap on one hit
         lda     f:$7e0000+OT6_SETZERROW
-        cmp     #OT6_SETZER_COIN
-        beq     @coins
-        lda     OT6_BOOST_REVEALED,x    ; Hired Help and Jackpot: the boost
-        and     #$03                    ;   buys more hits -- one more pass of
-        clc                             ;   the attack a point (Ot6HitCount's
-        adc     $3a70                   ;   counter), each its own hire or its
-        sta     $3a70                   ;   own roll, so no point is lost to
-        lda     f:$7e0000+OT6_SETZERROW ;   the 9,999 cap on one hit
         cmp     #OT6_SETZER_JACKPOT
         beq     @dice
-@coins: lda     #$18
+        lda     #$18
         sta     $b5             ; GP Rain's animation
         lda     #$a2            ; attacker special effect $51 (GP Rain)
         rtl
@@ -557,7 +534,12 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         tya                     ; width-neutral
         cmp     #$08
         bcs     @monster
-        lda     $3a7c           ; the queued command
+        lda     $b8             ; ChooseTarget's mask for this pass: none
+        ora     $b9             ;   left standing (the passes before felled
+        bne     @aimed          ;   them all) and the pass pays nothing
+        sec
+        rtl
+@aimed: lda     $3a7c           ; the queued command
         cmp     #$0f
         bne     @rain           ; command $18: the Coin Toss relic's GP Rain
         lda     f:$7e0000+OT6_SETZERROW
@@ -576,9 +558,29 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         lda     #OT6_COIN_RATE
 @price: phx
         tyx                     ; X = the payer (Ot6CoinGil pins its own width)
-        jsl     Ot6CoinGil      ; level x rate (x 2^boost for a character)
+        jsl     Ot6CoinGil      ; level x rate
         plx
+        clc                     ; a body to pay for
         rtl
+.endproc
+
+; [ the Coin Toss relic's GP Rain: the boost buys tosses ]
+;
+; Cmd_18 (command $18, a character's GP Rain from the relic) calls here after
+; its InitTarget: 1 + boost passes, each its own toss at level x 30, as Coin
+; Toss's.  A monster's GP Rain is vanilla's single pass.
+; entry: jsl, a8/i8, db=$7e, x = the attacker.  clobbers a; preserves x/y.
+.proc Ot6RainPasses
+        .a8
+        txa                     ; width-neutral
+        cmp     #$08
+        bcs     @done           ; a monster: one pass
+        lda     OT6_BOOST_REVEALED,x
+        and     #$03
+        clc
+        adc     $3a70
+        sta     $3a70
+@done:  rtl
 .endproc
 
 ; [ Hired Help's class: the first physical class the target is weak to ]
@@ -632,8 +634,8 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ; level x 2, times the face again for the triple, saturating at 65,535 as the
 ; effect's own loop does -- and carry set, so the effect returns at once.
 ;
-; The face is a gamble, even odds on 1-6 (one battle Rand mod 6, within
-; 1/256 of even), and the boost buys more of it: Ot6SetzerEffect adds the
+; The face is a gamble, even odds on 1-6 (one battle Rand, redrawn past 251,
+; mod 6: each face 42 of 252), and the boost buys more of it: Ot6SetzerEffect adds the
 ; boost to the action's attack count, so 1 + boost passes each roll their own
 ; triple and land their own hit (owner, 2026-10-02: a gamble, and every point
 ; must land something under the 9,999 cap on one hit; playtesting tunes it).
@@ -668,13 +670,14 @@ Ot6JackpotCubeTbl:
         .a8
         .i8
         phx
-        ot6_rand                ; A = 0-255
+@draw:  ot6_rand                ; A = 0-255
+        cmp     #252            ; 252 = 42 x 6: a draw past it is drawn
+        bcs     @draw           ;   again, so the six faces are even exactly
 @mod6:  cmp     #$06
         bcc     @rolled
         sbc     #$06            ; (carry is set: the cmp above)
         bra     @mod6
-@rolled:                        ; A = the face index 0-5, even odds within
-                                ;   1/256 (256 is not a multiple of 6)
+@rolled:                        ; A = the face index 0-5, each 42 of 252
         sta     $b6             ; the third die
         sta     $b7
         asl

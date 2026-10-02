@@ -16,15 +16,17 @@
 --   * the table: Slot $5C, Coin Toss $59, Hired Help $5A, Jackpot $5B down
 --     the left column, Jackpot priced 99 MP and the rest unpriced, Coin
 --     Toss targeting the enemy side ($6A, GP Rain's), mode 4;
---   * the gil: TakeGil takes level x 30 at 0 BP and twice that at 1 BP
---     (the boost buys coins), and the purse falls by exactly that;
+--   * the tosses: 1 + boost of them (the boost buys tosses, owner
+--     2026-10-02), one pass of the action each, each that finds a body
+--     paying level x 30 (TakeGil), none past the last standing body, and
+--     the purse falling by exactly those;
 --   * no MP; the bank: +1 unboosted, -1 at 1 BP;
---   * the damage: twice the gil over the targets, each target's share
---     halved while its shields hold, doubled once Broken (the throw's own
---     chip can break it), never more than the HP it had;
---   * the class: every chip call carries special ($08), and a target loses
---     one shield exactly when its row holds special and it stood shielded
---     and unbroken.
+--   * every toss replayed from the opening state (H.setzerReplay): twice
+--     its gil over the bodies it hit, each share halved while shields hold,
+--     doubled once Broken (a toss's own chip can break it), capped at 9,999
+--     and the HP; the class special ($08) on every hit, a shield off a
+--     special-weak body that stood shielded and unbroken -- held against
+--     every body's HP and shields at the end.
 -- Negative controls: the mutant ROMs in build/attempts/wt/kit-setzer/
 -- (rate, boost, class) fail the named assertion.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
@@ -33,7 +35,6 @@ local H = dofile("tools/tests/lib/ot6.lua")
 SETZER_SKIP = SETZER_SKIP or 0
 local COIN = 0x59
 
-local function bits(m) local n = 0; while m > 0 do n = n + (m & 1); m = m >> 1 end; return n end
 
 local function walkToBattle()
   local wp = 1
@@ -58,37 +59,7 @@ local function checkList(l)
 end
 
 local function checkThrow(r, i)
-  local want = r.level * 30 * (1 << r.boost)
-  H.log(string.format("[cointoss] throw %d at %d BP, L%d: TakeGil %s, purse %d -> %d", i, r.boost, r.level,
-    tostring(r.cost), r.gil0, r.gil1))
-  H.assertEq(r.cost, want, string.format("throw %d: the gil thrown is level x 30 x 2^boost", i))
-  H.assertEq(r.gil0 - r.gil1, want, string.format("throw %d: the purse falls by that", i))
-  H.assertEq(r.mp1, r.mp0, string.format("throw %d: no MP", i))
-  local bank = r.boost == 0 and math.min(5, r.bank0 + 1) or r.bank0 - r.boost
-  H.assertEq(r.bank1, bank, string.format("throw %d: the bank (%d before, %d BP)", i, r.bank0, r.boost))
-  local n = bits(r.targets)
-  H.assertEq(n >= 1, true, string.format("throw %d hit at least one monster (mask $%02X)", i, r.targets))
-  for _, c in ipairs(r.chips) do
-    if c.y >= 8 then H.assertEq(c.class, 0x08, string.format("throw %d: the coins are special", i)) end
-  end
-  for s = 0, 5 do
-    if (r.targets >> s) & 1 == 1 then
-      local o, m = r.mon0[s], r.mon1[s]
-      local d = (2 * want) // n
-      local sh = o.sh
-      local chip = o.sh > 0 and o.brk == 0 and (o.cls & 0x08) ~= 0
-      if chip then sh = sh - 1 end
-      if o.brk == 0 and sh > 0 then d = (d * 8) >> 4
-      elseif (o.brk ~= 0 or (chip and sh == 0)) and d < 32768 then d = d * 2 end
-      d = math.min(d, 9999, o.hp)
-      H.log(string.format("[cointoss]   slot %d: HP %d -> %d (want -%d), shields %d -> %d (row $%02X, %s)",
-        s, o.hp, m.hp, d, o.sh, m.sh, o.cls, chip and "special: chips" or "no special chip"))
-      H.assertEq(o.hp - m.hp, d, string.format("throw %d: slot %d's share of the coins", i, s))
-      if not (chip and sh == 0) then
-        H.assertEq(o.sh - m.sh, chip and 1 or 0, string.format("throw %d: slot %d's shields", i, s))
-      end
-    end
-  end
+  return H.setzerCheckCoins(r, i, 30, function() return 0x08 end, "cointoss")
 end
 
 local WANT = { { row = COIN, boost = 1 }, { row = COIN, boost = 0 } }

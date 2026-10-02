@@ -34,7 +34,7 @@ Slot is the first entry and spins the reels as before. Coin Toss throws
 Gil at every monster, Setzer's level × 30 of it, for twice that in damage
 shared among them; the coins count as his special weapon type, so they
 chip a shield off every monster weak to cards and dice, and each Boost
-Point doubles both the Gil and the damage. Hired Help pays a sellsword
+Point throws them once more, chipping and paying again. Hired Help pays a sellsword
 Setzer's level × 50 Gil for a blow at one monster, dealt with whichever
 weapon type that monster is weak to (slashing, piercing or bludgeoning),
 so Setzer can break what his own weapon can't; each Boost Point hires one
@@ -45,5 +45,6 @@ anything from a dud to the maximum, and each Boost Point rolls the dice
 once more for another hit. Jackpot chips no shields, but a Broken target
 takes it doubled. The rows grey out when you can't pay or Jackpot is
 spent. Wearing the Coin Toss relic still swaps Slot for plain GP Rain,
-which now chips like Coin Toss and grows with boosting too. The Narshe
+which now chips like Coin Toss and throws once more for each Boost Point.
+A throw or a blow that finds no monster left standing costs nothing. The Narshe
 school's skills advisor has two new pages about it.

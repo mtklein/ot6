@@ -544,7 +544,7 @@ for #319 (2026-10-02), each with its reason.
 | # | Ability | Price | Chip | Boost buys | Source |
 |---|---|---|---|---|---|
 | 1 | Slot ✦ | free | the reel's attack | the rig's certainty (see Steal's ladder; `ot6_slot.asm`) | join |
-| 2 | Coin Toss | level × 30 gil | ¤, one per body (every enemy) | twice the coins per point: the gil and the damage both ×2/×4/×8 | join |
+| 2 | Coin Toss | level × 30 gil a toss | ¤, one per body a toss (every enemy) | another toss a point (1 + boost tosses, each its own gil, hit and chip) | join |
 | 3 | Hired Help | level × 50 gil a hire | the target's own physical class (slashing, else piercing, else bludgeoning), one a hire | another hire a point (1 + boost hires, each its own fee, hit and chip) | join |
 | 4 | **Jackpot** (divine) | 99 MP, once a battle | null-break | another roll a point (1 + boost rolls, each its own gamble and its own hit) | his World of Ruin return (Kohlingen, switch `$00CA`) |
 
@@ -568,12 +568,19 @@ the targets (the enemy side). *Reason: the relic named Coin Toss already
 is this verb in FF6; the kit row makes it Setzer's own without a relic
 slot.* Coins are ¤, like his cards and dice, so it chips one shield on each
 body whose row holds ¤: the wide ¤ key the guideline asks for ("Special is
-a common key"). **Boost pays once, in coins**: the damage is the gil, so a
-point throws twice the coins, and the bigger price and the bigger hit are
-one purchase (×2 per point, not MP's ×2.5, because the coins are the
-damage). The same rule now applies to the Coin Toss relic's GP Rain, whose
-boost used to buy nothing (Ot6BoostDmg's multiplier runs before GP Rain's
-effect overwrites the damage).
+a common key"). **Boost buys tosses** (owner, 2026-10-02: boost pays
+through more hits, never a bigger one, so no point is lost to the 9,999 cap
+on one hit -- at L50 one doubled toss already capped on a lone unshielded
+target): 1 + boost tosses, one pass of the action each (`Ot6SetzerEffect`
+adds the boost to the attack count), each at level × 30 gil, each its own
+hit on every body and its own ¤ chip on every ¤-weak one. Three points are
+four tosses and four chips a body. A toss that finds no body standing (the
+tosses before it felled them all) pays nothing, and so does such a hire
+(`Ot6CoinPrice`, `battle_hirerefund`). The Coin Toss relic's GP Rain buys
+tosses the same way (`Ot6RainPasses` in Cmd_18); before #319 its boost
+bought nothing (Ot6BoostDmg's multiplier runs before GP Rain's effect
+overwrites the damage). (Earlier the same day the boost doubled the coins,
+×2 gil and ×2 damage a point; set aside for the cap.)
 
 **Hired Help is a sellsword whose weapon fits the target.** One enemy; a
 hire costs level × 50 gil and lands twice its fee, and its break class is
@@ -591,8 +598,9 @@ Three points are four hires, four chips and 6,200 gil at L31; a hire
 lands 3,100 there (1,550 shielded, 6,200 on a Broken body), and its fee
 never passes 4,950 (L99), so the damage cannot wrap (the old one-hire x8
 fee wrapped from L82) and a hire that meets the cap on a Broken body still
-leaves every point its own hit. A hire that outlives its target
-goes to another body, as a multi-hit Blitz's swing does.
+leaves every point its own hit. A hire that outlives its target goes to
+another body, as a multi-hit Blitz's swing does, and one that finds none
+pays nothing.
 
 **Jackpot (divine): the Fixed Dice come up a triple.** One enemy, by
 vanilla's dice arithmetic: face³ × level × 2 for the three dice, times the
@@ -602,7 +610,9 @@ doubled once it is Broken, capped at 9,999. Null-break: the Fixed Dice
 are the outliers, so it chips nothing and ignores the row. **It is a
 gamble, and the boost buys more of it** (owner, 2026-10-02: Jackpot is a
 gamble, and every point must land something under the cap): each roll is
-a face 1-6 at even odds (one battle Rand mod 6, within 1/256), and the
+a face 1-6 at exactly even odds (one battle Rand, drawn again past 251, mod
+6: 42 of 252 each; a plain mod 6 on the byte would have favoured 1-4, 43
+of 256 against 42), and the
 boost buys another roll a point -- 1 + boost passes, each its own triple
 and its own hit. *Reason: a hit that can be a dud is the gambler's verb,
 and an extra roll is a purchase that always lands, at any level and
@@ -647,8 +657,9 @@ reads). Jackpot greys for MP or once spent. One authority each:
 `Ot6SetzerCost` (MP, flat, Ot6AbilityCost's `@slot` arm) and `Ot6CoinGil`
 (gil a throw or a hire; `Ot6CoinTotal` the whole action's, which the grey
 reads). Tests: `battle_cointoss`, `battle_hiredhelp`, `battle_jackpot`,
-`battle_setzergrey` (the purse's grey and refusal) and `battle_gprain`
-(the Coin Toss relic's GP Rain).
+`battle_setzergrey` (the purse's grey and refusal), `battle_gprain` (the
+Coin Toss relic's GP Rain) and `battle_hirerefund` (a hire past the last
+body pays nothing).
 
 **The route's driver plays the table** (`Driver:setzerLine`, lib/ot6.lua;
 #353), reading what an informed player would: Jackpot priced as the gamble
