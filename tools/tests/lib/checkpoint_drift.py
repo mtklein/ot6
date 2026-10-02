@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 """checkpoint_drift.py -- how far a tracked checkpoint has drifted from the
-play the chain from power-on makes today, and the re-cut.
+save the graph's play makes today, and the re-cut.
 
-A cut (tools/tests/savestate_graph.py, prev= with checkpoint=) boots its leg
-from the TRACKED checkpoint in tools/tests/checkpoints/<key>/.  `ninja
-chain` captures and seals a fresh one at the same save into
-build/checkpoints/<key>/ (savestate_ninja.py chain_plan): from the run of
-prev's copy, from a cutter= script booted from it, or, for a frontier
-checkpoint nothing boots yet, from the copy whose state says saves=.
-Every tracked checkpoint something boots is one of these
-(savestate_ninja.py --coverage).
+Every tracked checkpoint (tools/tests/checkpoints/<key>/) is made by one run
+on the savestate graph (savestate_ninja.py): a cut's prev, its cutter=, a
+saves= state, or a CAPTURES cutter.  That run captures the battery into
+build/checkpoints/<key>/, a seal edge makes it a checkpoint, and the cut
+after it Continues that capture.  The tracked copy is what suites and
+by-hand runs boot; this compares the two.
 
-The verdict is byte for byte: the chain is deterministic, so a tracked
-battery that is today's play is the fresh capture's bytes.  Only each save
+The verdict is byte for byte: the graph is deterministic, so a tracked
+battery that is today's play is the capture's bytes.  Only each save
 slot's play time ($1863-$1865) and checksum ($1FFE-$1FFF) are left out.
 Anything else that differs -- a slot, the OT6 codex in bank $31, the
 battery's own bytes -- is drift.
@@ -24,30 +22,24 @@ story switches; the encounter counters ($1FA1-$1FA5); espers, spells,
 SwdTech, Blitz, Lore, Rage and Dance; then every remaining differing slot
 byte, other slot, codex byte and battery byte by address.
 
-A capture is only compared or copied while it is today's: its provenance
-generator_sig must equal what `savestate_stamp.sh sig` gives now (the
-generator, the lib halves, the checkpoint it booted), and the chain state
-that captured it must have run on this tree's ROM.  A lib-only change does
-not re-run the chain, so without this a capture from before it would pass.
-
     checkpoint_drift.py KEY...            report; exit 0
     checkpoint_drift.py --strict KEY...   report; exit 1 if any KEY drifted
-                                          or its capture is stale (the
-                                          release gate, configure.py)
-    checkpoint_drift.py --recut KEY...    copy each sealed capture over its
-                                          tracked checkpoint (refused when
-                                          stale), then report
+                                          (the gate, build/checks/
+                                          checkpoint_drift.ok in `ninja`)
+    checkpoint_drift.py --recut KEY...    copy each capture over its tracked
+                                          checkpoint, refused unless the
+                                          capture's record is current
+                                          (lib/stamps.py), then report
     checkpoint_drift.py --selftest
 
-Re-cut at every release, and during a cycle whenever the report shows a
-material change (docs/TOOLING.md).  A suite that depends on a level or an
-item asserts its own precondition; the contracts stay light.
+The gate runs after the captures it reads, so they are current by
+construction.  A by-hand --recut asks lib/stamps.py, the same question
+`ninja` answers by the same inputs.
 """
 
 from __future__ import annotations
 
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -226,62 +218,6 @@ def explain(fresh: bytes, tracked: bytes, offs: list[int]) -> list[str]:
     return lines
 
 
-# ---------------------------------------------------- is the capture today's --
-def stamp_tool(*args) -> str:
-    r = subprocess.run(["sh", str(HERE / "savestate_stamp.sh"), *args],
-                       capture_output=True, text=True, cwd=ROOT)
-    if r.returncode != 0:
-        raise sc.CheckpointError(f"savestate_stamp.sh {' '.join(args)}: "
-                                 f"{r.stderr.strip()}")
-    return r.stdout.strip()
-
-
-def producer_stamp(key: str) -> Path | None:
-    """The record of the chain run that saves `key` (savestate_ninja.py
-    chain_producers): build/states/chain_<state>.stamp of the copy whose
-    run saves it, or build/checkpoints/<key>.rom for a cutter, which
-    publishes no state.  Both carry a `rom <sha>` line.  None when no run
-    on the graph saves `key`."""
-    import savestate_ninja as sn
-    run = sn.chain_producers(sn.load(ROOT)).get(key)
-    if run is None:
-        return None
-    return ROOT / sn.capture_record(key, run)
-
-
-def stale_reason(key: str, fresh_root=FRESH) -> str | None:
-    """Why the capture in fresh_root/key is not today's, or None."""
-    manifest, _ = sc.load(fresh_root / key)
-    prov = manifest.get("provenance")
-    if not isinstance(prov, dict):
-        return "it carries no mechanical provenance"
-    recorded = prov.get("generator_sig", "")
-    parts = recorded.split()
-    if len(parts) < 2:
-        return f"its generator_sig {recorded!r} is malformed"
-    try:
-        now = stamp_tool("sig", *parts[1:])
-    except sc.CheckpointError as exc:
-        return f"its signature cannot be recomputed ({exc})"
-    if now != recorded:
-        return (f"it was captured under sig {parts[0][:12]} of {parts[1]} and "
-                f"today's is {now.split()[0][:12]} (a generator, lib half or "
-                f"booted checkpoint changed since `ninja chain` ran)")
-    stamp = producer_stamp(key) if fresh_root == FRESH else None
-    if fresh_root == FRESH:
-        if stamp is None or not stamp.exists():
-            return ("no chain run's record (a chain_ stamp, or a cutter's "
-                    "build/checkpoints/<key>.rom) names the run that "
-                    "captured it")
-        rom = next((l.split()[1] for l in stamp.read_text().splitlines()
-                    if l.startswith("rom ")), None)
-        now_rom = stamp_tool("romsig")
-        if rom != now_rom:
-            return (f"{stamp.name} ran on ROM {str(rom)[:12]} and this tree's "
-                    f"is {now_rom[:12]}")
-    return None
-
-
 # ------------------------------------------------------------------ verbs --
 def compare(key: str, fresh_root=FRESH, tracked_root=TRACKED):
     """(differing offsets, explanation lines)."""
@@ -292,17 +228,33 @@ def compare(key: str, fresh_root=FRESH, tracked_root=TRACKED):
     return offs, (explain(fb, tb, offs) if offs else [])
 
 
-def recut(key: str, fresh_root=FRESH, tracked_root=TRACKED) -> None:
-    """Copy build/checkpoints/<key>/ over the tracked checkpoint: the
-    manifest, the payload and its provenance sidecar, as the chain sealed
-    them.  Validated first; refused when the capture is not today's."""
+def capture_problem(key: str, root=ROOT) -> str | None:
+    """Why the graph's capture of `key` is not today's, or None: its record
+    (build/checkpoints/<key>.stamp) asked the question `ninja` answers."""
+    import stamps
+    v, msg = stamps.stamp_status(f"build/checkpoints/{key}.stamp", root)
+    if v is None:
+        return "no capture record (build/checkpoints/<key>.stamp): run ninja"
+    return None if v == stamps.FRESH else msg
+
+
+def recut(key: str, fresh_root=FRESH, tracked_root=TRACKED,
+          problem=capture_problem) -> None:
+    """Copy the graph's sealed capture (manifest.json and payload) over the
+    tracked checkpoint.  Validated first; refused when the capture is not
+    today's.  A provenance sidecar the old capture path left beside a
+    tracked payload is removed: the manifest carries the record."""
     src, dst = fresh_root / key, tracked_root / key
-    why = stale_reason(key, fresh_root)
+    why = problem(key)
     if why:
-        raise sc.CheckpointError(f"refusing to re-cut from a stale capture: {why}")
+        raise sc.CheckpointError(f"refusing to re-cut from a capture that is "
+                                 f"not today's: {why}")
     manifest, payload = sc.load(src)
-    for name in ("manifest.json", payload.name, payload.name + ".provenance.json"):
+    for name in ("manifest.json", payload.name):
         shutil.copyfile(src / name, dst / name)
+    side = dst / (payload.name + ".provenance.json")
+    if side.exists():
+        side.unlink()
     sc.load(dst)
 
 
@@ -320,32 +272,26 @@ def main(argv: list[str]) -> int:
         try:
             if do_recut:
                 recut(key)
-            why = stale_reason(key) if (strict or do_recut) else None
             offs, lines = compare(key)
         except sc.CheckpointError as exc:
             print(f"checkpoint drift {key}: cannot compare -- {exc}")
             bad += 1
             refused += do_recut
             continue
-        if why:
-            bad += 1
-            print(f"checkpoint drift {key}: the chain's capture is stale -- {why}; "
-                  f"run `ninja chain` first")
-            continue
         if offs:
             bad += 1
             print(f"checkpoint drift {key}: {len(offs)} byte(s) differ from the "
-                  f"chain's fresh capture (build/checkpoints/{key}), play time "
-                  f"and checksums aside:")
+                  f"graph's capture (build/checkpoints/{key}), play time and "
+                  f"checksums aside:")
             for line in lines:
                 print(f"  {line}")
         else:
             print(f"checkpoint drift {key}: none -- the tracked save is the "
-                  f"one the chain makes today")
+                  f"one the graph makes today")
     if strict and bad:
         print(f"checkpoint drift: {bad} of {len(keys)} tracked checkpoint(s) "
-              f"are not today's play; run `ninja chain`, then re-cut them "
-              f"before releasing:\n"
+              f"are not today's play; re-cut them from the graph's captures "
+              f"and commit:\n"
               f"  python3 tools/tests/lib/checkpoint_drift.py --recut "
               + " ".join(keys))
         return 1
@@ -432,29 +378,26 @@ def selftest() -> int:
                                "payload_sha256": hashlib.sha256(data).hexdigest(),
                                "generator_sig": "0" * 64 + " gen_selftest",
                                "ancestors": []}}))
-            (d / "k.sram.provenance.json").write_text("{}")
+        (t / "tracked" / "k-v1" / "k.sram.provenance.json").write_text("{}")
         offs, lines = compare("k-v1", t / "fresh", t / "tracked")
         check("the report names the drift", any("LOCKE level" in l for l in lines))
-        why = stale_reason("k-v1", t / "fresh")
-        check("a capture whose sig is not today's is stale", why is not None)
         try:
-            recut("k-v1", t / "fresh", t / "tracked")
+            recut("k-v1", t / "fresh", t / "tracked",
+                  problem=lambda k: "its ROM moved")
             refused = False
-        except sc.CheckpointError:
-            refused = True
-        check("--recut refuses a stale capture", refused)
-    # where each capture's ROM record lives, on this tree's graph: a copy's
-    # stamp, or a cutter's own record (it publishes no state)
-    rec = {k: producer_stamp(k) for k in ("wor-tomb-v1", "post-opera-v1",
-                                          "wor-falcon-v1")}
-    check("a WoR leg's capture is recorded by the copy that saved it",
-          str(rec["wor-tomb-v1"]).endswith("build/states/chain_wor_tomb.stamp"))
-    check("a cutter's capture is recorded beside it",
-          str(rec["post-opera-v1"]).endswith("build/checkpoints/post-opera-v1.rom"))
-    check("the frontier's capture is recorded by its saves= copy",
-          str(rec["wor-falcon-v1"]).endswith("build/states/chain_wor_falcon.stamp"))
-    check("a checkpoint no chain run saves has no record",
-          producer_stamp("negative-stale-check-v1") is None)
+        except sc.CheckpointError as exc:
+            refused = "its ROM moved" in str(exc)
+        check("MUTANT --recut refuses a capture whose record is not current",
+              refused)
+        check("...and leaves the tracked checkpoint alone",
+              compare("k-v1", t / "fresh", t / "tracked")[0] != [])
+        recut("k-v1", t / "fresh", t / "tracked", problem=lambda k: None)
+        check("--recut copies a current capture over the tracked checkpoint",
+              compare("k-v1", t / "fresh", t / "tracked")[0] == [])
+        check("...and drops the old provenance sidecar beside it",
+              not (t / "tracked" / "k-v1" / "k.sram.provenance.json").exists())
+    check("a key with no capture record is refused",
+          capture_problem("selftest-no-such-v1") is not None)
     check("--recut exits non-zero when it refuses (no capture to copy)",
           main(["--recut", "selftest-no-such-v1"]) == 1)
     print("checkpoint_drift selftest:", "ok" if ok else "FAILED")

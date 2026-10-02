@@ -53,6 +53,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "tests"))
+sys.path.insert(0, str(ROOT / "tools" / "tests" / "lib"))
+import savestate_ninja as sn  # noqa: E402
 
 VERDICT_PASS = re.compile(r"^\[ot6\] PASS \(frame (\d+)\)(?: attempts=(\d+)/(\d+))?")
 VERDICT_FAIL = re.compile(r"^\[ot6\] FAIL: (.*)")
@@ -244,11 +246,9 @@ def main():
     gen = e["gen"]
     step = a.step if a.step is not None else max(1, 60 // max(a.seeds, 1))
     timeout = a.timeout or e.get("timeout") or 1800
-    env_extra = {}
-    if e.get("checkpoint"):
-        env_extra["OT6_SRAM_CHECKPOINT"] = f"tools/tests/checkpoints/{e['checkpoint']}"
-    if e.get("stack"):
-        env_extra["OT6_STACK"] = e["stack"]
+    # the environment the graph runs it under: a cut Continues the graph's
+    # capture of its checkpoint (savestate_ninja.boot_env)
+    env_extra = dict(sn.boot_env(e))
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     outdir = Path(a.out).resolve() if a.out else ROOT / "build" / "sweeps" / f"{a.state}-{stamp}"
     outdir.mkdir(parents=True, exist_ok=True)

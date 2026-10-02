@@ -24,8 +24,8 @@
 -- worldNavTo / advanceStory / route) lives in lib/ot6_field.lua, and
 -- lib/compose.py inlines both halves into every composed script, so the
 -- dofile line above stays the only line a test writes, and H carries the
--- merged API.  The freshness signature (lib/savestate_stamp.sh sig) hashes
--- generator ++ this file ++ ot6_field.lua, in that fixed order.
+-- merged API.  A run depends on the composed script's token stream
+-- (compose.py --digest), so a code edit here re-runs every script.
 --
 -- Environment notes (Mesen 2.1.1, verified against Mesen's source):
 --  * Lua 5.4.  print() goes to the testrunner's stdout.  emu.log() goes to
@@ -2360,32 +2360,21 @@ end
 -- menu", which often omits the real cause: the savestate may have been
 -- generated against a different ROM than the one running, so the first
 -- step needing a specific frame lands on a frame the fixture's timing no
--- longer has.  So every timeout appends what the run knows: which fixture
--- it booted, and whether composition already flagged that fixture as
--- generated from sources this tree no longer has (OT6_STALE, emitted by
--- lib/compose.py).
+-- longer has.  So every timeout appends which fixture the run booted and
+-- how to rule that out.
 M.lastState = nil
 
 function M.timeoutContext()
   if not M.lastState then
     return ""   -- power-on boot: no fixture to name, so add nothing
   end
-  local out = "\n  fixture booted by this run: " .. M.lastState
-  local stale = type(OT6_STALE) == "table" and OT6_STALE[M.lastState]
-  if stale then
-    out = out .. "\n  and it is STALE: " .. stale
-    out = out .. "\n  A savestate generated against a different ROM resumes at a"
-      .. " PC and a frame parity that\n  have since moved, so the first input"
-      .. " needing a specific frame is where it surfaces --\n  usually as a"
-      .. " timeout on something innocent, like this one."
-  else
-    out = out .. "\n  (composition did not flag it stale, so a ROM/fixture"
-      .. " mismatch is less likely here --\n  but rule it out before you"
-      .. " suspect the feature: a timeout on an input step is what a\n"
-      .. "  mismatched pairing looks like.)"
-  end
-  return out .. "\n  Confirm: python3 tools/tests/lib/compose.py"
-    .. " --check-states\n  Regenerate: nice -n 10 ninja -f build/build.ninja <state>"
+  local state = M.lastState:gsub("%.mss%.lua$", "")
+  return "\n  fixture booted by this run: " .. M.lastState
+    .. "\n  A savestate from another ROM or another harness resumes where"
+    .. " its timing has moved, and\n  a timeout on an input step is what that"
+    .. " looks like; rule it out before you suspect the feature:"
+    .. "\n  Confirm: python3 tools/tests/lib/stamps.py --check-states"
+    .. "\n  Regenerate: ninja build/states/" .. state .. ".mss.lua"
 end
 
 -- Wait until pred() is truthy, polling every pollEvery frames (default 1).

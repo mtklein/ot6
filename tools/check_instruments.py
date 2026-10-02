@@ -36,7 +36,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools", "tests", "lib"))
-import compose  # noqa: E402 -- declared_states: the graph's state names
+import stamps  # noqa: E402 -- declared_states: the graph's state names
 
 OUT = os.path.join(ROOT, "build", "checks", "instruments")
 MANUAL = re.compile(r"^-- @manual(.*)$", re.M)
@@ -133,7 +133,7 @@ def emulated(rel: str, text: str, states: set[str]) -> tuple[bool, str]:
 def main(argv: list[str]) -> int:
     os.makedirs(OUT, exist_ok=True)
     todo = [os.path.relpath(os.path.abspath(a), ROOT) for a in argv] or instruments()
-    states = compose.declared_states(ROOT)
+    states = set(stamps.declared_states(ROOT))
     lua = shutil.which("lua")
     bad = 0
     for rel in todo:

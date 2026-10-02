@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
 """Validate and materialize OT6's small, versioned battery-save checkpoints.
 
-PROVENANCE.  A checkpoint's `provenance` field records the ancestry of the
-chain of generated savestates above it, as a dict:
+PROVENANCE.  A checkpoint's `provenance` field records the run that cut
+it, as a dict:
 
     "provenance": {
-      "format": "ot6-provenance/v2",          # the sig's scheme (v1 accepted)
+      "format": "ot6-provenance/v3",          # the record's scheme (v1, v2 accepted)
       "payload_sha256": "<sha256 of the .sram bytes>",
-      "generator_sig": "<sig> <gen> [extras]",     # savestate_stamp.sh sig of the
-                                              # generator that drove the
-                                              # capture run, verbatim
-      "ancestors": [                          # what the capture run booted:
-        {"path": "build/states/x.stamp",      # the stamp of each embedded
-         "sha256": "<sha256 of that file>"},  # state, and/or the manifest of
-        ...                                   # the checkpoint it Continued from
+      "generator_sig": "<sha256> <gen>",      # v3: the capture run's composed
+                                              # script (compose.py --digest)
+                                              # and its generator
+      "ancestors": [                          # v3: the capture's stamp
+        {"path": "build/checkpoints/k.stamp", # (lib/stamps.py), which records
+         "sha256": "<sha256 of that file>"},  # every input of that run
+        ...
       ]
     }
 
-run.sh's OT6_CAPTURE_SRM mode writes this object to
-`<payload>.provenance.json` beside the captured battery.  `seal CHECKPOINT`
-folds the sidecar into manifest.json and recomputes size/sha256.
+The graph's capture of a checkpoint (savestate_ninja.py) is sealed by
+`seal-capture CDIR AUTHORED STAMP`: the tracked manifest's authored fields,
+the payload's size and sha256, and this record built from the capture's
+stamp, refused when the battery does not hold the save `saved` declares.
+checkpoint_drift.py --recut copies that sealed checkpoint over the tracked
+one.
 
 A manifest whose `provenance` is prose (or absent) is LEGACY-V0:
 grandfathered with a warning on stderr, never a failure.  A manifest whose
@@ -41,13 +44,14 @@ import tempfile
 from pathlib import Path
 
 SCHEMA = "ot6.sram-checkpoint/v1"
-# Must match savestate_stamp.sh's GATE_CONTRACT: the scheme a new capture's
-# generator_sig is computed under.
-PROVENANCE_FORMAT = "ot6-provenance/v2"
+# The scheme a new capture's record is written under.
+PROVENANCE_FORMAT = "ot6-provenance/v3"
 # Every scheme a sealed record may carry.  A record keeps the format it was
 # captured under; its sig is what that run computed, never recomputed here.
-# v1 hashed .lua sources as bytes, v2 as Lua token streams (#247).
-PROVENANCE_FORMATS = ("ot6-provenance/v1", PROVENANCE_FORMAT)
+# v1 hashed .lua sources as bytes, v2 as Lua token streams (#247), v3 names
+# the capture run's composed script and its stamp.
+PROVENANCE_FORMATS = ("ot6-provenance/v1", "ot6-provenance/v2",
+                      PROVENANCE_FORMAT)
 SRAM_SIZE = 32768
 _HEX64 = re.compile(r"[0-9a-f]{64}")
 
@@ -254,75 +258,68 @@ def load(checkpoint: Path, expected_layout: str | None = None) -> tuple[dict, Pa
     return manifest, payload
 
 
-def capture(root: Path, out: Path, payload: Path, generator_sig: str,
-            ancestors: list[str]) -> None:
-    """Write the mechanical provenance sidecar for a just-captured battery.
-    `ancestors` are tree-relative paths, hashed against `root`."""
+def capture_provenance(root: Path, payload: Path, stamp: str) -> dict:
+    """The provenance record of a captured battery, from its capture's stamp
+    (lib/stamps.py, `stamp` tree-relative): the stamp's composed digest and
+    generator, and the stamp itself as the ancestor that records every input
+    of the run."""
     try:
         data = payload.read_bytes()
+        stamp_bytes = (root / stamp).read_bytes()
     except OSError as exc:
-        raise CheckpointError(f"cannot read captured payload: {exc}") from exc
-    rec: dict = {"format": PROVENANCE_FORMAT,
-                 "payload_sha256": hashlib.sha256(data).hexdigest(),
-                 "generator_sig": generator_sig,
-                 "ancestors": []}
-    for rel in ancestors:
-        try:
-            blob = (root / rel).read_bytes()
-        except OSError as exc:
-            raise CheckpointError(f"cannot read ancestor {rel}: {exc}") from exc
-        rec["ancestors"].append(
-            {"path": rel, "sha256": hashlib.sha256(blob).hexdigest()})
+        raise CheckpointError(f"cannot read a capture's record: {exc}") from exc
+    fields = dict(l.split(" ", 1) for l in stamp_bytes.decode().splitlines()
+                  if " " in l)
+    if not (_HEX64.fullmatch(fields.get("composed", "")) and fields.get("generator")):
+        raise CheckpointError(f"{stamp} is not a capture stamp (no composed "
+                              f"digest and generator)")
+    rec = {"format": PROVENANCE_FORMAT,
+           "payload_sha256": hashlib.sha256(data).hexdigest(),
+           "generator_sig": f"{fields['composed']} {fields['generator']}",
+           "ancestors": [{"path": stamp,
+                          "sha256": hashlib.sha256(stamp_bytes).hexdigest()}]}
     problem = provenance_problem(rec, rec["payload_sha256"])
     if problem:
-        raise CheckpointError(f"refusing to write a bad sidecar: {problem}")
-    out.write_text(json.dumps(rec, indent=2) + "\n")
+        raise CheckpointError(f"refusing to write a bad record: {problem}")
+    return rec
 
 
-def seal(checkpoint: Path) -> None:
-    """Fold a capture's provenance sidecar into the checkpoint's manifest.
-    Verifies the sidecar against the payload, recomputes size/sha256, and
-    writes `provenance`; other authored fields pass through untouched."""
-    manifest_path = checkpoint / "manifest.json"
+def seal_capture(cdir: Path, authored: Path, stamp: str,
+                 root: Path | None = None) -> None:
+    """Write cdir/manifest.json for a capture: the authored fields (a
+    tracked manifest minus size, sha256 and provenance), the payload's size
+    and sha256, and its provenance from the capture's stamp.  Refused, and
+    no manifest written, when the payload does not hold the save the
+    authored `saved` declares (#218): the declaration is authored, the
+    bytes decide."""
+    root = Path(root) if root else Path(__file__).resolve().parents[3]
     try:
-        manifest = json.loads(manifest_path.read_text())
+        manifest = json.loads(Path(authored).read_text())
     except (OSError, json.JSONDecodeError) as exc:
-        raise CheckpointError(f"cannot read {manifest_path}: {exc}") from exc
+        raise CheckpointError(f"cannot read {authored}: {exc}") from exc
     payload_name = manifest.get("payload")
     if not isinstance(payload_name, str) or Path(payload_name).name != payload_name:
         raise CheckpointError("payload must be one plain filename")
-    payload = checkpoint / payload_name
+    payload = cdir / payload_name
     try:
         data = payload.read_bytes()
     except OSError as exc:
         raise CheckpointError(f"cannot read payload: {exc}") from exc
     if len(data) != SRAM_SIZE:
         raise CheckpointError(f"payload is {len(data)} bytes, not {SRAM_SIZE}")
-    sidecar = checkpoint / (payload_name + ".provenance.json")
-    try:
-        prov = json.loads(sidecar.read_text())
-    except (OSError, json.JSONDecodeError) as exc:
-        raise CheckpointError(
-            f"cannot read {sidecar}: {exc} -- a seal needs the capture "
-            f"run's sidecar (run.sh OT6_CAPTURE_SRM writes it beside the "
-            f"payload); there is deliberately no way to author one by hand"
-        ) from exc
-    actual = hashlib.sha256(data).hexdigest()
-    problem = provenance_problem(prov, actual) if isinstance(prov, dict) \
-        else "sidecar is not a JSON object"
-    if problem:
-        raise CheckpointError(f"{sidecar}: {problem}")
-    # #218: never seal a payload that does not hold the save the manifest is
-    # named for.  The declaration is authored; the bytes decide.
     declared = manifest.get("saved")
     if declared is not None:
         problem = saved_problem(declared, data)
         if problem:
-            raise CheckpointError(f"{manifest_path}: {problem}")
+            raise CheckpointError(f"{cdir}: {problem}")
     manifest["size"] = SRAM_SIZE
-    manifest["sha256"] = actual
-    manifest["provenance"] = prov
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    manifest["sha256"] = hashlib.sha256(data).hexdigest()
+    manifest["provenance"] = capture_provenance(root, payload, stamp)
+    out = cdir / "manifest.json"
+    tmp = out.with_name("manifest.json.tmp")
+    tmp.write_text(json.dumps(manifest, indent=2) + "\n")
+    os.replace(tmp, out)
+    load(cdir)
 
 
 def materialize(checkpoint: Path, destination: Path,
@@ -347,16 +344,24 @@ def selftest() -> None:
         payload = bytes(range(256)) * 128
         (root / "save.srm").write_bytes(payload)
         # The positive-control manifest carries mechanical provenance built
-        # by the real capture path.
-        (root / "ancestor.stamp").write_text("sig gen\nartifact ab\n")
-        capture(root, root / "save.srm.provenance.json", root / "save.srm",
-                "ab" * 32 + " gen_cut extras", ["ancestor.stamp"])
-        rec = json.loads((root / "save.srm.provenance.json").read_text())
+        # by the real capture path, from a capture's stamp.
+        (root / "k.stamp").write_text("ot6-stamp/v3\ngenerator gen_cut\n"
+                                      "composed " + "ab" * 32 + "\n")
+        rec = capture_provenance(root, root / "save.srm", "k.stamp")
         assert rec["payload_sha256"] == hashlib.sha256(payload).hexdigest(), \
             "capture hashed the wrong payload bytes"
+        assert rec["generator_sig"] == "ab" * 32 + " gen_cut", \
+            "the record does not name the stamp's composed digest and generator"
         assert rec["ancestors"][0]["sha256"] == hashlib.sha256(
-            (root / "ancestor.stamp").read_bytes()).hexdigest(), \
-            "capture hashed the wrong ancestor bytes"
+            (root / "k.stamp").read_bytes()).hexdigest(), \
+            "capture hashed the wrong stamp bytes"
+        (root / "notastamp").write_text("sig gen\n")
+        try:
+            capture_provenance(root, root / "save.srm", "notastamp")
+        except CheckpointError:
+            pass
+        else:
+            raise AssertionError("a record was built from a non-stamp")
         base = {
             "schema": SCHEMA,
             "payload": "save.srm",
@@ -430,12 +435,14 @@ def selftest() -> None:
             assert "legacy-v0" in warned and "issue #75" in warned, (
                 f"legacy checkpoint did not warn loudly: {warned!r}")
 
-        # 2. seal folds the capture sidecar into the manifest, recomputing
-        #    the payload hash.
-        (root / "manifest.json").write_text(json.dumps(stripped))
-        seal(root)
+        # 2. seal-capture writes the manifest from the authored fields, the
+        #    payload's hash and the stamp's record.
+        authored = {k: v for k, v in stripped.items()
+                    if k not in ("size", "sha256")}
+        (root / "authored.json").write_text(json.dumps(authored))
+        seal_capture(root, root / "authored.json", "k.stamp", root)
         sealed = json.loads((root / "manifest.json").read_text())
-        assert sealed["provenance"] == rec, "seal did not fold the sidecar in"
+        assert sealed["provenance"] == rec, "seal did not record the stamp"
         assert sealed["sha256"] == base["sha256"], "seal recompute wrong"
         assert sealed["persistent_layout"] == "ot6-test-layout/v1", (
             "seal must pass authored fields through untouched")
@@ -463,16 +470,16 @@ def selftest() -> None:
             else:
                 raise AssertionError(f"bad provenance accepted: {why}")
 
-        # 4. seal only trusts a sidecar that matches the payload as it is
-        #    now: a payload swapped after capture is refused, not accepted.
+        # 4. a seal hashes the payload as it is now, so a payload swapped
+        #    after a manifest was written no longer loads.
         (root / "manifest.json").write_text(json.dumps(base))
         (root / "save.srm").write_bytes(bytes(SRAM_SIZE))
         try:
-            seal(root)
+            load(root)
         except CheckpointError:
             pass
         else:
-            raise AssertionError("seal accepted a payload the sidecar "
+            raise AssertionError("load accepted a payload the manifest "
                                  "never hashed")
 
         # ---- the `saved` declaration (#218) ----------------------------
@@ -534,21 +541,23 @@ def selftest() -> None:
             assert saved_problem(decl, blob) is not None, \
                 f"saved declaration accepted {why}"
 
-        # and end to end: load()/seal() refuse a manifest whose `saved`
-        # block does not match the payload, and pass one that does.
+        # and end to end: load()/seal-capture refuse a manifest whose
+        # `saved` block does not match the payload, and pass one that does.
         (root / "save.srm").write_bytes(field)
-        capture(root, root / "save.srm.provenance.json", root / "save.srm",
-                "ab" * 32 + " gen_cut extras", ["ancestor.stamp"])
-        rec2 = json.loads((root / "save.srm.provenance.json").read_text())
+        rec2 = capture_provenance(root, root / "save.srm", "k.stamp")
         saved_base = dict(base, sha256=hashlib.sha256(field).hexdigest(),
                           provenance=rec2, saved=good)
         (root / "manifest.json").write_text(json.dumps(saved_base))
         load(root)
-        seal(root)
-        bad = dict(saved_base,
-                   saved={"slot": 3, "field": {"map": 103, "x": 57, "y": 8}})
+        (root / "authored.json").write_text(json.dumps(dict(authored, saved=good)))
+        seal_capture(root, root / "authored.json", "k.stamp", root)
+        badsaved = {"slot": 3, "field": {"map": 103, "x": 57, "y": 8}}
+        bad = dict(saved_base, saved=badsaved)
         (root / "manifest.json").write_text(json.dumps(bad))
-        for fn, name in ((load, "load"), (seal, "seal")):
+        (root / "authored.json").write_text(json.dumps(dict(authored, saved=badsaved)))
+        for fn, name in ((load, "load"),
+                         (lambda r: seal_capture(r, r / "authored.json",
+                                                 "k.stamp", r), "seal")):
             try:
                 fn(root)
             except CheckpointError as exc:
@@ -560,7 +569,7 @@ def selftest() -> None:
                     f"does not declare")
 
         print("sram_checkpoint selftest: PASS (schema, size, hash, path, "
-              "persistent_layout negatives; provenance capture/seal "
+              "persistent_layout negatives; provenance from a stamp/seal "
               "round-trip, legacy-v0 warning, malformed-record refusals; "
               "saved-block decode and load/seal refusals)")
 
@@ -594,17 +603,13 @@ def main(argv: list[str]) -> int:
         elif len(argv) in (3, 4) and argv[0] == "materialize":
             materialize(Path(argv[1]), Path(argv[2]),
                         argv[3] if len(argv) == 4 else None)
-        elif len(argv) >= 5 and argv[0] == "capture":
-            capture(Path(argv[1]), Path(argv[2]), Path(argv[3]), argv[4],
-                    argv[5:])
-        elif len(argv) == 2 and argv[0] == "seal":
-            seal(Path(argv[1]))
+        elif len(argv) == 4 and argv[0] == "seal-capture":
+            seal_capture(Path(argv[1]), Path(argv[2]), argv[3])
         else:
             print(
                 "usage: sram_checkpoint.py validate CHECKPOINT [LAYOUT] | "
                 "materialize CHECKPOINT DEST [LAYOUT] | "
-                "capture ROOT OUT_JSON PAYLOAD GENERATOR_SIG [ANCESTOR_REL...] | "
-                "seal CHECKPOINT | selftest",
+                "seal-capture CDIR AUTHORED_JSON CAPTURE_STAMP | selftest",
                 file=sys.stderr,
             )
             return 2

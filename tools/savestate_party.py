@@ -81,11 +81,7 @@ def split_orphans(files: list[str], declared: set[str]):
     if not declared:
         return list(files), []
     live = [p for p in files if stem_of(p) in declared]
-    # `ninja chain`'s chain_<state> copies are not leftovers; they are not
-    # qualification fixtures either, so they are neither live nor orphans
-    orphans = sorted(stem_of(p) for p in files if stem_of(p) not in declared
-                     and not (stem_of(p).startswith("chain_")
-                              and stem_of(p)[len("chain_"):] in declared))
+    orphans = sorted(stem_of(p) for p in files if stem_of(p) not in declared)
     return live, orphans
 
 

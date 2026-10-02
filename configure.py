@@ -2,14 +2,17 @@
 """configure.py -- emit ./build.ninja, the whole project as one ninja graph.
 
 Bare `ninja` builds and tests everything: the default targets are the
-ROM, every generated savestate, every suite test's result, every audit and
-every selftest.  `ninja release` is all of that plus the release
-preflights (the chain from power-on among them), the BPS patch and the
-zip.  `ninja chain` is the chain from power-on alone (savestate_ninja.py
-chain_plan).  Those are the only aliases; any partial need is a real
-output path
+ROM, every generated savestate and checkpoint capture, every suite test's
+result, every audit and selftest, and the checkpoint drift gate.  There are
+no aliases: anything narrower is a real output path
 (`ninja build/states/vargas_entry.mss.lua`,
-`ninja build/results/suite/battle_break.ok`, `ninja ff6/rom/ff6-en.sfc`).
+`ninja build/results/suite/battle_break.ok`, `ninja ff6/rom/ff6-en.sfc`),
+and the release is `ninja build/release/ot6-vX.Y.zip` (everything in the
+default, the release preflights, the patch and the zip).
+Every edge depends on its true inputs by content, so `ninja` re-runs
+exactly what a change invalidates: a ROM, emulator, generator, runner or
+test-library change replays the game from the first run it reaches, and a
+suite or check edit re-runs that suite or check.
 Parallelism is ninja's own, unbounded; emulator-running commands are
 prefixed with nice(1).
 
@@ -31,17 +34,22 @@ from the root):
   ROM            ff6-en.sfc via tools/build/link_rom.sh.
   build/ot6.sfc  copy_if_changed of ff6-en.sfc: mtime bumps with unchanged
                  bytes prune everything downstream (restat).
-  savestates     the story-chain graph, embedded from
-                 tools/tests/lib/savestate_ninja.py (the same data file,
-                 tools/tests/savestate_graph.py, drives it).
-  suite          one edge per `-- @suite` test.  A test whose fixture is
-                 missing builds the fixture, and the release artifact
-                 depends on every test's .ok, so "everything ran" is graph
-                 structure.
+  savestates     the one graph of generated states and checkpoint captures,
+                 played from power-on, embedded from
+                 tools/tests/lib/savestate_ninja.py (the data file is
+                 tools/tests/savestate_graph.py).
+  suite          one edge per `-- @suite` test, after a digest edge for its
+                 composed script (compose.py --digest, restat): the suite
+                 re-runs when its composed program, the ROM, the emulator
+                 pin, the runner or a checkpoint it boots moved.  A test
+                 whose fixture is missing builds the fixture, and the
+                 release artifact depends on every test's .ok, so
+                 "everything ran" is graph structure.
   checks         the selftests and audits, each with its real inputs, so an
-                 unchanged tree re-runs none of them.
+                 unchanged tree re-runs none of them; among them the drift
+                 gate, every tracked checkpoint against the graph's capture.
   release        preflights (branch, README version, real notes), the BPS
-                 patch, and the zip (`ninja release`).
+                 patch, and the zip (build/release/ot6-vX.Y.zip).
 
 Regeneration: the `configure` edge below re-runs this script when it, the
 graph data, VERSION, or any globbed directory changes (the depfile lists
@@ -123,6 +131,15 @@ w("  command = mkdir -p $$(dirname $out) && { cmp -s $in $out || cp $in $out; }"
 w("  description = copy_if_changed $in")
 w("  restat = 1")
 w()
+w("# A Lua source's copy: the new bytes always land, but the old mtime is")
+w("# kept when the Lua token stream (comments and whitespace dropped) did")
+w("# not move, so restat prunes a comment-only edit (#247).")
+w("rule copy_if_lua_changed")
+w("  command = python3 tools/tests/lib/lua_fingerprint.py "
+  "copy-if-changed $in $out")
+w("  description = copy_if_lua_changed $in")
+w("  restat = 1")
+w()
 w("# ca65 runs with cwd=ff6 (sources use ff6-relative include/incbin paths);")
 w("# the depfile it writes is therefore ff6-relative and gets rebased to the")
 w("# repo root before ninja parses it (deps = gcc).")
@@ -144,11 +161,18 @@ w()
 
 # -------------------------------------------------------- copy_if_changed --
 copy_if_changed_edges = {}
+lua_copy_edges = {}
 
 
 def copy_if_changed_from(src):
     dep = f"build/ninja/src/{src}"
     copy_if_changed_edges[dep] = src
+    return dep
+
+
+def lua_copy_from(src):
+    dep = f"build/ninja/src/lua/{src}"
+    lua_copy_edges[dep] = src
     return dep
 
 
@@ -329,32 +353,34 @@ w.edge(["build/ot6.sfc"], "copy_if_changed", ["ff6/rom/ff6-en.sfc"])
 
 # ------------------------------------------------------------ savestates ---
 states = sn.load(ROOT)
+captures = sn.load_captures(ROOT)
 read_deps.add(sn.GRAPH)
-errors = sn.validate(states, ROOT)
+# configure-time: a malformed entry, or a tracked checkpoint no run on the
+# graph saves (the drift gate would miss it), stops here
+errors = sn.validate(states, ROOT, captures)
 if errors:
     for e in errors:
         print(f"savestate_graph: {e}", file=sys.stderr)
     sys.exit(1)
-sn.emit_state_edges(w, states, ROOT, copy_if_changed_from)
-# The chain from power-on (savestate_ninja.py chain_plan): qualification
-# boots each cut leg from its tracked checkpoint; `ninja chain` plays the
-# whole chain from power-on as chain_<state> copies, each leg booted from
-# the save the one before it made.  `release` depends on it.
-chain_end = sn.emit_chain_edges(w, states, ROOT, copy_if_changed_from)
+state_mss = sn.emit_state_edges(w, states, ROOT, copy_if_changed_from,
+                                lua_copy_from, captures)
 # Every name a test can reference includes the `also=` siblings: a state
 # like figaro_cleared is emitted by gen_edgar's edge as an also-artifact,
-# and fixture_deps() filtering against primary names only would drop it,
-# leaving an edge that races its fixture on a from-scratch build.
+# and a filter against primary names only would drop it, leaving an edge
+# that races its fixture on a from-scratch build.
 state_names = {e["state"] for e in states} \
             | {a for e in states if e["also"] for a in e["also"]}
-all_stamps = [f"build/states/{e['state']}.stamp" for e in states]
-all_sidecars = [f"build/states/{e['state']}.mss.lua" for e in states]
+all_mss = [m for e in states for m in state_mss[e["state"]]]
+gate_keys = sorted(sn.producers(states, captures))
 
 # ------------------------------------------------------------------ suite --
-LIBS = list(sn.LIB_HALVES)
-HARNESS = ["tools/tests/run.sh", "tools/tests/lib/compose.py",
-           "tools/tests/lib/decode_b64.py", "tools/tests/lib/pin_test_saves.py",
-           "tools/tests/lib/sram_checkpoint.py", "tools/build/run_suite_test.sh"]
+LIBS = list(sn.LIB_FILES)
+# What a suite's run executes besides its composed script (savestate_ninja's
+# RUN_INPUTS, plus the suite wrapper).
+SUITE_RUN = [copy_if_changed_from(p) for p in sn.RUN_INPUTS] \
+    + [copy_if_changed_from("tools/build/run_suite_test.sh")]
+COMPOSE_DEPS = [lua_copy_from(p) for p in LIBS] \
+    + [copy_if_changed_from(p) for p in sn.COMPOSE_INPUTS]
 
 # Tests that boot power-on under a dirty deterministic RAM fill and/or
 # cold-Continue a tracked checkpoint battery.
@@ -421,16 +447,11 @@ TEST_ENV = {
 # any <name>.mss reference, path-qualified or bare -- compose.py resolves
 # both against build/states, so both are fixture dependencies; the filter
 # against the graph's state names keeps false positives out
-STATE_REF = re.compile(r"([A-Za-z0-9_]+)\.mss")
-
-
 def fixture_deps(lua_path):
-    text = (ROOT / lua_path).read_text(errors="replace")
-    deps = []
-    for fx in sorted({s for s in STATE_REF.findall(text) if s in state_names}):
-        deps += [f"build/states/{fx}.mss.lua", f"build/states/{fx}.mss",
-                 f"build/states/{fx}.stamp"]
-    return deps
+    """The sidecars a script's composition embeds (compose.py's own rule,
+    savestate_ninja.fixture_refs)."""
+    return [f"build/states/{fx}.mss.lua"
+            for fx in sn.fixture_refs(ROOT, lua_path, state_names)]
 
 
 suite_tests = []
@@ -442,18 +463,20 @@ for f in glob("tools/tests/*.lua"):
     t = Path(f).stem
     suite_tests.append(t)
     attrs = m.group(1)
-    # the emulator pin too: a test result is the emulator's as much as the
-    # ROM's, so a new emulator re-runs every test, as it regenerates every state
-    deps = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR),
-            copy_if_changed_from(f)]
-    deps += [copy_if_changed_from(h) for h in LIBS] + HARNESS
-    deps += fixture_deps(f)
-    fm = re.search(r"savestate=([A-Za-z0-9_]+)", attrs)
-    if fm and f"build/states/{fm.group(1)}.mss" not in deps:
-        fx = fm.group(1)
-        deps += [f"build/states/{fx}.mss.lua", f"build/states/{fx}.mss",
-                 f"build/states/{fx}.stamp"]
     env = TEST_ENV.get(t, "")
+    # The suite's composed program: its script, the lib it inlines, the
+    # sidecars it embeds, the write gate, its symbols -- compared by token
+    # stream, so an edit that leaves the program alone stops at the digest.
+    sidecars = fixture_deps(f)
+    fm = re.search(r"savestate=([A-Za-z0-9_]+)", attrs)
+    if fm and f"build/states/{fm.group(1)}.mss.lua" not in sidecars:
+        sidecars.append(f"build/states/{fm.group(1)}.mss.lua")
+    digest = f"{sn.DIGEST_DIR}/suite_{t}.digest"
+    w.edge([digest], "compose_digest", [f], implicit=COMPOSE_DEPS + sidecars,
+           script=f, env=env)
+    # The run: the emulator pin too, since a test result is the emulator's
+    # as much as the ROM's.
+    deps = [digest] + SUITE_RUN
     if "OT6_SRAM_CHECKPOINT=" in env:
         key = env.split("OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/")[1].split()[0]
         deps += [copy_if_changed_from(a) for a in sn.checkpoint_inputs(ROOT, key)]
@@ -471,14 +494,13 @@ def check(name, cmd, deps, desc=None):
 
 
 test_luas = glob("tools/tests/*.lua") + glob("tools/tests/lib/*.lua")
-# Covers stamp_status and the legacy-stamp adoption (--adopt-stamps), both
-# of which shell into savestate_stamp.sh; the adoption half also probes the
-# installed ninja's build-log columns on a mock graph.
 check("compose_selftest", "python3 tools/tests/lib/compose.py --selftest",
-      ["tools/tests/lib/compose.py", "tools/tests/lib/decode_b64.py",
-       "tools/tests/lib/savestate_stamp.sh",
-       "tools/tests/lib/lua_fingerprint.py"]
+      ["tools/tests/lib/compose.py", "tools/tests/lib/lua_fingerprint.py"]
       + LIBS)
+# a stamp's verdict, every input moved one at a time, with a mutant each
+check("stamps_selftest", "python3 tools/tests/lib/stamps.py --selftest",
+      ["tools/tests/lib/stamps.py", "tools/tests/lib/compose.py",
+       "tools/tests/lib/lua_fingerprint.py"])
 check("sram_selftest", "python3 tools/tests/lib/sram_checkpoint.py selftest",
       ["tools/tests/lib/sram_checkpoint.py"])
 check("verdict_selftest", "sh tools/tests/run.sh --verdict-selftest",
@@ -571,14 +593,14 @@ check("retain_evidence_selftest",
       ["tools/retain_evidence.py"])
 check("ninja_py_selftest", "python3 tools/tests/lib/savestate_ninja.py --selftest",
       ["tools/tests/lib/savestate_ninja.py"])
-check("ninja_sh_selftest", "sh tools/tests/lib/savestate_ninja_selftest.sh",
-      ["tools/tests/lib/savestate_ninja_selftest.sh",
+# the graph's build semantics against real ninja on a mock tree: which runs
+# each kind of change replays, and that the stamps agree
+check("ninja_graph_selftest",
+      "python3 tools/tests/lib/savestate_ninja_selftest.py",
+      ["tools/tests/lib/savestate_ninja_selftest.py",
        "tools/tests/lib/savestate_ninja.py",
-       "tools/tests/lib/savestate_stamp.sh",
-       "tools/tests/lib/lua_fingerprint.py"])
-check("stamp_selftest", "sh tools/tests/lib/savestate_stamp_selftest.sh",
-      ["tools/tests/lib/savestate_stamp_selftest.sh",
-       "tools/tests/lib/savestate_stamp.sh",
+       "tools/tests/lib/stamps.py", "tools/tests/lib/compose.py",
+       "tools/tests/lib/sram_checkpoint.py",
        "tools/tests/lib/lua_fingerprint.py"])
 check("runner_isolation", "sh tools/tests/lib/runner_isolation_selftest.sh",
       ["tools/tests/lib/runner_isolation_selftest.sh", "tools/tests/run.sh"])
@@ -596,54 +618,48 @@ check("checkpoint_saves", "sh tools/tests/lib/checkpoint_saves.sh",
 check("checkpoint_drift_selftest",
       "python3 tools/tests/lib/checkpoint_drift.py --selftest",
       ["tools/tests/lib/checkpoint_drift.py", "tools/tests/lib/sram_checkpoint.py",
-       "tools/tests/lib/savestate_ninja.py", sn.GRAPH])
-# #354: every tracked checkpoint a state or a suite boots is captured by a
-# run on the chain from power-on, so `ninja release`'s drift gate compares
-# it; the rest are the graph's NOT_GATED, each with its reason.
-suite_checkpoints = sorted({m for env in TEST_ENV.values() for m in re.findall(
-    r"OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/(\S+)", env)})
-check("checkpoint_coverage",
-      "python3 tools/tests/lib/savestate_ninja.py --coverage --booted "
-      + " ".join(suite_checkpoints),
-      ["tools/tests/lib/savestate_ninja.py", sn.GRAPH, "configure.py"]
-      + glob("tools/tests/checkpoints/*/manifest.json"),
-      desc="every booted checkpoint is in the drift gate")
+       "tools/tests/lib/stamps.py", "tools/tests/lib/compose.py"])
+# THE DRIFT GATE: every tracked checkpoint is the save the graph's run makes
+# there today, byte for byte, play time and checksums aside (levels, gear,
+# gil, the bag, story switches, the codex).  Every tracked checkpoint is on
+# the graph (savestate_ninja.validate refuses one that is not), so this
+# compares every one.  The fix for a drifted one is
+# `checkpoint_drift.py --recut <key>` and a commit.
+check("checkpoint_drift",
+      "python3 tools/tests/lib/checkpoint_drift.py --strict "
+      + " ".join(gate_keys),
+      ["tools/tests/lib/checkpoint_drift.py",
+       "tools/tests/lib/sram_checkpoint.py"]
+      + [p for k in gate_keys for p in sn.capture_paths(ROOT, k)[:2]]
+      + [a for k in gate_keys for a in sn.checkpoint_inputs(ROOT, k)],
+      desc="tracked checkpoints are the graph's play")
 check("checkpoint_negatives", "nice sh tools/tests/lib/checkpoint_negatives.sh",
-      ["tools/tests/lib/checkpoint_negatives.sh", "tools/tests/run.sh",
-       copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR)]
-      + LIBS + checkpoint_files)
+      ["tools/tests/lib/checkpoint_negatives.sh"]
+      + [copy_if_changed_from(p) for p in sn.RUN_INPUTS]
+      + [copy_if_changed_from("tools/tests/lib/compose.py")]
+      + [lua_copy_from(h) for h in LIBS] + checkpoint_files)
 # the segment runner's negative control (#178, #200): a contract failure
 # fails on attempt 1 of 3 with no replay -- a red run a suite cannot expect
 check("retry_negative", "nice sh tools/tests/lib/retry_negative.sh",
-      ["tools/tests/lib/retry_negative.sh", "tools/tests/run.sh",
-       "tools/tests/lib/compose.py",
-       copy_if_changed_from("tools/tests/probe_retry_negative.lua"),
-       copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR)]
-      + [copy_if_changed_from(h) for h in LIBS])
+      ["tools/tests/lib/retry_negative.sh",
+       copy_if_changed_from("tools/tests/lib/compose.py"),
+       copy_if_changed_from("tools/tests/probe_retry_negative.lua")]
+      + [copy_if_changed_from(p) for p in sn.RUN_INPUTS]
+      + [lua_copy_from(h) for h in LIBS])
 # #309: every instrument left in tools/tests (`-- @manual`) composes and
 # starts (docs/TESTING.md "Scripts that stay in the tree").
 instruments = [f for f in glob("tools/tests/*.lua")
                if re.search(r"^-- @manual", (ROOT / f).read_text(errors="replace"), re.M)]
 check("instruments", "nice python3 tools/check_instruments.py",
-      ["tools/check_instruments.py", copy_if_changed_from("build/ot6.sfc"),
-       copy_if_changed_from(sn.EMULATOR)]
-      + [copy_if_changed_from(f) for f in instruments] + HARNESS
-      + [copy_if_changed_from(h) for h in LIBS]
+      ["tools/check_instruments.py", "tools/tests/lib/stamps.py", sn.GRAPH,
+       copy_if_changed_from("tools/tests/lib/compose.py")]
+      + [copy_if_changed_from(p) for p in sn.RUN_INPUTS]
+      + [copy_if_changed_from(f) for f in instruments]
+      + [lua_copy_from(h) for h in LIBS]
       + [d for f in instruments for d in fixture_deps(f)])
-# The verdict depends on the ROM (a stamp records the ROM it was captured
-# on), on the generators (their own sigs), and -- for the drift note, and
-# for any stamp still on the conservative pre-ROM-identity rule -- on the
-# lib halves, all through the same copy_if_changed edges the generate and suite edges
-# use, so the check re-runs exactly when its answer can move.
-check("check_states", "python3 tools/tests/lib/compose.py --check-states",
-      ["tools/tests/lib/compose.py", "tools/tests/lib/savestate_stamp.sh",
-       "tools/tests/lib/lua_fingerprint.py",
-       sn.GRAPH, copy_if_changed_from("build/ot6.sfc")]
-      + [copy_if_changed_from(f"tools/tests/{e['gen']}.lua") for e in states if e.get("gen")]
-      + [copy_if_changed_from(h) for h in LIBS] + all_stamps)
 
-# the four fixture audits: real inputs replace the old make-level stamp
-AUDIT_COMMON = all_stamps + checkpoint_files
+# the four fixture audits read the generated states and the checkpoints
+AUDIT_COMMON = all_mss + checkpoint_files
 check("audit_equipment", "python3 tools/audit_equipment.py",
       ["tools/audit_equipment.py"] + AUDIT_COMMON)
 check("check_mog_gear", "python3 tools/check_mog_gear.py",
@@ -678,41 +694,11 @@ check("release_readme",
       f" current release'; exit 1; }}",
       ["VERSION", "README.md"], desc=f"README names v{VERSION}")
 
-# The two release preflights are not qualification: bare `ninja`
-# runs every qualifier on pushed main before the release commit (VERSION,
-# notes, README) exists; `ninja release` (the zip) still requires both.
+# The two release preflights are not qualification: bare `ninja` runs every
+# qualifier on pushed main before the release commit (VERSION, notes,
+# README) exists; the zip still requires both.
 release_pre = qual[qual_before_release:]
 del qual[qual_before_release:]
-# The chain from power-on is a release preflight too: the legs
-# qualification booted from tracked checkpoints must also play through
-# from power-on, each from the save the leg before it made.  And every
-# tracked checkpoint the chain captures (every one something boots,
-# checkpoint_coverage above) must be the save that chain makes today
-# (checkpoint_drift.py: levels, gear, gil, the bag, story switches); the fix
-# for a drifted one is `checkpoint_drift.py --recut`, then qualify again.
-if chain_end:
-    release_pre.append(chain_end)
-    captures = sn.chain_captures(states, ROOT)
-    tracked = [a for key in sorted(captures)
-               for a in sn.checkpoint_inputs(ROOT, key)]
-    out = "build/checks/checkpoint_drift.ok"
-    # ...and every capture must be today's: the lib halves, the stamp tool
-    # and the ROM are inputs here, so a lib-only edit (which re-runs no
-    # chain edge) re-runs this check, and the check refuses the capture
-    # whose provenance sig no longer matches
-    w.edge([out], "sh",
-           implicit=["tools/tests/lib/checkpoint_drift.py",
-                     "tools/tests/lib/sram_checkpoint.py",
-                     "tools/tests/lib/savestate_stamp.sh",
-                     "tools/tests/lib/lua_fingerprint.py",
-                     "tools/tests/lib/savestate_ninja.py", sn.GRAPH,
-                     "build/ot6.sfc"] + LIBS
-           + [p for key in sorted(captures) for p in captures[key]] + tracked,
-           cmd="python3 tools/tests/lib/checkpoint_drift.py --strict "
-               + " ".join(sorted(captures))
-               + f" && mkdir -p build/checks && touch {out}",
-           desc="tracked checkpoints are today's play")
-    release_pre.append(out)
 
 bps = f"{rel_dir}/{BASE[:-len('.sfc')]}.bps"
 w.edge([bps], "sh", [BASE, "build/ot6.sfc"], implicit=qual + release_pre,
@@ -732,7 +718,9 @@ w.edge([f"build/release/ot6-v{VERSION}.zip"], "sh",
 # ----------------------------------------------- copy_if_changed + regen ---
 w()
 for dep, src in sorted(copy_if_changed_edges.items()):
-    w.edge([dep], sn.copy_rule(src, states), [src])
+    w.edge([dep], "copy_if_changed", [src])
+for dep, src in sorted(lua_copy_edges.items()):
+    w.edge([dep], "copy_if_lua_changed", [src])
 w()
 w("rule configure")
 w("  command = python3 configure.py")
@@ -744,11 +732,10 @@ w.edge(["build.ninja"], "configure",
        ["configure.py", sn.GRAPH, "tools/tests/lib/savestate_ninja.py",
         "VERSION"])
 w()
-w.edge(["release"], "phony", [f"build/release/ot6-v{VERSION}.zip"])
-# `chain` is the one other alias: the chain from power-on's last state
-# moves whenever a cut or a leg is added, and this name does not.
-if chain_end:
-    w.edge(["chain"], "phony", [chain_end])
+# The default: every qualifier, and every generated state's and capture's
+# record (lib/stamps.py), which nothing else depends on.
+qual += [f"build/states/{n}.stamp" for n in sorted(state_names)]
+qual += [sn.capture_paths(ROOT, k)[2] for k in gate_keys]
 w("default " + " ".join(esc(p) for p in qual))
 w()
 

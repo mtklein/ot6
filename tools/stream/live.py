@@ -687,20 +687,23 @@ class Scanner:
     def progress(self):
         try:
             if self.prog is None:
-                states = runpy.run_path(os.path.join(
-                    ROOT, "tools/tests/savestate_graph.py"))["STATES"]
-                xy = _route_coords([e["state"] for e in states])
-                # freshness check: compose.py's own stamp verification
-                # (signature over generator+libs+extras, artifact hash,
-                # ancestor chain).  A fresh stamp is what ninja will not
-                # re-run -- except for a ROM-content change, which the graph
-                # tracks separately and a mid-gate page can ignore honestly.
+                graph = runpy.run_path(os.path.join(
+                    ROOT, "tools/tests/savestate_graph.py"))
+                states = graph["STATES"] + graph.get("CAPTURES", [])
+                xy = _route_coords([e["state"] for e in states
+                                    if e.get("state")])
+                # freshness check: lib/stamps.py, the question ninja
+                # answers by the same inputs (the composed script, the ROM,
+                # the runner, the capture a cut boots, the artifact, and
+                # what the state grew from).  A fresh stamp is what ninja
+                # will not re-run.
+                sys.path.insert(0, os.path.join(ROOT, "tools/tests/lib"))
                 spec = importlib.util.spec_from_file_location(
-                    "compose", os.path.join(ROOT, "tools/tests/lib/compose.py"))
-                compose = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(compose)
+                    "stamps", os.path.join(ROOT, "tools/tests/lib/stamps.py"))
+                stamps = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(stamps)
                 from pathlib import Path
-                self.prog = (states, xy, compose, Path(ROOT))
+                self.prog = (states, xy, stamps, Path(ROOT))
                 try:   # which machine's route is newest, for merge_progress
                     self.route_ts = int(subprocess.run(
                         ["git", "-C", ROOT, "log", "-1", "--format=%ct"],
@@ -710,8 +713,9 @@ class Scanner:
             live_test = (self.live_ref or {}).get("test")
             # The stamp checks cost seconds of CPU a pass (a whole core on
             # px13), so their verdicts are kept until a file they read
-            # changes: the ROM, a state or stamp, or anything under
-            # tools/tests (generators, lib, the stamp tool, checkpoints).
+            # changes: the ROM and its symbols, a state, capture or stamp,
+            # the write-gate registry, the emulator pin, or anything under
+            # tools/tests (generators, lib, the runner, checkpoints).
             fp = route_inputs()
             if fp != self.memo_fp:
                 self.memo, self.memo_fp = {}, fp
@@ -1176,12 +1180,16 @@ HINT = re.compile(r"(?:\bframe[= ]|[ (]f)(\d{3,})\b")
 def route_inputs():
     """(path, mtime, size) of every file a stamp check reads, as one hash."""
     h = hashlib.sha1()
-    tops = [os.path.join(ROOT, "build/ot6.sfc")]
+    tops = [os.path.join(ROOT, p) for p in (
+        "build/ot6.sfc", "ff6/rom/ff6-en.dbg", "tools/state_write_waivers.txt",
+        "tools/mesen/EMULATOR")]
     try:
         tops += [e.path for e in os.scandir(os.path.join(ROOT, "build/states"))
                  if e.is_file() and not e.name.endswith(".log")]
     except OSError:
         pass
+    for d, _dirs, files in os.walk(os.path.join(ROOT, "build/checkpoints")):
+        tops += [os.path.join(d, f) for f in files]
     for d, _dirs, files in os.walk(os.path.join(ROOT, "tools/tests")):
         tops += [os.path.join(d, f) for f in files]
     for p in sorted(tops):
@@ -1193,13 +1201,18 @@ def route_inputs():
     return h.hexdigest()
 
 
-def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
+def build_progress(states, xy, stamps, rootp, t0, live_test, memo=None):
     """One progress.json payload: every graph edge's status (done when its
-    stamp passes compose's freshness check, running when a live workspace
-    bears its name, pending otherwise), WoB coords for the map, a
-    whole-build time-left ETA (the savestate critical path plus the parallel
-    suite phase) from the ninja log's durations, and which single
-    edge is on the live view.
+    stamp is current by lib/stamps.py, running when a live workspace bears
+    its name, pending otherwise), WoB coords for the map, a whole-build
+    time-left ETA (the savestate critical path plus the parallel suite
+    phase) from the ninja log's durations, and which single edge is on the
+    live view.
+
+    `states` is the graph's STATES followed by its CAPTURES.  A cutter's
+    capture (a cut's cutter=, or a CAPTURES entry) is a node of its own,
+    named by its worker label (capture_<key>), waiting on the state it
+    boots; a cut waits on the run that made the save it Continues.
 
     live_test is the state name of the workspace follow() is tailing -- the
     ONE segment streaming on index.html.  It is distinct from `running`,
@@ -1209,28 +1222,23 @@ def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
     """
     memo = {} if memo is None else memo
     verdicts = memo.setdefault("fresh", {})
-    # compose's own memo, shared across the pass: each stamp's ancestors
-    # are checked once, not again for every descendant (a pass was
-    # quadratic in the chain: 300-400 s on the peers)
-    chain = memo.setdefault("stamp", {})
-    stale = (compose.STALE, compose.UNBOUND, compose.UNVERIFIED)
+    # stamps.py's own memo, shared across the pass: each script is composed
+    # once and each stamp's ancestors checked once, not again for every
+    # descendant
+    smemo = memo.setdefault("stamp", {})
+    stale = (stamps.STALE, stamps.UNBOUND, stamps.UNVERIFIED)
 
-    def fresh(x):   # compose's verdict, remembered while its inputs stand
-        if x not in verdicts:
+    def fresh(stamp_rel):   # the verdict, remembered while its inputs stand
+        if stamp_rel not in verdicts:
             try:
-                verdicts[x] = (compose.stamp_status(x, rootp, chain)[0]
-                               not in stale)
+                verdicts[stamp_rel] = (stamps.stamp_status(stamp_rel, rootp,
+                                                           smemo)[0]
+                                       not in stale)
             except Exception:
-                # A check that raised (a checkpoint extra gone missing) is
-                # not fresh, and the in-progress marks it left in compose's
-                # memo would read as "nothing to check" next time: drop
-                # them.
-                for k in [k for k, v in chain.items() if v is None]:
-                    del chain[k]
-                verdicts[x] = False
-        return verdicts[x]
+                verdicts[stamp_rel] = False
+        return verdicts[stamp_rel]
 
-    dur, qdur = {}, {}
+    dur, qdur, cdur = {}, {}, {}
     try:
         with open(os.path.join(ROOT, "build/ninja/.ninja_log")) as f:
             for line in f:
@@ -1242,6 +1250,8 @@ def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
                     dur[o[13:-4]] = secs          # savestate generate edge
                 elif o.startswith("build/results/suite/") and o.endswith(".ok"):
                     qdur[o[20:-3]] = secs          # a parallel suite test edge
+                elif o.startswith("build/checkpoints/") and o.endswith(".sram"):
+                    cdur[o.split("/")[2]] = secs   # a capture's run
     except OSError:
         pass
     running = set()
@@ -1251,11 +1261,41 @@ def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
                 running.add(os.path.basename(os.path.dirname(ws)).split(".")[0])
         except OSError:
             pass
-    edges, done = [], 0
+    owner = {}
     for e in states:
-        n = e["state"]
-        names = [n] + list(e.get("also") or [])
-        cost = max((dur.get(x, 0.0) for x in names), default=0.0)
+        if e.get("state"):
+            for x in [e["state"]] + list(e.get("also") or []):
+                owner[x] = e["state"]
+
+    def cap_label(key):
+        return "capture_" + key.replace("-", "_")
+    # the cutters' captures, once per checkpoint: key -> the state it boots
+    cutters = {}
+    for e in states:
+        if e.get("capture"):
+            cutters.setdefault(e["capture"], e["prev"])
+        elif e.get("cutter") and e.get("checkpoint"):
+            cutters.setdefault(e["checkpoint"], e["prev"])
+    edges, done = [], 0
+    nodes = [e for e in states if e.get("state")] + [
+        {"capture": k, "prev": p} for k, p in cutters.items()]
+    for e in nodes:
+        if e.get("state"):
+            n = e["state"]
+            names = [n] + list(e.get("also") or [])
+            cost = max((dur.get(x, 0.0) for x in names), default=0.0)
+            stamp_rels = [f"build/states/{x}.stamp" for x in names]
+            if e.get("checkpoint") and e["checkpoint"] in cutters:
+                deps = [cap_label(e["checkpoint"])]
+            else:
+                deps = [d for d in (e.get("prev"), e.get("after")) if d]
+        else:
+            n = cap_label(e["capture"])
+            owner[n] = n
+            names = [n]
+            cost = cdur.get(e["capture"], 0.0)
+            stamp_rels = [f"build/checkpoints/{e['capture']}.stamp"]
+            deps = [e["prev"]]
         # a live workspace takes priority over content freshness: artifacts
         # from a superseded edge can pass the stamp check while their
         # replacement run is mid-flight
@@ -1264,22 +1304,18 @@ def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
             st = "running"
         else:
             try:
-                if all(os.path.exists(
-                           os.path.join(ROOT, f"build/states/{x}.stamp"))
-                       and fresh(x) for x in names):
+                if all(os.path.exists(os.path.join(ROOT, s)) and fresh(s)
+                       for s in stamp_rels):
                     st = "done"
             except Exception:
                 pass
         if st == "done":
             done += 1
         ed = {"name": n, "dur": cost, "status": st,
-              "ckpt": bool(e.get("checkpoint")),
-              # what it waits on, so merge_progress can redo the ETA.  A
-              # cut (prev= with checkpoint=, savestate_graph.py) boots its
-              # tracked checkpoint in qualification and waits on no prev.
-              "deps": [d for d in (None if e.get("checkpoint") else e.get("prev"),
-                                   e.get("seed"), e.get("after"))
-                       if d]}
+              "ckpt": bool(e.get("checkpoint") or e.get("capture")),
+              # what it waits on, so merge_progress can redo the ETA: the
+              # state it boots, or the run that made the save it Continues
+              "deps": deps}
         if n in xy:   # WoB world-tile coords for the map view
             ed["x"], ed["y"] = round(xy[n][0], 1), round(xy[n][1], 1)
         if live_test and live_test in names:
@@ -1287,10 +1323,6 @@ def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
         edges.append(ed)
     # remaining critical path: longest chain of not-done edges (file order is
     # play order; prev links carry the real topology)
-    owner = {}
-    for e in states:
-        for x in [e["state"]] + list(e.get("also") or []):
-            owner[x] = e["state"]
     for ed in edges:
         ed["deps"] = [owner[d] for d in ed["deps"] if d in owner]
     eta = critical_path(edges)

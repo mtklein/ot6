@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""lua_fingerprint.py: the one definition of what a Lua source's provenance
-hash covers (issue #247).
+"""lua_fingerprint.py: the one definition of what counts as a change to a
+Lua program (issue #247).
 
-A generator's stamp binds the play that reached a fixture.  A comment or a
-re-indent changes no play, so the hash is taken over the file's Lua tokens,
-not its bytes: comments (`--` line comments, `--[[ ]]` / `--[==[ ]==]` long
+A comment or a re-indent changes no play, so a Lua source is compared by
+its tokens, not its bytes: comments (`--` line comments, `--[[ ]]` / `--[==[ ]==]` long
 comments) and whitespace are dropped, and every other token is kept verbatim,
 one per line.  String literals are tokens, so a `--` or a run of spaces
 inside "...", '...' or [[...]] / [==[...]==] is kept exactly.  The output is
@@ -15,18 +14,16 @@ One kind of comment is kept: a harness directive, a line comment of the
 form `-- OT6_NAME: value` (run.sh reads `-- OT6_CHECKPOINT_LAYOUT:` from the
 composed script), because it changes what a run does.
 
-savestate_stamp.sh (the `generate` edge's stamps) and compose.py
-(--check-states, embed-time checks) both reach this file, and the ninja
-graph's generator copies use `copy-if-changed` below, so the stamp checker
-and the build schedule agree on what counts as a change.
+compose.py --digest hashes a composed script's token stream (what every
+run in the ninja graph depends on), lib/stamps.py records each source's
+token hash, and the graph's Lua copies use `copy-if-changed` below, so the
+stamp checker and the build schedule agree on what counts as a change.
 
 Usage:
     lua_fingerprint.py normalize FILE        # the token stream, to stdout
-    lua_fingerprint.py digest PREFIX FILE... # sha256(PREFIX\\n ++ each file),
-                                             # a .lua file as its token stream
     lua_fingerprint.py hash FILE             # sha256 of one file's token stream
     lua_fingerprint.py copy-if-changed SRC DST
-        # ninja's copy for a generator: DST gets SRC's bytes, but keeps its
+        # ninja's copy for a Lua source: DST gets SRC's bytes, but keeps its
         # mtime when the token streams agree, so restat prunes a comment-only
         # edit and a code edit re-runs everything downstream.
 """
@@ -112,14 +109,6 @@ def content(path):
     return normalize_bytes(data) if is_lua(path) else data
 
 
-def digest(prefix, paths):
-    h = hashlib.sha256()
-    h.update(prefix.encode() + b"\n")
-    for p in paths:
-        h.update(content(p))
-    return h.hexdigest()
-
-
 def filehash(path):
     return hashlib.sha256(content(path)).hexdigest()
 
@@ -154,8 +143,6 @@ def main(argv):
     try:
         if len(argv) == 2 and argv[0] == "normalize":
             sys.stdout.buffer.write(content(argv[1]))
-        elif len(argv) >= 2 and argv[0] == "digest":
-            print(digest(argv[1], argv[2:]))
         elif len(argv) == 2 and argv[0] == "hash":
             print(filehash(argv[1]))
         elif len(argv) == 3 and argv[0] == "copy-if-changed":

@@ -23,8 +23,11 @@
 #   other than the machine-wide one.  Its sha256 is recorded as an
 #   `[emulator]` line at the end of the log, with the sha256 of the core
 #   that run loaded (core=), and beside every published .mss as
-#   <state>.mss.emulator (that same line), where savestate_stamp.sh reads
-#   the first sha for the stamp.
+#   <state>.mss.emulator (that same line), where lib/stamps.py reads the
+#   first sha for the stamp.
+# * Artifacts (.mss, .mss.lua, a captured battery) are published only when
+#   their bytes changed, so a run that plays to the same bytes leaves them,
+#   and ninja's restat stops there.
 # * MESEN_SCRIPT_ONLY=1 is exported unless the run measures coverage: the
 #   patched build (tools/mesen/) then skips the debugger bookkeeping the
 #   harness never reads; the official binary ignores the variable.
@@ -494,52 +497,23 @@ publish_file() {
   tmp="$dest.tmp.$$"
   cp "$src" "$tmp" && mv -f "$tmp" "$dest"
 }
+# An artifact (a savestate, its sidecar, a captured battery) is published
+# only when its bytes changed: a run that plays to the same bytes leaves the
+# old file, and its mtime, in place, so ninja's restat stops there instead
+# of re-running everything that boots it.
+publish_artifact() {
+  cmp -s "$1" "$2" 2>/dev/null || publish_file "$1" "$2"
+}
 # Checkpoint creation is intentionally a separate, explicit operation.  Mesen
 # flushes battery SRAM only while shutting down, so the complete 32 KiB file
 # becomes available here, after the Lua script has exercised the real Save UI.
+# Its record is the capture's stamp (lib/stamps.py), written by its own ninja
+# edge, and `sram_checkpoint.py seal-capture` turns the two into a checkpoint.
 if [ "$verdict" -eq 0 ] && [ -n "${OT6_CAPTURE_SRM:-}" ]; then
   captured="$TEST_SAVES/$(basename "$ROM" .sfc).srm"
   if [ -f "$captured" ] && [ "$(wc -c < "$captured" | tr -d ' ')" -eq 32768 ]; then
     mkdir -p "$(dirname "$OT6_CAPTURE_SRM")"
-    publish_file "$captured" "$OT6_CAPTURE_SRM"
-    # Provenance sidecar: records what cut this battery -- the capturing
-    # generator's provenance signature (savestate_stamp.sh), plus the hash
-    # of everything the run booted from (each embedded savestate's stamp,
-    # and the prior checkpoint's manifest when the run Continued from one).
-    # The sidecar lands beside the payload; `sram_checkpoint.py seal` folds
-    # it into manifest.json.  A capture that cannot state its provenance is
-    # refused.
-    gen=$(basename "$SCRIPT" .lua)
-    checkpoint_extras=""
-    adir=""
-    if [ -n "${OT6_SRAM_CHECKPOINT:-}" ]; then
-      adir="$OT6_SRAM_CHECKPOINT"
-      case "$adir" in "$ROOT"/*) adir="${adir#"$ROOT"/}" ;; esac
-      checkpoint_extras="$adir/manifest.json"
-      for p in "$ROOT/$adir"/*.sram; do
-        [ -f "$p" ] && checkpoint_extras="$checkpoint_extras $adir/$(basename "$p")"
-      done
-    fi
-    # shellcheck disable=SC2086 -- extras/ancestors are space-separated lists
-    if generator_sig=$(sh "$ROOT/tools/tests/lib/savestate_stamp.sh" sig "$gen" $checkpoint_extras); then
-      ancestors=$(
-        sed -n 's/^-- state \([A-Za-z0-9_]*\)\.mss\.lua .*/\1/p' "$COMPOSED" |
-          while IFS= read -r s; do
-            [ -f "$ROOT/build/states/$s.stamp" ] && echo "build/states/$s.stamp"
-          done
-      )
-      [ -z "$adir" ] || ancestors="$adir/manifest.json
-$ancestors"
-      # shellcheck disable=SC2086
-      python3 "$ROOT/tools/tests/lib/sram_checkpoint.py" capture "$ROOT" \
-        "$OT6_CAPTURE_SRM.provenance.json" "$OT6_CAPTURE_SRM" \
-        "$generator_sig" $ancestors ||
-        { echo "capture provenance sidecar failed for $OT6_CAPTURE_SRM"; verdict=2; }
-    else
-      echo "capture refused: cannot derive a provenance signature for $SCRIPT" \
-           "(a capture must run a tools/tests generator; issue #75)"
-      verdict=2
-    fi
+    publish_artifact "$captured" "$OT6_CAPTURE_SRM"
   else
     echo "Mesen did not flush a complete 32768-byte SRAM image: $captured"
     verdict=2
@@ -559,26 +533,30 @@ publish_file "$RUN_LOG" "$LOG"
 # published copy is always the one whose own edge scheduled it.  Screenshots
 # publish either way, since they are forensic output with no edge of their own.
 # Each published .mss gets <state>.mss.emulator beside it: this run's
-# [emulator] log line, verbatim, which savestate_stamp.sh write records in
-# the stamp, so the log and the stamp name the same binary by construction.
+# [emulator] log line, verbatim, which lib/stamps.py records in the stamp,
+# so the log and the stamp name the same binary by construction.
 publish_emulator() {
   case "$1" in *.mss)
     grep '^\[emulator\]' "$RUN_LOG" | tail -n 1 > "$1.emulator.tmp.$$" &&
-      mv -f "$1.emulator.tmp.$$" "$1.emulator" ;;
+      if cmp -s "$1.emulator.tmp.$$" "$1.emulator" 2>/dev/null; then
+        rm -f "$1.emulator.tmp.$$"
+      else
+        mv -f "$1.emulator.tmp.$$" "$1.emulator"
+      fi ;;
   esac
 }
 if [ "$verdict" -eq 0 ] && [ -z "${OT6_NO_PUBLISH:-}" ]; then
   if [ -n "${OT6_EXPECT_ARTIFACT:-}" ]; then
     for src in $OT6_EXPECT_ARTIFACT; do
       pub="$PUBLISH/$src"   # before publish_file, which reuses $src
-      publish_file "$ART/$src" "$pub"
+      publish_artifact "$ART/$src" "$pub"
       publish_emulator "$pub"
     done
   else
     for src in "$ART"/*; do
       [ -f "$src" ] || continue
       pub="$PUBLISH/$(basename "$src")"
-      publish_file "$src" "$pub"
+      publish_artifact "$src" "$pub"
       publish_emulator "$pub"
     done
   fi
