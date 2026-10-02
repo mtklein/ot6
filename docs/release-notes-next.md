@@ -18,10 +18,10 @@ no weakness of its own, answers to Setzer's cards. Setzer's cards, Trump and dic
 the tomb's undead and its demon (the Orog, the Osteosaur, the PowerDemon)
 and Dullahan himself; the tomb's plants still want blades, points and
 fire. Dullahan has ten shields, open to spears, darts, the crossbow,
-fists, fire and Setzer's cards, and Setzer is the one who breaks him most
-often. In the tomb's monster chest the shell has no shields and takes
-full damage from the start, and felling either the shell or the head
-ends the fight.
+Sabin's Pummel and Suplex, fire and Setzer's cards, and Setzer is the one
+who breaks him most often. In the tomb's monster chest the shell has no
+shields and takes full damage from the start, and felling either the
+shell or the head ends the fight.
 
 **A boosted action that never happens keeps its boost points.** When a
 character is knocked out or put to sleep after choosing a boosted action
