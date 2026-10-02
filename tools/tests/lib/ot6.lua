@@ -7596,8 +7596,9 @@ end
 -- relic's GP Rain, $18: no table, target select straight away; recorded
 -- with row = $18).  L takes back a pending boost the entry does not want.
 -- An entry { row = "defend" } is a Defend, which banks a point.  Everyone
--- else Defends while the plan has turns left, then everyone, SETZER too,
--- Fights its default target until the battle ends; the victory text is
+-- else Defends while the plan has turns left (or Fights, opts.othersFight),
+-- then everyone, SETZER too, Fights its default target until the battle
+-- ends; the victory text is
 -- pressed through (opts.untilPlanDone ends the step instead, mid-battle,
 -- once the plan is spent and its last row has resolved).  Nothing is
 -- written.
@@ -7806,7 +7807,7 @@ function M.setzerBattle(plan, opts)
     local st = M.readByte(MSTATE)
     local p = plan[k]
     if M.readByte(0x3ED8 + a * 2) ~= 9 then
-      if p ~= nil then defend(st) else fight(a, st) end
+      if p ~= nil and not opts.othersFight then defend(st) else fight(a, st) end
       return
     end
     Z.entity = a * 2

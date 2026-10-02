@@ -396,7 +396,7 @@ local function play()
       S.mark = #acts
       H.log(string.format("[%s] %s, crowd %d of %d, candidate %d of %d: the party %ss until SETZER has thrown",
         TAG, p.kind, (crowdsFor[p.kind] or 0) + 1, p.crowds, S.try, #p.cands, c.others))
-      S.step, S.phase = H.setzerBattle(c.fn(c), { untilPlanDone = true, others = c.others }), "plan"
+      S.step, S.phase = H.setzerBattle(c.fn(c), { untilPlanDone = true, othersFight = c.others == "fight" }), "plan"
     end
     if S.phase == "plan" then
       local r = S.step:tick()

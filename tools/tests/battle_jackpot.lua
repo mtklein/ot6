@@ -189,31 +189,40 @@ end
 -- picked by inputs: frames stood on the grave before the press (the battle
 -- key: from this grave $be steps $10 every four frames, so 16 waits are the
 -- 16 keys), frames the party stands in the battle before acting (Dullahan's
--- turns go on, moving the draws), and SETZER's Defends before the throw.
--- Candidates, in order: two Defends then three, each over the stands 0,
--- 330, 420, 520, 640, 760 (a stand under ~300 ends inside the load and
--- changes nothing: labs-r4), each over the 16 keys -- 192 at most.  The
--- entry shift (OT6_SEED_SHIFT, the runner's own idle at the boot point) is
--- added to every wait, so a varied entry walks the same keys in another
--- order.  Each candidate is a full throw at 3 BP, checked by checkJackpot
--- like the passes above; the search stops once both draws are met.
+-- turns go on, moving the draws), SETZER's Defends before the throw, and
+-- whether the others Defend or Fight meanwhile.  Candidates, in order:
+-- stand 0 then 640 (a stand under ~300 ends inside the load and changes
+-- nothing, labs-r4; 330-520 mostly repeat stand 0), each over 2 then 3
+-- Defends, each over the others Defending then Fighting, each over the 16
+-- keys -- 128 at most.  The entry shift (OT6_SEED_SHIFT, the runner's own
+-- idle at the boot point) is added to every wait, so a varied entry walks
+-- the same keys in another order.  Each candidate is a full throw at 3 BP,
+-- checked by checkJackpot like the passes above; the search stops once
+-- both draws are met.  Longer fights were measured and dropped: a 760-frame
+-- stand and 4 Defends each wiped the party on one key (labs-r5,
+-- search_all-r8, search_all-r9), and a wipe would fail the suite by luck.
 --
 -- The bound, for the redraw (the rarer): the table holds 4 bytes past 251
 -- of 256, a throw is four rolls, so a throw redraws with p = 1 - (252/256)^4
 -- = 6.1%.  Throws that repeat one state repeat one outcome, so what counts
 -- is the distinct throws among the candidates: with D distinct, the chance
--- none redraws is 0.939^D -- 1% at D = 73, 0.1% at D = 110.  The lab over
--- the whole set (build/attempts/wt/kit-setzer/labs-r5/) measures D; the
--- empty pass is the commoner (about one distinct throw in eight at 3 BP).
--- A search that meets neither, or only one, fails by name.
+-- none redraws is 0.939^D.  The whole set, played at entry shifts 0, 13 and
+-- 29 (labs-r5/search_all-r10, JACKPOT_SEARCH_ALL): 99 distinct throws of
+-- 127 played at each (the 128th was skipped by a predicate fixed since),
+-- 6 of them redrawing (6.1%, as the model has it) and 33 with an empty
+-- pass, no wipe -- so a fixture whose 99 distinct throws hold no redraw has
+-- p = 0.939^99 = 0.2%, and then the suite fails by name, as it does if the
+-- empty pass (a third of the throws) is not met.
 local ENTRY = (type(OT6_SEED_SHIFT) == "number" and OT6_SEED_SHIFT or 0)
 local CAND = {}
-for _, d in ipairs({ 2, 3 }) do
-  for _, st in ipairs({ 0, 330, 420, 520, 640, 760 }) do
-    for i = 0, 15 do CAND[#CAND + 1] = { wait = ENTRY + 1 + 4 * i, stand = st, defends = d } end
+for _, st in ipairs({ 0, 640 }) do
+  for _, d in ipairs({ 2, 3 }) do
+    for _, of in ipairs({ false, true }) do
+      for i = 0, 15 do CAND[#CAND + 1] = { wait = ENTRY + 1 + 4 * i, stand = st, defends = d, othersFight = of } end
+    end
   end
 end
-local S = { i = 0, cur = nil, found = {}, seen = {}, distinct = 0 }
+local S = { i = 0, played = 0, cur = nil, found = {}, seen = {}, distinct = 0 }
 
 local function waitFor(fn)
   local c, n = 0, nil
@@ -231,7 +240,7 @@ local function candidateBattle()
       local plan = {}
       for _ = 1, S.cur.defends do plan[#plan + 1] = { row = "defend" } end
       plan[#plan + 1] = { row = JACKPOT, boost = 3 }
-      step = H.setzerBattle(plan, { untilPlanDone = true })
+      step = H.setzerBattle(plan, { untilPlanDone = true, othersFight = S.cur.othersFight })
     end
     return step:tick()
   end, reset = function() step = nil end }
@@ -239,7 +248,7 @@ end
 
 local search = H.seqStep({
   H.driveUntil(function()
-    return (S.found.empty and S.found.redraw) or S.i >= #CAND
+    return (S.found.empty and S.found.redraw) or S.played >= #CAND
   end, 2000000, {
     H.call(function()
       S.i = S.i + 1
@@ -252,8 +261,10 @@ local search = H.seqStep({
     waitFor(function() return S.cur.stand end),
     candidateBattle(),
     H.call(function()
+      S.played = S.played + 1
       local c, recs = S.cur, H.vars.setzer
-      local label = string.format("search %d (wait %d, stand %d, %d Defends)", S.i, c.wait, c.stand, c.defends)
+      local label = string.format("search %d (wait %d, stand %d, %d Defends, the others %s)", S.i, c.wait, c.stand,
+        c.defends, c.othersFight and "Fight" or "Defend")
       H.assertEq(#recs, 1, label .. ": one Jackpot resolved")
       H.assertEq(recs[1].row == JACKPOT and recs[1].boost == 3, true, label .. ": a Jackpot at 3 BP")
       local got = checkJackpot(recs[1], S.i + 3)
@@ -274,7 +285,7 @@ local search = H.seqStep({
   H.call(function()
     if JACKPOT_SEARCH_ALL then
       H.log(string.format("[jackpot] search, the whole set: %d candidates, %d distinct throws, %d with an empty "
-        .. "pass, %d with a redraw (entry shift %d)", S.i, S.distinct, (S.foundAll or {}).empty or 0,
+        .. "pass, %d with a redraw (entry shift %d)", S.played, S.distinct, (S.foundAll or {}).empty or 0,
         (S.foundAll or {}).redraw or 0, ENTRY))
       return
     end
@@ -285,7 +296,7 @@ local search = H.seqStep({
       .. "its %d candidates (%d distinct throws tried; none redrawing has p = 0.939^%d = %.4f)", #CAND,
       S.distinct, S.distinct, 0.939 ^ S.distinct))
     H.log(string.format("[jackpot] search: an empty pass at %s, a redraw at %s; %d candidate(s), %d distinct "
-      .. "(entry shift %d)", S.found.empty, S.found.redraw, S.i, S.distinct, ENTRY))
+      .. "(entry shift %d)", S.found.empty, S.found.redraw, S.played, S.distinct, ENTRY))
   end),
 })
 
