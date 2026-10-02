@@ -20,9 +20,10 @@
 -- bench (below: a Fenix Down, a status cure or a Potion for whoever needs
 -- one, else Defend) play every window until every bank holds 3, every
 -- member stands at 60% of max HP or better and every case's actor is free
--- to play its verb; snapshot, and assert that precondition.  (A battle the
--- party cannot get ready in -- an actor under a Mute the bag cannot lift,
--- say -- is fought out and the next encounter taken, at most four.)  Each case
+-- to play its verb; snapshot only then.  (A battle the party cannot get
+-- ready in -- an actor under a Mute the bag cannot lift, say -- is fought
+-- out and the next encounter taken, up to MEASURE_BATTLES, derived from
+-- 394's pool; past that the precondition is an error.)  Each case
 -- restores that snapshot, benches the other windows until its actor's
 -- opens (an actor blocked there, by a greyed row or a status, benches that
 -- window too and starts at a later one), presses R three times and plays
@@ -77,21 +78,33 @@ local STATE = "build/states/fc_alcove.mss.lua"
 
 local BOOST = 3
 local MULT = 1 << BOOST
--- What Ot6BoostDmg makes of `din` at BOOST: BOOST doublings of the 16-bit
--- word, and $7FFF when one of them carries out of bit 15 (`asl / bcs @cap`,
--- ot6_boostdmg.asm).  A product in $8000-$FFFF carries out of none and is
--- stored as it stands: on the re-cut a magicite esper's 4327 left
--- Ot6BoostDmg as 34616 ($8738), where min(din x 8, $7FFF) expected $7FFF
--- (build/attempts/wt/procboost-v024/air/new6/new_k6.log.gz).
+-- What Ot6BoostDmg makes of `din` at BOOST, as the frozen v0.24 ROM does
+-- it: BOOST doublings of the 16-bit word, and $7FFF when one of them
+-- carries out of bit 15 (`asl / bcs @cap`, ot6_boostdmg.asm).  That $7FFF
+-- arm is a known ROM bug, #359: a product in $8000-$FFFF carries out of
+-- nothing and stands (a magicite esper's 4327 left as 34616, $8738,
+-- build/attempts/wt/procboost-v024/air/new6/new_k6.log.gz), while one past
+-- $FFFF drops to $7FFF, under the products below it.  The decision there is
+-- to saturate at $FFFF; when the ROM does, this arm returns $FFFF.  Until
+-- then it matches the ROM rather than the decision, so the suite measures
+-- the build it runs on.
 local function boosted(din)
   local v = din * MULT
-  if v > 0xFFFF then return 0x7FFF end
+  if v > 0xFFFF then return 0x7FFF end      -- #359: the ROM's overflow arm
   return v
 end
 local TERRA, LOCKE, SHADOW = 0x00, 0x01, 0x03
 local ICE_ROD, MITHRIL_KNIFE, MAGICITE = 0x36, 0x01, 0xF9
 local FIRE, FIRE3 = 0x00, 0x09
-local FIGHT_TRIES, MAGICITE_TRIES, ROUND_FRAMES = 12, 6, 1800
+-- Try n of a retried case gives the actor's first n-1 windows to the bench
+-- (tryCase), so its reach is bounded by 6000 frames (the single-window
+-- reach the suite always had; the longest try-1 reach measured is 1406,
+-- rod in px13/new7/new_k10)
+-- plus ROUND_FRAMES per window spent.  Measured per spent window, try n's
+-- reach less try 1's over n-1: 550, 653, 1051, 3157 and 3345 frames
+-- (build/attempts/wt/procboost-v024/reach_frames.txt, the final sweep and
+-- its replay); ROUND_FRAMES is twice the largest.
+local FIGHT_TRIES, MAGICITE_TRIES, ROUND_FRAMES = 12, 6, 2 * 3345
 local GAU, RAGE_ENTRIES = 0x0B, 8          -- the rage window lists at most eight
 local GAU_STATE = "build/states/gau_joined.mss.lua"
 local RAGECOUNT, RAGEBEAST, MP = 0x3A9A, 0x33A8, 0x3C08
@@ -110,7 +123,7 @@ local HANDS = 0x3CA8
 local CMD_FIGHT, CMD_ITEM, CMD_MAGIC, CMD_THROW, CMD_RAGE = 0x00, 0x01, 0x02, 0x08, 0x10
 
 local slotOf, snap, armed = {}, nil, nil
-local snapSeats, snapReady, snapWhy          -- the party as the snapshot was taken
+local snapSeats                               -- the seats as the snapshot was taken
 local SETTLE, settled = 8, 0                  -- released frames on its window first
 local unreadySaid = -1200
 local weapspell                               -- OT6_WEAPSPELL, off the dbg
@@ -162,6 +175,16 @@ local function installObservers()
     if armed == nil or armed.endF then return end
     local x = emu.getState()["cpu.x"] & 0xFFFF
     if x ~= armed.slot * 2 then return end
+    -- command $29 is no action anyone queued: the engine runs it for an
+    -- entity whose Stop, Reflect, Freeze or Psyche counter just ran out
+    -- (battle_main.asm Cmd_29), and it reaches Ot6BoostDmg with 0 in.  One
+    -- landed on GAU between his Rage's confirm and its end on a varied
+    -- Veldt draw and failed "the queued command is Rage: got 41 ($29)"
+    -- (build/attempts/wt/procboost-v024/px13/rage8/old_k2.log.gz).
+    if H.readByte(0x3A7C) == 0x29 then
+      armed.timers = (armed.timers or 0) + 1
+      return
+    end
     armed.calls[#armed.calls + 1] = {
       b5 = H.readByte(0xB5), b6 = H.readByte(0xB6), a7c = H.readByte(0x3A7C),
       a7d = H.readByte(0x3A7D), pend = H.readByte(PEND + x),
@@ -226,9 +249,10 @@ end
 -- Healing, like a Defend, is an unboosted action, so it banks the actor's
 -- pip.  Healing comes first because the encounter is whatever 394 deals:
 -- on the v0.24 re-cut a lone Ninja (formation 0003) took half of every bar
--- while the banks filled (1207 -> 600 on TERRA) and two more of its
--- party-wide hits killed LOCKE inside the rod case before his Ice Rod went
--- off (build/attempts/wt/v024-recut/qual1/procboost_hpdiag.log).
+-- while the banks filled (1207 -> 600 on TERRA), and with the others
+-- Defending through its party-wide hits the party wiped inside the rod
+-- case: LOCKE's Ice Rod committed (f5754) and never went off before the
+-- wipe (canary f6788; build/attempts/wt/v024-recut/qual1/procboost_hpdiag.log).
 -- battle_boostcharge's bench, which this follows, heals first for the same
 -- reason.  HEAL_PCT sits above READY_PCT, the snapshot's floor: healing
 -- only members under the floor itself, a Potion (about 250) at a time
@@ -294,21 +318,43 @@ local function awaiting(s)
   if landed or H.frame - r.f > INBOUND_WAIT then inbound[s] = nil return false end
   return true
 end
+local activeCases, blocked     -- the cases this half measures, and blocked(c) (below)
+local function cureFor(s, greys)
+  local s1, s2 = statusBytes(s)
+  for _, k in ipairs(STATUS_CURES) do
+    if (k.greys == true) == greys and ((k.byte == 1 and s1 or s2) & k.bit) ~= 0 then
+      local item = H.statusCure({ byte = k.byte, bit = k.bit, items = k.items,
+                                  has = function(id) return battInvIdx(id) ~= nil end })
+      if item then return { item = item, target = s, why = k.name, byte = k.byte, bit = k.bit } end
+    end
+  end
+end
 local function carePlan()
   for s = 0, 3 do
     if seated(s) and H.readWord(HP + s * 2) == 0 and battInvIdx(FENIX) and not awaiting(s) then
       return { item = FENIX, target = s, why = "down" }
     end
   end
+  -- Petrify or Zombie takes a member out of the bench: lift it on anyone
   for s = 0, 3 do
     if seated(s) and H.readWord(HP + s * 2) > 0 and not awaiting(s) then
-      local s1, s2 = statusBytes(s)
-      for _, k in ipairs(STATUS_CURES) do
-        if ((k.byte == 1 and s1 or s2) & k.bit) ~= 0 then
-          local item = H.statusCure({ byte = k.byte, bit = k.bit, items = k.items,
-                                      has = function(id) return battInvIdx(id) ~= nil end })
-          if item then return { item = item, target = s, why = k.name, byte = k.byte, bit = k.bit } end
-        end
+      local plan = cureFor(s, false)
+      if plan then return plan end
+    end
+  end
+  -- Imp and Mute only grey commands, and the bag holds few of their cures
+  -- (one Echo Screen and no Remedy at fc_alcove): lift one only on a
+  -- case's actor whose verb row it greys, the cases in order, so the
+  -- caster first.  Curing SHADOW's Mute, which greys nothing he throws,
+  -- spent the only Echo Screen and left TERRA's Mute nothing
+  -- (build/attempts/wt/procboost-v024/px13/new7/new_k5.log.gz, f19826).
+  for _, c in ipairs(activeCases or {}) do
+    local s = slotOf[c.char]
+    if s ~= nil and seated(s) and H.readWord(HP + s * 2) > 0 and not awaiting(s) then
+      local why = blocked(c)
+      if why and why:find("greyed", 1, true) then
+        local plan = cureFor(s, true)
+        if plan then return plan end
       end
     end
   end
@@ -431,7 +477,7 @@ local phase, held = "idle", nil
 -- muted TERRA before the snapshot and the magic case walked the cursor
 -- up and down past the greyed row for 6000 frames
 -- (build/attempts/wt/procboost-v024/air/old2/old_k6.log.gz).
-local function blocked(c)
+function blocked(c)
   local s = slotOf[c.char]
   if s == nil or not seated(s) then return "not seated" end
   if H.readWord(HP + s * 2) == 0 then return "down" end
@@ -519,7 +565,7 @@ local function tryCase(c, n)
       H.rearmInputInjection()
       inbound = {}
       c.slot = slotOf[c.char]
-      c.calls, c.fb, c.endF, c.beast = {}, {}, nil, nil
+      c.calls, c.fb, c.endF, c.beast, c.timers = {}, {}, nil, nil, nil
       c.pendAtConfirm, c.bankAtConfirm, c.mpAtConfirm = nil, nil, nil
       c.spend = n - 1
       tick, phase, held, spent, deferring = 0, "reach", nil, 0, nil
@@ -529,11 +575,13 @@ local function tryCase(c, n)
         if phase == "reach" then
           -- bench the other windows until this actor's opens.  Try n gives
           -- the actor's first n-1 windows to the bench, so each try acts
-          -- after another round of the encounter's turns and draws on
-          -- another stretch of the battle RNG; an idle wait at the window
-          -- does not move it ($be held at $C5 through 528 idle frames, and
-          -- twelve fight tries swung the same four hits,
-          -- build/attempts/wt/procboost-v024/px13/diagbe/diagbe_k4.log.gz).
+          -- after n-1 more rounds of everyone's turns.  The idle waits this
+          -- replaced (48 frames more a try) did not vary the swings: on one
+          -- draw $be stood at $C5 through every wait of tries 1-4 and moved
+          -- only once a monster acted inside the wait ($C7 and $CE from
+          -- wait 145, $D5 in try 9, $DE in try 12), and all twelve tries
+          -- swung the same four hits
+          -- (build/attempts/wt/procboost-v024/px13/diagbe/diagbe_k4.log.gz).
           -- An actor who cannot play the verb at a window (blocked)
           -- spends it the same way, and the case starts at one where they
           -- can.
@@ -592,11 +640,12 @@ local function tryCase(c, n)
         who = string.format("beast $%02X (special $%02X), ", c.beast, specialOf(c.beast))
       end
       H.log(string.format("[procboost] %s try %d (%d window(s) spent first): %spending at confirm %s: %s"
-        .. " ; Ot6FightBoost: %s ; bank %s->%d pending %d, mp %s->%d",
+        .. " ; Ot6FightBoost: %s ; bank %s->%d pending %d, mp %s->%d%s",
         c.name, n, c.spend, who, tostring(c.pendAtConfirm),
         #parts > 0 and table.concat(parts, " | ") or "no Ot6BoostDmg call",
         #fparts > 0 and table.concat(fparts, " | ") or "not reached",
-        tostring(c.bankAtConfirm), bankAfter, pendAfter, tostring(c.mpAtConfirm), mpAfter))
+        tostring(c.bankAtConfirm), bankAfter, pendAfter, tostring(c.mpAtConfirm), mpAfter,
+        c.timers and string.format(" ; %d status-timer call(s) ($29) left out", c.timers) or ""))
       if c.done == nil or c.done(c) then
         c.hit = { calls = c.calls, fb = c.fb, n = n, pendAtConfirm = c.pendAtConfirm,
                   bankAtConfirm = c.bankAtConfirm, bankAfter = bankAfter, pendAfter = pendAfter,
@@ -619,13 +668,14 @@ local CASES = {
   { name = "magicite", char = LOCKE, verb = "item", item = MAGICITE, tries = MAGICITE_TRIES,
     done = function(c) return #c.calls > 0 end },
 }
+activeCases = CASES
 -- The precondition every case starts from: every member alive at READY_PCT
 -- of max HP or better, and every case's actor free to play its verb.
 local function ready()
   if not standing() then
     return false, string.format("a member down or under %d%% of max HP", READY_PCT)
   end
-  for _, c in ipairs(CASES) do
+  for _, c in ipairs(activeCases) do
     local why = blocked(c)
     if why then return false, c.name .. ": " .. why end
   end
@@ -636,7 +686,7 @@ end
 -- down with no Fenix Down in the bag, or under a status that lasts the
 -- battle (Petrify, Zombie, Imp, Mute) and that nothing in the bag lifts.
 local function unliftable()
-  for _, c in ipairs(CASES) do
+  for _, c in ipairs(activeCases) do
     local s = slotOf[c.char]
     local why = s ~= nil and not awaiting(s) and blocked(c) or nil
     if why == "down" and battInvIdx(FENIX) == nil then
@@ -662,8 +712,24 @@ end
 -- Pace a lane off the arrival tile on 394 until an encounter comes.
 local lane
 local BACK = { left = "right", right = "left", up = "down", down = "up" }
+local paceTick, paceLost = 0, 0
 local function paceFrame()
-  if not (H.hasControl() and H.tileAligned()) then H.setPad({}) return end
+  paceTick = paceTick + 1
+  if H.dialogWaiting() then                 -- a box the fight-out left: page it
+    paceLost = 0
+    H.setPad(paceTick % 8 < 4 and { a = true } or {})
+    return
+  end
+  if not (H.hasControl() and H.tileAligned()) then
+    paceLost = paceLost + 1
+    if paceLost > 1800 then
+      error(string.format("pacing 394: no control and no dialog for 1800 frames (f%d, map %d)",
+        H.frame, H.mapId() & 0x3FF), 0)
+    end
+    H.setPad({})
+    return
+  end
+  paceLost = 0
   local x, y = H.fieldX(), H.fieldY()
   if lane == nil then
     for _, d in ipairs({ "left", "right", "up", "down" }) do
@@ -675,7 +741,38 @@ local function paceFrame()
 end
 
 -- Read the battle that is up: the seats, TERRA's weapon spell, the draw.
-local UNREADY_FRAMES, MEASURE_BATTLES = 20000, 4
+-- How many battles to try before the precondition is called unreachable.
+-- A battle fails to serve when a case's actor is blocked by something the
+-- bag cannot lift (UNREADY_FRAMES is the backstop; no measured battle has
+-- needed it).  Every block of that kind measured on 394 was a Mute, and
+-- every Mute came in a formation holding an Apokryphos or a Misfit
+-- (build/attempts/wt/procboost-v024/summary.txt).  394's pool is four
+-- "+rand" words: the encounter counter picks the word, which the tables fix
+-- for a given counter, and the word's base + rand(0..3) picks the
+-- formation.  So whatever the counter, an encounter is such a formation
+-- with odds at most q, the largest share of them in any word, and N
+-- unservable battles in a row have odds at most q^N even if every such
+-- formation always blocked.  MEASURE_BATTLES is the least N with
+-- q^N <= MEASURE_FAIL.
+local MUTERS = { [0x00C] = "Apokryphos", [0x0A4] = "Misfit" }
+local MEASURE_FAIL = 1e-3
+local function measureBattles()
+  local pool = H.encounterPool(H.fieldEncounterGroup(394))
+  local q = 0
+  for slot = 1, 4 do
+    local hit = 0
+    for _, f in ipairs(pool[slot].formations) do
+      for _, sp in ipairs(f.species) do
+        if MUTERS[sp] then hit = hit + 1 break end
+      end
+    end
+    q = math.max(q, hit / #pool[slot].formations)
+  end
+  assert(q < 1, "394's pool has a word that deals only Apokryphos/Misfit formations")
+  return math.max(1, math.ceil(math.log(MEASURE_FAIL) / math.log(q))), q
+end
+local MEASURE_BATTLES, MUTER_ODDS = measureBattles()
+local UNREADY_FRAMES = 20000
 local serving = { n = 1, mode = "fill", since = nil, W = nil }
 local function battleSetup()
   slotOf = {}
@@ -763,7 +860,7 @@ local steps = {
         H.setPad({})
         settled = settled + 1
         if settled >= SETTLE then
-          snapSeats, snapReady, snapWhy = seatsLine(), ready()
+          snapSeats = seatsLine()
           snap = H.requestSaveState()
         end
         return
@@ -804,15 +901,12 @@ local steps = {
   H.waitFrames(2),
   H.call(function()
     H.checkReq(snap, "snapshot")
-    H.log(string.format("[procboost] snapshot f%d: seats %s, after %d bench action(s)",
-      H.frame, snapSeats, benchHeals))
-    -- every case restores this and sits through the encounter's hits until
-    -- its actor's action resolves; a member the next hits can kill, or an
-    -- actor who cannot play the verb, ends the case (or the run) before it
-    -- measures anything
-    H.assertEq(snapReady, true, string.format("precondition: the party is ready at the snapshot, "
-      .. "every member alive at %d%% of max HP or better and every case's actor free to play "
-      .. "its verb (%s%s)", READY_PCT, snapSeats, snapWhy and ("; " .. snapWhy) or ""))
+    -- the gate above is the precondition's check: it snapshots only a
+    -- ready party, and a precondition no battle reaches is its error
+    H.log(string.format("[procboost] snapshot f%d in battle %d: seats %s, after %d bench "
+      .. "action(s); %d battle(s) allowed (an Apokryphos/Misfit formation at most %.2f of a "
+      .. "draw, so %d unservable in a row at most %.4f)", H.frame, serving.n, snapSeats,
+      benchHeals, MEASURE_BATTLES, MUTER_ODDS, MEASURE_BATTLES, MUTER_ODDS ^ MEASURE_BATTLES))
   end),
 }
 for _, c in ipairs(CASES) do
@@ -928,20 +1022,42 @@ for _, s in ipairs({
       "GAU's rage window lists 1..%d rages (%d)", RAGE_ENTRIES, learned))
     H.log(string.format("[procboost] GAU slot %d; %d rages learned", slotOf[GAU], learned))
   end),
+  -- the same gate as the first half's: GAU's own window, his bank at
+  -- BOOST, the party ready (activeCases is the Rage row now), the pad left
+  -- alone for SETTLE frames on it
+  H.call(function() activeCases, settled, unreadySaid = RAGE, 0, -1200 end),
   H.driveUntil(function() return snap ~= nil end, 30000, {
     H.call(function()
       local s = slotOf[GAU]
       if H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_CMD and (H.readByte(ACTOR) & 3) == s
-         and H.readByte(BANK + s * 2) >= BOOST and H.readByte(PEND + s * 2) == 0 then
+         and H.readByte(BANK + s * 2) >= BOOST and H.readByte(PEND + s * 2) == 0 and ready() then
         H.setPad({})
-        snap = H.requestSaveState()
+        settled = settled + 1
+        if settled >= SETTLE then
+          snapSeats = seatsLine()
+          snap = H.requestSaveState()
+        end
         return
+      end
+      settled = 0
+      if H.readByte(BANK + s * 2) >= BOOST and H.frame - unreadySaid >= 1200 then
+        local _, why = ready()
+        if why then
+          unreadySaid = H.frame
+          H.log(string.format("[procboost] f%d: GAU's bank at %d, not ready yet: %s; seats %s",
+            H.frame, BOOST, why, seatsLine()))
+        end
       end
       bench(-1)
     end),
-  }, "GAU's window with " .. BOOST .. " pips"),
+  }, string.format("GAU's window with %d pips, every member alive at %d%% of max HP and GAU "
+    .. "free to Rage", BOOST, READY_PCT)),
   H.waitFrames(2),
-  H.call(function() H.checkReq(snap, "snapshot at GAU's window") end),
+  H.call(function()
+    H.checkReq(snap, "snapshot at GAU's window")
+    H.log(string.format("[procboost] snapshot at GAU's window f%d: seats %s, after %d bench "
+      .. "action(s)", H.frame, snapSeats, benchHeals))
+  end),
 }) do steps[#steps + 1] = s end
 for _, c in ipairs(RAGE) do
   for _, s in ipairs(tryCase(c, 1)) do steps[#steps + 1] = s end
@@ -992,4 +1108,16 @@ steps[#steps + 1] = H.call(function()
     fights, BOOST))
 end)
 
-H.run({ maxFrames = 400000 }, steps)
+-- The run's cap is the sum of its steps' own bounds, so no step's budget is
+-- cut short by it: the walk out, MEASURE_BATTLES battles at 30000, every
+-- try's reach and resolve, and the Rage half's walk, gate and cases.
+local function runBudget()
+  local f = 20 + 20 + 3000 + 1800 + 900 + 30000 + 900 + 30000 * MEASURE_BATTLES
+  for _, c in ipairs(CASES) do
+    for n = 1, c.tries do f = f + 2 + 6000 + (n - 1) * ROUND_FRAMES + 6000 end
+  end
+  f = f + 20 + 3000 + 30000 + 900 + 30000 + 2
+  for _ = 1, #RAGE do f = f + 2 + 6000 + 6000 end
+  return f
+end
+H.run({ maxFrames = runBudget() }, steps)
