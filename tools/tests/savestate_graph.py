@@ -45,11 +45,6 @@
 #       one generator run that publishes several states: one edge, one
 #       play-through, all the artifacts the script emits along the way.
 #
-#   S("whelk_entry", gen="gen_whelk_poweron", after="battle2_entry")
-#       generated from power-on (no savestate input) and ORDERED after
-#       another state so the two emulator runs never race, without inheriting
-#       its staleness -- ninja's order-only dependency.
-#
 # What a state's run depends on, by content (savestate_ninja.py): its
 # composed script (the generator, the lib files compose.py inlines, the
 # sidecars it embeds), the ROM, the emulator pin, run.sh and the Python it
@@ -59,11 +54,10 @@
 # TypeError here, not a silently-plain entry downstream.
 
 
-def S(state, *, gen, prev=None, checkpoint=None, after=None, timeout=None,
-      also=None, saves=None, cutter=None):
+def S(state, *, gen, prev=None, checkpoint=None, timeout=None, also=None,
+      saves=None, cutter=None):
     return {"state": state, "gen": gen, "prev": prev, "checkpoint": checkpoint,
-            "after": after, "timeout": timeout, "also": also, "saves": saves,
-            "cutter": cutter}
+            "timeout": timeout, "also": also, "saves": saves, "cutter": cutter}
 
 
 def C(checkpoint, *, cutter, prev):
@@ -81,9 +75,12 @@ STATES = [
     # whelk_entry: the dialog-opening boss fight battle_dlgmenu tests.
     # gen_whelk_poweron generates it from COLD POWER-ON -- plays the New Game
     # intro through the Narshe gauntlet to the mines -- so it consumes no
-    # predecessor savestate; `after=` only keeps the three suite states from
-    # racing each other's emulator boots, exactly the order make ran them in.
-    S("whelk_entry", gen="gen_whelk_poweron", after="battle2_entry"),
+    # predecessor savestate.  It is the head of the line every later state
+    # grows from, so nothing orders it after the two suite states above
+    # (every run has its own emulator home; the old after= ordering held
+    # the whole line back 117 s behind them,
+    # build/attempts/wt/one-graph/px13/after-full).
+    S("whelk_entry", gen="gen_whelk_poweron"),
 
     # ---- the story chain past the whelk -----------------------------------
     # Each link consumes the previous link's savestate, so the order below is

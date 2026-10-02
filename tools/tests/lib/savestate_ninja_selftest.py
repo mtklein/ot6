@@ -11,7 +11,8 @@ it publishes an artifact only when its bytes changed, as run.sh does.
 
 The graph: a (power-on) saves k1, which b Continues (a cut); c follows b;
 a cutter booted from c saves k2, which d Continues; e follows d and saves k3
-(the frontier); a capture-only cutter lifts k4 from c; x is ordered after a.
+(the frontier); a capture-only cutter lifts k4 from c; x is another
+power-on root.
 
 Each case moves one input and checks which runs ninja makes, and that the
 stamps (stamps.py --check-states) agree with what ninja did.
@@ -161,7 +162,7 @@ def mock(root):
     t.write("tools/tests/savestate_graph.py", '''
 def S(state, **kw):
     return dict({"state": state, "gen": None, "prev": None,
-                 "checkpoint": None, "after": None, "timeout": None,
+                 "checkpoint": None, "timeout": None,
                  "also": None, "saves": None, "cutter": None}, **kw)
 STATES = [
     S("a", gen="gen_a"),
@@ -169,7 +170,7 @@ STATES = [
     S("c", gen="gen_c", prev="b"),
     S("d", gen="gen_d", prev="c", checkpoint="k2-v1", cutter="gen_cut"),
     S("e", gen="gen_e", prev="d", saves="k3-v1"),
-    S("x", gen="gen_x", after="a"),
+    S("x", gen="gen_x"),
 ]
 CAPTURES = [{"capture": "k4-v1", "cutter": "gen_seed", "prev": "c"}]
 ''')

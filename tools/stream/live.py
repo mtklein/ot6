@@ -1288,7 +1288,7 @@ def build_progress(states, xy, stamps, rootp, t0, live_test, memo=None):
             if e.get("checkpoint") and e["checkpoint"] in cutters:
                 deps = [cap_label(e["checkpoint"])]
             else:
-                deps = [d for d in (e.get("prev"), e.get("after")) if d]
+                deps = [e["prev"]] if e.get("prev") else []
         else:
             n = cap_label(e["capture"])
             owner[n] = n

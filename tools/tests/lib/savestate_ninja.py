@@ -92,8 +92,8 @@ CAPTURE_DIR = "build/checkpoints"
 AUTHORED_DIR = "build/ninja/authored"
 
 NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
-FIELDS = {"state", "gen", "prev", "checkpoint", "after", "timeout", "also",
-          "saves", "cutter"}
+FIELDS = {"state", "gen", "prev", "checkpoint", "timeout", "also", "saves",
+          "cutter"}
 CAPTURE_FIELDS = {"capture", "cutter", "prev", "timeout"}
 # run.sh's wall-clock cap for a run with no timeout= of its own.  Bare
 # `ninja` runs every ready edge at once and equally-niced emulators stretch
@@ -193,11 +193,6 @@ def validate(states, root, captures=()):
             err(e, f"no such generator tools/tests/{gen}.lua")
         if prev and prev not in seen:
             err(e, f"prev {prev!r} is not an earlier state")
-        after = e.get("after")
-        if after and (prev or checkpoint):
-            err(e, "after= excludes prev= and checkpoint=")
-        if after and after not in seen:
-            err(e, f"after {after!r} is not an earlier state")
         # A cut boots the graph's own capture of the save prev's play ends
         # at; a checkpoint with no prev= would boot a save no run here made.
         if checkpoint and not prev:
@@ -450,8 +445,6 @@ def emit_state_edges(w, states, root, copy_from, lua_copy_from=None,
             seal_edge(key)
         elif e.get("prev"):
             ancestor = f"build/states/{e['prev']}.stamp"
-        if e.get("after"):
-            order.append(f"build/states/{e['after']}.mss.lua")
         outs = []
         for n in outs_names:
             outs += [f"build/states/{n}.mss.lua", f"build/states/{n}.mss"]
@@ -638,8 +631,7 @@ def selftest():
                   cutter="gen_cut"),
                 s(state="r", gen="gen_ok", prev="q", checkpoint="k3-v1",
                   saves="k4-v1", also=["r2"]),
-                s(state="x", gen="gen_ok", prev="o"),
-                s(state="w", gen="gen_ok", after="o")]
+                s(state="x", gen="gen_ok", prev="o")]
         caps = [{"capture": "seed-v1", "cutter": "gen_seed", "prev": "o"}]
         check("a well-formed graph validates",
               validate(full, root, caps) == [])
@@ -649,8 +641,8 @@ def selftest():
             ("unknown generator", full + [s(state="z", gen="gen_nope")], caps),
             ("prev not earlier", [s(state="z", gen="gen_ok", prev="o")] + full,
              caps),
-            ("after with prev", full + [s(state="z", gen="gen_ok", prev="o",
-                                          after="o")], caps),
+            ("after= (an order with no dependency)",
+             full + [s(state="z", gen="gen_ok", after="o")], caps),
             ("a checkpoint boot with no prev",
              full + [s(state="z", gen="gen_ok", checkpoint="k1-v1")], caps),
             ("a negative fixture",
@@ -778,8 +770,6 @@ def selftest():
               "--ancestor build/states/o.stamp" in body("build/states/x.stamp"))
         check("an also= sibling has its own stamp edge",
               ": stamp build/states/r2.mss |" in edge("build/states/r2.stamp"))
-        check("after= orders without a dependency",
-              "|| build/states/o.mss.lua" in edge("build/states/w.mss.lua"))
         check("no edge in the graph names a chain_ copy or a phony alias",
               "chain_" not in text and ": phony" not in text)
         check("generator timeouts default to 1800 s",
