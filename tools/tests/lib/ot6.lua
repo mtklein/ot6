@@ -8362,18 +8362,6 @@ function M.hireCrewCheck(r, tag)
       M.assertEq(a.shown, true, string.format("%s pass %d: the %s is shown once in", tag, k, NAME[fig]))
     end
   end
-  for j, s in ipairs(swaps) do
-    M.log(string.format("[crew] %s swap %d (f%d) to gfx $%02X at (%d,%d), %s", tag, j, s.f, s.to, s.x, s.y,
-      s.pass.pincer and "a pincer" or "sideways"))
-    M.assertEq(outOfSight(s, s.pass.pincer), true, string.format("%s swap %d: the slot stands out of sight (%d,%d)",
-      tag, j, s.x, s.y))
-  end
-  for j, l in ipairs(loads) do
-    M.assertEq(l.hidden, true, string.format("%s load %d (gfx $%02X): the slot is hidden while it changes", tag, j, l.to))
-  end
-  local swapped = 0
-  for _, p in ipairs(passes) do if ((p.mark >> 4) & 7) ~= 4 then swapped = swapped + 2 end end
-  M.assertEq(#swaps, swapped, string.format("%s: two swaps a walked-in hire (%d)", tag, #swaps))
   M.assertEq(#strikes, #r.costs, string.format("%s: every paid hire was drawn as its figure's strike (%d strikes, %d paid)",
     tag, #strikes, #r.costs))
   for j, s in ipairs(strikes) do
@@ -8409,6 +8397,18 @@ function M.hireCrewCheck(r, tag)
   M.assertEq(done.pose.c0, ex.pose.c0, tag .. ": $61c0 (secondary action) as it was")
   M.assertEq(done.pose.c1, ex.pose.c1, tag .. ": $61c1 (graphical action) as it was")
   M.assertEq(done.shown, true, tag .. ": SETZER's slot is shown")
+  for j, s in ipairs(swaps) do
+    M.log(string.format("[crew] %s swap %d (f%d) to gfx $%02X at (%d,%d), %s", tag, j, s.f, s.to, s.x, s.y,
+      s.pass.pincer and "a pincer" or "sideways"))
+    M.assertEq(outOfSight(s, s.pass.pincer), true, string.format("%s swap %d: the slot stands out of sight (%d,%d)",
+      tag, j, s.x, s.y))
+  end
+  for j, l in ipairs(loads) do
+    M.assertEq(l.hidden, true, string.format("%s load %d (gfx $%02X): the slot is hidden while it changes", tag, j, l.to))
+  end
+  local swapped = 0
+  for _, p in ipairs(passes) do if ((p.mark >> 4) & 7) ~= 4 then swapped = swapped + 2 end end
+  M.assertEq(#swaps, swapped, string.format("%s: two swaps a walked-in hire (%d)", tag, #swaps))
   return passes, strikes
 end
 
