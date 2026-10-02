@@ -8883,17 +8883,68 @@ function M.fleePress(o)
   return { l = true, r = true }
 end
 
-function M.fleeBattle(maxFrames)
-  local phase = 0
-  return M.withReset(M.driveUntil(function()
-    return not M.battleLoadStarted()
-  end, maxFrames or 9000, {
+-- A formation that cannot be run from: $b1 bit 1 (the pincer arrangement;
+-- Cmd_2a answers "Can't run away!!", battle_main.asm:5729-5731) or the
+-- formation's own no-run bit $2f4b bit 0.  Read once the battle is active.
+function M.cantRunFrom()
+  return (M.readByte(0x00B1) & 0x02) ~= 0 or (M.readByte(0x2F4B) & 0x01) ~= 0
+end
+
+-- Held L+R on such a formation does nothing: the hold sat until the pack
+-- wiped the party ("L+R held at f11472 but this formation cannot be run
+-- from ($B1=22 $2F4B=00)", battle_slotsboot on the v0.24 re-cut).  So the
+-- step reads it once the battle is active and stops holding.  What happens
+-- then is the caller's choice, and there is no default:
+--   opts.onCantRun = "fight"   fight it out (M.fightBattleByMenu, budget
+--                              opts.fightFrames, default 30000), as a
+--                              player with no way out does
+--   opts.onCantRun = "return"  end the step with the battle still up; the
+--                              caller reads M.fleeOutcome == "cantrun"
+--   (absent)                   fail at once, naming the formation's bits:
+--                              a caller that never planned for it does not
+--                              hold the pad until a wipe
+-- M.fleeOutcome is "fled" (the battle ended under the run, or was won
+-- through the spoils), "cantrun" or "fought" when the step ends.
+function M.fleeBattle(maxFrames, opts)
+  opts = opts or {}
+  local phase, verdict = 0, nil
+  return M.withReset(M.seqStep({
+    M.call(function() verdict = nil; M.fleeOutcome = nil end),
+    M.driveUntil(function()
+      if not M.battleLoadStarted() then verdict = verdict or "fled"; return true end
+      if verdict == nil and M.battleActive() and M.cantRunFrom() then
+        verdict = "cantrun"
+        return true
+      end
+      return false
+    end, maxFrames or 9000, {
+      M.call(function()
+        phase = (phase + 1) % 8
+        M.setPad(M.fleePress({ standing = #M.activeSlots(), menu = M.readByte(BATTLE.MENU),
+                               state = M.readByte(BATTLE.MSTATE), phase = phase }))
+      end),
+    }, "flee battle (hold L+R)"),
     M.call(function()
-      phase = (phase + 1) % 8
-      M.setPad(M.fleePress({ standing = #M.activeSlots(), menu = M.readByte(BATTLE.MENU),
-                             state = M.readByte(BATTLE.MSTATE), phase = phase }))
+      M.setPad({})
+      M.fleeOutcome = verdict
+      if verdict ~= "cantrun" then return end
+      local why = string.format("this formation cannot be run from ($B1=%02X $2F4B=%02X)",
+        M.readByte(0x00B1), M.readByte(0x2F4B))
+      if opts.onCantRun == "fight" then
+        M.log("[flee] " .. why .. ": fighting it out")
+      elseif opts.onCantRun == "return" then
+        M.log("[flee] " .. why .. ": returning to the caller with the battle up")
+      else
+        error("fleeBattle: " .. why .. ", and the caller passed no onCantRun "
+          .. "(\"fight\" or \"return\"): holding L+R here sits until the party is "
+          .. "wiped", 0)
+      end
     end),
-  }, "flee battle (hold L+R)"), function() phase = 0 end)
+    M.cond(function() return verdict == "cantrun" and opts.onCantRun == "fight" end, {
+      M.fightBattleByMenu(opts.fightFrames or 30000),
+      M.call(function() M.fleeOutcome = "fought" end),
+    }, {}),
+  }), function() phase, verdict = 0, nil end)
 end
 
 
@@ -9193,9 +9244,7 @@ end
 -- formation too (measured 2026-09-16 on the Whelk fight, $B1=07 $2F4B=0C,
 -- counters 03,01,03 -> 06,03,05 under a held L+R; probe_noeffect_cantrun),
 -- it is the run command itself that refuses ("can't run away!!", Cmd_2a).
-local function cantRun()
-  return (M.readByte(0x00B1) & 0x02) ~= 0 or (M.readByte(0x2F4B) & 0x01) ~= 0
-end
+local function cantRun() return M.cantRunFrom() end
 
 -- The list windows' cursor block.  btlgfx_ram.inc reserves $890F..$896E
 -- as 24 four-byte tables, one byte per actor (indexed by $62CA), and each
