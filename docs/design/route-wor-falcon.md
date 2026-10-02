@@ -530,7 +530,7 @@ member's experience.
 
 | character | planned (kits.md) | what this arc has | where it bites |
 |---|---|---|---|
-| SETZER | Slot ✦; Coin Toss, Hired Help (gil-priced); divine Jackpot | Slot only (vanilla); the Coin Toss *relic* in the bag turns Slot into GP Rain | his first arc: one verb; his ¤ weapons (Cards, Trump, Dice) key six of the arc's twelve species since the re-cut (section 8.7) |
+| SETZER | Slot ✦; Coin Toss, Hired Help (gil-priced); divine Jackpot | built since #319 (kits.md "Setzer"): his table behind Slot, Jackpot learned at Kohlingen's rejoin | his first arc; the route's driver plays the table (`Driver:setzerLine`, #353; section 13.10) |
 | EDGAR | 8 Tools (AutoCrossbow, NoiseBlaster, Bio Blaster, Flash, Drill, Chain Saw, Debilitator, Overclock) | 3: AutoCrossbow, NoiseBlaster, Bio Blaster | Drill (pierce x2, "answers armored bosses") and Debilitator are in Figaro's World of Ruin shop 84, which refuses a party with EDGAR or SABIN (`_ca67c0`): both are in every party this arc fields; Chain Saw is a Zozo chest (after the Falcon); Overclock is not built. Dullahan is the armored boss Drill was planned for |
 | CELES | RunicBlade (divine): Runic that also reflects | Runic | Dullahan is a caster boss: Runic takes his Ice 2, Ice 3, Pearl, N. Cross and his own Cure 2 (section 5) |
 | SABIN | through Air Blade (L30) | Air Blade held; Spiraler L42 | — |
@@ -2088,8 +2088,9 @@ flight taken out, `assertEq failed: (25,160): on foot ($11FA): got 1, want
 
 - **The Exp. Egg** (from the tomb) is still in the bag; the relic rule does
   not rank it and no member wears it.
-- **SETZER's Slot** is not played in these fights (the driver's `opts.slot`
-  is off); the Coin Toss relic stays in the bag.
+- **SETZER's Slot** was not played in these fights (the driver's `opts.slot`
+  was off); the Coin Toss relic stays in the bag.  Since #319/#353 the
+  driver plays his table (13.10).
 - **The tombstone puzzle** (299 (12,39)) was not done.
 - The Dullahan care-model and the auto-Shell relic notes above (13.6).
 

@@ -4830,6 +4830,22 @@ function M.setzerJackpot(face, level)
   return math.min(65535, face * face * face * level * 2 * face)
 end
 
+-- The button that walks SETZER's open table (the Tools shell, $30) onto
+-- its Slot row and confirms it, for a test or driver that spins the reels
+-- by hand: a direction while the cursor is elsewhere, "a" on the row, "b"
+-- when the list has no Slot row (it is another kit's list).
+function M.slotRowButton(actor)
+  local want
+  for i = 0, 7 do
+    if M.readByte(0x4005 + i * 3) == BATTLE.SETZER.SLOT then want = i; break end
+  end
+  if want == nil then return "b" end
+  local cc, cr = M.readByte(0x8963 + actor), M.readByte(0x8967 + actor)
+  if cc ~= want % 2 then return want % 2 > cc and "right" or "left" end
+  if cr ~= want // 2 then return want // 2 > cr and "down" or "up" end
+  return "a"
+end
+
 -- Which of SETZER's lines pays this turn, or nil (the lines below it: the
 -- keyed Fight, the plain boost-Fight).  An informed policy, and what it
 -- reads: the target's HP, shields and Broken timer, the classes the HUD
