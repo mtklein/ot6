@@ -5209,7 +5209,12 @@ function Driver:makePlan(actor)
     -- the action still open is read provisionally, as the raise gate does
     local open = {}
     if self.monAct ~= nil then
-      for _, d in ipairs(self.monAct.drops) do open[d.e] = (open[d.e] or 0) + d.drop end
+      -- a status landing (a Zombie touch reading as the whole HP bar) is no
+      -- hit here either: tomb_zombie priced "s1 1x1710 (worst)" off the
+      -- still-open touch before it closed and left the ledger
+      for _, d in ipairs(self.monAct.drops) do
+        if not statusDrop(self.monAct, d) then open[d.e] = (open[d.e] or 0) + d.drop end
+      end
       for _, v in pairs(open) do
         any = true
         if fallback == nil or v > fallback then fallback = v end
