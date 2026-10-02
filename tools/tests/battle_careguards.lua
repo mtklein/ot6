@@ -12,10 +12,19 @@
 --      planned a beat before Muddle landed, was committed and the engine
 --      aimed it at TERRA -- gen_gate_cave_save's first cave fight.)
 --   B. A Zombie at the plan.  At the first window, before the driver's
---      first frame, one member is Zombied ($3EE4 bit 1) at a third of its HP, with the driver's Zombie cure off
---      (opts.zombieCure = false, the line before #263) so the heal lines are
---      what is asked.  No heal or party cure may be planned on it: a cure on
---      a Zombie is damage.
+--      first frame, one member is Zombied ($3EE4 bit 1) at a third of its
+--      HP, with the driver's Zombie cure off (opts.zombieCure = false, the
+--      line before #263) so the heal lines are what is asked.  No heal or
+--      party cure may be planned on it: a cure on a Zombie is damage.
+--      The engine keeps no Zombie standing on HP: AfterAction1
+--      (battle_main.asm @069b) zeroes the current HP of every Wound or
+--      Zombie target after every action ("stz $3bf4,x ; set current hp to
+--      0").  So the staged Zombie stands at its third only until the first
+--      action closes -- the review of bcf5240f read that settle as "[death]
+--      f+140 entity 1 ... by entity 3 char 9 cmd $00 atk $FF (an ally's
+--      action)": SETZER's Fight was the action that closed, not a hit on
+--      him.  B watches the windows planned while the Zombie stands on HP,
+--      asserts there was at least one, and ends at the settle.
 --   C. Zombied after the plan.  At the first window one member is put at a
 --      third of its HP; the
 --      first time a heal on it stands in the item list or the target
@@ -65,6 +74,21 @@ local function tick()
       if p ~= nil and a == victim and p.kind == "defer" then seen.defer = true end
     end
   elseif branch == "B" then
+    if hp(victim) == 0 then
+      if not seen.settled then
+        seen.settled = H.frame
+        H.log(string.format("[careguards] B: f%d entity %d's HP settled to 0 (AfterAction1 @069b zeroes a "
+          .. "Zombie's HP after an action); %d window(s) planned while it stood on HP", H.frame, victim,
+          seen.windows or 0))
+      end
+      return
+    end
+    if p ~= nil and not seen["w" .. tostring(p)] and (H.readByte(ST1 + victim * 2) & 0x02) ~= 0 then
+      seen["w" .. tostring(p)] = true
+      seen.windows = (seen.windows or 0) + 1
+      H.log(string.format("[careguards] B: f%d actor %d planned %s (%s) with entity %d Zombied at %d/%d",
+        H.frame, a or -1, tostring(p.kind), tostring(p.reason), victim, hp(victim), maxhp(victim)))
+    end
     if p ~= nil and p.target == victim and (p.kind == "heal" or (p.kind == "item"
        and type(p.reason) == "string" and p.reason:sub(1, 5) ~= "cure " and p.reason ~= "revive"))
        and (H.readByte(ST1 + victim * 2) & 0x02) ~= 0 and not seen[p] then
@@ -114,6 +138,7 @@ local function run(name, opts, stage)
     H.call(function() if stage then stage() end end),
     H.driveUntil(function()
       return (written ~= nil and H.frame - written > 1800) or not up()
+        or (name == "B" and seen.settled ~= nil and H.frame - seen.settled > 60)
     end, 12000, { H.call(tick) }, name .. ": the driver's play"),
     H.release(),
   })
@@ -140,6 +165,8 @@ H.run({ maxFrames = 80000 }, {
       hp(victim), maxhp(victim)))
   end),
   H.call(function()
+    H.assertEq((seen.windows or 0) >= 1, true, string.format("B: precondition: a window planned while the "
+      .. "Zombie stood on HP (%d before the settle at f%s)", seen.windows or 0, tostring(seen.settled)))
     H.assertEq(#viol, 0, "B: no heal or party cure planned with a Zombie as its patient: " .. table.concat(viol, "; "))
     H.log("[careguards] B PASSED: no heal planned on the Zombie")
   end),

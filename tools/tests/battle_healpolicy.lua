@@ -993,6 +993,87 @@ H.run({ maxFrames = 3000 }, {
     H.log("battle_healpolicy: the kit's random-battle MP budget checked")
   end),
 
+  -- 16. the hit ledger, the heal watch and the queued cure-hit as
+  -- arithmetic (reviews of f8f9ad66 and bcf5240f: M4a-c and item 4-5 had
+  -- only lab evidence).  Each rule is a plain function the driver calls.
+  H.call(function()
+    -- M4a: a status landing is no hit.  tomb_zombie's Zombie touch read the
+    -- whole bar as the drop ("s0 1x1589 (worst)"): ZOMBIE newly set.
+    H.assertEq(H.statusDrop(0x00, 0x02, 0x00, 0xEF), true,
+      "a Fight that leaves its victim newly ZOMBIE is a status landing")
+    H.assertEq(H.statusDrop(0x02, 0x02, 0x00, 0xEF), false,
+      "a hit on a member already ZOMBIE is no status landing")
+    H.assertEq(H.statusDrop(0x00, 0x40, 0x02, 0x00), true, "PETRIFY newly set is a status landing")
+    local mp = H.sym("MagicProp") & 0x3FFFFF
+    local nopower = nil
+    for id = 0, 0x35 do
+      if nopower == nil and H.readRomByte(mp + id * 14 + 6) == 0 then nopower = id end
+    end
+    H.assertEq(nopower ~= nil, true, "precondition: a spell with no power in the black/white/grey list")
+    H.assertEq(H.statusDrop(0x00, 0x00, 0x02, nopower), true,
+      string.format("a cast of spell $%02X (power 0) is a status landing", nopower))
+    H.assertEq(H.readRomByte(mp + 0x07 * 14 + 6) > 0, true, "precondition: Bolt 2 ($07) has power")
+    H.assertEq(H.statusDrop(0x00, 0x00, 0x02, 0x07), false, "Bolt 2's drop is a hit")
+    local L = H.ledgerCommit(nil, { cmd = 0x00, party = 0x02 },
+      { { e = 1, drop = 1548, last = 1548, hp = 0, status = true } })
+    H.assertEq(tostring(L.max) .. "/" .. tostring(L.min) .. "/" .. tostring(L.lb), "nil/nil/nil",
+      "a Zombie touch (1548 -> 0) puts no hit, no smallest hit and no floor in the ledger")
+    H.assertEq(L.actN .. "/" .. L.actSum, "1/0", "...and counts as one action of size 0 in the typical mean")
+    -- M4b: a killing blow is a censored floor, never the smallest hit
+    -- (vector_entry: "slot 2's smallest hit this fight so far: 75, on
+    -- entity 2 (75 -> 0)" under a 544 Bolt 2)
+    L = H.ledgerCommit(nil, { cmd = 0x02, party = 0x04 }, { { e = 2, drop = 544, last = 619, hp = 75 } })
+    H.assertEq(L.min, 544, "a 619 -> 75 Bolt 2 is the smallest hit")
+    L = H.ledgerCommit(L, { cmd = 0x02, party = 0x04 }, { { e = 2, drop = 75, last = 75, hp = 0 } })
+    H.assertEq(tostring(L.min) .. "/" .. tostring(L.on[2]) .. "/" .. tostring(L.lb) .. "/" .. tostring(L.lbOn and L.lbOn[2]), "544/544/75/75",
+      "the killing blow 75 -> 0 stays a floor (lb 75); the smallest hit stays 544")
+    -- item 4: counters and buffs stay out of the typical mean; the mean waits
+    local n0 = L.actN
+    L = H.ledgerCommit(L, { cmd = 0x00, counter = true, party = 0x01 }, { { e = 0, drop = 90, last = 500, hp = 410 } })
+    H.assertEq(L.actN, n0, "a counterattack is no action of the typical mean")
+    H.assertEq(L.maxOn[0], 90, "...but its hit is still in the worst on that member")
+    L = H.ledgerCommit(L, { cmd = 0x02, party = 0x00 }, {})
+    H.assertEq(L.actN, n0, "a buff on its own side (no party bit, nothing dropped) is no action of the mean")
+    L = H.ledgerCommit(L, { cmd = 0x2E, party = 0x01 }, {})
+    H.assertEq(L.actN, n0, "the script's $2E is no action of the mean")
+    local T = H.ledgerCommit(nil, { cmd = 0x00, party = 0x01 }, { { e = 0, drop = 100, last = 500, hp = 400 } })
+    T = H.ledgerCommit(T, { cmd = 0x00, party = 0x01 }, {})
+    H.assertEq(H.typicalOf(T), nil, string.format("two actions are under M.TYPICAL_MIN (%d): no typical yet",
+      H.TYPICAL_MIN))
+    T = H.ledgerCommit(T, { cmd = 0x00, party = 0x01 }, { { e = 1, drop = 200, last = 600, hp = 400 } })
+    H.assertEq(H.typicalOf(T), 100, "three actions (100, a miss, 200): the typical action is 100")
+    -- M4c and item 4: the heal watch.  vector_entry's cure on entity 2 at
+    -- 75/619 (by entity 2), the member killed before it landed, then a
+    -- Fenix Down by entity 1 raising it to 77.
+    local w = { hp = 75, maxhp = 619, by = 2, until_ = 1000 }
+    H.assertEq(H.healWatchStep(w, 0, 10), "fell",
+      "the cure's target falls: the watch ends, and no later raise can be read as the cure")
+    H.assertEq(H.healWatchStep(w, 325, 10), "measured",
+      "a rise is the heal, whoever's command the frame shows (tomb_r7 k10_s0: entity 3's Potion landed "
+      .. "during entity 2's command)")
+    H.assertEq(H.healWatchStep(w, 619, 10), "full", "a rise to max HP is capped, not measured")
+    H.assertEq(H.healWatchStep(w, 60, 10), "lower", "a drop moves the baseline")
+    H.assertEq(H.healWatchStep(w, 75, 1001), "expired", "no rise inside the watch's ticks: it lapses")
+    -- item 5 of f8f9ad66: a queued cure-hit that will not run is stale
+    local q = { tick = 100 }
+    H.assertEq(H.queuedHitStale(q, { hp = 0, tick = 110 }), "it fell", "a hitter who fell")
+    H.assertEq(H.queuedHitStale(q, { hp = 500, denied = "SLEEP", tick = 110 }), "it is under SLEEP", "a hitter asleep")
+    H.assertEq(H.queuedHitStale(q, { hp = 500, muddled = true, tick = 110 }), "it is Muddled", "a hitter muddled")
+    H.assertEq(H.queuedHitStale(q, { hp = 500, ownWindow = true, tick = 110 }), "its own window is open again",
+      "a hitter whose window is open again (its command ran or was dropped)")
+    H.assertEq(H.queuedHitStale(q, { hp = 500, tick = 100 + 240 + 601 }), "it never ran", "RAISE_WAIT + 600 ticks on")
+    H.assertEq(H.queuedHitStale(q, { hp = 500, tick = 110 }), nil, "...and otherwise it is in flight")
+    -- review of bcf5240f, item 5: an unmeasured cure priced from the ROM's
+    -- formula, at variance's low end: power 10, magic power 40, level 20
+    -- -> 40 + 40 x 10 x 20 / 32 = 290, x 224/256 + 1 = 254
+    H.assertEq(H.cureRestoreMin({ power = 10, heal = true, flags2 = 0x20, level = 20, magpow = 40 }), 254,
+      "a cure that ignores defense: 254 at least")
+    H.assertEq(H.cureRestoreMin({ power = 10, heal = true, flags2 = 0x00, level = 20, magpow = 40, mdef = 51 }),
+      ((254 * 204) >> 8) + 1, "...through 51 magic defense when it does not")
+    H.assertEq(H.cureRestoreMin({ power = 10, heal = false, level = 20, magpow = 40 }), nil, "no heal flag: no price")
+    H.log("battle_healpolicy: the hit ledger, the heal watch, the queued cure-hit and the cure price checked")
+  end),
+
   -- 8. the table was not skipped
   H.call(function()
     H.assertEq(ran, #CASES, string.format(

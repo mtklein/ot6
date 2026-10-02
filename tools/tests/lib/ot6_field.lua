@@ -5350,6 +5350,13 @@ end
 -- members: { { charId, "NAME" }, ... }; those not in the active party are
 -- left out.  Returns { { ch=, name=, want={ [4]=id, [5]=id }, changes={
 -- {slot, id}, ... } }, ... } and logs every decision as a [relics] line.
+-- Step 3b's one class test: the Egg may take a slot only from a guard or a
+-- spare ward (and then only one that is not threat-critical), never from an
+-- acting relic.  A function of its own so field_relicplan's mutant can
+-- switch it off (mutants_relic.sh nosoft).
+function M.eggMayDisplace(cl)
+  return cl ~= nil and (cl.aff == "guard" or cl.aff == "spare")
+end
 function M.relicPlan(members, opts)
   opts = opts or {}
   local tag = opts.tag or "relics"
@@ -5408,6 +5415,7 @@ function M.relicPlan(members, opts)
     count[id] = count[id] - 1
     lines[#lines + 1] = string.format("%s goes to %s's slot %d (over %s): %s", relicName(id), m.name, slot,
       relicName(m.cur[slot]), why)
+    return slot
   end
   local function hasFree(m)
     for _, s in ipairs(m.free) do if not m.want[s] then return true end end
@@ -5587,7 +5595,7 @@ function M.relicPlan(members, opts)
           else
             for _, s in ipairs(m.free) do
               local wc = m.want[s] ~= nil and M.relicClass(m.want[s], opts.threats) or nil
-              local soft = wc ~= nil and (wc.aff == "guard" or wc.aff == "spare")
+              local soft = M.eggMayDisplace(wc)
               if count[id] > 0 and m.want[s] ~= nil and m.want[s] ~= id and soft and not critical(m, s) then
                 local w = m.want[s]
                 m.want[s] = nil
@@ -5623,10 +5631,10 @@ function M.relicPlan(members, opts)
           id = id or held
         end
         if id then
-          take(m, id, "a slot nothing above took: kept filled")
           -- read by field_relicplan: a slot step 4 filled was open before it
+          -- (keyed by slot, review of bcf5240f: a relic id can sit in both)
           m.filler = m.filler or {}
-          m.filler[id] = true
+          m.filler[take(m, id, "a slot nothing above took: kept filled")] = true
         end
       end
     end
@@ -5643,6 +5651,7 @@ function M.relicPlan(members, opts)
       local o = s == 4 and 5 or 4
       if m.want[s] ~= nil and m.want[s] ~= 0xFF and m.want[s] == m.cur[o] and m.want[o] ~= m.cur[o] then
         m.want[s], m.want[o] = m.want[o], m.want[s]
+        if m.filler then m.filler[s], m.filler[o] = m.filler[o], m.filler[s] end
         lines[#lines + 1] = string.format("%s: %s stays in slot %d, where it sits (the two slots swapped in the plan)",
           m.name, relicName(m.cur[o]), o)
       end
