@@ -48,8 +48,9 @@ lifting a finger, subscribe in [Obtainium](https://obtainium.imranr.dev/):
 carry over. RetroArch: put the ROM in a folder its playlist scans, and
 re-scan once so OT6.sfc shows up. If you used to soft-patch, delete the
 `Final Fantasy III (USA).bps` beside your vanilla ROM so vanilla stays
-vanilla, and keep any `OT6.bps` (or `.ips`/`.ups`) out of OT6.sfc's folder,
-since RetroArch would apply it on top; the app warns if it sees one.
+vanilla, and keep any `OT6.bps` (or `.ips`, `.ups`, `.xdelta`, or a numbered
+one like `OT6.ips1`) out of OT6.sfc's folder, since RetroArch would apply it
+on top; the app warns if it sees one.
 
 ## Contributing
 

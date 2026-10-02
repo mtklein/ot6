@@ -15,6 +15,21 @@ public final class RomScan {
 
     /** The output file, never a candidate. */
     public static final String OUT = "OT6.sfc";
+    public static final String TMP = OUT + ".tmp";
+
+    /** OT6.sfc or its temporary (any case): files the app writes and deletes. */
+    public static boolean isOutput(String name) {
+        return name != null && (name.equalsIgnoreCase(OUT) || name.equalsIgnoreCase(TMP));
+    }
+
+    /**
+     * A soft-patch RetroArch would apply on top of OT6.sfc: OT6.ips, .bps,
+     * .ups or .xdelta, or a numbered follow-on patch (.ips1 to .ips9 and so
+     * on), as RetroArch's tasks/task_patch.c looks for them.
+     */
+    public static boolean isSoftPatch(String name) {
+        return name != null && name.matches("(?i)OT6\\.(ips|bps|ups|xdelta)[1-9]?");
+    }
 
     public interface Bytes {
         byte[] read() throws IOException;
@@ -63,7 +78,7 @@ public final class RomScan {
     public static Result choose(List<Entry> files, Bps.Info info) throws IOException {
         Result r = new Result();
         for (Entry e : files) {
-            if (e.name == null || e.name.equalsIgnoreCase(OUT) || !sizeFits(e.size, info)) {
+            if (e.name == null || isOutput(e.name) || !sizeFits(e.size, info)) {
                 r.skipped++;
                 continue;
             }

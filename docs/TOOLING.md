@@ -140,7 +140,7 @@ output folder) keep working unchanged.
 
 Built with the plain SDK tools by `tools/android/build_apk.sh` (aapt2,
 javac, d8, zipalign, apksigner; no Gradle). The pieces, as installed on
-the Macs on 2026-10-02:
+this Mac (the release machine) on 2026-10-02:
 
 ```sh
 brew bundle    # openjdk@21 (21.0.12.1), cask android-commandlinetools
@@ -161,16 +161,28 @@ piece stops the build with the line above. The ninja edges:
   a copier-headered copy matched, OT6.sfc never a candidate, wrong-size
   files never read, and nothing chosen when nothing matches.
   It needs a JDK only, and no qualification.
-- `build/release/ot6-vX.Y.apk` carries the release .bps; versionName is
-  VERSION, versionCode is major×10000 + minor×100 + patch (0.23 → 2300).
+- `build/release/ot6-vX.Y.apk` carries `build/android/ot6.bps`, made by the
+  release patch's own flips command from the same two ROMs, so it builds
+  without qualification. versionName is VERSION exactly, with no "v":
+  Obtainium reconciles a release tag `v0.24` with an installed `0.24` but
+  not the other way round (its `reconcileVersionDifferences` takes the
+  installed version as the template). versionCode is
+  major×1000000 + minor×10000 + patch×100 + (N for `-rcN`, else 99), so
+  0.24-rc1 → 240001 < 0.24 → 240099 < 0.24.1 → 240199; another VERSION
+  shape fails only this edge, saying so.
 - `build/checks/android_apk.ok` (`tools/android/verify_apk.sh`):
   `apksigner verify --print-certs` must show the certificate pinned in
-  `android/release-cert.sha256`, `aapt2 dump badging` the versionCode,
-  versionName, minSdk and targetSdk, no permissions and not debuggable, and
-  the APK must carry the patch the host check tested.
+  `android/release-cert.sha256`, `aapt2 dump badging` the package
+  `io.github.mtklein.ot6patcher`, the label "OT6 Patcher", the versionCode,
+  versionName, minSdk and targetSdk, no permissions and not debuggable (a
+  test build fails), and the APK must carry the patch the host check tested.
+- `build/checks/android_apk_release.ok`: that patch is byte for byte the
+  qualified release .bps (so this one needs qualification).
 
-`ninja release` builds all three, so a release needs the JDK, the SDK and
-the signing key; bare `ninja` builds none of them.
+`ninja release` builds all of them, so a release needs the JDK, the SDK and
+the signing key; bare `ninja` builds none of them. Without qualification,
+`ninja build/release/ot6-vX.Y.apk build/checks/android_apk.ok` builds and
+checks the APK alone.
 
 **The signing key.** Installed copies accept updates signed with one key
 only, forever. It lives outside the repo at

@@ -89,6 +89,21 @@ public final class BpsTest {
         else
             fail("scan considered OT6.sfc (read " + out.reads + "x)");
 
+        File lower = new File("ot6.SFC", base), tmp = new File("OT6.sfc.tmp", base);
+        r = scan(lower, tmp);
+        if (r.chosen == null && lower.reads == 0 && tmp.reads == 0)
+            pass("scan skips ot6.SFC and OT6.sfc.tmp too (any case)");
+        else
+            fail("scan considered a differently cased OT6.sfc or its temporary");
+
+        String[] strays = {"OT6.bps", "ot6.IPS", "OT6.ups", "OT6.xdelta", "OT6.ips1", "OT6.bps9"};
+        String[] fine = {"OT6.sfc", "OT6.ips10", "OT6.bps0", "Final Fantasy III (USA).bps", "OT6.zip"};
+        boolean ok = true;
+        for (String s : strays) ok &= RomScan.isSoftPatch(s);
+        for (String s : fine) ok &= !RomScan.isSoftPatch(s);
+        if (ok) pass("soft-patches RetroArch would apply to OT6.sfc are recognised, others not");
+        else fail("soft-patch recognition is wrong");
+
         // no match: everything checked is listed, nothing chosen
         File bad = new File("wrong.sfc", wrong);
         File cut = new File("short.sfc", shortRom.length, shortRom);

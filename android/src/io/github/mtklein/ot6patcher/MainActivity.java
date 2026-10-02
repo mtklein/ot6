@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.Button;
@@ -25,8 +27,11 @@ public final class MainActivity extends Activity {
     private static final int PICK_ROM = 1, PICK_FOLDER = 2;
 
     private LinearLayout box;
-    private boolean busy;
-    private String note;     // a picked file's check, shown above the state
+    // Static, so an activity recreated by a rotation sees work still running
+    // and its outcome; `shown` is the activity on screen (UI thread only).
+    private static volatile boolean busy;
+    private static volatile String note;   // a picked file's check, shown above the state
+    private static MainActivity shown;
 
     @Override
     protected void onCreate(Bundle saved) {
@@ -51,7 +56,14 @@ public final class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        shown = this;
         render();
+    }
+
+    @Override
+    protected void onPause() {
+        if (shown == this) shown = null;
+        super.onPause();
     }
 
     private int dp(int x) {
@@ -138,17 +150,19 @@ public final class MainActivity extends Activity {
     }
 
     private void background(final Runnable work) {
+        if (busy) return;
         busy = true;
         render();
+        final Handler ui = new Handler(Looper.getMainLooper());
         new Thread(new Runnable() {
             @Override public void run() {
                 try {
                     work.run();
                 } finally {
-                    runOnUiThread(new Runnable() {
+                    ui.post(new Runnable() {
                         @Override public void run() {
                             busy = false;
-                            render();
+                            if (shown != null) shown.render();
                         }
                     });
                 }
@@ -158,9 +172,23 @@ public final class MainActivity extends Activity {
 
     private void write() {
         note = null;
+        final android.content.Context app = getApplicationContext();
         background(new Runnable() {
-            @Override public void run() { Patcher.write(MainActivity.this); }
+            @Override public void run() { Patcher.write(app); }
         });
+    }
+
+    /** Takes a persistable grant; on failure says so and returns false. */
+    private boolean keep(Uri uri, int flags) {
+        try {
+            getContentResolver().takePersistableUriPermission(uri, flags);
+            return true;
+        } catch (RuntimeException e) {
+            note = "Android would not let OT6 Patcher keep access to that choice (" + e
+                    + "). Try again, or choose a different place.";
+            render();
+            return false;
+        }
     }
 
     @Override
@@ -168,41 +196,53 @@ public final class MainActivity extends Activity {
         if (result != RESULT_OK || data == null || data.getData() == null) return;
         final Uri uri = data.getData();
         if (request == PICK_FOLDER) {
-            getContentResolver().takePersistableUriPermission(uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            if (!keep(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION)) return;
             // a new folder: find the ROM in it afresh
             Patcher.prefs(this).edit().putString("tree", uri.toString())
                     .remove("source").remove("sourceName").apply();
             Patcher.keepOnlyCurrentGrants(this);
             write();
         } else if (request == PICK_ROM) {
-            getContentResolver().takePersistableUriPermission(uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            if (!keep(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)) return;
             final String name = Patcher.nameOf(this, uri, false);
+            final android.content.Context app = getApplicationContext();
             note = null;
             background(new Runnable() {
-                @Override public void run() { useRomFile(uri, name); }
+                @Override public void run() { useRomFile(app, uri, name); }
             });
         }
     }
 
     /** The fallback: a ROM picked by hand, kept only if it is the one the patch expects. */
-    private void useRomFile(Uri uri, String name) {
+    private static void useRomFile(android.content.Context c, Uri uri, String name) {
+        boolean kept = false;
         try {
-            Bps.Info info = Bps.read(Patcher.bundledPatch(this));
-            byte[] file = Patcher.readAll(getContentResolver(), uri);
-            Bps.source(file, info);
-            Patcher.prefs(this).edit().putString("source", uri.toString())
+            if (RomScan.isOutput(name)) {
+                note = name + " is the file OT6 Patcher writes, not a ROM it can read from."
+                        + " Pick your Final Fantasy III ROM.";
+                return;
+            }
+            Bps.Info info = Bps.read(Patcher.bundledPatch(c));
+            Bps.source(Patcher.readAll(c.getContentResolver(), uri), info);
+            Patcher.prefs(c).edit().putString("source", uri.toString())
                     .putString("sourceName", name).apply();
-            Patcher.keepOnlyCurrentGrants(this);
-            Patcher.write(this);
+            kept = true;
+            Patcher.keepOnlyCurrentGrants(c);
+            Patcher.write(c);
         } catch (Bps.BpsException e) {
-            if (!uri.toString().equals(Patcher.prefs(this).getString("source", null)))
-                getContentResolver().releasePersistableUriPermission(uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION);
             note = name + " can't be used: " + e.getMessage() + ".";
         } catch (Exception e) {
             note = name + " could not be read: " + e;
+        } finally {
+            if (!kept && !uri.toString().equals(Patcher.prefs(c).getString("source", null))) {
+                try {
+                    c.getContentResolver().releasePersistableUriPermission(uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                } catch (RuntimeException ignored) {
+                    // never held
+                }
+            }
         }
     }
 }

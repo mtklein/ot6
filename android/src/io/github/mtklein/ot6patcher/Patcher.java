@@ -21,7 +21,7 @@ import java.util.List;
 
 /**
  * Applies the patch this APK carries (assets/ot6.bps) to the player's own
- * ROM and writes the result as OT6.sfc in the folder they chose.  The
+ * ROM and writes the result as OT6.sfc in the folder they granted.  The
  * source ROM is only ever read.  Shared by MainActivity and UpdateReceiver;
  * all of it runs off the UI thread.  It never notifies: each result goes to
  * the "last*" settings and logcat, and the app shows it when next opened.
@@ -31,7 +31,7 @@ final class Patcher {
     static final String PREFS = "ot6";
 
     /** The output's fixed name: RetroArch keys saves and states by content file name. */
-    static final String OUT = "OT6.sfc";
+    static final String OUT = RomScan.OUT;
 
     private Patcher() {}
 
@@ -116,8 +116,9 @@ final class Patcher {
         return out;
     }
 
+    /** The child with this name, ignoring case (FAT and SD cards ignore it too). */
     static Child find(List<Child> kids, String name) {
-        for (Child ch : kids) if (name.equals(ch.name)) return ch;
+        for (Child ch : kids) if (name.equalsIgnoreCase(ch.name)) return ch;
         return null;
     }
 
@@ -140,13 +141,19 @@ final class Patcher {
         }
     }
 
+    static String docId(Uri doc) {
+        try {
+            return DocumentsContract.getDocumentId(doc);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     /** Soft-patches RetroArch would apply on top of OT6.sfc, if any sit beside it. */
     static String strays(List<Child> kids) {
         StringBuilder s = new StringBuilder();
         for (Child ch : kids)
-            for (String ext : new String[] {".bps", ".ips", ".ups"})
-                if (ch.name != null && ch.name.equalsIgnoreCase("OT6" + ext))
-                    s.append(s.length() > 0 ? ", " : "").append(ch.name);
+            if (RomScan.isSoftPatch(ch.name)) s.append(s.length() > 0 ? ", " : "").append(ch.name);
         return s.toString();
     }
 
@@ -166,6 +173,10 @@ final class Patcher {
         return r;
     }
 
+    private static Result failed(Context c, String message) {
+        return done(c, false, message, null, null);
+    }
+
     /** Releases every persisted grant but the folder's and the remembered ROM's. */
     static void keepOnlyCurrentGrants(Context c) {
         SharedPreferences p = prefs(c);
@@ -181,41 +192,64 @@ final class Patcher {
     }
 
     /**
-     * Patches the player's ROM and writes OT6.sfc into the granted folder,
-     * atomically.  The ROM is the remembered one while it still reads and
-     * matches; otherwise the folder is scanned for it by CRC32 (RomScan), so a
-     * renamed or moved-in ROM still works.  Settings from v0.23's first build
-     * (a separately picked ROM plus an output folder) keep working as they are.
+     * Patches the player's ROM and writes OT6.sfc into the granted folder.
+     * The ROM is the remembered one while it still reads and matches;
+     * otherwise the folder is scanned for it by CRC32 (RomScan), so a renamed
+     * or moved-in ROM still works.  Settings from v0.23's first build (a
+     * separately picked ROM plus an output folder) keep working as they are.
+     *
+     * The new OT6.sfc is written under a temporary name and read back before
+     * the old one is deleted and the new one renamed into place: there is
+     * never a partial OT6.sfc, though for a moment there may be none.
+     * Synchronized: the update receiver and "write again" never interleave.
      */
-    static Result write(Context c) {
+    static synchronized Result write(Context c) {
         final ContentResolver cr = c.getContentResolver();
         SharedPreferences p = prefs(c);
         String v = "OT6 v" + version(c);
         String treeStr = p.getString("tree", null);
         if (treeStr == null)
-            return done(c, false, v + " is installed, but setup isn't finished:"
-                    + " open OT6 Patcher and choose the folder your ROM is in.", null, null);
+            return failed(c, v + " is installed, but setup isn't finished:"
+                    + " open OT6 Patcher and choose the folder your ROM is in.");
         final Uri tree = Uri.parse(treeStr);
         if (!hasTreeAccess(c, tree))
-            return done(c, false, v + " could not be written: OT6 Patcher lost access"
-                    + " to its folder. Open it and choose the folder again.", null, null);
+            return failed(c, v + " could not be written: OT6 Patcher lost access"
+                    + " to its folder. Open it and choose the folder again.");
         String folder = nameOf(c, tree, true);
-        try {
-            byte[] patch = bundledPatch(c);
-            Bps.Info info = Bps.read(patch);
 
+        byte[] patch;
+        Bps.Info info;
+        try {
+            patch = bundledPatch(c);
+            info = Bps.read(patch);
+        } catch (Exception e) {
+            return failed(c, v + " could not be written: this OT6 Patcher's built-in patch"
+                    + " is damaged (" + e.getMessage() + "). Reinstall it; your ROM is fine.");
+        }
+        try {
+            List<Child> kids = children(cr, tree);
+            Child old = find(kids, OUT);
+
+            // the remembered ROM, if it still reads and matches
             byte[] rom = null;
             String used = p.getString("sourceName", null);
             String srcStr = p.getString("source", null);
             if (srcStr != null) {
+                Uri src = Uri.parse(srcStr);
+                String srcDoc = docId(src);
+                if (RomScan.isOutput(used) || RomScan.isOutput(nameOf(c, src, false))
+                        || (old != null && old.docId.equals(srcDoc)))
+                    return failed(c, v + " was not written: the ROM it remembers is "
+                            + used + ", the very file it writes. Rename your Final Fantasy"
+                            + " III ROM to anything but OT6.sfc and choose its folder again.");
                 try {
-                    rom = Bps.source(readAll(cr, Uri.parse(srcStr)), info);
+                    rom = Bps.source(readAll(cr, src), info);
                 } catch (Exception gone) {
                     Log.i(TAG, "remembered ROM " + used + " is gone or changed (" + gone
                             + "); scanning " + folder);
                 }
             }
-            List<Child> kids = children(cr, tree);
+            // else the folder's, found by size and CRC32
             if (rom == null) {
                 List<RomScan.Entry> entries = new ArrayList<>();
                 for (final Child ch : kids)
@@ -225,36 +259,47 @@ final class Patcher {
                         }
                     }, ch));
                 RomScan.Result found = RomScan.choose(entries, info);
+                Log.i(TAG, "scan of " + folder + ": " + (found.checked.isEmpty()
+                        ? "no ROM-sized file" : RomScan.describe(found)));
                 if (found.chosen == null)
-                    return done(c, false, v + " was not written: no Final Fantasy III"
-                            + " (USA) v1.0 ROM (CRC32 " + Bps.hex(info.sourceCrc) + ") is in "
-                            + folder + ". " + (found.checked.isEmpty()
+                    return failed(c, v + " was not written: no Final Fantasy III (USA) v1.0"
+                            + " ROM (CRC32 " + Bps.hex(info.sourceCrc) + ") is in " + folder
+                            + ". " + (found.checked.isEmpty()
                                 ? "No file there is the ROM's size."
                                 : "Checked: " + RomScan.describe(found) + ".")
-                            + " Choose another folder, or pick the ROM file, in OT6 Patcher.", null, null);
+                            + " Choose another folder, or pick the ROM file, in OT6 Patcher.");
                 Child ch = (Child) found.chosen.ref;
+                if (RomScan.isOutput(ch.name))   // RomScan never offers it; never delete a ROM
+                    throw new IllegalStateException("scan chose " + ch.name);
                 rom = found.rom;
                 used = ch.name;
                 p.edit().putString("source", childUri(tree, ch.docId).toString())
                         .putString("sourceName", ch.name).apply();
                 keepOnlyCurrentGrants(c);
-                Log.i(TAG, "scan of " + folder + ": " + RomScan.describe(found));
             }
-            byte[] target = Bps.apply(patch, rom);        // checks the target CRC32
 
-            String tmp = OUT + ".tmp";
-            Child stale = find(kids, tmp);
+            byte[] target;
+            try {
+                target = Bps.apply(patch, rom);
+            } catch (Bps.BpsException e) {   // the ROM matched, so the patch is at fault
+                return failed(c, v + " could not be written: this OT6 Patcher's built-in"
+                        + " patch is damaged (" + e.getMessage() + "). Reinstall it;"
+                        + " your ROM is fine.");
+            }
+
+            Child stale = find(kids, RomScan.TMP);
             if (stale != null) DocumentsContract.deleteDocument(cr, childUri(tree, stale.docId));
             Uri t = DocumentsContract.createDocument(cr, folderUri(tree),
-                    "application/octet-stream", tmp);
-            if (t == null) throw new IOException("could not create " + tmp);
+                    "application/octet-stream", RomScan.TMP);
+            if (t == null) throw new IOException("could not create " + RomScan.TMP);
             String tName = displayName(cr, t);
-            if (!tmp.equals(tName)) {
+            if (!RomScan.TMP.equals(tName)) {
                 DocumentsContract.deleteDocument(cr, t);
-                throw new IOException("the folder named the new file " + tName + ", not " + tmp);
+                throw new IOException("the folder named the new file " + tName
+                        + ", not " + RomScan.TMP);
             }
             OutputStream o = cr.openOutputStream(t, "w");
-            if (o == null) throw new IOException("cannot write " + tmp);
+            if (o == null) throw new IOException("cannot write " + RomScan.TMP);
             try {
                 o.write(target);
             } finally {
@@ -262,33 +307,26 @@ final class Patcher {
             }
             if (!Arrays.equals(readAll(cr, t), target)) {
                 DocumentsContract.deleteDocument(cr, t);
-                throw new IOException(tmp + " did not read back as written");
+                throw new IOException(RomScan.TMP + " did not read back as written");
             }
             // SAF's rename never replaces (the file provider picks "OT6 (1).sfc"
-            // instead), so the old OT6.sfc goes first: the folder holds the old
-            // ROM or the new one, never a partial file, though for a moment it
-            // holds neither.
-            Child old = find(kids, OUT);
+            // instead), so the old OT6.sfc goes first.
             if (old != null) DocumentsContract.deleteDocument(cr, childUri(tree, old.docId));
             Uri r = DocumentsContract.renameDocument(cr, t, OUT);
             if (r == null) r = t;
             String rName = displayName(cr, r);
             if (!OUT.equals(rName))
-                throw new IOException("renaming " + tmp + " gave " + rName + ", not " + OUT);
+                throw new IOException("renaming " + RomScan.TMP + " gave " + rName
+                        + ", not " + OUT);
             String stray = strays(kids);
-            p.edit().putString("strays", stray).apply();
             return done(c, true, v + " written to " + folder + "/" + OUT
                     + " (CRC32 " + Bps.hex(info.targetCrc) + ") from " + used + "."
                     + (stray.isEmpty() ? "" : " Warning: " + stray + " is in the same folder,"
                        + " and RetroArch would apply it on top of OT6; delete it."),
                     used, Bps.hex(info.targetCrc));
-        } catch (Bps.BpsException e) {
-            return done(c, false, v + " was not written: " + e.getMessage() + ".", null, null);
         } catch (Exception e) {
             Log.e(TAG, "write failed", e);
-            return done(c, false, v + " could not be written to " + folder + "/"
-                    + OUT + ": " + e, null, null);
+            return failed(c, v + " could not be written to " + folder + "/" + OUT + ": " + e);
         }
     }
-
 }

@@ -6,6 +6,8 @@ BUILD_TOOLS=35.0.1        # sdkmanager "build-tools;35.0.1"
 PLATFORM=android-35       # sdkmanager "platforms;android-35"
 MIN_SDK=26
 TARGET_SDK=35
+PACKAGE=io.github.mtklein.ot6patcher   # permanent: installed copies update only within it
+LABEL="OT6 Patcher"
 
 INSTALL_HINT="install with: brew bundle  (openjdk@21, android-commandlinetools), then
   JAVA_HOME=/opt/homebrew/opt/openjdk@21 sdkmanager --sdk_root=/opt/homebrew/share/android-commandlinetools 'build-tools;$BUILD_TOOLS' 'platforms;$PLATFORM'"

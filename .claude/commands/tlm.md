@@ -233,8 +233,9 @@ back. Steps, in order, none skipped:
 5. `ninja release` (qualification is up to date, so this is the
    preflights, the patch, the zip and the Android APK):
    `build/release/ot6-vX.Y.zip` and `build/release/ot6-vX.Y.apk` must
-   build, and `build/checks/android_apk.ok` (signature, badging, the tested
-   patch inside) must pass. The APK needs the signing key
+   build, and `build/checks/android_apk.ok` (signature, package, badging,
+   the tested patch inside) and `build/checks/android_apk_release.ok` (that
+   patch is the release .bps) must pass. The APK needs the signing key
    (docs/TOOLING.md, "Android patcher").
 6. `git tag -a vX.Y -m "OT6 vX.Y -- <Name>"`, `git push origin main
    release/vX.Y vX.Y`, then

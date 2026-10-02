@@ -725,17 +725,21 @@ w.edge([f"build/release/ot6-v{VERSION}.zip"], "sh",
        desc=f"release zip v{VERSION}")
 
 # The OT6 Patcher APK (android/, docs/TOOLING.md "Android patcher"): carries
-# the release .bps and writes the patched ROM on the player's device.  Only
-# `ninja release` builds it, so bare `ninja` never needs the JDK, the Android
-# SDK or the signing key; the scripts say what is missing.  The host check
-# runs the app's BPS code on the JVM against a patch made the same way as
-# the release one (so it needs no qualification), and verify_apk.sh proves
-# the APK carries that same tested patch.
+# the patch and writes the patched ROM on the player's device.  Only `ninja
+# release` (or an explicit path) builds it, so bare `ninja` never needs the
+# JDK, the Android SDK or the signing key; the scripts say what is missing.
+#
+# The APK carries build/android/ot6.bps, made by the release patch's own
+# flips command from the same inputs, so the APK, the host check and the
+# signing checks run without qualification
+# (`ninja build/release/ot6-vX.Y.apk build/checks/android_apk.ok`); the
+# release itself also requires android_apk_release.ok, which compares that
+# patch with the qualified release .bps byte for byte.
 android_bps = "build/android/ot6.bps"
 w.edge([android_bps], "sh", [BASE, "build/ot6.sfc"],
        cmd=f'mkdir -p build/android && tools/bin/flips --create --bps'
            f' "{BASE}" build/ot6.sfc {android_bps} >/dev/null',
-       desc="bps patch for the android host check")
+       desc="bps patch for the android apk")
 w.edge(["build/checks/android_bps.ok"], "sh", [BASE, android_bps, "build/ot6.sfc"],
        implicit=["tools/android/bps_check.sh", "tools/android/env.sh",
                  "android/src/io/github/mtklein/ot6patcher/Bps.java",
@@ -744,23 +748,46 @@ w.edge(["build/checks/android_bps.ok"], "sh", [BASE, android_bps, "build/ot6.sfc
        cmd=f'tools/android/bps_check.sh "{BASE}" {android_bps} build/ot6.sfc'
            f' && mkdir -p build/checks && touch build/checks/android_bps.ok',
        desc="android BPS applier on the JVM")
-# versionCode orders releases: major*10000 + minor*100 + patch (0.23 -> 2300)
-_v = [int(x) for x in VERSION.split(".")] + [0, 0]
-apk_code = _v[0] * 10000 + _v[1] * 100 + _v[2]
+
+
+def apk_version_code(version):
+    """versionCode for VERSION, ordering releases and their candidates:
+    major*1000000 + minor*10000 + patch*100 + (N for -rcN, else 99), so
+    0.24-rc1 -> 240001 < 0.24 -> 240099 < 0.24.1 -> 240199.  None when
+    VERSION has another shape (the APK edge then fails saying so; nothing
+    else in the graph depends on it)."""
+    m = re.fullmatch(r"(\d+)\.(\d+)(?:\.(\d+))?(?:-rc([1-9]\d?))?", version)
+    if not m or int(m.group(2)) > 99 or int(m.group(3) or 0) > 99:
+        return None
+    major, minor, patch, rc = (int(g) if g else 0 for g in m.groups())
+    return major * 1000000 + minor * 10000 + patch * 100 + (rc or 99)
+
+
+apk_code = apk_version_code(VERSION)
 apk = f"build/release/ot6-v{VERSION}.apk"
-w.edge([apk], "sh", [bps],
-       implicit=["build/checks/android_bps.ok", "tools/android/build_apk.sh",
-                 "tools/android/env.sh", "android/AndroidManifest.xml"]
-                + glob("android/src/io/github/mtklein/ot6patcher/*.java")
-                + glob("android/res/*/*.xml"),
-       cmd=f'tools/android/build_apk.sh "{bps}" {VERSION} {apk_code} {apk}',
-       desc=f"android apk v{VERSION}")
+apk_inputs = ["build/checks/android_bps.ok", "tools/android/build_apk.sh",
+              "tools/android/env.sh", "android/AndroidManifest.xml"] \
+    + glob("android/src/io/github/mtklein/ot6patcher/*.java") \
+    + glob("android/res/*/*.xml")
+if apk_code is None:
+    w.edge([apk], "sh", [android_bps], implicit=apk_inputs,
+           cmd=f"echo 'ERROR: VERSION {VERSION} is not major.minor[.patch][-rcN];"
+               f" the APK needs one to make its versionCode' && exit 1",
+           desc=f"android apk v{VERSION}")
+else:
+    w.edge([apk], "sh", [android_bps], implicit=apk_inputs,
+           cmd=f'tools/android/build_apk.sh {android_bps} {VERSION} {apk_code} {apk}',
+           desc=f"android apk v{VERSION}")
 w.edge(["build/checks/android_apk.ok"], "sh", [apk, android_bps],
        implicit=["tools/android/verify_apk.sh", "tools/android/env.sh",
                  "android/release-cert.sha256"],
        cmd=f'tools/android/verify_apk.sh {apk} {VERSION} {apk_code} {android_bps}'
            f' && touch build/checks/android_apk.ok',
        desc=f"verify android apk v{VERSION}")
+w.edge(["build/checks/android_apk_release.ok"], "sh", [android_bps, bps],
+       cmd=f'cmp {android_bps} "{bps}"'
+           f' && touch build/checks/android_apk_release.ok',
+       desc=f"android apk carries the release patch v{VERSION}")
 
 # ----------------------------------------------- copy_if_changed + regen ---
 w()
@@ -778,7 +805,8 @@ w.edge(["build.ninja"], "configure",
         "VERSION"])
 w()
 w.edge(["release"], "phony", [f"build/release/ot6-v{VERSION}.zip", apk,
-                              "build/checks/android_apk.ok"])
+                              "build/checks/android_apk.ok",
+                              "build/checks/android_apk_release.ok"])
 # `chain` is the one other alias: the chain from power-on's last state
 # moves whenever a cut or a leg is added, and this name does not.
 if chain_end:

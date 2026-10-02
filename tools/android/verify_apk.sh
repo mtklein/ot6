@@ -24,11 +24,12 @@ got=$(echo "$certs" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
 badging=$("$BT/aapt2" dump badging "$apk")
 echo "$badging" | grep -E "^(package|minSdkVersion|targetSdkVersion|application-label):"
 fail=0
-for want in "versionCode='$code'" "versionName='$name'"; do
+for want in "package: name='$PACKAGE' " "versionCode='$code'" "versionName='$name'"; do
   echo "$badging" | grep "^package:" | grep -q "$want" || { echo "FAIL: badging lacks $want" >&2; fail=1; }
 done
 echo "$badging" | grep -qx "minSdkVersion:'$MIN_SDK'" || { echo "FAIL: minSdk is not $MIN_SDK" >&2; fail=1; }
 echo "$badging" | grep -qx "targetSdkVersion:'$TARGET_SDK'" || { echo "FAIL: targetSdk is not $TARGET_SDK" >&2; fail=1; }
+echo "$badging" | grep -qx "application-label:'$LABEL'" || { echo "FAIL: the label is not $LABEL (a test build?)" >&2; fail=1; }
 echo "$badging" | grep -q "^application-debuggable" && { echo "FAIL: the APK is debuggable (a test build?)" >&2; fail=1; }
 echo "$badging" | grep "^uses-permission:" && { echo "FAIL: the APK asks for permissions; it needs none" >&2; fail=1; }
 unzip -p "$apk" assets/ot6.bps | cmp -s - "$tested" || { echo "FAIL: the APK's assets/ot6.bps is not $tested" >&2; fail=1; }
