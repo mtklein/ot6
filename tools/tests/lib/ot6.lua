@@ -6721,9 +6721,9 @@ function Driver:button(actor)
   if self.plan == nil or self.planActor ~= actor then
     if st == BATTLE.ST_TGT then
       -- A target window with no plan behind it is one of two things, told
-      -- apart by self.confirmed (written at every confirm, cleared at
-      -- ST_CMD with tgtSpin).  tgtSpin resets only at ST_CMD (a genuine
-      -- menu restart), not on any off-ST_TGT flicker.
+      -- apart by self.confirmed (written at every confirm, cleared when the
+      -- menu closes and at ST_CMD with tgtSpin).  tgtSpin resets only at
+      -- ST_CMD (a genuine menu restart), not on any off-ST_TGT flicker.
       local chars, mons = M.readByte(BATTLE.TGTCHARS), M.readByte(BATTLE.TGTMONS)
       local c = self.confirmed
       self.tgtSpin = self.tgtSpin + 1
@@ -6777,8 +6777,24 @@ function Driver:button(actor)
         self.confirmed = nil
         return { "b" }
       end
-      if c.side == "monsters" and mons == 0 then return self:cross("monsters") end
-      if c.side == "chars" and (mons ~= 0 or chars == 0) then return self:cross("chars") end
+      -- crossing back: a crossing that has done nothing twice each way
+      -- (cross() would fail fast) backs out to plan afresh instead -- this
+      -- is a backstop, and a B costs a pulse where a stuck run costs the
+      -- battle (review of 43462e7d)
+      local toward = (c.side == "monsters" and mons == 0 and "monsters")
+        or (c.side == "chars" and (mons ~= 0 or chars == 0) and "chars") or nil
+      if toward ~= nil then
+        local L = self:layoutOf()
+        for _, d in ipairs(toward == "monsters" and L.toMonsters or L.toChars) do
+          if (self.steerDead[d] or 0) < 2 then return self:cross(toward) end
+        end
+        M.log(string.format("[%s] refused-confirm walk cannot cross back to the %s (%s did "
+          .. "nothing twice each; chars=%02X mons=%02X) -- backing out to plan afresh",
+          self.tag or "fight", toward, table.concat(toward == "monsters" and L.toMonsters
+            or L.toChars, " and "), chars, mons))
+        self.confirmed = nil
+        return { "b" }
+      end
       if c.side == "chars" and c.target ~= nil then
         -- a party-side confirm names its member (a cure, a raise, the
         -- Muddle rule's Fight): the A lands on that member or not at all,
@@ -8474,7 +8490,10 @@ function Driver:frame()
     -- A eventually.  Preserve the old edge-A behavior only while there is
     -- no interactive menu to steer.
     self.menuStreak, self.tick = 0, 0
-    self.plan, self.planActor, self.held = nil, nil, {}
+    -- the confirm record goes with the menu: a refused confirm keeps the
+    -- menu open, so a record that outlives a closed menu is a turn ago's
+    -- and must not steer a later window's walk (review of 43462e7d)
+    self.plan, self.planActor, self.held, self.confirmed = nil, nil, {}, nil
     M.setPad((M.frame % 8 < 4) and { "a" } or {})
     return
   end
@@ -8598,7 +8617,7 @@ M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end)
     plan = nil, planActor = nil, held = {},
     heldFast = false,                  -- the live steer asked for 3 presses/pulse
     tgtSpin = 0,                       -- frames spent undecided in ST_TGT
-    confirmed = nil,                   -- { actor, side, kind } of the last confirm, until ST_CMD
+    confirmed = nil,                   -- { actor, side, target, kind } of the last confirm, until ST_CMD or the menu closes
     unknownSt = nil, unknownN = 0,     -- unknown-menu-state stall guard
     unknownSeen = {},                  -- st -> true once logged this battle (#188)
     sideWindowN = 0,                   -- Row/Def. windows backed out of this battle
