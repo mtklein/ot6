@@ -70,20 +70,21 @@ local function checkHire(r, i)
 end
 
 -- ---- the plays -------------------------------------------------------------
--- Stage 1 (one battle): a hire at 1 BP, then one unboosted -- held to the
--- purse (checkHire) and to the crew (H.hireCrewCheck).  Stages 2 and 3 (a
--- battle each): SETZER Defends to bank the points, then hires at 2 and at
--- 3 BP -- held to the crew: the merchant, soldier, Leo and the fourth hire
+-- Stages, a battle each (again in the next battle if it ends first), with
+-- field care between: SETZER Defends twice and hires at 3 BP; Defends once
+-- and hires at 2 BP; hires at 1 BP, then unboosted -- that last held to the
+-- purse (checkHire) and every hire to the crew (H.hireCrewCheck): the merchant, soldier, Leo and the fourth hire
 -- (Shadow while he can be hired, the ghost when not, Interceptor while he
 -- fights in the party), whatever bodies the passes find.  The coin replay
--- (checkHire) is held to stage 1 only: a 2 or 3 BP hire can outlive its
+-- (checkHire) is held to the 1-and-0 stage only: a 2 or 3 BP hire can outlive its
 -- target, and the pass after a kill finds no body even when another stands
 -- (the pass-retarget defect, fixed on wt/pass-retarget, not here).
 local STAGES = {
-  { { row = HIRE, boost = 1 }, { row = HIRE, boost = 0 } },
-  { { row = "defend" }, { row = HIRE, boost = 2 } },
   { { row = "defend" }, { row = "defend" }, { row = HIRE, boost = 3 } },
+  { { row = "defend" }, { row = HIRE, boost = 2 } },
+  { { row = HIRE, boost = 1 }, { row = HIRE, boost = 0 } },
 }
+local PURSE_STAGE = 3   -- the stage held to the coin replay (checkHire)
 local function hires(stage)
   local t = {}
   for _, e in ipairs(stage) do if e.row == HIRE then t[#t + 1] = e end end
@@ -101,6 +102,7 @@ H.run({ maxFrames = 400000 }, {
       battles = battles + 1
       H.assertEq(battles <= 8, true, string.format("the three stages within eight battles (stage %d)", stage))
     end),
+    H.fieldCare({ tag = "care between the hires' battles", threshold = 0.8 }),
     walkToBattle(),
     (function()
       local step
@@ -133,7 +135,7 @@ H.run({ maxFrames = 400000 }, {
       local r = e.r
       H.assertEq(r.row, HIRE, string.format("record %d is a Hired Help", i))
       H.assertEq(r.boost, e.want.boost, string.format("record %d ran at its planned boost", i))
-      if e.stage == 1 then checkHire(r, i) end
+      if e.stage == PURSE_STAGE then checkHire(r, i) end
       H.hireCrewCheck(r, string.format("hire %d (%d BP)", i, r.boost))
     end
     H.log(string.format("[hiredhelp] PASSED: %d hires (1, 0, 2 and 3 BP) over %d battle(s)", #recs, battles))
