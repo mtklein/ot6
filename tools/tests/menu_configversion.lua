@@ -63,8 +63,12 @@ local EXPECT = "OT6 v" .. OT6_VERSION
 local WANT = encode(EXPECT)
 local TITLE = encode("Config")
 local FONT = H.sym("SmallFontGfx") & 0x3FFFFF
-local WINDOW = H.sym("ConfigVersionWindow") & 0x3FFFFF
-local FIELD = H.sym("Ot6VersionText") & 0x3FFFFF
+-- the OT6 symbols, looked up where they are used: a ROM from before the
+-- version tab has neither, and fails on the screen first
+local function romSym(a, name)
+  H.assertEq(a ~= nil, true, "this ROM's symbols include " .. name)
+  return a & 0x3FFFFF
+end
 
 local function st() return H.readByte(ZMENUSTATE) end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -129,48 +133,63 @@ end
 
 local pageChecked = {}
 
+-- Each page's checks all run and report before the page fails, so one
+-- negative control shows every check that catches it (VRAM and frame).
 local function checkPage(page)
   local b = bg3()
   local width = emu.getScreenSize().width
   local frame = emu.getScreenBuffer()
   H.assertEq(bright(), 15, page .. ": the screen is fully faded in")
+  local fails = {}
+  local function check(ok, what)
+    if not ok then
+      fails[#fails + 1] = what
+      H.log(page .. ": MISMATCH " .. what)
+    end
+  end
 
   -- 1. VRAM tilemap: the tab's cells hold the expected text in white
   local got = {}
   for i = 1, #WANT do
     local w = mapWord(b, TEXT_X + i - 1, TEXT_Y)
     got[i] = w & 0xff
-    H.assertEq(w >> 8, WHITE_ATTR, string.format(
-      "%s: BG3 cell {%d,%d} attribute (white text)", page, TEXT_X + i - 1, TEXT_Y))
+    check(w >> 8 == WHITE_ATTR, string.format(
+      "BG3 VRAM cell {%d,%d} attribute $%02X, want $%02X (white text)",
+      TEXT_X + i - 1, TEXT_Y, w >> 8, WHITE_ATTR))
+    check(got[i] == WANT[i], string.format(
+      "BG3 VRAM cell {%d,%d} is $%02X, want $%02X: %q's character %d (%q)",
+      TEXT_X + i - 1, TEXT_Y, got[i], WANT[i], EXPECT, i, EXPECT:sub(i, i)))
   end
   H.log(string.format("%s: BG3 VRAM tilemap at {%d,%d}: %s (want %s = %q)",
     page, TEXT_X, TEXT_Y, hexs(got), hexs(WANT), EXPECT))
-  for i = 1, #WANT do
-    H.assertEq(got[i], WANT[i], string.format(
-      "%s: BG3 VRAM cell {%d,%d} is %q's character %d", page,
-      TEXT_X + i - 1, TEXT_Y, EXPECT, i))
-  end
-  local tab = H.readRomByte(WINDOW + 2)  -- make_window: .addr pos, .byte w, h
+  local tabSym = H.sym("ConfigVersionWindow")
+  check(tabSym ~= nil, "this ROM's symbols include ConfigVersionWindow")
+  -- make_window: .addr pos, .byte w, h
+  local tab = tabSym and H.readRomByte((tabSym & 0x3FFFFF) + 2) or 10
   H.assertEq(#WANT <= tab, true, string.format(
     "%q (%d characters) fits the version tab's %d columns", EXPECT, #WANT, tab))
   for x = TEXT_X + #WANT, TEXT_X + tab - 1 do
-    H.assertEq(mapWord(b, x, TEXT_Y), 0, string.format(
-      "%s: BG3 cell {%d,%d} after the text, inside the tab, is blank", page, x, TEXT_Y))
+    check(mapWord(b, x, TEXT_Y) == 0, string.format(
+      "BG3 VRAM cell {%d,%d} after the text, inside the tab, is blank", x, TEXT_Y))
   end
   for x = 0, TEXT_X - 1 do
-    H.assertEq(mapWord(b, x, TEXT_Y), 0, string.format(
-      "%s: BG3 cell {%d,%d} left of the text is blank", page, x, TEXT_Y))
+    check(mapWord(b, x, TEXT_Y) == 0, string.format(
+      "BG3 VRAM cell {%d,%d} left of the text is blank", x, TEXT_Y))
   end
   for i = 1, #TITLE do
-    H.assertEq(mapWord(b, TITLE_X + i - 1, TEXT_Y) & 0xff, TITLE[i], string.format(
-      "%s: the Config title's cell {%d,%d} is still there", page, TITLE_X + i - 1, TEXT_Y))
+    check(mapWord(b, TITLE_X + i - 1, TEXT_Y) & 0xff == TITLE[i], string.format(
+      "the Config title's cell {%d,%d} is still there", TITLE_X + i - 1, TEXT_Y))
   end
-  -- ...and each code's tile is the ROM font's glyph
+  -- ...and each expected code's tile is the ROM font's glyph
   for i = 1, #WANT do
+    local same = true
     for j = 0, 15 do
-      H.assertEq(emu.read(b.chr + WANT[i] * 16 + j, VR), H.readRomByte(FONT + WANT[i] * 16 + j),
-        string.format("%s: BG3 tile $%02X byte %d is SmallFontGfx's", page, WANT[i], j))
+      if emu.read(b.chr + WANT[i] * 16 + j, VR) ~= H.readRomByte(FONT + WANT[i] * 16 + j) then
+        same = false
+      end
     end
+    check(same, string.format("BG3 tile $%02X (%q) is SmallFontGfx's glyph",
+      WANT[i], EXPECT:sub(i, i)))
   end
 
   -- 2. the frame: calibrate the row offset on the vanilla "Config" title
@@ -190,17 +209,17 @@ local function checkPage(page)
   local off = offs[1]
   for i = 1, #WANT do
     local ok, why = cellShows(b, frame, width, TEXT_X + i - 1, TEXT_Y, WANT[i], 0, off)
-    H.assertEq(ok, true, string.format(
-      "%s: the frame shows %q's character %d (%q) at cell {%d,%d}%s", page, EXPECT, i,
-      EXPECT:sub(i, i), TEXT_X + i - 1, TEXT_Y, why and (": " .. why) or ""))
+    check(ok, string.format("the frame shows %q's character %d (%q) at cell {%d,%d}%s",
+      EXPECT, i, EXPECT:sub(i, i), TEXT_X + i - 1, TEXT_Y, why and (": " .. why) or ""))
   end
   for x = TEXT_X + #WANT, TEXT_X + tab - 1 do
     local ok, why = cellShows(b, frame, width, x, TEXT_Y, 0xff, 0, off)
-    H.assertEq(ok, true, string.format(
-      "%s: the frame shows no ink at cell {%d,%d}, after the text%s", page, x, TEXT_Y,
-      why and (": " .. why) or ""))
+    check(ok, string.format("the frame shows no ink at cell {%d,%d}, after the text%s",
+      x, TEXT_Y, why and (": " .. why) or ""))
   end
-  H.log(string.format("%s: the frame shows %q at BG3 {%d,%d} (frame row offset %d, "
+  H.assertEq(#fails, 0, string.format("%s: %d check(s) failed (first: %s)",
+    page, #fails, fails[1] or "-"))
+  H.log(string.format("%s: VRAM and frame show %q at BG3 {%d,%d} (frame row offset %d, "
     .. "calibrated on the Config title)", page, EXPECT, TEXT_X, TEXT_Y, off))
   pageChecked[page] = true
 end
@@ -236,8 +255,8 @@ H.run({ maxFrames = 40000 }, {
   H.waitFrames(30),
   H.call(function()
     H.assertEq(H.readByte(ZPAGE), 0, "Config opens on page 1")
+    H.screenshot("configversion_page1")    -- the evidence, before the verdict
     checkPage("page 1")
-    H.screenshot("configversion_page1")
   end),
 
   -- Down past the last row of page 1 scrolls to page 2 (MenuState_50)
@@ -245,8 +264,8 @@ H.run({ maxFrames = 40000 }, {
     { H.pressButtons({ "down" }, 2), H.waitFrames(10) }, "Config page 2"),
   H.waitFrames(30),
   H.call(function()
+    H.screenshot("configversion_page2")    -- the evidence, before the verdict
     checkPage("page 2")
-    H.screenshot("configversion_page2")
   end),
 
   H.driveUntil(function() return st() ~= ST_CONFIG end, 600,
@@ -260,7 +279,8 @@ H.run({ maxFrames = 40000 }, {
     end
     -- the ROM field the screen came from, for the log
     local raw = {}
-    for i = 0, 15 do raw[#raw + 1] = H.readRomByte(FIELD + i) end
+    local field = romSym(H.sym("Ot6VersionText"), "Ot6VersionText")
+    for i = 0, 15 do raw[#raw + 1] = H.readRomByte(field + i) end
     H.log("Ot6VersionText (c0/ffa0) = " .. hexs(raw))
     for i = 1, #WANT do
       H.assertEq(raw[i], WANT[i], string.format("Ot6VersionText byte %d", i - 1))

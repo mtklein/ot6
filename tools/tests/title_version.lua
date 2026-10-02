@@ -121,35 +121,47 @@ H.run({ maxFrames = 3000 }, {
   H.waitUntil(splashUp, 1200, "the splash, faded in", 1),
   H.waitFrames(30),
   H.call(function()
+    H.screenshot("titleversion_splash")         -- the evidence, before the verdict
     local b = bg1()
+    -- every check runs and reports before the verdict, so one negative
+    -- control shows each check that catches it
+    local fails = {}
+    local function check(ok, what)
+      if not ok then
+        fails[#fails + 1] = what
+        H.log("splash: MISMATCH " .. what)
+      end
+    end
     -- 1. VRAM: the row's cells
-    local got = {}
     for x = 0, 31 do
       local w = cellWord(b, x, ROW)
       local i = x - X0 + 1
       if i >= 1 and i <= #WANT then
-        got[i] = w
-        H.assertEq(w, (PAL << 10) | (TILE + i - 1), string.format(
-          "BG1 cell {%d,%d} is %q's character %d: palette 1, tile $%03X",
-          x, ROW, EXPECT, i, TILE + i - 1))
+        check(w == (PAL << 10) | (TILE + i - 1), string.format(
+          "BG1 cell {%d,%d} is $%04X, want $%04X: %q's character %d, palette 1, tile $%03X",
+          x, ROW, w, (PAL << 10) | (TILE + i - 1), EXPECT, i, TILE + i - 1))
       else
-        H.assertEq(w, FILL, string.format(
-          "BG1 cell {%d,%d}, outside the text, is the splash's fill", x, ROW))
+        check(w == FILL, string.format(
+          "BG1 cell {%d,%d}, outside the text, is $%04X, want the splash's fill $%04X",
+          x, ROW, w, FILL))
       end
     end
     -- ...and each cell's tile is the expected glyph, through the colour mapping
     for i = 1, #WANT do
-      local t = TILE + i - 1
+      local t, bad = TILE + i - 1, nil
       for py = 0, 7 do
         for px = 0, 7 do
-          H.assertEq(pix4(b, t, px, py), S2T[font2(WANT[i], px, py)], string.format(
-            "tile $%03X pixel (%d,%d) is %q's character %d (%q) in SmallFontGfx",
-            t, px, py, EXPECT, i, EXPECT:sub(i, i)))
+          if not bad and pix4(b, t, px, py) ~= S2T[font2(WANT[i], px, py)] then
+            bad = string.format("pixel (%d,%d) is colour %d, want %d", px, py,
+              pix4(b, t, px, py), S2T[font2(WANT[i], px, py)])
+          end
         end
       end
+      check(bad == nil, string.format("tile $%03X is %q's character %d (%q) in SmallFontGfx%s",
+        t, EXPECT, i, EXPECT:sub(i, i), bad and (": " .. bad) or ""))
     end
-    H.log(string.format("splash: BG1 VRAM row %d, cells %d-%d hold %q (tiles $%03X-$%03X)",
-      ROW, X0, X0 + #WANT - 1, EXPECT, TILE, TILE + #WANT - 1))
+    H.log(string.format("splash: BG1 VRAM row %d, cells %d-%d, tiles $%03X-$%03X checked against %q",
+      ROW, X0, X0 + #WANT - 1, TILE, TILE + #WANT - 1, EXPECT))
 
     -- 2. the frame, calibrated on the logo
     local width = emu.getScreenSize().width
@@ -171,15 +183,31 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(#offs, 1, string.format(
       "exactly one frame row offset shows the logo (BG1 rows %d-%d) (found %d)",
       LOGO_Y0, LOGO_Y1, #offs))
-    for i = 1, #WANT do
-      local ok, why = cellShows(b, frame, width, X0 + i - 1, ROW, TILE + i - 1, PAL, offs[1])
-      H.assertEq(ok, true, string.format(
-        "the frame shows %q's character %d (%q) at cell {%d,%d}%s", EXPECT, i,
-        EXPECT:sub(i, i), X0 + i - 1, ROW, why and (": " .. why) or ""))
+    -- each character's cell must show its glyph in the live palette (the
+    -- tile the cell names is the one the PPU draws; checking the glyph
+    -- itself is (1)'s job, so here the expected glyph is rendered directly)
+    local function glyphShows(x, c, off)
+      local sx, sy = x * 8 - (b.hscroll % 256), ROW * 8 - b.vscroll + off
+      for py = 0, 7 do
+        for px = 0, 7 do
+          local want = palColor(PAL * 16 + S2T[font2(c, px, py)])
+          local got = frame[(sy + py) * width + sx + px + 1] & 0xffffff
+          if got ~= want then
+            return nil, string.format("pixel (%d,%d) is %06X, want %06X", sx + px, sy + py, got, want)
+          end
+        end
+      end
+      return true
     end
-    H.log(string.format("splash: the frame shows %q under the logo (frame row offset %d, "
+    for i = 1, #WANT do
+      local ok, why = glyphShows(X0 + i - 1, WANT[i], offs[1])
+      check(ok, string.format("the frame shows %q's character %d (%q) at cell {%d,%d}%s",
+        EXPECT, i, EXPECT:sub(i, i), X0 + i - 1, ROW, why and (": " .. why) or ""))
+    end
+    H.assertEq(#fails, 0, string.format("splash: %d check(s) failed (first: %s)",
+      #fails, fails[1] or "-"))
+    H.log(string.format("splash: VRAM and the frame show %q under the logo (frame row offset %d, "
       .. "calibrated on the logo)", EXPECT, offs[1]))
-    H.screenshot("titleversion_splash")
   end),
 
   -- the title takes over: BG1 back on its left screen
