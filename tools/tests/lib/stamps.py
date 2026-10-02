@@ -220,9 +220,12 @@ def _own(path, root, memo):
         return (None, None, [])
     rec = parse(text)
     art = rec.get("artifact")
-    hint = regen_hint(art[0]) if art else f"ninja {me}"
+    v3 = rec["format"] == FORMAT and art and art[0] and "generator" in rec
+    hint = (regen_hint(art[0]) if v3 else
+            f"ninja build/states/{me}.mss.lua" if "/" not in me else
+            f"ninja {me}")
     memo["hint"][path] = hint
-    if rec["format"] != FORMAT or not art or "generator" not in rec:
+    if not v3:
         return (UNBOUND, f"{me} is UNBOUND -- its stamp is not an {FORMAT} "
                          f"record (written by an older harness), so nothing "
                          f"ties its bytes to its inputs; regenerate: {hint}", [])
