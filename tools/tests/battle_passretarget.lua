@@ -164,6 +164,21 @@ local seen = { hire = {}, jackpot = {}, coin = {}, fight = {}, resplit = {}, van
 local checked = { acts = 0, passes = 0 }
 local function note(k, key0) seen[k][key0 or "?"] = (seen[k][key0 or "?"] or 0) + 1 end
 
+-- PASS_TALLY (a lab switch, off in the suite): count each failed check by
+-- assertion, kind and battle key and play on, so one run on an old or
+-- mutant ROM shows where across its draws the rule breaks
+PASS_TALLY = PASS_TALLY or false
+local tally = {}
+local function want(got, exp, what, kind, key0)
+  if not PASS_TALLY then return H.assertEq(got, exp, what) end
+  if got ~= exp then
+    local t = what:match("^(%u):") or what:sub(1, 8)
+    local k = string.format("%s %s %s", t, kind, key0 or "?")
+    tally[k] = (tally[k] or 0) + 1
+    H.log(string.format("[%s] TALLY fail: %s (got %s, want %s)", TAG, what, tostring(got), tostring(exp)))
+  end
+end
+
 local function judge(a)
   a.kind = kindOf(a)
   local ext = extended(a)
@@ -177,7 +192,8 @@ local function judge(a)
     a.ab and string.format(" (id $%02X)", a.ab) or "", a.offering and " (Offering)" or "", #a.passes, a.key or "?",
     table.concat(lines, "; ")))
   if a.cmd == 0x0F and a.row and a.row >= COIN and a.row <= JACKPOT and a.boost >= 1 then
-    H.assertEq(#a.passes, 1 + a.boost, string.format("E: %s at %d BP runs 1 + boost passes", a.kind, a.boost))
+    want(#a.passes, 1 + a.boost, string.format("E: %s at %d BP runs 1 + boost passes", a.kind, a.boost), a.kind,
+      a.key)
   end
   -- the action's own passes: not a weapon's follow-up spell ($b5 = $02,
   -- which keeps vanilla's "same target"; the rows' own $b5 moves with their
@@ -194,15 +210,15 @@ local function judge(a)
         .. "landed on $%04X)", a.kind, a.e, a.boost, p, #a.passes, a.key or "?", pre, stand, q.post)
       if ext then
         checked.passes = checked.passes + 1
-        H.assertEq(q.post & 0xFF, 0, "F: a pass OT6 added stays on the side its target was on (the monsters) -- "
-          .. what)
-        H.assertEq(post ~= 0, true, "A: it lands on a body while one stands -- " .. what)
+        want(q.post & 0xFF, 0, "F: a pass OT6 added stays on the side its target was on (the monsters) -- "
+          .. what, a.kind, a.key)
+        want(post ~= 0, true, "A: it lands on a body while one stands -- " .. what, a.kind, a.key)
         if bits(pre) >= 2 and (pre & stand) ~= 0 then
-          H.assertEq(post, pre & stand, "D: a group pass lands on the group's survivors -- " .. what)
+          want(post, pre & stand, "D: a group pass lands on the group's survivors -- " .. what, a.kind, a.key)
         end
-        H.assertEq(post & ~stand & 0x3F, 0, "B: it lands on standing bodies only -- " .. what)
+        want(post & ~stand & 0x3F, 0, "B: it lands on standing bodies only -- " .. what, a.kind, a.key)
         if ONE[a.kind] then
-          H.assertEq(bits(post), 1, "C: a one-body action's pass lands on one body -- " .. what)
+          want(bits(post), 1, "C: a one-body action's pass lands on one body -- " .. what, a.kind, a.key)
         end
         if (pre & stand) == 0 then
           if seen[a.kind == "capture" and "fight" or a.kind] then note(a.kind == "capture" and "fight" or a.kind, a.key) end
@@ -217,8 +233,8 @@ local function judge(a)
         -- targeting ($ba bit 5, CmdTargetTbl) puts an emptied mask back on
         -- the backup targets ($3a4e), so the second hand swings at the body
         -- the first hand felled
-        H.assertEq(q.post, q.pre, "vanilla: an unboosted two-hand Fight's second hand swings at the body the first "
-          .. "hand felled -- " .. what)
+        want(q.post, q.pre, "vanilla: an unboosted two-hand Fight's second hand swings at the body the first "
+          .. "hand felled -- " .. what, a.kind, a.key)
         note("vanilla", a.key)
         H.log(string.format("[%s]   vanilla: %s", TAG, what))
       end
@@ -500,6 +516,12 @@ H.run({ maxFrames = 2400000 }, {
       local n, d = 0, 0
       for _, c in pairs(seen[k]) do n, d = n + c, d + 1 end
       t[#t + 1] = string.format("%s %d pass(es) over %d distinct key(s)", k, n, d)
+    end
+    if PASS_TALLY then
+      local t, n = {}, 0
+      for k, c in pairs(tally) do t[#t + 1] = string.format("%s x%d", k, c); n = n + c end
+      table.sort(t)
+      H.log(string.format("[%s] TALLY: %d failed check(s): %s", TAG, n, table.concat(t, "; ")))
     end
     H.log(string.format("[%s] PASSED: %d extended action(s), %d later pass(es) held while a body stood, over %d "
       .. "battle(s) (%d crowds); %s", TAG, checked.acts, checked.passes, battles, crowds, table.concat(t, "; ")))
