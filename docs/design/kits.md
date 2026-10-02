@@ -674,14 +674,21 @@ reads). Jackpot greys for MP or once spent. One authority each:
 reads). Tests: `battle_cointoss`, `battle_hiredhelp`, `battle_jackpot`,
 `battle_setzergrey` (the purse's grey and refusal), `battle_gprain` (the
 Coin Toss relic's GP Rain) and `battle_hirerefund` (a hire past the last
-body pays nothing). The coin suites throw in the first battle that deals
-a special-weak crowd and assert that a toss split and chipped;
-`battle_jackpot` holds every roll to the draw rule, with a draw whose early
-kill leaves a pass empty and one that redraws past 251; `battle_setzergrey`
-prices two, three and four throws against the purse. Negative controls:
-the mutant ROMs (`mutants5.py`, same-size edits for the savestate suite)
-and the no-edit control built by the same pipeline, in
-`build/attempts/wt/kit-setzer/m6/`; the earlier `px13/m2/` set that
+body pays nothing). The coin suites throw in the battles that deal a
+special-weak crowd (the engine's alive mask, so a petrified body is out)
+and assert that a toss split and chipped; the other battles are fought out
+by the route's fight driver with field care after, within a budget decoded
+from the room's pool (the worst encounter-counter state's encounters to
+the next crowd, 19 here, per crowd the throws need). `battle_jackpot`
+holds every roll to the draw rule, and a bounded search over grave waits,
+in-battle stands and Defends (192 throws at most; a throw redraws with p =
+6.1%, so the bound is stated in distinct throws) finds a draw whose early
+kill leaves a pass empty and one that redraws past 251, or fails by name;
+`battle_setzergrey` prices two, three and four throws against the purse,
+step 5 from the purse step 4 left. Negative controls: the mutant ROMs
+(`mutants5.py`, same-size edits for the savestate suite) and the no-edit
+control built by the same pipeline, in
+`build/attempts/wt/kit-setzer/m7/`; the earlier `px13/m2/` set that
 c9fccbd6 cites (the floor curve's mutants) was lost with px13's worktree
 before it was copied, and the curve it tested is gone.
 

@@ -208,8 +208,8 @@ end
 -- A search that meets neither, or only one, fails by name.
 local ENTRY = (type(OT6_SEED_SHIFT) == "number" and OT6_SEED_SHIFT or 0)
 local CAND = {}
-for _, d in ipairs({ 2, 3 }) do
-  for _, st in ipairs({ 0, 330, 420, 520, 640, 760 }) do
+for _, d in ipairs({ 2, 3, 4, 5 }) do
+  for _, st in ipairs({ 0, 640 }) do
     for i = 0, 15 do CAND[#CAND + 1] = { wait = ENTRY + 1 + 4 * i, stand = st, defends = d } end
   end
 end
