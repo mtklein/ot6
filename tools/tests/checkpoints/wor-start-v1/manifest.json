@@ -17,11 +17,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "8ea15212a8c623b7d977c2f9c29d491389096d963e6d4bf9cff263cdc81ae477",
-    "generator_sig": "03ef09369d2b99e6c44a75f1fc5b2f380c42b392d7f30054b340eac0e73a73e5 gen_wor_start build/checkpoints/wor-island-v1/manifest.json build/checkpoints/wor-island-v1/wor-island.sram",
+    "generator_sig": "539039599aa4389ff3a3cf6bbb5839467965d3f32a0099e73682d39928c9fc1f gen_wor_start build/checkpoints/wor-island-v1/manifest.json build/checkpoints/wor-island-v1/wor-island.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/wor-island-v1/manifest.json",
-        "sha256": "df964d9733b76013e89ea70edaa739a4891be058d4059a4fb05529dd0b382fb8"
+        "sha256": "5bec895fbf1f84760c6ea6dc1e8554367b34bb8f5a91c58b56250f6417667352"
       }
     ]
   }

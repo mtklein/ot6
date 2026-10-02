@@ -9,11 +9,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "60b6d599a2936420d8f48a285c8e0228c2ee8f5c66d52a93cca03d9df6342700",
-    "generator_sig": "80b5f549e5aab9341087a8d3b7d9c09cb26318f74a698d93807bad2703355c45 gen_banquet_done build/checkpoints/vector-crash-v1/manifest.json build/checkpoints/vector-crash-v1/vector-crash.sram",
+    "generator_sig": "571450a4beb9d0bfb59978cb7ae041d1262bf9e06d9e46b9ffba46505d140655 gen_banquet_done build/checkpoints/vector-crash-v1/manifest.json build/checkpoints/vector-crash-v1/vector-crash.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/vector-crash-v1/manifest.json",
-        "sha256": "488661c90d114f11d7ed6b63db996df65362fb45660fbf37814c427b3a23d61a"
+        "sha256": "4630bff0464caeffef615ae99ce52ab1fff545bb1626f50250b33cabd1b8aa1e"
       }
     ]
   }
