@@ -7541,6 +7541,234 @@ function Driver:idle()
   self.skillDead = {}
 end
 
+-- ---- SETZER's table, played by hand for the kit suites (#319) ----------
+-- M.setzerBattle(plan, opts) is one battle, already loading or up, in
+-- which SETZER takes his turns from `plan` through the real menu: R for the
+-- entry's boost (only what the bank holds), A on the Slot command, the
+-- list's cursor onto the entry's row ($5c Slot, $59 Coin Toss, $5a Hired
+-- Help, $5b Jackpot), A, and A again at target select (Hired Help and
+-- Jackpot aim at the entry's `slot`, a monster slot, when it gives one).
+-- An entry { row = "defend" } is a Defend, which banks a point.  Everyone
+-- else Defends while the plan has turns left, then everyone, SETZER too,
+-- Fights its default target until the battle ends; the victory text is
+-- pressed through.  Nothing is written.
+--
+-- What it records, per played row, in M.vars.setzer (one record each),
+-- read at the action's own edges: `pre` at Ot6SetzerExec (the row's
+-- execution starts), `post` at Ot6ActionEnd for SETZER (it has ended):
+--   row, boost (the pending boost the row executed at), level, gil0/gil1,
+--   mp0/mp1, bank0/bank1 (bank0 before the charge), cost (TakeGil's A),
+--   mon0/mon1 = { [slot] = { hp, sh, brk, cls, present } }, targets (the
+--   monster mask the row hit, $b9 at the exec), chips = { {y, class} }
+--   (every Ot6ClassChip call during the action), divine0/divine1, and for a
+--   Jackpot dmg/b6/b7 (read as the effect sets the dice animation).
+-- The list as it was drawn, per opening: M.vars.setzerList = { { ids,
+-- qty, flags, mode } }; opts.onList(list, pend) runs at each opening.
+function M.setzerBattle(plan, opts)
+  opts = opts or {}
+  local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
+  local k, cool, listSeen = 1, 0, {}
+  -- One token per call: the callbacks a call registers act only while it
+  -- is the live one, so a suite that plays several battles (one call
+  -- each) never has an earlier call's watchers writing into this one's.
+  local token = nil
+  local Z = { rec = nil, entity = nil }
+  local function gil() return M.readWord(0x1860) + M.readByte(0x1862) * 65536 end
+  local function mons()
+    local t = {}
+    for s = 0, 5 do
+      t[s] = { hp = M.readWord(0x3BFC + s * 2), sh = M.readByte(0x3E40 + s * 2),
+        brk = M.readByte(0x3E90 + s * 2), cls = M.readByte(0x3EA4 + s * 2),
+        present = (M.readByte(0x3AA8 + s * 2) & 1) == 1 }
+    end
+    return t
+  end
+  local function pulse(btn)
+    if cool > 0 then cool = cool - 1; M.setPad({}); return end
+    M.setPad({ [btn] = true }); cool = 10
+  end
+  local function arm()
+    if token ~= nil then return end
+    token = {}
+    M.setzerToken = token
+    M.vars.setzer, M.vars.setzerList = {}, {}
+    local mine = token
+    local function live() return M.setzerToken == mine end
+    local a = M.sym("Ot6SetzerExec")
+    emu.addMemoryCallback(function()
+      if not live() or Z.entity == nil then return end
+      local row = M.readByte(0xB6)
+      if row < 0x59 or row > 0x5B then return end
+      local e = Z.entity
+      Z.rec = { row = row, boost = M.readByte(0x3E9D + e), level = M.readByte(0x3B18 + e),
+        gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
+        mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
+        entity = e, setzerBit = M.readByte(0x3018 + e) }
+    end, emu.callbackType.exec, a, a)
+    local t = M.sym("TakeGil")
+    emu.addMemoryCallback(function()
+      if live() and Z.rec and not Z.rec.cost then Z.rec.cost = emu.getState()["cpu.a"] & 0xffff end
+    end, emu.callbackType.exec, t, t)
+    local c = M.sym("Ot6ClassChip")
+    emu.addMemoryCallback(function()
+      if live() and Z.rec then
+        Z.rec.chips[#Z.rec.chips + 1] = { y = emu.getState()["cpu.y"] & 0xff, class = M.readByte(0x57B8) }
+      end
+    end, emu.callbackType.exec, c, c)
+    emu.addMemoryCallback(function(_, v)
+      if live() and Z.rec and Z.rec.row == 0x5B and v == 0x26 then
+        Z.rec.dmg, Z.rec.b6, Z.rec.b7, Z.rec.class = M.readWord(0x11B0), M.readByte(0xB6), M.readByte(0xB7),
+          M.readByte(0x57B8)
+      end
+    end, emu.callbackType.write, 0x0000B5, 0x0000B5)
+    local e = M.sym("Ot6ActionEnd")
+    emu.addMemoryCallback(function()
+      if not live() then return end
+      local x = emu.getState()["cpu.x"] & 0xff
+      if Z.rec and Z.entity and x == Z.entity then Z.rec.ended = M.frame end
+    end, emu.callbackType.exec, e, e)
+  end
+  -- the record closes on the frame after SETZER's Ot6ActionEnd, which has
+  -- charged the bank by then (its entry, where the hook sees it, has not)
+  local function close()
+    local r = Z.rec
+    if r and r.ended and M.frame > r.ended then
+      local x = Z.entity
+      do
+        r.gil1, r.mp1, r.bank1 = gil(), M.readWord(0x3C08 + x), M.readByte(0x3E9C + x)
+        r.mon1, r.divine1 = mons(), M.readByte(0x3ECB)
+        M.vars.setzer[#M.vars.setzer + 1] = r
+        Z.rec = nil
+        M.log(string.format("[setzer] f%d row $%02X at %d BP (L%d): gil %d -> %d (TakeGil %s), MP %d -> %d, "
+          .. "bank %d -> %d, divine %02X -> %02X, targets %02X, %d chip call(s)%s", M.frame, r.row, r.boost,
+          r.level, r.gil0, r.gil1, tostring(r.cost), r.mp0, r.mp1, r.bank0, r.bank1, r.divine0, r.divine1,
+          r.targets, #r.chips, r.dmg and string.format(", dice b6=%02X b7=%02X dmg %d class %02X", r.b6, r.b7,
+          r.dmg, r.class) or ""))
+        for s = 0, 5 do
+          local o, n = r.mon0[s], r.mon1[s]
+          if o.present then
+            M.log(string.format("[setzer]   slot %d: HP %d -> %d, shields %d -> %d, broken %d -> %d, row %02X",
+              s, o.hp, n.hp, o.sh, n.sh, o.brk, n.brk, o.cls))
+          end
+        end
+      end
+    end
+  end
+  local function fight(a, st)
+    if st == 0x05 then
+      if (M.readByte(0x890F + a) & 3) ~= 0 then pulse("up") else pulse("a") end
+    elseif st == 0x38 then pulse("a")
+    elseif st == 0x30 or st == 0x0E or st == 0x0A or st == 0x08 then pulse("b")
+    else M.setPad({}) end
+  end
+  local function defend(st)
+    if st == 0x05 then pulse("right") elseif st == 0x27 then pulse("a") else M.setPad({}) end
+  end
+  local function tick()
+    arm()
+    close()
+    if M.readByte(MENU) == 0 then
+      local alive = false
+      for s = 0, 5 do
+        if M.readWord(0x3BFC + s * 2) > 0 and (M.readByte(0x3AA8 + s * 2) & 1) == 1 then alive = true end
+      end
+      if not alive then pulse("a") else M.setPad({}) end
+      return
+    end
+    local a = M.readByte(ACTOR) & 3
+    local st = M.readByte(MSTATE)
+    local p = plan[k]
+    if M.readByte(0x3ED8 + a * 2) ~= 9 then
+      if p ~= nil then defend(st) else fight(a, st) end
+      return
+    end
+    Z.entity = a * 2
+    local entity = Z.entity
+    if p == nil then fight(a, st); return end
+    if p.row == "defend" then
+      if st == 0x27 and cool == 0 then k = k + 1 end
+      defend(st)
+      return
+    end
+    if st == 0x05 then
+      local want = math.min(p.boost or 0, M.readByte(0x3E9C + entity), 3)
+      if M.readByte(0x3E9D + entity) < want then pulse("r"); return end
+      local row
+      for r = 0, 3 do if M.readByte(0x202E + a * 12 + r * 3) == 0x0F then row = r end end
+      M.assertEq(row ~= nil, true, "SETZER's command list holds Slot")
+      local cur = M.readByte(0x890F + a) & 3
+      if cur ~= row then pulse(cur < row and "down" or "up"); return end
+      pulse("a")
+    elseif st == 0x30 then
+      if not listSeen[k] then
+        listSeen[k] = true
+        local l = { ids = {}, qty = {}, flags = {}, mode = M.readByte(0x6168) }
+        for i = 0, 7 do
+          l.ids[i] = M.readByte(0x4005 + i * 3)
+          l.qty[i] = M.readByte(0x4006 + i * 3)
+          l.flags[i] = M.readByte(0x4007 + i * 3)
+        end
+        M.vars.setzerList[#M.vars.setzerList + 1] = l
+        M.log(string.format("[setzer] f%d the table (mode %d): %s", M.frame, l.mode,
+          table.concat((function()
+            local t = {}
+            for i = 0, 7, 2 do t[#t + 1] = string.format("$%02X/%d/$%02X", l.ids[i], l.qty[i], l.flags[i]) end
+            return t
+          end)(), " ")))
+        if opts.onList then opts.onList(l, M.readByte(0x3E9D + entity)) end
+        if opts.shot then M.screenshot(opts.shot .. "_" .. k) end
+      end
+      local want
+      for i = 0, 7 do if M.readByte(0x4005 + i * 3) == p.row then want = i end end
+      M.assertEq(want ~= nil, true, string.format("the table holds row $%02X", p.row))
+      local cc, cr = M.readByte(0x8963 + a), M.readByte(0x8967 + a)
+      if cc ~= want % 2 then pulse(want % 2 > cc and "right" or "left"); return end
+      if cr ~= want // 2 then pulse(want // 2 > cr and "down" or "up"); return end
+      if p.refused then
+        -- the row must be refused: A buzzes and the list stays up
+        p.presses = (p.presses or 0) + (cool == 0 and 1 or 0)
+        if p.presses > 3 then
+          M.log(string.format("[setzer] f%d row $%02X refused %d A presses; the list stays up -- backing out",
+            M.frame, p.row, p.presses - 1))
+          p.refusedSeen = true
+          k = k + 1
+          pulse("b")
+          return
+        end
+      end
+      pulse("a")
+    elseif st == 0x38 then
+      if p.slot ~= nil then
+        local want = 1 << p.slot
+        local mons = M.readByte(0x7B7E)
+        if mons ~= want and (p.spin or 0) < 12 then
+          if cool == 0 then p.spin = (p.spin or 0) + 1 end
+          pulse(({ "down", "up", "right", "left" })[1 + ((p.spin or 0) // 3) % 4])
+          return
+        end
+      end
+      if cool == 0 then k = k + 1 end
+      pulse("a")
+    elseif st == 0x08 then
+      if cool == 0 and M.readByte(0x7B92) == 0 then k = k + 1 end
+      pulse("a")
+    elseif st == 0x27 then
+      pulse("a")
+    else
+      M.setPad({})
+    end
+  end
+  return M.seqStep({
+    M.waitUntil(function() return M.battleActive() end, 1200, "the battle is up", 2),
+    M.driveUntil(function() return not M.battleLoadStarted() end, opts.maxFrames or 40000, {
+      { tick = function() tick(); return "frame" end, reset = function() end },
+    }, "the battle with SETZER's plan ends"),
+    M.call(function()
+      M.log(string.format("[setzer] the battle is over: %d row(s) played of %d planned", #M.vars.setzer, #plan))
+    end),
+  })
+end
+
 -- ---- what leaves a battle alive, and what the battle paid (#255) ----
 -- Read every battle frame once the seats are written (tick 6): the
 -- members seated and their experience, then each frame WinBattle's own
