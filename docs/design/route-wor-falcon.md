@@ -1899,7 +1899,8 @@ has risen ...): expected 1, read 0`, `ram $1F62 & $FF (the Falcon parked at
 x 25 ...): expected 0x19, read 0x1A`, each `VIOLATED -- 1 field(s) differ`.
 The flashback's `$01F0-$01F3` are the scene's own temporaries (measured 0
 again at the landing; the first contract pinned `$01F3` and failed on it,
-`dev/gl1/k0_s0.log`).
+`dev/gl1/k0_s0.log`). The ROM clears switches `$01F0-$01FF` on every new
+map (`ff6/src/field/init.asm:470-471`, `stz $1ebe / stz $1ebf`).
 
 What the plan did not know:
 
@@ -1965,7 +1966,7 @@ The policy (`settleDigit`): read the digit after the chest and again at
 the grave; while L? Pearl would hit someone (or the digit is 0, whose
 divide-by-zero is unmeasured), walk the room for a battle's purse, at most
 8 battles. On the policy arm (`var1/`) the digit after the chest was 1 on 4
-of 10 draws and 9 or 7 on the rest; the walk cost 1-2 battles each, and on
+of 10 draws and 9 or 7 on the rest; the walk cost 1-3 battles each (K=1 took 3: two purses ending in 0, then a Mad Oscar), and on
 one draw (K=7) the walk to the grave moved a safe 9 to 3 (`at the grave:
 gil 277673, last digit 3: L? Pearl would hit CELES L33, SABIN L33`) and one
 grave-room battle moved it on. Every press of the grave on the policy arm
@@ -2025,7 +2026,7 @@ loss is a game over (`FAIL: GAME OVER fired`), counted, not retried.
 | lever: the Czarina Ring (Safe, Shell) for CELES's Ribbon (`var1/` K=0-3, `dullczar/`) | 32 | 20 | 32 | 0 | 0 | 21 | 5428 / 6184 / 10771 |
 
 On the same four entry states the route's own arm spent 37 Potions and 2
-Fenix Downs with 4 deaths over its 32 runs; the Czarina arm, 21, 0 and 0
+Fenix Downs with 2 deaths over its 32 runs (both in var1_k0_s0_w9); the Czarina arm, 21, 0 and 0
 (the relic's menu moves the press's frame, so the keys differ). Both
 losses in the control are wipes late in long fights, the party worn down
 with little boost banked (`dullctl/var0_k1_s0_w9.log`: `[death] f+13359
