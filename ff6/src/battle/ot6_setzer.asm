@@ -783,6 +783,30 @@ Ot6HireWeapTbl:
         .byte   $14+1, $14+1, $22+1, $46+1     ; Leo: crystal, crystal, gold lance, morning star
         .byte   $26+1, $2b+1, $26+1, $44+1     ; Shadow: kodachi, ashura, kodachi, flail
 
+; [ a strike's animation, the slot's step-back flag kept ]
+; w7e61ae (a byte a slot): the Fight animation's forward step sets it
+; (_c1b86b) and the turn's step back (GfxCmd_0d) moves every slot that has
+; it back 24 px.  The hire walks off from wherever the strike left it and
+; Setzer walks back to his own home, so the step back must not move him
+; again: the flag is put back as it was around the strike, the shape
+; vanilla's Jump command animation uses (inc w7e61ae / FightCmdAnim /
+; stz w7e61ae).  a8/i16, db=$7e.  clobbers a and y.
+.macro hire_strike target
+        ldy     #$0001
+        lda     ($78),y         ; the attacker's slot
+        longa
+        and     #$0003
+        tay
+        shorta
+        lda     $61ae,y         ; w7e61ae
+        pha
+        phy
+        jsr_c1  target
+        ply
+        pla
+        sta     $61ae,y
+.endmacro
+
 .proc Ot6CoinAnim
         .a8
         .i16
@@ -837,8 +861,9 @@ Ot6HireWeapTbl:
 :       lda     $03,s
         and     #$70
         cmp     #$40
-        beq     @dog
-        lsr
+        bne     :+
+        jmp     @dog
+:       lsr
         lsr
         lsr
         lsr
@@ -875,7 +900,7 @@ Ot6HireWeapTbl:
         lda     #$00
         sta     ($76),y         ; the right hand (byte 2)
         phx
-        jsr_c1  FightCmdAnim    ; the strike
+        hire_strike FightCmdAnim        ; the strike
         plx
         ldy     #$0003
         pla
@@ -905,7 +930,7 @@ Ot6HireWeapTbl:
         lda     #$fc            ; Interceptor's counterattack
         sta     ($76),y
         phx
-        jsr_c1  MagicCmdAnim
+        hire_strike MagicCmdAnim
         plx
         ldy     #$0002
         pla
