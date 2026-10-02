@@ -464,13 +464,36 @@ def _route_coords(names):
         return {}
 
 
+# Keep the screen on while a page is shown (the Screen Wake Lock API), e.g.
+# a laptop's display left showing the grid.  A browser drops the lock when
+# the tab is hidden, and some want a user gesture first, so it is asked for
+# again on return, on any click, and once a minute.
+WAKE_JS = """<script>
+(function () {
+  if (!('wakeLock' in navigator)) return;
+  let lock = null;
+  async function hold() {
+    if (lock || document.visibilityState !== 'visible') return;
+    try {
+      lock = await navigator.wakeLock.request('screen');
+      lock.addEventListener('release', () => { lock = null; });
+    } catch (e) { lock = null; }
+  }
+  document.addEventListener('visibilitychange', hold);
+  document.addEventListener('click', hold);
+  setInterval(hold, 60000);
+  hold();
+})();
+</script>"""
+
+
 def write_pages(webroot):
     # index.html is the worker grid (default landing); the classic
     # single-worker detail moves to live1.html
     with open(os.path.join(webroot, "index.html"), "w") as f:
-        f.write(GRID_PAGE)
+        f.write(GRID_PAGE + WAKE_JS)
     with open(os.path.join(webroot, "live1.html"), "w") as f:
-        f.write(DETAIL_PAGE)
+        f.write(DETAIL_PAGE + WAKE_JS)
     try:
         states = runpy.run_path(
             os.path.join(ROOT, "tools/tests/savestate_graph.py"))["STATES"]
@@ -479,7 +502,7 @@ def write_pages(webroot):
         coords = {}
     baked = {n: [round(x, 1), round(y, 1)] for n, (x, y) in coords.items()}
     with open(os.path.join(webroot, "progress.html"), "w") as f:
-        f.write(PROGRESS_PAGE.replace("__COORDS__", json.dumps(baked)))
+        f.write(PROGRESS_PAGE.replace("__COORDS__", json.dumps(baked)) + WAKE_JS)
 
 
 def ensure_map(webroot):
