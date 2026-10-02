@@ -16,10 +16,13 @@
 --      is put on from the bag;
 --   3. the arc's threats (H.ARC_THREATS["wor-falcon"]): the widest guard
 --      goes to the caster, as before #351, and no ward comes out of the bag;
---   4. the Exp. Egg, under each set: on the member furthest behind on levels
---      when one is behind, and never in place of a threat-critical relic --
---      a ward for that fight's damage, or a guard adding a threatened status
---      to its wearer; opts.egg = false leaves it out of the swaps.
+--   4. the Exp. Egg, under each set, read against the same threats' plan
+--      with opts.egg = false (the slots before step 3b): on the member
+--      furthest behind on levels when one is behind, only into a free slot
+--      or over a guard or spare ward that adds no threatened status to its
+--      wearer -- never over an acting relic -- and, arming for a boss
+--      (Dullahan's threats carry boss = true), not at all while the bag
+--      holds another relic the member can wear.
 -- The negative controls (a rule switched off, each turning this red) are
 -- recorded in the commit that adds the file.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -64,8 +67,11 @@ local function covers(id, threats)
 end
 local checked = 0
 
--- the Egg's two promises under one plan
-local function eggChecks(plan, threats, what, egg)
+-- the Egg's promises under one plan, read against the same threats' plan
+-- with the Egg left out (opts.egg = false: what the rule puts in each slot
+-- before step 3b; the fixture's SETZER already wears the Egg, so what he
+-- wears is no baseline)
+local function eggChecks(plan, plan0, threats, what)
   local top, low = 0, nil
   for _, p in ipairs(MEMBERS) do if level(p[1]) > top then top = level(p[1]) end end
   for _, p in ipairs(MEMBERS) do
@@ -73,37 +79,61 @@ local function eggChecks(plan, threats, what, egg)
   end
   for _, p in ipairs(MEMBERS) do
     for s = 4, 5 do
-      local before, after = relicAt(p[1], s), planned(plan, p[1], s)
-      if after == EGG and before ~= EGG and before ~= 0xFF then
-        -- a swap: never over a threat-critical relic
-        H.assertEq(egg ~= false, true, string.format("%s: with opts.egg = false the Egg replaces nothing (%s's slot %d, $%02X)",
-          what, p[2], s, before))
-        H.assertEq(shell(before) and threats.magic == true, false, string.format(
-          "%s: the Egg did not displace %s's ward $%02X against this fight's magic", what, p[2], before))
+      local base, after = planned(plan0, p[1], s), planned(plan, p[1], s)
+      if after == EGG and base ~= EGG and base ~= 0xFF then
+        -- a displacement: never over a threat-critical relic
+        H.assertEq(shell(base) and threats.magic == true, false, string.format(
+          "%s: the Egg did not displace %s's ward $%02X against this fight's magic", what, p[2], base))
         local others = 0
         local o = planned(plan, p[1], s == 4 and 5 or 4)
         if o ~= nil and o ~= 0xFF then others = covers(o, threats) end
-        H.assertEq(covers(before, threats) & ~others, 0, string.format(
+        H.assertEq(covers(base, threats) & ~others, 0, string.format(
           "%s: the Egg did not displace %s's guard $%02X covering a threatened status nothing else on %s covers",
-          what, p[2], before, p[2]))
+          what, p[2], base, p[2]))
         H.assertEq(level(p[1]) < top, true, string.format(
           "%s: the Egg displaced a relic only on a member behind on levels (%s L%d; the party's highest L%d)",
           what, p[2], level(p[1]), top))
+        -- never over an acting relic (the coordinator's call on the review
+        -- of f8f9ad66): only a guard or a spare ward gives its slot up
+        local bc = H.relicClass(base, threats)
+        H.assertEq(bc ~= nil and (bc.aff == "guard" or bc.aff == "spare"), true, string.format(
+          "%s: the Egg displaced %s's $%02X, a guard or a spare (not an acting relic: %s)", what, p[2], base,
+          bc and tostring(bc.aff) or "unranked"))
+        H.assertEq(threats.boss == true, false, string.format(
+          "%s: no Egg swap when arming for a boss (%s's slot %d, $%02X)", what, p[2], s, base))
         checked = checked + 1
       end
     end
   end
-  if low ~= nil and egg ~= false and owned(function(id) return id == EGG end) then
+  if threats.boss then
+    -- arming for a boss the Egg keeps a slot only when nothing else the
+    -- member can wear is left: here the bag holds another relic for him
+    for _, p in ipairs(MEMBERS) do
+      for s = 4, 5 do
+        if planned(plan, p[1], s) == EGG then
+          local other = bagHas(function(id)
+            local cl = id ~= EGG and H.relicClass(id, threats) or nil
+            return cl ~= nil and not cl.hands and wears(p[1], id)
+          end)
+          H.assertEq(other, nil, string.format("%s: arming for a boss, the Egg is planned on %s's slot %d only "
+            .. "when the bag holds no other relic %s can wear", what, p[2], s, p[2]))
+          checked = checked + 1
+        end
+      end
+    end
+  end
+  if low ~= nil and owned(function(id) return id == EGG end) then
     local on = planned(plan, low[1], 4) == EGG or planned(plan, low[1], 5) == EGG
-    -- the lowest member has a slot the Egg may take: empty, or holding a
-    -- relic that is neither a weapon-hands relic, a ward for this fight's
-    -- magic, nor a guard adding a threatened status over its other slot
+    -- the lowest member has a slot the Egg may take in the Egg-less plan:
+    -- empty, the Egg itself (step 4 kept it), or a guard or spare that adds
+    -- no threatened status over its other slot
     local open = false
     for s = 4, 5 do
-      local id = relicAt(low[1], s)
-      local other = relicAt(low[1], s == 4 and 5 or 4)
+      local id = planned(plan0, low[1], s)
+      local other = planned(plan0, low[1], s == 4 and 5 or 4)
+      local cl = id ~= 0xFF and H.relicClass(id, threats) or nil
       if id == 0xFF or id == EGG then open = true
-      elseif (prop(id, 12) & 0x38) == 0 and not (shell(id) and threats.magic)
+      elseif cl ~= nil and (cl.aff == "guard" or cl.aff == "spare")
          and (covers(id, threats) & ~(other ~= 0xFF and covers(other, threats) or 0)) == 0 then
         open = true
       end
@@ -111,7 +141,7 @@ local function eggChecks(plan, threats, what, egg)
     H.log(string.format("[relicplan] %s: the Egg %s %s (L%d, behind the party's L%d)%s", what,
       on and "is planned on" or "could not go on", low[2], level(low[1]), top,
       open and "" or "; every slot holds something it may not displace"))
-    if open then
+    if open and not threats.boss then
       local any = false
       for _, p in ipairs(MEMBERS) do
         if level(p[1]) < top and (planned(plan, p[1], 4) == EGG or planned(plan, p[1], 5) == EGG) then any = true end
@@ -152,7 +182,8 @@ H.run({ maxFrames = 3000 }, {
           "Dullahan's magic: %s's slot %d is not given to a plain guard ($%02X) over the ward", caster[2], s, id))
       end
     end
-    eggChecks(plan, dull, "Dullahan", nil)
+    eggChecks(plan, H.relicPlan(MEMBERS, { threats = dull, tag = "relicplan dullahan, egg off", egg = false }),
+      dull, "Dullahan")
 
     -- 2. the same with no magic named: no ward from the bag
     local nomagic = { s1 = dull.s1, s2 = dull.s2 }
@@ -166,7 +197,8 @@ H.run({ maxFrames = 3000 }, {
         end
       end
     end
-    eggChecks(plan, nomagic, "no magic", nil)
+    eggChecks(plan, H.relicPlan(MEMBERS, { threats = nomagic, tag = "relicplan no magic, egg off", egg = false }),
+      nomagic, "no magic")
 
     -- 3. the arc's threats: the widest guard to the caster, no ward from the bag
     local arc = H.ARC_THREATS["wor-falcon"]
@@ -199,9 +231,8 @@ H.run({ maxFrames = 3000 }, {
         end
       end
     end
-    eggChecks(plan, arc, "the arc", nil)
-    plan = H.relicPlan(MEMBERS, { threats = arc, tag = "relicplan arc, egg off", egg = false })
-    eggChecks(plan, arc, "the arc, opts.egg = false", false)
-    H.log(string.format("[relicplan] PASSED: per-fight wards, the arc's widest guard and %d Egg swap(s) checked", checked))
+    eggChecks(plan, H.relicPlan(MEMBERS, { threats = arc, tag = "relicplan arc, egg off", egg = false }),
+      arc, "the arc")
+    H.log(string.format("[relicplan] PASSED: per-fight wards, the arc's widest guard and %d Egg check(s)", checked))
   end),
 })
