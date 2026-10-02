@@ -89,20 +89,21 @@ local function standing()
   return m
 end
 
--- the weakest standing monster slot, read when the cursor needs it
-local function weakest()
+-- the standing monster slot with the least (or most) HP, read when the
+-- cursor needs it
+local function pick(most)
   local best, hp = nil, nil
   local m = standing()
   for s = 0, 5 do
     if (m >> s) & 1 == 1 then
       local h = H.readWord(0x3BFC + s * 2)
-      if hp == nil or h < hp then best, hp = s, h end
+      if hp == nil or (most and h > hp) or (not most and h < hp) then best, hp = s, h end
     end
   end
   return best
 end
-local function aimed(t)
-  return setmetatable(t, { __index = function(_, k) if k == "slot" then return weakest() end end })
+local function aimed(t, most)
+  return setmetatable(t, { __index = function(_, k) if k == "slot" then return pick(most) end end })
 end
 
 -- ---- the instrument ------------------------------------------------------
@@ -161,14 +162,15 @@ local function judge(a)
   if a.cmd == 0x0F and a.row and a.row >= COIN and a.row <= JACKPOT and a.boost >= 1 then
     H.assertEq(#a.passes, 1 + a.boost, string.format("E: %s at %d BP runs 1 + boost passes", a.kind, a.boost))
   end
-  local fam = a.passes[1].b5
+  -- the action's own passes: not a weapon's follow-up spell ($b5 = $02,
+  -- which keeps vanilla's "same target"; the rows' own $b5 moves with their
+  -- animation, Jackpot's to the dice' $26)
   local famN = 0
-  for _, q in ipairs(a.passes) do if q.b5 == fam then famN = famN + 1 end end
+  for _, q in ipairs(a.passes) do if q.b5 ~= 0x02 then famN = famN + 1 end end
   for p, q in ipairs(a.passes) do
-    -- a pass after the first, of the action's own command (a weapon's
-    -- follow-up spell, $b5 = $02, keeps vanilla's "same target"), starting
-    -- on monsters only, while a monster stands
-    if p >= 2 and q.b5 == fam and q.post ~= nil and q.pre ~= 0 and (q.pre & 0xFF) == 0 and q.stand ~= 0 then
+    -- a pass after the first, of the action's own, starting on monsters
+    -- only, while a monster stands
+    if p >= 2 and q.b5 ~= 0x02 and q.post ~= nil and q.pre ~= 0 and (q.pre & 0xFF) == 0 and q.stand ~= 0 then
       local pre, post, stand = q.pre >> 8, q.post >> 8, q.stand
       local fell = pre & ~stand & 0x3F
       local what = string.format("%s by e%d at %d BP, pass %d of %d (key %s; started on $%02X, standing $%02X, "
@@ -267,31 +269,57 @@ local function judgeNew()
 end
 
 -- ---- the walk ------------------------------------------------------------
-local PLANS = {
-  { kind = "hire", plan = function() return { { row = "defend" }, { row = "defend" }, aimed({ row = HIRE, boost = 3 }) } end },
-  { kind = "jackpot", plan = function() return { { row = "defend" }, { row = "defend" }, aimed({ row = JACKPOT, boost = 3 }) } end },
-  { kind = "resplit", plan = function() return { aimed({ row = HIRE, boost = 0 }), { row = "defend" }, { row = COIN, boost = 3 } } end },
-}
-local MAXTRIES = 2
-local tries = {}
-local function count(t) local n = 0 for _ in pairs(t) do n = n + 1 end return n end
-local function nextPlan()
-  for _, p in ipairs(PLANS) do
-    if count(seen[p.kind]) == 0 then
-      tries[p.kind] = tries[p.kind] or 0
-      H.assertEq(tries[p.kind] < MAXTRIES, true, string.format("%s: the draw this needs (a pass whose body fell "
-        .. "while another stands) within %d crowd plans", p.kind, MAXTRIES))
-      tries[p.kind] = tries[p.kind] + 1
-      return p
-    end
-  end
-  return nil
+-- SETZER's plans, one kind at a time, each played from the crowd battle's
+-- opening snapshot (TESTING.md: branch one legitimately reached state into
+-- experiments) on SETZER's first turn, or his first two for the re-split.
+-- One battle gives a kind two candidates: the rest of the party Defends
+-- until SETZER has thrown, or Fights (unboosted), which moves the battle RNG
+-- and the bodies' HP before his turn.  A kind that misses its draw in both
+-- -- the kill came on the last pass, a counter felled the crowd, SETZER was
+-- turned to a zombie before his turn -- tries again in the next crowd, up
+-- to MAXCROWDS.  What does not vary a throw (measured): the frames the
+-- party stands before the first input (eight stands of 0-840 frames gave
+-- one Jackpot throw: the battle waits while a command window is open), and
+-- SETZER Defending first to bank more (in the tomb's crowds a second turn
+-- rarely came: he was felled or turned to a zombie first).
+local function aim(e, how)
+  if how == nil then return e end
+  return aimed(e, how == "strong")
 end
+local function cands(fn)
+  return { { others = "defend", fn = fn }, { others = "fight", fn = fn } }
+end
+local MAXCROWDS = 4
+local PLANS = {
+  -- a hire kills an Exoray (1,200 HP; 1,550 shielded at L31), so the next
+  -- must find another body
+  { kind = "hire", cands = cands(function() return { aim({ row = HIRE, boost = 1 }, "weak") } end) },
+  -- a face of 3 or more kills any body of the crowd at full HP; the throw
+  -- goes to the default target (an aim the cursor walk cannot reach falls
+  -- back to confirming where the cursor stands: once a party member)
+  { kind = "jackpot", cands = cands(function() return { { row = JACKPOT, boost = 1 } } end) },
+  -- a hire takes most of the strongest body (2,058 -> 458 on a
+  -- PowerDemon), so a toss over the group fells it and the next splits
+  { kind = "resplit", cands = cands(function() return { aim({ row = HIRE, boost = 0 }, "strong"),
+    { row = COIN, boost = 2 } } end) },
+}
+local tries, throws, crowdsFor = {}, {}, {}
+local function count(t) local n = 0 for _ in pairs(t) do n = n + 1 end return n end
+local function pending()
+  local t = {}
+  for _, p in ipairs(PLANS) do if count(seen[p.kind]) == 0 then t[#t + 1] = p end end
+  return t
+end
+local FIGHTAFTER = 8
+local setzerDoneAt = nil
 local function allSeen()
-  for _, k in ipairs({ "hire", "jackpot", "resplit", "fight" }) do
-    if count(seen[k]) == 0 then return false end
-  end
-  return true
+  if #pending() > 0 then return false end
+  setzerDoneAt = setzerDoneAt or battles
+  if count(seen.fight) > 0 then return true end
+  H.assertEq(battles - setzerDoneAt < FIGHTAFTER, true, string.format("fight: the draw this needs (a boosted swing "
+    .. "whose body fell while another stands) within %d battles after SETZER's (none in %d battles)", FIGHTAFTER,
+    battles))
+  return false
 end
 
 local W, since, battles, crowds = nil, 0, 0, 0
@@ -310,36 +338,87 @@ local function crowdHere()
   return alive >= 2 and weak >= 1, alive
 end
 
+-- one battle: SETZER's pending kinds from its opening snapshot (a crowd past
+-- PASS_SKIP), then the fight driver to its end
 local function play()
-  local step, F, plan = nil, nil, nil
+  local S = {}
+  local function fresh() S = { phase = "start" } end
+  fresh()
   return { tick = function()
-    if step == nil and F == nil and plan == nil then
+    if S.phase == "start" then
       local crowd, alive = crowdHere()
-      local p = (crowd and crowds >= PASS_SKIP) and nextPlan() or nil
+      S.kinds = (crowd and crowds >= PASS_SKIP) and pending() or {}
       H.log(string.format("[%s] battle %d, key %s: %d monster(s)%s -- %s", TAG, battles, key, alive,
-        crowd and ", a crowd" or "", p and ("SETZER plays " .. p.kind) or "fight it out"))
+        crowd and ", a crowd" or "", #S.kinds > 0 and ("SETZER plays " .. (function()
+          local t = {} for _, p in ipairs(S.kinds) do t[#t + 1] = p.kind end return table.concat(t, ", ") end)())
+        or "fight it out"))
       if crowd then crowds, since = crowds + 1, 0 end
-      if p then
-        plan = p
-        step = H.setzerBattle(p.plan(), { untilPlanDone = true })
-      end
+      if #S.kinds == 0 then S.phase = "fight" else S.req, S.phase = H.requestSaveState(), "snap" end
     end
-    if step then
-      local r = step:tick()
+    if S.phase == "snap" then
+      if not S.req.done then return "frame" end
+      H.checkReq(S.req, "the crowd battle's opening snapshot")
+      S.blob, S.ki, S.try, S.phase = S.req.blob, 1, 1, "stand"
+    end
+    if S.phase == "restore" then
+      if not S.req.done then return "frame" end
+      H.checkReq(S.req, "restoring the crowd battle's opening snapshot")
+      open = {}
+      S.phase = "stand"
+    end
+    if S.phase == "stand" then
+      local p = S.kinds[S.ki]
+      local c = p.cands[S.try]
+      S.mark = #acts
+      H.log(string.format("[%s] %s, crowd %d of %d, candidate %d of %d: the party %ss until SETZER has thrown",
+        TAG, p.kind, (crowdsFor[p.kind] or 0) + 1, MAXCROWDS, S.try, #p.cands, c.others))
+      S.step, S.phase = H.setzerBattle(c.fn(c), { untilPlanDone = true, others = c.others }), "plan"
+    end
+    if S.phase == "plan" then
+      local r = S.step:tick()
       judgeNew()
       if r ~= "done" then return r end
-      step = nil
-      if not H.battleLoadStarted() then judgeNew(); plan = nil; return "done" end
+      local p = S.kinds[S.ki]
+      local sig = {}
+      for n = S.mark + 1, #acts do
+        if acts[n].cmd == 0x0F then
+          for _, q in ipairs(acts[n].passes) do sig[#sig + 1] = string.format("%04X>%04X", q.pre, q.post or 0) end
+        end
+      end
+      sig = table.concat(sig, " ")
+      throws[p.kind] = throws[p.kind] or {}
+      if sig ~= "" then throws[p.kind][sig] = true end   -- "": SETZER never threw
+      tries[p.kind] = (tries[p.kind] or 0) + 1
+      local met = count(seen[p.kind]) > 0
+      H.log(string.format("[%s] %s, try %d: %s | %s | %d distinct throw(s) so far", TAG, p.kind, S.try,
+        met and "the draw is met" or "no draw", sig, count(throws[p.kind])))
+      if met then
+        S.ki, S.try = S.ki + 1, 1
+      elseif S.try < #p.cands then
+        S.try = S.try + 1
+      else
+        crowdsFor[p.kind] = (crowdsFor[p.kind] or 0) + 1
+        H.assertEq(crowdsFor[p.kind] < MAXCROWDS, true, string.format("%s: the draw this needs (a pass whose body "
+          .. "fell while another stands) within %d crowds, %d candidates each (%d distinct throws)", p.kind,
+          MAXCROWDS, #p.cands, count(throws[p.kind])))
+        S.ki, S.try = S.ki + 1, 1
+      end
+      if S.ki <= #S.kinds then
+        S.req, S.phase = H.requestLoadState(S.blob), "restore"
+        return "frame"
+      end
+      S.phase = "fight"
+      if not H.battleLoadStarted() then return "done" end
     end
-    if F == nil then
-      F = H.newFightDriver(TAG .. " fight " .. battles,
+    if S.F == nil then
+      S.F = H.newFightDriver(TAG .. " fight " .. battles,
         { tactical = true, boost = true, items = true, bank = 0, healPercent = 55, setzer = false })
     end
     judgeNew()
-    if not H.battleLoadStarted() then F, plan = nil, nil; return "done" end
-    F.frame()
+    if not H.battleLoadStarted() then return "done" end
+    S.F.frame()
     return "frame"
-  end, reset = function() step, F, plan = nil, nil, nil end }
+  end, reset = function() fresh() end }
 end
 
 local steps = {
