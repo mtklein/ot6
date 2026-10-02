@@ -35,11 +35,12 @@
 -- vanilla's Retarget turns on the party by the Muddle bit and by $3395
 -- (Charm) alike, the one branch check G holds shut.
 -- Negative controls (build/attempts/wt/pass-retarget/round2/mutants/): a
--- ROM whose pass spreads to the party side fails H here; one whose OT6
--- pass falls through to vanilla's Retarget fails F here (the muddled
--- SETZER's second swing went to the party while a monster stood); one
--- that retargets to the party side fails G in battle_passretarget.  The
--- ROM before the fix fails A here (its second swing landed nowhere).
+-- ROM whose pass spreads to the party side when a party member fell fails
+-- H here; one whose OT6 pass falls through to vanilla's Retarget fails F
+-- here (the muddled SETZER's second swing went to the party while a
+-- monster stood); one that sends the pass to the party once no monster
+-- stands fails G here.  The ROM before the fix fails A here (its second
+-- swing landed nowhere).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 

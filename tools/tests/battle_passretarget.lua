@@ -132,9 +132,9 @@ end
 --     first turn on the crowd (the damage arithmetic above), so a crowd
 --     misses only when he cannot act first; met in the first crowd in 8 of
 --     8 variations;
---   jackpot, 6: a face of 3+ is 4 of 6; met in 8 of 11 crowds tried, so a
---     miss within six is about (3/11)^6 = 0.04%;
---   resplit, 10: met in 8 of 9 crowds tried (the blind-aim sweep before it:
+--   jackpot, 6: a face of 3+ is 4 of 6; met in 8 of 9 crowds tried, so a
+--     miss within six is about (1/9)^6, under 0.001%;
+--   resplit, 10: met in 8 of 14 crowds tried (the blind-aim sweep before it:
 --     6 of 12 by key); at the worse rate a miss within ten is about
 --     0.5^10 = 0.1%.
 local function aim(e, how)
@@ -161,10 +161,10 @@ local function pending()
 end
 local W, since, battles, crowds = nil, 0, 0, 0
 -- a boosted Fight's draw (a swing whose body fell while another stands)
--- within FIGHTAFTER battles of SETZER's kinds: the sweep met it by battle 4
--- in every variation, at worst one battle after SETZER's kinds were done
--- (k0: done in battle 3, the draw in battle 4); 8 is a stated margin over
--- that worst case, not a measured tail
+-- within FIGHTAFTER battles of SETZER's kinds: the sweep met it before
+-- SETZER's kinds were done in seven variations and one battle after in the
+-- eighth (k0: done in battle 2, the draw in battle 3); 8 is a stated margin
+-- over that worst case, not a measured tail
 local FIGHTAFTER = 8
 local setzerDoneAt = nil
 local function allSeen()
