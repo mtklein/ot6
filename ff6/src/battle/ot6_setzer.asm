@@ -757,9 +757,12 @@ OT6_SW_SHADOW_SAVED  = $1e80 + ($37d >> 3)
 
 ; [ the slot's pose at the action's start ]
 ; Ot6SetzerExec, a Hired Help row: SETZER's wCharGfxData $61bf/$61c0/$61c1
-; (the base, secondary and override graphical actions) into OT6_HIREPOSE,
-; which Ot6CoinAnim writes back once he is home after the last hire -- the
-; walks and the strike leave their own there.  y = the attacker (a
+; (the base, secondary and override graphical actions) into OT6_HIREPOSE.
+; Ot6CoinAnim writes $61c0/$61c1 back once he is home after the last hire --
+; the walks and the strike leave their own there (the strike's $61c1 = 4
+; outlived the action, the review of 83c38a58 found).  $61bf is kept for the
+; record only: the engine moves it itself at the turn's end, as it does
+; after vanilla's coins ($0B -> $06 on the kit-setzer base too).  y = the attacker (a
 ; character: entity x 16 = slot x 32), a8, i8, db=$7e.  preserves a, x, y.
 .proc Ot6HirePoseSave
         .a8
@@ -1048,12 +1051,11 @@ Ot6HireBitTbl:
         shorta0
         lda     #$02            ; walking toward them: Setzer comes back home
         jsr     Ot6HireWalk
-        lda     f:$7e0000+OT6_HIREPOSE
-        sta     $61bf,x         ; and stands as he stood at the action's start
         lda     f:$7e0000+OT6_HIREPOSE+1
-        sta     $61c0,x
+        sta     $61c0,x         ; and stands as he stood at the action's start
         lda     f:$7e0000+OT6_HIREPOSE+2
-        sta     $61c1,x
+        sta     $61c1,x         ;   ($61bf, the base action, is the engine's:
+                                ;   it moves at the turn's end as vanilla's)
 :       longa
         pla                     ; home
         shorta0

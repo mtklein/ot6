@@ -8403,7 +8403,9 @@ function M.hireCrewCheck(r, tag)
   M.assertEq(done.oy, ex.oy, tag .. ": SETZER's y offset as it was")
   M.assertEq(done.x, ex.x, tag .. ": SETZER stands where he stood (screen x)")
   M.assertEq(done.y, ex.y, tag .. ": SETZER stands where he stood (screen y)")
-  M.assertEq(done.pose.bf, ex.pose.bf, tag .. ": $61bf (base action) as it was")
+  -- $61bf (the base action) is the engine's: it moves at the turn's end as
+  -- after vanilla's coins ($0B -> $06 on the kit-setzer base, build/attempts/
+  -- wt/hire-sprite-review/restore_base_*), so it is logged above, not held
   M.assertEq(done.pose.c0, ex.pose.c0, tag .. ": $61c0 (secondary action) as it was")
   M.assertEq(done.pose.c1, ex.pose.c1, tag .. ": $61c1 (graphical action) as it was")
   M.assertEq(done.shown, true, tag .. ": SETZER's slot is shown")

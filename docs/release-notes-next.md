@@ -40,8 +40,11 @@ weapon type that monster is weak to (slashing, piercing or bludgeoning),
 so Setzer can break what his own weapon can't; each Boost Point hires one
 more blow, paid for and chipping like the first. You see each hire: Setzer
 steps aside and a merchant walks in to strike, and each Boost Point brings
-someone tougher, an Imperial soldier, then General Leo, then Shadow (or,
-if Shadow is already fighting beside you, his dog Interceptor). Both cost Gil instead of
+someone tougher, an Imperial soldier, then General Leo, then a fourth: Shadow
+himself if he's free to hire, his dog Interceptor if Shadow is fighting in your
+party (with nothing left to hit, the dog doesn't appear), or a ghost from the
+Phantom Train if Shadow was never recruited or was left behind on the Floating
+Continent. Both cost Gil instead of
 MP. Once he rejoins in the World of Ruin he also has **Jackpot**: for 99
 MP, once a battle, three dice come up matching for a hit that can be
 anything from a dud to the maximum, and each Boost Point rolls the dice
