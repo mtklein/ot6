@@ -114,7 +114,7 @@ public final class MainActivity extends Activity {
         box.removeAllViews();
         SharedPreferences p = Patcher.prefs(this);
         String v = Patcher.version(this);
-        text("OT6 Patcher v" + v, 22);
+        text(getApplicationInfo().loadLabel(getPackageManager()) + " v" + v, 22);
         if (busy) text("Working…", 16);
         if (note != null) text(note, 16);
         String src = p.getString("source", null), tree = p.getString("tree", null);

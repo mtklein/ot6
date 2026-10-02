@@ -175,7 +175,7 @@ replace it.
 
 **Test builds** install beside a player's copy when built with
 `OT6_APK_PACKAGE=io.github.mtklein.ot6patcher.test`: their own settings,
-their own update broadcasts.
+their own update broadcasts, and the label "OT6 Patcher TEST".
 
 Only the ROMs, `build/`, `build.ninja`, `tools/Mesen.app`, and `tools/bin`
 are git-ignored. Ripped assets are tracked.
