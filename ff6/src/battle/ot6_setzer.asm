@@ -453,7 +453,10 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         bcs     @reel
         sta     f:$7e0000+OT6_SETZERROW
         stz     $3412           ; attack name type 0: the row's name
-        cmp     #OT6_SETZER_COIN
+        cmp     #OT6_SETZER_HIRE
+        bne     :+
+        jsr     Ot6HirePoseSave ; the slot's pose, put back after the last hire
+:       cmp     #OT6_SETZER_COIN
         bne     @single
         lda     #$18            ; GP Rain's targeting
         sec
@@ -652,9 +655,14 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ; animation never did:
 ;   %1fffccLF   1   a hire (with $b6 = the Hired Help row, Ot6CoinAnim's test)
 ;               fff the figure: 0 merchant, 1 Imperial soldier, 2 General Leo,
-;                   3 Shadow, 4 Interceptor (the top hire while Shadow fights
-;                   in this party: he can't walk in from outside it, so his
-;                   dog takes the job)
+;                   then the fourth hire: 3 Shadow while he is there to hire
+;                   (recruited, $02E3, and not left on the Floating Continent:
+;                   in the World of Ruin, $00A4, only if the escape waited for
+;                   him, $037D); 4 Interceptor while Shadow is in this
+;                   battle's party, standing or KO'd (he can't walk in from
+;                   outside it, so his dog takes the job); else 5, a Phantom
+;                   Train ghost (owner, 2026-10-02: the fourth is never Shadow
+;                   when Shadow could not be hired)
 ;               cc  the weapon's class (Ot6CoinPrice ors it in once the
 ;                   target is known): 0 none, 1 slashing, 2 piercing,
 ;                   3 bludgeoning
@@ -703,12 +711,76 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         cmp     #$30            ; the fourth hire, Shadow ...
         bne     @out
         jsr     Ot6ShadowFielded
-        bcc     @out
+        bcc     @hirable
         lda     $b7             ; ... fights in this party: Interceptor
         and     #$8f
         ora     #$40
         sta     $b7
+        rts
+@hirable:
+        jsr     Ot6ShadowHirable
+        bcs     @out            ; ... is there to hire: Shadow
+        lda     $b7             ; ... is not: the ghost
+        and     #$8f
+        ora     #$50
+        sta     $b7
 @out:   rts
+.endproc
+
+; [ can Shadow be hired? ]
+; Recruited ($1edc bit 3: event switch $02E3, "SHADOW initialized", set when
+; he first joins and never cleared) and not left on the Floating Continent:
+; the escape's "Jump!!" before he arrives never sets $037D (event_main.asm
+; _ca57b3 sets it when he makes the airship), and from the World of Ruin
+; ($00A4, set at the landing) a clear $037D means he died there.  Switch n
+; is bit (n & 7) of $1e80 + (n >> 3).  a8, either index width.
+; out: carry set = yes.  clobbers a; preserves x and y.
+OT6_SW_SHADOW_INIT   = $1e80 + ($2e3 >> 3)
+OT6_SW_WOR           = $1e80 + ($0a4 >> 3)
+OT6_SW_SHADOW_SAVED  = $1e80 + ($37d >> 3)
+.proc Ot6ShadowHirable
+        .a8
+        lda     OT6_SW_SHADOW_INIT
+        and     #1 << ($2e3 & 7)
+        beq     @no             ; never recruited
+        lda     OT6_SW_WOR
+        and     #1 << ($0a4 & 7)
+        beq     @yes            ; the World of Balance: alive
+        lda     OT6_SW_SHADOW_SAVED
+        and     #1 << ($37d & 7)
+        beq     @no             ; left on the Floating Continent
+@yes:   sec
+        rts
+@no:    clc
+        rts
+.endproc
+
+; [ the slot's pose at the action's start ]
+; Ot6SetzerExec, a Hired Help row: SETZER's wCharGfxData $61bf/$61c0/$61c1
+; (the base, secondary and override graphical actions) into OT6_HIREPOSE,
+; which Ot6CoinAnim writes back once he is home after the last hire -- the
+; walks and the strike leave their own there.  y = the attacker (a
+; character: entity x 16 = slot x 32), a8, i8, db=$7e.  preserves a, x, y.
+.proc Ot6HirePoseSave
+        .a8
+        .i8
+        pha
+        phx
+        tya
+        asl
+        asl
+        asl
+        asl
+        tax
+        lda     $61bf,x
+        sta     f:$7e0000+OT6_HIREPOSE
+        lda     $61c0,x
+        sta     f:$7e0000+OT6_HIREPOSE+1
+        lda     $61c1,x
+        sta     f:$7e0000+OT6_HIREPOSE+2
+        plx
+        pla
+        rts
 .endproc
 
 ; [ is Shadow in this battle's party? ]
@@ -749,34 +821,47 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ; command animation $24, the coins.
 ;
 ; A hire (Ot6HireMark's $b7, third byte of the script; the row's id second):
-; the hire walks in from the screen's edge behind the party, where Setzer
-; walked out, strikes, and walks off again.  The figure is drawn by Setzer's own sprite slot: the
-; battle graphics engine draws a character slot from that slot's graphics
-; buffer, and the ROM holds the merchant, soldier, Leo and Shadow as full
-; battle sprite sets (Locke's disguises, Leo's Thamasa fight, Shadow), so
-; the slot is reloaded with the figure while it stands off screen
-; (status_pat_tfr's own swap, the one Imp and Morph use: $2eae,x is the
-; graphics the slot should show) and put back after.  The strike is the
-; Fight command's animation (FightCmdAnim) with a weapon chosen by figure
-; and class (Ot6HireWeapTbl), the shape vanilla's Red Card desperation uses
-; (MagicCmdAnim's $f9 arm: the script bytes rewritten, FightCmdAnim run).
-; Interceptor's pass plays his counterattack's animation ($fc) from where
-; Setzer stands, off screen, so the dog bounds in.
+; Setzer walks off, each hire walks in where he stood, strikes, and walks
+; off again.  The figure is drawn by Setzer's own sprite slot: the battle
+; graphics engine draws a character slot from that slot's graphics buffer,
+; and the ROM holds the merchant, soldier, Leo, Shadow and the Phantom Train
+; ghosts as full battle sprite sets (Locke's disguises, Leo's Thamasa fight,
+; the train), so the slot is reloaded with the figure (status_pat_tfr's own
+; swap, the one Imp and Morph use: $2eae,x is the graphics the slot should
+; show, and LoadCharGfx loads the figure's own palette into the slot's) and
+; put back after.  Every swap happens with the slot hidden (w7e61ac, the
+; characters-shown mask AnimCmd_e1 drives) and out of the way:
+;   * a front, back or side attack: off the screen edge behind the party,
+;     OT6_HIRE_OFF px sideways (away from the enemies, the way the turn's
+;     step back goes: w7e7b10);
+;   * a pincer ($201f = 2): the party stands mid-screen between the two
+;     sides, so sideways is into the enemies; the hires walk up the party's
+;     column and off the top edge instead (Ot6HireOut).
+; The strike is the Fight command's animation (FightCmdAnim) with a weapon
+; chosen by figure and class (Ot6HireWeapTbl), the shape vanilla's Red Card
+; desperation uses (MagicCmdAnim's $f9 arm: the script bytes rewritten,
+; FightCmdAnim run).  Interceptor's pass plays his counterattack's animation
+; ($fc) from where Setzer waits, out of sight, so the dog bounds in; with no
+; body left it draws nothing (MagicCmdAnim's own CheckNullTarget).
 ;
 ; Each pass is its own animation command, so the walk-out belongs to the
 ; first and the walk-back to the last (F and L in $b7); between passes the
-; slot waits off screen showing Setzer.  Nothing here draws a battle Rand
-; ($be): the animation is longer than the coins', which moves the frame
-; count and so the ATB fill during it, not the RNG.
+; slot waits out of the way showing Setzer.  After the last, Setzer's pose
+; is put back as it was at the action's start (OT6_HIREPOSE).  Nothing here
+; draws a Rand: the battle's $be is left as it was; the longer action moves
+; the frame clock and the ATB fill during it, so later draws move.
 ;
 ; entry: a8/i16, db=$7e, ($76) the script command, ($78) its parameters.
 
 OT6_HIRE_OFF   = 96             ; pixels past home that a slot waits: off screen
+OT6_HIRE_LIFT  = 24             ; a pincer: how far past the top edge the
+                                ;   slot's anchor goes (Ot6HireOut)
 OT6_HIRE_STEP  = 8              ; pixels a walking frame (12 frames a walk)
 
-; the figures' battle graphics (CHAR_GFX)
+; the figures' battle graphics (CHAR_GFX); figure 4, Interceptor, has none
 Ot6HireGfxTbl:
         .byte   CHAR_GFX::MERCHANT, CHAR_GFX::SOLDIER, CHAR_GFX::LEO, CHAR_GFX::SHADOW
+        .byte   $ff, CHAR_GFX::GHOST
 
 ; the weapon each figure swings, by class (none, slashing, piercing,
 ; bludgeoning): the Fight animation's weapon number, item id + 1
@@ -785,6 +870,12 @@ Ot6HireWeapTbl:
         .byte   $0a+1, $0a+1, $1d+1, $46+1     ; soldier: mithrilblade, mithrilblade, mithril pike, morning star
         .byte   $14+1, $14+1, $22+1, $46+1     ; Leo: crystal, crystal, gold lance, morning star
         .byte   $26+1, $2b+1, $26+1, $44+1     ; Shadow: kodachi, ashura, kodachi, flail
+        .byte   $00, $00, $00, $00             ; (Interceptor: his own animation)
+        .byte   $00+1, $0a+1, $1d+1, $4a+1     ; ghost: dirk, mithrilblade, mithril pike, bone club
+
+; the slot's bit in w7e61ac, by slot
+Ot6HireBitTbl:
+        .byte   $01, $02, $04, $08
 
 ; [ a strike's animation, the slot's step-back flag kept ]
 ; w7e61ae (a byte a slot): the Fight animation's forward step sets it
@@ -829,6 +920,11 @@ Ot6HireWeapTbl:
 @done:  jml     f:GfxCmd_00     ; an rts in bank C1
 
 @hire:  pha                     ; [1,s] the mark
+        lda     $201f           ; the battle's arrangement
+        cmp     #$02
+        beq     :+
+        lda     #$00            ; front, back or side: sideways
+:       sta     OT6_HIREAXIS    ; (2, a pincer: up)
         ldy     #$0001
         lda     ($78),y         ; the attacker's slot
         and     #$03
@@ -840,14 +936,15 @@ Ot6HireWeapTbl:
         asl
         asl
         tax                     ; X = the slot's wCharGfxData offset
-        lda     $61d4,x         ; home: where Setzer stood (the first pass),
+        shorta
+        jsr     Ot6HireCoord    ; home: where Setzer stood (the first pass),
         pha                     ;   [1,s] home, [3,s] the mark
         shorta0
         lda     $03,s
         lsr
         bcs     @first
-        longa                   ; a later pass: the slot waits off screen,
-        lda     #$0000          ;   so home is OT6_HIRE_OFF back from it
+        longa                   ; a later pass: the slot waits out of the way,
+        lda     #$0000          ;   so home is back from it
         jsr     Ot6HireOut
         eor     #$ffff
         inc
@@ -876,7 +973,7 @@ Ot6HireWeapTbl:
         tax
         lda     f:Ot6HireGfxTbl,x
         plx
-        jsr     Ot6HireSwap     ; the figure, off screen
+        jsr     Ot6HireSwap     ; the figure, out of sight
         pha                     ; [1,s] the slot's own graphics, [2,s] home, [4,s] the mark
         longa
         lda     $02,s
@@ -951,6 +1048,12 @@ Ot6HireWeapTbl:
         shorta0
         lda     #$02            ; walking toward them: Setzer comes back home
         jsr     Ot6HireWalk
+        lda     f:$7e0000+OT6_HIREPOSE
+        sta     $61bf,x         ; and stands as he stood at the action's start
+        lda     f:$7e0000+OT6_HIREPOSE+1
+        sta     $61c0,x
+        lda     f:$7e0000+OT6_HIREPOSE+2
+        sta     $61c1,x
 :       longa
         pla                     ; home
         shorta0
@@ -958,44 +1061,91 @@ Ot6HireWeapTbl:
         jml     f:GfxCmd_00
 .endproc
 
-; [ the off-screen spot behind a slot ]
-; A (16 bits) = an x offset -> A = it plus OT6_HIRE_OFF away from the
-; enemies: right for a slot facing left (w7e7b10 = 0, the usual side), left
-; for one facing right (the party's left side in a pincer or side attack),
-; as the turn's step back (GfxCmd_0d) reads w7e7b10.  ($78) the script's
-; parameters, the attacker's slot second.  a16/i16, db=$7e.  preserves y.
+; [ the coordinate a hire walks on ]
+; X = the slot's wCharGfxData offset.  out: A (16 bits) = its x offset
+; ($61d4) sideways, its y offset ($61c7) in a pincer (OT6_HIREAXIS).
+; a8 in, a16 out, i16, db=$7e.  preserves x and y.
+.proc Ot6HireCoord
+        .a8
+        .i16
+        lda     OT6_HIREAXIS
+        longa
+        .a16
+        bne     @y
+        lda     $61d4,x
+        rts
+@y:     lda     $61c7,x
+        rts
+.endproc
+
+; [ the out-of-the-way spot for a coordinate ]
+; A (16 bits) = a coordinate (Ot6HireCoord's) -> A = where the slot waits
+; out of sight from it:
+;   sideways: OT6_HIRE_OFF px away from the enemies: right for a slot facing
+;     left (w7e7b10 = 0, the usual side), left for one facing right (the
+;     party's left side in a side attack), as the turn's step back
+;     (GfxCmd_0d) reads w7e7b10;
+;   a pincer: up the screen by the slot's own height on it (w7e61b9 +
+;     w7e61d2, the base and lift DrawCharSprite adds to the y offset) plus
+;     OT6_HIRE_LIFT, so the sprite stands past the top edge -- not past -32,
+;     where DrawCharSprite pins a sprite's y to $97 (on screen).
+; ($78) the script's parameters, the attacker's slot second.  a16/i16,
+; db=$7e.  preserves x and y.
 .proc Ot6HireOut
         .a16
         .i16
+        phx
         phy
-        pha                     ; [1,s] the offset
+        pha                     ; [1,s] the coordinate
         ldy     #$0001
         lda     ($78),y         ; the attacker's slot (and the byte after)
         and     #$0003
         tay
         shorta
+        lda     OT6_HIREAXIS
+        bne     @up
         lda     $7b10,y         ; w7e7b10: the slot's facing
         longa
         bne     @left
         pla
         clc
         adc     #OT6_HIRE_OFF
-        ply
-        rts
+        bra     @done
 @left:  pla
         sec
         sbc     #OT6_HIRE_OFF
-        ply
+        bra     @done
+@up:    longa
+        tya
+        asl
+        asl
+        asl
+        asl
+        asl
+        tax                     ; the slot's wCharGfxData offset
+        lda     $61b9,x
+        clc
+        adc     $61d2,x
+        clc
+        adc     #OT6_HIRE_LIFT
+        eor     #$ffff
+        inc
+        clc
+        adc     $01,s
+        sta     $01,s
+        pla
+@done:  ply
+        plx
         rts
 .endproc
 
-; [ walk a character slot sideways to an x offset ]
+; [ walk a character slot to a coordinate ]
 ; A = the walking action (wCharGfxData secondary action: 2 toward the enemies,
 ; 3 away; the frames are drawn in the slot's own facing),
-; Y = the x offset to stop at, X = the slot's wCharGfxData offset.
-; OT6_HIRE_STEP pixels a frame, the walking frames drawn (the slot's pose
-; override is lifted for the walk and put back).  a8/i16, db=$7e.
-; preserves x and y.
+; Y = the coordinate to stop at (x offset sideways, y offset in a pincer:
+; OT6_HIREAXIS), X = the slot's wCharGfxData offset.  OT6_HIRE_STEP pixels a
+; frame, the walking frames drawn (the slot's pose override is lifted for
+; the walk and put back).  a8/i16, db=$7e.  preserves x and y.
 .proc Ot6HireWalk
         .a8
         .i16
@@ -1003,30 +1153,40 @@ Ot6HireWeapTbl:
         lda     $61c1,x
         pha                     ; [1,s] the pose override
         stz     $61c1,x
+        phx
+        lda     OT6_HIREAXIS
+        beq     @frame
+        longa                   ; a pincer: walk the y offset ($61c7), the
+        txa                     ;   same slot's word 13 bytes before $61d4
+        sec
+        sbc     #$61d4-$61c7
+        tax
+        shorta0
 @frame: longa
         tya
         sec
-        sbc     $61d4,x         ; target - offset
+        sbc     $61d4,x         ; target - coordinate
         beq     @there
-        bmi     @left
+        bmi     @less
         cmp     #OT6_HIRE_STEP+1
         bcc     @snap
         lda     $61d4,x
         clc
         adc     #OT6_HIRE_STEP
         bra     @set
-@left:  cmp     #.loword(-OT6_HIRE_STEP)
+@less:  cmp     #.loword(-OT6_HIRE_STEP)
         bcs     @snap
         lda     $61d4,x
         sec
         sbc     #OT6_HIRE_STEP
         bra     @set
 @snap:  tya
-@set:   sta     $61d4,x         ; the slot's x offset
+@set:   sta     $61d4,x
         shorta0
         jsl     WaitFrame_far
         bra     @frame
 @there: shorta0
+        plx
         pla
         sta     $61c1,x
         stz     $61c0,x
@@ -1035,8 +1195,11 @@ Ot6HireWeapTbl:
 
 ; [ show other graphics in a character slot ]
 ; A = the graphics index (CHAR_GFX), X = the slot's wCharGfxData offset (the
-; slot's $2eae block shares it).  Writes it as the slot's graphics and lets
-; status_pat_tfr load it (graphics and palette, as Imp's swap does).
+; slot's $2eae block shares it).  The slot is hidden (w7e61ac) through the
+; swap and the two frames after it, so the old sprite is never seen turning
+; into the new one wherever it stands; the graphics are written as the
+; slot's and status_pat_tfr loads them (tiles, and the figure's palette into
+; the slot's, as Imp's swap does); then the slot is shown as it was.
 ; out: A = the graphics the slot had.  a8/i16, db=$7e.  preserves x and y.
 .proc Ot6HireSwap
         .a8
@@ -1047,7 +1210,7 @@ Ot6HireWeapTbl:
         xba
         sta     $2eae,x
         xba
-        pha                     ; [1,s] the old graphics
+        pha                     ; the old graphics
         phx
         longa
         txa
@@ -1056,10 +1219,20 @@ Ot6HireWeapTbl:
         lsr
         lsr
         lsr
+        tax                     ; X = the slot
         shorta
         sta     $7b78           ; w7e7b78: status_pat_tfr's slot
-        shorta0                 ; (it indexes with tay/tax: B = 0)
+        lda     f:Ot6HireBitTbl,x
+        and     $61ac           ; w7e61ac: is the slot shown?
+        pha                     ; [1,s] its shown bit, [2,s] x, [4,s] the old graphics
+        lda     f:Ot6HireBitTbl,x
+        trb     $61ac           ; hide it
+        shorta0                 ; (status_pat_tfr indexes with tay/tax: B = 0)
         jsl     _c12f75         ; status_pat_tfr_long
+        jsl     WaitFrame_far   ; the new tiles and palette reach VRAM/CGRAM
+        jsl     WaitFrame_far
+        pla
+        tsb     $61ac           ; shown again if it was
         plx
         pla
         ply
