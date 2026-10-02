@@ -8179,7 +8179,8 @@ end
 --   arrive the pass's first CheckNullTarget (after the walk-in): the
 --          graphics id, the $7F buffer against that figure's ROM sheet (as
 --          LoadCharGfx builds it), the position, the shown bit;
---   strike FightCmdAnim, or MagicCmdAnim with Interceptor's $FC;
+--   strike FightCmdAnim, or Interceptor's $FC drawn (ExecAnim after a
+--          MagicCmdAnim entry with $FC: with no body left it draws nothing);
 --   end    SETZER's Ot6ActionEnd: graphics, buffer against SETZER's sheet,
 --          offsets, pose.
 -- M.hireCrewCheck(r, tag) holds one H.setzerBattle record to the design
@@ -8294,7 +8295,18 @@ function M.hireCrewArm()
   local function strike(kind)
     return function()
       if not cur then return end
-      if kind == "dog" and script(2) ~= 0xFC then return end
+      if kind == "dog" then
+        -- MagicCmdAnim runs for Interceptor's pass whether or not a body is
+        -- left; its own CheckNullTarget skips the animation when none is,
+        -- so the dog is drawn only when ExecAnim runs after this entry
+        if script(2) == 0xFC then cur.dogEntered = true end
+        return
+      end
+      if kind == "dogdrawn" then
+        if not cur.dogEntered or cur.dogDrawn then return end
+        cur.dogDrawn = true
+        kind = "dog"
+      end
       if kind == "fight" and cur.arrive == nil then return end
       local g = M.readByte(0x7B6C + cur.slot)
       HC.strikes[#HC.strikes + 1] = { f = M.frame, pass = cur, kind = kind, gfx = g, weapon = script(3),
@@ -8304,6 +8316,8 @@ function M.hireCrewArm()
   local fa, ma = M.sym("FightCmdAnim"), M.sym("MagicCmdAnim")
   emu.addMemoryCallback(strike("fight"), emu.callbackType.exec, fa, fa)
   emu.addMemoryCallback(strike("dog"), emu.callbackType.exec, ma, ma)
+  local ea = M.sym("ExecAnim")
+  emu.addMemoryCallback(strike("dogdrawn"), emu.callbackType.exec, ea, ea)
   local ae = M.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
     local e = emu.getState()["cpu.x"] & 0xff
