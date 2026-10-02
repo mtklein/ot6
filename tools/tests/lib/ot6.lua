@@ -7859,8 +7859,12 @@ function M.setzerBattle(plan, opts)
       end
       pulse("a")
     elseif st == 0x38 then
-      M.assertEq(p.refused and true or false, false, string.format("row $%s at %s BP, planned refused, is refused at "
-        .. "the list (its confirm must not reach target select)", tostring(p.row), tostring(p.boost)))
+      -- an entry planned refused whose A was pressed in the list must not get
+      -- here (the previous entry's own target select lingers a frame or two
+      -- after k moves on, before this entry has pressed anything)
+      M.assertEq(p.refused and (p.presses or 0) >= 1 or false, false, string.format("row $%02X at %d BP, planned "
+        .. "refused, is refused at the list (its confirm must not reach target select)", type(p.row) == "number"
+        and p.row or 0, p.boost or 0))
       if p.slot ~= nil then
         local want = 1 << p.slot
         local mons = M.readByte(0x7B7E)

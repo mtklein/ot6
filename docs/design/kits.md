@@ -614,7 +614,8 @@ a face 1-6 at near-even odds (one battle Rand, drawn again past 251, mod
 6; the redraw takes the table's next byte, a fixed successor, so over the
 256 places a roll can start each face is 42-44 of 256, consistent with
 the measurement below), and the boost buys another roll a point -- 1 + boost passes, each its own triple
-and its own hit. *Reason: a hit that can be a dud is the gambler's verb,
+and its own hit. A pass that finds no body left (the rolls before felled
+the last) is skipped: no triple, no dice, no draw (round 4). *Reason: a hit that can be a dud is the gambler's verb,
 and an extra roll is a purchase that always lands, at any level and
 shield state; playtesting tunes the power.* What one roll lands (the
 means at even odds; the 42-44 weights move them by under 2%):
@@ -672,7 +673,16 @@ reads). Jackpot greys for MP or once spent. One authority each:
 reads). Tests: `battle_cointoss`, `battle_hiredhelp`, `battle_jackpot`,
 `battle_setzergrey` (the purse's grey and refusal), `battle_gprain` (the
 Coin Toss relic's GP Rain) and `battle_hirerefund` (a hire past the last
-body pays nothing).
+body pays nothing). The coin suites throw in the first battle that deals
+a special-weak crowd and assert that a toss split and chipped;
+`battle_jackpot` holds every roll to the draw rule, with a draw whose early
+kill leaves a pass empty and one that redraws past 251; `battle_setzergrey`
+prices two, three and four throws against the purse. Negative controls:
+the mutant ROMs (`mutants5.py`, same-size edits for the savestate suite)
+and the no-edit control built by the same pipeline, in
+`build/attempts/wt/kit-setzer/m5/`; the earlier `px13/m2/` set that
+c9fccbd6 cites (the floor curve's mutants) was lost with px13's worktree
+before it was copied, and the curve it tested is gone.
 
 **The route's driver plays the table** (`Driver:setzerLine`, lib/ot6.lua;
 #353), reading what an informed player would: Jackpot priced as the gamble
