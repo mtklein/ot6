@@ -378,6 +378,19 @@ OT6_DANCETIER        := $eda1   ; 8 bytes (4 characters, stride 2)
 .assert OT6_DANCETIER = OT6_WEAPSPELL + 1, error, "the dance tier must follow the weapon-spell flag without a gap"
 .assert OT6_DANCETIER + 8 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
+; whether the turn ExecAction is running has an action to run (#346).
+; Ot6NoActionMark writes it at every pass of ExecAction's head, from the
+; command-list pointer the bmi there tests and $3406: bit 7 set = a fresh
+; turn from the action queue whose list was empty (an action removed after
+; it was queued), which takes the placeholder CmdNoEffect path; Ot6ActionEnd
+; at that turn's end charges no boost.  A resumed second half (X-Magic)
+; with an empty list is not marked: the first half already used the boost.
+; ($b5 = $12 is not that test: Empowerer's attacker effect writes $12 to
+; $b5 during a real Bushido turn.)  Written before every read; InitBP need
+; not clear it.
+OT6_NOACTION         := $eda9
+.assert OT6_NOACTION = OT6_DANCETIER + 8, error, "the no-action flag must follow the dance tier without a gap"
+
 ; the shield icon's count tiles (#292).  Each monster slot 0-5 owns one font
 ; cell (Ot6ShieldSlotCellTbl), and the tile in it is the shield showing that
 ; slot's live count (Ot6ShieldGlyphs, 1..99), so any count draws true.
@@ -393,7 +406,7 @@ OT6_DANCETIER        := $eda1   ; 8 bytes (4 characters, stride 2)
 OT6_SHHAVE           := $edc0   ; 6 bytes
 OT6_SHWANT           := $edc6   ; 6 bytes
 OT6_SHPEND           := $edcc
-.assert OT6_SHHAVE >= OT6_DANCETIER + 8, error, "shield-tile state must not collide with the dance tier"
+.assert OT6_SHHAVE >= OT6_NOACTION + 1, error, "shield-tile state must not collide with the dance tier or the no-action flag"
 .assert OT6_SHWANT = OT6_SHHAVE + 6, error, "shield-tile want must follow have without overlap"
 .assert OT6_SHPEND = OT6_SHWANT + 6, error, "shield-tile pending mask must follow want without overlap"
 .assert OT6_SHPEND <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
