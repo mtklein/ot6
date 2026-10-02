@@ -208,9 +208,11 @@ end
 -- A search that meets neither, or only one, fails by name.
 local ENTRY = (type(OT6_SEED_SHIFT) == "number" and OT6_SEED_SHIFT or 0)
 local CAND = {}
-for _, d in ipairs({ 2, 3, 4, 5 }) do
-  for _, st in ipairs({ 0, 640 }) do
-    for i = 0, 15 do CAND[#CAND + 1] = { wait = ENTRY + 1 + 4 * i, stand = st, defends = d } end
+for _, st in ipairs({ 0, 640 }) do
+  for _, d in ipairs({ 2, 3 }) do
+    for _, of in ipairs({ false, true }) do
+      for i = 0, 15 do CAND[#CAND + 1] = { wait = ENTRY + 1 + 4 * i, stand = st, defends = d, othersFight = of } end
+    end
   end
 end
 local S = { i = 0, cur = nil, found = {}, seen = {}, distinct = 0 }
@@ -231,7 +233,7 @@ local function candidateBattle()
       local plan = {}
       for _ = 1, S.cur.defends do plan[#plan + 1] = { row = "defend" } end
       plan[#plan + 1] = { row = JACKPOT, boost = 3 }
-      step = H.setzerBattle(plan, { untilPlanDone = true })
+      step = H.setzerBattle(plan, { untilPlanDone = true, othersFight = S.cur.othersFight })
     end
     return step:tick()
   end, reset = function() step = nil end }
@@ -253,7 +255,8 @@ local search = H.seqStep({
     candidateBattle(),
     H.call(function()
       local c, recs = S.cur, H.vars.setzer
-      local label = string.format("search %d (wait %d, stand %d, %d Defends)", S.i, c.wait, c.stand, c.defends)
+      local label = string.format("search %d (wait %d, stand %d, %d Defends, the others %s)", S.i, c.wait, c.stand,
+        c.defends, c.othersFight and "Fight" or "Defend")
       H.assertEq(#recs, 1, label .. ": one Jackpot resolved")
       H.assertEq(recs[1].row == JACKPOT and recs[1].boost == 3, true, label .. ": a Jackpot at 3 BP")
       local got = checkJackpot(recs[1], S.i + 3)
