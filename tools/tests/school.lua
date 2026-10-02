@@ -330,8 +330,9 @@ end
 -- one must not step on another: the wandering ghost (obj $14) can stand in
 -- the x=108 column, and the plan around it then ran over the x=99 door into
 -- the middle room (the v0.24 re-cut's narshe-mission-v1;
--- build/attempts/wt/v024-recut/school/).  So a hall door's walk avoids the
--- other two, and waits out the ghost when it blocks the only way.
+-- build/attempts/wt/v024-recut/suite_fixes/summary.txt).  So a hall door's
+-- walk avoids the other two, and waits out the ghost when it blocks the
+-- only way.
 local HALL_DOORS = { 93, 99, 108 }
 local function otherHallDoors(x)
   local out = {}

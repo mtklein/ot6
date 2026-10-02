@@ -314,13 +314,14 @@ def emit_state_rules(w):
     w("# bytes, so the source's stamp -- its sig, its artifact hash, its")
     w("# ancestor -- records the copy verbatim, and the copied stamp is")
     w("# what lets a stacked generate edge bind ITS ancestor line to a real file (#75).")
-    w("# Each file is rewritten only when its bytes differ (restat), so a source")
-    w("# regenerated to the same bytes -- a clean qualification on an unchanged")
-    w("# ROM -- does not make the chain from power-on replay behind it.")
+    w("# Each half is rewritten only when its bytes differ (restat), and the")
+    w("# stamp only when a half moved or its binding lines (rom, generator,")
+    w("# artifact) differ, so a source regenerated to the same bytes -- a clean")
+    w("# qualification on an unchanged ROM, under newer lib halves than the")
+    w("# copy's -- does not make the chain from power-on replay behind it")
+    w("# (savestate_ninja.py seed_copy).")
     w("rule seed")
-    w("  command = for x in mss mss.lua stamp; do "
-      "cmp -s build/states/$src.$$x build/states/$state.$$x || "
-      "cp build/states/$src.$$x build/states/$state.$$x || exit 1; done")
+    w("  command = python3 tools/tests/lib/savestate_ninja.py --seed $src $state")
     w("  description = stack seed $state <- $src")
     w("  restat = 1")
     w("")
@@ -478,6 +479,39 @@ def chain_plan(states):
 
 
 SEALED_FIELDS = ("size", "sha256", "provenance")
+
+
+SEED_BINDING = ("rom ", "generator ", "artifact ")
+
+
+def seed_copy(states_dir, src, dst):
+    """The seed rule: copy a finished state's two halves into its chain_
+    name byte for byte, each only when its bytes differ (restat), and its
+    stamp verbatim whenever a half moved or the stamp's binding lines (rom,
+    generator, artifact) differ.  A stamp whose binding lines match and
+    whose halves did not move differs only in provenance -- its own sig
+    line, the lib hashes, the emulator record, and an ancestor line whose
+    hash follows the ancestor's provenance -- and is NOT rewritten: a
+    clean qualification that regenerates the source to the same bytes
+    under lib halves newer than the copy's (the chain edges carry the lib
+    halves as inputs themselves, so a lib edit still replays the chain)
+    must not replay the chain from power-on behind it (v0.24:
+    build/attempts/wt/v024-recut/gate/).  Returns 0."""
+    moved = False
+    for ext in ("mss", "mss.lua"):
+        s, d = states_dir / f"{src}.{ext}", states_dir / f"{dst}.{ext}"
+        data = s.read_bytes()
+        if not (d.exists() and d.read_bytes() == data):
+            d.write_bytes(data)
+            moved = True
+    s, d = states_dir / f"{src}.stamp", states_dir / f"{dst}.stamp"
+
+    def binding(p):
+        return [l for l in p.read_text().splitlines() if l.startswith(SEED_BINDING)]
+    if moved or not d.exists() or binding(s) != binding(d):
+        if not (d.exists() and d.read_bytes() == s.read_bytes()):
+            d.write_bytes(s.read_bytes())
+    return 0
 
 
 def write_authored(manifest, out):
@@ -848,6 +882,9 @@ def main(argv):
     ap.add_argument("--authored", nargs=2, metavar=("MANIFEST", "OUT"),
                     help="write MANIFEST's authored fields to OUT, only "
                          "when they changed (the chain's seal template)")
+    ap.add_argument("--seed", nargs=2, metavar=("SRC", "STATE"),
+                    help="the seed rule: copy build/states/SRC.* to STATE.* "
+                         "(seed_copy)")
     ap.add_argument("--coverage", action="store_true",
                     help="check that every tracked checkpoint is captured by "
                          "the chain (so the drift gate compares it) or named "
@@ -860,6 +897,8 @@ def main(argv):
         return selftest()
     if args.authored:
         return write_authored(Path(args.authored[0]), Path(args.authored[1]))
+    if args.seed:
+        return seed_copy(args.root.resolve() / "build" / "states", *args.seed)
 
     root = args.root.resolve()
     states = load(root)

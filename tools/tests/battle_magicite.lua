@@ -1132,7 +1132,7 @@ H.run({ maxFrames = 150000 }, {
   -- quarter of her pool, or a Tent).  The pinned 31 of 180 is under that
   -- band, so with a Tincture in the bag the default care drank one and
   -- opened the boss at 81 (the v0.24 re-cut's n024_entry carries 7;
-  -- build/attempts/wt/v024-recut/magicite/).
+  -- build/attempts/wt/v024-recut/suite_fixes/summary.txt).
   H.fieldCare({ tag = "before battle 72 (boot B)", threshold = 0.95,
                 magic = false, tincture = false, tent = false }),
   enterBoss("bootB"),

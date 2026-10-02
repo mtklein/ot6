@@ -2676,13 +2676,17 @@ end
 --
 -- A crossing's random encounters are draws: on some histories the walk
 -- meets no battle at all (gen_mrf_chute's upper floor on the v0.24 ROM,
--- build/attempts/wt/v024-recut/mrf_chute/).  watch() also counts entries to
+-- build/attempts/wt/v024-recut/mrf_chute/).  A sweep over such a walk
+-- passes opts.allowNoBattle = true.  watch() also counts entries to
 -- InitBattle, by its symbol rather than the scanned store, so report() can
 -- tell an attempt that met no battle (no entry: nothing was there to
 -- spread) from a battle the seed watcher missed (an entry and no seed).
--- An attempt with no battle passes only as the LAST attempt that ran: an
--- attempt retried after one is the same route with no fight to vary, so
--- the retry replays it, and report() fails it.
+-- With allowNoBattle, an attempt with no battle passes only as the LAST
+-- attempt that ran: an attempt retried after one is the same route with
+-- no fight to vary, so the retry replays it, and report() fails it.
+-- Without it (the default: a boss fight, a forced battle), an attempt that
+-- met no battle fails as it always did -- the sweep's shape moved and the
+-- spread is in the wrong place.
 --
 -- opts.attempts (default 3) only sets the spacing; it is not a licence to
 -- widen the sweep.
@@ -2694,6 +2698,7 @@ function M.newSeedSweep(tag, opts)
   local attempts = opts.attempts or 3
   local gap = opts.gap or (M.SEED_PERIOD // attempts)
   local phaseOf = opts.phaseSource or M.seedPhase
+  local allowNoBattle = opts.allowNoBattle == true
   local L = { tag = tag or "sweep", seeds = {}, extras = {}, targets = {},
               spreads = {}, inits = {} }
   local base, cur, watching = nil, 0, false
@@ -2828,9 +2833,10 @@ function M.newSeedSweep(tag, opts)
       for n = 1, attempts do
         if L.seeds[n] then ran[#ran + 1] = n
         elseif L.spreads[n] then
-          if (L.inits[n] or 0) == 0 then
-            -- no battle at all: nothing was there to spread.  Only the last
-            -- attempt may end that way; a retry after it replays it.
+          if (L.inits[n] or 0) == 0 and allowNoBattle then
+            -- a crossing that met no battle: nothing was there to spread.
+            -- Only the last attempt may end that way; a retry after it
+            -- replays it.
             assert(n == last, string.format(
               "%s: attempt %d met no battle, and attempt %d was run after it.  "
               .. "With no fight on the route the spread varies nothing, so the "
@@ -2845,15 +2851,29 @@ function M.newSeedSweep(tag, opts)
           end
         end
       end
-      -- An attempt that took a phase, entered InitBattle and drew no seed is
-      -- a battle the watcher missed.  Checked before the empty case below,
-      -- as the more specific account of the same symptom.
-      assert(#silent == 0, string.format(
-        "%s: attempt(s) %s took a battle RNG phase, entered InitBattle and then "
-        .. "drew no seed.  The watcher is on `sta $be` at battle init, which "
-        .. "every InitBattle runs, so the seed watcher missed a battle (or "
-        .. "points at the wrong instruction).",
-        L.tag, table.concat(silent, ", ")))
+      -- An attempt that took a phase and then drew no seed: a battle the
+      -- watcher missed (it entered InitBattle), or, on a sweep that does not
+      -- allow a battle-less attempt, a battle that never came.  Checked
+      -- before the empty case below, as the more specific account of the
+      -- same symptom.
+      if #silent > 0 then
+        local missed = {}
+        for _, n in ipairs(silent) do
+          if (L.inits[n] or 0) > 0 then missed[#missed + 1] = n end
+        end
+        assert(#missed == 0, string.format(
+          "%s: attempt(s) %s took a battle RNG phase, entered InitBattle and then "
+          .. "drew no seed.  The watcher is on `sta $be` at battle init, which "
+          .. "every InitBattle runs, so the seed watcher missed a battle (or "
+          .. "points at the wrong instruction).",
+          L.tag, table.concat(missed, ", ")))
+        error(string.format(
+          "%s: attempt(s) %s took a battle RNG phase and then drew no seed.  The "
+          .. "watcher is on `sta $be` at battle init, so either that attempt "
+          .. "never reached a battle -- in which case this sweep's shape moved "
+          .. "and the spread is in the wrong place -- or the watcher missed one.",
+          L.tag, table.concat(silent, ", ")), 0)
+      end
       assert(#ran > 0 or nobattle ~= nil, L.tag .. ": no battle seeding was recorded for any "
         .. "attempt.  Either no attempt reached a battle, or the seed watcher "
         .. "never fired -- both make the distinctness check vacuous.")
