@@ -681,14 +681,15 @@ by the route's fight driver with field care after, within a budget decoded
 from the room's pool (the worst encounter-counter state's encounters to
 the next crowd, 19 here, per crowd the throws need). `battle_jackpot`
 holds every roll to the draw rule, and a bounded search over grave waits,
-in-battle stands and Defends (192 throws at most; a throw redraws with p =
-6.1%, so the bound is stated in distinct throws) finds a draw whose early
-kill leaves a pass empty and one that redraws past 251, or fails by name;
+in-battle stands, Defends and the others' Fight or Defend (128 throws at
+most, 99 of them distinct here; a throw redraws with p = 6.1%, so a miss is
+0.939^99 = 0.2%) finds a draw whose early kill leaves a pass empty and one
+that redraws past 251, or fails by name;
 `battle_setzergrey` prices two, three and four throws against the purse,
 step 5 from the purse step 4 left. Negative controls: the mutant ROMs
 (`mutants5.py`, same-size edits for the savestate suite) and the no-edit
 control built by the same pipeline, in
-`build/attempts/wt/kit-setzer/m7/`; the earlier `px13/m2/` set that
+`build/attempts/wt/kit-setzer/m7/` (and `m8/`, battle_jackpot's revised search); the earlier `px13/m2/` set that
 c9fccbd6 cites (the floor curve's mutants) was lost with px13's worktree
 before it was copied, and the curve it tested is gone.
 
