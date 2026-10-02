@@ -15,8 +15,9 @@
 --   b. Hired Help aimed at a live monster the cursor is not on, with
 --      walking off for this entry (aimWalk = false): refused the same way;
 --   c. Hired Help, unboosted, aimed at the live monster with the highest
---      slot: the cursor is walked there and the hire lands on that slot and
---      no other ($b9 at its exec).
+--      slot the cursor is not resting on when its target select opens: the
+--      cursor is walked there and the hire lands on that slot and no other
+--      ($b9 at its exec).
 -- Asserted: a and b refused, exactly one hire executed (c's), on c's slot,
 -- and the purse fell by that one fee.  On the lib before aimStep a and b
 -- were confirmed where the cursor stood: build/attempts/wt/pass-retarget/aim/.
@@ -44,7 +45,6 @@ local function play()
       H.log(string.format("[%s] encounter %d: alive $%02X (%d monster(s))", TAG, since, m, count(m)))
       S.phase = (count(m) >= 2 and not done) and "plan" or "fight"
       if S.phase == "plan" then
-        for s = 0, 5 do if (m >> s) & 1 == 1 then far = s end end
         for s = 5, 0, -1 do
           if (m >> s) & 1 == 0 and (H.readByte(0x3AA8 + s * 2) & 1) == 0 then absent = s end
         end
@@ -58,7 +58,17 @@ local function play()
           for s = 0, 5 do if (lm >> s) & 1 == 1 and (1 << s) ~= cur then return s end end
           return absent
         end })
-        S.pos = { row = HIRE, boost = 0, slot = far }
+        -- latched when its target select opens: the live monster with the
+        -- highest slot the cursor is not resting on, so the aim must walk
+        S.pos = setmetatable({ row = HIRE, boost = 0 }, { __index = function(t, k)
+          if k ~= "slot" then return nil end
+          if rawget(t, "latched") == nil then
+            local cur, lm = H.readByte(0x7B7E), alive()
+            for s = 0, 5 do if (lm >> s) & 1 == 1 and (1 << s) ~= cur then rawset(t, "latched", s) end end
+            far = rawget(t, "latched")
+          end
+          return rawget(t, "latched")
+        end })
         S.step = H.setzerBattle({ S.negA, S.negB, S.pos }, { untilPlanDone = true, aimRefusedOk = true })
       end
     end
@@ -72,8 +82,9 @@ local function play()
         .. "holds, is refused at target select", absent))
       H.assertEq(rawget(S.negB, "aimRefused") ~= nil, true, "a hire aimed off the cursor with walking off is "
         .. "refused, not confirmed where the cursor stands")
-      H.assertEq(rawget(S.pos, "aimRefused"), nil, string.format("the hire aimed at live slot %d is not refused", far))
+      H.assertEq(rawget(S.pos, "aimRefused"), nil, string.format("the hire aimed at live slot %s is not refused", tostring(far)))
       H.assertEq(#recs, 1, "exactly one hire executed: the aimed one")
+      H.assertEq((rawget(S.pos, "aim") or { presses = 0 }).presses > 0, true, "the aimed hire walked the cursor")
       H.log(string.format("[%s] c: aimed at slot %d, the hire's targets $%02X, purse %d -> %d (fee %d)", TAG, far,
         recs[1].targets, S.gil0, gil(), recs[1].level * 50))
       H.assertEq(recs[1].targets, 1 << far, string.format("the aimed hire lands on slot %d and no other", far))
