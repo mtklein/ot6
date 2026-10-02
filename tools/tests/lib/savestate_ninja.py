@@ -62,13 +62,15 @@ ROM = "build/ot6.sfc"
 # emulator that played it, so the pin is an input of every run.
 EMULATOR = "tools/mesen/EMULATOR"
 # What a run executes besides its composed script: the runner and the
-# Python it calls before and after the emulator (settings pins, the
-# checkpoint materialize, the artifact decode).  compose.py is not here:
-# the digest edge is what a run's composition depends on.
+# Python it calls before and after the emulator (the settings pins, the
+# artifact decode).  compose.py is not here: the digest edge is what a run's
+# composition depends on.
 RUN_INPUTS = (ROM, EMULATOR, "tools/tests/run.sh",
               "tools/tests/lib/pin_test_saves.py",
-              "tools/tests/lib/sram_checkpoint.py",
               "tools/tests/lib/decode_b64.py")
+# ...and what a run that Continues a checkpoint also executes: the
+# checkpoint's validate-and-materialize before the emulator boots.
+CHECKPOINT_TOOL = "tools/tests/lib/sram_checkpoint.py"
 # The test library compose.py can inline.  A digest edge depends on every
 # one through a Lua copy (comment and whitespace edits move nothing); the
 # digest itself says whether the composed program moved.
@@ -441,8 +443,8 @@ def emit_state_edges(w, states, root, copy_from, lua_copy_from=None,
             key = e["checkpoint"]
             payload, manifest, cstamp = capture_paths(root, key)
             authored = f"{AUTHORED_DIR}/{key}.json"
-            deps += [payload, authored]
-            run_inputs += [payload, authored]
+            deps += [copy_from(CHECKPOINT_TOOL), payload, authored]
+            run_inputs += [CHECKPOINT_TOOL, payload, authored]
             order.append(manifest)
             ancestor = cstamp
             seal_edge(key)
@@ -501,7 +503,7 @@ def emit_state_edges(w, states, root, copy_from, lua_copy_from=None,
 def copy_sources(states, root, captures=()):
     """(byte-copied sources, Lua-copied sources) the state edges route
     through copy edges, in first-use order."""
-    byte = list(RUN_INPUTS) + [p for p in COMPOSE_INPUTS if p not in RUN_INPUTS]
+    byte = list(RUN_INPUTS) + [CHECKPOINT_TOOL] + list(COMPOSE_INPUTS)
     byte += [p for p in STAMP_TOOL if p not in byte]
     return byte, list(LIB_FILES)
 
@@ -734,6 +736,10 @@ def selftest():
               and f"{AUTHORED_DIR}/k1-v1.json" in gp
               and "|| build/checkpoints/k1-v1/manifest.json" in gp
               and "tools/tests/checkpoints/k1-v1" not in gp)
+        check("only a run that Continues a checkpoint depends on its "
+              "materialize (sram_checkpoint.py)",
+              copy_from(CHECKPOINT_TOOL) in gp
+              and copy_from(CHECKPOINT_TOOL) not in edge("build/states/o.mss.lua"))
         check("the cut's run Continues the capture",
               "OT6_SRAM_CHECKPOINT=build/checkpoints/k1-v1" in
               body("build/states/p.mss.lua"))

@@ -567,6 +567,15 @@ def selftest() -> None:
                 raise AssertionError(
                     f"{name} accepted a battery holding a save the manifest "
                     f"does not declare")
+        # ...and a refused seal writes no manifest: nothing that boots the
+        # capture can find a checkpoint naming a save its battery lacks.
+        (root / "manifest.json").unlink()
+        try:
+            seal_capture(root, root / "authored.json", "k.stamp", root)
+        except CheckpointError:
+            pass
+        assert not (root / "manifest.json").exists(), \
+            "a refused seal left a manifest behind"
 
         print("sram_checkpoint selftest: PASS (schema, size, hash, path, "
               "persistent_layout negatives; provenance from a stamp/seal "

@@ -422,7 +422,7 @@ def selftest():
         v, m = st("a")
         check("MUTANT a ROM change is STALE", v, STALE)
         check("...named as a different ROM",
-              "a machine snapshot of a different ROM" in m, True)
+              "a machine snapshot of a different ROM" in (m or ""), True)
         (root / "build/ot6.sfc").unlink()
         check("no built ROM is UNVERIFIED", st("a")[0], UNVERIFIED)
         (root / "build/ot6.sfc").write_bytes(b"rom v1")
@@ -431,7 +431,7 @@ def selftest():
         (root / "tools/tests/run.sh").write_text("run v2\n")
         v, m = st("a")
         check("MUTANT a runner change is STALE, naming it",
-              (v, "tools/tests/run.sh moved" in m), (STALE, True))
+              (v, "tools/tests/run.sh moved" in (m or "")), (STALE, True))
         (root / "tools/tests/run.sh").write_text("run v1\n")
         # the lib: no exemption -- a code edit is a change like any other
         (lib / "ot6.lua").write_text("local M = {}\nM.v = 2\nreturn M\n")
@@ -439,7 +439,7 @@ def selftest():
         check("MUTANT a lib code edit is STALE (no provenance-drift exemption)",
               v, STALE)
         check("...naming the lib file that moved",
-              "tools/tests/lib/ot6.lua moved" in m, True)
+              "tools/tests/lib/ot6.lua moved" in (m or ""), True)
         (lib / "ot6.lua").write_text("-- note\nlocal M = {}\n  M.v = 1\nreturn M\n")
         check("a lib comment/whitespace edit leaves it FRESH", st("a"),
               (FRESH, None))
@@ -450,7 +450,7 @@ def selftest():
         check("MUTANT a generator code edit is STALE", st("a")[0], STALE)
         v, m = st("b")
         check("...and its child is STALE via it",
-              (v, "STALE via a" in m), (STALE, True))
+              (v, "STALE via a" in (m or "")), (STALE, True))
         (root / "tools/tests/gen_a.lua").write_text(
             'local H = dofile("tools/tests/lib/ot6.lua")\nH.run({}, {})\n')
         check("restoring the generator restores the chain", st("b"),
@@ -465,7 +465,7 @@ def selftest():
         (root / "build/states/a.mss.lua").write_text('return "QUJD"\n')
         v, m = st("b")
         check("MUTANT a regenerated parent sidecar stales the child",
-              (v, "its composed script changed" in m), (STALE, True))
+              (v, "its composed script changed" in (m or "")), (STALE, True))
         run("a", "gen_a")
         check("a parent regenerated to the same bytes leaves the child FRESH",
               st("b"), (FRESH, None))
@@ -488,7 +488,7 @@ def selftest():
         pay.write_bytes(b"battery v2")
         v, m = st("c")
         check("MUTANT a moved capture stales the cut that Continues it",
-              (v, "build/checkpoints/k-v1/k.sram" in m), (STALE, True))
+              (v, "build/checkpoints/k-v1/k.sram" in (m or "")), (STALE, True))
         # format: an older stamp is not trusted
         (root / "build/states/a.stamp").write_text(
             "deadbeef gen_a\nrom x\ngenerator y\nartifact z\n")

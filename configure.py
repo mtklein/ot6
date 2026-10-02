@@ -376,7 +376,8 @@ gate_keys = sorted(sn.producers(states, captures))
 # ------------------------------------------------------------------ suite --
 LIBS = list(sn.LIB_FILES)
 # What a suite's run executes besides its composed script (savestate_ninja's
-# RUN_INPUTS, plus the suite wrapper).
+# RUN_INPUTS, plus the suite wrapper; a suite that Continues a checkpoint
+# adds its materialize, below).
 SUITE_RUN = [copy_if_changed_from(p) for p in sn.RUN_INPUTS] \
     + [copy_if_changed_from("tools/build/run_suite_test.sh")]
 COMPOSE_DEPS = [lua_copy_from(p) for p in LIBS] \
@@ -480,6 +481,7 @@ for f in glob("tools/tests/*.lua"):
     if "OT6_SRAM_CHECKPOINT=" in env:
         key = env.split("OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/")[1].split()[0]
         deps += [copy_if_changed_from(a) for a in sn.checkpoint_inputs(ROOT, key)]
+        deps.append(copy_if_changed_from(sn.CHECKPOINT_TOOL))
     w.edge([f"build/results/suite/{t}.ok"], "suitetest", implicit=deps,
            test=t, env=env)
     qual.append(f"build/results/suite/{t}.ok")
@@ -635,7 +637,7 @@ check("checkpoint_drift",
       desc="tracked checkpoints are the graph's play")
 check("checkpoint_negatives", "nice sh tools/tests/lib/checkpoint_negatives.sh",
       ["tools/tests/lib/checkpoint_negatives.sh"]
-      + [copy_if_changed_from(p) for p in sn.RUN_INPUTS]
+      + [copy_if_changed_from(p) for p in sn.RUN_INPUTS + (sn.CHECKPOINT_TOOL,)]
       + [copy_if_changed_from("tools/tests/lib/compose.py")]
       + [lua_copy_from(h) for h in LIBS] + checkpoint_files)
 # the segment runner's negative control (#178, #200): a contract failure

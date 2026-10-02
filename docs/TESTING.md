@@ -75,23 +75,27 @@ battery save loaded through Continue can be a suitable cross-build entry point
 when its persistent layout remains compatible; test that compatibility rather
 than assuming it.
 
-The Ninja graph and stamp checker implement that separation. Each generated
-fixture's stamp records the ROM it was captured on, its generator's own
-signature, its artifact and ancestor bindings (compatibility), and the
-signature and per-file hashes of the shared harness sources that produced it
-(provenance). A fixture is stale when the ROM or its generator changed or a
-binding fails; a change to the shared harness sources alone is reported as
-provenance drift and regenerates nothing. A stamp written before ROM identity
-was recorded stays on the older conservative whole-signature rule until its
-fixture is regenerated, or until `compose.py --adopt-stamps` proves the
-missing lines from the tree's own records (the current sources still hash to
-the recorded signature, the artifact verifies, and ninja's build log shows
-the ROM copy-if-changed step last ran before the generate edge with its copy equal
-to the current ROM) and appends them; no ROM identity is invented for it,
-and a fixture the records cannot prove is refused. This describes
-the implementation, not an additional owner restriction. Improve
-dependency/compatibility handling when needed; do not forge stamps, discard
-provenance, or silently disable checks. Use `H.requestSaveState`,
+The Ninja graph and the stamps implement this. The graph of generated
+states is played once, from power-on: every state boots the state before
+it, and at a cut the battery save the run before it made, so the fixtures,
+the tracked checkpoints and the play are one line. Each run depends on its
+true inputs by content: its composed script (the generator, the test
+library it inlines, the savestates it embeds, compared as a Lua token
+stream), the ROM, the emulator pin, the runner, and at a cut the save it
+Continues. `ninja` reruns exactly what a change reaches. A ROM, emulator,
+runner, generator or library change replays the game from the first run it
+touches; a comment, or any change that leaves every composed program alone,
+replays nothing; and a run that plays to the same bytes stops there. That a
+library change replays the game is the build being exact about what it last
+ran, not a finding that the snapshots it made became illegitimate. Each
+artifact's stamp (`tools/tests/lib/stamps.py`) records what produced it:
+the composed script's digest, every other input's hash, the artifact, what
+it booted, the emulator. `stamps.py --check-states` asks the question ninja
+answers, by the same inputs. Every tracked checkpoint is cut from the
+graph's capture of it, and the drift gate holds the tracked copy to that
+capture. This describes the implementation, not an additional owner
+restriction. Improve dependency handling when needed; do not forge stamps,
+discard provenance, or silently disable checks. Use `H.requestSaveState`,
 `H.requestLoadState`, `H.saveState`, and `H.loadState` for coherent
 snapshots, and the versioned SRAM checkpoint path for battery saves. Prefer
 these existing supported paths during iteration.
