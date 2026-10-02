@@ -206,6 +206,9 @@ def held(claims, machine, active, now):
     return max(0, sum(c["n"] for c in live) - rise)
 
 
+SETTLE_SEC = 300      # a returning peer's quiet period before it takes work
+
+
 def placement(machines, mods, claims, now):
     """placement.json from the machines' state now, the models and claims."""
     out = []
@@ -221,6 +224,13 @@ def placement(machines, mods, claims, now):
                         for k, v in sorted(mo["shape"].items())}
         rec["shift"] = mo["d"]
         if not m["up"]:
+            continue
+        # A peer that has only just come back (a sleeping laptop's brief
+        # network wake) gets no room until it has stayed up a while: work
+        # placed there would freeze when it sleeps again.
+        if m.get("up_since") and now - m["up_since"] < SETTLE_SEC:
+            rec["room"] = 0
+            rec["settling"] = int(SETTLE_SEC - (now - m["up_since"]))
             continue
         room = mo["knee"] - m["active"]
         h = held(claims, m["name"], m["active"], now)

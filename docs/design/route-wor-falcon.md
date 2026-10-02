@@ -83,6 +83,12 @@ emulator run was made for this plan.
    last chests and two rooms before the grave (map 300 (122,14), shown by
    `$0632`, which is set). It is the Dullahan retry point and the first
    field save-point checkpoint of the World of Ruin chain (section 7).
+10. **Played (section 13):** the chest and Dullahan are won at L31-L33 in
+   every measured draw with the route's policy (80 of 80 each, 49 and 52
+   battle keys); the gil's digit is the lever that matters at Dullahan (30
+   of 32 left at 1); SETZER lands four of Dullahan's breaks in five; the
+   rising leaves the Falcon over (68,187), and `H.flyTo` flies it to
+   (25,160), where `wor-falcon-v1` is cut.
 
 ---
 
@@ -195,9 +201,10 @@ the deaths it still costs from a hurt start are the driver's heal-lock.
 **#322 fits here too**: the Hero Ring and the passage on leg 1, the Regal
 Crown on leg 2's walk to the engineer. If the owner prefers the side items
 out of the story chain, leg 1 is the one to drop: legs 2-11 do not need it.
-**Played** as a side branch off `wor-edgar-v1` (section 10): every chest
-above but the Regal Crown (leg 2's), plus South Figaro's (2,43) Elixir; the
-rich man's house is a warp maze from its door, not one region.
+**Played** off `wor-edgar-v1` (section 10): every chest above but the
+Regal Crown (leg 2's), plus South Figaro's (2,43) Elixir; the rich man's
+house is a warp maze from its door, not one region. First a side branch,
+then put on the chain with its relics worn (owner, 2026-10-01; 10.4).
 
 ### 2.3 The castle's ride (leg 2)
 
@@ -322,6 +329,10 @@ $00CD=1 $01B8=1 $01B9=1 ... $039B=1` (`:11257-11276`), `ResetTurtles`, and
 `load_map 1, {25, 160}, ... AIRSHIP` (`:11280`): the party is aboard the
 Falcon, flying, over `(25,160) prop $0544 walk group 49` (`tiles.txt`). `$039B`
 shows Palidor on the Solitary Island's beach (magicite.md): the next arcs'.
+**Measured** (section 13): the load is followed by the rising's own
+`move_vehicle` script (`:11287-11298`), which flies the Falcon on to
+(68,187) before the pilot has the controls; leg 11 flies it back to
+(25,160) and lands there.
 
 ### 2.8 Where the World of Ruin opens
 
@@ -484,7 +495,8 @@ member's experience.
 
 - **Zombie** (the tomb): Revivify (4 in the bag; Kohlingen's item shop 67
   sells it at 300), the Amulet (Dark, Zombie, Poison; 5000 in South
-  Figaro's relic shop 62, none in Kohlingen), the passage's **Ribbon**.
+  Figaro's relic shop 62, none in Kohlingen), the passage's **Ribbon** (on
+  CELES since 10.4).
   The relic slots are spoken for (two Genji Gloves, CELES's and EDGAR's
   Jewel Rings, SABIN's Black Belt, EDGAR's Star Pendant), so each Amulet is
   a choice against one of those. Breaking a Zombie-caster before its turn
@@ -651,8 +663,8 @@ in parallel (docs/TOOLING.md "Cuts and the chain from power-on").
 | checkpoint | where | why |
 |---|---|---|
 | `wor-edgar-v1` (exists) | world (81,86), the Figaro desert | the start |
-| **`wor-figaro-sweep-v1`** (sealed, a side branch; section 10) | world (81,86) again, after leg 1 | the side items and the desert (#321, #322) cut off the story chain, so the Kohlingen legs need not replay a long optional leg; drop it if leg 1 is dropped |
-| **`wor-kohlingen-v1`** | world (40,45), east of Kohlingen's door (sealed; section 11) | the first save with SETZER, dressed, after Kohlingen's shops; the boot for the tomb |
+| **`wor-figaro-sweep-v1`** (sealed; on the chain since 2026-10-01, sections 10, 10.4) | world (81,86) again, after leg 1 | the side items and the desert (#321, #322), the relics worn; the boot for the Kohlingen leg |
+| **`wor-kohlingen-v1`** | world (40,45), east of Kohlingen's door (sealed; section 11; re-cut from `wor-figaro-sweep-v1`, 11.4) | the first save with SETZER, dressed, after Kohlingen's shops; the boot for the tomb |
 | **`wor-tomb-v1`** | Darill's Tomb B3, the save point (122,14) | the last save before the monster chest and Dullahan: the retry point for both, and the World of Ruin's first save-point checkpoint |
 | **`wor-falcon-v1`** | world (25,160), landed beside the Falcon | the end of the arc; the hub the World of Ruin arcs boot from |
 
@@ -887,17 +899,17 @@ other break suites pass on the re-cut ROM (`ninja_checks.log`).
 
 | mechanic | where | coverage today | what the driving needs |
 |---|---|---|---|
-| Dullahan: an event battle whose loss is a game over | the grave | the runner retries a lost segment from its boot | the lab (section 5): level target, Shell/Haste/Slow, SETZER's arms |
-| Zombie on several members, in battle | the tomb (four species) | field cure HANDLED (#190); the battle raise refuses a Fenix Down on a zombie (#245); **the battle cure HANDLED (#263, 12.3)** | measured (12.3): members Zombied at a battle's end 12 -> 3 over 102 tomb battles; the Amulets and the Ribbon remain levers |
-| Sour Mouth (six statuses) | Mad Oscar, B2/B3 | Muddle HANDLED (route-wor-edgar 12.4); Sleep "planned around / not measured live" | Remedy in battle; the Ribbon |
-| L? Pearl and the gil digit | Dullahan | not read by the driver | read `$1860-$1862` at the grave; the digit is a lever a person can move (selling an odd-priced item) |
+| Dullahan: an event battle whose loss is a game over | the grave | **measured (13.6)**: 80 of 80 over 52 keys at L31-L33 with the digit settled; 30 of 32 with it at 1 | the runner retries a lost segment from its boot |
+| Zombie on several members, in battle | the tomb (four species) | field cure HANDLED (#190); the battle raise refuses a Fenix Down on a zombie (#245); **the battle cure HANDLED (#263, 12.3)** | measured (12.3): members Zombied at a battle's end 12 -> 3 over 102 tomb battles; with CELES in the Ribbon (12.7) 3 over 57: Zombie lands on the other three; the Amulet goes on by the relic rule when one drops |
+| Sour Mouth (six statuses) | Mad Oscar, B2/B3 | Muddle HANDLED (route-wor-edgar 12.4); Sleep "planned around / not measured live" | Remedy in battle; the Ribbon (worn by CELES since 10.4; she said no status in 12.7's ten runs) |
+| L? Pearl and the gil digit | Dullahan | **HANDLED (13.3)**: `gen_wor_falcon` reads it after the chest and at the grave and moves it with a Mad Oscar's purse (no shop in the tomb) | — |
 | Frozen (N. Cross) | Dullahan | planned around / not measured live | — |
-| a chest that opens a battle (`EventCmd_8e`) | 300 (120,9) | not in mechanics-coverage | open it after the save; the runner's battle handling |
-| the Whelk pattern: a shell that counters, a head that hides | the chest | the Narshe Whelk's driver | the kill order (head only) |
+| a chest that opens a battle (`EventCmd_8e`) | 300 (120,9) | **HANDLED (13.5)**: faced and pressed like a chest, the fight played by the driver | — |
+| the Whelk pattern: a shell that counters, a head that hides | the chest | **measured (13.5)**: the head first; 80 of 80 over 49 keys; Giga Volt one counter in three | — |
 | face-and-hold-A switches and turtle rides, three directions | the tomb | HANDLED (`H.faceAndHoldA`, up at the Figaro turtle) | down (56,14) and right (71,9) are new directions for it |
 | the castle's ride (a dialog choice and a scripted move) | leg 2 | the Edgar arc's surfacing is the same scene family | choice 0 at "(Go to Kohlingen?)" |
-| **flying and landing the Falcon** | the end | "PARTIAL — contract assertions only" | a land verb (A over land) and a contract; a suite for the new mechanic |
-| a scripted cutscene with walking in the middle | 301 (the flashback) | none needed beyond talks and a step-on trigger | talk, step, talk |
+| **flying and landing the Falcon** | the end | **HANDLED (13.8)**: `H.flyTo` (steer, A, coast, B over a landable tile), `field_flyto`, `wor-falcon-v1`'s contract | — |
+| a scripted cutscene with walking in the middle | 301 (the flashback) | **HANDLED (13.1)**: talk, step, talk (`H.talkToObj` on NPC_5, the trigger (17,16)) | — |
 | a party member joining undressed | SETZER | `M.equipKit` and the world menu helpers (#255) | dress him from the bag and Kohlingen's shops |
 | the desert's Sand Horse pair | group 44, both castle tiles | the driver heal-locks (#312); lost 2 of 8 with two members; **won 124 of 124 over 60 keys with the trio** (section 10.3) | the heal policy's fix (#312), measured there as a lever |
 | map-init `mod_bg_tiles` and turtles | the tomb, 297's stairs, 66, 89 | the lib reads live RAM | offline counts are verify-on-arrival |
@@ -916,10 +928,12 @@ segment Continues `wor-edgar-v1`, walks the desert and the plain to South
 Figaro, takes the basement passage's chests by both of its ways in, takes
 the Hero Ring through the Figaro cave's other door, walks back through the
 desert and saves on the castle's tile again through `H.saveAtCheckpoint`:
-the `wor-figaro-sweep-v1` checkpoint. Nothing boots it (`wor_kohlingen`
-boots `wor-edgar-v1`), so the leg sits beside the chain, not on its
-critical path; the relics go to the bag, the kit is unchanged, and the
-Regal Crown is left for the Kohlingen leg. Every number below is quoted
+the `wor-figaro-sweep-v1` checkpoint. As first driven nothing booted it
+(`wor_kohlingen` booted `wor-edgar-v1`), the relics went to the bag and
+the kit was unchanged; since the re-cut of 10.4 the leg is on the chain
+(`wor_kohlingen` boots its checkpoint) and each relic goes on as it is
+found. The Regal Crown is left for the Kohlingen leg. Sections 10.1-10.3
+are the first driving; every number in them is quoted
 from a log under `build/attempts/wt/wor-figaro-sweep/` (`capture/` the
 sealing run, the graph edge, the Continue and its negative; `var1/` the
 variation set; `pace1*`, `lab222_*` the formation-222 lab; `dev/` the
@@ -1082,10 +1096,145 @@ belongs in `M.healDecision` (#312, v0.26) and is measured above. Not
 measured: CELES and SABIN alone against 222 (the leg never fields the
 pair), and the lever's effect on other fights.
 
+### 10.4 The relics worn, and the side trip on the chain (re-cut 2026-10-01)
+
+Owner, 2026-10-01: "you gotta use a ribbon when you have one" (guidelines
+"Ribbons are worth going out of your way for"). The leg now dresses the
+party the moment a find is in the bag (after the Ribbon's cellar, after
+the rich man's cellar, after the Hero Ring), and `wor_kohlingen` boots its
+checkpoint, so the relics ride the chain to the tomb and Dullahan. Every
+number below is quoted from `build/attempts/wt/ribbon-chain/` (`capture/`
+the sealing runs, the cold Continues and their negatives, for all three
+re-cut checkpoints; `var_kohlingen/`, `var_tomb/` the variation sets;
+`var_tomb_a/` the first tomb set, before a fix; `dev/` the first runs;
+`lab/` the scripts), on ROM `86018dd9ac20` (main `5abf9e2e`), run on px13.
+Nothing was measured by writing game state.
+
+**The rule** is one lib helper, `H.relicPlan` / `H.dressRelics`
+(`lib/ot6_field.lua`; #351), read from the ROM's item records (ItemProp
++6/+7 status protection, +8 bit 3 Haste, +9 the Atlas/Earring bits, +11
+bit 7 the Hyper Wrist, +12 the Black Belt's counter and the two-weapon
+bits) and the threats the caller states (`H.ARC_THREATS["wor-falcon"]`, one
+entry the arc's three generators share: the tomb's Zombie, Sour Mouth's
+Imp, Poison, Dark, Sleep, Muddle and Mute, the Sap seen there, the
+chest's PetriBlast). A worn Genji Glove stays where it is; a spare one in
+the bag goes on the main boost-Fighter not wearing one (the highest vigor),
+and the Relic menu's own re-equip arms the second hand. The widest guard
+goes next, to the party's caster (the member with the most spells
+learned, counted only for the twelve characters with a spell-table row),
+or, when she cannot wear it or has no free slot, to the next member by
+spells learned who can; then Haste, +25% damage, vigor, counter and magic
+outrank plain guards, each to the member it helps most (Haste the
+slowest, damage and vigor the two-weapon Fighters first, then by vigor);
+a guard fills a slot nothing better took, by the threatened statuses it
+adds. Then it dresses through the Relic menu.
+
+**Who wears what, and why** (`capture/capture_wor-figaro-sweep-v1.log`):
+
+| member | relics | the log's reason |
+|---|---|---|
+| CELES | Genji Glove, **Ribbon** | `Ribbon $CA goes to CELES's slot 5 (over Jewel Ring $B5): the widest guard (9 of the threatened statuses) to the party's caster (7 spells learned; SABIN 0, EDGAR 0)` |
+| SABIN | Genji Glove, Hero Ring | `Hero Ring $C9 goes to SABIN's slot 5 (over Hyper Wrist $D2): rank 4, to the member whose Fight it scales most (two weapons, vigor 47)` |
+| EDGAR | RunningShoes, Hyper Wrist | `RunningShoes $BA goes to EDGAR's slot 4 ...: Haste, rank 5, to the slowest member with a free slot (speed 30)`; `Hyper Wrist $D2 goes to EDGAR's slot 5 (over Black Belt $D5): rank 3, ... (one weapon, vigor 39)` |
+| SETZER (at Kohlingen) | Black Belt, Star Pendant | `Black Belt $D5 goes to SETZER's slot 4 (over (empty) $FF): rank 2 ...`; `Star Pendant $B1 goes to SETZER's slot 5 ...: a guard (1 of the threatened statuses)` (`capture/capture_wor-kohlingen-v1.log`) |
+
+**Why CELES wears the Ribbon.** She is the party's caster and its Runic
+(Dullahan's handle, section 5): Mute and Imp take her Magic and Runic
+while the others keep Fight, Blitz, Tools and Slot, and Sleep, Muddle and
+Zombie cost every member alike. On her it replaces a Jewel Ring whose one
+threatened status (Petrify) it also covers, so she loses nothing. The
+statuses the tomb said in section 12's set (`status_tomb.py` over
+`wor-tomb/var1/`, body battles, 19 runs) agree: CELES 15 lines (`BLIND 3,
+IMP 3, POISON 4, SLEEP 3, ZOMBIE 2`: every Sour Mouth landing), SABIN 8,
+EDGAR 8, SETZER 10 (two of them Slow, which no relic here blocks). The
+case for EDGAR or SETZER (the Ribbon covers both of their guards, freeing
+a slot) does not hold under the rule, since the acting relics displace
+those guards either way; what moves is whether CELES or EDGAR carries the
+third acting relic. It was measured as a lab arm (12.7).
+
+**What the plan did not know:** the Relic menu re-equips by Optimum on the
+way out whenever the relics changed and a Genji Glove, Gauntlet or Merit
+Award sits in the old or new pair, one that stays put included
+(`CheckReequipRelics`, `menu/equip.asm`). The first run lost CELES's
+ThunderBlade to the Blizzard, which Dullahan absorbs
+(`dev/sweep1_optimum_finding.txt`: `before=13 0F 7E 8F D1 B5`,
+`after=13 0E 7E 8F D1 CA`; that run was killed and its log lost, so the
+file quotes the lines as read during it; the finding is live in the
+capture log, `capture/capture_wor-figaro-sweep-v1.log`: `[relics after
+the Ribbon] CELES: the Relic menu's re-equip moved slot 1 $0F -> $0E;
+putting it back`). `H.dressRelics` notes the gear before each
+Relic session and re-equips it after: `[relics after the Ribbon] CELES:
+the Relic menu's re-equip moved slot 1 $0F -> $0E; putting it back`, then
+`CELES's gear slot 1 holds $0F as before the relics`.
+
+**The re-cut.** `capture/capture_wor-figaro-sweep-v1.log`: `contract
+wor-edgar-v1 (entry): all 26 fields hold`; `[sweep] the Ribbon ($CA) is
+worn by CELES`, `the Hero Ring ($C9) is worn by SABIN`, `the Hyper Wrist
+($D2) is worn by EDGAR`, `the RunningShoes ($BA) is worn by EDGAR`;
+`[saved] wor-figaro-sweep-v1: slot 3 holds map 1 ($2001) world tile
+(81,86)`; `contract wor-figaro-sweep-v1 (exit): all 30 fields hold`; `[wor]
+the battles: 10 ($0DC x2, $07D x1, $176 x2, $175 x2, $086 x1, $0E8 x1, $0E9
+x1): 10 won`; `PASS (frame 42972) attempts=1/3`. Sealed
+(`capture/validate_wor-figaro-sweep-v1.txt`): `valid
+ot6.sram-checkpoint/v1: 32768 bytes sha256=2d716d50536d... holds=slot 3
+world 1 (81,86)`. The cold Continue (`capture/continue_figaro_sweep.log`):
+`contract wor-figaro-sweep-v1 (entry): all 30 fields hold`, `CELES ...
+esper+kit 06 13 0F 7E 8F D1 CA; SABIN ... 01 57 57 77 90 D1 C9; EDGAR ...
+00 11 5C 76 89 BA D2`. The contract's new pin fails alone on the battery
+it replaced (`capture/negative_contract_on_old_wor-figaro-sweep-v1.log`):
+`contract wor-figaro-sweep-v1 (entry) VIOLATED -- 1 field(s) differ: ram
+$1702 & $FF (CELES wears the Ribbon ...): expected 0xCA, read 0xB5`. The
+first sealing run (`capture-first/`) dressed EDGAR with two Star Pendants
+for a moment (a tie between equal guards went by item number); the
+re-cut's rule keeps the worn guard on a tie and gives a guard only to a
+member it adds a threatened status to.
+
+**The leg under draw variation** (`var_sweep/`, `lab/varlab_sweep.py`, the
+first driving's varlab with the shipped generator: K encounters used up
+on the continent's grass, forest and plain before the body, retries off;
+`summary.txt`, `keys.txt`):
+
+| K | 0 | 1 | 2 | 3 | 4 | 5 (6 fought) | 6 | 7 (8 fought) | 8 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| PASS frame | 42972 | 45812 | 57120 | 55355 | 69437 | 59535 | 65808 | 74621 | 66478 | 76346 |
+| lowest member HP (body) | 948 | 992 | 217 | 794 | 524 | 1010 | 259 | 842 | 1110 | 920 |
+
+**10 of 10 `PASS attempts=1/1`**, each `contract wor-figaro-sweep-v1
+(exit): all 30 fields hold`; every `[outcome]` line `paid as due` (150 of
+150), no death in a body. `body: 102 battles, 90 distinct battle keys
+(seed+group+formation); outcomes {'WON': 102}`: by place map 87 (the
+passage) 34 keys, the world 27, map 68 (the cave) 25, map 90 5. The desert
+in the bodies: the Sand Horse pair (222) once (`k2_s0 | body | be80-g00DE
+| 0DE | Sand Horse x2 | WON`, 4176 ticks), formation 223 six times. In
+every run the three Relic-menu stops ended in the same kit (`[relics after
+the Hero Ring] CELES wears Genji Glove $D1, Ribbon $CA`, `SABIN wears Genji
+Glove $D1, Hero Ring $C9`, `EDGAR wears RunningShoes $BA, Hyper Wrist
+$D2`) with one Optimum put-back (`putting it back`, 1 a run).
+
+**After the review's generality fixes** (a spare two-weapon relic
+planned, spells counted only where a spell-table row exists, the widest
+guard passed to the next member who can wear it, the threats in one
+place), the three captures were re-run from the same tracked boots
+(`recheck/`): `PASS (frame 42972)`, `(26324)`, `(26573)`, each
+`attempts=1/3` with `all 30` / `all 34` / `all 31 fields hold`, and the
+payloads are the same batteries byte for byte (`recheck/validate_*.txt`:
+`sha256=2d716d50536d...`, `b0c2de780704...`, `cd0d052614f6...`); only the
+provenance signatures were re-sealed. The cold Continues hold (`all 30`,
+`all 34`, `all 31 fields hold`). A plan-only probe on the battery from
+before the re-cut (`recheck/probe_relic_plan.log`, `lab/probe_relic_plan.lua`;
+the Ribbon still in the bag) exercises the fallback: `[probe] the Ribbon
+goes to: the trio CELES; without CELES SABIN; CELES listed last CELES`
+(`Ribbon $CA goes to SABIN's slot 5 (over Black Belt $D5): the widest
+guard ... to SABIN, the first by spells learned (SABIN 0, EDGAR 0) who can
+wear it with a free slot`). No battery on this arc holds a spare Genji
+Glove, Gauntlet or Merit Award, or GOGO or UMARO, so those two paths have
+not run.
+
 ## 11. The castle's ride, Kohlingen and SETZER, played (legs 2-4, `gen_wor_kohlingen`, `wor-kohlingen-v1`)
 
 Driven 2026-10-01 for #263 (and #322's Regal Crown). The segment
-Continues `wor-edgar-v1` (`H.bootCheckpoint`), takes the Regal Crown off
+Continued `wor-edgar-v1` (`H.bootCheckpoint`; since 11.4 it Continues
+`wor-figaro-sweep-v1`), takes the Regal Crown off
 the castle's basements, rides the castle to Kohlingen, walks into town,
 opens its two chests, rests at the inn, takes SETZER, dresses him from the
 bag and the town's shops, and saves east of the town's door through
@@ -1254,6 +1403,58 @@ in a body (`var/summary.txt`); the bodies fought **33 battles over 33
 distinct battle keys**, all won (`var/keys.txt`: formations 229 x7, 232
 x8, 233 x8, 239 x6, 228, 231, 241, 243 one each); the lowest member HP on
 a body's battle lines was 584.
+
+### 11.4 Re-cut from the side trip (`build/attempts/wt/ribbon-chain/`)
+
+The leg now Continues `wor-figaro-sweep-v1` (10.4): the same tile (81,86),
+the castle not yet sailed, the trio wearing the side trip's relics and the
+bag holding its finds. Nothing in the leg's route or assertions needed to
+change; SETZER's relics now come from the same relic rule over all four
+(`H.dressRelics`), which leaves the trio's as they were. The capture
+(`capture/capture_wor-kohlingen-v1.log`): `contract wor-figaro-sweep-v1
+(entry): all 30 fields hold`; `[care at the boot] nothing to do`; `[kit]
+the Regal Crown goes to SABIN`; `[castle] f10159 the castle has sailed for
+Kohlingen`; `[kit] SETZER's weapon: shop 65's $50 scores 6133 against the
+bag's best 6104` (the Trump, as in 11.3); `[shop] Kohlingen item counter:
+bought: tonic=4 potion=54 fenix=29 remedy=10 soft=18 revivify=10
+greencherry=5 gil=231655 (spent 9200 GP)`; `[relics with SETZER] SETZER
+wears Black Belt $D5, Star Pendant $B1`; `[saved] wor-kohlingen-v1: slot 3
+holds map 1 ($2001) world tile (40,45)`; `contract wor-kohlingen-v1 (exit):
+all 34 fields hold`; `[wor] the battles: 3 ($0E7 x1, $0E9 x1, $0EF x1): 3
+won`; `PASS (frame 26324) attempts=1/3`. Sealed
+(`capture/validate_wor-kohlingen-v1.txt`): `sha256=b0c2de780704...
+holds=slot 3 world 1 (40,45)`. The cold Continue
+(`capture/continue_kohlingen.log`): `contract wor-kohlingen-v1 (entry): all
+34 fields hold`, `SETZER L31 ... esper+kit 17 50 5F 7C 95 D5 B1;
+gil=231655`. The contract's new pin (CELES's Ribbon) fails alone on the
+battery it replaced (`capture/negative_contract_on_old_wor-kohlingen-v1.log`:
+`VIOLATED -- 1 field(s) differ: ram $1702 & $FF ... expected 0xCA, read
+0xB5`).
+
+Under draw variation (`var_kohlingen/`, `lab/varlab_kohlingen.py`: K
+encounters used up on the South Figaro continent before the body, retries
+off; `summary.txt`, `keys.txt`):
+
+| K | body battles (key/formation) | lowest member HP (body) | verdict |
+|---|---|---|---|
+| 0 | `be1C/$0E7`, `beC0/$0E9`, `be1C/$0EF` | 1519 | `PASS (frame 26324) attempts=1/1` |
+| 1 | `beA0/$0E7`, `beA0/$08A`, `be84/$0EF` | 1550 | `PASS (frame 28478)` |
+| 2 | `be7C/$0E9`, `beB0/$0E9`, `be0C/$0EF` | 1273 | `PASS (frame 31092)` |
+| 3 | `be48/$0E7`, `beC0/$0E9`, `beB8/$0F1` | 1285 | `PASS (frame 36059)` |
+| 4 (5 fought) | `beF0/$0E5`, `be0C/$0F1` | 1097 | `PASS (frame 39974)` |
+| 5 | `be74/$0E8`, `beB4/$0E7` | 1102 | `PASS (frame 42664)` |
+| 6 (7 fought) | `be0C/$0E8`, `beC0/$0E4`, `be50/$0DE`, `beE0/$0EF` | 938 | `PASS (frame 52406)` |
+| 8 | `beF0/$0E4`, `beC8/$0E8`, `beC8/$0EF` | 803 | `PASS (frame 56204)` |
+| 10 (11 fought) | `beF0/$0E8`, `beAC/$0E5` | 1050 | `PASS (frame 58716)` |
+| 12 | `be28/$0E5`, `be58/$0EF` | 1515 | `PASS (frame 62227)` |
+
+**10 of 10 `PASS attempts=1/1`**, each `contract wor-kohlingen-v1 (exit):
+all 34 fields hold` with SETZER in `D5 B1`; every `[outcome]` line `paid
+as due` (81 of 81), no death in a body. `body: 27 battles, 26 distinct
+battle keys (seed+group+formation); outcomes {'WON': 27}` (one key,
+`beC0-g00E9/$0E9`, in K=0 and K=3). The Sand Horse pair (222) came up once
+in a body (K=6: `be50-g00DE | 0DE | Sand Horse x2 | WON`) and once in a
+prefix (K=10), both won by the trio in its new relics.
 
 ## 12. Darill's Tomb to its save point, played (legs 5-8, `gen_wor_tomb`, `wor-tomb-v1`)
 
@@ -1532,9 +1733,365 @@ witness (a broken monster reaching it acts after all). Body battles:
   leg's.
 - **The tombstone puzzle** (299 (12,39), the Exp. Egg hint) was not done.
 
+### 12.7 Re-cut with the Ribbon on (`build/attempts/wt/ribbon-chain/`)
+
+The leg Continues the re-cut `wor-kohlingen-v1` (11.4): CELES in the
+Ribbon, SABIN the Hero Ring, EDGAR the RunningShoes and the Hyper Wrist,
+SETZER the Black Belt and a Star Pendant. On the save point, before the
+save, the relic rule re-plans with what the chests and the drops brought
+(`H.dressRelics`): the Exp. Egg is not ranked (it helps no fight), and an
+Amulet, when one drops, goes on SETZER over the Star Pendant (`Amulet $B3
+goes to SETZER's slot 5 (over Star Pendant $B1): a guard (3 of the
+threatened statuses)`, `var_tomb/k1_s0.log`). The capture
+(`capture/capture_wor-tomb-v1.log`): `contract wor-kohlingen-v1 (entry):
+all 34 fields hold`; `[kit] the Genji Helmet ($81) goes to EDGAR`, `the
+Crystal Mail ($98) goes to EDGAR`; `[saved] wor-tomb-v1: slot 3 holds map
+300 ($012C) tile (122,14)`; `contract wor-tomb-v1 (exit): all 31 fields
+hold`; `[wor] the battles: 6 ($0F6 x1, $0F9 x2, $0F7 x1, $0FA x1, $0FB x1):
+6 won`; `PASS (frame 26573) attempts=1/3`. Sealed
+(`capture/validate_wor-tomb-v1.txt`): `sha256=cd0d052614f6... holds=slot 3
+map 300 (122,14)`. The cold Continue (`capture/continue_tomb.log`):
+`contract wor-tomb-v1 (entry): all 31 fields hold`, `CELES L32 ... esper+kit
+06 13 0F 7E 8F D1 CA; ... EDGAR L32 ... 00 11 5C 81 98 BA D2; SETZER L31 ...
+17 50 5F 7C 95 D5 B1; gil=247857; revivify=17 remedy=10 potion=53 fenix=29
+tent=10`; the new pin fails alone on the battery it replaced
+(`capture/negative_contract_on_old_wor-tomb-v1.log`: `VIOLATED -- 1
+field(s) differ: ram $1702 & $FF ... expected 0xCA, read 0xB5`).
+
+**A failed first set** (`var_tomb_a/`): the first re-cut also re-planned
+the relics at B2's hub after the chests. Where an Amulet had dropped the
+Relic menu opened there, and afterwards the walker found no path from
+(29,26) to (37,23) for the 900 frames of its retries: `FAIL: navTo: no path
+(29,26)->(37,23) [0 edges blocklisted, 20 retries]` in K=1 and K=6 (8 of 10
+PASS), and a third time in the lab arm's first set before it was
+re-derived (`var_tomb_armE_a/k1_s0.log`, the same line). Every run whose
+Relic menu opened at the hub failed there and no other did
+(`build/attempts/wt/ribbon-chain-review/hub_menus.txt`); the field care at
+the same tile never opened a menu in any set (`[before the turtles]
+nothing to do`, 39 runs), so the defect predates the relic rule and is
+filed apart. The re-plan now runs only on the save point, whose step-on waits
+out the field's stale map after a menu. The capture never opened that
+menu, so its re-capture is the same battery byte for byte (payload
+`cd0d052614f6...` both times; `capture-tomb-first/`); only the provenance
+signature changed. Why the hub's map stays unwalkable after a menu is not
+diagnosed (the B2 pocket joins of 2.6 and the z-level are the suspects).
+
+**Under draw variation** (`var_tomb/`, `lab/varlab_tomb.py`: K encounters
+used up on the Kohlingen continent before the body, retries off;
+`summary.txt`, `analysis.txt`, `status.txt`):
+
+| K | verdict | K | verdict |
+|---|---|---|---|
+| 0 | `PASS (frame 26573) attempts=1/1` | 5 | `PASS (frame 46755)` |
+| 1 | `PASS (frame 30405)` | 6 | `PASS (frame 49949)` |
+| 2 | `PASS (frame 34604)` | 8 | `PASS (frame 55071)` |
+| 3 | `PASS (frame 32800)` | 10 | `PASS (frame 65616)` |
+| 4 | `PASS (frame 42370)` | 12 | `PASS (frame 63711)` |
+
+**10 of 10**, each `contract wor-tomb-v1 (exit): all 31 fields hold`.
+`body: 62 battles over 56 distinct battle keys (seed+group+formation);
+outcomes {'WON': 62}`, 57 of them in the tomb (formation 250 22 battles,
+249 16, 248 7, 247 5, 251 4).
+
+**What the Ribbon changed, against 12.2-12.4.** Section 12's set
+(`wor-tomb/var1/`, the cure on, 19 runs) against this one, and a lab arm
+with the Ribbon on EDGAR instead (`var_tomb_armE/`: the same generators
+with the relic rule's `opts.guardTo = 4` lever and the CELES pin dropped,
+`lab/arm_edgar.py`, its own sweep and Kohlingen captures under `armE/`;
+EDGAR wore `Ribbon $CA, RunningShoes $BA`, CELES `Genji Glove $D1, Hyper
+Wrist $D2`; the same ten K, 10 of 10 PASS). Status lines are counted as
+said in body battles (`lab/status_tomb.py`); "deaths" are the `[death]`
+lines other than the Zombie touch's (`atk $EF`, the landing reads as a
+death):
+
+| set | tomb battles | ended with a member Zombied | member-battles Zombied at the end | XP unpaid to members down or Zombied | statuses said on the Ribbon's wearer | Zombie said | other deaths | Fenix Downs |
+|---|---|---|---|---|---|---|---|---|
+| 12.2, no Ribbon (19 runs) | 102 | 3 | 3 | 3,537 over 4 | (CELES) 15 | 19 | 3 | 1 |
+| Ribbon on CELES (10 runs) | 57 | 3 | 3 | 2,476 over 3 | **0** | 22 | 4 | 1 |
+| Ribbon on EDGAR (10 runs) | 57 | 2 | 2 | 1,796 over 2 | **0** (CELES 6) | 15 | 3 | 0 |
+
+- **The Ribbon empties its wearer's status list**: CELES said nothing in
+  ten runs (15 lines over 19 before, every Sour Mouth landing among them);
+  in the arm EDGAR said nothing and CELES 6 (`POISON 4, ZOMBIE 2`). Sour
+  Mouth now lands on whoever else it picks (`SETZER ... is an IMP` in K=1
+  and K=10).
+- **Zombie landings per tomb battle roughly doubled while the
+  end-of-battle outcomes held.** Zombie was said 22 times over 57 tomb
+  battles here against 19 over 102 before (0.39 against 0.19 a battle;
+  the arm 15 over 57), all of it on the other three (`SABIN 5, EDGAR 8,
+  SETZER 9` lines); the in-battle cure (12.3) cleared most (`Zombie
+  cleared in battle 19`, `status.txt`), and the
+  battles that ended with a member Zombied held at three of 57 against
+  three of 102 (2.9% before, 5.3% here, 3.5% in the arm: three, three and
+  two battles, inside each other's noise). The arms share 21 of their ~58 distinct body keys
+  (`arms_keys.txt`), so ten runs each cannot tell them apart; the choice
+  of wearer stands on the reason in 10.4, not on these numbers.
+- **The deaths are the party's own** in both arms. Ribbon on CELES: a
+  Zombied SETZER's Fight killed CELES from 1417 (`var_tomb/k10_s0.log`:
+  `[death] f+2379 entity 0 char 6 from 1417/1798 by entity 3 char 9 ... (an
+  ally's action)`, the one Fenix Down); CELES's boosted party Cure 2,
+  planned before EDGAR was Zombied, killed him when it landed (`k8_s0.log`:
+  `party cure: 2 hurt (worst 71%), boost 1 folds $2D -> $2E ... all
+  allies`, then `[death] f+1864 entity 2 char 4 from 750/1701 by entity 0
+  char 6 cmd $02 atk $2E`); and twice a one-action kill from 80% or more on
+  SETZER (`cmd $0C atk $E5`, K=5 and K=12). In the arm a Cure 2 or Cure 3
+  landed on a Zombied SABIN twice (`k2`, `k6`: CELES's) and a Zombied
+  CELES's own turn cast one on herself (`k3`: `(its own action)`). A
+  party cure landing on a member Zombied after it was planned is a driver
+  class for a lab (out of this re-cut's scope).
+
+The graph's own edges on the merged tree (`ninja/ninja_edges.log`, `nice
+ninja -j4 build/states/wor_figaro_sweep.mss build/states/wor_kohlingen.mss
+build/states/wor_tomb.mss build/results/suite/battle_zombiecure.ok`) play
+the same runs (`PASS (frame 42972)`, `(26324)`, `(26573)`, each
+`attempts=1/3` with its exit contract holding), regenerate
+`battle_zombiecure`'s fixture on the new `wor_tomb` (`tomb_zombie
+generated: battle be54-g00F9, entity 3 (char 9) Zombied at f6620`), and the
+suite passes on it (`[23/23] suite battle_zombiecure`, no FAILED).
+
 ## 13. Dullahan and the Falcon, played (legs 9-11, `gen_wor_falcon`, `wor-falcon-v1`)
 
-Not yet driven.
+Driven 2026-10-01 for #263. The segment Continues `wor-tomb-v1` (the
+re-cut with the Ribbon on CELES, payload `cd0d0526...`), arms for the two
+fights ahead, opens the monster chest, moves the gil's last digit off the
+party's levels, saves, beats Dullahan, plays the flashback, flies the
+Falcon to (25,160), lands it and saves: the `wor-falcon-v1` checkpoint.
+Every number below is quoted from a log under
+`build/attempts/wt/wor-falcon/final/` (`capture2/` the sealing run,
+`continue/` the cold Continue, `neg/` the contract's negatives, `suite/`
+the graph's own edge, `field_flyto` and its mutants, `var1/` and `var0/`
+the variation sets, `chest/`, `dull/`, `dullctl/` and `dullczar/` the
+labs, `interrupted/` three lab runs stopped when the base moved; their
+scripts one level up). The development runs, on the pre-Ribbon
+`wor-tomb-v1` (`468ec180...`), are kept in `dev/`. All on ROM
+`86018dd9ac20`, px13. Nothing was measured by writing game state.
+
+### 13.1 The run (`capture2/capture_wor-falcon-v1.log`)
+
+| step | what the log says |
+|---|---|
+| boot | `contract wor-tomb-v1 (entry): all 31 fields hold`; `kit CELES 06 13 0F 7E 8F D1 CA` (the ThunderBlade in her left hand, the Ribbon) |
+| the kit | `[kit] CELES hand 1: holds $0F (keys 0 of the fights' species, power 108, ABSORBED by one of them); the best for the fights ahead is $16 (keys 0, power 125)`; `[kit] EDGAR hand 0: holds $11 (keys 0 ...); the best ... is $06 (keys 2, power 146)` (the Man Eater: pierce keys the Whelk Head and Dullahan); SETZER keeps the Trump (`keys 1`), SABIN his Fire Knuckles (`keys 2`) |
+| the chest | `[key] battle key beC4-g01B1`; `[outcome] battle $1B1 WON after 5913 ticks: killed s0:$101` |
+| the purse | `[pearl] after the chest: gil 248857, last digit 7: L? Pearl would hit no one` (no walk needed on this draw) |
+| the save | `[saved] the save after the chest: slot 3 holds map 300 ($012C) tile (122,14)` |
+| the grave | one battle on the walk (`$0F8 WON after 3625 ticks`); `[pearl] pressing the grave: gil 251107, last digit 7: L? Pearl would hit no one` |
+| Dullahan | `[key] battle key be14-g01C7`; `[monact] ... cmd $0C atk $98 L? Pearl`; `[outcome] battle $1C7 WON after 6906 ticks` |
+| the flashback | `[falcon] f22536 in the flashback map 301 (28,6)`; `[falcon] f23416 Daryl's promise seen map 301 (17,16)` |
+| the rising | `[falcon] f32617 in flight over world 1 (68,187): vehicle 1` |
+| the flight | `[fly] f32619 (68.06,187.56) tile (68,187) -> (25,160): 50.4 tiles, bearing 148, heading 316 (err 102, turn 0)`; `[fly] f32739 (45.12,172.38) ... speed 2048 (coasts 2.8)`; `[fly] the Falcon to (25,160): on foot at (25,160), the airship parked at (25,160)` |
+| the save | `[saved] wor-falcon-v1: slot 3 holds map 1 ($0401) world tile (25,160)`; `contract wor-falcon-v1 (exit): all 30 fields hold`; `[wor] the battles: 3 ($1B1 x1, $0F8 x1, $1C7 x1): 3 won`; `PASS (frame 33362) attempts=1/3` |
+
+Sealed and validated (`capture2/validate_wor-falcon-v1.txt`): `valid
+ot6.sram-checkpoint/v1: 32768 bytes sha256=eeee5c8ccd1d... holds=slot 3
+world 1 (25,160) [$1F64=$0401] (saved: declared and checked)`. The cold
+Continue (`continue/continue_falcon.log`): `contract wor-falcon-v1 (entry):
+all 30 fields hold`, `[continue] world 1 at (25,160), ... the airship parked
+at (25,160): CELES L32 ... SETZER L31 ...; gil=251107; potion=52 fenix=29`.
+The graph's own edge plays the same run (`suite/ninja_field_flyto.log`:
+`[3/5] generate wor_falcon <- gen_wor_falcon`, `PASS (frame 33362)
+attempts=1/3`). The contract's negatives (`neg/`): the same probe on
+`wor-tomb-v1` reads `contract wor-falcon-v1 (entry) VIOLATED -- 10
+field(s) differ`; and copies of the battery with one cell changed (the
+slot checksum recomputed; `make_neg.py`) each fail alone: `switch $02B2
+(Dullahan is beaten ...): expected 1, read 0`, `switch $00CC (the Falcon
+has risen ...): expected 1, read 0`, `ram $1F62 & $FF (the Falcon parked at
+x 25 ...): expected 0x19, read 0x1A`, each `VIOLATED -- 1 field(s) differ`.
+The flashback's `$01F0-$01F3` are the scene's own temporaries (measured 0
+again at the landing; the first contract pinned `$01F3` and failed on it,
+`dev/gl1/k0_s0.log`). The ROM clears switches `$01F0-$01FF` on every new
+map (`ff6/src/field/init.asm:470-471`, `stz $1ebe / stz $1ebf`).
+
+What the plan did not know:
+
+- **The rising flies the Falcon itself.** After `load_map 1, {25, 160}`
+  the event's `move_vehicle` script (`event_main.asm:11287-11298`) carries
+  it to (68,187) before the pilot has it; the plan's "control in flight
+  over (25,160)" was the load, not the control. Leg 11 flies back to
+  (25,160), the tile the next arcs were planned from (2.7).
+- **The tomb moves the digit only through the Mad Oscar.** Of the
+  formations the east room and the grave room deal (groups 151 and 150:
+  247-251) only the Mad Oscar's pay a purse that does not end in 0 (`$061
+  Mad Oscar ... GP 2292`, x2 as a random: +4 to the digit); the Exoray and
+  PowerDemon formations' end in 0 (`dev/dev/run1.log`: six grave-room
+  battles, each `$0F9` or `$0F7`, the digit `1` throughout), the chest
+  pays 1000, and GP Rain costs level x 30 (`AttackerEffect_51`). There is
+  no shop.
+- **A Genji Glove's Relic menu re-equips**, so a relic lever has to put the
+  hands back (the relic rule's own lesson, ribbon-chain); `lab_grave.lua`'s
+  `LAB_RELIC` does.
+
+### 13.2 Arming, and the route's policy
+
+`armForFights` reads the ROM: for each weapon hand, the weapon from the
+hand and the bag that scores best on the two fights' species, power scaled
+up by the share of their gauged species it keys (its class in the shield
+row, or its element among their vanilla weaknesses), never one whose
+element any of them absorbs; EDGAR, SETZER and SABIN first, CELES last.
+The first draft scored keys first and power second and handed the bag's
+30-power MithrilKnife to SETZER and CELES (`dev/dev/run1.log`: `the best
+for the fights ahead is $01 (keys 2, power 30)`); the power-scaled score is
+what shipped. No relic moves: `wor-tomb-v1` was dressed by the relic rule
+for the arc's threats on that save point, and the chest and Dullahan add
+none it does not cover.
+
+The fights' options: the chest `{ focus = { { species = WHELK_HEAD } } }`
+(the head first; the shell has no gauge and answers hits), Dullahan
+`{ runic = true }` (CELES raises Runic: Ice 2, Ice 3, Pearl, N. Cross and
+his own Cure 2 are runic), everything else the driver's defaults (break,
+the keyed line, boost banked and spent, Potions and CELES's Cure for care).
+Two levers were measured on the pre-Ribbon base and not shipped:
+- the chest with CELES on Runic too (Giga Volt is runic): 48 of 48 won
+  either way over 31 keys, with 1 death (focus alone, `dev/c0/`) against 7
+  (with Runic, `dev/c1/`): `runs: {'WON': 48}; deaths 1` / `deaths 7 (bp at
+  death: Counter({1: 4, 3: 2, 5: 1}))`;
+- Dullahan with SETZER the only healer and no Cure (`{ runic = true, cure
+  = false, healer = 9 }`, `dev/p1c/`) on 16 draws with the digit at 1: `runs:
+  {'LOST': 2, 'WON': 14}; deaths 13`, against the shipped options' 16 of 16
+  on the same snapshots (`dev/p0c/`).
+
+### 13.3 L? Pearl and the purse
+
+L? Pearl opens every Dullahan fight (`L? Pearl casts 80 in 80 runs`,
+`dull/`). With the digit at 1 it hits all four: `[monact] f493 slot 0 cmd
+$0C atk $98 L? Pearl partyhp 1798,1710,1701,1597`, then `partyhp=1219,1075,
+1263,1156` (`dullctl/var0_k1_s0_w1.log`); with it at 5, nobody
+(`dull/var1_k1_s0_w1.log`: `partyhp=1798,1710,1701,1597` after it). It
+comes back in the hit-counter combo (L? Pearl + Absolute 0), at whatever HP
+the party has then: of the control arm's 29 deaths, 3 are to it
+(`dullctl/var0_k1_s0_w9.log`: three members at once, `[death] f+13359 ...
+atk $98`).
+
+The policy (`settleDigit`): read the digit after the chest and again at
+the grave; while L? Pearl would hit someone (or the digit is 0, whose
+divide-by-zero is unmeasured), walk the room for a battle's purse, at most
+8 battles. On the policy arm (`var1/`) the digit after the chest was 1 on 4
+of 10 draws and 9 or 7 on the rest; the walk cost 1-3 battles each (K=1 took 3: two purses ending in 0, then a Mad Oscar), and on
+one draw (K=7) the walk to the grave moved a safe 9 to 3 (`at the grave:
+gil 277673, last digit 3: L? Pearl would hit CELES L33, SABIN L33`) and one
+grave-room battle moved it on. Every press of the grave on the policy arm
+read `L? Pearl would hit no one`.
+
+### 13.4 Under real draw variation (`var1/`, `var0/`)
+
+`genlab.py` derives the generator with a block after the boot that fights
+K encounters in the east room's own pool and steps back onto the save
+point (`varlab.py`'s shape); retries off. `var1/summary.txt` (the policy)
+and `var0/summary.txt` (`DIGIT_POLICY = false`, the control):
+
+| arm | runs | verdicts | chest | digit at the press | Dullahan | KOs / Zombie landings / Fenix Downs | Potions spent |
+|---|---|---|---|---|---|---|---|
+| policy, K=0-7 at shift 0, K=0 at 23 and 41 | 10 | `10 PASS` | 10 won, 10 keys | 7, 7, 7, 5, 5, 5, 5, 9, 9, 7 | 10 won, 10 keys, 5821-10149 ticks | 4 / 2 / 3 | 1-17 a run |
+| control, K=0-5 | 6 | `6 PASS` | 6 won | 7, 1, 1, 1, 1, 9 | 6 won, 6443-11766 ticks | 3 / 1 / 2 | 1-28 a run (28 and 25 at digit 1) |
+
+Every run landed at (25,160) and held the exit contract. The KOs and
+Zombie landings are the tomb's random battles (the Exoray's Zombie, 12.3)
+but one: a KO in Dullahan's fight on the policy arm (`var1/k3_s0.log`:
+`[death] f+4224 entity 1 char 5 from 300/1710 by slot 0 cmd $00 atk $EE
+bp=1`), raised and won.
+
+### 13.5 The monster chest, a lab (`chest/`, `lab_chestsnap.lua`)
+
+From the frame below the chest in each of the ten `var1/` runs
+(`wor_chest.mss`: armed, on (120,10)), eight waits each before the press
+(the event battle's draw is the frame counter at its start), retries off,
+the generator's own options. `chest/analysis.txt`:
+
+| | runs | distinct battle keys | won | deaths (boost at death) | Fenix Downs | Potions | ticks (min / median / max) |
+|---|---|---|---|---|---|---|---|
+| the chest | 80 | 49 | **80** (`groups won in every run: 49 of 49`) | 5 (bp 1, 1, 1, 0, 0) | 4 | 77 | 1549 / 4093 / 9509 |
+
+Not a coin flip and not attrition at this level: every key won. The fight
+ends on the first boss_death, the shell's or the head's, **40 and 40**
+(`killed s0:$101` / `killed s1:$135`). The head was never broken: its six
+pierce shields took 82 chips, all EDGAR's (the AutoCrossbow), and the fight
+ended first in every run. The shell's counter is Giga Volt one hit in three,
+as its script says (`attack NOTHING, NOTHING, GIGA_VOLT`), not on every
+hit: **73 Giga Volts over 213 counters weighed** on the shell
+(`Ot6MayAct`, `[retal]` lines). The head hid 46 times (`cmd $24 atk $08`),
+and Magnitude8 came 34 times. The four keys with deaths: `beB4` (1, no
+Fenix), `beB0` (2), `beF0` (1), `be28` (1). It is worth opening at this
+level; it pays no XP and holds nothing but the fight.
+
+### 13.6 Dullahan, a lab (`dull/`, `dullctl/`, `dullczar/`, `lab_grave.lua`)
+
+From the frame on the grave in each `var1/` run (`wor_grave.mss`), eight
+waits each before the press, retries off, the generator's own options; a
+loss is a game over (`FAIL: GAME OVER fired`), counted, not retried.
+
+| arm | runs | distinct keys | won | deaths (boost at death) | Fenix Downs | Potions | ticks (min / median / max) |
+|---|---|---|---|---|---|---|---|
+| **the route** (digit settled, `dull/`) | 80 | 52 | **80** (`groups won in every run: 52 of 52`) | 4 (all bp 1) | 4 | 98 | 5485 / 6588 / 13168 |
+| control: the digit at 1, all four hit (`var0/` K=1-4, `dullctl/`) | 32 | 27 | **30** (`groups with a loss: 2`: `beD0`, `beC4`) | 29 (bp 0 x17, 1 x8, 2 x4) | 10 | 233 | 5958 / 8821 / 16500 (wins) |
+| lever: the Czarina Ring (Safe, Shell) for CELES's Ribbon (`var1/` K=0-3, `dullczar/`) | 32 | 20 | 32 | 0 | 0 | 21 | 5428 / 6184 / 10771 |
+
+On the same four entry states the route's own arm spent 37 Potions and 2
+Fenix Downs with 2 deaths over its 32 runs (both in var1_k0_s0_w9); the Czarina arm, 21, 0 and 0
+(the relic's menu moves the press's frame, so the keys differ). Both
+losses in the control are wipes late in long fights, the party worn down
+with little boost banked (`dullctl/var0_k1_s0_w9.log`: `[death] f+13359
+entity 0 char 6 from 224/1798 by slot 0 cmd $0C atk $98 bp=0`, three
+members to the combo's L? Pearl); the policy's settled digit removes both
+L? Pearls' damage. **Measured rate with the route's policy: 80 of 80, 52 of
+52 keys.** The hit-counter combo barely fires (Absolute 0: 0 in `dull/`, 2
+in `dullctl/`): the break and the kill come first.
+
+Two notes for the driver, not shipped: the heal model prices Dullahan's
+round at two of his worst single actions (`inside one round of death
+(2172)`, two 1086-HP Pearls under Haste), above every member's maximum, so
+every member is always "in danger" and many turns go to +250 Potions
+(`dev/grave0/w37.log`); and an auto-Shell relic is not ranked by the relic
+rule (`H.relicClass` returns nil for the Czarina Ring), so the lever above
+cannot be the rule's choice today.
+
+### 13.7 SETZER on arrival (owner, 2026-10-01: "every recruit should feel amazing")
+
+`credit.lua` credits each frame's fall in a monster's HP, shields, broken
+ticks and life to the party member whose action is running (ExecCmd);
+`analyze.py` sums it. SETZER fights with the Trump (¤) throughout; Slot is
+not in the driver's plan here.
+
+| fight | SETZER's damage (share of all; per-run median) | chips | breaks | fight-ending blows | the others |
+|---|---|---|---|---|---|
+| Dullahan (`dull/`, 80 runs, 1,876,390 damage) | 399,666 (**21%**; median 21%) | 349 of 886 | **68 of 84** | 7 of 80 | SABIN 61% and 46 blows, EDGAR 17% and 26, CELES 1% (Runic) |
+| the chest (`chest/`, 80 runs) | 195,523 (19%; median 10%) | 0 | 0 (no break landed by anyone) | 21 of 80 | SABIN 42% and 30, CELES 21% and 26, EDGAR 17% and 3 |
+
+In Dullahan he is the breaker: four breaks in five are his (`breaks landed
+by: {'SETZER': 68, 'SABIN': 11, 'EDGAR': 5}`), the ¤ key of 8.7 at work,
+and the break is where SABIN's Blitzes land their damage. He lands one
+kill in eleven. In the chest neither part keys ¤ (the shell has no gauge,
+the head is pierce), and he is a fifth of the damage. Not a passenger; his
+share is the break, not the damage.
+
+### 13.8 Flying and landing (`H.flyTo`, `field_flyto`)
+
+`H.flyTo(tx, ty)` (lib/ot6_field.lua) flies the airship with the pilot's
+buttons, measured from the Falcon's first control (`dev/dev/probe_flight.log`):
+heading `$73` (the math angle is `$73 - 270`; Left turns it up), position
+`$34/$38` in 1/16 tiles, A for speed `$26` (to `$0800`, about a third of a
+tile a frame), a coast of about three tiles, B to land on a tile whose
+property bit 1 is clear. It steers to the bearing, letting go early enough
+for the turn's momentum, holds A while the target is ahead and farther than
+the coast, nudges with A when stopped short, and lands over the target;
+it refuses a target the airship cannot land on. `field_flyto` (suite,
+fixture `wor_flight`, the pilot's first control) flies to the route's
+(25,160) (a turn of 102 degrees left) and to (128,171) (31 degrees right),
+asserting the party on foot on each target and the airship parked there
+(`suite/suite_field_flyto.log`: `[flyto] PASSED (25,160): on foot there at
+f341`, `[flyto] PASSED (128,171): on foot there at f665`, `PASS (frame 665)
+attempts=1/1`). Its mutants fail where they should (`suite/`): with the
+flight taken out, `assertEq failed: (25,160): on foot ($11FA): got 1, want
+0`; with an unlandable target, `(100,170) is a tile the airship can land on
+(its property word $0753, bit 1 clear): got false, want true`.
+
+### 13.9 What was left
+
+- **The Exp. Egg** (from the tomb) is still in the bag; the relic rule does
+  not rank it and no member wears it.
+- **SETZER's Slot** is not played in these fights (the driver's `opts.slot`
+  is off); the Coin Toss relic stays in the bag.
+- **The tombstone puzzle** (299 (12,39)) was not done.
+- The Dullahan care-model and the auto-Shell relic notes above (13.6).
 
 ## 14. What the owner may want to decide
 
@@ -1549,16 +2106,33 @@ Not yet driven.
   Drill and Debilitator sit in a shop that refuses this party (vanilla's
   "I can't take money from the King!"). Keep the refusal (vanilla) or let
   this arc's EDGAR buy them.
-- **Dullahan's telegraph** (Absolute 0 proposed) and whether the policy may
-  set the gil's last digit against L? Pearl (an informed reading, a
-  human input).
-- **The side items' place**: played as a side leg off `wor-edgar-v1`
-  (section 10; `wor-figaro-sweep-v1`, which nothing boots yet). The
-  Ribbon, Hero Ring, Hyper Wrist and RunningShoes are in that branch's bag
-  only: the tomb's legs, booted from `wor-kohlingen-v1` off `wor-edgar-v1`,
-  do not carry them. Moving the Kohlingen leg to boot the sweep's
-  checkpoint would put them on the chain (and the Ribbon against the
-  tomb's Zombie) at the cost of making leg 1 critical path again.
+- **Dullahan's telegraph** (Absolute 0 proposed): open. The hit-counter
+  combo that holds Absolute 0 fired twice in 144 lab fights (13.6);
+  the break and the kill come first. The gil's last digit against L? Pearl:
+  decided fair play (the TLM, 2026-10-01); with no shop in the tomb the
+  route moves it with a Mad Oscar's purse (13.3). Left unmoved, the fight
+  was lost 2 times in 32 at digit 1 (13.6).
+- **An auto-Shell relic for a caster boss** (13.6): the Czarina Ring on
+  CELES in place of the Ribbon spent 21 Potions and no Fenix Down over 32
+  Dullahan fights, against the route's 37 and 2 on the same entry states;
+  both won every fight. The relic rule does not rank Safe/Shell relics, so
+  the route does not wear it; ranking them for a fight whose damage is
+  spells is a rule change for the owner.
+- **SETZER on arrival** (13.7): in Dullahan he lands four breaks in five
+  and a fifth of the damage; in the chest, where ¤ keys nothing, a fifth of
+  the damage and no breaks. His Slot is not played (#319's verbs); whether
+  the driver should spin it at bosses is open.
+- **The side items' place**: decided (owner, 2026-10-01: "you gotta use a
+  ribbon when you have one"): the side leg is on the chain and its relics
+  are worn (10.4, 11.4, 12.7). Before that, the Ribbon, Hero Ring, Hyper
+  Wrist and RunningShoes were in that branch's bag only: the tomb's legs,
+  booted from `wor-kohlingen-v1` off `wor-edgar-v1`,
+  did not carry them. Leg 1 is critical path again; the cost in chain
+  length and re-cuts is ours (guidelines).
+- **Who wears the Ribbon**: CELES by the relic rule (the party's caster,
+  10.4). The audit's case for EDGAR or SETZER (it frees a guard slot) and
+  the lab arm (12.7) do not separate the two at ten runs each; the
+  lever (`opts.guardTo`) is there if the owner prefers another wearer.
 
 ---
 

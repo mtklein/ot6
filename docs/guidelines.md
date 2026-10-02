@@ -104,6 +104,12 @@ power, write like a human (owner, 2026-09-30).
   and some bosses can take ¤ beside their other keys, often enough that
   bringing Setzer or Relm is a real choice, without ¤ becoming the answer
   to every fight (owner, 2026-10-01).
+- **Every recruit should feel amazing and important on arrival** (owner,
+  2026-10-01). The area right after a character joins is a good place to
+  show what only they bring: break keys their weapons or skills hold that
+  the party lacked, a kit ready to use, and gear worth wearing from the
+  first fight. Each arc's route plan can say how its recruit shines, and
+  play can measure it (who lands the breaks, whose actions end fights).
 - **Prefer not to retune vanilla enemies** (AI scripts, spells, one-shots)
   to dodge a hard fight. OT6 changes battle systems more than individual
   enemy quirks; a hard fight is usually answered with levels, gear, route or

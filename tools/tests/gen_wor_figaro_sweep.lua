@@ -5,10 +5,10 @@
 -- plain to South Figaro, take the basement passage's chests by both of its
 -- ways in, take the Hero Ring through the Figaro cave's other door, walk
 -- back through the desert, and save on the castle's tile again: the
--- `wor-figaro-sweep-v1` battery.  A side branch off the chain: nothing
--- after it boots it (wor_kohlingen boots wor-edgar-v1).  Generates
--- wor_figaro_sweep.mss; its capture run (OT6_CAPTURE_SRM) cuts
--- `wor-figaro-sweep-v1`.  docs/design/route-wor-falcon.md has the plan
+-- `wor-figaro-sweep-v1` battery, the boot for the Kohlingen leg (the side
+-- trip is on the chain: guidelines "Ribbons are worth going out of your way
+-- for").  Generates wor_figaro_sweep.mss; its capture run (OT6_CAPTURE_SRM)
+-- cuts `wor-figaro-sweep-v1`.  docs/design/route-wor-falcon.md has the plan
 -- (section 2.2) and what this measured (section 10).
 --
 -- The route:
@@ -31,8 +31,15 @@
 --   5. The walk back to the castle's tile (81,86) through the desert, the
 --      field care to full, and the real Save UI into slot 3 there
 --      (H.saveAtCheckpoint "wor-figaro-sweep-v1").
--- No kit changes: the relics taken go to the bag, and the leg that boots
--- this checkpoint dresses from it.
+-- The relics go on the moment they are in the bag (guidelines "Relics
+-- matter", "Ribbons are worth going out of your way for"): after the
+-- Ribbon's cellar, after the rich man's cellar and after the Hero Ring,
+-- the party's relic slots are re-planned by the lib's relic rule
+-- (H.dressRelics, lib/ot6_field.lua: the Ribbon to the party's caster, then
+-- Haste, damage and vigor over plain guards) and dressed through the Relic
+-- menu.  On this chain that is CELES Genji Glove + Ribbon, SABIN Genji
+-- Glove + Hero Ring, EDGAR RunningShoes + Hyper Wrist; the contract pins
+-- CELES's Ribbon.
 -- Every battle's [outcome] is asserted said, judged on the battle's own end
 -- reading, and paid as due; every battle's draw is logged as a [key] line
 -- (the seed $be at InitBattle's store and the battle group $11E0) so a set
@@ -75,6 +82,9 @@ local function kit(ch)
   return table.concat(t, " ")
 end
 local MEMBERS = { { CELES, "CELES" }, { SABIN, "SABIN" }, { EDGAR, "EDGAR" } }
+-- the statuses the arc's coming fights inflict, for the relic rule's
+-- guards (lib/ot6_field.lua M.ARC_THREATS, shared by the arc's generators)
+local ARC_THREATS = H.ARC_THREATS["wor-falcon"]
 local function supplies()
   return string.format("tonic=%d potion=%d fenix=%d remedy=%d soft=%d revivify=%d greencherry=%d gil=%d",
     H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX), H.invCountOf(REMEDY),
@@ -298,6 +308,7 @@ H.run({ maxFrames = 200000 }, {
   mustChest(101, 43, 0x0FE, "Ribbon", RIBBON),
   mustChest(92, 53, 0x0FF, "Ether", ETHER),
   H.call(function() say("sweep", "the cellar by Duncan's way: " .. taken()) end),
+  H.dressRelics(MEMBERS, { threats = ARC_THREATS, tag = "relics after the Ribbon" }),
   H.crossDoor(97, 41, MAP_PASSAGE, 34, 50, "the cellar -> the passage 89(97,41)->87(34,50)"),
   H.call(function()
     H.assertEq(H.chestOpen(0x020) and H.chestOpen(0x021), true,
@@ -322,6 +333,7 @@ H.run({ maxFrames = 200000 }, {
   mustChest(110, 49, 0x0FC, "Hyper Wrist", HYPER_WRIST),
   mustChest(120, 53, 0x100, "RunningShoes", RUNNINGSHOES),
   H.call(function() say("sweep", "the cellar by the rich man's way: " .. taken()) end),
+  H.dressRelics(MEMBERS, { threats = ARC_THREATS, tag = "relics after the Hyper Wrist and the RunningShoes" }),
   H.crossDoor(105, 53, MAP_RICH_B1, 31, 17, "the cellar -> the rich man's basement 89(105,53)->83(31,17)"),
   H.crossDoor(17, 4, MAP_RICH_B1, 7, 11, "the rich man's basement: the warp 83(17,4)->83(7,11)",
     { avoid = { { 32, 18 }, { 35, 12 }, { 40, 12 }, { 45, 12 } } }),
@@ -347,6 +359,7 @@ H.run({ maxFrames = 200000 }, {
   walkInto(4, 4, MAP_CAVE2, "the cave: the other door (4,4) -> 90 (41,13)", { { 10, 2 } }),
   mustChest(52, 14, 0x013, "Hero Ring", HERO_RING),
   H.call(function() say("sweep", "the Hero Ring: " .. taken()) end),
+  H.dressRelics(MEMBERS, { threats = ARC_THREATS, tag = "relics after the Hero Ring" }),
   walkInto(41, 14, MAP_CAVE, "map 90 -> the cave (68 (4,5))"),
   crossLink(17, 20, function() return H.fieldX() > 40 end, "the cave: the link (17,20) -> (61,56)",
     { { 10, 2 }, { 4, 4 } }),
@@ -371,6 +384,17 @@ H.run({ maxFrames = 200000 }, {
       H.assertEq(H.chestOpen(ch[1]), true, string.format("%s's chest is open (bit $%03X)", ch[2], ch[1]))
     end
     H.assertEq(H.chestOpen(0x09A), false, "the Regal Crown's chest is left for the Kohlingen leg (bit $09A)")
+    -- the finds are worn, not carried: each one the rule placed is on
+    local worn = {}
+    for _, p in ipairs(MEMBERS) do
+      worn[H.readByte(c(p[1], 0x23))] = p[2]
+      worn[H.readByte(c(p[1], 0x24))] = p[2]
+    end
+    for _, r in ipairs({ { RIBBON, "the Ribbon" }, { HERO_RING, "the Hero Ring" }, { HYPER_WRIST, "the Hyper Wrist" },
+                         { RUNNINGSHOES, "the RunningShoes" } }) do
+      H.log(string.format("[sweep] %s ($%02X) is worn by %s", r[2], r[1], worn[r[1]] or "nobody (the bag)"))
+    end
+    H.assertEq(worn[RIBBON] ~= nil, true, "the Ribbon is worn, not carried")
   end),
   H.saveAtCheckpoint("wor-figaro-sweep-v1"),
   H.call(function()
