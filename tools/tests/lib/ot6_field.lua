@@ -5615,6 +5615,23 @@ function M.relicPlan(members, opts)
       end
     end
   end
+  -- The two relic slots are alike, so a relic the plan keeps on its wearer
+  -- stays in the slot it sits in: a plan that moved the Egg from SETZER's
+  -- slot 5 to slot 4 (the Star Pendant taking 5) asked the Relic menu for
+  -- a relic not in the bag, and dressRelics refused it ("relics after
+  -- Dullahan: a member's new relics are all in the bag (no swap
+  -- deadlock)", the policy genlab's k0_s0).  Swapping the two planned
+  -- slots back changes nothing a fight sees.
+  for _, m in ipairs(ms) do
+    for _, s in ipairs({ 4, 5 }) do
+      local o = s == 4 and 5 or 4
+      if m.want[s] ~= nil and m.want[s] ~= 0xFF and m.want[s] == m.cur[o] and m.want[o] ~= m.cur[o] then
+        m.want[s], m.want[o] = m.want[o], m.want[s]
+        lines[#lines + 1] = string.format("%s: %s stays in slot %d, where it sits (the two slots swapped in the plan)",
+          m.name, relicName(m.cur[o]), o)
+      end
+    end
+  end
   local plan = {}
   for _, m in ipairs(ms) do
     local changes = {}
