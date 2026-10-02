@@ -66,8 +66,8 @@
 -- pass whose starting body has fallen while another stands, for Hired
 -- Help, Jackpot and a boosted Fight, and a Coin Toss pass whose group lost
 -- a body and kept another.  The budget: a crowd within
--- M.setzerCrowdBudget's decoded worst case of the last; MAXCROWDS crowds a
--- kind; a boosted Fight's within FIGHTAFTER battles of SETZER's last.  Each
+-- M.setzerCrowdBudget's decoded worst case of the last; the kind's crowds
+-- (4, 6, 10); a boosted Fight's within FIGHTAFTER battles of SETZER's last.  Each
 -- battle's key ($be at the open and the formation) is logged, and the
 -- draws are counted by distinct key.
 -- Negative controls: the ROM before the fix and the mutant ROMs in
@@ -295,7 +295,10 @@ end
 -- and the bodies' HP before his turn.  A kind that misses its draw in both
 -- -- the kill came on the last pass, a counter felled the crowd, SETZER was
 -- turned to a zombie before his turn -- tries again in the next crowd, up
--- to MAXCROWDS.  What does not vary a throw (measured): the frames the
+-- to the kind's crowds.  The bounds are the measured rates' (eight entry
+-- variations, wt/pass-retarget's sweep): a hire met its draw in the first
+-- crowd every time (4 allowed); a Jackpot in 7 of 8 first crowds (6); the
+-- re-split in 8 of 15 crowds tried (10: about 0.47^10 = 0.05% to miss).  What does not vary a throw (measured): the frames the
 -- party stands before the first input (eight stands of 0-840 frames gave
 -- one Jackpot throw: the battle waits while a command window is open), and
 -- SETZER Defending first to bank more (in the tomb's crowds a second turn
@@ -309,20 +312,19 @@ local function cands(fn, more)
   if more then t[#t + 1] = more end
   return t
 end
-local MAXCROWDS = 4
 local PLANS = {
   -- a hire kills an Exoray (1,200 HP; 1,550 shielded at L31), so the next
   -- must find another body
-  { kind = "hire", cands = cands(function() return { aim({ row = HIRE, boost = 1 }, "weak") } end) },
+  { kind = "hire", crowds = 4, cands = cands(function() return { aim({ row = HIRE, boost = 1 }, "weak") } end) },
   -- a face of 3 or more kills any body of the crowd at full HP; the throw
   -- goes to the default target (an aim the cursor walk cannot reach falls
   -- back to confirming where the cursor stands: once a party member)
-  { kind = "jackpot", cands = cands(function() return { { row = JACKPOT, boost = 1 } } end) },
+  { kind = "jackpot", crowds = 6, cands = cands(function() return { { row = JACKPOT, boost = 1 } } end) },
   -- a hire takes most of the strongest body (2,058 -> 458 on a
   -- PowerDemon), so a toss over the group fells it and the next splits;
   -- or, on SETZER's first turn, two tosses over a crowd the party's swings
   -- have worn down
-  { kind = "resplit", cands = cands(function() return { aim({ row = HIRE, boost = 0 }, "strong"),
+  { kind = "resplit", crowds = 10, cands = cands(function() return { aim({ row = HIRE, boost = 0 }, "strong"),
     { row = COIN, boost = 2 } } end, { others = "fight", fn = function() return { { row = COIN, boost = 1 } } end }) },
 }
 local tries, throws, crowdsFor = {}, {}, {}
@@ -393,13 +395,29 @@ local function play()
       local c = p.cands[S.try]
       S.mark = #acts
       H.log(string.format("[%s] %s, crowd %d of %d, candidate %d of %d: the party %ss until SETZER has thrown",
-        TAG, p.kind, (crowdsFor[p.kind] or 0) + 1, MAXCROWDS, S.try, #p.cands, c.others))
+        TAG, p.kind, (crowdsFor[p.kind] or 0) + 1, p.crowds, S.try, #p.cands, c.others))
       S.step, S.phase = H.setzerBattle(c.fn(c), { untilPlanDone = true, others = c.others }), "plan"
     end
     if S.phase == "plan" then
       local r = S.step:tick()
       judgeNew()
-      if r ~= "done" then return r end
+      -- SETZER out before his throw (Wounded, Petrified or a Zombie;
+      -- Berserk, Muddled or asleep; Stopped): the party would Defend on
+      -- waiting for a turn that cannot come, so this candidate ends here
+      if r ~= "done" then
+        local out = nil
+        for e = 0, 6, 2 do
+          if H.readByte(0x3ED8 + e) == 9 then
+            local s1, s2, s3 = H.readByte(0x3EE4 + e), H.readByte(0x3EE5 + e), H.readByte(0x3EF8 + e)
+            if (s1 & 0xC2) ~= 0 or (s2 & 0xB0) ~= 0 or (s3 & 0x10) ~= 0 then
+              out = string.format("status %02X %02X %02X", s1, s2, s3)
+            end
+          end
+        end
+        if out == nil or not H.battleLoadStarted() then return r end
+        H.log(string.format("[%s] SETZER cannot act (%s): this candidate ends", TAG, out))
+        H.setPad({})
+      end
       local p = S.kinds[S.ki]
       local sig = {}
       for n = S.mark + 1, #acts do
@@ -420,9 +438,9 @@ local function play()
         S.try = S.try + 1
       else
         crowdsFor[p.kind] = (crowdsFor[p.kind] or 0) + 1
-        H.assertEq(crowdsFor[p.kind] < MAXCROWDS, true, string.format("%s: the draw this needs (a pass whose body "
+        H.assertEq(crowdsFor[p.kind] < p.crowds, true, string.format("%s: the draw this needs (a pass whose body "
           .. "fell while another stands) within %d crowds, %d candidates each (%d distinct throws)", p.kind,
-          MAXCROWDS, #p.cands, count(throws[p.kind])))
+          p.crowds, #p.cands, count(throws[p.kind])))
         S.ki, S.try = S.ki + 1, 1
       end
       if S.ki <= #S.kinds then
