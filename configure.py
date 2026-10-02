@@ -402,6 +402,9 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
     "battle_hirerefund": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    # wt/hire-sprite: the 3 and 2 BP hires' figures (Defends bank the points)
+    "battle_hirecrew": "OT6_TIMEOUT=2400 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
     # walks from the Narshe exit spawn into the Beginner's House
     "school":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1",
