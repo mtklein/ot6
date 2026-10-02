@@ -472,60 +472,26 @@ local function openSlotWindow(what)
   })
 end
 
--- Walk the plain until an encounter worth spinning in turns up, then take
--- the party's slots off it.  Used twice: once for the battle H1 is played
--- in, once for the fresh battle H2 needs (see the comment at that call).
--- The floor is two live bodies and 900 total max HP, which is what a
--- formation needs to still be standing after two Slot resolutions.
-local function drawBattle(tag, tries)
-  local steps = { H.call(function() H.vars.suitable = false end) }
-  local pattern = { "down", "down", "right", "right", "down", "down",
-                    "left", "left" }
-  for n = 1, tries do
-    local w = {
-      (function()
-        local ph = 0
-        return H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
-          H.call(function()
-            ph = ph + 1
-            H.setPad({ [pattern[(math.floor(ph / 20) % #pattern) + 1]] = true })
-          end),
-        }, tag .. ": a real world encounter fires (draw " .. n .. ")")
-      end)(),
-      H.release(),
-      H.waitUntil(function() return H.battleActive() end, 900,
-        tag .. ": battle active (draw " .. n .. ")", 30),
-      H.waitFrames(240),
-      H.call(function()
-        msPresent = {}
-        for m = 0, 5 do
-          if H.readByte(0x3AA8 + m * 2) % 2 == 1 then
-            msPresent[#msPresent + 1] = m
-          end
-        end
-        local mhp = 0
-        for _, m in ipairs(msPresent) do mhp = mhp + H.readWord(0x3BFC + m * 2) end
-        H.vars.suitable = (#msPresent >= 2 and mhp >= 900)
-        H.log(string.format("%s draw %d: %d bodies, %d total max HP -> %s",
-          tag, n, #msPresent, mhp, H.vars.suitable and "FIGHT" or "flee"))
-      end),
-      H.cond(function() return not H.vars.suitable end, {
-        H.fleeBattle(9000, { onCantRun = "fight" }),
-        H.waitUntil(function()
-          return H.worldMode() and H.worldHasControl()
-        end, 1200, tag .. ": back on the plain after draw " .. n, 10),
-        H.waitFrames(30),
-      }, {}),
-    }
-    if n == 1 then
-      for _, s in ipairs(w) do steps[#steps + 1] = s end
-    else
-      steps[#steps + 1] = H.cond(function() return not H.vars.suitable end, w, {})
-    end
-  end
+-- Reach an encounter worth spinning in, then take the party's slots off
+-- it.  Used twice: once for the battle H1 is played in, once for the
+-- fresh battle H2 needs (see the comment at that call).  The draw is
+-- battle_slotsboot's (H.newEncounterDraw, lib/ot6_field.lua): pace a
+-- stretch of the disembark row that rolls one group, budget the
+-- encounters over every counter state from the pool's decode, run from
+-- the rest or fight out a pack that cannot be run from, care after each.
+-- The floor is two bodies and 600 max HP with no monster that can take
+-- Setzer's turn on any of its own (H.judgeFormation).  It was 900 HP by
+-- live count, which let Mind Candy x4 (1160 HP, SleepSting on any turn)
+-- through, and no slot of the Blackjack's plain (group 10) reaches 900
+-- without a Mind Candy; the Vulture + Iron Fist it deals (745) stood
+-- through battle_slotsboot's three resolutions in all 30 runs of its
+-- draw sweep (build/attempts/wt/slotsboot-v024/summary.txt), and a
+-- battle here plays two.
+local function drawBattle(tag)
+  local D = H.newEncounterDraw({ tag = tag, minBodies = 2, minHp = 600 })
+  local steps = D.steps()
   steps[#steps + 1] = H.call(function()
-    H.assertEq(H.vars.suitable, true,
-      tag .. ": the pool dealt a two-resolution formation")
+    msPresent = D.msPresent
     for s = 0, 3 do
       local id = H.readByte(0x3ED8 + s * 2)
       if id ~= 0xFF then slotOf[id] = s end
@@ -771,7 +737,7 @@ end
 local function battleHalf(tag, phases)
   local done = false
   local body = { H.call(function() lostBattle = false end) }
-  for _, s in ipairs(drawBattle(tag, 6)) do body[#body + 1] = s end
+  for _, s in ipairs(drawBattle(tag)) do body[#body + 1] = s end
   for _, s in ipairs(phases) do
     body[#body + 1] = H.cond(function() return not lostBattle end, { s })
   end
