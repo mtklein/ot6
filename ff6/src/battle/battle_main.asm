@@ -6478,6 +6478,7 @@ _initanima:
 @2639:  php
         stz     $3a72       ; clear battle script command queue pointer
         stz     $3a70       ; clear number of attacks (0 = 1 attack)
+        stz     OT6_PASSRETARGET ; ot6: and no passes OT6 added (ot6_passes.asm)
         longa
         stz     $3a32       ; clear pointer to battle script data
         stz     $3a34       ; clear counter for damage variables
@@ -8450,8 +8451,12 @@ ExecAttack:
         sta     $3416
 @3288:  plx                 ; next attack
         dec     $3a70
-        bmi     @3291
+        bmi     @ot6last
         pea     ExecAttack-1
+        rts
+@ot6last:
+        jsl     Ot6PassesDone   ; ot6: the last pass is done, and the passes
+                                ;   OT6 added with it (ot6_passes.asm)
 @3291:  rts
 
 ; ------------------------------------------------------------------------------
@@ -8473,6 +8478,7 @@ CalcAttackEffect:
                                 ;   x=attacker, $3a7d=attack id, props still editable.
         jsl     Ot6Assassinate  ; ot6: Shadow's divine -- same hook point, Broken non-boss
                                 ;   instant kill (dormant until Shadow is fielded).
+        jsl     Ot6PassTargeted ; ot6: this pass has targeted (ot6_passes.asm)
         phx
         lda     $b8         ; targets
         jsr     CountBits
@@ -15078,10 +15084,14 @@ ChooseTarget:
         bit     #$2c
         beq     @58ed
         bra     @58f6
-@58b3:  lda     $ba
-        bit     #$04
+@58b3:  jsl     Ot6PassRetarget ; ot6: $ba bit 2 ("don't retarget"), except
+                                ;   a later pass OT6 added: another monster
+                                ;   (carry set, the monster side in $b8/$b9)
+                                ;   or none, never Retarget (ot6_passes.asm)
         bne     @58c8
+        bcs     @ot6side
 @58b9:  jsr     Retarget
+@ot6side:
         jsr     _c258fa
         lda     $ba
         bit     #$08

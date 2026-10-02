@@ -574,7 +574,8 @@ on one hit -- at L50 one doubled toss already capped on a lone unshielded
 target): 1 + boost tosses, one pass of the action each (`Ot6SetzerEffect`
 adds the boost to the attack count), each at level × 30 gil, each its own
 hit on every body and its own ¤ chip on every ¤-weak one. Three points are
-four tosses and four chips a body. A toss that finds no body standing (the
+four tosses and four chips a body. A toss after a body falls splits over
+the bodies left (`battle_passretarget`). A toss that finds no body standing (the
 tosses before it felled them all) pays nothing, and so does such a hire
 (`Ot6CoinPrice`, `battle_hirerefund`). The Coin Toss relic's GP Rain buys
 tosses the same way (`Ot6RainPasses` in Cmd_18); before #319 its boost
@@ -599,8 +600,9 @@ lands 3,100 there (1,550 shielded, 6,200 on a Broken body), and its fee
 never passes 4,950 (L99), so the damage cannot wrap (the old one-hire x8
 fee wrapped from L82) and a hire that meets the cap on a Broken body still
 leaves every point its own hit. A hire that outlives its target goes to
-another body, as a multi-hit Blitz's swing does, and one that finds none
-pays nothing.
+another monster, as every pass OT6 adds to an action does
+(`Ot6PassRetarget`; [multi-hit.md](multi-hit.md) §6), and one that finds
+none standing pays nothing.
 
 **Each hire is somebody new** (owner, 2026-10-02: a growing crew, not the
 same guy again). Setzer walks out of sight, and each hire walks in where
@@ -658,7 +660,8 @@ a face 1-6 at near-even odds, 42-44 of 256 a face, consistent with the
 measurement below (one battle Rand, drawn again past 251, mod 6; the
 redraw takes the table's next byte, a fixed successor), and the boost buys
 another roll a point -- 1 + boost passes, each its own triple and its own
-hit. A pass that finds no body left (the rolls before felled the last) is
+hit. A roll whose target fell to the roll before goes to another monster; a
+pass that finds no body left (the rolls before felled the last) is
 skipped: no triple, no dice, no draw. *Reason: a hit that can be a dud is
 the gambler's verb,
 and an extra roll is a purchase that always lands, at any level and
@@ -717,8 +720,10 @@ reads). Jackpot greys for MP or once spent. One authority each:
 (gil a throw or a hire; `Ot6CoinTotal` the whole action's, which the grey
 reads). Tests: `battle_cointoss`, `battle_hiredhelp`, `battle_jackpot`,
 `battle_setzergrey` (the purse's grey and refusal), `battle_gprain` (the
-Coin Toss relic's GP Rain) and `battle_hirerefund` (a hire past the last
-body pays nothing). The coin suites throw in the battles that deal a
+Coin Toss relic's GP Rain), `battle_hirerefund` (a hire past the last
+body pays nothing) and `battle_passretarget` (a hire, roll or swing whose
+body fell goes to another, and a toss re-splits over the survivors). The
+coin suites throw in the battles that deal a
 special-weak crowd (the engine's alive mask, so a petrified body is out)
 and assert that a toss split and chipped; the other battles are fought out
 by the route's fight driver with field care after, within a budget decoded

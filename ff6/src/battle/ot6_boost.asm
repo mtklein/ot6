@@ -547,6 +547,7 @@ spend:  asl                     ; two swings per bp
         clc
         adc     $3a70
         sta     $3a70
+        jsl     Ot6PassesAdded  ; a pass whose body fell retargets
 done:   rtl
 .endproc
 
@@ -827,6 +828,7 @@ done:   plx
         clc
         adc     $3a70
         sta     $3a70
+        jsl     Ot6PassesAdded  ; a throw whose body fell retargets
 done:   pla
         rtl
 .endproc
