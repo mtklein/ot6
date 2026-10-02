@@ -540,6 +540,7 @@ H.run({ maxFrames = 20000 }, {
       "the @rage arm does NOT reach Ot6BoostPriceFor either: cmd $10 is in "
       .. "the same gate, and the boost buys the trance's coin")
 
+    local _ = H.sym("Ot6SetzerCost")   -- (named literally, so compose resolves it)
     local zHit, zN = armEscalates("Ot6SetzerCost")
     H.assertEq(zN, 1, "one Ot6SetzerCost call in Ot6AbilityCost (the @slot arm, #319)")
     H.assertEq(zHit, 0,

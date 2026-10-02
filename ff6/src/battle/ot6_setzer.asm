@@ -539,7 +539,12 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         bne     @aimed          ;   them all) and the pass pays nothing
         sec
         rtl
-@aimed: lda     $3a7c           ; the queued command
+@aimed: stz     $3414           ; damage modification off, every pass: the
+                                ;   later tosses of a boosted Coin Toss took
+                                ;   defense and the variance without it
+                                ;   (battle_cointoss: 2900 -> 1098 for two
+                                ;   930-gil tosses, where 1040 is the coins')
+        lda     $3a7c           ; the queued command
         cmp     #$0f
         bne     @rain           ; command $18: the Coin Toss relic's GP Rain
         lda     f:$7e0000+OT6_SETZERROW
