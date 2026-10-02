@@ -2124,10 +2124,13 @@ chips 106 breaks 17 kills 2`.  The rows from the credit lines' commands
 
 What it says.  In Dullahan SETZER stays the breaker (his Trump keys ¤ and
 his Fight lands the breaks either way) and Jackpot becomes his finisher:
-the policy throws it once Dullahan is Broken and under 10,000 HP, where a
-1-BP floor of three reaches the cap (`SETZER Jackpot on slot 0 (4592 HP, 0
-shield(s), Broken) at 1 BP (lowest face 3), 99 MP of 297`), so the
-fight-ending blows move from SABIN to him; the fights are no shorter (the
+of its 14 throws, 9 came with Dullahan Broken and under 10,000 HP, where a
+1-BP floor of three reached the cap (`SETZER Jackpot on slot 0 (4592 HP, 0
+shield(s), Broken) at 1 BP (lowest face 3), 99 MP of 297`), 3 with him
+Broken at 14,432-14,570 HP (also 1 BP), and 2 before the break, at 2 BP
+with one or two shields left (`SETZER Jackpot on slot 0 (17663 HP, 1
+shield(s)) at 2 BP (lowest face 5)`), counted off the `[advanceStory]`
+lines in `labs/dull/`; the fight-ending blows move from SABIN to him; the fights are no shorter (the
 same median) and no fight was lost in either arm. In the chest, where ¤
 keys nothing, Hired Help is his way in: the sellsword strikes the Whelk
 Head with piercing (`SETZER Hired Help on slot 1: 1550 gil of 247857; his
@@ -2135,6 +2138,28 @@ Fight keys nothing there`), and the policy arm spent 28 Potions to the
 control's 40 and no Fenix Down to its 2. Slot and Coin Toss were not chosen
 on this arc: the tomb's random fights end before his bank reaches 3, and
 Coin Toss waits for two revealed ¤ bodies.
+
+The table above measured the first Jackpot and Hired Help (a floor the
+boost raised to certain sixes; one hire whose fee the boost doubled), on ROM
+`c4986f696e4a`.  Both were redesigned the same day (kits.md "Setzer"); 13.11
+measures the redesign.
+
+### 13.11 Dullahan with the rolls and the hires (owner, 2026-10-02)
+
+Jackpot now rolls once more a boost point (each roll a face 1-6, its own hit)
+and Hired Help hires once more a point (each hire its own fee, hit and
+chip).  The policy arm again, briefly, on ROM `0a95b57fd7bd`: the grave
+frame the regenerated generator leaves (`final2/wor_falcon.log`), eight
+waits, `labs-r2/dull2.txt`: 8 of 8 won over 3 battle keys (`groups won in
+every run: 3 of 3`), no death, `potions spent 12 over 8 runs`.  From
+`labs-r2/dull2_analysis.txt`: `SETZER actions 31 damage 95840 (51% of all;
+per run min 27% median 72% max 79%) chips 23 breaks 3 kills 4`.  The
+policy throws Jackpot at the opening, with one point and Dullahan whole
+(`SETZER Jackpot on slot 0 (23450 HP, 10 shield(s)) at 1 BP: 2 roll(s) of
+expected 5162 each, 99 MP of 198`: this frame's SETZER spent one Jackpot in
+the chest, hence 198 MP), and hires against the shields before the ¤ cell
+is revealed (`SETZER Hired Help on slot 0 at 2 BP: 3 hire(s) at 1550 gil
+...`).  Three keys is few: the share is a direction, not a rate.
 
 ## 14. What the owner may want to decide
 
