@@ -641,8 +641,10 @@ and leaves `$be` as it was; the longer action shifts the frame clock and
 ATB timing, so later draws and later battles' keys move (the review
 measured the next battle's key: `$be` 60 against E0, build/attempts/wt/
 hire-sprite-review/). (`Ot6CoinAnim`, `Ot6HireMark`, `Ot6ShadowHirable`;
-`battle_hiredhelp` holds every pass, swap, strike and the restore to the
-animation's own state.)
+`battle_hiredhelp` (1 BP, 0 BP) and `battle_hirecrew` (3 BP, 2 BP) hold
+every pass, swap, strike and the restore to the animation's own state;
+the ghost, Interceptor and the pincer are played in labs, evidence and
+negative controls in build/attempts/wt/hire-sprite/round2/.)
 
 **Jackpot (divine): the Fixed Dice come up a triple.** One enemy, by
 vanilla's dice arithmetic: face³ × level × 2 for the three dice, times the
