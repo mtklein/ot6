@@ -63,8 +63,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "tools" / "tests" / "lib"))
 import savestate_ninja as sn  # noqa: E402
+sys.path.insert(0, str(ROOT / "tools" / "build"))
+import rom_version  # noqa: E402
 
 VERSION = (ROOT / "VERSION").read_text().strip()
+# The one VERSION grammar (tools/build/rom_version.py check_version): the APK
+# versionCode and the ROM's 15-cell version field both need it, so a VERSION
+# outside it fails here, before anything builds.
+try:
+    rom_version.check_version(VERSION)
+except ValueError as e:
+    sys.exit(f"configure.py: {e}")
 BASE = "Final Fantasy III (USA).sfc"
 BASE_SHA1 = "4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7"
 
@@ -494,7 +503,8 @@ check("compose_selftest", "python3 tools/tests/lib/compose.py --selftest",
 # The version fields and the ROM identity that masks them (one mutant per
 # property: a flip outside the fields moves the identity, inside does not).
 check("rom_version_selftest", "python3 tools/build/rom_version.py selftest",
-      ["tools/build/rom_version.py"]
+      ["tools/build/rom_version.py", "ff6/include/ot6_version.inc",
+       "ff6/tools/fix_checksum.py"]
       + glob("tools/char_table/*_en.json", "ff6"))
 check("sram_selftest", "python3 tools/tests/lib/sram_checkpoint.py selftest",
       ["tools/tests/lib/sram_checkpoint.py"])
@@ -772,34 +782,15 @@ w.edge(["build/checks/android_bps.ok"], "sh", [BASE, android_bps, "build/ot6.sfc
        desc="android BPS applier on the JVM")
 
 
-def apk_version_code(version):
-    """versionCode for VERSION, ordering releases and their candidates:
-    major*1000000 + minor*10000 + patch*100 + (N for -rcN, else 99), so
-    0.24-rc1 -> 240001 < 0.24 -> 240099 < 0.24.1 -> 240199.  None when
-    VERSION has another shape (the APK edge then fails saying so; nothing
-    else in the graph depends on it)."""
-    m = re.fullmatch(r"(\d+)\.(\d+)(?:\.(\d+))?(?:-rc([1-9]\d?))?", version)
-    if not m or int(m.group(2)) > 99 or int(m.group(3) or 0) > 99:
-        return None
-    major, minor, patch, rc = (int(g) if g else 0 for g in m.groups())
-    return major * 1000000 + minor * 10000 + patch * 100 + (rc or 99)
-
-
-apk_code = apk_version_code(VERSION)
+apk_code = rom_version.apk_version_code(VERSION)
 apk = f"build/release/ot6-v{VERSION}.apk"
 apk_inputs = ["build/checks/android_bps.ok", "tools/android/build_apk.sh",
               "tools/android/env.sh", "android/AndroidManifest.xml"] \
     + glob("android/src/io/github/mtklein/ot6patcher/*.java") \
     + glob("android/res/*/*.xml")
-if apk_code is None:
-    w.edge([apk], "sh", [android_bps], implicit=apk_inputs,
-           cmd=f"echo 'ERROR: VERSION {VERSION} is not major.minor[.patch][-rcN];"
-               f" the APK needs one to make its versionCode' && exit 1",
-           desc=f"android apk v{VERSION}")
-else:
-    w.edge([apk], "sh", [android_bps], implicit=apk_inputs,
-           cmd=f'tools/android/build_apk.sh {android_bps} {VERSION} {apk_code} {apk}',
-           desc=f"android apk v{VERSION}")
+w.edge([apk], "sh", [android_bps], implicit=apk_inputs,
+       cmd=f'tools/android/build_apk.sh {android_bps} {VERSION} {apk_code} {apk}',
+       desc=f"android apk v{VERSION}")
 w.edge(["build/checks/android_apk.ok"], "sh", [apk, android_bps],
        implicit=["tools/android/verify_apk.sh", "tools/android/env.sh",
                  "android/release-cert.sha256"],
@@ -824,7 +815,7 @@ w("  generator = 1")
 w("  restat = 1")
 w.edge(["build.ninja"], "configure",
        ["configure.py", sn.GRAPH, "tools/tests/lib/savestate_ninja.py",
-        "VERSION"])
+        "VERSION", "tools/build/rom_version.py", "ff6/include/ot6_version.inc"])
 w()
 w.edge(["release"], "phony", [f"build/release/ot6-v{VERSION}.zip", apk,
                               "build/checks/android_apk.ok",

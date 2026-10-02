@@ -32,6 +32,7 @@ Usage:
         # write both fields; DBG (ff6-en.dbg) must place Ot6VersionText and
         # SnesHeader where VERSION_FIELDS says, and "OT6 v<VERSION>" must fit
         # OT6_VERSION_CELLS
+    rom_version.py check VERSION     # the VERSION grammar (configure.py runs it)
     rom_version.py identity ROM      # the masked sha256
     rom_version.py read ROM          # the two fields, decoded
     rom_version.py copy-if-identity-changed SRC DST
@@ -58,6 +59,12 @@ HEADER_CHECKSUM = ("checksum", 0xFFDC, 4)
 VERSION_FIELDS = (VERSION_TEXT, HEADER_TITLE, HEADER_CHECKSUM)
 
 TEXT_PREFIX = "OT6 v"
+# The one VERSION grammar (configure.py checks it when it configures, and
+# derives the APK versionCode from it): major.minor[.patch][-rcN], minor and
+# patch 0-99, N 1-99, and "OT6 v<VERSION>" no wider than the 15 cells the ROM
+# shows it in.  So 0.24, 0.24-rc1, 0.24.1, 0.24.1-rc1 and 10.24-rc10 are
+# versions; 0.24.10-rc10 (17 characters) is not.
+VERSION_RE = re.compile(r"(\d+)\.(\d+)(?:\.(\d+))?(?:-rc([1-9]\d?))?")
 SPACE = 0xFF                            # the menu font's blank cell
 TITLE_PREFIX = "OT6 V"
 # the menu font's small-text table (ff6/tools/encode_menu_text.py's
@@ -76,6 +83,32 @@ def _codec():
                 enc.setdefault(v, code)
             dec.setdefault(code, values[0])
     return enc, dec
+
+
+def check_version(version):
+    """(major, minor, patch, rc) for a VERSION the grammar above accepts
+    (patch and rc 0 when absent); ValueError, saying why, for any other."""
+    m = VERSION_RE.fullmatch(version)
+    if not m:
+        raise ValueError(f"VERSION {version!r} is not major.minor[.patch][-rcN]")
+    major, minor, patch, rc = (int(g) if g else 0 for g in m.groups())
+    if minor > 99 or patch > 99:
+        raise ValueError(f"VERSION {version!r}: minor and patch are 0-99 "
+                         f"(the APK versionCode gives each two digits)")
+    cells = version_cells()
+    if len(TEXT_PREFIX + version) > cells:
+        raise ValueError(f"VERSION {version!r}: {(TEXT_PREFIX + version)!r} is "
+                         f"{len(TEXT_PREFIX + version)} characters; the ROM shows "
+                         f"it in {cells} cells")
+    return major, minor, patch, rc
+
+
+def apk_version_code(version):
+    """The APK's versionCode, ordering releases and their candidates:
+    major*1000000 + minor*10000 + patch*100 + (N for -rcN, else 99), so
+    0.24-rc1 -> 240001 < 0.24 -> 240099 < 0.24.1 -> 240199."""
+    major, minor, patch, rc = check_version(version)
+    return major * 1000000 + minor * 10000 + patch * 100 + (rc or 99)
 
 
 def version_cells():
@@ -169,8 +202,7 @@ def stamp(data, version, dbg_text):
                              f"rom_version.py masks ${off:06X}.  Move it back "
                              f"or update VERSION_FIELDS (and re-cut nothing: "
                              f"a layout move is a ROM change anyway)")
-    if not version or version != version.strip():
-        raise ValueError(f"VERSION {version!r} is empty or padded")
+    check_version(version)
     end = max(off + size for _name, off, size in VERSION_FIELDS)
     if len(data) < end:
         raise ValueError(f"the ROM is {len(data)} bytes, too short for the "
@@ -283,8 +315,13 @@ def selftest():
               identity(bytes(m)) == identity(a))
     check("a short file's identity is its plain sha256",
           identity(b"rom v1\n") == hashlib.sha256(b"rom v1\n").hexdigest())
-    for bad, why in (("0.24-rc1000", "wider than 15 cells"), ("", "empty"),
-                     (" 0.23", "padded"), ("0.2@", "no glyph")):
+    for v, code in (("0.24-rc1", 240001), ("0.24", 240099), ("0.24.1", 240199),
+                    ("0.24.1-rc1", 240101), ("10.24-rc10", 10240010)):
+        check(f"VERSION {v!r}: APK versionCode {code}", apk_version_code(v) == code)
+    for bad, why in (("0.24-rc1000", "not the grammar"), ("", "empty"),
+                     (" 0.23", "padded"), ("0.2@", "not the grammar"),
+                     ("0.24.10-rc10", "wider than 15 cells"),
+                     ("0.100", "minor over 99"), ("0.24-rc0", "rc 0")):
         try:
             stamp(rom, bad, dbg)
             check(f"VERSION {bad!r} refused ({why})", False)
@@ -330,6 +367,9 @@ def main(argv):
             rom.write_bytes(out)
             print(f"rom_version: stamped {read(out)[0]!r} / {read(out)[1]!r};"
                   f" identity {identity(out)}")
+        elif len(argv) == 2 and argv[0] == "check":
+            print(f"VERSION {argv[1]}: {check_version(argv[1])}, "
+                  f"APK versionCode {apk_version_code(argv[1])}")
         elif len(argv) == 2 and argv[0] == "identity":
             print(identity(Path(argv[1]).read_bytes()))
         elif len(argv) == 2 and argv[0] == "read":
