@@ -600,9 +600,9 @@ lands 3,100 there (1,550 shielded, 6,200 on a Broken body), and its fee
 never passes 4,950 (L99), so the damage cannot wrap (the old one-hire x8
 fee wrapped from L82) and a hire that meets the cap on a Broken body still
 leaves every point its own hit. A hire that outlives its target goes to
-another body on that side, as every pass OT6 adds to an action does
+another monster, as every pass OT6 adds to an action does
 (`Ot6PassRetarget`; [multi-hit.md](multi-hit.md) §6), and one that finds
-none pays nothing.
+none standing pays nothing.
 
 **Jackpot (divine): the Fixed Dice come up a triple.** One enemy, by
 vanilla's dice arithmetic: face³ × level × 2 for the three dice, times the
@@ -616,7 +616,7 @@ a face 1-6 at near-even odds, 42-44 of 256 a face, consistent with the
 measurement below (one battle Rand, drawn again past 251, mod 6; the
 redraw takes the table's next byte, a fixed successor), and the boost buys
 another roll a point -- 1 + boost passes, each its own triple and its own
-hit. A roll whose target fell to the roll before goes to another body; a
+hit. A roll whose target fell to the roll before goes to another monster; a
 pass that finds no body left (the rolls before felled the last) is
 skipped: no triple, no dice, no draw. *Reason: a hit that can be a dud is
 the gambler's verb,

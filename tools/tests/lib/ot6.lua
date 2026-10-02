@@ -7781,10 +7781,33 @@ function M.setzerBattle(plan, opts)
   -- aim pressed down/up/right/left twelve times and then A wherever the
   -- cursor stood: once a party member, and a 2 BP Jackpot wiped the party,
   -- build/attempts/wt/pass-retarget/iterations/.)
-  local function aimStep(A, want, walkOk)
+  local function aimStep(A, want, walkOk, ally)
     local chars, mons, alive = M.readByte(0x7B7D), M.readByte(0x7B7E), M.readByte(0x3A75)
     local node = M.tgtNodeName(chars, mons)
     if A.last then A.g.record(A.last.node, A.last.dir, node); A.last = nil end
+    if ally ~= nil then
+      -- a party member asked for by name (an entry's `ally`, a character
+      -- slot): the confirm lands on exactly that member
+      if mons == 0 and chars == ally then return "confirm" end
+      if walkOk == false or A.presses >= 24 then
+        return "refuse", string.format("the cursor stands on %s, not the party member asked for (chars $%02X)",
+          node, ally)
+      end
+      local L, dir = M.battleLayout(), nil
+      if mons ~= 0 or chars == 0 then
+        A.cross = (A.cross or 0) + 1
+        dir = L.toChars[1 + (A.cross - 1) % #L.toChars]
+      else
+        local cur = 0
+        for e = 0, 3 do if chars & (1 << e) ~= 0 then cur = e; break end end
+        local want2 = 0
+        for e = 0, 3 do if ally & (1 << e) ~= 0 then want2 = e; break end end
+        dir = cur < want2 and "down" or "up"
+      end
+      A.presses = A.presses + 1
+      pulse(dir)
+      return "walk"
+    end
     local function isGoal(n)
       if n:sub(1, 5) ~= "mons=" then return false end
       local m = tonumber(n:sub(6), 16)
@@ -7826,7 +7849,14 @@ function M.setzerBattle(plan, opts)
   local function fight(a, st)
     if st == 0x05 then
       fightAim = nil
-      if (M.readByte(0x890F + a) & 3) ~= 0 then pulse("up") else pulse("a") end
+      -- Fight's row read off the actor's command list ($202E + 12a, three
+      -- bytes a row), not assumed to be row 0; a list with no Fight (a
+      -- Gau, an Umaro) Defends instead
+      local row
+      for r = 0, 3 do if M.readByte(0x202E + a * 12 + r * 3) == 0x00 then row = row or r end end
+      if row == nil then pulse("right"); return end  -- Defend
+      local cur = M.readByte(0x890F + a) & 3
+      if cur ~= row then pulse(cur < row and "down" or "up") else pulse("a") end
     elseif st == 0x38 then
       -- a Fight at the default target: any live monster, never the party
       if cool > 0 then pulse("a"); return end
@@ -7839,6 +7869,7 @@ function M.setzerBattle(plan, opts)
         fightAim = nil
         pulse("b")
       end
+    elseif st == 0x27 then pulse("a")   -- the Defend that stood in for a missing Fight
     elseif st == 0x30 or st == 0x0E or st == 0x0A or st == 0x08 then pulse("b")
     else M.setPad({}) end
   end
@@ -7959,11 +7990,13 @@ function M.setzerBattle(plan, opts)
       local slot = p.slot
       local walkOk = opts.aimWalk
       if p.aimWalk ~= nil then walkOk = p.aimWalk end
-      local r, why = aimStep(p.aim, slot ~= nil and (1 << slot) or nil, walkOk)
+      local r, why = aimStep(p.aim, slot ~= nil and (1 << slot) or nil, walkOk,
+        p.ally ~= nil and (1 << p.ally) or nil)
       if r == "walk" then return end
       if r == "refuse" then
         local what = string.format("row $%02X at %d BP aimed at %s: %s", type(p.row) == "number" and p.row or 0,
-          p.boost or 0, slot ~= nil and ("monster slot " .. slot) or "a live monster", why)
+          p.boost or 0, p.ally ~= nil and ("party slot " .. p.ally) or slot ~= nil and ("monster slot " .. slot)
+          or "a live monster", why)
         M.log(string.format("[setzer] f%d %s -- not confirmed", M.frame, what))
         M.assertEq(opts.aimRefusedOk == true, true, "SETZER's target select confirms only the target asked for: "
           .. what)
@@ -8006,6 +8039,229 @@ function M.setzerBattle(plan, opts)
         #M.vars.setzer, #plan, k))
     end),
   })
+end
+
+-- ---- OT6's added passes, watched pass by pass (wt/pass-retarget) --------
+-- The instrument battle_passretarget (played) and battle_passside (its
+-- mechanism twin) read.  Every action of every character: each pass at
+-- CalcAttackEffect's ChooseTarget -- the mask it starts with, at
+-- Ot6Life3Targeting's entry just before; the mask it chose, at
+-- Ot6Oblivion's entry just after -- and which monsters stand there.
+-- Nothing is written.
+M.PASS_SETZERROW = 0xEDCD          -- OT6_SETZERROW (ot6_memory.inc)
+M.PASS_MARK = 0xEDCE               -- OT6_PASSRETARGET: logged, never asserted
+
+local function passBits(m)
+  local n = 0
+  while m ~= 0 do n = n + (m & 1); m = m >> 1 end
+  return n
+end
+M.passBits = passBits
+
+-- the monsters ChooseTarget would keep: present ($3AA0+x bit 0), in the
+-- battle's target mask ($3A78 high byte), not Wounded, Petrified or Zombie
+-- ($3EE4+x & $C2: a monster's test) and not hidden ($3EF9+x bit 5) --
+-- CheckTargetsPresent's test, x = 8 + 2s.  (A petrified body keeps its HP
+-- and stays present: measured, a Mad Oscar at 1,266 HP with $3EE4 = $40,
+-- build/attempts/wt/pass-retarget/lab/dbg_new_k0.log.)
+function M.passStanding()
+  local m, tm = 0, M.readByte(0x3A79)
+  for s = 0, 5 do
+    local x = 8 + s * 2
+    if (M.readByte(0x3AA0 + x) & 1) == 1 and ((tm >> s) & 1) == 1 and (M.readByte(0x3EE4 + x) & 0xC2) == 0
+        and (M.readByte(0x3EF9 + x) & 0x20) == 0 then
+      m = m | (1 << s)
+    end
+  end
+  return m
+end
+
+-- the party members standing (bit e for the character in slot e): HP
+-- above 0 and not Wounded, Petrified or a Zombie
+function M.passPartyStanding()
+  local m = 0
+  for e = 0, 3 do
+    if M.readWord(0x3BF4 + e * 2) > 0 and (M.readByte(0x3EE4 + e * 2) & 0xC2) == 0 then m = m | (1 << e) end
+  end
+  return m
+end
+
+local passHitTbl = nil
+function M.passHitCountIds()
+  if passHitTbl then return passHitTbl end
+  passHitTbl = {}
+  local t = M.sym("Ot6HitCountTbl") & 0x3FFFFF
+  for i = 0, 63 do
+    local id = M.readRomByte(t + i * 2)
+    if id == 0xFF then break end
+    passHitTbl[id] = M.readRomByte(t + i * 2 + 1)
+  end
+  return passHitTbl
+end
+
+local PASS_CMD = { [0x00] = "fight", [0x06] = "capture", [0x0A] = "blitz", [0x09] = "tool", [0x18] = "gprain" }
+local PASS_ROW = { [0x59] = "coin", [0x5A] = "hire", [0x5B] = "jackpot" }
+M.PASS_ONE = { fight = true, capture = true, hire = true, jackpot = true, blitz = true, tool = true }
+-- a Fight's or Capture's own count: one pass a hand, eight with Offering
+-- (FightAttack: $3a70 = 1, or 7 when $3C58 bit 0); what the first pass
+-- finds above that is OT6's, two a point -- the player's boost or an
+-- engine-driven actor's dumped bank (Ot6Retaliate), which the pending byte
+-- at ExecCmd does not show
+local function passFightBase(a) return a.offering and 7 or 1 end
+-- the act's kind, its boost (a Fight's derived from its count) and whether
+-- OT6 added passes to it: a Fight or Capture whose first pass counts above
+-- vanilla's, a Setzer row or a character's GP Rain at 1 BP or more, or a
+-- Blitz or Tool with a row in the ROM's Ot6HitCountTbl
+function M.passClassify(a)
+  if a.cmd == 0x0F then a.kind = PASS_ROW[a.row] or "slot"
+  else a.kind = PASS_CMD[a.cmd] or string.format("cmd%02X", a.cmd or 0xFF) end
+  local k = a.kind
+  if k == "fight" or k == "capture" then
+    a.boost = (a.passes[1].a70 - passFightBase(a)) // 2
+    a.ext = a.passes[1].a70 > passFightBase(a)
+  elseif k == "gprain" or k == "coin" or k == "hire" or k == "jackpot" then a.ext = a.boost >= 1
+  elseif k == "blitz" or k == "tool" then a.ext = a.ab ~= nil and M.passHitCountIds()[a.ab] ~= nil
+  else a.ext = false end
+  return a
+end
+
+-- M.passWatch(): arm the instrument (once a run).  Returns W: W.acts, every
+-- closed action with a pass, oldest first (W.open, the actions under way,
+-- by entity: a test that restores a snapshot clears it); W.key, set by the
+-- caller to name the battle (W.seed0 is the battle's seed as InitBattle
+-- sets it, $021e << 2 into $be just before its jsr LoadBattleProp).
+function M.passWatch()
+  local W = { acts = {}, open = {}, key = nil, seed0 = nil }
+  local lb = M.sym("LoadBattleProp")
+  emu.addMemoryCallback(function() W.seed0 = M.readByte(0xBE) end, emu.callbackType.exec, lb, lb)
+  local ec = M.sym("ExecCmd@battle_code")
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xff
+    if x >= 8 then return end
+    W.open[x] = { e = x, boost = M.readByte(0x3E9D + x), passes = {}, key = W.key, f = M.frame,
+      offering = (M.readByte(0x3C58 + x) & 1) == 1 }
+  end, emu.callbackType.exec, ec, ec)
+  -- the Blitz or Tool id, as Cmd_0a / Cmd_09 hand it to Ot6HitCount (A; y =
+  -- the attacker): a failed Blitz input arrives as Pummel's
+  local hc = M.sym("Ot6HitCount")
+  emu.addMemoryCallback(function()
+    local y = emu.getState()["cpu.y"] & 0xff
+    if W.open[y] then W.open[y].ab = emu.getState()["cpu.a"] & 0xff end
+  end, emu.callbackType.exec, hc, hc)
+  local pre = M.sym("Ot6Life3Targeting")
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xff
+    local a = W.open[x]
+    if not a then return end
+    if a.cmd == nil then
+      a.cmd = M.readByte(0x3A7C)
+      if a.cmd == 0x0F then a.row = M.readByte(M.PASS_SETZERROW) end
+    end
+    a.passes[#a.passes + 1] = { pre = M.readByte(0xB8) | (M.readByte(0xB9) << 8), stand = M.passStanding(),
+      a70 = M.readByte(0x3A70), b5 = M.readByte(0xB5), ba = M.readByte(0xBA), bb = M.readByte(0xBB),
+      mark = M.readByte(M.PASS_MARK), foes = M.readByte(0x3A40), pstand = M.passPartyStanding() }
+  end, emu.callbackType.exec, pre, pre)
+  local post = M.sym("Ot6Oblivion")
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xff
+    local a = W.open[x]
+    local q = a and a.passes[#a.passes]
+    if q and q.post == nil then q.post = M.readByte(0xB8) | (M.readByte(0xB9) << 8) end
+  end, emu.callbackType.exec, post, post)
+  local fin = M.sym("Ot6ActionEnd")
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xff
+    local a = W.open[x]
+    if not a then return end
+    W.open[x] = nil
+    if #a.passes >= 1 then W.acts[#W.acts + 1] = a end
+  end, emu.callbackType.exec, fin, fin)
+  return W
+end
+
+-- M.passCheck(a, check, note, tag): log act a and hold each pass after its
+-- first (a weapon's follow-up spell, $b5 = $02, keeps vanilla's "same
+-- target" and is not one) to the rule (ot6_passes.asm).  check(got, want,
+-- what, kind, key) asserts (or tallies); note(event, kind, key, what) is
+-- told each draw: "retarget" (a pass whose starting bodies fell while a
+-- monster stands), "resplit" (a Coin Toss pass whose group lost a body and
+-- kept one), "emptied" (a pass after the monster side emptied), "party" (a
+-- pass that started on a party member who had fallen), "vanilla" (an unboosted two-hand
+-- Fight's second hand after the first hand's kill).  The side masks: the
+-- monster side is the monster slots and the characters fighting as
+-- enemies ($3A40 at the pass); the party is the other characters.
+-- For an action OT6 extended:
+--   F. a pass that starts on the monster side stays on it;
+--   A. it lands on a body while one stands;
+--   D. a pass that starts on a group with a fallen body lands on the
+--      group's survivors (the coins re-split);
+--   B. on standing bodies only;
+--   C. one body, for the one-body actions;
+--   G. once the monster side has emptied it lands on no party member;
+--   H. a pass that starts on a party member spreads to no other one: it
+--      lands on that member or nowhere;
+--   E. a Setzer row runs 1 + boost passes.
+-- And vanilla's own: an unboosted two-hand Fight (a Genji pair, two
+-- passes) keeps vanilla's rule, its second hand swinging at the body the
+-- first hand felled.
+function M.passCheck(a, check, note, tag)
+  M.passClassify(a)
+  local lines = {}
+  for p, q in ipairs(a.passes) do
+    lines[#lines + 1] = string.format("p%d $3A70=%d mark=%d b5=%02X ba=%02X bb=%02X in $%04X stand %02X -> $%04X", p,
+      q.a70, q.mark, q.b5, q.ba, q.bb, q.pre, q.stand, q.post or 0xFFFF)
+  end
+  M.log(string.format("[%s] %s by e%d at %d BP%s%s, %d pass(es), key %s: %s", tag, a.kind, a.e, a.boost,
+    a.ab and string.format(" (id $%02X)", a.ab) or "", a.offering and " (Offering)" or "", #a.passes, a.key or "?",
+    table.concat(lines, "; ")))
+  if a.cmd == 0x0F and a.row and PASS_ROW[a.row] and a.boost >= 1 then
+    check(#a.passes, 1 + a.boost, string.format("E: %s at %d BP runs 1 + boost passes", a.kind, a.boost), a.kind,
+      a.key)
+  end
+  local famN = 0
+  for _, q in ipairs(a.passes) do if q.b5 ~= 0x02 then famN = famN + 1 end end
+  for p, q in ipairs(a.passes) do
+    if p >= 2 and q.b5 ~= 0x02 and q.post ~= nil and q.pre ~= 0 then
+      local foes = q.foes or 0
+      local preMon, prePty = q.pre >> 8, (q.pre & 0xFF) & ~foes
+      local preSide = preMon ~= 0 or (q.pre & 0xFF & foes) ~= 0
+      local post, postPty, stand = q.post >> 8, (q.post & 0xFF) & ~foes, q.stand
+      local what = string.format("%s by e%d at %d BP, pass %d of %d (key %s; started on $%04X, standing $%02X, "
+        .. "landed on $%04X)", a.kind, a.e, a.boost, p, #a.passes, a.key or "?", q.pre, stand, q.post)
+      local k = a.kind == "capture" and "fight" or a.kind
+      if a.ext and prePty ~= 0 then
+        if (prePty & ~(q.pstand or 0xF)) ~= 0 then note("party", k, a.key, what) end
+        check(q.post & ~q.pre, 0, "H: a pass OT6 added that starts on a party member spreads to no other one -- "
+          .. what, a.kind, a.key)
+      elseif a.ext and preSide and stand == 0 then
+        note("emptied", k, a.key, what)
+        check(postPty, 0, "G: once the monster side has emptied, a pass OT6 added lands on no party member -- "
+          .. what, a.kind, a.key)
+      elseif preSide and prePty == 0 and stand ~= 0 then
+        local fell = preMon & ~stand & 0x3F
+        if a.ext then
+          check(postPty, 0, "F: a pass OT6 added stays on the monster side -- " .. what, a.kind, a.key)
+          check(post ~= 0, true, "A: it lands on a body while one stands -- " .. what, a.kind, a.key)
+          if passBits(preMon) >= 2 and (preMon & stand) ~= 0 then
+            check(post, preMon & stand, "D: a group pass lands on the group's survivors -- " .. what, a.kind, a.key)
+          end
+          check(post & ~stand & 0x3F, 0, "B: it lands on standing bodies only -- " .. what, a.kind, a.key)
+          if M.PASS_ONE[a.kind] then
+            check(passBits(post), 1, "C: a one-body action's pass lands on one body -- " .. what, a.kind, a.key)
+          end
+          if (preMon & stand) == 0 then note("retarget", k, a.key, what) end
+          if a.kind == "coin" and passBits(preMon) >= 2 and fell ~= 0 and (preMon & stand) ~= 0 then
+            note("resplit", k, a.key, what)
+          end
+        elseif a.kind == "fight" and famN == 2 and (q.ba & 0x40) == 0 and (preMon & stand) == 0 then
+          check(q.post, q.pre, "vanilla: an unboosted two-hand Fight's second hand swings at the body the first "
+            .. "hand felled -- " .. what, a.kind, a.key)
+          note("vanilla", k, a.key, what)
+        end
+      end
+    end
+  end
+  return a
 end
 
 -- M.speciesClassRow(sp): the class-weakness row the break seed gives a

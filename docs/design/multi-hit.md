@@ -513,29 +513,43 @@ spliced data bytes. No new RAM.
   end the break loop. (`kits.md` proposes an *Overcharge* passive, "+1
   AutoCrossbow hit per 2 BP", which is a per-character exception a passive
   channel could carry later, and it is out of scope here.)
-- **A pass OT6 added goes to another body when its own has fallen**
-  (`Ot6PassRetarget`, `ot6_passes.asm`; `battle_passretarget`). Every
-  extra pass OT6 buys rides vanilla's one loop (`$3a70`): a boosted Fight
-  or Capture, Pummel, Bum Rush and Drill (`Ot6HitCount`), a dumped Throw,
-  Setzer's Coin Toss, Hired Help and Jackpot and a character's GP Rain, and
-  a Mimic of any of them (it re-runs the copied command's handler). That
-  loop never retargets a later pass whose body fell on the pass before: it
-  sets "don't retarget" ($ba bit 2) on every pass after the first and
-  starts each on the previous pass's targets, so a Fight's remaining
-  swings beat the corpse (Fight's targeting puts an emptied mask back on
-  `$3a4e`) and a hire's or a roll's next pass landed nowhere, the one after
-  retargeting (wt/hire-sprite). Boost paid for hits that never landed while
-  a body still stood. Now, once the action's first pass has run, a pass of
-  an action OT6 added passes to whose targets all fell takes every body on
-  their side (not the side Retarget picks, which turns a muddled actor on
-  its party) and ChooseTarget narrows it as usual: one body for a one-body
-  action, the group for Coin Toss, nothing when no body stands there.
+- **A pass OT6 added goes to another monster when its own has fallen, and
+  never to the party** (`Ot6PassRetarget`, `ot6_passes.asm`;
+  `battle_passretarget` in play, `battle_passside` for the party and
+  emptied-side cases). Every extra pass OT6 buys rides vanilla's one loop
+  (`$3a70`), marked by a jsl at each adder: a boosted Fight or Capture
+  (`Ot6FightBoost`), Pummel, Bum Rush and Drill (`Ot6HitCount`), a dumped
+  Throw (`Ot6ThrowBoost`), Setzer's Coin Toss, Hired Help and Jackpot
+  (`Ot6SetzerEffect`) and a character's GP Rain (`Ot6RainPasses`), and a
+  Mimic of any of them (it re-runs the copied command's handler). That loop
+  never retargets a later pass whose body fell on the pass before: it sets
+  "don't retarget" ($ba bit 2) on every pass after the first and starts
+  each on the previous pass's targets, so a Fight's remaining swings beat
+  the corpse (Fight's targeting puts an emptied mask back on `$3a4e`) or
+  landed nowhere, and a hire's or a roll's next pass landed nowhere, the one
+  after retargeting (wt/hire-sprite). Boost paid for hits that never landed
+  while a body still stood. Now, once the action's first pass has run:
+  - targets that fell on the monster side (a monster, or a character
+    fighting as an enemy, `$3a40`) give way to that whole side, which
+    ChooseTarget masks to the bodies standing and narrows as usual: one body
+    for a one-body action, the group for Coin Toss;
+  - with no monster standing, the pass lands nowhere (a Fight's on the
+    corpse), never falling through to vanilla's Retarget, which picks the
+    side by the attacker's status and sends a muddled actor at its party;
+  - a party member who fell (a muddled actor's pick, or the player's aim
+    at an ally) is not replaced: the pass lands on that member or nowhere.
   Vanilla's own multi-pass actions keep their rules: an unboosted Genji
-  pair's second hand still swings at the body the first hand felled,
-  Offering, Quadra Slam/Slice and the Dragon Horn pick at random every pass
-  ($ba bit 6), and a weapon's follow-up spell keeps its target ($ba bit 3).
-  A group pass that loses a body was never affected: ChooseTarget masks the
-  fallen out, so the next toss splits over the survivors.
+  pair's second hand still swings at the body the first hand felled
+  (measured), and Offering, Quadra Slam/Slice and the Dragon Horn pick at
+  random every pass ($ba bit 6) and a weapon's follow-up spell keeps its
+  target ($ba bit 3), by the code. A group pass that loses a body was never
+  affected: ChooseTarget masks the fallen out, so the next toss splits over
+  the survivors (measured). Met in play: a boosted Fight, Pummel, Hired
+  Help, Jackpot and Coin Toss's re-split. Drill, Bum Rush, Capture, a
+  character's GP Rain, Umaro's Throw, Mimic and Offering with boost are
+  covered by construction (one hook, a mark at each adder), not met in
+  play: the tomb party has no Locke, Gogo or Umaro, and the driver never
+  drew a Drill there.
 - **SwdTech is already excluded from `Ot6BoostDmg`** because the BP bought the
   tech. Multi-hit does not change that.
 - **Break window caps every curve identically.** Rate (§1.2), duration

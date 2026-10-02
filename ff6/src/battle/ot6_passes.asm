@@ -17,10 +17,11 @@
 ; saved, so the pass after that starts empty and retargets: passes alternate
 ; dead / retarget (wt/hire-sprite: a 3 BP Hired Help on three bodies landed
 ; passes 1 and 3, passes 2 and 4 found nothing, and the third body kept its
-; 2,058 HP; build/attempts/wt/hire-sprite/retarget/).  A Fight's pass never
-; empties: Fight's targeting ($ba bit 5, CmdTargetTbl) puts an emptied mask
-; back on the backup targets ($3a4e), so every swing after a kill beat the
-; corpse while a body still stood (battle_passretarget, the base ROM).
+; 2,058 HP; build/attempts/wt/hire-sprite/retarget/).  A Fight's emptied
+; mask goes back to the backup targets ($3a4e: Fight's targeting sets $ba
+; bit 5, CmdTargetTbl), so its swings after a kill beat the corpse while a
+; body still stood (battle_passretarget's base tally, `B fight`), or, with no
+; backup, landed nowhere (`A fight`).
 ;
 ; Vanilla's own multi-pass actions keep their rules: an unboosted Genji
 ; pair's second hand still swings at the body the first hand felled
@@ -60,46 +61,59 @@
 
 ; jsl from ChooseTarget where its mask has come out empty (@58b3), replacing
 ; `lda $ba / bit #$04`; a `bne` after it skips Retarget, and a `bcs` skips
-; only Retarget itself.  Vanilla retargets unless $ba bit 2 is set.  With it
-; set, a pass of an action OT6 added passes to retargets all the same, once
-; the first pass has run ($3a70 has counted down from the mark
-; Ot6PassesAdded left): its target fell to an earlier pass of the same
-; action.  It goes to the side that target was on, not to the side
-; Retarget would pick (a muddled character's Retarget turns to its own
-; party: measured, a muddled Genji pair with a 3 BP dump went on swinging
-; at CELES once the last monster fell).  So $b8/$b9 get every slot of the
-; previous pass's side ($3a30, the targets that pass chose), and ChooseTarget
-; carries on from there as after Retarget: _c258fa and CheckTargetsPresent
-; keep the bodies still standing, and $bb narrows them to one or keeps the
-; group (a single-target hire stays single, a Coin Toss stays on the group).
-; A pass that finds no one standing there still lands nowhere -- or, for a
-; Fight ($ba bit 5), on the backup targets ($3a4e), as vanilla's does.
+; only Retarget itself.
+;
+; Vanilla's own passes, and the first pass of any action, keep vanilla's
+; rule: retarget unless $ba bit 2 ("don't retarget") is set.
+;
+; A later pass of an action OT6 added passes to ($3a70 has counted down from
+; the mark Ot6PassesAdded left) found its targets fallen to an earlier pass
+; of the same action, or found nothing at all after such a pass landed
+; nowhere (ExecAttack's @31c5 clears bit 2 for a pass that STARTS empty, and
+; vanilla would Retarget it).  It goes to another monster or nowhere:
+;   * the previous pass's targets ($3a30) were on the monster side -- a
+;     monster, or a character fighting as an enemy ($3a40) -- so $b8/$b9 get
+;     that whole side (the monster slots and the $3a40 characters), and
+;     ChooseTarget carries on as after Retarget: _c258fa and
+;     CheckTargetsPresent keep the bodies still standing, and $bb narrows
+;     them to one or keeps the group (a hire stays single, a Coin Toss stays
+;     on the group).  None standing: the pass lands nowhere -- or, for a
+;     Fight ($ba bit 5), on the backup targets ($3a4e), the fallen body, as
+;     vanilla's does;
+;   * anything else (a party member: a muddled or charmed actor's pick, or
+;     the player's aim at an ally; or nothing): no retarget, so the pass
+;     lands nowhere (a Fight's on the fallen member), and never spreads to
+;     another ally.
+; Never vanilla's Retarget, which picks the side by the attacker's status
+; and turns a muddled actor on its own party.
 ;
 ; a8/i8 (ChooseTarget's shortai), db=$7e, x = the attacker.  out: Z clear =
 ; keep the empty mask; Z set, carry clear = vanilla's Retarget; Z set, carry
-; set = the side is in $b8/$b9.  A clobbered (every path reloads it); X and Y
-; preserved.
+; set = the monster side is in $b8/$b9.  A clobbered (every path reloads
+; it); X and Y preserved.
 .proc Ot6PassRetarget
         .a8
-        lda     $ba
-        and     #$04
-        bne     held
-        clc                     ; Z set (the and), carry clear: vanilla
-        rtl
-held:   lda     f:$7e0000+OT6_PASSRETARGET
-        beq     keep            ; vanilla's own passes: keep its rule
+        lda     f:$7e0000+OT6_PASSRETARGET
+        beq     vanilla         ; no passes OT6 added: vanilla's rule
         cmp     f:$7e0000+$3a70
-        beq     keep            ; the action's first pass: vanilla
-        lda     f:$7e0000+$3a30 ; the previous pass's characters...
-        beq     :+
-        lda     #$0f            ;   ... means the party's side
-:       sta     $b8
-        lda     f:$7e0000+$3a31 ; its monsters...
-        beq     :+
-        lda     #$3f            ;   ... means the monsters' side
-:       sta     $b9
+        beq     vanilla         ; the action's first pass: vanilla's rule
+        lda     f:$7e0000+$3a31 ; the previous pass's monsters...
+        bne     monsters
+        lda     f:$7e0000+$3a30 ; ... or characters fighting as enemies
+        and     f:$7e0000+$3a40
+        beq     keep            ; a party member, or nothing: no retarget
+monsters:
+        lda     f:$7e0000+$3a40 ; the monster side: characters fighting as
+        sta     $b8             ;   enemies (Retarget's own `lda $3a40 /
+        lda     #$3f            ;   tsb $b8`) and every monster slot
+        sta     $b9
         lda     #$00            ; Z set
         sec                     ; carry set: this side, no Retarget
+        rtl
+vanilla:
+        lda     $ba
+        and     #$04            ; Z set: vanilla retargets; clear: it keeps
+        clc
         rtl
 keep:   lda     #$04            ; Z clear: no retarget
         rtl

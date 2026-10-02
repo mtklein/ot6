@@ -15080,9 +15080,9 @@ ChooseTarget:
         beq     @58ed
         bra     @58f6
 @58b3:  jsl     Ot6PassRetarget ; ot6: $ba bit 2 ("don't retarget"), except
-                                ;   a later pass OT6 added, whose body fell
-                                ;   to an earlier pass: carry set, and its
-                                ;   side is in $b8/$b9 (ot6_passes.asm)
+                                ;   a later pass OT6 added: another monster
+                                ;   (carry set, the monster side in $b8/$b9)
+                                ;   or none, never Retarget (ot6_passes.asm)
         bne     @58c8
         bcs     @ot6side
 @58b9:  jsr     Retarget
