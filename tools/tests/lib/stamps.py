@@ -189,24 +189,61 @@ def _status(path, root, memo, active):
     return v
 
 
+# Across calls in one process (live.py asks every few seconds while a
+# build publishes), a file's hash and a script's composition are kept while
+# the files they were computed from keep their (mtime, size): a long-lived
+# caller recomposes only the scripts whose inputs moved.
+_HASHES, _COMPOSED = {}, {}
+
+
+def _stat(path):
+    try:
+        st = os.stat(path)
+        return (st.st_mtime_ns, st.st_size)
+    except OSError:
+        return None
+
+
 def _hash(root, rel, memo):
     hs = memo.setdefault("hash", {})
     if rel not in hs:
         p = root / rel
-        hs[rel] = sha256_file(p) if p.exists() else None
+        key = (str(p), _stat(p))
+        if key not in _HASHES:
+            _HASHES[key] = sha256_file(p) if key[1] else None
+        hs[rel] = _HASHES[key]
     return hs[rel]
+
+
+def _compose_reads(root, gen, env):
+    """The files composing `gen` reads, by compose.py's own rules."""
+    script = root / "tools" / "tests" / f"{gen}.lua"
+    files = [script, *(root / p for p in LIB_FILES),
+             HERE / "compose.py", HERE / "lua_fingerprint.py",
+             root / "tools" / "state_write_waivers.txt",
+             Path(env.get("OT6_DBG") or root / "ff6" / "rom" / "ff6-en.dbg")]
+    try:
+        refs = re.findall(r'"([^"]+\.mss\.lua)"', script.read_text())
+    except OSError:
+        refs = []
+    files += [root / "build" / "states" / Path(r).name for r in refs]
+    return files
 
 
 def _composed(root, gen, env, memo):
     cs = memo.setdefault("composed", {})
     key = (gen, tuple(sorted(env.items())))
     if key not in cs:
-        try:
-            text, _ = compose.compose_script(
-                root / "tools" / "tests" / f"{gen}.lua", root, env)
-            cs[key] = (compose.composed_digest(text), None)
-        except (compose.ComposeError, OSError, ValueError) as e:
-            cs[key] = (None, str(e).splitlines()[0])
+        fp = (str(root), key, tuple((str(f), _stat(f))
+                                    for f in _compose_reads(root, gen, env)))
+        if fp not in _COMPOSED:
+            try:
+                text, _ = compose.compose_script(
+                    root / "tools" / "tests" / f"{gen}.lua", root, env)
+                _COMPOSED[fp] = (compose.composed_digest(text), None)
+            except (compose.ComposeError, OSError, ValueError) as e:
+                _COMPOSED[fp] = (None, str(e).splitlines()[0])
+        cs[key] = _COMPOSED[fp]
     return cs[key]
 
 
