@@ -127,16 +127,18 @@ end
 -- came on the last pass, a counter felled the crowd, SETZER was turned to a
 -- zombie before his turn -- tries again in the next crowd, up to its
 -- `crowds`.  The bounds' basis (the eight-variation sweep with the read
--- aim, build/attempts/wt/pass-retarget/round2/sweep/):
+-- aim):
 --   hire, 4: the first hire kills the weakest body whenever SETZER has his
 --     first turn on the crowd (the damage arithmetic above), so a crowd
 --     misses only when he cannot act first; met in the first crowd in 8 of
---     8 variations;
---   jackpot, 6: a face of 3+ is 4 of 6; met in 8 of 9 crowds tried, so a
---     miss within six is about (1/9)^6, under 0.001%;
---   resplit, 10: met in 8 of 14 crowds tried (the blind-aim sweep before it:
---     6 of 12 by key); at the worse rate a miss within ten is about
---     0.5^10 = 0.1%.
+--     8 variations (round 3's sweep, build/attempts/wt/pass-retarget/
+--     round3/sweep/, as round 2's);
+--   jackpot, 6: a face of 3+ is 4 of 6; met in 8 of 8 crowds tried in round
+--     3 and 8 of 9 in round 2, so a miss within six is about (1/9)^6, under
+--     0.001%;
+--   resplit, 10: met in 8 of 16 crowds tried in round 3 (8 of 14 in round
+--     2, 6 of 12 by key with the blind aim); at that rate a miss within ten
+--     is about 0.5^10 = 0.1%.
 local function aim(e, how)
   if how == nil then return e end
   return aimed(e, how == "strong")
@@ -161,11 +163,11 @@ local function pending()
 end
 local W, since, battles, crowds = nil, 0, 0, 0
 -- a boosted Fight's draw (a swing whose body fell while another stands)
--- within FIGHTAFTER battles of SETZER's kinds: the round-2 sweep met it
--- before SETZER's kinds were done in six variations, one battle after in k0
--- (done in battle 2, the draw in 3) and two after in k2 (done in 4, the
--- draw in 6); 8 is a stated margin over that worst case, not a measured
--- tail
+-- within FIGHTAFTER battles of SETZER's kinds: the round-2 and round-3
+-- sweeps met it before SETZER's kinds were done in six variations, one
+-- battle after in k0 (done in battle 2, the draw in 3) and two after in k2
+-- (done in 4, the draw in 6); 8 is a stated margin over that worst case,
+-- not a measured tail
 local FIGHTAFTER = 8
 local setzerDoneAt = nil
 local function allSeen()

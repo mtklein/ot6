@@ -528,14 +528,21 @@ spliced data bytes. No new RAM.
   the corpse (Fight's targeting puts an emptied mask back on `$3a4e`) or
   landed nowhere, and a hire's or a roll's next pass landed nowhere, the one
   after retargeting (wt/hire-sprite). Boost paid for hits that never landed
-  while a body still stood. Now, once the action's first pass has run:
+  while a body still stood. Now, once one of the action's passes has
+  targeted (an empty hand's pass never reaches ChooseTarget, so a Fight
+  with its weapon in the off hand only first targets one pass down the
+  count, and its first targeting pass keeps vanilla's retarget of a queued
+  target that fell before the action):
   - targets that fell on the monster side (a monster, or a character
     fighting as an enemy, `$3a40`) give way to that whole side, which
     ChooseTarget masks to the bodies standing and narrows as usual: one body
     for a one-body action, the group for Coin Toss;
   - with no monster standing, the pass lands nowhere (a Fight's on the
-    corpse), never falling through to vanilla's Retarget, which picks the
-    side by the attacker's status and sends a muddled actor at its party;
+    corpse), and so does a pass that then starts empty: never vanilla's
+    Retarget, which picks the side by the attacker's status and sends a
+    muddled actor at its party (`battle_passside` stages that with a
+    declared Muddle write at the action's start: mechanism staging, since a
+    really Muddled actor is engine-driven);
   - a party member who fell (a muddled actor's pick, or the player's aim
     at an ally) is not replaced: the pass lands on that member or nowhere.
   Vanilla's own multi-pass actions keep their rules: an unboosted Genji

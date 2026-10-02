@@ -8215,8 +8215,10 @@ end
 --      a pass that starts on the fallen bodies, and a pass that starts
 --      empty after one that landed nowhere;
 --   I. the action's first pass that targets (an empty hand's never does),
---      when the target it was queued at has fallen, lands on a standing
---      monster (vanilla's first-pass retarget, kept);
+--      when the target it was queued at has fallen, is retargeted as
+--      vanilla's first pass is: it lands on a body (vanilla's Retarget
+--      picks the side, so a Zombie's lands on either -- measured, a zombie
+--      SETZER's queued Coin Toss went to the party, round3/sweep k4);
 --   H. a pass that starts on a party member spreads to no other one: it
 --      lands on that member or nowhere;
 --   E. a Setzer row runs 1 + boost passes.
@@ -8246,9 +8248,8 @@ function M.passCheck(a, check, note, tag)
       local what = string.format("%s by e%d at %d BP, its first targeting pass (key %s; queued on $%04X, standing "
         .. "$%02X, landed on $%04X)", a.kind, a.e, a.boost, a.key or "?", q.pre, q.stand, q.post)
       note("first", k0, a.key, what)
-      check(((q.post >> 8) & q.stand) ~= 0 and (q.post & 0xFF & ~(q.foes or 0)) == 0, true, "I: the first "
-        .. "targeting pass of an action OT6 extended, its queued target fallen, lands on a standing monster -- "
-        .. what, a.kind, a.key)
+      check(q.post ~= 0, true, "I: the first targeting pass of an action OT6 extended, its queued target "
+        .. "fallen, is retargeted as vanilla's first pass is (it lands on a body) -- " .. what, a.kind, a.key)
     end
     if p >= 2 and a.ext and q.b5 ~= 0x02 and q.post ~= nil and q.pre == 0 and q.stand == 0 then
       local what = string.format("%s by e%d at %d BP, pass %d of %d (key %s; started empty, no monster standing, "
