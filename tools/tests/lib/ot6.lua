@@ -8890,11 +8890,12 @@ function M.cantRunFrom()
   return (M.readByte(0x00B1) & 0x02) ~= 0 or (M.readByte(0x2F4B) & 0x01) ~= 0
 end
 
--- Held L+R on such a formation does nothing: the hold sat until the pack
--- wiped the party ("L+R held at f11472 but this formation cannot be run
--- from ($B1=22 $2F4B=00)", battle_slotsboot on the v0.24 re-cut).  So the
--- step reads it once, on the battle's first active frame (the bit is set
--- again during a run's own exit), and does not hold.  What happens
+-- Held L+R on such a formation does nothing: the hold sat until the run
+-- timed out ("L+R held at f12608 but this formation cannot be run from
+-- ($B1=22 $2F4B=00)", wt/slotsboot-v024's first lab version on the v0.24
+-- re-cut, build/attempts/wt/slotsboot-v024/runs/new1_k0_s1.log.gz).  So the
+-- step reads it on every active frame until a run is under way (the bit is
+-- set again during a run's own exit), and does not hold.  What happens
 -- then is the caller's choice, and there is no default:
 --   opts.onCantRun = "fight"   fight it out (M.fightBattleByMenu, budget
 --                              opts.fightFrames, default 30000), as a
@@ -8908,23 +8909,33 @@ end
 -- through the spoils), "cantrun" or "fought" when the step ends.
 function M.fleeBattle(maxFrames, opts)
   opts = opts or {}
-  local phase, verdict, checked = 0, nil, false
+  local phase, verdict, running = 0, nil, false
   return M.withReset(M.seqStep({
-    M.call(function() verdict, checked = nil, false; M.fleeOutcome = nil end),
+    M.call(function() verdict, running = nil, false; M.fleeOutcome = nil end),
     M.driveUntil(function()
       if verdict == "cantrun" then return true end
       if not M.battleLoadStarted() then verdict = verdict or "fled"; return true end
       return false
     end, maxFrames or 9000, {
       M.call(function()
-        -- Read once, on the first active frame: $b1 bit 1 is also set
-        -- during a run's own exit (battle_fleesolo: "ran at 2815", then
-        -- "$B1=02" at f3120 with the battle still fading), so a later read
-        -- would call a run that worked a refusal.  A step begun on the
-        -- spoils (no active frame) presses through them as before.
-        if not checked and M.battleActive() then
-          checked = true
-          if M.cantRunFrom() then verdict = "cantrun"; M.setPad({}); return end
+        -- Read on every active frame until a run is under way ($2f45, the
+        -- party is running, or $3a38, someone just escaped), then stop.
+        -- UpdateMonsterGfxBuf recomputes $b1 after every command
+        -- (battle_main.asm:15688: pincer sides alive, a can't-run monster
+        -- entering, $3a42), so a battle can turn unrunnable mid-fight; but
+        -- the bit is also set during a run's own exit (battle_fleesolo at
+        -- 7e64d0ec: "arm 2 ran at f2815", then "L+R held at f3120 but this
+        -- formation cannot be run from ($B1=02 ...)" with the battle still
+        -- fading; build/attempts/wt/v024-recut/corrections/
+        -- suite_battle_fleesolo_px13_main_7e64d0ec.log.gz), so a read after
+        -- the run began would call a run that worked a refusal.  A step
+        -- begun on the spoils (no active frame) presses through them.
+        if not running and M.battleActive() then
+          if M.readByte(0x2F45) ~= 0 or M.readByte(0x3A38) ~= 0 then
+            running = true
+          elseif M.cantRunFrom() then
+            verdict = "cantrun"; M.setPad({}); return
+          end
         end
         phase = (phase + 1) % 8
         M.setPad(M.fleePress({ standing = #M.activeSlots(), menu = M.readByte(BATTLE.MENU),
@@ -8951,7 +8962,7 @@ function M.fleeBattle(maxFrames, opts)
       M.fightBattleByMenu(opts.fightFrames or 30000),
       M.call(function() M.fleeOutcome = "fought" end),
     }, {}),
-  }), function() phase, verdict, checked = 0, nil, false end)
+  }), function() phase, verdict, running = 0, nil, false end)
 end
 
 
