@@ -180,7 +180,9 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ; damage is twice the gil thrown, split over the targets.  The coins are the
 ; damage, so the boost buys more coins: x2 / x4 / x8 for 1 / 2 / 3 points,
 ; and that one purchase is both the bigger price and the bigger hit (boost
-; pays once).  A monster's GP Rain is vanilla's: level x 30, no boost.
+; pays once).  Hired Help's fee (rate 50) is one hire's and never doubles:
+; its boost buys more hires, each paying its own fee (Ot6SetzerEffect,
+; Ot6CoinTotal).  A monster's GP Rain is vanilla's: level x 30, no boost.
 ;
 ; The one price authority: the row's grey (Ot6SetzerRowGrey), the confirm's
 ; refusal (the same grey), and the gil the action takes (Ot6CoinPrice) all
@@ -202,6 +204,11 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         cmp     #$08
         lda     #$00
         bcs     :+              ; a monster: no boost
+        lda     $01,s
+        cmp     #OT6_HIRE_RATE
+        lda     #$00
+        bcs     :+              ; Hired Help: the boost buys hires, one fee
+                                ;   each, never a dearer one (Ot6CoinTotal)
         lda     OT6_BOOST_REVEALED,x    ; the pending boost
         and     #$03
 :       pha                     ; [1,s] the boost, [2,s] the rate
@@ -245,6 +252,64 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 .endproc
 
 ; ------------------------------------------------------------------------------
+
+; [ the gil a coin row's whole action takes, at the pending boost ]
+;
+; Coin Toss: one throw, Ot6CoinGil's (the boost doubles the coins).  Hired
+; Help: one fee a hire and 1 + boost hires (Ot6SetzerEffect adds the boost to
+; the action's attack count, and each pass pays its fee at AttackerEffect_51),
+; so the purse must hold them all.  At the ceilings (L99, 4 hires) 19,800.
+; in: A = the row id, X = the payer's entity offset, a8, i16.  out: the gil
+; in the 16-bit accumulator (B:A), a8.  preserves X and Y.
+.proc Ot6CoinTotal
+        .a8
+        .i16
+        phy
+        pha                     ; [1,s] the row
+        jsl     Ot6CoinRate
+        jsl     Ot6CoinGil      ; C = one throw's / one hire's gil
+        tay                     ; Y = it (all 16 bits under i16)
+        pla                     ; the row
+        cmp     #OT6_SETZER_HIRE
+        bne     @one
+        lda     OT6_BOOST_REVEALED,x
+        and     #$03
+        beq     @one            ; one hire
+        cmp     #$02
+        bcc     @two            ; 1 BP: two fees
+        beq     @three          ; 2 BP: three fees
+        longa                   ; 3 BP: four fees
+        .a16
+        tya
+        asl
+        asl
+        bra     @sum
+@three: .a8
+        longa
+        .a16
+        tya
+        asl
+        phy
+        clc
+        adc     $01,s           ; two fees + one
+        ply
+        bra     @sum
+@two:   .a8
+        longa
+        .a16
+        tya
+        asl
+@sum:   tay
+        shorta
+        .a8
+@one:   longa
+        .a16
+        tya
+        shorta                  ; C = the gil (B keeps the high byte)
+        .a8
+        ply
+        rtl
+.endproc
 
 ; [ does the party's purse hold this price? ]
 ; in: the price in the 16-bit accumulator (B:A).  out: carry set = yes.
@@ -303,8 +368,7 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         beq     @coins
         cmp     #OT6_SETZER_COIN
         bne     @white          ; Slot, an empty cell: the MP grey only
-@coins: jsl     Ot6CoinRate
-        jsl     Ot6CoinGil      ; the price at the caster's pending boost
+@coins: jsl     Ot6CoinTotal    ; the whole action's gil at the pending boost
         jsl     Ot6PurseHolds
         bcs     @white
         bra     @grey
@@ -447,9 +511,17 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         lda     #$60
         sta     $11a2           ; ignore defense, don't split
         lda     f:$7e0000+OT6_SETZERROW
+        cmp     #OT6_SETZER_COIN
+        beq     @coins
+        lda     OT6_BOOST_REVEALED,x    ; Hired Help and Jackpot: the boost
+        and     #$03                    ;   buys more hits -- one more pass of
+        clc                             ;   the attack a point (Ot6HitCount's
+        adc     $3a70                   ;   counter), each its own hire or its
+        sta     $3a70                   ;   own roll, so no point is lost to
+        lda     f:$7e0000+OT6_SETZERROW ;   the 9,999 cap on one hit
         cmp     #OT6_SETZER_JACKPOT
         beq     @dice
-        lda     #$18
+@coins: lda     #$18
         sta     $b5             ; GP Rain's animation
         lda     #$a2            ; attacker special effect $51 (GP Rain)
         rtl
@@ -560,16 +632,12 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ; level x 2, times the face again for the triple, saturating at 65,535 as the
 ; effect's own loop does -- and carry set, so the effect returns at once.
 ;
-; The face is a gamble the boost tilts (owner, 2026-10-02: a gamble, not a
-; guaranteed top roll; playtesting tunes it): each point raises the lowest
-; face by one, and the face is even odds from that floor to six.
-;   0 BP: 1-6, each 1/6      (a six 1 in 6, a five or six 1 in 3)
-;   1 BP: 2-6, each 1/5      (a six 1 in 5, a five or six 2 in 5)
-;   2 BP: 3-6, each 1/4      (a six 1 in 4, a five or six 1 in 2)
-;   3 BP: 4-6, each 1/3      (a six 1 in 3, a five or six 2 in 3)
-; so three points guarantee a four (4^4 x level x 2, 15,872 at L31) and never
-; a six.  The draw is one battle Rand reduced mod (6 - boost), within 1/256
-; of even (256 is not a multiple of 6, 5 or 3).  Nothing else is bought: no multiplier (the command is in Ot6BoostDmg's gate,
+; The face is a gamble, even odds on 1-6 (one battle Rand mod 6, within
+; 1/256 of even), and the boost buys more of it: Ot6SetzerEffect adds the
+; boost to the action's attack count, so 1 + boost passes each roll their own
+; triple and land their own hit (owner, 2026-10-02: a gamble, and every point
+; must land something under the 9,999 cap on one hit; playtesting tunes it).
+; Nothing else is bought: no multiplier (the command is in Ot6BoostDmg's gate,
 ; and this damage is set here, after CalcDmg), and the MP price is flat.
 ;
 ; Null-break (kits.md: the Fixed Dice are the outliers, large numbers and no
@@ -600,23 +668,13 @@ Ot6JackpotCubeTbl:
         .a8
         .i8
         phx
-        lda     OT6_BOOST_REVEALED,y
-        and     #$03
-        pha                     ; [1,s] the floor's face index: the boost
-        lda     #$06
-        sec
-        sbc     $01,s
-        pha                     ; [1,s] faces from the floor to six, [2,s] floor
-        ot6_rand                ; A = 0-255 (the macro keeps the stack even)
-@mod:   cmp     $01,s
+        ot6_rand                ; A = 0-255
+@mod6:  cmp     #$06
         bcc     @rolled
-        sbc     $01,s           ; (carry is set: the cmp above)
-        bra     @mod
-@rolled:
-        clc
-        adc     $02,s           ; + the floor: the face index 0-5
-        plx                     ; drop the count
-        plx                     ; drop the floor (x is the caller's again below)
+        sbc     #$06            ; (carry is set: the cmp above)
+        bra     @mod6
+@rolled:                        ; A = the face index 0-5, even odds within
+                                ;   1/256 (256 is not a multiple of 6)
         sta     $b6             ; the third die
         sta     $b7
         asl

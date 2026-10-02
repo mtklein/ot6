@@ -4822,8 +4822,6 @@ end
 -- list's wItemList ids.  M.setzerGil / M.setzerJackpot are the ROM's
 -- arithmetic, for the policy below and for the suites that check it.
 BATTLE.SETZER = { COIN = 0x59, HIRE = 0x5A, JACKPOT = 0x5B, SLOT = 0x5C }
-BATTLE.SETZER_FLOOR = { [0] = 1, 2, 3, 4 }      -- Jackpot's lowest face per point;
-                                                --   faces even from it to six
 function M.setzerGil(level, rate, boost)
   return level * rate * (1 << (boost or 0))
 end
@@ -4854,25 +4852,27 @@ end
 -- axis holds no key), the party's gil, SETZER's MP and bank, whether his
 -- Jackpot is spent (OT6_DIVINE_USED) and learned (event switch $00CA), and
 -- whether this is a random battle (OT6_RANDBTL).
---   Jackpot: a gamble (the face is even odds from 1 + boost to six), so
---     priced by its expected value: for each boost the bank holds, the mean
---     over those faces of the damage after the shields' halving or the
---     Broken double, capped at min(HP, 9999).  The smallest boost within 5%
---     of the best mean is the one thrown, when that mean is at least
---     o.jackpotEv (4000, what 99 MP should buy) and the target has at least
---     o.jackpotHp HP (4000).
+--   Jackpot: a gamble, one roll a hit and one more roll a boost point
+--     (faces 1-6 at even odds), priced by a roll's expected landed damage
+--     (shields' halving or the Broken double, the 9,999 cap, the HP): as
+--     many rolls as the HP wants and the bank holds, when they are expected
+--     to land at least o.jackpotEv (4000) on a target of o.jackpotHp HP.
 --   Slot at 3 BP in a random battle against two or more: a chosen triple,
 --     whatever reel 1 stops on (ot6_slot.asm), never a miss.
 --   Coin Toss when it chips two or more bodies (revealed special on each
 --     living, shielded, unbroken monster).
 --   Hired Help when the target is shielded and unbroken, its revealed row
---     holds a physical class, and SETZER's own Fight keys none of it.
+--     holds a physical class, and SETZER's own Fight keys none of it: a hire
+--     a point, as many as the shields want, the bank holds and the purse
+--     pays.
 -- Gil is spent only above o.gilFloor (20,000: a town's shopping kept back).
 -- opts.setzer = false turns all of it off; a table overrides the numbers
 -- (jackpot/slot/coin/hire = false drop one line).
 function Driver:setzerLine(actor, have)
   local o = self.opts.setzer
-  if o == false or M.readByte(BATTLE.BCHID + actor * 2) ~= 9 then return nil end
+  -- SETZER_POLICY_OFF (a global a lab sets ahead of the lib's run) turns the
+  -- table off for a whole generator: the control arm of a measurement
+  if o == false or SETZER_POLICY_OFF or M.readByte(BATTLE.BCHID + actor * 2) ~= 9 then return nil end
   o = type(o) == "table" and o or {}
   local row = cmdRow(actor, BATTLE.CMD_SLOT)
   if row == nil or self.skillDead[BATTLE.CMD_SLOT] then return nil end
@@ -4892,26 +4892,21 @@ function Driver:setzerLine(actor, have)
   local spent = (M.readByte(0x3ECB) & M.readByte(0x3018 + e)) ~= 0
   local hp = M.readWord(BATTLE.MON_HP + slot * 2)
   if o.jackpot ~= false and learned and not spent and mp >= 99 and hp >= (o.jackpotHp or 4000) then
-    local need = math.min(hp, 9999)
-    local ev, best = {}, 0
-    for b = 0, math.min(have, 3) do
-      local sum, n = 0, 0
-      for f = BATTLE.SETZER_FLOOR[b], 6 do
-        local d = M.setzerJackpot(f, level)
-        if broken then d = d * 2 elseif sh > 0 then d = d // 2 end
-        sum, n = sum + math.min(d, need), n + 1
-      end
-      ev[b] = sum / n
-      if ev[b] > best then best = ev[b] end
+    -- one roll's expected landed damage: the faces 1-6 at even odds, each
+    -- face^4 x level x 2, halved by shields or doubled when Broken, capped
+    -- at 9,999 and at the HP; the boost buys one more roll a point
+    local sum = 0
+    for f = 1, 6 do
+      local d = M.setzerJackpot(f, level)
+      if broken then d = d * 2 elseif sh > 0 then d = d // 2 end
+      sum = sum + math.min(d, 9999, hp)
     end
-    local want = nil
-    for b = 0, math.min(have, 3) do
-      if ev[b] >= best * 0.95 then want = b; break end
-    end
-    if want ~= nil and ev[want] >= (o.jackpotEv or 4000) then
-      M.log(string.format("[%s] actor=%d SETZER Jackpot on slot %d (%d HP, %d shield(s)%s) at %d BP: "
-        .. "expected %d of the %d it can take (faces %d-6), 99 MP of %d", tag, actor, slot, hp, sh,
-        broken and ", Broken" or "", want, math.floor(ev[want]), need, BATTLE.SETZER_FLOOR[want], mp))
+    local per = sum / 6
+    local want = math.max(0, math.min(math.min(have, 3), math.ceil(hp / per) - 1))
+    if per * (1 + want) >= (o.jackpotEv or 4000) then
+      M.log(string.format("[%s] actor=%d SETZER Jackpot on slot %d (%d HP, %d shield(s)%s) at %d BP: %d roll(s) "
+        .. "of expected %d each, 99 MP of %d", tag, actor, slot, hp, sh, broken and ", Broken" or "", want,
+        1 + want, math.floor(per), mp))
       return { kind = "skill", cmd = BATTLE.CMD_SLOT, skill = BATTLE.SETZER.JACKPOT, row = row,
                boostLeft = want, aim = slot, reason = "jackpot" }
     end
@@ -4939,14 +4934,17 @@ function Driver:setzerLine(actor, have)
                boostLeft = 0, reason = "coin" }
     end
   end
-  -- Hired Help
-  local hirePrice = M.setzerGil(level, 50, 0)
-  if o.hire ~= false and gil - hirePrice >= floorGil and sh > 0 and not broken
+  -- Hired Help: a hire a point, one chip each, so as many as the shields
+  -- still want (and the bank and the purse allow)
+  local fee = M.setzerGil(level, 50, 0)
+  if o.hire ~= false and gil - fee >= floorGil and sh > 0 and not broken
      and hitChips(slot, 0x07, 0) > 0 and fightChips(actor, slot, have) == 0 then
-    M.log(string.format("[%s] actor=%d SETZER Hired Help on slot %d: %d gil of %d; his Fight keys "
-      .. "nothing there", tag, actor, slot, hirePrice, gil))
+    local b = math.max(0, math.min(have, 3, sh - 1))
+    while b > 0 and gil - fee * (1 + b) < floorGil do b = b - 1 end
+    M.log(string.format("[%s] actor=%d SETZER Hired Help on slot %d at %d BP: %d hire(s) at %d gil of %d; his "
+      .. "Fight keys nothing there", tag, actor, slot, b, 1 + b, fee, gil))
     return { kind = "skill", cmd = BATTLE.CMD_SLOT, skill = BATTLE.SETZER.HIRE, row = row,
-             boostLeft = 0, aim = slot, reason = "hire" }
+             boostLeft = b, aim = slot, reason = "hire" }
   end
   return nil
 end
@@ -7578,6 +7576,9 @@ end
 -- list's cursor onto the entry's row ($5c Slot, $59 Coin Toss, $5a Hired
 -- Help, $5b Jackpot), A, and A again at target select (Hired Help and
 -- Jackpot aim at the entry's `slot`, a monster slot, when it gives one).
+-- An entry with `cmd` uses that command row instead of Slot's (the Coin Toss
+-- relic's GP Rain, $18: no table, target select straight away; recorded
+-- with row = $18).  L takes back a pending boost the entry does not want.
 -- An entry { row = "defend" } is a Defend, which banks a point.  Everyone
 -- else Defends while the plan has turns left, then everyone, SETZER too,
 -- Fights its default target until the battle ends; the victory text is
@@ -7592,8 +7593,11 @@ end
 --   mp0/mp1, bank0/bank1 (bank0 before the charge), cost (TakeGil's A),
 --   mon0/mon1 = { [slot] = { hp, sh, brk, cls, present } }, targets (the
 --   monster mask the row hit, $b9 at the exec), chips = { {y, class} }
---   (every Ot6ClassChip call during the action), divine0/divine1, and for a
---   Jackpot dmg/b6/b7 (read as the effect sets the dice animation).
+--   (every Ot6ClassChip call during the action), divine0/divine1, costs
+--   (TakeGil's A at every pass: a Hired Help pays one fee a hire), and for a
+--   Jackpot dice = { {dmg, b6, b7, class, hp} } one per roll (read as the
+--   effect sets the dice animation; hp = every slot's HP then, before the
+--   roll lands), dmg/b6/b7/class being the last roll's.
 -- The list as it was drawn, per opening: M.vars.setzerList = { { ids,
 -- qty, flags, mode } }; opts.onList(list, pend) runs at each opening.
 function M.setzerBattle(plan, opts)
@@ -7635,11 +7639,26 @@ function M.setzerBattle(plan, opts)
       Z.rec = { row = row, boost = M.readByte(0x3E9D + e), level = M.readByte(0x3B18 + e),
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
-        entity = e, setzerBit = M.readByte(0x3018 + e) }
+        entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {} }
     end, emu.callbackType.exec, a, a)
+    -- the Coin Toss relic's GP Rain (command $18, no table): its own record
+    local g = M.sym("Cmd_18")
+    emu.addMemoryCallback(function()
+      if not live() or Z.entity == nil then return end
+      local e = Z.entity
+      if (emu.getState()["cpu.y"] & 0xff) ~= e then return end
+      Z.rec = { row = 0x18, boost = M.readByte(0x3E9D + e), level = M.readByte(0x3B18 + e),
+        gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
+        mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
+        entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {} }
+    end, emu.callbackType.exec, g, g)
     local t = M.sym("TakeGil")
     emu.addMemoryCallback(function()
-      if live() and Z.rec and not Z.rec.cost then Z.rec.cost = emu.getState()["cpu.a"] & 0xffff end
+      if live() and Z.rec then
+        local c = emu.getState()["cpu.a"] & 0xffff
+        Z.rec.cost = Z.rec.cost or c
+        Z.rec.costs[#Z.rec.costs + 1] = c          -- one per pass: a hire each
+      end
     end, emu.callbackType.exec, t, t)
     local c = M.sym("Ot6ClassChip")
     emu.addMemoryCallback(function()
@@ -7651,6 +7670,9 @@ function M.setzerBattle(plan, opts)
       if live() and Z.rec and Z.rec.row == 0x5B and v == 0x26 then
         Z.rec.dmg, Z.rec.b6, Z.rec.b7, Z.rec.class = M.readWord(0x11B0), M.readByte(0xB6), M.readByte(0xB7),
           M.readByte(0x57B8)
+        Z.rec.dice[#Z.rec.dice + 1] = { dmg = Z.rec.dmg, b6 = Z.rec.b6, b7 = Z.rec.b7, class = Z.rec.class,
+          hp = {} }
+        for s2 = 0, 5 do Z.rec.dice[#Z.rec.dice].hp[s2] = M.readWord(0x3BFC + s2 * 2) end
       end
     end, emu.callbackType.write, 0x0000B5, 0x0000B5)
     local e = M.sym("Ot6ActionEnd")
@@ -7747,9 +7769,11 @@ function M.setzerBattle(plan, opts)
     if st == 0x05 then
       local want = math.min(p.boost or 0, M.readByte(0x3E9C + entity), 3)
       if M.readByte(0x3E9D + entity) < want then pulse("r"); return end
+      if M.readByte(0x3E9D + entity) > want then pulse("l"); return end
+      local cmd = p.cmd or 0x0F
       local row
-      for r = 0, 3 do if M.readByte(0x202E + a * 12 + r * 3) == 0x0F then row = r end end
-      M.assertEq(row ~= nil, true, "SETZER's command list holds Slot")
+      for r = 0, 3 do if M.readByte(0x202E + a * 12 + r * 3) == cmd then row = r end end
+      M.assertEq(row ~= nil, true, string.format("SETZER's command list holds command $%02X", cmd))
       local cur = M.readByte(0x890F + a) & 3
       if cur ~= row then pulse(cur < row and "down" or "up"); return end
       pulse("a")
@@ -7815,7 +7839,11 @@ function M.setzerBattle(plan, opts)
   return M.seqStep({
     M.waitUntil(function() return M.battleActive() end, 1200, "the battle is up", 2),
     M.driveUntil(function()
-      if opts.untilPlanDone and k > #plan and Z.rec == nil then return true end
+      if opts.untilPlanDone and k > #plan and Z.rec == nil then
+        local rows = 0
+        for _, p2 in ipairs(plan) do if type(p2.row) == "number" and not p2.refused then rows = rows + 1 end end
+        if #(M.vars.setzer or {}) >= rows then return true end
+      end
       return not M.battleLoadStarted()
     end, opts.maxFrames or 40000, {
       { tick = function() tick(); return "frame" end, reset = function() end },

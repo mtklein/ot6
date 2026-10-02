@@ -392,6 +392,10 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
     "battle_hiredhelp": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    "battle_setzergrey": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    "battle_gprain": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
     # walks from the Narshe exit spawn into the Beginner's House
     "school":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1",
