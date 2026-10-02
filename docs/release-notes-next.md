@@ -12,9 +12,9 @@ release's notes.
 weaknesses.** The monsters around Kohlingen and in Darill's Tomb used to
 carry generic weaknesses and five shields, so a break could take most of
 a fight to land. Now each has two to four shields and a weakness the
-party holds: Edgar's crossbow chips Deep Eyes and Exorays, Sabin's fists
-suit the Osteosaur's bones, and the Bogy, a ghost with no weakness of its
-own, answers to Setzer's cards. Setzer's cards, Trump and dice also key
+party holds: Edgar's crossbow chips Deep Eyes and Exorays, Sabin's
+Pummel and Suplex suit the Osteosaur's bones, and the Bogy, a ghost with
+no weakness of its own, answers to Setzer's cards. Setzer's cards, Trump and dice also key
 the tomb's undead and its demon (the Orog, the Osteosaur, the PowerDemon)
 and Dullahan himself; the tomb's plants still want blades, points and
 fire. Dullahan has ten shields, open to spears, darts, the crossbow,
