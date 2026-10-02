@@ -510,7 +510,7 @@ local function drawBattle(tag, tries)
           tag, n, #msPresent, mhp, H.vars.suitable and "FIGHT" or "flee"))
       end),
       H.cond(function() return not H.vars.suitable end, {
-        H.fleeBattle(9000),
+        H.fleeBattle(9000, { onCantRun = "fight" }),
         H.waitUntil(function()
           return H.worldMode() and H.worldHasControl()
         end, 1200, tag .. ": back on the plain after draw " .. n, 10),
@@ -786,7 +786,7 @@ local function battleHalf(tag, phases)
         or not H.battleLoadStarted()
     end, 9000, { H.call(function() recoveryTurn() end), H.waitFrames(1) },
       tag .. ": SETZER raised and healed after his fall"),
-    H.fleeBattle(12000),
+    H.fleeBattle(12000, { onCantRun = "fight" }),
     H.waitUntil(function()
       return H.worldMode() and H.worldHasControl()
     end, 1800, tag .. ": back on the plain for a fresh battle", 10),
@@ -901,7 +901,7 @@ add(battleHalf("H1 battle", {
 -- assumed, and both regen steps (0 -> 1 in the first fight, 1 -> 2 in the
 -- second) are still real unboosted spins.
 add({
-  H.fleeBattle(12000),
+  H.fleeBattle(12000, { onCantRun = "fight" }),
   H.waitUntil(function()
     return H.worldMode() and H.worldHasControl()
   end, 1800, "back on the plain for H2's own battle", 10),

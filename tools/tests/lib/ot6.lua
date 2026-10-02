@@ -2676,13 +2676,17 @@ end
 --
 -- A crossing's random encounters are draws: on some histories the walk
 -- meets no battle at all (gen_mrf_chute's upper floor on the v0.24 ROM,
--- build/attempts/wt/v024-recut/mrf_chute/).  watch() also counts entries to
+-- build/attempts/wt/v024-recut/mrf_chute/).  A sweep over such a walk
+-- passes opts.allowNoBattle = true.  watch() also counts entries to
 -- InitBattle, by its symbol rather than the scanned store, so report() can
 -- tell an attempt that met no battle (no entry: nothing was there to
 -- spread) from a battle the seed watcher missed (an entry and no seed).
--- An attempt with no battle passes only as the LAST attempt that ran: an
--- attempt retried after one is the same route with no fight to vary, so
--- the retry replays it, and report() fails it.
+-- With allowNoBattle, an attempt with no battle passes only as the LAST
+-- attempt that ran: an attempt retried after one is the same route with
+-- no fight to vary, so the retry replays it, and report() fails it.
+-- Without it (the default: a boss fight, a forced battle), an attempt that
+-- met no battle fails as it always did -- the sweep's shape moved and the
+-- spread is in the wrong place.
 --
 -- opts.attempts (default 3) only sets the spacing; it is not a licence to
 -- widen the sweep.
@@ -2694,6 +2698,7 @@ function M.newSeedSweep(tag, opts)
   local attempts = opts.attempts or 3
   local gap = opts.gap or (M.SEED_PERIOD // attempts)
   local phaseOf = opts.phaseSource or M.seedPhase
+  local allowNoBattle = opts.allowNoBattle == true
   local L = { tag = tag or "sweep", seeds = {}, extras = {}, targets = {},
               spreads = {}, inits = {} }
   local base, cur, watching = nil, 0, false
@@ -2828,9 +2833,10 @@ function M.newSeedSweep(tag, opts)
       for n = 1, attempts do
         if L.seeds[n] then ran[#ran + 1] = n
         elseif L.spreads[n] then
-          if (L.inits[n] or 0) == 0 then
-            -- no battle at all: nothing was there to spread.  Only the last
-            -- attempt may end that way; a retry after it replays it.
+          if (L.inits[n] or 0) == 0 and allowNoBattle then
+            -- a crossing that met no battle: nothing was there to spread.
+            -- Only the last attempt may end that way; a retry after it
+            -- replays it.
             assert(n == last, string.format(
               "%s: attempt %d met no battle, and attempt %d was run after it.  "
               .. "With no fight on the route the spread varies nothing, so the "
@@ -2845,15 +2851,29 @@ function M.newSeedSweep(tag, opts)
           end
         end
       end
-      -- An attempt that took a phase, entered InitBattle and drew no seed is
-      -- a battle the watcher missed.  Checked before the empty case below,
-      -- as the more specific account of the same symptom.
-      assert(#silent == 0, string.format(
-        "%s: attempt(s) %s took a battle RNG phase, entered InitBattle and then "
-        .. "drew no seed.  The watcher is on `sta $be` at battle init, which "
-        .. "every InitBattle runs, so the seed watcher missed a battle (or "
-        .. "points at the wrong instruction).",
-        L.tag, table.concat(silent, ", ")))
+      -- An attempt that took a phase and then drew no seed: a battle the
+      -- watcher missed (it entered InitBattle), or, on a sweep that does not
+      -- allow a battle-less attempt, a battle that never came.  Checked
+      -- before the empty case below, as the more specific account of the
+      -- same symptom.
+      if #silent > 0 then
+        local missed = {}
+        for _, n in ipairs(silent) do
+          if (L.inits[n] or 0) > 0 then missed[#missed + 1] = n end
+        end
+        assert(#missed == 0, string.format(
+          "%s: attempt(s) %s took a battle RNG phase, entered InitBattle and then "
+          .. "drew no seed.  The watcher is on `sta $be` at battle init, which "
+          .. "every InitBattle runs, so the seed watcher missed a battle (or "
+          .. "points at the wrong instruction).",
+          L.tag, table.concat(missed, ", ")))
+        error(string.format(
+          "%s: attempt(s) %s took a battle RNG phase and then drew no seed.  The "
+          .. "watcher is on `sta $be` at battle init, so either that attempt "
+          .. "never reached a battle -- in which case this sweep's shape moved "
+          .. "and the spread is in the wrong place -- or the watcher missed one.",
+          L.tag, table.concat(silent, ", ")), 0)
+      end
       assert(#ran > 0 or nobattle ~= nil, L.tag .. ": no battle seeding was recorded for any "
         .. "attempt.  Either no attempt reached a battle, or the seed watcher "
         .. "never fired -- both make the distinctness check vacuous.")
@@ -8863,17 +8883,75 @@ function M.fleePress(o)
   return { l = true, r = true }
 end
 
-function M.fleeBattle(maxFrames)
-  local phase = 0
-  return M.withReset(M.driveUntil(function()
-    return not M.battleLoadStarted()
-  end, maxFrames or 9000, {
+-- A formation that cannot be run from: $b1 bit 1 (the pincer arrangement;
+-- Cmd_2a answers "Can't run away!!", battle_main.asm:5729-5731) or the
+-- formation's own no-run bit $2f4b bit 0.  Read once the battle is active.
+function M.cantRunFrom()
+  return (M.readByte(0x00B1) & 0x02) ~= 0 or (M.readByte(0x2F4B) & 0x01) ~= 0
+end
+
+-- Held L+R on such a formation does nothing: the hold sat until the pack
+-- wiped the party ("L+R held at f11472 but this formation cannot be run
+-- from ($B1=22 $2F4B=00)", battle_slotsboot on the v0.24 re-cut).  So the
+-- step reads it once, on the battle's first active frame (the bit is set
+-- again during a run's own exit), and does not hold.  What happens
+-- then is the caller's choice, and there is no default:
+--   opts.onCantRun = "fight"   fight it out (M.fightBattleByMenu, budget
+--                              opts.fightFrames, default 30000), as a
+--                              player with no way out does
+--   opts.onCantRun = "return"  end the step with the battle still up; the
+--                              caller reads M.fleeOutcome == "cantrun"
+--   (absent)                   fail at once, naming the formation's bits:
+--                              a caller that never planned for it does not
+--                              hold the pad until a wipe
+-- M.fleeOutcome is "fled" (the battle ended under the run, or was won
+-- through the spoils), "cantrun" or "fought" when the step ends.
+function M.fleeBattle(maxFrames, opts)
+  opts = opts or {}
+  local phase, verdict, checked = 0, nil, false
+  return M.withReset(M.seqStep({
+    M.call(function() verdict, checked = nil, false; M.fleeOutcome = nil end),
+    M.driveUntil(function()
+      if verdict == "cantrun" then return true end
+      if not M.battleLoadStarted() then verdict = verdict or "fled"; return true end
+      return false
+    end, maxFrames or 9000, {
+      M.call(function()
+        -- Read once, on the first active frame: $b1 bit 1 is also set
+        -- during a run's own exit (battle_fleesolo: "ran at 2815", then
+        -- "$B1=02" at f3120 with the battle still fading), so a later read
+        -- would call a run that worked a refusal.  A step begun on the
+        -- spoils (no active frame) presses through them as before.
+        if not checked and M.battleActive() then
+          checked = true
+          if M.cantRunFrom() then verdict = "cantrun"; M.setPad({}); return end
+        end
+        phase = (phase + 1) % 8
+        M.setPad(M.fleePress({ standing = #M.activeSlots(), menu = M.readByte(BATTLE.MENU),
+                               state = M.readByte(BATTLE.MSTATE), phase = phase }))
+      end),
+    }, "flee battle (hold L+R)"),
     M.call(function()
-      phase = (phase + 1) % 8
-      M.setPad(M.fleePress({ standing = #M.activeSlots(), menu = M.readByte(BATTLE.MENU),
-                             state = M.readByte(BATTLE.MSTATE), phase = phase }))
+      M.setPad({})
+      M.fleeOutcome = verdict
+      if verdict ~= "cantrun" then return end
+      local why = string.format("this formation cannot be run from ($B1=%02X $2F4B=%02X)",
+        M.readByte(0x00B1), M.readByte(0x2F4B))
+      if opts.onCantRun == "fight" then
+        M.log("[flee] " .. why .. ": fighting it out")
+      elseif opts.onCantRun == "return" then
+        M.log("[flee] " .. why .. ": returning to the caller with the battle up")
+      else
+        error("fleeBattle: " .. why .. ", and the caller passed no onCantRun "
+          .. "(\"fight\" or \"return\"): holding L+R here sits until the party is "
+          .. "wiped", 0)
+      end
     end),
-  }, "flee battle (hold L+R)"), function() phase = 0 end)
+    M.cond(function() return verdict == "cantrun" and opts.onCantRun == "fight" end, {
+      M.fightBattleByMenu(opts.fightFrames or 30000),
+      M.call(function() M.fleeOutcome = "fought" end),
+    }, {}),
+  }), function() phase, verdict, checked = 0, nil, false end)
 end
 
 
@@ -9173,9 +9251,7 @@ end
 -- formation too (measured 2026-09-16 on the Whelk fight, $B1=07 $2F4B=0C,
 -- counters 03,01,03 -> 06,03,05 under a held L+R; probe_noeffect_cantrun),
 -- it is the run command itself that refuses ("can't run away!!", Cmd_2a).
-local function cantRun()
-  return (M.readByte(0x00B1) & 0x02) ~= 0 or (M.readByte(0x2F4B) & 0x01) ~= 0
-end
+local function cantRun() return M.cantRunFrom() end
 
 -- The list windows' cursor block.  btlgfx_ram.inc reserves $890F..$896E
 -- as 24 four-byte tables, one byte per actor (indexed by $62CA), and each

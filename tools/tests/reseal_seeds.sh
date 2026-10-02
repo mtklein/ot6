@@ -1,8 +1,12 @@
 #!/bin/sh
 # reseal_seeds.sh -- re-cut every SRM seed whose boot state has moved past
-# its sealed provenance.  Idempotent: a seed whose provenance is newer than
-# its boot state is skipped, so running this after every chain wave keeps
-# the seed set coherent with the run at no extra cost.
+# its sealed provenance.  Idempotent: a seed is fresh when its sealed
+# manifest's ancestor record names its boot state's stamp with the sha256
+# that stamp has now, and is skipped, so running this after every chain
+# wave keeps the seed set coherent with the run at no extra cost.  The
+# verdict is by content, not mtimes: a checkout that rewrites the
+# provenance files does not make a stale seed look fresh (v0.24,
+# build/attempts/wt/v024-recut/reseal/).
 #
 #   tools/tests/reseal_seeds.sh            # sweep everything stale
 #
@@ -16,13 +20,26 @@ cd "$(dirname "$0")/../.." || exit 2
 fail=0
 sweep() {
   cutter=$1 state=$2 dir=$3 payload=$4
-  prov="tools/tests/checkpoints/$dir/$payload.provenance.json"
-  mss="build/states/$state.mss"
-  [ -f "$mss" ] || { echo "[$dir] SKIP: $state.mss not generated yet"; return; }
-  if [ -f "$prov" ] && [ ! "$mss" -nt "$prov" ]; then
-    echo "[$dir] fresh (provenance newer than $state.mss)"
+  stamp="build/states/$state.stamp"
+  [ -f "build/states/$state.mss" ] && [ -f "$stamp" ] ||
+    { echo "[$dir] SKIP: $state.mss not generated yet"; return; }
+  # the sha256 the sealed manifest records for the boot state's stamp, or
+  # nothing when it records none (an unsealed or legacy seed: re-cut it)
+  recorded=$(python3 -c '
+import json, sys
+m = json.load(open(sys.argv[1]))
+p = m.get("provenance")
+for a in (p.get("ancestors", []) if isinstance(p, dict) else []):
+    if a.get("path") == sys.argv[2]:
+        print(a.get("sha256", ""))
+' "tools/tests/checkpoints/$dir/manifest.json" "$stamp" 2>/dev/null)
+  now=$(shasum -a 256 "$stamp" 2>/dev/null || sha256sum "$stamp")
+  now=${now%% *}
+  if [ -n "$recorded" ] && [ "$recorded" = "$now" ]; then
+    echo "[$dir] fresh (sealed from $stamp ${now%"${now#????????????}"})"
     return
   fi
+  echo "[$dir] stale: sealed from $stamp ${recorded:-(no record)}, which is now $now"
   echo "[$dir] re-cutting from $state.mss ..."
   if OT6_CAPTURE_SRM="tools/tests/checkpoints/$dir/$payload" \
        tools/tests/run.sh "tools/tests/$cutter.lua" \

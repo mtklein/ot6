@@ -131,7 +131,10 @@ local function survey(tag, targets)
 end
 
 local CROSS_ATTEMPTS = 6
-local L = H.newSeedSweep("mrf crossing", { attempts = CROSS_ATTEMPTS })
+-- allowNoBattle: the upper floor's encounters are draws, and some histories
+-- cross it without one (lib/ot6.lua M.newSeedSweep)
+local L = H.newSeedSweep("mrf crossing", { attempts = CROSS_ATTEMPTS,
+                                           allowNoBattle = true })
 local crossed, crossLost, crossBlob = false, nil, nil
 
 local function crossBody()

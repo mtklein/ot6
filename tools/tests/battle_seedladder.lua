@@ -14,9 +14,11 @@
 --   2. negative -- two attempts driven onto one phase draw one seed, and
 --      L.report() raises;
 --   3. report() also fails on a ladder that recorded no seeding at all, on
---      an attempt that met no battle and was then retried, and on an attempt
---      whose battle entered InitBattle but drew no seed (a missed watcher);
---      a LAST attempt that met no battle passes (nothing to spread);
+--      an attempt that took a phase and never fought (the default sweep),
+--      on an attempt that met no battle and was then retried (a crossing's
+--      sweep, allowNoBattle), and on an attempt whose battle entered
+--      InitBattle but drew no seed (a missed watcher); a crossing's LAST
+--      attempt that met no battle passes (nothing to spread);
 --   4/5. the harness samples $021e once per emulated frame, but the real
 --      counter's tick straddles that boundary, so about a quarter of the
 --      phases are never what a sample returns. spread() must release when
@@ -183,13 +185,33 @@ H.run({ maxFrames = 8000 }, {
 
   -- An attempt that takes a phase and then never fights is the subtler one:
   -- the other attempts still compare fine, so the ladder would report green
-  -- while covering one fewer fight than it claims.  Three shapes of it.
+  -- while covering one fewer fight than it claims.  Four shapes of it.
   --
-  -- 3a. The LAST attempt met no battle at all (InitBattle never ran): a
-  -- crossing whose encounters did not come on this draw.  Nothing was there
-  -- to spread and nothing was retried, so report() passes and says so.
+  -- 3a. The default sweep (a boss fight, a forced battle): an attempt that
+  -- took a phase and never fought fails -- the sweep's shape moved and the
+  -- spread is in the wrong place.  SILENT spreads and stops.
   (function()
-    local LAST = H.newSeedSweep("no-battle last attempt")
+    local SILENT = H.newSeedSweep("silent-attempt control")
+    return H.seqStep({
+      SILENT.watch(),
+      SILENT.spread(1),
+      H.call(function()
+        local ok, err = pcall(SILENT.report().tick)
+        H.assertEq(ok, false,
+          "an attempt that took a phase and drew no seed FAILS the default ladder")
+        H.assertEq(tostring(err):find("the spread is in the wrong place", 1, true) ~= nil,
+          true, "and it names the moved shape rather than reporting a bare pass: "
+          .. tostring(err))
+      end),
+    })
+  end)(),
+
+  -- 3b. A crossing's sweep (allowNoBattle): its LAST attempt met no battle
+  -- at all (InitBattle never ran), the walk's encounters did not come on
+  -- this draw.  Nothing was there to spread and nothing was retried, so
+  -- report() passes and says so.
+  (function()
+    local LAST = H.newSeedSweep("no-battle last attempt", { allowNoBattle = true })
     return H.seqStep({
       LAST.watch(),
       LAST.spread(1),
@@ -203,10 +225,11 @@ H.run({ maxFrames = 8000 }, {
     })
   end)(),
 
-  -- 3b. ...but an attempt that met no battle and was then RETRIED fails: the
-  -- route has no fight for the spread to vary, so the retry replays it.
+  -- 3c. ...but on a crossing's sweep, an attempt that met no battle and was
+  -- then RETRIED fails: the route has no fight for the spread to vary, so
+  -- the retry replays it.
   (function()
-    local RETRY = H.newSeedSweep("no-battle retried control")
+    local RETRY = H.newSeedSweep("no-battle retried control", { allowNoBattle = true })
     return H.seqStep({
       RETRY.watch(),
       RETRY.spread(1),
@@ -221,7 +244,7 @@ H.run({ maxFrames = 8000 }, {
     })
   end)(),
 
-  -- 3c. An attempt that entered InitBattle and drew no seed is a battle the
+  -- 3d. An attempt that entered InitBattle and drew no seed is a battle the
   -- seed watcher missed.  The miss is injected into the sweep's own record
   -- (the seed it captured is dropped after a real battle), the shape a
   -- watcher on the wrong instruction leaves.
