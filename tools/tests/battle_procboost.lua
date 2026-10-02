@@ -16,16 +16,25 @@
 --
 -- From fc_alcove (TERRA with Blizzard, LOCKE, SHADOW, EDGAR; Ice Rod,
 -- MithrilKnife and Magicite in the bag): out of the alcove onto the
--- continent, pace to a random encounter, everyone Defends until every bank
--- holds 3, snapshot.  Each case restores that snapshot, Defends the other
--- windows until its actor's opens, presses R three times and plays the verb
--- through its menu.  No state is written.  Every Ot6BoostDmg call the actor
+-- continent, pace to a random encounter (whichever 394 deals), and let the
+-- bench (below: a Fenix Down, a status cure or a Potion for whoever needs
+-- one, else Defend) play every window until every bank holds 3, every
+-- member stands at 60% of max HP or better and every case's actor is free
+-- to play its verb; snapshot, and assert that precondition.  (A battle the
+-- party cannot get ready in -- an actor under a Mute the bag cannot lift,
+-- say -- is fought out and the next encounter taken, at most four.)  Each case
+-- restores that snapshot, benches the other windows until its actor's
+-- opens (an actor blocked there, by a greyed row or a status, benches that
+-- window too and starts at a later one), presses R three times and plays
+-- the verb through its menu.
+-- No state is written.  Every Ot6BoostDmg call the actor
 -- makes during the action is recorded ($11b0 in and out, $b5/$b6, $3a7c/$3a7d,
 -- pending, OT6_WEAPSPELL).  Asserted:
 --   magic   TERRA's Fire, boosted, runs as Fire 3 and leaves unmultiplied
 --   fight   TERRA's Fight: every Blizzard Ice it casts leaves unmultiplied,
---           and the swings (command $00) do too; retried at longer idle waits
---           until a try casts (a 1-in-4 roll per hit)
+--           and the swings (command $00) do too; retried, each try a
+--           round later than the last, until a try casts (a 1-in-4 roll
+--           per hit)
 --   throw   SHADOW's MithrilKnife ($01, also Ice's id) leaves x8
 --   rod     LOCKE's Ice Rod from Item (runs as Ice 2) leaves x8
 --   magicite  LOCKE's Magicite from Item: any damage its esper deals leaves x8
@@ -68,10 +77,21 @@ local STATE = "build/states/fc_alcove.mss.lua"
 
 local BOOST = 3
 local MULT = 1 << BOOST
+-- What Ot6BoostDmg makes of `din` at BOOST: BOOST doublings of the 16-bit
+-- word, and $7FFF when one of them carries out of bit 15 (`asl / bcs @cap`,
+-- ot6_boostdmg.asm).  A product in $8000-$FFFF carries out of none and is
+-- stored as it stands: on the re-cut a magicite esper's 4327 left
+-- Ot6BoostDmg as 34616 ($8738), where min(din x 8, $7FFF) expected $7FFF
+-- (build/attempts/wt/procboost-v024/air/new6/new_k6.log.gz).
+local function boosted(din)
+  local v = din * MULT
+  if v > 0xFFFF then return 0x7FFF end
+  return v
+end
 local TERRA, LOCKE, SHADOW = 0x00, 0x01, 0x03
 local ICE_ROD, MITHRIL_KNIFE, MAGICITE = 0x36, 0x01, 0xF9
 local FIRE, FIRE3 = 0x00, 0x09
-local FIGHT_TRIES, MAGICITE_TRIES, WAIT_STEP = 12, 6, 48
+local FIGHT_TRIES, MAGICITE_TRIES, ROUND_FRAMES = 12, 6, 1800
 local GAU, RAGE_ENTRIES = 0x0B, 8          -- the rage window lists at most eight
 local GAU_STATE = "build/states/gau_joined.mss.lua"
 local RAGECOUNT, RAGEBEAST, MP = 0x3A9A, 0x33A8, 0x3C08
@@ -90,6 +110,9 @@ local HANDS = 0x3CA8
 local CMD_FIGHT, CMD_ITEM, CMD_MAGIC, CMD_THROW, CMD_RAGE = 0x00, 0x01, 0x02, 0x08, 0x10
 
 local slotOf, snap, armed = {}, nil, nil
+local snapSeats, snapReady, snapWhy          -- the party as the snapshot was taken
+local SETTLE, settled = 8, 0                  -- released frames on its window first
+local unreadySaid = -1200
 local weapspell                               -- OT6_WEAPSPELL, off the dbg
 local learned                                 -- GAU's rage-window length
 
@@ -193,14 +216,163 @@ local function pulse(btn)
   tick = tick + 1
   H.setPad((btn and tick % 12 < 6) and { [btn] = true } or {})
 end
--- everyone but `except` Defends: RIGHT opens Def., A commits it
-local function defendOthers(except)
-  if H.readByte(MENU) == 0 then pulse(nil) return end
+
+-- The bench: everyone but `except` keeps the party standing, so the action
+-- under measurement lives to resolve.  A window with someone down gives a
+-- Fenix Down; one with a status a bag item lifts gives that item; one with
+-- a member under HEAL_PCT of max HP gives the most hurt of them a Potion
+-- (an X-Potion under a quarter, a Tonic when the Potions are gone); any
+-- other window takes a real Defend (RIGHT opens Def., A commits it).
+-- Healing, like a Defend, is an unboosted action, so it banks the actor's
+-- pip.  Healing comes first because the encounter is whatever 394 deals:
+-- on the v0.24 re-cut a lone Ninja (formation 0003) took half of every bar
+-- while the banks filled (1207 -> 600 on TERRA) and two more of its
+-- party-wide hits killed LOCKE inside the rod case before his Ice Rod went
+-- off (build/attempts/wt/v024-recut/qual1/procboost_hpdiag.log).
+-- battle_boostcharge's bench, which this follows, heals first for the same
+-- reason.  HEAL_PCT sits above READY_PCT, the snapshot's floor: healing
+-- only members under the floor itself, a Potion (about 250) at a time
+-- against chip damage on four bars, held the party within a few points of
+-- it for 30000 frames and never had all four over it at once
+-- (build/attempts/wt/procboost-v024/air/new4/new_k5.log.gz).
+local TONIC, POTION, XPOTION, FENIX = 0xE8, 0xE9, 0xEA, 0xF0
+local HEAL_PCT, READY_PCT = 75, 60
+local HP, MAXHP = 0x3BF4, 0x3C1C
+local tc = H.targetCursor({ mask = 0x7B7D, dirs = { "down", "up", "left", "right" } })
+local benchTick, plans, benchHeals = 0, {}, 0
+local function seated(s) return H.readByte(BCHID + s * 2) ~= 0xFF end
+local function seatsLine()
+  local t = {}
+  for s = 0, 3 do
+    if seated(s) then
+      t[#t + 1] = string.format("a%d:%d/%d", s, H.readWord(HP + s * 2), H.readWord(MAXHP + s * 2))
+    end
+  end
+  return table.concat(t, " ")
+end
+-- every seated member alive and at or above READY_PCT of max HP
+local function standing()
+  for s = 0, 3 do
+    if seated(s) then
+      local hp, mx = H.readWord(HP + s * 2), H.readWord(MAXHP + s * 2)
+      if hp == 0 or hp * 100 < READY_PCT * mx then return false end
+    end
+  end
+  return true
+end
+local function statusBytes(s)
+  return H.readByte(0x3EE4 + s * 2), H.readByte(0x3EE5 + s * 2),
+         H.readByte(0x3EF8 + s * 2), H.readByte(0x3EF9 + s * 2)
+end
+-- The statuses a bag item lifts that keep a member from acting as told:
+-- Petrify (Soft), Imp and Mute (each greys commands; Green Cherry, Echo
+-- Screen), Zombie (Holy Water), with Remedy behind each.  Which item
+-- clears which bit is read from the ROM's own records (H.statusCure).
+-- Sleep and Muddle lift under any physical hit and Stop on its counter;
+-- nothing here hits an ally, so those are waited out (a case's actor
+-- under one defers, below).
+local ST2_MUTE = 0x08
+local STATUS_CURES = {
+  { byte = 1, bit = H.ST1_PETRIFY, name = "Petrify", items = { H.SOFT, H.REMEDY } },
+  { byte = 1, bit = H.ST1_ZOMBIE, name = "Zombie", items = { H.REVIVIFY, H.REMEDY } },
+  { byte = 1, bit = H.ST1_IMP, name = "Imp", items = { H.GREEN_CHERRY, H.REMEDY }, greys = true },
+  { byte = 2, bit = ST2_MUTE, name = "Mute", items = { 0xFB, H.REMEDY }, greys = true },
+}
+-- A member someone has already queued care for is left to it until it
+-- lands (the HP rises, or the status the item was for clears) or
+-- INBOUND_WAIT frames pass: three windows in a row once queued three
+-- Potions on one member at 58% before the first went off
+-- (build/attempts/wt/procboost-v024/px13/new3/new_k6.log.gz, f32864-f33304).
+local INBOUND_WAIT = 600
+local inbound = {}
+local function awaiting(s)
+  local r = inbound[s]
+  if r == nil then return false end
+  local s1, s2 = statusBytes(s)
+  local landed = H.readWord(HP + s * 2) > r.hp
+    or (r.bit ~= nil and (((r.byte == 1) and s1 or s2) & r.bit) == 0)
+  if landed or H.frame - r.f > INBOUND_WAIT then inbound[s] = nil return false end
+  return true
+end
+local function carePlan()
+  for s = 0, 3 do
+    if seated(s) and H.readWord(HP + s * 2) == 0 and battInvIdx(FENIX) and not awaiting(s) then
+      return { item = FENIX, target = s, why = "down" }
+    end
+  end
+  for s = 0, 3 do
+    if seated(s) and H.readWord(HP + s * 2) > 0 and not awaiting(s) then
+      local s1, s2 = statusBytes(s)
+      for _, k in ipairs(STATUS_CURES) do
+        if ((k.byte == 1 and s1 or s2) & k.bit) ~= 0 then
+          local item = H.statusCure({ byte = k.byte, bit = k.bit, items = k.items,
+                                      has = function(id) return battInvIdx(id) ~= nil end })
+          if item then return { item = item, target = s, why = k.name, byte = k.byte, bit = k.bit } end
+        end
+      end
+    end
+  end
+  local worst, wpct = nil, nil
+  for s = 0, 3 do
+    local hp, mx = H.readWord(HP + s * 2), H.readWord(MAXHP + s * 2)
+    if seated(s) and hp > 0 and mx > 0 and not awaiting(s) then
+      local pct = hp * 100 // mx
+      if wpct == nil or pct < wpct then worst, wpct = s, pct end
+    end
+  end
+  if worst == nil or wpct >= HEAL_PCT then return nil end
+  local item = (wpct < 25 and battInvIdx(XPOTION) and XPOTION)
+            or (battInvIdx(POTION) and POTION) or (battInvIdx(TONIC) and TONIC) or nil
+  if item == nil then return nil end
+  return { item = item, target = worst, why = string.format("at %d%%", wpct) }
+end
+local function bench(except)
+  benchTick = benchTick + 1
+  tc.observe()
+  if H.readByte(MENU) == 0 then H.setPad({}) return end
   local st, a = H.readByte(MSTATE), H.readByte(ACTOR) & 3
-  if a == except then pulse(nil) return end
-  if st == ST_CMD then pulse("right")
-  elseif st == ST_DEF then pulse("a")
-  else pulse(nil) end
+  if a == except then H.setPad({}) return end
+  local btn
+  if st == ST_CMD then
+    local p = carePlan()
+    plans[a] = p
+    local row = p and cmdRow(a, CMD_ITEM)
+    if row == nil then
+      btn = "right"
+    else
+      local cur = H.readByte(CMDROW + a) & 3
+      btn = (cur == row) and "a" or ((cur < row) and "down" or "up")
+    end
+  elseif st == ST_DEF then
+    btn = "a"
+  elseif st == ST_ITEM then
+    local p = plans[a]
+    local want = p and battInvIdx(p.item)
+    if want == nil then
+      btn = "b"
+    else
+      local cur = H.readByte(ITEMSCR + a) + H.readByte(ITEMROW + a)
+      btn = (cur < want and "down") or (cur > want and "up") or "a"
+    end
+  elseif st == ST_TGT then
+    local p = plans[a]
+    if p == nil then
+      btn = "b"
+    else
+      btn = tc.steer(p.target, benchTick)
+      if btn == "a" and not p.said then
+        p.said = true
+        benchHeals = benchHeals + 1
+        inbound[p.target] = { f = H.frame, hp = H.readWord(HP + p.target * 2),
+                              byte = p.byte, bit = p.bit }
+        H.log(string.format("[procboost] bench f%d: slot %d gives item $%02X to slot %d (%s); seats %s",
+          H.frame, a, p.item, p.target, p.why, seatsLine()))
+      end
+      H.setPad((btn and (benchTick - 1) % 16 < 4) and { [btn] = true } or {})
+      return
+    end
+  end
+  H.setPad((btn and benchTick % 12 < 6) and { [btn] = true } or {})
 end
 
 -- the list steer for each verb: the button that walks toward the wanted
@@ -251,6 +423,30 @@ local CMD_OF = { fight = CMD_FIGHT, throw = CMD_THROW, item = CMD_ITEM, magic = 
                  rage = CMD_RAGE }
 local LIST_OF = { throw = ST_THROW, item = ST_ITEM, magic = ST_MAGIC, rage = ST_RAGE }
 local phase, held = "idle", nil
+-- Why a case's actor cannot play its verb now, or nil: down, a status that
+-- takes the turn or the choice of command away (H.turnDenied, Muddle,
+-- Zombie), or the verb's command row greyed -- Mute or Imp greys Magic,
+-- and btlgfx skips a row whose flags bit 7 is set, so no press lands on it
+-- (#153).  On the re-cut, a $0B7 draw (Brainpans, Misfit, Apokryphos)
+-- muted TERRA before the snapshot and the magic case walked the cursor
+-- up and down past the greyed row for 6000 frames
+-- (build/attempts/wt/procboost-v024/air/old2/old_k6.log.gz).
+local function blocked(c)
+  local s = slotOf[c.char]
+  if s == nil or not seated(s) then return "not seated" end
+  if H.readWord(HP + s * 2) == 0 then return "down" end
+  local s1, s2, s3, s4 = statusBytes(s)
+  local den = H.turnDenied({ s1 = s1, s2 = s2, s3 = s3, s4 = s4 })
+  if den then return den end
+  if (s2 & H.ST2_MUDDLE) ~= 0 then return "Muddle" end
+  if (s1 & H.ST1_ZOMBIE) ~= 0 then return "Zombie" end
+  local row = cmdRow(s, CMD_OF[c.verb])
+  if row == nil then return "no " .. c.verb .. " command" end
+  if (H.readByte(CMDTBL + s * 12 + row * 3 + 1) & 0x80) ~= 0 then
+    return string.format("the %s row greyed (status bytes %02X %02X)", c.verb, s1, s2)
+  end
+  return nil
+end
 -- the pending boost, bank and MP as the action is committed; arms the observers
 local function markConfirm(c)
   local e = c.slot * 2
@@ -308,7 +504,7 @@ end
 -- one try of a case from the snapshot; `c.done(c)` says whether the try
 -- produced the thing the case is about (nil = any try does)
 local function tryCase(c, n)
-  local req, waited, skip = nil, 0, false
+  local req, spent, skip, deferring = nil, 0, false, nil
   return {
     H.call(function()
       skip = c.hit ~= nil or (c.present ~= nil and not c.present())
@@ -321,24 +517,53 @@ local function tryCase(c, n)
       if skip then return end
       H.checkReq(req, "snapshot load")
       H.rearmInputInjection()
+      inbound = {}
       c.slot = slotOf[c.char]
       c.calls, c.fb, c.endF, c.beast = {}, {}, nil, nil
       c.pendAtConfirm, c.bankAtConfirm, c.mpAtConfirm = nil, nil, nil
-      c.wait = (n - 1) * WAIT_STEP
-      tick, phase, held, waited = 0, "reach", nil, 0
+      c.spend = n - 1
+      tick, phase, held, spent, deferring = 0, "reach", nil, 0, nil
     end),
-    H.driveUntil(function() return skip or phase == "sent" end, 6000 + (n - 1) * WAIT_STEP, {
+    H.driveUntil(function() return skip or phase == "sent" end, 6000 + (n - 1) * ROUND_FRAMES, {
       H.call(function()
         if phase == "reach" then
-          -- Defend the other windows until this actor's opens, then idle
-          -- there for the try's wait
-          if H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_CMD
-             and (H.readByte(ACTOR) & 3) == c.slot then
-            H.setPad({})
-            waited = waited + 1
-            if waited >= c.wait then phase, tick = "boost", 0 end
+          -- bench the other windows until this actor's opens.  Try n gives
+          -- the actor's first n-1 windows to the bench, so each try acts
+          -- after another round of the encounter's turns and draws on
+          -- another stretch of the battle RNG; an idle wait at the window
+          -- does not move it ($be held at $C5 through 528 idle frames, and
+          -- twelve fight tries swung the same four hits,
+          -- build/attempts/wt/procboost-v024/px13/diagbe/diagbe_k4.log.gz).
+          -- An actor who cannot play the verb at a window (blocked)
+          -- spends it the same way, and the case starts at one where they
+          -- can.
+          local mine = H.readByte(MENU) ~= 0 and (H.readByte(ACTOR) & 3) == c.slot
+          if not mine then
+            deferring = nil
+            bench(c.slot)
+          elseif deferring then
+            bench(-1)
+          elseif H.readByte(MSTATE) ~= ST_CMD then
+            -- a sub-window of the actor's own: back out to its command list
+            local st = H.readByte(MSTATE)
+            pulse((st == ST_DEF or st == ST_TGT or st == ST_ITEM or st == ST_MAGIC
+                   or st == ST_THROW or st == ST_RAGE) and "b" or nil)
           else
-            defendOthers(c.slot)
+            local why = blocked(c)
+            if why then
+              H.log(string.format("[procboost] %s try %d: slot %d's window at f%d, but %s: "
+                .. "the bench plays it; seats %s", c.name, n, c.slot, H.frame, why, seatsLine()))
+            elseif spent < c.spend then
+              spent = spent + 1
+              why = "spent"
+            end
+            if why then
+              deferring = why
+              bench(-1)
+            else
+              H.setPad({})
+              phase, tick = "boost", 0
+            end
           end
           return
         end
@@ -350,7 +575,7 @@ local function tryCase(c, n)
       end),
     }, string.format("%s, try %d", c.name, n)),
     H.driveUntil(function() return skip or (c.endF ~= nil and H.frame >= c.endF + 30) end, 6000, {
-      H.call(function() defendOthers(c.slot) end),
+      H.call(function() bench(c.slot) end),
     }, c.name .. " resolves, try " .. n),
     H.call(function()
       if skip then return end
@@ -366,9 +591,9 @@ local function tryCase(c, n)
       if c.verb == "rage" and c.beast then
         who = string.format("beast $%02X (special $%02X), ", c.beast, specialOf(c.beast))
       end
-      H.log(string.format("[procboost] %s try %d (wait %d): %spending at confirm %s: %s"
+      H.log(string.format("[procboost] %s try %d (%d window(s) spent first): %spending at confirm %s: %s"
         .. " ; Ot6FightBoost: %s ; bank %s->%d pending %d, mp %s->%d",
-        c.name, n, c.wait, who, tostring(c.pendAtConfirm),
+        c.name, n, c.spend, who, tostring(c.pendAtConfirm),
         #parts > 0 and table.concat(parts, " | ") or "no Ot6BoostDmg call",
         #fparts > 0 and table.concat(fparts, " | ") or "not reached",
         tostring(c.bankAtConfirm), bankAfter, pendAfter, tostring(c.mpAtConfirm), mpAfter))
@@ -394,6 +619,89 @@ local CASES = {
   { name = "magicite", char = LOCKE, verb = "item", item = MAGICITE, tries = MAGICITE_TRIES,
     done = function(c) return #c.calls > 0 end },
 }
+-- The precondition every case starts from: every member alive at READY_PCT
+-- of max HP or better, and every case's actor free to play its verb.
+local function ready()
+  if not standing() then
+    return false, string.format("a member down or under %d%% of max HP", READY_PCT)
+  end
+  for _, c in ipairs(CASES) do
+    local why = blocked(c)
+    if why then return false, c.name .. ": " .. why end
+  end
+  return true, nil
+end
+
+-- Why a case's actor stays blocked for the rest of this battle, or nil:
+-- down with no Fenix Down in the bag, or under a status that lasts the
+-- battle (Petrify, Zombie, Imp, Mute) and that nothing in the bag lifts.
+local function unliftable()
+  for _, c in ipairs(CASES) do
+    local s = slotOf[c.char]
+    local why = s ~= nil and not awaiting(s) and blocked(c) or nil
+    if why == "down" and battInvIdx(FENIX) == nil then
+      return c.name .. ": down, and no Fenix Down in the bag"
+    end
+    if why ~= nil and why ~= "down" then
+      -- the status behind this block: Petrify or Zombie by name, Imp or
+      -- Mute for a greyed row (a Sleep, a Stop or a Muddle wears off)
+      local greyed = why:find("greyed", 1, true) ~= nil
+      local s1, s2 = statusBytes(s)
+      for _, k in ipairs(STATUS_CURES) do
+        if ((k.byte == 1 and s1 or s2) & k.bit) ~= 0 and (why == k.name or (greyed and k.greys))
+           and H.statusCure({ byte = k.byte, bit = k.bit, items = k.items,
+                              has = function(id) return battInvIdx(id) ~= nil end }) == nil then
+          return string.format("%s: %s, and nothing in the bag lifts it", c.name, k.name)
+        end
+      end
+    end
+  end
+  return nil
+end
+
+-- Pace a lane off the arrival tile on 394 until an encounter comes.
+local lane
+local BACK = { left = "right", right = "left", up = "down", down = "up" }
+local function paceFrame()
+  if not (H.hasControl() and H.tileAligned()) then H.setPad({}) return end
+  local x, y = H.fieldX(), H.fieldY()
+  if lane == nil then
+    for _, d in ipairs({ "left", "right", "up", "down" }) do
+      if H.canStep(x, y, d) then lane = { ax = x, ay = y, out = d, back = BACK[d] } break end
+    end
+    if lane == nil then H.setPad({}) return end
+  end
+  H.setPad({ [(x == lane.ax and y == lane.ay) and lane.out or lane.back] = true })
+end
+
+-- Read the battle that is up: the seats, TERRA's weapon spell, the draw.
+local UNREADY_FRAMES, MEASURE_BATTLES = 20000, 4
+local serving = { n = 1, mode = "fill", since = nil, W = nil }
+local function battleSetup()
+  slotOf = {}
+  for s = 0, 3 do
+    local id = H.readByte(BCHID + s * 2)
+    if id ~= 0xFF then slotOf[id] = s end
+  end
+  for _, ch in ipairs({ TERRA, LOCKE, SHADOW }) do
+    assert(slotOf[ch], string.format("character %d is in the battle", ch))
+  end
+  -- the Fight case needs a weapon whose on-hit spell is a fold-table spell
+  -- (the case the executing bytes misread); TERRA's Blizzard casts Ice
+  local fold, base = {}, H.sym("Ot6FoldTbl") & 0x3FFFFF
+  for i = 0, 23 do fold[H.readRomByte(base + i)] = true end
+  local s = slotOf[TERRA]
+  local item = H.readByte(HANDS + s * 2)
+  local sp = onHitSpell(item) or onHitSpell(H.readByte(HANDS + s * 2 + 1))
+  assert(sp and fold[sp], string.format("TERRA's weapon ($%02X) casts a fold-table spell on hit", item))
+  CASES[2].castSpell = sp
+  H.log(string.format("[procboost] TERRA slot %d holds $%02X, casts spell $%02X on hit "
+    .. "(in Ot6FoldTbl); LOCKE slot %d, SHADOW slot %d", s, item, sp, slotOf[LOCKE], slotOf[SHADOW]))
+  local w = {}
+  for _, v in ipairs(H.formationWords()) do w[#w + 1] = string.format("%04X", v) end
+  H.log(string.format("[procboost] battle %d for the measurement: group $%04X, formation %s; seats %s",
+    serving.n, H.readWord(0x11E0), table.concat(w, " "), seatsLine()))
+end
 
 local steps = {
   H.waitFrames(20),
@@ -411,62 +719,101 @@ local steps = {
   }, "alcove -> 394"),
   H.release(),
   H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 900, "control on 394", 10),
-  (function()
-    local lane
-    local BACK = { left = "right", right = "left", up = "down", down = "up" }
-    return H.driveUntil(function() return H.battleLoadStarted() end, 30000, {
-      H.call(function()
-        if not (H.hasControl() and H.tileAligned()) then H.setPad({}) return end
-        local x, y = H.fieldX(), H.fieldY()
-        if lane == nil then
-          for _, d in ipairs({ "left", "right", "up", "down" }) do
-            if H.canStep(x, y, d) then lane = { ax = x, ay = y, out = d, back = BACK[d] } break end
-          end
-          if lane == nil then H.setPad({}) return end
-        end
-        H.setPad({ [(x == lane.ax and y == lane.ay) and lane.out or lane.back] = true })
-      end),
-    }, "a random encounter")
-  end)(),
+  H.driveUntil(function() return H.battleLoadStarted() end, 30000, {
+    H.call(function() paceFrame() end),
+  }, "a random encounter"),
   H.release(),
   H.waitUntil(function() return H.battleActive() end, 900, "battle up", 5),
-  H.call(function()
-    for s = 0, 3 do
-      local id = H.readByte(BCHID + s * 2)
-      if id ~= 0xFF then slotOf[id] = s end
-    end
-    for _, ch in ipairs({ TERRA, LOCKE, SHADOW }) do
-      assert(slotOf[ch], string.format("character %d is in the battle", ch))
-    end
-    -- the Fight case needs a weapon whose on-hit spell is a fold-table spell
-    -- (the case the executing bytes misread); TERRA's Blizzard casts Ice
-    local fold, base = {}, H.sym("Ot6FoldTbl") & 0x3FFFFF
-    for i = 0, 23 do fold[H.readRomByte(base + i)] = true end
-    local s = slotOf[TERRA]
-    local item = H.readByte(HANDS + s * 2)
-    local sp = onHitSpell(item) or onHitSpell(H.readByte(HANDS + s * 2 + 1))
-    assert(sp and fold[sp], string.format("TERRA's weapon ($%02X) casts a fold-table spell on hit", item))
-    CASES[2].castSpell = sp
-    H.log(string.format("[procboost] TERRA slot %d holds $%02X, casts spell $%02X on hit "
-      .. "(in Ot6FoldTbl); LOCKE slot %d, SHADOW slot %d", s, item, sp, slotOf[LOCKE], slotOf[SHADOW]))
-  end),
-  -- everyone Defends until every bank holds BOOST, then snapshot the next window
-  H.driveUntil(function() return snap ~= nil end, 30000, {
+  H.call(function() battleSetup() end),
+  -- the bench plays every window until every bank holds BOOST and the party
+  -- is ready (above), then snapshot the next command window once the pad
+  -- has been released for SETTLE frames on it: a snapshot taken as one of
+  -- the bench's Defend presses landed held LOCKE's Def. window open in
+  -- every restore, and the rod case sat on it for 6000 frames
+  -- (build/attempts/wt/procboost-v024/air/new2/new_k3.log.gz).
+  -- A battle the party cannot get ready in (a case's actor blocked by
+  -- something unliftable, or UNREADY_FRAMES with every bank full) is fought
+  -- out by the route's walker and the next encounter taken, up to
+  -- MEASURE_BATTLES: a Misfit's Mute on TERRA after the bag's
+  -- one Echo Screen had gone to SHADOW held the magic row grey for 26000
+  -- frames (build/attempts/wt/procboost-v024/px13/new5/new_k5.log.gz), and
+  -- Mute ends with the battle.
+  H.driveUntil(function() return snap ~= nil end, 30000 * MEASURE_BATTLES, {
     H.call(function()
+      if serving.mode == "out" then
+        if serving.W.frame() then return end      -- the battle, its reload, its care
+        serving.mode = "pace"
+      end
+      if serving.mode == "pace" then
+        if H.battleLoadStarted() then serving.mode = "up" H.setPad({}) return end
+        paceFrame()
+        return
+      end
+      if serving.mode == "up" then
+        if not H.battleActive() then H.setPad({}) return end
+        battleSetup()
+        serving.mode, serving.since = "fill", nil
+        return
+      end
       local full = true
       for _, ch in ipairs({ TERRA, LOCKE, SHADOW }) do
         if H.readByte(BANK + slotOf[ch] * 2) < BOOST then full = false end
       end
-      if full and H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_CMD then
+      if full and ready() and H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_CMD then
         H.setPad({})
-        snap = H.requestSaveState()
+        settled = settled + 1
+        if settled >= SETTLE then
+          snapSeats, snapReady, snapWhy = seatsLine(), ready()
+          snap = H.requestSaveState()
+        end
         return
       end
-      defendOthers(-1)
+      settled = 0
+      if full then
+        serving.since = serving.since or H.frame
+        local stuck = unliftable()
+        if stuck or H.frame - serving.since >= UNREADY_FRAMES then
+          local why = stuck or select(2, ready())
+          if serving.n >= MEASURE_BATTLES then
+            error(string.format("precondition: no battle of %d let the party get ready (every "
+              .. "member alive at %d%% of max HP or better and every case's actor free to play "
+              .. "its verb); the last, %d frames after every bank filled: %s; seats %s",
+              MEASURE_BATTLES, READY_PCT, H.frame - serving.since, why, seatsLine()), 0)
+          end
+          H.log(string.format("[procboost] battle %d cannot serve: %d frames after every bank "
+            .. "reached %d, %s; fighting it out and taking the next encounter; seats %s",
+            serving.n, H.frame - serving.since, BOOST, why, seatsLine()))
+          serving.n, serving.mode = serving.n + 1, "out"
+          serving.W = H.newWalkFighter("procboost: a battle that cannot serve")
+          serving.W.frame()
+          return
+        end
+      end
+      if full and H.frame - unreadySaid >= 1200 then
+        local _, why = ready()
+        if why then
+          unreadySaid = H.frame
+          H.log(string.format("[procboost] f%d: every bank at %d, not ready yet: %s; seats %s",
+            H.frame, BOOST, why, seatsLine()))
+        end
+      end
+      bench(-1)
     end),
-  }, "every bank at " .. BOOST),
+  }, string.format("every bank at %d, every member alive at %d%% of max HP and every case's actor "
+    .. "free to play its verb, within %d battles", BOOST, READY_PCT, MEASURE_BATTLES)),
   H.waitFrames(2),
-  H.call(function() H.checkReq(snap, "snapshot") end),
+  H.call(function()
+    H.checkReq(snap, "snapshot")
+    H.log(string.format("[procboost] snapshot f%d: seats %s, after %d bench action(s)",
+      H.frame, snapSeats, benchHeals))
+    -- every case restores this and sits through the encounter's hits until
+    -- its actor's action resolves; a member the next hits can kill, or an
+    -- actor who cannot play the verb, ends the case (or the run) before it
+    -- measures anything
+    H.assertEq(snapReady, true, string.format("precondition: the party is ready at the snapshot, "
+      .. "every member alive at %d%% of max HP or better and every case's actor free to play "
+      .. "its verb (%s%s)", READY_PCT, snapSeats, snapWhy and ("; " .. snapWhy) or ""))
+  end),
 }
 for _, c in ipairs(CASES) do
   for n = 1, c.tries do
@@ -513,13 +860,13 @@ steps[#steps + 1] = H.call(function()
   -- throw: MithrilKnife's id is Ice's, and a Throw is not a cast
   k = one(by.throw, function(k) return k.b5 == CMD_THROW end, "the throw")
   H.assertEq(k.a7d, MITHRIL_KNIFE, "throw: the queued attack is the knife")
-  H.assertEq(k.dout, math.min(k.din * MULT, 0x7FFF), string.format(
+  H.assertEq(k.dout, boosted(k.din), string.format(
     "throw: MithrilKnife leaves x%d (%d in)", MULT, k.din))
 
   -- rod: the Ice Rod runs as a command-$02 Ice 2 that nothing folded
   k = one(by.rod, function(k) return k.b5 == CMD_MAGIC end, "the rod's spell")
   H.assertEq(k.a7c, CMD_ITEM, "rod: the queued command is Item")
-  H.assertEq(k.dout, math.min(k.din * MULT, 0x7FFF), string.format(
+  H.assertEq(k.dout, boosted(k.din), string.format(
     "rod: the Ice Rod's spell $%02X leaves x%d (%d in)", k.b6, MULT, k.din))
 
   -- magicite: whatever damage its esper deals is multiplied
@@ -528,7 +875,7 @@ steps[#steps + 1] = H.call(function()
     for _, k in ipairs(by.magicite.hit.calls) do
       if k.pend == BOOST then
         mc = mc + 1
-        H.assertEq(k.dout, math.min(k.din * MULT, 0x7FFF), string.format(
+        H.assertEq(k.dout, boosted(k.din), string.format(
           "magicite: the esper's $%02X leaves x%d (%d in)", k.b6, MULT, k.din))
       end
     end
@@ -545,7 +892,7 @@ for e = 0, RAGE_ENTRIES - 1 do
                       present = function() return e < learned end }
 end
 for _, s in ipairs({
-  H.call(function() snap, armed = nil, nil end),
+  H.call(function() snap, armed, inbound = nil, nil, {} end),
   H.loadState(GAU_STATE),
   H.waitFrames(20),
   H.waitUntil(function() return H.worldMode() and H.worldHasControl() end, 3000, "world control", 5),
@@ -590,7 +937,7 @@ for _, s in ipairs({
         snap = H.requestSaveState()
         return
       end
-      defendOthers(-1)
+      bench(-1)
     end),
   }, "GAU's window with " .. BOOST .. " pips"),
   H.waitFrames(2),
