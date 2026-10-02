@@ -46,5 +46,6 @@ once more for another hit. Jackpot chips no shields, but a Broken target
 takes it doubled. The rows grey out when you can't pay or Jackpot is
 spent. Wearing the Coin Toss relic still swaps Slot for plain GP Rain,
 which now chips like Coin Toss and throws once more for each Boost Point.
-A throw or a blow that finds no monster left standing costs nothing. The Narshe
+A throw or a blow that finds no monster left standing costs nothing,
+and Jackpot stops rolling once no monster is left. The Narshe
 school's skills advisor has two new pages about it.

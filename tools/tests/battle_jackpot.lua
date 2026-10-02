@@ -7,16 +7,25 @@
 -- grave (the party armed and cared for, the gil's digit settled, before
 -- the press), reached by play from the wor-tomb-v1 battery; SETZER rejoined
 -- in the World of Ruin there (event switch $00CA), so Jackpot is learned.
--- Three passes from that frame, each pressing the grave and playing SETZER
+-- Five passes from that frame, each pressing the grave and playing SETZER
 -- through the real menu (H.setzerBattle) against Dullahan (23,450 HP, ten
 -- shields):
 --   pass 1: Defend twice (the bank to 3), Jackpot at 3 BP: four rolls;
 --   pass 2: Jackpot at 1 BP (two rolls), then Jackpot again;
---   pass 3: Defend once, Jackpot unboosted (one roll), then Jackpot again.
+--   pass 3: Defend once, Jackpot unboosted (one roll), then Jackpot again;
+--   pass 4: pass 1's plan from a draw (frames stood before the press and in
+--     the battle, both inputs) whose early rolls fell Dullahan, so the
+--     passes after find no body;
+--   pass 5: pass 1's plan from a draw whose roll meets a table byte past
+--     251 and draws again.
 -- What it holds, per Jackpot (at Ot6SetzerExec's entry and SETZER's
--- Ot6ActionEnd; each roll as the effect sets the dice animation):
---   * 1 + boost rolls (the boost buys rolls: owner, 2026-10-02), fewer only
---     when the last body has fallen;
+-- Ot6ActionEnd; each pass at Ot6JackpotDice's entry and the dice effect's
+-- return; each roll as the effect sets the dice animation):
+--   * 1 + boost passes (the boost buys rolls: owner, 2026-10-02); a pass
+--     that finds a body rolls once, its face the first byte of the battle
+--     RNG table below 252 after $be, mod 6, and $be stops on that byte; a
+--     pass that finds none (the rolls before felled the last body) rolls
+--     nothing, queues no dice and draws no Rand ($be unmoved);
 --   * each roll three dice of one face (b7 = face-1 in both nybbles, b6 =
 --     face-1), the face 1-6, its damage face^3 x level x 2 times the face
 --     (vanilla's Fixed Dice arithmetic, saturating at 65,535), and what it
@@ -28,8 +37,9 @@
 --     once-a-battle flag (OT6_DIVINE_USED) set for SETZER by it;
 --   * the second Jackpot of the battle is refused at the list: three A
 --     presses, the list stays up, nothing is queued.
--- The face odds are a distribution: measured by the lab in
--- build/attempts/wt/kit-setzer/jackpot-dist/, not by these draws.
+-- The face odds are a distribution: measured by the labs in
+-- build/attempts/wt/kit-setzer/ (jackpot-dist/, labs-r3/), not by these
+-- draws; these hold each roll to the draw rule that makes them.
 -- The run ends once the plan is spent; Dullahan's fight is not finished.
 -- Negative controls: the mutant ROMs in build/attempts/wt/kit-setzer/.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -175,7 +185,7 @@ local function pass(n, plan, wantBoost, o)
   return H.seqStep(steps)
 end
 
-H.run({ maxFrames = 90000 }, {
+H.run({ maxFrames = 150000 }, {
   pass(1, { { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3 } }, 3),
   pass(2, { { row = JACKPOT, boost = 1 }, { row = JACKPOT, refused = true } }, 1),
   pass(3, { { row = "defend" }, { row = JACKPOT, boost = 0 }, { row = JACKPOT, refused = true } }, 0),

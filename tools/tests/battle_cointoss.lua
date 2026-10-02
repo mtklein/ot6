@@ -7,9 +7,13 @@
 -- World of Ruin, so his Jackpot is learned), walk the east room until the
 -- game deals a battle (field group 151: a Mad Oscar; a Mad Oscar and an
 -- Exoray; a PowerDemon and two Exorays), and play SETZER's turns through
--- the real menu (H.setzerBattle).  Every assertion is derived from that
--- battle's own state, so any formation the room deals is a valid draw;
--- SETZER_SKIP (default 0) battles are fought out first to vary it.
+-- the real menu (H.setzerBattle), in the first battles that deal a crowd
+-- (two or more monsters, one special-weak: crowdHere; the rest are fought
+-- out with the free Fight), so a toss splits across bodies and chips the
+-- special-weak one -- asserted (coverage), since a lone Mad Oscar dealt
+-- first had quietly stopped both from running.  Every other assertion is
+-- derived from the battle's own state; SETZER_SKIP (default 0) battles are
+-- fought out first to vary the draw.
 --
 -- What it holds, per throw (the action's own edges: Ot6SetzerExec's entry
 -- and SETZER's Ot6ActionEnd):
@@ -32,6 +36,24 @@
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
+-- a crowd worth the coins: two or more monsters standing, one of them
+-- special-weak (its class row holds $08) and shielded.  A battle without
+-- one is fought out with the free Fight (an empty plan) and the walk goes
+-- on, as a player saving the coins would; the draws are the room's own.
+local function crowdHere(tag, n)
+  local alive, weak = 0, 0
+  for s = 0, 5 do
+    if H.readWord(0x3BFC + s * 2) > 0 and (H.readByte(0x3AA8 + s * 2) & 1) == 1 then
+      alive = alive + 1
+      if (H.readByte(0x3EA4 + s * 2) & 0x08) ~= 0 and H.readByte(0x3E40 + s * 2) > 0 then weak = weak + 1 end
+    end
+  end
+  local yes = alive >= 2 and weak >= 1
+  H.log(string.format("[%s] battle %d: %d monster(s), %d special-weak and shielded -- %s", tag, n, alive, weak,
+    yes and "throw here" or "fight it out"))
+  return yes
+end
+
 -- the draw this suite needs (kit-setzer round 4: a lone Mad Oscar had
 -- crept in, and the split across bodies and the special chip stopped
 -- running): at least one toss over two or more bodies, and at least one
@@ -50,8 +72,6 @@ local function coverage(all, tag)
 end
 
 SETZER_SKIP = SETZER_SKIP or 0
--- frames stood at the save point before the walk: picks the room's draw
-SETZER_WAIT = SETZER_WAIT or 0
 local COIN = 0x59
 
 
@@ -89,22 +109,23 @@ local function remaining()
   return t
 end
 
-H.run({ maxFrames = 200000 }, {
+H.run({ maxFrames = 400000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
   H.repeatN(SETZER_SKIP, { walkToBattle(), H.setzerBattle({}) }),
-  H.waitFrames(SETZER_WAIT),
   -- both throws, in as many battles as the draws take (at most four)
-  H.driveUntil(function() return #done >= #WANT end, 160000, {
+  H.driveUntil(function() return #done >= #WANT end, 360000, {
     H.call(function()
       battles = battles + 1
-      H.assertEq(battles <= 4, true, "both throws within four battles")
+      H.assertEq(battles <= 8, true, "both throws within eight battles")
     end),
     walkToBattle(),
+    H.waitUntil(function() return H.battleActive() end, 1200, "the battle is up", 2),
     H.cond(function() return true end, {
       (function()
         local step
         return { tick = function()
-          step = step or H.setzerBattle(remaining(), { onList = checkList, shot = "cointoss_table" })
+          step = step or H.setzerBattle(crowdHere("cointoss", battles) and remaining() or {},
+            { onList = checkList, shot = "cointoss_table" })
           local r = step:tick()
           if r == "done" then
             for _, rec in ipairs(H.vars.setzer) do done[#done + 1] = rec end
