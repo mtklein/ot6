@@ -13,8 +13,10 @@
 --      three distinct seeds, and L.report() passes;
 --   2. negative -- two attempts driven onto one phase draw one seed, and
 --      L.report() raises;
---   3. report() also fails on a ladder that recorded no seeding at all, and
---      on an attempt that took a phase but never fought;
+--   3. report() also fails on a ladder that recorded no seeding at all, on
+--      an attempt that met no battle and was then retried, and on an attempt
+--      whose battle entered InitBattle but drew no seed (a missed watcher);
+--      a LAST attempt that met no battle passes (nothing to spread);
 --   4/5. the harness samples $021e once per emulated frame, but the real
 --      counter's tick straddles that boundary, so about a quarter of the
 --      phases are never what a sample returns. spread() must release when
@@ -181,18 +183,69 @@ H.run({ maxFrames = 8000 }, {
 
   -- An attempt that takes a phase and then never fights is the subtler one:
   -- the other attempts still compare fine, so the ladder would report green
-  -- while covering one fewer fight than it claims.  SILENT spreads and stops.
+  -- while covering one fewer fight than it claims.  Three shapes of it.
+  --
+  -- 3a. The LAST attempt met no battle at all (InitBattle never ran): a
+  -- crossing whose encounters did not come on this draw.  Nothing was there
+  -- to spread and nothing was retried, so report() passes and says so.
   (function()
-    local SILENT = H.newSeedSweep("silent-attempt control")
+    local LAST = H.newSeedSweep("no-battle last attempt")
     return H.seqStep({
-      SILENT.watch(),
-      SILENT.spread(1),
+      LAST.watch(),
+      LAST.spread(1),
+      H.waitFrames(20),
       H.call(function()
-        local ok, err = pcall(SILENT.report().tick)
+        H.assertEq(LAST.inits[1], nil, "no InitBattle ran after the spread")
+        local ok, err = pcall(LAST.report().tick)
+        H.assertEq(ok, true,
+          "a last attempt that met no battle PASSES the ladder: " .. tostring(err))
+      end),
+    })
+  end)(),
+
+  -- 3b. ...but an attempt that met no battle and was then RETRIED fails: the
+  -- route has no fight for the spread to vary, so the retry replays it.
+  (function()
+    local RETRY = H.newSeedSweep("no-battle retried control")
+    return H.seqStep({
+      RETRY.watch(),
+      RETRY.spread(1),
+      RETRY.spread(2, { forcePhase = function() return H.seedPhase() end }),
+      H.call(function()
+        local ok, err = pcall(RETRY.report().tick)
         H.assertEq(ok, false,
-          "an attempt that took a phase and drew no seed FAILS the ladder")
-        H.assertEq(tostring(err):find("drew no seed") ~= nil, true,
-          "and it names the attempt rather than reporting a bare pass")
+          "an attempt that met no battle and was retried FAILS the ladder")
+        H.assertEq(tostring(err):find("met no battle, and attempt 2 was run after it",
+          1, true) ~= nil, true, "and it names the retry: " .. tostring(err))
+      end),
+    })
+  end)(),
+
+  -- 3c. An attempt that entered InitBattle and drew no seed is a battle the
+  -- seed watcher missed.  The miss is injected into the sweep's own record
+  -- (the seed it captured is dropped after a real battle), the shape a
+  -- watcher on the wrong instruction leaves.
+  (function()
+    local MISS = H.newSeedSweep("missed-seed control")
+    local loadReq
+    return H.seqStep({
+      MISS.watch(),
+      H.call(function() loadReq = H.requestLoadState(blob) end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(loadReq, "entry-point reload") end),
+      H.waitFrames(90),
+      MISS.spread(1),
+      H.enterEncounter(),
+      H.waitFrames(20),
+      H.call(function()
+        H.assertEq((MISS.inits[1] or 0) > 0, true, "the control's battle entered InitBattle")
+        H.assertEq(MISS.seeds[1] ~= nil, true, "and the seed watcher saw it")
+        MISS.seeds[1] = nil                       -- the injected miss
+        local ok, err = pcall(MISS.report().tick)
+        H.assertEq(ok, false,
+          "an attempt that entered InitBattle and drew no seed FAILS the ladder")
+        H.assertEq(tostring(err):find("entered InitBattle and then drew no seed",
+          1, true) ~= nil, true, "and it names the missed seed: " .. tostring(err))
       end),
     })
   end)(),
