@@ -37,8 +37,10 @@
 -- with that figure's sheet in the ROM (as LoadCharGfx builds it); the slot's
 -- x offset each frame (SETZER off screen, OT6_HIRE_OFF past home); and at
 -- the action's end SETZER's own sheet back in the buffer, at home.  Every
--- paid hire is one drawn strike.  Negative control: the hire on GP Rain's
--- coin animation (build/attempts/wt/hire-sprite/) fails "every paid hire".
+-- paid hire is one drawn strike.  Negative controls (build/attempts/wt/
+-- hire-sprite/negative/): the hire on GP Rain's old coin animation fails
+-- "SETZER's slot went off screen"; the walks and strikes without the
+-- graphics swap fail "the slot shows the merchant".
 
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
