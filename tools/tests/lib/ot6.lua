@@ -7786,9 +7786,25 @@ function M.setzerBattle(plan, opts)
           M.log(string.format("[setzer] f%d no monster stands: %s", M.frame, table.concat(t, ", ")))
         end
         pulse("a")
-      else M.setPad({}) end
+      else
+        -- no menu for 600 frames with a monster still reading alive: the
+        -- victory text can be up over a body the slot data still counts
+        -- (measured: battle_gprain's lone Mad Oscar, "Got 390 Exp.
+        -- point(s)" held for 39,000 frames), so press it through
+        Z.idle = (Z.idle or 0) + 1
+        if Z.idle >= 600 then
+          if Z.idle == 600 then
+            M.log(string.format("[setzer] f%d no menu for 600 frames with a monster reading alive: pressing A",
+              M.frame))
+          end
+          pulse("a")
+        else
+          M.setPad({})
+        end
+      end
       return
     end
+    Z.idle = 0
     local a = M.readByte(ACTOR) & 3
     local st = M.readByte(MSTATE)
     local p = plan[k]

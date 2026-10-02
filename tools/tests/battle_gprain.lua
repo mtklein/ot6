@@ -75,7 +75,7 @@ local function checkRain(r, i)
 end
 
 local WANT = { { cmd = 0x18, boost = 1 }, { cmd = 0x18, boost = 0 } }
-local done, battles = {}, 0
+local done, battles, all, seen = {}, 0, {}, 0
 local function remaining()
   local t = {}
   for i = #done + 1, #WANT do t[#t + 1] = WANT[i] end
@@ -113,24 +113,29 @@ H.run({ maxFrames = 400000 }, {
     (function()
       local step
       return { tick = function()
+        if step == nil then H.vars.setzer = {} end   -- no record of an earlier battle is read again
         step = step or H.setzerBattle(crowdHere("gprain", battles) and remaining() or {}, {})
         local r = step:tick()
+        -- each throw is checked the moment its record closes
+        local recs = H.vars.setzer or {}
+        while seen < #recs do
+          seen = seen + 1
+          local rec, i = recs[seen], #done + 1
+          H.assertEq(rec.row, 0x18, string.format("record %d is a GP Rain", i))
+          H.assertEq(rec.boost, WANT[i].boost, string.format("record %d ran at its planned boost", i))
+          all[i] = checkRain(rec, i)
+          done[i] = rec
+        end
         if r == "done" then
-          for _, rec in ipairs(H.vars.setzer) do done[#done + 1] = rec end
+          seen = 0
           step = nil
         end
         return r
-      end, reset = function() step = nil end }
+      end, reset = function() step = nil; seen = 0 end }
     end)(),
   }, "both GP Rains resolve"),
   H.call(function()
-    local all = {}
     H.assertEq(#done, #WANT, "two GP Rains resolved")
-    for i, r in ipairs(done) do
-      H.assertEq(r.row, 0x18, string.format("record %d is a GP Rain", i))
-      H.assertEq(r.boost, WANT[i].boost, string.format("record %d ran at its planned boost", i))
-      all[#all + 1] = checkRain(r, i)
-    end
     coverage(all, "gprain")
     H.log(string.format("[gprain] PASSED: %d GP Rains over %d battle(s)", #done, battles))
   end),
