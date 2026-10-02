@@ -33,6 +33,83 @@ public final class BpsTest {
         }
     }
 
+    /** A folder entry whose bytes count their reads. */
+    static final class File {
+        final RomScan.Entry entry;
+        int reads;
+
+        File(String name, final byte[] data) {
+            this(name, data.length, data);
+        }
+
+        File(String name, long size, final byte[] data) {
+            entry = new RomScan.Entry(name, size, new RomScan.Bytes() {
+                @Override public byte[] read() { reads++; return data; }
+            }, null);
+        }
+    }
+
+    static RomScan.Result scan(File... files) throws Exception {
+        java.util.List<RomScan.Entry> list = new java.util.ArrayList<>();
+        for (File f : files) list.add(f.entry);
+        return RomScan.choose(list, scanInfo);
+    }
+
+    static Bps.Info scanInfo;
+
+    /** The folder scan that finds the player's ROM (RomScan). */
+    static void scans(byte[] base, byte[] headered, byte[] wrong, byte[] shortRom, byte[] want,
+                      Bps.Info info) throws Exception {
+        scanInfo = info;
+        // the ROM among other files; a wrong-size file is never read
+        File notes = new File("notes.txt", new byte[100]);
+        File big = new File("Chrono Trigger (USA).sfc", new byte[4194304]);
+        File rom = new File("Final Fantasy III (USA).sfc", base);
+        RomScan.Result r = scan(notes, big, rom);
+        if (r.chosen == rom.entry && !r.headered && Arrays.equals(r.rom, base)
+                && notes.reads == 0 && big.reads == 0 && r.skipped == 2)
+            pass("scan picks the ROM by CRC32 and reads no wrong-size file (" + RomScan.describe(r) + ")");
+        else
+            fail("scan: chose " + (r.chosen == null ? "nothing" : r.chosen.name) + ", read notes "
+                    + notes.reads + "x and the 4 MB file " + big.reads + "x");
+
+        // a copier-headered copy matches, and gives the bare ROM image
+        File smc = new File("ff3.smc", headered);
+        r = scan(smc);
+        if (r.chosen == smc.entry && r.headered && Arrays.equals(r.rom, base))
+            pass("scan matches a copy with a copier header (" + RomScan.describe(r) + ")");
+        else
+            fail("scan did not match the copier-headered copy");
+
+        // OT6.sfc is never a candidate, even holding the very bytes of the ROM
+        File out = new File("OT6.sfc", base);
+        r = scan(out);
+        if (r.chosen == null && out.reads == 0 && r.skipped == 1)
+            pass("scan skips OT6.sfc unread, even when it holds the source ROM");
+        else
+            fail("scan considered OT6.sfc (read " + out.reads + "x)");
+
+        // no match: everything checked is listed, nothing chosen
+        File bad = new File("wrong.sfc", wrong);
+        File cut = new File("short.sfc", shortRom.length, shortRom);
+        File ot6 = new File("OT6 copy.sfc", want);
+        r = scan(bad, cut, ot6);
+        if (r.chosen == null && r.checked.size() == 1 && r.checked.get(0).name.equals("wrong.sfc")
+                && !r.checked.get(0).matches && cut.reads == 0 && ot6.reads == 0)
+            pass("scan with no match chooses nothing and lists what it read (" + RomScan.describe(r) + ")");
+        else
+            fail("scan with no match: chose " + (r.chosen == null ? "nothing" : r.chosen.name)
+                    + ", checked " + RomScan.describe(r));
+
+        // a size that lies (the listing says ROM-sized, the bytes aren't): read, refused
+        File liar = new File("liar.sfc", base.length, shortRom);
+        r = scan(liar);
+        if (r.chosen == null && liar.reads == 1)
+            pass("scan refuses a file whose bytes don't match its listed size");
+        else
+            fail("scan accepted a file whose bytes don't match its listed size");
+    }
+
     static void putLe32(byte[] b, int at, int v) {
         for (int i = 0; i < 4; i++) b[at + i] = (byte) (v >>> (8 * i));
     }
@@ -90,6 +167,8 @@ public final class BpsTest {
         final byte[] shortRom = Arrays.copyOf(base, base.length - 1);
         refuses("source ROM one byte short", "wrong ROM", () -> Bps.source(shortRom, info));
         refuses("the patched ROM offered as the source", "wrong ROM", () -> Bps.source(want, info));
+
+        scans(base, headered, wrong, shortRom, want, info);
 
         System.out.println("android_bps: " + passes + " passed, " + failures + " failed");
         System.exit(failures == 0 ? 0 : 1);

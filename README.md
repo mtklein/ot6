@@ -36,15 +36,17 @@ lifting a finger, subscribe in [Obtainium](https://obtainium.imranr.dev/):
 
 1. Add an app with the URL `https://github.com/mtklein/ot6`, and under
    "Filter APKs by regular expression" enter `ot6-.*\.apk`.
-2. Install it and open OT6 Patcher once: choose your own Final Fantasy III
-   (USA) v1.0 ROM (it's never included, and never changed), then the folder
-   to write `OT6.sfc` into.
-3. From then on, each update Obtainium installs rewrites `OT6.sfc` and
-   posts a notification; there's no need to open the app.
+2. Install it, open OT6 Patcher once, and choose the folder that holds your
+   own Final Fantasy III (USA) v1.0 ROM (it's never included, and never
+   changed). The app finds the ROM there and writes `OT6.sfc` beside it. If
+   it can't find it, it lists what it checked, and you can pick the ROM
+   file yourself.
+3. From then on, each update Obtainium installs quietly rewrites `OT6.sfc`,
+   with no notifications; open the app any time to see the last result.
 
 `OT6.sfc` keeps its name across updates, so your saves and save states
-carry over. RetroArch: choose the folder its playlist scans, and re-scan it
-once so OT6.sfc shows up. If you used to soft-patch, delete the
+carry over. RetroArch: put the ROM in a folder its playlist scans, and
+re-scan once so OT6.sfc shows up. If you used to soft-patch, delete the
 `Final Fantasy III (USA).bps` beside your vanilla ROM so vanilla stays
 vanilla, and keep any `OT6.bps` (or `.ips`/`.ups`) out of OT6.sfc's folder,
 since RetroArch would apply it on top; the app warns if it sees one.

@@ -11,5 +11,6 @@ out=build/android/host
 rm -rf "$out"
 mkdir -p "$out"
 "$JAVA_HOME/bin/javac" -Xlint:all -Werror -d "$out" \
-  android/src/io/github/mtklein/ot6patcher/Bps.java android/test/BpsTest.java
+  android/src/io/github/mtklein/ot6patcher/Bps.java \
+  android/src/io/github/mtklein/ot6patcher/RomScan.java android/test/BpsTest.java
 "$JAVA_HOME/bin/java" -cp "$out" io.github.mtklein.ot6patcher.BpsTest "$@"

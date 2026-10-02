@@ -127,10 +127,16 @@ The non-brew pieces need the manual steps at each bullet.
 
 `android/` is OT6 Patcher, a small Android app (plain Java, no libraries)
 shipped as `ot6-vX.Y.apk` on each GitHub release so Obtainium can keep a
-handheld current. It carries the release's .bps, applies it to the
-player's own ROM (checking the source and target CRC32s; a 512-byte copier
-header is stripped) and writes `OT6.sfc` into a folder they chose, again
-after every update (a `MY_PACKAGE_REPLACED` receiver).
+handheld current. It carries the release's .bps. Setup is one step: the
+player grants the folder holding their ROM, and the app finds the ROM there
+by size and CRC32 (`RomScan.java`; a 512-byte copier header is stripped),
+applies the patch, checks the target CRC32 and writes `OT6.sfc` beside it.
+Picking the ROM file is the fallback. After every update a
+`MY_PACKAGE_REPLACED` receiver does it again, silently: the remembered ROM
+if it still matches, else a fresh scan. Results go to the app's settings
+and logcat (tag `OT6Patcher`), never a notification; the app asks for no
+permissions. Installs set up by the first v0.23 build (a picked ROM plus an
+output folder) keep working unchanged.
 
 Built with the plain SDK tools by `tools/android/build_apk.sh` (aapt2,
 javac, d8, zipalign, apksigner; no Gradle). The pieces, as installed on
@@ -151,14 +157,17 @@ piece stops the build with the line above. The ninja edges:
   (`android/src/.../Bps.java`) on the JVM: the patch must rebuild
   `build/ot6.sfc` from the base ROM byte for byte, and a corrupted patch,
   a wrong ROM and a short ROM must be refused (`android/test/BpsTest.java`).
+  It also runs the folder scan: the ROM found by CRC32 among other files,
+  a copier-headered copy matched, OT6.sfc never a candidate, wrong-size
+  files never read, and nothing chosen when nothing matches.
   It needs a JDK only, and no qualification.
 - `build/release/ot6-vX.Y.apk` carries the release .bps; versionName is
   VERSION, versionCode is major×10000 + minor×100 + patch (0.23 → 2300).
 - `build/checks/android_apk.ok` (`tools/android/verify_apk.sh`):
   `apksigner verify --print-certs` must show the certificate pinned in
   `android/release-cert.sha256`, `aapt2 dump badging` the versionCode,
-  versionName, minSdk and targetSdk, and the APK must carry the patch the
-  host check tested.
+  versionName, minSdk and targetSdk, no permissions and not debuggable, and
+  the APK must carry the patch the host check tested.
 
 `ninja release` builds all three, so a release needs the JDK, the SDK and
 the signing key; bare `ninja` builds none of them.
@@ -175,7 +184,9 @@ replace it.
 
 **Test builds** install beside a player's copy when built with
 `OT6_APK_PACKAGE=io.github.mtklein.ot6patcher.test`: their own settings,
-their own update broadcasts, and the label "OT6 Patcher TEST".
+their own update broadcasts, and the label "OT6 Patcher TEST". They are
+debuggable, so `adb shell run-as io.github.mtklein.ot6patcher.test cat
+shared_prefs/ot6.xml` shows the last result.
 
 Only the ROMs, `build/`, `build.ninja`, `tools/Mesen.app`, and `tools/bin`
 are git-ignored. Ripped assets are tracked.

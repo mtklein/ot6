@@ -37,15 +37,18 @@ cp "$bps" "$work/assets/ot6.bps"
 "$BT/aapt2" compile --dir android/res -o "$work/res.zip"
 # OT6_APK_PACKAGE renames the package, so a test build installs beside the
 # player's own copy (own settings, own update broadcasts) instead of over it,
-# and labels it "OT6 Patcher TEST" so nobody mistakes it for theirs.
+# and labels it "OT6 Patcher TEST" so nobody mistakes it for theirs.  Test
+# builds are debuggable, so `adb shell run-as <package>` can read their settings.
 manifest=android/AndroidManifest.xml
+debug=
 if [ -n "${OT6_APK_PACKAGE:-}" ]; then
+  debug=--debug-mode
   manifest=$work/AndroidManifest.xml
   sed 's/android:label="OT6 Patcher"/android:label="OT6 Patcher TEST"/' \
     android/AndroidManifest.xml > "$manifest"
 fi
 "$BT/aapt2" link -I "$ANDROID_JAR" --manifest "$manifest" \
-  ${OT6_APK_PACKAGE:+--rename-manifest-package "$OT6_APK_PACKAGE"} \
+  ${OT6_APK_PACKAGE:+--rename-manifest-package "$OT6_APK_PACKAGE"} $debug \
   --min-sdk-version "$MIN_SDK" --target-sdk-version "$TARGET_SDK" \
   --version-code "$code" --version-name "$name" \
   -A "$work/assets" -o "$work/unsigned.apk" "$work/res.zip"

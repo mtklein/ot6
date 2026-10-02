@@ -739,6 +739,7 @@ w.edge([android_bps], "sh", [BASE, "build/ot6.sfc"],
 w.edge(["build/checks/android_bps.ok"], "sh", [BASE, android_bps, "build/ot6.sfc"],
        implicit=["tools/android/bps_check.sh", "tools/android/env.sh",
                  "android/src/io/github/mtklein/ot6patcher/Bps.java",
+                 "android/src/io/github/mtklein/ot6patcher/RomScan.java",
                  "android/test/BpsTest.java"],
        cmd=f'tools/android/bps_check.sh "{BASE}" {android_bps} build/ot6.sfc'
            f' && mkdir -p build/checks && touch build/checks/android_bps.ok',

@@ -3,7 +3,8 @@
 #   tools/android/verify_apk.sh <apk> <versionName> <versionCode> <tested .bps>
 # - apksigner verifies it, signed by the release certificate pinned in
 #   android/release-cert.sha256 (a different key would break every update);
-# - aapt2's badging has the versionCode, versionName and SDK levels asked for;
+# - aapt2's badging has the versionCode, versionName and SDK levels asked for,
+#   asks for no permissions (no notifications) and is not debuggable;
 # - the patch it carries is byte for byte the one bps_check.sh tested.
 set -eu
 [ $# -eq 4 ] || { echo "usage: $0 <apk> <versionName> <versionCode> <tested .bps>" >&2; exit 2; }
@@ -28,6 +29,8 @@ for want in "versionCode='$code'" "versionName='$name'"; do
 done
 echo "$badging" | grep -qx "minSdkVersion:'$MIN_SDK'" || { echo "FAIL: minSdk is not $MIN_SDK" >&2; fail=1; }
 echo "$badging" | grep -qx "targetSdkVersion:'$TARGET_SDK'" || { echo "FAIL: targetSdk is not $TARGET_SDK" >&2; fail=1; }
+echo "$badging" | grep -q "^application-debuggable" && { echo "FAIL: the APK is debuggable (a test build?)" >&2; fail=1; }
+echo "$badging" | grep "^uses-permission:" && { echo "FAIL: the APK asks for permissions; it needs none" >&2; fail=1; }
 unzip -p "$apk" assets/ot6.bps | cmp -s - "$tested" || { echo "FAIL: the APK's assets/ot6.bps is not $tested" >&2; fail=1; }
 [ $fail -eq 0 ]
 echo "android_apk: $apk is v$name ($code), release-signed, carrying $(wc -c < "$tested" | tr -d ' ') bytes of tested patch"

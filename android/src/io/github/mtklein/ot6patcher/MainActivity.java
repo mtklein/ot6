@@ -1,13 +1,9 @@
 package io.github.mtklein.ot6patcher;
 
-import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.UriPermission;
-import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowInsets;
@@ -20,16 +16,17 @@ import java.text.DateFormat;
 import java.util.Date;
 
 /**
- * First launch: the player picks their own FF3 (USA) ROM, which is checked
- * against the patch, then an output folder; the app writes OT6.sfc there.
- * Later: shows what was written and offers to write it again.
+ * Setup is one step: the player chooses the folder their FF3 (USA) ROM is
+ * in; the app finds the ROM there by CRC32 and writes OT6.sfc beside it.
+ * Picking the ROM file itself is the fallback.  Later: shows what was
+ * written and offers to write it again.
  */
 public final class MainActivity extends Activity {
     private static final int PICK_ROM = 1, PICK_FOLDER = 2;
 
     private LinearLayout box;
     private boolean busy;
-    private String note;     // the latest ROM check's outcome, shown above the state
+    private String note;     // a picked file's check, shown above the state
 
     @Override
     protected void onCreate(Bundle saved) {
@@ -49,14 +46,6 @@ public final class MainActivity extends Activity {
             }
         });
         setContentView(scroll);
-
-        SharedPreferences p = Patcher.prefs(this);
-        if (Build.VERSION.SDK_INT >= 33 && !p.getBoolean("askedNotify", false)
-                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
-                   != PackageManager.PERMISSION_GRANTED) {
-            p.edit().putBoolean("askedNotify", true).apply();
-            requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, 0);
-        }
     }
 
     @Override
@@ -117,33 +106,23 @@ public final class MainActivity extends Activity {
         text(getApplicationInfo().loadLabel(getPackageManager()) + " v" + v, 22);
         if (busy) text("Working…", 16);
         if (note != null) text(note, 16);
-        String src = p.getString("source", null), tree = p.getString("tree", null);
-        if (src == null) {
-            if (note == null)
-                text("This app makes OT6.sfc from your own Final Fantasy III (USA) v1.0 ROM"
-                        + " and rewrites it after every update, keeping the same name so your"
-                        + " saves carry over. Your ROM is only read, never changed.\n\n"
-                        + "First, choose your ROM.", 16);
-            button("Choose your FF3 ROM", pickRom);
-            return;
-        }
+        String tree = p.getString("tree", null);
         if (tree == null) {
-            text("ROM: " + p.getString("sourceName", "?") + "\n\nNow choose the folder to"
-                    + " write OT6.sfc into (for RetroArch, the folder its playlist scans).", 16);
-            button("Choose output folder", pickFolder);
-            button("Choose another ROM", pickRom);
+            text("This app makes OT6.sfc from your own Final Fantasy III (USA) v1.0 ROM,"
+                    + " in the same folder, and rewrites it after every update, keeping the"
+                    + " name so your saves carry over. Your ROM is only read, never changed."
+                    + "\n\nChoose the folder your ROM is in (for RetroArch, one its playlist"
+                    + " scans); the app finds the ROM there.", 16);
+            button("Choose ROM folder", pickFolder);
             return;
         }
         Uri treeUri = Uri.parse(tree);
         StringBuilder s = new StringBuilder();
-        s.append("ROM: ").append(p.getString("sourceName", "?"))
-         .append("\nOutput: ").append(Patcher.nameOf(this, treeUri, true)).append('/')
-         .append(Patcher.OUT)
+        s.append("Folder: ").append(Patcher.nameOf(this, treeUri, true))
+         .append("\nROM: ").append(p.getString("sourceName", "not found yet"))
          .append("\nThis app carries OT6 v").append(v).append('.');
-        if (!Patcher.hasReadAccess(this, Uri.parse(src)))
-            s.append("\n\nThe app no longer has access to the ROM; choose it again.");
         if (!Patcher.hasTreeAccess(this, treeUri))
-            s.append("\n\nThe app no longer has access to the output folder; choose it again.");
+            s.append("\n\nThe app no longer has access to this folder; choose it again.");
         String last = p.getString("lastMessage", null);
         if (last != null)
             s.append("\n\nLast write (")
@@ -154,8 +133,8 @@ public final class MainActivity extends Activity {
             s.append("\n\nOT6.sfc is not known to be v").append(v).append(" yet.");
         text(s.toString(), 16);
         button("Write OT6.sfc again", writeAgain);
-        button("Choose another ROM", pickRom);
-        button("Choose another output folder", pickFolder);
+        button("Choose another folder", pickFolder);
+        button("Pick the ROM file instead", pickRom);
     }
 
     private void background(final Runnable work) {
@@ -184,60 +163,39 @@ public final class MainActivity extends Activity {
         });
     }
 
-    /** Keeps only the grants for the ROM and the folder in use. */
-    private void releaseOtherGrants() {
-        SharedPreferences p = Patcher.prefs(this);
-        String src = p.getString("source", null), tree = p.getString("tree", null);
-        for (UriPermission g : getContentResolver().getPersistedUriPermissions()) {
-            String u = g.getUri().toString();
-            if (!u.equals(src) && !u.equals(tree))
-                getContentResolver().releasePersistableUriPermission(g.getUri(),
-                        (g.isReadPermission() ? Intent.FLAG_GRANT_READ_URI_PERMISSION : 0)
-                        | (g.isWritePermission() ? Intent.FLAG_GRANT_WRITE_URI_PERMISSION : 0));
-        }
-    }
-
     @Override
     protected void onActivityResult(int request, int result, Intent data) {
         if (result != RESULT_OK || data == null || data.getData() == null) return;
         final Uri uri = data.getData();
-        SharedPreferences p = Patcher.prefs(this);
-        if (request == PICK_ROM) {
+        if (request == PICK_FOLDER) {
+            getContentResolver().takePersistableUriPermission(uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            // a new folder: find the ROM in it afresh
+            Patcher.prefs(this).edit().putString("tree", uri.toString())
+                    .remove("source").remove("sourceName").apply();
+            Patcher.keepOnlyCurrentGrants(this);
+            write();
+        } else if (request == PICK_ROM) {
             getContentResolver().takePersistableUriPermission(uri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION);
             final String name = Patcher.nameOf(this, uri, false);
-            final boolean needFolder = p.getString("tree", null) == null;
             note = null;
             background(new Runnable() {
-                @Override public void run() { checkRom(uri, name, needFolder); }
+                @Override public void run() { useRomFile(uri, name); }
             });
-        } else if (request == PICK_FOLDER) {
-            getContentResolver().takePersistableUriPermission(uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-            p.edit().putString("tree", uri.toString()).apply();
-            releaseOtherGrants();
-            write();
         }
     }
 
-    /** Reads the picked file and keeps it only if it is the ROM the patch expects. */
-    private void checkRom(Uri uri, String name, boolean thenFolder) {
+    /** The fallback: a ROM picked by hand, kept only if it is the one the patch expects. */
+    private void useRomFile(Uri uri, String name) {
         try {
             Bps.Info info = Bps.read(Patcher.bundledPatch(this));
             byte[] file = Patcher.readAll(getContentResolver(), uri);
             Bps.source(file, info);
             Patcher.prefs(this).edit().putString("source", uri.toString())
-                    .putString("sourceName", name).remove("lastMessage").apply();
-            releaseOtherGrants();
-            note = name + " is Final Fantasy III (USA) v1.0 (CRC32 " + Bps.hex(info.sourceCrc)
-                    + (Bps.headered(file, info) ? ", after removing its 512-byte copier header"
-                       : "") + ").";
-            if (thenFolder)
-                runOnUiThread(new Runnable() {
-                    @Override public void run() { pickFolder.onClick(null); }
-                });
-            else
-                Patcher.write(this);
+                    .putString("sourceName", name).apply();
+            Patcher.keepOnlyCurrentGrants(this);
+            Patcher.write(this);
         } catch (Bps.BpsException e) {
             if (!uri.toString().equals(Patcher.prefs(this).getString("source", null)))
                 getContentResolver().releasePersistableUriPermission(uri,

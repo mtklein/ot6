@@ -1,9 +1,5 @@
 package io.github.mtklein.ot6patcher;
 
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
@@ -27,12 +23,12 @@ import java.util.List;
  * Applies the patch this APK carries (assets/ot6.bps) to the player's own
  * ROM and writes the result as OT6.sfc in the folder they chose.  The
  * source ROM is only ever read.  Shared by MainActivity and UpdateReceiver;
- * all of it runs off the UI thread.
+ * all of it runs off the UI thread.  It never notifies: each result goes to
+ * the "last*" settings and logcat, and the app shows it when next opened.
  */
 final class Patcher {
     static final String TAG = "OT6Patcher";
     static final String PREFS = "ot6";
-    static final String CHANNEL = "updates";
 
     /** The output's fixed name: RetroArch keys saves and states by content file name. */
     static final String OUT = "OT6.sfc";
@@ -41,7 +37,6 @@ final class Patcher {
 
     static final class Result {
         boolean ok;          // OT6.sfc is this APK's build
-        boolean needsUser;   // only opening the app can fix it
         String message;
     }
 
@@ -79,12 +74,6 @@ final class Patcher {
         return readAll(c.getAssets().open("ot6.bps"));
     }
 
-    static boolean hasReadAccess(Context c, Uri doc) {
-        for (UriPermission p : c.getContentResolver().getPersistedUriPermissions())
-            if (p.getUri().equals(doc) && p.isReadPermission()) return true;
-        return false;
-    }
-
     static boolean hasTreeAccess(Context c, Uri tree) {
         for (UriPermission p : c.getContentResolver().getPersistedUriPermissions())
             if (p.getUri().equals(tree) && p.isReadPermission() && p.isWritePermission())
@@ -94,6 +83,7 @@ final class Patcher {
 
     static final class Child {
         String docId, name;
+        long size;
     }
 
     static Uri folderUri(Uri tree) {
@@ -110,13 +100,14 @@ final class Patcher {
                 DocumentsContract.getTreeDocumentId(tree));
         List<Child> out = new ArrayList<>();
         Cursor q = cr.query(list, new String[] {Document.COLUMN_DOCUMENT_ID,
-                Document.COLUMN_DISPLAY_NAME}, null, null, null);
+                Document.COLUMN_DISPLAY_NAME, Document.COLUMN_SIZE}, null, null, null);
         if (q == null) throw new IOException("cannot list the folder");
         try {
             while (q.moveToNext()) {
                 Child ch = new Child();
                 ch.docId = q.getString(0);
                 ch.name = q.getString(1);
+                ch.size = q.isNull(2) ? -1 : q.getLong(2);
                 out.add(ch);
             }
         } finally {
@@ -159,53 +150,99 @@ final class Patcher {
         return s.toString();
     }
 
-    private static Result done(Context c, boolean ok, boolean needsUser, String message) {
+    /** Records a result where the app shows it (and logcat); never a notification. */
+    private static Result done(Context c, boolean ok, String message, String rom, String crc) {
         Result r = new Result();
         r.ok = ok;
-        r.needsUser = needsUser;
         r.message = message;
-        prefs(c).edit().putBoolean("lastOk", ok).putString("lastMessage", message)
+        SharedPreferences.Editor e = prefs(c).edit().putBoolean("lastOk", ok)
+                .putString("lastMessage", message)
                 .putLong("lastTime", System.currentTimeMillis())
-                .putString("lastVersion", version(c)).apply();
+                .putString("lastVersion", version(c));
+        if (ok) e.putString("lastRom", rom).putString("lastCrc", crc);
+        else e.remove("lastRom").remove("lastCrc");
+        e.commit();   // the receiver's process may end right after
         Log.i(TAG, (ok ? "ok: " : "failed: ") + message);
         return r;
     }
 
-    /** Patches the remembered ROM and writes OT6.sfc into the remembered folder, atomically. */
-    static Result write(Context c) {
+    /** Releases every persisted grant but the folder's and the remembered ROM's. */
+    static void keepOnlyCurrentGrants(Context c) {
+        SharedPreferences p = prefs(c);
+        String src = p.getString("source", null), tree = p.getString("tree", null);
         ContentResolver cr = c.getContentResolver();
+        for (UriPermission g : cr.getPersistedUriPermissions()) {
+            String u = g.getUri().toString();
+            if (!u.equals(src) && !u.equals(tree))
+                cr.releasePersistableUriPermission(g.getUri(),
+                        (g.isReadPermission() ? Intent.FLAG_GRANT_READ_URI_PERMISSION : 0)
+                        | (g.isWritePermission() ? Intent.FLAG_GRANT_WRITE_URI_PERMISSION : 0));
+        }
+    }
+
+    /**
+     * Patches the player's ROM and writes OT6.sfc into the granted folder,
+     * atomically.  The ROM is the remembered one while it still reads and
+     * matches; otherwise the folder is scanned for it by CRC32 (RomScan), so a
+     * renamed or moved-in ROM still works.  Settings from v0.23's first build
+     * (a separately picked ROM plus an output folder) keep working as they are.
+     */
+    static Result write(Context c) {
+        final ContentResolver cr = c.getContentResolver();
         SharedPreferences p = prefs(c);
         String v = "OT6 v" + version(c);
-        String srcStr = p.getString("source", null);
-        String srcName = p.getString("sourceName", "your ROM");
         String treeStr = p.getString("tree", null);
-        if (srcStr == null || treeStr == null)
-            return done(c, false, true, v + " is installed, but setup isn't finished:"
-                    + " open OT6 Patcher to choose your ROM and an output folder.");
-        Uri src = Uri.parse(srcStr), tree = Uri.parse(treeStr);
-        if (!hasReadAccess(c, src))
-            return done(c, false, true, v + " could not be written: OT6 Patcher lost access"
-                    + " to " + srcName + ". Open it and choose your ROM again.");
+        if (treeStr == null)
+            return done(c, false, v + " is installed, but setup isn't finished:"
+                    + " open OT6 Patcher and choose the folder your ROM is in.", null, null);
+        final Uri tree = Uri.parse(treeStr);
         if (!hasTreeAccess(c, tree))
-            return done(c, false, true, v + " could not be written: OT6 Patcher lost access"
-                    + " to the output folder. Open it and choose the folder again.");
+            return done(c, false, v + " could not be written: OT6 Patcher lost access"
+                    + " to its folder. Open it and choose the folder again.", null, null);
         String folder = nameOf(c, tree, true);
         try {
             byte[] patch = bundledPatch(c);
             Bps.Info info = Bps.read(patch);
-            byte[] file;
-            try {
-                file = readAll(cr, src);
-            } catch (IOException | SecurityException e) {
-                return done(c, false, true, v + " could not be written: " + srcName
-                        + " can't be read any more (" + e.getMessage()
-                        + "). Open OT6 Patcher and choose your ROM again.");
+
+            byte[] rom = null;
+            String used = p.getString("sourceName", null);
+            String srcStr = p.getString("source", null);
+            if (srcStr != null) {
+                try {
+                    rom = Bps.source(readAll(cr, Uri.parse(srcStr)), info);
+                } catch (Exception gone) {
+                    Log.i(TAG, "remembered ROM " + used + " is gone or changed (" + gone
+                            + "); scanning " + folder);
+                }
             }
-            byte[] rom = Bps.source(file, info);         // throws on the wrong ROM
+            List<Child> kids = children(cr, tree);
+            if (rom == null) {
+                List<RomScan.Entry> entries = new ArrayList<>();
+                for (final Child ch : kids)
+                    entries.add(new RomScan.Entry(ch.name, ch.size, new RomScan.Bytes() {
+                        @Override public byte[] read() throws IOException {
+                            return readAll(cr, childUri(tree, ch.docId));
+                        }
+                    }, ch));
+                RomScan.Result found = RomScan.choose(entries, info);
+                if (found.chosen == null)
+                    return done(c, false, v + " was not written: no Final Fantasy III"
+                            + " (USA) v1.0 ROM (CRC32 " + Bps.hex(info.sourceCrc) + ") is in "
+                            + folder + ". " + (found.checked.isEmpty()
+                                ? "No file there is the ROM's size."
+                                : "Checked: " + RomScan.describe(found) + ".")
+                            + " Choose another folder, or pick the ROM file, in OT6 Patcher.", null, null);
+                Child ch = (Child) found.chosen.ref;
+                rom = found.rom;
+                used = ch.name;
+                p.edit().putString("source", childUri(tree, ch.docId).toString())
+                        .putString("sourceName", ch.name).apply();
+                keepOnlyCurrentGrants(c);
+                Log.i(TAG, "scan of " + folder + ": " + RomScan.describe(found));
+            }
             byte[] target = Bps.apply(patch, rom);        // checks the target CRC32
 
             String tmp = OUT + ".tmp";
-            List<Child> kids = children(cr, tree);
             Child stale = find(kids, tmp);
             if (stale != null) DocumentsContract.deleteDocument(cr, childUri(tree, stale.docId));
             Uri t = DocumentsContract.createDocument(cr, folderUri(tree),
@@ -240,38 +277,18 @@ final class Patcher {
                 throw new IOException("renaming " + tmp + " gave " + rName + ", not " + OUT);
             String stray = strays(kids);
             p.edit().putString("strays", stray).apply();
-            return done(c, true, false, v + " written to " + folder + "/" + OUT
-                    + " (CRC32 " + Bps.hex(info.targetCrc) + ")."
+            return done(c, true, v + " written to " + folder + "/" + OUT
+                    + " (CRC32 " + Bps.hex(info.targetCrc) + ") from " + used + "."
                     + (stray.isEmpty() ? "" : " Warning: " + stray + " is in the same folder,"
-                       + " and RetroArch would apply it on top of OT6; delete it."));
+                       + " and RetroArch would apply it on top of OT6; delete it."),
+                    used, Bps.hex(info.targetCrc));
         } catch (Bps.BpsException e) {
-            return done(c, false, true, v + " was not written: " + srcName + ": "
-                    + e.getMessage() + ".");
+            return done(c, false, v + " was not written: " + e.getMessage() + ".", null, null);
         } catch (Exception e) {
             Log.e(TAG, "write failed", e);
-            return done(c, false, false, v + " could not be written to " + folder + "/"
-                    + OUT + ": " + e);
+            return done(c, false, v + " could not be written to " + folder + "/"
+                    + OUT + ": " + e, null, null);
         }
     }
 
-    static void notify(Context c, Result r) {
-        NotificationManager nm = c.getSystemService(NotificationManager.class);
-        nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Patch updates",
-                NotificationManager.IMPORTANCE_DEFAULT));
-        Intent open = new Intent(c, MainActivity.class)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent pi = PendingIntent.getActivity(c, 0, open,
-                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-        Notification n = new Notification.Builder(c, CHANNEL)
-                .setSmallIcon(r.ok ? android.R.drawable.stat_sys_download_done
-                                   : android.R.drawable.stat_notify_error)
-                .setContentTitle(r.ok ? "OT6 v" + version(c) + " ready"
-                        : r.needsUser ? "OT6 Patcher: open the app" : "OT6 Patcher failed")
-                .setContentText(r.message)
-                .setStyle(new Notification.BigTextStyle().bigText(r.message))
-                .setContentIntent(pi)
-                .setAutoCancel(true)
-                .build();
-        nm.notify(1, n);
-    }
 }
