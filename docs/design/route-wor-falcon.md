@@ -2094,6 +2094,48 @@ flight taken out, `assertEq failed: (25,160): on foot ($11FA): got 1, want
 - **The tombstone puzzle** (299 (12,39)) was not done.
 - The Dullahan care-model and the auto-Shell relic notes above (13.6).
 
+### 13.10 SETZER's kit played (#319, #353)
+
+Since #319 SETZER's Slot row opens his table (Slot, Coin Toss, Hired Help,
+Jackpot; kits.md "Setzer") and the driver plays it (`Driver:setzerLine`).
+Measured on ROM `c4986f696e4a` (px13), every number from a log under
+`build/attempts/wt/kit-setzer/`: six variation runs of the generator (K = 0-5
+encounters used up first, `labs/var1.txt`: `k0_s0: PASS (frame 30542)` ...
+`k5_s0: PASS (frame 42239)`, every run won the chest and Dullahan), and from
+their snapshots the chest and grave labs at four waits each, retries off,
+with the policy (`labs/chest`, `labs/dull`) and with `setzer = false`, the
+driver as it was (`labs/chestctl`, `labs/dullctl`). `labs/go.sh` is the
+batch; `labs/*_analysis.txt` the tables.
+
+| fight | arm | runs / keys | won | ticks (min / median / max) | SETZER's damage | his chips / breaks / fight-ending blows | his rows used |
+|---|---|---|---|---|---|---|---|
+| Dullahan | policy | 24 / 20 | 24 | 5426 / 6828 / 11227 | 163,311 (**29%**; median 30%) | 103 / **16 of 24** / **9 of 24** | Jackpot 14 |
+| Dullahan | control | 24 / 20 | 24 | 5670 / 6831 / 11227 | 112,198 (20%; median 25%) | 106 / 17 of 24 / 2 of 24 | — |
+| the chest | policy | 24 / 21 | 24 | 1673 / 4415 / 7593 | 66,472 (**23%**; median 13%) | 2 / 0 / **8 of 24** | Hired Help 8, Jackpot 2 |
+| the chest | control | 24 / 21 | 24 | 1673 / 4473 / 9477 | 56,005 (19%; median 11%) | 0 / 0 / 6 of 24 | — |
+
+From `labs/dull_analysis.txt`: `SETZER actions 104 damage 163311 (29% of
+all; per run min 8% median 30% max 54%) chips 103 breaks 16 kills 9`, and
+`dullctl_analysis.txt`: `SETZER actions 104 damage 112198 (20% of all ...)
+chips 106 breaks 17 kills 2`.  The rows from the credit lines' commands
+(`$15A` Hired Help, `$15B` Jackpot): Dullahan `{'00': 74, '01': 16, '15B':
+14}` against the control's `{'00': 89, '01': 15}`; the chest `{'00': 24,
+'01': 9, '15A': 8, '15B': 2}` against `{'00': 38, '01': 15}`.
+
+What it says.  In Dullahan SETZER stays the breaker (his Trump keys ¤ and
+his Fight lands the breaks either way) and Jackpot becomes his finisher:
+the policy throws it once Dullahan is Broken and under 10,000 HP, where a
+1-BP floor of three reaches the cap (`SETZER Jackpot on slot 0 (4592 HP, 0
+shield(s), Broken) at 1 BP (lowest face 3), 99 MP of 297`), so the
+fight-ending blows move from SABIN to him; the fights are no shorter (the
+same median) and no fight was lost in either arm. In the chest, where ¤
+keys nothing, Hired Help is his way in: the sellsword strikes the Whelk
+Head with piercing (`SETZER Hired Help on slot 1: 1550 gil of 247857; his
+Fight keys nothing there`), and the policy arm spent 28 Potions to the
+control's 40 and no Fenix Down to its 2. Slot and Coin Toss were not chosen
+on this arc: the tomb's random fights end before his bank reaches 3, and
+Coin Toss waits for two revealed ¤ bodies.
+
 ## 14. What the owner may want to decide
 
 - **The draft rows** (section 8): decided, approved as written (owner,
