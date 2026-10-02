@@ -457,7 +457,7 @@ table out of the built ROM, flat rows marked.
 | **Steal** (chance verb, flat) | 4 | 4 | 4 | 4 |
 | **Rage** (chance verb, flat) | 8 | 8 | 8 | 8 |
 | **Slot** (chance verb, unpriced) | 0 | 0 | 0 | 0 |
-| **Jackpot** (chance verb: the boost buys its face) | 99 | 99 | 99 | 99 |
+| **Jackpot** (chance verb: the boost tilts its odds) | 99 | 99 | 99 | 99 |
 | Pummel / AutoCrossbow | 4 | 10 | 25 | 63 |
 | Bestow (flat, buys nothing) | 5 | 5 | 5 | 5 |
 | NoiseBlaster / Flash | 6 | 15 | 38 | 94 |

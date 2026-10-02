@@ -4822,7 +4822,8 @@ end
 -- list's wItemList ids.  M.setzerGil / M.setzerJackpot are the ROM's
 -- arithmetic, for the policy below and for the suites that check it.
 BATTLE.SETZER = { COIN = 0x59, HIRE = 0x5A, JACKPOT = 0x5B, SLOT = 0x5C }
-BATTLE.SETZER_FLOOR = { [0] = 1, 3, 5, 6 }      -- Jackpot's lowest face per point
+BATTLE.SETZER_FLOOR = { [0] = 1, 2, 3, 4 }      -- Jackpot's lowest face per point;
+                                                --   faces even from it to six
 function M.setzerGil(level, rate, boost)
   return level * rate * (1 << (boost or 0))
 end
@@ -4853,9 +4854,13 @@ end
 -- axis holds no key), the party's gil, SETZER's MP and bank, whether his
 -- Jackpot is spent (OT6_DIVINE_USED) and learned (event switch $00CA), and
 -- whether this is a random battle (OT6_RANDBTL).
---   Jackpot: a target with at least o.jackpotHp HP (4000), at the smallest
---     boost whose lowest face reaches min(HP, 9999) after the shields'
---     halving (or the Broken double); held while the bank is short of it.
+--   Jackpot: a gamble (the face is even odds from 1 + boost to six), so
+--     priced by its expected value: for each boost the bank holds, the mean
+--     over those faces of the damage after the shields' halving or the
+--     Broken double, capped at min(HP, 9999).  The smallest boost within 5%
+--     of the best mean is the one thrown, when that mean is at least
+--     o.jackpotEv (4000, what 99 MP should buy) and the target has at least
+--     o.jackpotHp HP (4000).
 --   Slot at 3 BP in a random battle against two or more: a chosen triple,
 --     whatever reel 1 stops on (ot6_slot.asm), never a miss.
 --   Coin Toss when it chips two or more bodies (revealed special on each
@@ -4888,16 +4893,25 @@ function Driver:setzerLine(actor, have)
   local hp = M.readWord(BATTLE.MON_HP + slot * 2)
   if o.jackpot ~= false and learned and not spent and mp >= 99 and hp >= (o.jackpotHp or 4000) then
     local need = math.min(hp, 9999)
-    local want = 3
-    for b = 0, 3 do
-      local d = M.setzerJackpot(BATTLE.SETZER_FLOOR[b], level)
-      if broken then d = d * 2 elseif sh > 0 then d = d // 2 end
-      if d >= need then want = b; break end
+    local ev, best = {}, 0
+    for b = 0, math.min(have, 3) do
+      local sum, n = 0, 0
+      for f = BATTLE.SETZER_FLOOR[b], 6 do
+        local d = M.setzerJackpot(f, level)
+        if broken then d = d * 2 elseif sh > 0 then d = d // 2 end
+        sum, n = sum + math.min(d, need), n + 1
+      end
+      ev[b] = sum / n
+      if ev[b] > best then best = ev[b] end
     end
-    if want <= math.min(have, 3) then
-      M.log(string.format("[%s] actor=%d SETZER Jackpot on slot %d (%d HP, %d shield(s)%s) at %d BP "
-        .. "(lowest face %d), 99 MP of %d", tag, actor, slot, hp, sh, broken and ", Broken" or "",
-        want, BATTLE.SETZER_FLOOR[want], mp))
+    local want = nil
+    for b = 0, math.min(have, 3) do
+      if ev[b] >= best * 0.95 then want = b; break end
+    end
+    if want ~= nil and ev[want] >= (o.jackpotEv or 4000) then
+      M.log(string.format("[%s] actor=%d SETZER Jackpot on slot %d (%d HP, %d shield(s)%s) at %d BP: "
+        .. "expected %d of the %d it can take (faces %d-6), 99 MP of %d", tag, actor, slot, hp, sh,
+        broken and ", Broken" or "", want, math.floor(ev[want]), need, BATTLE.SETZER_FLOOR[want], mp))
       return { kind = "skill", cmd = BATTLE.CMD_SLOT, skill = BATTLE.SETZER.JACKPOT, row = row,
                boostLeft = want, aim = slot, reason = "jackpot" }
     end

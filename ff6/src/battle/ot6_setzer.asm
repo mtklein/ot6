@@ -560,9 +560,16 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ; level x 2, times the face again for the triple, saturating at 65,535 as the
 ; effect's own loop does -- and carry set, so the effect returns at once.
 ;
-; The face is a d6 the boost floors (chance verb: the boost buys certainty):
-; any face at 0 points, 3 or better at 1, 5 or better at 2, sixes at 3.
-; Nothing else is bought: no multiplier (the command is in Ot6BoostDmg's gate,
+; The face is a gamble the boost tilts (owner, 2026-10-02: a gamble, not a
+; guaranteed top roll; playtesting tunes it): each point raises the lowest
+; face by one, and the face is even odds from that floor to six.
+;   0 BP: 1-6, each 1/6      (a six 1 in 6, a five or six 1 in 3)
+;   1 BP: 2-6, each 1/5      (a six 1 in 5, a five or six 2 in 5)
+;   2 BP: 3-6, each 1/4      (a six 1 in 4, a five or six 1 in 2)
+;   3 BP: 4-6, each 1/3      (a six 1 in 3, a five or six 2 in 3)
+; so three points guarantee a four (4^4 x level x 2, 15,872 at L31) and never
+; a six.  The draw is one battle Rand reduced mod (6 - boost), within 1/256
+; of even (256 is not a multiple of 6, 5 or 3).  Nothing else is bought: no multiplier (the command is in Ot6BoostDmg's gate,
 ; and this damage is set here, after CalcDmg), and the MP price is flat.
 ;
 ; Null-break (kits.md: the Fixed Dice are the outliers, large numbers and no
@@ -573,8 +580,6 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ;
 ; entry: jsl from AttackerEffect_09's head, a8/i8, db=$7e, y = the attacker,
 ; x = the effect index.  out: carry set = handled.  preserves y.
-Ot6JackpotFloorTbl:
-        .byte   0, 2, 4, 5      ; the lowest face index (face - 1) per point
 Ot6JackpotCubeTbl:
         .byte   1, 8, 27, 64, 125, 216
 
@@ -595,21 +600,23 @@ Ot6JackpotCubeTbl:
         .a8
         .i8
         phx
-        ot6_rand                ; A = 0-255
-@mod6:  cmp     #$06
-        bcc     @rolled
-        sbc     #$06            ; (carry is set: the cmp above)
-        bra     @mod6
-@rolled:
-        pha                     ; [1,s] the rolled face index 0-5
         lda     OT6_BOOST_REVEALED,y
         and     #$03
-        tax
-        lda     f:Ot6JackpotFloorTbl,x
-        cmp     $01,s
-        bcc     @face           ; the floor is below the roll: the roll stands
-        sta     $01,s           ; the boost's floor
-@face:  pla                     ; A = the face index
+        pha                     ; [1,s] the floor's face index: the boost
+        lda     #$06
+        sec
+        sbc     $01,s
+        pha                     ; [1,s] faces from the floor to six, [2,s] floor
+        ot6_rand                ; A = 0-255 (the macro keeps the stack even)
+@mod:   cmp     $01,s
+        bcc     @rolled
+        sbc     $01,s           ; (carry is set: the cmp above)
+        bra     @mod
+@rolled:
+        clc
+        adc     $02,s           ; + the floor: the face index 0-5
+        plx                     ; drop the count
+        plx                     ; drop the floor (x is the caller's again below)
         sta     $b6             ; the third die
         sta     $b7
         asl

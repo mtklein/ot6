@@ -546,7 +546,7 @@ for #319 (2026-10-02), each with its reason.
 | 1 | Slot ✦ | free | the reel's attack | the rig's certainty (see Steal's ladder; `ot6_slot.asm`) | join |
 | 2 | Coin Toss | level × 30 gil | ¤, one per body (every enemy) | twice the coins per point: the gil and the damage both ×2/×4/×8 | join |
 | 3 | Hired Help | level × 50 gil | the target's own physical class (slashing, else piercing, else bludgeoning), one | the same: twice the fee and the hit per point | join |
-| 4 | **Jackpot** (divine) | 99 MP, once a battle | null-break | the dice's face: any at 0, 3+ at 1, 5+ at 2, sixes at 3 | his World of Ruin return (Kohlingen, switch `$00CA`) |
+| 4 | **Jackpot** (divine) | 99 MP, once a battle | null-break | the dice's odds: the lowest face rises by one a point (1 / 2 / 3 / 4), even odds from it to six | his World of Ruin return (Kohlingen, switch `$00CA`) |
 
 **The table behind Slot.** Setzer's rows are FIGHT, SLOT, MAGIC, ITEM and
 the menu is four rows, so like Locke he has no spare slot, and his third
@@ -589,9 +589,25 @@ class it chips, as any chip does.
 vanilla's dice arithmetic: face³ × level × 2 for the three dice, times the
 face again for the triple (so 62 at a triple of ones and the 9,999 cap from
 fours up at L31). Null-break: the Fixed Dice are the outliers, so it chips
-nothing and ignores the row. **Boost buys the face**, the chance-verb canon
-(each point narrows the gamble, three remove it): the lowest face is 1 / 3 /
-5 / 6 at 0 / 1 / 2 / 3 points. Nothing else is bought: no multiplier (cmd
+nothing and ignores the row. **Boost tilts the gamble, and never removes
+it** (owner, 2026-10-02: Jackpot is a gamble, not a guaranteed top roll):
+each point raises the lowest face by one, and the face is even odds from
+that floor to six.
+
+| BP | faces | a six | a five or six | the floor's damage at L31 |
+|---|---|---|---|---|
+| 0 | 1-6, 1/6 each | 1 in 6 | 1 in 3 | 62 |
+| 1 | 2-6, 1/5 each | 1 in 5 | 2 in 5 | 992 |
+| 2 | 3-6, 1/4 each | 1 in 4 | 1 in 2 | 5,022 |
+| 3 | 4-6, 1/3 each | 1 in 3 | 2 in 3 | 15,872 |
+
+*Reason: a curve simple enough to read off the HUD, with a real top-roll
+chance at every level and a guarantee that stops at four; playtesting will
+tune the floor, the odds and the power.* (Before this ruling the floor ran
+1 / 3 / 5 / 6, so three points were certain sixes.) The draw is one battle
+Rand mod (6 − boost), within 1/256 of even; the lab in
+`build/attempts/wt/kit-setzer/jackpot-dist/` measures it. Nothing else is
+bought: no multiplier (cmd
 `$0f` is in Ot6BoostDmg's gate) and the MP is flat. **Price 99 MP, once a
 battle** (`OT6_DIVINE_USED`): 99 is the shared ultimate ceiling, and the
 once-a-battle flag (Cleave's and Assassinate's) keeps a 9,999 hit a boss
@@ -610,9 +626,11 @@ reads). Jackpot greys for MP or once spent. One authority each:
 (gil). Tests: `battle_cointoss`, `battle_hiredhelp`, `battle_jackpot`.
 
 **The route's driver plays the table** (`Driver:setzerLine`, lib/ot6.lua;
-#353), reading what an informed player would: Jackpot on a target of
-4,000 HP or more at the smallest boost whose lowest face reaches its HP
-(or the 9,999 cap) after the shields' halving or the Broken double; Slot
+#353), reading what an informed player would: Jackpot priced as the gamble
+it is, by its expected damage over the faces a boost leaves (after the
+shields' halving or the Broken double, capped at the target's HP and
+9,999), at the smallest boost within 5% of the best the bank allows, when
+that expectation is at least 4,000 and the target has 4,000 HP; Slot
 at 3 BP in a random battle against two or more (a chosen triple); Coin
 Toss when its revealed ¤ chips two or more bodies; Hired Help when the
 target's revealed row holds a physical class his own Fight does not key.

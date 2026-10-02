@@ -40,8 +40,9 @@ or bludgeoning), so Setzer can break what his own weapon can't. Both cost
 Gil instead of MP, and each Boost Point doubles both the Gil and the
 damage. Once he rejoins in the World of Ruin he also has **Jackpot**: for
 99 MP, once a battle, the dice come up three of a kind for a huge hit
-(it chips no shields, but a Broken target takes it doubled). Each Boost Point raises the lowest face it can
-roll, and three points guarantee sixes. The rows grey out when you can't
+(it chips no shields, but a Broken target takes it doubled). It is a gamble: each Boost Point raises the lowest
+face it can roll by one (three points promise at least fours), and the faces
+above that are even odds, so a six is never certain. The rows grey out when you can't
 pay or Jackpot is spent. Wearing the Coin Toss relic still swaps Slot for
 plain GP Rain, which now chips like Coin Toss and grows with boosting too.
 The Narshe school's skills advisor has two new pages about it.
