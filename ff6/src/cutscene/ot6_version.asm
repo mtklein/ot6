@@ -11,8 +11,10 @@
 ; copyright sprites (y=160).  The glyphs are the menu font's
 ; (SmallFontGfx), recoloured into the logo's palette 1 (SplashPal: ink
 ; white $7fff, shadow black $0000, the rest the backdrop grey $1063), in
-; BG1 tiles $310-$319 (VRAM $6100-$619f), which nothing loads: they stay
-; zero from ClearVRAM through the splash and the title.
+; BG1 tiles $310-$31e (VRAM $6100-$61ef), which nothing loads: they stay
+; zero from ClearVRAM through the splash and the title.  Every loop runs all
+; 15 cells and nothing branches on the text, so every VERSION draws in the
+; same cycles.
 ;
 ; Timing and footprint, so the boot plays exactly as before:
 ;   - The cutscene program is vanilla byte for byte, so its decompression
@@ -33,8 +35,11 @@
 .segment "ot6_title_version"
 
 .import Ot6VersionText, SmallFontGfx
+.include "ot6_version.inc"
 
-OT6_SPLASH_MAX = 10                     ; the Config tab's width (rom_version.py)
+; all OT6_VERSION_CELLS (15) cells of the field, every build, centered:
+; columns 8-22 (the field centres the text and pads it with blank cells)
+OT6_SPLASH_X = (32 - OT6_VERSION_CELLS) / 2
 OT6_SPLASH_ROW = 17
 OT6_SPLASH_MAP = $0400                  ; BG1SC $03: 64x64; the splash shows
                                         ; the top-right screen (BG1 hscroll 256)
@@ -100,20 +105,15 @@ Ot6DrawSplashVersion:
         phb
         shorta
         longi
-        jsr     Ot6SplashMapAddr        ; VMADD = the text's first cell, X = 0
-@cell:  lda     f:Ot6VersionText,x      ; one map word per character:
-        beq     @glyphs                 ; palette 1, tile $310 + i
+        jsr     Ot6SplashMapAddr        ; VMADD = the first cell, X = 0
         longa
-        txa
-        clc
+@cell:  txa                             ; one map word per cell:
+        clc                             ; palette 1, tile $310 + i
         adc     #OT6_SPLASH_ATTR | OT6_SPLASH_TILE
         sta     f:hVMDATAL
-        shorta
         inx
-        cpx     #OT6_SPLASH_MAX
+        cpx     #OT6_VERSION_CELLS
         bne     @cell
-@glyphs:
-        longa
         lda     #OT6_SPLASH_CHR
         sta     f:hVMADDL
         shorta
@@ -125,7 +125,6 @@ Ot6DrawSplashVersion:
 ; s 0 -> 1 (backdrop grey), s 1 -> 3 (black), s 2 -> 2 (grey), s 3 -> 4 (white)
 ; so plane 0 = ~p1, plane 1 = p0 ^ p1, plane 2 = p0 & p1, plane 3 = 0
 @char:  lda     f:Ot6VersionText,x
-        beq     @done
         jsr     Ot6SplashGlyphY         ; Y = the glyph's 16 bytes
 @p01:   lda     .loword(SmallFontGfx)+1,y
         eor     #$ff
@@ -149,9 +148,9 @@ Ot6DrawSplashVersion:
         and     #$0f
         bne     @p23
         inx
-        cpx     #OT6_SPLASH_MAX
+        cpx     #OT6_VERSION_CELLS
         bne     @char
-@done:  plb
+        plb
         plp
         rtl
 
@@ -177,60 +176,33 @@ Ot6EraseSplashVersion:
         php
         shorta
         longi
-        jsr     Ot6SplashMapAddr
-@cell:  lda     f:Ot6VersionText,x
-        beq     @glyphs
+        jsr     Ot6SplashMapAddr        ; VMADD = the first cell, X = 0
         longa
         lda     #OT6_SPLASH_FILL
-        sta     f:hVMDATAL
-        shorta
+@cell:  sta     f:hVMDATAL
         inx
-        cpx     #OT6_SPLASH_MAX
+        cpx     #OT6_VERSION_CELLS
         bne     @cell
-@glyphs:
-        longa
         lda     #OT6_SPLASH_CHR
         sta     f:hVMADDL
-        shorta
-        ldx     #0
-@char:  lda     f:Ot6VersionText,x
-        beq     @done
-        ldy     #16
-        longa
         lda     #0
+        ldx     #OT6_VERSION_CELLS * 16
 @word:  sta     f:hVMDATAL
-        dey
+        dex
         bne     @word
         shorta
-        inx
-        cpx     #OT6_SPLASH_MAX
-        bne     @char
-@done:  plp
+        plp
         rtl
 
 ; ------------------------------------------------------------------------------
 
-; [ VMADD = the first cell of the centered text; X = 0 ]
-
-; the text is n characters (up to OT6_SPLASH_MAX), from column (32 - n) / 2
+; [ VMADD = the first of the 15 cells; X = 0 ]
 
 Ot6SplashMapAddr:
         lda     #$80                    ; increment after the high byte (as
         sta     f:hVMAINC               ; InitHWRegs set it)
-        ldx     #0
-@len:   lda     f:Ot6VersionText,x
-        beq     @addr
-        inx
-        cpx     #OT6_SPLASH_MAX
-        bne     @len
-@addr:  longa
-        txa
-        eor     #$ffff
-        sec
-        adc     #32                     ; 32 - n
-        lsr
-        clc
-        adc     #OT6_SPLASH_MAP + OT6_SPLASH_ROW * 32
+        longa
+        lda     #OT6_SPLASH_MAP + OT6_SPLASH_ROW * 32 + OT6_SPLASH_X
         sta     f:hVMADDL
         shorta
         ldx     #0

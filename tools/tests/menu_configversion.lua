@@ -1,14 +1,17 @@
 -- @suite
 -- menu_configversion.lua -- the Config screen shows which OT6 this is:
--- "OT6 v" .. VERSION in the version tab, top-left, on both Config pages.
+-- "OT6 v" .. VERSION, centered on the bottom row inside its main window, on
+-- both Config pages.
 --
--- The ROM carries the text in Ot6VersionText (c0/ffa0, field/header.asm),
--- stamped after the link from the repo's VERSION by tools/build/rom_version.py;
--- config.asm DrawConfigVersion draws it on BG3 inside ConfigVersionWindow,
--- the "Config" tab's mirror.  The expectation here comes from the tree's
--- VERSION file (compose.py injects it as OT6_VERSION), not from the ROM, so
--- a ROM stamped with another version fails: that is the negative control
--- (a build with a different VERSION, booted with OT6_ROM/OT6_DBG).
+-- The ROM carries the text in Ot6VersionText (c0/ffa0, field/header.asm):
+-- OT6_VERSION_CELLS (15) cells, the text centered and space-padded, stamped
+-- after the link from the repo's VERSION by tools/build/rom_version.py.
+-- menu/ot6_version.asm Ot6ConfigSelectFrame draws all 15 cells on BG3 row
+-- 25, columns 8-22, in grey, on the first frame of the Config select state.
+-- The expectation here comes from the tree's VERSION file (compose.py
+-- injects it as OT6_VERSION), not from the ROM, so a ROM stamped with
+-- another version fails: that is the negative control (a build with a
+-- different VERSION, booted with OT6_ROM/OT6_DBG).
 --
 -- Boot: cold Continue of the narshe-mission-v1 battery (world (84,34), on
 -- foot), then the player's path: X opens the main menu, the cursor goes down
@@ -18,15 +21,17 @@
 --
 -- The text is read off the screen two ways, on each page:
 --   1. VRAM: the BG3 tilemap the PPU is fetching (its base from the PPU
---      state, not assumed) holds the expected character codes, in white,
---      at the tab's cells, with nothing after them inside the tab; and each
---      code's tile in BG3's character VRAM is the ROM font's glyph
---      (SmallFontGfx), so those codes draw those letters.
+--      state, not assumed) holds the 15 expected cells, in grey, and the
+--      rest of the row is empty; and each code's tile in BG3's character
+--      VRAM is the ROM font's glyph (SmallFontGfx), so those codes draw
+--      those letters.
 --   2. The frame: every 8x8 cell of the picture Mesen produced matches its
 --      glyph pixel for pixel (ink in the palette's colours, no ink where the
 --      glyph has none).  The frame's row offset is calibrated on the
---      vanilla "Config" title on the same BG3 row first, so the mapping is
---      measured, not assumed.  A screenshot of each page is the evidence.
+--      vanilla "Config" title (BG3 row 2) first, so the mapping is measured,
+--      not assumed.  A screenshot of each page is the evidence.
+-- Every check runs and reports before a page's verdict, so one negative
+-- control shows each check that catches it.
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -34,9 +39,10 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local ZMENUSTATE, ZCURSOR, ZPAGE = 0x26, 0x4b, 0x4a
 local ST_MAIN, ST_CONFIG = 0x05, 0x0e   -- MENU_STATE::CONFIG_SELECT
 local MAIN_ROW_CONFIG = 5
-local TEXT_X, TEXT_Y = 2, 2             -- DrawConfigVersion: lda_pos BG3A, {2, 2}
-local TITLE_X = 24                      -- CONFIG_TITLE: BG3A, {24, 2}, "Config"
-local WHITE_ATTR = 0x20                 -- BG3_TEXT_COLOR::DEFAULT (palette 0, priority)
+local CELLS = 15                        -- OT6_VERSION_CELLS (include/ot6_version.inc)
+local ROW, X0 = 25, (32 - CELLS) // 2   -- OT6_CFG_ROW, OT6_CFG_X
+local GREY_ATTR = 0x24                  -- BG3_TEXT_COLOR::GRAY: palette 1, priority
+local TITLE_X, TITLE_Y = 24, 2          -- CONFIG_TITLE: BG3A, {24, 2}, "Config"
 
 local VR = emu.memType.snesVideoRam
 
@@ -51,24 +57,19 @@ local function code(ch)
   if b >= 48 and b <= 57 then return 0xb4 + b - 48 end
   error("no menu-font code for " .. string.format("%q", ch), 0)
 end
-local function encode(s)
-  local t = {}
-  for i = 1, #s do t[i] = code(s:sub(i, i)) end
-  return t
-end
 
 H.assertEq(type(OT6_VERSION), "string",
   "compose.py injects the tree's VERSION as OT6_VERSION")
 local EXPECT = "OT6 v" .. OT6_VERSION
-local WANT = encode(EXPECT)
-local TITLE = encode("Config")
+H.assertEq(#EXPECT <= CELLS, true, string.format("%q fits %d cells", EXPECT, CELLS))
+-- the 15 cells: the text centered, blank-padded (rom_version.py field_bytes)
+local PAD = (CELLS - #EXPECT) // 2
+local WANT, SHOWN = {}, string.rep(" ", PAD) .. EXPECT
+SHOWN = SHOWN .. string.rep(" ", CELLS - #SHOWN)
+for i = 1, CELLS do WANT[i] = code(SHOWN:sub(i, i)) end
+local TITLE = {}
+for i = 1, 6 do TITLE[i] = code(("Config"):sub(i, i)) end
 local FONT = H.sym("SmallFontGfx") & 0x3FFFFF
--- the OT6 symbols, looked up where they are used: a ROM from before the
--- version tab has neither, and fails on the screen first
-local function romSym(a, name)
-  H.assertEq(a ~= nil, true, "this ROM's symbols include " .. name)
-  return a & 0x3FFFFF
-end
 
 local function st() return H.readByte(ZMENUSTATE) end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -133,8 +134,6 @@ end
 
 local pageChecked = {}
 
--- Each page's checks all run and report before the page fails, so one
--- negative control shows every check that catches it (VRAM and frame).
 local function checkPage(page)
   local b = bg3()
   local width = emu.getScreenSize().width
@@ -148,40 +147,31 @@ local function checkPage(page)
     end
   end
 
-  -- 1. VRAM tilemap: the tab's cells hold the expected text in white
+  -- 1. VRAM tilemap: the row holds the 15 cells in grey, and nothing else
   local got = {}
-  for i = 1, #WANT do
-    local w = mapWord(b, TEXT_X + i - 1, TEXT_Y)
-    got[i] = w & 0xff
-    check(w >> 8 == WHITE_ATTR, string.format(
-      "BG3 VRAM cell {%d,%d} attribute $%02X, want $%02X (white text)",
-      TEXT_X + i - 1, TEXT_Y, w >> 8, WHITE_ATTR))
-    check(got[i] == WANT[i], string.format(
-      "BG3 VRAM cell {%d,%d} is $%02X, want $%02X: %q's character %d (%q)",
-      TEXT_X + i - 1, TEXT_Y, got[i], WANT[i], EXPECT, i, EXPECT:sub(i, i)))
+  for x = 0, 31 do
+    local w = mapWord(b, x, ROW)
+    local i = x - X0 + 1
+    if i >= 1 and i <= CELLS then
+      got[i] = w & 0xff
+      check(w >> 8 == GREY_ATTR, string.format(
+        "BG3 VRAM cell {%d,%d} attribute $%02X, want $%02X (grey text)",
+        x, ROW, w >> 8, GREY_ATTR))
+      check(got[i] == WANT[i], string.format(
+        "BG3 VRAM cell {%d,%d} is $%02X, want $%02X: cell %d of %q (%q)",
+        x, ROW, got[i], WANT[i], i, SHOWN, SHOWN:sub(i, i)))
+    else
+      check(w == 0, string.format("BG3 VRAM cell {%d,%d}, outside the 15, is empty", x, ROW))
+    end
   end
-  H.log(string.format("%s: BG3 VRAM tilemap at {%d,%d}: %s (want %s = %q)",
-    page, TEXT_X, TEXT_Y, hexs(got), hexs(WANT), EXPECT))
-  local tabSym = H.sym("ConfigVersionWindow")
-  check(tabSym ~= nil, "this ROM's symbols include ConfigVersionWindow")
-  -- make_window: .addr pos, .byte w, h
-  local tab = tabSym and H.readRomByte((tabSym & 0x3FFFFF) + 2) or 10
-  H.assertEq(#WANT <= tab, true, string.format(
-    "%q (%d characters) fits the version tab's %d columns", EXPECT, #WANT, tab))
-  for x = TEXT_X + #WANT, TEXT_X + tab - 1 do
-    check(mapWord(b, x, TEXT_Y) == 0, string.format(
-      "BG3 VRAM cell {%d,%d} after the text, inside the tab, is blank", x, TEXT_Y))
-  end
-  for x = 0, TEXT_X - 1 do
-    check(mapWord(b, x, TEXT_Y) == 0, string.format(
-      "BG3 VRAM cell {%d,%d} left of the text is blank", x, TEXT_Y))
-  end
+  H.log(string.format("%s: BG3 VRAM row %d, cells %d-%d: %s (want %s = %q)",
+    page, ROW, X0, X0 + CELLS - 1, hexs(got), hexs(WANT), SHOWN))
   for i = 1, #TITLE do
-    check(mapWord(b, TITLE_X + i - 1, TEXT_Y) & 0xff == TITLE[i], string.format(
-      "the Config title's cell {%d,%d} is still there", TITLE_X + i - 1, TEXT_Y))
+    check(mapWord(b, TITLE_X + i - 1, TITLE_Y) & 0xff == TITLE[i], string.format(
+      "the Config title's cell {%d,%d} is still there", TITLE_X + i - 1, TITLE_Y))
   end
   -- ...and each expected code's tile is the ROM font's glyph
-  for i = 1, #WANT do
+  for i = 1, CELLS do
     local same = true
     for j = 0, 15 do
       if emu.read(b.chr + WANT[i] * 16 + j, VR) ~= H.readRomByte(FONT + WANT[i] * 16 + j) then
@@ -189,7 +179,7 @@ local function checkPage(page)
       end
     end
     check(same, string.format("BG3 tile $%02X (%q) is SmallFontGfx's glyph",
-      WANT[i], EXPECT:sub(i, i)))
+      WANT[i], SHOWN:sub(i, i)))
   end
 
   -- 2. the frame: calibrate the row offset on the vanilla "Config" title
@@ -197,8 +187,8 @@ local function checkPage(page)
   for off = -16, 16 do
     local all = true
     for i = 1, #TITLE do
-      local w = mapWord(b, TITLE_X + i - 1, TEXT_Y)
-      if not cellShows(b, frame, width, TITLE_X + i - 1, TEXT_Y, w & 0xff, (w >> 10) & 7, off) then
+      local w = mapWord(b, TITLE_X + i - 1, TITLE_Y)
+      if not cellShows(b, frame, width, TITLE_X + i - 1, TITLE_Y, w & 0xff, (w >> 10) & 7, off) then
         all = false; break
       end
     end
@@ -207,20 +197,17 @@ local function checkPage(page)
   H.assertEq(#offs, 1, string.format(
     "%s: exactly one frame row offset shows the vanilla Config title (found %d)", page, #offs))
   local off = offs[1]
-  for i = 1, #WANT do
-    local ok, why = cellShows(b, frame, width, TEXT_X + i - 1, TEXT_Y, WANT[i], 0, off)
-    check(ok, string.format("the frame shows %q's character %d (%q) at cell {%d,%d}%s",
-      EXPECT, i, EXPECT:sub(i, i), TEXT_X + i - 1, TEXT_Y, why and (": " .. why) or ""))
-  end
-  for x = TEXT_X + #WANT, TEXT_X + tab - 1 do
-    local ok, why = cellShows(b, frame, width, x, TEXT_Y, 0xff, 0, off)
-    check(ok, string.format("the frame shows no ink at cell {%d,%d}, after the text%s",
-      x, TEXT_Y, why and (": " .. why) or ""))
+  local pal = (GREY_ATTR >> 2) & 7
+  for i = 1, CELLS do
+    local ok, why = cellShows(b, frame, width, X0 + i - 1, ROW, WANT[i], pal, off)
+    check(ok, string.format("the frame shows cell %d of %q (%q) at {%d,%d}%s",
+      i, SHOWN, SHOWN:sub(i, i), X0 + i - 1, ROW, why and (": " .. why) or ""))
   end
   H.assertEq(#fails, 0, string.format("%s: %d check(s) failed (first: %s)",
     page, #fails, fails[1] or "-"))
-  H.log(string.format("%s: VRAM and frame show %q at BG3 {%d,%d} (frame row offset %d, "
-    .. "calibrated on the Config title)", page, EXPECT, TEXT_X, TEXT_Y, off))
+  H.log(string.format("%s: VRAM and frame show %q at BG3 row %d, cells %d-%d (frame "
+    .. "row offset %d, calibrated on the Config title)", page, EXPECT, ROW, X0,
+    X0 + CELLS - 1, off))
   pageChecked[page] = true
 end
 
@@ -277,15 +264,6 @@ H.run({ maxFrames = 40000 }, {
       H.assertEq(H.readByte(SETTINGS + i), before[i], string.format(
         "Config option byte $%04X unchanged (the test only moved the cursor)", SETTINGS + i))
     end
-    -- the ROM field the screen came from, for the log
-    local raw = {}
-    local field = romSym(H.sym("Ot6VersionText"), "Ot6VersionText")
-    for i = 0, 15 do raw[#raw + 1] = H.readRomByte(field + i) end
-    H.log("Ot6VersionText (c0/ffa0) = " .. hexs(raw))
-    for i = 1, #WANT do
-      H.assertEq(raw[i], WANT[i], string.format("Ot6VersionText byte %d", i - 1))
-    end
-    H.assertEq(raw[#WANT + 1], 0, "Ot6VersionText is $00-terminated after the text")
     H.log(string.format("VERSION OK: the Config screen shows %q on both pages "
       .. "(VRAM tilemap + glyph tiles, and the frame's pixels)", EXPECT))
   end),

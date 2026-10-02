@@ -31,5 +31,5 @@ nothing.
 
 **The game shows which OT6 it is.** The splash at power-on shows "OT6 v"
 and the version number under the FINAL FANTASY III logo, and the Config
-screen shows it in a tab in its top-left corner, on both of its pages, so
+screen shows it on the bottom line of its window, on both of its pages, so
 you can tell which build a device is running without leaving the game.

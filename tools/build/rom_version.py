@@ -6,10 +6,12 @@ A built ROM says which OT6 it is in two fixed-size, fixed-address fields,
 written after the link (tools/build/link_rom.sh, before fix_checksum.py)
 from the repo's VERSION file:
 
-    Ot6VersionText  c0/ffa0, 16 bytes   "OT6 v<VERSION>" in the menu font's
-                    encoding, $00-terminated and $00-padded.  The Config
-                    screen (menu/ot6_version.asm) and the boot splash
-                    (cutscene/ot6_version.asm) draw it.
+    Ot6VersionText  c0/ffa0, 16 bytes   OT6_VERSION_CELLS (15) menu-font
+                    cells, "OT6 v<VERSION>" centered and padded with spaces
+                    ($ff), then $00 (ff6/include/ot6_version.inc).  The
+                    Config screen (menu/ot6_version.asm) and the boot splash
+                    (cutscene/ot6_version.asm) each draw all 15 cells, so
+                    every VERSION runs the same code for the same cycles.
     SnesHeader      c0/ffc0, 21 bytes   the internal header title, ASCII
                     "OT6 V<VERSION>", space-padded, for tools that read it.
 
@@ -28,8 +30,8 @@ and VERSION, not only the identity.
 Usage:
     rom_version.py stamp ROM VERSION DBG
         # write both fields; DBG (ff6-en.dbg) must place Ot6VersionText and
-        # SnesHeader where VERSION_FIELDS says, and the text must fit the
-        # Config screen's version tab (ConfigVersionWindow's inner width)
+        # SnesHeader where VERSION_FIELDS says, and "OT6 v<VERSION>" must fit
+        # OT6_VERSION_CELLS
     rom_version.py identity ROM      # the masked sha256
     rom_version.py read ROM          # the two fields, decoded
     rom_version.py copy-if-identity-changed SRC DST
@@ -56,6 +58,7 @@ HEADER_CHECKSUM = ("checksum", 0xFFDC, 4)
 VERSION_FIELDS = (VERSION_TEXT, HEADER_TITLE, HEADER_CHECKSUM)
 
 TEXT_PREFIX = "OT6 v"
+SPACE = 0xFF                            # the menu font's blank cell
 TITLE_PREFIX = "OT6 V"
 # the menu font's small-text table (ff6/tools/encode_menu_text.py's
 # SMALL_CHAR_TABLES_EN): the version text is drawn with DrawPosTextFar
@@ -73,6 +76,33 @@ def _codec():
                 enc.setdefault(v, code)
             dec.setdefault(code, values[0])
     return enc, dec
+
+
+def version_cells():
+    """OT6_VERSION_CELLS, from the include the asm assembles with; it must
+    leave the field one byte for its $00."""
+    inc = (ROOT / "ff6" / "include" / "ot6_version.inc").read_text()
+    m = re.search(r"^OT6_VERSION_CELLS\s*=\s*(\d+)", inc, re.M)
+    if not m:
+        raise ValueError("ff6/include/ot6_version.inc defines no OT6_VERSION_CELLS")
+    cells = int(m.group(1))
+    if cells + 1 != VERSION_TEXT[2]:
+        raise ValueError(f"OT6_VERSION_CELLS is {cells}; Ot6VersionText holds "
+                         f"{VERSION_TEXT[2]} bytes, so it must be {VERSION_TEXT[2] - 1}")
+    return cells
+
+
+def field_bytes(version):
+    """Ot6VersionText's 16 bytes for `version`: the text centered in the
+    cells, space-padded, then $00."""
+    cells = version_cells()
+    text = menu_text(version)
+    if len(text) > cells:
+        raise ValueError(f"{(TEXT_PREFIX + version)!r} is {len(text)} characters; "
+                         f"the version displays are {cells} cells wide")
+    left = (cells - len(text)) // 2
+    body = bytes([SPACE] * left) + text + bytes([SPACE] * (cells - left - len(text)))
+    return body + b"\0"
 
 
 def menu_text(version):
@@ -132,8 +162,7 @@ def _dbg_symbols(dbg_text, names):
 
 def stamp(data, version, dbg_text):
     """The ROM bytes with both fields written for `version`."""
-    syms = _dbg_symbols(dbg_text, [VERSION_TEXT[0], HEADER_TITLE[0],
-                                   "ConfigVersionWindow"])
+    syms = _dbg_symbols(dbg_text, [VERSION_TEXT[0], HEADER_TITLE[0]])
     for name, off, _size in (VERSION_TEXT, HEADER_TITLE):
         if syms[name] & 0x3FFFFF != off:
             raise ValueError(f"{name} is at ${syms[name]:06X} in the .dbg; "
@@ -142,21 +171,20 @@ def stamp(data, version, dbg_text):
                              f"a layout move is a ROM change anyway)")
     if not version or version != version.strip():
         raise ValueError(f"VERSION {version!r} is empty or padded")
+    end = max(off + size for _name, off, size in VERSION_FIELDS)
+    if len(data) < end:
+        raise ValueError(f"the ROM is {len(data)} bytes, too short for the "
+                         f"version fields (they end at ${end:06X})")
     out = bytearray(data)
-    text = menu_text(version)
-    # make_window: .addr position, .byte inner width, inner height
-    width = out[(syms["ConfigVersionWindow"] & 0x3FFFFF) + 2]
-    if len(text) > width:
-        raise ValueError(f"{(TEXT_PREFIX + version)!r} is {len(text)} "
-                         f"characters; the Config screen's version tab "
-                         f"(ConfigVersionWindow) is {width} wide")
     _, off, size = VERSION_TEXT
-    out[off:off + size] = text + bytes(size - len(text))
+    out[off:off + size] = field_bytes(version)
     title = header_title(version)
     _, off, size = HEADER_TITLE
     if len(title) > size:
         raise ValueError(f"header title {title!r} is longer than {size}")
     out[off:off + size] = title + b" " * (size - len(title))
+    if len(out) != len(data):
+        raise ValueError("stamping changed the ROM's length")
     return bytes(out)
 
 
@@ -166,7 +194,7 @@ def read(data):
     _, off, size = VERSION_TEXT
     raw = data[off:off + size]
     raw = raw[:raw.index(0)] if 0 in raw else raw
-    text = "".join(dec.get(b, f"{{${b:02x}}}") for b in raw)
+    text = "".join(dec.get(b, f"{{${b:02x}}}") for b in raw).strip(" ")
     _, off, size = HEADER_TITLE
     return text, data[off:off + size].decode("ascii", "replace").rstrip(" ")
 
@@ -194,6 +222,18 @@ def copy_if_identity_changed(src, dst):
         os.utime(dst, ns=(st.st_atime_ns, st.st_mtime_ns))
 
 
+def _fix_checksum(rom):
+    """ff6/tools/fix_checksum.py's checksum, as link_rom.sh writes it."""
+    sys.path.insert(0, str(ROOT / "ff6" / "tools"))
+    import fix_checksum
+    off = HEADER_CHECKSUM[1]
+    out = bytearray(rom)
+    out[off:off + 4] = (0xAAAA).to_bytes(2, "little") + (0x5555).to_bytes(2, "little")  # its dummy
+    s = fix_checksum.mirror_sum(out)
+    out[off:off + 4] = (s ^ 0xFFFF).to_bytes(2, "little") + s.to_bytes(2, "little")
+    return bytes(out)
+
+
 def selftest():
     import tempfile
     fails = []
@@ -206,28 +246,36 @@ def selftest():
     dbg = ('sym\tid=1,name="Ot6VersionText",addrsize=absolute,scope=0,'
            'def=1,val=0xC0FFA0,seg=1,type=lab\n'
            'sym\tid=2,name="SnesHeader",addrsize=absolute,scope=0,'
-           'def=2,val=0xC0FFC0,seg=2,type=lab\n'
-           'sym\tid=3,name="ConfigVersionWindow",addrsize=absolute,scope=0,'
-           'def=3,val=0xC30010,seg=3,type=lab\n')
-    rom = bytearray(b"\xa5" * 0x40000)
-    rom[0x30012] = 10                       # the tab's inner width
-    a = stamp(bytes(rom), "0.23", dbg)
-    b = stamp(bytes(rom), "0.24", dbg)
-    check("two versions stamp different bytes", a != b)
+           'def=2,val=0xC0FFC0,seg=2,type=lab\n')
+    rom = bytes(b"\xa5" * 0x40000)
+
+    def build(version):
+        """As link_rom.sh does: stamp, then the checksum over the result."""
+        return _fix_checksum(stamp(rom, version, dbg))
+
+    a, b = build("0.23"), build("0.24")
+    check("two versions build different bytes", a != b)
+    check("...in the checksum too (so the mask must cover it)",
+          a[0xFFDC:0xFFE0] != b[0xFFDC:0xFFE0])
     check("...with the same identity", identity(a) == identity(b))
     check("read decodes the menu text and title",
           read(a) == ("OT6 v0.23", "OT6 V0.23"))
-    check("the menu text is menu-font bytes, $00-padded",
-          a[0xFFA0:0xFFB0] == bytes([0x8E, 0x93, 0xBA, 0xFF, 0xAF, 0xB4, 0xC5,
-                                     0xB6, 0xB7]) + bytes(7))
+    check("the field is the text centered in 15 cells, space-padded, then $00",
+          a[0xFFA0:0xFFB0] == bytes([0xFF] * 3 + [0x8E, 0x93, 0xBA, 0xFF, 0xAF,
+                                     0xB4, 0xC5, 0xB6, 0xB7] + [0xFF] * 3 + [0]))
     check("the title is space-padded ASCII",
           a[0xFFC0:0xFFD5] == b"OT6 V0.23" + b" " * 12)
+    for v, text in (("0.24-rc1", "OT6 v0.24-rc1"), ("0.24.1", "OT6 v0.24.1"),
+                    ("0.24-rc10", "OT6 v0.24-rc10"), ("10.24-rc10", "OT6 v10.24-rc10")):
+        c = build(v)
+        check(f"VERSION {v!r} builds: {read(c)[0]!r}, same identity",
+              read(c)[0] == text and identity(c) == identity(a))
     outside = [0xFF9F, 0xFFB0, 0xFFD5, 0xFFDB, 0xFFE0, 0x0000, 0x3FFFF]
     for off in outside:
         m = bytearray(a)
         m[off] ^= 0x01
         check(f"a flip at ${off:06X} (outside the fields) moves the identity",
-              identity(bytes(m)) != identity(a))
+              identity(_fix_checksum(bytes(m))) != identity(a))
     for name, off, size in VERSION_FIELDS:
         m = bytearray(a)
         m[off + size - 1] ^= 0x01
@@ -235,18 +283,23 @@ def selftest():
               identity(bytes(m)) == identity(a))
     check("a short file's identity is its plain sha256",
           identity(b"rom v1\n") == hashlib.sha256(b"rom v1\n").hexdigest())
-    for bad, why in (("0.123456", "wider than the tab"), ("", "empty"),
+    for bad, why in (("0.24-rc1000", "wider than 15 cells"), ("", "empty"),
                      (" 0.23", "padded"), ("0.2@", "no glyph")):
         try:
-            stamp(bytes(rom), bad, dbg)
+            stamp(rom, bad, dbg)
             check(f"VERSION {bad!r} refused ({why})", False)
         except ValueError:
             check(f"VERSION {bad!r} refused ({why})", True)
     try:
-        stamp(bytes(rom), "0.23", dbg.replace("0xC0FFA0", "0xC0FF90"))
+        stamp(rom, "0.23", dbg.replace("0xC0FFA0", "0xC0FF90"))
         check("a moved Ot6VersionText refused", False)
     except ValueError:
         check("a moved Ot6VersionText refused", True)
+    try:
+        stamp(rom[:0xFFD0], "0.23", dbg)
+        check("a ROM too short for the fields refused, not grown", False)
+    except ValueError:
+        check("a ROM too short for the fields refused, not grown", True)
     with tempfile.TemporaryDirectory() as d:
         src, dst = os.path.join(d, "src.sfc"), os.path.join(d, "dst.sfc")
         Path(src).write_bytes(a)
@@ -259,11 +312,11 @@ def selftest():
         check("...and keeps its mtime", os.stat(dst).st_mtime_ns == 1_000_000_000)
         m = bytearray(b)
         m[0x1234] ^= 1
-        Path(src).write_bytes(bytes(m))
+        Path(src).write_bytes(_fix_checksum(bytes(m)))
         copy_if_identity_changed(src, dst)
         check("any other change: the copy's mtime moves",
               os.stat(dst).st_mtime_ns != 1_000_000_000
-              and Path(dst).read_bytes() == bytes(m))
+              and Path(dst).read_bytes() == _fix_checksum(bytes(m)))
     print(f"rom_version selftest: {'FAIL' if fails else 'ok'}"
           f" ({len(fails)} failure(s))")
     return 1 if fails else 0

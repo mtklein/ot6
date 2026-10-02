@@ -95,7 +95,7 @@ DrawConfigMenu:
         ldy     #near ConfigMainWindow
         jsr     DrawWindow
         ldy     #near ConfigLabelWindow
-        jsr     Ot6DrawConfigWindows    ; ot6: DrawWindow, then the version tab
+        jsr     DrawWindow
         jsr     TfrBG2ScreenAB
         jsr     LoadColorBarPal
         jsr     ClearBG1ScreenA
@@ -105,7 +105,7 @@ DrawConfigMenu:
         lda     #BG3_TEXT_COLOR::TEAL
         sta     zTextColor
         ldy     #near ConfigTitleText
-        jsr     Ot6DrawConfigTitle      ; ot6: DrawPosKana, then the version
+        jsr     DrawPosKana
         lda     #BG1_TEXT_COLOR::TEAL
         sta     zTextColor
         ldx     #near ConfigLabelTextList2

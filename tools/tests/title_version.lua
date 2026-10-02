@@ -6,7 +6,8 @@
 -- The ROM carries the text in Ot6VersionText (c0/ffa0, field/header.asm),
 -- stamped after the link from the repo's VERSION by tools/build/rom_version.py;
 -- cutscene/ot6_version.asm draws it on BG1's right screen (the screen the
--- splash shows), row 17, centered, in BG1 tiles $310 up, recoloured from the
+-- splash shows), row 17: all 15 cells of the field (the text centered and
+-- blank-padded), columns 8-22, in BG1 tiles $310-$31e, recoloured from the
 -- menu font (SmallFontGfx) into the logo's palette 1.  The expectation comes
 -- from the tree's VERSION (compose.py injects OT6_VERSION), so a ROM stamped
 -- with another version fails: the negative control boots one with OT6_ROM.
@@ -14,9 +15,9 @@
 -- Power-on, no input.  On the splash, once its fade-in is complete, the text
 -- is read off the screen two ways:
 --   1. VRAM: the BG1 tilemap the PPU fetches (base and scroll from the PPU
---      state) holds one cell per character, centered, the rest of the row
---      the splash's fill; and each cell's 4bpp tile, read back through the
---      colour mapping, is the expected character's SmallFontGfx glyph.
+--      state) holds the 15 cells, the rest of the row the splash's fill;
+--      and each cell's 4bpp tile, read back through the colour mapping, is
+--      the expected cell's SmallFontGfx glyph (a blank cell's is blank).
 --   2. The frame: every pixel of those cells is its glyph's colour from the
 --      live palette; the frame's row offset is calibrated on the logo's
 --      cells (vanilla) first.  A screenshot is the evidence.
@@ -25,7 +26,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local VR = emu.memType.snesVideoRam
-local ROW, MAX = 17, 10
+local ROW, CELLS = 17, 15               -- OT6_SPLASH_ROW, OT6_VERSION_CELLS
 local TILE = 0x310                      -- OT6_SPLASH_TILE
 local FILL = 0x0777                     -- OT6_SPLASH_FILL (_7e7a4c)
 local PAL = 1                           -- the logo's palette
@@ -47,10 +48,14 @@ end
 H.assertEq(type(OT6_VERSION), "string",
   "compose.py injects the tree's VERSION as OT6_VERSION")
 local EXPECT = "OT6 v" .. OT6_VERSION
+H.assertEq(#EXPECT <= CELLS, true, string.format("%q fits %d cells", EXPECT, CELLS))
+-- the 15 cells: the text centered, blank-padded (rom_version.py field_bytes)
+local PAD = (CELLS - #EXPECT) // 2
+local SHOWN = string.rep(" ", PAD) .. EXPECT
+SHOWN = SHOWN .. string.rep(" ", CELLS - #SHOWN)
 local WANT = {}
-for i = 1, #EXPECT do WANT[i] = code(EXPECT:sub(i, i)) end
-H.assertEq(#WANT <= MAX, true, string.format("%q fits the splash's %d cells", EXPECT, MAX))
-local X0 = (32 - #WANT) // 2            -- Ot6SplashMapAddr: (32 - n) / 2
+for i = 1, CELLS do WANT[i] = code(SHOWN:sub(i, i)) end
+local X0 = (32 - CELLS) // 2            -- OT6_SPLASH_X: columns 8-22
 local FONT = H.sym("SmallFontGfx") & 0x3FFFFF
 
 local function bg1()
@@ -136,10 +141,10 @@ H.run({ maxFrames = 3000 }, {
     for x = 0, 31 do
       local w = cellWord(b, x, ROW)
       local i = x - X0 + 1
-      if i >= 1 and i <= #WANT then
+      if i >= 1 and i <= CELLS then
         check(w == (PAL << 10) | (TILE + i - 1), string.format(
-          "BG1 cell {%d,%d} is $%04X, want $%04X: %q's character %d, palette 1, tile $%03X",
-          x, ROW, w, (PAL << 10) | (TILE + i - 1), EXPECT, i, TILE + i - 1))
+          "BG1 cell {%d,%d} is $%04X, want $%04X: cell %d, palette 1, tile $%03X",
+          x, ROW, w, (PAL << 10) | (TILE + i - 1), i, TILE + i - 1))
       else
         check(w == FILL, string.format(
           "BG1 cell {%d,%d}, outside the text, is $%04X, want the splash's fill $%04X",
@@ -147,7 +152,7 @@ H.run({ maxFrames = 3000 }, {
       end
     end
     -- ...and each cell's tile is the expected glyph, through the colour mapping
-    for i = 1, #WANT do
+    for i = 1, CELLS do
       local t, bad = TILE + i - 1, nil
       for py = 0, 7 do
         for px = 0, 7 do
@@ -157,11 +162,11 @@ H.run({ maxFrames = 3000 }, {
           end
         end
       end
-      check(bad == nil, string.format("tile $%03X is %q's character %d (%q) in SmallFontGfx%s",
-        t, EXPECT, i, EXPECT:sub(i, i), bad and (": " .. bad) or ""))
+      check(bad == nil, string.format("tile $%03X is cell %d of %q (%q) in SmallFontGfx%s",
+        t, i, SHOWN, SHOWN:sub(i, i), bad and (": " .. bad) or ""))
     end
     H.log(string.format("splash: BG1 VRAM row %d, cells %d-%d, tiles $%03X-$%03X checked against %q",
-      ROW, X0, X0 + #WANT - 1, TILE, TILE + #WANT - 1, EXPECT))
+      ROW, X0, X0 + CELLS - 1, TILE, TILE + CELLS - 1, SHOWN))
 
     -- 2. the frame, calibrated on the logo
     local width = emu.getScreenSize().width
@@ -199,10 +204,10 @@ H.run({ maxFrames = 3000 }, {
       end
       return true
     end
-    for i = 1, #WANT do
+    for i = 1, CELLS do
       local ok, why = glyphShows(X0 + i - 1, WANT[i], offs[1])
-      check(ok, string.format("the frame shows %q's character %d (%q) at cell {%d,%d}%s",
-        EXPECT, i, EXPECT:sub(i, i), X0 + i - 1, ROW, why and (": " .. why) or ""))
+      check(ok, string.format("the frame shows %q's cell %d (%q) at {%d,%d}%s",
+        SHOWN, i, SHOWN:sub(i, i), X0 + i - 1, ROW, why and (": " .. why) or ""))
     end
     H.assertEq(#fails, 0, string.format("splash: %d check(s) failed (first: %s)",
       #fails, fails[1] or "-"))
@@ -219,7 +224,7 @@ H.run({ maxFrames = 3000 }, {
       H.assertEq(vw(b.map + 0x400 + ROW * 32 + x), FILL, string.format(
         "after the splash, BG1's right-screen cell {%d,%d} is the fill again", x, ROW))
     end
-    for i = 0, MAX * 16 - 1 do
+    for i = 0, CELLS * 16 - 1 do
       H.assertEq(vw(b.chr + TILE * 16 + i), 0, string.format(
         "after the splash, BG1 tile word $%04X is zero again", b.chr + TILE * 16 + i))
     end
