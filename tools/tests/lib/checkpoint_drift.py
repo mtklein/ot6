@@ -315,7 +315,7 @@ def main(argv: list[str]) -> int:
     if not keys:
         print(__doc__.strip().split("\n\n")[4], file=sys.stderr)
         return 2
-    bad = 0
+    bad = refused = 0
     for key in keys:
         try:
             if do_recut:
@@ -325,6 +325,7 @@ def main(argv: list[str]) -> int:
         except sc.CheckpointError as exc:
             print(f"checkpoint drift {key}: cannot compare -- {exc}")
             bad += 1
+            refused += do_recut
             continue
         if why:
             bad += 1
@@ -347,6 +348,10 @@ def main(argv: list[str]) -> int:
               f"before releasing:\n"
               f"  python3 tools/tests/lib/checkpoint_drift.py --recut "
               + " ".join(keys))
+        return 1
+    if refused:
+        print(f"checkpoint drift: {refused} of {len(keys)} re-cut(s) refused; "
+              f"the tracked checkpoint(s) named above are unchanged")
         return 1
     return 0
 
@@ -450,6 +455,8 @@ def selftest() -> int:
           str(rec["wor-falcon-v1"]).endswith("build/states/chain_wor_falcon.stamp"))
     check("a checkpoint no chain run saves has no record",
           producer_stamp("negative-stale-check-v1") is None)
+    check("--recut exits non-zero when it refuses (no capture to copy)",
+          main(["--recut", "selftest-no-such-v1"]) == 1)
     print("checkpoint_drift selftest:", "ok" if ok else "FAILED")
     return 0 if ok else 1
 

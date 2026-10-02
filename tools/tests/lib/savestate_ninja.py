@@ -1148,8 +1148,10 @@ def selftest():
               sum(1 for l in lines
                   if l.startswith("build build/checkpoints/k2-v1/")) == 1)
         check("the cutter cut's copy Continues the captured save",
-              "generate build/checkpoints/k2-v1/manifest.json" in
-              edge("build/states/chain_q.mss.lua"))
+              "generate_capture build/checkpoints/k2-v1/manifest.json "
+              "build/checkpoints/k2-v1/k2.sram |" in
+              edge("build/states/chain_q.mss.lua")
+              and "OT6_SRAM_CHECKPOINT=build/checkpoints/k2-v1" in text)
         check("a saves= frontier's copy captures its save",
               "build/checkpoints/k4-v1/manifest.json" in
               edge("build/states/chain_r.mss.lua")
