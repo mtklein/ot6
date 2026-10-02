@@ -14,3 +14,6 @@ __pycache__/
 # session/agent state (worktrees can hold ROM copies; never commit)
 /.claude/*
 !/.claude/commands/
+# the Android release key lives in ~/.config/ot6, never here
+*.jks
+*.keystore
