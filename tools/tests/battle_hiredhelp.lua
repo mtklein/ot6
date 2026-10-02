@@ -71,20 +71,20 @@ end
 
 -- ---- the plays -------------------------------------------------------------
 -- Stages, a battle each (again in the next battle if it ends first), with
--- field care between: SETZER Defends twice and hires at 3 BP; Defends once
--- and hires at 2 BP; hires at 1 BP, then unboosted -- that last held to the
--- purse (checkHire) and every hire to the crew (H.hireCrewCheck): the merchant, soldier, Leo and the fourth hire
+-- field care between: SETZER hires at 1 BP, then unboosted -- held to the
+-- purse (checkHire); Defends twice and hires at 3 BP; Defends once and
+-- hires at 2 BP -- every hire held to the crew (H.hireCrewCheck): the merchant, soldier, Leo and the fourth hire
 -- (Shadow while he can be hired, the ghost when not, Interceptor while he
 -- fights in the party), whatever bodies the passes find.  The coin replay
 -- (checkHire) is held to the 1-and-0 stage only: a 2 or 3 BP hire can outlive its
 -- target, and the pass after a kill finds no body even when another stands
 -- (the pass-retarget defect, fixed on wt/pass-retarget, not here).
 local STAGES = {
+  { { row = HIRE, boost = 1 }, { row = HIRE, boost = 0 } },
   { { row = "defend" }, { row = "defend" }, { row = HIRE, boost = 3 } },
   { { row = "defend" }, { row = HIRE, boost = 2 } },
-  { { row = HIRE, boost = 1 }, { row = HIRE, boost = 0 } },
 }
-local PURSE_STAGE = 3   -- the stage held to the coin replay (checkHire)
+local PURSE_STAGE = 1   -- the stage held to the coin replay (checkHire)
 local function hires(stage)
   local t = {}
   for _, e in ipairs(stage) do if e.row == HIRE then t[#t + 1] = e end end
