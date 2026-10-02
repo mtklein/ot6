@@ -1058,6 +1058,12 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(H.healWatchStep(w, 619, 10), "full", "a rise to max HP is capped, not measured")
     H.assertEq(H.healWatchStep(w, 60, 10), "lower", "a drop moves the baseline")
     H.assertEq(H.healWatchStep(w, 75, 1001), "expired", "no rise inside the watch's ticks: it lapses")
+    -- a cure's watch carries its ROM band; a Potion's 250 above the cast's
+    -- most is not the cure (vector_entry at 15a54c03: "cure $2D restored 250
+    -- hp on entity 3 ... [the ROM's least: 202]")
+    local cw = { hp = 300, maxhp = 619, by = 2, until_ = 1000, lo = 202, hi = 230 }
+    H.assertEq(H.healWatchStep(cw, 550, 10), "outside", "a +250 rise outside the cure's 202..230 is another heal")
+    H.assertEq(H.healWatchStep(cw, 520, 10), "measured", "a +220 rise inside 202..230 is the cure")
     -- item 5 of f8f9ad66: a queued cure-hit that will not run is stale
     local q = { tick = 100 }
     H.assertEq(H.queuedHitStale(q, { hp = 0, tick = 110 }), "it fell", "a hitter who fell")
@@ -1070,8 +1076,8 @@ H.run({ maxFrames = 3000 }, {
     -- review of bcf5240f, item 5: an unmeasured cure priced from the ROM's
     -- formula, at variance's low end: power 10, magic power 40, level 20
     -- -> 40 + 40 x 10 x 20 / 32 = 290, x 224/256 + 1 = 254
-    H.assertEq(H.cureRestoreMin({ power = 10, heal = true, flags2 = 0x20, level = 20, magpow = 40 }), 254,
-      "a cure that ignores defense: 254 at least")
+    local lo, hi = H.cureRestoreMin({ power = 10, heal = true, flags2 = 0x20, level = 20, magpow = 40 })
+    H.assertEq(lo .. ".." .. hi, "254..289", "a cure that ignores defense: 254 at least, 289 at most (290 x 255/256 + 1)")
     H.assertEq(H.cureRestoreMin({ power = 10, heal = true, flags2 = 0x00, level = 20, magpow = 40, mdef = 51 }),
       ((254 * 204) >> 8) + 1, "...through 51 magic defense when it does not")
     H.assertEq(H.cureRestoreMin({ power = 10, heal = false, level = 20, magpow = 40 }), nil, "no heal flag: no price")

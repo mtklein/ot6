@@ -7571,8 +7571,8 @@ function Driver:button(actor)
        and self.castRestore[self.plan.spell] == nil then
       -- an all-ally cast is boosted and spread, so its per-head number
       -- would poison the single-cast ledger; it goes unmeasured
-      watch = { into = self.castRestore, id = self.plan.spell, what = "cure",
-                rom = (self:castRestoreOf(self.plan.spell, actor, self.plan.target)) }
+      local lo, _, hi = self:castRestoreOf(self.plan.spell, actor, self.plan.target)
+      watch = { into = self.castRestore, id = self.plan.spell, what = "cure", rom = lo, lo = lo, hi = hi }
     end
     if watch then
       watch.target, watch.by = self.plan.target, actor
@@ -8243,6 +8243,8 @@ end
 --               restored 77 hp on entity 2" off another member's Fenix Down
 --               raising the cure's target from 0; review of f8f9ad66, M4c)
 --   "full"      a rise to max HP: the number is capped, not measured
+--   "outside"   a cure's rise outside its ROM band (w.lo..w.hi): another
+--               heal; the baseline moves
 --   "measured"  a rise: the heal, whoever's command the frame shows.  The
 --               first M4c cut also required the healer's own command to be
 --               in ExecCmd, and the measured-heal lines fell 35 -> 28 in the
@@ -8259,6 +8261,11 @@ function M.healWatchStep(w, hp, tick)
   if hp == 0 or hp == 0xFFFF then return "fell" end
   if hp > w.hp then
     if hp >= w.maxhp then return "full" end
+    -- a cure's rise outside what the ROM lets it restore is somebody
+    -- else's heal: vector_entry at 15a54c03 measured "cure $2D restored
+    -- 250 hp on entity 3 ... [the ROM's least: 202]", a Potion's 250 above
+    -- the cast's most (230)
+    if w.lo ~= nil and w.hi ~= nil and (hp - w.hp < w.lo or hp - w.hp > w.hi) then return "outside" end
     return "measured"
   end
   if hp < w.hp then return "lower" end
@@ -8274,6 +8281,11 @@ function Driver:watchHeal()
     M.log(string.format("[%s] [heal-watch] %s $%02X on entity %d: %s", self.tag or "fight", w.what, w.id,
       w.target, step == "fell" and "the target fell first; not measured" or "a rise to max HP, capped; not measured"))
     self.healWatch = nil
+  elseif step == "outside" then
+    M.log(string.format("[%s] [heal-watch] entity %d rose %d -> %d (+%d): outside what the watched cure $%02X "
+      .. "restores (%d..%d); another heal, the baseline moves", self.tag or "fight", w.target, w.hp, hp,
+      hp - w.hp, w.id, w.lo, w.hi))
+    w.hp = hp
   elseif step == "measured" then
     local a = self:allyAct()
     w.into[w.id] = hp - w.hp
@@ -8750,14 +8762,18 @@ end
 function M.cureRestoreMin(o)
   local p = o.power or 0
   if p == 0 or not o.heal then return nil end
-  local d = p * 4 + (((o.magpow or 0) * p * (o.level or 1)) >> 5)
-  d = ((d * 224) >> 8) + 1
-  if ((o.flags2 or 0) & 0x20) == 0 then
-    local mdef = o.mdef or 0
-    d = mdef >= 255 and 1 or ((d * (255 - mdef)) >> 8) + 1
-    if o.shell then d = ((d * 170) >> 8) + 1 end
+  local base = p * 4 + (((o.magpow or 0) * p * (o.level or 1)) >> 5)
+  local function mod(v)
+    local d = ((base * v) >> 8) + 1
+    if ((o.flags2 or 0) & 0x20) == 0 then
+      local mdef = o.mdef or 0
+      d = mdef >= 255 and 1 or ((d * (255 - mdef)) >> 8) + 1
+      if o.shell then d = ((d * 170) >> 8) + 1 end
+    end
+    return math.min(9999, d)
   end
-  return math.min(9999, d)
+  -- the least (variance 224) and, second, the most (variance 255)
+  return mod(224), mod(255)
 end
 -- measured this battle, else the ROM's least; and which it was
 function Driver:castRestoreOf(spell, actor, target)
@@ -8765,11 +8781,11 @@ function Driver:castRestoreOf(spell, actor, target)
   if spell == nil or spell > 0xFF or actor == nil then return nil, "no spell" end
   local base = (M.sym("MagicProp") & 0x3FFFFF) + spell * 14
   local x, y = actor * 2, (target or actor) * 2
-  local v = M.cureRestoreMin({ power = M.readRomByte(base + 6), flags2 = M.readRomByte(base + 2),
+  local v, hi = M.cureRestoreMin({ power = M.readRomByte(base + 6), flags2 = M.readRomByte(base + 2),
     heal = (M.readRomByte(base + 4) & 0x01) ~= 0, level = M.readByte(0x3B18 + x),
     magpow = M.readByte(0x3B41 + x), mdef = M.readByte(0x3BB9 + y),
     shell = (M.readByte(BATTLE.ST3 + y) & 0x20) ~= 0 })
-  return v, v and "ROM-priced, not yet measured" or "no heal"
+  return v, v and "ROM-priced, not yet measured" or "no heal", hi
 end
 
 function Driver:allyAct()
