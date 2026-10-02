@@ -27986,11 +27986,9 @@ CmdAnim_03:
 ; [ attack command $18: gp rain ]
 
 CmdAnim_18:
-@bbed:  jsr     NullTargetAnim
-        bcc     @bbf6
-        lda     #$24
-        bra     _c1bbe1
-@bbf6:  rts
+@bbed:  jml     f:Ot6CoinAnim   ; ot6: same size; Hired Help's hires walk in
+        .res    6, $ea          ;   and strike, everything else is vanilla's
+                                ;   coins (ot6_setzer.asm, Ot6CoinAnim)
 
 ; ------------------------------------------------------------------------------
 

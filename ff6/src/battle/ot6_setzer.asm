@@ -534,6 +534,8 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         tya                     ; width-neutral
         cmp     #$08
         bcs     @monster
+        jsr     Ot6HireMark     ; a hire's pass: who comes ($b7), before the
+                                ;   no-body return, so every pass carries it
         lda     $b8             ; ChooseTarget's mask for this pass: none
         ora     $b9             ;   left standing (the passes before felled
         bne     @aimed          ;   them all) and the pass pays nothing
@@ -555,6 +557,13 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         lda     #OT6_COIN_RATE
         bra     @price
 @hire:  jsr     Ot6HireClass
+        lda     f:$7e0000+OT6_ATKCLASS  ; the sellsword's weapon fits it: the
+        cmp     #OT6_BLUDG              ;   class as two bits into $b7's cc
+        bne     :+                      ;   ($01/$02/$04 -> 1/2/3, none 0)
+        lda     #$03
+:       asl
+        asl
+        tsb     $b7
         lda     #OT6_HIRE_RATE
         bra     @price
 @monster:
@@ -625,6 +634,326 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 @sto:   sta     f:$7e0000+OT6_ATKCLASS
         plp
         plx
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ Hired Help's crew: who answers this pass ]
+;
+; The boost buys hires, and each hire is somebody new: the 0 BP hire is a
+; merchant, and every point brings the next, tougher figure (owner,
+; 2026-10-02: a growing crew, not the same guy again; the top one is Shadow,
+; FF6's mercenary for hire).  The pass's figure rides to the animation in
+; $b7, which CmdAnim_18 reads as the script's third byte and GP Rain's own
+; animation never did:
+;   %1fffccLF   1   a hire (with $b6 = the Hired Help row, Ot6CoinAnim's test)
+;               fff the figure: 0 merchant, 1 Imperial soldier, 2 General Leo,
+;                   3 Shadow, 4 Interceptor (the top hire while Shadow fights
+;                   in this party: he can't walk in from outside it, so his
+;                   dog takes the job)
+;               cc  the weapon's class (Ot6CoinPrice ors it in once the
+;                   target is known): 0 none, 1 slashing, 2 piercing,
+;                   3 bludgeoning
+;               L   the action's last pass (Setzer comes back after it)
+;               F   its first (Setzer steps out before it)
+; The pass is k = boost - $3a70: Ot6SetzerEffect adds the boost to the count
+; and the multi-attack loop counts it down after each pass, so the first
+; pass sees the boost and the last 0.  The pending boost is charged only at
+; Ot6ActionEnd, so it holds for every pass.
+; in: y = the attacker (a character), a8, either index width, db=$7e.
+; clobbers a; preserves x and y.
+.proc Ot6HireMark
+        .a8
+        lda     $3a7c           ; the queued command
+        cmp     #$0f
+        bne     @out
+        lda     f:$7e0000+OT6_SETZERROW
+        cmp     #OT6_SETZER_HIRE
+        bne     @out
+        lda     OT6_BOOST_REVEALED,y
+        and     #$03
+        sec
+        sbc     $3a70           ; k = boost - passes still to come
+        bcs     :+
+        lda     #$00            ; (more passes than the boost bought: the
+:       cmp     #$04            ;   first figure; never more than the fourth)
+        bcc     :+
+        lda     #$03
+:       pha                     ; [1,s] k
+        asl
+        asl
+        asl
+        asl
+        ora     #$80
+        sta     $b7             ; the figure, no class yet, no flags
+        pla
+        bne     :+
+        lda     #$01            ; F: the first pass
+        tsb     $b7
+:       lda     $3a70
+        bne     :+
+        lda     #$02            ; L: the last pass
+        tsb     $b7
+:       lda     $b7
+        and     #$70
+        cmp     #$30            ; the fourth hire, Shadow ...
+        bne     @out
+        jsr     Ot6ShadowFielded
+        bcc     @out
+        lda     $b7             ; ... fights in this party: Interceptor
+        and     #$8f
+        ora     #$40
+        sta     $b7
+@out:   rts
+.endproc
+
+; [ is Shadow in this battle's party? ]
+; Any of the four character slots holding actor 3, standing or not.  a8,
+; either index width.  out: carry set = yes.  clobbers a; preserves x and y.
+.proc Ot6ShadowFielded
+        .a8
+        phx
+        php
+        longi
+        .i16
+        ldx     #$0000
+@slot:  lda     $3ed8,x         ; the slot's actor ($ff empty)
+        cmp     #CHAR::SHADOW
+        beq     @yes
+        inx
+        inx
+        cpx     #$0008
+        bcc     @slot
+        plp
+        plx
+        clc
+        rts
+@yes:   plp
+        plx
+        sec
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ CmdAnim_18 in bank F0: GP Rain's coins, or Hired Help's crew ]
+;
+; Reached by jml from CmdAnim_18 (attack command $18's animation), whose
+; jsr (CmdAnimTbl,x) return address is still on the stack: it leaves by
+; jml to an rts in bank C1.  Not a hire (Coin Toss, the relic's GP Rain, a
+; monster's): vanilla's two lines, the error walk with no target, else
+; command animation $24, the coins.
+;
+; A hire (Ot6HireMark's $b7, third byte of the script; the row's id second):
+; the hire walks in from the right edge where Setzer walked out, strikes,
+; and walks off again.  The figure is drawn by Setzer's own sprite slot: the
+; battle graphics engine draws a character slot from that slot's graphics
+; buffer, and the ROM holds the merchant, soldier, Leo and Shadow as full
+; battle sprite sets (Locke's disguises, Leo's Thamasa fight, Shadow), so
+; the slot is reloaded with the figure while it stands off screen
+; (status_pat_tfr's own swap, the one Imp and Morph use: $2eae,x is the
+; graphics the slot should show) and put back after.  The strike is the
+; Fight command's animation (FightCmdAnim) with a weapon chosen by figure
+; and class (Ot6HireWeapTbl), the shape vanilla's Red Card desperation uses
+; (MagicCmdAnim's $f9 arm: the script bytes rewritten, FightCmdAnim run).
+; Interceptor's pass plays his counterattack's animation ($fc) from where
+; Setzer stands, off screen, so the dog bounds in.
+;
+; Each pass is its own animation command, so the walk-out belongs to the
+; first and the walk-back to the last (F and L in $b7); between passes the
+; slot waits off screen showing Setzer.  Nothing here draws a battle Rand
+; ($be): the animation is longer than the coins', which moves the frame
+; count and so the ATB fill during it, not the RNG.
+;
+; entry: a8/i16, db=$7e, ($76) the script command, ($78) its parameters.
+
+OT6_HIRE_WALK  = 16             ; frames a walk takes
+OT6_HIRE_STEP  = 6              ; pixels a frame (96: past the right edge)
+
+; the figures' battle graphics (CHAR_GFX)
+Ot6HireGfxTbl:
+        .byte   CHAR_GFX::MERCHANT, CHAR_GFX::SOLDIER, CHAR_GFX::LEO, CHAR_GFX::SHADOW
+
+; the weapon each figure swings, by class (none, slashing, piercing,
+; bludgeoning): the Fight animation's weapon number, item id + 1
+Ot6HireWeapTbl:
+        .byte   $00+1, $0b+1, $00+1, $34+1     ; merchant: dirk, regal cutlass, dirk, mithril rod
+        .byte   $0a+1, $0a+1, $1d+1, $46+1     ; soldier: mithrilblade, mithrilblade, mithril pike, morning star
+        .byte   $14+1, $14+1, $22+1, $46+1     ; Leo: crystal, crystal, gold lance, morning star
+        .byte   $26+1, $2b+1, $26+1, $44+1     ; Shadow: kodachi, ashura, kodachi, flail
+
+.proc Ot6CoinAnim
+        .a8
+        .i16
+        ldy     #$0002
+        lda     ($76),y         ; the attack byte: the Hired Help row?
+        cmp     #OT6_SETZER_HIRE
+        bne     @rain
+        lda     ($78)
+        bmi     @rain           ; a monster's GP Rain
+        iny
+        lda     ($76),y         ; Ot6HireMark's byte
+        bmi     @hire
+@rain:  jsr_c1  NullTargetAnim
+        bcc     @done
+        lda     #$24            ; command animation $24: the coins
+        jml     f:_c1bbe1
+@done:  jml     f:GfxCmd_00     ; an rts in bank C1
+
+@hire:  pha                     ; [1,s] the mark
+        ldy     #$0001
+        lda     ($78),y         ; the attacker's slot
+        and     #$03
+        longa
+        and     #$0003
+        asl
+        asl
+        asl
+        asl
+        asl
+        tax                     ; X = the slot's wCharGfxData offset
+        shorta0
+        lda     $01,s
+        lsr
+        bcc     :+              ; not the first pass: Setzer is already out
+        lda     #$03            ; walking right: Setzer steps out
+        ldy     #OT6_HIRE_STEP
+        jsr     Ot6HireWalk
+:       lda     $01,s
+        and     #$70
+        cmp     #$40
+        beq     @dog
+        lsr
+        lsr
+        lsr
+        lsr
+        phx
+        tax
+        lda     f:Ot6HireGfxTbl,x
+        plx
+        jsr     Ot6HireSwap     ; the figure, off screen
+        pha                     ; [1,s] the slot's own graphics, [2,s] the mark
+        lda     #$02            ; walking left: the hire walks in
+        ldy     #.loword(-OT6_HIRE_STEP)
+        jsr     Ot6HireWalk
+        jsr_c1  CheckNullTarget ; carry clear: nobody left to strike
+        bcc     @out
+        ldy     #$0002
+        lda     ($76),y
+        pha                     ; [1,s] byte 2
+        iny
+        lda     ($76),y
+        pha                     ; [1,s] byte 3, [2,s] byte 2, [3,s] gfx, [4,s] mark
+        lda     $04,s
+        and     #$7c            ; fffcc00: figure x 4 + class, x 4
+        lsr
+        lsr
+        phx
+        tax
+        lda     f:Ot6HireWeapTbl,x
+        plx
+        sta     ($76),y         ; the weapon (byte 3)
+        dey
+        lda     #$00
+        sta     ($76),y         ; the right hand (byte 2)
+        phx
+        jsr_c1  FightCmdAnim    ; the strike
+        plx
+        ldy     #$0003
+        pla
+        sta     ($76),y
+        dey
+        pla
+        sta     ($76),y
+@out:   lda     #$03            ; walking right: the hire leaves
+        ldy     #OT6_HIRE_STEP
+        jsr     Ot6HireWalk
+        pla                     ; the slot's own graphics
+        jsr     Ot6HireSwap
+        bra     @back
+
+@dog:   lda     ($78)
+        pha                     ; [1,s] the flags, [2,s] the mark
+        ora     #$10            ; no pre-magic swirl
+        sta     ($78)
+        ldy     #$0002
+        lda     ($76),y
+        pha                     ; [1,s] byte 2
+        lda     #$fc            ; Interceptor's counterattack
+        sta     ($76),y
+        phx
+        jsr_c1  MagicCmdAnim
+        plx
+        ldy     #$0002
+        pla
+        sta     ($76),y
+        pla
+        sta     ($78)
+
+@back:  pla                     ; the mark
+        and     #$02
+        beq     :+              ; not the last pass: Setzer stays out
+        lda     #$02            ; walking left: Setzer comes back
+        ldy     #.loword(-OT6_HIRE_STEP)
+        jsr     Ot6HireWalk
+:       jml     f:GfxCmd_00
+.endproc
+
+; [ walk a character slot sideways for OT6_HIRE_WALK frames ]
+; A = the walking action (wCharGfxData secondary action: 2 left, 3 right),
+; Y = pixels a frame (signed), X = the slot's wCharGfxData offset.  a8/i16,
+; db=$7e.  preserves x and y.
+.proc Ot6HireWalk
+        .a8
+        .i16
+        sta     $61c0,x         ; secondary graphical action
+        lda     #OT6_HIRE_WALK
+@frame: pha
+        longa
+        tya
+        clc
+        adc     $61d4,x         ; the slot's x offset
+        sta     $61d4,x
+        shorta0
+        jsl     WaitFrame_far
+        pla
+        dec
+        bne     @frame
+        stz     $61c0,x
+        rts
+.endproc
+
+; [ show other graphics in a character slot ]
+; A = the graphics index (CHAR_GFX), X = the slot's wCharGfxData offset (the
+; slot's $2eae block shares it).  Writes it as the slot's graphics and lets
+; status_pat_tfr load it (graphics and palette, as Imp's swap does).
+; out: A = the graphics the slot had.  a8/i16, db=$7e.  preserves x and y.
+.proc Ot6HireSwap
+        .a8
+        .i16
+        phy
+        xba
+        lda     $2eae,x         ; the slot's graphics
+        xba
+        sta     $2eae,x
+        xba
+        pha                     ; [1,s] the old graphics
+        phx
+        longa
+        txa
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        shorta
+        sta     $7b78           ; w7e7b78: status_pat_tfr's slot
+        shorta0                 ; (it indexes with tay/tax: B = 0)
+        jsl     _c12f75         ; status_pat_tfr_long
+        plx
+        pla
+        ply
         rts
 .endproc
 
