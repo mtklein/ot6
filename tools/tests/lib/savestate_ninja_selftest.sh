@@ -192,6 +192,33 @@ grep -q "^lib tools/tests/lib/ot6.lua " "$TMP/build/states/b.stamp" &&
   echo "  pass stamp records the lib halves it was generated with" ||
   { echo "  FAIL stamp has no lib provenance lines"; ok=0; }
 
+# 6a. a seed source regenerated to the SAME bytes under newer lib halves (a
+#     clean qualification after a lib edit): its halves are rewritten with
+#     identical bytes and its stamp's provenance lines (sig, lib, ancestor
+#     hash, emulator) move, its binding lines (rom, generator, artifact) do
+#     not.  The seed keeps its copy and nothing behind it replays (v0.24:
+#     the gate replayed the chain from power-on after qual1).  A moved
+#     binding line still refreshes the seed's stamp and replays behind it.
+sleep 1
+dstamp=$(cat "$TMP/build/states/d.stamp")
+sed 's/^lib tools\/tests\/lib\/ot6.lua .*/lib tools\/tests\/lib\/ot6.lua 0000000000000000000000000000000000000000000000000000000000000001/' \
+  "$TMP/build/states/b.stamp" > "$TMP/b.stamp.new" &&
+  mv "$TMP/b.stamp.new" "$TMP/build/states/b.stamp"
+for x in mss mss.lua; do cp "$TMP/build/states/b.$x" "$TMP/b.$x.copy" &&
+  mv "$TMP/b.$x.copy" "$TMP/build/states/b.$x"; done
+run
+check "a provenance-only change to the seed's source replays nothing" "" "$ran"
+check "...and leaves the seed's stamp as it was" "$dstamp" "$(cat "$TMP/build/states/d.stamp")"
+sleep 1
+sed 's/^artifact .*/artifact 0000000000000000000000000000000000000000000000000000000000000002/' \
+  "$TMP/build/states/b.stamp" > "$TMP/b.stamp.new" &&
+  mv "$TMP/b.stamp.new" "$TMP/build/states/b.stamp"
+run
+check "a binding change to the seed's source replays behind the seed" "e " "$ran"
+cmp -s "$TMP/build/states/d.stamp" "$TMP/build/states/b.stamp" &&
+  echo "  pass ...and the seed's stamp is the source's again" ||
+  { echo "  FAIL seed stamp not refreshed after a binding change"; ok=0; }
+
 # 7. checkpoint payload and manifest edits re-run only the step that uses it.
 sleep 1
 edit tools/tests/checkpoints/toy-v1/toy.sram "sram v2"
