@@ -19,17 +19,21 @@
 --            fells the ally, and the second must stay on that ally (the
 --            Fight's backup target) or land nowhere, not spread to another
 --            (check H).  Each ally in turn until one falls to the first swing.
---   emptied: every monster's HP is set to 1, and one ally is Muddled ($3EE5
---            bit 5) with 3 BP pending and banked ($3E9D, $3E9C): it Fights
---            on its own, each swing felling a monster, the next going to
---            another (checks F, A, B, C), and the swings after the last
---            monster falls land on no party member (check G).  Each ally in
---            turn until one empties the monster side with a swing to spare
---            (a muddled actor may pick an ally first).
+--   emptied: every monster's HP is set to 1 and SETZER's bank to 3; he
+--            Fights his default target at 3 BP (2 BP the second candidate)
+--            through the real menu, and as the action starts (ExecCmd for
+--            him) he is Muddled ($3EE5 bit 5, the bit vanilla's Retarget
+--            reads to turn an attacker on its own party).  Each swing fells
+--            a monster and the next goes to another (checks F, A, B, C); the
+--            swings after the last falls land on no party member (check G).
+--            (Muddling him at the menu instead does not take: a status
+--            written there leaves the command window his, measured --
+--            build/attempts/wt/pass-retarget/side/.)
 -- The other members Defend throughout.  Every pass of every action is
 -- held to M.passCheck, whose checks name what they assert.
 -- A charmed actor is not exercised: nothing in this room charms, and
--- Charm's targeting is the same side flip Muddle's is.
+-- vanilla's Retarget turns on the party by the Muddle bit and by $3395
+-- (Charm) alike, the one branch check G holds shut.
 -- Negative controls: the mutant ROMs in build/attempts/wt/pass-retarget/
 -- (party: the pass spreads to the party side; emptied: the pass falls
 -- through to vanilla's Retarget) fail H and G.
@@ -46,6 +50,20 @@ local function note(event, kind, key0, what)
   H.log(string.format("[%s]   %s: %s", TAG, event, what))
 end
 local PW, judgedN = nil, 0
+-- the "emptied" case's Muddle, written as SETZER's action starts (ExecCmd,
+-- x = the actor) and only for the case that armed it
+local muddleAt = nil
+local function armMuddle()
+  local ec = H.sym("ExecCmd@battle_code")
+  emu.addMemoryCallback(function()
+    if muddleAt == nil then return end
+    local x = emu.getState()["cpu.x"] & 0xff
+    if x ~= muddleAt or H.readByte(0x3A7C) ~= 0x00 then return end
+    H.writeByte(0x3EE5 + x, H.readByte(0x3EE5 + x) | 0x20)
+    H.log(string.format("[%s] f%d SETZER's Fight starts: Muddled ($3EE5 = %02X)", TAG, H.frame, H.readByte(0x3EE5 + x)))
+    muddleAt = nil
+  end, emu.callbackType.exec, ec, ec)
+end
 local function judgeNew()
   while judgedN < #PW.acts do
     judgedN = judgedN + 1
@@ -88,7 +106,7 @@ local function play()
       H.assertEq(#S.allies >= 1, true, "an ally with a Fight row stands beside SETZER")
       S.cases = {}
       for _, e in ipairs(S.allies) do S.cases[#S.cases + 1] = { kind = "party", e = e } end
-      for _, e in ipairs(S.allies) do S.cases[#S.cases + 1] = { kind = "emptied", e = e } end
+      for _, b in ipairs({ 3, 2 }) do S.cases[#S.cases + 1] = { kind = "emptied", e = slotOf(SETZER), boost = b } end
       S.ci, S.phase = 1, "write"
       S.met = {}
     end
@@ -110,12 +128,12 @@ local function play()
         for s = 0, 5 do
           if (alive() >> s) & 1 == 1 then H.writeWord(0x3BFC + s * 2, 1) end
         end
-        H.writeByte(0x3EE5 + c.e * 2, H.readByte(0x3EE5 + c.e * 2) | 0x20)
         H.writeByte(0x3E9C + c.e * 2, 3)
-        H.writeByte(0x3E9D + c.e * 2, 3)
-        H.log(string.format("[%s] emptied, ally slot %d: every monster at 1 HP; the ally Muddled with 3 BP", TAG, c.e))
-        S.step = H.setzerBattle({ { row = "defend" }, { row = "defend" }, { row = "defend" }, { row = "defend" } },
-          { untilPlanDone = true })
+        muddleAt = c.e * 2
+        H.log(string.format("[%s] emptied: every monster at 1 HP, SETZER's bank 3; he Fights at %d BP, Muddled as it "
+          .. "starts", TAG, c.boost))
+        S.step = H.setzerBattle({ { row = "fight", cmd = 0x00, boost = c.boost }, { row = "defend" },
+          { row = "defend" } }, { untilPlanDone = true })
       end
       S.phase = "play"
     end
@@ -132,7 +150,8 @@ local function play()
       end
       if got == nil and r ~= "done" and H.battleLoadStarted() then return r end
       local met = #seen[c.kind] > S.before
-      H.log(string.format("[%s] %s, ally slot %d: %s", TAG, c.kind, c.e, got == nil and "the actor's Fight never "
+      muddleAt = nil
+      H.log(string.format("[%s] %s, slot %d: %s", TAG, c.kind, c.e, got == nil and "the actor's Fight never "
         .. "ran" or met and "the draw is met" or "no draw (the Fight went elsewhere or felled nothing)"))
       if met then S.met[c.kind] = true end
       -- next case: the first of the next kind once this kind is met
@@ -144,8 +163,8 @@ local function play()
       end
       H.assertEq(S.met.party == true, true, string.format("party: an ally felled by the first swing, the next held "
         .. "(tried %d allies)", #S.allies))
-      H.assertEq(S.met.emptied == true, true, string.format("emptied: a muddled boosted Fight emptied the monster "
-        .. "side with a swing to spare (tried %d allies)", #S.allies))
+      H.assertEq(S.met.emptied == true, true, "emptied: SETZER's muddled boosted Fight emptied the monster side "
+        .. "with a swing to spare (at 3 BP, then 2 BP)")
       done = true
       S.phase = "fight"
       if not H.battleLoadStarted() then return "done" end
@@ -165,6 +184,7 @@ H.run({ maxFrames = 800000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
   H.call(function()
     PW = H.passWatch()
+    armMuddle()
     W = H.setzerCrowdBudget(H.fieldEncounterGroup(H.mapId() & 0x1ff), TAG)
   end),
   H.driveUntil(function() return done end, 760000, {
