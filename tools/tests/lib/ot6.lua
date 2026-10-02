@@ -8369,6 +8369,8 @@ function M.hireCrewCheck(r, tag)
     M.assertEq(p.mark & 2 ~= 0, k == #passes, string.format("%s pass %d: SETZER comes back after the last only", tag, k))
     if fig == 4 then
       M.assertEq(a, nil, string.format("%s pass %d: Interceptor's pass walks nobody in", tag, k))
+      M.assertEq(p.dogEntered == true, true, string.format("%s pass %d: Interceptor's counterattack ($FC) is asked for",
+        tag, k))
     else
       M.assertEq(a ~= nil, true, string.format("%s pass %d: the %s walked in", tag, k, NAME[fig]))
       M.assertEq(a.gfx, M.HIRE_FIG_GFX[fig], string.format("%s pass %d: the slot shows the %s", tag, k, NAME[fig]))
