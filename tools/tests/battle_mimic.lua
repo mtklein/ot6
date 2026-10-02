@@ -682,7 +682,7 @@ local steps = {
           end
         end),
         H.cond(function() return measured end, {}, {
-          H.fleeBattle(9000),
+          H.fleeBattle(9000, { onCantRun = "fight" }),
           H.waitUntil(function() return H.worldMode() and H.worldHasControl() end, 1200,
             "back on the world map after running from draw " .. try, 10),
           H.waitFrames(30),
