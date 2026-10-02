@@ -46,7 +46,7 @@ local function worldGrind(txIn, tyIn, what)
   local W = H.newWalkFighter(what or "worldGrind")
   return H.driveUntil(function()
     local tx, ty = rz(txIn), rz(tyIn)
-    return (not H.worldMode()) or (H.worldX() == tx and H.worldY() == ty
+    return H.offWorld() or (H.worldX() == tx and H.worldY() == ty
       and H.worldHasControl() and H.worldAligned())
   end, 30000, {
     H.call(function()

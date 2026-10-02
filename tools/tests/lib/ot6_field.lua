@@ -977,6 +977,17 @@ end
 -- On the world map iff (word $1F64 & $3FF) < 3.  Raw compares are wrong
 -- there, because entrance/parent records carry flag bits in the high byte.
 function M.worldMode() return (M.readWord(0x1f64) & 0x3FF) < 3 end
+-- Off the world map for a field map, as a trigger or a door takes the
+-- party -- not into map 3, the Tent's interior, which the field care's
+-- world-map Tent visits and returns from on the same tile ("[tiles] map=3
+-- n=1 xy=8:8" between "plan: pitch a Tent" and "pitched a Tent").  A
+-- walker that ends on "left the world" read the Tent as an arrival: the
+-- policy chain's vector_entry stopped its walk at (125,187) mid-Tent and
+-- failed "trigger approach x: got 125, want 124".
+M.TENT_MAP = 3
+function M.offWorld()
+  return not M.worldMode() and (M.readWord(0x1f64) & 0x1FF) ~= M.TENT_MAP
+end
 -- which world: 0=WoB 1=WoR 2=Serpent Trench
 function M.worldId() return M.readWord(0x1f64) & 0xFF end
 
