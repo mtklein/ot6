@@ -136,9 +136,9 @@ end
 --   jackpot, 6: a face of 3+ is 4 of 6; met in 8 of 8 crowds tried in round
 --     3 and 8 of 9 in round 2, so a miss within six is about (1/9)^6, under
 --     0.001%;
---   resplit, 10: met in 8 of 16 crowds tried in round 3 (8 of 14 in round
---     2, 6 of 12 by key with the blind aim); at that rate a miss within ten
---     is about 0.5^10 = 0.1%.
+--   resplit, 10: met in 8 of 17 crowds tried in round 3 (8 of 14 in round
+--     2, 6 of 12 by key with the blind aim); at round 3's rate a miss within
+--     ten is about (9/17)^10 = 0.2%.
 local function aim(e, how)
   if how == nil then return e end
   return aimed(e, how == "strong")
