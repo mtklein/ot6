@@ -2093,6 +2093,31 @@ flight taken out, `assertEq failed: (25,160): on foot ($11FA): got 1, want
 - **The tombstone puzzle** (299 (12,39)) was not done.
 - The Dullahan care-model and the auto-Shell relic notes above (13.6).
 
+### 13.10 The care policy pass (wt/care-policy, #312 #348 #351)
+
+The two 13.6 notes and the Egg are the driver's now.  The round price
+charges one enemy's second action in a window at its typical action (every
+action it has taken, a miss or a buff a zero) rather than its worst again
+(`a round costs 266 (2 enemy action(s) inside 202 ticks: s0 2x (200 worst +
+1x66 typical)`), a heal on an endangered ally is taken only when it lifts
+them clear of the round, the relic rule ranks a Shell/Safe ward for a
+fight whose damage is magic (`H.FIGHT_THREATS.dullahan`), and the Exp. Egg
+goes to whoever is behind on levels where it displaces nothing
+threat-critical.  The leg arms for Dullahan before the grave (`[relics for
+Dullahan] Czarina Ring $C1 goes to CELES's slot 5 (over Ribbon $CA)`,
+`Exp. Egg $E4 goes to SETZER's slot 5 (over Star Pendant $B1)`) and goes
+back to the arc's relics after him (the Ribbon to CELES).  Measured from the
+generator's own grave snapshots, base generator and driver against this
+branch's, by distinct fight (snapshot + key), every fight won in every arm
+(`build/attempts/wt/care-policy/dull/`): over K = 0..3 x 8 waits, Potions
+37 -> 9 with the base kit (deaths 2 -> 1, one fight both) and 59 -> 11 with
+the armed kit (deaths 0 -> 2, one fight: `[death] f+3488 entity 1 char 5
+from 781/1710 by slot 0 cmd $2E atk $01`, a Pearl he had not yet seen on
+him); over K = 0 x 64 waits (15 fights a kit), Potions 23 -> 5 (base kit,
+deaths 2 -> 1) and 14 -> 4 (armed kit, deaths 0 -> 0).  The two kits'
+snapshots draw disjoint keys, so the relics' own effect is not separated
+from the draw here.
+
 ## 14. What the owner may want to decide
 
 - **The draft rows** (section 8): decided, approved as written (owner,
