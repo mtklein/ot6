@@ -54,6 +54,52 @@
 -- hands FixDrainDmg, damage numerals, and the stand-in's MP and BP at the
 -- Mimic confirm and after Ot6ActionEnd.
 
+-- The draw (#354 re-cut).  Every formation this plain deals by Thamasa holds
+-- a Baskervor ($01D), whose retaliation is `if_num_monsters 1 / if_hit /
+-- attack SNEEZE, NOTHING, NOTHING`: once one monster or fewer stands, a hit
+-- on it may answer with Sneeze ($CB), which takes a party member out of the
+-- fight ($3A39).  A source sneezed out between an x-magic's two spells never
+-- casts the second, and a stand-in sneezed out before its Mimic never
+-- copies, so the case cannot finish.  The v0.24 re-cut dealt the lone
+-- Baskervor (formation $0A0): its first x-magic case sneezed TERRA out after
+-- her Fire and waited 12000 frames for her Drain
+-- (build/attempts/wt/mimic-v024/).
+--
+-- So the source aims every single-target pick at the sturdiest body (the
+-- most HP standing; sturdiest, below), and the copy follows it.  Before the
+-- copy resolves, the only body the cases can kill is that one: every
+-- single-target hit lands on it, an all-target source cast is one unboosted
+-- cast on bodies at full HP, and an all-target copy is the stand-in's last
+-- action, whose counters come after it.  Each encounter is then read off
+-- the ROM -- the species' AI scripts (M.partRoles' lastStand / lastStandN),
+-- whether a holder's own death ends its script (`if_self_dead / end_if`
+-- first in its retaliation), and the species' max HP -- and it is run from,
+-- as a player keeping a party together would, when a Sneeze counter is
+-- armed at the opening (N or fewer standing) or once the aimed body falls
+-- (another holder left with N or fewer, or the aimed holder's own killing
+-- blow when its death does not end its script); with a tie for the most HP
+-- every tied body counts as aimed.  On this plain that runs from the lone
+-- Baskervor (160) and the pair (191: either one's death leaves the other
+-- alone) and measures 162, whose aimed Baskervor dies quietly and leaves
+-- only the Cephaler.  The budget is the most encounters any
+-- encounter-counter state needs to deal a measurable slot of the pool
+-- CheckBattleWorld rolled (H.worstCaseEncounters; 19 for group 24 on the
+-- v0.24 ROM).  A case that loses a member it still needs anyway (a KO, a
+-- kill this reading did not foresee) fails at once, naming it, instead of
+-- timing out.
+--
+-- Levers, for evidence only (the suite runs BURN 0, MUTANT nil): BURN runs
+-- from that many encounters first, whatever they are, to vary the encounter
+-- history (TESTING.md: the draw moves with encounters used up, not seeds);
+-- MUTANT "take-any" measures the first draw after BURN with no Sneeze check
+-- (the old behavior), "opening-only" checks only the opening (the first
+-- fix, which measured 191), "refuse-all" calls every formation armed,
+-- "budget-1" allows one draw, "other-group" decodes the budget for a
+-- group the walk does not roll, "default-target" confirms the source's
+-- target where the cursor opens (the old aim), "fell" reads every needed
+-- member as KO'd (guard's fell branch).
+local BURN, MUTANT = 0, nil
+
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -110,6 +156,95 @@ local function members()
 end
 local function recCmd(c, r) return 0x1600 + 37 * c + 0x16 + r end
 
+-- ---- the draw: Sneeze counters (see the header) -----------------------------
+local MAXDRAWS = 24          -- draws built after BURN; the budget must fit
+local worldGroup = nil       -- the group the last CheckBattleWorld rolled
+local battleKey = nil        -- the last battle's key (H.firstBattleKey)
+local function aiByte(species)
+  local ptrs, base = H.sym("AIScriptPtrs") & 0x3FFFFF, H.sym("AIScript") & 0x3FFFFF
+  local off = H.readRomWord(ptrs + species * 2)
+  return function(i) return H.readRomByte(base + off + i) end
+end
+-- N of a species' `if_num_monsters N` retaliation that throws Sneeze, or nil
+local function sneezeN(species)
+  if species >= 0x180 then return nil end
+  local r = H.partRoles(aiByte(species), 0)
+  for _, a in ipairs(r.lastStand) do
+    if a == H.SNEEZE then return r.lastStandN or 1 end
+  end
+end
+-- its retaliation opens `if_self_dead / end_if` (FC 12 00 00 FE): its
+-- death ends the script (AICmd_fe), so its killing blow throws nothing
+local function quietDeath(species)
+  local at, i = aiByte(species), 0
+  while at(i) ~= 0xFF and i < H.AI_SCRIPT_MAX do i = i + (H.AI_OP_LEN[at(i)] or 1) end
+  return at(i + 1) == 0xFC and at(i + 2) == 0x12 and at(i + 3) == 0 and at(i + 4) == 0
+     and at(i + 5) == 0xFE
+end
+-- a species' max HP (MonsterProp +8, the word LoadMonsterProp seeds)
+local function speciesHp(species)
+  return H.readRomWord((H.sym("MonsterProp") & 0x3FFFFF) + species * 32 + 8)
+end
+-- why a formation of these species, all standing at full HP, can answer a
+-- hit with a Sneeze before a copy resolves (header: at the opening, or once
+-- the aimed body falls); nil when it cannot
+local function sneezeArmed(species)
+  if MUTANT == "refuse-all" then return "MUTANT refuse-all" end
+  local n, top = #species, -1
+  for _, sp in ipairs(species) do
+    local N = sneezeN(sp)
+    if N and n <= N then
+      return string.format("$%03X throws Sneeze at a hit once %d or fewer stand, and %d stand%s",
+        sp, N, n, n == 1 and "s" or "")
+    end
+    top = math.max(top, speciesHp(sp))
+  end
+  if MUTANT == "opening-only" then return nil end
+  for k, aimed in ipairs(species) do
+    if speciesHp(aimed) == top then
+      local N = sneezeN(aimed)
+      if N and n - 1 <= N and not quietDeath(aimed) then
+        return string.format("$%03X (aimed, %d HP) throws Sneeze at its own killing blow, "
+          .. "%d left standing", aimed, top, n - 1)
+      end
+      for j, sp in ipairs(species) do
+        N = sneezeN(sp)
+        if j ~= k and N and n - 1 <= N then
+          return string.format("killing the aimed $%03X (%d HP) leaves $%03X, which throws Sneeze "
+            .. "once %d or fewer stand, with %d", aimed, top, sp, N, n - 1)
+        end
+      end
+    end
+  end
+end
+local budgets = {}
+local function budgetFor(group)
+  if budgets[group] then return budgets[group] end
+  local pool = H.encounterPool(group)
+  local ok, parts = {}, {}
+  for slot = 1, 4 do
+    ok[slot] = true
+    local names = {}
+    for _, f in ipairs(pool[slot].formations) do
+      local why = sneezeArmed(f.species)
+      ok[slot] = ok[slot] and why == nil
+      local sp = {}
+      for _, s in ipairs(f.species) do sp[#sp + 1] = string.format("%03X", s) end
+      names[#names + 1] = string.format("%d [%s]%s", f.id, table.concat(sp, " "),
+        why and (" armed: " .. why) or "")
+    end
+    parts[#parts + 1] = string.format("slot %d (%d/256) %s%s", slot, pool[slot].odds,
+      table.concat(names, ", "), ok[slot] and " measurable" or "")
+  end
+  local worst = H.worstCaseEncounters(function() return function(slot) return ok[slot] end end)
+  H.log(string.format("[mimic] budget: group %d: %s -- the worst of the 65536 encounter-counter "
+    .. "states needs %d encounter(s) to deal a measurable slot", group, table.concat(parts, "; "), worst))
+  H.assertEq(worst <= MAXDRAWS, true, string.format("group %d deals a formation with no Sneeze "
+    .. "counter armed within the %d draws built (worst counter state: %d)", group, MAXDRAWS, worst))
+  budgets[group] = worst
+  return worst
+end
+
 -- ---- observers -------------------------------------------------------------
 local armed = nil        -- the case being measured
 local function rd16(a) return H.readWord(a) end
@@ -119,6 +254,14 @@ local function installObservers()
   installed = true
   local function cx() return emu.getState()["cpu.x"] & 0xFFFF end
   local function cy() return emu.getState()["cpu.y"] & 0xFFFF end
+  local cbw = H.sym("CheckBattleWorld")
+  emu.addMemoryCallback(function() worldGroup = H.worldCheckGroup() end, emu.callbackType.exec, cbw, cbw)
+  -- each battle's key (seed at its store, formation, encounter counters),
+  -- so a sweep counts its draws by distinct battle, not by run
+  local ss = H.seedStoreAddr()
+  emu.addMemoryCallback(function()
+    battleKey = H.firstBattleKey(emu.getState()["cpu.a"] & 0xFF, H.readWord(0x11E0))
+  end, emu.callbackType.exec, ss, ss)
   emu.addMemoryCallback(function(addr, v)
     if armed == nil or armed.endF then return end
     armed.stores[#armed.stores + 1] = string.format("[$%04X<-%d x=%02X 3a7a=$%02X 3a7b=$%02X]",
@@ -285,6 +428,80 @@ local function decide(c)
   return defendPress(st)
 end
 
+-- The members a case still needs are in the fight and on their feet: the
+-- source until its last pick's SaveForMimic, the stand-in until its Mimic's
+-- Ot6ActionEnd.  One sneezed out ($3A39, the member's bit) or KO'd ($3EE4
+-- bit 7) never finishes its part, so the case fails here, naming it.
+local function guard(c)
+  local left, need = H.leftMask(), {}
+  if not (c.srcDone and c.srcSaved >= #c.picks) then
+    need[#need + 1] = { c.src, "the source", "its cast resolved" }
+  end
+  if c.endF == nil then need[#need + 1] = { standS, "the stand-in", "its Mimic resolved" } end
+  for _, n in ipairs(need) do
+    local s = n[1]
+    local st1 = H.readByte(0x3EE4 + s * 2)
+    if MUTANT == "fell" then st1 = st1 | 0x80 end
+    local out, ko = ((left >> s) & 1) == 1, (st1 & 0x80) ~= 0
+    if out or ko then
+      error(string.format("case %s: %s (slot %d) %s before %s ($3A39=$%02X, status1 $%02X; "
+        .. "SaveForMimic{%s}) -- the case cannot finish", c.name, n[2], s,
+        out and "LEFT the fight" or "fell", n[3], left, st1, table.concat(c.sfmAll, " ")), 0)
+    end
+  end
+end
+
+-- The source's target: a single-target pick goes to the monster with the
+-- most HP standing, and the copy follows it (Mimic replays the targets).
+-- The Sneeze counter arms only once a kill leaves one monster standing
+-- (header), and a source or a copy aimed at the frailest body kills it
+-- first: on the re-cut's Cephaler + Baskervor draw ($0A2, 420 and 750 HP)
+-- TERRA's Drain + Fire took the Cephaler at the default cursor, the
+-- stand-in's copied Drain went on to the lone Baskervor, and its Sneeze
+-- took the stand-in out before the copied Fire (build/attempts/wt/
+-- mimic-v024/).  The Baskervor's own death stops its script (`if_self_dead
+-- / end_if` ends it), so on that draw a kill on the sturdiest body arms
+-- nothing; a draw where it would (191, two Baskervors) is run from
+-- (sneezeArmed).  An all-target pick (a lore, a summon) is confirmed as it opens.  Steered
+-- with H.targetCursor, its taps paced as battle_assassinate paces them.
+local function sturdiest()
+  local best, hp = nil, -1
+  for _, e in ipairs(H.activeSlots()) do
+    local v = H.readWord(0x3BF4 + (4 + e.slot) * 2)
+    if v > hp then best, hp = e.slot, v end
+  end
+  return best
+end
+local T = H.targetCursor()
+local mf, tapNo, tapAt = 0, -1, 0
+-- the pad for the source's own target window, or false when this is not it
+local function aimPress(c)
+  if H.readByte(MENU) == 0 or H.readByte(MSTATE) ~= ST_TGT or (H.readByte(ACTOR) & 3) ~= c.src
+     or c.srcDone then
+    mf, tapNo = 0, -1
+    return false
+  end
+  mf = mf + 1
+  local edge = (mf - 1) % 8 < 4
+  local m = T.mask
+  if m == nil then return {} end
+  local btn
+  if (m & (m - 1)) ~= 0 then
+    btn = edge and "a" or nil                  -- all targets
+  else
+    c.tgtSlot = c.tgtSlot or sturdiest()
+    btn = T.steer(c.tgtSlot, mf)
+    if btn == "a" then
+      if not edge then btn = nil end
+    else
+      if btn ~= nil and T.press ~= tapNo then tapNo, tapAt = T.press, mf end
+      btn = (tapNo >= 0 and mf - tapAt < 4) and T.dir or nil
+    end
+  end
+  if btn == "a" then c.tgtSeen = true end
+  return btn and { [btn] = true } or {}
+end
+
 local function runCase(snapRef, c)
   local req
   return {
@@ -294,13 +511,17 @@ local function runCase(snapRef, c)
       H.checkReq(req, "snapshot load")
       H.rearmInputInjection()
       tick, held = 0, nil
-      c.pickIdx, c.srcSaved, c.srcActs, c.srcQueued, c.tgtSeen = 1, 0, {}, 0, false
+      c.pickIdx, c.srcSaved, c.srcActs, c.srcQueued, c.tgtSeen, c.tgtSlot = 1, 0, {}, 0, false, nil
       c.stores, c.standStores, c.folds, c.staged, c.dmg, c.castIds = {}, {}, {}, {}, {}, {}
       c.srcNums, c.standNums, c.sfmAll, c.standDmg, c.drainLog = {}, {}, {}, {}, {}
       armed = c
     end),
     H.driveUntil(function() return c.endF ~= nil and H.frame >= c.endF + 20 end, 12000, {
       H.call(function()
+        guard(c)
+        T.observe()
+        local aim = MUTANT ~= "default-target" and aimPress(c)
+        if aim then held = nil; H.setPad(aim) return end
         tick = tick + 1
         local ph = tick % 12
         if ph == 0 then held = decide(c) end
@@ -321,8 +542,9 @@ local function runCase(snapRef, c)
       H.setPad({})
       local charged = (c.mp0 or 0) - (c.mpEnd or c.mp0 or 0)
       H.log(string.format("[mimic] %s: source slot %d cmd $%02X picks %s srcBoost %d (source MP %d -> %s); "
-        .. "source actions saved %s", c.name, c.src, c.cmd, table.concat(c.pickNames, "+"),
-        c.srcBoost or 0, c.srcMp0 or -1, tostring(c.srcMpEnd), table.concat(c.srcActs, " ")))
+        .. "source actions saved %s; aimed at %s", c.name, c.src, c.cmd, table.concat(c.pickNames, "+"),
+        c.srcBoost or 0, c.srcMp0 or -1, tostring(c.srcMpEnd), table.concat(c.srcActs, " "),
+        c.tgtSlot and ("monster slot " .. c.tgtSlot .. ", the most HP standing") or "all targets or the default"))
       H.log(string.format("[mimic] %s: stand-in boost %d: pending at confirm %d bank %d; %s",
         c.name, c.boost, c.pendAtConfirm or -1, c.bank0 or -1, c.replace or "mimicreplace NOT reached"))
       H.log(string.format("[mimic] %s: Ot6QueueFold entries %s", c.name, table.concat(c.folds, " ")))
@@ -393,36 +615,82 @@ local steps = {
   end),
   (function()
     -- lap between the Continue tile and a tile a few steps off it, each leg
-    -- planned on the settled tilemap (M.worldBfs), until an encounter fires
+    -- planned on the settled tilemap (M.worldBfs), until an encounter fires;
+    -- a draw whose Sneeze counter is armed from the opening is run from and
+    -- the lap goes on (see the header)
     local home, away, goal, plan, idx
-    return H.driveUntil(function() return H.battleLoadStarted() end, 30000, {
-      H.call(function()
-        if not H.worldHasControl() or not H.worldSettled() then plan = nil; H.setPad({}) return end
-        if not H.worldAligned() then return end
-        local x, y = H.worldX(), H.worldY()
-        if home == nil then
-          home = { x, y }
-          for _, o in ipairs({ { 0, -4 }, { 0, 4 }, { -4, 0 }, { 4, 0 }, { 0, -3 }, { 0, 3 },
-                               { -3, 0 }, { 3, 0 }, { 2, 2 }, { -2, -2 }, { 2, -2 }, { -2, 2 } }) do
-            local p = H.worldBfs(x + o[1], y + o[2])
-            if p and #p >= 3 and #p <= 10 then away = { x + o[1], y + o[2] } break end
+    local function lapWalk(what)
+      return H.driveUntil(function() return H.battleLoadStarted() end, 30000, {
+        H.call(function()
+          if not H.worldHasControl() or not H.worldSettled() then plan = nil; H.setPad({}) return end
+          if not H.worldAligned() then return end
+          local x, y = H.worldX(), H.worldY()
+          if home == nil then
+            home = { x, y }
+            for _, o in ipairs({ { 0, -4 }, { 0, 4 }, { -4, 0 }, { 4, 0 }, { 0, -3 }, { 0, 3 },
+                                 { -3, 0 }, { 3, 0 }, { 2, 2 }, { -2, -2 }, { 2, -2 }, { -2, 2 } }) do
+              local p = H.worldBfs(x + o[1], y + o[2])
+              if p and #p >= 3 and #p <= 10 then away = { x + o[1], y + o[2] } break end
+            end
+            assert(away, "a reachable tile a few steps from the Continue tile")
+            goal = away
+            H.log(string.format("[mimic] encounter lap (%d,%d) <-> (%d,%d)", x, y, away[1], away[2]))
           end
-          assert(away, "a reachable tile a few steps from the Continue tile")
-          goal = away
-          H.log(string.format("[mimic] encounter lap (%d,%d) <-> (%d,%d)", x, y, away[1], away[2]))
-        end
-        if plan == nil or idx > #plan then
-          if x == goal[1] and y == goal[2] then goal = (goal == away) and home or away end
-          plan, idx = H.worldBfs(goal[1], goal[2]), 1
-          if not plan or #plan == 0 then plan = nil; H.setPad({}) return end
-        end
-        local dir = plan[idx]; idx = idx + 1
-        H.setPad({ [dir] = true })
-      end),
-    }, "a random encounter")
+          if plan == nil or idx > #plan then
+            if x == goal[1] and y == goal[2] then goal = (goal == away) and home or away end
+            plan, idx = H.worldBfs(goal[1], goal[2]), 1
+            if not plan or #plan == 0 then plan = nil; H.setPad({}) return end
+          end
+          local dir = plan[idx]; idx = idx + 1
+          H.setPad({ [dir] = true })
+        end),
+      }, what)
+    end
+    local measured, group0, budget = false, nil, nil
+    local steps = {}
+    for try = 1, BURN + MAXDRAWS do
+      steps[#steps + 1] = H.cond(function() return measured end, {}, {
+        lapWalk("a random encounter (draw " .. try .. ")"),
+        H.release(),
+        H.waitUntil(function() return H.battleActive() end, 900, "battle up (draw " .. try .. ")", 5),
+        H.call(function()
+          local sp, names = {}, {}
+          for _, e in ipairs(H.formationSpecies()) do
+            sp[#sp + 1] = e.species
+            names[#names + 1] = string.format("$%03X", e.species)
+          end
+          local why = sneezeArmed(sp)
+          local verdict
+          if try <= BURN then
+            verdict = string.format("used up (BURN %d)", BURN)
+          else
+            -- the budget belongs to the pool that dealt this encounter
+            group0 = group0 or (MUTANT == "other-group" and worldGroup + 1 or worldGroup)
+            H.assertEq(worldGroup, group0, string.format("draw %d was dealt by group %s, the pool "
+              .. "the budget was decoded from", try, tostring(group0)))
+            budget = budget or (MUTANT == "budget-1" and 1 or budgetFor(group0))
+            measured = why == nil or MUTANT == "take-any"
+            verdict = measured and ("measured" .. (why and " (MUTANT take-any)" or "")) or "run from"
+          end
+          H.log(string.format("[mimic] draw %d: key %s group %s, formation %s%s -> %s", try,
+            tostring(battleKey), tostring(worldGroup), table.concat(names, " "),
+            why and ("; armed: " .. why) or "; no Sneeze counter armed", verdict))
+          if try > BURN and not measured then
+            H.assertEq(try - BURN < budget, true, string.format("a formation with no Sneeze "
+              .. "counter armed drawn within %d encounter(s), the most any encounter-counter "
+              .. "state needs from group %d", budget, group0))
+          end
+        end),
+        H.cond(function() return measured end, {}, {
+          H.fleeBattle(9000, { onCantRun = "fight" }),
+          H.waitUntil(function() return H.worldMode() and H.worldHasControl() end, 1200,
+            "back on the world map after running from draw " .. try, 10),
+          H.waitFrames(30),
+        }),
+      })
+    end
+    return H.repeatN(1, steps)
   end)(),
-  H.release(),
-  H.waitUntil(function() return H.battleActive() end, 900, "battle up", 5),
   H.call(function()
     for s = 0, 3 do
       local id = H.readByte(0x3ED8 + s * 2)
