@@ -477,8 +477,9 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ; own `stz $3414`), and $11a2 = $60, GP Rain's ignore-defense and don't-split
 ; (the coins' split over the targets is the effect's own divide).  Then:
 ;   Coin Toss, Hired Help: GP Rain's attacker effect $51, which takes the gil
-;     (Ot6CoinPrice) and deals twice it; $b5 = $18 so the animation is GP
-;     Rain's thrown coins.
+;     (Ot6CoinPrice) and deals twice it; $b5 = $18, GP Rain's animation
+;     command: Coin Toss throws its coins, and a hire's pass is drawn as
+;     the hired figure (Ot6HireMark, Ot6CoinAnim).
 ;   Jackpot: the dice effect $09, whose Jackpot arm (Ot6JackpotDice) throws
 ;     the triple and sets the dice animation ($b5 = $26) itself.
 ; a8/i8, db=$7e.  out: A = the attacker special effect index (x2) for $11a9.
@@ -499,7 +500,7 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         cmp     #OT6_SETZER_JACKPOT
         beq     @dice
         lda     #$18
-        sta     $b5             ; GP Rain's animation
+        sta     $b5             ; GP Rain's animation command (Ot6CoinAnim)
         lda     #$a2            ; attacker special effect $51 (GP Rain)
         rtl
 @dice:  lda     #$12            ; attacker special effect $09 (dice)

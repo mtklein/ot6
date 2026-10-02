@@ -602,6 +602,27 @@ leaves every point its own hit. A hire that outlives its target goes to
 another body, as a multi-hit Blitz's swing does, and one that finds none
 pays nothing.
 
+**Each hire is somebody new** (owner, 2026-10-02: a growing crew, not the
+same guy again). Setzer walks off the right edge, and each hire walks in
+where he stood, swings the weapon that fits the target and walks off: the
+0 BP hire is a merchant, and each point brings the next, tougher figure,
+an Imperial soldier, then General Leo, then Shadow, FF6's own mercenary
+for hire. While Shadow fights in the party he can't walk in from outside
+it, so the fourth hire is his dog: Interceptor bounds in with his
+counterattack. Setzer walks back after the last. *Reason: the boost buys
+hires, and a hire should look hired. The figures are the ROM's own full
+battle sprite sets (Locke's disguises, Leo, Shadow), drawn in Setzer's
+slot while it stands off screen, so they cost no VRAM, no palette and no
+new art.* The weapon is a fixed one a figure and class (merchant: Dirk or
+Regal Cutlass or Mithril Rod; soldier: Mithril Blade, Mithril Pike or
+Morning Star; Leo: Crystal, Gold Lance or Morning Star; Shadow: Kodachi,
+Ashura or Flail); it is a picture only, the class is the hire's. A hire
+that finds no body still walks in, and leaves without a swing. The longer
+animation changes the frames an action takes (and so the ATB fill during
+it), not the battle RNG: nothing in it draws a battle Rand
+(`Ot6CoinAnim`, `Ot6HireMark`; `battle_hiredhelp` reads the figure off
+Setzer's graphics buffer at every strike).
+
 **Jackpot (divine): the Fixed Dice come up a triple.** One enemy, by
 vanilla's dice arithmetic: face³ × level × 2 for the three dice, times the
 face again for the triple (saturating at 65,535 as vanilla's loop does),
