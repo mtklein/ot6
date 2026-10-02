@@ -12,84 +12,63 @@ ordered `ff6/src/battle/ot6_*.asm` modules (emitted by `ot6.asm` into
 expanded bank $F0) plus minimal jsl shims in vanilla banks.
 
 `python3 configure.py` writes `build.ninja`; `ninja` builds and tests
-everything (qualification), and `ninja release` goes on to the release
-preflights and the zip. Any narrower need is a
-real output path (`ninja ff6/rom/ff6-en.sfc`,
-`ninja build/results/suite/battle_break.ok`). The graph regenerates itself
-when `configure.py`, the savestate graph, `VERSION`, or any globbed
-directory changes.
+everything (qualification, the checkpoint drift gate included), and
+`ninja build/release/ot6-vX.Y.zip` goes on to the release preflights and
+the zip. There are no aliases: any narrower need is a real output path
+(`ninja ff6/rom/ff6-en.sfc`, `ninja build/results/suite/battle_break.ok`).
+The graph regenerates itself when `configure.py`, the savestate graph,
+`VERSION`, or any globbed directory changes.
 
-### Cuts and the chain from power-on
+### Cuts and the one graph
 
 A `.mss` belongs to one ROM, so after a ROM change every generated state
-regenerates, each from the one before it. To keep that from being one long
-serial run, the chain is cut where the play saves (at a
-save point, or on the world map, where the game lets you save anywhere):
-an entry in
+regenerates, each from the one before it: the graph is one line, played
+once from power-on. It is cut where the play saves (at a save point, or on
+the world map, where the game lets you save anywhere): an entry in
 `tools/tests/savestate_graph.py` with both `prev=` and `checkpoint=` is a
 cut, and `prev=` names the state whose play ends where the save begins.
 The leg before it ends by saving there through the real Save UI and
-asserting the checkpoint's contract as its exit
-(`H.saveAtCheckpoint`, `lib/ot6_contract.lua`); the leg after it
-Continues the save and asserts the same contract as its entry
-(`H.bootCheckpoint`). Qualification boots each cut leg from the tracked
-checkpoint in `tools/tests/checkpoints/`, which still loads after a ROM
-change, so the legs regenerate at once.
+asserting the checkpoint's contract as its exit (`H.saveAtCheckpoint`,
+`lib/ot6_contract.lua`); its run captures the battery into
+`build/checkpoints/<key>/`, a seal edge checks it holds the declared save,
+and the leg after it Continues that capture and asserts the same contract
+as its entry (`H.bootCheckpoint`). A cut is where the play goes through the
+real Continue screen; it does not make the legs independent.
 
 Two variants. In the Vector arc the save is made by a separate,
 capture-only script booted from `prev`'s savestate rather than by
 `prev`'s own run: `cutter=` names it (`gen_post_opera_checkpoint` from
 blackjack, `gen_mrf_save_room_checkpoint`, `gen_n024_save_checkpoint`,
 `gen_minecart_platform_checkpoint`, `gen_terra_returned_checkpoint` from
-n128_won). Qualification never runs a cutter. And `saves=` marks a run
-that ends by saving a tracked checkpoint no cut boots yet: the frontier
-(`wor-falcon-v1`) and `crescent-landing-v1` (thamasa_night boots the
-savestate).
+n128_won). And `saves=` marks a run that ends by saving a tracked
+checkpoint no cut boots yet: the frontier (`wor-falcon-v1`) and
+`crescent-landing-v1` (thamasa_night boots the savestate). The graph's
+`CAPTURES` lift the five checkpoints nothing in the graph boots
+(`world-sfigaro-v1`, `sfigaro-basement-v1`, `train-engineer-v1`,
+`terra-caves-v1`, `vector-escape-v1`) with their capture-only cutters. The
+line runs from power-on through the Opera, the Vector arc, the Floating
+Continent and every World of Ruin leg to wor_falcon; the World of Balance
+-> World of Ruin crossing is a plain savestate link (wor_landing ->
+wor_island).
 
-`ninja chain` plays the whole chain from power-on instead: `chain_<state>`
-copies of every state from the first cut on, each booted from the copy
-before it and, at a cut, from the save the producing copy just made
-(captured with `OT6_CAPTURE_SRM` and sealed into
-`build/checkpoints/<key>/`); a cutter runs from the copy of its `prev`,
-publishes no state, and records the ROM it played on in
-`build/checkpoints/<key>.rom`. The line runs from power-on through the
-Opera, the Vector arc, the Floating Continent and every World of Ruin leg
-to wor_falcon. No boundary on it lacks a state to chain from: the World of
-Balance -> World of Ruin crossing is a plain savestate link (wor_landing ->
-wor_island, no save between), and wor-start-v1 is made by wor_start's own
-run from wor_island's save. It is the one alias besides `release`,
-because the chain's last state moves as cuts and legs are added.
-`ninja release` depends on it. Run it too when a leg's exit contract
-fails in qualification: the chain says whether the story still plays
-through. It is long and serial (the World of Ruin legs alone carry
-3600-7200 s caps); bare `ninja` never runs it.
+Every tracked checkpoint in `tools/tests/checkpoints/` is made by one run on
+the graph (configure refuses a graph that leaves one out), and suites in
+`configure.py`'s `TEST_ENV` and by-hand runs boot the tracked copies. The
+drift gate, `build/checks/checkpoint_drift.ok` in the default, holds each
+tracked copy to the graph's capture byte for byte (play time and checksums
+aside; the graph is deterministic), and explains a drift in play terms
+(`tools/tests/lib/checkpoint_drift.py`): every character's level,
+experience, HP/MP and gear, gil and the bag, story switches, encounter
+counters, spells and skills, the OT6 codex, and any other differing byte by
+address. A drifted checkpoint is re-cut from the graph's capture and
+committed:
 
-Every tracked checkpoint something boots (a state, or a suite in
-`configure.py`'s `TEST_ENV`) is captured on that line. The rest are named
-in the graph's `NOT_GATED` with the reason (today: the four
-`reseal_seeds.sh` seeds and `vector-escape-v1`, which nothing boots).
-Qualification's `checkpoint_coverage` check
-(`savestate_ninja.py --coverage`) refuses any other tracked checkpoint, so
-a new leg that boots a checkpoint with no `prev=` fails `ninja`.
-
-A tracked checkpoint drifts from today's play as the route changes above
-it. At each capture the chain prints the drift (`tools/tests/lib/checkpoint_drift.py`),
-explained in play terms: every character's level, experience, HP/MP and
-gear, gil and the bag, story switches, encounter counters, spells and
-skills, the OT6 codex, and any other differing byte by address.
-`ninja release` fails while any tracked checkpoint's battery differs from
-its fresh capture byte for byte (play time and checksums aside; the chain
-is deterministic), or while a capture is older than today's generator, lib
-halves or ROM. Re-cut at every release, and during a cycle whenever the
-report shows a material change:
-
-    ninja chain
     python3 tools/tests/lib/checkpoint_drift.py --recut <key>...
 
-`--recut` copies the chain's sealed capture over the tracked checkpoint
-(any key the chain captures, World of Ruin legs and cutters included);
-then commit and qualify again. The contracts stay light: a suite that
-needs a level or an item asserts its own precondition.
+`--recut` refuses a capture whose stamp is not current
+(`lib/stamps.py`). Re-cutting re-runs the suites that boot that checkpoint
+and nothing in the graph, which boots its own captures. The contracts stay
+light: a suite that needs a level or an item asserts its own precondition.
 
 ## Installed pieces
 
@@ -174,7 +153,7 @@ those.
 
 - **Packages** (apt): `git cc65 ninja-build python3 python3-numpy
   libsdl2-2.0-0 unzip`. No compiler is needed: nothing in the build or the
-  harness compiles C (building OT6's Mesen does; see OT6's Mesen). `ninja release` also wants `tools/bin/flips`, which
+  harness compiles C (building OT6's Mesen does; see OT6's Mesen). The release zip (`ninja build/release/ot6-vX.Y.zip`) also wants `tools/bin/flips`, which
   would need a compiler to build (see the Flips bullet above), so release
   packaging stays on a Mac.
 - **Mesen**: OT6's build (OT6's Mesen, below), one self-contained binary
@@ -235,10 +214,10 @@ differently from 2.1.1, because of MesenCE's DMA clock-counting fix
 1da6c1ad (build/attempts/mesence-eval/).
 
 - `tools/mesen/EMULATOR` is a regeneration input like the ROM: every
-  generate, chain and suite edge depends on it (configure.py), so changing
-  it regenerates every fixture and re-runs every test, and the chain's
-  captures then make `checkpoint_drift.py` ask for every cut checkpoint to
-  be re-cut. Change it in the same commit as a deployment, and deploy on
+  generate, capture and suite edge depends on it (configure.py), so
+  changing it regenerates every fixture and re-runs every test, and the
+  drift gate then asks for every checkpoint whose capture moved to be
+  re-cut. Change it in the same commit as a deployment, and deploy on
   every machine (px13, the Air, this Mac) before regenerating anywhere: a
   machine still running the old build would regenerate on the old
   emulator, and nothing checks which build a run used beyond the stamp's

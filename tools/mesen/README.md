@@ -15,12 +15,12 @@ github.com/mtklein/mesen (GPL v3, in Mesen's fork network; its
 `EMULATOR` pins the build: one line, `<repository> <tag> <commit>`
 (today `https://github.com/mtklein/mesen ot6-2.2.1-1 40586fe8...`).
 `build.sh` builds that commit and nothing else. The same file is an input of
-every generate, chain and suite edge (configure.py), like the ROM: a new pin
-regenerates every fixture and re-runs every test, and through the chain's
-captures `checkpoint_drift.py` then asks for every cut checkpoint to be
-re-cut before a release. So moving to a new emulator build is: push the
-commit to the fork, tag it `ot6-<base>-<n>`, change `EMULATOR`, build and
-deploy it on every machine, then regenerate (`ninja chain`, `ninja`).
+every generate, capture and suite edge (configure.py), like the ROM: a new
+pin regenerates every fixture and re-runs every test, and the drift gate
+then asks for every checkpoint whose capture moved to be re-cut. So moving
+to a new emulator build is: push the commit to the fork, tag it
+`ot6-<base>-<n>`, change `EMULATOR`, build and deploy it on every machine,
+then `ninja` (and `checkpoint_drift.py --recut` what the gate names).
 The file holds no comments, so only a real change regenerates anything.
 
 Until 2026-10-01 the harness ran the same two code changes on SourMesen's
@@ -158,7 +158,7 @@ Every run log ends with `[emulator] <sha256> MESEN_SCRIPT_ONLY
 requested=<v> core=<sha256>`: the executable, and the MesenCore that run
 loaded (macOS: "Which core a Mac bundle runs", below). run.sh also
 publishes that line beside each `.mss` it publishes
-(`<state>.mss.emulator`), and `savestate_stamp.sh` copies its first sha
+(`<state>.mss.emulator`), and `lib/stamps.py` copies its first sha
 into the stamp's `emulator <sha256>` line, so the two agree. Both are
 records of which binary ran; what makes fixtures regenerate is `EMULATOR`.
 
@@ -185,7 +185,7 @@ sha256sum tools/Mesen-linux/Mesen               # = sha256 in the buildinfo
 The next run.sh then rebuilds the shared copy and logs the new
 `[emulator]` sha. To roll back, install the kept binary the same way. A
 deployment whose `EMULATOR` change has landed is followed by regeneration
-(`ninja chain`, the checkpoint re-cut, `ninja`); a rollback that keeps
+(`ninja`, then the checkpoint re-cut the drift gate asks for); a rollback that keeps
 `EMULATOR` regenerates nothing, so roll back `EMULATOR` with it.
 
 ## Building (macOS arm64)

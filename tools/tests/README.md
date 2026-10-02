@@ -7,116 +7,123 @@ scripted input, assert on RAM, and capture screenshots/savestates.
 
 ```sh
 ninja build/ot6.sfc                                   # build the ROM
-tools/tests/run.sh tools/tests/battle_smoke.lua       # run one test raw
 ninja build/results/suite/battle_break.ok             # run one suite test (and what it needs)
-ninja build/states/vargas_entry.mss.lua               # generate one savestate (and its chain)
-ninja                                                 # everything
+ninja build/states/vargas_entry.mss.lua               # generate one savestate (and what it boots)
+ninja                                                 # everything, the drift gate included
+ninja build/release/ot6-vX.Y.zip                      # everything, then the release preflights and the zip
 
-python3 tools/tests/lib/compose.py --check-states     # is this red test a stale fixture?
-python3 tools/tests/lib/compose.py --adopt-stamps     # upgrade legacy stamps the tree's records can prove
+python3 tools/tests/lib/stamps.py --check-states      # is anything generated not current?
+tools/tests/run.sh tools/tests/battle_smoke.lua       # run one script by hand
 ```
 
-Run `--check-states` when a fixture-related test fails unexpectedly. It
-names what moved and gives regeneration commands. A fixture is **STALE**
-when the ROM this tree builds is not the ROM it was captured on, when its
-own generator (or the checkpoint it boots from) changed, or when its
-artifact/ancestor bindings fail, or when a state it grew from is itself
-stale or unbound (transitively: `STALE via dadaluma_entry <- zozo_arrival`
-names the chain down to the link that moved); **UNBOUND** when its bytes are not the
-ones its stamp records; **UNVERIFIED** when the tree has no built ROM
-to compare against. A change to the shared lib halves alone (`ot6.lua`,
-`ot6_field.lua`, `ot6_contract.lua`) is reported as *provenance drift*:
-informational, exit 0, the fixture stays a valid snapshot. That is the
-separation [the canonical testing policy](../../docs/TESTING.md) asks for;
-do not infer a product bug or an obligation to replay the whole route from
-staleness alone. A stamp written before ROM identity was recorded has no
-`rom` line and is held to the older conservative whole-sig rule (any lib
-edit stales it) until its fixture is regenerated; the report counts these.
-
-Run `--adopt-stamps` **before** the first lib edit after a regeneration run
-that left legacy stamps: it upgrades each one to the full format in place,
-but only when the tree's own records prove what the missing lines would
-say, and refuses (saying why, per fixture) otherwise. The proof is: the
-stamp's sig still equals the current sig over generator + lib halves (so the
-`generator` and `lib` lines are the current hashes); the `.mss` still
-matches its `artifact` line; and ninja's build log (`build/ninja/.ninja_log`)
-shows the ROM copy-if-changed step `build/ninja/src/build/ot6.sfc` last ran
-before the state's generate edge started while its copy is byte-equal to
-`build/ot6.sfc` (that copy is rewritten only on a ROM content change, and
-every generate edge depends on it, so the state was generated on the current
-ROM). Nothing is invented: a stamp whose sig already moved, whose ROM copy
-ran after the generate, whose artifact moved, or which has no ninja record is
-left as it is. The original sig line is kept; children bound by `ancestor`
-to the parent's old bytes are rebound to its new bytes; every rewrite keeps
-the stamp's mtime so ninja sees no generation. Run it with no ninja alive in
-the tree, and re-run `--check-states` afterwards.
+There are no aliases: every target is a real path. `ninja` runs exactly
+what a change invalidates, by the true inputs of each step (below); nothing
+is exempt and nothing is scheduled. `ninja -n` lists what the dependencies
+say could run; it cannot know that a digest or a run will come out the same
+bytes (restat), so after an edit that moves no program it lists more than
+the real build runs. Run a fixture's path through ninja before a by-hand run
+that boots it: a fixture ninja has not regenerated after a change is not
+current, and nothing at run time warns about it.
 
 ## The savestate graph
 
 The graph of generated savestates is data: `tools/tests/savestate_graph.py`,
-one entry per state. `configure.py` embeds it into `build.ninja` (via
-`lib/savestate_ninja.py`). A generated link's scheduling inputs are its
-compatibility inputs: the ROM bytes, its generator `gen_*.lua`, and, for a
-segment that starts from a saved checkpoint, that checkpoint's manifest and
-SRAM payload. Every one is a declared ninja dependency routed through a
-copy-if-changed edge (`cmp || cp` with `restat = 1`), so staleness is decided
-by content: a rebuild that bumps timestamps without moving bytes regenerates
-nothing; a changed input re-runs every transitive dependent. A generator is
-compared as its Lua token stream (`lib/lua_fingerprint.py`: comments and
-whitespace dropped, strings kept verbatim), so a comment-only or
-re-indenting edit regenerates nothing. Editing one generator's code
-regenerates only the states it feeds; a ROM content change
-regenerates the whole chain. The three lib halves `lib/compose.py` inlines
-(`ot6.lua`, `ot6_field.lua`, `ot6_contract.lua`) are **not** generate-edge
-inputs: editing one re-runs every suite test, audit and selftest that
-depends on it, and regenerates no fixture (docs/TESTING.md: a change to
-logging, assertions, or controller policy does not by itself make a
-legitimately reached snapshot illegitimate). `lib/savestate_ninja_selftest.sh`
-checks those semantics against real ninja on a mock tree in seconds, with no
-emulator.
+one entry per state in play order. `configure.py` embeds it into
+`build.ninja` (via `lib/savestate_ninja.py`). It is **one graph, played
+once, from power-on**: every state boots the state before it (`prev=`), and
+at a cut (`prev=` with `checkpoint=`) the battery save the run before it
+made. That run captures its battery (`OT6_CAPTURE_SRM`) into
+`build/checkpoints/<key>/`, a seal edge makes the capture a checkpoint (the
+tracked manifest's authored fields, the payload's size and hash, provenance
+from the capture's stamp; `sram_checkpoint.py seal-capture`, which refuses a
+battery that does not hold the save `saved` declares), and the cut's run
+Continues it. A `cutter=` script, booted from `prev`'s savestate, makes the
+save when `prev`'s own run does not; `saves=` marks a run that saves a
+checkpoint nothing boots yet; `CAPTURES` lifts the checkpoints nothing in
+the graph boots. So every tracked checkpoint in `tools/tests/checkpoints/`
+is made by one run on the graph (`savestate_ninja.validate` refuses a graph
+that leaves one out), and the drift gate, `build/checks/checkpoint_drift.ok`
+in the default, holds each tracked copy to the graph's capture byte for byte
+(play time and checksums aside): `checkpoint_drift.py --recut <key>` and a
+commit fix a drifted one. The tracked copies are what suites in
+`configure.py`'s `TEST_ENV` and by-hand runs boot; nothing in the graph
+boots them.
 
-`lib/savestate_stamp.sh` covers provenance and compatibility: each
-generation stamps `build/states/<state>.stamp` with
+A run's dependencies are its true inputs, compared by content:
 
-    sha256(GATE_CONTRACT ++ generator ++ ot6.lua ++ ot6_field.lua ++
-           ot6_contract.lua ++ extras) <generator> [extras]
-    rom <sha256 of the ROM the run booted>
-    generator <sha256(GATE_CONTRACT ++ generator ++ extras)>
-    lib <path> <sha256 of that lib half's token stream>  (one per half)
-    artifact <sha256 of build/states/<state>.mss>
-    ancestor <path> <sha256 of that file>
+- **its composed script.** A digest edge
+  (`build/ninja/digest/<state>.digest`) runs `compose.py --digest`, which
+  composes the script exactly as the run will (the generator, the lib files
+  it inlines, the savestate sidecars it embeds, the write gate from
+  `tools/state_write_waivers.txt`, the symbols it names from
+  `ff6/rom/ff6-en.dbg`) and writes the sha256 of its Lua token stream
+  (`lib/lua_fingerprint.py`: comments and whitespace dropped, strings kept),
+  rewriting the file only when it moved. The digest edge depends on every
+  lib file through a Lua copy and on compose.py, the waiver registry and the
+  symbols through byte copies, so it re-runs on any of them; `restat`
+  stops the run behind it when the program did not move.
+- **the ROM, the emulator pin** (`tools/mesen/EMULATOR`), **run.sh and the
+  Python it runs** (`pin_test_saves.py`, `decode_b64.py`, and for a run
+  that Continues a checkpoint `sram_checkpoint.py`), each through a
+  copy-if-changed edge, so a checkout's mtime bump moves nothing.
+- **what it boots:** `prev`'s sidecar (embedded, so through the digest),
+  or at a cut the capture's payload and the tracked manifest's authored
+  fields (the sealed manifest orders the run; its provenance is a record).
 
-Every `.lua` input above is hashed as its Lua token stream
-(`lib/lua_fingerprint.py`, the one definition `savestate_stamp.sh`,
-`compose.py` and the ninja copy rule all use): `--` and `--[[ ]]` /
-`--[==[ ]==]` comments and whitespace are dropped, string literals are kept
-byte for byte, and a `-- OT6_NAME:` harness directive is kept. A comment
-edit leaves every stamp valid; a code edit, including one inside a string,
-stales the fixture and its chain.
+Generate and capture edges are `restat`, and run.sh publishes an artifact
+only when its bytes changed, so a run that plays to the same bytes stops
+there. What each kind of change re-runs:
 
-The `rom`, `generator`, `artifact` and `ancestor` lines decide freshness;
-the sig and `lib` lines record exactly which harness sources produced the
-fixture and are reported as drift when they move. `lib/compose.py`
-re-verifies all of it at consume time (the same `stamp_status()` behind
-`--check-states`), so the whole chain is verifiable transitively from files
-on disk, and the ninja graph and the checker agree on what is stale.
-`GATE_CONTRACT` (`ot6-provenance/v2`, one constant in `savestate_stamp.sh`)
-is a fixed input to both sigs: bumping it deliberately stales every stamp
-in the checker (the graph does not track it; regenerate by hand). v1
-hashed `.lua` inputs as bytes; `lib/migrate_fingerprints.py` re-stamps a
-v1 stamp that still verifies under v1 as v2, regenerating nothing, and
-`--check-states` names it when a tree still carries v1 stamps.
+| change | re-runs |
+|---|---|
+| ROM bytes, the emulator pin, run.sh or the Python it runs | every run, the whole game from power-on, and every suite |
+| a test-library code edit (`lib/*.lua`) | every run whose composed program it changes (today: all of them; see below), and every suite |
+| a generator's code | that run, then each run its new bytes reach |
+| a suite's code | that suite |
+| a comment or whitespace in any Lua, another script's waiver, compose.py edits that leave every program alone | the digest edges, nothing after them |
+| a tracked checkpoint (a re-cut) | the suites that boot it, and the drift gate |
+| the stamp tool | the stamps |
+
+`lib/savestate_ninja_selftest.py` (`build/checks/ninja_graph_selftest.ok`)
+holds every row of that table against real ninja on a mock tree in
+seconds, with no emulator, and `lib/savestate_ninja.py --selftest` holds the
+emitted shape.
+
+Every generator inlines the whole library, and the library is not split:
+measured over the 106 commits that moved its code from 2026-09-15 to
+2026-10-02, 75 reach every generator even by a function-level call graph
+(the fight driver and the navigator are what every leg plays), and a split
+of the three files into modules a script names would have spared 1.1% of
+the replayed frames and 22% of the suite re-runs
+(build/attempts/wt/one-graph/analysis/split_value.txt, libdeps_history.jsonl).
+The game replays because the code that plays it moved.
 
 The scenario split is played on **one pinned playthrough** — Locke, then Sabin,
 then Terra — the way a single player with one cartridge plays it: scenario
-choice is order, not branching.  Each scenario's generators run exactly once;
-Sabin's opener boots `locke_done`, Terra's boots `sabin_done`, and Terra's
-closer (`gen_terra_done`), booted with all three completions carried in,
-rides the reunion cutscene and generates `reunion_ready` directly.  A
-generator that emits several states along one run declares them with
-`also=[...]` in the graph: one edge, one play-through, all its artifacts
-(`compose.py`'s `OT6_STACK` prefix machinery survives for experiments that
-replay a route from a foreign boot, but the graph no longer uses it).
+choice is order, not branching. Sabin's opener boots `locke_done`, Terra's
+boots `sabin_done`, and Terra's closer (`gen_terra_done`), booted with all
+three completions carried in, rides the reunion cutscene and generates
+`reunion_ready` directly. A generator that emits several states along one
+run declares them with `also=[...]` in the graph: one edge, one play-through,
+all its artifacts.
+
+### Stamps
+
+Each artifact's stamp (`build/states/<state>.stamp`,
+`build/checkpoints/<key>.stamp`) is its own edge after the run, written by
+`lib/stamps.py` from the same inputs (format `ot6-stamp/v3`): the generator,
+the composed script's digest and the environment that composition read, the
+hash of every other input, a token hash of the generator and each lib file
+(a record, so a message can name what moved), the artifact's hash, the
+stamp of what it booted, and the emulator that ran. A stamp is current when
+composing its generator now gives the recorded digest, every input hashes
+as recorded, the artifact is the recorded bytes, and what it booted is
+current too: the question ninja answers, by the same inputs.
+`stamps.py --check-states` asks it of every stamp the graph writes (STALE:
+an input moved, or `STALE via` the state it grew from; UNBOUND: the bytes
+are not the recorded ones, or an older stamp format; UNVERIFIED: no built
+ROM to compare against). live.py's route map and `tools/worktree-setup.sh`
+read the same verdicts.
 
 ## run.sh
 

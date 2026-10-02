@@ -214,11 +214,19 @@ owner asks. Main stays pushed throughout: nothing about a release holds it
 back. Steps, in order, none skipped:
 
 1. Freeze the ROM: no ROM change lands until the tag. Test, harness and doc
-   changes keep landing and pushing.
-2. `ninja` from a clean git tree (`git status` empty; never `ninja -t
-   clean`, which deletes the tracked generated sources the ff6 encoders
-   write and leaves the build unable to run), on pushed main. Green is the
-   qualification; keep its log. Anything merged while it runs gets a
+   changes keep landing and pushing; a test-library, generator or runner
+   change replays the game from the first run it reaches, as a ROM change
+   does, so one landing now costs a replay before the tag.
+2. `ninja` on pushed main in a clean git tree: `git status` empty, which is
+   what "clean" means here (never `ninja -t clean`, which deletes the
+   tracked generated sources the ff6 encoders write and leaves the build
+   unable to run). It is incremental: it replays the game from power-on
+   only as far as the frozen ROM and the merged changes reach, and runs
+   the drift gate (`build/checks/checkpoint_drift.ok`). Green is the
+   qualification; keep its log. If the gate names drifted checkpoints,
+   `python3 tools/tests/lib/checkpoint_drift.py --recut <keys>`, commit,
+   push, and `ninja` again (that re-runs the suites that boot them and the
+   gate, nothing in the graph). Anything merged while it runs gets a
    follow-up `ninja` before the tag.
 3. Ombudsman + critic on docs/release-notes-next.md against the log since
    the last tag (every claim names a commit or a test). The notes were
@@ -230,8 +238,8 @@ back. Steps, in order, none skipped:
    start a fresh docs/release-notes-next.md; update README's "vX.Y is the
    current release" line and tag link. Commit as `release: vX.Y -- <Name>
    (version bump + release notes)`; fast-forward release/vX.Y to it.
-5. `ninja release` (qualification is up to date, so this is the
-   preflights, the patch and the zip): `build/release/ot6-vX.Y.zip` must build.
+5. `ninja build/release/ot6-vX.Y.zip` (qualification is up to date, so
+   this is the preflights, the patch and the zip): it must build.
 6. `git tag -a vX.Y -m "OT6 vX.Y -- <Name>"`, `git push origin main
    release/vX.Y vX.Y`, then
    `gh release create vX.Y build/release/ot6-vX.Y.zip --title "OT6 vX.Y — <Name>" --notes-file docs/release-notes-vX.Y.md`.
