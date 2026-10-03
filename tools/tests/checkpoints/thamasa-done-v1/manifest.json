@@ -5,15 +5,15 @@
   "milestone": "thamasa-done",
   "persistent_layout": "ot6-codex-o8-v1",
   "size": 32768,
-  "sha256": "4076f3788d864f6578d92d28f0930dae575c055b425382070206f083506e166f",
+  "sha256": "c63aa1fc7337e977499bef388cb5cb09b692cccd629b9c39aed15edb946a7156",
   "provenance": {
-    "format": "ot6-provenance/v2",
-    "payload_sha256": "4076f3788d864f6578d92d28f0930dae575c055b425382070206f083506e166f",
-    "generator_sig": "dea1429bacbe1ce74f499f26fb6d16a42d978746ab00de4a6506aed8109d9cdc gen_massacre build/checkpoints/ultros-won-v1/manifest.json build/checkpoints/ultros-won-v1/ultros-won.sram",
+    "format": "ot6-provenance/v3",
+    "payload_sha256": "c63aa1fc7337e977499bef388cb5cb09b692cccd629b9c39aed15edb946a7156",
+    "generator_sig": "960810dec73e8aa98f39af83da16b5a23b770a8f806a7bd36672ae49e8fe1340 gen_massacre",
     "ancestors": [
       {
-        "path": "build/checkpoints/ultros-won-v1/manifest.json",
-        "sha256": "d2b5ad81b16123becae69806ca71f9500281cab8fa19afcca22574c5fc7ee127"
+        "path": "build/checkpoints/thamasa-done-v1.stamp",
+        "sha256": "dfb357f0b936bd1d4867482cfbc709163dc3371ed32aa942d50de2c71e6c6f99"
       }
     ]
   }

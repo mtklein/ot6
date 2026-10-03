@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "33d4b05d4ef67f01ba0b2b0a515ffedd65e449c1f8da09728d1c3fdc7894916f",
+  "sha256": "fc4dcc08ed37d7e618707e9d68d2537021aa4c4cadbcffb24309ef94352b1ef9",
   "provenance": {
-    "format": "ot6-provenance/v2",
-    "payload_sha256": "33d4b05d4ef67f01ba0b2b0a515ffedd65e449c1f8da09728d1c3fdc7894916f",
-    "generator_sig": "31b35cdc9a1740439dca7d84d05a4384c5dc71aa8560b7a3325c584707eba8fa gen_kolts build/checkpoints/world-figaro-v1/manifest.json build/checkpoints/world-figaro-v1/world-figaro.sram",
+    "format": "ot6-provenance/v3",
+    "payload_sha256": "fc4dcc08ed37d7e618707e9d68d2537021aa4c4cadbcffb24309ef94352b1ef9",
+    "generator_sig": "33ffec7bfdee3f21052d203e183548322f8d4b02271f0a4d056a42658aac89ef gen_kolts",
     "ancestors": [
       {
-        "path": "build/checkpoints/world-figaro-v1/manifest.json",
-        "sha256": "e79480f091e8ca8977303d1be036da521173d43b87300eeb059ce433ae57c31c"
+        "path": "build/checkpoints/kolts-summit-v1.stamp",
+        "sha256": "af01cbeef8bb23fe77415aa66d174c99e3a1f601860fffb39251050108948fcc"
       }
     ]
   }

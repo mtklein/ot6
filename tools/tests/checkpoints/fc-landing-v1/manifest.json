@@ -5,15 +5,15 @@
   "milestone": "fc-landing",
   "persistent_layout": "ot6-codex-o8-v1",
   "size": 32768,
-  "sha256": "a6d2fa391a33aa426ba865ebf1e51fa943cf71097daf0198e2dea289517bdc0c",
+  "sha256": "0cdd62da18cd610381df68d40ba600094f0e6dbbd922b07426d4167c48b281a3",
   "provenance": {
-    "format": "ot6-provenance/v2",
-    "payload_sha256": "a6d2fa391a33aa426ba865ebf1e51fa943cf71097daf0198e2dea289517bdc0c",
-    "generator_sig": "51e1cb103bda3b83b5637e8e08cc01a552e9231b5da99cb730b66c1e6bf9475c gen_fc_landing build/checkpoints/thamasa-done-v1/manifest.json build/checkpoints/thamasa-done-v1/thamasa-done.sram",
+    "format": "ot6-provenance/v3",
+    "payload_sha256": "0cdd62da18cd610381df68d40ba600094f0e6dbbd922b07426d4167c48b281a3",
+    "generator_sig": "5253c9e82c3b48531e3fb4062602a55613042a175c5ad7898fb4291c610a6c98 gen_fc_landing",
     "ancestors": [
       {
-        "path": "build/checkpoints/thamasa-done-v1/manifest.json",
-        "sha256": "7375f985d2af53441c99a778c204f1f3ade03f49379db77a1c3545e18dfb2dbf"
+        "path": "build/checkpoints/fc-landing-v1.stamp",
+        "sha256": "26ca54c28951c121b14fe51caaf76113f88cef1d62ca78126d0ddc463c5032f8"
       }
     ]
   }

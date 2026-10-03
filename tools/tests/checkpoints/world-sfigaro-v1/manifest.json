@@ -1,19 +1,19 @@
 {
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "world-sfigaro.sram",
-  "size": 32768,
-  "sha256": "15cb054c698cdd8886394a724b6504aac63fb7a6a662caa2b1d0dfaa31ced56d",
   "slot": 3,
   "milestone": "world-sfigaro",
   "persistent_layout": "ot6-codex-o8-v1",
+  "size": 32768,
+  "sha256": "1bdc401e59e4e4ea6ecb692c7ae469366c4769a817463ee08aae76c859498c0b",
   "provenance": {
-    "format": "ot6-provenance/v2",
-    "payload_sha256": "15cb054c698cdd8886394a724b6504aac63fb7a6a662caa2b1d0dfaa31ced56d",
-    "generator_sig": "7645bedd30c11b93fda80cea9f76607c4607eb194710a3822aba23625146e1f1 gen_seed_worldsfigaro",
+    "format": "ot6-provenance/v3",
+    "payload_sha256": "1bdc401e59e4e4ea6ecb692c7ae469366c4769a817463ee08aae76c859498c0b",
+    "generator_sig": "c8edd6f8e835de82c6361fbba5c6d0d82be44daf9238eee679a0c6ba5bf35d06 gen_seed_worldsfigaro",
     "ancestors": [
       {
-        "path": "build/states/south_figaro.stamp",
-        "sha256": "70b96f79e3662b8807bc289a8031963d5fc13d73162b9dbd5d9a52e8964f8edf"
+        "path": "build/checkpoints/world-sfigaro-v1.stamp",
+        "sha256": "dbcd0d1cef1fa0d22a5c2f41e1425545e5060740acf98458c375c046287e3ccc"
       }
     ]
   }

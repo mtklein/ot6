@@ -5,15 +5,15 @@
   "milestone": "minecart-platform",
   "persistent_layout": "ot6-codex-o8-v1",
   "size": 32768,
-  "sha256": "578c662106f050489cc252b2ed112ec4af3f2c66a0a0399512d66d39e9bf7a2c",
+  "sha256": "c3e58467047057b0f025a46177902eb928290e9daaa78e25184b2ba2e9b7f1f6",
   "provenance": {
-    "format": "ot6-provenance/v2",
-    "payload_sha256": "578c662106f050489cc252b2ed112ec4af3f2c66a0a0399512d66d39e9bf7a2c",
-    "generator_sig": "6ef1684bb272fade132f4d9bba13f9b292e3d4e8d34ca408f028c53488277d96 gen_minecart_platform_checkpoint",
+    "format": "ot6-provenance/v3",
+    "payload_sha256": "c3e58467047057b0f025a46177902eb928290e9daaa78e25184b2ba2e9b7f1f6",
+    "generator_sig": "2caefa0b2935c7be86876a30d531f6a6bb775bdc0d8d8d5af4898cb381395302 gen_minecart_platform_checkpoint",
     "ancestors": [
       {
-        "path": "build/states/chain_minecart_entry.stamp",
-        "sha256": "82faf081688b76879442d4c1687f1d9dfed9a1daa678578110037d7810d69419"
+        "path": "build/checkpoints/minecart-platform-v1.stamp",
+        "sha256": "be65254e251406605fabbec9a0cebf3a6bb5b2a124d68e7e398f21dacc8b7690"
       }
     ]
   }

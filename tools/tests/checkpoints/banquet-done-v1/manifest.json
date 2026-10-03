@@ -5,15 +5,15 @@
   "milestone": "banquet-done",
   "persistent_layout": "ot6-codex-o8-v1",
   "size": 32768,
-  "sha256": "60b6d599a2936420d8f48a285c8e0228c2ee8f5c66d52a93cca03d9df6342700",
+  "sha256": "3e36685a51a73f589c074d4593ddd0b090194a0661628aae634f215e68254cf5",
   "provenance": {
-    "format": "ot6-provenance/v2",
-    "payload_sha256": "60b6d599a2936420d8f48a285c8e0228c2ee8f5c66d52a93cca03d9df6342700",
-    "generator_sig": "571450a4beb9d0bfb59978cb7ae041d1262bf9e06d9e46b9ffba46505d140655 gen_banquet_done build/checkpoints/vector-crash-v1/manifest.json build/checkpoints/vector-crash-v1/vector-crash.sram",
+    "format": "ot6-provenance/v3",
+    "payload_sha256": "3e36685a51a73f589c074d4593ddd0b090194a0661628aae634f215e68254cf5",
+    "generator_sig": "7e85f32dab08b51d65516ef42fc06b693931f0a2b71a8e6f1753a18408768f4c gen_banquet_done",
     "ancestors": [
       {
-        "path": "build/checkpoints/vector-crash-v1/manifest.json",
-        "sha256": "4630bff0464caeffef615ae99ce52ab1fff545bb1626f50250b33cabd1b8aa1e"
+        "path": "build/checkpoints/banquet-done-v1.stamp",
+        "sha256": "ae668cc97740352001ceaf7fe2fb3967cdd496fe8f4426403ee359eb2d31e4c2"
       }
     ]
   }

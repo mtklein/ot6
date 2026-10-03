@@ -1,8 +1,6 @@
 {
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "train-engineer.sram",
-  "size": 32768,
-  "sha256": "2df5ea058eda22717ee0016050abaf6f865b6785d24d4804d0e8a91d17b6ed75",
   "slot": 3,
   "milestone": "train-engineer",
   "persistent_layout": "ot6-codex-o8-v1",
@@ -14,14 +12,16 @@
       "y": 10
     }
   },
+  "size": 32768,
+  "sha256": "3cb1d806ccaa82c9b8c7f8d762871ce276a8197f0d4981fa2ec28a556c0b4a0d",
   "provenance": {
-    "format": "ot6-provenance/v2",
-    "payload_sha256": "2df5ea058eda22717ee0016050abaf6f865b6785d24d4804d0e8a91d17b6ed75",
-    "generator_sig": "91bc31db1b1f74b658497d038fb1c6af647b9d6f18cb1a76bd0c08fecfb73754 gen_seed_train",
+    "format": "ot6-provenance/v3",
+    "payload_sha256": "3cb1d806ccaa82c9b8c7f8d762871ce276a8197f0d4981fa2ec28a556c0b4a0d",
+    "generator_sig": "bfbbbe9aa05b28d74613409d0b0cbf546c404c303d12de3074e0a3930744157f gen_seed_train",
     "ancestors": [
       {
-        "path": "build/states/train_done.stamp",
-        "sha256": "dfcd697da30e546248c48046a53d2a0e00fd3f3d3c498e749a30bb6ddf4ed8d2"
+        "path": "build/checkpoints/train-engineer-v1.stamp",
+        "sha256": "4aa7f49ea1a889e3b8a33521460b59cd2bd712faae3df907f1693e9d131fcd7d"
       }
     ]
   }

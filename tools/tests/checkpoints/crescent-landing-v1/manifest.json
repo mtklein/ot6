@@ -5,15 +5,15 @@
   "milestone": "crescent-landing",
   "persistent_layout": "ot6-codex-o8-v1",
   "size": 32768,
-  "sha256": "a1e886f2285d871cee6d3df632b6f7da56916dc427713588833cc1cb592a6d3b",
+  "sha256": "bfcb27fe9634627ee4836674edad84b315e867d5759b62b95040b4b437b10642",
   "provenance": {
-    "format": "ot6-provenance/v2",
-    "payload_sha256": "a1e886f2285d871cee6d3df632b6f7da56916dc427713588833cc1cb592a6d3b",
-    "generator_sig": "e9747192c28589504ee58b81905f72a4fb1cae74c96e2c625190ed4fd9406600 gen_voyage build/checkpoints/banquet-done-v1/manifest.json build/checkpoints/banquet-done-v1/banquet-done.sram",
+    "format": "ot6-provenance/v3",
+    "payload_sha256": "bfcb27fe9634627ee4836674edad84b315e867d5759b62b95040b4b437b10642",
+    "generator_sig": "a893afda632d5f899b6f5abaea16b4c701909c96ea7ae457bde2c43363ab9ac5 gen_voyage",
     "ancestors": [
       {
-        "path": "build/checkpoints/banquet-done-v1/manifest.json",
-        "sha256": "136e68ee4c04809dd085845e5f9e936ac9732c7fd0e92861fd62b59455f5ddaf"
+        "path": "build/checkpoints/crescent-landing-v1.stamp",
+        "sha256": "f576f4e125eb151a92d5ce7ce09add02b04b1e6fb158bf4a045cb5299d20d204"
       }
     ]
   }

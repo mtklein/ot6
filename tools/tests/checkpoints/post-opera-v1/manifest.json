@@ -5,15 +5,15 @@
   "milestone": "post-opera",
   "persistent_layout": "ot6-codex-o8-v1",
   "size": 32768,
-  "sha256": "d4f7b83ab501345eddd42fc01e8bb075a601b7f6a391c8d46047fce07a3d2d18",
+  "sha256": "f47824c898ca7858d016a03cd955e151416186a7020e0f8afcf30ac3e141f386",
   "provenance": {
-    "format": "ot6-provenance/v2",
-    "payload_sha256": "d4f7b83ab501345eddd42fc01e8bb075a601b7f6a391c8d46047fce07a3d2d18",
-    "generator_sig": "87a03f91ac0366c54f6b8025e7ab5aa49d6f10692efcbb2a0363c1e93481ab6e gen_post_opera_checkpoint",
+    "format": "ot6-provenance/v3",
+    "payload_sha256": "f47824c898ca7858d016a03cd955e151416186a7020e0f8afcf30ac3e141f386",
+    "generator_sig": "69af8318e86ab3f65e60d84813a32902e76001b0eeeaaaeecafdacfb5c743395 gen_post_opera_checkpoint",
     "ancestors": [
       {
-        "path": "build/states/chain_blackjack.stamp",
-        "sha256": "5c6f4d650be1ad45da4060d825148996f4f6c5e10362bf6f36e497ab636e1323"
+        "path": "build/checkpoints/post-opera-v1.stamp",
+        "sha256": "0b0ae345154f83b60944c9e99b7e8bb3cf9b5b08ad8308ea4a2657fb7fcb68f3"
       }
     ]
   }

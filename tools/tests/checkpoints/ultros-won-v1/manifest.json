@@ -5,15 +5,15 @@
   "milestone": "ultros-won",
   "persistent_layout": "ot6-codex-o8-v1",
   "size": 32768,
-  "sha256": "55886759a9c3ad70bd2e3e7ce4c8992f8cbe0c85b0876d0edcfb5fcbd1dc7809",
+  "sha256": "7ff4ed6eb182ff7ea32f9556af4731a1b3a585248f6e722d6df85c5abd23691c",
   "provenance": {
-    "format": "ot6-provenance/v2",
-    "payload_sha256": "55886759a9c3ad70bd2e3e7ce4c8992f8cbe0c85b0876d0edcfb5fcbd1dc7809",
-    "generator_sig": "4158b46a9f1346c8848d376f2414368e2f37afa5a969f6818cce421aa5a4159a gen_ultros build/checkpoints/esper-mtn-save-v1/manifest.json build/checkpoints/esper-mtn-save-v1/esper-mtn-save.sram",
+    "format": "ot6-provenance/v3",
+    "payload_sha256": "7ff4ed6eb182ff7ea32f9556af4731a1b3a585248f6e722d6df85c5abd23691c",
+    "generator_sig": "59e65a95621bd2ddba77c3d125629c953a7ffe2d3b498fe9ba8fec80c01dff49 gen_ultros",
     "ancestors": [
       {
-        "path": "build/checkpoints/esper-mtn-save-v1/manifest.json",
-        "sha256": "972147c3f06b3b5a1df54597ec560341ab94642a64ece11d440d088533cb1256"
+        "path": "build/checkpoints/ultros-won-v1.stamp",
+        "sha256": "be32dec0de72651a24c2d8653bee1c297a71de0007120b60aec1ccd420cd82ed"
       }
     ]
   }

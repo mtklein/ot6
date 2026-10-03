@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "198a11ece3a39d96ed7d8353cd28f688c61f9a82f3d0db13afe8576bced5a8a2",
+  "sha256": "1c3a1b495d57d88fc2ad91b38beb71332bdb5591db1d8850800a78e5e8fe5da7",
   "provenance": {
-    "format": "ot6-provenance/v2",
-    "payload_sha256": "198a11ece3a39d96ed7d8353cd28f688c61f9a82f3d0db13afe8576bced5a8a2",
-    "generator_sig": "0e181404fb4b7f83fb7e07202e3b62f9cdc77738ddcb5d1404e2483d51b84b1f gen_sabin_trench",
+    "format": "ot6-provenance/v3",
+    "payload_sha256": "1c3a1b495d57d88fc2ad91b38beb71332bdb5591db1d8850800a78e5e8fe5da7",
+    "generator_sig": "22d777808db3d68805839822752693f4a5e7910d1edf7a238aae1810e9159ea6 gen_sabin_trench",
     "ancestors": [
       {
-        "path": "build/states/chain_gau_joined.stamp",
-        "sha256": "7229688765d2fc2305c33a455fad47c2306b0a3a1dee2ead63e4f52312c7c1de"
+        "path": "build/checkpoints/sabin-done-v1.stamp",
+        "sha256": "34128ad3ef745c8ddfcb899b839f67914d30fd6553624d146b3513eabb45c73d"
       }
     ]
   }

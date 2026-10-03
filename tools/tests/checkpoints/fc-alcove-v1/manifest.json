@@ -5,15 +5,15 @@
   "milestone": "fc-alcove",
   "persistent_layout": "ot6-codex-o8-v1",
   "size": 32768,
-  "sha256": "e95451cd94ad0268ba0636741841b307a680a3da6a88bab4e21b24003884ab0a",
+  "sha256": "a3c26bae66d92fd306152b5162d8bfecfb1d353566a0f95bfec883b06469d584",
   "provenance": {
-    "format": "ot6-provenance/v2",
-    "payload_sha256": "e95451cd94ad0268ba0636741841b307a680a3da6a88bab4e21b24003884ab0a",
-    "generator_sig": "f9b854b6dc891afdbe348cd45282e7021d2ebd1a53876ac5e54845fdac98d4ce gen_fc_alcove build/checkpoints/fc-landing-v1/manifest.json build/checkpoints/fc-landing-v1/fc-landing.sram",
+    "format": "ot6-provenance/v3",
+    "payload_sha256": "a3c26bae66d92fd306152b5162d8bfecfb1d353566a0f95bfec883b06469d584",
+    "generator_sig": "94480ca925918ac07e6be9808ef3bc47c001054a8562000975d13c2b3746c2df gen_fc_alcove",
     "ancestors": [
       {
-        "path": "build/checkpoints/fc-landing-v1/manifest.json",
-        "sha256": "bfadf43ce01265de7a88ec413edf5e6693e6792f4d7db0884995ec56f1bc8a90"
+        "path": "build/checkpoints/fc-alcove-v1.stamp",
+        "sha256": "0b87978c89ec097425689668ab71a74622aa3eee0b716dd4825a595ccc721e03"
       }
     ]
   }

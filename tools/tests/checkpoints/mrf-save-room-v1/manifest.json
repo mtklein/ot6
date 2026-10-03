@@ -5,15 +5,15 @@
   "milestone": "mrf-save-room",
   "persistent_layout": "ot6-codex-o8-v1",
   "size": 32768,
-  "sha256": "3ef10891a233be472b179f1bcf52e7ca629f609c2fb7d91bf0d22505d36db8bb",
+  "sha256": "3e10f5c62bcd4e11680552be8fb2b88b6acd1561b8b18de340e355849a5ade8a",
   "provenance": {
-    "format": "ot6-provenance/v2",
-    "payload_sha256": "3ef10891a233be472b179f1bcf52e7ca629f609c2fb7d91bf0d22505d36db8bb",
-    "generator_sig": "972170fa91fb47e7c7a1c4c951fc4444e7f345fdc5e4f8a1c2fd50b5a423850f gen_mrf_save_room_checkpoint",
+    "format": "ot6-provenance/v3",
+    "payload_sha256": "3e10f5c62bcd4e11680552be8fb2b88b6acd1561b8b18de340e355849a5ade8a",
+    "generator_sig": "de724fc8bb97a58c6362566e0f326a3922fe39d2cb4e8489009a6c2f23bdd777 gen_mrf_save_room_checkpoint",
     "ancestors": [
       {
-        "path": "build/states/chain_ifrit_entry.stamp",
-        "sha256": "90b1b635d3b4117aa68dd05a3b7ad414fbc2bc482b5810c28360863d9329e5b6"
+        "path": "build/checkpoints/mrf-save-room-v1.stamp",
+        "sha256": "48d3c4c5da5bf121d690a5ffca704cbe1b0c5ce41443e69bdd9618fdc62258d0"
       }
     ]
   }

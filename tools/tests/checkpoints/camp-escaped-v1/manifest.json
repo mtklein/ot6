@@ -12,15 +12,15 @@
     }
   },
   "size": 32768,
-  "sha256": "6e9f8ab0512c1d221fde8807cfab60aeb7d4ef10fd4ad81ea0362abee023db30",
+  "sha256": "620f8af9bae24588ee31bc26aea1496d24499fec7b6f71b820a2736818381dd4",
   "provenance": {
-    "format": "ot6-provenance/v2",
-    "payload_sha256": "6e9f8ab0512c1d221fde8807cfab60aeb7d4ef10fd4ad81ea0362abee023db30",
-    "generator_sig": "87b628db31c9878edd7fb6e1fbfb3e5b88fe57dbf9ff2170401089ae837b926a gen_sabin_magitek",
+    "format": "ot6-provenance/v3",
+    "payload_sha256": "620f8af9bae24588ee31bc26aea1496d24499fec7b6f71b820a2736818381dd4",
+    "generator_sig": "475d8631b3c8660102393d0e934b04848fd25f33057be0b0c5971a4be2094209 gen_sabin_magitek",
     "ancestors": [
       {
-        "path": "build/states/chain_doma_defended.stamp",
-        "sha256": "7337150a14a31a33fd36fbf4b3ac2d57d098ef5d004caf403998cde59439b6f9"
+        "path": "build/checkpoints/camp-escaped-v1.stamp",
+        "sha256": "c19299f8c667f632f0ddde9fc02beb70040358946cd46b90d9ece86a29992585"
       }
     ]
   }

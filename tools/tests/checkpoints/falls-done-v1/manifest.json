@@ -12,15 +12,15 @@
     }
   },
   "size": 32768,
-  "sha256": "4695476eebaa18918c568d9d899079b21f6e057a2740190d6c19ce49a7340c19",
+  "sha256": "9213b883c7ac60789a324528a03d1fa3b040fc8ddeee5753919665af78e5836f",
   "provenance": {
-    "format": "ot6-provenance/v2",
-    "payload_sha256": "4695476eebaa18918c568d9d899079b21f6e057a2740190d6c19ce49a7340c19",
-    "generator_sig": "be7a2fd6753eb71f480e4b5940cc62e6a83d493d4335760e21da47f18e4a2fb1 gen_sabin_falls",
+    "format": "ot6-provenance/v3",
+    "payload_sha256": "9213b883c7ac60789a324528a03d1fa3b040fc8ddeee5753919665af78e5836f",
+    "generator_sig": "93a8dd7688515f93c8312f02749c58ea81d4098c94882596655d5ee6a8073b53 gen_sabin_falls",
     "ancestors": [
       {
-        "path": "build/states/chain_train_done.stamp",
-        "sha256": "10a591bc51a3c0628546437972cd9212d71ade01a114277b36848b5618ae34ef"
+        "path": "build/checkpoints/falls-done-v1.stamp",
+        "sha256": "de3513c2bc285d9fc53d840403e86f32b57c0e0748abfbaf4d171b97f24b3129"
       }
     ]
   }
