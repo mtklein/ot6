@@ -394,7 +394,7 @@ local function walkSteps(n)
         H.vars.suitable and "FIGHT" or "flee"))
     end),
     H.cond(function() return not H.vars.suitable end, {
-      H.fleeBattle(9000),
+      H.fleeBattle(9000, { onCantRun = "fight" }),
       H.waitFrames(30),
     }, {}),
   }

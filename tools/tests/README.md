@@ -40,11 +40,11 @@ say, and refuses (saying why, per fixture) otherwise. The proof is: the
 stamp's sig still equals the current sig over generator + lib halves (so the
 `generator` and `lib` lines are the current hashes); the `.mss` still
 matches its `artifact` line; and ninja's build log (`build/ninja/.ninja_log`)
-shows the ROM copy-if-changed step `build/ninja/src/build/ot6.sfc` last ran
-before the state's generate edge started while its copy is byte-equal to
-`build/ot6.sfc` (that copy is rewritten only on a ROM content change, and
-every generate edge depends on it, so the state was generated on the current
-ROM). Nothing is invented: a stamp whose sig already moved, whose ROM copy
+shows the ROM copy step `build/ninja/src/build/ot6.sfc` last ran before the
+state's generate edge started while its copy has the ROM identity of
+`build/ot6.sfc` (the copy's mtime moves only when the identity changes, and
+every generate edge depends on it, so the state was generated on a ROM with
+the current identity). Nothing is invented: a stamp whose sig already moved, whose ROM copy
 ran after the generate, whose artifact moved, or which has no ninja record is
 left as it is. The original sig line is kept; children bound by `ancestor`
 to the parent's old bytes are rebound to its new bytes; every rewrite keeps
@@ -80,11 +80,27 @@ generation stamps `build/states/<state>.stamp` with
 
     sha256(GATE_CONTRACT ++ generator ++ ot6.lua ++ ot6_field.lua ++
            ot6_contract.lua ++ extras) <generator> [extras]
-    rom <sha256 of the ROM the run booted>
+    rom <identity of the ROM the run booted>
     generator <sha256(GATE_CONTRACT ++ generator ++ extras)>
     lib <path> <sha256 of that lib half's token stream>  (one per half)
     artifact <sha256 of build/states/<state>.mss>
     ancestor <path> <sha256 of that file>
+
+The ROM identity is `tools/build/rom_version.py identity`: the sha256 of
+the ROM with its version fields set to zero, `Ot6VersionText` (c0/ffa0, 16
+bytes: 15 cells holding "OT6 v<VERSION>" centered and blank-padded, then a
+$00; the Config screen and the boot splash draw all 15 cells), the
+header title (c0/ffc0, 21 bytes, "OT6 V<VERSION>") and the header checksum
+(c0/ffdc, 4 bytes). `link_rom.sh` stamps both fields from `VERSION` after the
+link. The ROM's ninja copy (`build/ninja/src/build/ot6.sfc`) is
+`copy_if_rom_identity_changed`: it takes the new bytes but keeps its mtime
+when the identity did not move, so a VERSION bump regenerates and re-runs
+nothing that binds to the ROM, while any other byte change does
+(`lib/savestate_ninja_selftest.sh` checks both). The suites about the fields
+themselves (`menu_configversion`, `title_version`; `VERSION_TESTS` in
+configure.py) also depend on `build/ot6.sfc` and `VERSION`, and compare what
+the screen shows against the tree's VERSION (compose.py injects it as
+`OT6_VERSION`).
 
 Every `.lua` input above is hashed as its Lua token stream
 (`lib/lua_fingerprint.py`, the one definition `savestate_stamp.sh`,

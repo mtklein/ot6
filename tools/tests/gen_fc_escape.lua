@@ -274,6 +274,7 @@ end
 local function nerapaAttempt(n)
   local F = H.newFightDriver("Nerapa", FIGHT_ESCAPE)
   local wipedN, lost, why, fenix0 = 0, false, nil, nil
+  local inBattle, randomBattle = false, false
   return H.cond(function() return nerapaWon end, {}, {
     n > 1 and lossReload(function() return nerapaBlob end, "Nerapa") or seq({}),
     -- the bag is sampled AFTER the reload (the reload restores it): the
@@ -314,8 +315,33 @@ local function nerapaAttempt(n)
       end, 30500, {
         H.call(function()
           if lost then H.setPad({}); return end
-          if H.battleLoadStarted() or H.battleActive() then F.frame(); return end
-          if H.dialogWaiting() then H.setPad(t % 16 < 4 and { "a" } or {}) else H.setPad({}) end
+          if H.battleLoadStarted() or H.battleActive() then
+            if not inBattle then
+              inBattle, randomBattle = true, H.readByte(H.RANDBTL) ~= 0
+            end
+            F.frame(); return
+          end
+          if inBattle then
+            inBattle = false
+            if randomBattle and nerapaUp() then
+              H.log(string.format("[Nerapa] attempt %d: a random battle came before Nerapa "
+                .. "(fought; master clock %d) -- talking to him again", n, H.readWord(0x1189)))
+            end
+          end
+          if H.dialogWaiting() then H.setPad(t % 16 < 4 and { "a" } or {}); return end
+          -- The step onto Nerapa's tile can draw a random encounter (the
+          -- talk gesture's first press walks (106,15) -> (107,15)), and it
+          -- comes back with Nerapa still standing: the v0.24 draws met a
+          -- side attack there on every rung (build/attempts/wt/v024-recut/
+          -- fc_escape/).  Back in the field with him up, talk again.
+          if nerapaUp() and H.hasControl() then
+            local c = t % 48
+            if c < 4 then H.setPad({ right = true })
+            elseif c >= 24 and c < 28 then H.setPad({ a = true })
+            else H.setPad({}) end
+            return
+          end
+          H.setPad({})
         end),
       }, string.format("Nerapa falls ($0361 clears), attempt %d", n))
     end)(),

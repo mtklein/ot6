@@ -259,7 +259,7 @@ local function enterDesertBattle(n)
     end, {}, {
       H.cond(function() return H.battleLoadStarted() end, {
         H.logStep("formation unsuitable -- fleeing for a fresh draw"),
-        H.fleeBattle(12000),
+        H.fleeBattle(12000, { onCantRun = "fight" }),
         H.waitFrames(240),
       }, {}),
       H.driveUntil(function() return H.battleLoadStarted() end, 25000, {
@@ -431,7 +431,7 @@ H.run({ maxFrames = 150000 }, {
           H.log(string.format("drain round %d: mp=%d", round, poolMp()))
         end),
         H.cond(function() return H.battleLoadStarted() end, {
-          H.fleeBattle(12000),
+          H.fleeBattle(12000, { onCantRun = "fight" }),
           H.waitFrames(240),
         }, {}),
         -- a real field care stop between rounds, the route's own pattern
@@ -449,7 +449,7 @@ H.run({ maxFrames = 150000 }, {
       "the pool really was drained below one steal by real attempts")
   end),
   H.cond(function() return H.battleLoadStarted() end, {
-    H.fleeBattle(12000),
+    H.fleeBattle(12000, { onCantRun = "fight" }),
     H.waitFrames(240),
   }, {}),
   -- and one more care stop, so the refusal battle is not fought by a party

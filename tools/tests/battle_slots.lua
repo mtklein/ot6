@@ -22,7 +22,15 @@
 --   Ot6BoostDmg's $0f gate: slot attacks never get the damage multiplier.
 
 -- battle_slotsboot covers tier 0 and tier 3 end to end on a natural
--- checkpoint boot.  This file covers the rest, in two parts:
+-- checkpoint boot.  This file covers the rest, in two parts.  Both share
+-- the draw (H.newEncounterDraw) and the party around Setzer -- care, the
+-- control cures and the lost point (H.newSpinnerCare) -- so the rules do
+-- not drift apart.  Untested in the new draw: the resolve loop's
+-- "dropped" branch and its fall with the spin queued (it asserts his
+-- books unmoved); "cancelled" was reached by the old draw, which fought
+-- Mind Candy packs (runs3/bso_k0 at 347d4b53), and none of the three by
+-- the candy (12 shifts) and fellsetzer (8 shifts) labs
+-- (build/attempts/wt/slotsboot-v024/lab4_attempts/bscd5_*, bsfs5_*).
 --
 --   The input-driven half (no writes): a second natural boot of the
 --   terra-returned-v1 SRAM checkpoint, driving the two tiers slotsboot
@@ -136,153 +144,35 @@ end
 
 -- The other members' windows.  Nobody but Setzer attacks (the formation
 -- has to stand through two resolutions per battle), so each of their
--- turns is care or a Defend, chosen once when the window opens:
---   * a dead member is raised with a Fenix Down, Setzer first, one raise in
---     flight at a time;
+-- turns is care, a cure or a Defend, chosen once when the window opens:
+-- H.newSpinnerCare (lib/ot6_field.lua), shared with battle_slotsboot.
+--   * Setzer's control taken (H.controlTaken: the Iron Fist's lone Stone
+--     is a Muddle, and the draw now always fights Vulture + Iron Fist): a
+--     Fenix Down for Death, an ally's plain Fight on him for Sleep or
+--     Muddle, the item the ROM's records name for the rest; then a
+--     muddled or sleeping ally the same way;
+--   * else a dead member is raised with a Fenix Down;
 --   * else a living member below CARE_PCT of max HP gets a Potion (a Tonic
 --     when the bag has no Potion), Setzer first, then the most hurt, one
 --     heal in flight per member;
 --   * else Defend (RIGHT opens the Def. side window, A commits it): the
 --     member guards while Setzer's spin is queued, and the window closes.
--- Before this the windows were handed on with X or left open, and a draw
--- that wore Setzer down left him spinning at 34/556 HP with nobody to heal
--- him: at MesenCE 2.2.1 shift 0 he died with the tier-2 spin committed and
--- unresolved, and the drive waited out its budget on LOCKE's open window
--- while the party bled out (build/attempts/wt/suites-2.2.1/).
-local CARE_PCT = 50
-local TONIC, POTION, FENIX = 0xE8, 0xE9, 0xF0
-local CMD_ITEM, ST_CMD, ST_ITEM, ST_TGT, ST_DEF = 0x01, 0x05, 0x0A, 0x38, 0x27
-local BATTINV, ITEMSCR, ITEMROW = 0x2686, 0x8947, 0x894F
-local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
+-- A window open for a member whose own control is taken is passed on
+-- with X.  Before this the windows were handed on with X or left open, and
+-- a draw that wore Setzer down left him spinning at 34/556 HP with nobody
+-- to heal him: at MesenCE 2.2.1 shift 0 he died with the tier-2 spin
+-- committed and unresolved, and the drive waited out its budget on LOCKE's
+-- open window while the party bled out (build/attempts/wt/suites-2.2.1/).
+-- A status no cure in reach answers fails at once, naming it
+-- (care.watch); one still on him DENY_MAX frames on fails too.
+local CARE_PCT, DENY_MAX = 50, 6000
+local care = H.newSpinnerCare({ spinner = function() return actor end,
+                                carePct = CARE_PCT, denyMax = DENY_MAX })
+local partyLine, otherWindow, otherWindowsReset = care.partyLine, care.window, care.reset
 local function chid(s) return H.readByte(0x3ED8 + s * 2) end
 local function php(s) return H.readWord(0x3BF4 + s * 2) end
 local function pmax(s) return H.readWord(0x3C1C + s * 2) end
 local function seated(s) return chid(s) ~= 0xFF and pmax(s) > 0 end
-local function partyLine()
-  local t = {}
-  for s = 0, 3 do
-    if seated(s) then
-      t[#t + 1] = string.format("%02X:%d/%d bp%d", chid(s), php(s), pmax(s), bp(s))
-    end
-  end
-  return table.concat(t, " ")
-end
-local function invIdx(item)
-  for i = 0, 251 do
-    if H.readByte(BATTINV + i * 5) == item and H.readByte(BATTINV + i * 5 + 3) > 0 then
-      return i
-    end
-  end
-end
-local function invCount(item)
-  local i = invIdx(item)
-  return i and H.readByte(BATTINV + i * 5 + 3) or 0
-end
-local raising = nil                       -- { e, f }: a Fenix Down in flight
-local healing = {}                        -- e -> { f, hp }: a heal in flight
-local cared = { heal = 0, raise = 0 }
-local W = { actor = nil, n = 0, plan = nil, tgt = nil, idx = nil, via = nil }
-local function carePlan(a)
-  if raising and (php(raising.e) > 0 or H.frame - raising.f > 900) then raising = nil end
-  for e, h in pairs(healing) do
-    if php(e) > h.hp or php(e) == 0 or H.frame - h.f > 900 then healing[e] = nil end
-  end
-  local order = {}
-  for s = 0, 3 do if seated(s) and chid(s) == SETZER then order[#order + 1] = s end end
-  for s = 0, 3 do if seated(s) and chid(s) ~= SETZER then order[#order + 1] = s end end
-  local itemCell = nil
-  for r = 0, 3 do
-    if H.readByte(0x202E + a * 12 + r * 3) == CMD_ITEM then itemCell = r end
-  end
-  if itemCell == nil then return "defend" end
-  if raising == nil and invIdx(FENIX) then
-    for _, s in ipairs(order) do
-      if php(s) == 0 then return "raise", s, invIdx(FENIX), itemCell end
-    end
-  end
-  local item = invIdx(POTION) and POTION or (invIdx(TONIC) and TONIC or nil)
-  if item == nil then return "defend" end
-  local pick, pickPct = nil, nil
-  for i, s in ipairs(order) do
-    local pct = php(s) * 100 // math.max(pmax(s), 1)
-    if php(s) > 0 and pct < CARE_PCT and healing[s] == nil then
-      -- Setzer first; otherwise the most hurt
-      if pick == nil or (chid(pick) ~= SETZER and pct < pickPct) then
-        pick, pickPct = s, pct
-      end
-    end
-  end
-  if pick then return "heal", pick, invIdx(item), itemCell, item end
-  return "defend"
-end
--- One frame of another member's window (MENU open, ACTOR not Setzer).
-local function otherWindow()
-  local a = H.readByte(ACTOR) & 3
-  -- a new window (another actor, or the same one after the menu closed)
-  -- chooses its plan
-  if W.actor ~= a then
-    W.actor, W.via, W.n = a, nil, 0
-    W.plan, W.tgt, W.idx, W.cell, W.item = carePlan(a)
-    if W.plan ~= "defend" then
-      H.log(string.format("[care] f%d actor %d (%02X): %s slot %d (%02X) with $%02X " ..
-        "(%d in the bag) | party %s", H.frame, a, chid(a), W.plan, W.tgt, chid(W.tgt),
-        W.plan == "raise" and FENIX or W.item,
-        invCount(W.plan == "raise" and FENIX or W.item), partyLine()))
-    end
-  end
-  W.n = W.n + 1
-  local ph = W.n % 10
-  local st = H.readByte(MSTATE)
-  local function tap(b) H.setPad(ph < 5 and { [b] = true } or {}) end
-  if W.plan == "defend" then
-    if st == ST_CMD then
-      if pend(a) > 0 then tap("l") else tap("right") end
-    elseif st == ST_DEF then tap("a")
-    elseif st == 0x0A or st == 0x30 or st == 0x16 or st == 0x24 or st == 0x0E
-        or st == ST_TGT then tap("b")
-    else H.setPad({}) end
-    return
-  end
-  if st == ST_CMD then
-    local cur = H.readByte(0x890F + a)
-    if cur ~= W.cell then tap(cur < W.cell and "down" or "up"); return end
-    if pend(a) > 0 then tap("l"); return end             -- care goes unboosted
-    W.via = "cmd"
-    tap("a")
-  elseif st == ST_ITEM then
-    local cur = H.readByte(ITEMSCR + a) + H.readByte(ITEMROW + a)
-    if cur ~= W.idx then tap(cur < W.idx and "down" or "up"); return end
-    W.via = "item"
-    tap("a")
-  elseif st == ST_TGT then
-    if W.via ~= "item" and W.via ~= "confirmed" then tap("b"); return end
-    local chars = H.readByte(TGTCHARS)
-    if H.readByte(TGTMONS) ~= 0 or chars == 0 then
-      tap(H.battleLayout().toChars[1])
-      return
-    end
-    if chars ~= (1 << W.tgt) then
-      local cur = 0
-      for s = 3, 0, -1 do if chars & (1 << s) ~= 0 then cur = s end end
-      tap(cur < W.tgt and "down" or "up")
-      return
-    end
-    if ph < 5 and W.via == "item" then
-      W.via = "confirmed"
-      if W.plan == "raise" then raising = { e = W.tgt, f = H.frame }
-      else healing[W.tgt] = { f = H.frame, hp = php(W.tgt) } end
-      cared[W.plan] = cared[W.plan] + 1
-      H.log(string.format("[care] f%d actor %d confirms the %s on slot %d (#%d)",
-        H.frame, a, W.plan, W.tgt, cared[W.plan]))
-    end
-    tap("a")
-  elseif st == 0x30 or st == 0x16 or st == 0x24 or st == 0x27 or st == 0x0E then
-    tap("b")                                  -- a window care never means to be in
-  else
-    H.setPad({})
-  end
-end
-local function otherWindowsReset() W.actor, W.plan = nil, nil end
 
 -- Setzer falling.  A character who falls with a command queued never runs
 -- it: measured at MesenCE 2.2.1 shift 0 (the old suite), Setzer committed
@@ -307,35 +197,58 @@ local function watchFall(tag)
   end
   return lostBattle
 end
+-- The formation falling before the phases are done loses the battle the
+-- same way, and so does the lost point (care.lostPoint, the rule
+-- battle_slotsboot plays by: the formation down to the lone Iron Fist,
+-- whose Stone is then live; two or more members out of control; no ally
+-- left in control).  Read while waiting for his window only, so a spin in
+-- flight as the formation thins is still played to its resolution.  The formation does fall at a second
+-- resolution (battle_slotsboot n3_k1_s0, n3_k4_s0 in
+-- build/attempts/wt/slotsboot-v024/runs3/), which is why a battle here
+-- can be lost and a fresh one drawn rather than assumed to stand.
+local function formationDown()
+  for m = 0, 5 do
+    if (H.readByte(0x3AA8 + m * 2) & 1) == 1 and H.readWord(0x3BFC + m * 2) > 0 then
+      return false
+    end
+  end
+  return true
+end
+local function loseBattle(tag, why)
+  if lostBattle then return end
+  lostBattle = true
+  lostBattles = lostBattles + 1
+  H.log(string.format("[slots] f%d %s: %s -- this battle is lost to the test (#%d); "
+    .. "a fresh battle | party %s", H.frame, tag, why, lostBattles, partyLine()))
+end
+local function watchFormation(tag)
+  if not lostBattle and actor and H.battleLoadStarted() then
+    local why = formationDown() and "the formation fell before the spins were done"
+      or care.lostPoint()
+    if why then
+      lostBattle = true
+      lostBattles = lostBattles + 1
+      H.log(string.format("[slots] f%d %s: %s -- this battle is lost to the test (#%d); "
+        .. "a fresh battle | party %s", H.frame, tag, why, lostBattles, partyLine()))
+    end
+  end
+  return lostBattle
+end
 -- One frame of the party while Setzer waits on a queued spin or lies
 -- fallen: messages paged with A, the other members' windows played
 -- (otherWindow), his own window left alone.
 local function partyTurn()
+  -- the lost point is read at his next window (menuFor), not here: a spin
+  -- in flight as the formation thins is still played to its resolution
+  if actor and not lostBattle and not care.lostPoint() then care.watch("party turn") end
   if H.readByte(MENU) == 0 then
     otherWindowsReset()
     H.setPad(H.frame % 8 < 4 and { a = true } or {})
-  elseif H.readByte(ACTOR) ~= actor then
+  elseif H.readByte(ACTOR) ~= actor or care.spinnerTaken() then
     otherWindow()
   else
     otherWindowsReset()
     H.setPad({})
-  end
-end
--- One frame of the party after Setzer's fall, until he stands past
--- CARE_PCT: every window, his own included, plays its care plan.  His own
--- window used to be left alone here, so a raised Setzer whose window
--- opened before anyone else's held the menu with nobody healing him, and
--- the recovery waited out its budget (#346).  carePlan puts him first, so
--- his own window drinks a Potion (or Defends once he is past CARE_PCT).
-local function recoveryTurn()
-  if H.readByte(MENU) == 0 then
-    otherWindowsReset()
-    H.setPad(H.frame % 8 < 4 and { a = true } or {})
-  elseif H.readByte(ACTOR) == actor and php(actor) == 0 then
-    otherWindowsReset()                -- his window, closing as he falls
-    H.setPad({})
-  else
-    otherWindow()
   end
 end
 
@@ -348,12 +261,15 @@ local function menuFor(charId, what)
   local started = nil
   local function up()
     return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == slotOf[charId]
+      and H.controlTaken(slotOf[charId]) == nil
   end
   return H.withReset(H.driveUntil(function() return up() or lostBattle end, 30000, {
     H.call(function()
       ph = ph + 1
       started = started or H.frame
       watchFall(what)
+      watchFormation(what)
+      if actor and not lostBattle then care.watch(what) end
       -- Where is the machine?  A menu that never arrives is usually a battle
       -- that has ended or a party that is dying, and neither says so on its
       -- own: the drive just stops logging until the budget runs out.
@@ -379,7 +295,8 @@ local function menuFor(charId, what)
           H.screenshot("slots_stall")
         end
       end
-      if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= slotOf[charId] then
+      if H.readByte(MENU) ~= 0 and (H.readByte(ACTOR) ~= slotOf[charId]
+          or H.controlTaken(slotOf[charId]) ~= nil) then
         otherWindow()
       else
         otherWindowsReset()
@@ -412,6 +329,17 @@ local function bankPending(want, what)
   return H.withReset(H.repeatN(1, {
     H.driveUntil(function() return lostBattle or pend(actor) >= want end, 1500, {
       H.call(function()
+        if bp(actor) < want and not lostBattle then
+          -- the bank no longer covers the tier: a turn the engine took for
+          -- him (a Muddle) dumped it under Ot6Retaliate, and a bank is per
+          -- battle, so this battle is lost to the test
+          lostBattle = true
+          lostBattles = lostBattles + 1
+          H.log(string.format("[slots] f%d %s: the bank holds %d, short of tier %d -- this "
+            .. "battle is lost to the test (#%d); a fresh battle | party %s", H.frame, what,
+            bp(actor), want, lostBattles, partyLine()))
+          return
+        end
         if taps >= 12 then
           error(string.format("%s: R tapped %d times and pending still reads "
             .. "%d (want %d) -- the press is not being stored at all",
@@ -472,66 +400,34 @@ local function openSlotWindow(what)
   })
 end
 
--- Walk the plain until an encounter worth spinning in turns up, then take
--- the party's slots off it.  Used twice: once for the battle H1 is played
--- in, once for the fresh battle H2 needs (see the comment at that call).
--- The floor is two live bodies and 900 total max HP, which is what a
--- formation needs to still be standing after two Slot resolutions.
-local function drawBattle(tag, tries)
-  local steps = { H.call(function() H.vars.suitable = false end) }
-  local pattern = { "down", "down", "right", "right", "down", "down",
-                    "left", "left" }
-  for n = 1, tries do
-    local w = {
-      (function()
-        local ph = 0
-        return H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
-          H.call(function()
-            ph = ph + 1
-            H.setPad({ [pattern[(math.floor(ph / 20) % #pattern) + 1]] = true })
-          end),
-        }, tag .. ": a real world encounter fires (draw " .. n .. ")")
-      end)(),
-      H.release(),
-      H.waitUntil(function() return H.battleActive() end, 900,
-        tag .. ": battle active (draw " .. n .. ")", 30),
-      H.waitFrames(240),
-      H.call(function()
-        msPresent = {}
-        for m = 0, 5 do
-          if H.readByte(0x3AA8 + m * 2) % 2 == 1 then
-            msPresent[#msPresent + 1] = m
-          end
-        end
-        local mhp = 0
-        for _, m in ipairs(msPresent) do mhp = mhp + H.readWord(0x3BFC + m * 2) end
-        H.vars.suitable = (#msPresent >= 2 and mhp >= 900)
-        H.log(string.format("%s draw %d: %d bodies, %d total max HP -> %s",
-          tag, n, #msPresent, mhp, H.vars.suitable and "FIGHT" or "flee"))
-      end),
-      H.cond(function() return not H.vars.suitable end, {
-        H.fleeBattle(9000),
-        H.waitUntil(function()
-          return H.worldMode() and H.worldHasControl()
-        end, 1200, tag .. ": back on the plain after draw " .. n, 10),
-        H.waitFrames(30),
-      }, {}),
-    }
-    if n == 1 then
-      for _, s in ipairs(w) do steps[#steps + 1] = s end
-    else
-      steps[#steps + 1] = H.cond(function() return not H.vars.suitable end, w, {})
-    end
-  end
+-- Reach an encounter worth spinning in, then take the party's slots off
+-- it.  Used twice: once for the battle H1 is played in, once for the
+-- fresh battle H2 needs (see the comment at that call).  The draw is
+-- battle_slotsboot's (H.newEncounterDraw, lib/ot6_field.lua): pace a
+-- stretch of the disembark row that rolls one group, budget the
+-- encounters over every counter state from the pool's decode, run from
+-- the rest or fight out a pack that cannot be run from, care after each.
+-- The floor is two bodies and 600 max HP with no monster that can take
+-- Setzer's turn on any of its own (H.judgeFormation).  It was 900 HP by
+-- live count, which let Mind Candy x4 (1160 HP, SleepSting on any turn)
+-- through, and no slot of the Blackjack's plain (group 10) reaches 900
+-- without a Mind Candy.  The Vulture + Iron Fist it deals (745) does not
+-- always stand through two resolutions (battle_slotsboot's n3_k1_s0 and
+-- n3_k4_s0 lost it at the second), so a formation that falls loses the
+-- battle to the test and a fresh one is drawn (watchFormation).
+local function drawBattle(tag)
+  local D = H.newEncounterDraw({ tag = tag, minBodies = 2, minHp = 600 })
+  local steps = D.steps()
   steps[#steps + 1] = H.call(function()
-    H.assertEq(H.vars.suitable, true,
-      tag .. ": the pool dealt a two-resolution formation")
+    msPresent = D.msPresent
     for s = 0, 3 do
       local id = H.readByte(0x3ED8 + s * 2)
       if id ~= 0xFF then slotOf[id] = s end
     end
     H.assertEq(slotOf[SETZER] ~= nil, true, tag .. ": SETZER present")
     actor = slotOf[SETZER]
+    H.assertEq(bp(actor), 1, tag .. ": the battle opens at 1 bp (Ot6InitBP), read before "
+      .. "any turn of his -- a bank is per battle")
     H.log(string.format("%s: setzer slot %d monsters={%s} joker=$%02x",
       tag, actor, table.concat(msPresent, ","), H.readByte(JOKER)))
   end)
@@ -610,8 +506,10 @@ local function playedSpin(tag, checks, want)
     end, 30000, attempt, tag .. ": a spin played to its commit"),
     H.call(function()
       if lostBattle then return end
-      H.assertEq(committed, true,
-        tag .. ": a spin was played to its commit before the battle ended")
+      if not committed then
+        loseBattle(tag, "the battle ended before the spin committed")
+        return
+      end
       H.log(string.format("%s: committed on spin %d", tag, spins))
       if checks.afterCommit then checks.afterCommit() end
     end),
@@ -674,7 +572,18 @@ local function resolveLoop(tag)
         H.readByte(MENU), H.readByte(ACTOR), H.readByte(MSTATE),
         tostring(H.battleLoadStarted()), H.monstersPresent(), partyLine()))
     end
-    if not H.battleLoadStarted() or watchFall(tag) then return true end
+    local wasLost = lostBattle
+    if not H.battleLoadStarted() or watchFall(tag) then
+      if not wasLost and lostBattle and php(actor) == 0
+         and (actEnd[actor * 2] or 0) == r0 then
+        -- he fell with the spin queued: it never ran, and nothing was
+        -- charged for it (#346)
+        H.assertEq(pend(actor) == p0 and bp(actor) == b0, true, string.format("%s: he fell "
+          .. "with the spin queued and his books unmoved (pend %d -> %d, bp %d -> %d)",
+          tag, p0, pend(actor), b0, bp(actor)))
+      end
+      return true
+    end
     local ran = (actEnd[actor * 2] or 0) - r0
     local cmd = actEndCmd[actor * 2] or 0xFF
     if ran > 0 and cmd ~= CMD_SLOT then
@@ -755,7 +664,7 @@ local function resolvedSpin(tag, checks, want)
     end, 60000, body, tag .. ": the spin resolves"),
     H.call(function()
       if lostBattle then return end
-      H.assertEq(spinDone, true, tag .. ": the spin resolved before the battle ended")
+      if not spinDone then loseBattle(tag, "the battle ended before the spin resolved") end
     end),
   })
 end
@@ -771,26 +680,25 @@ end
 local function battleHalf(tag, phases)
   local done = false
   local body = { H.call(function() lostBattle = false end) }
-  for _, s in ipairs(drawBattle(tag, 6)) do body[#body + 1] = s end
+  for _, s in ipairs(drawBattle(tag)) do body[#body + 1] = s end
   for _, s in ipairs(phases) do
     body[#body + 1] = H.cond(function() return not lostBattle end, { s })
   end
   body[#body + 1] = H.cond(function() return lostBattle end, {
     H.call(function()
-      H.assertEq(lostBattles <= MAX_LOST, true, string.format("Setzer fell in %d " ..
-        "battles (the bound is %d): the party cannot keep him standing through " ..
-        "a spin", lostBattles, MAX_LOST))
+      H.assertEq(lostBattles <= MAX_LOST, true, string.format("%d battles lost to the " ..
+        "test (Setzer fell, the formation fell, or the bank was dumped; the bound is " ..
+        "%d)", lostBattles, MAX_LOST))
     end),
-    H.driveUntil(function()
-      return (php(actor) > 0 and php(actor) * 100 >= pmax(actor) * CARE_PCT)
-        or not H.battleLoadStarted()
-    end, 9000, { H.call(function() recoveryTurn() end), H.waitFrames(1) },
-      tag .. ": SETZER raised and healed after his fall"),
-    H.fleeBattle(12000),
+    -- the party Fights the battle out (care.fightOut: every member with
+    -- control Fights the first monster standing), as battle_slotsboot
+    -- does, then field care raises and heals Setzer for the fresh battle
+    care.fightOut(tag),
     H.waitUntil(function()
       return H.worldMode() and H.worldHasControl()
     end, 1800, tag .. ": back on the plain for a fresh battle", 10),
-    H.waitFrames(60),
+    H.waitFrames(30),
+    H.careStop(tag .. ": care after the lost battle"),
   }, { H.call(function() done = true end) })
   return { H.driveUntil(function() return done end, 150000, body, tag .. ": played") }
 end
@@ -859,9 +767,6 @@ add({ H.call(function() armWatches() end) })
 add(battleHalf("H1 battle", {
   -- ---------------------------------------------- H1: the tier-1 spin
   menuFor(SETZER, "setzer menu (H1)"),
-  H.call(function()
-    H.assertEq(bp(actor), 1, "battle opens at 1 bp (Ot6InitBP)")
-  end),
   bankPending(1, "H1"),
   H.call(function()
     H.assertEq(pend(actor), 1, "one real R press banks pending 1")
@@ -901,18 +806,13 @@ add(battleHalf("H1 battle", {
 -- assumed, and both regen steps (0 -> 1 in the first fight, 1 -> 2 in the
 -- second) are still real unboosted spins.
 add({
-  H.fleeBattle(12000),
+  H.fleeBattle(12000, { onCantRun = "fight" }),
   H.waitUntil(function()
     return H.worldMode() and H.worldHasControl()
   end, 1800, "back on the plain for H2's own battle", 10),
   H.waitFrames(60),
 })
 add(battleHalf("H2 battle", {
-  H.call(function()
-    H.assertEq(bp(actor), 1,
-      "the second battle re-seeds the bank at Ot6InitBP's 1 -- a bank is "
-      .. "per battle, which is why H2 gets its own")
-  end),
   menuFor(SETZER, "setzer menu (bank spin 2)"),
   resolvedSpin("bank2", {}, 0),
   H.call(function()
@@ -960,8 +860,10 @@ add(battleHalf("H2 battle", {
     H.assertEq(#mulHits, 0,
       "EXEMPTION (unrigged half): the damage multiplier never ran under cmd "
       .. "$0f across all four natural resolutions")
-    H.log("unrigged half complete: tier-1 and tier-2 store/rig/bless/economy "
-      .. "on a natural boot")
+    H.log(string.format("unrigged half complete: tier-1 and tier-2 store/rig/bless/economy "
+      .. "on a natural boot; control taken %d time(s), cures confirmed %d hit / %d item / "
+      .. "%d raise, battles lost to the test %d", care.taken.n, care.cared.hit,
+      care.cared.cure, care.cared.raise, lostBattles))
   end),
 }))
 

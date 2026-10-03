@@ -23,11 +23,12 @@ directory changes.
 
 A `.mss` belongs to one ROM, so after a ROM change every generated state
 regenerates, each from the one before it. To keep that from being one long
-serial run, the World of Balance chain is cut where the play saves (at a
+serial run, the chain is cut where the play saves (at a
 save point, or on the world map, where the game lets you save anywhere):
 an entry in
 `tools/tests/savestate_graph.py` with both `prev=` and `checkpoint=` is a
-cut. The leg before it ends by saving there through the real Save UI and
+cut, and `prev=` names the state whose play ends where the save begins.
+The leg before it ends by saving there through the real Save UI and
 asserting the checkpoint's contract as its exit
 (`H.saveAtCheckpoint`, `lib/ot6_contract.lua`); the leg after it
 Continues the save and asserts the same contract as its entry
@@ -35,18 +36,44 @@ Continues the save and asserts the same contract as its entry
 checkpoint in `tools/tests/checkpoints/`, which still loads after a ROM
 change, so the legs regenerate at once.
 
+Two variants. In the Vector arc the save is made by a separate,
+capture-only script booted from `prev`'s savestate rather than by
+`prev`'s own run: `cutter=` names it (`gen_post_opera_checkpoint` from
+blackjack, `gen_mrf_save_room_checkpoint`, `gen_n024_save_checkpoint`,
+`gen_minecart_platform_checkpoint`, `gen_terra_returned_checkpoint` from
+n128_won). Qualification never runs a cutter. And `saves=` marks a run
+that ends by saving a tracked checkpoint no cut boots yet: the frontier
+(`wor-falcon-v1`) and `crescent-landing-v1` (thamasa_night boots the
+savestate).
+
 `ninja chain` plays the whole chain from power-on instead: `chain_<state>`
 copies of every state from the first cut on, each booted from the copy
 before it and, at a cut, from the save the producing copy just made
 (captured with `OT6_CAPTURE_SRM` and sealed into
-`build/checkpoints/<key>/`). It is the one alias besides `release`,
+`build/checkpoints/<key>/`); a cutter runs from the copy of its `prev`,
+publishes no state, and records the ROM it played on in
+`build/checkpoints/<key>.rom`. The line runs from power-on through the
+Opera, the Vector arc, the Floating Continent and every World of Ruin leg
+to wor_falcon. No boundary on it lacks a state to chain from: the World of
+Balance -> World of Ruin crossing is a plain savestate link (wor_landing ->
+wor_island, no save between), and wor-start-v1 is made by wor_start's own
+run from wor_island's save. It is the one alias besides `release`,
 because the chain's last state moves as cuts and legs are added.
 `ninja release` depends on it. Run it too when a leg's exit contract
 fails in qualification: the chain says whether the story still plays
-through.
+through. It is long and serial (the World of Ruin legs alone carry
+3600-7200 s caps); bare `ninja` never runs it.
+
+Every tracked checkpoint something boots (a state, or a suite in
+`configure.py`'s `TEST_ENV`) is captured on that line. The rest are named
+in the graph's `NOT_GATED` with the reason (today: the four
+`reseal_seeds.sh` seeds and `vector-escape-v1`, which nothing boots).
+Qualification's `checkpoint_coverage` check
+(`savestate_ninja.py --coverage`) refuses any other tracked checkpoint, so
+a new leg that boots a checkpoint with no `prev=` fails `ninja`.
 
 A tracked checkpoint drifts from today's play as the route changes above
-it. At each cut the chain prints the drift (`tools/tests/lib/checkpoint_drift.py`),
+it. At each capture the chain prints the drift (`tools/tests/lib/checkpoint_drift.py`),
 explained in play terms: every character's level, experience, HP/MP and
 gear, gil and the bag, story switches, encounter counters, spells and
 skills, the OT6 codex, and any other differing byte by address.
@@ -59,7 +86,8 @@ report shows a material change:
     ninja chain
     python3 tools/tests/lib/checkpoint_drift.py --recut <key>...
 
-`--recut` copies the chain's sealed capture over the tracked checkpoint;
+`--recut` copies the chain's sealed capture over the tracked checkpoint
+(any key the chain captures, World of Ruin legs and cutters included);
 then commit and qualify again. The contracts stay light: a suite that
 needs a level or an item asserts its own precondition.
 
@@ -92,6 +120,85 @@ The non-brew pieces need the manual steps at each bullet.
   dies on first launch as DllNotFoundException → Abort trap 6.
 - **dotnet@8** — via Homebrew (keg-only); only for building OT6's Mesen
   (`tools/mesen/build.sh` finds it), not for running it.
+- **openjdk@21** and **android-commandlinetools** — via Homebrew; only
+  for the Android patcher APK (below), which only `ninja release` builds.
+
+## Android patcher
+
+`android/` is OT6 Patcher, a small Android app (plain Java, no libraries)
+shipped as `ot6-vX.Y.apk` on each GitHub release so Obtainium can keep a
+handheld current. It carries the release's .bps. Setup is one step: the
+player grants the folder holding their ROM, and the app finds the ROM there
+by size and CRC32 (`RomScan.java`; a 512-byte copier header is stripped),
+applies the patch, checks the target CRC32 and writes `OT6.sfc` beside it.
+Picking the ROM file is the fallback. After every update a
+`MY_PACKAGE_REPLACED` receiver does it again, silently: the remembered ROM
+if it still matches, else a fresh scan. Results go to the app's settings
+and logcat (tag `OT6Patcher`), never a notification; the app asks for no
+permissions. Installs set up by the first v0.23 build (a picked ROM plus an
+output folder) keep working unchanged.
+
+Built with the plain SDK tools by `tools/android/build_apk.sh` (aapt2,
+javac, d8, zipalign, apksigner; no Gradle). The pieces, as installed on
+this Mac (the release machine) on 2026-10-02:
+
+```sh
+brew bundle    # openjdk@21 (21.0.12.1), cask android-commandlinetools
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 sdkmanager \
+  --sdk_root=/opt/homebrew/share/android-commandlinetools \
+  "build-tools;35.0.1" "platforms;android-35"
+```
+
+`tools/android/env.sh` pins those versions (minSdk 26, targetSdk 35) and
+finds them through `JAVA_HOME` and `ANDROID_HOME` when set; a missing
+piece stops the build with the line above. The ninja edges:
+
+- `build/checks/android_bps.ok` runs the app's BPS code
+  (`android/src/.../Bps.java`) on the JVM: the patch must rebuild
+  `build/ot6.sfc` from the base ROM byte for byte, and a corrupted patch,
+  a wrong ROM and a short ROM must be refused (`android/test/BpsTest.java`).
+  It also runs the folder scan: the ROM found by CRC32 among other files,
+  a copier-headered copy matched, OT6.sfc never a candidate, wrong-size
+  files never read, and nothing chosen when nothing matches.
+  It needs a JDK only, and no qualification.
+- `build/release/ot6-vX.Y.apk` carries `build/android/ot6.bps`, made by the
+  release patch's own flips command from the same two ROMs, so it builds
+  without qualification. versionName is VERSION exactly, with no "v":
+  Obtainium reconciles a release tag `v0.24` with an installed `0.24` but
+  not the other way round (its `reconcileVersionDifferences` takes the
+  installed version as the template). versionCode is
+  major×1000000 + minor×10000 + patch×100 + (N for `-rcN`, else 99), so
+  0.24-rc1 → 240001 < 0.24 → 240099 < 0.24.1 → 240199; another VERSION
+  shape fails only this edge, saying so.
+- `build/checks/android_apk.ok` (`tools/android/verify_apk.sh`):
+  `apksigner verify --print-certs` must show the certificate pinned in
+  `android/release-cert.sha256`, `aapt2 dump badging` the package
+  `io.github.mtklein.ot6patcher`, the label "OT6 Patcher", the versionCode,
+  versionName, minSdk and targetSdk, no permissions and not debuggable (a
+  test build fails), and the APK must carry the patch the host check tested.
+- `build/checks/android_apk_release.ok`: that patch is byte for byte the
+  qualified release .bps (so this one needs qualification).
+
+`ninja release` builds all of them, so a release needs the JDK, the SDK and
+the signing key; bare `ninja` builds none of them. Without qualification,
+`ninja build/release/ot6-vX.Y.apk build/checks/android_apk.ok` builds and
+checks the APK alone.
+
+**The signing key.** Installed copies accept updates signed with one key
+only, forever. It lives outside the repo at
+`~/.config/ot6/android-release.jks` (PKCS12, alias `ot6`, certificate
+SHA-256 `e27bba94…0a9d49`, the full digest in `android/release-cert.sha256`);
+its password is the login Keychain item `ot6-android-release` (account
+`ot6`), which the build reads with `security find-generic-password -w`.
+Back both up. A missing keystore stops the build rather than making a new
+key; `tools/android/new_keystore.sh` made the first one and refuses to
+replace it.
+
+**Test builds** install beside a player's copy when built with
+`OT6_APK_PACKAGE=io.github.mtklein.ot6patcher.test`: their own settings,
+their own update broadcasts, and the label "OT6 Patcher TEST". They are
+debuggable, so `adb shell run-as io.github.mtklein.ot6patcher.test cat
+shared_prefs/ot6.xml` shows the last result.
 
 Only the ROMs, `build/`, `build.ninja`, `tools/Mesen.app`, and `tools/bin`
 are git-ignored. Ripped assets are tracked.

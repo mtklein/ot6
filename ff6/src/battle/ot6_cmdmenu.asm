@@ -401,9 +401,15 @@
         beq     @bushido
         cmp     #$03
         beq     @thief
+        cmp     #$04
+        beq     @setzer
         pla                     ; blitz
         jsl     Ot6CostFor
         jml     Ot6PendPrice
+@setzer:
+        pla                     ; Setzer's table: flat, like the thief rows
+        jml     Ot6SetzerCost   ;   (Ot6BoostDmg gates cmd $0f); Coin Toss and
+                                ;   Hired Help are paid in gil, not MP
 @bushido:
         pla
         jml     Ot6CostFor      ; the tech's own row price, unescalated
@@ -555,6 +561,8 @@
         .i16
         pha                     ; [S+1] park the MP grey
         lda     $6168
+        cmp     #$04
+        beq     @setzer         ; Setzer's table: the purse and the divine
         cmp     #$03
         beq     @thief          ; the thief submenu's own BP reason
         cmp     #$02
@@ -612,6 +620,11 @@
         rtl
 @pass:  pla                     ; MP grey (unchanged)
         rtl
+; Setzer's table (w7e6168 = 4): a coin row the purse cannot pay at the pending
+; boost, or a Jackpot already spent this battle (ot6_setzer.asm)
+@setzer:
+        pla                     ; the MP grey
+        jml     Ot6SetzerRowGrey
 .endproc
 
 ; ------------------------------------------------------------------------------

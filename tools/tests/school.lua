@@ -241,8 +241,8 @@ local cases = {
     },
   },
   {
-    id = 0x0276, pages = 5,
-    -- In OT6, Blitz, Tools, SwdTech, Steal, Dance and Rage cost MP. If you can't pay, the skill is greyed out.{page}Cyan's SwdTech: there is no charge gauge. It lists his three best skills, for 1, 2 and 3 Boost Points.{page}Steal, Slot and Rage: each Boost Point improves the odds instead of adding damage.{page}With 3 points, Steal always works and gets the rare item, if any, and Rage always uses its special.{page}Shadow: once a battle, his hit that breaks a monster, or hits a broken one, kills it. Most bosses just stay broken.
+    id = 0x0276, pages = 7,
+    -- In OT6, Blitz, Tools, SwdTech, Steal, Dance and Rage cost MP. If you can't pay, the skill is greyed out.{page}Cyan's SwdTech: there is no charge gauge. It lists his three best skills, for 1, 2 and 3 Boost Points.{page}Steal, Slot and Rage: each Boost Point improves the odds instead of adding damage.{page}With 3 points, Steal always works and gets the rare item, if any, and Rage always uses its special.{page}Shadow: once a battle, his hit that breaks a monster, or hits a broken one, kills it. Most bosses just stay broken.{page}Setzer's Slot opens a list. Coin Toss throws Gil at every monster; Hired Help buys one blow it is weak to.{page}Both cost Gil, not MP. A Boost Point buys one more toss or blow. Later: Jackpot, 99 MP, once a battle.
     bytes = {
       0x28, 0x94, 0x2E, 0x33, 0x5A, 0x98, 0x21, 0xD6, 0x4D, 0x53, 0x98, 0x33,
       0xF2, 0x45, 0x4C, 0x98, 0x32, 0x50, 0x3D, 0x33, 0x3E, 0xFC, 0x98, 0x32,
@@ -269,7 +269,19 @@ local cases = {
       0xA1, 0x89, 0x3A, 0x44, 0x86, 0xB9, 0x46, 0x9F, 0x9E, 0x87, 0x98, 0xB0,
       0x91, 0xA5, 0x86, 0xB9, 0x3B, 0xCA, 0xF3, 0x94, 0x9F, 0x3E, 0x98, 0x44,
       0xF8, 0x45, 0x86, 0xA5, 0xFB, 0x2C, 0x48, 0x9E, 0xA1, 0x48, 0x4C, 0xB7,
-      0x86, 0x43, 0xCB, 0x84, 0x9E, 0xF4, 0xA1, 0xCA, 0xF3, 0x47, 0x65, 0x00,
+      0x86, 0x43, 0xCB, 0x84, 0x9E, 0xF4, 0xA1, 0xCA, 0xF3, 0x47, 0x65, 0x13,
+      0x32, 0xD0, 0x53, 0x87, 0xB4, 0x7F, 0x32, 0xEA, 0x84, 0x48, 0xBC, 0x47,
+      0x86, 0xB9, 0xD6, 0x9E, 0xFB, 0x22, 0x48, 0x8A, 0x7F, 0x33, 0x48, 0x4C,
+      0x86, 0x83, 0xCA, 0x50, 0x86, 0x26, 0xF8, 0x88, 0x84, 0x3E, 0x99, 0x4B,
+      0xA3, 0x46, 0x9F, 0x9E, 0x87, 0x68, 0x7F, 0x27, 0x42, 0x89, 0x8C, 0x27,
+      0xE5, 0x49, 0xA1, 0x4E, 0x52, 0x86, 0x9F, 0x80, 0x3B, 0xEA, 0xF5, 0xA5,
+      0x97, 0x86, 0xCE, 0x3A, 0xF0, 0x96, 0x65, 0x13, 0x21, 0x48, 0x83, 0xB2,
+      0x48, 0x9E, 0x7F, 0x26, 0xF8, 0x98, 0xED, 0x84, 0x2C, 0x2F, 0xFB, 0x20,
+      0x7F, 0x21, 0xF2, 0x9E, 0x7F, 0x2F, 0x48, 0x8A, 0x84, 0x3B, 0x4E, 0x52,
+      0x86, 0x9F, 0x80, 0x46, 0xB0, 0x80, 0x96, 0x4C, 0x86, 0xB0, 0xA1, 0xEA,
+      0x50, 0xFB, 0x2B, 0x95, 0x87, 0x82, 0x29, 0xEE, 0x44, 0x49, 0x48, 0x4D,
+      0x98, 0x5D, 0x5D, 0x7F, 0x2C, 0x2F, 0x98, 0x9F, 0xEF, 0x88, 0xA1, 0x95,
+      0x4D, 0xB6, 0x65, 0x00,
     },
   },
 }
@@ -326,9 +338,25 @@ local function pressWalk(dir, pred, maxFrames, what)
 end
 
 -- Walk to a room's tile and step through the door above/below it.
-local function door(x, y, dir, dest, what)
+-- The hall's (104) three north doors sit at y=45, x=93/99/108.  A walk to
+-- one must not step on another: the wandering ghost (obj $14) can stand in
+-- the x=108 column, and the plan around it then ran over the x=99 door into
+-- the middle room (the v0.24 re-cut's narshe-mission-v1;
+-- build/attempts/wt/v024-recut/suite_fixes/summary.txt).  So a hall door's
+-- walk avoids the other two, and waits out the ghost when it blocks the
+-- only way.
+local HALL_DOORS = { 93, 99, 108 }
+local function otherHallDoors(x)
+  local out = {}
+  for _, dx in ipairs(HALL_DOORS) do
+    if dx ~= x then out[#out + 1] = { dx, 45 } end
+  end
+  return out
+end
+
+local function door(x, y, dir, dest, what, avoid)
   return {
-    H.navTo(x, y, { maxFrames = 6000, playBattles = true }),
+    H.navTo(x, y, { maxFrames = 6000, playBattles = true, avoid = avoid }),
     pressWalk(dir, function() return map() == dest end, 1200, what),
     H.waitUntil(settled(dest), 1800, what .. ": control", 5),
     H.waitFrames(20),
@@ -486,18 +514,21 @@ H.run({ maxFrames = 200000 }, flat({
   talkAfterYes(0x14, 0x0273, 0x0274, "hall"),
 
   -- right room (107): the practice dare beside the monster chest
-  door(108, 46, "up", 107, "hall door x=108 -> right room"),
+  door(108, 46, "up", 107, "hall door x=108 -> right room",
+       otherHallDoors(108)),
   talk(0x14, 0x025D, "right room"),
   door(57, 35, "down", 104, "right room -> hall"),
 
   -- middle room (106)
-  door(99, 46, "up", 106, "hall door x=99 -> middle room"),
+  door(99, 46, "up", 106, "hall door x=99 -> middle room",
+       otherHallDoors(99)),
   talk(0x15, 0x0267, "middle room"),
   talk(0x12, 0x0264, "middle room"),
   door(57, 35, "down", 104, "middle room -> hall"),
 
   -- left room (105)
-  door(93, 46, "up", 105, "hall door x=93 -> left room"),
+  door(93, 46, "up", 105, "hall door x=93 -> left room",
+       otherHallDoors(93)),
   talk(0x13, 0x026D, "left room"),
   talk(0x16, 0x0270, "left room"),
   talk(0x14, 0x026E, "left room"),

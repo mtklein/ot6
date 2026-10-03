@@ -464,13 +464,36 @@ def _route_coords(names):
         return {}
 
 
+# Keep the screen on while a page is shown (the Screen Wake Lock API), e.g.
+# a laptop's display left showing the grid.  A browser drops the lock when
+# the tab is hidden, and some want a user gesture first, so it is asked for
+# again on return, on any click, and once a minute.
+WAKE_JS = """<script>
+(function () {
+  if (!('wakeLock' in navigator)) return;
+  let lock = null;
+  async function hold() {
+    if (lock || document.visibilityState !== 'visible') return;
+    try {
+      lock = await navigator.wakeLock.request('screen');
+      lock.addEventListener('release', () => { lock = null; });
+    } catch (e) { lock = null; }
+  }
+  document.addEventListener('visibilitychange', hold);
+  document.addEventListener('click', hold);
+  setInterval(hold, 60000);
+  hold();
+})();
+</script>"""
+
+
 def write_pages(webroot):
     # index.html is the worker grid (default landing); the classic
     # single-worker detail moves to live1.html
     with open(os.path.join(webroot, "index.html"), "w") as f:
-        f.write(GRID_PAGE)
+        f.write(GRID_PAGE + WAKE_JS)
     with open(os.path.join(webroot, "live1.html"), "w") as f:
-        f.write(DETAIL_PAGE)
+        f.write(DETAIL_PAGE + WAKE_JS)
     try:
         states = runpy.run_path(
             os.path.join(ROOT, "tools/tests/savestate_graph.py"))["STATES"]
@@ -479,7 +502,7 @@ def write_pages(webroot):
         coords = {}
     baked = {n: [round(x, 1), round(y, 1)] for n, (x, y) in coords.items()}
     with open(os.path.join(webroot, "progress.html"), "w") as f:
-        f.write(PROGRESS_PAGE.replace("__COORDS__", json.dumps(baked)))
+        f.write(PROGRESS_PAGE.replace("__COORDS__", json.dumps(baked)) + WAKE_JS)
 
 
 def ensure_map(webroot):
@@ -1276,13 +1299,15 @@ def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
     # tests, many of which run in parallel once the ROM is built and their
     # state deps are done.  Count it so the figure reads as whole-build
     # time-left, not just savestate-generation time.  A suite is still-to-run
-    # when its .ok is missing or older than the ROM; these run in parallel, so
+    # when its .ok is missing or older than the ROM's identity copy (the one
+    # a suite depends on: a VERSION bump moves build/ot6.sfc, not the copy,
+    # and re-runs no suite but the version ones); these run in parallel, so
     # divide by an effective worker count (heavy emulator workers -> about
     # half the logical cores).
     # During a plain run nothing rebuilds the ROM, every .ok stays fresh, and
     # this term is zero, so the run ETA is unchanged.
     try:
-        rom_m = os.path.getmtime(os.path.join(ROOT, "build/ot6.sfc"))
+        rom_m = os.path.getmtime(os.path.join(ROOT, "build/ninja/src/build/ot6.sfc"))
     except OSError:
         rom_m = 0.0
     rem_state = sum((e["dur"] or 60) for e in edges if e["status"] != "done")
@@ -1482,6 +1507,9 @@ def place(n, port, who=None):
             why = ("down" if not m["up"] else "no runs logged yet"
                    if not m.get("curve") else "no room figure")
             print(f"  {m['name']}: {why}")
+            continue
+        if "settling" in m:    # back from sleep: no room until it stays up
+            print(f"  {m['name']}: room 0 (settling, {m['settling']} s more)")
             continue
         held = "".join(f" - {k.replace('_', ' ')} {m[k]}"
                        for k in ("claimed", "reserve", "owner_load") if k in m)

@@ -54,7 +54,7 @@ WorldOfRuinScene_ext:
 
 TitleScreen:
 @680c:  jsr     DecompCutsceneProg
-        jml     TitleScreen_ext2
+        jml     Ot6TitleScreen          ; ot6: the splash's version (ot6_version.asm)
 
 ; ------------------------------------------------------------------------------
 
@@ -1667,5 +1667,14 @@ _7e7c23:
 TownPal1:
 @7c43:  .word   $0000,$367e,$1136,$0c42,$0841,$45cd,$3d6a,$3528
         .word   $2528,$2ce7,$24e6,$20c5,$18c5,$18a3,$1483,$1063
+
+
+; ot6: the end of the program, where Ot6TitleScreen puts the splash's two
+; trampolines (a label, no bytes: the program is vanilla byte for byte)
+Ot6CutsceneProgEnd:
+
+; ------------------------------------------------------------------------------
+
+.include "ot6_version.asm"
 
 ; ------------------------------------------------------------------------------
