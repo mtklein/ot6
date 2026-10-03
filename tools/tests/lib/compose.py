@@ -626,6 +626,9 @@ def selftest() -> int:
         (lib / "ot6_field.lua").write_text("local M = ...\nM.f = 1\n")
         (lib / "ot6_contract.lua").write_text("local M = ...\nM.c = 1\n")
         (root / "build" / "states" / "a.mss.lua").write_text('return "QUFB"\n')
+        # every tree has a VERSION: a composition that read it for a script
+        # not naming OT6_VERSION must fail the check below, not crash
+        (root / "VERSION").write_text("1.0\n")
         gen = root / "tools" / "tests" / "gen_x.lua"
 
         def dig(env=None):

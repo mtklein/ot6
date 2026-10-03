@@ -688,6 +688,12 @@ def selftest():
                   saves="k4-v1", also=["r2"]),
                 s(state="x", gen="gen_x", prev="o")]
         caps = [{"capture": "seed-v1", "cutter": "gen_seed", "prev": "o"}]
+        READS.clear()
+        validate(full, root, caps)
+        check("configure-time reads are recorded for the depfile: each "
+              "generator whose sidecars it reads, each checkpoint directory",
+              {"tools/tests/gen_x.lua", "tools/tests/checkpoints/k1-v1",
+               "tools/tests/checkpoints"} <= READS)
         check("a well-formed graph validates",
               validate(full, root, caps) == [])
         bad = [
