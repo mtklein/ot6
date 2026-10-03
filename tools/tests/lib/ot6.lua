@@ -13502,8 +13502,17 @@ function M.typicalTruth()
         T.curX = x
         -- (for the log only: what the engine had aimed it at as it entered)
         u.aim = (u.aim or "") .. string.format("%s$%02X/$%02X", u.aim and " " or "", M.readByte(0xB8), M.readByte(0xB9))
-        if (M.readByte(0xB8) & 0x0F) ~= 0 then u.aimParty = true end
-        if (M.readByte(0xB9) & 0x3F) ~= 0 then u.aimMon = true end
+        -- the script's own $2E/$2F entries are nobody's action, and so are
+        -- their target bits: Dullahan's self-cast Cure 2 ($02/$2E, aimed
+        -- $00/$01) followed by a $2F aimed $24/$02 read as a turn aimed at
+        -- the party and counted, where the ledger (rightly) calls it a buff
+        -- (the chain at 78f10b16: "unit 6: slot 0 turn cmds $02,$2F value 0
+        -- -> counted (aimed $00/$01 $24/$02)", units 7 against the ledger's 6)
+        local c = M.readByte(0xB5)
+        if c ~= 0x2E and c ~= 0x2F then
+          if (M.readByte(0xB8) & 0x0F) ~= 0 then u.aimParty = true end
+          if (M.readByte(0xB9) & 0x3F) ~= 0 then u.aimMon = true end
+        end
         T.cur = u
       end)
       hookAt(M.sym("ApplyDmg"), function(x, y)
