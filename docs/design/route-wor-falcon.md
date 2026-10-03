@@ -2302,24 +2302,38 @@ instead`) and he died from 591.  (The bag line called the Ether `$EC`
   a hit lands first (`H.healInFlight`);
 - the round's one care turn is kept after the confirm (`H.careRefund`):
   from 11a8f6e3 the confirm's own `dropPlan("confirm_attempt")` refunded
-  it, so the rule bound only while a plan was being steered.
+  it, so the rule bound only while a plan was being steered.  It holds for
+  top-ups and reopens for a lift (`H.liftReopens`): a member inside their
+  round with a heal in hand that lifts them clear, the way an owed top-up
+  reopens it for a raise.  The Gate's shift 5 had wiped with LOCKE at
+  144/820 under a 286 round and an X-Potion in the bag, the turn gone to a
+  top-up;
+- a queued heal holds the others off its target only when it lifts them
+  clear of the round, or they stand outside it (`H.inFlightHolds`): a
+  Potion queued on SETZER at 25/902 under 413 held an Elixir off;
+- the SPEND line names why no heal saves: the round's care turn gone to
+  another, the heal policy, or an empty bag.
 
-Measured against main 5883ecb9 on the same snapshots, by distinct fight
-(`build/attempts/wt/care-items/`, r1 main, r5 head).  "Refund" is the head
-with the old care refund (`H.CONFIRM_REFUNDS_CARE = true`):
+Measured against main 5883ecb9 on the same snapshots, by distinct fight,
+Zombie touches apart (a ZOMBIE status within two frames of the death,
+`tools/audit_zombie_touches.py`; `build/attempts/wt/care-items/`, r1 main,
+r5 cae71db9, r7 the head).  "Refund" is cae71db9 with the old care refund;
+"no in-flight cap" is 3847043e, the lift reopen without H.inFlightHolds:
 
-| | main | head, refund | head |
-|---|---|---|---|
-| Dullahan B (32 fights): deaths, Fenix Downs | 5, 4 | 6, 4 | 4, 4 |
-| ... Potions, X-Potions, gil of sold items | 22, 0, 8600 | 16, 21, 6800 | 7, 11, 4100 |
-| Gate (7 shifts): runs passed, deaths | 6/7, 9 | 7/7, 3 | 6/7, 7 |
-| Chain: deaths, Fenix Downs | 7, 1 | 9, 3 | 6, 1 |
+| | main | refund | cae71db9 | no in-flight cap | head |
+|---|---|---|---|---|---|
+| Dullahan B (32 fights): deaths, Fenix Downs | 5, 4 | 6, 4 | 4, 4 | 6, 4 | 5, 4 |
+| ... Potions, X-Potions, gil of sold items | 22, 0, 8600 | 16, 21, 6800 | 7, 11, 4100 | 17, 23, 7100 | 16, 24, 6800 |
+| Gate (7 shifts): runs passed, deaths | 6/7, 6 | 7/7, 2 | 6/7, 5 | 7/7, 2 | 6/7, 5 |
+| Chain: deaths, Fenix Downs | 6, 1 | 8, 3 | 5, 1 | -- | 8, 4 |
 
-No X-Potion is planned outside the round in any of them (the chain: 5
-inside, 0 outside; Dullahan B 13 and 0; the Gate 2 and 0), and no Elixir
-or Megalixir is planned at all.  The care refund's arm is better at the
-Gate (its shift 5 survives) and worse at Dullahan B and on the chain
-(sabin_done 1 -> 3 deaths); the head keeps the care turn.
+No X-Potion is planned outside the round in any of them, and no Elixir
+or Megalixir on a top-up.  The head's chain lost its deaths on two legs:
+sabin_done's trench (1 -> 3, one of them a raised SABIN at 45/363 topped up
+and killed by atk $EF) and wor_falcon (a Pearl took SABIN from 591 with a
+lifting Potion queued).  Its Gate shift 5 wiped through a Muddle-rule hit
+on SABIN at 5 HP.  On these draws no arm is better everywhere: the lift
+reopen and the refund both buy the Gate's shift 5 and cost Dullahan B.
 
 battle_brokendeath's ladder was four rungs ten phases apart, a budget read
 off a map of counting phases measured with one driver; under the head's
