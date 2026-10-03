@@ -10,10 +10,12 @@ after it Continues that capture.  The tracked copy is what suites and
 by-hand runs boot; this compares the two.
 
 The verdict is byte for byte: the graph is deterministic, so a tracked
-battery that is today's play is the capture's bytes.  Only each save
-slot's play time ($1863-$1865) and checksum ($1FFE-$1FFF) are left out.
-Anything else that differs -- a slot, the OT6 codex in bank $31, the
-battery's own bytes -- is drift.
+battery that is today's play is the capture's bytes, play time and slot
+checksums included (43 of 43 captures replayed to the same bytes on the
+Air, on px13 and against the tracked copies:
+build/attempts/wt/one-graph/{air,px13}/after-full.payload-cmp.txt).
+Anything that differs -- a slot, the OT6 codex in bank $31, the battery's
+own bytes -- is drift.
 
 The report explains a drift in play terms, decoded from the last-saved slot:
 where the save is; all sixteen character records (level, experience, max
@@ -54,24 +56,9 @@ NAMES = ["TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN", "CELES",
          "STRAGO", "RELM", "SETZER", "MOG", "GAU", "GOGO", "UMARO",
          "char14", "char15"]
 SLOT_LEN = 0xA00                       # WRAM $1600-$1FFF, CopyGameDataToSRAM
-SKIP_IN_SLOT = (0x1863, 0x1864, 0x1865, 0x1FFE, 0x1FFF)   # play time, checksum
-
-
-def skipped_offsets() -> set[int]:
-    out = set()
-    for ptr in set(sc.SLOT_PTR.values()):
-        for a in SKIP_IN_SLOT:
-            out.add(ptr + a - 0x1600)
-    return out
-
-
-SKIP = skipped_offsets()
-
-
 def byte_diffs(fresh: bytes, tracked: bytes) -> list[int]:
-    """Payload offsets that differ, play time and checksums left out."""
-    return [i for i in range(sc.SRAM_SIZE)
-            if fresh[i] != tracked[i] and i not in SKIP]
+    """Payload offsets that differ."""
+    return [i for i in range(sc.SRAM_SIZE) if fresh[i] != tracked[i]]
 
 
 def sram_addr(off: int) -> str:
@@ -85,6 +72,7 @@ CHAR_LEN = 37
 RANGES = [(0x1600, 0x1600 + 16 * CHAR_LEN - 1, "character records"),
           (0x1850, 0x185F, "party/row bytes"),
           (0x1860, 0x1862, "gil"),
+          (0x1863, 0x1865, "play time"),
           (0x1869, 0x1A68, "bag"),
           (0x1A69, 0x1A6C, "espers"),
           (0x1A6E, 0x1CF5, "spells learned"),
@@ -96,7 +84,8 @@ RANGES = [(0x1600, 0x1600 + 16 * CHAR_LEN - 1, "character records"),
           (0x1E80, 0x1EFF, "story switches"),
           (0x1F60, 0x1F61, "world tile"), (0x1F64, 0x1F65, "map"),
           (0x1FC0, 0x1FC1, "field tile"),
-          (0x1FA1, 0x1FA5, "encounter counters")]
+          (0x1FA1, 0x1FA5, "encounter counters"),
+          (0x1FFE, 0x1FFF, "slot checksum")]
 
 
 def explain(fresh: bytes, tracked: bytes, offs: list[int]) -> list[str]:
@@ -281,8 +270,7 @@ def main(argv: list[str]) -> int:
         if offs:
             bad += 1
             print(f"checkpoint drift {key}: {len(offs)} byte(s) differ from the "
-                  f"graph's capture (build/checkpoints/{key}), play time and "
-                  f"checksums aside:")
+                  f"graph's capture (build/checkpoints/{key}):")
             for line in lines:
                 print(f"  {line}")
         else:
@@ -332,8 +320,12 @@ def selftest() -> int:
         return bytes(d)
     a = battery()
     check("a save is not drift against itself", byte_diffs(a, a) == [])
-    offs = byte_diffs(battery(a1863=5, a1865=7, a1FFE=1, a1FFF=2), a)
-    check("play time and the checksum are not drift", offs == [])
+    pt = battery(a1863=5, a1865=7, a1FFE=1, a1FFF=2)
+    offs = byte_diffs(pt, a)
+    check("MUTANT play time and the checksum are drift (the replay is "
+          "deterministic: no exemption)", len(offs) == 4)
+    check("...and the report names them", any("play time" in l for l in
+                                               explain(pt, a, offs)))
     # the reviewer's blind spots, each alone
     celes_exp = 0x1600 + 37 * 6 + 0x11           # CELES is not in the party
     offs = byte_diffs(battery(**{f"a{celes_exp:X}": 9}), a)

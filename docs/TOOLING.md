@@ -56,7 +56,7 @@ the graph (configure refuses a graph that leaves one out), and suites in
 `configure.py`'s `TEST_ENV` and by-hand runs boot the tracked copies. The
 drift gate, `build/checks/checkpoint_drift.ok` in the default, holds each
 tracked copy to the graph's capture byte for byte (play time and checksums
-aside; the graph is deterministic), and explains a drift in play terms
+too: the graph is deterministic), and explains a drift in play terms
 (`tools/tests/lib/checkpoint_drift.py`): every character's level,
 experience, HP/MP and gear, gil and the bag, story switches, encounter
 counters, spells and skills, the OT6 codex, and any other differing byte by
