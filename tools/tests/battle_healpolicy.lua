@@ -648,6 +648,16 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(v == "spend" and why:find("(the round's care turn went to actor 3: item $EA +676 = 820, "
       .. "it would lift, but not this turn)", 1, true) ~= nil, true,
       "the Gate's s5 LOCKE: the budget is the reason, and the X-Potion that would lift is named (" .. why .. ")")
+    -- a heal in flight holds the others off its target only when it lifts
+    -- them, or they are outside their round (re-review of cae71db9: SETZER at
+    -- 25/902 under 413 on a queued Potion, an Elixir in the bag)
+    H.assertEq(H.inFlightHolds({ restore = 250 }, 25, 413), false,
+      "a queued Potion that leaves him at 275 under 413 does not hold the Elixir off")
+    H.assertEq(H.inFlightHolds({ restore = 250 }, 231, 413), true,
+      "...one that lifts him (231 + 250 = 481) does")
+    H.assertEq(H.inFlightHolds({ restore = 250 }, 600, 413), true,
+      "...and outside the round the guard holds whatever is queued")
+    H.assertEq(H.inFlightHolds({}, 25, 413), true, "...as does a queued heal of unknown size")
     -- the budget reopens for a lift (review of care-items cae71db9)
     H.assertEq(H.liftReopens({ hp = 144, cost = 286, restores = { 250, 676 } }), true,
       "LOCKE at 144/820 inside a 286 round, an X-Potion's 676 in hand: the budget reopens")

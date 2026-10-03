@@ -6350,7 +6350,7 @@ function Driver:makePlan(actor)
     for e = 0, 3 do
       local hp, maxhp, cost = hpNow[e], maxOf(e), price[e] or 0
       if hp > 0 and maxhp > 0 and hp < maxhp and cost > 0 and hp <= cost
-         and self.healQueued[e] == nil and not status1Has(e, M.ST1_ZOMBIE) then
+         and not M.inFlightHolds(self.healQueued[e], hp, cost) and not status1Has(e, M.ST1_ZOMBIE) then
         local restores, what = {}, {}
         if row ~= nil then
           for _, it in ipairs(self:bagHeals(e, hp)) do
@@ -6533,8 +6533,11 @@ function Driver:makePlan(actor)
     -- closed (review of care-items cae71db9)
     local whyNot = nil
     if where ~= "care" then
+      local gap = math.max(0, maxhp - hp)
       for _, h in ipairs(heals) do
-        refused[#refused + 1] = { what = h.what, restore = h.restore, note = "it would lift, but not this turn" }
+        local r = h.restore and math.min(h.restore, gap) or nil
+        refused[#refused + 1] = { what = h.what, restore = r,
+          note = (r == nil or hp + r > cost) and "it would lift, but not this turn" or nil }
       end
       heals = {}
       if not careOpen then
@@ -6914,7 +6917,7 @@ function Driver:makePlan(actor)
       -- plan -- planned on one already, the heal was backed out and planned
       -- again until the watchdog dropped it (review of f8f9ad66, M3)
       local inFlight = self.healQueued[e]
-      if inFlight ~= nil and hp > 0 and hp < maxhp then
+      if inFlight ~= nil and hp > 0 and hp < maxhp and M.inFlightHolds(inFlight, hp, price[e]) then
         -- another member's heal on it is confirmed and has not landed
         -- (#370: wor_falcon at the head gave EDGAR at 86/1701 two X-Potions,
         -- the second planned on the HP the first was about to fill)
@@ -7084,7 +7087,7 @@ function Driver:makePlan(actor)
                 .. "costs %d (%s)", self.tag or "fight", actor, c.e, c.hp,
                 c.maxhp, spell, cell, mpCost, M.readWord(BATTLE.CURMP + actor * 2),
                 gain and tostring(gain) or "?", cost, why))
-              return { kind = "heal", spell = spell, target = c.e,
+              return { kind = "heal", spell = spell, target = c.e, restore = gain,
                        row = cureRow, reason = why }
             end
             local said = string.format("[%s] actor=%d not curing entity %d "
@@ -7115,7 +7118,7 @@ function Driver:makePlan(actor)
               for _, r in ipairs(refused) do t[#t + 1] = string.format("$%02X (%s)", r.item.id, r.why) end
               return table.concat(t, "; ")
             end)()) or ""))
-          return { kind = "item", item = it.id, target = c.e, row = row,
+          return { kind = "item", item = it.id, target = c.e, row = row, restore = it.restore,
                    idx = it.idx, reason = why, flat = it.flat }
         end
         local t = {}
@@ -8470,6 +8473,7 @@ function Driver:button(actor)
       for e = 0, 3 do
         if (self.plan.all and M.readWord(0x3C1C + e * 2) > 0) or e == self.plan.target then
           self.healQueued[e] = { by = actor, tick = self.battleTick, hp = M.readWord(0x3BF4 + e * 2),
+                                 restore = not self.plan.all and self.plan.restore or nil,
                                  what = self.plan.kind == "heal" and string.format("cure $%02X", self.plan.spell or 0)
                                    or string.format("$%02X", self.plan.item or 0) }
         end
@@ -10635,6 +10639,18 @@ function Driver:watchDamage()
   for i = #self.dmgWatch, 1, -1 do
     if self.battleTick > self.dmgWatch[i].until_ then table.remove(self.dmgWatch, i) end
   end
+end
+
+-- Whether a heal in flight holds the others off its target (#370): it
+-- does unless the member is inside their round and the queued heal does
+-- not lift them clear (re-review of cae71db9: the Gate's shift 5 left
+-- SETZER at 25/902 under a 413 round on a queued Potion, "+250 = 275",
+-- with an Elixir in the bag).  q.restore nil (a party cure, a cast not
+-- measured) holds.
+function M.inFlightHolds(q, hp, cost)
+  if q == nil then return false end
+  if q.restore == nil or (cost or 0) <= 0 or hp > cost then return true end
+  return hp + q.restore > cost
 end
 
 -- A confirmed heal in flight (#370), one frame of it as plain arithmetic:
