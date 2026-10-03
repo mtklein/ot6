@@ -2314,26 +2314,40 @@ instead`) and he died from 591.  (The bag line called the Ether `$EC`
 - the SPEND line names why no heal saves: the round's care turn gone to
   another, the heal policy, or an empty bag.
 
-Measured against main 5883ecb9 on the same snapshots, by distinct fight,
-Zombie touches apart (a ZOMBIE status within two frames of the death,
-`tools/audit_zombie_touches.py`; `build/attempts/wt/care-items/`, r1 main,
-r5 cae71db9, r7 the head).  "Refund" is cae71db9 with the old care refund;
-"no in-flight cap" is 3847043e, the lift reopen without H.inFlightHolds:
+A queued cure-hit is part of its target's round (`H.roundWithQueuedHits`,
+#320's floor gap): the floor is read when the hit is planned, and the hit
+waits in the queue -- the Gate's shift 5 lost SABIN to LOCKE's hit planned
+at 275/902 (floor 114) and run at 27, after the Muddle had cleared on its
+own.  With the hit priced in, the care lines planned an Elixir on him at
+182; on that draw it was queued behind the same monsters and he still fell.
 
-| | main | refund | cae71db9 | no in-flight cap | head |
-|---|---|---|---|---|---|
-| Dullahan B (32 fights): deaths, Fenix Downs | 5, 4 | 6, 4 | 4, 4 | 6, 4 | 5, 4 |
-| ... Potions, X-Potions, gil of sold items | 22, 0, 8600 | 16, 21, 6800 | 7, 11, 4100 | 17, 23, 7100 | 16, 24, 6800 |
-| Gate (7 shifts): runs passed, deaths | 6/7, 6 | 7/7, 2 | 6/7, 5 | 7/7, 2 | 6/7, 5 |
-| Chain: deaths, Fenix Downs | 6, 1 | 8, 3 | 5, 1 | -- | 8, 4 |
+Measured on a wide sample, by distinct fight (snapshot + battle key, the
+first run of each), Zombie touches apart: Dullahan arm B from the grave
+cut for K = 0..10 by main's generator, 18 waits each (198 runs, 154
+distinct fights an arm), and the Gate from 28 boot shifts (0..54 step 2).
+Four arms: main 5883ecb9, cae71db9, cae71db9 with the old care refund,
+and the head (892e274f: the lift reopen, the in-flight cap, the queued
+cure-hit).  Intervals are 95% (normal on the per-fight counts; Wilson for
+proportions); the paired column is the head against each arm on the same
+fights, with McNemar's exact p on the discordant ones
+(`build/attempts/wt/care-items/wide/stats_*.txt`):
 
-No X-Potion is planned outside the round in any of them, and no Elixir
-or Megalixir on a top-up.  The head's chain lost its deaths on two legs:
-sabin_done's trench (1 -> 3, one of them a raised SABIN at 45/363 topped up
-and killed by atk $EF) and wor_falcon (a Pearl took SABIN from 591 with a
-lifting Potion queued).  Its Gate shift 5 wiped through a Muddle-rule hit
-on SABIN at 5 HP.  On these draws no arm is better everywhere: the lift
-reopen and the refund both buy the Gate's shift 5 and cost Dullahan B.
+| | main | cae71db9 | refund | head |
+|---|---|---|---|---|
+| Dullahan B: deaths (a fight) | 16 (0.104, 0.056-0.152) | 7 (0.045, 0.012-0.078) | 14 (0.091, 0.045-0.136) | 11 (0.071, 0.031-0.112) |
+| ... Fenix Downs | 9 | 7 | 8 | 9 |
+| ... head minus arm, discordant worse/better, p | 4/9, 0.27 | 4/0, 0.125 | 0/3, 0.25 | -- |
+| ... Potions, X-Potions | 101, 0 | 38, 51 | 62, 78 | 55, 88 |
+| Gate: runs passed (Wilson) | 27/28 (0.82-0.99) | 27/28 | 28/28 (0.88-1.00) | 28/28 |
+| ... deaths (fights 104-108) | 9 | 9 | 5 | 5 |
+
+Every arm that weighs the bag beats main at Dullahan B in the point
+estimate; cae71db9 does so outside the noise (13 fights better, 4 worse,
+p = 0.049).  No arm beats the head outside the noise: cae71db9 has 4
+fewer Dullahan deaths (4 discordant fights, all the head's, p = 0.125),
+the head 4 fewer Gate deaths.  No X-Potion is planned outside the round in
+any arm (the head: 125 inside, 0 outside at Dullahan B; 7 and 0 at the
+Gate), and no cure-hit killed anyone in these 904 runs.
 
 battle_brokendeath's ladder was four rungs ten phases apart, a budget read
 off a map of counting phases measured with one driver; under the head's
