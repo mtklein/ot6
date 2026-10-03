@@ -426,6 +426,9 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
     "battle_passside": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    # wt/hire-sprite: the 3 and 2 BP hires' figures (Defends bank the points)
+    "battle_hirecrew": "OT6_TIMEOUT=2400 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
     # the Config screen's version tab, from the Narshe exit spawn
     "menu_configversion":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1",

@@ -34,6 +34,9 @@ CODE_EXT_INC = 1
 .global Ot6SetzerEffect          ;   the row's attack props + special effect
 .global Ot6SlotKitRow            ;   FixPlayerAttack: a kit row maps to no reel
 .global Ot6CoinPrice             ;   GP Rain's gil: rate x level, + class
+.global Ot6CoinAnim              ;   CmdAnim_18's hires (bank F0); the C1 locals
+.global NullTargetAnim, _c1bbe1, FightCmdAnim, MagicCmdAnim, CheckNullTarget
+.global WaitFrame_far, _c12f75, GfxCmd_00
 .global Ot6RainPasses            ;   the relic's GP Rain: the boost buys tosses
 .global Ot6JackpotDice           ;   the dice effect's Jackpot arm: a fixed triple
 .global Ot6BlitzListOpen         ; v0.3 blitz-as-menu: _c1776b -> tools shell
