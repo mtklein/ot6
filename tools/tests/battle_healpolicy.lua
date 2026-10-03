@@ -620,6 +620,13 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(v, nil, "no round measured yet: nothing says next round is lethal (" .. why .. ")")
     v, why = H.spendDecision({ hp = 447, maxhp = 447, roundCost = 447, bp = 3, heals = {} })
     H.assertEq(v, "spend", "map 269: LOCKE at full 447 under a 447 one-shot with 3 BP and nothing to heal with -- spend (" .. why .. ")")
+    -- a Potion the lift rule refused is named, not "nothing to heal with"
+    -- (review of b490ce32: gate s5 "134/902 ... no heal saves it (nothing to
+    -- heal with)" with 60 Potions in the bag)
+    v, why = H.spendDecision({ hp = 134, maxhp = 902, roundCost = 418, bp = 3, heals = {},
+      refused = { { what = "item $E9", restore = 250 } } })
+    H.assertEq(v == "spend" and why:find("item $E9 +250 = 384, not lifting clear of the round", 1, true) ~= nil, true,
+      "the refused Potion is named in the spend line (" .. why .. ")")
     -- the wipe class
     local d = function(tick, from, maxhp, bp, one)
       return { tick = tick, from = from, maxhp = maxhp, bp = bp, oneAction = one }

@@ -1666,6 +1666,12 @@ function M.spendDecision(o)
   for _, h in ipairs(o.heals or {}) do
     tried[#tried + 1] = string.format("%s +%d = %d", h.what, h.restore, hp + h.restore)
   end
+  -- the heals in hand the lift rule turned down (review of b490ce32: gate
+  -- s5 said "nothing to heal with" with 60 Potions in the bag)
+  for _, h in ipairs(o.refused or {}) do
+    tried[#tried + 1] = string.format("%s +%s = %s, not lifting clear of the round", h.what,
+      tostring(h.restore), h.restore and tostring(hp + h.restore) or "?")
+  end
   return "spend", string.format("%d/%d is inside one round of death (%d) holding %d BP, "
     .. "and no heal saves it (%s)", hp, o.maxhp or 0, cost, bp,
     #tried > 0 and table.concat(tried, ", ") or "nothing to heal with")
@@ -6124,7 +6130,7 @@ function Driver:makePlan(actor)
     -- and died holding 3 BP.  From the attack lines (the care block
     -- closed to this actor, or it declined every heal) no heal is
     -- coming this turn at all.
-    local heals = {}
+    local heals, refused = {}, {}
     if where == "care" then
       local allies = 0
       for e = 0, 3 do
@@ -6140,8 +6146,12 @@ function Driver:makePlan(actor)
       if cureRow ~= nil then
         for _, spell in ipairs(type(self.opts.cure) == "table" and self.opts.cure or BATTLE.CURES) do
           local r = self:castRestoreOf(spell, actor, actor)
-          if spellCell(actor, spell, true) and taken(r, true) then
-            heals[#heals + 1] = { what = string.format("cure $%02X", spell), restore = r }
+          if spellCell(actor, spell, true) then
+            if taken(r, true) then
+              heals[#heals + 1] = { what = string.format("cure $%02X", spell), restore = r }
+            else
+              refused[#refused + 1] = { what = string.format("cure $%02X", spell), restore = r }
+            end
           end
         end
       end
@@ -6150,11 +6160,13 @@ function Driver:makePlan(actor)
         if item and taken(self:itemRestoreOf(item), false) then
           heals[#heals + 1] = { what = string.format("item $%02X", item),
                                 restore = self:itemRestoreOf(item) }
+        elseif item then
+          refused[#refused + 1] = { what = string.format("item $%02X", item), restore = self:itemRestoreOf(item) }
         end
       end
     end
     local verdict, why = M.spendDecision({ hp = hp, maxhp = maxhp, roundCost = cost,
-                                           bp = have, heals = heals })
+                                           bp = have, heals = heals, refused = refused })
     if verdict ~= "spend" then
       local said = string.format("[%s] actor=%d no spend (%s): %s", self.tag or "fight",
         actor, where, why)
@@ -12604,6 +12616,143 @@ function M.run(opts, steps)
       emu.stop(1)
     end
   end, emu.eventType.startFrame)
+end
+
+
+-- M.typicalTruth(): the engine's own account of the monsters' turns,
+-- counters and damage, for checking the hit ledger's typical action
+-- (Driver:commitMonAct, M.ledgerCommit) from outside it -- the one source
+-- battle_typicalgate and the lab's build/lab/care/truth_hook.lua both load
+-- (review of b490ce32: the two were hand-kept copies).  Nothing in the
+-- driver reads it.
+--   a monster's turn   = the ATB queueing it (gaugefull @11aa's `jsr
+--                        _c24e77`, "add action to queue": one per gauge
+--                        fill, a Broken monster's refused turn included)
+--                        and every ExecCmd entry of that monster after it
+--                        that ExecRetal did not run;
+--   a counter          = ExecRetal (@4b7b) and the ExecCmd entry it runs;
+--   the damage         = the engine's own figure as ApplyDmg (@12f5)
+--                        applies it: $33D0,y on a party target y, capped at
+--                        the HP it had ($3BF4,y);
+--   the final targets  = the targets ApplyDmg was called on; for a unit
+--                        that called ApplyDmg on nobody (a miss, a
+--                        status-only action, a do-nothing turn), the
+--                        target bits it entered ExecCmd with ($B8 party,
+--                        $B9 monsters) -- the one input this shares with
+--                        the driver.  (SaveForMimic's $B8/$B9 were tried
+--                        as the final set and read monster bits on party
+--                        Battles that missed: not the targets.)
+-- A unit counts in the typical mean when it is a counter that landed HP,
+-- or a turn that did not land only on monsters (a buff, a self-cure); the
+-- script's $2E/$2F entries are nobody's action.  Its value is the most HP
+-- it took off one member.
+-- Installed once (its hooks stay); returns the table: reset(), expected()
+-- (the counted units per slot { n, sum } and a line per unit), units.
+local typicalTruthT = nil
+function M.typicalTruth()
+  if typicalTruthT ~= nil then return typicalTruthT end
+  local T = { units = {}, turn = {}, retal = {}, cur = nil, inBattle = false }
+  do
+    -- (each address by a literal M.sym("...") call: compose.py injects only
+    -- the symbols it finds written that way)
+    local function hookAt(a, fn)
+      emu.addMemoryCallback(function()
+        local st = emu.getState()
+        fn(st["cpu.x"] & 0xffff, st["cpu.y"] & 0xffff)
+      end, emu.callbackType.exec, a, a)
+    end
+    local function newUnit(x, counter)
+      local u = { slot = x // 2 - 4, counter = counter, cmds = {}, per = {}, hitParty = false, hitMon = false }
+      T.units[#T.units + 1] = u
+      return u
+    end
+    function T.install()
+      if T.installed then return end
+      T.installed = true
+      -- the jsr inside gaugefull: checked against the ROM's own bytes
+      local q = M.sym("gaugefull") + 0x1C
+      local target = M.sym("_c24e77") & 0xFFFF
+      local f = q & 0x3FFFFF
+      if M.readRomByte(f) ~= 0x20 or (M.readRomByte(f + 1) | (M.readRomByte(f + 2) << 8)) ~= target then
+        error(string.format("truth_hook: no `jsr _c24e77` at gaugefull+$1C ($%06X)", q))
+      end
+      hookAt(q, function(x) if x >= 8 and x < 20 then T.turn[x] = newUnit(x, false) end end)
+      hookAt(M.sym("ExecRetal"), function(x) if x >= 8 and x < 20 then T.retal[x] = true end end)
+      -- a retal script that issued nothing runs no ExecCmd: its mark ends
+      -- when control is back at the top of the battle loop (ExecRetal
+      -- pushes BattleLoop-1 as its return)
+      hookAt(M.sym("BattleLoop"), function() T.retal = {} end)
+      hookAt(M.sym("ExecCmd@battle_code"), function(x)
+        T.cur = nil
+        if x < 8 or x >= 20 or x % 2 ~= 0 then return end
+        local u
+        if T.retal[x] then
+          T.retal[x] = nil
+          u = newUnit(x, true)
+        else
+          u = T.turn[x] or newUnit(x, false)
+          T.turn[x] = u
+        end
+        u.cmds[#u.cmds + 1] = M.readByte(0xB5)
+        T.curX = x
+        -- (for the log only: what the engine had aimed it at as it entered)
+        u.aim = (u.aim or "") .. string.format("%s$%02X/$%02X", u.aim and " " or "", M.readByte(0xB8), M.readByte(0xB9))
+        if (M.readByte(0xB8) & 0x0F) ~= 0 then u.aimParty = true end
+        if (M.readByte(0xB9) & 0x3F) ~= 0 then u.aimMon = true end
+        T.cur = u
+      end)
+      hookAt(M.sym("ApplyDmg"), function(x, y)
+        local u = T.cur
+        if u == nil or (M.readByte(0x11A2) & 0x80) ~= 0 then return end
+        if y < 8 then
+          u.hitParty = true
+          local dmg = M.readWord(0x33D0 + y)
+          if dmg ~= 0xFFFF and dmg > 0 then
+            local hp = M.readWord(0x3BF4 + y)
+            u.per[y // 2] = (u.per[y // 2] or 0) + math.min(dmg, hp)
+          end
+        elseif y < 20 then
+          u.hitMon = true
+        end
+      end)
+    end
+    function T.reset() T.units, T.turn, T.retal, T.cur = {}, {}, {}, nil end
+    -- the expected count and sum per slot, and the units' lines
+    function T.expected()
+      local want, lines = {}, {}
+      for i, u in ipairs(T.units) do
+        local script = #u.cmds > 0
+        for _, c in ipairs(u.cmds) do if c ~= 0x2E and c ~= 0x2F then script = false end end
+        local v = 0
+        for _, d in pairs(u.per) do if d > v then v = d end end
+        local counted
+        if #u.cmds == 0 or script then counted = false
+        elseif u.counter then counted = v > 0
+        else
+          -- a buff: what it reached was monsters only (ApplyDmg's targets,
+          -- else the resolved target bits), nothing taken off the party
+          local applied = u.hitParty or u.hitMon
+          local party = u.hitParty or (not applied and u.aimParty)
+          local mon = u.hitMon or (not applied and u.aimMon)
+          counted = not (mon and not party)
+        end
+        local cs = {}
+        for _, c in ipairs(u.cmds) do cs[#cs + 1] = string.format("$%02X", c) end
+        lines[#lines + 1] = string.format("unit %d: slot %d %s cmds %s value %d -> %s (aimed %s%s)", i, u.slot,
+          u.counter and "counter" or "turn", table.concat(cs, ","), v, counted and "counted" or "out",
+          u.aim or "-", u.hitMon and ", hit a monster" or "")
+        if counted then
+          local w = want[u.slot] or { n = 0, sum = 0 }
+          w.n, w.sum = w.n + 1, w.sum + v
+          want[u.slot] = w
+        end
+      end
+      return want, lines
+    end
+  end
+  T.install()
+  typicalTruthT = T
+  return T
 end
 
 end   -- the segment runner's scope
