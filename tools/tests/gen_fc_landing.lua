@@ -138,7 +138,13 @@ local function deckDrive(untilKit)
       return mapIs(394) and H.hasControl() and seenBattles >= 1
     end, 120000, {
       H.call(function()
-        local active = H.battleActive()
+        -- a battle up, read from memory: its load begun and a monster
+        -- present.  (H.battleActive() adds a screenshot to see the screen
+        -- is rendering, which encodes a PNG: called on every frame here, it
+        -- was half of this leg's emulator time -- 51-58% of the samples in
+        -- build/attempts/wt/one-graph/air/prof/ -- for a count only the
+        -- log and `seenBattles >= 1` read.)
+        local active = H.battleLoadStarted() and H.monstersPresent() > 0
         if active and not lastActive then
           seenBattles = seenBattles + 1
           H.log(string.format("  [IAF battle %d] f%d", seenBattles, H.frame))
