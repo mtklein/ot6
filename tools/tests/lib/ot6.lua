@@ -13512,12 +13512,18 @@ function M.typicalTruth()
         if c ~= 0x2E and c ~= 0x2F then
           if (M.readByte(0xB8) & 0x0F) ~= 0 then u.aimParty = true end
           if (M.readByte(0xB9) & 0x3F) ~= 0 then u.aimMon = true end
+          T.cur = u
         end
-        T.cur = u
       end)
       hookAt(M.sym("ApplyDmg"), function(x, y)
         local u = T.cur
         if u == nil or (M.readByte(0x11A2) & 0x80) ~= 0 then return end
+        -- a heal ($11A4 bit 0, "restore hp") is no hit on whoever it lands
+        -- on: Dullahan's Cure 2 on himself, drawn to CELES by her Runic,
+        -- reached ApplyDmg on entity 0 with $11A4=$21 and $FFFF damage, and
+        -- the truth read a self-cure as an action on the party (the chain at
+        -- 78f10b16, unit 6; build/attempts/wt/care-items/r6/tg_dbg)
+        if (M.readByte(0x11A4) & 0x01) ~= 0 then return end
         if y < 8 then
           u.hitParty = true
           local dmg = M.readWord(0x33D0 + y)
