@@ -3294,6 +3294,57 @@ local function menuHome()
   return M.fieldControl()
 end
 
+-- A menu list is still scrolling while zTextScrollRate ($41-$42,
+-- menu_ram.inc; item.asm UpdateTextScroll) is nonzero, and an A pressed
+-- then is lost: measured on the relic list at wor_sabin, the 9th down
+-- scrolled the list ($41 = $04 at f4288-f4290), the A held at f4289-f4290
+-- never reached the newly-pressed bits (z08 = 0000 with z04 = 0080) and
+-- the list stayed open on the Back Guard until the 300-frame wait ran out
+-- (build/attempts/wt/walker-after-menu/merge-1769662a/sabin/).
+function M.menuListSettled() return M.readWord(0x41) == 0 end
+
+-- M.confirmA: a step that presses A on a menu cursor once the cursor is on
+-- its target and the list has settled (onTarget() and M.menuListSettled()),
+-- then watches for the press to take (accepted()),
+-- and presses again if it did not within `window` frames (default 30), up
+-- to opts.tries presses (default 4) before it raises.  Every menu helper
+-- confirm that is a single press goes through it.
+function M.confirmA(label, onTarget, accepted, opts)
+  opts = opts or {}
+  local tries, maxTries, window = 0, opts.tries or 4, opts.window or 30
+  local phase, n = "settle", 0
+  local function reset() tries, phase, n = 0, "settle", 0 end
+  return M.withReset(M.driveUntil(function()
+    if accepted() then M.setPad({}); return true end
+    return false
+  end, opts.maxFrames or 1200, {
+    M.call(function()
+      if phase == "settle" then
+        if onTarget() and M.menuListSettled() then n = n + 1 else n = 0 end
+        M.setPad({})
+        if n >= 1 then
+          if tries >= maxTries then
+            error(string.format("%s: %d A presses on the target were not taken", label, tries), 0)
+          end
+          tries = tries + 1
+          if tries > 1 then
+            M.log(string.format("[confirm] %s: the A was not taken; press %d", label, tries))
+          end
+          phase, n = "press", 0
+        end
+      elseif phase == "press" then
+        n = n + 1
+        M.setPad(n <= 2 and { "a" } or {})
+        if n > 2 then phase, n = "wait", 0 end
+      else                                   -- "wait": give the press its frames
+        n = n + 1
+        M.setPad({})
+        if n >= window then phase, n = "settle", 0 end
+      end
+    end),
+  }, label), reset)
+end
+
 function M.charHp(c) return M.readWord(0x1600 + 37 * c + 9) end
 
 -- M.calcMaxHpMp: unpack one of the two `bbnnnnnn nnnnnnnn` words in a
@@ -5499,8 +5550,9 @@ function M.equipEsper(pos, esperIdx, opts)
     freeSteps[#freeSteps + 1] = s
   end
   freeSteps[#freeSteps + 1] = seekRow(tag .. " (free): list cursor on an empty row", 0xFF)
-  freeSteps[#freeSteps + 1] = M.waitFrames(20)
-  freeSteps[#freeSteps + 1] = M.pressButtons({ "a" }, 3)   -- MenuState_1e @2908: unequip
+  freeSteps[#freeSteps + 1] = M.confirmA(tag .. " (free): unequip",   -- MenuState_1e @2908
+    function() return st() == ST_LIST and M.readByte(GENJULIST + M.readByte(CUR)) == 0xFF end,
+    function() return worn(owner) == 0xFF end)
   freeSteps[#freeSteps + 1] = M.waitFrames(20)
   freeSteps[#freeSteps + 1] = M.call(function()
     if worn(owner) ~= 0xFF then
@@ -5515,9 +5567,9 @@ function M.equipEsper(pos, esperIdx, opts)
   local equipSteps = {}
   for _, s in ipairs(listWalk(tag, targetPos)) do equipSteps[#equipSteps + 1] = s end
   equipSteps[#equipSteps + 1] = seekRow(tag .. ": list cursor on the stone", esperIdx)
-  equipSteps[#equipSteps + 1] = M.waitFrames(20)
-  equipSteps[#equipSteps + 1] = M.driveUntil(function() return st() == ST_DETAIL end, 600,
-    { M.pressButtons({ "a" }, 3), M.waitFrames(12) }, tag .. ": detail")
+  equipSteps[#equipSteps + 1] = M.confirmA(tag .. ": detail",
+    function() return st() == ST_LIST and M.readByte(GENJULIST + M.readByte(CUR)) == esperIdx end,
+    function() return st() == ST_DETAIL end)
   equipSteps[#equipSteps + 1] = M.waitFrames(20)
   equipSteps[#equipSteps + 1] = M.pressButtons({ "a" }, 3)   -- MenuState_4d @5902: equip esper
   equipSteps[#equipSteps + 1] = M.waitUntil(function() return st() == ST_LIST end, 300,
@@ -5630,33 +5682,33 @@ function M.equipWeapon(pos, itemId, opts)
       return st() == ST_MAIN and M.readByte(CUR) == MAINROW
     end, 900, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
       tag .. ": cursor on the menu row"),
-    M.pressButtons({ "a" }, 2),
-    M.waitUntil(function() return st() == ST_CHAR end, 300,
-      tag .. ": character select", 5),
+    M.confirmA(tag .. ": character select",
+      function() return st() == ST_MAIN and M.readByte(CUR) == MAINROW end,
+      function() return st() == ST_CHAR end),
     M.waitFrames(10),
     M.driveUntil(function()
       return st() == ST_CHAR and M.readByte(CUR) == targetPos()
     end, 600, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
       tag .. ": character cursor"),
-    M.pressButtons({ "a" }, 2),
-    M.waitUntil(function() return st() == ST_OPT end, 600,
-      tag .. ": equip options", 5),
+    M.confirmA(tag .. ": equip options",
+      function() return st() == ST_CHAR and M.readByte(CUR) == targetPos() end,
+      function() return st() == ST_OPT end),
     M.waitFrames(10),
     M.driveUntil(function()
       return st() == ST_OPT and M.readByte(CUR) == 0
     end, 600, { M.pressButtons({ "left" }, 2), M.waitFrames(10) },
       tag .. ": cursor on the Equip option"),
-    M.pressButtons({ "a" }, 2),
-    M.waitUntil(function() return st() == ST_SLOT end, 300,
-      tag .. ": slot select", 5),
+    M.confirmA(tag .. ": slot select",
+      function() return st() == ST_OPT and M.readByte(CUR) == 0 end,
+      function() return st() == ST_SLOT end),
     M.waitFrames(10),
     M.driveUntil(function()
       return st() == ST_SLOT and M.readByte(SLOTCUR) == slotRow
     end, 600, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
       tag .. ": slot cursor"),
-    M.pressButtons({ "a" }, 2),
-    M.waitUntil(function() return st() == ST_ITEM end, 300,
-      tag .. ": item list", 5),
+    M.confirmA(tag .. ": item list",
+      function() return st() == ST_SLOT and M.readByte(SLOTCUR) == slotRow end,
+      function() return st() == ST_ITEM end),
     M.waitFrames(10),
     -- The list holds only what this character can wear, so walk it until
     -- the item is under the cursor OR the cursor has stopped moving (the
@@ -5688,9 +5740,11 @@ function M.equipWeapon(pos, itemId, opts)
     }, tag .. ": list cursor on the item (or the list's end)"),
     M.release(),
     M.cond(function() return found end, {
-      M.pressButtons({ "a" }, 2),
-      M.waitUntil(function() return st() == ST_SLOT end, 300,
-        tag .. ": equipped, back on slots", 5),
+      M.confirmA(tag .. ": equipped, back on slots",
+        function()
+          return st() == ST_ITEM and M.readByte(0x1869 + M.readByte(0x9d8a + M.readByte(CUR))) == itemId
+        end,
+        function() return st() == ST_SLOT end),
       M.call(function() if opts.result then opts.result.found = true end end),
     }, {
       M.call(function()
@@ -5824,18 +5878,21 @@ function M.equipKit(charId, items, opts)
       M.waitFrames(20),
       M.driveUntil(function() return st() == ST_MAIN and M.readByte(CUR) == MAINROW end, 900,
         { M.pressButtons({ "down" }, 2), M.waitFrames(10) }, stag .. ": cursor on the menu row"),
-      M.pressButtons({ "a" }, 2),
-      M.waitUntil(function() return st() == ST_CHAR end, 300, stag .. ": character select", 5),
+      M.confirmA(stag .. ": character select",
+        function() return st() == ST_MAIN and M.readByte(CUR) == MAINROW end,
+        function() return st() == ST_CHAR end),
       M.waitFrames(10),
       M.driveUntil(function() return st() == ST_CHAR and M.readByte(CUR) == pos end, 600,
         { M.pressButtons({ "down" }, 2), M.waitFrames(10) }, stag .. ": character cursor"),
-      M.pressButtons({ "a" }, 2),
-      M.waitUntil(function() return st() == ST_OPT end, 600, stag .. ": equip options", 5),
+      M.confirmA(stag .. ": equip options",
+        function() return st() == ST_CHAR and M.readByte(CUR) == pos end,
+        function() return st() == ST_OPT end),
       M.waitFrames(10),
       M.driveUntil(function() return st() == ST_OPT and M.readByte(CUR) == 0 end, 600,
         { M.pressButtons({ "left" }, 2), M.waitFrames(10) }, stag .. ": cursor on the Equip option"),
-      M.pressButtons({ "a" }, 2),
-      M.waitUntil(function() return st() == ST_SLOT end, 300, stag .. ": slot select", 5),
+      M.confirmA(stag .. ": slot select",
+        function() return st() == ST_OPT and M.readByte(CUR) == 0 end,
+        function() return st() == ST_SLOT end),
       M.waitFrames(10),
     }
     for _, it in ipairs(list) do
@@ -5852,8 +5909,9 @@ function M.equipKit(charId, items, opts)
       end, {
         M.driveUntil(function() return st() == ST_SLOT and M.readByte(SLOTCUR) == slotRow end, 600,
           { M.pressButtons({ "down" }, 2), M.waitFrames(10) }, itag .. ": slot cursor"),
-        M.pressButtons({ "a" }, 2),
-        M.waitUntil(function() return st() == ST_ITEM end, 300, itag .. ": item list", 5),
+        M.confirmA(itag .. ": item list",
+          function() return st() == ST_SLOT and M.readByte(SLOTCUR) == slotRow end,
+          function() return st() == ST_ITEM end),
         M.waitFrames(10),
         M.call(function() found, stuck, lastCur, ph = false, 0, nil, 0 end),
         M.driveUntil(function()
@@ -5875,8 +5933,11 @@ function M.equipKit(charId, items, opts)
         }, itag .. ": list cursor on the item (or the list's end)"),
         M.release(),
         M.cond(function() return found end, {
-          M.pressButtons({ "a" }, 2),
-          M.waitUntil(function() return st() == ST_SLOT end, 300, itag .. ": equipped, back on slots", 5),
+          M.confirmA(itag .. ": equipped, back on slots",
+            function()
+              return st() == ST_ITEM and M.readByte(0x1869 + M.readByte(0x9d8a + M.readByte(CUR))) == item
+            end,
+            function() return st() == ST_SLOT end),
           M.call(function()
             M.assertEq(slotByte(slot), item, itag .. ": the slot holds it")
             if opts.ladder then doneSlot[slot] = true end
@@ -6408,8 +6469,10 @@ function M.emptyEquip(charId, opts)
     M.release(), M.waitFrames(10),
     press(ST_OPT, "options row"),
     seek(ST_OPT, function() return OPT_EMPTY end, "left", "right", "cursor on Empty"),
-    M.release(), M.waitFrames(10),
-    M.pressButtons({ "a" }, 4),
+    M.release(),
+    M.confirmA(tag .. ": Empty",
+      function() return st() == ST_OPT and M.readByte(CUR) == OPT_EMPTY end,
+      function() return four() == "FF FF FF FF" end),
     M.waitFrames(20),
     M.call(function()
       M.log(string.format("[%s] char=%d after=%s", tag, charId, four()))
