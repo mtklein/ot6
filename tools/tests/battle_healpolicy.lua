@@ -658,6 +658,13 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(H.inFlightHolds({ restore = 250 }, 600, 413), true,
       "...and outside the round the guard holds whatever is queued")
     H.assertEq(H.inFlightHolds({}, 25, 413), true, "...as does a queued heal of unknown size")
+    -- a refused heal that would lift is not called "not lifting" (8ec3c0f1's
+    -- Gate shift 5: EDGAR alone at 344/821 under 550, "item $EE +477 = 821,
+    -- not lifting clear of the round" -- the solo clause had refused it)
+    v, why = H.spendDecision({ hp = 344, maxhp = 821, roundCost = 550, bp = 3, heals = {},
+      refused = { { what = "item $EE", restore = 477 } } })
+    H.assertEq(why:find("item $EE +477 = 821, it would lift, but the heal policy refused it", 1, true) ~= nil, true,
+      "a refused heal that lifts is said as refused, not as too small (" .. why .. ")")
     -- the budget reopens for a lift (review of care-items cae71db9)
     H.assertEq(H.liftReopens({ hp = 144, cost = 286, restores = { 250, 676 } }), true,
       "LOCKE at 144/820 inside a 286 round, an X-Potion's 676 in hand: the budget reopens")

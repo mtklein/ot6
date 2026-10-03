@@ -1917,7 +1917,8 @@ function M.spendDecision(o)
   for _, h in ipairs(o.refused or {}) do
     tried[#tried + 1] = string.format("%s +%s = %s, %s", h.what,
       tostring(h.restore), h.restore and tostring(hp + h.restore) or "?",
-      h.note or "not lifting clear of the round")
+      h.note or ((h.restore and hp + h.restore > cost) and "it would lift, but the heal policy refused it"
+        or "not lifting clear of the round"))
   end
   -- why nothing saves (review of care-items cae71db9: "(nothing to heal
   -- with)" with X-Potions in the bag, the budget having closed care): the
