@@ -1208,8 +1208,12 @@ H.run({ maxFrames = 3000 }, {
     -- HP the first was about to fill
     local q = { hp = 86, tick = 100 }
     H.assertEq(H.healInFlight(q, 86, 110), nil, "a heal confirmed at 86 HP is in flight while the HP stands")
-    H.assertEq(H.healInFlight(q, 40, 120), nil, "...and while a hit lowers it")
-    H.assertEq(H.healInFlight(q, 80, 130), "landed", "...and has landed when the HP rises off the lowest it read")
+    H.assertEq(H.healInFlight(q, 90, 130), "landed", "...and has landed when the HP rises")
+    -- arm B k0_s0_w25 (the first cut): CELES's X-Potion confirmed on SABIN at
+    -- 1208, a Pearl took him to 143 first, and the guard held every other
+    -- heal until he died
+    H.assertEq(H.healInFlight({ hp = 1208, tick = 5588 }, 143, 5700), "hit",
+      "a hit before the heal lands releases the others to plan on what they see")
     H.assertEq(H.healInFlight({ hp = 86, tick = 100 }, 0, 110), "fell", "a target that falls ends it")
     H.assertEq(H.healInFlight({ hp = 86, tick = 100 }, 86, 100 + 240 + 601), "lapsed",
       "no rise inside RAISE_WAIT + 600 ticks: it lapses")

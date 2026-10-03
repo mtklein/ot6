@@ -10496,15 +10496,19 @@ function Driver:watchDamage()
 end
 
 -- A confirmed heal in flight (#370), one frame of it as plain arithmetic:
--- q = { hp, tick } (the target's HP at the confirm, lowered by any hit
--- since), hp its HP now, tick the battle tick.  Returns "landed" (the HP
--- rose), "fell" (the target is down), "lapsed" (no rise inside
--- RAISE_WAIT + 600 ticks) or nil while the heal is still coming.
+-- q = { hp, tick } (the target's HP and the tick at the confirm), hp its
+-- HP now, tick the battle tick.  Returns "landed" (the HP rose), "fell"
+-- (the target is down), "hit" (a hit landed before the heal did: the
+-- member stands where the heal was not planned for, and the others plan
+-- on what they see -- the first cut held them, and arm B's k0_s0_w25 lost
+-- SABIN at 143/1812 with CELES's X-Potion, confirmed at 1208, still not run
+-- 1200 frames on), "lapsed" (no rise inside RAISE_WAIT + 600 ticks) or nil
+-- while the heal is still coming.
 function M.healInFlight(q, hp, tick)
   if hp == 0 or hp == 0xFFFF then return "fell" end
   if hp > q.hp then return "landed" end
+  if hp < q.hp then return "hit" end
   if tick - q.tick > BATTLE.RAISE_WAIT + 600 then return "lapsed" end
-  q.hp = math.min(q.hp, hp)
   return nil
 end
 
