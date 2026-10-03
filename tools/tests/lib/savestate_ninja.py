@@ -349,9 +349,11 @@ def emit_state_rules(w):
     w("  restat = 1")
     w("")
     w("# A run's record (lib/stamps.py): what it composed, ran on and booted.")
+    w("# stamps.py rewrites a stamp only when its text moved (restat).")
     w("rule stamp")
     w("  command = python3 tools/tests/lib/stamps.py write $out $args")
     w("  description = stamp $out")
+    w("  restat = 1")
     w("")
     w("# The checkpoint a capture makes: the tracked manifest's authored")
     w("# fields, the payload's size and sha256, and its provenance from the")
@@ -405,7 +407,10 @@ def emit_state_edges(w, states, root, copy_from, lua_copy_from=None,
             args.append(f"--ancestor {ancestor}")
         if emulator_of:
             args.append(f"--emulator-of {emulator_of}")
-        srcs = [p for p in inputs]
+        # the stamp hashes the sources; it depends on them as the run does,
+        # through their copies
+        copied = set(RUN_INPUTS) | {CHECKPOINT_TOOL}
+        srcs = [copy_from(p) if p in copied else p for p in inputs]
         w(f"build {out}: stamp {artifact} | {digest_path(label)} "
           f"{' '.join(srcs + stamp_tool)}")
         w(f"  args = {' '.join(args)}")

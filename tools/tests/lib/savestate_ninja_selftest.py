@@ -241,6 +241,9 @@ def main():
             t.bump(rel)
         rc, ran, log = t.ninja()
         check("mtime-only touches (a checkout) replay nothing", ran, [])
+        rc, ran, log = t.ninja()
+        check("...and leave nothing for the next ninja", "no work to do" in log,
+              True)
 
         # -- the uniform rule: every input of a run, by content -----------
         romfill(t, 1, 2)
@@ -262,6 +265,10 @@ def main():
         check("...while the ROM's copy still takes the new bytes",
               t.p("build/ot6.sfc").read_bytes() ==
               t.p("build/ninja/src/build/ot6.sfc").read_bytes(), True)
+        rc, ran, log = t.ninja()
+        check("MUTANT ...and the next ninja has no work at all (a stamp "
+              "that did not move is not left looking out of date)",
+              "no work to do" in log, True)
         t.write("tools/mesen/EMULATOR", "emulator v2\n")
         rc, ran, _ = t.ninja()
         check("an emulator pin change replays the whole game", ran, ALL)
@@ -306,6 +313,10 @@ def main():
         rc, ran, log = t.ninja()
         check("a stamp-tool edit rewrites stamps and replays nothing",
               (ran, " stamp " in log or "stamp build" in log), ([], True))
+        rc, ran, log = t.ninja()
+        check("MUTANT ...and a stamp whose text did not move is not left "
+              "looking out of date (the next ninja has no work)",
+              "no work to do" in log, True)
 
         # -- a generator: that run, then what its bytes reach -------------
         t.write("tools/tests/gen_c.lua", t.p("tools/tests/gen_c.lua")
