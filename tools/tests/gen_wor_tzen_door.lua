@@ -579,7 +579,10 @@ H.run({ maxFrames = 600000 }, {
   H.setRows({ [CELES] = true }, { tag = "CELES row" }),
   H.equipEsper(function() return (H.readByte(0x1850 + CELES) >> 3) & 3 end, MADUIN,
     { tag = "MADUIN -> CELES" }),
-  H.equipKit(CELES, { { 4, GENJI }, { 5, JEWEL_RING } }, { tag = "CELES relics" }),
+  -- through the relic rule over the kit (H.relicKit), Petrify the threat
+  -- (the Osprey's Beak): a guard covering it and more (a Ribbon) takes the
+  -- Jewel Ring's slot
+  H.relicKit(CELES, "CELES", { [4] = GENJI, [5] = JEWEL_RING }, { tag = "CELES relics" }),
   H.equipKit(CELES, { { 1, THUNDERBLADE }, { 0, BLIZZARD } }, { tag = "CELES blades" }),
   H.waitUntil(function() return H.worldHasControl() and H.worldAligned() and bright() >= 15 end,
     1200, "the world map back after the kit", 5),

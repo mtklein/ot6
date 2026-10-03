@@ -159,7 +159,12 @@ local function usualRelics(what, hands)
       local r = H.readByte(c(m[1], 0x24))
       return inParty(m[1]) and (r == PEACE_RING or r == BACK_GUARD)
         and H.invCountOf(USUAL_RELIC[m[1]]) > 0
-    end, { H.equipKit(m[1], { { 5, USUAL_RELIC[m[1]] } }, { tag = m[2] .. ": the usual relic back (" .. what .. ")" }),
+    end, { m[1] == CELES
+             -- CELES's through the relic rule over it (H.relicKit): a Ribbon
+             -- the Back Guard took off goes back on, not the Jewel Ring
+             and H.relicKit(CELES, m[2], { [5] = USUAL_RELIC[CELES] },
+               { tag = m[2] .. ": the usual relic back (" .. what .. ")" })
+             or H.equipKit(m[1], { { 5, USUAL_RELIC[m[1]] } }, { tag = m[2] .. ": the usual relic back (" .. what .. ")" }),
            keep and handsBack(m, keep, what) or H.seqStep({}) }, {})
   end
   return H.seqStep(steps)

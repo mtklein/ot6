@@ -2686,6 +2686,11 @@ function M.phaseWalk(tx, ty, spec)
           .. "hp %d -> %d", M.fieldX(), M.fieldY(), fsf(), hp0, hpsum()), 0)
       end
       if not plan then
+        -- every read below (the hurt-tile step-off's M.canStep, a grid
+        -- capture) is of the map, so none is made before the party can be
+        -- walked: after a battle or the care stop's menu the field reloads
+        -- the map, and until then the object map is the other module's
+        if not (M.hasControl() and M.tileAligned()) then M.setPad({}); return end
         -- parked on a hurt-list tile (a battle return can leave the party
         -- there): step off before observing, because a swap would hurt
         local hk = tkey(M.fieldX(), M.fieldY())
@@ -3305,21 +3310,28 @@ local function menuHome()
   return M.fieldControl()
 end
 
--- A menu list is still scrolling while zTextScrollRate ($41-$42,
--- menu_ram.inc; item.asm UpdateTextScroll) is nonzero, and an A pressed
--- then is lost: measured on the relic list at wor_sabin, the 9th down
--- scrolled the list ($41 = $04 at f4288-f4290), the A held at f4289-f4290
--- never reached the newly-pressed bits (z08 = 0000 with z04 = 0080) and
--- the list stayed open on the Back Guard until the 300-frame wait ran out
--- (build/attempts/wt/walker-after-menu/merge-1769662a/sabin/).
-function M.menuListSettled() return M.readWord(0x41) == 0 end
+-- The menu takes no input while zWaitCounter ($20) runs: WaitFrame
+-- (menu_common.asm) clears the newly-pressed bits z08/z0a every frame the
+-- counter is nonzero, after UpdateCtrlMenu has already moved the edge into
+-- z0c, so a press polled then is consumed and lost.  A list scroll sets the
+-- counter (TextScrollTask_02, item.asm: 3 frames) together with
+-- zTextScrollRate ($41-$42), which it clears only once the counter is 0.
+-- Measured on the relic list at wor_sabin: the 9th down scrolled the list,
+-- the A held at f4289-f4290 was polled at f4290 with $41 = $04, z08 read
+-- 0000 beside z04 = 0080, and the list stayed open on the Back Guard until
+-- the 300-frame wait ran out (build/attempts/wt/walker-after-menu/
+-- merge-1769662a/sabin/).  Both read 0: the next press is read.
+function M.menuListSettled() return M.readWord(0x20) == 0 and M.readWord(0x41) == 0 end
 
--- M.confirmA: a step that presses A on a menu cursor once the cursor is on
--- its target and the list has settled (onTarget() and M.menuListSettled()),
--- then watches for the press to take (accepted()),
+-- M.confirmA: a step that presses A on a menu cursor on the first frame the
+-- cursor is on its target and the menu takes input (onTarget() and
+-- M.menuListSettled()), then watches for the press to take (accepted()),
 -- and presses again if it did not within `window` frames (default 30), up
--- to opts.tries presses (default 4) before it raises.  Every menu helper
--- confirm that is a single press goes through it.
+-- to opts.tries presses (default 4) before it raises.  The list helpers'
+-- single-press confirms go through it: equipWeapon, equipKit, equipEsper,
+-- emptyEquip and saveGame's Save row; the care kernel, bagArrange, setRows,
+-- buyItem and saveGame's slot confirm re-press on a cadence until the
+-- screen moves.
 function M.confirmA(label, onTarget, accepted, opts)
   opts = opts or {}
   local tries, maxTries, window = 0, opts.tries or 4, opts.window or 30
@@ -3331,18 +3343,17 @@ function M.confirmA(label, onTarget, accepted, opts)
   end, opts.maxFrames or 1200, {
     M.call(function()
       if phase == "settle" then
-        if onTarget() and M.menuListSettled() then n = n + 1 else n = 0 end
-        M.setPad({})
-        if n >= 1 then
-          if tries >= maxTries then
-            error(string.format("%s: %d A presses on the target were not taken", label, tries), 0)
-          end
-          tries = tries + 1
-          if tries > 1 then
-            M.log(string.format("[confirm] %s: the A was not taken; press %d", label, tries))
-          end
-          phase, n = "press", 0
+        if not (onTarget() and M.menuListSettled()) then M.setPad({}); return end
+        if tries >= maxTries then
+          error(string.format("%s: %d A presses on the target were not taken", label, tries), 0)
         end
+        tries = tries + 1
+        if tries > 1 then
+          M.log(string.format("[confirm] %s: the A was not taken; press %d", label, tries))
+        end
+        -- pressed on this frame, the one that read the menu ready
+        M.setPad({ "a" })
+        phase, n = "press", 1
       elseif phase == "press" then
         n = n + 1
         M.setPad(n <= 2 and { "a" } or {})
@@ -4928,7 +4939,14 @@ local FACE_VAL = { up = 0, right = 1, down = 2, left = 3 }
 function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
   opts = opts or {}
   local pick, startMap
+  -- The staging tile is picked once and kept, so it is picked only on a
+  -- frame the party can be walked (M.hasControl: the map loaded); until
+  -- then stage() is nil, which navTo reads as "not there yet" and never
+  -- plans on (it plans only with control).  A pick made while the field
+  -- reloads the map after a menu or a battle reads the stale object map
+  -- (#352: the B2 hub's staging (37,23)).
   local function stage()
+    if not pick and not M.hasControl() then return nil end
     if not pick then
       for _, c in ipairs(DIAGSTAGE) do
         local cx, cy, move = sx + c[1], sy + c[2], c[3]
@@ -4949,7 +4967,8 @@ function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
     -- the first step is the reset (#196): the stage, the start map and
     -- the far-side settle count are all re-read where this pass stands
     M.call(function() pick, startMap = nil, mapLow(); settledAgain() end),
-    M.navTo(function() return stage()[1] end, function() return stage()[2] end,
+    M.navTo(function() local p = stage(); return p and p[1] end,
+      function() local p = stage(); return p and p[2] end,
       { maxFrames = 9000, playBattles = "tactical", healer = opts.healer,
         bank = 3, items = true, avoid = opts.avoid, fight = opts.fight,
         arrive = function() return mapLow() ~= startMap end }),
@@ -4959,7 +4978,8 @@ function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
       M.call(function()
         aPhase = (aPhase + 1) % 8
         if M.dialogWaiting() then M.setPad(aPhase < 4 and { "a" } or {}); return end
-        M.setPad({ [stage()[3]] = true })
+        local p = stage()
+        M.setPad(p and { [p[3]] = true } or {})
       end),
     }, what),
     M.release(),
@@ -4985,7 +5005,9 @@ M.gil = gilNow
 function M.shopTalk(nx, ny, what, opts)
   opts = opts or {}
   local pick
+  -- picked only with control, as M.crossDoor's staging tile
   local function stage()
+    if not pick and not M.hasControl() then return nil end
     if not pick then
       for _, c in ipairs(SHOP_CAND) do
         local sx, sy = nx + c[1], ny + c[2]
@@ -5001,19 +5023,22 @@ function M.shopTalk(nx, ny, what, opts)
   return M.seqStep({
     -- the staging tile is picked afresh per pass (#196)
     M.call(function() pick = nil end),
-    M.navTo(function() return stage()[1] end, function() return stage()[2] end,
+    M.navTo(function() local p = stage(); return p and p[1] end,
+      function() local p = stage(); return p and p[2] end,
       { maxFrames = 9000, playBattles = "tactical", healer = opts.healer,
         bank = 3, items = true, fight = opts.fight }),
     M.driveUntil(function()
-      return M.readByte(0x087f + M.readWord(0x0803)) == FACE_VAL[stage()[3]]
+      local p = stage()
+      return p ~= nil and M.readByte(0x087f + M.readWord(0x0803)) == FACE_VAL[p[3]]
     end, 300, {
-      M.call(function() M.setPad({ [stage()[3]] = true }) end),
+      M.call(function() local p = stage(); M.setPad(p and { [p[3]] = true } or {}) end),
     }, what .. ": faced"),
     M.release(), M.waitFrames(4),
     M.driveUntil(function() return M.readByte(0x0026) == 0x25 end, 3000, {
       M.call(function()
         aPh = (aPh + 1) % 12
-        M.setPad(aPh < 4 and { a = true, [stage()[3]] = true } or {})
+        local p = stage()
+        M.setPad((aPh < 4 and p) and { a = true, [p[3]] = true } or {})
       end),
     }, what .. ": shop opens"),
     M.call(function()
@@ -5498,25 +5523,25 @@ function M.equipEsper(pos, esperIdx, opts)
         return st() == ST_MAIN and M.readByte(CUR) == 1
       end, 900, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
         what .. ": cursor on Skills"),
-      M.pressButtons({ "a" }, 2),
-      M.waitUntil(function() return st() == ST_CHAR end, 300,
-        what .. ": character select", 5),
+      M.confirmA(what .. ": character select",
+        function() return st() == ST_MAIN and M.readByte(CUR) == 1 end,
+        function() return st() == ST_CHAR end),
       M.waitFrames(10),
       M.driveUntil(function()
         return st() == ST_CHAR and M.readByte(CUR) == posFn()
       end, 600, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
         what .. ": character cursor"),
-      M.pressButtons({ "a" }, 2),
-      M.waitUntil(function() return st() == ST_SKILLS end, 300,
-        what .. ": skills submenu", 5),
+      M.confirmA(what .. ": skills submenu",
+        function() return st() == ST_CHAR and M.readByte(CUR) == posFn() end,
+        function() return st() == ST_SKILLS end),
       M.waitFrames(10),
       M.driveUntil(function()
         return st() == ST_SKILLS and M.readByte(CUR) == 0
       end, 600, { M.pressButtons({ "up" }, 2), M.waitFrames(6) },
         what .. ": cursor to Espers"),
-      M.pressButtons({ "a" }, 2),
-      M.waitUntil(function() return st() == ST_LIST end, 300,
-        what .. ": esper list", 5),
+      M.confirmA(what .. ": esper list",
+        function() return st() == ST_SKILLS and M.readByte(CUR) == 0 end,
+        function() return st() == ST_LIST end),
       M.waitFrames(10),
     }
   end
@@ -5592,9 +5617,9 @@ function M.equipEsper(pos, esperIdx, opts)
     function() return st() == ST_LIST and M.readByte(GENJULIST + M.readByte(CUR)) == esperIdx end,
     function() return st() == ST_DETAIL end)
   equipSteps[#equipSteps + 1] = M.waitFrames(20)
-  equipSteps[#equipSteps + 1] = M.pressButtons({ "a" }, 3)   -- MenuState_4d @5902: equip esper
-  equipSteps[#equipSteps + 1] = M.waitUntil(function() return st() == ST_LIST end, 300,
-    tag .. ": back on the list", 5)
+  equipSteps[#equipSteps + 1] = M.confirmA(tag .. ": back on the list",   -- MenuState_4d @5902: equip esper
+    function() return st() == ST_DETAIL end,
+    function() return st() == ST_LIST end)
   equipSteps[#equipSteps + 1] = M.waitFrames(10)
   equipSteps[#equipSteps + 1] = M.call(function()
     local got = worn(target)
@@ -6180,8 +6205,13 @@ function M.relicPlan(members, opts)
   for i, p in ipairs(members) do
     local ch = p[1]
     if (M.readByte(0x1850 + ch) & 0x07) == active and (M.readByte(0x1850 + ch) & 0x07) ~= 0 then
-      local cur = { [4] = charByte(ch, 0x23), [5] = charByte(ch, 0x24) }
-      local m = { ch = ch, name = p[2], order = i, cur = cur, want = {}, free = {},
+      -- opts.assume[ch] = { [4] = id, [5] = id }: plan as if the member wore
+      -- these (a route's fixed kit, M.relicKit); the pool below accounts
+      -- for the assumed relic leaving the bag and the real one entering it
+      local real = { [4] = charByte(ch, 0x23), [5] = charByte(ch, 0x24) }
+      local as = opts.assume and opts.assume[ch]
+      local cur = { [4] = as and as[4] or real[4], [5] = as and as[5] or real[5] }
+      local m = { ch = ch, name = p[2], order = i, cur = cur, real = real, want = {}, free = {},
         vigor = charByte(ch, 0x1A), speed = charByte(ch, 0x1B), magic = charByte(ch, 0x1D), level = charByte(ch, 8),
         spells = spellsLearned(ch), twoWeapons = false }
       for s = 4, 5 do
@@ -6205,6 +6235,22 @@ function M.relicPlan(members, opts)
       local cl = M.relicClass(id, opts.threats)
       if cl and not cl.hands then add(id, q) end
       if cl and cl.hands then spareHands[#spareHands + 1] = { id = id, n = q } end
+    end
+  end
+  -- an assumed relic is counted in the bag above but is worn in the plan,
+  -- and the real one it replaces would come off into the bag
+  for _, m in ipairs(ms) do
+    for s = 4, 5 do
+      if m.cur[s] ~= m.real[s] then
+        local cl = M.relicClass(m.cur[s], opts.threats)
+        if cl and not cl.hands and count[m.cur[s]] then count[m.cur[s]] = count[m.cur[s]] - 1 end
+        if cl and cl.hands then
+          for _, sp in ipairs(spareHands) do if sp.id == m.cur[s] and sp.n > 0 then sp.n = sp.n - 1 end end
+        end
+        local rl = m.real[s] ~= 0xFF and M.relicClass(m.real[s], opts.threats) or nil
+        if rl and not rl.hands then add(m.real[s], 1) end
+        if rl and rl.hands then spareHands[#spareHands + 1] = { id = m.real[s], n = 1 } end
+      end
     end
   end
   for _, m in ipairs(ms) do
@@ -6242,7 +6288,9 @@ function M.relicPlan(members, opts)
   -- the highest vigor (guidelines "Relics matter, the Genji Glove
   -- especially").  The Relic menu's own Optimum then arms the second hand
   -- (dressRelics keeps that re-equip rather than putting the gear back).
-  for _, sp in ipairs(spareHands) do
+  -- (opts.spareHands = false skips this step: M.relicKit, whose caller
+  -- decides the hands with the gear)
+  for _, sp in ipairs(opts.spareHands ~= false and spareHands or {}) do
     for _ = 1, sp.n do
       local best = nil
       for _, m in ipairs(ms) do
@@ -6260,10 +6308,15 @@ function M.relicPlan(members, opts)
   -- 2. the widest guard to the caster (the most spells learned); when she
   -- cannot wear it or has no free slot, to the next member by spells
   -- learned (then the order of `members`) who can: never left in the bag
-  local wide, wcover = nil, 0
+  -- (ties on the threatened statuses go to the guard covering more of all
+  -- of them: a Ribbon over a Jewel Ring when the threat is Petrify alone)
+  local wide, wcover, wall = nil, 0, 0
   for _, id in ipairs(ids) do
     local cl = M.relicClass(id, opts.threats)
-    if count[id] > 0 and cl.rank == 1 and cl.cover > wcover then wide, wcover = id, cl.cover end
+    local all = cl and M.relicClass(id).cover or 0
+    if count[id] > 0 and cl.rank == 1 and (cl.cover > wcover or (cl.cover == wcover and cl.cover > 0 and all > wall)) then
+      wide, wcover, wall = id, cl.cover, all
+    end
   end
   -- opts.guardTo (a character id) names the widest guard's wearer instead:
   -- a lever for a lab comparing wearers, not the rule
@@ -6480,8 +6533,8 @@ function M.relicPlan(members, opts)
     end
     lines[#lines + 1] = string.format("%s: slot 4 %s, slot 5 %s (%d change%s)", m.name,
       relicName(m.want[4] or m.cur[4]), relicName(m.want[5] or m.cur[5]), #changes, #changes == 1 and "" or "s")
-    plan[#plan + 1] = { ch = m.ch, name = m.name, want = m.want, changes = changes, handCome = m.handCome,
-      filler = m.filler or {} }
+    plan[#plan + 1] = { ch = m.ch, name = m.name, want = m.want, cur = m.cur, real = m.real, changes = changes,
+      handCome = m.handCome, filler = m.filler or {} }
   end
   for _, l in ipairs(lines) do M.log(string.format("[%s] %s", tag, l)) end
   return plan
@@ -6576,6 +6629,69 @@ function M.dressRelics(members, opts)
       end
     end,
     reset = function() plan, queue, cur, restore = nil, nil, nil, nil end,
+  }
+end
+
+-- M.relicKit(ch, name, kit, opts): a route's fixed relics through the
+-- relic rule.  kit = { [4] = id, [5] = id } (either may be left out: that
+-- slot is planned from what is worn).  When the step is reached,
+-- M.relicPlan runs for this member as if the kit were on (opts.assume), so
+-- a relic in the bag the rule ranks above a kit choice takes its slot --
+-- the widest guard (a Ribbon) before any other guard or acting relic, a
+-- two-weapon relic never displaced -- and a kit choice nothing outranks
+-- stays (step 4).  A two-weapon relic in the bag is not put on (step 1 is
+-- skipped): it arms the second hand through the Relic menu's Optimum, a
+-- gear decision the kit's caller makes with its gear (measured: the
+-- Genji Glove on CELES in the FC escape kit had Optimum hand her a blade
+-- the next fight's formation absorbs, and the absorb guard stopped the
+-- run; build/attempts/wt/walker-after-menu/ribbon/).  The pair the plan wants goes on through the Relic menu
+-- (M.equipKit), one session.  Guidelines: "Ribbons ... go on the moment
+-- it's in the bag"; a person changing relics at this menu reads the bag.
+-- opts.threats as M.relicPlan's; without them, the statuses the kit's own
+-- guards cover (the route chose them for those), or every status when the
+-- kit holds no guard.  opts.tag.
+function M.relicKit(ch, name, kit, opts)
+  opts = opts or {}
+  local tag = opts.tag or (name .. " relics")
+  local step
+  return {
+    tick = function()
+      if step == nil then
+        local threats = opts.threats
+        if threats == nil then
+          local s1, s2 = 0, 0
+          for s = 4, 5 do
+            local cl = kit[s] and M.relicClass(kit[s]) or nil
+            if cl and cl.aff == "guard" then s1, s2 = s1 | itemProp(kit[s], 6), s2 | itemProp(kit[s], 7) end
+          end
+          if s1 | s2 ~= 0 then threats = { s1 = s1, s2 = s2 } end
+        end
+        M.log(string.format("[%s] the relic rule over the kit (%s), threats %s", tag,
+          (function()
+            local t = {}
+            for s = 4, 5 do if kit[s] then t[#t + 1] = string.format("slot %d %s", s, relicName(kit[s])) end end
+            return table.concat(t, ", ")
+          end)(), threats and string.format("STATUS1 $%02X STATUS2 $%02X", threats.s1 or 0, threats.s2 or 0) or "every status"))
+        local plan = M.relicPlan({ { ch, name } }, { threats = threats, tag = tag,
+          assume = { [ch] = kit }, spareHands = false })
+        local p = plan[1]
+        M.assertEq(p ~= nil, true, tag .. ": the member is in the active party")
+        local items, wants = {}, {}
+        for s = 4, 5 do
+          local id = p.want[s] or p.cur[s]
+          wants[#wants + 1] = relicName(id)
+          if id ~= 0xFF and id ~= p.real[s] then items[#items + 1] = { s, id } end
+          if kit[s] and id ~= kit[s] then
+            M.log(string.format("[%s] slot %d: %s in place of the kit's %s (the relic rule)", tag, s,
+              relicName(id), relicName(kit[s])))
+          end
+        end
+        M.log(string.format("[%s] %s wears %s", tag, name, table.concat(wants, ", ")))
+        step = #items > 0 and M.equipKit(ch, items, { tag = tag }) or M.call(function() end)
+      end
+      return step:tick()
+    end,
+    reset = function() step = nil end,
   }
 end
 
@@ -6982,8 +7098,10 @@ function M.talkToObj(obj, what, maxF)
     return math.abs(ox - M.fieldX()) + math.abs(oy - M.fieldY()) == 1
   end
   local apFrame, apPick = -1000, nil
+  -- re-picked every 30 frames, and only on a frame the party can be walked
+  -- (as M.crossDoor's staging tile)
   local function approach()
-    if M.frame - apFrame >= 30 then
+    if M.frame - apFrame >= 30 and M.hasControl() then
       apFrame = M.frame
       local ox, oy = objAt()
       apPick = { ox, oy + 1 }
@@ -6995,8 +7113,8 @@ function M.talkToObj(obj, what, maxF)
     return apPick
   end
   local function walkStep()
-    return M.navTo(function() return approach()[1] end,
-                   function() return approach()[2] end, {
+    return M.navTo(function() local p = approach(); return p and p[1] end,
+                   function() local p = approach(); return p and p[2] end, {
       maxFrames = maxF or 20000, playBattles = true,
       arrive = function()
         return engaged or (adjacent() and M.hasControl() and M.tileAligned())
@@ -7358,9 +7476,9 @@ function M.saveGame(opts)
     end, 600, {
       M.pressButtons({ "up" }, 4), M.waitFrames(16),
     }, tag .. ": cursor on Save"),
-    M.pressButtons({ "a" }, 4),
-    M.waitUntil(function() return M.readByte(ZMENUSTATE) == SAVE_SELECT end,
-      600, tag .. ": save-slot selection", 5),
+    M.confirmA(tag .. ": save-slot selection",
+      function() return M.readByte(ZMENUSTATE) == 0x05 and M.readByte(0x4b) == 6 end,
+      function() return M.readByte(ZMENUSTATE) == SAVE_SELECT end),
     M.driveUntil(function()
       return M.readByte(ZMENUSTATE) == SAVE_SELECT
          and M.readByte(0x4b) == slot - 1
@@ -7382,13 +7500,14 @@ function M.saveGame(opts)
       M.log(string.format("[%s] real Save UI wrote slot %d", tag, slot))
     end),
     -- close the menu; field and world settle differently.  The world map
-    -- is debounced (20 calm frames).  The field is not: hasControl is
-    -- true from the first frame the field is back with its map reloaded
-    -- (careClose's rule), and a save point's tile re-fires the SavePoint
-    -- script under the party every 4th frame, so 20 calm frames there
-    -- never come (build/attempts/wt/walker-after-menu/save_close/).  They
-    -- used to come only from the reload itself, when hasControl read true
-    -- through LoadMap.
+    -- is debounced (20 calm frames).  The field is not: one frame of
+    -- H.hasControl, which reads true only once the map is reloaded (a save
+    -- is not a menu step, so it waits for the loaded map itself), because
+    -- a save point's tile re-fires the SavePoint script under the party
+    -- every 4th frame and 20 calm frames there never come
+    -- (build/attempts/wt/walker-after-menu/save_close/).  They used to
+    -- come only from the reload itself, when hasControl read true through
+    -- LoadMap.
     (function() local calm = 0
       return M.driveUntil(function()
         local closed = not menuOpen()
@@ -7412,7 +7531,7 @@ end
 -- is not a menu helper (a walk, a BFS read in a test's own cond) until it
 -- is.  The strict wait sits there, before anything plans a route.
 for _, name in ipairs({ "fieldCare", "careStop", "bagArrange", "setRows", "equipEsper",
-                        "equipWeapon", "equipLoadout", "equipKit", "dressRelics", "emptyEquip" }) do
+                        "equipWeapon", "equipLoadout", "equipKit", "dressRelics", "relicKit", "emptyEquip" }) do
   local build = M[name]
   M[name] = function(...)
     return M.menuStep(build(...), name)

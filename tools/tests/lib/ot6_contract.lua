@@ -1891,6 +1891,7 @@ function M.stepOntoSavePoint(x, y, opts)
   local ph, calm = 0, 0
   local function pickFrom()
     if from then return from end
+    if not M.hasControl() then return nil end   -- picked only on a walkable, loaded map
     for _, s in ipairs(SAVE_SIDES) do
       if M.bfsPath(x + s[1], y + s[2]) ~= nil then
         from = { x + s[1], y + s[2], s[3] }
@@ -1902,15 +1903,20 @@ function M.stepOntoSavePoint(x, y, opts)
       from[1], from[2], from[3]))
     return from
   end
-  -- The approach is chosen on a loaded map: a menu's close wait
-  -- (H.hasControl) lasts until the field has reloaded the map the menu
-  -- wrote over (M.mapLoaded; build/attempts/wt/walker-after-menu/), so the
-  -- choice needs no wait of its own.
+  -- Both choices read the map, so both are made with control (M.hasControl:
+  -- the map loaded).  After a menu helper the step runner's reload gate
+  -- (M.menuStep) already holds this step until then; the wait here covers
+  -- a step reached any other way (a story stretch ending in a battle's
+  -- reload), and the approach side is picked only with control, as
+  -- M.crossDoor's staging tile (build/attempts/wt/walker-after-menu/).
   return M.seqStep({
     M.call(function() from = opts.from end),
+    M.waitUntil(function() return M.hasControl() end, 1200,
+      string.format("the save point (%d,%d): a loaded map to plan on", x, y), 1),
     M.cond(function() return M.bfsPath(x, y) ~= nil end,
       { M.navTo(x, y, nav) },
-      { M.navTo(function() return pickFrom()[1] end, function() return pickFrom()[2] end, nav),
+      { M.navTo(function() local p = pickFrom(); return p and p[1] end,
+                function() local p = pickFrom(); return p and p[2] end, nav),
         M.withReset(M.driveUntil(function()
           calm = (onSaveTile(x, y) and M.tileAligned()
                   and not M.dialogWaiting()) and calm + 1 or 0

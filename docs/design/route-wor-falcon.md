@@ -1536,8 +1536,12 @@ otherwise; the order of 2.6 is the order walked):
   flag `H.hasControl` read came back clear while the field was still
   reloading the map after the menu, and the object map the walker reads
   held the menu's scratch bytes until LoadMap rebuilt it. `H.hasControl`
-  now also requires the map loaded (`H.mapLoaded`), so every menu's close
-  wait outlasts the reload, and this step's own wait is gone.
+  now also requires the map loaded (`H.mapLoaded`). The menu helpers close
+  on the control flags alone (`H.fieldControl`), so a menu can follow a
+  menu through the reload as a player holding X does, and the step runner's
+  reload gate (`H.menuStep`) holds any other step until the map is loaded;
+  this step's approach side, like every cached pick, is chosen only with
+  `H.hasControl`, and its own 39-frame wait is gone.
 - **Each room of maps 299 and 300 is its own pocket**, joined by same-map
   doors (`plan/nolinks.txt`), so the walk is a chain of door crossings
   rather than one path; B2's hub (37,12) holds five of them.
@@ -1784,8 +1788,10 @@ the hub's map recovers on time; the walker's choice does not. The Relic
 menu's close wait ended while the field was still reloading the map, the
 next step's door crossing picked its staging tile from a BFS on the
 unloaded map, found none of (37,22)'s neighbours reachable, and fell back
-to (37,23), a tile no walk reaches. With `H.hasControl` waiting out the
-reload the crossing stages at (37,21), and the re-plan runs at the hub
+to (37,23), a tile no walk reaches. Now the step after a menu helper waits
+in the step runner's reload gate until the map is loaded, and the
+crossing's staging tile is picked only on a frame `H.hasControl` reads
+true; the crossing stages at (37,21), and the re-plan runs at the hub
 again (and once more on the save point).
 
 **Under draw variation** (`var_tomb/`, `lab/varlab_tomb.py`: K encounters

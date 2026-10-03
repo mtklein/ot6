@@ -609,8 +609,11 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
       H.readByte(base + 0x1F), H.readByte(base + 0x20), H.readByte(base + 0x21),
       H.readByte(base + 0x22), H.readByte(base + 0x23), H.readByte(base + 0x24), H.readWord(0x1189)))
   end),
-  H.equipKit(6, { { 0, 0x11 }, { 0, 0x0E }, { 0, 0x0A },
-                  { 4, 0xB1 }, { 5, 0xB5 } }, { tag = "CELES escape kit", ladder = true }),
+  -- the relics through the relic rule over the kit (H.relicKit): a relic in
+  -- the bag it ranks above the Star Pendant or the Jewel Ring goes on in
+  -- their place (a Ribbon stolen from AtmaWeapon, guidelines "Ribbons")
+  H.equipKit(6, { { 0, 0x11 }, { 0, 0x0E }, { 0, 0x0A } }, { tag = "CELES escape kit", ladder = true }),
+  H.relicKit(6, "CELES", { [4] = 0xB1, [5] = 0xB5 }, { tag = "CELES escape kit (relics)" }),
   H.call(function()
     local base = 0x1600 + 37 * 6
     H.log(string.format("[escape] CELES after the kit: %02X %02X %02X %02X %02X %02X master=%d",

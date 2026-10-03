@@ -66,7 +66,10 @@ H.run({ maxFrames = 12000 }, {
   -- first and the next-best in the bag after it.  Her row stays as it is
   -- (BACK); no fight in this segment or the next measures it.
   H.call(function() healthBefore = health() end),
-  H.equipKit(CELES, { { 4, 0xD1 }, { 5, 0xC1 } }, { tag = "CELES relics" }),
+  -- through the relic rule over the kit (H.relicKit): a relic in the bag
+  -- it ranks above the Czarina Ring -- the widest guard, a Ribbon first --
+  -- goes on in its place; the Genji Glove stays
+  H.relicKit(CELES, "CELES", { [4] = 0xD1, [5] = 0xC1 }, { tag = "CELES relics" }),
   H.equipKit(CELES, { { 0, 0x11 }, { 0, 0x0F },
                       { 1, 0x0E }, { 1, 0x0F }, { 1, 0x5C },
                       { 2, 0x76 }, { 2, 0x6E },
