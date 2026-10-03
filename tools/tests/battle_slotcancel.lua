@@ -20,7 +20,9 @@
 -- raises him plays no part.  The cap hides the pip at bank 5, so the moment
 -- the test waits for is a cancel below it: Setzer, whose Defends would hold
 -- the bank at 5, spends a pip on a boosted spin whenever his window opens on
--- a full bank outside a branch point.
+-- 4 or 5 outside a branch point, so his windows open below the cap.  (At 5
+-- only, the bank stood at 5 at nearly every window a blow was queued for:
+-- 0 branch points in 43k frames, round2/slot/logs/new_s5.log.gz.)
 --
 -- Played, not written: a natural boot of the terra-returned-v1 checkpoint,
 -- a drawn battle, and real inputs only.  The party plays a policy a person
@@ -34,24 +36,37 @@
 --     Setzer Defends (a guarded turn regenerates a pip).  Well above the
 --     members' median blow (measured as they land) a Fight lands at once;
 --     nearer, the member holds his window with the cursor on Setzer until
---     Setzer's gauge is full and a monster's action is starting, then
---     strikes, so Setzer's own window opens next with the blow queued
---     behind that action.
+--     Setzer's gauge is full, then strikes, so Setzer's own window opens
+--     next with the blow still in its run-up -- unless another member is
+--     waiting for a window too: his would open first, and a window between
+--     the strike and Setzer's costs as many frames as Setzer's whole Slot
+--     input, so the striker stands down (Defends) and a later window
+--     strikes.
 -- The branch point is Setzer's window opening on him below the median blow
 -- (it fells him), a pip banked, and a member's Fight on him still in its
 -- advance wait (read off the command lists and the action queue).  It is
--- snapshotted and branched BRANCHES_PER_POINT times: each branch idles 4
--- frames longer there, then banks one pip with R, spins and commits as fast
--- as a person taps, and is played on, the members now only caring and
--- guarding, until the spin's own turn ends (Ot6ActionEnd with his entity;
--- the no-action mark, the command that ran and his out-of-the-fight bits
--- read there).  Whether the blow lands before the commit (no spin), in the
--- spin's advance wait (vanilla drops the spin with him: no end of its own),
--- or once the spin waits in the action queue (it comes up with the
--- no-action mark) is the draw's business.  When no branch of a point came
--- up marked below bank 5, the snapshot is restored and play goes on from
--- it (Setzer Defends in that window) to the next branch point, at most
--- MAX_POINTS of them.
+-- snapshotted, and each branch idles some frames there, then banks one pip
+-- with R, spins and commits as fast as a person taps, and is played on,
+-- the members now only caring and guarding, until the spin's own turn ends
+-- (Ot6ActionEnd with his entity; the no-action mark, the command that ran
+-- and his out-of-the-fight bits read there).  The blow's landing does not
+-- move with the idle frames (Active battle mode: Setzer's menus stop no
+-- clock); his commit moves frame for frame.  So by the idle frames the
+-- outcomes come in order: the spin reaches the action queue ahead of the
+-- blow and RUNS; or behind it and comes up with the no-action mark
+-- (CANCELLED, the moment the test waits for); or the blow lands with the
+-- spin still in its advance wait (vanilla drops the spin with him: no end
+-- of its own); or before the commit (no spin).  The branches search that
+-- order: 0 idle frames first, doubling after a RAN, halving the gap after
+-- a later outcome, until one comes up CANCELLED, the gap closes, or
+-- BRANCHES_PER_POINT have run.  (The first version branched at 0 and 4
+-- idle frames only: idling can delay the commit but never bring it
+-- forward, so a point whose fastest commit was already late could not
+-- succeed -- the re-cut terra-returned-v1's draw met four such points and
+-- failed, build/attempts/wt/one-graph/round2/slot/.)  When no branch of a
+-- point came up marked below bank 5, the snapshot is restored and play goes
+-- on from it (Setzer Defends in that window) to the next branch point, at
+-- most MAX_POINTS of them.
 -- Asserted, per branch:
 --   1. a spin that ran ($0F, unmarked), the control's and any branch's:
 --      pending -> 0 and the bank down by the tier (the boost is still
@@ -143,6 +158,18 @@ local function setzerReady()
   return php(actor) > 0 and H.readByte(0x3219 + actor * 2) == 0
     and H.readByte(0x32CC + actor * 2) == 0xFF
 end
+-- Another member whose gauge is full with nothing of his queued: his
+-- window would open between the striker's and Setzer's, and a window there
+-- costs the blow's run-up about as many frames as Setzer's whole Slot input
+-- (measured: build/attempts/wt/one-graph/round2/slot/).
+local function otherWaiting(striker)
+  for s = 0, 3 do
+    if s ~= actor and s ~= striker and seated(s) and php(s) > 0
+       and H.readByte(0x3219 + s * 2) == 0 and H.readByte(0x32CC + s * 2) == 0xFF then
+      return s
+    end
+  end
+end
 
 -- ------------------------------------------------------ the other members
 -- One plan per window, chosen when it opens:
@@ -154,7 +181,6 @@ end
 --     the moment when he is near the median blow (planFor, otherWindow);
 --   * else Defend.
 local attackSetzer = true
-local monsterActing, monsterStart = nil, 0   -- a monster's action in progress (exec watches)
 local skipPoint = false      -- playing on from a branch point: not that window again
 local ctl, ctlDone = nil, false   -- the control spin (the approach, below)
 local blows = {}             -- what the members' Fights have taken off Setzer
@@ -202,8 +228,8 @@ local function planFor(a)
     -- one blow in flight at a time.  Well above the median blow
     -- measured, a plain Fight wears him down; nearer, the blow may fell him,
     -- so it waits: the window is held, the cursor on him, until his gauge is
-    -- full and a monster's action is starting (otherWindow), so his own
-    -- window opens next with the blow still queued behind that action
+    -- full (otherWindow), so his own window opens next with the blow still
+    -- in its run-up
     return { kind = "attack", tgt = actor, cell = fightCell,
              ambush = php(actor) < 2 * blow() }
   end
@@ -264,17 +290,27 @@ local function otherWindow()
       return
     end
     if plan.ambush and not W.sprung then
-      -- the cursor rests on Setzer; strike as a monster's action begins
-      -- with his gauge full, so the blow waits behind that action and his
-      -- own window opens while it plays
-      if not (setzerReady() and monsterActing and H.frame - monsterStart <= 12) then
-        H.setPad({})
+      -- the cursor rests on Setzer until his gauge is full; then strike,
+      -- so his window is the next to open, with the blow in its run-up.
+      -- When another member is waiting too, his window would open first:
+      -- this one stands down (Defends) and leaves the strike to a later
+      -- window.  (The first version also waited for a monster's action to
+      -- begin, so the blow would queue behind it; measured, the blow
+      -- reaches the action queue some 140 frames after the confirm, long
+      -- after that action has played: round2/slot/trace_s0.log.gz.)
+      if not setzerReady() then H.setPad({}); return end
+      local o = otherWaiting(a)
+      if o then
+        H.log(string.format("[cancel] f%d actor %d stands down: slot %d (%02X) waits " ..
+          "for a window too, which would open before Setzer's", H.frame, a, o, chid(o)))
+        W.plan = { kind = "defend" }
+        tap("b")
         return
       end
       W.sprung = true
-      H.log(string.format("[cancel] f%d actor %d strikes: Setzer's gauge is full and a " ..
-        "monster's action began %d frame(s) ago (a %d-frame hold) | party %s", H.frame, a,
-        H.frame - monsterStart, W.n, partyLine()))
+      H.log(string.format("[cancel] f%d actor %d strikes: Setzer's gauge is full and " ..
+        "no one else waits for a window (a %d-frame hold) | party %s", H.frame, a,
+        W.n, partyLine()))
     end
     if ph < 5 and W.via == "list" then
       W.via = "confirmed"
@@ -408,8 +444,8 @@ local function approachFrame()
     if not ctlDone and (ctl == nil or not ctl.commit) and not low() and bp(actor) >= 1 then
       ctl = ctl or {}
       setzerSpin()
-    elseif ctlDone and bp(actor) >= 5 then
-      setzerSpin()      -- a full bank hides the pip: spend one on a boosted spin
+    elseif ctlDone and bp(actor) >= 4 then
+      setzerSpin()      -- keep the bank below the cap: spend one on a boosted spin
     else
       setzerDefend()
     end
@@ -481,13 +517,36 @@ end
 
 local snap = nil
 local points = 0
-local function branch(j, wait)
-  local req, k
+-- The search at a branch point.  Setzer's commit lands `wait` frames later
+-- in a branch that idles `wait` frames first; the blow's landing does not
+-- move.  So the outcomes run in order of wait: RAN (the spin reached the
+-- action queue ahead of the blow), CANCELLED (behind it, before it ran:
+-- the moment the test waits for), DROPPED (he fell with the spin still in
+-- its advance wait) and NO COMMIT (the blow landed before the commit).
+-- Starting at 0, a RAN doubles the wait and anything later halves the gap,
+-- until a branch comes up CANCELLED, the gap between the latest RAN and the
+-- earliest later outcome closes, or BRANCHES_PER_POINT branches have run.
+local SR = nil               -- { lo = latest RAN wait, hi = earliest later wait, n }
+local BRANCHES_PER_POINT, MAX_WAIT = 10, 240
+local function nextWait()
+  if SR.hi == nil then return SR.lo < 0 and 0 or math.min(SR.lo * 2 + 8, MAX_WAIT) end
+  return (SR.lo + SR.hi) // 2
+end
+local function searchDone()
+  if SR.found then return true end
+  if SR.n >= BRANCHES_PER_POINT then return true end
+  if SR.hi ~= nil and SR.hi - SR.lo <= 1 then return true end
+  return SR.hi == nil and SR.lo >= MAX_WAIT
+end
+local function branch()
+  local req, k, wait, target
   return H.cond(function() return true end, {
     H.call(function() H.setPad({}); rec = nil; req = H.requestLoadState(snap.blob) end),
     H.waitFrames(2),
     H.call(function()
-      H.checkReq(req, "snapshot load (branch " .. j .. " of point " .. points .. ")")
+      wait = nextWait()
+      SR.n = SR.n + 1
+      H.checkReq(req, "snapshot load (branch " .. SR.n .. " of point " .. points .. ")")
       H.rearmInputInjection()
       k = #recs + 1
       rec = { k = k, wait = wait, point = points }
@@ -497,8 +556,10 @@ local function branch(j, wait)
       raising, healing, hitting, W, SS, SD = nil, {}, nil, {}, { n = 0, rTaps = 0 }, { n = 0 }
       H.log(string.format("[cancel] branch %d (point %d): %d idle frames at Setzer's window",
         k, points, wait))
+      target = H.frame + wait + 1
     end),
-    H.waitFrames(wait + 1),
+    H.driveUntil(function() return H.frame >= target end, MAX_WAIT + 2,
+      { H.call(function() H.setPad({}) end), H.waitFrames(1) }, "the branch's idle frames"),
     H.driveUntil(function()
       if not H.battleLoadStarted() then return true end
       if rec.done or rec.dropped or rec.lost then return true end
@@ -518,12 +579,22 @@ local function branch(j, wait)
           tostring(rec.raised), pend(actor), bp(actor)))
       else
         local what = d.kind == "ran" and "RAN" or "CANCELLED"
+        if d.kind == "cancelled" then SR.found = true end
         H.log(string.format("[cancel] branch %d %s: commit f%d pending %d bank %d | turn end " ..
           "f%d no-action mark %s $b5=$%02X hp %d%s -> pending %d bank %d (fell f%s, raised f%s)",
           k, what, c.f, c.p, c.b, d.f, d.kind == "cancelled" and "SET" or "clear", d.cmd,
           d.hp, d.ko and " out of the fight" or "", d.p, d.b, tostring(rec.fell), tostring(rec.raised)))
       end
       rec.logged = true
+      -- the search: a spin that ran was early; anything else was late
+      if d and d.kind == "ran" then SR.lo = math.max(SR.lo, wait)
+      elseif not (d and d.kind == "cancelled") then
+        SR.hi = SR.hi and math.min(SR.hi, wait) or wait
+      end
+      if not searchDone() then
+        H.log(string.format("[cancel] search (point %d): ran at <= %d, late at >= %s; next %d",
+          points, SR.lo, tostring(SR.hi), nextWait()))
+      end
     end),
   })
 end
@@ -592,7 +663,7 @@ end
 -- restore the snapshot and play on from it (Setzer Defends in that window,
 -- as at any other) to the next branch point, at most MAX_POINTS of them.
 local battles, atPoint = 0, false
-local BRANCHES_PER_POINT, MAX_POINTS = 2, 10
+local MAX_POINTS = 10
 local function belowCap()
   local n = 0
   for _, r in ipairs(recs) do
@@ -642,7 +713,9 @@ local function round()
     H.waitFrames(2),
     H.call(function() H.checkReq(snap, "snapshot at Setzer's window") end),
   }
-  for j = 1, BRANCHES_PER_POINT do point[#point + 1] = branch(j, (j - 1) * 4) end
+  point[#point + 1] = H.call(function() SR = { lo = -1, hi = nil, n = 0 } end)
+  point[#point + 1] = H.driveUntil(searchDone, 200000, { branch() },
+    "the branch search at this point")
   local req
   point[#point + 1] = H.cond(function() return not found() end, {
     H.call(function() H.setPad({}); req = H.requestLoadState(snap.blob) end),
@@ -676,7 +749,6 @@ local steps = {
     local ae = H.sym("Ot6ActionEnd")
     emu.addMemoryCallback(function()
       local x = emu.getState()["cpu.x"] & 0xffff
-      if x == monsterActing then monsterActing = nil end
       if actor == nil then return end
       if x == actor * 2 then
         -- what ended: the ROM's own record of a fresh turn with nothing to
@@ -688,11 +760,6 @@ local steps = {
                    ko = (H.readByte(0x3EE4 + x) & 0xC0) ~= 0 }   -- KO'd or petrified
       end
     end, emu.callbackType.exec, ae, ae)
-    local ea = H.sym("ExecAction")
-    emu.addMemoryCallback(function()
-      local x = emu.getState()["cpu.x"] & 0xff
-      if x >= 8 then monsterActing, monsterStart = x, H.frame end
-    end, emu.callbackType.exec, ea, ea)
     local addr = H.seedStoreAddr()
     emu.addMemoryCallback(function()
       local seed = emu.getState()["cpu.a"] & 0xff
