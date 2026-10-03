@@ -387,8 +387,27 @@ H.run({ maxFrames = 3000 }, {
       "463 clears a 400 round: the raise stands and owes its top-up (" .. why .. ")")
     raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 1710, power = 2, smallestHit = 150,
                                                 topUpFirst = true, topUp = 250, roundCost = 1083 })
+    H.assertEq(tostring(ok) .. "/" .. tostring(needs), "false/nil",
+      "213 survives the 150 hit but not the 1083 round, and 463 does not clear it: refused -- surviving "
+      .. "alone is judged against the round (" .. why .. ")")
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 1710, power = 2, smallestHit = 150, roundCost = 200 })
     H.assertEq(tostring(ok) .. "/" .. tostring(needs), "true/nil",
-      "213 survives the 150 hit alone: raised, and no top-up is owed (" .. why .. ")")
+      "213 over both the 150 hit and a 200 round survives alone: raised, no top-up owed (" .. why .. ")")
+    -- sabin_done at 892e274f (last round of the care-items review): SABIN
+    -- (363) raised to 45 "survives the smallest hit, 34" under a 91 round,
+    -- and to 45 on "no enemy hit measured yet", both "judged to survive
+    -- alone"; both died before a top-up
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 363, power = 2, smallestHit = 34, roundCost = 91,
+                                                topUpFirst = true, topUp = 250 })
+    H.assertEq(tostring(raiseHp) .. "/" .. tostring(ok) .. "/" .. tostring(needs), "45/true/true",
+      "45 over the 34 hit but inside the 91 round: raised on its top-up, which is owed (" .. why .. ")")
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 363, power = 2, smallestHit = 34, roundCost = 91,
+                                                topUpFirst = false, topUp = 250 })
+    H.assertEq(tostring(ok), "false",
+      "...and with the enemy first and no kill in reach, not raised to die again (" .. why .. ")")
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 363, power = 2, smallestHit = nil })
+    H.assertEq(tostring(ok) .. "/" .. tostring(needs), "true/true",
+      "nothing measured: the raise stands, and its top-up is owed -- not judged to survive alone (" .. why .. ")")
     -- the ATB read behind topUpFirst: $3218,x is the 16-bit gauge the
     -- engine adds $3ac8,x to every tick and reads as full when its high
     -- byte is 0 (battle_main.asm `lda $3219,x / beq` "branch if atb
@@ -656,8 +675,10 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(H.inFlightHolds({ restore = 250 }, 231, 413), true,
       "...one that lifts him (231 + 250 = 481) does")
     H.assertEq(H.inFlightHolds({ restore = 250 }, 600, 413), true,
-      "...and outside the round the guard holds whatever is queued")
-    H.assertEq(H.inFlightHolds({}, 25, 413), true, "...as does a queued heal of unknown size")
+      "...and outside the round the guard holds a known heal")
+    H.assertEq(H.inFlightHolds({}, 25, 413), false,
+      "a queued heal of unknown size holds nobody off (last round of the review)")
+    H.assertEq(H.inFlightHolds({}, 600, 413), false, "...outside the round either")
     -- a refused heal that would lift is not called "not lifting" (8ec3c0f1's
     -- Gate shift 5: EDGAR alone at 344/821 under 550, "item $EE +477 = 821,
     -- not lifting clear of the round" -- the solo clause had refused it)
@@ -673,6 +694,21 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(H.liftReopens({ hp = 27, cost = H.roundWithQueuedHits(413, { 114 }), restores = { 250, 875 } }), true,
       "...so at 27 HP he is inside it and an Elixir lifts him before the hit lands")
     H.assertEq(H.roundWithQueuedHits(413, {}), 413, "no hit queued: the monsters' round alone")
+    -- the floor after the round, as makePlan wires it (H.muddleFloors into
+    -- H.muddleRule): LOCKE's floor on SABIN 114, SABIN's round 413
+    local fl = H.muddleFloors({ actor = 1, maxhp = { [0] = 0, [1] = 820, [2] = 821, [3] = 902 },
+      floorOf = function(e) return e == 3 and 114 or 50 end,
+      round = function(e) return e == 3 and 413 or 0 end })
+    H.assertEq(fl[3], 527, "the floor makePlan hands the Muddle rule is the hit's 114 plus SABIN's 413 round")
+    local r, held = H.muddleRule({ actor = 1, status2 = { [0] = 0, [1] = 0, [2] = 0, [3] = 0x20 },
+      hp = { [0] = 0, [1] = 144, [2] = 821, [3] = 275 }, maxhp = { [0] = 0, [1] = 820, [2] = 821, [3] = 902 },
+      floor = fl })
+    H.assertEq(tostring(r) .. "/" .. tostring(held), "nil/3",
+      "the Gate's shift 5: SABIN at 275 is held -- 275 - 413 does not stay over 114")
+    r, held = H.muddleRule({ actor = 1, status2 = { [0] = 0, [1] = 0, [2] = 0, [3] = 0x20 },
+      hp = { [0] = 0, [1] = 144, [2] = 821, [3] = 600 }, maxhp = { [0] = 0, [1] = 820, [2] = 821, [3] = 902 },
+      floor = fl })
+    H.assertEq(tostring(r), "3", "...at 600 (600 - 413 = 187 over 114) the cure-hit goes")
     -- the budget reopens for a lift (review of care-items cae71db9)
     H.assertEq(H.liftReopens({ hp = 144, cost = 286, restores = { 250, 676 } }), true,
       "LOCKE at 144/820 inside a 286 round, an X-Potion's 676 in hand: the budget reopens")

@@ -697,6 +697,27 @@ M.ST2_MUDDLE = 0x20                   -- STATUS2::CONFUSE, $3ee5 + entity*2
 --   inFlight optional, entity -> true when another member's cure-hit on
 --            it is confirmed and has not run (#348): one hit per muddled
 --            ally in flight, the way a raise is (#341)
+-- The unmuddle floors makePlan hands M.muddleRule (#320, last round of
+-- the care-items review): the hitter's floor on each ally (the most its
+-- Fight can take, Driver:unmuddleFloor) plus the ally's round, since the
+-- hit waits in the queue behind the round -- the Gate's shift 5 queued
+-- LOCKE's hit on SABIN at 275/902 over a floor of 114, under a 413 round,
+-- and it ran at 27.  So the hit is held unless hp - round > floor.
+--   actor     the hitter
+--   maxhp     entity -> max HP (0 for an empty slot)
+--   floorOf   function(e) -> the hitter's floor on e
+--   round     function(e) -> e's round (0 when none is priced)
+function M.muddleFloors(o)
+  local fl = {}
+  for e = 0, 3 do
+    if e ~= o.actor and (o.maxhp[e] or 0) > 0 then
+      local f = o.floorOf(e)
+      if f ~= nil then fl[e] = f + math.max(0, o.round(e) or 0) end
+    end
+  end
+  return fl
+end
+
 function M.muddleRule(o)
   local st, hp, maxhp, floor = o.status2 or {}, o.hp or {}, o.maxhp or {}, o.floor or {}
   local inFlight = o.inFlight or {}
@@ -1371,14 +1392,27 @@ function M.raiseDecision(o)
       .. "else the field care's after the fight"
   end
   if raiseHp <= 0 then return raiseHp, false, "nothing to raise to" end
+  -- "Survives alone" is judged against the round the lift rule prices
+  -- (o.roundCost) as well as the smallest hit, and with nothing measured
+  -- the raise stands but owes its top-up (last round of the care-items
+  -- review: sabin_done raised SABIN to 45/363 "survives the smallest hit,
+  -- 34" under a 91 round and to 45 on "no enemy hit measured yet", both
+  -- "judged to survive alone", and both died before anyone topped him up)
   local hit = o.smallestHit
-  if hit == nil then return raiseHp, true, "no enemy hit measured yet" end
-  if hit < raiseHp then
-    return raiseHp, true, string.format("%d HP survives the smallest hit, %d", raiseHp, hit)
+  local round = o.roundCost or 0
+  if hit == nil and round <= 0 then
+    return raiseHp, true, "no enemy hit measured yet: the raise stands, and nothing says it "
+      .. "survives alone -- its top-up is owed", true
   end
+  local bar0 = math.max(hit or 0, round)
+  if raiseHp > bar0 then
+    return raiseHp, true, string.format("%d HP survives alone: the smallest hit %s, the round %d",
+      raiseHp, hit and tostring(hit) or "unmeasured", round)
+  end
+  hit = hit or bar0
   if o.killInReach then
-    return raiseHp, true, string.format("%d HP would not survive the %d hit, but a "
-      .. "kill is in reach: the raise is free", raiseHp, hit)
+    return raiseHp, true, string.format("%d HP would not survive the %d %s, but a "
+      .. "kill is in reach: the raise is free", raiseHp, bar0, round >= hit and "round" or "hit")
   end
   -- (a) is priced against the round the heal policy's lift rule will price
   -- the top-up against (o.roundCost, the raised member's window), not the
@@ -5789,9 +5823,11 @@ function Driver:raiseOk(e, actor)
     end
   end
   local o = { maxhp = maxhp, power = M.itemPower(BATTLE.FENIX_DOWN), smallestHit = hit,
-              zombie = status1Has(e, M.ST1_ZOMBIE) }
+              zombie = status1Has(e, M.ST1_ZOMBIE), roundCost = self:roundPriceFor(e) }
   local detail = ""
-  if hit ~= nil and hit >= raiseHp then
+  -- (the kill and the top-up race, whenever the raise does not survive
+  -- alone: its hit or its round reaches the raise's HP, M.raiseDecision)
+  if math.max(hit or 0, o.roundCost or 0) >= raiseHp then
     -- (b) a kill in reach: the last monster against the party's window
     local slot = soleTarget()
     if slot ~= nil then
@@ -5845,7 +5881,6 @@ function Driver:raiseOk(e, actor)
         .. "(slot %d is %d ticks from acting)", lethalSlot, lethalEta)
     end
   end
-  o.roundCost = self:roundPriceFor(e)
   local _, ok, why, needsTopUp = M.raiseDecision(o)
   return ok, raiseHp, hit, hitSlot, hitOn, why .. detail, needsTopUp
 end
@@ -6140,12 +6175,14 @@ function Driver:makePlan(actor)
   -- clears the status (CalcMaxDmg strips it from a physically damaged
   -- target; a Remedy does not carry the bit, M.itemStatus2).
   do
-    local s2, mx, fl = {}, {}, {}
+    local s2, mx = {}, {}
     for e = 0, 3 do
       s2[e] = M.readByte(BATTLE.ST2 + e * 2)
       mx[e] = maxOf(e)
-      if e ~= actor and mx[e] > 0 then fl[e] = self:unmuddleFloor(actor, e) end
     end
+    local fl = M.muddleFloors({ actor = actor, maxhp = mx,
+      floorOf = function(e) return self:unmuddleFloor(actor, e) end,
+      round = function(e) return price[e] or 0 end })
     -- a cure-hit already confirmed on a muddled ally, by another member,
     -- and not yet run (#348): the queued record lasts until the hitter's
     -- command runs (Driver:watchAllyExec), the pending one until the bit
@@ -6188,8 +6225,9 @@ function Driver:makePlan(actor)
       local est = self:allyFightEstimate(actor, held)
       local measured = M.unmuddleHits[M.readByte(BATTLE.BCHID + actor * 2)]
       local said = string.format("[%s] actor=%d: entity %d (%d/%d) is MUDDLED but at or under "
-        .. "this actor's unmuddle floor %d (%s) -- the Fight that cures would kill; planning on",
-        self.tag or "fight", actor, held, hpNow[held], mx[held], fl[held],
+        .. "this actor's unmuddle floor %d, its round %d included (%s) -- the Fight that cures would "
+        .. "kill once the round has run; planning on",
+        self.tag or "fight", actor, held, hpNow[held], mx[held], fl[held], price[held] or 0,
         est and string.format("its Fight on this ally priced to a floor of %d (%s)%s%s", est.top, est.parts,
           est.lethal and ("; " .. est.lethal .. ", so every HP is under it") or "",
           measured and string.format(", its largest measured unmuddle hit %d", measured) or "")
@@ -10688,10 +10726,12 @@ end
 -- SETZER at 25/902 under a 413 round on a queued Potion, "+250 = 275",
 -- with an Elixir in the bag).  q.restore nil (a party cure, a cast not
 -- measured) holds.
+-- (last round of the review: a heal of unknown size -- a party cure, a
+-- first cast not yet measured -- holds nobody off; only a known restore
+-- that lifts the target clear of their round does)
 function M.inFlightHolds(q, hp, cost)
-  if q == nil then return false end
-  if q.restore == nil or (cost or 0) <= 0 or hp > cost then return true end
-  return hp + q.restore > cost
+  if q == nil or q.restore == nil then return false end
+  return hp + q.restore > (cost or 0)
 end
 
 -- A confirmed heal in flight (#370), one frame of it as plain arithmetic:
