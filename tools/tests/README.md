@@ -135,7 +135,8 @@ same play twice for a release: qualification (legs from the tracked
 checkpoints, 3669 s on the Air, 2401 s on px13) and then the chain from
 power-on (6061 s on the Air, 7758 s on px13). A library code edit costs the
 same replay as a ROM change (px13: 9107 s); under the old graph it re-ran
-only the suites (908 s on px13) and left the replay to the release's chain.
+only the suites (908 s on px13) and left the replay to the release's chain
+(8003 s on px13 for that edit, 8911 s in all).
 A suite edit costs that suite (56 s on px13). Changes that replay the game
 landed on every landing day from 09-16 to 10-01: 34 ROM, 62 library, 61
 generator and 13 runner landings over 10 days
@@ -148,8 +149,12 @@ machine and about half that at a load near the core count (live.py's
 placement curves), so what else the machine runs moves the replay's wall
 time by up to 2x. One leg, fc_landing, runs at half the speed of its
 neighbours on both machines at the same load (202 frames/s on the idle
-Air; its frames are the Imperial Air Force fights on the airship deck);
-what costs it is not yet measured. `build/throughput.jsonl` (live.py) is
+Air; its frames are the Imperial Air Force fights on the airship deck).
+What costs it is PNG encoding: CPU samples of the Air's Mesen put 51-58%
+of fc_landing's active samples in deflate under `emu.takeScreenshot`
+against 2% for wor_edgar (air/prof/), because gen_fc_landing.lua polls
+`H.battleActive()` every frame and its `screenLooksAlive()` encodes a
+screenshot per battle frame. `build/throughput.jsonl` (live.py) is
 where to re-measure: every run's frames, wall time, frames/s and load.
 
 ### Stamps
