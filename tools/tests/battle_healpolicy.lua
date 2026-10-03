@@ -635,6 +635,26 @@ H.run({ maxFrames = 3000 }, {
       refused = { { what = "item $E9", restore = 250 } } })
     H.assertEq(v == "spend" and why:find("item $E9 +250 = 384, not lifting clear of the round", 1, true) ~= nil, true,
       "the refused Potion is named in the spend line (" .. why .. ")")
+    -- and the spend line names why nothing saves (review of care-items
+    -- cae71db9: "(nothing to heal with)" while the budget had closed care)
+    H.assertEq(why:find("(the lift rule: item $E9", 1, true) ~= nil, true,
+      "a heal the lift rule refused: the lift rule is the reason (" .. why .. ")")
+    v, why = H.spendDecision({ hp = 447, maxhp = 447, roundCost = 447, bp = 3, heals = {} })
+    H.assertEq(why:find("(the bag holds no heal)", 1, true) ~= nil, true,
+      "an empty bag is said as one (" .. why .. ")")
+    v, why = H.spendDecision({ hp = 144, maxhp = 820, roundCost = 286, bp = 1, heals = {},
+      why = "the round's care turn went to actor 3",
+      refused = { { what = "item $EA", restore = 676, note = "it would lift, but not this turn" } } })
+    H.assertEq(v == "spend" and why:find("(the round's care turn went to actor 3: item $EA +676 = 820, "
+      .. "it would lift, but not this turn)", 1, true) ~= nil, true,
+      "the Gate's s5 LOCKE: the budget is the reason, and the X-Potion that would lift is named (" .. why .. ")")
+    -- the budget reopens for a lift (review of care-items cae71db9)
+    H.assertEq(H.liftReopens({ hp = 144, cost = 286, restores = { 250, 676 } }), true,
+      "LOCKE at 144/820 inside a 286 round, an X-Potion's 676 in hand: the budget reopens")
+    H.assertEq(H.liftReopens({ hp = 30, cost = 286, restores = { 250 } }), false,
+      "...not for a heal that leaves him inside the round (30 + 250 = 280)")
+    H.assertEq(H.liftReopens({ hp = 400, cost = 286, restores = { 676 } }), false,
+      "...nor for a member outside the round: that is a top-up, the budget's to keep")
     -- the wipe class
     local d = function(tick, from, maxhp, bp, one)
       return { tick = tick, from = from, maxhp = maxhp, bp = bp, oneAction = one }

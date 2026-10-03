@@ -987,6 +987,25 @@ end
 -- ({ item, why }), the cheapest first.  An owed top-up (the raise's) takes
 -- the cheapest item that lifts the raised member clear of the round, else
 -- the cheapest there is.
+-- Whether the round's care budget reopens for a lift (review of care-items
+-- cae71db9): a member inside their round (hp <= cost) and a heal in hand
+-- that lifts them clear (hp + restore > cost).  The budget is for top-ups:
+-- one care turn a round, ending the fight being the strongest heal.  A
+-- lift is a death prevented, and the budget does not hold it -- the Gate's
+-- shift 5 wiped with LOCKE at 144/820 under a 286 round and an X-Potion in
+-- the bag, the round's care turn having gone to SABIN's top-up ("actor=1
+-- SPEND (attack): 144/820 is inside one round of death (286) ...").
+--   hp, cost   the member's HP and their round
+--   restores   what each heal in hand would put back
+function M.liftReopens(o)
+  local hp, cost = o.hp or 0, o.cost or 0
+  if hp <= 0 or cost <= 0 or hp > cost then return false end
+  for _, r in ipairs(o.restores or {}) do
+    if r ~= nil and hp + r > cost then return true end
+  end
+  return false
+end
+
 -- Whether an item the engine aims at the whole party lifts every member of
 -- `inside` ({ hp, maxhp, cost } each: the members inside their round)
 -- clear of their round (#370: the Megalixir's turn).
@@ -1896,12 +1915,18 @@ function M.spendDecision(o)
   -- the heals in hand the lift rule turned down (review of b490ce32: gate
   -- s5 said "nothing to heal with" with 60 Potions in the bag)
   for _, h in ipairs(o.refused or {}) do
-    tried[#tried + 1] = string.format("%s +%s = %s, not lifting clear of the round", h.what,
-      tostring(h.restore), h.restore and tostring(hp + h.restore) or "?")
+    tried[#tried + 1] = string.format("%s +%s = %s, %s", h.what,
+      tostring(h.restore), h.restore and tostring(hp + h.restore) or "?",
+      h.note or "not lifting clear of the round")
   end
+  -- why nothing saves (review of care-items cae71db9: "(nothing to heal
+  -- with)" with X-Potions in the bag, the budget having closed care): the
+  -- caller's o.why -- the round's care turn gone to another, the lift rule,
+  -- or an empty bag
+  local why = o.why or (#tried > 0 and "the lift rule" or "the bag holds no heal")
   return "spend", string.format("%d/%d is inside one round of death (%d) holding %d BP, "
-    .. "and no heal saves it (%s)", hp, o.maxhp or 0, cost, bp,
-    #tried > 0 and table.concat(tried, ", ") or "nothing to heal with")
+    .. "and no heal saves it (%s%s)", hp, o.maxhp or 0, cost, bp, why,
+    #tried > 0 and (": " .. table.concat(tried, ", ")) or "")
 end
 
 -- How a wipe reads (#175), from its [death] records -- each { tick, from,
@@ -6315,6 +6340,45 @@ function Driver:makePlan(actor)
       end
     end
   end
+  -- ...and so does a lift (M.liftReopens): a member inside their round,
+  -- no heal of another's in flight on them, and a heal in hand -- the bag's
+  -- (M.itemChoice's candidates, an unsold one included: the member is
+  -- inside) or a cure measured this battle -- that lifts them clear.  The
+  -- reopened block cares for those members only (liftOnly).
+  local liftOnly = false
+  if not careOpen and (row ~= nil or cureRow ~= nil) then
+    for e = 0, 3 do
+      local hp, maxhp, cost = hpNow[e], maxOf(e), price[e] or 0
+      if hp > 0 and maxhp > 0 and hp < maxhp and cost > 0 and hp <= cost
+         and self.healQueued[e] == nil and not status1Has(e, M.ST1_ZOMBIE) then
+        local restores, what = {}, {}
+        if row ~= nil then
+          for _, it in ipairs(self:bagHeals(e, hp)) do
+            restores[#restores + 1] = it.restore
+            what[#what + 1] = string.format("$%02X +%d", it.id, it.restore)
+          end
+        end
+        if cureRow ~= nil then
+          for _, spell in ipairs(type(self.opts.cure) == "table" and self.opts.cure or BATTLE.CURES) do
+            local r = self.castRestore[spell]
+            if r ~= nil and spellCell(actor, spell, true) then
+              restores[#restores + 1] = r
+              what[#what + 1] = string.format("cure $%02X +%d", spell, r)
+            end
+          end
+        end
+        if M.liftReopens({ hp = hp, cost = cost, restores = restores }) then
+          careOpen, liftOnly = true, true
+          local said = string.format("[%s] actor=%d: entity %d at %d/%d is inside a %d round "
+            .. "and a heal in hand lifts them (%s) -- the round's care budget (actor %d's) "
+            .. "reopens for the lift", self.tag or "fight", actor, e, hp, maxhp, cost,
+            table.concat(what, ", "), self.careActor)
+          if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+          break
+        end
+      end
+    end
+  end
   if (row ~= nil or cureRow ~= nil) and totalMon > 200 and self.parkDropN < 3
      and not careOpen then
     local said = string.format("[%s] actor=%d: this round's care turn "
@@ -6427,7 +6491,7 @@ function Driver:makePlan(actor)
     -- closed to this actor, or it declined every heal) no heal is
     -- coming this turn at all.
     local heals, refused = {}, {}
-    if where == "care" then
+    do
       local allies = 0
       for e = 0, 3 do
         if e ~= actor and hpNow[e] > 0 and maxOf(e) > 0 then
@@ -6464,8 +6528,23 @@ function Driver:makePlan(actor)
         end
       end
     end
+    -- From the attack lines no heal comes this turn: what the care lines
+    -- would have taken is said, not counted, with the reason the block was
+    -- closed (review of care-items cae71db9)
+    local whyNot = nil
+    if where ~= "care" then
+      for _, h in ipairs(heals) do
+        refused[#refused + 1] = { what = h.what, restore = h.restore, note = "it would lift, but not this turn" }
+      end
+      heals = {}
+      if not careOpen then
+        whyNot = string.format("the round's care turn went to actor %d", self.careActor or -1)
+      elseif #refused > 0 then
+        whyNot = "the care lines took none"
+      end
+    end
     local verdict, why = M.spendDecision({ hp = hp, maxhp = maxhp, roundCost = cost,
-                                           bp = have, heals = heals, refused = refused })
+                                           bp = have, heals = heals, refused = refused, why = whyNot })
     if verdict ~= "spend" then
       local said = string.format("[%s] actor=%d no spend (%s): %s", self.tag or "fight",
         actor, where, why)
@@ -6768,7 +6847,7 @@ function Driver:makePlan(actor)
             .. "Fenix Down on them is confirmed (tick %d) and has not landed", self.tag or "fight",
             actor, e, queued.by, queued.tick)
           if said ~= self.healSaid then self.healSaid = said; M.log(said) end
-        elseif maxOf(e) > 0 and hpNow[e] == 0
+        elseif maxOf(e) > 0 and hpNow[e] == 0 and not liftOnly
            and self:battInvIdx(BATTLE.FENIX_DOWN) then
           local ok, raiseHp, hit, hitSlot, hitOn, why, needsTopUp = self:raiseOk(e, actor)
           local hitStr = hit and string.format("%d (slot %d on entity %d)", hit, hitSlot, hitOn)
@@ -6843,6 +6922,9 @@ function Driver:makePlan(actor)
           .. "on it is confirmed (tick %d) and has not landed", self.tag or "fight", actor, e, hp, maxhp,
           inFlight.by, inFlight.what, inFlight.tick)
         if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+      elseif liftOnly and not (hp > 0 and (price[e] or 0) > 0 and hp <= price[e]) then
+        -- (the budget reopened for a lift: a member outside their round
+        -- waits for the next round's care turn)
       elseif hp > 0 and maxhp > 0 and hp < maxhp and not status1Has(e, M.ST1_ZOMBIE) then
         local pct = hp * 100 // maxhp
         -- a statue is the cure line's, not a patient (a Potion cannot
