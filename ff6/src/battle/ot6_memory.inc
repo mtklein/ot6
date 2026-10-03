@@ -432,5 +432,15 @@ OT6_PASSRETARGET     := $edce
 .assert OT6_PASSRETARGET = OT6_SETZERROW + 1, error, "the added-pass mark must follow setzer's row without a gap"
 .assert OT6_PASSRETARGET <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
+; Hired Help's animation (ot6_setzer.asm): SETZER's slot pose at the action's
+; start (Ot6SetzerExec: wCharGfxData $61bf/$61c0/$61c1, put back after the last
+; hire), and the axis the hires walk on for this action (0: sideways off the
+; edge behind the party; nonzero: a pincer, up off the top edge), set at each pass.
+OT6_HIREPOSE         := $edcf   ; 3 bytes
+OT6_HIREAXIS         := $edd2
+.assert OT6_HIREPOSE = OT6_PASSRETARGET + 1, error, "the hire's pose save must follow the added-pass mark without a gap"
+.assert OT6_HIREAXIS = OT6_HIREPOSE + 3, error, "the hire's axis must follow its pose save"
+.assert OT6_HIREAXIS <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
 
 .endif
