@@ -8077,6 +8077,7 @@ function M.setzerBattle(plan, opts)
     end
   end
   return M.seqStep({
+    M.call(function() M.logRomIdentity("[setzer]") end),
     M.waitUntil(function() return M.battleActive() end, 1200, "the battle is up", 2),
     M.driveUntil(function()
       if opts.untilPlanDone and k > #plan and Z.rec == nil then
@@ -8630,6 +8631,414 @@ function M.setzerCheckCoins(r, i, rate, classOf, tag)
     end
   end
   return passes
+end
+
+-- ---- Hired Help's crew on screen (wt/hire-sprite, kits.md "Each hire is
+-- somebody new") ---------------------------------------------------------
+-- M.hireCrewArm() hooks the animation's own state, read-only, once a run:
+--   exec   Ot6SetzerExec for a Hired Help row: SETZER's slot, pose
+--          ($61bf/$61c0/$61c1), offsets and graphics as the action starts;
+--   pass   every Ot6CoinAnim entry carrying a hire's mark ($b6 = $5A, $b7
+--          bit 7): the mark, the slot, the arrangement ($201F), whether
+--          SHADOW sits in the party and whether he can be hired then (the
+--          same story switches Ot6ShadowHirable reads);
+--   swap   every Ot6HireSwap entry: the slot's absolute position (base +
+--          offsets, DrawCharSprite's sum) when its graphics change;
+--   load   every status_pat_tfr_long call during a pass: whether the slot
+--          is hidden (w7e61ac) while its tiles and palette change;
+--   arrive the pass's first CheckNullTarget (after the walk-in): the
+--          graphics id, the $7F buffer against that figure's ROM sheet (as
+--          LoadCharGfx builds it), the position, the shown bit;
+--   strike FightCmdAnim, or Interceptor's $FC drawn (ExecAnim after a
+--          MagicCmdAnim entry with $FC: with no body left it draws nothing);
+--   end    SETZER's Ot6ActionEnd: graphics, buffer against SETZER's sheet,
+--          offsets, pose.
+-- M.hireCrewCheck(r, tag) holds one H.setzerBattle record to the design
+-- and logs one line a pass, strike and end.
+local HC = nil
+M.HIRE_FIG_GFX = { [0] = 0x13, [1] = 0x0E, [2] = 0x10, [3] = 0x03, [5] = 0x14 }
+M.HIRE_FIG_NAME = { [0] = "merchant", [1] = "soldier", [2] = "Leo", [3] = "Shadow", [4] = "Interceptor", [5] = "ghost" }
+-- the weapon a figure swings by class (none, slashing, piercing, bludgeoning),
+-- item ids from kits.md; the Fight animation's number is id + 1
+M.HIRE_FIG_WEAPON = {
+  [0] = { 0x00, 0x0B, 0x00, 0x34 }, [1] = { 0x0A, 0x0A, 0x1D, 0x46 },
+  [2] = { 0x14, 0x14, 0x22, 0x46 }, [3] = { 0x26, 0x2B, 0x26, 0x44 },
+  [5] = { 0x00, 0x0A, 0x1D, 0x4A },
+}
+local function romB(a) return M.readRomByte(a & 0x3FFFFF) end
+local hcSheets = {}
+local function hcSheet(g)
+  if hcSheets[g] then return hcSheets[g] end
+  local p = M.sym("CharGfxPtrs") + 3 * g
+  local base = romB(p) | (romB(p + 1) << 8) | (romB(p + 2) << 16)
+  local tbl, out = M.sym("_c2c745"), {}
+  for t = 0, 255 do
+    local off = romB(tbl + 2 * t) | (romB(tbl + 2 * t + 1) << 8)
+    for b = 0, 31 do out[t * 32 + b] = (off == 0xFFFF) and 0 or romB(base + off + b) end
+  end
+  local function rev(v)
+    local r = 0
+    for i = 0, 7 do if v & (1 << i) ~= 0 then r = r | (1 << (7 - i)) end end
+    return r
+  end
+  for i = 0, 63 do out[0x3C0 + i] = rev(out[0x3C0 + i]); out[0x10C0 + i] = rev(out[0x10C0 + i]) end
+  hcSheets[g] = out
+  return out
+end
+function M.hireBufferOff(slot, g)    -- bytes of the slot's $7F buffer that are not g's sheet
+  local want, base, bad = hcSheet(g), 0x10000 + slot * 0x2000, 0
+  for i = 0, 0x1FFF do
+    if emu.read(base + i, emu.memType.snesWorkRam) ~= want[i] then bad = bad + 1 end
+  end
+  return bad
+end
+local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
+function M.hireSlotPos(slot)         -- DrawCharSprite's sums, before the pose's own piece offsets
+  local b = 0x61B6 + slot * 32
+  return s16(M.readWord(b + 1)) + s16(M.readWord(b + 0x1E)) + s16(M.readWord(b + 0x0F)),
+    s16(M.readWord(b + 3)) + s16(M.readWord(b + 0x11)) + s16(M.readWord(b + 0x1C))
+end
+-- get_yoffset's lift for a slot ($38 in DrawCharSprite, added to the
+-- base y): -12 in a magitek battle (w7e64ba), else Float's bob
+-- (FloatStatusOffsetTbl by the frame counter w7e61c2) while the slot's
+-- status has Float ($2EC4 bit 7) and no pose override ($61D1, $61C1)
+function M.hireLift(slot)
+  if M.readByte(0x64BA) ~= 0 then return -12 end
+  local b = slot * 32
+  if (M.readByte(0x2EC4 + b) & 0x80) ~= 0 and M.readByte(0x61D1 + b) == 0 and M.readByte(0x61C1 + b) == 0 then
+    return romB(M.sym("FloatStatusOffsetTbl") + ((M.readByte(0x61C2 + b) & 0x38) >> 3)) - 256
+  end
+  return 0
+end
+local function hcPose(slot)
+  local b = 0x61B6 + slot * 32
+  return { bf = M.readByte(b + 9), c0 = M.readByte(b + 10), c1 = M.readByte(b + 11) }
+end
+function M.shadowFielded()
+  for s = 0, 3 do if M.readByte(0x3ED8 + s * 2) == 3 then return true end end
+  return false
+end
+function M.shadowHirable()           -- event switch $02E3 ($1EDC bit 3): recruited, and not
+  return (M.readByte(0x1EDC) & 0x08) ~= 0  -- left on the Floating Continent (its Jump clears it, _ca48c1)
+end
+-- sha256 of n bytes read by get(i), i = 0 .. n-1 (FIPS 180-4)
+local SHA_K = {
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2 }
+local function sha256(get, n)
+  local H8 = { 0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19 }
+  local M32 = 0xFFFFFFFF
+  local function rotr(x, k) return ((x >> k) | (x << (32 - k))) & M32 end
+  local total = ((n + 9 + 63) // 64) * 64
+  local function byte(i)
+    if i < n then return get(i) end
+    if i == n then return 0x80 end
+    if i >= total - 8 then return ((n * 8) >> ((total - 1 - i) * 8)) & 0xFF end
+    return 0
+  end
+  local w = {}
+  for blk = 0, total - 64, 64 do
+    for t = 0, 15 do
+      local i = blk + 4 * t
+      w[t] = (byte(i) << 24) | (byte(i + 1) << 16) | (byte(i + 2) << 8) | byte(i + 3)
+    end
+    for t = 16, 63 do
+      local a, b = w[t - 15], w[t - 2]
+      local s0 = rotr(a, 7) ~ rotr(a, 18) ~ (a >> 3)
+      local s1 = rotr(b, 17) ~ rotr(b, 19) ~ (b >> 10)
+      w[t] = (w[t - 16] + s0 + w[t - 7] + s1) & M32
+    end
+    local a, b, c, d, e, f, g, h = H8[1], H8[2], H8[3], H8[4], H8[5], H8[6], H8[7], H8[8]
+    for t = 0, 63 do
+      local S1 = rotr(e, 6) ~ rotr(e, 11) ~ rotr(e, 25)
+      local ch = (e & f) ~ ((~e) & g)
+      local t1 = (h + S1 + ch + SHA_K[t + 1] + w[t]) & M32
+      local S0 = rotr(a, 2) ~ rotr(a, 13) ~ rotr(a, 22)
+      local mj = (a & b) ~ (a & c) ~ (b & c)
+      local t2 = (S0 + mj) & M32
+      h, g, f, e, d, c, b, a = g, f, e, (d + t1) & M32, c, b, a, (t1 + t2) & M32
+    end
+    H8[1], H8[2], H8[3], H8[4] = (H8[1] + a) & M32, (H8[2] + b) & M32, (H8[3] + c) & M32, (H8[4] + d) & M32
+    H8[5], H8[6], H8[7], H8[8] = (H8[5] + e) & M32, (H8[6] + f) & M32, (H8[7] + g) & M32, (H8[8] + h) & M32
+  end
+  local out = {}
+  for i = 1, 8 do out[i] = string.format("%08x", H8[i]) end
+  return table.concat(out)
+end
+M.sha256 = sha256
+-- the ROM's identity as tools/build/rom_version.py computes it: sha256 of
+-- the whole file with the version fields (Ot6VersionText c0/ffa0, 16
+-- bytes; the header title c0/ffc0, 21; the checksum c0/ffdc, 4) zeroed,
+-- the binding savestate_stamp.sh romsig and the test results use; and the
+-- version text itself
+function M.romIdentity()
+  local n = emu.getMemorySize(emu.memType.snesPrgRom)
+  local function masked(i)
+    if (i >= 0xFFA0 and i < 0xFFB0) or (i >= 0xFFC0 and i < 0xFFD5) or (i >= 0xFFDC and i < 0xFFE0) then return 0 end
+    return emu.read(i, emu.memType.snesPrgRom)
+  end
+  local v = {}
+  for i = 0, 20 do
+    local c = emu.read(0xFFC0 + i, emu.memType.snesPrgRom)
+    v[#v + 1] = (c >= 0x20 and c < 0x7F) and string.char(c) or "?"
+  end
+  return string.format("identity %s (%d bytes, rom_version.py's: the version fields zeroed), header \"%s\"",
+    sha256(masked, n), n, (table.concat(v):gsub("%s+$", "")))
+end
+-- the ROM identity, logged once a run under the first tag that asks
+-- (every SETZER suite asks through M.setzerBattle; M.hireCrewArm too)
+local romIdentityLogged = false
+function M.logRomIdentity(tag)
+  if romIdentityLogged then return end
+  romIdentityLogged = true
+  M.log(tag .. " ROM " .. M.romIdentity())
+end
+function M.hireCrewArm()
+  if HC then return HC end
+  HC = { execs = {}, passes = {}, swaps = {}, loads = {}, strikes = {}, ends = {}, frames = {}, pins = {} }
+  local cur = nil
+  local function script(i) return M.readByte(M.readWord(0x76) + i) end
+  local ex = M.sym("Ot6SetzerExec")
+  emu.addMemoryCallback(function()
+    if M.readByte(0xB6) ~= 0x5A then return end
+    local e = emu.getState()["cpu.y"] & 0xff
+    if e >= 8 then return end
+    local slot = e // 2
+    local x, y = M.hireSlotPos(slot)
+    HC.execs[#HC.execs + 1] = { f = M.frame, slot = slot, pose = hcPose(slot), x = x, y = y,
+      ox = M.readWord(0x61D4 + slot * 32), oy = M.readWord(0x61C7 + slot * 32), gfx = M.readByte(0x7B6C + slot) }
+    HC.watch = slot
+  end, emu.callbackType.exec, ex, ex)
+  -- every frame of a hire, its Ot6SetzerExec to its Ot6ActionEnd: the
+  -- slot's shown bit, base y and status lift; and every tile of the slot
+  -- that DrawCharSprite or DrawStatusSprites pins to y = $97 (a tile above
+  -- -32: their own lda #$97, located from each routine's entry and checked
+  -- to be that instruction)
+  local dcs, dss = M.sym("DrawCharSprite"), M.sym("DrawStatusSprites")
+  local pinC, pinS = dcs + (0x3679 - 0x34DB), dss + (0x348E - 0x33A3)
+  for _, a in ipairs({ pinC, pinS }) do
+    M.assertEq(string.format("%02X %02X", romB(a), romB(a + 1)), "A9 97",
+      string.format("the pin to $97 at $%06X", a))
+  end
+  local drawing = nil
+  local function drawer() drawing = emu.getState()["cpu.a"] & 3 end
+  emu.addMemoryCallback(drawer, emu.callbackType.exec, dcs, dcs)
+  emu.addMemoryCallback(drawer, emu.callbackType.exec, dss, dss)
+  local function pinned(kind)
+    return function()
+      if HC.watch == nil or drawing ~= HC.watch then return end
+      local st = emu.getState()
+      HC.pins[#HC.pins + 1] = { f = M.frame, kind = kind, slot = drawing,
+        y = M.readByte(((st["cpu.d"] or 0) + 0x3E) & 0xFFFF), shown = (M.readByte(0x61AC) & (1 << drawing)) ~= 0 }
+    end
+  end
+  emu.addMemoryCallback(pinned("sprite"), emu.callbackType.exec, pinC, pinC)
+  emu.addMemoryCallback(pinned("status"), emu.callbackType.exec, pinS, pinS)
+  emu.addEventCallback(function()
+    if HC.watch == nil then return end
+    local slot = HC.watch
+    local _, y = M.hireSlotPos(slot)
+    local fr = { f = M.frame, slot = slot, y = y, lift = M.hireLift(slot),
+      shown = (M.readByte(0x61AC) & (1 << slot)) ~= 0, gfx = M.readByte(0x7B6C + slot),
+      float = (M.readByte(0x2EC4 + slot * 32) & 0x80) ~= 0 }
+    HC.frames[#HC.frames + 1] = fr
+    if M.HIRE_FRAME_LOG then
+      M.log(string.format("[crew frame] f%d slot %d %s base y %d lift %d anchor %d gfx $%02X%s", fr.f, slot,
+        fr.shown and "shown " or "hidden", fr.y, fr.lift, fr.y + fr.lift, fr.gfx, fr.float and " Float" or ""))
+    end
+  end, emu.eventType.endFrame)
+  local an = M.sym("Ot6CoinAnim")
+  emu.addMemoryCallback(function()
+    if script(2) ~= 0x5A or script(3) & 0x80 == 0 or (M.readByte(M.readWord(0x78)) & 0x80) ~= 0 then cur = nil; return end
+    local slot = M.readByte(M.readWord(0x78) + 1) & 3
+    local x, y = M.hireSlotPos(slot)
+    cur = { f = M.frame, mark = script(3), slot = slot, pincer = M.readByte(0x201F) == 2, x0 = x, y0 = y,
+      fielded = M.shadowFielded(), hirable = M.shadowHirable(), loads = 0, hiddenLoads = 0 }
+    HC.passes[#HC.passes + 1] = cur
+  end, emu.callbackType.exec, an, an)
+  local sw = M.sym("Ot6HireSwap")
+  emu.addMemoryCallback(function()
+    if not cur then return end
+    local x, y = M.hireSlotPos(cur.slot)
+    HC.swaps[#HC.swaps + 1] = { f = M.frame, pass = cur, x = x, y = y, lift = M.hireLift(cur.slot),
+      to = emu.getState()["cpu.a"] & 0xff }
+  end, emu.callbackType.exec, sw, sw)
+  local ld = M.sym("_c12f75")
+  emu.addMemoryCallback(function()
+    if not cur or M.readByte(0x7B78) & 3 ~= cur.slot then return end
+    local hidden = (M.readByte(0x61AC) & (1 << cur.slot)) == 0
+    HC.loads[#HC.loads + 1] = { f = M.frame, pass = cur, hidden = hidden, to = M.readByte(0x2EAE + cur.slot * 32) }
+  end, emu.callbackType.exec, ld, ld)
+  local cn = M.sym("CheckNullTarget")
+  emu.addMemoryCallback(function()
+    if not cur or cur.arrive or ((cur.mark >> 4) & 7) == 4 then return end
+    local g = M.readByte(0x7B6C + cur.slot)
+    local x, y = M.hireSlotPos(cur.slot)
+    cur.arrive = { f = M.frame, gfx = g, off = M.hireBufferOff(cur.slot, g), x = x, y = y,
+      shown = (M.readByte(0x61AC) & (1 << cur.slot)) ~= 0 }
+  end, emu.callbackType.exec, cn, cn)
+  local function strike(kind)
+    return function()
+      if not cur then return end
+      if kind == "dog" then
+        -- MagicCmdAnim runs for Interceptor's pass whether or not a body is
+        -- left; its own CheckNullTarget skips the animation when none is,
+        -- so the dog is drawn only when ExecAnim runs after this entry
+        if script(2) == 0xFC then cur.dogEntered = true end
+        return
+      end
+      if kind == "dogdrawn" then
+        if not cur.dogEntered or cur.dogDrawn then return end
+        cur.dogDrawn = true
+        kind = "dog"
+      end
+      if kind == "fight" and cur.arrive == nil then return end
+      local g = M.readByte(0x7B6C + cur.slot)
+      HC.strikes[#HC.strikes + 1] = { f = M.frame, pass = cur, kind = kind, gfx = g, weapon = script(3),
+        off = M.hireBufferOff(cur.slot, g) }
+    end
+  end
+  local fa, ma = M.sym("FightCmdAnim"), M.sym("MagicCmdAnim")
+  emu.addMemoryCallback(strike("fight"), emu.callbackType.exec, fa, fa)
+  emu.addMemoryCallback(strike("dog"), emu.callbackType.exec, ma, ma)
+  local ea = M.sym("ExecAnim")
+  emu.addMemoryCallback(strike("dogdrawn"), emu.callbackType.exec, ea, ea)
+  local ae = M.sym("Ot6ActionEnd")
+  emu.addMemoryCallback(function()
+    local e = emu.getState()["cpu.x"] & 0xff
+    if e < 8 and M.readByte(0x3ED8 + e) == 9 then
+      local slot = e // 2
+      local x, y = M.hireSlotPos(slot)
+      HC.ends[#HC.ends + 1] = { f = M.frame, slot = slot, gfx = M.readByte(0x7B6C + slot),
+        off = M.hireBufferOff(slot, 0x09), x = x, y = y, pose = hcPose(slot),
+        ox = M.readWord(0x61D4 + slot * 32), oy = M.readWord(0x61C7 + slot * 32),
+        shown = (M.readByte(0x61AC) & (1 << slot)) ~= 0 }
+      cur = nil
+      if HC.watch == slot then HC.watch = nil end
+    end
+  end, emu.callbackType.exec, ae, ae)
+  M.logRomIdentity("[crew]")
+  return HC
+end
+local function within(list, r)
+  local t = {}
+  for _, v in ipairs(list) do if v.f >= r.f and v.f <= r.ended then t[#t + 1] = v end end
+  return t
+end
+-- a sprite this far past an edge shows nothing: 16 px wide, the screen 256
+-- wide; a pincer's slot waits above the top edge: its drawn anchor (base y
+-- plus its status lift, DrawCharSprite's sum) at -32 or above, so its lower
+-- tile ends 8 px above the top edge
+local function outOfSight(s, pincer)
+  if pincer then return s.y + s.lift <= -32 end
+  return s.x >= 256 or s.x <= -16
+end
+function M.hireCrewCheck(r, tag)
+  local NAME = M.HIRE_FIG_NAME
+  local passes, swaps, loads, strikes = within(HC.passes, r), within(HC.swaps, r), within(HC.loads, r),
+    within(HC.strikes, r)
+  local ex, done = nil, nil
+  for _, e in ipairs(HC.execs) do if e.f == r.f then ex = e end end
+  for _, e in ipairs(HC.ends) do if e.f == r.ended then done = e end end
+  M.assertEq(ex ~= nil, true, tag .. ": SETZER's slot read at Ot6SetzerExec")
+  M.assertEq(#passes, 1 + r.boost, tag .. ": one hire animation a pass")
+  for k, p in ipairs(passes) do
+    local fig = (p.mark >> 4) & 7
+    local want = math.min(k - 1, 3)
+    if want == 3 then want = p.fielded and 4 or (p.hirable and 3 or 5) end
+    local a = p.arrive
+    M.log(string.format("[crew] %s pass %d: mark $%02X -- the %s (class bits %d)%s%s, %s; SHADOW %s; %s", tag, k,
+      p.mark, NAME[fig] or "?", (p.mark >> 2) & 3, p.mark & 1 ~= 0 and ", first" or "", p.mark & 2 ~= 0 and ", last" or "",
+      p.pincer and "a pincer" or "sideways", p.fielded and "in the party" or (p.hirable and "hirable" or "not hirable"),
+      a and string.format("arrived f%d at (%d,%d) showing gfx $%02X, %d of 8192 buffer bytes off its sheet, %s", a.f,
+        a.x, a.y, a.gfx, a.off, a.shown and "shown" or "HIDDEN") or "no walk-in"))
+    M.assertEq(NAME[fig], NAME[want], string.format("%s pass %d: the %s comes", tag, k, NAME[want]))
+    M.assertEq(p.mark & 1 ~= 0, k == 1, string.format("%s pass %d: SETZER steps out on the first pass only", tag, k))
+    M.assertEq(p.mark & 2 ~= 0, k == #passes, string.format("%s pass %d: SETZER comes back after the last only", tag, k))
+    if fig == 4 then
+      M.assertEq(a, nil, string.format("%s pass %d: Interceptor's pass walks nobody in", tag, k))
+      M.assertEq(p.dogEntered == true, true, string.format("%s pass %d: Interceptor's counterattack ($FC) is asked for",
+        tag, k))
+    else
+      M.assertEq(a ~= nil, true, string.format("%s pass %d: the %s walked in", tag, k, NAME[fig]))
+      M.assertEq(a.gfx, M.HIRE_FIG_GFX[fig], string.format("%s pass %d: the slot shows the %s", tag, k, NAME[fig]))
+      M.assertEq(a.off, 0, string.format("%s pass %d: the slot's graphics buffer is the %s's sheet", tag, k, NAME[fig]))
+      M.assertEq(a.shown, true, string.format("%s pass %d: the %s is shown once in", tag, k, NAME[fig]))
+    end
+  end
+  M.assertEq(#strikes, #r.costs, string.format("%s: every paid hire was drawn as its figure's strike (%d strikes, %d paid)",
+    tag, #strikes, #r.costs))
+  for j, s in ipairs(strikes) do
+    local fig = (s.pass.mark >> 4) & 7
+    local cls = (s.pass.mark >> 2) & 3
+    M.log(string.format("[crew] %s strike %d (%s, f%d): slot shows gfx $%02X, %d of 8192 buffer bytes off its sheet, weapon $%02X",
+      tag, j, s.kind, s.f, s.gfx, s.off, s.weapon))
+    if fig == 4 then
+      M.assertEq(s.kind, "dog", string.format("%s strike %d: Interceptor's own animation", tag, j))
+      M.assertEq(s.gfx, 0x09, string.format("%s strike %d: SETZER's slot keeps SETZER while the dog runs", tag, j))
+    else
+      M.assertEq(s.kind, "fight", string.format("%s strike %d: a Fight swing", tag, j))
+      M.assertEq(s.gfx, M.HIRE_FIG_GFX[fig], string.format("%s strike %d: the slot shows the %s", tag, j, NAME[fig]))
+      M.assertEq(s.off, 0, string.format("%s strike %d: the slot's graphics buffer is the %s's sheet", tag, j, NAME[fig]))
+      M.assertEq(s.weapon, M.HIRE_FIG_WEAPON[fig][cls + 1] + 1, string.format("%s strike %d: the %s's weapon for class %d",
+        tag, j, NAME[fig], cls))
+    end
+  end
+  M.assertEq(done ~= nil, true, tag .. ": SETZER's slot read at Ot6ActionEnd")
+  M.log(string.format("[crew] %s ends: gfx $%02X, %d buffer bytes off SETZER's sheet, at (%d,%d) offsets %04X/%04X, pose %02X/%02X/%02X, %s"
+    .. " (exec: (%d,%d) offsets %04X/%04X, pose %02X/%02X/%02X)", tag, done.gfx, done.off, done.x, done.y, done.ox, done.oy,
+    done.pose.bf, done.pose.c0, done.pose.c1, done.shown and "shown" or "HIDDEN", ex.x, ex.y, ex.ox, ex.oy, ex.pose.bf,
+    ex.pose.c0, ex.pose.c1))
+  M.assertEq(done.gfx, 0x09, tag .. ": SETZER's slot shows SETZER again")
+  M.assertEq(done.off, 0, tag .. ": SETZER's own sheet is back in the buffer")
+  M.assertEq(done.ox, ex.ox, tag .. ": SETZER's x offset as it was")
+  M.assertEq(done.oy, ex.oy, tag .. ": SETZER's y offset as it was")
+  M.assertEq(done.x, ex.x, tag .. ": SETZER stands where he stood (screen x)")
+  M.assertEq(done.y, ex.y, tag .. ": SETZER stands where he stood (screen y)")
+  -- $61bf (the base action) is the engine's: it moves at the turn's end as
+  -- after vanilla's coins ($0B -> $06 on the kit-setzer base, build/attempts/
+  -- wt/hire-sprite-review/restore_base_*), so it is logged above, not held
+  M.assertEq(done.pose.c0, ex.pose.c0, tag .. ": $61c0 (secondary action) as it was")
+  M.assertEq(done.pose.c1, ex.pose.c1, tag .. ": $61c1 (graphical action) as it was")
+  M.assertEq(done.shown, true, tag .. ": SETZER's slot is shown")
+  for j, s in ipairs(swaps) do
+    M.log(string.format("[crew] %s swap %d (f%d) to gfx $%02X at (%d,%d) lift %d, %s", tag, j, s.f, s.to, s.x, s.y,
+      s.lift, s.pass.pincer and "a pincer" or "sideways"))
+    M.assertEq(outOfSight(s, s.pass.pincer), true, string.format("%s swap %d: the slot stands out of sight (%d,%d) lift %d",
+      tag, j, s.x, s.y, s.lift))
+  end
+  local frames, pins = within(HC.frames, r), within(HC.pins, r)
+  local shownAbove, prev = 0, nil
+  for _, fr in ipairs(frames) do
+    if fr.slot == ex.slot then
+      if fr.shown and fr.y + fr.lift < 0 then shownAbove = shownAbove + 1 end
+      if prev and (fr.shown ~= prev.shown or fr.gfx ~= prev.gfx) then
+        M.log(string.format("[crew] %s f%d: %s at base y %d lift %d gfx $%02X%s", tag, fr.f, fr.shown and "shown" or "hidden",
+          fr.y, fr.lift, fr.gfx, fr.float and " (Float)" or ""))
+      end
+      prev = fr
+    end
+  end
+  M.log(string.format("[crew] %s: %d frames watched, %d of them shown with the anchor above the top edge, %d tile(s) pinned to $97",
+    tag, #frames, shownAbove, #pins))
+  for j, pn in ipairs(pins) do
+    M.log(string.format("[crew] %s pin %d: f%d a %s tile of slot %d (y $%02X) pinned to $97, slot %s", tag, j, pn.f,
+      pn.kind, pn.slot, pn.y, pn.shown and "shown" or "hidden"))
+  end
+  M.assertEq(#pins, 0, string.format("%s: no tile of SETZER's slot pinned to $97 on any frame", tag))
+  for j, l in ipairs(loads) do
+    M.assertEq(l.hidden, true, string.format("%s load %d (gfx $%02X): the slot is hidden while it changes", tag, j, l.to))
+  end
+  local swapped = 0
+  for _, p in ipairs(passes) do if ((p.mark >> 4) & 7) ~= 4 then swapped = swapped + 2 end end
+  M.assertEq(#swaps, swapped, string.format("%s: two swaps a walked-in hire (%d)", tag, #swaps))
+  return passes, strikes
 end
 
 -- ---- what leaves a battle alive, and what the battle paid (#255) ----

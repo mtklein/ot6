@@ -26,6 +26,22 @@
 --     state and held against every body's HP and shields at the end.
 -- Negative controls: the mutant ROMs in build/attempts/wt/kit-setzer/
 -- (rate, boost, class) fail the named assertion.
+--
+-- And what the player sees (wt/hire-sprite, kits.md "Each hire is somebody
+-- new"): every hire held to H.hireCrewCheck, which reads the animation's
+-- own state, not a flag -- each pass's figure (merchant, then soldier);
+-- each walked-in figure's graphics id and its $7F buffer compared byte for
+-- byte with that figure's ROM sheet; each swap made with the slot hidden
+-- and standing out of sight (its absolute screen position past the edge);
+-- each paid hire one drawn strike with the figure's weapon for the class;
+-- and at SETZER's Ot6ActionEnd his sheet, screen position, offsets and
+-- pose ($61c0/$61c1) as at his Ot6SetzerExec.  The 2 and 3 BP hires (Leo,
+-- the fourth hire) are battle_hirecrew's.  The ROM's identity is logged.
+-- Negative controls (one byte-patched ROM a property, mutants2.py and its
+-- list beside each): build/attempts/wt/hire-sprite/round2/negative/,
+-- round3_main/negative/ (the same on the merged ROM) and round4/negative/
+-- (mutants4.py: those eight and five more).
+
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -63,6 +79,7 @@ end
 
 H.run({ maxFrames = 200000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
+  H.call(function() H.hireCrewArm() end),
   H.repeatN(SETZER_SKIP, { walkToBattle(), H.setzerBattle({}) }),
   H.driveUntil(function() return #done >= #WANT end, 160000, {
     H.call(function()
@@ -76,7 +93,15 @@ H.run({ maxFrames = 200000 }, {
         step = step or H.setzerBattle(remaining(), { shot = "hiredhelp_table" })
         local r = step:tick()
         if r == "done" then
-          for _, rec in ipairs(H.vars.setzer) do done[#done + 1] = rec end
+          for _, rec in ipairs(H.vars.setzer) do
+            done[#done + 1] = rec
+            local i = #done      -- held as the battle ends, before the next one
+            H.assertEq(i <= #WANT, true, string.format("record %d of the %d planned", i, #WANT))
+            H.assertEq(rec.row, HIRE, string.format("record %d is a Hired Help", i))
+            H.assertEq(rec.boost, WANT[i].boost, string.format("record %d ran at its planned boost", i))
+            checkHire(rec, i)
+            H.hireCrewCheck(rec, string.format("hire %d (%d BP)", i, rec.boost))
+          end
           step = nil
         end
         return r
@@ -85,11 +110,6 @@ H.run({ maxFrames = 200000 }, {
   }, "both hires resolve"),
   H.call(function()
     H.assertEq(#done, #WANT, "two hires resolved")
-    for i, r in ipairs(done) do
-      H.assertEq(r.row, HIRE, string.format("record %d is a Hired Help", i))
-      H.assertEq(r.boost, WANT[i].boost, string.format("record %d ran at its planned boost", i))
-      checkHire(r, i)
-    end
     H.log(string.format("[hiredhelp] PASSED: %d hires over %d battle(s)", #done, battles))
   end),
 })
