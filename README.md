@@ -76,7 +76,7 @@ has those steps.
 `ninja` runs the whole graph: both ROMs, the game played once from
 power-on through every generated savestate (scripted playthroughs, one
 after another: about 2.4 million emulated frames from power-on to the
-Falcon, hours on one machine), every suite test, the
+Falcon, 1.9 h on an otherwise idle Air), every suite test, the
 audits and selftests, and the checkpoint drift gate. It reruns exactly what
 a change reaches: a ROM, emulator, runner, generator or test-library
 change replays the game from the first run it touches; a suite edit re-runs

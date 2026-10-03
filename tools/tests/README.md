@@ -122,6 +122,36 @@ three completions carried in, rides the reunion cutscene and generates
 run declares them with `also=[...]` in the graph: one edge, one play-through,
 all its artifacts.
 
+### What it costs
+
+Measured (build/attempts/wt/one-graph/; wall times from start to green,
+ninja's own logs). A full replay's critical path is the line from power-on
+to wor_falcon, 89 runs and about 2.42 million emulated frames, and it is
+nearly the whole wall time: the suites run beside it. On the Air with
+nothing else running, the ROM's line ran at 364 frames/s and the build took
+6727 s (1.87 h, -j5); on px13 shared with other work (load 9-20 on 24
+threads) at 251 frames/s, 9795 s (2.72 h, -j7). The old graph needed the
+same play twice for a release: qualification (legs from the tracked
+checkpoints, 3669 s on the Air, 2401 s on px13) and then the chain from
+power-on (6061 s on the Air, 7758 s on px13). A library code edit costs the
+same replay as a ROM change (px13: 9107 s); under the old graph it re-ran
+only the suites (908 s on px13) and left the replay to the release's chain.
+A suite edit costs that suite (56 s on px13). Changes that replay the game
+landed on every landing day from 09-16 to 10-01: 34 ROM, 62 library, 61
+generator and 13 runner landings over 10 days
+(analysis/landings_per_day.txt).
+
+The long legs are long because they play long (frames, Air): zozo_arrival
+171,871, wor_edgar 139,733, south_figaro 92,404, train_done 89,505,
+narshe_mission 88,353. Emulation runs at about 400-420 frames/s on an idle
+machine and about half that at a load near the core count (live.py's
+placement curves), so what else the machine runs moves the replay's wall
+time by up to 2x. One leg, fc_landing, runs at half the speed of its
+neighbours on both machines at the same load (202 frames/s on the idle
+Air; its frames are the Imperial Air Force fights on the airship deck);
+what costs it is not yet measured. `build/throughput.jsonl` (live.py) is
+where to re-measure: every run's frames, wall time, frames/s and load.
+
 ### Stamps
 
 Each artifact's stamp (`build/states/<state>.stamp`,
