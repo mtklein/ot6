@@ -62,10 +62,11 @@
 --  17. which item a care turn spends (#370, H.itemChoice): the bag's
 --      prices read off the ROM (a sold item's price word, an unsold one's
 --      effect at the shops' gil per HP and MP), the cheapest item the lift
---      rule takes -- an X-Potion for wor_falcon's SABIN at 905/1812 under
---      846, no Elixir on a top-up, an Elixir when only it lifts a member
---      inside the round -- the Megalixir's party lift, and the status
---      cures in gil order.
+--      rule takes -- no item no shop sells on a top-up (wor_falcon's SABIN
+--      at 905/1812 under 846), an X-Potion or an Elixir when it lifts a
+--      member inside the round, the last few priced dearer -- the
+--      Megalixir's party lift, the status cures in gil order, a heal in
+--      flight, and the round's care turn kept after a confirm.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TONIC, POTION = 0xE8, 0xE9
@@ -1139,7 +1140,7 @@ H.run({ maxFrames = 3000 }, {
   -- (the price word reads 2) the effect at the shops' least gil per HP
   -- (Tonic 50 for 50) and per MP (Tincture 1500 for 50).
   H.call(function()
-    local XPOT, ELIXIR, MEGALIXIR, FENIX = 0xEA, 0xEE, 0xEF, 0xF0
+    local XPOT, ELIXIR, MEGALIXIR, MAGICITE = 0xEA, 0xEE, 0xEF, 0xF9
     H.assertEq(H.itemSold(POTION), true, "a shop sells the Potion")
     H.assertEq(H.itemSold(XPOT), false, "no shop sells the X-Potion")
     H.assertEq(H.itemSold(ELIXIR), false, "...nor the Elixir")
@@ -1147,49 +1148,67 @@ H.run({ maxFrames = 3000 }, {
     local r = H.shopRates()
     H.assertEq(r.hp, 1, "the shops' least gil per HP: the Tonic's 50 for 50")
     H.assertEq(r.mp, 30, "...and per MP: the Tincture's 1500 for 50")
+    -- the scarcity of what no shop sells (review of a8df0a6f): 1 + legs to
+    -- the next source / the count held, the horizon 10 legs with none known
+    H.assertEq(H.scarcity(7), 1 + 10 / 7, "seven held, no source known: 1 + 10/7")
+    H.assertEq(H.scarcity(1), 11, "the last one counts for more: 1 + 10/1")
+    H.assertEq(H.scarcity(7, 1), 1 + 1 / 7, "a source on the next leg leaves little premium")
     local sabin = { hp = 905, maxhp = 1812, mp = 274, maxmp = 318 }
-    H.assertEq(H.itemGil(XPOT, sabin), 1812, "an X-Potion on SABIN (1812 max HP) is worth 1812 gil")
-    H.assertEq(H.itemGil(ELIXIR, sabin), 1812 + 318 * 30, "an Elixir on him: 1812 HP + 318 MP x 30")
+    H.assertEq(H.itemGil(XPOT, sabin, nil, 7), math.floor(1812 * (1 + 10 / 7) + 0.5),
+      "an X-Potion on SABIN, seven in the bag: 1812 HP at 1 gil, times the scarcity")
+    H.assertEq(H.itemGil(XPOT, sabin, nil, 1) > H.itemGil(XPOT, sabin, nil, 7), true,
+      "...and the last one is dearer than one of seven")
+    H.assertEq(H.itemGil(ELIXIR, sabin, nil, 7), math.floor((1812 + 318 * 30) * (1 + 10 / 7) + 0.5),
+      "an Elixir on him: 1812 HP + 318 MP x 30, times the scarcity")
     local party = { sabin, { hp = 1798, maxhp = 1798, mp = 330, maxmp = 330 } }
-    H.assertEq(H.itemGil(MEGALIXIR, sabin, party), (1812 + 318 * 30) + (1798 + 330 * 30),
-      "a Megalixir: the Elixir's worth on every member it reaches")
+    H.assertEq(H.itemGil(MEGALIXIR, sabin, party, 1),
+      math.floor(((1812 + 318 * 30) + (1798 + 330 * 30)) * 11 + 0.5),
+      "a Megalixir: the Elixir's worth on every member it reaches, the only one held")
+    H.assertEq(H.itemGil(MAGICITE) >= 1000000000, true,
+      "an unsold item with no HP or MP to price it by is priceless, never 0 (Magicite $F9)")
     H.assertEq(H.deathGil(1812), 500 + (1812 - 226), "SABIN's death: the Fenix Down's 500 and 1586 HP to buy back")
     local function bag(list)
       local t = {}
       for _, it in ipairs(list) do
         local id, restore = it[1], it[2]
         t[#t + 1] = { id = id, restore = restore, flat = (H.itemProps(id) & H.ITEM_RATIO) == 0,
-                      gil = H.itemGil(id, sabin, party) }
+                      unsold = not H.itemSold(id), gil = H.itemGil(id, sabin, party, 7) }
       end
       return t
     end
-    local function choose(hp, cost, list)
-      local it, why = H.itemChoice({ hp = hp, maxhp = 1812, roundCost = cost, allies = 3, threshold = 60,
-        cap = H.deathGil(1812), items = bag(list) })
-      return it and string.format("$%02X %s", it.id, why) or "nothing"
+    local function choose(hp, cost, list, raw)
+      local it, why, refused = H.itemChoice({ hp = hp, maxhp = 1812, roundCost = cost, allies = 3, threshold = 60,
+        cap = H.deathGil(1812), items = raw or bag(list) })
+      return it and string.format("$%02X %s", it.id, why) or "nothing", refused
     end
     -- wor_falcon r15: "actor=1 not healing entity 1 (905/1812): $E9 restores
     -- 250 and a round costs 846", 7 X-Potions in the bag, then "[death] f+4481
-    -- entity 1 char 5 from 591/1812"
-    H.assertEq(choose(905, 846, { { POTION, 250 }, { XPOT, 907 }, { ELIXIR, 907 } }), "$EA top-up",
-      "SABIN at 905/1812 under an 846 round: the Potion cannot keep up, the X-Potion can")
-    H.assertEq(choose(905, 846, { { POTION, 250 }, { ELIXIR, 907 } }), "nothing",
-      "...with no X-Potion, no Elixir on the top-up: it costs more than the death it guards against")
-    H.assertEq(choose(591, 846, { { POTION, 250 }, { ELIXIR, 1221 } }), "$EE top-up",
-      "...but inside the round (591 under 846), the Elixir that lifts him is spent")
+    -- entity 1 char 5 from 591/1812".  At 905 under 846 he is outside the
+    -- round: an X-Potion there is a top-up, and no shop sells it
+    local got, refused = choose(905, 846, { { POTION, 250 }, { XPOT, 907 }, { ELIXIR, 907 } })
+    H.assertEq(got, "nothing", "SABIN at 905/1812 under an 846 round: no X-Potion on a top-up (none is sold)")
+    H.assertEq(refused[2] and refused[2].why, "no shop sells it: kept for a member inside the round",
+      "...the X-Potion is refused as irreplaceable, not as too weak")
     H.assertEq(choose(591, 846, { { POTION, 250 }, { XPOT, 1221 }, { ELIXIR, 1221 } }), "$EA top-up",
-      "...and the X-Potion before it when both lift")
+      "inside the round (591 under 846) the X-Potion that lifts him is spent")
+    H.assertEq(choose(591, 846, { { POTION, 250 }, { ELIXIR, 1221 } }), "$EE top-up",
+      "...and the Elixir when no X-Potion is held")
     H.assertEq(choose(600, 200, { { POTION, 250 }, { XPOT, 1212 } }), "$E9 top-up",
       "a Potion that does the job is the cheaper turn")
     H.assertEq(choose(1700, 846, { { POTION, 250 }, { XPOT, 112 }, { ELIXIR, 112 } }), "nothing",
       "chip damage (1700/1812, outside the round): nothing is spent")
+    H.assertEq(choose(905, 846, nil, { { id = POTION, restore = 1000, flat = true, gil = 3000 } }), "nothing",
+      "a sold heal dearer than the death (3000 against 2086) is no top-up either")
     H.assertEq(choose(100, 120, { { TONIC, 50 }, { POTION, 250 } }), "$E9 top-up",
       "a Tonic is not offered while a Potion is held (a turn buys a real heal)")
     H.assertEq(choose(100, 120, { { TONIC, 50 } }), "$E8 covering an ally",
       "...and is the last item standing")
     local it = H.itemChoice({ hp = 226, maxhp = 1812, roundCost = 1083, allies = 3, threshold = 60, owed = true,
       items = bag({ { POTION, 250 }, { XPOT, 1586 } }) })
-    H.assertEq(it and it.id, XPOT, "a raise's owed top-up under a 1083 round: the X-Potion that lifts, not the Potion")
+    H.assertEq(it and it.id, XPOT, "a raise's owed top-up inside a 1083 round: the X-Potion that lifts, not the Potion")
+    it = H.itemChoice({ hp = 900, maxhp = 1812, roundCost = 500, allies = 3, threshold = 60, owed = true,
+      items = bag({ { POTION, 250 }, { XPOT, 912 } }) })
+    H.assertEq(it and it.id, POTION, "...and outside the round the Potion: the X-Potion stays in the bag")
     -- the Megalixir: every member inside the round lifted, or no party turn
     H.assertEq(H.itemAllAllies(MEGALIXIR), true, "the Megalixir's targeting has no moveable cursor: the whole party")
     H.assertEq(H.itemAllAllies(XPOT), false, "...the X-Potion's does")
@@ -1203,25 +1222,23 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(table.concat(H.cureItems(1, 0x40), ","), string.format("%d,%d", 0xF4, 0xF5),
       "Petrify: Soft (200) before Remedy")
     H.assertEq(table.concat(H.cureItems(1, 0x02), ","), string.format("%d", 0xF1), "Zombie: Revivify alone")
-    -- a confirmed fill is in flight until its target's HP rises: wor_falcon
+    -- a confirmed heal is in flight until its target's HP rises: wor_falcon
     -- at the head gave EDGAR at 86/1701 a second X-Potion planned on the
-    -- HP the first was about to fill.  Only a fill: the first cut held
-    -- every heal, and battle_brokendeath's ladder found no counting rung
-    H.assertEq(H.healFills(XPOT), true, "an X-Potion fills its target (16/16 of max HP)")
-    H.assertEq(H.healFills(ELIXIR), true, "...and an Elixir")
-    H.assertEq(H.healFills(POTION), false, "a Potion's 250 stacks: a second one is no waste")
-    H.assertEq(H.healFills(FENIX), false, "a Fenix Down is a raise, not a fill")
+    -- HP the first was about to fill
     local q = { hp = 86, tick = 100 }
     H.assertEq(H.healInFlight(q, 86, 110), nil, "a heal confirmed at 86 HP is in flight while the HP stands")
     H.assertEq(H.healInFlight(q, 90, 130), "landed", "...and has landed when the HP rises")
-    -- arm B k0_s0_w25 (the first cut): CELES's X-Potion confirmed on SABIN at
-    -- 1208, a Pearl took him to 143 first, and the guard held every other
-    -- heal until he died
+    -- arm B k0_s0_w25: CELES's X-Potion confirmed on SABIN at 1208, a Pearl
+    -- took him to 143 first, and the guard held every other heal
     H.assertEq(H.healInFlight({ hp = 1208, tick = 5588 }, 143, 5700), "hit",
       "a hit before the heal lands releases the others to plan on what they see")
     H.assertEq(H.healInFlight({ hp = 86, tick = 100 }, 0, 110), "fell", "a target that falls ends it")
     H.assertEq(H.healInFlight({ hp = 86, tick = 100 }, 86, 100 + 240 + 601), "lapsed",
       "no rise inside RAISE_WAIT + 600 ticks: it lapses")
+    -- the round's care turn: a confirmed plan keeps it (review of a8df0a6f:
+    -- dropPlan("confirm_attempt") refunded it from 11a8f6e3 on)
+    H.assertEq(H.careRefund("confirm_attempt"), false, "a confirmed care turn is not refunded")
+    H.assertEq(H.careRefund("back_out"), true, "...a plan backed out of before its confirm is")
     H.log("battle_healpolicy: the bag's prices and the item a care turn spends (#370) checked")
   end),
 

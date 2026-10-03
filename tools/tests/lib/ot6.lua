@@ -898,10 +898,29 @@ function M.itemEffect(item, t)
   end
   return hp, mp
 end
+-- The scarcity of an item no shop sells (#370, review of a8df0a6f): the
+-- last few count for more.  `count` is how many the bag holds (this one
+-- included) and `legs` how many route legs away the next source of it is
+-- (a chest the route opens: the caller's opts.nextSource, the route being
+-- the generators' knowledge rather than the ROM's); with no source known
+-- the horizon is M.SCARCE_LEGS.  The multiplier is 1 + legs / count: seven
+-- X-Potions with none known ahead are worth 1 + 10/7 = 2.4 times their
+-- effect each, the last one 11 times, and a source on the next leg leaves
+-- little premium (1 + 1/7).
+M.SCARCE_LEGS = 10
+function M.scarcity(count, legs)
+  count = math.max(1, count or 1)
+  legs = legs or M.SCARCE_LEGS
+  return 1 + legs / count
+end
+-- an unsold item with no HP or MP effect to price it by (Magicite, a status
+-- cure no shop sold) is never the cheap choice: it prices at this, not at 0
+M.PRICELESS = 1000000000
 -- The gil one use is worth: its price when a shop sells it, else its full
 -- effect at the shops' rates on each member it reaches (t alone, or every
--- member of `party` for an item the engine aims at the whole party).
-function M.itemGil(item, t, party)
+-- member of `party` for an item the engine aims at the whole party), times
+-- its scarcity (M.scarcity: `count` in the bag, the next source `legs` away).
+function M.itemGil(item, t, party, count, legs)
   if M.itemSold(item) then return M.itemPrice(item) end
   local rates = M.shopRates()
   local who = (M.itemAllAllies(item) and party) or { t or {} }
@@ -910,7 +929,8 @@ function M.itemGil(item, t, party)
     local hp, mp = M.itemEffect(item, m)
     gil = gil + hp * (rates.hp or 0) + mp * (rates.mp or 0)
   end
-  return math.floor(gil + 0.5)
+  if gil <= 0 then return M.PRICELESS end
+  return math.floor(gil * M.scarcity(count, legs) + 0.5)
 end
 -- What a death costs to undo, in the same gil: the Fenix Down, and the HP
 -- its raise (max HP * power >> 4) leaves to buy back at the shops' rate.
@@ -951,12 +971,18 @@ end
 --   * a turn buys a real heal (guidelines: Potions, not Tonics, in
 --     battle): a flat item weaker than the strongest flat one in the bag
 --     is not offered -- the Tonic is the last item standing, as before;
---   * an item dearer than the death it guards against (M.deathGil, o.cap)
---     is spent only when the member is inside the round (hp <= the round's
---     cost): no Elixir on a top-up.
+--   * an item no shop sells (`unsold`: X-Potion, Elixir, Megalixir) is
+--     irreplaceable and is spent only on a member inside the round (hp <=
+--     the round's cost), never on a top-up (review of a8df0a6f: 9 of the
+--     chain's 14 X-Potion plans were top-ups, wor_falcon's "905/1812 ...
+--     a round costs 846 (top-up)" among them); opts.reserve still keeps
+--     the last n of any item (Driver:battInvIdx);
+--   * a sold item dearer than the death it guards against (M.deathGil,
+--     o.cap) is spent only inside the round too.
 --   o.hp, o.maxhp, o.roundCost, o.allies, o.threshold, o.owed  as healDecision
 --   o.cap     the death's price in gil (M.deathGil)
---   o.items   { { id, restore, gil, flat = true for a flat-power item } ... }
+--   o.items   { { id, restore, gil, flat = true for a flat-power item,
+--               unsold = true for an item no shop sells } ... }
 -- Returns the item record chosen, the reason, and the list of refusals
 -- ({ item, why }), the cheapest first.  An owed top-up (the raise's) takes
 -- the cheapest item that lifts the raised member clear of the round, else
@@ -987,21 +1013,33 @@ function M.itemChoice(o)
   end)
   local hp, cost = o.hp or 0, o.roundCost or 0
   local refused = {}
+  local inside = cost > 0 and hp <= cost
+  local KEPT = "no shop sells it: kept for a member inside the round"
   if o.owed then
+    local any = nil
     for _, it in ipairs(items) do
-      if hp + it.restore > cost then return it, "the raise's top-up (#168)", refused end
+      if it.unsold and not inside then
+        refused[#refused + 1] = { item = it, why = KEPT }
+      else
+        if hp + it.restore > cost then return it, "the raise's top-up (#168)", refused end
+        any = any or it
+      end
     end
-    if items[1] then return items[1], "the raise's top-up (#168)", refused end
+    if any then return any, "the raise's top-up (#168)", refused end
     return nil, nil, refused
   end
-  local inside = cost > 0 and hp <= cost
   for _, it in ipairs(items) do
     local why = M.healDecision({ hp = hp, maxhp = o.maxhp, restore = it.restore,
       roundCost = cost, allies = o.allies, threshold = o.threshold })
-    if why and (inside or o.cap == nil or it.gil <= o.cap) then return it, why, refused end
-    refused[#refused + 1] = { item = it, why = why and string.format("%d gil is more than the death "
-      .. "it guards against (%d) and the member is not inside the round", it.gil, o.cap)
-      or "it buys back less than the round spends" }
+    if why and it.unsold and not inside then
+      refused[#refused + 1] = { item = it, why = KEPT }
+    elseif why and (inside or o.cap == nil or it.gil <= o.cap) then
+      return it, why, refused
+    else
+      refused[#refused + 1] = { item = it, why = why and string.format("%d gil is more than the death "
+        .. "it guards against (%d) and the member is not inside the round", it.gil, o.cap)
+        or "it buys back less than the round spends" }
+    end
   end
   return nil, nil, refused
 end
@@ -4833,9 +4871,23 @@ function Driver:traceDrop(reason)
   end
 end
 
+-- Whether dropping a plan refunds the round's care turn (#370's review,
+-- the one-care-turn rule of 11a8f6e3): a plan dropped before it was
+-- confirmed never cared, so the turn goes back; a confirmed one is the
+-- round's care until the carer's next turn delimits the round.  The confirm
+-- itself calls dropPlan("confirm_attempt"), and from 11a8f6e3 to a8df0a6f
+-- that refunded the turn too, so the rule bound only while a plan was being
+-- steered (M.CONFIRM_REFUNDS_CARE = true is that driver, a lab lever).
+M.CONFIRM_REFUNDS_CARE = false
+function M.careRefund(reason)
+  if reason == "confirm_attempt" then return M.CONFIRM_REFUNDS_CARE == true end
+  return true
+end
 function Driver:dropPlan(reason)
   if reason ~= "confirm_attempt" then self:traceDrop(reason or "back_out") end
-  if self.careActor ~= nil and self.careActor == self.planActor then self.careActor = nil end
+  if self.careActor ~= nil and self.careActor == self.planActor and M.careRefund(reason) then
+    self.careActor = nil
+  end
   self.plan, self.planActor = nil, nil
 end
 
@@ -4895,8 +4947,13 @@ function Driver:bagHeals(e, hp, all)
         else
           restore = math.max(0, math.min(M.itemEffect(id, t), t.maxhp - t.hp))
         end
+        local count = 0
+        for j = 0, 251 do
+          if M.readByte(BATTLE.BATTINV + j * 5) == id then count = count + M.readByte(BATTLE.BATTINV + j * 5 + 3) end
+        end
         list[#list + 1] = { id = id, restore = restore, flat = flat, idx = self:battInvIdx(id),
-                            gil = M.itemGil(id, t, party) }
+                            unsold = not M.itemSold(id), count = count,
+                            gil = M.itemGil(id, t, party, count, (self.opts.nextSource or {})[id]) }
       end
     end
   end
@@ -6779,7 +6836,7 @@ function Driver:makePlan(actor)
       -- again until the watchdog dropped it (review of f8f9ad66, M3)
       local inFlight = self.healQueued[e]
       if inFlight ~= nil and hp > 0 and hp < maxhp then
-        -- another member's fill on it is confirmed and has not landed
+        -- another member's heal on it is confirmed and has not landed
         -- (#370: wor_falcon at the head gave EDGAR at 86/1701 two X-Potions,
         -- the second planned on the HP the first was about to fill)
         local said = string.format("[%s] actor=%d no heal on entity %d (%d/%d): actor %d's %s "
@@ -8320,15 +8377,19 @@ function Driver:button(actor)
         self.plan.target, self.topUpOwed[self.plan.target]))
       self.topUpOwed[self.plan.target] = nil
     end
-    -- a confirmed item that fills its target to max is in flight until the
-    -- HP rises (#370): nobody else heals that member on the HP it read
-    -- before the fill (H.healFills; a flat heal stacks and is left alone)
-    if self.plan.kind == "item" and self.plan.reason ~= "revive" and M.healFills(self.plan.item)
+    -- a confirmed heal is in flight until its target's HP rises (#370):
+    -- nobody else heals that member on the HP it read before the heal.
+    -- Every heal, a Potion's and a cast's too (review of a8df0a6f: holding
+    -- only a fill spent 21 Potions at Dullahan B against 15, and lost the
+    -- Gate's shift 5 that holding every heal won)
+    if (self.plan.kind == "heal" or (self.plan.kind == "item" and self.plan.reason ~= "revive"
+        and not (type(self.plan.reason) == "string" and self.plan.reason:sub(1, 5) == "cure ")))
        and self.plan.target ~= nil then
       for e = 0, 3 do
         if (self.plan.all and M.readWord(0x3C1C + e * 2) > 0) or e == self.plan.target then
           self.healQueued[e] = { by = actor, tick = self.battleTick, hp = M.readWord(0x3BF4 + e * 2),
-                                 what = string.format("$%02X", self.plan.item or 0) }
+                                 what = self.plan.kind == "heal" and string.format("cure $%02X", self.plan.spell or 0)
+                                   or string.format("$%02X", self.plan.item or 0) }
         end
       end
     end
@@ -10492,18 +10553,6 @@ function Driver:watchDamage()
   for i = #self.dmgWatch, 1, -1 do
     if self.battleTick > self.dmgWatch[i].until_ then table.remove(self.dmgWatch, i) end
   end
-end
-
--- Whether an item's heal fills its target to max HP (#370): an HP item
--- whose power is a fraction of max (ItemProp +$13 bit 7) at the whole of
--- it (power 16: X-Potion, Elixir, Megalixir).  A second heal planned on a
--- member such an item is about to fill is thrown away; a flat heal (a
--- Potion's 250) stacks, so a second one is not.
-function M.healFills(item)
-  if item == nil or item > 0xFE then return false end
-  local p = M.itemProps(item)
-  return (p & M.ITEM_HP) ~= 0 and (p & M.ITEM_RATIO) ~= 0 and (p & M.ITEM_CURES) == 0
-    and M.itemPower(item) >= 16
 end
 
 -- A confirmed heal in flight (#370), one frame of it as plain arithmetic:
