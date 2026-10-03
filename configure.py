@@ -457,7 +457,11 @@ TEST_ENV = {
     # Rage half (K4), ~37k frames, 461 s at the 80.7 frames/s above, and a
     # draw that needs more fight retries spends a round (up to 3,345 frames
     # measured) per try; 1800 is 3.9x the measured body
-    # (build/attempts/wt/procboost-v024/summary.txt)
+    # (build/attempts/wt/procboost-v024/summary.txt).  The magicite case's
+    # worst draw, all eleven tries measuring nothing, played the first half
+    # in 88,082 frames (2,907 -> 90,989; with the Rage half's 9,790, ~97.9k
+    # frames, 1,213 s at 80.7 frames/s): 1800 is 1.48x it
+    # (build/attempts/wt/procboost-magicite/neg/nomeasure_k1.log.gz)
     "battle_procboost": "OT6_TIMEOUT=1800",
     "battle_statuses": "OT6_TIMEOUT=3600",
     "battle_levelup": "OT6_TIMEOUT=3600",
