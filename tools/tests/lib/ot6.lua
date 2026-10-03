@@ -5526,6 +5526,27 @@ end
 -- o = { hp (the hitter's), denied (its turn-denying status or nil),
 -- muddled, ownWindow (the hitter's own window is open again), tick }.
 -- Returns why the record is stale, or nil while it is in flight.
+-- A member's round with the party's own queued cure-hits on them (the
+-- unmuddle floor's gap, #320; re-review of care-items 0b2df05e): the floor
+-- is read when the hit is planned, and a confirmed hit waits in the queue
+-- behind everything entered before it, so the target can fall far under
+-- the floor before it runs -- and it runs even after something else
+-- cleared the Muddle.  The Gate's shift 5 at 8ec3c0f1: LOCKE planned his
+-- hit on SABIN at 275/902 (floor 114), monsters took SABIN to 27, the
+-- Muddle cleared on its own, and the queued hit landed: "[death] f+8853
+-- entity 3 char 5 from 5/902 by entity 1 char 1 ... (the Muddle rule's
+-- unmuddle hit)".  The hit is part of what comes at the member before
+-- their next turn, priced at the hitter's floor (the most its Fight can
+-- take, Driver:unmuddleFloor), so the care lines see SABIN inside his
+-- round and lift him before it lands.
+--   cost    the member's round from the monsters
+--   hits    the floors of the cure-hits queued on the member
+function M.roundWithQueuedHits(cost, hits)
+  local c = cost or 0
+  for _, h in ipairs(hits or {}) do c = c + (h or 0) end
+  return c
+end
+
 function M.queuedHitStale(q, o)
   if (o.hp or 0) == 0 then return "it fell" end
   if o.denied ~= nil then return "it is under " .. o.denied end
@@ -6024,6 +6045,25 @@ function Driver:makePlan(actor)
         price[e], priceWhy[e] = 0, "down"
       end
     end
+  end
+  -- the party's own cure-hits queued on a member (M.roundWithQueuedHits):
+  -- a hitter whose hit will still run (M.queuedHitStale) adds its floor
+  do
+    local onE = {}
+    for by, q in pairs(self.unmuddleQueued or {}) do
+      local stale = M.queuedHitStale(q, { hp = hpNow[by], denied = denied(by),
+        muddled = (M.readByte(BATTLE.ST2 + by * 2) & M.ST2_MUDDLE) ~= 0, ownWindow = by == actor,
+        tick = self.battleTick })
+      if stale == nil and q.e ~= nil and (price[q.e] or 0) >= 0 and hpNow[q.e] > 0 then
+        local hit = self:unmuddleFloor(by, q.e)
+        if hit ~= nil and hit > 0 then
+          onE[q.e] = onE[q.e] or {}
+          onE[q.e][#onE[q.e] + 1] = hit
+          priceWhy[q.e] = (priceWhy[q.e] or "") .. string.format(" + actor %d's queued cure-hit (at most %d)", by, hit)
+        end
+      end
+    end
+    for e, hits in pairs(onE) do price[e] = M.roundWithQueuedHits(price[e], hits) end
   end
   -- The round price checked against what came (#312): the actor's own
   -- priced round -- the enemy actions it counted before this actor's

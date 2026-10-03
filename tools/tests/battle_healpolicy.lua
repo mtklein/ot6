@@ -665,6 +665,14 @@ H.run({ maxFrames = 3000 }, {
       refused = { { what = "item $EE", restore = 477 } } })
     H.assertEq(why:find("item $EE +477 = 821, it would lift, but the heal policy refused it", 1, true) ~= nil, true,
       "a refused heal that lifts is said as refused, not as too small (" .. why .. ")")
+    -- a queued cure-hit is part of its target's round (#320's gap, the
+    -- Gate's shift 5 at 8ec3c0f1: LOCKE's hit planned on SABIN at 275/902,
+    -- floor 114, landed on him at 27 after monsters took the rest)
+    H.assertEq(H.roundWithQueuedHits(413, { 114 }), 527,
+      "SABIN's 413 round from the monsters and LOCKE's queued hit (at most 114): 527")
+    H.assertEq(H.liftReopens({ hp = 27, cost = H.roundWithQueuedHits(413, { 114 }), restores = { 250, 875 } }), true,
+      "...so at 27 HP he is inside it and an Elixir lifts him before the hit lands")
+    H.assertEq(H.roundWithQueuedHits(413, {}), 413, "no hit queued: the monsters' round alone")
     -- the budget reopens for a lift (review of care-items cae71db9)
     H.assertEq(H.liftReopens({ hp = 144, cost = 286, restores = { 250, 676 } }), true,
       "LOCKE at 144/820 inside a 286 round, an X-Potion's 676 in hand: the budget reopens")
