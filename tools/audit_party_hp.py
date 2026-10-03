@@ -96,6 +96,18 @@ def describe(m: dict) -> str:
 
 # ---------------------------------------------------------------- selftest --
 
+def cut_source(repo: str, key: str) -> str | None:
+    """The state the graph's run that saves tracked checkpoint `key` boots
+    (the prev= of the cut that Continues it)."""
+    import importlib.util
+    path = os.path.join(repo, "tools", "tests", "savestate_graph.py")
+    spec = importlib.util.spec_from_file_location("savestate_graph", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return next((e.get("prev") for e in mod.STATES
+                 if e.get("checkpoint") == key), None)
+
+
 def selftest(repo: str = ".") -> int:
     def rec(hp, maxhp, st1=0x00, **kw):
         d = {"name": "TERRA", "level": 9, "hp": hp, "maxhp": maxhp,
@@ -160,23 +172,31 @@ def selftest(repo: str = ".") -> int:
                    f"n024-entry-save-v1 among the tracked checkpoints, "
                    f"got {sorted(payloads)}")
     else:
-        party, err = read_party_sram(payloads["n024-entry-save-v1"])
-        # The four records the emulator independently logged out of live
-        # WRAM after booting this checkpoint (the one-graph re-cut at
-        # 7a13bfe5; gen_esper_tubes' "[care before battle 72] opening the
-        # menu" line in build/states/esper_tubes_entry.log, whose stamp's
-        # input line names this payload, sha 4e55a598: c1 590/751,
-        # c4 715/752, c5 725/761, c6 703/747; its "plan:" line logs status1
-        # 00; build/attempts/wt/one-graph/air/audit_party_hp_pin.txt).
-        # Re-derive the pin from that line whenever the checkpoint is re-cut.
-        want = {"LOCKE": (590, 751, 0x00), "EDGAR": (715, 752, 0x00),
-                "SABIN": (725, 761, 0x00), "CELES": (703, 747, 0x00)}
-        got = {m["name"]: (m["hp"], m["maxhp"], m["status1"])
-               for m in (party or [])}
-        if err or got != want:
-            bad.append(f"read_party_sram(n024-entry-save-v1) should read the "
-                       f"four records the emulator logged from it, "
-                       f"got {err or got}")
+        # The SRAM decode, held to the emulator's own WRAM: the run that
+        # cut this checkpoint booted the state named below (the graph's
+        # prev= of the cut), walked two tiles to the save point and saved,
+        # no battle between, so the four party records it saved are the
+        # ones that state's savestate holds (read_party: a different decode
+        # of a different file).  First pinned by hand from a run log
+        # (LOCKE 590/751, EDGAR 715/752, SABIN 725/761, CELES 703/747,
+        # status1 00: build/attempts/wt/one-graph/air/audit_party_hp_pin.txt);
+        # derived here instead, so a re-cut needs no hand step.
+        key = "n024-entry-save-v1"
+        src = cut_source(repo, key)
+        mss = os.path.join(repo, "build", "states", f"{src}.mss") if src else None
+        if mss and os.path.isfile(mss):
+            want_party, werr = read_party(mss)
+        else:
+            want_party, werr = None, f"no {mss or 'cut of ' + key}: ninja it"
+        party, err = read_party_sram(payloads[key])
+
+        def recs(ms):
+            return {m["name"]: (m["hp"], m["maxhp"], m["status1"])
+                    for m in (ms or [])}
+        if werr or err or len(recs(party)) != 4 or recs(party) != recs(want_party):
+            bad.append(f"read_party_sram({key}) should read the four records "
+                       f"the savestate it was saved from holds ({mss}): "
+                       f"want {werr or recs(want_party)}, got {err or recs(party)}")
 
     for line in bad:
         print(f"  SELFTEST FAIL {line}")

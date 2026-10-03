@@ -225,9 +225,15 @@ back. Steps, in order, none skipped:
    the drift gate (`build/checks/checkpoint_drift.ok`). Green is the
    qualification; keep its log. If the gate names drifted checkpoints,
    `python3 tools/tests/lib/checkpoint_drift.py --recut <keys>`, commit,
-   push, and `ninja` again (that re-runs the suites that boot them and the
-   gate, nothing in the graph). Anything merged while it runs gets a
-   follow-up `ninja` before the tag.
+   push, and `ninja` again. That re-runs what reads the tracked copies and
+   nothing in the graph: the suites that boot them, the checks that read
+   every tracked checkpoint (`checkpoint_saves`, `checkpoint_negatives`,
+   the four party/equipment/supply/chest audits) and the gate; measured,
+   a one-checkpoint re-cut ran 12 edges
+   (build/attempts/wt/one-graph/air/demo3.txt). No hand step follows a
+   re-cut: `audit_party_hp`'s selftest derives its expected records from
+   the savestate the cut was saved from. Anything merged while it runs
+   gets a follow-up `ninja` before the tag.
 3. Ombudsman + critic on docs/release-notes-next.md against the log since
    the last tag (every claim names a commit or a test). The notes were
    written as changes merged (AGENTS.md); this step checks them, not
