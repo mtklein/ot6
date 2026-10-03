@@ -55,6 +55,10 @@ put() {  # <dest> <content>: write only when it changed
   if cmp -s "$1.tmp.$$" "$1" 2>/dev/null; then rm -f "$1.tmp.$$"
   else mv -f "$1.tmp.$$" "$1"; fi
 }
+rec() {  # <published artifact>: its .published record, as run.sh writes it
+  put "$1.published" "sha256 $(shasum -a 256 "$1" | cut -d' ' -f1)
+"
+}
 if [ -z "${OT6_NO_PUBLISH:-}" ]; then
   for a in $OT6_EXPECT_ARTIFACT; do
     case "$a" in *.mss.lua) continue ;; esac
@@ -63,6 +67,7 @@ if [ -z "${OT6_NO_PUBLISH:-}" ]; then
     put "build/states/$s.mss" "$c"
     put "build/states/$s.mss.lua" "return \"$(printf '%s' "$c" | base64 | tr -d '\n')\"
 "
+    rec "build/states/$s.mss"; rec "build/states/$s.mss.lua"
   done
 fi
 if [ -n "${OT6_CAPTURE_SRM:-}" ]; then
@@ -78,6 +83,7 @@ except OSError:
 if old != data:
     open(sys.argv[1], "wb").write(data)
 PY
+  rec "$OT6_CAPTURE_SRM"
 fi
 exit 0
 '''
@@ -362,6 +368,32 @@ def main():
               "Continues it, not its producer (and the cut's same bytes "
               "stop there)", (ran, "seal build/checkpoints/k1-v1" in log),
               (["b"], True))
+
+        # -- an artifact no run made (review of eba1d252, forge-probe2) ------
+        t.p("build/states/e.mss").write_text("HAND-MADE e")
+        t.p("build/states/e.mss.lua").write_text('return "SEFORC1NQURFIGU="\n')
+        rc, ran, log = t.ninja()
+        check("MUTANT a hand-replaced state is refused by its stamp edge, "
+              "not stamped", (rc != 0, ran, "replaced without a run" in log,
+                              t.p("build/states/e.stamp").exists()),
+              (True, [], True, False))
+        rc, ran, _ = t.ninja()
+        rc2, _ = t.check_states()
+        check("...and the next ninja regenerates it from its run",
+              (rc, ran, rc2, t.p("build/states/e.mss").read_text().startswith("e ")),
+              (0, ["e"], 0, True))
+        good = t.p("build/checkpoints/k1-v1/k1.sram").read_bytes()
+        t.p("build/checkpoints/k1-v1/k1.sram").write_bytes(b"H" * 32768)
+        rc, ran, log = t.ninja()
+        check("MUTANT a hand-replaced capture is refused, not stamped or "
+              "sealed", (rc != 0, ran, "seal build/checkpoints/k1-v1" in log),
+              (True, [], False))
+        rc, ran, _ = t.ninja()
+        rc2, _ = t.check_states()
+        check("...and the next ninja re-captures it from its producer",
+              (rc, "a" in ran, rc2,
+               t.p("build/checkpoints/k1-v1/k1.sram").read_bytes() == good),
+              (0, True, 0, True))
 
         # -- failure --------------------------------------------------------
         t.write("build/fail.c", "")

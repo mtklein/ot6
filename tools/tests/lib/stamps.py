@@ -113,7 +113,49 @@ def stamp_text(root, generator, digest_file, artifact, inputs, ancestor=None,
     return "\n".join(lines) + "\n"
 
 
+def published_problems(root, artifact):
+    """The files of a run's artifact (a .mss with its .mss.lua sidecar, or a
+    captured battery) whose bytes are not what run.sh published
+    (<file>.published, written beside each as it publishes): (path, why)."""
+    root = Path(root)
+    files = [artifact]
+    if artifact.endswith(".mss") and (root / (artifact + ".lua")).exists():
+        files.append(artifact + ".lua")
+    bad = []
+    for rel in files:
+        rec = root / (rel + ".published")
+        try:
+            want = rec.read_text().split()[1]
+        except (OSError, IndexError):
+            bad.append((rel, "no run published it (no " + rel + ".published)"))
+            continue
+        now = sha256_file(root / rel)
+        if now != want:
+            bad.append((rel, f"sha {now[:12]} is not the {want[:12]} its run published"))
+    return bad
+
+
+def refuse(root, out, bad):
+    """The stamp edge's refusal: no stamp, and each file no run made moved
+    aside to <file>.unbound, so the generate edge that owns it is dirty and
+    the next `ninja` regenerates it."""
+    root = Path(root)
+    try:
+        (root / out).unlink()
+    except FileNotFoundError:
+        pass
+    for rel, why in bad:
+        os.replace(root / rel, root / (rel + ".unbound"))
+        print(f"stamps.py: refusing to stamp {rel}: {why}; it was replaced "
+              f"without a run.  Moved it to {rel}.unbound; the next `ninja` "
+              "regenerates it.", file=sys.stderr)
+    return 1
+
+
 def write(root, out, **kw):
+    bad = published_problems(root, kw["artifact"])
+    if bad:
+        return refuse(root, out, bad)
     text = stamp_text(root, **kw)
     out = Path(root) / out
     if not (out.exists() and out.read_text() == text):
@@ -444,18 +486,24 @@ def selftest():
             'local H = dofile("tools/tests/lib/ot6.lua")\nH.run({}, {})\n')
         inputs = ["build/ot6.sfc", "tools/tests/run.sh"]
 
+        def publish(rel):          # what run.sh writes beside what it publishes
+            (root / (rel + ".published")).write_text(
+                f"sha256 {sha256_file(root / rel)}\n")
+
         def run(state, gen, ancestor=None, env=None, extra=()):
             env = env or {}
             st = root / "build/states"
             (st / f"{state}.mss").write_bytes(f"{state} bytes".encode())
             (st / f"{state}.mss.lua").write_text('return "%s"\n' % (
                 __import__("base64").b64encode(f"{state} bytes".encode()).decode()))
+            publish(f"build/states/{state}.mss")
+            publish(f"build/states/{state}.mss.lua")
             d = root / f"build/ninja/digest/{state}.digest"
             compose.main_digest(root / f"tools/tests/{gen}.lua", d, root, env)
-            write(root, f"build/states/{state}.stamp", generator=gen,
-                  digest_file=str(d.relative_to(root)),
-                  artifact=f"build/states/{state}.mss",
-                  inputs=inputs + list(extra), ancestor=ancestor)
+            return write(root, f"build/states/{state}.stamp", generator=gen,
+                         digest_file=str(d.relative_to(root)),
+                         artifact=f"build/states/{state}.mss",
+                         inputs=inputs + list(extra), ancestor=ancestor)
 
         def st(name):
             return stamp_status(name, root)
@@ -521,6 +569,7 @@ def selftest():
         # a cut: the capture it booted is an input
         pay = root / "build/checkpoints/k-v1/k.sram"
         pay.write_bytes(b"battery v1")
+        publish("build/checkpoints/k-v1/k.sram")
         run("c", "gen_c", "build/checkpoints/k-v1.stamp",
             env={"OT6_SRAM_CHECKPOINT": "build/checkpoints/k-v1"},
             extra=["build/checkpoints/k-v1/k.sram"])
@@ -538,6 +587,44 @@ def selftest():
         v, m = st("c")
         check("MUTANT a moved capture stales the cut that Continues it",
               (v, "build/checkpoints/k-v1/k.sram" in (m or "")), (STALE, True))
+        # the stamp edge: an artifact no run published is refused, not
+        # stamped (forge-probe2, review of eba1d252)
+        import contextlib, io
+
+        def stamp_a():
+            d = "build/ninja/digest/a.digest"
+            with contextlib.redirect_stderr(io.StringIO()) as err:
+                rc = write(root, "build/states/a.stamp", generator="gen_a",
+                           digest_file=d, artifact="build/states/a.mss",
+                           inputs=inputs)
+            return rc, err.getvalue()
+
+        run("a", "gen_a")
+        a = root / "build/states/a.mss"
+        a.write_bytes(b"HAND-MADE a")
+        rc, err = stamp_a()
+        check("MUTANT the stamp edge refuses a hand-replaced artifact", rc, 1)
+        check("...leaves no stamp", (root / "build/states/a.stamp").exists(), False)
+        check("...and moves the bytes aside, so ninja regenerates it",
+              (a.exists(), (root / "build/states/a.mss.unbound").read_bytes()),
+              (False, b"HAND-MADE a"))
+        check("...saying so", "replaced without a run" in err, True)
+        run("a", "gen_a")
+        (root / "build/states/a.mss.lua").write_text('return "SEFORA=="\n')
+        rc, err = stamp_a()
+        check("MUTANT ...and a hand-replaced sidecar", (rc, "a.mss.lua" in err), (1, True))
+        run("a", "gen_a")
+        (root / "build/states/a.mss.published").unlink()
+        rc, err = stamp_a()
+        check("MUTANT ...and an artifact no run published at all", rc, 1)
+        check("a run's own bytes are stamped", run("a", "gen_a"), 0)
+        pay.write_bytes(b"HAND-MADE battery")
+        with contextlib.redirect_stderr(io.StringIO()):
+            rc = write(root, "build/checkpoints/k-v1.stamp", generator="gen_a",
+                       digest_file="build/ninja/digest/a.digest",
+                       artifact="build/checkpoints/k-v1/k.sram", inputs=inputs,
+                       ancestor="build/states/a.stamp")
+        check("MUTANT the stamp edge refuses a hand-replaced capture", rc, 1)
         # format: an older stamp is not trusted
         (root / "build/states/a.stamp").write_text(
             "deadbeef gen_a\nrom x\ngenerator y\nartifact z\n")

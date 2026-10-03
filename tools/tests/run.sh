@@ -27,7 +27,8 @@
 #   first sha for the stamp.
 # * Artifacts (.mss, .mss.lua, a captured battery) are published only when
 #   their bytes changed, so a run that plays to the same bytes leaves them,
-#   and ninja's restat stops there.
+#   and ninja's restat stops there.  Each gets <artifact>.published, the
+#   sha256 of what this run published, which the stamp edge checks.
 # * MESEN_SCRIPT_ONLY=1 is exported unless the run measures coverage: the
 #   patched build (tools/mesen/) then skips the debugger bookkeeping the
 #   harness never reads; the official binary ignores the variable.
@@ -501,8 +502,23 @@ publish_file() {
 # only when its bytes changed: a run that plays to the same bytes leaves the
 # old file, and its mtime, in place, so ninja's restat stops there instead
 # of re-running everything that boots it.
+#
+# Beside each it records what it published, <artifact>.published (the
+# sha256 of those bytes; rewritten only when they move): the stamp edge
+# (lib/stamps.py write) refuses an artifact that is not what a run
+# published, so a file replaced by hand is regenerated, never stamped.
+sha256_of() {
+  if command -v sha256sum > /dev/null 2>&1; then sha256sum "$1"
+  else shasum -a 256 "$1"; fi | cut -d' ' -f1
+}
 publish_artifact() {
   cmp -s "$1" "$2" 2>/dev/null || publish_file "$1" "$2"
+  printf 'sha256 %s\n' "$(sha256_of "$2")" > "$2.published.tmp.$$" &&
+    if cmp -s "$2.published.tmp.$$" "$2.published" 2>/dev/null; then
+      rm -f "$2.published.tmp.$$"
+    else
+      mv -f "$2.published.tmp.$$" "$2.published"
+    fi
 }
 # Checkpoint creation is intentionally a separate, explicit operation.  Mesen
 # flushes battery SRAM only while shutting down, so the complete 32 KiB file
