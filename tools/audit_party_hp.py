@@ -162,15 +162,15 @@ def selftest(repo: str = ".") -> int:
     else:
         party, err = read_party_sram(payloads["n024-entry-save-v1"])
         # The four records the emulator independently logged out of live
-        # WRAM after booting this checkpoint (the v0.24 re-cut; gen_esper_tubes'
-        # "[care before battle 72] opening the menu" line in
-        # build/states/esper_tubes_entry.log, whose stamp binds this
-        # manifest: c1 751/751, c4 707/752, c5 830/830, c6 734/747; its
-        # "plan:" line logs status1 00; build/attempts/wt/v024-recut/
-        # audit_party_hp/).  Re-derive the pin from that line whenever the
-        # checkpoint is re-cut.
-        want = {"LOCKE": (751, 751, 0x00), "EDGAR": (707, 752, 0x00),
-                "SABIN": (830, 830, 0x00), "CELES": (734, 747, 0x00)}
+        # WRAM after booting this checkpoint (the one-graph re-cut at
+        # 7a13bfe5; gen_esper_tubes' "[care before battle 72] opening the
+        # menu" line in build/states/esper_tubes_entry.log, whose stamp's
+        # input line names this payload, sha 4e55a598: c1 590/751,
+        # c4 715/752, c5 725/761, c6 703/747; its "plan:" line logs status1
+        # 00; build/attempts/wt/one-graph/air/audit_party_hp_pin.txt).
+        # Re-derive the pin from that line whenever the checkpoint is re-cut.
+        want = {"LOCKE": (590, 751, 0x00), "EDGAR": (715, 752, 0x00),
+                "SABIN": (725, 761, 0x00), "CELES": (703, 747, 0x00)}
         got = {m["name"]: (m["hp"], m["maxhp"], m["status1"])
                for m in (party or [])}
         if err or got != want:
