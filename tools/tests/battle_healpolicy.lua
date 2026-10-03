@@ -1203,9 +1203,14 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(table.concat(H.cureItems(1, 0x40), ","), string.format("%d,%d", 0xF4, 0xF5),
       "Petrify: Soft (200) before Remedy")
     H.assertEq(table.concat(H.cureItems(1, 0x02), ","), string.format("%d", 0xF1), "Zombie: Revivify alone")
-    -- a confirmed heal is in flight until its target's HP rises: wor_falcon
+    -- a confirmed fill is in flight until its target's HP rises: wor_falcon
     -- at the head gave EDGAR at 86/1701 a second X-Potion planned on the
-    -- HP the first was about to fill
+    -- HP the first was about to fill.  Only a fill: the first cut held
+    -- every heal, and battle_brokendeath's ladder found no counting rung
+    H.assertEq(H.healFills(XPOT), true, "an X-Potion fills its target (16/16 of max HP)")
+    H.assertEq(H.healFills(ELIXIR), true, "...and an Elixir")
+    H.assertEq(H.healFills(POTION), false, "a Potion's 250 stacks: a second one is no waste")
+    H.assertEq(H.healFills(FENIX), false, "a Fenix Down is a raise, not a fill")
     local q = { hp = 86, tick = 100 }
     H.assertEq(H.healInFlight(q, 86, 110), nil, "a heal confirmed at 86 HP is in flight while the HP stands")
     H.assertEq(H.healInFlight(q, 90, 130), "landed", "...and has landed when the HP rises")

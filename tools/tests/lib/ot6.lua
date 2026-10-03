@@ -6779,7 +6779,7 @@ function Driver:makePlan(actor)
       -- again until the watchdog dropped it (review of f8f9ad66, M3)
       local inFlight = self.healQueued[e]
       if inFlight ~= nil and hp > 0 and hp < maxhp then
-        -- another member's heal on it is confirmed and has not landed
+        -- another member's fill on it is confirmed and has not landed
         -- (#370: wor_falcon at the head gave EDGAR at 86/1701 two X-Potions,
         -- the second planned on the HP the first was about to fill)
         local said = string.format("[%s] actor=%d no heal on entity %d (%d/%d): actor %d's %s "
@@ -8320,16 +8320,15 @@ function Driver:button(actor)
         self.plan.target, self.topUpOwed[self.plan.target]))
       self.topUpOwed[self.plan.target] = nil
     end
-    -- a confirmed heal is in flight until its target's HP rises (#370):
-    -- nobody else heals that member on the HP it read before the heal
-    if (self.plan.kind == "heal" or (self.plan.kind == "item" and self.plan.reason ~= "revive"
-        and not (type(self.plan.reason) == "string" and self.plan.reason:sub(1, 5) == "cure ")))
+    -- a confirmed item that fills its target to max is in flight until the
+    -- HP rises (#370): nobody else heals that member on the HP it read
+    -- before the fill (H.healFills; a flat heal stacks and is left alone)
+    if self.plan.kind == "item" and self.plan.reason ~= "revive" and M.healFills(self.plan.item)
        and self.plan.target ~= nil then
       for e = 0, 3 do
         if (self.plan.all and M.readWord(0x3C1C + e * 2) > 0) or e == self.plan.target then
           self.healQueued[e] = { by = actor, tick = self.battleTick, hp = M.readWord(0x3BF4 + e * 2),
-                                 what = self.plan.kind == "heal" and string.format("cure $%02X", self.plan.spell or 0)
-                                   or string.format("$%02X", self.plan.item or 0) }
+                                 what = string.format("$%02X", self.plan.item or 0) }
         end
       end
     end
@@ -10493,6 +10492,18 @@ function Driver:watchDamage()
   for i = #self.dmgWatch, 1, -1 do
     if self.battleTick > self.dmgWatch[i].until_ then table.remove(self.dmgWatch, i) end
   end
+end
+
+-- Whether an item's heal fills its target to max HP (#370): an HP item
+-- whose power is a fraction of max (ItemProp +$13 bit 7) at the whole of
+-- it (power 16: X-Potion, Elixir, Megalixir).  A second heal planned on a
+-- member such an item is about to fill is thrown away; a flat heal (a
+-- Potion's 250) stacks, so a second one is not.
+function M.healFills(item)
+  if item == nil or item > 0xFE then return false end
+  local p = M.itemProps(item)
+  return (p & M.ITEM_HP) ~= 0 and (p & M.ITEM_RATIO) ~= 0 and (p & M.ITEM_CURES) == 0
+    and M.itemPower(item) >= 16
 end
 
 -- A confirmed heal in flight (#370), one frame of it as plain arithmetic:
