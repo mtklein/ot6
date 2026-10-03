@@ -6412,8 +6412,10 @@ function M.relicPlan(members, opts)
         guard = string.format("a guard (%d of the threatened statuses), rank 1, to a slot nothing better took", cl.cover),
         ward = string.format("a ward (%s) against the fight's %s damage, rank 6, to the party's caster first "
           .. "(%d spells learned)", (cl.shell and cl.safe) and "Shell and Safe" or cl.shell and "Shell" or "Safe",
-          (opts.threats.magic and opts.threats.physical) and "magic and physical" or opts.threats.magic and "magic"
-          or "physical", m.spells),
+          -- (a ward is ranked only for a fight's threats, but this table is
+          -- built for every take, threats or none)
+          (opts.threats and opts.threats.magic and opts.threats.physical) and "magic and physical"
+          or (opts.threats and opts.threats.magic) and "magic" or "physical", m.spells),
       })[cl.aff]
       take(m, id, why)
     end
