@@ -6777,7 +6777,16 @@ function Driver:makePlan(actor)
       -- confirm's guard (button) only catches a Zombie landing after the
       -- plan -- planned on one already, the heal was backed out and planned
       -- again until the watchdog dropped it (review of f8f9ad66, M3)
-      if hp > 0 and maxhp > 0 and hp < maxhp and not status1Has(e, M.ST1_ZOMBIE) then
+      local inFlight = self.healQueued[e]
+      if inFlight ~= nil and hp > 0 and hp < maxhp then
+        -- another member's heal on it is confirmed and has not landed
+        -- (#370: wor_falcon at the head gave EDGAR at 86/1701 two X-Potions,
+        -- the second planned on the HP the first was about to fill)
+        local said = string.format("[%s] actor=%d no heal on entity %d (%d/%d): actor %d's %s "
+          .. "on it is confirmed (tick %d) and has not landed", self.tag or "fight", actor, e, hp, maxhp,
+          inFlight.by, inFlight.what, inFlight.tick)
+        if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+      elseif hp > 0 and maxhp > 0 and hp < maxhp and not status1Has(e, M.ST1_ZOMBIE) then
         local pct = hp * 100 // maxhp
         -- a statue is the cure line's, not a patient (a Potion cannot
         -- even land on it); a condemned member the clock takes before
@@ -8311,6 +8320,19 @@ function Driver:button(actor)
         self.plan.target, self.topUpOwed[self.plan.target]))
       self.topUpOwed[self.plan.target] = nil
     end
+    -- a confirmed heal is in flight until its target's HP rises (#370):
+    -- nobody else heals that member on the HP it read before the heal
+    if (self.plan.kind == "heal" or (self.plan.kind == "item" and self.plan.reason ~= "revive"
+        and not (type(self.plan.reason) == "string" and self.plan.reason:sub(1, 5) == "cure ")))
+       and self.plan.target ~= nil then
+      for e = 0, 3 do
+        if (self.plan.all and M.readWord(0x3C1C + e * 2) > 0) or e == self.plan.target then
+          self.healQueued[e] = { by = actor, tick = self.battleTick, hp = M.readWord(0x3BF4 + e * 2),
+                                 what = self.plan.kind == "heal" and string.format("cure $%02X", self.plan.spell or 0)
+                                   or string.format("$%02X", self.plan.item or 0) }
+        end
+      end
+    end
     -- and what a damage plan lands, for the press rule's window (the
     -- dmgWatch queue; watchDamage credits and settles it).  A Fight
     -- on a muddled ally (#170) moves no monster HP and is not one.
@@ -8406,7 +8428,7 @@ function Driver:idle()
   self.monAct, self.deathSaid, self.battleDeaths, self.wipeSaid = nil, {}, {}, false
   self.monTurn = {}
   self.raisePending, self.topUpOwed, self.unmuddlePending = nil, {}, nil
-  self.raiseQueued, self.cureQueued = {}, {}
+  self.raiseQueued, self.cureQueued, self.healQueued = {}, {}, {}
   self.statusSaid, self.cureSaid, self.freeRoundSaid = {}, nil, false
   execActor, execActorCmd, execDone = nil, nil, {}
   execParty, execSkipped = nil, {}
@@ -10473,6 +10495,19 @@ function Driver:watchDamage()
   end
 end
 
+-- A confirmed heal in flight (#370), one frame of it as plain arithmetic:
+-- q = { hp, tick } (the target's HP at the confirm, lowered by any hit
+-- since), hp its HP now, tick the battle tick.  Returns "landed" (the HP
+-- rose), "fell" (the target is down), "lapsed" (no rise inside
+-- RAISE_WAIT + 600 ticks) or nil while the heal is still coming.
+function M.healInFlight(q, hp, tick)
+  if hp == 0 or hp == 0xFFFF then return "fell" end
+  if hp > q.hp then return "landed" end
+  if tick - q.tick > BATTLE.RAISE_WAIT + 600 then return "lapsed" end
+  q.hp = math.min(q.hp, hp)
+  return nil
+end
+
 -- The raise-then-top-up pair (#168): a pending Fenix Down has landed
 -- when its target's HP moves off 0; the member is then owed a top-up
 -- until it arrives, they climb clear on their own, or they fall again.
@@ -10482,6 +10517,11 @@ function Driver:watchPendingCare()
     if (hp > 0 and hp ~= 0xFFFF) or self.battleTick - q.tick > BATTLE.RAISE_WAIT + 600 then
       self.raiseQueued[e] = nil
     end
+  end
+  -- a queued heal has landed when its target's HP rises above what it
+  -- read at the confirm, is gone when the target falls, else after its window
+  for e, q in pairs(self.healQueued) do
+    if M.healInFlight(q, M.readWord(0x3BF4 + e * 2), self.battleTick) ~= nil then self.healQueued[e] = nil end
   end
   -- a queued status cure has landed when the bit it carries is gone
   -- (the [status] CLEARED line says so), or is forgotten after its window
@@ -11439,6 +11479,7 @@ M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end)
     -- same entity 480 frames later while the first sat in the queue, and
     -- both were spent (4 -> 2 in the bag) on one Imp.
     cureQueued = {},                   -- e -> { by, tick, item }
+    healQueued = {},                   -- e -> { by, tick, hp, what }: a confirmed heal not landed (#370)
     -- and the Muddle rule's own pending hit (#170): one ally's Fight on the
     -- muddled member is in the air, so the next actor plans normally rather
     -- than land a second hit on a member the first one already cleared

@@ -1203,6 +1203,16 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(table.concat(H.cureItems(1, 0x40), ","), string.format("%d,%d", 0xF4, 0xF5),
       "Petrify: Soft (200) before Remedy")
     H.assertEq(table.concat(H.cureItems(1, 0x02), ","), string.format("%d", 0xF1), "Zombie: Revivify alone")
+    -- a confirmed heal is in flight until its target's HP rises: wor_falcon
+    -- at the head gave EDGAR at 86/1701 a second X-Potion planned on the
+    -- HP the first was about to fill
+    local q = { hp = 86, tick = 100 }
+    H.assertEq(H.healInFlight(q, 86, 110), nil, "a heal confirmed at 86 HP is in flight while the HP stands")
+    H.assertEq(H.healInFlight(q, 40, 120), nil, "...and while a hit lowers it")
+    H.assertEq(H.healInFlight(q, 80, 130), "landed", "...and has landed when the HP rises off the lowest it read")
+    H.assertEq(H.healInFlight({ hp = 86, tick = 100 }, 0, 110), "fell", "a target that falls ends it")
+    H.assertEq(H.healInFlight({ hp = 86, tick = 100 }, 86, 100 + 240 + 601), "lapsed",
+      "no rise inside RAISE_WAIT + 600 ticks: it lapses")
     H.log("battle_healpolicy: the bag's prices and the item a care turn spends (#370) checked")
   end),
 
