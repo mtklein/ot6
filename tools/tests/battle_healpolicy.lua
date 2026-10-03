@@ -1150,9 +1150,10 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(r.mp, 30, "...and per MP: the Tincture's 1500 for 50")
     -- the scarcity of what no shop sells (review of a8df0a6f): 1 + legs to
     -- the next source / the count held, the horizon 10 legs with none known
-    H.assertEq(H.scarcity(7), 1 + 10 / 7, "seven held, no source known: 1 + 10/7")
-    H.assertEq(H.scarcity(1), 11, "the last one counts for more: 1 + 10/1")
-    H.assertEq(H.scarcity(7, 1), 1 + 1 / 7, "a source on the next leg leaves little premium")
+    local function f4(x) return string.format("%.4f", x) end
+    H.assertEq(f4(H.scarcity(7)), f4(1 + 10 / 7), "seven held, no source known: 1 + 10/7")
+    H.assertEq(f4(H.scarcity(1)), f4(11), "the last one counts for more: 1 + 10/1")
+    H.assertEq(f4(H.scarcity(7, 1)), f4(1 + 1 / 7), "a source on the next leg leaves little premium")
     local sabin = { hp = 905, maxhp = 1812, mp = 274, maxmp = 318 }
     H.assertEq(H.itemGil(XPOT, sabin, nil, 7), math.floor(1812 * (1 + 10 / 7) + 0.5),
       "an X-Potion on SABIN, seven in the bag: 1812 HP at 1 gil, times the scarcity")
