@@ -977,6 +977,17 @@ end
 -- On the world map iff (word $1F64 & $3FF) < 3.  Raw compares are wrong
 -- there, because entrance/parent records carry flag bits in the high byte.
 function M.worldMode() return (M.readWord(0x1f64) & 0x3FF) < 3 end
+-- Off the world map for a field map, as a trigger or a door takes the
+-- party -- not into map 3, the Tent's interior, which the field care's
+-- world-map Tent visits and returns from on the same tile ("[tiles] map=3
+-- n=1 xy=8:8" between "plan: pitch a Tent" and "pitched a Tent").  A
+-- walker that ends on "left the world" read the Tent as an arrival: the
+-- policy chain's vector_entry stopped its walk at (125,187) mid-Tent and
+-- failed "trigger approach x: got 125, want 124".
+M.TENT_MAP = 3
+function M.offWorld()
+  return not M.worldMode() and (M.readWord(0x1f64) & 0x1FF) ~= M.TENT_MAP
+end
 -- which world: 0=WoB 1=WoR 2=Serpent Trench
 function M.worldId() return M.readWord(0x1f64) & 0xFF end
 
@@ -4605,6 +4616,16 @@ local function careKernel(opts)
   }
 end
 
+-- The care before a leg's first fights (#312, guideline "Heal outside
+-- battles"): a person tops up before walking into a known danger zone,
+-- not only below the after-battle fraction.  The World of Ruin legs'
+-- boot care ran at fieldCare's default 0.55 and declined EDGAR at
+-- 948/1600 ("[care at the boot] nothing to do: c4 948/1600 hp"), so the
+-- Sand Horse sweep entered the desert with him at 59%; its two full-HP
+-- entry snapshots lost nobody.  The World of Balance legs' pre-danger
+-- cares sit at 0.85-0.95; this is that figure, named once.
+M.CARE_BEFORE_FIGHTS = 0.9
+
 -- M.fieldCare: the step form -- behaviorally what it has always been
 -- (open the menu, serve the plans, close, settle), built on careKernel.
 -- A live event timer skips the visit outright (see M.eventTimerLive):
@@ -6007,6 +6028,10 @@ end
 --      to the next member by spells learned who can.
 --   3. Then every other ranked relic, in rank order, each to a free slot
 --      of the member it helps most:
+--        a ward for this fight's damage (#351)     rank 6, the caster first
+--          (Shell for threats.magic, Safe for threats.physical; auto,
+--          +8 $20/$40, or near-fatal, +13 bits 0/1: the Czarina Ring);
+--          a ward the fight does not call for is a spare (step 4 only)
 --        Haste (+8 bit 3: RunningShoes)            rank 5, the slowest member
 --        +25% physical and magic (+9 = $03: Hero Ring) rank 4, a fighter
 --        vigor x1.5 (+11 bit 7: Hyper Wrist) or
@@ -6020,6 +6045,14 @@ end
 --      speed (+$1B); "a caster" by magic (+$1D) among members with a spell
 --      learned.  Ties go to the member already wearing the relic, then to
 --      the order of `members`.
+--   3b. The Exp. Egg (+13 bit 3) to the member furthest behind on levels,
+--      in a free slot or in place of a guard or spare that is not
+--      threat-critical, never over an acting relic and never when arming
+--      for a boss (threats.boss); opts.egg = false leaves it to step 4.
+--   4. A slot nothing above took keeps what it holds, else the leftover
+--      the member can wear.
+-- Arm per fight (#351): a generator calls this before a fight with that
+-- fight's threats (M.FIGHT_THREATS) and again after with the arc's.
 -- The threatened statuses are opts.threats ({ s1 =, s2 = } STATUS1/2
 -- masks: what the coming fights inflict, an informed reading the caller
 -- states); without them every status counts.  A guard covering none of
@@ -6036,11 +6069,28 @@ end
 M.ARC_THREATS = {
   ["wor-falcon"] = { s1 = 0x67, s2 = 0xE8 },
 }
+-- The statuses and the kind of damage one fight deals, for the rule when a
+-- generator arms per fight (#351) rather than per arc.  `magic` and
+-- `physical` say which kind dominates the fight's damage: a Shell (Safe)
+-- relic -- auto or near-fatal -- is ranked for a magic (physical) fight.
+-- "dullahan": event battle 85, an informed reading of his actions in the
+-- Falcon's lab (build/attempts/wt/wor-falcon/final/dull/, the [monact]
+-- tallies): Ice 2, Ice 3, Pearl, L? Pearl and N. Cross carry his damage
+-- (Pearl 1083-1086 a hit, Ice 2 to 623), his Battle 195-460; the only
+-- status he landed in 80 runs was Frozen, twice, which no relic's
+-- status-1/2 guard covers.  The Czarina Ring in place of CELES's Ribbon
+-- cut Potions 37 -> 21 and Fenix Downs 2 -> 0 on the same four entry
+-- states (dullczar/ against dull/, 32/32 won either way).
+M.FIGHT_THREATS = {
+  dullahan = { s1 = 0x00, s2 = 0x00, magic = true, boss = true },
+}
 local RELIC_NAMES = {
   [0xB0] = "Goggles", [0xB1] = "Star Pendant", [0xB2] = "Peace Ring", [0xB3] = "Amulet",
-  [0xB5] = "Jewel Ring", [0xBA] = "RunningShoes", [0xC3] = "Earrings", [0xC4] = "Atlas Armlet",
-  [0xC9] = "Hero Ring", [0xCA] = "Ribbon", [0xD1] = "Genji Glove", [0xD2] = "Hyper Wrist",
-  [0xD5] = "Black Belt", [0xFF] = "(empty)",
+  [0xB5] = "Jewel Ring", [0xB7] = "Barrier Ring", [0xB8] = "MithrilGlove", [0xB9] = "Guard Ring",
+  [0xBA] = "RunningShoes", [0xC1] = "Czarina Ring", [0xC3] = "Earrings", [0xC4] = "Atlas Armlet",
+  [0xC8] = "Pod Bracelet", [0xC9] = "Hero Ring", [0xCA] = "Ribbon", [0xD1] = "Genji Glove",
+  [0xD2] = "Hyper Wrist", [0xD5] = "Black Belt", [0xE0] = "Marvel Shoes", [0xE4] = "Exp. Egg",
+  [0xFF] = "(empty)",
 }
 local function relicName(id)
   return string.format("%s $%02X", RELIC_NAMES[id] or "relic", id)
@@ -6063,7 +6113,28 @@ function M.relicClass(id, threats)
   local cover = threats and (popcount(p1 & (threats.s1 or 0)) + popcount(p2 & (threats.s2 or 0)))
     or (popcount(p1) + popcount(p2))
   if (itemProp(id, 12) & 0x38) ~= 0 then return { rank = 99, hands = true, cover = cover } end
+  -- a ward (#351): Shell or Safe, auto (+8 bits $20/$40: Guard Ring,
+  -- Pod Bracelet, Marvel Shoes) or cast once near death (+13 bits 0/1:
+  -- Barrier Ring, MithrilGlove, Czarina Ring), ranked first when the
+  -- coming fight's damage is of the kind it halves (threats.magic,
+  -- threats.physical); otherwise ranked by its other effects as before
+  local st3, nf = itemProp(id, 8), itemProp(id, 13)
+  local shell = (st3 & 0x20) ~= 0 or (nf & 0x01) ~= 0
+  local safe = (st3 & 0x40) ~= 0 or (nf & 0x02) ~= 0
+  if threats and ((threats.magic and shell) or (threats.physical and safe)) then
+    return { rank = 6, aff = "ward", cover = cover, shell = shell, safe = safe }
+  end
+  -- a ward this fight does not call for is a spare: off when a ranked
+  -- relic wants its slot (the Ribbon back on CELES after Dullahan), kept
+  -- where nothing does (step 4), never put on from the bag
+  if (shell or safe) and (st3 & ~0x60) == 0 and (nf & ~0x03) == 0 then
+    return { rank = 0, aff = "spare", cover = cover }
+  end
   if (itemProp(id, 8) & 0x08) ~= 0 then return { rank = 5, aff = "slowest", cover = cover } end
+  -- the Exp. Egg (+13 bit 3, double experience): to whoever is behind on
+  -- levels, placed after the ranked relics and displacing nothing
+  -- threat-critical (#351; relicPlan step 3b)
+  if (nf & 0x08) ~= 0 then return { rank = 0, aff = "behind", cover = cover } end
   local dmg = itemProp(id, 9) & 0x03
   if dmg == 0x03 then return { rank = 4, aff = "fighter", cover = cover } end
   if (itemProp(id, 11) & 0x80) ~= 0 or dmg == 0x01 then return { rank = 3, aff = "fighter", cover = cover } end
@@ -6094,6 +6165,13 @@ end
 -- members: { { charId, "NAME" }, ... }; those not in the active party are
 -- left out.  Returns { { ch=, name=, want={ [4]=id, [5]=id }, changes={
 -- {slot, id}, ... } }, ... } and logs every decision as a [relics] line.
+-- Step 3b's one class test: the Egg may take a slot only from a guard or a
+-- spare ward (and then only one that is not threat-critical), never from an
+-- acting relic.  A function of its own so field_relicplan's mutant can
+-- switch it off (mutants_relic.sh nosoft).
+function M.eggMayDisplace(cl)
+  return cl ~= nil and (cl.aff == "guard" or cl.aff == "spare")
+end
 function M.relicPlan(members, opts)
   opts = opts or {}
   local tag = opts.tag or "relics"
@@ -6104,7 +6182,7 @@ function M.relicPlan(members, opts)
     if (M.readByte(0x1850 + ch) & 0x07) == active and (M.readByte(0x1850 + ch) & 0x07) ~= 0 then
       local cur = { [4] = charByte(ch, 0x23), [5] = charByte(ch, 0x24) }
       local m = { ch = ch, name = p[2], order = i, cur = cur, want = {}, free = {},
-        vigor = charByte(ch, 0x1A), speed = charByte(ch, 0x1B), magic = charByte(ch, 0x1D),
+        vigor = charByte(ch, 0x1A), speed = charByte(ch, 0x1B), magic = charByte(ch, 0x1D), level = charByte(ch, 8),
         spells = spellsLearned(ch), twoWeapons = false }
       for s = 4, 5 do
         local cl = M.relicClass(cur[s], opts.threats)
@@ -6134,8 +6212,8 @@ function M.relicPlan(members, opts)
   end
   local lines = {}
   for _, m in ipairs(ms) do
-    lines[#lines + 1] = string.format("%s (vigor %d, speed %d, magic %d, %d spells, %s) wears %s, %s; keeps %s",
-      m.name, m.vigor, m.speed, m.magic, m.spells, m.twoWeapons and "two weapons" or "one weapon",
+    lines[#lines + 1] = string.format("%s (L%d, vigor %d, speed %d, magic %d, %d spells, %s) wears %s, %s; keeps %s",
+      m.name, m.level, m.vigor, m.speed, m.magic, m.spells, m.twoWeapons and "two weapons" or "one weapon",
       relicName(m.cur[4]), relicName(m.cur[5]),
       (function()
         local t = {}
@@ -6152,6 +6230,7 @@ function M.relicPlan(members, opts)
     count[id] = count[id] - 1
     lines[#lines + 1] = string.format("%s goes to %s's slot %d (over %s): %s", relicName(id), m.name, slot,
       relicName(m.cur[slot]), why)
+    return slot
   end
   local function hasFree(m)
     for _, s in ipairs(m.free) do if not m.want[s] then return true end end
@@ -6247,7 +6326,7 @@ function M.relicPlan(members, opts)
   end
   for _, id in ipairs(order) do
     local cl = M.relicClass(id, opts.threats)
-    while count[id] > 0 do
+    while count[id] > 0 and cl.aff ~= "behind" and cl.aff ~= "spare" do
       local cands = {}
       for _, m in ipairs(ms) do
         if hasFree(m) and wearsItem(m.ch, id) and (cl.aff ~= "caster" or m.spells > 0)
@@ -6264,6 +6343,8 @@ function M.relicPlan(members, opts)
           if a.speed ~= b.speed then return a.speed < b.speed end
         elseif cl.aff == "caster" then
           if a.magic ~= b.magic then return a.magic > b.magic end
+        elseif cl.aff == "ward" then
+          if a.spells ~= b.spells then return a.spells > b.spells end
         end
         local wa, wb = wearing(a, id), wearing(b, id)
         if wa ~= wb then return wa end
@@ -6276,8 +6357,73 @@ function M.relicPlan(members, opts)
           m.twoWeapons and "two weapons" or "one weapon", m.vigor),
         caster = string.format("+25%% magic, rank 2, to the caster (magic %d)", m.magic),
         guard = string.format("a guard (%d of the threatened statuses), rank 1, to a slot nothing better took", cl.cover),
+        ward = string.format("a ward (%s) against the fight's %s damage, rank 6, to the party's caster first "
+          .. "(%d spells learned)", (cl.shell and cl.safe) and "Shell and Safe" or cl.shell and "Shell" or "Safe",
+          (opts.threats.magic and opts.threats.physical) and "magic and physical" or opts.threats.magic and "magic"
+          or "physical", m.spells),
       })[cl.aff]
       take(m, id, why)
+    end
+  end
+  -- 3b. the Exp. Egg (#351): to the member furthest behind on levels
+  -- (below the party's highest; the lowest, then the order of `members`),
+  -- into a free slot, else in place of a guard or a spare ward planned
+  -- there that is not threat-critical (a guard adding a threatened status
+  -- the member would not otherwise have is) -- never over an acting relic
+  -- (Haste, damage, counter: the first cut took SETZER's Black Belt in 11
+  -- of 13 tomb runs and EDGAR's RunningShoes in 2, review of f8f9ad66), and
+  -- never when arming for a boss (threats.boss).  Nobody behind: step 4.
+  local function critical(m, s)
+    local w = m.want[s]
+    if w == nil then return false end
+    local cl = M.relicClass(w, opts.threats)
+    if cl == nil or cl.hands or cl.aff == "ward" then return cl ~= nil end
+    if cl.aff == "guard" then
+      local saved = m.want[s]
+      m.want[s] = nil
+      local a = adds(m, w)
+      m.want[s] = saved
+      return a > 0
+    end
+    return false
+  end
+  local top = 0
+  for _, m in ipairs(ms) do if m.level > top then top = m.level end end
+  for _, id in ipairs(order) do
+    local cl = M.relicClass(id, opts.threats)
+    if cl.aff == "behind" and opts.egg ~= false and not (opts.threats and opts.threats.boss) then
+      local behind = {}
+      for _, m in ipairs(ms) do
+        if m.level < top and wearsItem(m.ch, id) then behind[#behind + 1] = m end
+      end
+      table.sort(behind, function(a, b)
+        if a.level ~= b.level then return a.level < b.level end
+        return a.order < b.order
+      end)
+      for _, m in ipairs(behind) do
+        if count[id] < 1 then break end
+        local worn = wearing(m, id) and (m.want[4] == id or m.want[5] == id)
+        if not worn then
+          if hasFree(m) then
+            take(m, id, string.format("the Exp. Egg to the member furthest behind on levels (L%d, the party's "
+              .. "highest L%d), a free slot", m.level, top))
+          else
+            for _, s in ipairs(m.free) do
+              local wc = m.want[s] ~= nil and M.relicClass(m.want[s], opts.threats) or nil
+              local soft = M.eggMayDisplace(wc)
+              if count[id] > 0 and m.want[s] ~= nil and m.want[s] ~= id and soft and not critical(m, s) then
+                local w = m.want[s]
+                m.want[s] = nil
+                count[w] = count[w] + 1
+                take(m, id, string.format("the Exp. Egg to the member furthest behind on levels (L%d, the "
+                  .. "party's highest L%d), in place of %s, which guards nothing this fight threatens",
+                  m.level, top, relicName(w)))
+                break
+              end
+            end
+          end
+        end
+      end
     end
   end
   -- 4. a slot nothing above took: what it holds, while nobody took that,
@@ -6285,14 +6431,44 @@ function M.relicPlan(members, opts)
   for _, m in ipairs(ms) do
     for _, s in ipairs(m.free) do
       if not m.want[s] then
+        -- arming for a boss, the Egg keeps a slot only when nothing else
+        -- the member can wear is left (3b)
+        local boss = opts.threats and opts.threats.boss
+        local function egg(x) return x ~= 0xFF and M.relicClass(x, opts.threats) ~= nil
+          and M.relicClass(x, opts.threats).aff == "behind" end
         local id = m.cur[s]
-        if id == 0xFF or (count[id] or 0) < 1 then
+        if id == 0xFF or (count[id] or 0) < 1 or (boss and egg(id)) then
+          local held = id ~= 0xFF and (count[id] or 0) >= 1 and id or nil
           id = nil
           for _, x in ipairs(order) do
-            if id == nil and count[x] > 0 and wearsItem(m.ch, x) then id = x end
+            if id == nil and count[x] > 0 and wearsItem(m.ch, x) and not (boss and egg(x)) then id = x end
           end
+          id = id or held
         end
-        if id then take(m, id, "a slot nothing above took: kept filled") end
+        if id then
+          -- read by field_relicplan: a slot step 4 filled was open before it
+          -- (keyed by slot, review of bcf5240f: a relic id can sit in both)
+          m.filler = m.filler or {}
+          m.filler[take(m, id, "a slot nothing above took: kept filled")] = true
+        end
+      end
+    end
+  end
+  -- The two relic slots are alike, so a relic the plan keeps on its wearer
+  -- stays in the slot it sits in: a plan that moved the Egg from SETZER's
+  -- slot 5 to slot 4 (the Star Pendant taking 5) asked the Relic menu for
+  -- a relic not in the bag, and dressRelics refused it ("relics after
+  -- Dullahan: a member's new relics are all in the bag (no swap
+  -- deadlock)", the policy genlab's k0_s0).  Swapping the two planned
+  -- slots back changes nothing a fight sees.
+  for _, m in ipairs(ms) do
+    for _, s in ipairs({ 4, 5 }) do
+      local o = s == 4 and 5 or 4
+      if m.want[s] ~= nil and m.want[s] ~= 0xFF and m.want[s] == m.cur[o] and m.want[o] ~= m.cur[o] then
+        m.want[s], m.want[o] = m.want[o], m.want[s]
+        if m.filler then m.filler[s], m.filler[o] = m.filler[o], m.filler[s] end
+        lines[#lines + 1] = string.format("%s: %s stays in slot %d, where it sits (the two slots swapped in the plan)",
+          m.name, relicName(m.cur[o]), o)
       end
     end
   end
@@ -6304,7 +6480,8 @@ function M.relicPlan(members, opts)
     end
     lines[#lines + 1] = string.format("%s: slot 4 %s, slot 5 %s (%d change%s)", m.name,
       relicName(m.want[4] or m.cur[4]), relicName(m.want[5] or m.cur[5]), #changes, #changes == 1 and "" or "s")
-    plan[#plan + 1] = { ch = m.ch, name = m.name, want = m.want, changes = changes, handCome = m.handCome }
+    plan[#plan + 1] = { ch = m.ch, name = m.name, want = m.want, changes = changes, handCome = m.handCome,
+      filler = m.filler or {} }
   end
   for _, l in ipairs(lines) do M.log(string.format("[%s] %s", tag, l)) end
   return plan

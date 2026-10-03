@@ -2253,6 +2253,39 @@ SETZER's turn came); seeds 7 and 23 spend 4,650 gil, three hires at 1,550 in Dul
 249557 -> 246457 (-3100)`; `fal_pol_s7: ... gil 247857 -> 246457`), under
 2% of a purse of 247,857.  No random battle spends gil in any of the eight.
 
+### 13.14 The care policy pass (wt/care-policy, #312 #348 #351)
+
+The two 13.6 notes are the driver's now.  The round price charges one
+enemy's second action in a window at its typical action -- the mean of its
+damaging actions on the party, once it has taken three; a counter-attack, a
+buff and a status landing (a Zombie touch reading as the whole HP bar) stay
+out of it -- rather than its worst again; a heal on an endangered ally is
+taken only when it lifts them clear of the round; and the relic rule ranks
+a Shell/Safe ward for a fight whose damage is magic
+(`H.FIGHT_THREATS.dullahan`).  The Exp. Egg goes to whoever is behind on
+levels only into a free slot or over a guard or spare ward that guards
+nothing the fight threatens -- never over an acting relic -- and not at
+all when arming for a boss: Dullahan's threats carry `boss = true`.  The
+leg arms for Dullahan before the grave (`[relics for Dullahan] CELES: slot
+4 Genji Glove $D1, slot 5 Czarina Ring $C1 (1 change)`, `SETZER: slot 4
+Black Belt $D5, slot 5 Star Pendant $B1 (0 changes)`) and goes back to the
+arc's relics after him (the Ribbon to CELES).  The first cut put the Egg
+on SETZER for Dullahan (over the Star Pendant) and over an acting relic in
+all 13 tomb runs (SETZER's Black Belt in 11, EDGAR's RunningShoes in 2);
+this one puts it on in none of the 13.
+
+Measured from the generator's own grave snapshots, by distinct fight
+(snapshot + key), every fight won in every arm
+(`build/attempts/wt/care-policy/dull/`, `tally_r2_*.txt`): over K = 0..3 x 8
+waits, main's driver and kit spent 37 Potions with 2 deaths in one fight;
+this branch's driver on main's kit 11 Potions, 1 death; main's driver on
+this branch's kit 39, 2 deaths in one fight; this branch's driver and kit
+18, 1 death.  Over K = 0 x 64 waits (15 fights a kit): 23 Potions and 2
+deaths (main), 5 and 1 (this driver, main's kit), 22 and 0 (main's driver,
+this kit), 10 and 0 (this driver and kit).  The gain is in Potions; the
+deaths are one or two a sweep either way.  The two kits' snapshots draw
+disjoint keys, so the relics' own effect is not separated from the draw.
+
 ## 14. What the owner may want to decide
 
 - **The draft rows** (section 8): decided, approved as written (owner,
