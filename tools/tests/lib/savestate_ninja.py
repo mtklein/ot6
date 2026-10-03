@@ -109,11 +109,17 @@ CUTTER_TIMEOUT = 3600
 # The sidecars a composition embeds: compose.py's own rule, every
 # "<path>.mss.lua" string literal in the script.
 SIDECAR_REF = re.compile(r'"([^"]+\.mss\.lua)"')
+# Every file and directory the helpers below read while the manifest is
+# written: configure.py lists them in build.ninja's depfile, so an edit
+# that changes what they return (a script that embeds another sidecar, a
+# checkpoint that gains a payload) re-runs configure.
+READS = set()
 
 
 def checkpoint_inputs(root, key):
     """A tracked checkpoint's files: manifest first, then sorted payloads."""
     adir = f"tools/tests/checkpoints/{key}"
+    READS.add(adir)
     payloads = sorted(p.name for p in (root / adir).glob("*.sram"))
     return [f"{adir}/manifest.json"] + [f"{adir}/{p}" for p in payloads]
 
@@ -125,6 +131,7 @@ def payload_name(root, key):
 def tracked_checkpoints(root):
     """Every tracked checkpoint key, the deliberately wrong negative-*
     fixtures aside."""
+    READS.add("tools/tests/checkpoints")
     return sorted(p.parent.name for p in
                   (root / "tools/tests/checkpoints").glob("*/manifest.json")
                   if not p.parent.name.startswith("negative"))
@@ -166,6 +173,12 @@ def validate(states, root, captures=()):
     some other kind of edge."""
     errors = []
     seen = set()
+    runs = {}        # (generator, boot) -> the entry that plays it
+    names = set()
+    for e in states:
+        if isinstance(e, dict):
+            names.add(e.get("state"))
+            names.update(e.get("also") or [])
 
     def err(entry, msg):
         errors.append(f"{entry.get('state') or entry.get('capture') or '<unnamed>'}: {msg}")
@@ -197,6 +210,25 @@ def validate(states, root, captures=()):
             err(e, f"no such generator tools/tests/{gen}.lua")
         if prev and prev not in seen:
             err(e, f"prev {prev!r} is not an earlier state")
+        # One leg, one run: a script from one boot plays the same game
+        # whatever its edge is called, so a second entry is the same leg
+        # played twice.  Its other saves are also= siblings.
+        boot = (checkpoint, prev) if checkpoint else prev
+        if gen and (gen, boot) in runs:
+            err(e, f"{gen} from {checkpoint or prev or 'power-on'} is the leg "
+                   f"{runs[(gen, boot)]!r} already plays: name this save in "
+                   f"its also=")
+        runs[(gen, boot)] = s
+        # prev= is what the run boots: the one sidecar the generator embeds
+        # (compose.py), or, at a cut, none (it boots the capture).
+        if gen and (root / "tools/tests" / f"{gen}.lua").is_file():
+            refs = fixture_refs(root, f"tools/tests/{gen}.lua", names)
+            want = [] if checkpoint or not prev else [prev]
+            if refs != want:
+                err(e, f"{gen} embeds {refs or 'no sidecar'} but the entry "
+                       f"boots {('the capture ' + checkpoint) if checkpoint else (prev or 'power-on')}"
+                       + (" (a cut boots its capture and embeds none)" if checkpoint else
+                          f" (prev= must be the sidecar it embeds)"))
         # A cut boots the graph's own capture of the save prev's play ends
         # at; a checkpoint with no prev= would boot a save no run here made.
         if checkpoint and not prev:
@@ -315,6 +347,7 @@ def boot_env(e):
 
 def fixture_refs(root, lua_rel, names):
     """The graph states whose sidecars a script's composition embeds."""
+    READS.add(str(lua_rel))
     text = (root / lua_rel).read_text(errors="replace")
     return sorted({Path(r).name[:-len(".mss.lua")]
                    for r in SIDECAR_REF.findall(text)} & set(names))
@@ -335,7 +368,7 @@ def emit_state_rules(w):
     w("# each only when its bytes changed (restat).  OT6_EXPECT_ARTIFACT makes")
     w("# a run that passes without emitting them all a failure.")
     w("rule generate")
-    w("  command = OT6_WORKER=$state OT6_EXPECT_ARTIFACT='$expect' $env "
+    w("  command = OT6_GRAPH=1 OT6_WORKER=$state OT6_EXPECT_ARTIFACT='$expect' $env "
       "tools/tests/run.sh tools/tests/$gen.lua build/states/$state.log")
     w("  description = generate $state <- $gen")
     w("  restat = 1")
@@ -343,7 +376,7 @@ def emit_state_rules(w):
     w("# A cutter: a capture-only script booted from a state; it publishes no")
     w("# state, only the battery it saved (OT6_CAPTURE_SRM).")
     w("rule capture")
-    w("  command = OT6_WORKER=$worker OT6_NO_PUBLISH=1 $env "
+    w("  command = OT6_GRAPH=1 OT6_WORKER=$worker OT6_NO_PUBLISH=1 $env "
       "tools/tests/run.sh tools/tests/$gen.lua build/states/$worker.log")
     w("  description = capture $key <- $gen")
     w("  restat = 1")
@@ -628,8 +661,14 @@ def selftest():
             (d / "manifest.json").write_text("{}")
             (d / f"{key[:-3]}.sram").write_text("x")
         (root / "tools/tests/checkpoints/two-v1").mkdir(parents=True)
-        for g in ("gen_ok", "gen_cut", "gen_seed"):
+        for g in ("gen_ok", "gen_cut", "gen_seed", "gen_q2"):
             (root / f"tools/tests/{g}.lua").write_text("-- ok")
+        for g, fx in (("gen_x", "o"), ("gen_y", "x"), ("gen_two", "o")):
+            (root / f"tools/tests/{g}.lua").write_text(
+                f'H.loadState("build/states/{fx}.mss.lua")')
+        (root / "tools/tests/gen_two.lua").write_text(
+            'H.loadState("build/states/o.mss.lua")\n'
+            'H.loadState("build/states/x.mss.lua")')
         # o boots power-on and saves k1, which p Continues.  A cutter
         # booted from p saves k2, which q and q2 Continue; r Continues k3,
         # which q's own run saves; r's run saves k4, which nothing boots;
@@ -643,11 +682,11 @@ def selftest():
                 s(state="p", gen="gen_ok", prev="o", checkpoint="k1-v1"),
                 s(state="q", gen="gen_ok", prev="p", checkpoint="k2-v1",
                   cutter="gen_cut"),
-                s(state="q2", gen="gen_ok", prev="p", checkpoint="k2-v1",
+                s(state="q2", gen="gen_q2", prev="p", checkpoint="k2-v1",
                   cutter="gen_cut"),
                 s(state="r", gen="gen_ok", prev="q", checkpoint="k3-v1",
                   saves="k4-v1", also=["r2"]),
-                s(state="x", gen="gen_ok", prev="o")]
+                s(state="x", gen="gen_x", prev="o")]
         caps = [{"capture": "seed-v1", "cutter": "gen_seed", "prev": "o"}]
         check("a well-formed graph validates",
               validate(full, root, caps) == [])
@@ -694,6 +733,21 @@ def selftest():
              caps),
             ("also duplicating a state",
              full + [s(state="z", gen="gen_ok", also=["o"])], caps),
+            ("one leg played twice: a second entry with the same generator "
+             "and boot (n024_won / esper_tubes_entry)",
+             full + [s(state="z", gen="gen_x", prev="o")], caps),
+            ("...the same at a cut",
+             full + [s(state="z", gen="gen_q2", prev="p", checkpoint="k2-v1",
+                       cutter="gen_cut")], caps),
+            ("prev= that is not the sidecar the generator embeds",
+             full + [s(state="z", gen="gen_y", prev="o")], caps),
+            ("a generator that embeds a sidecar with no prev=",
+             full + [s(state="z", gen="gen_y")], caps),
+            ("a generator that embeds two sidecars",
+             full + [s(state="z", gen="gen_two", prev="o")], caps),
+            ("a cut whose generator embeds a sidecar besides its capture",
+             full + [s(state="z", gen="gen_x", prev="p", checkpoint="k2-v1",
+                       cutter="gen_cut")], caps),
         ]
         for label, graph, cs in bad:
             check(f"NEGATIVE {label}", validate(graph, root, cs) != [])

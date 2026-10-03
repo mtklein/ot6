@@ -108,6 +108,14 @@ def glob(pattern, base="."):
     return hits
 
 
+def read(path):
+    """A file's text, recorded in configure.d: what configure derives from a
+    file's contents (a suite's attributes, the sidecars it embeds) is
+    re-derived when the file changes."""
+    read_deps.add(str(path))
+    return (ROOT / path).read_text(errors="replace")
+
+
 def esc(path):
     """ninja path escaping: spaces only (no $ or : in any path here)."""
     return path.replace("$", "$$").replace(" ", "$ ")
@@ -187,7 +195,7 @@ w("# One suite test: compose, boot Mesen headless, publish the log, touch the")
 w("# ok.  $env carries the per-test environment (dirty-RAM pins, checkpoint")
 w("# batteries, coverage artifact dirs); the separating space lives here.")
 w("rule suitetest")
-w("  command = $env nice tools/build/run_suite_test.sh $test $out")
+w("  command = OT6_GRAPH=1 $env nice tools/build/run_suite_test.sh $test $out")
 w("  description = suite $test")
 w()
 
@@ -532,7 +540,7 @@ def fixture_deps(lua_path):
 
 suite_tests = []
 for f in glob("tools/tests/*.lua"):
-    text = (ROOT / f).read_text(errors="replace")
+    text = read(f)
     m = re.search(r"^-- @suite(.*)$", text, re.M)
     if not m:
         continue
@@ -706,8 +714,8 @@ check("checkpoint_drift_selftest",
       ["tools/tests/lib/checkpoint_drift.py", "tools/tests/lib/sram_checkpoint.py",
        "tools/tests/lib/stamps.py", "tools/tests/lib/compose.py"])
 # THE DRIFT GATE: every tracked checkpoint is the save the graph's run makes
-# there today, byte for byte, play time and checksums aside (levels, gear,
-# gil, the bag, story switches, the codex).  Every tracked checkpoint is on
+# there today, byte for byte, play time and checksums included (levels,
+# gear, gil, the bag, story switches, the codex).  Every tracked checkpoint is on
 # the graph (savestate_ninja.validate refuses one that is not), so this
 # compares every one.  The fix for a drifted one is
 # `checkpoint_drift.py --recut <key>` and a commit.
@@ -735,7 +743,7 @@ check("retry_negative", "nice sh tools/tests/lib/retry_negative.sh",
 # #309: every instrument left in tools/tests (`-- @manual`) composes and
 # starts (docs/TESTING.md "Scripts that stay in the tree").
 instruments = [f for f in glob("tools/tests/*.lua")
-               if re.search(r"^-- @manual", (ROOT / f).read_text(errors="replace"), re.M)]
+               if re.search(r"^-- @manual", read(f), re.M)]
 check("instruments", "nice python3 tools/check_instruments.py",
       ["tools/check_instruments.py", "tools/tests/lib/stamps.py", sn.GRAPH,
        copy_if_changed_from("tools/tests/lib/compose.py")]
@@ -876,6 +884,7 @@ w()
 text = "\n".join(w.lines)
 out = ROOT / "build.ninja"
 (ROOT / "build/ninja").mkdir(parents=True, exist_ok=True)
+read_deps |= sn.READS
 dep_targets = " ".join(sorted(esc(d) for d in read_deps))
 (ROOT / "build/ninja/configure.d").write_text(f"build.ninja: {dep_targets}\n")
 if not (out.exists() and out.read_text() == text):

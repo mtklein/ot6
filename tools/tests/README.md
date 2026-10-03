@@ -44,7 +44,7 @@ the graph boots. So every tracked checkpoint in `tools/tests/checkpoints/`
 is made by one run on the graph (`savestate_ninja.validate` refuses a graph
 that leaves one out), and the drift gate, `build/checks/checkpoint_drift.ok`
 in the default, holds each tracked copy to the graph's capture byte for byte
-(play time and checksums aside): `checkpoint_drift.py --recut <key>` and a
+(play time and checksums too): `checkpoint_drift.py --recut <key>` and a
 commit fix a drifted one. The tracked copies are what suites in
 `configure.py`'s `TEST_ENV` and by-hand runs boot; nothing in the graph
 boots them.
@@ -120,7 +120,11 @@ boots `sabin_done`, and Terra's closer (`gen_terra_done`), booted with all
 three completions carried in, rides the reunion cutscene and generates
 `reunion_ready` directly. A generator that emits several states along one
 run declares them with `also=[...]` in the graph: one edge, one play-through,
-all its artifacts.
+all its artifacts. `savestate_ninja.validate` holds the graph to that at
+configure time: two entries with the same generator and the same boot are
+one leg played twice (refused: name the second save in the first's
+`also=`), and an entry's `prev=` must be the one sidecar its generator
+embeds (none at a cut, which boots its capture).
 
 ### What it costs
 
@@ -174,6 +178,27 @@ an input moved, or `STALE via` the state it grew from; UNBOUND: the bytes
 are not the recorded ones, or an older stamp format; UNVERIFIED: no built
 ROM to compare against). live.py's route map and `tools/worktree-setup.sh`
 read the same verdicts.
+
+The stamp edge stamps only what a run made. run.sh writes
+`<artifact>.published` (the sha256 of the bytes it published) beside each
+artifact it publishes; an artifact that is not those bytes (replaced by
+hand, copied in from another tree) is refused: no stamp, the file moved
+aside to `<artifact>.unbound`, the build failed with its name, and the
+next `ninja` regenerates it, since the generate edge's output is gone.
+
+There is no `--check-states` edge in the default, and none is needed.
+Every stamp is an ordinary output of the default, and its edge depends on
+everything the checker reads (the composed digest, the run's inputs, the
+artifact, the stamp of what it booted), so after a green `ninja` every
+stamp is current by construction, and a stamp that is not is an edge
+ninja would run. The checker is for what ninja does not see: a tree
+seeded from another (`worktree-setup.sh` runs it), and runs off the graph.
+A run off the graph -- by hand, a probe, a sweep, an instrument -- is told
+when a state it embeds is not current: compose.py prints a WARNING naming
+it and why, the run log carries it, and a timeout names it again
+(`OT6_STALE`, read by `timeoutContext`). Runs ninja schedules carry
+`OT6_GRAPH=1` and skip the check, their embedded states being what their
+own dependencies just made current.
 
 ## run.sh
 

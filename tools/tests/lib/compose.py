@@ -685,6 +685,22 @@ def selftest() -> int:
         check("...and an environment it read",
               out.read_text().splitlines()[1:],
               ["env OT6_SRAM_CHECKPOINT=build/checkpoints/k"])
+        # a run off the graph is told when what it embeds is not current
+        text = compose_script(gen, root, {})[0]
+        stale = stale_fixtures(text, root)
+        check("MUTANT a hand run embedding a state no current stamp vouches "
+              "for is flagged", list(stale), ["a.mss.lua"])
+        flagged = flag_stale(text, stale)
+        check("...in its log and in OT6_STALE for timeoutContext, after the "
+              "marker line",
+              (flagged.split("\n", 1)[0] == MARKER, "[ot6] WARNING: " in flagged,
+               'OT6_STALE = {\n  ["a.mss.lua"] = ' in flagged), (True, True, True))
+        check("...and only there: the digest a graph run records is the "
+              "composition's", (main_digest(gen, out, root, {}),
+                                out.read_text().splitlines()[0]),
+              (0, composed_digest(text)))
+        check("a composition that embeds nothing stale is left alone",
+              flag_stale(text, {}), text)
 
     print("selftest: " + ("ok" if ok else "FAILED"))
     return 0 if ok else 1
@@ -927,6 +943,44 @@ def main_digest(script_path, out, root=ROOT, env=None):
     return 0
 
 
+def lua_str(s):
+    return '"%s"' % s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
+def stale_fixtures(text, root=ROOT):
+    """{sidecar name: why} for each graph state the composed text embeds
+    whose stamp is not current (lib/stamps.py): a hand run, a probe or a
+    sweep booting it plays a state no run of today's tree made (issue #2).
+    A state with no stamp says so too.  Embedded files from outside
+    build/states (a lab's own) are not the graph's to judge."""
+    import stamps          # stamps imports this module; only here, lazily
+    out, memo = {}, {}
+    for name, src in re.findall(r"^-- state (\S+) sha=\S+ .* <- (.*)$", text, re.M):
+        if not src.startswith("build/states/"):
+            continue
+        verdict, msg = stamps.stamp_status(name, root, memo)
+        if verdict is None:
+            out[name] = (f"{src} has no stamp: nothing records the run that "
+                         f"made it (ninja {src} regenerates it)")
+        elif verdict != stamps.FRESH:
+            out[name] = msg
+    return out
+
+
+def flag_stale(text, stale):
+    """The composed text with the stale fixtures named where a run shows
+    them: a WARNING line in the run log, and OT6_STALE for the lib's
+    timeoutContext, which names it again on any timeout."""
+    if not stale:
+        return text
+    first, rest = text.split("\n", 1)
+    add = [f'print("[ot6] WARNING: " .. {lua_str(why)})\n' for why in stale.values()]
+    add.append("OT6_STALE = {\n")
+    add += [f"  [{lua_str(n)}] = {lua_str(why)},\n" for n, why in stale.items()]
+    add.append("}\n")
+    return first + "\n" + "".join(add) + rest
+
+
 def main() -> int:
     argv = sys.argv[1:]
     if argv == ["--selftest"]:
@@ -948,9 +1002,17 @@ def main() -> int:
     except ComposeError as e:
         print(f"error: {e}")
         return 1
+    # A run ninja schedules (OT6_GRAPH=1, the generate, capture and suite
+    # rules) embeds what its own dependencies just made current; any other
+    # run -- by hand, a probe, a sweep, an instrument -- is told when a state
+    # it embeds is not, here and in its log.
+    stale = {} if os.environ.get("OT6_GRAPH") == "1" else stale_fixtures(text)
+    text = flag_stale(text, stale)
     out_path.write_text(text)
     for n in notes:
         print(n)
+    for why in stale.values():
+        print(f"WARNING: {why}")
     states = re.findall(r"^-- state (\S+) sha=(\S+) .* <- (.*)$", text, re.M)
     print(f"composed {out_path} ({len(states)} embedded savestate(s))")
     for name, sha, src in states:

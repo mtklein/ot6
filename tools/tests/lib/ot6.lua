@@ -2420,8 +2420,10 @@ end
 -- menu", which often omits the real cause: the savestate may have been
 -- generated against a different ROM than the one running, so the first
 -- step needing a specific frame lands on a frame the fixture's timing no
--- longer has.  So every timeout appends which fixture the run booted and
--- how to rule that out.
+-- longer has.  So every timeout appends which fixture the run booted,
+-- whether composition already found it not current (OT6_STALE, which
+-- lib/compose.py emits for a run off the graph: by hand, a probe, a sweep),
+-- and how to rule that out.
 M.lastState = nil
 
 function M.timeoutContext()
@@ -2429,7 +2431,9 @@ function M.timeoutContext()
     return ""   -- power-on boot: no fixture to name, so add nothing
   end
   local state = M.lastState:gsub("%.mss%.lua$", "")
+  local stale = type(OT6_STALE) == "table" and OT6_STALE[M.lastState]
   return "\n  fixture booted by this run: " .. M.lastState
+    .. (stale and ("\n  and composition found it NOT CURRENT: " .. stale) or "")
     .. "\n  A savestate from another ROM or another harness resumes where"
     .. " its timing has moved, and\n  a timeout on an input step is what that"
     .. " looks like; rule it out before you suspect the feature:"

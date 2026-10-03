@@ -401,16 +401,14 @@ STATES = [
     # B->C's terminal.
     S("n024_entry", gen="gen_n024_entry", prev="magicite_ifrit_shiva"),
     # ---- boundary C: the NEW 273 save point --------------------------------
-    # The step OUT of C starts from a checkpoint for BOTH of gen_esper_tubes'
-    # states: one script, one cold-Continue boot, two states -- so both are
-    # cuts at the same save, which gen_n024_save_checkpoint makes from
-    # n024_entry (the chain captures it once).  battle 72, then the {25,50}
-    # door into map 274 and the entry point for the facing+A-gated
-    # BIG_SWITCH trigger.
-    S("n024_won", gen="gen_esper_tubes", prev="n024_entry",
-      checkpoint="n024-entry-save-v1", cutter="gen_n024_save_checkpoint"),
+    # The step OUT of C is one cut: gen_esper_tubes, one cold-Continue boot
+    # of the save gen_n024_save_checkpoint makes from n024_entry, two
+    # states (n024_won after battle 72; esper_tubes_entry past the {25,50}
+    # door into map 274, at the entry point for the facing+A-gated
+    # BIG_SWITCH trigger).  One run publishes both.
     S("esper_tubes_entry", gen="gen_esper_tubes", prev="n024_entry",
-      checkpoint="n024-entry-save-v1", cutter="gen_n024_save_checkpoint"),
+      checkpoint="n024-entry-save-v1", cutter="gen_n024_save_checkpoint",
+      also=["n024_won"]),
     # gen_esper_tubes_done: the Cid/Kefka set piece -- six espers, and CELES
     # leaves the roster ($02F6=0).
     S("esper_tubes", gen="gen_esper_tubes_done", prev="esper_tubes_entry"),
