@@ -2280,40 +2280,55 @@ The care lines offered only the Potion (else the Tonic).  After 13.14 the
 chain's Dullahan left SABIN at 905/1812 under an 846 round with seven
 X-Potions in the bag (`$E9 restores 250 and a round costs 846 ... acting
 instead`) and he died from 591.  (The bag line called the Ether `$EC`
-"elixir"; the party holds 5 Ethers and 7 Elixirs `$EE` there.)  Now every
-battle-usable HP item is weighed by the lift rule and the cheapest in gil
-that the rule takes is spent (`H.itemChoice`).  The prices are the ROM's:
-a sold item's price word (ShopProp lists what shops sell), an unsold one's
-effect at the shops' least gil per HP and MP (the Tonic's 1, the
-Tincture's 30) -- an X-Potion on SABIN is 1812, an Elixir 11352.  A
-top-up never spends an item dearer than the death it guards against
-(`H.deathGil`: the Fenix Down's 500 and the HP its raise leaves); a member
-inside the round gets whatever lifts them.  A Megalixir is a party turn
-when two or more members are inside their rounds and it lifts each (no bag
-on the route holds one yet, so that menu path is unmeasured in play).  The
-status cures take the same gil order (`H.cureItems`).  A confirmed item
-that fills its target (`H.healFills`: X-Potion, Elixir, Megalixir) is in
-flight until the target's HP rises or a hit lands first
-(`H.healInFlight`), and nobody else heals that member meanwhile: the first
-cut gave EDGAR at 86/1701 two X-Potions, the second planned on the HP the
-first was about to fill.  A flat heal stacks and is not held; holding every
-heal reordered the party's turns enough that battle_brokendeath's ladder
-found no counting rung.
+"elixir"; the party holds 5 Ethers and 7 Elixirs `$EE` there.)  Now:
 
-Measured against main 5883ecb9 on snapshots cut on this ROM, by distinct
-fight (`build/attempts/wt/care-items/`, r1 and r4): Dullahan arm B (K =
-0..3 x 8 waits, 32 fights) 32 won either way; main 5 deaths, 4 Fenix
-Downs, 22 Potions (8600 gil with the Fenix Downs); this branch 3 deaths, 2
-Fenix Downs, 21 Potions (7300 gil) and 24 X-Potions (27 planned, 48631
-gil at the shops' rate).  The Sealed Gate cave (7 boot shifts): 6 of 7 either way
-(shift 5 wipes in both), main 9 deaths, this branch 8.  The Sand Horse
-pair (15 fights each) planned no heal either way.  Deaths and the gil a
-shop would take both fall a little; the X-Potions go freely, 29 of 33
-plans lifting a member inside the round.  Two levers measured on the way:
-holding every confirmed heal in flight, not only a fill, spent 15 Potions
-at Dullahan and won the Gate's shift 5 (r2), but cost battle_brokendeath
-its counting rung; and a stricter top-up price (the death's, discounted by
-the rounds it is away) would trim the 4 outside the round.
+- every battle-usable HP item is weighed by the lift rule and the cheapest
+  in gil that the rule takes is spent (`H.itemChoice`).  Prices are the
+  ROM's: a sold item's price word (ShopProp lists what shops sell), an
+  unsold one's effect at the shops' least gil per HP and MP (the Tonic's
+  1, the Tincture's 30) times a scarcity term, 1 + legs to the next source
+  / the count held (`H.scarcity`; the next source is the generator's
+  `opts.nextSource`, else a 10-leg horizon), so the last few count for
+  more.  An unsold item with no HP or MP to price it by is priceless, not
+  free;
+- an item no shop sells (X-Potion, Elixir, Megalixir) is spent only on a
+  member inside the round, never on a top-up; `opts.reserve` still keeps
+  the last n of anything.  A sold item dearer than the death it guards
+  against (`H.deathGil`) is no top-up either.  A Megalixir is a party turn
+  when two or more members are inside their rounds and it lifts each (no
+  bag on the route holds one, so that menu path is unmeasured in play);
+- the status cures take the same gil order (`H.cureItems`);
+- a confirmed heal holds the others off its target until the HP rises or
+  a hit lands first (`H.healInFlight`);
+- the round's one care turn is kept after the confirm (`H.careRefund`):
+  from 11a8f6e3 the confirm's own `dropPlan("confirm_attempt")` refunded
+  it, so the rule bound only while a plan was being steered.
+
+Measured against main 5883ecb9 on the same snapshots, by distinct fight
+(`build/attempts/wt/care-items/`, r1 main, r5 head).  "Refund" is the head
+with the old care refund (`H.CONFIRM_REFUNDS_CARE = true`):
+
+| | main | head, refund | head |
+|---|---|---|---|
+| Dullahan B (32 fights): deaths, Fenix Downs | 5, 4 | 6, 4 | 4, 4 |
+| ... Potions, X-Potions, gil of sold items | 22, 0, 8600 | 16, 21, 6800 | 7, 11, 4100 |
+| Gate (7 shifts): runs passed, deaths | 6/7, 9 | 7/7, 3 | 6/7, 7 |
+| Chain: deaths, Fenix Downs | 7, 1 | 9, 3 | 6, 1 |
+
+No X-Potion is planned outside the round in any of them (the chain: 5
+inside, 0 outside; Dullahan B 13 and 0; the Gate 2 and 0), and no Elixir
+or Megalixir is planned at all.  The care refund's arm is better at the
+Gate (its shift 5 survives) and worse at Dullahan B and on the chain
+(sabin_done 1 -> 3 deaths); the head keeps the care turn.
+
+battle_brokendeath's ladder was four rungs ten phases apart, a budget read
+off a map of counting phases measured with one driver; under the head's
+driver with the refund the old suite failed shift 0 (`rungs ...:
+1:0w/0sk 2:0w/0sk 3:0w/0sk 4:1w/0s`) and needed its last rung at shift 20.
+It now visits rung 1 and one target in each of the period's fifteen runs
+of four (every phase the fight can draw), stopping at the first counting
+rung, and logs the map it saw: 7 of 7 shifts pass under the head, the
+refund arm and main's driver alike, in at most 3 rungs (r5/bd_*).
 
 ## 14. What the owner may want to decide
 
