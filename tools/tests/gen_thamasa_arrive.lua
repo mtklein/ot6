@@ -327,13 +327,32 @@ local steps = {
   H.call(function()
     H.log(string.format("[ot6] at (249,128) staging tile, f%d", H.frame))
   end),
-  (function() local W = H.newWalkFighter("held RIGHT onto (250,128)")
-    return H.driveUntil(function() return not H.worldMode() end, 2000, {
+  -- The step onto (250,128) can draw a random battle, and a fight is not
+  -- the walk: the 2000-frame bound counts only frames spent holding RIGHT,
+  -- and the battle is the walk fighter's (with the runner's watchdogs).
+  -- The chain's v0.24 draw met one there that ran past 1800 frames
+  -- (LOCKE sneezed out of it), and the old whole-step 2000 cap timed out
+  -- mid-fight on all three attempts (build/attempts/wt/v024-recut/
+  -- thamasa_arrive/).
+  (function()
+    local W = H.newWalkFighter("held RIGHT onto (250,128)")
+    local held = 0
+    return H.withReset(H.driveUntil(function()
+      if not H.worldMode() then return true end
+      if held > 2000 then
+        error(string.format("held RIGHT onto (250,128) for %d frames outside battle and "
+          .. "never left the world map: the trigger tile is not where this step expects "
+          .. "(at (%d,%d))", held, H.worldX(), H.worldY()), 0)
+      end
+      return false
+    end, 60000, {
       H.call(function()
         if W.frame() then return end
+        held = held + 1
         H.setPad({ right = true })
       end),
-    }, "held RIGHT onto (250,128) -> Thamasa 343 (23,46)") end)(),
+    }, "held RIGHT onto (250,128) -> Thamasa 343 (23,46)"), function() held = 0 end)
+  end)(),
   H.release(),
   H.waitUntil(function() return map() == 343 and H.hasControl() end, 3000,
     "Thamasa map loaded", 5),

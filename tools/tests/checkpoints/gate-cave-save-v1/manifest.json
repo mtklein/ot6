@@ -1,21 +1,8 @@
 {
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "gate-cave-save.sram",
-  "size": 32768,
-  "sha256": "6abe614f19ddb3e30a73055d0596307cb50a0153e35731341d55662c59cfeb1d",
   "slot": 3,
   "milestone": "gate-cave-save",
-  "provenance": {
-    "format": "ot6-provenance/v2",
-    "payload_sha256": "6abe614f19ddb3e30a73055d0596307cb50a0153e35731341d55662c59cfeb1d",
-    "generator_sig": "1c39488d65fe136436258c9eb1721b23f907a8b9a94eea650b3355f9d8b867e5 gen_gate_cave_save tools/tests/checkpoints/narshe-mission-v1/manifest.json tools/tests/checkpoints/narshe-mission-v1/narshe-mission.sram",
-    "ancestors": [
-      {
-        "path": "tools/tests/checkpoints/narshe-mission-v1/manifest.json",
-        "sha256": "2eb9b9dd119e09600ac3bbd63ff4d99f9e0e54afb3539ed3a207cedde40a38ba"
-      }
-    ]
-  },
   "persistent_layout": "ot6-codex-o8-v1",
   "saved": {
     "slot": 3,
@@ -24,5 +11,18 @@
       "x": 74,
       "y": 53
     }
+  },
+  "size": 32768,
+  "sha256": "2b99111d2f6c25e0bf712c9d2342709b39a1ab683b36060d1eddafbda87a4899",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "2b99111d2f6c25e0bf712c9d2342709b39a1ab683b36060d1eddafbda87a4899",
+    "generator_sig": "f4ceccfc5a2b5c56946a9f80b04c0e4ab781f65def1adeea7704b24c0a4cb1fd gen_gate_cave_save build/checkpoints/narshe-mission-v1/manifest.json build/checkpoints/narshe-mission-v1/narshe-mission.sram",
+    "ancestors": [
+      {
+        "path": "build/checkpoints/narshe-mission-v1/manifest.json",
+        "sha256": "04a18a0b0706ba52cffbee7e33040992e96de25e0c6a25f1789c48f7c6ec78b0"
+      }
+    ]
   }
 }

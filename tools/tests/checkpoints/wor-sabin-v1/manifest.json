@@ -1,8 +1,6 @@
 {
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "wor-sabin.sram",
-  "size": 32768,
-  "sha256": "2c943b2a3c4af513ea64d71e14d5f8b577dfab7b14e6576d920082b74e103d68",
   "slot": 3,
   "milestone": "wor-sabin",
   "persistent_layout": "ot6-codex-o8-v1",
@@ -14,14 +12,16 @@
       "y": 179
     }
   },
+  "size": 32768,
+  "sha256": "3c13ff6db267084205a1fcf150275bc8690cbfd3b041b916c529befb077fc634",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "2c943b2a3c4af513ea64d71e14d5f8b577dfab7b14e6576d920082b74e103d68",
-    "generator_sig": "1547bb37e1ec6d77736cea9f65fd439ced9f079c81220c124d1208e0d31fb2a8 gen_wor_sabin tools/tests/checkpoints/wor-tzen-door-v1/manifest.json tools/tests/checkpoints/wor-tzen-door-v1/wor-tzen-door.sram",
+    "payload_sha256": "3c13ff6db267084205a1fcf150275bc8690cbfd3b041b916c529befb077fc634",
+    "generator_sig": "61cbbccc8672bb20b731c29a51a03c9a43109da3440be591c2a05647edc71be9 gen_wor_sabin build/checkpoints/wor-tzen-door-v1/manifest.json build/checkpoints/wor-tzen-door-v1/wor-tzen-door.sram",
     "ancestors": [
       {
-        "path": "tools/tests/checkpoints/wor-tzen-door-v1/manifest.json",
-        "sha256": "4c8e2a401ca09d834f0cfd89cc92c2ffef14226cb98e230bfc226ebb14b02f59"
+        "path": "build/checkpoints/wor-tzen-door-v1/manifest.json",
+        "sha256": "b17231e72458351673e066bfca7c1cce328ca18e01dd4973d3dc05e2ee38a2f6"
       }
     ]
   }

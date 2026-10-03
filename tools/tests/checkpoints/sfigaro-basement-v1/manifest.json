@@ -2,7 +2,7 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "sfigaro-basement.sram",
   "size": 32768,
-  "sha256": "b2e5d22e570d15dc2efd3441a251a0a60b6cb16934578e63b6288d7b5a286f1d",
+  "sha256": "a3ef2f1fbb75f129a05c2306bf519153a432c0ea10b17c5099751ddefed5ab7b",
   "slot": 3,
   "milestone": "sfigaro-basement",
   "persistent_layout": "ot6-codex-o8-v1",
@@ -15,13 +15,13 @@
     }
   },
   "provenance": {
-    "format": "ot6-provenance/v1",
-    "payload_sha256": "b2e5d22e570d15dc2efd3441a251a0a60b6cb16934578e63b6288d7b5a286f1d",
-    "generator_sig": "c7b8d7ee211ef315097a5fbd4951d53d6066162c3c7303db151fbb0501b8cff9 gen_seed_basement",
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "a3ef2f1fbb75f129a05c2306bf519153a432c0ea10b17c5099751ddefed5ab7b",
+    "generator_sig": "e76893f05dd0d63746bf87106e2a6fd049418f8ab0ba790ea3823ced28a93e40 gen_seed_basement",
     "ancestors": [
       {
         "path": "build/states/sfigaro_escape.stamp",
-        "sha256": "8033399e40c5a64b2666e5b0d7454300a617247ec62946abe6f561ac9851305b"
+        "sha256": "d985d7536f1b245cf1eb2449c96260402c1ee7576e80023e13a45f69f89fbcec"
       }
     ]
   }

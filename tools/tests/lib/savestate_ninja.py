@@ -13,7 +13,11 @@ differ, and `restat = 1` prunes everything downstream when it did not move.
 A generator is copied by `copy_if_lua_changed` instead (lua_fingerprint.py
 copy-if-changed): the copy takes the new bytes but keeps its mtime when the
 Lua token stream did not move, so a comment or whitespace edit regenerates
-nothing, the same rule the stamps' generator hash follows (#247).
+nothing, the same rule the stamps' generator hash follows (#247).  The ROM
+is copied by `copy_if_rom_identity_changed` (tools/build/rom_version.py): the
+same shape, keyed on the ROM identity, the ROM with its version fields
+masked, so a VERSION bump regenerates nothing, the same rule the stamps'
+`rom` line follows.
 Generated states themselves are not copied this way: a regenerated .mss is
 new bytes, and everything booted from it must replay.
 
@@ -314,13 +318,14 @@ def emit_state_rules(w):
     w("# bytes, so the source's stamp -- its sig, its artifact hash, its")
     w("# ancestor -- records the copy verbatim, and the copied stamp is")
     w("# what lets a stacked generate edge bind ITS ancestor line to a real file (#75).")
-    w("# Each file is rewritten only when its bytes differ (restat), so a source")
-    w("# regenerated to the same bytes -- a clean qualification on an unchanged")
-    w("# ROM -- does not make the chain from power-on replay behind it.")
+    w("# Each half is rewritten only when its bytes differ (restat), and the")
+    w("# stamp only when a half moved or its binding lines (rom, generator,")
+    w("# artifact) differ, so a source regenerated to the same bytes -- a clean")
+    w("# qualification on an unchanged ROM, under newer lib halves than the")
+    w("# copy's -- does not make the chain from power-on replay behind it")
+    w("# (savestate_ninja.py seed_copy).")
     w("rule seed")
-    w("  command = for x in mss mss.lua stamp; do "
-      "cmp -s build/states/$src.$$x build/states/$state.$$x || "
-      "cp build/states/$src.$$x build/states/$state.$$x || exit 1; done")
+    w("  command = python3 tools/tests/lib/savestate_ninja.py --seed $src $state")
     w("  description = stack seed $state <- $src")
     w("  restat = 1")
     w("")
@@ -331,6 +336,16 @@ def emit_state_rules(w):
     w("  command = python3 tools/tests/lib/lua_fingerprint.py "
       "copy-if-changed $in $out")
     w("  description = copy_if_lua_changed $in")
+    w("  restat = 1")
+    w("")
+    w("# The ROM's copy, the same shape: the new bytes always land, but the")
+    w("# old mtime is kept when the ROM identity (the ROM with its version")
+    w("# fields masked, tools/build/rom_version.py) did not move, so a VERSION")
+    w("# bump alone regenerates and re-runs nothing behind it.")
+    w("rule copy_if_rom_identity_changed")
+    w("  command = python3 tools/build/rom_version.py "
+      "copy-if-identity-changed $in $out")
+    w("  description = copy_if_rom_identity_changed $in")
     w("  restat = 1")
     w("")
 
@@ -478,6 +493,39 @@ def chain_plan(states):
 
 
 SEALED_FIELDS = ("size", "sha256", "provenance")
+
+
+SEED_BINDING = ("rom ", "generator ", "artifact ")
+
+
+def seed_copy(states_dir, src, dst):
+    """The seed rule: copy a finished state's two halves into its chain_
+    name byte for byte, each only when its bytes differ (restat), and its
+    stamp verbatim whenever a half moved or the stamp's binding lines (rom,
+    generator, artifact) differ.  A stamp whose binding lines match and
+    whose halves did not move differs only in provenance -- its own sig
+    line, the lib hashes, the emulator record, and an ancestor line whose
+    hash follows the ancestor's provenance -- and is NOT rewritten: a
+    clean qualification that regenerates the source to the same bytes
+    under lib halves newer than the copy's (the chain edges carry the lib
+    halves as inputs themselves, so a lib edit still replays the chain)
+    must not replay the chain from power-on behind it (v0.24:
+    build/attempts/wt/v024-recut/gate/).  Returns 0."""
+    moved = False
+    for ext in ("mss", "mss.lua"):
+        s, d = states_dir / f"{src}.{ext}", states_dir / f"{dst}.{ext}"
+        data = s.read_bytes()
+        if not (d.exists() and d.read_bytes() == data):
+            d.write_bytes(data)
+            moved = True
+    s, d = states_dir / f"{src}.stamp", states_dir / f"{dst}.stamp"
+
+    def binding(p):
+        return [l for l in p.read_text().splitlines() if l.startswith(SEED_BINDING)]
+    if moved or not d.exists() or binding(s) != binding(d):
+        if not (d.exists() and d.read_bytes() == s.read_bytes()):
+            d.write_bytes(s.read_bytes())
+    return 0
 
 
 def write_authored(manifest, out):
@@ -727,7 +775,11 @@ def emit_chain_edges(w, states, root, copy_if_changed_from):
 
 def copy_rule(src, states):
     """The copy rule for one copy_if_changed source: a generator the graph
-    runs is copied by its Lua token stream, anything else by its bytes."""
+    runs is copied by its Lua token stream, the ROM by its identity
+    (rom_version.py: the version fields masked), anything else by its
+    bytes."""
+    if src == ROM:
+        return "copy_if_rom_identity_changed"
     gens = {f"tools/tests/{e[k]}.lua" for e in states
             for k in ("gen", "cutter") if e.get(k)}
     return "copy_if_lua_changed" if src in gens else "copy_if_changed"
@@ -848,6 +900,9 @@ def main(argv):
     ap.add_argument("--authored", nargs=2, metavar=("MANIFEST", "OUT"),
                     help="write MANIFEST's authored fields to OUT, only "
                          "when they changed (the chain's seal template)")
+    ap.add_argument("--seed", nargs=2, metavar=("SRC", "STATE"),
+                    help="the seed rule: copy build/states/SRC.* to STATE.* "
+                         "(seed_copy)")
     ap.add_argument("--coverage", action="store_true",
                     help="check that every tracked checkpoint is captured by "
                          "the chain (so the drift gate compares it) or named "
@@ -860,6 +915,8 @@ def main(argv):
         return selftest()
     if args.authored:
         return write_authored(Path(args.authored[0]), Path(args.authored[1]))
+    if args.seed:
+        return seed_copy(args.root.resolve() / "build" / "states", *args.seed)
 
     root = args.root.resolve()
     states = load(root)
@@ -990,9 +1047,36 @@ def selftest():
         check("seed consumes both halves of its source AND its stamp (#75)",
               "seed build/states/b.mss.lua build/states/b.mss "
               "build/states/b.stamp" in text)
-        check("seed copies the stamp with the state (#75)",
-              "for x in mss mss.lua stamp;" in text
-              and "cp build/states/$src.$$x build/states/$state.$$x" in text)
+        check("seed copies the halves and the stamp through seed_copy (#75)",
+              "savestate_ninja.py --seed $src $state" in text)
+        # seed_copy itself: a fresh seed is a verbatim copy; a provenance-
+        # only change to the source's stamp leaves the seed's stamp alone;
+        # a binding change (or a moved half) rewrites it.
+        sd = root / "seedcopy"
+        sd.mkdir()
+        (sd / "s.mss").write_bytes(b"half")
+        (sd / "s.mss.lua").write_bytes(b"lua")
+        stamp = "sig gen_s\nrom r1\ngenerator g1\nlib x l1\nartifact a1\n"
+        (sd / "s.stamp").write_text(stamp)
+        seed_copy(sd, "s", "c")
+        check("seed_copy: a fresh seed is a verbatim copy of halves and stamp",
+              all((sd / f"c.{x}").read_bytes() == (sd / f"s.{x}").read_bytes()
+                  for x in ("mss", "mss.lua", "stamp")))
+        (sd / "s.stamp").write_text(stamp.replace("lib x l1", "lib x l2")
+                                    .replace("sig gen_s", "sig2 gen_s"))
+        seed_copy(sd, "s", "c")
+        check("seed_copy: a provenance-only change leaves the seed's stamp alone",
+              (sd / "c.stamp").read_text() == stamp)
+        (sd / "s.stamp").write_text(stamp.replace("artifact a1", "artifact a2"))
+        seed_copy(sd, "s", "c")
+        check("seed_copy: a binding change rewrites the seed's stamp",
+              (sd / "c.stamp").read_bytes() == (sd / "s.stamp").read_bytes())
+        (sd / "s.stamp").write_text(stamp.replace("lib x l1", "lib x l3"))
+        (sd / "s.mss").write_bytes(b"half2")
+        seed_copy(sd, "s", "c")
+        check("seed_copy: a moved half rewrites the seed's stamp too",
+              (sd / "c.stamp").read_bytes() == (sd / "s.stamp").read_bytes()
+              and (sd / "c.mss").read_bytes() == b"half2")
         check("seed rewrites only changed bytes (restat)",
               text.split("rule seed")[1].split("rule ")[0].count("restat = 1") == 1)
         # provenance ancestors: what each edge tells savestate_stamp.sh to

@@ -562,7 +562,7 @@ local function drawBattle(tag, tries)
           tag, n, #msPresent, mhp, H.vars.suitable and "FIGHT" or "flee"))
       end),
       H.cond(function() return not H.vars.suitable end, {
-        H.fleeBattle(9000),
+        H.fleeBattle(9000, { onCantRun = "fight" }),
         H.waitUntil(function()
           return H.worldMode() and H.worldHasControl()
         end, 1200, tag .. ": back on the plain after draw " .. n, 10),
@@ -661,7 +661,7 @@ local function round()
       H.log(string.format("[cancel] battle %d ended before a branch point | party %s",
         battles, partyLine()))
     end),
-    H.cond(function() return H.battleLoadStarted() end, { H.fleeBattle(12000) }, {}),
+    H.cond(function() return H.battleLoadStarted() end, { H.fleeBattle(12000, { onCantRun = "fight" }) }, {}),
     backToPlain(),
     H.waitFrames(60),
   })

@@ -76,7 +76,9 @@ when its persistent layout remains compatible; test that compatibility rather
 than assuming it.
 
 The Ninja graph and stamp checker implement that separation. Each generated
-fixture's stamp records the ROM it was captured on, its generator's own
+fixture's stamp records the ROM it was captured on (its identity: the ROM
+with its version fields masked, `tools/build/rom_version.py`, so the release
+commit's VERSION bump alone stales nothing), its generator's own
 signature, its artifact and ancestor bindings (compatibility), and the
 signature and per-file hashes of the shared harness sources that produced it
 (provenance). A fixture is stale when the ROM or its generator changed or a
@@ -132,9 +134,11 @@ charge, a hit, a revive) to the action that made it rather than to the
 first change seen.
 
 A seed shift does not re-draw encounters. `OT6_SEED_SHIFT` moves in-battle
-RNG only. When an encounter comes and which formation it is are save data
-(counters at `$1fa1`-`$1fa5`; the formation pick advances once per
-encounter), so replays and retries from one fixture meet the same
+RNG only. When an encounter comes and which formation it is are fixed by
+the fixture: by the WRAM counters at `$1fa1`-`$1fa5` in a savestate, and on
+a Continue by SRAM's random seed `$307ff1`, which the load advances and
+copies into all five counters (the formation pick then advances once per
+encounter). So replays and retries from one fixture meet the same
 formations. To vary the draw, use up
 encounters before the body (fight or run them), not idle frames or seeds.
 Budgets for "within N encounters" come from the map's decoded pool odds, not

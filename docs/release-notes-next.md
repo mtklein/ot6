@@ -8,27 +8,6 @@ release's notes.
 
 ## What's changed
 
-**The World of Ruin from Figaro Castle to the Falcon has designed break
-weaknesses.** The monsters around Kohlingen and in Darill's Tomb used to
-carry generic weaknesses and five shields, so a break could take most of
-a fight to land. Now each has two to four shields and a weakness the
-party holds: Edgar's crossbow chips Deep Eyes and Exorays, Sabin's
-Pummel and Suplex suit the Osteosaur's bones, and the Bogy, a ghost with
-no weakness of its own, answers to Setzer's cards. Setzer's cards, Trump and dice also key
-the tomb's undead and its demon (the Orog, the Osteosaur, the PowerDemon)
-and Dullahan himself; the tomb's plants still want blades, points and
-fire. Dullahan has ten shields, open to spears, darts, the crossbow,
-Sabin's Pummel and Suplex, fire and Setzer's cards, and Setzer is the one
-who breaks him most often. In the tomb's monster chest the shell has no
-shields and takes full damage from the start, and felling either the
-shell or the head ends the fight.
-
-**A boosted action that never happens keeps its boost points.** When a
-character is knocked out or put to sleep after choosing a boosted action
-but before it goes off, the action is lost, as in the original game, and
-the points stay in the bank: a Slot spin that never turns costs Setzer
-nothing.
-
 **Setzer has his whole kit.** His Slot command now opens a short list.
 Slot is the first entry and spins the reels as before. Coin Toss throws
 Gil at every monster, Setzer's level × 30 of it, for twice that in damage
@@ -63,3 +42,8 @@ for Pummel's second blow and for Setzer's extra hires and Jackpot rolls,
 so every hit you paid for lands on a monster while one is standing.
 Without boost, a Genji Glove's second swing still follows the first, as
 in the original game.
+
+**The game shows which OT6 it is.** The splash at power-on shows "OT6 v"
+and the version number under the FINAL FANTASY III logo, and the Config
+screen shows it on the bottom line of its window, on both of its pages, so
+you can tell which build a device is running without leaving the game.
