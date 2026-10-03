@@ -2,8 +2,8 @@
 -- battle_hirecrew.lua -- SETZER's Hired Help at 3 and 2 BP (wt/hire-sprite,
 -- kits.md "Each hire is somebody new"): every boost point's hire is the
 -- next figure -- the merchant, the Imperial soldier, General Leo, and the
--- fourth: Shadow while he can be hired (recruited, $02E3, and not left on
--- the Floating Continent: in the World of Ruin, $00A4, only with $037D),
+-- fourth: Shadow while he can be hired (event switch $02E3: recruited, and
+-- not left on the Floating Continent, whose escape's Jump clears it),
 -- Interceptor while Shadow is in the battle's party, a Phantom Train ghost
 -- when he can't be hired.  battle_hiredhelp holds the 1 BP and unboosted
 -- hires (merchant, soldier) and their purse; this holds the 3 and 2 BP ones.
@@ -26,11 +26,12 @@
 -- one drawn strike with the figure's weapon for the class; and at SETZER's
 -- Ot6ActionEnd his sheet, screen position, offsets and pose ($61c0/$61c1)
 -- as at his Ot6SetzerExec.  The purse is not replayed here: a 2 or 3 BP
--- hire can outlive its target, and the pass after a kill finds no body
--- even while another stands (the pass-retarget defect, wt/pass-retarget's);
--- a no-body pass still walks its figure in and out, and is checked so.
--- The ROM's identity is logged.  Negative controls: build/attempts/wt/
--- hire-sprite/negative/.
+-- hire can outlive its target; a pass after a kill moves on to another
+-- monster while one stands (pass-retarget, merged with v0.24), and a pass
+-- with no body left still walks its figure in and out, and is checked so.  The ROM's identity is logged.
+-- Negative controls (one byte-patched ROM a property, mutants2.py and its
+-- list beside each): build/attempts/wt/hire-sprite/round2/negative/,
+-- round3_main/negative/ (the same on the merged ROM) and round4/negative/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -55,7 +56,7 @@ local stage, battles, recs = 1, 0, {}
 
 H.run({ maxFrames = 300000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
-  H.call(function() H.hireCrewArm(); H.log("[hirecrew] ROM " .. H.romIdentity()) end),
+  H.call(function() H.hireCrewArm() end),
   H.repeatN(SETZER_SKIP, { walkToBattle(), H.setzerBattle({}) }),
   H.driveUntil(function() return stage > #STAGES end, 280000, {
     H.call(function()

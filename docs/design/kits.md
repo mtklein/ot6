@@ -611,9 +611,10 @@ hire is a merchant, and each point brings the next, tougher figure, an
 Imperial soldier, then General Leo. The fourth hire (3 BP) depends on
 Shadow (owner, 2026-10-02):
 - **Shadow**, FF6's own mercenary for hire, when he is there to hire:
-  recruited (event switch `$02E3`), and not left on the Floating
-  Continent (in the World of Ruin, `$00A4`, only if the escape waited for
-  him, `$037D`);
+  recruited and not left on the Floating Continent (event switch
+  `$02E3`: his recruitment sets it, and the escape's Jump without him
+  clears it), so a Shadow who made the airship is for hire in the World
+  of Ruin before he rejoins;
 - **Interceptor** while Shadow is in the battle's party, standing or KO'd
   (he can't walk in from outside it, so his dog takes the job and bounds
   in with his counterattack); with no body left to hit, the dog's pass
@@ -626,8 +627,11 @@ Shadow (owner, 2026-10-02):
 Where they walk: in a front, back or side attack, off the screen edge
 behind the party (away from the enemies, the way the turn's step back
 goes); in a pincer, where the party stands mid-screen between the two
-sides, up the party's column and off the top edge. Every swap of the
-slot's graphics happens with the slot hidden and out of sight, and
+sides, up the party's column and off the top edge, the slot hidden on
+every frame some tile of it would stand above the edge (Float's bob and
+magitek's lift counted), where the engine would move that tile down to
+y = 151. Every swap of the slot's graphics happens with the slot
+hidden and out of sight, and
 Setzer's pose is put back after the last hire as it was before the first.
 *Reason: the boost buys hires, and a hire should look hired. The figures
 are the ROM's own full battle sprite sets (Locke's disguises, Leo, Shadow,
@@ -644,9 +648,11 @@ ATB timing, so later draws and later battles' keys move (the review
 measured the next battle's key: `$be` 60 against E0, build/attempts/wt/
 hire-sprite-review/). (`Ot6CoinAnim`, `Ot6HireMark`, `Ot6ShadowHirable`;
 `battle_hiredhelp` (1 BP, 0 BP) and `battle_hirecrew` (3 BP, 2 BP) hold
-every pass, swap, strike and the restore to the animation's own state;
-the ghost, Interceptor and the pincer are played in labs, evidence and
-negative controls in build/attempts/wt/hire-sprite/round2/.)
+every pass, swap, strike and the restore to the animation's own state,
+and count every tile of Setzer's slot the engine pins on any frame of a
+hire; the ghost, Interceptor and the pincer (a floating Setzer's too)
+are played in labs. Evidence and negative controls: build/attempts/wt/
+hire-sprite/round2/, round3_main/ (the v0.24 merge) and round4/.)
 
 **Jackpot (divine): the Fixed Dice come up a triple.** One enemy, by
 vanilla's dice arithmetic: face³ × level × 2 for the three dice, times the

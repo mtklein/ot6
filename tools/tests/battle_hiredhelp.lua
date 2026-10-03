@@ -37,7 +37,9 @@
 -- and at SETZER's Ot6ActionEnd his sheet, screen position, offsets and
 -- pose ($61c0/$61c1) as at his Ot6SetzerExec.  The 2 and 3 BP hires (Leo,
 -- the fourth hire) are battle_hirecrew's.  The ROM's identity is logged.
--- Negative controls: build/attempts/wt/hire-sprite/negative/.
+-- Negative controls (one byte-patched ROM a property, mutants2.py and its
+-- list beside each): build/attempts/wt/hire-sprite/round2/negative/,
+-- round3_main/negative/ (the same on the merged ROM) and round4/negative/.
 
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -76,7 +78,7 @@ end
 
 H.run({ maxFrames = 200000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
-  H.call(function() H.hireCrewArm(); H.log("[hiredhelp] ROM " .. H.romIdentity()) end),
+  H.call(function() H.hireCrewArm() end),
   H.repeatN(SETZER_SKIP, { walkToBattle(), H.setzerBattle({}) }),
   H.driveUntil(function() return #done >= #WANT end, 160000, {
     H.call(function()
@@ -93,6 +95,7 @@ H.run({ maxFrames = 200000 }, {
           for _, rec in ipairs(H.vars.setzer) do
             done[#done + 1] = rec
             local i = #done      -- held as the battle ends, before the next one
+            H.assertEq(i <= #WANT, true, string.format("record %d of the %d planned", i, #WANT))
             H.assertEq(rec.row, HIRE, string.format("record %d is a Hired Help", i))
             H.assertEq(rec.boost, WANT[i].boost, string.format("record %d ran at its planned boost", i))
             checkHire(rec, i)

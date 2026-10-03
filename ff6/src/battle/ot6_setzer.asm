@@ -658,11 +658,11 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ;   %1fffccLF   1   a hire (with $b6 = the Hired Help row, Ot6CoinAnim's test)
 ;               fff the figure: 0 merchant, 1 Imperial soldier, 2 General Leo,
 ;                   then the fourth hire: 3 Shadow while he is there to hire
-;                   (recruited, $02E3, and not left on the Floating Continent:
-;                   in the World of Ruin, $00A4, only if the escape waited for
-;                   him, $037D); 4 Interceptor while Shadow is in this
-;                   battle's party, standing or KO'd (he can't walk in from
-;                   outside it, so his dog takes the job); else 5, a Phantom
+;                   (event switch $02E3: recruited, and not left on the
+;                   Floating Continent, Ot6ShadowHirable); 4 Interceptor
+;                   while Shadow is in this battle's party, standing or KO'd
+;                   (he can't walk in from outside it, so his dog takes the
+;                   job); else 5, a Phantom
 ;                   Train ghost (owner, 2026-10-02: the fourth is never Shadow
 ;                   when Shadow could not be hired)
 ;               cc  the weapon's class (Ot6CoinPrice ors it in once the
@@ -730,28 +730,24 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 .endproc
 
 ; [ can Shadow be hired? ]
-; Recruited ($1edc bit 3: event switch $02E3, "SHADOW initialized", set when
-; he first joins and never cleared) and not left on the Floating Continent:
-; the escape's "Jump!!" before he arrives never sets $037D (event_main.asm
-; _ca57b3 sets it when he makes the airship), and from the World of Ruin
-; ($00A4, set at the landing) a clear $037D means he died there.  Switch n
-; is bit (n & 7) of $1e80 + (n >> 3).  a8, either index width.
+; Event switch $02E3 ("SHADOW initialized", $1edc bit 3) alone answers it.
+; Each recruitment sets it (Sabin's scenario, the Thamasa join, the 3000 GP
+; hire), and nothing clears it but the Floating Continent escape's
+; Jump without him (event_main.asm _ca48c1: "switch $02F3=0 / switch
+; $02E3=0"), after which no event sets it again before the ending.  So a
+; Shadow who made the airship keeps it into the World of Ruin, rejoined or
+; not, and stays for hire; one left behind has lost it.  ($037D, set when he
+; makes the airship, adds nothing: the only World of Ruin with it clear is
+; the one that Jump made, which has $02E3 clear already.)  Switch n is bit
+; (n & 7) of $1e80 + (n >> 3).  a8, either index width.
 ; out: carry set = yes.  clobbers a; preserves x and y.
 OT6_SW_SHADOW_INIT   = $1e80 + ($2e3 >> 3)
-OT6_SW_WOR           = $1e80 + ($0a4 >> 3)
-OT6_SW_SHADOW_SAVED  = $1e80 + ($37d >> 3)
 .proc Ot6ShadowHirable
         .a8
         lda     OT6_SW_SHADOW_INIT
         and     #1 << ($2e3 & 7)
-        beq     @no             ; never recruited
-        lda     OT6_SW_WOR
-        and     #1 << ($0a4 & 7)
-        beq     @yes            ; the World of Balance: alive
-        lda     OT6_SW_SHADOW_SAVED
-        and     #1 << ($37d & 7)
-        beq     @no             ; left on the Floating Continent
-@yes:   sec
+        beq     @no             ; never recruited, or left behind
+        sec
         rts
 @no:    clc
         rts
@@ -860,9 +856,26 @@ OT6_SW_SHADOW_SAVED  = $1e80 + ($37d >> 3)
 
 OT6_HIRE_OFF   = 96             ; pixels past home that a slot waits: off screen
 OT6_HIRE_LIFT  = 32             ; a pincer: how far past the top edge the
-                                ;   slot's anchor goes (Ot6HireOut): its two
-                                ;   16-px rows at -32 and -16, off the top
+                                ;   slot's base y goes (Ot6HireOut): both
+                                ;   16-px tiles, from 8 px above the anchor
+                                ;   to 24 below, wholly above the top edge
+                                ;   whatever lift its status adds (the top
+                                ;   one pinned, so the walk hides the slot:
+                                ;   OT6_HIRE_PIN)
 OT6_HIRE_STEP  = 8              ; pixels a walking frame (12 frames a walk)
+
+; a pincer's walks show the slot only while no tile of it can be pinned:
+; DrawCharSprite draws a slot's top tile 8 px above its anchor
+; (CharSpriteData), and the anchor is the base y (w7e61b9 + w7e61c7 +
+; w7e61d2) plus get_yoffset's lift ($38: Float's bob, FloatStatusOffsetTbl,
+; -5 to -8; magitek, -12) plus $44 (-1 on some frames); a tile whose y is
+; below -32 is pinned to $97.  So a walking slot is shown only at a base y
+; no lower than OT6_HIRE_PIN plus the deepest lift its status can add
+; (Ot6HireWalk), and hidden above that.
+OT6_HIRE_PIN   = -32 + 8        ; the lowest anchor whose top tile stands
+OT6_HIRE_BASE  = 1              ; the deepest lift: $44 alone,
+OT6_HIRE_FLOAT = 8 + 1          ;   Float's deepest bob and $44,
+OT6_HIRE_MAGI  = 12 + 1         ;   magitek's lift and $44
 
 ; the figures' battle graphics (CHAR_GFX); figure 4, Interceptor, has none
 Ot6HireGfxTbl:
@@ -1115,8 +1128,9 @@ Ot6HireBitTbl:
 ;     (GfxCmd_0d) reads w7e7b10;
 ;   a pincer: up the screen by the slot's own height on it (w7e61b9 +
 ;     w7e61d2, the base and lift DrawCharSprite adds to the y offset) plus
-;     OT6_HIRE_LIFT, so the sprite stands past the top edge -- not past -32,
-;     where DrawCharSprite pins a sprite's y to $97 (on screen).
+;     OT6_HIRE_LIFT, so the whole sprite stands above the top edge (the
+;     walk keeps the slot hidden up there, where a tile would be pinned:
+;     OT6_HIRE_PIN).
 ; ($78) the script's parameters, the attacker's slot second.  a16/i16,
 ; db=$7e.  preserves x and y.
 .proc Ot6HireOut
@@ -1173,21 +1187,40 @@ Ot6HireBitTbl:
 ; Y = the coordinate to stop at (x offset sideways, y offset in a pincer:
 ; OT6_HIREAXIS), X = the slot's wCharGfxData offset.  OT6_HIRE_STEP pixels a
 ; frame, the walking frames drawn (the slot's pose override is lifted for
-; the walk and put back).  a8/i16, db=$7e.  preserves x and y.
+; the walk and put back).  In a pincer, a slot that starts the walk shown is
+; shown on each frame only while its base y is low enough that no tile can
+; be pinned (OT6_HIRE_PIN), and hidden while it is above: off the top edge,
+; walking out or in.  a8/i16, db=$7e.  preserves x and y.
+OT6_HIRE_YX    = $61d4-$61c7    ; a pincer walks with X this far back
 .proc Ot6HireWalk
         .a8
         .i16
         sta     $61c0,x         ; secondary graphical action
         lda     $61c1,x
-        pha                     ; [1,s] the pose override
+        pha                     ; the pose override
         stz     $61c1,x
         phx
+        longa
+        txa
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        tax                     ; the slot
+        shorta0
+        lda     f:Ot6HireBitTbl,x
+        plx
+        phx
+        and     $61ac           ; w7e61ac: shown at the start?
+        pha                     ; [1,s] the slot's bit if it walks shown (else
+                                ;   0), [2,s] x, [4,s] the pose override
         lda     OT6_HIREAXIS
         beq     @frame
         longa                   ; a pincer: walk the y offset ($61c7), the
         txa                     ;   same slot's word 13 bytes before $61d4
         sec
-        sbc     #$61d4-$61c7
+        sbc     #OT6_HIRE_YX
         tax
         shorta0
 @frame: longa
@@ -1211,9 +1244,42 @@ Ot6HireBitTbl:
 @snap:  tya
 @set:   sta     $61d4,x
         shorta0
-        jsl     WaitFrame_far
+        lda     OT6_HIREAXIS
+        beq     @wait           ; sideways: shown or hidden as it started
+        lda     $01,s
+        beq     @wait           ; walking hidden
+        phy                     ; [1,s] the target, [3,s] the slot's bit
+        ldy     #.loword(OT6_HIRE_PIN+OT6_HIRE_BASE)
+        lda     $64ba           ; w7e64ba: a magitek battle
+        beq     :+
+        ldy     #.loword(OT6_HIRE_PIN+OT6_HIRE_MAGI)
+        bra     @low
+:       lda     $2ec4+OT6_HIRE_YX,x     ; the slot's status ($2ec4, bit 7:
+        bpl     @low                    ;   Float, get_yoffset's test)
+        ldy     #.loword(OT6_HIRE_PIN+OT6_HIRE_FLOAT)
+@low:   phy                     ; [1,s] the lowest base y it shows at,
+        longa                   ;   [3,s] the target, [5,s] the slot's bit
+        lda     $61b9+OT6_HIRE_YX,x
+        clc
+        adc     $61d4,x         ; (the y offset, $61c7)
+        clc
+        adc     $61d2+OT6_HIRE_YX,x     ; the base y DrawCharSprite adds to
+        sec
+        sbc     $01,s
+        bmi     @hide
+        shorta0
+        lda     $05,s
+        tsb     $61ac           ; low enough: shown
+        bra     @gated
+@hide:  shorta0
+        lda     $05,s
+        trb     $61ac           ; above: hidden
+@gated: ply
+        ply
+@wait:  jsl     WaitFrame_far
         bra     @frame
 @there: shorta0
+        pla                     ; the slot's bit
         plx
         pla
         sta     $61c1,x
