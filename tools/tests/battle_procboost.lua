@@ -712,21 +712,27 @@ end
 -- (vanilla's n=$19, skip=$0B, base=$36: never Odin or Raiden).  RandA is
 -- RNGTbl[++$be] * n / 256, and RNGTbl is a permutation of 0..255, so each
 -- esper's odds are its share of the 256 table entries.  Each esper's
--- MagicProp record (+$02 flags: bit 7 "can't target characters", bit 2
--- "can hit dead targets"; +$04 bit 0 heal; +$06 power) says what its draw
--- gives the case:
+-- MagicProp record (+$00 targeting; +$02 flags: bit 7 "can't target
+-- characters", bit 2 "can hit dead targets"; +$04 bit 0 heal; +$06 power)
+-- says what its draw gives the case.  The side an auto-targeted attack
+-- lands on is the targeting byte's (the side chooser at C2/5937 in
+-- ff6/notes/ff3u.asm): ($bb & $0C) == $04 is every body on both sides, and
+-- otherwise bit 6 picks the enemy side over the caster's; flags bit 7 then
+-- strikes the characters out (_MaskTarget, C2/58FA).  So the party is in
+-- an esper's targets when its targeting is both-sides or own-side and
+-- flags bit 7 is clear:
 --   power 0 (Siren, Shoat, Stray, Palidor, Ragnarok and the party buffs):
 --     no damage, so nothing for the boost to multiply; the case tries again
 --   resurrection targeting (Phoenix): its heal may land on no living body;
 --     counted with the power-0 draws for the try bound
---   damage not barred from characters, not a heal (Crusader's Purifier,
---     targeting $04, the same record as vanilla's): it hits every body on the
---     field.  At x8 the per-target damage is the 9999 cap, past any party's
+--   damage that reaches the party, not a heal (Crusader's Purifier,
+--     targeting $04 and flags $40, the same record as vanilla's): it hits
+--     every body on the field.  At x8 the per-target damage is the 9999 cap, past any party's
 --     max HP here, so no brace saves the party (on the care-policy chain's
 --     fc_alcove, base 7243 left as 57944 and each seat took 9999,
---     build/attempts/wt/procboost-magicite/diag/diagm2_k0.log.gz).  The call is measured and
---     the branch ends at the wipe, before the run's canary would read it as
---     the run's game over: the snapshot is restored.
+--     build/attempts/wt/procboost-magicite/diag/diagm2_k0.log.gz).  The
+--     call is measured and the branch ends at the wipe, before the run's
+--     canary would read it as the run's game over: the snapshot is restored.
 --   everything else: damage or healing that leaves x8.
 local RNGTBL_N = 256
 local function magicitePool()
@@ -749,7 +755,10 @@ local function magicitePool()
   for r = 0, n - 1 do
     local id = base + r + (r >= skip and 2 or 0)
     local rec = mp + id * 14
-    local flags, heal, power = H.readRomByte(rec + 2), (H.readRomByte(rec + 4) & 0x01) ~= 0, H.readRomByte(rec + 6)
+    local tgt, flags = H.readRomByte(rec), H.readRomByte(rec + 2)
+    local heal, power = (H.readRomByte(rec + 4) & 0x01) ~= 0, H.readRomByte(rec + 6)
+    local side = ((tgt & 0x0C) == 0x04 and "both") or ((tgt & 0x40) ~= 0 and "enemy") or "party"
+    local reachesParty = side ~= "enemy" and (flags & 0x80) == 0
     local name = {}
     for j = 0, 7 do
       local ch = H.readRomByte(names + (id - base) * 8 + j)
@@ -757,7 +766,7 @@ local function magicitePool()
       elseif ch >= 0x9A and ch <= 0xB3 then name[#name + 1] = string.char(97 + ch - 0x9A) end
     end
     local e = { id = id, name = table.concat(name), power = power, heal = heal, odds = (share[r] or 0),
-                hitsParty = power > 0 and not heal and (flags & 0x80) == 0,
+                side = side, hitsParty = power > 0 and not heal and reachesParty,
                 idle = power == 0 or (flags & 0x04) ~= 0 }
     if e.idle then idle = idle + e.odds end
     pool[id] = e
@@ -1054,16 +1063,18 @@ local steps = {
     H.checkReq(snap, "snapshot")
     -- the gate above is the precondition's check: it snapshots only a
     -- ready party, and a precondition no battle reaches is its error
-    local idle, party = {}, {}
+    local idle, party, sides = {}, {}, {}
     for id = 0, 255 do
       local e = MAGICITE_POOL[id]
       if e and e.idle then idle[#idle + 1] = e.name end
       if e and e.hitsParty then party[#party + 1] = e.name end
+      if e and e.power > 0 then sides[#sides + 1] = string.format("%s %s%s", e.name, e.side, e.heal and " heal" or "") end
     end
     H.log(string.format("[procboost] the Magicite's pool: %d espers from RandGenju; %.3f of a draw "
       .. "measures nothing (%s), so %d tries leave at most %.4f; hits the party too: %s",
       MAGICITE_N, MAGICITE_IDLE, table.concat(idle, " "), MAGICITE_TRIES, MAGICITE_IDLE ^ MAGICITE_TRIES,
       #party > 0 and table.concat(party, " ") or "none"))
+    H.log("[procboost] the Magicite's espers with power, by side: " .. table.concat(sides, ", "))
     H.log(string.format("[procboost] snapshot f%d in battle %d: seats %s, after %d bench "
       .. "action(s); %d battle(s) allowed (an Apokryphos/Misfit formation at most %.2f of a "
       .. "draw, so %d unservable in a row at most %.4f)", H.frame, serving.n, snapSeats,
@@ -1135,7 +1146,7 @@ steps[#steps + 1] = H.call(function()
   H.assertEq(k.a7d, MAGICITE, "magicite: the queued item is the Magicite")
   local mc = 0
   for _, k in ipairs(mh.calls) do
-    if k.pend == BOOST then
+    if k.pend == BOOST and k.b5 == CMD_SUMMON and k.b6 == mh.esper then
       mc = mc + 1
       H.assertEq(k.dout, boosted(k.din), string.format(
         "magicite: the esper's $%02X leaves x%d (%d in)", k.b6, MULT, k.din))
