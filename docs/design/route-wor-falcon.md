@@ -2274,6 +2274,47 @@ this kit), 10 and 0 (this driver and kit).  The gain is in Potions; the
 deaths are one or two a sweep either way.  The two kits' snapshots draw
 disjoint keys, so the relics' own effect is not separated from the draw.
 
+### 13.15 The bag in battle (wt/care-items, #370)
+
+The care lines offered only the Potion (else the Tonic).  After 13.14 the
+chain's Dullahan left SABIN at 905/1812 under an 846 round with seven
+X-Potions in the bag (`$E9 restores 250 and a round costs 846 ... acting
+instead`) and he died from 591.  (The bag line called the Ether `$EC`
+"elixir"; the party holds 5 Ethers and 7 Elixirs `$EE` there.)  Now every
+battle-usable HP item is weighed by the lift rule and the cheapest in gil
+that the rule takes is spent (`H.itemChoice`).  The prices are the ROM's:
+a sold item's price word (ShopProp lists what shops sell), an unsold one's
+effect at the shops' least gil per HP and MP (the Tonic's 1, the
+Tincture's 30) -- an X-Potion on SABIN is 1812, an Elixir 11352.  A
+top-up never spends an item dearer than the death it guards against
+(`H.deathGil`: the Fenix Down's 500 and the HP its raise leaves); a member
+inside the round gets whatever lifts them.  A Megalixir is a party turn
+when two or more members are inside their rounds and it lifts each (no bag
+on the route holds one yet, so that menu path is unmeasured in play).  The
+status cures take the same gil order (`H.cureItems`).  A confirmed item
+that fills its target (`H.healFills`: X-Potion, Elixir, Megalixir) is in
+flight until the target's HP rises or a hit lands first
+(`H.healInFlight`), and nobody else heals that member meanwhile: the first
+cut gave EDGAR at 86/1701 two X-Potions, the second planned on the HP the
+first was about to fill.  A flat heal stacks and is not held; holding every
+heal reordered the party's turns enough that battle_brokendeath's ladder
+found no counting rung.
+
+Measured against main 5883ecb9 on snapshots cut on this ROM, by distinct
+fight (`build/attempts/wt/care-items/`, r1 and r4): Dullahan arm B (K =
+0..3 x 8 waits, 32 fights) 32 won either way; main 5 deaths, 4 Fenix
+Downs, 22 Potions (8600 gil with the Fenix Downs); this branch 3 deaths, 2
+Fenix Downs, 21 Potions (7300 gil) and 24 X-Potions (27 planned, 48631
+gil at the shops' rate).  The Sealed Gate cave (7 boot shifts): 6 of 7 either way
+(shift 5 wipes in both), main 9 deaths, this branch 8.  The Sand Horse
+pair (15 fights each) planned no heal either way.  Deaths and the gil a
+shop would take both fall a little; the X-Potions go freely, 29 of 33
+plans lifting a member inside the round.  Two levers measured on the way:
+holding every confirmed heal in flight, not only a fill, spent 15 Potions
+at Dullahan and won the Gate's shift 5 (r2), but cost battle_brokendeath
+its counting rung; and a stricter top-up price (the death's, discounted by
+the rounds it is away) would trim the 4 outside the round.
+
 ## 14. What the owner may want to decide
 
 - **The draft rows** (section 8): decided, approved as written (owner,
