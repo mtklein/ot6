@@ -461,7 +461,7 @@ H.run({ maxFrames = 200000 }, {
   end),
   -- the care before the castle (the side trip saves after its care to
   -- full; a draw that leaves someone short is cared for here)
-  H.fieldCare({ tag = "care at the boot" }),
+  H.fieldCare({ tag = "care at the boot", threshold = H.CARE_BEFORE_FIGHTS }),
 
   -- ---- 1. into the castle --------------------------------------------------------------
   H.worldNavTo(CASTLE_TILE[1], CASTLE_TILE[2], { maxFrames = 6000, playBattles = "tactical",

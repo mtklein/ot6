@@ -37,6 +37,8 @@ tools/tests/battle_bushido.lua	.writeWord(
 tools/tests/battle_bushidogrey.lua	.writeWord(
 tools/tests/battle_bushidoloadout.lua	.writeByte(
 tools/tests/battle_bushidoloadout.lua	.writeWord(
+tools/tests/battle_careguards.lua	.writeByte(	quarantine: a status landing at a chosen frame (Muddle or Zombie on a plan in flight) cannot be had on cue; the property is the driver's reaction
+tools/tests/battle_careguards.lua	.writeWord(	quarantine: one member put hurt so the heal lines have a patient
 tools/tests/battle_class.lua	.writeByte(
 tools/tests/battle_class.lua	.writeWord(
 tools/tests/battle_clockwork.lua	.writeByte(

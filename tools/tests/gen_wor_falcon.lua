@@ -380,7 +380,7 @@ H.run({ maxFrames = 200000 }, {
   -- ---- 1. care, and arm for the chest and Dullahan -----------------------------------------
   -- (the checkpoint's party is cared for; a body that starts from another
   -- draw may not be, and the Equip menu will not take a fallen member)
-  H.fieldCare({ tag = "care at the boot" }),
+  H.fieldCare({ tag = "care at the boot", threshold = H.CARE_BEFORE_FIGHTS }),
   H.call(function()
     for _, p in ipairs(MEMBERS) do
       H.assertEq(H.charHp(p[1]) > 0 and (H.charStatus1(p[1]) & 0xC2) == 0, true, string.format(
@@ -429,6 +429,10 @@ H.run({ maxFrames = 200000 }, {
   settleDigit({ { 100, 24 }, { 100, 16 } }, "the grave room"),
   checkOutcomes("the purse in the grave room"),
   H.navTo(GRAVE[1], GRAVE[2] + 1, { maxFrames = 8000, playBattles = "tactical", fight = FIGHT }),
+  -- armed for the fight ahead (#351): the lib's relic rule against
+  -- Dullahan's own threats (H.FIGHT_THREATS.dullahan: magic damage, no
+  -- status a relic guards), and back to the arc's after him
+  H.dressRelics(MEMBERS, { threats = H.FIGHT_THREATS.dullahan, tag = "relics for Dullahan" }),
   H.fieldCare({ threshold = 1.0, tag = "before the grave" }),
   H.navTo(GRAVE[1], GRAVE[2], { maxFrames = 3000, playBattles = "tactical", fight = FIGHT }),
   checkOutcomes("the grave's approach"),
@@ -454,6 +458,7 @@ H.run({ maxFrames = 200000 }, {
 
   -- ---- 6. the flashback and the Falcon ----------------------------------------------------
   H.fieldCare({ tag = "after Dullahan" }),
+  H.dressRelics(MEMBERS, { threats = H.ARC_THREATS["wor-falcon"], tag = "relics after Dullahan" }),
   walkInto(GRAVE[1], 7, MAP_FLASH, "the grave room (100,7) -> the flashback (301)"),
   H.advanceStory(function()
     return map() == MAP_FLASH and sw(0x01F1) == 1 and H.hasControl() and H.tileAligned()

@@ -626,8 +626,9 @@ check("test_registration",
 # not a gate, but the line shapes it reads are asserted here
 check("audit_fenix_selftest",
       "python3 tools/audit_boost.py --selftest"
-      " && python3 tools/audit_fenix.py --selftest",
-      ["tools/audit_boost.py", "tools/audit_fenix.py",
+      " && python3 tools/audit_fenix.py --selftest"
+      " && python3 tools/audit_zombie_touches.py --selftest",
+      ["tools/audit_boost.py", "tools/audit_fenix.py", "tools/audit_zombie_touches.py",
        "tools/tests/savestate_graph.py"])
 # The retention step (#222): evidence a merge message or a design doc
 # quotes must outlive the worktree it was produced in, so the copy's
