@@ -604,6 +604,55 @@ another monster, as every pass OT6 adds to an action does
 (`Ot6PassRetarget`; [multi-hit.md](multi-hit.md) §6), and one that finds
 none standing pays nothing.
 
+**Each hire is somebody new** (owner, 2026-10-02: a growing crew, not the
+same guy again). Setzer walks out of sight, and each hire walks in where
+he stood, swings the weapon that fits the target and walks off: the 0 BP
+hire is a merchant, and each point brings the next, tougher figure, an
+Imperial soldier, then General Leo. The fourth hire (3 BP) depends on
+Shadow (owner, 2026-10-02):
+- **Shadow**, FF6's own mercenary for hire, when he is there to hire:
+  recruited and not left on the Floating Continent (event switch
+  `$02E3`: his recruitment sets it, and the escape's Jump without him
+  clears it), so a Shadow who made the airship is for hire in the World
+  of Ruin before he rejoins;
+- **Interceptor** while Shadow is in the battle's party, standing or KO'd
+  (he can't walk in from outside it, so his dog takes the job and bounds
+  in with his counterattack); with no body left to hit, the dog's pass
+  draws nothing;
+- **a Phantom Train ghost** when Shadow can't be hired (never recruited,
+  or left behind on the Floating Continent): the ghosts who joined Sabin's
+  party on the train are FF6's other hired hands, and their battle sprite
+  set is in the ROM.
+
+Where they walk: in a front, back or side attack, off the screen edge
+behind the party (away from the enemies, the way the turn's step back
+goes); in a pincer, where the party stands mid-screen between the two
+sides, up the party's column and off the top edge, the slot hidden
+whenever a tile would be pinned to y = 151 (Float's bob and magitek's
+lift counted). Every swap of the slot's graphics happens with the slot
+hidden and out of sight, and
+Setzer's pose is put back after the last hire as it was before the first.
+*Reason: the boost buys hires, and a hire should look hired. The figures
+are the ROM's own full battle sprite sets (Locke's disguises, Leo, Shadow,
+the train's ghosts), drawn in Setzer's own slot: no VRAM and no new art;
+each figure's palette is loaded into Setzer's slot's palette while it
+stands in.* The weapon is a fixed one a figure and class (merchant: Dirk,
+Regal Cutlass or Mithril Rod; soldier: Mithril Blade, Mithril Pike or
+Morning Star; Leo: Crystal, Gold Lance or Morning Star; Shadow: Kodachi,
+Ashura or Flail; ghost: Dirk, Mithril Blade, Mithril Pike or Bone Club);
+it is a picture only, the class is the hire's. A hire that finds no body
+still walks in, and leaves without a swing. The animation draws no Rand
+and leaves `$be` as it was; the longer action shifts the frame clock and
+ATB timing, so later draws and later battles' keys move (the review
+measured the next battle's key: `$be` 60 against E0, build/attempts/wt/
+hire-sprite-review/). (`Ot6CoinAnim`, `Ot6HireMark`, `Ot6ShadowHirable`;
+`battle_hiredhelp` (1 BP, 0 BP) and `battle_hirecrew` (3 BP, 2 BP) hold
+every pass, swap, strike and the restore to the animation's own state,
+and count every tile of Setzer's slot the engine pins on any frame of a
+hire; the ghost, Interceptor and the pincer (a floating Setzer's too)
+are played in labs. Evidence and negative controls: build/attempts/wt/
+hire-sprite/round2/, round3_main/ (the v0.24 merge) and round4/.)
+
 **Jackpot (divine): the Fixed Dice come up a triple.** One enemy, by
 vanilla's dice arithmetic: face³ × level × 2 for the three dice, times the
 face again for the triple (saturating at 65,535 as vanilla's loop does),
