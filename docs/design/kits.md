@@ -627,10 +627,9 @@ Shadow (owner, 2026-10-02):
 Where they walk: in a front, back or side attack, off the screen edge
 behind the party (away from the enemies, the way the turn's step back
 goes); in a pincer, where the party stands mid-screen between the two
-sides, up the party's column and off the top edge, the slot hidden on
-every frame some tile of it would stand above the edge (Float's bob and
-magitek's lift counted), where the engine would move that tile down to
-y = 151. Every swap of the slot's graphics happens with the slot
+sides, up the party's column and off the top edge, the slot hidden
+whenever a tile would be pinned to y = 151 (Float's bob and magitek's
+lift counted). Every swap of the slot's graphics happens with the slot
 hidden and out of sight, and
 Setzer's pose is put back after the last hire as it was before the first.
 *Reason: the boost buys hires, and a hire should look hired. The figures

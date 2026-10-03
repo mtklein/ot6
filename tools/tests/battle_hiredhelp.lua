@@ -39,7 +39,8 @@
 -- the fourth hire) are battle_hirecrew's.  The ROM's identity is logged.
 -- Negative controls (one byte-patched ROM a property, mutants2.py and its
 -- list beside each): build/attempts/wt/hire-sprite/round2/negative/,
--- round3_main/negative/ (the same on the merged ROM) and round4/negative/.
+-- round3_main/negative/ (the same on the merged ROM) and round4/negative/
+-- (mutants4.py: those eight and five more).
 
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")

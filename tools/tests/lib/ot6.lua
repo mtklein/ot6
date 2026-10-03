@@ -8077,6 +8077,7 @@ function M.setzerBattle(plan, opts)
     end
   end
   return M.seqStep({
+    M.call(function() M.logRomIdentity("[setzer]") end),
     M.waitUntil(function() return M.battleActive() end, 1200, "the battle is up", 2),
     M.driveUntil(function()
       if opts.untilPlanDone and k > #plan and Z.rec == nil then
@@ -8790,6 +8791,14 @@ function M.romIdentity()
   return string.format("identity %s (%d bytes, rom_version.py's: the version fields zeroed), header \"%s\"",
     sha256(masked, n), n, (table.concat(v):gsub("%s+$", "")))
 end
+-- the ROM identity, logged once a run under the first tag that asks
+-- (every SETZER suite asks through M.setzerBattle; M.hireCrewArm too)
+local romIdentityLogged = false
+function M.logRomIdentity(tag)
+  if romIdentityLogged then return end
+  romIdentityLogged = true
+  M.log(tag .. " ROM " .. M.romIdentity())
+end
 function M.hireCrewArm()
   if HC then return HC end
   HC = { execs = {}, passes = {}, swaps = {}, loads = {}, strikes = {}, ends = {}, frames = {}, pins = {} }
@@ -8914,7 +8923,7 @@ function M.hireCrewArm()
       if HC.watch == slot then HC.watch = nil end
     end
   end, emu.callbackType.exec, ae, ae)
-  M.log("[crew] ROM " .. M.romIdentity())
+  M.logRomIdentity("[crew]")
   return HC
 end
 local function within(list, r)
