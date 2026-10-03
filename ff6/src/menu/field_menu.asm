@@ -1558,7 +1558,7 @@ MenuState_6b:
 ; [ menu state $0e: config ]
 
 MenuState_0e:
-@22c5:  jsr     InitDMA1BG1ScreenAB
+@22c5:  jsr     Ot6ConfigSelectFrame    ; ot6: the version row, then InitDMA1BG1ScreenAB
         lda     z0a+1
         bit     #$04
         beq     @22e0

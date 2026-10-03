@@ -36,3 +36,8 @@ for Pummel's second blow and for Setzer's extra hires and Jackpot rolls,
 so every hit you paid for lands on a monster while one is standing.
 Without boost, a Genji Glove's second swing still follows the first, as
 in the original game.
+
+**The game shows which OT6 it is.** The splash at power-on shows "OT6 v"
+and the version number under the FINAL FANTASY III logo, and the Config
+screen shows it on the bottom line of its window, on both of its pages, so
+you can tell which build a device is running without leaving the game.
