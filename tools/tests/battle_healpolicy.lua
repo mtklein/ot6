@@ -59,6 +59,13 @@
 --  15. the kit's MP in a random battle (H.kitBudget): a quarter of max MP
 --      kept for the next boss and a turn's boost rationed to a quarter,
 --      on SABIN's Phantom Train numbers; an event battle spends as before.
+--  17. which item a care turn spends (#370, H.itemChoice): the bag's
+--      prices read off the ROM (a sold item's price word, an unsold one's
+--      effect at the shops' gil per HP and MP), the cheapest item the lift
+--      rule takes -- an X-Potion for wor_falcon's SABIN at 905/1812 under
+--      846, no Elixir on a top-up, an Elixir when only it lifts a member
+--      inside the round -- the Megalixir's party lift, and the status
+--      cures in gil order.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TONIC, POTION = 0xE8, 0xE9
@@ -1125,6 +1132,78 @@ H.run({ maxFrames = 3000 }, {
       ((254 * 204) >> 8) + 1, "...through 51 magic defense when it does not")
     H.assertEq(H.cureRestoreMin({ power = 10, heal = false, level = 20, magpow = 40 }), nil, "no heal flag: no price")
     H.log("battle_healpolicy: the hit ledger, the heal watch, the queued cure-hit and the cure price checked")
+  end),
+
+  -- 17. which item a care turn spends (#370).  The prices are the ROM's:
+  -- ItemProp +$1C for what a shop sells (ShopProp), and for what none sells
+  -- (the price word reads 2) the effect at the shops' least gil per HP
+  -- (Tonic 50 for 50) and per MP (Tincture 1500 for 50).
+  H.call(function()
+    local XPOT, ELIXIR, MEGALIXIR, FENIX = 0xEA, 0xEE, 0xEF, 0xF0
+    H.assertEq(H.itemSold(POTION), true, "a shop sells the Potion")
+    H.assertEq(H.itemSold(XPOT), false, "no shop sells the X-Potion")
+    H.assertEq(H.itemSold(ELIXIR), false, "...nor the Elixir")
+    H.assertEq(H.itemGil(POTION), 300, "the Potion costs its price word, 300")
+    local r = H.shopRates()
+    H.assertEq(r.hp, 1, "the shops' least gil per HP: the Tonic's 50 for 50")
+    H.assertEq(r.mp, 30, "...and per MP: the Tincture's 1500 for 50")
+    local sabin = { hp = 905, maxhp = 1812, mp = 274, maxmp = 318 }
+    H.assertEq(H.itemGil(XPOT, sabin), 1812, "an X-Potion on SABIN (1812 max HP) is worth 1812 gil")
+    H.assertEq(H.itemGil(ELIXIR, sabin), 1812 + 318 * 30, "an Elixir on him: 1812 HP + 318 MP x 30")
+    local party = { sabin, { hp = 1798, maxhp = 1798, mp = 330, maxmp = 330 } }
+    H.assertEq(H.itemGil(MEGALIXIR, sabin, party), (1812 + 318 * 30) + (1798 + 330 * 30),
+      "a Megalixir: the Elixir's worth on every member it reaches")
+    H.assertEq(H.deathGil(1812), 500 + (1812 - 226), "SABIN's death: the Fenix Down's 500 and 1586 HP to buy back")
+    local function bag(list)
+      local t = {}
+      for _, it in ipairs(list) do
+        local id, restore = it[1], it[2]
+        t[#t + 1] = { id = id, restore = restore, flat = (H.itemProps(id) & H.ITEM_RATIO) == 0,
+                      gil = H.itemGil(id, sabin, party) }
+      end
+      return t
+    end
+    local function choose(hp, cost, list)
+      local it, why = H.itemChoice({ hp = hp, maxhp = 1812, roundCost = cost, allies = 3, threshold = 60,
+        cap = H.deathGil(1812), items = bag(list) })
+      return it and string.format("$%02X %s", it.id, why) or "nothing"
+    end
+    -- wor_falcon r15: "actor=1 not healing entity 1 (905/1812): $E9 restores
+    -- 250 and a round costs 846", 7 X-Potions in the bag, then "[death] f+4481
+    -- entity 1 char 5 from 591/1812"
+    H.assertEq(choose(905, 846, { { POTION, 250 }, { XPOT, 907 }, { ELIXIR, 907 } }), "$EA top-up",
+      "SABIN at 905/1812 under an 846 round: the Potion cannot keep up, the X-Potion can")
+    H.assertEq(choose(905, 846, { { POTION, 250 }, { ELIXIR, 907 } }), "nothing",
+      "...with no X-Potion, no Elixir on the top-up: it costs more than the death it guards against")
+    H.assertEq(choose(591, 846, { { POTION, 250 }, { ELIXIR, 1221 } }), "$EE top-up",
+      "...but inside the round (591 under 846), the Elixir that lifts him is spent")
+    H.assertEq(choose(591, 846, { { POTION, 250 }, { XPOT, 1221 }, { ELIXIR, 1221 } }), "$EA top-up",
+      "...and the X-Potion before it when both lift")
+    H.assertEq(choose(600, 200, { { POTION, 250 }, { XPOT, 1212 } }), "$E9 top-up",
+      "a Potion that does the job is the cheaper turn")
+    H.assertEq(choose(1700, 846, { { POTION, 250 }, { XPOT, 112 }, { ELIXIR, 112 } }), "nothing",
+      "chip damage (1700/1812, outside the round): nothing is spent")
+    H.assertEq(choose(100, 120, { { TONIC, 50 }, { POTION, 250 } }), "$E9 top-up",
+      "a Tonic is not offered while a Potion is held (a turn buys a real heal)")
+    H.assertEq(choose(100, 120, { { TONIC, 50 } }), "$E8 covering an ally",
+      "...and is the last item standing")
+    local it = H.itemChoice({ hp = 226, maxhp = 1812, roundCost = 1083, allies = 3, threshold = 60, owed = true,
+      items = bag({ { POTION, 250 }, { XPOT, 1586 } }) })
+    H.assertEq(it and it.id, XPOT, "a raise's owed top-up under a 1083 round: the X-Potion that lifts, not the Potion")
+    -- the Megalixir: every member inside the round lifted, or no party turn
+    H.assertEq(H.itemAllAllies(MEGALIXIR), true, "the Megalixir's targeting has no moveable cursor: the whole party")
+    H.assertEq(H.itemAllAllies(XPOT), false, "...the X-Potion's does")
+    H.assertEq(H.partyLift(MEGALIXIR, { { hp = 300, maxhp = 1812, cost = 846 }, { hp = 200, maxhp = 1798, cost = 900 } }),
+      true, "two members inside their rounds, both lifted by a Megalixir")
+    H.assertEq(H.partyLift(MEGALIXIR, { { hp = 300, maxhp = 1812, cost = 846 }, { hp = 200, maxhp = 800, cost = 900 } }),
+      false, "...not when one's round is above its max HP")
+    -- the status cures in gil order, off the ROM's records
+    H.assertEq(table.concat(H.cureItems(1, 0x20), ","), string.format("%d,%d", 0xF8, 0xF5),
+      "Imp: Green Cherry (150) before Remedy (1000)")
+    H.assertEq(table.concat(H.cureItems(1, 0x40), ","), string.format("%d,%d", 0xF4, 0xF5),
+      "Petrify: Soft (200) before Remedy")
+    H.assertEq(table.concat(H.cureItems(1, 0x02), ","), string.format("%d", 0xF1), "Zombie: Revivify alone")
+    H.log("battle_healpolicy: the bag's prices and the item a care turn spends (#370) checked")
   end),
 
   -- 8. the table was not skipped

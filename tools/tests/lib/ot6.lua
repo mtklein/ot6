@@ -808,13 +808,202 @@ M.REVIVIFY = 0xF1
 -- bit 6) drain on the dot trigger, Slow (STATUS3 bit 2) halves the ATB
 -- constant.  None denies a turn; the [status] line says each.
 M.ST1_BLIND, M.ST1_POISON, M.ST2_SAP, M.ST3_SLOW = 0x01, 0x04, 0x40, 0x04
+-- With no `items`, the candidates are every consumable usable in battle
+-- whose record carries the bit with the remove flag, cheapest first in
+-- gil (M.cureItems, #370): Green Cherry 150 before Remedy 1000 for Imp,
+-- Soft 200 before Remedy for Petrify, read off the ROM rather than listed.
 function M.statusCure(o)
-  for _, item in ipairs(o.items or { M.GREEN_CHERRY, M.REMEDY }) do
+  for _, item in ipairs(o.items or M.cureItems(o.byte, o.bit)) do
     local rec
     if o.byte == 2 then rec = M.itemStatus2(item) else rec = M.itemStatus1(item) end
     if (rec & o.bit) ~= 0 and o.has(item) then return item end
   end
   return nil
+end
+
+-- What the bag's items are worth in gil (#370: "spend like a person
+-- watching their gil" -- guidelines).  Everything here is read off the
+-- ROM: the item record's type (+$00: bits 0-2 the type, 6 = item; bit 5
+-- "usable in battle", LoadItemProp @54dc), targeting (+$0E), properties
+-- (+$13: bit 7 the power is a fraction of max HP/MP, bit 5 removes status,
+-- bit 4 restores MP, bit 3 restores HP -- @2a87), power (+$14) and price
+-- (+$1C, the word CalcShopPrice reads), and which items any shop sells
+-- (ShopProp: 128 records of 9 bytes, bytes 1-8 item ids, $FF empty).
+--
+-- A sold item costs its price.  An item no shop sells (X-Potion, Ether,
+-- Elixir, Megalixir: their price word reads 2) is worth what its effect
+-- would cost from the shops: the HP it gives at the least gil a sold item
+-- charges per HP (Tonic 50/50, Dried Meat 150/150: 1 gil an HP; Potion
+-- 300/250), the MP at the least per MP (Tincture 1500/50: 30), on each
+-- member it reaches.  An X-Potion on SABIN at 1812 max HP is then 1812
+-- gil, an Elixir on him 1812 + 318 MP x 30 = 11352, a Megalixir that sum
+-- over the party.
+M.ITEM_RATIO, M.ITEM_CURES, M.ITEM_MP, M.ITEM_HP = 0x80, 0x20, 0x10, 0x08
+local ITEM_TARGET, ITEM_PROPS, ITEM_PRICE = 0x0E, 0x13, 0x1C
+local function itemRec(item) return (M.sym("ItemProp") & 0x3FFFFF) + item * ITEM_REC end
+function M.itemTargeting(item) return M.readRomByte(itemRec(item) + ITEM_TARGET) end
+function M.itemProps(item) return M.readRomByte(itemRec(item) + ITEM_PROPS) end
+function M.itemPrice(item) return M.readRomWord(itemRec(item) + ITEM_PRICE) end
+-- a consumable (type 6) the battle's Item menu offers (type bit 5)
+function M.itemBattleUsable(item)
+  if item == nil or item > 0xFE then return false end
+  local t = M.readRomByte(itemRec(item) + ITEM_TYPE)
+  return (t & 0x80) == 0 and (t & 0x07) == 6 and (t & 0x20) ~= 0
+end
+-- the targeting byte's bit 0 is the moveable cursor: an item without it
+-- (Megalixir $2E) is aimed at the whole party by the engine
+function M.itemAllAllies(item) return (M.itemTargeting(item) & 0x01) == 0 end
+local soldCache = nil
+function M.itemSold(item)
+  if soldCache == nil then
+    soldCache = {}
+    local base = M.sym("ShopProp") & 0x3FFFFF
+    for s = 0, 127 do
+      for k = 1, 8 do
+        local id = M.readRomByte(base + s * 9 + k)
+        if id ~= 0xFF then soldCache[id] = true end
+      end
+    end
+  end
+  return soldCache[item] == true
+end
+-- the least gil per HP and per MP a sold flat restorer charges
+local rateCache = nil
+function M.shopRates()
+  if rateCache == nil then
+    rateCache = { hp = nil, mp = nil }
+    for id = 0, 0xFE do
+      local p = M.itemProps(id)
+      local pw = M.itemPower(id)
+      if M.itemBattleUsable(id) and M.itemSold(id) and (p & M.ITEM_RATIO) == 0 and pw > 0
+         and (p & M.ITEM_CURES) == 0 then
+        local r = M.itemPrice(id) / pw
+        if (p & M.ITEM_HP) ~= 0 and (rateCache.hp == nil or r < rateCache.hp) then rateCache.hp = r end
+        if (p & M.ITEM_MP) ~= 0 and (rateCache.mp == nil or r < rateCache.mp) then rateCache.mp = r end
+      end
+    end
+  end
+  return rateCache
+end
+-- What one use gives a member t = { hp, maxhp, mp, maxmp } at full effect:
+-- HP and MP, the fraction items' share of max (CalcRatio: max * power >> 4)
+function M.itemEffect(item, t)
+  local p, pw = M.itemProps(item), M.itemPower(item)
+  local hp, mp = 0, 0
+  if (p & M.ITEM_HP) ~= 0 then
+    hp = (p & M.ITEM_RATIO) ~= 0 and (((t.maxhp or 0) * pw) >> 4) or pw
+  end
+  if (p & M.ITEM_MP) ~= 0 then
+    mp = (p & M.ITEM_RATIO) ~= 0 and (((t.maxmp or 0) * pw) >> 4) or pw
+  end
+  return hp, mp
+end
+-- The gil one use is worth: its price when a shop sells it, else its full
+-- effect at the shops' rates on each member it reaches (t alone, or every
+-- member of `party` for an item the engine aims at the whole party).
+function M.itemGil(item, t, party)
+  if M.itemSold(item) then return M.itemPrice(item) end
+  local rates = M.shopRates()
+  local who = (M.itemAllAllies(item) and party) or { t or {} }
+  local gil = 0
+  for _, m in ipairs(who) do
+    local hp, mp = M.itemEffect(item, m)
+    gil = gil + hp * (rates.hp or 0) + mp * (rates.mp or 0)
+  end
+  return math.floor(gil + 0.5)
+end
+-- What a death costs to undo, in the same gil: the Fenix Down, and the HP
+-- its raise (max HP * power >> 4) leaves to buy back at the shops' rate.
+-- A heal that is a top-up -- the member is not inside the round -- is
+-- worth at most this: an item dearer than the death it might prevent is
+-- kept for when the death is this round's (M.itemChoice).
+function M.deathGil(maxhp, fenix)
+  fenix = fenix or 0xF0
+  local raise = ((maxhp or 0) * M.itemPower(fenix)) >> 4
+  return math.floor(M.itemPrice(fenix) + ((maxhp or 0) - raise) * (M.shopRates().hp or 0) + 0.5)
+end
+-- The status cures (#370's "Remedy-class" items): every battle-usable
+-- consumable whose record carries `bit` in status byte `byte` (1 or 2)
+-- with the remove flag, cheapest first in gil.
+function M.cureItems(byte, bit)
+  local list = {}
+  for id = 0, 0xFE do
+    if M.itemBattleUsable(id) and (M.itemProps(id) & M.ITEM_CURES) ~= 0 then
+      local rec = byte == 2 and M.itemStatus2(id) or M.itemStatus1(id)
+      if (rec & bit) ~= 0 then list[#list + 1] = id end
+    end
+  end
+  table.sort(list, function(a, b)
+    local ga, gb = M.itemGil(a), M.itemGil(b)
+    if ga ~= gb then return ga < gb end
+    return a < b
+  end)
+  return list
+end
+
+-- Which HP item a care turn spends on one member (#370), as arithmetic on
+-- plain numbers so battle_healpolicy can put cases through it.  Each item
+-- is weighed by the lift rule (M.healDecision) on what it restores, and
+-- the cheapest in gil that the rule takes is the one: a Potion when a
+-- Potion lifts, an X-Potion when only it does (wor_falcon's SABIN at
+-- 905/1812 under an 846 round, 7 X-Potions in the bag: "$E9 restores 250
+-- and a round costs 846 ... acting instead", and he died).  Two limits:
+--   * a turn buys a real heal (guidelines: Potions, not Tonics, in
+--     battle): a flat item weaker than the strongest flat one in the bag
+--     is not offered -- the Tonic is the last item standing, as before;
+--   * an item dearer than the death it guards against (M.deathGil, o.cap)
+--     is spent only when the member is inside the round (hp <= the round's
+--     cost): no Elixir on a top-up.
+--   o.hp, o.maxhp, o.roundCost, o.allies, o.threshold, o.owed  as healDecision
+--   o.cap     the death's price in gil (M.deathGil)
+--   o.items   { { id, restore, gil, flat = true for a flat-power item } ... }
+-- Returns the item record chosen, the reason, and the list of refusals
+-- ({ item, why }), the cheapest first.  An owed top-up (the raise's) takes
+-- the cheapest item that lifts the raised member clear of the round, else
+-- the cheapest there is.
+-- Whether an item the engine aims at the whole party lifts every member of
+-- `inside` ({ hp, maxhp, cost } each: the members inside their round)
+-- clear of their round (#370: the Megalixir's turn).
+function M.partyLift(item, inside)
+  for _, c in ipairs(inside) do
+    local gain = math.min(M.itemEffect(item, c), (c.maxhp or 0) - (c.hp or 0))
+    if (c.hp or 0) + gain <= (c.cost or 0) then return false end
+  end
+  return #inside > 0
+end
+
+function M.itemChoice(o)
+  local items, best = {}, 0
+  for _, it in ipairs(o.items or {}) do
+    if it.flat and (it.restore or 0) > best then best = it.restore end
+  end
+  for _, it in ipairs(o.items or {}) do
+    if not (it.flat and (it.restore or 0) < best) then items[#items + 1] = it end
+  end
+  table.sort(items, function(a, b)
+    if a.gil ~= b.gil then return a.gil < b.gil end
+    if a.restore ~= b.restore then return a.restore > b.restore end
+    return a.id < b.id
+  end)
+  local hp, cost = o.hp or 0, o.roundCost or 0
+  local refused = {}
+  if o.owed then
+    for _, it in ipairs(items) do
+      if hp + it.restore > cost then return it, "the raise's top-up (#168)", refused end
+    end
+    if items[1] then return items[1], "the raise's top-up (#168)", refused end
+    return nil, nil, refused
+  end
+  local inside = cost > 0 and hp <= cost
+  for _, it in ipairs(items) do
+    local why = M.healDecision({ hp = hp, maxhp = o.maxhp, restore = it.restore,
+      roundCost = cost, allies = o.allies, threshold = o.threshold })
+    if why and (inside or o.cap == nil or it.gil <= o.cap) then return it, why, refused end
+    refused[#refused + 1] = { item = it, why = why and string.format("%d gil is more than the death "
+      .. "it guards against (%d) and the member is not inside the round", it.gil, o.cap)
+      or "it buys back less than the round spends" }
+  end
+  return nil, nil, refused
 end
 
 -- Vanish (STATUS1 bit 4) and Image (STATUS2 bit 2) on a monster (#190):
@@ -4672,6 +4861,48 @@ function Driver:itemRestoreOf(item)
   return self.itemRestore[item] or M.itemPower(item)
 end
 
+-- The HP items the bag holds for entity e at `hp` (#370), priced for
+-- M.itemChoice: every battle-usable consumable that restores HP and is no
+-- status cure (Fenix Down and Revivify carry HP with the remove flag),
+-- above its reserve.  `all` = true lists the ones the engine aims at the
+-- whole party (Megalixir) instead of the single-target ones.  A flat item
+-- restores what itemRestoreOf says (measured, else its power); a fraction
+-- item the share of max HP it gives, up to what e is missing.
+function Driver:bagHeals(e, hp, all)
+  local function member(p)
+    return { hp = M.readWord(0x3BF4 + p * 2), maxhp = M.readWord(0x3C1C + p * 2),
+             mp = M.readWord(BATTLE.CURMP + p * 2), maxmp = M.readWord(BATTLE.MAXMP + p * 2) }
+  end
+  local t = member(e)
+  t.hp = hp or t.hp
+  local party = {}
+  for p = 0, 3 do
+    local m = member(p)
+    if m.maxhp > 0 and m.hp > 0 and (M.leftMask() >> p) & 1 == 0 then party[#party + 1] = m end
+  end
+  local list, seen = {}, {}
+  for i = 0, 251 do
+    local id = M.readByte(BATTLE.BATTINV + i * 5)
+    if id ~= 0xFF and not seen[id] then
+      local p = M.itemProps(id)
+      if (p & M.ITEM_HP) ~= 0 and (p & M.ITEM_CURES) == 0 and M.itemBattleUsable(id)
+         and M.itemAllAllies(id) == (all == true) and self:battInvIdx(id) ~= nil then
+        seen[id] = true
+        local flat = (p & M.ITEM_RATIO) == 0
+        local restore
+        if flat then
+          restore = self:itemRestoreOf(id)
+        else
+          restore = math.max(0, math.min(M.itemEffect(id, t), t.maxhp - t.hp))
+        end
+        list[#list + 1] = { id = id, restore = restore, flat = flat, idx = self:battInvIdx(id),
+                            gil = M.itemGil(id, t, party) }
+      end
+    end
+  end
+  return list
+end
+
 -- The cast guards, shared by every attack-cast line (M.castVeto holds
 -- the decision; this is its log line).  A spell whose element something
 -- in the formation ABSORBS is a heal for the enemy (#99); a reflectable spell
@@ -5095,7 +5326,8 @@ end
 
 -- The cure the bag holds for entity e's Petrify (Soft, then Remedy),
 -- Imp (Green Cherry, then Remedy) or Berserk (nothing in this ROM),
--- through M.statusCure and the reserve-aware battInvIdx.  A statue
+-- through M.statusCure and the reserve-aware battInvIdx: the items whose
+-- records carry the bit, cheapest first in gil (M.cureItems, #370).  A statue
 -- first: it is dead to the engine until the Soft, and a party of
 -- statues is a game over.
 --
@@ -5109,11 +5341,11 @@ end
 -- after the fight, as before.
 function Driver:cureFor(e)
   if status1Has(e, M.ST1_PETRIFY) then
-    return M.statusCure({ byte = 1, bit = M.ST1_PETRIFY, items = { M.SOFT, M.REMEDY },
+    return M.statusCure({ byte = 1, bit = M.ST1_PETRIFY,
       has = function(item) return self:battInvIdx(item) ~= nil end }), "Petrify"
   end
   if status1Has(e, M.ST1_ZOMBIE) and not status1Has(e, 0x80) and self.opts.zombieCure ~= false then
-    return M.statusCure({ byte = 1, bit = M.ST1_ZOMBIE, items = { M.REVIVIFY, M.REMEDY },
+    return M.statusCure({ byte = 1, bit = M.ST1_ZOMBIE,
       has = function(item) return self:battInvIdx(item) ~= nil end }), "Zombie"
   end
   if status1Has(e, M.ST1_IMP) then
@@ -5121,7 +5353,7 @@ function Driver:cureFor(e)
       has = function(item) return self:battInvIdx(item) ~= nil end }), "Imp"
   end
   if (M.readByte(BATTLE.ST2 + e * 2) & M.ST2_BERSERK) ~= 0 then
-    return M.statusCure({ byte = 2, bit = M.ST2_BERSERK, items = { M.REMEDY },
+    return M.statusCure({ byte = 2, bit = M.ST2_BERSERK,
       has = function(item) return self:battInvIdx(item) ~= nil end }), "Berserk"
   end
   return nil, nil
@@ -5469,8 +5701,15 @@ function Driver:raiseOk(e, actor)
       detail = "; kill: not the last monster"
     end
     -- (a) a top-up first: the other members' gauges against the lethal slot's
-    local topUp = (self:battInvIdx(BATTLE.POTION) and self:itemRestoreOf(BATTLE.POTION))
-               or (self:battInvIdx(BATTLE.TONIC) and self:itemRestoreOf(BATTLE.TONIC)) or 0
+    -- what the owed top-up would be: the item M.itemChoice spends on the
+    -- raised member (#370: the cheapest that lifts them clear of the
+    -- round, an X-Potion where a Potion does not)
+    local topUp = 0
+    do
+      local it = M.itemChoice({ hp = raiseHp, maxhp = maxhp, roundCost = self:roundPriceFor(e),
+        owed = true, items = self:bagHeals(e, raiseHp) })
+      topUp = it and it.restore or 0
+    end
     local first, firstEta, firstPct = nil, nil, nil
     for p = 0, 3 do
       -- a Stopped, asleep or berserk member's gauge is not a turn the
@@ -6156,12 +6395,15 @@ function Driver:makePlan(actor)
         end
       end
       if row ~= nil then
-        local item = (self:battInvIdx(BATTLE.POTION) and BATTLE.POTION) or (self:battInvIdx(BATTLE.TONIC) and BATTLE.TONIC)
-        if item and taken(self:itemRestoreOf(item), false) then
-          heals[#heals + 1] = { what = string.format("item $%02X", item),
-                                restore = self:itemRestoreOf(item) }
-        elseif item then
-          refused[#refused + 1] = { what = string.format("item $%02X", item), restore = self:itemRestoreOf(item) }
+        -- the bag as the care lines weigh it (#370): the item M.itemChoice
+        -- would spend on this actor, else each it refused
+        local it, _, no = M.itemChoice({ hp = hp, maxhp = maxhp, roundCost = cost, allies = allies,
+          threshold = self:healPct(), cap = M.deathGil(maxhp), items = self:bagHeals(actor, hp) })
+        if it then
+          heals[#heals + 1] = { what = string.format("item $%02X", it.id), restore = it.restore }
+        end
+        for _, r in ipairs(no or {}) do
+          refused[#refused + 1] = { what = string.format("item $%02X", r.item.id), restore = r.item.restore }
         end
       end
     end
@@ -6623,6 +6865,35 @@ function Driver:makePlan(actor)
         end
       end
     end
+    -- The party item (#370): two or more members inside their round and
+    -- an item the engine aims at the whole party (Megalixir) that lifts
+    -- each of them clear -- one turn where a single heal saves one.  Like
+    -- the party cure, never with a Zombie seated (it reaches every seat).
+    if row ~= nil and zombieSeated == nil then
+      local inside = {}
+      for _, c in ipairs(cands) do
+        if (price[c.e] or 0) > 0 and c.hp <= price[c.e] then inside[#inside + 1] = c end
+      end
+      if #inside >= 2 then
+        local best, ins = nil, {}
+        for _, c in ipairs(inside) do ins[#ins + 1] = { hp = c.hp, maxhp = c.maxhp, cost = price[c.e] } end
+        for _, it in ipairs(self:bagHeals(inside[1].e, inside[1].hp, true)) do
+          if M.partyLift(it.id, ins) and (best == nil or it.gil < best.gil) then best = it end
+        end
+        if best then
+          local t = {}
+          for _, c in ipairs(inside) do
+            t[#t + 1] = string.format("entity %d %d/%d under %d", c.e, c.hp, c.maxhp, price[c.e])
+          end
+          self.healSaid = nil
+          M.log(string.format("[%s] actor=%d party item $%02X: %d members inside their round (%s) "
+            .. "and it lifts each clear; %d gil", self.tag or "fight", actor, best.id, #inside,
+            table.concat(t, ", "), best.gil))
+          return { kind = "item", item = best.id, target = inside[1].e, row = row, idx = best.idx,
+                   all = true, auto = true, reason = "party_inside" }
+        end
+      end
+    end
     for _, c in ipairs(cands) do
       local cost = price[c.e] or 0
       -- The cast, offered first.  A cure's magic_prop power scales with
@@ -6676,29 +6947,37 @@ function Driver:makePlan(actor)
           end
         end
       end
-      -- then the bag.  In combat the bag heals with POTIONS: a turn must
-      -- buy a real heal (owner guideline -- Tonics are the field
-      -- resource), so the Tonic is only ever the last item standing.
-      local item = row ~= nil
-               and (self:battInvIdx(BATTLE.POTION) and BATTLE.POTION
-                 or self:battInvIdx(BATTLE.TONIC) and BATTLE.TONIC) or nil
-      if item then
-        local gain = self:itemRestoreOf(item)
-        local why = M.healDecision({ hp = c.hp, maxhp = c.maxhp,
-          restore = gain, roundCost = cost, allies = allies,
-          threshold = threshold, owed = self.topUpOwed[c.e] ~= nil })
-        if why then
+      -- then the bag (#370): every HP item it holds, weighed by the lift
+      -- rule and priced in gil (M.itemChoice).  In combat a turn must buy
+      -- a real heal (owner guideline -- Tonics are the field resource),
+      -- so a weak flat item is only ever the last one standing.
+      local heals = row ~= nil and self:bagHeals(c.e, c.hp) or {}
+      if #heals > 0 then
+        local cap = M.deathGil(c.maxhp)
+        local it, why, refused = M.itemChoice({ hp = c.hp, maxhp = c.maxhp, roundCost = cost,
+          allies = allies, threshold = threshold, owed = self.topUpOwed[c.e] ~= nil,
+          cap = cap, items = heals })
+        if it then
           self.healSaid = nil
           M.log(string.format("[%s] actor=%d heal entity %d (%d/%d) with " ..
-            "$%02X -- restores %d, a round costs %d (%s)", self.tag or "fight",
-            actor, c.e, c.hp, c.maxhp, item, gain, cost, why))
-          return { kind = "item", item = item, target = c.e, row = row,
-                   idx = self:battInvIdx(item), reason = why }
+            "$%02X -- restores %d, a round costs %d (%s); %d gil%s", self.tag or "fight",
+            actor, c.e, c.hp, c.maxhp, it.id, it.restore, cost, why, it.gil,
+            #refused > 0 and string.format(", the cheaper refused: %s", (function()
+              local t = {}
+              for _, r in ipairs(refused) do t[#t + 1] = string.format("$%02X (%s)", r.item.id, r.why) end
+              return table.concat(t, "; ")
+            end)()) or ""))
+          return { kind = "item", item = it.id, target = c.e, row = row,
+                   idx = it.idx, reason = why, flat = it.flat }
+        end
+        local t = {}
+        for _, r in ipairs(refused) do
+          t[#t + 1] = string.format("$%02X restores %d for %d gil: %s", r.item.id, r.item.restore,
+            r.item.gil, r.why)
         end
         local said = string.format("[%s] actor=%d not healing entity %d " ..
-          "(%d/%d): $%02X restores %d and a round costs %d, so the turn "
-          .. "buys back less than it spends -- acting instead",
-          self.tag or "fight", actor, c.e, c.hp, c.maxhp, item, gain, cost)
+          "(%d/%d): a round costs %d (a death costs %d gil); %s -- acting instead",
+          self.tag or "fight", actor, c.e, c.hp, c.maxhp, cost, cap, table.concat(t, "; "))
         if said ~= self.healSaid then self.healSaid = said; M.log(said) end
       end
     end
@@ -7778,7 +8057,16 @@ function Driver:button(actor)
       -- chars = 0 would set cur = 0 and, for target 0, spin forever
       -- pressing UP.
       if chars == 0 then return self:cross("chars") end
-      if self.plan.all then
+      if self.plan.all and self.plan.auto then
+        -- an item the engine aims at the whole party (targeting without
+        -- the moveable-cursor bit, #370): the cursor is the engine's, and
+        -- A confirms whatever it lit
+        M.log(string.format("[%s] actor=%d party item $%02X at the target window: chars=%02X "
+          .. "all=%02X -- confirming the engine's aim", self.tag or "fight", actor, self.plan.item or 0,
+          chars, M.readByte(BATTLE.TGTALL)))
+        if self.recovery then self.recovery.confirm(actor, M.frame, chars, mons) end
+        -- falls through to the confirm below
+      elseif self.plan.all then
         -- one R press latches all-allies (TGTALL=1 -- probe_targetall);
         -- confirm once the latch reads back.  If it never takes (a spell
         -- without MULTI_TARGET), drop to the single-target steer.
@@ -7796,7 +8084,7 @@ function Driver:button(actor)
         return (self.tgtSpin % 4) < 2 and { "r" } or {}
       end
       local wantMask = 1 << self.plan.target
-      if chars ~= wantMask then
+      if chars ~= wantMask and not (self.plan.all and self.plan.auto) then
         local cur = 0
         for e = 0, 3 do
           if chars & (1 << e) ~= 0 then cur = e; break end
@@ -7970,7 +8258,10 @@ function Driver:button(actor)
     -- unconditionally in makePlan.  Either way it is measured once per
     -- battle, because a reloaded retry is a different fight.
     local watch = nil
+    -- (a fraction item -- X-Potion, Elixir, Megalixir -- fills its target
+    -- to max: there is no flat figure to learn, #370)
     if self.plan.kind == "item" and self.plan.item ~= BATTLE.FENIX_DOWN
+       and (M.itemProps(self.plan.item) & M.ITEM_RATIO) == 0
        and self.itemRestore[self.plan.item] == nil then
       -- an item heals exactly its power byte (ItemProp +$14): the band is
       -- that one value (review of ad048b29: 17 of 55 Potion measurements in
