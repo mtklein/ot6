@@ -62,10 +62,24 @@ A run's dependencies are its true inputs, compared by content:
   lib file through a Lua copy and on compose.py, the waiver registry and the
   symbols through byte copies, so it re-runs on any of them; `restat`
   stops the run behind it when the program did not move.
-- **the ROM, the emulator pin** (`tools/mesen/EMULATOR`), **run.sh and the
-  Python it runs** (`pin_test_saves.py`, `decode_b64.py`, and for a run
-  that Continues a checkpoint `sram_checkpoint.py`), each through a
-  copy-if-changed edge, so a checkout's mtime bump moves nothing.
+- **the ROM's identity, the emulator pin** (`tools/mesen/EMULATOR`),
+  **run.sh and the Python it runs** (`pin_test_saves.py`, `decode_b64.py`,
+  and for a run that Continues a checkpoint `sram_checkpoint.py`), each
+  through a copy edge that keeps its mtime when what it compares did not
+  move, so a checkout's mtime bump moves nothing. The ROM's copy
+  (`build/ninja/src/build/ot6.sfc`) is `copy_if_rom_identity_changed`:
+  the ROM identity is `tools/build/rom_version.py identity`, the sha256 of
+  the ROM with its version fields set to zero (`Ot6VersionText`, c0/ffa0,
+  16 bytes: 15 cells holding "OT6 v<VERSION>" centered and blank-padded,
+  then a $00, which the Config screen and the boot splash draw; the header
+  title, c0/ffc0, 21 bytes; the header checksum, c0/ffdc, 4 bytes), which
+  `link_rom.sh` stamps from `VERSION` after the link. So the release
+  commit's VERSION bump replays nothing, and any other byte does. The
+  suites about the fields themselves (`menu_configversion`,
+  `title_version`; `VERSION_TESTS` in configure.py) also depend on the
+  ROM's bytes, and compare what the screen shows against the tree's
+  VERSION, which compose.py injects as `OT6_VERSION` into a script that
+  names it (so VERSION is in their composed program and no other).
 - **what it boots:** `prev`'s sidecar (embedded, so through the digest),
   or at a cut the capture's payload and the tracked manifest's authored
   fields (the sealed manifest orders the run; its provenance is a record).
@@ -76,7 +90,8 @@ there. What each kind of change re-runs:
 
 | change | re-runs |
 |---|---|
-| ROM bytes, the emulator pin, run.sh or the Python it runs | every run, the whole game from power-on, and every suite |
+| the ROM's identity, the emulator pin, run.sh or the Python it runs | every run, the whole game from power-on, and every suite |
+| VERSION (the ROM's version fields) | the version suites, and the checks and release edges that read the ROM's bytes |
 | a test-library code edit (`lib/*.lua`) | every run whose composed program it changes (today: all of them; see below), and every suite |
 | a generator's code | that run, then each run its new bytes reach |
 | a suite's code | that suite |

@@ -17,11 +17,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "2ef61607bf1ea9adb691aac6cd318618a4ae5f1f793dd4dcd971da020b1041b7",
-    "generator_sig": "50d0c09a5b94a0ff071deb0af0ed4d09ca739f0a33f04e55bcab3c53b9953510 gen_wor_kohlingen build/checkpoints/wor-figaro-sweep-v1/manifest.json build/checkpoints/wor-figaro-sweep-v1/wor-figaro-sweep.sram",
+    "generator_sig": "ae498238b55e8bfeb1652a0aa9f7867e4d91135e262e78fac5e82568d7d16637 gen_wor_kohlingen build/checkpoints/wor-figaro-sweep-v1/manifest.json build/checkpoints/wor-figaro-sweep-v1/wor-figaro-sweep.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/wor-figaro-sweep-v1/manifest.json",
-        "sha256": "5d6fd87c0884b803706e807ffe285ede50562b7eb78ce9cb54c4e10428eebc95"
+        "sha256": "5266eeb1db013365678c2b8cd5050980cdd17d391a7a68513bb4a0cab0c5bc41"
       }
     ]
   }

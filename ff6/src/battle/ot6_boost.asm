@@ -547,6 +547,7 @@ spend:  asl                     ; two swings per bp
         clc
         adc     $3a70
         sta     $3a70
+        jsl     Ot6PassesAdded  ; a pass whose body fell retargets
 done:   rtl
 .endproc
 
@@ -827,6 +828,7 @@ done:   plx
         clc
         adc     $3a70
         sta     $3a70
+        jsl     Ot6PassesAdded  ; a throw whose body fell retargets
 done:   pla
         rtl
 .endproc
@@ -1803,6 +1805,8 @@ OT6_LIFE3_ID = $35
         beq     @dance          ; dance: flat, paid at dance-START only
         cmp     #$10
         beq     @rage           ; rage: the same shape as dance
+        cmp     #$0f
+        beq     @slot           ; slot: Setzer's table, flat
         ; no cmd-$11 arm: Leap is free.  It is never rendered on any
         ; surface, and it shares the Fight row on the Veldt (Ot6VeldtRow,
         ; battle_main.asm), where the free floor has to survive it.  Falling
@@ -1892,6 +1896,19 @@ OT6_LIFE3_ID = $35
                                 ;   coin (Ot6RageCoin), certainty across a
                                 ;   spread of effects rather than magnitude,
                                 ;   and the BP is what pays for it
+        plp
+        rtl
+@slot:  ; Setzer's table (ot6_setzer.asm): the row the submenu queued is in
+        ; $3a7b (FixPlayerAttack's Slot arm keeps a row id rather than mapping
+        ; it as a reel), and a reel spin's $3a7b is its mapped attack, which
+        ; the leaf prices 0, as Slot always was.  Flat at every boost level:
+        ; cmd $0f is in Ot6BoostDmg's gate.  Every row's boost buys passes
+        ; (Jackpot's rolls, Coin Toss's tosses, Hired Help's hires), and Coin
+        ; Toss and Hired Help are paid in gil (Ot6CoinGil), so no MP price
+        ; here escalates.
+        pla                     ; drop the parked cost (0 for slot)
+        lda     $3a7b
+        jsl     Ot6SetzerCost
         plp
         rtl
 @swdtech:

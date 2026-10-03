@@ -660,6 +660,18 @@ def selftest() -> int:
         check("the composed text names the embedded state tree-relative",
               "<- build/states/a.mss.lua" in compose_script(gen, root, {})[0],
               True)
+        (root / "VERSION").write_text("1.0\n")
+        ver = root / "tools" / "tests" / "title_x.lua"
+        ver.write_text('local H = dofile("tools/tests/lib/ot6.lua")\n'
+                       'H.run({}, { H.call(function() return OT6_VERSION end) })\n')
+        v1 = composed_digest(compose_script(ver, root, {})[0])
+        check("a script that names OT6_VERSION gets the tree's VERSION",
+              'OT6_VERSION = "1.0"' in compose_script(ver, root, {})[0], True)
+        (root / "VERSION").write_text("1.1\n")
+        check("MUTANT a VERSION bump moves the digest of a script that "
+              "names OT6_VERSION",
+              composed_digest(compose_script(ver, root, {})[0]) != v1, True)
+        check("...and no other script's", dig(), base)
         out = root / "d.digest"
         main_digest(gen, out, root, {})
         m1 = out.stat().st_mtime_ns
@@ -771,6 +783,14 @@ def compose_script(script_path, root=ROOT, env=None):
     #                   shift across one 60-frame period and log each first
     #                   battle's RNG key (#208; seed_sweep.py --probe)
     preamble.append('OT6_SCRIPT = "%s"\n' % script_path.stem)
+    # The tree's VERSION file, for a script that checks the version the ROM
+    # shows against the one the tree says (menu_configversion): Mesen's
+    # sandbox cannot read files.  Only a script that names OT6_VERSION gets
+    # it, so a VERSION bump moves no other script's composed program.
+    if re.search(r"\bOT6_VERSION\b", script):
+        version = (root / "VERSION").read_text().strip()
+        preamble.append('OT6_VERSION = "%s"\n'
+                        % version.replace("\\", "\\\\").replace('"', '\\"'))
     for var in ("OT6_RETRIES", "OT6_SEED_SHIFT", "OT6_SHIFT_PROBE",
                 "OT6_WATCHDOG"):
         raw = env.get(var)

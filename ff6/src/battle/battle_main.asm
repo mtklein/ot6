@@ -3742,6 +3742,13 @@ _1720:  sta     $b6
 ; [ command $0f: slot ]
 
 Cmd_0f:
+        jsl     Ot6SetzerExec   ; ot6: Slot is the first row of Setzer's table;
+        bcc     @1726           ;   a Coin Toss, Hired Help or Jackpot row
+        tyx                     ;   rode in as $b6.  carry set = one of them,
+        jsr     _c2298d         ;   A = the command whose targeting it takes:
+        jsl     Ot6SetzerEffect ;   InitTarget as that, then its props and
+        sta     $11a9           ;   its attacker effect (GP Rain's coins or
+        jmp     ExecAttack      ;   the dice), and attack.  ot6_setzer.asm
 @1726:  lda     #$10
         trb     $b0
         lda     $b6
@@ -4136,6 +4143,7 @@ _189e:  tyx
 Cmd_18:
 @1907:  tyx
         jsr     _c2298a
+        jsl     Ot6RainPasses   ; ot6: a character's boost buys tosses
         inc     $11a6
         lda     #$60
         tsb     $11a2
@@ -6470,6 +6478,7 @@ _initanima:
 @2639:  php
         stz     $3a72       ; clear battle script command queue pointer
         stz     $3a70       ; clear number of attacks (0 = 1 attack)
+        stz     OT6_PASSRETARGET ; ot6: and no passes OT6 added (ot6_passes.asm)
         longa
         stz     $3a32       ; clear pointer to battle script data
         stz     $3a34       ; clear counter for damage variables
@@ -8442,8 +8451,12 @@ ExecAttack:
         sta     $3416
 @3288:  plx                 ; next attack
         dec     $3a70
-        bmi     @3291
+        bmi     @ot6last
         pea     ExecAttack-1
+        rts
+@ot6last:
+        jsl     Ot6PassesDone   ; ot6: the last pass is done, and the passes
+                                ;   OT6 added with it (ot6_passes.asm)
 @3291:  rts
 
 ; ------------------------------------------------------------------------------
@@ -8465,6 +8478,7 @@ CalcAttackEffect:
                                 ;   x=attacker, $3a7d=attack id, props still editable.
         jsl     Ot6Assassinate  ; ot6: Shadow's divine -- same hook point, Broken non-boss
                                 ;   instant kill (dormant until Shadow is fielded).
+        jsl     Ot6PassTargeted ; ot6: this pass has targeted (ot6_passes.asm)
         phx
         lda     $b8         ; targets
         jsr     CountBits
@@ -10682,11 +10696,13 @@ _3fb6:  rts
 ; [ attacker special effect $51: gp rain ]
 
 AttackerEffect_51:
-@3fb7:  lda     $3b18,y
-        xba
-        lda     #$1e
-        jsr     MultAB
-        longa
+@3fb7:  jsl     Ot6CoinPrice    ; ot6: was level x 30 (lda $3b18,y / xba /
+                                ;   lda #$1e / jsr MultAB): the same for a
+                                ;   monster, level x 50 for Hired Help, and
+                                ;   the coins' break class is set; carry set
+        bcc     :+              ;   = a character's pass with no body left
+        rts                     ;   standing: nothing to pay for or hit
+:       longa
         cpy     #$08
         bcs     @3fd3
         jsr     TakeGil
@@ -10993,6 +11009,9 @@ AttackerEffect_29:
 ; [ attacker special effect $09: dice/fixed dice ]
 
 AttackerEffect_09:
+        jsl     Ot6JackpotDice  ; ot6: Setzer's Jackpot throws a fixed triple
+        bcc     @4158           ;   (carry set: done, damage and dice set)
+        rts
 @4158:  stz     $3414       ; disable damage modification
         lda     #$20
         tsb     $11a4       ; can't dodge
@@ -13045,6 +13064,8 @@ FixPlayerAttack:
         xba
 @4db4:  cmp     #$0f
         bne     @4ddb       ; branch if not slot
+        jsl     Ot6SlotKitRow   ; ot6: a row of Setzer's table is no reel
+        bcs     @4ddb           ;   result: keep its id (carry set)
         pha
         xba
         tax
@@ -15063,10 +15084,14 @@ ChooseTarget:
         bit     #$2c
         beq     @58ed
         bra     @58f6
-@58b3:  lda     $ba
-        bit     #$04
+@58b3:  jsl     Ot6PassRetarget ; ot6: $ba bit 2 ("don't retarget"), except
+                                ;   a later pass OT6 added: another monster
+                                ;   (carry set, the monster side in $b8/$b9)
+                                ;   or none, never Retarget (ot6_passes.asm)
         bne     @58c8
+        bcs     @ot6side
 @58b9:  jsr     Retarget
+@ot6side:
         jsr     _c258fa
         lda     $ba
         bit     #$08

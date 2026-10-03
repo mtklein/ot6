@@ -17,11 +17,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "1ced805970aac312d1bff92c924b1b8a650766573002a204460c92e962f9f69d",
-    "generator_sig": "64283be00ecf8301a63ca3167e2e56ed8508147d511e111b90ae6ccf4dbc0879 gen_wor_nikeah build/checkpoints/wor-sabin-v1/manifest.json build/checkpoints/wor-sabin-v1/wor-sabin.sram",
+    "generator_sig": "8a07cdf966064a50fabfa4caf676c06058f7737b20967b552fe768244acc28cc gen_wor_nikeah build/checkpoints/wor-sabin-v1/manifest.json build/checkpoints/wor-sabin-v1/wor-sabin.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/wor-sabin-v1/manifest.json",
-        "sha256": "5e0c1ae5874a75d8f0228075d5925a0ab37c5277b6b91e0cf7bca9b3a6535dc7"
+        "sha256": "5b803ae0b127f3f2e5038c5d8a4c4a22213cc9f1aa29d4763f0ad5f1981326e5"
       }
     ]
   }

@@ -9,6 +9,10 @@ brew "sdl2"   # MesenCore.dylib's one non-system link; Mesen aborts without it
 brew "ninja"  # runs the generated savestate graph (build/build.ninja; #25)
 brew "lua"    # the standalone library self-tests qualification runs (instruments.ok)
 brew "dotnet@8"  # .NET 8 SDK (keg-only): builds OT6's Mesen's UI (tools/mesen/build.sh)
+# The Android patcher APK (build/release/ot6-vX.Y.apk; docs/TOOLING.md "Android patcher"),
+# plus sdkmanager "build-tools;35.0.1" "platforms;android-35" once.
+brew "openjdk@21"                          # javac, keytool; JAVA_HOME for d8/apksigner
+cask "android-commandlinetools" if OS.mac? # sdkmanager
 
 # Optional. The build itself needs only stock python3 (>=3.9); numpy is used
 # by the asset re-encoders (ff6/tools/brr.py, monster_stencil.py,

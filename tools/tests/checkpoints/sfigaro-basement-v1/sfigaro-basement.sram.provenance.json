@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
   "payload_sha256": "a3ef2f1fbb75f129a05c2306bf519153a432c0ea10b17c5099751ddefed5ab7b",
-  "generator_sig": "8192f42225c51b9cfc2f0b5fcaa46cd1ee4358b2a5c2eb6a52117205cc2faf70 gen_seed_basement",
+  "generator_sig": "e76893f05dd0d63746bf87106e2a6fd049418f8ab0ba790ea3823ced28a93e40 gen_seed_basement",
   "ancestors": [
     {
       "path": "build/states/sfigaro_escape.stamp",
-      "sha256": "cc39159860588a0948aec5fed38ac1e1b1b99163754f317436b2ba2bf0119d79"
+      "sha256": "d985d7536f1b245cf1eb2449c96260402c1ee7576e80023e13a45f69f89fbcec"
     }
   ]
 }

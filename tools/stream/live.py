@@ -1331,13 +1331,15 @@ def build_progress(states, xy, stamps, rootp, t0, live_test, memo=None):
     # tests, many of which run in parallel once the ROM is built and their
     # state deps are done.  Count it so the figure reads as whole-build
     # time-left, not just savestate-generation time.  A suite is still-to-run
-    # when its .ok is missing or older than the ROM; these run in parallel, so
+    # when its .ok is missing or older than the ROM's identity copy (the one
+    # a suite depends on: a VERSION bump moves build/ot6.sfc, not the copy,
+    # and re-runs no suite but the version ones); these run in parallel, so
     # divide by an effective worker count (heavy emulator workers -> about
     # half the logical cores).
     # During a plain run nothing rebuilds the ROM, every .ok stays fresh, and
     # this term is zero, so the run ETA is unchanged.
     try:
-        rom_m = os.path.getmtime(os.path.join(ROOT, "build/ot6.sfc"))
+        rom_m = os.path.getmtime(os.path.join(ROOT, "build/ninja/src/build/ot6.sfc"))
     except OSError:
         rom_m = 0.0
     rem_state = sum((e["dur"] or 60) for e in edges if e["status"] != "done")

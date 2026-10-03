@@ -7,15 +7,15 @@ boost-point turn economy.
 
 ## Status
 
-v0.23 is the current release
-([tag](https://github.com/mtklein/ot6/releases/tag/v0.23)); Edgar's part of
-the World of Ruin has designed break weaknesses, a monster you break loses
-the turn it was about to take, and Terra, Celes and the Espers have short
-spell lists that stronger spells grow from by boosting (details in the
-release notes). The game is playable from the start through the end of
+v0.24 is the current release
+([tag](https://github.com/mtklein/ot6/releases/tag/v0.24)); the World of
+Ruin from Figaro Castle to the Falcon has designed break weaknesses, a
+boosted action that never happens keeps its points, and an Android app
+keeps your patched ROM current (details in the release notes). The game is playable from the start through the end of
 the World of Balance: the whole Thamasa arc, the world tour aboard the
 repaired Blackjack, the IAF gauntlet, the Floating Continent and AtmaWeapon,
-and the escape — and into the World of Ruin as far as Edgar rejoining at Figaro Castle.
+and the escape — and into the World of Ruin as far as the Falcon, with Setzer back and
+Darill's Tomb cleared.
 
 Break and boost are the two central systems. Enemies carry shields and hidden
 weaknesses, hitting a weakness chips a shield, and breaking drops defenses
@@ -27,6 +27,30 @@ fully restore HP and MP.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the mechanics design and
 [docs/TOOLING.md](docs/TOOLING.md) for tool installation.
+
+## Playing on Android
+
+Each release carries `ot6-vX.Y.apk`, OT6 Patcher: a small app that makes
+`OT6.sfc` from your own ROM and keeps it current. To get updates without
+lifting a finger, subscribe in [Obtainium](https://obtainium.imranr.dev/):
+
+1. Add an app with the URL `https://github.com/mtklein/ot6`, and under
+   "Filter APKs by regular expression" enter `ot6-.*\.apk`.
+2. Install it, open OT6 Patcher once, and choose the folder that holds your
+   own Final Fantasy III (USA) v1.0 ROM (it's never included, and never
+   changed). The app finds the ROM there and writes `OT6.sfc` beside it. If
+   it can't find it, it lists what it checked, and you can pick the ROM
+   file yourself.
+3. From then on, each update Obtainium installs quietly rewrites `OT6.sfc`,
+   with no notifications; open the app any time to see the last result.
+
+`OT6.sfc` keeps its name across updates, so your saves and save states
+carry over. RetroArch: put the ROM in a folder its playlist scans, and
+re-scan once so OT6.sfc shows up. If you used to soft-patch, delete the
+`Final Fantasy III (USA).bps` beside your vanilla ROM so vanilla stays
+vanilla, and keep any `OT6.bps` (or `.ips`, `.ups`, `.xdelta`, or a numbered
+one like `OT6.ips1`) out of OT6.sfc's folder, since RetroArch would apply it
+on top; the app warns if it sees one.
 
 ## Contributing
 
@@ -43,22 +67,27 @@ brew bundle                 # cc65, sdl2, ninja, ffmpeg
 python3 -m pip install numpy
 python3 configure.py        # writes build.ninja
 ninja                       # builds and tests everything (qualification)
-ninja release               # ...then the release preflights and the zip
+ninja build/release/ot6-vX.Y.zip   # ...then the release preflights and the zip
 ```
 
 Mesen and Flips are not brew-installable; [docs/TOOLING.md](docs/TOOLING.md)
 has those steps.
 
-`ninja` runs the whole graph: both ROMs, every generated savestate (the
-story-chain fixtures are multi-minute scripted playthroughs; a cold build
-takes upward of an hour and a half), all 94 suite tests, the audits and
-selftests. `ninja release` adds the release preflights and packaging.
-Anything narrower is a real output path:
+`ninja` runs the whole graph: both ROMs, the game played once from
+power-on through every generated savestate (scripted playthroughs, one
+after another: about 2.4 million emulated frames from power-on to the
+Falcon, hours on one machine), every suite test, the
+audits and selftests, and the checkpoint drift gate. It reruns exactly what
+a change reaches: a ROM, emulator, runner, generator or test-library
+change replays the game from the first run it touches; a suite edit re-runs
+that suite. The release zip's path adds the release preflights and
+packaging, and the APK's paths the Android patcher (docs/TOOLING.md).
+There are no aliases; anything narrower is a real output path:
 
 ```sh
 ninja ff6/rom/ff6-en.sfc                    # just the ROM
 ninja build/results/suite/battle_break.ok   # one suite test (and what it needs)
-ninja build/states/vargas_entry.mss.lua     # one savestate (and its chain)
+ninja build/states/vargas_entry.mss.lua     # one savestate (and what it boots)
 ```
 
 `tools/gui.sh` opens the built ROM in the Mesen GUI.

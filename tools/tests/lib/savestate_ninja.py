@@ -25,8 +25,11 @@ Dependencies are the true inputs of each run, by content:
     edit that leaves a script's composed program alone (a comment, another
     script's waiver, compose.py's own diagnostics) runs that digest edge
     and nothing after it.
-  * the ROM, the emulator pin, run.sh and the Python it runs
-    (RUN_INPUTS), each through a copy_if_changed edge;
+  * the ROM's identity (tools/build/rom_version.py: the ROM with its
+    version fields masked, so the release commit's VERSION bump moves
+    nothing that does not read them), the emulator pin, run.sh and the
+    Python it runs (RUN_INPUTS), each through a copy edge that keeps its
+    mtime when what it compares did not move;
   * at a cut, the capture's payload and the tracked manifest's authored
     fields (its sealed manifest only orders the run: the seal re-checks the
     payload before anything boots it).
@@ -79,11 +82,12 @@ LIB_FILES = (
     "tools/tests/lib/ot6_field.lua",
     "tools/tests/lib/ot6_contract.lua",
 )
-# What composition reads besides the script, its lib and its sidecars.
+# What composition reads besides the script, its lib and its sidecars:
+# VERSION reaches only a script that names OT6_VERSION (compose.py).
 COMPOSE_INPUTS = ("tools/tests/lib/compose.py",
                   "tools/tests/lib/lua_fingerprint.py",
                   "tools/state_write_waivers.txt",
-                  "ff6/rom/ff6-en.dbg")
+                  "ff6/rom/ff6-en.dbg", "VERSION")
 STAMP_TOOL = ("tools/tests/lib/stamps.py", "tools/tests/lib/compose.py",
               "tools/tests/lib/lua_fingerprint.py")
 COPY_DIR = "build/ninja/src"
@@ -546,10 +550,17 @@ def emit(states, root, captures=()):
     w("  description = copy_if_lua_changed $in")
     w("  restat = 1")
     w("")
+    w("rule copy_if_rom_identity_changed")
+    w("  command = python3 tools/build/rom_version.py "
+      "copy-if-identity-changed $in $out")
+    w("  description = copy_if_rom_identity_changed $in")
+    w("  restat = 1")
+    w("")
     emit_state_rules(w)
     byte, lua = copy_sources(states, root, captures)
     for src in byte:
-        w(f"build {copy_from(src)}: copy_if_changed {src}")
+        rule = "copy_if_rom_identity_changed" if src == ROM else "copy_if_changed"
+        w(f"build {copy_from(src)}: {rule} {src}")
     for src in lua:
         w(f"build {COPY_DIR}/lua/{src}: copy_if_lua_changed {src}")
     w("")

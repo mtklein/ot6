@@ -11,8 +11,10 @@ inputs (savestate_ninja.py):
     composed <sha256>            compose.py --digest of it, as the run composed it
     env <K>=<V>                  the environment that composition read (0+)
     input <path> <sha256>        each other input of the run, by its bytes: the
-                                 ROM, the emulator pin, run.sh and the Python it
-                                 runs, and at a cut the capture it Continued
+                                 ROM (by its identity, the version fields
+                                 masked: tools/build/rom_version.py), the
+                                 emulator pin, run.sh and the Python it runs,
+                                 and at a cut the capture it Continued
     source <path> <sha256>       the generator and each lib file, by Lua token
                                  stream: a record, so a message can say which
                                  one moved
@@ -57,12 +59,22 @@ ROOT = HERE.parent.parent.parent
 sys.path.insert(0, str(HERE))
 import compose  # noqa: E402
 import lua_fingerprint  # noqa: E402
+sys.path.insert(0, str(HERE.parent.parent / "build"))
+import rom_version  # noqa: E402
 
 FORMAT = "ot6-stamp/v3"
 LIB_FILES = ("tools/tests/lib/ot6.lua", "tools/tests/lib/ot6_field.lua",
              "tools/tests/lib/ot6_contract.lua")
 ROM = "build/ot6.sfc"
 FRESH, STALE, UNBOUND, UNVERIFIED = "fresh", "stale", "unbound", "unverified"
+
+
+def input_hash(rel, path):
+    """What a stamp records for one input: the ROM by its identity (the
+    copy ninja compares it by), anything else by its bytes."""
+    if rel == ROM:
+        return rom_version.identity(Path(path).read_bytes())
+    return sha256_file(path)
 
 
 def sha256_file(path):
@@ -91,7 +103,7 @@ def stamp_text(root, generator, digest_file, artifact, inputs, ancestor=None,
     lines = [FORMAT, f"generator {generator}", f"composed {rec[0]}"]
     lines += [l for l in rec[1:] if l.startswith("env ")]
     for p in inputs:
-        lines.append(f"input {p} {sha256_file(root / p)}")
+        lines.append(f"input {p} {input_hash(p, root / p)}")
     for p in [f"tools/tests/{generator}.lua", *LIB_FILES]:
         lines.append(f"source {p} {lua_fingerprint.filehash(root / p)}")
     lines.append(f"artifact {artifact} {sha256_file(root / artifact)}")
@@ -210,7 +222,7 @@ def _hash(root, rel, memo):
         p = root / rel
         key = (str(p), _stat(p))
         if key not in _HASHES:
-            _HASHES[key] = sha256_file(p) if key[1] else None
+            _HASHES[key] = input_hash(rel, p) if key[1] else None
         hs[rel] = _HASHES[key]
     return hs[rel]
 
@@ -278,12 +290,12 @@ def _own(path, root, memo):
         now = _hash(root, p, memo)
         if now is None:
             return (UNVERIFIED, f"{me} is UNVERIFIED -- it was generated on "
-                                f"ROM sha {h[:12]} but this tree has no {ROM} "
+                                f"ROM identity {h[:12]} but this tree has no {ROM} "
                                 f"to compare against; build it (ninja {ROM}) "
                                 f"and re-check", [])
         if now != h:
-            return (STALE, f"{me} is STALE -- generated on ROM sha {h[:12]}, "
-                           f"but {ROM} is sha {now[:12]}: a machine snapshot "
+            return (STALE, f"{me} is STALE -- generated on ROM identity "
+                           f"{h[:12]}, but {ROM} is {now[:12]}: a machine snapshot "
                            f"of a different ROM; regenerate: {hint}", [])
     for p, h in rec["input"]:
         if p == ROM:

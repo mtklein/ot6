@@ -31,7 +31,7 @@ from pathlib import Path
 REAL = Path(__file__).resolve().parents[3]
 COPIED = ["tools/tests/lib/savestate_ninja.py", "tools/tests/lib/stamps.py",
           "tools/tests/lib/compose.py", "tools/tests/lib/lua_fingerprint.py",
-          "tools/tests/lib/sram_checkpoint.py"]
+          "tools/tests/lib/sram_checkpoint.py", "tools/build/rom_version.py"]
 
 STUB_RUN = r'''#!/bin/sh
 # stub run.sh: journal, injected failure, deterministic "play", publish an
@@ -125,6 +125,17 @@ class Tree:
         return r.returncode, r.stdout
 
 
+def romfill(t, version_byte, code_byte):
+    """A 64 KB mock ROM: `version_byte` in each version field
+    (rom_version.py masks them), `code_byte` at $1234 (it does not)."""
+    b = bytearray(b"\xa5" * 0x10000)
+    for off in (0xFFA5, 0xFFC5, 0xFFDC):
+        b[off] = version_byte
+    b[0x1234] = code_byte
+    t.p("build").mkdir(parents=True, exist_ok=True)
+    t.p("build/ot6.sfc").write_bytes(bytes(b))
+
+
 def mock(root):
     t = Tree(root)
     for rel in COPIED:
@@ -141,7 +152,8 @@ def mock(root):
     t.write("tools/state_write_waivers.txt", "")
     t.write("ff6/rom/ff6-en.dbg", "")
     t.write("tools/mesen/EMULATOR", "emulator v1\n")
-    t.write("build/ot6.sfc", "rom v1\n")
+    t.write("VERSION", "1.0\n")
+    romfill(t, 1, 1)
     gens = {"gen_a": ("a1", ""), "gen_b": ("b1", ""),
             "gen_c": ("c1", 'H.loadState("build/states/b.mss.lua")'),
             "gen_cut": ("k2", 'H.loadState("build/states/c.mss.lua")'),
@@ -231,7 +243,7 @@ def main():
         check("mtime-only touches (a checkout) replay nothing", ran, [])
 
         # -- the uniform rule: every input of a run, by content -----------
-        t.write("build/ot6.sfc", "rom v2\n")
+        romfill(t, 1, 2)
         check("dry run after a ROM change lists every run",
               sum(1 for l in t.dry().splitlines()
                   if " generate " in l or " capture " in l), 8)
@@ -240,6 +252,16 @@ def main():
               (rc, "a machine snapshot of a different ROM" in out), (1, True))
         rc, ran, _ = t.ninja()
         check("MUTANT a ROM change replays the whole game", ran, ALL)
+        romfill(t, 2, 2)
+        rc, ran, _ = t.ninja()
+        check("a change to the ROM's version fields alone (a VERSION bump) "
+              "replays nothing", ran, [])
+        rc, out = t.check_states()
+        check("...and the stamps, which record the ROM's identity, agree",
+              rc, 0)
+        check("...while the ROM's copy still takes the new bytes",
+              t.p("build/ot6.sfc").read_bytes() ==
+              t.p("build/ninja/src/build/ot6.sfc").read_bytes(), True)
         t.write("tools/mesen/EMULATOR", "emulator v2\n")
         rc, ran, _ = t.ninja()
         check("an emulator pin change replays the whole game", ran, ALL)

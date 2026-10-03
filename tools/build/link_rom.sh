@@ -4,8 +4,8 @@
 # ld65 config maps the cutscene wram segment to temp_lz/cutscene.bin (the
 # path is hardcoded in cfg/ff6-*.cfg's bank_7e FILE=), so: link once to
 # materialize that segment, lzss-compress it, wrap the .lz in a one-line
-# .incbin module, assemble it, link again with that object appended, then
-# fix the SNES checksum.
+# .incbin module, assemble it, link again with that object appended, stamp
+# the version fields, then fix the SNES checksum.
 #
 # temp_lz is shared scratch BECAUSE the cfg hardcodes it, so two ROM links
 # must never run concurrently; the ninja graph serializes them with an
@@ -27,4 +27,7 @@ ca65 --bin-include-dir temp_lz temp_lz/cutscene_lz.asm -o temp_lz/cutscene.lz.o
 ld65 --dbgfile "${out%.sfc}.dbg" -m "${out%.sfc}.map" -o "$out" -C "$cfg" \
   "$@" temp_lz/cutscene.lz.o
 rm -rf temp_lz
+# The version fields (Ot6VersionText, the header title) from the repo's
+# VERSION, before the checksum that covers them (tools/build/rom_version.py).
+python3 ../tools/build/rom_version.py stamp "$out" "$(cat ../VERSION)" "${out%.sfc}.dbg"
 python3 tools/fix_checksum.py "$out"

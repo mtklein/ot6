@@ -18257,6 +18257,18 @@ _c1_thief_open:
         jsl     Ot6ThiefListOpen
         jmp     OpenToolsWindow
 
+; ot6 (setzer's kit): Slot is the first row of Setzer's table, the twin of
+; the thief submenu above.  OpenCmdMenuTbl[$0f] hits this stub instead of the
+; reels; bank $f0 fills wItemList with Slot / Coin Toss / Hired Help /
+; Jackpot and raises setzer mode w7e6168=4 (carry set), and the Slot row's
+; confirm chains on to the reels.  Anyone else with the Slot command (a Gogo)
+; gets the reels straight away (carry clear), as before.
+_c1_slot_open:
+        jsl     Ot6SetzerListOpen
+        bcc     @reels
+        jmp     OpenToolsWindow
+@reels: jmp     OpenSlotWindow
+
 ; ------------------------------------------------------------------------------
 
 ; [ init target cursor select ]
@@ -19059,7 +19071,9 @@ OpenCmdMenuTbl:
         .addr   OpenLoreWindow
         .addr   _c17795
         .addr   _c17795
-        .addr   OpenSlotWindow
+        .addr   _c1_slot_open           ; ot6: $0f slot -- was OpenSlotWindow;
+                                        ;   now Setzer's table, whose first row
+                                        ;   IS Slot (the reels, unchanged)
         .addr   OpenRageWindow
         .addr   _c17795
         .addr   _c17795
@@ -20715,6 +20729,12 @@ UpdateMenuState_30:
                                 ;   No new commit code: the whole point of
                                 ;   putting the ladder behind Steal is that this
                                 ;   path already carries a per-row id.
+        cmp     #$04            ; ot6: setzer's table? a kit row takes the
+        bne     @notsetzer      ;   thief arm (target select, the row id as
+        jsl     Ot6SetzerConfirm ;  the queued attack byte under command $0f);
+        bcs     :+              ;   the Slot row (carry clear) is chained on
+        rts                     ;   to the reels in bank F0
+@notsetzer:
         cmp     #$02            ; ot6: bushido submenu? row r = boost r,
         bne     @blitzcommit    ;   latch the base+r tech in bank F0 (X = cell
         jsl     Ot6BushidoConfirm ;   offset from _c18470; may refuse & stay open)

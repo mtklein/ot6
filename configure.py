@@ -7,8 +7,11 @@ result, every audit and selftest, and the checkpoint drift gate.  There are
 no aliases: anything narrower is a real output path
 (`ninja build/states/vargas_entry.mss.lua`,
 `ninja build/results/suite/battle_break.ok`, `ninja ff6/rom/ff6-en.sfc`),
-and the release is `ninja build/release/ot6-vX.Y.zip` (everything in the
-default, the release preflights, the patch and the zip).
+and the release is `ninja build/release/ot6-vX.Y.zip
+build/release/ot6-vX.Y.apk build/checks/android_apk.ok
+build/checks/android_apk_release.ok` (everything in the default, the
+release preflights, the patch, the zip and the Android patcher APK with its
+checks).
 Every edge depends on its true inputs by content, so `ninja` re-runs
 exactly what a change invalidates: a ROM, emulator, generator, runner or
 test-library change replays the game from the first run it reaches, and a
@@ -31,25 +34,35 @@ from the root):
   ff6 objects    ca65 with --create-dep; depfiles are rebased to root-relative
                  paths (tools/build/rebase_depfile.py) because ca65 runs with
                  cwd=ff6 and ninja resolves depfile paths against the root.
-  ROM            ff6-en.sfc via tools/build/link_rom.sh.
+  ROM            ff6-en.sfc via tools/build/link_rom.sh, which stamps the
+                 version fields from VERSION (tools/build/rom_version.py).
   build/ot6.sfc  copy_if_changed of ff6-en.sfc: mtime bumps with unchanged
-                 bytes prune everything downstream (restat).
+                 bytes prune everything downstream (restat).  Everything
+                 that binds to the ROM (states, suite results, checks)
+                 depends on its identity copy instead
+                 (copy_if_rom_identity_changed: the version fields masked),
+                 so a VERSION bump re-runs only what reads those fields.
   savestates     the one graph of generated states and checkpoint captures,
                  played from power-on, embedded from
                  tools/tests/lib/savestate_ninja.py (the data file is
                  tools/tests/savestate_graph.py).
   suite          one edge per `-- @suite` test, after a digest edge for its
                  composed script (compose.py --digest, restat): the suite
-                 re-runs when its composed program, the ROM, the emulator
-                 pin, the runner or a checkpoint it boots moved.  A test
-                 whose fixture is missing builds the fixture, and the
-                 release artifact depends on every test's .ok, so
+                 re-runs when its composed program, the ROM's identity, the
+                 emulator pin, the runner or a checkpoint it boots moved.
+                 A test whose fixture is missing builds the fixture, and
+                 the release artifact depends on every test's .ok, so
                  "everything ran" is graph structure.
   checks         the selftests and audits, each with its real inputs, so an
                  unchanged tree re-runs none of them; among them the drift
                  gate, every tracked checkpoint against the graph's capture.
   release        preflights (branch, README version, real notes), the BPS
-                 patch, and the zip (build/release/ot6-vX.Y.zip).
+                 patch, the zip (build/release/ot6-vX.Y.zip), and the
+                 Android patcher APK with its checks
+                 (build/release/ot6-vX.Y.apk, build/checks/android_apk.ok,
+                 build/checks/android_apk_release.ok; they need the JDK,
+                 the Android SDK and the signing key, which the default
+                 does not).
 
 Regeneration: the `configure` edge below re-runs this script when it, the
 graph data, VERSION, or any globbed directory changes (the depfile lists
@@ -64,8 +77,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "tools" / "tests" / "lib"))
 import savestate_ninja as sn  # noqa: E402
+sys.path.insert(0, str(ROOT / "tools" / "build"))
+import rom_version  # noqa: E402
 
 VERSION = (ROOT / "VERSION").read_text().strip()
+# The one VERSION grammar (tools/build/rom_version.py check_version): the APK
+# versionCode and the ROM's 15-cell version field both need it, so a VERSION
+# outside it fails here, before anything builds.
+try:
+    rom_version.check_version(VERSION)
+except ValueError as e:
+    sys.exit(f"configure.py: {e}")
 BASE = "Final Fantasy III (USA).sfc"
 BASE_SHA1 = "4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7"
 
@@ -129,6 +151,16 @@ w("# change; restat = 1 prunes everything downstream when it did not.")
 w("rule copy_if_changed")
 w("  command = mkdir -p $$(dirname $out) && { cmp -s $in $out || cp $in $out; }")
 w("  description = copy_if_changed $in")
+w("  restat = 1")
+w()
+w("# The ROM's copy, the same shape: the new bytes always land, but the")
+w("# old mtime is kept when the ROM identity (the ROM with its version")
+w("# fields masked, tools/build/rom_version.py) did not move, so a VERSION")
+w("# bump alone re-runs nothing that binds to the ROM's identity.")
+w("rule copy_if_rom_identity_changed")
+w("  command = python3 tools/build/rom_version.py "
+  "copy-if-identity-changed $in $out")
+w("  description = copy_if_rom_identity_changed $in")
 w("  restat = 1")
 w()
 w("# A Lua source's copy: the new bytes always land, but the old mtime is")
@@ -330,7 +362,8 @@ def rom_edge(out, objs):
     w.edge([out, out[:-len(".sfc")] + ".dbg", out[:-len(".sfc")] + ".map"],
            "sh", ["ff6/cfg/ff6-en.cfg"] + objs,
            implicit=["tools/build/link_rom.sh", "ff6/tools/encode_cutscene.py",
-                     "ff6/tools/fix_checksum.py"],
+                     "ff6/tools/fix_checksum.py", "tools/build/rom_version.py",
+                     "VERSION"],
            cmd=f"tools/build/link_rom.sh cfg/ff6-en.cfg {out[len('ff6/'):]} "
                + " ".join(rel),
            desc=f"link {Path(out).name}")
@@ -411,6 +444,34 @@ TEST_ENV = {
     # #327: TERRA knows Life and pays Life 3 here; no write needed
     "battle_lifefold":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fire-out-v1",
+    # #319: SETZER's kit, played in Darill's Tomb's east room from the
+    # battery cut on its save point (SETZER back in the World of Ruin, so
+    # Jackpot is learned).  A run is the Continue, a walk and one to four
+    # battles: 6-30k frames (battle_jackpot plays Dullahan from wor_grave)
+    # battle_jackpot: three passes and a bounded search (at most 192 throws)
+    "battle_jackpot": "OT6_TIMEOUT=3600",
+    "battle_cointoss": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    "battle_hiredhelp": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    "battle_setzergrey": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    "battle_gprain": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    "battle_hirerefund": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    # battle_passretarget: 3-21 battles over its entry variations (11k-85k
+    # frames, build/attempts/wt/pass-retarget/sweep/), more when the
+    # re-split takes its ten crowds
+    "battle_passretarget": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    "battle_setzeraim": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    "battle_passside": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    # the Config screen's version tab, from the Narshe exit spawn
+    "menu_configversion":
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1",
     # walks from the Narshe exit spawn into the Beginner's House
     "school":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1",
@@ -445,6 +506,13 @@ TEST_ENV = {
     "battle_levelup": "OT6_TIMEOUT=3600",
 }
 
+# Tests about the version fields themselves (tools/build/rom_version.py):
+# everything else binds to the ROM's identity, which leaves those fields
+# out, so these also depend on the ROM's bytes (and, through OT6_VERSION in
+# their composed program, on VERSION), and the release commit's VERSION bump
+# re-runs them on the bytes that ship.
+VERSION_TESTS = {"menu_configversion", "title_version"}
+
 # any <name>.mss reference, path-qualified or bare -- compose.py resolves
 # both against build/states, so both are fixture dependencies; the filter
 # against the graph's state names keeps false positives out
@@ -478,6 +546,8 @@ for f in glob("tools/tests/*.lua"):
     # The run: the emulator pin too, since a test result is the emulator's
     # as much as the ROM's.
     deps = [digest] + SUITE_RUN
+    if t in VERSION_TESTS:
+        deps.append("build/ot6.sfc")
     if "OT6_SRAM_CHECKPOINT=" in env:
         key = env.split("OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/")[1].split()[0]
         deps += [copy_if_changed_from(a) for a in sn.checkpoint_inputs(ROOT, key)]
@@ -502,7 +572,13 @@ check("compose_selftest", "python3 tools/tests/lib/compose.py --selftest",
 # a stamp's verdict, every input moved one at a time, with a mutant each
 check("stamps_selftest", "python3 tools/tests/lib/stamps.py --selftest",
       ["tools/tests/lib/stamps.py", "tools/tests/lib/compose.py",
-       "tools/tests/lib/lua_fingerprint.py"])
+       "tools/tests/lib/lua_fingerprint.py", "tools/build/rom_version.py"])
+# The version fields and the ROM identity that masks them (one mutant per
+# property: a flip outside the fields moves the identity, inside does not).
+check("rom_version_selftest", "python3 tools/build/rom_version.py selftest",
+      ["tools/build/rom_version.py", "ff6/include/ot6_version.inc",
+       "ff6/tools/fix_checksum.py"]
+      + glob("tools/char_table/*_en.json", "ff6"))
 check("sram_selftest", "python3 tools/tests/lib/sram_checkpoint.py selftest",
       ["tools/tests/lib/sram_checkpoint.py"])
 check("verdict_selftest", "sh tools/tests/run.sh --verdict-selftest",
@@ -603,7 +679,7 @@ check("ninja_graph_selftest",
        "tools/tests/lib/savestate_ninja.py",
        "tools/tests/lib/stamps.py", "tools/tests/lib/compose.py",
        "tools/tests/lib/sram_checkpoint.py",
-       "tools/tests/lib/lua_fingerprint.py"])
+       "tools/tests/lib/lua_fingerprint.py", "tools/build/rom_version.py"])
 check("runner_isolation", "sh tools/tests/lib/runner_isolation_selftest.sh",
       ["tools/tests/lib/runner_isolation_selftest.sh", "tools/tests/run.sh"])
 check("shared_emulator", "sh tools/tests/lib/shared_emulator_selftest.sh",
@@ -717,10 +793,57 @@ w.edge([f"build/release/ot6-v{VERSION}.zip"], "sh",
            f' "ot6-v{VERSION}/RELEASE_NOTES.md"',
        desc=f"release zip v{VERSION}")
 
+# The OT6 Patcher APK (android/, docs/TOOLING.md "Android patcher"): carries
+# the patch and writes the patched ROM on the player's device.  Only its own
+# paths build it, so bare `ninja` never needs the JDK, the Android SDK or the
+# signing key; the scripts say what is missing.
+#
+# The APK carries build/android/ot6.bps, made by the release patch's own
+# flips command from the same inputs, so the APK, the host check and the
+# signing checks run without qualification
+# (`ninja build/release/ot6-vX.Y.apk build/checks/android_apk.ok`); the
+# release itself also requires android_apk_release.ok, which compares that
+# patch with the qualified release .bps byte for byte.
+android_bps = "build/android/ot6.bps"
+w.edge([android_bps], "sh", [BASE, "build/ot6.sfc"],
+       cmd=f'mkdir -p build/android && tools/bin/flips --create --bps'
+           f' "{BASE}" build/ot6.sfc {android_bps} >/dev/null',
+       desc="bps patch for the android apk")
+w.edge(["build/checks/android_bps.ok"], "sh", [BASE, android_bps, "build/ot6.sfc"],
+       implicit=["tools/android/bps_check.sh", "tools/android/env.sh",
+                 "android/src/io/github/mtklein/ot6patcher/Bps.java",
+                 "android/src/io/github/mtklein/ot6patcher/RomScan.java",
+                 "android/test/BpsTest.java"],
+       cmd=f'tools/android/bps_check.sh "{BASE}" {android_bps} build/ot6.sfc'
+           f' && mkdir -p build/checks && touch build/checks/android_bps.ok',
+       desc="android BPS applier on the JVM")
+
+
+apk_code = rom_version.apk_version_code(VERSION)
+apk = f"build/release/ot6-v{VERSION}.apk"
+apk_inputs = ["build/checks/android_bps.ok", "tools/android/build_apk.sh",
+              "tools/android/env.sh", "android/AndroidManifest.xml"] \
+    + glob("android/src/io/github/mtklein/ot6patcher/*.java") \
+    + glob("android/res/*/*.xml")
+w.edge([apk], "sh", [android_bps], implicit=apk_inputs,
+       cmd=f'tools/android/build_apk.sh {android_bps} {VERSION} {apk_code} {apk}',
+       desc=f"android apk v{VERSION}")
+w.edge(["build/checks/android_apk.ok"], "sh", [apk, android_bps],
+       implicit=["tools/android/verify_apk.sh", "tools/android/env.sh",
+                 "android/release-cert.sha256"],
+       cmd=f'tools/android/verify_apk.sh {apk} {VERSION} {apk_code} {android_bps}'
+           f' && touch build/checks/android_apk.ok',
+       desc=f"verify android apk v{VERSION}")
+w.edge(["build/checks/android_apk_release.ok"], "sh", [android_bps, bps],
+       cmd=f'cmp {android_bps} "{bps}"'
+           f' && touch build/checks/android_apk_release.ok',
+       desc=f"android apk carries the release patch v{VERSION}")
+
 # ----------------------------------------------- copy_if_changed + regen ---
 w()
 for dep, src in sorted(copy_if_changed_edges.items()):
-    w.edge([dep], "copy_if_changed", [src])
+    w.edge([dep], "copy_if_rom_identity_changed" if src == sn.ROM
+           else "copy_if_changed", [src])
 for dep, src in sorted(lua_copy_edges.items()):
     w.edge([dep], "copy_if_lua_changed", [src])
 w()
@@ -732,7 +855,7 @@ w("  generator = 1")
 w("  restat = 1")
 w.edge(["build.ninja"], "configure",
        ["configure.py", sn.GRAPH, "tools/tests/lib/savestate_ninja.py",
-        "VERSION"])
+        "VERSION", "tools/build/rom_version.py", "ff6/include/ot6_version.inc"])
 w()
 # The default: every qualifier, and every generated state's and capture's
 # record (lib/stamps.py), which nothing else depends on.

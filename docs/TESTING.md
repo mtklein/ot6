@@ -81,7 +81,9 @@ it, and at a cut the battery save the run before it made, so the fixtures,
 the tracked checkpoints and the play are one line. Each run depends on its
 true inputs by content: its composed script (the generator, the test
 library it inlines, the savestates it embeds, compared as a Lua token
-stream), the ROM, the emulator pin, the runner, and at a cut the save it
+stream), the ROM (its identity: the ROM with its version fields masked,
+`tools/build/rom_version.py`, so the release commit's VERSION bump alone
+replays nothing), the emulator pin, the runner, and at a cut the save it
 Continues. `ninja` reruns exactly what a change reaches. A ROM, emulator,
 runner, generator or library change replays the game from the first run it
 touches; a comment, or any change that leaves every composed program alone,
