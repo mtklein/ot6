@@ -357,6 +357,8 @@ local function setzerSpin()
     local cur = H.readByte(0x890F + actor)
     if cur ~= cell then tap(cur < cell and "down" or "up"); return end
     tap("a")
+  elseif st == 0x30 then
+    tap(H.slotRowButton(actor))    -- Setzer's table: its first row is Slot
   elseif st == ST_REELS then
     if H.readByte(PRESS[3]) ~= 0 and H.readByte(STOP[3]) == 0 then
       H.setPad({})                 -- reel 3 settling: the commit waits for it

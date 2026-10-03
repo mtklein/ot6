@@ -540,6 +540,14 @@ H.run({ maxFrames = 20000 }, {
       "the @rage arm does NOT reach Ot6BoostPriceFor either: cmd $10 is in "
       .. "the same gate, and the boost buys the trance's coin")
 
+    local _ = H.sym("Ot6SetzerCost")   -- (named literally, so compose resolves it)
+    local zHit, zN = armEscalates("Ot6SetzerCost")
+    H.assertEq(zN, 1, "one Ot6SetzerCost call in Ot6AbilityCost (the @slot arm, #319)")
+    H.assertEq(zHit, 0,
+      "the @slot arm does NOT reach Ot6BoostPriceFor: cmd $0f is in the gate, "
+      .. "so Setzer's table is flat -- Jackpot's boost buys rolls, and the "
+      .. "coin rows are paid in gil, not MP")
+
     local dHit, dN = armEscalates("Ot6DanceCost")
     H.assertEq(dN, 1, "one Ot6DanceCost call in Ot6AbilityCost (the @dance arm)")
     H.assertEq(dHit, 1,
@@ -561,8 +569,8 @@ H.run({ maxFrames = 20000 }, {
       .. "escalates exactly when Ot6BoostDmg multiplies it, and #219's four "
       .. "call sites became two when the owner exempted the chance verbs")
     H.log(string.format("Ot6AbilityCost: %d escalating arms (dance %d/%d, "
-      .. "boosted %d/%d); steal %d/%d and rage %d/%d flat",
-      #escalating, dHit, dN, cHit, cN, sHit, sN, rHit, rN))
+      .. "boosted %d/%d); steal %d/%d, rage %d/%d and slot %d/%d flat",
+      #escalating, dHit, dN, cHit, cN, sHit, sN, rHit, rN, zHit, zN))
 
     -- The drawn price has to make the same split, or the menu and the charge
     -- disagree.  Ot6KitRowCost's thief arm is now one flat tail-call, so the

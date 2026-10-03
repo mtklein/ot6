@@ -386,6 +386,31 @@ TEST_ENV = {
     # #327: TERRA knows Life and pays Life 3 here; no write needed
     "battle_lifefold":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fire-out-v1",
+    # #319: SETZER's kit, played in Darill's Tomb's east room from the
+    # battery cut on its save point (SETZER back in the World of Ruin, so
+    # Jackpot is learned).  A run is the Continue, a walk and one to four
+    # battles: 6-30k frames (battle_jackpot plays Dullahan from wor_grave)
+    # battle_jackpot: three passes and a bounded search (at most 192 throws)
+    "battle_jackpot": "OT6_TIMEOUT=3600",
+    "battle_cointoss": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    "battle_hiredhelp": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    "battle_setzergrey": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    "battle_gprain": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    "battle_hirerefund": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    # battle_passretarget: 3-21 battles over its entry variations (11k-85k
+    # frames, build/attempts/wt/pass-retarget/sweep/), more when the
+    # re-split takes its ten crowds
+    "battle_passretarget": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    "battle_setzeraim": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    "battle_passside": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
     # walks from the Narshe exit spawn into the Beginner's House
     "school":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1",
