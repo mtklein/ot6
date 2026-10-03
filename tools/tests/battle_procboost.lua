@@ -775,7 +775,15 @@ local function magicitePool()
   assert(q < 1, "the Magicite's pool holds an esper with power to multiply")
   return pool, q, n
 end
-local MAGICITE_POOL, MAGICITE_IDLE, MAGICITE_N = magicitePool()
+-- Decoded as the script loads, because the try count shapes the steps; an
+-- error raised here, before H.run, hangs the testrunner silently until
+-- OT6_TIMEOUT (a mutant of the RandGenju check sat 30 minutes with no line
+-- logged), so it is caught and raised again from the run's first step.
+local poolOk, MAGICITE_POOL, MAGICITE_IDLE, MAGICITE_N = pcall(magicitePool)
+local poolErr = nil
+if not poolOk then
+  poolErr, MAGICITE_POOL, MAGICITE_IDLE, MAGICITE_N = tostring(MAGICITE_POOL), {}, 0.5, 0
+end
 -- tries until a draw measures: the least N with q^N <= MAGICITE_FAIL, q the
 -- share of draws that measure nothing (each try draws a round later than the
 -- last, at another point of the RNG)
@@ -961,6 +969,7 @@ local function battleSetup()
 end
 
 local steps = {
+  H.call(function() if poolErr then error("the Magicite's pool: " .. poolErr, 0) end end),
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(20),
