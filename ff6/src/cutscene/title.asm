@@ -203,6 +203,7 @@ SplashLoop:
         sty     $25
         sty     $27
         jsr     ResetTasks
+Ot6SplashOffSite:                       ; ot6: patched at run time (ot6_version.asm)
         jsr     DisableInterrupts
         rts
 
@@ -223,6 +224,7 @@ SplashPal:
 ; [ splash screen $00: init ]
 
 SplashState_00:
+Ot6SplashOnSite:                        ; ot6: patched at run time (ot6_version.asm)
 @5155:  jsr     _7e5306
         ldx     #$3000
         ldy     #.loword(BlackPal)

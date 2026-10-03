@@ -37,6 +37,33 @@ JmpIRQ:
 
 ; ------------------------------------------------------------------------------
 
+; [ ot6: the build's version, shown on the Config screen and the boot splash ]
+
+; A fixed-size field at a fixed address (c0/ffa0, the ot6_version segment in
+; cfg/ff6-en.cfg), filled after the link by tools/build/rom_version.py from
+; the repo's VERSION file: OT6_VERSION_CELLS (15) menu-font cells, "OT6
+; v<VERSION>" centered and space-padded ($ff), then a $00
+; (include/ot6_version.inc).  The SNES header title below is the same
+; kind of field (ASCII "OT6 V<VERSION>", space-padded).  The ROM identity
+; that fixtures and test results bind to (rom_version.py identity) is the
+; ROM with these two fields and the header checksum zeroed, so a VERSION
+; bump changes the shipped bytes and nothing a fixture depends on.  The
+; assembled bytes here are only placeholders: the stamp checks this
+; address in ff6-en.dbg before it writes.
+
+.export Ot6VersionText
+.include "ot6_version.inc"
+.assert OT6_VERSION_CELLS + 1 = $10, error, "Ot6VersionText is OT6_VERSION_CELLS cells and a $00"
+
+.segment "ot6_version"
+
+Ot6VersionText:
+@ffa0:  fixed_block $10
+        .byte   0                       ; placeholder (rom_version.py stamps it)
+        end_fixed_block 0
+
+; ------------------------------------------------------------------------------
+
 .segment "snes_header_ext"
 
 .if LANG_EN
@@ -55,7 +82,8 @@ SnesHeaderExt:
 SnesHeader:
 @ffc0:
 .if LANG_EN
-        .byte   "FINAL FANTASY 3      " ; rom title (U)
+        .byte   "OT6                  " ; rom title (U): rom_version.py stamps
+                                        ; "OT6 V<VERSION>" (see Ot6VersionText)
 .else
         .byte   "FINAL FANTASY 6      " ; rom title (J)
 .endif

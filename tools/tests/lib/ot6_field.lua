@@ -1057,14 +1057,24 @@ end
 --          $F0, else 4 -- 80, 80, 80 and 16 in 256.  A word with bit 15
 --          set deals formation (word & $1FF) plus a battle-RNG 0..3
 --          (battle_main.asm @30f3, after the CondBattle swaps).
--- UpdateBattleGrpRng steps a SAVE-DATA counter once per encounter:
+-- UpdateBattleGrpRng steps a WRAM counter once per encounter:
 --   $1fa2 += 1 (and on its wrap $1fa3 += $17); v = RNGTbl[$1fa2] + $1fa3.
 -- Steps ($1fa1/$1fa4) decide only WHEN an encounter comes, never which,
--- and OT6_SEED_SHIFT (battle RNG $be) moves neither: a fixture's coming
--- formations are fixed by two bytes, and every regeneration of the chain
+-- and OT6_SEED_SHIFT (battle RNG $be) moves neither.  Where the counter
+-- starts depends on how the run boots.  A savestate carries $1fa1-$1fa5
+-- as they were.  A Continue does not use the saved counters at all: it
+-- re-seeds them from SRAM's random seed $307ff1, which GameLoadMenu adds
+-- 1 to (menu_common.asm @016f) and EventCmd_ab adds $0D to and copies
+-- into $1f6d and all five of $1fa1-$1fa5 (event.asm @b91b).  So a
+-- Continue's coming formations are fixed by that one SRAM byte, with
+-- $1fa2 == $1fa3 at the first walk, and every regeneration of the chain
 -- deals it different ones.  A test that must reach a formation budgets
 -- its encounters over every counter state (M.worstCaseEncounters), not
--- the one its fixture happens to carry.
+-- the one its fixture happens to carry.  That bound is conservative
+-- for a first walk after a Continue (only the $1fa2 == $1fa3 diagonal
+-- occurs there: for battle_slotsboot's group 10 its worst is 15
+-- encounters against 21 over all states), and it is the right one for
+-- a later walk, which can stand anywhere on the counter's path.
 M.ENCOUNTER_ODDS = { 80, 80, 80, 16 }     -- in 256, slots 1..4
 
 function M.encounterSlot(v)
@@ -1181,6 +1191,739 @@ function M.encounterShare(hist, n)
   local k = 0
   for m, c in pairs(hist) do if m <= n then k = k + c end end
   return k / 65536
+end
+
+-- ---- statuses that take a member's command (the Slot suites) -----------
+-- Every status that takes away a member's control of their own turn, as
+-- the battle reads them ($3ee4/$3ee5/$3ef8/$3ef9 + entity*2): the engine
+-- takes the window (Death, Petrify, Zombie, Sleep, Muddle, Berserk: the
+-- @0941 list M.turnDenied describes), holds the gauge under a kept window
+-- (Stop, Frozen), or greys every command but Fight/Item/Magic (Imp).
+-- How a person standing beside the member gives the turn back: cure =
+-- "hit", a plain physical hit (CalcMaxDmg @0c45 strips Sleep and Muddle
+-- from a physically damaged target); or `items`, in order, of which the
+-- first the bag holds and whose ItemProp cure byte carries the bit
+-- (M.statusCure) is used -- Fenix Down for Death, Soft/Remedy for
+-- Petrify, Revivify/Remedy for Zombie, Green Cherry/Remedy for Imp,
+-- Remedy for Berserk (whose record does not carry it in this ROM, so
+-- Berserk has none); neither = only time clears it.
+M.CONTROL_STATUSES = {
+  { byte = 1, bit = 0x80, name = "Death",   items = { 0xF0 } },
+  { byte = 1, bit = 0x40, name = "Petrify", items = { 0xF4, 0xF5 } },
+  { byte = 1, bit = 0x02, name = "Zombie",  items = { 0xF1, 0xF5 } },
+  { byte = 1, bit = 0x20, name = "Imp",     items = { 0xF8, 0xF5 } },
+  { byte = 2, bit = 0x80, name = "Sleep",   cure = "hit" },
+  { byte = 2, bit = 0x20, name = "Muddle",  cure = "hit" },
+  { byte = 2, bit = 0x10, name = "Berserk", items = { 0xF5 } },
+  { byte = 3, bit = 0x10, name = "Stop" },
+  { byte = 4, bit = 0x02, name = "Frozen" },
+}
+local CONTROL_ST = { 0x3EE4, 0x3EE5, 0x3EF8, 0x3EF9 }
+
+-- The first control-taking status a party entity (0..3) carries, as its
+-- M.CONTROL_STATUSES row, or nil.  A seated member at 0 HP reads as Death.
+function M.controlTaken(e)
+  for _, c in ipairs(M.CONTROL_STATUSES) do
+    if (M.readByte(CONTROL_ST[c.byte] + e * 2) & c.bit) ~= 0 then return c end
+  end
+  if M.readWord(0x3C1C + e * 2) > 0 and M.readWord(0x3BF4 + e * 2) == 0 then
+    return M.CONTROL_STATUSES[1]
+  end
+  return nil
+end
+
+-- The control-taking statuses one attack can inflict, by name: the
+-- species' special ($EF; MonsterProp+31, a status index when its low six
+-- bits are under $20) or a spell (MagicProp+10..13, the four status bytes
+-- it sets, unless MagicProp+4 bit 2 says it removes them).  $EE (Battle)
+-- and $FE (nothing) inflict none.
+local function attackControl(attack, species)
+  local out = {}
+  if attack == 0xEE or attack == 0xFE then return out end
+  if attack == 0xEF then
+    local sp = M.readRomByte((M.sym("MonsterProp") & 0x3FFFFF) + species * 32 + 31) & 0x3F
+    if sp < 0x20 then
+      local byte, bit = (sp >> 3) + 1, 1 << (sp & 7)
+      for _, c in ipairs(M.CONTROL_STATUSES) do
+        if c.byte == byte and c.bit == bit then out[#out + 1] = c.name end
+      end
+    end
+    return out
+  end
+  local mp = (M.sym("MagicProp") & 0x3FFFFF) + attack * 14
+  if (M.readRomByte(mp + 4) & 0x04) ~= 0 then return out end
+  for _, c in ipairs(M.CONTROL_STATUSES) do
+    if (M.readRomByte(mp + 9 + c.byte) & c.bit) ~= 0 then out[#out + 1] = c.name end
+  end
+  return out
+end
+
+-- What in a species' AI script (AIScriptPtrs / AIScript, walked with
+-- M.AI_OP_LEN as M.partRoles walks it) can take a member's control:
+-- { { status, attack, anyTurn, counter } ... }.  An attack inside a block
+-- that opens with conditions ($FC ... up to its $FE: the Iron Fist's
+-- `if_num_monsters 1 / attack BATTLE, STONE, STONE`) has anyTurn false;
+-- one outside any block can come on any of the monster's turns (the Mind
+-- Candy's `attack BATTLE, BATTLE, SPECIAL`, SleepSting).  The second
+-- section is the retaliation script (counter true).  ifMonsters is N when
+-- the block's only condition is `if_num_monsters N`: the attack is live
+-- once N or fewer monsters stand (M.newSpinnerCare's lost point).
+local speciesControlCache = {}
+function M.speciesControl(species)
+  if speciesControlCache[species] then return speciesControlCache[species] end
+  local r = M.speciesControlUncached(species)
+  speciesControlCache[species] = r
+  return r
+end
+function M.speciesControlUncached(species)
+  local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
+  local off = M.readRomWord(ptrs + species * 2)
+  local function at(i) return M.readRomByte(base + off + i) end
+  local out, seen = {}, {}
+  local i, section, inBlock, conds = 0, 0, false, false
+  local ifMonsters, otherConds = nil, false     -- the open block's conditions
+  local function add(a)
+    for _, name in ipairs(attackControl(a, species)) do
+      local key = string.format("%s/%02X/%s/%d", name, a, tostring(not inBlock), section)
+      if not seen[key] then
+        seen[key] = true
+        out[#out + 1] = { status = name, attack = a, anyTurn = not inBlock, counter = section == 1,
+                          ifMonsters = inBlock and not otherConds and ifMonsters or nil }
+      end
+    end
+  end
+  while section < 2 and i < M.AI_SCRIPT_MAX do
+    local op = at(i)
+    local len = M.AI_OP_LEN[op] or 1
+    if op == 0xFC then
+      if not conds then conds, inBlock, ifMonsters, otherConds = true, true, nil, false end
+      -- `if_num_monsters N` (FC 13 01 N, M.partRoles' lastStand): the
+      -- block runs once N or fewer monsters stand; any other condition
+      -- leaves the block's trigger unmodelled (ifMonsters nil)
+      if at(i + 1) == 0x13 and at(i + 2) == 0x01 then ifMonsters = at(i + 3)
+      else otherConds = true end
+    else
+      conds = false
+      if op < 0xF0 then add(op)
+      elseif op == 0xF0 then add(at(i + 1)); add(at(i + 2)); add(at(i + 3))
+      elseif op == 0xFE then inBlock = false
+      elseif op == 0xFF then section, inBlock = section + 1, false end
+    end
+    i = i + len
+  end
+  return out
+end
+
+-- A formation judged from the ROM for a fight a member must keep their
+-- turns through: suits when it has at least minBodies bodies and minHp
+-- max HP among them (MonsterProp+8) and no species can take a member's
+-- control on any of its turns (M.speciesControl anyTurn).  Conditional
+-- sources are let through and reported; answering them is the fight's
+-- (battle_slotsboot cures with M.controlTaken / M.CONTROL_STATUSES).
+-- Returns suits, hp, and a description of every control source.
+function M.judgeFormation(species, minBodies, minHp)
+  local hp, anyTurn, srcs = 0, false, {}
+  local mp = M.sym("MonsterProp") & 0x3FFFFF
+  local done = {}
+  for _, sp in ipairs(species) do
+    hp = hp + M.readRomWord(mp + sp * 32 + 8)
+    if not done[sp] then
+      done[sp] = true
+      for _, c in ipairs(M.speciesControl(sp)) do
+        anyTurn = anyTurn or c.anyTurn
+        srcs[#srcs + 1] = string.format("%03X %s via $%02X%s%s", sp, c.status, c.attack,
+          c.counter and " (counter)" or "", c.anyTurn and " ANY TURN" or " (conditional)")
+      end
+    end
+  end
+  return #species >= minBodies and hp >= minHp and not anyTurn, hp, srcs
+end
+
+-- ---- the party around a spinner (the Slot suites) ----------------------
+-- M.newSpinnerCare(o): the other members' windows while one member (the
+-- spinner: Setzer in battle_slotsboot and battle_slots) plays a command
+-- the test is about.  Nobody but the spinner attacks: the formation has
+-- to stand through it.  Each window, once, picks:
+--   * the spinner's control taken (M.controlTaken): a Fenix Down on him
+--     for Death; an ally's plain Fight on him for Sleep or Muddle (healed
+--     first when the hit could drop him: under hitFloor % of his max HP,
+--     the fight driver's unmeasured unmuddle floor, a quarter); the item
+--     the ROM's records say cures Petrify, Zombie, Imp or Berserk; then
+--     an ally asleep or muddled gets the same hit (a muddled ally's own
+--     turns are the engine's to aim, at the formation or the party);
+--   * else a dead member raised with a Fenix Down;
+--   * else a living member under carePct % gets a Potion (a Tonic
+--     without), the spinner first, else the most hurt;
+--   * else Defend.
+-- A window open for a member whose own control is taken (a Muddle that
+-- landed as it opened) is passed on with X, as the fight driver's
+-- muddled actor defers (#170).  A confirmed action is in flight until it
+-- lands, 900 frames pass, or what it answered is gone or has become
+-- something else (a Fight on a muddled member who then falls leaves him
+-- needing a Fenix Down).
+-- C.watch(what) says when the spinner's control is taken and given back,
+-- and fails at once, naming it, on a status no cure in reach answers
+-- (Berserk, Stop, Frozen; an empty bag; a hit with no ally in control
+-- holding a Fight row), or one still on him o.denyMax frames after it
+-- landed.  C.lostPoint() (below) is when a fight is no longer one the
+-- test can finish; the caller checks it before C.watch.
+--   o.spinner()   the spinner's party entity (0..3), or nil
+--   o.name        his name for the messages (default "SETZER")
+--   o.carePct, o.hitFloor, o.denyMax   (50, 25, 6000)
+-- C.window() plays one frame of a window that is not the spinner's own
+-- spin (MENU open); C.reset() forgets the window; C.taken = { since,
+-- name, n }; C.cared = { heal, raise, cure, hit }; C.partyLine().
+function M.newSpinnerCare(o)
+  local C = { taken = { since = nil, name = nil, n = 0 },
+              cared = { heal = 0, raise = 0, cure = 0, hit = 0 } }
+  local NAME = o.name or "SETZER"
+  local CARE_PCT, HIT_FLOOR = o.carePct or 50, o.hitFloor or 25
+  local DENY_MAX = o.denyMax or 6000
+  local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
+  local TONIC, POTION, FENIX = 0xE8, 0xE9, 0xF0
+  local CMD_FIGHT, CMD_ITEM = 0x00, 0x01
+  local ST_CMD, ST_ITEM, ST_TGT, ST_DEF = 0x05, 0x0A, 0x38, 0x27
+  local BATTINV, ITEMSCR, ITEMROW = 0x2686, 0x8947, 0x894F
+  local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
+  local inFlight, W = {}, { actor = nil, n = 0 }
+  local taken, cared = C.taken, C.cared
+  local function chid(s) return M.readByte(0x3ED8 + s * 2) end
+  local function php(s) return M.readWord(0x3BF4 + s * 2) end
+  local function pmax(s) return M.readWord(0x3C1C + s * 2) end
+  local function seated(s) return chid(s) ~= 0xFF and pmax(s) > 0 end
+  function C.partyLine()
+    local t = {}
+    for s = 0, 3 do
+      if seated(s) then
+        local c = M.controlTaken(s)
+        t[#t + 1] = string.format("%02X:%d/%d bp%d%s", chid(s), php(s), pmax(s),
+          M.readByte(0x3E9C + s * 2), c and (" " .. c.name) or "")
+      end
+    end
+    return table.concat(t, " ")
+  end
+  local partyLine = C.partyLine
+  local function invIdx(item)
+    for i = 0, 251 do
+      if M.readByte(BATTINV + i * 5) == item and M.readByte(BATTINV + i * 5 + 3) > 0 then
+        return i
+      end
+    end
+  end
+  local function invCount(item)
+    local i = invIdx(item)
+    return i and M.readByte(BATTINV + i * 5 + 3) or 0
+  end
+  local function cmdCell(a, cmd)
+    for r = 0, 3 do
+      if M.readByte(0x202E + a * 12 + r * 3) == cmd then return r end
+    end
+  end
+  C.cmdCell = cmdCell
+  function C.spinnerTaken()
+    local s = o.spinner()
+    return s ~= nil and M.controlTaken(s) or nil
+  end
+  -- the members other than `but` whose control is their own
+  local function inControl(but)
+    local t = {}
+    for s = 0, 3 do
+      if s ~= but and seated(s) and M.controlTaken(s) == nil then t[#t + 1] = s end
+    end
+    return t
+  end
+  -- the cure in reach for a control-taking status on entity e: "hit" (an
+  -- ally whose control is their own and who has a Fight row), an item id
+  -- the bag holds, or nil
+  local function cureOf(c, e)
+    if c.cure == "hit" then
+      for _, s in ipairs(inControl(e)) do
+        if cmdCell(s, CMD_FIGHT) then return "hit" end
+      end
+      return nil
+    end
+    if c.items == nil then return nil end
+    return M.statusCure({ byte = c.byte, bit = c.bit, items = c.items,
+      has = function(item) return invIdx(item) ~= nil end })
+  end
+
+  -- The lost point (review of 3c0d68d8: h3_k9_s15, one all-target Stone
+  -- muddled three members, nobody attacked the lone 333-HP Iron Fist, and
+  -- the party wiped with banks of 4, 2 and 5 standing): the moment the
+  -- fight stops being one the spins can be played through.  Returns why,
+  -- or nil:
+  --   * the spinner fell (battle_slots' rule: a fall costs that battle;
+  --     raising him in it burned the bag in the fellsetzer lab);
+  --   * the formation is down to a monster whose conditional control
+  --     attack is now live (M.speciesControl ifMonsters: the Iron Fist's
+  --     `if_num_monsters 1 / Stone` once it stands alone);
+  --   * two or more members have lost control (M.controlTaken);
+  --   * no member but the spinner has control left.
+  -- The caller marks the battle lost to the test and ends it with Fights
+  -- (C.fightOut) rather than spin into it.
+  function C.lostPoint()
+    local spinner = o.spinner()
+    if spinner ~= nil and seated(spinner) and php(spinner) == 0 then
+      return NAME .. " fell"
+    end
+    local standing, species = 0, {}
+    for m = 0, 5 do
+      if (M.readByte(0x3AA8 + m * 2) & 1) == 1 and M.readWord(0x3BFC + m * 2) > 0 then
+        standing = standing + 1
+        species[#species + 1] = M.readWord(0x57C0 + m * 2)
+      end
+    end
+    if standing > 0 then
+      for _, sp in ipairs(species) do
+        if sp < 0x180 then
+          for _, c in ipairs(M.speciesControl(sp)) do
+            if not c.anyTurn and not c.counter and c.ifMonsters and standing <= c.ifMonsters then
+              return string.format("the formation is down to %d monster(s) and $%03X's %s "
+                .. "($%02X, if_num_monsters %d) is live", standing, sp, c.status, c.attack,
+                c.ifMonsters)
+            end
+          end
+        end
+      end
+    end
+    local lostN, names = 0, {}
+    for s = 0, 3 do
+      local c = seated(s) and M.controlTaken(s) or nil
+      if c then lostN = lostN + 1; names[#names + 1] = string.format("%02X %s", chid(s), c.name) end
+    end
+    if lostN >= 2 then
+      return string.format("%d members have lost control (%s)", lostN, table.concat(names, ", "))
+    end
+    local spin = o.spinner()
+    if spin ~= nil and #inControl(spin) == 0 then
+      return "no member but " .. NAME .. " has control left"
+    end
+    return nil
+  end
+
+  local function carePlan(a)
+    local actor = o.spinner()
+    if C.fightingOut then
+      -- the battle is lost to the test: every member with control Fights
+      -- the first monster standing (C.fightOut)
+      local fightCell = cmdCell(a, CMD_FIGHT)
+      for m = 0, 5 do
+        if fightCell and (M.readByte(0x3AA8 + m * 2) & 1) == 1 and M.readWord(0x3BFC + m * 2) > 0 then
+          return { plan = "kill", mon = m, tgt = a, cell = fightCell,
+                   why = string.format("the battle is lost to the test: a Fight on monster slot %d", m) }
+        end
+      end
+      return { plan = "defend" }
+    end
+    for e, h in pairs(inFlight) do
+      local now = M.controlTaken(e)
+      if M.frame - h.f > 900 or (h.kind == "heal" and php(e) > h.hp)
+         or (h.kind ~= "heal" and (now == nil or now.name ~= h.st)) then
+        inFlight[e] = nil
+      end
+    end
+    local itemCell, fightCell = cmdCell(a, CMD_ITEM), cmdCell(a, CMD_FIGHT)
+    local order = { actor }
+    for s = 0, 3 do if s ~= actor then order[#order + 1] = s end end
+    for _, e in ipairs(order) do
+      local c = seated(e) and M.controlTaken(e) or nil
+      if c and e ~= a and inFlight[e] == nil and (e == actor or c.cure == "hit") then
+        local cure = cureOf(c, e)
+        if c.name == "Death" and cure and itemCell then
+          return { plan = "raise", tgt = e, idx = invIdx(cure), cell = itemCell, item = cure, why = c.name }
+        elseif cure == "hit" and fightCell then
+          if php(e) * 100 < pmax(e) * HIT_FLOOR and itemCell then
+            local item = invIdx(POTION) and POTION or (invIdx(TONIC) and TONIC or nil)
+            if item then
+              return { plan = "heal", tgt = e, idx = invIdx(item), cell = itemCell, item = item,
+                       why = c.name .. " (healed before the hit that cures it)" }
+            end
+          end
+          return { plan = "hit", tgt = e, cell = fightCell, why = c.name }
+        elseif cure and itemCell then
+          return { plan = "cure", tgt = e, idx = invIdx(cure), cell = itemCell, item = cure, why = c.name }
+        end
+      end
+    end
+    if itemCell == nil then return { plan = "defend" } end
+    if invIdx(FENIX) then
+      for s = 0, 3 do
+        if seated(s) and php(s) == 0 and inFlight[s] == nil and s ~= a then
+          return { plan = "raise", tgt = s, idx = invIdx(FENIX), cell = itemCell, item = FENIX, why = "Death" }
+        end
+      end
+    end
+    local item = invIdx(POTION) and POTION or (invIdx(TONIC) and TONIC or nil)
+    if item == nil then return { plan = "defend" } end
+    local pick, pickPct = nil, nil
+    for s = 0, 3 do
+      local pct = seated(s) and php(s) * 100 // math.max(pmax(s), 1) or 100
+      if seated(s) and php(s) > 0 and pct < CARE_PCT and inFlight[s] == nil then
+        if pick == nil or (s == actor) or (pick ~= actor and pct < pickPct) then
+          pick, pickPct = s, pct
+        end
+      end
+    end
+    if pick then
+      return { plan = "heal", tgt = pick, idx = invIdx(item), cell = itemCell, item = item, why = "HP" }
+    end
+    return { plan = "defend" }
+  end
+
+  function C.window()
+    local a = M.readByte(ACTOR) & 3
+    if W.actor ~= a then
+      W.actor, W.via, W.n = a, nil, 0
+      W.p = carePlan(a)
+      if W.p.plan ~= "defend" then
+        M.log(string.format("[care] f%d actor %d (%02X): %s slot %d (%02X)%s for %s | party %s",
+          M.frame, a, chid(a), W.p.plan, W.p.tgt, chid(W.p.tgt),
+          W.p.item and string.format(" with $%02X (%d in the bag)", W.p.item, invCount(W.p.item)) or "",
+          W.p.why, partyLine()))
+      end
+    end
+    W.n = W.n + 1
+    local ph = W.n % 10
+    local st = M.readByte(MSTATE)
+    local p = W.p
+    local function tap(b) M.setPad(ph < 5 and { [b] = true } or {}) end
+    local own = M.controlTaken(a)
+    if own then
+      if W.n == 1 then
+        M.log(string.format("[care] f%d actor %d (%02X)'s window is open under %s: passed on (X)",
+          M.frame, a, chid(a), own.name))
+      end
+      if st == ST_CMD then tap("x") else tap("b") end
+      return
+    end
+    if p.plan == "defend" then
+      if st == ST_CMD then
+        if M.readByte(0x3E9D + a * 2) > 0 then tap("l") else tap("right") end
+      elseif st == ST_DEF then tap("a")
+      elseif st == 0x0A or st == 0x30 or st == 0x16 or st == 0x24 or st == 0x0E
+          or st == ST_TGT or st == 0x08 then tap("b")
+      else M.setPad({}) end
+      return
+    end
+    if st == ST_CMD then
+      local cur = M.readByte(0x890F + a)
+      if cur ~= p.cell then tap(cur < p.cell and "down" or "up"); return end
+      if M.readByte(0x3E9D + a * 2) > 0 then tap("l"); return end   -- care goes unboosted
+      W.via = (p.plan == "hit" or p.plan == "kill") and "fight" or "cmd"
+      tap("a")
+    elseif st == ST_ITEM and p.idx then
+      local cur = M.readByte(ITEMSCR + a) + M.readByte(ITEMROW + a)
+      if cur ~= p.idx then tap(cur < p.idx and "down" or "up"); return end
+      W.via = "item"
+      tap("a")
+    elseif st == ST_TGT and p.plan == "kill" then
+      -- a Fight on a monster: the cursor walked onto its slot, then A
+      if W.via ~= "fight" and W.via ~= "confirmed" then tap("b"); return end
+      local mons, chars = M.readByte(TGTMONS), M.readByte(TGTCHARS)
+      if chars ~= 0 or mons == 0 then tap(M.battleLayout().toMonsters[1]); return end
+      if mons ~= (1 << p.mon) and W.n < 120 then
+        local dirs = { "down", "up", "left", "right" }
+        tap(dirs[1 + ((W.n // 10) % 4)])
+        return
+      end
+      if ph < 5 and W.via == "fight" then
+        W.via = "confirmed"
+        M.log(string.format("[care] f%d actor %d confirms a Fight on monster slot %d (%s)",
+          M.frame, a, p.mon, p.why))
+      end
+      tap("a")
+    elseif st == ST_TGT then
+      if W.via ~= "item" and W.via ~= "fight" and W.via ~= "confirmed" then tap("b"); return end
+      local chars = M.readByte(TGTCHARS)
+      if M.readByte(TGTMONS) ~= 0 or chars == 0 then
+        tap(M.battleLayout().toChars[1])
+        return
+      end
+      if chars ~= (1 << p.tgt) then
+        local cur = 0
+        for s = 3, 0, -1 do if chars & (1 << s) ~= 0 then cur = s end end
+        tap(cur < p.tgt and "down" or "up")
+        return
+      end
+      if ph < 5 and (W.via == "item" or W.via == "fight") then
+        W.via = "confirmed"
+        local now = M.controlTaken(p.tgt)
+        inFlight[p.tgt] = { f = M.frame, kind = p.plan, hp = php(p.tgt), st = now and now.name }
+        cared[p.plan] = (cared[p.plan] or 0) + 1
+        M.log(string.format("[care] f%d actor %d confirms the %s on slot %d (%s; #%d)",
+          M.frame, a, p.plan == "hit" and "Fight" or p.plan, p.tgt, p.why, cared[p.plan]))
+      end
+      tap("a")
+    elseif st == 0x30 or st == 0x16 or st == 0x24 or st == 0x27 or st == 0x0E or st == 0x08 then
+      tap("b")                                  -- a window care never means to be in
+    else
+      M.setPad({})
+    end
+  end
+  function C.reset() W.actor, W.p = nil, nil end
+
+  -- A step that ends a battle lost to the test with Fights: every window
+  -- whose member has control (the spinner's included) Fights the first
+  -- monster standing; a member out of control is passed on (X); pages
+  -- are turned with A.  Ends when the battle does.
+  function C.fightOut(tag)
+    return M.withReset(M.driveUntil(function()
+      if not M.battleLoadStarted() then C.fightingOut = false; return true end
+      return false
+    end, 30000, {
+      M.call(function()
+        if not C.fightingOut then
+          C.fightingOut = true
+          C.reset()
+          M.log(string.format("[%s] f%d the party Fights the battle out | party %s", tag,
+            M.frame, partyLine()))
+        end
+        if M.readByte(MENU) == 0 then
+          C.reset()
+          M.setPad(M.frame % 8 < 4 and { a = true } or {})
+        else
+          C.window()
+        end
+      end),
+    }, tag .. ": the lost battle fought out"), function() C.fightingOut = false; C.reset() end)
+  end
+
+  function C.watch(what)
+    local c = C.spinnerTaken()
+    if c then
+      if taken.since == nil then
+        taken.since, taken.name, taken.n = M.frame, c.name, taken.n + 1
+        M.log(string.format("[control] f%d %s: %s cannot take a command: %s (#%d) | party %s",
+          M.frame, what, NAME, c.name, taken.n, partyLine()))
+      end
+      if cureOf(c, o.spinner()) == nil then
+        error(string.format("%s: %s cannot take a command: %s, and nothing in reach "
+          .. "cures it (%s)", what, NAME, c.name, c.cure == "hit"
+          and "no ally with control has a Fight row" or c.items
+          and "none of its cure items in the bag" or "only time clears it"), 0)
+      end
+      if M.frame - taken.since > DENY_MAX then
+        error(string.format("%s: %s cannot take a command: %s, still %d frames after it "
+          .. "landed (cures confirmed: %d hit, %d item, %d raise)", what, NAME, c.name,
+          M.frame - taken.since, cared.hit, cared.cure, cared.raise), 0)
+      end
+    elseif taken.since ~= nil then
+      M.log(string.format("[control] f%d %s: %s's %s is gone after %d frames; resuming | party %s",
+        M.frame, what, NAME, taken.name, M.frame - taken.since, partyLine()))
+      taken.since, taken.name = nil, nil
+    end
+  end
+  return C
+end
+
+-- ---- reaching a formation by its pool (the Slot suites) ----------------
+-- M.newEncounterDraw(opts) paces a stretch of the world row the party
+-- stands on whose every tile rolls one encounter group from any saved
+-- position (as battle_steal's desert), and meets encounters until the
+-- pool deals a formation M.judgeFormation accepts, budgeted over every
+-- counter state (M.worstCaseEncounters) from the group CheckBattleWorld
+-- really rolls.  Each encounter asserts the group rolled and the word the
+-- counter chose, the word captured where CheckBattleWorld stores it
+-- (`sta f:$0011e0`): LoadBattleProp rewrites $11e0 in battle (a
+-- CondBattle swap, and bit 15's +Rand&3), so the battle's copy is the
+-- formation, not the word.  Unsuitable encounters are run from, or fought
+-- out when the pack cannot be run from (M.fleeBattle's onCantRun =
+-- "fight": $b1 bit 1, a pincer, or the formation's no-run bit $2f4b
+-- bit 0), with field care after each.
+--   opts.tag        log tag
+--   opts.minBodies, opts.minHp   the M.judgeFormation floors
+--   opts.maxTries   encounters built (the budget must fit; default 24)
+--   opts.pace       tiles each way from the start tile (default 4)
+-- D.steps() returns the step list; afterwards D.suitable, D.n (encounters
+-- met), D.group, D.budget, D.msPresent (the live monster slots).
+function M.newEncounterDraw(opts)
+  local D = { tag = opts.tag or "draw", maxTries = opts.maxTries or 24,
+              pace = opts.pace or 4, n = 0, suitable = false }
+  local CBW, CBW_END = M.sym("CheckBattleWorld"), M.sym("GetVeldtBattle")
+  local RNG = M.sym("RNGTbl") & 0x3FFFFF
+  local armed = false
+  local function arm()
+    if armed then return end
+    armed = true
+    emu.addMemoryCallback(function() D.worldGroup = M.worldCheckGroup() end,
+      emu.callbackType.exec, CBW, CBW)
+    -- CheckBattleWorld's own store of the word (16-bit, so the high byte
+    -- is written second); a write from anywhere else (LoadBattleProp's
+    -- rewrite, an event battle) is not it.  GetVeldtBattle follows
+    -- CheckBattleWorld in the ROM, so it bounds the proc.
+    for _, hi in ipairs({ 0x0011E1, 0x7E11E1 }) do
+      emu.addMemoryCallback(function(_, v)
+        local s = emu.getState()
+        local pc = (s["cpu.k"] << 16) | s["cpu.pc"]
+        if pc >= CBW and pc < CBW_END then
+          D.storedWord = M.readByte(0x11E0) | (v << 8)
+        end
+      end, emu.callbackType.write, hi, hi)
+    end
+  end
+
+  function D.planPace()
+    local x0, y0 = M.worldX(), M.worldY()
+    local function own(x) return M.worldEncounterGroup(x, y0, x, y0) end
+    local g = own(x0)
+    local lo, hi = x0, x0
+    while lo > x0 - D.pace and M.worldPassable(lo - 1, y0) and own(lo - 1) == g do lo = lo - 1 end
+    while hi < x0 + D.pace and M.worldPassable(hi + 1, y0) and own(hi + 1) == g do hi = hi + 1 end
+    local zx, zy = M.worldZonePos()
+    local groups = {}
+    for x = lo, hi do
+      for z = lo, hi do
+        local gg = M.worldEncounterGroup(x, y0, z, y0)
+        if gg ~= nil then groups[gg] = true end
+      end
+      local gg = M.worldEncounterGroup(x, y0, zx, zy)
+      if gg ~= nil then groups[gg] = true end
+    end
+    local list = {}
+    for gg in pairs(groups) do list[#list + 1] = tostring(gg) end
+    table.sort(list)
+    M.log(string.format("[%s] pace: row %d, x %d..%d (start x %d, saved position "
+      .. "(%d,%d)); the groups it can roll: %s", D.tag, y0, lo, hi, x0, zx, zy,
+      table.concat(list, ",")))
+    M.assertEq(hi - lo >= 2, true, string.format("%s: the start row gives a stretch "
+      .. "of at least three tiles that roll group %s (x %d..%d)", D.tag, tostring(g), lo, hi))
+    M.assertEq(#list == 1 and list[1] == tostring(g), true, string.format("%s: every "
+      .. "encounter on the stretch rolls group %s, whatever the saved position (rolls %s)",
+      D.tag, tostring(g), table.concat(list, ",")))
+    D.row, D.lo, D.hi, D.group, D.dir = y0, lo, hi, g, "left"
+  end
+
+  function D.planDraws()
+    local pool = M.encounterPool(D.group)
+    local ok, any, parts = {}, {}, {}
+    for slot = 1, 4 do
+      ok[slot], any[slot] = true, false
+      local names = {}
+      for _, f in ipairs(pool[slot].formations) do
+        local suits, hp, srcs = M.judgeFormation(f.species, opts.minBodies, opts.minHp)
+        f.suits = suits
+        ok[slot] = ok[slot] and suits
+        any[slot] = any[slot] or suits
+        local sp = {}
+        for _, s in ipairs(f.species) do sp[#sp + 1] = string.format("%03X", s) end
+        names[#names + 1] = string.format("%d [%s] %d HP%s", f.id, table.concat(sp, " "),
+          hp, #srcs > 0 and (" {" .. table.concat(srcs, "; ") .. "}") or "")
+      end
+      parts[#parts + 1] = string.format("slot %d (%d/256, $%04X) %s%s", slot,
+        pool[slot].odds, pool[slot].word, table.concat(names, ", "), ok[slot] and " SUITS" or "")
+    end
+    local worst, hist = M.worstCaseEncounters(function()
+      return function(slot) return ok[slot] end
+    end)
+    M.log(string.format("[%s] budget: group %d (floor %d bodies, %d max HP, no "
+      .. "control-taking attack on any turn): %s -- the worst of the 65536 "
+      .. "encounter-counter states needs %d encounter(s); %.1f%% need no more than 6",
+      D.tag, D.group, opts.minBodies, opts.minHp, table.concat(parts, "; "), worst,
+      100 * M.encounterShare(hist, 6)))
+    M.assertEq(worst <= D.maxTries, true, string.format("%s: group %d deals a "
+      .. "suitable formation within the %d encounters built (worst state: %d)",
+      D.tag, D.group, D.maxTries, worst))
+    local a, b = M.readByte(0x1FA2), M.readByte(0x1FA3)
+    local seq, lo, hi = {}, nil, nil
+    for n = 1, D.maxTries do
+      a = (a + 1) & 0xFF                     -- UpdateBattleGrpRng
+      if a == 0 then b = (b + 0x17) & 0xFF end
+      seq[n] = M.encounterSlot((M.readRomByte(RNG + a) + b) & 0xFF)
+      if lo == nil and any[seq[n]] then lo = n end
+      if hi == nil and ok[seq[n]] then hi = n end
+    end
+    D.budget, D.pool, D.seq, D.n, D.suitable = worst, pool, seq, 0, false
+    M.log(string.format("[%s] the counter ($1fa2=$%02X $1fa3=$%02X) deals slots %s: "
+      .. "a suitable formation at encounter %s", D.tag, M.readByte(0x1FA2),
+      M.readByte(0x1FA3), table.concat(seq, ","),
+      lo == hi and tostring(lo) or (tostring(lo) .. ".." .. tostring(hi))))
+  end
+
+  local function paceWalk(what)
+    return M.driveUntil(function() return M.battleLoadStarted() end, 25000, {
+      M.call(function()
+        if not M.worldMode() or not M.worldHasControl() then M.setPad({}); return end
+        if M.worldAligned() then
+          local x = M.worldX()
+          if x <= D.lo then D.dir = "right" elseif x >= D.hi then D.dir = "left" end
+        end
+        M.setPad({ [D.dir] = true })
+      end),
+    }, what)
+  end
+
+  local survey = M.call(function()
+    D.n = D.n + 1
+    local n, slot = D.n, D.seq[D.n]
+    local e = D.pool[slot]
+    M.assertEq(D.worldGroup, D.group, string.format("%s: encounter %d was dealt by "
+      .. "group %d, the pool its budget was decoded from", D.tag, n, D.group))
+    M.assertEq(D.storedWord, e.word, string.format("%s: encounter %d dealt slot %d's "
+      .. "word, as the counter said (the word CheckBattleWorld stored)", D.tag, n, slot))
+    D.msPresent = {}
+    for m = 0, 5 do
+      if M.readByte(0x3AA8 + m * 2) % 2 == 1 then D.msPresent[#D.msPresent + 1] = m end
+    end
+    local live = {}
+    for _, s in ipairs(M.formationSpecies()) do live[#live + 1] = s.species end
+    local suits, _, srcs = M.judgeFormation(live, opts.minBodies, opts.minHp)
+    local mhp = 0
+    for _, m in ipairs(D.msPresent) do mhp = mhp + M.readWord(0x3BFC + m * 2) end
+    D.suitable = suits and #D.msPresent >= opts.minBodies and mhp >= opts.minHp
+    table.sort(live)
+    local romSuits = nil
+    for _, f in ipairs(e.formations) do
+      local sp = {}
+      for _, s in ipairs(f.species) do sp[#sp + 1] = s end
+      table.sort(sp)
+      if table.concat(sp, ",") == table.concat(live, ",") then romSuits = f.suits end
+    end
+    M.log(string.format("[%s] draw %d: slot %d $%04X (battle $11e0 $%04X), %d bodies, "
+      .. "%d total max HP%s -> %s", D.tag, n, slot, e.word, M.readWord(0x11E0),
+      #D.msPresent, mhp, #srcs > 0 and (" {" .. table.concat(srcs, "; ") .. "}") or "",
+      D.suitable and "FIGHT" or "pass"))
+    M.assertEq(romSuits, D.suitable, string.format("%s: encounter %d's live formation "
+      .. "is one of slot %d's, judged as the ROM's data judged it", D.tag, n, slot))
+  end)
+
+  local function attempt(n)
+    return M.cond(function() return not D.suitable and n <= D.budget end, {
+      M.call(function() D.storedWord = nil end),
+      paceWalk(D.tag .. ": a real world encounter fires (draw " .. n .. ")"),
+      M.release(),
+      M.waitUntil(function() return M.battleActive() end, 900,
+        D.tag .. ": battle active (draw " .. n .. ")", 30),
+      M.waitFrames(240),
+      survey,
+      M.cond(function() return not D.suitable end, {
+        M.fleeBattle(9000, { onCantRun = "fight" }),
+        M.call(function()
+          M.log(string.format("[%s] draw %d: %s", D.tag, n, tostring(M.fleeOutcome)))
+        end),
+        M.waitUntil(function()
+          return M.worldMode() and M.worldHasControl()
+        end, 1200, D.tag .. ": back on the plain after draw " .. n, 10),
+        M.waitFrames(30),
+        M.careStop(D.tag .. ": care after draw " .. n),
+      }, {}),
+    }, {})
+  end
+
+  function D.steps()
+    local steps = {
+      M.waitUntil(function() return M.worldSettled() end, 1500,
+        D.tag .. ": the world map settled", 5),
+      M.call(function() arm(); D.planPace(); D.planDraws() end),
+    }
+    for n = 1, D.maxTries do steps[#steps + 1] = attempt(n) end
+    steps[#steps + 1] = M.call(function()
+      M.assertEq(D.suitable, true, string.format("%s: a suitable formation was "
+        .. "dealt within %d encounters, the most any encounter-counter state needs "
+        .. "from group %d", D.tag, D.budget, D.group))
+    end)
+    return steps
+  end
+  return D
 end
 
 local function worldEdgeKey(x, y, dir)

@@ -462,7 +462,7 @@ local function enterDesertBattle(n, wantFb)
     end, {}, {
       H.cond(function() return H.battleLoadStarted() end, {
         H.logStep("formation unsuitable -- fleeing for a fresh draw"),
-        H.fleeBattle(12000),
+        H.fleeBattle(12000, { onCantRun = "fight" }),
         H.waitFrames(240),
       }, {}),
       H.call(function() plan, goal = nil, nil end),
@@ -568,7 +568,7 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(rec.code < 3, true, "no stole-message on an empty enemy")
     H.assertEq(#rec.draws, 0, "and still no roll (empties exit before it)")
   end),
-  H.fleeBattle(12000),
+  H.fleeBattle(12000, { onCantRun = "fight" }),
   H.waitFrames(240),
 
   -- ================= battle 2: the ring (labeled isolation arm) =========
@@ -596,7 +596,7 @@ H.run({ maxFrames = 150000 }, {
     -- take the ring back off: the arms below must be bare vanilla
     H.writeByte(0x3C45 + locke*2, H.readByte(0x3C45 + locke*2) & 0xFE)
   end),
-  H.fleeBattle(12000),
+  H.fleeBattle(12000, { onCantRun = "fight" }),
   H.waitFrames(240),
 
   -- ========== battle 3: the fallback, and the bare vanilla gamble =======

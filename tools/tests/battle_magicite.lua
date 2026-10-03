@@ -1128,9 +1128,11 @@ H.run({ maxFrames = 150000 }, {
   H.waitFrames(60),
   H.call(function() pinPool("bootB", POOL) end),
   equipOn(3, SHIVA, 6, "B/celes-shiva"),
-  -- item-only for HP, as the comment at [drain] says: no Tincture or Tent
-  -- (the 15a54c03 chain's n024_entry ships 2 Tinctures, and the care stop
-  -- drank one: "used $EB on char 6: ... 31 -> 81 mp")
+  -- HP only: no cast, and neither MP arm (a Tincture for a member under a
+  -- quarter of her pool, or a Tent).  The pinned 31 of 180 is under that
+  -- band, so with a Tincture in the bag the default care drank one and
+  -- opened the boss at 81 (the v0.24 re-cut's n024_entry carries 7;
+  -- build/attempts/wt/v024-recut/suite_fixes/summary.txt).
   H.fieldCare({ tag = "before battle 72 (boot B)", threshold = 0.95,
                 magic = false, tincture = false, tent = false }),
   enterBoss("bootB"),

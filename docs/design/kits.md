@@ -532,6 +532,190 @@ ice/order/tempo. The pairing is clearer here than in vanilla.
   reaction (reflect as well as absorb) and takes duration from boost
   like any other reactive verb.
 
+### Setzer — Gambler/Merchant (special ¤: cards, dice; darts = piercing)
+
+Slot ✦ is the signature; Coin Toss and Hired Help carry the merchant house
+(paid in gil, not MP); the divine is **Jackpot**, a Fixed-Dice triple
+payoff, never Slot itself ✦. His cards, Trump and Dice chip ¤ on Fight;
+the Fixed Dice are null-break (large numbers, no chip, row ignored, vanilla
+behaviour preserved ✦). Decisions below were made as the TLM's delegate
+for #319 (2026-10-02), each with its reason.
+
+| # | Ability | Price | Chip | Boost buys | Source |
+|---|---|---|---|---|---|
+| 1 | Slot ✦ | free | the reel's attack | the rig's certainty (see Steal's ladder; `ot6_slot.asm`) | join |
+| 2 | Coin Toss | level × 30 gil a toss | ¤, one per body a toss (every enemy) | another toss a point (1 + boost tosses, each its own gil, hit and chip) | join |
+| 3 | Hired Help | level × 50 gil a hire | the target's own physical class (slashing, else piercing, else bludgeoning), one a hire | another hire a point (1 + boost hires, each its own fee, hit and chip) | join |
+| 4 | **Jackpot** (divine) | 99 MP, once a battle | null-break | another roll a point (1 + boost rolls, each its own gamble and its own hit) | his World of Ruin return (Kohlingen, switch `$00CA`) |
+
+**The table behind Slot.** Setzer's rows are FIGHT, SLOT, MAGIC, ITEM and
+the menu is four rows, so like Locke he has no spare slot, and his third
+row is the Magic an Esper gives him. The ladder goes behind the row he has:
+`OpenCmdMenuTbl[$0f]` opens a Tools-shell list (mode `$6168 = 4`) whose
+first row is Slot itself; Slot's row closes the list and opens the reels
+exactly as the command window did, so the reels, their boost ladder and
+their charge are unchanged. *Reason: Locke's thief list is the precedent,
+and it keeps Magic.* A Coin Toss relic still turns Slot into GP Rain (no
+table), as a Thief Glove turns Steal into Capture; a Gogo with Slot gets
+the reels straight away (the table is Setzer's job). The row ids are the
+last AttackName pad slots: Coin Toss `$59`, Hired Help `$5a`, Jackpot
+`$5b`, Slot `$5c` (Slot never queues, and `$5c` is the id Ot6Oblivion keys
+Cleave on). `ot6_setzer.asm` has the machinery.
+
+**Coin Toss is GP Rain as a kit row.** It runs vanilla's GP Rain effect:
+it takes level × 30 gil and deals twice that, ignoring defense, split over
+the targets (the enemy side). *Reason: the relic named Coin Toss already
+is this verb in FF6; the kit row makes it Setzer's own without a relic
+slot.* Coins are ¤, like his cards and dice, so it chips one shield on each
+body whose row holds ¤: the wide ¤ key the guideline asks for ("Special is
+a common key"). **Boost buys tosses** (owner, 2026-10-02: boost pays
+through more hits, never a bigger one, so no point is lost to the 9,999 cap
+on one hit -- at L50 one doubled toss already capped on a lone unshielded
+target): 1 + boost tosses, one pass of the action each (`Ot6SetzerEffect`
+adds the boost to the attack count), each at level × 30 gil, each its own
+hit on every body and its own ¤ chip on every ¤-weak one. Three points are
+four tosses and four chips a body. A toss after a body falls splits over
+the bodies left (`battle_passretarget`). A toss that finds no body standing (the
+tosses before it felled them all) pays nothing, and so does such a hire
+(`Ot6CoinPrice`, `battle_hirerefund`). The Coin Toss relic's GP Rain buys
+tosses the same way (`Ot6RainPasses` in Cmd_18); before #319 its boost
+bought nothing (Ot6BoostDmg's multiplier runs before GP Rain's effect
+overwrites the damage). (Earlier the same day the boost doubled the coins,
+×2 gil and ×2 damage a point; set aside for the cap.)
+
+**Hired Help is a sellsword whose weapon fits the target.** One enemy; a
+hire costs level × 50 gil and lands twice its fee, and its break class is
+the first physical class in the target's weakness row (slashing, then
+piercing, then bludgeoning); a target with none takes an unkeyed hit.
+*Reason: the merchant buys the key the party lacks; it is priced in the
+resource a WoR party has a lot of, but a player feels (1,550 gil a hire at
+L31), and it is never ¤ (that is Coin Toss's and the cards').* It reveals
+the class it chips, as any chip does. **Boost buys hires** (owner,
+2026-10-02: boost pays through more hits, so it never runs into the 9,999
+cap on one hit): 1 + boost hires, one pass of the action each
+(`Ot6SetzerEffect` adds the boost to the attack count Ot6HitCount uses),
+each paying its own fee, landing its own hit and chipping its own shield.
+Three points are four hires, four chips and 6,200 gil at L31; a hire
+lands 3,100 there (1,550 shielded, 6,200 on a Broken body), and its fee
+never passes 4,950 (L99), so the damage cannot wrap (the old one-hire x8
+fee wrapped from L82) and a hire that meets the cap on a Broken body still
+leaves every point its own hit. A hire that outlives its target goes to
+another monster, as every pass OT6 adds to an action does
+(`Ot6PassRetarget`; [multi-hit.md](multi-hit.md) §6), and one that finds
+none standing pays nothing.
+
+**Jackpot (divine): the Fixed Dice come up a triple.** One enemy, by
+vanilla's dice arithmetic: face³ × level × 2 for the three dice, times the
+face again for the triple (saturating at 65,535 as vanilla's loop does),
+then the hit as any hit lands: halved while the target's shields hold,
+doubled once it is Broken, capped at 9,999. Null-break: the Fixed Dice
+are the outliers, so it chips nothing and ignores the row. **It is a
+gamble, and the boost buys more of it** (owner, 2026-10-02: Jackpot is a
+gamble, and every point must land something under the cap): each roll is
+a face 1-6 at near-even odds, 42-44 of 256 a face, consistent with the
+measurement below (one battle Rand, drawn again past 251, mod 6; the
+redraw takes the table's next byte, a fixed successor), and the boost buys
+another roll a point -- 1 + boost passes, each its own triple and its own
+hit. A roll whose target fell to the roll before goes to another monster; a
+pass that finds no body left (the rolls before felled the last) is
+skipped: no triple, no dice, no draw. *Reason: a hit that can be a dud is
+the gambler's verb,
+and an extra roll is a purchase that always lands, at any level and
+shield state; playtesting tunes the power.* What one roll lands (the
+means at even odds; the 42-44 weights move them by under 2%):
+
+| face | L31 shielded | L31 unshielded | L31 Broken | L50 shielded | L50 unshielded |
+|---|---|---|---|---|---|
+| 1 | 31 | 62 | 124 | 50 | 100 |
+| 2 | 496 | 992 | 1,984 | 800 | 1,600 |
+| 3 | 2,511 | 5,022 | 9,999 | 4,050 | 8,100 |
+| 4 | 7,936 | 9,999 | 9,999 | 9,999 | 9,999 |
+| 5 | 9,999 | 9,999 | 9,999 | 9,999 | 9,999 |
+| 6 | 9,999 | 9,999 | 9,999 | 9,999 | 9,999 |
+| a roll's mean | 5,162 | 6,012 | 7,017 | 5,816 | 6,633 |
+
+so a throw's mean is (1 + boost) times the roll's, and the spread is the
+sum of 1 + boost independent rolls (the lab in
+`build/attempts/wt/kit-setzer/jackpot-dist/` measures the faces and what
+each lands, and tabulates the throws per boost). The battle Rand walks a
+256-byte table that holds every byte once, so its 252 bytes below 252 give
+each face 42; the four above redraw onto their successors, which is where
+the 43s and 44 come from. Measured in play
+(`build/attempts/wt/kit-setzer/labs-r3/`, round 3): a fight, dice
+included, is fixed by its battle key and the inputs, and from the grave
+the key takes 16 values, so runs repeat throws and the labs count each
+distinct throw once. Played throws at 3 BP, the fight varied by 15 keys and
+six in-battle stands: 30 distinct throws of 96, 120 rolls, faces 1-6
+14 / 24 / 19 / 27 / 19 / 17, chi2 5.6 (5 df; 11.07 is p = .05). The
+earlier fault-injected lab's 3-BP fives (34 of 320, chi2 14.0) were in
+part repeats: 64 distinct throws of 80, 256 rolls, 43 / 54 / 50 / 36 / 30
+/ 43, chi2 9.1. Nothing else is bought:
+no multiplier (cmd `$0f` is in Ot6BoostDmg's gate) and the MP is flat.
+(Two earlier curves were set aside the same day: a floor the boost raised
+to certain sixes at 3 BP, then a floor of 1 / 2 / 3 / 4 with even odds
+above it; both bought a bigger single hit, which the 9,999 cap wasted.)
+**Price 99 MP, once a battle** (`OT6_DIVINE_USED`): 99 is the shared
+ultimate ceiling, and the once-a-battle flag (Cleave's and Assassinate's)
+keeps up to four 9,999 hits a boss answer rather than a loop (33% of his
+L31 pool, above the baseline's band: the size of the payoff is the reason,
+and once a battle bounds it). **Learned on his World of Ruin return**
+(switch `$00CA`, set when he rejoins in Kohlingen's inn). *Reason:
+divines come by story, and his arc is the tomb and the Falcon; in the WoB
+his L16-25 Jackpot would land 9,999s against bosses of 5-10k HP, so it
+waits for the WoR, where it makes him a recruit that matters at once.*
+**Mimic copies it freely**, and that is intended (guidelines: "Mimic is
+free"): a Gogo mimicking Jackpot (or Cyan's Cleave) pays no MP and is not
+held to the once-a-battle flag, which is Setzer's own; it is a reason to
+bring Gogo.
+
+**Prices.** Slot stays free. Coin Toss and Hired Help cost gil only (the
+row draws no MP; it greys and is refused when the purse cannot pay the
+price at the pending boost, `Ot6SetzerRowGrey`, the same grey the confirm
+reads). Jackpot greys for MP or once spent. One authority each:
+`Ot6SetzerCost` (MP, flat, Ot6AbilityCost's `@slot` arm) and `Ot6CoinGil`
+(gil a throw or a hire; `Ot6CoinTotal` the whole action's, which the grey
+reads). Tests: `battle_cointoss`, `battle_hiredhelp`, `battle_jackpot`,
+`battle_setzergrey` (the purse's grey and refusal), `battle_gprain` (the
+Coin Toss relic's GP Rain), `battle_hirerefund` (a hire past the last
+body pays nothing) and `battle_passretarget` (a hire, roll or swing whose
+body fell goes to another, and a toss re-splits over the survivors). The
+coin suites throw in the battles that deal a
+special-weak crowd (the engine's alive mask, so a petrified body is out)
+and assert that a toss split and chipped; the other battles are fought out
+by the route's fight driver with field care after, within a budget decoded
+from the room's pool (the worst encounter-counter state's encounters to
+the next crowd, 19 here, per crowd the throws need). `battle_jackpot`
+holds every roll to the draw rule, and a bounded search over grave waits,
+in-battle stands, Defends and the others' Fight or Defend (128 throws at
+most, 99 of them distinct here; a throw redraws with p = 6.1%, so a miss is
+0.939^99 = 0.2%) finds a draw whose early kill leaves a pass empty and one
+that redraws past 251, or fails by name;
+`battle_setzergrey` prices two, three and four throws against the purse,
+step 5 from the purse step 4 left. Negative controls: the mutant ROMs
+(`mutants5.py`, same-size edits for the savestate suite) and the no-edit
+control built by the same pipeline, in
+`build/attempts/wt/kit-setzer/m7/` (and `m8/`, battle_jackpot's revised search); the earlier `px13/m2/` set that
+c9fccbd6 cites (the floor curve's mutants) was lost with px13's worktree
+before it was copied, and the curve it tested is gone.
+
+**The route's driver plays the table** (`Driver:setzerLine`, lib/ot6.lua;
+#353), reading what an informed player would: Jackpot priced as the gamble
+it is, by a roll's expected landed damage (the six faces after the
+shields' halving or the Broken double, capped at 9,999 and the target's
+HP), with as many rolls as the HP wants and the bank holds, when the
+throw is expected to land 4,000 on a target of 4,000 HP or more; Slot
+at 3 BP in a random battle against two or more (a chosen triple); Coin
+Toss when its revealed ¤ chips two or more bodies, with a toss a point up
+to the most shields among them; Hired Help when the
+target's revealed row holds a physical class his own Fight does not key,
+with a hire a point up to the shields left (bank and purse allowing).
+Gil is spent only above a 20,000 reserve, and only in event battles (a
+boss, a monster chest): measured, Hired Help in the World of Balance grind
+cost some 30,000 gil a run against the control and bought no fewer deaths
+(route-wor-falcon.md 13.12), so random battles get his free Fight. `opts.setzer = false` is the
+old behaviour (the control arm of the Falcon arc's labs,
+route-wor-falcon.md 13.10).
+
 ---
 
 ## Sketches (join order, WoB)
@@ -542,12 +726,7 @@ ice/order/tempo. The pairing is clearer here than in vanilla.
   dies -- and so does a hit of his on an enemy someone else already
   Broke. A boss is only Broken, and the divine is kept for a body it can
   kill (owner ruling, #239). Interceptor is a passive.
-- **Setzer — Gambler/Merchant (special ¤: dice, cards; darts =
-  piercing)**: Slot ✦ signature; Coin Toss, Hired Help (pay GP for
-  effects) carry the merchant house; divine **Jackpot**, a
-  Fixed-Dice triple payoff, never Slot itself ✦. Ordinary dice and
-  cards chip ¤; the outliers (Fixed Dice) are null-break: large
-  numbers, no chip, row ignored (vanilla behaviour, preserved ✦).
+- **Setzer — Gambler/Merchant**: built; see "Setzer" above (#319).
 - **Mog — Dancer (piercing: spear)**: the 8 Dances verbatim ✦,
   learned by dancing on each terrain ✦; divine **Water Rondo**, kept
   WoB-missable, vanilla-style. This kit needs no further design work.

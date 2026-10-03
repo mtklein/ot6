@@ -231,11 +231,27 @@ back. Steps, in order, none skipped:
    current release" line and tag link. Commit as `release: vX.Y -- <Name>
    (version bump + release notes)`; fast-forward release/vX.Y to it.
 5. `ninja release` (qualification is up to date, so this is the
-   preflights, the patch and the zip): `build/release/ot6-vX.Y.zip` must build.
+   preflights, the patch, the zip and the Android APK):
+   `build/release/ot6-vX.Y.zip` and `build/release/ot6-vX.Y.apk` must
+   build, and `build/checks/android_apk.ok` (signature, package, badging,
+   the tested patch inside) and `build/checks/android_apk_release.ok` (that
+   patch is the release .bps) must pass. The APK needs the signing key
+   (docs/TOOLING.md, "Android patcher").
+   The bump relinks the ROM with the new version in its two version fields
+   (tools/build/rom_version.py), so the BPS, the zip and the APK all carry
+   the bumped version. States, checkpoints and every other result bind to
+   the ROM's identity, which masks those fields: the bump regenerates no
+   state and re-runs only what reads the ROM's bytes, namely the two
+   version suites (menu_configversion, title_version, on the bytes that
+   ship), the `break_coverage_ratchet` and `shield_rows` checks, and under
+   `release` `build/checks/checkpoint_drift.ok` and the android_bps / APK
+   edges.
 6. `git tag -a vX.Y -m "OT6 vX.Y -- <Name>"`, `git push origin main
    release/vX.Y vX.Y`, then
-   `gh release create vX.Y build/release/ot6-vX.Y.zip --title "OT6 vX.Y — <Name>" --notes-file docs/release-notes-vX.Y.md`.
-7. Verify: `gh release view vX.Y` shows the asset; README's tag link resolves.
+   `gh release create vX.Y build/release/ot6-vX.Y.zip build/release/ot6-vX.Y.apk --title "OT6 vX.Y — <Name>" --notes-file docs/release-notes-vX.Y.md`.
+7. Verify: `gh release view vX.Y` shows both assets (the zip and
+   `ot6-vX.Y.apk`, which Obtainium installs from); README's tag link
+   resolves.
 
 A version that exists in VERSION and README but not as a tag and a GitHub
 release is drift; finish it or roll it back, never leave it.

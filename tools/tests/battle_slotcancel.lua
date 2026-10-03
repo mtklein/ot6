@@ -357,6 +357,8 @@ local function setzerSpin()
     local cur = H.readByte(0x890F + actor)
     if cur ~= cell then tap(cur < cell and "down" or "up"); return end
     tap("a")
+  elseif st == 0x30 then
+    tap(H.slotRowButton(actor))    -- Setzer's table: its first row is Slot
   elseif st == ST_REELS then
     if H.readByte(PRESS[3]) ~= 0 and H.readByte(STOP[3]) == 0 then
       H.setPad({})                 -- reel 3 settling: the commit waits for it
@@ -560,7 +562,7 @@ local function drawBattle(tag, tries)
           tag, n, #msPresent, mhp, H.vars.suitable and "FIGHT" or "flee"))
       end),
       H.cond(function() return not H.vars.suitable end, {
-        H.fleeBattle(9000),
+        H.fleeBattle(9000, { onCantRun = "fight" }),
         H.waitUntil(function()
           return H.worldMode() and H.worldHasControl()
         end, 1200, tag .. ": back on the plain after draw " .. n, 10),
@@ -659,7 +661,7 @@ local function round()
       H.log(string.format("[cancel] battle %d ended before a branch point | party %s",
         battles, partyLine()))
     end),
-    H.cond(function() return H.battleLoadStarted() end, { H.fleeBattle(12000) }, {}),
+    H.cond(function() return H.battleLoadStarted() end, { H.fleeBattle(12000, { onCantRun = "fight" }) }, {}),
     backToPlain(),
     H.waitFrames(60),
   })

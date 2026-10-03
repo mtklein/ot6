@@ -95,6 +95,7 @@ Ot6HitCountTbl:
         clc
         adc     f:$7e0000+$3a70 ; add, so a future +1 source composes
         sta     f:$7e0000+$3a70
+        jsl     Ot6PassesAdded  ; a strike whose body fell retargets
 @done:  pla                     ; the ability id, back to the caller
         plx
         plp

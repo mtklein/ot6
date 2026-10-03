@@ -35,7 +35,7 @@ touches vanilla behavior where a pillar requires it.
 | Cyan | Samurai | Katana | — | the 8 SwdTech, priced in BP (see below) |
 | Celes | Rune Knight | Sword | Ice/Holy | Runic from the start (signature) + spells (see below) |
 | Gau | Beast Tamer | Fangs (innate) | Earth | Rage learned without limit on the Veldt, 8 equipped (see below) |
-| Setzer | Gambler/Merchant | Cards & dice | — | Slots from the start (signature); Coin Toss, Hired Help (pay GP for effects); divine is a new top-end ability, never Slots itself |
+| Setzer | Gambler/Merchant | Cards & dice | — | Slot from the start (signature), with Coin Toss and Hired Help (paid in gil) behind it; divine: Jackpot, a Fixed-Dice triple, never Slot itself (kits.md) |
 | Strago | Scholar | Rod | Fire/Ice/Lightning | 8 Lores, Aqua Breath as the free signature; **Analyze** (reveals shields and weaknesses) cheap at #2 |
 | Relm | Painter | Brush | — | Sketch stays as signature |
 | Shadow | Assassin | Dagger (thrown) | Dark | Throw (signature); divine: Assassinate, once a battle: the hit of his that breaks an enemy kills it outright, as does a hit on one already Broken; a boss is only Broken |

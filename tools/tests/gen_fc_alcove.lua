@@ -328,7 +328,10 @@ end
 -- wipeEndsRide so the ride ends instead of raising; the burst and settle
 -- loops set `lost` on the canary's counter.
 local ATTEMPTS = 3
-local LD = H.newSeedSweep("FC descent (394 crossing)", { attempts = ATTEMPTS })
+-- allowNoBattle: the continent's encounters are draws, and a crossing can
+-- meet none (lib/ot6.lua M.newSeedSweep)
+local LD = H.newSeedSweep("FC descent (394 crossing)", { attempts = ATTEMPTS,
+                                                         allowNoBattle = true })
 local function seq(steps) return H.cond(function() return true end, steps) end
 
 local function lossReload(n)

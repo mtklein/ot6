@@ -1,20 +1,20 @@
 {
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "post-opera.sram",
-  "size": 32768,
-  "sha256": "3acfe81f2eae8cf5ed3e1cb2cf9896bd5937f9259cef9e34ae7a3886ce291b3c",
   "slot": 3,
   "milestone": "post-opera",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "size": 32768,
+  "sha256": "d4f7b83ab501345eddd42fc01e8bb075a601b7f6a391c8d46047fce07a3d2d18",
   "provenance": {
-    "format": "ot6-provenance/v1",
-    "payload_sha256": "3acfe81f2eae8cf5ed3e1cb2cf9896bd5937f9259cef9e34ae7a3886ce291b3c",
-    "generator_sig": "f43b36a94d5b84d53772ed69ce4b9818c2aeede9139d04ab370085b187a733d5 gen_post_opera_checkpoint",
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "d4f7b83ab501345eddd42fc01e8bb075a601b7f6a391c8d46047fce07a3d2d18",
+    "generator_sig": "87a03f91ac0366c54f6b8025e7ab5aa49d6f10692efcbb2a0363c1e93481ab6e gen_post_opera_checkpoint",
     "ancestors": [
       {
-        "path": "build/states/blackjack.stamp",
-        "sha256": "2425571d5dc6c92f003a6017b14c6f982823e4f19f0e465894fee19d97b35d4a"
+        "path": "build/states/chain_blackjack.stamp",
+        "sha256": "5c6f4d650be1ad45da4060d825148996f4f6c5e10362bf6f36e497ab636e1323"
       }
     ]
-  },
-  "persistent_layout": "ot6-codex-o8-v1"
+  }
 }

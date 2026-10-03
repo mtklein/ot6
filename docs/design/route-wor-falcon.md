@@ -530,7 +530,7 @@ member's experience.
 
 | character | planned (kits.md) | what this arc has | where it bites |
 |---|---|---|---|
-| SETZER | Slot ✦; Coin Toss, Hired Help (gil-priced); divine Jackpot | Slot only (vanilla); the Coin Toss *relic* in the bag turns Slot into GP Rain | his first arc: one verb; his ¤ weapons (Cards, Trump, Dice) key six of the arc's twelve species since the re-cut (section 8.7) |
+| SETZER | Slot ✦; Coin Toss, Hired Help (gil-priced); divine Jackpot | built since #319 (kits.md "Setzer"): his table behind Slot, Jackpot learned at Kohlingen's rejoin | his first arc; the route's driver plays the table (`Driver:setzerLine`, #353; section 13.10) |
 | EDGAR | 8 Tools (AutoCrossbow, NoiseBlaster, Bio Blaster, Flash, Drill, Chain Saw, Debilitator, Overclock) | 3: AutoCrossbow, NoiseBlaster, Bio Blaster | Drill (pierce x2, "answers armored bosses") and Debilitator are in Figaro's World of Ruin shop 84, which refuses a party with EDGAR or SABIN (`_ca67c0`): both are in every party this arc fields; Chain Saw is a Zozo chest (after the Falcon); Overclock is not built. Dullahan is the armored boss Drill was planned for |
 | CELES | RunicBlade (divine): Runic that also reflects | Runic | Dullahan is a caster boss: Runic takes his Ice 2, Ice 3, Pearl, N. Cross and his own Cure 2 (section 5) |
 | SABIN | through Air Blade (L30) | Air Blade held; Spiraler L42 | — |
@@ -2088,12 +2088,160 @@ flight taken out, `assertEq failed: (25,160): on foot ($11FA): got 1, want
 
 - **The Exp. Egg** (from the tomb) is still in the bag; the relic rule does
   not rank it and no member wears it.
-- **SETZER's Slot** is not played in these fights (the driver's `opts.slot`
-  is off); the Coin Toss relic stays in the bag.
+- **SETZER's Slot** was not played in these fights (the driver's `opts.slot`
+  was off); the Coin Toss relic stays in the bag.  Since #319/#353 the
+  driver plays his table (13.10).
 - **The tombstone puzzle** (299 (12,39)) was not done.
 - The Dullahan care-model and the auto-Shell relic notes above (13.6).
 
-### 13.10 The care policy pass (wt/care-policy, #312 #348 #351)
+### 13.10 SETZER's kit played (#319, #353)
+
+Since #319 SETZER's Slot row opens his table (Slot, Coin Toss, Hired Help,
+Jackpot; kits.md "Setzer") and the driver plays it (`Driver:setzerLine`).
+Measured on ROM `c4986f696e4a` (px13), every number from a log under
+`build/attempts/wt/kit-setzer/`: six variation runs of the generator (K = 0-5
+encounters used up first, `labs/var1.txt`: `k0_s0: PASS (frame 30542)` ...
+`k5_s0: PASS (frame 42239)`, every run won the chest and Dullahan), and from
+their snapshots the chest and grave labs at four waits each, retries off,
+with the policy (`labs/chest`, `labs/dull`) and with `setzer = false`, the
+driver as it was (`labs/chestctl`, `labs/dullctl`). `labs/go.sh` is the
+batch; `labs/*_analysis.txt` the tables.
+
+| fight | arm | runs / keys | won | ticks (min / median / max) | SETZER's damage | his chips / breaks / fight-ending blows | his rows used |
+|---|---|---|---|---|---|---|---|
+| Dullahan | policy | 24 / 20 | 24 | 5426 / 6828 / 11227 | 163,311 (**29%**; median 30%) | 103 / **16 of 24** / **9 of 24** | Jackpot 14 |
+| Dullahan | control | 24 / 20 | 24 | 5670 / 6831 / 11227 | 112,198 (20%; median 25%) | 106 / 17 of 24 / 2 of 24 | — |
+| the chest | policy | 24 / 21 | 24 | 1673 / 4415 / 7593 | 66,472 (**23%**; median 13%) | 2 / 0 / **8 of 24** | Hired Help 8, Jackpot 2 |
+| the chest | control | 24 / 21 | 24 | 1673 / 4473 / 9477 | 56,005 (19%; median 11%) | 0 / 0 / 6 of 24 | — |
+
+From `labs/dull_analysis.txt`: `SETZER actions 104 damage 163311 (29% of
+all; per run min 8% median 30% max 54%) chips 103 breaks 16 kills 9`, and
+`dullctl_analysis.txt`: `SETZER actions 104 damage 112198 (20% of all ...)
+chips 106 breaks 17 kills 2`.  The rows from the credit lines' commands
+(`$15A` Hired Help, `$15B` Jackpot): Dullahan `{'00': 74, '01': 16, '15B':
+14}` against the control's `{'00': 89, '01': 15}`; the chest `{'00': 24,
+'01': 9, '15A': 8, '15B': 2}` against `{'00': 38, '01': 15}`.
+
+What it says.  In Dullahan SETZER stays the breaker (his Trump keys ¤ and
+his Fight lands the breaks either way) and Jackpot becomes his finisher:
+of its 14 throws, 9 came with Dullahan Broken and under 10,000 HP, where a
+1-BP floor of three reached the cap (`SETZER Jackpot on slot 0 (4592 HP, 0
+shield(s), Broken) at 1 BP (lowest face 3), 99 MP of 297`), 3 with him
+Broken at 14,432-14,570 HP (also 1 BP), and 2 before the break, at 2 BP
+with one or two shields left (`SETZER Jackpot on slot 0 (17663 HP, 1
+shield(s)) at 2 BP (lowest face 5)`), counted off the `[advanceStory]`
+lines in `labs/dull/`; the fight-ending blows move from SABIN to him; the fights are no shorter (the
+same median) and no fight was lost in either arm. In the chest, where ¤
+keys nothing, Hired Help is his way in: the sellsword strikes the Whelk
+Head with piercing (`SETZER Hired Help on slot 1: 1550 gil of 247857; his
+Fight keys nothing there`), and the policy arm spent 28 Potions to the
+control's 40 and no Fenix Down to its 2. Slot and Coin Toss were not chosen
+on this arc: the tomb's random fights end before his bank reaches 3, and
+Coin Toss waits for two revealed ¤ bodies.
+
+The table above measured the first Jackpot and Hired Help (a floor the
+boost raised to certain sixes; one hire whose fee the boost doubled), on ROM
+`c4986f696e4a`.  Both were redesigned the same day (kits.md "Setzer"); 13.11
+measures the redesign.
+
+### 13.11 Dullahan with the rolls and the hires (owner, 2026-10-02)
+
+Jackpot now rolls once more a boost point (each roll a face 1-6, its own hit)
+and Hired Help hires once more a point (each hire its own fee, hit and
+chip).  The policy arm again, briefly, on ROM `0a95b57fd7bd`: the grave
+frame the regenerated generator leaves (`final2/wor_falcon.log`), eight
+waits, `labs-r2/dull2.txt`: 8 of 8 won over 3 battle keys (`groups won in
+every run: 3 of 3`), no death, `potions spent 12 over 8 runs`.  From
+`labs-r2/dull2_analysis.txt`: `SETZER actions 31 damage 95840 (51% of all;
+per run min 27% median 72% max 79%) chips 23 breaks 3 kills 4`.  The
+policy throws Jackpot at the opening, with one point and Dullahan whole
+(`SETZER Jackpot on slot 0 (23450 HP, 10 shield(s)) at 1 BP: 2 roll(s) of
+expected 5162 each, 99 MP of 198`: this frame's SETZER spent one Jackpot in
+the chest, hence 198 MP), and hires against the shields before the ¤ cell
+is revealed (`SETZER Hired Help on slot 0 at 2 BP: 3 hire(s) at 1550 gil
+...`).  Three keys is few: the share is a direction, not a rate.
+
+### 13.12 The driver's table on the generators that seat SETZER
+
+The coordinator's review asked what the driver's table does on the
+generators that seat SETZER, where nothing had measured it: the World of
+Balance grind (`gen_narshe_mission`, from `terra-returned-v1`, LOCKE EDGAR
+SABIN SETZER) and this arc's tomb and Falcon legs.  Each generator twice
+(in-battle seeds 0 and 23, retries off) with the policy and with
+`SETZER_POLICY_OFF` (the control), ROM `0a95b57fd7bd`;
+`build/attempts/wt/kit-setzer/gm/gm_summary.txt`:
+
+| generator | arm | battles won | deaths | Fenix Downs (bag) | gil | rows chosen |
+|---|---|---|---|---|---|---|
+| narshe_mission | control s0 / s23 | 18 / 18 | 0 / 0 | 20 -> 23 | 122,167 -> 113,497 / 113,797 | — |
+| narshe_mission | policy s0 / s23 | 17 / 18 | **2** / 0 | 20 -> 23 | 122,167 -> **84,253 / 78,797** | Hired Help 28 / 28 |
+| wor_tomb | control | 6 / 6 | 0 / 0 | 29 -> 29 | 231,655 -> 247,857 | — |
+| wor_tomb | policy | 6 / 6 | **1 / 2** | 29 -> 29 | 231,655 -> 244,757 / 241,657 | Hired Help 2 / 3 |
+| wor_falcon | control | 3 / 3 | 0 / 0 | 29 -> 29 | 247,857 -> 251,107 | — |
+| wor_falcon | policy | 3 / 3 | 0 / 0 | 29 -> 29 | 247,857 -> 248,007 | Jackpot 2 / 2, Hired Help 2 / 1 |
+
+(`nm_pol_s0: ... battles 17 won 17 | deaths 2 (bp {'0': 2}) | ... gil 122167
+-> 84253 | SETZER plans {'Hired Help': 28}`; `tomb_pol_s23: ... deaths 2 (bp
+{'1': 2}) ... gil 231655 -> 241657 | SETZER plans {'Hired Help': 3}`.)  Hired
+Help in random battles bought nothing the free Fight did not: some 30,000
+gil a WoB run and deaths the control did not take.  So the gil rows now
+wait for an event battle (kits.md), and the policy arms again
+(`gm/gm2_summary.txt`): the grind and the tomb play exactly as the control
+(`nm_pol_s0: PASS (frame 106028) ... deaths 0 ... gil 122167 -> 113497 |
+SETZER plans {}`, `tomb_pol_s0: ... gil 231655 -> 247857 | SETZER plans {}`),
+and the Falcon leg keeps its Jackpots and hires (`fal_pol_s0: ... deaths 1
+(bp {'1': 1}) ... gil 247857 -> 251107 | SETZER plans {'Jackpot': 2, 'Hired
+Help': 1}`, `fal_pol_s23: ... deaths 0 ... gil 247857 -> 246457`).  Two
+seeds an arm is a direction, not a rate.
+
+### 13.13 Dullahan on the final kit, by distinct battle key (round 3)
+
+ROM `049ee079d85e` (Coin Toss buys tosses, a pass with no body pays
+nothing, Jackpot's rejection draw), the grave frame `wor_grave`, the
+policy arm (`{ runic = true }`) and the control (`{ runic = true, setzer =
+false }`) over the same entries; `build/attempts/wt/kit-setzer/labs-r3/`.
+A fight is fixed by its battle key (the in-battle seed shift only moves the
+entry frame, so shifts 0 / 7 / 13 met keys the waits already met), so the
+16 runs an arm are 8 distinct keys, and `dull_perkey.txt` sets the arms
+side by side a key:
+
+| key | policy ticks | SETZER (policy) | control ticks | SETZER (control) |
+|---|---|---|---|---|
+| be0C | 4,015 | 86%, Hired Help 1, Jackpot 1, the kill | 6,893 | 26% |
+| be1C | 6,186 | 68%, Hired Help 2, Jackpot 1 | 9,615 | 8% |
+| be3C | 6,454 | 54%, Hired Help 2, Jackpot 1 | 6,814 | 26% |
+| be5C | 9,542 | 18%, Jackpot 1 | 6,024 | 25% |
+| be7C | 9,179 | 56%, Hired Help 1, Jackpot 1, the kill | 6,704 | 12% |
+| be9C | 7,483 | 70%, Hired Help 1, Jackpot 1, the kill | 6,119 | 30% |
+| beBC | 5,705 | 73%, Hired Help 2, Jackpot 1 | 8,728 | 8% |
+| beDC | 5,340 | 73%, Hired Help 2, Jackpot 1 | 6,416 | 17% |
+
+(`be0C-g01C7 | policy 4015t SETZER actions 2 ($15A:1 $15B:1), damage 20218
+(86%), chips 1, breaks 0, kills 1`; `| control 6893t SETZER actions 4
+($00:4), damage 6109 (26%), chips 4, breaks 1, kills 0`.)  Both arms win
+every fight (`groups won in every run: 8 of 8`) with no death and no Fenix
+Down.  With his table SETZER deals a median 69% a key against 21% without
+it, and the fight is shorter at 5 keys of 8 (53,904 ticks over the 8
+against 57,313).  The cost is Potions: `potions spent 55 over 16 runs`
+against `potions spent 20 over 16 runs` (run-weighted; by key, 19 against
+12), most of it at be5C and be7C, the two keys where the policy fight ran
+longer.  His Fight's own breaks go (6 against 10 in the run-weighted
+credit): the Jackpot is null-break and the hires chip what his Fight does
+not key.
+
+**What the Falcon leg spends in gil** with the gil rows kept to event
+battles: `gen_wor_falcon` from `wor-tomb-v1`, policy and control at four
+in-battle seeds, every fall of the purse logged (`labs-r3/gm3_summary.txt`,
+`gilwatch.lua`; the falls to 0 and back are the generator's save and
+reload, not spending).  Seeds 0 and 13 spend nothing (`fal_pol_s0: ...
+gil 247857 -> 251107`, the control's own end; seed 0's one planned hire,
+in the chest, never ran: the battle ended, `killed s0:$101`, before
+SETZER's turn came); seeds 7 and 23 spend 4,650 gil, three hires at 1,550 in Dullahan
+(`[gilwatch] f12550 gil 251107 -> 249557 (-1550)`, `[gilwatch] f13963 gil
+249557 -> 246457 (-3100)`; `fal_pol_s7: ... gil 247857 -> 246457`), under
+2% of a purse of 247,857.  No random battle spends gil in any of the eight.
+
+### 13.14 The care policy pass (wt/care-policy, #312 #348 #351)
 
 The two 13.6 notes are the driver's now.  The round price charges one
 enemy's second action in a window at its typical action -- the mean of its
