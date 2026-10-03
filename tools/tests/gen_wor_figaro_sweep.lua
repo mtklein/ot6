@@ -290,7 +290,7 @@ H.run({ maxFrames = 200000 }, {
   end),
   -- the checkpoint was saved hurt (EDGAR 948/1600 and SABIN 75/291 MP at
   -- the tracked save): the care before the walk
-  H.fieldCare({ tag = "care at the boot" }),
+  H.fieldCare({ tag = "care at the boot", threshold = H.CARE_BEFORE_FIGHTS }),
 
   -- ---- 1. the desert and the plain to South Figaro --------------------------------------------
   worldInto(SF_DOOR, MAP_SF, "into South Figaro"),

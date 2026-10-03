@@ -74,12 +74,34 @@ local CASES = {
   { name = "the same drink, but it is keeping an ally up",
     hp = 100, maxhp = 168, restore = 50, roundCost = 112, allies = 1,
     threshold = 60, want = "covering an ally" },
-  -- A party still covers an ally the drink cannot lift clear of the WORST
-  -- round: 40 + 50 loses to a 112 round and survives the 55 the same soldier
-  -- also throws, and roundCost is the worst seen rather than the usual one.
-  { name = "an ally the drink cannot lift clear of the worst round",
+  -- The lift (#312): a drink that leaves the ally inside the round spends
+  -- the turn and only delays the death -- 40 + 50 = 90 is still inside a
+  -- 112 round -- so the actor acts instead (and the spend rule, counting
+  -- only heals this policy takes, sees none that saves).  The Sand Horse
+  -- lab lever: deaths 9 -> 0 over 42 keys.  (Before #312 this case read
+  -- "covering an ally".)
+  { name = "an ally the drink cannot lift clear of the round",
     hp = 40, maxhp = 168, restore = 50, roundCost = 112, allies = 1,
+    threshold = 60, want = nil },
+  -- ...one that it does lift clear is still covered: 70 + 50 = 120 > 112
+  { name = "an ally the drink lifts clear of the round",
+    hp = 70, maxhp = 168, restore = 50, roundCost = 112, allies = 1,
     threshold = 60, want = "covering an ally" },
+  -- ...and the boundary: 62 + 50 = 112 is exactly the round, still dead
+  { name = "an ally the drink lifts to exactly the round",
+    hp = 62, maxhp = 168, restore = 50, roundCost = 112, allies = 1,
+    threshold = 60, want = nil },
+  -- the lift binds a cast as it binds a drink: a cure that leaves an
+  -- endangered ally inside the round is a delay too (under the threshold
+  -- or not), so `mp` does not reopen it
+  { name = "a cure on an endangered ally that does not lift them",
+    hp = 40, maxhp = 168, restore = 50, roundCost = 112, allies = 1,
+    threshold = 60, mp = true, want = nil },
+  -- Dullahan's opening priced at the old two-Pearls figure (2172 against
+  -- a 1798 max): no Potion lifts anybody clear of that, so nobody drinks
+  { name = "a round above max HP: no lift is possible",
+    hp = 1175, maxhp = 1798, restore = 250, roundCost = 2166, allies = 3,
+    threshold = 60, want = nil },
   -- Alone, the same character swings: the drink costs more attacking time
   -- than it buys, and there is nobody else's turns to buy back.
   { name = "the same character alone",
@@ -343,6 +365,22 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(ok, true, "...unless the kill is in reach, when the raise costs nothing")
     raiseHp, ok = H.raiseDecision({ maxhp = 358, power = 2, smallestHit = 44 })
     H.assertEq(ok, false, "Rizopas seed $64 unchanged: 44 into 44, nothing else known, refused")
+    -- the top-up branch prices against the round the lift rule will use
+    -- (review of 4ff9b236; arms/armGL_dullB/genlab_base_k0_s0_w9.log.gz:
+    -- SABIN 1710 to 213, smallest hit 299, a round costs 1083)
+    local needs
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 1710, power = 2, smallestHit = 299,
+                                                topUpFirst = true, topUp = 250, roundCost = 1083 })
+    H.assertEq(tostring(ok) .. "/" .. tostring(needs), "false/nil",
+      "213 + 250 = 463 does not clear the 1083 round: no raise on a top-up the lift rule will refuse (" .. why .. ")")
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 1710, power = 2, smallestHit = 299,
+                                                topUpFirst = true, topUp = 250, roundCost = 400 })
+    H.assertEq(tostring(ok) .. "/" .. tostring(needs), "true/true",
+      "463 clears a 400 round: the raise stands and owes its top-up (" .. why .. ")")
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 1710, power = 2, smallestHit = 150,
+                                                topUpFirst = true, topUp = 250, roundCost = 1083 })
+    H.assertEq(tostring(ok) .. "/" .. tostring(needs), "true/nil",
+      "213 survives the 150 hit alone: raised, and no top-up is owed (" .. why .. ")")
     -- the ATB read behind topUpFirst: $3218,x is the 16-bit gauge the
     -- engine adds $3ac8,x to every tick and reads as full when its high
     -- byte is 0 (battle_main.asm `lda $3219,x / beq` "branch if atb
@@ -390,6 +428,76 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(H.muddleRule({ actor = 1, status2 = { [0] = 0x20, [1] = 0, [2] = 0, [3] = 0 },
       hp = { [0] = 399, [1] = 1509, [2] = 0, [3] = 0 }, maxhp = { [0] = 1595, [1] = 1609, [2] = 0, [3] = 0 },
       floor = { [0] = 398 } }), 0, "one HP above the floor: hit it")
+    -- one cure-hit in flight (#348): the tomb's EDGAR planned a second
+    -- hit on CELES while SETZER's was still queued, and SETZER's killed
+    -- her; an ally whose hit is in flight is neither hit again nor held,
+    -- and the next muddled ally is the one planned for
+    local q4 = { [0] = 1000, [1] = 1500, [2] = 1200, [3] = 1400 }
+    local m4 = { [0] = 1696, [1] = 1609, [2] = 1600, [3] = 1500 }
+    r, held = H.muddleRule({ actor = 2, status2 = { [0] = 0x20, [1] = 0, [2] = 0, [3] = 0 },
+      hp = q4, maxhp = m4, inFlight = { [0] = true } })
+    H.assertEq(tostring(r) .. "/" .. tostring(held), "nil/nil",
+      "a muddled ally with another member's cure-hit in flight: no second hit, not held")
+    H.assertEq(H.muddleRule({ actor = 2, status2 = { [0] = 0x20, [1] = 0x20, [2] = 0, [3] = 0 },
+      hp = q4, maxhp = m4, inFlight = { [0] = true } }), 1,
+      "...and another muddled ally beside it is the one this actor hits")
+    H.assertEq(H.muddleRule({ actor = 2, status2 = { [0] = 0x20, [1] = 0, [2] = 0, [3] = 0 },
+      hp = q4, maxhp = m4 }), 0, "the same ally with nothing in flight: hit it")
+    -- the floor's price (#348, H.allyFightMax), the engine's arithmetic
+    -- worked by hand: bp 100, L30, vigor x2 80, defense 100 -- attack 180,
+    -- 180 x 30 x 30 / 256 = 632, 100 + 1.5 x 632 = 1048, x255/256 + 1 =
+    -- 1044, x155/256 + 1 = 633, halved for one party member on another: 316
+    local base = { hands = { { bp = 100 } }, level = 30, vigor2 = 80, def = 100 }
+    local f = H.allyFightMax(base)
+    H.assertEq(f.max * 10000 + f.crit, 3160632, "a plain Fight on an ally priced at 316, a critical 632")
+    H.assertEq(f.top, 632, "...and the floor is the critical's")
+    base.tBackRow = true
+    H.assertEq(H.allyFightMax(base).max, 158, "the ally in the back row halves it")
+    base.tBackRow = nil
+    -- every row of the weapon-effect class (review of f8f9ad66, M2): the
+    -- same swing, worked by hand from the engine's paths (the comment at
+    -- M.allyFightMax names each)
+    local function fx(hand, extra)
+      local o = { hands = { hand }, level = 30, vigor2 = 80, def = 100, magpow = 60 }
+      for k, v in pairs(extra or {}) do o[k] = v end
+      return H.allyFightMax(o)
+    end
+    -- a weapon spell (CheckWeaponMagic, 1 swing in 4): power 20 at magic
+    -- power 60, L30: 80 + 60 x 20 x 30 / 32 = 1205, x255/256 + 1 = 1201,
+    -- x255/256 + 1 (magic defense 0) = 1197, halved for an ally: 598, on
+    -- top of the critical swing's 632
+    f = fx({ bp = 100, spell = { power = 20, elem = 0 } })
+    H.assertEq(f.max * 10000 + f.top, 3161230, "a hand that casts: max 316, the floor 632 + its spell 598")
+    f = fx({ bp = 100, effect = 13 })
+    H.assertEq(f.lethal ~= nil, true, "Scimitar/Zantetsuken (effect 13): instant death, lethal at any HP")
+    f = fx({ bp = 100, effect = 9, dice = 2 })
+    H.assertEq(f.max * 10000 + f.top, 21602160, "Dice (effect 9): no damage modification, 6 x 6 x L30 x 2 = 2160")
+    f = fx({ bp = 100, effect = 9, dice = 3 })
+    H.assertEq(f.top, 9999, "Fixed Dice, three dice: 216 x 7 (a triple) x L30 x 2 -> the 9999 cap")
+    f = fx({ bp = 100, effect = 11, windSlash = { power = 60, elem = 0 } })
+    H.assertEq(f.max * 10000 + f.top, 3161793,
+      "Tempest (effect 11): 1 swing in 2 a Wind Slash (power 60: 1793) in place of the swing")
+    f = fx({ bp = 100, effect = 12 })
+    H.assertEq(f.top, 0, "Heal Rod (effect 12): heals, nothing to price")
+    f = fx({ bp = 100, effect = 4 }, { human = true })
+    H.assertEq(f.max * 10000 + f.top, 6320948, "Man Eater (effect 4) on a human: $bc+2, x2; a critical x3")
+    f = fx({ bp = 100, effect = 7 })
+    H.assertEq(f.max * 10000 + f.top, 6320632, "an MP critical (effect 7): x2 always, no second critical")
+    f = fx({ bp = 100, effect = 2 }, { hp = 1600, maxhp = 1600 })
+    H.assertEq(f.max * 10000 + f.top, 2450245, "Atma Weapon (effect 2): no defense, no critical, x(HP+1)L/(MaxHP+1)/64")
+    f = fx({ bp = 100, effect = 10 }, { hp = 600, maxhp = 1600 })
+    H.assertEq(f.max * 10000 + f.top, 10202040, "Valiant Knife (effect 10): no defense, + its missing 1000 HP")
+    f = fx({ bp = 100, effect = 8 }, { tFloat = true })
+    H.assertEq(f.max * 10000 + f.top, 9481264, "Sniper (effect 8) on a floater: $bc+4, x3; a critical x4")
+    base.hands = { { bp = 100, effect = 3 } }
+    H.assertEq(H.allyFightMax(base).lethal ~= nil, true,
+      "the Trump's instant death (effect 3): lethal at any HP (the tomb's CELES, from 989/1696)")
+    base.deathProof = true
+    H.assertEq(H.allyFightMax(base).lethal, nil, "...unless the ally is proof against instant death")
+    base.deathProof = nil
+    base.hands = { { bp = 100, elem = 0x01 } }
+    base.absorb = 0x01
+    H.assertEq(H.allyFightMax(base).max, 0, "a weapon element the ally absorbs: nothing to price")
     H.log("battle_healpolicy: refined raise gate, ATB read and Muddle rule checked")
   end),
 
@@ -512,6 +620,13 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(v, nil, "no round measured yet: nothing says next round is lethal (" .. why .. ")")
     v, why = H.spendDecision({ hp = 447, maxhp = 447, roundCost = 447, bp = 3, heals = {} })
     H.assertEq(v, "spend", "map 269: LOCKE at full 447 under a 447 one-shot with 3 BP and nothing to heal with -- spend (" .. why .. ")")
+    -- a Potion the lift rule refused is named, not "nothing to heal with"
+    -- (review of b490ce32: gate s5 "134/902 ... no heal saves it (nothing to
+    -- heal with)" with 60 Potions in the bag)
+    v, why = H.spendDecision({ hp = 134, maxhp = 902, roundCost = 418, bp = 3, heals = {},
+      refused = { { what = "item $E9", restore = 250 } } })
+    H.assertEq(v == "spend" and why:find("item $E9 +250 = 384, not lifting clear of the round", 1, true) ~= nil, true,
+      "the refused Potion is named in the spend line (" .. why .. ")")
     -- the wipe class
     local d = function(tick, from, maxhp, bp, one)
       return { tick = tick, from = from, maxhp = maxhp, bp = bp, oneAction = one }
@@ -570,6 +685,25 @@ H.run({ maxFrames = 3000 }, {
       .. "a gauge that cannot fill (Stop) adds nothing (" .. why .. ")")
     c, n = H.roundCost({ window = 250, enemies = { { slot = 0, eta = 30, period = 300 } } })
     H.assertEq(c * 10 + n, 1, "nothing measured anywhere: the action is counted, priced at 0")
+    -- one enemy acting twice in the window (#312's Dullahan finding): its
+    -- worst once and its typical action for the second.  The numbers are
+    -- var1_k6_s0_w1's: a 202-tick window, his gauge full with a 139-tick
+    -- period, Pearl 1086 his worst, and the mean of his landed actions
+    -- there (195, 197, 460, 299, 202, 1083, 623, 1086) 518
+    c, n, why = H.roundCost({ window = 202,
+      enemies = { { slot = 0, eta = 0, period = 139, worst = 1086, typical = 518 } } })
+    H.assertEq(c * 10 + n, 16042, "Dullahan twice in a window: 1086 + 518 = 1604, not 2 x 1086 = 2172 ("
+      .. why .. ")")
+    H.assertEq(c < 1798 and 2172 > 1798, true, "...under his targets' max HP, where the old price was above it")
+    c, n = H.roundCost({ window = 202,
+      enemies = { { slot = 0, eta = 0, period = 139, worst = 1086 } } })
+    H.assertEq(c * 10 + n, 21722, "no typical measured: every action at the worst, as before")
+    c, n = H.roundCost({ window = 100,
+      enemies = { { slot = 0, eta = 0, period = 139, worst = 1086, typical = 518 } } })
+    H.assertEq(c * 10 + n, 10861, "one action in the window: the worst alone")
+    c, n = H.roundCost({ window = 500,
+      enemies = { { slot = 0, eta = 40, period = 227, worst = 149, typical = 200 } } })
+    H.assertEq(c * 10 + n, 4473, "a typical above the worst (a mean of misreads) never raises the price")
     H.log("battle_healpolicy: round price (#206, #194) checked")
   end),
 
@@ -880,6 +1014,117 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(tostring(kb) .. "/" .. tostring(kprice), "0/16",
       "...the same pool in an event battle pays the unboosted Drill")
     H.log("battle_healpolicy: the kit's random-battle MP budget checked")
+  end),
+
+  -- 16. the hit ledger, the heal watch and the queued cure-hit as
+  -- arithmetic (reviews of f8f9ad66 and bcf5240f: M4a-c and item 4-5 had
+  -- only lab evidence).  Each rule is a plain function the driver calls.
+  H.call(function()
+    -- M4a: a status landing is no hit.  tomb_zombie's Zombie touch read the
+    -- whole bar as the drop ("s0 1x1589 (worst)"): ZOMBIE newly set.
+    H.assertEq(H.statusDrop(0x00, 0x02, 0x00, 0xEF), true,
+      "a Fight that leaves its victim newly ZOMBIE is a status landing")
+    H.assertEq(H.statusDrop(0x02, 0x02, 0x00, 0xEF), false,
+      "a hit on a member already ZOMBIE is no status landing")
+    H.assertEq(H.statusDrop(0x00, 0x40, 0x02, 0x00), true, "PETRIFY newly set is a status landing")
+    H.assertEq(H.statusDrop(0x00, 0x80, 0x00, 0xEE, 0x01, 0x00), true,
+      "a Condemned count running out (Condemned cleared, Wound set) is the Doom, a status landing")
+    H.assertEq(H.statusDrop(0x00, 0x80, 0x00, 0xEE, 0x00, 0x00), false,
+      "a killing blow on a member not Condemned is a hit (censored by the ledger, not dropped)")
+    local mp = H.sym("MagicProp") & 0x3FFFFF
+    local nopower = nil
+    for id = 0, 0x35 do
+      if nopower == nil and H.readRomByte(mp + id * 14 + 6) == 0 then nopower = id end
+    end
+    H.assertEq(nopower ~= nil, true, "precondition: a spell with no power in the black/white/grey list")
+    H.assertEq(H.statusDrop(0x00, 0x00, 0x02, nopower), true,
+      string.format("a cast of spell $%02X (power 0) is a status landing", nopower))
+    H.assertEq(H.readRomByte(mp + 0x07 * 14 + 6) > 0, true, "precondition: Bolt 2 ($07) has power")
+    H.assertEq(H.statusDrop(0x00, 0x00, 0x02, 0x07), false, "Bolt 2's drop is a hit")
+    local L = H.ledgerCommit(nil, { cmd = 0x00, party = 0x02 },
+      { { e = 1, drop = 1548, last = 1548, hp = 0, status = true } })
+    H.assertEq(tostring(L.max) .. "/" .. tostring(L.min) .. "/" .. tostring(L.lb), "nil/nil/nil",
+      "a Zombie touch (1548 -> 0) puts no hit, no smallest hit and no floor in the ledger")
+    H.assertEq(L.actN .. "/" .. L.actSum, "1/0", "...and counts as one action of size 0 in the typical mean")
+    -- M4b: a killing blow is a censored floor, never the smallest hit
+    -- (vector_entry: "slot 2's smallest hit this fight so far: 75, on
+    -- entity 2 (75 -> 0)" under a 544 Bolt 2)
+    L = H.ledgerCommit(nil, { cmd = 0x02, party = 0x04 }, { { e = 2, drop = 544, last = 619, hp = 75 } })
+    H.assertEq(L.min, 544, "a 619 -> 75 Bolt 2 is the smallest hit")
+    L = H.ledgerCommit(L, { cmd = 0x02, party = 0x04 }, { { e = 2, drop = 75, last = 75, hp = 0 } })
+    H.assertEq(tostring(L.min) .. "/" .. tostring(L.on[2]) .. "/" .. tostring(L.lb) .. "/" .. tostring(L.lbOn and L.lbOn[2]), "544/544/75/75",
+      "the killing blow 75 -> 0 stays a floor (lb 75); the smallest hit stays 544")
+    -- item 4: counters and buffs stay out of the typical mean; the mean waits
+    local n0 = L.actN
+    L = H.ledgerCommit(L, { cmd = 0x00, counter = true, party = 0x01 }, {})
+    H.assertEq(L.actN, n0, "a counterattack that lands nothing is no action of the typical mean (never a zero)")
+    L = H.ledgerCommit(L, { cmd = 0x00, counter = true, party = 0x01 }, { { e = 0, drop = 90, last = 500, hp = 410 } })
+    H.assertEq(tostring(L.actN) .. "/" .. tostring(L.maxOn and L.maxOn[0]), (n0 + 1) .. "/90",
+      "a counterattack that lands counts at its hit (Dullahan's Battle is his counter, $B1 bit 0)")
+    n0 = L.actN
+    L = H.ledgerCommit(L, { cmd = 0x02, party = 0x00, mon = 0x01 }, {})
+    H.assertEq(L.actN, n0, "a buff on its own side (monster targets only, nothing dropped) is no action of the mean")
+    L = H.ledgerCommit(L, { cmd = 0x12, party = 0x00, mon = 0x00 }, {})
+    H.assertEq(L.actN .. "/" .. L.actSum, (n0 + 1) .. "/" .. L.actSum,
+      "a do-nothing turn aimed at nobody is a turn that took nothing: a zero in the mean")
+    n0 = L.actN
+    L = H.ledgerCommit(L, { cmd = 0x2E, party = 0x01 }, {})
+    H.assertEq(L.actN, n0, "the script's $2E is no action of the mean")
+    local T = H.ledgerCommit(nil, { cmd = 0x00, party = 0x01 }, { { e = 0, drop = 100, last = 500, hp = 400 } })
+    T = H.ledgerCommit(T, { cmd = 0x00, party = 0x01 }, {})
+    H.assertEq(H.typicalOf(T), nil, string.format("two actions are under M.TYPICAL_MIN (%d): no typical yet",
+      H.TYPICAL_MIN))
+    T = H.ledgerCommit(T, { cmd = 0x00, party = 0x01 }, { { e = 1, drop = 200, last = 600, hp = 400 } })
+    H.assertEq(H.typicalOf(T), 100, "three actions (100, a miss, 200): the typical action is 100")
+    -- M4c and item 4: the heal watch.  vector_entry's cure on entity 2 at
+    -- 75/619 (by entity 2), the member killed before it landed, then a
+    -- Fenix Down by entity 1 raising it to 77.
+    local w = { hp = 75, maxhp = 619, by = 2, until_ = 1000 }
+    H.assertEq(H.healWatchStep(w, 0, 10), "fell",
+      "the cure's target falls: the watch ends, and no later raise can be read as the cure")
+    H.assertEq(H.healWatchStep(w, 325, 10), "measured",
+      "a rise is the heal, whoever's command the frame shows (tomb_r7 k10_s0: entity 3's Potion landed "
+      .. "during entity 2's command)")
+    H.assertEq(H.healWatchStep(w, 619, 10), "full", "a rise to max HP is capped, not measured")
+    H.assertEq(H.healWatchStep(w, 60, 10), "lower", "a drop moves the baseline")
+    H.assertEq(H.healWatchStep(w, 75, 1001), "expired", "no rise inside the watch's ticks: it lapses")
+    -- a cure's watch carries its ROM band; a Potion's 250 above the cast's
+    -- most is not the cure (vector_entry at 15a54c03: "cure $2D restored 250
+    -- hp on entity 3 ... [the ROM's least: 202]")
+    local cw = { hp = 300, maxhp = 619, by = 2, until_ = 1000, lo = 202, hi = 230 }
+    H.assertEq(H.healWatchStep(cw, 550, 10), "outside", "a +250 rise outside the cure's 202..230 is another heal")
+    H.assertEq(H.healWatchStep(cw, 520, 10), "measured", "a +220 rise inside 202..230 is the cure")
+    -- an item's band is its power byte exactly: the r10 labs read "item $E9
+    -- restored 490" (two Potions summed) and "restored 236"
+    local pw = H.itemPower(0xE9)
+    local iw = { hp = 300, maxhp = 1600, by = 3, until_ = 1000, lo = pw, hi = pw }
+    H.assertEq(H.healWatchStep(iw, 300 + pw, 10), "measured", string.format("a Potion's +%d is the Potion", pw))
+    H.assertEq(H.healWatchStep(iw, 790, 10), "outside", "a +490 rise is not one Potion")
+    H.assertEq(H.healWatchStep(iw, 536, 10), "outside", "a +236 rise is not one Potion")
+    -- item 5 of f8f9ad66: a queued cure-hit that will not run is stale
+    local q = { tick = 100 }
+    H.assertEq(H.queuedHitStale(q, { hp = 0, tick = 110 }), "it fell", "a hitter who fell")
+    H.assertEq(H.queuedHitStale(q, { hp = 500, denied = "SLEEP", tick = 110 }), "it is under SLEEP", "a hitter asleep")
+    H.assertEq(H.queuedHitStale(q, { hp = 500, muddled = true, tick = 110 }), "it is Muddled", "a hitter muddled")
+    H.assertEq(H.queuedHitStale(q, { hp = 500, ownWindow = true, tick = 110 }), "its own window is open again",
+      "a hitter whose window is open again (its command ran or was dropped)")
+    H.assertEq(H.queuedHitStale(q, { hp = 500, tick = 100 + 240 + 601 }), "it never ran", "RAISE_WAIT + 600 ticks on")
+    H.assertEq(H.queuedHitStale(q, { hp = 500, tick = 110 }), nil, "...and otherwise it is in flight")
+    -- review of bcf5240f, item 5: an unmeasured cure priced from the ROM's
+    -- formula, at variance's low end: power 10, magic power 40, level 20
+    -- -> 40 + 40 x 10 x 20 / 32 = 290, x 224/256 + 1 = 254
+    -- the top-up a raise was planned on goes through whatever the round
+    -- costs (#168; Dullahan arm B k0_s0_w9, review of ad048b29)
+    H.assertEq(H.healDecision({ hp = 213, maxhp = 1710, restore = 250, roundCost = 1083, allies = 3, owed = true }),
+      "the raise's top-up (#168)", "a raised member at 213/1710 owed its top-up gets it under a 1083 round")
+    H.assertEq(H.healDecision({ hp = 213, maxhp = 1710, restore = 250, roundCost = 1083, allies = 3 }), nil,
+      "...and without the raise behind it the lift rule refuses the same Potion")
+    local lo, hi = H.cureRestoreMin({ power = 10, heal = true, flags2 = 0x20, level = 20, magpow = 40 })
+    H.assertEq(lo .. ".." .. hi, "254..289", "a cure that ignores defense: 254 at least, 289 at most (290 x 255/256 + 1)")
+    H.assertEq(H.cureRestoreMin({ power = 10, heal = true, flags2 = 0x00, level = 20, magpow = 40, mdef = 51 }),
+      ((254 * 204) >> 8) + 1, "...through 51 magic defense when it does not")
+    H.assertEq(H.cureRestoreMin({ power = 10, heal = false, level = 20, magpow = 40 }), nil, "no heal flag: no price")
+    H.log("battle_healpolicy: the hit ledger, the heal watch, the queued cure-hit and the cure price checked")
   end),
 
   -- 8. the table was not skipped

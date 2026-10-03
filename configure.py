@@ -469,6 +469,9 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
     "battle_passside": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+    # wt/hire-sprite: the 3 and 2 BP hires' figures (Defends bank the points)
+    "battle_hirecrew": "OT6_TIMEOUT=2400 "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
     # the Config screen's version tab, from the Narshe exit spawn
     "menu_configversion":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1",
@@ -500,7 +503,11 @@ TEST_ENV = {
     # Rage half (K4), ~37k frames, 461 s at the 80.7 frames/s above, and a
     # draw that needs more fight retries spends a round (up to 3,345 frames
     # measured) per try; 1800 is 3.9x the measured body
-    # (build/attempts/wt/procboost-v024/summary.txt)
+    # (build/attempts/wt/procboost-v024/summary.txt).  The magicite case's
+    # worst draw, all eleven tries measuring nothing, played the first half
+    # in 88,082 frames (2,907 -> 90,989; with the Rage half's 9,790, ~97.9k
+    # frames, 1,213 s at 80.7 frames/s): 1800 is 1.48x it
+    # (build/attempts/wt/procboost-magicite/neg/nomeasure_k1.log.gz)
     "battle_procboost": "OT6_TIMEOUT=1800",
     "battle_statuses": "OT6_TIMEOUT=3600",
     "battle_levelup": "OT6_TIMEOUT=3600",
@@ -660,8 +667,9 @@ check("test_registration",
 # not a gate, but the line shapes it reads are asserted here
 check("audit_fenix_selftest",
       "python3 tools/audit_boost.py --selftest"
-      " && python3 tools/audit_fenix.py --selftest",
-      ["tools/audit_boost.py", "tools/audit_fenix.py",
+      " && python3 tools/audit_fenix.py --selftest"
+      " && python3 tools/audit_zombie_touches.py --selftest",
+      ["tools/audit_boost.py", "tools/audit_fenix.py", "tools/audit_zombie_touches.py",
        "tools/tests/savestate_graph.py"])
 # The retention step (#222): evidence a merge message or a design doc
 # quotes must outlive the worktree it was produced in, so the copy's

@@ -449,7 +449,7 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(H.invCountOf(REMEDY) > 0, true, "Remedy in the bag for the Mad Oscar's Sour Mouth")
     H.log(string.format("[wor] SETZER's Esper byte $%02X (UNICORN is 23 = $17)", H.readByte(c(SETZER, 0x1E))))
   end),
-  H.fieldCare({ tag = "care at the boot" }),
+  H.fieldCare({ tag = "care at the boot", threshold = H.CARE_BEFORE_FIGHTS }),
 
   -- ---- 1. the walk to the tomb ---------------------------------------------------------------
   H.worldNavTo(TOMB_TILE[1], TOMB_TILE[2], { maxFrames = 20000, playBattles = "tactical", fight = FIGHT,

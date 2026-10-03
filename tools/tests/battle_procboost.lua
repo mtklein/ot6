@@ -38,9 +38,13 @@
 --           per hit)
 --   throw   SHADOW's MithrilKnife ($01, also Ice's id) leaves x8
 --   rod     LOCKE's Ice Rod from Item (runs as Ice 2) leaves x8
---   magicite  LOCKE's Magicite from Item: any damage its esper deals leaves x8
---           (which esper answers is the item's own roll; a harmless one is
---           logged, not failed)
+--   magicite  LOCKE's Magicite from Item: the drawn esper's damage (or
+--           healing) leaves x8.  Which esper answers is the item's own roll
+--           over a pool decoded from the ROM (magicitePool, below); a draw
+--           with nothing to multiply is retried a round later, and the case
+--           fails if no try measured.  Crusader's Purifier hits every body,
+--           the party included, and x8 is past any party's HP: that draw is
+--           measured and its branch ends there (the snapshot restored)
 --   and the Fight's swings: Ot6FightBoost raised its multi-attack count by 2
 --           per pending pip ($3a70 1 -> 7 at boost 3), the positive control
 --           for the swing observer the Rage row reads
@@ -104,7 +108,7 @@ local FIRE, FIRE3 = 0x00, 0x09
 -- reach less try 1's over n-1: 550, 653, 1051, 3157 and 3345 frames
 -- (build/attempts/wt/procboost-v024/reach_frames.txt, the final sweep and
 -- its replay); ROUND_FRAMES is twice the largest.
-local FIGHT_TRIES, MAGICITE_TRIES, ROUND_FRAMES = 12, 6, 2 * 3345
+local FIGHT_TRIES, ROUND_FRAMES = 12, 2 * 3345
 local GAU, RAGE_ENTRIES = 0x0B, 8          -- the rage window lists at most eight
 local GAU_STATE = "build/states/gau_joined.mss.lua"
 local RAGECOUNT, RAGEBEAST, MP = 0x3A9A, 0x33A8, 0x3C08
@@ -121,6 +125,7 @@ local MSCROLL, MCOL, MROW, MLISTPTR = 0x8913, 0x8917, 0x891B, 0x302C
 local BANK, PEND = 0x3E9C, 0x3E9D
 local HANDS = 0x3CA8
 local CMD_FIGHT, CMD_ITEM, CMD_MAGIC, CMD_THROW, CMD_RAGE = 0x00, 0x01, 0x02, 0x08, 0x10
+local CMD_SUMMON = 0x19                       -- what GetCmdForAI names an esper's attack
 
 local slotOf, snap, armed = {}, nil, nil
 local snapSeats                               -- the seats as the snapshot was taken
@@ -232,6 +237,24 @@ local function installObservers()
       armed.beast = H.readByte(RAGEBEAST + x)
     end
   end, emu.callbackType.exec, ae, ae)
+  -- the Magicite's draw: AttackerEffect_49 is `jsr RandGenju / sta $3400`,
+  -- so A at the instruction after the jsr is the esper.  Tempest's effect
+  -- branches into that same sta (wind slash), so only a pass that entered
+  -- AttackerEffect_49 counts.
+  local e49 = H.sym("AttackerEffect_49")
+  local rg = H.sym("RandGenju")
+  H.assertEq(H.readRomByte((e49 & 0x3FFFFF)) == 0x20 and H.readRomWord((e49 & 0x3FFFFF) + 1) == (rg & 0xFFFF),
+    true, "AttackerEffect_49 opens with jsr RandGenju")
+  local drawing = false
+  emu.addMemoryCallback(function()
+    drawing = armed ~= nil and not armed.endF
+  end, emu.callbackType.exec, e49, e49)
+  emu.addMemoryCallback(function()
+    if not drawing then return end
+    drawing = false
+    if armed == nil or armed.endF then return end
+    armed.esper = emu.getState()["cpu.a"] & 0xFF
+  end, emu.callbackType.exec, e49 + 3, e49 + 3)
 end
 
 local tick = 0
@@ -566,6 +589,7 @@ local function tryCase(c, n)
       inbound = {}
       c.slot = slotOf[c.char]
       c.calls, c.fb, c.endF, c.beast, c.timers = {}, {}, nil, nil, nil
+      c.esper, c.cutF, c.cutSeats = nil, nil, nil
       c.pendAtConfirm, c.bankAtConfirm, c.mpAtConfirm = nil, nil, nil
       c.spend = n - 1
       tick, phase, held, spent, deferring = 0, "reach", nil, 0, nil
@@ -622,13 +646,28 @@ local function tryCase(c, n)
         H.setPad((held and ph < 6) and { [held] = true } or {})
       end),
     }, string.format("%s, try %d", c.name, n)),
-    H.driveUntil(function() return skip or (c.endF ~= nil and H.frame >= c.endF + 30) end, 6000, {
-      H.call(function() bench(c.slot) end),
+    H.driveUntil(function()
+      return skip or c.cutF ~= nil or (c.endF ~= nil and H.frame >= c.endF + 30)
+    end, 6000, {
+      H.call(function()
+        if c.cut and c.cut(c) then
+          c.cutF, c.cutSeats = H.frame, seatsLine()
+          H.setPad({})
+          return
+        end
+        bench(c.slot)
+      end),
     }, c.name .. " resolves, try " .. n),
     H.call(function()
       if skip then return end
       armed = nil
       H.setPad({})
+      if c.cutF then
+        -- the action wiped the party (the case's cut says why): the branch
+        -- ends here, and the snapshot comes back so no frame of the wipe
+        -- plays on into the next step
+        req = H.requestLoadState(snap.blob)
+      end
       local e = c.slot * 2
       local bankAfter, pendAfter = H.readByte(BANK + e), H.readByte(PEND + e)
       local mpAfter = H.readWord(MP + e)
@@ -646,13 +685,120 @@ local function tryCase(c, n)
         #fparts > 0 and table.concat(fparts, " | ") or "not reached",
         tostring(c.bankAtConfirm), bankAfter, pendAfter, tostring(c.mpAtConfirm), mpAfter,
         c.timers and string.format(" ; %d status-timer call(s) ($29) left out", c.timers) or ""))
-      if c.done == nil or c.done(c) then
+      local measured = c.done == nil or c.done(c)
+      if c.note then
+        local note = c.note(c, measured)
+        c.draws = c.draws or {}
+        c.draws[#c.draws + 1] = string.format("try %d: %s", n, note)
+        H.log(string.format("[procboost] %s try %d: %s", c.name, n, note))
+      end
+      if measured then
         c.hit = { calls = c.calls, fb = c.fb, n = n, pendAtConfirm = c.pendAtConfirm,
                   bankAtConfirm = c.bankAtConfirm, bankAfter = bankAfter, pendAfter = pendAfter,
-                  beast = c.beast }
+                  beast = c.beast, esper = c.esper, cutF = c.cutF }
       end
     end),
+    H.waitFrames(2),
+    H.call(function()
+      if not skip and c.cutF then H.checkReq(req, "snapshot load after the wipe") end
+    end),
   }
+end
+
+-- The Magicite item's esper pool, from the ROM.  AttackerEffect_49 draws
+-- it with RandGenju (battle_main.asm):
+--   lda #n / jsr RandA / cmp #skip / bcc + / inc / inc / + clc / adc #base
+-- so r = RandA(n) picks esper base + r, or base + r + 2 from r = skip on
+-- (vanilla's n=$19, skip=$0B, base=$36: never Odin or Raiden).  RandA is
+-- RNGTbl[++$be] * n / 256, and RNGTbl is a permutation of 0..255, so each
+-- esper's odds are its share of the 256 table entries.  Each esper's
+-- MagicProp record (+$00 targeting; +$02 flags: bit 7 "can't target
+-- characters", bit 2 "can hit dead targets"; +$04 bit 0 heal; +$06 power)
+-- says what its draw gives the case.  The side an auto-targeted attack
+-- lands on is the targeting byte's (the side chooser at C2/5937 in
+-- ff6/notes/ff3u.asm): ($bb & $0C) == $04 is every body on both sides, and
+-- otherwise bit 6 picks the enemy side over the caster's; flags bit 7 then
+-- strikes the characters out (_MaskTarget, C2/58FA).  So the party is in
+-- an esper's targets when its targeting is both-sides or own-side and
+-- flags bit 7 is clear:
+--   power 0 (Siren, Shoat, Stray, Palidor, Ragnarok and the party buffs):
+--     no damage, so nothing for the boost to multiply; the case tries again
+--   resurrection targeting (Phoenix): its heal may land on no living body;
+--     counted with the power-0 draws for the try bound
+--   damage that reaches the party, not a heal (Crusader's Purifier,
+--     targeting $04 and flags $40, the same record as vanilla's): it hits
+--     every body on the field.  At x8 the per-target damage is the 9999 cap, past any party's
+--     max HP here, so no brace saves the party (on the care-policy chain's
+--     fc_alcove, base 7243 left as 57944 and each seat took 9999,
+--     build/attempts/wt/procboost-magicite/diag/diagm2_k0.log.gz).  The
+--     call is measured and the branch ends at the wipe, before the run's
+--     canary would read it as the run's game over: the snapshot is restored.
+--   everything else: damage or healing that leaves x8.
+local RNGTBL_N = 256
+local function magicitePool()
+  local rg = H.sym("RandGenju") & 0x3FFFFF
+  local b = {}
+  for i = 0, 13 do b[i] = H.readRomByte(rg + i) end
+  local ra = H.sym("RandA")
+  H.assertEq(b[0] == 0xA9 and b[2] == 0x20 and (b[3] | b[4] << 8) == (ra & 0xFFFF) and b[5] == 0xC9
+    and b[7] == 0x90 and b[8] == 0x02 and b[9] == 0x1A and b[10] == 0x1A and b[11] == 0x18
+    and b[12] == 0x69, true, "RandGenju is lda #n / jsr RandA / cmp #skip / bcc / inc / inc / clc / adc #base")
+  local n, skip, base = b[1], b[6], b[13]
+  local rng = H.sym("RNGTbl") & 0x3FFFFF
+  local share = {}
+  for i = 0, RNGTBL_N - 1 do
+    local r = (H.readRomByte(rng + i) * n) >> 8
+    share[r] = (share[r] or 0) + 1
+  end
+  local mp, names = H.sym("MagicProp") & 0x3FFFFF, H.sym("GenjuName") & 0x3FFFFF
+  local pool, idle = {}, 0
+  for r = 0, n - 1 do
+    local id = base + r + (r >= skip and 2 or 0)
+    local rec = mp + id * 14
+    local tgt, flags = H.readRomByte(rec), H.readRomByte(rec + 2)
+    local heal, power = (H.readRomByte(rec + 4) & 0x01) ~= 0, H.readRomByte(rec + 6)
+    local side = ((tgt & 0x0C) == 0x04 and "both") or ((tgt & 0x40) ~= 0 and "enemy") or "party"
+    local reachesParty = side ~= "enemy" and (flags & 0x80) == 0
+    local name = {}
+    for j = 0, 7 do
+      local ch = H.readRomByte(names + (id - base) * 8 + j)
+      if ch >= 0x80 and ch <= 0x99 then name[#name + 1] = string.char(65 + ch - 0x80)
+      elseif ch >= 0x9A and ch <= 0xB3 then name[#name + 1] = string.char(97 + ch - 0x9A) end
+    end
+    local e = { id = id, name = table.concat(name), power = power, heal = heal, odds = (share[r] or 0),
+                side = side, hitsParty = power > 0 and not heal and reachesParty,
+                idle = power == 0 or (flags & 0x04) ~= 0 }
+    if e.idle then idle = idle + e.odds end
+    pool[id] = e
+  end
+  local q = idle / RNGTBL_N
+  assert(q < 1, "the Magicite's pool holds an esper with power to multiply")
+  return pool, q, n
+end
+-- Decoded as the script loads, because the try count shapes the steps; an
+-- error raised here, before H.run, hangs the testrunner silently until
+-- OT6_TIMEOUT (a mutant of the RandGenju check sat 30 minutes with no line
+-- logged), so it is caught and raised again from the run's first step.
+local poolOk, MAGICITE_POOL, MAGICITE_IDLE, MAGICITE_N = pcall(magicitePool)
+local poolErr = nil
+if not poolOk then
+  poolErr, MAGICITE_POOL, MAGICITE_IDLE, MAGICITE_N = tostring(MAGICITE_POOL), {}, 0.5, 0
+end
+-- tries until a draw measures: the least N with q^N <= MAGICITE_FAIL, q the
+-- share of draws that measure nothing (each try draws a round later than the
+-- last, at another point of the RNG)
+local MAGICITE_FAIL = 1e-3
+local MAGICITE_TRIES = math.max(1, math.ceil(math.log(MAGICITE_FAIL) / math.log(MAGICITE_IDLE)))
+local function esperName(id)
+  local e = id and MAGICITE_POOL[id]
+  return id == nil and "no draw seen" or string.format("$%02X %s", id, e and e.name or "(not in the pool)")
+end
+-- the call that measures a Magicite try: the drawn esper's attack, run as a
+-- summon, at the pending boost, with damage (or healing) to multiply
+local function magiciteCall(c, calls)
+  for _, k in ipairs(calls or c.calls) do
+    if k.pend == BOOST and k.din > 0 and k.b5 == CMD_SUMMON and k.b6 == c.esper then return k end
+  end
 end
 
 local function isCast(c, k) return k.b5 == CMD_MAGIC and k.b6 == c.castSpell end
@@ -666,7 +812,29 @@ local CASES = {
   { name = "throw", char = SHADOW, verb = "throw", item = MITHRIL_KNIFE, tries = 1 },
   { name = "rod", char = LOCKE, verb = "item", item = ICE_ROD, tries = 1 },
   { name = "magicite", char = LOCKE, verb = "item", item = MAGICITE, tries = MAGICITE_TRIES,
-    done = function(c) return #c.calls > 0 end },
+    done = function(c) return magiciteCall(c) ~= nil end,
+    -- the drawn esper hits the party and the party is down: the branch ends
+    cut = function(c)
+      local e = c.esper and MAGICITE_POOL[c.esper]
+      return e ~= nil and e.hitsParty and magiciteCall(c) ~= nil and H.partyWipedInBattle()
+    end,
+    note = function(c, measured)
+      local e = c.esper and MAGICITE_POOL[c.esper]
+      local k = measured and magiciteCall(c)
+      local what
+      if c.esper == nil then
+        what = "no esper drawn"
+      elseif k then
+        what = string.format("%d -> %d", k.din, k.dout)
+      elseif e and e.power == 0 then
+        what = "power 0, nothing to multiply"
+      else
+        what = "no damage or healing at the pending boost"
+      end
+      return string.format("the Magicite drew %s: %s%s", esperName(c.esper), what,
+        c.cutF and string.format("; it hit the party too, wiped at f%d (seats %s): the branch ends, "
+          .. "the snapshot restored", c.cutF, c.cutSeats) or "")
+    end },
 }
 activeCases = CASES
 -- The precondition every case starts from: every member alive at READY_PCT
@@ -801,6 +969,7 @@ local function battleSetup()
 end
 
 local steps = {
+  H.call(function() if poolErr then error("the Magicite's pool: " .. poolErr, 0) end end),
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(20),
@@ -903,6 +1072,18 @@ local steps = {
     H.checkReq(snap, "snapshot")
     -- the gate above is the precondition's check: it snapshots only a
     -- ready party, and a precondition no battle reaches is its error
+    local idle, party, sides = {}, {}, {}
+    for id = 0, 255 do
+      local e = MAGICITE_POOL[id]
+      if e and e.idle then idle[#idle + 1] = e.name end
+      if e and e.hitsParty then party[#party + 1] = e.name end
+      if e and e.power > 0 then sides[#sides + 1] = string.format("%s %s%s", e.name, e.side, e.heal and " heal" or "") end
+    end
+    H.log(string.format("[procboost] the Magicite's pool: %d espers from RandGenju; %.3f of a draw "
+      .. "measures nothing (%s), so %d tries leave at most %.4f; hits the party too: %s",
+      MAGICITE_N, MAGICITE_IDLE, table.concat(idle, " "), MAGICITE_TRIES, MAGICITE_IDLE ^ MAGICITE_TRIES,
+      #party > 0 and table.concat(party, " ") or "none"))
+    H.log("[procboost] the Magicite's espers with power, by side: " .. table.concat(sides, ", "))
     H.log(string.format("[procboost] snapshot f%d in battle %d: seats %s, after %d bench "
       .. "action(s); %d battle(s) allowed (an Apokryphos/Misfit formation at most %.2f of a "
       .. "draw, so %d unservable in a row at most %.4f)", H.frame, serving.n, snapSeats,
@@ -923,8 +1104,9 @@ steps[#steps + 1] = H.call(function()
     error(c.name .. ": no Ot6BoostDmg call that is " .. what, 0)
   end
   for _, c in ipairs(CASES) do
-    H.assertEq(c.hit ~= nil or c.name == "magicite", true, c.name .. ": the case happened")
-    if c.hit then H.assertEq(c.hit.pendAtConfirm, BOOST, c.name .. ": pending boost at the confirm") end
+    H.assertEq(c.hit ~= nil, true, c.name .. ": the case happened"
+      .. (c.draws and " (" .. table.concat(c.draws, "; ") .. ")" or ""))
+    H.assertEq(c.hit.pendAtConfirm, BOOST, c.name .. ": pending boost at the confirm")
   end
 
   -- magic: the fold bought Fire 3; no multiplier on top
@@ -963,20 +1145,26 @@ steps[#steps + 1] = H.call(function()
   H.assertEq(k.dout, boosted(k.din), string.format(
     "rod: the Ice Rod's spell $%02X leaves x%d (%d in)", k.b6, MULT, k.din))
 
-  -- magicite: whatever damage its esper deals is multiplied
+  -- magicite: the drawn esper's damage (or healing) is multiplied
+  local mh = by.magicite.hit
+  H.assertEq(MAGICITE_POOL[mh.esper] ~= nil, true, string.format(
+    "magicite: the drawn esper (%s) is in the pool decoded from RandGenju", esperName(mh.esper)))
+  k = magiciteCall({ esper = mh.esper }, mh.calls)
+  H.assertEq(k ~= nil, true, "magicite: the drawn esper's attack ran as a summon with damage at the pending boost")
+  H.assertEq(k.a7c, CMD_ITEM, "magicite: the queued command is Item")
+  H.assertEq(k.a7d, MAGICITE, "magicite: the queued item is the Magicite")
   local mc = 0
-  if by.magicite.hit then
-    for _, k in ipairs(by.magicite.hit.calls) do
-      if k.pend == BOOST then
-        mc = mc + 1
-        H.assertEq(k.dout, boosted(k.din), string.format(
-          "magicite: the esper's $%02X leaves x%d (%d in)", k.b6, MULT, k.din))
-      end
+  for _, k in ipairs(mh.calls) do
+    if k.pend == BOOST and k.b5 == CMD_SUMMON and k.b6 == mh.esper then
+      mc = mc + 1
+      H.assertEq(k.dout, boosted(k.din), string.format(
+        "magicite: the esper's $%02X leaves x%d (%d in)", k.b6, MULT, k.din))
     end
   end
   H.log(string.format("[procboost] verdict: magic skipped, %d weapon cast(s) unmultiplied "
-    .. "(try %d), throw x%d, rod x%d, magicite %s", casts, by.fight.hit.n, MULT, MULT,
-    mc > 0 and string.format("x%d on %d call(s)", MULT, mc) or "dealt no damage in the tries"))
+    .. "(try %d), throw x%d, rod x%d, magicite x%d on %d call(s) (try %d of %d: %s%s)", casts,
+    by.fight.hit.n, MULT, MULT, MULT, mc, mh.n, MAGICITE_TRIES, esperName(mh.esper),
+    mh.cutF and ", which wiped the party; its branch ended there" or ""))
 end)
 
 -- ---- the Rage row, from gau_joined ---------------------------------------
