@@ -3239,10 +3239,12 @@ end
 --   stale-live coincidence mid-handoff, which is the bug this guard
 --   exists for.
 --   Field -> raw single frame plus the caller's own ZM guard: on the
---   field hasControl() reads false for the entire menu lifetime and
---   becomes true only when the field module is back with its map
---   reloaded (M.mapLoaded), so the first true frame is correct.
---   Debouncing it hangs instead (every
+--   field the control flags (M.fieldControl) read false for the entire
+--   menu lifetime and become true when the field module is back, so the
+--   first true frame is correct.  That is before the map has reloaded:
+--   the next menu may open through the reload (a held X is read on the
+--   field's first live frame), and the step runner's reload gate holds
+--   anything else (M.menuStep).  Debouncing it hangs instead (every
 --   B tap the close driver sends drops control for a frame; 4-of-12
 --   tapping never leaves 30 clean frames in a row).
 local function careClose(zmExtra)
@@ -3255,7 +3257,7 @@ local function careClose(zmExtra)
       calm = ok and calm + 1 or 0
       return calm >= 30
     end
-    return M.hasControl() and M.tileAligned()
+    return M.fieldControl() and M.tileAligned()
        and (zmExtra == nil or zmExtra())
   end
 end
@@ -3272,16 +3274,24 @@ end
 -- world map back under the menu.  menuBack() builds a fresh predicate per
 -- step (careClose's world half counts calm frames); menuHome() is the
 -- undebounced "the map has control" a session waits on before it opens.
+--
+-- On the field both read the control flags alone (M.fieldControl), not
+-- the loaded map: a session closes, and the next one opens, through the
+-- map reload, as a person holding X does; the gain is about 24 frames a
+-- round trip (the IAF deck's between-wave kit, gen_fc_landing:
+-- build/attempts/wt/walker-after-menu/merge-898a7e06/).  The helpers are
+-- menu steps (M.menuStep, the end of this file), so nothing but another
+-- menu starts after one before the map is loaded.
 local function menuBack()
   local worldClosed = careClose()
   return function()
     if M.worldMode() then return worldClosed() end
-    return M.hasControl()
+    return M.fieldControl()
   end
 end
 local function menuHome()
   if M.worldMode() then return M.worldHasControl() and M.worldAligned() end
-  return M.hasControl()
+  return M.fieldControl()
 end
 
 function M.charHp(c) return M.readWord(0x1600 + 37 * c + 9) end
@@ -7154,4 +7164,17 @@ function M.saveGame(opts)
     end)(),
     M.waitFrames(30),
   })
+end
+
+-- The field-menu helpers are menu steps (lib/ot6.lua M.menuStep): one may
+-- start while the map reloads after another, and each one that ends before
+-- the map is loaded arms the reload gate, which holds the next step that
+-- is not a menu helper (a walk, a BFS read in a test's own cond) until it
+-- is.  The strict wait sits there, before anything plans a route.
+for _, name in ipairs({ "fieldCare", "careStop", "bagArrange", "setRows", "equipEsper",
+                        "equipWeapon", "equipLoadout", "equipKit", "dressRelics", "emptyEquip" }) do
+  local build = M[name]
+  M[name] = function(...)
+    return M.menuStep(build(...), name)
+  end
 end
