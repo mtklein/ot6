@@ -66,9 +66,10 @@ H.run({ maxFrames = 12000 }, {
   -- first and the next-best in the bag after it.  Her row stays as it is
   -- (BACK); no fight in this segment or the next measures it.
   H.call(function() healthBefore = health() end),
-  -- through the relic rule over the kit (H.relicKit): a relic in the bag
-  -- it ranks above the Czarina Ring -- the widest guard, a Ribbon first --
-  -- goes on in its place; the Genji Glove stays
+  -- through the relic rule over the kit (H.relicKit): the kit names no
+  -- threat, so only a guard may take the Czarina Ring's slot -- the widest
+  -- in the bag, a Ribbon first; an acting relic the rule ranks higher (a
+  -- Black Belt) does not; the Genji Glove stays
   H.relicKit(CELES, "CELES", { [4] = 0xD1, [5] = 0xC1 }, { tag = "CELES relics" }),
   H.equipKit(CELES, { { 0, 0x11 }, { 0, 0x0F },
                       { 1, 0x0E }, { 1, 0x0F }, { 1, 0x5C },

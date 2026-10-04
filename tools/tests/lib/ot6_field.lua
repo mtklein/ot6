@@ -6651,7 +6651,8 @@ end
 -- it's in the bag"; a person changing relics at this menu reads the bag.
 -- opts.threats as M.relicPlan's; without them, the statuses the kit's own
 -- guards cover (the route chose them for those), or every status when the
--- kit holds no guard.  opts.tag.
+-- kit holds no guard -- and then only a guard may take a kit slot, never
+-- an acting relic (the kit names no threat).  opts.tag.
 function M.relicKit(ch, name, kit, opts)
   opts = opts or {}
   local tag = opts.tag or (name .. " relics")
@@ -6678,6 +6679,27 @@ function M.relicKit(ch, name, kit, opts)
           assume = { [ch] = kit }, spareHands = false })
         local p = plan[1]
         M.assertEq(p ~= nil, true, tag .. ": the member is in the active party")
+        -- a kit that names no threats (none given, no guard in it) chose
+        -- its relics for what they do, not for a status: the rule may put
+        -- a guard (the widest first, a Ribbon) in a kit slot, never an
+        -- acting relic.  Without a Ribbon in the bag the rule would put a
+        -- Black Belt over wor_island's Czarina Ring, the route's chosen
+        -- insurance for a solo ("slot 5: Black Belt $D5 in place of the
+        -- kit's Czarina Ring $C1 (the relic rule)", chain_wor_island,
+        -- build/attempts/wt/walker-after-menu/round4/chain_e67a14f6/).
+        if threats == nil then
+          for s = 4, 5 do
+            local id = p.want[s]
+            if kit[s] and id and id ~= kit[s] then
+              local cl = id ~= 0xFF and M.relicClass(id) or nil
+              if not (cl and cl.aff == "guard") then
+                M.log(string.format("[%s] slot %d: %s stays -- the kit names no threat, so only a guard takes its "
+                  .. "slot, not the rule's %s", tag, s, relicName(kit[s]), relicName(id)))
+                p.want[s] = kit[s]
+              end
+            end
+          end
+        end
         -- the kit's guards were chosen for the threatened statuses they
         -- cover; the plan keeps that cover.  The rule ranks acting relics
         -- above guards because a Ribbon is assumed on (relicPlan's note);
