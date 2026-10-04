@@ -51,7 +51,11 @@ local MENU, ACTOR, CHID = 0x7BCA, 0x62CA, 0x3ED8
 local HEAD_SP = 0x0134
 local CHAR_TERRA = 0x00
 
+local PHP, PMAXHP = 0x3BF4, 0x3C1C    -- party HP / max HP, +char slot*2
+local MFLAGS, MGAUGE = 0x3AA8, 0x3221 -- monster $3AA0/$3219 rows, +slot*2
+
 local hs, terra                       -- head monster slot, Terra's char slot
+local shell                           -- the shell's monster slot
 
 local function shields()  return H.readByte(SHLD + hs * 2) end
 local function maxShield() return H.readByte(SHLD + hs * 2 + 1) end
@@ -81,7 +85,7 @@ end
 -- the animation, so a drop observed with the timer up is a hit that ran the
 -- broken-double path.
 local drops = {}
-local prevHp = nil
+local prevHp, prevShellHp = nil, nil
 local function sampleDrops()
   local hp = headHp()
   if prevHp ~= nil and hp < prevHp then
@@ -91,38 +95,111 @@ local function sampleDrops()
       d, timer(), shields()))
   end
   prevHp = hp
+  local sh = H.readWord(MHP + shell * 2)
+  if prevShellHp ~= nil and sh < prevShellHp then
+    H.log(string.format("hp drop: shell -%d (a beam that missed the head's window)",
+      prevShellHp - sh))
+  end
+  prevShellHp = sh
 end
 
 -- ------------------------------------------------------------- driver --
 -- Sequences run from the settled top command menu, on the MagiTek cursor:
 --   beam at the default target    A A A
 --   Heal Force (2,0), both lists  A dn dn A A  (self-target by default)
--- Only Terra beams.  Vicks and Wedge heal, and everyone heals while the head
--- is retracted, so no beam is ever spent on the shell and every drop on the
--- head is one caster's Fire Beam.
+-- Only Terra beams, so every drop on the head is one caster's Fire Beam.
+-- Vicks and Wedge heal, and Terra heals on any turn she doesn't beam.
+--
+-- When Terra beams is read off the shell, whose own turn is what hides and
+-- shows the head (AIScript _256: each turn past its 10-tick timer toggles
+-- the head).  A beam lands 165-527 frames after it is ordered, so a beam
+-- ordered while the shell's turn is near lands after the hide, retargets
+-- to the shell, and the shell answers with its Mega Volt counter.  At
+-- shift 40 on 594e2fa1 that happened twice and the second counter killed
+-- Terra (77 HP max, 52 left after two head hits): the old driver beamed
+-- whenever the head was up, nobody could revive her, and the drive timed
+-- out with two of four shields gone
+-- (build/attempts/wt/break-draws/diag3-s40.log).  Across shifts 20/40/45,
+-- every beam ordered with the shell's gauge already full or its turn
+-- running ($3AA0 bits 3/5/6) went to the shell, and every beam ordered on
+-- a running gauge at 16..150 of 256 hit the head; the gauge gained at most
+-- 111 between order and landing, and the one order at 235 strayed.  The
+-- old driver failed 19 of 60 shifts (60 distinct battle keys) this way:
+-- 10 with Terra killed by a counter, 9 with her alive but 9-12 of her
+-- beams spent on the shell, too few on the head inside the budget
+-- (build/attempts/wt/break-draws/summary-nc-oldpolicy.txt).
+--
+-- Terra's turns tend to arrive just as the shell's does, so beaming only
+-- when her turn happens to open inside the window starved the drive (one
+-- beam in 40000 frames at shift 40, build/attempts/wt/break-draws/
+-- try1-s40.log).  So she waits for it the way a player would: her command
+-- menu stays open until the head is up and the shell's gauge has restarted
+-- and sits in its first half, then she beams.  Battle time runs at the top
+-- menu (wait mode stops it only in the lists): in try2-s40.log Terra held
+-- from f2728 (shell gauge 0, flags $29: its turn queued) to f4888 (gauge 9,
+-- flags $01: that turn and the next one ran, the head up again).  Below half HP she heals instead of waiting, so a stray that slips
+-- through anyway costs a counter she survives rather than the fight.
 local BEAM = { "a", "a", "a" }
 local HEAL = { "a", "down", "down", "a", "a" }
+local GAUGE_OPEN = 128
 local mStreak, mSeq, mIdx, mStall, mNoMenu = 0, nil, 1, 0, 0
 local beamsOrdered = 0
+local holding = false
 
+local function shellGauge() return H.readByte(MGAUGE + shell * 2) end
+local function beamWindow()
+  local g = shellGauge()
+  return headAlive() and (H.readByte(MFLAGS + shell * 2) & 0x68) == 0
+     and g > 0 and g < GAUGE_OPEN
+end
+local function terraHp() return H.readWord(PHP + terra * 2) end
+local function terraSafe()
+  return terraHp() * 2 > H.readWord(PMAXHP + terra * 2)
+end
+
+-- the sequence for this window's owner, or nil to hold the menu open
 local function seqFor(actor)
-  if actor == terra and headAlive() then
+  if actor ~= terra then return HEAL end
+  local why = (not terraSafe() and "heal") or (beamWindow() and "beam")
+    or "hold"
+  if why ~= "hold" or not holding then
+    H.log(string.format("terra turn f%d: %s (head up=%s, shell gauge=%d "
+      .. "flags=%02X, terra hp=%d/%d)", H.frame, why,
+      tostring(headAlive()), shellGauge(), H.readByte(MFLAGS + shell * 2),
+      terraHp(), H.readWord(PMAXHP + terra * 2)))
+  end
+  holding = why == "hold"
+  if why == "beam" then
     beamsOrdered = beamsOrdered + 1
     return BEAM
   end
-  return HEAL
+  if why == "heal" then return HEAL end
+  return nil
+end
+
+-- Terra is the only beamer and nothing in this fight revives her, so her
+-- fall ends the measurement: say so instead of driving out the budget.
+local function assertTerraUp()
+  if terraHp() == 0 then
+    error(string.format("TERRA fell (the only beamer; nothing here revives) "
+      .. "with the head at %d/4 shields after %d beam(s) ordered",
+      shields(), beamsOrdered), 0)
+  end
 end
 
 local function policyPulse()
   if H.readByte(MENU) == 0 then
-    mStreak, mSeq, mIdx, mStall = 0, nil, 1, 0
+    mStreak, mSeq, mIdx, mStall, holding = 0, nil, 1, 0, false
     mNoMenu = mNoMenu + 1
     return mNoMenu % 2 == 0 and { "a" } or {}
   end
   mNoMenu = 0
   mStreak = mStreak + 1
   if mStreak < 4 then return {} end
-  if mSeq == nil then mSeq, mIdx = seqFor(H.readByte(ACTOR)), 1 end
+  if mSeq == nil then
+    mSeq, mIdx = seqFor(H.readByte(ACTOR)), 1
+    if mSeq == nil then return {} end   -- Terra waits at her open menu
+  end
   if mIdx <= #mSeq then
     local b = mSeq[mIdx]
     mIdx = mIdx + 1
@@ -197,11 +274,21 @@ H.run({ maxFrames = 60000 }, {
       if sp == HEAD_SP then hs = slot end
     end
     H.assertEq(hs ~= nil, true, "the head has a monster slot")
+    -- the shell: the one other monster on the field, whose turns hide and
+    -- show the head (the beam window above reads its gauge)
+    local others = 0
+    for slot = 0, 5 do
+      if slot ~= hs and (H.readByte(ALIVE + slot * 2) & 1) == 1 then
+        shell, others = slot, others + 1
+      end
+    end
+    H.assertEq(others, 1, "exactly one other monster (the shell) beside the head")
     for s = 0, 3 do
       if H.readByte(CHID + s * 2) == CHAR_TERRA then terra = s end
     end
     H.assertEq(terra ~= nil, true, "TERRA has a party slot (the only beamer)")
-    H.log(string.format("head slot %d, terra slot %d", hs, terra))
+    H.log(string.format("head slot %d, shell slot %d, terra slot %d",
+      hs, shell, terra))
 
     -- Ot6ShieldTbl authors $0134 as 4 shields / OT6_PIERCE (ot6_hud.asm:1730)
     H.assertEq(shields(), 4, "head seeded at its authored 4 shields")
@@ -220,6 +307,7 @@ H.run({ maxFrames = 60000 }, {
   -- 2+3. Terra beams the head until it breaks (watcher rides the pred)
   H.driveUntil(function()
     sampleDrops()
+    assertTerraUp()
     return timer() > 0
   end, 40000, { H.call(pulseTick) }, "the head to break"),
   H.release(),
