@@ -207,7 +207,7 @@ async function tick(){ try{
       + '<span style="color:#465">'+'○'.repeat(m.room||0)+'</span>';
     return '<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+nm
       + '<span style="letter-spacing:1px">'+dots+'</span>'
-      + (m.fps ? ' <span style="color:#687">'+nf(Math.round(m.fps))+' f/s</span>' : '')
+      + (m.fps ? ' <span style="color:#687">'+nf(Math.round(m.fps))+' fps</span>' : '')
       + '</div>'; }).join('');
   const seen = new Set();
   ws.forEach(w=>{
