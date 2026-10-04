@@ -49,12 +49,11 @@ local WEAK, CWEAK, MHP = 0x3BE8, 0x3EA4, 0x3BFC
 local ALIVE, MSTAT, SPEC = 0x3AA8, 0x3EEC, 0x57C0
 local MENU, ACTOR, CHID = 0x7BCA, 0x62CA, 0x3ED8
 local HEAD_SP = 0x0134
-local CHAR_TERRA = 0x00
 
 local PHP, PMAXHP = 0x3BF4, 0x3C1C    -- party HP / max HP, +char slot*2
 local MFLAGS, MGAUGE = 0x3AA8, 0x3221 -- monster $3AA0/$3219 rows, +slot*2
 
-local hs, terra                       -- head monster slot, Terra's char slot
+local hs                              -- head monster slot
 local shell                           -- the shell's monster slot
 
 local function shields()  return H.readByte(SHLD + hs * 2) end
@@ -78,118 +77,144 @@ local function report(tag)
   end)
 end
 
+-- Who acts: ExecCmd is entered once per action with x = the acting
+-- entity (0,2,4,6 the party, 8.. the monsters), and actions run one at a
+-- time, so the entity latched here is the one whose action lands the next
+-- HP write.  Every head drop is attributed to it.
+local lastActor = nil
+local shellActs, counters = 0, 0
+emu.addMemoryCallback(function()
+  local x = emu.getState()["cpu.x"] & 0xff
+  lastActor = x
+  if shell ~= nil and x == 8 + shell * 2 then
+    shellActs = shellActs + 1
+  end
+end, emu.callbackType.exec, H.sym("ExecCmd@battle_code"),
+  H.sym("ExecCmd@battle_code"))
+
+local function who(x)
+  if x == nil then return "?" end
+  if x < 8 then
+    local id = H.readByte(CHID + x)
+    return string.format("p%d(char %02X)", x // 2, id)
+  end
+  return string.format("m%d", (x - 8) // 2)
+end
+
 -- per-frame HP watcher on the head: every discrete drop is recorded with the
--- broken-timer state at observation time.  The breaking hit's damage is
--- computed in the same CalcTargetDmg call that sets the timer (chip runs
--- before the broken-double join), and the HP write lands frames later during
--- the animation, so a drop observed with the timer up is a hit that ran the
--- broken-double path.
+-- broken-timer state at observation time and the entity whose action it
+-- was.  The breaking hit's damage is computed in the same CalcTargetDmg
+-- call that sets the timer (chip runs before the broken-double join), and
+-- the HP write lands frames later during the animation, so a drop observed
+-- with the timer up is a hit that ran the broken-double path.
 local drops = {}
 local prevHp, prevShellHp = nil, nil
+local prevParty = {}
+local headWasUp, showFrame, showTurns, showBeams = nil, nil, {}, 0
+local showings = {}
+local strays = 0
 local function sampleDrops()
   local hp = headHp()
   if prevHp ~= nil and hp < prevHp then
     local d = prevHp - hp
-    drops[#drops + 1] = { d = d, broken = timer() ~= 0 }
-    H.log(string.format("hp drop: head -%d (timer %02X, shields %d)",
-      d, timer(), shields()))
+    drops[#drops + 1] = { d = d, broken = timer() ~= 0, by = lastActor }
+    H.log(string.format("hp drop: head -%d by %s (timer %02X, shields %d)",
+      d, who(lastActor), timer(), shields()))
   end
   prevHp = hp
   local sh = H.readWord(MHP + shell * 2)
   if prevShellHp ~= nil and sh < prevShellHp then
-    H.log(string.format("hp drop: shell -%d (a beam that missed the head's window)",
-      prevShellHp - sh))
+    strays = strays + 1
+    H.log(string.format("hp drop: shell -%d by %s (an attack that missed "
+      .. "the head's window)", prevShellHp - sh, who(lastActor)))
   end
   prevShellHp = sh
+  -- party damage dealt by the shell is its Mega Volt counter (AIScript
+  -- _256 has no other attack)
+  for s = 0, 3 do
+    local php = H.readWord(PHP + s * 2)
+    if prevParty[s] ~= nil and php < prevParty[s]
+       and lastActor == 8 + shell * 2 then
+      H.log(string.format("hp drop: p%d -%d by the shell's counter "
+        .. "(%d/%d left)", s, prevParty[s] - php, php,
+        H.readWord(PMAXHP + s * 2)))
+    end
+    prevParty[s] = php
+  end
+  local up = headAlive()
+  if up ~= headWasUp then
+    if up then
+      showFrame, showTurns, showBeams = H.frame, {}, 0
+      H.log(string.format("head shows f%d", H.frame))
+    elseif headWasUp then
+      local t = {}
+      for s = 0, 3 do
+        if showTurns[s] then t[#t + 1] = string.format("p%d:%d", s, showTurns[s]) end
+      end
+      showings[#showings + 1] = { f = H.frame - showFrame, turns = showTurns }
+      H.log(string.format("head hides f%d after %d frames up; turns while up %s; beams %d",
+        H.frame, H.frame - showFrame, table.concat(t, " "), showBeams))
+    end
+    headWasUp = up
+  end
 end
 
 -- ------------------------------------------------------------- driver --
 -- Sequences run from the settled top command menu, on the MagiTek cursor:
---   beam at the default target    A A A
---   Heal Force (2,0), both lists  A dn dn A A  (self-target by default)
--- Only Terra beams, so every drop on the head is one caster's Fire Beam.
--- Vicks and Wedge heal, and Terra heals on any turn she doesn't beam.
+--   Fire Beam at the default target  A A A
+--   Heal Force (2,0), both lists      A dn dn A A  (self-target by default)
 --
--- When Terra beams is read off the shell, whose own turn is what hides and
--- shows the head (AIScript _256: each turn past its 10-tick timer toggles
--- the head).  A beam lands 165-527 frames after it is ordered, so a beam
--- ordered while the shell's turn is near lands after the hide, retargets
--- to the shell, and the shell answers with its Mega Volt counter.  At
--- shift 40 on 594e2fa1 that happened twice and the second counter killed
--- Terra (77 HP max, 52 left after two head hits): the old driver beamed
--- whenever the head was up, nobody could revive her, and the drive timed
--- out with two of four shields gone
--- (build/attempts/wt/break-draws/diag3-s40.log).  Across shifts 20/40/45,
--- every beam ordered with the shell's gauge already full or its turn
--- running ($3AA0 bits 3/5/6) went to the shell, and every beam ordered on
--- a running gauge at 16..150 of 256 hit the head; the gauge gained at most
--- 111 between order and landing, and the one order at 235 strayed.  The
--- old driver failed 19 of 60 shifts (60 distinct battle keys) this way:
--- 10 with Terra killed by a counter, 9 with her alive but 9-12 of her
--- beams spent on the shell, too few on the head inside the budget
--- (build/attempts/wt/break-draws/summary-nc-oldpolicy.txt).
+-- The owner's way with this fight: "I always find I get one round with
+-- each character to attack, then the gruuu comes up and the head will
+-- disappear, one round of healing on each character, then the head comes
+-- back and I can finish it off round 2."  So each member, when their turn
+-- comes, looks at the field: head up, Fire Beam it (the head is authored
+-- fire-weak, Ot6ElemAddTbl, and every MagiTek list starts on Fire Beam);
+-- head gone, Heal Force.  No one waits with a menu open.
 --
--- Terra's turns tend to arrive just as the shell's does, so beaming only
--- when her turn happens to open inside the window starved the drive (one
--- beam in 40000 frames at shift 40, build/attempts/wt/break-draws/
--- try1-s40.log).  So she waits for it the way a player would: her command
--- menu stays open until the head is up and the shell's gauge has restarted
--- and sits in its first half, then she beams.  Battle time runs at the top
--- menu (wait mode stops it only in the lists): in try2-s40.log Terra held
--- from f2728 (shell gauge 0, flags $29: its turn queued) to f4888 (gauge 9,
--- flags $01: that turn and the next one ran, the head up again).  Below half HP she heals instead of waiting, so a stray that slips
--- through anyway costs a counter she survives rather than the fight.
+-- The shell's own turn hides and shows the head (AIScript _256: each turn
+-- past its 10-tick timer toggles the head, "Gruuu..."), and a beam lands
+-- 165-527 frames after it is ordered, so a beam ordered just before the
+-- hide retargets to the shell and draws its Mega Volt counter.  The
+-- watcher above logs those as shell drops and counters.
 local BEAM = { "a", "a", "a" }
 local HEAL = { "a", "down", "down", "a", "a" }
-local GAUGE_OPEN = 128
 local mStreak, mSeq, mIdx, mStall, mNoMenu = 0, nil, 1, 0, 0
 local beamsOrdered = 0
-local holding = false
 
 local function shellGauge() return H.readByte(MGAUGE + shell * 2) end
-local function beamWindow()
-  local g = shellGauge()
-  return headAlive() and (H.readByte(MFLAGS + shell * 2) & 0x68) == 0
-     and g > 0 and g < GAUGE_OPEN
-end
-local function terraHp() return H.readWord(PHP + terra * 2) end
-local function terraSafe()
-  return terraHp() * 2 > H.readWord(PMAXHP + terra * 2)
-end
 
--- the sequence for this window's owner, or nil to hold the menu open
 local function seqFor(actor)
-  if actor ~= terra then return HEAL end
-  local why = (not terraSafe() and "heal") or (beamWindow() and "beam")
-    or "hold"
-  if why ~= "hold" or not holding then
-    H.log(string.format("terra turn f%d: %s (head up=%s, shell gauge=%d "
-      .. "flags=%02X, terra hp=%d/%d)", H.frame, why,
-      tostring(headAlive()), shellGauge(), H.readByte(MFLAGS + shell * 2),
-      terraHp(), H.readWord(PMAXHP + terra * 2)))
-  end
-  holding = why == "hold"
-  if why == "beam" then
+  local up = headAlive()
+  local why = up and "beam" or "heal"
+  H.log(string.format("p%d turn f%d: %s (head up=%s, shell gauge=%d "
+    .. "flags=%02X, hp=%d/%d)", actor, H.frame, why, tostring(up),
+    shellGauge(), H.readByte(MFLAGS + shell * 2),
+    H.readWord(PHP + actor * 2), H.readWord(PMAXHP + actor * 2)))
+  if up then
+    showTurns[actor] = (showTurns[actor] or 0) + 1
+    showBeams = showBeams + 1
     beamsOrdered = beamsOrdered + 1
     return BEAM
   end
-  if why == "heal" then return HEAL end
-  return nil
+  return HEAL
 end
 
--- Terra is the only beamer and nothing in this fight revives her, so her
--- fall ends the measurement: say so instead of driving out the budget.
-local function assertTerraUp()
-  if terraHp() == 0 then
-    error(string.format("TERRA fell (the only beamer; nothing here revives) "
-      .. "with the head at %d/4 shields after %d beam(s) ordered",
-      shields(), beamsOrdered), 0)
+-- nothing in this fight revives, so a wipe ends the measurement: say so
+-- instead of driving out the budget.
+local function assertPartyUp()
+  for s = 0, 3 do
+    if (H.readByte(CHID + s * 2)) ~= 0xFF and H.readWord(PHP + s * 2) > 0 then
+      return
+    end
   end
+  error(string.format("the party fell with the head at %d/4 shields after "
+    .. "%d beam(s) ordered", shields(), beamsOrdered), 0)
 end
 
 local function policyPulse()
   if H.readByte(MENU) == 0 then
-    mStreak, mSeq, mIdx, mStall, holding = 0, nil, 1, 0, false
+    mStreak, mSeq, mIdx, mStall = 0, nil, 1, 0
     mNoMenu = mNoMenu + 1
     return mNoMenu % 2 == 0 and { "a" } or {}
   end
@@ -198,7 +223,6 @@ local function policyPulse()
   if mStreak < 4 then return {} end
   if mSeq == nil then
     mSeq, mIdx = seqFor(H.readByte(ACTOR)), 1
-    if mSeq == nil then return {} end   -- Terra waits at her open menu
   end
   if mIdx <= #mSeq then
     local b = mSeq[mIdx]
@@ -283,12 +307,7 @@ H.run({ maxFrames = 60000 }, {
       end
     end
     H.assertEq(others, 1, "exactly one other monster (the shell) beside the head")
-    for s = 0, 3 do
-      if H.readByte(CHID + s * 2) == CHAR_TERRA then terra = s end
-    end
-    H.assertEq(terra ~= nil, true, "TERRA has a party slot (the only beamer)")
-    H.log(string.format("head slot %d, shell slot %d, terra slot %d",
-      hs, shell, terra))
+    H.log(string.format("head slot %d, shell slot %d", hs, shell))
 
     -- Ot6ShieldTbl authors $0134 as 4 shields / OT6_PIERCE (ot6_hud.asm:1730)
     H.assertEq(shields(), 4, "head seeded at its authored 4 shields")
@@ -304,10 +323,10 @@ H.run({ maxFrames = 60000 }, {
   end),
   report("seeded"),
 
-  -- 2+3. Terra beams the head until it breaks (watcher rides the pred)
+  -- 2+3. the party beams the head until it breaks (watcher rides the pred)
   H.driveUntil(function()
     sampleDrops()
-    assertTerraUp()
+    assertPartyUp()
     return timer() > 0
   end, 40000, { H.call(pulseTick) }, "the head to break"),
   H.release(),
@@ -345,27 +364,50 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(beamsOrdered >= 4, true,
       "four or more beams were ordered -- the drive really fired the key "
       .. "(a break with no beams ordered would mean something else chipped)")
-    -- 3b. broken x2 for a flags3-$20 beam: the head's drop record is
-    -- [unbroken chip(s)..., the breaking hit]; the breaking hit ran with the
-    -- timer up and must be ~4x the first unbroken chip.  Every drop is one
-    -- caster's Fire Beam, so the ratio needs no stat equalization.
+    -- 3b. broken x2 for a flags3-$20 beam: the breaking hit (the first
+    -- drop observed with the timer up) must be ~4x the same caster's first
+    -- unbroken chip.  Several members beam, and Fire Beam's damage follows
+    -- its caster's level and magic, so the ratio pairs one caster's two
+    -- hits, attributed by the acting entity at ExecCmd; it needs no stat
+    -- equalization that way.
     local parts = {}
     for _, e in ipairs(drops) do
-      parts[#parts + 1] = string.format("%d%s", e.d, e.broken and "B" or "")
+      parts[#parts + 1] = string.format("%d%s/%s", e.d, e.broken and "B" or "",
+        who(e.by))
     end
     H.log(string.format("head drop record: %s", table.concat(parts, " ")))
+    H.log(string.format("drive tally: beams ordered %d, shell drops %d, "
+      .. "shell actions %d, showings %d", beamsOrdered, strays, shellActs,
+      #showings))
     H.assertEq(#drops >= 2, true, "two chip hits recorded on the head")
-    local first, last = drops[1], drops[#drops]
-    H.assertEq(first.broken, false, "first chip landed unbroken")
-    H.assertEq(last.broken, true, "breaking hit landed with the timer up")
+    for _, e in ipairs(drops) do
+      H.assertEq(e.by ~= nil and e.by < 8, true,
+        "every head drop was a party member's action")
+    end
+    local brk = nil
+    for _, e in ipairs(drops) do
+      if e.broken then brk = e; break end
+    end
+    H.assertEq(brk ~= nil, true, "breaking hit landed with the timer up")
+    local first = nil
+    for _, e in ipairs(drops) do
+      if e == brk then break end
+      if e.by == brk.by then first = e; break end
+    end
+    H.assertEq(first ~= nil, true, string.format(
+      "the breaking caster (%s) chipped the head unbroken before it broke",
+      who(brk.by)))
+    H.assertEq(first.broken, false, "that chip landed unbroken")
+    H.log(string.format("ratio pair (%s): chip %d, breaking hit %d",
+      who(brk.by), first.d, brk.d))
     -- shielded resistance sets these bounds: the unbroken chip is weak x2 *
     -- shielded x0.5 = ~1x base; the breaking hit is weak x2 * broken x2,
     -- unattenuated because its chip zeroed the shields before the damage
     -- tail, giving ~4x base.  True range [3.51, 4.55] under vanilla's
     -- 224..255/256 spread.
-    H.assertEq(last.d > first.d * 3, true,
-      "broken beam hit > 3x the shielded chip (0.5x lifted, x2 collected)")
-    H.assertEq(last.d < first.d * 6, true,
+    H.assertEq(brk.d > first.d * 3, true,
+      "broken beam hit > 3x the same caster's shielded chip (0.5x lifted, x2 collected)")
+    H.assertEq(brk.d < first.d * 6, true,
       "and < 6x (weak x2 * broken x2, not something wilder)")
     H.screenshot("break_broken")
   end),
@@ -385,8 +427,10 @@ H.run({ maxFrames = 60000 }, {
     H.call(function() H.setPad(H.frame % 10 < 5 and { "b" } or {}) end),
   }, "battle time running (no submenu holding it in wait mode)"),
   H.release(),
-  H.waitUntil(function() return timer() == 0 and shields() == 4 end,
-    12000, "broken head to recover", 60),
+  H.waitUntil(function()
+    sampleDrops()
+    return timer() == 0 and shields() == 4
+  end, 12000, "broken head to recover", 1),
   H.waitFrames(30),
   report("recovered"),
   H.call(function()
