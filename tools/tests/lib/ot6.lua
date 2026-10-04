@@ -1435,8 +1435,9 @@ function M.raiseDecision(o)
       raiseHp + topUp, (o.roundCost or 0) > hit
         and string.format("the %d round", o.roundCost) or string.format("the %d hit", hit))
   end
-  return raiseHp, false, string.format("%d HP does not survive the %d hit, no kill "
-    .. "is in reach, and the enemy acts before anyone can top up", raiseHp, hit)
+  return raiseHp, false, string.format("%d HP does not survive %s, no kill "
+    .. "is in reach, and the enemy acts before anyone can top up", raiseHp,
+    round > hit and string.format("the %d round", round) or string.format("the %d hit", hit))
 end
 
 -- The keyed line's boost (#174): boost-Fight through randoms is the
@@ -6745,7 +6746,14 @@ function Driver:makePlan(actor)
     end
     return nil
   end
-  local finisher = totalMon <= 200
+  -- The window closes the care block for an attack, so it holds only an
+  -- actor with one: with no Fight row the attack lines end in "switch",
+  -- a passed turn that finishes nothing.  battle_healerdown's riders
+  -- (MagiTek, -, -, Item) passed 35 and 36 turns under it with the healer
+  -- dead, and their care opened only with entity 1 at 13/68 inside its
+  -- round -- too late for a raise once a raise has to survive its round
+  -- (build/attempts/wt/care-items/healerdown/).
+  local finisher = totalMon <= 200 and cmdRow(actor, BATTLE.CMD_FIGHT) ~= nil
   local yieldWhy = nil
   if finisher and (row ~= nil or cureRow ~= nil) and self.parkDropN < 3 and careOpen then
     yieldWhy = finisherYields()
