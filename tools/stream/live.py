@@ -768,8 +768,10 @@ class Scanner:
 
     def _track(self, wid, log, tag, branch, data, mtime, now):
         """Fold one scan of one worker into its run: frames advanced since
-        the last scan (a drop in M.frame is a restarted attempt, counted from
-        0) and the newest log mtime, which is where the run ends."""
+        the last scan (a drop in M.frame is a restart or a state restore:
+        nothing is counted for that scan, since a restore lands mid-game and
+        the frames since it are unknown) and the newest log mtime, which is
+        where the run ends."""
         r = self.runs.get(wid)
         if r is None:
             if wid in self.recorded:   # a retained failed workspace, touched
@@ -788,7 +790,7 @@ class Scanner:
         frame, verdict = run_progress(data)
         if frame is not None:
             if r["last"] is not None:
-                inc = frame - r["last"] if frame >= r["last"] else frame
+                inc = frame - r["last"] if frame >= r["last"] else 0
                 r["frames"] += inc
                 self.incs.append((now, inc))
             r["last"] = frame
