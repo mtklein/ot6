@@ -350,7 +350,12 @@ against the rule (60edd119), 32 boot shifts each from gau_joined 99bffd2b
 | runs with a death | 17 | 6 |
 | rule minus main, by first battle: fewer / more / as many | | 13 / 3 / 14, p = 0.021 |
 
-Main's arm reproduces the study's numbers exactly. The cost: one ride lost
+Main's arm reproduces the study's numbers exactly. After review the
+walker became the engine's own walk and physical answers are priced too
+(a6345366); its H arm, rerun on the same 32 shifts, refused the same 182
+Pummels at the same frames and finished every shift on the same frame
+(`build/attempts/wt/rewind-search/verify2/vetocmp.txt`), with the same
+totals (`verify2/stats.txt`). The cost: one ride lost
 in the rule's arm (s22: the party opened the next battle at 37/30/58 after
 a long Aspik fight and wiped, `class=worn down`; the dive ladder's attempt
 2 landed), against none in main's. Fights without the Pummel run longer;
