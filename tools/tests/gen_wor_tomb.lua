@@ -24,7 +24,10 @@
 --      (37,58): the Czarina Gown and the Exp. Egg, (43,57) -> (76,19), the
 --      wall switch (76,10) facing up with A ($02B8) opens (79,3); back to
 --      the hub.  Whoever each armour improves most (defense plus magic
---      defense, read from the ROM) wears it.
+--      defense, read from the ROM) wears it; the relics are re-planned by
+--      the lib's relic rule (H.dressRelics) with what the chests and the
+--      drops brought (the Exp. Egg is not ranked; an Amulet is a Zombie
+--      guard).
 --   6. The hub -> (37,22) -> the turtle (56,14): facing down with A rides
 --      it to B3 (69,8) ($02B4); the switch (70,8) facing up with A moves
 --      B3's turtle ($02B5); from (71,9) facing right with A it carries the
@@ -32,9 +35,7 @@
 --      (122,28).
 --   7. The Man Eater (124,9); the monster chest (120,9) is left closed (the
 --      Dullahan leg's); the field care (a Tent where it is worth one), the
---      relics re-planned by the lib's relic rule (H.dressRelics) with what
---      the chests and the drops brought (the Exp. Egg is not ranked; an
---      Amulet is a Zombie guard), and the real Save UI on the save point
+--      relics re-planned once more, and the real Save UI on the save point
 --      (H.saveAtCheckpoint "wor-tomb-v1").
 -- Every battle's [outcome] is asserted said, judged on the battle's own end
 -- reading, and paid as due; every battle's draw is logged as a [key] line
@@ -506,6 +507,10 @@ H.run({ maxFrames = 200000 }, {
   link(MAP_B2, 11, 55, 29, 26, "the Crystal Mail's room (11,55) -> the hub (29,26)"),
   checkOutcomes("the chests and the wall switch"),
   H.fieldCare({ tag = "before the turtles" }),
+  -- The relics re-planned with what the chests and the drops brought (the
+  -- lib's relic rule, H.dressRelics; an Amulet, say, guards Zombie), here on
+  -- the hub with the chests opened, where a player would change them.
+  H.dressRelics(MEMBERS, { threats = ARC_THREATS, tag = "relics after the chests" }),
 
   -- ---- 6. the turtles ---------------------------------------------------------------------------
   link(MAP_B2, 37, 22, 56, 12, "the hub (37,22) -> the turtle's landing (56,12)"),
@@ -537,12 +542,7 @@ H.run({ maxFrames = 200000 }, {
   -- pitches one when the party's hole is past a Tent's worth of Tonics)
   H.stepOntoSavePoint(SAVE_POINT[1], SAVE_POINT[2]),
   H.fieldCare({ threshold = 1.0, tag = "on the save point" }),
-  -- The relics re-planned with what the chests and the drops brought (the
-  -- lib's relic rule, H.dressRelics; an Amulet, say, guards Zombie), here on
-  -- the save point, whose step-on waits out the field's stale map after a
-  -- menu (H.stepOntoSavePoint).  Not at the B2 hub after the chests: a
-  -- Relic menu at (29,26) left the walker no path to (37,23) for the 900
-  -- frames of its retries (build/attempts/wt/ribbon-chain/var_tomb_a/k1_s0.log).
+  -- and once more before the save, for what the turtles' rooms dropped
   H.dressRelics(MEMBERS, { threats = ARC_THREATS, tag = "relics on the save point" }),
   H.saveAtCheckpoint("wor-tomb-v1"),
   checkOutcomes("the stretch"),

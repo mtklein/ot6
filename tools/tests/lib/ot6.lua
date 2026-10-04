@@ -2512,12 +2512,64 @@ end
 
 M.frame = 0
 
+-- The reload gate.  A menu helper (M.menuStep) ends as soon as the field
+-- has control back, which is before the field has reloaded the map the
+-- menu wrote over; it arms the gate.  Until the map is loaded (or the party
+-- is on the world map), every seqStep holds a child it has not started yet
+-- unless that child is itself a menu helper, or part of one: the next menu
+-- may open through the reload, nothing else may start on the unloaded map.
+-- 600 frames is a backstop that logs and lets go.
+M.reloadGate = nil
+M.menuDepth = 0       -- > 0 while a menu step ticks: its own children pass
+local function reloadGateHolds(nextStep)
+  local g = M.reloadGate
+  if not g or nextStep.menu or M.menuDepth > 0 then return false end
+  local world = M.worldMode and M.worldMode()
+  if world or M.mapLoaded() or M.frame - g.f >= 600 then
+    if M.frame - g.f >= 600 and not world and not M.mapLoaded() then
+      M.log(string.format("[reload gate] after %s: the map still not loaded at +%d; letting go",
+        g.tag, M.frame - g.f))
+    elseif M.frame > g.f then
+      M.log(string.format("[reload gate] after %s: the next step waited %d frame(s) for the map",
+        g.tag, M.frame - g.f))
+    end
+    M.reloadGate = nil
+    return false
+  end
+  return true
+end
+
+-- Mark a step as a menu helper: it starts through the reload gate, and when
+-- it ends with the field's map not yet loaded it arms the gate (and with
+-- the map loaded, clears it).
+function M.menuStep(step, tag)
+  return {
+    menu = true,
+    tick = function(self)
+      M.menuDepth = M.menuDepth + 1   -- (a raise leaves it; resetLibState clears it)
+      local r = step:tick()
+      M.menuDepth = M.menuDepth - 1
+      if r == "done" then
+        local reloading = not (M.worldMode and M.worldMode()) and not M.mapLoaded()
+        M.reloadGate = reloading and { f = M.frame, tag = tag or "a menu" } or nil
+      end
+      return r
+    end,
+    reset = function(self) if step.reset then step:reset() end end,
+  }
+end
+
 seqStep = function(steps)
   return {
     i = 1,
     tick = function(self)
       while self.i <= #steps do
-        local r = steps[self.i]:tick()
+        local s = steps[self.i]
+        if self.started ~= self.i then
+          if reloadGateHolds(s) then return "frame" end
+          self.started = self.i
+        end
+        local r = s:tick()
         if r == "frame" then return "frame" end
         self.i = self.i + 1
       end
@@ -2525,6 +2577,7 @@ seqStep = function(steps)
     end,
     reset = function(self)
       self.i = 1
+      self.started = nil
       for _, s in ipairs(steps) do
         if s.reset then s:reset() end
       end
@@ -3316,13 +3369,52 @@ end
 -- and the event PC.  Deliberately cheap: RAM reads only, no screenshots
 -- (battleLoadStarted is the battle gate, and battleActive()'s screen check
 -- is too expensive for a per-frame poll).
+--
+-- It also requires the field's map to be loaded (M.mapLoaded).  Every
+-- flag above reads "control" for most of the ~50 frames the field takes to
+-- reload the map after a menu closes: the menu returns, the field restores
+-- its direct page and runs LoadMap with the screen off, and only LoadMap's
+-- InitNPCMap rewrites the object map at $7E2000, which the menu used as
+-- scratch.  Until then the walker's step check reads the menu's bytes and
+-- BFS reaches nothing (Darill's Tomb B2 hub (29,26): no tile reachable
+-- from +11 to +48 frames after the main menu's B, then everything;
+-- build/attempts/wt/walker-after-menu/).
 function M.hasControl()
+  return M.fieldControl() and M.mapLoaded()
+end
+
+-- The control flags alone, without the loaded map: true already while the
+-- field reloads the map after a menu.  What the menu helpers wait on
+-- (lib/ot6_field.lua menuBack, menuHome, careClose): the game reads a held
+-- X on the field's first live frame, so a person can chain one menu into
+-- the next through the reload, and the helpers do too.  Nothing may plan a
+-- route on it; the step runner's reload gate (M.menuStep) holds the next
+-- step that is not a menu helper until M.mapLoaded.
+function M.fieldControl()
   return (M.readByte(0x1eb9) & 0x80) == 0
      and M.readByte(0x0084) == 0
      and M.readByte(0x0059) == 0
      and (M.readByte(0x087c + pobj()) & 0x0F) == 2
      and not M.eventRunning()
      and not M.battleLoadStarted()
+end
+
+-- The field is past its map load: the field's own interrupt handler is
+-- installed and no same-map reload is pending.  A menu (and the battle
+-- module, the world map, a cutscene) installs its own NMI at $1500-$1503;
+-- the field reinstalls JML FieldNMI only after it has restored its direct
+-- page, and sets $58 ("reload the same map") in the same breath, which
+-- LoadMap clears only at its end, after InitNPCMap and the startup event
+-- (field/menu.asm OpenMenu, field/battle.asm ExecBattle, field/init.asm
+-- LoadMap, field/reset.asm InitInterrupts).  RAM only: the PPU's forced
+-- blank is no witness, since the field's IRQ sets it at 30 Hz for its
+-- BG animation DMA (field/anim.asm TfrBGAnimGfx) and NMI clears it.
+local fieldNmi
+function M.mapLoaded()
+  fieldNmi = fieldNmi or M.sym("FieldNMI")
+  return M.readByte(0x0058) == 0
+     and M.readWord(0x1501) == (fieldNmi & 0xFFFF)
+     and M.readByte(0x1503) == (fieldNmi >> 16) & 0xFF
 end
 
 -- Six formation species words for the current battle ($57c0+2i); the
@@ -13179,6 +13271,7 @@ local function resetLibState()
   M.setPad(nil)
   M.vars = {}
   M.lastState = nil
+  M.reloadGate, M.menuDepth = nil, 0
   M.absorbGuardBattles, M.absorbGuardClashes, M.absorbGuardEntries = 0, 0, 0
   guardArmed, guardSettle, guardSeen, guardRandom = true, 0, {}, false
   traceMap, traceSet, traceCount = nil, {}, 0

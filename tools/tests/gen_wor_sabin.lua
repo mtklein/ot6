@@ -403,13 +403,18 @@ H.run({ maxFrames = 200000 }, {
   H.cond(function() return HOUSE_BACK_GUARD end, {
     -- leaving the Relic screen runs the game's own Optimum on the hands:
     -- the Break Blade and a shield (build/attempts/wt/wor-sabin/lab/ws/lab_bg.log: after=11 5C)
-    H.equipKit(CELES, { { 4, BACK_GUARD } }, { tag = "CELES: the Back Guard for the house" }),
+    -- through the relic rule over the kit (H.relicKit), Petrify the threat
+    -- (the HermitCrab's Rock): the Back Guard (unranked) stays put, the other
+    -- slot goes to the guard covering Petrify and the most else
+    H.relicKit(CELES, "CELES", { [4] = BACK_GUARD }, { tag = "CELES: the Back Guard for the house",
+      threats = { s1 = 0x40, s2 = 0x00 } }),
   }, {}),
   H.call(function()
     say("tzen", "ready for the house, kit " .. kit(CELES))
     H.assertEq(whole(CELES), true, "CELES goes into the house whole")
-    H.assertEq(H.readByte(c(CELES, 0x23)) == JEWEL_RING or H.readByte(c(CELES, 0x24)) == JEWEL_RING, true,
-      "CELES wears a Jewel Ring (the HermitCrab's Rock petrifies, and a statue is a lost fight alone)")
+    local function guards(id) return id == 0xFF and 0 or H.readRomByte((H.sym("ItemProp") & 0x3FFFFF) + id * 30 + 6) end
+    H.assertEq((guards(H.readByte(c(CELES, 0x23))) | guards(H.readByte(c(CELES, 0x24)))) & 0x40, 0x40,
+      "a relic CELES wears guards Petrify (the HermitCrab's Rock petrifies, and a statue is a lost fight alone)")
     if HOUSE_BACK_GUARD then
       H.assertEq(H.readByte(c(CELES, 0x23)) == BACK_GUARD or H.readByte(c(CELES, 0x24)) == BACK_GUARD, true,
         "CELES wears the Back Guard (no pincer, no back attack in the house)")
@@ -518,7 +523,8 @@ H.run({ maxFrames = 200000 }, {
   -- ThunderBlade in the left hand, the Blizzard in the right), then
   -- SABIN's relics first: the second Fire Knuckle needs the Genji Glove on
   H.cond(function() return HOUSE_BACK_GUARD end, {
-    H.equipKit(CELES, { { 4, GENJI } }, { tag = "CELES: the Genji Glove back" }),
+    H.relicKit(CELES, "CELES", { [4] = GENJI }, { tag = "CELES: the Genji Glove back",
+      threats = { s1 = 0x40, s2 = 0x00 } }),
     H.equipKit(CELES, { { 1, THUNDERBLADE }, { 0, BLIZZARD } }, { tag = "CELES blades" }),
   }, {}),
   H.equipKit(SABIN, { { 4, GENJI }, { 5, BLACK_BELT } }, { tag = "SABIN relics" }),
@@ -530,8 +536,13 @@ H.run({ maxFrames = 200000 }, {
     say("tzen", "SABIN dressed")
     H.assertEq(kit(SABIN), string.format("%02X %02X %02X %02X %02X %02X %02X", IFRIT, FIRE_KNUCKLE,
       FIRE_KNUCKLE, TIGER_MASK, POWER_SASH, GENJI, BLACK_BELT), "SABIN wears IFRIT and his kit")
-    H.assertEq(kit(CELES), "06 0E 0F 76 8F D1 B5", "CELES wears the stretch's kit again: MADUIN, "
-      .. "Blizzard + ThunderBlade, Gold Helmet, Gold Armor, Genji Glove, Jewel Ring")
+    H.assertEq(kit(CELES):sub(1, 17), "06 0E 0F 76 8F D1", "CELES wears the stretch's kit again: MADUIN, "
+      .. "Blizzard + ThunderBlade, Gold Helmet, Gold Armor, Genji Glove")
+    -- the other relic is the relic rule's (H.relicKit above): the Jewel
+    -- Ring, or a guard covering Petrify and more (a Ribbon)
+    local r5 = H.readByte(c(CELES, 0x24))
+    H.assertEq(r5 ~= 0xFF and (H.readRomByte((H.sym("ItemProp") & 0x3FFFFF) + r5 * 30 + 6) & 0x40) ~= 0, true,
+      string.format("CELES's other relic $%02X guards Petrify", r5))
   end),
 
   -- ---- 7. out to the World of Ruin map, and the save ------------------------------------

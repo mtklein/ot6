@@ -110,12 +110,15 @@ end
 -- turn on (Tonic first, then Potion).  #143's mog-gear route unequips MOG's
 -- Mithril Pike/Shld into the bag ahead of the consumables, so the Tonic is no
 -- longer the top row: walk the cursor to it by id ($2686 is the menu-order
--- battle bag, stride 5: +0 id, +3 count) rather than to row 0.
+-- battle bag, stride 5: +0 id, +3 count) rather than to row 0.  The bag
+-- has holes: a used-up stack leaves its row $FF (worldmap_narshe's draw
+-- at 4748d741: "bag FF:0 E9:2 F6:3 ...", the Tonics spent), so every row
+-- is read rather than stopping at the first empty one.
 local function bankItemRow()
-  for r = 0, 31 do
-    local id = H.readByte(0x2686 + r * 5)
-    if id == 0xFF then break end
-    if (id == TONIC or id == 0xE9) and H.readByte(0x2686 + r * 5 + 3) > 0 then return r end
+  for _, want in ipairs({ TONIC, 0xE9 }) do
+    for r = 0, 255 do
+      if H.readByte(0x2686 + r * 5) == want and H.readByte(0x2686 + r * 5 + 3) > 0 then return r end
+    end
   end
   return nil
 end

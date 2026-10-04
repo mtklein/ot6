@@ -97,10 +97,25 @@ Addresses (from the vendored disassembly):
 | `$E5`-`$E7` | 24-bit event script PC; idle = `$CA0000`, real scripts run in banks `$CA`-`$CC` |
 | `$BA` / `$D3` | both `1` = a dialog is open, waiting for a keypress |
 | `$B2` | party z-level (bit 0 upper, bit 1 lower) |
+| `$0058` | reload the same map: set as a menu or battle hands back, cleared at the end of `LoadMap` |
+| `$1500`-`$1503` | the running module's NMI jump; `JML FieldNMI` once the field has the machine back |
 
 Events can walk the party while `$1EB9`/`$0084`/`$0059` all read normal, so
-`H.hasControl()` tests the movement type and event PC too. Two event-PC
-details:
+`H.hasControl()` tests the movement type and event PC too. After a menu
+every one of those reads clear for most of the ~40-50 frames the field
+takes to reload the map (a battle hands back through the same reload),
+while the object map at `$7E2000` still holds the menu's scratch bytes, so
+it also requires the map loaded (`H.mapLoaded()`: `$0058` clear and the
+field's NMI installed); the flags alone are `H.fieldControl()`. The menu
+helpers open and close on `H.fieldControl()`: the game reads a held X on
+the field's first live frame, so one menu follows another through the
+reload, as a player's would. Each helper is a menu step (`H.menuStep`); one
+that ends before the map is loaded arms the step runner's reload gate,
+which holds the next step that is not itself a menu helper until
+`H.mapLoaded()`. Anything that plans on the map and keeps the result (a
+door's staging tile, a shopkeeper's or save point's approach side) picks
+only on a frame `H.hasControl()` reads true. A door to another map is not
+covered: `$0058` stays clear through that load. Two event-PC details:
 
 - On maps with ambient NPC activity the event PC reads `$80xxxx` for one
   frame at a time, every few frames, forever; `H.eventRunning()` therefore
@@ -121,7 +136,8 @@ compose inlines both, so scripts see one `H`):
 - `H.tileAligned()` — at rest exactly on a tile: `$0869`, `$086C` and the
   low 4 bits of both pixel words all zero. Position samples are only valid
   here.
-- `H.hasControl()` — true only when the party can be walked this frame.
+- `H.hasControl()` — true only when the party can be walked this frame
+  (the map loaded); `H.fieldControl()` — the control flags alone.
 - `H.eventRunning()`, `H.dialogWaiting()` — the checks above.
 - `H.canStep(x, y, move)` — true passability for one step, from RAM.
   `move` is one of `up right down left upright downright downleft upleft`.
