@@ -3683,6 +3683,100 @@ function M.partRoles(byteAt, slot)
   return r
 end
 
+-- What a monster's retaliation answers one party action with (#372).  The
+-- retaliation section (after the main section's $FF) is blocks of
+-- conditions ($FC, 4 bytes each) then commands then $FE (end_if) or the
+-- section's $FF; the AI walker runs the FIRST block whose conditions all
+-- hold, and its end_if ends the script (trench-dive.md, measured: 524
+-- party Fights into Aspik formations drew no Giga Volt, 123 Blitzes drew
+-- 34).  use = { cmd = the party command id, atk = its attack id, item =
+-- the item id, elem = its element mask }.  Conditions this reads:
+--   FC 01 c1 c2  if_cmd      the command is c1 or c2
+--   FC 02 a1 a2  if_attack   the attack is a1 or a2
+--   FC 03 i1 i2  if_item     the item is i1 or i2
+--   FC 04 mask   if_element  the action's element is in the mask
+--   FC 05        if_hit      any hit (the action is assumed to land)
+-- Any other condition (HP, status, variables, monster counts, timers) is
+-- not decided here: its block MAY run, its attacks are counted as
+-- possible, and the walk goes on to the blocks after it.  Returns the
+-- attack ids that can answer (F0's three choices each count; NOTHING,
+-- $FE, left out) and whether the answer is certain (a block whose every
+-- condition held).
+function M.retalAnswer(byteAt, use)
+  local i, n = 0, 0
+  while byteAt(i) ~= 0xFF and n < M.AI_SCRIPT_MAX do   -- the main section
+    i = i + (M.AI_OP_LEN[byteAt(i)] or 1)
+    n = n + 1
+  end
+  i = i + 1
+  local out, certain = {}, false
+  local holds, maybe, inConds, any = true, false, false, false
+  local block = {}
+  local function close()
+    if holds and (any or #block > 0) then
+      for _, a in ipairs(block) do out[#out + 1] = a end
+      if not maybe then certain = true end
+    end
+    block, holds, maybe, inConds, any = {}, true, false, false, false
+  end
+  local function attack(a) if a ~= 0xFE then block[#block + 1] = a end end
+  local function either(v, a, b) return v ~= nil and (v == a or v == b) end
+  while i < M.AI_SCRIPT_MAX do
+    local op = byteAt(i)
+    if op == 0xFF then close(); break end
+    if op == 0xFC then
+      if not inConds then block, holds, maybe, inConds = {}, true, false, true end
+      any = true
+      local c, a, b = byteAt(i + 1), byteAt(i + 2), byteAt(i + 3)
+      if c == 0x01 then holds = holds and either(use.cmd, a, b)
+      elseif c == 0x02 then holds = holds and either(use.atk, a, b)
+      elseif c == 0x03 then holds = holds and either(use.item, a, b)
+      elseif c == 0x04 then holds = holds and ((use.elem or 0) & a) ~= 0
+      elseif c == 0x05 then -- if_hit: the action lands
+      else maybe = true end
+    else
+      inConds = false
+      if op == 0xFE then
+        close()
+        if certain then break end
+      elseif op < 0xF0 then attack(op)
+      elseif op == 0xF0 then attack(byteAt(i + 1)); attack(byteAt(i + 2)); attack(byteAt(i + 3))
+      end
+    end
+    i = i + (M.AI_OP_LEN[op] or 1)
+  end
+  return out, certain
+end
+
+-- A monster's magical attack on a party member, from the ROM and the
+-- battle's own bytes: CalcMagicDmg (@2b69, as M.cureRestoreMin reads it)
+-- power x 4 + magic power x power x level / 32, the 224..255/256
+-- variance, the target's magic defense and Shell, then its element bytes
+-- (null 0, absorb 0, half /2, weak x2).  o = { power, flags2, level,
+-- magpow, mdef, shell, elem, weak, half, null, absorb }.  Returns the
+-- least and the most it takes, or nil for an attack that is no magical
+-- damage (no power, physical, a heal).
+function M.magicHitRange(o)
+  local p = o.power or 0
+  if p == 0 or (o.flags2 or 0) & 0x01 ~= 0 or o.heal then return nil end
+  local base = p * 4 + (((o.magpow or 0) * p * (o.level or 1)) >> 5)
+  local e = o.elem or 0
+  local function mod(v)
+    local d = ((base * v) >> 8) + 1
+    if ((o.flags2 or 0) & 0x20) == 0 then
+      local mdef = o.mdef or 0
+      d = mdef >= 255 and 1 or ((d * (255 - mdef)) >> 8) + 1
+      if o.shell then d = ((d * 170) >> 8) + 1 end
+    end
+    if e ~= 0 and ((o.null or 0) & e) ~= 0 then return 0 end
+    if e ~= 0 and ((o.absorb or 0) & e) ~= 0 then return 0 end
+    if e ~= 0 and ((o.half or 0) & e) ~= 0 then d = d // 2 end
+    if e ~= 0 and ((o.weak or 0) & e) ~= 0 then d = d * 2 end
+    return math.min(9999, d)
+  end
+  return mod(224), mod(255)
+end
+
 -- The kill order for a formation of linked parts, or nil for one that is
 -- not: no slot's death ends the fight, more than one slot's does (the
 -- Whelk's shell and head, $1B0, each carry a boss_death and restore the
@@ -5059,6 +5153,79 @@ function Driver:castVetoed(abilityId, what)
         or ("NULLS " .. M.elemStr(elem) .. string.format(" (live null byte $%02X)", s.null))))
   end
   return true
+end
+
+-- The counter a verb draws (#372).  A person who has read the bestiary,
+-- or watched SABIN eat 400 lightning for a Pummel, knows which monsters
+-- answer which verbs: Aspik's retaliation answers a Fight with its own
+-- Battle and every other hit with Giga Volt, a 110-power spell that
+-- takes more than SABIN's whole bar.  So before a non-Fight verb that can
+-- land on a standing monster (`slots`: the monsters it may hit -- every
+-- standing one for an auto-targeted Pummel or a party-wide tool), the
+-- driver reads that monster's retaliation (M.retalAnswer, the ROM's AI
+-- script) for the verb and for a Fight, prices each magical answer on
+-- the actor (M.magicHitRange: the ROM's spell, the monster's level and
+-- magic power and the actor's defenses, all battle bytes), and refuses
+-- the verb when its answer can take the actor's whole HP while a
+-- Fight's answer cannot.  True means the verb is off the table this
+-- turn; the caller falls through to its next line (the Fight).
+function Driver:counterVetoed(actor, use, slots, what)
+  local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
+  local MP = M.sym("MagicProp") & 0x3FFFFF
+  local y = actor * 2
+  local hp = M.readWord(0x3BF4 + y)
+  if hp == 0 then return false end
+  local function worst(slot, u)
+    local species = M.readWord(M.FORMATION + slot * 2)
+    if species == 0xFFFF or species >= 0x180 then return 0, nil, {} end
+    local off = M.readRomWord(ptrs + species * 2)
+    local atks = M.retalAnswer(function(i) return M.readRomByte(base + off + i) end, u)
+    local x = 8 + slot * 2
+    local top, which = 0, nil
+    for _, a in ipairs(atks) do
+      local r = MP + a * 14
+      local _, hi = M.magicHitRange({ power = M.readRomByte(r + 6), flags2 = M.readRomByte(r + 2),
+        heal = (M.readRomByte(r + 4) & 0x01) ~= 0, level = M.readByte(0x3B18 + x),
+        magpow = M.readByte(0x3B41 + x), mdef = M.readByte(0x3BB9 + y),
+        shell = (M.readByte(BATTLE.ST3 + y) & 0x20) ~= 0, elem = M.readRomByte(r + 1),
+        weak = M.readByte(0x3BE0 + y), half = M.readByte(0x3BE1 + y),
+        null = M.readByte(0x3BCD + y), absorb = M.readByte(0x3BCC + y) })
+      if hi ~= nil and hi > top then top, which = hi, a end
+    end
+    return top, which, atks
+  end
+  for _, slot in ipairs(slots) do
+    if monAlive(slot) then
+      local top, which = worst(slot, use)
+      if top >= hp then
+        local ftop, _, fatks = worst(slot, { cmd = BATTLE.CMD_FIGHT })
+        if ftop < hp then
+          local fsaid = {}
+          for _, a in ipairs(fatks) do fsaid[#fsaid + 1] = string.format("$%02X", a) end
+          local key = string.format("%d:%s:%d:%d", actor, what, slot, which)
+          self.counterSaid = self.counterSaid or {}
+          if not self.counterSaid[key] then
+            self.counterSaid[key] = true
+            M.log(string.format("[%s] actor=%d %s refused: slot %d (species $%03X) answers it "
+              .. "with attack $%02X, up to %d against %d HP; a Fight draws %s, %s (#372) "
+              .. "-- falling through", self.tag or "fight", actor, what, slot,
+              M.readWord(M.FORMATION + slot * 2), which, top, hp,
+              #fsaid > 0 and table.concat(fsaid, "/") or "no answer",
+              ftop > 0 and string.format("up to %d", ftop) or "no magical damage"))
+          end
+          return true
+        end
+      end
+    end
+  end
+  return false
+end
+
+-- The monsters standing now, for a verb the engine aims itself.
+local function standingSlots()
+  local t = {}
+  for s = 0, 5 do if monAlive(s) then t[#t + 1] = s end end
+  return t
 end
 
 -- The kill order in force: the authored one (opts.focus) where a
@@ -6523,7 +6690,9 @@ function Driver:makePlan(actor)
       end
     end
     if self.opts.tactical and id == 5 and (self.opts.blitz or BATTLE.PUMMEL) == BATTLE.PUMMEL
-       and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ] then
+       and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
+       and not self:counterVetoed(actor, { cmd = BATTLE.CMD_BLITZ, atk = BATTLE.PUMMEL },
+         standingSlots(), "Pummel") then
       local bb = M.kitBoost(actor, BATTLE.PUMMEL, bp)
       if bb ~= nil then
         offer({ kind = "skill", cmd = BATTLE.CMD_BLITZ, skill = BATTLE.PUMMEL,
@@ -7521,7 +7690,9 @@ function Driver:makePlan(actor)
              row = cmdRow(actor, BATTLE.CMD_TOOLS), boostLeft = toolBp }
   end
   if self.opts.tactical and id == 5
-     and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ] then
+     and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
+     and not self:counterVetoed(actor, { cmd = BATTLE.CMD_BLITZ, atk = self.opts.blitz or BATTLE.PUMMEL },
+       standingSlots(), string.format("Blitz $%02X", self.opts.blitz or BATTLE.PUMMEL)) then
     -- Same rule as the Tools line: the blitz's own row price, escalated
     -- (#219).  Suplex at boost 3 is 81 MP against SABIN's 80-MP pool at
     -- the level he joins, so this line steps down far more often than
@@ -8641,6 +8812,7 @@ function Driver:idle()
   self.layout, self.layoutUnreadSaid, self.steerLast, self.steerDead = nil, false, nil, {}
   self.parts, self.partsLast, self.partsFell, self.partsSwitch = nil, {}, {}, {}
   self.lastStand = nil
+  self.counterSaid = nil
   self.tgtGraphs, self.tgtRouteSaid, self.tgtVisited, self.tgtCycled, self.tgtUnreach = {}, nil, {}, false, {}
   self.parkSt, self.parkN, self.idleSt, self.idleN = nil, 0, nil, 0
   self.unknownSt, self.unknownN, self.unknownSeen, self.sideWindowN = nil, 0, {}, 0
