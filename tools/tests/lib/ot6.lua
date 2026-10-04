@@ -3683,6 +3683,157 @@ function M.partRoles(byteAt, slot)
   return r
 end
 
+-- What a monster's retaliation answers one party action with (#372).  The
+-- answer is the AI walker's own walk (battle_main.asm), run over the
+-- retaliation section (the bytes after the main section's $FF):
+--   * commands run in order from the top (NextAICmd @1ab4); an attack
+--     byte (< $F0) or attack ($F0, one of three) issues an action;
+--   * a condition ($FC, AICmd_fc @1a91) that holds just goes on to the
+--     next command; one that misses (conditionmiss @1a9b) skips forward
+--     with FindAIScriptEnd (@1a43) past the next $FE and goes on there,
+--     or ends at an $FF;
+--   * end_if ($FE) and the end ($FF) both end the script when the walk
+--     reaches them (AICmd_fe/ff @1a7b set $f5 = $ff).
+-- So a condition after commands, with no $FE between, gates only the
+-- commands after it; the ones before it have already run.
+-- use = { cmd = the party command id, atk = its attack id, item = the item
+-- id, elem = its element mask }.  Conditions this decides:
+--   FC 01 c1 c2  if_cmd      the command is c1 or c2
+--   FC 02 a1 a2  if_attack   the attack is a1 or a2
+--   FC 03 i1 i2  if_item     the item is i1 or i2
+--   FC 04 mask   if_element  the action's element is in the mask
+--   FC 05        if_hit      any hit (the action is assumed to land)
+-- Any other condition (HP, status, variables, monster counts, timers) is
+-- not decided here: the walk takes both ways.  Returns the attack ids that
+-- can answer (each of $F0's three; NOTHING, $FE, left out) and whether the
+-- answer is certain (no undecided condition on any path walked).
+-- What the walk leaves to the caller: Ot6AISkip (ot6_break.asm) skips a
+-- Broken, living monster's counter attacks; a dying one's run as always.
+function M.retalAnswer(byteAt, use)
+  local i, n = 0, 0
+  while byteAt(i) ~= 0xFF and n < M.AI_SCRIPT_MAX do   -- the main section
+    i = i + (M.AI_OP_LEN[byteAt(i)] or 1)
+    n = n + 1
+  end
+  local start = i + 1
+  local out, seen, certain = {}, {}, true
+  local function either(v, a, b) return v ~= nil and (v == a or v == b) end
+  local function add(a)
+    if a ~= 0xFE and not seen[a] then seen[a] = true; out[#out + 1] = a end
+  end
+  -- FindAIScriptEnd: the byte after the next $FE, or nil at an $FF
+  local function pastEndIf(j)
+    for _ = 1, M.AI_SCRIPT_MAX do
+      local op = byteAt(j)
+      if op == 0xFE then return j + 1 end
+      if op == 0xFF then return nil end
+      j = j + (op < 0xF0 and 1 or (M.AI_OP_LEN[op] or 1))
+    end
+    return nil
+  end
+  local walked = {}
+  local function walk(j)
+    while j ~= nil and j < start + M.AI_SCRIPT_MAX do
+      if walked[j] then return end          -- a fork that met an earlier walk
+      walked[j] = true
+      local op = byteAt(j)
+      if op == 0xFE or op == 0xFF then return end
+      if op == 0xFC then
+        local c, a, b = byteAt(j + 1), byteAt(j + 2), byteAt(j + 3)
+        local holds
+        if c == 0x01 then holds = either(use.cmd, a, b)
+        elseif c == 0x02 then holds = either(use.atk, a, b)
+        elseif c == 0x03 then holds = either(use.item, a, b)
+        elseif c == 0x04 then holds = ((use.elem or 0) & a) ~= 0
+        elseif c == 0x05 then holds = true
+        end
+        if holds == nil then
+          certain = false
+          walk(pastEndIf(j + 4))             -- the miss
+          j = j + 4                          -- and the hold, below
+        elseif holds then
+          j = j + 4
+        else
+          j = pastEndIf(j + 4)
+        end
+      else
+        if op < 0xF0 then add(op)
+        elseif op == 0xF0 then add(byteAt(j + 1)); add(byteAt(j + 2)); add(byteAt(j + 3))
+        end
+        j = j + (op < 0xF0 and 1 or (M.AI_OP_LEN[op] or 1))
+      end
+    end
+  end
+  walk(start)
+  return out, certain
+end
+
+-- A monster's magical attack on a party member, from the ROM and the
+-- battle's own bytes: CalcMagicDmg (@2b69, as M.cureRestoreMin reads it)
+-- power x 4 + magic power x power x level / 32, the 224..255/256
+-- variance, the target's magic defense and Shell, then its element bytes
+-- (null 0, absorb 0, half /2, weak x2).  o = { power, flags2, level,
+-- magpow, mdef, shell, elem, weak, half, null, absorb }.  Returns the
+-- least and the most it takes, or nil for an attack that is no magical
+-- damage (no power, physical, a heal).
+function M.magicHitRange(o)
+  local p = o.power or 0
+  if p == 0 or (o.flags2 or 0) & 0x01 ~= 0 or o.heal then return nil end
+  local base = p * 4 + (((o.magpow or 0) * p * (o.level or 1)) >> 5)
+  local e = o.elem or 0
+  local function mod(v)
+    local d = ((base * v) >> 8) + 1
+    if ((o.flags2 or 0) & 0x20) == 0 then
+      local mdef = o.mdef or 0
+      d = mdef >= 255 and 1 or ((d * (255 - mdef)) >> 8) + 1
+      if o.shell then d = ((d * 170) >> 8) + 1 end
+    end
+    if e ~= 0 and ((o.null or 0) & e) ~= 0 then return 0 end
+    if e ~= 0 and ((o.absorb or 0) & e) ~= 0 then return 0 end
+    if e ~= 0 and ((o.half or 0) & e) ~= 0 then d = d // 2 end
+    if e ~= 0 and ((o.weak or 0) & e) ~= 0 then d = d * 2 end
+    return math.min(9999, d)
+  end
+  return mod(224), mod(255)
+end
+
+-- A monster's physical attack on a party member, the same way: CalcDmg's
+-- physical half (@2ba6) for a monster attacker -- power x 4 (asl2 for
+-- X >= 8), raised by 3/4 when $b2 bit 14 is clear (taken as the most it
+-- can be: the low end leaves it out), plus its vigor ($3B2C, LoadMonsterProp
+-- @2ce4's Rand & 7 + 56: 56..63), times level, /256, times level -- then
+-- CalcDmgMod (@0c9e): variance 224..255/256, the target's defense
+-- ($3BB8), Safe (x170/256), Defend and the back row ($3AA1 bits 1 and 5:
+-- each halves), then its element bytes.  power is the monster's battle
+-- power ($3B68) for Battle, or the spell's own for a physical spell.
+-- o = { power, level, vigor (or nil: 56..63), def, safe, defending,
+-- backRow, elem, weak, half, null, absorb }.  Returns the least and the
+-- most it takes (a critical, 1 in 32, doubles it and is not counted), or
+-- nil for no power.
+function M.physHitRange(o)
+  local p = o.power or 0
+  if p == 0 then return nil end
+  local lv = o.level or 1
+  local e = o.elem or 0
+  local function hit(raise, vigor, v)
+    local a = p * 4
+    if raise then a = (((a >> 1) + a) >> 1) + a end
+    local d = (((a + vigor) * lv) >> 8) * lv
+    d = ((d * v) >> 8) + 1
+    local def = o.def or 0
+    d = def >= 255 and 1 or ((d * (255 - def)) >> 8) + 1
+    if o.safe then d = ((d * 170) >> 8) + 1 end
+    if o.defending then d = d >> 1 end
+    if o.backRow then d = d >> 1 end
+    if e ~= 0 and ((o.null or 0) & e) ~= 0 then return 0 end
+    if e ~= 0 and ((o.absorb or 0) & e) ~= 0 then return 0 end
+    if e ~= 0 and ((o.half or 0) & e) ~= 0 then d = d // 2 end
+    if e ~= 0 and ((o.weak or 0) & e) ~= 0 then d = d * 2 end
+    return math.min(9999, d)
+  end
+  return hit(false, o.vigor or 56, 224), hit(true, o.vigor or 63, 255)
+end
+
 -- The kill order for a formation of linked parts, or nil for one that is
 -- not: no slot's death ends the fight, more than one slot's does (the
 -- Whelk's shell and head, $1B0, each carry a boss_death and restore the
@@ -5059,6 +5210,101 @@ function Driver:castVetoed(abilityId, what)
         or ("NULLS " .. M.elemStr(elem) .. string.format(" (live null byte $%02X)", s.null))))
   end
   return true
+end
+
+-- The counter a verb draws (#372).  A person who has read the bestiary,
+-- or watched SABIN eat 400 lightning for a Pummel, knows which monsters
+-- answer which verbs: Aspik's retaliation answers a Fight with its own
+-- Battle and every other hit with Giga Volt, a 110-power spell that
+-- takes more than SABIN's whole bar.  So before a non-Fight verb that can
+-- land on a standing monster (`slots`: the monsters it may hit -- every
+-- standing one for an auto-targeted Pummel or a party-wide tool), the
+-- driver reads that monster's retaliation (M.retalAnswer, the ROM's AI
+-- script) for the verb and for a Fight, prices each answer on the actor
+-- the way the engine would (M.magicHitRange, M.physHitRange: the ROM's
+-- spell or the monster's battle power, its level, magic power and vigor,
+-- the actor's defenses and Shell/Safe/row/elements, all battle bytes),
+-- and refuses the verb when its answer can take the actor's whole HP
+-- while a Fight's answer cannot.  An answer the models do not price (a
+-- monster's Special, $EF) makes the Fight's side unknown, and then
+-- nothing is refused.  Not read: Ot6AISkip's Broken rule (a Broken,
+-- living monster skips its counter attacks) -- the counter that kills is
+-- the dying one, which runs regardless.  True means the verb is off the
+-- table this turn; the caller falls through to its next line.
+function Driver:counterVetoed(actor, use, slots, what)
+  local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
+  local MP = M.sym("MagicProp") & 0x3FFFFF
+  local y = actor * 2
+  local hp = M.readWord(0x3BF4 + y)
+  if hp == 0 then return false end
+  local tgt = { def = M.readByte(0x3BB8 + y), mdef = M.readByte(0x3BB9 + y),
+    shell = (M.readByte(BATTLE.ST3 + y) & 0x20) ~= 0, safe = (M.readByte(BATTLE.ST3 + y) & 0x40) ~= 0,
+    defending = (M.readByte(0x3AA1 + y) & 0x02) ~= 0, backRow = (M.readByte(0x3AA1 + y) & 0x20) ~= 0,
+    weak = M.readByte(0x3BE0 + y), half = M.readByte(0x3BE1 + y),
+    null = M.readByte(0x3BCD + y), absorb = M.readByte(0x3BCC + y) }
+  local function priced(slot, a)
+    local x = 8 + slot * 2
+    local o = { level = M.readByte(0x3B18 + x), magpow = M.readByte(0x3B41 + x),
+                vigor = M.readByte(0x3B2C + x) }
+    for k, v in pairs(tgt) do o[k] = v end
+    if a == 0xEE then                       -- Battle: its battle power, no element
+      o.power = M.readByte(0x3B68 + x)
+      local _, hi = M.physHitRange(o)
+      return hi or 0
+    end
+    if a == 0xEF then return nil end        -- Special: not priced
+    local r = MP + a * 14
+    o.power, o.flags2, o.elem = M.readRomByte(r + 6), M.readRomByte(r + 2), M.readRomByte(r + 1)
+    o.heal = (M.readRomByte(r + 4) & 0x01) ~= 0
+    if o.heal then return 0 end
+    local _, hi
+    if (o.flags2 & 0x01) ~= 0 then _, hi = M.physHitRange(o) else _, hi = M.magicHitRange(o) end
+    return hi or 0
+  end
+  local function worst(slot, u)
+    local species = M.readWord(M.FORMATION + slot * 2)
+    if species == 0xFFFF or species >= 0x180 then return 0, nil, {}, false end
+    local off = M.readRomWord(ptrs + species * 2)
+    local atks = M.retalAnswer(function(i) return M.readRomByte(base + off + i) end, u)
+    local top, which, unknown = 0, nil, false
+    for _, a in ipairs(atks) do
+      local hi = priced(slot, a)
+      if hi == nil then unknown = true
+      elseif hi > top then top, which = hi, a end
+    end
+    return top, which, atks, unknown
+  end
+  for _, slot in ipairs(slots) do
+    if monAlive(slot) then
+      local top, which = worst(slot, use)
+      if top >= hp then
+        local ftop, _, fatks, funknown = worst(slot, { cmd = BATTLE.CMD_FIGHT })
+        if ftop < hp and not funknown then
+          local fsaid = {}
+          for _, a in ipairs(fatks) do fsaid[#fsaid + 1] = string.format("$%02X", a) end
+          local key = string.format("%d:%s:%d:%d", actor, what, slot, which)
+          self.counterSaid = self.counterSaid or {}
+          if not self.counterSaid[key] then
+            self.counterSaid[key] = true
+            M.log(string.format("[%s] actor=%d %s refused: slot %d (species $%03X) answers it "
+              .. "with attack $%02X, up to %d against %d HP; a Fight draws %s, up to %d (#372) "
+              .. "-- falling through", self.tag or "fight", actor, what, slot,
+              M.readWord(M.FORMATION + slot * 2), which, top, hp,
+              #fsaid > 0 and table.concat(fsaid, "/") or "no answer", ftop))
+          end
+          return true
+        end
+      end
+    end
+  end
+  return false
+end
+
+-- The monsters standing now, for a verb the engine aims itself.
+local function standingSlots()
+  local t = {}
+  for s = 0, 5 do if monAlive(s) then t[#t + 1] = s end end
+  return t
 end
 
 -- The kill order in force: the authored one (opts.focus) where a
@@ -6523,7 +6769,9 @@ function Driver:makePlan(actor)
       end
     end
     if self.opts.tactical and id == 5 and (self.opts.blitz or BATTLE.PUMMEL) == BATTLE.PUMMEL
-       and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ] then
+       and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
+       and not self:counterVetoed(actor, { cmd = BATTLE.CMD_BLITZ, atk = BATTLE.PUMMEL },
+         standingSlots(), "Pummel") then
       local bb = M.kitBoost(actor, BATTLE.PUMMEL, bp)
       if bb ~= nil then
         offer({ kind = "skill", cmd = BATTLE.CMD_BLITZ, skill = BATTLE.PUMMEL,
@@ -7521,7 +7769,9 @@ function Driver:makePlan(actor)
              row = cmdRow(actor, BATTLE.CMD_TOOLS), boostLeft = toolBp }
   end
   if self.opts.tactical and id == 5
-     and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ] then
+     and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
+     and not self:counterVetoed(actor, { cmd = BATTLE.CMD_BLITZ, atk = self.opts.blitz or BATTLE.PUMMEL },
+       standingSlots(), string.format("Blitz $%02X", self.opts.blitz or BATTLE.PUMMEL)) then
     -- Same rule as the Tools line: the blitz's own row price, escalated
     -- (#219).  Suplex at boost 3 is 81 MP against SABIN's 80-MP pool at
     -- the level he joins, so this line steps down far more often than
@@ -8641,6 +8891,7 @@ function Driver:idle()
   self.layout, self.layoutUnreadSaid, self.steerLast, self.steerDead = nil, false, nil, {}
   self.parts, self.partsLast, self.partsFell, self.partsSwitch = nil, {}, {}, {}
   self.lastStand = nil
+  self.counterSaid = nil
   self.tgtGraphs, self.tgtRouteSaid, self.tgtVisited, self.tgtCycled, self.tgtUnreach = {}, nil, {}, false, {}
   self.parkSt, self.parkN, self.idleSt, self.idleN = nil, 0, nil, 0
   self.unknownSt, self.unknownN, self.unknownSeen, self.sideWindowN = nil, 0, {}, 0

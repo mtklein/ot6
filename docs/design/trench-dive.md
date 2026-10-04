@@ -312,6 +312,56 @@ and everything downstream of it go STALE by the graph's own rule
 to sequence; this branch does not run it. The `shipped` run above is the
 generate edge played for its verdict only, with `OT6_NO_PUBLISH=1`.
 
+## The counter rule (#372, #375, 2026-10-04)
+
+The kill order made the counter rare, not gone: on the care-items study's
+sample (`build/attempts/wt/care-items/trench/stats.txt`) all 28 Giga Volt
+deaths across 64 runs were SABIN, from 200 HP and more, after his Pummel.
+The rewind-search lab (`tools/tests/rewind_search.py`) branched every
+SABIN command window in an Aspik formation, 32 boot shifts from the
+study's entry: 180 decisions over 42 distinct battle keys, 3,998 branches
+each played to the fight's end by the driver, and every decision's control
+(the run's own continuation from the restored snapshot and heap) replayed
+the driver's own branch exactly (`180 MATCH, 0 MISMATCH`;
+`build/attempts/wt/rewind-search/search1/report.txt`). One decision deep,
+a Fight in place of the Pummel drew Giga Volt a quarter as often (0.06 a
+fight against 0.25, first decision of 24 keys; 6 fewer, 3 more, p = 0.51
+on its own, `search1/pairs.txt`): the direction, not yet the proof.
+
+The rule is the driver's, not the generator's: `Driver:counterVetoed`
+reads the target's retaliation script from the ROM (`M.retalAnswer`: the
+first block whose conditions hold runs), prices each magical answer on
+the actor from the ROM spell and the battle's own bytes
+(`M.magicHitRange`, CalcMagicDmg's terms), and refuses a verb whose answer
+can take the actor's whole HP while a Fight's cannot. For Aspik and SABIN:
+`Pummel refused: slot 3 (species $059) answers it with attack $B9, up to
+426 against 363 HP; a Fight draws $EE, no magical damage`. It guards
+SABIN's auto-targeted Blitz (any standing monster is a possible target).
+
+Verified by plain play, no rewinds, the study's protocol: main (ecb9d688)
+against the rule (60edd119), 32 boot shifts each from gau_joined 99bffd2b
+(`build/attempts/wt/rewind-search/verify/stats.txt`):
+
+| | main | rule |
+|---|---|---|
+| runs passed | 32/32 | 32/32 |
+| deaths (Giga Volt) | 30 (14) | 10 (0) |
+| Fenix Downs landed | 26 | 6 |
+| runs with a death | 17 | 6 |
+| rule minus main, by first battle: fewer / more / as many | | 13 / 3 / 14, p = 0.021 |
+
+Main's arm reproduces the study's numbers exactly. After review the
+walker became the engine's own walk and physical answers are priced too
+(a6345366); its H arm, rerun on the same 32 shifts, refused the same 182
+Pummels at the same frames and finished every shift on the same frame
+(`build/attempts/wt/rewind-search/verify2/vetocmp.txt`), with the same
+totals (`verify2/stats.txt`). The cost: one ride lost
+in the rule's arm (s22: the party opened the next battle at 37/30/58 after
+a long Aspik fight and wiped, `class=worn down`; the dive ladder's attempt
+2 landed), against none in main's. Fights without the Pummel run longer;
+the HP the party carries between back-to-back ride battles is the next
+thing to watch.
+
 ## Options not taken
 
 - **Turn SABIN's Blitz off for the dive.** Measured, as the `noblitz`
@@ -342,7 +392,7 @@ generate edge played for its verdict only, with `OT6_NO_PUBLISH=1`.
 - **Runic.** CYAN is in the party and has it, but the trench's counter is
   a monster's scripted Lore, not a spell Runic's gate admits, and it is
   aimed at whoever swung. Not a lever here.
-- **A driver that learns the counter.** The honest general answer — "a
+- **A driver that learns the counter** (done 2026-10-04, above: it reads the counter from the ROM rather than learning it). The honest general answer — "a
   person who watched SABIN eat 363 lightning for a Pummel stops
   Pummelling" — and the driver has most of the parts already (it attributes
   every death to the monster action that caused it). It is real machinery

@@ -689,6 +689,11 @@ check("retry_negative", "nice sh tools/tests/lib/retry_negative.sh",
       + [copy_if_changed_from(h) for h in LIBS])
 # #309: every instrument left in tools/tests (`-- @manual`) composes and
 # starts (docs/TESTING.md "Scripts that stay in the tree").
+def splice_hosts(lua_path):
+    m = re.search(r"^-- @manual\s+splice:\s*(\S+)", (ROOT / lua_path).read_text(errors="replace"), re.M)
+    return [m.group(1)] if m else []
+
+
 instruments = [f for f in glob("tools/tests/*.lua")
                if re.search(r"^-- @manual", (ROOT / f).read_text(errors="replace"), re.M)]
 check("instruments", "nice python3 tools/check_instruments.py",
@@ -696,7 +701,10 @@ check("instruments", "nice python3 tools/check_instruments.py",
        copy_if_changed_from(sn.EMULATOR)]
       + [copy_if_changed_from(f) for f in instruments] + HARNESS
       + [copy_if_changed_from(h) for h in LIBS]
-      + [d for f in instruments for d in fixture_deps(f)])
+      + [d for f in instruments for d in fixture_deps(f)]
+      # a spliced instrument (`-- @manual splice: <host>`) runs inside its host
+      + [x for f in instruments for h in splice_hosts(f)
+         for x in [copy_if_changed_from(h)] + fixture_deps(h)])
 # The verdict depends on the ROM (a stamp records the ROM it was captured
 # on), on the generators (their own sigs), and -- for the drift note, and
 # for any stamp still on the conservative pre-ROM-identity rule -- on the
