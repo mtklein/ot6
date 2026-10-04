@@ -311,6 +311,7 @@ local search = H.seqStep({
       end
       H.assertEq(#recs, 1, label .. ": one Jackpot resolved" .. (S.lost and string.format(" (its exec seen at f%s, "
         .. "then %s)", tostring(S.execF), S.lost) or ""))
+      H.assertEq(S.execF ~= nil, true, label .. ": the exec hook saw this Jackpot (the lost-candidate check reads it)")
       H.assertEq(recs[1].row == JACKPOT and recs[1].boost == 3, true, label .. ": a Jackpot at 3 BP")
       local got = checkJackpot(recs[1], S.i + 3)
       local sig = {}
