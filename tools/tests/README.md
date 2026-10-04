@@ -244,6 +244,7 @@ checked spliced into that host. The instruments today:
 | `parts_selftest.lua` | the multi-part reader and planner against the built ROM's formations (no emulator) |
 | `recovery_trace_selftest.lua` | the recovery-trace ledger (no emulator) |
 | `fight_drops_selftest.lua` | every plan drop goes through `Driver:dropPlan` (no emulator) |
+| `counter_selftest.lua` | the counter rule's readers (#372): the AI walker over retaliation scripts and the magical/physical damage models, against the built ROM and hand-checked numbers, each assertion failed by its own mutant (no emulator) |
 | `rewind_search.lua` (+ `rewind_search.py`) | a lab: at a character's battle decisions, every option the command window offers, each played out from a whole-machine snapshot with the script's Lua heap rolled back alongside, scored across draws (#375); never route or balance evidence |
 
 ### Library reference (abridged)
