@@ -16,7 +16,9 @@
 --   then a bounded search (below) for two draws the passes above may not
 --     meet: one whose early rolls fell Dullahan, so the passes after find
 --     no body, and one whose roll meets a table byte past 251 and draws
---     again.  Every candidate it plays is held to everything below.
+--     again.  Every candidate that throws is held to everything below; one
+--     whose party falls before its Jackpot resolves throws nothing, and is
+--     counted and logged as such.
 -- What it holds, per Jackpot (at Ot6SetzerExec's entry and SETZER's
 -- Ot6ActionEnd; each pass at Ot6JackpotDice's entry and the dice effect's
 -- return; each roll as the effect sets the dice animation):
@@ -213,6 +215,19 @@ end
 -- pass, no wipe -- so a fixture whose 99 distinct throws hold no redraw has
 -- p = 0.939^99 = 0.2%, and then the suite fails by name, as it does if the
 -- empty pass (a third of the throws) is not met.
+--
+-- A candidate the party does not survive: the measured set had no wipe on
+-- its grave, but the grave moves with the route's timing, and on
+-- wt/walker-after-menu's (the fixture gen_wor_falcon played at 67303338)
+-- search 39 (wait 25, stand 0, 3 Defends, the others Defend) ended in a
+-- party wipe before its throw, and the run failed on the canary's game over
+-- (build/attempts/wt/walker-after-menu/round4/jackpot/).  The candidates are
+-- experiments branched from one snapshot; one the party loses before its
+-- Jackpot resolves has no throw to check, so the lib's wipe predicate held
+-- 90 frames (as gen_esper_tubes reads it) ends that candidate, the next one
+-- reloads the grave, and the lost ones are counted in the search's last
+-- line.  90 frames is under the canary's 300, so no game over is counted
+-- and allowGameOver stays off: a wipe anywhere else still fails the run.
 local ENTRY = (type(OT6_SEED_SHIFT) == "number" and OT6_SEED_SHIFT or 0)
 local CAND = {}
 for _, st in ipairs({ 0, 640 }) do
@@ -234,16 +249,23 @@ local function waitFor(fn)
 end
 
 local function candidateBattle()
-  local step
+  local step, wipedN
   return { tick = function()
     if step == nil then
       local plan = {}
       for _ = 1, S.cur.defends do plan[#plan + 1] = { row = "defend" } end
       plan[#plan + 1] = { row = JACKPOT, boost = 3 }
       step = H.setzerBattle(plan, { untilPlanDone = true, othersFight = S.cur.othersFight })
+      wipedN, S.lost = 0, nil
+    end
+    wipedN = H.partyWipedInBattle() and wipedN + 1 or 0
+    if wipedN >= 90 then
+      S.lost = string.format("the party wiped (the lib's wipe predicate, 90 frames, at f%d)", H.frame)
+      H.setPad({})
+      return "done"
     end
     return step:tick()
-  end, reset = function() step = nil end }
+  end, reset = function() step, wipedN = nil, 0 end }
 end
 
 local search = H.seqStep({
@@ -265,6 +287,12 @@ local search = H.seqStep({
       local c, recs = S.cur, H.vars.setzer
       local label = string.format("search %d (wait %d, stand %d, %d Defends, the others %s)", S.i, c.wait, c.stand,
         c.defends, c.othersFight and "Fight" or "Defend")
+      if S.lost and #recs == 0 then
+        S.lostN = (S.lostN or 0) + 1
+        H.log(string.format("[jackpot] %s: no throw -- %s before the Jackpot resolved (%d lost so far)", label,
+          S.lost, S.lostN))
+        return
+      end
       H.assertEq(#recs, 1, label .. ": one Jackpot resolved")
       H.assertEq(recs[1].row == JACKPOT and recs[1].boost == 3, true, label .. ": a Jackpot at 3 BP")
       local got = checkJackpot(recs[1], S.i + 3)
@@ -295,8 +323,9 @@ local search = H.seqStep({
     H.assertEq(S.found.redraw ~= nil, true, string.format("the search met a throw that redraws past 251 within "
       .. "its %d candidates (%d distinct throws tried; none redrawing has p = 0.939^%d = %.4f)", #CAND,
       S.distinct, S.distinct, 0.939 ^ S.distinct))
-    H.log(string.format("[jackpot] search: an empty pass at %s, a redraw at %s; %d candidate(s), %d distinct "
-      .. "(entry shift %d)", S.found.empty, S.found.redraw, S.played, S.distinct, ENTRY))
+    H.log(string.format("[jackpot] search: an empty pass at %s, a redraw at %s; %d candidate(s), %d distinct, "
+      .. "%d lost to a wipe before the throw (entry shift %d)", S.found.empty, S.found.redraw, S.played, S.distinct,
+      S.lostN or 0, ENTRY))
   end),
 })
 
