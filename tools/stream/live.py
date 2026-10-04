@@ -194,21 +194,24 @@ async function tick(){ try{
     + '</div>'; });
   $('starting').innerHTML = html;
   const hm=t=>new Date(t*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-  // One line per machine: a filled dot per emulator running (red if
-  // frozen), a hollow dot per one more it has room for, and its speed.
-  $('machines').innerHTML = (j.machines||[]).map(m=>{
-    const nm = '<b style="display:inline-block;min-width:3.5em">'+esc(m.name)+'</b>';
-    if(!m.up) return '<div>'+nm+'<span style="color:#d9a24b">'
+  // One line per machine, in columns: name, frames/s right-justified to
+  // four digits, then a filled dot per emulator running (red if frozen)
+  // and a hollow dot per one more it has room for, trailing off the right.
+  const ms = j.machines||[];
+  const w = Math.max(0, ...ms.map(m=>m.name.length)) + 1;
+  $('machines').innerHTML = ms.map(m=>{
+    const nm = '<b>'+esc(m.name.padEnd(w))+'</b>';
+    if(!m.up) return '<div style="white-space:pre">'+nm+'<span style="color:#d9a24b">'
       + (m.err==='connecting' ? 'connecting…' : 'offline since '+hm(m.down_since))
       + '</span></div>';
+    const fps = String(Math.min(9999, Math.round(m.fps||0))).padStart(4);
     const ok = Math.max(0, m.active - m.frozen);
     const dots = '<span style="color:#e06060">'+'●'.repeat(m.frozen)+'</span>'
       + '<span style="color:#8c8">'+'●'.repeat(ok)+'</span>'
       + '<span style="color:#465">'+'○'.repeat(m.room||0)+'</span>';
-    return '<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+nm
-      + '<span style="letter-spacing:1px">'+dots+'</span>'
-      + (m.fps ? ' <span style="color:#687">'+nf(Math.round(m.fps))+' fps</span>' : '')
-      + '</div>'; }).join('');
+    return '<div style="white-space:pre;overflow:hidden">'+nm
+      + '<span style="color:#687">'+fps+' fps  </span>'
+      + '<span style="letter-spacing:1px">'+dots+'</span></div>'; }).join('');
   const seen = new Set();
   ws.forEach(w=>{
     seen.add(w.id);
