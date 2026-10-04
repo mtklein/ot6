@@ -126,55 +126,90 @@ def signp(a, b):
     return min(1.0, 2 * sum(math.comb(n, i) for i in range(k + 1)) / 2 ** n)
 
 
-def report(d, counter):
+def mean(xs):
+    return sum(xs) / len(xs) if xs else float("nan")
+
+
+def report(d, counter, a_kind=None, b_kind=None):
     rows = []
-    for log in sorted(d.glob("s*.log"), key=lambda p: int(p.stem[1:])):
+    logs = sorted(d.glob("s*.log"), key=lambda p: int(p.stem[1:]))
+    for log in logs:
         for n, dec in sorted(parse(log).items()):
             dec["shift"] = int(log.stem[1:])
             rows.append(dec)
-    print(f"{len(rows)} decision(s) searched in {len(list(d.glob('s*.log')))} log(s); "
+    print(f"{len(rows)} decision(s) searched in {len(logs)} log(s); "
           f"distinct battle keys {len({r['key'] for r in rows})}")
     ctl = [r["control"] for r in rows]
-    print(f"control (restored own plan replays branch own): {ctl.count('MATCH')} MATCH, "
+    print(f"control (the run's own continuation replays branch own): {ctl.count('MATCH')} MATCH, "
           f"{ctl.count('MISMATCH')} MISMATCH, {ctl.count(None)} unread")
-    # per kind of option, against the driver's own choice at the same decision
+    nb = sum(len(r["branches"]) for r in rows)
+    nd = sum(1 for r in rows for b in r["branches"].values() if b["dropped"])
+    print(f"branches played {nb}; {nd} had the swapped plan dropped before its confirm (left out below)")
+
+    # A kind of option is scored by its MEAN over that kind's branches at a
+    # decision (every target, every boost), never the best of several.  The
+    # sign tests take one decision per distinct battle key (the first):
+    # decisions inside one battle are not independent draws.
+    def kind_branches(r):
+        out = {}
+        for k, b in r["branches"].items():
+            if k == 0 or b["dropped"]:
+                continue
+            out.setdefault(kind_of(b["desc"]), []).append(b)
+        return out
+
+    def avg(bs, f):
+        return mean([f(b) for b in bs])
+
+    first = {}
+    for r in rows:
+        first.setdefault(r["key"], r)
     kinds = {}
-    seen_key = set()
     for r in rows:
         own = r["branches"].get(0)
         if own is None:
             continue
-        first_of_key = r["key"] not in seen_key
-        seen_key.add(r["key"])
-        best = {}
-        for k, b in r["branches"].items():
-            if k == 0 or b["dropped"]:
-                continue
-            kd = kind_of(b["desc"])
-            if kd not in best or badness(b) < badness(best[kd]):
-                best[kd] = b
-        for kd, b in best.items():
-            K = kinds.setdefault(kd, dict(better=0, worse=0, same=0, n=0, keys=set(), dd=0, dh=0,
-                                          counters_b=0, counters_own=0))
+        for kd, bs in kind_branches(r).items():
+            K = kinds.setdefault(kd, dict(n=0, keys=set(), fewer=0, more=0, same=0, deaths=[], down=[],
+                                          hp=[], won=[], ctr=[], own_deaths=[], own_ctr=[]))
+            md = avg(bs, lambda b: b["deaths"])
             K["n"] += 1
             K["keys"].add(r["key"])
-            K["dd"] += b["deaths"] - own["deaths"]
-            K["dh"] += b["hpLost"] - own["hpLost"]
-            K["counters_b"] += b["acts"].count(counter) if counter else 0
-            K["counters_own"] += own["acts"].count(counter) if counter else 0
-            if badness(b) < badness(own):
-                K["better"] += 1
-            elif badness(b) > badness(own):
-                K["worse"] += 1
-            else:
-                K["same"] += 1
-    print("\nper kind of option (its best target), against the driver's own choice at the same "
-          "decision: better / worse / same (badness: lost, down at end, deaths, HP lost, frames)")
-    for kd, K in sorted(kinds.items(), key=lambda kv: -kv[1]["better"] + kv[1]["worse"]):
-        print(f"  {kd:24s} n={K['n']:3d} keys={len(K['keys']):3d}  better {K['better']:3d} worse "
-              f"{K['worse']:3d} same {K['same']:3d}  sign p={signp(K['better'], K['worse']):.4f}  "
-              f"deaths {K['dd']:+d}  HP {K['dh']:+d}"
-              + (f"  {counter} drawn {K['counters_b']} vs own {K['counters_own']}" if counter else ""))
+            K["deaths"].append(md)
+            K["down"].append(avg(bs, lambda b: b["down"]))
+            K["hp"].append(avg(bs, lambda b: b["hpLost"]))
+            K["won"].append(avg(bs, lambda b: 1 if b["how"] == "won" else 0))
+            K["own_deaths"].append(own["deaths"])
+            if counter:
+                K["ctr"].append(avg(bs, lambda b: b["acts"].count(counter)))
+                K["own_ctr"].append(own["acts"].count(counter))
+            if first[r["key"]] is r:
+                K["fewer"] += md < own["deaths"]
+                K["more"] += md > own["deaths"]
+                K["same"] += md == own["deaths"]
+    print("\nper kind of option (its mean over targets at each decision) against the driver's own "
+          "choice there; sign test on deaths, first decision of each battle key:")
+    for kd, K in sorted(kinds.items(), key=lambda kv: mean(kv[1]["deaths"])):
+        print(f"  {kd:22s} decisions={K['n']:3d} keys={len(K['keys']):3d}  deaths {mean(K['deaths']):.2f} "
+              f"(own {mean(K['own_deaths']):.2f})  down {mean(K['down']):.2f}  hpLost {mean(K['hp']):.0f}  "
+              f"won {mean(K['won']):.2f}"
+              + (f"  {counter} {mean(K['ctr']):.2f} (own {mean(K['own_ctr']):.2f})" if counter else "")
+              + f"  | fewer {K['fewer']} more {K['more']} same {K['same']} p={signp(K['fewer'], K['more']):.4f}")
+    if a_kind and b_kind:
+        fewer = more = same = 0
+        da, db = [], []
+        for r in first.values():
+            kb = kind_branches(r)
+            if a_kind in kb and b_kind in kb:
+                x, y = avg(kb[a_kind], lambda b: b["deaths"]), avg(kb[b_kind], lambda b: b["deaths"])
+                da.append(x)
+                db.append(y)
+                fewer += x < y
+                more += x > y
+                same += x == y
+        print(f"\n{a_kind} against {b_kind} at the same decision (first of each battle key, {len(da)} "
+              f"keys): mean deaths {mean(da):.2f} vs {mean(db):.2f}; fewer {fewer}, more {more}, "
+              f"same {same}; sign test p = {signp(fewer, more):.4f}")
     print("\nper decision:")
     for r in rows:
         own = r["branches"].get(0, {})
@@ -208,6 +243,8 @@ def main():
     s = sub.add_parser("report")
     s.add_argument("--dir", required=True)
     s.add_argument("--counter", default=None, help="a monster action to count, e.g. ':$B9'")
+    s.add_argument("--pair", nargs=2, default=None, metavar=("KIND_A", "KIND_B"),
+                   help="pair two kinds directly, e.g. 'Fight bp0' 'Blitz $5D bp0'")
     a = ap.parse_args()
     d = Path(a.dir)
     d.mkdir(parents=True, exist_ok=True)
@@ -217,7 +254,7 @@ def main():
             for out in ex.map(lambda s: run_one(a, s, d), a.shifts):
                 print(out, flush=True)
     else:
-        report(d, a.counter)
+        report(d, a.counter, *(a.pair or (None, None)))
     return 0
 
 

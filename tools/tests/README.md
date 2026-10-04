@@ -233,7 +233,9 @@ question and goes, its findings in the commit that deletes it. Every
 composes and starts: a `-- @manual standalone: lua ...` file runs under
 `lua`; any other must load only fixtures the graph makes, compose, and
 reach its own boot point in the emulator (it is stopped 600 frames later,
-or passes first). The instruments today:
+or passes first); a `-- @manual splice: <host> [with <lua>]` file is a chunk
+its runner inserts into a host script after the host's lib line, and is
+checked spliced into that host. The instruments today:
 
 | instrument | what it measures |
 |---|---|
@@ -242,6 +244,7 @@ or passes first). The instruments today:
 | `parts_selftest.lua` | the multi-part reader and planner against the built ROM's formations (no emulator) |
 | `recovery_trace_selftest.lua` | the recovery-trace ledger (no emulator) |
 | `fight_drops_selftest.lua` | every plan drop goes through `Driver:dropPlan` (no emulator) |
+| `rewind_search.lua` (+ `rewind_search.py`) | a lab: at a character's battle decisions, every option the command window offers, each played out from a whole-machine snapshot with the script's Lua heap rolled back alongside, scored across draws (#375); never route or balance evidence |
 
 ### Library reference (abridged)
 
