@@ -15,7 +15,8 @@ tailing its growing run.log:
   [ot6note] <f> <text>  the driver's notes
   [ot6] <text>          every other log line, shown as notes too
 
-Serves one page on --port (default 8611).  Latency is Mesen's stdout block
+Serves one page on --port (default 8611), to this machine only unless
+--bind 0.0.0.0 (then a phone on the same Wi-Fi opens http://mbp.local:8611/).  Latency is Mesen's stdout block
 buffering: bursts every second or so.
 
 More machines: `--peer air.local` (repeatable; `host:path` when the repo is
@@ -153,7 +154,7 @@ def log_tree(log):
 # unreachable, load, active and frozen counts, and which branch/worktree each
 # of its workers belongs to.  A tile click opens the single-worker detail
 # (live1.html) for that worker.
-GRID_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 workers</title>
+GRID_PAGE = """<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OT6 workers</title>
 <body style="margin:0;background:#111;color:#cdc;font:13px ui-monospace,monospace">
 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 14px">
 <b style="font-size:16px">live workers</b>
@@ -261,7 +262,7 @@ tick(); setInterval(tick, 1000);
 # live notes, sourced from status.json).  With ?w=<id> it "follows by name":
 # any grid worker's big screenshot, frame, stuck flag and latest notes,
 # sourced from grid.json.
-DETAIL_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 live</title>
+DETAIL_PAGE = """<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OT6 live</title>
 <body style="margin:0;background:#111;color:#cdc;display:grid;place-items:center;min-height:100vh;font:14px ui-monospace,monospace">
 <div style="text-align:center;padding:12px">
 <div style="font-size:16px;padding-bottom:6px"><span id=who style="color:#cdc"></span></div>
@@ -329,7 +330,7 @@ tick(); setInterval(tick, 400);
 # __COORDS__ is replaced at page-write time with {name: [x,y]} world-tile
 # coordinates (route_coords.py, offsets pre-applied) -- the fallback for a
 # progress.json written by an older live.py that carries no x/y per edge.
-PROGRESS_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 route</title>
+PROGRESS_PAGE = """<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OT6 route</title>
 <body style="margin:0;background:#111;color:#cdc;font:13px ui-monospace,monospace">
 <div style="max-width:1000px;margin:0 auto;padding:16px">
 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
@@ -1526,6 +1527,9 @@ def main():
     ap.add_argument("workspace", nargs="?", help="a build/test-runs/<ws> dir "
                     "(default: the one with the newest run.log)")
     ap.add_argument("--port", type=int, default=8611)
+    ap.add_argument("--bind", default="127.0.0.1", metavar="ADDR",
+                    help="address to serve on; 0.0.0.0 lets a phone on the "
+                    "same network open http://<this mac>.local:PORT/")
     ap.add_argument("--peer", action="append", default=[], metavar="HOST[:PATH]",
                     help="also show this machine's workers, over ssh (repo at "
                     "~/ot6 there unless :PATH); repeatable")
@@ -1569,12 +1573,14 @@ def main():
         threading.Thread(target=peer_thread, args=(board, p, stop),
                          daemon=True).start()
 
-    httpd = ThreadingHTTPServer(("127.0.0.1", args.port),
+    httpd = ThreadingHTTPServer((args.bind, args.port),
                                 partial(SimpleHTTPRequestHandler,
                                         directory=webroot))
     # a plain kill runs the cleanup below too (the ssh children)
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
-    print(f"live: http://127.0.0.1:{args.port}/  (test {test}, log {log}, "
+    url_host = (socket.gethostname().split(".")[0] + ".local"
+                if args.bind == "0.0.0.0" else args.bind)
+    print(f"live: http://{url_host}:{args.port}/  (test {test}, log {log}, "
           f"machines {', '.join(board.names)})")
     try:
         httpd.serve_forever()
