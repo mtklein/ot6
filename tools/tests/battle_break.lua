@@ -139,6 +139,13 @@ end
 -- from f2728 (shell gauge 0, flags $29: its turn queued) to f4888 (gauge 9,
 -- flags $01: that turn and the next one ran, the head up again).  Below half HP she heals instead of waiting, so a stray that slips
 -- through anyway costs a counter she survives rather than the fight.
+--
+-- The owner's way (everyone Fire Beams while the head shows, Heal Forces
+-- while it hides, no menu held) breaks the head faster (3758-7951 frames)
+-- and plays more like a person, but it is not this file's policy: at 4 of
+-- 60 shifts a second beam already ordered when the head broke landed
+-- broken and killed it, so the fight ended with nothing left to recover
+-- (build/attempts/wt/whelk-rhythm/summary-rhythm2.txt).
 local BEAM = { "a", "a", "a" }
 local HEAL = { "a", "down", "down", "a", "a" }
 local GAUGE_OPEN = 128
@@ -385,11 +392,23 @@ H.run({ maxFrames = 60000 }, {
     H.call(function() H.setPad(H.frame % 10 < 5 and { "b" } or {}) end),
   }, "battle time running (no submenu holding it in wait mode)"),
   H.release(),
-  H.waitUntil(function() return timer() == 0 and shields() == 4 end,
-    12000, "broken head to recover", 60),
+  -- The recovery is only a recovery while the head lives: a head killed
+  -- after its break ends the battle (AIScript _308, boss_death), and the
+  -- field then reads timer 0 and shields 4 at its old slot whatever
+  -- happened, so a dead head would pass the wait below without anything
+  -- having recovered.  Watch its HP every frame of the wait.
+  H.waitUntil(function()
+    if headHp() == 0 then
+      error(string.format("the head died after its break (hp 0, timer %02X, "
+        .. "shields %d), so the battle ended before its recovery could be "
+        .. "observed", timer(), shields()), 0)
+    end
+    return timer() == 0 and shields() == 4
+  end, 12000, "broken head to recover", 1),
   H.waitFrames(30),
   report("recovered"),
   H.call(function()
+    H.assertEq(headHp() > 0, true, "the head is alive at its recovery")
     H.assertEq(shields(), 4, "shields restored to max")
     H.assertEq(revealed() & 0x01, 0x01, "revealed weakness survives recovery")
     H.screenshot("break_recovered")
