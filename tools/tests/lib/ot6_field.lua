@@ -6678,6 +6678,35 @@ function M.relicKit(ch, name, kit, opts)
           assume = { [ch] = kit }, spareHands = false })
         local p = plan[1]
         M.assertEq(p ~= nil, true, tag .. ": the member is in the active party")
+        -- the kit's guards were chosen for the threatened statuses they
+        -- cover; the plan keeps that cover.  The rule ranks acting relics
+        -- above guards because a Ribbon is assumed on (relicPlan's note);
+        -- without one in the bag a Black Belt would take the slot of the
+        -- only guard against the threat (measured: chain_wor_tzen_door,
+        -- "slot 5: Black Belt $D5 in place of the kit's Jewel Ring $B5",
+        -- then "relics protect STATUS1 $00" and the Petrify assert,
+        -- build/attempts/wt/walker-after-menu/round4/).  A kit slot whose
+        -- planned relic loses a threatened status the kit covered keeps the
+        -- kit's relic; a Ribbon covers them, so it still goes on.
+        local t1, t2 = threats and threats.s1 or 0xFF, threats and threats.s2 or 0xFF
+        local function cover(ids)
+          local c1, c2 = 0, 0
+          for _, id in pairs(ids) do
+            if id ~= 0xFF then c1, c2 = c1 | itemProp(id, 6), c2 | itemProp(id, 7) end
+          end
+          return c1 & t1, c2 & t2
+        end
+        local k1, k2 = cover({ kit[4] or 0xFF, kit[5] or 0xFF })
+        for s = 4, 5 do
+          local w = { p.want[4] or p.cur[4], p.want[5] or p.cur[5] }
+          local w1, w2 = cover(w)
+          local m1, m2 = k1 & ~w1, k2 & ~w2
+          if kit[s] and w[s - 3] ~= kit[s] and (itemProp(kit[s], 6) & m1 | itemProp(kit[s], 7) & m2) ~= 0 then
+            M.log(string.format("[%s] slot %d: %s stays -- %s in its place would leave STATUS1 $%02X STATUS2 $%02X "
+              .. "of the threat uncovered", tag, s, relicName(kit[s]), relicName(w[s - 3]), m1, m2))
+            p.want[s] = kit[s]
+          end
+        end
         local items, wants = {}, {}
         for s = 4, 5 do
           local id = p.want[s] or p.cur[s]
