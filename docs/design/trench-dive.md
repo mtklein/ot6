@@ -329,13 +329,14 @@ fight against 0.25, first decision of 24 keys; 6 fewer, 3 more, p = 0.51
 on its own, `search1/pairs.txt`): the direction, not yet the proof.
 
 The rule is the driver's, not the generator's: `Driver:counterVetoed`
-reads the target's retaliation script from the ROM (`M.retalAnswer`: the
-first block whose conditions hold runs), prices each magical answer on
-the actor from the ROM spell and the battle's own bytes
-(`M.magicHitRange`, CalcMagicDmg's terms), and refuses a verb whose answer
-can take the actor's whole HP while a Fight's cannot. For Aspik and SABIN:
+reads the target's retaliation script from the ROM (`M.retalAnswer`,
+walked the way battle_main.asm's AI walker does), prices each answer on
+the actor (`M.magicHitRange` for spells, `M.physHitRange` for Battle and
+physical spells), and refuses a verb whose answer can take the actor's
+whole HP while a Fight's cannot. For Aspik and SABIN:
 `Pummel refused: slot 3 (species $059) answers it with attack $B9, up to
-426 against 363 HP; a Fight draws $EE, no magical damage`. It guards
+426 against 298 HP; a Fight draws $EE, up to 20 (#372)`
+(build/attempts/wt/rewind-search/verify2/H/s22/w1.log.gz). It guards
 SABIN's auto-targeted Blitz (any standing monster is a possible target).
 
 Verified by plain play, no rewinds, the study's protocol: main (ecb9d688)
