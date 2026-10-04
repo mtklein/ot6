@@ -9,6 +9,12 @@ script declare one or the other).  Per instrument:
 
   * standalone (`-- @manual standalone: lua <path>`): run with `lua`; exit
     0 is a start.
+  * spliced (`-- @manual splice: <host.lua> [with <lua>]`): not a script of
+    its own but a chunk a runner inserts into a host script right after
+    the host's `local H = dofile(".../lib/ot6.lua")` line (rewind_search.lua
+    into a leg's generator).  It is spliced the same way (the `with` Lua
+    first), and the result is checked as below: it must load only graph
+    fixtures, compose, and reach the host's boot point.
   * otherwise: every savestate it names ("<name>.mss.lua") must be a state
     the graph makes (tools/tests/savestate_graph.py) or one the script saves
     itself -- a fixture nothing generates any more cannot boot.  The script
@@ -40,6 +46,17 @@ import compose  # noqa: E402 -- declared_states: the graph's state names
 
 OUT = os.path.join(ROOT, "build", "checks", "instruments")
 MANUAL = re.compile(r"^-- @manual(.*)$", re.M)
+SPLICE = re.compile(r"^\s*splice:\s*(\S+)(?:\s+with\s+(.*?))?\s*$")
+HOST_LIB = re.compile(r'^local H = dofile\("[^"]*lib/ot6\.lua"\)\n', re.M)
+
+
+def splice(host_text: str, insert: str) -> str:
+    """The host script with `insert` placed right after its one lib line."""
+    hits = list(HOST_LIB.finditer(host_text))
+    if len(hits) != 1:
+        raise ValueError(f"the host has {len(hits)} `local H = dofile(.../lib/ot6.lua)` lines, want 1")
+    at = hits[0].end()
+    return host_text[:at] + insert + "\n" + host_text[at:]
 STATE_REF = re.compile(r'"(?:[^"]*/)?([A-Za-z0-9_]+)\.mss\.lua"')
 SAVED = re.compile(r'saveState\(\s*"(?:[^"]*/)?([A-Za-z0-9_]+)\.mss"')
 SMOKE_FRAMES = 600
@@ -139,8 +156,23 @@ def main(argv: list[str]) -> int:
     for rel in todo:
         text = open(os.path.join(ROOT, rel), encoding="utf-8", errors="replace").read()
         m = MANUAL.search(text)
+        sp = SPLICE.match(m.group(1)) if m else None
         if m and "standalone: lua" in m.group(1):
             ok, why = standalone(rel, lua)
+        elif sp:
+            host = sp.group(1)
+            try:
+                text = splice(open(os.path.join(ROOT, host), encoding="utf-8").read(),
+                              (sp.group(2) or "") + "\n" + text)
+            except (OSError, ValueError) as e:
+                ok, why = False, f"cannot splice into {host}: {e}"
+            else:
+                spliced = os.path.join(OUT, os.path.basename(rel)[:-4] + "_in_"
+                                       + os.path.basename(host))
+                with open(spliced, "w") as f:
+                    f.write(text)
+                ok, why = emulated(os.path.relpath(spliced, ROOT), text, states)
+                why = f"spliced into {host}: {why}"
         else:
             ok, why = emulated(rel, text, states)
         print(("  ok    " if ok else "  FAIL  ") + f"{rel}: {why}")
