@@ -6707,6 +6707,46 @@ function M.relicKit(ch, name, kit, opts)
             p.want[s] = kit[s]
           end
         end
+        -- a slot the kit leaves to the rule: while a threatened status is
+        -- still uncovered, the guard covering most of it (then the most of
+        -- every status), from the bag or worn now, takes that slot in place
+        -- of the rule's pick -- never over a two-weapon relic (measured:
+        -- chain_wor_sabin's house kit { [4] = Back Guard }, threats
+        -- Petrify: "Black Belt $D5 goes to CELES's slot 5 (over Jewel Ring
+        -- $B5)", then "a relic CELES wears guards Petrify" failed,
+        -- build/attempts/wt/walker-after-menu/round4/)
+        do
+          local w = { p.want[4] or p.cur[4], p.want[5] or p.cur[5] }
+          local w1, w2 = cover(w)
+          local m1 = threats and ((threats.s1 or 0) & ~w1) or 0
+          local m2 = threats and ((threats.s2 or 0) & ~w2) or 0
+          if m1 | m2 ~= 0 then
+            local avail, ids = {}, {}
+            for i = 0, 255 do
+              if M.readByte(0x1869 + i) ~= 0xFF and M.readByte(0x1969 + i) > 0 then avail[M.readByte(0x1869 + i)] = true end
+            end
+            for s = 4, 5 do if p.real[s] ~= 0xFF then avail[p.real[s]] = true end end
+            for id in pairs(avail) do ids[#ids + 1] = id end
+            table.sort(ids)
+            local best, bc, ball = nil, 0, 0
+            for _, id in ipairs(ids) do
+              local cl = M.relicClass(id)
+              if cl and cl.aff == "guard" and wearsItem(ch, id) then
+                local c = popcount(itemProp(id, 6) & m1) + popcount(itemProp(id, 7) & m2)
+                if c > bc or (c == bc and c > 0 and cl.cover > ball) then best, bc, ball = id, c, cl.cover end
+              end
+            end
+            for s = 4, 5 do
+              local cl = M.relicClass(w[s - 3])
+              if best and not kit[s] and w[s - 3] ~= best and not (cl and cl.hands) then
+                M.log(string.format("[%s] slot %d: %s in place of the rule's %s -- STATUS1 $%02X STATUS2 $%02X of the "
+                  .. "threat uncovered, and it covers %d of them", tag, s, relicName(best), relicName(w[s - 3]), m1, m2, bc))
+                p.want[s] = best
+                break
+              end
+            end
+          end
+        end
         local items, wants = {}, {}
         for s = 4, 5 do
           local id = p.want[s] or p.cur[s]
