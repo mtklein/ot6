@@ -15,7 +15,8 @@ tailing its growing run.log:
   [ot6note] <f> <text>  the driver's notes
   [ot6] <text>          every other log line, shown as notes too
 
-Serves one page on --port (default 8611).  Latency is Mesen's stdout block
+Serves one page on --port (default 8611), to this machine only unless
+--bind 0.0.0.0 (then a phone on the same Wi-Fi opens http://mbp.local:8611/).  Latency is Mesen's stdout block
 buffering: bursts every second or so.
 
 More machines: `--peer air.local` (repeatable; `host:path` when the repo is
@@ -34,7 +35,7 @@ and the concurrency it ran at (emulators, and the load average).  From that
 log tools/stream/placement.py gives each machine a curve and a knee that
 follow other load, heat and power as they change, and from the knee and what
 the machine runs right now, how many more emulators it can take.  That is
-placement.json, one line on the page, and:
+placement.json, the hollow dots on the page (one per emulator of room), and:
 
     python3 tools/stream/live.py --place 8     # where the next 8 should go
     python3 tools/stream/live.py --place 8 --claim wt/foo   # and hold them
@@ -153,11 +154,10 @@ def log_tree(log):
 # unreachable, load, active and frozen counts, and which branch/worktree each
 # of its workers belongs to.  A tile click opens the single-worker detail
 # (live1.html) for that worker.
-GRID_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 workers</title>
+GRID_PAGE = """<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OT6 workers</title>
 <body style="margin:0;background:#111;color:#cdc;font:13px ui-monospace,monospace">
 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 14px">
 <b style="font-size:16px">live workers</b>
-<span id=hdr style="color:#8a8"></span>
 <a href="progress.html" style="color:#8ac">route map &rarr;</a></div>
 <div id=machines style="padding:0 14px 10px;line-height:1.6"></div>
 <div id=grid style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;padding:0 14px 18px"></div>
@@ -178,9 +178,6 @@ async function tick(){ try{
   const ws = all.filter(w=>w.shot);
   const starting = all.filter(w=>!w.shot);
   $('empty').style.display = all.length ? 'none' : 'block';
-  $('hdr').textContent = all.length ? (all.length+' active worker'+(all.length>1?'s':'')
-    + ' · '+all.filter(w=>w.stuck).length+' frozen'
-    + (starting.length ? ' · '+starting.length+' booting' : '')) : '';
   // Live processes whose first screenshot has not landed yet.  There is no
   // second case any more: OT6_LIVE is gone and every run broadcasts, so a
   // worker without a picture is booting rather than mute, and it promotes
@@ -197,21 +194,21 @@ async function tick(){ try{
     + '</div>'; });
   $('starting').innerHTML = html;
   const hm=t=>new Date(t*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  // One line per machine: a filled dot per emulator running (red if
+  // frozen), a hollow dot per one more it has room for, and its speed.
   $('machines').innerHTML = (j.machines||[]).map(m=>{
-    if(!m.up) return '<div><b style="color:#d9a24b">'+esc(m.name)+'</b> <span style="color:#d9a24b">'
-      + (m.err==='connecting' ? 'connecting\u2026' : 'unreachable since '+hm(m.down_since))
-      + '</span>' + (m.err && m.err!=='connecting' ? ' <span style="color:#687">('+esc(m.err)+')</span>' : '') + '</div>';
-    let h = '<div><b>'+esc(m.name)+'</b> <span style="color:#8a8">'
-      + m.active+' active \u00b7 '
-      + '<span style="color:'+(m.frozen?'#e06060':'#8a8')+'">'+m.frozen+' frozen</span>'
-      + (m.load ? ' \u00b7 load '+m.load[0].toFixed(1)+' / '+m.ncpu+' cores' : '')
-      + (m.fps!=null ? ' \u00b7 '+nf(Math.round(m.fps))+' frames/s' : '')
-      + (m.room!=null ? ' \u00b7 room '+m.room+' (peak '+m.peak+')' : '') + '</span></div>';
-    m.trees.forEach(t=>{ h += '<div style="color:#8a9;padding-left:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
-      + '<span style="color:#9bc">'+esc(t.branch)+'</span>'+(t.tree?' <span style="color:#687">@'+esc(t.tree)+'</span>':'')
-      + ' \u00b7 '+t.tests.length+': '+esc(t.tests.join(', '))+'</div>'; });
-    return h; }).join('')
-    + (j.place ? '<div style="color:#687">' + esc(j.place) + '</div>' : '');
+    const nm = '<b style="display:inline-block;min-width:3.5em">'+esc(m.name)+'</b>';
+    if(!m.up) return '<div>'+nm+'<span style="color:#d9a24b">'
+      + (m.err==='connecting' ? 'connecting…' : 'offline since '+hm(m.down_since))
+      + '</span></div>';
+    const ok = Math.max(0, m.active - m.frozen);
+    const dots = '<span style="color:#e06060">'+'●'.repeat(m.frozen)+'</span>'
+      + '<span style="color:#8c8">'+'●'.repeat(ok)+'</span>'
+      + '<span style="color:#465">'+'○'.repeat(m.room||0)+'</span>';
+    return '<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+nm
+      + '<span style="letter-spacing:1px">'+dots+'</span>'
+      + (m.fps ? ' <span style="color:#687">'+nf(Math.round(m.fps))+' fps</span>' : '')
+      + '</div>'; }).join('');
   const seen = new Set();
   ws.forEach(w=>{
     seen.add(w.id);
@@ -261,7 +258,7 @@ tick(); setInterval(tick, 1000);
 # live notes, sourced from status.json).  With ?w=<id> it "follows by name":
 # any grid worker's big screenshot, frame, stuck flag and latest notes,
 # sourced from grid.json.
-DETAIL_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 live</title>
+DETAIL_PAGE = """<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OT6 live</title>
 <body style="margin:0;background:#111;color:#cdc;display:grid;place-items:center;min-height:100vh;font:14px ui-monospace,monospace">
 <div style="text-align:center;padding:12px">
 <div style="font-size:16px;padding-bottom:6px"><span id=who style="color:#cdc"></span></div>
@@ -329,12 +326,11 @@ tick(); setInterval(tick, 400);
 # __COORDS__ is replaced at page-write time with {name: [x,y]} world-tile
 # coordinates (route_coords.py, offsets pre-applied) -- the fallback for a
 # progress.json written by an older live.py that carries no x/y per edge.
-PROGRESS_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 route</title>
+PROGRESS_PAGE = """<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OT6 route</title>
 <body style="margin:0;background:#111;color:#cdc;font:13px ui-monospace,monospace">
 <div style="max-width:1000px;margin:0 auto;padding:16px">
 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
 <b style="font-size:17px">the route</b>
-<span id=hdr style="color:#8a8"></span>
 <a id=tog href="#" style="color:#8ac">grid view</a></div>
 <svg id=map viewBox="0 0 256 256" width="100%" style="display:block;margin:auto;max-height:88vh"></svg>
 <div id=cur style="color:#9ac;padding-top:4px"></div>
@@ -998,8 +994,7 @@ class Board:
         for mc, pm in zip(machines, place["machines"]):
             mc.update({k: pm[k] for k in ("room", "peak") if k in pm})
         out = {"workers": workers, "count": len(workers), "ts": int(now),
-               "machines": machines, "local": HOST,
-               "place": pl.place_line(place)}
+               "machines": machines, "local": HOST}
         self._dump("grid.json", out)
         self._dump("placement.json", place)
         prog = self.merge_progress(m)
@@ -1526,6 +1521,9 @@ def main():
     ap.add_argument("workspace", nargs="?", help="a build/test-runs/<ws> dir "
                     "(default: the one with the newest run.log)")
     ap.add_argument("--port", type=int, default=8611)
+    ap.add_argument("--bind", default="127.0.0.1", metavar="ADDR",
+                    help="address to serve on; 0.0.0.0 lets a phone on the "
+                    "same network open http://<this mac>.local:PORT/")
     ap.add_argument("--peer", action="append", default=[], metavar="HOST[:PATH]",
                     help="also show this machine's workers, over ssh (repo at "
                     "~/ot6 there unless :PATH); repeatable")
@@ -1569,12 +1567,14 @@ def main():
         threading.Thread(target=peer_thread, args=(board, p, stop),
                          daemon=True).start()
 
-    httpd = ThreadingHTTPServer(("127.0.0.1", args.port),
+    httpd = ThreadingHTTPServer((args.bind, args.port),
                                 partial(SimpleHTTPRequestHandler,
                                         directory=webroot))
     # a plain kill runs the cleanup below too (the ssh children)
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
-    print(f"live: http://127.0.0.1:{args.port}/  (test {test}, log {log}, "
+    url_host = (socket.gethostname().split(".")[0] + ".local"
+                if args.bind == "0.0.0.0" else args.bind)
+    print(f"live: http://{url_host}:{args.port}/  (test {test}, log {log}, "
           f"machines {', '.join(board.names)})")
     try:
         httpd.serve_forever()
