@@ -195,7 +195,7 @@ async function tick(){ try{
   $('starting').innerHTML = html;
   const hm=t=>new Date(t*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
   // One line per machine, in columns: name, frames/s right-justified to
-  // four digits, then a filled dot per emulator running (red if frozen)
+  // five digits, then a filled dot per emulator running (red if frozen)
   // and a hollow dot per one more it has room for, trailing off the right.
   const ms = j.machines||[];
   const w = Math.max(0, ...ms.map(m=>m.name.length)) + 1;
@@ -204,7 +204,7 @@ async function tick(){ try{
     if(!m.up) return '<div style="white-space:pre">'+nm+'<span style="color:#d9a24b">'
       + (m.err==='connecting' ? 'connecting…' : 'offline since '+hm(m.down_since))
       + '</span></div>';
-    const fps = String(Math.min(9999, Math.round(m.fps||0))).padStart(4);
+    const fps = String(Math.min(99999, Math.round(m.fps||0))).padStart(5);
     const ok = Math.max(0, m.active - m.frozen);
     const dots = '<span style="color:#e06060">'+'●'.repeat(m.frozen)+'</span>'
       + '<span style="color:#8c8">'+'●'.repeat(ok)+'</span>'
