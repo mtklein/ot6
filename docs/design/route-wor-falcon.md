@@ -2358,6 +2358,65 @@ of four (every phase the fight can draw), stopping at the first counting
 rung, and logs the map it saw: 7 of 7 shifts pass under the head, the
 refund arm and main's driver alike, in at most 3 rungs (r5/bd_*).
 
+The last round (670a9f21) closed three gaps the re-review found:
+
+- the Muddle rule's floor is the hitter's floor plus the target's round
+  (`H.muddleFloors`): the hit waits in the queue behind the round, so it
+  is held unless hp - round stays above the floor.  The Gate's shift 5
+  had queued LOCKE's hit on SABIN at 275/902 over a floor of 114, under a
+  413 round, and it ran at 27;
+- `H.inFlightHolds` holds the others off only for a queued heal whose
+  restore is known and lifts the target clear of the round; a party cure
+  or a first cast not yet measured holds nobody;
+- `H.raiseDecision` judges "survives alone" against the round the lift
+  rule prices as well as the smallest hit, and with nothing measured the
+  raise stands but owes its top-up.  The chain's sabin_done had raised
+  SABIN to 45/363 on "survives the smallest hit, 34" under a 91 round and
+  on "no enemy hit measured yet", both "judged to survive alone", and he
+  died from 45 and from 10.
+
+On the wide sample the round changed nothing: Dullahan B 154 fights, 11
+deaths, 9 Fenix Downs, and the Gate 28/28 with 5 deaths, the same fights
+as 892e274f's code with no discordant fight either place
+(`wide/stats_final_*.txt`).  Against main at Dullahan B the head had 4
+fights worse and 9 better (p = 0.27): no difference shown either way.
+
+The chain's sabin_done had moved from main's 1 death and no Fenix Down to
+3 and 3 (892e274f, `chain11/main_vs_head.txt`).  It is the draw.  Main's
+and the head's chains enter the leg on the same gau_joined (the same
+bytes: it is cut from the falls-done checkpoint, `trench/entry_sha.txt`),
+and the chain plays boot shift 0.  Both arms played the whole leg from
+that entry under boot shifts 0..62 step 2 (30 distinct first battles,
+over 100 distinct battle keys an arm, `trench/stats.txt`):
+
+| | main | head |
+|---|---|---|
+| runs passed | 32/32 | 32/32 |
+| deaths (Aspik's Giga Volt) | 30 (14) | 30 (14) |
+| Fenix Downs landed | 26 | 26 |
+| runs with a death | 17 | 17 |
+| head minus main, by first battle: more deaths / fewer / as many | | 6 / 6 / 18 |
+
+Shift 0 is one of the head's six worse draws (main 1 death, head 3).
+Under 670a9f21 the leg plays the same as under 892e274f at shift 0
+(`PASS (frame 32726)`, 3 deaths): the raises there now owe their top-up,
+and SABIN still falls at 45 with the Potion queued.  About half the
+leg's deaths in both arms are Giga Volt one-shots on SABIN from 200 HP or
+more, each after his auto-targeted Pummel (Blitz $5D) into an Aspik
+formation (the retaliation the dive's kill order is written around); no
+in-battle care reaches those.
+
+The chain at 670a9f21 failed battle_healerdown: the Magitek riders have no
+Fight row, so under the finisher window (monsters at 80 HP <= 200) the
+care block stayed shut and they passed 35 and 36 turns with the healer
+dead; care opened only with entity 1 at 13/68, when a raise to 7 under a
+16 round no longer survives it.  The window now holds only an actor with
+a Fight row, and the raise comes on the riders' first turn: 0/16 boot
+shifts passed before, 16/16 after (`healerdown/`).  The chain regenerated
+from nothing with it passes with no failed edge, and no leg moved from
+670a9f21's chain; against main it is 6 deaths and 1 Fenix Down to 8 and
+4, all of it sabin_done's shift-0 draw above (`chain15/main_vs_head.txt`).
+
 ## 14. What the owner may want to decide
 
 - **The draft rows** (section 8): decided, approved as written (owner,
