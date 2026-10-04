@@ -44,7 +44,8 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 local CELES, SABIN, EDGAR, SETZER = 6, 5, 4, 9
 local TONIC, POTION, FENIX, REMEDY, SOFT = 0xE8, 0xE9, 0xF0, 0xF5, 0xF4
-local REVIVIFY, TENT, XPOTION, ELIXIR = 0xF1, 0xF7, 0xEA, 0xEC
+-- (the bag line said "elixir" of $EC, which is the Ether; Elixir is $EE)
+local REVIVIFY, TENT, XPOTION, ETHER, ELIXIR = 0xF1, 0xF7, 0xEA, 0xEC, 0xEE
 local MAP_B2, MAP_B3, MAP_FLASH = 299, 300, 301
 local SAVE_POINT = { 122, 14 }
 local BIT_MONSTER = 0x0A1
@@ -80,8 +81,9 @@ local function kit(ch)
 end
 local MEMBERS = { { CELES, "CELES" }, { SABIN, "SABIN" }, { EDGAR, "EDGAR" }, { SETZER, "SETZER" } }
 local function supplies()
-  return string.format("tonic=%d potion=%d xpotion=%d elixir=%d fenix=%d remedy=%d soft=%d revivify=%d tent=%d gil=%d",
-    H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(XPOTION), H.invCountOf(ELIXIR), H.invCountOf(FENIX),
+  return string.format("tonic=%d potion=%d xpotion=%d ether=%d elixir=%d fenix=%d remedy=%d soft=%d revivify=%d tent=%d gil=%d",
+    H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(XPOTION), H.invCountOf(ETHER), H.invCountOf(ELIXIR),
+    H.invCountOf(FENIX),
     H.invCountOf(REMEDY), H.invCountOf(SOFT), H.invCountOf(REVIVIFY), H.invCountOf(TENT), H.gil())
 end
 local function member(ch, name)

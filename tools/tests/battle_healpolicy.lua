@@ -59,6 +59,14 @@
 --  15. the kit's MP in a random battle (H.kitBudget): a quarter of max MP
 --      kept for the next boss and a turn's boost rationed to a quarter,
 --      on SABIN's Phantom Train numbers; an event battle spends as before.
+--  17. which item a care turn spends (#370, H.itemChoice): the bag's
+--      prices read off the ROM (a sold item's price word, an unsold one's
+--      effect at the shops' gil per HP and MP), the cheapest item the lift
+--      rule takes -- no item no shop sells on a top-up (wor_falcon's SABIN
+--      at 905/1812 under 846), an X-Potion or an Elixir when it lifts a
+--      member inside the round, the last few priced dearer -- the
+--      Megalixir's party lift, the status cures in gil order, a heal in
+--      flight, and the round's care turn kept after a confirm.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TONIC, POTION = 0xE8, 0xE9
@@ -379,8 +387,27 @@ H.run({ maxFrames = 3000 }, {
       "463 clears a 400 round: the raise stands and owes its top-up (" .. why .. ")")
     raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 1710, power = 2, smallestHit = 150,
                                                 topUpFirst = true, topUp = 250, roundCost = 1083 })
+    H.assertEq(tostring(ok) .. "/" .. tostring(needs), "false/nil",
+      "213 survives the 150 hit but not the 1083 round, and 463 does not clear it: refused -- surviving "
+      .. "alone is judged against the round (" .. why .. ")")
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 1710, power = 2, smallestHit = 150, roundCost = 200 })
     H.assertEq(tostring(ok) .. "/" .. tostring(needs), "true/nil",
-      "213 survives the 150 hit alone: raised, and no top-up is owed (" .. why .. ")")
+      "213 over both the 150 hit and a 200 round survives alone: raised, no top-up owed (" .. why .. ")")
+    -- sabin_done at 892e274f (last round of the care-items review): SABIN
+    -- (363) raised to 45 "survives the smallest hit, 34" under a 91 round,
+    -- and to 45 on "no enemy hit measured yet", both "judged to survive
+    -- alone"; both died before a top-up
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 363, power = 2, smallestHit = 34, roundCost = 91,
+                                                topUpFirst = true, topUp = 250 })
+    H.assertEq(tostring(raiseHp) .. "/" .. tostring(ok) .. "/" .. tostring(needs), "45/true/true",
+      "45 over the 34 hit but inside the 91 round: raised on its top-up, which is owed (" .. why .. ")")
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 363, power = 2, smallestHit = 34, roundCost = 91,
+                                                topUpFirst = false, topUp = 250 })
+    H.assertEq(tostring(ok), "false",
+      "...and with the enemy first and no kill in reach, not raised to die again (" .. why .. ")")
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 363, power = 2, smallestHit = nil })
+    H.assertEq(tostring(ok) .. "/" .. tostring(needs), "true/true",
+      "nothing measured: the raise stands, and its top-up is owed -- not judged to survive alone (" .. why .. ")")
     -- the ATB read behind topUpFirst: $3218,x is the 16-bit gauge the
     -- engine adds $3ac8,x to every tick and reads as full when its high
     -- byte is 0 (battle_main.asm `lda $3219,x / beq` "branch if atb
@@ -627,6 +654,68 @@ H.run({ maxFrames = 3000 }, {
       refused = { { what = "item $E9", restore = 250 } } })
     H.assertEq(v == "spend" and why:find("item $E9 +250 = 384, not lifting clear of the round", 1, true) ~= nil, true,
       "the refused Potion is named in the spend line (" .. why .. ")")
+    -- and the spend line names why nothing saves (review of care-items
+    -- cae71db9: "(nothing to heal with)" while the budget had closed care)
+    H.assertEq(why:find("(the lift rule: item $E9", 1, true) ~= nil, true,
+      "a heal the lift rule refused: the lift rule is the reason (" .. why .. ")")
+    v, why = H.spendDecision({ hp = 447, maxhp = 447, roundCost = 447, bp = 3, heals = {} })
+    H.assertEq(why:find("(the bag holds no heal)", 1, true) ~= nil, true,
+      "an empty bag is said as one (" .. why .. ")")
+    v, why = H.spendDecision({ hp = 144, maxhp = 820, roundCost = 286, bp = 1, heals = {},
+      why = "the round's care turn went to actor 3",
+      refused = { { what = "item $EA", restore = 676, note = "it would lift, but not this turn" } } })
+    H.assertEq(v == "spend" and why:find("(the round's care turn went to actor 3: item $EA +676 = 820, "
+      .. "it would lift, but not this turn)", 1, true) ~= nil, true,
+      "the Gate's s5 LOCKE: the budget is the reason, and the X-Potion that would lift is named (" .. why .. ")")
+    -- a heal in flight holds the others off its target only when it lifts
+    -- them, or they are outside their round (re-review of cae71db9: SETZER at
+    -- 25/902 under 413 on a queued Potion, an Elixir in the bag)
+    H.assertEq(H.inFlightHolds({ restore = 250 }, 25, 413), false,
+      "a queued Potion that leaves him at 275 under 413 does not hold the Elixir off")
+    H.assertEq(H.inFlightHolds({ restore = 250 }, 231, 413), true,
+      "...one that lifts him (231 + 250 = 481) does")
+    H.assertEq(H.inFlightHolds({ restore = 250 }, 600, 413), true,
+      "...and outside the round the guard holds a known heal")
+    H.assertEq(H.inFlightHolds({}, 25, 413), false,
+      "a queued heal of unknown size holds nobody off (last round of the review)")
+    H.assertEq(H.inFlightHolds({}, 600, 413), false, "...outside the round either")
+    -- a refused heal that would lift is not called "not lifting" (8ec3c0f1's
+    -- Gate shift 5: EDGAR alone at 344/821 under 550, "item $EE +477 = 821,
+    -- not lifting clear of the round" -- the solo clause had refused it)
+    v, why = H.spendDecision({ hp = 344, maxhp = 821, roundCost = 550, bp = 3, heals = {},
+      refused = { { what = "item $EE", restore = 477 } } })
+    H.assertEq(why:find("item $EE +477 = 821, it would lift, but the heal policy refused it", 1, true) ~= nil, true,
+      "a refused heal that lifts is said as refused, not as too small (" .. why .. ")")
+    -- a queued cure-hit is part of its target's round (#320's gap, the
+    -- Gate's shift 5 at 8ec3c0f1: LOCKE's hit planned on SABIN at 275/902,
+    -- floor 114, landed on him at 27 after monsters took the rest)
+    H.assertEq(H.roundWithQueuedHits(413, { 114 }), 527,
+      "SABIN's 413 round from the monsters and LOCKE's queued hit (at most 114): 527")
+    H.assertEq(H.liftReopens({ hp = 27, cost = H.roundWithQueuedHits(413, { 114 }), restores = { 250, 875 } }), true,
+      "...so at 27 HP he is inside it and an Elixir lifts him before the hit lands")
+    H.assertEq(H.roundWithQueuedHits(413, {}), 413, "no hit queued: the monsters' round alone")
+    -- the floor after the round, as makePlan wires it (H.muddleFloors into
+    -- H.muddleRule): LOCKE's floor on SABIN 114, SABIN's round 413
+    local fl = H.muddleFloors({ actor = 1, maxhp = { [0] = 0, [1] = 820, [2] = 821, [3] = 902 },
+      floorOf = function(e) return e == 3 and 114 or 50 end,
+      round = function(e) return e == 3 and 413 or 0 end })
+    H.assertEq(fl[3], 527, "the floor makePlan hands the Muddle rule is the hit's 114 plus SABIN's 413 round")
+    local r, held = H.muddleRule({ actor = 1, status2 = { [0] = 0, [1] = 0, [2] = 0, [3] = 0x20 },
+      hp = { [0] = 0, [1] = 144, [2] = 821, [3] = 275 }, maxhp = { [0] = 0, [1] = 820, [2] = 821, [3] = 902 },
+      floor = fl })
+    H.assertEq(tostring(r) .. "/" .. tostring(held), "nil/3",
+      "the Gate's shift 5: SABIN at 275 is held -- 275 - 413 does not stay over 114")
+    r, held = H.muddleRule({ actor = 1, status2 = { [0] = 0, [1] = 0, [2] = 0, [3] = 0x20 },
+      hp = { [0] = 0, [1] = 144, [2] = 821, [3] = 600 }, maxhp = { [0] = 0, [1] = 820, [2] = 821, [3] = 902 },
+      floor = fl })
+    H.assertEq(tostring(r), "3", "...at 600 (600 - 413 = 187 over 114) the cure-hit goes")
+    -- the budget reopens for a lift (review of care-items cae71db9)
+    H.assertEq(H.liftReopens({ hp = 144, cost = 286, restores = { 250, 676 } }), true,
+      "LOCKE at 144/820 inside a 286 round, an X-Potion's 676 in hand: the budget reopens")
+    H.assertEq(H.liftReopens({ hp = 30, cost = 286, restores = { 250 } }), false,
+      "...not for a heal that leaves him inside the round (30 + 250 = 280)")
+    H.assertEq(H.liftReopens({ hp = 400, cost = 286, restores = { 676 } }), false,
+      "...nor for a member outside the round: that is a top-up, the budget's to keep")
     -- the wipe class
     local d = function(tick, from, maxhp, bp, one)
       return { tick = tick, from = from, maxhp = maxhp, bp = bp, oneAction = one }
@@ -1125,6 +1214,114 @@ H.run({ maxFrames = 3000 }, {
       ((254 * 204) >> 8) + 1, "...through 51 magic defense when it does not")
     H.assertEq(H.cureRestoreMin({ power = 10, heal = false, level = 20, magpow = 40 }), nil, "no heal flag: no price")
     H.log("battle_healpolicy: the hit ledger, the heal watch, the queued cure-hit and the cure price checked")
+  end),
+
+  -- 17. which item a care turn spends (#370).  The prices are the ROM's:
+  -- ItemProp +$1C for what a shop sells (ShopProp), and for what none sells
+  -- (the price word reads 2) the effect at the shops' least gil per HP
+  -- (Tonic 50 for 50) and per MP (Tincture 1500 for 50).
+  H.call(function()
+    local XPOT, ELIXIR, MEGALIXIR, MAGICITE = 0xEA, 0xEE, 0xEF, 0xF9
+    H.assertEq(H.itemSold(POTION), true, "a shop sells the Potion")
+    H.assertEq(H.itemSold(XPOT), false, "no shop sells the X-Potion")
+    H.assertEq(H.itemSold(ELIXIR), false, "...nor the Elixir")
+    H.assertEq(H.itemGil(POTION), 300, "the Potion costs its price word, 300")
+    local r = H.shopRates()
+    H.assertEq(r.hp, 1, "the shops' least gil per HP: the Tonic's 50 for 50")
+    H.assertEq(r.mp, 30, "...and per MP: the Tincture's 1500 for 50")
+    -- the scarcity of what no shop sells (review of a8df0a6f): 1 + legs to
+    -- the next source / the count held, the horizon 10 legs with none known
+    local function f4(x) return string.format("%.4f", x) end
+    H.assertEq(f4(H.scarcity(7)), f4(1 + 10 / 7), "seven held, no source known: 1 + 10/7")
+    H.assertEq(f4(H.scarcity(1)), f4(11), "the last one counts for more: 1 + 10/1")
+    H.assertEq(f4(H.scarcity(7, 1)), f4(1 + 1 / 7), "a source on the next leg leaves little premium")
+    local sabin = { hp = 905, maxhp = 1812, mp = 274, maxmp = 318 }
+    H.assertEq(H.itemGil(XPOT, sabin, nil, 7), math.floor(1812 * (1 + 10 / 7) + 0.5),
+      "an X-Potion on SABIN, seven in the bag: 1812 HP at 1 gil, times the scarcity")
+    H.assertEq(H.itemGil(XPOT, sabin, nil, 1) > H.itemGil(XPOT, sabin, nil, 7), true,
+      "...and the last one is dearer than one of seven")
+    H.assertEq(H.itemGil(ELIXIR, sabin, nil, 7), math.floor((1812 + 318 * 30) * (1 + 10 / 7) + 0.5),
+      "an Elixir on him: 1812 HP + 318 MP x 30, times the scarcity")
+    local party = { sabin, { hp = 1798, maxhp = 1798, mp = 330, maxmp = 330 } }
+    H.assertEq(H.itemGil(MEGALIXIR, sabin, party, 1),
+      math.floor(((1812 + 318 * 30) + (1798 + 330 * 30)) * 11 + 0.5),
+      "a Megalixir: the Elixir's worth on every member it reaches, the only one held")
+    H.assertEq(H.itemGil(MAGICITE) >= 1000000000, true,
+      "an unsold item with no HP or MP to price it by is priceless, never 0 (Magicite $F9)")
+    H.assertEq(H.deathGil(1812), 500 + (1812 - 226), "SABIN's death: the Fenix Down's 500 and 1586 HP to buy back")
+    local function bag(list)
+      local t = {}
+      for _, it in ipairs(list) do
+        local id, restore = it[1], it[2]
+        t[#t + 1] = { id = id, restore = restore, flat = (H.itemProps(id) & H.ITEM_RATIO) == 0,
+                      unsold = not H.itemSold(id), gil = H.itemGil(id, sabin, party, 7) }
+      end
+      return t
+    end
+    local function choose(hp, cost, list, raw)
+      local it, why, refused = H.itemChoice({ hp = hp, maxhp = 1812, roundCost = cost, allies = 3, threshold = 60,
+        cap = H.deathGil(1812), items = raw or bag(list) })
+      return it and string.format("$%02X %s", it.id, why) or "nothing", refused
+    end
+    -- wor_falcon r15: "actor=1 not healing entity 1 (905/1812): $E9 restores
+    -- 250 and a round costs 846", 7 X-Potions in the bag, then "[death] f+4481
+    -- entity 1 char 5 from 591/1812".  At 905 under 846 he is outside the
+    -- round: an X-Potion there is a top-up, and no shop sells it
+    local got, refused = choose(905, 846, { { POTION, 250 }, { XPOT, 907 }, { ELIXIR, 907 } })
+    H.assertEq(got, "nothing", "SABIN at 905/1812 under an 846 round: no X-Potion on a top-up (none is sold)")
+    H.assertEq(refused[2] and refused[2].why, "no shop sells it: kept for a member inside the round",
+      "...the X-Potion is refused as irreplaceable, not as too weak")
+    H.assertEq(choose(591, 846, { { POTION, 250 }, { XPOT, 1221 }, { ELIXIR, 1221 } }), "$EA top-up",
+      "inside the round (591 under 846) the X-Potion that lifts him is spent")
+    H.assertEq(choose(591, 846, { { POTION, 250 }, { ELIXIR, 1221 } }), "$EE top-up",
+      "...and the Elixir when no X-Potion is held")
+    H.assertEq(choose(600, 200, { { POTION, 250 }, { XPOT, 1212 } }), "$E9 top-up",
+      "a Potion that does the job is the cheaper turn")
+    H.assertEq(choose(1700, 846, { { POTION, 250 }, { XPOT, 112 }, { ELIXIR, 112 } }), "nothing",
+      "chip damage (1700/1812, outside the round): nothing is spent")
+    H.assertEq(choose(905, 846, nil, { { id = POTION, restore = 1000, flat = true, gil = 3000 } }), "nothing",
+      "a sold heal dearer than the death (3000 against 2086) is no top-up either")
+    H.assertEq(choose(100, 120, { { TONIC, 50 }, { POTION, 250 } }), "$E9 top-up",
+      "a Tonic is not offered while a Potion is held (a turn buys a real heal)")
+    H.assertEq(choose(100, 120, { { TONIC, 50 } }), "$E8 covering an ally",
+      "...and is the last item standing")
+    local it = H.itemChoice({ hp = 226, maxhp = 1812, roundCost = 1083, allies = 3, threshold = 60, owed = true,
+      items = bag({ { POTION, 250 }, { XPOT, 1586 } }) })
+    H.assertEq(it and it.id, XPOT, "a raise's owed top-up inside a 1083 round: the X-Potion that lifts, not the Potion")
+    it = H.itemChoice({ hp = 900, maxhp = 1812, roundCost = 500, allies = 3, threshold = 60, owed = true,
+      items = bag({ { POTION, 250 }, { XPOT, 912 } }) })
+    H.assertEq(it and it.id, POTION, "...and outside the round the Potion: the X-Potion stays in the bag")
+    -- the Megalixir: every member inside the round lifted, or no party turn
+    H.assertEq(H.itemAllAllies(MEGALIXIR), true, "the Megalixir's targeting has no moveable cursor: the whole party")
+    H.assertEq(H.itemAllAllies(XPOT), false, "...the X-Potion's does")
+    H.assertEq(H.partyLift(MEGALIXIR, { { hp = 300, maxhp = 1812, cost = 846 }, { hp = 200, maxhp = 1798, cost = 900 } }),
+      true, "two members inside their rounds, both lifted by a Megalixir")
+    H.assertEq(H.partyLift(MEGALIXIR, { { hp = 300, maxhp = 1812, cost = 846 }, { hp = 200, maxhp = 800, cost = 900 } }),
+      false, "...not when one's round is above its max HP")
+    -- the status cures in gil order, off the ROM's records
+    H.assertEq(table.concat(H.cureItems(1, 0x20), ","), string.format("%d,%d", 0xF8, 0xF5),
+      "Imp: Green Cherry (150) before Remedy (1000)")
+    H.assertEq(table.concat(H.cureItems(1, 0x40), ","), string.format("%d,%d", 0xF4, 0xF5),
+      "Petrify: Soft (200) before Remedy")
+    H.assertEq(table.concat(H.cureItems(1, 0x02), ","), string.format("%d", 0xF1), "Zombie: Revivify alone")
+    -- a confirmed heal is in flight until its target's HP rises: wor_falcon
+    -- at the head gave EDGAR at 86/1701 a second X-Potion planned on the
+    -- HP the first was about to fill
+    local q = { hp = 86, tick = 100 }
+    H.assertEq(H.healInFlight(q, 86, 110), nil, "a heal confirmed at 86 HP is in flight while the HP stands")
+    H.assertEq(H.healInFlight(q, 90, 130), "landed", "...and has landed when the HP rises")
+    -- arm B k0_s0_w25: CELES's X-Potion confirmed on SABIN at 1208, a Pearl
+    -- took him to 143 first, and the guard held every other heal
+    H.assertEq(H.healInFlight({ hp = 1208, tick = 5588 }, 143, 5700), "hit",
+      "a hit before the heal lands releases the others to plan on what they see")
+    H.assertEq(H.healInFlight({ hp = 86, tick = 100 }, 0, 110), "fell", "a target that falls ends it")
+    H.assertEq(H.healInFlight({ hp = 86, tick = 100 }, 86, 100 + 240 + 601), "lapsed",
+      "no rise inside RAISE_WAIT + 600 ticks: it lapses")
+    -- the round's care turn: a confirmed plan keeps it (review of a8df0a6f:
+    -- dropPlan("confirm_attempt") refunded it from 11a8f6e3 on)
+    H.assertEq(H.careRefund("confirm_attempt"), false, "a confirmed care turn is not refunded")
+    H.assertEq(H.careRefund("back_out"), true, "...a plan backed out of before its confirm is")
+    H.log("battle_healpolicy: the bag's prices and the item a care turn spends (#370) checked")
   end),
 
   -- 8. the table was not skipped

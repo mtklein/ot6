@@ -2274,6 +2274,149 @@ this kit), 10 and 0 (this driver and kit).  The gain is in Potions; the
 deaths are one or two a sweep either way.  The two kits' snapshots draw
 disjoint keys, so the relics' own effect is not separated from the draw.
 
+### 13.15 The bag in battle (wt/care-items, #370)
+
+The care lines offered only the Potion (else the Tonic).  After 13.14 the
+chain's Dullahan left SABIN at 905/1812 under an 846 round with seven
+X-Potions in the bag (`$E9 restores 250 and a round costs 846 ... acting
+instead`) and he died from 591.  (The bag line called the Ether `$EC`
+"elixir"; the party holds 5 Ethers and 7 Elixirs `$EE` there.)  Now:
+
+- every battle-usable HP item is weighed by the lift rule and the cheapest
+  in gil that the rule takes is spent (`H.itemChoice`).  Prices are the
+  ROM's: a sold item's price word (ShopProp lists what shops sell), an
+  unsold one's effect at the shops' least gil per HP and MP (the Tonic's
+  1, the Tincture's 30) times a scarcity term, 1 + legs to the next source
+  / the count held (`H.scarcity`; the next source is the generator's
+  `opts.nextSource`, else a 10-leg horizon), so the last few count for
+  more.  An unsold item with no HP or MP to price it by is priceless, not
+  free;
+- an item no shop sells (X-Potion, Elixir, Megalixir) is spent only on a
+  member inside the round, never on a top-up; `opts.reserve` still keeps
+  the last n of anything.  A sold item dearer than the death it guards
+  against (`H.deathGil`) is no top-up either.  A Megalixir is a party turn
+  when two or more members are inside their rounds and it lifts each (no
+  bag on the route holds one, so that menu path is unmeasured in play);
+- the status cures take the same gil order (`H.cureItems`);
+- a confirmed heal holds the others off its target until the HP rises or
+  a hit lands first (`H.healInFlight`);
+- the round's one care turn is kept after the confirm (`H.careRefund`):
+  from 11a8f6e3 the confirm's own `dropPlan("confirm_attempt")` refunded
+  it, so the rule bound only while a plan was being steered.  It holds for
+  top-ups and reopens for a lift (`H.liftReopens`): a member inside their
+  round with a heal in hand that lifts them clear, the way an owed top-up
+  reopens it for a raise.  The Gate's shift 5 had wiped with LOCKE at
+  144/820 under a 286 round and an X-Potion in the bag, the turn gone to a
+  top-up;
+- a queued heal holds the others off its target only when it lifts them
+  clear of the round, or they stand outside it (`H.inFlightHolds`): a
+  Potion queued on SETZER at 25/902 under 413 held an Elixir off;
+- the SPEND line names why no heal saves: the round's care turn gone to
+  another, the heal policy, or an empty bag.
+
+A queued cure-hit is part of its target's round (`H.roundWithQueuedHits`,
+#320's floor gap): the floor is read when the hit is planned, and the hit
+waits in the queue -- the Gate's shift 5 lost SABIN to LOCKE's hit planned
+at 275/902 (floor 114) and run at 27, after the Muddle had cleared on its
+own.  With the hit priced in, the care lines planned an Elixir on him at
+182; on that draw it was queued behind the same monsters and he still fell.
+
+Measured on a wide sample, by distinct fight (snapshot + battle key, the
+first run of each), Zombie touches apart: Dullahan arm B from the grave
+cut for K = 0..10 by main's generator, 18 waits each (198 runs, 154
+distinct fights an arm), and the Gate from 28 boot shifts (0..54 step 2).
+Four arms: main 5883ecb9, cae71db9, cae71db9 with the old care refund,
+and the head (892e274f: the lift reopen, the in-flight cap, the queued
+cure-hit).  Intervals are 95% (normal on the per-fight counts; Wilson for
+proportions); the paired column is the head against each arm on the same
+fights, with McNemar's exact p on the discordant ones
+(`build/attempts/wt/care-items/wide/stats_*.txt`):
+
+| | main | cae71db9 | refund | head |
+|---|---|---|---|---|
+| Dullahan B: deaths (a fight) | 16 (0.104, 0.056-0.152) | 7 (0.045, 0.012-0.078) | 14 (0.091, 0.045-0.136) | 11 (0.071, 0.031-0.112) |
+| ... Fenix Downs | 9 | 7 | 8 | 9 |
+| ... head minus arm, discordant worse/better, p | 4/9, 0.27 | 4/0, 0.125 | 0/3, 0.25 | -- |
+| ... Potions, X-Potions | 101, 0 | 38, 51 | 62, 78 | 55, 88 |
+| Gate: runs passed (Wilson) | 27/28 (0.82-0.99) | 27/28 | 28/28 (0.88-1.00) | 28/28 |
+| ... deaths (fights 104-108) | 9 | 9 | 5 | 5 |
+
+Every arm that weighs the bag beats main at Dullahan B in the point
+estimate; cae71db9 does so outside the noise (13 fights better, 4 worse,
+p = 0.049).  No arm beats the head outside the noise: cae71db9 has 4
+fewer Dullahan deaths (4 discordant fights, all the head's, p = 0.125),
+the head 4 fewer Gate deaths.  No X-Potion is planned outside the round in
+any arm (the head: 125 inside, 0 outside at Dullahan B; 7 and 0 at the
+Gate), and no cure-hit killed anyone in these 904 runs.
+
+battle_brokendeath's ladder was four rungs ten phases apart, a budget read
+off a map of counting phases measured with one driver; under the head's
+driver with the refund the old suite failed shift 0 (`rungs ...:
+1:0w/0sk 2:0w/0sk 3:0w/0sk 4:1w/0s`) and needed its last rung at shift 20.
+It now visits rung 1 and one target in each of the period's fifteen runs
+of four (every phase the fight can draw), stopping at the first counting
+rung, and logs the map it saw: 7 of 7 shifts pass under the head, the
+refund arm and main's driver alike, in at most 3 rungs (r5/bd_*).
+
+The last round (670a9f21) closed three gaps the re-review found:
+
+- the Muddle rule's floor is the hitter's floor plus the target's round
+  (`H.muddleFloors`): the hit waits in the queue behind the round, so it
+  is held unless hp - round stays above the floor.  The Gate's shift 5
+  had queued LOCKE's hit on SABIN at 275/902 over a floor of 114, under a
+  413 round, and it ran at 27;
+- `H.inFlightHolds` holds the others off only for a queued heal whose
+  restore is known and lifts the target clear of the round; a party cure
+  or a first cast not yet measured holds nobody;
+- `H.raiseDecision` judges "survives alone" against the round the lift
+  rule prices as well as the smallest hit, and with nothing measured the
+  raise stands but owes its top-up.  The chain's sabin_done had raised
+  SABIN to 45/363 on "survives the smallest hit, 34" under a 91 round and
+  on "no enemy hit measured yet", both "judged to survive alone", and he
+  died from 45 and from 10.
+
+On the wide sample the round changed nothing: Dullahan B 154 fights, 11
+deaths, 9 Fenix Downs, and the Gate 28/28 with 5 deaths, the same fights
+as 892e274f's code with no discordant fight either place
+(`wide/stats_final_*.txt`).  Against main at Dullahan B the head had 4
+fights worse and 9 better (p = 0.27): no difference shown either way.
+
+The chain's sabin_done had moved from main's 1 death and no Fenix Down to
+3 and 3 (892e274f, `chain11/main_vs_head.txt`).  It is the draw.  Main's
+and the head's chains enter the leg on the same gau_joined (the same
+bytes: it is cut from the falls-done checkpoint, `trench/entry_sha.txt`),
+and the chain plays boot shift 0.  Both arms played the whole leg from
+that entry under boot shifts 0..62 step 2 (30 distinct first battles,
+over 100 distinct battle keys an arm, `trench/stats.txt`):
+
+| | main | head |
+|---|---|---|
+| runs passed | 32/32 | 32/32 |
+| deaths (Aspik's Giga Volt) | 30 (14) | 30 (14) |
+| Fenix Downs landed | 26 | 26 |
+| runs with a death | 17 | 17 |
+| head minus main, by first battle: more deaths / fewer / as many | | 6 / 6 / 18 |
+
+Shift 0 is one of the head's six worse draws (main 1 death, head 3).
+Under 670a9f21 the leg plays the same as under 892e274f at shift 0
+(`PASS (frame 32726)`, 3 deaths): the raises there now owe their top-up,
+and SABIN still falls at 45 with the Potion queued.  About half the
+leg's deaths in both arms are Giga Volt one-shots on SABIN from 200 HP or
+more, each after his auto-targeted Pummel (Blitz $5D) into an Aspik
+formation (the retaliation the dive's kill order is written around); no
+in-battle care reaches those.
+
+The chain at 670a9f21 failed battle_healerdown: the Magitek riders have no
+Fight row, so under the finisher window (monsters at 80 HP <= 200) the
+care block stayed shut and they passed 35 and 36 turns with the healer
+dead; care opened only with entity 1 at 13/68, when a raise to 7 under a
+16 round no longer survives it.  The window now holds only an actor with
+a Fight row, and the raise comes on the riders' first turn: 0/16 boot
+shifts passed before, 16/16 after (`healerdown/`).  The chain regenerated
+from nothing with it passes with no failed edge, and no leg moved from
+670a9f21's chain; against main it is 6 deaths and 1 Fenix Down to 8 and
+4, all of it sabin_done's shift-0 draw above (`chain15/main_vs_head.txt`).
+
 ## 14. What the owner may want to decide
 
 - **The draft rows** (section 8): decided, approved as written (owner,

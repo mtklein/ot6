@@ -697,6 +697,27 @@ M.ST2_MUDDLE = 0x20                   -- STATUS2::CONFUSE, $3ee5 + entity*2
 --   inFlight optional, entity -> true when another member's cure-hit on
 --            it is confirmed and has not run (#348): one hit per muddled
 --            ally in flight, the way a raise is (#341)
+-- The unmuddle floors makePlan hands M.muddleRule (#320, last round of
+-- the care-items review): the hitter's floor on each ally (the most its
+-- Fight can take, Driver:unmuddleFloor) plus the ally's round, since the
+-- hit waits in the queue behind the round -- the Gate's shift 5 queued
+-- LOCKE's hit on SABIN at 275/902 over a floor of 114, under a 413 round,
+-- and it ran at 27.  So the hit is held unless hp - round > floor.
+--   actor     the hitter
+--   maxhp     entity -> max HP (0 for an empty slot)
+--   floorOf   function(e) -> the hitter's floor on e
+--   round     function(e) -> e's round (0 when none is priced)
+function M.muddleFloors(o)
+  local fl = {}
+  for e = 0, 3 do
+    if e ~= o.actor and (o.maxhp[e] or 0) > 0 then
+      local f = o.floorOf(e)
+      if f ~= nil then fl[e] = f + math.max(0, o.round(e) or 0) end
+    end
+  end
+  return fl
+end
+
 function M.muddleRule(o)
   local st, hp, maxhp, floor = o.status2 or {}, o.hp or {}, o.maxhp or {}, o.floor or {}
   local inFlight = o.inFlight or {}
@@ -808,13 +829,259 @@ M.REVIVIFY = 0xF1
 -- bit 6) drain on the dot trigger, Slow (STATUS3 bit 2) halves the ATB
 -- constant.  None denies a turn; the [status] line says each.
 M.ST1_BLIND, M.ST1_POISON, M.ST2_SAP, M.ST3_SLOW = 0x01, 0x04, 0x40, 0x04
+-- With no `items`, the candidates are every consumable usable in battle
+-- whose record carries the bit with the remove flag, cheapest first in
+-- gil (M.cureItems, #370): Green Cherry 150 before Remedy 1000 for Imp,
+-- Soft 200 before Remedy for Petrify, read off the ROM rather than listed.
 function M.statusCure(o)
-  for _, item in ipairs(o.items or { M.GREEN_CHERRY, M.REMEDY }) do
+  for _, item in ipairs(o.items or M.cureItems(o.byte, o.bit)) do
     local rec
     if o.byte == 2 then rec = M.itemStatus2(item) else rec = M.itemStatus1(item) end
     if (rec & o.bit) ~= 0 and o.has(item) then return item end
   end
   return nil
+end
+
+-- What the bag's items are worth in gil (#370: "spend like a person
+-- watching their gil" -- guidelines).  Everything here is read off the
+-- ROM: the item record's type (+$00: bits 0-2 the type, 6 = item; bit 5
+-- "usable in battle", LoadItemProp @54dc), targeting (+$0E), properties
+-- (+$13: bit 7 the power is a fraction of max HP/MP, bit 5 removes status,
+-- bit 4 restores MP, bit 3 restores HP -- @2a87), power (+$14) and price
+-- (+$1C, the word CalcShopPrice reads), and which items any shop sells
+-- (ShopProp: 128 records of 9 bytes, bytes 1-8 item ids, $FF empty).
+--
+-- A sold item costs its price.  An item no shop sells (X-Potion, Ether,
+-- Elixir, Megalixir: their price word reads 2) is worth what its effect
+-- would cost from the shops: the HP it gives at the least gil a sold item
+-- charges per HP (Tonic 50/50, Dried Meat 150/150: 1 gil an HP; Potion
+-- 300/250), the MP at the least per MP (Tincture 1500/50: 30), on each
+-- member it reaches.  An X-Potion on SABIN at 1812 max HP is then 1812
+-- gil, an Elixir on him 1812 + 318 MP x 30 = 11352, a Megalixir that sum
+-- over the party.
+M.ITEM_RATIO, M.ITEM_CURES, M.ITEM_MP, M.ITEM_HP = 0x80, 0x20, 0x10, 0x08
+local ITEM_TARGET, ITEM_PROPS, ITEM_PRICE = 0x0E, 0x13, 0x1C
+local function itemRec(item) return (M.sym("ItemProp") & 0x3FFFFF) + item * ITEM_REC end
+function M.itemTargeting(item) return M.readRomByte(itemRec(item) + ITEM_TARGET) end
+function M.itemProps(item) return M.readRomByte(itemRec(item) + ITEM_PROPS) end
+function M.itemPrice(item) return M.readRomWord(itemRec(item) + ITEM_PRICE) end
+-- a consumable (type 6) the battle's Item menu offers (type bit 5)
+function M.itemBattleUsable(item)
+  if item == nil or item > 0xFE then return false end
+  local t = M.readRomByte(itemRec(item) + ITEM_TYPE)
+  return (t & 0x80) == 0 and (t & 0x07) == 6 and (t & 0x20) ~= 0
+end
+-- the targeting byte's bit 0 is the moveable cursor: an item without it
+-- (Megalixir $2E) is aimed at the whole party by the engine
+function M.itemAllAllies(item) return (M.itemTargeting(item) & 0x01) == 0 end
+local soldCache = nil
+function M.itemSold(item)
+  if soldCache == nil then
+    soldCache = {}
+    local base = M.sym("ShopProp") & 0x3FFFFF
+    for s = 0, 127 do
+      for k = 1, 8 do
+        local id = M.readRomByte(base + s * 9 + k)
+        if id ~= 0xFF then soldCache[id] = true end
+      end
+    end
+  end
+  return soldCache[item] == true
+end
+-- the least gil per HP and per MP a sold flat restorer charges
+local rateCache = nil
+function M.shopRates()
+  if rateCache == nil then
+    rateCache = { hp = nil, mp = nil }
+    for id = 0, 0xFE do
+      local p = M.itemProps(id)
+      local pw = M.itemPower(id)
+      if M.itemBattleUsable(id) and M.itemSold(id) and (p & M.ITEM_RATIO) == 0 and pw > 0
+         and (p & M.ITEM_CURES) == 0 then
+        local r = M.itemPrice(id) / pw
+        if (p & M.ITEM_HP) ~= 0 and (rateCache.hp == nil or r < rateCache.hp) then rateCache.hp = r end
+        if (p & M.ITEM_MP) ~= 0 and (rateCache.mp == nil or r < rateCache.mp) then rateCache.mp = r end
+      end
+    end
+  end
+  return rateCache
+end
+-- What one use gives a member t = { hp, maxhp, mp, maxmp } at full effect:
+-- HP and MP, the fraction items' share of max (CalcRatio: max * power >> 4)
+function M.itemEffect(item, t)
+  local p, pw = M.itemProps(item), M.itemPower(item)
+  local hp, mp = 0, 0
+  if (p & M.ITEM_HP) ~= 0 then
+    hp = (p & M.ITEM_RATIO) ~= 0 and (((t.maxhp or 0) * pw) >> 4) or pw
+  end
+  if (p & M.ITEM_MP) ~= 0 then
+    mp = (p & M.ITEM_RATIO) ~= 0 and (((t.maxmp or 0) * pw) >> 4) or pw
+  end
+  return hp, mp
+end
+-- The scarcity of an item no shop sells (#370, review of a8df0a6f): the
+-- last few count for more.  `count` is how many the bag holds (this one
+-- included) and `legs` how many route legs away the next source of it is
+-- (a chest the route opens: the caller's opts.nextSource, the route being
+-- the generators' knowledge rather than the ROM's); with no source known
+-- the horizon is M.SCARCE_LEGS.  The multiplier is 1 + legs / count: seven
+-- X-Potions with none known ahead are worth 1 + 10/7 = 2.4 times their
+-- effect each, the last one 11 times, and a source on the next leg leaves
+-- little premium (1 + 1/7).
+M.SCARCE_LEGS = 10
+function M.scarcity(count, legs)
+  count = math.max(1, count or 1)
+  legs = legs or M.SCARCE_LEGS
+  return 1 + legs / count
+end
+-- an unsold item with no HP or MP effect to price it by (Magicite, a status
+-- cure no shop sold) is never the cheap choice: it prices at this, not at 0
+M.PRICELESS = 1000000000
+-- The gil one use is worth: its price when a shop sells it, else its full
+-- effect at the shops' rates on each member it reaches (t alone, or every
+-- member of `party` for an item the engine aims at the whole party), times
+-- its scarcity (M.scarcity: `count` in the bag, the next source `legs` away).
+function M.itemGil(item, t, party, count, legs)
+  if M.itemSold(item) then return M.itemPrice(item) end
+  local rates = M.shopRates()
+  local who = (M.itemAllAllies(item) and party) or { t or {} }
+  local gil = 0
+  for _, m in ipairs(who) do
+    local hp, mp = M.itemEffect(item, m)
+    gil = gil + hp * (rates.hp or 0) + mp * (rates.mp or 0)
+  end
+  if gil <= 0 then return M.PRICELESS end
+  return math.floor(gil * M.scarcity(count, legs) + 0.5)
+end
+-- What a death costs to undo, in the same gil: the Fenix Down, and the HP
+-- its raise (max HP * power >> 4) leaves to buy back at the shops' rate.
+-- A heal that is a top-up -- the member is not inside the round -- is
+-- worth at most this: an item dearer than the death it might prevent is
+-- kept for when the death is this round's (M.itemChoice).
+function M.deathGil(maxhp, fenix)
+  fenix = fenix or 0xF0
+  local raise = ((maxhp or 0) * M.itemPower(fenix)) >> 4
+  return math.floor(M.itemPrice(fenix) + ((maxhp or 0) - raise) * (M.shopRates().hp or 0) + 0.5)
+end
+-- The status cures (#370's "Remedy-class" items): every battle-usable
+-- consumable whose record carries `bit` in status byte `byte` (1 or 2)
+-- with the remove flag, cheapest first in gil.
+function M.cureItems(byte, bit)
+  local list = {}
+  for id = 0, 0xFE do
+    if M.itemBattleUsable(id) and (M.itemProps(id) & M.ITEM_CURES) ~= 0 then
+      local rec = byte == 2 and M.itemStatus2(id) or M.itemStatus1(id)
+      if (rec & bit) ~= 0 then list[#list + 1] = id end
+    end
+  end
+  table.sort(list, function(a, b)
+    local ga, gb = M.itemGil(a), M.itemGil(b)
+    if ga ~= gb then return ga < gb end
+    return a < b
+  end)
+  return list
+end
+
+-- Which HP item a care turn spends on one member (#370), as arithmetic on
+-- plain numbers so battle_healpolicy can put cases through it.  Each item
+-- is weighed by the lift rule (M.healDecision) on what it restores, and
+-- the cheapest in gil that the rule takes is the one: a Potion when a
+-- Potion lifts, an X-Potion when only it does (wor_falcon's SABIN at
+-- 905/1812 under an 846 round, 7 X-Potions in the bag: "$E9 restores 250
+-- and a round costs 846 ... acting instead", and he died).  Two limits:
+--   * a turn buys a real heal (guidelines: Potions, not Tonics, in
+--     battle): a flat item weaker than the strongest flat one in the bag
+--     is not offered -- the Tonic is the last item standing, as before;
+--   * an item no shop sells (`unsold`: X-Potion, Elixir, Megalixir) is
+--     irreplaceable and is spent only on a member inside the round (hp <=
+--     the round's cost), never on a top-up (review of a8df0a6f: 9 of the
+--     chain's 14 X-Potion plans were top-ups, wor_falcon's "905/1812 ...
+--     a round costs 846 (top-up)" among them); opts.reserve still keeps
+--     the last n of any item (Driver:battInvIdx);
+--   * a sold item dearer than the death it guards against (M.deathGil,
+--     o.cap) is spent only inside the round too.
+--   o.hp, o.maxhp, o.roundCost, o.allies, o.threshold, o.owed  as healDecision
+--   o.cap     the death's price in gil (M.deathGil)
+--   o.items   { { id, restore, gil, flat = true for a flat-power item,
+--               unsold = true for an item no shop sells } ... }
+-- Returns the item record chosen, the reason, and the list of refusals
+-- ({ item, why }), the cheapest first.  An owed top-up (the raise's) takes
+-- the cheapest item that lifts the raised member clear of the round, else
+-- the cheapest there is.
+-- Whether the round's care budget reopens for a lift (review of care-items
+-- cae71db9): a member inside their round (hp <= cost) and a heal in hand
+-- that lifts them clear (hp + restore > cost).  The budget is for top-ups:
+-- one care turn a round, ending the fight being the strongest heal.  A
+-- lift is a death prevented, and the budget does not hold it -- the Gate's
+-- shift 5 wiped with LOCKE at 144/820 under a 286 round and an X-Potion in
+-- the bag, the round's care turn having gone to SABIN's top-up ("actor=1
+-- SPEND (attack): 144/820 is inside one round of death (286) ...").
+--   hp, cost   the member's HP and their round
+--   restores   what each heal in hand would put back
+function M.liftReopens(o)
+  local hp, cost = o.hp or 0, o.cost or 0
+  if hp <= 0 or cost <= 0 or hp > cost then return false end
+  for _, r in ipairs(o.restores or {}) do
+    if r ~= nil and hp + r > cost then return true end
+  end
+  return false
+end
+
+-- Whether an item the engine aims at the whole party lifts every member of
+-- `inside` ({ hp, maxhp, cost } each: the members inside their round)
+-- clear of their round (#370: the Megalixir's turn).
+function M.partyLift(item, inside)
+  for _, c in ipairs(inside) do
+    local gain = math.min(M.itemEffect(item, c), (c.maxhp or 0) - (c.hp or 0))
+    if (c.hp or 0) + gain <= (c.cost or 0) then return false end
+  end
+  return #inside > 0
+end
+
+function M.itemChoice(o)
+  local items, best = {}, 0
+  for _, it in ipairs(o.items or {}) do
+    if it.flat and (it.restore or 0) > best then best = it.restore end
+  end
+  for _, it in ipairs(o.items or {}) do
+    if not (it.flat and (it.restore or 0) < best) then items[#items + 1] = it end
+  end
+  table.sort(items, function(a, b)
+    if a.gil ~= b.gil then return a.gil < b.gil end
+    if a.restore ~= b.restore then return a.restore > b.restore end
+    return a.id < b.id
+  end)
+  local hp, cost = o.hp or 0, o.roundCost or 0
+  local refused = {}
+  local inside = cost > 0 and hp <= cost
+  local KEPT = "no shop sells it: kept for a member inside the round"
+  if o.owed then
+    local any = nil
+    for _, it in ipairs(items) do
+      if it.unsold and not inside then
+        refused[#refused + 1] = { item = it, why = KEPT }
+      else
+        if hp + it.restore > cost then return it, "the raise's top-up (#168)", refused end
+        any = any or it
+      end
+    end
+    if any then return any, "the raise's top-up (#168)", refused end
+    return nil, nil, refused
+  end
+  for _, it in ipairs(items) do
+    local why = M.healDecision({ hp = hp, maxhp = o.maxhp, restore = it.restore,
+      roundCost = cost, allies = o.allies, threshold = o.threshold })
+    if why and it.unsold and not inside then
+      refused[#refused + 1] = { item = it, why = KEPT }
+    elseif why and (inside or o.cap == nil or it.gil <= o.cap) then
+      return it, why, refused
+    else
+      refused[#refused + 1] = { item = it, why = why and string.format("%d gil is more than the death "
+        .. "it guards against (%d) and the member is not inside the round", it.gil, o.cap)
+        or "it buys back less than the round spends" }
+    end
+  end
+  return nil, nil, refused
 end
 
 -- Vanish (STATUS1 bit 4) and Image (STATUS2 bit 2) on a monster (#190):
@@ -1125,14 +1392,27 @@ function M.raiseDecision(o)
       .. "else the field care's after the fight"
   end
   if raiseHp <= 0 then return raiseHp, false, "nothing to raise to" end
+  -- "Survives alone" is judged against the round the lift rule prices
+  -- (o.roundCost) as well as the smallest hit, and with nothing measured
+  -- the raise stands but owes its top-up (last round of the care-items
+  -- review: sabin_done raised SABIN to 45/363 "survives the smallest hit,
+  -- 34" under a 91 round and to 45 on "no enemy hit measured yet", both
+  -- "judged to survive alone", and both died before anyone topped him up)
   local hit = o.smallestHit
-  if hit == nil then return raiseHp, true, "no enemy hit measured yet" end
-  if hit < raiseHp then
-    return raiseHp, true, string.format("%d HP survives the smallest hit, %d", raiseHp, hit)
+  local round = o.roundCost or 0
+  if hit == nil and round <= 0 then
+    return raiseHp, true, "no enemy hit measured yet: the raise stands, and nothing says it "
+      .. "survives alone -- its top-up is owed", true
   end
+  local bar0 = math.max(hit or 0, round)
+  if raiseHp > bar0 then
+    return raiseHp, true, string.format("%d HP survives alone: the smallest hit %s, the round %d",
+      raiseHp, hit and tostring(hit) or "unmeasured", round)
+  end
+  hit = hit or bar0
   if o.killInReach then
-    return raiseHp, true, string.format("%d HP would not survive the %d hit, but a "
-      .. "kill is in reach: the raise is free", raiseHp, hit)
+    return raiseHp, true, string.format("%d HP would not survive the %d %s, but a "
+      .. "kill is in reach: the raise is free", raiseHp, bar0, round >= hit and "round" or "hit")
   end
   -- (a) is priced against the round the heal policy's lift rule will price
   -- the top-up against (o.roundCost, the raised member's window), not the
@@ -1155,8 +1435,9 @@ function M.raiseDecision(o)
       raiseHp + topUp, (o.roundCost or 0) > hit
         and string.format("the %d round", o.roundCost) or string.format("the %d hit", hit))
   end
-  return raiseHp, false, string.format("%d HP does not survive the %d hit, no kill "
-    .. "is in reach, and the enemy acts before anyone can top up", raiseHp, hit)
+  return raiseHp, false, string.format("%d HP does not survive %s, no kill "
+    .. "is in reach, and the enemy acts before anyone can top up", raiseHp,
+    round > hit and string.format("the %d round", round) or string.format("the %d hit", hit))
 end
 
 -- The keyed line's boost (#174): boost-Fight through randoms is the
@@ -1669,12 +1950,19 @@ function M.spendDecision(o)
   -- the heals in hand the lift rule turned down (review of b490ce32: gate
   -- s5 said "nothing to heal with" with 60 Potions in the bag)
   for _, h in ipairs(o.refused or {}) do
-    tried[#tried + 1] = string.format("%s +%s = %s, not lifting clear of the round", h.what,
-      tostring(h.restore), h.restore and tostring(hp + h.restore) or "?")
+    tried[#tried + 1] = string.format("%s +%s = %s, %s", h.what,
+      tostring(h.restore), h.restore and tostring(hp + h.restore) or "?",
+      h.note or ((h.restore and hp + h.restore > cost) and "it would lift, but the heal policy refused it"
+        or "not lifting clear of the round"))
   end
+  -- why nothing saves (review of care-items cae71db9: "(nothing to heal
+  -- with)" with X-Potions in the bag, the budget having closed care): the
+  -- caller's o.why -- the round's care turn gone to another, the lift rule,
+  -- or an empty bag
+  local why = o.why or (#tried > 0 and "the lift rule" or "the bag holds no heal")
   return "spend", string.format("%d/%d is inside one round of death (%d) holding %d BP, "
-    .. "and no heal saves it (%s)", hp, o.maxhp or 0, cost, bp,
-    #tried > 0 and table.concat(tried, ", ") or "nothing to heal with")
+    .. "and no heal saves it (%s%s)", hp, o.maxhp or 0, cost, bp, why,
+    #tried > 0 and (": " .. table.concat(tried, ", ")) or "")
 end
 
 -- How a wipe reads (#175), from its [death] records -- each { tick, from,
@@ -4644,9 +4932,23 @@ function Driver:traceDrop(reason)
   end
 end
 
+-- Whether dropping a plan refunds the round's care turn (#370's review,
+-- the one-care-turn rule of 11a8f6e3): a plan dropped before it was
+-- confirmed never cared, so the turn goes back; a confirmed one is the
+-- round's care until the carer's next turn delimits the round.  The confirm
+-- itself calls dropPlan("confirm_attempt"), and from 11a8f6e3 to a8df0a6f
+-- that refunded the turn too, so the rule bound only while a plan was being
+-- steered (M.CONFIRM_REFUNDS_CARE = true is that driver, a lab lever).
+M.CONFIRM_REFUNDS_CARE = false
+function M.careRefund(reason)
+  if reason == "confirm_attempt" then return M.CONFIRM_REFUNDS_CARE == true end
+  return true
+end
 function Driver:dropPlan(reason)
   if reason ~= "confirm_attempt" then self:traceDrop(reason or "back_out") end
-  if self.careActor ~= nil and self.careActor == self.planActor then self.careActor = nil end
+  if self.careActor ~= nil and self.careActor == self.planActor and M.careRefund(reason) then
+    self.careActor = nil
+  end
   self.plan, self.planActor = nil, nil
 end
 
@@ -4670,6 +4972,53 @@ end
 -- (watchHeal's healWatch).
 function Driver:itemRestoreOf(item)
   return self.itemRestore[item] or M.itemPower(item)
+end
+
+-- The HP items the bag holds for entity e at `hp` (#370), priced for
+-- M.itemChoice: every battle-usable consumable that restores HP and is no
+-- status cure (Fenix Down and Revivify carry HP with the remove flag),
+-- above its reserve.  `all` = true lists the ones the engine aims at the
+-- whole party (Megalixir) instead of the single-target ones.  A flat item
+-- restores what itemRestoreOf says (measured, else its power); a fraction
+-- item the share of max HP it gives, up to what e is missing.
+function Driver:bagHeals(e, hp, all)
+  local function member(p)
+    return { hp = M.readWord(0x3BF4 + p * 2), maxhp = M.readWord(0x3C1C + p * 2),
+             mp = M.readWord(BATTLE.CURMP + p * 2), maxmp = M.readWord(BATTLE.MAXMP + p * 2) }
+  end
+  local t = member(e)
+  t.hp = hp or t.hp
+  local party = {}
+  for p = 0, 3 do
+    local m = member(p)
+    if m.maxhp > 0 and m.hp > 0 and (M.leftMask() >> p) & 1 == 0 then party[#party + 1] = m end
+  end
+  local list, seen = {}, {}
+  for i = 0, 251 do
+    local id = M.readByte(BATTLE.BATTINV + i * 5)
+    if id ~= 0xFF and not seen[id] then
+      local p = M.itemProps(id)
+      if (p & M.ITEM_HP) ~= 0 and (p & M.ITEM_CURES) == 0 and M.itemBattleUsable(id)
+         and M.itemAllAllies(id) == (all == true) and self:battInvIdx(id) ~= nil then
+        seen[id] = true
+        local flat = (p & M.ITEM_RATIO) == 0
+        local restore
+        if flat then
+          restore = self:itemRestoreOf(id)
+        else
+          restore = math.max(0, math.min(M.itemEffect(id, t), t.maxhp - t.hp))
+        end
+        local count = 0
+        for j = 0, 251 do
+          if M.readByte(BATTLE.BATTINV + j * 5) == id then count = count + M.readByte(BATTLE.BATTINV + j * 5 + 3) end
+        end
+        list[#list + 1] = { id = id, restore = restore, flat = flat, idx = self:battInvIdx(id),
+                            unsold = not M.itemSold(id), count = count,
+                            gil = M.itemGil(id, t, party, count, (self.opts.nextSource or {})[id]) }
+      end
+    end
+  end
+  return list
 end
 
 -- The cast guards, shared by every attack-cast line (M.castVeto holds
@@ -5095,7 +5444,8 @@ end
 
 -- The cure the bag holds for entity e's Petrify (Soft, then Remedy),
 -- Imp (Green Cherry, then Remedy) or Berserk (nothing in this ROM),
--- through M.statusCure and the reserve-aware battInvIdx.  A statue
+-- through M.statusCure and the reserve-aware battInvIdx: the items whose
+-- records carry the bit, cheapest first in gil (M.cureItems, #370).  A statue
 -- first: it is dead to the engine until the Soft, and a party of
 -- statues is a game over.
 --
@@ -5109,11 +5459,11 @@ end
 -- after the fight, as before.
 function Driver:cureFor(e)
   if status1Has(e, M.ST1_PETRIFY) then
-    return M.statusCure({ byte = 1, bit = M.ST1_PETRIFY, items = { M.SOFT, M.REMEDY },
+    return M.statusCure({ byte = 1, bit = M.ST1_PETRIFY,
       has = function(item) return self:battInvIdx(item) ~= nil end }), "Petrify"
   end
   if status1Has(e, M.ST1_ZOMBIE) and not status1Has(e, 0x80) and self.opts.zombieCure ~= false then
-    return M.statusCure({ byte = 1, bit = M.ST1_ZOMBIE, items = { M.REVIVIFY, M.REMEDY },
+    return M.statusCure({ byte = 1, bit = M.ST1_ZOMBIE,
       has = function(item) return self:battInvIdx(item) ~= nil end }), "Zombie"
   end
   if status1Has(e, M.ST1_IMP) then
@@ -5121,7 +5471,7 @@ function Driver:cureFor(e)
       has = function(item) return self:battInvIdx(item) ~= nil end }), "Imp"
   end
   if (M.readByte(BATTLE.ST2 + e * 2) & M.ST2_BERSERK) ~= 0 then
-    return M.statusCure({ byte = 2, bit = M.ST2_BERSERK, items = { M.REMEDY },
+    return M.statusCure({ byte = 2, bit = M.ST2_BERSERK,
       has = function(item) return self:battInvIdx(item) ~= nil end }), "Berserk"
   end
   return nil, nil
@@ -5211,6 +5561,27 @@ end
 -- o = { hp (the hitter's), denied (its turn-denying status or nil),
 -- muddled, ownWindow (the hitter's own window is open again), tick }.
 -- Returns why the record is stale, or nil while it is in flight.
+-- A member's round with the party's own queued cure-hits on them (the
+-- unmuddle floor's gap, #320; re-review of care-items 0b2df05e): the floor
+-- is read when the hit is planned, and a confirmed hit waits in the queue
+-- behind everything entered before it, so the target can fall far under
+-- the floor before it runs -- and it runs even after something else
+-- cleared the Muddle.  The Gate's shift 5 at 8ec3c0f1: LOCKE planned his
+-- hit on SABIN at 275/902 (floor 114), monsters took SABIN to 27, the
+-- Muddle cleared on its own, and the queued hit landed: "[death] f+8853
+-- entity 3 char 5 from 5/902 by entity 1 char 1 ... (the Muddle rule's
+-- unmuddle hit)".  The hit is part of what comes at the member before
+-- their next turn, priced at the hitter's floor (the most its Fight can
+-- take, Driver:unmuddleFloor), so the care lines see SABIN inside his
+-- round and lift him before it lands.
+--   cost    the member's round from the monsters
+--   hits    the floors of the cure-hits queued on the member
+function M.roundWithQueuedHits(cost, hits)
+  local c = cost or 0
+  for _, h in ipairs(hits or {}) do c = c + (h or 0) end
+  return c
+end
+
 function M.queuedHitStale(q, o)
   if (o.hp or 0) == 0 then return "it fell" end
   if o.denied ~= nil then return "it is under " .. o.denied end
@@ -5453,9 +5824,11 @@ function Driver:raiseOk(e, actor)
     end
   end
   local o = { maxhp = maxhp, power = M.itemPower(BATTLE.FENIX_DOWN), smallestHit = hit,
-              zombie = status1Has(e, M.ST1_ZOMBIE) }
+              zombie = status1Has(e, M.ST1_ZOMBIE), roundCost = self:roundPriceFor(e) }
   local detail = ""
-  if hit ~= nil and hit >= raiseHp then
+  -- (the kill and the top-up race, whenever the raise does not survive
+  -- alone: its hit or its round reaches the raise's HP, M.raiseDecision)
+  if math.max(hit or 0, o.roundCost or 0) >= raiseHp then
     -- (b) a kill in reach: the last monster against the party's window
     local slot = soleTarget()
     if slot ~= nil then
@@ -5469,8 +5842,15 @@ function Driver:raiseOk(e, actor)
       detail = "; kill: not the last monster"
     end
     -- (a) a top-up first: the other members' gauges against the lethal slot's
-    local topUp = (self:battInvIdx(BATTLE.POTION) and self:itemRestoreOf(BATTLE.POTION))
-               or (self:battInvIdx(BATTLE.TONIC) and self:itemRestoreOf(BATTLE.TONIC)) or 0
+    -- what the owed top-up would be: the item M.itemChoice spends on the
+    -- raised member (#370: the cheapest that lifts them clear of the
+    -- round, an X-Potion where a Potion does not)
+    local topUp = 0
+    do
+      local it = M.itemChoice({ hp = raiseHp, maxhp = maxhp, roundCost = self:roundPriceFor(e),
+        owed = true, items = self:bagHeals(e, raiseHp) })
+      topUp = it and it.restore or 0
+    end
     local first, firstEta, firstPct = nil, nil, nil
     for p = 0, 3 do
       -- a Stopped, asleep or berserk member's gauge is not a turn the
@@ -5502,7 +5882,6 @@ function Driver:raiseOk(e, actor)
         .. "(slot %d is %d ticks from acting)", lethalSlot, lethalEta)
     end
   end
-  o.roundCost = self:roundPriceFor(e)
   local _, ok, why, needsTopUp = M.raiseDecision(o)
   return ok, raiseHp, hit, hitSlot, hitOn, why .. detail, needsTopUp
 end
@@ -5703,6 +6082,25 @@ function Driver:makePlan(actor)
       end
     end
   end
+  -- the party's own cure-hits queued on a member (M.roundWithQueuedHits):
+  -- a hitter whose hit will still run (M.queuedHitStale) adds its floor
+  do
+    local onE = {}
+    for by, q in pairs(self.unmuddleQueued or {}) do
+      local stale = M.queuedHitStale(q, { hp = hpNow[by], denied = denied(by),
+        muddled = (M.readByte(BATTLE.ST2 + by * 2) & M.ST2_MUDDLE) ~= 0, ownWindow = by == actor,
+        tick = self.battleTick })
+      if stale == nil and q.e ~= nil and (price[q.e] or 0) >= 0 and hpNow[q.e] > 0 then
+        local hit = self:unmuddleFloor(by, q.e)
+        if hit ~= nil and hit > 0 then
+          onE[q.e] = onE[q.e] or {}
+          onE[q.e][#onE[q.e] + 1] = hit
+          priceWhy[q.e] = (priceWhy[q.e] or "") .. string.format(" + actor %d's queued cure-hit (at most %d)", by, hit)
+        end
+      end
+    end
+    for e, hits in pairs(onE) do price[e] = M.roundWithQueuedHits(price[e], hits) end
+  end
   -- The round price checked against what came (#312): the actor's own
   -- priced round -- the enemy actions it counted before this actor's
   -- next turn, and their price -- beside the monster actions that did
@@ -5778,12 +6176,14 @@ function Driver:makePlan(actor)
   -- clears the status (CalcMaxDmg strips it from a physically damaged
   -- target; a Remedy does not carry the bit, M.itemStatus2).
   do
-    local s2, mx, fl = {}, {}, {}
+    local s2, mx = {}, {}
     for e = 0, 3 do
       s2[e] = M.readByte(BATTLE.ST2 + e * 2)
       mx[e] = maxOf(e)
-      if e ~= actor and mx[e] > 0 then fl[e] = self:unmuddleFloor(actor, e) end
     end
+    local fl = M.muddleFloors({ actor = actor, maxhp = mx,
+      floorOf = function(e) return self:unmuddleFloor(actor, e) end,
+      round = function(e) return price[e] or 0 end })
     -- a cure-hit already confirmed on a muddled ally, by another member,
     -- and not yet run (#348): the queued record lasts until the hitter's
     -- command runs (Driver:watchAllyExec), the pending one until the bit
@@ -5826,8 +6226,9 @@ function Driver:makePlan(actor)
       local est = self:allyFightEstimate(actor, held)
       local measured = M.unmuddleHits[M.readByte(BATTLE.BCHID + actor * 2)]
       local said = string.format("[%s] actor=%d: entity %d (%d/%d) is MUDDLED but at or under "
-        .. "this actor's unmuddle floor %d (%s) -- the Fight that cures would kill; planning on",
-        self.tag or "fight", actor, held, hpNow[held], mx[held], fl[held],
+        .. "this actor's unmuddle floor %d, its round %d included (%s) -- the Fight that cures would "
+        .. "kill once the round has run; planning on",
+        self.tag or "fight", actor, held, hpNow[held], mx[held], fl[held], price[held] or 0,
         est and string.format("its Fight on this ally priced to a floor of %d (%s)%s%s", est.top, est.parts,
           est.lethal and ("; " .. est.lethal .. ", so every HP is under it") or "",
           measured and string.format(", its largest measured unmuddle hit %d", measured) or "")
@@ -6019,6 +6420,45 @@ function Driver:makePlan(actor)
       end
     end
   end
+  -- ...and so does a lift (M.liftReopens): a member inside their round,
+  -- no heal of another's in flight on them, and a heal in hand -- the bag's
+  -- (M.itemChoice's candidates, an unsold one included: the member is
+  -- inside) or a cure measured this battle -- that lifts them clear.  The
+  -- reopened block cares for those members only (liftOnly).
+  local liftOnly = false
+  if not careOpen and (row ~= nil or cureRow ~= nil) then
+    for e = 0, 3 do
+      local hp, maxhp, cost = hpNow[e], maxOf(e), price[e] or 0
+      if hp > 0 and maxhp > 0 and hp < maxhp and cost > 0 and hp <= cost
+         and not M.inFlightHolds(self.healQueued[e], hp, cost) and not status1Has(e, M.ST1_ZOMBIE) then
+        local restores, what = {}, {}
+        if row ~= nil then
+          for _, it in ipairs(self:bagHeals(e, hp)) do
+            restores[#restores + 1] = it.restore
+            what[#what + 1] = string.format("$%02X +%d", it.id, it.restore)
+          end
+        end
+        if cureRow ~= nil then
+          for _, spell in ipairs(type(self.opts.cure) == "table" and self.opts.cure or BATTLE.CURES) do
+            local r = self.castRestore[spell]
+            if r ~= nil and spellCell(actor, spell, true) then
+              restores[#restores + 1] = r
+              what[#what + 1] = string.format("cure $%02X +%d", spell, r)
+            end
+          end
+        end
+        if M.liftReopens({ hp = hp, cost = cost, restores = restores }) then
+          careOpen, liftOnly = true, true
+          local said = string.format("[%s] actor=%d: entity %d at %d/%d is inside a %d round "
+            .. "and a heal in hand lifts them (%s) -- the round's care budget (actor %d's) "
+            .. "reopens for the lift", self.tag or "fight", actor, e, hp, maxhp, cost,
+            table.concat(what, ", "), self.careActor)
+          if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+          break
+        end
+      end
+    end
+  end
   if (row ~= nil or cureRow ~= nil) and totalMon > 200 and self.parkDropN < 3
      and not careOpen then
     local said = string.format("[%s] actor=%d: this round's care turn "
@@ -6131,7 +6571,7 @@ function Driver:makePlan(actor)
     -- closed to this actor, or it declined every heal) no heal is
     -- coming this turn at all.
     local heals, refused = {}, {}
-    if where == "care" then
+    do
       local allies = 0
       for e = 0, 3 do
         if e ~= actor and hpNow[e] > 0 and maxOf(e) > 0 then
@@ -6156,17 +6596,38 @@ function Driver:makePlan(actor)
         end
       end
       if row ~= nil then
-        local item = (self:battInvIdx(BATTLE.POTION) and BATTLE.POTION) or (self:battInvIdx(BATTLE.TONIC) and BATTLE.TONIC)
-        if item and taken(self:itemRestoreOf(item), false) then
-          heals[#heals + 1] = { what = string.format("item $%02X", item),
-                                restore = self:itemRestoreOf(item) }
-        elseif item then
-          refused[#refused + 1] = { what = string.format("item $%02X", item), restore = self:itemRestoreOf(item) }
+        -- the bag as the care lines weigh it (#370): the item M.itemChoice
+        -- would spend on this actor, else each it refused
+        local it, _, no = M.itemChoice({ hp = hp, maxhp = maxhp, roundCost = cost, allies = allies,
+          threshold = self:healPct(), cap = M.deathGil(maxhp), items = self:bagHeals(actor, hp) })
+        if it then
+          heals[#heals + 1] = { what = string.format("item $%02X", it.id), restore = it.restore }
+        end
+        for _, r in ipairs(no or {}) do
+          refused[#refused + 1] = { what = string.format("item $%02X", r.item.id), restore = r.item.restore }
         end
       end
     end
+    -- From the attack lines no heal comes this turn: what the care lines
+    -- would have taken is said, not counted, with the reason the block was
+    -- closed (review of care-items cae71db9)
+    local whyNot = nil
+    if where ~= "care" then
+      local gap = math.max(0, maxhp - hp)
+      for _, h in ipairs(heals) do
+        local r = h.restore and math.min(h.restore, gap) or nil
+        refused[#refused + 1] = { what = h.what, restore = r,
+          note = (r == nil or hp + r > cost) and "it would lift, but not this turn" or nil }
+      end
+      heals = {}
+      if not careOpen then
+        whyNot = string.format("the round's care turn went to actor %d", self.careActor or -1)
+      elseif #refused > 0 then
+        whyNot = "the care lines took none"
+      end
+    end
     local verdict, why = M.spendDecision({ hp = hp, maxhp = maxhp, roundCost = cost,
-                                           bp = have, heals = heals, refused = refused })
+                                           bp = have, heals = heals, refused = refused, why = whyNot })
     if verdict ~= "spend" then
       local said = string.format("[%s] actor=%d no spend (%s): %s", self.tag or "fight",
         actor, where, why)
@@ -6285,7 +6746,14 @@ function Driver:makePlan(actor)
     end
     return nil
   end
-  local finisher = totalMon <= 200
+  -- The window closes the care block for an attack, so it holds only an
+  -- actor with one: with no Fight row the attack lines end in "switch",
+  -- a passed turn that finishes nothing.  battle_healerdown's riders
+  -- (MagiTek, -, -, Item) passed 35 and 36 turns under it with the healer
+  -- dead, and their care opened only with entity 1 at 13/68 inside its
+  -- round -- too late for a raise once a raise has to survive its round
+  -- (build/attempts/wt/care-items/healerdown/).
+  local finisher = totalMon <= 200 and cmdRow(actor, BATTLE.CMD_FIGHT) ~= nil
   local yieldWhy = nil
   if finisher and (row ~= nil or cureRow ~= nil) and self.parkDropN < 3 and careOpen then
     yieldWhy = finisherYields()
@@ -6469,7 +6937,7 @@ function Driver:makePlan(actor)
             .. "Fenix Down on them is confirmed (tick %d) and has not landed", self.tag or "fight",
             actor, e, queued.by, queued.tick)
           if said ~= self.healSaid then self.healSaid = said; M.log(said) end
-        elseif maxOf(e) > 0 and hpNow[e] == 0
+        elseif maxOf(e) > 0 and hpNow[e] == 0 and not liftOnly
            and self:battInvIdx(BATTLE.FENIX_DOWN) then
           local ok, raiseHp, hit, hitSlot, hitOn, why, needsTopUp = self:raiseOk(e, actor)
           local hitStr = hit and string.format("%d (slot %d on entity %d)", hit, hitSlot, hitOn)
@@ -6535,7 +7003,19 @@ function Driver:makePlan(actor)
       -- confirm's guard (button) only catches a Zombie landing after the
       -- plan -- planned on one already, the heal was backed out and planned
       -- again until the watchdog dropped it (review of f8f9ad66, M3)
-      if hp > 0 and maxhp > 0 and hp < maxhp and not status1Has(e, M.ST1_ZOMBIE) then
+      local inFlight = self.healQueued[e]
+      if inFlight ~= nil and hp > 0 and hp < maxhp and M.inFlightHolds(inFlight, hp, price[e]) then
+        -- another member's heal on it is confirmed and has not landed
+        -- (#370: wor_falcon at the head gave EDGAR at 86/1701 two X-Potions,
+        -- the second planned on the HP the first was about to fill)
+        local said = string.format("[%s] actor=%d no heal on entity %d (%d/%d): actor %d's %s "
+          .. "on it is confirmed (tick %d) and has not landed", self.tag or "fight", actor, e, hp, maxhp,
+          inFlight.by, inFlight.what, inFlight.tick)
+        if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+      elseif liftOnly and not (hp > 0 and (price[e] or 0) > 0 and hp <= price[e]) then
+        -- (the budget reopened for a lift: a member outside their round
+        -- waits for the next round's care turn)
+      elseif hp > 0 and maxhp > 0 and hp < maxhp and not status1Has(e, M.ST1_ZOMBIE) then
         local pct = hp * 100 // maxhp
         -- a statue is the cure line's, not a patient (a Potion cannot
         -- even land on it); a condemned member the clock takes before
@@ -6623,6 +7103,35 @@ function Driver:makePlan(actor)
         end
       end
     end
+    -- The party item (#370): two or more members inside their round and
+    -- an item the engine aims at the whole party (Megalixir) that lifts
+    -- each of them clear -- one turn where a single heal saves one.  Like
+    -- the party cure, never with a Zombie seated (it reaches every seat).
+    if row ~= nil and zombieSeated == nil then
+      local inside = {}
+      for _, c in ipairs(cands) do
+        if (price[c.e] or 0) > 0 and c.hp <= price[c.e] then inside[#inside + 1] = c end
+      end
+      if #inside >= 2 then
+        local best, ins = nil, {}
+        for _, c in ipairs(inside) do ins[#ins + 1] = { hp = c.hp, maxhp = c.maxhp, cost = price[c.e] } end
+        for _, it in ipairs(self:bagHeals(inside[1].e, inside[1].hp, true)) do
+          if M.partyLift(it.id, ins) and (best == nil or it.gil < best.gil) then best = it end
+        end
+        if best then
+          local t = {}
+          for _, c in ipairs(inside) do
+            t[#t + 1] = string.format("entity %d %d/%d under %d", c.e, c.hp, c.maxhp, price[c.e])
+          end
+          self.healSaid = nil
+          M.log(string.format("[%s] actor=%d party item $%02X: %d members inside their round (%s) "
+            .. "and it lifts each clear; %d gil", self.tag or "fight", actor, best.id, #inside,
+            table.concat(t, ", "), best.gil))
+          return { kind = "item", item = best.id, target = inside[1].e, row = row, idx = best.idx,
+                   all = true, auto = true, reason = "party_inside" }
+        end
+      end
+    end
     for _, c in ipairs(cands) do
       local cost = price[c.e] or 0
       -- The cast, offered first.  A cure's magic_prop power scales with
@@ -6665,7 +7174,7 @@ function Driver:makePlan(actor)
                 .. "costs %d (%s)", self.tag or "fight", actor, c.e, c.hp,
                 c.maxhp, spell, cell, mpCost, M.readWord(BATTLE.CURMP + actor * 2),
                 gain and tostring(gain) or "?", cost, why))
-              return { kind = "heal", spell = spell, target = c.e,
+              return { kind = "heal", spell = spell, target = c.e, restore = gain,
                        row = cureRow, reason = why }
             end
             local said = string.format("[%s] actor=%d not curing entity %d "
@@ -6676,29 +7185,37 @@ function Driver:makePlan(actor)
           end
         end
       end
-      -- then the bag.  In combat the bag heals with POTIONS: a turn must
-      -- buy a real heal (owner guideline -- Tonics are the field
-      -- resource), so the Tonic is only ever the last item standing.
-      local item = row ~= nil
-               and (self:battInvIdx(BATTLE.POTION) and BATTLE.POTION
-                 or self:battInvIdx(BATTLE.TONIC) and BATTLE.TONIC) or nil
-      if item then
-        local gain = self:itemRestoreOf(item)
-        local why = M.healDecision({ hp = c.hp, maxhp = c.maxhp,
-          restore = gain, roundCost = cost, allies = allies,
-          threshold = threshold, owed = self.topUpOwed[c.e] ~= nil })
-        if why then
+      -- then the bag (#370): every HP item it holds, weighed by the lift
+      -- rule and priced in gil (M.itemChoice).  In combat a turn must buy
+      -- a real heal (owner guideline -- Tonics are the field resource),
+      -- so a weak flat item is only ever the last one standing.
+      local heals = row ~= nil and self:bagHeals(c.e, c.hp) or {}
+      if #heals > 0 then
+        local cap = M.deathGil(c.maxhp)
+        local it, why, refused = M.itemChoice({ hp = c.hp, maxhp = c.maxhp, roundCost = cost,
+          allies = allies, threshold = threshold, owed = self.topUpOwed[c.e] ~= nil,
+          cap = cap, items = heals })
+        if it then
           self.healSaid = nil
           M.log(string.format("[%s] actor=%d heal entity %d (%d/%d) with " ..
-            "$%02X -- restores %d, a round costs %d (%s)", self.tag or "fight",
-            actor, c.e, c.hp, c.maxhp, item, gain, cost, why))
-          return { kind = "item", item = item, target = c.e, row = row,
-                   idx = self:battInvIdx(item), reason = why }
+            "$%02X -- restores %d, a round costs %d (%s); %d gil%s", self.tag or "fight",
+            actor, c.e, c.hp, c.maxhp, it.id, it.restore, cost, why, it.gil,
+            #refused > 0 and string.format(", the cheaper refused: %s", (function()
+              local t = {}
+              for _, r in ipairs(refused) do t[#t + 1] = string.format("$%02X (%s)", r.item.id, r.why) end
+              return table.concat(t, "; ")
+            end)()) or ""))
+          return { kind = "item", item = it.id, target = c.e, row = row, restore = it.restore,
+                   idx = it.idx, reason = why, flat = it.flat }
+        end
+        local t = {}
+        for _, r in ipairs(refused) do
+          t[#t + 1] = string.format("$%02X restores %d for %d gil: %s", r.item.id, r.item.restore,
+            r.item.gil, r.why)
         end
         local said = string.format("[%s] actor=%d not healing entity %d " ..
-          "(%d/%d): $%02X restores %d and a round costs %d, so the turn "
-          .. "buys back less than it spends -- acting instead",
-          self.tag or "fight", actor, c.e, c.hp, c.maxhp, item, gain, cost)
+          "(%d/%d): a round costs %d (a death costs %d gil); %s -- acting instead",
+          self.tag or "fight", actor, c.e, c.hp, c.maxhp, cost, cap, table.concat(t, "; "))
         if said ~= self.healSaid then self.healSaid = said; M.log(said) end
       end
     end
@@ -7778,7 +8295,16 @@ function Driver:button(actor)
       -- chars = 0 would set cur = 0 and, for target 0, spin forever
       -- pressing UP.
       if chars == 0 then return self:cross("chars") end
-      if self.plan.all then
+      if self.plan.all and self.plan.auto then
+        -- an item the engine aims at the whole party (targeting without
+        -- the moveable-cursor bit, #370): the cursor is the engine's, and
+        -- A confirms whatever it lit
+        M.log(string.format("[%s] actor=%d party item $%02X at the target window: chars=%02X "
+          .. "all=%02X -- confirming the engine's aim", self.tag or "fight", actor, self.plan.item or 0,
+          chars, M.readByte(BATTLE.TGTALL)))
+        if self.recovery then self.recovery.confirm(actor, M.frame, chars, mons) end
+        -- falls through to the confirm below
+      elseif self.plan.all then
         -- one R press latches all-allies (TGTALL=1 -- probe_targetall);
         -- confirm once the latch reads back.  If it never takes (a spell
         -- without MULTI_TARGET), drop to the single-target steer.
@@ -7796,7 +8322,7 @@ function Driver:button(actor)
         return (self.tgtSpin % 4) < 2 and { "r" } or {}
       end
       local wantMask = 1 << self.plan.target
-      if chars ~= wantMask then
+      if chars ~= wantMask and not (self.plan.all and self.plan.auto) then
         local cur = 0
         for e = 0, 3 do
           if chars & (1 << e) ~= 0 then cur = e; break end
@@ -7970,7 +8496,10 @@ function Driver:button(actor)
     -- unconditionally in makePlan.  Either way it is measured once per
     -- battle, because a reloaded retry is a different fight.
     local watch = nil
+    -- (a fraction item -- X-Potion, Elixir, Megalixir -- fills its target
+    -- to max: there is no flat figure to learn, #370)
     if self.plan.kind == "item" and self.plan.item ~= BATTLE.FENIX_DOWN
+       and (M.itemProps(self.plan.item) & M.ITEM_RATIO) == 0
        and self.itemRestore[self.plan.item] == nil then
       -- an item heals exactly its power byte (ItemProp +$14): the band is
       -- that one value (review of ad048b29: 17 of 55 Potion measurements in
@@ -8019,6 +8548,23 @@ function Driver:button(actor)
         .. "was owed (raised at tick %d)", self.tag or "fight", actor, self.plan.kind,
         self.plan.target, self.topUpOwed[self.plan.target]))
       self.topUpOwed[self.plan.target] = nil
+    end
+    -- a confirmed heal is in flight until its target's HP rises (#370):
+    -- nobody else heals that member on the HP it read before the heal.
+    -- Every heal, a Potion's and a cast's too (review of a8df0a6f: holding
+    -- only a fill spent 21 Potions at Dullahan B against 15, and lost the
+    -- Gate's shift 5 that holding every heal won)
+    if (self.plan.kind == "heal" or (self.plan.kind == "item" and self.plan.reason ~= "revive"
+        and not (type(self.plan.reason) == "string" and self.plan.reason:sub(1, 5) == "cure ")))
+       and self.plan.target ~= nil then
+      for e = 0, 3 do
+        if (self.plan.all and M.readWord(0x3C1C + e * 2) > 0) or e == self.plan.target then
+          self.healQueued[e] = { by = actor, tick = self.battleTick, hp = M.readWord(0x3BF4 + e * 2),
+                                 restore = not self.plan.all and self.plan.restore or nil,
+                                 what = self.plan.kind == "heal" and string.format("cure $%02X", self.plan.spell or 0)
+                                   or string.format("$%02X", self.plan.item or 0) }
+        end
+      end
     end
     -- and what a damage plan lands, for the press rule's window (the
     -- dmgWatch queue; watchDamage credits and settles it).  A Fight
@@ -8115,7 +8661,7 @@ function Driver:idle()
   self.monAct, self.deathSaid, self.battleDeaths, self.wipeSaid = nil, {}, {}, false
   self.monTurn = {}
   self.raisePending, self.topUpOwed, self.unmuddlePending = nil, {}, nil
-  self.raiseQueued, self.cureQueued = {}, {}
+  self.raiseQueued, self.cureQueued, self.healQueued = {}, {}, {}
   self.statusSaid, self.cureSaid, self.freeRoundSaid = {}, nil, false
   execActor, execActorCmd, execDone = nil, nil, {}
   execParty, execSkipped = nil, {}
@@ -10182,6 +10728,37 @@ function Driver:watchDamage()
   end
 end
 
+-- Whether a heal in flight holds the others off its target (#370): it
+-- does unless the member is inside their round and the queued heal does
+-- not lift them clear (re-review of cae71db9: the Gate's shift 5 left
+-- SETZER at 25/902 under a 413 round on a queued Potion, "+250 = 275",
+-- with an Elixir in the bag).  q.restore nil (a party cure, a cast not
+-- measured) holds.
+-- (last round of the review: a heal of unknown size -- a party cure, a
+-- first cast not yet measured -- holds nobody off; only a known restore
+-- that lifts the target clear of their round does)
+function M.inFlightHolds(q, hp, cost)
+  if q == nil or q.restore == nil then return false end
+  return hp + q.restore > (cost or 0)
+end
+
+-- A confirmed heal in flight (#370), one frame of it as plain arithmetic:
+-- q = { hp, tick } (the target's HP and the tick at the confirm), hp its
+-- HP now, tick the battle tick.  Returns "landed" (the HP rose), "fell"
+-- (the target is down), "hit" (a hit landed before the heal did: the
+-- member stands where the heal was not planned for, and the others plan
+-- on what they see -- the first cut held them, and arm B's k0_s0_w25 lost
+-- SABIN at 143/1812 with CELES's X-Potion, confirmed at 1208, still not run
+-- 1200 frames on), "lapsed" (no rise inside RAISE_WAIT + 600 ticks) or nil
+-- while the heal is still coming.
+function M.healInFlight(q, hp, tick)
+  if hp == 0 or hp == 0xFFFF then return "fell" end
+  if hp > q.hp then return "landed" end
+  if hp < q.hp then return "hit" end
+  if tick - q.tick > BATTLE.RAISE_WAIT + 600 then return "lapsed" end
+  return nil
+end
+
 -- The raise-then-top-up pair (#168): a pending Fenix Down has landed
 -- when its target's HP moves off 0; the member is then owed a top-up
 -- until it arrives, they climb clear on their own, or they fall again.
@@ -10191,6 +10768,11 @@ function Driver:watchPendingCare()
     if (hp > 0 and hp ~= 0xFFFF) or self.battleTick - q.tick > BATTLE.RAISE_WAIT + 600 then
       self.raiseQueued[e] = nil
     end
+  end
+  -- a queued heal has landed when its target's HP rises above what it
+  -- read at the confirm, is gone when the target falls, else after its window
+  for e, q in pairs(self.healQueued) do
+    if M.healInFlight(q, M.readWord(0x3BF4 + e * 2), self.battleTick) ~= nil then self.healQueued[e] = nil end
   end
   -- a queued status cure has landed when the bit it carries is gone
   -- (the [status] CLEARED line says so), or is forgotten after its window
@@ -11148,6 +11730,7 @@ M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end)
     -- same entity 480 frames later while the first sat in the queue, and
     -- both were spent (4 -> 2 in the bag) on one Imp.
     cureQueued = {},                   -- e -> { by, tick, item }
+    healQueued = {},                   -- e -> { by, tick, hp, what }: a confirmed heal not landed (#370)
     -- and the Muddle rule's own pending hit (#170): one ally's Fight on the
     -- muddled member is in the air, so the next actor plans normally rather
     -- than land a second hit on a member the first one already cleared
@@ -13106,13 +13689,28 @@ function M.typicalTruth()
         T.curX = x
         -- (for the log only: what the engine had aimed it at as it entered)
         u.aim = (u.aim or "") .. string.format("%s$%02X/$%02X", u.aim and " " or "", M.readByte(0xB8), M.readByte(0xB9))
-        if (M.readByte(0xB8) & 0x0F) ~= 0 then u.aimParty = true end
-        if (M.readByte(0xB9) & 0x3F) ~= 0 then u.aimMon = true end
-        T.cur = u
+        -- the script's own $2E/$2F entries are nobody's action, and so are
+        -- their target bits: Dullahan's self-cast Cure 2 ($02/$2E, aimed
+        -- $00/$01) followed by a $2F aimed $24/$02 read as a turn aimed at
+        -- the party and counted, where the ledger (rightly) calls it a buff
+        -- (the chain at 78f10b16: "unit 6: slot 0 turn cmds $02,$2F value 0
+        -- -> counted (aimed $00/$01 $24/$02)", units 7 against the ledger's 6)
+        local c = M.readByte(0xB5)
+        if c ~= 0x2E and c ~= 0x2F then
+          if (M.readByte(0xB8) & 0x0F) ~= 0 then u.aimParty = true end
+          if (M.readByte(0xB9) & 0x3F) ~= 0 then u.aimMon = true end
+          T.cur = u
+        end
       end)
       hookAt(M.sym("ApplyDmg"), function(x, y)
         local u = T.cur
         if u == nil or (M.readByte(0x11A2) & 0x80) ~= 0 then return end
+        -- a heal ($11A4 bit 0, "restore hp") is no hit on whoever it lands
+        -- on: Dullahan's Cure 2 on himself, drawn to CELES by her Runic,
+        -- reached ApplyDmg on entity 0 with $11A4=$21 and $FFFF damage, and
+        -- the truth read a self-cure as an action on the party (the chain at
+        -- 78f10b16, unit 6; build/attempts/wt/care-items/r6/tg_dbg)
+        if (M.readByte(0x11A4) & 0x01) ~= 0 then return end
         if y < 8 then
           u.hitParty = true
           local dmg = M.readWord(0x33D0 + y)

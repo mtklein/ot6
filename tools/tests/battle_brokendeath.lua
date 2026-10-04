@@ -45,24 +45,26 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 -- An attempt counts only when it shows BOTH the mid-break kill and #291's
 -- window (a standing monster's queued turn meeting its break), and that is a
--- property of the draw.  Four rungs, ten phases apart, derived from this
--- door's measured draws (build/attempts/wt/suite-honesty/brokendeath/
--- round2/): 214 rungs, on three paths (rung 1 in place, a lab's one-rung
--- sweep, and rungs after a reload), drew 32 distinct phases (the 30 that
--- are 0 or 3 mod 4, plus 26 and 30 as rung 1s), all measured, 22 counting
--- in every measurement (20 of the 30, plus 26 and 30).  Rung 1
--- draws its base minus 3.  A later rung's target falls, in runs of four,
--- on a phase q = 3 mod 4 or on q + 1, and which one follows rung 1's own
--- residue mod 4 (all 88 later rungs measured: 60 in a sweep of every target
--- after a reload, 28 in the suite's ladders).  On that model the worst of
--- the 30 bases this door can boot to needs its 3rd rung at gap 10, so four
--- leaves one to spare; gap 15 leaves a base with no counting rung at N = 4.
--- Crediting a later rung only when both q and q + 1 count, no gap-10 ladder
--- of up to six rungs covers every base.  The six-rung gap-10 ladder run from
--- all 60 seed shifts needed at most 3.  A regenerated fixture redraws this
--- map.  The property is asserted over every rung that ran, not only the one
--- that counts.
-local ATTEMPTS, GAP = 4, 10
+-- property of the draw AND of the driver that plays it.  The ladder was four
+-- rungs ten phases apart, a budget read off a map of which phases count that
+-- was measured with one driver (build/attempts/wt/suite-honesty/
+-- brokendeath/round2/: 22 of 32 drawn phases counting); the care-items
+-- driver, which holds a heal in flight, plays the same draws differently, and
+-- at 0a9a8446 the chain's run found no counting rung in four ("rungs ...:
+-- 1:0w/0sk 2:0w/0sk 3:0w/0sk 4:1w/0s", build/attempts/wt/care-items/r3/).
+-- So the budget is the map itself, not a measurement of it.  What a rung can
+-- draw (measured there): rung 1 draws its base minus 3; a later rung's
+-- target falls, in runs of four, on a phase q = 3 mod 4 or q + 1, one of
+-- the pair per run.  Sixty phases are fifteen runs of four, so rung 1 and
+-- one target in each of the fifteen runs visit every phase this door can
+-- draw; a stride of 28 (seven runs, coprime with fifteen) spreads the early
+-- rungs over the period.  The ladder stops at the first counting rung, so a
+-- driver whose map is dense pays one or two rungs and a sparse one pays
+-- more, and failing means no phase this fight can draw shows both, which
+-- is a finding about the driver or the gates, not the draw.  A rung that
+-- draws a seed an earlier rung drew is the same fight again: it is fought
+-- (the property is asserted over every rung that ran) but cannot count.
+local ATTEMPTS, GAP = H.SEED_PERIOD // 4 + 1, 28
 local L = H.newSeedSweep("battle 70", { attempts = ATTEMPTS, gap = GAP })
 local rungs = {}   -- per attempt: { n, windows, scripts, kill } (the verdict's record)
 
@@ -287,6 +289,11 @@ local function attempt(n)
     H.call(function()
       H.setPad({})
       local upto = deathFrame or H.frame
+      -- the same seed as an earlier rung is the same fight: not a new draw
+      local again = nil
+      for m = 1, n - 1 do
+        if L.seeds[m] and L.seeds[n] and L.seeds[m].seed == L.seeds[n].seed then again = m end
+      end
       local nWin, nScr = 0, 0
       for _, r in ipairs(execs) do
         if r.f >= (startFrame or 0) and r.f <= upto and r.ent >= 0x08
@@ -297,11 +304,16 @@ local function attempt(n)
       end
       local kill = deathFrame and deathTicks ~= 0 and sawBreak[deathSlot]
       rungs[#rungs + 1] = { n = n, windows = nWin, scripts = nScr,
-                            kill = kill and true or false,
+                            kill = kill and true or false, again = again,
+                            seed = L.seeds[n] and L.seeds[n].seed,
+                            phase = L.seeds[n] and L.seeds[n].phase,
                             startFrame = startFrame, upto = upto }
       H.log(string.format("attempt %d: %d window(s), %d broken-timer script "
         .. "turn(s) f%d..f%d", n, nWin, nScr, startFrame, upto))
-      if kill and nWin == 0 then
+      if again then
+        H.log(string.format("attempt %d drew $be=$%02X, the seed attempt %d drew: the same "
+          .. "fight again, fought but not counted", n, L.seeds[n].seed, again))
+      elseif kill and nWin == 0 then
         H.log(string.format("attempt %d: %s killed mid-break (tk=%d) but no "
           .. "queued turn met a break in this timeline -- no observation of "
           .. "#291's window; retrying", n, mname(deathSlot), deathTicks))
@@ -325,7 +337,7 @@ local function attempt(n)
   })
 end
 
-H.run({ maxFrames = 250000 }, {
+H.run({ maxFrames = 120000 + 16000 * ATTEMPTS }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(30),
@@ -385,11 +397,20 @@ H.run({ maxFrames = 250000 }, {
 
   -- 3. the fight, on the phase-spread sweep
   L.watch(),
-  attempt(1),
-  attempt(2),
-  attempt(3),
-  attempt(4),
-  L.report(),
+  (function()
+    local steps = {}
+    for n = 1, ATTEMPTS do steps[#steps + 1] = attempt(n) end
+    return seq(steps)
+  end)(),
+  -- the sweep's own check: every rung that took a phase drew a seed (the
+  -- watcher's positive control); a repeat is allowed here and is not counted
+  -- above, where L.report would refuse it
+  H.call(function()
+    for _, g in ipairs(rungs) do
+      H.assertEq(g.seed ~= nil, true, string.format("attempt %d drew a battle seed "
+        .. "(the seed watcher fired after its spread)", g.n))
+    end
+  end),
 
   -- 4. The property under test: a mid-break kill happened, and the
   -- `if_self_dead` script still ran and ended the fight.
@@ -402,6 +423,14 @@ H.run({ maxFrames = 250000 }, {
     end
     H.log("rungs (attempt:windows/broken scripts, k = mid-break kill): "
       .. table.concat(ran, " "))
+    -- the observed map: the phase each rung drew, and what it showed
+    local map = {}
+    for _, r in ipairs(rungs) do
+      map[#map + 1] = string.format("%d@%s%s%s%s", r.n, tostring(r.phase),
+        r.kill and "k" or "", r.windows > 0 and "w" or "", r.again and "=" .. r.again or "")
+    end
+    H.log(string.format("the map this run observed (attempt@phase, k kill, w window, =m a repeat): %s; "
+      .. "%d of the %d rungs the ladder allows were fought", table.concat(map, " "), #rungs, ATTEMPTS))
     H.assertEq(allScripts, 0,
       "no Broken monster ran its AI script in ANY rung that was fought "
       .. "(#291: a turn queued before the break is consumed at ExecAction)")
