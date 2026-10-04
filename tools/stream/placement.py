@@ -254,17 +254,6 @@ def fill(machines):
     return {"order": order, "room": len(order)}
 
 
-def place_line(p):
-    """The page's one line: each machine's room now."""
-    parts = []
-    for m in p["machines"]:
-        parts.append(f"{m['name']} {m['room']}" if "room" in m else
-                     f"{m['name']} (down)" if not m["up"] else
-                     f"{m['name']} (no runs logged yet)")
-    return ("room now: " + ", ".join(parts)
-            + " · python3 tools/stream/live.py --place N")
-
-
 @contextlib.contextmanager
 def locked(path):
     """An exclusive lock on path (a <path>.lock beside it), held by every
