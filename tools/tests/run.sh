@@ -72,7 +72,7 @@ fi
 SCRIPT="${1:?usage: run.sh <script.lua> [logfile]}"
 
 # A human-readable prefix for the workspace directory name.
-label=$(printf '%s' "${OT6_WORKER:-run}" | tr -c 'A-Za-z0-9_.-' '_')
+label=$(printf '%s' "${OT6_WORKER:-$(basename "$SCRIPT" .lua)}" | tr -c 'A-Za-z0-9_.-' '_')
 RUN_ROOT="$ROOT/build/test-runs"
 mkdir -p "$RUN_ROOT"
 WDIR=$(mktemp -d "$RUN_ROOT/${label}.XXXXXXXX") || exit 2
