@@ -19,6 +19,10 @@ real output path (`ninja ff6/rom/ff6-en.sfc`,
 when `configure.py`, the savestate graph, `VERSION`, or any globbed
 directory changes.
 
+Don't edit `tools/tests/run.sh` or any other shell script while a `ninja`
+or `run.sh` is executing it: bash reads scripts incrementally, and the
+running instances resume at shifted offsets and fail.
+
 ### Cuts and the chain from power-on
 
 A `.mss` belongs to one ROM, so after a ROM change every generated state
