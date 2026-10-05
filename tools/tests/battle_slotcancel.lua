@@ -438,7 +438,7 @@ local function approachFrame()
     -- without a Fenix Down no branch point can come (#377's sweep2 k5 spent
     -- 40000 frames healing around a fallen Setzer with an empty bag)
     H.assertEq(invCount(FENIX) > 0, true, string.format("precondition: a Fenix Down to " ..
-      "raise SETZER (battle %d, point %d: the bag is out)", battles, points))
+      "raise SETZER (f%d: the bag is out)", H.frame))
   end
   if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor then
     W = {}
