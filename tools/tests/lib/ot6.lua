@@ -12864,13 +12864,17 @@ local function coverageFlush()
 end
 
 local function traceTick()
-  if not M.tileAligned() then return end
+  -- the world map keeps its party tile in $e0/$e2, not the field object (#288)
+  local world = M.worldMode ~= nil and M.worldMode()
+  if world then
+    if not M.worldAligned() then return end
+  elseif not M.tileAligned() then return end
   local m = M.mapId() & 0x1ff
   if m ~= traceMap then
     traceFlush()
     traceMap = m
   end
-  local k = M.fieldX() .. ":" .. M.fieldY()
+  local k = world and (M.worldX() .. ":" .. M.worldY()) or (M.fieldX() .. ":" .. M.fieldY())
   if not traceSet[k] then
     traceSet[k] = true
     traceCount = traceCount + 1
