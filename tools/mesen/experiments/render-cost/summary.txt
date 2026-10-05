@@ -1,0 +1,179 @@
+# wt/render-cost summary, generated 2026-10-05 16:12:16 CDT on mbp (mbp, 14 cores); every run one emulator at a time, niced 10; load1s column = 1-min load average at each run
+
+## python3 rc_summary.py (medians of 3; Ginstr = retired instructions/1e9 from /usr/bin/time -l)
+workload variant      n  verdicts      frames  real(s): runs -> median   fps    vs base   Ginstr  load1s
+rwhelk   base         3  PASS            36896  78.36 78.71 78.25        ->   78.36     471                  1770  3.15 4.80 2.16
+rwhelk   skip128      3  PASS            36896  57.03 57.49 56.50        ->   57.03     647   27.2% less     1160  2.03 2.19 3.97
+rwhelk   skipall      3  PASS            36896  57.42 57.16 57.95        ->   57.42     643   26.7% less     1155  2.16 2.00 2.19
+rwhelk   nomixer      3  PASS            36896  77.75 78.84 77.45        ->   77.75     475    0.8% less     1768  2.24 2.57 2.18
+rwhelk   norewind     3  PASS            36896  76.81 77.25 77.37        ->   77.25     478    1.4% less     1745  3.27 4.45 2.13
+rwhelk   all_safe     3  PASS            36896  55.90 56.09 55.68        ->   55.90     660   28.7% less     1132  3.07 4.61 1.92
+rwhelk   nodsp_probe  1  PASS            36896  69.81                    ->   69.81     529   10.9% less     1632  1.75
+rrage    base         3  PASS            30753  71.41 71.95 70.87        ->   71.41     431                  1611  1.90 5.74 1.79
+rrage    skip128      3  PASS            30753  53.78 54.36 53.69        ->   53.78     572   24.7% less     1101  2.64 4.20 2.16
+rrage    skipall      3  PASS            30753  53.68 53.82 53.36        ->   53.68     573   24.8% less     1097  2.87 3.94 2.90
+rrage    nomixer      3  PASS            30753  71.30 71.44 71.00        ->   71.30     431    0.2% less     1609  2.56 4.32 2.01
+rrage    norewind     3  PASS            30753  70.28 70.46 70.04        ->   70.28     438    1.6% less     1588  2.89 3.50 1.96
+rrage    all_safe     3  PASS            30753  53.06 52.64 52.18        ->   52.64     584   26.3% less     1076  4.42 4.68 2.08
+rrage    nodsp_probe  1  PASS            30753  63.66                    ->   63.66     483   10.9% less     1496  2.08
+rzozo    base         3  PASS            80000  181.38 180.19 178.71     ->  180.19     444                  4072  3.55 4.09 1.67
+rzozo    skip128      3  PASS            80000  138.86 137.88 137.56     ->  137.88     580   23.5% less     2823  2.70 4.82 1.83
+rzozo    skipall      3  PASS            80000  137.47 137.68 136.94     ->  137.47     582   23.7% less     2813  2.17 4.25 1.86
+rzozo    nomixer      3  PASS            80000  181.07 181.16 180.10     ->  181.07     442   -0.5% less     4067  2.45 4.26 1.41
+rzozo    norewind     3  PASS            80000  176.95 178.55 177.20     ->  177.20     451    1.7% less     4010  3.17 5.38 1.54
+rzozo    all_safe     3  PASS            80000  133.56 135.40 134.44     ->  134.44     595   25.4% less     2755  2.93 2.78 2.11
+whelk    base         3  PASS            36896  86.88 85.46 86.04        ->   86.04     429                  1949  1.76 1.88 1.85
+whelk    skip128      1  PASS            36597  64.03                    ->   64.03     572   25.6% less     1335  2.61
+whelk    norewind     3  PASS            36896  84.47 84.16 84.91        ->   84.47     437    1.8% less     1923  1.99 1.92 2.47
+whelk    all_safe     1  PASS            36597  63.29                    ->   63.29     578   26.4% less     1306  1.83
+rage     base         3  PASS            30753  73.88 73.15 73.15        ->   73.15     420                  1637  2.62 2.10 2.10
+rage     skip128      1  FAIL              189  0.88                     ->    0.88     215   98.8% less       10  2.84
+rage     norewind     3  PASS            30753  71.54 71.88 73.42        ->   71.88     428    1.7% less     1614  1.79 2.10 2.84
+rage     all_safe     1  FAIL              189  0.69                     ->    0.69     274   99.1% less       10  2.84
+zozo     base         3  PASS           195744  464.32 469.68 471.31     ->  469.68     417                 10302  2.66 2.84 2.70
+
+## identity: rc_compare.py <workload>/base/r1 vs every other run (count of DIFFERENT sections, which ones)
+rwhelk base r2: 0 different | 
+rwhelk base r3: 0 different | 
+rwhelk skip128 r1: 0 different | 
+rwhelk skip128 r2: 0 different | 
+rwhelk skip128 r3: 0 different | 
+rwhelk skipall r1: 0 different | 
+rwhelk skipall r2: 0 different | 
+rwhelk skipall r3: 0 different | 
+rwhelk nomixer r1: 0 different | 
+rwhelk nomixer r2: 0 different | 
+rwhelk nomixer r3: 0 different | 
+rwhelk norewind r1: 0 different | 
+rwhelk norewind r2: 0 different | 
+rwhelk norewind r3: 0 different | 
+rwhelk all_safe r1: 0 different | 
+rwhelk all_safe r2: 0 different | 
+rwhelk all_safe r3: 0 different | 
+rwhelk nodsp_probe r1: 3 different | rcdump aram;rcstate 602;RESULT ;
+rrage base r2: 0 different | 
+rrage base r3: 0 different | 
+rrage skip128 r1: 0 different | 
+rrage skip128 r2: 0 different | 
+rrage skip128 r3: 0 different | 
+rrage skipall r1: 0 different | 
+rrage skipall r2: 0 different | 
+rrage skipall r3: 0 different | 
+rrage nomixer r1: 0 different | 
+rrage nomixer r2: 0 different | 
+rrage nomixer r3: 0 different | 
+rrage norewind r1: 0 different | 
+rrage norewind r2: 0 different | 
+rrage norewind r3: 0 different | 
+rrage all_safe r1: 0 different | 
+rrage all_safe r2: 0 different | 
+rrage all_safe r3: 0 different | 
+rrage nodsp_probe r1: 3 different | rcdump aram;rcstate 602;RESULT ;
+rzozo base r2: 0 different | 
+rzozo base r3: 0 different | 
+rzozo skip128 r1: 0 different | 
+rzozo skip128 r2: 0 different | 
+rzozo skip128 r3: 0 different | 
+rzozo skipall r1: 0 different | 
+rzozo skipall r2: 0 different | 
+rzozo skipall r3: 0 different | 
+rzozo nomixer r1: 0 different | 
+rzozo nomixer r2: 0 different | 
+rzozo nomixer r3: 0 different | 
+rzozo norewind r1: 0 different | 
+rzozo norewind r2: 0 different | 
+rzozo norewind r3: 0 different | 
+rzozo all_safe r1: 0 different | 
+rzozo all_safe r2: 0 different | 
+rzozo all_safe r3: 0 different | 
+whelk base r2: 0 different | 
+whelk base r3: 0 different | 
+whelk skip128 r1: 10 different | verdict |;ot6 (132;notes (132;pads (2728;rcdump aram;rcdump vram;rcdump wram;rcstate 602;shots DIFFERENT;RESULT ;
+whelk norewind r1: 0 different | 
+whelk norewind r2: 0 different | 
+whelk norewind r3: 0 different | 
+whelk all_safe r1: 10 different | verdict |;ot6 (132;notes (132;pads (2728;rcdump aram;rcdump vram;rcdump wram;rcstate 602;shots DIFFERENT;RESULT ;
+rage base r2: 0 different | 
+rage base r3: 0 different | 
+rage skip128 r1: 12 different | verdict |;ot6 (415;notes (413;pads (780;rcdump aram;rcdump cgram;rcdump oam;rcdump vram;rcdump wram;rcstate 602;shots DIFFERENT;RESULT ;
+rage norewind r1: 0 different | 
+rage norewind r2: 0 different | 
+rage norewind r3: 0 different | 
+rage all_safe r1: 12 different | verdict |;ot6 (415;notes (413;pads (780;rcdump aram;rcdump cgram;rcdump oam;rcdump vram;rcdump wram;rcstate 602;shots DIFFERENT;RESULT ;
+
+## first divergences of the live (pixel-reading) harness runs under skip128
+  verdict  DIFFERENT | [ot6] PASS (frame 36896) attempts=1/3 | [ot6] PASS (frame 36597) attempts=1/3
+  ot6      DIFFERENT (132 vs 132 lines) first difference at line 10: "[ot6] emitted blob 'poweron_cliff.png' (10678 bytes)" vs "[ot6] emitted blob 'poweron_cliff.png' (10790 bytes)"
+  pads     DIFFERENT (2728 vs 2734 lines) first difference at line 2550: '[ot6pad] 30247 a' vs '[ot6pad] 30127 a'
+  verdict  DIFFERENT | [ot6] PASS (frame 30753) attempts=1/1 | [ot6] FAIL: ...d/test-runs/rc_rage_skip128_1.dQoHNZr8/composed_live.lua:23979: assertEq fa
+  ot6      DIFFERENT (415 vs 22 lines) first difference at line 10: "[ot6] waitUntil 'battle active' satisfied after 120 frames" vs "[ot6] waitUntil 'battle active' satisfied after 0 frames"
+  notes    DIFFERENT (413 vs 19 lines) first difference at line 8: "[ot6note] 309 waitUntil 'battle active' satisfied after 120 frames" vs "[ot6note] 189 waitUntil 'battle active' satisfied after 0 frames"
+  pads     DIFFERENT (780 vs 22 lines)
+
+## nodsp_probe divergence (DSP synthesis is emulation, not output)
+  rcdump   DIFFERENT aram 65536 bytes, 10096 differ
+  rcstate  DIFFERENT 602 keys, 186 differ ['spc.dsp.adsr1', 'spc.dsp.brrData', 'spc.dsp.brrHeader', 'spc.dsp.brrNextAddress', 'spc.dsp.counter', 'spc.dsp.dirSampleTableAddress', 'spc.dsp.echoEnabled',
+RESULT DIFFERENT
+
+## sample profiles (rc_categorize.py)
+== build/rc/runs/whelk/base/rprof.sample.txt  (50477 busy samples at 1 ms, idle waits excluded)
+   12.1%  debugger + script-only bookkeeping
+    5.3%  lua dispatch + VM + emu.* API (harness Lua)
+    2.0%  png/deflate (screenshots, savestates)
+    3.8%  rewind/savestate
+   14.7%  PPU pixel pipeline (what _skipRender skips)
+    7.8%  PPU other (scanline timing, sprite eval/fetch, registers)
+    0.8%  video output (decode thread: filter/convert)
+    7.0%  DSP (sample synthesis, envelopes, echo)
+    6.6%  SPC700 (+timers)
+    0.1%  audio output (resample/mix)
+   28.9%  CPU + bus + DMA + clocks
+   10.7%  libc/kernel/other
+    other, top: <deduplicated_symbol> 8.3%; pthread_cond_timedwait_relative_np 0.8%; _platform_memmove 0.3%; GCToOSInterface::GetLowPrecisionTimeStam 0.2%; std::this_thread::sleep_for(std::chrono: 0.2%
+    top 25 self:
+== build/rc/runs/rwhelk/base/rprof.sample.txt  (50580 busy samples at 1 ms, idle waits excluded)
+   12.4%  debugger + script-only bookkeeping
+    0.0%  lua dispatch + VM + emu.* API (harness Lua)
+    1.2%  png/deflate (screenshots, savestates)
+    4.4%  rewind/savestate
+   16.0%  PPU pixel pipeline (what _skipRender skips)
+    8.4%  PPU other (scanline timing, sprite eval/fetch, registers)
+    0.8%  video output (decode thread: filter/convert)
+    7.4%  DSP (sample synthesis, envelopes, echo)
+    7.3%  SPC700 (+timers)
+    0.1%  audio output (resample/mix)
+   29.9%  CPU + bus + DMA + clocks
+   12.2%  libc/kernel/other
+    other, top: <deduplicated_symbol> 9.6%; GCToOSInterface::GetLowPrecisionTimeStam 0.4%; _platform_memmove 0.3%; std::this_thread::sleep_for(std::chrono: 0.2%; pthread_mutex_lock 0.2%
+    top 25 self:
+== build/rc/runs/rwhelk/skip128/rprof.sample.txt  (42356 busy samples at 1 ms, idle waits excluded)
+   17.5%  debugger + script-only bookkeeping
+    0.0%  lua dispatch + VM + emu.* API (harness Lua)
+    1.8%  png/deflate (screenshots, savestates)
+    6.3%  rewind/savestate
+    0.2%  PPU pixel pipeline (what _skipRender skips)
+    9.5%  PPU other (scanline timing, sprite eval/fetch, registers)
+    0.0%  video output (decode thread: filter/convert)
+   10.5%  DSP (sample synthesis, envelopes, echo)
+    9.9%  SPC700 (+timers)
+    0.2%  audio output (resample/mix)
+   41.8%  CPU + bus + DMA + clocks
+    2.3%  libc/kernel/other
+    other, top: <deduplicated_symbol> 1.1%; pthread_cond_timedwait_relative_np 0.4%; LockHandler::~LockHandler() 0.1%; mach_msg2_internal 0.1%; _platform_memmove 0.1%
+    top 25 self:
+
+## rc_split.py (rwhelk: profile shares x unprofiled median wall)
+category                                                    base s skip128 s  saved s
+debugger + script-only bookkeeping                             9.7      10.0     -0.3
+lua dispatch + VM + emu.* API (harness Lua)                    0.0       0.0      0.0
+png/deflate (screenshots, savestates)                          0.9       1.0     -0.1
+rewind/savestate                                               3.4       3.6     -0.1
+PPU pixel pipeline (what _skipRender skips)                   12.5       0.1     12.4
+PPU other (scanline timing, sprite eval/fetch, registers)      6.6       5.4      1.2
+video output (decode thread: filter/convert)                   0.6       0.0      0.6
+DSP (sample synthesis, envelopes, echo)                        5.8       6.0     -0.2
+SPC700 (+timers)                                               5.7       5.6      0.1
+audio output (resample/mix)                                    0.1       0.1     -0.0
+CPU + bus + DMA + clocks                                      23.4      23.8     -0.4
+libc/kernel/other                                              9.6       1.3      8.2
+total (median wall)                                           78.4      57.0     21.3
