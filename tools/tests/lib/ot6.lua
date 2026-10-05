@@ -7724,6 +7724,23 @@ function Driver:makePlan(actor)
       if la then return a.margin < b.margin end
       return a.pct < b.pct
     end)
+    -- the actor's own lift first (#312), the same rule the raise above
+    -- holds to: an actor inside its own round with a heal in hand that
+    -- lifts it heals itself before a needier ally -- measured on the Sealed
+    -- Gate cave (build/attempts/wt/v026-driver/367/gate/new_s20): "holds its
+    -- raise of entity 0 ... item $EA +646 = 820 over the 596 round lifts it
+    -- first", then a heal on entity 2 went first and the actor spent its pip
+    -- instead of lifting itself
+    if M.SPEND_SEES_THROUGH ~= false and hpNow[actor] > 0 and (price[actor] or 0) > 0
+       and hpNow[actor] <= price[actor] then
+      for i, c in ipairs(cands) do
+        if c.e == actor and i > 1 and ownLift() ~= nil then
+          table.remove(cands, i)
+          table.insert(cands, 1, c)
+          break
+        end
+      end
+    end
     local allies = 0
     for e = 0, 3 do
       if e ~= actor and hpNow[e] > 0 and maxOf(e) > 0 then
