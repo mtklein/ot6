@@ -42,7 +42,7 @@ town that sells the item, scales with the active party's highest level:
 | item | band | first shop on the route |
 |---|---|---|
 | Tonic | ~level x5, cap 99 | Figaro Castle (shop 4, `gen_edgar`) |
-| Fenix Down | ~level, ~15-20 | South Figaro (shop 8, `gen_kolts`) |
+| Fenix Down | ~level, ~15-20 | Figaro Castle (shop 4, `gen_edgar`, #307): toward the band with at most half the purse the tool shop leaves (two at L7, carrying three into the desert); South Figaro (shop 8, `gen_kolts`) fills it |
 | **Potion** | **~level x1.5, minimum 10** | the Phantom Train's ghost merchant (shop 85, `gen_sabin_train`; L14 -> 21) |
 | **Tincture** | **~level / 4, rounded up** (the MP column, #231: one caster's pool per stretch; [supply.md](supply.md)) | Narshe (shop 3, `gen_zozo1_submerge`; L14 -> 4).  Figaro Castle sells them too, and its purse cannot carry one. |
 | Tent | 4 from Albrook (the factory's two save points), 10 from Jidoor | Albrook (shop 24, `gen_vector_entry`); `gen_narshe_mission`'s TENT to 10 stands |

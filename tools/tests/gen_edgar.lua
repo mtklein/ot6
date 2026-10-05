@@ -79,6 +79,9 @@ local function seq(steps) return H.cond(function() return true end, steps) end
 
 local aPhase = 0
 
+-- the tool shop's two purchases, each price asserted at its buyItem below
+local TOOL_BILL = 750 + 500
+
 -- Cross the entrance whose source tile is (sx,sy), landing on map dm at
 -- (dx,dy).  The door tile is a wall until CheckDoor opens it, so BFS
 -- cannot plan through it: the crossing is navTo to a neighbouring tile
@@ -365,6 +368,32 @@ H.run({ maxFrames = 120000 }, {
   -- failing that assertion and blocking the whole downstream tree).
   H.buyItem(0xE8, 0, function() return 30 - invCount(0xE8) end, "TONIC to 30"),
   H.waitUntil(inState(0x26), 2400, "item shop: back at the buy list", 2),
+  -- #307: Fenix Downs before the desert.  The chain reaches this counter
+  -- with the one Fenix Down it found, and the next counter that sells them
+  -- is South Figaro's, across the desert and the cave, where TERRA (94 HP)
+  -- falls about one battle in six (battle_steal's own measurement).  The
+  -- band is ~level (docs/design/level-curve.md); a person watching their
+  -- gil keeps the tool shop's bill (BioBlaster 750 + NoiseBlaster 500, each
+  -- asserted at its purchase below) and spends at most half of what is left
+  -- on 500-gil Fenix Downs: South Figaro sells them at the same price, so
+  -- the rest is better carried there with the Antidotes and Softs its
+  -- counter buys before the grind.  On the 2026-10-05 chain (3978 gil here,
+  -- party L5/L7) that is two, carrying three into the desert.
+  H.buyItem(0xF0, 5, function()
+    local price = H.readWord(0x9f09 + 5 * 2)
+    local spare = gil() - TOOL_BILL
+    local lv = 0
+    for _, c in ipairs(H.partyMembers()) do
+      lv = math.max(lv, H.readByte(0x1600 + 37 * c + 8))
+    end
+    local afford = (spare // 2) // price
+    local want = math.max(0, math.min(lv - invCount(0xF0), afford))
+    H.log(string.format("[shop] Fenix Down: band %d (L%d), have %d, %d gil " ..
+      "spare after the tool bill of %d, half of it buys %d at %d: buying %d",
+      lv, lv, invCount(0xF0), spare, TOOL_BILL, afford, price, want))
+    return want
+  end, "FENIX DOWN toward the band"),
+  H.waitUntil(inState(0x26), 2400, "item shop: back at the buy list", 2),
   shopPress("b", inState(0x25), "item shop: back to options"),
   shopPress("b", function() return H.hasControl() and map() == 59 end,
     "item shop: closed"),
@@ -376,6 +405,8 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(invCount(0xE8) >= 25, true,
       string.format("Tonics restocked at the Figaro item shop (have %d)",
         invCount(0xE8)))
+    H.assertEq(gil() >= TOOL_BILL, true, string.format(
+      "the tool shop's bill (%d) is still in the purse (%d)", TOOL_BILL, gil()))
     H.log(string.format("[shop] item shop done: gil=%d tonic=%d potion=%d "
       .. "fenix=%d", gil(), invCount(0xE8), invCount(0xE9), invCount(0xF0)))
     where("item shop done")
