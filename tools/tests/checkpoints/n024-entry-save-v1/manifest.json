@@ -4,6 +4,14 @@
   "slot": 3,
   "milestone": "n024-entry-save",
   "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 273,
+      "x": 26,
+      "y": 53
+    }
+  },
   "size": 32768,
   "sha256": "7ca276dbf8b75a1422da5f54df3863e45ad07898a18273bcc446888a73a53e26",
   "provenance": {

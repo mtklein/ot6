@@ -58,7 +58,11 @@ wave() {  # <label> <stagger seconds> <builds wanted>
   done
   builds=$(cat "$TMP/$1".*.out | grep -c 'creating shared test emulator')
   if [ "$builds" = "$3" ]; then printf '  pass  %s: %s build(s), all %s workers served\n' "$1" "$builds" "$N"
-  else fail "$1: $builds build(s), want $3"; fi
+  else
+    fail "$1: $builds build(s), want $3"
+    # #371: which workers built, and what each one's look under the lock saw
+    grep -H 'creating shared test emulator' "$TMP/$1".*.out | sed "s|^$TMP/|        |"
+  fi
 }
 
 bundle_ok() {  # the shape the gate promises, and nothing the build leaves behind

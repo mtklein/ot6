@@ -4,6 +4,14 @@
   "slot": 3,
   "milestone": "esper-mtn-save",
   "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 375,
+      "x": 8,
+      "y": 44
+    }
+  },
   "size": 32768,
   "sha256": "6779647e125a58e8fd937cc67a6469743ff174b9fa61ed0cbc4dbb041d7d183d",
   "provenance": {

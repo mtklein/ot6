@@ -205,7 +205,7 @@ keep flagging it.
   the *last* row per species, so it read the dead block.  Fixed as #157:
   the first block is deleted, the parser reads first-wins, and
   `tools/check_shield_rows.py` fails the build on a duplicate species.
-  `tools/tests/probe_shield_rows.lua` measures the seeded class byte and
+  `tools/tests/probe_shield_rows.lua` (deleted in b18643d7) measured the seeded class byte and
   the per-hit chips from `zozo_arrival`.
 - Runic opens a target window in this ROM (`state $38` after the confirm),
   so `newFightDriver` will need a target step if it ever gains a Runic

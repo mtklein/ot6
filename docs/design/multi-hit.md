@@ -7,7 +7,7 @@ strikes twice, Bum Rush four times and Drill twice, each at power divided by
 its hit count (§5, where the hook lives).
 
 Three instruments support the shipped rule:
-`tools/tests/probe_multihit.lua` (the live rule and the break-window cap),
+`tools/tests/probe_multihit.lua` (deleted in b18643d7; the live rule and the break-window cap),
 `tools/tests/battle_hitcount.lua` (a suite test: a real Pummel, driven by
 controller input on the Mt. Kolts fixture, strikes twice), and
 `tools/audit_multihit.py` (the shipped table, re-derived from the ROM sources
