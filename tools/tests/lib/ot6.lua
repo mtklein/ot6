@@ -1222,7 +1222,7 @@ function M.roundCost(o)
         n = n + (window - en.eta) // en.period
       end
     end
-    local each0 = en.worst or o.fallback
+    local each0 = en.worst or en.rom or o.fallback
     if en.eta ~= nil and each0 ~= nil then
       if en.period ~= nil and en.period > 0 then
         rate = rate + each0 * window // en.period
@@ -1232,6 +1232,9 @@ function M.roundCost(o)
     end
     if n > 0 then
       local each, how = en.worst, "worst"
+      if each == nil and en.rom ~= nil then
+        each, how = en.rom, string.format("unseen, its script's worst $%02X from the ROM", en.romAtk or 0)
+      end
       if each == nil then each, how = o.fallback, "unmeasured, at the battle's worst" end
       actions = actions + n
       if each ~= nil then
@@ -5373,36 +5376,78 @@ end
 -- living monster skips its counter attacks) -- the counter that kills is
 -- the dying one, which runs regardless.  True means the verb is off the
 -- table this turn; the caller falls through to its next line.
-function Driver:counterVetoed(actor, use, slots, what)
-  local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
+-- The most attack `a` of monster slot `slot` can take off party entity
+-- `e`, by the models (M.physHitRange, M.magicHitRange) on the battle's own
+-- bytes and the ROM's MagicProp: 0 for a heal or a no-damage spell, nil
+-- for the monster's Special ($EF), which they do not price.
+local function monHitOn(slot, e, a)
   local MP = M.sym("MagicProp") & 0x3FFFFF
-  local y = actor * 2
-  local hp = M.readWord(0x3BF4 + y)
-  if hp == 0 then return false end
-  local tgt = { def = M.readByte(0x3BB8 + y), mdef = M.readByte(0x3BB9 + y),
+  local y, x = e * 2, 8 + slot * 2
+  local o = { def = M.readByte(0x3BB8 + y), mdef = M.readByte(0x3BB9 + y),
     shell = (M.readByte(BATTLE.ST3 + y) & 0x20) ~= 0, safe = (M.readByte(BATTLE.ST3 + y) & 0x40) ~= 0,
     defending = (M.readByte(0x3AA1 + y) & 0x02) ~= 0, backRow = (M.readByte(0x3AA1 + y) & 0x20) ~= 0,
     weak = M.readByte(0x3BE0 + y), half = M.readByte(0x3BE1 + y),
-    null = M.readByte(0x3BCD + y), absorb = M.readByte(0x3BCC + y) }
-  local function priced(slot, a)
-    local x = 8 + slot * 2
-    local o = { level = M.readByte(0x3B18 + x), magpow = M.readByte(0x3B41 + x),
-                vigor = M.readByte(0x3B2C + x) }
-    for k, v in pairs(tgt) do o[k] = v end
-    if a == 0xEE then                       -- Battle: its battle power, no element
-      o.power = M.readByte(0x3B68 + x)
-      local _, hi = M.physHitRange(o)
-      return hi or 0
-    end
-    if a == 0xEF then return nil end        -- Special: not priced
-    local r = MP + a * 14
-    o.power, o.flags2, o.elem = M.readRomByte(r + 6), M.readRomByte(r + 2), M.readRomByte(r + 1)
-    o.heal = (M.readRomByte(r + 4) & 0x01) ~= 0
-    if o.heal then return 0 end
-    local _, hi
-    if (o.flags2 & 0x01) ~= 0 then _, hi = M.physHitRange(o) else _, hi = M.magicHitRange(o) end
+    null = M.readByte(0x3BCD + y), absorb = M.readByte(0x3BCC + y),
+    level = M.readByte(0x3B18 + x), magpow = M.readByte(0x3B41 + x), vigor = M.readByte(0x3B2C + x) }
+  if a == 0xEE then                         -- Battle: its battle power, no element
+    o.power = M.readByte(0x3B68 + x)
+    local _, hi = M.physHitRange(o)
     return hi or 0
   end
+  if a == 0xEF then return nil end          -- Special: not priced
+  local r = MP + a * 14
+  o.power, o.flags2, o.elem = M.readRomByte(r + 6), M.readRomByte(r + 2), M.readRomByte(r + 1)
+  o.heal = (M.readRomByte(r + 4) & 0x01) ~= 0
+  if o.heal then return 0 end
+  local _, hi
+  if (o.flags2 & 0x01) ~= 0 then _, hi = M.physHitRange(o) else _, hi = M.magicHitRange(o) end
+  return hi or 0
+end
+
+-- An enemy the fight has not yet measured (#367), priced from what it can
+-- do: the attacks its AI script's main section names ($F0's three and the
+-- single-attack bytes; not the retaliation, which answers the party's
+-- hits), each through monHitOn on member e, and the most of them.  The
+-- Special ($EF) is priced as its Battle, a floor.  Measured on the Sealed
+-- Gate (care-policy-review recount_r5.txt section 2): slot 2's unseen $EB
+-- read "unmeasured, at the battle's worst" at 70 and landed 522.  Returns
+-- the price and the attack, or nil (no script, nothing it names hurts).
+-- M.PRICE_UNSEEN_FROM_ROM = false is the driver before #367.
+function Driver:scriptWorst(slot, e)
+  if M.PRICE_UNSEEN_FROM_ROM == false then return nil end
+  local species = M.readWord(M.FORMATION + slot * 2)
+  if species == 0xFFFF or species >= 0x180 then return nil end
+  local key = string.format("%d:%d:%d", slot, species, e)
+  self.romWorst = self.romWorst or {}
+  local c = self.romWorst[key]
+  if c ~= nil then return c.v, c.a end
+  local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
+  local off = M.readRomWord(ptrs + species * 2)
+  local function b(i) return M.readRomByte(base + off + i) end
+  local atks, i = {}, 0
+  while b(i) ~= 0xFF and i < M.AI_SCRIPT_MAX do
+    local op = b(i)
+    if op < 0xF0 then atks[#atks + 1] = op
+    elseif op == 0xF0 then atks[#atks + 1] = b(i + 1); atks[#atks + 1] = b(i + 2); atks[#atks + 1] = b(i + 3) end
+    i = i + (op < 0xF0 and 1 or (M.AI_OP_LEN[op] or 1))
+  end
+  local best, bestA = nil, nil
+  for _, a in ipairs(atks) do
+    if a ~= 0xFE then
+      local v = monHitOn(slot, e, a == 0xEF and 0xEE or a)
+      if v ~= nil and v > 0 and (best == nil or v > best) then best, bestA = v, a end
+    end
+  end
+  self.romWorst[key] = { v = best, a = bestA }
+  return best, bestA
+end
+
+function Driver:counterVetoed(actor, use, slots, what)
+  local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
+  local y = actor * 2
+  local hp = M.readWord(0x3BF4 + y)
+  if hp == 0 then return false end
+  local function priced(slot, a) return monHitOn(slot, actor, a) end
   local function worst(slot, u)
     local species = M.readWord(M.FORMATION + slot * 2)
     if species == 0xFFFF or species >= 0x180 then return 0, nil, {}, false end
@@ -6368,8 +6413,11 @@ function Driver:roundPriceFor(e)
         if v ~= nil and (worst == nil or v > worst) then worst = v end
       end
       local mconst = M.readWord(BATTLE.ATB_CONST + 8 + s2 * 2)
+      local rom, romAtk = nil, nil
+      if worst == nil then rom, romAtk = self:scriptWorst(s2, e) end
       enemies[#enemies + 1] = { slot = s2, eta = etaOf(8 + s2 * 2),
-        period = mconst > 0 and math.ceil(0xFF00 / mconst) or nil, worst = worst, typical = M.typicalOf(L) }
+        period = mconst > 0 and math.ceil(0xFF00 / mconst) or nil, worst = worst, typical = M.typicalOf(L),
+        rom = rom, romAtk = romAtk }
     end
   end
   return (M.roundCost({ window = window, enemies = enemies, fallback = fallback }))
@@ -6512,9 +6560,11 @@ function Driver:makePlan(actor)
                 if v ~= nil and (worst == nil or v > worst) then worst = v end
               end
               local mconst = M.readWord(BATTLE.ATB_CONST + 8 + s2 * 2)
+              local rom, romAtk = nil, nil
+              if worst == nil then rom, romAtk = self:scriptWorst(s2, e) end
               enemies[#enemies + 1] = { slot = s2, eta = etaOf(8 + s2 * 2),
                 period = mconst > 0 and math.ceil(0xFF00 / mconst) or nil, worst = worst,
-                typical = M.typicalOf(L) }
+                typical = M.typicalOf(L), rom = rom, romAtk = romAtk }
             end
           end
           if window == nil then
@@ -9190,6 +9240,7 @@ function Driver:idle()
   self.dmgHit, self.hitLedger, self.partyHpLast = {}, {}, {}
   self.monAct, self.deathSaid, self.battleDeaths, self.wipeSaid = nil, {}, {}, false
   self.monTurn = {}
+  self.romWorst = nil
   self.raisePending, self.topUpOwed, self.unmuddlePending = nil, {}, nil
   self.raiseQueued, self.cureQueued, self.healQueued = {}, {}, {}
   self.statusSaid, self.cureSaid, self.freeRoundSaid = {}, nil, false
