@@ -18,9 +18,11 @@ Five slots, all data-table work:
    only while the magicite is equipped.
 2. **Stat passive** — a fixed, constant stat bump (+magic, +speed…)
    that behaves like the passive below: active while
-   equipped, and learnable ✦. This is the only stat growth a
-   magicite grants. Vanilla's per-level bonuses stay deleted, and
-   there is no while-equipped-only stat mod either. It follows
+   equipped, and learnable ✦. Vanilla's per-level bonuses stay
+   deleted.  What ships today is the while-equipped half: an equipped
+   esper adds its signed vigor/speed/stamina/magic deltas (-7..+7,
+   `Ot6EsperStatTbl`, applied by `Ot6EsperStatMod` in
+   `UpdateEquipBattle`); the learnable half is not built. It follows
    Octopath's Support-Skill shape: a large bump that does not
    compound. Octopath sizes these at about +50 on a 999-scale stat;
    translate to FF6's stat ranges at tuning, so the roster
