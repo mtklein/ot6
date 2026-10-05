@@ -91,6 +91,10 @@ local function sample()
         end
         if not cgWhiteF and cgPal3() == 0x7FFF then cgWhiteF = H.frame end
         if not shot and #white[g] >= 3 then
+          if not H.frameDrawn() then
+            error("battle_breakflash: the flash frame was not drawn (render on demand, #394); "
+              .. "the suite calls H.renderAlways() for this")
+          end
           local ok, png = pcall(emu.takeScreenshot)
           if ok and type(png) == "string" and #png > 0 then
             shot, shotAt = png, H.frame
@@ -167,6 +171,8 @@ local function regauge(g)
 end
 
 H.run({ maxFrames = 60000 }, {
+  -- it screenshots the flash itself, on a frame it picks as it sees it (#394)
+  H.call(H.renderAlways),
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),

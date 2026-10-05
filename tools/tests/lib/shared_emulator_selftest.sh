@@ -31,6 +31,16 @@ else
   DEFAULT_CACHE=.cache/ot6; DEFAULT_APP=Mesen-test
   file_stamp() { stat -Lc '%s %Y' "$1"; }
 fi
+# A machine with the pin deployed (run.sh: ~/mesen-pins/<commit>/) provisions
+# that build, into a shared copy named after the pin
+PIN_COMMIT=$(cut -d' ' -f3 "$ROOT/tools/mesen/EMULATOR" 2>/dev/null)
+PIN_DIR="$HOME/mesen-pins/$PIN_COMMIT"
+PIN12=$(echo "$PIN_COMMIT" | cut -c1-12)
+if [ -n "$PIN_COMMIT" ] && [ "$(uname -s)" = Darwin ] && [ -x "$PIN_DIR/Mesen.app/Contents/MacOS/Mesen" ]; then
+  APP="$CACHE/Mesen-test-$PIN12.app"; SRC_BIN="$PIN_DIR/Mesen.app/Contents/MacOS/Mesen"
+elif [ -n "$PIN_COMMIT" ] && [ "$(uname -s)" != Darwin ] && [ -x "$PIN_DIR/Mesen" ]; then
+  APP="$CACHE/Mesen-test-$PIN12"; SRC_BIN="$PIN_DIR/Mesen"
+fi
 N=16
 fails=0
 fail() { echo "  FAIL  $*"; fails=$((fails + 1)); }

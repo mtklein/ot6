@@ -123,6 +123,8 @@ local function splashUp()
 end
 
 H.run({ maxFrames = 3000 }, {
+  -- it reads the screen's pixels itself, outside a battle (#394)
+  H.call(H.renderAlways),
   H.waitUntil(splashUp, 1200, "the splash, faded in", 1),
   H.waitFrames(30),
   H.call(function()
