@@ -37,11 +37,13 @@ THE RATCHET (owner, 2026-09-01), two tiers:
    the walkers' `[outcome] battle $<formation>`) and, by the `[tiles]`
    line that follows it (flushed as the party leaves a map), the map it
    was fought on.  A field map is claimed when a formation of its own pool
-   was fought there.  A world sector (world_battle_group.dat, bytes 0-255
-   the World of Balance, 256-511 the World of Ruin) is claimed when a
-   formation of its group was fought on that world's map: the [tiles]
-   trace records no world coordinates yet (#288), so a group shared by a
-   played sector and an unplayed one claims both.  The hand list this
+   was fought there.  A world sector byte (world_battle_group.dat, bytes
+   0-255 the World of Balance, 256-511 the World of Ruin; field/battle.asm
+   CheckBattleWorld indexes it world*256 + (y & $E0) + ((x >> 3) & $1C) +
+   the terrain's group) is claimed when a formation of its group was
+   fought on that world's map and, once the [tiles] trace records world
+   coordinates (#288), the party walked that sector; until then a group
+   shared by a played sector and an unplayed one claims both.  The hand list this
    replaced claimed fifteen World of Ruin maps nobody had visited and the
    whole WoB overworld (Triangle Island, the airship-only isles), and
    missed Esper Mountain and the Floating Continent.  With no logs the
@@ -120,10 +122,14 @@ OUTCOME = re.compile(r'^\[ot6\] .*\[outcome\] battle \$([0-9A-F]{3}) ')
 TILES = re.compile(r'^\[ot6\] \[tiles\] map=(\d+) ')
 
 
+XY = re.compile(r'xy=(\S+)')
+
+
 def fought_by_map(paths):
     """{map: {formation}}: each battle a log names, on the map whose
     [tiles] line comes next (the trace flushes a map as the party leaves
-    it, and a battle leaves $1F64 on its field map)."""
+    it, and a battle leaves $1F64 on its field map).  Also fills WALKED
+    with each world's walked sector bases."""
     out = {}
     for path in paths:
         pending = set()
@@ -134,14 +140,33 @@ def fought_by_map(paths):
                     pending.add(int(m.group(1), 16))
                     continue
                 t = TILES.match(line)
+                if t and int(t.group(1)) in (0, 1):
+                    w = int(t.group(1))
+                    for xy in XY.search(line).group(1).split(','):
+                        x, _, y = xy.partition(':')
+                        if x.isdigit() and y.isdigit() and (int(x), int(y)) != (0, 0):
+                            TILESEEN.setdefault(w, set()).add((int(x), int(y)))
+                            WALKED.setdefault(w, set()).add(
+                                w * 256 + (int(y) & 0xE0) + ((int(x) >> 3) & 0x1C))
                 if t and pending:
                     out.setdefault(int(t.group(1)), set()).update(pending)
                     pending = set()
     return out
 
 
+# {world: {sector base byte}} walked, from [tiles] lines with world
+# coordinates; empty for a world whose logs carry none (#288)
+WALKED = {}
+TILESEEN = {}
+
+
 LOGS = sorted(glob.glob(os.path.join(ROOT, 'build', 'states', '*.log')))
 FOUGHT = fought_by_map(LOGS)
+# a world's walked sectors count once its logs record the world trace
+# (#288): the blind trace wrote only the field coordinates of map-change
+# frames under map=0/1, 56 distinct tiles across the 217 logs of
+# 2026-10-05, where one World of Ruin leg alone walks 221
+WALKED = {w: secs for w, secs in WALKED.items() if len(TILESEEN[w]) >= 100}
 
 
 def group_forms(g):
@@ -153,7 +178,9 @@ CLAIMED_FIELD = {m for m in range(len(props)//33)
                  and group_forms(sbg[m]) & FOUGHT.get(m, set())}
 CLAIMED_WORLD_SECTORS = {sec for sec in range(512)
                          if wbg[sec] != 0xFF
-                         and group_forms(wbg[sec]) & FOUGHT.get(sec // 256, set())}
+                         and group_forms(wbg[sec]) & FOUGHT.get(sec // 256, set())
+                         and (sec // 256 not in WALKED
+                              or sec & ~3 in WALKED[sec // 256])}
 
 PARTY_CLASSES = 0x01 | 0x02 | 0x04          # slash+pierce+bludg, broadly held
 PARTY_ELEMS   = 0x01 | 0x02 | 0x04          # fire+ice+bolt once espers exist
@@ -224,7 +251,8 @@ print(f'tuning claim, from {len(LOGS)} generator log(s) in build/states '
       f'({nfought} map+formation pairs fought): {len(CLAIMED_FIELD)} field '
       f'maps {sorted(CLAIMED_FIELD)}; world sector bytes: '
       f'{len([s for s in CLAIMED_WORLD_SECTORS if s < 256])} of the WoB, '
-      f'{len([s for s in CLAIMED_WORLD_SECTORS if s >= 256])} of the WoR; '
+      f'{len([s for s in CLAIMED_WORLD_SECTORS if s >= 256])} of the WoR '
+      f'(walked sectors known for world(s) {sorted(WALKED) or "none"}); '
       f'{len(unclaimed)} battle-enabled maps UNCLAIMED')
 if not LOGS:
     print('  (no generator logs: nothing is claimed until the route is played)')
