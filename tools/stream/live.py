@@ -614,6 +614,7 @@ def scan_worker(data, shots_stuck, frames_stuck):
 
 # ---- throughput: frames emulated per second, and one record per run -------
 FRAME_B = re.compile(rb"^\[ot6(?:shot|pad|note)\] (\d+) ")
+FRAME_LINE = re.compile(rb"^\[ot6(?:shot|pad|note)\] \d+ ", re.M)
 FPS_WINDOW = 30.0      # seconds the per-machine frames/s figure averages over
 
 
@@ -635,6 +636,17 @@ def run_progress(data):
     if max(p, f) >= 0:
         verdict = "pass" if p > f else "fail"
     return frame, verdict
+
+
+def _ended(data):
+    """True when a run.log tail ends in its run's verdict: no screenshot,
+    pad or note line after the last "[ot6] PASS (frame" / "[ot6] FAIL:".
+    A sweep or a retry ladder logs a verdict and plays on; only the last
+    word ends the run."""
+    v = max(data.rfind(b"\n[ot6] PASS (frame "), data.rfind(b"\n[ot6] FAIL: "))
+    if v < 0:
+        return False
+    return FRAME_LINE.search(data[v + 1:].split(b"\n", 1)[-1]) is None
 
 
 def _run_start(ws):
@@ -746,7 +758,7 @@ class Scanner:
             # a run that spoke its verdict and has gone quiet is over: it
             # leaves the grid now, not when its log ages out (its tile would
             # linger with "frame --" and a last, stale picture)
-            if run_progress(data)[1] is not None and now - mtime > 3:
+            if _ended(data) and now - mtime > 3:
                 continue
             # a changed screen goes out at once; an unchanged one again
             # every PNG_RESEND_SEC, so a snapshot the viewer lost (a dropped
@@ -858,6 +870,7 @@ class Scanner:
 
 PEER_STALE_SEC = 20   # a peer silent this long is shown unreachable
 PNG_RESEND_SEC = 15   # an unchanged screenshot is sent again this often
+PNG_GRACE_SEC = 60    # a worker's picture outlives its last listing this long
 
 # ---- placement: where the next emulators should go ------------------------
 # The model (curves, knees, claims, fill order) is tools/stream/placement.py;
@@ -881,6 +894,7 @@ class Board:
         self.m = {n: {"snap": None, "progress": None, "ok_ts": None,
                       "down_since": t, "err": "connecting"} for n in names}
         self.pngs = {n: set() for n in names}   # PNG files on disk per machine
+        self.png_seen = {}                      # machine -> worker id -> last listed
         self.procs = {}   # name -> its live ssh child (peer_thread)
         # The run log lives in the main tree, like build/attempts, so every
         # viewer (whichever tree it runs from) adds to and reads one history.
@@ -932,8 +946,17 @@ class Board:
             except OSError:
                 pass
         live = {w["id"] for w in snap.get("workers", [])}
-        for wid in list(self.pngs[name] - live):   # finished workers
-            self._drop_png(name, wid)
+        now = time.time()
+        seen = self.png_seen.setdefault(name, {})
+        for wid in live:
+            seen[wid] = now
+        # a worker gone from one snapshot keeps its picture a while: it is
+        # deleted only after PNG_GRACE_SEC unseen, so a tile never points at
+        # a file a moment ago deleted
+        for wid in list(self.pngs[name] - live):
+            if now - seen.get(wid, 0) > PNG_GRACE_SEC:
+                self._drop_png(name, wid)
+                seen.pop(wid, None)
         if snap.get("done"):
             self._log_runs(name, snap["done"])
         with self.lock:
