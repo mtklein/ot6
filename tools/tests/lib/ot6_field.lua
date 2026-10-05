@@ -6310,9 +6310,10 @@ end
 --      learned.  Ties go to the member already wearing the relic, then to
 --      the order of `members`.
 --   3b. The Exp. Egg (+13 bit 3) to the member furthest behind on levels,
---      in a free slot or in place of a guard or spare that is not
---      threat-critical, never over an acting relic and never when arming
---      for a boss (threats.boss); opts.egg = false leaves it to step 4.
+--      in a free slot or in place of the lowest-ranked relic there that
+--      is not threat-critical (a spare, a guard adding no threatened
+--      status, then an acting relic by rank), never when arming for a
+--      boss (threats.boss); opts.egg = false leaves it to step 4.
 --   4. A slot nothing above took keeps what it holds, else the leftover
 --      the member can wear.
 -- Arm per fight (#351): a generator calls this before a fight with that
@@ -6429,12 +6430,13 @@ end
 -- members: { { charId, "NAME" }, ... }; those not in the active party are
 -- left out.  Returns { { ch=, name=, want={ [4]=id, [5]=id }, changes={
 -- {slot, id}, ... } }, ... } and logs every decision as a [relics] line.
--- Step 3b's one class test: the Egg may take a slot only from a guard or a
--- spare ward (and then only one that is not threat-critical), never from an
--- acting relic.  A function of its own so field_relicplan's mutant can
--- switch it off (mutants_relic.sh nosoft).
+-- Step 3b's one class test: the relic classes the Egg may take a slot from
+-- (a guard or a spare ward, and an acting relic, the lowest rank first;
+-- relicPlan then refuses any that is threat-critical), never a two-weapon
+-- relic, a ward or another Egg.  A function of its own so field_relicplan's
+-- mutants can switch it.
 function M.eggMayDisplace(cl)
-  return cl ~= nil and (cl.aff == "guard" or cl.aff == "spare")
+  return cl ~= nil and not cl.hands and cl.aff ~= "ward" and cl.aff ~= "behind"
 end
 function M.relicPlan(members, opts)
   opts = opts or {}
@@ -6660,13 +6662,22 @@ function M.relicPlan(members, opts)
     end
   end
   -- 3b. the Exp. Egg (#351): to the member furthest behind on levels
-  -- (below the party's highest; the lowest, then the order of `members`),
-  -- into a free slot, else in place of a guard or a spare ward planned
-  -- there that is not threat-critical (a guard adding a threatened status
-  -- the member would not otherwise have is) -- never over an acting relic
-  -- (Haste, damage, counter: the first cut took SETZER's Black Belt in 11
-  -- of 13 tomb runs and EDGAR's RunningShoes in 2, review of f8f9ad66), and
-  -- never when arming for a boss (threats.boss).  Nobody behind: step 4.
+  -- (below the party's highest), "when no threat-critical relic is
+  -- displaced" (the owner's ranking, v0.24 ombudsman C5): into a free slot,
+  -- else in place of the lowest-ranked relic planned there that is not
+  -- threat-critical -- a spare ward, a guard adding no threatened status
+  -- the member would not otherwise have, then an acting relic by rank
+  -- (counter or +25% magic 2, vigor 3, +25% both 4, Haste 5).  A guard
+  -- that adds a threatened status, a ward this fight calls for and a
+  -- two-weapon relic are threat-critical and never displaced.  Among the
+  -- members tied furthest behind, the one whose displaced relic ranks
+  -- lowest (one already wearing the Egg first).  Never when arming for a
+  -- boss (threats.boss).  Nobody behind: step 4.
+  -- History: the first cut (f8f9ad66) took SETZER's Black Belt in 11 of 13
+  -- tomb runs and EDGAR's RunningShoes in 2; its review then barred every
+  -- acting relic, after which the chain never wore the Egg at all
+  -- ("[relics after Dullahan] SETZER: slot 4 Black Belt $D5, slot 5 Star
+  -- Pendant $B1", build/attempts/wt/v026-field/351/).
   local function critical(m, s)
     local w = m.want[s]
     if w == nil then return false end
@@ -6686,37 +6697,50 @@ function M.relicPlan(members, opts)
   for _, id in ipairs(order) do
     local cl = M.relicClass(id, opts.threats)
     if cl.aff == "behind" and opts.egg ~= false and not (opts.threats and opts.threats.boss) then
-      local behind = {}
-      for _, m in ipairs(ms) do
-        if m.level < top and wearsItem(m.ch, id) then behind[#behind + 1] = m end
-      end
-      table.sort(behind, function(a, b)
-        if a.level ~= b.level then return a.level < b.level end
-        return a.order < b.order
-      end)
-      for _, m in ipairs(behind) do
-        if count[id] < 1 then break end
-        local worn = wearing(m, id) and (m.want[4] == id or m.want[5] == id)
-        if not worn then
-          if hasFree(m) then
-            take(m, id, string.format("the Exp. Egg to the member furthest behind on levels (L%d, the party's "
-              .. "highest L%d), a free slot", m.level, top))
-          else
+      while count[id] > 0 do
+        local low = nil
+        for _, m in ipairs(ms) do
+          if m.level < top and wearsItem(m.ch, id) and m.want[4] ~= id and m.want[5] ~= id then
+            low = (low == nil or m.level < low) and m.level or low
+          end
+        end
+        if low == nil then break end
+        local best = nil
+        for _, m in ipairs(ms) do
+          if m.level == low and wearsItem(m.ch, id) and m.want[4] ~= id and m.want[5] ~= id then
             for _, s in ipairs(m.free) do
-              local wc = m.want[s] ~= nil and M.relicClass(m.want[s], opts.threats) or nil
-              local soft = M.eggMayDisplace(wc)
-              if count[id] > 0 and m.want[s] ~= nil and m.want[s] ~= id and soft and not critical(m, s) then
-                local w = m.want[s]
-                m.want[s] = nil
-                count[w] = count[w] + 1
-                take(m, id, string.format("the Exp. Egg to the member furthest behind on levels (L%d, the "
-                  .. "party's highest L%d), in place of %s, which guards nothing this fight threatens",
-                  m.level, top, relicName(w)))
-                break
+              local w, key = m.want[s], nil
+              if w == nil then key = -1
+              elseif w ~= id and M.eggMayDisplace(M.relicClass(w, opts.threats)) and not critical(m, s) then
+                key = M.relicClass(w, opts.threats).rank
+              end
+              if key ~= nil then
+                local c = { m = m, s = s, key = key, wears = wearing(m, id) }
+                if best == nil or c.key < best.key
+                   or (c.key == best.key and c.wears and not best.wears)
+                   or (c.key == best.key and c.wears == best.wears and m.order < best.m.order) then
+                  best = c
+                end
               end
             end
           end
         end
+        if best == nil then
+          lines[#lines + 1] = string.format("the Exp. Egg stays off: every slot of the members behind on levels "
+            .. "(L%d, the party's highest L%d) holds a threat-critical relic", low, top)
+          break
+        end
+        local m, w = best.m, best.m.want[best.s]
+        if w ~= nil then
+          m.want[best.s] = nil
+          count[w] = count[w] + 1
+        end
+        take(m, id, w == nil
+          and string.format("the Exp. Egg to the member furthest behind on levels (L%d, the party's highest "
+            .. "L%d), a free slot", m.level, top)
+          or string.format("the Exp. Egg to the member furthest behind on levels (L%d, the party's highest "
+            .. "L%d), in place of %s, the lowest-ranked relic there that no threat needs (rank %d)",
+            m.level, top, relicName(w), best.key))
       end
     end
   end
