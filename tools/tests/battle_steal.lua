@@ -139,11 +139,31 @@ end
 local mf = 0
 local drive = { wantBp = 0, wantPend = 0, target = nil }
 local tc = H.targetCursor({ mask = 0x7B7E })
+-- A banking item turn is a heal, and it goes where a person aims a heal
+-- (#298): the most wounded living member by the share of max HP missing,
+-- not the item's default target, LOCKE himself.  TERRA (94 max HP) fell in
+-- battle 1 in 6 of 46 runs while LOCKE topped himself up
+-- (build/attempts/wt/steal-wipe/summary.txt: "dead(sampled)=['2']").  nil
+-- (the default target) when nobody is hurt.
+local tcChars = H.targetCursor({ mask = 0x7B7D })
+local function mostWounded()
+  local best, bestFrac = nil, nil
+  for e = 0, 3 do
+    local hp, mx = H.readWord(0x3BF4 + e * 2), H.readWord(0x3C1C + e * 2)
+    if mx > 0 and mx ~= 0xFFFF and hp > 0 and hp < mx and (H.readByte(0x3A39) >> e) & 1 == 0 then
+      local frac = hp / mx
+      if bestFrac == nil or frac < bestFrac then best, bestFrac = e, frac end
+    end
+  end
+  return best
+end
+local bankSaid = nil
 local function decide()
   if H.readByte(MENU) == 0 then
     return (H.frame % 8 < 4) and { a = true } or {}
   end
   tc.observe()
+  tcChars.observe()
   mf = mf + 1
   local act = H.readByte(ACTOR) & 3
   local st = H.readByte(MSTATE)
@@ -172,7 +192,14 @@ local function decide()
       if cur < want then btn = "down"
       elseif cur > want then btn = "up"
       else btn = "a" end
-    elseif st == ST_TGT then btn = "a"
+    elseif st == ST_TGT then
+      local who = BANK_SELF ~= true and mostWounded() or nil
+      if who ~= nil then
+        local said = string.format("[bank] f%d LOCKE's banking item turn aims at entity %d (%d/%d HP), the most wounded",
+          H.frame, who, H.readWord(0x3BF4 + who * 2), H.readWord(0x3C1C + who * 2))
+        if said:gsub("^%[bank%] f%d+ ", "") ~= bankSaid then bankSaid = said:gsub("^%[bank%] f%d+ ", ""); H.log(said) end
+      end
+      btn = tcChars.steer(who, mf)
     else btn = "b" end
   elseif pend() < drive.wantPend then            -- BOOST: real R edges
     btn = (st == ST_CMD) and "r" or "b"
