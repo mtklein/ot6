@@ -41,10 +41,11 @@
 -- Cases 2-5 test the HP heal's fallbacks, so each switches the MP side's
 -- two arms off (opts.tent = false, opts.tincture = false).  The landing
 -- is on the world map, where the item list offers a Tent, and the care
--- pitches one ahead of any heal whenever the party is 1200 HP short in
--- total or anybody is under the MP band (docs/design/supply.md).  A walk
--- that leaves that big a hole makes the Tent the right call, so with the
--- arm on, "the Potion heals" held only for draws that left less (the
+-- pitches one ahead of any heal whenever the heals the bag would spend on
+-- the party's HP hole cost at least the Tent's 1200 gil, or anybody is
+-- under the MP band (docs/design/supply.md; field_tenthp).  A walk that
+-- leaves that big a hole makes the Tent the right call, so with the arm
+-- on, "the Potion heals" held only for draws that left less (the
 -- 2026-09-28 chain's case 2: 1296 HP short, a Tent pitched, no Potion).
 -- With no Tent on offer the Potion is what heals under any draw, and with
 -- the Tincture arm off only a cast can move TERRA's MP.
