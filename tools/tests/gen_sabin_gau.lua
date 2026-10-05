@@ -1950,8 +1950,13 @@ H.run({ maxFrames = 500000, allowGameOver = true }, {
       "the Dried Meat was fed to GAU through the real battle Item menu " ..
       "(the old 'measured undrivable' claim is retired -- see the header)")
     H.assertEq(invCount(DRIED_MEAT), 0, "the meat left the bag with GAU")
-    H.assertEq(fedSwitch(), true,
-      "the Dried-Meat reaction set Gau's battle switch")
+    -- fed as the grind latched it at the join (the switch, or the meat
+    -- gone from the bag).  $3EBD is battle RAM: re-read here, once the join
+    -- event has reached the world, it reads the world init's bytes now that
+    -- world control waits for the world's NMI (#343; the v0.26 chain's
+    -- chain_gau_joined, build/attempts/wt/v026-field/gau/)
+    H.assertEq(fed, true,
+      "the Dried-Meat reaction (as latched at the join) fed GAU")
   end),
   H.waitUntil(function()
     return H.worldMode() and H.worldHasControl() and H.worldAligned()
