@@ -5,15 +5,15 @@
   "milestone": "n024-entry-save",
   "persistent_layout": "ot6-codex-o8-v1",
   "size": 32768,
-  "sha256": "70b0a9c191ebdee4f8d0320978da140ad4015d34bbec0b7b0f8431258bfc8abc",
+  "sha256": "7ca276dbf8b75a1422da5f54df3863e45ad07898a18273bcc446888a73a53e26",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "70b0a9c191ebdee4f8d0320978da140ad4015d34bbec0b7b0f8431258bfc8abc",
-    "generator_sig": "24e08d28a6481152f9f425fd513fad03817e22776454b289b53cdebcdf7500ae gen_n024_save_checkpoint",
+    "payload_sha256": "7ca276dbf8b75a1422da5f54df3863e45ad07898a18273bcc446888a73a53e26",
+    "generator_sig": "88d5e4af3a5418df6d66b5bb0caf6591efe42f5918fbf6dafcb99e7e7e47354d gen_n024_save_checkpoint",
     "ancestors": [
       {
         "path": "build/states/chain_n024_entry.stamp",
-        "sha256": "443808a6824b471e58508044e6d8d1a18957a999bcccbc88b9fd0b21debd2500"
+        "sha256": "d5f9b3545bbed0e49fbcf83e94cbf2f97f6d306bb853aadafd17ba777f6e9a45"
       }
     ]
   }

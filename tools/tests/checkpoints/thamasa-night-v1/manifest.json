@@ -5,15 +5,15 @@
   "milestone": "thamasa-night",
   "persistent_layout": "ot6-codex-o8-v1",
   "size": 32768,
-  "sha256": "63ebc06eed06b6cb91ebc3d1676af7e9cafc7a438661d9dde33d551e2b3d6a53",
+  "sha256": "415809b0ede16e73a910e17722a6a8ecbf6b8d965798e5c4ce01be8764b8ea4f",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "63ebc06eed06b6cb91ebc3d1676af7e9cafc7a438661d9dde33d551e2b3d6a53",
-    "generator_sig": "88095e06e6eb4a67b3ac0a8bb895ef078d50ba2ca0c6715585c895e0f047822b gen_thamasa_arrive",
+    "payload_sha256": "415809b0ede16e73a910e17722a6a8ecbf6b8d965798e5c4ce01be8764b8ea4f",
+    "generator_sig": "a23104cd4900881ec021827ad71db0efb654d36a16274e6ccadd658c339ee9fd gen_thamasa_arrive",
     "ancestors": [
       {
         "path": "build/states/chain_crescent_landing.stamp",
-        "sha256": "a58caf6f5bce224090088cdb257fcad5adc6851524e1662e9c66146a3393050d"
+        "sha256": "13bebb9ef9994b9eaac7b03c365ead1b30b06fbd8de59d4028fb2b19dccde8eb"
       }
     ]
   }

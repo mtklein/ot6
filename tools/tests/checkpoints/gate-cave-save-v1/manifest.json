@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "2b99111d2f6c25e0bf712c9d2342709b39a1ab683b36060d1eddafbda87a4899",
+  "sha256": "1b18e9a33b6743ee4d3f64eac062783422b3afe72a544a5dea66b808185055d4",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "2b99111d2f6c25e0bf712c9d2342709b39a1ab683b36060d1eddafbda87a4899",
-    "generator_sig": "f4ceccfc5a2b5c56946a9f80b04c0e4ab781f65def1adeea7704b24c0a4cb1fd gen_gate_cave_save build/checkpoints/narshe-mission-v1/manifest.json build/checkpoints/narshe-mission-v1/narshe-mission.sram",
+    "payload_sha256": "1b18e9a33b6743ee4d3f64eac062783422b3afe72a544a5dea66b808185055d4",
+    "generator_sig": "83fa59b3eee4379d73d1c440001dc68b0e4065a2f932c1b2f0308a307677eb83 gen_gate_cave_save build/checkpoints/narshe-mission-v1/manifest.json build/checkpoints/narshe-mission-v1/narshe-mission.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/narshe-mission-v1/manifest.json",
-        "sha256": "04a18a0b0706ba52cffbee7e33040992e96de25e0c6a25f1789c48f7c6ec78b0"
+        "sha256": "ade5d2692afc1a588d13d29fa504093ccfad01e6e116813b0d53736c8ade782b"
       }
     ]
   }

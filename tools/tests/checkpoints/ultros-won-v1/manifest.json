@@ -5,15 +5,15 @@
   "milestone": "ultros-won",
   "persistent_layout": "ot6-codex-o8-v1",
   "size": 32768,
-  "sha256": "55886759a9c3ad70bd2e3e7ce4c8992f8cbe0c85b0876d0edcfb5fcbd1dc7809",
+  "sha256": "e70a3417db05ffc8ec31eb06c2d31c0baa0a7df66eceb0dcb3c9f00e26a8b8ca",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "55886759a9c3ad70bd2e3e7ce4c8992f8cbe0c85b0876d0edcfb5fcbd1dc7809",
-    "generator_sig": "4158b46a9f1346c8848d376f2414368e2f37afa5a969f6818cce421aa5a4159a gen_ultros build/checkpoints/esper-mtn-save-v1/manifest.json build/checkpoints/esper-mtn-save-v1/esper-mtn-save.sram",
+    "payload_sha256": "e70a3417db05ffc8ec31eb06c2d31c0baa0a7df66eceb0dcb3c9f00e26a8b8ca",
+    "generator_sig": "71297e8519cea985143f2d462b36ba6a9d84e1df5ed178c2c06fa33be20ad9f4 gen_ultros build/checkpoints/esper-mtn-save-v1/manifest.json build/checkpoints/esper-mtn-save-v1/esper-mtn-save.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/esper-mtn-save-v1/manifest.json",
-        "sha256": "972147c3f06b3b5a1df54597ec560341ab94642a64ece11d440d088533cb1256"
+        "sha256": "e32ae93094cf3815682292c54a5ef46af13a199e5c501732f63bc94cd552b3fe"
       }
     ]
   }
