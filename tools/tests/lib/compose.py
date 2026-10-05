@@ -898,9 +898,22 @@ class CrossTree(Exception):
     """A referenced sidecar exists only outside the composing tree."""
 
 
-BODY_OPEN = ("H.segmentBody(function()  -- the segment body (lib/ot6.lua's "
+# The body runs under xpcall at load (#369).  Raised uncaught, a load-time
+# error goes to Mesen's script log, which nothing reads headless, and the
+# emulator runs the game unscripted: run.sh's watchdog catches only a script
+# that printed nothing, so one that logged first sat silent until
+# OT6_TIMEOUT and was then retried as a timeout.  Caught, it is a FAIL line
+# with the error and its traceback, and the run stops on its first frame.
+# One line each, so the script's own line numbers move by one, as before.
+BODY_OPEN = ("do local __ot6_ok, __ot6_err = xpcall(function() "
+             "H.segmentBody(function()  -- the segment body (lib/ot6.lua's "
              "retry runner replays this)\n")
-BODY_CLOSE = "\nend)  -- H.segmentBody\n"
+BODY_CLOSE = ("\nend) end, function(e) return (type(debug) == 'table' and "
+              "debug.traceback or tostring)(e, 2) end)  -- H.segmentBody\n"
+              "if not __ot6_ok then H.log('FAIL: the script raised at LOAD, "
+              "before its first frame: ' .. tostring(__ot6_err)); "
+              "emu.addEventCallback(function() emu.stop(1) end, "
+              "emu.eventType.startFrame) end end\n")
 
 
 def inline_libs(script: str, lib: str, field: str, contract: str,
@@ -1250,7 +1263,10 @@ def selftest() -> int:
           got.startswith("-- a test\n") and "H.run({}, {})\n" in got, True)
     check("inline wraps the script in the replayable segment body (#178)",
           "H.segmentBody(function()" in got
-          and got.rstrip().endswith("end)  -- H.segmentBody"), True)
+          and "end)  -- H.segmentBody\n" in got, True)
+    check("inline runs the body under xpcall and FAILs a load error (#369)",
+          "xpcall(function() H.segmentBody(function()" in got
+          and "raised at LOAD" in got, True)
     check("inline opens the body AFTER the three lib halves",
           got.find("CONTRACTBODY") < got.find("H.segmentBody(function()"),
           True)
