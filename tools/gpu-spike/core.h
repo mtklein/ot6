@@ -362,9 +362,11 @@ static inline void interrupt(THR Cpu& s, THR Ctx& c, u32 vector) {
 }
 
 // ---------------------------------------------------------- one opcode --
-static inline void step(THR Cpu& s, THR Ctx& c, CDEV u32* dectab) {
-  u32 opcode = fetch8(s, c);
-  u32 dw = dectab[opcode];
+// The body of one instruction after its opcode byte.  The table-driven
+// step() calls it with the decode word looked up at run time; the
+// SWITCH256 variant calls it from a 256-case switch with the decode word
+// as a literal, so the compiler specializes each case (Mesen's shape).
+static inline __attribute__((always_inline)) void exec_body(THR Cpu& s, THR Ctx& c, u32 opcode, u32 dw) {
   u32 mode = dw & 31, op = (dw >> 5) & 127, wcls = (dw >> 12) & 3;
   bool load = (dw >> 14) & 1, store = (dw >> 15) & 1;
   bool w8 = wcls == W_8 || (wcls == W_M && (s.p & F_M)) || (wcls == W_X && (s.p & F_X));
@@ -679,6 +681,18 @@ static inline void step(THR Cpu& s, THR Ctx& c, CDEV u32* dectab) {
   }
 
   s.icount++;
+}
+
+static inline void step(THR Cpu& s, THR Ctx& c, CDEV u32* dectab) {
+  u32 opcode = fetch8(s, c);
+#ifdef SWITCH256
+  switch (opcode) {
+    SWITCH256_CASES
+    default: break;
+  }
+#else
+  exec_body(s, c, opcode, dectab[opcode]);
+#endif
 }
 
 // After each instruction: take the NMI the schedule says follows it.

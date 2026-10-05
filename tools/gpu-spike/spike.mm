@@ -54,7 +54,19 @@ int main(int argc, char** argv) {
     if (ckb.size() < K * ckSize) { fprintf(stderr, "need %u checkpoints, file has %zu\n", K, ckb.size() / ckSize); return 2; }
 
     id<MTLDevice> dev = MTLCreateSystemDefaultDevice();
-    std::string src = std::string("#include <metal_stdlib>\nusing namespace metal;\n") + read_text(std::string(SPIKE_DIR) + "/core.h") + "\n" + read_text(std::string(SPIKE_DIR) + "/kernel.metal");
+    std::vector<u32> dec0(256);
+    build_decode(dec0.data());
+    std::string pre = "#include <metal_stdlib>\nusing namespace metal;\n";
+    if (getenv("SPIKE_SWITCH256")) {
+      pre += "#define SWITCH256 1\n#define SWITCH256_CASES \\\n";
+      char line[128];
+      for (int i = 0; i < 256; i++) {
+        snprintf(line, sizeof line, "  case 0x%02X: exec_body(s, c, 0x%02Xu, 0x%08Xu); break; \\\n", i, i, dec0[i]);
+        pre += line;
+      }
+      pre += "\n";
+    }
+    std::string src = pre + read_text(std::string(SPIKE_DIR) + "/core.h") + "\n" + read_text(std::string(SPIKE_DIR) + "/kernel.metal");
     NSError* err = nil;
     MTLCompileOptions* opts = [MTLCompileOptions new];
     opts.mathMode = MTLMathModeSafe;
@@ -169,7 +181,7 @@ int main(int argc, char** argv) {
       }
     }
     uint64_t instrs = icount1 - icount0;
-    printf("device: %s\n", dev.name.UTF8String);
+    printf("device: %s  dispatch=%s\n", dev.name.UTF8String, getenv("SPIKE_SWITCH256") ? "switch256" : "table");
     printf("config: N=%u layout=%s stride=%u stagger=%u frames/instance=%u chunk=%u tg=%u dispatches=%d\n",
            N, interleave ? "interleave" : "contig", S, K, F, chunk, tg, dispatches);
     printf("status:");
