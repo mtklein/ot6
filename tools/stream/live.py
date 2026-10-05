@@ -237,6 +237,8 @@ async function tick(){ try{
       grid.appendChild(t);
     }
     const img = t.querySelector('img');
+    // a load that fails clears the mark, so the next tick asks again
+    if(!img.onerror) img.onerror = ()=>img.removeAttribute('data-s');
     if(w.shot && img.getAttribute('data-s')!==w.shot){
       img.setAttribute('data-s', w.shot); img.src = w.shot; }
     t.querySelector('.nm').textContent = w.name;
@@ -668,6 +670,7 @@ class Scanner:
         except Exception:
             self.tuning = (40, 200_000, 8, 2000)
         self.sent = {}         # worker id -> hash8 of the PNG last handed out
+        self.sent_ts = {}      # worker id -> when that PNG was last handed out
         self.live_ref = live_ref
         self.prog = None       # progress inputs, loaded on first use
         self.route_ts = 0      # commit time of ROOT's HEAD: the route's age
@@ -740,9 +743,14 @@ class Scanner:
             frame, png, h, stuck = scan_worker(data, s_stuck, f_stuck)
             self._track(wid, log, tag, branch, data, mtime, now)
             active.add(wid)
-            if png is not None and h is not None and self.sent.get(wid) != h:
+            # a changed screen goes out at once; an unchanged one again
+            # every PNG_RESEND_SEC, so a snapshot the viewer lost (a dropped
+            # line, a reconnect) can't leave its tile without a picture
+            if png is not None and h is not None and (
+                    self.sent.get(wid) != h
+                    or now - self.sent_ts.get(wid, 0) > PNG_RESEND_SEC):
                 pngs[wid] = png
-                self.sent[wid] = h
+                self.sent[wid], self.sent_ts[wid] = h, now
             rec = {"id": wid, "test": dirname.split(".")[0], "tree": tag,
                    "branch": branch, "frame": frame, "h": self.sent.get(wid),
                    "stuck": bool(stuck), "notes": _last_notes(data, 8)}
@@ -755,6 +763,7 @@ class Scanner:
         for wid in list(self.sent):
             if wid not in active:
                 del self.sent[wid]
+                self.sent_ts.pop(wid, None)
         try:
             load = [round(x, 2) for x in os.getloadavg()]
         except OSError:
@@ -843,6 +852,7 @@ class Scanner:
 
 
 PEER_STALE_SEC = 20   # a peer silent this long is shown unreachable
+PNG_RESEND_SEC = 15   # an unchanged screenshot is sent again this often
 
 # ---- placement: where the next emulators should go ------------------------
 # The model (curves, knees, claims, fill order) is tools/stream/placement.py;
@@ -971,8 +981,11 @@ class Board:
                 rec.update(
                     id=_safe_id(f"{n}_{w['id']}"), machine=n, local=(n == HOST),
                     name=w["test"] + (f" @{w['tree']}" if w["tree"] else ""),
+                    # only a picture the viewer has on disk: a tile never
+                    # points at a file that isn't there
                     shot=(f"grid/{_safe_id(n + '_' + w['id'])}.png?{w['h']}"
-                          if w.get("h") else None))
+                          if w.get("h") and os.path.exists(self._png(n, w["id"]))
+                          else None))
                 mine.append(rec)
             mine.sort(key=lambda w: (w["name"], w["id"]))
             workers += mine
