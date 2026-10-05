@@ -1429,6 +1429,20 @@ function M.raiseDecision(o)
       topUp, raiseHp + topUp, (o.roundCost or 0) > hit
         and string.format("the %d round", o.roundCost) or string.format("the %d hit", hit)), true
   end
+  -- Heading for a wipe (#374): every member still standing is inside one
+  -- round of death (o.wipe, the reason with its numbers).  A Fenix Down
+  -- refused there is a Fenix Down the party loses with: battle_healerdown's
+  -- riders wiped holding 2 on "7 HP, and even an ally's top-up first (7 + 0
+  -- = 7) does not clear the 16 round".  A raised member is one more body
+  -- the enemy's next actions can land on, and one more turn; that beats
+  -- the wipe whether or not the raise survives its round.  The top-up stays
+  -- owed when the bag has one.
+  if o.wipe and M.RAISE_INTO_WIPE ~= false then
+    return raiseHp, true, string.format("%d HP does not clear %s, but the party is heading for "
+      .. "a wipe (%s): a raise that buys a turn beats a wipe (#374)", raiseHp,
+      round > hit and string.format("the %d round", round) or string.format("the %d hit", hit),
+      o.wipe), topUp > 0
+  end
   if o.topUpFirst then
     return raiseHp, false, string.format("%d HP, and even an ally's top-up first "
       .. "(%d + %d = %d) does not clear %s", raiseHp, raiseHp, topUp,
@@ -6240,6 +6254,26 @@ function Driver:raiseOk(e, actor)
       o.topUpFirst = false
       detail = detail .. string.format("; gauges: nobody else standing to top up "
         .. "(slot %d is %d ticks from acting)", lethalSlot, lethalEta)
+    end
+  end
+  -- (#374) heading for a wipe: every member standing besides the fallen one
+  -- is inside one round of death, by the round makePlan prices (a full
+  -- gauge of their own)
+  if math.max(hit or 0, o.roundCost or 0) >= raiseHp and not o.killInReach then
+    local standing, inside, parts = 0, 0, {}
+    for p = 0, 3 do
+      local php = M.readWord(0x3BF4 + p * 2)
+      if p ~= e and php > 0 and php ~= 0xFFFF and M.readWord(0x3C1C + p * 2) > 0
+         and (M.leftMask() >> p) & 1 == 0 then
+        standing = standing + 1
+        local rp = self:roundPriceFor(p) or 0
+        if rp > 0 and php <= rp then inside = inside + 1 end
+        parts[#parts + 1] = string.format("e%d %d under %d", p, php, rp)
+      end
+    end
+    if standing > 0 and inside == standing then
+      o.wipe = string.format("%d standing, every one inside its round: %s", standing,
+        table.concat(parts, ", "))
     end
   end
   local _, ok, why, needsTopUp = M.raiseDecision(o)
@@ -11789,9 +11823,9 @@ function Driver:watchHits()
     end
     local cls = M.wipeClass(self.battleDeaths, { onePct = BATTLE.ONE_SHOT_PCT,
       early = BATTLE.EARLY_TICKS, banked = BATTLE.BANKED_BP, statues = statues })
-    M.log(string.format("[%s] [wipe] f+%d party_bp=%s deaths=%s class=%s",
+    M.log(string.format("[%s] [wipe] f+%d party_bp=%s deaths=%s class=%s fenix=%d",
       self.tag or "fight", self.battleTick, table.concat(pbp, ","),
-      #ds > 0 and table.concat(ds, ";") or "none", cls))
+      #ds > 0 and table.concat(ds, ";") or "none", cls, bagCount(BATTLE.FENIX_DOWN)))
   end
 end
 

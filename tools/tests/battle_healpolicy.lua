@@ -405,6 +405,20 @@ H.run({ maxFrames = 3000 }, {
                                                 topUpFirst = false, topUp = 250 })
     H.assertEq(tostring(ok), "false",
       "...and with the enemy first and no kill in reach, not raised to die again (" .. why .. ")")
+    -- heading for a wipe (#374): battle_healerdown's riders (chain14 on
+    -- the care-items branch) wiped holding 2 Fenix Downs on "7 HP, and even
+    -- an ally's top-up first (7 + 0 = 7) does not clear the 16 round" -- an
+    -- empty top-up bag, every member standing inside its round.  The raise
+    -- that buys a turn goes; with someone standing clear it does not.
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 60, power = 2, smallestHit = 9, roundCost = 16,
+                                                topUpFirst = true, topUp = 0,
+                                                wipe = "2 standing, every one inside its round: e1 13 under 16, e2 9 under 16" })
+    H.assertEq(tostring(raiseHp) .. "/" .. tostring(ok) .. "/" .. tostring(needs), "7/true/false",
+      "7 HP under a 16 round with nothing to top it up, the party heading for a wipe: raised, no top-up owed (" .. why .. ")")
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 60, power = 2, smallestHit = 9, roundCost = 16,
+                                                topUpFirst = true, topUp = 0 })
+    H.assertEq(tostring(ok), "false",
+      "...and the same raise with a member standing clear of the round is refused (" .. why .. ")")
     raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 363, power = 2, smallestHit = nil })
     H.assertEq(tostring(ok) .. "/" .. tostring(needs), "true/true",
       "nothing measured: the raise stands, and its top-up is owed -- not judged to survive alone (" .. why .. ")")
