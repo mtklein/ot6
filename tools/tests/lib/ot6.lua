@@ -1193,7 +1193,10 @@ end
 --            has landed this battle); nil = such an action adds nothing
 --   each enemy may also carry `rom`: for one with nothing measured, the
 --            most its own script's attacks can take off this member, priced
---            from the ROM (Driver:scriptWorst, #367), used before fallback
+--            from the ROM (Driver:scriptWorst, #367), used before fallback;
+--            it costs about 2.6% more won ticks in the Sealed Gate's cave
+--            and the spend rule fires ~98 times in 10 runs against 2
+--            (deaths 3 against 7: 10 shifts, a small sample; see there)
 --   each enemy may also carry `typical`: the mean of the actions it has
 --            taken (each action's largest loss on one member, a miss or a
 --            buff a zero; Driver:commitMonAct), nil = not measured
@@ -5416,9 +5419,20 @@ end
 -- hits), each through monHitOn on member e, and the most of them.  The
 -- Special ($EF) is priced as its Battle, a floor.  Measured on the Sealed
 -- Gate (care-policy-review recount_r5.txt section 2): slot 2's unseen $EB
--- read "unmeasured, at the battle's worst" at 70 and landed 522.  Returns
--- the price and the attack, or nil (no script, nothing it names hurts).
--- M.PRICE_UNSEEN_FROM_ROM = false is the driver before #367.
+-- read "unmeasured, at the battle's worst" at 70 and then took at least
+-- 522 (it killed a member from 522).  Returns the price and the attack, or
+-- nil (no script, nothing it names hurts).  M.PRICE_UNSEEN_FROM_ROM = false
+-- is the driver before #367.
+-- The cache is keyed on slot, species and member for the battle, so it
+-- does not follow the member's defenses moving mid-battle (Shell, Safe,
+-- Defend, a row change): the first reading stands until the battle ends
+-- or the enemy lands something, which replaces this price.
+-- What it costs, measured on the Sealed Gate's cave against the old price
+-- (build/attempts/wt/v026-driver/367/gate/tally.txt, 10 seed shifts a side):
+-- about 2.6% slower (244,385 won ticks against 238,174), and the spend rule
+-- fired 98 times in the 10 runs against 2, because members read inside
+-- their round early; deaths 3 against 7, a small sample (10 shifts, 9
+-- distinct first battle keys).
 function Driver:scriptWorst(slot, e)
   if M.PRICE_UNSEEN_FROM_ROM == false then return nil end
   local species = M.readWord(M.FORMATION + slot * 2)
@@ -5444,7 +5458,7 @@ function Driver:scriptWorst(slot, e)
   -- status a 0; M.UNSEEN_PRICE = "mean") spends less but measured worse on
   -- both counts, 10 seed shifts each (build/attempts/wt/v026-driver/367/
   -- gate2/tally.txt): max 3 deaths in 244,385 won ticks, mean 5 in 256,671,
-  -- the old battle's-worst price 7 in 238,174.
+  -- the old battle's-worst price 7 in 238,174 -- deaths a small sample.
   local best, bestA, sum, n = nil, nil, 0, 0
   for _, a in ipairs(atks) do
     if a ~= 0xFE then
@@ -5528,34 +5542,18 @@ function Driver:focusList()
   return nil
 end
 
--- The monster slot this actor's Fight breaks best right now, read the way a
--- person reads the HUD's class cell (#161): among the living monsters, the
--- one where the hit lands the most break chips.  The chips come from
--- fightChips -> hitChips, which reads RV_CLASS / RV_ELEM (BATTLE.RV_CLASS /
--- RV_ELEM, the bytes the HUD draws), so an unrevealed axis counts for
--- nothing -- the driver aims at a key it can SEE, exactly as a blind player
--- does, and a Genji Glove pair counts twice because fightChips already
--- doubles it.  makePlan hands this to a plain Fight as plan.aim, and the
--- ST_TGT steer aims the cursor there through the focus graph.
---
--- Returns nil wherever there is nothing to steer for, leaving the engine's
--- default cursor and the behaviour byte-identical:
---   * an authored (opts.focus) or multi-part (self.parts) kill order is in
---     force -- that targeting wins, the same guard focusList reads, so this
---     is opt-in-safe;
---   * opts.aim = false, the lever that stubs the pick back to the old shape;
---   * fewer than two monsters stand, so the default already lands on the
---     only one;
---   * this hand chips every living monster the SAME (best == worst), whether
---     that is all-zero or a uniform revealed key: class is irrelevant to the
---     choice here, so the tie is left to the engine and nothing churns.
--- Otherwise the strictly-best slot, lowest on a tie.
 -- Whether monster slot s's script can put a status on the party (#325): an
 -- attack its main section names whose MagicProp record sets a status
--- (+$0A..+$0D, the lift flag +$04 bit 2 clear), or its Special ($EF) where
+-- (+$0A..+$0D, the lift flag +$04 bit 2 clear) that hurts the party, or its Special ($EF) where
 -- MonsterProp +$1F names a status ($00..$1F: status bits 0-31) -- the
 -- Bloompire's Energy Sap, which zombified five members on wor-edgar's leg 1.
 -- Cached per species.  Returns the attack id that does, or nil.
+-- Only the statuses that hurt the party count (review of 0fd4d1fd: not a
+-- monster's own Haste, Regen, Shell, Safe, Reflect, Image, Vanish or Float):
+-- status 1 Blind, Zombie, Poison, Imp, Petrify, Wound ($E7); status 2
+-- Condemned, Mute, Berserk, Muddle, Sap, Sleep ($F9); status 3 Slow, Stop
+-- ($14); status 4 Frozen ($02).
+local HARM = { 0xE7, 0xF9, 0x14, 0x02 }
 local statusAtkCache = {}
 local function statusInflicter(slot)
   local species = M.readWord(M.FORMATION + slot * 2)
@@ -5571,13 +5569,13 @@ local function statusInflicter(slot)
     if found or a == 0xFE then return end
     if a == 0xEF then
       local sp = M.readRomByte((M.sym("MonsterProp") & 0x3FFFFF) + species * MON_REC + 0x1F) & 0x3F
-      if sp < 0x20 then found = a end
+      if sp < 0x20 and (HARM[(sp >> 3) + 1] >> (sp & 7)) & 1 == 1 then found = a end
       return
     end
     if a == 0xEE then return end
     local r = MP + a * 14
     if (M.readRomByte(r + 4) & 0x04) ~= 0 then return end
-    for k = 10, 13 do if M.readRomByte(r + k) ~= 0 then found = a; return end end
+    for k = 10, 13 do if M.readRomByte(r + k) & HARM[k - 9] ~= 0 then found = a; return end end
   end
   while b(i) ~= 0xFF and i < M.AI_SCRIPT_MAX do
     local op = b(i)
@@ -5650,6 +5648,28 @@ function Driver:finishAim(actor, boost)
   return best
 end
 
+-- The monster slot this actor's Fight breaks best right now, read the way a
+-- person reads the HUD's class cell (#161): among the living monsters, the
+-- one where the hit lands the most break chips.  The chips come from
+-- fightChips -> hitChips, which reads RV_CLASS / RV_ELEM (BATTLE.RV_CLASS /
+-- RV_ELEM, the bytes the HUD draws), so an unrevealed axis counts for
+-- nothing -- the driver aims at a key it can SEE, exactly as a blind player
+-- does, and a Genji Glove pair counts twice because fightChips already
+-- doubles it.  makePlan hands this to a plain Fight as plan.aim, and the
+-- ST_TGT steer aims the cursor there through the focus graph.
+--
+-- Returns nil wherever there is nothing to steer for, leaving the engine's
+-- default cursor and the behaviour byte-identical:
+--   * an authored (opts.focus) or multi-part (self.parts) kill order is in
+--     force -- that targeting wins, the same guard focusList reads, so this
+--     is opt-in-safe;
+--   * opts.aim = false, the lever that stubs the pick back to the old shape;
+--   * fewer than two monsters stand, so the default already lands on the
+--     only one;
+--   * this hand chips every living monster the SAME (best == worst), whether
+--     that is all-zero or a uniform revealed key: class is irrelevant to the
+--     choice here, so the tie is left to the engine and nothing churns.
+-- Otherwise the strictly-best slot, lowest on a tie.
 function Driver:chipAim(actor, boost)
   if self.opts.aim == false or self.opts.focus or self.parts then return nil end
   if self.lastStand and self:focusList() ~= nil then return nil end
@@ -5946,9 +5966,13 @@ function Driver:setzerLine(actor, have)
   -- battle (v0.25's chain logs: no "SETZER Slot" line; route-wor-falcon.md
   -- 13.9).  o.slotAt / M.SLOT_AT is the lever (3 is the driver before).
   -- Measured (build/attempts/wt/v026-driver/353/): it fires in one random
-  -- battle a run at most, and the five battles it fired in took +16, +200,
-  -- +8, -208 and -120 ticks against the same battle without it (-104 in
-  -- all), no death moved -- the verb played at no measured cost; what would
+  -- battle a run at most -- 2 of 2 tomb runs and 1 of 2 Narshe-mission runs
+  -- under the new rule (353/slot), 3 of 13 tomb runs with 0-12 encounters
+  -- used up (353/tomb) -- and the five distinct battles it fired in took
+  -- +16 (slot/tomb/new_s0 = tomb/slot2_k0), +200 (slot/tomb/new_s23), +8
+  -- (slot/nm/new_s0), -208 (tomb/slot2_k11) and -120 (tomb/slot2_k12)
+  -- ticks against the same battle without it (-104 in all), no death
+  -- moved -- the verb played at no measured cost; what would
   -- make it pay (reel 1 timed on a chosen icon) is not built yet.
   local slotAt = o.slotAt or M.SLOT_AT or 2
   if o.slot ~= false and have >= slotAt and M.readByte(M.RANDBTL) ~= 0 and livingMonsters() >= 2 then
@@ -6010,15 +6034,25 @@ function Driver:magitekLine(actor)
   local slot = self:pressTarget()
   if slot == nil then for s = 0, 5 do if monAlive(s) then slot = s; break end end end
   if slot == nil then return nil end
-  local terra = M.readByte(0x2EAE + actor * 32) == 0
-  local offer = terra and { 0, 1, 2, 3, 7 } or { 0, 1, 2 }
+  -- the seat's list, read from the ROM the way UpdateMenuState_2a does: the
+  -- seat's $2EAE byte picks TerraMagitekAttackTbl (0) or
+  -- DefaultMagitekAttackTbl, eight entries, $FF an empty one; Heal Force
+  -- (entry 4, attack $87) is a heal and stays out of the attack offer
+  local tbl = (M.readByte(0x2EAE + actor * 32) == 0 and M.sym("TerraMagitekAttackTbl")
+    or M.sym("DefaultMagitekAttackTbl")) & 0x3FFFFF
+  local offer = {}
+  for idx = 0, 7 do
+    local v = M.readRomByte(tbl + idx)
+    if v < 0x80 and v ~= 4 then offer[#offer + 1] = { entry = idx, atk = v } end
+  end
   local MP = M.sym("MagicProp") & 0x3FFFFF
   local x = 8 + slot * 2
   local weak, half = M.readByte(0x3BE0 + x), M.readByte(0x3BE1 + x)
   local absorb, null = M.readByte(0x3BCC + x), M.readByte(0x3BCD + x)
   local best, bestScore, said = nil, nil, {}
-  for _, idx in ipairs(offer) do
-    local atk = BATTLE.MTEK_BASE + idx
+  local bestAtk = nil
+  for _, of in ipairs(offer) do
+    local idx, atk = of.entry, BATTLE.MTEK_BASE + of.atk
     local elem = M.readRomByte(MP + atk * 14 + 1)
     local power = M.readRomByte(MP + atk * 14 + 6)
     local score
@@ -6031,17 +6065,17 @@ function Driver:magitekLine(actor)
       score = score + 1000 * hitChips(slot, 0, elem)
     end
     said[#said + 1] = string.format("$%02X elem $%02X power %d -> %d", atk, elem, power, score)
-    if score >= 0 and (bestScore == nil or score > bestScore) then best, bestScore = idx, score end
+    if score >= 0 and (bestScore == nil or score > bestScore) then best, bestScore, bestAtk = idx, score, atk end
   end
   if best == nil then return nil end
   local key = string.format("mtek:%d:%d:%d", actor, slot, best)
   if not self.statusSaid[key] then
     self.statusSaid[key] = true
     M.log(string.format("[%s] actor=%d MagiTek $%02X (entry %d) at slot %d: %s (#373)", self.tag or "fight",
-      actor, BATTLE.MTEK_BASE + best, best, slot, table.concat(said, "; ")))
+      actor, bestAtk, best, slot, table.concat(said, "; ")))
   end
   return { kind = "magitek", row = cmdRow(actor, BATTLE.CMD_MAGITEK), entry = best,
-           skill = BATTLE.MTEK_BASE + best, aim = slot, boostLeft = 0 }
+           skill = bestAtk, aim = slot, boostLeft = 0 }
 end
 
 function Driver:dmgWatchOf(e)
@@ -6490,8 +6524,13 @@ function Driver:raiseOk(e, actor)
     end
   end
   -- (#374) heading for a wipe: every member standing besides the fallen one
-  -- is inside one round of death, by the round makePlan prices (a full
-  -- gauge of their own)
+  -- is hurt and inside one round of death, by a round priced from what the
+  -- enemy has actually landed (a full gauge of their own; no unseen enemy
+  -- priced from its script, #367).  With the script's price in it, the
+  -- Sealed Gate's cave read every member inside its round from full HP and
+  -- raised on it: "102 HP does not clear the 1293 round, but the party is
+  -- heading for a wipe (3 standing ..." (build/attempts/wt/v026-driver/
+  -- 367/gate2/max_s20.log.gz, review of 0fd4d1fd)
   if math.max(hit or 0, o.roundCost or 0) >= raiseHp and not o.killInReach then
     local standing, inside, parts = 0, 0, {}
     for p = 0, 3 do
@@ -6499,8 +6538,8 @@ function Driver:raiseOk(e, actor)
       if p ~= e and php > 0 and php ~= 0xFFFF and M.readWord(0x3C1C + p * 2) > 0
          and (M.leftMask() >> p) & 1 == 0 then
         standing = standing + 1
-        local rp = self:roundPriceFor(p) or 0
-        if rp > 0 and php <= rp then inside = inside + 1 end
+        local rp = self:roundPriceFor(p, true) or 0
+        if rp > 0 and php <= rp and php < M.readWord(0x3C1C + p * 2) then inside = inside + 1 end
         parts[#parts + 1] = string.format("e%d %d under %d", p, php, rp)
       end
     end
@@ -6516,8 +6555,10 @@ end
 -- what one enemy round costs member e over a full gauge of its own (a
 -- raised member's gauge starts empty), priced as makePlan prices the
 -- living: the ledger's worst per turn on e (else anybody), the open turn
--- read provisionally, the typical action for repeats
-function Driver:roundPriceFor(e)
+-- read provisionally, the typical action for repeats; `measured` leaves out
+-- an unseen enemy's price from its script (#367), so only what the enemy
+-- has landed counts
+function Driver:roundPriceFor(e, measured)
   local const = M.readWord(BATTLE.ATB_CONST + e * 2)
   if const == 0 or const == 0xFFFF then return nil end
   local window = math.ceil(0xFF00 / const)
@@ -6546,7 +6587,7 @@ function Driver:roundPriceFor(e)
       end
       local mconst = M.readWord(BATTLE.ATB_CONST + 8 + s2 * 2)
       local rom, romAtk = nil, nil
-      if worst == nil then rom, romAtk = self:scriptWorst(s2, e) end
+      if worst == nil and not measured then rom, romAtk = self:scriptWorst(s2, e) end
       enemies[#enemies + 1] = { slot = s2, eta = etaOf(8 + s2 * 2),
         period = mconst > 0 and math.ceil(0xFF00 / mconst) or nil, worst = worst, typical = M.typicalOf(L),
         rom = rom, romAtk = romAtk }

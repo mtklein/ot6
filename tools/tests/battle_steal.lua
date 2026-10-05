@@ -141,10 +141,11 @@ local drive = { wantBp = 0, wantPend = 0, target = nil }
 local tc = H.targetCursor({ mask = 0x7B7E })
 -- A banking item turn is a heal, and it goes where a person aims a heal
 -- (#298): the most wounded living member by the share of max HP missing,
--- not the item's default target, LOCKE himself.  TERRA (94 max HP) fell in
--- battle 1 in 6 of 46 runs while LOCKE topped himself up
--- (build/attempts/wt/steal-wipe/summary.txt: "dead(sampled)=['2']").  nil
--- (the default target) when nobody is hurt.
+-- not the item's default target, LOCKE himself.  With LOCKE topping himself
+-- up (BANK_SELF = true), TERRA (94 max HP) was sampled at 0 HP in 5 of 17
+-- runs with 0-16 desert encounters used up first; aimed at the most
+-- wounded, in 0 of 17 (build/attempts/wt/v026-driver/298/steal/
+-- stealsum.txt).  nil (the default target) when nobody is hurt.
 local tcChars = H.targetCursor({ mask = 0x7B7D })
 local function mostWounded()
   local best, bestFrac = nil, nil
