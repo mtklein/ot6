@@ -4113,8 +4113,17 @@ function M.targetCursor(opts)
     end
     if s:sub(1, 1) == "X" then
       for _, d in ipairs(back) do add(d) end
-      for _, es in pairs(edges) do
-        for d, to in pairs(es) do if to == s then add(REVERSE[d]) end end
+      -- in a fixed order (#256): the state names are strings, and Lua
+      -- 5.4 seeds string hashing per run, so pairs() here walked the
+      -- learned map in a different order from one run to the next and
+      -- the press it chose moved with it
+      local from = {}
+      for k in pairs(edges) do from[#from + 1] = k end
+      table.sort(from)
+      for _, k in ipairs(from) do
+        for _, d in ipairs({ "left", "down", "right", "up" }) do
+          if edges[k][d] == s then add(REVERSE[d]) end
+        end
       end
       for _, d in ipairs(dirs) do add(d) end
     else
