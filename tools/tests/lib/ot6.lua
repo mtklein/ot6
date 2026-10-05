@@ -169,8 +169,64 @@ end
 -- here is latched by the ROM at the frame's inputPolled, so it can land one
 -- frame after the stamp.
 local LIVE_IVL = 128
+
+-- ------------------------------------------------------ render on demand --
+-- Drawing pixels was ~27% of a headless frame, and the harness looks at few
+-- of them (#394; tools/mesen/experiments/render-cost/summary.txt).  OT6's
+-- Mesen draws only the frames a script asks for once M.run turns this on
+-- (emu.setRenderOnDemand; emulation is the same either way), so every
+-- pixel read needs its frame asked for ahead: a request made in the
+-- runner's startFrame callback draws the frame starting then, and the next
+-- callback reads it.  The runner asks (renderAhead, below) for the frame
+-- before each watch sample (its screen hash) and each live shot; a battle
+-- reads its screen from RAM (M.battleScreenLit).  A screenshot of a frame
+-- that was not drawn waits one frame for it (M.screenshot, M.flushShots),
+-- and a run's stop waits for it too.  A script reading pixels itself
+-- outside those either asks with M.requestRender() a frame ahead or calls
+-- M.renderAlways(); a read of a frame that was not drawn raises, naming
+-- this.  An emulator without the calls (stock Mesen, an older pin) draws
+-- every frame and none of this applies.
+local RENDER_API = type(emu.setRenderOnDemand) == "function"
+  and type(emu.requestRender) == "function" and type(emu.isFrameRendered) == "function"
+local renderOn = false            -- set by M.run, cleared by M.renderAlways
+local pendingShots = {}           -- screenshot tags waiting for a drawn frame
+local rawTakeScreenshot, rawGetScreenBuffer = emu.takeScreenshot, emu.getScreenBuffer
+
+-- Was the frame just finished drawn?  (Always, without render on demand.)
+function M.frameDrawn()
+  return not renderOn or emu.isFrameRendered()
+end
+-- Draw the frame starting now (from a startFrame callback) or the next one.
+function M.requestRender()
+  if renderOn then emu.requestRender() end
+end
+-- Draw every frame from here on, for a script that reads pixels on its own.
+function M.renderAlways()
+  if renderOn then
+    renderOn = false
+    emu.setRenderOnDemand(false)
+    M.log("render on demand off: this script draws every frame (M.renderAlways)")
+  end
+end
+local function startRenderOnDemand()
+  if not RENDER_API or OT6_RENDER_ALWAYS then return end
+  renderOn = true
+  emu.setRenderOnDemand(true)
+  -- the raw reads, for a script calling them itself: a stale frame raises
+  local function guard(name)
+    if not M.frameDrawn() then
+      error(string.format("emu.%s read frame %d's pixels, which were not drawn (render "
+        .. "on demand, #394): ask for the frame a callback ahead with H.requestRender(), "
+        .. "or call H.renderAlways() before reading pixels", name, M.frame), 3)
+    end
+  end
+  emu.takeScreenshot = function(...) guard("takeScreenshot"); return rawTakeScreenshot(...) end
+  emu.getScreenBuffer = function(...) guard("getScreenBuffer"); return rawGetScreenBuffer(...) end
+end
+
 function M.liveShot()
-  local png = emu.takeScreenshot()
+  if not M.frameDrawn() then return end
+  local png = rawTakeScreenshot()
   if png and #png > 0 then
     print("[ot6shot] " .. M.frame .. " " .. M.b64encode(png))
   end
@@ -436,13 +492,31 @@ end
 -- (empty string during the first ~100 frames, before the first decoded
 -- frame).  The file itself is written by run.sh: build/states/shots/<tag>.png
 function M.screenshot(tag)
-  local ok, png = pcall(emu.takeScreenshot)
+  if not M.frameDrawn() then
+    -- render on demand: this frame was not drawn; the next one is, and the
+    -- runner's next callback takes the shot (M.flushShots)
+    pendingShots[#pendingShots + 1] = tag
+    M.requestRender()
+    return 0
+  end
+  local ok, png = pcall(rawTakeScreenshot)
   if ok and type(png) == "string" and #png > 0 then
     M.emitBlob(tag .. ".png", png)
     return #png
   end
   M.log("screenshot '" .. tag .. "' unavailable (no decoded frame yet)")
   return 0
+end
+
+-- The screenshots M.screenshot put off, taken once a drawn frame is in
+-- (asked for again until one is).  True when none is left waiting.
+function M.flushShots()
+  if #pendingShots == 0 then return true end
+  if not M.frameDrawn() then M.requestRender(); return false end
+  local tags = pendingShots
+  pendingShots = {}
+  for _, tag in ipairs(tags) do M.screenshot(tag) end
+  return #pendingShots == 0
 end
 
 -- ----------------------------------------------------- FF6 battle signals --
@@ -585,17 +659,40 @@ end
 -- Cheap "is anything on screen" check: an all-black 256x224 screenshot
 -- compresses to ~750 bytes, the battle-transition mosaic to ~2.3 KB, and a
 -- real battle scene (bg + sprites + UI windows) to ~10 KB.  4000 separates
--- the transition from a real battle scene.
+-- the transition from a real battle scene.  Under render on demand a frame
+-- that was not drawn has no pixels to judge: in a battle the battle's own
+-- brightness answers (M.battleScreenLit), elsewhere it reads false.
 function M.screenLooksAlive()
-  local ok, png = pcall(emu.takeScreenshot)
+  if not M.frameDrawn() then
+    return M.battleLoadStarted() and M.battleScreenLit()
+  end
+  local ok, png = pcall(rawTakeScreenshot)
   return ok and type(png) == "string" and #png > 4000
 end
 
+-- The battle screen is lit: the brightness the battle module writes to
+-- INIDISP each frame ($7EE9F9, btlgfx_main.asm @0c95; 0 or $80 is the
+-- screen off) is at least 5 of 15.  It answers what the screenshot check
+-- answered (#394), from RAM, so a battle's frames need not be drawn.  On
+-- every battle frame of gen_zozo2_arrival, battle_rage and
+-- gen_whelk_poweron under the old pin (build/attempts/wt/v026-lib/394/ab/
+-- probe/old/*.log, the [alive] lines: frame, PNG bytes, $E9F9) the PNG
+-- check read alive at every brightness 5-15 (88k frames) and dead at 0 and
+-- $80 but for the first frames of a fade-out (the picture lags the byte a
+-- frame); 1-4 is the fade's ramp and went either way.  The two it reads
+-- differently on purpose: a one-frame white-out flash mid-battle (2 frames
+-- in gen_whelk_poweron, PNG 291 bytes at brightness 15) is a lit battle,
+-- and a fade reads lit or dark by the brightness, not the picture.
+function M.battleScreenLit()
+  local b = M.readByte(0x7EE9F9)
+  return b >= 5 and b <= 15
+end
+
 -- True while a battle is fully up and rendering.  A crashed battle load
--- leaves the screen black and fails this check.  emu.getState() is not
+-- leaves the screen dark and fails this check.  emu.getState() is not
 -- used here: polling it is correlated with emulator crashes.
 function M.battleActive()
-  return M.battleLoadStarted() and M.monstersPresent() > 0 and M.screenLooksAlive()
+  return M.battleLoadStarted() and M.monstersPresent() > 0 and M.battleScreenLit()
 end
 
 -- --------------------------------------------- absorbed-weapon guard --
@@ -3082,9 +3179,9 @@ end
 -- hold up long enough to commit the step (20 frames), release and let
 -- the engine settle (2), tap A (pressButtons' 4 on / 2 off, which clears
 -- any incidental dialog), and cycle until the battle module starts loading;
--- then wait for the battle to be fully up and rendering.  battleActive()
--- takes a screenshot per poll (screenLooksAlive), so the wait polls
--- every 30 frames rather than every frame.
+-- then wait for the battle to be fully up and rendering.  The wait polls
+-- every 30 frames rather than every frame (battleActive() took a screenshot
+-- per poll until #394; the 30 stays, part of each test's landing).
 --
 -- Deliberately option-free: the constants are part of each test's
 -- frame/RNG landing, since a different hold or wait changes which frame
@@ -3506,8 +3603,7 @@ end
 -- nibble via the $0803 offset: 2 = user-controlled, 4 = event-controlled;
 -- events can walk the party while every other flag looks clear)
 -- and the event PC.  Deliberately cheap: RAM reads only, no screenshots
--- (battleLoadStarted is the battle gate, and battleActive()'s screen check
--- is too expensive for a per-frame poll).
+-- (battleLoadStarted is the battle gate).
 --
 -- It also requires the field's map to be loaded (M.mapLoaded).  Every
 -- flag above reads "control" for most of the ~50 frames the field takes to
@@ -13173,7 +13269,8 @@ local IDLE_SLACK = 600
 -- the script itself is holding.
 
 local function screenHash()
-  local ok, buf = pcall(emu.getScreenBuffer)
+  if not M.frameDrawn() then return nil end    -- render on demand: not drawn
+  local ok, buf = pcall(rawGetScreenBuffer)
   if not ok or type(buf) ~= "table" then return nil end
   local h, n = 2166136261, #buf
   for i = 1, n, WATCH.screenStride do
@@ -14015,6 +14112,23 @@ function M.run(opts, steps)
     WATCH.quietFrames))
 
   local finished = false
+  startRenderOnDemand()
+
+  -- A run's stop, after any screenshot M.screenshot put off for a drawn
+  -- frame (render on demand): the stop waits a frame or two for it.
+  local stopCode, stopWait = nil, 0
+  local drawn, frames = 0, 0     -- render on demand: frames drawn of frames run
+  local function stopRun(code)
+    if renderOn then
+      print(string.format("[render] drew %d of %d frames (render on demand)", drawn, frames))
+    end
+    if #pendingShots > 0 then
+      stopCode = code
+      M.requestRender()
+      return
+    end
+    emu.stop(code)
+  end
 
   -- Silent-auto-Continue canary.  Every game-over path routes through the
   -- event GameOver script ($CC/E568); when it runs, the title screen
@@ -14196,7 +14310,7 @@ function M.run(opts, steps)
           .. "this failed on attempt %d of %d without a retry: fix it, do "
           .. "not re-roll it.", class, RUN.attempt, RUN.attempts)
         or ""))
-    emu.stop(code)
+    stopRun(code)
   end
 
   -- Restore the boot snapshot and replay the body; the reloading branch of
@@ -14237,7 +14351,7 @@ function M.run(opts, steps)
       .. "battle(s)", #RUN.probe.rows, distinct))
     M.log(string.format("PASS (frame %d) attempts=%d/%d", M.frame,
       RUN.attempt, RUN.attempts))
-    emu.stop(0)
+    stopRun(0)
   end
 
   -- Probe mode: this shift's sample is in; on to the next, or finish.
@@ -14558,7 +14672,7 @@ function M.run(opts, steps)
       end
       M.log(string.format("PASS (frame %d) attempts=%d/%d", M.frame,
         RUN.attempt, RUN.attempts))
-      emu.stop(0)
+      stopRun(0)
     end
   end
 
@@ -14567,9 +14681,31 @@ function M.run(opts, steps)
   -- invisible headless (the script log is not read; docs/TESTING.md's
   -- "no verdict" signature), so the whole frame body runs under pcall and
   -- an error there is a FAIL line naming the runner, exit 1.
+  -- What the next callback may read (render on demand): the watch's
+  -- sample, the live shot, and a screenshot still waiting.  Asked from this
+  -- callback, so it is the frame starting now that is drawn, and the next
+  -- callback that reads it.
+  local function renderAhead()
+    if not renderOn then return end
+    local nxt = M.frame + 1
+    if #pendingShots > 0 or nxt == 20 or nxt % LIVE_IVL == 0
+       or nxt % WATCH.sampleEvery == 0 then
+      emu.requestRender()
+    end
+  end
+
   rawAddEventCallback(function()
+    if stopCode ~= nil then
+      stopWait = stopWait + 1
+      if M.flushShots() or stopWait > 3 then emu.stop(stopCode) end
+      return
+    end
     if finished then return end
+    frames = frames + 1
+    if renderOn and emu.isFrameRendered() then drawn = drawn + 1 end
+    M.flushShots()
     local ok, err = pcall(frame)
+    pcall(renderAhead)
     if not ok and not finished then
       finished = true
       pcall(traceFlush)

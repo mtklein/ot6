@@ -167,6 +167,8 @@ local function regauge(g)
 end
 
 H.run({ maxFrames = 60000 }, {
+  -- it screenshots the flash itself, on a frame it picks as it sees it (#394)
+  H.call(H.renderAlways),
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),

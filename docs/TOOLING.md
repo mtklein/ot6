@@ -312,15 +312,20 @@ What differs from macOS:
 
 ## OT6's Mesen
 
-The harness runs OT6's build of MesenCE 2.2.1: tag `ot6-2.2.1-1` of OT6's fork,
-github.com/mtklein/mesen, which adds four small commits to MesenCE's
+The harness runs OT6's build of MesenCE 2.2.1: tag `ot6-2.2.1-2` of OT6's fork,
+github.com/mtklein/mesen, which adds five small commits to MesenCE's
 `2.2.1` tag. `tools/mesen/EMULATOR` pins the commit and
 `tools/mesen/build.sh` builds it (README.md there). The script-only change
 stops Mesen's debugger keeping the per-access records only its windows
 read (the code/data log, access counters, call stack, event log) when
 `MESEN_SCRIPT_ONLY=1`; the screenshot change makes `emu.takeScreenshot`
 return the frame just finished instead of sometimes the one before; the
-third lets the .NET 10 SDK build it. On px13 and on the Air it played six
+third lets the .NET 10 SDK build it; the fifth (#394) draws only the
+frames a script asks for (`emu.setRenderOnDemand`, `emu.requestRender`;
+the harness asks for the few it reads) and makes the debugger's hot paths
+test inline whether a script callback could run before calling into it
+(README.md there, "Render on demand" and "Script callbacks, paid per
+use"). On px13 and on the Air the first four played six
 legs (the full gen_zozo2_arrival, battle_rage, a cold boot, an SRAM
 Continue, an in-game save, wipe_reclass) exactly as a stock 2.2.1 build
 did: every log line but `[CPU]`/`[emulator]`, every screenshot, every
@@ -338,7 +343,9 @@ differently from 2.1.1, because of MesenCE's DMA clock-counting fix
   captures then make `checkpoint_drift.py` ask for every cut checkpoint to
   be re-cut. Change it in the same commit as a deployment, and deploy on
   every machine (px13, the Air, this Mac) before regenerating anywhere.
-  run.sh refuses to run on a machine whose deployed build is not the pinned
+  Builds are deployed per pin (`~/mesen-pins/<commit>/`, README.md
+  "Deploying"), so a new pin's deployment leaves trees on the old pin
+  running. run.sh refuses to run on a machine whose deployed build is not the pinned
   one (it reads the `<repository> <tag> <commit>` record build.sh packs
   into the executable, `tools/mesen/buildinfo.py`; `OT6_MESEN_APP` is
   exempt), logs that commit on the `[emulator]` line (`commit=`), and each
@@ -357,12 +364,13 @@ differently from 2.1.1, because of MesenCE's DMA clock-counting fix
   Xcode command line tools and the Brewfile's `dotnet@8`); the build ends
   with a smoke test against a stock 2.2.1 build each machine keeps in
   `~/mesen-reference/` (`build.sh --stock`).
-- A machine uses it once the emulator in its main tree is replaced by the
-  build (README.md, "Deploying"): `tools/Mesen-linux/Mesen` on px13
-  (executable `b5a407c3...8c54`, core `045e8526...a568`), `tools/Mesen.app`
-  on the Macs, both running the same Air-built bundle (executable
-  `e96f5fdf...7b37`, core `f5821dc3...3b57`). The builds they replaced are
-  kept in `~/mesen-patched/` as `2.1.1-<sha8>-Mesen[.app]`, with their
+- A machine runs the pinned build from `~/mesen-pins/<commit>/` once it is
+  deployed there (README.md, "Deploying"), else the main tree's
+  `tools/Mesen-linux/Mesen` (`tools/Mesen.app` on a Mac), which still hold
+  ot6-2.2.1-1 (px13 executable `b5a407c3...8c54`; the Macs the same
+  Air-built bundle, `e96f5fdf...7b37`). ot6-2.2.1-2 is deployed on all
+  three, each its own build (README.md lists the shas). The 2.1.1 builds
+  are kept in `~/mesen-patched/` as `2.1.1-<sha8>-Mesen[.app]`, with their
   `.buildinfo`.
 
 ## Reference docs for the asm work (see research/)
