@@ -223,6 +223,9 @@ do
     H.vars.checks = (H.vars.checks or 0) + 1
     local ok, g = pcall(H.worldCheckGroup)
     if not ok then H.log("[budget] CheckBattleWorld watch: " .. tostring(g)) end
+    local zx, zy = H.worldZonePos()
+    H.log(string.format("[budget] check f%d: world %d zone pos (%d,%d) bg $11F9=%02X -> %s",
+      H.frame, H.readByte(0x1F64), zx, zy, H.readByte(0x11F9), tostring(g)))
     worldGroup = ok and g or nil
   end, emu.callbackType.exec, check, check)
   H.log(string.format("[budget] watching CheckBattleWorld at $%06x", check))
