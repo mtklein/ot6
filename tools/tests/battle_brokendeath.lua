@@ -337,6 +337,14 @@ local function attempt(n)
   })
 end
 
+-- The cap (#336).  The longest legal run fights every rung: a lab copy
+-- whose rungs never count (build/lab/v026/mk_worst.py brokendeath-nocount)
+-- fought all 16 and ended at f185,970 and f188,138 (seed shifts 0 and 8,
+-- build/attempts/wt/v026-suites/r/worstb/), 11.6k frames a rung on
+-- average.  120000 + 16000 x 16 = 376,000 is 2.0x the longest of those.
+-- (The run's wall clock is configure.py's OT6_TIMEOUT, whose comment still
+-- derives it from the old four-rung ladder; at its 80.7 frames/s, 188k
+-- frames is ~2,330 s against its 1,800.)
 H.run({ maxFrames = 120000 + 16000 * ATTEMPTS }, {
   H.waitFrames(20),
   H.loadState(STATE),
