@@ -3150,8 +3150,10 @@ end
 -- opts.tent       false switches the Tent arm off (default on): where the
 --                 item list offers a Tent -- a save point or the world map
 --                 -- one is pitched instead of the items whenever a
---                 Tincture would be due for anyone or the party's HP hole
---                 is past 24 Tonics' worth, a Tent's own price
+--                 Tincture would be due for anyone, the heals the bag
+--                 would spend on the party's HP hole cost at least a
+--                 Tent's own price, or the bag cannot lift a member under
+--                 the threshold (#278)
 -- opts.maxFrames  budget for the whole visit (default 24000)
 -- opts.maxTries   plans to attempt before giving up (default 48)
 -- opts.tag        log prefix
@@ -3191,9 +3193,24 @@ local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
 -- owner's ruling on #231; a dry caster mid-fight is the fight driver's
 -- call, tools/tests/lib/ot6.lua).
 local CARE_TINCTURE, CARE_TENT = 0xEB, 0xF7
--- The HP deficit past which a Tent beats the Tonics that would fill it:
--- 1200 gil is 24 Tonics, so 24 x 50 HP.
-local TENT_WORTH_HP = 24 * 50
+-- An item's field record, read from the ROM the way the field item routine
+-- reads it (docs/design/supply.md): +$13 bit 3 restores HP, bit 7 makes
+-- +$14 a count of sixteenths of the maximum instead of a flat amount; the
+-- price is the word at +$1C.
+local function careItemByte(id, off)
+  return M.readRomByte((M.sym("ItemProp") & 0x3FFFFF) + id * 30 + off)
+end
+local function careItemPrice(id)
+  return careItemByte(id, 0x1C) | (careItemByte(id, 0x1D) << 8)
+end
+-- HP one use of a healing item restores on a member with this maximum
+-- (0 for an item that restores none)
+local function careItemHp(id, maxHp)
+  local f, amt = careItemByte(id, 0x13), careItemByte(id, 0x14)
+  if (f & 0x08) == 0 then return 0 end
+  if (f & 0x80) ~= 0 then return maxHp * amt // 16 end
+  return amt
+end
 
 -- ---- clearing a status ----
 --
@@ -3942,6 +3959,7 @@ local function careKernel(opts)
   end
 
   local failed = {}         -- plans the game refused, so they are not retried
+  local tentWhy = nil       -- why pickTent last chose a Tent, for the plan line
   local function key(w)
     if w.kind == "cast" then
       return string.format("%d:cast:%d:%d", w.char, w.caster, w.spell)
@@ -3959,8 +3977,8 @@ local function careKernel(opts)
         M.charMp(w.caster), M.charMaxMp(w.caster))
     elseif w.kind == "tent" then
       local hp, mp = partyShort()
-      return string.format("%s (the party %d hp and %d mp short, %d in the bag)",
-        w.why, hp, mp, M.invCountOf(CARE_TENT))
+      return string.format("%s (the party %d hp and %d mp short, %d in the bag: %s)",
+        w.why, hp, mp, M.invCountOf(CARE_TENT), tentWhy or "?")
     end
     return string.format("%s char %d with $%02X (%d/%d hp, %d/%d mp, status1 %02X)",
       w.why, w.char, w.item, M.charHp(w.char), M.charMaxHp(w.char),
@@ -4058,22 +4076,62 @@ local function careKernel(opts)
     return nil
   end
 
+  -- What the bag would spend, in gil, filling every reachable member's HP
+  -- hole with the heals pickItem reaches for, in its order (Tonics, then
+  -- Potions), each one whole item at its ROM price and yield, within what
+  -- the reserve leaves (#278).  Also returns whether the bag runs dry
+  -- before a member the care would serve (under the threshold) is lifted
+  -- to it, and a short "n x item" account for the plan line.
+  local function bagHpCost()
+    local left = { [CARE_TONIC] = avail(CARE_TONIC), [CARE_POTION] = avail(CARE_POTION) }
+    local used = { [CARE_TONIC] = 0, [CARE_POTION] = 0 }
+    local gil, stranded = 0, false
+    for _, c in ipairs(careParty()) do
+      if M.charHp(c) > 0 and (M.charStatus1(c) & 0xC2) == 0 then
+        local hp, mx = M.charHp(c), M.charMaxHp(c)
+        for _, id in ipairs({ CARE_TONIC, CARE_POTION }) do
+          local y = careItemHp(id, mx)
+          while hp < mx and y > 0 and left[id] > 0 do
+            hp = math.min(mx, hp + y)
+            left[id], used[id] = left[id] - 1, used[id] + 1
+            gil = gil + careItemPrice(id)
+          end
+        end
+        if mx > 0 and hp < mx * thresh then stranded = true end
+      end
+    end
+    return gil, stranded, string.format("%d tonic + %d potion = %d gil",
+      used[CARE_TONIC], used[CARE_POTION], gil)
+  end
+
   -- A Tent where the item list offers one (a save point, the world map),
   -- when it is the cheaper answer: whenever a Tincture would otherwise be
   -- due for anyone (1200 for everything against 1500 for 50 MP), or the
-  -- party's HP hole alone is past the 24 Tonics a Tent costs.  Below that
-  -- the Tonics are cheaper and the Tent is kept (supply.md, the rule for
-  -- each option).
+  -- heals the bag would spend filling the party's HP hole cost at least
+  -- the Tent's own price, or the bag cannot lift a member the care would
+  -- serve.  Below that the items are cheaper and the Tent is kept
+  -- (supply.md, the rule for each option).  The price is what the bag
+  -- would actually spend (#278): the first cut priced the hole in Tonics
+  -- (24 x 50 HP) and applied it after they ran out, so a party 1143 HP
+  -- short with 0 Tonics drank five Potions (1500 gil) with ten Tents in
+  -- the bag on the world map (build/attempts/wt/emptybag-anydraw/holes.txt).
   local function pickTent()
     if not useTent or not tentUsable() or avail(CARE_TENT) < 1 then return nil end
     local w = { kind = "tent", item = CARE_TENT, why = "pitch a Tent" }
     if failed[key(w)] then return nil end
-    local hp = partyShort()
-    local due = hp >= TENT_WORTH_HP
-    for _, c in ipairs(careParty()) do
-      if mpShort(c) then due = true end
+    local price = careItemPrice(CARE_TENT)
+    local gil, stranded, acct = bagHpCost()
+    local why = nil
+    if gil >= price then
+      why = string.format("the heals would cost %s, the Tent %d", acct, price)
+    elseif stranded then
+      why = string.format("the bag cannot lift everyone (%s)", acct)
     end
-    return due and w or nil
+    for _, c in ipairs(careParty()) do
+      if why == nil and mpShort(c) then why = "a Tincture would be due" end
+    end
+    tentWhy = why
+    return why and w or nil
   end
 
   -- A Tincture on the member furthest under the MP band; the loop picks
