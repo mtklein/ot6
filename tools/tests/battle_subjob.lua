@@ -275,7 +275,10 @@ local function decide()
             castLogged = true
             local rec = LISTS[celes] + castRec * 4
             H.log(string.format("[C] confirming at row %d col %d: record %d holds $%02X "
-              .. "(bytes %02X %02X %02X %02X), pending %d, bank %d, pool %d", ar, col, castRec,
+              .. "(bytes %02X %02X %02X %02X), pending %d, bank %d, pool %d, status "
+              .. string.format("%02X %02X %02X %02X", H.readByte(0x3EE4 + celes*2),
+                H.readByte(0x3EE5 + celes*2), H.readByte(0x3EF8 + celes*2),
+                H.readByte(0x3EF9 + celes*2)), ar, col, castRec,
               H.readByte(rec), H.readByte(rec), H.readByte(rec + 1), H.readByte(rec + 2),
               H.readByte(rec + 3), pend(celes), bp(celes), mp(celes)))
           end
