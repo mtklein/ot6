@@ -747,7 +747,8 @@ end
 -- a sleeper does nothing, a berserker Fights whom RandCharAction picks, a
 -- statue is dead to the engine (SetStatus_06 @460b sets the dead flag and
 -- clears $3aa0.7, "battle menu can't open") until a Soft.  Measured
--- 2026-09-16 (probe_statuses.lua, the world walk off camp_escaped):
+-- 2026-09-16 (probe_statuses.lua, deleted in fe9d1ff7, last version at b4023415;
+-- the world walk off camp_escaped):
 -- Berserk landed on SHADOW as his window opened ($7BCA=01 $7BC2=01
 -- actor=1), the driver planned a Fight for him, and the engine took the
 -- window away inside the pulse (the plan died as actor_changed); his
@@ -2243,7 +2244,8 @@ end
 -- answered `true` here, and the driver's hand model (handsOf) counted
 -- every empty off hand as a second weapon -- the same doubling #235 is
 -- about, arriving by a second road.  Measured, not reasoned: the #219 lab
--- hit it first and guarded it locally (fightvsabilitylab.py's fvaArmed,
+-- hit it first and guarded it locally (fightvsabilitylab.py's fvaArmed -- the lab deleted in 07ca5f4e, last
+-- version at 48a26888 --
 -- "ItemProp has a record there and H.isWeapon would read it"); the guard
 -- belongs here, where the driver reads.  weaponClass($FF) still answers
 -- bludgeoning: an empty hand is a fist, it is just not a WEAPON.
@@ -4701,13 +4703,13 @@ local BATTLE = {
   -- (UpdateMenuState_1b / _c183f7, btlgfx_main.asm)
   CMD_LORE = 0x0C, ST_LORE_OPEN = 0x19, ST_LORE = 0x1B,
   -- SHADOW's Throw: cmd $08 -> $2B (OpenThrowWindow builds wItemList) ->
-  -- $2D (item select) -> ST_TGT (probe_throw.lua; btlgfx
+  -- $2D (item select) -> ST_TGT (probe_throw.lua, deleted in bd50a973, last version at 3ea77d55; btlgfx
   -- UpdateMenuState_2b/2d).  The skeans and their element bits:
   -- Fire Skean $AB=fire($01), Water Edge $AC=water($80), Bolt Edge
   -- $AD=bolt($04) (bosses-wob.md's element byte convention).
   CMD_THROW = 0x08, ST_THROW_OPEN = 0x2B, ST_THROW = 0x2D,
   SKEAN_ELEM = { [0xAB] = 0x01, [0xAC] = 0x80, [0xAD] = 0x04 },
-  -- The command window's two side windows (probe_rowdef.lua, #188): LEFT
+  -- The command window's two side windows (probe_rowdef.lua, #188; deleted in bd50a973, last version at 6c76177f): LEFT
   -- at command select opens Row ($05 -> $01 -> $24) and RIGHT opens Def.
   -- ($05 -> $01 -> $27).  Inside either, A commits the row change or the
   -- defend as the turn's command, B or the opposite direction closes it
@@ -4719,7 +4721,7 @@ local BATTLE = {
   -- knowing $24, sat there until the watchdog tripped.  This driver never
   -- means to be in either; it backs out with B and keeps its plan.
   ST_ROW = 0x24, ST_DEF = 0x27,
-  -- EDGAR's Tools family (probe_tools.lua, #188): A on the Tools row ->
+  -- EDGAR's Tools family (probe_tools.lua, #188; deleted in bd50a973, last version at d22ceac0): A on the Tools row ->
   -- $2E (OpenToolsWindow builds wItemList, ~7 frames) -> $01 -> $30 (the
   -- list, ST_TOOLS); B from the list -> $01 -> $05 directly
   -- (CloseToolsWindow is a subroutine there, so $2F is not written); A on
@@ -4729,7 +4731,7 @@ local BATTLE = {
   -- shell ($6168 mode byte), so every Sabin and Cyan fight passes here
   -- too.  Both are transitional: the plan waits them out.
   ST_TOOLS_OPEN = 0x2E, ST_TOOLS_CLOSE = 0x2F,
-  -- CYAN's SwdTech (probe_swdtech.lua, #188) is the same shell, not the
+  -- CYAN's SwdTech (probe_swdtech.lua, #188; deleted in bd50a973, last version at f1f26173) is the same shell, not the
   -- vanilla $37 gauge: OpenCmdMenuTbl[$07] is _c1_bushido_open (bushido
   -- mode $6168=2) and UpdateMenuState_35, the only way into $37/$36, is
   -- dead.  Measured: A on SwdTech $05 -> $2E -> $01 -> $30, B -> $01 ->
@@ -4737,13 +4739,13 @@ local BATTLE = {
   -- 57.0D: tech id, MP cost), row i banks boost i+1, a row past the bank
   -- is refused silently in $30, and a commit queues the tech with NO target
   -- select ($30 -> $2F -> $01 -> $05 -> $0F -> $01 -> $10 -> $01 -> $00),
-  -- exactly SABIN's Blitz commit (probe_blitz.lua).
+  -- exactly SABIN's Blitz commit (probe_blitz.lua, deleted in bd50a973; last version at f1f26173).
   CMD_SWDTECH = 0x07,
-  -- CELES's Runic (probe_runic.lua): no window.  A on the Runic row goes
+  -- CELES's Runic (probe_runic.lua, deleted in bd50a973; last version at f1f26173): no window.  A on the Runic row goes
   -- $05 -> $38 with the target latched on herself (chars = 1<<actor); B ->
   -- $05; A commits ($38 -> $05 -> $0F -> $01 -> $10 -> $01 -> $00).
   CMD_RUNIC = 0x0B,
-  -- SETZER's Slot (probe_slot.lua): A on Slot $05 -> $06 (OpenSlotWindow)
+  -- SETZER's Slot (probe_slot.lua, deleted in bd50a973; last version at f1f26173): A on Slot $05 -> $06 (OpenSlotWindow)
   -- -> $01 -> $32 -> $39 -> $08, the reel state.  In $08 the first A starts
   -- the spin and each later A stops the next reel once it is ready; the
   -- reel-3 stop commits.  B closes only before the first A ($08 -> $3A ->
@@ -4780,7 +4782,8 @@ local BATTLE = {
   TGTCHARS = 0x7B7D, TGTMONS = 0x7B7E,
   -- multi-target latch: one R press on a MULTI_TARGET spell's target screen
   -- sets this to 1 and widens the side mask to every valid ally/monster
-  -- (probe_targetall.lua measured it; btlgfx_main.asm @6e9a sets it)
+  -- (probe_targetall.lua, deleted in bd50a973, last version at 6507162d,
+  -- measured it; btlgfx_main.asm @6e9a sets it)
   TGTALL = 0x7B7F,
   TONIC = 0xE8, POTION = 0xE9, FENIX_DOWN = 0xF0,
   AUTOCROSSBOW = M.AUTOCROSSBOW, PUMMEL = 0x5D,
@@ -4826,15 +4829,15 @@ local BATTLE = {
 BATTLE.KNOWN_ST = { [BATTLE.ST_CMD] = true, [BATTLE.ST_TGT] = true, [BATTLE.ST_ITEM] = true,
                     [BATTLE.ST_MAGIC] = true, [BATTLE.ST_ESPER] = true, [BATTLE.ST_TOOLS] = true,
                     [BATTLE.ST_LORE] = true, [BATTLE.ST_LORE_OPEN] = true, [0x01] = true,
-                    -- the Throw family (probe_throw.lua; btlgfx
+                    -- the Throw family (probe_throw.lua, deleted in bd50a973; btlgfx
                     -- UpdateMenuState_2b/2c/2d): open, close, item select
                     [BATTLE.ST_THROW_OPEN] = true, [0x2C] = true, [BATTLE.ST_THROW] = true,
-                    -- the command window's side windows (probe_rowdef.lua)
+                    -- the command window's side windows (probe_rowdef.lua, deleted in bd50a973)
                     -- and the Tools shell's open and force-close states
-                    -- (probe_tools.lua); see the constants
+                    -- (probe_tools.lua, deleted in bd50a973); see the constants
                     [BATTLE.ST_ROW] = true, [BATTLE.ST_DEF] = true,
                     [BATTLE.ST_TOOLS_OPEN] = true, [BATTLE.ST_TOOLS_CLOSE] = true,
-                    -- SETZER's reel state (probe_slot.lua)
+                    -- SETZER's reel state (probe_slot.lua, deleted in bd50a973)
                     [BATTLE.ST_SLOT] = true,
                     -- the MagiTek list (#373): open, close, attack select
                     [BATTLE.ST_MTEK_OPEN] = true, [BATTLE.ST_MTEK_CLOSE] = true,
@@ -7759,7 +7762,7 @@ function Driver:makePlan(actor)
     -- form of the effect once -- Cure2/Cure3 the whole party -- rather
     -- than spending a turn per head).  Boost folds the tier (1 BP ->
     -- Cure2, 2 BP -> Cure3) and one R press on the target screen latches
-    -- all allies (TGTALL -- probe_targetall.lua).  Unboosted party Cure
+    -- all allies (TGTALL -- probe_targetall.lua, deleted in bd50a973).  Unboosted party Cure
     -- is NOT offered: vanilla halves a spread spell, so tier-0-all heals
     -- less per head than the single cast, and the single line below
     -- already owns that case.
@@ -8256,7 +8259,7 @@ function Driver:makePlan(actor)
   -- person acts on what the fight has shown); the skeans are bought for
   -- exactly this (Fire Skean $AB, Water Edge $AC, Bolt Edge $AD -> fire/
   -- water/bolt), and boost multiplies a thrown skean like any damage
-  -- verb.  Flow measured by probe_throw.lua: cmd $08 -> $2B builds
+  -- verb.  Flow measured by probe_throw.lua (deleted in bd50a973): cmd $08 -> $2B builds
   -- wItemList -> $2D selects -> ST_TGT.  The boost stays free: cmd $08
   -- falls out of Ot6AbilityCost's chain with vanilla's own cost, 0, so
   -- there is no price here to escalate (#219).
@@ -8713,7 +8716,7 @@ function Driver:button(actor)
     -- does this, after two pulses of the same window, since a landed
     -- confirm's closing tail also passes through here for a tick.
     -- A Slot spin that has started cannot be backed out of (B is not
-    -- read once the first A lands, probe_slot.lua): a person finishes
+    -- read once the first A lands, probe_slot.lua, deleted in bd50a973): a person finishes
     -- it.  Before the first A it is a list like the others.
     if st == BATTLE.ST_SLOT and M.readByte(BATTLE.SLOT_PRESS1) ~= 0 then return { "a" } end
     if BATTLE.IDLE_ST[st] or st == BATTLE.ST_SLOT then
@@ -9007,7 +9010,7 @@ function Driver:button(actor)
   end
   if st == BATTLE.ST_TGT and self.plan.kind == "runic" then
     -- the engine latched the target on the caster (chars = 1<<actor,
-    -- probe_runic.lua); there is nothing to steer
+    -- probe_runic.lua, deleted in bd50a973); there is nothing to steer
     M.log(string.format("[%s] actor=%d Runic confirmed (target chars=%02X)",
       self.tag or "fight", actor, M.readByte(BATTLE.TGTCHARS)))
     if self.recovery then self.recovery.confirm(actor, M.frame,
@@ -9039,7 +9042,7 @@ function Driver:button(actor)
         if self.recovery then self.recovery.confirm(actor, M.frame, chars, mons) end
         -- falls through to the confirm below
       elseif self.plan.all then
-        -- one R press latches all-allies (TGTALL=1 -- probe_targetall);
+        -- one R press latches all-allies (TGTALL=1 -- probe_targetall, deleted in bd50a973);
         -- confirm once the latch reads back.  If it never takes (a spell
         -- without MULTI_TARGET), drop to the single-target steer.
         if M.readByte(BATTLE.TGTALL) ~= 0 then
@@ -12512,7 +12515,8 @@ M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end)
     -- both executed (branch_boostfight_s48: f4322 and f4734, tgt $0008).
     raiseQueued = {},                  -- e -> { by, tick }
     -- and every confirmed status cure not yet landed, by target (#187):
-    -- measured on mrf_263 (probe_statuses, 2026-09-16), actor 3's Green
+    -- measured on mrf_263 (probe_statuses, 2026-09-16; deleted in fe9d1ff7, last version at
+    -- b4023415), actor 3's Green
     -- Cherry on entity 1 was confirmed, actor 0 planned a second on the
     -- same entity 480 frames later while the first sat in the queue, and
     -- both were spent (4 -> 2 in the bag) on one Imp.
@@ -13038,7 +13042,8 @@ end
 -- character's run counter $3D70,x, and when the counter reaches the run
 -- difficulty $3A3B it sets the character's bit in $3A38 (just escaped),
 -- which becomes $3A39 (left the battle) when the run action resolves.
--- Measured 2026-09-16 (probe_escape_cells.lua, the crescent_landing world
+-- Measured 2026-09-16 (probe_escape_cells.lua, deleted in bd50a973, last version at
+-- 31188c02; the crescent_landing world
 -- random that tripped the first version of this rule, TERRA/LOCKE vs two
 -- Behemoth-class monsters, $3A3B=4): with L+R held from the first battle
 -- frame $2F45 went 0->1 at +133 frames, the counters moved at +245, +373,
@@ -13059,7 +13064,7 @@ end
 -- formation's own "L+R has no effect" bit, $2F4B bit 0 (event battles).
 -- Checked BEFORE the escape cells: the run counters tick in such a
 -- formation too (measured 2026-09-16 on the Whelk fight, $B1=07 $2F4B=0C,
--- counters 03,01,03 -> 06,03,05 under a held L+R; probe_noeffect_cantrun),
+-- counters 03,01,03 -> 06,03,05 under a held L+R; probe_noeffect_cantrun, deleted in bd50a973, last version at 6346bb5c),
 -- it is the run command itself that refuses ("can't run away!!", Cmd_2a).
 local function cantRun() return M.cantRunFrom() end
 
@@ -13081,8 +13086,8 @@ local function cantRun() return M.cantRunFrom() end
 -- in-window row sits on the last line while the scroll offset walks.
 -- Measured 2026-09-16 on vector_crash's BASEMENT 3 random: the driver's
 -- 43-row walk to the Potion read as "no-effect: down for 304 frames at
--- B:01.0A.03.00.00.00.00.00" on all three attempts (probe_list_scroll.lua
--- has the per-cell trace).  Printed per list so the ring names the cell.
+-- B:01.0A.03.00.00.00.00.00" on all three attempts (probe_list_scroll.lua, deleted in bd50a973, last version at 6346bb5c,
+-- had the per-cell trace).  Printed per list so the ring names the cell.
 local function listSig()
   local a = M.readByte(0x62CA) & 3
   local function b(addr) return M.readByte(addr + a) end
@@ -13270,7 +13275,7 @@ local function watchTick()
   -- can't-run bits) or those cells have gone still.  Measured 2026-09-16
   -- on crescent_landing's first world random: three false trips of the
   -- first version, every one 300 frames of "l+r" under an open window
-  -- with the run counters ticking (probe_escape_cells.lua).
+  -- with the run counters ticking (probe_escape_cells.lua, deleted in bd50a973).
   local escapeLive = false
   if inBattle then
     local esc = escapeSig()
@@ -13883,7 +13888,8 @@ function M.run(opts, steps)
   -- Third watch, the battle-side wipe (#153): an annihilated party never
   -- reaches either of the above on its own.  LoseBattle sets $3ebc bit 0
   -- and the battle module then SITS on the annihilated screen waiting for
-  -- a press -- measured with probe_wipe_canary.lua on the FC (394): every
+  -- a press -- measured with probe_wipe_canary.lua (deleted in bd50a973; last version
+  -- at 2c2492b0) on the FC (394): every
   -- battle-HP word 0 from t=11945, $3ebc=$0D, no GameOver read and no
   -- TitleScreen exec for the next 30,000 frames with the pad released.
   -- Only a press moves it on, and the press a driver makes there is the
