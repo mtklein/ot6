@@ -265,9 +265,10 @@ those.
 
 - **Packages** (apt): `git cc65 ninja-build python3 python3-numpy
   libsdl2-2.0-0 unzip`. No compiler is needed: nothing in the build or the
-  harness compiles C (building OT6's Mesen does; see OT6's Mesen). `ninja release` also wants `tools/bin/flips`, which
-  would need a compiler to build (see the Flips bullet above), so release
-  packaging stays on a Mac.
+  harness compiles C (building OT6's Mesen does; see OT6's Mesen). `ninja release` also wants `tools/bin/flips`, built
+  on px13 from the Flips source (the Flips bullet above), plus the
+  Android pieces under "Android patcher" and `gh`. Every machine can cut a
+  release; none is special.
 - **Mesen**: OT6's build (OT6's Mesen, below), one self-contained binary
   at `tools/Mesen-linux/Mesen`, built on px13 by `tools/mesen/build.sh`.
   It needs `libsdl2-2.0-0` and nothing else extra to run. The official
