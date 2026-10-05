@@ -85,6 +85,7 @@ local LOW_PCT = 15          -- the control spins only while he stands above this
 local CARE_PCT = 40         -- ...and give a Potion to any other member below this
 local MAX_BATTLES = 6
 local BANK_SPEND = 3         -- off a branch point he spins boosted on a bank this high
+local COMMIT_HOLD = 600      -- a branch's commit waits at most this long for the blow to queue
 
 local NOACTION = nil        -- OT6_NOACTION's WRAM offset (H.sym, at the first step)
 local function bp(s)   return H.readByte(0x3E9C + s * 2) end
@@ -148,16 +149,6 @@ local function aheadOf(x)
     if e == x then return n end
     if e ~= 0xFF then n = n + 1 end
   end
-end
--- The blow on him waits in the action queue itself (not its advance wait)
--- behind something: an action still to run ahead of it, or one playing now.
--- A spin he commits then joins the queue behind the blow, so the blow runs
--- first whenever it has not run by his commit (#377: a blow still in its
--- advance wait at his window either landed before his commit or joined the
--- queue after his spin, which then ran).
-local function queuedBehind(t)
-  local n = t and aheadOf(t)
-  return n ~= nil and (n >= 1 or executing ~= nil)
 end
 -- His gauge is full and nothing of his is queued: his window is next in line.
 local function setzerReady()
@@ -345,16 +336,7 @@ local function branchPoint()
     and H.readByte(MSTATE) == ST_CMD and php(actor) > 0 and low() and bp(actor) >= 1
     and threatOn(actor) ~= nil and php(actor) < blow() and ctlDone
     and bp(actor) < 5                     -- below the cap, where the pip shows
-    and queuedBehind(threatOn(actor))     -- the blow waits in the queue, behind something
-end
--- At his window with the blow still in its advance wait, he waits (the pad
--- idle, as a person may) up to HOLD_MAX frames for it to join the queue.
-local HOLD_MAX = 120
-local function holdForBlow()
-  local t = threatOn(actor)
-  return ctlDone and t ~= nil and aheadOf(t) == nil and H.readByte(MSTATE) == ST_CMD
-    and php(actor) > 0 and low() and bp(actor) >= 1 and bp(actor) < 5
-    and php(actor) < blow() and (SD.hold or 0) < HOLD_MAX
+    and aheadOf(threatOn(actor)) == nil   -- the blow is still in its advance wait
 end
 
 -- ---------------------------------------------------------- the branches
@@ -393,6 +375,13 @@ local function setzerSpin()
   elseif st == ST_REELS then
     if H.readByte(PRESS[3]) ~= 0 and H.readByte(STOP[3]) == 0 then
       H.setPad({})                 -- reel 3 settling: the commit waits for it
+    elseif SS.holdFor and H.readByte(STOP[3]) ~= 0 and not SS.holdFor() then
+      -- every reel stopped: the commit press waits, the reels showing,
+      -- until the blow on him has joined the action queue (a person
+      -- watching the field holds the last press), so the spin queues
+      -- behind it (#377: committed at once, the spin raced the blow)
+      SS.held = (SS.held or 0) + 1
+      H.setPad({})
     else
       tap("a")                     -- reels 1-3, then the commit
     end
@@ -451,13 +440,10 @@ local function approachFrame()
         "hp %d (median blow %d), bank %d, held %d", H.frame, t, aheadOf(t) and
         string.format("in the queue, %d ahead", aheadOf(t)) or "in its advance wait",
         executing and string.format("entity %d for %d", executing, H.frame - execStart) or "nothing",
-        php(actor), blow(), bp(actor), SD.hold or 0))
+        php(actor), blow(), bp(actor), 0))
     end
     if ctl and ctl.commit and ctl.away and not ctl.done then ctl = nil end  -- dropped: again
-    if not skipPoint and holdForBlow() then
-      SD.hold = (SD.hold or 0) + 1
-      H.setPad({})
-    elseif not ctlDone and (ctl == nil or not ctl.commit) and not low() and bp(actor) >= 1 then
+    if not ctlDone and (ctl == nil or not ctl.commit) and not low() and bp(actor) >= 1 then
       ctl = ctl or {}
       setzerSpin()
     elseif ctlDone and bp(actor) >= BANK_SPEND then
@@ -468,7 +454,7 @@ local function approachFrame()
   else
     if ctl and ctl.commit then ctl.away = true end
     skipPoint = false
-    SD.n, SS.n, SD.hold, SD.seen = 0, 0, 0, nil
+    SD.n, SS.n, SD.seen = 0, 0, nil
     pageOrOther()
   end
 end
@@ -497,6 +483,13 @@ local function branchFrame()
     end
   end
   if not rec.hit and php(actor) < rec.hp0 then rec.hit = H.frame end  -- the blow lands
+  if rec.commit and not rec.queued and aheadOf(actor * 2) ~= nil then
+    rec.queued = H.frame                   -- the spin joins the action queue
+    rec.queuedAhead = aheadOf(actor * 2)
+  end
+  if not rec.commit and not rec.blowQueued and rec.threat and aheadOf(rec.threat) ~= nil then
+    rec.blowQueued = H.frame
+  end
   if not rec.commit and php(actor) == 0 then
     rec.lost = H.frame                     -- the blow landed before the commit
     return
@@ -543,11 +536,19 @@ local function branch(j, wait)
       H.checkReq(req, "snapshot load (branch " .. j .. " of point " .. points .. ")")
       H.rearmInputInjection()
       k = #recs + 1
-      rec = { k = k, wait = wait, point = points, f0 = H.frame, hp0 = php(actor) }
+      rec = { k = k, wait = wait, point = points, f0 = H.frame, hp0 = php(actor),
+              threat = threatOn(actor) }
       recs[#recs + 1] = rec
       commitHit, endHit = false, nil
       attackSetzer = false
       raising, healing, hitting, W, SS, SD = nil, {}, nil, {}, { n = 0, rTaps = 0 }, { n = 0 }
+      local t = rec.threat
+      SS.holdFor = function()
+        -- commit once the blow is in the queue, or once it is gone from his
+        -- command list (it ran), or after COMMIT_HOLD frames
+        return t == nil or aheadOf(t) ~= nil or H.readByte(0x32CC + t) == 0xFF
+          or (SS.held or 0) >= COMMIT_HOLD
+      end
       H.log(string.format("[cancel] branch %d (point %d): %d idle frames at Setzer's window",
         k, points, wait))
     end),
@@ -560,8 +561,10 @@ local function branch(j, wait)
     H.call(function()
       local c, d = rec.commit, rec.done
       local function off(f) return f and string.format("+%d", f - rec.f0) or "-" end
-      H.log(string.format("[cancel] branch %d timing from the window: commit %s, blow lands %s, " ..
-        "fell %s", k, off(c and c.f), off(rec.hit), off(rec.lost or rec.fell)))
+      H.log(string.format("[cancel] branch %d timing from the window: blow queued %s, commit %s " ..
+        "(held %d), spin queued %s (%s ahead), blow lands %s, fell %s", k, off(rec.blowQueued),
+        off(c and c.f), SS.held or 0, off(rec.queued), tostring(rec.queuedAhead), off(rec.hit),
+        off(rec.lost or rec.fell)))
       if not c then
         H.log(string.format("[cancel] branch %d: NO COMMIT: %s", k, rec.lost and
           string.format("he fell at f%d, before the commit press", rec.lost)
@@ -698,7 +701,7 @@ local function round()
         "%d action(s) ahead of it in the queue", aheadOf(t)) or "still in its advance wait",
         string.format("%d of %d", blow(), #blows), partyLine(),
         executing and string.format("entity %d for %d frame(s)", executing, H.frame - execStart)
-        or "nothing", SD.hold or 0))
+        or "nothing", 0))
       H.setPad({})
       snap = H.requestSaveState()
     end),
