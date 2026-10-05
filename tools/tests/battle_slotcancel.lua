@@ -85,7 +85,6 @@ local LOW_PCT = 15          -- the control spins only while he stands above this
 local CARE_PCT = 40         -- ...and give a Potion to any other member below this
 local MAX_BATTLES = 6
 local BANK_SPEND = 3         -- off a branch point he spins boosted on a bank this high
-local PLAY_MAX = 60          -- a branch point's monster action began this recently (frames)
 
 local NOACTION = nil        -- OT6_NOACTION's WRAM offset (H.sym, at the first step)
 local function bp(s)   return H.readByte(0x3E9C + s * 2) end
@@ -337,12 +336,6 @@ local function branchPoint()
     and threatOn(actor) ~= nil and php(actor) < blow() and ctlDone
     and bp(actor) < 5                     -- below the cap, where the pip shows
     and aheadOf(threatOn(actor)) == nil   -- the blow is still in its advance wait
-    -- ...and a monster's action began under PLAY_MAX frames ago, so the
-    -- blow waits behind most of it: over wt/v026-suites' sc7 and sc9 every
-    -- point with nothing playing (16 branches) and 30 of 40 with an action
-    -- already 60+ frames in fell before the commit; all 6 under 60 came up
-    -- cancelled (points.py)
-    and monsterActing ~= nil and H.frame - monsterStart < PLAY_MAX
 end
 
 -- ---------------------------------------------------------- the branches
@@ -357,10 +350,9 @@ local commitHit, endHit = false, nil
 local SS = { n = 0, rTaps = 0 }
 local function setzerSpin()
   SS.n = SS.n + 1
-  local cyc = SS.cycle or 6          -- quick hands: the blow is already queued
-  local ph = SS.n % cyc
+  local ph = SS.n % 6                -- quick hands: the blow is already queued
   local st = H.readByte(MSTATE)
-  local function tap(b) H.setPad(ph < cyc // 2 and { [b] = true } or {}) end
+  local function tap(b) H.setPad(ph < 3 and { [b] = true } or {}) end
   if st == ST_CMD then
     local want = 1
     if pend(actor) < want then
@@ -453,8 +445,6 @@ local function branchFrame()
     commitHit = false
     if rec.commit == nil then
       rec.commit = { f = H.frame, p = pend(actor), b = bp(actor), hp = php(actor) }
-      rec.blowAtCommit = rec.threat and (aheadOf(rec.threat) and "queued" or
-        (H.readByte(0x32CC + rec.threat) ~= 0xFF and "advance wait" or "gone")) or "-"
       H.log(string.format("[cancel] branch %d f%d commit: pending %d, bank %d, hp %d | party %s",
         rec.k, H.frame, rec.commit.p, rec.commit.b, rec.commit.hp, partyLine()))
     end
@@ -472,13 +462,6 @@ local function branchFrame()
         rec.dropped = { f = H.frame, cmd = e.cmd }
       end
     end
-  end
-  if not rec.hit and php(actor) < rec.hp0 then rec.hit = H.frame end  -- the blow lands
-  if rec.commit and not rec.queued and aheadOf(actor * 2) ~= nil then
-    rec.queued = H.frame                   -- the spin joins the action queue
-  end
-  if not rec.blowQueued and rec.threat and aheadOf(rec.threat) ~= nil then
-    rec.blowQueued = H.frame
   end
   if not rec.commit and php(actor) == 0 then
     rec.lost = H.frame                     -- the blow landed before the commit
@@ -526,17 +509,15 @@ local function branch(j, wait)
       H.checkReq(req, "snapshot load (branch " .. j .. " of point " .. points .. ")")
       H.rearmInputInjection()
       k = #recs + 1
-      rec = { k = k, cycle = wait, point = points, f0 = H.frame, hp0 = php(actor),
-              threat = threatOn(actor) }
+      rec = { k = k, wait = wait, point = points }
       recs[#recs + 1] = rec
       commitHit, endHit = false, nil
       attackSetzer = false
-      raising, healing, hitting, W, SD = nil, {}, nil, {}, { n = 0 }
-      SS = { n = 0, rTaps = 0, cycle = wait }
-      H.log(string.format("[cancel] branch %d (point %d): SETZER taps every %d frames",
+      raising, healing, hitting, W, SS, SD = nil, {}, nil, {}, { n = 0, rTaps = 0 }, { n = 0 }
+      H.log(string.format("[cancel] branch %d (point %d): %d idle frames at Setzer's window",
         k, points, wait))
     end),
-    H.waitFrames(1),
+    H.waitFrames(wait + 1),
     H.driveUntil(function()
       if not H.battleLoadStarted() then return true end
       if rec.done or rec.dropped or rec.lost then return true end
@@ -544,11 +525,6 @@ local function branch(j, wait)
     end, 9000, { H.call(branchFrame), H.waitFrames(1) }, "a branch: the spin's turn ends"),
     H.call(function()
       local c, d = rec.commit, rec.done
-      local function off(f) return f and string.format("+%d", f - rec.f0) or "-" end
-      H.log(string.format("[cancel] branch %d timing from the window (taps every %d): blow " ..
-        "queued %s, commit %s (the blow then: %s), spin queued %s, blow lands %s, fell %s", k,
-        rec.cycle, off(rec.blowQueued), off(c and c.f), tostring(rec.blowAtCommit),
-        off(rec.queued), off(rec.hit), off(rec.lost or rec.fell)))
       if not c then
         H.log(string.format("[cancel] branch %d: NO COMMIT: %s", k, rec.lost and
           string.format("he fell at f%d, before the commit press", rec.lost)
@@ -572,23 +548,58 @@ local function branch(j, wait)
 end
 
 -- ------------------------------------------------------------- the draws
--- The draw is battle_slots' (H.newEncounterDraw, lib/ot6_field.lua): pace a
--- stretch of the disembark row that rolls one group, budget the encounters
--- over every encounter-counter state from the pool's decode (#299), run from
--- the rest or fight out a pack that cannot be run from, care after each.
--- The floor is two bodies and 600 max HP with no monster that can take a
--- member's turn on any of its own (H.judgeFormation).  This file used to
--- take six clock-walked draws for two bodies and 900 max HP by live count:
--- a bare number, and on the Blackjack's plain (group 10) only Mind Candy
--- packs reach 900 (battle_slots' drawBattle comment), whose SleepSting
--- takes a turn on any of their own.  Nothing here attacks the formation but
--- SETZER's spins.
 local msPresent = {}
-local function drawBattle(tag)
-  local D = H.newEncounterDraw({ tag = tag, minBodies = 2, minHp = 600 })
-  local steps = D.steps()
+local function drawBattle(tag, tries)
+  local steps = { H.call(function() H.vars.suitable = false end) }
+  -- a closed square: the walk comes back where it started, so six draws
+  -- (and the encounters a varied history used up first) do not drift the
+  -- party off the plain into a town, where no encounter fires ("down, down,
+  -- right, right, down, down, left, left" walked four steps south a lap)
+  local pattern = { "down", "down", "right", "right", "up", "up",
+                    "left", "left" }
+  for n = 1, tries do
+    local w = {
+      (function()
+        local ph = 0
+        return H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
+          H.call(function()
+            ph = ph + 1
+            H.setPad({ [pattern[(math.floor(ph / 20) % #pattern) + 1]] = true })
+          end),
+        }, tag .. ": a real world encounter fires (draw " .. n .. ")")
+      end)(),
+      H.release(),
+      H.waitUntil(function() return H.battleActive() end, 900,
+        tag .. ": battle active (draw " .. n .. ")", 30),
+      H.waitFrames(240),
+      H.call(function()
+        msPresent = {}
+        for m = 0, 5 do
+          if H.readByte(0x3AA8 + m * 2) % 2 == 1 then msPresent[#msPresent + 1] = m end
+        end
+        local mhp = 0
+        for _, m in ipairs(msPresent) do mhp = mhp + H.readWord(0x3BFC + m * 2) end
+        -- the monsters have to outlast the members' turns and the branches
+        H.vars.suitable = (#msPresent >= 2 and mhp >= 900)
+        H.log(string.format("%s draw %d: %d bodies, %d total max HP -> %s",
+          tag, n, #msPresent, mhp, H.vars.suitable and "FIGHT" or "flee"))
+      end),
+      H.cond(function() return not H.vars.suitable end, {
+        H.fleeBattle(9000, { onCantRun = "fight" }),
+        H.waitUntil(function()
+          return H.worldMode() and H.worldHasControl()
+        end, 1200, tag .. ": back on the plain after draw " .. n, 10),
+        H.waitFrames(30),
+      }, {}),
+    }
+    if n == 1 then
+      for _, s in ipairs(w) do steps[#steps + 1] = s end
+    else
+      steps[#steps + 1] = H.cond(function() return not H.vars.suitable end, w, {})
+    end
+  end
   steps[#steps + 1] = H.call(function()
-    msPresent = D.msPresent
+    H.assertEq(H.vars.suitable, true, tag .. ": the pool dealt a formation that lasts")
     actor = nil
     for s = 0, 3 do if chid(s) == SETZER then actor = s end end
     H.assertEq(actor ~= nil, true, tag .. ": SETZER present")
@@ -606,11 +617,6 @@ end
 -- as at any other) to the next branch point, at most MAX_POINTS of them.
 local battles, atPoint = 0, false
 local BRANCHES_PER_POINT, MAX_POINTS = 2, 10
--- each branch's hands: a tap every CYCLES[j] frames, half of it held.  The
--- commit is a race with the blow (header), so the branches differ in how
--- fast SETZER's hands are, not in idle frames at the window: an idle wait
--- there does not re-draw the battle (#360)
-local CYCLES = { 4, 6 }
 local function belowCap()
   local n = 0
   for _, r in ipairs(recs) do
@@ -633,7 +639,7 @@ local function round()
     battles = battles + 1
     raising, healing, hitting, W, SD = nil, {}, nil, {}, { n = 0 }
   end) }
-  for _, st in ipairs(drawBattle("battle")) do draw[#draw + 1] = st end
+  for _, st in ipairs(drawBattle("battle", 6)) do draw[#draw + 1] = st end
   local body = {
     H.cond(function() return not H.battleLoadStarted() end, draw, {}),
     H.call(function() atPoint, attackSetzer = false, true end),
@@ -653,16 +659,14 @@ local function round()
         "%s | party %s", points, H.frame, battles, php(actor), pmax(actor),
         pend(actor), bp(actor), t, aheadOf(t) and string.format(
         "%d action(s) ahead of it in the queue", aheadOf(t)) or "still in its advance wait",
-        string.format("%d of %d", blow(), #blows), partyLine()) .. string.format(" | playing: %s",
-        executing and string.format("entity %d for %d frame(s)", executing, H.frame - execStart)
-        or "nothing"))
+        string.format("%d of %d", blow(), #blows), partyLine()))
       H.setPad({})
       snap = H.requestSaveState()
     end),
     H.waitFrames(2),
     H.call(function() H.checkReq(snap, "snapshot at Setzer's window") end),
   }
-  for j = 1, BRANCHES_PER_POINT do point[#point + 1] = branch(j, CYCLES[j]) end
+  for j = 1, BRANCHES_PER_POINT do point[#point + 1] = branch(j, (j - 1) * 4) end
   local req
   point[#point + 1] = H.cond(function() return not found() end, {
     H.call(function() H.setPad({}); req = H.requestLoadState(snap.blob) end),
