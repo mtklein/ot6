@@ -730,13 +730,11 @@ local function round()
       points = points + 1
       local t = threatOn(actor)
       H.log(string.format("[cancel] branch point %d f%d (battle %d): hp %d/%d, pending %d, " ..
-        "bank %d; entity %d's queued Fight targets him (%s), the members' median blow " ..
-        "%s | party %s | playing: %s | held %d", points, H.frame, battles, php(actor), pmax(actor),
-        pend(actor), bp(actor), t, aheadOf(t) and string.format(
-        "%d action(s) ahead of it in the queue", aheadOf(t)) or "still in its advance wait",
-        string.format("%d of %d", blow(), #blows), partyLine(),
+        "bank %d, the members' median blow %d of %d; member %s ready to strike (waited %d " ..
+        "frame(s)) | party %s | playing: %s", points, H.frame, battles, php(actor), pmax(actor),
+        pend(actor), bp(actor), blow(), #blows, tostring(striker()), SD.wait or 0, partyLine(),
         executing and string.format("entity %d for %d frame(s)", executing, H.frame - execStart)
-        or "nothing", 0))
+        or "nothing"))
       H.setPad({})
       snap = H.requestSaveState()
     end),
