@@ -4,6 +4,14 @@
   "slot": 3,
   "milestone": "ultros-won",
   "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 375,
+      "x": 8,
+      "y": 44
+    }
+  },
   "size": 32768,
   "sha256": "e70a3417db05ffc8ec31eb06c2d31c0baa0a7df66eceb0dcb3c9f00e26a8b8ca",
   "provenance": {

@@ -19,6 +19,12 @@ real output path (`ninja ff6/rom/ff6-en.sfc`,
 when `configure.py`, the savestate graph, `VERSION`, or any globbed
 directory changes.
 
+To run a gate in the background, `sh tools/gate.sh -k 0 [target...]`
+passes its arguments to ninja, exits with ninja's status and ends with
+the FAILED edges (the log in `build/gate.log`). A wrapper like
+`(ninja ...; echo $?)` exits with echo's 0, and a red gate has been read
+green that way.
+
 Don't edit `tools/tests/run.sh` or any other shell script while a `ninja`
 or `run.sh` is executing it: bash reads scripts incrementally, and the
 running instances resume at shifted offsets and fail.
@@ -70,8 +76,8 @@ through. It is long and serial (the World of Ruin legs alone carry
 
 Every tracked checkpoint something boots (a state, or a suite in
 `configure.py`'s `TEST_ENV`) is captured on that line. The rest are named
-in the graph's `NOT_GATED` with the reason (today: the four
-`reseal_seeds.sh` seeds and `vector-escape-v1`, which nothing boots).
+in the graph's `NOT_GATED` with the reason (today none: the five that
+stood there, booted by nothing, were retired with their cutters, #356).
 Qualification's `checkpoint_coverage` check
 (`savestate_ninja.py --coverage`) refuses any other tracked checkpoint, so
 a new leg that boots a checkpoint with no `prev=` fails `ninja`.
@@ -331,10 +337,13 @@ differently from 2.1.1, because of MesenCE's DMA clock-counting fix
   it regenerates every fixture and re-runs every test, and the chain's
   captures then make `checkpoint_drift.py` ask for every cut checkpoint to
   be re-cut. Change it in the same commit as a deployment, and deploy on
-  every machine (px13, the Air, this Mac) before regenerating anywhere: a
-  machine still running the old build would regenerate on the old
-  emulator, and nothing checks which build a run used beyond the stamp's
-  `emulator` record.
+  every machine (px13, the Air, this Mac) before regenerating anywhere.
+  run.sh refuses to run on a machine whose deployed build is not the pinned
+  one (it reads the `<repository> <tag> <commit>` record build.sh packs
+  into the executable, `tools/mesen/buildinfo.py`; `OT6_MESEN_APP` is
+  exempt), logs that commit on the `[emulator]` line (`commit=`), and each
+  stamp records it as `pin <commit>`: `compose.py --check-states` reads a
+  fixture made under another pin as stale.
 - run.sh exports `MESEN_SCRIPT_ONLY=1` for every run except a coverage run
   (OT6_COVERAGE), which needs the code/data log; a stock build ignores
   the variable.

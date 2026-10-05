@@ -27,6 +27,7 @@
 #     artifact <sha256(build/states/<state>.mss)>
 #     ancestor <path> <sha256(<path> file bytes)>        (non-root states only)
 #     emulator <sha256 of the Mesen executable that made the .mss, or unknown>
+#     pin <the tools/mesen/EMULATOR commit that executable was built from, or unknown>
 #
 # Provenance versus compatibility (docs/TESTING.md): the sig and lib lines
 # record exactly which harness sources produced the fixture.  They are kept
@@ -43,7 +44,13 @@
 # tools/mesen/ patched one) and nothing compares it, so swapping emulators
 # regenerates nothing.  It is copied from <state>.mss.emulator, the run's
 # own `[emulator] <sha256> ...` log line that run.sh publishes beside the
-# .mss, so the log and the stamp agree by construction.  compose.py's stamp_check verifies every line;
+# .mss, so the log and the stamp agree by construction.  The pin line is
+# a compatibility binding (#345): the commit packed in that executable
+# (the [emulator] line's commit=, tools/mesen/buildinfo.py), which run.sh
+# only lets run when it is tools/mesen/EMULATOR's; a stamp whose pin is
+# not the tree's EMULATOR commit is stale, as one on another ROM is.
+# `unknown` (a build without the record, or a stamp written before the
+# line existed) binds nothing.  compose.py's stamp_check verifies every line;
 # `compose.py --check-states` asks it of the whole tree.
 #
 # A stamp written before the rom/generator lines existed carries neither.
@@ -189,6 +196,18 @@ emusig() {
   echo "${sha:-unknown}"
 }
 
+# The commit of the emulator that made <state>.mss: commit= on the same
+# published [emulator] line, under the same freshness rule; "unknown"
+# otherwise.
+pinsig() {
+  side="$STATES/$1.mss.emulator"
+  c=""
+  if [ -f "$side" ] && [ ! "$side" -ot "$STATES/$1.mss" ]; then
+    c=$(sed -n 's/^\[emulator\] .* commit=\([0-9a-f]\{40\}\)\( .*\)\{0,1\}$/\1/p' "$side" | head -n 1)
+  fi
+  echo "${c:-unknown}"
+}
+
 # sha256 of one file, bare.  Used for the artifact and ancestor bindings.
 filehash() {
   shasum -a 256 "$1" | cut -c1-64
@@ -239,6 +258,7 @@ case "$cmd" in
     rom_hash=$(romsig) || exit 2
     gen_hash=$(gensig "$gen" "$@") || exit 2
     emu_hash=$(emusig "$state")
+    pin_commit=$(pinsig "$state")
     # Everything is computed; only now may the old stamp be replaced.
     sigline=$(sig "$gen" "$@") || exit 2
     liblines=""
@@ -256,6 +276,7 @@ case "$cmd" in
       [ "$ancestor" = "-" ] ||
         printf 'ancestor %s %s\n' "$ancestor" "$anc_hash"
       printf 'emulator %s\n' "$emu_hash"
+      printf 'pin %s\n' "$pin_commit"
     } > "$STATES/$state.stamp"
     ;;
   *)
