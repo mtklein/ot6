@@ -19,8 +19,14 @@
 -- petrified, $3ee4 & $c0).  A natural fall is enough; the Fenix Down that
 -- raises him plays no part.  The cap hides the pip at bank 5, so the moment
 -- the test waits for is a cancel below it: Setzer, whose Defends would hold
--- the bank at 5, spends a pip on a boosted spin whenever his window opens on
--- a full bank outside a branch point.
+-- the bank at 5, spends a pip on a boosted spin whenever his window opens
+-- outside a branch point on a bank of BANK_SPEND or more, so his windows
+-- come up below the cap however long the fight runs.  (Spending only on a
+-- full bank was not enough: a spin cancelled by his fall charges nothing
+-- and earns nothing, so a Setzer felled again and again sat at 5 for a
+-- whole fight, and the branch point came only when a fresh battle reset
+-- his bank to 1 -- the v0.25 re-cut's terra-returned-v1 dealt a second
+-- battle where it never did, build/attempts/wt/recut-fallout/slotcancel/.)
 --
 -- Played, not written: a natural boot of the terra-returned-v1 checkpoint,
 -- a drawn battle, and real inputs only.  The party plays a policy a person
@@ -78,6 +84,7 @@ local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
 local LOW_PCT = 15          -- the control spins only while he stands above this
 local CARE_PCT = 40         -- ...and give a Potion to any other member below this
 local MAX_BATTLES = 6
+local BANK_SPEND = 3         -- off a branch point he spins boosted on a bank this high
 
 local NOACTION = nil        -- OT6_NOACTION's WRAM offset (H.sym, at the first step)
 local function bp(s)   return H.readByte(0x3E9C + s * 2) end
@@ -408,8 +415,8 @@ local function approachFrame()
     if not ctlDone and (ctl == nil or not ctl.commit) and not low() and bp(actor) >= 1 then
       ctl = ctl or {}
       setzerSpin()
-    elseif ctlDone and bp(actor) >= 5 then
-      setzerSpin()      -- a full bank hides the pip: spend one on a boosted spin
+    elseif ctlDone and bp(actor) >= BANK_SPEND then
+      setzerSpin()      -- keep the bank off the cap, where it hides the pip
     else
       setzerDefend()
     end
