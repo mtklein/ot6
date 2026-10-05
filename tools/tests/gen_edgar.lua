@@ -3,8 +3,8 @@
 -- outside the sand.  Generates three states:
 --   figaro_intro.mss    after the first audience ($0004 set)
 --   figaro_matron.mss   after the flashback ($0308 set again)
---   figaro_cleared.mss  first controllable frame on the world map,
---                       TERRA + LOCKE + EDGAR, tools carried
+--   figaro_cleared.mss  on the world map, off the chocobo and cared for
+--                       (#297), TERRA + LOCKE + EDGAR, tools carried
 --
 -- The party roster changes several times through the chapter; every
 -- position read goes through the $0803 party-object offset (H.fieldX/Y)
@@ -78,6 +78,10 @@ end
 local function seq(steps) return H.cond(function() return true end, steps) end
 
 local aPhase = 0
+
+-- the care threshold the party leaves the castle at (#297): the pre-danger
+-- top-up the generators' explicit cares use, not the walk's 0.65
+local LEAVE_CARE = 0.9
 
 -- the tool shop's two purchases, each price asserted at its buyItem below
 local TOOL_BILL = 750 + 500
@@ -647,18 +651,11 @@ H.run({ maxFrames = 120000 }, {
           H.readByte(0x1850 + c)))
       end
     end
-    H.screenshot("figaro_cleared")
-  end),
-  H.saveState("figaro_cleared.mss"),
-  H.logStep(function()
-    return string.format("figaro_cleared generated at frame %d", H.frame)
   end),
 
-  -- Off the chocobo, and a world save where it sets the party down: the
-  -- cut gen_kolts boots from (savestate_graph.py; lib/ot6_contract.lua
-  -- "world-figaro-v1").  B held while riding dismounts: LandAirship
-  -- stages the tile into $1F60/$1F61, ExitVehicle clears $11FA, and
-  -- InitWorld seeds $E0/$E2 (gen_kolts's header).
+  -- Off the chocobo: B held while riding dismounts.  LandAirship stages the
+  -- tile into $1F60/$1F61, ExitVehicle clears $11FA, and InitWorld seeds
+  -- $E0/$E2 (gen_kolts's header).
   H.hold({ "b" }),
   H.driveUntil(function() return H.readByte(0x11fa) & 3 == 0 end, 900, {
     H.waitFrames(1),
@@ -672,5 +669,32 @@ H.run({ maxFrames = 120000 }, {
       "world position is live (InitWorld ran, not InitChoco)")
     where("dismounted")
   end),
+  -- #297: a person heals before setting out across the desert.  The
+  -- escape's battle can end with someone hurt, and the care advanceStory
+  -- runs after it cannot help: control comes back on the chocobo, where
+  -- the menu does not open ("the menu never opened; giving up on this care
+  -- stop", build/attempts/wt/steal-evidence/regen_figaro_cleared.log, EDGAR
+  -- left at 94/169).  On foot the menu opens, so the care stop is here, at
+  -- the pre-desert top-up threshold, and the fixture asserts it took.
+  H.careStop("care before the desert", { threshold = LEAVE_CARE }),
+  H.call(function()
+    for _, c in ipairs(H.partyMembers()) do
+      local base = 0x1600 + 37 * c
+      local hp, mhp = H.readWord(base + 9), H.readWord(base + 11) & 0x3fff
+      H.log(string.format("[leave] char %d L%d %d/%d hp", c,
+        H.readByte(base + 8), hp, mhp))
+      H.assertEq(hp > 0 and hp >= LEAVE_CARE * mhp, true, string.format(
+        "char %d leaves Figaro topped up (%d/%d, threshold %.2f)", c, hp, mhp,
+        LEAVE_CARE))
+    end
+    H.screenshot("figaro_cleared")
+  end),
+  H.saveState("figaro_cleared.mss"),
+  H.logStep(function()
+    return string.format("figaro_cleared generated at frame %d", H.frame)
+  end),
+
+  -- A world save where the party stands: the cut gen_kolts boots from
+  -- (savestate_graph.py; lib/ot6_contract.lua "world-figaro-v1").
   H.saveAtCheckpoint("world-figaro-v1"),
 })
