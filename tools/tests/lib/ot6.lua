@@ -1218,6 +1218,7 @@ end
 function M.roundCost(o)
   local window = o.window or 0
   local cost, actions, parts, rate = 0, 0, {}, 0
+  local acts = {}     -- each action inside the window: its slot and price (nil: unmeasured)
   local gauges = {}
   for _, en in ipairs(o.enemies or {}) do
     gauges[#gauges + 1] = string.format("s%d eta %s/%s", en.slot or -1,
@@ -1250,6 +1251,8 @@ function M.roundCost(o)
           rest = en.typical
         end
         cost = cost + each + (n - 1) * rest
+        acts[#acts + 1] = { slot = en.slot, price = each }
+        for _ = 2, n do acts[#acts + 1] = { slot = en.slot, price = rest } end
         if rest ~= each then
           parts[#parts + 1] = string.format("s%d %dx (%d worst + %dx%d typical)", en.slot or -1,
             n, each, n - 1, rest)
@@ -1258,12 +1261,13 @@ function M.roundCost(o)
         end
       else
         parts[#parts + 1] = string.format("s%d %dx? (unmeasured)", en.slot or -1, n)
+        for _ = 1, n do acts[#acts + 1] = { slot = en.slot } end
       end
     end
   end
   local why = string.format("%d enemy action(s) inside %d ticks%s [%s]", actions, window,
     #parts > 0 and (": " .. table.concat(parts, " + ")) or "", table.concat(gauges, ", "))
-  return cost, actions, why, rate
+  return cost, actions, why, rate, acts
 end
 
 -- Is a heal worth the turn it costs?  All of newFightDriver's heal policy,
@@ -1357,30 +1361,149 @@ function M.killEstimate(o)
   return per * toBreak + per * 4 * broken, toBreak, broken
 end
 
--- Heading for a wipe (#374), the arithmetic Driver:raiseOk hands to
--- M.raiseDecision as o.wipe.  `members` are the ones still standing besides
--- the fallen, each { e, hp, maxhp, round } with `round` what the enemy's landed hits
--- (Driver:roundPriceFor(e, true)) cost over a full gauge of e's own -- every
--- enemy action in that window priced as if it all fell on e.  So one round is
--- not a threat to each member at once: an enemy action takes down one member,
--- not two.  A wipe is the round landing before ANY standing member can act
--- again (the smallest of their rounds) taking the party's pooled standing HP;
--- one member standing is then simply inside its own round.  Returns the
--- reason, or nil (also with nothing landed yet: a round of 0 takes nobody).
--- Review of 63473f75: per member, four landed 250s read as a 1000 round over
--- each of 900/950/990 HP and called a wipe that 1000 spread over three can't
--- make (build/attempts/wt/v026-driver-review3/wiperisk_probe.log).
+-- Heading for a wipe (#374, as hits needed #395), the arithmetic
+-- Driver:raiseOk hands to M.raiseDecision as o.wipe.  `members` are the ones
+-- still standing besides the fallen, each { e, hp, maxhp, window, enemies,
+-- fallback }: `window` is a full gauge of the member's own in ticks, and
+-- `enemies`/`fallback` the M.roundCost input pricing what the enemy has
+-- landed on that member (Driver:roundEnemies(e, true)).  The window that
+-- counts is the shortest, the quickest member's gauge refilling: the enemy
+-- actions inside it, each priced on each member (its worst landed hit there,
+-- the typical one for repeats), are the round that lands before any of them
+-- acts twice.  An enemy action takes down one member, not two, so the party
+-- is heading for a wipe when those actions can be shared out to drop every
+-- member: Sum ceil(hp_m / price on m) actions or fewer when each prices the
+-- same on a member, and the exact share-out (a Pareto pass) when they
+-- differ -- one 400 and three 10s drop one member at 100, not three.
+-- Returns the reason, or nil and why not (an unpriced action -- nothing
+-- landed yet -- drops nobody).
+--
+-- Review of wt/v026-driver (build/attempts/wt/v026-driver-review3/
+-- wiperisk_probe2.log): the pooled form (standing HP against the smallest
+-- round) missed 3 of 4 actions wiping when the enemy hit members unevenly
+-- (50s on one, 400s on the other) and read a wipe under overkill (900 HP
+-- under four 250s, which need five).
 function M.wipeRisk(members)
-  if #members == 0 then return nil end
-  local pool, round, parts = 0, nil, {}
+  if #members == 0 then return nil, "nobody else standing" end
+  local window = nil
   for _, m in ipairs(members) do
-    pool = pool + m.hp
-    if round == nil or m.round < round then round = m.round end
-    parts[#parts + 1] = string.format("e%d %d/%d", m.e, m.hp, m.maxhp or 0)
+    if m.window ~= nil and (window == nil or m.window < window) then window = m.window end
   end
-  if pool > round then return nil end
-  return string.format("%d standing, %d HP between them (%s) under the %d round that lands "
-    .. "before any of them acts", #members, pool, table.concat(parts, ", "), round)
+  if window == nil then return nil, "no gauge to count a window by" end
+  -- each member's price for each action in the window (slot order, so the
+  -- lists line up: the enemies' gauges are the same for every member)
+  local acts, prices = nil, {}
+  for i, m in ipairs(members) do
+    local _, _, _, _, a = M.roundCost({ window = window, enemies = m.enemies or {}, fallback = m.fallback })
+    if acts == nil then acts = a end
+    if #a ~= #acts then return nil, "the members' windows disagree" end
+    prices[i] = {}
+    for k, act in ipairs(a) do prices[i][k] = act.price or 0 end
+  end
+  local n = #acts
+  if n == 0 then
+    return nil, string.format("no enemy action inside the quickest gauge (%d ticks)", window)
+  end
+  -- the share-out, exactly: a dynamic program over the actions (biggest
+  -- first), each spent on any one member.  A state is the damage taken so
+  -- far by every member but the last, each capped at its HP (more drops
+  -- nobody further), and it keeps the most the last member can have taken
+  -- (with the counts and sums behind it, for the reason).  A state that the
+  -- remaining actions cannot finish -- some member short even taking all of
+  -- them -- is dropped.  The party wipes when a state reaches every HP.
+  -- Exact; a state count past STATES_MAX (never near it at a window's
+  -- handful of actions) stops the reading as undecided, said as such,
+  -- never as a refusal (#395 review: the first cut's node cap read a cut-
+  -- short search as "cannot drop").  Near the cap it costs about a second
+  -- of Lua inside one frame callback (20 distinct actions: 1.15 s an
+  -- instance on average, 15 of 300 reaching the cap; 16: 0.10 s;
+  -- build/attempts/wt/v026-lib/395/review_fix/wipecap.log); a raise
+  -- decision is rare and a window holds a handful of actions.
+  local STATES_MAX = 200000
+  local nm = #members
+  local order = {}
+  for k = 1, n do order[k] = k end
+  local function top(k) local t = 0 for q = 1, nm do t = math.max(t, prices[q][k]) end return t end
+  table.sort(order, function(a, b) local ta, tb = top(a), top(b) if ta ~= tb then return ta > tb end return a < b end)
+  local hp, left = {}, {}                 -- left[q][k]: member q's price total over actions k..n
+  for q, m in ipairs(members) do
+    hp[q] = math.max(m.hp, 0)
+    left[q] = {}
+    left[q][n + 1] = 0
+    for k = n, 1, -1 do left[q][k] = left[q][k + 1] + prices[q][order[k]] end
+  end
+  -- state: { d = {damage per member, capped}, c = {actions taken}, t = {damage taken, uncapped} }
+  local function keyOf(d) local t = {} for q = 1, nm - 1 do t[q] = d[q] end return table.concat(t, ",") end
+  local function done(d) for q = 1, nm do if d[q] < hp[q] then return false end end return true end
+  local states = { [keyOf({})] = { d = {}, c = {}, t = {} } }
+  for q = 1, nm do states[keyOf({})].d[q] = 0; states[keyOf({})].c[q] = 0; states[keyOf({})].t[q] = 0 end
+  local won, count = nil, 1
+  if done(states[keyOf({})].d) then won = states[keyOf({})] end
+  for k = 1, n do
+    if won then break end
+    local a, nxt, nn = order[k], {}, 0
+    for _, st in pairs(states) do
+      for q = 1, nm do
+        local pr = prices[q][a]
+        if pr > 0 and st.d[q] < hp[q] then
+          local d, c, t = {}, {}, {}
+          for r = 1, nm do d[r] = st.d[r]; c[r] = st.c[r]; t[r] = st.t[r] end
+          d[q] = math.min(hp[q], d[q] + pr); c[q] = c[q] + 1; t[q] = t[q] + pr
+          local alive = true
+          for r = 1, nm do if d[r] + left[r][k + 1] < hp[r] then alive = false break end end
+          if alive then
+            local kk = keyOf(d)
+            local old = nxt[kk]
+            if old == nil then nn = nn + 1 end
+            if old == nil or d[nm] > old.d[nm] then nxt[kk] = { d = d, c = c, t = t } end
+            if done(d) then won = nxt[kk] end
+          end
+        end
+      end
+      if won then break end
+      -- spent on nobody (every member it can land on is already down)
+      local landed = false
+      for q = 1, nm do if prices[q][a] > 0 and st.d[q] < hp[q] then landed = true break end end
+      if not landed then
+        local kk = keyOf(st.d)
+        if nxt[kk] == nil then nn = nn + 1 end
+        if nxt[kk] == nil or st.d[nm] > nxt[kk].d[nm] then nxt[kk] = st end
+      end
+    end
+    states, count = nxt, nn
+    if not won and count > STATES_MAX then
+      return nil, string.format("undecided: %d share-outs of the %d enemy action(s) inside the "
+        .. "quickest gauge (%d ticks) after %d of them, past the %d the reading keeps", count, n,
+        window, k, STATES_MAX)
+    end
+    if count == 0 then break end
+  end
+  if not won then
+    -- why not, for the log: what each member needs taken alone
+    local alone = {}
+    for i2, m in ipairs(members) do
+      local t = {}
+      for k = 1, n do t[k] = prices[i2][k] end
+      table.sort(t, function(a, b) return a > b end)
+      local sum, need = 0, nil
+      for k, pr in ipairs(t) do
+        sum = sum + pr
+        if pr > 0 and sum >= m.hp then need = k break end
+      end
+      alone[#alone + 1] = string.format("e%d %d/%d %s", m.e, m.hp, m.maxhp or 0,
+        need and string.format("by %d", need) or "by none of them")
+    end
+    return nil, string.format("the %d enemy action(s) inside the quickest gauge (%d ticks) cannot "
+      .. "drop all %d standing (alone: %s)", n, window, #members, table.concat(alone, ", "))
+  end
+  local parts, need = {}, 0
+  for q, m in ipairs(members) do
+    need = need + won.c[q]
+    parts[#parts + 1] = string.format("e%d %d/%d by %d (%d damage)", m.e, m.hp, m.maxhp or 0,
+      won.c[q], won.t[q])
+  end
+  return string.format("%d standing go down to %d of the %d enemy actions inside one full gauge "
+    .. "of the quickest of them (%d ticks): %s", #members, need, n, window, table.concat(parts, ", "))
 end
 
 -- Whether a raise is worth the Fenix Down (#165, refined by #168): the HP
@@ -6551,10 +6674,10 @@ function Driver:raiseOk(e, actor)
         .. "(slot %d is %d ticks from acting)", lethalSlot, lethalEta)
     end
   end
-  -- (#374) heading for a wipe (M.wipeRisk): the members standing besides
-  -- the fallen one, their HP pooled, are inside the round that lands before
-  -- any of them acts, priced from what the enemy has actually landed (no
-  -- unseen enemy priced from its script, #367).  With the script's price in it, the
+  -- (#374, #395) heading for a wipe (M.wipeRisk): the enemy actions inside
+  -- the quickest standing member's full gauge can drop every member standing
+  -- besides the fallen one, priced from what the enemy has actually landed
+  -- on each (no unseen enemy priced from its script, #367).  With the script's price in it, the
   -- Sealed Gate's cave read every member inside its round from full HP and
   -- raised on it: "102 HP does not clear the 1293 round, but the party is
   -- heading for a wipe (3 standing ..." (build/attempts/wt/v026-driver/
@@ -6565,11 +6688,15 @@ function Driver:raiseOk(e, actor)
       local php = M.readWord(0x3BF4 + p * 2)
       if p ~= e and php > 0 and php ~= 0xFFFF and M.readWord(0x3C1C + p * 2) > 0
          and (M.leftMask() >> p) & 1 == 0 then
+        -- (one with no gauge is still a member to drop: window nil, prices kept)
+        local window, enemies, fallback = self:roundEnemies(p, true)
         members[#members + 1] = { e = p, hp = php, maxhp = M.readWord(0x3C1C + p * 2),
-                                  round = self:roundPriceFor(p, true) or 0 }
+                                  window = window, enemies = enemies, fallback = fallback }
       end
     end
-    o.wipe = M.wipeRisk(members)
+    local why
+    o.wipe, why = M.wipeRisk(members)
+    if o.wipe == nil and why ~= nil then detail = detail .. "; wipe: no -- " .. why end
   end
   local _, ok, why, needsTopUp = M.raiseDecision(o)
   return ok, raiseHp, hit, hitSlot, hitOn, why .. detail, needsTopUp
@@ -6582,9 +6709,20 @@ end
 -- an unseen enemy's price from its script (#367), so only what the enemy
 -- has landed counts
 function Driver:roundPriceFor(e, measured)
+  local window, enemies, fallback = self:roundEnemies(e, measured)
+  if window == nil then return nil end
+  return (M.roundCost({ window = window, enemies = enemies, fallback = fallback }))
+end
+
+-- M.roundCost's input for member e: its window (a full gauge of its own, in
+-- ticks), the living enemies' gauges and prices on e, and the fallback
+-- price; nil when e has no gauge
+function Driver:roundEnemies(e, measured)
+  -- (a member with no gauge of its own -- the constant reads 0 or $FFFF --
+  -- has no window, but the enemies' prices on it still count: a standing
+  -- member the wipe reading must still see go down, #395 review)
   local const = M.readWord(BATTLE.ATB_CONST + e * 2)
-  if const == 0 or const == 0xFFFF then return nil end
-  local window = math.ceil(0xFF00 / const)
+  local window = (const ~= 0 and const ~= 0xFFFF) and math.ceil(0xFF00 / const) or nil
   local fallback = nil
   for s2 = 0, 5 do
     local L = self.hitLedger[s2]
@@ -6616,7 +6754,7 @@ function Driver:roundPriceFor(e, measured)
         rom = rom, romAtk = romAtk }
     end
   end
-  return (M.roundCost({ window = window, enemies = enemies, fallback = fallback }))
+  return window, enemies, fallback
 end
 
 function Driver:loreDiagnose(actor, want)
