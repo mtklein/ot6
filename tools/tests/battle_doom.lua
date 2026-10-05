@@ -124,7 +124,10 @@ local function watchCounts()
     -- frames): that clear is the queue's timing, not the count's, and is not
     -- a step.
     local condemned = (H.readByte(ST2 + e * 2) & 0x01) ~= 0
-    if condemned then
+    -- visits are counted whatever the bit reads: the visit that carries the
+    -- count to its Doom can clear the bit before this frame samples it (a
+    -- mutant that steps a visit late read 3 visits for 3 wanted that way)
+    do
       local acc = H.readByte(ACC + e * 2)
       if accLast[e] ~= nil and acc ~= accLast[e] then
         visits[e] = (visits[e] or 0) + 1
