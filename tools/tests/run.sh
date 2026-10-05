@@ -29,6 +29,10 @@
 #   patched build (tools/mesen/) then skips the debugger bookkeeping the
 #   harness never reads; the official binary ignores the variable.
 set -u
+# Every emulator runs at low CPU priority (niceness 10 or more), however it
+# was started: the machines are shared with their owner, and placement fills
+# them on the understanding that whatever the owner runs comes first.
+if [ "$(nice)" -lt 10 ]; then exec nice -n $((10 - $(nice))) sh "$0" "$@"; fi
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ROM="${OT6_ROM:-$ROOT/build/ot6.sfc}"
 # The verdict patterns must match a whole verdict line rather than a prefix.
