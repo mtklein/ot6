@@ -19,7 +19,7 @@ weapon type that monster is weak to (slashing, piercing or bludgeoning),
 so Setzer can break what his own weapon can't; each Boost Point hires one
 more blow, paid for and chipping like the first. You see each hire: Setzer
 steps aside and a merchant walks in to strike, and each Boost Point brings
-someone tougher, an Imperial soldier, then General Leo, then a fourth: Shadow
+someone new, an Imperial soldier, then General Leo, then a fourth: Shadow
 himself if he's free to hire, his dog Interceptor if Shadow is fighting in your
 party (with nothing left to hit, the dog doesn't appear), or a ghost from the
 Phantom Train if Shadow was never recruited or was left behind on the Floating
@@ -39,7 +39,7 @@ school's skills advisor has two new pages about it.
 boosted Fight kills its target with swings still to come, the rest now
 go to another monster instead of beating the fallen one. The same goes
 for Pummel's second blow and for Setzer's extra hires and Jackpot rolls,
-so every hit you paid for lands on a monster while one is standing.
+so the hits you paid for land on a monster while one is standing.
 Without boost, a Genji Glove's second swing still follows the first, as
 in the original game.
 
@@ -47,3 +47,5 @@ in the original game.
 and the version number under the FINAL FANTASY III logo, and the Config
 screen shows it on the bottom line of its window, on both of its pages, so
 you can tell which build a device is running without leaving the game.
+Emulators and flash carts that show a game's internal title now show
+"OT6" and the version too.
