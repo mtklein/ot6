@@ -437,11 +437,22 @@ local function approachFrame()
     -- a window is up and he is down with nothing on its way to raise him:
     -- without a Fenix Down no branch point can come (#377's sweep2 k5 spent
     -- 40000 frames healing around a fallen Setzer with an empty bag)
-    H.assertEq(invCount(FENIX) > 0, true, string.format("precondition: a Fenix Down to " ..
-      "raise SETZER (f%d: the bag is out)", H.frame))
+    if invCount(FENIX) == 0 then
+      H.assertEq(false, true, string.format("precondition: a Fenix Down to raise SETZER " ..
+        "(f%d: the bag is out)", H.frame))
+    end
   end
   if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor then
     W = {}
+    if ctlDone and threatOn(actor) and SD.seen ~= threatOn(actor) and H.readByte(MSTATE) == ST_CMD then
+      SD.seen = threatOn(actor)
+      local t = SD.seen
+      H.log(string.format("[cancel] f%d his window with entity %d's blow on him: %s, playing %s, " ..
+        "hp %d (median blow %d), bank %d, held %d", H.frame, t, aheadOf(t) and
+        string.format("in the queue, %d ahead", aheadOf(t)) or "in its advance wait",
+        executing and string.format("entity %d for %d", executing, H.frame - execStart) or "nothing",
+        php(actor), blow(), bp(actor), SD.hold or 0))
+    end
     if ctl and ctl.commit and ctl.away and not ctl.done then ctl = nil end  -- dropped: again
     if not skipPoint and holdForBlow() then
       SD.hold = (SD.hold or 0) + 1
@@ -457,7 +468,7 @@ local function approachFrame()
   else
     if ctl and ctl.commit then ctl.away = true end
     skipPoint = false
-    SD.n, SS.n, SD.hold = 0, 0, 0
+    SD.n, SS.n, SD.hold, SD.seen = 0, 0, 0, nil
     pageOrOther()
   end
 end
