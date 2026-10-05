@@ -5922,11 +5922,19 @@ function Driver:setzerLine(actor, have)
                boostLeft = want, aim = slot, reason = "jackpot" }
     end
   end
-  -- Slot at 3 BP in a random battle
-  if o.slot ~= false and have >= 3 and M.readByte(M.RANDBTL) ~= 0 and livingMonsters() >= 2 then
-    M.log(string.format("[%s] actor=%d SETZER Slot at 3 BP: a chosen triple against %d", tag, actor,
-      livingMonsters()))
-    return { kind = "slot", row = row, skill = BATTLE.SETZER.SLOT, boostLeft = 3, reason = "slot" }
+  -- Slot in a random battle against two or more, at the bank's boost from
+  -- SLOT_AT up (#353): 3 BP chooses the triple (whatever reel 1 stops on,
+  -- ot6_slot.asm), 2 BP blesses every icon so reels 2 and 3 drift toward
+  -- the pair and the triple.  At 3 alone it never fired on the chain: the
+  -- route's bank policy spends at 2, so SETZER never held 3 in a random
+  -- battle (v0.25's chain logs: no "SETZER Slot" line; route-wor-falcon.md
+  -- 13.9).  o.slotAt / M.SLOT_AT is the lever (3 is the driver before).
+  local slotAt = o.slotAt or M.SLOT_AT or 2
+  if o.slot ~= false and have >= slotAt and M.readByte(M.RANDBTL) ~= 0 and livingMonsters() >= 2 then
+    local b = math.min(have, 3)
+    M.log(string.format("[%s] actor=%d SETZER Slot at %d BP: %s against %d", tag, actor, b,
+      b >= 3 and "a chosen triple" or "every icon blessed", livingMonsters()))
+    return { kind = "slot", row = row, skill = BATTLE.SETZER.SLOT, boostLeft = b, reason = "slot" }
   end
   -- the gil rows are for the fights that matter: a random battle is won
   -- with the free Fight (measured, gm.sh: in the WoB grind Hired Help took
