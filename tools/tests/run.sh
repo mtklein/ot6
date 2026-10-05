@@ -223,6 +223,14 @@ shared_app_ready() {
   [ ! -e "$SHARED_APP$BIN_SUB/settings.json" ] &&
   [ "$(cat "$SHARED_APP.stamp" 2>/dev/null)" = "$SRC_STAMP" ]
 }
+# What a not-ready look saw, for the build line (#371: a selftest wave once
+# counted two builds of one cold cache, never reproduced; the next one says
+# what the second builder found).
+shared_app_why() {
+  if [ ! -x "$SHARED_APP$BIN_SUB/Mesen" ]; then echo "no executable"
+  elif [ -e "$SHARED_APP$BIN_SUB/settings.json" ]; then echo "a settings.json"
+  else echo "stamp '$(cat "$SHARED_APP.stamp" 2>/dev/null)', want '$SRC_STAMP'"; fi
+}
 
 if ! shared_app_ready; then
   # Many workers can arrive here at once on a cold cache.  Whoever wins the
@@ -246,7 +254,7 @@ if ! shared_app_ready; then
     # finished bundle down under every worker between its own look and its
     # exec (#242: three generate edges died that way on a cold cache).
     if ! shared_app_ready; then
-      echo "creating shared test emulator (one-time${GATEKEEPER_NOTE})..."
+      echo "creating shared test emulator (one-time${GATEKEEPER_NOTE}; pid $$ found $(shared_app_why))..."
       TMP="$MESEN_CACHE/.build.$$"
       rm -rf "$TMP" "$SHARED_APP" "$SHARED_APP.stamp"
       # cp -c = APFS clonefile: instant and ~zero physical disk.  -L because
@@ -264,6 +272,10 @@ if ! shared_app_ready; then
              "$TMP$BIN_SUB/RecentGames" "$TMP$BIN_SUB/Debugger"
       mv "$TMP" "$SHARED_APP"
       printf '%s' "$SRC_STAMP" > "$SHARED_APP.stamp"
+      # Verify before the lock is let go: a build the next look cannot see
+      # as ready would be built again under every worker already handed it.
+      shared_app_ready || {
+        echo "shared test emulator built but not ready: $(shared_app_why)"; exit 2; }
     fi
     rm -rf "$LOCK"; HELD_LOCK=""
   fi
@@ -290,6 +302,28 @@ if [ -z "$EMULATOR_SHA" ] || [ "${EMULATOR_OF:-}" != "$SRC_STAMP" ]; then
   EMULATOR_SHA=$(shasum -a 256 "$SHARED_APP$BIN_SUB/Mesen" | cut -c1-64)
   printf '%s %s\n' "$EMULATOR_SHA" "$SRC_STAMP" > "$SHARED_APP.sha256.$$" &&
     mv -f "$SHARED_APP.sha256.$$" "$SHARED_APP.sha256"
+fi
+# Which build that is (#345): the `<repository> <tag> <commit>` record
+# tools/mesen/build.sh packs into the executable (tools/mesen/buildinfo.py;
+# `none` for a build without one), read once per shared copy like the sha.
+# The deployed emulator must be the one tools/mesen/EMULATOR pins: every
+# fixture and verdict is the emulator's as much as the ROM's, and a machine
+# still running the old build after a pin change would regenerate under
+# the new pin with the wrong emulator.  OT6_MESEN_APP is a deliberate
+# other emulator (build.sh's smoke test runs a stock reference) and is not
+# held to the pin.
+EMULATOR_REC=""
+[ -f "$SHARED_APP.buildinfo" ] && { read -r EMULATOR_REC_OF; read -r EMULATOR_REC; } < "$SHARED_APP.buildinfo"
+if [ -z "$EMULATOR_REC" ] || [ "${EMULATOR_REC_OF:-}" != "$SRC_STAMP" ]; then
+  EMULATOR_REC=$(python3 "$ROOT/tools/mesen/buildinfo.py" "$SHARED_APP$BIN_SUB/Mesen")
+  printf '%s\n%s\n' "$SRC_STAMP" "$EMULATOR_REC" > "$SHARED_APP.buildinfo.$$" &&
+    mv -f "$SHARED_APP.buildinfo.$$" "$SHARED_APP.buildinfo"
+fi
+EMULATOR_COMMIT=$(printf '%s' "$EMULATOR_REC" | cut -d' ' -f3)
+PIN=$(cat "$ROOT/tools/mesen/EMULATOR" 2>/dev/null)
+if [ -z "${OT6_MESEN_APP:-}" ] && [ "$EMULATOR_REC" != "$PIN" ]; then
+  echo "[ot6] FAIL: the deployed emulator $SRC_APP is the build '$EMULATOR_REC', but tools/mesen/EMULATOR pins '$PIN': deploy the pinned build on this machine first (tools/mesen/README.md, Deploying); refused BEFORE boot"
+  exit 2
 fi
 
 # Remove any stale per-worker bundle in build/.  Test -L as well as -e: it
@@ -347,6 +381,17 @@ python3 "$ROOT/tools/tests/lib/pin_test_saves.py" \
 # stale srm couples one run to the next and gets baked into generated
 # savestates.  Tests that need a save inject it explicitly (SRM sidecars).
 rm -f "$TEST_SAVES"/*.srm
+# A script that declares a battery layout (the marker below) and embeds no
+# savestate boots only by Continuing a battery, so without
+# OT6_SRAM_CHECKPOINT it would Continue an empty one, start a New Game and
+# fail much later on whatever it waited for (#248: probe_save_compat ran to
+# its timeout that way).  Refuse it here, naming the fix.
+if [ -z "${OT6_SRAM_CHECKPOINT:-}" ] &&
+   grep -q '^-- OT6_CHECKPOINT_LAYOUT: ' "$COMPOSED" &&
+   ! grep -q '^-- state [A-Za-z0-9_]*\.mss\.lua ' "$COMPOSED"; then
+  echo "[ot6] FAIL: $(basename "$SCRIPT") boots by Continuing a battery (it declares OT6_CHECKPOINT_LAYOUT and loads no savestate), and no OT6_SRAM_CHECKPOINT was given: run it as OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/<key> (configure.py's TEST_ENV names a suite's; refused BEFORE boot)"
+  exit 2
+fi
 if [ -n "${OT6_SRAM_CHECKPOINT:-}" ]; then
   # A generator step declares the persistent-SRAM layout it understands with
   # a marker comment in its script:
@@ -440,7 +485,7 @@ CORE_SHA=unknown
 for f in "$MESEN2/MesenCore.dylib" "$MESEN2/MesenCore.so"; do
   [ -f "$f" ] && CORE_SHA=$(shasum -a 256 "$f" | cut -c1-64)
 done
-printf '[emulator] %s MESEN_SCRIPT_ONLY requested=%s core=%s\n' "${EMULATOR_SHA:-unknown}" "$MESEN_SCRIPT_ONLY" "$CORE_SHA" >> "$RUN_LOG"
+printf '[emulator] %s MESEN_SCRIPT_ONLY requested=%s core=%s commit=%s\n' "${EMULATOR_SHA:-unknown}" "$MESEN_SCRIPT_ONLY" "$CORE_SHA" "${EMULATOR_COMMIT:-none}" >> "$RUN_LOG"
 
 python3 "$ROOT/tools/tests/lib/decode_b64.py" "$RUN_LOG" "$ART"
 

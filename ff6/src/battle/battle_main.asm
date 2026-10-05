@@ -10687,6 +10687,8 @@ AttackerEffect_0b:
 
 AttackerEffect_49:
 @3fad:  jsr     RandGenju
+        jsl     Ot6MagiciteKeep ; ot6: a boosted draw the boost cannot pay
+        bcs     @3fad           ;   for draws again (ot6_magicite.asm, #368)
 _3fb0:  sta     $3400       ; current spell
         inc     $3a70       ; increment number of attacks
 _3fb6:  rts

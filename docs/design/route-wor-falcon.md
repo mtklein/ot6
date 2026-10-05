@@ -848,6 +848,11 @@ moved.
 | `$06F` PowerDemon | a demon | 3 · slash, pierce | **3 · slash, pierce, ¤** | a demon |
 | `$11C` Dullahan | a headless knight | 10 · pierce, bludg | **10 · pierce, bludg, ¤** | the headless spirit in the armor (its third key) |
 
+(Since #347 the earlier arcs and the WoB take ¤ on their own spirits too:
+the Pm Stalker, the NeckHunter and Dante in the WoR, the Sealed Gate's
+spirit and the Floating Continent's Apokryphos, Misfit and Brainpan in the
+WoB; their route docs say why.)
+
 Left without ¤: the Harpiai (a harpy, a flier), the Muus (a shelled
 beast), the Mad Oscar and the Exoray (plants), the Presenter (no gauge)
 and the Whelk Head (a shellfish).

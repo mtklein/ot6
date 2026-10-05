@@ -12,7 +12,7 @@
 > first-battle samples.
 >
 > The one thing that took measuring (see `gen_sfigaro.lua` BEAT 3 and
-> `tools/tests/probe_richman_return.lua`): the basement is one-way across a
+> `tools/tests/probe_richman_return.lua`, deleted in b18643d7): the basement is one-way across a
 > **map reload**.  The grandson steps aside for a merchant via an
 > `obj_script`, not a spawn slot, and $01F0 clears on reload, so on
 > re-entering from the west he is back at (6,10) blocking the corridor to

@@ -180,8 +180,9 @@ These numbers live in `Ot6AbilityCostTbl` (ff6/src/battle/ot6_boost.asm)
 **Every number in these tables is a base price for the rows that
 escalate.** Since #219, boosting an ability whose damage the boost
 multiplies costs escalating MP: the row's price becomes
-`min(99, floor(base * 2.5^boost + 0.5))`, i.e. x1 / x2.5 / x6.25 / x15.625
-for pending boost 0/1/2/3, capped at 99.
+`max(base, min(99, floor(base * 2.5^boost + 0.5)))` (`Ot6BoostPriceFor`),
+i.e. x1 / x2.5 / x6.25 / x15.625 for pending boost 0/1/2/3, capped at 99 and
+never below the base (Phoenix's 110 stays 110).
 
 Who pays it is one test: **a price escalates exactly when `Ot6BoostDmg`
 multiplies it.** Blitz, Tools and Dance escalate, because their commands are

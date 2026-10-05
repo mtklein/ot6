@@ -72,7 +72,7 @@ This is the check that was missing when a generator's save step was
 silently skipped and two checkpoints shipped holding an older save
 (#218): the live half is `H.assertSavedSlot(map, x, y, what)` in
 `lib/ot6_contract.lua`, asserted right after `H.saveGame` in the generator
-that cuts the checkpoint and again in the `gen_seed_*` lifter.
+that cuts the checkpoint.
 
 `ninja build/checks/checkpoint_saves.ok`
 (`tools/tests/lib/checkpoint_saves.sh`) runs that validation over every

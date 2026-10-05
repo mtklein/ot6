@@ -13524,10 +13524,12 @@ function M.run(opts, steps)
     local ok, addr = pcall(M.seedStoreAddr)
     if ok then
       rawAddMemoryCallback(function()
-        if RUN.phase ~= "run" or RUN.firstBattle then return end
+        if RUN.phase ~= "run" then return end
         -- Mesen fires exec callbacks before the instruction: A is the seed.
         local seed = emu.getState()["cpu.a"] & 0xff
         local grp = M.readWord(0x11e0)
+        -- every battle's key, so rates count distinct fights (#339)
+        if RUN.firstBattle then M.log(string.format("[seed] battle: attempt %d f%d key %s", RUN.attempt, M.frame, firstBattleKey(seed, grp))) return end
         local fb = { attempt = RUN.attempt, shift = RUN.shift, frame = M.frame,
           boot = RUN.bootFrame and (M.frame - RUN.bootFrame) or nil,
           phase = M.seedPhase(), seed = seed, group = grp,

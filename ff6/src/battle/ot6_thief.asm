@@ -315,7 +315,7 @@ done:   plp
 ;     Ot6ActionEnd, so Bestow cannot accidentally be free.  Charging it here
 ;     instead would leave the pending byte at 0, Ot6ActionEnd would pay Locke
 ;     his +1 regen, and a Bestow would cost him nothing net, which is one free
-;     pip per turn for 4 MP.
+;     pip per turn for 5 MP (Ot6ThiefCostTbl; kits.md, mp-economy.md).
 ;   * there is exactly one BP charge path in the game and this uses it, so no
 ;     second clamp, no second cap, no way for the two to drift.
 ; If the player has already armed a pending boost with L/R before opening the

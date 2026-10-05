@@ -183,7 +183,10 @@ sha256sum tools/Mesen-linux/Mesen               # = sha256 in the buildinfo
 ```
 
 The next run.sh then rebuilds the shared copy and logs the new
-`[emulator]` sha. To roll back, install the kept binary the same way. A
+`[emulator]` sha and `commit=`. run.sh refuses to run while the deployed
+build's packed record (`python3 tools/mesen/buildinfo.py <binary>`) is not
+`EMULATOR`'s line, so a machine left on the old build after a pin change
+stops rather than regenerating under the new pin. To roll back, install the kept binary the same way. A
 deployment whose `EMULATOR` change has landed is followed by regeneration
 (`ninja chain`, the checkpoint re-cut, `ninja`); a rollback that keeps
 `EMULATOR` regenerates nothing, so roll back `EMULATOR` with it.

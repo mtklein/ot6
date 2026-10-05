@@ -4,6 +4,13 @@
   "slot": 3,
   "milestone": "terra-returned",
   "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "x": 24,
+      "y": 121
+    }
+  },
   "size": 32768,
   "sha256": "fd454aa6e0f6ad5551c2c99700ce01848865a293a37519369536736810afb8d1",
   "provenance": {

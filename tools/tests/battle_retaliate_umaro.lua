@@ -563,9 +563,9 @@ H.run({ maxFrames = 60000, retries = 3 }, {
             H.assertEq(d.pendX, p, string.format(
               "f%d %s: with his pending %d", w.f, name, p))
             local want = d.before << p
-            if want > 0xFFFF then want = 0x7FFF end
+            if want > 0xFFFF then want = 0xFFFF end   -- #359: saturates
             H.assertEq(d.after, want, string.format(
-              "f%d %s: damage %d -> %d (x%d, $7fff on overflow), and NOT "
+              "f%d %s: damage %d -> %d (x%d, $ffff on overflow), and NOT "
               .. "the unmultiplied %d", w.f, name, d.before, want, 1 << p,
               d.before))
           end

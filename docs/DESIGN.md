@@ -17,10 +17,11 @@ touches vanilla behavior where a pillar requires it.
 2. **Shields and weaknesses.** Every enemy has shields and a hidden weakness
    set (elements + weapon classes). Chip shields by hitting weaknesses; at 0
    the enemy Breaks, loses its turn, and takes double damage.
-3. **Boost Points.** +1 per turn, bank up to 5, spend up to 3 to boost an
-   action. Boosting costs next turn's BP gain.
-4. **Magicite are second jobs.** Equipping a magicite grants its skill list
-   and weapon access *while equipped*; nothing is taught permanently. One copy
+3. **Boost Points.** Start each battle with 1, +1 at the end of each
+   action, bank up to 5, spend up to 3 to boost an action. A boosted action
+   earns no BP.
+4. **Magicite are second jobs.** Equipping a magicite grants its spells
+   and a small stat package *while equipped*; nothing is taught permanently. One copy
    of each magicite exists, so kitting the party is a puzzle, the same way
    Octopath allows one shrine license at a time.
 
@@ -36,14 +37,17 @@ touches vanilla behavior where a pillar requires it.
 | Celes | Rune Knight | Sword | Ice/Holy | Runic from the start (signature) + spells (see below) |
 | Gau | Beast Tamer | Fangs (innate) | Earth | Rage learned without limit on the Veldt, 8 equipped (see below) |
 | Setzer | Gambler/Merchant | Cards & dice | — | Slot from the start (signature), with Coin Toss and Hired Help (paid in gil) behind it; divine: Jackpot, a Fixed-Dice triple, never Slot itself (kits.md) |
-| Strago | Scholar | Rod | Fire/Ice/Lightning | 8 Lores, Aqua Breath as the free signature; **Analyze** (reveals shields and weaknesses) cheap at #2 |
+| Strago | Scholar | Rod | Fire/Ice/Lightning | 8 Lores, Aqua Breath as the free signature; **Analyze** (reveals shields and weaknesses) cheap at #2 -- planned, not in the game |
 | Relm | Painter | Brush | — | Sketch stays as signature |
 | Shadow | Assassin | Dagger (thrown) | Dark | Throw (signature); divine: Assassinate, once a battle: the hit of his that breaks an enemy kills it outright, as does a hit on one already Broken; a boss is only Broken |
 | Mog | Dancer | Spear | varies by dance | the 8 Dances, verbatim |
 | Umaro / Gogo | Berserker / Mime | — | — | bonus characters; Gogo has access to every job and masters none |
 
-**Weapon classes (8):** sword, dagger, spear, katana, claw, rod, ranged
-(cards/dice/boomerangs/thrown), brush.
+**Break classes (4):** Slash (swords, katanas, claws), Pierce (spears,
+daggers, thrown edges, bolts, darts), Bludgeon (fists, staves, rods, flails,
+boomerangs) and Special ¤ (dice, cards, brushes), `OT6_SLASH` ..
+`OT6_SPECIAL` in `ot6_class.asm`; `Ot6WeapClassTbl` gives every weapon
+one.
 **Elements (8):** FF6's native fire, ice, lightning, wind, earth, water,
 holy, poison. That is two more than Octopath's six, which makes the weakness
 matrix larger.
@@ -56,7 +60,7 @@ weakness bits in vanilla), one weapon-class (new side table in expanded ROM).
 
 **Chip.** Any damaging hit that matches a weakness removes 1 shield, and a
 multi-hit action chips per hit (one boosted Fight chips four shields off one
-guard — `multi-hit.md` §1, `probe_multihit.lua`). Multi-hit is deliberately
+guard — `multi-hit.md` §1, `probe_multihit.lua`, deleted in b18643d7). Multi-hit is deliberately
 scarce: `tools/audit_multihit.py` (which exits nonzero if it goes stale)
 enumerates **six** multi-hit abilities in the whole game, spread over the
 three physical kits. Cyan's are vanilla's — Quadra Slam ×4 and Quadra Slice ×4
@@ -72,13 +76,14 @@ table row, so it lands one hit per body and exactly **one** chip against a
 solo boss. Breadth and rate are separate levers and are priced separately;
 `design/multi-hit.md` is the survey.
 
-**Break.** At 0 shields: the enemy's ATB resets and it is inflicted with a
-Broken state for the length of a private broken timer at `$3e88,y` gated by
-`Ot6Gate` (`ot6_break.asm:1655` — vanilla Stop is not used); all damage it
-takes is ×2; its weakness list is locked revealed for the rest of the
-battle. On recovery, shields reset to `shield_max`. `OT6_BREAK_TICKS` is
+**Break.** At 0 shields (`Ot6Chip` / `Ot6ClassChip`) the enemy is Broken
+for the length of a private timer at `$3e88,y`; no ATB cell is written.
+While the timer runs `Ot6Gate` refuses to queue its turns (vanilla Stop is
+not used) and `Ot6BrokenTurn` empties a turn it had already queued, so its
+gauge refills and waits; all damage it takes is ×2. A break reveals no
+weaknesses. On recovery (`Ot6Tick`), shields reset to `shield_max`. `OT6_BREAK_TICKS` is
 `$10` (`ot6_break.asm:1`), which measures **2159 frames** — about 36 s of
-battle time — for an on-stage monster (`probe_ifritbreak.lua`).
+battle time — for an on-stage monster (`probe_ifritbreak.lua`, deleted).
 
 **Shielded resistance.** While an enemy still has shields and is not broken it
 takes reduced damage (×0.5), so the swing from shielded to broken is ×4, and
@@ -91,8 +96,11 @@ broken-and-unweak case, so it never measures the strongest state. Either way
 the conclusion holds: boosting into an unbroken, non-weak target is the worst
 return on BP, which is intended.
 
-**Reveal.** Weaknesses start hidden. Chipping one reveals that entry;
-Strago's Analyze reveals everything (the same role Cyrus fills in Octopath).
+**Reveal.** Weaknesses start hidden. Chipping one reveals that entry
+(`Ot6RevealCommit`, for every monster of the species) and it stays revealed,
+across battles too: the per-save codex seeds it at the next battle's start
+(`Ot6SeedShields`). Nothing reveals everything at once; Strago's planned
+Analyze (the role Cyrus fills in Octopath) is not in the game.
 
 **Display ships with the break system**, not as later polish: the shield
 count and revealed-weakness icons are how an Octopath battle reads to the
@@ -108,15 +116,17 @@ Cannon is holy, Drill is spear-class, Fire Dance is fire, ...).
 
 ## BP economy
 
-- +1 BP when a character's turn comes up (ATB fills), capped at 5 — unless
-  they boosted on their previous action (Octopath's no-regen rule, ported 1:1).
+- +1 BP at the end of each of a character's actions (`Ot6ActionEnd`),
+  capped at 5, unless that action was boosted (Octopath's no-regen rule).
+  Every character opens a battle with 1 BP (`Ot6InitBP`).
 - Spend up to 3 BP when confirming an action. Attack: +1 hit per BP. Skills:
   potency tier per BP. Buffs/debuffs: duration per BP.
 - Enemies don't have BP, same asymmetry as Octopath: bosses get shields and
   telegraphs, players get the economy.
 - Boosting also costs MP, when the boost is buying damage. A boosted
-  ability pays `min(99, floor(base × 2.5^boost + 0.5))` — x1 / x2.5 / x6.25 /
-  x15.625 — so a boost is a trade of two currencies rather than a free
+  ability pays `max(base, min(99, floor(base × 2.5^boost + 0.5)))`
+  (`Ot6BoostPriceFor`) — x1 / x2.5 / x6.25 / x15.625, capped at 99 and never
+  below the base — so a boost is a trade of two currencies rather than a free
   multiplier. The rule is one test: **a price escalates exactly when the
   boost multiplies the action.** So Fight and Capture stay free (the boost
   buys swings), tier-family magic and SwdTech are unchanged (the boost
@@ -190,26 +200,26 @@ vanilla, is deleted. The 8 techniques are priced in BP:
 Boost *selects* the tech, the way it folds a mage's spell tier, and
 vanilla's own count of techs known clamps the range to the best one Cyan has
 learned. Every SwdTech carries a **1-BP floor**: `Ot6BushidoTech`
-(`ff6/src/battle/ot6_kits.asm:74-79`) opens with `cmp #$01 / bcs :+ /
+(`ff6/src/battle/ot6_bushido.asm`) opens with `cmp #$01 / bcs :+ /
 lda #$01`, so a stray 0 is clamped *up* to the cheapest tier rather than
 allowed to name a tech, and the menu never offers boost 0 at all. The
 mapping is `base = max(0, ceiling-2)`, `tech = min(base + boost-1, ceiling)`
-(`ot6_kits.asm:65-70`), so boost 1/2/3 selects Cyan's **top three learned**
+(its `@auto` block, with `Ot6BushidoCeil`), so boost 1/2/3 selects Cyan's **top three learned**
 techs, weakest to strongest. The per-tech BP numbers in the table are
 therefore not fixed prices; what a given tier costs slides as he learns
 more, so read the column as the *relative* ordering it was drawn for. Pricing
 consequences are in `design/kits.md` and `design/mp-economy.md`.
 
 There is also a direct SwdTech submenu — `Ot6BushidoListOpen`
-(`ot6_kits.asm:842`), dispatched from `btlgfx_main.asm:18237`, with per-row
-greying by `Ot6BushidoRowGrey` and a field-configurable loadout word at
+(`ot6_cmdmenu.asm`), dispatched from `btlgfx_main.asm`, with per-row
+greying by `Ot6BushidoRowGrey` (`ot6_cmdmenu.asm`) and a field-configurable loadout word at
 `$1e1d`. Boost selects the tech when the loadout is on AUTO; the submenu is
 an additional surface, not a replacement.
 
 Cleave is in the ladder and divine-gated: `Ot6BushidoOblivion`
-(`ot6_kits.asm:141`) places tech 7 at boost 3 and drops a *spent* divine
+(`ot6_bushido.asm`) places tech 7 at boost 3 and drops a *spent* divine
 back to Quadra Slice for the rest of the battle; the resolution-time Broken
-gate is `Ot6Oblivion` (`ot6_kits.asm:250`), hooked after `ChooseTarget` in
+gate is `Ot6Oblivion` (`ot6_divine.asm`), hooked after `ChooseTarget` in
 `CalcAttackEffect`, because the target does not exist when the command is entered.
 Mapping, consequences, and the reasoning: design/kits.md.
 
@@ -225,19 +235,20 @@ charm and the price.
 
 **Gau, controlled.** Gau is the Ochette model — **learn many, equip 8** —
 with Rage kept as the verb: Veldt learning stays unlimited and the 8 slots
-are the equip layer (`Ot6RageCost` at `ot6_boost.asm:1181`; `Ot6RageLearned`
-/ `Slot` / `Nth` / `List` / `Show` from `ot6_kits.asm:1882` onward, with the
-model stated at `ot6_kits.asm:1860`). Leap keeps its name, because
+are the equip layer (`Ot6RageCost` in `ot6_boost.asm`; `Ot6RageLearned`
+/ `Slot` / `Nth` / `List` / `Show` in `ot6_rage.asm`, with the model stated
+in that file's header). Leap keeps its name, because
 CONTRIBUTING's vocabulary rule rules out *Capture*, which FF3-US already
 prints as a battle command (`$06`, the Thief Glove). Leap is also free: it
 shares the Fight row on the Veldt (`Ot6VeldtRow`, called from
-`battle_main.asm:13977`) and costs nothing (`ot6_boost.asm:1186`). There is
+`battle_main.asm`) and costs nothing (`Ot6RageCost`). There is
 no stable. `design/kit-gau.md` is the canonical Gau document.
 
 ## Turn structure
 
-ATB stays in Wait mode, which already approximates discrete turns: "a turn"
-for BP purposes is each time a combatant's gauge fills. BP math is
+ATB is vanilla's: Wait or Active as the player sets it in Config (a new
+game starts on Wait, `menu_sram.asm`); OT6 does not force either. "A turn"
+for BP purposes is each action a character finishes. BP math is
 per-character and does not need global rounds.
 
 ## Magicite as sub-jobs
@@ -255,7 +266,9 @@ magicite.
 
 ## Skill learning
 
-Magic AP is rebadged as JP. Skill #1 — the signature — is free and known on
+Planned, not in the game: no JP exists (esper learn rates are all zero,
+and a battle's magic points feed only Terra's Morph). The plan: magic AP
+is rebadged as JP. Skill #1 — the signature — is free and known on
 join. The remaining seven are bought in any order at escalating costs
 (e.g. 80/200/450/800/1400/2200; divine: 3000 and requires the other seven).
 Passives unlock at 2/4/6/8 skills learned.
