@@ -97,7 +97,7 @@ rm -rf "$TMP/home"
 R=60
 r=1; multi=0; none=0
 while [ "$r" -le "$R" ]; do
-  rm -f "$TMP/lock" "$TMP"/won.*
+  rm -rf "$TMP/lock" "$TMP"/won.*
   i=1
   while [ "$i" -le "$N" ]; do
     ( "$ROOT/tools/tests/run.sh" --take-lock "$TMP/lock" && : > "$TMP/won.$i" ) &
@@ -109,7 +109,7 @@ while [ "$r" -le "$R" ]; do
   [ "$won" -lt 1 ] && none=$((none + 1))
   r=$((r + 1))
 done
-rm -f "$TMP/lock" "$TMP"/won.*
+rm -rf "$TMP/lock" "$TMP"/won.*
 if [ "$multi" = 0 ] && [ "$none" = 0 ]; then
   printf '  pass  the build lock: %s rounds of %s concurrent takers, one winner each\n' "$R" "$N"
 else
