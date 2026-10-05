@@ -198,8 +198,15 @@ local function drainTonics()
         H.assertEq(stop(), true, string.format("drain round %d: a battle left somebody short "
           .. "of max HP within %d legs", drinkN, LEGS_PER_STOP))
       end),
+      -- the Tent and Tincture arms off: the drain's job is the Tonics, and
+      -- with one Tonic left and the Potions held back the care pitches a
+      -- Tent instead (the bag cannot lift everyone: "pitch a Tent (the
+      -- party 240 hp and 0 mp short, ... (1 tonic + 0 potion = 50 gil))",
+      -- build/attempts/wt/v026-field/final2/emptybag.log), which is the
+      -- right call in play and no drink here
       H.fieldCare({ tag = "drinking the Tonics down " .. drinkN,
-        threshold = 1.0, magic = false, reserve = { [POTION] = 99 } }),
+        threshold = 1.0, magic = false, reserve = { [POTION] = 99 },
+        tent = false, tincture = false }),
       H.call(function()
         roster("drain " .. drinkN)
         H.assertEq(H.invCountOf(TONIC) < before, true, string.format("drain round %d "
