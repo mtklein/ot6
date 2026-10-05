@@ -5940,6 +5940,11 @@ function Driver:setzerLine(actor, have)
   -- route's bank policy spends at 2, so SETZER never held 3 in a random
   -- battle (v0.25's chain logs: no "SETZER Slot" line; route-wor-falcon.md
   -- 13.9).  o.slotAt / M.SLOT_AT is the lever (3 is the driver before).
+  -- Measured (build/attempts/wt/v026-driver/353/): it fires in one random
+  -- battle a run at most, and the five battles it fired in took +16, +200,
+  -- +8, -208 and -120 ticks against the same battle without it (-104 in
+  -- all), no death moved -- the verb played at no measured cost; what would
+  -- make it pay (reel 1 timed on a chosen icon) is not built yet.
   local slotAt = o.slotAt or M.SLOT_AT or 2
   if o.slot ~= false and have >= slotAt and M.readByte(M.RANDBTL) ~= 0 and livingMonsters() >= 2 then
     local b = math.min(have, 3)
