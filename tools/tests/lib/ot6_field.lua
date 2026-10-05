@@ -1231,8 +1231,9 @@ end
 --
 -- plan() reads the stretch from the tile the party stands on, out to
 -- opts.width tiles each way along its row while the next tile is walkable
--- and rolls the same group; it asserts the stretch is at least three tiles
--- and that every pairing of a stretch tile with a saved position the walk
+-- and rolls the same group; it asserts the stretch is at least two tiles
+-- (Doma's plain at camp_escaped gives two: x 179..180 on row 71) and that
+-- every pairing of a stretch tile with a saved position the walk
 -- can leave (any stretch tile, where its battles happen, and the live one,
 -- which the first encounter reads) rolls that one group.
 function M.newPacer(opts)
@@ -1286,8 +1287,8 @@ function M.newPacer(opts)
     M.log(string.format("[%s] pace: row %d, x %d..%d (from x %d, saved position "
       .. "(%d,%d)); the groups it can roll: %s", tag, y0, lo, hi, x0, zx, zy,
       table.concat(list, ",")))
-    M.assertEq(hi - lo >= 2, true, string.format("[%s] the row gives a stretch of "
-      .. "at least three tiles that roll group %d (x %d..%d)", tag, g, lo, hi))
+    M.assertEq(hi - lo >= 1, true, string.format("[%s] the row gives a stretch of "
+      .. "at least two tiles that roll group %d (x %d..%d)", tag, g, lo, hi))
     M.assertEq(#list == 1 and list[1] == tostring(g), true, string.format(
       "[%s] every encounter on the stretch rolls group %d, whatever the saved "
       .. "position (rolls %s)", tag, g, table.concat(list, ",")))
