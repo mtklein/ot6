@@ -183,6 +183,16 @@ def rom_identity(root):
     return (out.strip() if out else None), path
 
 
+def emulator_pin(root):
+    """The commit tools/mesen/EMULATOR pins (its third field), or None when
+    the tree has no pin to compare against."""
+    try:
+        parts = (Path(root) / "tools" / "mesen" / "EMULATOR").read_text().split()
+    except OSError:
+        return None
+    return parts[2] if len(parts) >= 3 else None
+
+
 def _v1_hint(gen, root, extras, recorded, which):
     """When a stamp's `which` digest ('sig' or 'generator') is the current
     sources' digest under the v1 byte-hash scheme, the fixture did not move:
@@ -230,6 +240,12 @@ def stamp_status(name, root, _memo=None):
         `generator <sha256>`  the generator's own sig (extras included,
                               lib halves excluded).  The play that reached
                               the state changed: STALE.
+        `pin <commit>`        the emulator build that made it (#345): the
+                              commit packed in the executable, which
+                              run.sh only runs when it is
+                              tools/mesen/EMULATOR's.  Not the tree's pin:
+                              STALE.  `pin unknown`, or no pin line (a
+                              stamp written before #345), binds nothing.
         `artifact <sha256>`   the .mss beside the stamp: replaced bytes
                               are UNBOUND.
         `ancestor <path> <sha256>`  the stamp or checkpoint manifest this
@@ -372,6 +388,13 @@ def _own_stamp_status(base, root):
                 f"fixture {base} is STALE -- generated on ROM identity "
                 f"{rom[0][:12]}, but {rom_path} is {have[:12]}: a "
                 f"machine snapshot of a different ROM; {regen}")
+        pin = (fields.get("pin") or ["unknown"])[0]
+        want = emulator_pin(root)
+        if pin != "unknown" and want and pin != want:
+            return STALE, (
+                f"fixture {base} is STALE -- made by the emulator built from "
+                f"{pin[:12]}, but tools/mesen/EMULATOR pins {want[:12]}: the "
+                f"emulator the fixtures are made with moved; {regen}")
         cur_own = generator_own_sig(gen, root, extras)
         if cur_own != own[0]:
             return STALE, (
@@ -724,7 +747,7 @@ def adoption_proof(base, root, records, rom_now, rom_copy_sha):
         return "full", None
     # (the emulator line is provenance only, written since the tools/mesen/
     # build; it binds nothing either way)
-    unexpected = sorted(set(fields) - {"artifact", "ancestor", "emulator"})
+    unexpected = sorted(set(fields) - {"artifact", "ancestor", "emulator", "pin"})
     if unexpected:
         return "refused", (
             f"its stamp carries {', '.join(unexpected)} line(s) but not the "
@@ -1496,6 +1519,29 @@ def selftest() -> int:
               stamp_status("fake", root)[0], STALE)
         rom.write_bytes(b"rom v1")
         lib_ot6.write_text("ot6.lua v1\n")
+        # The emulator pin (#345): a stamp made by the pinned build is
+        # fresh; one made by another build is STALE once EMULATOR moves;
+        # `pin unknown` binds nothing.
+        (root / "tools" / "mesen").mkdir(parents=True)
+        pin_file = root / "tools" / "mesen" / "EMULATOR"
+        pin_a, pin_b = "a" * 40, "b" * 40
+        pin_file.write_text(f"https://example/mesen ot6-x-1 {pin_a}\n")
+        (st / "fake.mss.emulator").write_text(
+            f"[emulator] {'0' * 64} MESEN_SCRIPT_ONLY requested=1 "
+            f"core={'0' * 64} commit={pin_a}\n")
+        gate("write", "fake", "gen_fake", "-")
+        check("a stamp made under the tree's pin is FRESH",
+              stamp_status("fake", root), (FRESH, None))
+        pin_file.write_text(f"https://example/mesen ot6-x-2 {pin_b}\n")
+        v, m = stamp_status("fake", root)
+        check("a pin change is STALE (#345)", v, STALE)
+        has("...naming the recorded and pinned commits", m,
+            "pins bbbbbbbbbbbb")
+        (st / "fake.mss.emulator").unlink()
+        gate("write", "fake", "gen_fake", "-")
+        check("`pin unknown` binds nothing",
+              stamp_status("fake", root), (FRESH, None))
+        pin_file.unlink()
 
         # -- migration: a stamp from before the rom/generator lines existed
         #    (sig, artifact, ancestor only) is held to the conservative

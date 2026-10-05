@@ -297,6 +297,28 @@ if [ -z "$EMULATOR_SHA" ] || [ "${EMULATOR_OF:-}" != "$SRC_STAMP" ]; then
   printf '%s %s\n' "$EMULATOR_SHA" "$SRC_STAMP" > "$SHARED_APP.sha256.$$" &&
     mv -f "$SHARED_APP.sha256.$$" "$SHARED_APP.sha256"
 fi
+# Which build that is (#345): the `<repository> <tag> <commit>` record
+# tools/mesen/build.sh packs into the executable (tools/mesen/buildinfo.py;
+# `none` for a build without one), read once per shared copy like the sha.
+# The deployed emulator must be the one tools/mesen/EMULATOR pins: every
+# fixture and verdict is the emulator's as much as the ROM's, and a machine
+# still running the old build after a pin change would regenerate under
+# the new pin with the wrong emulator.  OT6_MESEN_APP is a deliberate
+# other emulator (build.sh's smoke test runs a stock reference) and is not
+# held to the pin.
+EMULATOR_REC=""
+[ -f "$SHARED_APP.buildinfo" ] && { read -r EMULATOR_REC_OF; read -r EMULATOR_REC; } < "$SHARED_APP.buildinfo"
+if [ -z "$EMULATOR_REC" ] || [ "${EMULATOR_REC_OF:-}" != "$SRC_STAMP" ]; then
+  EMULATOR_REC=$(python3 "$ROOT/tools/mesen/buildinfo.py" "$SHARED_APP$BIN_SUB/Mesen")
+  printf '%s\n%s\n' "$SRC_STAMP" "$EMULATOR_REC" > "$SHARED_APP.buildinfo.$$" &&
+    mv -f "$SHARED_APP.buildinfo.$$" "$SHARED_APP.buildinfo"
+fi
+EMULATOR_COMMIT=$(printf '%s' "$EMULATOR_REC" | cut -d' ' -f3)
+PIN=$(cat "$ROOT/tools/mesen/EMULATOR" 2>/dev/null)
+if [ -z "${OT6_MESEN_APP:-}" ] && [ "$EMULATOR_REC" != "$PIN" ]; then
+  echo "[ot6] FAIL: the deployed emulator $SRC_APP is the build '$EMULATOR_REC', but tools/mesen/EMULATOR pins '$PIN': deploy the pinned build on this machine first (tools/mesen/README.md, Deploying); refused BEFORE boot"
+  exit 2
+fi
 
 # Remove any stale per-worker bundle in build/.  Test -L as well as -e: it
 # may be a symlink whose target is gone, and -e alone is false for that.
@@ -457,7 +479,7 @@ CORE_SHA=unknown
 for f in "$MESEN2/MesenCore.dylib" "$MESEN2/MesenCore.so"; do
   [ -f "$f" ] && CORE_SHA=$(shasum -a 256 "$f" | cut -c1-64)
 done
-printf '[emulator] %s MESEN_SCRIPT_ONLY requested=%s core=%s\n' "${EMULATOR_SHA:-unknown}" "$MESEN_SCRIPT_ONLY" "$CORE_SHA" >> "$RUN_LOG"
+printf '[emulator] %s MESEN_SCRIPT_ONLY requested=%s core=%s commit=%s\n' "${EMULATOR_SHA:-unknown}" "$MESEN_SCRIPT_ONLY" "$CORE_SHA" "${EMULATOR_COMMIT:-none}" >> "$RUN_LOG"
 
 python3 "$ROOT/tools/tests/lib/decode_b64.py" "$RUN_LOG" "$ART"
 

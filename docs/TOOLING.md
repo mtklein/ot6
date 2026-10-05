@@ -337,10 +337,13 @@ differently from 2.1.1, because of MesenCE's DMA clock-counting fix
   it regenerates every fixture and re-runs every test, and the chain's
   captures then make `checkpoint_drift.py` ask for every cut checkpoint to
   be re-cut. Change it in the same commit as a deployment, and deploy on
-  every machine (px13, the Air, this Mac) before regenerating anywhere: a
-  machine still running the old build would regenerate on the old
-  emulator, and nothing checks which build a run used beyond the stamp's
-  `emulator` record.
+  every machine (px13, the Air, this Mac) before regenerating anywhere.
+  run.sh refuses to run on a machine whose deployed build is not the pinned
+  one (it reads the `<repository> <tag> <commit>` record build.sh packs
+  into the executable, `tools/mesen/buildinfo.py`; `OT6_MESEN_APP` is
+  exempt), logs that commit on the `[emulator]` line (`commit=`), and each
+  stamp records it as `pin <commit>`: `compose.py --check-states` reads a
+  fixture made under another pin as stale.
 - run.sh exports `MESEN_SCRIPT_ONLY=1` for every run except a coverage run
   (OT6_COVERAGE), which needs the code/data log; a stock build ignores
   the variable.
