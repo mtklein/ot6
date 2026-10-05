@@ -684,7 +684,7 @@ check("checkpoint_negatives", "nice sh tools/tests/lib/checkpoint_negatives.sh",
 check("retry_negative", "nice sh tools/tests/lib/retry_negative.sh",
       ["tools/tests/lib/retry_negative.sh", "tools/tests/run.sh",
        "tools/tests/lib/compose.py",
-       copy_if_changed_from("tools/tests/probe_retry_negative.lua"),
+       copy_if_changed_from("tools/tests/lib/retry_negative.lua"),
        copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR)]
       + [copy_if_changed_from(h) for h in LIBS])
 # #309: every instrument left in tools/tests (`-- @manual`) composes and

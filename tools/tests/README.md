@@ -517,7 +517,7 @@ runs every script through the **segment runner** at the bottom of
 `tools/tests/segment_retry.lua` (suite) proves the replay: a `nopath`
 raised on attempt 1 passes on attempt 2 with rebuilt locals and steps;
 `lib/retry_negative.sh` (`ninja build/checks/retry_negative.ok`) runs
-`probe_retry_negative.lua` through run.sh and asserts the red verdict a
+`lib/retry_negative.lua` through run.sh and asserts the red verdict a
 suite cannot expect: an assert failing on attempt 1 of 3, no `attempt
 2/3` line, and a FAIL that names `class=assert` as not seed-dependent.
 `H.attemptFailures()` returns the earlier attempts' `{ attempt, class,

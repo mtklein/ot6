@@ -105,7 +105,6 @@ tools/tests/codex_ctx.lua	.writeWord(	2	quarantine: the Veldt serves the SAVE's 
 tools/tests/field_healpolicy.lua	.writeWord(	1	quarantine: the healthy-fixture campaign (#122 fallout) leaves no savestate that arrives hurt, so the test writes its own patient's HP
 tools/tests/field_mpband.lua	.writeByte(	2	quarantine: #231 mechanism staging -- the item under test (a Tincture, a Tent, an Elixir) is written into an empty bag slot, because the fixtures this ROM verifies were cut before the route buys one; the plan, the menu walk, the item's acceptance, the bag delta and the pools afterwards are the game's own, read back
 tools/tests/field_mpband.lua	.writeWord(	2	quarantine: #231 mechanism staging -- one member's MP word is zeroed (no shipped fixture arrives with a dry caster: the exit contract ships parties whole and a level-up refills the pool) and the HP words are lowered where a branch needs a hole, field_healpolicy's patient one currency over
-tools/tests/probe_tent_summit.lua	.writeByte(	2	quarantine: #231 instrument -- a Tent staged into an empty bag slot on a fixture that holds none, to watch the field's control cells after the tent event
 tools/tests/field_subjob.lua	.writeByte(	2
 tools/tests/field_zombiecure.lua	.writeByte(	3	quarantine: Zombie and Petrify are a monster special's roll (Zombone in the Sealed Gate cave is the walked route's one Zombie pool), not producible on cue, and the exit contract ships no fixture carrying either; the file writes the one status-1 bit onto LOCKE from the boot snapshot (and for its branch D, the zombie at 0 HP a battle leaves, his HP word to 0), and the plan, the menu walk, the item's acceptance, the bag delta and the cleared bit under test are the game's own, read back
 tools/tests/gen_battle2.lua	.writeWord(	2
@@ -132,15 +131,9 @@ tools/tests/menu_lorepage.lua	.writeWord(	4	quarantine: Strago is unreachable by
 tools/tests/menu_ragepage.lua	.writeByte(	2
 tools/tests/menu_swdtechpage.lua	.writeByte(	1
 tools/tests/metrics_battle.lua	.writeByte(	8
-tools/tests/probe_dottick.lua	.writeByte(	45
-tools/tests/probe_dottick.lua	.writeWord(	4
-tools/tests/probe_multihit.lua	.writeByte(	34
-tools/tests/probe_multihit.lua	.writeWord(	4
 tools/tests/save_checksum.lua	emu.write	1	quarantine: the 1-in-65536 zero-checksum save (owner-named)
 tools/tests/battle_healerdown.lua	.writeByte(	6	quarantine: #128 regression staging -- the healer death (engine corpse shape hp=0+st1 $80) and a Fenix Down are poked because a real targeted kill couples to formation luck; the property under test is the driver policy, not the fight
 tools/tests/battle_healerdown.lua	.writeWord(	1	quarantine: #128 regression staging, same reason as its writeByte line
-tools/tests/probe_boy_passage.lua	.writeByte(	1	quarantine: #145 reachability probe -- sets the MERCHANT disguise flag $0104 (a labelled one-flag write) to drive the grandson boy's disguise-gated passage (_ca7bcd->_ca7bf8) and confirm he steps aside; read-mostly instrument, the write is the disguise it measures
-tools/tests/probe_richman_return.lua	.writeByte(	1	quarantine: #145 reachability probe -- sets the merchant disguise $0104 to drive the west-town bypass and map the (blocked) rich-man's-house return route; labelled disguise-flag instrument write, read-mostly
 tools/tests/battle_mimic.lua	.writeByte(	2	quarantine: #260 mechanism staging -- no fixture has Gogo (Mimic) or a Gem Box (X-Magic), both World of Ruin; two field command bytes give a party member Mimic and TERRA X-Magic before the first encounter, and everything after is the engine's own
 tools/tests/battle_passside.lua	.writeByte(	6	quarantine: wt/pass-retarget mechanism staging -- states that do not come on cue: SETZER's bank ($3E9C); his Muddle bit ($3EE5 bit 5) written as his action starts (ExecCmd), the engine's SetStatus not run; his weapon moved to the off hand by swapping the per-hand battle bytes ($3B68 power, $3B90 element, $3BA4 props, $3B7C hit rate, $3D34 spellcast, $3CBC special, $3CA8 item); and the queued target felled as the action starts (Wound, $3EEC bit 7) -- every pass after is the engine's own
 tools/tests/battle_passside.lua	.writeWord(	3	quarantine: wt/pass-retarget mechanism staging -- an ally at 1 HP ($3BF4, felled by the first swing), monsters at 1 HP ($3BFC, emptied by the swings or tosses), and the queued target's HP set to 0 ($3BFC) as the action starts -- every pass after is the engine's own

@@ -5,7 +5,7 @@
 # failure is replayed.  This is the other half: a CONTRACT failure (an
 # assertEq) must fail on attempt 1 of 3 with NO replay, because a retry
 # must never launder a bug.  A suite cannot expect a red run, so this
-# drives tools/tests/probe_retry_negative.lua through the real path
+# drives tools/tests/lib/retry_negative.lua through the real path
 # (tools/tests/run.sh) and asserts on the red verdict itself:
 #
 #   * run.sh exits non-zero;
@@ -39,12 +39,12 @@ reclaim_retained() {
 
 echo "retry-negative: an assertEq on attempt 1 of 3 must fail without a replay..."
 if OT6_NO_PUBLISH=1 OT6_WORKER=retry_neg \
-   sh "$ROOT/tools/tests/run.sh" "$ROOT/tools/tests/probe_retry_negative.lua" "$LOG" \
+   sh "$ROOT/tools/tests/run.sh" "$ROOT/tools/tests/lib/retry_negative.lua" "$LOG" \
    > "$STDOUT" 2>&1
 then
   fail "the run came back GREEN: an assertEq failure passed (see $LOG)"
 fi
-grep -q '^\[ot6\] \[retry\] segment runner: probe_retry_negative, up to 3 attempt(s)' "$LOG" ||
+grep -q '^\[ot6\] \[retry\] segment runner: retry_negative, up to 3 attempt(s)' "$LOG" ||
   fail "the runner did not announce 3 attempts ($LOG)"
 grep -q '^\[ot6\] \[retry\] attempt 1/3 FAILED class=assert ' "$LOG" ||
   fail "no '[retry] attempt 1/3 FAILED class=assert' line ($LOG)"
