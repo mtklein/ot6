@@ -23,7 +23,8 @@ Continent. Each keeps every weakness it had.
 
 **A boosted Magicite always calls an Esper worth the boost.** Using a
 Magicite with Boost Points no longer wastes them on an Esper that does no
-damage (Siren, Golem, Fenrir and the rest) or on Phoenix, and it no longer
+damage (Siren, Golem, Fenrir and the rest), passes over Phoenix (whose
+revival only pays when someone is already down), and it no longer
 calls Crusader, whose boosted Purifier wiped your own party. A boosted
 Magicite now calls an Esper that strikes the enemy, or a healing one,
 and the boost multiplies it. Unboosted, Magicite is the same gamble as

@@ -345,7 +345,12 @@ espers, never Odin or Raiden), and its boost is `Ot6BoostDmg`'s multiplier.
 Half the pool had nothing for it to multiply: twelve espers of power 0
 (Siren, Shoat, Stray, Palidor, Ragnarok, Kirin, ZoneSeek, Carbunkl, Phantom,
 Golem, Unicorn, Fenrir) and Phoenix's revival, 0.520 of a draw
-(`build/attempts/wt/procboost-magicite/summary.txt`). A boosted Magicite
+(`build/attempts/wt/procboost-magicite/summary.txt`). (Phoenix is not
+quite nothing: with a member down, the multiplier does act on its revival,
+`157 -> 1256` in build/attempts/wt/v026-rom/368/mbp/mut_noredraw.out; with
+no one down it buys nothing. The redraw skips it either way, for a payoff
+that doesn't depend on the party's state; #393 tracks keeping it when
+someone is down.) A boosted Magicite
 that drew one spent its pips and bought nothing. And Crusader's Purifier
 strikes both sides (targeting `$04`, flags `$40`, vanilla's record byte for
 byte; vanilla's Magicite→Crusader also hits the party,

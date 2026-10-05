@@ -6,8 +6,9 @@
 ; (Ot6BoostDmg, guidelines "boost pays once": everything else buys the
 ; multiplier), and half of the pool has nothing for it to multiply: twelve
 ; espers of power 0 (Siren, Shoat, Stray, Palidor, Ragnarok, Kirin, ZoneSeek,
-; Carbunkl, Phantom, Golem, Unicorn, Fenrir) and Phoenix's revival, 0.520 of
-; a draw (build/attempts/wt/procboost-magicite/summary.txt).  A boosted
+; Carbunkl, Phantom, Golem, Unicorn, Fenrir) and Phoenix's revival (which
+; pays only when a member is already down), 0.520 of a draw
+; (build/attempts/wt/procboost-magicite/summary.txt).  A boosted
 ; Magicite that drew one spent its pips and bought nothing.  And Crusader's
 ; Purifier strikes both sides (vanilla's record, byte for byte), so a boosted
 ; one multiplied onto the caster's own party: x8 is 9999 on every seat.
@@ -17,7 +18,7 @@
 ; it heals, unable to reach the party.  Every draw is vanilla's RandGenju, on
 ; the battle RNG; an unboosted Magicite takes the first draw, whatever it is,
 ; exactly as vanilla does (Crusader included).  The rule reads MagicProp,
-; so it follows the espers' records rather than a list; battle_magiciteboost
+; so it follows the espers' records rather than a list; battle_procboost (magicitePool)
 ; decodes the same rule from the ROM and checks the draws.  RNGTbl is a
 ; permutation of 0-255, so 256 draws in a row reach every slot of the pool,
 ; and the pool holds payable espers (Ramuh, Ifrit, ...): the loop ends.
