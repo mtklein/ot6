@@ -268,7 +268,17 @@ local function decide()
         elseif ar > wr then btn = "up"
         elseif col < wc then btn = "right"
         elseif col > wc then btn = "left"
-        else btn = "a" end
+        else
+          btn = "a"
+          if not R.castLogged then
+            R.castLogged = true
+            local rec = LISTS[celes] + castRec * 4
+            H.log(string.format("[C] confirming at row %d col %d: record %d holds $%02X "
+              .. "(bytes %02X %02X %02X %02X), pending %d, bank %d, pool %d", ar, col, castRec,
+              H.readByte(rec), H.readByte(rec), H.readByte(rec + 1), H.readByte(rec + 2),
+              H.readByte(rec + 3), pend(celes), bp(celes), mp(celes)))
+          end
+        end
       elseif st == ST_ESPER then btn = "b"
       elseif st == ST_TGT then btn = "a"
       else btn = "b" end
