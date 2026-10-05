@@ -799,9 +799,15 @@ local actions = {
       -- (predictionHeld): a battle that taught nothing with the species on
       -- stage and no teaching row in the battle's own tables means the
       -- field-side model disagrees with the battle's, and no retry can fix
-      -- that.  A species not on stage then is not judged: retried.
+      -- that.  The formation is staged, so the species is always on stage:
+      -- a battle without it is a staging that missed, which fails here at
+      -- its first miss rather than in up to 16 silent retries and a WRITE
+      -- HALF failure that names the wrong cause (#252, the v0.21 ombudsman).
       if taughtN == 0 then
-        H.assertEq(predictionHeld ~= false, true, string.format(
+        H.assertEq(predictionHeld ~= nil, true, string.format("write battle %d: the "
+          .. "staged formation f%d put species $%03X on stage", fights, writeChoice.f,
+          writeChoice.sp))
+        H.assertEq(predictionHeld, true, string.format(
           "write battle %d: with species $%03X on stage, the battle's command "
           .. "table and seeded masks give a member a role that can teach its "
           .. "class bits %02X, as the field records predicted", fights,
@@ -831,7 +837,10 @@ local actions = {
         H.call(battleReset),
         settleSeed("write-half battle " .. n),
         H.call(judgePrediction),
-        H.driveUntil(function() return not H.battleLoadStarted() end, 30000, {
+        -- 15000: the longest write battle that finished, over the forced
+        -- sweep behind 1601f24b, took 8,681 frames; 30000 was a raise for
+        -- the since-fixed Defend loop (#252, the v0.21 ombudsman)
+        H.driveUntil(function() return not H.battleLoadStarted() end, 15000, {
           H.call(battlePulse),
         }, "fight write-half battle " .. n),
         H.call(account),

@@ -127,7 +127,7 @@ local CLASSCHIP, CLASSCHIP_END = H.sym("Ot6ClassChip"), H.sym("Ot6RevealCommit")
 assert(CLASSCHIP < CLASSCHIP_END and CLASSCHIP_END - CLASSCHIP < 0x100,
   "Ot6RevealCommit follows Ot6ClassChip in the ROM (the chip store's pc range)")
 local branchRecord = nil
-emu.addMemoryCallback(function(addr)
+emu.addMemoryCallback(function(addr, value)
   if branchRecord == nil then return end
   local off = addr - (0x7E0000 + SH_CUR)
   if off % 2 ~= 0 then return end
@@ -139,6 +139,10 @@ emu.addMemoryCallback(function(addr)
   if (H.readByte(ATKCLASS) & H.readByte(BP_CLASS + slot * 2) & PIERCE) == 0 then return end
   branchRecord.chips = branchRecord.chips + 1
   branchRecord.on[slot] = (branchRecord.on[slot] or 0) + 1
+  -- the chip that empties the gauge is the break, read at its own store, so
+  -- a Cirpius broken and killed by one blow counts (#252: the per-frame scan
+  -- below saw only a Cirpius still alive and Broken)
+  if value == 0 then branchRecord.broke[slot] = true end
 end, emu.callbackType.write, 0x7E0000 + SH_CUR, 0x7E0000 + SH_CUR + 11)
 
 -- ---- where the pierce hand's Fights were aimed ----------------------------

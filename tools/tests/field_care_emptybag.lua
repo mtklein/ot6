@@ -172,15 +172,25 @@ local function missing()
   end
   return false
 end
+-- The drain's bound is the bag itself (#252: it was a bare 200 legs against
+-- the ~198 a band of 99 needed): every leg ends in a care stop that drinks
+-- at least one Tonic -- asserted per leg -- so the Tonics at the start are
+-- the most legs it can take.  255 legs are built, more than one bag slot
+-- holds (99).
 local drinkN = 0
-local function drainTonics(n)
-  local legB = 0
+local function drainTonics()
+  local legB, before, budget = 0, 0, nil
   return H.seqStep({
-    H.repeatN(n, {
-      H.cond(function() return H.invCountOf(TONIC) > 0 end, {
+    H.call(function()
+      budget = H.invCountOf(TONIC)
+      H.log(string.format("[drain] %d Tonics in the bag: at most %d legs", budget, budget))
+    end),
+    H.repeatN(255, {
+      H.cond(function() return H.invCountOf(TONIC) > 0 and drinkN < budget end, {
         fresh(function()
           drinkN = drinkN + 1
           legB = battles
+          before = H.invCountOf(TONIC)
           local function stop()
             return battles > legB and missing() and settled()
           end
@@ -189,7 +199,12 @@ local function drainTonics(n)
             H.cond(function() return settled() and missing() end, {
               H.fieldCare({ tag = "drinking the Tonics down " .. drinkN,
                 threshold = 1.0, magic = false, reserve = { [POTION] = 99 } }),
-              H.call(function() roster("drain " .. drinkN) end),
+              H.call(function()
+                roster("drain " .. drinkN)
+                H.assertEq(H.invCountOf(TONIC) < before, true, string.format("drain leg %d "
+                  .. "drank a Tonic (%d -> %d): the bound counts on it", drinkN, before,
+                  H.invCountOf(TONIC)))
+              end),
             }, {}),
           }
         end),
@@ -225,7 +240,7 @@ H.run({ maxFrames = 1200000 }, {
   end),
 
   -- ---- 0. the Tonics are drunk down to none, through the field menu --------
-  drainTonics(200),
+  drainTonics(),
   H.call(function()
     H.assertEq(H.invCountOf(TONIC), 0, "the bag holds no Tonics")
     H.assertEq(H.invCountOf(POTION) > 4, true, "and Potions above the care floor")

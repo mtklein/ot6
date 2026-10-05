@@ -548,6 +548,11 @@ local function refusalArm(o)
           .. "in the next battle", o.label, tries, H.readByte(MSTATE),
           H.readByte(CLOSEFLAG), seen[cmd] - before.seen, before.qcount,
           H.readByte(QCOUNT)))
+        -- void for the list's read, not for the refusal: the row buzzed, so
+        -- nothing of this verb may have been queued for him (#252: this
+        -- path only logged it)
+        H.assertEq(seen[cmd] - before.seen, 0, string.format("[%s] attempt %d (void): "
+          .. "the refused %s queued no action", o.label, tries, o.verb))
         return
       end
       assertRefused()

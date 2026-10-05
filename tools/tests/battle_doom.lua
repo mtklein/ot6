@@ -292,7 +292,10 @@ H.run({ maxFrames = 90000 }, {
       "...naming the count the member's $3B05 held on the frame it was said")
     H.assertEq(at.count ~= nil and at.count <= 1, true,
       "...a count at or under the 1 it was poked at (it only runs down)")
-    H.assertEq(at.turn == nil or at.count * H.COUNT_FRAMES <= at.turn, true,
+    -- the refusal names a race against the member's next turn, so that turn
+    -- has to be known where it was said (#252: a nil turn used to pass)
+    H.assertEq(at.turn ~= nil, true, "...with the member's next turn known when it was said")
+    H.assertEq(at.count * H.COUNT_FRAMES <= at.turn, true,
       "...and the Doom did beat the member's next turn then (count x "
       .. H.COUNT_FRAMES .. " <= frames to it)")
     H.assertEq(healed, nil, "no heal or cure plan named the condemned member before the Doom")
@@ -312,10 +315,10 @@ H.run({ maxFrames = 90000 }, {
       .. "H.COUNT_FRAMES=%d; the Doom on entity %d landed %d frames after its poke at count 1",
       #periods > 0 and periods[1] or -1, table.concat(periods, ","), H.COUNT_FRAMES, doomedB,
       (deathFrame or 0) - frameB))
-    if #periods > 0 then
-      H.assertEq(periods[1] >= H.COUNT_FRAMES - 34 and periods[1] <= H.COUNT_FRAMES + 34, true,
-        string.format("the shortest measured count is one entity visit off %d frames (got %d)",
-          H.COUNT_FRAMES, periods[1]))
-    end
+    -- (#252: this used to sit inside `if #periods > 0`, so no measurement passed)
+    H.assertEq(#periods > 0, true, "a count decrement was measured")
+    H.assertEq(periods[1] >= H.COUNT_FRAMES - 34 and periods[1] <= H.COUNT_FRAMES + 34, true,
+      string.format("the shortest measured count is one entity visit off %d frames (got %d)",
+        H.COUNT_FRAMES, periods[1]))
   end),
 })
