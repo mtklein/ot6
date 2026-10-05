@@ -938,47 +938,17 @@ local function b68Observe()
 end
 
 
-local L47 = H.newSeedSweep("battle 47")
-local b47Blob, b47won = nil, false
-local function b47Won() return b47won end
-local function b47Checkpoint()
-  local ckReq
+-- Battle 47, played once (#311).  This used to be a three-rung reload
+-- ladder (an in-run snapshot and H.newSeedSweep's spread seeds, the same
+-- plan each rung, its losses invisible to the retry audit).  A loss now
+-- raises the wipe it is (class=wipe), and the segment runner's bounded
+-- retry is the only reload.
+local function b47Fight()
   return H.cond(function() return true end, {
-    H.call(function() ckReq = H.requestSaveState() end),
-    H.waitFrames(2),
     H.call(function()
-      H.checkReq(ckReq, "b47 checkpoint")
-      b47Blob = ckReq.blob
-      H.log(string.format("[train] b47 checkpoint captured (%d bytes) f%d",
-        #b47Blob, H.frame))
-    end),
-  }, {})
-end
-local function b47Attempt(n)
-  local ldReq
-  return H.cond(function() return not b47won end, {
-    H.cond(function() return n > 1 end, {
-      H.logStep(function()
-        return string.format("[train] b47 ATTEMPT %d -- reloading (%s)",
-          n, tostring(lost))
-      end),
-      H.call(function() ldReq = H.requestLoadState(b47Blob) end),
-      H.waitFrames(2),
-      H.call(function()
-        H.checkReq(ldReq, "b47 attempt " .. n)
-        -- the restored snapshot restarts the experiment: the canary's
-        -- count (and its pad freeze, which the reload thaws) belong to
-        -- the lost attempt
-        H.gameOverFired = 0
-      end),
-      H.waitFrames(60),                 -- settle the reload before driving
-    }, {}),
-    L47.spread(n),                      -- spread the battle RNG phase (#83)
-    H.call(function()
-      lost, fightTier, wipeN = nil, n, 0
+      lost, fightTier, wipeN = nil, 1, 0
       b47Heals, fPlan, fPlanActor = 0, nil, nil
       b47Watch.reset()
-      H.gameOverFired = 0
     end),
     nav(26, 9, { maxFrames = 3000 }),
     (function()
@@ -995,28 +965,27 @@ local function b47Attempt(n)
       return holdDrive("down", function()
         frames = frames + 1
         if frames > 29000 and lost == nil then
-          lost = string.format("b47 attempt %d deadline (29000 frames) with " ..
+          error(string.format("timeout after 29000 frames: battle 47 with " ..
             "no win and no wipe seen -- a genuine stall, see #159/#163 [%s]",
-            n, partyLine())
+            partyLine()), 0)
           H.log("[train] LOST -- " .. lost)
         end
         return lost ~= nil
             or (mapIdx() == 142 and H.hasControl() and H.tileAligned()
                 and not inBattle() and bright() >= 15)
-      end, "battle 47 + mob scene (attempt " .. n .. ")", 30000, "fight")
+      end, "battle 47 + mob scene", 30000, "fight")
     end)(),
     H.waitFrames(30),
     H.call(function()
       -- the 1/16 leave roll is a no-op by design (Ot6ShadowLeaves): a
       -- missing SHADOW after a win is a ROM regression, not a re-roll
-      H.assertEq(inParty(3), true, "SHADOW aboard after battle 47's win (the leave roll is a no-op by design)")
-      if lost == nil then
-        b47won = true
-        H.log(string.format("[train] battle 47 attempt %d clean: won, " ..
-          "SHADOW aboard", n))
+      if lost ~= nil then
+        error("train: battle 47: THE PARTY IS WIPED -- " .. lost, 0)
       end
+      H.assertEq(inParty(3), true, "SHADOW aboard after battle 47's win (the leave roll is a no-op by design)")
+      H.log("[train] battle 47 clean: won, SHADOW aboard")
     end),
-  }, {})
+  })
 end
 
 -- (A wander-for-an-encounter top-up was tried here and does not work: the
@@ -1281,9 +1250,9 @@ local function b68Fight()
   }, {})
 end
 
--- allowGameOver: the battle-47 ladder below deliberately survives a lost
--- fight (#163); wipeWatch reads H.gameOverFired as a loss and the next
--- attempt reloads.  It ends with that ladder (H.setAllowGameOver below).
+-- allowGameOver: through battle 47 a lost fight is read by wipeWatch
+-- (#163), which b47Fight raises as the wipe it is, with the party's last
+-- reading; it ends there (H.setAllowGameOver below).
 H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(30),
@@ -1468,25 +1437,12 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     return sw(0x3D) == 1 and H.hasControl() and H.tileAligned()
   end, "bait the follower ghost", 4000),
 
-  -- ---- battle 47, with real input, behind the sweep ----
-  b47Checkpoint(),
-  L47.watch(),
-  b47Attempt(1),
-  b47Attempt(2),
-  b47Attempt(3),
-  L47.report(),
-  H.call(function()
-    if not b47Won() then
-      error(string.format("train: battle 47 did not complete cleanly on " ..
-        "any of 3 attempts -- last: %s -- do not rig this segment",
-        tostring(lost)), 0)
-    end
-  end),
-  -- Battle 47's ladder is the only thing here that survives a lost fight.
-  -- From now on a wipe (a corridor random, battle 68) is the canary's: it
+  -- ---- battle 47, with real input ----
+  b47Fight(),
+  -- From battle 47 on a wipe (a corridor random, battle 68) is the canary's: it
   -- counts it, freezes the pad and files the attempt as class wipe, with
   -- its context line, for the segment runner's bounded retry.
-  H.setAllowGameOver(false, "battle 47's ladder is done; battle 68 and the " ..
+  H.setAllowGameOver(false, "battle 47 is done; battle 68 and the " ..
     "rest of the train lose the way every other fight does"),
 
   nav(40, 8, { maxFrames = 4000 }),
