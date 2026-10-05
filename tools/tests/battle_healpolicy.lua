@@ -405,6 +405,48 @@ H.run({ maxFrames = 3000 }, {
                                                 topUpFirst = false, topUp = 250 })
     H.assertEq(tostring(ok), "false",
       "...and with the enemy first and no kill in reach, not raised to die again (" .. why .. ")")
+    -- heading for a wipe (#374): battle_healerdown's riders (chain14 on
+    -- the care-items branch) wiped holding 2 Fenix Downs on "7 HP, and even
+    -- an ally's top-up first (7 + 0 = 7) does not clear the 16 round" -- an
+    -- empty top-up bag, every member standing inside its round.  The raise
+    -- that buys a turn goes; with someone standing clear it does not.
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 60, power = 2, smallestHit = 9, roundCost = 16,
+                                                topUpFirst = true, topUp = 0,
+                                                wipe = "2 standing, every one inside its round: e1 13 under 16, e2 9 under 16" })
+    H.assertEq(tostring(raiseHp) .. "/" .. tostring(ok) .. "/" .. tostring(needs), "7/true/false",
+      "7 HP under a 16 round with nothing to top it up, the party heading for a wipe: raised, no top-up owed (" .. why .. ")")
+    raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 60, power = 2, smallestHit = 9, roundCost = 16,
+                                                topUpFirst = true, topUp = 0 })
+    H.assertEq(tostring(ok), "false",
+      "...and the same raise with a member standing clear of the round is refused (" .. why .. ")")
+    -- ...and o.wipe as Driver:raiseOk builds it (H.wipeRisk on the members
+    -- still standing, each round priced from landed hits only).  A member's
+    -- round prices every enemy action in its window as if all fell on it, so
+    -- a wipe is the party's pooled HP inside the round that lands before any
+    -- of them acts, never the round counted once against each member (review
+    -- of 63473f75: four landed 250s, a 1000 round, read as a wipe over
+    -- 900/950/990, build/attempts/wt/v026-driver-review3/wiperisk_probe.log).
+    -- A full-HP member counts like any other (review of 0e0e4150).
+    local w = H.wipeRisk({ { e = 1, hp = 900, maxhp = 900, round = 1400 },
+                           { e = 3, hp = 300, maxhp = 978, round = 1300 } })
+    H.assertEq(w ~= nil, true, "1200 HP between a full-HP member and a hurt one, under the 1300 "
+      .. "round that lands before either acts: heading for a wipe (" .. tostring(w) .. ")")
+    w = H.wipeRisk({ { e = 2, hp = 200, maxhp = 600, round = 250 } })
+    H.assertEq(w ~= nil, true, "one member standing at 200 under a landed 250: inside it, a wipe ("
+      .. tostring(w) .. ")")
+    H.assertEq(H.wipeRisk({ { e = 1, hp = 900, maxhp = 900, round = 1000 },
+                            { e = 2, hp = 950, maxhp = 950, round = 1000 },
+                            { e = 3, hp = 990, maxhp = 990, round = 1000 } }), nil,
+      "the reviewer's spread: a 1000 round over 900/950/990 at full HP kills nobody: no wipe read")
+    H.assertEq(H.wipeRisk({ { e = 1, hp = 900, maxhp = 900, round = 600 },
+                            { e = 3, hp = 300, maxhp = 978, round = 600 } }), nil,
+      "one member inside the 600 round and one standing clear of it: no wipe read")
+    H.assertEq(H.wipeRisk({ { e = 1, hp = 500, maxhp = 900, round = 2000 },
+                            { e = 3, hp = 500, maxhp = 978, round = 600 } }), nil,
+      "1000 HP over the 600 that lands before e3 acts (e1's slower gauge sees 2000): no wipe read")
+    H.assertEq(H.wipeRisk({ { e = 1, hp = 900, maxhp = 900, round = 0 },
+                            { e = 3, hp = 300, maxhp = 978, round = 0 } }), nil,
+      "nothing landed yet (both rounds 0): no wipe read")
     raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 363, power = 2, smallestHit = nil })
     H.assertEq(tostring(ok) .. "/" .. tostring(needs), "true/true",
       "nothing measured: the raise stands, and its top-up is owed -- not judged to survive alone (" .. why .. ")")

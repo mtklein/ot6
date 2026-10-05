@@ -747,7 +747,8 @@ end
 -- a sleeper does nothing, a berserker Fights whom RandCharAction picks, a
 -- statue is dead to the engine (SetStatus_06 @460b sets the dead flag and
 -- clears $3aa0.7, "battle menu can't open") until a Soft.  Measured
--- 2026-09-16 (probe_statuses.lua, the world walk off camp_escaped):
+-- 2026-09-16 (probe_statuses.lua, deleted in fe9d1ff7, last version at b4023415;
+-- the world walk off camp_escaped):
 -- Berserk landed on SHADOW as his window opened ($7BCA=01 $7BC2=01
 -- actor=1), the driver planned a Fight for him, and the engine took the
 -- window away inside the pulse (the plan died as actor_changed); his
@@ -1103,7 +1104,7 @@ end
 -- nil when every living monster can be hit.
 function M.dodgerUp()
   for s = 0, 5 do
-    if M.readWord(0x3BFC + s * 2) > 0 and (M.readByte(0x3AA8 + s * 2) & 1) == 1 then
+    if M.monStanding(s) then
       local what = M.dodges({ s1 = M.readByte(0x3EE4 + (4 + s) * 2),
                               s2 = M.readByte(0x3EE5 + (4 + s) * 2) })
       if what ~= nil then return s, what end
@@ -1190,6 +1191,12 @@ end
 --   fallback the per-action price for an enemy that acts in the window
 --            with nothing measured (the largest single action any enemy
 --            has landed this battle); nil = such an action adds nothing
+--   each enemy may also carry `rom`: for one with nothing measured, the
+--            most its own script's attacks can take off this member, priced
+--            from the ROM (Driver:scriptWorst, #367), used before fallback;
+--            it costs about 2.6% more won ticks in the Sealed Gate's cave
+--            and the spend rule fires ~98 times in 10 runs against 2
+--            (deaths 3 against 7: 10 shifts, a small sample; see there)
 --   each enemy may also carry `typical`: the mean of the actions it has
 --            taken (each action's largest loss on one member, a miss or a
 --            buff a zero; Driver:commitMonAct), nil = not measured
@@ -1222,7 +1229,7 @@ function M.roundCost(o)
         n = n + (window - en.eta) // en.period
       end
     end
-    local each0 = en.worst or o.fallback
+    local each0 = en.worst or en.rom or o.fallback
     if en.eta ~= nil and each0 ~= nil then
       if en.period ~= nil and en.period > 0 then
         rate = rate + each0 * window // en.period
@@ -1232,6 +1239,9 @@ function M.roundCost(o)
     end
     if n > 0 then
       local each, how = en.worst, "worst"
+      if each == nil and en.rom ~= nil then
+        each, how = en.rom, string.format("unseen, priced from its script (its worst $%02X) in the ROM", en.romAtk or 0)
+      end
       if each == nil then each, how = o.fallback, "unmeasured, at the battle's worst" end
       actions = actions + n
       if each ~= nil then
@@ -1347,6 +1357,32 @@ function M.killEstimate(o)
   return per * toBreak + per * 4 * broken, toBreak, broken
 end
 
+-- Heading for a wipe (#374), the arithmetic Driver:raiseOk hands to
+-- M.raiseDecision as o.wipe.  `members` are the ones still standing besides
+-- the fallen, each { e, hp, maxhp, round } with `round` what the enemy's landed hits
+-- (Driver:roundPriceFor(e, true)) cost over a full gauge of e's own -- every
+-- enemy action in that window priced as if it all fell on e.  So one round is
+-- not a threat to each member at once: an enemy action takes down one member,
+-- not two.  A wipe is the round landing before ANY standing member can act
+-- again (the smallest of their rounds) taking the party's pooled standing HP;
+-- one member standing is then simply inside its own round.  Returns the
+-- reason, or nil (also with nothing landed yet: a round of 0 takes nobody).
+-- Review of 63473f75: per member, four landed 250s read as a 1000 round over
+-- each of 900/950/990 HP and called a wipe that 1000 spread over three can't
+-- make (build/attempts/wt/v026-driver-review3/wiperisk_probe.log).
+function M.wipeRisk(members)
+  if #members == 0 then return nil end
+  local pool, round, parts = 0, nil, {}
+  for _, m in ipairs(members) do
+    pool = pool + m.hp
+    if round == nil or m.round < round then round = m.round end
+    parts[#parts + 1] = string.format("e%d %d/%d", m.e, m.hp, m.maxhp or 0)
+  end
+  if pool > round then return nil end
+  return string.format("%d standing, %d HP between them (%s) under the %d round that lands "
+    .. "before any of them acts", #members, pool, table.concat(parts, ", "), round)
+end
+
 -- Whether a raise is worth the Fenix Down (#165, refined by #168): the HP
 -- it gives back against the smallest hit the living enemy has landed this
 -- fight.  Fenix Down (item $F0: ItemProp +19 bit 7 "fraction of max HP",
@@ -1428,6 +1464,20 @@ function M.raiseDecision(o)
       .. "but an ally tops up first: %d + %d = %d clears %s", raiseHp, hit, raiseHp,
       topUp, raiseHp + topUp, (o.roundCost or 0) > hit
         and string.format("the %d round", o.roundCost) or string.format("the %d hit", hit)), true
+  end
+  -- Heading for a wipe (#374): every member still standing is inside one
+  -- round of death (o.wipe, the reason with its numbers).  A Fenix Down
+  -- refused there is a Fenix Down the party loses with: battle_healerdown's
+  -- riders wiped holding 2 on "7 HP, and even an ally's top-up first (7 + 0
+  -- = 7) does not clear the 16 round".  A raised member is one more body
+  -- the enemy's next actions can land on, and one more turn; that beats
+  -- the wipe whether or not the raise survives its round.  The top-up stays
+  -- owed when the bag has one.
+  if o.wipe and M.RAISE_INTO_WIPE ~= false then
+    return raiseHp, true, string.format("%d HP does not clear %s, but the party is heading for "
+      .. "a wipe (%s): a raise that buys a turn beats a wipe (#374)", raiseHp,
+      round > hit and string.format("the %d round", round) or string.format("the %d hit", hit),
+      o.wipe), topUp > 0
   end
   if o.topUpFirst then
     return raiseHp, false, string.format("%d HP, and even an ally's top-up first "
@@ -2223,7 +2273,8 @@ end
 -- answered `true` here, and the driver's hand model (handsOf) counted
 -- every empty off hand as a second weapon -- the same doubling #235 is
 -- about, arriving by a second road.  Measured, not reasoned: the #219 lab
--- hit it first and guarded it locally (fightvsabilitylab.py's fvaArmed,
+-- hit it first and guarded it locally (fightvsabilitylab.py's fvaArmed -- the lab deleted in 07ca5f4e, last
+-- version at 48a26888 --
 -- "ItemProp has a record there and H.isWeapon would read it"); the guard
 -- belongs here, where the driver reads.  weaponClass($FF) still answers
 -- bludgeoning: an empty hand is a fist, it is just not a WEAPON.
@@ -2322,8 +2373,7 @@ end
 function M.activeSlots()
   local out = {}
   for slot = 0, 5 do
-    if M.readWord(0x3BFC + slot * 2) > 0
-       and (M.readByte(0x3AA8 + slot * 2) & 1) == 1 then
+    if M.monStanding(slot) then
       out[#out + 1] = {
         slot = slot, species = M.readWord(M.FORMATION + slot * 2),
         absorb = M.readByte(0x3BCC + 8 + slot * 2),
@@ -3785,7 +3835,12 @@ end
 --     with FindAIScriptEnd (@1a43) past the next $FE and goes on there,
 --     or ends at an $FF;
 --   * end_if ($FE) and the end ($FF) both end the script when the walk
---     reaches them (AICmd_fe/ff @1a7b set $f5 = $ff).
+--     reaches them (AICmd_fe/ff @1a7b set $f5 = $ff);
+--   * wait ($FD, AICmd_fd @1a74) ends this counter's walk too, but the
+--     pointer past it is kept ($3D20) and the NEXT counter resumes there
+--     (NextAICmd's loop test, $f5 == $f4), so the attacks after a $FD
+--     answer the following hit: the walk goes on through it (#376,
+--     counter_selftest's $0F3 case).
 -- So a condition after commands, with no $FE between, gates only the
 -- commands after it; the ones before it have already run.
 -- use = { cmd = the party command id, atk = its attack id, item = the item
@@ -4108,8 +4163,17 @@ function M.targetCursor(opts)
     end
     if s:sub(1, 1) == "X" then
       for _, d in ipairs(back) do add(d) end
-      for _, es in pairs(edges) do
-        for d, to in pairs(es) do if to == s then add(REVERSE[d]) end end
+      -- in a fixed order (#256): the state names are strings, and Lua
+      -- 5.4 seeds string hashing per run, so pairs() here walked the
+      -- learned map in a different order from one run to the next and
+      -- the press it chose moved with it
+      local from = {}
+      for k in pairs(edges) do from[#from + 1] = k end
+      table.sort(from)
+      for _, k in ipairs(from) do
+        for _, d in ipairs({ "left", "down", "right", "up" }) do
+          if edges[k][d] == s then add(REVERSE[d]) end
+        end
       end
       for _, d in ipairs(dirs) do add(d) end
     else
@@ -4668,13 +4732,13 @@ local BATTLE = {
   -- (UpdateMenuState_1b / _c183f7, btlgfx_main.asm)
   CMD_LORE = 0x0C, ST_LORE_OPEN = 0x19, ST_LORE = 0x1B,
   -- SHADOW's Throw: cmd $08 -> $2B (OpenThrowWindow builds wItemList) ->
-  -- $2D (item select) -> ST_TGT (probe_throw.lua; btlgfx
+  -- $2D (item select) -> ST_TGT (probe_throw.lua, deleted in bd50a973, last version at 3ea77d55; btlgfx
   -- UpdateMenuState_2b/2d).  The skeans and their element bits:
   -- Fire Skean $AB=fire($01), Water Edge $AC=water($80), Bolt Edge
   -- $AD=bolt($04) (bosses-wob.md's element byte convention).
   CMD_THROW = 0x08, ST_THROW_OPEN = 0x2B, ST_THROW = 0x2D,
   SKEAN_ELEM = { [0xAB] = 0x01, [0xAC] = 0x80, [0xAD] = 0x04 },
-  -- The command window's two side windows (probe_rowdef.lua, #188): LEFT
+  -- The command window's two side windows (probe_rowdef.lua, #188; deleted in bd50a973, last version at 6c76177f): LEFT
   -- at command select opens Row ($05 -> $01 -> $24) and RIGHT opens Def.
   -- ($05 -> $01 -> $27).  Inside either, A commits the row change or the
   -- defend as the turn's command, B or the opposite direction closes it
@@ -4686,7 +4750,7 @@ local BATTLE = {
   -- knowing $24, sat there until the watchdog tripped.  This driver never
   -- means to be in either; it backs out with B and keeps its plan.
   ST_ROW = 0x24, ST_DEF = 0x27,
-  -- EDGAR's Tools family (probe_tools.lua, #188): A on the Tools row ->
+  -- EDGAR's Tools family (probe_tools.lua, #188; deleted in bd50a973, last version at d22ceac0): A on the Tools row ->
   -- $2E (OpenToolsWindow builds wItemList, ~7 frames) -> $01 -> $30 (the
   -- list, ST_TOOLS); B from the list -> $01 -> $05 directly
   -- (CloseToolsWindow is a subroutine there, so $2F is not written); A on
@@ -4696,7 +4760,7 @@ local BATTLE = {
   -- shell ($6168 mode byte), so every Sabin and Cyan fight passes here
   -- too.  Both are transitional: the plan waits them out.
   ST_TOOLS_OPEN = 0x2E, ST_TOOLS_CLOSE = 0x2F,
-  -- CYAN's SwdTech (probe_swdtech.lua, #188) is the same shell, not the
+  -- CYAN's SwdTech (probe_swdtech.lua, #188; deleted in bd50a973, last version at f1f26173) is the same shell, not the
   -- vanilla $37 gauge: OpenCmdMenuTbl[$07] is _c1_bushido_open (bushido
   -- mode $6168=2) and UpdateMenuState_35, the only way into $37/$36, is
   -- dead.  Measured: A on SwdTech $05 -> $2E -> $01 -> $30, B -> $01 ->
@@ -4704,13 +4768,13 @@ local BATTLE = {
   -- 57.0D: tech id, MP cost), row i banks boost i+1, a row past the bank
   -- is refused silently in $30, and a commit queues the tech with NO target
   -- select ($30 -> $2F -> $01 -> $05 -> $0F -> $01 -> $10 -> $01 -> $00),
-  -- exactly SABIN's Blitz commit (probe_blitz.lua).
+  -- exactly SABIN's Blitz commit (probe_blitz.lua, deleted in bd50a973; last version at f1f26173).
   CMD_SWDTECH = 0x07,
-  -- CELES's Runic (probe_runic.lua): no window.  A on the Runic row goes
+  -- CELES's Runic (probe_runic.lua, deleted in bd50a973; last version at f1f26173): no window.  A on the Runic row goes
   -- $05 -> $38 with the target latched on herself (chars = 1<<actor); B ->
   -- $05; A commits ($38 -> $05 -> $0F -> $01 -> $10 -> $01 -> $00).
   CMD_RUNIC = 0x0B,
-  -- SETZER's Slot (probe_slot.lua): A on Slot $05 -> $06 (OpenSlotWindow)
+  -- SETZER's Slot (probe_slot.lua, deleted in bd50a973; last version at f1f26173): A on Slot $05 -> $06 (OpenSlotWindow)
   -- -> $01 -> $32 -> $39 -> $08, the reel state.  In $08 the first A starts
   -- the spin and each later A stops the next reel once it is ready; the
   -- reel-3 stop commits.  B closes only before the first A ($08 -> $3A ->
@@ -4747,7 +4811,8 @@ local BATTLE = {
   TGTCHARS = 0x7B7D, TGTMONS = 0x7B7E,
   -- multi-target latch: one R press on a MULTI_TARGET spell's target screen
   -- sets this to 1 and widens the side mask to every valid ally/monster
-  -- (probe_targetall.lua measured it; btlgfx_main.asm @6e9a sets it)
+  -- (probe_targetall.lua, deleted in bd50a973, last version at 6507162d,
+  -- measured it; btlgfx_main.asm @6e9a sets it)
   TGTALL = 0x7B7F,
   TONIC = 0xE8, POTION = 0xE9, FENIX_DOWN = 0xF0,
   AUTOCROSSBOW = M.AUTOCROSSBOW, PUMMEL = 0x5D,
@@ -4781,26 +4846,38 @@ local BATTLE = {
   DMG_SETTLE = 45,                     -- frames after SaveForMimic before the figure is read
   DMG_EXPIRE = 3600,                   -- a confirmed plan that never executed (hygiene)
   LORE_STALL = 600,                    -- pursuit frames with no landed lore
+  -- MagiTek (#373): command $1D opens the attack list through state $28
+  -- (OpenMagitekWindow) to $2A (UpdateMenuState_2a: two columns, entry =
+  -- row * 2 + column, the column at $893F and the row at $8943 per actor,
+  -- get_madou_poi), and $29 closes it; the attack is $83 + entry
+  -- (RandMagitek's base), from TerraMagitekAttackTbl (all eight) when the
+  -- seat's $2EAE byte is 0, else DefaultMagitekAttackTbl (0, 1, 2, 4)
+  CMD_MAGITEK = 0x1D, ST_MTEK_OPEN = 0x28, ST_MTEK_CLOSE = 0x29, ST_MTEK = 0x2A,
+  MTEK_COL = 0x893F, MTEK_ROW = 0x8943, MTEK_BASE = 0x83,
 }
 BATTLE.KNOWN_ST = { [BATTLE.ST_CMD] = true, [BATTLE.ST_TGT] = true, [BATTLE.ST_ITEM] = true,
                     [BATTLE.ST_MAGIC] = true, [BATTLE.ST_ESPER] = true, [BATTLE.ST_TOOLS] = true,
                     [BATTLE.ST_LORE] = true, [BATTLE.ST_LORE_OPEN] = true, [0x01] = true,
-                    -- the Throw family (probe_throw.lua; btlgfx
+                    -- the Throw family (probe_throw.lua, deleted in bd50a973; btlgfx
                     -- UpdateMenuState_2b/2c/2d): open, close, item select
                     [BATTLE.ST_THROW_OPEN] = true, [0x2C] = true, [BATTLE.ST_THROW] = true,
-                    -- the command window's side windows (probe_rowdef.lua)
+                    -- the command window's side windows (probe_rowdef.lua, deleted in bd50a973)
                     -- and the Tools shell's open and force-close states
-                    -- (probe_tools.lua); see the constants
+                    -- (probe_tools.lua, deleted in bd50a973); see the constants
                     [BATTLE.ST_ROW] = true, [BATTLE.ST_DEF] = true,
                     [BATTLE.ST_TOOLS_OPEN] = true, [BATTLE.ST_TOOLS_CLOSE] = true,
-                    -- SETZER's reel state (probe_slot.lua)
-                    [BATTLE.ST_SLOT] = true }
+                    -- SETZER's reel state (probe_slot.lua, deleted in bd50a973)
+                    [BATTLE.ST_SLOT] = true,
+                    -- the MagiTek list (#373): open, close, attack select
+                    [BATTLE.ST_MTEK_OPEN] = true, [BATTLE.ST_MTEK_CLOSE] = true,
+                    [BATTLE.ST_MTEK] = true }
 -- The selection windows a plan-less driver backs out of (see the
 -- plan-nil head of button()): every list that waits on A or B.  The
 -- transitional states ($19 lore fill, $2B/$2C throw open/close) are
 -- left out; they pass on their own.
 BATTLE.IDLE_ST = { [BATTLE.ST_ITEM] = true, [BATTLE.ST_TOOLS] = true, [BATTLE.ST_MAGIC] = true,
-                   [BATTLE.ST_ESPER] = true, [BATTLE.ST_LORE] = true, [BATTLE.ST_THROW] = true }
+                   [BATTLE.ST_ESPER] = true, [BATTLE.ST_LORE] = true, [BATTLE.ST_THROW] = true,
+                   [BATTLE.ST_MTEK] = true }
 for _, s in ipairs(BATTLE.ST_TRANSITIONAL) do BATTLE.KNOWN_ST[s] = true end
 
 -- A command row the cursor can actually land on.  Each $202E row is
@@ -4964,11 +5041,28 @@ end
 -- living entry, else the only living monster on the field.  With
 -- several and no focus the engine's default cursor decides, and the
 -- model does not guess.
+-- Whether monster slot s still stands, by the engine's own test (#362):
+-- UpdateDead (@4ab9) counts a monster alive ($3A75, and $3A77 from it)
+-- only while it is present ($3AA8 bit 0) and its status 1 holds none of
+-- Wound, Petrify or Zombie ($C2).  HP alone reads a statue as alive: a
+-- Mad Oscar petrified at 2647 HP left $3A77 01 -> 00 while every HP test
+-- here still counted it (build/attempts/review/kit-setzer-6d05c229/
+-- r4_probe_gprain_petrify.txt).  The status byte is read live rather than
+-- the mask, which UpdateDead rewrites only once the action that landed the
+-- status has finished.  M.STATUE_STANDS = true is the driver before #362
+-- (the lab lever).
+M.STATUE_STANDS = false
+function M.monStanding(s)
+  if M.readWord(BATTLE.MON_HP + s * 2) == 0
+     or (M.readByte(BATTLE.MON_PRESENT + s * 2) & 1) == 0 then return false end
+  return M.STATUE_STANDS == true or (M.readByte(BATTLE.ST1 + (4 + s) * 2) & 0xC2) == 0
+end
+local monAlive = M.monStanding
+
 local function soleTarget()
   local only = nil
   for s = 0, 5 do
-    if M.readWord(BATTLE.MON_HP + s * 2) > 0
-       and (M.readByte(BATTLE.MON_PRESENT + s * 2) & 1) == 1 then
+    if monAlive(s) then
       if only ~= nil then return nil end
       only = s
     end
@@ -4979,15 +5073,9 @@ end
 local function livingMonsters()
   local n = 0
   for s = 0, 5 do
-    if M.readWord(BATTLE.MON_HP + s * 2) > 0
-       and (M.readByte(BATTLE.MON_PRESENT + s * 2) & 1) == 1 then n = n + 1 end
+    if monAlive(s) then n = n + 1 end
   end
   return n
-end
-
-local function monAlive(s)
-  return M.readWord(BATTLE.MON_HP + s * 2) > 0
-     and (M.readByte(BATTLE.MON_PRESENT + s * 2) & 1) == 1
 end
 
 -- ticks until entity X's gauge fills (X = e*2 for the party, 8 + s*2
@@ -5132,7 +5220,7 @@ end
 local function liveMonMask()
   local m = 0
   for s = 0, 5 do
-    if M.readWord(0x3BFC + s * 2) > 0 and (M.readByte(0x3AA8 + s * 2) & 1) == 1 then
+    if M.monStanding(s) then
       m = m | (1 << s)
     end
   end
@@ -5151,7 +5239,7 @@ function Driver:focusReachable(slot)
   if u == nil then return true end
   local live = 0
   for s = 0, 5 do
-    if M.readWord(0x3BFC + s * 2) > 0 and (M.readByte(0x3AA8 + s * 2) & 1) == 1 then
+    if monAlive(s) then
       live = live | (1 << s)
     end
   end
@@ -5323,36 +5411,102 @@ end
 -- living monster skips its counter attacks) -- the counter that kills is
 -- the dying one, which runs regardless.  True means the verb is off the
 -- table this turn; the caller falls through to its next line.
-function Driver:counterVetoed(actor, use, slots, what)
-  local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
+-- The most attack `a` of monster slot `slot` can take off party entity
+-- `e`, by the models (M.physHitRange, M.magicHitRange) on the battle's own
+-- bytes and the ROM's MagicProp: 0 for a heal or a no-damage spell, nil
+-- for the monster's Special ($EF), which they do not price.
+local function monHitOn(slot, e, a)
   local MP = M.sym("MagicProp") & 0x3FFFFF
-  local y = actor * 2
-  local hp = M.readWord(0x3BF4 + y)
-  if hp == 0 then return false end
-  local tgt = { def = M.readByte(0x3BB8 + y), mdef = M.readByte(0x3BB9 + y),
+  local y, x = e * 2, 8 + slot * 2
+  local o = { def = M.readByte(0x3BB8 + y), mdef = M.readByte(0x3BB9 + y),
     shell = (M.readByte(BATTLE.ST3 + y) & 0x20) ~= 0, safe = (M.readByte(BATTLE.ST3 + y) & 0x40) ~= 0,
     defending = (M.readByte(0x3AA1 + y) & 0x02) ~= 0, backRow = (M.readByte(0x3AA1 + y) & 0x20) ~= 0,
     weak = M.readByte(0x3BE0 + y), half = M.readByte(0x3BE1 + y),
-    null = M.readByte(0x3BCD + y), absorb = M.readByte(0x3BCC + y) }
-  local function priced(slot, a)
-    local x = 8 + slot * 2
-    local o = { level = M.readByte(0x3B18 + x), magpow = M.readByte(0x3B41 + x),
-                vigor = M.readByte(0x3B2C + x) }
-    for k, v in pairs(tgt) do o[k] = v end
-    if a == 0xEE then                       -- Battle: its battle power, no element
-      o.power = M.readByte(0x3B68 + x)
-      local _, hi = M.physHitRange(o)
-      return hi or 0
-    end
-    if a == 0xEF then return nil end        -- Special: not priced
-    local r = MP + a * 14
-    o.power, o.flags2, o.elem = M.readRomByte(r + 6), M.readRomByte(r + 2), M.readRomByte(r + 1)
-    o.heal = (M.readRomByte(r + 4) & 0x01) ~= 0
-    if o.heal then return 0 end
-    local _, hi
-    if (o.flags2 & 0x01) ~= 0 then _, hi = M.physHitRange(o) else _, hi = M.magicHitRange(o) end
+    null = M.readByte(0x3BCD + y), absorb = M.readByte(0x3BCC + y),
+    level = M.readByte(0x3B18 + x), magpow = M.readByte(0x3B41 + x), vigor = M.readByte(0x3B2C + x) }
+  if a == 0xEE then                         -- Battle: its battle power, no element
+    o.power = M.readByte(0x3B68 + x)
+    local _, hi = M.physHitRange(o)
     return hi or 0
   end
+  if a == 0xEF then return nil end          -- Special: not priced
+  local r = MP + a * 14
+  o.power, o.flags2, o.elem = M.readRomByte(r + 6), M.readRomByte(r + 2), M.readRomByte(r + 1)
+  o.heal = (M.readRomByte(r + 4) & 0x01) ~= 0
+  if o.heal then return 0 end
+  local _, hi
+  if (o.flags2 & 0x01) ~= 0 then _, hi = M.physHitRange(o) else _, hi = M.magicHitRange(o) end
+  return hi or 0
+end
+
+-- An enemy the fight has not yet measured (#367), priced from what it can
+-- do: the attacks its AI script's main section names ($F0's three and the
+-- single-attack bytes; not the retaliation, which answers the party's
+-- hits), each through monHitOn on member e, and the most of them.  The
+-- Special ($EF) is priced as its Battle, a floor.  Measured on the Sealed
+-- Gate (care-policy-review recount_r5.txt section 2): slot 2's unseen $EB
+-- read "unmeasured, at the battle's worst" at 70 and then took at least
+-- 522 (it killed a member from 522).  Returns the price and the attack, or
+-- nil (no script, nothing it names hurts).  M.PRICE_UNSEEN_FROM_ROM = false
+-- is the driver before #367.
+-- The cache is keyed on slot, species and member for the battle, so it
+-- does not follow the member's defenses moving mid-battle (Shell, Safe,
+-- Defend, a row change): the first reading stands until the battle ends
+-- or the enemy lands something, which replaces this price.
+-- What it costs, measured on the Sealed Gate's cave against the old price
+-- (build/attempts/wt/v026-driver/367/gate/tally.txt, 10 seed shifts a side):
+-- about 2.6% slower (244,385 won ticks against 238,174), and the spend rule
+-- fired 98 times in the 10 runs against 2, because members read inside
+-- their round early; deaths 3 against 7, a small sample (10 shifts, 9
+-- distinct first battle keys).
+function Driver:scriptWorst(slot, e)
+  if M.PRICE_UNSEEN_FROM_ROM == false then return nil end
+  local species = M.readWord(M.FORMATION + slot * 2)
+  if species == 0xFFFF or species >= 0x180 then return nil end
+  local key = string.format("%d:%d:%d", slot, species, e)
+  self.romWorst = self.romWorst or {}
+  local c = self.romWorst[key]
+  if c ~= nil then return c.v, c.a end
+  local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
+  local off = M.readRomWord(ptrs + species * 2)
+  local function b(i) return M.readRomByte(base + off + i) end
+  local atks, i = {}, 0
+  while b(i) ~= 0xFF and i < M.AI_SCRIPT_MAX do
+    local op = b(i)
+    if op < 0xF0 then atks[#atks + 1] = op
+    elseif op == 0xF0 then atks[#atks + 1] = b(i + 1); atks[#atks + 1] = b(i + 2); atks[#atks + 1] = b(i + 3) end
+    i = i + (op < 0xF0 and 1 or (M.AI_OP_LEN[op] or 1))
+  end
+  -- the most of them.  It reads every member of the Sealed Gate's cave
+  -- "inside one round of death" from full HP early ("902/902 is inside one
+  -- round of death (1139)") and the spend rule fires 7-14 times a run
+  -- against 0-2; the mean over every attack the script names (a buff or a
+  -- status a 0; M.UNSEEN_PRICE = "mean") spends less but measured worse on
+  -- both counts, 10 seed shifts each (build/attempts/wt/v026-driver/367/
+  -- gate2/tally.txt): max 3 deaths in 244,385 won ticks, mean 5 in 256,671,
+  -- the old battle's-worst price 7 in 238,174 -- deaths a small sample.
+  local best, bestA, sum, n = nil, nil, 0, 0
+  for _, a in ipairs(atks) do
+    if a ~= 0xFE then
+      local v = monHitOn(slot, e, a == 0xEF and 0xEE or a)
+      if v ~= nil then
+        sum, n = sum + v, n + 1
+        if v > 0 and (best == nil or v > best) then best, bestA = v, a end
+      end
+    end
+  end
+  local price = best
+  if M.UNSEEN_PRICE == "mean" and n > 0 and best ~= nil then price = math.max(1, sum // n) end
+  self.romWorst[key] = { v = price, a = bestA }
+  return price, bestA
+end
+
+function Driver:counterVetoed(actor, use, slots, what)
+  local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
+  local y = actor * 2
+  local hp = M.readWord(0x3BF4 + y)
+  if hp == 0 then return false end
+  local function priced(slot, a) return monHitOn(slot, actor, a) end
   local function worst(slot, u)
     local species = M.readWord(M.FORMATION + slot * 2)
     if species == 0xFFFF or species >= 0x180 then return 0, nil, {}, false end
@@ -5412,6 +5566,112 @@ function Driver:focusList()
     end
   end
   return nil
+end
+
+-- Whether monster slot s's script can put a status on the party (#325): an
+-- attack its main section names whose MagicProp record sets a status
+-- (+$0A..+$0D, the lift flag +$04 bit 2 clear) that hurts the party, or its Special ($EF) where
+-- MonsterProp +$1F names a status ($00..$1F: status bits 0-31) -- the
+-- Bloompire's Energy Sap, which zombified five members on wor-edgar's leg 1.
+-- Cached per species.  Returns the attack id that does, or nil.
+-- Only the statuses that hurt the party count (review of 0fd4d1fd: not a
+-- monster's own Haste, Regen, Shell, Safe, Reflect, Image, Vanish or Float):
+-- status 1 Blind, Zombie, Poison, Imp, Petrify, Wound ($E7); status 2
+-- Condemned, Mute, Berserk, Muddle, Sap, Sleep ($F9); status 3 Slow, Stop
+-- ($14); status 4 Frozen ($02).
+local HARM = { 0xE7, 0xF9, 0x14, 0x02 }
+local statusAtkCache = {}
+local function statusInflicter(slot)
+  local species = M.readWord(M.FORMATION + slot * 2)
+  if species == 0xFFFF or species >= 0x180 then return nil end
+  local c = statusAtkCache[species]
+  if c ~= nil then return c or nil end
+  local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
+  local MP = M.sym("MagicProp") & 0x3FFFFF
+  local off = M.readRomWord(ptrs + species * 2)
+  local function b(i) return M.readRomByte(base + off + i) end
+  local found, i = false, 0
+  local function check(a)
+    if found or a == 0xFE then return end
+    if a == 0xEF then
+      local sp = M.readRomByte((M.sym("MonsterProp") & 0x3FFFFF) + species * MON_REC + 0x1F) & 0x3F
+      if sp < 0x20 and (HARM[(sp >> 3) + 1] >> (sp & 7)) & 1 == 1 then found = a end
+      return
+    end
+    if a == 0xEE then return end
+    local r = MP + a * 14
+    if (M.readRomByte(r + 4) & 0x04) ~= 0 then return end
+    for k = 10, 13 do if M.readRomByte(r + k) & HARM[k - 9] ~= 0 then found = a; return end end
+  end
+  while b(i) ~= 0xFF and i < M.AI_SCRIPT_MAX do
+    local op = b(i)
+    if op < 0xF0 then check(op)
+    elseif op == 0xF0 then check(b(i + 1)); check(b(i + 2)); check(b(i + 3)) end
+    i = i + (op < 0xF0 and 1 or (M.AI_OP_LEN[op] or 1))
+  end
+  statusAtkCache[species] = found
+  return found or nil
+end
+
+-- The kill this actor's Fight makes this turn (#325): a standing monster
+-- whose HP this Fight is expected to take -- the per-hit figure its last
+-- Fight landed (dmgHit, shielded-equivalent), else the smallest any member's
+-- Fight has landed, times the swings at this boost, x4 on a broken gauge and
+-- the hits past the break x4 (M.killEstimate) -- a status inflicter first,
+-- then the fewest HP.  wor-edgar's leg 1 left a Bloompire at 12 HP (one
+-- shield) while the driver killed the others, and its Energy Sap zombified
+-- five members (build/attempts/review-wor-edgar/).  nil when there is
+-- nothing measured or nothing to finish; an authored or multi-part kill
+-- order wins (the caller asks after them).  M.FINISH_FIRST = false is the
+-- driver before #325.
+function Driver:finishAim(actor, boost)
+  if M.FINISH_FIRST == false or self.opts.aim == false then return nil end
+  if livingMonsters() < 2 then return nil end
+  local per = nil
+  local dh = self.dmgHit[actor]
+  if dh ~= nil and dh.kind == "fight" and dh.per > 0 then per = dh.per end
+  if per == nil then
+    for e = 0, 3 do
+      local d = self.dmgHit[e]
+      if d ~= nil and d.kind == "fight" and d.per > 0 and (per == nil or d.per < per) then per = d.per end
+    end
+  end
+  if per == nil then return nil end
+  local _, l = handsOf(actor)
+  local mainHits, offHits = M.fightHits(l ~= nil and 2 or 1, boost)
+  local hits = mainHits + offHits
+  local best, bestHp, bestSt, said = nil, nil, nil, nil
+  for s = 0, 5 do
+    if monAlive(s) then
+      local hp = M.readWord(BATTLE.MON_HP + s * 2)
+      local sh = M.readByte(BATTLE.SH_CUR + s * 2)
+      local broken = M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0
+      local est
+      if broken then est = per * 4 * hits
+      else
+        est = M.killEstimate({ per = per, hits = hits, chips = fightChips(actor, s, boost), need = sh })
+          or per * hits
+      end
+      if est >= hp then
+        local st = statusInflicter(s)
+        local better = best == nil or (st ~= nil and bestSt == nil)
+          or ((st ~= nil) == (bestSt ~= nil) and hp < bestHp)
+        if better then
+          best, bestHp, bestSt = s, hp, st
+          said = string.format("slot %d at %d HP (%d shield(s)%s) inside this Fight's %d (%d a hit x %d)%s",
+            s, hp, sh, broken and ", BROKEN" or "", est, per, hits,
+            st and string.format(", and its $%02X sets a status", st) or "")
+        end
+      end
+    end
+  end
+  if best == nil then return nil end
+  local key = string.format("finish:%d:%d:%d", actor, best, bestHp)
+  if not self.statusSaid[key] then
+    self.statusSaid[key] = true
+    M.log(string.format("[%s] actor=%d FINISH: %s -- the kill first (#325)", self.tag or "fight", actor, said))
+  end
+  return best
 end
 
 -- The monster slot this actor's Fight breaks best right now, read the way a
@@ -5615,9 +5875,7 @@ function Driver:pressTarget()
   local focus = self:focusList()
   if focus then
     for _, e in ipairs(M.focusSlots(focus)) do
-      if M.readWord(BATTLE.MON_HP + e.slot * 2) > 0
-         and (M.readByte(BATTLE.MON_PRESENT + e.slot * 2) & 1) == 1
-         and self:focusReachable(e.slot) then return e.slot end
+      if monAlive(e.slot) and self:focusReachable(e.slot) then return e.slot end
     end
   end
   return soleTarget()
@@ -5726,11 +5984,28 @@ function Driver:setzerLine(actor, have)
                boostLeft = want, aim = slot, reason = "jackpot" }
     end
   end
-  -- Slot at 3 BP in a random battle
-  if o.slot ~= false and have >= 3 and M.readByte(M.RANDBTL) ~= 0 and livingMonsters() >= 2 then
-    M.log(string.format("[%s] actor=%d SETZER Slot at 3 BP: a chosen triple against %d", tag, actor,
-      livingMonsters()))
-    return { kind = "slot", row = row, skill = BATTLE.SETZER.SLOT, boostLeft = 3, reason = "slot" }
+  -- Slot in a random battle against two or more, at the bank's boost from
+  -- SLOT_AT up (#353): 3 BP chooses the triple (whatever reel 1 stops on,
+  -- ot6_slot.asm), 2 BP blesses every icon so reels 2 and 3 drift toward
+  -- the pair and the triple.  At 3 alone it never fired on the chain: the
+  -- route's bank policy spends at 2, so SETZER never held 3 in a random
+  -- battle (v0.25's chain logs: no "SETZER Slot" line; route-wor-falcon.md
+  -- 13.9).  o.slotAt / M.SLOT_AT is the lever (3 is the driver before).
+  -- Measured (build/attempts/wt/v026-driver/353/): it fires in one random
+  -- battle a run at most -- 2 of 2 tomb runs and 1 of 2 Narshe-mission runs
+  -- under the new rule (353/slot), 3 of 13 tomb runs with 0-12 encounters
+  -- used up (353/tomb) -- and the five distinct battles it fired in took
+  -- +16 (slot/tomb/new_s0 = tomb/slot2_k0), +200 (slot/tomb/new_s23), +8
+  -- (slot/nm/new_s0), -208 (tomb/slot2_k11) and -120 (tomb/slot2_k12)
+  -- ticks against the same battle without it (-104 in all), no death
+  -- moved -- the verb played at no measured cost; what would
+  -- make it pay (reel 1 timed on a chosen icon) is not built yet.
+  local slotAt = o.slotAt or M.SLOT_AT or 2
+  if o.slot ~= false and have >= slotAt and M.readByte(M.RANDBTL) ~= 0 and livingMonsters() >= 2 then
+    local b = math.min(have, 3)
+    M.log(string.format("[%s] actor=%d SETZER Slot at %d BP: %s against %d", tag, actor, b,
+      b >= 3 and "a chosen triple" or "every icon blessed", livingMonsters()))
+    return { kind = "slot", row = row, skill = BATTLE.SETZER.SLOT, boostLeft = b, reason = "slot" }
   end
   -- the gil rows are for the fights that matter: a random battle is won
   -- with the free Fight (measured, gm.sh: in the WoB grind Hired Help took
@@ -5773,6 +6048,62 @@ function Driver:setzerLine(actor, have)
              boostLeft = b, aim = slot, reason = "hire" }
   end
   return nil
+end
+
+-- The MagiTek attack this actor's list offers that does the most to the
+-- target (#373), as a plan, or nil.  Entries 0-2 are the beams (fire, ice,
+-- lightning: MagicProp's own element bytes), 3 Bio Blast, 4 Heal Force (a
+-- heal: not an attack here), 5 Confuser, 6 X-Fer, 7 Tek Missile; a soldier's
+-- list holds 0, 1, 2 and 4.  The target is the focus/press target, else the
+-- first standing monster, and the plan aims the cursor there.
+function Driver:magitekLine(actor)
+  local slot = self:pressTarget()
+  if slot == nil then for s = 0, 5 do if monAlive(s) then slot = s; break end end end
+  if slot == nil then return nil end
+  -- the seat's list, read from the ROM the way UpdateMenuState_2a does: the
+  -- seat's $2EAE byte picks TerraMagitekAttackTbl (0) or
+  -- DefaultMagitekAttackTbl, eight entries, $FF an empty one; an entry whose
+  -- MagicProp record carries the heal flag (+4 bit 0: Heal Force) stays out
+  local tbl = (M.readByte(0x2EAE + actor * 32) == 0 and M.sym("TerraMagitekAttackTbl")
+    or M.sym("DefaultMagitekAttackTbl")) & 0x3FFFFF
+  local MP = M.sym("MagicProp") & 0x3FFFFF
+  local offer = {}
+  for idx = 0, 7 do
+    local v = M.readRomByte(tbl + idx)
+    if v < 0x80 and (M.readRomByte(MP + (BATTLE.MTEK_BASE + v) * 14 + 4) & 0x01) == 0 then
+      offer[#offer + 1] = { entry = idx, atk = v }
+    end
+  end
+  local x = 8 + slot * 2
+  local weak, half = M.readByte(0x3BE0 + x), M.readByte(0x3BE1 + x)
+  local absorb, null = M.readByte(0x3BCC + x), M.readByte(0x3BCD + x)
+  local best, bestScore, said = nil, nil, {}
+  local bestAtk = nil
+  for _, of in ipairs(offer) do
+    local idx, atk = of.entry, BATTLE.MTEK_BASE + of.atk
+    local elem = M.readRomByte(MP + atk * 14 + 1)
+    local power = M.readRomByte(MP + atk * 14 + 6)
+    local score
+    if elem ~= 0 and ((absorb & elem) ~= 0 or (null & elem) == elem) then
+      score = -1
+    else
+      score = power
+      if elem ~= 0 and (weak & elem) ~= 0 then score = score * 2
+      elseif elem ~= 0 and (half & elem) ~= 0 then score = score // 2 end
+      score = score + 1000 * hitChips(slot, 0, elem)
+    end
+    said[#said + 1] = string.format("$%02X elem $%02X power %d -> %d", atk, elem, power, score)
+    if score >= 0 and (bestScore == nil or score > bestScore) then best, bestScore, bestAtk = idx, score, atk end
+  end
+  if best == nil then return nil end
+  local key = string.format("mtek:%d:%d:%d", actor, slot, best)
+  if not self.statusSaid[key] then
+    self.statusSaid[key] = true
+    M.log(string.format("[%s] actor=%d MagiTek $%02X (entry %d) at slot %d: %s (#373)", self.tag or "fight",
+      actor, bestAtk, best, slot, table.concat(said, "; ")))
+  end
+  return { kind = "magitek", row = cmdRow(actor, BATTLE.CMD_MAGITEK), entry = best,
+           skill = bestAtk, aim = slot, boostLeft = 0 }
 end
 
 function Driver:dmgWatchOf(e)
@@ -6220,6 +6551,26 @@ function Driver:raiseOk(e, actor)
         .. "(slot %d is %d ticks from acting)", lethalSlot, lethalEta)
     end
   end
+  -- (#374) heading for a wipe (M.wipeRisk): the members standing besides
+  -- the fallen one, their HP pooled, are inside the round that lands before
+  -- any of them acts, priced from what the enemy has actually landed (no
+  -- unseen enemy priced from its script, #367).  With the script's price in it, the
+  -- Sealed Gate's cave read every member inside its round from full HP and
+  -- raised on it: "102 HP does not clear the 1293 round, but the party is
+  -- heading for a wipe (3 standing ..." (build/attempts/wt/v026-driver/
+  -- 367/gate2/max_s20.log.gz, review of 0fd4d1fd)
+  if math.max(hit or 0, o.roundCost or 0) >= raiseHp and not o.killInReach then
+    local members = {}
+    for p = 0, 3 do
+      local php = M.readWord(0x3BF4 + p * 2)
+      if p ~= e and php > 0 and php ~= 0xFFFF and M.readWord(0x3C1C + p * 2) > 0
+         and (M.leftMask() >> p) & 1 == 0 then
+        members[#members + 1] = { e = p, hp = php, maxhp = M.readWord(0x3C1C + p * 2),
+                                  round = self:roundPriceFor(p, true) or 0 }
+      end
+    end
+    o.wipe = M.wipeRisk(members)
+  end
   local _, ok, why, needsTopUp = M.raiseDecision(o)
   return ok, raiseHp, hit, hitSlot, hitOn, why .. detail, needsTopUp
 end
@@ -6227,8 +6578,10 @@ end
 -- what one enemy round costs member e over a full gauge of its own (a
 -- raised member's gauge starts empty), priced as makePlan prices the
 -- living: the ledger's worst per turn on e (else anybody), the open turn
--- read provisionally, the typical action for repeats
-function Driver:roundPriceFor(e)
+-- read provisionally, the typical action for repeats; `measured` leaves out
+-- an unseen enemy's price from its script (#367), so only what the enemy
+-- has landed counts
+function Driver:roundPriceFor(e, measured)
   local const = M.readWord(BATTLE.ATB_CONST + e * 2)
   if const == 0 or const == 0xFFFF then return nil end
   local window = math.ceil(0xFF00 / const)
@@ -6256,8 +6609,11 @@ function Driver:roundPriceFor(e)
         if v ~= nil and (worst == nil or v > worst) then worst = v end
       end
       local mconst = M.readWord(BATTLE.ATB_CONST + 8 + s2 * 2)
+      local rom, romAtk = nil, nil
+      if worst == nil and not measured then rom, romAtk = self:scriptWorst(s2, e) end
       enemies[#enemies + 1] = { slot = s2, eta = etaOf(8 + s2 * 2),
-        period = mconst > 0 and math.ceil(0xFF00 / mconst) or nil, worst = worst, typical = M.typicalOf(L) }
+        period = mconst > 0 and math.ceil(0xFF00 / mconst) or nil, worst = worst, typical = M.typicalOf(L),
+        rom = rom, romAtk = romAtk }
     end
   end
   return (M.roundCost({ window = window, enemies = enemies, fallback = fallback }))
@@ -6400,9 +6756,11 @@ function Driver:makePlan(actor)
                 if v ~= nil and (worst == nil or v > worst) then worst = v end
               end
               local mconst = M.readWord(BATTLE.ATB_CONST + 8 + s2 * 2)
+              local rom, romAtk = nil, nil
+              if worst == nil then rom, romAtk = self:scriptWorst(s2, e) end
               enemies[#enemies + 1] = { slot = s2, eta = etaOf(8 + s2 * 2),
                 period = mconst > 0 and math.ceil(0xFF00 / mconst) or nil, worst = worst,
-                typical = M.typicalOf(L) }
+                typical = M.typicalOf(L), rom = rom, romAtk = romAtk }
             end
           end
           if window == nil then
@@ -6715,7 +7073,7 @@ function Driver:makePlan(actor)
   -- to item menus and its parting move erased the party; any attack
   -- would have ended the danger instead.
   local totalMon = 0
-  for s = 0, 5 do totalMon = totalMon + M.readWord(0x3BFC + s * 2) end
+  for s = 0, 5 do if monAlive(s) then totalMon = totalMon + M.readWord(0x3BFC + s * 2) end end
   -- The park ratchet: three watchdog drops in one battle means the
   -- steer cannot land its plans (a greyed confirm, a moved row), and
   -- replanning the same care loops forever -- the plains grind hung
@@ -6897,19 +7255,15 @@ function Driver:makePlan(actor)
   -- first when it is available.  Measured on Rizopas care_i50 (#162):
   -- SABIN at 82/363 under a 244 round spent eleven turns on care while
   -- one 1-BP Fight ended the fight.
-  local function spendPlan(where)
-    if self.opts.spend == false or livingMonsters() == 0 then return nil end
+  -- the heals this actor could give themself right now, priced the
+  -- way the care lines below price them.  Only a heal those lines
+  -- would TAKE can save (#206): the Potion that "saves: 17 + 250 = 267
+  -- survives the 262 round" was the same Potion the heal policy
+  -- refused as "buys back less than it spends", so LOCKE did neither
+  -- and died holding 3 BP.
+  local function actorHeals()
     local hp, maxhp = hpNow[actor], maxOf(actor)
     local cost = price[actor] or 0
-    if hp <= 0 or cost <= 0 or hp > cost or have < 1 then return nil end
-    -- the heals this actor could give themself right now, priced the
-    -- way the care lines below price them.  Only a heal those lines
-    -- would TAKE can save (#206): the Potion that "saves: 17 + 250 = 267
-    -- survives the 262 round" was the same Potion the heal policy
-    -- refused as "buys back less than it spends", so LOCKE did neither
-    -- and died holding 3 BP.  From the attack lines (the care block
-    -- closed to this actor, or it declined every heal) no heal is
-    -- coming this turn at all.
     local heals, refused = {}, {}
     do
       local allies = 0
@@ -6948,11 +7302,37 @@ function Driver:makePlan(actor)
         end
       end
     end
+    return heals, refused
+  end
+  -- The heal the care lines would take on this actor that lifts it clear
+  -- of its own round, said as "what +restore", or nil (#312)
+  local function ownLift()
+    local hp, cost = hpNow[actor], price[actor] or 0
+    for _, h in ipairs((actorHeals())) do
+      if h.restore ~= nil and hp + h.restore > cost then
+        return string.format("%s +%d = %d over the %d round", h.what, h.restore, hp + h.restore, cost)
+      end
+    end
+    return nil
+  end
+  -- `goesTo` (#312): the care block has chosen a turn that does not lift
+  -- this actor (a raise of another, a heal on someone else), so no heal is
+  -- coming to it this turn whatever the bag holds -- the attack lines'
+  -- reading.  The Runic-off Kefka loss (#257, build/attempts/wt/kefka-lab/
+  -- lab/logs/nrunic_suiteg29_s44.log.gz): TERRA alone at 158/345 under a
+  -- 193 round read "no spend (care): item $E9 saves: 158 + 250 = 408", then
+  -- spent the turn raising CELES, three turns running, and died holding 5 BP.
+  local function spendPlan(where, goesTo)
+    if self.opts.spend == false or livingMonsters() == 0 then return nil end
+    local hp, maxhp = hpNow[actor], maxOf(actor)
+    local cost = price[actor] or 0
+    if hp <= 0 or cost <= 0 or hp > cost or have < 1 then return nil end
+    local heals, refused = actorHeals()
     -- From the attack lines no heal comes this turn: what the care lines
     -- would have taken is said, not counted, with the reason the block was
     -- closed (review of care-items cae71db9)
     local whyNot = nil
-    if where ~= "care" then
+    if where ~= "care" or goesTo ~= nil then
       local gap = math.max(0, maxhp - hp)
       for _, h in ipairs(heals) do
         local r = h.restore and math.min(h.restore, gap) or nil
@@ -6960,7 +7340,9 @@ function Driver:makePlan(actor)
           note = (r == nil or hp + r > cost) and "it would lift, but not this turn" or nil }
       end
       heals = {}
-      if not careOpen then
+      if goesTo ~= nil then
+        whyNot = "this turn's care goes to " .. goesTo
+      elseif not careOpen then
         whyNot = string.format("the round's care turn went to actor %d", self.careActor or -1)
       elseif #refused > 0 then
         whyNot = "the care lines took none"
@@ -7008,6 +7390,22 @@ function Driver:makePlan(actor)
       .. "rather than die holding boost (#175)", self.tag or "fight", actor, where, why,
       best.what, best.chips or 0, tostring(slot)))
     return best
+  end
+  -- A care turn that does not lift this actor, while the actor is inside
+  -- its own round holding BP (#312): the care lines' choice is weighed
+  -- against the spend rule with no heal coming to the actor this turn, and
+  -- the spend goes first when it fires -- the plan the care lines chose
+  -- (`plan`, said as `what`) otherwise.  M.SPEND_SEES_THROUGH = false is
+  -- the driver before #312 (the lab lever).
+  local function orSpend(plan, what)
+    if plan == nil or M.SPEND_SEES_THROUGH == false then return plan end
+    local hp, cost = hpNow[actor], price[actor] or 0
+    if hp <= 0 or cost <= 0 or hp > cost or have < 1 then return plan end
+    if plan.all then return plan end           -- a party heal reaches the actor too
+    if plan.target == actor and plan.restore ~= nil and hp + plan.restore > cost then return plan end
+    if plan.target == actor and plan.restore == nil and plan.kind == "heal" then return plan end
+    local sp = spendPlan("care", what)
+    return sp or plan
   end
   -- The finisher gate yields to the enemy's arithmetic (#204).  "Under
   -- 200 total, attack" was written for a party one poke from ending a
@@ -7282,21 +7680,35 @@ function Driver:makePlan(actor)
           local ok, raiseHp, hit, hitSlot, hitOn, why, needsTopUp = self:raiseOk(e, actor)
           local hitStr = hit and string.format("%d (slot %d on entity %d)", hit, hitSlot, hitOn)
             or "none measured"
-          if ok then
+          -- the actor's own lift first (#312): a reviver inside its own
+          -- round who spends the turn on a raise dies before the raised can
+          -- be helped, and the raise with it
+          local own = nil
+          if ok and e ~= actor and M.SPEND_SEES_THROUGH ~= false and hpNow[actor] > 0
+             and (price[actor] or 0) > 0 and hpNow[actor] <= price[actor] then
+            own = ownLift()
+          end
+          if own ~= nil then
+            local said = string.format("[%s] actor=%d holds its raise of entity %d: it stands "
+              .. "inside its own round (%d <= %d) and %s lifts it first (#312)", self.tag or "fight",
+              actor, e, hpNow[actor], price[actor], own)
+            if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+          elseif ok then
             M.log(string.format("[%s] actor=%d revive entity %d with Fenix Down: "
               .. "raise to %d HP (1/8 of %d), the living enemy's smallest hit %s "
               .. "-- %s", self.tag or "fight", actor, e, raiseHp,
               maxOf(e), hitStr, why))
-            return { kind = "item", item = BATTLE.FENIX_DOWN, target = e, row = row,
+            return orSpend({ kind = "item", item = BATTLE.FENIX_DOWN, target = e, row = row,
                      idx = self:battInvIdx(BATTLE.FENIX_DOWN), reason = "revive",
-                     needsTopUp = needsTopUp == true }
+                     needsTopUp = needsTopUp == true }, string.format("a raise of entity %d", e))
+          else
+            local said = string.format("[%s] actor=%d no raise: Fenix Down would put "
+              .. "entity %d at %d HP (1/8 of %d), the living enemy's smallest hit %s "
+              .. "-- %s; killing first, caring for the living instead",
+              self.tag or "fight", actor, e, raiseHp, maxOf(e),
+              hitStr, why)
+            if said ~= self.healSaid then self.healSaid = said; M.log(said) end
           end
-          local said = string.format("[%s] actor=%d no raise: Fenix Down would put "
-            .. "entity %d at %d HP (1/8 of %d), the living enemy's smallest hit %s "
-            .. "-- %s; killing first, caring for the living instead",
-            self.tag or "fight", actor, e, raiseHp, maxOf(e),
-            hitStr, why)
-          if said ~= self.healSaid then self.healSaid = said; M.log(said) end
         end
       end
     end
@@ -7386,6 +7798,23 @@ function Driver:makePlan(actor)
       if la then return a.margin < b.margin end
       return a.pct < b.pct
     end)
+    -- the actor's own lift first (#312), the same rule the raise above
+    -- holds to: an actor inside its own round with a heal in hand that
+    -- lifts it heals itself before a needier ally -- measured on the Sealed
+    -- Gate cave (build/attempts/wt/v026-driver/367/gate/new_s20): "holds its
+    -- raise of entity 0 ... item $EA +646 = 820 over the 596 round lifts it
+    -- first", then a heal on entity 2 went first and the actor spent its pip
+    -- instead of lifting itself
+    if M.SPEND_SEES_THROUGH ~= false and hpNow[actor] > 0 and (price[actor] or 0) > 0
+       and hpNow[actor] <= price[actor] then
+      for i, c in ipairs(cands) do
+        if c.e == actor and i > 1 and ownLift() ~= nil then
+          table.remove(cands, i)
+          table.insert(cands, 1, c)
+          break
+        end
+      end
+    end
     local allies = 0
     for e = 0, 3 do
       if e ~= actor and hpNow[e] > 0 and maxOf(e) > 0 then
@@ -7397,7 +7826,7 @@ function Driver:makePlan(actor)
     -- form of the effect once -- Cure2/Cure3 the whole party -- rather
     -- than spending a turn per head).  Boost folds the tier (1 BP ->
     -- Cure2, 2 BP -> Cure3) and one R press on the target screen latches
-    -- all allies (TGTALL -- probe_targetall.lua).  Unboosted party Cure
+    -- all allies (TGTALL -- probe_targetall.lua, deleted in bd50a973).  Unboosted party Cure
     -- is NOT offered: vanilla halves a spread spell, so tier-0-all heals
     -- less per head than the single cast, and the single line below
     -- already owns that case.
@@ -7438,8 +7867,8 @@ function Driver:makePlan(actor)
             .. "(worst %d%%), boost %d folds $%02X -> $%02X (%d MP), "
             .. "all allies -- %s", self.tag or "fight", actor, #cands,
             cands[1].pct, boost, spell, folded, mpc, why))
-          return { kind = "heal", spell = spell, target = cands[1].e,
-                   row = cureRow, all = true, boostLeft = boost, reason = "party_hurt" }
+          return orSpend({ kind = "heal", spell = spell, target = cands[1].e,
+                   row = cureRow, all = true, boostLeft = boost, reason = "party_hurt" }, "a party cure")
         end
       end
     end
@@ -7514,8 +7943,8 @@ function Driver:makePlan(actor)
                 .. "costs %d (%s)", self.tag or "fight", actor, c.e, c.hp,
                 c.maxhp, spell, cell, mpCost, M.readWord(BATTLE.CURMP + actor * 2),
                 gain and tostring(gain) or "?", cost, why))
-              return { kind = "heal", spell = spell, target = c.e, restore = gain,
-                       row = cureRow, reason = why }
+              return orSpend({ kind = "heal", spell = spell, target = c.e, restore = gain,
+                       row = cureRow, reason = why }, string.format("a cure on entity %d", c.e))
             end
             local said = string.format("[%s] actor=%d not curing entity %d "
               .. "(%d/%d): $%02X restores %d and a round costs %d, so the "
@@ -7545,8 +7974,8 @@ function Driver:makePlan(actor)
               for _, r in ipairs(refused) do t[#t + 1] = string.format("$%02X (%s)", r.item.id, r.why) end
               return table.concat(t, "; ")
             end)()) or ""))
-          return { kind = "item", item = it.id, target = c.e, row = row, restore = it.restore,
-                   idx = it.idx, reason = why, flat = it.flat }
+          return orSpend({ kind = "item", item = it.id, target = c.e, row = row, restore = it.restore,
+                   idx = it.idx, reason = why, flat = it.flat }, string.format("a heal on entity %d", c.e))
         end
         local t = {}
         for _, r in ipairs(refused) do
@@ -7782,6 +8211,15 @@ function Driver:makePlan(actor)
              tier = math.max(1, math.min(have, cap, 3)),
              row = cmdRow(actor, BATTLE.CMD_SWDTECH), boostLeft = 0 }
   end
+  -- a kill this turn goes ahead of the key on another body (#325)
+  if not (self.opts.focus or self.parts or (self.lastStand and self:focusList() ~= nil))
+     and cmdRow(actor, BATTLE.CMD_FIGHT) ~= nil then
+    local fin = self:finishAim(actor, boost)
+    if fin ~= nil then
+      return { kind = "fight", row = cmdRow(actor, BATTLE.CMD_FIGHT), boostLeft = boost, aim = fin,
+               reason = "finish" }
+    end
+  end
   if self.opts.keyed ~= false then
     local slot = self:pressTarget()
     if slot == nil then
@@ -7885,7 +8323,7 @@ function Driver:makePlan(actor)
   -- person acts on what the fight has shown); the skeans are bought for
   -- exactly this (Fire Skean $AB, Water Edge $AC, Bolt Edge $AD -> fire/
   -- water/bolt), and boost multiplies a thrown skean like any damage
-  -- verb.  Flow measured by probe_throw.lua: cmd $08 -> $2B builds
+  -- verb.  Flow measured by probe_throw.lua (deleted in bd50a973): cmd $08 -> $2B builds
   -- wItemList -> $2D selects -> ST_TGT.  The boost stays free: cmd $08
   -- falls out of Ot6AbilityCost's chain with vanilla's own cost, 0, so
   -- there is no price here to escalate (#219).
@@ -7894,7 +8332,7 @@ function Driver:makePlan(actor)
     for item, elem in pairs(BATTLE.SKEAN_ELEM) do
       if self:battInvIdx(item) then
         for s = 0, 5 do
-          if M.readWord(0x3BFC + s * 2) > 0
+          if monAlive(s)
              and (M.readByte(0x3E91 + s * 2) & elem) ~= 0 then
             M.log(string.format("[%s] SHADOW throws $%02X at slot %d "
               .. "(revealed elem mask %02X)", self.tag or "fight", item, s, elem))
@@ -7906,6 +8344,17 @@ function Driver:makePlan(actor)
     end
   end
   local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
+  -- MagiTek (#373): the Narshe riders' command table is MagiTek, -, -,
+  -- Item, with no Fight row, and every attack turn here was a "switch" --
+  -- battle_healerdown's riders passed 35 and 36 turns.  The beam is chosen
+  -- the way a person picks one, reading the target: what it absorbs or
+  -- nulls is out, a revealed shield key it chips first, then the power its
+  -- elements leave (weak x2, half /2), from the ROM's MagicProp.
+  if fight == nil and cmdRow(actor, BATTLE.CMD_MAGITEK) and not self.skillDead[BATTLE.CMD_MAGITEK]
+     and M.MAGITEK_OFF ~= true then
+    local line = self:magitekLine(actor)
+    if line then return line end
+  end
   if fight == nil then return { kind = "switch" } end
   -- The plain boost-Fight through the randoms (#161): with no authored or
   -- multi-part kill order it aims at the slot this hand breaks best, so a
@@ -8331,7 +8780,7 @@ function Driver:button(actor)
     -- does this, after two pulses of the same window, since a landed
     -- confirm's closing tail also passes through here for a tick.
     -- A Slot spin that has started cannot be backed out of (B is not
-    -- read once the first A lands, probe_slot.lua): a person finishes
+    -- read once the first A lands, probe_slot.lua, deleted in bd50a973): a person finishes
     -- it.  Before the first A it is a list like the others.
     if st == BATTLE.ST_SLOT and M.readByte(BATTLE.SLOT_PRESS1) ~= 0 then return { "a" } end
     if BATTLE.IDLE_ST[st] or st == BATTLE.ST_SLOT then
@@ -8523,6 +8972,16 @@ function Driver:button(actor)
     if cc ~= wc then return { wc > cc and "right" or "left" } end
     return { wr > cr and "down" or "up" }
   end
+  if (st == BATTLE.ST_MTEK_OPEN or st == BATTLE.ST_MTEK_CLOSE) and self.plan.kind == "magitek" then
+    return nil                       -- the list is building / closing; wait
+  end
+  if st == BATTLE.ST_MTEK and self.plan.kind == "magitek" then
+    local wc, wr = self.plan.entry % 2, self.plan.entry // 2
+    local cc, cr = M.readByte(BATTLE.MTEK_COL + actor), M.readByte(BATTLE.MTEK_ROW + actor)
+    if cc ~= wc then return { wc > cc and "right" or "left" } end
+    if cr ~= wr then return { wr > cr and "down" or "up" } end
+    return { "a" }
+  end
   if (st == BATTLE.ST_TOOLS_OPEN or st == BATTLE.ST_TOOLS_CLOSE)
      and (self.plan.kind == "skill" or self.plan.kind == "slot") then
     return nil                       -- the shell is building / closing; wait
@@ -8615,7 +9074,7 @@ function Driver:button(actor)
   end
   if st == BATTLE.ST_TGT and self.plan.kind == "runic" then
     -- the engine latched the target on the caster (chars = 1<<actor,
-    -- probe_runic.lua); there is nothing to steer
+    -- probe_runic.lua, deleted in bd50a973); there is nothing to steer
     M.log(string.format("[%s] actor=%d Runic confirmed (target chars=%02X)",
       self.tag or "fight", actor, M.readByte(BATTLE.TGTCHARS)))
     if self.recovery then self.recovery.confirm(actor, M.frame,
@@ -8647,7 +9106,7 @@ function Driver:button(actor)
         if self.recovery then self.recovery.confirm(actor, M.frame, chars, mons) end
         -- falls through to the confirm below
       elseif self.plan.all then
-        -- one R press latches all-allies (TGTALL=1 -- probe_targetall);
+        -- one R press latches all-allies (TGTALL=1 -- probe_targetall, deleted in bd50a973);
         -- confirm once the latch reads back.  If it never takes (a spell
         -- without MULTI_TARGET), drop to the single-target steer.
         if M.readByte(BATTLE.TGTALL) ~= 0 then
@@ -8719,8 +9178,7 @@ function Driver:button(actor)
       -- presence bit ($3AA8) set -- a part that has not entered yet (or
       -- has left) is skipped rather than steered at
       for _, e in ipairs(M.focusSlots(focus)) do
-        if M.readWord(0x3BFC + e.slot * 2) > 0
-           and (M.readByte(0x3AA8 + e.slot * 2) & 1) == 1 and self:focusReachable(e.slot) then
+        if monAlive(e.slot) and self:focusReachable(e.slot) then
           want, wantSlot = e.mask, e.slot; break
         end
       end
@@ -8912,6 +9370,7 @@ function Driver:button(actor)
     -- dmgWatch queue; watchDamage credits and settles it).  A Fight
     -- on a muddled ally (#170) moves no monster HP and is not one.
     if not self.plan.ally and (self.plan.kind == "fight" or self.plan.kind == "skill" or self.plan.kind == "magic"
+       or self.plan.kind == "magitek"
        or self.plan.kind == "summon" or self.plan.kind == "throw" or self.plan.kind == "lore") then
       -- an actor gets a fresh confirm only after its last command
       -- resolved (settled below) or was refused at the cursor, so an
@@ -9003,6 +9462,7 @@ function Driver:idle()
   self.dmgHit, self.hitLedger, self.partyHpLast = {}, {}, {}
   self.monAct, self.deathSaid, self.battleDeaths, self.wipeSaid = nil, {}, {}, false
   self.monTurn = {}
+  self.romWorst = nil
   self.raisePending, self.topUpOwed, self.unmuddlePending = nil, {}, nil
   self.raiseQueued, self.cureQueued, self.healQueued = {}, {}, {}
   self.statusSaid, self.cureSaid, self.freeRoundSaid = {}, nil, false
@@ -11714,9 +12174,9 @@ function Driver:watchHits()
     end
     local cls = M.wipeClass(self.battleDeaths, { onePct = BATTLE.ONE_SHOT_PCT,
       early = BATTLE.EARLY_TICKS, banked = BATTLE.BANKED_BP, statues = statues })
-    M.log(string.format("[%s] [wipe] f+%d party_bp=%s deaths=%s class=%s",
+    M.log(string.format("[%s] [wipe] f+%d party_bp=%s deaths=%s class=%s fenix=%d",
       self.tag or "fight", self.battleTick, table.concat(pbp, ","),
-      #ds > 0 and table.concat(ds, ";") or "none", cls))
+      #ds > 0 and table.concat(ds, ";") or "none", cls, bagCount(BATTLE.FENIX_DOWN)))
   end
 end
 
@@ -11837,6 +12297,25 @@ end
 function Driver:frame()
   if self.recovery then recoveryActivate(self.recovery); recoveryFlush() end
   execActivate()
+  -- A new battle under a driver nobody idled (#364).  Everything per
+  -- battle -- the layout above all, read once and cached -- is reset by
+  -- idle(), which the walkers call between battles; a caller that only
+  -- ticks frame() while a battle is up (a lab's walk, a suite's loop)
+  -- carried the first battle's layout into the next: hire-sprite's pincer
+  -- lab read "back attack" at its first battle and steered a later normal
+  -- one with it, and STUCK "crossing to the monsters in a back attack:
+  -- right did nothing twice".  The end hook (UpdateSRAM) marks where the
+  -- last battle ended; a frame past its hand-back tail (90 frames,
+  -- watchLeavers) under a driver that watched before it is a new battle.
+  if endSnap ~= nil and self.startFrame ~= nil and self.battleTick > 0
+     and endSnap.frame >= self.startFrame and M.frame - endSnap.frame >= 90
+     and not M.STALE_BATTLE_STATE then
+    M.log(string.format("[%s] a new battle, %d frames after the last one ended, under a driver "
+      .. "nobody idled: its per-battle state (the layout, the ledgers) is reset here (#364)",
+      self.tag or "fight", M.frame - endSnap.frame))
+    self:idle()
+    self.startFrame = nil
+  end
   self.battleTick = self.battleTick + 1
   -- The party's HP as the battle opened, for the first-turn danger floor
   -- in makePlan.  Taken a beat after the table goes live so every entity
@@ -11884,6 +12363,7 @@ function Driver:frame()
   self:watchHits()
   self:watchLanders()
   self:watchParts()
+  self:watchStatues()
   local menu = M.readByte(BATTLE.MENU)
   self:logBattleLine(menu)
   if menu == 0 then
@@ -11974,6 +12454,28 @@ function Driver:frame()
   if self.heldFast then
     M.setPad(held < self:cadence() and held % 10 < 5 and self.held or {})
   else M.setPad(held < 6 and self.held or {}) end
+end
+
+-- A monster that still holds HP but the engine has counted out (#362):
+-- Petrify (or Wound, or Zombie) in its status 1, the bits UpdateDead
+-- tests.  Said once per slot per battle, so a lab can count the fights
+-- where the driver's alive test (M.monStanding) and an HP test part ways.
+function Driver:watchStatues()
+  for s = 0, 5 do
+    local hp = M.readWord(BATTLE.MON_HP + s * 2)
+    local st = M.readByte(BATTLE.ST1 + (4 + s) * 2)
+    if hp > 0 and (M.readByte(BATTLE.MON_PRESENT + s * 2) & 1) == 1 and (st & 0xC2) ~= 0
+       and not self.statusSaid["statue:" .. s] then
+      self.statusSaid["statue:" .. s] = true
+      local others = 0
+      for s2 = 0, 5 do if s2 ~= s and M.monStanding(s2) then others = others + 1 end end
+      M.log(string.format("[%s] [statue] f+%d slot %d ($%03X) holds %d/%d HP under status 1 $%02X: "
+        .. "the engine counts it out; %s (#362); %d other(s) standing", self.tag or "fight",
+        self.battleTick, s, M.readWord(M.FORMATION + s * 2), hp, M.readWord(0x3C24 + s * 2), st,
+        M.STATUE_STANDS and "the driver counts it STANDING (M.STATUE_STANDS)" or "so does the driver",
+        others))
+    end
+  end
 end
 
 -- commit what the hit ledger still holds open (the action being read and
@@ -12077,7 +12579,8 @@ M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end)
     -- both executed (branch_boostfight_s48: f4322 and f4734, tgt $0008).
     raiseQueued = {},                  -- e -> { by, tick }
     -- and every confirmed status cure not yet landed, by target (#187):
-    -- measured on mrf_263 (probe_statuses, 2026-09-16), actor 3's Green
+    -- measured on mrf_263 (probe_statuses, 2026-09-16; deleted in fe9d1ff7, last version at
+    -- b4023415), actor 3's Green
     -- Cherry on entity 1 was confirmed, actor 0 planned a second on the
     -- same entity 480 frames later while the first sat in the queue, and
     -- both were spent (4 -> 2 in the bag) on one Imp.
@@ -12429,13 +12932,17 @@ local function coverageFlush()
 end
 
 local function traceTick()
-  if not M.tileAligned() then return end
+  -- the world map keeps its party tile in $e0/$e2, not the field object (#288)
+  local world = M.worldMode ~= nil and M.worldMode()
+  if world then
+    if not M.worldAligned() then return end
+  elseif not M.tileAligned() then return end
   local m = M.mapId() & 0x1ff
   if m ~= traceMap then
     traceFlush()
     traceMap = m
   end
-  local k = M.fieldX() .. ":" .. M.fieldY()
+  local k = world and (M.worldX() .. ":" .. M.worldY()) or (M.fieldX() .. ":" .. M.fieldY())
   if not traceSet[k] then
     traceSet[k] = true
     traceCount = traceCount + 1
@@ -12599,7 +13106,8 @@ end
 -- character's run counter $3D70,x, and when the counter reaches the run
 -- difficulty $3A3B it sets the character's bit in $3A38 (just escaped),
 -- which becomes $3A39 (left the battle) when the run action resolves.
--- Measured 2026-09-16 (probe_escape_cells.lua, the crescent_landing world
+-- Measured 2026-09-16 (probe_escape_cells.lua, deleted in bd50a973, last version at
+-- 31188c02; the crescent_landing world
 -- random that tripped the first version of this rule, TERRA/LOCKE vs two
 -- Behemoth-class monsters, $3A3B=4): with L+R held from the first battle
 -- frame $2F45 went 0->1 at +133 frames, the counters moved at +245, +373,
@@ -12620,7 +13128,7 @@ end
 -- formation's own "L+R has no effect" bit, $2F4B bit 0 (event battles).
 -- Checked BEFORE the escape cells: the run counters tick in such a
 -- formation too (measured 2026-09-16 on the Whelk fight, $B1=07 $2F4B=0C,
--- counters 03,01,03 -> 06,03,05 under a held L+R; probe_noeffect_cantrun),
+-- counters 03,01,03 -> 06,03,05 under a held L+R; probe_noeffect_cantrun, deleted in bd50a973, last version at 6346bb5c),
 -- it is the run command itself that refuses ("can't run away!!", Cmd_2a).
 local function cantRun() return M.cantRunFrom() end
 
@@ -12642,8 +13150,8 @@ local function cantRun() return M.cantRunFrom() end
 -- in-window row sits on the last line while the scroll offset walks.
 -- Measured 2026-09-16 on vector_crash's BASEMENT 3 random: the driver's
 -- 43-row walk to the Potion read as "no-effect: down for 304 frames at
--- B:01.0A.03.00.00.00.00.00" on all three attempts (probe_list_scroll.lua
--- has the per-cell trace).  Printed per list so the ring names the cell.
+-- B:01.0A.03.00.00.00.00.00" on all three attempts (probe_list_scroll.lua, deleted in bd50a973, last version at 6346bb5c,
+-- had the per-cell trace).  Printed per list so the ring names the cell.
 local function listSig()
   local a = M.readByte(0x62CA) & 3
   local function b(addr) return M.readByte(addr + a) end
@@ -12831,7 +13339,7 @@ local function watchTick()
   -- can't-run bits) or those cells have gone still.  Measured 2026-09-16
   -- on crescent_landing's first world random: three false trips of the
   -- first version, every one 300 frames of "l+r" under an open window
-  -- with the run counters ticking (probe_escape_cells.lua).
+  -- with the run counters ticking (probe_escape_cells.lua, deleted in bd50a973).
   local escapeLive = false
   if inBattle then
     local esc = escapeSig()
@@ -13135,10 +13643,19 @@ end
 -- call to this, so the runner can replay the body.  A script composed
 -- before this existed (or composed by hand) never calls it: the
 -- runner then reports that retries are unavailable rather than pretending.
+-- The first run is protected (#376): Mesen drops an error raised while
+-- the script loads without a word on stdout, and the run then idles to
+-- the wall-clock cap (check_instruments reported a mutant that raised at
+-- load as "no boot point within 300s").  The error is said as the run's
+-- FAIL and the run stops at its first frame.
 function M.segmentBody(fn)
   M.__body = fn
   installShim()
-  fn()
+  local ok, err = pcall(fn)
+  if not ok then
+    M.log("FAIL: the script raised as it loaded (before its first frame): " .. tostring(err))
+    rawAddEventCallback(function() emu.stop(1) end, emu.eventType.startFrame)
+  end
 end
 
 -- Called by M.loadState once the fixture is in, and by assertEntryContract
@@ -13435,7 +13952,8 @@ function M.run(opts, steps)
   -- Third watch, the battle-side wipe (#153): an annihilated party never
   -- reaches either of the above on its own.  LoseBattle sets $3ebc bit 0
   -- and the battle module then SITS on the annihilated screen waiting for
-  -- a press -- measured with probe_wipe_canary.lua on the FC (394): every
+  -- a press -- measured with probe_wipe_canary.lua (deleted in bd50a973; last version
+  -- at 2c2492b0) on the FC (394): every
   -- battle-HP word 0 from t=11945, $3ebc=$0D, no GameOver read and no
   -- TitleScreen exec for the next 30,000 frames with the pad released.
   -- Only a press moves it on, and the press a driver makes there is the
