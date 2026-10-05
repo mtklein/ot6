@@ -5078,7 +5078,15 @@ function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
           pick = { cx, cy, press }; break
         end
       end
-      pick = pick or { sx, sy + 1, "up" }
+      -- No reachable neighbour on a loaded map is a route error, not a
+      -- tile to guess: the old fallback cached (sx, sy+1) whether or not
+      -- any walk reached it, and the walk then failed far from the cause
+      -- (#357).
+      if not pick then
+        error(string.format("%s: no tile next to the door (%d,%d) is reachable from " ..
+          "(%d,%d) on map %d (tried the four sides and four diagonals)",
+          what, sx, sy, M.fieldX(), M.fieldY(), mapLow()), 0)
+      end
       M.log(string.format("%s: staging (%d,%d), hold %s into (%d,%d)",
         what, pick[1], pick[2], pick[3], sx, sy))
     end
