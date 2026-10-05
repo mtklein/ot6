@@ -479,7 +479,11 @@ local fed = false                        -- observed feed reaction completed
 -- the reaction's own mark: Gau's battle switch ($3EBD bit 1) seen set
 -- inside the battle that fed him.  $3EBD is battle RAM, so it is latched
 -- there; read after the join event reaches the world it holds whatever the
--- world init left (#343).
+-- world init left (#343).  AIScript::_370 runs recruit_gau before
+-- set_battle_switch 13, 1, so the grind's "GAU joins" step ends a few
+-- frames before the switch lands (f14894 against the write at f14898,
+-- build/attempts/wt/v026-field/r2/gau_switch_probe.log): it is latched by
+-- the join event's advance too, which runs while the battle is still up.
 local fedSw = false
 local grind = { fights = 0, appearances = 0 }
 local function gauOn()
@@ -496,6 +500,9 @@ local function gauPresent()
      and (H.readByte(0x3a40) & mask) ~= 0
 end
 local function fedSwitch() return (H.readByte(0x3EBD) & 0x02) ~= 0 end
+local function latchFedSw()
+  if H.battleLoadStarted() and fedSwitch() then fedSw = true end
+end
 
 -- Who is who in a battle.  A party entity's character id is $3ED8+2e (the
 -- actor number Ot6VeldtRow compares against CHAR::GAU), so a plan names
@@ -1136,7 +1143,7 @@ local function grindStep()
     local actor = H.readByte(ACTOR)
     phase = (phase + 1) % 8
     fed = fedSwitch() or invCount(DRIED_MEAT) == 0
-    if H.battleLoadStarted() and fedSwitch() then fedSw = true end
+    latchFedSw()
     if fed or meatSubmitted or feedSubmissions >= 3 then
       H.setPad({})
       return
@@ -1469,6 +1476,7 @@ local function grindAttempt(n)
           return H.worldMode() and H.worldHasControl() and H.worldAligned()
         end, 20000, {
           H.call(function()
+            latchFedSw()
             phase = (phase + 1) % 12
             H.setPad(phase < 4 and { "a" } or {})
           end),

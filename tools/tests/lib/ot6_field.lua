@@ -2445,14 +2445,11 @@ function M.worldNavTo(txIn, tyIn, opts)
   -- heal-after-every-battle: see navTo's care block; same contract here,
   -- run once the post-battle world reload has fully settled
   local careD, sawBattle = nil, false
-  -- a fought battle owes its care stop before the walk may end (#323; see
-  -- navTo's): the goal-tile terminator otherwise fires on the first frame
-  -- of world control after a battle that came up on the goal tile, before
-  -- the body's care block (which waits for the fade-in) is ever reached
-  local owed, owedN = false, 0
-  local function careOwed()
-    return owed and opts.care ~= false and not M.eventTimerLive() and owedN < 600
-  end
+  -- No owed-care gate as navTo has (#323): a battle on the world walk's
+  -- goal tile was cared for before the walk ended with or without one
+  -- (field_goalcare's world arm green on main's lib and with the gate cut,
+  -- build/attempts/wt/v026-field/323/goalcare_mainlib.log, r2/
+  -- goalcare_mut_worldgate.log), so it was dropped as unproven.
   -- walk-budget semantics shared with navTo: battle and care frames do
   -- not charge maxFrames (see navTo's measured note); the driveUntil cap
   -- is the hard backstop.
@@ -2464,8 +2461,6 @@ function M.worldNavTo(txIn, tyIn, opts)
     local done
     if wipeSeen then
       done = true
-    elseif careOwed() then
-      done = false
     elseif arrive and arrive() then
       done = true
     else
@@ -2498,7 +2493,6 @@ function M.worldNavTo(txIn, tyIn, opts)
         else careD.frame(); return end
       end
       battN = M.battleLoadStarted() and battN + 1 or 0
-      if owed and battN == 0 then owedN = owedN + 1 end
       if tactical and battN == 0 then tactical.idle() end
       -- 1. battle: clear it (never a spared formation), then let the
       --    world reload run out before touching the plan again
@@ -2509,7 +2503,6 @@ function M.worldNavTo(txIn, tyIn, opts)
           M.setPad({})
           return
         end
-        owed, owedN = true, 0
         if wantsFlee(opts.playBattles)
            or (flee and next(fleeSet) and M.formationHas(fleeSet)) then
           flee(battN)
@@ -2551,7 +2544,7 @@ function M.worldNavTo(txIn, tyIn, opts)
       --     The world menu is safe here -- careClose's world-mode
       --     debounce owns the teardown.
       if sawBattle then
-        sawBattle, owed = false, false
+        sawBattle = false
         if opts.care ~= false and not M.eventTimerLive() then
           careD = M.newCareDriver({
             threshold = opts.careThreshold or 0.65, reserve = opts.reserve,
@@ -2627,7 +2620,6 @@ function M.worldNavTo(txIn, tyIn, opts)
     blocked, nblocked, plan, idx, pend = {}, 0, nil, 1, nil
     aPhase, battN, walked, hb = 0, 0, 0, -600
     wipeSeen, careD, sawBattle = false, nil, false
-    owed, owedN = false, 0
   end)
 end
 
