@@ -113,8 +113,15 @@ for _, bank in ipairs((function()
   local base = bank << 16
   emu.addMemoryCallback(ioRead, emu.callbackType.read, base | 0x2100, base | 0x21FF)
   emu.addMemoryCallback(ioRead, emu.callbackType.read, base | 0x4000, base | 0x43FF)
-  emu.addMemoryCallback(ioWrite, emu.callbackType.write, base | 0x2100, base | 0x21FF)
-  emu.addMemoryCallback(ioWrite, emu.callbackType.write, base | 0x4000, base | 0x43FF)
+  -- Writes: only the ports whose effects a CPU-only replay could need (APU,
+  -- WRAM port, joypad latch, CPU control/ALU/DMA enables, DMA channel
+  -- setup).  The PPU data ports are left out: DMA and HDMA write them
+  -- thousands of times a frame (a 5-frame probe logged 30k such writes).
+  emu.addMemoryCallback(ioWrite, emu.callbackType.write, base | 0x2140, base | 0x2143)
+  emu.addMemoryCallback(ioWrite, emu.callbackType.write, base | 0x2180, base | 0x2183)
+  emu.addMemoryCallback(ioWrite, emu.callbackType.write, base | 0x4016, base | 0x4016)
+  emu.addMemoryCallback(ioWrite, emu.callbackType.write, base | 0x4200, base | 0x420D)
+  emu.addMemoryCallback(ioWrite, emu.callbackType.write, base | 0x4300, base | 0x437F)
 end
 
 H.run({ maxFrames = SEG_FRAMES * 2 + 2000 }, {
