@@ -1103,7 +1103,7 @@ end
 -- nil when every living monster can be hit.
 function M.dodgerUp()
   for s = 0, 5 do
-    if M.readWord(0x3BFC + s * 2) > 0 and (M.readByte(0x3AA8 + s * 2) & 1) == 1 then
+    if M.monStanding(s) then
       local what = M.dodges({ s1 = M.readByte(0x3EE4 + (4 + s) * 2),
                               s2 = M.readByte(0x3EE5 + (4 + s) * 2) })
       if what ~= nil then return s, what end
@@ -2322,8 +2322,7 @@ end
 function M.activeSlots()
   local out = {}
   for slot = 0, 5 do
-    if M.readWord(0x3BFC + slot * 2) > 0
-       and (M.readByte(0x3AA8 + slot * 2) & 1) == 1 then
+    if M.monStanding(slot) then
       out[#out + 1] = {
         slot = slot, species = M.readWord(M.FORMATION + slot * 2),
         absorb = M.readByte(0x3BCC + 8 + slot * 2),
@@ -4978,11 +4977,28 @@ end
 -- living entry, else the only living monster on the field.  With
 -- several and no focus the engine's default cursor decides, and the
 -- model does not guess.
+-- Whether monster slot s still stands, by the engine's own test (#362):
+-- UpdateDead (@4ab9) counts a monster alive ($3A75, and $3A77 from it)
+-- only while it is present ($3AA8 bit 0) and its status 1 holds none of
+-- Wound, Petrify or Zombie ($C2).  HP alone reads a statue as alive: a
+-- Mad Oscar petrified at 2647 HP left $3A77 01 -> 00 while every HP test
+-- here still counted it (build/attempts/review/kit-setzer-6d05c229/
+-- r4_probe_gprain_petrify.txt).  The status byte is read live rather than
+-- the mask, which UpdateDead rewrites only once the action that landed the
+-- status has finished.  M.STATUE_STANDS = true is the driver before #362
+-- (the lab lever).
+M.STATUE_STANDS = false
+function M.monStanding(s)
+  if M.readWord(BATTLE.MON_HP + s * 2) == 0
+     or (M.readByte(BATTLE.MON_PRESENT + s * 2) & 1) == 0 then return false end
+  return M.STATUE_STANDS == true or (M.readByte(BATTLE.ST1 + (4 + s) * 2) & 0xC2) == 0
+end
+local monAlive = M.monStanding
+
 local function soleTarget()
   local only = nil
   for s = 0, 5 do
-    if M.readWord(BATTLE.MON_HP + s * 2) > 0
-       and (M.readByte(BATTLE.MON_PRESENT + s * 2) & 1) == 1 then
+    if monAlive(s) then
       if only ~= nil then return nil end
       only = s
     end
@@ -4993,15 +5009,9 @@ end
 local function livingMonsters()
   local n = 0
   for s = 0, 5 do
-    if M.readWord(BATTLE.MON_HP + s * 2) > 0
-       and (M.readByte(BATTLE.MON_PRESENT + s * 2) & 1) == 1 then n = n + 1 end
+    if monAlive(s) then n = n + 1 end
   end
   return n
-end
-
-local function monAlive(s)
-  return M.readWord(BATTLE.MON_HP + s * 2) > 0
-     and (M.readByte(BATTLE.MON_PRESENT + s * 2) & 1) == 1
 end
 
 -- ticks until entity X's gauge fills (X = e*2 for the party, 8 + s*2
@@ -5146,7 +5156,7 @@ end
 local function liveMonMask()
   local m = 0
   for s = 0, 5 do
-    if M.readWord(0x3BFC + s * 2) > 0 and (M.readByte(0x3AA8 + s * 2) & 1) == 1 then
+    if M.monStanding(s) then
       m = m | (1 << s)
     end
   end
@@ -5165,7 +5175,7 @@ function Driver:focusReachable(slot)
   if u == nil then return true end
   local live = 0
   for s = 0, 5 do
-    if M.readWord(0x3BFC + s * 2) > 0 and (M.readByte(0x3AA8 + s * 2) & 1) == 1 then
+    if monAlive(s) then
       live = live | (1 << s)
     end
   end
@@ -5629,9 +5639,7 @@ function Driver:pressTarget()
   local focus = self:focusList()
   if focus then
     for _, e in ipairs(M.focusSlots(focus)) do
-      if M.readWord(BATTLE.MON_HP + e.slot * 2) > 0
-         and (M.readByte(BATTLE.MON_PRESENT + e.slot * 2) & 1) == 1
-         and self:focusReachable(e.slot) then return e.slot end
+      if monAlive(e.slot) and self:focusReachable(e.slot) then return e.slot end
     end
   end
   return soleTarget()
@@ -6729,7 +6737,7 @@ function Driver:makePlan(actor)
   -- to item menus and its parting move erased the party; any attack
   -- would have ended the danger instead.
   local totalMon = 0
-  for s = 0, 5 do totalMon = totalMon + M.readWord(0x3BFC + s * 2) end
+  for s = 0, 5 do if monAlive(s) then totalMon = totalMon + M.readWord(0x3BFC + s * 2) end end
   -- The park ratchet: three watchdog drops in one battle means the
   -- steer cannot land its plans (a greyed confirm, a moved row), and
   -- replanning the same care loops forever -- the plains grind hung
@@ -7908,7 +7916,7 @@ function Driver:makePlan(actor)
     for item, elem in pairs(BATTLE.SKEAN_ELEM) do
       if self:battInvIdx(item) then
         for s = 0, 5 do
-          if M.readWord(0x3BFC + s * 2) > 0
+          if monAlive(s)
              and (M.readByte(0x3E91 + s * 2) & elem) ~= 0 then
             M.log(string.format("[%s] SHADOW throws $%02X at slot %d "
               .. "(revealed elem mask %02X)", self.tag or "fight", item, s, elem))
@@ -8733,8 +8741,7 @@ function Driver:button(actor)
       -- presence bit ($3AA8) set -- a part that has not entered yet (or
       -- has left) is skipped rather than steered at
       for _, e in ipairs(M.focusSlots(focus)) do
-        if M.readWord(0x3BFC + e.slot * 2) > 0
-           and (M.readByte(0x3AA8 + e.slot * 2) & 1) == 1 and self:focusReachable(e.slot) then
+        if monAlive(e.slot) and self:focusReachable(e.slot) then
           want, wantSlot = e.mask, e.slot; break
         end
       end
@@ -11898,6 +11905,7 @@ function Driver:frame()
   self:watchHits()
   self:watchLanders()
   self:watchParts()
+  self:watchStatues()
   local menu = M.readByte(BATTLE.MENU)
   self:logBattleLine(menu)
   if menu == 0 then
@@ -11988,6 +11996,28 @@ function Driver:frame()
   if self.heldFast then
     M.setPad(held < self:cadence() and held % 10 < 5 and self.held or {})
   else M.setPad(held < 6 and self.held or {}) end
+end
+
+-- A monster that still holds HP but the engine has counted out (#362):
+-- Petrify (or Wound, or Zombie) in its status 1, the bits UpdateDead
+-- tests.  Said once per slot per battle, so a lab can count the fights
+-- where the driver's alive test (M.monStanding) and an HP test part ways.
+function Driver:watchStatues()
+  for s = 0, 5 do
+    local hp = M.readWord(BATTLE.MON_HP + s * 2)
+    local st = M.readByte(BATTLE.ST1 + (4 + s) * 2)
+    if hp > 0 and (M.readByte(BATTLE.MON_PRESENT + s * 2) & 1) == 1 and (st & 0xC2) ~= 0
+       and not self.statusSaid["statue:" .. s] then
+      self.statusSaid["statue:" .. s] = true
+      local others = 0
+      for s2 = 0, 5 do if s2 ~= s and M.monStanding(s2) then others = others + 1 end end
+      M.log(string.format("[%s] [statue] f+%d slot %d ($%03X) holds %d/%d HP under status 1 $%02X: "
+        .. "the engine counts it out; %s (#362); %d other(s) standing", self.tag or "fight",
+        self.battleTick, s, M.readWord(M.FORMATION + s * 2), hp, M.readWord(0x3C24 + s * 2), st,
+        M.STATUE_STANDS and "the driver counts it STANDING (M.STATUE_STANDS)" or "so does the driver",
+        others))
+    end
+  end
 end
 
 -- commit what the hit ledger still holds open (the action being read and
