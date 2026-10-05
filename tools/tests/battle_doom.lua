@@ -37,7 +37,9 @@
 --      checked against the gauge at that frame.
 -- Then the Doom lands (a [death] line with nobody's action attributed)
 -- and the CLEARED line says so.  The count's own clock is measured on the
--- way (frames between decrements) and logged beside H.COUNT_FRAMES.
+-- way in visits of the member's status counter (watchCounts): each count
+-- steps on the visit its accumulator carries, and four visits at the
+-- running clock's gap are H.COUNT_FRAMES.
 -- Negative control: stub H.doomRule to nil and A goes red -- the actor
 -- plans without spending, or heals.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -96,6 +98,18 @@ H.log = function(msg)
   return rawLog(msg)
 end
 local lastCount, lastCountFrame, periods, decremented = {}, {}, {}, {}
+-- The count's clock is visits, not frames.  DecCounters visits each entity
+-- every 16 battle-time ticks; a visit adds the entity's speed constant
+-- ($3add: 64 at normal speed) to its $3adc accumulator, and the count steps
+-- on the visit that carries out of it.  Battle time stops while an action
+-- plays out, so a count measured in frames is its clock plus whatever froze
+-- it: on wt/v026-driver's kolts_cave draw one count took 339 frames for
+-- its four visits (build/attempts/wt/v026-driver/doom/suite_battle_doom_branch_air.log).
+-- So each visit is seen as the accumulator moving, and a count is checked
+-- against the visits its own speed constants give; the frames are the
+-- shortest gap between two visits, the running clock's.
+local ACC, SPEED, NORMAL_SPEED = 0x3ADC, 0x3ADD, 64
+local accLast, visits, sim, periodVisits, visitFrame, minVisit = {}, {}, {}, {}, {}, nil
 
 local function watchCounts()
   for e = 0, 3 do
@@ -110,6 +124,27 @@ local function watchCounts()
     -- frames): that clear is the queue's timing, not the count's, and is not
     -- a step.
     local condemned = (H.readByte(ST2 + e * 2) & 0x01) ~= 0
+    if condemned then
+      local acc = H.readByte(ACC + e * 2)
+      if accLast[e] ~= nil and acc ~= accLast[e] then
+        visits[e] = (visits[e] or 0) + 1
+        -- the visits this count should take: the accumulator replayed from
+        -- where the last step left it, with each visit's live constant,
+        -- until it carries
+        if sim[e] ~= nil and sim[e].want == nil then
+          sim[e].acc = sim[e].acc + H.readByte(SPEED + e * 2)
+          sim[e].n = sim[e].n + 1
+          if sim[e].acc > 0xFF then sim[e].want = sim[e].n end
+          sim[e].speeds[H.readByte(SPEED + e * 2)] = true
+        end
+        if visitFrame[e] ~= nil then
+          local g = H.frame - visitFrame[e]
+          if minVisit == nil or g < minVisit then minVisit = g end
+        end
+        visitFrame[e] = H.frame
+      end
+      accLast[e] = acc
+    end
     local b = condemned and H.readByte(DOOM_COUNT + e * 2) or nil
     local stepped = lastCount[e] ~= nil and lastCountFrame[e] ~= nil
       and ((b ~= nil and b < lastCount[e]) or (b == nil and lastCount[e] >= 2))
@@ -122,8 +157,17 @@ local function watchCounts()
       -- so a period is recorded from the second decrement on (#190,
       -- M.COUNT_FRAMES).  A's count (poked at 2) steps twice before its Doom,
       -- so it gives one period; B's (poked at 1) steps once and gives none.
-      if decremented[e] then periods[#periods + 1] = H.frame - lastCountFrame[e] end
+      if decremented[e] then
+        periods[#periods + 1] = H.frame - lastCountFrame[e]
+        local sp = {}
+        for k in pairs(sim[e].speeds) do sp[#sp + 1] = k end
+        table.sort(sp)
+        periodVisits[#periodVisits + 1] = { e = e, got = visits[e], want = sim[e].want,
+                                            speeds = table.concat(sp, "/") }
+      end
       decremented[e] = true
+      visits[e] = 0
+      sim[e] = { acc = accLast[e] or 0, n = 0, speeds = {} }
     end
     if b ~= lastCount[e] then lastCount[e], lastCountFrame[e] = b, H.frame end
   end
@@ -317,8 +361,22 @@ H.run({ maxFrames = 90000 }, {
       (deathFrame or 0) - frameB))
     -- (#252: this used to sit inside `if #periods > 0`, so no measurement passed)
     H.assertEq(#periods > 0, true, "a count decrement was measured")
-    H.assertEq(periods[1] >= H.COUNT_FRAMES - 34 and periods[1] <= H.COUNT_FRAMES + 34, true,
-      string.format("the shortest measured count is one entity visit off %d frames (got %d)",
-        H.COUNT_FRAMES, periods[1]))
+    local said = {}
+    for _, v in ipairs(periodVisits) do
+      said[#said + 1] = string.format("entity %d %s visit(s), %s by its speed ($3add %s)",
+        v.e, tostring(v.got), tostring(v.want), v.speeds)
+    end
+    H.log(string.format("[test] visits per measured count: %s; shortest gap between visits %s frames",
+      table.concat(said, "; "), tostring(minVisit)))
+    for i, v in ipairs(periodVisits) do
+      H.assertEq(v.got ~= nil and v.got == v.want, true, string.format(
+        "count %d (entity %d) stepped on the visit its accumulator carried: %s visit(s), want %s",
+        i, v.e, tostring(v.got), tostring(v.want)))
+    end
+    -- H.COUNT_FRAMES prices a count at normal speed: 256 / 64 visits, each
+    -- 16 ticks of 2 frames while the clock runs
+    H.assertEq(minVisit ~= nil and (256 // NORMAL_SPEED) * minVisit == H.COUNT_FRAMES, true,
+      string.format("%d visits at the running clock's %s frames each are H.COUNT_FRAMES=%d",
+        256 // NORMAL_SPEED, tostring(minVisit), H.COUNT_FRAMES))
   end),
 })
