@@ -1236,7 +1236,7 @@ function M.roundCost(o)
     if n > 0 then
       local each, how = en.worst, "worst"
       if each == nil and en.rom ~= nil then
-        each, how = en.rom, string.format("unseen, its script's worst $%02X from the ROM", en.romAtk or 0)
+        each, how = en.rom, string.format("unseen, priced from its script (its worst $%02X) in the ROM", en.romAtk or 0)
       end
       if each == nil then each, how = o.fallback, "unmeasured, at the battle's worst" end
       actions = actions + n
@@ -5434,15 +5434,26 @@ function Driver:scriptWorst(slot, e)
     elseif op == 0xF0 then atks[#atks + 1] = b(i + 1); atks[#atks + 1] = b(i + 2); atks[#atks + 1] = b(i + 3) end
     i = i + (op < 0xF0 and 1 or (M.AI_OP_LEN[op] or 1))
   end
-  local best, bestA = nil, nil
+  -- the mean over every attack the script names (a buff or a status a 0),
+  -- each at the most it can take: the most of them (M.UNSEEN_PRICE =
+  -- "max") read every member of the Sealed Gate's cave "inside one round
+  -- of death" from full HP -- "902/902 is inside one round of death
+  -- (1139)", "791/902 ... (2054)" -- and spent a pip a turn on it
+  -- (build/attempts/wt/v026-driver/367/gate/: SPEND 8-14 a run against 0-2)
+  local best, bestA, sum, n = nil, nil, 0, 0
   for _, a in ipairs(atks) do
     if a ~= 0xFE then
       local v = monHitOn(slot, e, a == 0xEF and 0xEE or a)
-      if v ~= nil and v > 0 and (best == nil or v > best) then best, bestA = v, a end
+      if v ~= nil then
+        sum, n = sum + v, n + 1
+        if v > 0 and (best == nil or v > best) then best, bestA = v, a end
+      end
     end
   end
-  self.romWorst[key] = { v = best, a = bestA }
-  return best, bestA
+  local price = best
+  if M.UNSEEN_PRICE ~= "max" and n > 0 and best ~= nil then price = math.max(1, sum // n) end
+  self.romWorst[key] = { v = price, a = bestA }
+  return price, bestA
 end
 
 function Driver:counterVetoed(actor, use, slots, what)
