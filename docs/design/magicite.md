@@ -345,12 +345,17 @@ espers, never Odin or Raiden), and its boost is `Ot6BoostDmg`'s multiplier.
 Half the pool had nothing for it to multiply: twelve espers of power 0
 (Siren, Shoat, Stray, Palidor, Ragnarok, Kirin, ZoneSeek, Carbunkl, Phantom,
 Golem, Unicorn, Fenrir) and Phoenix's revival, 0.520 of a draw
-(`build/attempts/wt/procboost-magicite/summary.txt`). (Phoenix is not
-quite nothing: with a member down, the multiplier does act on its revival,
-`157 -> 1256` in build/attempts/wt/v026-rom/368/mbp/mut_noredraw.out; with
-no one down it buys nothing. The redraw skips it either way, for a payoff
-that doesn't depend on the party's state; #393 tracks keeping it when
-someone is down.) A boosted Magicite
+(`build/attempts/wt/procboost-magicite/summary.txt`). (Phoenix is
+nothing too, with or without a member down. `Ot6BoostDmg` does take its
+`157` to `1256`, but no HP follows the multiplier: Phoenix raises the
+fallen to a quarter of max HP whatever the boost, and with everyone
+standing it heals no one. Measured on fc_alcove's party, slot 3 Fought down
+to 0/1132 and LOCKE's Magicite drawing Phoenix: boosted `157->1256 ...
+a3 0->283`, unboosted `157->157 ... a3 0->283`; with no one down, boosted
+`157->1256; HP a0 1181->1181 a1 1400->1400 a2 1208->1174 a3 1132->1132`
+(the a2 drop a monster's), build/attempts/wt/v026-rom2/393/. So #393's
+"keep Phoenix when someone is down" would spend the pips on nothing; the
+redraw keeps passing it over.) A boosted Magicite
 that drew one spent its pips and bought nothing. And Crusader's Purifier
 strikes both sides (targeting `$04`, flags `$40`, vanilla's record byte for
 byte; vanilla's Magicite→Crusader also hits the party,
