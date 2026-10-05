@@ -219,8 +219,12 @@ end, emu.callbackType.write, 0x7E3EE4 + 8, 0x7E3EE4 + 0x13)
 
 do
   local check = H.sym("CheckBattleWorld")
-  emu.addMemoryCallback(function() worldGroup = H.worldCheckGroup() end,
-    emu.callbackType.exec, check, check)
+  emu.addMemoryCallback(function()
+    local ok, g = pcall(H.worldCheckGroup)
+    if not ok then H.log("[budget] CheckBattleWorld watch: " .. tostring(g)) end
+    worldGroup = ok and g or nil
+  end, emu.callbackType.exec, check, check)
+  H.log(string.format("[budget] watching CheckBattleWorld at $%06x", check))
 end
 
 -- ---- Interceptor's counters, on the ledger (read-only) -------------------
