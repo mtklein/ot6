@@ -743,6 +743,11 @@ class Scanner:
             frame, png, h, stuck = scan_worker(data, s_stuck, f_stuck)
             self._track(wid, log, tag, branch, data, mtime, now)
             active.add(wid)
+            # a run that spoke its verdict and has gone quiet is over: it
+            # leaves the grid now, not when its log ages out (its tile would
+            # linger with "frame --" and a last, stale picture)
+            if run_progress(data)[1] is not None and now - mtime > 3:
+                continue
             # a changed screen goes out at once; an unchanged one again
             # every PNG_RESEND_SEC, so a snapshot the viewer lost (a dropped
             # line, a reconnect) can't leave its tile without a picture
