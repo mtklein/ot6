@@ -65,3 +65,7 @@
 ; a pass OT6 added retargets when its body has fallen, appended for the same
 ; reason.
         .include "ot6_passes.asm"
+
+; a boosted Magicite draws an esper its boost pays for (#368), appended for
+; the same reason.
+        .include "ot6_magicite.asm"

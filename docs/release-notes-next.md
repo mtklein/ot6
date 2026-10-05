@@ -20,3 +20,11 @@ creatures you meet: the Pm Stalker in Tzen's collapsing house, the
 NeckHunter and Dante in the cave to Figaro Castle, the spirits of the
 Sealed Gate cave, and the Apokryphos, Misfit and Brainpan of the Floating
 Continent. Each keeps every weakness it had.
+
+**A boosted Magicite always calls an Esper worth the boost.** Using a
+Magicite with Boost Points no longer wastes them on an Esper that does no
+damage (Siren, Golem, Fenrir and the rest) or on Phoenix, and it no longer
+calls Crusader, whose boosted Purifier wiped your own party. A boosted
+Magicite now calls an Esper that strikes the enemy, or a healing one,
+and the boost multiplies it. Unboosted, Magicite is the same gamble as
+ever, Crusader included.
