@@ -15,7 +15,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")   -- only for H.sym address lookups
 
 local PRG = emu.memType.snesPrgRom
-local SLASH, PIERCE, BLUDG = 0x01, 0x02, 0x04
+local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
 local FIRE, ICE, BOLT, POISON, WATER = 0x01, 0x02, 0x04, 0x08, 0x80
 local fails = 0
 
@@ -103,6 +103,17 @@ local want = {
   -- only legal weapon is the Imp Halberd $24 (no shop stocks it) and bare
   -- hands read $ff -> OT6_BLUDG.
   [0x0059] = { 2, BLUDG,          "aspik (trench) -- #23, was a dead PIERCE" },
+  -- the floating continent's random pool (map 394): the FC party carries
+  -- RELM, whose brushes are special (weapon-classes.md), and special is a
+  -- common key (guidelines, #347): the three magic bodies take it; the
+  -- beasts, the dragons and the ninja do not
+  [0x0020] = { 3, SLASH | PIERCE,           "behemoth (FC)" },
+  [0x0083] = { 3, SLASH | PIERCE,           "dragon (FC)" },
+  [0x000c] = { 2, SLASH | PIERCE | SPECIAL, "apokryphos (FC): a demon, special" },
+  [0x00a4] = { 2, SLASH | PIERCE | SPECIAL, "misfit (FC): conjured, special" },
+  [0x0003] = { 2, SLASH | PIERCE,           "ninja (FC)" },
+  [0x00d8] = { 2, SLASH | PIERCE,           "wirey drgn (FC)" },
+  [0x004a] = { 2, SLASH | PIERCE | SPECIAL, "brainpan (FC): a mind, special" },
 }
 for id, w in pairs(want) do
   local r = S[id]

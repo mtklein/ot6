@@ -339,7 +339,12 @@ carries Ramuh (bolt). The descent's difficulty is the Dragon's 7000 HP and
 850 MP at the party's level, not element hostility; see the descent lab note.
 
 The FC randoms carry authored `Ot6ShieldTbl` rows: Behemoth/Dragon 3
-pips, Apokryphos/Misfit/Ninja/WireyDrgn/Brainpan 2 pips. Four of the
+pips, Apokryphos/Misfit/Ninja/WireyDrgn/Brainpan 2 pips, all slash and
+pierce. The three magic bodies (Apokryphos, Misfit, Brainpan: each
+holy-weak, each a caster) also take special (¤) since #347 (guidelines,
+"Special (¤) is a common key"), so RELM's brushes key them; the beasts,
+the dragons and the Ninja do not (`battle_breaktbl` checks the seven
+rows). Four of the
 seven species are vanilla no-run (`monster_prop` +19 bit 2: Apokryphos,
 Misfit, WireyDrgn, Brainpan), so 7 of the 12 formations cannot be fled.
 Ninja pairs throw ~300/char AoE per round and can nuke a full-HP party

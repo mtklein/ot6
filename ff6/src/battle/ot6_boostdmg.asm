@@ -129,13 +129,17 @@
         longa
         lda     $11b0
 @mul:   asl                     ; not a true xN, but x2/x4/x8 reads better
-        bcs     @cap            ; on 16-bit overflow, saturate
+        bcs     @cap            ; on 16-bit overflow, saturate at $ffff
+                                ;   like the rest of the engine (#359):
+                                ;   the 9999 cap is downstream, and a
+                                ;   lower ceiling here made x2 of 40000
+                                ;   less than 40000
         shorta                  ; 8-bit dec: a 16-bit rmw would clobber
         dec     OT6_SCR_BIT     ; the scratch byte next door
         longa                   ; (rep/sep leave z alone; a survives)
         bne     @mul
         bra     @store
-@cap:   lda     #$7fff
+@cap:   lda     #$ffff
 @store: sta     $11b0
         shorta0
 done:   plp

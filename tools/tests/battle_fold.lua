@@ -6,17 +6,20 @@
 -- damage multiplier.
 --
 -- On worldmap_narshe Terra owns Magic (row 2) with Fire ($00, 4 MP) and
--- Cure ($2D, 5 MP), cast through the live menu.  Her pool is 29 MP, which
--- pays Fire 2's 20 once and cannot pay it twice, so the fold under test is
--- pending 1, Fire -> Fire 2 ($00 -> $05, Ot6FoldTbl row 0), priced at
--- Fire 2's own 20.  Ot6InitBP grants 1 opening bp and pending caps at bp,
+-- Cure ($2D, 5 MP), cast through the live menu.  Her pool (whatever the
+-- fixture's history left; 34 MP on the 2026-09-22 chain) has to pay Fire
+-- 2's 20, asserted at boot; the fold under test is pending 1, Fire -> Fire
+-- 2 ($00 -> $05, Ot6FoldTbl row 0), priced at Fire 2's own 20.  Whether
+-- the pool could pay it twice is the fixture's history, not the fold's
+-- rule, so it is logged, not asserted (#252: the old "< 40" and "< 51"
+-- preconditions pinned one chain's pool).  Ot6InitBP grants 1 opening bp and pending caps at bp,
 -- so one R edge arms the fold.
 --
 --   asserts: $3410 sees the folded tier id at execution, the tier's own
 --   mp cost is both queued ($3620 page, Ot6QueueFold -> Ot6SpellMP) and
 --   spent (pool delta == 20 exactly), the damage lands in
 --   tier-2-potency-without-multiplier bounds, the boost is consumed with
---   regen skipped, and the leftover pool cannot pay the tier again.
+--   regen skipped.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/worldmap_narshe.mss.lua"
 
@@ -185,9 +188,8 @@ H.run({ maxFrames = 60000 }, {
     H.log(string.format("terra slot %d: bp=%d mp=%d, monsters open at %d hp",
       terra, bp(terra), mp0, mhp0))
     H.assertEq(bp(terra), 1, "she opens with the 1 bp Ot6InitBP grants")
-    H.assertEq(mp0 >= FIRE2_MP, true, "the real pool pays Fire 2 once...")
-    H.assertEq(mp0 < 2 * FIRE2_MP, true, "...but could not pay it twice")
-    H.assertEq(mp0 < 51, true, "...and never pays Fire 3 (preview's arm)")
+    H.assertEq(mp0 >= FIRE2_MP, true, string.format("precondition: her real pool "
+      .. "(%d MP) pays Fire 2's %d", mp0, FIRE2_MP))
     emu.addMemoryCallback(function(addr, value)
       spells[#spells + 1] = value
     end, emu.callbackType.write, 0x7e3410, 0x7e3410)
@@ -314,8 +316,8 @@ H.run({ maxFrames = 60000 }, {
     H.log(string.format("mp %d -> %d = %d spent", mp0, mp1, mp0 - mp1))
     H.assertEq(mp0 - mp1, FIRE2_MP,
       "and the pool really paid it: exactly Fire 2's 20")
-    H.assertEq(mp1 < FIRE2_MP, true,
-      "the real wallet after one fold cannot buy a second (#64's economy)")
+    H.log(string.format("the wallet after one fold %s buy a second (%d MP left)",
+      mp1 < FIRE2_MP and "cannot" or "could", mp1))
     -- potency: the fold executed the tier's own record against the
     -- monsters.  The computed damage (numeral cell $33D0,y, pre-HP-clamp)
     -- is the check, because the trash's low HP saturates any HP-drop bound.

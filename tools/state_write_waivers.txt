@@ -35,8 +35,11 @@
 # zero-checksum save, a legacy save layout no version writes.  It is
 # documentation, not a gate; a line without one is no less sanctioned.
 tools/tests/battle_assassinate.lua	.writeByte(	1
+tools/tests/battle_assassinate.lua	.writeWord(	1	quarantine: the isolation arm's staged HP: no PIERCE-weak body the camp pool deals outlives its doubled break, so the hook point's Broken-boss read is unreachable by play (#296)
 tools/tests/battle_breakflash.lua	.writeByte(	13
 tools/tests/battle_breakflash.lua	.writeWord(	2
+tools/tests/battle_boostcap.lua	.writeByte(	1	quarantine: #359 mechanism test -- the actor's bank set to 3 pips per case so R can raise pending to the case's boost through the menu
+tools/tests/battle_boostcap.lua	.writeWord(	3	quarantine: #359 mechanism test -- a base damage of 8192+ at x8 (or 32768+ at x2) is not reachable by play on any fixture, so the base is injected into $11b0 at Ot6BoostDmg's entry; HP pinned so eight boosted beams neither end nor lose the fight
 tools/tests/battle_bushido.lua	.writeByte(	1
 tools/tests/battle_bushido.lua	.writeWord(	2
 tools/tests/battle_bushidogrey.lua	.writeWord(	1

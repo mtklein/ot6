@@ -76,6 +76,10 @@ H.run({ maxFrames = 120000 }, {
     gil0, blades0 = H.gil(), H.invCountOf(MITHRIL_BLADE)
     H.log(string.format("[shop suite] boot: (%d,%d) gil=%d mithrilblade=%d",
       H.fieldX(), H.fieldY(), gil0, blades0))
+    -- the two purchases below cost 2 x 450 (#252: the fixture's purse was
+    -- assumed, not asserted)
+    H.assertEq(gil0 >= 900, true, string.format("precondition: the purse (%d gil) "
+      .. "pays two MithrilBlades at 450", gil0))
 
     -- the table, read dry: what the generators asserted by hand
     local t, tn = H.shopType(5)

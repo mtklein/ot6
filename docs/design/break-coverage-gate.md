@@ -19,7 +19,7 @@ rule.
 | id | body | L | HP | vanilla weak | absorbs | authored row |
 |---|---|---|---|---|---|---|
 | `$06E` | ninja | 20 | 781 | **ice\|holy** | **fire**\|poison | 2 · pierce\|slash |
-| `$0E5` | spirit | 20 | 590 | **holy** | fire\|poison | 2 · slash\|bludg |
+| `$0E5` | spirit | 20 | 590 | **holy** | fire\|poison | 2 · slash\|bludg\|special |
 | `$0B3` | soft flier | 20 | 480 | **ice** | fire | 2 · slash |
 | `$048` | shelled tank (×3 stacks) | 21 | 1100 | **holy\|water** | fire\|poison | 3 · pierce\|bludg |
 | `$082` | brute | 21 | 1991 | **fire\|holy** | poison | 4 · bludg\|slash |
@@ -32,6 +32,9 @@ rule.
   hands: LOCKE's daggers and EDGAR's AutoCrossbow (pierce — the crossbow
   sweeps the `$048` trio), TERRA/EDGAR blades (slash), SABIN's fists
   (bludg).
+- **The spirit takes special (¤)** too (#347, guidelines "Special (¤) is
+  a common key"): a Setzer brought on the mission (he can be, from the
+  Opera on) keys it with cards or dice.
 - Shields follow the house curve: 2 for trash, 3 for the stacked tank,
   4 (miniboss-grade) for the 1991-HP brute.
 

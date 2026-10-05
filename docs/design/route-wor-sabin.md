@@ -844,7 +844,7 @@ route.
 |---|---|---|---|---|---|---|
 | `$0E1` Scorpion | soft body (def 5 / mdef 215) | 26 | 290 | **none** | — | 2 · slash\|pierce |
 | `$02C` HermitCrab | shelled, starts in Safe | 26 | 305 | water | — | 2 · slash\|bludg |
-| `$0C0` Pm Stalker | ghost, floats | 26 | 265 | **fire\|holy** | poison | 2 · slash |
+| `$0C0` Pm Stalker | ghost, floats | 26 | 265 | **fire\|holy** | poison | 2 · slash\|special ¤ (8.6) |
 
 - **Today, formation 209 (Scorpion ×3, 62.5 % of the house's draws) has no
   key for a sword-carrying Celes, who is alone in the house.** The floor is
@@ -917,6 +917,20 @@ and 40 are gone; `audit.before.txt` / `audit.after.txt` in
 `build/attempts/wt/wor-break-rows/`). The tuning claim
 (`CLAIMED_WORLD_SECTORS`, `CLAIMED_FIELD`) is unchanged and grows only once
 the driving has played these areas.
+
+### 8.6 Special as a common key (#347, owner 2026-10-01)
+
+Guidelines, "Special (¤) is a common key": spirits, magical and cursed
+bodies take ¤ beside their other keys, so Setzer's cards and dice and
+Relm's brushes have plenty to break. Nobody here holds ¤ (Setzer joins at
+Kohlingen), so this is for a later party: Gau's Veldt draws and a return
+with Setzer or Relm. Of the twelve, the **Pm Stalker** (a floating ghost)
+takes it: `2 · slash, ¤`, shields and its other key unchanged. The rest
+are flesh, scale, shell or pests; the Lunaris, whose only key is its class
+row, was left as it is. `battle_breakwor_sabin` carries the row in `WANT`
+and logs the count (`special: 1 of 12 designed species take ¤ in this
+ROM`; 0 on a2d49b67); every formation still has a key for Celes alone
+(build/attempts/wt/v026-rom/347/px13/).
 
 ---
 

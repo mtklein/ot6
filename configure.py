@@ -454,7 +454,9 @@ TEST_ENV = {
     # the long runs is 80.7 frames/s (the Air, heavily loaded; the Mac at
     # load 12 ran 187.5-236.2): 1,081 s.  1800 is 1.67x that
     # (build/attempts/wt/suite-honesty/brokendeath/round2/)
-    "battle_brokendeath": "OT6_TIMEOUT=1800",
+    # every rung fought ran to f185,970-f188,138 at ~80.7 frames/s, about
+    # 2,330 s (build/attempts/wt/v026-suites/r/worstb); 2x that, rounded
+    "battle_brokendeath": "OT6_TIMEOUT=4800",
     # the bench and its gate lengthen the measured battle: the longest bodies
     # measured are 27,432 frames for the first half (K6) and 9,790 for the
     # Rage half (K4), ~37k frames, 461 s at the 80.7 frames/s above, and a

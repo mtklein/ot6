@@ -528,24 +528,24 @@ add({
     end
     classWrites = {}
     -- battle B is a single natural draw with no formation criterion, so
-    -- nothing guarantees a bludgeon-weak body.  When the draw lacks one,
-    -- every present body's class-weak mask gains OT6_BLUDG here, before the
-    -- swing, so the chip arm always has a positive case.  The poke never
-    -- touches shields, HP or the class window under test.
-    local anyB = false
+    -- nothing guarantees a bludgeon-weak body, and Gau's swing goes where
+    -- the target cursor's own default lands.  So every present body that
+    -- is not already bludgeon-weak gains OT6_BLUDG in its class-weak mask
+    -- here, before the swing, so whatever body the swing hits is a positive
+    -- case for the chip arm.  (Until #252 this pinned only when NO body was
+    -- weak: on a mixed draw the default could land on an unpinned body and
+    -- "at least one hit body is bludgeon-weak" failed on the cursor's pick.)
+    -- The poke never touches shields, HP or the class window under test.
+    local pinned = {}
     for _, m in ipairs(msPresent) do
-      if (H.readByte(CLSWEAK(8 + m * 2)) & OT6_BLUDG) ~= 0 then anyB = true end
-    end
-    if not anyB then
-      -- pin EVERY present body: the swing's target is the cursor's own
-      -- pick, so pinning one body races the target select.
-      for _, m in ipairs(msPresent) do
-        local e = 8 + m * 2
+      local e = 8 + m * 2
+      if (H.readByte(CLSWEAK(e)) & OT6_BLUDG) == 0 then
         H.writeByte(CLSWEAK(e), H.readByte(CLSWEAK(e)) | OT6_BLUDG)
+        pinned[#pinned + 1] = tostring(m)
       end
-      H.log("[pre-fight] draw had no bludgeon-weak body: every present "
-        .. "body's mask pinned |= OT6_BLUDG (labeled positive-arm poke)")
     end
+    H.log(string.format("[pre-fight] bodies not bludgeon-weak by the draw, pinned |= "
+      .. "OT6_BLUDG (labeled positive-arm poke): {%s}", table.concat(pinned, ",")))
     H.log(string.format("[pre-fight] bodies=%d gau slot %d fights from the "
       .. "real menu", #msPresent, gauSlot))
   end),

@@ -13,12 +13,14 @@
 --      her own Ice (the weakest hand section 8 designs for): a species
 --      whose break class (authored, else the floor) includes slash, or
 --      whose weakness (vanilla or added) includes ice.
+--   3. special (¤) is a common key (guidelines, #347): the designed rows
+--      that take it are the spirits, and the count is logged.
 --
 -- All mismatches are logged before the verdict, so a red run names every
 -- missing or wrong row at once.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG = 0x01, 0x02, 0x04
+local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
 local FIRE, ICE, BOLT, HOLY, WATER = 0x01, 0x02, 0x04, 0x20, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte }
@@ -37,7 +39,7 @@ local WANT = {
   -- Tzen's collapsing house (map 311; its monster box is event group 150)
   [0x0E1] = { "Scorpion",   2, SLASH | PIERCE, 0 },
   [0x02C] = { "HermitCrab", 2, SLASH | BLUDG,  WATER },
-  [0x0C0] = { "Pm Stalker", 2, SLASH,          FIRE | HOLY },
+  [0x0C0] = { "Pm Stalker", 2, SLASH | SPECIAL, FIRE | HOLY },  -- a ghost: ¤ (#347)
 }
 
 -- where the stretch draws from (section 4): world groups (40 is the other
@@ -173,6 +175,13 @@ H.run({ maxFrames = 600 }, {
       end
     end
     H.log(string.format("checked %d formations", #order))
+
+    local nspecial, nids = 0, 0
+    for sp in pairs(WANT) do
+      nids = nids + 1
+      if shield[sp] and (shield[sp][2] & SPECIAL) ~= 0 then nspecial = nspecial + 1 end
+    end
+    H.log(string.format("special: %d of %d designed species take ¤ in this ROM", nspecial, nids))
 
     H.assertEq(#problems, 0, "WoR island-to-Tzen break row mismatches")
     H.log("WoR island-to-Tzen break rows verified against the built ROM")
