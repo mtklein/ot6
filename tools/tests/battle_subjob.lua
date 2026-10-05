@@ -166,6 +166,7 @@ end
 local mf = 0
 local celesMode = "defer"                -- "defer"|"cast"
 local wantPend, castRec = 0, nil
+local castLogged = false
 local tgtFlag, tgtAge, tgtPress
 local function decide()
   if H.readByte(MENU) == 0 then
@@ -270,8 +271,8 @@ local function decide()
         elseif col > wc then btn = "left"
         else
           btn = "a"
-          if not R.castLogged then
-            R.castLogged = true
+          if not castLogged then
+            castLogged = true
             local rec = LISTS[celes] + castRec * 4
             H.log(string.format("[C] confirming at row %d col %d: record %d holds $%02X "
               .. "(bytes %02X %02X %02X %02X), pending %d, bank %d, pool %d", ar, col, castRec,
