@@ -85,7 +85,6 @@ local LOW_PCT = 15          -- the control spins only while he stands above this
 local CARE_PCT = 40         -- ...and give a Potion to any other member below this
 local MAX_BATTLES = 6
 local BANK_SPEND = 3         -- off a branch point he spins boosted on a bank this high
-local COMMIT_HOLD = 600      -- a branch's commit waits at most this long for the blow to queue
 
 local NOACTION = nil        -- OT6_NOACTION's WRAM offset (H.sym, at the first step)
 local function bp(s)   return H.readByte(0x3E9C + s * 2) end
@@ -180,6 +179,20 @@ local function blow()        -- the median measured blow (40 before any)
 end
 local raising, healing, hitting = nil, {}, nil
 local W = {}
+local rec = nil              -- the live branch's record (the branches, below)
+-- How many frames an action committed now waits in its advance wait before
+-- it joins the action queue (_c21193): the counter $3ab4,x climbs by
+-- $3ac8,x / 2 a frame until its high byte reaches the duration $322c,x
+-- (CmdDelayTbl: $10 for Fight and Slot alike, QueueAction / CalcCmdDelay).
+-- For an action not yet committed the duration is taken as $10.
+local function waitLeft(x, dur)
+  local rate = H.readWord(0x3AC8 + x) >> 1
+  if rate == 0 then return nil end
+  dur = dur or H.readByte(0x322C + x)
+  local need = (dur << 8) - H.readWord(0x3AB4 + x)
+  if need <= 0 then return 0 end
+  return (need + rate - 1) // rate
+end
 local function planFor(a)
   if raising and (php(raising.s) > 0 or H.frame - raising.f > 900) then raising = nil end
   for s, h in pairs(healing) do
@@ -211,14 +224,19 @@ local function planFor(a)
     if pick then return { kind = "heal", tgt = pick, cell = itemCell, item = POTION } end
   end
   local fightCell = cmdCell(a, CMD_FIGHT)
-  if attackSetzer and ctlDone and fightCell and php(actor) > 0 and hitting == nil then
-    -- one blow in flight at a time.  Well above the median blow
-    -- measured, a plain Fight wears him down; nearer, the blow may fell him,
-    -- so it waits: the window is held, the cursor on him, until his gauge is
-    -- full and a monster's action is starting (otherWindow), so his own
-    -- window opens next with the blow still queued behind that action
-    return { kind = "attack", tgt = actor, cell = fightCell,
-             ambush = php(actor) < 2 * blow() }
+  if rec then
+    -- a branch: the first member whose window opens after his commit
+    -- strikes him, timed (otherWindow); everyone else guards
+    if rec.commit and not rec.struck and fightCell and php(actor) > 0 then
+      return { kind = "attack", tgt = actor, cell = fightCell, timed = true }
+    end
+    return { kind = "defend" }
+  end
+  if attackSetzer and ctlDone and fightCell and php(actor) > blow() and hitting == nil then
+    -- one blow in flight at a time, and only while he stands above the
+    -- median blow: it wears him down into one blow's reach without felling
+    -- him, and there he is left for the branch point
+    return { kind = "attack", tgt = actor, cell = fightCell }
   end
   return { kind = "defend" }
 end
@@ -237,10 +255,6 @@ local function otherWindow()
   local st = H.readByte(MSTATE)
   local function tap(b) H.setPad(ph < 5 and { [b] = true } or {}) end
   local plan = W.plan
-  if plan.ambush and not W.sprung and (php(actor) == 0 or W.n > 2400) then
-    W.plan = { kind = "defend" }             -- he fell to the monsters, or never readied
-    return
-  end
   if plan.kind == "defend" then
     if st == ST_CMD then
       if pend(a) > 0 then tap("l") else tap("right") end
@@ -276,18 +290,25 @@ local function otherWindow()
       tap(cur < plan.tgt and "down" or "up")
       return
     end
-    if plan.ambush and not W.sprung then
-      -- the cursor rests on Setzer; strike as a monster's action begins
-      -- with his gauge full, so the blow waits behind that action and his
-      -- own window opens while it plays
-      if not (setzerReady() and monsterActing and H.frame - monsterStart <= 12) then
-        H.setPad({})
-        return
-      end
+    if plan.timed and not W.sprung then
+      -- the cursor rests on Setzer.  His spin joins the action queue at
+      -- rec.spinQ (read off his advance wait at the commit); the blow,
+      -- confirmed now, would join it waitLeft frames from now.  The press
+      -- waits until the blow would join rec.delta frames ahead of the spin:
+      -- the blow then runs first with the spin waiting behind it, and fells
+      -- him with the spin still in the queue.
+      local af = waitLeft(a * 2, 0x10)
+      local slack = rec.spinQ and af and (rec.spinQ - (H.frame + af)) or nil
+      if slack and slack > rec.delta then H.setPad({}); return end
       W.sprung = true
-      H.log(string.format("[cancel] f%d actor %d strikes: Setzer's gauge is full and a " ..
-        "monster's action began %d frame(s) ago (a %d-frame hold) | party %s", H.frame, a,
-        H.frame - monsterStart, W.n, partyLine()))
+      rec.struck = { f = H.frame, a = a, af = af, slack = slack }
+      H.log(string.format("[cancel] branch %d f%d actor %d strikes: his spin joins the queue at " ..
+        "f%s, this blow in %s frame(s) (slack %s, want %d) | party %s", rec.k, H.frame, a,
+        tostring(rec.spinQ), tostring(af), tostring(slack), rec.delta, partyLine()))
+      W.via = "confirmed"
+      hitting = { f = H.frame, hp = php(actor) }
+      H.setPad({ a = true })
+      return
     end
     if ph < 5 and W.via == "list" then
       W.via = "confirmed"
@@ -331,12 +352,31 @@ local function setzerDefend()
       or st == 0x0E or st == ST_REELS then tap("b")
   else H.setPad({}) end
 end
-local function branchPoint()
+-- A member who can strike him the moment his window closes: standing, his
+-- gauge full, nothing of his queued, Fight in his menu, his turn his own.
+local function striker()
+  for s = 0, 3 do
+    if s ~= actor and seated(s) and php(s) > 0 and H.readByte(0x3219 + s * 2) == 0
+       and H.readByte(0x32CC + s * 2) == 0xFF and cmdCell(s, CMD_FIGHT)
+       and H.controlTaken(s) == nil then
+      return s
+    end
+  end
+end
+-- His window, low and within one blow, a pip banked below the cap, no blow
+-- on him already: where a branch can start.
+local function pointWindow()
   return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor
     and H.readByte(MSTATE) == ST_CMD and php(actor) > 0 and low() and bp(actor) >= 1
-    and threatOn(actor) ~= nil and php(actor) < blow() and ctlDone
+    and php(actor) < blow() and ctlDone
     and bp(actor) < 5                     -- below the cap, where the pip shows
-    and aheadOf(threatOn(actor)) == nil   -- the blow is still in its advance wait
+    and threatOn(actor) == nil
+end
+-- ...and a member ready to strike once he commits.  Short of one, he waits
+-- at the window (the pad idle) up to WAIT_STRIKER frames for one.
+local WAIT_STRIKER = 900
+local function branchPoint()
+  return pointWindow() and striker() ~= nil
 end
 
 -- ---------------------------------------------------------- the branches
@@ -344,7 +384,6 @@ end
 -- his actions (Ot6ActionEnd with his entity, $b5 the command that ran) are
 -- observed by exec watches and read on the next frame, when the books have
 -- settled.
-local rec = nil              -- the live branch's record
 local recs = {}
 local commitHit, endHit = false, nil
 
@@ -375,13 +414,6 @@ local function setzerSpin()
   elseif st == ST_REELS then
     if H.readByte(PRESS[3]) ~= 0 and H.readByte(STOP[3]) == 0 then
       H.setPad({})                 -- reel 3 settling: the commit waits for it
-    elseif SS.holdFor and H.readByte(STOP[3]) ~= 0 and not SS.holdFor() then
-      -- every reel stopped: the commit press waits, the reels showing,
-      -- until the blow on him has joined the action queue (a person
-      -- watching the field holds the last press), so the spin queues
-      -- behind it (#377: committed at once, the spin raced the blow)
-      SS.held = (SS.held or 0) + 1
-      H.setPad({})
     else
       tap("a")                     -- reels 1-3, then the commit
     end
@@ -443,7 +475,10 @@ local function approachFrame()
         php(actor), blow(), bp(actor), 0))
     end
     if ctl and ctl.commit and ctl.away and not ctl.done then ctl = nil end  -- dropped: again
-    if not ctlDone and (ctl == nil or not ctl.commit) and not low() and bp(actor) >= 1 then
+    if not skipPoint and pointWindow() and (SD.wait or 0) < WAIT_STRIKER then
+      SD.wait = (SD.wait or 0) + 1        -- for a member to be ready to strike
+      H.setPad({})
+    elseif not ctlDone and (ctl == nil or not ctl.commit) and not low() and bp(actor) >= 1 then
       ctl = ctl or {}
       setzerSpin()
     elseif ctlDone and bp(actor) >= BANK_SPEND then
@@ -454,7 +489,7 @@ local function approachFrame()
   else
     if ctl and ctl.commit then ctl.away = true end
     skipPoint = false
-    SD.n, SS.n, SD.seen = 0, 0, nil
+    SD.n, SS.n, SD.seen, SD.wait = 0, 0, nil, 0
     pageOrOther()
   end
 end
@@ -464,8 +499,13 @@ local function branchFrame()
     commitHit = false
     if rec.commit == nil then
       rec.commit = { f = H.frame, p = pend(actor), b = bp(actor), hp = php(actor) }
-      H.log(string.format("[cancel] branch %d f%d commit: pending %d, bank %d, hp %d | party %s",
-        rec.k, H.frame, rec.commit.p, rec.commit.b, rec.commit.hp, partyLine()))
+      local w = waitLeft(actor * 2)
+      rec.spinQ = w and H.frame + w
+      H.log(string.format("[cancel] branch %d f%d commit: pending %d, bank %d, hp %d; the spin " ..
+        "joins the queue in %s frame(s) (duration $%02X, counter $%04X, rate %d) | party %s",
+        rec.k, H.frame, rec.commit.p, rec.commit.b, rec.commit.hp, tostring(w),
+        H.readByte(0x322C + actor * 2), H.readWord(0x3AB4 + actor * 2),
+        H.readWord(0x3AC8 + actor * 2) >> 1, partyLine()))
     end
   end
   if endHit then
@@ -487,8 +527,9 @@ local function branchFrame()
     rec.queued = H.frame                   -- the spin joins the action queue
     rec.queuedAhead = aheadOf(actor * 2)
   end
-  if not rec.commit and not rec.blowQueued and rec.threat and aheadOf(rec.threat) ~= nil then
+  if rec.struck and not rec.blowQueued and aheadOf(rec.struck.a * 2) ~= nil then
     rec.blowQueued = H.frame
+    rec.blowAhead = aheadOf(rec.struck.a * 2)
   end
   if not rec.commit and php(actor) == 0 then
     rec.lost = H.frame                     -- the blow landed before the commit
@@ -536,23 +577,15 @@ local function branch(j, wait)
       H.checkReq(req, "snapshot load (branch " .. j .. " of point " .. points .. ")")
       H.rearmInputInjection()
       k = #recs + 1
-      rec = { k = k, wait = wait, point = points, f0 = H.frame, hp0 = php(actor),
-              threat = threatOn(actor) }
+      rec = { k = k, delta = wait, point = points, f0 = H.frame, hp0 = php(actor) }
       recs[#recs + 1] = rec
       commitHit, endHit = false, nil
       attackSetzer = false
       raising, healing, hitting, W, SS, SD = nil, {}, nil, {}, { n = 0, rTaps = 0 }, { n = 0 }
-      local t = rec.threat
-      SS.holdFor = function()
-        -- commit once the blow is in the queue, or once it is gone from his
-        -- command list (it ran), or after COMMIT_HOLD frames
-        return t == nil or aheadOf(t) ~= nil or H.readByte(0x32CC + t) == 0xFF
-          or (SS.held or 0) >= COMMIT_HOLD
-      end
-      H.log(string.format("[cancel] branch %d (point %d): %d idle frames at Setzer's window",
-        k, points, wait))
+      H.log(string.format("[cancel] branch %d (point %d): the blow is to join the queue %d " ..
+        "frame(s) ahead of his spin", k, points, wait))
     end),
-    H.waitFrames(wait + 1),
+    H.waitFrames(1),
     H.driveUntil(function()
       if not H.battleLoadStarted() then return true end
       if rec.done or rec.dropped or rec.lost then return true end
@@ -561,9 +594,10 @@ local function branch(j, wait)
     H.call(function()
       local c, d = rec.commit, rec.done
       local function off(f) return f and string.format("+%d", f - rec.f0) or "-" end
-      H.log(string.format("[cancel] branch %d timing from the window: blow queued %s, commit %s " ..
-        "(held %d), spin queued %s (%s ahead), blow lands %s, fell %s", k, off(rec.blowQueued),
-        off(c and c.f), SS.held or 0, off(rec.queued), tostring(rec.queuedAhead), off(rec.hit),
+      H.log(string.format("[cancel] branch %d timing from the window: commit %s, spin due %s, " ..
+        "struck %s, blow queued %s (%s ahead), spin queued %s (%s ahead), blow lands %s, fell %s",
+        k, off(c and c.f), off(rec.spinQ), off(rec.struck and rec.struck.f), off(rec.blowQueued),
+        tostring(rec.blowAhead), off(rec.queued), tostring(rec.queuedAhead), off(rec.hit),
         off(rec.lost or rec.fell)))
       if not c then
         H.log(string.format("[cancel] branch %d: NO COMMIT: %s", k, rec.lost and
@@ -657,6 +691,7 @@ end
 -- as at any other) to the next branch point, at most MAX_POINTS of them.
 local battles, atPoint = 0, false
 local BRANCHES_PER_POINT, MAX_POINTS = 2, 10
+local DELTAS = { 3, 8 }      -- frames the blow is to join the queue ahead of the spin
 local function belowCap()
   local n = 0
   for _, r in ipairs(recs) do
@@ -682,7 +717,7 @@ local function round()
   for _, st in ipairs(drawBattle("battle", 6)) do draw[#draw + 1] = st end
   local body = {
     H.cond(function() return not H.battleLoadStarted() end, draw, {}),
-    H.call(function() atPoint, attackSetzer = false, true end),
+    H.call(function() atPoint, attackSetzer, rec = false, true, nil end),
     H.driveUntil(function()
       if not H.battleLoadStarted() then return true end
       if not skipPoint and branchPoint() then atPoint = true; return true end
@@ -708,7 +743,7 @@ local function round()
     H.waitFrames(2),
     H.call(function() H.checkReq(snap, "snapshot at Setzer's window") end),
   }
-  for j = 1, BRANCHES_PER_POINT do point[#point + 1] = branch(j, (j - 1) * 4) end
+  for j = 1, BRANCHES_PER_POINT do point[#point + 1] = branch(j, DELTAS[j]) end
   local req
   point[#point + 1] = H.cond(function() return not found() end, {
     H.call(function() H.setPad({}); req = H.requestLoadState(snap.blob) end),
@@ -716,7 +751,7 @@ local function round()
     H.call(function()
       H.checkReq(req, "snapshot load (play on from branch point " .. points .. ")")
       H.rearmInputInjection()
-      skipPoint, attackSetzer = true, true
+      skipPoint, attackSetzer, rec = true, true, nil
       commitHit, endHit = false, nil
       raising, healing, hitting, W, SS, SD = nil, {}, nil, {}, { n = 0, rTaps = 0 }, { n = 0 }
       H.log(string.format("[cancel] no placeholder from branch point %d: playing on from it", points))
