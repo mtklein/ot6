@@ -46,10 +46,9 @@
 -- The branch point is Setzer's window opening on him below the median blow
 -- (it fells him), a pip banked, and a member's Fight on him still in its
 -- advance wait (read off the command lists and the action queue).  It is
--- snapshotted and branched BRANCHES_PER_POINT times: each branch banks one
--- pip with R, spins and commits with hands of its own speed (a tap every
--- CYCLES[j] frames: 4, a fast person, then 6), and is played on, the
--- members now only caring and
+-- snapshotted and branched BRANCHES_PER_POINT times: each branch idles 4
+-- frames longer there, then banks one pip with R, spins and commits as fast
+-- as a person taps, and is played on, the members now only caring and
 -- guarding, until the spin's own turn ends (Ot6ActionEnd with his entity;
 -- the no-action mark, the command that ran and his out-of-the-fight bits
 -- read there).  Whether the blow lands before the commit (no spin), in the
@@ -59,15 +58,6 @@
 -- up marked below bank 5, the snapshot is restored and play goes on from
 -- it (Setzer Defends in that window) to the next branch point, at most
 -- MAX_POINTS of them.
--- Why hand speed (#377).  The race the branch point sets up is SETZER's
--- commit, about 100 frames into his window at a tap every 6, against the
--- queued blow, which lands 30 to 110 frames in on many points; the
--- branches used to differ by 4 idle frames at the window, which re-drew
--- nothing (54 of 56 point pairs over wt/recut-fallout's sweeps ended the
--- same way, build/attempts/wt/v026-suites/slotcancel/), and 1 new draw in
--- 10 found no cancel in MAX_POINTS points.  The draws come from the pool
--- (drawBattle, below), and a fallen SETZER with no Fenix Down left fails
--- at once as a named precondition rather than at a 40000-frame timeout.
 -- Asserted, per branch:
 --   1. a spin that ran ($0F, unmarked), the control's and any branch's:
 --      pending -> 0 and the bank down by the tier (the boost is still
@@ -95,12 +85,6 @@ local LOW_PCT = 15          -- the control spins only while he stands above this
 local CARE_PCT = 40         -- ...and give a Potion to any other member below this
 local MAX_BATTLES = 6
 local BANK_SPEND = 3         -- off a branch point he spins boosted on a bank this high
--- A branch point's blow must wait at least this many more frames in its
--- advance wait (waitLeft): SETZER's commit takes 91 to 107 frames at a tap
--- every 4 (wt/v026-suites sc7), and a blow that joins the queue before it
--- lands before it.  sc7's NO COMMIT points had their blow join the queue at
--- +17 and +23; its CANCELLED ones at +85, +189 and +197.
-local FUSE_MIN = 80
 
 local NOACTION = nil        -- OT6_NOACTION's WRAM offset (H.sym, at the first step)
 local function bp(s)   return H.readByte(0x3E9C + s * 2) end
@@ -165,18 +149,6 @@ local function aheadOf(x)
     if e ~= 0xFF then n = n + 1 end
   end
 end
--- How many frames entity x's committed action still waits in its advance
--- wait before it joins the action queue (_c21193): the counter $3ab4,x
--- climbs by $3ac8,x / 2 a frame until its high byte reaches the duration
--- $322c,x ($10 for Fight, CmdDelayTbl).
-local function waitLeft(x)
-  local rate = H.readWord(0x3AC8 + x) >> 1
-  local dur = H.readByte(0x322C + x)
-  if rate == 0 or dur == 0xFF then return nil end
-  local need = (dur << 8) - H.readWord(0x3AB4 + x)
-  if need <= 0 then return 0 end
-  return (need + rate - 1) // rate
-end
 -- His gauge is full and nothing of his is queued: his window is next in line.
 local function setzerReady()
   return php(actor) > 0 and H.readByte(0x3219 + actor * 2) == 0
@@ -207,7 +179,6 @@ local function blow()        -- the median measured blow (40 before any)
 end
 local raising, healing, hitting = nil, {}, nil
 local W = {}
-local forcedPlan = nil       -- SETZER's own Potion (approachFrame), through otherWindow
 local function planFor(a)
   if raising and (php(raising.s) > 0 or H.frame - raising.f > 900) then raising = nil end
   for s, h in pairs(healing) do
@@ -254,7 +225,7 @@ end
 local function otherWindow()
   local a = H.readByte(ACTOR) & 3
   if W.actor ~= a then
-    W = { actor = a, n = 0, via = nil, plan = forcedPlan or planFor(a) }
+    W = { actor = a, n = 0, via = nil, plan = planFor(a) }
     if W.plan.kind ~= "defend" then
       H.log(string.format("[cancel] f%d actor %d (%02X): %s slot %d (%02X) | party %s",
         H.frame, a, chid(a), W.plan.kind, W.plan.tgt, chid(W.plan.tgt), partyLine()))
@@ -365,7 +336,6 @@ local function branchPoint()
     and threatOn(actor) ~= nil and php(actor) < blow() and ctlDone
     and bp(actor) < 5                     -- below the cap, where the pip shows
     and aheadOf(threatOn(actor)) == nil   -- the blow is still in its advance wait
-    and (waitLeft(threatOn(actor)) or 0) >= FUSE_MIN   -- ...for longer than a spin takes
 end
 
 -- ---------------------------------------------------------- the branches
@@ -453,32 +423,6 @@ local function approachFrame()
       "(f%d: the bag is out)", H.frame))
   end
   if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor then
-    local t = threatOn(actor)
-    if ctlDone and t and SD.seen ~= t and H.readByte(MSTATE) == ST_CMD then
-      SD.seen = t
-      H.log(string.format("[cancel] f%d his window, entity %d's blow on him %s; playing %s; hp %d " ..
-        "(median blow %d), bank %d%s", H.frame, t, aheadOf(t) and string.format("queued, %d ahead",
-        aheadOf(t)) or string.format("in its advance wait, %s frame(s) to go", tostring(waitLeft(t))),
-        executing and string.format("entity %d for %d", executing, H.frame - execStart) or "nothing",
-        php(actor), blow(), bp(actor), skipPoint and " (playing on from a point)" or ""))
-    end
-    -- a lethal blow on its way that no branch takes (its fuse too short, or
-    -- the point already branched): he drinks a Potion, as a person seeing
-    -- it come would, and keeps the Fenix Downs for the falls the branches
-    -- need (#377: sc7's k0 spent all 20 by f83112)
-    local itemCell = cmdCell(actor, CMD_ITEM)
-    if ctlDone and t and php(actor) <= blow() * 3 // 2 and itemCell and invIdx(POTION)
-       and (SD.potion or H.readByte(MSTATE) == ST_CMD) then
-      if not SD.potion then
-        SD.potion = true
-        forcedPlan = { kind = "heal", tgt = actor, cell = itemCell, item = POTION }
-        H.log(string.format("[cancel] f%d SETZER drinks a Potion against entity %d's blow (hp %d)",
-          H.frame, t, php(actor)))
-      end
-      otherWindow()
-      forcedPlan = nil
-      return
-    end
     W = {}
     if ctl and ctl.commit and ctl.away and not ctl.done then ctl = nil end  -- dropped: again
     if not ctlDone and (ctl == nil or not ctl.commit) and not low() and bp(actor) >= 1 then
@@ -492,7 +436,7 @@ local function approachFrame()
   else
     if ctl and ctl.commit then ctl.away = true end
     skipPoint = false
-    SD.n, SS.n, SD.seen, SD.potion = 0, 0, nil, nil
+    SD.n, SS.n = 0, 0
     pageOrOther()
   end
 end
