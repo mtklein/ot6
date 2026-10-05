@@ -1907,16 +1907,21 @@ Ot6ShieldTbl:
         .byte   3, OT6_SLASH|OT6_PIERCE ; behemoth: the pool's elite
         .word   $0083
         .byte   3, OT6_SLASH|OT6_PIERCE ; dragon: the other elite
+        ; the three bodies of the pool that are magic rather than flesh or
+        ; scale (each holy-weak, each casting) take special too, so Relm's
+        ; brushes key them (#347; she is in the FC party); the beasts, the
+        ; dragons and the ninja do not.
         .word   $000c
-        .byte   2, OT6_SLASH|OT6_PIERCE ; apokryphos
+        .byte   2, OT6_SLASH|OT6_PIERCE|OT6_SPECIAL ; apokryphos: a demon
         .word   $00a4
-        .byte   2, OT6_SLASH|OT6_PIERCE ; misfit
+        .byte   2, OT6_SLASH|OT6_PIERCE|OT6_SPECIAL ; misfit: a conjured
+                                ;   thing
         .word   $0003
         .byte   2, OT6_SLASH|OT6_PIERCE ; ninja
         .word   $00d8
         .byte   2, OT6_SLASH|OT6_PIERCE ; wirey drgn
         .word   $004a
-        .byte   2, OT6_SLASH|OT6_PIERCE ; brainpan
+        .byte   2, OT6_SLASH|OT6_PIERCE|OT6_SPECIAL ; brainpan: a mind
         .word   $0043
         .byte   2, OT6_SLASH|OT6_PIERCE ; sky armor: IAF wave trash, repeating;
                                 ;   the real gauges stay on Ultros/Chupon/
@@ -1986,8 +1991,10 @@ Ot6ShieldTbl:
                                 ;   a blade finds him.  ice|holy vanilla;
                                 ;   absorbs fire (the trap stays)
         .word   $00E5
-        .byte   2, OT6_SLASH|OT6_BLUDG  ; spirit: swept apart or beaten
-                                ;   through.  holy vanilla
+        .byte   2, OT6_SLASH|OT6_BLUDG|OT6_SPECIAL ; spirit: swept apart
+                                ;   or beaten through, and a spirit:
+                                ;   special for a Setzer brought along
+                                ;   (#347).  holy vanilla
         .word   $00B3
         .byte   2, OT6_SLASH    ; the soft flier; ice vanilla
         .word   $0048
@@ -2056,9 +2063,10 @@ Ot6ShieldTbl:
                                 ;   body outside the shell, a blow cracks
                                 ;   the shell.  water vanilla
         .word   $00c0
-        .byte   2, OT6_SLASH    ; pm stalker: a floating ghost, the blade
-                                ;   in Celes's hand.  fire|holy vanilla;
-                                ;   absorbs poison
+        .byte   2, OT6_SLASH|OT6_SPECIAL ; pm stalker: a floating ghost,
+                                ;   the blade in Celes's hand, and a
+                                ;   spirit: special too (#347).  fire|holy
+                                ;   vanilla; absorbs poison
         ; ---- the world of ruin: tzen to edgar (nikeah, south figaro, the
         ; figaro cave, the castle's engine room; docs/design/route-wor-
         ; edgar.md section 8) ------------------------------------------------
@@ -2113,12 +2121,16 @@ Ot6ShieldTbl:
                                 ;   its fire|holy vanilla (and its runic
                                 ;   fire 2) the real handles
         .word   $00a9
-        .byte   3, OT6_SLASH|OT6_PIERCE ; neckhunter: a reaper, a blade or a
-                                ;   point.  poison vanilla (bio blaster)
+        .byte   3, OT6_SLASH|OT6_PIERCE|OT6_SPECIAL ; neckhunter: a
+                                ;   reaper, a blade or a point; death's
+                                ;   own shape is a spirit: special too
+                                ;   (#347).  poison vanilla (bio blaster)
         .word   $00d7
-        .byte   4, OT6_SLASH|OT6_BLUDG  ; dante: the cave's miniboss-grade
-                                ;   body; broken, it cannot counter with
-                                ;   L.3 Muddle.  poison vanilla
+        .byte   4, OT6_SLASH|OT6_BLUDG|OT6_SPECIAL ; dante: the cave's
+                                ;   miniboss-grade body; broken, it cannot
+                                ;   counter with L.3 Muddle.  a demon that
+                                ;   answers magic with magic: special too
+                                ;   (#347).  poison vanilla
         .word   $008b
         .byte   2, OT6_BLUDG|OT6_PIERCE ; drop: a blade passes through water;
                                 ;   a fist or a point splashes it.

@@ -13,3 +13,10 @@ used to roll over to a lower number when a very strong attack doubled past
 the game's internal limit, so against a heavily armored or Shelled enemy a
 boosted blow could land for less than a weaker one. Boosted damage now
 holds at the top instead; the usual 9,999 cap per hit is unchanged.
+
+**More monsters fear cards, dice and brushes.** Special weapons (Setzer's
+cards and dice, Relm's brushes) now break more of the spirits and magical
+creatures you meet: the Pm Stalker in Tzen's collapsing house, the
+NeckHunter and Dante in the cave to Figaro Castle, the spirits of the
+Sealed Gate cave, and the Apokryphos, Misfit and Brainpan of the Floating
+Continent. Each keeps every weakness it had.
