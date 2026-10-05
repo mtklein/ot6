@@ -878,7 +878,13 @@ function M.advanceStory(pred, maxFrames, opts)
     -- never complete mid-care: pred() can be map/switch-based and go true
     -- while the care menu is still open, which would end the step with
     -- the menu up and the next step pressing into it
-    local done = careD == nil and (wipeSeen or pred())
+    -- nor on the frame the care a fought battle owes is about to start
+    -- (#323): pred() runs before the body, and a pred that reads "the
+    -- battle is over and control is back" ended the ride on exactly the
+    -- frame the care block below would have opened the menu
+    local careDue = sawBattle and opts.care ~= false and not M.eventTimerLive()
+      and M.hasControl() and M.tileAligned()
+    local done = careD == nil and (wipeSeen or (not careDue and pred()))
     if done then M.setPad({}) end
     return done
   end, maxFrames or 20000, {
