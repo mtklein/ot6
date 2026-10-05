@@ -115,8 +115,9 @@ Cannon is holy, Drill is spear-class, Fire Dance is fire, ...).
 - Enemies don't have BP, same asymmetry as Octopath: bosses get shields and
   telegraphs, players get the economy.
 - Boosting also costs MP, when the boost is buying damage. A boosted
-  ability pays `min(99, floor(base × 2.5^boost + 0.5))` — x1 / x2.5 / x6.25 /
-  x15.625 — so a boost is a trade of two currencies rather than a free
+  ability pays `max(base, min(99, floor(base × 2.5^boost + 0.5)))`
+  (`Ot6BoostPriceFor`) — x1 / x2.5 / x6.25 / x15.625, capped at 99 and never
+  below the base — so a boost is a trade of two currencies rather than a free
   multiplier. The rule is one test: **a price escalates exactly when the
   boost multiplies the action.** So Fight and Capture stay free (the boost
   buys swings), tier-family magic and SwdTech are unchanged (the boost

@@ -78,7 +78,8 @@ policy.
 ### AutoCrossbow's ladder
 
 Base 4 MP (`Ot6AbilityCostTbl`, `ot6_boost.asm:1544`), and
-`min(99, floor(base * 2.5^boost + 0.5))` on top:
+`max(base, min(99, floor(base * 2.5^boost + 0.5)))` on top
+(`Ot6BoostPriceFor`):
 
 | boost | price | damage |
 |---|---|---|
