@@ -4808,6 +4808,14 @@ local BATTLE = {
   DMG_SETTLE = 45,                     -- frames after SaveForMimic before the figure is read
   DMG_EXPIRE = 3600,                   -- a confirmed plan that never executed (hygiene)
   LORE_STALL = 600,                    -- pursuit frames with no landed lore
+  -- MagiTek (#373): command $1D opens the attack list through state $28
+  -- (OpenMagitekWindow) to $2A (UpdateMenuState_2a: two columns, entry =
+  -- row * 2 + column, the column at $893F and the row at $8943 per actor,
+  -- get_madou_poi), and $29 closes it; the attack is $83 + entry
+  -- (RandMagitek's base), from TerraMagitekAttackTbl (all eight) when the
+  -- seat's $2EAE byte is 0, else DefaultMagitekAttackTbl (0, 1, 2, 4)
+  CMD_MAGITEK = 0x1D, ST_MTEK_OPEN = 0x28, ST_MTEK_CLOSE = 0x29, ST_MTEK = 0x2A,
+  MTEK_COL = 0x893F, MTEK_ROW = 0x8943, MTEK_BASE = 0x83,
 }
 BATTLE.KNOWN_ST = { [BATTLE.ST_CMD] = true, [BATTLE.ST_TGT] = true, [BATTLE.ST_ITEM] = true,
                     [BATTLE.ST_MAGIC] = true, [BATTLE.ST_ESPER] = true, [BATTLE.ST_TOOLS] = true,
@@ -4821,13 +4829,17 @@ BATTLE.KNOWN_ST = { [BATTLE.ST_CMD] = true, [BATTLE.ST_TGT] = true, [BATTLE.ST_I
                     [BATTLE.ST_ROW] = true, [BATTLE.ST_DEF] = true,
                     [BATTLE.ST_TOOLS_OPEN] = true, [BATTLE.ST_TOOLS_CLOSE] = true,
                     -- SETZER's reel state (probe_slot.lua)
-                    [BATTLE.ST_SLOT] = true }
+                    [BATTLE.ST_SLOT] = true,
+                    -- the MagiTek list (#373): open, close, attack select
+                    [BATTLE.ST_MTEK_OPEN] = true, [BATTLE.ST_MTEK_CLOSE] = true,
+                    [BATTLE.ST_MTEK] = true }
 -- The selection windows a plan-less driver backs out of (see the
 -- plan-nil head of button()): every list that waits on A or B.  The
 -- transitional states ($19 lore fill, $2B/$2C throw open/close) are
 -- left out; they pass on their own.
 BATTLE.IDLE_ST = { [BATTLE.ST_ITEM] = true, [BATTLE.ST_TOOLS] = true, [BATTLE.ST_MAGIC] = true,
-                   [BATTLE.ST_ESPER] = true, [BATTLE.ST_LORE] = true, [BATTLE.ST_THROW] = true }
+                   [BATTLE.ST_ESPER] = true, [BATTLE.ST_LORE] = true, [BATTLE.ST_THROW] = true,
+                   [BATTLE.ST_MTEK] = true }
 for _, s in ipairs(BATTLE.ST_TRANSITIONAL) do BATTLE.KNOWN_ST[s] = true end
 
 -- A command row the cursor can actually land on.  Each $202E row is
@@ -5809,6 +5821,50 @@ function Driver:setzerLine(actor, have)
              boostLeft = b, aim = slot, reason = "hire" }
   end
   return nil
+end
+
+-- The MagiTek attack this actor's list offers that does the most to the
+-- target (#373), as a plan, or nil.  Entries 0-2 are the beams (fire, ice,
+-- lightning: MagicProp's own element bytes), 3 Bio Blast, 4 Heal Force (a
+-- heal: not an attack here), 5 Confuser, 6 X-Fer, 7 Tek Missile; a soldier's
+-- list holds 0, 1, 2 and 4.  The target is the focus/press target, else the
+-- first standing monster, and the plan aims the cursor there.
+function Driver:magitekLine(actor)
+  local slot = self:pressTarget()
+  if slot == nil then for s = 0, 5 do if monAlive(s) then slot = s; break end end end
+  if slot == nil then return nil end
+  local terra = M.readByte(0x2EAE + actor * 32) == 0
+  local offer = terra and { 0, 1, 2, 3, 7 } or { 0, 1, 2 }
+  local MP = M.sym("MagicProp") & 0x3FFFFF
+  local x = 8 + slot * 2
+  local weak, half = M.readByte(0x3BE0 + x), M.readByte(0x3BE1 + x)
+  local absorb, null = M.readByte(0x3BCC + x), M.readByte(0x3BCD + x)
+  local best, bestScore, said = nil, nil, {}
+  for _, idx in ipairs(offer) do
+    local atk = BATTLE.MTEK_BASE + idx
+    local elem = M.readRomByte(MP + atk * 14 + 1)
+    local power = M.readRomByte(MP + atk * 14 + 6)
+    local score
+    if elem ~= 0 and ((absorb & elem) ~= 0 or (null & elem) == elem) then
+      score = -1
+    else
+      score = power
+      if elem ~= 0 and (weak & elem) ~= 0 then score = score * 2
+      elseif elem ~= 0 and (half & elem) ~= 0 then score = score // 2 end
+      score = score + 1000 * hitChips(slot, 0, elem)
+    end
+    said[#said + 1] = string.format("$%02X elem $%02X power %d -> %d", atk, elem, power, score)
+    if score >= 0 and (bestScore == nil or score > bestScore) then best, bestScore = idx, score end
+  end
+  if best == nil then return nil end
+  local key = string.format("mtek:%d:%d:%d", actor, slot, best)
+  if not self.statusSaid[key] then
+    self.statusSaid[key] = true
+    M.log(string.format("[%s] actor=%d MagiTek $%02X (entry %d) at slot %d: %s (#373)", self.tag or "fight",
+      actor, BATTLE.MTEK_BASE + best, best, slot, table.concat(said, "; ")))
+  end
+  return { kind = "magitek", row = cmdRow(actor, BATTLE.CMD_MAGITEK), entry = best,
+           skill = BATTLE.MTEK_BASE + best, aim = slot, boostLeft = 0 }
 end
 
 function Driver:dmgWatchOf(e)
@@ -8016,6 +8072,17 @@ function Driver:makePlan(actor)
     end
   end
   local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
+  -- MagiTek (#373): the Narshe riders' command table is MagiTek, -, -,
+  -- Item, with no Fight row, and every attack turn here was a "switch" --
+  -- battle_healerdown's riders passed 35 and 36 turns.  The beam is chosen
+  -- the way a person picks one, reading the target: what it absorbs or
+  -- nulls is out, a revealed shield key it chips first, then the power its
+  -- elements leave (weak x2, half /2), from the ROM's MagicProp.
+  if fight == nil and cmdRow(actor, BATTLE.CMD_MAGITEK) and not self.skillDead[BATTLE.CMD_MAGITEK]
+     and M.MAGITEK_OFF ~= true then
+    local line = self:magitekLine(actor)
+    if line then return line end
+  end
   if fight == nil then return { kind = "switch" } end
   -- The plain boost-Fight through the randoms (#161): with no authored or
   -- multi-part kill order it aims at the slot this hand breaks best, so a
@@ -8633,6 +8700,16 @@ function Driver:button(actor)
     if cc ~= wc then return { wc > cc and "right" or "left" } end
     return { wr > cr and "down" or "up" }
   end
+  if (st == BATTLE.ST_MTEK_OPEN or st == BATTLE.ST_MTEK_CLOSE) and self.plan.kind == "magitek" then
+    return nil                       -- the list is building / closing; wait
+  end
+  if st == BATTLE.ST_MTEK and self.plan.kind == "magitek" then
+    local wc, wr = self.plan.entry % 2, self.plan.entry // 2
+    local cc, cr = M.readByte(BATTLE.MTEK_COL + actor), M.readByte(BATTLE.MTEK_ROW + actor)
+    if cc ~= wc then return { wc > cc and "right" or "left" } end
+    if cr ~= wr then return { wr > cr and "down" or "up" } end
+    return { "a" }
+  end
   if (st == BATTLE.ST_TOOLS_OPEN or st == BATTLE.ST_TOOLS_CLOSE)
      and (self.plan.kind == "skill" or self.plan.kind == "slot") then
     return nil                       -- the shell is building / closing; wait
@@ -9021,6 +9098,7 @@ function Driver:button(actor)
     -- dmgWatch queue; watchDamage credits and settles it).  A Fight
     -- on a muddled ally (#170) moves no monster HP and is not one.
     if not self.plan.ally and (self.plan.kind == "fight" or self.plan.kind == "skill" or self.plan.kind == "magic"
+       or self.plan.kind == "magitek"
        or self.plan.kind == "summon" or self.plan.kind == "throw" or self.plan.kind == "lore") then
       -- an actor gets a fresh confirm only after its last command
       -- resolved (settled below) or was refused at the cursor, so an
