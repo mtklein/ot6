@@ -521,6 +521,7 @@ def ensure_map(webroot):
 SHOT_B = re.compile(rb"^\[ot6shot\] (\d+) (\S+)")   # bytes, for tail scans
 PAD_B = re.compile(rb"^\[ot6pad\] (\d+)")
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+PNG_END = b"IEND\xaeB`\x82"   # the IEND chunk and its CRC, a PNG's last 8 bytes
 
 
 def _safe_id(s):
@@ -565,7 +566,7 @@ def scan_worker(data, shots_stuck, frames_stuck):
 
     frame is the latest [ot6pad] counter (falls back to the last shot's
     frame).  png_bytes is the newest [ot6shot] payload that decodes to a
-    valid PNG (a partial trailing line is skipped).  stuck folds in
+    whole PNG, magic through IEND (a partial trailing line is skipped).  stuck folds in
     stuck_detector's freeze rule: a trailing run of >= shots_stuck identical
     screenshots spanning >= frames_stuck advancing frames.
     """
@@ -588,7 +589,9 @@ def scan_worker(data, shots_stuck, frames_stuck):
             raw = base64.b64decode(payload)
         except Exception:
             continue
-        if raw[:8] == PNG_MAGIC:
+        # whole means it ends with the IEND chunk: a line still being
+        # written decodes too, with the magic, and shows as a broken image
+        if raw[:8] == PNG_MAGIC and raw.endswith(PNG_END):
             png = raw
             h = hashlib.md5(payload).hexdigest()[:8]
             break
