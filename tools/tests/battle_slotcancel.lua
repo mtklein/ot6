@@ -85,6 +85,7 @@ local LOW_PCT = 15          -- the control spins only while he stands above this
 local CARE_PCT = 40         -- ...and give a Potion to any other member below this
 local MAX_BATTLES = 6
 local BANK_SPEND = 3         -- off a branch point he spins boosted on a bank this high
+local PLAY_MAX = 60          -- a branch point's monster action began this recently (frames)
 
 local NOACTION = nil        -- OT6_NOACTION's WRAM offset (H.sym, at the first step)
 local function bp(s)   return H.readByte(0x3E9C + s * 2) end
@@ -336,6 +337,12 @@ local function branchPoint()
     and threatOn(actor) ~= nil and php(actor) < blow() and ctlDone
     and bp(actor) < 5                     -- below the cap, where the pip shows
     and aheadOf(threatOn(actor)) == nil   -- the blow is still in its advance wait
+    -- ...and a monster's action began under PLAY_MAX frames ago, so the
+    -- blow waits behind most of it: over wt/v026-suites' sc7 and sc9 every
+    -- point with nothing playing (16 branches) and 30 of 40 with an action
+    -- already 60+ frames in fell before the commit; all 6 under 60 came up
+    -- cancelled (points.py)
+    and monsterActing ~= nil and H.frame - monsterStart < PLAY_MAX
 end
 
 -- ---------------------------------------------------------- the branches
