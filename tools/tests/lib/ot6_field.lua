@@ -5142,18 +5142,6 @@ end
 -- Promoted from gen_thamasa_fire.lua so the Floating Continent prep can shop
 -- at Thamasa with the same measured mechanics (one implementation, not two).
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
--- Returns the predicate and a function that restarts its count, for a
--- step that is repeated (#196): the count is only advanced while the
--- predicate is polled, so it would otherwise carry the last pass's
--- settled run into the next.
-local function calmFor(n, extra)
-  local cnt = 0
-  return function()
-    local ok = M.hasControl() and M.tileAligned() and (not extra or extra())
-    cnt = ok and cnt + 1 or 0
-    return cnt >= n
-  end, function() cnt = 0 end
-end
 local function mapLow() return M.mapId() & 0x1ff end
 local DIAGSTAGE = {
   { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
@@ -5179,7 +5167,17 @@ function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
   -- plans on (it plans only with control).  A pick made while the field
   -- reloads the map after a menu or a battle reads the stale object map
   -- (#352: the B2 hub's staging (37,23)).
-  local noPick = 0
+  -- Frames (not calls: navTo resolves the goal two or more times a frame)
+  -- with control and no pick.  The bound is navTo's own no-path budget,
+  -- 20 retries 45 frames apart (navTo's noPathRetries and pause): with no
+  -- neighbour reachable the fallback below is unreachable too, so the walk
+  -- would raise its generic "no path" about then; this says it with the
+  -- door first.  Measured: the three doors that started with no pick in
+  -- the 9e46511d chain picked within 2-5 of those retries (Jidoor item
+  -- shop, Albrook inn, Nikeah cafe; build/attempts/wt/v026-field/
+  -- final-9e46511d-px13/chain.log lines 15405, 35584, 37219).
+  local NOPICK_FRAMES = 20 * 45
+  local noPick, noPickFrame = 0, nil
   local function stage()
     if not pick and (not M.hasControl() or M.mapLoading()) then return nil end
     if not pick then
@@ -5196,19 +5194,21 @@ function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
       -- (23,39), had none reachable on the first controlled frame and
       -- crossed once the walk got closer).  The old fallback was cached
       -- for good whether or not any walk reached it (#357); a door none
-      -- of whose neighbours turns reachable for 1800 picks is a route
-      -- error, said with the door, the party's tile and the map.
+      -- of whose neighbours turns reachable for NOPICK_FRAMES controlled
+      -- frames is a route error, said with the door, the party's tile and
+      -- the map.
       if not pick then
-        noPick = noPick + 1
-        if noPick == 1 then
+        local first = noPickFrame ~= M.frame and noPick == 0
+        if noPickFrame ~= M.frame then noPick, noPickFrame = noPick + 1, M.frame end
+        if first then
           M.log(string.format("%s: no tile next to the door (%d,%d) is reachable from (%d,%d) "
             .. "yet; walking toward (%d,%d) and picking again", what, sx, sy,
             M.fieldX(), M.fieldY(), sx, sy + 1))
         end
-        if noPick > 1800 then
+        if noPick > NOPICK_FRAMES then
           error(string.format("%s: no tile next to the door (%d,%d) became reachable in %d "
-            .. "picks, from (%d,%d) on map %d (tried the four sides and four diagonals)",
-            what, sx, sy, noPick - 1, M.fieldX(), M.fieldY(), mapLow()), 0)
+            .. "controlled frames, from (%d,%d) on map %d (tried the four sides and four "
+            .. "diagonals)", what, sx, sy, noPick - 1, M.fieldX(), M.fieldY(), mapLow()), 0)
         end
         return { sx, sy + 1, "up" }
       end
@@ -5217,12 +5217,29 @@ function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
     end
     return pick
   end
-  local settled, settledAgain = calmFor(20)
+  -- Far-side control: LoadMap has been over for 20 frames and the party
+  -- stands with control.  Not 20 consecutive M.hasControl frames: every
+  -- control flag reads true inside LoadMap (lib/ot6.lua M.mapLoading), so
+  -- such a count was met inside the load, before the far map existed
+  -- (#357); and a landing tile whose trigger drops control one frame in
+  -- four after the load never gives 20 in a row (gen_edgar's Figaro
+  -- courtyard door, build/attempts/wt/v026-field/chainfail/).
+  local loadedN = 0
+  local function settled()
+    loadedN = M.mapLoading() and 0 or loadedN + 1
+    return loadedN >= 20 and M.hasControl() and M.tileAligned()
+  end
+  -- restarted on every pass (#196): the count advances only while it is
+  -- polled, so it would otherwise carry the last pass's run into the next
+  local function settledAgain() loadedN = 0 end
   local aPhase = 0
   return M.seqStep({
     -- the first step is the reset (#196): the stage, the start map and
     -- the far-side settle count are all re-read where this pass stands
-    M.call(function() pick, startMap, noPick = nil, mapLow(), 0; settledAgain() end),
+    M.call(function()
+      pick, startMap, noPick, noPickFrame = nil, mapLow(), 0, nil
+      settledAgain()
+    end),
     M.navTo(function() local p = stage(); return p and p[1] end,
       function() local p = stage(); return p and p[2] end,
       { maxFrames = 9000, playBattles = "tactical", healer = opts.healer,

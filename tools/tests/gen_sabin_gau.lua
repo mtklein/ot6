@@ -476,6 +476,11 @@ local function ladderLoss(ladder, n, of, shift)
   ladderFailed(ladder, n, of, shift)
 end
 local fed = false                        -- observed feed reaction completed
+-- the reaction's own mark: Gau's battle switch ($3EBD bit 1) seen set
+-- inside the battle that fed him.  $3EBD is battle RAM, so it is latched
+-- there; read after the join event reaches the world it holds whatever the
+-- world init left (#343).
+local fedSw = false
 local grind = { fights = 0, appearances = 0 }
 local function gauOn()
   local targettable = H.readByte(0x2f4e)
@@ -1131,6 +1136,7 @@ local function grindStep()
     local actor = H.readByte(ACTOR)
     phase = (phase + 1) % 8
     fed = fedSwitch() or invCount(DRIED_MEAT) == 0
+    if H.battleLoadStarted() and fedSwitch() then fedSw = true end
     if fed or meatSubmitted or feedSubmissions >= 3 then
       H.setPad({})
       return
@@ -1448,7 +1454,7 @@ local function grindAttempt(n)
     grindSeeds.spread(n),
     H.call(function()
       clearLoss()
-      fed = false
+      fed, fedSw = false, false
       H.gameOverFired = 0
       grind = { fights = 0, appearances = 0, wins = 0, eligible = 0 }
     end),
@@ -1950,13 +1956,13 @@ H.run({ maxFrames = 500000, allowGameOver = true }, {
       "the Dried Meat was fed to GAU through the real battle Item menu " ..
       "(the old 'measured undrivable' claim is retired -- see the header)")
     H.assertEq(invCount(DRIED_MEAT), 0, "the meat left the bag with GAU")
-    -- fed as the grind latched it at the join (the switch, or the meat
-    -- gone from the bag).  $3EBD is battle RAM: re-read here, once the join
-    -- event has reached the world, it reads the world init's bytes now that
-    -- world control waits for the world's NMI (#343; the v0.26 chain's
-    -- chain_gau_joined, build/attempts/wt/v026-field/gau/)
-    H.assertEq(fed, true,
-      "the Dried-Meat reaction (as latched at the join) fed GAU")
+    -- the switch as latched inside the feeding battle (fedSw): re-read
+    -- here, once the join event has reached the world, $3EBD holds the
+    -- world init's bytes now that world control waits for the world's NMI
+    -- (#343; the v0.26 chain's chain_gau_joined,
+    -- build/attempts/wt/v026-field/gau/)
+    H.assertEq(fedSw, true,
+      "the Dried-Meat reaction set Gau's battle switch (seen in the battle)")
   end),
   H.waitUntil(function()
     return H.worldMode() and H.worldHasControl() and H.worldAligned()
