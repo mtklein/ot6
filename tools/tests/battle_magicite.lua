@@ -193,7 +193,7 @@ local function equipOn(pos, idx, roster, tag)
 end
 
 -- ------------------------------------------------------ the battle drive --
-local spells, mpWrites = {}, {}
+local spells = {}
 local R = {}   -- results; declared BEFORE enterBoss so its $3410 callback
                -- closes over this table
 
@@ -493,6 +493,20 @@ end
 -- return than at its entry.  An Osmose re-aimed by Muddle, or the boss's
 -- own casts spending its pool (Ice cost it 777->772 in the wipe run,
 -- which is what satisfied a bare bossMp() < g0), do not count.
+-- The write that charged an Osmose: to her pool, by her own action (X her
+-- offset, CalcAttackEffect's `sta $3c08,x`), between the Osmose's dispatch
+-- and its return, leaving exactly what she held at its dispatch less the
+-- price (the whole word, not its low byte: #252)
+local function osmoseDebit(o)
+  if o == nil then return nil end
+  for _, w in ipairs(poolWrites) do
+    if w.tag == celes and w.x == celes * 2 and w.frame >= o.frame
+       and (o.doneFrame == nil or w.frame <= o.doneFrame) and w.new == o.mp0 - OSMOSE_MP then
+      return w
+    end
+  end
+  return nil
+end
 local function osmoseLanded()
   for _, o in ipairs(R.osmoses or {}) do
     if (o.tgt & (0x0100 << BOSS)) ~= 0 and o.bossMp1 and o.bossMp1 < o.bossMp0 then
@@ -827,13 +841,11 @@ local function enterBoss(tag)
       divineDispatch, holdWhy, monInFlight = {}, {}, 0
       steerBails = 0
       R.osmoses = {}
-      spells, mpWrites = {}, {}
+      spells = {}
       installWatches()
       emu.addMemoryCallback(function(_, v)
         spells[#spells + 1] = v
       end, emu.callbackType.write, 0x7e3410, 0x7e3410)
-      emu.addMemoryCallback(function(_, v) mpWrites[#mpWrites + 1] = v end,
-        emu.callbackType.write, 0x7e3C08 + celes*2, 0x7e3C08 + celes*2)
       H.log(string.format("%s: locke slot %d mp=%d, celes slot %d mp=%d, "
         .. "boss hp=%d mp=%d allow34=%04x", tag, locke, mp(locke), celes,
         mp(celes), bossHp(), bossMp(), bossAllow34()))
@@ -1024,7 +1036,14 @@ H.run({ maxFrames = 150000 }, {
       writesStr(poolWrites, R.ddChargeIdx, #poolWrites, function(w)
         return w.tag == celes end)))
     H.assertEq(mp(celes), last.new,
-      "[flag] her pool is what the engine's own last write left (no refund)")
+      "[flag] her pool is what the engine's own last write left")
+    -- no refund: nothing wrote her pool inside the divine's own action
+    -- after its charge (from the charge to the divine's return); the
+    -- charge itself, a write the same watch caught, is the positive control
+    local d = divineDispatch[DDUST]
+    local inside = writesStr(poolWrites, R.ddChargeIdx, d.pw1, function(w) return w.tag == celes end)
+    H.assertEq(inside, "none", string.format("[flag] no write to her pool between the divine's "
+      .. "charge (%s) and its return (no refund)", writeStr(poolWrites[R.ddChargeIdx])))
     H.assertEq(mp(celes) >= SHELL_MP, true,
       "[flag] ...and it still pays her kit's dearest row (Shell, 15)")
   end),
@@ -1046,7 +1065,6 @@ H.run({ maxFrames = 150000 }, {
     return H.repeatN(1, {
       H.call(function()
         m0, g0 = mp(celes), bossMp()
-        mpWrites = {}
         celesMode = "cast"; castRec = recOf(celes, OSMOSE)
         H.log(string.format("[osmose] casting at mp=%d, boss pool=%d", m0, g0))
       end),
@@ -1075,17 +1093,11 @@ H.run({ maxFrames = 150000 }, {
           end
         end
         local o = osmoseLanded()
-        local debited = false
-        for _, v in ipairs(mpWrites) do
-          if o and (v & 0xff) == ((o.mp0 - OSMOSE_MP) & 0xff) then debited = true end
-        end
-        return debited and bossMp() < g0 and o ~= nil
+        return osmoseDebit(o) ~= nil and bossMp() < g0
       end, 20000, "Celes's Osmose is really charged and drains the boss"),
       H.call(function() celesMode = "defer" end),
       H.waitFrames(240),
       H.call(function()
-        local seen = {}
-        for _, v in ipairs(mpWrites) do seen[v & 0xff] = true end
         H.log(string.format("[osmose] mp %d->%d, boss pool %d->%d",
           m0, mp(celes), g0, bossMp()))
         local o = osmoseLanded()
@@ -1094,9 +1106,11 @@ H.run({ maxFrames = 150000 }, {
           .. "the boss's pool was lower at its return than at its entry")
         H.assertEq(o ~= nil and o.mp1 > o.mp0, true,
           "[osmose] ...and her own pool rose across that same execution")
-        H.assertEq(o ~= nil and seen[(o.mp0 - OSMOSE_MP) & 0xff], true,
-          "[osmose] the caster's MP was debited to exactly mp0-8 (the charge; "
-          .. "mp0 = her pool as that landed Osmose entered ExecCmd)")
+        local dw = osmoseDebit(o)
+        H.assertEq(dw ~= nil, true,
+          "[osmose] the caster's MP was debited to exactly mp0-8 by her own charge inside "
+          .. "that Osmose (mp0 = her pool as that landed Osmose entered ExecCmd)"
+          .. (dw and (": " .. writeStr(dw)) or ""))
         H.assertEq(bossMp() < g0, true, "[osmose] the boss's real pool dropped")
         H.assertEq(o ~= nil and mp(celes) > o.mp0, true,
           "[osmose] and the caster ended NET POSITIVE -- 8 MP is still a refill "

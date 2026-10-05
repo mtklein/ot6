@@ -493,7 +493,7 @@ end
 -- off a damage figure that grows with both.
 local BOOSTDMG = H.sym("Ot6BoostDmg")
 local BOOSTDMG_END = H.sym("Ot6FoldCmdTbl")      -- the table after the proc
-local bdCalls, bdStores = {}, {}
+local bdCalls, bdStores, calcStores = {}, {}, {}
 local ledger = {}
 local function flushLedger(tag)
   for _, e in ipairs(ledger) do
@@ -629,6 +629,9 @@ H.run({ maxFrames = 150000 }, {
           local pc = (st["cpu.k"] << 16) | st["cpu.pc"]
           if pc >= BOOSTDMG and pc < BOOSTDMG_END then
             bdStores[#bdStores + 1] = { seq = execSeq, v = v, pc = pc }
+          else
+            -- the damage calc's own stores, the watch's positive control
+            calcStores[#calcStores + 1] = { seq = execSeq, v = v, pc = pc }
           end
         end)
       end, emu.callbackType.write, base + 0x11B0, base + 0x11B1)
@@ -756,6 +759,17 @@ H.run({ maxFrames = 150000 }, {
         H.assertEq(live, true, string.format(
           "Ot6BoostDmg was handed his %s with cmd $07 and boost %d still "
           .. "pending -- the multiplier was asked", techName(DMG_T), DMG_ROW + 1))
+        -- the same watch saw the tech's own damage calc store $11B0 (#252:
+        -- `0 store(s)` alone could not tell a quiet multiplier from a blind
+        -- watch)
+        local calc = {}
+        for _, w in ipairs(calcStores) do
+          if w.seq == seqNo then calc[#calc + 1] = string.format("$%02x@%06x", w.v, w.pc) end
+        end
+        H.log(string.format("[boostdmg] the damage calc's own stores to $11B0 in that action: %d {%s}",
+          #calc, table.concat(calc, " ")))
+        H.assertEq(#calc > 0, true, "the $11B0 watch saw the tech's damage calc store "
+          .. "(the positive control for the zero below)")
         H.assertEq(#stored, 0,
           "boost bought the tech, not a damage multiplier too (Ot6BoostDmg "
           .. "stored no multiplied $11B0 for it)")
