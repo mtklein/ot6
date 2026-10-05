@@ -1593,9 +1593,18 @@ def main():
         threading.Thread(target=peer_thread, args=(board, p, stop),
                          daemon=True).start()
 
-    httpd = ThreadingHTTPServer((args.bind, args.port),
-                                partial(SimpleHTTPRequestHandler,
-                                        directory=webroot))
+    # The grid asks for every tile's picture at once.  socketserver's listen
+    # backlog is 5, so a burst of 25 connections reset most of them and the
+    # tiles showed broken images (reproduced in Chromium: 14 of 24 tiles
+    # broken, 221 ERR_CONNECTION_RESET / ERR_SOCKET_NOT_CONNECTED in 60 s).
+    class Server(ThreadingHTTPServer):
+        request_queue_size = 256
+        daemon_threads = True
+    class Handler(SimpleHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"   # keep-alive: fewer connections
+        def log_message(self, *a):      # quiet: one line per tile per second
+            pass
+    httpd = Server((args.bind, args.port), partial(Handler, directory=webroot))
     # a plain kill runs the cleanup below too (the ssh children)
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     url_host = (socket.gethostname().split(".")[0] + ".local"
