@@ -35,6 +35,9 @@ need_jdk() {
 }
 
 need_sdk() {
+  if [ -z "${ANDROID_HOME:-}${ANDROID_SDK_ROOT:-}" ] && [ -d "$HOME/android-sdk" ]; then
+    ANDROID_HOME=$HOME/android-sdk          # the Linux worker's install
+  fi
   ANDROID_HOME=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/opt/homebrew/share/android-commandlinetools}}
   BT=$ANDROID_HOME/build-tools/$BUILD_TOOLS
   ANDROID_JAR=$ANDROID_HOME/platforms/$PLATFORM/android.jar

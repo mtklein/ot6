@@ -153,6 +153,14 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@21 sdkmanager \
   "build-tools;35.0.1" "platforms;android-35"
 ```
 
+Every release machine carries the same pieces, so any of them can cut a
+release. On px13 (Linux, 2026-10-04): `apt-get install openjdk-21-jdk-headless`,
+the command-line tools unpacked to `~/android-sdk/cmdline-tools/latest`, and
+the same `sdkmanager --sdk_root=$HOME/android-sdk "build-tools;35.0.1"
+"platforms;android-35"`; the keystore at `~/.config/ot6/android-release.jks`
+and its password in `~/.config/ot6/android-release.pass` (mode 600), which
+`build_apk.sh` reads where there is no Keychain.
+
 `tools/android/env.sh` pins those versions (minSdk 26, targetSdk 35) and
 finds them through `JAVA_HOME` and `ANDROID_HOME` when set; a missing
 piece stops the build with the line above. The ninja edges:

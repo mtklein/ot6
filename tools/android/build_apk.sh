@@ -22,9 +22,14 @@ if [ ! -f "$KS" ]; then
   echo "  A new key (tools/android/new_keystore.sh) means every player reinstalls." >&2
   exit 1
 fi
-if ! OT6_KS_PASS=$(security find-generic-password -a ot6 -s ot6-android-release -w 2>/dev/null); then
-  echo "ERROR: no login Keychain item ot6-android-release holding $KS's password" >&2
-  echo "  (security find-generic-password -a ot6 -s ot6-android-release)." >&2
+# The password: the login Keychain on a Mac; elsewhere (the Linux worker)
+# ~/.config/ot6/android-release.pass, mode 600, beside the keystore.
+PASSFILE=$HOME/.config/ot6/android-release.pass
+if [ -n "${OT6_KS_PASS:-}" ]; then :
+elif [ -f "$PASSFILE" ]; then OT6_KS_PASS=$(cat "$PASSFILE")
+elif ! OT6_KS_PASS=$(security find-generic-password -a ot6 -s ot6-android-release -w 2>/dev/null); then
+  echo "ERROR: no password for $KS: neither the login Keychain item ot6-android-release" >&2
+  echo "  (security find-generic-password -a ot6 -s ot6-android-release) nor $PASSFILE." >&2
   exit 1
 fi
 export OT6_KS_PASS
