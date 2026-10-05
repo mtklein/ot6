@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from audit_chests import load_chests, map_titles
 
-# The measured camera (probe_chestcam.lua): scroll = party px - CAM_OFF,
+# The measured camera (probe_chestcam.lua, deleted in b18643d7): scroll = party px - CAM_OFF,
 # clamped at 0; the visible rect is VIEW_W x VIEW_H from there.
 CAM_OFF_X, CAM_OFF_Y = 112, 112
 VIEW_W, VIEW_H = 256, 224

@@ -1360,7 +1360,7 @@ def selftest() -> int:
 
     # -- comment_only_refs: what makes the ambiguity check fatal for a call
     #    and inert for prose.  Both halves matter: a doc comment naming a
-    #    duplicated symbol must not fail a build (probe_dottick.lua's header
+    #    duplicated symbol must not fail a build (probe_dottick.lua's header, deleted in b18643d7,
     #    does that), and a real call must not be excused by an unrelated
     #    comment elsewhere in the file that names it.
     src = ('-- doc: H.sym("OnlyInProse") is the hazard\n'
@@ -2260,7 +2260,7 @@ def main() -> int:
         #
         # The exception is a name whose every occurrence is inside a comment.
         # The ref collector over-collects from prose (see _SYM_REF), and
-        # probe_dottick.lua's header documents this hazard by spelling out
+        # probe_dottick.lua's header (deleted in b18643d7) spelled out the hazard as
         # `H.sym("ExecCmd")`.  A doc comment must not fail a build, so a
         # comment-only ambiguity is recorded in OT6_SYMS_AMBIG instead, and
         # H.sym raises the same message if the name is called.

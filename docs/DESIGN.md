@@ -56,7 +56,7 @@ weakness bits in vanilla), one weapon-class (new side table in expanded ROM).
 
 **Chip.** Any damaging hit that matches a weakness removes 1 shield, and a
 multi-hit action chips per hit (one boosted Fight chips four shields off one
-guard — `multi-hit.md` §1, `probe_multihit.lua`). Multi-hit is deliberately
+guard — `multi-hit.md` §1, `probe_multihit.lua`, deleted in b18643d7). Multi-hit is deliberately
 scarce: `tools/audit_multihit.py` (which exits nonzero if it goes stale)
 enumerates **six** multi-hit abilities in the whole game, spread over the
 three physical kits. Cyan's are vanilla's — Quadra Slam ×4 and Quadra Slice ×4
@@ -78,7 +78,7 @@ Broken state for the length of a private broken timer at `$3e88,y` gated by
 takes is ×2; its weakness list is locked revealed for the rest of the
 battle. On recovery, shields reset to `shield_max`. `OT6_BREAK_TICKS` is
 `$10` (`ot6_break.asm:1`), which measures **2159 frames** — about 36 s of
-battle time — for an on-stage monster (`probe_ifritbreak.lua`).
+battle time — for an on-stage monster (`probe_ifritbreak.lua`, deleted).
 
 **Shielded resistance.** While an enemy still has shields and is not broken it
 takes reduced damage (×0.5), so the swing from shielded to broken is ×4, and
