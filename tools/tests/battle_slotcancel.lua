@@ -622,58 +622,23 @@ local function branch(j, wait)
 end
 
 -- ------------------------------------------------------------- the draws
+-- The draw is battle_slots' (H.newEncounterDraw, lib/ot6_field.lua): pace a
+-- stretch of the disembark row that rolls one group, budget the encounters
+-- over every encounter-counter state from the pool's decode (#299), run from
+-- the rest or fight out a pack that cannot be run from, care after each.
+-- The floor is two bodies and 600 max HP with no monster that can take a
+-- member's turn on any of its own (H.judgeFormation).  This file used to
+-- take six clock-walked draws for two bodies and 900 max HP by live count:
+-- a bare number, and on the Blackjack's plain (group 10) only Mind Candy
+-- packs reach 900 (battle_slots' drawBattle comment), whose SleepSting
+-- takes turns on any of their own.  Nothing here attacks the formation but
+-- SETZER's spins, so 600 stands through the rounds.
 local msPresent = {}
-local function drawBattle(tag, tries)
-  local steps = { H.call(function() H.vars.suitable = false end) }
-  -- a closed square: the walk comes back where it started, so six draws
-  -- (and the encounters a varied history used up first) do not drift the
-  -- party off the plain into a town, where no encounter fires ("down, down,
-  -- right, right, down, down, left, left" walked four steps south a lap)
-  local pattern = { "down", "down", "right", "right", "up", "up",
-                    "left", "left" }
-  for n = 1, tries do
-    local w = {
-      (function()
-        local ph = 0
-        return H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
-          H.call(function()
-            ph = ph + 1
-            H.setPad({ [pattern[(math.floor(ph / 20) % #pattern) + 1]] = true })
-          end),
-        }, tag .. ": a real world encounter fires (draw " .. n .. ")")
-      end)(),
-      H.release(),
-      H.waitUntil(function() return H.battleActive() end, 900,
-        tag .. ": battle active (draw " .. n .. ")", 30),
-      H.waitFrames(240),
-      H.call(function()
-        msPresent = {}
-        for m = 0, 5 do
-          if H.readByte(0x3AA8 + m * 2) % 2 == 1 then msPresent[#msPresent + 1] = m end
-        end
-        local mhp = 0
-        for _, m in ipairs(msPresent) do mhp = mhp + H.readWord(0x3BFC + m * 2) end
-        -- the monsters have to outlast the members' turns and the branches
-        H.vars.suitable = (#msPresent >= 2 and mhp >= 900)
-        H.log(string.format("%s draw %d: %d bodies, %d total max HP -> %s",
-          tag, n, #msPresent, mhp, H.vars.suitable and "FIGHT" or "flee"))
-      end),
-      H.cond(function() return not H.vars.suitable end, {
-        H.fleeBattle(9000, { onCantRun = "fight" }),
-        H.waitUntil(function()
-          return H.worldMode() and H.worldHasControl()
-        end, 1200, tag .. ": back on the plain after draw " .. n, 10),
-        H.waitFrames(30),
-      }, {}),
-    }
-    if n == 1 then
-      for _, s in ipairs(w) do steps[#steps + 1] = s end
-    else
-      steps[#steps + 1] = H.cond(function() return not H.vars.suitable end, w, {})
-    end
-  end
+local function drawBattle(tag)
+  local D = H.newEncounterDraw({ tag = tag, minBodies = 2, minHp = 600 })
+  local steps = D.steps()
   steps[#steps + 1] = H.call(function()
-    H.assertEq(H.vars.suitable, true, tag .. ": the pool dealt a formation that lasts")
+    msPresent = D.msPresent
     actor = nil
     for s = 0, 3 do if chid(s) == SETZER then actor = s end end
     H.assertEq(actor ~= nil, true, tag .. ": SETZER present")
@@ -714,7 +679,7 @@ local function round()
     battles = battles + 1
     raising, healing, hitting, W, SD = nil, {}, nil, {}, { n = 0 }
   end) }
-  for _, st in ipairs(drawBattle("battle", 6)) do draw[#draw + 1] = st end
+  for _, st in ipairs(drawBattle("battle")) do draw[#draw + 1] = st end
   local body = {
     H.cond(function() return not H.battleLoadStarted() end, draw, {}),
     H.call(function() atPoint, attackSetzer, rec = false, true, nil end),
