@@ -217,6 +217,14 @@ shared_app_ready() {
   [ ! -e "$SHARED_APP$BIN_SUB/settings.json" ] &&
   [ "$(cat "$SHARED_APP.stamp" 2>/dev/null)" = "$SRC_STAMP" ]
 }
+# What a not-ready look saw, for the build line (#371: a selftest wave once
+# counted two builds of one cold cache, never reproduced; the next one says
+# what the second builder found).
+shared_app_why() {
+  if [ ! -x "$SHARED_APP$BIN_SUB/Mesen" ]; then echo "no executable"
+  elif [ -e "$SHARED_APP$BIN_SUB/settings.json" ]; then echo "a settings.json"
+  else echo "stamp '$(cat "$SHARED_APP.stamp" 2>/dev/null)', want '$SRC_STAMP'"; fi
+}
 
 if ! shared_app_ready; then
   # Many workers can arrive here at once on a cold cache.  Whoever wins the
@@ -240,7 +248,7 @@ if ! shared_app_ready; then
     # finished bundle down under every worker between its own look and its
     # exec (#242: three generate edges died that way on a cold cache).
     if ! shared_app_ready; then
-      echo "creating shared test emulator (one-time${GATEKEEPER_NOTE})..."
+      echo "creating shared test emulator (one-time${GATEKEEPER_NOTE}; pid $$ found $(shared_app_why))..."
       TMP="$MESEN_CACHE/.build.$$"
       rm -rf "$TMP" "$SHARED_APP" "$SHARED_APP.stamp"
       # cp -c = APFS clonefile: instant and ~zero physical disk.  -L because
@@ -258,6 +266,10 @@ if ! shared_app_ready; then
              "$TMP$BIN_SUB/RecentGames" "$TMP$BIN_SUB/Debugger"
       mv "$TMP" "$SHARED_APP"
       printf '%s' "$SRC_STAMP" > "$SHARED_APP.stamp"
+      # Verify before the lock is let go: a build the next look cannot see
+      # as ready would be built again under every worker already handed it.
+      shared_app_ready || {
+        echo "shared test emulator built but not ready: $(shared_app_why)"; exit 2; }
     fi
     rm -rf "$LOCK"; HELD_LOCK=""
   fi
