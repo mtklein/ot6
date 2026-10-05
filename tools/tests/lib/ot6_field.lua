@@ -573,6 +573,16 @@ function M.navTo(txIn, tyIn, opts)
   -- before walking on, so the next fight starts whole.  opts.care=false
   -- opts out; a live event timer opts the scene out automatically.
   local careD, sawBattle, fought = nil, false, nil
+  -- A battle the walk fought owes its care stop before the walk may end
+  -- (#323): one that comes up on the goal tile itself ends the walk on
+  -- the field's first controlled frame otherwise, because the terminator
+  -- runs before the body's care block and the reload's quiet frames have
+  -- already filled its calm count.  Bounded: a scene that keeps control
+  -- for 600 frames after the battle lets the walk end as before.
+  local owed, owedN = false, 0
+  local function careOwed()
+    return owed and opts.care ~= false and not M.eventTimerLive() and owedN < 600
+  end
   local function drop(why)  -- discard the plan, logging why once, not per frame
     if plan or pend then
       M.log(string.format("nav: %s at (%d,%d); plan dropped", why,
@@ -588,6 +598,8 @@ function M.navTo(txIn, tyIn, opts)
     local done
     if wipeSeen then
       done = true
+    elseif careOwed() then
+      done = false
     elseif arrive and arrive() then
       done = true
     else
@@ -627,6 +639,7 @@ function M.navTo(txIn, tyIn, opts)
         else careD.frame(); return end
       end
       battN = M.battleLoadStarted() and battN + 1 or 0
+      if owed and battN == 0 then owedN = owedN + 1 end
       -- forensics (once per battle): the tile the party stood on when the
       -- battle came up, its props and its neighbours', and the event script
       -- pointer -- the shape of the $ca0029 stall (a battle starting while a
@@ -662,6 +675,7 @@ function M.navTo(txIn, tyIn, opts)
           M.setPad({})                 -- goal fight: left alone for arrive()
           return
         end
+        owed, owedN = true, 0
         if wantsFlee(opts.playBattles) then
           flee(battN)
           return
@@ -702,7 +716,7 @@ function M.navTo(txIn, tyIn, opts)
       --     combat before walking on (the heal-after-every-battle
       --     directive).  Costs nothing when nobody needs care.
       if sawBattle then
-        sawBattle = false
+        sawBattle, owed = false, false
         if opts.care ~= false and not M.eventTimerLive() then
           careD = M.newCareDriver({
             threshold = opts.careThreshold or 0.65, reserve = opts.reserve,
@@ -819,6 +833,7 @@ function M.navTo(txIn, tyIn, opts)
     walked, plan, idx, pend, aPhase, calm = 0, nil, 1, nil, 0, 0
     battN, dlgN, lostN, noPathN, pause = 0, 0, 0, 0, 0
     wipeSeen, careD, sawBattle, fought = false, nil, false, nil
+    owed, owedN = false, 0
   end)
 end
 
@@ -2319,6 +2334,14 @@ function M.worldNavTo(txIn, tyIn, opts)
   -- heal-after-every-battle: see navTo's care block; same contract here,
   -- run once the post-battle world reload has fully settled
   local careD, sawBattle = nil, false
+  -- a fought battle owes its care stop before the walk may end (#323; see
+  -- navTo's): the goal-tile terminator otherwise fires on the first frame
+  -- of world control after a battle that came up on the goal tile, before
+  -- the body's care block (which waits for the fade-in) is ever reached
+  local owed, owedN = false, 0
+  local function careOwed()
+    return owed and opts.care ~= false and not M.eventTimerLive() and owedN < 600
+  end
   -- walk-budget semantics shared with navTo: battle and care frames do
   -- not charge maxFrames (see navTo's measured note); the driveUntil cap
   -- is the hard backstop.
@@ -2330,6 +2353,8 @@ function M.worldNavTo(txIn, tyIn, opts)
     local done
     if wipeSeen then
       done = true
+    elseif careOwed() then
+      done = false
     elseif arrive and arrive() then
       done = true
     else
@@ -2362,6 +2387,7 @@ function M.worldNavTo(txIn, tyIn, opts)
         else careD.frame(); return end
       end
       battN = M.battleLoadStarted() and battN + 1 or 0
+      if owed and battN == 0 then owedN = owedN + 1 end
       if tactical and battN == 0 then tactical.idle() end
       -- 1. battle: clear it (never a spared formation), then let the
       --    world reload run out before touching the plan again
@@ -2372,6 +2398,7 @@ function M.worldNavTo(txIn, tyIn, opts)
           M.setPad({})
           return
         end
+        owed, owedN = true, 0
         if wantsFlee(opts.playBattles)
            or (flee and next(fleeSet) and M.formationHas(fleeSet)) then
           flee(battN)
@@ -2413,7 +2440,7 @@ function M.worldNavTo(txIn, tyIn, opts)
       --     The world menu is safe here -- careClose's world-mode
       --     debounce owns the teardown.
       if sawBattle then
-        sawBattle = false
+        sawBattle, owed = false, false
         if opts.care ~= false and not M.eventTimerLive() then
           careD = M.newCareDriver({
             threshold = opts.careThreshold or 0.65, reserve = opts.reserve,
@@ -2489,6 +2516,7 @@ function M.worldNavTo(txIn, tyIn, opts)
     blocked, nblocked, plan, idx, pend = {}, 0, nil, 1, nil
     aPhase, battN, walked, hb = 0, 0, 0, -600
     wipeSeen, careD, sawBattle = false, nil, false
+    owed, owedN = false, 0
   end)
 end
 
@@ -7301,9 +7329,13 @@ function M.talkToObj(obj, what, maxF)
     return apPick
   end
   local function walkStep()
+    -- A battle on the approach is fought with the tactical driver (items,
+    -- the heal policy, the kit) and cared for after, like any walk's: the
+    -- blind A-taps of playBattles = true lost the Tentacles (#323,
+    -- build/attempts/wt/wor-edgar/leg3/ed9.log).
     return M.navTo(function() local p = approach(); return p and p[1] end,
                    function() local p = approach(); return p and p[2] end, {
-      maxFrames = maxF or 20000, playBattles = true,
+      maxFrames = maxF or 20000, playBattles = "tactical",
       arrive = function()
         return engaged or (adjacent() and M.hasControl() and M.tileAligned())
       end,
