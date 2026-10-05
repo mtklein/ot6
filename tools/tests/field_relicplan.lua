@@ -162,7 +162,6 @@ local function eggChecks(plan, plan0, threats, what)
     end
   end
   if low ~= nil and owned(function(id) return id == EGG end) then
-    local on = planned(plan, low[1], 4) == EGG or planned(plan, low[1], 5) == EGG
     -- the lowest member has a slot the Egg may take in the Egg-less plan:
     -- empty, the Egg itself (step 4 kept it), or a relic no threat needs
     local open = false
@@ -170,9 +169,15 @@ local function eggChecks(plan, plan0, threats, what)
       local id = planned(plan0, low[1], s)
       if id == EGG or softRank(plan0, low[1], s, threats) ~= nil then open = true end
     end
-    H.log(string.format("[relicplan] %s: the Egg %s %s (L%d, behind the party's L%d)%s", what,
-      on and "is planned on" or "could not go on", low[2], level(low[1]), top,
-      open and "" or "; every slot holds something it may not displace"))
+    local who = {}
+    for _, p in ipairs(MEMBERS) do
+      if planned(plan, p[1], 4) == EGG or planned(plan, p[1], 5) == EGG then
+        who[#who + 1] = string.format("%s L%d", p[2], level(p[1]))
+      end
+    end
+    H.log(string.format("[relicplan] %s: the Egg is planned on %s (the furthest behind: %s L%d, the party's L%d)%s",
+      what, #who > 0 and table.concat(who, ", ") or "nobody", low[2], level(low[1]), top,
+      open and "" or "; every slot of theirs holds something it may not displace"))
     if open and not threats.boss then
       local any = false
       for _, p in ipairs(MEMBERS) do
