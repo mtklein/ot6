@@ -224,7 +224,7 @@ local want = { slot = nil, bank = 0, pend = 0, mode = "idle",
 -- Is anyone down, or badly hurt?  battle_stealmp's shape.  An all-Defend
 -- party is a party that never ends a fight, and on run 2 of this file that
 -- ground three seats to 0 HP and lost the run while the arm was still
--- banking pips (build/attempts/battle_kitrefuse.run2.log: "the last battle up
+-- banking pips (build/attempts/kitrefuse-confirm/attempts/battle_kitrefuse.run2.log: "the last battle up
 -- (f36450) was formation 0032 0032 ... a4:2/280 a1:0/249 a0:0/241 a5:0/324").
 -- So the bystanders stop deferring and start swinging as soon as the party is
 -- in trouble, and each arm hands the battle back through recover() below.
@@ -320,7 +320,7 @@ local function pulse()
     -- shell confirms a row, and once the rows are priced out that press is
     -- refused forever and the turn never ends.  (Measured: without this the
     -- arm that hands EDGAR's window back after his refusal deadlocked --
-    -- build/attempts/battle_kitrefuse.run1.log, "timeout after 40000 frames
+    -- build/attempts/kitrefuse-confirm/attempts/battle_kitrefuse.run1.log, "timeout after 40000 frames
     -- driving toward LOCKE's command window".)
     if st == ST_TGT then
       H.setPad(ph % 8 < 4 and { a = true } or {})   -- a swing needs a target
@@ -515,7 +515,8 @@ end
 -- anything was committed -- measured on a SABIN at level 14, where the arm
 -- takes boost 3 and so two banking Fights: every monster read 0 HP on the
 -- buzz frame and the close flag $7bcb rose one frame later
--- (build/lab/live-state-suites/probe_kitrefuse_L14_settle.log,
+-- (build/attempts/wt-live-state-suites/lab/live-state-suites/
+-- probe_kitrefuse_L14_settle.log,
 -- `[settle 2] menu=01 st=30 ... close=1 ... mons=0,0,0,0,0,0`).  Whether a
 -- banking swing kills is the draw, not the property under test, so such an
 -- attempt is void, said so, and the arm is asked again in the next battle.

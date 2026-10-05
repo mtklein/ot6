@@ -147,7 +147,8 @@ local sawNumeral = false
 -- 20 frames later than the fixture's first run made it: a Berserk, then
 -- SABIN and CYAN at 0 HP with SHADOW alone on 177 and "timeout after 30000
 -- frames driving toward [zero] his next SwdTech window"
--- (build/lab/live-state-suites/suite_battle_bushido.run1.log).  Which
+-- (build/attempts/wt-live-state-suites/lab/live-state-suites/
+-- suite_battle_bushido.run1.log).  Which
 -- member the draw fells is not the property under test; raising him the
 -- way a person would is how the arms get his window back.
 local tc = H.targetCursor({ mask = 0x7B7D,
