@@ -48,6 +48,7 @@ local function worldReady()
 end
 
 local subject                  -- Locke's battle slot, found by reading $3ED8
+local snap, load, B, BR, found = nil, nil, {}, {}, false   -- the volley's branch search
 local rPresses = 0             -- real R edges counted at the subject's menu
 local swings, swingRef = {}, nil
 local armed = false
@@ -68,7 +69,10 @@ local hitRefs = {}
 -- one pad decision per 8 frames, 4 held + 4 released; returns the button
 -- table to hold this frame.
 local mf = 0
+local lastR = false
 local function decide()
+  local prevR = lastR
+  lastR = false                                  -- every early return releases R
   if H.readByte(MENU) == 0 then
     -- no interactive menu: page battle text / victory the driver way
     return (H.frame % 8 < 4) and { a = true } or {}
@@ -95,8 +99,12 @@ local function decide()
       if not armed then
         armed = true
         swingRef = emu.addMemoryCallback(function(addr, value)
-          swings[#swings + 1] = value
+          if not closed then swings[#swings + 1] = value end
         end, emu.callbackType.write, 0x7e3a70, 0x7e3a70)
+        emu.addMemoryCallback(function()
+          local x = emu.getState()["cpu.x"] & 0xFFFF
+          if x == subject * 2 and B.be == nil then B.be = H.readByte(0xBE) end
+        end, emu.callbackType.exec, H.sym("ExecAction"), H.sym("ExecAction"))
         local wc, hj = H.sym("Ot6WeaponClass"), H.sym("Ot6HitJoin")
         local sf = H.sym("SaveForMimic")
         hitRefs.wcAddr, hitRefs.hjAddr, hitRefs.sfAddr = wc, hj, sf
@@ -118,7 +126,6 @@ local function decide()
         end, emu.callbackType.exec, sf, sf)
       end
       btn = "r"
-      if (mf - 1) % 8 == 0 then rPresses = rPresses + 1 end
     else btn = "b" end
   else                                           -- FIGHT, boosted
     if st == ST_CMD then
@@ -133,12 +140,20 @@ local function decide()
     H.log(string.format("hits: f%d st=%02x act=%d press %s (bp=%d pend=%d)",
       H.frame, st, act, btn, bp(subject), pend(subject)))
   end
+  -- an R edge is the pad going from released to R, counted where it is
+  -- sent: counting only at a press cycle's first frame missed the edge of a
+  -- window that opened mid-cycle (#252: "at least two R edges were really
+  -- sent" failed at seed shifts 8 and 16 with pend reaching 2,
+  -- build/attempts/wt/v026-rom2/r3/hits/old_s8.log.gz)
+  if btn == "r" and not prevR then rPresses = rPresses + 1 end
+  lastR = (btn == "r")
   return btn and { [btn] = true } or {}
 end
 
 local plan, idx, goal = nil, 1, { 82, 56 }
+local MAX_BRANCHES, IDLE = 6, 30
 
-H.run({ maxFrames = 45000 }, {
+H.run({ maxFrames = 45000 + MAX_BRANCHES * (MAX_BRANCHES * IDLE + 10000 + 200) }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
@@ -186,64 +201,103 @@ H.run({ maxFrames = 45000 }, {
     H.assertEq(pend(subject), 2, "pending 2 from real R presses")
     H.assertEq(rPresses >= 2, true, "at least two R edges were really sent")
   end),
-  H.driveUntil(function() return pend(subject) == 0 end, 10000, {
-    H.call(function() H.setPad(decide()) end),
-  }, "boosted fight lands"),
-  H.waitFrames(120),
+  -- #252: a volley that misses outright lands 0, which the 0-or-N shape
+  -- allows, and then nothing of the model was seen landing.  So the boosted
+  -- Fight is a branch search, as a precondition: a snapshot at his window
+  -- with the boost raised, each branch idling IDLE more frames there before
+  -- the Fight (the monsters act meanwhile and move the battle RNG; $be at
+  -- the Fight's ExecAction is logged), until one volley LANDS.  Every
+  -- branch's volley is checked in full; at most MAX_BRANCHES.
   H.call(function()
     H.setPad({})
-    emu.removeMemoryCallback(swingRef, emu.callbackType.write, 0x7e3a70, 0x7e3a70)
-    local n5, maxv, vals = 0, -1, {}
-    for _, v in ipairs(swings) do
-      if v == 5 then n5 = n5 + 1 end
-      if v > maxv and v ~= 0xff then maxv = v end   -- ff = the dec-past-zero wrap
-      vals[#vals + 1] = string.format("%02x", v)
-    end
-    H.log("swing-count write values: " .. table.concat(vals, " "))
-    H.assertEq(n5, 1, "exactly one boosted fight queued 1+2*2 swings")
-    H.assertEq(maxv, 5, "and nothing queued more")
-    H.assertEq(bp(subject), 1, "boost consumed (3-2), regen skipped")
-    H.assertEq(pend(subject), 0, "pending cleared")
+    snap = H.requestSaveState()
+  end),
+  H.waitFrames(2),
+  H.call(function() H.checkReq(snap, "snapshot at his boosted window") end),
+  H.repeatN(1, (function()
+    local t = {}
+    for k = 1, MAX_BRANCHES do
+      t[#t + 1] = H.cond(function() return not found end, {
+        H.call(function()
+          H.setPad({})
+          if k > 1 then load = H.requestLoadState(snap.blob) end
+        end),
+        H.waitFrames(2),
+        H.call(function()
+          if k > 1 then H.checkReq(load, "snapshot restore"); H.rearmInputInjection() end
+          swings, fightSwings, fightHits = {}, 0, 0
+          handPass = { [0] = 0, [1] = 0 }
+          counting, closed = false, false
+          B = { idle = (k - 1) * IDLE }
+        end),
+        (function()
+          local w = 0
+          return H.driveUntil(function() w = w + 1 return w > (k - 1) * IDLE end,
+            MAX_BRANCHES * IDLE + 10, { H.call(function() H.setPad({}) end) }, "branch idle")
+        end)(),
+        H.driveUntil(function() return pend(subject) == 0 end, 10000, {
+          H.call(function() H.setPad(decide()) end),
+        }, "boosted fight lands"),
+        H.waitFrames(120),
+        H.call(function()
+          H.setPad({})
+          local n5, maxv, vals = 0, -1, {}
+          for _, v in ipairs(swings) do
+            if v == 5 then n5 = n5 + 1 end
+            if v > maxv and v ~= 0xff then maxv = v end   -- ff = the dec-past-zero wrap
+            vals[#vals + 1] = string.format("%02x", v)
+          end
+          H.log("swing-count write values: " .. table.concat(vals, " "))
+          H.assertEq(n5, 1, "exactly one boosted fight queued 1+2*2 swings")
+          H.assertEq(maxv, 5, "and nothing queued more")
+          H.assertEq(bp(subject), 1, "boost consumed (3-2), regen skipped")
+          H.assertEq(pend(subject), 0, "pending cleared")
 
-    -- ---- #235: swings attempted vs hits landed, measured ----------------
-    for _, k in ipairs({ "wc", "hj", "sf" }) do
-      emu.removeMemoryCallback(hitRefs[k], emu.callbackType.exec,
-                               hitRefs[k .. "Addr"], hitRefs[k .. "Addr"])
+          -- ---- #235: swings attempted vs hits landed, measured ----------------
+          local rh = H.readByte(0x1600 + 37 * 0x01 + 0x1F)
+          local lh = H.readByte(0x1600 + 37 * 0x01 + 0x20)
+          local hands = (H.isWeapon(rh) and 1 or 0) + (H.isWeapon(lh) and 1 or 0)
+          if hands == 0 then hands = 1 end          -- an empty main hand is a fist
+          H.log(string.format("hits: LOCKE hands=%d (R $%02X, L $%02X) -- "
+            .. "swings=%d (main %d, off %d), landed=%d", hands, rh, lh,
+            fightSwings, handPass[0], handPass[1], fightHits))
+          H.assertEq(hands, 1,
+            "LOCKE carries ONE weapon here: this fixture is the one-weapon case")
+          H.assertEq(fightSwings, H.fightPasses(2), string.format(
+            "the loop ran %d passes for a 2-BP Fight ($3a70 = 5, +1)", fightSwings))
+          H.assertEq(handPass[0] == handPass[1], true, string.format(
+            "the passes alternate hands: %d main, %d off", handPass[0], handPass[1]))
+          local main, off = H.fightHits(hands, 2)
+          H.assertEq(main + off, fightSwings // 2, string.format(
+            "H.fightHits(%d, 2) = %d, half the %d passes the loop just ran: the "
+            .. "other half are the EMPTY hand (#235)", hands, main + off, fightSwings))
+          H.assertEq(off, 0, "and the model gives the empty hand none of them")
+          -- What the volley actually landed.  A whole action can miss (the #219
+          -- lab's histogram is 0 or N, never a value between: the whiffing half
+          -- is the empty hand, not a die roll), so the measurement is asserted
+          -- as that shape rather than as one number a stray miss would redden.
+          -- It is still a real check: 5 -- the count the library used to claim
+          -- for this exact turn -- cannot come out of this ROM either way.
+          H.assertEq(fightHits <= main + off, true, string.format(
+            "the ROM landed %d of %d swings -- never more than the %d a single "
+            .. "armed hand can land", fightHits, fightSwings, main + off))
+          H.assertEq(fightHits == 0 or fightHits == main + off, true, string.format(
+            "landed hits are 0 or %d and never between (measured %d): the "
+            .. "whiffing half is the empty hand", main + off, fightHits))
+          B.hits, B.want = fightHits, main + off
+          BR[#BR + 1] = B
+          H.log(string.format("[branch] %d: $be %s at the Fight's ExecAction, %d idle frame(s) at "
+            .. "his window: landed %d of %d", #BR, B.be and string.format("$%02X", B.be) or "-",
+            B.idle, fightHits, main + off))
+          if fightHits == main + off and fightHits > 0 then found = true end
+        end),
+      }, {})
     end
-    local rh = H.readByte(0x1600 + 37 * 0x01 + 0x1F)
-    local lh = H.readByte(0x1600 + 37 * 0x01 + 0x20)
-    local hands = (H.isWeapon(rh) and 1 or 0) + (H.isWeapon(lh) and 1 or 0)
-    if hands == 0 then hands = 1 end          -- an empty main hand is a fist
-    H.log(string.format("hits: LOCKE hands=%d (R $%02X, L $%02X) -- "
-      .. "swings=%d (main %d, off %d), landed=%d", hands, rh, lh,
-      fightSwings, handPass[0], handPass[1], fightHits))
-    H.assertEq(hands, 1,
-      "LOCKE carries ONE weapon here: this fixture is the one-weapon case")
-    H.assertEq(fightSwings, H.fightPasses(2), string.format(
-      "the loop ran %d passes for a 2-BP Fight ($3a70 = 5, +1)", fightSwings))
-    H.assertEq(handPass[0] == handPass[1], true, string.format(
-      "the passes alternate hands: %d main, %d off", handPass[0], handPass[1]))
-    local main, off = H.fightHits(hands, 2)
-    H.assertEq(main + off, fightSwings // 2, string.format(
-      "H.fightHits(%d, 2) = %d, half the %d passes the loop just ran: the "
-      .. "other half are the EMPTY hand (#235)", hands, main + off, fightSwings))
-    H.assertEq(off, 0, "and the model gives the empty hand none of them")
-    -- What the volley actually landed.  A whole action can miss (the #219
-    -- lab's histogram is 0 or N, never a value between: the whiffing half
-    -- is the empty hand, not a die roll), so the measurement is asserted
-    -- as that shape rather than as one number a stray miss would redden.
-    -- It is still a real check: 5 -- the count the library used to claim
-    -- for this exact turn -- cannot come out of this ROM either way.
-    H.assertEq(fightHits <= main + off, true, string.format(
-      "the ROM landed %d of %d swings -- never more than the %d a single "
-      .. "armed hand can land", fightHits, fightSwings, main + off))
-    H.assertEq(fightHits == 0 or fightHits == main + off, true, string.format(
-      "landed hits are 0 or %d and never between (measured %d): the "
-      .. "whiffing half is the empty hand", main + off, fightHits))
-    if fightHits == 0 then
-      H.log("hits: this volley missed outright (0 landed) -- the ceiling "
-        .. "is still what was checked")
-    end
+    return t
+  end)()),
+  H.call(function()
+    H.assertEq(found, true, string.format("precondition: a branch's boosted volley landed "
+      .. "(within %d branches)", MAX_BRANCHES))
     H.screenshot("hits_landed")
   end),
 })
