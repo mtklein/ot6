@@ -82,19 +82,14 @@ local STATE = "build/states/fc_alcove.mss.lua"
 
 local BOOST = 3
 local MULT = 1 << BOOST
--- What Ot6BoostDmg makes of `din` at BOOST, as the frozen v0.24 ROM does
--- it: BOOST doublings of the 16-bit word, and $7FFF when one of them
--- carries out of bit 15 (`asl / bcs @cap`, ot6_boostdmg.asm).  That $7FFF
--- arm is a known ROM bug, #359: a product in $8000-$FFFF carries out of
--- nothing and stands (a magicite esper's 4327 left as 34616, $8738,
--- build/attempts/wt/procboost-v024/air/new6/new_k6.log.gz), while one past
--- $FFFF drops to $7FFF, under the products below it.  The decision there is
--- to saturate at $FFFF; when the ROM does, this arm returns $FFFF.  Until
--- then it matches the ROM rather than the decision, so the suite measures
--- the build it runs on.
+-- What Ot6BoostDmg makes of `din` at BOOST: BOOST doublings of the 16-bit
+-- word, saturating at $FFFF when one of them carries out of bit 15 (`asl /
+-- bcs @cap`, ot6_boostdmg.asm), like the rest of the engine's damage math.
+-- Until #359 the cap was $7FFF, so a product past $FFFF fell below the
+-- products under it; battle_boostcap reaches that arm.
 local function boosted(din)
   local v = din * MULT
-  if v > 0xFFFF then return 0x7FFF end      -- #359: the ROM's overflow arm
+  if v > 0xFFFF then return 0xFFFF end      -- #359: saturates at $ffff
   return v
 end
 local TERRA, LOCKE, SHADOW = 0x00, 0x01, 0x03

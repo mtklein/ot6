@@ -34,7 +34,7 @@
 --      dealt damage (base > 0) -- without it this run says nothing about
 --      the steps after the first;
 --   3. every step with damage, the start and each later one, came back
---      multiplied by 2 (saturating at $7fff, the proc's own cap);
+--      multiplied by 2 (saturating at $ffff, the proc's own cap, #359);
 --   4. no later step spent a pip: Ot6ActionEnd found MOG's pending boost
 --      at 0 on every dancing turn but the start.
 
@@ -258,7 +258,7 @@ local function multiplied(base, n)
   local v = base
   for _ = 1, n do
     v = v << 1
-    if v > 0xFFFF then return 0x7FFF end
+    if v > 0xFFFF then return 0xFFFF end    -- #359: saturates at $ffff
   end
   return v
 end

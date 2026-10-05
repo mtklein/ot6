@@ -32,6 +32,8 @@
 tools/tests/battle_assassinate.lua	.writeByte(
 tools/tests/battle_breakflash.lua	.writeByte(
 tools/tests/battle_breakflash.lua	.writeWord(
+tools/tests/battle_boostcap.lua	.writeByte(	quarantine: #359 mechanism test -- the actor's bank set to 3 pips per case so R can raise pending to the case's boost through the menu
+tools/tests/battle_boostcap.lua	.writeWord(	quarantine: #359 mechanism test -- a base damage of 8192+ at x8 (or 32768+ at x2) is not reachable by play on any fixture, so the base is injected into $11b0 at Ot6BoostDmg's entry; HP pinned so eight boosted beams neither end nor lose the fight
 tools/tests/battle_bushido.lua	.writeByte(
 tools/tests/battle_bushido.lua	.writeWord(
 tools/tests/battle_bushidogrey.lua	.writeWord(
