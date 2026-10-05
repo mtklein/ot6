@@ -76,6 +76,7 @@
 --           attempt that loses his window is void and drains its battle.
 
 local H = dofile("tools/tests/lib/ot6.lua")
+local P = H.newPacer({ tag = "pace" })     -- one pool's row (#306)
 local STATE = "build/states/camp_escaped.mss.lua"
 
 local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
@@ -384,13 +385,16 @@ local function decide()
   end
   return btn and { [btn] = true } or {}
 end
+local inBattle = false
 local function frame()
   if H.battleLoadStarted() then
+    -- each battle's first frame: the pool that dealt it is the paced one
+    if not inBattle then inBattle = true; P.assertGroup("the battle at f" .. H.frame) end
     H.setPad(decide())
     return
   end
-  if not H.worldMode() or not H.worldHasControl() then H.setPad({}); return end
-  H.setPad(((H.frame // 120) % 2 == 0) and { left = true } or { right = true })
+  inBattle = false
+  H.setPad(P.pad())
 end
 local function driveTo(pred, maxF, tag)
   return H.driveUntil(pred, maxF, {
@@ -532,6 +536,10 @@ H.run({ maxFrames = 200000 }, {
 
   H.loadState(STATE),
   H.waitFrames(30),
+  -- pace one pool's stretch of the row the fixture stands on, not the
+  -- clock (#306)
+  H.waitUntil(function() return H.worldSettled() end, 1500, "the world map settled", 5),
+  H.call(function() P.plan() end),
   -- ---------------------------------------------------------- 2. the charge --
   -- One battle per attempt.  An attempt is void when CYAN's own tech
   -- never starts in it: the Berserk special (or any status that takes his

@@ -1208,6 +1208,108 @@ function M.encounterShare(hist, n)
   return k / 65536
 end
 
+-- ---- pacing one pool's row on the world map (#306) ----------------------
+-- A suite that walks for random encounters and budgets them from one pool
+-- has to keep every encounter in that pool.  Alternating left and right on
+-- the clock does not: each battle's length shifts the turns, and
+-- battle_steal's walk drifted onto a grass tile of Narshe's pool ("[dbg]
+-- check f22195 group=0 bg=00", build/attempts/wt/steal-evidence/lab/
+-- dbg_k3_s13.log).  M.newPacer paces a stretch of the party's own row whose
+-- every tile rolls one group, turning at its ends by position, and watches
+-- the group CheckBattleWorld really rolls so each battle can assert it.
+--
+--   local P = H.newPacer({ width = 4, tag = "desert" })
+--   H.call(P.plan)                   -- once, on the settled world map
+--   ...every walking frame: H.setPad(P.pad())
+--   ...in each battle: P.assertGroup("battle 2")
+--
+-- plan() reads the stretch from the tile the party stands on, out to
+-- opts.width tiles each way along its row while the next tile is walkable
+-- and rolls the same group; it asserts the stretch is at least three tiles
+-- and that every pairing of a stretch tile with a saved position the walk
+-- can leave (any stretch tile, where its battles happen, and the live one,
+-- which the first encounter reads) rolls that one group.
+function M.newPacer(opts)
+  opts = opts or {}
+  local width, tag = opts.width or 4, opts.tag or "pace"
+  local P = { group = nil }
+  local pace, rolled = nil, nil
+  function P.plan()
+    -- the watch is registered on every plan: a retried attempt replays its
+    -- body and finds the last attempt's watch made inert (lib/ot6.lua, the
+    -- callback-registration note)
+    rolled = nil
+    local check = M.sym("CheckBattleWorld")
+    emu.addMemoryCallback(function() rolled = M.worldCheckGroup() end,
+      emu.callbackType.exec, check, check)
+    local x0, y0 = M.worldX(), M.worldY()
+    local function own(x) return M.worldEncounterGroup(x, y0, x, y0) end
+    -- the stretch's seed: the party's own tile, or where it rolls nothing,
+    -- the nearest tile along the row that rolls something, reached over
+    -- walkable tiles that roll nothing (so no battle comes on the way)
+    local s = own(x0) ~= nil and x0 or nil
+    for d = 1, width do
+      if s then break end
+      for _, sx in ipairs({ x0 - d, x0 + d }) do
+        local step, clear = sx < x0 and -1 or 1, true
+        for x = x0 + step, sx, step do
+          if not M.worldPassable(x, y0) or (x ~= sx and own(x) ~= nil) then clear = false end
+        end
+        if not s and clear and own(sx) ~= nil then s = sx end
+      end
+    end
+    M.assertEq(s ~= nil, true, string.format("[%s] the party's tile (%d,%d) or one "
+      .. "within %d along its row rolls random battles", tag, x0, y0, width))
+    local g = own(s)
+    local lo, hi = s, s
+    x0 = s
+    while lo > x0 - width and M.worldPassable(lo - 1, y0) and own(lo - 1) == g do lo = lo - 1 end
+    while hi < x0 + width and M.worldPassable(hi + 1, y0) and own(hi + 1) == g do hi = hi + 1 end
+    local zx, zy = M.worldZonePos()
+    local groups, list = {}, {}
+    for x = lo, hi do
+      for z = lo, hi do
+        local gg = M.worldEncounterGroup(x, y0, z, y0)
+        if gg ~= nil then groups[gg] = true end
+      end
+      local gg = M.worldEncounterGroup(x, y0, zx, zy)
+      if gg ~= nil then groups[gg] = true end
+    end
+    for gg in pairs(groups) do list[#list + 1] = tostring(gg) end
+    table.sort(list)
+    M.log(string.format("[%s] pace: row %d, x %d..%d (from x %d, saved position "
+      .. "(%d,%d)); the groups it can roll: %s", tag, y0, lo, hi, x0, zx, zy,
+      table.concat(list, ",")))
+    M.assertEq(hi - lo >= 2, true, string.format("[%s] the row gives a stretch of "
+      .. "at least three tiles that roll group %d (x %d..%d)", tag, g, lo, hi))
+    M.assertEq(#list == 1 and list[1] == tostring(g), true, string.format(
+      "[%s] every encounter on the stretch rolls group %d, whatever the saved "
+      .. "position (rolls %s)", tag, g, table.concat(list, ",")))
+    pace = { y = y0, lo = lo, hi = hi, dir = "left" }
+    P.group = g
+    return P
+  end
+  -- the pad for one walking frame: nothing while the world is not the
+  -- party's, else the stretch's current direction, turned at its ends
+  function P.pad()
+    assert(pace, "newPacer: pad() before plan()")
+    if not M.worldMode() or not M.worldHasControl() then return {} end
+    if M.worldAligned() then
+      local x = M.worldX()
+      if x <= pace.lo then pace.dir = "right"
+      elseif x >= pace.hi then pace.dir = "left" end
+    end
+    return { [pace.dir] = true }
+  end
+  -- the group the last CheckBattleWorld rolled (nil before any)
+  function P.rolled() return rolled end
+  function P.assertGroup(what)
+    M.assertEq(rolled, P.group, string.format("[%s] %s was dealt by group %s, "
+      .. "the paced stretch's", tag, what, tostring(P.group)))
+  end
+  return P
+end
+
 -- ---- statuses that take a member's command (the Slot suites) -----------
 -- Every status that takes away a member's control of their own turn, as
 -- the battle reads them ($3ee4/$3ee5/$3ef8/$3ef9 + entity*2): the engine

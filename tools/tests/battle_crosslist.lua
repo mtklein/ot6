@@ -12,6 +12,7 @@
 --   4. the list data is sound.  wItemList holds exactly the tool
 --      ids his real bag carries.
 local H = dofile("tools/tests/lib/ot6.lua")
+local P = H.newPacer({ tag = "desert" })   -- one pool's row (#306)
 local STATE = "build/states/figaro_cleared.mss.lua"
 
 local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
@@ -102,17 +103,17 @@ H.run({ maxFrames = 60000 }, {
   }, "chocobo dismount"),
   H.release(),
   H.waitFrames(120),
+  -- pace one pool's stretch of the dismount row, not the clock (#306)
+  H.waitUntil(function() return H.worldSettled() end, 1500, "the world map settled", 5),
+  H.call(function() P.plan() end),
   H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
-    H.call(function()
-      if not H.worldMode() or not H.worldHasControl() then H.setPad({}); return end
-      local phase = (H.frame // 120) % 2
-      H.setPad(phase == 0 and { left = true } or { right = true })
-    end),
+    H.call(function() H.setPad(P.pad()) end),
   }, "desert encounter"),
   H.release(),
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
   H.waitFrames(90),
   H.call(function()
+    P.assertGroup("the desert encounter")
     for slot = 0, 3 do
       local chid = H.readByte(0x3ED8 + slot*2)
       if chid == 0x00 then terra = slot end
