@@ -341,6 +341,17 @@ python3 "$ROOT/tools/tests/lib/pin_test_saves.py" \
 # stale srm couples one run to the next and gets baked into generated
 # savestates.  Tests that need a save inject it explicitly (SRM sidecars).
 rm -f "$TEST_SAVES"/*.srm
+# A script that declares a battery layout (the marker below) and embeds no
+# savestate boots only by Continuing a battery, so without
+# OT6_SRAM_CHECKPOINT it would Continue an empty one, start a New Game and
+# fail much later on whatever it waited for (#248: probe_save_compat ran to
+# its timeout that way).  Refuse it here, naming the fix.
+if [ -z "${OT6_SRAM_CHECKPOINT:-}" ] &&
+   grep -q '^-- OT6_CHECKPOINT_LAYOUT: ' "$COMPOSED" &&
+   ! grep -q '^-- state [A-Za-z0-9_]*\.mss\.lua ' "$COMPOSED"; then
+  echo "[ot6] FAIL: $(basename "$SCRIPT") boots by Continuing a battery (it declares OT6_CHECKPOINT_LAYOUT and loads no savestate), and no OT6_SRAM_CHECKPOINT was given: run it as OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/<key> (configure.py's TEST_ENV names a suite's; refused BEFORE boot)"
+  exit 2
+fi
 if [ -n "${OT6_SRAM_CHECKPOINT:-}" ]; then
   # A generator step declares the persistent-SRAM layout it understands with
   # a marker comment in its script:
