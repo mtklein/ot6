@@ -5434,12 +5434,14 @@ function Driver:scriptWorst(slot, e)
     elseif op == 0xF0 then atks[#atks + 1] = b(i + 1); atks[#atks + 1] = b(i + 2); atks[#atks + 1] = b(i + 3) end
     i = i + (op < 0xF0 and 1 or (M.AI_OP_LEN[op] or 1))
   end
-  -- the mean over every attack the script names (a buff or a status a 0),
-  -- each at the most it can take: the most of them (M.UNSEEN_PRICE =
-  -- "max") read every member of the Sealed Gate's cave "inside one round
-  -- of death" from full HP -- "902/902 is inside one round of death
-  -- (1139)", "791/902 ... (2054)" -- and spent a pip a turn on it
-  -- (build/attempts/wt/v026-driver/367/gate/: SPEND 8-14 a run against 0-2)
+  -- the most of them.  It reads every member of the Sealed Gate's cave
+  -- "inside one round of death" from full HP early ("902/902 is inside one
+  -- round of death (1139)") and the spend rule fires 7-14 times a run
+  -- against 0-2; the mean over every attack the script names (a buff or a
+  -- status a 0; M.UNSEEN_PRICE = "mean") spends less but measured worse on
+  -- both counts, 10 seed shifts each (build/attempts/wt/v026-driver/367/
+  -- gate2/tally.txt): max 3 deaths in 244,385 won ticks, mean 5 in 256,671,
+  -- the old battle's-worst price 7 in 238,174.
   local best, bestA, sum, n = nil, nil, 0, 0
   for _, a in ipairs(atks) do
     if a ~= 0xFE then
@@ -5451,7 +5453,7 @@ function Driver:scriptWorst(slot, e)
     end
   end
   local price = best
-  if M.UNSEEN_PRICE ~= "max" and n > 0 and best ~= nil then price = math.max(1, sum // n) end
+  if M.UNSEEN_PRICE == "mean" and n > 0 and best ~= nil then price = math.max(1, sum // n) end
   self.romWorst[key] = { v = price, a = bestA }
   return price, bestA
 end
