@@ -539,7 +539,11 @@ end
 local msPresent = {}
 local function drawBattle(tag, tries)
   local steps = { H.call(function() H.vars.suitable = false end) }
-  local pattern = { "down", "down", "right", "right", "down", "down",
+  -- a closed square: the walk comes back where it started, so six draws
+  -- (and the encounters a varied history used up first) do not drift the
+  -- party off the plain into a town, where no encounter fires ("down, down,
+  -- right, right, down, down, left, left" walked four steps south a lap)
+  local pattern = { "down", "down", "right", "right", "up", "up",
                     "left", "left" }
   for n = 1, tries do
     local w = {
