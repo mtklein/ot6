@@ -25,37 +25,32 @@ THE RATCHET (owner, 2026-09-01), two tiers:
    hands every species some class and the broad-kit model accepts most
    of them.  Passing tier 1 is NOT "tuned".
 
-2. THE TUNING CLAIM: the explicit map/sector sets below are the areas we
-   claim to have tuned by play.  The claim may ONLY GROW, and everything
+2. THE TUNING CLAIM: the areas play has backed, and everything
    battle-enabled outside it is reported UNCLAIMED/UNTUNED so vacuous
    passes can never be mistaken for verified ones.  The planned
    tightening applies the per-era party-hands table (weapon-classes.md's
    coverage rule) strictly within the claim.
 
-The World of Ruin is entirely UNCLAIMED as of 2026-09-01.
+   The claim is DERIVED from what the route fought (#287), not a hand
+   list: the generator logs in build/states/*.log name each battle's
+   formation (the runner's `[seed] ... battle` lines with `g<formation>`,
+   the walkers' `[outcome] battle $<formation>`) and, by the `[tiles]`
+   line that follows it (flushed as the party leaves a map), the map it
+   was fought on.  A field map is claimed when a formation of its own pool
+   was fought there.  A world sector byte (world_battle_group.dat, bytes
+   0-255 the World of Balance, 256-511 the World of Ruin; field/battle.asm
+   CheckBattleWorld indexes it world*256 + (y & $E0) + ((x >> 3) & $1C) +
+   the terrain's group) is claimed when a formation of its group was
+   fought on that world's map and, once the [tiles] trace records world
+   coordinates (#288), the party walked that sector; until then a group
+   shared by a played sector and an unplayed one claims both.  The hand list this
+   replaced claimed fifteen World of Ruin maps nobody had visited and the
+   whole WoB overworld (Triangle Island, the airship-only isles), and
+   missed Esper Mountain and the Floating Continent.  With no logs the
+   claim is empty, and the audit says so.
 """
 
-# ---- THE TUNING CLAIM (may only grow) -----------------------------------
-# Field maps the fighting run has validated by play, area by area,
-# plus the WoB world sectors (world_battle_group.dat bytes 0-255; bytes
-# 256-511 are the WoR and are unclaimed).
-CLAIMED_FIELD = set(
-    [3, 4, 9, 20, 21, 30, 32, 33, 34, 35, 36, 37, 38, 39, 41, 42, 43,
-     48, 49, 50, 107]                       # narshe: mines, town, caves
-    + [53, 55, 57, 58, 59, 60, 61, 62, 63, 64, 68, 69, 70, 71, 72, 73,
-       75, 76, 77, 78, 80, 81, 83, 84, 85, 86, 87, 90, 91, 92]  # figaro/SF
-    + [95, 96, 97, 98, 100, 101, 102, 103]  # mt. kolts
-    + [108, 109, 110, 112, 113, 114]        # returners / lete / split
-    + [115, 120, 125, 126, 130, 132, 133, 134, 135, 140, 141, 142,
-       144, 145, 146, 149, 151, 152, 153]   # sabin scenario / train
-    + [221, 225]                            # zozo
-    + [240, 242, 253, 262, 263, 264, 269, 271, 273]  # vector / mrf
-    + [323, 332]                            # albrook
-    + [377, 382, 383, 384, 385, 386]        # base / sealed gate cave
-)
-CLAIMED_WORLD_SECTORS = set(range(256))     # the WoB overworld
-
-import json, os, sys
+import glob, json, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def rd(p): return open(os.path.join(ROOT, p), 'rb').read()
@@ -121,6 +116,72 @@ with open(os.path.join(ROOT, 'ff6/src/battle/ot6_break_floor.inc')) as f:
                     except ValueError: continue
                 floor[i] = val; i += 1
 
+# ---- THE TUNING CLAIM, from the route's own battles (#287) --------------
+SEED_BATTLE = re.compile(r'^\[ot6\] \[seed\] (?:first )?battle: .*?key be[0-9A-F]{2}-g([0-9A-F]{4})')
+OUTCOME = re.compile(r'^\[ot6\] .*\[outcome\] battle \$([0-9A-F]{3}) ')
+TILES = re.compile(r'^\[ot6\] \[tiles\] map=(\d+) ')
+
+
+XY = re.compile(r'xy=(\S+)')
+
+
+def fought_by_map(paths):
+    """{map: {formation}}: each battle a log names, on the map whose
+    [tiles] line comes next (the trace flushes a map as the party leaves
+    it, and a battle leaves $1F64 on its field map).  Also fills WALKED
+    with each world's walked sector bases."""
+    out = {}
+    for path in paths:
+        pending = set()
+        with open(path, errors='replace') as f:
+            for line in f:
+                m = SEED_BATTLE.match(line) or OUTCOME.match(line)
+                if m:
+                    pending.add(int(m.group(1), 16))
+                    continue
+                t = TILES.match(line)
+                if t and int(t.group(1)) in (0, 1):
+                    w = int(t.group(1))
+                    for xy in XY.search(line).group(1).split(','):
+                        x, _, y = xy.partition(':')
+                        if x.isdigit() and y.isdigit() and (int(x), int(y)) != (0, 0):
+                            TILESEEN.setdefault(w, set()).add((int(x), int(y)))
+                            WALKED.setdefault(w, set()).add(
+                                w * 256 + (int(y) & 0xE0) + ((int(x) >> 3) & 0x1C))
+                if t and pending:
+                    out.setdefault(int(t.group(1)), set()).update(pending)
+                    pending = set()
+    return out
+
+
+# {world: {sector base byte}} walked, from [tiles] lines with world
+# coordinates; empty for a world whose logs carry none (#288)
+WALKED = {}
+TILESEEN = {}
+
+
+LOGS = sorted(glob.glob(os.path.join(ROOT, 'build', 'states', '*.log')))
+FOUGHT = fought_by_map(LOGS)
+# a world's walked sectors count once its logs record the world trace
+# (#288): the blind trace wrote only the field coordinates of map-change
+# frames under map=0/1, 56 distinct tiles across the 217 logs of
+# 2026-10-05, where one World of Ruin leg alone walks 221
+WALKED = {w: secs for w, secs in WALKED.items() if len(TILESEEN[w]) >= 100}
+
+
+def group_forms(g):
+    return {rbg[g*8+i] | (rbg[g*8+i+1] << 8) for i in range(0, 8, 2)}
+
+
+CLAIMED_FIELD = {m for m in range(len(props)//33)
+                 if props[m*33+5] & 0x80
+                 and group_forms(sbg[m]) & FOUGHT.get(m, set())}
+CLAIMED_WORLD_SECTORS = {sec for sec in range(512)
+                         if wbg[sec] != 0xFF
+                         and group_forms(wbg[sec]) & FOUGHT.get(sec // 256, set())
+                         and (sec // 256 not in WALKED
+                              or sec & ~3 in WALKED[sec // 256])}
+
 PARTY_CLASSES = 0x01 | 0x02 | 0x04          # slash+pierce+bludg, broadly held
 PARTY_ELEMS   = 0x01 | 0x02 | 0x04          # fire+ice+bolt once espers exist
 
@@ -181,13 +242,20 @@ for sec in range(512):
     forms = [rbg[g*8+i] | (rbg[g*8+i+1] << 8) for i in range(0, 8, 2)]
     lines = pool_report(f'sector {sec}', forms)
     if lines:
-        tag = '' if claimed else '  [WoR: UNCLAIMED/UNTUNED]'
+        tag = '' if claimed else '  [UNCLAIMED/UNTUNED]'
         print(f'world group {g:3d} (first sector {sec}):{tag}')
         for l in lines: print(l)
 
-print(f'tuning claim: {len(CLAIMED_FIELD)} field maps + the WoB overworld; '
-      f'{len(unclaimed)} battle-enabled maps UNCLAIMED (WoR + not yet '
-      f'validated) -- the claim may only grow')
+nfought = sum(len(v) for v in FOUGHT.values())
+print(f'tuning claim, from {len(LOGS)} generator log(s) in build/states '
+      f'({nfought} map+formation pairs fought): {len(CLAIMED_FIELD)} field '
+      f'maps {sorted(CLAIMED_FIELD)}; world sector bytes: '
+      f'{len([s for s in CLAIMED_WORLD_SECTORS if s < 256])} of the WoB, '
+      f'{len([s for s in CLAIMED_WORLD_SECTORS if s >= 256])} of the WoR '
+      f'(walked sectors known for world(s) {sorted(WALKED) or "none"}); '
+      f'{len(unclaimed)} battle-enabled maps UNCLAIMED')
+if not LOGS:
+    print('  (no generator logs: nothing is claimed until the route is played)')
 
 if NOKEY[0]:
     print(f'RATCHET: {NOKEY[0]} no-key formation(s) -- the build gate refuses')

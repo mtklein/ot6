@@ -4,6 +4,13 @@
   "slot": 3,
   "milestone": "fire-out",
   "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "x": 249,
+      "y": 128
+    }
+  },
   "size": 32768,
   "sha256": "3456a2664d1c82a64df55f54204604e570fe46956c460d61a4b82aefe470249f",
   "provenance": {

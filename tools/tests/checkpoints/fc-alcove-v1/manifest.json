@@ -4,6 +4,14 @@
   "slot": 3,
   "milestone": "fc-alcove",
   "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 358,
+      "x": 8,
+      "y": 10
+    }
+  },
   "size": 32768,
   "sha256": "0b9b4a3966abd3235e70425d114352048bcde32c915bc3a105729275d8a6283a",
   "provenance": {

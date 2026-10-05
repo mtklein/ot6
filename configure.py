@@ -563,7 +563,10 @@ check("break_coverage_ratchet", "python3 tools/audit_break_coverage.py",
        "ff6/src/field/rand_battle_group.dat",
        "ff6/src/field/world_battle_group.dat",
        "ff6/src/battle/battle_monsters.dat",
-       "ff6/src/battle/monster_prop.dat"])
+       "ff6/src/battle/monster_prop.dat"]
+      # the tuning claim is read from the generator logs (#287), which are
+      # written beside the stamps
+      + all_stamps)
 # One row per species (#157): Ot6SeedShields takes the FIRST match, so a
 # second Ot6ShieldTbl/Ot6ElemAddTbl row for a species is dead code that
 # reads as authored.  Source and the shipped ROM table must agree row for
@@ -684,7 +687,7 @@ check("checkpoint_negatives", "nice sh tools/tests/lib/checkpoint_negatives.sh",
 check("retry_negative", "nice sh tools/tests/lib/retry_negative.sh",
       ["tools/tests/lib/retry_negative.sh", "tools/tests/run.sh",
        "tools/tests/lib/compose.py",
-       copy_if_changed_from("tools/tests/probe_retry_negative.lua"),
+       copy_if_changed_from("tools/tests/lib/retry_negative.lua"),
        copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR)]
       + [copy_if_changed_from(h) for h in LIBS])
 # #309: every instrument left in tools/tests (`-- @manual`) composes and
