@@ -115,6 +115,10 @@ local function invIdx(item)
     end
   end
 end
+local function invCount(item)
+  local i = invIdx(item)
+  return i and H.readByte(BATTINV + i * 5 + 3) or 0
+end
 local function cmdCell(a, cmd)
   for r = 0, 3 do
     if H.readByte(0x202E + a * 12 + r * 3) == cmd then return r end
@@ -145,6 +149,16 @@ local function aheadOf(x)
     if e ~= 0xFF then n = n + 1 end
   end
 end
+-- The blow on him waits in the action queue itself (not its advance wait)
+-- behind something: an action still to run ahead of it, or one playing now.
+-- A spin he commits then joins the queue behind the blow, so the blow runs
+-- first whenever it has not run by his commit (#377: a blow still in its
+-- advance wait at his window either landed before his commit or joined the
+-- queue after his spin, which then ran).
+local function queuedBehind(t)
+  local n = t and aheadOf(t)
+  return n ~= nil and (n >= 1 or executing ~= nil)
+end
 -- His gauge is full and nothing of his is queued: his window is next in line.
 local function setzerReady()
   return php(actor) > 0 and H.readByte(0x3219 + actor * 2) == 0
@@ -162,6 +176,7 @@ end
 --   * else Defend.
 local attackSetzer = true
 local monsterActing, monsterStart = nil, 0   -- a monster's action in progress (exec watches)
+local executing, execStart = nil, 0          -- any entity's action in progress (ExecAction..Ot6ActionEnd)
 local skipPoint = false      -- playing on from a branch point: not that window again
 local ctl, ctlDone = nil, false   -- the control spin (the approach, below)
 local blows = {}             -- what the members' Fights have taken off Setzer
@@ -330,7 +345,16 @@ local function branchPoint()
     and H.readByte(MSTATE) == ST_CMD and php(actor) > 0 and low() and bp(actor) >= 1
     and threatOn(actor) ~= nil and php(actor) < blow() and ctlDone
     and bp(actor) < 5                     -- below the cap, where the pip shows
-    and aheadOf(threatOn(actor)) == nil   -- the blow is still in its advance wait
+    and queuedBehind(threatOn(actor))     -- the blow waits in the queue, behind something
+end
+-- At his window with the blow still in its advance wait, he waits (the pad
+-- idle, as a person may) up to HOLD_MAX frames for it to join the queue.
+local HOLD_MAX = 120
+local function holdForBlow()
+  local t = threatOn(actor)
+  return ctlDone and t ~= nil and aheadOf(t) == nil and H.readByte(MSTATE) == ST_CMD
+    and php(actor) > 0 and low() and bp(actor) >= 1 and bp(actor) < 5
+    and php(actor) < blow() and (SD.hold or 0) < HOLD_MAX
 end
 
 -- ---------------------------------------------------------- the branches
@@ -409,10 +433,20 @@ local function approachFrame()
       end
     end
   end
+  if H.readByte(MENU) ~= 0 and php(actor) == 0 and raising == nil then
+    -- a window is up and he is down with nothing on its way to raise him:
+    -- without a Fenix Down no branch point can come (#377's sweep2 k5 spent
+    -- 40000 frames healing around a fallen Setzer with an empty bag)
+    H.assertEq(invCount(FENIX) > 0, true, string.format("precondition: a Fenix Down to " ..
+      "raise SETZER (battle %d, point %d: the bag is out)", battles, points))
+  end
   if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor then
     W = {}
     if ctl and ctl.commit and ctl.away and not ctl.done then ctl = nil end  -- dropped: again
-    if not ctlDone and (ctl == nil or not ctl.commit) and not low() and bp(actor) >= 1 then
+    if not skipPoint and holdForBlow() then
+      SD.hold = (SD.hold or 0) + 1
+      H.setPad({})
+    elseif not ctlDone and (ctl == nil or not ctl.commit) and not low() and bp(actor) >= 1 then
       ctl = ctl or {}
       setzerSpin()
     elseif ctlDone and bp(actor) >= BANK_SPEND then
@@ -423,7 +457,7 @@ local function approachFrame()
   else
     if ctl and ctl.commit then ctl.away = true end
     skipPoint = false
-    SD.n, SS.n = 0, 0
+    SD.n, SS.n, SD.hold = 0, 0, 0
     pageOrOther()
   end
 end
@@ -451,6 +485,7 @@ local function branchFrame()
       end
     end
   end
+  if not rec.hit and php(actor) < rec.hp0 then rec.hit = H.frame end  -- the blow lands
   if not rec.commit and php(actor) == 0 then
     rec.lost = H.frame                     -- the blow landed before the commit
     return
@@ -497,7 +532,7 @@ local function branch(j, wait)
       H.checkReq(req, "snapshot load (branch " .. j .. " of point " .. points .. ")")
       H.rearmInputInjection()
       k = #recs + 1
-      rec = { k = k, wait = wait, point = points }
+      rec = { k = k, wait = wait, point = points, f0 = H.frame, hp0 = php(actor) }
       recs[#recs + 1] = rec
       commitHit, endHit = false, nil
       attackSetzer = false
@@ -513,6 +548,9 @@ local function branch(j, wait)
     end, 9000, { H.call(branchFrame), H.waitFrames(1) }, "a branch: the spin's turn ends"),
     H.call(function()
       local c, d = rec.commit, rec.done
+      local function off(f) return f and string.format("+%d", f - rec.f0) or "-" end
+      H.log(string.format("[cancel] branch %d timing from the window: commit %s, blow lands %s, " ..
+        "fell %s", k, off(c and c.f), off(rec.hit), off(rec.lost or rec.fell)))
       if not c then
         H.log(string.format("[cancel] branch %d: NO COMMIT: %s", k, rec.lost and
           string.format("he fell at f%d, before the commit press", rec.lost)
@@ -591,8 +629,9 @@ local function drawBattle(tag, tries)
     actor = nil
     for s = 0, 3 do if chid(s) == SETZER then actor = s end end
     H.assertEq(actor ~= nil, true, tag .. ": SETZER present")
-    H.log(string.format("%s: setzer slot %d monsters={%s} | party %s", tag, actor,
-      table.concat(msPresent, ","), partyLine()))
+    H.log(string.format("%s: setzer slot %d monsters={%s} | party %s | bag: %d Fenix Down, " ..
+      "%d Potion", tag, actor, table.concat(msPresent, ","), partyLine(), invCount(FENIX),
+      invCount(POTION)))
   end)
   return steps
 end
@@ -643,10 +682,12 @@ local function round()
       local t = threatOn(actor)
       H.log(string.format("[cancel] branch point %d f%d (battle %d): hp %d/%d, pending %d, " ..
         "bank %d; entity %d's queued Fight targets him (%s), the members' median blow " ..
-        "%s | party %s", points, H.frame, battles, php(actor), pmax(actor),
+        "%s | party %s | playing: %s | held %d", points, H.frame, battles, php(actor), pmax(actor),
         pend(actor), bp(actor), t, aheadOf(t) and string.format(
         "%d action(s) ahead of it in the queue", aheadOf(t)) or "still in its advance wait",
-        string.format("%d of %d", blow(), #blows), partyLine()))
+        string.format("%d of %d", blow(), #blows), partyLine(),
+        executing and string.format("entity %d for %d frame(s)", executing, H.frame - execStart)
+        or "nothing", SD.hold or 0))
       H.setPad({})
       snap = H.requestSaveState()
     end),
@@ -688,6 +729,7 @@ local steps = {
     emu.addMemoryCallback(function()
       local x = emu.getState()["cpu.x"] & 0xffff
       if x == monsterActing then monsterActing = nil end
+      if x == executing then executing = nil end
       if actor == nil then return end
       if x == actor * 2 then
         -- what ended: the ROM's own record of a fresh turn with nothing to
@@ -702,6 +744,7 @@ local steps = {
     local ea = H.sym("ExecAction")
     emu.addMemoryCallback(function()
       local x = emu.getState()["cpu.x"] & 0xff
+      executing, execStart = x, H.frame
       if x >= 8 then monsterActing, monsterStart = x, H.frame end
     end, emu.callbackType.exec, ea, ea)
     local addr = H.seedStoreAddr()
