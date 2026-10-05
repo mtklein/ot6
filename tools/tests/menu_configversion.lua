@@ -215,6 +215,8 @@ local SETTINGS = 0x1d4d                 -- $1d4d-$1d54: the Config options
 local before = {}
 
 H.run({ maxFrames = 40000 }, {
+  -- it reads the screen's pixels itself, outside a battle (#394)
+  H.call(H.renderAlways),
   -- cold Continue (the checkpoint's $307ff0=3 preselects slot 3)
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),

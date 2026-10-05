@@ -352,6 +352,13 @@ global and asserts which boot actually ran (`H.lastState` is set by
   them in a one-shot trampoline (`H.requestSaveState`/`H.requestLoadState`).
 - Screenshots: `emu.takeScreenshot()` works headless, returns a 256x224 RGB
   PNG string; empty during the first ~100 frames.
+- Render on demand (#394, tools/mesen/README.md): under `H.run` the
+  emulator draws only the frames the lib asks for, so a frame's pixels
+  exist only if it was asked for a callback ahead.  `H.screenshot` handles
+  it (a frame not drawn is shot on the next one); a script that reads
+  pixels itself (`emu.takeScreenshot`, `emu.getScreenBuffer`) calls
+  `H.renderAlways()` first, or `H.requestRender()` the callback before the
+  read.  A read of a frame that was not drawn raises.
 - `emu.getState()` returns a flat dotted-key table: `s["ppu.scanline"]`,
   `s["cpu.pc"]`; `s.ppu` is nil, and indexing it inside a callback throws
   silently, skipping the rest of that invocation.

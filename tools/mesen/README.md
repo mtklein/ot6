@@ -1,26 +1,29 @@
 # OT6's Mesen
 
 OT6's harness runs its own build of Mesen: MesenCE 2.2.1
-(github.com/nesdev-org/MesenCE, tag `2.2.1`, commit `20ba206c`) with three
-small changes, kept as commits (tag `ot6-2.2.1-1`) on OT6's fork,
+(github.com/nesdev-org/MesenCE, tag `2.2.1`, commit `20ba206c`) with four
+small changes, kept as commits (tag `ot6-2.2.1-4`) on OT6's fork,
 github.com/mtklein/mesen (GPL v3, in Mesen's fork network; its
 `OT6-CHANGES.md` is the change notice):
 
 - **Script-only debugger mode** (below), for speed.
 - **Screenshot sync** (below), for correct screenshots.
+- **Render on demand, and a debugger that pays only for the script's
+  callbacks** (below), for speed (#394).
 - **SDK roll-forward**: `UI/global.json` lets the .NET SDK roll forward to a
   newer major version, so the .NET 10 SDK on px13 builds it as dotnet@8
   does on the Macs. It changes no code.
 
 `EMULATOR` pins the build: one line, `<repository> <tag> <commit>`
-(today `https://github.com/mtklein/mesen ot6-2.2.1-1 40586fe8...`).
+(today `https://github.com/mtklein/mesen ot6-2.2.1-4 25f8ce92...`).
 `build.sh` builds that commit and nothing else. The same file is an input of
 every generate, chain and suite edge (configure.py), like the ROM: a new pin
 regenerates every fixture and re-runs every test, and through the chain's
 captures `checkpoint_drift.py` then asks for every cut checkpoint to be
 re-cut before a release. So moving to a new emulator build is: push the
 commit to the fork, tag it `ot6-<base>-<n>`, change `EMULATOR`, build and
-deploy it on every machine, then regenerate (`ninja chain`, `ninja`).
+deploy it on every machine (Deploying, below: per pin, so trees on the old
+pin keep running), then regenerate (`ninja chain`, `ninja`).
 The file holds no comments, so only a real change regenerates anything.
 
 Until 2026-10-01 the harness ran the same two code changes on SourMesen's
@@ -97,6 +100,60 @@ there sometimes copied the previous frame. The change makes the screenshot
 wait for the pending decode, so it is always the frame the emulation thread
 just finished.
 
+## Render on demand
+
+Drawing the picture was about 27% of a headless frame, and the harness looks
+at few frames (tools/mesen/experiments/render-cost/summary.txt). A script
+that calls `emu.setRenderOnDemand(true)` gets only the frames it asks for
+with `emu.requestRender()` drawn: the request is read after the StartFrame
+event, so a `startFrame` callback can ask for the frame starting then, and
+the next callback reads it. It goes through Mesen's own frame-skip path
+(`_skipRender`). Drawing leaves one piece of machine state behind: the
+palette lookups set the PPU's `InternalCgramAddress`, which savestates
+carry and a CGRAM access during rendering uses (review of #394). So a
+frame not drawn still evaluates -- tile fetch, layers and backdrop, no
+output -- the lines whose lookups can be its last: the last visible line,
+every line when HDMA writes INIDISP, the line where forced blank turned on
+the frame before, and the current line when forced blank turns on. A flag
+tracks when the address may still differ from drawing every frame, and a
+savestate or a CGRAM access during rendering while it is set is counted
+(`emu.getRenderOnDemandInexact()`; `lib/ot6.lua` fails such a run). On
+replays of three harness runs the old build and this one end with the same
+WRAM, ARAM, VRAM, OAM, CGRAM, SRAM and `emu.getState()`, and the address
+at every frame's start is the same (build/attempts/wt/v026-lib/394/ab/
+replay/, replaycg/; the first cut, which didn't evaluate, differed there on
+48 forced-blank frames of gen_whelk_poweron). A frame not drawn isn't handed
+to the video decoder, so `emu.takeScreenshot()` and `emu.getScreenBuffer()`
+keep the last frame drawn, and so does a savestate's picture;
+`emu.isFrameRendered()` says whether the frame just finished was drawn.
+Unloading the script turns it off.
+
+`lib/ot6.lua` turns it on in `H.run` and asks for a frame ahead of each
+read it makes (the watchdog's screen hash every 16 frames, the live shot
+every 128); `H.screenshot` of a frame that wasn't drawn is taken on the
+next one, and battleActive reads the battle's brightness byte instead of
+a screenshot.
+A raw pixel read of a frame that wasn't drawn raises; a script reading
+pixels itself calls `H.renderAlways()` or `H.requestRender()` a frame
+ahead.
+
+## Script callbacks, paid per use
+
+In script-only mode the hot paths (each memory access, instruction, idle
+cycle and PPU cycle) test inline, in `Emulator.h` and `Debugger.h`, whether
+the CPU is quiet (script-only, no step, break, breakpoint, trace log or
+step back) and whether any script has a callback that this access could
+run: callbacks are counted per type (read, write, exec) and per CPU, and
+the union of every script's 256-byte page filter is kept in the Debugger.
+Only then do they call into the debugger. The test is the one the
+out-of-line code already made before skipping the per-CPU debugger, so
+nothing that runs changes; a run pays for the callbacks it registered and
+nothing per cycle otherwise. On gen_whelk_poweron (macOS `sample`, 1 ms)
+the debugger and script bookkeeping went from 16.0% of samples to 1.7%
+(build/attempts/wt/v026-lib/394/prof/whelk_new1 and whelk_new4).
+`RewindManager::IsRewinding` is inline too, and the harness turns rewind
+off (`lib/pin_test_saves.py`; `OT6_REWIND=1` keeps it, to measure it).
+
 ## Building (Linux x64)
 
 ```
@@ -162,34 +219,52 @@ publishes that line beside each `.mss` it publishes
 into the stamp's `emulator <sha256>` line, so the two agree. Both are
 records of which binary ran; what makes fixtures regenerate is `EMULATOR`.
 
-## Deploying on a Linux worker (px13)
+## Deploying
 
-run.sh runs `tools/Mesen-linux/Mesen` of the main tree (`~/ot6`; worktrees
-link to it) through one machine-wide shared copy, which it refreshes when
-the binary's size or mtime changes. So deploying is replacing that file
-while no ninja or run.sh is alive on the machine (other agents' included).
-`~/mesen-patched/` keeps every build deployed, as
-`<base>-<sha8>-Mesen` with its `.buildinfo` (`2.1.1-48baed80-Mesen`,
-`2.2.1-b5a407c3-Mesen`, ...), so the one replaced is the rollback:
+Each machine keeps every pinned build in its own directory,
+`~/mesen-pins/<commit>/` (`Mesen.app` and `Mesen.app.buildinfo` on a Mac,
+`Mesen` and `Mesen.buildinfo` on Linux), and run.sh runs the one the tree's
+`EMULATOR` names, through a machine-wide shared copy of its own
+(`Mesen-test-<commit12>` in `~/Library/Caches/ot6` or `~/.cache/ot6`). So
+trees on different pins run side by side on one machine, and deploying a
+new pin is adding its directory: no tree on another pin notices, and
+nothing has to wait for other agents' runs to finish. A machine without the
+pin's directory falls back to the main tree's `tools/Mesen.app`
+(`tools/Mesen-linux/Mesen`), the way it ran before #394, and run.sh still
+refuses any build whose packed record (`python3 tools/mesen/buildinfo.py
+<binary>`) is not `EMULATOR`'s line, so a machine missing the pin stops
+rather than regenerating under it with the wrong emulator.
+
+On every machine (px13, the Air, this Mac), after building
+(`tools/mesen/build.sh`, which ends with the smoke test):
 
 ```
-cd ~/ot6
-tools/mesen/build.sh ~/work/mesen-build        # builds and smoke-tests against ~/mesen-reference
-B=~/work/mesen-build/Mesen2/bin/linux-x64/Release/linux-x64/publish/Mesen
-n=$(sha256sum $B | cut -c1-8)
-mkdir -p ~/mesen-patched && cp -p $B ~/mesen-patched/2.2.1-$n-Mesen && cp -p $B.buildinfo ~/mesen-patched/2.2.1-$n-Mesen.buildinfo
-install -m 755 $B tools/Mesen-linux/Mesen
-sha256sum tools/Mesen-linux/Mesen               # = sha256 in the buildinfo
+P=~/mesen-pins/$(cut -d' ' -f3 tools/mesen/EMULATOR); mkdir -p $P
+# macOS
+B=~/work/mesen-build/Mesen2/bin/osx-arm64/Release/osx-arm64/publish   # or a copy from another Mac
+ditto $B/Mesen.app $P/Mesen.app && cp -p $B/Mesen.app.buildinfo $P/
+shasum -a 256 $P/Mesen.app/Contents/MacOS/Mesen    # = sha256 in the buildinfo
+# Linux
+B=~/work/mesen-build/Mesen2/bin/linux-x64/Release/linux-x64/publish
+install -m 755 $B/Mesen $P/Mesen && cp -p $B/Mesen.buildinfo $P/
+sha256sum $P/Mesen                                  # = sha256 in the buildinfo
 ```
 
-The next run.sh then rebuilds the shared copy and logs the new
-`[emulator]` sha and `commit=`. run.sh refuses to run while the deployed
-build's packed record (`python3 tools/mesen/buildinfo.py <binary>`) is not
-`EMULATOR`'s line, so a machine left on the old build after a pin change
-stops rather than regenerating under the new pin. To roll back, install the kept binary the same way. A
-deployment whose `EMULATOR` change has landed is followed by regeneration
-(`ninja chain`, the checkpoint re-cut, `ninja`); a rollback that keeps
-`EMULATOR` regenerates nothing, so roll back `EMULATOR` with it.
+The next run.sh in a tree on that pin builds the shared copy (a Gatekeeper
+scan of a few seconds on a Mac, once) and logs the new `[emulator]` sha and
+`commit=`. Old pins' directories can stay; one no tree uses any more can be
+deleted. A deployment whose `EMULATOR` change has landed is followed by
+regeneration (`ninja chain`, the checkpoint re-cut, `ninja`); rolling back
+is reverting `EMULATOR`, which finds the old pin's directory (or the
+fallback) again. `tools/Mesen.app` stays the bundle for playing by hand
+(`tools/gui.sh`); the 2.2.1 builds deployed there before per-pin
+directories are kept in `~/mesen-patched/` as `2.2.1-<sha8>-Mesen[.app]`.
+
+ot6-2.2.1-4 (25f8ce92) is deployed on all three (2026-10-05), each machine
+its own build of it: mbp executable `91fc1bed...f26f` (core `b43f2d35...183d`), the Air `015ead3e...75eb`
+(core `825b8c6a...7712`), px13 `ff5f9e06...cf39` (core `b8026921...ee8f`); every build passed the smoke test
+("smoke test: OK -- battle_banner's 30 [ot6] lines match the reference
+build's", build/attempts/wt/v026-lib/394/builds/*-2.2.1-4*).
 
 ## Building (macOS arm64)
 
@@ -232,37 +307,3 @@ pre-seed a worker's home with a core, so every run loads the packed one,
 which the executable's sha256 covers, and the `[emulator]` line also
 carries the core that run loaded (`core=<sha256>`, hashed in the home
 afterwards): the `packed_mesencore_sha256` of `Mesen.app.buildinfo`.
-
-## Deploying on a Mac
-
-run.sh runs the main tree's `tools/Mesen.app` (worktrees link to it) through
-a machine-wide shared copy, refreshed when the executable's size or mtime
-changes; a new bundle path costs a Gatekeeper scan of a few seconds on its
-first run. A bundle used by hand in portable mode keeps that profile inside
-it (settings.json, Saves, SaveStates, RecentGames ...), so the new bundle
-takes those along, but not the dependencies Mesen unpacked there. While no
-ninja or run.sh is alive on the machine (other agents' included):
-
-```
-cd ~/ot6
-B=~/work/mesen-build/Mesen2/bin/osx-arm64/Release/osx-arm64/publish/Mesen.app   # or a copy from another Mac
-old=$(shasum -a 256 tools/Mesen.app/Contents/MacOS/Mesen | cut -c1-8)
-n=$(shasum -a 256 "$B/Contents/MacOS/Mesen" | cut -c1-8)
-mkdir -p ~/mesen-patched && ditto tools/Mesen.app ~/mesen-patched/2.2.1-$old-Mesen.app   # the rollback, profile and all
-ditto "$B" ~/mesen-patched/2.2.1-$n-Mesen.app && cp -p "$B.buildinfo" ~/mesen-patched/2.2.1-$n-Mesen.app.buildinfo
-ditto "$B" tools/Mesen.app.new
-for f in tools/Mesen.app/Contents/MacOS/*; do
-  n=$(basename "$f")
-  [ -e "tools/Mesen.app.new/Contents/MacOS/$n" ] && continue
-  case "$n" in MesenCore.dylib|MesenNesDB.txt) continue ;; esac   # unpacked by Mesen, not profile
-  ditto "$f" "tools/Mesen.app.new/Contents/MacOS/$n"
-done
-mv tools/Mesen.app tools/Mesen.app.old && mv tools/Mesen.app.new tools/Mesen.app && rm -rf tools/Mesen.app.old
-shasum -a 256 tools/Mesen.app/Contents/MacOS/Mesen   # = sha256 in the buildinfo
-```
-
-(`2.2.1-` names the base of the bundle being kept; the 2.1.1 bundles are
-`~/mesen-patched/2.1.1-dbb67f06-Mesen.app`.) The next run.sh rebuilds the
-shared copy and logs the new `[emulator]` sha. To roll back, put the kept
-bundle back the same way (carry anything newer in its profile across with
-the same loop), with `EMULATOR` rolled back too.
