@@ -220,6 +220,7 @@ end, emu.callbackType.write, 0x7E3EE4 + 8, 0x7E3EE4 + 0x13)
 do
   local check = H.sym("CheckBattleWorld")
   emu.addMemoryCallback(function()
+    H.vars.checks = (H.vars.checks or 0) + 1
     local ok, g = pcall(H.worldCheckGroup)
     if not ok then H.log("[budget] CheckBattleWorld watch: " .. tostring(g)) end
     worldGroup = ok and g or nil
@@ -492,6 +493,8 @@ local function encounter(tag)
   for n = 1, MAXDRAWS do
     local w = walkSteps(n)
     table.insert(w, 5, H.call(function()
+      H.log(string.format("[budget] draw %d: %s CheckBattleWorld call(s), group %s", n,
+        tostring(H.vars.checks), tostring(worldGroup)))
       if group == nil then group, budget = worldGroup, budgetFor(worldGroup) end
       H.assertEq(worldGroup, group, string.format("%s draw %d was dealt by group %s, the "
         .. "pool its budget was decoded from (%s)", tag, n, tostring(worldGroup), tostring(group)))
