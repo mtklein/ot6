@@ -4,6 +4,13 @@
   "slot": 3,
   "milestone": "thamasa-done",
   "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "x": 249,
+      "y": 128
+    }
+  },
   "size": 32768,
   "sha256": "b4b6c3bb6209eaf6cb69100249c058b4b60550c317d2d3ef2ab2745fae4c4ea5",
   "provenance": {

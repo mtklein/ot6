@@ -517,7 +517,7 @@ runs every script through the **segment runner** at the bottom of
 `tools/tests/segment_retry.lua` (suite) proves the replay: a `nopath`
 raised on attempt 1 passes on attempt 2 with rebuilt locals and steps;
 `lib/retry_negative.sh` (`ninja build/checks/retry_negative.ok`) runs
-`probe_retry_negative.lua` through run.sh and asserts the red verdict a
+`lib/retry_negative.lua` through run.sh and asserts the red verdict a
 suite cannot expect: an assert failing on attempt 1 of 3, no `attempt
 2/3` line, and a FAIL that names `class=assert` as not seed-dependent.
 `H.attemptFailures()` returns the earlier attempts' `{ attempt, class,
@@ -535,8 +535,12 @@ and a sweep leave the logs a merge message or a design doc then quotes.
 They are gitignored and they live in the worktree the work was done in, so
 `git worktree remove` takes the cited lines with them (#222: three design
 docs carry citations that resolve nowhere). Run the script first: it copies
-those three trees into the main tree under `build/attempts/<branch>/`,
-relative paths preserved, and cite the retained path.
+`build/attempts/` to the same path in the main tree, so a citation of
+`build/attempts/<x>` resolves as written (#248), and `build/lab/` and
+`build/sweeps/` under `build/attempts/<branch>/`, relative paths preserved;
+cite those by the retained path. A worktree made by
+`tools/worktree-setup.sh` writes `build/attempts/` into the main tree's
+already, and the script skips it.
 
 Text evidence only — logs, tables, traces, the one-off script copies a lab
 ran, screenshots under `--max-bytes` — never savestates, ROMs or archives,

@@ -4,6 +4,14 @@
   "slot": 3,
   "milestone": "minecart-platform",
   "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 272,
+      "x": 3,
+      "y": 55
+    }
+  },
   "size": 32768,
   "sha256": "203f6f882d7f2e3eef231323e2830a7dffbd0732735c67dfc8fec44e971d00f2",
   "provenance": {

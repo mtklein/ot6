@@ -4,6 +4,13 @@
   "slot": 3,
   "milestone": "crescent-landing",
   "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "x": 232,
+      "y": 150
+    }
+  },
   "size": 32768,
   "sha256": "a296d03d1b05ae58642ea35ecaf948edb062bbc6d25aca13f2e1dfe085257db8",
   "provenance": {

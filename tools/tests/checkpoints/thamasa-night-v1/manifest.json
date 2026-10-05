@@ -4,6 +4,13 @@
   "slot": 3,
   "milestone": "thamasa-night",
   "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "x": 249,
+      "y": 128
+    }
+  },
   "size": 32768,
   "sha256": "415809b0ede16e73a910e17722a6a8ecbf6b8d965798e5c4ce01be8764b8ea4f",
   "provenance": {

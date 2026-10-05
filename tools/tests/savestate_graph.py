@@ -439,8 +439,9 @@ STATES = [
       checkpoint="minecart-platform-v1",
       cutter="gen_minecart_platform_checkpoint"),
     # ---- boundaries E and F ------------------------------------------------
-    # gen_vector_escape_checkpoint cuts E's tracked SRAM checkpoint from
-    # n128_won; nothing boots it (NOT_GATED, below).
+    # E's checkpoint (vector-escape-v1, cut from n128_won by hand) was
+    # booted by nothing and is retired (#356); gen_n128 still asserts its
+    # exit contract.
     # The E->F step (Cranes -> Terra's return -> the Esper-World flashback ->
     # takeoff -> the grounded-Blackjack world save at (24,121)) lives WHOLE
     # in gen_terra_returned_checkpoint -- §5 forbids splitting it (a save inside
@@ -851,19 +852,7 @@ STATES = [
 # Only a checkpoint nothing boots -- no state above, no suite in
 # configure.py's TEST_ENV -- may stand here; savestate_ninja.py --coverage
 # refuses a booted one, and any tracked checkpoint that is neither captured
-# by the chain nor named here.  These are by-hand cuts from qualification
-# states (tools/tests/reseal_seeds.sh, or the cutter named), kept for
-# by-hand use; one becomes gated the day something boots it (a cut with its
-# cutter=).
-NOT_GATED = {
-    "vector-escape-v1": "booted by nothing; gen_vector_escape_checkpoint "
-                        "cuts it from n128_won by hand",
-    "sfigaro-basement-v1": "booted by nothing; gen_seed_basement cuts it "
-                           "from sfigaro_escape (reseal_seeds.sh)",
-    "train-engineer-v1": "booted by nothing; gen_seed_train cuts it from "
-                         "train_done (reseal_seeds.sh)",
-    "terra-caves-v1": "booted by nothing; gen_seed_terracave cuts it from "
-                      "terra_clifftop (reseal_seeds.sh)",
-    "world-sfigaro-v1": "booted by nothing; gen_seed_worldsfigaro cuts it "
-                        "from south_figaro (reseal_seeds.sh)",
-}
+# by the chain nor named here.  Empty since #356: the five that stood here
+# (vector-escape-v1 and the four reseal_seeds.sh seeds) were booted by
+# nothing and went with their cutters.
+NOT_GATED = {}
