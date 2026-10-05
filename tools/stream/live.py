@@ -237,6 +237,8 @@ async function tick(){ try{
       grid.appendChild(t);
     }
     const img = t.querySelector('img');
+    // a load that fails clears the mark, so the next tick asks again
+    if(!img.onerror) img.onerror = ()=>img.removeAttribute('data-s');
     if(w.shot && img.getAttribute('data-s')!==w.shot){
       img.setAttribute('data-s', w.shot); img.src = w.shot; }
     t.querySelector('.nm').textContent = w.name;
@@ -521,6 +523,7 @@ def ensure_map(webroot):
 SHOT_B = re.compile(rb"^\[ot6shot\] (\d+) (\S+)")   # bytes, for tail scans
 PAD_B = re.compile(rb"^\[ot6pad\] (\d+)")
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+PNG_END = b"IEND\xaeB`\x82"   # the IEND chunk and its CRC, a PNG's last 8 bytes
 
 
 def _safe_id(s):
@@ -565,7 +568,7 @@ def scan_worker(data, shots_stuck, frames_stuck):
 
     frame is the latest [ot6pad] counter (falls back to the last shot's
     frame).  png_bytes is the newest [ot6shot] payload that decodes to a
-    valid PNG (a partial trailing line is skipped).  stuck folds in
+    whole PNG, magic through IEND (a partial trailing line is skipped).  stuck folds in
     stuck_detector's freeze rule: a trailing run of >= shots_stuck identical
     screenshots spanning >= frames_stuck advancing frames.
     """
@@ -588,7 +591,9 @@ def scan_worker(data, shots_stuck, frames_stuck):
             raw = base64.b64decode(payload)
         except Exception:
             continue
-        if raw[:8] == PNG_MAGIC:
+        # whole means it ends with the IEND chunk: a line still being
+        # written decodes too, with the magic, and shows as a broken image
+        if raw[:8] == PNG_MAGIC and raw.endswith(PNG_END):
             png = raw
             h = hashlib.md5(payload).hexdigest()[:8]
             break
@@ -609,6 +614,7 @@ def scan_worker(data, shots_stuck, frames_stuck):
 
 # ---- throughput: frames emulated per second, and one record per run -------
 FRAME_B = re.compile(rb"^\[ot6(?:shot|pad|note)\] (\d+) ")
+FRAME_LINE = re.compile(rb"^\[ot6(?:shot|pad|note)\] \d+ ", re.M)
 FPS_WINDOW = 30.0      # seconds the per-machine frames/s figure averages over
 
 
@@ -630,6 +636,17 @@ def run_progress(data):
     if max(p, f) >= 0:
         verdict = "pass" if p > f else "fail"
     return frame, verdict
+
+
+def _ended(data):
+    """True when a run.log tail ends in its run's verdict: no screenshot,
+    pad or note line after the last "[ot6] PASS (frame" / "[ot6] FAIL:".
+    A sweep or a retry ladder logs a verdict and plays on; only the last
+    word ends the run."""
+    v = max(data.rfind(b"\n[ot6] PASS (frame "), data.rfind(b"\n[ot6] FAIL: "))
+    if v < 0:
+        return False
+    return FRAME_LINE.search(data[v + 1:].split(b"\n", 1)[-1]) is None
 
 
 def _run_start(ws):
@@ -665,6 +682,7 @@ class Scanner:
         except Exception:
             self.tuning = (40, 200_000, 8, 2000)
         self.sent = {}         # worker id -> hash8 of the PNG last handed out
+        self.sent_ts = {}      # worker id -> when that PNG was last handed out
         self.live_ref = live_ref
         self.prog = None       # progress inputs, loaded on first use
         self.route_ts = 0      # commit time of ROOT's HEAD: the route's age
@@ -723,7 +741,17 @@ class Scanner:
         active_sec, tail_n, s_stuck, f_stuck = self.tuning
         now = time.time()
         workers, pngs, active = [], {}, set()
+        real_seen = set()
         for log in run_logs():
+            # one run, once: a tree whose build/test-runs is a symlink into
+            # another's (an agent's mutant copies) would show every run again
+            # under each tree's name.  The run belongs to the tree that holds
+            # its directory.
+            real = os.path.realpath(log)
+            if real in real_seen:
+                continue
+            real_seen.add(real)
+            log = real
             try:
                 mtime = os.path.getmtime(log)
                 if now - mtime > active_sec:
@@ -737,9 +765,19 @@ class Scanner:
             frame, png, h, stuck = scan_worker(data, s_stuck, f_stuck)
             self._track(wid, log, tag, branch, data, mtime, now)
             active.add(wid)
-            if png is not None and h is not None and self.sent.get(wid) != h:
+            # a run that spoke its verdict and has gone quiet is over: it
+            # leaves the grid now, not when its log ages out (its tile would
+            # linger with "frame --" and a last, stale picture)
+            if _ended(data) and now - mtime > 3:
+                continue
+            # a changed screen goes out at once; an unchanged one again
+            # every PNG_RESEND_SEC, so a snapshot the viewer lost (a dropped
+            # line, a reconnect) can't leave its tile without a picture
+            if png is not None and h is not None and (
+                    self.sent.get(wid) != h
+                    or now - self.sent_ts.get(wid, 0) > PNG_RESEND_SEC):
                 pngs[wid] = png
-                self.sent[wid] = h
+                self.sent[wid], self.sent_ts[wid] = h, now
             rec = {"id": wid, "test": dirname.split(".")[0], "tree": tag,
                    "branch": branch, "frame": frame, "h": self.sent.get(wid),
                    "stuck": bool(stuck), "notes": _last_notes(data, 8)}
@@ -752,6 +790,7 @@ class Scanner:
         for wid in list(self.sent):
             if wid not in active:
                 del self.sent[wid]
+                self.sent_ts.pop(wid, None)
         try:
             load = [round(x, 2) for x in os.getloadavg()]
         except OSError:
@@ -840,6 +879,8 @@ class Scanner:
 
 
 PEER_STALE_SEC = 20   # a peer silent this long is shown unreachable
+PNG_RESEND_SEC = 15   # an unchanged screenshot is sent again this often
+PNG_GRACE_SEC = 60    # a worker's picture outlives its last listing this long
 
 # ---- placement: where the next emulators should go ------------------------
 # The model (curves, knees, claims, fill order) is tools/stream/placement.py;
@@ -863,6 +904,7 @@ class Board:
         self.m = {n: {"snap": None, "progress": None, "ok_ts": None,
                       "down_since": t, "err": "connecting"} for n in names}
         self.pngs = {n: set() for n in names}   # PNG files on disk per machine
+        self.png_seen = {}                      # machine -> worker id -> last listed
         self.procs = {}   # name -> its live ssh child (peer_thread)
         # The run log lives in the main tree, like build/attempts, so every
         # viewer (whichever tree it runs from) adds to and reads one history.
@@ -914,8 +956,17 @@ class Board:
             except OSError:
                 pass
         live = {w["id"] for w in snap.get("workers", [])}
-        for wid in list(self.pngs[name] - live):   # finished workers
-            self._drop_png(name, wid)
+        now = time.time()
+        seen = self.png_seen.setdefault(name, {})
+        for wid in live:
+            seen[wid] = now
+        # a worker gone from one snapshot keeps its picture a while: it is
+        # deleted only after PNG_GRACE_SEC unseen, so a tile never points at
+        # a file a moment ago deleted
+        for wid in list(self.pngs[name] - live):
+            if now - seen.get(wid, 0) > PNG_GRACE_SEC:
+                self._drop_png(name, wid)
+                seen.pop(wid, None)
         if snap.get("done"):
             self._log_runs(name, snap["done"])
         with self.lock:
@@ -968,9 +1019,17 @@ class Board:
                 rec.update(
                     id=_safe_id(f"{n}_{w['id']}"), machine=n, local=(n == HOST),
                     name=w["test"] + (f" @{w['tree']}" if w["tree"] else ""),
+                    # only a picture the viewer has on disk: a tile never
+                    # points at a file that isn't there
                     shot=(f"grid/{_safe_id(n + '_' + w['id'])}.png?{w['h']}"
-                          if w.get("h") else None))
+                          if w.get("h") and os.path.exists(self._png(n, w["id"]))
+                          else None))
                 mine.append(rec)
+            # two runs of one test in one tree are told apart by their run id
+            names = collections.Counter(w["name"] for w in mine)
+            for w in mine:
+                if names[w["name"]] > 1:
+                    w["name"] += " #" + w["id"].rsplit(".", 1)[-1][:4]
             mine.sort(key=lambda w: (w["name"], w["id"]))
             workers += mine
             trees = {}
@@ -1572,9 +1631,18 @@ def main():
         threading.Thread(target=peer_thread, args=(board, p, stop),
                          daemon=True).start()
 
-    httpd = ThreadingHTTPServer((args.bind, args.port),
-                                partial(SimpleHTTPRequestHandler,
-                                        directory=webroot))
+    # The grid asks for every tile's picture at once.  socketserver's listen
+    # backlog is 5, so a burst of 25 connections reset most of them and the
+    # tiles showed broken images (reproduced in Chromium: 14 of 24 tiles
+    # broken, 221 ERR_CONNECTION_RESET / ERR_SOCKET_NOT_CONNECTED in 60 s).
+    class Server(ThreadingHTTPServer):
+        request_queue_size = 256
+        daemon_threads = True
+    class Handler(SimpleHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"   # keep-alive: fewer connections
+        def log_message(self, *a):      # quiet: one line per tile per second
+            pass
+    httpd = Server((args.bind, args.port), partial(Handler, directory=webroot))
     # a plain kill runs the cleanup below too (the ssh children)
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     url_host = (socket.gethostname().split(".")[0] + ".local"

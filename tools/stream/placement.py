@@ -60,10 +60,12 @@ CLAIM_SEC = 120           # how long a --claim holds its emulators
 # desk machine); a machine not named comes after, in --peer order.
 PREFER = ("px13", "air", "mbp")
 # The owner's headroom policy, not a measurement: the owner's machines.  On
-# each a batch leaves this many emulators' worth of the knee free (0: none),
-# and backs off by the load our own emulators there do not explain (the
-# owner's own work, or macOS's).  px13 is ours alone and not listed.
-RESERVE = {"mbp": 4, "air": 0}
+# each a batch leaves this many emulators' worth of the knee free (0: none,
+# owner 2026-10-05: "default to using it more"), and backs off by the load
+# our own emulators there do not explain (the owner's own work, or macOS's).
+# Every emulator runs niced (run.sh), so the owner's work comes first anyway.
+# px13 is ours alone and not listed.
+RESERVE = {"mbp": 0, "air": 0}
 
 
 def _median(xs):
