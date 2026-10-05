@@ -9,11 +9,10 @@
 -- healing:
 
 -- Under 15360 HP Ultros self-casts Haste+Safe (Safe halves physical damage
--- taken), so the back half of the fight is slower; the seed sweep + a deep
--- item bag (22 Tonics / 9 Potions / 15 Fenix Downs at N) carry it.  A missed-
--- win attempt reloads the entry-point savestate and re-fights on a spread
--- battle seed (H.newSeedSweep, gen_thamasa_fire's FlameEater pattern), with
--- the GameOver read-canary (lib) the ground-truth loss signal.
+-- taken), so the back half of the fight is slower; a deep item bag (22
+-- Tonics / 9 Potions / 15 Fenix Downs at N) carries it.  The GameOver
+-- read-canary (lib) is the ground-truth loss signal; a loss is a wipe the
+-- segment runner retries (#311).
 
 -- No chests: none sit on the walked route (the mountain chests are all off
 -- the direct save-point<->statue-room line), so chests_opened.txt is
@@ -72,46 +71,6 @@ local function pressWalk(dir, pred, maxFrames, what)
   }, what)
 end
 
--- care: a full-heal stop that skips (logged) rather than hangs when the field
--- isn't settled (gen_thamasa_fire's shape).
-local function care(what)
-  return seq({
-    H.waitUntilSoft(function()
-      return H.hasControl() and H.tileAligned() and bright() >= 15
-         and not H.dialogWaiting() and not H.battleLoadStarted()
-    end, 1200, "care " .. what),
-    H.cond(function()
-      return H.hasControl() and H.tileAligned() and not H.dialogWaiting()
-         and not H.battleLoadStarted()
-    end, {
-      H.waitFrames(60),
-      H.fieldCare({ tag = "care " .. what, threshold = 1.0 }),
-    }, {
-      H.logStep(function()
-        return string.format("[care %s] SKIPPED -- not settled at (%d,%d) map %d",
-          what, H.fieldX(), H.fieldY(), map())
-      end),
-    }),
-  })
-end
-
--- lossReload: restore the entry-point blob and clear the GameOver counter
--- (gen_thamasa_fire's shape).
-local function lossReload(blobFn, tag)
-  local req
-  return seq({
-    H.call(function() req = H.requestLoadState(blobFn()) end),
-    H.waitFrames(2),
-    H.call(function()
-      H.checkReq(req, tag .. ": loss-reload")
-      H.gameOverFired = 0
-      H.log(string.format("[%s] loss-reload done, GameOver counter cleared, f%d",
-        tag, H.frame))
-    end),
-    H.waitFrames(90),
-  })
-end
-
 -- tapToSave (gen_esper_mtn): a held press walks through a SavePoint trigger
 -- without firing it, so tap toward the tile and settle on an aligned rest.
 local function tapToSave(tx, ty, maxFrames, what)
@@ -158,22 +117,25 @@ local function tapToSave(tx, ty, maxFrames, what)
 end
 
 -- =============================================================== the FIGHT ==
-local L125 = H.newSeedSweep("Ultros III (battle 125)", { attempts = 5 })
-local ultBlob, ultWon = nil, false
-
-local function ultrosAttempt(n)
+-- #311: one fight, played once.  This file used to carry its own five-rung
+-- seed sweep (H.newSeedSweep): an in-run snapshot at the trigger and up to
+-- four reloads at spread battle seeds, the same plan each time, its losses
+-- invisible to the retry audit.  A lost Ultros III now raises the wipe it is
+-- (the runner's class=wipe), and the segment runner's standard bounded retry
+-- -- the boot snapshot, a moved seed, a counted `[retry]` line -- is the only
+-- reload.
+local function ultrosFight()
   local F = H.newFightDriver("Ultros III", { tactical = true, boost = true,
     bank = 3, items = true, cure = false, healPercent = 45 })
   local notBattle, giveUp = 0, 0
-  return H.cond(function() return ultWon end, {}, {
+  local function lost(what)
+    error(string.format("Ultros III (battle 125): THE PARTY IS WIPED -- %s, f%d",
+      what, H.frame), 0)
+  end
+  return seq({
     H.logStep(function()
-      return string.format("Ultros III attempt %d at f%d", n, H.frame)
+      return string.format("Ultros III at f%d", H.frame)
     end),
-    n > 1 and seq({
-      lossReload(function() return ultBlob end, "Ultros III"),
-      care("post-reload, attempt " .. n),
-    }) or seq({}),
-    L125.spread(n),
     -- step down onto (15,22): the Ultros trigger.  pressWalk advances the
     -- choreography + RELM-join dialog with A and exits when the battle module
     -- takes the screen.
@@ -193,11 +155,13 @@ local function ultrosAttempt(n)
         if H.gameOverFired > 0 then H.setPad({}); return end
         F.frame()
       end),
-    }, "Ultros III fight (attempt " .. n .. ")"),
+    }, "Ultros III fight"),
     H.call(function()
-      H.log(string.format("[Ultros III] phase 1 done, attempt %d, f%d, "
-        .. "gameOverFired=%d ultrosHp=%d", n, H.frame, H.gameOverFired,
-        ultrosHp()))
+      H.log(string.format("[Ultros III] phase 1 done, f%d, gameOverFired=%d " ..
+        "ultrosHp=%d", H.frame, H.gameOverFired, ultrosHp()))
+      if H.gameOverFired > 0 then
+        lost("GameOver read-fired (event GameOver, $CC/E568)")
+      end
     end),
     -- PHASE 2: mash A through the win tail until $0095 flips (or a GameOver
     -- shows itself).  $0095 is set only by the real post-fight script (:73801)
@@ -220,26 +184,15 @@ local function ultrosAttempt(n)
     -- would drop RELM, who joins only in this scene).
     H.call(function()
       H.setPad({})
-      local realWin = H.gameOverFired == 0 and sw(0x0095) == 1
-         and partyOf(TERRA) ~= 0 and partyOf(RELM) ~= 0
       if H.gameOverFired > 0 then
-        H.log(string.format("Ultros III attempt %d LOST -- GameOver read-fired"
-          .. " (event GameOver, $CC/E568), f%d", n, H.frame))
-      elseif realWin then
-        ultWon = true
-        H.log(string.format("Ultros III BEATEN on attempt %d, f%d, map=%d "
-          .. "pos=(%d,%d) partyRELM=%d", n, H.frame, map(), H.fieldX(),
-          H.fieldY(), partyOf(RELM)))
-      else
-        H.log(string.format("Ultros III attempt %d LOST -- win verification "
-          .. "failed ($0095=%d partyOf(TERRA)=%d partyOf(RELM)=%d "
-          .. "gameOverFired=%d giveUp=%d), f%d", n, sw(0x0095), partyOf(TERRA),
-          partyOf(RELM), H.gameOverFired, giveUp, H.frame))
+        lost("GameOver read-fired in the win tail")
       end
+      H.assertEq(sw(0x0095) == 1 and partyOf(TERRA) ~= 0 and partyOf(RELM) ~= 0,
+        true, string.format("Ultros III's win verified ($0095=%d partyOf(TERRA)=%d " ..
+          "partyOf(RELM)=%d)", sw(0x0095), partyOf(TERRA), partyOf(RELM)))
+      H.log(string.format("Ultros III BEATEN, f%d, map=%d pos=(%d,%d) partyRELM=%d",
+        H.frame, map(), H.fieldX(), H.fieldY(), partyOf(RELM)))
     end),
-    H.cond(function() return not ultWon end, {
-      lossReload(function() return ultBlob end, "Ultros III"),
-    }, {}),
   })
 end
 
@@ -347,34 +300,8 @@ H.run({ maxFrames = 5000000, allowGameOver = true }, {
     H.log(string.format("[ot6] lore seen f%d (%d,%d)",
       H.frame, H.fieldX(), H.fieldY()))
   end),
-  -- THE SEED-SWEEP ENTRY POINT: capture the pre-fight savestate here, lore
-  -- seen and Ultros not yet fought, so a lost attempt re-fights without
-  -- replaying the lore scene.
-  (function()
-    local ckReq
-    return seq({
-      H.call(function() ckReq = H.requestSaveState() end),
-      H.waitFrames(2),
-      H.call(function()
-        H.checkReq(ckReq, "Ultros III entry-point checkpoint")
-        ultBlob = ckReq.blob
-        H.log("[ot6] Ultros III entry-point savestate captured")
-      end),
-    })
-  end)(),
-  L125.watch(),
-  ultrosAttempt(1),
-  ultrosAttempt(2),
-  ultrosAttempt(3),
-  ultrosAttempt(4),
-  ultrosAttempt(5),
+  ultrosFight(),
   H.call(function()
-    if not ultWon then
-      error(L125.report() .. " -- all 5 Ultros III seed-sweep attempts lost; "
-        .. "see the per-attempt numbers above (no Sketch, no enemy-stat "
-        .. "change -- report and stop per the dispatch)", 0)
-    end
-    H.log(L125.report())
     H.assertEq(sw(0x0095), 1, "$0095 SET -- Ultros III beaten")
     H.assertEq(partyOf(RELM) ~= 0, true, "RELM is in the party")
     H.screenshot("ultros_won_scene")
