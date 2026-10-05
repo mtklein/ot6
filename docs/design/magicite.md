@@ -338,6 +338,40 @@ outside both boost axes: the gap `magicite-tube-six.md` §12.4 records for
 Shoat and Phantom. Whether Quartr's and W Wind's fraction damage takes the
 multiplier was not checked.
 
+### The Magicite item, boosted (#368)
+
+The Magicite item calls a random esper (`AttackerEffect_49`: `RandGenju`, 25
+espers, never Odin or Raiden), and its boost is `Ot6BoostDmg`'s multiplier.
+Half the pool had nothing for it to multiply: twelve espers of power 0
+(Siren, Shoat, Stray, Palidor, Ragnarok, Kirin, ZoneSeek, Carbunkl, Phantom,
+Golem, Unicorn, Fenrir) and Phoenix's revival, 0.520 of a draw
+(`build/attempts/wt/procboost-magicite/summary.txt`). (Phoenix is not
+quite nothing: with a member down, the multiplier does act on its revival,
+`157 -> 1256` in build/attempts/wt/v026-rom/368/mbp/mut_noredraw.out; with
+no one down it buys nothing. The redraw skips it either way, for a payoff
+that doesn't depend on the party's state; #393 tracks keeping it when
+someone is down.) A boosted Magicite
+that drew one spent its pips and bought nothing. And Crusader's Purifier
+strikes both sides (targeting `$04`, flags `$40`, vanilla's record byte for
+byte; vanilla's Magicite→Crusader also hits the party,
+`build/attempts/wt/one-graph/review-procboost-magicite/codepath.txt`), so a
+boosted one multiplied onto the caster's own party: ×8 is 9999 on every
+seat.
+
+**Decision:** the boost still buys the multiplier, and a boosted Magicite
+draws again past any esper the multiplier cannot serve on the enemy:
+power 0, a revival, or damage that can reach the party (both sides, or the
+caster's side without "can't target characters"). A heal (Starlet,
+Sraphim) is kept: the multiplier is the heal. `Ot6MagiciteKeep`
+(`ot6_magicite.asm`) reads each draw's `MagicProp` record, so the rule
+follows the espers' data rather than a list; every draw is vanilla's own
+`RandGenju`. Unboosted, the Magicite is vanilla's gamble, Crusader
+included. On today's records the boosted pool is Ramuh, Ifrit, Shiva,
+Terrato, Maduin, Bismark, Tritoch, Bahamut, Alexandr, Sraphim and Starlet.
+`battle_procboost`'s magicite case decodes the same rule from the ROM and
+checks every boosted draw: each one it kept pays, each one it passed over
+does not, and some try drew again.
+
 ### Open questions for the owner
 
 1. **Stat packages.** The stat column above is not built; the twelve rows of
