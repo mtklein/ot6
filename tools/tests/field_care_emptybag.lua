@@ -172,48 +172,54 @@ local function missing()
   end
   return false
 end
--- The drain's bound is the bag itself (#252: it was a bare 200 legs against
--- the ~198 a band of 99 needed): every leg ends in a care stop that drinks
--- at least one Tonic -- asserted per leg -- so the Tonics at the start are
--- the most legs it can take.  255 legs are built, more than one bag slot
--- holds (99).
+-- The drain (#252: it was 200 legs, a bare number; a care stop after a
+-- leg that met no battle, or one that hurt nobody, drinks nothing, and on
+-- this corridor 52 legs drank 23 Tonics in 7 stops (wt/v026-suites s252), so
+-- a band of 99 needs ~220 legs).  Now each round walks legs until a battle
+-- leaves somebody short of max HP -- at most LEGS_PER_STOP legs, the bound
+-- walkUntilHurt uses on the same corridor -- and then takes the care stop,
+-- which drinks at least one Tonic (asserted), so the Tonics in the bag at
+-- the start bound the rounds.
+local LEGS_PER_STOP = 48
 local drinkN = 0
 local function drainTonics()
   local legB, before, budget = 0, 0, nil
+  local function stop() return battles > legB and missing() and settled() end
+  local round = fresh(function()
+    drinkN = drinkN + 1
+    legB = battles
+    before = H.invCountOf(TONIC)
+    return {
+      H.repeatN(LEGS_PER_STOP, {
+        H.cond(function() return not stop() end, { fresh(function() return leg(stop) end) }, {}),
+      }),
+      H.call(function()
+        H.assertEq(stop(), true, string.format("drain round %d: a battle left somebody short "
+          .. "of max HP within %d legs", drinkN, LEGS_PER_STOP))
+      end),
+      H.fieldCare({ tag = "drinking the Tonics down " .. drinkN,
+        threshold = 1.0, magic = false, reserve = { [POTION] = 99 } }),
+      H.call(function()
+        roster("drain " .. drinkN)
+        H.assertEq(H.invCountOf(TONIC) < before, true, string.format("drain round %d "
+          .. "drank a Tonic (%d -> %d): the bound counts on it", drinkN, before,
+          H.invCountOf(TONIC)))
+      end),
+    }
+  end)
   return H.seqStep({
     H.call(function()
       budget = H.invCountOf(TONIC)
-      H.log(string.format("[drain] %d Tonics in the bag: at most %d legs", budget, budget))
+      H.log(string.format("[drain] %d Tonics in the bag: at most %d rounds of at most %d legs",
+        budget, budget, LEGS_PER_STOP))
     end),
-    H.repeatN(255, {
-      H.cond(function() return H.invCountOf(TONIC) > 0 and drinkN < budget end, {
-        fresh(function()
-          drinkN = drinkN + 1
-          legB = battles
-          before = H.invCountOf(TONIC)
-          local function stop()
-            return battles > legB and missing() and settled()
-          end
-          return {
-            H.seqStep(leg(stop)),
-            H.cond(function() return settled() and missing() end, {
-              H.fieldCare({ tag = "drinking the Tonics down " .. drinkN,
-                threshold = 1.0, magic = false, reserve = { [POTION] = 99 } }),
-              H.call(function()
-                roster("drain " .. drinkN)
-                H.assertEq(H.invCountOf(TONIC) < before, true, string.format("drain leg %d "
-                  .. "drank a Tonic (%d -> %d): the bound counts on it", drinkN, before,
-                  H.invCountOf(TONIC)))
-              end),
-            }, {}),
-          }
-        end),
-      }, {}),
+    H.repeatN(99, {
+      H.cond(function() return H.invCountOf(TONIC) > 0 and drinkN < budget end, { round }, {}),
     }),
     H.call(function()
       roster("drained")
       H.assertEq(H.invCountOf(TONIC), 0, string.format(
-        "the party drank its Tonics down to none through the field menu (%d legs)", drinkN))
+        "the party drank its Tonics down to none through the field menu (%d rounds)", drinkN))
     end),
   })
 end
