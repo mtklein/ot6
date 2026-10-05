@@ -2050,12 +2050,47 @@ end
 -- as soon as the encounter roll wins, well before battleLoadStarted's
 -- HP-table signal), bit4 reload-world (the post-battle fade/init).
 -- battleLoadStarted is still checked for the battle interior itself.
+--
+-- It also requires the world module's own interrupt handler to be the one
+-- installed (M.worldNmiInstalled), as M.hasControl requires the field's.
+-- Each module installs its own NMI at $1500-$1503 and the world installs
+-- WorldNMI (VehicleNMI aboard) last thing before WorldMain
+-- (world/init.asm InitInterruptsWorld), so every flag above can read
+-- "control" while another module still owns the machine.  Measured
+-- (build/attempts/wt/walker-after-menu-review/, #357): with the main menu
+-- up, "f1473 menu ... wctl=true $58=00 nmi=C3138D $26=05"; after it
+-- closes, true from the menu's last frame for ~35 frames while the menu's
+-- NMI was still installed ("f1523 close ... wctl=true ... nmi=C3138D" to
+-- "f1558 after ... nmi=EEA728"); and through a field -> world handover with
+-- the field's NMI still in ("f1391 walk wm=true ... wctl=true $58=00
+-- nmi=C00182"), the window in which a single poll read world (0,0) and a
+-- route planned from there (#343, gen_zozo2_arrival leaving Jidoor).
+local NMI_JUMP = 0x1501
+local function nmiJump() return M.readWord(NMI_JUMP) | (M.readByte(NMI_JUMP + 2) << 16) end
+local worldNmis
+function M.worldNmiInstalled()
+  worldNmis = worldNmis or { [M.sym("WorldNMI")] = true, [M.sym("VehicleNMI")] = true }
+  return worldNmis[nmiJump()] == true
+end
+-- The menu module is the one running: its NMI is installed (menu_common.asm
+-- InitInterrupts, before its first state).  $26 is the menu's state only
+-- while this holds; on a map it is RAM nobody keeps, and a value the last
+-- menu left there (or a battle's) reads like a menu screen (#332).
+local menuNmi
+function M.menuRunning()
+  menuNmi = menuNmi or M.sym("MenuNMI")
+  return nmiJump() == menuNmi
+end
+-- The main menu is up: the menu module runs and sits on its main screen.
+function M.mainMenuUp() return M.readByte(0x26) == 0x05 and M.menuRunning() end
+
 function M.worldHasControl()
   return M.worldMode()
      and M.readByte(0x0019) == 0
      and (M.readByte(0x00e7) & 0x01) == 0
      and (M.readByte(0x00e8) & 0x31) == 0
      and not M.battleLoadStarted()
+     and M.worldNmiInstalled()
 end
 
 -- The world map is loaded AND faded in.  M.worldHasControl() alone reads
@@ -4731,8 +4766,10 @@ function M.fieldCare(opts)
   return M.cond(function() return not M.eventTimerLive() end, {
     M.cond(function() return K.anyNeed() and not battle() end, {
       M.logStep(function() return K.roster("opening the menu") end),
+      -- the menu's main screen, read only while the menu module runs:
+      -- $26 alone is any byte the last menu or battle left on the map (#332)
       M.driveUntil(function()
-        return battle() or M.readByte(CARE_ZM) == 0x05
+        return battle() or M.mainMenuUp()
       end, 1800, {
         M.call(function()
           phase = (phase + 1) % 12
@@ -4874,7 +4911,7 @@ function M.newCareDriver(opts)
       mode, n = "open", 0
     end
     if mode == "open" then
-      if M.readByte(CARE_ZM) == 0x05 then mode, n = "gap", 0; M.setPad({}); return end
+      if M.mainMenuUp() then mode, n = "gap", 0; M.setPad({}); return end
       if n > 1800 then
         M.log(string.format("[%s] the menu never opened; giving up on this care stop", K.tag))
         mode = "done"; M.setPad({}); return
@@ -5257,7 +5294,7 @@ function M.bagArrange(order, opts)
       mode, n = "open", 0
     end
     if mode == "open" then
-      if st == 0x05 then mode, n = "item", 0; M.setPad({}); return end
+      if M.mainMenuUp() then mode, n = "item", 0; M.setPad({}); return end
       if n > 1800 then error(string.format("[%s] the menu never opened", tag), 0) end
       M.setPad(ph < 4 and { "x" } or {}); return
     end
