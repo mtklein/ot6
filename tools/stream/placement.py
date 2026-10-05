@@ -13,6 +13,10 @@ module turns that log into, per machine:
             fast as that test goes alone here", so neither the test mix
             nor a test's solo rate on another machine bends the curve.  A
             test never run alone on the machine is left out of its curve.
+            Solo runs of the last HALF_LIFE_H join the baseline only once
+            they are older, when the test has older ones (#342): a slow
+            spell seen only in solo runs pulled the baseline down with it,
+            so its runs read as full speed and the shift never moved.
   shift     d >= 0, the emulators' worth of the machine something else is
             using (other load, heat, the charger): a machine that slows
             down runs like it has d more emulators already.  Each 6-hour
@@ -25,6 +29,11 @@ module turns that log into, per machine:
             age (SHAPE_HALF_LIFE_D).  Counting a slowed run where it really
             sat keeps a slow spell from bending the shape at the levels it
             happened to run at, so the whole curve moves with the shift.
+            Only runs older than HALF_LIFE_H build it, when there are any
+            (#342): the last few hours are what the shift is fitted to, and
+            a slow spell inside them bent the shape where it ran instead
+            (slow solo runs lowered level 1, and the shift read 0); a burst
+            of runs at one level waits that long to move the knee.
   knee      the fewest emulators whose total, k * shape(k), is within 5% of
             the best (one more when that is the most ever run, so the curve
             keeps learning), less d: a slowdown moves it down by d, and a
@@ -156,18 +165,25 @@ def models(records, now):
     for r in whole:
         if round(r["conc"]) == 1:
             quiet = (r.get("load") or 0.0) < QUIET_LOAD
-            solo.setdefault((r["machine"], r["test"]), []).append((quiet, r["fps"]))
+            old = now - r["ts"] >= HALF_LIFE_H * 3600
+            solo.setdefault((r["machine"], r["test"]), []).append(
+                (quiet, old, r["fps"]))
     base = {}
     for key, xs in solo.items():
-        q = [f for quiet, f in xs if quiet]
-        base[key] = _median(q or [f for _q, f in xs])
+        xs = [x for x in xs if x[1]] or xs      # the older ones, if any
+        q = [f for quiet, _o, f in xs if quiet]
+        base[key] = _median(q or [f for _q, _o, f in xs])
     out = {}
     win_s = HALF_LIFE_H * 3600
     for m in sorted({r["machine"] for r in whole}):
         runs = [(r["conc"], r["fps"] / base[m, r["test"]], r["frames"], r["ts"])
                 for r in whole
                 if r["machine"] == m and base.get((m, r["test"]))]
-        first, _ = _shape(runs, now)
+        settled = [r for r in runs if now - r[3] >= win_s]
+        first, _ = _shape(settled, now)
+        if not first:
+            settled = runs
+            first, _ = _shape(runs, now)
         if not first:
             continue
         windows = {}
@@ -175,7 +191,7 @@ def models(records, now):
             windows.setdefault(int(run[3] // win_s), []).append(run)
         dw = {w: _shift(first, rs) for w, rs in windows.items()}
         shape, counts = _shape([(c + dw[int(ts // win_s)], sp, f, ts)
-                                for c, sp, f, ts in runs], now)
+                                for c, sp, f, ts in settled], now)
         if not shape:
             continue
         d = _shift(shape, runs, now)
