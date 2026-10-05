@@ -47,6 +47,7 @@ town that sells the item, scales with the active party's highest level:
 | **Tincture** | **~level / 4, rounded up** (the MP column, #231: one caster's pool per stretch; [supply.md](supply.md)) | Narshe (shop 3, `gen_zozo1_submerge`; L14 -> 4).  Figaro Castle sells them too, and its purse cannot carry one. |
 | Tent | 4 from Albrook (the factory's two save points), 10 from Jidoor | Albrook (shop 24, `gen_vector_entry`); `gen_narshe_mission`'s TENT to 10 stands |
 | Revivify | 3 | Jidoor (shop 22, `gen_zozo2_arrival`) |
+| Remedy | 5 before the Floating Continent (#361: its map 394 deals Mute casters, Apokryphos and Misfits, in half its draws; one cure a leg plus two) | Thamasa (shop 35, row 3, `gen_fc_landing`); no Echo Screen counter on the way |
 
 The MP rows are measured and ruled on in [supply.md](supply.md): the
 prices and yields off `item_prop_en.dat`, the inns' prices per town, where

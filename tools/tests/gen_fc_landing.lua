@@ -258,16 +258,31 @@ H.run({ maxFrames = 600000 }, flatten({
   H.buyItem(REVIVIFY, 5, function() return 3 - H.invCountOf(REVIVIFY) end, "REVIVIFY to 3"),
   H.buyItem(TINCTURE, 2, function() return 7 - H.invCountOf(TINCTURE) end, "TINCTURE to 7"),
   H.buyItem(TENT, 7, function() return 10 - H.invCountOf(TENT) end, "TENT to 10"),
+  -- #361: the continent's map 394 deals Apokryphos and Misfits in half its
+  -- draws (battle_procboost's pool decode, build/attempts/wt/procboost-v024/
+  -- summary.txt), and both cast Mute, which greys TERRA's and CELES's
+  -- Magic until cured.  The bag came here with one Echo Screen and at most
+  -- one Remedy, so a second Mute had no cure (that suite's K5: "the magic
+  -- row greyed (status bytes 00 08)" for 26000 frames once the one Echo
+  -- Screen had gone to SHADOW).  This counter sells no Echo Screen; its
+  -- Remedy (row 3) carries Mute's STATUS2 bit (M.statusCure reads it off
+  -- the ROM), and at 1000 gil against a six-figure purse a person carries
+  -- one for each of the three legs (the gauntlet, the alcove, the escape)
+  -- before the World of Ruin's first counter, plus two for a leg that
+  -- meets more.
+  H.buyItem(REMEDY, 3, function() return 5 - H.invCountOf(REMEDY) end, "REMEDY to 5"),
   H.buyItem(TONIC, 0, function() return 99 - H.invCountOf(TONIC) end, "TONIC to 99"),
   H.shopClose("Thamasa item shop"),
   H.call(function()
-    H.log(string.format("[prep] shop done: tonic=%d potion=%d fenix=%d tincture=%d tent=%d gil=%d f%d",
+    H.log(string.format("[prep] shop done: tonic=%d potion=%d fenix=%d tincture=%d tent=%d remedy=%d echo=%d gil=%d f%d",
       H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN),
-      H.invCountOf(TINCTURE), H.invCountOf(TENT), H.gil(), H.frame))
+      H.invCountOf(TINCTURE), H.invCountOf(TENT), H.invCountOf(REMEDY),
+      H.invCountOf(0xFB), H.gil(), H.frame))
     H.assertEq(H.invCountOf(POTION) >= 65, true, "Potions stocked to 65 for the gauntlet -- the L29 band plus the measured FC spend")
     H.assertEq(H.invCountOf(FENIX_DOWN) >= 25, true, "Fenix Downs stocked to 25")
     H.assertEq(H.invCountOf(TINCTURE) >= 7, true, "Tinctures stocked to 7 -- the L28 MP band (#231)")
     H.assertEq(H.invCountOf(TENT) >= 10, true, "Tents at 10 for the continent's save points (#231)")
+    H.assertEq(H.invCountOf(REMEDY) >= 5, true, "Remedies at 5: a Mute on the continent has a cure (#361)")
   end),
   H.bagArrange({ POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY }, { tag = "bag: combat items on top" }),
   H.call(function()
