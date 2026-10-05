@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
   c.nmi_at = cap.nmi_at.data(); c.n_nmi = (u32)cap.nmi_at.size();
   c.io_at = cap.io_at.data(); c.io_val = cap.io_val.data(); c.n_io = (u32)cap.io_at.size();
   c.pad = cap.pad.data();
-  c.wram_base = 0; c.sram_base = 0; c.stride = 1; c.sram_mask = (u32)sram.size() - 1;
+  c.stride = 1; c.sram_mask = (u32)sram.size() - 1;
   c.io_check = 1;
   Cpu s = initial_cpu(cap);
 

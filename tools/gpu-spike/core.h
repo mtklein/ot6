@@ -103,10 +103,10 @@ enum { ST_OK = 0, ST_DONE = 1, ST_STP = 2, ST_IO_READ = 3, ST_IO_MISMATCH = 4,
 #define MK_IO 3u
 #define MK_OPEN 4u
 
-// Everything one instance touches.  WRAM and SRAM are either
-// instance-contiguous (stride 1, base = lane * size) or byte-interleaved
-// across instances (stride = N, base = lane): byte i of lane L lives at
-// base + i * stride.
+// Everything one instance touches.  wram/sram point at this instance's
+// byte 0; byte i is at [i * stride]: stride 1 is instance-contiguous,
+// stride B interleaves blocks of B instances byte by byte (the kernel sets
+// the pointers; 64-bit there, 32-bit offsets here).
 struct Ctx {
   DEV u8* wram;
   DEV u8* sram;
@@ -118,14 +118,14 @@ struct Ctx {
   CDEV u32* io_val;       // replayed reads: addr16 | value << 16
   u32 n_io;
   CDEV u16* pad;          // per-frame joypad 1 word for this instance
-  u32 wram_base, sram_base, stride;
+  u32 stride;
   u32 sram_mask;
   u32 io_check;           // 1: check replayed-read addresses (and icounts)
 };
 
 // ------------------------------------------------------------- memory --
-#define WR(c, i) (c).wram[(c).wram_base + (u32)(i) * (c).stride]
-#define SR(c, i) (c).sram[(c).sram_base + (u32)(i) * (c).stride]
+#define WR(c, i) (c).wram[(u32)(i) * (c).stride]
+#define SR(c, i) (c).sram[(u32)(i) * (c).stride]
 
 #ifndef IO_HOOK
 #define IO_HOOK(s, addr, v) (v)
