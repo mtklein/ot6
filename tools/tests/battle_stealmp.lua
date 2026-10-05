@@ -261,7 +261,13 @@ end
 -- decode, on the same desert.  The bare six this file used to build is the
 -- budget battle_steal dropped: on its 2026-09-28 decode the worst state
 -- needs 11 encounters for a Sand Ray from group 1 (battle_steal.lua's
--- budget comment).  The walk paces a stretch of the dismount row whose
+-- budget comment; on this file's own decode, group 1, 0.5% of counter
+-- states need more than 6 and the worst needs 11).  Played: with 72
+-- encounters used up first (the counter's run of ten slot-2 draws,
+-- build/attempts/wt/v026-suites/r/probe_desert_seq.log), battle 1 needed
+-- all 11 ("battle 1 try 11 (group 1, budget 11): rareT=0", r/smp3/
+-- new_k72.log.gz) and with 74, 9; the old six would have failed both.
+-- The walk paces a stretch of the dismount row whose
 -- every tile rolls one group (planPace), so the budget's pool is the one
 -- that deals; each battle asserts that group.  (The clock's left/right walk
 -- this file used drifts with each battle's timing; battle_steal's drifted
