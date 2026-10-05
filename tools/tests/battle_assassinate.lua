@@ -88,7 +88,16 @@ local OT6_PIERCE = 0x02
 local BREAK_TICKS = 0x10   -- OT6_BREAK_TICKS (ot6_break.asm:1): the value
                            -- the "shields down: break" store writes; the
                            -- timer's own ticks write less
-local FIGHTS = 6
+-- Arm 1's fights: a suitable fight shows the divine unless Interceptor's
+-- counters empty it before Shadow breaks a body, a matter of play, not the
+-- pool.  Measured (#296): 6 of 35 arm-1 fights ended with no divine
+-- (build/attempts/wt/suite-anydraw/lab/logs/assassinate_*, and this branch's
+-- sweeps over 0-13 encounters used up and seed shifts,
+-- build/attempts/wt/v026-suites/assassinate/); the one-sided 95% upper bound
+-- on that rate is 0.31, and at it FIGHTS = 8 misses with 0.31^8 = 8.7e-5,
+-- under 1e-4 (the 6 this file used to build: 9.0e-4).
+-- Arm 3 needs one: its staged body cannot fall before it breaks.
+local FIGHTS = 8
 -- the isolation arm's staged HP (header): enough that the bitted body
 -- outlives its doubled break and the hits after it (Shadow's back-row
 -- blows on this pool are ~50 shielded, ~200 on the break)
