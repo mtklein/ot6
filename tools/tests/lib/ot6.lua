@@ -1393,6 +1393,27 @@ end
 --                care's Revivify clears the bit after the fight (ff443cb0)
 --
 -- Returns the raise HP, true to raise / false to refuse, and the reason.
+-- Heading for a wipe (#374), the arithmetic Driver:raiseOk hands to
+-- M.raiseDecision as o.wipe: `members` are the ones still standing besides
+-- the fallen, each { e, hp, maxhp, round } with `round` priced only from what
+-- the enemy has landed (Driver:roundPriceFor(e, true)).  Every one inside
+-- its round (hp <= round, round > 0) is a wipe coming -- a member at full HP
+-- under a landed round that takes it all is inside too -- and the reason is
+-- returned; nil otherwise, and nil when nothing has landed (round 0).
+-- M.WIPE_NEEDS_HURT = true adds the 0e0e4150 condition that a member also be
+-- below max HP (the review's mutant).
+function M.wipeRisk(members)
+  if #members == 0 then return nil end
+  local parts = {}
+  for _, m in ipairs(members) do
+    local inside = m.round > 0 and m.hp <= m.round
+    if M.WIPE_NEEDS_HURT and m.hp >= m.maxhp then inside = false end
+    if not inside then return nil end
+    parts[#parts + 1] = string.format("e%d %d under %d", m.e, m.hp, m.round)
+  end
+  return string.format("%d standing, every one inside its round: %s", #members, table.concat(parts, ", "))
+end
+
 function M.raiseDecision(o)
   local maxhp, power = o.maxhp or 0, o.power or 2
   local raiseHp = (maxhp * power) >> 4
@@ -6036,16 +6057,18 @@ function Driver:magitekLine(actor)
   if slot == nil then return nil end
   -- the seat's list, read from the ROM the way UpdateMenuState_2a does: the
   -- seat's $2EAE byte picks TerraMagitekAttackTbl (0) or
-  -- DefaultMagitekAttackTbl, eight entries, $FF an empty one; Heal Force
-  -- (entry 4, attack $87) is a heal and stays out of the attack offer
+  -- DefaultMagitekAttackTbl, eight entries, $FF an empty one; an entry whose
+  -- MagicProp record carries the heal flag (+4 bit 0: Heal Force) stays out
   local tbl = (M.readByte(0x2EAE + actor * 32) == 0 and M.sym("TerraMagitekAttackTbl")
     or M.sym("DefaultMagitekAttackTbl")) & 0x3FFFFF
+  local MP = M.sym("MagicProp") & 0x3FFFFF
   local offer = {}
   for idx = 0, 7 do
     local v = M.readRomByte(tbl + idx)
-    if v < 0x80 and v ~= 4 then offer[#offer + 1] = { entry = idx, atk = v } end
+    if v < 0x80 and (M.readRomByte(MP + (BATTLE.MTEK_BASE + v) * 14 + 4) & 0x01) == 0 then
+      offer[#offer + 1] = { entry = idx, atk = v }
+    end
   end
-  local MP = M.sym("MagicProp") & 0x3FFFFF
   local x = 8 + slot * 2
   local weak, half = M.readByte(0x3BE0 + x), M.readByte(0x3BE1 + x)
   local absorb, null = M.readByte(0x3BCC + x), M.readByte(0x3BCD + x)
@@ -6523,30 +6546,25 @@ function Driver:raiseOk(e, actor)
         .. "(slot %d is %d ticks from acting)", lethalSlot, lethalEta)
     end
   end
-  -- (#374) heading for a wipe: every member standing besides the fallen one
-  -- is hurt and inside one round of death, by a round priced from what the
-  -- enemy has actually landed (a full gauge of their own; no unseen enemy
-  -- priced from its script, #367).  With the script's price in it, the
+  -- (#374) heading for a wipe (M.wipeRisk): every member standing besides
+  -- the fallen one is inside one round of death, by a round priced from what
+  -- the enemy has actually landed (a full gauge of their own; no unseen
+  -- enemy priced from its script, #367).  With the script's price in it, the
   -- Sealed Gate's cave read every member inside its round from full HP and
   -- raised on it: "102 HP does not clear the 1293 round, but the party is
   -- heading for a wipe (3 standing ..." (build/attempts/wt/v026-driver/
   -- 367/gate2/max_s20.log.gz, review of 0fd4d1fd)
   if math.max(hit or 0, o.roundCost or 0) >= raiseHp and not o.killInReach then
-    local standing, inside, parts = 0, 0, {}
+    local members = {}
     for p = 0, 3 do
       local php = M.readWord(0x3BF4 + p * 2)
       if p ~= e and php > 0 and php ~= 0xFFFF and M.readWord(0x3C1C + p * 2) > 0
          and (M.leftMask() >> p) & 1 == 0 then
-        standing = standing + 1
-        local rp = self:roundPriceFor(p, true) or 0
-        if rp > 0 and php <= rp and php < M.readWord(0x3C1C + p * 2) then inside = inside + 1 end
-        parts[#parts + 1] = string.format("e%d %d under %d", p, php, rp)
+        members[#members + 1] = { e = p, hp = php, maxhp = M.readWord(0x3C1C + p * 2),
+                                  round = self:roundPriceFor(p, true) or 0 }
       end
     end
-    if standing > 0 and inside == standing then
-      o.wipe = string.format("%d standing, every one inside its round: %s", standing,
-        table.concat(parts, ", "))
-    end
+    o.wipe = M.wipeRisk(members)
   end
   local _, ok, why, needsTopUp = M.raiseDecision(o)
   return ok, raiseHp, hit, hitSlot, hitOn, why .. detail, needsTopUp

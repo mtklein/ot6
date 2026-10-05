@@ -419,6 +419,22 @@ H.run({ maxFrames = 3000 }, {
                                                 topUpFirst = true, topUp = 0 })
     H.assertEq(tostring(ok), "false",
       "...and the same raise with a member standing clear of the round is refused (" .. why .. ")")
+    -- ...and o.wipe as Driver:raiseOk builds it (H.wipeRisk on the members
+    -- still standing, each round priced from landed hits only): a full-HP
+    -- member under a landed round that takes it all is inside it (review of
+    -- 0e0e4150: a 'hurt' condition there blocked a true wipe); with nothing
+    -- landed yet (round 0) no wipe is read, and neither is one with a
+    -- member standing clear
+    local w = H.wipeRisk({ { e = 1, hp = 900, maxhp = 900, round = 1100 },
+                           { e = 3, hp = 300, maxhp = 978, round = 600 } })
+    H.assertEq(w ~= nil, true, "a full-HP member inside a landed round that takes it all, and a hurt "
+      .. "one inside its own: heading for a wipe (" .. tostring(w) .. ")")
+    H.assertEq(H.wipeRisk({ { e = 1, hp = 900, maxhp = 900, round = 0 },
+                            { e = 3, hp = 300, maxhp = 978, round = 0 } }), nil,
+      "nothing landed yet (both rounds 0): no wipe read")
+    H.assertEq(H.wipeRisk({ { e = 1, hp = 900, maxhp = 900, round = 600 },
+                            { e = 3, hp = 300, maxhp = 978, round = 600 } }), nil,
+      "a member standing clear of its round: no wipe read")
     raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 363, power = 2, smallestHit = nil })
     H.assertEq(tostring(ok) .. "/" .. tostring(needs), "true/true",
       "nothing measured: the raise stands, and its top-up is owed -- not judged to survive alone (" .. why .. ")")
