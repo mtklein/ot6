@@ -7,6 +7,16 @@
 # bundle; a warm cache is built zero times; a stale stamp (a Mesen upgrade)
 # is rebuilt exactly once, again with every worker served.
 #
+# What makes "exactly once" hold is the build lock's mutual exclusion, so
+# that is measured first, directly: rounds of concurrent takers of one lock
+# (run.sh --take-lock, the primitive the gate uses), each round exactly one
+# winner.  #371 was that primitive failing: px13's mkdir(1) (uutils
+# coreutils 0.10.0) let several concurrent takers win, two workers built at
+# once, and the second build's mv nested it inside the first's bundle.  The
+# waves catch that only when two workers' looks happen to coincide; the
+# rounds catch it every run.  bundle_ok also lists the bundle's hidden
+# entries, where that nested build hid.
+#
 # The cold waves stagger their launches by a few milliseconds, the spread
 # compose.py's run time gave the release qualification's first wave, which
 # is what put a worker's readiness look before the builder's last step and
@@ -68,7 +78,7 @@ wave() {  # <label> <stagger seconds> <builds wanted>
 bundle_ok() {  # the shape the gate promises, and nothing the build leaves behind
   [ -x "$APP$BIN_SUB/Mesen" ] || fail "$1: no executable at $APP$BIN_SUB/Mesen"
   [ ! -e "$APP$BIN_SUB/settings.json" ] || fail "$1: settings.json survived into the shared copy"
-  [ "$(ls "$APP")" = "$TOP" ] || fail "$1: the bundle holds more than $TOP: $(ls "$APP" | tr '\n' ' ')"
+  [ "$(ls -A "$APP")" = "$TOP" ] || fail "$1: the bundle holds more than $TOP: $(ls -A "$APP" | tr '\n' ' ')"
   [ "$(cat "$APP.stamp")" = "$(file_stamp "$SRC_BIN")" ] || fail "$1: stamp does not name the source binary"
   [ ! -e "$CACHE/.build.lock" ] || fail "$1: the lock was left held"
   [ -z "$(ls -d "$CACHE"/.build.* 2>/dev/null)" ] || fail "$1: build leftovers: $(ls -d "$CACHE"/.build.* | tr '\n' ' ')"
@@ -82,6 +92,29 @@ if [ "$(cat "$TMP/default.app" 2>/dev/null)" = "$TMP/home/$DEFAULT_CACHE/$DEFAUL
   echo "  pass  OT6_MESEN_CACHE unset provisions under \$HOME/$DEFAULT_CACHE"
 else fail "OT6_MESEN_CACHE unset provisioned at '$(cat "$TMP/default.app" 2>/dev/null)'"; fi
 rm -rf "$TMP/home"
+
+# The lock: R rounds of N concurrent takers, exactly one winner each.
+R=60
+r=1; multi=0; none=0
+while [ "$r" -le "$R" ]; do
+  rm -f "$TMP/lock" "$TMP"/won.*
+  i=1
+  while [ "$i" -le "$N" ]; do
+    ( "$ROOT/tools/tests/run.sh" --take-lock "$TMP/lock" && : > "$TMP/won.$i" ) &
+    i=$((i + 1))
+  done
+  wait
+  won=$(ls "$TMP"/won.* 2>/dev/null | wc -l | tr -d ' ')
+  [ "$won" -gt 1 ] && multi=$((multi + 1))
+  [ "$won" -lt 1 ] && none=$((none + 1))
+  r=$((r + 1))
+done
+rm -f "$TMP/lock" "$TMP"/won.*
+if [ "$multi" = 0 ] && [ "$none" = 0 ]; then
+  printf '  pass  the build lock: %s rounds of %s concurrent takers, one winner each\n' "$R" "$N"
+else
+  fail "the build lock: of $R rounds of $N concurrent takers, $multi had more than one winner and $none had none"
+fi
 
 k=1
 while [ "$k" -le 6 ]; do

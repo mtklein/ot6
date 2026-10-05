@@ -75,6 +75,18 @@ if [ "${1:-}" = "--verdict-selftest" ]; then
   echo "run.sh --verdict-selftest: OK"; exit 0
 fi
 
+# The build lock: the shell's own exclusive create (noclobber `>` opens with
+# O_CREAT|O_EXCL), so exactly one of any number of concurrent takers gets
+# it, whatever mkdir(1) the machine has.  It used to be `mkdir "$LOCK"`, and
+# px13's mkdir is uutils coreutils 0.10.0 (Ubuntu 26.04), which is not
+# atomic: of 16 concurrent `mkdir L`, more than one reported success in 210
+# of 300 rounds (GNU mkdir and os.mkdir: 0 of 300), so two workers built the
+# shared copy at once, the second mv nesting its build inside the first's
+# (#371, build/attempts/wt/v026-graph/371/).
+take_lock() { ( set -C; : > "$1" ) 2>/dev/null; }
+# --take-lock <path>: the primitive alone, for shared_emulator_selftest.sh.
+if [ "${1:-}" = "--take-lock" ]; then take_lock "${2:?--take-lock <path>}"; exit; fi
+
 SCRIPT="${1:?usage: run.sh <script.lua> [logfile]}"
 
 # A human-readable prefix for the workspace directory name.
@@ -233,15 +245,15 @@ shared_app_why() {
 }
 
 if ! shared_app_ready; then
-  # Many workers can arrive here at once on a cold cache.  Whoever wins the
-  # mkdir builds it; the rest wait for that one build instead of racing to
+  # Many workers can arrive here at once on a cold cache.  Whoever takes the
+  # lock builds it; the rest wait for that one build instead of racing to
   # install over each other (mv of a directory onto an existing directory
   # nests it rather than replacing it, which would corrupt the bundle).
   mkdir -p "$MESEN_CACHE"
   LOCK="$MESEN_CACHE/.build.lock"
   held=""; waited=0
   until shared_app_ready; do
-    if mkdir "$LOCK" 2>/dev/null; then held=1; break; fi
+    if take_lock "$LOCK"; then held=1; break; fi
     sleep 1; waited=$((waited + 1))
     [ "$waited" -gt 180 ] && { echo "stale lock $LOCK; remove it and retry"; exit 2; }
   done
