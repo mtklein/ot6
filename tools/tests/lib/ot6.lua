@@ -1357,6 +1357,32 @@ function M.killEstimate(o)
   return per * toBreak + per * 4 * broken, toBreak, broken
 end
 
+-- Heading for a wipe (#374), the arithmetic Driver:raiseOk hands to
+-- M.raiseDecision as o.wipe.  `members` are the ones still standing besides
+-- the fallen, each { e, hp, maxhp, round } with `round` what the enemy's landed hits
+-- (Driver:roundPriceFor(e, true)) cost over a full gauge of e's own -- every
+-- enemy action in that window priced as if it all fell on e.  So one round is
+-- not a threat to each member at once: an enemy action takes down one member,
+-- not two.  A wipe is the round landing before ANY standing member can act
+-- again (the smallest of their rounds) taking the party's pooled standing HP;
+-- one member standing is then simply inside its own round.  Returns the
+-- reason, or nil (also with nothing landed yet: a round of 0 takes nobody).
+-- Review of 63473f75: per member, four landed 250s read as a 1000 round over
+-- each of 900/950/990 HP and called a wipe that 1000 spread over three can't
+-- make (build/attempts/wt/v026-driver-review3/wiperisk_probe.log).
+function M.wipeRisk(members)
+  if #members == 0 then return nil end
+  local pool, round, parts = 0, nil, {}
+  for _, m in ipairs(members) do
+    pool = pool + m.hp
+    if round == nil or m.round < round then round = m.round end
+    parts[#parts + 1] = string.format("e%d %d/%d", m.e, m.hp, m.maxhp or 0)
+  end
+  if pool > round then return nil end
+  return string.format("%d standing, %d HP between them (%s) under the %d round that lands "
+    .. "before any of them acts", #members, pool, table.concat(parts, ", "), round)
+end
+
 -- Whether a raise is worth the Fenix Down (#165, refined by #168): the HP
 -- it gives back against the smallest hit the living enemy has landed this
 -- fight.  Fenix Down (item $F0: ItemProp +19 bit 7 "fraction of max HP",
@@ -1393,27 +1419,6 @@ end
 --                care's Revivify clears the bit after the fight (ff443cb0)
 --
 -- Returns the raise HP, true to raise / false to refuse, and the reason.
--- Heading for a wipe (#374), the arithmetic Driver:raiseOk hands to
--- M.raiseDecision as o.wipe: `members` are the ones still standing besides
--- the fallen, each { e, hp, maxhp, round } with `round` priced only from what
--- the enemy has landed (Driver:roundPriceFor(e, true)).  Every one inside
--- its round (hp <= round, round > 0) is a wipe coming -- a member at full HP
--- under a landed round that takes it all is inside too -- and the reason is
--- returned; nil otherwise, and nil when nothing has landed (round 0).
--- M.WIPE_NEEDS_HURT = true adds the 0e0e4150 condition that a member also be
--- below max HP (the review's mutant).
-function M.wipeRisk(members)
-  if #members == 0 then return nil end
-  local parts = {}
-  for _, m in ipairs(members) do
-    local inside = m.round > 0 and m.hp <= m.round
-    if M.WIPE_NEEDS_HURT and m.hp >= m.maxhp then inside = false end
-    if not inside then return nil end
-    parts[#parts + 1] = string.format("e%d %d under %d", m.e, m.hp, m.round)
-  end
-  return string.format("%d standing, every one inside its round: %s", #members, table.concat(parts, ", "))
-end
-
 function M.raiseDecision(o)
   local maxhp, power = o.maxhp or 0, o.power or 2
   local raiseHp = (maxhp * power) >> 4
@@ -6546,10 +6551,10 @@ function Driver:raiseOk(e, actor)
         .. "(slot %d is %d ticks from acting)", lethalSlot, lethalEta)
     end
   end
-  -- (#374) heading for a wipe (M.wipeRisk): every member standing besides
-  -- the fallen one is inside one round of death, by a round priced from what
-  -- the enemy has actually landed (a full gauge of their own; no unseen
-  -- enemy priced from its script, #367).  With the script's price in it, the
+  -- (#374) heading for a wipe (M.wipeRisk): the members standing besides
+  -- the fallen one, their HP pooled, are inside the round that lands before
+  -- any of them acts, priced from what the enemy has actually landed (no
+  -- unseen enemy priced from its script, #367).  With the script's price in it, the
   -- Sealed Gate's cave read every member inside its round from full HP and
   -- raised on it: "102 HP does not clear the 1293 round, but the party is
   -- heading for a wipe (3 standing ..." (build/attempts/wt/v026-driver/
