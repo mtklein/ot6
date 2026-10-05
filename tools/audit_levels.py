@@ -2,7 +2,7 @@
 """Measure the ACTUAL party levels the route banks at every checkpoint.
 
 Read-only companion to audit_party_hp.py: reads the same .mss fixtures and
-tracked SRAM checkpoints with no emulator, but reports progression rather
+SRAM checkpoint captures (build/checkpoints) with no emulator, but reports progression rather
 than casualties -- per enrolled character LEVEL, max HP, max MP, and
 experience (record offset +$11, three bytes; ff6/notes/field-ram.txt:898),
 so the table joins mechanically against a healthy-curve table keyed by

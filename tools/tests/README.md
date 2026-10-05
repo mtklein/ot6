@@ -10,7 +10,8 @@ ninja build/ot6.sfc                                   # build the ROM
 tools/tests/run.sh tools/tests/battle_smoke.lua       # run one test raw
 ninja build/results/suite/battle_break.ok             # run one suite test (and what it needs)
 ninja build/states/vargas_entry.mss.lua               # generate one savestate (and its chain)
-ninja                                                 # everything
+ninja                                                 # everything (qualification)
+ninja quick                                           # dev lever: late suites from tracked checkpoints, never evidence
 
 python3 tools/tests/lib/compose.py --check-states     # is this red test a stale fixture?
 python3 tools/tests/lib/compose.py --adopt-stamps     # upgrade legacy stamps the tree's records can prove
@@ -56,17 +57,23 @@ the tree, and re-run `--check-states` afterwards.
 The graph of generated savestates is data: `tools/tests/savestate_graph.py`,
 one entry per state. `configure.py` embeds it into `build.ninja` (via
 `lib/savestate_ninja.py`). A generated link's scheduling inputs are its
-compatibility inputs: the ROM bytes, its generator `gen_*.lua`, and, for a
-segment that starts from a saved checkpoint, that checkpoint's manifest and
-SRAM payload. Every one is a declared ninja dependency routed through a
+compatibility inputs: the ROM bytes, the emulator pin, its generator
+`gen_*.lua`, `tools/tests/replay.txt` (the scheduled-replay lever), and what
+it boots: its `prev=` state, or, for a leg that starts at a save point (a
+cut), the capture of the battery the run before it saved
+(`build/checkpoints/<key>/`, sealed against the tracked manifest's authored
+fields). The game is played once, from power-on; the tracked checkpoints in
+`tools/tests/checkpoints/` are the committed copies of the captures, booted
+by nothing in the graph but `ninja quick` (docs/TOOLING.md "One play from
+power-on, and cuts"). Every one is a declared ninja dependency routed through a
 copy-if-changed edge (`cmp || cp` with `restat = 1`), so staleness is decided
 by content: a rebuild that bumps timestamps without moving bytes regenerates
 nothing; a changed input re-runs every transitive dependent. A generator is
 compared as its Lua token stream (`lib/lua_fingerprint.py`: comments and
 whitespace dropped, strings kept verbatim), so a comment-only or
 re-indenting edit regenerates nothing. Editing one generator's code
-regenerates only the states it feeds; a ROM content change
-regenerates the whole chain. The three lib halves `lib/compose.py` inlines
+regenerates the states its new bytes reach (through a capture too); a ROM
+content change or an emulator pin change replays the whole line once. The three lib halves `lib/compose.py` inlines
 (`ot6.lua`, `ot6_field.lua`, `ot6_contract.lua`) are **not** generate-edge
 inputs: editing one re-runs every suite test, audit and selftest that
 depends on it, and regenerates no fixture (docs/TESTING.md: a change to

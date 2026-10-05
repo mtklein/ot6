@@ -119,7 +119,9 @@ def logged_entry_party(repo: str = "."):
     """
     import hashlib
     import re
-    manifest = os.path.join(repo, "tools/tests/checkpoints",
+    # the capture esper_tubes_entry Continued (#363), whose payload
+    # checkpoint_payloads() reads
+    manifest = os.path.join(repo, "build/checkpoints",
                             ENTRY_CHECKPOINT, "manifest.json")
     stamp = os.path.join(repo, ENTRY_STAMP)
     log = os.path.join(repo, ENTRY_LOG)
@@ -128,7 +130,7 @@ def logged_entry_party(repo: str = "."):
             return None, f"{f} is missing (build {ENTRY_STAMP} first)"
     with open(manifest, "rb") as fh:
         msha = hashlib.sha256(fh.read()).hexdigest()
-    rel = f"tools/tests/checkpoints/{ENTRY_CHECKPOINT}/manifest.json"
+    rel = f"build/checkpoints/{ENTRY_CHECKPOINT}/manifest.json"
     with open(stamp) as fh:
         bound = [ln.split()[2] for ln in fh
                  if ln.startswith(f"ancestor {rel} ")]
@@ -245,7 +247,7 @@ def selftest(repo: str = ".") -> int:
     payloads = dict(checkpoint_payloads(repo))
     if "n024-entry-save-v1" not in payloads or len(payloads) < 5:
         bad.append(f"checkpoint_payloads({repo!r}) should find "
-                   f"n024-entry-save-v1 among the tracked checkpoints, "
+                   f"n024-entry-save-v1 among the captured checkpoints, "
                    f"got {sorted(payloads)}")
     else:
         party, err = read_party_sram(payloads["n024-entry-save-v1"])

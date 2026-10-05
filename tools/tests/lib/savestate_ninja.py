@@ -324,6 +324,22 @@ def line_end(states):
     return best if best in by else None
 
 
+def line_runs(states):
+    """The entries whose runs make up the play from power-on to line_end():
+    its prev= ancestry, as the entry names that own each run.  Everything
+    else (a branch, a suite) is side work beside it."""
+    by = {e["state"]: e for e in states}
+    owner = _owners(states)
+    end = line_end(states)
+    out = set()
+    e = by.get(end)
+    while e is not None:
+        out.add(e["state"])
+        p = e.get("prev")
+        e = by[owner[p]] if p else None
+    return out
+
+
 def coverage(states, root, booted=(), not_gated=None):
     """Errors, one per tracked checkpoint the release gate would not check
     and per suite boot of a save no run makes: every
@@ -476,13 +492,16 @@ def _seal_cmd(key, authored):
             f"python3 tools/tests/lib/checkpoint_drift.py {key}")
 
 
-def emit_state_edges(w, states, root, copy_if_changed_from):
+def emit_state_edges(w, states, root, copy_if_changed_from, side_pool=None):
     """The per-state build statements, the cutters' capture edges and the
     authored-manifest templates.  copy_if_changed_from(path) -> the
     dependency path to use for a copied source; the caller owns emitting the
     copy_if_changed edges themselves (so a source shared with other parts
     of a larger graph is copied exactly once)."""
     prods = producers(states)
+    # side_pool: a ninja pool for runs off the play from power-on, so the
+    # line's next run never waits for a -j slot behind side work (#344)
+    line = line_runs(states)
     # the entry whose own run saves each checkpoint, and the cutters (a
     # capture-only script booted from a state) that save the rest
     saves = {run[1]: key for key, run in prods.items() if run[0] == "run"}
@@ -515,6 +534,8 @@ def emit_state_edges(w, states, root, copy_if_changed_from):
         w(f"  env = OT6_TIMEOUT={CUTTER_TIMEOUT} OT6_NO_PUBLISH=1 "
           f"OT6_CAPTURE_SRM={ins[1]}")
         w(f"  seal = {_seal_cmd(key, authored)}")
+        if side_pool and _owners(states)[boot] not in line:
+            w(f"  pool = {side_pool}")
     if cutters:
         w("")
     for e in states:
@@ -577,7 +598,102 @@ def emit_state_edges(w, states, root, copy_if_changed_from):
         if seal:
             w(f"  seal = {seal}")
             w(f"  key = {key}")
+        if side_pool and s not in line:
+            w(f"  pool = {side_pool}")
     w("")
+
+
+# ------------------------------------------------------- the quick lever --
+# `ninja quick` (configure.py): early feedback for a branch that changed the
+# ROM, without waiting for the play from power-on to reach a late leg.  Each
+# cut leg boots its TRACKED checkpoint instead of the capture, so the legs
+# between cuts run at once, as quick_<state> copies (OT6_STACK=quick_), and
+# the suites whose fixtures they reach run on those.  A tracked checkpoint
+# is a save made by an older build's play, so a quick result is NOT
+# qualification, merge or release evidence (docs/TESTING.md); nothing in
+# the default graph or the release depends on a quick_ output.
+QUICK = "quick_"
+
+
+def quick_affected(states):
+    """The states whose quick_ copy differs from the real one: every state
+    with a cut in its prev= ancestry (itself included), also= siblings
+    with their run."""
+    owner = _owners(states)
+    by = {e["state"]: e for e in states}
+    out = set()
+    for e in states:
+        cut = bool(e.get("prev") and e.get("checkpoint"))
+        if cut or (e.get("prev") and owner[e["prev"]] in out):
+            out.add(e["state"])
+            out.update(e.get("also") or [])
+    return out & (set(by) | {a for e in states for a in (e.get("also") or [])})
+
+
+def emit_quick_edges(w, states, root, copy_if_changed_from, side_pool=None):
+    """The quick_ copies (see QUICK): a generate edge per affected entry,
+    a cut booting the tracked checkpoint, and a plain copy of each
+    unaffected state a copy boots.  Returns the affected names."""
+    affected = quick_affected(states)
+    owner = _owners(states)
+    common = [copy_if_changed_from(ROM), copy_if_changed_from(EMULATOR)]
+    w("# The quick lever (savestate_ninja.py QUICK): never qualification.")
+    w("rule quick_copy")
+    w("  command = cp $src.mss build/states/$state.mss && "
+      "cp $src.mss.lua build/states/$state.mss.lua && "
+      "cp $src.stamp build/states/$state.stamp")
+    w("  description = quick copy $state")
+    w("")
+    copied = set()
+    for e in states:
+        if e["state"] not in affected:
+            continue
+        p = e.get("prev")
+        if p and not e.get("checkpoint") and owner[p] not in affected \
+                and p not in copied:
+            copied.add(p)
+            src = f"build/states/{p}"
+            w(f"build build/states/{QUICK}{p}.mss build/states/{QUICK}{p}.mss.lua "
+              f"build/states/{QUICK}{p}.stamp: quick_copy {src}.mss "
+              f"{src}.mss.lua {src}.stamp")
+            w(f"  state = {QUICK}{p}")
+            w(f"  src = {src}")
+    for e in states:
+        s, gen = e["state"], e["gen"]
+        if s not in affected:
+            continue
+        names = [QUICK + n for n in [s] + list(e.get("also") or [])]
+        outs = " ".join(f"build/states/{n}.mss.lua build/states/{n}.mss"
+                        for n in names)
+        deps = common + [copy_if_changed_from(f"tools/tests/{gen}.lua")]
+        env = [f"OT6_STACK={QUICK}", f"OT6_TIMEOUT={e.get('timeout') or 1800}"]
+        if e.get("prev") and e.get("checkpoint"):
+            key = e["checkpoint"]
+            ins = checkpoint_inputs(root, key)
+            explicit = " " + " ".join(ins)
+            env.append(f"OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/{key}")
+            extras, ancestor = " " + " ".join(ins), ins[0]
+        else:
+            p = QUICK + e["prev"]
+            explicit = (f" build/states/{p}.mss.lua build/states/{p}.mss"
+                        f" build/states/{p}.stamp")
+            extras, ancestor = "", f"build/states/{p}.stamp"
+        stamp_cmds, anc = [], ancestor
+        for n in names:
+            stamp_cmds.append(
+                f"sh tools/tests/lib/savestate_stamp.sh write {n} {gen} {anc}{extras}")
+            anc = f"build/states/{n}.stamp"
+        stamp_outs = " ".join(f"build/states/{n}.stamp" for n in names)
+        w(f"build {outs} {stamp_outs}: generate{explicit} | {' '.join(deps)}")
+        w(f"  state = {names[0]}")
+        w(f"  gen = {gen}")
+        w(f"  expect = {' '.join(f'{n}.mss {n}.mss.lua' for n in names)}")
+        w(f"  stamps = {' && '.join(stamp_cmds)}")
+        w(f"  env = {' '.join(env)}")
+        if side_pool:
+            w(f"  pool = {side_pool}")
+    w("")
+    return affected
 
 
 def copy_rule(src, states):
@@ -931,6 +1047,28 @@ def selftest():
               and "OT6_TIMEOUT=1800" in body("build/states/x.mss.lua"))
         check("`chain` names the end of the play from power-on",
               "build chain: phony build/states/r.mss.lua" in text)
+        pooled = []
+        emit_state_edges(pooled.append, full, root, copy_if_changed_from,
+                         side_pool="side")
+
+        def pool_of(out):
+            i = next(i for i, l in enumerate(pooled)
+                     if l.startswith(f"build {out}"))
+            for l in pooled[i + 1:]:
+                if not l.startswith("  "):
+                    return None
+                if l.startswith("  pool = "):
+                    return l.split(" = ")[1]
+            return None
+        check("the play from power-on is o, p, q, r",
+              line_runs(full) == {"o", "p", "q", "r"})
+        check("its runs and the cutter on it take any free slot; side work "
+              "(a branch, a second power-on root, a cut off the line) is "
+              "pooled (#344)",
+              [pool_of(f"build/states/{n}.mss.lua") for n in "opqrxb"]
+              + [pool_of("build/states/q2.mss.lua"),
+                 pool_of("build/checkpoints/k2-v1/manifest.json")]
+              == [None, None, None, None, "side", "side", "side", None])
         check("the drift gate's keys are every captured checkpoint",
               sorted(captures(full, root)) ==
               ["k1-v1", "k2-v1", "k3-v1", "k4-v1"])

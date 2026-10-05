@@ -99,6 +99,37 @@ provenance, or silently disable checks. Use `H.requestSaveState`,
 snapshots, and the versioned SRAM checkpoint path for battery saves. Prefer
 these existing supported paths during iteration.
 
+### What each build target counts as
+
+The graph plays the game once from power-on (#363, docs/TOOLING.md "One
+play from power-on, and cuts"): each leg boots what the run before it made,
+and at a save point it Continues the battery that run saved and the build
+captured, never an older tracked copy.
+
+- **`ninja`** (bare) is qualification: every generated state on that one
+  line from power-on, every suite, audit and selftest, all on the tree's
+  ROM and emulator pin. A green `ninja` from a clean git tree is merge and
+  release evidence. A state played under an older test library on the
+  same ROM, generator and emulator pin counts (provenance drift, above):
+  a library-only change re-runs the suites and replays no state. Until
+  2026-10-05 a release also required the chain from power-on to be
+  replayed under today's library; that requirement is dropped, and
+  `tools/tests/replay.txt` is the lever for a full replay under today's
+  library when one is wanted (bumped on a schedule, or before a release
+  whose library changes should show in the play).
+- **`ninja release`** is `ninja` plus the release preflights, among them the
+  drift gate: every tracked checkpoint is byte for byte the save the
+  qualified play made (re-cut with `checkpoint_drift.py --recut`, which
+  replays nothing).
+- **`ninja quick`** is a development lever, not evidence of any kind for a
+  merge or a release: each leg after a save point boots the tracked
+  checkpoint, a save an older build's play made, so a branch that changed
+  the ROM hears from its late suites without waiting for the line. A
+  quick failure is worth reading; a quick pass is not qualification.
+- A suite run by hand, a lab or a sweep is evidence for the question it
+  was run to answer (see "Match the evidence to the question"), with the
+  boot it names.
+
 Evidence must outlive the tree it was produced in. Write evidence you will
 cite under `build/attempts/<branch>/` and cite it by that path. In an agent
 worktree, `tools/worktree-setup.sh` makes `build/attempts` a link to the

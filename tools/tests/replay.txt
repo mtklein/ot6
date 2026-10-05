@@ -1,0 +1,6 @@
+# The scheduled-replay lever (#363).  Every generate and capture edge in the
+# savestate graph depends on this file and nothing else does, so changing the
+# line below replays the whole game from power-on under today's test library
+# (a library edit alone replays nothing: docs/TESTING.md, provenance).
+# Bump it with the date and the reason when a full replay is wanted.
+2026-10-05 the graph played once from power-on (#363)

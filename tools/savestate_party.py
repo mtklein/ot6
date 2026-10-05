@@ -24,6 +24,9 @@ import zlib
 
 GRAPH = "tools/tests/savestate_graph.py"
 CHECKPOINTS = "tools/tests/checkpoints"
+# The saves the legs Continue: each tracked checkpoint's capture, made by a
+# run on the savestate graph in this tree (#363).
+CAPTURES = "build/checkpoints"
 
 CHAR_BLOCK = 0x1600          # WRAM address of the character table
 PARTY = 0x1850               # WRAM address of the party/order bytes
@@ -81,11 +84,11 @@ def split_orphans(files: list[str], declared: set[str]):
     if not declared:
         return list(files), []
     live = [p for p in files if stem_of(p) in declared]
-    # `ninja chain`'s chain_<state> copies are not leftovers; they are not
+    # `ninja quick`'s quick_<state> copies are not leftovers; they are not
     # qualification fixtures either, so they are neither live nor orphans
     orphans = sorted(stem_of(p) for p in files if stem_of(p) not in declared
-                     and not (stem_of(p).startswith("chain_")
-                              and stem_of(p)[len("chain_"):] in declared))
+                     and not (stem_of(p).startswith("quick_")
+                              and stem_of(p)[len("quick_"):] in declared))
     return live, orphans
 
 
@@ -226,7 +229,32 @@ def read_party_sram(path: str):
 
 
 def checkpoint_payloads(repo: str) -> list[tuple[str, str]]:
-    """(checkpoint name, payload path) for every tracked SRAM checkpoint."""
+    """(checkpoint name, payload path) for every checkpoint the legs
+    Continue: for each tracked checkpoint, the capture the graph's run made
+    of it (build/checkpoints/<key>/), which is the save the next leg boots;
+    the tracked copy is only its committed record (checkpoint_drift.py).
+    A key with no capture in this tree yet is left out (the audits' ninja
+    edges depend on every capture, so under ninja there is none)."""
+    out = []
+    pattern = os.path.join(repo, CHECKPOINTS, "*", "manifest.json")
+    for mf in sorted(glob.glob(pattern)):
+        key = os.path.basename(os.path.dirname(mf))
+        cmf = os.path.join(repo, CAPTURES, key, "manifest.json")
+        try:
+            with open(cmf) as f:
+                m = json.load(f)
+        except (OSError, ValueError):
+            continue
+        payload = os.path.join(os.path.dirname(cmf), m.get("payload", ""))
+        if os.path.isfile(payload):
+            out.append((key, payload))
+    return out
+
+
+def tracked_payloads(repo: str) -> list[tuple[str, str]]:
+    """(checkpoint name, payload path) for every TRACKED checkpoint: the
+    committed bytes, which move only at a re-cut (a reader's selftest pins
+    against these)."""
     out = []
     pattern = os.path.join(repo, CHECKPOINTS, "*", "manifest.json")
     for mf in sorted(glob.glob(pattern)):

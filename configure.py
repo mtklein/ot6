@@ -153,6 +153,17 @@ w("  deps = gcc")
 w("  description = ca65 $obj")
 w()
 sn.emit_state_rules(w)
+# #344/#363: the play from power-on is one serial line and it is the build's
+# critical path, so its next run must never wait for a -j slot.  Everything
+# else that runs an emulator (suites, branch states, `ninja quick`) shares
+# this pool, sized to the cores: ninja's default -j is cores + 2, which
+# leaves the line its slots.  (Ninja 1.13 ranks ready edges by downstream
+# edge count, not by duration, so a ready line edge goes first anyway; the
+# pool is what keeps a slot free for it.)
+import os  # noqa: E402
+w("pool side")
+w(f"  depth = {max(1, (os.cpu_count() or 2))}")
+w()
 w("# One suite test: compose, boot Mesen headless, publish the log, touch the")
 w("# ok.  $env carries the per-test environment (dirty-RAM pins, checkpoint")
 w("# batteries, coverage artifact dirs); the separating space lives here.")
@@ -355,13 +366,16 @@ if errors:
     for e in errors:
         print(f"savestate_graph: {e}", file=sys.stderr)
     sys.exit(1)
-sn.emit_state_edges(w, states, ROOT, copy_if_changed_from)
+sn.emit_state_edges(w, states, ROOT, copy_if_changed_from, side_pool="side")
 # Every checkpoint a run on the graph saves, and the files its capture is
 # sealed into (build/checkpoints/<key>/): the cuts Continue them, the suites
 # below Continue them, and the release's drift gate compares them with the
 # tracked copies.
 captures = sn.captures(states, ROOT)
 chain_end = sn.line_end(states)
+# `ninja quick`'s copies: the dev lever, never qualification (QUICK).
+quick_affected = sn.emit_quick_edges(w, states, ROOT, copy_if_changed_from,
+                                     side_pool="side")
 # Every name a test can reference includes the `also=` siblings: a state
 # like figaro_cleared is emitted by gen_edgar's edge as an also-artifact,
 # and fixture_deps() filtering against primary names only would drop it,
@@ -500,6 +514,7 @@ def fixture_deps(lua_path):
 
 
 suite_tests = []
+quick = []          # `ninja quick`: every suite's quick result
 for f in glob("tools/tests/*.lua"):
     text = (ROOT / f).read_text(errors="replace")
     m = re.search(r"^-- @suite(.*)$", text, re.M)
@@ -529,8 +544,34 @@ for f in glob("tools/tests/*.lua"):
                      f"the savestate graph saves")
         deps += sn.capture_inputs(ROOT, key)
     w.edge([f"build/results/suite/{t}.ok"], "suitetest", implicit=deps,
-           test=t, env=env)
+           test=t, env=env, pool="side")
     qual.append(f"build/results/suite/{t}.ok")
+    # `ninja quick` (savestate_ninja.py QUICK): the suite on the quick_
+    # copies of its fixtures when a cut is in their ancestry, Continuing the
+    # tracked checkpoint instead of the capture; otherwise its quick result
+    # is its real one.  Never qualification (docs/TESTING.md).
+    fixtures = {d.split("/")[-1].split(".")[0] for d in deps
+                if d.startswith("build/states/")}
+    ckpt = "OT6_SRAM_CHECKPOINT=" in env
+    if ckpt or fixtures & quick_affected:
+        qdeps = [d for d in deps if not d.startswith(("build/states/",
+                                                      sn.CAPTURE_DIR + "/"))]
+        for fx in sorted(fixtures):
+            n = sn.QUICK + fx if fx in quick_affected else fx
+            qdeps += [f"build/states/{n}.mss.lua", f"build/states/{n}.mss",
+                      f"build/states/{n}.stamp"]
+        qenv = env
+        if ckpt:
+            qenv = env.replace(f"OT6_SRAM_CHECKPOINT={sn.CAPTURE_DIR}/",
+                               "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/")
+            qdeps += [copy_if_changed_from(a)
+                      for a in sn.checkpoint_inputs(ROOT, key)]
+        w.edge([f"build/results/quick/{t}.ok"], "suitetest", implicit=qdeps,
+               test=t, env=(f"OT6_STACK={sn.QUICK} " + qenv).strip(),
+               pool="side")
+        quick.append(f"build/results/quick/{t}.ok")
+    else:
+        quick.append(f"build/results/suite/{t}.ok")
 
 # ------------------------------------------------------------------ checks --
 def check(name, cmd, deps, desc=None):
@@ -736,7 +777,7 @@ check("check_states", "python3 tools/tests/lib/compose.py --check-states",
 # copies (tools/savestate_party.py checkpoint_payloads).
 capture_files = sorted(p for paths in captures.values() for p in paths
                        if not p.endswith(".record"))
-AUDIT_COMMON = all_stamps + capture_files
+AUDIT_COMMON = all_stamps + capture_files + checkpoint_files
 check("audit_equipment", "python3 tools/audit_equipment.py",
       ["tools/audit_equipment.py"] + AUDIT_COMMON)
 check("check_mog_gear", "python3 tools/check_mog_gear.py",
@@ -889,6 +930,11 @@ w.edge(["release"], "phony", [f"build/release/ot6-v{VERSION}.zip", apk,
 # moves whenever a cut or a leg is added, and this name does not.
 if chain_end:
     w.edge(["chain"], "phony", [f"build/states/{chain_end}.mss.lua"])
+# `quick`: every suite, each cut leg booted from its tracked checkpoint so
+# a ROM-changing branch hears from its late suites early.  Not
+# qualification, merge or release evidence (docs/TESTING.md); bare `ninja`
+# and `release` never build it.
+w.edge(["quick"], "phony", quick)
 w("default " + " ".join(esc(p) for p in qual))
 w()
 
