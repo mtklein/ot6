@@ -4,6 +4,13 @@
   "slot": 3,
   "milestone": "banquet-done",
   "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "x": 120,
+      "y": 188
+    }
+  },
   "size": 32768,
   "sha256": "64f006b38ffaf0bc3fa176bd28abe8872ec1de828713e3e8b209c482499a195b",
   "provenance": {

@@ -4,6 +4,14 @@
   "slot": 3,
   "milestone": "fc-landing",
   "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 394,
+      "x": 7,
+      "y": 12
+    }
+  },
   "size": 32768,
   "sha256": "7020595964babafd6f9fe0d25ffb53577ef08d02d56bf258a2e8a82d8bd8d6da",
   "provenance": {

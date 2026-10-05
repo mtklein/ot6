@@ -76,8 +76,8 @@ through. It is long and serial (the World of Ruin legs alone carry
 
 Every tracked checkpoint something boots (a state, or a suite in
 `configure.py`'s `TEST_ENV`) is captured on that line. The rest are named
-in the graph's `NOT_GATED` with the reason (today: the four
-`reseal_seeds.sh` seeds and `vector-escape-v1`, which nothing boots).
+in the graph's `NOT_GATED` with the reason (today none: the five that
+stood there, booted by nothing, were retired with their cutters, #356).
 Qualification's `checkpoint_coverage` check
 (`savestate_ninja.py --coverage`) refuses any other tracked checkpoint, so
 a new leg that boots a checkpoint with no `prev=` fails `ninja`.
