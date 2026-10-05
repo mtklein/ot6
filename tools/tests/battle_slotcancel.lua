@@ -115,6 +115,10 @@ local function invIdx(item)
     end
   end
 end
+local function invCount(item)
+  local i = invIdx(item)
+  return i and H.readByte(BATTINV + i * 5 + 3) or 0
+end
 local function cmdCell(a, cmd)
   for r = 0, 3 do
     if H.readByte(0x202E + a * 12 + r * 3) == cmd then return r end
@@ -162,6 +166,7 @@ end
 --   * else Defend.
 local attackSetzer = true
 local monsterActing, monsterStart = nil, 0   -- a monster's action in progress (exec watches)
+local executing, execStart = nil, 0          -- any entity's action in progress (ExecAction..Ot6ActionEnd)
 local skipPoint = false      -- playing on from a branch point: not that window again
 local ctl, ctlDone = nil, false   -- the control spin (the approach, below)
 local blows = {}             -- what the members' Fights have taken off Setzer
@@ -409,6 +414,13 @@ local function approachFrame()
       end
     end
   end
+  if H.readByte(MENU) ~= 0 and php(actor) == 0 and raising == nil and invCount(FENIX) == 0 then
+    -- a window is up and he is down with no Fenix Down left to raise him:
+    -- no branch point can come (#377: wt/recut-fallout's sweep2 k5 spent
+    -- 40000 frames healing around a fallen SETZER with an empty bag)
+    H.assertEq(false, true, string.format("precondition: a Fenix Down to raise SETZER " ..
+      "(f%d: the bag is out)", H.frame))
+  end
   if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor then
     W = {}
     if ctl and ctl.commit and ctl.away and not ctl.done then ctl = nil end  -- dropped: again
@@ -591,8 +603,9 @@ local function drawBattle(tag, tries)
     actor = nil
     for s = 0, 3 do if chid(s) == SETZER then actor = s end end
     H.assertEq(actor ~= nil, true, tag .. ": SETZER present")
-    H.log(string.format("%s: setzer slot %d monsters={%s} | party %s", tag, actor,
-      table.concat(msPresent, ","), partyLine()))
+    H.log(string.format("%s: setzer slot %d monsters={%s} | party %s | bag: %d Fenix Down, " ..
+      "%d Potion", tag, actor, table.concat(msPresent, ","), partyLine(), invCount(FENIX),
+      invCount(POTION)))
   end)
   return steps
 end
@@ -688,6 +701,7 @@ local steps = {
     emu.addMemoryCallback(function()
       local x = emu.getState()["cpu.x"] & 0xffff
       if x == monsterActing then monsterActing = nil end
+      if x == executing then executing = nil end
       if actor == nil then return end
       if x == actor * 2 then
         -- what ended: the ROM's own record of a fresh turn with nothing to
@@ -702,6 +716,7 @@ local steps = {
     local ea = H.sym("ExecAction")
     emu.addMemoryCallback(function()
       local x = emu.getState()["cpu.x"] & 0xff
+      executing, execStart = x, H.frame
       if x >= 8 then monsterActing, monsterStart = x, H.frame end
     end, emu.callbackType.exec, ea, ea)
     local addr = H.seedStoreAddr()

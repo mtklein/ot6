@@ -329,6 +329,13 @@ local function pacing()
   }
 end
 
+-- The cap (#304).  The longest legal run paces the whole decoded budget
+-- (36 battles on group 8, the "[test] budget" line) with no status landing:
+-- a lab copy forced down that path (build/lab/v026/mk_worst.py
+-- statuses-full) ended at f110,084, f110,882 and f111,293 (seed shifts 0,
+-- 8, 16; build/attempts/wt/v026-suites/r/worst/).  200,000 is 1.8x the
+-- longest; the budget's own count moves with the ROM, and a decode needing
+-- more battles than 200000 / 3,100 frames a battle (~64) would need it raised.
 H.run({ maxFrames = 200000 }, {
   H.loadState(STATE),
   H.waitFrames(30),

@@ -220,7 +220,7 @@ local function cyanCanChoose()
 end
 -- A status that outlives its battle (KO, Petrify) is not waited out by
 -- walking to the next encounter: it comes along.  Measured on the original
--- file at a 17-frame idle before the walk (build/lab/mpb/mc_sweep1/
+-- file at a 17-frame idle before the walk (build/attempts/wt/mp-baselines/lab/mpb/mc_sweep1/
 -- orig_idle17.log): CYAN was KO'd in a void attempt's battle and opened
 -- refusal attempts 3 and 4 at st1=80, so both were void before they began.
 -- SHADOW cures it from the bag the way a player would -- a Fenix Down for
