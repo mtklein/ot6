@@ -664,7 +664,9 @@ function M.navTo(txIn, tyIn, opts)
           M.monstersPresent(), M.readWord(M.BATTLE_HP), M.readWord(M.BATTLE_HP + 2),
           M.readWord(M.BATTLE_HP + 4), M.readWord(M.BATTLE_HP + 6), M.readByte(0x00ba), M.readByte(0x00d3)))
       end
-      lostN = M.hasControl() and 0 or lostN + 1
+      -- control, and not inside LoadMap: the map being loaded is not yet
+      -- the one BFS would read (#357, lib/ot6.lua M.mapLoading)
+      lostN = (M.hasControl() and not M.mapLoading()) and 0 or lostN + 1
       if tactical and battN == 0 then tactical.idle() end
       -- 1. battle: clear it, but never the goal formation
       if battN >= 3 then
@@ -5178,7 +5180,7 @@ function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
   -- reloads the map after a menu or a battle reads the stale object map
   -- (#352: the B2 hub's staging (37,23)).
   local function stage()
-    if not pick and not M.hasControl() then return nil end
+    if not pick and (not M.hasControl() or M.mapLoading()) then return nil end
     if not pick then
       for _, c in ipairs(DIAGSTAGE) do
         local cx, cy, move = sx + c[1], sy + c[2], c[3]
@@ -5247,7 +5249,7 @@ function M.shopTalk(nx, ny, what, opts)
   local pick
   -- picked only with control, as M.crossDoor's staging tile
   local function stage()
-    if not pick and not M.hasControl() then return nil end
+    if not pick and (not M.hasControl() or M.mapLoading()) then return nil end
     if not pick then
       for _, c in ipairs(SHOP_CAND) do
         local sx, sy = nx + c[1], ny + c[2]
@@ -7458,7 +7460,7 @@ function M.talkToObj(obj, what, maxF)
   -- re-picked every 30 frames, and only on a frame the party can be walked
   -- (as M.crossDoor's staging tile)
   local function approach()
-    if M.frame - apFrame >= 30 and M.hasControl() then
+    if M.frame - apFrame >= 30 and M.hasControl() and not M.mapLoading() then
       apFrame = M.frame
       local ox, oy = objAt()
       apPick = { ox, oy + 1 }
