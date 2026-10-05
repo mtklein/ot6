@@ -1190,6 +1190,9 @@ end
 --   fallback the per-action price for an enemy that acts in the window
 --            with nothing measured (the largest single action any enemy
 --            has landed this battle); nil = such an action adds nothing
+--   each enemy may also carry `rom`: for one with nothing measured, the
+--            most its own script's attacks can take off this member, priced
+--            from the ROM (Driver:scriptWorst, #367), used before fallback
 --   each enemy may also carry `typical`: the mean of the actions it has
 --            taken (each action's largest loss on one member, a miss or a
 --            buff a zero; Driver:commitMonAct), nil = not measured
@@ -5531,6 +5534,106 @@ end
 --     that is all-zero or a uniform revealed key: class is irrelevant to the
 --     choice here, so the tie is left to the engine and nothing churns.
 -- Otherwise the strictly-best slot, lowest on a tie.
+-- Whether monster slot s's script can put a status on the party (#325): an
+-- attack its main section names whose MagicProp record sets a status
+-- (+$0A..+$0D, the lift flag +$04 bit 2 clear), or its Special ($EF) where
+-- MonsterProp +$1F names a status ($00..$1F: status bits 0-31) -- the
+-- Bloompire's Energy Sap, which zombified five members on wor-edgar's leg 1.
+-- Cached per species.  Returns the attack id that does, or nil.
+local statusAtkCache = {}
+local function statusInflicter(slot)
+  local species = M.readWord(M.FORMATION + slot * 2)
+  if species == 0xFFFF or species >= 0x180 then return nil end
+  local c = statusAtkCache[species]
+  if c ~= nil then return c or nil end
+  local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
+  local MP = M.sym("MagicProp") & 0x3FFFFF
+  local off = M.readRomWord(ptrs + species * 2)
+  local function b(i) return M.readRomByte(base + off + i) end
+  local found, i = false, 0
+  local function check(a)
+    if found or a == 0xFE then return end
+    if a == 0xEF then
+      local sp = M.readRomByte((M.sym("MonsterProp") & 0x3FFFFF) + species * MON_REC + 0x1F) & 0x3F
+      if sp < 0x20 then found = a end
+      return
+    end
+    if a == 0xEE then return end
+    local r = MP + a * 14
+    if (M.readRomByte(r + 4) & 0x04) ~= 0 then return end
+    for k = 10, 13 do if M.readRomByte(r + k) ~= 0 then found = a; return end end
+  end
+  while b(i) ~= 0xFF and i < M.AI_SCRIPT_MAX do
+    local op = b(i)
+    if op < 0xF0 then check(op)
+    elseif op == 0xF0 then check(b(i + 1)); check(b(i + 2)); check(b(i + 3)) end
+    i = i + (op < 0xF0 and 1 or (M.AI_OP_LEN[op] or 1))
+  end
+  statusAtkCache[species] = found
+  return found or nil
+end
+
+-- The kill this actor's Fight makes this turn (#325): a standing monster
+-- whose HP this Fight is expected to take -- the per-hit figure its last
+-- Fight landed (dmgHit, shielded-equivalent), else the smallest any member's
+-- Fight has landed, times the swings at this boost, x4 on a broken gauge and
+-- the hits past the break x4 (M.killEstimate) -- a status inflicter first,
+-- then the fewest HP.  wor-edgar's leg 1 left a Bloompire at 12 HP (one
+-- shield) while the driver killed the others, and its Energy Sap zombified
+-- five members (build/attempts/review-wor-edgar/).  nil when there is
+-- nothing measured or nothing to finish; an authored or multi-part kill
+-- order wins (the caller asks after them).  M.FINISH_FIRST = false is the
+-- driver before #325.
+function Driver:finishAim(actor, boost)
+  if M.FINISH_FIRST == false or self.opts.aim == false then return nil end
+  if livingMonsters() < 2 then return nil end
+  local per = nil
+  local dh = self.dmgHit[actor]
+  if dh ~= nil and dh.kind == "fight" and dh.per > 0 then per = dh.per end
+  if per == nil then
+    for e = 0, 3 do
+      local d = self.dmgHit[e]
+      if d ~= nil and d.kind == "fight" and d.per > 0 and (per == nil or d.per < per) then per = d.per end
+    end
+  end
+  if per == nil then return nil end
+  local _, l = handsOf(actor)
+  local mainHits, offHits = M.fightHits(l ~= nil and 2 or 1, boost)
+  local hits = mainHits + offHits
+  local best, bestHp, bestSt, said = nil, nil, nil, nil
+  for s = 0, 5 do
+    if monAlive(s) then
+      local hp = M.readWord(BATTLE.MON_HP + s * 2)
+      local sh = M.readByte(BATTLE.SH_CUR + s * 2)
+      local broken = M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0
+      local est
+      if broken then est = per * 4 * hits
+      else
+        est = M.killEstimate({ per = per, hits = hits, chips = fightChips(actor, s, boost), need = sh })
+          or per * hits
+      end
+      if est >= hp then
+        local st = statusInflicter(s)
+        local better = best == nil or (st ~= nil and bestSt == nil)
+          or ((st ~= nil) == (bestSt ~= nil) and hp < bestHp)
+        if better then
+          best, bestHp, bestSt = s, hp, st
+          said = string.format("slot %d at %d HP (%d shield(s)%s) inside this Fight's %d (%d a hit x %d)%s",
+            s, hp, sh, broken and ", BROKEN" or "", est, per, hits,
+            st and string.format(", and its $%02X sets a status", st) or "")
+        end
+      end
+    end
+  end
+  if best == nil then return nil end
+  local key = string.format("finish:%d:%d:%d", actor, best, bestHp)
+  if not self.statusSaid[key] then
+    self.statusSaid[key] = true
+    M.log(string.format("[%s] actor=%d FINISH: %s -- the kill first (#325)", self.tag or "fight", actor, said))
+  end
+  return best
+end
+
 function Driver:chipAim(actor, boost)
   if self.opts.aim == false or self.opts.focus or self.parts then return nil end
   if self.lastStand and self:focusList() ~= nil then return nil end
@@ -7997,6 +8100,15 @@ function Driver:makePlan(actor)
     return { kind = "skill", cmd = BATTLE.CMD_SWDTECH, bushido = true,
              tier = math.max(1, math.min(have, cap, 3)),
              row = cmdRow(actor, BATTLE.CMD_SWDTECH), boostLeft = 0 }
+  end
+  -- a kill this turn goes ahead of the key on another body (#325)
+  if not (self.opts.focus or self.parts or (self.lastStand and self:focusList() ~= nil))
+     and cmdRow(actor, BATTLE.CMD_FIGHT) ~= nil then
+    local fin = self:finishAim(actor, boost)
+    if fin ~= nil then
+      return { kind = "fight", row = cmdRow(actor, BATTLE.CMD_FIGHT), boostLeft = boost, aim = fin,
+               reason = "finish" }
+    end
   end
   if self.opts.keyed ~= false then
     local slot = self:pressTarget()
