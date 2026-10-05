@@ -84,8 +84,13 @@ fi
 # shared copy at once, the second mv nesting its build inside the first's
 # (#371, build/attempts/wt/v026-graph/371/).
 take_lock() { ( set -C; : > "$1" ) 2>/dev/null; }
-# --take-lock <path>: the primitive alone, for shared_emulator_selftest.sh.
-if [ "${1:-}" = "--take-lock" ]; then take_lock "${2:?--take-lock <path>}"; exit; fi
+# --take-lock <path> [<go>]: the primitive alone, for
+# shared_emulator_selftest.sh; with <go>, spin (no forks) until it exists,
+# so concurrent takers all reach the lock in the same instant.
+if [ "${1:-}" = "--take-lock" ]; then
+  if [ -n "${3:-}" ]; then while [ ! -e "$3" ]; do :; done; fi
+  take_lock "${2:?--take-lock <path> [<go>]}"; exit
+fi
 
 SCRIPT="${1:?usage: run.sh <script.lua> [logfile]}"
 
