@@ -19,6 +19,12 @@ real output path (`ninja ff6/rom/ff6-en.sfc`,
 when `configure.py`, the savestate graph, `VERSION`, or any globbed
 directory changes.
 
+To run a gate in the background, `sh tools/gate.sh -k 0 [target...]`
+passes its arguments to ninja, exits with ninja's status and ends with
+the FAILED edges (the log in `build/gate.log`). A wrapper like
+`(ninja ...; echo $?)` exits with echo's 0, and a red gate has been read
+green that way.
+
 Don't edit `tools/tests/run.sh` or any other shell script while a `ninja`
 or `run.sh` is executing it: bash reads scripts incrementally, and the
 running instances resume at shifted offsets and fail.

@@ -10,11 +10,21 @@ worktree, or name it, BEFORE removing it:
 
     python3 tools/retain_evidence.py <worktree> <branch> [options]
 
-Each of the three trees is copied into the main tree under
-`build/attempts/<branch>/<tree>/`, relative paths preserved:
+`build/attempts` is copied to the same path in the main tree, so a file
+the worktree cited as `build/attempts/<x>` resolves at that citation (#248:
+nesting it under the branch put a file cited as
+`build/attempts/wt/<b>/x.log` at `build/attempts/wt/<b>/attempts/wt/<b>/x.log`).
+`build/lab` and `build/sweeps` are scratch nobody can cite as retained, so
+they go under `build/attempts/<branch>/<tree>/`, relative paths preserved,
+and the retained path is the one to cite (docs/TESTING.md):
 
+    <worktree>/build/attempts/wt/zozo-grind/run.log
+        -> <main>/build/attempts/wt/zozo-grind/run.log
     <worktree>/build/lab/zozo-grind/aggregate.txt
         -> <main>/build/attempts/wt/zozo-grind/lab/zozo-grind/aggregate.txt
+
+A worktree made by tools/worktree-setup.sh has build/attempts linked to the
+main tree's already, and it is skipped.
 
 TEXT EVIDENCE ONLY.  Logs, tables, traces, the one-off generator copies a
 lab ran and the failure frames a run names are evidence; savestates
@@ -133,7 +143,11 @@ def plan(worktree: str, branch: str, dest_root: str, max_bytes: int):
             # its evidence is already there; walking it would copy the main
             # tree's evidence into itself.
             continue
-        out_root = os.path.join(dest_root, "build", "attempts", branch, tree)
+        if tree == "attempts":
+            # the cited path itself (#248), not nested under the branch
+            out_root = os.path.join(dest_root, "build", "attempts")
+        else:
+            out_root = os.path.join(dest_root, "build", "attempts", branch, tree)
         for dirpath, dirnames, filenames in os.walk(src_root):
             dirnames.sort()
             for name in sorted(filenames):
@@ -198,9 +212,10 @@ def retain(worktree: str, branch: str, dest_root: str, *, max_bytes: int,
         total += size
 
     verb = "would copy" if dry_run else "copied"
-    print(f"{verb} {len(todo)} file(s), {human(total)} into "
-          f"{os.path.join(dest_root, 'build', 'attempts', branch)}"
-          f" (trees: {', '.join(have)})", file=out)
+    print(f"{verb} {len(todo)} file(s), {human(total)} under "
+          f"{os.path.join(dest_root, 'build', 'attempts')} (trees: "
+          f"{', '.join(have)}; attempts at its cited path, lab and sweeps "
+          f"under {branch}/)", file=out)
     if sames:
         print(f"{len(sames)} file(s) already retained identically", file=out)
     if skipped:
@@ -230,8 +245,8 @@ def selftest() -> int:
         wt = os.path.join(tmp, "wt")
         main = os.path.join(tmp, "main")
         files = {
-            "build/attempts/zozo/run.log": b"attempt 1 FAILED\n",
-            "build/attempts/zozo/shot.mss": b"\x00" * 4096,
+            "build/attempts/wt/demo/run.log": b"attempt 1 FAILED\n",
+            "build/attempts/wt/demo/shot.mss": b"\x00" * 4096,
             "build/lab/zozo-grind/aggregate.txt": b"policy n wins\n",
             "build/lab/zozo-grind/bake/bake.log": b"[west landing]\n",
             "build/sweeps/s-1/summary.tsv": b"seed\tverdict\n",
@@ -254,6 +269,7 @@ def selftest() -> int:
             return rc, buf.getvalue()
 
         base = os.path.join(main, "build", "attempts", "wt", "demo")
+        cited = os.path.join(base, "run.log")   # build/attempts/wt/demo/run.log
 
         rc, _ = run(dry_run=True)
         check(rc == 0, "dry run exits 0")
@@ -261,10 +277,14 @@ def selftest() -> int:
 
         rc, text = run()
         check(rc == 0, "first run exits 0")
-        for rel in ("attempts/zozo/run.log", "lab/zozo-grind/aggregate.txt",
+        check(os.path.isfile(cited),
+              "build/attempts lands at the path the worktree cited (#248)")
+        check(not os.path.exists(os.path.join(base, "attempts")),
+              "build/attempts is not nested under the branch (#248)")
+        for rel in ("lab/zozo-grind/aggregate.txt",
                     "lab/zozo-grind/bake/bake.log", "sweeps/s-1/summary.tsv"):
             check(os.path.isfile(os.path.join(base, rel)), f"copied {rel}")
-        for rel in ("attempts/zozo/shot.mss", "sweeps/s-1/ot6.sfc",
+        for rel in ("shot.mss", "sweeps/s-1/ot6.sfc",
                     "sweeps/s-1/notes.zip"):
             check(not os.path.exists(os.path.join(base, rel)), f"skipped {rel}")
         check(not os.path.exists(os.path.join(base, "states")),
@@ -279,17 +299,17 @@ def selftest() -> int:
         check("4 file(s) already retained identically" in text,
               f"second run reports 4 retained: {text!r}")
 
-        with open(os.path.join(base, "attempts/zozo/run.log"), "wb") as f:
+        with open(cited, "wb") as f:
             f.write(b"tampered\n")
         rc, text = run()
         check(rc == 1, "a differing file is refused")
-        check("attempts/zozo/run.log" in text, "the refusal names the file")
-        with open(os.path.join(base, "attempts/zozo/run.log"), "rb") as f:
+        check("attempts/wt/demo/run.log" in text, "the refusal names the file")
+        with open(cited, "rb") as f:
             check(f.read() == b"tampered\n", "the refusal copied nothing")
 
         rc, text = run(force=True)
         check(rc == 0, "--force exits 0")
-        with open(os.path.join(base, "attempts/zozo/run.log"), "rb") as f:
+        with open(cited, "rb") as f:
             check(f.read() == b"attempt 1 FAILED\n", "--force overwrites")
 
         rc = retain(main, "wt/demo", main, max_bytes=DEFAULT_MAX_BYTES,
