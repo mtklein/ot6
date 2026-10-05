@@ -3785,7 +3785,12 @@ end
 --     with FindAIScriptEnd (@1a43) past the next $FE and goes on there,
 --     or ends at an $FF;
 --   * end_if ($FE) and the end ($FF) both end the script when the walk
---     reaches them (AICmd_fe/ff @1a7b set $f5 = $ff).
+--     reaches them (AICmd_fe/ff @1a7b set $f5 = $ff);
+--   * wait ($FD, AICmd_fd @1a74) ends this counter's walk too, but the
+--     pointer past it is kept ($3D20) and the NEXT counter resumes there
+--     (NextAICmd's loop test, $f5 == $f4), so the attacks after a $FD
+--     answer the following hit: the walk goes on through it (#376,
+--     counter_selftest's $0F3 case).
 -- So a condition after commands, with no $FE between, gates only the
 -- commands after it; the ones before it have already run.
 -- use = { cmd = the party command id, atk = its attack id, item = the item
@@ -13135,10 +13140,19 @@ end
 -- call to this, so the runner can replay the body.  A script composed
 -- before this existed (or composed by hand) never calls it: the
 -- runner then reports that retries are unavailable rather than pretending.
+-- The first run is protected (#376): Mesen drops an error raised while
+-- the script loads without a word on stdout, and the run then idles to
+-- the wall-clock cap (check_instruments reported a mutant that raised at
+-- load as "no boot point within 300s").  The error is said as the run's
+-- FAIL and the run stops at its first frame.
 function M.segmentBody(fn)
   M.__body = fn
   installShim()
-  fn()
+  local ok, err = pcall(fn)
+  if not ok then
+    M.log("FAIL: the script raised as it loaded (before its first frame): " .. tostring(err))
+    rawAddEventCallback(function() emu.stop(1) end, emu.eventType.startFrame)
+  end
 end
 
 -- Called by M.loadState once the fixture is in, and by assertEntryContract
