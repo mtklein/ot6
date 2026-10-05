@@ -5,11 +5,11 @@
 -- next Fight.  battle_retaliate.lua proves the rule for Berserk; this file
 -- proves it for the script-driven case, on the route, with nothing staged.
 --
--- THE GAP, measured before it was closed (build/lab/scripted/red-script.log,
--- retained as build/attempts/<branch>/lab/scripted/red-script.log): every
+-- THE GAP, measured before it was closed (build/attempts/wt/retaliate-scope/
+-- lab/scripted/red-script.log): every
 -- writer of OT6_UNCTL was RandCharAction's, and a scripted character never
 -- passes RandCharAction -- QueueAction sends it to ExecMonsterAction first
--- -- so CYAN in the Doma courtyard defence logged `flag=$00` at all five
+-- -- so CYAN in the Imperial Camp's defence logged `flag=$00` at all five
 -- of his scripted actions over two waves, his bank read 1 2 1 2 3 at his
 -- action ends with every one of them the gain arm, the soldiers cut him
 -- 358 -> 324 and 358 -> 322, and his provoked Fight (`f5093 e2 bank=3
@@ -18,7 +18,7 @@
 --
 -- WHAT IS PLAYED, AND NOTHING IS STAGED.  camp_cleared is SABIN at (8,29) on
 -- map 119 with CYAN (the warrior NPC, object 18) fighting off Imperial
--- troops.  Facing CYAN and pressing A runs the courtyard defence: three
+-- troops.  Facing CYAN and pressing A runs the camp's defence: three
 -- fights (battle 13, 13, 14), in each of which CYAN stands in the party as
 -- an AI-scripted character (CharAI $05/$06 cyan_imp_camp, script
 -- AIScript::_368: `attack DISPATCH, BATTLE, BATTLE`, and a one-in-three
@@ -342,12 +342,12 @@ H.run({ maxFrames = 60000, retries = 3 }, {
       .. "$%06X; hurt lines at $%06X", D.base, D.perBp, D.cap, D.unctl,
       D.markBase))
     H.assertEq(H.mapId() & 0x1FF, 119, "camp_cleared boots on map 119")
-    H.assertEq(sw(WAVES[1]), 0, "and the courtyard defence has not begun")
+    H.assertEq(sw(WAVES[1]), 0, "and the camp's defence has not begun")
     H.log(string.format("[seed] SABIN at (%d,%d), CYAN (obj %d) at (%d,%d)",
       H.fieldX(), H.fieldY(), CYAN_OBJ, objX(CYAN_OBJ), objY(CYAN_OBJ)))
   end),
 
-  -- the courtyard defence, wave by wave, until a provoked Fight resolves
+  -- the camp's defence, wave by wave, until a provoked Fight resolves
   H.driveUntil(measured, 45000, {
     H.call(function()
       phase = (phase + 1) % 8

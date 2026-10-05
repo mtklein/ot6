@@ -2,10 +2,12 @@
 """Every test-shaped file under tools/tests declares whether it runs.
 
 A `.lua` under tools/tests must either be a suite member (`-- @suite ...`)
-or say out loud that it is not (`-- @manual ...`).  Three prefixes are
-exempt, carrying their status in the name by convention: `gen_*` (savestate
-generators, run by the ninja graph), `probe*` (throwaway diagnostics, run
-by hand), `shot_*` (screenshot producers, run by hand).
+or say out loud that it is not (`-- @manual ...`).  One prefix is exempt,
+carrying its status in the name: `gen_*` (savestate generators, run by the
+ninja graph).  `probe*` and `shot_*` were exempt too until #310: the policy
+(docs/TESTING.md, "Scripts that stay in the tree") is the same for them, so
+a probe is an instrument (`@manual`, which check_instruments.py starts) or
+it goes, its findings in the commit that deletes it.
 
 Usage:  python3 tools/check_test_registration.py [--dir tools/tests] [--selftest]
 Exit 0 if every non-exempt file declares itself, 1 otherwise.
@@ -18,7 +20,7 @@ import glob
 import os
 import sys
 
-EXEMPT_PREFIXES = ("gen_", "probe", "shot_")
+EXEMPT_PREFIXES = ("gen_",)
 SUITE_MARK = "-- @suite"
 MANUAL_MARK = "-- @manual"
 
@@ -60,9 +62,8 @@ def selftest() -> int:
             print(f"  SELFTEST FAIL {what}: got {got!r} want {want!r}")
 
     check("gen_ is exempt", is_exempt("gen_arvis.lua"), True)
-    check("probe_ is exempt", is_exempt("probe_vargas.lua"), True)
-    check("probe16 (no underscore) is exempt", is_exempt("probe16.lua"), True)
-    check("shot_ is exempt", is_exempt("shot_mines.lua"), True)
+    check("probe_ is NOT exempt (#310)", is_exempt("probe_vargas.lua"), False)
+    check("shot_ is NOT exempt (#310)", is_exempt("shot_mines.lua"), False)
     check("a battle_ test is NOT exempt", is_exempt("battle_break.lua"), False)
     check("an instrument is NOT exempt", is_exempt("metrics_battle.lua"), False)
 

@@ -5,7 +5,10 @@ sanctioned write-side API uses.
 Scans every tools/tests/**/*.lua for the write-side token surface below,
 after stripping Lua comments and string literals so prose does not trip it.
 Every hit must be declared in tools/state_write_waivers.txt as a (file,
-token) pair; an undeclared hit or a stale waiver entry fails the run.
+token, count) line: the count is the number of call sites the file holds
+for that token, so a new write in a file that already holds a waiver for
+its token fails too (#303), as does a count that no longer matches (a
+removed write) or a stale entry.
 --regen-waivers rewrites the list from the current corpus.
 
 Usage:  python3 tools/check_state_writes.py [--repo ROOT] [-v]
@@ -164,28 +167,35 @@ WAIVER_HEADER = """\
 # state_write_waivers.txt -- the registry of sanctioned state-writes for
 # tools/check_state_writes.py.
 #
-# Each line names one (file, token) pair that writes emulated state.  Every one
+# Each line names one (file, token) pair that writes emulated state and the
+# number of call sites the file has for it, so a new write is a new count
+# rather than a silent extra site (#303).  Every one
 # is a sanctioned expedient: a focused unit-style test, a measurement
 # instrument, or the write primitives themselves -- the kind the owner ruled
 # fine, because instrumenting a mechanism a person cannot produce on cue is not
 # a claim about play.  The honesty that matters -- the long playthroughs (the
 # savestate generators) playing for real -- is a separate and ABSOLUTE check,
-# check_playthrough_honest.py, which refuses a generator that writes at all.
+# check_playthrough_honest.py, which rejects selective gameplay edits.
+# Complete snapshot capture/restore is authorized through the library helpers;
+# see docs/TESTING.md, the current testing policy.
 #
-#   * a write whose (file, token) is not listed FAILS the run, so a new poke is
-#     a reviewed line rather than a silent one;
-#   * a listed pair that no longer matches anything FAILS as stale and must be
-#     deleted, so the registry stays honest about the corpus.
+#   * a write whose (file, token) is not listed, or one more site than its
+#     count, FAILS the run, so a new poke is a reviewed line rather than a
+#     silent one;
+#   * a listed pair that no longer matches anything, or matches fewer sites
+#     than its count, FAILS as stale and must be corrected, so the registry
+#     stays honest about the corpus.
 #
 # This is a registry, not a burn-down: it may grow when a new unit-style test
 # earns an expedient, and it carries no obligation to reach zero.
 #
 # After removing writes:  python3 tools/check_state_writes.py --regen-waivers
-# rewrites this file from the corpus (it preserves the third field).
+# rewrites this file from the corpus (it preserves the quarantine field).
 #
-# format: <path relative to repo root> <TAB> <token> [<TAB> quarantine: why]
+# format: <path relative to repo root> <TAB> <token> <TAB> <sites>
+#         [<TAB> quarantine: why]
 #
-# The optional `quarantine: <why>` third field records why the expedient is
+# The optional `quarantine: <why>` last field records why the expedient is
 # warranted -- typically an input the game can only produce rarely or never on
 # cue: deliberate VRAM corruption for the font-restore path, the 1-in-65536
 # zero-checksum save, a legacy save layout no version writes.  It is
@@ -194,8 +204,9 @@ WAIVER_HEADER = """\
 
 
 def load_waivers(path: str):
-    """{(file, token): reason-or-None} from the waiver file.  A third field
-    beginning `quarantine:` records the reason; missing file = empty."""
+    """{(file, token): (sites, reason-or-None)} from the waiver file.  The
+    third field is the site count; a fourth beginning `quarantine:` records
+    the reason; missing file = empty."""
     waivers = {}
     if not os.path.exists(path):
         return waivers
@@ -205,39 +216,57 @@ def load_waivers(path: str):
             if not line.strip() or line.lstrip().startswith("#"):
                 continue
             parts = line.split("\t")
-            if len(parts) not in (2, 3) or not parts[0] or not parts[1]:
+            if (len(parts) not in (3, 4) or not parts[0] or not parts[1]
+                    or not parts[2].isdigit() or int(parts[2]) < 1):
                 raise SystemExit(
                     "check_state_writes: %s:%d: malformed waiver line %r "
-                    "(want <path>\\t<token>[\\tquarantine: why])"
+                    "(want <path>\\t<token>\\t<sites>[\\tquarantine: why])"
                     % (path, lineno, line))
             reason = None
-            if len(parts) == 3:
-                if not parts[2].startswith("quarantine:"):
+            if len(parts) == 4:
+                if not parts[3].startswith("quarantine:"):
                     raise SystemExit(
-                        "check_state_writes: %s:%d: third field must begin "
-                        "'quarantine:', got %r" % (path, lineno, parts[2]))
-                reason = parts[2]
-            waivers[(parts[0], parts[1])] = reason
+                        "check_state_writes: %s:%d: fourth field must begin "
+                        "'quarantine:', got %r" % (path, lineno, parts[3]))
+                reason = parts[3]
+            waivers[(parts[0], parts[1])] = (int(parts[2]), reason)
     return waivers
 
 
 def write_waivers(path: str, hits, existing=None) -> int:
     """Rewrite the list from the corpus, preserving quarantine reasons."""
     existing = existing or {}
-    pairs = sorted({(rel, tok) for rel, _line, tok in hits})
+    counts = site_counts(hits)
     with open(path, "w", encoding="utf-8") as f:
         f.write(WAIVER_HEADER)
-        for rel, tok in pairs:
-            reason = existing.get((rel, tok))
-            f.write("%s\t%s%s\n" % (rel, tok, "\t" + reason if reason else ""))
-    return len(pairs)
+        for rel, tok in sorted(counts):
+            reason = existing.get((rel, tok), (0, None))[1]
+            f.write("%s\t%s\t%d%s\n" % (rel, tok, counts[(rel, tok)],
+                                         "\t" + reason if reason else ""))
+    return len(counts)
+
+
+def site_counts(hits):
+    """{(file, token): number of call sites}."""
+    counts = {}
+    for rel, _line, tok in hits:
+        counts[(rel, tok)] = counts.get((rel, tok), 0) + 1
+    return counts
 
 
 def compare(hits, waivers):
-    """(unwaived hits, stale waiver pairs)."""
-    fired = {(rel, tok) for rel, _line, tok in hits}
-    unwaived = [h for h in hits if (h[0], h[2]) not in waivers]
-    stale = sorted(set(waivers) - fired)
+    """(unwaived hits, stale waiver pairs).
+
+    A pair with more sites than its waiver declares reports every site of
+    the pair as unwaived (which one is new is for the reader to say); a
+    pair with fewer sites, or none, is stale.  Stale items are
+    (file, token, declared, found)."""
+    counts = site_counts(hits)
+    unwaived = [h for h in hits
+                if counts[(h[0], h[2])] > waivers.get((h[0], h[2]), (0, None))[0]]
+    stale = sorted((rel, tok, n, counts.get((rel, tok), 0))
+                   for (rel, tok), (n, _r) in waivers.items()
+                   if counts.get((rel, tok), 0) < n)
     return unwaived, stale
 
 
@@ -248,7 +277,7 @@ def run_check(root: str, waiver_path: str, verbose: bool) -> int:
     waivers = load_waivers(waiver_path)
     unwaived, stale = compare(hits, waivers)
 
-    with_reason = sum(1 for v in waivers.values() if v is not None)
+    with_reason = sum(1 for _n, r in waivers.values() if r is not None)
 
     print("state-write check (%s/**/*.lua)" % TESTS_DIR)
     print("  scanned %d files: %d state-write sites, %d sanctioned "
@@ -264,19 +293,25 @@ def run_check(root: str, waiver_path: str, verbose: bool) -> int:
             print("  %s %s:%d: %s" % (mark, rel, line, tok))
 
     if unwaived:
-        print("  %d UNDECLARED STATE WRITE(S).  A test may read memory and "
-              "inject input; a write is an expedient that must be declared:"
-              % len(unwaived))
+        counts = site_counts(hits)
+        print("  UNDECLARED STATE WRITE(S) in %d (file, token) pair(s).  A "
+              "test may read memory and inject input; a write is an "
+              "expedient that must be declared:"
+              % len({(r, t) for r, _l, t in unwaived}))
         for rel, line, tok in unwaived:
-            print("  %s:%d: %s" % (rel, line, tok))
+            print("  %s:%d: %s  (%d site(s), %d declared)" % (
+                rel, line, tok, counts[(rel, tok)],
+                waivers.get((rel, tok), (0, None))[0]))
         print("  If this is a focused unit-style test or instrument, add the "
-              "(file, token) to %s with a reason -- that is the sanctioned "
+              "(file, token) to %s with its site count and a reason (or "
+              "raise its count) -- that is the sanctioned "
               "kind.  If it is a savestate generator, it is refused outright: "
               "the long playthroughs play for real (check_playthrough_honest.py)."
               % WAIVER_FILE.replace(os.sep, "/"))
-    for rel, tok in stale:
-        print("  STALE ENTRY: %s\t%s -- no hits left; delete the line "
-              "(or --regen-waivers after a cleanup)" % (rel, tok))
+    for rel, tok, n, found in stale:
+        print("  STALE ENTRY: %s\t%s declares %d site(s), %d found -- "
+              "correct or delete the line (or --regen-waivers after a "
+              "cleanup)" % (rel, tok, n, found))
 
     if unwaived or stale:
         return 1
@@ -363,9 +398,33 @@ local sneak = __OT6_EMU_RAW.write(0x1a, 4)
         # regen: both hits collapse to one (file, token) pair, then pass
         npairs = write_waivers(wpath, hits, load_waivers(wpath))
         expect(npairs == 1, "regen: want 1 pair, got %d" % npairs)
+        expect(load_waivers(wpath) == {("tools/tests/lib/dirty.lua",
+                                        "emu.write"): (2, None)},
+               "regen records the site count: %r" % load_waivers(wpath))
         unwaived, stale = compare(hits, load_waivers(wpath))
         expect(not unwaived and not stale,
                "regenerated waivers must pass: %r %r" % (unwaived, stale))
+
+        # a new site of an already-waived token fails (#303: per call
+        # site, not per (file, token))
+        with open(os.path.join(tdir, "lib", "dirty.lua"), "a") as f:
+            f.write("emu.write(0x30, 3)\n")
+        hits, _ = scan_tree(tmp)
+        unwaived, stale = compare(hits, load_waivers(wpath))
+        expect(len(unwaived) == 3 and not stale,
+               "a third emu.write under a 2-site waiver must fail: %r %r"
+               % (unwaived, stale))
+        with open(os.path.join(tdir, "lib", "dirty.lua"), "w") as f:
+            f.write("emu.write(0x10, 1)\n")
+        hits, _ = scan_tree(tmp)
+        unwaived, stale = compare(hits, load_waivers(wpath))
+        expect(not unwaived and stale == [("tools/tests/lib/dirty.lua",
+                                           "emu.write", 2, 1)],
+               "a removed site leaves the count stale: %r %r"
+               % (unwaived, stale))
+        with open(os.path.join(tdir, "lib", "dirty.lua"), "w") as f:
+            f.write("emu.write(0x10, 1)\nemu.write(0x20, 2)\n")
+        hits, _ = scan_tree(tmp)
 
         # a new token in a waived file still fails (granularity is per pair)
         with open(os.path.join(tdir, "lib", "dirty.lua"), "a") as f:
@@ -381,7 +440,7 @@ local sneak = __OT6_EMU_RAW.write(0x1a, 4)
         hits, _ = scan_tree(tmp)
         unwaived, stale = compare(hits, load_waivers(wpath))
         expect(not unwaived and
-               stale == [("tools/tests/lib/dirty.lua", "emu.write")],
+               stale == [("tools/tests/lib/dirty.lua", "emu.write", 2, 0)],
                "stale waiver must be reported: %r %r" % (unwaived, stale))
 
         # regen after the wave: the list shrinks to nothing and passes

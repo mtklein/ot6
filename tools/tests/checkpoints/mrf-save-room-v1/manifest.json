@@ -4,6 +4,14 @@
   "slot": 3,
   "milestone": "mrf-save-room",
   "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 270,
+      "x": 25,
+      "y": 10
+    }
+  },
   "size": 32768,
   "sha256": "26639bf746e0ca2426bb96edaa71420831387961d7ee042e9ffc4e16e67bbdcb",
   "provenance": {

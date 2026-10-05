@@ -250,27 +250,140 @@ local function classify()
     end
   end
 end
-local plan
+-- How many encounters a battle may take to draw a species with a rare steal
+-- slot (#299).  Which slot of the pool comes next is fixed by the save's
+-- encounter counter ($1fa2/$1fa3, lib/ot6_field.lua above
+-- M.worstCaseEncounters), and every regeneration of the chain deals this
+-- fixture a different one, so the budget is the most encounters ANY counter
+-- state needs to deal a slot whose every formation holds a rare-slot species
+-- (H.worstCaseEncounters over the group CheckBattleWorld really rolled,
+-- decoded from the ROM's formations and MonsterItems) -- battle_steal's
+-- decode, on the same desert.  The bare six this file used to build is the
+-- budget battle_steal dropped: on its 2026-09-28 decode the worst state
+-- needs 11 encounters for a Sand Ray from group 1 (battle_steal.lua's
+-- budget comment; on this file's own decode, group 1, 0.5% of counter
+-- states need more than 6 and the worst needs 11).  Played: with 72
+-- encounters used up first (the counter's run of ten slot-2 draws,
+-- build/attempts/wt/v026-suites/r/probe_desert_seq.log), battle 1 needed
+-- all 11 ("battle 1 try 11 (group 1, budget 11): rareT=0", r/smp3/
+-- new_k72.log.gz) and with 74, 9; the old six would have failed both.
+-- The walk paces a stretch of the dismount row whose
+-- every tile rolls one group (planPace), so the budget's pool is the one
+-- that deals; each battle asserts that group.  (The clock's left/right walk
+-- this file used drifts with each battle's timing; battle_steal's drifted
+-- onto a group-0 grass tile.)
+local ITEMS = H.sym("MonsterItems") & 0x3FFFFF
+local MAXTRIES = 40                -- steps built per battle; the budget must fit
+local PACE = 4                     -- tiles each way from the dismount tile, at most
+local worldGroup = nil             -- the group the last CheckBattleWorld rolled
+local pace = nil                   -- { y, lo, hi, group, dir }, set by planPace
+local budgets = {}                 -- [group] = worst, decoded once
+local function budgetFor(group)
+  if budgets[group] then return budgets[group] end
+  local pool = H.encounterPool(group)
+  local ok, parts = {}, {}
+  for slot = 1, 4 do
+    ok[slot] = true
+    local names = {}
+    for _, f in ipairs(pool[slot].formations) do
+      local rare = false
+      for _, sp in ipairs(f.species) do
+        if H.readRomByte(ITEMS + sp*4) ~= NONE then rare = true end
+      end
+      ok[slot] = ok[slot] and rare
+      local sp = {}
+      for _, x in ipairs(f.species) do sp[#sp+1] = string.format("%03X", x) end
+      names[#names+1] = string.format("%d [%s]", f.id, table.concat(sp, " "))
+    end
+    parts[#parts+1] = string.format("slot %d (%d/256) %s%s", slot,
+      pool[slot].odds, table.concat(names, ", "), ok[slot] and " suits" or "")
+  end
+  local worst, hist = H.worstCaseEncounters(function()
+    return function(slot) return ok[slot] end
+  end)
+  H.log(string.format("[test] budget: group %d: %s -- the worst of the 65536 "
+    .. "encounter-counter states needs %d encounter(s); %.1f%% need no more "
+    .. "than 6", group, table.concat(parts, "; "), worst,
+    100 * H.encounterShare(hist, 6)))
+  H.assertEq(worst <= MAXTRIES, true, string.format("group %d deals a "
+    .. "rare-slot species within the %d tries built (worst state: %d)",
+    group, MAXTRIES, worst))
+  budgets[group] = worst
+  return worst
+end
+-- The stretch to pace (battle_steal's planPace): from the dismount tile out
+-- to PACE tiles each way along its row while the next tile is walkable and
+-- rolls the same group, every pairing of a stretch tile with a saved
+-- position the walk can leave rolling that group too.
+local function planPace()
+  local x0, y0 = H.worldX(), H.worldY()
+  local function own(x) return H.worldEncounterGroup(x, y0, x, y0) end
+  local g = own(x0)
+  H.assertEq(g ~= nil, true, string.format("the dismount tile (%d,%d) rolls "
+    .. "random battles", x0, y0))
+  local lo, hi = x0, x0
+  while lo > x0 - PACE and H.worldPassable(lo - 1, y0) and own(lo - 1) == g do
+    lo = lo - 1
+  end
+  while hi < x0 + PACE and H.worldPassable(hi + 1, y0) and own(hi + 1) == g do
+    hi = hi + 1
+  end
+  local zx, zy = H.worldZonePos()
+  local groups = {}
+  for x = lo, hi do
+    for z = lo, hi do
+      local gg = H.worldEncounterGroup(x, y0, z, y0)
+      if gg ~= nil then groups[gg] = true end
+    end
+    local gg = H.worldEncounterGroup(x, y0, zx, zy)
+    if gg ~= nil then groups[gg] = true end
+  end
+  local list = {}
+  for gg in pairs(groups) do list[#list+1] = tostring(gg) end
+  table.sort(list)
+  H.log(string.format("[test] pace: row %d, x %d..%d (dismount x %d, saved "
+    .. "position (%d,%d)); the groups it can roll: %s", y0, lo, hi, x0, zx, zy,
+    table.concat(list, ",")))
+  H.assertEq(hi - lo >= 2, true, string.format("the dismount row gives a "
+    .. "stretch of at least three tiles that roll group %d (x %d..%d)", g, lo, hi))
+  H.assertEq(#list == 1 and list[1] == tostring(g), true, string.format(
+    "every encounter on the stretch rolls group %d, whatever the saved "
+    .. "position (rolls %s)", g, table.concat(list, ",")))
+  pace = { y = y0, lo = lo, hi = hi, group = g, dir = "left" }
+end
+local function desertWalk(tag)
+  return H.driveUntil(function() return H.battleLoadStarted() end, 25000, {
+    H.call(function()
+      if not H.worldMode() or not H.worldHasControl() then
+        H.setPad({}); return
+      end
+      if H.worldAligned() then
+        local x = H.worldX()
+        if x <= pace.lo then pace.dir = "right"
+        elseif x >= pace.hi then pace.dir = "left" end
+      end
+      H.setPad({ [pace.dir] = true })
+    end),
+  }, tag)
+end
 local function enterDesertBattle(n)
-  local steps = {}
-  for try = 1, 6 do
+  local budget, group = nil, nil
+  local steps = { H.call(function()
+    group = pace.group
+    budget = budgetFor(group)
+  end) }
+  for try = 1, MAXTRIES do
     steps[#steps+1] = H.cond(function()
-      return H.battleLoadStarted() and rareT ~= nil
+      return (H.battleLoadStarted() and rareT ~= nil) or try > budget
     end, {}, {
       H.cond(function() return H.battleLoadStarted() end, {
         H.logStep("formation unsuitable -- fleeing for a fresh draw"),
         H.fleeBattle(12000, { onCantRun = "fight" }),
         H.waitFrames(240),
       }, {}),
-      H.driveUntil(function() return H.battleLoadStarted() end, 25000, {
-        H.call(function()
-          if not H.worldMode() or not H.worldHasControl() then
-            H.setPad({}); return
-          end
-          H.setPad(((H.frame // 120) % 2 == 0) and { left = true }
-            or { right = true })
-        end),
-      }, "desert encounter " .. n .. " try " .. try),
+      H.waitUntil(function() return H.worldSettled() end, 1500,
+        "the world map settled (battle " .. n .. " try " .. try .. ")", 5),
+      desertWalk("desert encounter " .. n .. " try " .. try),
       H.release(),
       H.waitUntil(function() return H.battleActive() end, 900,
         "battle " .. n .. " active", 30),
@@ -281,15 +394,19 @@ local function enterDesertBattle(n)
           if H.readByte(0x3ED8 + slot*2) == 0x01 then locke = slot end
         end
         H.assertEq(locke ~= nil, true, "LOCKE is really in this party")
+        H.assertEq(worldGroup, group, string.format("battle %d try %d was "
+          .. "dealt by group %d, the pool its budget was decoded from", n, try, group))
         classify()
-        H.log(string.format("battle %d: rareT=%s mp=%d", n,
-          tostring(rareT), mp()))
+        H.log(string.format("battle %d try %d (group %d, budget %d): rareT=%s mp=%d",
+          n, try, group, budget, tostring(rareT), mp()))
       end),
     })
   end
   steps[#steps+1] = H.call(function()
-    H.assertEq(rareT ~= nil, true,
-      "a both-populated species drawn within six encounters")
+    H.assertEq(H.battleLoadStarted() and rareT ~= nil, true,
+      string.format("a rare-slot species drawn within %s encounters, the most "
+        .. "any encounter-counter state needs from group %s", tostring(budget),
+        tostring(group)))
   end)
   return H.repeatN(1, steps)
 end
@@ -318,12 +435,20 @@ H.run({ maxFrames = 150000 }, {
       base, STEAL_COST))
   end),
 
+  H.call(function()
+    local check = H.sym("CheckBattleWorld")
+    emu.addMemoryCallback(function() worldGroup = H.worldCheckGroup() end,
+      emu.callbackType.exec, check, check)
+  end),
   H.hold({ "b" }),                    -- real chocobo dismount (gen_kolts)
   H.driveUntil(function() return H.readByte(0x11fa) & 3 == 0 end, 900, {
     H.waitFrames(1),
   }, "chocobo dismount"),
   H.release(),
   H.waitFrames(120),
+  H.waitUntil(function() return H.worldSettled() end, 1500,
+    "the world map settled", 5),
+  H.call(planPace),
 
   -- ------------------------------------------------------------ 2. charge --
   enterDesertBattle(1),

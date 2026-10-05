@@ -22,12 +22,14 @@
 --      a class key for the three members together, and each member holds
 --      a class key on at least three of the four (CELES's slash misses
 --      `$13D`, the design's one).
+--   4. special (¤) is a common key (guidelines, #347): the designed rows
+--      that take it are the cave's reaper and demon; the count is logged.
 --
 -- All mismatches are logged before the verdict, so a red run names every
 -- missing or wrong row at once.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SLASH, PIERCE, BLUDG = 0x01, 0x02, 0x04
+local SLASH, PIERCE, BLUDG, SPECIAL = 0x01, 0x02, 0x04, 0x08
 local FIRE, ICE, BOLT, POISON, HOLY, WATER = 0x01, 0x02, 0x04, 0x08, 0x20, 0x80
 
 -- species -> { name, shields, class mask, vanilla weak byte }
@@ -45,8 +47,8 @@ local WANT = {
   -- the Figaro cave and the castle's basements (groups 137-140)
   [0x049] = { "Humpty",     2, BLUDG,          FIRE | HOLY },
   [0x04B] = { "Cruller",    3, BLUDG,          FIRE | HOLY },
-  [0x0A9] = { "NeckHunter", 3, SLASH | PIERCE, POISON },
-  [0x0D7] = { "Dante",      4, SLASH | BLUDG,  POISON },
+  [0x0A9] = { "NeckHunter", 3, SLASH | PIERCE | SPECIAL, POISON },  -- a reaper: ¤ (#347)
+  [0x0D7] = { "Dante",      4, SLASH | BLUDG | SPECIAL,  POISON },  -- a demon: ¤ (#347)
   [0x08B] = { "Drop",       2, BLUDG | PIERCE, BOLT | WATER },
   -- the engine room's Tentacles (event group 84)
   [0x11B] = { "Tentacle",   5, SLASH | PIERCE, ICE | WATER },
@@ -209,6 +211,13 @@ H.run({ maxFrames = 600 }, {
       H.log(string.format("the Tentacles: %s holds a class key on %d of 4", m[1], n))
       if n < 3 then problem("the Tentacles: %s holds a class key on only %d of 4 (want 3+)", m[1], n) end
     end
+
+    local nspecial, nids = 0, 0
+    for sp in pairs(WANT) do
+      nids = nids + 1
+      if shield[sp] and (shield[sp][2] & SPECIAL) ~= 0 then nspecial = nspecial + 1 end
+    end
+    H.log(string.format("special: %d of %d designed species take ¤ in this ROM", nspecial, nids))
 
     H.assertEq(#problems, 0, "WoR Tzen-to-Edgar break row mismatches")
     H.log("WoR Tzen-to-Edgar break rows verified against the built ROM")

@@ -327,7 +327,12 @@ end
 local function bankPending(want, what)
   local taps = 0
   return H.withReset(H.repeatN(1, {
-    H.driveUntil(function() return lostBattle or pend(actor) >= want end, 1500, {
+    -- the drive also ends when the window is no longer his (a status took
+    -- it): the caller's openSlotWindow and reel drives answer a window gone
+    -- (#252: a hard assert here failed the run instead)
+    H.driveUntil(function()
+      return lostBattle or pend(actor) >= want or not setzerWindow()
+    end, 1500, {
       H.call(function()
         if bp(actor) < want and not lostBattle then
           -- the bank no longer covers the tier: a turn the engine took for
@@ -345,8 +350,6 @@ local function bankPending(want, what)
             .. "%d (want %d) -- the press is not being stored at all",
             what, taps, pend(actor), want), 0)
         end
-        H.assertEq(setzerWindow(), true,
-          what .. ": setzer's command window is up for the R tap")
         taps = taps + 1
       end),
       H.pressButtons({ "r" }, 6), H.waitFrames(20),

@@ -646,8 +646,8 @@ unchanged and grows only by play.
 |---|---|---|---|---|
 | `$049` Humpty | an egg | 800 | fire, holy | **2 · bludg** |
 | `$04B` Cruller | a ring of dough (evade 100) | 1334 | fire, holy | **3 · bludg** |
-| `$0A9` NeckHunter | a reaper | 1334 | poison | **3 · slash, pierce** |
-| `$0D7` Dante | the cave's miniboss-grade body | 1945 | poison | **4 · slash, bludg** |
+| `$0A9` NeckHunter | a reaper | 1334 | poison | **3 · slash, pierce, special ¤** (8.7) |
+| `$0D7` Dante | the cave's miniboss-grade body | 1945 | poison | **4 · slash, bludg, special ¤** (8.7) |
 | `$08B` Drop | a drop of water | 1000 | bolt, water | **2 · bludg, pierce** |
 
 - **Humpty / Cruller**: shells and dough are cracked, not cut: SABIN's
@@ -697,6 +697,21 @@ Party: CELES, SABIN and EDGAR (who joins on the spot). Formation 454.
 53, 62-64 and event group 84 with the hands that meet it: every species
 is keyed for CELES + SABIN (and for the Tentacles' three) under the
 designed rows.
+
+### 8.7 Special as a common key (#347, owner 2026-10-01)
+
+Guidelines, "Special (¤) is a common key." Nobody on this stretch holds ¤
+(Setzer joins at Kohlingen), so the rows serve a later party: Gau's Veldt
+and a return with Setzer or Relm. Two of the seventeen take it: the
+**NeckHunter** (a reaper: death's own shape) and **Dante** (a demon that
+answers magic with magic), each beside its existing keys, shields
+unchanged. The Cruller (dough, evade 100) and the Drop (water) were
+candidates and stay as they are: their fire, holy and bolt already key
+them, and giving ¤ to four of the cave's five bodies would make it the
+answer to the cave. `battle_breakwor_edgar` carries the rows in `WANT` and
+logs `special: 2 of 17 designed species take ¤ in this ROM` (0 on
+a2d49b67); every formation stays keyed for the party that meets it
+(build/attempts/wt/v026-rom/347/px13/).
 
 ---
 

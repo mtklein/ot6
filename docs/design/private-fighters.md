@@ -14,7 +14,7 @@ about how far it reached and what the fix is.
 ## The class
 
 Since #219 a boosted Blitz, Tool or non-tier cast costs escalating MP —
-`min(99, round(base * 2.5^boost))`, `Ot6BoostPriceFor` — so a row the pool
+`max(base, min(99, round(base * 2.5^boost)))`, `Ot6BoostPriceFor` — so a row the pool
 covers unboosted prices out the moment pips go on it.
 
 When #228 found this, an unaffordable kit row was **greyed but still

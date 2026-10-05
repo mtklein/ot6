@@ -494,7 +494,12 @@ local function brokenBranch(tag, to, wantBrokenAtHit)
   }
 end
 
-H.run({ maxFrames = 200000 }, {
+-- The cap (#336).  Battle 66 is a scripted fight (the formation is fixed;
+-- the seed is the axis): over seed shifts 0, 3, 7, 11, 19, 23, 29 and 37 the
+-- run ended at f20,062 to f22,321 (build/attempts/wt/v026-suites/r/vargas/),
+-- so 45,000 is 2.0x the longest.  It was 150,000, then 200,000 (#314), with
+-- no derivation.
+H.run({ maxFrames = 45000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()

@@ -454,7 +454,9 @@ TEST_ENV = {
     # the long runs is 80.7 frames/s (the Air, heavily loaded; the Mac at
     # load 12 ran 187.5-236.2): 1,081 s.  1800 is 1.67x that
     # (build/attempts/wt/suite-honesty/brokendeath/round2/)
-    "battle_brokendeath": "OT6_TIMEOUT=1800",
+    # every rung fought ran to f185,970-f188,138 at ~80.7 frames/s, about
+    # 2,330 s (build/attempts/wt/v026-suites/r/worstb); 2x that, rounded
+    "battle_brokendeath": "OT6_TIMEOUT=4800",
     # the bench and its gate lengthen the measured battle: the longest bodies
     # measured are 27,432 frames for the first half (K6) and 9,790 for the
     # Rage half (K4), ~37k frames, 461 s at the 80.7 frames/s above, and a
@@ -563,7 +565,10 @@ check("break_coverage_ratchet", "python3 tools/audit_break_coverage.py",
        "ff6/src/field/rand_battle_group.dat",
        "ff6/src/field/world_battle_group.dat",
        "ff6/src/battle/battle_monsters.dat",
-       "ff6/src/battle/monster_prop.dat"])
+       "ff6/src/battle/monster_prop.dat"]
+      # the tuning claim is read from the generator logs (#287), which are
+      # written beside the stamps
+      + all_stamps)
 # One row per species (#157): Ot6SeedShields takes the FIRST match, so a
 # second Ot6ShieldTbl/Ot6ElemAddTbl row for a species is dead code that
 # reads as authored.  Source and the shipped ROM table must agree row for
@@ -684,7 +689,7 @@ check("checkpoint_negatives", "nice sh tools/tests/lib/checkpoint_negatives.sh",
 check("retry_negative", "nice sh tools/tests/lib/retry_negative.sh",
       ["tools/tests/lib/retry_negative.sh", "tools/tests/run.sh",
        "tools/tests/lib/compose.py",
-       copy_if_changed_from("tools/tests/probe_retry_negative.lua"),
+       copy_if_changed_from("tools/tests/lib/retry_negative.lua"),
        copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR)]
       + [copy_if_changed_from(h) for h in LIBS])
 # #309: every instrument left in tools/tests (`-- @manual`) composes and

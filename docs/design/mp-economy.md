@@ -546,8 +546,8 @@ Vanilla-free player verbs, with their cost shapes:
 | Rage (Gau) | flat, paid at start | 8 | one payment starts a whole-battle possession and every possessed turn after it is free, the same rule Dance takes; `Ot6RageCost` tail-calls `Ot6DanceCost` so the two cannot drift |
 
 Every row above that is not marked "free — exception" is a **base**
-price: a boosted use of it costs `min(99, floor(base * 2.5^boost +
-0.5))`. See "Boosting costs MP" above for which verbs escalate and why.
+price: a boosted use of it costs `max(base, min(99, floor(base *
+2.5^boost + 0.5)))` (`Ot6BoostPriceFor`). See "Boosting costs MP" above for which verbs escalate and why.
 
 | Leap (Gau) | free — exception | 0 | the free floor rather than an exemption: Leap shares Gau's FIGHT row on the Veldt (kits.md), so on the Veldt it is the Fight command |
 | Sketch (Relm) | flat small | 2–4 | pay to roll; the Sketch bug stays (house rule) and does not refund |
