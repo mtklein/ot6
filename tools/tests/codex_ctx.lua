@@ -837,9 +837,12 @@ local actions = {
         H.call(battleReset),
         settleSeed("write-half battle " .. n),
         H.call(judgePrediction),
-        -- 15000: the longest write battle that finished, over the forced
-        -- sweep behind 1601f24b, took 8,681 frames; 30000 was a raise for
-        -- the since-fixed Defend loop (#252, the v0.21 ombudsman)
+        -- 15000: the v0.21 ombudsman (#252) read the longest write battle
+        -- that finished, over the forced sweep behind 1601f24b, as 8,681
+        -- frames, and 30000 as a raise for the since-fixed Defend loop; on
+        -- this branch's runs they took @CTX@ frames
+        -- (build/attempts/wt/v026-suites/ctx/), so 15000 is @RATIO@ of the
+        -- longest seen
         H.driveUntil(function() return not H.battleLoadStarted() end, 15000, {
           H.call(battlePulse),
         }, "fight write-half battle " .. n),

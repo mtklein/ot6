@@ -59,9 +59,21 @@ local function consume()
   return false                            -- Sabin's own window: caller's turn
 end
 
+-- #252: a subject KO'd, petrified or zombied never reaches the window this
+-- file waits for (nobody here cures it); say so at once rather than at the
+-- wait's timeout.  Statuses time or a hit clears (Sleep, Stop, Muddle) are
+-- waited out as before.
+local LASTING = { Death = true, Petrify = true, Zombie = true }
+local function mustAct(slot, who, what)
+  local c = slot and H.controlTaken(slot)
+  if c and LASTING[c.name] then
+    error(string.format("%s: %s cannot take a command: %s (H.controlTaken)", what, who, c.name), 0)
+  end
+end
 -- wait for Sabin's command window (a fresh open, through UpdateMenuState_04)
 local function sabinWindow(what)
   return H.driveUntil(function()
+    if H.battleActive() then mustAct(sab(), "SABIN", what) end
     return H.battleLoadStarted() and H.readByte(MENU) ~= 0
        and H.readByte(ACTOR) == sab() and H.readByte(MSTATE) == ST_CMD
   end, 30000, {
