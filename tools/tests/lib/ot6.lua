@@ -11858,6 +11858,25 @@ end
 function Driver:frame()
   if self.recovery then recoveryActivate(self.recovery); recoveryFlush() end
   execActivate()
+  -- A new battle under a driver nobody idled (#364).  Everything per
+  -- battle -- the layout above all, read once and cached -- is reset by
+  -- idle(), which the walkers call between battles; a caller that only
+  -- ticks frame() while a battle is up (a lab's walk, a suite's loop)
+  -- carried the first battle's layout into the next: hire-sprite's pincer
+  -- lab read "back attack" at its first battle and steered a later normal
+  -- one with it, and STUCK "crossing to the monsters in a back attack:
+  -- right did nothing twice".  The end hook (UpdateSRAM) marks where the
+  -- last battle ended; a frame past its hand-back tail (90 frames,
+  -- watchLeavers) under a driver that watched before it is a new battle.
+  if endSnap ~= nil and self.startFrame ~= nil and self.battleTick > 0
+     and endSnap.frame >= self.startFrame and M.frame - endSnap.frame >= 90
+     and not M.STALE_BATTLE_STATE then
+    M.log(string.format("[%s] a new battle, %d frames after the last one ended, under a driver "
+      .. "nobody idled: its per-battle state (the layout, the ledgers) is reset here (#364)",
+      self.tag or "fight", M.frame - endSnap.frame))
+    self:idle()
+    self.startFrame = nil
+  end
   self.battleTick = self.battleTick + 1
   -- The party's HP as the battle opened, for the first-turn danger floor
   -- in makePlan.  Taken a beat after the table goes live so every entity
