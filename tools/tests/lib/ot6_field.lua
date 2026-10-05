@@ -5168,15 +5168,16 @@ function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
   -- reloads the map after a menu or a battle reads the stale object map
   -- (#352: the B2 hub's staging (37,23)).
   -- Frames (not calls: navTo resolves the goal two or more times a frame)
-  -- with control and no pick.  The bound is navTo's own no-path budget,
-  -- 20 retries 45 frames apart (navTo's noPathRetries and pause): with no
-  -- neighbour reachable the fallback below is unreachable too, so the walk
-  -- would raise its generic "no path" about then; this says it with the
-  -- door first.  Measured: the three doors that started with no pick in
-  -- the 9e46511d chain picked within 2-5 of those retries (Jidoor item
-  -- shop, Albrook inn, Nikeah cafe; build/attempts/wt/v026-field/
-  -- final-9e46511d-px13/chain.log lines 15405, 35584, 37219).
-  local NOPICK_FRAMES = 20 * 45
+  -- with control and no pick.  With no neighbour reachable the fallback
+  -- below is unreachable too, so the walk sits in navTo's no-path retries
+  -- (45 frames apart) and raises its generic "no path" at the 21st, about
+  -- 920 frames in; the bound sits under that so the error names the door.
+  -- Measured: the three doors that started with no pick in the 9e46511d
+  -- chain picked within 2-5 of those retries, so 230 frames at most
+  -- (Jidoor item shop, Albrook inn, Nikeah cafe; build/attempts/wt/
+  -- v026-field/final-9e46511d-px13/chain.log lines 15405, 35584, 37219);
+  -- 600 is 2.6 times that.
+  local NOPICK_FRAMES = 600
   local noPick, noPickFrame = 0, nil
   local function stage()
     if not pick and (not M.hasControl() or M.mapLoading()) then return nil end
