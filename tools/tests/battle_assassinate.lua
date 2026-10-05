@@ -67,10 +67,16 @@
 --   3. the boss check: no boss shares a battle with Shadow anywhere in the
 --      generated tree, so the negative is an isolation arm.  A fresh battle
 --      (fresh flag), a PIERCE-weak body given $3aa1.2 -- the bit a boss
---      carries -- before any chip (this file's one write), then Shadow
---      breaks it by real chips: the break write comes, no mark, no flag
---      spent.  When the body outlives its doubled break, his next landed hit
---      on it (the hook point's Broken read) draws no mark either.
+--      carries -- and STAGED_HP hit points before any chip (this file's two
+--      writes), then Shadow breaks it by real chips: the break write comes,
+--      no mark, no flag spent.  Then his next attack on it reaches the hook
+--      point (Ot6Assassinate puts the Broken body to the gate before the hit
+--      roll, read off the gate's entry: caller, x = Shadow, y = the body,
+--      its OT6_BROKEN_TICKS nonzero) and draws no mark either.  The HP is
+--      staged because no PIERCE-weak body this pool deals outlives its
+--      doubled break: the hook point half was never reached in 23 runs
+--      (#296; CrassHoppr, 243 HP, 143 left at the breaking hit, which does
+--      ~200), so it claimed a check it did not make.  It is required now.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/camp_escaped.mss.lua"
 
@@ -83,6 +89,10 @@ local BREAK_TICKS = 0x10   -- OT6_BREAK_TICKS (ot6_break.asm:1): the value
                            -- the "shields down: break" store writes; the
                            -- timer's own ticks write less
 local FIGHTS = 6
+-- the isolation arm's staged HP (header): enough that the bitted body
+-- outlives its doubled break and the hits after it (Shadow's back-row
+-- blows on this pool are ~50 shielded, ~200 on the break)
+local STAGED_HP = 9999
 
 local function ent(m) return 8 + m * 2 end
 local function brk(m) return H.readByte(0x3E88 + ent(m)) end
@@ -138,14 +148,25 @@ H.log(string.format("[gate] Ot6AssassinateGate $%06x; jsr in Ot6HitJoin: %s; "
   jsrHit and string.format("$%06x", jsrHit) or "NONE (the chip-path hook is not there)",
   jsrSite and string.format("$%06x", jsrSite) or "NONE"))
 local gateVia = nil
+local hookReads = {}     -- { f, y, broken }: the hook point put a Broken body to the gate
+                         -- under Shadow's attack (x = Shadow), read at the gate's entry
 emu.addMemoryCallback(function()
   if not watching then return end
   pcall(function()
-    local sp = emu.getState()["cpu.sp"] & 0xFFFF
+    local st = emu.getState()
+    local sp = st["cpu.sp"] & 0xFFFF
     local ret = H.readWord(sp + 1)
     if jsrHit and ret == ((jsrHit + 2) & 0xFFFF) then gateVia = "Ot6HitJoin"
     elseif jsrSite and ret == ((jsrSite + 2) & 0xFFFF) then gateVia = "site"
     else gateVia = string.format("$%04x", ret) end
+    local x, y = st["cpu.x"] & 0xFF, st["cpu.y"] & 0xFF
+    if gateVia == "site" and shadowSlot and x == shadowSlot * 2 and y >= 8
+      and H.readByte(0x3E88 + y) ~= 0 then
+      hookReads[#hookReads + 1] = { f = H.frame, y = y, seq = stamp() }
+      H.log(string.format("[hook] f%d seq%d the hook point puts Broken body %d to the gate "
+        .. "under SHADOW's attack ($3aa1=$%02x)", H.frame, seq, (y - 8) // 2,
+        H.readByte(0x3AA1 + y)))
+    end
   end)
 end, emu.callbackType.exec, GATE, GATE)
 emu.addMemoryCallback(function(addr, v)
@@ -196,6 +217,12 @@ emu.addMemoryCallback(function(addr, v)
   end
 end, emu.callbackType.write, 0x7E3EE4 + 8, 0x7E3EE4 + 0x13)
 
+do
+  local check = H.sym("CheckBattleWorld")
+  emu.addMemoryCallback(function() worldGroup = H.worldCheckGroup() end,
+    emu.callbackType.exec, check, check)
+end
+
 -- ---- Interceptor's counters, on the ledger (read-only) -------------------
 -- battle_main.asm @4cd6 stores the counter's attack, $fc + a coin flip
 -- (Takedown / Wild Fang), into $3a7b before CreateRetalAction.
@@ -228,6 +255,7 @@ local function resetLedger()
   lastBrk, lastHp = {}, {}
   hpDrops, brokenHits, counters = 0, 0, 0
   divineKills, brokeAt, hpWrite, deathAt, killPending = {}, {}, {}, {}, {}
+  hookReads = {}
   scanBodies()
   watching = true
 end
@@ -399,19 +427,83 @@ local function walkSteps(n)
     }, {}),
   }
 end
+-- How many draws a fight may take to be dealt a suitable formation (#299).
+-- Which slot of the pool comes next is fixed by the save's encounter counter
+-- ($1fa2/$1fa3, lib/ot6_field.lua above M.worstCaseEncounters), and every
+-- regeneration of the chain deals camp_escaped a different one, so the
+-- budget is the most encounters ANY counter state needs to deal a slot whose
+-- every formation suits (suitableDraw's test, decoded from the ROM: three or
+-- more bodies, two of them PIERCE-weak by their class row,
+-- H.speciesClassRow, with shields -- an authored Ot6ShieldTbl count, else
+-- the level formula's 2 or more), over the group the first draw's
+-- CheckBattleWorld rolled.  Every draw asserts it came from that group.  The
+-- six draws this file used to build were a bare number.
+local MAXDRAWS = 40          -- draws built per fight; the decoded budget must fit
+local worldGroup = nil       -- the group the last CheckBattleWorld rolled
+local budgets = {}
+local function speciesShields(sp)
+  local t = H.sym("Ot6ShieldTbl") & 0x3FFFFF
+  for i = 0, 1023 do
+    local id = H.readRomWord(t + i * 4)
+    if id == 0xFFFF then break end
+    if id == sp then return H.readRomByte(t + i * 4 + 2) end
+  end
+  return 2                   -- the formula: 2 + level / 8, capped at 6
+end
+local function budgetFor(group)
+  if budgets[group] then return budgets[group] end
+  local pool = H.encounterPool(group)
+  local ok, parts = {}, {}
+  for slot = 1, 4 do
+    ok[slot] = true
+    local names = {}
+    for _, f in ipairs(pool[slot].formations) do
+      local pierce = 0
+      for _, sp in ipairs(f.species) do
+        if (H.speciesClassRow(sp) & OT6_PIERCE) ~= 0 and speciesShields(sp) > 0 then
+          pierce = pierce + 1
+        end
+      end
+      ok[slot] = ok[slot] and pierce >= 2 and #f.species >= 3
+      names[#names + 1] = string.format("%d (%d bodies, %d PIERCE-weak shielded)", f.id,
+        #f.species, pierce)
+    end
+    parts[#parts + 1] = string.format("slot %d (%d/256) %s%s", slot, pool[slot].odds,
+      table.concat(names, ", "), ok[slot] and " suits" or "")
+  end
+  local worst, hist = H.worstCaseEncounters(function()
+    return function(slot) return ok[slot] end
+  end)
+  H.log(string.format("[budget] group %d: %s -- the worst of the 65536 encounter-counter "
+    .. "states needs %d draw(s); %.1f%% need no more than 6", group, table.concat(parts, "; "),
+    worst, 100 * H.encounterShare(hist, 6)))
+  H.assertEq(worst <= MAXDRAWS, true, string.format("group %d deals a suitable formation "
+    .. "within the %d draws built (worst counter state: %d)", group, MAXDRAWS, worst))
+  budgets[group] = worst
+  return worst
+end
 local function encounter(tag)
+  local group, budget = nil, nil
   local steps = { H.call(function() H.vars.suitable = false end) }
-  for n = 1, 6 do
+  for n = 1, MAXDRAWS do
     local w = walkSteps(n)
+    table.insert(w, 5, H.call(function()
+      if group == nil then group, budget = worldGroup, budgetFor(worldGroup) end
+      H.assertEq(worldGroup, group, string.format("%s draw %d was dealt by group %s, the "
+        .. "pool its budget was decoded from (%s)", tag, n, tostring(worldGroup), tostring(group)))
+    end))
     if n == 1 then
       for _, s in ipairs(w) do steps[#steps + 1] = s end
     else
-      steps[#steps + 1] = H.cond(function() return not H.vars.suitable end, w, {})
+      steps[#steps + 1] = H.cond(function()
+        return not H.vars.suitable and n <= budget
+      end, w, {})
     end
   end
   steps[#steps + 1] = H.call(function()
-    H.assertEq(H.vars.suitable, true, tag .. ": the pool dealt two PIERCE-weak "
-      .. "shielded bodies among three or more within six draws")
+    H.assertEq(H.vars.suitable, true, string.format("%s: the pool dealt two PIERCE-weak "
+      .. "shielded bodies among three or more within %d draws, the most any "
+      .. "encounter-counter state needs from group %d", tag, budget, group))
     for s = 0, 3 do
       if H.readByte(0x3ED8 + s * 2) == SHADOW then shadowSlot = s end
     end
@@ -568,13 +660,15 @@ add({
 })
 
 -- ============== battle 3: the labeled isolation arm ========================
--- The boss check, with the one injected bit; see the header.  A fresh
+-- The boss check, with the injected bit and HP; see the header.  A fresh
 -- battle (fresh flag), the PIERCE-weak body with the most HP given
--- $3aa1.2 before any chip, then Shadow's chips break it: the break write
--- comes with no in-proc Death mark and no flag spend.  The write below is
--- this file's only one and may never produce fixtures.  A bitted body
--- Interceptor kills before Shadow breaks it, or a fight that empties
--- first, is followed by another fight, up to FIGHTS of them.
+-- $3aa1.2 and STAGED_HP before any chip, then Shadow's chips break it: the
+-- break write comes with no in-proc Death mark and no flag spend; then his
+-- next attack's hook point reads it Broken: no mark either.  The writes
+-- below are this file's only ones and may never produce fixtures.  With
+-- the staged HP neither Interceptor's counters nor the doubled break can
+-- fell the body, so one fight is the expectation; a fight that still ends
+-- unbroken is followed by another, up to FIGHTS of them.
 add({
   H.loadState(STATE),
   H.waitFrames(20),
@@ -598,7 +692,8 @@ add({
           .. "PIERCE-weak shielded body stands to wear the boss bit (a fresh "
           .. "battle's draw)", fights))
         H.vars.bossBody = best
-        H.writeByte(0x3AA1 + ent(best), aa1(best) | 0x04)   -- the arm's one write (header)
+        H.writeByte(0x3AA1 + ent(best), aa1(best) | 0x04)   -- the arm's writes (header)
+        H.writeWord(0x3BF4 + ent(best), STAGED_HP)
         forced = best
         resetLedger()
         H.log(string.format("[isolation arm] fight %d: body %d (hp=%d sh=%d) "
@@ -652,19 +747,27 @@ add({
       H.cond(function()
         return broke and alive(H.vars.bossBody) and H.battleLoadStarted()
       end, {
-        H.call(function() H.vars.brokenHits0 = brokenHits end),
+        H.call(function() H.vars.hookReads0 = #hookReads end),
         drive(function()
-          return brokenHits > H.vars.brokenHits0 or not alive(H.vars.bossBody)
-            or not H.battleLoadStarted()
-        end, 30000, "Shadow lands on the Broken 'boss' (isolation arm)"),
+          local m = H.vars.bossBody
+          for i = H.vars.hookReads0 + 1, #hookReads do
+            if hookReads[i].y == ent(m) then return true end
+          end
+          return not alive(m) or brk(m) == 0 or not H.battleLoadStarted()
+        end, 30000, "Shadow's next attack on the Broken 'boss' reaches the hook point (isolation arm)"),
+        H.waitFrames(8),
         H.call(function()
-          H.log(string.format("[isolation arm] hook point half: brokenHits=%d (was "
-            .. "%d) divineKills=%d flag=$%02x hp=%d alive=%s", brokenHits,
-            H.vars.brokenHits0, #divineKills, flagByte(),
-            mhp(H.vars.bossBody), tostring(alive(H.vars.bossBody))))
-          if brokenHits > H.vars.brokenHits0 then
+          local m, read = H.vars.bossBody, nil
+          for i = H.vars.hookReads0 + 1, #hookReads do
+            if hookReads[i].y == ent(m) then read = hookReads[i] end
+          end
+          H.log(string.format("[isolation arm] hook point half: %s divineKills=%d "
+            .. "flag=$%02x hp=%d alive=%s broken=%02x", read and string.format(
+            "the hook point read it Broken at f%d seq%d;", read.f, read.seq) or
+            "NOT reached;", #divineKills, flagByte(), mhp(m), tostring(alive(m)), brk(m)))
+          if read then
             H.assertEq(#divineKills, 0,
-              "a Broken BOSS is never assassinated: the landed hit fired no "
+              "a Broken BOSS is never assassinated: the hook point's gate fired no "
               .. "in-proc Death mark")
             H.assertEq(flagByte() & shadowBit(), 0,
               "and no divine was spent on it")
@@ -683,8 +786,9 @@ add({
           .. "(fought %d)", FIGHTS, fights))
         H.log(string.format("[isolation arm] done: fights=%d hook point half %s "
           .. "divineKills=%d flag=$%02x interceptor=%d", fights,
-          H.vars.siteHalf and "reached" or "not reached (the body died on "
-          .. "its doubled break)", #divineKills, flagByte(), counters))
+          H.vars.siteHalf and "reached" or "NOT reached", #divineKills, flagByte(), counters))
+        H.assertEq(H.vars.siteHalf == true, true, "the hook point half was reached: "
+          .. "Shadow's attack put the Broken 'boss' to the gate from the hook point (#296)")
         H.assertEq(#divineKills, 0, "no in-proc Death mark in the whole arm")
         watching = false
         H.screenshot("assassinate_boss")

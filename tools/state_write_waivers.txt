@@ -30,6 +30,7 @@
 # zero-checksum save, a legacy save layout no version writes.  It is
 # documentation, not a gate; a line without one is no less sanctioned.
 tools/tests/battle_assassinate.lua	.writeByte(
+tools/tests/battle_assassinate.lua	.writeWord(	quarantine: the isolation arm's staged HP: no PIERCE-weak body the camp pool deals outlives its doubled break, so the hook point's Broken-boss read is unreachable by play (#296)
 tools/tests/battle_breakflash.lua	.writeByte(
 tools/tests/battle_breakflash.lua	.writeWord(
 tools/tests/battle_bushido.lua	.writeByte(
