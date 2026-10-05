@@ -121,6 +121,30 @@ local function armWatches()
   emu.addMemoryCallback(function(_, v)
     if rec and rec.code >= 1 and v ~= NONE and not rec.done then rec.grant = v end
   end, emu.callbackType.write, 0x7E32F4, 0x7E32F4 + 18)
+  -- which slot Ot6StealSlot read: its rare arm is `lda $3308,y / rtl`
+  -- (B9 08 33 6B) and its common arm `lda $3309,y / rtl` (B9 09 33 6B),
+  -- each once in the proc.  The slot the ROM chose, not the item it
+  -- handed back: on group 1's Sand Ray ($05C) the rare and common slots
+  -- hold the same item ($F2), so "the grant is the rare item" passed
+  -- whichever slot was read (#252)
+  local base = H.sym("Ot6StealSlot")
+  local arms = {}
+  for off = 0, 0x60 do
+    local b0, b1, b2, b3 = H.readRomByte((base & 0x3FFFFF) + off), H.readRomByte((base & 0x3FFFFF) + off + 1),
+      H.readRomByte((base & 0x3FFFFF) + off + 2), H.readRomByte((base & 0x3FFFFF) + off + 3)
+    if b0 == 0xB9 and b2 == 0x33 and b3 == 0x6B and (b1 == 0x08 or b1 == 0x09) then
+      local k = b1 == 0x08 and "rare" or "common"
+      H.assertEq(arms[k], nil, "Ot6StealSlot has one " .. k .. " arm")
+      arms[k] = base + off
+    end
+  end
+  H.assertEq(arms.rare ~= nil and arms.common ~= nil, true,
+    "Ot6StealSlot's rare and common arms are found by their bytes")
+  for k, a in pairs(arms) do
+    emu.addMemoryCallback(function()
+      if rec and not rec.done then rec.slot = k end
+    end, emu.callbackType.exec, a, a)
+  end
   -- the mp-cost queue store (CreateAction), filtered to command $05: exactly
   -- what Ot6AbilityCost handed back for this Steal, captured at the source.
   -- battle_stealmp owns the economy; this file needs the number only to show
@@ -569,8 +593,9 @@ H.run({ maxFrames = 150000 }, {
         H.assertEq(rec.code, 3, "3 bp is a guaranteed success")
         H.assertEq(#rec.draws, 0,
           "...and draws NO success RNG at all (the clamp overflows first)")
+        H.assertEq(rec.slot, "rare", "3 bp read the RARE slot (Ot6StealSlot's rare arm ran)")
         H.assertEq(rec.grant, wantRare,
-          "3 bp took the RARE slot's item (species-authored, read live)")
+          "...and granted its item (species-authored, read live)")
         H.assertEq(stealRare(rareT), NONE,
           "the game's own clear emptied the rare slot")
         H.assertEq(stealCommon(rareT), NONE, "...and the common slot")
