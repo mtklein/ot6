@@ -835,12 +835,13 @@ local CASES = {
     end,
     note = function(c, measured)
       local e = c.esper and MAGICITE_POOL[c.esper]
-      local k = measured and magiciteCall(c)
+      local k = magiciteCall(c)
       local what
       if c.esper == nil then
         what = "no esper drawn"
       elseif k then
-        what = string.format("%d -> %d", k.din, k.dout)
+        what = string.format("%d -> %d%s", k.din, k.dout,
+          measured and "" or " (no try has drawn again yet)")
       elseif e and e.power == 0 then
         what = "power 0, nothing to multiply"
       else
