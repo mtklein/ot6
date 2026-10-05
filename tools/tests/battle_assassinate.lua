@@ -217,20 +217,6 @@ emu.addMemoryCallback(function(addr, v)
   end
 end, emu.callbackType.write, 0x7E3EE4 + 8, 0x7E3EE4 + 0x13)
 
-do
-  local check = H.sym("CheckBattleWorld")
-  emu.addMemoryCallback(function()
-    H.vars.checks = (H.vars.checks or 0) + 1
-    local ok, g = pcall(H.worldCheckGroup)
-    if not ok then H.log("[budget] CheckBattleWorld watch: " .. tostring(g)) end
-    local zx, zy = H.worldZonePos()
-    H.log(string.format("[budget] check f%d: world %d zone pos (%d,%d) bg $11F9=%02X -> %s",
-      H.frame, H.readByte(0x1F64), zx, zy, H.readByte(0x11F9), tostring(g)))
-    worldGroup = ok and g or nil
-  end, emu.callbackType.exec, check, check)
-  H.log(string.format("[budget] watching CheckBattleWorld at $%06x", check))
-end
-
 -- ---- Interceptor's counters, on the ledger (read-only) -------------------
 -- battle_main.asm @4cd6 stores the counter's attack, $fc + a coin flip
 -- (Takedown / Wild Fang), into $3a7b before CreateRetalAction.
@@ -448,6 +434,11 @@ end
 -- six draws this file used to build were a bare number.
 local MAXDRAWS = 40          -- draws built per fight; the decoded budget must fit
 local worldGroup = nil       -- the group the last CheckBattleWorld rolled
+do
+  local check = H.sym("CheckBattleWorld")
+  emu.addMemoryCallback(function() worldGroup = H.worldCheckGroup() end,
+    emu.callbackType.exec, check, check)
+end
 local budgets = {}
 local function speciesShields(sp)
   local t = H.sym("Ot6ShieldTbl") & 0x3FFFFF
@@ -496,8 +487,6 @@ local function encounter(tag)
   for n = 1, MAXDRAWS do
     local w = walkSteps(n)
     table.insert(w, 5, H.call(function()
-      H.log(string.format("[budget] draw %d: %s CheckBattleWorld call(s), group %s", n,
-        tostring(H.vars.checks), tostring(worldGroup)))
       if group == nil then group, budget = worldGroup, budgetFor(worldGroup) end
       H.assertEq(worldGroup, group, string.format("%s draw %d was dealt by group %s, the "
         .. "pool its budget was decoded from (%s)", tag, n, tostring(worldGroup), tostring(group)))
