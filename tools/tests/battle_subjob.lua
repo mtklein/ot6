@@ -30,6 +30,7 @@ local CMD_MAGIC, CMD_ITEM = 0x02, 0x01
 local MSCROLL, MCOL, MROW = 0x8913, 0x8917, 0x891B
 local LISTS = { [0] = 0x208e, [1] = 0x21ca, [2] = 0x2306, [3] = 0x2442 }
 local TONIC, POTION, TINCTURE = 0xE8, 0xE9, 0xEB
+local GREEN_CHERRY, REMEDY = 0xF8, 0xF5   -- Imp's cures (H.CONTROL_STATUSES)
 
 local locke, celes
 local function mp(slot) return H.readWord(0x3C08 + slot*2) end
@@ -168,6 +169,15 @@ local celesMode = "defer"                -- "defer"|"cast"
 local wantPend, castRec = 0, nil
 local castLogged = false
 local tgtFlag, tgtAge, tgtPress
+-- NUMBER 024 can Imp CELES, and an Imp casts nothing but Imp
+-- (CheckMagicEnabled): on main's 2026-10-05 n024_entry her Bolt row read
+-- disabled (record byte 1 $EF) with status1 $20 and the [C] cast buzzed
+-- 6,828 times to a 30000-frame timeout.  A person cures it: LOCKE spends
+-- his window on a Green Cherry (else a Remedy) on her, and she passes her
+-- windows until it is gone (#252).
+local function celesImp()
+  return celes ~= nil and (H.readByte(0x3EE4 + celes*2) & 0x20) ~= 0
+end
 local function decide()
   if H.readByte(MENU) == 0 then
     return (H.frame % 8 < 4) and { a = true } or {}
@@ -198,6 +208,8 @@ local function decide()
       local h, m = hp(s2), H.readWord(0x3C1C + s2*2)
       if h > 0 and m > 0 and h * 100 // m < 70 then hurt = true end
     end
+    local cure = celesImp() and bagIdxOf({ GREEN_CHERRY, REMEDY })
+    if cure then hurt = true end
     if st == ST_CMD and not hurt then btn = "x"
     elseif st == ST_CMD then
       local want = cmdRowOf(locke, CMD_ITEM)
@@ -205,7 +217,7 @@ local function decide()
       if cur == want then btn = "a"
       else btn = (cur < want) and "down" or "up" end
     elseif st == ST_ITEM then
-      local want = bagIdxOf({ TONIC, POTION })
+      local want = cure or bagIdxOf({ TONIC, POTION })
       if want == nil then btn = "b"
       else
         local cur = H.readByte(0x8947 + locke) + H.readByte(0x894F + locke)
@@ -222,6 +234,7 @@ local function decide()
           if pct < wpct then worst, wpct = s, pct end
         end
       end
+      if cure then worst = celes end
       if worst == nil or tgtFlag == (1 << worst) and (tgtAge or 0) >= 4 then
         btn = "a"
       else
@@ -251,6 +264,8 @@ local function decide()
         end
       elseif st == ST_TGT then btn = "a"
       else btn = "b" end
+    elseif celesImp() then                       -- an Imp waits for the cure
+      btn = (st == ST_CMD) and "x" or "b"
     else                                         -- "cast": boost, walk, cast
       if st == ST_CMD then
         if pend(celes) < wantPend then btn = "r"
@@ -293,7 +308,12 @@ local function decide()
   return btn and { [btn] = true } or {}
 end
 local function driveTo(pred, maxF, tag)
-  return H.driveUntil(pred, maxF, {
+  return H.driveUntil(function()
+    if celesImp() and not bagIdxOf({ GREEN_CHERRY, REMEDY }) then
+      error(tag .. ": CELES is an Imp and the bag holds no Green Cherry or Remedy", 0)
+    end
+    return pred()
+  end, maxF, {
     H.call(function()
       -- Life support, not play: the fold/MP measurements need CELES to
       -- bank real BP turns while three allies idle in a boss fight, and
