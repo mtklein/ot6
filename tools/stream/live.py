@@ -741,7 +741,17 @@ class Scanner:
         active_sec, tail_n, s_stuck, f_stuck = self.tuning
         now = time.time()
         workers, pngs, active = [], {}, set()
+        real_seen = set()
         for log in run_logs():
+            # one run, once: a tree whose build/test-runs is a symlink into
+            # another's (an agent's mutant copies) would show every run again
+            # under each tree's name.  The run belongs to the tree that holds
+            # its directory.
+            real = os.path.realpath(log)
+            if real in real_seen:
+                continue
+            real_seen.add(real)
+            log = real
             try:
                 mtime = os.path.getmtime(log)
                 if now - mtime > active_sec:
@@ -1015,6 +1025,11 @@ class Board:
                           if w.get("h") and os.path.exists(self._png(n, w["id"]))
                           else None))
                 mine.append(rec)
+            # two runs of one test in one tree are told apart by their run id
+            names = collections.Counter(w["name"] for w in mine)
+            for w in mine:
+                if names[w["name"]] > 1:
+                    w["name"] += " #" + w["id"].rsplit(".", 1)[-1][:4]
             mine.sort(key=lambda w: (w["name"], w["id"]))
             workers += mine
             trees = {}
