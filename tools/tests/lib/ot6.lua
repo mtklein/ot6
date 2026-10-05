@@ -6919,19 +6919,15 @@ function Driver:makePlan(actor)
   -- first when it is available.  Measured on Rizopas care_i50 (#162):
   -- SABIN at 82/363 under a 244 round spent eleven turns on care while
   -- one 1-BP Fight ended the fight.
-  local function spendPlan(where)
-    if self.opts.spend == false or livingMonsters() == 0 then return nil end
+  -- the heals this actor could give themself right now, priced the
+  -- way the care lines below price them.  Only a heal those lines
+  -- would TAKE can save (#206): the Potion that "saves: 17 + 250 = 267
+  -- survives the 262 round" was the same Potion the heal policy
+  -- refused as "buys back less than it spends", so LOCKE did neither
+  -- and died holding 3 BP.
+  local function actorHeals()
     local hp, maxhp = hpNow[actor], maxOf(actor)
     local cost = price[actor] or 0
-    if hp <= 0 or cost <= 0 or hp > cost or have < 1 then return nil end
-    -- the heals this actor could give themself right now, priced the
-    -- way the care lines below price them.  Only a heal those lines
-    -- would TAKE can save (#206): the Potion that "saves: 17 + 250 = 267
-    -- survives the 262 round" was the same Potion the heal policy
-    -- refused as "buys back less than it spends", so LOCKE did neither
-    -- and died holding 3 BP.  From the attack lines (the care block
-    -- closed to this actor, or it declined every heal) no heal is
-    -- coming this turn at all.
     local heals, refused = {}, {}
     do
       local allies = 0
@@ -6970,11 +6966,37 @@ function Driver:makePlan(actor)
         end
       end
     end
+    return heals, refused
+  end
+  -- The heal the care lines would take on this actor that lifts it clear
+  -- of its own round, said as "what +restore", or nil (#312)
+  local function ownLift()
+    local hp, cost = hpNow[actor], price[actor] or 0
+    for _, h in ipairs((actorHeals())) do
+      if h.restore ~= nil and hp + h.restore > cost then
+        return string.format("%s +%d = %d over the %d round", h.what, h.restore, hp + h.restore, cost)
+      end
+    end
+    return nil
+  end
+  -- `goesTo` (#312): the care block has chosen a turn that does not lift
+  -- this actor (a raise of another, a heal on someone else), so no heal is
+  -- coming to it this turn whatever the bag holds -- the attack lines'
+  -- reading.  The Runic-off Kefka loss (#257, build/attempts/wt/kefka-lab/
+  -- lab/logs/nrunic_suiteg29_s44.log.gz): TERRA alone at 158/345 under a
+  -- 193 round read "no spend (care): item $E9 saves: 158 + 250 = 408", then
+  -- spent the turn raising CELES, three turns running, and died holding 5 BP.
+  local function spendPlan(where, goesTo)
+    if self.opts.spend == false or livingMonsters() == 0 then return nil end
+    local hp, maxhp = hpNow[actor], maxOf(actor)
+    local cost = price[actor] or 0
+    if hp <= 0 or cost <= 0 or hp > cost or have < 1 then return nil end
+    local heals, refused = actorHeals()
     -- From the attack lines no heal comes this turn: what the care lines
     -- would have taken is said, not counted, with the reason the block was
     -- closed (review of care-items cae71db9)
     local whyNot = nil
-    if where ~= "care" then
+    if where ~= "care" or goesTo ~= nil then
       local gap = math.max(0, maxhp - hp)
       for _, h in ipairs(heals) do
         local r = h.restore and math.min(h.restore, gap) or nil
@@ -6982,7 +7004,9 @@ function Driver:makePlan(actor)
           note = (r == nil or hp + r > cost) and "it would lift, but not this turn" or nil }
       end
       heals = {}
-      if not careOpen then
+      if goesTo ~= nil then
+        whyNot = "this turn's care goes to " .. goesTo
+      elseif not careOpen then
         whyNot = string.format("the round's care turn went to actor %d", self.careActor or -1)
       elseif #refused > 0 then
         whyNot = "the care lines took none"
@@ -7030,6 +7054,22 @@ function Driver:makePlan(actor)
       .. "rather than die holding boost (#175)", self.tag or "fight", actor, where, why,
       best.what, best.chips or 0, tostring(slot)))
     return best
+  end
+  -- A care turn that does not lift this actor, while the actor is inside
+  -- its own round holding BP (#312): the care lines' choice is weighed
+  -- against the spend rule with no heal coming to the actor this turn, and
+  -- the spend goes first when it fires -- the plan the care lines chose
+  -- (`plan`, said as `what`) otherwise.  M.SPEND_SEES_THROUGH = false is
+  -- the driver before #312 (the lab lever).
+  local function orSpend(plan, what)
+    if plan == nil or M.SPEND_SEES_THROUGH == false then return plan end
+    local hp, cost = hpNow[actor], price[actor] or 0
+    if hp <= 0 or cost <= 0 or hp > cost or have < 1 then return plan end
+    if plan.all then return plan end           -- a party heal reaches the actor too
+    if plan.target == actor and plan.restore ~= nil and hp + plan.restore > cost then return plan end
+    if plan.target == actor and plan.restore == nil and plan.kind == "heal" then return plan end
+    local sp = spendPlan("care", what)
+    return sp or plan
   end
   -- The finisher gate yields to the enemy's arithmetic (#204).  "Under
   -- 200 total, attack" was written for a party one poke from ending a
@@ -7304,21 +7344,35 @@ function Driver:makePlan(actor)
           local ok, raiseHp, hit, hitSlot, hitOn, why, needsTopUp = self:raiseOk(e, actor)
           local hitStr = hit and string.format("%d (slot %d on entity %d)", hit, hitSlot, hitOn)
             or "none measured"
-          if ok then
+          -- the actor's own lift first (#312): a reviver inside its own
+          -- round who spends the turn on a raise dies before the raised can
+          -- be helped, and the raise with it
+          local own = nil
+          if ok and e ~= actor and M.SPEND_SEES_THROUGH ~= false and hpNow[actor] > 0
+             and (price[actor] or 0) > 0 and hpNow[actor] <= price[actor] then
+            own = ownLift()
+          end
+          if own ~= nil then
+            local said = string.format("[%s] actor=%d holds its raise of entity %d: it stands "
+              .. "inside its own round (%d <= %d) and %s lifts it first (#312)", self.tag or "fight",
+              actor, e, hpNow[actor], price[actor], own)
+            if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+          elseif ok then
             M.log(string.format("[%s] actor=%d revive entity %d with Fenix Down: "
               .. "raise to %d HP (1/8 of %d), the living enemy's smallest hit %s "
               .. "-- %s", self.tag or "fight", actor, e, raiseHp,
               maxOf(e), hitStr, why))
-            return { kind = "item", item = BATTLE.FENIX_DOWN, target = e, row = row,
+            return orSpend({ kind = "item", item = BATTLE.FENIX_DOWN, target = e, row = row,
                      idx = self:battInvIdx(BATTLE.FENIX_DOWN), reason = "revive",
-                     needsTopUp = needsTopUp == true }
+                     needsTopUp = needsTopUp == true }, string.format("a raise of entity %d", e))
+          else
+            local said = string.format("[%s] actor=%d no raise: Fenix Down would put "
+              .. "entity %d at %d HP (1/8 of %d), the living enemy's smallest hit %s "
+              .. "-- %s; killing first, caring for the living instead",
+              self.tag or "fight", actor, e, raiseHp, maxOf(e),
+              hitStr, why)
+            if said ~= self.healSaid then self.healSaid = said; M.log(said) end
           end
-          local said = string.format("[%s] actor=%d no raise: Fenix Down would put "
-            .. "entity %d at %d HP (1/8 of %d), the living enemy's smallest hit %s "
-            .. "-- %s; killing first, caring for the living instead",
-            self.tag or "fight", actor, e, raiseHp, maxOf(e),
-            hitStr, why)
-          if said ~= self.healSaid then self.healSaid = said; M.log(said) end
         end
       end
     end
@@ -7460,8 +7514,8 @@ function Driver:makePlan(actor)
             .. "(worst %d%%), boost %d folds $%02X -> $%02X (%d MP), "
             .. "all allies -- %s", self.tag or "fight", actor, #cands,
             cands[1].pct, boost, spell, folded, mpc, why))
-          return { kind = "heal", spell = spell, target = cands[1].e,
-                   row = cureRow, all = true, boostLeft = boost, reason = "party_hurt" }
+          return orSpend({ kind = "heal", spell = spell, target = cands[1].e,
+                   row = cureRow, all = true, boostLeft = boost, reason = "party_hurt" }, "a party cure")
         end
       end
     end
@@ -7536,8 +7590,8 @@ function Driver:makePlan(actor)
                 .. "costs %d (%s)", self.tag or "fight", actor, c.e, c.hp,
                 c.maxhp, spell, cell, mpCost, M.readWord(BATTLE.CURMP + actor * 2),
                 gain and tostring(gain) or "?", cost, why))
-              return { kind = "heal", spell = spell, target = c.e, restore = gain,
-                       row = cureRow, reason = why }
+              return orSpend({ kind = "heal", spell = spell, target = c.e, restore = gain,
+                       row = cureRow, reason = why }, string.format("a cure on entity %d", c.e))
             end
             local said = string.format("[%s] actor=%d not curing entity %d "
               .. "(%d/%d): $%02X restores %d and a round costs %d, so the "
@@ -7567,8 +7621,8 @@ function Driver:makePlan(actor)
               for _, r in ipairs(refused) do t[#t + 1] = string.format("$%02X (%s)", r.item.id, r.why) end
               return table.concat(t, "; ")
             end)()) or ""))
-          return { kind = "item", item = it.id, target = c.e, row = row, restore = it.restore,
-                   idx = it.idx, reason = why, flat = it.flat }
+          return orSpend({ kind = "item", item = it.id, target = c.e, row = row, restore = it.restore,
+                   idx = it.idx, reason = why, flat = it.flat }, string.format("a heal on entity %d", c.e))
         end
         local t = {}
         for _, r in ipairs(refused) do
