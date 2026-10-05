@@ -5179,6 +5179,7 @@ function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
   -- plans on (it plans only with control).  A pick made while the field
   -- reloads the map after a menu or a battle reads the stale object map
   -- (#352: the B2 hub's staging (37,23)).
+  local noPick = 0
   local function stage()
     if not pick and (not M.hasControl() or M.mapLoading()) then return nil end
     if not pick then
@@ -5189,14 +5190,27 @@ function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
           pick = { cx, cy, press }; break
         end
       end
-      -- No reachable neighbour on a loaded map is a route error, not a
-      -- tile to guess: the old fallback cached (sx, sy+1) whether or not
-      -- any walk reached it, and the walk then failed far from the cause
-      -- (#357).
+      -- No reachable neighbour yet: walk toward (sx, sy+1) meanwhile but
+      -- do not keep it, and pick again every frame -- an NPC in the way
+      -- moves on (gen_wor_south_figaro's Nikeah cafe door, (16,54) from
+      -- (23,39), had none reachable on the first controlled frame and
+      -- crossed once the walk got closer).  The old fallback was cached
+      -- for good whether or not any walk reached it (#357); a door none
+      -- of whose neighbours turns reachable for 1800 picks is a route
+      -- error, said with the door, the party's tile and the map.
       if not pick then
-        error(string.format("%s: no tile next to the door (%d,%d) is reachable from " ..
-          "(%d,%d) on map %d (tried the four sides and four diagonals)",
-          what, sx, sy, M.fieldX(), M.fieldY(), mapLow()), 0)
+        noPick = noPick + 1
+        if noPick == 1 then
+          M.log(string.format("%s: no tile next to the door (%d,%d) is reachable from (%d,%d) "
+            .. "yet; walking toward (%d,%d) and picking again", what, sx, sy,
+            M.fieldX(), M.fieldY(), sx, sy + 1))
+        end
+        if noPick > 1800 then
+          error(string.format("%s: no tile next to the door (%d,%d) became reachable in %d "
+            .. "picks, from (%d,%d) on map %d (tried the four sides and four diagonals)",
+            what, sx, sy, noPick - 1, M.fieldX(), M.fieldY(), mapLow()), 0)
+        end
+        return { sx, sy + 1, "up" }
       end
       M.log(string.format("%s: staging (%d,%d), hold %s into (%d,%d)",
         what, pick[1], pick[2], pick[3], sx, sy))
@@ -5208,7 +5222,7 @@ function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
   return M.seqStep({
     -- the first step is the reset (#196): the stage, the start map and
     -- the far-side settle count are all re-read where this pass stands
-    M.call(function() pick, startMap = nil, mapLow(); settledAgain() end),
+    M.call(function() pick, startMap, noPick = nil, mapLow(), 0; settledAgain() end),
     M.navTo(function() local p = stage(); return p and p[1] end,
       function() local p = stage(); return p and p[2] end,
       { maxFrames = 9000, playBattles = "tactical", healer = opts.healer,
