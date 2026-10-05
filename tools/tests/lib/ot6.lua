@@ -11620,16 +11620,25 @@ function Driver:watchHits()
       self.monAct.st2[e] = M.readByte(BATTLE.ST2 + e * 2)
     end
   end
-  -- what the action is, as it runs (commitMonAct's typical action): the
-  -- party bits of its targets ($B8 low byte: entities 0-3) and the
-  -- counterattack flag ($B1 bit 0), while this slot's command executes
-  -- (the counter flag is read once, as ExecCmd entered: ExecRetal and an
-  -- immediate action set it before ExecCmd, BattleLoop @0088 clears it
-  -- before the queue's next normal action)
-  if self.monAct ~= nil and execMon ~= nil and execMon == self.monAct.slot then
+  -- What the action is aimed at (commitMonAct's typical action) is read
+  -- once, as ExecCmd entered (execMonB8/execMonB9 above), like the counter
+  -- flag ($B1 bit 0: ExecRetal and an immediate action set it before
+  -- ExecCmd, BattleLoop @0088 clears it before the queue's next normal
+  -- action).  $B8/$B9 are the engine's shared target scratch, not the
+  -- action's: while a monster's action animates, a member's menu writes
+  -- its own targets there (GetPlayerTargets @4e29, QueueAction @0379), and
+  -- RunicEffect @3635 writes the rune knight's bit over a spell it draws.
+  -- Folding them in every frame read Dullahan's Cure 2 on himself ($B8=$00
+  -- $B9=$01 at entry) as aimed at CELES ("seq 9 cmd $02 atk $2E $B1=$06
+  -- $B8=$00 party=$1"), because she picked Runic on herself while it
+  -- played ("[b8w] f3881 $B8 <- $01 pc=$C24E29"), and counted a buff as a
+  -- zero: battle_typicalgate's "got 8, want 7" on the v0.25 re-cut
+  -- (build/attempts/wt/recut-fallout/typicalgate/).  M.MONACT_OLD keeps
+  -- the old per-frame reading it restores.
+  if M.MONACT_OLD and self.monAct ~= nil and execMon ~= nil and execMon == self.monAct.slot then
     self.monAct.party = (self.monAct.party or 0) | (M.readByte(0xB8) & 0x0F)
     self.monAct.mon = (self.monAct.mon or 0) | (M.readByte(0xB9) & 0x3F)
-    if M.MONACT_OLD and (M.readByte(0xB1) & 0x01) ~= 0 then self.monAct.counter = true end
+    if (M.readByte(0xB1) & 0x01) ~= 0 then self.monAct.counter = true end
   end
   for e = 0, 3 do
     local hp = M.readWord(0x3BF4 + e * 2)

@@ -94,6 +94,94 @@ def describe(m: dict) -> str:
             f"status1 {m['status1']:02X}, {where}")
 
 
+# The generator that boots the checkpoint, its log, and the line in that
+# log where the emulator reads the party out of live WRAM before anything
+# but menus and walking has touched it.
+ENTRY_CHECKPOINT = "n024-entry-save-v1"
+ENTRY_LOG = "build/states/esper_tubes_entry.log"
+ENTRY_STAMP = "build/states/esper_tubes_entry.stamp"
+
+
+def logged_entry_party(repo: str = "."):
+    """What the emulator logged about the party right after it Continued
+    from n024-entry-save-v1, as {char: (hp, maxhp, status1 or None)}, with
+    a note saying where it came from; or (None, why).
+
+    The source is gen_esper_tubes' own log, which the build regenerates
+    with its stamp whenever the checkpoint changes.  The stamp's ancestor
+    line must bind the checkpoint's current manifest, or the log is of
+    some other save.  The HP comes from the first "[care before battle 72]
+    opening the menu" line after the last boot point (a retry re-boots
+    the checkpoint), and only if no battle opened in between: a fight
+    would change the HP and the comparison would mean nothing.  status1
+    comes from that care stop's "plan:" lines, for the members it planned
+    for; the rest are compared on HP alone.
+    """
+    import hashlib
+    import re
+    manifest = os.path.join(repo, "tools/tests/checkpoints",
+                            ENTRY_CHECKPOINT, "manifest.json")
+    stamp = os.path.join(repo, ENTRY_STAMP)
+    log = os.path.join(repo, ENTRY_LOG)
+    for f in (manifest, stamp, log):
+        if not os.path.exists(f):
+            return None, f"{f} is missing (build {ENTRY_STAMP} first)"
+    with open(manifest, "rb") as fh:
+        msha = hashlib.sha256(fh.read()).hexdigest()
+    rel = f"tools/tests/checkpoints/{ENTRY_CHECKPOINT}/manifest.json"
+    with open(stamp) as fh:
+        bound = [ln.split()[2] for ln in fh
+                 if ln.startswith(f"ancestor {rel} ")]
+    if bound != [msha]:
+        return None, (f"{ENTRY_STAMP} binds {rel} at {bound}, the tree's is "
+                      f"{msha}: the log is of another save; regenerate it")
+    with open(log, errors="replace") as fh:
+        lines = [ln.rstrip("\n") for ln in fh if ln.startswith("[ot6] ")]
+    boots = [i for i, ln in enumerate(lines)
+             if f"[retry] boot point: checkpoint {ENTRY_CHECKPOINT} " in ln]
+    if not boots:
+        return None, f"{ENTRY_LOG} never boots {ENTRY_CHECKPOINT}"
+    tag = "[care before battle 72]"
+    hp_re = re.compile(r"c(\d+) (\d+)/(\d+) hp")
+    st_re = re.compile(r"plan: \S+ char (\d+) .*\((\d+)/(\d+) hp, "
+                       r".*status1 ([0-9A-F]{2})\)")
+    want, at = None, None
+    for i in range(boots[-1], len(lines)):
+        ln = lines[i]
+        if "[open] party HP as the battle opens" in ln:
+            return None, (f"{ENTRY_LOG}: a battle opened after the boot "
+                          f"point and before the {tag} menu line; its HP "
+                          f"is no longer the checkpoint's")
+        if f"{tag} opening the menu:" in ln:
+            want = {int(c): (int(h), int(m), None)
+                    for c, h, m in hp_re.findall(ln.split("|")[0])}
+            at = i
+            break
+    if not want:
+        return None, f"{ENTRY_LOG} has no {tag} opening-the-menu line"
+    for ln in lines[at:]:
+        if f"{tag} done:" in ln:
+            break
+        m = st_re.search(ln) if tag in ln else None
+        if m:
+            c = int(m.group(1))
+            if c in want:
+                want[c] = (want[c][0], want[c][1], int(m.group(4), 16))
+    return want, f"{ENTRY_LOG} line: {lines[at][:160]}"
+
+
+def agrees(got: dict, want: dict) -> bool:
+    """The SRAM read matches the log: the same members, the same HP and
+    max HP, and the same status1 wherever the log gave one."""
+    if set(got) != set(want):
+        return False
+    for c, (hp, mx, st) in want.items():
+        g = got[c]
+        if (g[0], g[1]) != (hp, mx) or (st is not None and g[2] != st):
+            return False
+    return True
+
+
 # ---------------------------------------------------------------- selftest --
 
 def selftest(repo: str = ".") -> int:
@@ -161,22 +249,24 @@ def selftest(repo: str = ".") -> int:
                    f"got {sorted(payloads)}")
     else:
         party, err = read_party_sram(payloads["n024-entry-save-v1"])
-        # The four records the emulator independently logged out of live
-        # WRAM after booting this checkpoint (the v0.24 re-cut; gen_esper_tubes'
-        # "[care before battle 72] opening the menu" line in
-        # build/states/esper_tubes_entry.log, whose stamp binds this
-        # manifest: c1 751/751, c4 707/752, c5 830/830, c6 734/747; its
-        # "plan:" line logs status1 00; build/attempts/wt/v024-recut/
-        # audit_party_hp/).  Re-derive the pin from that line whenever the
-        # checkpoint is re-cut.
-        want = {"LOCKE": (751, 751, 0x00), "EDGAR": (707, 752, 0x00),
-                "SABIN": (830, 830, 0x00), "CELES": (734, 747, 0x00)}
-        got = {m["name"]: (m["hp"], m["maxhp"], m["status1"])
+        got = {m["char"]: (m["hp"], m["maxhp"], m["status1"])
                for m in (party or [])}
-        if err or got != want:
+        want, why = logged_entry_party(repo)
+        if want is None:
+            bad.append(f"no emulator record of n024-entry-save-v1 to read "
+                       f"it against: {why}")
+        elif err or not agrees(got, want):
             bad.append(f"read_party_sram(n024-entry-save-v1) should read the "
-                       f"four records the emulator logged from it, "
-                       f"got {err or got}")
+                       f"records the emulator logged from it ({why}), "
+                       f"got {err or got}, logged {want}")
+        else:
+            # The negative control: the same comparison has to refuse a
+            # read one hp off, or it is not checking anything.
+            c = next(iter(got))
+            hp, mx, st = got[c]
+            if agrees({**got, c: (hp - 1, mx, st)}, want):
+                bad.append("the SRAM-vs-log comparison accepts a record one "
+                           "hp off; it compares nothing")
 
     for line in bad:
         print(f"  SELFTEST FAIL {line}")
