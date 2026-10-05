@@ -77,6 +77,7 @@ local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_TOOLS = 0x05, 0x30     -- command list; tools-shell blitz list
 local ST_ITEM, ST_TGT = 0x0A, 0x38      -- item select; target select
 local ST_THROW = 0x2D                   -- throw select (UpdateMenuState_2d)
+local ST_ROW, ST_DEF = 0x24, 0x27       -- Row / Def. side windows (lib's ST_ROW)
 local CMD_BLITZ, CMD_ITEM, CMD_THROW = 0x0A, 0x01, 0x08
 local CMDTBL, ITEMLIST = 0x202E, 0x4005 -- command cells; wItemList rows
 local BATTINV = 0x2686                  -- battle inventory, 5 bytes/entry
@@ -305,7 +306,7 @@ local function b47Button()
   if fPlan == nil or fPlanActor ~= actor then
     if st ~= ST_CMD then
       if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT
-         or st == ST_THROW then
+         or st == ST_THROW or st == ST_ROW or st == ST_DEF then
         return { "b" }
       end
       return nil
@@ -326,11 +327,7 @@ local function b47Button()
     end
     local cur = H.readByte(CMDROW + actor) & 3
     if cur == plan.row then return { "a" } end
-    if plan.rowStall and plan.rowStall > 2 then
-      plan.rowStall = 0
-      return { ({ [0]="up", [1]="left", [2]="right", [3]="down" })[plan.row] }
-    end
-    plan.rowStall = (plan.rowStall or 0) + 1
+    -- UP and DOWN only: LEFT/RIGHT here open Row/Def. (#366, b68Button)
     return { cur < plan.row and "down" or "up" }
   end
   if st == ST_ITEM and plan.kind == "item" then
@@ -375,7 +372,7 @@ local function b47Button()
     for b = 0, 3 do if chars & (1 << b) ~= 0 then cur = b; break end end
     return { cur < plan.target and "down" or "up" }
   end
-  if st == ST_TOOLS then return { "b" } end
+  if st == ST_TOOLS or st == ST_ROW or st == ST_DEF then return { "b" } end
   return nil
 end
 local function fightPulse(_)
@@ -599,6 +596,26 @@ local function neediest(limit20)
   end
   return best, miss
 end
+-- #366: the bank is spent on the damage turns, not carried to the grave.
+-- The v0.24 wipe and this branch's lab both died "holding 5 BP": SABIN's
+-- chips and SHADOW's throws were never boosted, so every pip they banked
+-- past the fifth was lost and a member a round from death took his pips
+-- with him.  A boosted Blitz is the x2/x4/x8 multiplier at an escalating
+-- price (Ot6BoostPriceFor; H.boostPlan is where a fighter reads it), so a
+-- chip boosts only with the MP the rest of the break does not need: the
+-- reserve is the unboosted Pummels (two shields each) that take the
+-- shields this cast leaves.  After the break (Suplex) nothing is
+-- reserved.  A Throw is multiplied and costs no MP (Ot6BoostDmg gates it
+-- in; probe_throw_boost), so a throw spends the bank whole, as Fight does.
+local function blitzBoost(skill, shields)
+  local want = math.min(H.readByte(BP + sabinE * 2), 3)
+  if want == 0 then return 0 end
+  local left = math.max(0, shields - (skill == PUMMEL and 2 or 1))
+  local reserve = ((left + 1) // 2) * (H.abilityCost(PUMMEL) or 4)
+  local boost, ok = H.boostPlan({ slot = sabinE, id = skill, want = want,
+    reserve = reserve, tag = "b68" })
+  return ok and boost or 0
+end
 local function makePlan(actor)
   local shields = H.readByte(SH(gSlot))
   local itemRow = cmdRowOf(actor, CMD_ITEM)
@@ -712,15 +729,19 @@ local function makePlan(actor)
   end
   if actor == sabinE and shields > 0 and not imp then
     if not b68.holyRevealed and pMP(sabinE) >= 10 then
-      b68Log(string.format("plan chip 1: AURABOLT (mp %d, sh %d, trainHP %d) " ..
-        "[%s]", pMP(sabinE), shields, H.readWord(MHP(gSlot)), partyLine()))
-      return { kind = "blitz", skill = AURABOLT,
+      local boost = blitzBoost(AURABOLT, shields)
+      b68Log(string.format("plan chip 1: AURABOLT boost=%d (mp %d, sh %d, " ..
+        "trainHP %d) [%s]", boost, pMP(sabinE), shields,
+        H.readWord(MHP(gSlot)), partyLine()))
+      return { kind = "blitz", skill = AURABOLT, boost = boost,
                row = cmdRowOf(actor, CMD_BLITZ) }
     end
     if pMP(sabinE) >= 4 then
-      b68Log(string.format("plan chip: PUMMEL x2 (mp %d, sh %d, trainHP %d) [%s]",
-        pMP(sabinE), shields, H.readWord(MHP(gSlot)), partyLine()))
-      return { kind = "blitz", skill = PUMMEL,
+      local boost = blitzBoost(PUMMEL, shields)
+      b68Log(string.format("plan chip: PUMMEL x2 boost=%d (mp %d, sh %d, " ..
+        "trainHP %d) [%s]", boost, pMP(sabinE), shields,
+        H.readWord(MHP(gSlot)), partyLine()))
+      return { kind = "blitz", skill = PUMMEL, boost = boost,
                row = cmdRowOf(actor, CMD_BLITZ) }
     end
     b68Log(string.format("SABIN is out of chip MP at %d shields (mp %d): " ..
@@ -729,22 +750,25 @@ local function makePlan(actor)
   end
   if actor == shadowE and shields > 0 and b68.holyRevealed and not imp
      and battInvIdx(FIRE_SKEAN) then
-    b68Log(string.format("throw: SHADOW FIRE SKEAN (%d left, sh %d) " ..
-      "trainHP=%d [%s]", invCount(FIRE_SKEAN), shields,
+    local boost = math.min(H.readByte(BP + actor * 2), 3)
+    b68Log(string.format("throw: SHADOW FIRE SKEAN boost=%d (%d left, sh %d) " ..
+      "trainHP=%d [%s]", boost, invCount(FIRE_SKEAN), shields,
       H.readWord(MHP(gSlot)), partyLine()))
-    return { kind = "throw", item = FIRE_SKEAN,
+    return { kind = "throw", item = FIRE_SKEAN, boost = boost,
              row = cmdRowOf(actor, CMD_THROW) }
   end
   if actor == shadowE and not imp and battInvIdx(SHURIKEN) then
-    b68Log(string.format("throw: SHADOW Shuriken (%d left) trainHP=%d [%s]",
-      invCount(SHURIKEN), H.readWord(MHP(gSlot)), partyLine()))
-    return { kind = "throw", item = SHURIKEN,
+    local boost = math.min(H.readByte(BP + actor * 2), 3)
+    b68Log(string.format("throw: SHADOW Shuriken boost=%d (%d left) trainHP=%d [%s]",
+      boost, invCount(SHURIKEN), H.readWord(MHP(gSlot)), partyLine()))
+    return { kind = "throw", item = SHURIKEN, boost = boost,
              row = cmdRowOf(actor, CMD_THROW) }
   end
   if actor == sabinE and not imp and pMP(sabinE) >= 13 then
-    b68Log(string.format("cast: SABIN Suplex (mp %d) trainHP=%d [%s]",
-      pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
-    return { kind = "blitz", skill = SUPLEX,
+    local boost = blitzBoost(SUPLEX, 0)
+    b68Log(string.format("cast: SABIN Suplex boost=%d (mp %d) trainHP=%d [%s]",
+      boost, pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
+    return { kind = "blitz", skill = SUPLEX, boost = boost,
              row = cmdRowOf(actor, CMD_BLITZ) }
   end
   -- an imp's Fight lands for 0: the pips stay banked for after the cure
@@ -763,7 +787,7 @@ local function b68Button()
   if plan == nil or b68.planActor ~= actor then
     if st ~= ST_CMD then
       if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT
-         or st == ST_THROW then
+         or st == ST_THROW or st == ST_ROW or st == ST_DEF then
         return { "b" }
       end
       return nil
@@ -784,14 +808,23 @@ local function b68Button()
     end
     local cur = H.readByte(CMDROW + actor) & 3
     if cur == wantRow then return { "a" } end
-    -- closed-loop steering; the engine skips invalid rows itself.  Try the
-    -- incremental read first, the absolute-jump buttons as fallback.
-    if plan.rowStall and plan.rowStall > 2 then
-      plan.rowStall = 0
-      return { ({ [0] = "up", [1] = "left", [2] = "right", [3] = "down" })[wantRow] }
-    end
-    plan.rowStall = (plan.rowStall or 0) + 1
+    -- closed-loop steering, UP and DOWN only; the engine skips invalid
+    -- rows itself.  (#366: this used to fall back to LEFT/RIGHT as
+    -- "absolute jumps" after two stalled pulses, but LEFT and RIGHT on the
+    -- command window open the Row and Def. side windows ($24/$27,
+    -- UpdateMenuState_24) -- the "unhandled menu state $24 ... plan=blitz"
+    -- of the v0.24 wipe was SABIN's steer toward Blitz, row 1, pressing
+    -- LEFT.)
     return { cur < wantRow and "down" or "up" }
+  end
+  -- Row / Def. (lib/ot6.lua's ST_ROW/ST_DEF): open only if a direction
+  -- reached the command window, which this fighter no longer presses
+  -- there.  A in $24 would change the row and spend the turn; B closes
+  -- it ($24 -> $05) with the turn and the plan intact.
+  if st == ST_ROW or st == ST_DEF then
+    b68Log(string.format("side window $%02X open (actor=%d plan=%s) -- B out",
+      st, actor, plan.kind))
+    return { "b" }
   end
   if st == ST_TOOLS and plan.kind == "blitz" then
     local row = nil
@@ -881,7 +914,7 @@ local function b68Observe()
   if (H.readByte(RVE(gSlot)) & HOLY) == HOLY
      or (H.readByte(RVPE(gSlot)) & HOLY) == HOLY then
     if not b68.holyRevealed then
-      b68.holyAt = H.frame
+      b68.holyAt, b68.holyBy = H.frame, H.readByte(0x3410)
       b68Log(string.format("HOLY revealed at f%d (lastSkill=$%02X)", H.frame,
         H.readByte(0x3410)))
     end
@@ -890,7 +923,7 @@ local function b68Observe()
   if (H.readByte(RVC(gSlot)) & OT6_BLUDG) == OT6_BLUDG
      or (H.readByte(RVPC(gSlot)) & OT6_BLUDG) == OT6_BLUDG then
     if not b68.bludgRevealed then
-      b68.bludgAt = H.frame
+      b68.bludgAt, b68.bludgBy = H.frame, H.readByte(0x3410)
       b68Log(string.format("OT6_BLUDG revealed at f%d (lastSkill=$%02X)",
         H.frame, H.readByte(0x3410)))
     end
@@ -1037,6 +1070,7 @@ local function b68Fight()
       b68.brokeAt, b68.killedAt, b68.brokeHP = nil, nil, nil
       b68.killParty, b68.wiped = nil, false
       b68.holyAt, b68.bludgAt, b68.chipAt, b68.castAt = nil, nil, {}, {}
+      b68.holyBy, b68.bludgBy = nil, nil
       b68.shieldsOff = 0
       b68.holyRevealed, b68.bludgRevealed = false, false
       b68.itemsOut = false
@@ -1207,8 +1241,30 @@ local function b68Fight()
       -- are seen on one frame.  A skill that never chipped proves nothing
       -- either way (SABIN short on MP, the train dead first): logged, with
       -- "cast but never chipped" told apart from "never cast".
-      local function tied(what, at, skill, name)
+      -- A Muddled or Berserk SABIN acts on his own (the engine picks the
+      -- Blitz, never this fighter's plan): the lab's be14 run (#366) had a
+      -- Muddled SABIN's Suplex ($5F, bludgeon too) chip the first shield
+      -- and reveal OT6_BLUDG before any Pummel.  So the reveal is tied to
+      -- the skill that made it (the attack index at the reveal frame) when
+      -- that skill chipped there, and a skill the plan never cast is the
+      -- engine's: its chip and reveal still have to share the frame.
+      local SKILLNAME = { [PUMMEL] = "Pummel ($5D)", [AURABOLT] = "AuraBolt ($5E)",
+                          [SUPLEX] = "Suplex ($5F)" }
+      local function tied(what, at, skill, name, by)
+        if by and by ~= skill and SKILLNAME[by] and b68.chipAt[by]
+           and at and math.abs(at - b68.chipAt[by]) <= REVEAL_SLACK then
+          skill, name = by, SKILLNAME[by]
+        end
         local cast, chip = b68.castAt[skill], b68.chipAt[skill]
+        if chip ~= nil and cast == nil then
+          H.log(string.format("[b68] %s: %s chipped f%d but the plan never " ..
+            "cast it -- the engine's (a Muddled/Berserk SABIN)", what, name, chip))
+          H.assertEq(at ~= nil and math.abs(at - chip) <= REVEAL_SLACK, true,
+            string.format("%d of 6 shields off: %s revealed by the %s that " ..
+            "chipped (engine-chosen; chip f%d, reveal f%s, slack %d)", off,
+            what, name, chip, tostring(at), REVEAL_SLACK))
+          return
+        end
         if chip == nil then
           H.log(string.format("[b68] %s: %s %s -- the tie is not asserted " ..
             "(%s revealed f%s)", what, name, cast and string.format(
@@ -1226,8 +1282,8 @@ local function b68Fight()
           off, what, name, tostring(cast), tostring(chip), tostring(at),
           REVEAL_SLACK))
       end
-      tied("HOLY", b68.holyAt, AURABOLT, "AuraBolt ($5E)")
-      tied("OT6_BLUDG", b68.bludgAt, PUMMEL, "Pummel ($5D)")
+      tied("HOLY", b68.holyAt, AURABOLT, "AuraBolt ($5E)", b68.holyBy)
+      tied("OT6_BLUDG", b68.bludgAt, PUMMEL, "Pummel ($5D)", b68.bludgBy)
       if off < 6 then
         H.log(string.format("[tuning] battle 68 won with %d of 6 shields off " ..
           "-- the train died before its break (killedAt=f%s casts=%d " ..
