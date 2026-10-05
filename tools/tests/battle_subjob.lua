@@ -174,7 +174,9 @@ local tgtFlag, tgtAge, tgtPress
 -- disabled (record byte 1 $EF) with status1 $20 and the [C] cast buzzed
 -- 6,828 times to a 30000-frame timeout.  A person cures it: LOCKE spends
 -- his window on a Green Cherry (else a Remedy) on her, and she passes her
--- windows until it is gone (#252).
+-- windows until it is gone (#252).  Played on that fixture: PASS at f5295;
+-- with the cures taken away the run fails at once, naming the Imp
+-- (build/attempts/wt/v026-suites/r/subjob/).
 local function celesImp()
   return celes ~= nil and (H.readByte(0x3EE4 + celes*2) & 0x20) ~= 0
 end
