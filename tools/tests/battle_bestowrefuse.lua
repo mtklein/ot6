@@ -231,8 +231,22 @@ local function decide()
   return btn and { [btn] = true } or {}
 end
 
+-- #252: a subject KO'd, petrified or zombied never reaches the window this
+-- file waits for (nobody here cures it); say so at once rather than at the
+-- wait's timeout.  Statuses time or a hit clears (Sleep, Stop, Muddle) are
+-- waited out as before.
+local LASTING = { Death = true, Petrify = true, Zombie = true }
+local function mustAct(slot, who, what)
+  local c = slot and H.controlTaken(slot)
+  if c and LASTING[c.name] then
+    error(string.format("%s: %s cannot take a command: %s (H.controlTaken)", what, who, c.name), 0)
+  end
+end
 local function driveTo(pred, maxF, tag)
-  return H.driveUntil(pred, maxF, {
+  return H.driveUntil(function()
+    if H.battleActive() then mustAct(locke, "LOCKE", tag) end
+    return pred()
+  end, maxF, {
     H.call(function() H.setPad(decide()) end),
   }, tag)
 end

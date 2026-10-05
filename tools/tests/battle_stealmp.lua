@@ -251,18 +251,81 @@ local function classify()
     end
   end
 end
-local plan
+-- How many encounters a battle may take to draw a species with a rare steal
+-- slot (#299).  Which slot of the pool comes next is fixed by the save's
+-- encounter counter ($1fa2/$1fa3, lib/ot6_field.lua above
+-- M.worstCaseEncounters), and every regeneration of the chain deals this
+-- fixture a different one, so the budget is the most encounters ANY counter
+-- state needs to deal a slot whose every formation holds a rare-slot species
+-- (H.worstCaseEncounters over the group CheckBattleWorld really rolled,
+-- decoded from the ROM's formations and MonsterItems) -- battle_steal's
+-- decode, on the same desert.  The bare six this file used to build is the
+-- budget battle_steal dropped: on its 2026-09-28 decode the worst state
+-- needs 11 encounters for a Sand Ray from group 1 (battle_steal.lua's
+-- budget comment; on this file's own decode, group 1, 0.5% of counter
+-- states need more than 6 and the worst needs 11).  Played: with 72
+-- encounters used up first (the counter's run of ten slot-2 draws,
+-- build/attempts/wt/v026-suites/r/probe_desert_seq.log), battle 1 needed
+-- all 11 ("battle 1 try 11 (group 1, budget 11): rareT=0", r/smp3/
+-- new_k72.log.gz) and with 74, 9; the old six would have failed both.
+-- The walk paces a stretch of the dismount row whose
+-- every tile rolls one group (H.newPacer, P above), so the budget's pool is
+-- the one that deals; each battle asserts that group (P.assertGroup).  (The clock's left/right walk
+-- this file used drifts with each battle's timing; battle_steal's drifted
+-- onto a group-0 grass tile.)
+local ITEMS = H.sym("MonsterItems") & 0x3FFFFF
+local MAXTRIES = 40                -- steps built per battle; the budget must fit
+local budgets = {}                 -- [group] = worst, decoded once
+local function budgetFor(group)
+  if budgets[group] then return budgets[group] end
+  local pool = H.encounterPool(group)
+  local ok, parts = {}, {}
+  for slot = 1, 4 do
+    ok[slot] = true
+    local names = {}
+    for _, f in ipairs(pool[slot].formations) do
+      local rare = false
+      for _, sp in ipairs(f.species) do
+        if H.readRomByte(ITEMS + sp*4) ~= NONE then rare = true end
+      end
+      ok[slot] = ok[slot] and rare
+      local sp = {}
+      for _, x in ipairs(f.species) do sp[#sp+1] = string.format("%03X", x) end
+      names[#names+1] = string.format("%d [%s]", f.id, table.concat(sp, " "))
+    end
+    parts[#parts+1] = string.format("slot %d (%d/256) %s%s", slot,
+      pool[slot].odds, table.concat(names, ", "), ok[slot] and " suits" or "")
+  end
+  local worst, hist = H.worstCaseEncounters(function()
+    return function(slot) return ok[slot] end
+  end)
+  H.log(string.format("[test] budget: group %d: %s -- the worst of the 65536 "
+    .. "encounter-counter states needs %d encounter(s); %.1f%% need no more "
+    .. "than 6", group, table.concat(parts, "; "), worst,
+    100 * H.encounterShare(hist, 6)))
+  H.assertEq(worst <= MAXTRIES, true, string.format("group %d deals a "
+    .. "rare-slot species within the %d tries built (worst state: %d)",
+    group, MAXTRIES, worst))
+  budgets[group] = worst
+  return worst
+end
 local function enterDesertBattle(n)
-  local steps = {}
-  for try = 1, 6 do
+  local budget, group = nil, nil
+  local steps = { H.call(function()
+    group = P.group
+    budget = budgetFor(group)
+  end) }
+  for try = 1, MAXTRIES do
     steps[#steps+1] = H.cond(function()
-      return H.battleLoadStarted() and rareT ~= nil
+      return (H.battleLoadStarted() and rareT ~= nil) or try > budget
     end, {}, {
       H.cond(function() return H.battleLoadStarted() end, {
         H.logStep("formation unsuitable -- fleeing for a fresh draw"),
         H.fleeBattle(12000, { onCantRun = "fight" }),
         H.waitFrames(240),
       }, {}),
+      H.waitUntil(function() return H.worldSettled() end, 1500,
+        "the world map settled (battle " .. n .. " try " .. try .. ")", 5),
       H.driveUntil(function() return H.battleLoadStarted() end, 25000, {
         H.call(function() H.setPad(P.pad()) end),
       }, "desert encounter " .. n .. " try " .. try),
@@ -278,14 +341,16 @@ local function enterDesertBattle(n)
         end
         H.assertEq(locke ~= nil, true, "LOCKE is really in this party")
         classify()
-        H.log(string.format("battle %d: rareT=%s mp=%d", n,
-          tostring(rareT), mp()))
+        H.log(string.format("battle %d try %d (group %d, budget %d): rareT=%s mp=%d",
+          n, try, group, budget, tostring(rareT), mp()))
       end),
     })
   end
   steps[#steps+1] = H.call(function()
-    H.assertEq(rareT ~= nil, true,
-      "a both-populated species drawn within six encounters")
+    H.assertEq(H.battleLoadStarted() and rareT ~= nil, true,
+      string.format("a rare-slot species drawn within %s encounters, the most "
+        .. "any encounter-counter state needs from group %s", tostring(budget),
+        tostring(group)))
   end)
   return H.repeatN(1, steps)
 end

@@ -75,6 +75,17 @@ local sawFresh, sawMidCycle = false, false
 -- steer the menu toward `who`'s command window (everyone else defers with
 -- X), then run `phase` there; 4-on/4-off command-window cadence.
 local mf = 0
+-- #252: a subject KO'd, petrified or zombied never reaches the window this
+-- file waits for (nobody here cures it); say so at once rather than at the
+-- wait's timeout.  Statuses time or a hit clears (Sleep, Stop, Muddle) are
+-- waited out as before.
+local LASTING = { Death = true, Petrify = true, Zombie = true }
+local function mustAct(slot, who, what)
+  local c = slot and H.controlTaken(slot)
+  if c and LASTING[c.name] then
+    error(string.format("%s: %s cannot take a command: %s (H.controlTaken)", what, who, c.name), 0)
+  end
+end
 local function windowOf(who, onCmd)
   if H.readByte(MENU) == 0 then
     return (H.frame % 8 < 4) and { a = true } or {}
@@ -139,6 +150,7 @@ H.run({ maxFrames = 60000 }, {
 
   -- open Terra's real magic list (walk the cursor to her Magic row)
   H.driveUntil(function()
+    if H.battleActive() then mustAct(terra, "TERRA", "her real spell list open") end
     return (H.readByte(ACTOR) & 3) == terra and H.readByte(MSTATE) == ST_SPELL
   end, 20000, {
     H.call(function()

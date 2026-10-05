@@ -312,7 +312,7 @@ H.run({ maxFrames = 60000 }, {
   -- be run from ($b1 bit 1, the flag the run command itself tests, or the
   -- formation's own no-L+R bit $2f4b bit 0 -- the lib's cantRun reading)
   -- is fought out through the Fight menu instead: measured at two ledge
-  -- fights and a 37-frame idle before the walk (build/lab/mpb/nm_sweep1/
+  -- fights and a 37-frame idle before the walk (build/attempts/wt/mp-baselines/lab/mpb/nm_sweep1/
   -- {orig,fix}_prior2_idle37.log), the held L+R met "Can't run away!!"
   -- for 12000 frames while the pack KO'd EDGAR.
   H.cond(function()
