@@ -327,7 +327,15 @@ local function b47Button()
     end
     local cur = H.readByte(CMDROW + actor) & 3
     if cur == plan.row then return { "a" } end
-    -- UP and DOWN only: LEFT/RIGHT here open Row/Def. (#366, b68Button)
+    -- UP and DOWN only: LEFT/RIGHT here open Row/Def. (#366, b68Button);
+    -- a row never reached fails by name (12 pulses unmoved)
+    if plan.lastCur == cur then plan.rowStall = (plan.rowStall or 0) + 1
+    else plan.rowStall, plan.lastCur = 0, cur end
+    if plan.rowStall > 12 then
+      error(string.format("battle 47: the command steer is stuck -- actor %d's " ..
+        "cursor sat on row %d for %d pulses wanting row %d", actor, cur, plan.rowStall,
+        plan.row), 0)
+    end
     return { cur < plan.row and "down" or "up" }
   end
   if st == ST_ITEM and plan.kind == "item" then
@@ -814,7 +822,15 @@ local function b68Button()
     -- command window open the Row and Def. side windows ($24/$27,
     -- UpdateMenuState_24) -- the "unhandled menu state $24 ... plan=blitz"
     -- of the v0.24 wipe was SABIN's steer toward Blitz, row 1, pressing
-    -- LEFT.)
+    -- LEFT.)  A row the cursor never reaches fails by name rather than
+    -- running to the frame cap: 12 pulses with the cursor unmoved.
+    if plan.lastCur == cur then plan.rowStall = (plan.rowStall or 0) + 1
+    else plan.rowStall, plan.lastCur = 0, cur end
+    if plan.rowStall > 12 then
+      error(string.format("battle 68: the command steer is stuck -- actor %d's " ..
+        "cursor sat on row %d for %d pulses wanting row %d (plan %s)", actor, cur,
+        plan.rowStall, wantRow, plan.kind), 0)
+    end
     return { cur < wantRow and "down" or "up" }
   end
   -- Row / Def. (lib/ot6.lua's ST_ROW/ST_DEF): open only if a direction
@@ -822,8 +838,14 @@ local function b68Button()
   -- there.  A in $24 would change the row and spend the turn; B closes
   -- it ($24 -> $05) with the turn and the plan intact.
   if st == ST_ROW or st == ST_DEF then
-    b68Log(string.format("side window $%02X open (actor=%d plan=%s) -- B out",
-      st, actor, plan.kind))
+    b68.sideN = (b68.sideN or 0) + 1
+    b68Log(string.format("side window $%02X open (actor=%d plan=%s, #%d this battle) -- B out",
+      st, actor, plan.kind, b68.sideN))
+    if b68.sideN > 6 then
+      error(string.format("battle 68: the Row/Def. side window ($%02X) opened %d times " ..
+        "-- something keeps pressing LEFT/RIGHT on the command window (actor %d, plan %s)",
+        st, b68.sideN, actor, plan.kind), 0)
+    end
     return { "b" }
   end
   if st == ST_TOOLS and plan.kind == "blitz" then
@@ -945,7 +967,10 @@ local function b68Observe()
       sabinE and pMP(sabinE) or -1, partyLine())
     b68.chips[#b68.chips + 1] = row
     local sk = H.readByte(0x3410)
-    b68.chipAt[sk] = b68.chipAt[sk] or H.frame   -- first chip by each skill
+    if b68.chipAt[sk] == nil then                 -- first chip by each skill
+      b68.chipAt[sk] = H.frame
+      b68.chipSt2[sk] = sabinE and H.readByte(0x3EE5 + sabinE * 2) or 0
+    end
     -- Shields off, not chip rows.  A double-hitting Pummel takes two shields
     -- in one transition (6->5->4->2 is three rows and four shields), so the
     -- row count undercounts the break and cannot be the thing asserted on.
@@ -1001,7 +1026,6 @@ local function b47Fight()
           error(string.format("timeout after 29000 frames: battle 47 with " ..
             "no win and no wipe seen -- a genuine stall, see #159/#163 [%s]",
             partyLine()), 0)
-          H.log("[train] LOST -- " .. lost)
         end
         return lost ~= nil
             or (mapIdx() == 142 and H.hasControl() and H.tileAligned()
@@ -1070,6 +1094,7 @@ local function b68Fight()
       b68.brokeAt, b68.killedAt, b68.brokeHP = nil, nil, nil
       b68.killParty, b68.wiped = nil, false
       b68.holyAt, b68.bludgAt, b68.chipAt, b68.castAt = nil, nil, {}, {}
+      b68.chipSt2, b68.sideN = {}, 0
       b68.holyBy, b68.bludgBy = nil, nil
       b68.shieldsOff = 0
       b68.holyRevealed, b68.bludgRevealed = false, false
@@ -1248,17 +1273,39 @@ local function b68Fight()
       -- the skill that made it (the attack index at the reveal frame) when
       -- that skill chipped there, and a skill the plan never cast is the
       -- engine's: its chip and reveal still have to share the frame.
+      -- A substitute revealer must carry the key it revealed, read from the
+      -- ROM: OT6_BLUDG from Ot6SkillClassTbl (Pummel, Suplex), HOLY from the
+      -- attack's own element byte (MagicProp +1: AuraBolt).
       local SKILLNAME = { [PUMMEL] = "Pummel ($5D)", [AURABOLT] = "AuraBolt ($5E)",
                           [SUPLEX] = "Suplex ($5F)" }
+      local function skillClass(id)
+        local base = H.sym("Ot6SkillClassTbl") & 0x3FFFFF
+        for i = 0, 63 do
+          local k = H.readRomByte(base + i * 2)
+          if k == 0xFF then return 0 end
+          if k == id then return H.readRomByte(base + i * 2 + 1) end
+        end
+        return 0
+      end
+      local function carries(key, id)
+        if key == "HOLY" then return (H.spellElement(id) & HOLY) ~= 0 end
+        return (skillClass(id) & OT6_BLUDG) ~= 0
+      end
       local function tied(what, at, skill, name, by)
-        if by and by ~= skill and SKILLNAME[by] and b68.chipAt[by]
+        if by and by ~= skill and SKILLNAME[by] and carries(what, by) and b68.chipAt[by]
            and at and math.abs(at - b68.chipAt[by]) <= REVEAL_SLACK then
           skill, name = by, SKILLNAME[by]
         end
+        H.assertEq(carries(what, skill), true, string.format("%s's revealer %s carries %s " ..
+          "(Ot6SkillClassTbl / its element byte)", what, name, what))
         local cast, chip = b68.castAt[skill], b68.chipAt[skill]
         if chip ~= nil and cast == nil then
+          local st2 = b68.chipSt2[skill] or 0
           H.log(string.format("[b68] %s: %s chipped f%d but the plan never " ..
-            "cast it -- the engine's (a Muddled/Berserk SABIN)", what, name, chip))
+            "cast it -- the engine's (SABIN's status2 at the chip $%02X)", what, name, chip, st2))
+          H.assertEq((st2 & (H.ST2_MUDDLE | H.ST2_BERSERK)) ~= 0, true, string.format(
+            "%s: a %s the plan never cast came from a Muddled or Berserk SABIN " ..
+            "(status2 $%02X at the chip)", what, name, st2))
           H.assertEq(at ~= nil and math.abs(at - chip) <= REVEAL_SLACK, true,
             string.format("%d of 6 shields off: %s revealed by the %s that " ..
             "chipped (engine-chosen; chip f%d, reveal f%s, slack %d)", off,
