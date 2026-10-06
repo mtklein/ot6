@@ -5784,7 +5784,39 @@ end
 -- it lands.  Summons, lores, blitzes, tools, throws and Fights all
 -- carry ignore-reflect or no spell record at all, and pass the Reflect
 -- half.  True means the cast is off the table this turn.
+-- Which standing monster's enemy Runic takes a spell (#413), or nil: the
+-- spell's MagicProp+3 (bit 3, RunicEffect's `$11a3 & $08`: runic-able)
+-- against each standing slot's $3E4C byte (bit 1, the enemy Runic the
+-- Speck's MonsterProp+30 sets).  special = { [slot] = byte } for the
+-- standing slots only.
+function M.runicTakes(flags3, special)
+  if (flags3 & 0x08) == 0 then return nil end
+  for s = 0, 5 do
+    if special[s] ~= nil and (special[s] & 0x02) ~= 0 then return s end
+  end
+  return nil
+end
 function Driver:castVetoed(abilityId, what)
+  -- An enemy Runic (#413): a monster carrying $3E4C bit 1 (the Speck's
+  -- MonsterProp+30, "A Speck absorbs magic!" on its launch) takes every
+  -- runic-able spell (MagicProp+3 bit 3, RunicEffect) cast while it
+  -- stands, whatever it was aimed at: the Air Force arm of #412 landed 0
+  -- with 124 of 321 casts, all but one with the Speck up.  Summons carry
+  -- no such bit and pass.
+  local MP = M.sym("MagicProp") & 0x3FFFFF
+  if M.ENEMY_RUNIC_VETO ~= false then
+    local special = {}
+    for s = 0, 5 do
+      if monAlive(s) then special[s] = M.readByte(0x3E4C + 8 + s * 2) end
+    end
+    local rs = M.runicTakes(M.readRomByte(MP + abilityId * 14 + 3), special)
+    if rs ~= nil then
+      M.log(string.format("[%s] %s $%02X refused: slot %d ($%03X) holds an enemy Runic and would absorb it "
+        .. "(#413) -- falling through", self.tag or "fight", what, abilityId, rs,
+        M.readWord(M.FORMATION + rs * 2)))
+      return true
+    end
+  end
   local elem = M.spellElement(abilityId)
   local s, why = M.castVeto(elem, M.spellReflectable(abilityId), activeSlots())
   if not s then return false end

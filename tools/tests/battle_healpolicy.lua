@@ -859,6 +859,13 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(L({ chips = 0, broken = true }), "line", "a 0-chip line on a Broken target: every hit x4")
     H.assertEq(L({ chips = 0, summon = true }), "summon", "nothing chips: the summon")
     H.assertEq(L({ chips = 0 }), nil, "nothing chips, no summon: the heal stands")
+    -- the enemy Runic (#413): the Speck ($146, MonsterProp+30 = $02) takes
+    -- every runic-able spell while it stands, whatever it was aimed at
+    H.assertEq(H.runicTakes(0x28, { [0] = 0x00, [3] = 0x02 }), 3, "Bolt (+3 $28) with the Speck up: slot 3 takes it")
+    H.assertEq(H.runicTakes(0x28, { [0] = 0x00, [2] = 0x00 }), nil, "Bolt with no Runic up: cast")
+    H.assertEq(H.runicTakes(0x02, { [3] = 0x02 }), nil, "RAMUH's summon (+3 $02, not runic-able): cast")
+    H.assertEq(H.runicTakes(0x28, { [0] = 0x04 }), nil, "$3E4C bit 2 is a character's Runic, not the enemy's")
+    H.assertEq(H.runicTakes(0x09, { [3] = 0x02 }), 3, "Cure (+3 $09) is runic-able too")
     -- the wipe class
     local d = function(tick, from, maxhp, bp, one)
       return { tick = tick, from = from, maxhp = maxhp, bp = bp, oneAction = one }
