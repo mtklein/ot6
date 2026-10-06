@@ -1137,19 +1137,57 @@ end
 -- shift 5 wiped with LOCKE at 144/820 under a 286 round and an X-Potion in
 -- the bag, the round's care turn having gone to SABIN's top-up ("actor=1
 -- SPEND (attack): 144/820 is inside one round of death (286) ...").
---   hp, cost   the member's HP and their round
---   restores   what each heal in hand would put back
---   outpace    (#402) the heal must also put back at least what the round
---              takes (r >= cost): one that only lifts the member over a
+--   hp, maxhp, cost   the member's HP, max HP and their round
+--   restores   what each heal in hand would put back (each counted up to
+--              the HP missing: a flat item's power and a fraction item's
+--              capped restore are judged alike)
+--   outpace    (#402) the heal must also outpace the round
+--              (M.liftOutpaces): one that only lifts the member over a
 --              round it loses again next round delays the death by a turn
---              and spends the party's turn doing it
+--              and spends the party's turn doing it.  A lever, off:
+--              M.LIFT_OUTPACES = true turns it on (and the reopened
+--              block's cure and bag filters with it).  Paired by battle
+--              key (gen_fc_landing from thamasa-done-v1, 48 shifts a
+--              side, build/attempts/wt/v026-driver2/review/ab402/) it
+--              showed no gain: the Air Force won on 20 of 23 distinct
+--              keys with it, 16 of 18 without; on the 10 keys both met,
+--              7 wins against 9, and over the 79 battle keys both met
+--              68 wins against 70, 18.7 deaths against 14.2 (per-key
+--              means).  The battle-4 wipe #402 was filed for (shift 0)
+--              no longer reproduces either way (both arms win it, no
+--              death, PASS).
+-- Whether a heal of `restore` on a member at hp/maxhp outpaces a round of
+-- `cost` (#402): it puts back at least what the round takes, or fills the
+-- member (a heal can put back no more than is missing, so a member within
+-- one round of full is outpaced by any heal that fills them).  The restore
+-- counts up to the HP missing.
+function M.liftOutpaces(hp, maxhp, restore, cost)
+  local eff = restore or 0
+  if maxhp ~= nil and maxhp > 0 then eff = math.min(eff, math.max(0, maxhp - hp)) end
+  return eff >= cost or (maxhp ~= nil and maxhp > 0 and hp + eff >= maxhp)
+end
 function M.liftReopens(o)
-  local hp, cost = o.hp or 0, o.cost or 0
+  local hp, cost, maxhp = o.hp or 0, o.cost or 0, o.maxhp
   if hp <= 0 or cost <= 0 or hp > cost then return false end
   for _, r in ipairs(o.restores or {}) do
-    if r ~= nil and hp + r > cost and (not o.outpace or r >= cost) then return true end
+    if r ~= nil then
+      local eff = (maxhp ~= nil and maxhp > 0) and math.min(r, math.max(0, maxhp - hp)) or r
+      if hp + eff > cost and (not o.outpace or M.liftOutpaces(hp, maxhp, r, cost)) then return true end
+    end
   end
   return false
+end
+-- The reopened budget's cures and bag heals (#402): only those that
+-- outpace the round (M.liftOutpaces) on a member at hp/maxhp
+function M.liftKeepsHeal(hp, maxhp, restore, cost)
+  return restore ~= nil and M.liftOutpaces(hp, maxhp, restore, cost)
+end
+function M.liftFilterHeals(heals, hp, maxhp, cost)
+  local keep = {}
+  for _, h in ipairs(heals) do
+    if M.liftKeepsHeal(hp, maxhp, h.restore or 0, cost) then keep[#keep + 1] = h end
+  end
+  return keep
 end
 
 -- Whether an item the engine aims at the whole party lifts every member of
@@ -7631,7 +7669,7 @@ function Driver:makePlan(actor)
           end
         end
         if M.liftReopens({ hp = hp, maxhp = maxhp, cost = cost, restores = restores,
-                           outpace = M.LIFT_OUTPACES ~= false }) then
+                           outpace = M.LIFT_OUTPACES == true }) then
           careOpen, liftOnly, liftSet[e] = true, true, true
           local said = string.format("[%s] actor=%d: entity %d at %d/%d is inside a %d round "
             .. "and a heal in hand lifts them (%s) -- the round's care budget (actor %d's) "
@@ -8418,7 +8456,8 @@ function Driver:makePlan(actor)
           end
           if cell ~= nil then
             local gain, src = self:castRestoreOf(spell, actor, c.e)
-            if liftOnly and M.LIFT_OUTPACES ~= false and gain ~= nil and gain < cost then
+            if liftOnly and M.LIFT_OUTPACES == true and gain ~= nil
+               and not M.liftKeepsHeal(c.hp, c.maxhp, gain, cost) then
               -- the reopened budget's extra care turn (#402): a cure that
               -- does not outpace the round is not worth it
               gain, cell = nil, nil
@@ -8454,14 +8493,10 @@ function Driver:makePlan(actor)
       -- a real heal (owner guideline -- Tonics are the field resource),
       -- so a weak flat item is only ever the last one standing.
       local heals = row ~= nil and self:bagHeals(c.e, c.hp) or {}
-      if liftOnly and M.LIFT_OUTPACES ~= false then
+      if liftOnly and M.LIFT_OUTPACES == true then
         -- the budget reopened for a lift (#402): only a heal that outpaces
         -- the round is worth the extra care turn
-        local keep = {}
-        for _, h in ipairs(heals) do
-          if (h.restore or 0) >= cost then keep[#keep + 1] = h end
-        end
-        heals = keep
+        heals = M.liftFilterHeals(heals, c.hp, c.maxhp, cost)
       end
       if #heals > 0 then
         local cap = M.deathGil(c.maxhp)

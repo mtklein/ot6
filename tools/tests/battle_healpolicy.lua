@@ -800,6 +800,32 @@ H.run({ maxFrames = 3000 }, {
       "...and the Gate's LOCKE (144 under 286, the X-Potion's 676) still reopens it")
     H.assertEq(H.liftReopens({ hp = 300, cost = 500, restores = { 300 }, outpace = true }), false,
       "...not a heal that lifts (300 + 300 over 500) but puts back less than the round takes (300 < 500)")
+    -- ...and a heal that fills the member outpaces any round (review B1 of
+    -- 4bd463d9): the IAF's first battle (key beEC-g00AF-e5E5E5D5D, shifts
+    -- 28 and 53) had TERRA at 537/960 under a 599 round, the Elixir's capped
+    -- 423 filling her; r >= cost refused it, the budget stayed shut, and she
+    -- died at 255/960 ("[death] f+3098 entity 0 char 0 from 255/960")
+    H.assertEq(H.liftReopens({ hp = 537, maxhp = 960, cost = 599, restores = { 250, 50, 423 }, outpace = true }), true,
+      "TERRA at 537/960 under a 599 round, an Elixir's 423 fills her: outpaces, the budget reopens")
+    H.assertEq(H.liftOutpaces(537, 960, 423, 599), true, "a heal that fills the member outpaces the round")
+    H.assertEq(H.liftOutpaces(537, 960, 250, 599), false, "a Potion's 250 neither fills her nor covers 599")
+    H.assertEq(H.liftOutpaces(200, 960, 2000, 599), true, "a flat restore counts up to the HP missing: 760 >= 599")
+    H.assertEq(H.liftOutpaces(200, 1500, 1000, 1400), false, "1000 on 200/1500 under 1400: neither")
+    H.assertEq(H.liftReopens({ hp = 100, maxhp = 500, cost = 600, restores = { 1000 }, outpace = true }), false,
+      "...and a heal counts only up to the HP missing: 1000 on 100/500 cannot lift her over a 600 round")
+    H.assertEq(H.liftOutpaces(200, 1500, 1300, 1400), true, "1300 on 200/1500 fills her: outpaces")
+    -- the reopened block's two filters (Driver: the cures by M.liftKeepsHeal,
+    -- the bag by M.liftFilterHeals)
+    H.assertEq(H.liftKeepsHeal(537, 960, 423, 599), true, "the cure filter keeps a cure that fills her")
+    H.assertEq(H.liftKeepsHeal(537, 960, 344, 599), false, "...and drops one that does not outpace (344 of 423 missing)")
+    H.assertEq(H.liftKeepsHeal(537, 960, nil, 599), false, "...and an unmeasured cure")
+    do
+      local kept = H.liftFilterHeals({ { id = 0xE9, restore = 250 }, { id = 0xE8, restore = 50 },
+        { id = 0xEE, restore = 423 } }, 537, 960, 599)
+      H.assertEq(#kept == 1 and kept[1].id or -1, 0xEE, "the bag filter keeps the Elixir alone (fills her)")
+      kept = H.liftFilterHeals({ { id = 0xE9, restore = 250 }, { id = 0xEA, restore = 1094 } }, 121, 2000, 603)
+      H.assertEq(#kept == 1 and kept[1].id or -1, 0xEA, "...the X-Potion alone over a 603 round at 121/2000")
+    end
     -- the wipe class
     local d = function(tick, from, maxhp, bp, one)
       return { tick = tick, from = from, maxhp = maxhp, bp = bp, oneAction = one }
