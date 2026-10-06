@@ -327,8 +327,8 @@ What differs from macOS:
 
 ## OT6's Mesen
 
-The harness runs OT6's build of MesenCE 2.2.1: tag `ot6-2.2.1-5` of OT6's fork,
-github.com/mtklein/mesen, which adds eight small commits to MesenCE's
+The harness runs OT6's build of MesenCE 2.2.1: tag `ot6-2.2.1-6` of OT6's fork,
+github.com/mtklein/mesen, which adds ten small commits to MesenCE's
 `2.2.1` tag. `tools/mesen/EMULATOR` pins the commit and
 `tools/mesen/build.sh` builds it (README.md there). The script-only change
 stops Mesen's debugger keeping the per-access records only its windows
@@ -384,7 +384,7 @@ differently from 2.1.1, because of MesenCE's DMA clock-counting fix
   deployed there (README.md, "Deploying"), else the main tree's
   `tools/Mesen-linux/Mesen` (`tools/Mesen.app` on a Mac), which still hold
   ot6-2.2.1-1 (px13 executable `b5a407c3...8c54`; the Macs the same
-  Air-built bundle, `e96f5fdf...7b37`). ot6-2.2.1-5 is deployed on all
+  Air-built bundle, `e96f5fdf...7b37`). ot6-2.2.1-6 is deployed on all
   three, each its own build (README.md lists the shas). The 2.1.1 builds
   are kept in `~/mesen-patched/` as `2.1.1-<sha8>-Mesen[.app]`, with their
   `.buildinfo`.

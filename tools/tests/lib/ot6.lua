@@ -14404,10 +14404,10 @@ function M.run(opts, steps)
     if not (RENDER_API and type(emu.getRenderOnDemandInexact) == "function") then return nil end
     local n = emu.getRenderOnDemandInexact()
     if n == 0 then return nil end
-    return string.format("render on demand: %d CGRAM access(es) during rendering or "
-      .. "savestate(s) inside the visible lines of a frame not drawn, where the PPU's palette "
-      .. "address or line state is not a drawn frame's (#394): this run is not emulation-identical "
-      .. "to drawing every frame; call H.renderAlways() in it", n)
+    return string.format("render on demand: %d CGRAM access(es) during rendering where the PPU's "
+      .. "palette address is not a drawn frame's, or savestate(s) inside the visible lines of a frame "
+      .. "not drawn (#394): this run is not emulation-identical to drawing every frame; call "
+      .. "H.renderAlways() in it", n)
   end
 
   -- Probe mode: the sampled table, then a PASS (a measurement, not a route).

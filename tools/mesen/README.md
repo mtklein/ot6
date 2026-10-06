@@ -2,7 +2,7 @@
 
 OT6's harness runs its own build of Mesen: MesenCE 2.2.1
 (github.com/nesdev-org/MesenCE, tag `2.2.1`, commit `20ba206c`) with four
-small changes, kept as commits (tag `ot6-2.2.1-5`) on OT6's fork,
+small changes, kept as commits (tag `ot6-2.2.1-6`) on OT6's fork,
 github.com/mtklein/mesen (GPL v3, in Mesen's fork network; its
 `OT6-CHANGES.md` is the change notice):
 
@@ -15,7 +15,7 @@ github.com/mtklein/mesen (GPL v3, in Mesen's fork network; its
   does on the Macs. It changes no code.
 
 `EMULATOR` pins the build: one line, `<repository> <tag> <commit>`
-(today `https://github.com/mtklein/mesen ot6-2.2.1-5 28eb2dbf...`).
+(today `https://github.com/mtklein/mesen ot6-2.2.1-6 03b19fc4...`).
 `build.sh` builds that commit and nothing else. The same file is an input of
 every generate, chain and suite edge (configure.py), like the ROM: a new pin
 regenerates every fixture and re-runs every test, and through the chain's
@@ -113,17 +113,30 @@ palette lookups set the PPU's `InternalCgramAddress`, which savestates
 carry and a CGRAM access during rendering uses (review of #394). So a
 frame not drawn still evaluates -- tile fetch, layers and backdrop, no
 output -- the lines whose lookups can be its last: the last visible line,
-every line when HDMA writes INIDISP, the line where forced blank turned on
-the frame before, the current line when forced blank turns on, and the
-rest of a frame and the next after a state load. A flag tracks when the
-address may still differ from drawing every frame (set by a skipped chunk
-a drawn frame would have rendered, cleared only by an evaluated chunk that
-wrote the address), and a CGRAM access during rendering while it is set,
-or a savestate while it is set or anywhere inside the visible lines of a
-frame not drawn (whose per-line draw and fetch state isn't a drawn
-frame's), is counted (`emu.getRenderOnDemandInexact()`; `lib/ot6.lua`
-fails such a run, verdict and seed probe alike). The harness saves states
-at a frame's start, where none of this applies. On
+every line when HDMA writes INIDISP, every line of a fade to black (a
+frame starting at a brightness below the last frame's start, or at 0: a
+fade's forced blank can turn on before a line's first pixel, as FF6's
+battle exit does, where the line before it would otherwise not have been
+seen), the line where forced blank turned on the frame before, the current
+line when forced blank turns on, and the rest of a frame and the next after
+a state load. A flag tracks when the address may still differ from drawing
+every frame (set by a skipped chunk a drawn frame would have rendered,
+cleared only by an evaluated chunk that wrote the address), and a CGRAM
+access during rendering while it is set, or a savestate anywhere inside the
+visible lines of a frame not drawn (whose per-line draw and fetch state
+isn't a drawn frame's), is counted (`emu.getRenderOnDemandInexact()`;
+`lib/ot6.lua` fails such a run, verdict and seed probe alike). A savestate
+carries the flag (ot6-2.2.1-6: the savestate format grows one field,
+SnesPpu's `_icaStale`; a state from an earlier build loads it clear), so
+the run that loads a state with the address unknown counts the access
+that would read it, as the run that saved it would have; every savestate
+under render on demand says which it is on stdout (`[render-on-demand]
+savestate at frame F scanline S: palette address known` or `UNKNOWN
+(carried)`). Before -6 such a savestate was counted itself, and failed
+gen_wor_tomb at seed shift 33: a battle exit's fade turned forced blank on
+before a line's first pixel, and the next savestate, in vblank, carried
+the address unknown (build/attempts/wt/v026-lib/394/carry/). The harness
+saves states outside the visible lines, where the rest doesn't apply. On
 replays of three harness runs the old build and this one end with the same
 WRAM, ARAM, VRAM, OAM, CGRAM, SRAM and `emu.getState()`, and the address
 at every frame's start is the same (build/attempts/wt/v026-lib/394/ab/
@@ -266,7 +279,17 @@ fallback) again. `tools/Mesen.app` stays the bundle for playing by hand
 (`tools/gui.sh`); the 2.2.1 builds deployed there before per-pin
 directories are kept in `~/mesen-patched/` as `2.2.1-<sha8>-Mesen[.app]`.
 
-ot6-2.2.1-5 (28eb2dbf) is deployed on all three (2026-10-05), each machine
+ot6-2.2.1-6 (03b19fc4) is deployed on all three (2026-10-06), each machine
+its own build of it: mbp executable `d459b803...b479` (core `3d975cb0...0ea8`),
+the Air `0b27c26f...68e8` (core `15db205d...a317`), px13 `7ea8e063...54ab` (core
+`9ed4d8d2...cf92`); every build passed the smoke test
+(build/attempts/wt/v026-lib/394/pin6/build_*.txt). On px13 the three replays
+end as the old build's (`identity.txt` there: WRAM, ARAM, VRAM, OAM, CGRAM,
+SRAM, `emu.getState` with the new `ppu.icaStale=false` set aside, every
+128th screenshot and the address at every frame's start), and their 13
+savestates all say `palette address known`.
+
+ot6-2.2.1-5 (28eb2dbf) was deployed on all three (2026-10-05), each machine
 its own build of it: mbp executable `0d6ca27c...0e56` (core `8d578097...c2dd`), the Air `08df062c...cd6a`
 (core `5b080723...e228`), px13 `1605a0d4...b6a9` (core `52509bc5...74ae`); every build passed the smoke test
 ("smoke test: OK -- battle_banner's 30 [ot6] lines match the reference
