@@ -17007,7 +17007,7 @@ CondBattle:
 MONSTER_PROP_REC     = 32
 MONSTER_PROP_SIZE    = 384 * MONSTER_PROP_REC
 GHOSTTRAIN_HP_AT     = MONSTER::GHOSTTRAIN * MONSTER_PROP_REC + 8
-GHOSTTRAIN_HP_OT6    = 3400
+GHOSTTRAIN_HP_OT6    = 2600
 MonsterProp:
         .incbin "monster_prop.dat", 0, GHOSTTRAIN_HP_AT
         .word   GHOSTTRAIN_HP_OT6                       ; $106 +$08 (was 1900)

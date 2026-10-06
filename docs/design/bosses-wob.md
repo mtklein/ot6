@@ -379,7 +379,7 @@ AirForce assembly carry — and `$01a` Doberman weak = **fire**.)
 
 ### 8. GhostTrain — the Phantom Train (Sabin, Cyan, Shadow)
 
-**Shields:** 4 (6 until #400) · **HP:** 3400 (vanilla 1900, #400) · **Weak:** fire, bolt, holy + bludgeoning ·
+**Shields:** 4 (6 until #400) · **HP:** 2600 (vanilla 1900, #400) · **Weak:** fire, bolt, holy + bludgeoning ·
 **absorbs poison.** (Decoded, not recalled: `$106` weak =
 **fire|bolt|holy** — `monster_prop.dat` +25 reads `$25` — and +23
 reads **`$08`, poison absorbed**; +24 is `$00`.)
@@ -387,12 +387,20 @@ reads **`$08`, poison absorbed**; +24 is `$00`.)
 - **Tuning (#400, 2026-10-06):** once SABIN's chips and SHADOW's throws
   spend their banked pips (#366), the vanilla 1900-HP train died before its
   sixth shield in most fights, so the break -- and Cyan's Cleave, which
-  needs it -- went unexercised.  Four shields over 3400 HP, measured from
-  the same 4 snapshots x 15 waits (45 distinct battle keys): the break
-  lands with HP left in 37 of 45 keys (48 of 60 fights) against 2 of 45
-  at six shields over 1900; deaths 14 either way; median kill frame 4755
-  against 5215; one key (be70) of 45 lost, which the six-shield train
-  also lost before #366.  Lab: build/attempts/wt/v026-route2/e400/.
+  needs it -- went unexercised.  Four shields over 2600 HP.  Measured on
+  two snapshot sets (4 boot shifts x 15 waits, 45 distinct battle keys
+  each; build/attempts/wt/v026-route2/e400/), breaks landing with HP left,
+  keys lost, deaths:
+
+  | train | v0.25 chain's snapshots | the re-cut chain's snapshots |
+  |---|---|---|
+  | 6 / 1900 | 2 keys, 0 lost, 14 deaths | 2 keys, 1 lost, 32 deaths |
+  | 4 / 2600 | 33 keys, 1 lost, 14 deaths | 26 keys, 2 lost, 39 deaths |
+  | 4 / 3400 | 37 keys, 1 lost, 14 deaths | 31 keys, 3 lost, 51 deaths |
+
+  2600 makes the break the usual win at the smaller cost in deaths and
+  losses; the fight is no longer than before (median kill frame 4572
+  against 4798).
 - **Telegraph:** the whistle sounds down the corridor → **Evil
   Toot**, a party-wide random status attack. Break the boiler before
   the move lands; Acid Rain between fuses keeps pressure on your
