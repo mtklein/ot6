@@ -37,7 +37,7 @@
 -- reveals HOLY) and Pummel (chips another, reveals OT6_BLUDG); after that
 -- all three attack with banked-boost Fights, healing under 50% from the
 -- ghost merchant's bag, reviving the fallen with Fenix Down and curing an
--- Imp with the bag's cure. The train killed before its sixth shield comes
+-- Imp with the bag's cure. The train killed before its last shield comes
 -- off is a win (docs/guidelines.md, #311), logged as a [tuning] line.
 --
 -- Win tail: victory scene -> the souls' station (Cyan's family) -> map 137
@@ -655,6 +655,16 @@ local function makePlan(actor)
       end
     end
   end
+  -- #403: a Muddled or Berserk SABIN gets no cure here.  No item in this
+  -- ROM removes either (item_prop: no record carries STATUS2 $20 or $10
+  -- with the remove flag).  The one other cure, an ally's plain Fight on a
+  -- Muddled SABIN, was tried and measured worse: a Fight's target select
+  -- opens on the monster side and RIGHT never crossed to the party there
+  -- (the menu sat at $38 while the train played on), both runs that tried
+  -- wiped where the same keys won without it, and the train's own hits
+  -- clear Muddle within a round anyway (be14: s00/20 at f1245, clear by
+  -- f2093; build/attempts/wt/v026-route2/e403/).  Berserk fights the train
+  -- on his own, which is what the plan wanted of him.
   local st1 = H.readByte(0x3EE4 + actor * 2)
   if (st1 & 0x04) ~= 0 and itemRow and battInvIdx(ANTIDOTE) then
     b68Log(string.format("cure e%d: ANTIDOTE (status=%02X) [%s]",
@@ -709,6 +719,15 @@ local function makePlan(actor)
       actor, item == TONIC and "TONIC" or "POTION", tgt, miss, partyLine()))
     return { kind = "item", item = item, target = tgt,
              row = cmdRowOf(actor, CMD_ITEM) }
+  end
+  -- #410: a player who knows the joke suplexes the train, and in OT6 that
+  -- wins (Ot6SuplexTrain): SABIN's first free turn is a Suplex whenever he
+  -- can pay for it.
+  if actor == sabinE and not imp and pMP(sabinE) >= (H.abilityCost(SUPLEX) or 13)
+     and H.readWord(MHP(gSlot)) > 0 then
+    b68Log(string.format("cast: SABIN Suplexes the train (the joke, #410; mp %d) trainHP=%d [%s]",
+      pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
+    return { kind = "blitz", skill = SUPLEX, boost = 0, row = cmdRowOf(actor, CMD_BLITZ) }
   end
   if actor == sabinE and mx > 0 and hp > 0 and hp * 20 < mx * sabinLimit then
     local p = healPlan(actor, mx - hp)
@@ -840,10 +859,16 @@ local function b68Button()
     b68.sideN = (b68.sideN or 0) + 1
     b68Log(string.format("side window $%02X open (actor=%d plan=%s, #%d this battle) -- B out",
       st, actor, plan.kind, b68.sideN))
-    if b68.sideN > 6 then
+    -- The bound, derived: this fighter presses no LEFT/RIGHT at the command
+    -- window.  A side window can open only from a direction held into the
+    -- battle (once) or a target steer's RIGHT that landed after its window
+    -- closed under it (at most once per RIGHT sent), so more openings than
+    -- RIGHTs + 1 means something else is pressing.
+    if b68.sideN > (b68.rightN or 0) + 1 then
       error(string.format("battle 68: the Row/Def. side window ($%02X) opened %d times " ..
-        "-- something keeps pressing LEFT/RIGHT on the command window (actor %d, plan %s)",
-        st, b68.sideN, actor, plan.kind), 0)
+        "against %d target-steer RIGHT(s) + 1 -- something presses LEFT/RIGHT on the " ..
+        "command window (actor %d, plan %s)", st, b68.sideN, b68.rightN or 0, actor,
+        plan.kind), 0)
     end
     return { "b" }
   end
@@ -893,7 +918,17 @@ local function b68Button()
     end
     local chars = H.readByte(TGTCHARS)
     local mons = H.readByte(TGTMONS)
-    if mons ~= 0 then return { "right" } end  -- off the monster side
+    if mons ~= 0 then                         -- off the monster side
+      b68.rightN = (b68.rightN or 0) + 1      -- a RIGHT that could land on $05
+      plan.sideStall = (plan.sideStall or 0) + 1
+      if plan.sideStall > 8 then
+        b68Log(string.format("target steer never left the monster side in %d RIGHTs " ..
+          "(plan %s) -- backing out", plan.sideStall, plan.kind))
+        b68.plan, b68.planActor = nil, nil
+        return { "b" }
+      end
+      return { "right" }
+    end
     local wantMask = 1 << plan.target
     if chars == wantMask then
       if plan.item == FENIX_DOWN then b68Watch.fenix(actor, plan.target) end
@@ -992,12 +1027,14 @@ local function b68Observe()
     b68.brokeAt = H.frame
     b68.brokeHP = hp
     b68Log(string.format(
-      "*** BREAK COMPLETE at f%d: six shields off with the train at %d of " ..
-      "1900 HP (casts=%d)", H.frame, hp, b68.casts))
+      "*** BREAK COMPLETE at f%d: all %d shields off with the train at %d of " ..
+      "%d HP (casts=%d)", H.frame, b68.maxSH or -1, hp, b68.maxHP or -1, b68.casts))
     H.screenshot("train_b68_broken")
   end
   if hp == 0 and b68.killedAt == nil and b68.lastHP and b68.lastHP > 0 then
     b68.killedAt = H.frame
+    b68.killSkill = H.readByte(0x3410)
+    b68.killFrom = b68.lastHP
     b68.killParty = partyLine()
     b68Log(string.format("train at 0 HP at f%d (brokeAt=%s)", H.frame,
       tostring(b68.brokeAt)))
@@ -1080,6 +1117,7 @@ end
 -- battle seed $be and the battle group ($11E0), the lib's first-battle key
 -- shape -- so a set of runs can count distinct fights rather than runs.
 local b68won = false
+local b68Req = nil                        -- the train_b68_entry capture
 local b68Arm = false
 local function b68Won() return b68won end
 local function b68KeyWatch()
@@ -1105,6 +1143,7 @@ local function b68Fight()
       b68.killParty, b68.wiped = nil, false
       b68.holyAt, b68.bludgAt, b68.chipAt, b68.castAt = nil, nil, {}, {}
       b68.chipWild, b68.sideN, b68.wildAt, b68.sabinCmdAt = {}, 0, nil, nil
+      b68.rightN = 0
       b68.holyBy, b68.bludgBy = nil, nil
       b68.shieldsOff = 0
       b68.holyRevealed, b68.bludgRevealed = false, false
@@ -1157,10 +1196,23 @@ local function b68Fight()
         gSlot, sabinE, lv, pMP(sabinE), H.readWord(0x3C30 + sabinE * 2),
         cyanE, shadowE, invCount(TONIC), invCount(POTION), gil()))
       H.assertEq(lv >= 6, true, "SABIN level 6+ -- AuraBolt learned")
-      -- the authored row, live: the runtime proof of GhostTrain's 6-shield
-      -- OT6_BLUDG entry in Ot6ShieldTbl
-      H.assertEq(H.readByte(SH(gSlot)), 6, "GHOSTTRAIN seeds 6 shields")
-      H.assertEq(H.readByte(SMX(gSlot)), 6, "GHOSTTRAIN max shields 6")
+      -- the authored row and the record, read from the ROM (#400 retunes
+      -- them): Ot6ShieldTbl's (species word, shields, classes) record and
+      -- MonsterProp's max HP word (+$08)
+      local t = H.sym("Ot6ShieldTbl") & 0x3FFFFF
+      b68.maxSH = nil
+      for i = 0, 1023 do
+        local id = H.readRomWord(t + i * 4)
+        if id == 0xFFFF then break end
+        if id == GHOSTTRAIN then b68.maxSH = H.readRomByte(t + i * 4 + 2); break end
+      end
+      b68.maxHP = H.readRomWord((H.sym("MonsterProp") & 0x3FFFFF) + GHOSTTRAIN * 32 + 8)
+      H.log(string.format("[b68] the train's record: %s shields (Ot6ShieldTbl), %d HP " ..
+        "(MonsterProp), %d HP live", tostring(b68.maxSH), b68.maxHP, H.readWord(MHP(gSlot))))
+      H.assertEq(b68.maxSH ~= nil, true, "GHOSTTRAIN has an authored Ot6ShieldTbl row")
+      H.assertEq(H.readByte(SH(gSlot)), b68.maxSH, "GHOSTTRAIN seeds its authored shields")
+      H.assertEq(H.readByte(SMX(gSlot)), b68.maxSH, "GHOSTTRAIN's max shields are its authored count")
+      H.assertEq(H.readWord(MHP(gSlot)), b68.maxHP, "GHOSTTRAIN opens at its record's max HP")
       H.assertEq(H.readByte(WKC(gSlot)), OT6_BLUDG,
         "GHOSTTRAIN's class row is OT6_BLUDG")
       H.assertEq(H.readByte(WKE(gSlot)) & HOLY, HOLY,
@@ -1257,15 +1309,26 @@ local function b68Fight()
     H.call(function()
       if b68.killedAt == nil then
         error(string.format("battle 68 ended at f%d with a member standing " ..
-          "and the train never seen at 0 HP (last train HP %s, %d of 6 " ..
+          "and the train never seen at 0 HP (last train HP %s, %d of %d " ..
           "shields off) -- neither a win nor a wipe this driver can read [%s]",
-          H.frame, tostring(b68.lastHP), b68.shieldsOff or 0, partyLine()), 0)
+          H.frame, tostring(b68.lastHP), b68.shieldsOff or 0, b68.maxSH or -1, partyLine()), 0)
       end
       H.assertEq(inParty(3), true, "SHADOW aboard after battle 68's win (the leave roll is a no-op by design)")
       b68won = true
       local off = b68.shieldsOff or 0
-      H.log(string.format("[b68] WON: %d of 6 shields off, killedAt=f%s " ..
-        "brokeAt=%s casts=%d chips=%d holy=%s bludg=%s", off,
+      local mx = b68.maxSH or 6
+      -- #410: a Suplex SABIN cast before the kill is the kill, in one hit
+      -- (Ot6SuplexTrain deals the train's whole current HP).
+      local sup = b68.castAt[SUPLEX]
+      if sup and b68.killedAt and sup <= b68.killedAt then
+        H.log(string.format("[b68] the joke: Suplex cast f%d, the train %s -> 0 at f%d by attack $%02X",
+          sup, tostring(b68.killFrom), b68.killedAt, b68.killSkill or -1))
+        H.assertEq(b68.killSkill, SUPLEX, string.format("the train's last HP went to the " ..
+          "Suplex cast at f%d (the killing hit read attack $%02X, the train from %s HP)", sup,
+          b68.killSkill or -1, tostring(b68.killFrom)))
+      end
+      H.log(string.format("[b68] WON: %d of %d shields off, killedAt=f%s " ..
+        "brokeAt=%s casts=%d chips=%d holy=%s bludg=%s", off, mx,
         tostring(b68.killedAt), tostring(b68.brokeAt), b68.casts, #b68.chips,
         tostring(b68.holyRevealed), tostring(b68.bludgRevealed)))
       -- Each reveal is tied to the chip its skill landed, on any win: the
@@ -1322,8 +1385,8 @@ local function b68Fight()
             "%s: a %s the plan never cast came from a SABIN Muddled or Berserk since his " ..
             "last command (chip f%d)", what, name, chip))
           H.assertEq(at ~= nil and math.abs(at - chip) <= REVEAL_SLACK, true,
-            string.format("%d of 6 shields off: %s revealed by the %s that " ..
-            "chipped (engine-chosen; chip f%d, reveal f%s, slack %d)", off,
+            string.format("%d of %d shields off: %s revealed by the %s that " ..
+            "chipped (engine-chosen; chip f%d, reveal f%s, slack %d)", off, mx,
             what, name, chip, tostring(at), REVEAL_SLACK))
           return
         end
@@ -1339,30 +1402,30 @@ local function b68Fight()
         H.log(string.format("[b68] %s: %s cast f%s, its first chip f%s, " ..
           "revealed f%s", what, name, tostring(cast), tostring(chip),
           tostring(at)))
-        H.assertEq(ok, true, string.format("%d of 6 shields off: %s revealed " ..
+        H.assertEq(ok, true, string.format("%d of %d shields off: %s revealed " ..
           "by the %s that chipped (cast f%s, chip f%s, reveal f%s, slack %d)",
-          off, what, name, tostring(cast), tostring(chip), tostring(at),
+          off, mx, what, name, tostring(cast), tostring(chip), tostring(at),
           REVEAL_SLACK))
       end
       tied("HOLY", b68.holyAt, AURABOLT, "AuraBolt ($5E)", b68.holyBy)
       tied("OT6_BLUDG", b68.bludgAt, PUMMEL, "Pummel ($5D)", b68.bludgBy)
-      if off < 6 then
-        H.log(string.format("[tuning] battle 68 won with %d of 6 shields off " ..
+      if off < mx then
+        H.log(string.format("[tuning] battle 68 won with %d of %d shields off " ..
           "-- the train died before its break (killedAt=f%s casts=%d " ..
-          "chips=%d holy=%s bludg=%s) [party at the kill: %s]", off,
+          "chips=%d holy=%s bludg=%s) [party at the kill: %s]", off, mx,
           tostring(b68.killedAt), b68.casts, #b68.chips,
           tostring(b68.holyRevealed), tostring(b68.bludgRevealed),
           tostring(b68.killParty)))
         return
       end
       H.log(string.format(
-        "[b68] break margin: train at %s of 1900 HP when the sixth shield " ..
+        "[b68] break margin: train at %s of %d HP when the last shield " ..
         "came off, dead %s frames later (brokeAt=%s killedAt=%s)",
-        tostring(b68.brokeHP), b68.brokeAt and b68.killedAt
+        tostring(b68.brokeHP), b68.maxHP or -1, b68.brokeAt and b68.killedAt
           and tostring(b68.killedAt - b68.brokeAt) or "?",
         tostring(b68.brokeAt), tostring(b68.killedAt)))
       H.assertEq(#b68.chips >= 2, true,
-        "a 6/6 break: at least two shield chips landed")
+        "a full break: at least two shield chips landed")
     end),
     }),
   }, {})
@@ -1664,6 +1727,10 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
       invCount(FENIX_DOWN), gil()))
   end),
 
+  -- train_b68_entry: the corridor before the smokestack switch, one walk
+  -- from battle 68 (battle_suplextrain boots it, #410).  Captured with no
+  -- frames spent, emitted after train_done.
+  H.call(function() b68Req = H.requestSaveState() end),
   b68KeyWatch(),
   b68Fight(),
   H.call(function()
@@ -1727,10 +1794,14 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     H.screenshot("train_done")
   end),
   H.saveState("train_done.mss"),
+  H.call(function()
+    H.checkReq(b68Req, "train_b68_entry capture")
+    H.emitBlob("train_b68_entry.mss", b68Req.blob)
+  end),
   H.logStep(function()
     return string.format("train_done generated at frame %d world (%d,%d) -- " ..
-      "battle 68 won with %d of 6 shields off (the [b68] WON line; a " ..
+      "battle 68 won with %d of %d shields off (the [b68] WON line; a " ..
       "[tuning] line when the train died before its break)",
-      H.frame, H.worldX(), H.worldY(), b68.shieldsOff or 0)
+      H.frame, H.worldX(), H.worldY(), b68.shieldsOff or 0, b68.maxSH or -1)
   end),
 })

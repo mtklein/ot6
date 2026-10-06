@@ -223,12 +223,15 @@ STATES = [
       checkpoint="camp-escaped-v1"),
     # gen_sabin_train: the Phantom Train, boarding to the Ghost Train's fall
     # -- the maze decoded and driven, and battle 68 fought with real Blitz
-    # inputs: the 6-shield OT6_BLUDG row chip-proven at runtime.  Ends on the
+    # inputs: the authored OT6_BLUDG row (4 shields, #400) chip-proven at runtime.  Ends on the
     # world map at (178,93) with $003A/$003B set.
     # timeout=1800: the #84 wave made the long runs longer (pickups, care
     # stops, fought detour encounters); both of these blew the default cap
     # with code=255 twice, at -j4 and -j2, once the wave landed.
-    S("train_done", gen="gen_sabin_train", prev="forest_done", timeout=1800),
+    # train_b68_entry: the corridor before the smokestack, one walk from
+    # battle 68 (battle_suplextrain, #410).
+    S("train_done", gen="gen_sabin_train", prev="forest_done", timeout=1800,
+      also=["train_b68_entry"]),
     # gen_sabin_falls: Baren Falls -- the jump, battle 18 mid-fall (RIZOPAS
     # surfaces in slot 5 off the piranhas' death script), SHADOW's exit, GAU
     # named on the Veldt shore.

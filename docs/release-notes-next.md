@@ -8,6 +8,13 @@ release's notes.
 
 ## What's changed
 
+**The Phantom Train: four shields, more HP -- and yes, Suplex.** The
+train now carries four shields instead of six over more HP, so a party
+that spends its Boost Points can break it (and give Cyan his first Cleave)
+before it falls. And Sabin's Suplex on the train wins the fight on the
+spot, the classic FF6 joke made true; it works on that train and nothing
+else.
+
 **A bigger boosted hit is never a smaller one.** A Boost Point's doubling
 used to roll over to a lower number when a very strong attack doubled past
 the game's internal limit, so against a heavily armored or Shelled enemy a

@@ -670,8 +670,57 @@ done:   rtl
         jsr     Ot6ClassChip
         jsr     Ot6AssassinateGate      ; ot6: shadow's break is his divine
         jsr     Ot6ShieldedDmg  ; ot6: sturdiness while shields hold
+        jsr     Ot6SuplexTrain  ; ot6: Sabin suplexes a train (#410)
         plp
         jmp     Ot6BrokenDmg    ; tail-call: its rtl returns to vanilla
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ the joke, made true: a Suplex that lands on the Ghost Train wins (#410) ]
+
+; FF6's best-known gag is Sabin suplexing the Phantom Train.  In OT6 it ends
+; the fight: a landed hit of attack $5f (Suplex; $3410, the attack the
+; action's target init recorded, InitTarget_02) on the Ghost Train
+; (species $0106, OT6_SPECIES) by a character deals the train's whole
+; current HP.  Nothing else changes: any other attack on the train, and a
+; Suplex on any other monster, pass through untouched.  The kill is its own
+; proc so the suites can watch it fire (battle_suplex, battle_suplextrain).
+; a8/i16 (the join pinned i16), x = attacker, y = target, $f0 = 16-bit
+; damage.  preserves x/y.
+
+.proc Ot6SuplexTrain
+        .a8
+        .i16
+        txa                     ; attacker entity offset, width-neutral test
+        cmp     #$08
+        bcs     done            ; a monster's attack: never
+        tya
+        cmp     #$08
+        bcc     done            ; a character target: never
+        lda     $3410
+        cmp     #$5f            ; ATTACK::SUPLEX
+        bne     done
+        lda     $f2
+        lsr
+        bcs     done            ; a resolved heal: never
+        longa
+        lda     OT6_SPECIES-8,y
+        cmp     #$0106          ; MONSTER::GHOSTTRAIN
+        shorta
+        bne     done
+        jmp     Ot6SuplexTrainKill
+done:   rts
+.endproc
+
+.proc Ot6SuplexTrainKill
+        .a8
+        .i16
+        longa
+        lda     $3bf4,y         ; the train's current HP
+        sta     $f0             ;   is the hit's damage
+        shorta
+        rts
 .endproc
 
 ; ------------------------------------------------------------------------------

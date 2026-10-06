@@ -1706,7 +1706,7 @@ Ot6ShieldTbl:
         .word   $001a
         .byte   2, OT6_PIERCE   ; doberman
         .word   $0106
-        .byte   6, OT6_BLUDG    ; ghosttrain
+        .byte   4, OT6_BLUDG    ; ghosttrain: 4 (was 6), #400
         .word   $0155
         .byte   4, OT6_SLASH|OT6_BLUDG  ; rizopas
         .word   $0154

@@ -5982,6 +5982,23 @@ function M.equipEsper(pos, esperIdx, opts)
         error(string.format("%s: stone $%02X is worn by char %d, who is not " ..
           "in the active party; this menu cannot free it", tag, esperIdx, owner), 0)
       end
+      -- The Skills menu will not open for a member whose status1 holds
+      -- $C2 (wound, Petrify, Zombie): field_menu.asm:740-752, @1e9c's
+      -- `lda a:$0014,x / and #$c2 / bne @1eb1`.  So neither the stone's
+      -- owner (to free it) nor the member receiving it can be reached
+      -- there (#406: TERRA, SHIVA's owner, down after IAF battle 1, gave
+      -- "SHIVA -> EDGAR (free): skills submenu: 4 A presses on the target
+      -- were not taken", build/attempts/wt/v026-driver2/402/ab/new_s28.log.gz).
+      -- Say which by name; the caller raises or cures them first.
+      for _, who in ipairs({ target, owner ~= target and owner or nil }) do
+        local st1 = M.charStatus1(who)
+        if (st1 & 0xC2) ~= 0 then
+          error(string.format("%s: char %d (%s of stone $%02X) has status1 $%02X "
+            .. "(wound/Petrify/Zombie), which the Skills menu refuses -- raise or cure "
+            .. "them before moving the stone", tag, who, who == target and "receiving" or "owner",
+            esperIdx, st1), 0)
+        end
+      end
     end),
     M.cond(function() return owner ~= nil and owner == target end, {
       M.logStep(function()
@@ -6364,7 +6381,144 @@ function M.equipKit(charId, items, opts)
   steps[#steps + 1] = M.call(function()
     M.log(string.format("[%s] char=%d after=%s", tag, charId, six()))
   end)
+  -- opts.absorbs (#404): the species of the fights ahead (a list of
+  -- species ids, or a function returning one).  The Relic menu re-equips
+  -- by Optimum, element-blind, whenever a two-weapon relic is involved; a
+  -- hand it (or the kit) left holding a weapon one of them absorbs is
+  -- re-armed here, from the ROM, before the session counts as done.
+  if opts.absorbs then
+    steps[#steps + 1] = M.absorbSafeArms({ charId }, opts.absorbs, { tag = tag .. " (absorb-safe arms)" })
+  end
   return M.seqStep(steps)
+end
+
+-- M.bagWeapons(c): the weapons in the bag ($1869 ids with a count), each
+-- once, strongest first by the ROM's power byte (ItemProp +$14; the
+-- record's type +$00 low bits = 1 is a weapon); with a character id, only
+-- those its actor can equip (ItemProp +$01, a 16-bit mask by actor --
+-- the list the Equip menu itself filters by).
+function M.bagWeapons(c)
+  local seen, out = {}, {}
+  local ip = M.sym("ItemProp") & 0x3FFFFF
+  for i = 0, 255 do
+    local id = M.readByte(0x1869 + i)
+    if id ~= 0xFF and M.readByte(0x1969 + i) > 0 and not seen[id] then
+      local t = M.readRomByte(ip + id * 30)
+      local wears = c == nil
+        if not wears then
+          wears = (M.readRomWord(ip + id * 30 + 1) >> M.charActor(c)) & 1 == 1
+        end
+      if (t & 0x80) == 0 and (t & 0x07) == 1 and wears then
+        seen[id] = true
+        out[#out + 1] = id
+      end
+    end
+  end
+  table.sort(out, function(a, b)
+    local pa, pb = M.itemPower(a), M.itemPower(b)
+    if pa ~= pb then return pa > pb end
+    return a < b
+  end)
+  return out
+end
+
+-- M.poolSpecies(group): every species the encounter group can deal, as the
+-- { {slot=, species=}, ... } list M.absorbClashesFor reads (#404).
+function M.poolSpecies(group)
+  local out, seen = {}, {}
+  local pool = M.encounterPool(group)
+  for slot = 1, 4 do
+    for _, f in ipairs(pool[slot].formations) do
+      for _, sp in ipairs(f.species) do
+        if not seen[sp] then seen[sp] = true; out[#out + 1] = { slot = #out, species = sp } end
+      end
+    end
+  end
+  return out
+end
+
+-- M.absorbSafeArms(chars, species, opts): for each listed character (char
+-- ids; nil = the active party), each hand whose weapon one of `species`
+-- ABSORBS (M.absorbClashesFor, the absorb guard's own reads) takes the
+-- strongest bag weapon none of them absorbs (M.bagWeapons, by the ROM's
+-- power byte; what the hand can wear is the game's list, equipKit's
+-- ladder).  Then it asserts no listed hand is left holding an absorbed
+-- weapon.  `species` is a list of species ids or {slot=,species=} records,
+-- or a function returning one (read when the step runs).  A party with no
+-- clash opens no menu.
+function M.absorbSafeArms(chars, species, opts)
+  opts = opts or {}
+  local tag = opts.tag or "absorb-safe arms"
+  local inner
+  local function norm()
+    local sp = type(species) == "function" and species() or species
+    local out = {}
+    for i, v in ipairs(sp) do
+      out[#out + 1] = type(v) == "table" and v or { slot = i - 1, species = v }
+    end
+    return out
+  end
+  local function mine(w)
+    if chars == nil then return true end
+    for _, c in ipairs(chars) do if c == w.char then return true end end
+    return false
+  end
+  local function clashes(sp)
+    local out = {}
+    for _, c in ipairs(M.absorbClashesFor(M.partyWeapons(), sp)) do
+      if mine(c) then out[#out + 1] = c end
+    end
+    return out
+  end
+  local function build()
+    local sp = norm()
+    local steps = {}
+    for _, c in ipairs(clashes(sp)) do
+      local slot = c.hand == "R" and 0 or 1
+      local items = {}
+      local bag = M.bagWeapons(c.char)
+      for _, it in ipairs(bag) do
+        if #M.absorbClashesFor({ { char = c.char, hand = c.hand, item = it } }, sp) == 0 then
+          items[#items + 1] = { slot, it }
+        end
+      end
+      M.log(string.format("[%s] %s -- re-arming from %d bag weapon(s), strongest first", tag,
+        M.clashStr(c), #items))
+      if #items > 0 then
+        steps[#steps + 1] = M.equipKit(c.char, items,
+          { tag = string.format("%s: char %d %s-hand", tag, c.char, c.hand), ladder = true })
+        -- the hand holds the best absorb-safe weapon: the strongest by the
+        -- ROM's power byte among every bag weapon this actor can equip that
+        -- none of the fights ahead absorbs (a ladder that stopped early, or
+        -- a pick by list order, fails here)
+        local best, cc, hand = items[1][2], c.char, slot
+        for _, it in ipairs(items) do
+          if M.itemPower(it[2]) > M.itemPower(best) then best = it[2] end
+        end
+        steps[#steps + 1] = M.call(function()
+          local got = M.readByte(0x1600 + 37 * cc + 0x1F + hand)
+          M.assertEq(M.itemPower(got) >= M.itemPower(best), true, string.format(
+            "%s: char %d's %s-hand took the best absorb-safe weapon ($%02X power %d; "
+            .. "the best was $%02X power %d)", tag, cc, hand == 0 and "R" or "L", got,
+            M.itemPower(got), best, M.itemPower(best)))
+        end)
+      end
+    end
+    steps[#steps + 1] = M.call(function()
+      local left, lines = clashes(sp), {}
+      for _, c in ipairs(left) do lines[#lines + 1] = M.clashStr(c) end
+      M.assertEq(#left, 0, tag .. ": no hand holds a weapon the fights ahead absorb"
+        .. (#left > 0 and (": " .. table.concat(lines, "; ")) or ""))
+    end)
+    return M.seqStep(steps)
+  end
+  return {
+    tick = function(self)
+      if inner == nil then inner = build() end
+      return inner:tick()
+    end,
+    reset = function(self) inner = nil end,
+  }
 end
 
 -- ---- relics: who wears which ---------------------------------------------
