@@ -271,12 +271,11 @@ local function fightButton()
     -- UP and DOWN only: LEFT/RIGHT on the command window open the Row and
     -- Def. side windows ($24/$27), which this fighter would then sit in
     -- (#366, gen_sabin_train's b68Button); a row never reached fails by
-    -- name (12 pulses unmoved) instead of running to the frame cap
-    if plan.lastCur == cur then plan.rowStall = (plan.rowStall or 0) + 1
-    else plan.rowStall, plan.lastCur = 0, cur end
+    -- name (12 steering pulses on one plan) instead of running to the frame cap
+    plan.rowStall = (plan.rowStall or 0) + 1
     if plan.rowStall > 12 then
       error(string.format("fight: the command steer is stuck -- actor %d's cursor " ..
-        "sat on row %d for %d pulses wanting row %d", actor, cur, plan.rowStall, plan.row), 0)
+        "on row %d after %d steering pulses wanting row %d", actor, cur, plan.rowStall, plan.row), 0)
     end
     return { cur < plan.row and "down" or "up" }
   end
