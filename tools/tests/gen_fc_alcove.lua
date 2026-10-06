@@ -67,7 +67,10 @@ local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 en
 -- through 36 Potions, 11 Tonics and a Fenix Down (f60848).
 --
 -- The first fix (19a6de87) gave TERRA a Bolt line and was inert: at this
--- checkpoint NOBODY knows Bolt.  The learned table ($1A6E + 54*char,
+-- checkpoint then NOBODY knew Bolt.  (Since #412 gen_fc_landing puts RAMUH
+-- on TERRA before the IAF, so she arrives here with Bolt; the line below
+-- casts it, the Ninja being bolt-weak, and keeps Fire for a TERRA without
+-- the stone.)  What the v0.17 state showed:  The learned table ($1A6E + 54*char,
 -- $FF = learned) read off the regenerated alcove state shows TERRA (L25,
 -- 228 MP, SHIVA worn) with $00 Fire, $04 Drain and $05 Fire 2 and no
 -- $02; LOCKE, SHADOW and EDGAR know nothing in $00-$17.  spellCell finds
@@ -89,8 +92,9 @@ local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 en
 -- live monster is Vanished (or Imaged), TERRA casts Fire, boosted when her
 -- bank allows, so the fold casts Fire 2 (#305: no one learns Fire 2 any
 -- more; the plan-time absorb guard still refuses it on a fire absorber);
--- otherwise the lookup is empty and she Fights as before.
-local FIRE = 0x00
+-- otherwise the lookup is empty and she Fights as before.  With RAMUH worn
+-- (#412) the cast is Bolt, which the Ninja ($003) is weak to.
+local FIRE, BOLT, RAMUH_ESPER = 0x00, 0x02, 0x00
 local dodgeSaid = nil
 local MAGIC = setmetatable({}, { __index = function(_, id)
   if id ~= TERRA then return nil end
@@ -98,9 +102,11 @@ local MAGIC = setmetatable({}, { __index = function(_, id)
   if s == nil then dodgeSaid = nil; return nil end
   if dodgeSaid ~= s then
     dodgeSaid = s
-    H.log(string.format("[fc] slot %d wears %s (f%d): TERRA's attack turns go to Fire (boosted: Fire 2)", s, what, H.frame))
+    H.log(string.format("[fc] slot %d wears %s (f%d): TERRA's attack turns go to %s", s, what, H.frame,
+      H.readByte(0x1600 + 37 * TERRA + 0x1E) == RAMUH_ESPER and "Bolt (RAMUH worn; boosted: Bolt 2)"
+        or "Fire (boosted: Fire 2)"))
   end
-  return { spell = FIRE }
+  return { spell = H.readByte(0x1600 + 37 * TERRA + 0x1E) == RAMUH_ESPER and BOLT or FIRE }
 end })
 local FIGHT = { tactical = true, boost = true, bank = 2, items = true,
                 healPercent = 50, magic = MAGIC }
