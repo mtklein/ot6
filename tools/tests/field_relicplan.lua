@@ -19,8 +19,9 @@
 --   4. the Exp. Egg, under each set, read against the same threats' plan
 --      with opts.egg = false (the slots before step 3b): on the member
 --      furthest behind on levels when one is behind, only into a free slot
---      or over a guard or spare ward that adds no threatened status to its
---      wearer -- never over an acting relic -- and, arming for a boss
+--      or over the lowest-ranked relic there that no threat needs (a spare
+--      ward, a guard adding no threatened status, then an acting relic by
+--      rank) -- never a two-weapon relic or a ward -- and, arming for a boss
 --      (Dullahan's threats carry boss = true), not at all while the bag
 --      holds another relic the member can wear.
 -- The negative controls (a rule switched off, each turning this red) are
@@ -73,11 +74,29 @@ local function covers(id, threats)
   return (prop(id, 6) & (threats.s1 or 0)) | (prop(id, 7) & (threats.s2 or 0))
 end
 local checked = 0
+-- the rank of what a member's slot holds in a plan when the Egg may take it
+-- (-1 empty; a spare ward 0, a guard adding no threatened status over the
+-- other slot 1, an acting relic its rank), nil when it is threat-critical
+-- (a two-weapon relic, a ward, a guard adding a threatened status) or
+-- unranked
+local function softRank(plan, ch, s, threats)
+  local id = planned(plan, ch, s)
+  -- a slot step 4 filled with a leftover was open when step 3b ran
+  if id == nil or id == 0xFF or filled(plan, ch, s) then return -1 end
+  local cl = id ~= EGG and H.relicClass(id, threats) or nil
+  if cl == nil or cl.hands or cl.aff == "ward" then return nil end
+  if cl.aff == "guard" then
+    local other = planned(plan, ch, s == 4 and 5 or 4)
+    if (covers(id, threats) & ~(other ~= nil and other ~= 0xFF and covers(other, threats) or 0)) ~= 0 then
+      return nil
+    end
+  end
+  return cl.rank
+end
 
 -- the Egg's promises under one plan, read against the same threats' plan
 -- with the Egg left out (opts.egg = false: what the rule puts in each slot
--- before step 3b; the fixture's SETZER already wears the Egg, so what he
--- wears is no baseline)
+-- before step 3b; a member already wearing the Egg is no baseline)
 local function eggChecks(plan, plan0, threats, what)
   local top, low = 0, nil
   for _, p in ipairs(MEMBERS) do if level(p[1]) > top then top = level(p[1]) end end
@@ -102,12 +121,23 @@ local function eggChecks(plan, plan0, threats, what)
         H.assertEq(level(p[1]) < top, true, string.format(
           "%s: the Egg displaced a relic only on a member behind on levels (%s L%d; the party's highest L%d)",
           what, p[2], level(p[1]), top))
-        -- never over an acting relic (the coordinator's call on the review
-        -- of f8f9ad66): only a guard or a spare ward gives its slot up
+        -- the lowest-ranked relic no threat needs (#351, the owner's
+        -- ranking): never a two-weapon relic, a ward or an unranked relic,
+        -- and no slot on a member as far behind held a lower-ranked one
         local bc = H.relicClass(base, threats)
-        H.assertEq(bc ~= nil and (bc.aff == "guard" or bc.aff == "spare"), true, string.format(
-          "%s: the Egg displaced %s's $%02X, a guard or a spare (not an acting relic: %s)", what, p[2], base,
+        H.assertEq(bc ~= nil and not bc.hands and bc.aff ~= "ward", true, string.format(
+          "%s: the Egg displaced %s's $%02X, which no threat needs (%s)", what, p[2], base,
           bc and tostring(bc.aff) or "unranked"))
+        for _, q in ipairs(MEMBERS) do
+          if level(q[1]) == level(p[1]) and wears(q[1], EGG) then
+            for s2 = 4, 5 do
+              local r = softRank(plan0, q[1], s2, threats)
+              H.assertEq(r == nil or r >= bc.rank, true, string.format(
+                "%s: the Egg took %s's $%02X (rank %d), the lowest-ranked relic no threat needs on a member "
+                .. "as far behind (%s's slot %d ranks %s)", what, p[2], base, bc.rank, q[2], s2, tostring(r)))
+            end
+          end
+        end
         H.assertEq(threats.boss == true, false, string.format(
           "%s: no Egg swap when arming for a boss (%s's slot %d, $%02X)", what, p[2], s, base))
         checked = checked + 1
@@ -132,24 +162,22 @@ local function eggChecks(plan, plan0, threats, what)
     end
   end
   if low ~= nil and owned(function(id) return id == EGG end) then
-    local on = planned(plan, low[1], 4) == EGG or planned(plan, low[1], 5) == EGG
     -- the lowest member has a slot the Egg may take in the Egg-less plan:
-    -- empty, the Egg itself (step 4 kept it), or a guard or spare that adds
-    -- no threatened status over its other slot
+    -- empty, the Egg itself (step 4 kept it), or a relic no threat needs
     local open = false
     for s = 4, 5 do
       local id = planned(plan0, low[1], s)
-      local other = planned(plan0, low[1], s == 4 and 5 or 4)
-      local cl = id ~= 0xFF and H.relicClass(id, threats) or nil
-      if id == 0xFF or id == EGG then open = true
-      elseif cl ~= nil and (cl.aff == "guard" or cl.aff == "spare")
-         and (covers(id, threats) & ~(other ~= 0xFF and covers(other, threats) or 0)) == 0 then
-        open = true
+      if id == EGG or softRank(plan0, low[1], s, threats) ~= nil then open = true end
+    end
+    local who = {}
+    for _, p in ipairs(MEMBERS) do
+      if planned(plan, p[1], 4) == EGG or planned(plan, p[1], 5) == EGG then
+        who[#who + 1] = string.format("%s L%d", p[2], level(p[1]))
       end
     end
-    H.log(string.format("[relicplan] %s: the Egg %s %s (L%d, behind the party's L%d)%s", what,
-      on and "is planned on" or "could not go on", low[2], level(low[1]), top,
-      open and "" or "; every slot holds something it may not displace"))
+    H.log(string.format("[relicplan] %s: the Egg is planned on %s (the furthest behind: %s L%d, the party's L%d)%s",
+      what, #who > 0 and table.concat(who, ", ") or "nobody", low[2], level(low[1]), top,
+      open and "" or "; every slot of theirs holds something it may not displace"))
     if open and not threats.boss then
       local any = false
       for _, p in ipairs(MEMBERS) do
