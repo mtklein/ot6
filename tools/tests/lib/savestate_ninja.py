@@ -630,6 +630,25 @@ def quick_affected(states):
     return out & (set(by) | {a for e in states for a in (e.get("also") or [])})
 
 
+_quick_copied = set()
+
+
+def quick_copy_edge(w, name):
+    """quick_<name> as a plain copy of <name>, once: for a state whose
+    quick copy is its real one (no cut in its ancestry), which a quick run
+    still boots by the quick_ name, since OT6_STACK=quick_ prefixes every
+    .mss the script names."""
+    if name in _quick_copied:
+        return
+    _quick_copied.add(name)
+    src = f"build/states/{name}"
+    w(f"build build/states/{QUICK}{name}.mss build/states/{QUICK}{name}.mss.lua "
+      f"build/states/{QUICK}{name}.stamp: quick_copy {src}.mss "
+      f"{src}.mss.lua {src}.stamp")
+    w(f"  state = {QUICK}{name}")
+    w(f"  src = {src}")
+
+
 def emit_quick_edges(w, states, root, copy_if_changed_from, side_pool=None):
     """The quick_ copies (see QUICK): a generate edge per affected entry,
     a cut booting the tracked checkpoint, and a plain copy of each
@@ -644,20 +663,12 @@ def emit_quick_edges(w, states, root, copy_if_changed_from, side_pool=None):
       "cp $src.stamp build/states/$state.stamp")
     w("  description = quick copy $state")
     w("")
-    copied = set()
     for e in states:
         if e["state"] not in affected:
             continue
         p = e.get("prev")
-        if p and not e.get("checkpoint") and owner[p] not in affected \
-                and p not in copied:
-            copied.add(p)
-            src = f"build/states/{p}"
-            w(f"build build/states/{QUICK}{p}.mss build/states/{QUICK}{p}.mss.lua "
-              f"build/states/{QUICK}{p}.stamp: quick_copy {src}.mss "
-              f"{src}.mss.lua {src}.stamp")
-            w(f"  state = {QUICK}{p}")
-            w(f"  src = {src}")
+        if p and not e.get("checkpoint") and owner[p] not in affected:
+            quick_copy_edge(w, p)
     for e in states:
         s, gen = e["state"], e["gen"]
         if s not in affected:

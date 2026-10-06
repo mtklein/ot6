@@ -63,8 +63,13 @@ path: after a ROM change, an emulator pin change or a `tools/tests/replay.txt`
 bump, `ninja` replays it once, from power-on, with the suites, the branches
 and the checks running beside it. Everything else that runs an emulator is
 in the `side` pool, one short of the machine's emulator slots (below), so
-the line's next run never waits for a `-j` slot or an emulator slot behind
-it (run plain `ninja`, whose default `-j` is cores + 2). A
+side work in this build cannot take the slot the line's next run needs (run
+plain `ninja`, whose default `-j` is cores + 2). That holds only within one
+build: the slots are machine-wide, so another tree's build, a lab, or this
+build's own emulator-running checks outside the pool (checkpoint_negatives,
+retry_negative, instruments) can still hold one; and the pool's depth is
+read from `~/.config/ot6/emulator-slots` (else the CPU count) when
+`configure.py` runs, so a change to that file re-configures. A
 generator edit replays that leg and every run its new bytes reach; a
 library edit (`tools/tests/lib/*.lua`) replays nothing and re-runs the
 suites (provenance drift, docs/TESTING.md). `ninja chain` is an alias for
@@ -105,9 +110,14 @@ shows a material change:
     python3 tools/tests/lib/checkpoint_drift.py --recut <key>...
 
 `--recut` copies the sealed capture over the tracked checkpoint. Since
-nothing in the graph boots a tracked checkpoint, a re-cut replays nothing:
-commit it and run `ninja release` again, which re-runs only the drift gate
-and the release edges. The contracts stay light: a suite that needs a
+nothing in the graph boots a tracked checkpoint, a re-cut replays no state
+and re-runs no suite that boots one: commit it and run `ninja release`
+again. What it does re-run is everything that reads the tracked files: the
+`checkpoint_authored` edge of each re-cut key (restat: nothing behind it
+moves), checkpoint_saves, checkpoint_negatives (an emulator check),
+checkpoint_coverage, the audits that read the tracked bytes, the drift
+gate and the release edges (on the Air, 486 s with the drift gate's old
+cost, build/attempts/wt/v026-graph/romchange/after-2.ninja_log). The contracts stay light: a suite that needs a
 level or an item asserts its own precondition.
 
 ## Installed pieces

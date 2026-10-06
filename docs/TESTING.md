@@ -111,16 +111,16 @@ captured, never an older tracked copy.
   ROM and emulator pin. A green `ninja` from a clean git tree is merge and
   release evidence. A state played under an older test library on the
   same ROM, generator and emulator pin counts (provenance drift, above):
-  a library-only change re-runs the suites and replays no state. Until
-  2026-10-05 a release also required the chain from power-on to be
-  replayed under today's library; that requirement is dropped, and
-  `tools/tests/replay.txt` is the lever for a full replay under today's
-  library when one is wanted (bumped on a schedule, or before a release
-  whose library changes should show in the play).
-- **`ninja release`** is `ninja` plus the release preflights, among them the
-  drift gate: every tracked checkpoint is byte for byte the save the
-  qualified play made (re-cut with `checkpoint_drift.py --recut`, which
-  replays nothing).
+  a library-only change re-runs the suites and replays no state. Nothing
+  else bounds how old that play is: it was last replayed at the last
+  change to the ROM, the emulator pin, a generator it reaches, or
+  `tools/tests/replay.txt`.
+- **`ninja release`** is `ninja` plus the release preflights, among them:
+  every state was played under the release's own library (no provenance
+  drift, `compose.py --play-current`; the remedy is a dated line in
+  `tools/tests/replay.txt`, one replay of the line), and the drift gate:
+  every tracked checkpoint is byte for byte the save the qualified play
+  made (re-cut with `checkpoint_drift.py --recut`, which replays nothing).
 - **`ninja quick`** is a development lever, not evidence of any kind for a
   merge or a release: each leg after a save point boots the tracked
   checkpoint, a save an older build's play made, so a branch that changed

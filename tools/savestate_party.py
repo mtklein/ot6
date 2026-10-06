@@ -233,21 +233,34 @@ def checkpoint_payloads(repo: str) -> list[tuple[str, str]]:
     Continue: for each tracked checkpoint, the capture the graph's run made
     of it (build/checkpoints/<key>/), which is the save the next leg boots;
     the tracked copy is only its committed record (checkpoint_drift.py).
-    A key with no capture in this tree yet is left out (the audits' ninja
-    edges depend on every capture, so under ninja there is none)."""
-    out = []
+    The negative-* fixtures are never captured.  A key with no capture in
+    this tree yet is left out and counted on stderr, so a hand run that read
+    fewer than it meant to says so (under ninja the audits' edges depend on
+    every capture, so there is none)."""
+    out, missing = [], []
     pattern = os.path.join(repo, CHECKPOINTS, "*", "manifest.json")
     for mf in sorted(glob.glob(pattern)):
         key = os.path.basename(os.path.dirname(mf))
+        if key.startswith("negative"):
+            continue
         cmf = os.path.join(repo, CAPTURES, key, "manifest.json")
         try:
             with open(cmf) as f:
                 m = json.load(f)
         except (OSError, ValueError):
+            missing.append(key)
             continue
         payload = os.path.join(os.path.dirname(cmf), m.get("payload", ""))
         if os.path.isfile(payload):
             out.append((key, payload))
+        else:
+            missing.append(key)
+    if missing:
+        import sys
+        print(f"WARNING: {len(missing)} of {len(missing) + len(out)} "
+              f"checkpoint(s) have no capture under {CAPTURES} in this tree "
+              f"and were NOT read: {' '.join(missing)} (build them: ninja "
+              f"build/checkpoints/<key>/manifest.json)", file=sys.stderr)
     return out
 
 

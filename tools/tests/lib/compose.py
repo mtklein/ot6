@@ -498,6 +498,37 @@ def stamp_check(name, root):
     return msg if verdict in (STALE, UNBOUND, UNVERIFIED) else None
 
 
+def play_current(root):
+    """`compose.py --play-current`: the release's bound on play staleness
+    (#363 review B1).  Every state the graph declares must be FRESH: played
+    on this ROM and pin, by today's generator, AND under today's lib halves.
+    A DRIFT state (provenance drift: played under other lib halves) is fine
+    for qualification but not for a release, which ships the play its
+    library makes.  The remedy is one replay of the line: bump
+    tools/tests/replay.txt and run `ninja`.  Exit 1, naming each state."""
+    declared = _graph_order(str(root))
+    memo, drift, other = {}, [], []
+    for name in declared:
+        verdict, msg = stamp_status(name, root, memo)
+        if verdict == FRESH:
+            continue
+        (drift if verdict == DRIFT else other).append(
+            (name, msg or "no stamp"))
+    for name, msg in other:
+        print(f"play-current: {name} is not a current fixture: {msg}")
+    for name, msg in drift:
+        print(f"play-current: {name} was played under other lib halves: {msg}")
+    if drift or other:
+        print(f"play-current: {len(drift) + len(other)} of {len(declared)} "
+              f"state(s) were not played under this tree's library; a release "
+              f"needs the play replayed under it: bump tools/tests/replay.txt "
+              f"(a dated line saying why) and run `ninja`")
+        return 1
+    print(f"play-current: all {len(declared)} states were played under this "
+          f"tree's ROM, pin, generators and library")
+    return 0
+
+
 def check_states(root):
     """`compose.py --check-states`: the same freshness question stamp_check()
     answers, asked of the whole fixture set at once instead of one sidecar at
@@ -2075,6 +2106,9 @@ def main() -> int:
     # any time a red test might not be caused by your change.
     if len(sys.argv) == 2 and sys.argv[1] == "--check-states":
         return check_states(ROOT)
+    # --play-current: the release's play-staleness gate (configure.py).
+    if len(sys.argv) == 2 and sys.argv[1] == "--play-current":
+        return play_current(ROOT)
     # --adopt-stamps: upgrade pre-ROM-identity stamps to the full format
     # where the tree's own records prove the missing lines (adopt_stamps).
     if len(sys.argv) == 2 and sys.argv[1] == "--adopt-stamps":

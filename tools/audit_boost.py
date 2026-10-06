@@ -325,6 +325,9 @@ def main():
     paths = []
     for g in globs:
         paths.extend(glob.glob(g))
+    if not args:   # not `ninja quick`'s runs, played from tracked checkpoints (#363)
+        paths = [p for p in paths if not os.path.basename(p).startswith(
+            ("quick_", "suite_quick_"))]
     report(paths)
 
 

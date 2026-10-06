@@ -79,10 +79,11 @@ fi
 # O_CREAT|O_EXCL), so exactly one of any number of concurrent takers gets
 # it, whatever mkdir(1) the machine has.  It used to be `mkdir "$LOCK"`, and
 # px13's mkdir is uutils coreutils 0.10.0 (Ubuntu 26.04), which is not
-# atomic: of 16 concurrent `mkdir L`, more than one reported success in 210
-# of 300 rounds (GNU mkdir and os.mkdir: 0 of 300), so two workers built the
-# shared copy at once, the second mv nesting its build inside the first's
-# (#371, build/attempts/wt/v026-graph/371/).
+# atomic: of 16 concurrent `mkdir L`, more than one reported success in 145
+# of 300 rounds on ext4 and 114 of 300 on tmpfs (GNU mkdir, os.mkdir and
+# this lock: 0 of 300; build/attempts/wt/v026-graph/371/mkdirrace.txt), so
+# two workers built the shared copy at once, the second mv nesting its
+# build inside the first's (#371).
 take_lock() { ( set -C; : > "$1" ) 2>/dev/null; }
 # --take-lock <path> [<go>]: the primitive alone, for
 # shared_emulator_selftest.sh; with <go>, spin (no forks) until it exists,

@@ -166,6 +166,11 @@ sn.emit_state_rules(w)
 import emu_slot  # noqa: E402
 w("pool side")
 w(f"  depth = {max(1, emu_slot.slots() - 1)}")
+# the setting is read here, at configure time: a change to it re-configures
+# (only an existing file can be a dependency; one created later is seen at
+# the next re-configure)
+if Path(emu_slot.CONF).is_file():
+    read_deps.add(emu_slot.CONF)
 w()
 w("# One suite test: compose, boot Mesen headless, publish the log, touch the")
 w("# ok.  $env carries the per-test environment (dirty-RAM pins, checkpoint")
@@ -559,8 +564,13 @@ for f in glob("tools/tests/*.lua"):
     if ckpt or fixtures & quick_affected:
         qdeps = [d for d in deps if not d.startswith(("build/states/",
                                                       sn.CAPTURE_DIR + "/"))]
+        # OT6_STACK=quick_ prefixes every .mss the suite names, so each
+        # fixture is booted by its quick_ name: a regenerated copy when a
+        # cut is in its ancestry, else a plain copy of the real state
         for fx in sorted(fixtures):
-            n = sn.QUICK + fx if fx in quick_affected else fx
+            if fx not in quick_affected:
+                sn.quick_copy_edge(w, fx)
+            n = sn.QUICK + fx
             qdeps += [f"build/states/{n}.mss.lua", f"build/states/{n}.mss",
                       f"build/states/{n}.stamp"]
         qenv = env
@@ -859,6 +869,21 @@ if captures:
                + f" && mkdir -p build/checks && touch {out}",
            desc="tracked checkpoints are today's play")
     release_pre.append(out)
+
+# #363 review B1: the play a release ships was played under the release's
+# library.  Lib edits replay nothing during a cycle (provenance drift), so
+# nothing else bounds how old the library that played the line is; the
+# release does.  A DRIFT stamp fails this by name; the remedy is a
+# tools/tests/replay.txt bump, one replay of the line.
+out = "build/checks/play_current.ok"
+w.edge([out], "sh",
+       implicit=["tools/tests/lib/compose.py", "tools/tests/lib/savestate_stamp.sh",
+                 "tools/tests/lib/lua_fingerprint.py", sn.GRAPH, "build/ot6.sfc"]
+       + LIBS + all_stamps,
+       cmd=f"python3 tools/tests/lib/compose.py --play-current"
+           f" && mkdir -p build/checks && touch {out}",
+       desc="every state was played under this tree's library")
+release_pre.append(out)
 
 bps = f"{rel_dir}/{BASE[:-len('.sfc')]}.bps"
 w.edge([bps], "sh", [BASE, "build/ot6.sfc"], implicit=qual + release_pre,
