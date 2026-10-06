@@ -946,7 +946,7 @@ class Board:
         self.pl = _placement()
         self.records, self.seen = self.pl.load_records(self.log, t)
         self.pruned = t
-        self.mods, self.mods_key = {}, None
+        self.mods, self.mods_key, self.mods_busy = {}, None, False
 
     def _remember(self, rec):
         """Keep one finished-run record; False if it is already known (two
@@ -1080,10 +1080,25 @@ class Board:
             if now - self.pruned > 86400:   # once a day, as at start-up
                 self.records, self.seen = pl.load_records(self.log, now)
                 self.pruned = now
-            # the curves change only with a new record, or slowly with age
+            # the curves change only with a new record, or slowly with age.
+            # They are fitted on a thread of their own, never under the lock
+            # or in this write: with ~40k records a fit takes ~40 s, and held
+            # here it stalled every peer's stream past its 30 s watchdog, so
+            # air and px13 read offline every minute (2026-10-06).  Until the
+            # first fit lands, placement works from no curves.
             key = (len(self.records), int(now // 60))
-            if key != self.mods_key:
-                self.mods, self.mods_key = pl.models(self.records, now), key
+            if key != self.mods_key and not self.mods_busy:
+                self.mods_busy, self.mods_key = True, key
+                records = list(self.records)
+
+                def fit(records=records, now=now):
+                    try:
+                        mods = pl.models(records, now)
+                        with self.lock:
+                            self.mods = mods
+                    finally:
+                        self.mods_busy = False
+                threading.Thread(target=fit, daemon=True).start()
         place = pl.placement(machines, self.mods,
                              pl.read_claims(self.claims, now), now)
         for mc, pm in zip(machines, place["machines"]):
