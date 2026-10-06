@@ -217,7 +217,7 @@ local function sneezeArmed(species)
   end
 end
 local budgets = {}
-local function budgetFor(group)
+local function worstFor(group)
   if budgets[group] then return budgets[group] end
   local pool = H.encounterPool(group)
   local ok, parts = {}, {}
@@ -238,9 +238,13 @@ local function budgetFor(group)
   local worst = H.worstCaseEncounters(function() return function(slot) return ok[slot] end end)
   H.log(string.format("[mimic] budget: group %d: %s -- the worst of the 65536 encounter-counter "
     .. "states needs %d encounter(s) to deal a measurable slot", group, table.concat(parts, "; "), worst))
+  budgets[group] = worst
+  return worst
+end
+local function budgetFor(group)
+  local worst = worstFor(group)
   H.assertEq(worst <= MAXDRAWS, true, string.format("group %d deals a formation with no Sneeze "
     .. "counter armed within the %d draws built (worst counter state: %d)", group, MAXDRAWS, worst))
-  budgets[group] = worst
   return worst
 end
 
@@ -611,29 +615,33 @@ local steps = {
     installObservers()
   end),
   (function()
-    -- pace one pool's stretch of the Continue tile's row (H.newPacer, #306)
-    -- until an encounter fires; a draw whose Sneeze counter is armed from the
-    -- opening is run from and the pacing goes on (see the header).  The lap
-    -- this file used (the Continue tile <-> a BFS tile a few steps off it)
-    -- could cross into another pool; the budget is decoded for one.
-    local P = H.newPacer({ tag = "mimic pace" })
-    local planned = false
+    -- pace one pool's stretch (H.newPacer, #306) until an encounter fires;
+    -- a draw whose Sneeze counter is armed from the opening is run from and
+    -- the pacing goes on (see the header).  The lap this file used (the
+    -- Continue tile <-> a BFS tile a few steps off it) could cross into
+    -- another pool; the budget is decoded for one.  The Continue tile is a
+    -- one-tile stretch of group 24 ("the row gives a stretch of at least two
+    -- tiles that roll group 24 (x 249..249)", build/attempts/wt/v026-pacer/
+    -- new_mimic_suite.log), so the walk first goes to the nearest stretch
+    -- of two or more tiles whose pool deals a measurable draw in budget.
+    local P = H.newPacer({ tag = "mimic pace",
+      want = function(g) return worstFor(g) <= MAXDRAWS end })
+    local sx, sy
     local function lapWalk(what)
       return H.driveUntil(function() return H.battleLoadStarted() end, 30000, {
-        H.call(function()
-          if not planned then
-            if not (H.worldHasControl() and H.worldSettled() and H.worldAligned()) then
-              H.setPad({}) return
-            end
-            P.plan()
-            planned = true
-          end
-          H.setPad(P.pad())
-        end),
+        H.call(function() H.setPad(P.pad()) end),
       }, what)
     end
     local measured, group0, budget = false, nil, nil
-    local steps = {}
+    local steps = {
+      H.waitUntil(function() return H.worldMode() and H.worldHasControl() and H.worldSettled() end,
+        1500, "the world map settled", 5),
+      H.call(function() sx, sy = P.findStart(8) end),
+      H.worldNavTo(function() return sx end, function() return sy end,
+        { maxFrames = 4000, playBattles = "mustflee", care = false }),
+      H.waitUntil(function() return H.worldSettled() end, 1500, "settled on the stretch", 5),
+      H.call(function() P.plan() end),
+    }
     for try = 1, BURN + MAXDRAWS do
       steps[#steps + 1] = H.cond(function() return measured end, {}, {
         lapWalk("a random encounter (draw " .. try .. ")"),

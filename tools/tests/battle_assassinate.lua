@@ -88,7 +88,16 @@ local BURN = 0
 -- right, 25 frames each) left the pool its budget was decoded from -- main
 -- at 995d4a28: "battle 1 draw 1 was dealt by group 1, the pool its budget
 -- was decoded from (8)" (build/attempts/main/qual-995d4a28-px13/).
-local P = H.newPacer({ tag = "pace" })
+-- The stretch is one whose pool can deal a suitable formation within the
+-- draws built (want): camp_escaped boots on Doma's x 179..180, group 1,
+-- whose pool never does ("group 1 deals a suitable formation within the 40
+-- draws built (worst counter state: 1024)",
+-- build/attempts/wt/v026-pacer/new_assassinate_suite.log), so the walk
+-- first goes to the nearest stretch of a pool that does (P.findStart).
+local worstFor              -- defined with the budget below
+local MAXDRAWS = 40          -- draws built per fight; the decoded budget must fit
+local P = H.newPacer({ tag = "pace",
+  want = function(g) return worstFor(g) <= MAXDRAWS end })
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_TRANS, ST_CMD, ST_DEF, ST_TGT = 0x01, 0x05, 0x27, 0x38
@@ -446,7 +455,6 @@ end
 -- (P.group).  Every draw asserts CheckBattleWorld rolled that group
 -- (P.assertGroup).  The six draws this file used to build were a bare
 -- number.
-local MAXDRAWS = 40          -- draws built per fight; the decoded budget must fit
 local budgets = {}
 local function speciesShields(sp)
   local t = H.sym("Ot6ShieldTbl") & 0x3FFFFF
@@ -457,7 +465,7 @@ local function speciesShields(sp)
   end
   return 2                   -- the formula: 2 + level / 8, capped at 6
 end
-local function budgetFor(group)
+worstFor = function(group)
   if budgets[group] then return budgets[group] end
   local pool = H.encounterPool(group)
   local ok, parts = {}, {}
@@ -484,9 +492,13 @@ local function budgetFor(group)
   H.log(string.format("[budget] group %d: %s -- the worst of the 65536 encounter-counter "
     .. "states needs %d draw(s); %.1f%% need no more than 6", group, table.concat(parts, "; "),
     worst, 100 * H.encounterShare(hist, 6)))
+  budgets[group] = worst
+  return worst
+end
+local function budgetFor(group)
+  local worst = worstFor(group)
   H.assertEq(worst <= MAXDRAWS, true, string.format("group %d deals a suitable formation "
     .. "within the %d draws built (worst counter state: %d)", group, MAXDRAWS, worst))
-  budgets[group] = worst
   return worst
 end
 local function encounter(tag)
@@ -544,7 +556,16 @@ add({
   -- his chips (arm 2's second break, arm 3's hook point half).
   H.setRows({ [SHADOW] = true }, { tag = "shadow back row" }),
   H.waitUntil(function() return H.worldSettled() end, 1500, "the world map settled", 5),
-  H.call(function() P.plan() end),
+  (function()
+    local sx, sy
+    return H.seqStep({
+      H.call(function() sx, sy = P.findStart(8) end),
+      H.worldNavTo(function() return sx end, function() return sy end,
+        { maxFrames = 4000, playBattles = "mustflee", care = false }),
+      H.waitUntil(function() return H.worldSettled() end, 1500, "settled on the stretch", 5),
+      H.call(function() P.plan() end),
+    })
+  end)(),
 })
 for i = 1, BURN do
   add({
