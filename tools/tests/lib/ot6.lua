@@ -7569,13 +7569,28 @@ function Driver:raceState(actor, R)
     for _, s in ipairs(list) do st.focus[#st.focus + 1] = type(s) == "table" and s.slot or s end
   end
   st.focus[#st.focus + 1] = slot
-  local pers, nper = 0, 0
-  for e = 0, 3 do
-    local dh = self.dmgHit[e]
-    if dh and dh.per and dh.per > 0 then pers, nper = pers + dh.per, nper + 1 end
+  -- a line's per-hit figure: this actor's own last landed hit with that
+  -- line (raceHitBy), else for a Fight the mean of the party's measured
+  -- Fights, else the mean of every measured hit
+  local by = self.raceHitBy or {}
+  local function meanOf(kind)
+    local t, n = 0, 0
+    for e = 0, 3 do
+      for k, v in pairs(by[e] or {}) do
+        if (kind == nil or k:sub(1, #kind + 1) == kind .. ":") and v > 0 then t, n = t + v, n + 1 end
+      end
+    end
+    return n > 0 and t // n or nil
   end
-  if nper == 0 then return nil, "no hit measured yet" end
-  local meanPer = pers // nper
+  local meanPer = meanOf(nil)
+  if meanPer == nil then return nil, "no hit measured yet" end
+  local function perOf(e, kind, key)
+    local v = (by[e] or {})[kind .. ":" .. tostring(key)]
+    if v and v > 0 then return v end
+    return meanOf(kind) or meanPer
+  end
+  st.perOf = perOf
+  st.raceHitBy = by
   for e = 0, 3 do
     local maxhp = R.maxOf(e)
     if maxhp > 0 and maxhp ~= 0xFFFF and M.readByte(BATTLE.BCHID + e * 2) ~= 0xFF then
@@ -7583,12 +7598,11 @@ function Driver:raceState(actor, R)
       local period = (const > 0 and const ~= 0xFFFF) and math.ceil(0xFF00 / const) or 600
       local eta = etaOf(e * 2) or period
       if e == actor then eta = 0 end
-      local dh = self.dmgHit[e]
-      local per = (dh and dh.per and dh.per > 0) and dh.per or meanPer
       local lines = {}
       for b = 0, 3 do
         local l = R.bestLine(e, slot, b)
         if l then
+          local per = perOf(e, l.kind, l.skill)
           local mult = (l.kind == "fight") and 1 or (1 + b)
           -- a Fight lands at its hand's hit rate ($3B7C) against the
           -- target's M.Block ($3B55); the kit lines at 1
@@ -7666,6 +7680,18 @@ end
 local function raceOfPlan(st, actor, plan)
   if plan == nil then return nil end
   local a = st.party[actor]
+  if (plan.kind == "magic" or plan.kind == "summon") and not plan.ally and st.perOf then
+    -- a cast at its own last landed hit (unmeasured: not modelled); a
+    -- spell chips a shield its element answers to; a summon strikes all
+    local by = st.raceHitBy and st.raceHitBy[actor] or {}
+    local per = by[plan.kind .. ":" .. tostring(plan.spell)]
+    if per == nil or per <= 0 then return nil end
+    local slot = st.focus[#st.focus]
+    local elem = plan.spell and M.spellElement(plan.spell) or 0
+    local chips = (slot and elem ~= 0 and (M.readByte(BATTLE.RV_ELEM + slot * 2) & elem) ~= 0) and 1 or 0
+    return { kind = "attack", line = { per = per, hits = 1, chips = chips, aoe = plan.kind == "summon" },
+             boost = math.min(plan.boostLeft or 0, 3), what = "rules: " .. plan.kind }
+  end
   if plan.kind == "fight" or plan.kind == "skill" then
     if plan.ally then return nil end
     local b = math.min(plan.boostLeft or 0, 3)
@@ -10545,7 +10571,7 @@ function Driver:button(actor)
         end
       end
       self.dmgWatch[#self.dmgWatch + 1] = { actor = actor, kind = self.plan.kind,
-                                  skill = self.plan.skill, seen = 0, norm = 0, n = 0,
+                                  skill = self.plan.skill, spell = self.plan.spell, seen = 0, norm = 0, n = 0,
                                   until_ = self.battleTick + BATTLE.DMG_EXPIRE }
     end
     -- A confirmed lore is the progress the stall guard watches for.
@@ -12709,6 +12735,11 @@ function Driver:watchDamage()
       if w.n > 0 then
         self.dmgHit[w.actor] = { kind = w.kind, skill = w.skill,
                             per = w.norm // w.n, n = w.n }
+        -- the care race's per-line figure: the last landed hit of each
+        -- line (kind and skill or spell) each actor used (#415)
+        self.raceHitBy = self.raceHitBy or {}
+        self.raceHitBy[w.actor] = self.raceHitBy[w.actor] or {}
+        self.raceHitBy[w.actor][w.kind .. ":" .. tostring(w.skill or w.spell)] = w.norm // w.n
       end
       M.log(string.format("[%s] actor=%d's %s took %d off the monsters "
         .. "(%d shielded-equivalent over %d hit(s), %d a hit; the press "
