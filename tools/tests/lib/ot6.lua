@@ -4041,14 +4041,26 @@ end
 -- monster throws once N or fewer monsters stand (#255: the Chitonid's
 -- `if_num_monsters 1 / if_hit / attack SNEEZE, NOTHING, NOTHING`, which
 -- sneezes a lone party out of the fight and its reward; the HermitCrab's
--- Rock), NOTHING ($FE) left out.
+-- Rock), NOTHING ($FE) left out.  And how that counter is gated (#401,
+-- docs/design/last-stand.md's three reads), in r.lastStandGate:
+--   guarded    the retaliation opens with `if_self_dead / end_if`
+--              (FC 12 00 00 | FE) before the counter: a dead monster does
+--              nothing, so its own killing blow never fires it (Apokryphos,
+--              Baskervor, TumbleWeed, Ing, GloomShell, Crusher, Muus)
+--   deathOnly  the counter's own conditions include if_self_dead: only the
+--              killing blow fires it (Coelecite, Face)
+--   cmds       the counter's `if_cmd A, B` (FC 01 A B): only those party
+--              commands on it fire it (Ing and Bug: Fight $00; Mind Candy:
+--              Steal $05 / Capture $06; Muus: Magic $02), else nil
 function M.partRoles(byteAt, slot)
   local r = { endsBattle = false, respawns = false, arms = {}, reads = {}, restores = 0, kills = 0,
-              lastStand = {} }
+              lastStand = {}, lastStandGate = { guarded = false, deathOnly = false } }
   local own = 1 << slot
   local i, section = 0, 0
   local conds, inDeath = false, false  -- inside a block's conditions; the block's are if_self_dead
   local condLast = false               -- the block's conditions include if_num_monsters N
+  local blockConds, blockBody = 0, 0   -- this block's condition and command counts (#401)
+  local blockCmds = nil                -- this block's if_cmd pair
   local function lastAttack(a)
     if a ~= 0xFE then r.lastStand[#r.lastStand + 1] = a end
   end
@@ -4056,10 +4068,15 @@ function M.partRoles(byteAt, slot)
     local op = byteAt(i)
     local len = M.AI_OP_LEN[op] or 1
     if op == 0xFC then
-      if not conds then conds, inDeath, condLast = true, false, false end
+      if not conds then
+        conds, inDeath, condLast = true, false, false
+        blockConds, blockBody, blockCmds = 0, 0, nil
+      end
+      blockConds = blockConds + 1
       if section == 1 and byteAt(i + 1) == 0x12 and byteAt(i + 2) == 0 and byteAt(i + 3) == 0 then
         inDeath = true
       end
+      if section == 1 and byteAt(i + 1) == 0x01 then blockCmds = { byteAt(i + 2), byteAt(i + 3) } end
       if section == 1 and byteAt(i + 1) == 0x13 and byteAt(i + 2) == 1 then
         condLast = true
         r.lastStandN = byteAt(i + 3)
@@ -4067,13 +4084,24 @@ function M.partRoles(byteAt, slot)
       if byteAt(i + 1) == 0x14 then r.reads[#r.reads + 1] = { var = byteAt(i + 2), switch = byteAt(i + 3) } end
     else
       conds = false
+      if op ~= 0xFE and op ~= 0xFF then blockBody = blockBody + 1 end
       if condLast and op < 0xF0 then
         lastAttack(op)
       elseif condLast and op == 0xF0 then
         lastAttack(byteAt(i + 1)); lastAttack(byteAt(i + 2)); lastAttack(byteAt(i + 3))
       end
+      if condLast and (op < 0xF0 or op == 0xF0) then
+        if inDeath then r.lastStandGate.deathOnly = true end
+        if blockCmds then r.lastStandGate.cmds = blockCmds end
+      end
+      if op == 0xFE and section == 1 and inDeath and not condLast and blockConds == 1 and blockBody == 0
+         and #r.lastStand == 0 then
+        -- `if_self_dead / end_if` ahead of any counter: a dead monster does nothing
+        r.lastStandGate.guarded = true
+      end
       if op == 0xFE then
         inDeath, condLast = false, false
+        blockConds, blockBody, blockCmds = 0, 0, nil
       elseif op == 0xFF then
         section, inDeath, condLast = section + 1, false, false
       elseif op == 0xF5 then
@@ -5830,12 +5858,9 @@ end
 function Driver:focusList()
   if self.opts.focus then return self.opts.focus end
   if self.parts then return self.parts.focus end
-  -- the last-stand focus holds while a counter body stands (readLastStand)
-  if self.lastStand then
-    for s = 0, 5 do
-      if monAlive(s) and self.lastStand.slots[s] then return self.lastStand.focus end
-    end
-  end
+  -- the last-stand focus holds while a counted counter body stands beside
+  -- a plain one (readLastStand, lastStandFocus)
+  if self.lastStand then return self:lastStandFocus() end
   return nil
 end
 
@@ -5851,6 +5876,20 @@ end
 -- Condemned, Mute, Berserk, Muddle, Sap, Sleep ($F9); status 3 Slow, Stop
 -- ($14); status 4 Frozen ($02).
 local HARM = { 0xE7, 0xF9, 0x14, 0x02 }
+-- Whether species' attack a puts a status above on the party: its MagicProp
+-- record (+$0A..+$0D, the lift flag +$04 bit 2 clear), or for its Special
+-- ($EF) the status MonsterProp +$1F names; Battle ($EE) sets none.
+function M.attackSetsHarm(species, a)
+  if a == 0xFE or a == 0xEE then return false end
+  if a == 0xEF then
+    local sp = M.readRomByte((M.sym("MonsterProp") & 0x3FFFFF) + species * MON_REC + 0x1F) & 0x3F
+    return sp < 0x20 and (HARM[(sp >> 3) + 1] >> (sp & 7)) & 1 == 1
+  end
+  local r = (M.sym("MagicProp") & 0x3FFFFF) + a * 14
+  if (M.readRomByte(r + 4) & 0x04) ~= 0 then return false end
+  for k = 10, 13 do if M.readRomByte(r + k) & HARM[k - 9] ~= 0 then return true end end
+  return false
+end
 local statusAtkCache = {}
 local function statusInflicter(slot)
   local species = M.readWord(M.FORMATION + slot * 2)
@@ -5864,15 +5903,7 @@ local function statusInflicter(slot)
   local found, i = false, 0
   local function check(a)
     if found or a == 0xFE then return end
-    if a == 0xEF then
-      local sp = M.readRomByte((M.sym("MonsterProp") & 0x3FFFFF) + species * MON_REC + 0x1F) & 0x3F
-      if sp < 0x20 and (HARM[(sp >> 3) + 1] >> (sp & 7)) & 1 == 1 then found = a end
-      return
-    end
-    if a == 0xEE then return end
-    local r = MP + a * 14
-    if (M.readRomByte(r + 4) & 0x04) ~= 0 then return end
-    for k = 10, 13 do if M.readRomByte(r + k) & HARM[k - 9] ~= 0 then found = a; return end end
+    if M.attackSetsHarm(species, a) then found = a end
   end
   while b(i) ~= 0xFF and i < M.AI_SCRIPT_MAX do
     local op = b(i)
@@ -6060,51 +6091,134 @@ end
 -- house's HermitCrab pair beside a Pm Stalker) both go first: the first
 -- one's death leaves two standing, and only the second one's killing
 -- blow can still land on N.
--- Scope, a lever (opts.lastStand): by default only the counters that take
--- a member OUT of the fight -- the Sneeze (attack $CB), whose escape
--- ending pays nothing: the Chitonid on the WoR plains and the Baskervor
--- on the WoB route, the two measured above.  The ROM's other last-stand
--- bodies (build/attempts/wt/wor-tzen-door/lab/laststand_census.txt:
--- Apokryphos, Behemoth, Ing, Bug, Mind Candy, Coelecite and others, the
--- HermitCrab's Rock in Tzen's house) are unmeasured under the order, so
--- not defaulted; true takes every last-stand counter first; false turns
--- the rule off.
+-- Scope (#401, docs/design/last-stand.md): each counter body's class and
+-- gate come from its own script (M.partRoles' lastStandGate) and its
+-- attacks, and are said with it:
+--   removal  the Sneeze (attack $CB): a member out of the fight and its
+--            reward (the Chitonid on the WoR plains, the Baskervor on the
+--            WoB route, measured above);
+--   status   a counter that puts a harmful status on the party (Petrify,
+--            Death/Doom, Muddle, Sleep, Dark ...: M.attackSetsHarm);
+--   damage   anything else (Behemoth's Take Down, Lifeshaver, Magnitude8,
+--            Battle, Fire Ball);
+-- and the gate: guarded (its retaliation opens with `if_self_dead /
+-- end_if`: never on its own killing blow), death-only (only there), and
+-- an `if_cmd` pair.  A counter gated on a command the driver never uses
+-- on a monster is no exposure at all and is never taken first: Steal or
+-- Capture (Mind Candy); Magic (Muus) unless the driver casts at monsters
+-- (opts.magic or opts.nuke).
+-- Which classes go first, the lever M.LAST_STAND_CLASSES (or
+-- opts.lastStand as a table; true is every class, false the rule off):
+-- removal by default.  Measured with status bodies first and damage
+-- bodies first while the party is thin (two or fewer standing, or under
+-- half its HP), 16 seed shifts a side (build/attempts/wt/v026-driver2/
+-- 401/, lab401_tally.py): on the Floating Continent the Apokryphos
+-- formation $0B7 (guarded, L.5 Doom / L.4 Flare / L.3 Muddle) went from
+-- 18 battles at 4178 ticks, 0 deaths, 4 Stops to 27 at 4782, 1 death, 19
+-- Stops -- the Brainpans stopping the party while it worked through the
+-- Apokryphos's 1900 HP -- and in the Sealed Gate cave the Ing formations
+-- (guarded, Fight-gated Glare) from 4052/4131 ticks to 4347/4224 with
+-- Blind 5 against 2; the Behemoth ($0BA, damage) 3614 -> 3476, the
+-- Coelecite ($09B) unchanged.  Turns spent on a big body that only
+-- counters once it is alone cost more than its counter; so status and
+-- damage stay levers.
 M.SNEEZE = 0xCB
+M.LAST_STAND_CLASSES = { removal = true }
+function M.lastStandClass(species, attacks)
+  local status = false
+  for _, a in ipairs(attacks) do
+    if a == M.SNEEZE then return "removal" end
+    if M.attackSetsHarm(species, a) then status = true end
+  end
+  return status and "status" or "damage"
+end
 function Driver:readLastStand(slots)
   self.lastStand = false
   local lever = self.opts.lastStand
   if lever == false then return end
-  local function counts(p)
-    if #p.roles.lastStand == 0 then return false end
-    if lever == true then return true end
-    for _, a in ipairs(p.roles.lastStand) do
-      if a == M.SNEEZE then return true end
-    end
-    return false
-  end
-  local focus, said, plain, set, live = {}, {}, false, {}, 0
+  local castsAtMonsters = self.opts.magic ~= nil or self.opts.nuke ~= nil
+  local entries, said, any = {}, {}, false
   for slot = 0, 5 do
     local p = slots[slot]
     if p and monAlive(slot) then
-      live = live + 1
-      if counts(p) then
-        focus[#focus + 1] = { slot = slot, mask = 1 << slot }
-        set[slot] = true
+      local atks = p.roles.lastStand
+      if #atks > 0 then
+        local g = p.roles.lastStandGate or {}
+        local class = M.lastStandClass(p.species, atks)
+        local classes = type(lever) == "table" and lever or M.LAST_STAND_CLASSES
+        local counted, why = true, nil
+        if lever ~= true then
+          if not classes[class] then
+            counted, why = false, "not a class this rule takes first"
+          elseif g.cmds then
+            local uses = false
+            for _, c in ipairs(g.cmds) do
+              if c == 0x00 or (c == 0x02 and castsAtMonsters) then uses = true end
+            end
+            if not uses then
+              counted, why = false, string.format("only command $%02X/$%02X on it fires it, which "
+                .. "this driver does not use", g.cmds[1], g.cmds[2])
+            end
+          end
+        end
         local atk = {}
-        for _, a in ipairs(p.roles.lastStand) do atk[#atk + 1] = string.format("$%02X", a) end
-        said[#said + 1] = string.format("slot %d ($%03X) throws %s (N=%d)", slot, p.species,
-          table.concat(atk, "/"), p.roles.lastStandN or 1)
-      else
-        plain = true
+        for _, a in ipairs(atks) do atk[#atk + 1] = string.format("$%02X", a) end
+        local gate = g.guarded and "guarded: never on its own killing blow"
+          or (g.deathOnly and "only on its own killing blow")
+          or "its own killing blow included"
+        if g.cmds then gate = gate .. string.format(", only command $%02X/$%02X", g.cmds[1], g.cmds[2]) end
+        said[#said + 1] = string.format("slot %d ($%03X) throws %s (N=%d; %s; %s%s)", slot, p.species,
+          table.concat(atk, "/"), p.roles.lastStandN or 1, class, gate,
+          (not counted) and (" -- left out: " .. why) or
+          ((class == "damage" and lever ~= true and classes.damage == "thin")
+            and " -- taken first while the party is thin" or ""))
+        if counted then
+          entries[slot] = { class = class, gate = g,
+                            thinOnly = lever ~= true and classes[class] == "thin" }
+          any = true
+        end
       end
     end
   end
-  if #focus == 0 or not plain then return end
-  self.lastStand = { focus = focus, slots = set }
-  M.log(string.format("[%s] [last stand] %s at a hit that leaves N or fewer monsters "
-    .. "standing, its own killing blow included (its retaliation's `if_num_monsters N`, "
-    .. "AICond_13; the ROM's AI script: an informed kill order) -- taken first, while %d "
-    .. "other(s) still stand", self.tag or "fight", table.concat(said, "; "), live - 1))
+  if #said == 0 then return end
+  self.lastStand = { entries = entries }
+  M.log(string.format("[%s] [last stand] %s -- a counter at a hit that leaves N or fewer monsters "
+    .. "standing (its retaliation's `if_num_monsters N`, AICond_13; the ROM's AI script: an "
+    .. "informed kill order), taken first while a plain body stands (#401)", self.tag or "fight",
+    table.concat(said, "; ")))
+  if not any then self.lastStand = false end
+end
+
+-- The last-stand focus as the fight stands now: every counted counter body
+-- alive (a damage-class one only while the party is thin), while some body
+-- without a counted counter stands; nil otherwise.
+function Driver:lastStandFocus()
+  local ls = self.lastStand
+  if not ls then return nil end
+  local thin = nil
+  local function partyThin()
+    if thin ~= nil then return thin end
+    local up, hp, max = 0, 0, 0
+    for e = 0, 3 do
+      local h, m = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+      if m > 0 and m ~= 0xFFFF and (M.leftMask() >> e) & 1 == 0 then
+        if h > 0 and h ~= 0xFFFF then up = up + 1; hp = hp + h end
+        max = max + m
+      end
+    end
+    thin = up <= 2 or hp * 2 < max
+    return thin
+  end
+  local focus, plain = {}, false
+  for s = 0, 5 do
+    if monAlive(s) then
+      local e = ls.entries[s]
+      local counted = e ~= nil and (not e.thinOnly or partyThin())
+      if counted then focus[#focus + 1] = { slot = s, mask = 1 << s } else plain = true end
+    end
+  end
+  if #focus == 0 or not plain then return nil end
+  return focus
 end
 
 -- What the parts do as the fight runs (#189), for the ledger a person

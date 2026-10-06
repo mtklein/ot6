@@ -175,7 +175,94 @@ assert(condAt, "$07C's if_num_monsters found")
 assert(lastStandOf(0x07C, { [condAt + 2] = 0x00 }) == "",
   "$07C with its count turned on the party: no last-stand counter")
 
-print("parts_selftest: PASS -- $1BA {0} with the blades respawning, $1CB {2,0} with the gun "
+-- The class, all 17 species (#401, docs/design/last-stand.md's table):
+-- each one's counter attacks, N, and its gate -- guarded (an
+-- `if_self_dead / end_if` ahead: never on its own killing blow), deathOnly
+-- (only the killing blow), and the `if_cmd` pair -- as the ROM holds them.
+local CLASS = {
+  { 0x00C, "Apokryphos", "94 95 96", 1, "guarded" },
+  { 0x01D, "Baskervor",  "CB",       1, "guarded" },
+  { 0x020, "Behemoth",   "EF EF",    1, "" },
+  { 0x02C, "HermitCrab", "EF",       1, "" },
+  { 0x034, "TumbleWeed", "EB",       1, "guarded" },
+  { 0x048, "Ing",        "EF",       1, "guarded cmd 00/00" },
+  { 0x07C, "Chitonid",   "CB",       1, "" },
+  { 0x08A, "GloomShell", "EF",       1, "guarded" },
+  { 0x08C, "Mind Candy", "EF",       1, "cmd 05/06" },
+  { 0x092, "Crusher",    "EB",       1, "guarded" },
+  { 0x0B3, "Coelecite",  "BC",       1, "deathOnly" },
+  { 0x0DB, "Muus",       "EE",       1, "guarded cmd 02/02" },
+  { 0x0E8, "Bug",        "EF",       1, "cmd 00/00" },
+  { 0x0F3, "Mag Roader", "B3",       1, "" },
+  { 0x120, "Larry",      "06",       2, "" },
+  { 0x158, "Long Arm",   "E3 E3 E3 E3 E3 E3", 0, "" },
+  { 0x159, "Face",       "15",       0, "deathOnly" },
+}
+local function gateOf(r)
+  local g, t = r.lastStandGate, {}
+  if g.guarded then t[#t + 1] = "guarded" end
+  if g.deathOnly then t[#t + 1] = "deathOnly" end
+  if g.cmds then t[#t + 1] = string.format("cmd %02X/%02X", g.cmds[1], g.cmds[2]) end
+  return table.concat(t, " ")
+end
+for _, c in ipairs(CLASS) do
+  local r = H.partRoles(scriptOf(c[1]), 0)
+  local atk = {}
+  for _, a in ipairs(r.lastStand) do atk[#atk + 1] = string.format("%02X", a) end
+  local got = table.concat(atk, " ") .. " N=" .. tostring(r.lastStandN) .. " [" .. gateOf(r) .. "]"
+  local want = c[3] .. " N=" .. tostring(c[4]) .. " [" .. c[5] .. "]"
+  assert(got == want, string.format("$%03X %s: got %s, want %s", c[1], c[2], got, want))
+end
+-- negative controls (#401): the Apokryphos's guard's end_if rewritten to a
+-- NOTHING attack (the guard block then does something): not guarded; the
+-- Coelecite's if_self_dead turned into if_hit (FC 05): not death-only; the
+-- Ing's if_cmd removed (rewritten to if_hit): no command gate
+local function findCond(script, a, b, c)
+  for i = 0, H.AI_SCRIPT_MAX do
+    if script(i) == 0xFC and script(i + 1) == a and (b == nil or script(i + 2) == b)
+       and (c == nil or script(i + 3) == c) then return i end
+  end
+end
+local apo = scriptOf(0x00C)
+local g0 = findCond(apo, 0x12, 0, 0)
+assert(g0 and apo(g0 + 4) == 0xFE, "$00C's guard found")
+assert(gateOf(H.partRoles(scriptOf(0x00C, { [g0 + 4] = 0xEE }), 0)) == "",
+  "$00C with the guard doing a Battle: not guarded")
+local coe = scriptOf(0x0B3)
+local d0 = findCond(coe, 0x12, 0, 0)
+assert(d0, "$0B3's if_self_dead found")
+assert(gateOf(H.partRoles(scriptOf(0x0B3, { [d0 + 1] = 0x05 }), 0)) == "",
+  "$0B3 with if_self_dead turned into if_hit: not death-only")
+local ing = scriptOf(0x048)
+local c0 = findCond(ing, 0x01)
+assert(c0, "$048's if_cmd found")
+assert(gateOf(H.partRoles(scriptOf(0x048, { [c0 + 1] = 0x05 }), 0)) == "guarded",
+  "$048 with its if_cmd turned into if_hit: guarded, no command gate")
+
+-- and each one's effect class (#401: the order is worth turns always for
+-- removal and status, for damage only while the party is thin), read from
+-- MagicProp / MonsterProp as the driver does
+emu.memType = { snesPrgRom = 1 }
+emu.read = function(addr) return rom:byte(addr + 1) end
+emu.readWord = function(addr) return rom:byte(addr + 1) | (rom:byte(addr + 2) << 8) end
+OT6_SYMS = { MagicProp = symbol("MagicProp"), MonsterProp = symbol("MonsterProp") }
+local CLASSOF = { [0x00C] = "status", [0x01D] = "removal", [0x020] = "damage", [0x02C] = "status",
+  [0x034] = "damage", [0x048] = "status", [0x07C] = "removal", [0x08A] = "status",
+  [0x08C] = "status", [0x092] = "damage", [0x0B3] = "damage", [0x0DB] = "damage",
+  [0x0E8] = "status", [0x0F3] = "damage", [0x120] = "damage", [0x158] = "damage", [0x159] = "damage" }
+local classes = {}
+for _, c in ipairs(CLASS) do
+  local r = H.partRoles(scriptOf(c[1]), 0)
+  local got = H.lastStandClass(c[1], r.lastStand)
+  assert(got == CLASSOF[c[1]], string.format("$%03X %s: class %s, want %s", c[1], c[2], got, CLASSOF[c[1]]))
+  classes[got] = (classes[got] or 0) + 1
+end
+-- mutant: the Chitonid's Sneeze read as a Battle ($EE): damage, not removal
+assert(H.lastStandClass(0x07C, { 0xEE }) == "damage", "$07C's counter as Battle: damage")
+
+print("parts_selftest: PASS -- the 17 last-stand species' counters and gates as docs/design/last-stand.md "
+  .. "reads them (#401), their classes (" .. (classes.removal or 0) .. " removal, " .. (classes.status or 0)
+  .. " status, " .. (classes.damage or 0) .. " damage), and four mutants; $1BA {0} with the blades respawning, $1CB {2,0} with the gun "
   .. "arming 0.0 and the Speck the body's; 9 linked formations, " .. plain
   .. " other multi-slot formations plan nothing; last-stand counters: $07C SNEEZE and $02C "
   .. "SPECIAL at N=1, $021 and $0E6 none, $0CC's one in slot 1, the party-count mutant none")
