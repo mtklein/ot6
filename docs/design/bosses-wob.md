@@ -386,7 +386,8 @@ reads **`$08`, poison absorbed**; +24 is `$00`.)
 
 - **Tuning (#400, 2026-10-06):** four shields over 2600 HP (vanilla 1900,
   six shields), so that once the party spends its pips (#366) the train is
-  usually Broken while alive and Cyan's Cleave gets its target.  By
+  Broken while alive in about half its fights or more, and Cyan's Cleave
+  gets its target.  By
   distinct key, the train is Broken with HP left in 31 and 24 of 45 keys on
   two snapshot sets (2 of 45 at six shields), deaths rise 10 -> 11 and
   23 -> 28, and one key per set turns into an attrition wipe
