@@ -1504,6 +1504,7 @@ end
 M.RACE_HORIZON = 8
 M.RACE_TICK_MARGIN = nil       -- nil: the quickest enemy's period
 M.RACE_LEFT_MARGIN = 0.05      -- of the enemy's effective HP at the start
+M.RACE_COST_MARGIN = 200       -- gil
 
 -- the cost of a consumable: its gil, dearer as the bag nears the reserve
 -- the rest of the leg wants (a supply band's floor): the last Fenix Downs
@@ -1719,6 +1720,14 @@ function M.raceBetter(a, b, st)
     local lm = (st.leftMargin or M.RACE_LEFT_MARGIN) * math.max(a.left0 or 0, 1)
     if math.abs(a.left - b.left) > lm then return a.left < b.left end
   end
+  -- the cost, by more than its margin (a heal that only trades its gil
+  -- for the aftermath's is no better than the attack: the field care
+  -- after the fight restores the same HP at the same price, without the
+  -- turn); inside it, the sooner kill or the lower HP left, raw
+  local cm = st.costMargin or M.RACE_COST_MARGIN
+  if math.abs(a.cost - b.cost) > cm then return a.cost < b.cost end
+  if a.kill and b.kill and a.kill ~= b.kill then return a.kill < b.kill end
+  if (a.left or 0) ~= (b.left or 0) then return (a.left or 0) < (b.left or 0) end
   return a.cost < b.cost
 end
 
@@ -7576,8 +7585,12 @@ function Driver:raceState(actor, R)
       local heals = {}
       if R.hpNow[e] > 0 then
         for _, h in ipairs(self:bagHeals(e, R.hpNow[e])) do
-          heals[#heals + 1] = { restore = h.restore or 0, cost = M.raceItemCost(M.itemPrice(h.id),
-            h.count, (M.CARE_RESERVE or {})[h.id] or 0), id = h.id }
+          -- a sold item at its price, dearer near the reserve; an unsold one
+          -- at bagHeals' own gil (its effect at the shops' rates, already
+          -- scarce-priced: M.itemGil)
+          local cost = h.unsold and (h.gil or M.PRICELESS)
+            or M.raceItemCost(M.itemPrice(h.id), h.count, (M.CARE_RESERVE or {})[h.id] or 0)
+          heals[#heals + 1] = { restore = h.restore or 0, cost = cost, id = h.id }
         end
       end
       st.party[e] = { hp = R.hpNow[e], maxhp = maxhp, eta = eta, period = period,
@@ -7651,8 +7664,13 @@ local function raceOfPlan(st, actor, plan)
         cost = M.itemPrice(BATTLE.FENIX_DOWN), what = "rules: raise" } or nil
     end
     if plan.restore then
+      -- priced as the race prices the same item on the same member
+      local cost = plan.item and M.itemPrice(plan.item) or 0
+      for _, h in ipairs((st.party[plan.target] or {}).heals or {}) do
+        if h.id == plan.item then cost = h.cost end
+      end
       return { kind = "heal", target = plan.target, restore = plan.restore,
-        cost = plan.item and M.itemPrice(plan.item) or 0, what = "rules: " .. plan.kind }
+        cost = cost, what = "rules: " .. plan.kind }
     end
   end
   return nil
