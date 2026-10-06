@@ -4908,6 +4908,9 @@ local function careKernel(opts)
   }
 end
 
+-- (the kernel by name, so a selftest can stand a fake in for it)
+M.careKernel = careKernel
+
 -- The care before a leg's first fights (#312, guideline "Heal outside
 -- battles"): a person tops up before walking into a known danger zone,
 -- not only below the after-battle fraction.  The World of Ruin legs'
@@ -4932,7 +4935,7 @@ function M.fieldCare(opts)
   -- and a member the party then could not revive).  A caller that truly
   -- means to spend everything before a boss passes reserve = {}.
   if opts.reserve == nil then opts.reserve = M.CARE_RESERVE end
-  local K = careKernel(opts)
+  local K = M.careKernel(opts)
   local phase = 0
   -- A battle can open under the visit: a wandering NPC whose touch is an
   -- encounter (the burning house's flames, npc_prop map 351: RANDOM, SLOW)
@@ -4951,7 +4954,12 @@ function M.fieldCare(opts)
     return not CARE_SCREENS[M.readByte(CARE_ZM)]
   end)
   local W
-  return M.cond(function() return not M.eventTimerLive() end, {
+  -- (#409) the kernel's latches -- `served`, the refused plans -- belong to
+  -- one visit: a step a loop reuses is reset between visits, and the reset
+  -- rebuilds the kernel, so a later visit with work to do cares again
+  -- instead of reading "satisfied after 0 frames" (battle_hirecrew's party
+  -- walked on with one member standing and wiped)
+  local step = M.cond(function() return not M.eventTimerLive() end, {
     M.cond(function() return K.anyNeed() and not battle() end, {
       M.logStep(function() return K.roster("opening the menu") end),
       -- the menu's main screen, read only while the menu module runs:
@@ -4967,7 +4975,7 @@ function M.fieldCare(opts)
       M.release(),
       M.waitFrames(10),
       M.driveUntil(function() return battle() or K.served() end, K.budget, {
-        M.call(K.serveFrame),
+        M.call(function() K.serveFrame() end),
       }, K.tag .. ": heal/revive through the field menu"),
       M.release(),
       M.driveUntil(function() return battle() or closed() end, 2400, {
@@ -5001,6 +5009,9 @@ function M.fieldCare(opts)
       return K.roster("an event timer is live: no menu care here")
     end),
   })
+  M.withReset(step, function() K, phase, W = M.careKernel(opts), 0, nil end)
+  step.kernel = function() return K end   -- the visit's kernel, for field_care_selftest
+  return step
 end
 
 -- M.newCareDriver: fieldCare's whole visit as a per-frame driver, for a

@@ -353,6 +353,12 @@ local function settleDigit(WPS, where)
   local fought0, wp = nil, 1
   return H.withReset(H.driveUntil(function()
     if fought0 == nil then fought0 = #H.outcomes end
+    -- not while a battle is up: its purse lands on the victory screen, and
+    -- ending the walk there abandons the battle before its [outcome] is
+    -- said (merged main 53b6a887's qualification: the Mad Oscar pair's
+    -- 2292 GP moved the digit at f+1500 of the east room's fourth battle,
+    -- "an [outcome] said for every battle fought ...: got 3, want 4")
+    if H.battleLoadStarted() then return false end
     local hit = pearlHits()
     return not DIGIT_POLICY or #hit == 0 or #H.outcomes - fought0 >= DIGIT_BATTLES
   end, 200000, {

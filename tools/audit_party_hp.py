@@ -154,13 +154,17 @@ def logged_entry_party(repo: str = "."):
             return None, (f"{ENTRY_LOG}: a battle opened after the boot "
                           f"point and before the {tag} menu line; its HP "
                           f"is no longer the checkpoint's")
-        if f"{tag} opening the menu:" in ln:
+        # the roster the care logs as it decides: "opening the menu" when it
+        # has work, "nothing to do" when the party already stands above its
+        # threshold (main 53b6a887's capture handed the party over at
+        # 751/751 .. 730/761, and the care opened no menu)
+        if f"{tag} opening the menu:" in ln or f"{tag} nothing to do:" in ln:
             want = {int(c): (int(h), int(m), None)
                     for c, h, m in hp_re.findall(ln.split("|")[0])}
             at = i
             break
     if not want:
-        return None, f"{ENTRY_LOG} has no {tag} opening-the-menu line"
+        return None, f"{ENTRY_LOG} has no {tag} roster line (opening the menu, or nothing to do)"
     for ln in lines[at:]:
         if f"{tag} done:" in ln:
             break
