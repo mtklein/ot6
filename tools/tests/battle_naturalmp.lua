@@ -291,6 +291,7 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(costs[1], XBOW_COST,
       "Ot6AbilityCost priced the AutoCrossbow at 4 MP")
     H.assertEq(#inside, 1, "one write to his pool inside the tool's own action")
+    tool.charge = inside[1]
     H.assertEq(inside[1].cmd == 0x09 and inside[1].x == e * 2, true,
       "...made under his own Tools command ($b5 = $09, X = his slot)")
     H.assertEq(inside[1].old - inside[1].new, XBOW_COST,
@@ -323,6 +324,7 @@ H.run({ maxFrames = 60000 }, {
         .. "fighting it out; the win runs the same writeback", H.readByte(0x00B1),
         H.readByte(0x2F4B)))
     end),
+    H.call(function() H.vars.foughtOut = true end),
     H.fightBattleByMenu(30000),
   }, {
     H.fleeBattle(12000),
@@ -341,12 +343,35 @@ H.run({ maxFrames = 60000 }, {
           .. "writes to this pool: %s", s, fieldPre[s], now,
           #moves > 0 and table.concat(moves, ", ") or "none"))
         H.assertEq(now, want,
-          "post-battle field MP = the pool the battle ended on (pre-battle "
-          .. "minus exactly what was spent)")
+          "post-battle field MP = the pool the battle ended on (its last write, "
+          .. "or the pool it loaded with when nothing wrote it)")
         if s == slotOf[EDGAR] then
           H.assertEq(last ~= nil, true,
             "...and EDGAR's is a pool the battle wrote (the AutoCrossbow's charge "
             .. "or later), not the one he walked in with")
+          -- what HE spent: the writes to his pool under his own actions (X
+          -- his offset, CalcAttackEffect's charge) are the AutoCrossbow's
+          -- charge and nothing else -- unless the exit was fought out by the
+          -- menu fighter, whose own priced verbs then charge too, each a
+          -- debit, never a refund (#252)
+          local own = {}
+          for _, w in ipairs(poolWrites) do
+            if w.slot == s and w.new < 10000 and w.x == s * 2 then own[#own + 1] = w end
+          end
+          local listed = {}
+          for _, w in ipairs(own) do listed[#listed + 1] = writeStr(w) end
+          H.assertEq(own[1] == tool.charge, true, string.format(
+            "...his first write under his own action is the AutoCrossbow's charge (%s)",
+            table.concat(listed, ", ")))
+          if H.vars.foughtOut then
+            for _, w in ipairs(own) do
+              H.assertEq(w.new < w.old, true, "...and every write under his own fought-out "
+                .. "actions is a charge: " .. writeStr(w))
+            end
+          else
+            H.assertEq(#own, 1, "...and the only one (the flee spends nothing): "
+              .. table.concat(listed, ", "))
+          end
         end
       end
     end

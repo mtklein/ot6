@@ -102,6 +102,24 @@ check("mid-block: a Fight draws Battle and, past if_hit, the spell",
 check("mid-block: a Blitz misses if_cmd and draws nothing",
   "retalAnswer", "if c == 0x01 then holds = either(use.cmd, a, b)", "if c == 0x01 then holds = true",
   function() return ids(H.retalAnswer(bytesOf(mid), { cmd = BLITZ })) == "" end)
+-- $0F3: `if_num_monsters 1 / attack $B3 / end_if / attack Battle /
+-- wait ($FD) / attack Battle,Battle,$EF` (#376).  $FD ends THIS counter's
+-- walk (AICmd_fd @1a74 saves the pointer to $f2 and returns), but
+-- ExecAIRetal @4bf4 keeps it ($3D20) with the blocks skipped so far ($f5
+-- -> $3241), and the next counter, reaching a command with the same count
+-- ($f5 == $f4, NextAICmd @1ab4), jumps there: the attack after the $FD
+-- answers the following hit.  Both registers read $FF at the battle's open
+-- (build/attempts/wt/v026-driver/376/aiinit.log), so the first counter
+-- walks from the top.  "What can answer this verb" is the union of the
+-- two, so the walk goes on through $FD: the $EF stays in (and with it the
+-- unpriced Special that keeps the rule from vetoing on $0F3).
+check("$0F3 answers a Fight with $EF too: the counter after a $FD resumes past it",
+  "retalAnswer", "if op == 0xFE or op == 0xFF then return end",
+  "if op == 0xFE or op == 0xFF or op == 0xFD then return end",
+  function()
+    local a = H.retalAnswer(scriptOf(0x0F3), { cmd = FIGHT })
+    return ids(a) == "B3,EE,EF"
+  end)
 -- synthetic: an undecided condition (FC 0C, HP below) is walked both ways
 local fork = { 0xFF, 0xFC, 0x0C, 0x00, 0x50, 0xB9, 0xFE, 0xFC, 0x05, 0x00, 0x00, 0xEE, 0xFE, 0xFF }
 check("an undecided condition is walked both ways and the answer is not certain",

@@ -663,6 +663,28 @@ def _run_start(ws):
         return None, None
 
 
+RUN_START_GRACE = 5    # seconds from a run dir appearing to its emulator (a tile shows late, never dead)
+
+
+def _live_run_dirs():
+    """Run directories (realpaths) that a running emulator has open: each
+    Mesen testrunner is started on <run dir>/composed_live.lua.  None when
+    ps can't be read (then nothing is filtered)."""
+    try:
+        out = subprocess.run(["ps", "-axo", "args"], capture_output=True,
+                             text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    dirs = set()
+    for line in out.splitlines():
+        if "--testrunner" not in line:
+            continue
+        for tok in line.split():
+            if tok.endswith("/composed_live.lua"):
+                dirs.add(os.path.realpath(os.path.dirname(tok)))
+    return dirs
+
+
 class Scanner:
     """This machine's view, one JSON-able snapshot per call: every active run
     worker (build/test-runs/*/run.log touched within ACTIVE_SEC -- the same
@@ -742,6 +764,11 @@ class Scanner:
         now = time.time()
         workers, pngs, active = [], {}, set()
         real_seen = set()
+        # a run counts only while its emulator runs: a killed run (an agent's
+        # load test, a stopped batch) leaves a fresh log behind but no work,
+        # and the mtime window alone showed ~100 such dead tiles on px13
+        # (2026-10-05).  A run gets RUN_START_GRACE to start its emulator.
+        live_dirs = _live_run_dirs()
         for log in run_logs():
             # one run, once: a tree whose build/test-runs is a symlink into
             # another's (an agent's mutant copies) would show every run again
@@ -756,7 +783,11 @@ class Scanner:
                 mtime = os.path.getmtime(log)
                 if now - mtime > active_sec:
                     continue
-                dirname = os.path.basename(os.path.dirname(log))
+                rdir = os.path.dirname(log)
+                if (live_dirs is not None and rdir not in live_dirs
+                        and now - os.path.getctime(rdir) > RUN_START_GRACE):
+                    continue
+                dirname = os.path.basename(rdir)
                 data = _tail_bytes(log, tail_n)
             except OSError:
                 continue

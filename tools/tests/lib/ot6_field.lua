@@ -573,6 +573,16 @@ function M.navTo(txIn, tyIn, opts)
   -- before walking on, so the next fight starts whole.  opts.care=false
   -- opts out; a live event timer opts the scene out automatically.
   local careD, sawBattle, fought = nil, false, nil
+  -- A battle the walk fought owes its care stop before the walk may end
+  -- (#323): one that comes up on the goal tile itself ends the walk on
+  -- the field's first controlled frame otherwise, because the terminator
+  -- runs before the body's care block and the reload's quiet frames have
+  -- already filled its calm count.  Bounded: a scene that keeps control
+  -- for 600 frames after the battle lets the walk end as before.
+  local owed, owedN = false, 0
+  local function careOwed()
+    return owed and opts.care ~= false and not M.eventTimerLive() and owedN < 600
+  end
   local function drop(why)  -- discard the plan, logging why once, not per frame
     if plan or pend then
       M.log(string.format("nav: %s at (%d,%d); plan dropped", why,
@@ -588,6 +598,8 @@ function M.navTo(txIn, tyIn, opts)
     local done
     if wipeSeen then
       done = true
+    elseif careOwed() then
+      done = false
     elseif arrive and arrive() then
       done = true
     else
@@ -627,6 +639,7 @@ function M.navTo(txIn, tyIn, opts)
         else careD.frame(); return end
       end
       battN = M.battleLoadStarted() and battN + 1 or 0
+      if owed and battN == 0 then owedN = owedN + 1 end
       -- forensics (once per battle): the tile the party stood on when the
       -- battle came up, its props and its neighbours', and the event script
       -- pointer -- the shape of the $ca0029 stall (a battle starting while a
@@ -651,7 +664,9 @@ function M.navTo(txIn, tyIn, opts)
           M.monstersPresent(), M.readWord(M.BATTLE_HP), M.readWord(M.BATTLE_HP + 2),
           M.readWord(M.BATTLE_HP + 4), M.readWord(M.BATTLE_HP + 6), M.readByte(0x00ba), M.readByte(0x00d3)))
       end
-      lostN = M.hasControl() and 0 or lostN + 1
+      -- control, and not inside LoadMap: the map being loaded is not yet
+      -- the one BFS would read (#357, lib/ot6.lua M.mapLoading)
+      lostN = (M.hasControl() and not M.mapLoading()) and 0 or lostN + 1
       if tactical and battN == 0 then tactical.idle() end
       -- 1. battle: clear it, but never the goal formation
       if battN >= 3 then
@@ -662,6 +677,7 @@ function M.navTo(txIn, tyIn, opts)
           M.setPad({})                 -- goal fight: left alone for arrive()
           return
         end
+        owed, owedN = true, 0
         if wantsFlee(opts.playBattles) then
           flee(battN)
           return
@@ -702,7 +718,7 @@ function M.navTo(txIn, tyIn, opts)
       --     combat before walking on (the heal-after-every-battle
       --     directive).  Costs nothing when nobody needs care.
       if sawBattle then
-        sawBattle = false
+        sawBattle, owed = false, false
         if opts.care ~= false and not M.eventTimerLive() then
           careD = M.newCareDriver({
             threshold = opts.careThreshold or 0.65, reserve = opts.reserve,
@@ -819,6 +835,7 @@ function M.navTo(txIn, tyIn, opts)
     walked, plan, idx, pend, aPhase, calm = 0, nil, 1, nil, 0, 0
     battN, dlgN, lostN, noPathN, pause = 0, 0, 0, 0, 0
     wipeSeen, careD, sawBattle, fought = false, nil, false, nil
+    owed, owedN = false, 0
   end)
 end
 
@@ -863,7 +880,13 @@ function M.advanceStory(pred, maxFrames, opts)
     -- never complete mid-care: pred() can be map/switch-based and go true
     -- while the care menu is still open, which would end the step with
     -- the menu up and the next step pressing into it
-    local done = careD == nil and (wipeSeen or pred())
+    -- nor on the frame the care a fought battle owes is about to start
+    -- (#323): pred() runs before the body, and a pred that reads "the
+    -- battle is over and control is back" ended the ride on exactly the
+    -- frame the care block below would have opened the menu
+    local careDue = sawBattle and opts.care ~= false and not M.eventTimerLive()
+      and M.hasControl() and M.tileAligned()
+    local done = careD == nil and (wipeSeen or (not careDue and pred()))
     if done then M.setPad({}) end
     return done
   end, maxFrames or 20000, {
@@ -1191,6 +1214,109 @@ function M.encounterShare(hist, n)
   local k = 0
   for m, c in pairs(hist) do if m <= n then k = k + c end end
   return k / 65536
+end
+
+-- ---- pacing one pool's row on the world map (#306) ----------------------
+-- A suite that walks for random encounters and budgets them from one pool
+-- has to keep every encounter in that pool.  Alternating left and right on
+-- the clock does not: each battle's length shifts the turns, and
+-- battle_steal's walk drifted onto a grass tile of Narshe's pool ("[dbg]
+-- check f22195 group=0 bg=00", build/attempts/wt/steal-evidence/lab/
+-- dbg_k3_s13.log).  M.newPacer paces a stretch of the party's own row whose
+-- every tile rolls one group, turning at its ends by position, and watches
+-- the group CheckBattleWorld really rolls so each battle can assert it.
+--
+--   local P = H.newPacer({ width = 4, tag = "desert" })
+--   H.call(P.plan)                   -- once, on the settled world map
+--   ...every walking frame: H.setPad(P.pad())
+--   ...in each battle: P.assertGroup("battle 2")
+--
+-- plan() reads the stretch from the tile the party stands on, out to
+-- opts.width tiles each way along its row while the next tile is walkable
+-- and rolls the same group; it asserts the stretch is at least two tiles
+-- (Doma's plain at camp_escaped gives two: x 179..180 on row 71) and that
+-- every pairing of a stretch tile with a saved position the walk
+-- can leave (any stretch tile, where its battles happen, and the live one,
+-- which the first encounter reads) rolls that one group.
+function M.newPacer(opts)
+  opts = opts or {}
+  local width, tag = opts.width or 4, opts.tag or "pace"
+  local P = { group = nil }
+  local pace, rolled = nil, nil
+  function P.plan()
+    -- the watch is registered on every plan: a retried attempt replays its
+    -- body and finds the last attempt's watch made inert (lib/ot6.lua, the
+    -- callback-registration note)
+    rolled = nil
+    local check = M.sym("CheckBattleWorld")
+    emu.addMemoryCallback(function() rolled = M.worldCheckGroup() end,
+      emu.callbackType.exec, check, check)
+    local x0, y0 = M.worldX(), M.worldY()
+    local function own(x) return M.worldEncounterGroup(x, y0, x, y0) end
+    -- the stretch's seed: the party's own tile, or where it rolls nothing,
+    -- the nearest tile along the row that rolls something, reached over
+    -- walkable tiles that roll nothing (so no battle comes on the way)
+    local s = own(x0) ~= nil and x0 or nil
+    for d = 1, width do
+      if s then break end
+      for _, sx in ipairs({ x0 - d, x0 + d }) do
+        local step, clear = sx < x0 and -1 or 1, true
+        for x = x0 + step, sx, step do
+          if not M.worldPassable(x, y0) or (x ~= sx and own(x) ~= nil) then clear = false end
+        end
+        if not s and clear and own(sx) ~= nil then s = sx end
+      end
+    end
+    M.assertEq(s ~= nil, true, string.format("[%s] the party's tile (%d,%d) or one "
+      .. "within %d along its row rolls random battles", tag, x0, y0, width))
+    local g = own(s)
+    local lo, hi = s, s
+    x0 = s
+    while lo > x0 - width and M.worldPassable(lo - 1, y0) and own(lo - 1) == g do lo = lo - 1 end
+    while hi < x0 + width and M.worldPassable(hi + 1, y0) and own(hi + 1) == g do hi = hi + 1 end
+    local zx, zy = M.worldZonePos()
+    local groups, list = {}, {}
+    for x = lo, hi do
+      for z = lo, hi do
+        local gg = M.worldEncounterGroup(x, y0, z, y0)
+        if gg ~= nil then groups[gg] = true end
+      end
+      local gg = M.worldEncounterGroup(x, y0, zx, zy)
+      if gg ~= nil then groups[gg] = true end
+    end
+    for gg in pairs(groups) do list[#list + 1] = tostring(gg) end
+    table.sort(list)
+    M.log(string.format("[%s] pace: row %d, x %d..%d (from x %d, saved position "
+      .. "(%d,%d)); the groups it can roll: %s", tag, y0, lo, hi, x0, zx, zy,
+      table.concat(list, ",")))
+    M.assertEq(hi - lo >= 1, true, string.format("[%s] the row gives a stretch of "
+      .. "at least two tiles that roll group %d (x %d..%d)", tag, g, lo, hi))
+    M.assertEq(#list == 1 and list[1] == tostring(g), true, string.format(
+      "[%s] every encounter on the stretch rolls group %d, whatever the saved "
+      .. "position (rolls %s)", tag, g, table.concat(list, ",")))
+    pace = { y = y0, lo = lo, hi = hi, dir = "left" }
+    P.group = g
+    return P
+  end
+  -- the pad for one walking frame: nothing while the world is not the
+  -- party's, else the stretch's current direction, turned at its ends
+  function P.pad()
+    assert(pace, "newPacer: pad() before plan()")
+    if not M.worldMode() or not M.worldHasControl() then return {} end
+    if M.worldAligned() then
+      local x = M.worldX()
+      if x <= pace.lo then pace.dir = "right"
+      elseif x >= pace.hi then pace.dir = "left" end
+    end
+    return { [pace.dir] = true }
+  end
+  -- the group the last CheckBattleWorld rolled (nil before any)
+  function P.rolled() return rolled end
+  function P.assertGroup(what)
+    M.assertEq(rolled, P.group, string.format("[%s] %s was dealt by group %s, "
+      .. "the paced stretch's", tag, what, tostring(P.group)))
+  end
+  return P
 end
 
 -- ---- statuses that take a member's command (the Slot suites) -----------
@@ -2050,12 +2176,47 @@ end
 -- as soon as the encounter roll wins, well before battleLoadStarted's
 -- HP-table signal), bit4 reload-world (the post-battle fade/init).
 -- battleLoadStarted is still checked for the battle interior itself.
+--
+-- It also requires the world module's own interrupt handler to be the one
+-- installed (M.worldNmiInstalled), as M.hasControl requires the field's.
+-- Each module installs its own NMI at $1500-$1503 and the world installs
+-- WorldNMI (VehicleNMI aboard) last thing before WorldMain
+-- (world/init.asm InitInterruptsWorld), so every flag above can read
+-- "control" while another module still owns the machine.  Measured
+-- (build/attempts/wt/walker-after-menu-review/, #357): with the main menu
+-- up, "f1473 menu ... wctl=true $58=00 nmi=C3138D $26=05"; after it
+-- closes, true from the menu's last frame for ~35 frames while the menu's
+-- NMI was still installed ("f1523 close ... wctl=true ... nmi=C3138D" to
+-- "f1558 after ... nmi=EEA728"); and through a field -> world handover with
+-- the field's NMI still in ("f1391 walk wm=true ... wctl=true $58=00
+-- nmi=C00182"), the window in which a single poll read world (0,0) and a
+-- route planned from there (#343, gen_zozo2_arrival leaving Jidoor).
+local NMI_JUMP = 0x1501
+local function nmiJump() return M.readWord(NMI_JUMP) | (M.readByte(NMI_JUMP + 2) << 16) end
+local worldNmis
+function M.worldNmiInstalled()
+  worldNmis = worldNmis or { [M.sym("WorldNMI")] = true, [M.sym("VehicleNMI")] = true }
+  return worldNmis[nmiJump()] == true
+end
+-- The menu module is the one running: its NMI is installed (menu_common.asm
+-- InitInterrupts, before its first state).  $26 is the menu's state only
+-- while this holds; on a map it is RAM nobody keeps, and a value the last
+-- menu left there (or a battle's) reads like a menu screen (#332).
+local menuNmi
+function M.menuRunning()
+  menuNmi = menuNmi or M.sym("MenuNMI")
+  return nmiJump() == menuNmi
+end
+-- The main menu is up: the menu module runs and sits on its main screen.
+function M.mainMenuUp() return M.readByte(0x26) == 0x05 and M.menuRunning() end
+
 function M.worldHasControl()
   return M.worldMode()
      and M.readByte(0x0019) == 0
      and (M.readByte(0x00e7) & 0x01) == 0
      and (M.readByte(0x00e8) & 0x31) == 0
      and not M.battleLoadStarted()
+     and M.worldNmiInstalled()
 end
 
 -- The world map is loaded AND faded in.  M.worldHasControl() alone reads
@@ -2284,6 +2445,11 @@ function M.worldNavTo(txIn, tyIn, opts)
   -- heal-after-every-battle: see navTo's care block; same contract here,
   -- run once the post-battle world reload has fully settled
   local careD, sawBattle = nil, false
+  -- No owed-care gate as navTo has (#323): a battle on the world walk's
+  -- goal tile was cared for before the walk ended with or without one
+  -- (field_goalcare's world arm green on main's lib and with the gate cut,
+  -- build/attempts/wt/v026-field/323/goalcare_mainlib.log, r2/
+  -- goalcare_mut_worldgate.log), so it was dropped as unproven.
   -- walk-budget semantics shared with navTo: battle and care frames do
   -- not charge maxFrames (see navTo's measured note); the driveUntil cap
   -- is the hard backstop.
@@ -3150,8 +3316,10 @@ end
 -- opts.tent       false switches the Tent arm off (default on): where the
 --                 item list offers a Tent -- a save point or the world map
 --                 -- one is pitched instead of the items whenever a
---                 Tincture would be due for anyone or the party's HP hole
---                 is past 24 Tonics' worth, a Tent's own price
+--                 Tincture would be due for anyone, the heals the bag
+--                 would spend on the party's HP hole cost at least a
+--                 Tent's own price, or the bag cannot lift a member under
+--                 the threshold (#278)
 -- opts.maxFrames  budget for the whole visit (default 24000)
 -- opts.maxTries   plans to attempt before giving up (default 48)
 -- opts.tag        log prefix
@@ -3191,9 +3359,24 @@ local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
 -- owner's ruling on #231; a dry caster mid-fight is the fight driver's
 -- call, tools/tests/lib/ot6.lua).
 local CARE_TINCTURE, CARE_TENT = 0xEB, 0xF7
--- The HP deficit past which a Tent beats the Tonics that would fill it:
--- 1200 gil is 24 Tonics, so 24 x 50 HP.
-local TENT_WORTH_HP = 24 * 50
+-- An item's field record, read from the ROM the way the field item routine
+-- reads it (docs/design/supply.md): +$13 bit 3 restores HP, bit 7 makes
+-- +$14 a count of sixteenths of the maximum instead of a flat amount; the
+-- price is the word at +$1C.
+local function careItemByte(id, off)
+  return M.readRomByte((M.sym("ItemProp") & 0x3FFFFF) + id * 30 + off)
+end
+local function careItemPrice(id)
+  return careItemByte(id, 0x1C) | (careItemByte(id, 0x1D) << 8)
+end
+-- HP one use of a healing item restores on a member with this maximum
+-- (0 for an item that restores none)
+local function careItemHp(id, maxHp)
+  local f, amt = careItemByte(id, 0x13), careItemByte(id, 0x14)
+  if (f & 0x08) == 0 then return 0 end
+  if (f & 0x80) ~= 0 then return maxHp * amt // 16 end
+  return amt
+end
 
 -- ---- clearing a status ----
 --
@@ -3942,6 +4125,7 @@ local function careKernel(opts)
   end
 
   local failed = {}         -- plans the game refused, so they are not retried
+  local tentWhy = nil       -- why pickTent last chose a Tent, for the plan line
   local function key(w)
     if w.kind == "cast" then
       return string.format("%d:cast:%d:%d", w.char, w.caster, w.spell)
@@ -3959,8 +4143,8 @@ local function careKernel(opts)
         M.charMp(w.caster), M.charMaxMp(w.caster))
     elseif w.kind == "tent" then
       local hp, mp = partyShort()
-      return string.format("%s (the party %d hp and %d mp short, %d in the bag)",
-        w.why, hp, mp, M.invCountOf(CARE_TENT))
+      return string.format("%s (the party %d hp and %d mp short, %d in the bag: %s)",
+        w.why, hp, mp, M.invCountOf(CARE_TENT), tentWhy or "?")
     end
     return string.format("%s char %d with $%02X (%d/%d hp, %d/%d mp, status1 %02X)",
       w.why, w.char, w.item, M.charHp(w.char), M.charMaxHp(w.char),
@@ -4058,22 +4242,62 @@ local function careKernel(opts)
     return nil
   end
 
+  -- What the bag would spend, in gil, filling every reachable member's HP
+  -- hole with the heals pickItem reaches for, in its order (Tonics, then
+  -- Potions), each one whole item at its ROM price and yield, within what
+  -- the reserve leaves (#278).  Also returns whether the bag runs dry
+  -- before a member the care would serve (under the threshold) is lifted
+  -- to it, and a short "n x item" account for the plan line.
+  local function bagHpCost()
+    local left = { [CARE_TONIC] = avail(CARE_TONIC), [CARE_POTION] = avail(CARE_POTION) }
+    local used = { [CARE_TONIC] = 0, [CARE_POTION] = 0 }
+    local gil, stranded = 0, false
+    for _, c in ipairs(careParty()) do
+      if M.charHp(c) > 0 and (M.charStatus1(c) & 0xC2) == 0 then
+        local hp, mx = M.charHp(c), M.charMaxHp(c)
+        for _, id in ipairs({ CARE_TONIC, CARE_POTION }) do
+          local y = careItemHp(id, mx)
+          while hp < mx and y > 0 and left[id] > 0 do
+            hp = math.min(mx, hp + y)
+            left[id], used[id] = left[id] - 1, used[id] + 1
+            gil = gil + careItemPrice(id)
+          end
+        end
+        if mx > 0 and hp < mx * thresh then stranded = true end
+      end
+    end
+    return gil, stranded, string.format("%d tonic + %d potion = %d gil",
+      used[CARE_TONIC], used[CARE_POTION], gil)
+  end
+
   -- A Tent where the item list offers one (a save point, the world map),
   -- when it is the cheaper answer: whenever a Tincture would otherwise be
   -- due for anyone (1200 for everything against 1500 for 50 MP), or the
-  -- party's HP hole alone is past the 24 Tonics a Tent costs.  Below that
-  -- the Tonics are cheaper and the Tent is kept (supply.md, the rule for
-  -- each option).
+  -- heals the bag would spend filling the party's HP hole cost at least
+  -- the Tent's own price, or the bag cannot lift a member the care would
+  -- serve.  Below that the items are cheaper and the Tent is kept
+  -- (supply.md, the rule for each option).  The price is what the bag
+  -- would actually spend (#278): the first cut priced the hole in Tonics
+  -- (24 x 50 HP) and applied it after they ran out, so a party 1143 HP
+  -- short with 0 Tonics drank five Potions (1500 gil) with ten Tents in
+  -- the bag on the world map (build/attempts/wt/emptybag-anydraw/holes.txt).
   local function pickTent()
     if not useTent or not tentUsable() or avail(CARE_TENT) < 1 then return nil end
     local w = { kind = "tent", item = CARE_TENT, why = "pitch a Tent" }
     if failed[key(w)] then return nil end
-    local hp = partyShort()
-    local due = hp >= TENT_WORTH_HP
-    for _, c in ipairs(careParty()) do
-      if mpShort(c) then due = true end
+    local price = careItemPrice(CARE_TENT)
+    local gil, stranded, acct = bagHpCost()
+    local why = nil
+    if gil >= price then
+      why = string.format("the heals would cost %s, the Tent %d", acct, price)
+    elseif stranded then
+      why = string.format("the bag cannot lift everyone (%s)", acct)
     end
-    return due and w or nil
+    for _, c in ipairs(careParty()) do
+      if why == nil and mpShort(c) then why = "a Tincture would be due" end
+    end
+    tentWhy = why
+    return why and w or nil
   end
 
   -- A Tincture on the member furthest under the MP band; the loop picks
@@ -4673,8 +4897,10 @@ function M.fieldCare(opts)
   return M.cond(function() return not M.eventTimerLive() end, {
     M.cond(function() return K.anyNeed() and not battle() end, {
       M.logStep(function() return K.roster("opening the menu") end),
+      -- the menu's main screen, read only while the menu module runs:
+      -- $26 alone is any byte the last menu or battle left on the map (#332)
       M.driveUntil(function()
-        return battle() or M.readByte(CARE_ZM) == 0x05
+        return battle() or M.mainMenuUp()
       end, 1800, {
         M.call(function()
           phase = (phase + 1) % 12
@@ -4816,7 +5042,7 @@ function M.newCareDriver(opts)
       mode, n = "open", 0
     end
     if mode == "open" then
-      if M.readByte(CARE_ZM) == 0x05 then mode, n = "gap", 0; M.setPad({}); return end
+      if M.mainMenuUp() then mode, n = "gap", 0; M.setPad({}); return end
       if n > 1800 then
         M.log(string.format("[%s] the menu never opened; giving up on this care stop", K.tag))
         mode = "done"; M.setPad({}); return
@@ -4908,18 +5134,6 @@ end
 -- Promoted from gen_thamasa_fire.lua so the Floating Continent prep can shop
 -- at Thamasa with the same measured mechanics (one implementation, not two).
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
--- Returns the predicate and a function that restarts its count, for a
--- step that is repeated (#196): the count is only advanced while the
--- predicate is polled, so it would otherwise carry the last pass's
--- settled run into the next.
-local function calmFor(n, extra)
-  local cnt = 0
-  return function()
-    local ok = M.hasControl() and M.tileAligned() and (not extra or extra())
-    cnt = ok and cnt + 1 or 0
-    return cnt >= n
-  end, function() cnt = 0 end
-end
 local function mapLow() return M.mapId() & 0x1ff end
 local DIAGSTAGE = {
   { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
@@ -4945,8 +5159,20 @@ function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
   -- plans on (it plans only with control).  A pick made while the field
   -- reloads the map after a menu or a battle reads the stale object map
   -- (#352: the B2 hub's staging (37,23)).
+  -- Frames (not calls: navTo resolves the goal two or more times a frame)
+  -- with control and no pick.  With no neighbour reachable the fallback
+  -- below is unreachable too, so the walk sits in navTo's no-path retries
+  -- (45 frames apart) and raises its generic "no path" at the 21st, about
+  -- 920 frames in; the bound sits under that so the error names the door.
+  -- Measured: the three doors that started with no pick in the 9e46511d
+  -- chain picked within 2-5 of those retries, so 230 frames at most
+  -- (Jidoor item shop, Albrook inn, Nikeah cafe; build/attempts/wt/
+  -- v026-field/final-9e46511d-px13/chain.log lines 15405, 35584, 37219);
+  -- 600 is 2.6 times that.
+  local NOPICK_FRAMES = 600
+  local noPick, noPickFrame = 0, nil
   local function stage()
-    if not pick and not M.hasControl() then return nil end
+    if not pick and (not M.hasControl() or M.mapLoading()) then return nil end
     if not pick then
       for _, c in ipairs(DIAGSTAGE) do
         local cx, cy, move = sx + c[1], sy + c[2], c[3]
@@ -4955,18 +5181,58 @@ function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
           pick = { cx, cy, press }; break
         end
       end
-      pick = pick or { sx, sy + 1, "up" }
+      -- No reachable neighbour yet: walk toward (sx, sy+1) meanwhile but
+      -- do not keep it, and pick again every frame -- an NPC in the way
+      -- moves on (gen_wor_south_figaro's Nikeah cafe door, (16,54) from
+      -- (23,39), had none reachable on the first controlled frame and
+      -- crossed once the walk got closer).  The old fallback was cached
+      -- for good whether or not any walk reached it (#357); a door none
+      -- of whose neighbours turns reachable for NOPICK_FRAMES controlled
+      -- frames is a route error, said with the door, the party's tile and
+      -- the map.
+      if not pick then
+        local first = noPickFrame ~= M.frame and noPick == 0
+        if noPickFrame ~= M.frame then noPick, noPickFrame = noPick + 1, M.frame end
+        if first then
+          M.log(string.format("%s: no tile next to the door (%d,%d) is reachable from (%d,%d) "
+            .. "yet; walking toward (%d,%d) and picking again", what, sx, sy,
+            M.fieldX(), M.fieldY(), sx, sy + 1))
+        end
+        if noPick > NOPICK_FRAMES then
+          error(string.format("%s: no tile next to the door (%d,%d) became reachable in %d "
+            .. "controlled frames, from (%d,%d) on map %d (tried the four sides and four "
+            .. "diagonals)", what, sx, sy, noPick - 1, M.fieldX(), M.fieldY(), mapLow()), 0)
+        end
+        return { sx, sy + 1, "up" }
+      end
       M.log(string.format("%s: staging (%d,%d), hold %s into (%d,%d)",
         what, pick[1], pick[2], pick[3], sx, sy))
     end
     return pick
   end
-  local settled, settledAgain = calmFor(20)
+  -- Far-side control: LoadMap has been over for 20 frames and the party
+  -- stands with control.  Not 20 consecutive M.hasControl frames: every
+  -- control flag reads true inside LoadMap (lib/ot6.lua M.mapLoading), so
+  -- such a count was met inside the load, before the far map existed
+  -- (#357); and a landing tile whose trigger drops control one frame in
+  -- four after the load never gives 20 in a row (gen_edgar's Figaro
+  -- courtyard door, build/attempts/wt/v026-field/chainfail/).
+  local loadedN = 0
+  local function settled()
+    loadedN = M.mapLoading() and 0 or loadedN + 1
+    return loadedN >= 20 and M.hasControl() and M.tileAligned()
+  end
+  -- restarted on every pass (#196): the count advances only while it is
+  -- polled, so it would otherwise carry the last pass's run into the next
+  local function settledAgain() loadedN = 0 end
   local aPhase = 0
   return M.seqStep({
     -- the first step is the reset (#196): the stage, the start map and
     -- the far-side settle count are all re-read where this pass stands
-    M.call(function() pick, startMap = nil, mapLow(); settledAgain() end),
+    M.call(function()
+      pick, startMap, noPick, noPickFrame = nil, mapLow(), 0, nil
+      settledAgain()
+    end),
     M.navTo(function() local p = stage(); return p and p[1] end,
       function() local p = stage(); return p and p[2] end,
       { maxFrames = 9000, playBattles = "tactical", healer = opts.healer,
@@ -5007,7 +5273,7 @@ function M.shopTalk(nx, ny, what, opts)
   local pick
   -- picked only with control, as M.crossDoor's staging tile
   local function stage()
-    if not pick and not M.hasControl() then return nil end
+    if not pick and (not M.hasControl() or M.mapLoading()) then return nil end
     if not pick then
       for _, c in ipairs(SHOP_CAND) do
         local sx, sy = nx + c[1], ny + c[2]
@@ -5199,7 +5465,7 @@ function M.bagArrange(order, opts)
       mode, n = "open", 0
     end
     if mode == "open" then
-      if st == 0x05 then mode, n = "item", 0; M.setPad({}); return end
+      if M.mainMenuUp() then mode, n = "item", 0; M.setPad({}); return end
       if n > 1800 then error(string.format("[%s] the menu never opened", tag), 0) end
       M.setPad(ph < 4 and { "x" } or {}); return
     end
@@ -6071,9 +6337,10 @@ end
 --      learned.  Ties go to the member already wearing the relic, then to
 --      the order of `members`.
 --   3b. The Exp. Egg (+13 bit 3) to the member furthest behind on levels,
---      in a free slot or in place of a guard or spare that is not
---      threat-critical, never over an acting relic and never when arming
---      for a boss (threats.boss); opts.egg = false leaves it to step 4.
+--      in a free slot or in place of the lowest-ranked relic there that
+--      is not threat-critical (a spare, a guard adding no threatened
+--      status, then an acting relic by rank), never when arming for a
+--      boss (threats.boss); opts.egg = false leaves it to step 4.
 --   4. A slot nothing above took keeps what it holds, else the leftover
 --      the member can wear.
 -- Arm per fight (#351): a generator calls this before a fight with that
@@ -6190,12 +6457,13 @@ end
 -- members: { { charId, "NAME" }, ... }; those not in the active party are
 -- left out.  Returns { { ch=, name=, want={ [4]=id, [5]=id }, changes={
 -- {slot, id}, ... } }, ... } and logs every decision as a [relics] line.
--- Step 3b's one class test: the Egg may take a slot only from a guard or a
--- spare ward (and then only one that is not threat-critical), never from an
--- acting relic.  A function of its own so field_relicplan's mutant can
--- switch it off (mutants_relic.sh nosoft).
+-- Step 3b's one class test: the relic classes the Egg may take a slot from
+-- (a guard or a spare ward, and an acting relic, the lowest rank first;
+-- relicPlan then refuses any that is threat-critical), never a two-weapon
+-- relic, a ward or another Egg.  A function of its own so field_relicplan's
+-- mutants can switch it.
 function M.eggMayDisplace(cl)
-  return cl ~= nil and (cl.aff == "guard" or cl.aff == "spare")
+  return cl ~= nil and not cl.hands and cl.aff ~= "ward" and cl.aff ~= "behind"
 end
 function M.relicPlan(members, opts)
   opts = opts or {}
@@ -6421,13 +6689,22 @@ function M.relicPlan(members, opts)
     end
   end
   -- 3b. the Exp. Egg (#351): to the member furthest behind on levels
-  -- (below the party's highest; the lowest, then the order of `members`),
-  -- into a free slot, else in place of a guard or a spare ward planned
-  -- there that is not threat-critical (a guard adding a threatened status
-  -- the member would not otherwise have is) -- never over an acting relic
-  -- (Haste, damage, counter: the first cut took SETZER's Black Belt in 11
-  -- of 13 tomb runs and EDGAR's RunningShoes in 2, review of f8f9ad66), and
-  -- never when arming for a boss (threats.boss).  Nobody behind: step 4.
+  -- (below the party's highest), "when no threat-critical relic is
+  -- displaced" (the owner's ranking, v0.24 ombudsman C5): into a free slot,
+  -- else in place of the lowest-ranked relic planned there that is not
+  -- threat-critical -- a spare ward, a guard adding no threatened status
+  -- the member would not otherwise have, then an acting relic by rank
+  -- (counter or +25% magic 2, vigor 3, +25% both 4, Haste 5).  A guard
+  -- that adds a threatened status, a ward this fight calls for and a
+  -- two-weapon relic are threat-critical and never displaced.  Among the
+  -- members tied furthest behind, the one whose displaced relic ranks
+  -- lowest (one already wearing the Egg first).  Never when arming for a
+  -- boss (threats.boss).  Nobody behind: step 4.
+  -- History: the first cut (f8f9ad66) took SETZER's Black Belt in 11 of 13
+  -- tomb runs and EDGAR's RunningShoes in 2; its review then barred every
+  -- acting relic, after which the chain never wore the Egg at all
+  -- ("[relics after Dullahan] SETZER: slot 4 Black Belt $D5, slot 5 Star
+  -- Pendant $B1", build/attempts/wt/v026-field/351/).
   local function critical(m, s)
     local w = m.want[s]
     if w == nil then return false end
@@ -6447,37 +6724,50 @@ function M.relicPlan(members, opts)
   for _, id in ipairs(order) do
     local cl = M.relicClass(id, opts.threats)
     if cl.aff == "behind" and opts.egg ~= false and not (opts.threats and opts.threats.boss) then
-      local behind = {}
-      for _, m in ipairs(ms) do
-        if m.level < top and wearsItem(m.ch, id) then behind[#behind + 1] = m end
-      end
-      table.sort(behind, function(a, b)
-        if a.level ~= b.level then return a.level < b.level end
-        return a.order < b.order
-      end)
-      for _, m in ipairs(behind) do
-        if count[id] < 1 then break end
-        local worn = wearing(m, id) and (m.want[4] == id or m.want[5] == id)
-        if not worn then
-          if hasFree(m) then
-            take(m, id, string.format("the Exp. Egg to the member furthest behind on levels (L%d, the party's "
-              .. "highest L%d), a free slot", m.level, top))
-          else
+      while count[id] > 0 do
+        local low = nil
+        for _, m in ipairs(ms) do
+          if m.level < top and wearsItem(m.ch, id) and m.want[4] ~= id and m.want[5] ~= id then
+            low = (low == nil or m.level < low) and m.level or low
+          end
+        end
+        if low == nil then break end
+        local best = nil
+        for _, m in ipairs(ms) do
+          if m.level == low and wearsItem(m.ch, id) and m.want[4] ~= id and m.want[5] ~= id then
             for _, s in ipairs(m.free) do
-              local wc = m.want[s] ~= nil and M.relicClass(m.want[s], opts.threats) or nil
-              local soft = M.eggMayDisplace(wc)
-              if count[id] > 0 and m.want[s] ~= nil and m.want[s] ~= id and soft and not critical(m, s) then
-                local w = m.want[s]
-                m.want[s] = nil
-                count[w] = count[w] + 1
-                take(m, id, string.format("the Exp. Egg to the member furthest behind on levels (L%d, the "
-                  .. "party's highest L%d), in place of %s, which guards nothing this fight threatens",
-                  m.level, top, relicName(w)))
-                break
+              local w, key = m.want[s], nil
+              if w == nil then key = -1
+              elseif w ~= id and M.eggMayDisplace(M.relicClass(w, opts.threats)) and not critical(m, s) then
+                key = M.relicClass(w, opts.threats).rank
+              end
+              if key ~= nil then
+                local c = { m = m, s = s, key = key, wears = wearing(m, id) }
+                if best == nil or c.key < best.key
+                   or (c.key == best.key and c.wears and not best.wears)
+                   or (c.key == best.key and c.wears == best.wears and m.order < best.m.order) then
+                  best = c
+                end
               end
             end
           end
         end
+        if best == nil then
+          lines[#lines + 1] = string.format("the Exp. Egg stays off: every slot of the members behind on levels "
+            .. "(L%d, the party's highest L%d) holds a threat-critical relic", low, top)
+          break
+        end
+        local m, w = best.m, best.m.want[best.s]
+        if w ~= nil then
+          m.want[best.s] = nil
+          count[w] = count[w] + 1
+        end
+        take(m, id, w == nil
+          and string.format("the Exp. Egg to the member furthest behind on levels (L%d, the party's highest "
+            .. "L%d), a free slot", m.level, top)
+          or string.format("the Exp. Egg to the member furthest behind on levels (L%d, the party's highest "
+            .. "L%d), in place of %s, the lowest-ranked relic there that no threat needs (rank %d)",
+            m.level, top, relicName(w), best.key))
       end
     end
   end
@@ -7194,7 +7484,7 @@ function M.talkToObj(obj, what, maxF)
   -- re-picked every 30 frames, and only on a frame the party can be walked
   -- (as M.crossDoor's staging tile)
   local function approach()
-    if M.frame - apFrame >= 30 and M.hasControl() then
+    if M.frame - apFrame >= 30 and M.hasControl() and not M.mapLoading() then
       apFrame = M.frame
       local ox, oy = objAt()
       apPick = { ox, oy + 1 }
@@ -7206,9 +7496,13 @@ function M.talkToObj(obj, what, maxF)
     return apPick
   end
   local function walkStep()
+    -- A battle on the approach is fought with the tactical driver (items,
+    -- the heal policy, the kit) and cared for after, like any walk's: the
+    -- blind A-taps of playBattles = true lost the Tentacles (#323,
+    -- build/attempts/wt/wor-edgar/leg3/ed9.log).
     return M.navTo(function() local p = approach(); return p and p[1] end,
                    function() local p = approach(); return p and p[2] end, {
-      maxFrames = maxF or 20000, playBattles = true,
+      maxFrames = maxF or 20000, playBattles = "tactical",
       arrive = function()
         return engaged or (adjacent() and M.hasControl() and M.tileAligned())
       end,

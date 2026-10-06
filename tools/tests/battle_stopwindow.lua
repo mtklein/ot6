@@ -87,6 +87,19 @@ local function hasFight(e)
 end
 
 local F = nil
+-- the commands ExecCmd runs ($b5) for each driver plan kind: Item for any
+-- item (a rod or a shield runs its spell as $02), Magic or Summon for a
+-- cast, and the kit commands for a skill (Bushido $07, Steal $05, Tools
+-- $09, Blitz $0A, Runic $0B, Lore $0C, Slot $0F)
+local KIND_CMDS = {
+  fight = { [0x00] = true },
+  item = { [0x01] = true, [0x02] = true }, heal = { [0x01] = true, [0x02] = true },
+  magic = { [0x02] = true }, summon = { [0x02] = true, [0x19] = true },
+  throw = { [0x08] = true }, slot = { [0x0F] = true }, lore = { [0x0C] = true },
+  runic = { [0x0B] = true },
+  skill = { [0x05] = true, [0x07] = true, [0x09] = true, [0x0A] = true, [0x0B] = true,
+            [0x0C] = true, [0x0F] = true },
+}
 local stopped, pokeFrame, pokeLine = nil, nil, nil
 local clearedFrame, clearedLine, stallLine = nil, nil, nil
 local execFrame, execCmd = nil, nil
@@ -226,8 +239,10 @@ H.run({ maxFrames = 90000 }, {
     for i = pokeLine + 1, #lines do
       local kind = lines[i]:match("actor=" .. e .. " char=%d+ plan=(%S+)")
       if kind and ownPlan == nil then ownPlan, ownKind = i, kind end
-      local a = lines[i]:match("actor=(%d) char=%d+ plan=")
-      if a and tonumber(a) ~= e and otherPlan == nil then otherPlan = i end
+      local a, k = lines[i]:match("actor=(%d) char=%d+ plan=(%S+)")
+      if a and tonumber(a) ~= e and otherPlan == nil and k ~= "defer" and k ~= "switch" then
+        otherPlan = i
+      end
     end
     H.assertEq(ownPlan ~= nil and clearedLine ~= nil and ownPlan < clearedLine, true,
       string.format("the driver planned for the Stopped actor %d at the window the engine "
@@ -242,6 +257,7 @@ H.run({ maxFrames = 90000 }, {
         tostring(stallLine)))
     -- ...and that command RAN, while the Stopped member was still frozen
     local otherActor = tonumber(lines[otherPlan]:match("actor=(%d) char=%d+ plan="))
+    local otherKind = lines[otherPlan]:match("actor=%d char=%d+ plan=(%S+)")
     local otherPlanFrame = lineFrame[otherPlan]
     local otherExec = nil
     for _, x in ipairs(partyExec) do
@@ -252,6 +268,13 @@ H.run({ maxFrames = 90000 }, {
         .. "(planned f%d, executed %s, Stop cleared %s)", otherActor, e, otherPlanFrame,
         otherExec and string.format("f%d cmd $%02X", otherExec.frame, otherExec.cmd) or "never",
         clearedFrame and ("f" .. clearedFrame) or "never"))
+    -- ...and what ran was the command that plan entered (#252): the plan's
+    -- kind names its command family, and ExecCmd's $b5 is the command
+    local want = KIND_CMDS[otherKind]
+    H.assertEq(want ~= nil, true, string.format("...the plan kind %s has a command family "
+      .. "here (a new kind is a verb to add to KIND_CMDS)", tostring(otherKind)))
+    H.assertEq(want[otherExec.cmd] == true, true, string.format("...and actor %d's executed "
+      .. "command $%02X is the one its plan=%s entered", otherActor, otherExec.cmd, otherKind))
     -- 4. the entered command ran only after Stop cleared
     H.assertEq(clearedFrame ~= nil, true, "Stop cleared on its counter")
     H.assertEq(execFrame ~= nil, true, "the Stopped member's command executed")

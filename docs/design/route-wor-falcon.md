@@ -2440,6 +2440,23 @@ from nothing with it passes with no failed edge, and no leg moved from
 670a9f21's chain; against main it is 6 deaths and 1 Fenix Down to 8 and
 4, all of it sabin_done's shift-0 draw above (`chain15/main_vs_head.txt`).
 
+### 13.16 The Exp. Egg worn (wt/v026-field, #351)
+
+13.14's Egg never went on: on the v0.25 chain the tomb's Egg sat in the bag
+to the Falcon (`[relics after Dullahan] SETZER: slot 4 Black Belt $D5, slot
+5 Star Pendant $B1`; field_relicplan "0 Egg check(s)").  The rule now
+follows the owner's ranking on #351: the Egg goes to whoever is furthest
+behind on levels, into a free slot or over the lowest-ranked relic there
+that no threat needs (a spare ward, a guard adding no threatened status,
+then an acting relic by rank); two-weapon relics, wards the fight calls
+for and guards adding a threatened status are never displaced, and boss
+arming still keeps it off.  Played on the branch from the tracked
+checkpoints: `[relics on the save point] SETZER: slot 4 Exp. Egg $E4, slot
+5 Star Pendant $B1`, Dullahan armed without it (`SETZER: slot 4 Black Belt
+$D5 ...`) and `[relics after Dullahan] SETZER wears Exp. Egg $E4, Star
+Pendant $B1`, both legs passing on their first attempt
+(`build/attempts/wt/v026-field/351/`).
+
 ## 14. What the owner may want to decide
 
 - **The draft rows** (section 8): decided, approved as written (owner,

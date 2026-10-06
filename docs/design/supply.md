@@ -166,9 +166,13 @@ route carries the inn, and the sixth is the fight driver's.
 - **Tent** -- a save point (or the world map) with both pools down: the
   whole party, both pools, revival, 1200.  Cheaper than one Tincture and
   as dear as 24 Tonics, so where the item list offers it, it is pitched
-  whenever a Tincture would otherwise be due for anyone, or the party's HP
-  deficit alone is past 1200; below that the Tonics are the cheaper answer
-  and the Tent is saved.  A Sleeping Bag (500, one member) sits between a
+  whenever a Tincture would otherwise be due for anyone, or the heals the
+  bag would actually spend filling the party's HP deficit (Tonics first,
+  then Potions, whole items at their prices, the reserve kept) cost 1200
+  or more, or the bag cannot lift a member under the care threshold at
+  all; below that the items are the cheaper answer and the Tent is saved.
+  With Tonics that is a deficit of about 1200 HP; on Potions alone (1.2 gil
+  per HP) about 1000 (#278).  A Sleeping Bag (500, one member) sits between a
   Tent and a Tincture; the route only ever holds the three it finds in
   chests, and field care leaves them to the person.
 - **Inn** -- in town, both pools, whole party, statuses, for 80-350: the
