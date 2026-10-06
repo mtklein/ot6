@@ -140,12 +140,25 @@ H.run({ maxFrames = 60000 }, {
     H.log(partyReport("mrf_263"))
   end),
 
+  -- Every chest on this floor the party can walk to from the landing, as a
+  -- player opens them (play over pipeline): DragoonBoots, the Blizzard (an
+  -- ice blade the Sealed Gate's and the World of Ruin's kits name -- before
+  -- this, the route's only Blizzard was Number 024's common drop, and a
+  -- rare draw left the bag without one) and the Zephyr Cape were walked
+  -- past.  Paths measured from mrf_263's landing (22,18): (5,32) 31 steps,
+  -- (55,35) 64, (60,34) 66; none is reachable after the ride.
+  H.openChest{ stand = { 5, 32 }, face = "up", bit = 88,
+               what = "DragoonBoots", nav = { playBattles = "tactical", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } } },
   H.openChest{ stand = { 15, 55 }, face = "left", bit = 89,
                what = "Gold Helmet", nav = { playBattles = "tactical", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } } },
   H.openChest{ stand = { 33, 57 }, face = "left", bit = 93,
                what = "Gold Armor", nav = { playBattles = "tactical", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } } },
   H.openChest{ stand = { 43, 46 }, face = "left", bit = 92,
                what = "Tent", nav = { playBattles = "tactical", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } } },
+  H.openChest{ stand = { 55, 35 }, face = "up", bit = 90,
+               what = "Blizzard", item = 0x0E, nav = { playBattles = "tactical", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } } },
+  H.openChest{ stand = { 60, 34 }, face = "up", bit = 91,
+               what = "Zephyr Cape", nav = { playBattles = "tactical", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } } },
 
   -- 1. two steps east onto {24,18} -> the ride -> {40,30}
   H.navTo(23, 18, { maxFrames = 12000, playBattles = "tactical", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } }),

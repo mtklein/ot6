@@ -29,35 +29,26 @@ local function cell9d(c) return H.readByte(0x7E9D89 + c) end
 -- asserted, START to commit
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 
--- ----------------------------------------------- the input-driven fighter --
--- The descent's fighter (KEFKA himself is the library driver's, below).
--- Presses start only once the battle-menu flag has held 4 straight
--- frames, then one button per 30-frame pulse (6 held, 24 released,
--- because battle menus ignore input during their open animation every
--- turn).  The per-turn sequence is built from the acting character's
--- live id and banked BP:
---     boost prefix        bank to 2, dump up to 3 -- but only as deep as
---                         the caster's MP can pay for and ration (#219;
---                         seqFor below, docs/design/narshe-descent.md)
---     EDGAR (4), tier 2+  down A A A   Tools -> AutoCrossbow
---     CELES (6), tier 3+  down A A     Runic, which absorbs KEFKA's Ice 2
---     SABIN (5), tier 3+  down A A A   Blitz -> Pummel
---     everyone else       A A          Fight, default target
--- A sequence that leaves the menu open (a target prompt the route did not
--- know about, or an MP refusal) taps A for two more pulses, backs out with B
--- and rebuilds from wherever the cursor is.
-local BCHID, BCHP, BCMAXHP = 0x3ed8, 0x3bf4, 0x3c1c
--- the boost price is paid from these; seqFor reaches them through
--- H.boostPlan (#230) rather than by hand, and narshedescentlab's `priced`
--- policy -- the cut of this fighter that prices but does not ration -- still
--- reads BCMP directly, so the names stay
-local BCMP, BCMAXMP = 0x3c08, 0x3c30
-local MENU, ACTOR = 0x7bca, 0x62ca -- battle menu open flag / whose menu
-local BP = 0x3e9c                  -- banked boost points, +slot*2
-local function monSpecies(i) return H.readWord(0x57c0 + i * 2) end
-local function monHp(i) return H.readWord(0x3bfc + i * 2) end
-local function monShields(i) return H.readByte(0x3e40 + i * 2) end
-local function monPresent(i) return H.readByte(0x3aa8 + i * 2) % 2 == 1 end
+-- ------------------------------------------------------- the descent fighter --
+-- #311: the descent is fought by the library's driver, the one KEFKA's fight
+-- below uses (#257), rather than the input-sequence fighter this file used to
+-- carry.  That fighter had no heal line, named whatever tool the cursor's
+-- row held (the Bio Blaster, $A4, a poison spell at 8 MP, where KEFKA's lab
+-- measured the AutoCrossbow), and raised its kit tier with each reload of
+-- its own three-rung ladder: attempt 1 tier 2 (EDGAR's Tools), attempts 2-3
+-- tier 3 (CELES's Runic and SABIN's Pummel too) -- a ladder that re-rolled
+-- the descent with a stronger plan until it passed ('PARTY WIPED in battle
+-- #6 at f25806' rescued by attempt 2, build/attempts/wt/kefka-lab/).
+-- The driver plays every collision the way it plays KEFKA: EDGAR's
+-- AutoCrossbow named by id (pierce, ignores defence, 4 MP), the bank of two
+-- pips spent up to three, TERRA's care turn with the bag's Potions.  CELES
+-- keeps the Fight: the raiders' script is physical, so Runic has nothing
+-- to absorb here.  One descent, played once; a loss raises the wipe it is
+-- and the segment runner's standard bounded retry (the boot snapshot, a
+-- moved seed, a counted `[retry]` line) is the only reload.
+local DESCENT = { tactical = true, boost = true, bank = 2, items = true,
+  healer = 0, healPercent = 70, tool = H.AUTOCROSSBOW }
+local BCHP, BCMAXHP = 0x3bf4, 0x3c1c
 local function partyLine()
   local p = {}
   for e = 0, 3 do
@@ -66,181 +57,37 @@ local function partyLine()
   end
   return table.concat(p, " ")
 end
-local function monsterLine()
-  local m = {}
-  for i = 0, 5 do
-    if monPresent(i) then
-      m[#m + 1] = string.format("$%04X hp=%d sh=%d", monSpecies(i),
-        monHp(i), monShields(i))
-    end
-  end
-  return table.concat(m, " | ")
-end
-local function seqFor(id, tier, slot)
-  local bp = H.readByte(BP + slot * 2)
-  local boost = bp >= 2 and math.min(bp, 3) or 0
-  -- #219, measured in docs/design/narshe-descent.md: a boost on a verb that
-  -- is not Fight costs MP, and a boost the pool cannot pay for is not a plan.
-  -- Unpriced, this fighter threw away 130 turns across a 12-seed spread and
-  -- lost 7 of 12 descents, because an unaffordable kit row was then GREYED
-  -- but still committable and CalcAttackEffect's universal insufficient-MP
-  -- gate refused it at EXECUTION, after the turn and the pips were spent.
-  -- v0.19 closed that: Ot6KitConfirmMP (ot6_cmdmenu.asm) refuses the row at
-  -- the CONFIRM, so the window buzzes, stays open, and keeps the turn, the
-  -- pips and the MP (battle_kitrefuse, mp-economy.md ruling 2).
-  --
-  -- The rule below does not change with that, and it matters more, not less.
-  -- A person reads the grey and picks a row they can pay for; a fighter that
-  -- does not read the price now presses A at a row that buzzes and stays
-  -- open -- which is a stall, and a stall is a timeout rather than a quiet
-  -- wasted turn.  So: price the boost before planning it.
-  --
-  -- Two rules, both H.boostPlan's -- the one door every fighter in the tree
-  -- goes through since #230, and itself M.affordBoost, the lib's copy of
-  -- Ot6BoostPriceFor:
-  --   * never plan a boost the pool cannot pay, and drop the verb entirely
-  --     for Fight when it cannot pay even the unboosted cast
-  --   * ration: one turn spends at most a quarter of the caster's MAXIMUM
-  --     MP.  The descent has no shop, no inn and no save point between the
-  --     staging tile and KEFKA, and its only MP refill is a level-up
-  --     (Ot6LevelUpHeal).  Unrationed, EDGAR's 57 MP buys two x4 crossbows
-  --     and then nothing for five battles; rationed it buys five x2 ones
-  --     across the whole walk.  The cap never blocks the unboosted cast --
-  --     the base price is not the boost's to ration.
-  -- The two costed verbs this fighter reaches for are EDGAR's Tools row and
-  -- SABIN's Pummel; CELES's Runic and everyone's Fight are free and pass the
-  -- bank's boost straight through.  Which tool the row names is the bag's
-  -- business, not the kit's, so H.namedTool reads it the way the ROM builds
-  -- the window (#230): bag order, tools flag $40, this actor's own cursor
-  -- cell.  On this descent that is AutoCrossbow, the id every one of the
-  -- control's 16 fizzles named.
-  -- SABIN's Blitz grid opens on cell (0,0), which is Pummel at every level.
-  local costed = nil
-  if id == 4 and tier >= 2 then
-    costed = H.namedTool(slot)
-    if costed == nil then tier = 0 end   -- no tool in the bag: Fight
-  elseif id == 5 and tier >= 3 then costed = 0x5D      -- Pummel
-  end
-  local ok
-  local want = boost
-  boost, ok = H.boostPlan({ slot = slot, id = costed, want = boost,
-                            tag = "descent", ration = 4 })
-  if not ok then
-    -- cannot pay even the unboosted verb: Fight, which is free, so the
-    -- bank's boost stands (#257: the fallback used to drop it and swing
-    -- unboosted holding the pips)
-    tier, boost = 0, want
-    if want > 0 then
-      H.log(string.format("[descent] [boost] slot %d: the Fight keeps the " ..
-        "bank's %d", slot, want))
-    end
-  end
-  local seq = {}
-  for _ = 1, boost do seq[#seq + 1] = "r" end
-  local function push(...)
-    for _, b in ipairs({ ... }) do seq[#seq + 1] = b end
-    return seq
-  end
-  if id == 4 and tier >= 2 then
-    return push("down", "a", "a", "a")                        -- AutoCrossbow
-  end
-  if id == 6 and tier >= 3 then
-    return push("down", "a", "a")                             -- Runic
-  end
-  if id == 5 and tier >= 3 then
-    return push("down", "a", "a", "a")                        -- Pummel
-  end
-  return push("a", "a")                                       -- Fight
-end
+local function monSpecies(i) return H.readWord(0x57c0 + i * 2) end
+local function monHp(i) return H.readWord(0x3bfc + i * 2) end
+local function monShields(i) return H.readByte(0x3e40 + i * 2) end
+local function monPresent(i) return H.readByte(0x3aa8 + i * 2) % 2 == 1 end
 
 local fights = 0
--- The lib fight driver's battle-open and [death] lines (newFightDriver,
--- lib/ot6.lua) for a fight this file drives itself, so tools/audit_boost.py
--- sees the pips a member held when they fell and tools/audit_fenix.py the
--- fight a Fenix Down answered (#220).  Ticks count from the first frame the
--- battle table is live with monsters present; no monster action is
--- attributed.
-local function newDeathWatch(tag)
-  local W = {}
-  function W.reset()
-    W.tick, W.opened, W.hp, W.said = 0, false, {}, {}
+-- One fighter drives the whole descent.  Call .frame(battN) every frame a
+-- battle is up (battN = consecutive battle frames), .idle() otherwise, and
+-- .watch() every frame of the drive: a wipe zeroes every battle-HP word,
+-- which the battle gate reads as "no battle" (#163), so the loss is read
+-- outside it -- the lib's wipe predicate held 90 straight frames, or the
+-- run canary's game-over count.
+local function mkFighter(tag)
+  local F = {}
+  local D = H.newFightDriver(tag, DESCENT)
+  local bt, wipeN = nil, 0
+  local function lost(what)
+    H.screenshot(string.format("narshe_lost%d", bt and bt.n or 0))
+    error(string.format("[%s] THE PARTY IS WIPED -- %s in battle #%s at f%d " ..
+      "(started f%s) -- party [%s]", tag, what, bt and tostring(bt.n) or "?",
+      H.frame, bt and tostring(bt.f0) or "?", bt and bt.lastParty or partyLine()), 0)
   end
-  W.reset()
-  function W.frame()
-    if not H.battleLoadStarted() then W.reset(); return end
-    if not W.opened and H.monstersPresent() == 0 then return end
-    W.tick = W.tick + 1
-    local pbp = {}
-    for p = 0, 3 do pbp[#pbp + 1] = tostring(H.readByte(0x3E9C + p * 2)) end
-    local party_bp = table.concat(pbp, ",")
-    if not W.opened then
-      W.opened = true
-      local hp = {}
-      for e = 0, 3 do hp[#hp + 1] = tostring(H.readWord(0x3BF4 + e * 2)) end
-      H.log(string.format("[%s] battle f+%d partyhp=%s party_bp=%s monsters=%d",
-        tag, W.tick, table.concat(hp, ","), party_bp, H.monstersPresent()))
-    end
-    for e = 0, 3 do
-      local hp, maxhp = H.readWord(0x3BF4 + e * 2), H.readWord(0x3C1C + e * 2)
-      local last = W.hp[e]
-      if last ~= nil and last ~= 0xFFFF and last > 0 and hp == 0 and maxhp > 0
-         and not W.said[e] then
-        W.said[e] = true
-        local bp = H.readByte(0x3E9C + e * 2)
-        H.log(string.format("[%s] [death] f+%d entity %d char %d from %d/%d by "
-          .. "nobody (no monster action attributed) bp=%d party_bp=%s%s", tag,
-          W.tick, e, H.readByte(0x3ED8 + e * 2), last, maxhp, bp, party_bp,
-          bp >= 3 and string.format(" -- died holding %d BP", bp) or ""))
-      elseif hp > 0 and hp ~= 0xFFFF then
-        W.said[e] = nil
-      end
-      W.hp[e] = hp
-    end
-  end
-  return W
-end
--- One fighter instance drives one stretch of play (a descent attempt, a
--- KEFKA attempt).  Call .frame(battN) every frame a battle is up (battN =
--- consecutive battle frames, caller-debounced), .idle() on the falling
--- edge; read .lost for a wipe verdict.
-local function mkFighter(tier, tag)
-  local F = { lost = nil }
-  local watch = newDeathWatch(tag)
-  local bt = nil
-  local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
-  local phase = 0
-  local wipeN = 0
-  -- #163: the loss watch, called on EVERY frame of the drive rather than
-  -- from F.frame, which the caller reaches only while battleLoadStarted()
-  -- holds -- and a wipe zeroes every battle-HP word, which that predicate
-  -- reads as "no battle", so the old in-fight check never saw the one
-  -- state it existed for (gen_sabin_falls, #159, had the same shape).
-  -- The lib's wipe predicate held 90 straight frames is the loss; so is
-  -- the run canary's count (it now counts a 300-frame battle-side wipe as
-  -- a game over and freezes the pad -- allowGameOver on the run keeps the
-  -- sweeps alive for the reload).
   function F.watch()
-    watch.frame()
     wipeN = H.partyWipedInBattle() and wipeN + 1 or 0
-    if (H.gameOverFired or 0) > 0 and not F.lost then
-      F.lost = string.format("GAME OVER counted by the canary at f%d " ..
-        "(battle #%s, tier %d) -- party [%s]", H.frame,
-        bt and tostring(bt.n) or "?", tier, partyLine())
-      H.log("[" .. tag .. "] " .. F.lost)
-    end
-    if wipeN >= 90 and not F.lost then
-      F.lost = string.format("PARTY WIPED in battle #%s at f%d (started " ..
-        "f%s, tier %d) -- party [%s]", bt and tostring(bt.n) or "?",
-        H.frame, bt and tostring(bt.f0) or "?", tier, partyLine())
-      H.log("[" .. tag .. "] " .. F.lost)
-      H.screenshot(string.format("narshe_lost%d", bt and bt.n or 0))
-    end
+    if wipeN >= 90 then lost("the battle table read wiped for 90 frames") end
+    if (H.gameOverFired or 0) > 0 then lost("the run canary counted a game over") end
   end
   function F.frame(battN)
-    phase = (phase + 1) % 8
     if battN == 3 then
       fights = fights + 1
-      bt = { n = fights, f0 = H.frame, wiped = 0 }
+      bt = { n = fights, f0 = H.frame }
       local w = H.formationWords()
       H.log(string.format("[%s] battle #%d up f%d party=%d " ..
         "(%04X %04X %04X %04X %04X %04X)", tag, bt.n, H.frame,
@@ -252,58 +99,16 @@ local function mkFighter(tier, tag)
         end
       end
     end
-    if bt then
-      bt.lastParty = partyLine()
-      if battN % 300 == 0 then
-        H.log(string.format("[%s] #%d f%d party [%s] vs %s",
-          tag, bt.n, H.frame, partyLine(), monsterLine()))
-      end
-      -- the wipe verdict is F.watch's, taken before this gate (#163)
-    end
-    -- act: outside a settled menu, edge-tap A (opening dialogs, the shell
-    -- text, victory pages); inside one, run the episode machine
-    if bt == nil or H.readByte(MENU) == 0 then
-      mStreak, mSeq = 0, nil
-      H.setPad(phase < 4 and { "a" } or {})
-      return
-    end
-    mStreak = mStreak + 1
-    if mStreak < 4 then H.setPad({}); return end
-    if mSeq == nil then
-      local slot = H.readByte(ACTOR) & 3
-      local id = H.readByte(BCHID + slot * 2)
-      mSeq, mIdx, mTick, mStall = seqFor(id, tier, slot), 1, 0, 0
-      H.log(string.format("[%s] #%d cast f%d slot=%d char=%d bp=%d seq=%s",
-        tag, bt.n, H.frame, slot, id, H.readByte(BP + slot * 2),
-        table.concat(mSeq, ",")))
-    end
-    mTick = mTick + 1
-    local ph = mTick % 30
-    local btn
-    if mIdx <= #mSeq then
-      btn = mSeq[mIdx]
-    elseif mStall < 2 then
-      btn = "a"                 -- a prompt the sequence did not know
-    elseif mStall < 4 then
-      btn = "b"                 -- back out (an MP refusal, a dead end)
-    else
-      mSeq = nil                -- rebuild from wherever the cursor is
-      H.setPad({})
-      return
-    end
-    if ph < 6 then H.setPad({ [btn] = true }) else H.setPad({}) end
-    if ph == 29 then
-      if mIdx <= #mSeq then mIdx = mIdx + 1 else mStall = mStall + 1 end
-    end
+    if bt then bt.lastParty = partyLine() end
+    D.frame()
   end
-  function F.idle(what)
+  function F.idle()
     if bt then
       H.log(string.format("[%s] battle #%d done at f%d (%d frames) -- " ..
-        "party [%s]%s", tag, bt.n, H.frame, H.frame - bt.f0,
-        bt.lastParty or "?", what and (" -- " .. what) or ""))
+        "party [%s]", tag, bt.n, H.frame, H.frame - bt.f0, bt.lastParty or "?"))
       bt = nil
     end
-    mStreak, mSeq = 0, nil
+    D.idle()
   end
   return F
 end
@@ -328,13 +133,10 @@ end
 
 -- ------------------------------------------------------ the descent step --
 -- o25's march reversed, an axis-alternating held pusher, with every
--- collision fought.  One attempt is one full descent from the narshe_battle
--- state; it ends done (party 1 parked at (19,36)), lost (a wipe read by the
--- fighter, or map 22 left outside a battle, since the game-over fade and the
--- march-reached-BANON endings both leave the map), or errors (a stuck
--- waypoint is a route or model failure rather than a fight outcome).
-local descBlob, descDone = nil, false
-local descLost = nil
+-- collision fought.  The descent ends done (party 1 parked at (19,36)) or
+-- raises: a wipe read by the fighter (class wipe, retried by the runner),
+-- map 22 left outside a battle (a march reached BANON), or a stuck waypoint
+-- (a route or model failure rather than a fight outcome).
 local WAY = {
   { 18, 11 }, { 18, 13 }, { 18, 16 }, { 17, 17 }, { 17, 20 },
   { 16, 21 }, { 15, 22 }, { 14, 23 }, { 13, 24 }, { 14, 26 },
@@ -342,37 +144,22 @@ local WAY = {
   { 18, 34 }, { 19, 35 }, { 19, 36 },
 }
 local WAY_CARE_AFTER = 12
-local function descentBody(tier, wi0, wi1)
+local descentF = nil
+local function descentBody(wi0, wi1)
   local wi = wi0
   local battN, holdF, axis = 0, 0, 1
-  local elapsed = 0
   local hb = -600
-  local F = mkFighter(tier, "descent")
   return H.driveUntil(function()
-    elapsed = elapsed + 1
-    if elapsed >= 88000 and descLost == nil then
-      descLost = string.format("descent episode unresolved after %d frames " ..
-        "at (%d,%d), waypoint %d/%d (tier %d) -- retrying the defense " ..
-        "checkpoint", elapsed, H.fieldX(), H.fieldY(), wi, #WAY, tier)
-      H.log("[descent] LOST -- " .. descLost)
-      return true
-    end
-    if F.lost then
-      descLost = F.lost
-      return true                       -- wiped; the sweep decides
-    end
     if map() ~= 22 and not H.battleLoadStarted() then
-      descLost = string.format("left map 22 outside a battle (map=%d f%d " ..
-        "at wp %d/%d) -- a march reached BANON or the wipe's fade ran",
-        map(), H.frame, wi, #WAY)
-      H.log("[descent] " .. descLost)
-      return true
+      error(string.format("[descent] left map 22 outside a battle (map=%d f%d " ..
+        "at wp %d/%d) -- a march reached BANON", map(), H.frame, wi, #WAY), 0)
     end
     return wi > wi1 and H.hasControl() and H.tileAligned()
   end, 90000, {
     H.call(function()
+      descentF = descentF or mkFighter("descent")
+      local F = descentF
       F.watch()                           -- every frame, outside the gate
-      if F.lost then H.setPad({}); return end
       battN = H.battleLoadStarted() and battN + 1 or 0
       if H.frame - hb >= 600 then
         hb = H.frame
@@ -413,58 +200,25 @@ local function descentBody(tier, wi0, wi1)
       end
       H.setPad({ [press] = true })
     end),
-  }, string.format("the descent to Kefka's entry point (tier %d, wp %d-%d)",
-    tier, wi0, wi1))
+  }, string.format("the descent to Kefka's entry point (wp %d-%d)", wi0, wi1))
 end
-local function descentAttempt(n)
-  local ldReq
-  local tier = math.min(n + 1, 3)
-  return H.cond(function() return not descDone end, {
-    H.cond(function() return n > 1 end, {
-      H.logStep(function()
-        return string.format("[descent] ATTEMPT %d -- reloading the " ..
-          "defense-live checkpoint after a loss (%s)", n, tostring(descLost))
-      end),
-      H.call(function() ldReq = H.requestLoadState(descBlob) end),
-      H.waitFrames(2),
-      H.call(function()
-        H.checkReq(ldReq, "descent attempt " .. n)
-        -- the restored snapshot restarts the experiment: the canary's
-        -- count (and its pad freeze, which the reload thaws) belong to
-        -- the lost attempt
-        H.gameOverFired = 0
-      end),
-      H.waitFrames(60),
-    }, {}),
-    H.call(function() descLost = nil; H.gameOverFired = 0 end),
-    -- There is no value in a deliberately Fight-only opening trial here:
-    -- EDGAR was selected for this party specifically because AutoCrossbow
-    -- clears the four-enemy waves.  Attempt 1 uses that authored kit; later
-    -- attempts add CELES's Runic and vary the battle timeline.
-    descentBody(tier, 1, WAY_CARE_AFTER),
+-- The descent, played once.  WAY_CARE_AFTER splits it at the rest a player
+-- takes before the recurring 001C+0065 raider corridor (waypoints 13-16).
+local function descent()
+  return H.cond(function() return true end, {
+    descentBody(1, WAY_CARE_AFTER),
     H.release(),
     H.waitFrames(10),
-    -- The rest a player takes before the recurring 001C+0065 raider
-    -- corridor (waypoints 13-16, see WAY_CARE_AFTER above).  Skipped when
-    -- this attempt already lost above it, so a failed care roll does not
-    -- masquerade as a fresh attempt.
-    H.cond(function() return descLost == nil end, {
-      H.fieldCare({ tag = "care before the raider corridor " .. n,
-                    threshold = 0.85, mpFloor = 0.5 }),
-    }, {}),
-    H.cond(function() return descLost == nil end, {
-      descentBody(tier, WAY_CARE_AFTER + 1, #WAY),
-      H.release(),
-      H.waitFrames(10),
-    }, {}),
+    H.fieldCare({ tag = "care before the raider corridor",
+                  threshold = 0.85, mpFloor = 0.5 }),
+    descentBody(WAY_CARE_AFTER + 1, #WAY),
+    H.release(),
+    H.waitFrames(10),
     H.call(function()
-      if descLost == nil then
-        descDone = true
-        H.log(string.format("[descent] attempt %d reached the entry point " ..
-          "after %d collision fights", n, fights))
-      end
+      H.log(string.format("[descent] reached the entry point after %d " ..
+        "collision fights", fights))
     end),
-  }, {})
+  })
 end
 
 -- -------------------------------------------------------- the KEFKA step --
@@ -473,10 +227,9 @@ end
 -- battle_kefka and gen_kefka_won carry verbatim, #257; the lab behind it is
 -- under build/attempts/wt/kefka-lab/), and the verdict read off the scripted
 -- branch: the win scene on the stage vs the {25,5} lose-path save point.
--- There is no KEFKA ladder.  The run allows a game over for the descent's
--- sweep above, so a lost battle 57 is raised here as the wipe it is (the
--- runner's class=wipe), and the segment runner's standard bounded retry is
--- the only reload: the boot snapshot, a moved seed, a counted
+-- There is no KEFKA ladder.  A lost battle 57 is raised here as the wipe it
+-- is (the runner's class=wipe), and the segment runner's standard bounded
+-- retry is the only reload: the boot snapshot, a moved seed, a counted
 -- `[retry] attempt n/3 FAILED` line.
 -- The KEFKA fighter (#257), verbatim in battle_kefka, gen_narshe_battle and
 -- gen_kefka_won.  Each lever was measured in build/attempts/wt/kefka-lab/:
@@ -563,12 +316,11 @@ local function kefkaFight()
 end
 
 -- Budgets: input-driven fights spend real ATB rounds on every descent
--- collision and on KEFKA himself, and the descent's ladder may replay it
--- up to three times.
--- allowGameOver: the descent's sweep deliberately survives a lost fight
--- (#163); F.watch reads H.gameOverFired as a loss and the next attempt
--- reloads.  KEFKA's fight raises its loss instead (kefkaFight).
-H.run({ maxFrames = 600000, allowGameOver = true }, {
+-- collision and on KEFKA himself.
+-- allowGameOver: a lost fight is read by the fight's own watch (the descent
+-- fighter's, kefkaFight's), which raises it as the wipe it is with the
+-- battle and the party's last reading; the runner's retry reloads.
+H.run({ maxFrames = 300000, allowGameOver = true }, {
   H.loadState(BOOT),
   H.waitFrames(30),
   H.call(function()
@@ -676,34 +428,9 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
   H.saveState("narshe_battle.mss"),
 
   -- ==================================================================== --
-  -- 3. The descent, started immediately, up to three input-driven attempts.
-  --    The ladder's
-  --    checkpoint is the defense-live moment the generation above captured;
-  --    re-capturing it in memory keeps the reload in-run.
+  -- 3. The descent, started immediately, played once (#311).
   -- ==================================================================== --
-  (function()
-    local ckReq
-    return H.cond(function() return true end, {
-      H.call(function() ckReq = H.requestSaveState() end),
-      H.waitFrames(2),
-      H.call(function()
-        H.checkReq(ckReq, "defense-live checkpoint")
-        descBlob = ckReq.blob
-        H.log(string.format("[descent] checkpoint captured (%d bytes) at " ..
-          "(%d,%d) f%d", #descBlob, H.fieldX(), H.fieldY(), H.frame))
-      end),
-    })
-  end)(),
-  descentAttempt(1),
-  descentAttempt(2),
-  descentAttempt(3),
-  H.call(function()
-    if not descDone then
-      error(string.format("[descent] no attempt survived of 3 tries " ..
-        "-- last loss: %s -- the per-attempt numbers above are the balance " ..
-        "finding (#74-style); do not rig this segment", tostring(descLost)), 0)
-    end
-  end),
+  descent(),
 
   -- It cannot heal parties 2 and 3 -- the menu shows the active party and
   -- this generator never switches with Y -- but it does not need to: they
@@ -727,8 +454,7 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
     -- The exit contract: a failure here means the descent cost more than
     -- the bag could answer.
     H.assertPartyStanding("kefka_entry")
-    H.log(string.format("[entry point] f%d after %d fights (all attempts)",
-      H.frame, fights))
+    H.log(string.format("[entry point] f%d after %d fights", H.frame, fights))
     H.screenshot("kefka_entry")
   end),
   H.saveState("kefka_entry.mss"),

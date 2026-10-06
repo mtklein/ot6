@@ -965,13 +965,17 @@ M.contracts["ultros-won-v1"] = {
   -- The Fire Rod is WORN by STRAGO ($07) in place of his Ice Rod; both
   -- it[4] checks find the weapon on its wearer rather than in the $1869
   -- bag.  The fled run carried a spare ThunderBlade that TERRA took in
-  -- prep; the fighting run's ONE ThunderBlade has ridden LOCKE's Genji
-  -- main hand since the banquet kit, so the prep leaves TERRA's weapon
-  -- alone (gen_ultros conds on the bag) and the blade is found on LOCKE.
+  -- prep; the fighting run's ONE ThunderBlade rides LOCKE's Genji main
+  -- hand from the banquet kit -- unless the Sealed Gate's strongest-first
+  -- ladder already put it in an empty-handed TERRA's hand (a run whose bag
+  -- lacked the Blizzard: gen_gate_cave_save "[kit] TERRA gear after:  0F
+  -- FF 6A 84", then the banquet's "LOCKE banquet kit slot 0: $0F not in
+  -- this run's bag"), so the prep leaves TERRA's weapon alone (gen_ultros
+  -- conds on the bag) and the blade is found on LOCKE or TERRA.
   items = {
     { 0xF0, 1, "Fenix Down -- town chest bit 250 (carried from N)" },
     { 0x35, 1, "Fire Rod -- map 351 chest bit 104 (worn by STRAGO in prep)", 0x07 },
-    { 0x0F, 1, "ThunderBlade -- worn by LOCKE (Genji main hand since the banquet)", 0x01 },
+    { 0x0F, 1, "ThunderBlade -- worn by LOCKE (Genji main hand since the banquet) or TERRA (the gate's ladder)", { 0x01, 0x00 } },
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
@@ -1695,10 +1699,15 @@ function M.contractDiffs(c)
       -- equips (a rod on a fighter, say) is still "held", just not in the
       -- $1869 array the plain scan above reads.  Checks the character's
       -- six equip slots ($1600+37*charId+$1F..$24: w/sh/he/ar/r1/r2).
+      -- A table of charIds allows any of them (a weapon the route's
+      -- kit ladders hand to whoever the draw left it with).
       if have == 0 and it[4] then
-        local base = 0x1600 + 37 * it[4]
-        for slot = 0x1F, 0x24 do
-          if M.readByte(base + slot) == it[1] then have = 1; break end
+        for _, who in ipairs(type(it[4]) == "table" and it[4] or { it[4] }) do
+          local base = 0x1600 + 37 * who
+          for slot = 0x1F, 0x24 do
+            if M.readByte(base + slot) == it[1] then have = 1; break end
+          end
+          if have == 1 then break end
         end
       end
       field(string.format("item $%02X (%s) %s inventory", it[1], it[3],
