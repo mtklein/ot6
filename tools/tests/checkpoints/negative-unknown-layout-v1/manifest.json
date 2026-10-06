@@ -2,9 +2,9 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "post-opera.sram",
   "size": 32768,
-  "sha256": "8003f8ef86075138ffc0cde570235f498f49f6d687d6317c1fb424bafbf701fe",
+  "sha256": "670f3cd09ecf2b03345cee0f8144f963f55bf65fa75e9ad6f1a47aa5ba7ce05f",
   "slot": 3,
   "milestone": "negative-unknown-layout",
-  "provenance": "DELIBERATELY WRONG fixture for `make checkpoint-negatives` (#25): byte-identical copy of post-opera-v1 whose persistent_layout names a schema no step declares support for.  Exercises the pre-boot refusal in run.sh + lib/sram_checkpoint.py; no generate rule may ever name this checkpoint.",
+  "provenance": "DELIBERATELY WRONG fixture for `make checkpoint-negatives` (#25): byte-identical copy of post-opera-v1 whose persistent_layout names a schema no step declares support for.  Exercises the pre-boot refusal in run.sh + lib/sram_checkpoint.py; no generate rule may ever name this checkpoint.  Rebuilt 2026-10-06 from the current post-opera-v1 payload (sha256 670f3cd09ecf2b03345cee0f8144f963f55bf65fa75e9ad6f1a47aa5ba7ce05f): the previous copy predated #305 and held TERRA's and CELES's Antdot, which the ROM no longer teaches (#335).",
   "persistent_layout": "ot6-codex-o9-experimental"
 }

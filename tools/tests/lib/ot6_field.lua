@@ -1360,6 +1360,13 @@ function M.newPacer(opts)
     end
     return { [pace.dir] = true }
   end
+  -- the stretch: its row and its two end tiles (after plan()), for a
+  -- caller that walks it with its own walker (battle_statuses' worldNavTo
+  -- legs, which fight with the tactical driver and care after)
+  function P.ends()
+    assert(pace, "newPacer: ends() before plan()")
+    return pace.lo, pace.hi, pace.y
+  end
   -- the group the last CheckBattleWorld rolled (nil before any)
   function P.rolled() return rolled end
   function P.assertGroup(what)
