@@ -41,6 +41,7 @@ local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 en
 local uSlot = nil
 local function brk() return H.readByte(0x3E88 + 8 + uSlot * 2) end
 local function shields() return H.readByte(0x3E38 + 8 + uSlot * 2) end
+local function maxShields() return H.readByte(0x3E39 + 8 + uSlot * 2) end
 local function uhp() return H.readWord(0x3BFC + uSlot * 2) end
 
 local story, brokenAttacks = {}, {}
@@ -125,12 +126,9 @@ H.run({ maxFrames = 60000 }, {
     end
     return uSlot ~= nil
   end, 6000, { H.call(function() H.setPad(H.frame % 8 < 4 and { "a" } or {}) end) },
-    "Ultros IV's battle is up"),
+    "Ultros IV's battle is loading"),
+  -- his story and his Broken turns are recorded from the battle's load on
   H.call(function()
-    H.log(string.format("[ultros4] slot %d: shields %d, hp %d", uSlot,
-      shields(), uhp()))
-    H.assertEq(shields(), 7, "Ultros IV seeds 7 shields")
-    H.assertEq(uhp() >= LINE, true, "Ultros IV starts above his story line")
     local ent = 8 + uSlot * 2
     local f3, f5, f7 = H.sym("AICmd_f3"), H.sym("AICmd_f5"), H.sym("AICmd_f7")
     local atk = H.sym("_1b28")
@@ -154,6 +152,21 @@ H.run({ maxFrames = 60000 }, {
       H.log(string.format("[ultros4] Ultros's AI queued cmd $%02X f%d while Broken",
         H.readByte(0x3A2C), H.frame))
     end, emu.callbackType.exec, atk, atk)
+  end),
+  -- His id ($57C0) and present bit ($3AA8) land a frame or so before
+  -- LoadRageProp's Ot6SeedShields writes his shields, and which side of a
+  -- frame edge that falls on moves with the fixture: today's capture read
+  -- "slot 1: shields 0" at f225 and its shields were written later in the
+  -- same frame.  So the seed is read once the battle is up and drawn
+  -- (InitBattle and every monster's load done), with no presses meanwhile.
+  H.driveUntil(function() return H.battleActive() end, 1200,
+    { H.call(function() H.setPad({}) end) }, "Ultros IV's battle is up"),
+  H.call(function()
+    H.log(string.format("[ultros4] slot %d at f%d: shields %d of %d, hp %d",
+      uSlot, H.frame, shields(), maxShields(), uhp()))
+    H.assertEq(maxShields(), 7, "Ultros IV seeds 7 shields (max)")
+    H.assertEq(shields(), 7, "Ultros IV seeds 7 shields")
+    H.assertEq(uhp() >= LINE, true, "Ultros IV starts above his story line")
   end),
   H.driveUntil(function() return cross ~= nil end, 20000, { driver() },
     "a hit takes Ultros IV under " .. LINE .. " HP"),
