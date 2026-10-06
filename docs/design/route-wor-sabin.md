@@ -84,9 +84,7 @@ measurement.
     first save after he joins is on the world map outside Tzen, 35 steps
     and a door from where control returns (§2.6, §7).
 11. **Driven to Tzen's door** (§10, 2026-09-23): the back row, Maduin, the
-    Blizzard + ThunderBlade Genji pair (the Blizzard is a World of Balance
-    find a run can miss; then Maduin's Ice is the ice key, 2026-10-05) and
-    a Jewel Ring; Albrook before
+    Blizzard + ThunderBlade Genji pair and a Jewel Ring; Albrook before
     and after a grind to L27; seven plains fights won, none lost, no Fenix
     Down, the walk off the sand; saved at (131,179). Two plan items moved
     on measurement: the back row beat the front on the same walk, and the

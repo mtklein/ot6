@@ -61,7 +61,6 @@ local IFRIT, SRAPHIM = 1, 21                        -- esper indices ($1A69 bits
 local FIRE_KNUCKLE, TIGER_MASK, POWER_SASH = 0x57, 0x77, 0x90
 local GENJI, BLACK_BELT, BACK_GUARD, JEWEL_RING = 0xD1, 0xD5, 0xE1, 0xB5
 local BLIZZARD, THUNDERBLADE = 0x0E, 0x0F
-local celesBlizzard = true   -- set at the kit, before the blades go on
 -- The house's relic (a lever; route-wor-sabin.md 11 has the A/B): the
 -- Back Guard takes the Genji Glove's slot from before the clock until
 -- Sabin has joined.  A solo CELES cannot flee a pincer, and in one her
@@ -523,12 +522,6 @@ H.run({ maxFrames = 200000 }, {
   -- CELES's own kit back (gen_wor_tzen_door's: the Genji Glove, the
   -- ThunderBlade in the left hand, the Blizzard in the right), then
   -- SABIN's relics first: the second Fire Knuckle needs the Genji Glove on
-  -- (the Blizzard is a World of Balance find a run can miss: gen_wor_tzen_door's
-  -- kit then fields MADUIN's Ice, and her right hand keeps what it had)
-  H.call(function()
-    celesBlizzard = H.invCountOf(BLIZZARD) > 0 or H.readByte(c(CELES, 0x1F)) == BLIZZARD
-      or H.readByte(c(CELES, 0x20)) == BLIZZARD
-  end),
   H.cond(function() return HOUSE_BACK_GUARD end, {
     H.relicKit(CELES, "CELES", { [4] = GENJI }, { tag = "CELES: the Genji Glove back",
       threats = { s1 = 0x40, s2 = 0x00 } }),
@@ -543,16 +536,8 @@ H.run({ maxFrames = 200000 }, {
     say("tzen", "SABIN dressed")
     H.assertEq(kit(SABIN), string.format("%02X %02X %02X %02X %02X %02X %02X", IFRIT, FIRE_KNUCKLE,
       FIRE_KNUCKLE, TIGER_MASK, POWER_SASH, GENJI, BLACK_BELT), "SABIN wears IFRIT and his kit")
-    if celesBlizzard then
-      H.assertEq(kit(CELES):sub(1, 17), "06 0E 0F 76 8F D1", "CELES wears the stretch's kit again: MADUIN, "
-        .. "Blizzard + ThunderBlade, Gold Helmet, Gold Armor, Genji Glove")
-    else
-      local k = kit(CELES)
-      H.log(string.format("[tzen] no Blizzard this run: CELES's right hand keeps $%s", k:sub(4, 5)))
-      H.assertEq(k:sub(1, 2) .. " " .. k:sub(7, 17), "06 0F 76 8F D1", "CELES wears the stretch's kit "
-        .. "again (no Blizzard this run): MADUIN, ThunderBlade, Gold Helmet, Gold Armor, Genji Glove")
-      H.assertEq(H.readByte(c(CELES, 0x1F)) ~= 0xFF, true, "CELES's right hand holds a weapon")
-    end
+    H.assertEq(kit(CELES):sub(1, 17), "06 0E 0F 76 8F D1", "CELES wears the stretch's kit again: MADUIN, "
+      .. "Blizzard + ThunderBlade, Gold Helmet, Gold Armor, Genji Glove")
     -- the other relic is the relic rule's (H.relicKit above): the Jewel
     -- Ring, or a guard covering Petrify and more (a Ribbon)
     local r5 = H.readByte(c(CELES, 0x24))

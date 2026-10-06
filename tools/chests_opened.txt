@@ -64,7 +64,10 @@
 84	map 262 factory, X-Potion (7,44)
 85	map 262 factory, Remedy (25,52)
 87	map 262 factory, ThunderBlade (25,44) -- HANDOFF's walked-past weapon
+88	map 263 factory, DragoonBoots (5,31)
 89	map 263 factory, Gold Helmet (14,55)
+90	map 263 factory, Blizzard (55,34)
+91	map 263 factory, Zephyr Cape (60,33)
 92	map 263 factory, Tent (42,46)
 93	map 263 factory, Gold Armor (32,57)
 94	map 271 research facility, Break Blade (8,37)

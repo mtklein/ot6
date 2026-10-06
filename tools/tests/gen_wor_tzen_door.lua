@@ -599,16 +599,8 @@ H.run({ maxFrames = 600000 }, {
     H.assertEq(prot & 0x40, 0x40, "a relic CELES wears protects her from Petrify (the Osprey's Beak)")
     H.assertEq((H.weaponElement(r) | H.weaponElement(l)) & 0x04, 0x04,
       "a blade in CELES's hands carries bolt (the Chitonid's key)")
-    -- Ice: the Blizzard when the bag has one.  It is a World of Balance
-    -- find the fighting run does not always make (the 3a0c7128 chain
-    -- reached the Sealed Gate without it: "[kit] TERRA gear after:  0F FF
-    -- 6A 84", and this kit then logged "$0E is not in the bag; skipped"),
-    -- and then the key she fields is MADUIN's Ice, live while he is worn.
-    local iceBlade = (H.weaponElement(r) | H.weaponElement(l)) & 0x02 == 0x02
-    H.log(string.format("[wor] kit: ice from %s", iceBlade and "a blade"
-      or "MADUIN's Ice spell (no ice blade in the bag)"))
-    H.assertEq(iceBlade or (H.invCountOf(BLIZZARD) == 0 and H.knowsSpell(CELES, 0x01)), true,
-      "CELES fields ice: a blade in her hands carries it, or the bag holds no ice blade and she casts Ice")
+    H.assertEq((H.weaponElement(r) | H.weaponElement(l)) & 0x02, 0x02,
+      "a blade in CELES's hands carries ice")
   end),
 
   -- ---- 2. the pools the walk may meet -------------------------------------------
