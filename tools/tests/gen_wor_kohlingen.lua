@@ -418,9 +418,10 @@ end
 -- (the Mad Oscar): Remedy and Revivify to TOMB_CURES each (informed: the
 -- tomb's scripts, route-wor-falcon 3.5 and 4.4).  The scarcest-by-price
 -- item last.
--- #411: the legs from Kohlingen to the Falcon spend 18 Potions (the bf19d581
--- line: wor_kohlingen potion=56 -> wor_flight 38), the last counter before them
-local FIELD_CARE_POTIONS, TOMB_CURES = 18, 10
+-- #411: the legs from Kohlingen to the Falcon spend 18-25 Potions (the
+-- bf19d581 line: wor_kohlingen potion=56 -> wor_flight 38; 3b1bc7c5: 93 ->
+-- 68), the last counter before them.  At L33 this fills the bag's 99.
+local FIELD_CARE_POTIONS, TOMB_CURES = 24, 10
 -- Fenix Downs: about the level, capped near 20 (guidelines "Supply band")
 local FENIX_CAP = 20
 local function potionBand() return H.careStockPotions(topLevel(), { spend = FIELD_CARE_POTIONS }) end
