@@ -221,6 +221,21 @@ shared_prefs/ot6.xml` shows the last result.
 Only the ROMs, `build/`, `build.ninja`, `tools/Mesen.app`, and `tools/bin`
 are git-ignored. Ripped assets are tracked.
 
+## The machine-wide emulator limit
+
+Every `tools/tests/run.sh` takes one of its machine's emulator slots before
+its emulator starts and keeps it until the run ends (`tools/tests/lib/emu_slot.py`,
+a kernel flock per slot under `~/.cache/ot6/emu-slots/`, dropped when the
+holder dies). The slot count is the machine's own, the first integer in
+`~/.config/ot6/emulator-slots` (CPU count when absent): mbp 12, the Air 8,
+px13 24 (2026-10-06). A batch larger than that queues inside run.sh and logs
+`[emu-slot] waited Ns for slot k of N`; the wait comes before the load grace
+and the wall-clock cap start, so queueing never fails a run. Placement
+(`live.py --place`) still says where work should go; the slots are the hard
+ceiling on any one machine, whatever a caller launches.
+`python3 tools/tests/lib/emu_slot.py --status` prints held and total;
+`--selftest` checks the limit on a private pool.
+
 ## Mesen facts the harness depends on
 
 - With no config file, Mesen ignores `--testrunner` and launches the GUI

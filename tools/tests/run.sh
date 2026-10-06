@@ -453,6 +453,23 @@ CAP="${OT6_TIMEOUT:-600}"
 # would turn a flaky test into a green one with no notice.  A no-verdict run
 # that died well short of the cap is not retried either: that is a Lua load
 # error, which is deterministic and will fail identically.
+# The machine-wide emulator limit (#407): before its emulator starts, this run
+# takes one of the machine's slots (lib/emu_slot.py: a flock the kernel drops
+# when the holder dies; N from the machine's own ~/.config/ot6/emulator-slots,
+# else its CPU count) and keeps it for every attempt.  A batch larger than N
+# queues here instead of swamping the machine, whatever the caller asked
+# placement for.  The wait comes before t0, so it never eats the load grace
+# or the wall-clock cap.
+SLOT_READY="$WDIR/emu-slot"
+python3 "$ROOT/tools/tests/lib/emu_slot.py" --hold $$ "$SLOT_READY" &
+slot_pid=$!
+until [ -s "$SLOT_READY" ]; do
+  kill -0 "$slot_pid" 2>/dev/null || { echo "emu_slot.py exited without a slot"; exit 2; }
+  sleep 1
+done
+read -r slot_k slot_n slot_wait < "$SLOT_READY"
+[ "$slot_wait" -gt 0 ] && echo "[emu-slot] waited ${slot_wait}s for slot $slot_k of $slot_n" >&2
+
 RETRIES="${OT6_TIMEOUT_RETRIES:-1}"
 attempt=0
 retried=0

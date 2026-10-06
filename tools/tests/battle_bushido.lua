@@ -3,6 +3,7 @@
 -- submenu rather than the vanilla numeral gauge.
 
 local H = dofile("tools/tests/lib/ot6.lua")
+local P = H.newPacer({ tag = "pace" })     -- one pool's row (#306)
 local STATE = "build/states/camp_escaped.mss.lua"
 
 local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
@@ -273,13 +274,16 @@ local function decide()
   end
   return btn and { [btn] = true } or {}
 end
+local inBattle = false
 local function frame()
   if H.battleLoadStarted() then
+    -- each battle's first frame: the pool that dealt it is the paced one
+    if not inBattle then inBattle = true; P.assertGroup("the battle at f" .. H.frame) end
     H.setPad(decide())
     return
   end
-  if not H.worldMode() or not H.worldHasControl() then H.setPad({}); return end
-  H.setPad(((H.frame // 120) % 2 == 0) and { left = true } or { right = true })
+  inBattle = false
+  H.setPad(P.pad())
 end
 local function driveTo(pred, maxF, tag)
   return H.driveUntil(pred, maxF, {
@@ -493,7 +497,7 @@ end
 -- off a damage figure that grows with both.
 local BOOSTDMG = H.sym("Ot6BoostDmg")
 local BOOSTDMG_END = H.sym("Ot6FoldCmdTbl")      -- the table after the proc
-local bdCalls, bdStores = {}, {}
+local bdCalls, bdStores, calcStores = {}, {}, {}
 local ledger = {}
 local function flushLedger(tag)
   for _, e in ipairs(ledger) do
@@ -536,6 +540,10 @@ H.run({ maxFrames = 150000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(30),
+  -- pace one pool's stretch of the row the fixture stands on, not the
+  -- clock (#306)
+  H.waitUntil(function() return H.worldSettled() end, 1500, "the world map settled", 5),
+  H.call(function() P.plan() end),
   driveTo(function() return H.battleLoadStarted() end, 25000, "first encounter"),
   H.release(),
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
@@ -629,6 +637,9 @@ H.run({ maxFrames = 150000 }, {
           local pc = (st["cpu.k"] << 16) | st["cpu.pc"]
           if pc >= BOOSTDMG and pc < BOOSTDMG_END then
             bdStores[#bdStores + 1] = { seq = execSeq, v = v, pc = pc }
+          else
+            -- the damage calc's own stores, the watch's positive control
+            calcStores[#calcStores + 1] = { seq = execSeq, v = v, pc = pc }
           end
         end)
       end, emu.callbackType.write, base + 0x11B0, base + 0x11B1)
@@ -756,6 +767,17 @@ H.run({ maxFrames = 150000 }, {
         H.assertEq(live, true, string.format(
           "Ot6BoostDmg was handed his %s with cmd $07 and boost %d still "
           .. "pending -- the multiplier was asked", techName(DMG_T), DMG_ROW + 1))
+        -- the same watch saw the tech's own damage calc store $11B0 (#252:
+        -- `0 store(s)` alone could not tell a quiet multiplier from a blind
+        -- watch)
+        local calc = {}
+        for _, w in ipairs(calcStores) do
+          if w.seq == seqNo then calc[#calc + 1] = string.format("$%02x@%06x", w.v, w.pc) end
+        end
+        H.log(string.format("[boostdmg] the damage calc's own stores to $11B0 in that action: %d {%s}",
+          #calc, table.concat(calc, " ")))
+        H.assertEq(#calc > 0, true, "the $11B0 watch saw the tech's damage calc store "
+          .. "(the positive control for the zero below)")
         H.assertEq(#stored, 0,
           "boost bought the tech, not a damage multiplier too (Ot6BoostDmg "
           .. "stored no multiplied $11B0 for it)")

@@ -77,6 +77,7 @@ local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_TOOLS = 0x05, 0x30     -- command list; tools-shell blitz list
 local ST_ITEM, ST_TGT = 0x0A, 0x38      -- item select; target select
 local ST_THROW = 0x2D                   -- throw select (UpdateMenuState_2d)
+local ST_ROW, ST_DEF = 0x24, 0x27       -- Row / Def. side windows (lib's ST_ROW)
 local CMD_BLITZ, CMD_ITEM, CMD_THROW = 0x0A, 0x01, 0x08
 local CMDTBL, ITEMLIST = 0x202E, 0x4005 -- command cells; wItemList rows
 local BATTINV = 0x2686                  -- battle inventory, 5 bytes/entry
@@ -305,7 +306,7 @@ local function b47Button()
   if fPlan == nil or fPlanActor ~= actor then
     if st ~= ST_CMD then
       if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT
-         or st == ST_THROW then
+         or st == ST_THROW or st == ST_ROW or st == ST_DEF then
         return { "b" }
       end
       return nil
@@ -326,11 +327,14 @@ local function b47Button()
     end
     local cur = H.readByte(CMDROW + actor) & 3
     if cur == plan.row then return { "a" } end
-    if plan.rowStall and plan.rowStall > 2 then
-      plan.rowStall = 0
-      return { ({ [0]="up", [1]="left", [2]="right", [3]="down" })[plan.row] }
-    end
+    -- UP and DOWN only: LEFT/RIGHT here open Row/Def. (#366, b68Button);
+    -- a row never reached fails by name (12 steering pulses on one plan)
     plan.rowStall = (plan.rowStall or 0) + 1
+    if plan.rowStall > 12 then
+      error(string.format("battle 47: the command steer is stuck -- actor %d's " ..
+        "cursor on row %d after %d steering pulses wanting row %d", actor, cur, plan.rowStall,
+        plan.row), 0)
+    end
     return { cur < plan.row and "down" or "up" }
   end
   if st == ST_ITEM and plan.kind == "item" then
@@ -375,7 +379,7 @@ local function b47Button()
     for b = 0, 3 do if chars & (1 << b) ~= 0 then cur = b; break end end
     return { cur < plan.target and "down" or "up" }
   end
-  if st == ST_TOOLS then return { "b" } end
+  if st == ST_TOOLS or st == ST_ROW or st == ST_DEF then return { "b" } end
   return nil
 end
 local function fightPulse(_)
@@ -599,6 +603,26 @@ local function neediest(limit20)
   end
   return best, miss
 end
+-- #366: the bank is spent on the damage turns, not carried to the grave.
+-- The v0.24 wipe and this branch's lab both died "holding 5 BP": SABIN's
+-- chips and SHADOW's throws were never boosted, so every pip they banked
+-- past the fifth was lost and a member a round from death took his pips
+-- with him.  A boosted Blitz is the x2/x4/x8 multiplier at an escalating
+-- price (Ot6BoostPriceFor; H.boostPlan is where a fighter reads it), so a
+-- chip boosts only with the MP the rest of the break does not need: the
+-- reserve is the unboosted Pummels (two shields each) that take the
+-- shields this cast leaves.  After the break (Suplex) nothing is
+-- reserved.  A Throw is multiplied and costs no MP (Ot6BoostDmg gates it
+-- in; probe_throw_boost), so a throw spends the bank whole, as Fight does.
+local function blitzBoost(skill, shields)
+  local want = math.min(H.readByte(BP + sabinE * 2), 3)
+  if want == 0 then return 0 end
+  local left = math.max(0, shields - (skill == PUMMEL and 2 or 1))
+  local reserve = ((left + 1) // 2) * (H.abilityCost(PUMMEL) or 4)
+  local boost, ok = H.boostPlan({ slot = sabinE, id = skill, want = want,
+    reserve = reserve, tag = "b68" })
+  return ok and boost or 0
+end
 local function makePlan(actor)
   local shields = H.readByte(SH(gSlot))
   local itemRow = cmdRowOf(actor, CMD_ITEM)
@@ -712,15 +736,19 @@ local function makePlan(actor)
   end
   if actor == sabinE and shields > 0 and not imp then
     if not b68.holyRevealed and pMP(sabinE) >= 10 then
-      b68Log(string.format("plan chip 1: AURABOLT (mp %d, sh %d, trainHP %d) " ..
-        "[%s]", pMP(sabinE), shields, H.readWord(MHP(gSlot)), partyLine()))
-      return { kind = "blitz", skill = AURABOLT,
+      local boost = blitzBoost(AURABOLT, shields)
+      b68Log(string.format("plan chip 1: AURABOLT boost=%d (mp %d, sh %d, " ..
+        "trainHP %d) [%s]", boost, pMP(sabinE), shields,
+        H.readWord(MHP(gSlot)), partyLine()))
+      return { kind = "blitz", skill = AURABOLT, boost = boost,
                row = cmdRowOf(actor, CMD_BLITZ) }
     end
     if pMP(sabinE) >= 4 then
-      b68Log(string.format("plan chip: PUMMEL x2 (mp %d, sh %d, trainHP %d) [%s]",
-        pMP(sabinE), shields, H.readWord(MHP(gSlot)), partyLine()))
-      return { kind = "blitz", skill = PUMMEL,
+      local boost = blitzBoost(PUMMEL, shields)
+      b68Log(string.format("plan chip: PUMMEL x2 boost=%d (mp %d, sh %d, " ..
+        "trainHP %d) [%s]", boost, pMP(sabinE), shields,
+        H.readWord(MHP(gSlot)), partyLine()))
+      return { kind = "blitz", skill = PUMMEL, boost = boost,
                row = cmdRowOf(actor, CMD_BLITZ) }
     end
     b68Log(string.format("SABIN is out of chip MP at %d shields (mp %d): " ..
@@ -729,22 +757,25 @@ local function makePlan(actor)
   end
   if actor == shadowE and shields > 0 and b68.holyRevealed and not imp
      and battInvIdx(FIRE_SKEAN) then
-    b68Log(string.format("throw: SHADOW FIRE SKEAN (%d left, sh %d) " ..
-      "trainHP=%d [%s]", invCount(FIRE_SKEAN), shields,
+    local boost = math.min(H.readByte(BP + actor * 2), 3)
+    b68Log(string.format("throw: SHADOW FIRE SKEAN boost=%d (%d left, sh %d) " ..
+      "trainHP=%d [%s]", boost, invCount(FIRE_SKEAN), shields,
       H.readWord(MHP(gSlot)), partyLine()))
-    return { kind = "throw", item = FIRE_SKEAN,
+    return { kind = "throw", item = FIRE_SKEAN, boost = boost,
              row = cmdRowOf(actor, CMD_THROW) }
   end
   if actor == shadowE and not imp and battInvIdx(SHURIKEN) then
-    b68Log(string.format("throw: SHADOW Shuriken (%d left) trainHP=%d [%s]",
-      invCount(SHURIKEN), H.readWord(MHP(gSlot)), partyLine()))
-    return { kind = "throw", item = SHURIKEN,
+    local boost = math.min(H.readByte(BP + actor * 2), 3)
+    b68Log(string.format("throw: SHADOW Shuriken boost=%d (%d left) trainHP=%d [%s]",
+      boost, invCount(SHURIKEN), H.readWord(MHP(gSlot)), partyLine()))
+    return { kind = "throw", item = SHURIKEN, boost = boost,
              row = cmdRowOf(actor, CMD_THROW) }
   end
   if actor == sabinE and not imp and pMP(sabinE) >= 13 then
-    b68Log(string.format("cast: SABIN Suplex (mp %d) trainHP=%d [%s]",
-      pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
-    return { kind = "blitz", skill = SUPLEX,
+    local boost = blitzBoost(SUPLEX, 0)
+    b68Log(string.format("cast: SABIN Suplex boost=%d (mp %d) trainHP=%d [%s]",
+      boost, pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
+    return { kind = "blitz", skill = SUPLEX, boost = boost,
              row = cmdRowOf(actor, CMD_BLITZ) }
   end
   -- an imp's Fight lands for 0: the pips stay banked for after the cure
@@ -763,7 +794,7 @@ local function b68Button()
   if plan == nil or b68.planActor ~= actor then
     if st ~= ST_CMD then
       if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT
-         or st == ST_THROW then
+         or st == ST_THROW or st == ST_ROW or st == ST_DEF then
         return { "b" }
       end
       return nil
@@ -784,14 +815,37 @@ local function b68Button()
     end
     local cur = H.readByte(CMDROW + actor) & 3
     if cur == wantRow then return { "a" } end
-    -- closed-loop steering; the engine skips invalid rows itself.  Try the
-    -- incremental read first, the absolute-jump buttons as fallback.
-    if plan.rowStall and plan.rowStall > 2 then
-      plan.rowStall = 0
-      return { ({ [0] = "up", [1] = "left", [2] = "right", [3] = "down" })[wantRow] }
-    end
+    -- closed-loop steering, UP and DOWN only; the engine skips invalid
+    -- rows itself.  (#366: this used to fall back to LEFT/RIGHT as
+    -- "absolute jumps" after two stalled pulses, but LEFT and RIGHT on the
+    -- command window open the Row and Def. side windows ($24/$27,
+    -- UpdateMenuState_24) -- the "unhandled menu state $24 ... plan=blitz"
+    -- of the v0.24 wipe was SABIN's steer toward Blitz, row 1, pressing
+    -- LEFT.)  A row the cursor never reaches fails by name rather than
+    -- running to the frame cap: four rows take at most three presses, so
+    -- 12 steering pulses on one plan is a stuck steer.
     plan.rowStall = (plan.rowStall or 0) + 1
+    if plan.rowStall > 12 then
+      error(string.format("battle 68: the command steer is stuck -- actor %d's " ..
+        "cursor on row %d after %d steering pulses wanting row %d (plan %s)", actor, cur,
+        plan.rowStall, wantRow, plan.kind), 0)
+    end
     return { cur < wantRow and "down" or "up" }
+  end
+  -- Row / Def. (lib/ot6.lua's ST_ROW/ST_DEF): open only if a direction
+  -- reached the command window, which this fighter no longer presses
+  -- there.  A in $24 would change the row and spend the turn; B closes
+  -- it ($24 -> $05) with the turn and the plan intact.
+  if st == ST_ROW or st == ST_DEF then
+    b68.sideN = (b68.sideN or 0) + 1
+    b68Log(string.format("side window $%02X open (actor=%d plan=%s, #%d this battle) -- B out",
+      st, actor, plan.kind, b68.sideN))
+    if b68.sideN > 6 then
+      error(string.format("battle 68: the Row/Def. side window ($%02X) opened %d times " ..
+        "-- something keeps pressing LEFT/RIGHT on the command window (actor %d, plan %s)",
+        st, b68.sideN, actor, plan.kind), 0)
+    end
+    return { "b" }
   end
   if st == ST_TOOLS and plan.kind == "blitz" then
     local row = nil
@@ -805,6 +859,7 @@ local function b68Button()
     if cc ~= wc then return { wc > cc and "right" or "left" } end
     if cr ~= wr then return { wr > cr and "down" or "up" } end
     b68.casts = b68.casts + 1                 -- the cast is committing NOW
+    if actor == sabinE then b68.sabinCmdAt = H.frame end
     b68.castAt[plan.skill] = b68.castAt[plan.skill] or H.frame
     b68.plan, b68.planActor = nil, nil        -- done: next menu replans fresh
     return { "a" }                            -- confirm; blitzes self-target
@@ -832,6 +887,7 @@ local function b68Button()
   end
   if st == ST_TGT then
     if plan.kind ~= "item" then
+      if actor == sabinE then b68.sabinCmdAt = H.frame end
       b68.plan, b68.planActor = nil, nil      -- Fight commits on this confirm
       return { "a" }                          -- default target
     end
@@ -841,6 +897,7 @@ local function b68Button()
     local wantMask = 1 << plan.target
     if chars == wantMask then
       if plan.item == FENIX_DOWN then b68Watch.fenix(actor, plan.target) end
+      if actor == sabinE then b68.sabinCmdAt = H.frame end
       b68.plan, b68.planActor = nil, nil      -- item commits on this confirm
       return { "a" }
     end
@@ -849,6 +906,7 @@ local function b68Button()
       b68Log(string.format("target steer stalled (chars=%02X want=%02X) " ..
         "-- accepting the current party target", chars, wantMask))
       if plan.item == FENIX_DOWN then b68Watch.fenix(actor, plan.target) end
+      if actor == sabinE then b68.sabinCmdAt = H.frame end
       b68.plan, b68.planActor = nil, nil
       return { "a" }                          -- any party target is harmless
     end
@@ -876,12 +934,18 @@ end
 
 -- observers: shield chips, the break, and the kill, each logged with numbers
 local function b68Observe()
+  -- the last frame SABIN was Muddled or Berserk: an action the engine
+  -- picked for him, not this fighter (a hit can cure Muddle before the
+  -- picked action lands, so the chip itself may see him clear)
+  if sabinE and (H.readByte(0x3EE5 + sabinE * 2) & (H.ST2_MUDDLE | H.ST2_BERSERK)) ~= 0 then
+    b68.wildAt = H.frame
+  end
   local shields = H.readByte(SH(gSlot))
   local hp = H.readWord(MHP(gSlot))
   if (H.readByte(RVE(gSlot)) & HOLY) == HOLY
      or (H.readByte(RVPE(gSlot)) & HOLY) == HOLY then
     if not b68.holyRevealed then
-      b68.holyAt = H.frame
+      b68.holyAt, b68.holyBy = H.frame, H.readByte(0x3410)
       b68Log(string.format("HOLY revealed at f%d (lastSkill=$%02X)", H.frame,
         H.readByte(0x3410)))
     end
@@ -890,7 +954,7 @@ local function b68Observe()
   if (H.readByte(RVC(gSlot)) & OT6_BLUDG) == OT6_BLUDG
      or (H.readByte(RVPC(gSlot)) & OT6_BLUDG) == OT6_BLUDG then
     if not b68.bludgRevealed then
-      b68.bludgAt = H.frame
+      b68.bludgAt, b68.bludgBy = H.frame, H.readByte(0x3410)
       b68Log(string.format("OT6_BLUDG revealed at f%d (lastSkill=$%02X)",
         H.frame, H.readByte(0x3410)))
     end
@@ -912,7 +976,11 @@ local function b68Observe()
       sabinE and pMP(sabinE) or -1, partyLine())
     b68.chips[#b68.chips + 1] = row
     local sk = H.readByte(0x3410)
-    b68.chipAt[sk] = b68.chipAt[sk] or H.frame   -- first chip by each skill
+    if b68.chipAt[sk] == nil then                 -- first chip by each skill
+      b68.chipAt[sk] = H.frame
+      b68.chipWild[sk] = b68.wildAt and b68.wildAt > (b68.sabinCmdAt or -1)
+        and b68.wildAt or nil
+    end
     -- Shields off, not chip rows.  A double-hitting Pummel takes two shields
     -- in one transition (6->5->4->2 is three rows and four shields), so the
     -- row count undercounts the break and cannot be the thing asserted on.
@@ -938,47 +1006,17 @@ local function b68Observe()
 end
 
 
-local L47 = H.newSeedSweep("battle 47")
-local b47Blob, b47won = nil, false
-local function b47Won() return b47won end
-local function b47Checkpoint()
-  local ckReq
+-- Battle 47, played once (#311).  This used to be a three-rung reload
+-- ladder (an in-run snapshot and H.newSeedSweep's spread seeds, the same
+-- plan each rung, its losses invisible to the retry audit).  A loss now
+-- raises the wipe it is (class=wipe), and the segment runner's bounded
+-- retry is the only reload.
+local function b47Fight()
   return H.cond(function() return true end, {
-    H.call(function() ckReq = H.requestSaveState() end),
-    H.waitFrames(2),
     H.call(function()
-      H.checkReq(ckReq, "b47 checkpoint")
-      b47Blob = ckReq.blob
-      H.log(string.format("[train] b47 checkpoint captured (%d bytes) f%d",
-        #b47Blob, H.frame))
-    end),
-  }, {})
-end
-local function b47Attempt(n)
-  local ldReq
-  return H.cond(function() return not b47won end, {
-    H.cond(function() return n > 1 end, {
-      H.logStep(function()
-        return string.format("[train] b47 ATTEMPT %d -- reloading (%s)",
-          n, tostring(lost))
-      end),
-      H.call(function() ldReq = H.requestLoadState(b47Blob) end),
-      H.waitFrames(2),
-      H.call(function()
-        H.checkReq(ldReq, "b47 attempt " .. n)
-        -- the restored snapshot restarts the experiment: the canary's
-        -- count (and its pad freeze, which the reload thaws) belong to
-        -- the lost attempt
-        H.gameOverFired = 0
-      end),
-      H.waitFrames(60),                 -- settle the reload before driving
-    }, {}),
-    L47.spread(n),                      -- spread the battle RNG phase (#83)
-    H.call(function()
-      lost, fightTier, wipeN = nil, n, 0
+      lost, fightTier, wipeN = nil, 1, 0
       b47Heals, fPlan, fPlanActor = 0, nil, nil
       b47Watch.reset()
-      H.gameOverFired = 0
     end),
     nav(26, 9, { maxFrames = 3000 }),
     (function()
@@ -995,28 +1033,26 @@ local function b47Attempt(n)
       return holdDrive("down", function()
         frames = frames + 1
         if frames > 29000 and lost == nil then
-          lost = string.format("b47 attempt %d deadline (29000 frames) with " ..
+          error(string.format("timeout after 29000 frames: battle 47 with " ..
             "no win and no wipe seen -- a genuine stall, see #159/#163 [%s]",
-            n, partyLine())
-          H.log("[train] LOST -- " .. lost)
+            partyLine()), 0)
         end
         return lost ~= nil
             or (mapIdx() == 142 and H.hasControl() and H.tileAligned()
                 and not inBattle() and bright() >= 15)
-      end, "battle 47 + mob scene (attempt " .. n .. ")", 30000, "fight")
+      end, "battle 47 + mob scene", 30000, "fight")
     end)(),
     H.waitFrames(30),
     H.call(function()
       -- the 1/16 leave roll is a no-op by design (Ot6ShadowLeaves): a
       -- missing SHADOW after a win is a ROM regression, not a re-roll
-      H.assertEq(inParty(3), true, "SHADOW aboard after battle 47's win (the leave roll is a no-op by design)")
-      if lost == nil then
-        b47won = true
-        H.log(string.format("[train] battle 47 attempt %d clean: won, " ..
-          "SHADOW aboard", n))
+      if lost ~= nil then
+        error("train: battle 47: THE PARTY IS WIPED -- " .. lost, 0)
       end
+      H.assertEq(inParty(3), true, "SHADOW aboard after battle 47's win (the leave roll is a no-op by design)")
+      H.log("[train] battle 47 clean: won, SHADOW aboard")
     end),
-  }, {})
+  })
 end
 
 -- (A wander-for-an-encounter top-up was tried here and does not work: the
@@ -1068,6 +1104,8 @@ local function b68Fight()
       b68.brokeAt, b68.killedAt, b68.brokeHP = nil, nil, nil
       b68.killParty, b68.wiped = nil, false
       b68.holyAt, b68.bludgAt, b68.chipAt, b68.castAt = nil, nil, {}, {}
+      b68.chipWild, b68.sideN, b68.wildAt, b68.sabinCmdAt = {}, 0, nil, nil
+      b68.holyBy, b68.bludgBy = nil, nil
       b68.shieldsOff = 0
       b68.holyRevealed, b68.bludgRevealed = false, false
       b68.itemsOut = false
@@ -1238,8 +1276,57 @@ local function b68Fight()
       -- are seen on one frame.  A skill that never chipped proves nothing
       -- either way (SABIN short on MP, the train dead first): logged, with
       -- "cast but never chipped" told apart from "never cast".
-      local function tied(what, at, skill, name)
+      -- A Muddled or Berserk SABIN acts on his own (the engine picks the
+      -- Blitz, never this fighter's plan): the lab's be14 run (#366) had a
+      -- Muddled SABIN's Suplex ($5F, bludgeon too) chip the first shield
+      -- and reveal OT6_BLUDG before any Pummel.  So the reveal is tied to
+      -- the skill that made it (the attack index at the reveal frame) when
+      -- that skill chipped there, and a skill the plan never cast is the
+      -- engine's: its chip and reveal still have to share the frame.
+      -- A substitute revealer must carry the key it revealed, read from the
+      -- ROM: OT6_BLUDG from Ot6SkillClassTbl (Pummel, Suplex), HOLY from the
+      -- attack's own element byte (MagicProp +1: AuraBolt).
+      local SKILLNAME = { [PUMMEL] = "Pummel ($5D)", [AURABOLT] = "AuraBolt ($5E)",
+                          [SUPLEX] = "Suplex ($5F)" }
+      local function skillClass(id)
+        local base = H.sym("Ot6SkillClassTbl") & 0x3FFFFF
+        for i = 0, 63 do
+          local k = H.readRomByte(base + i * 2)
+          if k == 0xFF then return 0 end
+          if k == id then return H.readRomByte(base + i * 2 + 1) end
+        end
+        return 0
+      end
+      local function carries(key, id)
+        if key == "HOLY" then return (H.spellElement(id) & HOLY) ~= 0 end
+        return (skillClass(id) & OT6_BLUDG) ~= 0
+      end
+      local function tied(what, at, skill, name, by)
+        if by and by ~= skill and SKILLNAME[by] and carries(what, by) and b68.chipAt[by]
+           and at and math.abs(at - b68.chipAt[by]) <= REVEAL_SLACK then
+          skill, name = by, SKILLNAME[by]
+        end
+        if by and SKILLNAME[by] then
+          H.assertEq(carries(what, by), true, string.format("%s revealed on a frame whose " ..
+            "attack is %s, which does not carry %s", what, SKILLNAME[by], what))
+        end
+        H.assertEq(carries(what, skill), true, string.format("%s's revealer %s carries %s " ..
+          "(Ot6SkillClassTbl / its element byte)", what, name, what))
         local cast, chip = b68.castAt[skill], b68.chipAt[skill]
+        if chip ~= nil and cast == nil then
+          local wild = b68.chipWild[skill]
+          H.log(string.format("[b68] %s: %s chipped f%d but the plan never " ..
+            "cast it -- the engine's (SABIN last Muddled/Berserk at f%s, after his last " ..
+            "command)", what, name, chip, tostring(wild)))
+          H.assertEq(wild ~= nil, true, string.format(
+            "%s: a %s the plan never cast came from a SABIN Muddled or Berserk since his " ..
+            "last command (chip f%d)", what, name, chip))
+          H.assertEq(at ~= nil and math.abs(at - chip) <= REVEAL_SLACK, true,
+            string.format("%d of 6 shields off: %s revealed by the %s that " ..
+            "chipped (engine-chosen; chip f%d, reveal f%s, slack %d)", off,
+            what, name, chip, tostring(at), REVEAL_SLACK))
+          return
+        end
         if chip == nil then
           H.log(string.format("[b68] %s: %s %s -- the tie is not asserted " ..
             "(%s revealed f%s)", what, name, cast and string.format(
@@ -1257,8 +1344,8 @@ local function b68Fight()
           off, what, name, tostring(cast), tostring(chip), tostring(at),
           REVEAL_SLACK))
       end
-      tied("HOLY", b68.holyAt, AURABOLT, "AuraBolt ($5E)")
-      tied("OT6_BLUDG", b68.bludgAt, PUMMEL, "Pummel ($5D)")
+      tied("HOLY", b68.holyAt, AURABOLT, "AuraBolt ($5E)", b68.holyBy)
+      tied("OT6_BLUDG", b68.bludgAt, PUMMEL, "Pummel ($5D)", b68.bludgBy)
       if off < 6 then
         H.log(string.format("[tuning] battle 68 won with %d of 6 shields off " ..
           "-- the train died before its break (killedAt=f%s casts=%d " ..
@@ -1281,9 +1368,9 @@ local function b68Fight()
   }, {})
 end
 
--- allowGameOver: the battle-47 ladder below deliberately survives a lost
--- fight (#163); wipeWatch reads H.gameOverFired as a loss and the next
--- attempt reloads.  It ends with that ladder (H.setAllowGameOver below).
+-- allowGameOver: through battle 47 a lost fight is read by wipeWatch
+-- (#163), which b47Fight raises as the wipe it is, with the party's last
+-- reading; it ends there (H.setAllowGameOver below).
 H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(30),
@@ -1468,25 +1555,12 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     return sw(0x3D) == 1 and H.hasControl() and H.tileAligned()
   end, "bait the follower ghost", 4000),
 
-  -- ---- battle 47, with real input, behind the sweep ----
-  b47Checkpoint(),
-  L47.watch(),
-  b47Attempt(1),
-  b47Attempt(2),
-  b47Attempt(3),
-  L47.report(),
-  H.call(function()
-    if not b47Won() then
-      error(string.format("train: battle 47 did not complete cleanly on " ..
-        "any of 3 attempts -- last: %s -- do not rig this segment",
-        tostring(lost)), 0)
-    end
-  end),
-  -- Battle 47's ladder is the only thing here that survives a lost fight.
-  -- From now on a wipe (a corridor random, battle 68) is the canary's: it
+  -- ---- battle 47, with real input ----
+  b47Fight(),
+  -- From battle 47 on a wipe (a corridor random, battle 68) is the canary's: it
   -- counts it, freezes the pad and files the attempt as class wipe, with
   -- its context line, for the segment runner's bounded retry.
-  H.setAllowGameOver(false, "battle 47's ladder is done; battle 68 and the " ..
+  H.setAllowGameOver(false, "battle 47 is done; battle 68 and the " ..
     "rest of the train lose the way every other fight does"),
 
   nav(40, 8, { maxFrames = 4000 }),

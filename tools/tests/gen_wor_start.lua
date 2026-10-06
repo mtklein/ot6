@@ -55,8 +55,14 @@ local H = dofile("tools/tests/lib/ot6.lua")
 --   "allnear"   "near" while the fast fish swims; every slow fish when it
 --               does not
 --   "wait"      "near", but stand at WAIT_SPOT and let the fish come
+--   "read"      (#358, ships) reads what a person cannot see from the
+--               house: the spawn switches the talk just rolled ($0369-$036C)
+--               and which object each fish is.  Past the first visit, no
+--               fast fish rolled: talk again at the bedside (the reroll)
+--               instead of walking to an empty beach; on the beach, the
+--               +32 and the +16 fish by object, never the -4 or the -16.
 -- Never the slowest fish (-16) under any of them.
-local POLICY = "near"
+local POLICY = "read"
 local SLOW_AFTER_FAST = 240
 local WAIT_SPOT = { 8, 12 }   -- the land-edge tile beside the fast fish's two likeliest shore tiles
 
@@ -65,6 +71,7 @@ local MAP_HOUSE, MAP_ISLE, MAP_BEACH = 397, 396, 398
 local OBJ_RAFT = 0x13                               -- npc_prop 397 record 4 (the raft)
 local GFX_FISH = 0x3A                               -- include/gfx/map_sprite_gfx.inc FISH
 local SPEED_FAST, SPEED_SLOW = 2, 1                 -- $0875: NORMAL 2, SLOW 1, SLOWER 0
+local OBJ_FISH_FAST, OBJ_FISH_GOOD = 0x11, 0x12     -- npc 2 ($0369, +32), npc 3 ($036A, +16)
 local TALK_X, TALK_Y = 99, 38                       -- beside the bed, facing right
 local LANDING_X, LANDING_Y = 146, 212               -- _ca5633: load_map 1, {146, 212}
 local CATCH_GIVEUP = 2400                           -- frames on one fish before leaving it
@@ -94,6 +101,14 @@ local DIRS = {
 local STEP = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
 local trip, fed, caughtTrip, firstDraw = 0, {}, {}, nil
+local rerolls = 0
+-- the "read" policy's house rule: past the first visit, standing in the
+-- house with the fast fish's spawn switch clear ($0369, set by the last
+-- talk's reroll), talk again rather than walk to the beach
+local function rereadOnly()
+  return POLICY == "read" and trip > 1 and map() == MAP_HOUSE
+    and sw(0x369) == 0 and not cidWell() and not cidDead()
+end
 local function fishSet()
   local parts = {}
   for i = 0x10, 0x1F do
@@ -155,6 +170,9 @@ local function fishing()
   local present, skip = {}, {}
   local function wanted(i)
     if not isFish(i) or skip[i] then return false end
+    -- "read": the two fish that feed him, by object (the +32 and the +16;
+    -- npc_prop 398, _ca5370), never the -4 or the -16
+    if POLICY == "read" then return i == OBJ_FISH_FAST or i == OBJ_FISH_GOOD end
     local sp = objSpeed(i)
     if sp >= SPEED_FAST then return true end
     if sp ~= SPEED_SLOW then return false end                    -- never the slowest
@@ -189,7 +207,8 @@ local function fishing()
       skip[target] = true; target = nil
     end
     -- no fast fish: the visit is over (the talk rerolls), except under "all"
-    -- and "allnear"
+    -- and "allnear" ("read" walks here with no fast fish only on trip 1,
+    -- the landing's own roll)
     if POLICY ~= "all" and POLICY ~= "allnear" and not fastSeen then return true end
     -- standing and waiting has the same patience as chasing one fish
     if POLICY == "wait" and H.frame - arrived > CATCH_GIVEUP then
@@ -211,6 +230,13 @@ local function fishing()
         end
         H.log(string.format("[cid] trip %d: the beach at f%d, health %d, fish %s",
           trip, H.frame, health(), fishSet()))
+        -- the ROM's fish, as "read" names them: the fast one and a slow one
+        if isFish(OBJ_FISH_FAST) then
+          H.assertEq(objSpeed(OBJ_FISH_FAST), SPEED_FAST, "obj $11 is the NORMAL-speed (+32) fish")
+        end
+        if isFish(OBJ_FISH_GOOD) then
+          H.assertEq(objSpeed(OBJ_FISH_GOOD), SPEED_SLOW, "obj $12 is a SLOW fish (the +16)")
+        end
       end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
@@ -400,43 +426,56 @@ H.run({ maxFrames = 200000, bootFallback = false }, {
     H.call(function()
       trip = trip + 1; caughtTrip = {}; tripStart = H.frame; healthBefore = health()
     end),
-    H.cond(function() return map() == MAP_HOUSE end,
-      { through(100, 46, "down", MAP_ISLE, "the house door -> 396") }, {}),
-    through(8, 14, "down", MAP_BEACH, "396 -> the beach 398"),
-    fishing(),
-    -- the boot point: this attempt's seed shift idles here, on the beach
-    -- after the first visit's catches, a beat before the walk back.  The
-    -- fish and the bird walk the field RNG ($1F6D) while Celes stands
-    -- there, and the next talk's reroll reads it.  An idle earlier (at the
-    -- Continue, or on first reaching the beach) leaves the first draw as
-    -- it was -- the first catch waits on the fish, which swim on the map's
-    -- own clock -- though not the rest of the run
-    -- (docs/design/wor-start.md "What varies the draw")
-    H.cond(function() return not beachMarked end, {
+    -- "read" (#358): in the house, with no fast fish rolled, the visit is
+    -- a talk, not a walk -- the talk is the reroll, and a walk to an empty
+    -- beach costs Cid about 11
+    H.cond(function() return rereadOnly() end, {
+      talkCid(),
       H.call(function()
-        beachMarked = true
-        H.bootMark(string.format("the fishing beach 398 after trip 1's catches (health %d, rand $%02X)",
-          health(), H.readByte(0x1F6D)))
+        rerolls = rerolls + 1
+        H.log(string.format("[cid] trip %d: a reroll talk at the bedside (no fast fish rolled), " ..
+          "health %d -> %d, roll now %d%d%d%d", trip, healthBefore, health(),
+          sw(0x369), sw(0x36A), sw(0x36B), sw(0x36C)))
       end),
-    }, {}),
-    through(4, 1, "up", MAP_ISLE, "the beach -> 396"),
-    through(8, 6, "up", MAP_HOUSE, "396 -> the house"),
-    H.call(function()
-      H.log(string.format("[cid] trip %d: home at f%d, health %d%s", trip, H.frame, health(),
-        cidDead() and " -- LOST (30 or less entering the house)" or ""))
-    end),
-    H.cond(function() return not cidDead() end, { talkCid() }, {}),
-    H.call(function()
-      fed[#fed + 1] = string.format("%d:{%s}", trip, table.concat(caughtTrip, ","))
-      if trip == 1 and not cidDead() then noteFirstDraw() end
-      H.log(string.format("[cid] trip %d done: %d frames, caught {%s}, health %d -> %d%s",
-        trip, H.frame - tripStart, table.concat(caughtTrip, ", "), healthBefore, health(),
-        cidWell() and " -- RECOVERED" or ""))
-    end),
+    }, {
+      H.cond(function() return map() == MAP_HOUSE end,
+        { through(100, 46, "down", MAP_ISLE, "the house door -> 396") }, {}),
+      through(8, 14, "down", MAP_BEACH, "396 -> the beach 398"),
+      fishing(),
+      -- the boot point: this attempt's seed shift idles here, on the beach
+      -- after the first visit's catches, a beat before the walk back.  The
+      -- fish and the bird walk the field RNG ($1F6D) while Celes stands
+      -- there, and the next talk's reroll reads it.  An idle earlier (at the
+      -- Continue, or on first reaching the beach) leaves the first draw as
+      -- it was -- the first catch waits on the fish, which swim on the map's
+      -- own clock -- though not the rest of the run
+      -- (docs/design/wor-start.md "What varies the draw")
+      H.cond(function() return not beachMarked end, {
+        H.call(function()
+          beachMarked = true
+          H.bootMark(string.format("the fishing beach 398 after trip 1's catches (health %d, rand $%02X)",
+            health(), H.readByte(0x1F6D)))
+        end),
+      }, {}),
+      through(4, 1, "up", MAP_ISLE, "the beach -> 396"),
+      through(8, 6, "up", MAP_HOUSE, "396 -> the house"),
+      H.call(function()
+        H.log(string.format("[cid] trip %d: home at f%d, health %d%s", trip, H.frame, health(),
+          cidDead() and " -- LOST (30 or less entering the house)" or ""))
+      end),
+      H.cond(function() return not cidDead() end, { talkCid() }, {}),
+      H.call(function()
+        fed[#fed + 1] = string.format("%d:{%s}", trip, table.concat(caughtTrip, ","))
+        if trip == 1 and not cidDead() then noteFirstDraw() end
+        H.log(string.format("[cid] trip %d done: %d frames, caught {%s}, health %d -> %d%s",
+          trip, H.frame - tripStart, table.concat(caughtTrip, ", "), healthBefore, health(),
+          cidWell() and " -- RECOVERED" or ""))
+      end),
+    }),
   }, "feeding Cid"),
   H.call(function()
-    H.log(string.format("[cid] Cid recovered on trip %d at f%d, health %d ($00B3=%d $00B4=%d, timer 0 flags $%02X), policy %s, first draw [%s]",
-      trip, H.frame, health(), sw(0xB3), sw(0xB4), H.readByte(0x1188), POLICY, tostring(firstDraw)))
+    H.log(string.format("[cid] Cid recovered on trip %d at f%d, health %d ($00B3=%d $00B4=%d, timer 0 flags $%02X), policy %s, %d reroll talk(s), first draw [%s]",
+      trip, H.frame, health(), sw(0xB3), sw(0xB4), H.readByte(0x1188), POLICY, rerolls, tostring(firstDraw)))
     H.assertEq(cidDead(), false, "Cid is alive")
   end),
 

@@ -5,69 +5,85 @@
 --
 -- A committed action waits in the battle's action queue ($3820) behind
 -- whatever is already queued.  If its character loses the action while it
--- waits -- falls, or falls asleep -- vanilla's RemoveAllActions empties his
--- command list and the advance-wait queue, but not the action queue, and
--- ExecAction runs the stale entry as its placeholder, CmdNoEffect ($b5 =
--- $12): nothing happens.  Ot6ActionEnd charged the pending boost there, so a
--- Setzer felled with a boosted spin queued paid for a spin that never ran
--- (first seen in a fault-injected lab, build/attempts/wt/suites-2.2.1/;
--- played here).  Now the ROM marks such a turn at ExecAction's head
--- (Ot6NoActionMark, OT6_NOACTION bit 7: a fresh turn with nothing to run)
--- and Ot6ActionEnd drops the pending tier there instead of spending it.
--- The lost turn's regen pip follows the TLM's ruling: earned if he is still
--- in the fight at the turn's end (a sleep), not if he is out of it (KO'd or
--- petrified, $3ee4 & $c0).  A natural fall is enough; the Fenix Down that
--- raises him plays no part.  The cap hides the pip at bank 5, so the moment
--- the test waits for is a cancel below it: Setzer, whose Defends would hold
--- the bank at 5, spends a pip on a boosted spin whenever his window opens
--- outside a branch point on a bank of BANK_SPEND or more, so his windows
--- come up below the cap however long the fight runs.  (Spending only on a
--- full bank was not enough: a spin cancelled by his fall charges nothing
--- and earns nothing, so a Setzer felled again and again sat at 5 for a
--- whole fight, and the branch point came only when a fresh battle reset
--- his bank to 1 -- the v0.25 re-cut's terra-returned-v1 dealt a second
--- battle where it never did, build/attempts/wt/recut-fallout/slotcancel/.)
+-- waits -- falls, is petrified or falls asleep -- vanilla's RemoveAllActions
+-- empties his command list and the advance-wait queue, but not the action
+-- queue, and ExecAction runs the stale entry as its placeholder,
+-- CmdNoEffect ($b5 = $12): nothing happens.  Ot6ActionEnd charged the
+-- pending boost there, so a Setzer who lost a boosted spin that way paid
+-- for a spin that never ran.  Now the ROM marks such a turn at ExecAction's
+-- head (Ot6NoActionMark, OT6_NOACTION bit 7: a fresh turn with nothing to
+-- run) and Ot6ActionEnd drops the pending tier there instead of spending
+-- it.  The lost turn's regen pip follows the TLM's ruling: earned if he is
+-- still in the fight at the turn's end (a sleep), not if he is out of it
+-- (KO'd or petrified, $3ee4 & $c0).
 --
--- Played, not written: a natural boot of the terra-returned-v1 checkpoint,
--- a drawn battle, and real inputs only.  The party plays a policy a person
--- could (reading what it likes, pressing only buttons):
---   * first the control: Setzer spins boosted (one pip, R) until one such
---     spin has run, the members keeping everyone, him included, above
---     CARE_PCT with Potions;
---   * then the other members raise the fallen with Fenix Downs (Setzer
---     first), give Potions to each other below CARE_PCT, and otherwise
---     Fight Setzer (an ally can be targeted), one blow in flight at a time;
---     Setzer Defends (a guarded turn regenerates a pip).  Well above the
---     members' median blow (measured as they land) a Fight lands at once;
---     nearer, the member holds his window with the cursor on Setzer until
---     Setzer's gauge is full and a monster's action is starting, then
---     strikes, so Setzer's own window opens next with the blow queued
---     behind that action.
--- The branch point is Setzer's window opening on him below the median blow
--- (it fells him), a pip banked, and a member's Fight on him still in its
--- advance wait (read off the command lists and the action queue).  It is
--- snapshotted and branched BRANCHES_PER_POINT times: each branch idles 4
--- frames longer there, then banks one pip with R, spins and commits as fast
--- as a person taps, and is played on, the members now only caring and
--- guarding, until the spin's own turn ends (Ot6ActionEnd with his entity;
--- the no-action mark, the command that ran and his out-of-the-fight bits
--- read there).  Whether the blow lands before the commit (no spin), in the
--- spin's advance wait (vanilla drops the spin with him: no end of its own),
--- or once the spin waits in the action queue (it comes up with the
--- no-action mark) is the draw's business.  When no branch of a point came
--- up marked below bank 5, the snapshot is restored and play goes on from
--- it (Setzer Defends in that window) to the next branch point, at most
--- MAX_POINTS of them.
--- Asserted, per branch:
---   1. a spin that ran ($0F, unmarked), the control's and any branch's:
---      pending -> 0 and the bank down by the tier (the boost is still
---      charged when it buys the spin);
+-- THE CANCEL IS A DECLARED FAULT INJECTION (docs/TESTING.md, "Synthetic
+-- mechanism tests"; the coordinator's ruling on #377, v0.26).  The property
+-- is the ROM's handling of a spin whose caster loses his action while it
+-- waits, not whether a party can arrange that by play: three play policies
+-- -- members felling Setzer with a blow timed into his wait -- failed 2 to
+-- 3 of 12 draws each, the queued blow landing before his ~100-frame commit
+-- and every fall between branch points spending a Fenix Down
+-- (build/attempts/wt/v026-rom2/slotcancel/).  Nothing in these fights puts
+-- him to sleep or stone by play: the party knows no Sleep and carries no
+-- item that inflicts it, and every monster action measured on him was a
+-- plain Fight ($b5 = $00, 12 traced runs).
+--
+-- So: Sleep, injected in the shape its own handler leaves -- the four
+-- bytes SetStatus_0f and UpdateStatus write when a Sleep lands: STATUS2
+-- bit 7 ($3ee5), the sleep counter $12 ($3cf9), $3aa0.7 cleared, and
+-- $3204's RemoveAllActions request ($40) -- written once his committed
+-- spin stands in the action queue behind another entity's entry (the
+-- measured point, below).  Everything after is the engine's: that entry's
+-- action runs, its AfterAction2 serves the $3204 request for every entity
+-- (RemoveAllActions: his command list and the advance-wait queue emptied,
+-- the action queue left alone), and his stale entry comes up.  Sleep's own
+-- allowed-mask ($331d) is read first and asserted.  Sleep and not Wound or
+-- Petrify: of the three statuses that empty the advance-wait queue it is
+-- the one whose handler leaves nothing else to fake (a Wound also needs HP
+-- 0, the death machinery and a Fenix Down; a Petrify the dead flag), and it
+-- is the "falls asleep" half of what this file always meant, the
+-- in-the-fight arm of the TLM's ruling -- so no Fenix Down is spent by it
+-- and none enters the verdict.  The writes are this file's line in
+-- tools/state_write_waivers.txt.
+--
+-- The measured point.  A commit puts his entry in the advance-wait queue
+-- ($3720), and the battle loop moves those entries, in order, into the
+-- action queue between actions; first in line, his runs at once and
+-- nothing can come between ("aw=[02] aq=[]" at the commit, "aq=[02]" 154
+-- frames later with nothing running, his ExecAction 26 frames after,
+-- build/attempts/wt/v026-rom2/r3/sc/dbg_k0.log.gz).  So his commit is held
+-- (the last reel's press) until another entity's entry stands in the
+-- advance-wait queue; his follows it into the action queue, and the
+-- injection is made there.  First cuts injected as a status to set behind
+-- a running monster action, or held the commit for a monster's action to
+-- begin, and reached the precondition on 5 to 7 of 12 draws (r3/sc/inj*).
+--
+-- Played around the injection: a natural boot of the terra-returned-v1
+-- checkpoint, a drawn battle, and real inputs only.  The members never
+-- attack; they raise the fallen with Fenix Downs (Setzer first), give
+-- Potions below CARE_PCT, and otherwise Defend.  Setzer:
+--   * the control first: a boosted spin (one pip, R) that runs ($0F);
+--   * then, at each window of his with 1 to 4 pips banked (below the cap,
+--     where the regen pip shows), a boosted spin whose commit is held as
+--     above, and the injection once his entry waits behind another.  A
+--     spin that still reached the front first ran, uninjected; the next
+--     window tries again, at most MAX_ATTEMPTS of them;
+--   * other windows Defend (a pip at 5 is spent on a boosted spin first,
+--     to bring the bank below the cap).
+-- Asserted, over every attempt:
+--   1. a spin that ran ($0F, unmarked), the control's and any attempt's:
+--      pending -> 0 and the bank down by the tier;
 --   2. a boosted spin whose turn came up marked: pending -> 0, nothing
---      charged, and the bank UNCHANGED when he is out of the fight at the
---      turn's end (up one, capped at 5, if he is in it -- a raise came first);
---   3. (no assertion) a spin dropped before it reached the queue ends no
---      turn of its own; the branch is logged and counted, nothing more;
--- and at least one of each of 1 (the control) and 2, 2 below bank 5.
+--      charged, and the bank up one (capped at 5) when he is in the fight at
+--      the turn's end -- asleep, as injected -- or UNCHANGED if out of it;
+--   3. a marked turn with him in the fight came after the injected Sleep
+--      was applied (the bit seen set; a blow may wake him again before the
+--      stale entry comes up), and the Sleep was allowed by his $331c;
+-- and the control, and at least one of 2 below bank 5 that the injection
+-- made (in the fight, Sleep applied).  A spin a monster's blow cancels by
+-- felling him (out of the fight) is booked by 2 like any other, but does
+-- not count toward the precondition.
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -84,8 +100,11 @@ local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
 local LOW_PCT = 15          -- the control spins only while he stands above this
 local CARE_PCT = 40         -- ...and give a Potion to any other member below this
 local MAX_BATTLES = 6
-local BANK_SPEND = 3         -- off a branch point he spins boosted on a bank this high
+-- injection attempts: 8 of 20 attempts over 12 drawn histories ran
+-- uninjected (r3/sc/inj6_k*), q = 0.4, and q^8 <= 1e-3
+local MAX_ATTEMPTS = 8
 
+local slept = nil           -- whether SETZER was asleep at his last ExecAction
 local NOACTION = nil        -- OT6_NOACTION's WRAM offset (H.sym, at the first step)
 local function bp(s)   return H.readByte(0x3E9C + s * 2) end
 local function pend(s) return H.readByte(0x3E9D + s * 2) end
@@ -141,12 +160,16 @@ local function threatOn(slot)
 end
 -- How many actions wait ahead of entity x in the action queue ($3820 from
 -- $3a66 to $3a67), or nil when x is not in it (still in its advance wait).
+-- The queue is a ring: both indices are bytes the engine inc's (wrapping
+-- at 256, _c24e77 and the battle loop), so it is walked modulo 256 (a
+-- plain start..end-1 loop read a wrapped queue as empty).
 local function aheadOf(x)
-  local n = 0
-  for i = H.readByte(0x3A66), H.readByte(0x3A67) - 1 do
+  local n, i, stop = 0, H.readByte(0x3A66), H.readByte(0x3A67)
+  while i ~= stop do
     local e = H.readByte(0x3820 + i)
     if e == x then return n end
     if e ~= 0xFF then n = n + 1 end
+    i = (i + 1) & 0xFF
   end
 end
 -- His gauge is full and nothing of his is queued: his window is next in line.
@@ -164,7 +187,7 @@ end
 --   * (after the control, outside the branches) Fight on Setzer, held for
 --     the moment when he is near the median blow (planFor, otherWindow);
 --   * else Defend.
-local attackSetzer = true
+local attackSetzer = false   -- the members never attack him now
 local monsterActing, monsterStart = nil, 0   -- a monster's action in progress (exec watches)
 local executing, execStart = nil, 0          -- any entity's action in progress (ExecAction..Ot6ActionEnd)
 local skipPoint = false      -- playing on from a branch point: not that window again
@@ -330,24 +353,29 @@ local function setzerDefend()
       or st == 0x0E or st == ST_REELS then tap("b")
   else H.setPad({}) end
 end
-local function branchPoint()
-  return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor
-    and H.readByte(MSTATE) == ST_CMD and php(actor) > 0 and low() and bp(actor) >= 1
-    and threatOn(actor) ~= nil and php(actor) < blow() and ctlDone
-    and bp(actor) < 5                     -- below the cap, where the pip shows
-    and aheadOf(threatOn(actor)) == nil   -- the blow is still in its advance wait
-end
-
--- ---------------------------------------------------------- the branches
--- Setzer's commits (Ot6SlotCommit, the reel commit press) and the ends of
--- his actions (Ot6ActionEnd with his entity, $b5 the command that ran) are
--- observed by exec watches and read on the next frame, when the books have
--- settled.
 local rec = nil              -- the live branch's record
 local recs = {}
 local commitHit, endHit = false, nil
 
 local SS = { n = 0, rTaps = 0 }
+-- A committed action enters the advance-wait queue ($3720, ring
+-- $3a64..$3a65) and the battle loop moves those entries, in order, into the
+-- action queue ($3820) between actions.  Measured after a commit (round-3
+-- dbg_k0.log): "aw=[02] aq=[]" at +0, "aq=[02]" at +154 with nothing
+-- executing, ExecAction at +180 -- his entry first in line, so nothing
+-- ran between its entry and its turn.  With another entity's entry ahead
+-- of his in the advance-wait queue, his follows it and waits behind it.
+local function otherWaiting()
+  local i, stop = H.readByte(0x3A64), H.readByte(0x3A65)
+  while i ~= stop do
+    local e = H.readByte(0x3720 + i)
+    if e ~= 0xFF and e ~= actor * 2 then return true end
+    i = (i + 1) & 0xFF
+  end
+  return false
+end
+-- another entity has an action committed and not yet started ($32cc, its
+-- command list, set as the action is queued and cleared as it starts)
 local function setzerSpin()
   SS.n = SS.n + 1
   local ph = SS.n % 6                -- quick hands: the blow is already queued
@@ -374,6 +402,11 @@ local function setzerSpin()
   elseif st == ST_REELS then
     if H.readByte(PRESS[3]) ~= 0 and H.readByte(STOP[3]) == 0 then
       H.setPad({})                 -- reel 3 settling: the commit waits for it
+    elseif SS.hold and H.readByte(PRESS[3]) ~= 0 and not otherWaiting() then
+      -- the injection attempt's commit waits until another entity's action
+      -- stands in the advance-wait queue, so his entry follows it into the
+      -- action queue and waits there behind it
+      H.setPad({})
     else
       tap("a")                     -- reels 1-3, then the commit
     end
@@ -383,168 +416,6 @@ local function setzerSpin()
   else
     H.setPad({})
   end
-end
-
--- The approach.  The control comes first: while Setzer stands above
--- LOW_PCT with a pip, his window spins boosted (one pip) until one such spin
--- has run ($0F) and its books are kept (ctl); every other window of his
--- Defends.  A control spin that fails to run (dropped or cancelled) is
--- simply played again from a later window.
-local function approachFrame()
-  if commitHit then
-    commitHit = false
-    if ctl and not ctl.commit then
-      ctl.commit = { f = H.frame, p = pend(actor), b = bp(actor), hp = php(actor) }
-    end
-  end
-  if endHit then
-    local e = endHit
-    endHit = nil
-    if ctl and ctl.commit and not ctl.done then
-      if e.cmd == CMD_SLOT and not e.noaction then
-        ctl.done = { f = H.frame, cmd = e.cmd, hp = e.hp, p = pend(actor), b = bp(actor) }
-        ctlDone = true
-        H.log(string.format("[cancel] control f%d: a boosted spin RAN: commit f%d pending %d " ..
-          "bank %d | turn end $b5=$0F -> pending %d bank %d", H.frame, ctl.commit.f,
-          ctl.commit.p, ctl.commit.b, ctl.done.p, ctl.done.b))
-      else
-        H.log(string.format("[cancel] control f%d: the spin ended as $%02X (no-action mark " ..
-          "%s), not run; again", H.frame, e.cmd, tostring(e.noaction)))
-        ctl = nil
-      end
-    end
-  end
-  if H.readByte(MENU) ~= 0 and php(actor) == 0 and raising == nil and invCount(FENIX) == 0 then
-    -- a window is up and he is down with no Fenix Down left to raise him:
-    -- no branch point can come (#377: wt/recut-fallout's sweep2 k5 spent
-    -- 40000 frames healing around a fallen SETZER with an empty bag)
-    H.assertEq(false, true, string.format("precondition: a Fenix Down to raise SETZER " ..
-      "(f%d: the bag is out)", H.frame))
-  end
-  if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor then
-    W = {}
-    if ctl and ctl.commit and ctl.away and not ctl.done then ctl = nil end  -- dropped: again
-    if not ctlDone and (ctl == nil or not ctl.commit) and not low() and bp(actor) >= 1 then
-      ctl = ctl or {}
-      setzerSpin()
-    elseif ctlDone and bp(actor) >= BANK_SPEND then
-      setzerSpin()      -- keep the bank off the cap, where it hides the pip
-    else
-      setzerDefend()
-    end
-  else
-    if ctl and ctl.commit then ctl.away = true end
-    skipPoint = false
-    SD.n, SS.n = 0, 0
-    pageOrOther()
-  end
-end
-
-local function branchFrame()
-  if commitHit then
-    commitHit = false
-    if rec.commit == nil then
-      rec.commit = { f = H.frame, p = pend(actor), b = bp(actor), hp = php(actor) }
-      H.log(string.format("[cancel] branch %d f%d commit: pending %d, bank %d, hp %d | party %s",
-        rec.k, H.frame, rec.commit.p, rec.commit.b, rec.commit.hp, partyLine()))
-    end
-  end
-  if endHit then
-    local e = endHit
-    endHit = nil
-    if rec.commit and rec.done == nil and rec.dropped == nil then
-      if e.noaction or e.cmd == CMD_SLOT then
-        rec.done = { f = H.frame, cmd = e.cmd, hp = e.hp, p = pend(actor), b = bp(actor),
-                     kind = e.noaction and "cancelled" or "ran", ko = e.ko }
-      else
-        -- a later turn of his (the Defend after a raise) ended first: the
-        -- spin was dropped with him before it reached the action queue
-        rec.dropped = { f = H.frame, cmd = e.cmd }
-      end
-    end
-  end
-  if not rec.commit and php(actor) == 0 then
-    rec.lost = H.frame                     -- the blow landed before the commit
-    return
-  end
-  if rec.commit and not rec.fell and php(actor) == 0 then
-    rec.fell = H.frame
-    H.log(string.format("[cancel] branch %d f%d SETZER fell with his spin (committed f%d) " ..
-      "not yet run | party %s", rec.k, H.frame, rec.commit.f, partyLine()))
-  end
-  if rec.fell and not rec.raised and php(actor) > 0 then
-    rec.raised = H.frame
-    H.log(string.format("[cancel] branch %d f%d SETZER raised: hp %d, pending %d, bank %d",
-      rec.k, H.frame, php(actor), pend(actor), bp(actor)))
-  end
-  if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor then
-    W = {}
-    if rec.commit then setzerDefend() else setzerSpin() end   -- one spin per branch
-  else
-    SS.n = 0
-    pageOrOther()
-  end
-end
-
-local function tally()
-  local ran, cancelled = 0, 0
-  for _, r in ipairs(recs) do
-    -- counted once the branch has been logged (the outer drive stops on it)
-    if r.logged and r.done and r.done.kind == "ran" and r.commit.p > 0 then ran = ran + 1 end
-    if r.logged and r.done and r.done.kind == "cancelled" and r.commit.p > 0 then
-      cancelled = cancelled + 1
-    end
-  end
-  return ran, cancelled
-end
-
-local snap = nil
-local points = 0
-local function branch(j, wait)
-  local req, k
-  return H.cond(function() return true end, {
-    H.call(function() H.setPad({}); rec = nil; req = H.requestLoadState(snap.blob) end),
-    H.waitFrames(2),
-    H.call(function()
-      H.checkReq(req, "snapshot load (branch " .. j .. " of point " .. points .. ")")
-      H.rearmInputInjection()
-      k = #recs + 1
-      rec = { k = k, wait = wait, point = points }
-      recs[#recs + 1] = rec
-      commitHit, endHit = false, nil
-      attackSetzer = false
-      raising, healing, hitting, W, SS, SD = nil, {}, nil, {}, { n = 0, rTaps = 0 }, { n = 0 }
-      H.log(string.format("[cancel] branch %d (point %d): %d idle frames at Setzer's window",
-        k, points, wait))
-    end),
-    H.waitFrames(wait + 1),
-    H.driveUntil(function()
-      if not H.battleLoadStarted() then return true end
-      if rec.done or rec.dropped or rec.lost then return true end
-      return rec.commit ~= nil and H.frame - rec.commit.f > 3000
-    end, 9000, { H.call(branchFrame), H.waitFrames(1) }, "a branch: the spin's turn ends"),
-    H.call(function()
-      local c, d = rec.commit, rec.done
-      if not c then
-        H.log(string.format("[cancel] branch %d: NO COMMIT: %s", k, rec.lost and
-          string.format("he fell at f%d, before the commit press", rec.lost)
-          or "the window was taken away"))
-      elseif not d then
-        H.log(string.format("[cancel] branch %d DROPPED: no end of the spin's own (%s; " ..
-          "fell f%s, raised f%s): it never reached the action queue | pending %d bank %d",
-          k, rec.dropped and string.format("his next turn ended as $%02X at f%d",
-          rec.dropped.cmd, rec.dropped.f) or "3000 frames passed", tostring(rec.fell),
-          tostring(rec.raised), pend(actor), bp(actor)))
-      else
-        local what = d.kind == "ran" and "RAN" or "CANCELLED"
-        H.log(string.format("[cancel] branch %d %s: commit f%d pending %d bank %d | turn end " ..
-          "f%d no-action mark %s $b5=$%02X hp %d%s -> pending %d bank %d (fell f%s, raised f%s)",
-          k, what, c.f, c.p, c.b, d.f, d.kind == "cancelled" and "SET" or "clear", d.cmd,
-          d.hp, d.ko and " out of the fight" or "", d.p, d.b, tostring(rec.fell), tostring(rec.raised)))
-      end
-      rec.logged = true
-    end),
-  })
 end
 
 -- ------------------------------------------------------------- the draws
@@ -610,22 +481,137 @@ local function drawBattle(tag, tries)
   return steps
 end
 
--- Rounds, battle after battle: draw when no battle is up, play on until
--- the branch point or the battle's end; at a branch point, snapshot and play
--- BRANCHES_PER_POINT branches; if none of them ended as the placeholder,
--- restore the snapshot and play on from it (Setzer Defends in that window,
--- as at any other) to the next branch point, at most MAX_POINTS of them.
-local battles, atPoint = 0, false
-local BRANCHES_PER_POINT, MAX_POINTS = 2, 10
-local function belowCap()
+
+-- ------------------------------------------------------------ the approach
+-- The control first (a boosted spin that runs), then injection attempts.
+local SLEEP_BIT = 0x80                -- STATUS2 bit 7 (SetStatusTbl's $0f)
+local ALLOWED2 = 0x331D               -- statuses 2 that can be set (+entity*2)
+local attempts = {}                   -- every injection attempt's record
+local A = nil                         -- the live attempt
+local spinOpen = nil
+local function asleep() return (H.readByte(0x3EE5 + actor * 2) & SLEEP_BIT) ~= 0 end
+local function cancelledBelowCap()
   local n = 0
-  for _, r in ipairs(recs) do
-    if r.logged and r.done and r.done.kind == "cancelled" and r.commit.p > 0
-       and r.commit.b < 5 then n = n + 1 end
+  for _, a in ipairs(attempts) do
+    -- the injection's own cancel: in the fight at the turn's end, and the
+    -- injected Sleep seen applied before it (a fall to a monster's blow
+    -- that cancels a spin is booked the same way but is play's, not the
+    -- precondition)
+    if a.done and a.done.kind == "cancelled" and a.commit.p > 0 and a.commit.b < 5
+       and not a.done.ko and a.sleptF ~= nil and a.sleptF <= a.done.f then n = n + 1 end
   end
   return n
 end
-local function found() return belowCap() >= 1 end
+local function found() return cancelledBelowCap() >= 1 end
+
+local function approachFrame()
+  if commitHit then
+    commitHit = false
+    if ctl and not ctl.commit and not ctlDone then
+      ctl.commit = { f = H.frame, p = pend(actor), b = bp(actor), hp = php(actor) }
+    elseif A and not A.commit then
+      A.commit = { f = H.frame, p = pend(actor), b = bp(actor), hp = php(actor) }
+      H.log(string.format("[inject] attempt %d f%d commit: pending %d bank %d; a monster's "
+        .. "action began %s frame(s) ago | party %s", #attempts, H.frame, A.commit.p, A.commit.b,
+        monsterActing and tostring(H.frame - monsterStart) or "-", partyLine()))
+    end
+  end
+  -- the injection: once, as his committed spin waits in the action queue
+  if A and A.commit and not A.injected and not A.done then
+    -- only behind another entry in the action queue: that action's
+    -- AfterAction2 is what empties his lists (RemoveAllActions) before his
+    -- entry comes up.  An entry first in line runs at once and is not
+    -- injected.
+    local ahead = aheadOf(actor * 2)
+    if ahead ~= nil and ahead >= 1 and executing ~= actor * 2 then
+      A.allowed = (H.readByte(ALLOWED2 + actor * 2) & SLEEP_BIT) ~= 0
+      H.assertEq(A.allowed, true, "precondition: Sleep can be set on SETZER ($331c allows it)")
+      -- ---- STATE WRITES 1-4 of 4 (waiver file): what SetStatus_0f and
+      -- UpdateStatus leave for a Sleep that lands -- STATUS2 bit 7, the
+      -- sleep counter $12, $3aa0.7 cleared (the battle menu may open), and
+      -- $3204's RemoveAllActions request ($40), which the running action's
+      -- AfterAction2 serves for every entity -------------------------------- --
+      local e = actor * 2
+      H.writeByte(0x3EE5 + e, H.readByte(0x3EE5 + e) | SLEEP_BIT)
+      H.writeByte(0x3CF9 + e, 0x12)
+      H.writeByte(0x3AA0 + e, H.readByte(0x3AA0 + e) & 0x7F)
+      H.writeByte(0x3204 + e, H.readByte(0x3204 + e) | 0x40)
+      A.injected = { f = H.frame, ahead = aheadOf(actor * 2), executing = executing }
+      H.log(string.format("[inject] attempt %d f%d Sleep written in its handler's shape: the spin "
+        .. "waits with %d action(s) ahead, entity %s executing", #attempts, H.frame,
+        A.injected.ahead, tostring(executing)))
+    end
+  end
+  if A and A.injected and not A.sleptF and asleep() then A.sleptF = H.frame end
+  if endHit then
+    local e = endHit
+    endHit = nil
+    if ctl and ctl.commit and not ctl.done and not ctlDone then
+      if e.cmd == CMD_SLOT and not e.noaction then
+        ctl.done = { f = H.frame, cmd = e.cmd, hp = e.hp, p = pend(actor), b = bp(actor) }
+        ctlDone = true
+        H.log(string.format("[cancel] control f%d: a boosted spin RAN: commit f%d pending %d " ..
+          "bank %d | turn end $b5=$0F -> pending %d bank %d", H.frame, ctl.commit.f,
+          ctl.commit.p, ctl.commit.b, ctl.done.p, ctl.done.b))
+      else
+        ctl = nil
+      end
+    elseif A and A.commit and not A.done then
+      if e.noaction or e.cmd == CMD_SLOT then
+        A.done = { f = H.frame, cmd = e.cmd, hp = e.hp, p = pend(actor), b = bp(actor),
+                   kind = e.noaction and "cancelled" or "ran", ko = e.ko, sleptAtExec = e.slept }
+        H.log(string.format("[inject] attempt %d %s: commit f%d pending %d bank %d | turn end " ..
+          "f%d no-action mark %s $b5=$%02X%s, asleep at its ExecAction %s -> pending %d bank %d",
+          #attempts, A.done.kind == "ran" and "RAN" or "CANCELLED", A.commit.f, A.commit.p,
+          A.commit.b, H.frame, e.noaction and "SET" or "clear", e.cmd,
+          e.ko and " out of the fight" or "", tostring(e.slept), A.done.p, A.done.b))
+      else
+        A.done = { kind = "other", cmd = e.cmd }
+      end
+      A = nil
+    end
+  end
+  if H.readByte(MENU) ~= 0 and php(actor) == 0 and raising == nil and invCount(FENIX) == 0 then
+    H.assertEq(false, true, string.format("precondition: a Fenix Down to raise SETZER " ..
+      "(f%d: the bag is out)", H.frame))
+  end
+  if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor then
+    W = {}
+    if ctl and ctl.commit and ctl.away and not ctl.done then ctl = nil end
+    if A and not A.commit and A.away then A = nil end      -- the window went by
+    if not ctlDone then
+      if (ctl == nil or not ctl.commit) and not low() and bp(actor) >= 1 then
+        ctl = ctl or {}
+        SS.hold = false
+        setzerSpin()
+      else
+        setzerDefend()
+      end
+    elseif A == nil and #attempts < MAX_ATTEMPTS and bp(actor) >= 1 and bp(actor) <= 4 then
+      A = { n = #attempts + 1 }
+      attempts[#attempts + 1] = A
+      SS.hold = true
+      setzerSpin()
+    elseif A ~= nil and not A.commit then
+      setzerSpin()
+    elseif bp(actor) >= 5 then
+      SS.hold = false
+      setzerSpin()      -- a spin that runs brings the bank under the cap
+    else
+      setzerDefend()
+    end
+  else
+    if ctl and ctl.commit then ctl.away = true end
+    if A and not A.commit then A.away = true end
+    SD.n, SS.n, SS.rTaps = 0, 0, 0
+    pageOrOther()
+  end
+end
+
+-- Rounds: draw when no battle is up, play on until the injection has a
+-- cancelled turn below the cap, MAX_ATTEMPTS attempts have been made, or
+-- the battle ends.
+local battles = 0
 local function backToPlain()
   local ph = 0
   return H.driveUntil(function()
@@ -640,58 +626,22 @@ local function round()
     raising, healing, hitting, W, SD = nil, {}, nil, {}, { n = 0 }
   end) }
   for _, st in ipairs(drawBattle("battle", 6)) do draw[#draw + 1] = st end
-  local body = {
+  return {
     H.cond(function() return not H.battleLoadStarted() end, draw, {}),
-    H.call(function() atPoint, attackSetzer = false, true end),
     H.driveUntil(function()
       if not H.battleLoadStarted() then return true end
-      if not skipPoint and branchPoint() then atPoint = true; return true end
-      return false
-    end, 40000, { H.call(approachFrame), H.waitFrames(1) },
-      "Setzer's window opens on him low with a pip and a blow queued, or the battle ends"),
+      return found() or (#attempts >= MAX_ATTEMPTS and A == nil)
+    end, 60000, { H.call(approachFrame), H.waitFrames(1) },
+      "the control, then an injected spin's turn ends, or the battle ends"),
+    H.cond(function() return not found() and not H.battleLoadStarted() end, {
+      H.call(function()
+        H.log(string.format("[cancel] battle %d ended | party %s", battles, partyLine()))
+      end),
+      backToPlain(),
+      H.waitFrames(60),
+    }, {}),
   }
-  local point = {
-    H.call(function()
-      points = points + 1
-      local t = threatOn(actor)
-      H.log(string.format("[cancel] branch point %d f%d (battle %d): hp %d/%d, pending %d, " ..
-        "bank %d; entity %d's queued Fight targets him (%s), the members' median blow " ..
-        "%s | party %s", points, H.frame, battles, php(actor), pmax(actor),
-        pend(actor), bp(actor), t, aheadOf(t) and string.format(
-        "%d action(s) ahead of it in the queue", aheadOf(t)) or "still in its advance wait",
-        string.format("%d of %d", blow(), #blows), partyLine()))
-      H.setPad({})
-      snap = H.requestSaveState()
-    end),
-    H.waitFrames(2),
-    H.call(function() H.checkReq(snap, "snapshot at Setzer's window") end),
-  }
-  for j = 1, BRANCHES_PER_POINT do point[#point + 1] = branch(j, (j - 1) * 4) end
-  local req
-  point[#point + 1] = H.cond(function() return not found() end, {
-    H.call(function() H.setPad({}); req = H.requestLoadState(snap.blob) end),
-    H.waitFrames(2),
-    H.call(function()
-      H.checkReq(req, "snapshot load (play on from branch point " .. points .. ")")
-      H.rearmInputInjection()
-      skipPoint, attackSetzer = true, true
-      commitHit, endHit = false, nil
-      raising, healing, hitting, W, SS, SD = nil, {}, nil, {}, { n = 0, rTaps = 0 }, { n = 0 }
-      H.log(string.format("[cancel] no placeholder from branch point %d: playing on from it", points))
-    end),
-  }, {})
-  body[#body + 1] = H.cond(function() return atPoint end, point, {
-    H.call(function()
-      H.log(string.format("[cancel] battle %d ended before a branch point | party %s",
-        battles, partyLine()))
-    end),
-    H.cond(function() return H.battleLoadStarted() end, { H.fleeBattle(12000, { onCantRun = "fight" }) }, {}),
-    backToPlain(),
-    H.waitFrames(60),
-  })
-  return body
 end
-
 local steps = {
   H.call(function()
     NOACTION = H.sym("OT6_NOACTION")
@@ -710,7 +660,8 @@ local steps = {
         -- the fight (KO'd or petrified)
         endHit = { cmd = H.readByte(0xB5), hp = php(actor),
                    noaction = (H.readByte(NOACTION) & 0x80) ~= 0,
-                   ko = (H.readByte(0x3EE4 + x) & 0xC0) ~= 0 }   -- KO'd or petrified
+                   ko = (H.readByte(0x3EE4 + x) & 0xC0) ~= 0,     -- KO'd or petrified
+                   slept = slept }
       end
     end, emu.callbackType.exec, ae, ae)
     local ea = H.sym("ExecAction")
@@ -718,6 +669,9 @@ local steps = {
       local x = emu.getState()["cpu.x"] & 0xff
       executing, execStart = x, H.frame
       if x >= 8 then monsterActing, monsterStart = x, H.frame end
+      if actor ~= nil and x == actor * 2 then
+        slept = (H.readByte(0x3EE5 + x) & 0x80) ~= 0       -- asleep as his turn comes up
+      end
     end, emu.callbackType.exec, ea, ea)
     local addr = H.seedStoreAddr()
     emu.addMemoryCallback(function()
@@ -753,52 +707,50 @@ local steps = {
   H.release(),
   H.waitFrames(30),
   H.driveUntil(function()
-    return found() or points >= MAX_POINTS
+    return found() or #attempts >= MAX_ATTEMPTS
       or (battles >= MAX_BATTLES and not H.battleLoadStarted())
-  end, 300000, round(), "rounds until a boosted spin of his ends as the placeholder"),
+  end, 400000, round(), "rounds until an injected spin's turn comes up with nothing to run"),
 }
 steps[#steps + 1] = H.call(function()
   H.setPad({})
-  local ran, cancelled = tally()
-  local fails, n = {}, 0
-  for _, r in ipairs(recs) do
-    local c, d = r.commit, r.done
-    if c and d then
-      n = n + 1
-      if d.kind == "ran" then
-        local wantB = c.p > 0 and c.b - c.p or math.min(c.b + 1, 5)
-        if not (d.p == 0 and d.b == wantB) then
-          fails[#fails + 1] = string.format("branch %d: a spin that ran (pending %d, bank %d " ..
-            "at its commit) left pending %d, bank %d (want 0, %d)", r.k, c.p, c.b, d.p, d.b, wantB)
-        end
-      else
-        -- the TLM's ruling (#346): nothing charged either way; a lost turn
-        -- earns the regen pip only if he still stands at its end
-        local wantB = d.ko and c.b or math.min(c.b + 1, 5)
-        if not (d.p == 0 and d.b == wantB) then
-          fails[#fails + 1] = string.format("branch %d: a spin that never ran (no-action " ..
-            "mark set, pending %d, bank %d at its commit, %s at its end) left pending %d, " ..
-            "bank %d (want 0, %d: nothing charged, %s)", r.k, c.p, c.b,
-            d.ko and "out of the fight" or "in the fight", d.p, d.b, wantB,
-            d.ko and "no regen out of the fight" or "the unboosted regen")
-        end
+  local fails, ran, cancelled = {}, 0, 0
+  for _, a in ipairs(attempts) do
+    local c, d = a.commit, a.done
+    if c and d and d.kind == "ran" then
+      ran = ran + 1
+      if not (d.p == 0 and d.b == c.b - c.p) then
+        fails[#fails + 1] = string.format("attempt %d: a spin that ran (pending %d, bank %d) "
+          .. "left pending %d, bank %d (want 0, %d)", a.n, c.p, c.b, d.p, d.b, c.b - c.p)
+      end
+    elseif c and d and d.kind == "cancelled" then
+      cancelled = cancelled + 1
+      local wantB = d.ko and c.b or math.min(c.b + 1, 5)
+      if not (d.p == 0 and d.b == wantB) then
+        fails[#fails + 1] = string.format("attempt %d: a spin that never ran (no-action mark "
+          .. "set, pending %d, bank %d at its commit, %s at its end) left pending %d, bank %d "
+          .. "(want 0, %d: nothing charged, %s)", a.n, c.p, c.b,
+          d.ko and "out of the fight" or "in the fight", d.p, d.b, wantB,
+          d.ko and "no regen out of the fight" or "the unboosted regen")
+      end
+      if not d.ko and not (a.sleptF ~= nil and a.sleptF <= d.f) then
+        fails[#fails + 1] = string.format("attempt %d: the turn came up marked with him in the "
+          .. "fight but no Sleep applied before it (injected %s)", a.n, tostring(a.injected ~= nil))
       end
     end
   end
-  H.log(string.format("[cancel] SUMMARY battles=%d points=%d branches=%d ended=%d " ..
-    "ran(boosted)=%d cancelled(boosted)=%d", battles, points, #recs, n, ran, cancelled))
+  H.log(string.format("[cancel] SUMMARY battles=%d attempts=%d ran(boosted)=%d " ..
+    "cancelled(boosted)=%d", battles, #attempts, ran, cancelled))
   for _, f in ipairs(fails) do H.log("[cancel] FAIL " .. f) end
-  H.assertEq(#fails, 0, "every branch's books: a spin that ran paid its tier, a spin " ..
-    "that never ran cost nothing (#346)")
-  H.assertEq(ctlDone, true, "precondition: the control -- a boosted spin of his ran " ..
-    "on the approach")
+  H.assertEq(#fails, 0, "every attempt's books: a spin that ran paid its tier, a spin " ..
+    "that never ran cost nothing and took the in-the-fight regen (#346)")
+  H.assertEq(ctlDone, true, "precondition: the control -- a boosted spin of his ran")
   local c, d = ctl.commit, ctl.done
   H.assertEq(d.p == 0 and d.b == c.b - c.p, true, string.format("the control: a boosted " ..
     "spin that ran paid its tier: pending %d -> %d (want 0), bank %d -> %d (want %d)",
     c.p, d.p, c.b, d.b, c.b - c.p))
-  H.assertEq(belowCap() >= 1, true, string.format("precondition: at least one branch's " ..
-    "boosted spin came up with nothing to run (the no-action mark) below bank 5, where the " ..
-    "regen pip shows -- Setzer fell with it queued (%d marked in all)", cancelled))
+  H.assertEq(found(), true, string.format("precondition: an injected attempt's boosted spin " ..
+    "came up with nothing to run below bank 5, within %d attempts (%d marked in all)",
+    MAX_ATTEMPTS, cancelled))
 end)
 
 H.run({ maxFrames = 400000 }, steps)

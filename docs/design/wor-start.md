@@ -368,7 +368,7 @@ kept in `fish-wait-fallback/`: their boot point fell to the runner's
 2400-frame fallback mid-visit, so all 40 were one draw (0 recovered); the
 re-run above has the boot point on the beach.
 
-**So the generator ships `near`**: the fast fish when it swims and a slow
+**So the generator shipped `near`** (until #358's `read`, below the lab): the fast fish when it swims and a slow
 one that comes near; no fast fish, straight back to Cid for the next
 reroll. On this generator's draws it is about as good as `all` (44 of 48
 searched and 64 of 67 held out, against 47 of 48 and 65 of 67), its slowest
@@ -380,6 +380,35 @@ each policy toward its fair-coin rate: `all` further than `near`.
 `fastslow`, the best under fair coins, loses on this bot's own paths (27 of
 34 searched, 10 of 25 held out): the same lesson from the other side. A
 lost first attempt is a retry (below).
+
+## The read policy (#358)
+
+`near` was picked on lab draws that reached the beach with Cid's first-feed
+health 113-139.  The re-cut chains hand `gen_wor_start` a lower start (the
+island save at `Cid health 112-113`, first draws `health 98-105`), and there
+`near` became a coin flip: v0.24's qualification passed it only on attempt
+3/3 (`LOST: Cid died -- health 22`, `health 14`;
+`build/attempts/wt/v024-recut/qual1/audit_retries.txt`).  Measured on the
+v0.25 chain, retries off, shifts 0-469 in steps of 7
+(`build/attempts/wt/v026-route/e358/summary_before2.txt`): `before_near: 68
+runs, 55 recovered; 26 distinct first draws: 20 recovered, 6 lost, 0
+mixed` -- every loss the same shape, ten or eleven walks to a beach with
+no fast fish (`LOST: Cid died -- health 20 as Celes walked into the house
+on trip 11; first draw [roll 0001 rand $95 health 103]`).
+
+A walk to a beach with no fast fish costs Cid about 11; the talk is the
+reroll and costs almost nothing (the timer fires only with no event
+running).  So the shipped policy, `read`, reads what a person cannot see
+from the house -- the spawn switches the talk just rolled (`$0369`-`$036C`)
+-- and past the first visit talks again at the bedside until the fast fish
+is rolled, then walks; on the beach it takes the +32 and the +16 fish by
+object (`$11`, `$12`, asserted against their swim speeds), never the -4 or
+the -16.  An informed policy (docs/TESTING.md: reading is full power, the
+inputs are a person's): every catch, talk and step is still a button
+press.  The same 68 shifts (`summary_after.txt`): `after_read: 68 runs, 68
+recovered; 26 distinct first draws: 26 recovered, 0 lost, 0 mixed`, the
+lowest health entering the house 73, at most 37 trips (25 of them reroll
+talks), the slowest recovery at f29,324 against `near`'s f70,255.
 
 ## The retry
 

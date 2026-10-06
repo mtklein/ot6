@@ -255,7 +255,8 @@ local function fightButton()
   local actor = H.readByte(ACTOR)
   if fPlan == nil or fPlanActor ~= actor then
     if st ~= ST_CMD then
-      if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT then
+      if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT
+         or st == 0x24 or st == 0x27 then   -- Row/Def. side windows
         return { "b" }
       end
       return nil
@@ -276,11 +277,15 @@ local function fightButton()
     end
     local cur = H.readByte(CMDROW + actor) & 3
     if cur == plan.row then return { "a" } end
-    if plan.rowStall and plan.rowStall > 2 then
-      plan.rowStall = 0
-      return { ({ [0]="up", [1]="left", [2]="right", [3]="down" })[plan.row] }
-    end
+    -- UP and DOWN only: LEFT/RIGHT on the command window open the Row and
+    -- Def. side windows ($24/$27), which this fighter would then sit in
+    -- (#366, gen_sabin_train's b68Button); a row never reached fails by
+    -- name (12 steering pulses on one plan) instead of running to the frame cap
     plan.rowStall = (plan.rowStall or 0) + 1
+    if plan.rowStall > 12 then
+      error(string.format("fight: the command steer is stuck -- actor %d's cursor " ..
+        "on row %d after %d steering pulses wanting row %d", actor, cur, plan.rowStall, plan.row), 0)
+    end
     return { cur < plan.row and "down" or "up" }
   end
   if st == ST_ITEM and plan.kind == "item" then
@@ -295,7 +300,7 @@ local function fightButton()
     fPlan, fPlanActor = nil, nil
     return { "a" }          -- item: default self; Fight: default enemy
   end
-  if st == ST_TOOLS then return { "b" } end
+  if st == ST_TOOLS or st == 0x24 or st == 0x27 then return { "b" } end  -- Row/Def. too
   return nil
 end
 -- The lib fight driver's battle-open and [death] lines (newFightDriver,

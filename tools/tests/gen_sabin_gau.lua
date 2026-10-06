@@ -476,6 +476,15 @@ local function ladderLoss(ladder, n, of, shift)
   ladderFailed(ladder, n, of, shift)
 end
 local fed = false                        -- observed feed reaction completed
+-- the reaction's own mark: Gau's battle switch ($3EBD bit 1) seen set
+-- inside the battle that fed him.  $3EBD is battle RAM, so it is latched
+-- there; read after the join event reaches the world it holds whatever the
+-- world init left (#343).  AIScript::_370 runs recruit_gau before
+-- set_battle_switch 13, 1, so the grind's "GAU joins" step ends a few
+-- frames before the switch lands (f14894 against the write at f14898,
+-- build/attempts/wt/v026-field/r2/gau_switch_probe.log): it is latched by
+-- the join event's advance too, which runs while the battle is still up.
+local fedSw = false
 local grind = { fights = 0, appearances = 0 }
 local function gauOn()
   local targettable = H.readByte(0x2f4e)
@@ -491,6 +500,9 @@ local function gauPresent()
      and (H.readByte(0x3a40) & mask) ~= 0
 end
 local function fedSwitch() return (H.readByte(0x3EBD) & 0x02) ~= 0 end
+local function latchFedSw()
+  if H.battleLoadStarted() and fedSwitch() then fedSw = true end
+end
 
 -- Who is who in a battle.  A party entity's character id is $3ED8+2e (the
 -- actor number Ot6VeldtRow compares against CHAR::GAU), so a plan names
@@ -1131,6 +1143,7 @@ local function grindStep()
     local actor = H.readByte(ACTOR)
     phase = (phase + 1) % 8
     fed = fedSwitch() or invCount(DRIED_MEAT) == 0
+    latchFedSw()
     if fed or meatSubmitted or feedSubmissions >= 3 then
       H.setPad({})
       return
@@ -1448,7 +1461,7 @@ local function grindAttempt(n)
     grindSeeds.spread(n),
     H.call(function()
       clearLoss()
-      fed = false
+      fed, fedSw = false, false
       H.gameOverFired = 0
       grind = { fights = 0, appearances = 0, wins = 0, eligible = 0 }
     end),
@@ -1463,6 +1476,7 @@ local function grindAttempt(n)
           return H.worldMode() and H.worldHasControl() and H.worldAligned()
         end, 20000, {
           H.call(function()
+            latchFedSw()
             phase = (phase + 1) % 12
             H.setPad(phase < 4 and { "a" } or {})
           end),
@@ -1950,8 +1964,13 @@ H.run({ maxFrames = 500000, allowGameOver = true }, {
       "the Dried Meat was fed to GAU through the real battle Item menu " ..
       "(the old 'measured undrivable' claim is retired -- see the header)")
     H.assertEq(invCount(DRIED_MEAT), 0, "the meat left the bag with GAU")
-    H.assertEq(fedSwitch(), true,
-      "the Dried-Meat reaction set Gau's battle switch")
+    -- the switch as latched inside the feeding battle (fedSw): re-read
+    -- here, once the join event has reached the world, $3EBD holds the
+    -- world init's bytes now that world control waits for the world's NMI
+    -- (#343; the v0.26 chain's chain_gau_joined,
+    -- build/attempts/wt/v026-field/gau/)
+    H.assertEq(fedSw, true,
+      "the Dried-Meat reaction set Gau's battle switch (seen in the battle)")
   end),
   H.waitUntil(function()
     return H.worldMode() and H.worldHasControl() and H.worldAligned()

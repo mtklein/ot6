@@ -3685,6 +3685,35 @@ end
 -- blank is no witness, since the field's IRQ sets it at 30 Hz for its
 -- BG animation DMA (field/anim.asm TfrBGAnimGfx) and NMI clears it.
 local fieldNmi
+-- M.mapLoading: LoadMap is running.  A door to ANOTHER map is the window
+-- the two reads below miss (#357): CheckEntrances leaves $58 clear for a
+-- new map, the field's NMI stays installed (LoadMap only disables
+-- interrupts), and LoadMap clears $84 near its top (field/init.asm), so
+-- every control flag reads true for the frames the load runs (33 of its
+-- 224 through Mt Kolts' ledge door, build/attempts/wt/v026-field/357/).
+-- The wor_falcon walker planned through one ("nav: edge (100,28)->up
+-- blocked in reality").  So the load itself is watched: an exec hook on
+-- LoadMap's entry raises a flag and one on NoMapLoad, the field loop's
+-- per-frame entry that LoadMap returns into, lowers it.  The hooks go
+-- through the raw handle, once, so a retried segment keeps them.  The
+-- walkers that plan on the map (navTo, crossDoor's and shopTalk's staging
+-- pick, talkToObj's approach) read it; M.hasControl does not, because
+-- generators' own calm counters still count those frames (gen_edgar's
+-- far-side calm(20) through the Figaro courtyard door is satisfied only
+-- inside the load, the landing tile's trigger dropping control one frame
+-- in four after it: build/attempts/wt/v026-field/chainfail/).
+local mapLoading, loadHooked = false, false
+function M.mapLoading()
+  if not loadHooked then
+    loadHooked = true
+    local enter, loop = M.sym("LoadMap"), M.sym("NoMapLoad")
+    rawAddMemoryCallback(function() mapLoading = true end,
+      emu.callbackType.exec, enter, enter)
+    rawAddMemoryCallback(function() mapLoading = false end,
+      emu.callbackType.exec, loop, loop)
+  end
+  return mapLoading
+end
 function M.mapLoaded()
   fieldNmi = fieldNmi or M.sym("FieldNMI")
   return M.readByte(0x0058) == 0

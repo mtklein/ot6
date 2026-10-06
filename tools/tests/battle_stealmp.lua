@@ -33,6 +33,7 @@
 -- is ever created -- so that arm waits on the error buzz ($95) instead and asserts the price off the row's own stamp in
 -- the submenu.
 local H = dofile("tools/tests/lib/ot6.lua")
+local P = H.newPacer({ tag = "desert" })   -- one pool's row (#306)
 local STATE = "build/states/figaro_cleared.mss.lua"
 
 local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
@@ -268,15 +269,12 @@ end
 -- all 11 ("battle 1 try 11 (group 1, budget 11): rareT=0", r/smp3/
 -- new_k72.log.gz) and with 74, 9; the old six would have failed both.
 -- The walk paces a stretch of the dismount row whose
--- every tile rolls one group (planPace), so the budget's pool is the one
--- that deals; each battle asserts that group.  (The clock's left/right walk
+-- every tile rolls one group (H.newPacer, P above), so the budget's pool is
+-- the one that deals; each battle asserts that group (P.assertGroup).  (The clock's left/right walk
 -- this file used drifts with each battle's timing; battle_steal's drifted
 -- onto a group-0 grass tile.)
 local ITEMS = H.sym("MonsterItems") & 0x3FFFFF
 local MAXTRIES = 40                -- steps built per battle; the budget must fit
-local PACE = 4                     -- tiles each way from the dismount tile, at most
-local worldGroup = nil             -- the group the last CheckBattleWorld rolled
-local pace = nil                   -- { y, lo, hi, group, dir }, set by planPace
 local budgets = {}                 -- [group] = worst, decoded once
 local function budgetFor(group)
   if budgets[group] then return budgets[group] end
@@ -311,65 +309,10 @@ local function budgetFor(group)
   budgets[group] = worst
   return worst
 end
--- The stretch to pace (battle_steal's planPace): from the dismount tile out
--- to PACE tiles each way along its row while the next tile is walkable and
--- rolls the same group, every pairing of a stretch tile with a saved
--- position the walk can leave rolling that group too.
-local function planPace()
-  local x0, y0 = H.worldX(), H.worldY()
-  local function own(x) return H.worldEncounterGroup(x, y0, x, y0) end
-  local g = own(x0)
-  H.assertEq(g ~= nil, true, string.format("the dismount tile (%d,%d) rolls "
-    .. "random battles", x0, y0))
-  local lo, hi = x0, x0
-  while lo > x0 - PACE and H.worldPassable(lo - 1, y0) and own(lo - 1) == g do
-    lo = lo - 1
-  end
-  while hi < x0 + PACE and H.worldPassable(hi + 1, y0) and own(hi + 1) == g do
-    hi = hi + 1
-  end
-  local zx, zy = H.worldZonePos()
-  local groups = {}
-  for x = lo, hi do
-    for z = lo, hi do
-      local gg = H.worldEncounterGroup(x, y0, z, y0)
-      if gg ~= nil then groups[gg] = true end
-    end
-    local gg = H.worldEncounterGroup(x, y0, zx, zy)
-    if gg ~= nil then groups[gg] = true end
-  end
-  local list = {}
-  for gg in pairs(groups) do list[#list+1] = tostring(gg) end
-  table.sort(list)
-  H.log(string.format("[test] pace: row %d, x %d..%d (dismount x %d, saved "
-    .. "position (%d,%d)); the groups it can roll: %s", y0, lo, hi, x0, zx, zy,
-    table.concat(list, ",")))
-  H.assertEq(hi - lo >= 2, true, string.format("the dismount row gives a "
-    .. "stretch of at least three tiles that roll group %d (x %d..%d)", g, lo, hi))
-  H.assertEq(#list == 1 and list[1] == tostring(g), true, string.format(
-    "every encounter on the stretch rolls group %d, whatever the saved "
-    .. "position (rolls %s)", g, table.concat(list, ",")))
-  pace = { y = y0, lo = lo, hi = hi, group = g, dir = "left" }
-end
-local function desertWalk(tag)
-  return H.driveUntil(function() return H.battleLoadStarted() end, 25000, {
-    H.call(function()
-      if not H.worldMode() or not H.worldHasControl() then
-        H.setPad({}); return
-      end
-      if H.worldAligned() then
-        local x = H.worldX()
-        if x <= pace.lo then pace.dir = "right"
-        elseif x >= pace.hi then pace.dir = "left" end
-      end
-      H.setPad({ [pace.dir] = true })
-    end),
-  }, tag)
-end
 local function enterDesertBattle(n)
   local budget, group = nil, nil
   local steps = { H.call(function()
-    group = pace.group
+    group = P.group
     budget = budgetFor(group)
   end) }
   for try = 1, MAXTRIES do
@@ -383,19 +326,20 @@ local function enterDesertBattle(n)
       }, {}),
       H.waitUntil(function() return H.worldSettled() end, 1500,
         "the world map settled (battle " .. n .. " try " .. try .. ")", 5),
-      desertWalk("desert encounter " .. n .. " try " .. try),
+      H.driveUntil(function() return H.battleLoadStarted() end, 25000, {
+        H.call(function() H.setPad(P.pad()) end),
+      }, "desert encounter " .. n .. " try " .. try),
       H.release(),
       H.waitUntil(function() return H.battleActive() end, 900,
         "battle " .. n .. " active", 30),
       H.waitFrames(90),
       H.call(function()
+        P.assertGroup("desert battle " .. n .. " try " .. try)
         locke = nil
         for slot = 0, 3 do
           if H.readByte(0x3ED8 + slot*2) == 0x01 then locke = slot end
         end
         H.assertEq(locke ~= nil, true, "LOCKE is really in this party")
-        H.assertEq(worldGroup, group, string.format("battle %d try %d was "
-          .. "dealt by group %d, the pool its budget was decoded from", n, try, group))
         classify()
         H.log(string.format("battle %d try %d (group %d, budget %d): rareT=%s mp=%d",
           n, try, group, budget, tostring(rareT), mp()))
@@ -435,20 +379,15 @@ H.run({ maxFrames = 150000 }, {
       base, STEAL_COST))
   end),
 
-  H.call(function()
-    local check = H.sym("CheckBattleWorld")
-    emu.addMemoryCallback(function() worldGroup = H.worldCheckGroup() end,
-      emu.callbackType.exec, check, check)
-  end),
   H.hold({ "b" }),                    -- real chocobo dismount (gen_kolts)
   H.driveUntil(function() return H.readByte(0x11fa) & 3 == 0 end, 900, {
     H.waitFrames(1),
   }, "chocobo dismount"),
   H.release(),
   H.waitFrames(120),
-  H.waitUntil(function() return H.worldSettled() end, 1500,
-    "the world map settled", 5),
-  H.call(planPace),
+  -- pace one pool's stretch of the dismount row, not the clock (#306)
+  H.waitUntil(function() return H.worldSettled() end, 1500, "the world map settled", 5),
+  H.call(function() P.plan() end),
 
   -- ------------------------------------------------------------ 2. charge --
   enterDesertBattle(1),
@@ -523,19 +462,14 @@ H.run({ maxFrames = 150000 }, {
         -- in the first round the battle from arm 2 is still up
         H.cond(function() return H.battleLoadStarted() end, {}, {
           H.driveUntil(function() return H.battleLoadStarted() end, 25000, {
-            H.call(function()
-              if not H.worldMode() or not H.worldHasControl() then
-                H.setPad({}); return
-              end
-              H.setPad(((H.frame // 120) % 2 == 0) and { left = true }
-                or { right = true })
-            end),
+            H.call(function() H.setPad(P.pad()) end),
           }, "drain round " .. round .. ": an encounter"),
           H.release(),
           H.waitUntil(function() return H.battleActive() end, 900,
             "drain round " .. round .. ": battle active", 30),
           H.waitFrames(90),
           H.call(function()
+            P.assertGroup("drain round " .. round)
             locke = nil
             for slot = 0, 3 do
               if H.readByte(0x3ED8 + slot*2) == 0x01 then locke = slot end
