@@ -7520,7 +7520,186 @@ function Driver:nukeFloor(actor)
   return self.opts.nukeFloor or (M.readWord(BATTLE.MAXMP + actor * 2) // 4)
 end
 
+-- The care race in the driver (#415): the race state built from the
+-- driver's own readings at a decision, the candidates the window offers,
+-- and the [race] line beside the rule stack's choice.  M.CARE_RACE = "log"
+-- (or true) scores and logs every decision and leaves the rules' plan in
+-- force; "act" (stage 3) will play the race's choice.  Off by default.
+--   party lines: bestLine's chips and hits at each boost, the damage watch's
+--     per-hit figure (dmgHit; a member not yet measured takes the mean of
+--     the measured ones, and with none measured the decision is not raced)
+--   enemy actions: each standing slot's worst landed hit on each member
+--     (roundEnemies: the ledger, else the script's worst from the ROM),
+--     single-target, so the sim assigns it pessimistically
+--   heals: the bag's (bagHeals) on each hurt member, each at its gil and
+--     scarcity against M.CARE_RESERVE; a raise: the Fenix Down on each
+--     fallen member, raised to 1/8 max HP
+M.CARE_RACE = M.CARE_RACE or false
+M.RACE_RAISE_RESERVE = 2
+function Driver:raceState(actor, R)
+  local st = { actor = actor, party = {}, enemies = {}, focus = {}, hpRate = M.shopRates().hp or 1.2,
+               bankAt = self.opts.bank or 0, horizon = M.RACE_HORIZON }
+  local slot = self:pressTarget()
+  if slot == nil then
+    for s = 0, 5 do if monAlive(s) then slot = s; break end end
+  end
+  if slot == nil then return nil, "no monster stands" end
+  local list = self:focusList()
+  if list then
+    for _, s in ipairs(list) do st.focus[#st.focus + 1] = type(s) == "table" and s.slot or s end
+  end
+  st.focus[#st.focus + 1] = slot
+  local pers, nper = 0, 0
+  for e = 0, 3 do
+    local dh = self.dmgHit[e]
+    if dh and dh.per and dh.per > 0 then pers, nper = pers + dh.per, nper + 1 end
+  end
+  if nper == 0 then return nil, "no hit measured yet" end
+  local meanPer = pers // nper
+  for e = 0, 3 do
+    local maxhp = R.maxOf(e)
+    if maxhp > 0 and maxhp ~= 0xFFFF and M.readByte(BATTLE.BCHID + e * 2) ~= 0xFF then
+      local const = M.readWord(BATTLE.ATB_CONST + e * 2)
+      local period = (const > 0 and const ~= 0xFFFF) and math.ceil(0xFF00 / const) or 600
+      local eta = etaOf(e * 2) or period
+      if e == actor then eta = 0 end
+      local dh = self.dmgHit[e]
+      local per = (dh and dh.per and dh.per > 0) and dh.per or meanPer
+      local lines = {}
+      for b = 0, 3 do
+        local l = R.bestLine(e, slot, b)
+        if l then
+          local mult = (l.kind == "fight") and 1 or (1 + b)
+          lines[b] = { per = per * mult, hits = l.hits or 1, chips = l.chips or 0, what = l.what, plan = l }
+        end
+      end
+      local heals = {}
+      if R.hpNow[e] > 0 then
+        for _, h in ipairs(self:bagHeals(e, R.hpNow[e])) do
+          heals[#heals + 1] = { restore = h.restore or 0, cost = M.raceItemCost(M.itemPrice(h.id),
+            h.count, (M.CARE_RESERVE or {})[h.id] or 0), id = h.id }
+        end
+      end
+      st.party[e] = { hp = R.hpNow[e], maxhp = maxhp, eta = eta, period = period,
+        bp = M.readByte(BATTLE.BP + e * 2), lines = lines, heals = heals, deathCost = M.deathGil(maxhp) }
+    end
+  end
+  if st.party[actor] == nil then return nil, "the actor is not seated" end
+  for s = 0, 5 do
+    if monAlive(s) then
+      local mconst = M.readWord(BATTLE.ATB_CONST + 8 + s * 2)
+      local en = { hp = M.readWord(BATTLE.MON_HP + s * 2),
+        sh = M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0 and 0 or M.readByte(BATTLE.SH_CUR + s * 2),
+        eta = etaOf(8 + s * 2) or 600, period = mconst > 0 and math.ceil(0xFF00 / mconst) or 600,
+        act = { aoe = false, dmg = {} } }
+      st.enemies[s] = en
+    end
+  end
+  local parts = self.parts
+  for e, p in pairs(st.party) do
+    local _, enemies, fallback = self:roundEnemies(e, false)
+    for _, en in ipairs(enemies or {}) do
+      local E = st.enemies[en.slot]
+      if E then E.act.dmg[e] = en.worst or en.rom or fallback or 0 end
+    end
+  end
+  if parts and parts.body ~= nil and st.enemies[parts.body] then st.enemies[parts.body].ends = true end
+  return st
+end
+
+-- the candidates: the attack lines at each boost the bank holds, a heal from
+-- the bag on each hurt member, a Fenix Down on each fallen one
+function Driver:raceCandidates(actor, st)
+  local c = {}
+  local a = st.party[actor]
+  for b = 0, math.min(a.bp, 3) do
+    if a.lines[b] then c[#c + 1] = { kind = "attack", line = a.lines[b], boost = b, what = a.lines[b].what } end
+  end
+  for e, p in pairs(st.party) do
+    if p.hp > 0 and p.hp < p.maxhp then
+      for _, h in ipairs(p.heals or {}) do
+        c[#c + 1] = { kind = "heal", target = e, restore = h.restore, cost = h.cost,
+          what = string.format("item $%02X on entity %d", h.id, e) }
+      end
+    elseif p.hp == 0 and self:battInvIdx(BATTLE.FENIX_DOWN) then
+      local count = 0
+      for i = 0, 251 do
+        if M.readByte(BATTLE.BATTINV + i * 5) == BATTLE.FENIX_DOWN then count = count + M.readByte(BATTLE.BATTINV + i * 5 + 3) end
+      end
+      c[#c + 1] = { kind = "raise", target = e, hp = (p.maxhp * M.itemPower(BATTLE.FENIX_DOWN)) >> 4,
+        cost = M.raceItemCost(M.itemPrice(BATTLE.FENIX_DOWN), count, M.RACE_RAISE_RESERVE),
+        what = string.format("Fenix Down on entity %d", e) }
+    end
+  end
+  return c
+end
+
+-- the rules' plan as a race candidate (nil when the race does not model it)
+local function raceOfPlan(st, actor, plan)
+  if plan == nil then return nil end
+  local a = st.party[actor]
+  if plan.kind == "fight" or plan.kind == "skill" then
+    if plan.ally then return nil end
+    local b = math.min(plan.boostLeft or 0, 3)
+    while b > 0 and a.lines[b] == nil do b = b - 1 end
+    return a.lines[b] and { kind = "attack", line = a.lines[b], boost = b, what = "rules: " .. plan.kind } or nil
+  end
+  if (plan.kind == "item" or plan.kind == "heal") and plan.target ~= nil and not plan.all then
+    if plan.item == BATTLE.FENIX_DOWN then
+      local p = st.party[plan.target]
+      return p and { kind = "raise", target = plan.target, hp = (p.maxhp * M.itemPower(BATTLE.FENIX_DOWN)) >> 4,
+        cost = M.itemPrice(BATTLE.FENIX_DOWN), what = "rules: raise" } or nil
+    end
+    if plan.restore then
+      return { kind = "heal", target = plan.target, restore = plan.restore,
+        cost = plan.item and M.itemPrice(plan.item) or 0, what = "rules: " .. plan.kind }
+    end
+  end
+  return nil
+end
+
+local function raceDesc(c, r)
+  return string.format("%s [%s%d down%s, %s, left %d, cost %d]", c.what or c.kind,
+    r.wipe and "WIPE, " or "", r.deaths, r.firstDeath and ("@" .. r.firstDeath) or "",
+    r.kill and ("ends @" .. r.kill) or "not over", math.floor(r.left), math.floor(r.cost))
+end
+
+function Driver:raceLog(actor, plan, R)
+  local st, why = self:raceState(actor, R)
+  if st == nil then
+    if self.raceSkipSaid ~= why then
+      self.raceSkipSaid = why
+      M.log(string.format("[%s] [race] actor=%d not raced: %s", self.tag or "fight", actor, why))
+    end
+    return
+  end
+  local cands = self:raceCandidates(actor, st)
+  local rc = raceOfPlan(st, actor, plan)
+  local ri = nil
+  if rc then cands[#cands + 1] = rc; ri = #cands end
+  if #cands == 0 then return end
+  local i, best, all = M.raceChoose(st, cands)
+  self.raceN = (self.raceN or 0) + 1
+  local agree
+  if ri == nil then agree = "rules plan not modelled (" .. tostring(plan and plan.kind) .. ")"
+  elseif i == ri or not M.raceBetter(best, all[ri], st) then agree = "agree"
+  else agree = "DISAGREE" end
+  M.log(string.format("[%s] [race] actor=%d %s: race %s%s; %d candidate(s)", self.tag or "fight", actor, agree,
+    raceDesc(cands[i], best), ri and (" | rules " .. raceDesc(cands[ri], all[ri])) or "", #cands))
+end
+
 function Driver:makePlan(actor)
+  self._race = nil
+  local plan = self:makePlanRules(actor)
+  if M.CARE_RACE and self._race ~= nil and self._race.actor == actor then
+    local ok, err = pcall(self.raceLog, self, actor, plan, self._race)
+    if not ok then M.log(string.format("[%s] [race] actor=%d error: %s", self.tag or "fight", actor, tostring(err))) end
+  end
+  self._race = nil
+  return plan
+end
+
+function Driver:makePlanRules(actor)
   -- What a round costs this party, measured rather than assumed.  For each
   -- entity, the most HP it has lost between two consecutive turns of the
   -- actor now deciding: that is the damage that will land before this actor
@@ -8115,6 +8294,8 @@ function Driver:makePlan(actor)
     end
     return best
   end
+  -- the care race's view of this decision (#415, Driver:raceLog)
+  self._race = { actor = actor, bestLine = bestLine, hpNow = hpNow, maxOf = maxOf, price = price }
   -- The spend rule (#175): this actor inside one round of death, holding
   -- BP, with no heal in hand that lifts them clear of the round, spends
   -- every pip now on their strongest line instead of a heal that only
