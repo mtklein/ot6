@@ -275,11 +275,11 @@ do
   local weak = rb(MPROP + GHOSTTRAIN * MREC + OFF_WEAK)
   local add = E[GHOSTTRAIN] and E[GHOSTTRAIN][1] or 0
   local chippable = weak | add
-  -- the premise, pinned: 6 shields behind bludgeoning, which is what makes
+  -- the premise, pinned: 4 shields (6 until #400) behind bludgeoning, which is what makes
   -- Sabin the only chipper in a party of Sabin, Cyan and Shadow.
   local row = S[GHOSTTRAIN]
-  check(row ~= nil and row[1] == 6 and row[2] == BLUDG, string.format(
-    "GhostTrain $%04X row is 6 shields / OT6_BLUDG (got %s) -- the premise of "
+  check(row ~= nil and row[1] == 4 and row[2] == BLUDG, string.format(
+    "GhostTrain $%04X row is 4 shields / OT6_BLUDG (got %s) -- the premise of "
     .. "#74", GHOSTTRAIN,
     row and string.format("%d/%02X", row[1], row[2]) or "MISSING"))
   check(chippable ~= 0, string.format(

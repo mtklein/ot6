@@ -106,7 +106,7 @@ then on; only his shield count grows.
 | 5 | TunnelArmor | Locke scenario | 5 |
 | 6 | Kefka ×2 | Imperial Camp (Sabin) | — (no gauge) |
 | 7 | Telstar | Imperial Camp (Sabin) | 4 (Dobermans 2) |
-| 8 | GhostTrain | Phantom Train (Sabin) | 6 |
+| 8 | GhostTrain | Phantom Train (Sabin) | 4 |
 | 9 | Rizopas | Baren Falls (Sabin) | 4 (Piranhas 1) |
 | 10 | Kefka | Narshe defense | 6 |
 | 11 | Dadaluma | Zozo | 6 (Iron Fists 2) |
@@ -379,11 +379,20 @@ AirForce assembly carry — and `$01a` Doberman weak = **fire**.)
 
 ### 8. GhostTrain — the Phantom Train (Sabin, Cyan, Shadow)
 
-**Shields:** 6 · **Weak:** fire, bolt, holy + bludgeoning ·
+**Shields:** 4 (6 until #400) · **HP:** 3400 (vanilla 1900, #400) · **Weak:** fire, bolt, holy + bludgeoning ·
 **absorbs poison.** (Decoded, not recalled: `$106` weak =
 **fire|bolt|holy** — `monster_prop.dat` +25 reads `$25` — and +23
 reads **`$08`, poison absorbed**; +24 is `$00`.)
 
+- **Tuning (#400, 2026-10-06):** once SABIN's chips and SHADOW's throws
+  spend their banked pips (#366), the vanilla 1900-HP train died before its
+  sixth shield in most fights, so the break -- and Cyan's Cleave, which
+  needs it -- went unexercised.  Four shields over 3400 HP, measured from
+  the same 4 snapshots x 15 waits (45 distinct battle keys): the break
+  lands with HP left in 37 of 45 keys (48 of 60 fights) against 2 of 45
+  at six shields over 1900; deaths 14 either way; median kill frame 4755
+  against 5215; one key (be70) of 45 lost, which the six-shield train
+  also lost before #366.  Lab: build/attempts/wt/v026-route2/e400/.
 - **Telegraph:** the whistle sounds down the corridor → **Evil
   Toot**, a party-wide random status attack. Break the boiler before
   the move lands; Acid Rain between fuses keeps pressure on your

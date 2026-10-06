@@ -581,7 +581,7 @@ local function closeShop()
 end
 
 local b68 = {
-  casts = 0, chips = {}, plan = nil, planActor = nil, impCure = {}, reviveFor = {}, wakeFor = {}, chipAt = {}, castAt = {},
+  casts = 0, chips = {}, plan = nil, planActor = nil, impCure = {}, reviveFor = {}, chipAt = {}, castAt = {},
   brokeAt = nil, impossible = nil, itemsOut = false,
   lastSH, lastHP,
 }
@@ -655,26 +655,16 @@ local function makePlan(actor)
       end
     end
   end
-  -- #403: a Muddled SABIN acts on his own and may turn on the party.  No
-  -- item in this ROM removes Muddle or Berserk (item_prop: no record
-  -- carries STATUS2 $20 or $10 with the remove flag), so a person wakes a
-  -- Muddled ally the way the game allows: a plain, unboosted Fight on him
-  -- (a physical hit clears Muddle).  One swing in flight, the imp cure's
-  -- rule; not when the swing could fell him (a hit under a quarter of his
-  -- HP is the bound).  Berserk has no cure at all: he fights the train on
-  -- his own, which is what the plan wanted of him anyway.
-  for e, rec in pairs(b68.wakeFor) do
-    if rec.by == actor or pHP(rec.by) == 0
-       or (H.readByte(0x3EE5 + e * 2) & H.ST2_MUDDLE) == 0 then b68.wakeFor[e] = nil end
-  end
-  if sabinE and actor ~= sabinE and pHP(sabinE) > 0 and not b68.wakeFor[sabinE]
-     and (H.readByte(0x3EE5 + sabinE * 2) & H.ST2_MUDDLE) ~= 0
-     and (H.readByte(0x3EE4 + actor * 2) & H.ST1_IMP) == 0
-     and pHP(sabinE) * 4 > pMaxHP(sabinE) then
-    b68Log(string.format("wake e%d: SABIN (e%d) is Muddled -- an unboosted Fight on him [%s]",
-      actor, sabinE, partyLine()))
-    return { kind = "fight", boost = 0, target = sabinE }
-  end
+  -- #403: a Muddled or Berserk SABIN gets no cure here.  No item in this
+  -- ROM removes either (item_prop: no record carries STATUS2 $20 or $10
+  -- with the remove flag).  The one other cure, an ally's plain Fight on a
+  -- Muddled SABIN, was tried and measured worse: a Fight's target select
+  -- opens on the monster side and RIGHT never crossed to the party there
+  -- (the menu sat at $38 while the train played on), both runs that tried
+  -- wiped where the same keys won without it, and the train's own hits
+  -- clear Muddle within a round anyway (be14: s00/20 at f1245, clear by
+  -- f2093; build/attempts/wt/v026-route2/e403/).  Berserk fights the train
+  -- on his own, which is what the plan wanted of him.
   local st1 = H.readByte(0x3EE4 + actor * 2)
   if (st1 & 0x04) ~= 0 and itemRow and battInvIdx(ANTIDOTE) then
     b68Log(string.format("cure e%d: ANTIDOTE (status=%02X) [%s]",
@@ -921,13 +911,19 @@ local function b68Button()
     local mons = H.readByte(TGTMONS)
     if mons ~= 0 then                         -- off the monster side
       b68.rightN = (b68.rightN or 0) + 1      -- a RIGHT that could land on $05
+      plan.sideStall = (plan.sideStall or 0) + 1
+      if plan.sideStall > 8 then
+        b68Log(string.format("target steer never left the monster side in %d RIGHTs " ..
+          "(plan %s) -- backing out", plan.sideStall, plan.kind))
+        b68.plan, b68.planActor = nil, nil
+        return { "b" }
+      end
       return { "right" }
     end
     local wantMask = 1 << plan.target
     if chars == wantMask then
       if plan.item == FENIX_DOWN then b68Watch.fenix(actor, plan.target) end
       if actor == sabinE then b68.sabinCmdAt = H.frame end
-      if plan.kind == "fight" then b68.wakeFor[plan.target] = { by = actor } end
       b68.plan, b68.planActor = nil, nil      -- item or swing commits on this confirm
       return { "a" }
     end
@@ -1029,8 +1025,8 @@ local function b68Observe()
     b68.brokeAt = H.frame
     b68.brokeHP = hp
     b68Log(string.format(
-      "*** BREAK COMPLETE at f%d: six shields off with the train at %d of " ..
-      "1900 HP (casts=%d)", H.frame, hp, b68.casts))
+      "*** BREAK COMPLETE at f%d: all %d shields off with the train at %d of " ..
+      "%d HP (casts=%d)", H.frame, b68.maxSH or -1, hp, b68.maxHP or -1, b68.casts))
     H.screenshot("train_b68_broken")
   end
   if hp == 0 and b68.killedAt == nil and b68.lastHP and b68.lastHP > 0 then
@@ -1150,7 +1146,7 @@ local function b68Fight()
       b68.lastSH, b68.lastHP = nil, nil
       b68.tornDown, b68.mstreak = 0, 0
       b68.oddState, b68.oddN, b68.impSaid = nil, 0, false
-      b68.impCure, b68.reviveFor, b68.wakeFor = {}, {}, {}
+      b68.impCure, b68.reviveFor = {}, {}
       gSlot, sabinE, cyanE, shadowE = nil, nil, nil, nil
       b68Watch.reset()
     end),
@@ -1197,8 +1193,23 @@ local function b68Fight()
       H.assertEq(lv >= 6, true, "SABIN level 6+ -- AuraBolt learned")
       -- the authored row, live: the runtime proof of GhostTrain's 6-shield
       -- OT6_BLUDG entry in Ot6ShieldTbl
-      H.assertEq(H.readByte(SH(gSlot)), 6, "GHOSTTRAIN seeds 6 shields")
-      H.assertEq(H.readByte(SMX(gSlot)), 6, "GHOSTTRAIN max shields 6")
+      -- the authored row and the record, read from the ROM (#400 retunes
+      -- them): Ot6ShieldTbl's (species word, shields, classes) record and
+      -- MonsterProp's max HP word (+$08)
+      local t = H.sym("Ot6ShieldTbl") & 0x3FFFFF
+      b68.maxSH = nil
+      for i = 0, 1023 do
+        local id = H.readRomWord(t + i * 4)
+        if id == 0xFFFF then break end
+        if id == GHOSTTRAIN then b68.maxSH = H.readRomByte(t + i * 4 + 2); break end
+      end
+      b68.maxHP = H.readRomWord((H.sym("MonsterProp") & 0x3FFFFF) + GHOSTTRAIN * 32 + 8)
+      H.log(string.format("[b68] the train's record: %s shields (Ot6ShieldTbl), %d HP " ..
+        "(MonsterProp), %d HP live", tostring(b68.maxSH), b68.maxHP, H.readWord(MHP(gSlot))))
+      H.assertEq(b68.maxSH ~= nil, true, "GHOSTTRAIN has an authored Ot6ShieldTbl row")
+      H.assertEq(H.readByte(SH(gSlot)), b68.maxSH, "GHOSTTRAIN seeds its authored shields")
+      H.assertEq(H.readByte(SMX(gSlot)), b68.maxSH, "GHOSTTRAIN's max shields are its authored count")
+      H.assertEq(H.readWord(MHP(gSlot)), b68.maxHP, "GHOSTTRAIN opens at its record's max HP")
       H.assertEq(H.readByte(WKC(gSlot)), OT6_BLUDG,
         "GHOSTTRAIN's class row is OT6_BLUDG")
       H.assertEq(H.readByte(WKE(gSlot)) & HOLY, HOLY,
@@ -1295,15 +1306,16 @@ local function b68Fight()
     H.call(function()
       if b68.killedAt == nil then
         error(string.format("battle 68 ended at f%d with a member standing " ..
-          "and the train never seen at 0 HP (last train HP %s, %d of 6 " ..
+          "and the train never seen at 0 HP (last train HP %s, %d of %d " ..
           "shields off) -- neither a win nor a wipe this driver can read [%s]",
-          H.frame, tostring(b68.lastHP), b68.shieldsOff or 0, partyLine()), 0)
+          H.frame, tostring(b68.lastHP), b68.shieldsOff or 0, b68.maxSH or -1, partyLine()), 0)
       end
       H.assertEq(inParty(3), true, "SHADOW aboard after battle 68's win (the leave roll is a no-op by design)")
       b68won = true
       local off = b68.shieldsOff or 0
-      H.log(string.format("[b68] WON: %d of 6 shields off, killedAt=f%s " ..
-        "brokeAt=%s casts=%d chips=%d holy=%s bludg=%s", off,
+      local mx = b68.maxSH or 6
+      H.log(string.format("[b68] WON: %d of %d shields off, killedAt=f%s " ..
+        "brokeAt=%s casts=%d chips=%d holy=%s bludg=%s", off, mx,
         tostring(b68.killedAt), tostring(b68.brokeAt), b68.casts, #b68.chips,
         tostring(b68.holyRevealed), tostring(b68.bludgRevealed)))
       -- Each reveal is tied to the chip its skill landed, on any win: the
@@ -1360,8 +1372,8 @@ local function b68Fight()
             "%s: a %s the plan never cast came from a SABIN Muddled or Berserk since his " ..
             "last command (chip f%d)", what, name, chip))
           H.assertEq(at ~= nil and math.abs(at - chip) <= REVEAL_SLACK, true,
-            string.format("%d of 6 shields off: %s revealed by the %s that " ..
-            "chipped (engine-chosen; chip f%d, reveal f%s, slack %d)", off,
+            string.format("%d of %d shields off: %s revealed by the %s that " ..
+            "chipped (engine-chosen; chip f%d, reveal f%s, slack %d)", off, mx,
             what, name, chip, tostring(at), REVEAL_SLACK))
           return
         end
@@ -1377,30 +1389,30 @@ local function b68Fight()
         H.log(string.format("[b68] %s: %s cast f%s, its first chip f%s, " ..
           "revealed f%s", what, name, tostring(cast), tostring(chip),
           tostring(at)))
-        H.assertEq(ok, true, string.format("%d of 6 shields off: %s revealed " ..
+        H.assertEq(ok, true, string.format("%d of %d shields off: %s revealed " ..
           "by the %s that chipped (cast f%s, chip f%s, reveal f%s, slack %d)",
-          off, what, name, tostring(cast), tostring(chip), tostring(at),
+          off, mx, what, name, tostring(cast), tostring(chip), tostring(at),
           REVEAL_SLACK))
       end
       tied("HOLY", b68.holyAt, AURABOLT, "AuraBolt ($5E)", b68.holyBy)
       tied("OT6_BLUDG", b68.bludgAt, PUMMEL, "Pummel ($5D)", b68.bludgBy)
-      if off < 6 then
-        H.log(string.format("[tuning] battle 68 won with %d of 6 shields off " ..
+      if off < mx then
+        H.log(string.format("[tuning] battle 68 won with %d of %d shields off " ..
           "-- the train died before its break (killedAt=f%s casts=%d " ..
-          "chips=%d holy=%s bludg=%s) [party at the kill: %s]", off,
+          "chips=%d holy=%s bludg=%s) [party at the kill: %s]", off, mx,
           tostring(b68.killedAt), b68.casts, #b68.chips,
           tostring(b68.holyRevealed), tostring(b68.bludgRevealed),
           tostring(b68.killParty)))
         return
       end
       H.log(string.format(
-        "[b68] break margin: train at %s of 1900 HP when the sixth shield " ..
+        "[b68] break margin: train at %s of %d HP when the last shield " ..
         "came off, dead %s frames later (brokeAt=%s killedAt=%s)",
-        tostring(b68.brokeHP), b68.brokeAt and b68.killedAt
+        tostring(b68.brokeHP), b68.maxHP or -1, b68.brokeAt and b68.killedAt
           and tostring(b68.killedAt - b68.brokeAt) or "?",
         tostring(b68.brokeAt), tostring(b68.killedAt)))
       H.assertEq(#b68.chips >= 2, true,
-        "a 6/6 break: at least two shield chips landed")
+        "a full break: at least two shield chips landed")
     end),
     }),
   }, {})
@@ -1767,8 +1779,8 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.saveState("train_done.mss"),
   H.logStep(function()
     return string.format("train_done generated at frame %d world (%d,%d) -- " ..
-      "battle 68 won with %d of 6 shields off (the [b68] WON line; a " ..
+      "battle 68 won with %d of %d shields off (the [b68] WON line; a " ..
       "[tuning] line when the train died before its break)",
-      H.frame, H.worldX(), H.worldY(), b68.shieldsOff or 0)
+      H.frame, H.worldX(), H.worldY(), b68.shieldsOff or 0, b68.maxSH or -1)
   end),
 })
