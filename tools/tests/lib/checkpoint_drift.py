@@ -253,6 +253,11 @@ def producer_record(key: str, root: Path = ROOT) -> Path | None:
     return root / sn.capture_record(key, run)
 
 
+# One verdict per stamp per process: every capture's check walks its
+# producer's ancestry from power-on, and the 38 keys share it.
+_STATUS_MEMO: dict = {}
+
+
 def stale_reason(key: str, fresh_root=FRESH, root: Path = ROOT) -> str | None:
     """Why the capture in fresh_root/key is not today's, or None."""
     import compose
@@ -275,7 +280,7 @@ def stale_reason(key: str, fresh_root=FRESH, root: Path = ROOT) -> str | None:
             return (f"build/states/{state}.stamp does not record the run that "
                     f"captured it (the stamp's sig and the capture's "
                     f"generator_sig differ): regenerate {state}")
-        verdict, msg = compose.stamp_status(state, root)
+        verdict, msg = compose.stamp_status(state, root, _STATUS_MEMO)
         if verdict not in ok:
             return f"the run that captured it is not current: {msg}"
         return None
@@ -303,7 +308,7 @@ def stale_reason(key: str, fresh_root=FRESH, root: Path = ROOT) -> str | None:
             or hashlib.sha256(stamp.read_bytes()).hexdigest() != anc[1]):
         return (f"its cutter {gen} booted a {boot} that has since moved; "
                 f"capture it again")
-    verdict, msg = compose.stamp_status(boot, root)
+    verdict, msg = compose.stamp_status(boot, root, _STATUS_MEMO)
     if verdict not in ok:
         return f"the state its cutter booted is not current: {msg}"
     return None
