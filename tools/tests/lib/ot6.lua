@@ -10445,7 +10445,23 @@ function M.setzerBattle(plan, opts)
     local st = M.readByte(MSTATE)
     local p = plan[k]
     if M.readByte(0x3ED8 + a * 2) ~= 9 then
-      if p ~= nil and not opts.othersFight then defend(st) else fight(a, st) end
+      -- the others Defend while SETZER's plan has turns left, unless his
+      -- control is taken (M.controlTaken: Zombie, Sleep, Death ...): then
+      -- no turn of his comes, and Defending waits on nothing.  Main
+      -- 53b6a887's qualification had battle_hirecrew's party Defend under
+      -- the Mad Oscar's pack with SETZER zombied for 17,000 frames, then
+      -- wipe with his queued hire never run.  They Fight it out instead; a
+      -- plan the battle ends first is the caller's to play again.
+      local out = nil
+      for s = 0, 3 do
+        if M.readByte(0x3ED8 + s * 2) == 9 then out = M.controlTaken and M.controlTaken(s) end
+      end
+      if out and p ~= nil and not Z.outSaid then
+        Z.outSaid = true
+        M.log(string.format("[setzer] f%d SETZER cannot take a command (%s): the others Fight the battle out",
+          M.frame, out.name))
+      end
+      if p ~= nil and not opts.othersFight and not out then defend(st) else fight(a, st) end
       return
     end
     Z.entity = a * 2
