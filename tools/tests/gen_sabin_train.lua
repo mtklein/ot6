@@ -720,6 +720,14 @@ local function makePlan(actor)
     return { kind = "item", item = item, target = tgt,
              row = cmdRowOf(actor, CMD_ITEM) }
   end
+  -- #410: a player who knows the joke suplexes the train, and in OT6 that
+  -- wins (Ot6SuplexTrain): SABIN's first free turn is a Suplex whenever he
+  -- can pay for it.
+  if actor == sabinE and not imp and pMP(sabinE) >= (H.abilityCost(SUPLEX) or 13) then
+    b68Log(string.format("cast: SABIN Suplexes the train (the joke, #410; mp %d) trainHP=%d [%s]",
+      pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
+    return { kind = "blitz", skill = SUPLEX, boost = 0, row = cmdRowOf(actor, CMD_BLITZ) }
+  end
   if actor == sabinE and mx > 0 and hp > 0 and hp * 20 < mx * sabinLimit then
     local p = healPlan(actor, mx - hp)
     if p then return p end
@@ -1024,6 +1032,8 @@ local function b68Observe()
   end
   if hp == 0 and b68.killedAt == nil and b68.lastHP and b68.lastHP > 0 then
     b68.killedAt = H.frame
+    b68.killSkill = H.readByte(0x3410)
+    b68.killFrom = b68.lastHP
     b68.killParty = partyLine()
     b68Log(string.format("train at 0 HP at f%d (brokeAt=%s)", H.frame,
       tostring(b68.brokeAt)))
@@ -1106,6 +1116,7 @@ end
 -- battle seed $be and the battle group ($11E0), the lib's first-battle key
 -- shape -- so a set of runs can count distinct fights rather than runs.
 local b68won = false
+local b68Req = nil                        -- the train_b68_entry capture
 local b68Arm = false
 local function b68Won() return b68won end
 local function b68KeyWatch()
@@ -1305,6 +1316,16 @@ local function b68Fight()
       b68won = true
       local off = b68.shieldsOff or 0
       local mx = b68.maxSH or 6
+      -- #410: a Suplex SABIN cast before the kill is the kill, in one hit
+      -- (Ot6SuplexTrain deals the train's whole current HP).
+      local sup = b68.castAt[SUPLEX]
+      if sup and b68.killedAt and sup <= b68.killedAt then
+        H.log(string.format("[b68] the joke: Suplex cast f%d, the train %s -> 0 at f%d by attack $%02X",
+          sup, tostring(b68.killFrom), b68.killedAt, b68.killSkill or -1))
+        H.assertEq(b68.killSkill, SUPLEX, string.format("the train's last HP went to the " ..
+          "Suplex cast at f%d (the killing hit read attack $%02X, the train from %s HP)", sup,
+          b68.killSkill or -1, tostring(b68.killFrom)))
+      end
       H.log(string.format("[b68] WON: %d of %d shields off, killedAt=f%s " ..
         "brokeAt=%s casts=%d chips=%d holy=%s bludg=%s", off, mx,
         tostring(b68.killedAt), tostring(b68.brokeAt), b68.casts, #b68.chips,
@@ -1705,6 +1726,10 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
       invCount(FENIX_DOWN), gil()))
   end),
 
+  -- train_b68_entry: the corridor before the smokestack switch, one walk
+  -- from battle 68 (battle_suplextrain boots it, #410).  Captured with no
+  -- frames spent, emitted after train_done.
+  H.call(function() b68Req = H.requestSaveState() end),
   b68KeyWatch(),
   b68Fight(),
   H.call(function()
@@ -1768,6 +1793,10 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     H.screenshot("train_done")
   end),
   H.saveState("train_done.mss"),
+  H.call(function()
+    H.checkReq(b68Req, "train_b68_entry capture")
+    H.emitBlob("train_b68_entry.mss", b68Req.blob)
+  end),
   H.logStep(function()
     return string.format("train_done generated at frame %d world (%d,%d) -- " ..
       "battle 68 won with %d of %d shields off (the [b68] WON line; a " ..

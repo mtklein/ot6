@@ -8,6 +8,10 @@ release's notes.
 
 ## What's changed
 
+**Yes, you can suplex the train.** Sabin's Suplex on the Phantom Train
+now wins the fight on the spot, as every FF6 player always hoped it
+would. It works on that train and nothing else.
+
 **The Phantom Train is meant to be broken.** With Sabin's Blitzes and
 Shadow's throws now spending their Boost Points, the train usually died
 before its shields came down, so its break (and Cyan's first Cleave) rarely
