@@ -6320,6 +6320,15 @@ end
 -- coin row's boost buys one more toss or hire a point at the same price
 -- each, so the most it can cost is level x rate x (1 + boost).
 BATTLE.SETZER = { COIN = 0x59, HIRE = 0x5A, JACKPOT = 0x5B, SLOT = 0x5C }
+-- The reels' machine bytes (#353): the boost pending on an entity (the
+-- tier a spin latches at its first A, Ot6SlotRig), the battle's flags
+-- (bit 2: Joker Doom refused), the spin's stored tier (OT6_SLOTTIER), the
+-- rig byte (w7e6179), reel 2's target icon or $FF (w7e617b), reel 3's
+-- target, $FF or bit 7 set for a refused pair (w7e617c), and the drift
+-- budget left (w7e617d)
+BATTLE.PEND_BP, BATTLE.BTL_FLAGS, BATTLE.JOKER_OFF = 0x3E9D, 0x2F49, 0x04
+BATTLE.SLOT_TIER, BATTLE.SLOT_RIG = 0x57BA, 0x6179
+BATTLE.SLOT_AIM2, BATTLE.SLOT_AIM3, BATTLE.SLOT_DRIFT = 0x617B, 0x617C, 0x617D
 function M.setzerGil(level, rate, boost)
   return level * rate * (1 + (boost or 0))
 end
@@ -6340,12 +6349,38 @@ end
 -- (_c2b4a3), 7-7-Bar is 0 (Joker Doom on the party: JokerTargetTbl $0f),
 -- anything else 7 (Lagomorph); SlotAttackTbl maps 1-6 to Joker Doom on the
 -- monsters, Bahamut, a random esper, H-Bomb, Chocobop and 7-Flush.
-M.SLOT_REELS = {
-  { 0, 4, 5, 3, 4, 5, 2, 5, 1, 4, 5, 3, 5, 2, 3, 1 },
-  { 0, 4, 1, 5, 3, 4, 1, 5, 4, 3, 2, 5, 4, 3, 2, 5 },
-  { 0, 1, 3, 4, 2, 5, 4, 3, 1, 5, 4, 3, 2, 5, 4, 5 },
-}
-M.SLOT_ATTACK = { [0] = 0x94, 0x94, 0x43, 0xFF, 0x80, 0x7F, 0x81, 0xFE }
+-- The tables are the ROM's, read once at run time (M.slotLoadTables):
+--   M.SLOT_REELS[reel][i + 1]  SlotReelTbl, three strips of 16 words
+--   M.SLOT_ATTACK[result]      SlotAttackTbl, results 0-7
+--   M.SLOT_RATE[icon]          SlotRateTbl, icons 0-5 (below)
+-- `romByte(offset)` reads the ROM and `symOf(name)` gives a symbol's ROM
+-- offset: the lib's own (M.readRomByte, M.sym) unless a caller with no
+-- emulator (slot_selftest) hands its own.
+function M.slotLoadTables(romByte, symOf)
+  romByte = romByte or M.readRomByte
+  -- each name a literal M.sym("...") call: compose.py injects only the
+  -- symbols a script names that way (OT6_SYMS)
+  local reels, atk, rate
+  if symOf then
+    reels, atk, rate = symOf("SlotReelTbl"), symOf("SlotAttackTbl"), symOf("SlotRateTbl")
+  else
+    reels, atk, rate = M.sym("SlotReelTbl") & 0x3FFFFF, M.sym("SlotAttackTbl") & 0x3FFFFF,
+      M.sym("SlotRateTbl") & 0x3FFFFF
+  end
+  local strips = {}
+  for r = 1, 3 do
+    local t = {}
+    for i = 0, 15 do t[i + 1] = romByte(reels + (r - 1) * 32 + i * 2) end
+    strips[r] = t
+  end
+  local a, rt = {}, {}
+  for i = 0, 7 do a[i] = romByte(atk + i) end
+  for i = 0, 5 do rt[i] = romByte(rate + i) end
+  M.SLOT_REELS, M.SLOT_ATTACK, M.SLOT_RATE = strips, a, rt
+end
+local function slotTables()
+  if M.SLOT_REELS == nil then M.slotLoadTables() end
+end
 -- the position a reel stops at for a press read with it at `pos`
 function M.slotStopPos(pos)
   local p = pos
@@ -6362,7 +6397,6 @@ end
 -- SlotRateTbl (btlgfx_main.asm @7ee1): the rig byte ANDed with an icon's
 -- rate is 0 when the machine blesses it (reels 2 and 3 drift to it, a pair
 -- of it is not refused).  Icons 4 and 5 rate 0: blessed under every rig.
-M.SLOT_RATE = { [0] = 0x1F, 0x03, 0x01, 0x01, 0x00, 0x00 }
 -- The icon to time the reels on at tier `tier` (the boost the spin latches
 -- at its first A), with `gate` the battle's $2F49.2 (Joker Doom refused).
 -- 3 BP chooses the triple, so the 7s (Joker Doom on every monster) where
@@ -6501,10 +6535,11 @@ function Driver:setzerLine(actor, have)
   -- battles it held in (ab6/).
   local slotAt = o.slotAt or M.SLOT_AT or 2
   local timed = o.timed ~= false and M.SLOT_TIMED ~= false
-  local gate = (M.readByte(0x2F49) & 0x04) ~= 0
+  local gate = (M.readByte(BATTLE.BTL_FLAGS) & BATTLE.JOKER_OFF) ~= 0
   if o.slot ~= false and have >= slotAt and M.readByte(M.RANDBTL) ~= 0 and livingMonsters() >= 2 then
     local b = math.min(have, 3)
     local aim
+    slotTables()
     if timed then
       local MP = M.sym("MagicProp") & 0x3FFFFF
       aim = M.slotAim(b, gate, function(a) return M.readRomByte(MP + a * 14 + 6) end)
@@ -13016,29 +13051,66 @@ end
 -- the press is a new edge:
 --   reel 1 on the frame whose stop is the icon (M.slotPressLands, a window
 --     of four frames; M.SLOT_LAG frames from pad to read);
---   reels 2 and 3, which drift toward reel 1's icon (and its pair) by up to
---     four icons when the rig blesses it, on the frame whose first stop has
---     that icon two of the drift's five stops on (M.slotDriftAt), so a
---     frame early or late still lands it; a reel 3 with no pair to complete
---     is pressed at once.
+--   reels 2 and 3 by what the machine will do with them (M.slotReelPlan,
+--     from the rig and the tier the first A stored): a reel that drifts
+--     toward its target on the frame whose first stop has the target
+--     halfway through the drift (two of a four-icon drift's five stops on),
+--     so a frame early or late still lands it; one that does not drift
+--     (reel 1's icon cursed by the rig) on the target's own stop, as reel 1;
+--     a reel 3 with no pair to complete at once, unless the pair is the 7s
+--     the machine refuses, when it waits for a stop that is not the Bar
+--     (7-7-Bar is Joker Doom on the party).
 -- A person watching the reels does the same.  True while the hook owns the
--- pad (the commit press after reel 3 is the pulse's).  Each reel's press
--- and stop are logged, with the read's frame, so a lab can measure
--- M.SLOT_LAG rather than assume it.
+-- pad (the commit press after reel 3 is the pulse's).  A press not read in
+-- 12 frames is released and timed again.  Each reel's press and stop are
+-- logged, with the read's frame, so a lab can measure M.SLOT_LAG rather
+-- than assume it.
 M.SLOT_LAG = M.SLOT_LAG or 1
 -- How many of a drifting reel's stops pass before `icon`, pressed with the
 -- reel at `pos` and read `lag` frames on: 0-`drift`, or nil when the drift
 -- does not reach it
 function M.slotDriftAt(reel, pos, icon, lag, drift)
   local stop = M.slotStopPos((pos - 4 * lag) & 0xFF)
-  for k = 0, drift do
+  for k = 0, math.min(drift, 15) do
     if M.slotIcon(reel, (stop - 16 * k) & 0xFF) == icon then return k end
+  end
+  return nil
+end
+-- What the machine will do with reel `r` (2 or 3) once its press is read
+-- (UpdateMenuState_08 @7f47 and @7f6f with ot6_slot.asm's hooks), from
+-- reel 1's icon i1, reel 2's i2 (for reel 3), the rig byte, the tier the
+-- first A stored and the battle's Joker Doom gate:
+--   { aim = icon, drift = extra stops it may spin looking for it }, or
+--   { avoid = icon } (a pair the machine refuses: reel 3 skips the icon
+--   that would complete it), or {} (nothing to complete)
+function M.slotReelPlan(r, i1, i2, rig, tier, gate)
+  local blessed = (rig & M.SLOT_RATE[i1]) == 0
+  local budget = tier >= 3 and 0xFF or 4
+  if r == 2 then
+    if blessed then return { aim = i1, drift = budget } end
+    return { aim = i1, drift = 0 }
+  end
+  if i2 ~= i1 then return {} end
+  if blessed then return { aim = i1, drift = budget } end
+  -- cursed pair: Ot6SlotMiss -- refused at tier 0, and a 7 pair under the
+  -- gate at any tier; else blessed
+  if tier == 0 or (i1 == 0 and gate) then return { avoid = i1 } end
+  return { aim = i1, drift = budget }
+end
+-- Whether a reel-3 press with the reel at `pos` stops on the Bar (2) when
+-- the machine refuses `avoid` there (it spins past that icon's stops)
+function M.slotAvoidStop(pos, avoid, lag)
+  local stop = M.slotStopPos((pos - 4 * lag) & 0xFF)
+  for _ = 0, 15 do
+    if M.slotIcon(3, stop) ~= avoid then return M.slotIcon(3, stop) end
+    stop = (stop - 16) & 0xFF
   end
   return nil
 end
 function Driver:slotTimed(actor)
   local p = self.plan
   if p == nil or p.kind ~= "slot" then return false end
+  slotTables()
   local st = M.readByte(BATTLE.MSTATE)
   local press = { M.readByte(BATTLE.SLOT_PRESS1), M.readByte(BATTLE.SLOT_PRESS1 + 1), M.readByte(BATTLE.SLOT_PRESS1 + 2) }
   local stop = { M.readByte(BATTLE.SLOT_STOP1), M.readByte(BATTLE.SLOT_STOP1 + 1), M.readByte(BATTLE.SLOT_STOP1 + 2) }
@@ -13054,7 +13126,8 @@ function Driver:slotTimed(actor)
       local icon = M.slotIcon(r, at)
       M.log(string.format("[%s] actor=%d [slot] reel %d stopped at $%02X, icon %d (aimed %d, %s): "
         .. "A down at $%02X f%d, read by f%d (reel at $%02X then)", self.tag or "fight", actor, r,
-        at, icon, t.aim or -1, t.aim == nil and "no pair to complete" or (icon == t.aim and "landed" or "MISSED"),
+        at, icon, t.aim or -1, t.aim == nil and (t.avoid and "a refused pair, the Bar kept off"
+          or "no pair to complete") or (icon == t.aim and "landed" or "MISSED"),
         t.pressPos, t.press, t.read or -1, t.readPos or 0))
     end
   end
@@ -13070,7 +13143,8 @@ function Driver:slotTimed(actor)
       .. "reel-3 mark $%02X, drift left %d", self.tag or "fight",
       actor, i1, i2, i3, r, M.SLOT_ATTACK[r], r == 0 and " (Joker Doom on the PARTY)" or
       (r == 7 and " (no triple)" or (i1 == p.aimIcon and " (the aimed triple)" or "")),
-      M.readByte(0x57BA), M.readByte(0x6179), M.readByte(0x617C), M.readByte(0x617D)))
+      M.readByte(BATTLE.SLOT_TIER), M.readByte(BATTLE.SLOT_RIG), M.readByte(BATTLE.SLOT_AIM3),
+      M.readByte(BATTLE.SLOT_DRIFT)))
   end
   if p.aimIcon == nil then return false end
   if st ~= BATTLE.ST_SLOT or M.readByte(BATTLE.ACTOR) & 3 ~= actor then return false end
@@ -13096,15 +13170,15 @@ function Driver:slotTimed(actor)
       actor, r, t.press))
     t.press = nil
   end
+  local gate = (M.readByte(BATTLE.BTL_FLAGS) & BATTLE.JOKER_OFF) ~= 0
   local want
   if r == 1 then
     -- the tier the first A will latch is the pending boost now (Ot6SlotRig);
     -- an R the menu did not take leaves it below the plan's, so aim for it
-    local tier = math.min(M.readByte(0x3E9D + actor * 2), 3)
+    local tier = math.min(M.readByte(BATTLE.PEND_BP + actor * 2), 3)
     if p.aimTier ~= tier then
       local MP = M.sym("MagicProp") & 0x3FFFFF
-      local aim = M.slotAim(tier, (M.readByte(0x2F49) & 0x04) ~= 0,
-        function(a) return M.readRomByte(MP + a * 14 + 6) end)
+      local aim = M.slotAim(tier, gate, function(a) return M.readRomByte(MP + a * 14 + 6) end)
       if p.aimTier ~= nil or aim ~= p.aimIcon then
         M.log(string.format("[%s] actor=%d [slot] the spin will latch tier %d (pending boost; planned %d): "
           .. "the reels timed on icon %d", self.tag or "fight", actor, tier, p.boostPlanned or -1, aim))
@@ -13115,9 +13189,16 @@ function Driver:slotTimed(actor)
     want = M.slotPressLands(pos, p.aimIcon, M.SLOT_LAG)
   else
     local i1 = M.slotIcon(1, M.readByte(BATTLE.SLOT_POS1))
-    local paired = r == 2 or M.slotIcon(2, M.readByte(BATTLE.SLOT_POS1 + 1)) == i1
-    t.aim = paired and i1 or nil
-    want = not paired or M.slotDriftAt(r, pos, i1, M.SLOT_LAG, 4) == 2
+    local i2 = M.slotIcon(2, M.readByte(BATTLE.SLOT_POS1 + 1))
+    local plan = M.slotReelPlan(r, i1, i2, M.readByte(BATTLE.SLOT_RIG), M.readByte(BATTLE.SLOT_TIER), gate)
+    t.aim, t.avoid = plan.aim, plan.avoid
+    if plan.aim then
+      want = M.slotDriftAt(r, pos, plan.aim, M.SLOT_LAG, plan.drift) == math.min(2, plan.drift // 2)
+    elseif plan.avoid then
+      want = M.slotAvoidStop(pos, plan.avoid, M.SLOT_LAG) ~= 2
+    else
+      want = true
+    end
   end
   if t.free and want then
     t.press, t.pressPos = M.frame, pos
