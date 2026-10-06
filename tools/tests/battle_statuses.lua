@@ -24,16 +24,18 @@
 -- legs' pool is Stray Cat x3 (no CrassHoppr) at 80/256 beside two
 -- CrassHoppr formations at 176/256, so one fixture meets CrassHopprs every
 -- battle and the next can meet eight Stray Cat packs in a row.  So the
--- walk PACES the route's own leg between (176,71) and (178,81) until a
--- turn-denying status has actually landed, and only then turns into the
--- forest; and it bounds the pacing by what can deny a turn, read from the
--- ROM: an EXPOSURE battle is one whose formation holds a species whose
+-- walk PACES one pool's stretch of the plain beside the route (H.newPacer:
+-- the nearest stretch of two or more tiles whose pool can deal the
+-- exposures within the cap, P.findStart; #399) until a turn-denying status
+-- has actually landed, and only then turns into the forest; and it bounds
+-- the pacing by what can deny a turn, read from the ROM: an EXPOSURE
+-- battle is one whose formation holds a species whose
 -- special (MonsterProp+31, decoded as battle_main.asm @3318 does) inflicts
 -- a status H.turnDenied names AND whose AI script can issue SPECIAL ($EF).
 -- The walk stops after EXPOSURES of those (the measured count, at
 -- EXPOSURES below), and caps the paced battles at the most any
--- encounter-counter state needs to deal that many exposures from the legs'
--- own pool (H.worstCaseEncounters), so a walk that really cannot draw one
+-- encounter-counter state needs to deal that many exposures from the
+-- stretch's pool (H.worstCaseEncounters), so a walk that really cannot draw one
 -- still fails loudly at the same assertion, and a fixture whose counter
 -- deals Stray Cats first still gets its full count of exposures.
 --
@@ -79,6 +81,12 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local STATE = "build/states/camp_escaped.mss.lua"
+-- Lever, for evidence only (the suite runs BURN 0): run from that many
+-- encounters on the paced stretch before the budget, unwatched, to vary
+-- the encounter history (TESTING.md: the draw moves with encounters used
+-- up, not seeds).
+local BURN = 0
+local burning = false
 local MENU, ACTOR = 0x7BCA, 0x62CA
 local S1, S2, S3 = 0x3EE4, 0x3EE5, 0x3EF8
 
@@ -160,6 +168,7 @@ local function onWorldCheck()
   lastTile, lastGroup = H.readByte(0x0AE2) * 256 + H.readByte(0x0AE0), H.worldCheckGroup()
 end
 local function observe()
+  if burning then return end
   if not H.battleLoadStarted() then
     if cur then
       -- a status that ended with the battle closes its window here, at
@@ -221,19 +230,18 @@ local function observe()
   end
 end
 
--- the route's own leg, paced: (176,71) and (178,81) are both on the line
--- camp_escaped's walker already plans through to the forest mouth (the
--- wnav trace logs both), so a lap between them is the same walk, walked
--- again, and draws from the same pool.
-local PACE_A, PACE_B = { 176, 71 }, { 178, 81 }
 -- How many exposure battles the walk gives a turn-denying special to
 -- land in: measured per exposure battle -- see the residual risk in the
 -- file header.
 local EXPOSURES = 16
+-- The most paced battles a pool may need for its budget: the cap below
+-- holds ~64 battles at ~3,100 frames each, so a pool needing more than 60
+-- to deal EXPOSURES exposures is not one this walk can use (want).
+local MAXBATTLES = 60
 -- the most battles the pacing may fight: what any encounter-counter state
--- needs to deal EXPOSURES exposures from the legs' pool, counted from the
--- pacing's own start (pacedFrom: battles on the way to A are not the
--- legs'); set once the world is loaded
+-- needs to deal EXPOSURES exposures from the stretch's pool, counted from
+-- the pacing's own start (pacedFrom: battles on the way to the stretch
+-- are not the pool's); set once the stretch is planned
 local battleBudget, pacedFrom = nil, 0
 local function leftTheWorld() return not H.worldMode() end
 local function fought() return #battles + (cur and 1 or 0) end
@@ -241,17 +249,12 @@ local function keepPacing()
   return not landedAny and exposures < EXPOSURES and fought() - pacedFrom < battleBudget
 end
 
--- The legs' pool and the budget it implies.  The groups are the ones a
--- lap's own paths roll from (H.worldPathGroups over A -> B -> A, the
--- walkers' BFS legs: every zone the legs stand in, with every battle
--- background they step on); a formation slot counts as an exposure only
--- when every formation it can deal holds a denier, in every one of those
--- groups.  The legs' first battle can instead roll from an ENTRY group --
--- the zone of wherever the party last battled, opened the menu or entered
--- the world before A, which the engine keeps until the next battle -- so
--- when there is one, that first battle is budgeted as a loss: one more
--- battle.
-local function poolLine(what, g, exposureSlot)
+-- A pool's budget: a formation slot counts as an exposure only when every
+-- formation it can deal holds a denier; the budget is the most battles any
+-- encounter-counter state needs to deal EXPOSURES of them.  A pool with no
+-- exposure slot never deals one (math.huge).
+local worsts = {}
+local function poolLine(g, exposureSlot)
   local pool = H.encounterPool(g)
   for slot = 1, 4 do
     local e = pool[slot]
@@ -262,40 +265,46 @@ local function poolLine(what, g, exposureSlot)
         names[#names + 1] = string.format("%03X", sp)
         deny = deny or denier(sp)
       end
-      if deny == nil and exposureSlot then exposureSlot[slot] = false end
+      if deny == nil then exposureSlot[slot] = false end
       parts[#parts + 1] = string.format("%d [%s]%s", f.id, table.concat(names, " "),
         deny and (" " .. deny) or "")
     end
-    H.log(string.format("[test] %s pool: group %d slot %d (%d/256) %s", what, g, slot, e.odds,
+    H.log(string.format("[test] pool: group %d slot %d (%d/256) %s", g, slot, e.odds,
       table.concat(parts, ", ")))
   end
 end
-local function budget()
-  return H.call(function()
-    local order, entry = H.worldPathGroups({ PACE_A, PACE_B, PACE_A })
-    H.assertEq(#order > 0, true, "the pacing legs roll random battles somewhere on their paths")
-    local exposureSlot = { true, true, true, true }
-    for _, g in ipairs(order) do poolLine("leg", g, exposureSlot) end
-    for _, g in ipairs(entry) do poolLine("entry", g, nil) end
-    local any = false
-    for slot = 1, 4 do any = any or exposureSlot[slot] end
-    H.assertEq(any, true, "the legs' pool deals a formation with a turn-denying species")
-    local worst, hist = H.worstCaseEncounters(function()
+local function worstFor(g)
+  if worsts[g] then return worsts[g] end
+  local exposureSlot = { true, true, true, true }
+  poolLine(g, exposureSlot)
+  local any = false
+  for slot = 1, 4 do any = any or exposureSlot[slot] end
+  local worst, hist = math.huge, nil
+  if any then
+    worst, hist = H.worstCaseEncounters(function()
       local n = 0
       return function(slot)
         if exposureSlot[slot] then n = n + 1 end
         return n >= EXPOSURES
       end
     end)
-    battleBudget, pacedFrom = worst + (#entry > 0 and 1 or 0), fought()
+  end
+  H.log(string.format("[test] group %d: %s", g, any and string.format("%d exposure battle(s) "
+    .. "within at most %d battle(s), the most any encounter-counter state needs (%.1f%% of "
+    .. "states need no more than %d)", EXPOSURES, worst, 100 * H.encounterShare(hist, EXPOSURES),
+    EXPOSURES) or "no slot deals a turn-denying species"))
+  worsts[g] = worst
+  return worst
+end
+local P = H.newPacer({ tag = "statuses pace",
+  want = function(g) return worstFor(g) <= MAXBATTLES end })
+local function budget()
+  return H.call(function()
+    battleBudget, pacedFrom = worstFor(P.group), fought()
     local zx, zy = H.worldZonePos()
-    H.log(string.format("[test] budget: %d exposure battle(s), within at most %d battle(s) -- "
-      .. "the most any encounter-counter state needs to deal that many from group(s) %s "
-      .. "(%.1f%% of states need no more than %d)%s; the engine's saved position is (%d,%d), "
-      .. "%d battle(s) fought before the legs", EXPOSURES, battleBudget,
-      table.concat(order, ","), 100 * H.encounterShare(hist, EXPOSURES), EXPOSURES,
-      #entry > 0 and (", plus one for a first battle from entry group(s) "
-        .. table.concat(entry, ",")) or "", zx, zy, pacedFrom))
+    H.log(string.format("[test] budget: %d exposure battle(s), within at most %d battle(s) of "
+      .. "group %d; the engine's saved position is (%d,%d), %d battle(s) fought before the "
+      .. "stretch", EXPOSURES, battleBudget, P.group, zx, zy, pacedFrom))
   end)
 end
 
@@ -314,7 +323,8 @@ local function pacing()
         if nav == nil then
           if not keepPacing() then return "done" end
           leg = leg + 1
-          local wp = (leg % 2 == 1) and PACE_B or PACE_A
+          local lo, hi, y = P.ends()
+          local wp = (leg % 2 == 1) and { hi, y } or { lo, y }
           H.log(string.format("[test] leg %d: no turn-denying status yet after %d battle(s), "
             .. "%d of them exposures -- pacing to (%d,%d) to draw more",
             leg, fought(), exposures, wp[1], wp[2]))
@@ -345,14 +355,49 @@ H.run({ maxFrames = 200000 }, {
     local check = H.sym("CheckBattleWorld")
     emu.addMemoryCallback(onWorldCheck, emu.callbackType.exec, check, check)
   end),
-  H.worldNavTo(PACE_A[1], PACE_A[2], { maxFrames = 25000,
-    playBattles = "tactical", arrive = leftTheWorld }),
-  -- the budget plans the legs' paths over the world tilemap in WRAM; a
-  -- battle on A itself ends the walk the frame control returns, before
-  -- the reload has rebuilt the map
+  -- the stretch is chosen on the settled world tilemap; a battle on the
+  -- start tile itself ends the walk the frame control returns, before the
+  -- reload has rebuilt the map
   H.waitUntil(function() return H.worldSettled() end, 1500, "the world map settled", 5),
+  (function()
+    local sx, sy
+    return H.seqStep({
+      H.call(function() sx, sy = P.findStart(8) end),
+      H.worldNavTo(function() return sx end, function() return sy end, { maxFrames = 25000,
+        playBattles = "tactical", arrive = leftTheWorld }),
+      H.waitUntil(function() return H.worldSettled() end, 1500, "settled on the stretch", 5),
+      H.call(function() P.plan() end),
+    })
+  end)(),
+  (function()
+    local steps = {}
+    for i = 1, BURN do
+      local lo, hi, y
+      steps[#steps + 1] = H.call(function() burning = true; lo, hi, y = P.ends() end)
+      steps[#steps + 1] = H.driveUntil(function() return H.battleLoadStarted() end, 25000, {
+        H.call(function() H.setPad(P.pad()) end) }, "BURN encounter " .. i)
+      steps[#steps + 1] = H.release()
+      steps[#steps + 1] = H.waitUntil(function() return H.battleActive() end, 1200,
+        "BURN battle " .. i .. " active", 5)
+      steps[#steps + 1] = H.call(function() P.assertGroup("BURN encounter " .. i) end)
+      steps[#steps + 1] = H.fleeBattle(9000, { onCantRun = "fight" })
+      steps[#steps + 1] = H.waitUntil(function() return H.worldSettled() end, 1500,
+        "settled after BURN " .. i, 5)
+    end
+    steps[#steps + 1] = H.call(function() burning = false end)
+    return H.seqStep(steps)
+  end)(),
   budget(),
   pacing(),
+  -- every paced battle came from the stretch's pool, the one the budget
+  -- was decoded from
+  H.call(function()
+    if cur then return end
+    for k = pacedFrom + 1, #battles do
+      H.assertEq(battles[k].group, P.group, string.format("paced battle %d was dealt by "
+        .. "group %s, the stretch's (the budget's pool)", battles[k].n, tostring(battles[k].group)))
+    end
+  end),
   H.worldNavTo(178, 82, { maxFrames = 25000,
     playBattles = "tactical", arrive = leftTheWorld }),
   H.waitUntil(function() return mapIdx() == 132 end, 4000, "the forest loads", 5),
