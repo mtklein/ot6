@@ -2,12 +2,13 @@
 """configure.py -- emit ./build.ninja, the whole project as one ninja graph.
 
 Bare `ninja` builds and tests everything: the default targets are the
-ROM, every generated savestate, every suite test's result, every audit and
-every selftest.  `ninja release` is all of that plus the release
-preflights (the chain from power-on among them), the BPS patch, the
-zip and the Android patcher APK.  `ninja chain` is the chain from power-on alone (savestate_ninja.py
-chain_plan).  Those are the only aliases; any partial need is a real
-output path
+ROM, every generated savestate (the game played once from power-on, each
+leg Continuing the save the run before it made), every suite test's
+result, every audit and every selftest.  `ninja release` is all of that
+plus the release preflights (the drift gate among them), the BPS patch,
+the zip and the Android patcher APK.  `ninja chain` is the play from
+power-on to its last state alone.  Those are the only aliases; any partial
+need is a real output path
 (`ninja build/states/vargas_entry.mss.lua`,
 `ninja build/results/suite/battle_break.ok`, `ninja ff6/rom/ff6-en.sfc`).
 Parallelism is ninja's own, unbounded; emulator-running commands are
@@ -36,9 +37,11 @@ from the root):
                  depends on its identity copy instead
                  (copy_if_rom_identity_changed: the version fields masked),
                  so a VERSION bump re-runs only what reads those fields.
-  savestates     the story-chain graph, embedded from
+  savestates     the story graph, embedded from
                  tools/tests/lib/savestate_ninja.py (the same data file,
-                 tools/tests/savestate_graph.py, drives it).
+                 tools/tests/savestate_graph.py, drives it): one run per
+                 leg, and at a cut the producer's run captures the save the
+                 next leg Continues (build/checkpoints/<key>/).
   suite          one edge per `-- @suite` test.  A test whose fixture is
                  missing builds the fixture, and the release artifact
                  depends on every test's .ok, so "everything ran" is graph
@@ -150,6 +153,25 @@ w("  deps = gcc")
 w("  description = ca65 $obj")
 w()
 sn.emit_state_rules(w)
+# #344/#363: the play from power-on is one serial line and it is the build's
+# critical path, so its next run must never wait behind side work.  Two
+# things could hold it: a -j slot and one of the machine's emulator slots
+# (run.sh holds one per run, lib/emu_slot.py: the machine's own setting, else
+# its CPU count).  Everything else that runs an emulator (suites, branch
+# states, `ninja quick`) shares this pool, one short of the emulator slots,
+# so one slot is always left for the line, and ninja's default -j (cores +
+# 2) is above the pool's depth.  (Ninja 1.13 ranks ready edges by downstream
+# edge count, not by duration, so a ready line edge goes first anyway; the
+# pool is what keeps a slot free for it.)
+import emu_slot  # noqa: E402
+w("pool side")
+w(f"  depth = {max(1, emu_slot.slots() - 1)}")
+# the setting is read here, at configure time: a change to it re-configures
+# (only an existing file can be a dependency; one created later is seen at
+# the next re-configure)
+if Path(emu_slot.CONF).is_file():
+    read_deps.add(emu_slot.CONF)
+w()
 w("# One suite test: compose, boot Mesen headless, publish the log, touch the")
 w("# ok.  $env carries the per-test environment (dirty-RAM pins, checkpoint")
 w("# batteries, coverage artifact dirs); the separating space lives here.")
@@ -352,12 +374,16 @@ if errors:
     for e in errors:
         print(f"savestate_graph: {e}", file=sys.stderr)
     sys.exit(1)
-sn.emit_state_edges(w, states, ROOT, copy_if_changed_from)
-# The chain from power-on (savestate_ninja.py chain_plan): qualification
-# boots each cut leg from its tracked checkpoint; `ninja chain` plays the
-# whole chain from power-on as chain_<state> copies, each leg booted from
-# the save the one before it made.  `release` depends on it.
-chain_end = sn.emit_chain_edges(w, states, ROOT, copy_if_changed_from)
+sn.emit_state_edges(w, states, ROOT, copy_if_changed_from, side_pool="side")
+# Every checkpoint a run on the graph saves, and the files its capture is
+# sealed into (build/checkpoints/<key>/): the cuts Continue them, the suites
+# below Continue them, and the release's drift gate compares them with the
+# tracked copies.
+captures = sn.captures(states, ROOT)
+chain_end = sn.line_end(states)
+# `ninja quick`'s copies: the dev lever, never qualification (QUICK).
+quick_affected = sn.emit_quick_edges(w, states, ROOT, copy_if_changed_from,
+                                     side_pool="side")
 # Every name a test can reference includes the `also=` siblings: a state
 # like figaro_cleared is emitted by gen_edgar's edge as an also-artifact,
 # and fixture_deps() filtering against primary names only would drop it,
@@ -374,33 +400,35 @@ HARNESS = ["tools/tests/run.sh", "tools/tests/lib/compose.py",
            "tools/tests/lib/sram_checkpoint.py", "tools/build/run_suite_test.sh"]
 
 # Tests that boot power-on under a dirty deterministic RAM fill and/or
-# cold-Continue a tracked checkpoint battery.
+# cold-Continue a checkpoint battery.  OT6_SRAM_CHECKPOINT names the
+# capture the graph's own run made (build/checkpoints/<key>), never the
+# tracked copy: the suite plays from the same save the next leg does.
 TEST_ENV = {
     "battle_reveal_poweron": "OT6_RAM_POWERON=AllOnes "
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/terra-returned-v1",
     "battle_slotsboot":
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/terra-returned-v1",
     "battle_slots":
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/terra-returned-v1",
     # #346: Setzer's party on a natural boot, as battle_slots.  Its runs end
     # between 7,389 and 43,474 frames (14 runs), about 7 minutes at the
     # ~100 frames/s a loaded machine emulates, close to the 600 s default
     "battle_slotcancel": "OT6_TIMEOUT=1800 "
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/terra-returned-v1",
     # Mimic (#260): no fixture has Gogo, so the test Continues fire-out-v1
     # and declares a two-byte command expedient (state_write_waivers.txt)
     "battle_mimic":
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fire-out-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
     # #292: NUMBER 024 (7 shields) is two steps from this save point
     "battle_hudcount":
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/n024-entry-save-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/n024-entry-save-v1",
     # Phoenix (#293): no fixture has it, so the test Continues fire-out-v1
     # and declares a one-byte esper expedient (state_write_waivers.txt)
     "battle_phoenixprice":
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fire-out-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
     # #327: TERRA knows Life and pays Life 3 here; no write needed
     "battle_lifefold":
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fire-out-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
     # #319: SETZER's kit, played in Darill's Tomb's east room from the
     # battery cut on its save point (SETZER back in the World of Ruin, so
     # Jackpot is learned).  A run is the Continue, a walk and one to four
@@ -408,33 +436,33 @@ TEST_ENV = {
     # battle_jackpot: three passes and a bounded search (at most 192 throws)
     "battle_jackpot": "OT6_TIMEOUT=3600",
     "battle_cointoss": "OT6_TIMEOUT=3600 "
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     "battle_hiredhelp": "OT6_TIMEOUT=1800 "
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     "battle_setzergrey": "OT6_TIMEOUT=1800 "
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     "battle_gprain": "OT6_TIMEOUT=3600 "
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     "battle_hirerefund": "OT6_TIMEOUT=1800 "
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     # battle_passretarget: 3-21 battles over its entry variations (11k-85k
     # frames, build/attempts/wt/pass-retarget/sweep/), more when the
     # re-split takes its ten crowds
     "battle_passretarget": "OT6_TIMEOUT=3600 "
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     "battle_setzeraim": "OT6_TIMEOUT=1800 "
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     "battle_passside": "OT6_TIMEOUT=1800 "
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     # wt/hire-sprite: the 3 and 2 BP hires' figures (Defends bank the points)
     "battle_hirecrew": "OT6_TIMEOUT=2400 "
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tomb-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     # the Config screen's version tab, from the Narshe exit spawn
     "menu_configversion":
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/narshe-mission-v1",
     # walks from the Narshe exit spawn into the Beginner's House
     "school":
-        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/narshe-mission-v1",
     # grinds honest world-map fights until the 1/16 Shadow-leave roll passes:
     # an 80-win cap at ~4000 frames a win is ~320k frames, ~1600 s at the
     # ~200 frames/s a loaded machine emulates; the 600 s default cap is far short
@@ -494,6 +522,7 @@ def fixture_deps(lua_path):
 
 
 suite_tests = []
+quick = []          # `ninja quick`: every suite's quick result
 for f in glob("tools/tests/*.lua"):
     text = (ROOT / f).read_text(errors="replace")
     m = re.search(r"^-- @suite(.*)$", text, re.M)
@@ -517,11 +546,45 @@ for f in glob("tools/tests/*.lua"):
                  f"build/states/{fx}.stamp"]
     env = TEST_ENV.get(t, "")
     if "OT6_SRAM_CHECKPOINT=" in env:
-        key = env.split("OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/")[1].split()[0]
-        deps += [copy_if_changed_from(a) for a in sn.checkpoint_inputs(ROOT, key)]
+        key = env.split(f"OT6_SRAM_CHECKPOINT={sn.CAPTURE_DIR}/")[1].split()[0]
+        if key not in captures:
+            sys.exit(f"configure.py: {t} Continues {key}, which no run on "
+                     f"the savestate graph saves")
+        deps += sn.capture_inputs(ROOT, key)
     w.edge([f"build/results/suite/{t}.ok"], "suitetest", implicit=deps,
-           test=t, env=env)
+           test=t, env=env, pool="side")
     qual.append(f"build/results/suite/{t}.ok")
+    # `ninja quick` (savestate_ninja.py QUICK): the suite on the quick_
+    # copies of its fixtures when a cut is in their ancestry, Continuing the
+    # tracked checkpoint instead of the capture; otherwise its quick result
+    # is its real one.  Never qualification (docs/TESTING.md).
+    fixtures = {d.split("/")[-1].split(".")[0] for d in deps
+                if d.startswith("build/states/")}
+    ckpt = "OT6_SRAM_CHECKPOINT=" in env
+    if ckpt or fixtures & quick_affected:
+        qdeps = [d for d in deps if not d.startswith(("build/states/",
+                                                      sn.CAPTURE_DIR + "/"))]
+        # OT6_STACK=quick_ prefixes every .mss the suite names, so each
+        # fixture is booted by its quick_ name: a regenerated copy when a
+        # cut is in its ancestry, else a plain copy of the real state
+        for fx in sorted(fixtures):
+            if fx not in quick_affected:
+                sn.quick_copy_edge(w, fx)
+            n = sn.QUICK + fx
+            qdeps += [f"build/states/{n}.mss.lua", f"build/states/{n}.mss",
+                      f"build/states/{n}.stamp"]
+        qenv = env
+        if ckpt:
+            qenv = env.replace(f"OT6_SRAM_CHECKPOINT={sn.CAPTURE_DIR}/",
+                               "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/")
+            qdeps += [copy_if_changed_from(a)
+                      for a in sn.checkpoint_inputs(ROOT, key)]
+        w.edge([f"build/results/quick/{t}.ok"], "suitetest", implicit=qdeps,
+               test=t, env=(f"OT6_STACK={sn.QUICK} " + qenv).strip(),
+               pool="side")
+        quick.append(f"build/results/quick/{t}.ok")
+    else:
+        quick.append(f"build/results/suite/{t}.ok")
 
 # ------------------------------------------------------------------ checks --
 def check(name, cmd, deps, desc=None):
@@ -669,11 +732,11 @@ check("checkpoint_drift_selftest",
       "python3 tools/tests/lib/checkpoint_drift.py --selftest",
       ["tools/tests/lib/checkpoint_drift.py", "tools/tests/lib/sram_checkpoint.py",
        "tools/tests/lib/savestate_ninja.py", sn.GRAPH])
-# #354: every tracked checkpoint a state or a suite boots is captured by a
-# run on the chain from power-on, so `ninja release`'s drift gate compares
-# it; the rest are the graph's NOT_GATED, each with its reason.
+# #354: every tracked checkpoint is captured by a run on the graph, so
+# `ninja release`'s drift gate compares it, and every save a suite Continues
+# is one; the rest are the graph's NOT_GATED, each with its reason.
 suite_checkpoints = sorted({m for env in TEST_ENV.values() for m in re.findall(
-    r"OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/(\S+)", env)})
+    r"OT6_SRAM_CHECKPOINT=build/checkpoints/(\S+)", env)})
 check("checkpoint_coverage",
       "python3 tools/tests/lib/savestate_ninja.py --coverage --booted "
       + " ".join(suite_checkpoints),
@@ -722,8 +785,22 @@ check("check_states", "python3 tools/tests/lib/compose.py --check-states",
       + [copy_if_changed_from(f"tools/tests/{e['gen']}.lua") for e in states if e.get("gen")]
       + [copy_if_changed_from(h) for h in LIBS] + all_stamps)
 
-# the four fixture audits: real inputs replace the old make-level stamp
-AUDIT_COMMON = all_stamps + checkpoint_files
+# the four fixture audits: real inputs replace the old make-level stamp.
+# They read the saves the legs Continue: the captures, not the tracked
+# copies (tools/savestate_party.py checkpoint_payloads).
+capture_files = sorted(p for paths in captures.values() for p in paths
+                       if not p.endswith(".record"))
+AUDIT_COMMON = all_stamps + capture_files + checkpoint_files
+# #335: every checkpoint's learned spells against the grant sources the
+# built ROM has (no tier, nothing unsourced), and its control (one
+# unsourced spell planted in memory must read BAD in every checkpoint).
+# It reads the saves the legs Continue, the captures
+# (savestate_party.checkpoint_payloads), as the audits do.
+check("spells_all",
+      "python3 tools/spells_all.py --control && python3 tools/spells_all.py",
+      ["tools/spells_all.py", "tools/check_spell_grants.py",
+       "tools/savestate_party.py", "ff6/rom/ff6-en.dbg",
+       copy_if_changed_from("build/ot6.sfc")] + capture_files)
 check("audit_equipment", "python3 tools/audit_equipment.py",
       ["tools/audit_equipment.py"] + AUDIT_COMMON)
 check("check_mog_gear", "python3 tools/check_mog_gear.py",
@@ -763,36 +840,50 @@ check("release_readme",
 # notes, README) exists; `ninja release` (the zip) still requires both.
 release_pre = qual[qual_before_release:]
 del qual[qual_before_release:]
-# The chain from power-on is a release preflight too: the legs
-# qualification booted from tracked checkpoints must also play through
-# from power-on, each from the save the leg before it made.  And every
-# tracked checkpoint the chain captures (every one something boots,
-# checkpoint_coverage above) must be the save that chain makes today
-# (checkpoint_drift.py: levels, gear, gil, the bag, story switches); the fix
-# for a drifted one is `checkpoint_drift.py --recut`, then qualify again.
-if chain_end:
-    release_pre.append(chain_end)
-    captures = sn.chain_captures(states, ROOT)
+# The drift gate is a release preflight: every tracked checkpoint (every
+# one the graph captures, checkpoint_coverage above) must be the save the
+# graph's play makes today, byte for byte (checkpoint_drift.py: levels,
+# gear, gil, the bag, story switches).  Nothing in the graph boots a
+# tracked checkpoint, so the fix for a drifted one, `checkpoint_drift.py
+# --recut`, replays nothing: commit it and run `ninja release` again.
+if captures:
     tracked = [a for key in sorted(captures)
                for a in sn.checkpoint_inputs(ROOT, key)]
     out = "build/checks/checkpoint_drift.ok"
-    # ...and every capture must be today's: the lib halves, the stamp tool
-    # and the ROM are inputs here, so a lib-only edit (which re-runs no
-    # chain edge) re-runs this check, and the check refuses the capture
-    # whose provenance sig no longer matches
+    # ...and every capture must be today's: made on this ROM, by today's
+    # generator, from a boot that is itself current (the producer's stamp,
+    # or a cutter's record).  The lib halves are provenance here as
+    # everywhere in the graph (#363): a lib-only edit replays nothing and
+    # does not stale a capture.
     w.edge([out], "sh",
            implicit=["tools/tests/lib/checkpoint_drift.py",
                      "tools/tests/lib/sram_checkpoint.py",
                      "tools/tests/lib/savestate_stamp.sh",
                      "tools/tests/lib/lua_fingerprint.py",
+                     "tools/tests/lib/compose.py",
                      "tools/tests/lib/savestate_ninja.py", sn.GRAPH,
-                     "build/ot6.sfc"] + LIBS
+                     "build/ot6.sfc"] + all_stamps
            + [p for key in sorted(captures) for p in captures[key]] + tracked,
            cmd="python3 tools/tests/lib/checkpoint_drift.py --strict "
                + " ".join(sorted(captures))
                + f" && mkdir -p build/checks && touch {out}",
            desc="tracked checkpoints are today's play")
     release_pre.append(out)
+
+# #363 review B1: the play a release ships was played under the release's
+# library.  Lib edits replay nothing during a cycle (provenance drift), so
+# nothing else bounds how old the library that played the line is; the
+# release does.  A DRIFT stamp fails this by name; the remedy is a
+# tools/tests/replay.txt bump, one replay of the line.
+out = "build/checks/play_current.ok"
+w.edge([out], "sh",
+       implicit=["tools/tests/lib/compose.py", "tools/tests/lib/savestate_stamp.sh",
+                 "tools/tests/lib/lua_fingerprint.py", sn.GRAPH, "build/ot6.sfc"]
+       + LIBS + all_stamps,
+       cmd=f"python3 tools/tests/lib/compose.py --play-current"
+           f" && mkdir -p build/checks && touch {out}",
+       desc="every state was played under this tree's library")
+release_pre.append(out)
 
 bps = f"{rel_dir}/{BASE[:-len('.sfc')]}.bps"
 w.edge([bps], "sh", [BASE, "build/ot6.sfc"], implicit=qual + release_pre,
@@ -873,10 +964,15 @@ w()
 w.edge(["release"], "phony", [f"build/release/ot6-v{VERSION}.zip", apk,
                               "build/checks/android_apk.ok",
                               "build/checks/android_apk_release.ok"])
-# `chain` is the one other alias: the chain from power-on's last state
+# `chain` is the one other alias: the play from power-on's last state
 # moves whenever a cut or a leg is added, and this name does not.
 if chain_end:
-    w.edge(["chain"], "phony", [chain_end])
+    w.edge(["chain"], "phony", [f"build/states/{chain_end}.mss.lua"])
+# `quick`: every suite, each cut leg booted from its tracked checkpoint so
+# a ROM-changing branch hears from its late suites early.  Not
+# qualification, merge or release evidence (docs/TESTING.md); bare `ninja`
+# and `release` never build it.
+w.edge(["quick"], "phony", quick)
 w("default " + " ".join(esc(p) for p in qual))
 w()
 

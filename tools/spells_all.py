@@ -18,7 +18,10 @@ For TERRA (0) and CELES (6):
 One line per checkpoint; 'BAD' marks any tier or unsourced spell.  Exit 1
 when any checkpoint is BAD.
 
-  spells_all.py [ROOT]      read ROOT/tools/tests/checkpoints (default .)
+  spells_all.py [ROOT]      read the checkpoints under ROOT (default .): the
+                            captures the legs Continue, build/checkpoints/<key>/,
+                            for every tracked key (savestate_party
+                            checkpoint_payloads, #363)
   spells_all.py --control   the same checkpoints, each with one spell that is
                             no tier and that no source the save has produces
                             set learned for LOCKE in memory: every checkpoint

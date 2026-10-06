@@ -15,12 +15,12 @@ github.com/mtklein/mesen (GPL v3, in Mesen's fork network; its
 `EMULATOR` pins the build: one line, `<repository> <tag> <commit>`
 (today `https://github.com/mtklein/mesen ot6-2.2.1-1 40586fe8...`).
 `build.sh` builds that commit and nothing else. The same file is an input of
-every generate, chain and suite edge (configure.py), like the ROM: a new pin
-regenerates every fixture and re-runs every test, and through the chain's
-captures `checkpoint_drift.py` then asks for every cut checkpoint to be
+every generate, capture and suite edge (configure.py), like the ROM: a new
+pin replays the game once from power-on and re-runs every test, and through
+the captures `checkpoint_drift.py` then asks for every cut checkpoint to be
 re-cut before a release. So moving to a new emulator build is: push the
 commit to the fork, tag it `ot6-<base>-<n>`, change `EMULATOR`, build and
-deploy it on every machine, then regenerate (`ninja chain`, `ninja`).
+deploy it on every machine, then regenerate (`ninja`).
 The file holds no comments, so only a real change regenerates anything.
 
 Until 2026-10-01 the harness ran the same two code changes on SourMesen's
@@ -188,7 +188,7 @@ build's packed record (`python3 tools/mesen/buildinfo.py <binary>`) is not
 `EMULATOR`'s line, so a machine left on the old build after a pin change
 stops rather than regenerating under the new pin. To roll back, install the kept binary the same way. A
 deployment whose `EMULATOR` change has landed is followed by regeneration
-(`ninja chain`, the checkpoint re-cut, `ninja`); a rollback that keeps
+(`ninja`, then the checkpoint re-cut, which replays nothing); a rollback that keeps
 `EMULATOR` regenerates nothing, so roll back `EMULATOR` with it.
 
 ## Building (macOS arm64)

@@ -29,77 +29,96 @@ Don't edit `tools/tests/run.sh` or any other shell script while a `ninja`
 or `run.sh` is executing it: bash reads scripts incrementally, and the
 running instances resume at shifted offsets and fail.
 
-### Cuts and the chain from power-on
+### One play from power-on, and cuts
 
 A `.mss` belongs to one ROM, so after a ROM change every generated state
-regenerates, each from the one before it. To keep that from being one long
-serial run, the chain is cut where the play saves (at a
-save point, or on the world map, where the game lets you save anywhere):
-an entry in
-`tools/tests/savestate_graph.py` with both `prev=` and `checkpoint=` is a
-cut, and `prev=` names the state whose play ends where the save begins.
-The leg before it ends by saving there through the real Save UI and
-asserting the checkpoint's contract as its exit
-(`H.saveAtCheckpoint`, `lib/ot6_contract.lua`); the leg after it
-Continues the save and asserts the same contract as its entry
-(`H.bootCheckpoint`). Qualification boots each cut leg from the tracked
-checkpoint in `tools/tests/checkpoints/`, which still loads after a ROM
-change, so the legs regenerate at once.
+regenerates, each from the one before it. The graph plays the game once,
+from power-on to the frontier (`wor_falcon`), with no second copy of any
+state (#363). Where the play saves -- at a save point, or on the world map,
+where the game lets you save anywhere -- the graph has a cut: an entry in
+`tools/tests/savestate_graph.py` with both `prev=` and `checkpoint=`, `prev=`
+naming the state whose play ends where the save begins. The leg before it
+ends by saving there through the real Save UI and asserting the
+checkpoint's contract as its exit (`H.saveAtCheckpoint`,
+`lib/ot6_contract.lua`); run.sh captures that battery (`OT6_CAPTURE_SRM`)
+and the edge seals it into `build/checkpoints/<key>/` against the tracked
+manifest's authored fields (its `saved` above all). The leg after it
+Continues that capture and asserts the same contract as its entry
+(`H.bootCheckpoint`). The suites in `configure.py`'s `TEST_ENV` that
+Continue a save Continue the capture too.
 
 Two variants. In the Vector arc the save is made by a separate,
-capture-only script booted from `prev`'s savestate rather than by
-`prev`'s own run: `cutter=` names it (`gen_post_opera_checkpoint` from
-blackjack, `gen_mrf_save_room_checkpoint`, `gen_n024_save_checkpoint`,
+capture-only script booted from `prev`'s savestate rather than by `prev`'s
+own run: `cutter=` names it (`gen_post_opera_checkpoint` from blackjack,
+`gen_mrf_save_room_checkpoint`, `gen_n024_save_checkpoint`,
 `gen_minecart_platform_checkpoint`, `gen_terra_returned_checkpoint` from
-n128_won). Qualification never runs a cutter. And `saves=` marks a run
-that ends by saving a tracked checkpoint no cut boots yet: the frontier
-(`wor-falcon-v1`) and `crescent-landing-v1` (thamasa_night boots the
-savestate).
+n128_won); its capture edge publishes no state and writes
+`build/checkpoints/<key>.record` (the ROM, its own sig, the payload, the
+stamp of what it booted). And `saves=` marks a run that ends by saving a
+checkpoint no cut boots yet: the frontier (`wor-falcon-v1`) and
+`crescent-landing-v1` (thamasa_night boots the savestate).
 
-`ninja chain` plays the whole chain from power-on instead: `chain_<state>`
-copies of every state from the first cut on, each booted from the copy
-before it and, at a cut, from the save the producing copy just made
-(captured with `OT6_CAPTURE_SRM` and sealed into
-`build/checkpoints/<key>/`); a cutter runs from the copy of its `prev`,
-publishes no state, and records the ROM it played on in
-`build/checkpoints/<key>.rom`. The line runs from power-on through the
-Opera, the Vector arc, the Floating Continent and every World of Ruin leg
-to wor_falcon. No boundary on it lacks a state to chain from: the World of
-Balance -> World of Ruin crossing is a plain savestate link (wor_landing ->
-wor_island, no save between), and wor-start-v1 is made by wor_start's own
-run from wor_island's save. It is the one alias besides `release`,
-because the chain's last state moves as cuts and legs are added.
-`ninja release` depends on it. Run it too when a leg's exit contract
-fails in qualification: the chain says whether the story still plays
-through. It is long and serial (the World of Ruin legs alone carry
-3600-7200 s caps); bare `ninja` never runs it.
+So the play is one serial line of runs, and it is the build's critical
+path: after a ROM change, an emulator pin change or a `tools/tests/replay.txt`
+bump, `ninja` replays it once, from power-on, with the suites, the branches
+and the checks running beside it. Everything else that runs an emulator is
+in the `side` pool, one short of the machine's emulator slots (below), so
+side work in this build cannot take the slot the line's next run needs (run
+plain `ninja`, whose default `-j` is cores + 2). That holds only within one
+build: the slots are machine-wide, so another tree's build, a lab, or this
+build's own emulator-running checks outside the pool (checkpoint_negatives,
+retry_negative, instruments) can still hold one; and the pool's depth is
+read from `~/.config/ot6/emulator-slots` (else the CPU count) when
+`configure.py` runs, so a change to that file re-configures. A
+generator edit replays that leg and every run its new bytes reach; a
+library edit (`tools/tests/lib/*.lua`) replays nothing and re-runs the
+suites (provenance drift, docs/TESTING.md). `ninja chain` is an alias for
+the line alone (its last state).
 
-Every tracked checkpoint something boots (a state, or a suite in
-`configure.py`'s `TEST_ENV`) is captured on that line. The rest are named
-in the graph's `NOT_GATED` with the reason (today none: the five that
-stood there, booted by nothing, were retired with their cutters, #356).
-Qualification's `checkpoint_coverage` check
-(`savestate_ninja.py --coverage`) refuses any other tracked checkpoint, so
-a new leg that boots a checkpoint with no `prev=` fails `ninja`.
+`ninja quick` is the fast lever for a branch that changed the ROM and wants
+its late suites' answers early: it runs every suite with each cut leg
+booted from its **tracked** checkpoint (`quick_<state>` copies), so the legs
+between cuts run at once instead of waiting for the line. A tracked
+checkpoint is a save an older build's play made, so a quick result is
+never qualification, merge or release evidence (docs/TESTING.md);
+nothing in `ninja` or `ninja release` depends on it.
+
+The tracked checkpoints in `tools/tests/checkpoints/` are the committed
+copies of the captures: nothing in the graph boots them. They let a hand
+run or a lab Continue a save without building the line, `ninja quick`
+boots them, and the release's drift gate compares them with today's
+captures. Every tracked checkpoint is captured by a run on the graph; the
+rest would be named in the graph's `NOT_GATED` with the reason (today
+none). Qualification's `checkpoint_coverage` check
+(`savestate_ninja.py --coverage`) refuses any other tracked checkpoint, and
+a suite that Continues a save no run makes.
 
 A tracked checkpoint drifts from today's play as the route changes above
-it. At each capture the chain prints the drift (`tools/tests/lib/checkpoint_drift.py`),
-explained in play terms: every character's level, experience, HP/MP and
-gear, gil and the bag, story switches, encounter counters, spells and
-skills, the OT6 codex, and any other differing byte by address.
-`ninja release` fails while any tracked checkpoint's battery differs from
-its fresh capture byte for byte (play time and checksums aside; the chain
-is deterministic), or while a capture is older than today's generator, lib
-halves or ROM. Re-cut at every release, and during a cycle whenever the
-report shows a material change:
+it. At each capture the edge prints the drift
+(`tools/tests/lib/checkpoint_drift.py`), explained in play terms: every
+character's level, experience, HP/MP and gear, gil and the bag, story
+switches, encounter counters, spells and skills, the OT6 codex, and any
+other differing byte by address. `ninja release` fails while any tracked
+checkpoint's battery differs from its capture byte for byte (play time and
+checksums aside; the play is deterministic), or while a capture is not
+today's: made on another ROM, by another generator or emulator pin, or
+from a boot that has since moved (a library edit alone does not stale
+one). Re-cut at every release, and during a cycle whenever the report
+shows a material change:
 
-    ninja chain
+    ninja
     python3 tools/tests/lib/checkpoint_drift.py --recut <key>...
 
-`--recut` copies the chain's sealed capture over the tracked checkpoint
-(any key the chain captures, World of Ruin legs and cutters included);
-then commit and qualify again. The contracts stay light: a suite that
-needs a level or an item asserts its own precondition.
+`--recut` copies the sealed capture over the tracked checkpoint. Since
+nothing in the graph boots a tracked checkpoint, a re-cut replays no state
+and re-runs no suite that boots one: commit it and run `ninja release`
+again. What it does re-run is everything that reads the tracked files: the
+`checkpoint_authored` edge of each re-cut key (restat: nothing behind it
+moves), checkpoint_saves, checkpoint_negatives (an emulator check),
+checkpoint_coverage, the audits that read the tracked bytes, the drift
+gate and the release edges (on the Air, 486 s with the drift gate's old
+cost, build/attempts/wt/v026-graph/romchange/after-2.ninja_log). The contracts stay light: a suite that needs a
+level or an item asserts its own precondition.
 
 ## Installed pieces
 
@@ -355,10 +374,10 @@ differently from 2.1.1, because of MesenCE's DMA clock-counting fix
 1da6c1ad (build/attempts/mesence-eval/).
 
 - `tools/mesen/EMULATOR` is a regeneration input like the ROM: every
-  generate, chain and suite edge depends on it (configure.py), so changing
-  it regenerates every fixture and re-runs every test, and the chain's
-  captures then make `checkpoint_drift.py` ask for every cut checkpoint to
-  be re-cut. Change it in the same commit as a deployment, and deploy on
+  generate, capture and suite edge depends on it (configure.py), so
+  changing it replays the game once from power-on and re-runs every test,
+  and the captures then make `checkpoint_drift.py` ask for every cut
+  checkpoint to be re-cut. Change it in the same commit as a deployment, and deploy on
   every machine (px13, the Air, this Mac) before regenerating anywhere.
   run.sh refuses to run on a machine whose deployed build is not the pinned
   one (it reads the `<repository> <tag> <commit>` record build.sh packs

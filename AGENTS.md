@@ -16,7 +16,10 @@ appropriate; "more likely to help than harm" is sufficient. Use relevant,
 proportionate checks rather than full release qualification or a
 multi-model review for every change. Preserve unrelated work and never
 rewrite published history. Release claims still need evidence appropriate
-to what they claim.
+to what they claim. A release's play is replayed under the
+release's own library: `ninja release` fails while any generated state was
+played under other library halves, and the remedy is a dated line in
+`tools/tests/replay.txt` and `ninja` ([TESTING.md](docs/TESTING.md#what-each-build-target-counts-as)).
 
 Keep `main` on GitHub current: push after every landing, including while a
 release is being qualified (agent worktrees branch from it).

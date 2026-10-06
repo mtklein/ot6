@@ -78,7 +78,9 @@ def scan(path):
 def collect(args):
     paths = []
     if not args:
-        paths = sorted((ROOT / "build/states").glob("*.log"))
+        # not `ninja quick`'s runs, which play from tracked checkpoints (#363)
+        paths = sorted(p for p in (ROOT / "build/states").glob("*.log")
+                       if not p.name.startswith(("quick_", "suite_quick_")))
     for a in args:
         p = Path(a)
         if p.is_dir():

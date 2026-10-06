@@ -160,7 +160,10 @@ WALKED = {}
 TILESEEN = {}
 
 
-LOGS = sorted(glob.glob(os.path.join(ROOT, 'build', 'states', '*.log')))
+# `ninja quick`'s runs (quick_<state>.log, suite_quick_<test>.log) played
+# from tracked checkpoints, not the qualified play (#363): not evidence here
+LOGS = sorted(p for p in glob.glob(os.path.join(ROOT, 'build', 'states', '*.log'))
+              if not os.path.basename(p).startswith(('quick_', 'suite_quick_')))
 FOUGHT = fought_by_map(LOGS)
 # a world's walked sectors count once its logs record the world trace
 # (#288): the blind trace wrote only the field coordinates of map-change
