@@ -2280,6 +2280,41 @@ function M.kitBudget(o)
     .. "next boss, at most %d spent on a turn's boost", reserve, maxPool, maxPool // 4)
 end
 
+-- The treadmill's bank (#414, Driver:makePlan's treadmillSpend): an actor
+-- holding this many BP (3, a full action's boost) spends them rather than
+-- take a care turn whose heal cannot lift its target clear of the round
+-- (M.treadmillSpends), on a line that chips or the summon
+-- (M.treadmillLine).  Off (false) by default: measured at the final rule
+-- (build/attempts/wt/v026-driver3/414/final/, the line's own captures,
+-- retries off) it never fired in 32 Air Force shifts, 16 of battle 68 or 8
+-- of the Sealed Gate cave, and #412's key beBC (shift 31) still wipes; the
+-- looser revision that also yielded heals that lift (the review of
+-- fe60af44: it traded lifting heals for 0-chip spends) is not kept.  The
+-- care rules' rethink is #415.  M.TREADMILL_BP = 3 turns it on.
+M.TREADMILL_BP = false
+-- Whether a care turn's heal (restore on a member at hp whose round costs
+-- `cost`) yields to the actor's bank of `bp` (#414): the heal does not
+-- lift the member clear of the round (hp + restore <= cost: the turn
+-- delays nothing), and the bank holds M.TREADMILL_BP or more.  A heal that
+-- lifts stands, as does a party heal or an unmeasured restore, hp or round
+-- (review of fe60af44: "restores 773, a round costs 838" on a member at
+-- 357/1130 lifts her clear and must not become a 0-chip spend).
+function M.treadmillSpends(o)
+  local at = o.bpAt == nil and M.TREADMILL_BP or o.bpAt
+  if not at or (o.bp or 0) < at then return false end
+  if o.all or o.restore == nil or o.hp == nil or (o.cost or 0) <= 0 then return false end
+  return o.hp + o.restore <= o.cost
+end
+-- What the bank goes to when a heal yields (#414): the strongest line if
+-- it chips (or its target is Broken, every hit landing x4), else the
+-- summon when the actor can cast it, else nothing -- the heal stands.
+-- o.chips, o.broken, o.summon (true when the summon line is open).
+function M.treadmillLine(o)
+  if (o.chips or 0) > 0 or o.broken then return "line" end
+  if o.summon then return "summon" end
+  return nil
+end
+
 -- Spend it before you die (#175): a member inside one round of death who
 -- holds banked BP, and whom no heal in hand lifts clear of that round,
 -- spends the pips now on their strongest line rather than take a heal
@@ -8004,7 +8039,55 @@ function Driver:makePlan(actor)
   -- the spend goes first when it fires -- the plan the care lines chose
   -- (`plan`, said as `what`) otherwise.  M.SPEND_SEES_THROUGH = false is
   -- the driver before #312 (the lab lever).
+  -- The treadmill (#414): a care turn whose heal does not outpace the
+  -- round on its target (restore < that member's round) only buys a round
+  -- back for a turn, and a party that spends every turn that way trades
+  -- Potions with the enemy until it falls -- the Air Force's key beBC
+  -- (build/attempts/wt/v026-airforce/412/), EDGAR dying with 5 BP.  An
+  -- actor whose bank holds M.TREADMILL_BP or more (a pip past what one
+  -- action spends is a pip the bank cannot grow) spends it instead, on its
+  -- strongest line at the boost one action takes.  M.TREADMILL_BP = false
+  -- is the driver before.
+  local function treadmillSpend(plan, what)
+    if self.opts.spend == false or livingMonsters() == 0 then return nil end
+    if (plan.kind ~= "item" and plan.kind ~= "heal") or plan.target == nil then return nil end
+    local cost = price[plan.target] or 0
+    if not M.treadmillSpends({ bp = have, hp = hpNow[plan.target], restore = plan.restore, cost = cost,
+                               all = plan.all }) then
+      return nil
+    end
+    local slot = self:pressTarget()
+    if slot == nil then
+      for s = 0, 5 do if monAlive(s) then slot = s; break end end
+    end
+    local b = math.min(have, 3)
+    local best = slot ~= nil and bestLine(actor, slot, b) or nil
+    local id = M.readByte(BATTLE.BCHID + actor * 2)
+    local sm = self.opts.summon and self.opts.summon[id]
+    local mrow = cmdRow(actor, BATTLE.CMD_MAGIC)
+    local summonOk = (sm and mrow and M.readByte(0x3344 + actor * 2) ~= 0xFF
+      and (M.readWord(0x3f2e) & M.readWord(0x3018 + actor * 2)) == 0
+      and M.readWord(BATTLE.CURMP + actor * 2) >= (sm.mp or 50)) and true or false
+    local pick = M.treadmillLine({ chips = best and best.chips or 0, summon = summonOk,
+      broken = slot ~= nil and M.readByte(BATTLE.BRK_TICKS + slot * 2) ~= 0 })
+    if pick == nil then return nil end
+    if pick == "summon" then
+      best = { kind = "summon", row = mrow, chips = 0, what = "the summon" }
+    end
+    best.reason = "treadmill"
+    self.healSaid = nil
+    M.log(string.format("[%s] actor=%d SPEND (treadmill): %s restores %d on entity %d at %d HP against its %d round "
+      .. "(it does not lift it clear) and %d BP are banked -- %s (%d chip(s) on slot %s) instead (#414)",
+      self.tag or "fight", actor, what or (plan.item and string.format("item $%02X", plan.item))
+        or string.format("cure $%02X", plan.spell or 0), plan.restore, plan.target, hpNow[plan.target], cost, have, best.what, best.chips or 0,
+      tostring(slot)))
+    return best
+  end
   local function orSpend(plan, what)
+    if plan ~= nil then
+      local t = treadmillSpend(plan, what)
+      if t then return t end
+    end
     if plan == nil or M.SPEND_SEES_THROUGH == false then return plan end
     local hp, cost = hpNow[actor], price[actor] or 0
     if hp <= 0 or cost <= 0 or hp > cost or have < 1 then return plan end
