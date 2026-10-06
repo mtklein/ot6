@@ -100,12 +100,18 @@ FIRST_TINCTURE_SHOP_ROW = "figaro_submerged"
 FIRST_REVIVIFY_SHOP_ROW = "zozo_arrival"
 REVIVIFY_BAND = 3
 # The Fenix Down band (level-curve.md's supply table, docs/guidelines.md
-# "about level Fenix Downs, caps near 20"; #405): ~level, capped at 20,
-# from Figaro Castle's shop 4 (gen_edgar's run buys toward it, #307) --
-# and on into the World of Ruin, where Fenix Downs are still the revive
-# every counter sells.
+# "about level Fenix Downs, caps near 20"; #405, calibrated by #411):
+# ~level, capped at 20, from the first counter whose purse can fill it --
+# South Figaro's second visit in gen_kolts ("FENIX DOWN to the band"), so
+# from kolts_entry on, and into the World of Ruin.  Figaro Castle's buy
+# before it is deliberately purse-limited (#307: half the spare gil).
+# "About": a counter fills to the party's level and the party gains a
+# level or two before the next one (kolts_entry carries 11 at L11; the
+# mountain and the Returners stretch reach L13 with no counter between),
+# so a bag is short only below the band less FENIX_SLACK.
 FENIX_BAND_CAP = 20
-FIRST_FENIX_SHOP_ROW = "figaro_intro"
+FENIX_SLACK = 2
+FIRST_FENIX_STATE = "kolts_entry"
 # The band is a WoB band: the graph row that generates this state (with its
 # `also=` artifacts, escape_start today) and everything downstream of it is
 # the World of Ruin, out of band.
@@ -155,17 +161,33 @@ def fenix_band(level: int) -> int:
     return min(FENIX_BAND_CAP, level)
 
 
+def fenix_short(have: int, level: int) -> bool:
+    """Under the Fenix band by more than its slack."""
+    return have < fenix_band(level) - FENIX_SLACK
+
+
+# What a Tonic and a Potion restore (supply.md section 1: +50 and +250 HP).
+TONIC_HP, POTION_HP = 50, 250
+
+
 def wor_heal_short(tonic: int, potion: int, level: int) -> bool:
-    """The World of Ruin's field-care rule (#255): the Tonic band where a
-    counter sells Tonics, and where a stretch has none, Potions carry the
-    field care (docs/guidelines.md, "Heal outside battles") -- so the bag's
-    Tonics and Potions together are measured against the Tonic band."""
-    return tonic + potion < tonic_band(level)
+    """The World of Ruin's field-care rule (#255, calibrated by #411): the
+    Tonic band where a counter sells Tonics, and where a stretch has none,
+    Potions carry the field care (docs/guidelines.md, "Heal outside
+    battles").  So the bag's field-care HP -- Tonics at 50, Potions at 250
+    (supply.md's yields) -- is measured against the Tonic band's HP."""
+    return tonic * TONIC_HP + potion * POTION_HP < tonic_band(level) * TONIC_HP
 
 
 def party_level(raw: bytes, cb: int):
     """The active party's highest level, or None if none is flagged active."""
-    levels = [m["level"] for m in party_at(raw, cb) if m.get("active")]
+    act = [m for m in party_at(raw, cb) if m.get("active")]
+    # #411: a cut taken in a scene whose cursor party is UMARO alone (the
+    # World of Balance's scenario select, gen_scenario's hub, and the
+    # captures beside it) has no playing party; its level says nothing.
+    if len(act) == 1 and act[0]["name"] == "UMARO":
+        return None
+    levels = [m["level"] for m in act]
     return max(levels) if levels else None
 
 
@@ -292,9 +314,21 @@ def in_revivify_band(name: str, states: dict) -> bool:
 
 
 def in_fenix_band(name: str, states: dict) -> bool:
-    """The Fenix Down band applies from Figaro Castle's shop on, the World
-    of Ruin included."""
-    return past_row(name, states, FIRST_FENIX_SHOP_ROW)
+    """The Fenix Down band applies from kolts_entry (the fill at South
+    Figaro's second counter) on, the World of Ruin included: the fixture's
+    `prev` chain reaches it, or ends at a checkpoint (all downstream)."""
+    seen = set()
+    while name and name not in seen:
+        if name == FIRST_FENIX_STATE:
+            return True
+        seen.add(name)
+        edge = states.get(name)
+        if edge is None:
+            return False
+        if edge["checkpoint"] and not edge["prev"]:
+            return True
+        name = edge["prev"]
+    return False
 
 
 def revivify_short(have: int) -> bool:
@@ -393,13 +427,15 @@ def selftest(repo: str = ".") -> int:
     check("fenix band at L7 (Figaro Castle)", fenix_band(7), 7)
     check("fenix band at L14", fenix_band(14), 14)
     check("fenix band at L27 caps", fenix_band(27), 20)
-    check("6 Fenix Downs at L7 is under the band", 6 < fenix_band(7), True)
-    check("20 Fenix Downs at L30 is not (negative control)", 20 < fenix_band(30), False)
-    # the WoR field-care rule: Tonics and Potions together against the Tonic band
-    check("4 Tonics + 45 Potions at L25 is short (the wor_start bag)",
-          wor_heal_short(4, 45, 25), True)
-    check("0 Tonics + 99 Potions at L25 is not (negative control)",
-          wor_heal_short(0, 99, 25), False)
+    check("10 Fenix Downs at L13 is short (band 13, slack 2)", fenix_short(10, 13), True)
+    check("11 Fenix Downs at L13 is not (negative control)", fenix_short(11, 13), False)
+    check("17 Fenix Downs at L30 is short", fenix_short(17, 30), True)
+    check("18 Fenix Downs at L30 is not", fenix_short(18, 30), False)
+    # the WoR field-care rule: Tonic+Potion HP against the Tonic band's HP
+    check("4 Tonics + 45 Potions at L25 carries the band (11450 HP >= 4950)",
+          wor_heal_short(4, 45, 25), False)
+    check("4 Tonics + 18 Potions at L25 is short (4700 HP < 4950)",
+          wor_heal_short(4, 18, 25), True)
 
     # Checked against mrf-save-room-v1, which carries two Fenix Downs.
     # The tracked copy: the reader's canary needs bytes that hold still
@@ -491,8 +527,12 @@ def selftest(repo: str = ".") -> int:
         # the Fenix band starts at Figaro Castle and runs into the WoR
         check("no Fenix band before Figaro Castle (figaro_entry)",
               in_fenix_band("figaro_entry", states), False)
-        check("the Fenix band covers gen_edgar's own artifacts (figaro_cleared)",
-              in_fenix_band("figaro_cleared", states), True)
+        check("nor at Figaro Castle, purse-limited by #307 (figaro_cleared)",
+              in_fenix_band("figaro_cleared", states), False)
+        check("nor on South Figaro's arrival (south_figaro)",
+              in_fenix_band("south_figaro", states), False)
+        check("the Fenix band starts at the fill (kolts_entry)",
+              in_fenix_band("kolts_entry", states), True)
         check("and the WoR landing (wor_landing)",
               in_fenix_band("wor_landing", states), True)
 
@@ -564,7 +604,7 @@ def main() -> int:
             zshort.append((name, bag["revivify"]))
         if in_fenix_band(name, states) and bag["level"] is not None:
             fband = fenix_band(bag["level"])
-            if bag["fenix"] < fband:
+            if fenix_short(bag["fenix"], bag["level"]):
                 fshort.append((name, bag["fenix"], fband, bag["level"]))
         if (in_world_of_ruin(name, states) and bag["level"] is not None
                 and wor_heal_short(bag["tonic"], bag["potion"], bag["level"])):
@@ -658,7 +698,7 @@ def main() -> int:
 
     if fshort:
         print(f"  WARNING: {len(fshort)} fixture(s) under the Fenix Down band "
-              f"(~level, cap {FENIX_BAND_CAP}; docs/design/level-curve.md) -- "
+              f"(~level less {FENIX_SLACK}, cap {FENIX_BAND_CAP}; docs/design/level-curve.md) -- "
               f"top up with a FENIX DOWN to N line at the shop stop before each"
               + ("" if args.verbose else "; -v lists them") + ":")
         if args.verbose:
