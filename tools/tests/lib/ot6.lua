@@ -1182,6 +1182,42 @@ end
 function M.liftKeepsHeal(hp, maxhp, restore, cost)
   return restore ~= nil and M.liftOutpaces(hp, maxhp, restore, cost)
 end
+-- The boost press at the command window (#408): R while the pending boost
+-- the engine shows is below what the plan wants, judged on the bytes
+-- rather than on the R pulses sent (one R the menu does not take otherwise
+-- leaves the verb a tier short, unnoticed: a 2-BP Slot spun at tier 1).
+--   want     the pending boost the plan wants (capped at 3)
+--   start    the pending boost when the plan first reached the window
+--   pending  the pending boost now ($3E9D + entity)
+--   sent     R pulses sent so far for this plan
+--   bank     the bank ($3E9C + entity): a pending boost cannot pass it
+-- Returns "r" (press R), "go" (the boost is in), or "settle" (go at what
+-- the bank allows, or after M.BOOST_R_TRIES R pulses the engine did not
+-- take), and what to say, if anything.
+M.BOOST_R_TRIES = 3
+function M.boostStep(o)
+  local start = o.start or 0
+  local missed = o.sent - (o.pending - start)
+  if o.pending >= o.want then
+    if missed > 0 then
+      return "go", string.format("pending boost %d as wanted, after %d R press(es), %d the menu did not take",
+        o.pending, o.sent, missed)
+    end
+    return "go"
+  end
+  if o.bank ~= nil and o.pending >= o.bank then
+    return "settle", string.format("wanted %d, the bank holds %d: going at %d", o.want, o.bank, o.pending)
+  end
+  if missed >= M.BOOST_R_TRIES then
+    return "settle", string.format("wanted %d, pending %d after %d R press(es), %d the menu did not take: "
+      .. "going at %d", o.want, o.pending, o.sent, missed, o.pending)
+  end
+  if missed > 0 then
+    return "r", string.format("an R the menu did not take (pending %d after %d R press(es), wanted %d): "
+      .. "pressing again", o.pending, o.sent, o.want)
+  end
+  return "r"
+end
 function M.liftFilterHeals(heals, hp, maxhp, cost)
   local keep = {}
   for _, h in ipairs(heals) do
@@ -9437,9 +9473,30 @@ function Driver:button(actor)
     -- "switch" (no Fight row) and "defer" (a muddled actor, #170) both
     -- hand the window on with X; the plan stays until the actor changes
     if self.plan.kind == "switch" or self.plan.kind == "defer" then return { "x" } end
-    if self.plan.boostLeft and self.plan.boostLeft > 0 then
+    -- the boost (#408): R until the pending boost the engine shows reads
+    -- what the plan wants (M.boostStep), not a count of R pulses sent
+    if self.plan.boostLeft and self.plan.boostLeft > 0 and M.BOOST_PULSES then
       self.plan.boostLeft = self.plan.boostLeft - 1
       return { "r" }
+    end
+    if not M.BOOST_PULSES and (self.plan.boostLeft or 0) > 0 or self.plan.boostWant then
+      local pend = M.readByte(BATTLE.PEND_BP + actor * 2)
+      local p = self.plan
+      if p.boostWant == nil then
+        p.boostWant = math.min(3, pend + p.boostLeft)
+        p.boostLeft, p.boostR, p.boostStart = 0, 0, pend
+      end
+      local step, why = M.boostStep({ want = p.boostWant, start = p.boostStart, pending = pend,
+        sent = p.boostR, bank = M.readByte(BATTLE.BP + actor * 2) })
+      if why and why ~= p.boostSaid then
+        p.boostSaid = why
+        M.log(string.format("[%s] actor=%d [boost] %s plan: %s", self.tag or "fight", actor, p.kind, why))
+      end
+      if step == "r" then
+        p.boostR = p.boostR + 1
+        return { "r" }
+      end
+      if step == "settle" then p.boostWant = pend end
     end
     -- The row can go grey between the plan and the press (a status that
     -- lands while the window is open: Mute greys Magic); the cursor

@@ -283,8 +283,28 @@ ok, got, logs = triple({ actor = 1, pending = 2, rig = 0, gate = false, aim = 3,
 check(ok, "a dropped first A: 3-3-3 on the retry, got " .. got)
 check(saidIn(logs, "was not read; timing again"), "the retry is said ('was not read; timing again')")
 
+-- the boost press at the command window (#408, M.boostStep): R until the
+-- pending boost reads what the plan wants, not a count of R pulses (a 2-BP
+-- Slot once spun at tier 1 after an R the menu did not take, 353/ab7)
+local function step(o) return H.boostStep(o) end
+check(step({ want = 2, start = 0, pending = 0, sent = 0, bank = 3 }) == "r", "nothing pending: R")
+check(select(2, step({ want = 2, start = 0, pending = 1, sent = 1, bank = 3 })) == nil, "one R, one pip: R, nothing to say")
+do
+  local st, why = step({ want = 2, start = 0, pending = 1, sent = 2, bank = 3 })
+  check(st == "r" and why and why:find("did not take", 1, true), "two R, one pip: an R not taken, R again")
+  st, why = step({ want = 2, start = 0, pending = 2, sent = 3, bank = 3 })
+  check(st == "go" and why and why:find("1 the menu did not take", 1, true), "the boost in after a retry: said")
+  check(step({ want = 2, start = 0, pending = 2, sent = 2, bank = 3 }) == "go", "two R, two pips: go")
+  check(step({ want = 2, start = 0, pending = 2, sent = 1, bank = 3 }) == "go", "the pending boost read, not the pulses")
+  st, why = step({ want = 2, start = 0, pending = 1, sent = 4, bank = 3 })
+  check(st == "settle" and why:find("going at 1", 1, true), "three R not taken: go at what is pending")
+  st, why = step({ want = 2, start = 0, pending = 1, sent = 1, bank = 1 })
+  check(st == "settle" and why:find("the bank holds 1", 1, true), "a bank of 1: go at 1")
+  check(step({ want = 3, start = 1, pending = 2, sent = 1, bank = 3 }) == "r", "a pip pending before the plan counts")
+end
+
 print(string.format("slot_selftest: PASS -- %d checks: the tables as the ROM has them, the stop rule, every "
   .. "icon's four press frames, the drift's press frames, the aim (7s at 3 BP, H-Bomb under the gate and at "
   .. "2 BP, 7-Flush below), the machine's reel plans, and Driver:slotTimed on a model of the reels: %d aimed "
   .. "spins at 2 BP over reel phases and a 2-3 frame read, the 7s at 3 BP, the re-aim at a lower tier, a "
-  .. "cursed reel-1 icon, and a dropped first A", n, sims))
+  .. "cursed reel-1 icon, and a dropped first A; the boost press read back (#408)", n, sims))
