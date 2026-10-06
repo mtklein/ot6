@@ -167,6 +167,53 @@ end
 
 -- ride a stretch: fights with the driver, dialogs A-tapped, choice boxes
 -- steered to `row` (a function of the choice count), until pred()
+-- Every other hand too: the route now carries a second Blizzard (gen_mrf_kefka's
+-- chest beside Number 024's drop), and the chain at 55844f5a met the
+-- ice-absorber with it in LOCKE's off-hand ("char 1's L-hand item $0E (ice)
+-- is ABSORBED by slot 0 species $0169").  Each hand whose weapon $0169
+-- absorbs (read from the ROM, H.absorbClashesFor) takes the strongest bag
+-- blade it does not, strongest first; the step asserts none is left.
+local ESC_SPECIES = { { slot = 0, species = 0x0169 } }
+local ESC_BLADES = { 0x0F, 0x0B, 0x0D, 0x0A, 0x0C, 0x09, 0x05, 0x08, 0x02,
+                     0x07, 0x04, 0x03, 0x01, 0x00 }
+local function escArms()
+  local inner
+  local function build()
+    local steps = {}
+    for _, c in ipairs(H.absorbClashesFor(H.partyWeapons(), ESC_SPECIES)) do
+      local slot = c.hand == "R" and 0 or 1
+      local items = {}
+      for _, it in ipairs(ESC_BLADES) do
+        if H.invCountOf(it) > 0 and #H.absorbClashesFor(
+             { { char = c.char, hand = c.hand, item = it } }, ESC_SPECIES) == 0 then
+          items[#items + 1] = { slot, it }
+        end
+      end
+      H.log(string.format("[escape arms] %s -- re-arming from %d bag candidate(s)",
+        H.clashStr(c), #items))
+      if #items > 0 then
+        steps[#steps + 1] = H.equipKit(c.char, items,
+          { tag = string.format("escape arms char %d %s-hand", c.char, c.hand), ladder = true })
+      end
+    end
+    steps[#steps + 1] = H.call(function()
+      local left = H.absorbClashesFor(H.partyWeapons(), ESC_SPECIES)
+      local lines = {}
+      for _, c in ipairs(left) do lines[#lines + 1] = H.clashStr(c) end
+      H.assertEq(#left, 0, "no hand goes into the escape holding a weapon the ice-absorber " ..
+        "drinks" .. (#left > 0 and (": " .. table.concat(lines, "; ")) or ""))
+    end)
+    return H.seqStep(steps)
+  end
+  return {
+    tick = function(self)
+      if inner == nil then inner = build() end
+      return inner:tick()
+    end,
+    reset = function(self) inner = nil end,
+  }
+end
+
 local function absorb(pred, cap, tag, row, driver)
   local t = 0
   local C = H.newChoice(function(_, mx) return row and row(mx) or (mx - 1) end,
@@ -528,6 +575,7 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
     -- run at its first 393 encounter).  The spare MithrilBlade ($0A,
     -- non-elemental) is hers for the escape; her Fight is not her damage.
     H.equipKit(TERRA, { { 0, 0x0A } }, { tag = "TERRA: MithrilBlade for the escape" }),
+    escArms(),
   }, {
     H.logStep(function() return "[escape] post-Atma: no field control (scripted); care skipped" end),
   }),

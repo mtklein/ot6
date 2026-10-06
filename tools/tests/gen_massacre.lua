@@ -85,39 +85,24 @@ local function rideScene(pred, maxF, tag)
   }, tag)
 end
 
--- lossReload: restore the pre-battle-124 blob and clear the GameOver counter.
-local function lossReload(blobFn, tag)
-  local req
-  return seq({
-    H.call(function() req = H.requestLoadState(blobFn()) end),
-    H.waitFrames(2),
-    H.call(function()
-      H.checkReq(req, tag .. ": loss-reload")
-      H.gameOverFired = 0
-      H.log(string.format("[%s] loss-reload done, GameOver cleared, f%d",
-        tag, H.frame))
-    end),
-    H.waitFrames(90),
-  })
-end
-
 -- ============================================================ battle 124 ==
-local L124 = H.newSeedSweep("Kefka vs Leo (battle 124)", { attempts = 5 })
-local leoBlob, leoWon = nil, false
+-- #311: one fight, played once.  This file used to carry its own five-rung
+-- seed sweep (H.newSeedSweep): an in-run snapshot before the fight and up to
+-- four reloads at spread battle seeds, the same plan each time, its losses
+-- invisible to the retry audit.  A lost battle 124 now raises the wipe it is
+-- (the runner's class=wipe), and the segment runner's standard bounded retry
+-- -- the boot snapshot, a moved seed, a counted `[retry]` line -- is the only
+-- reload.
 local CONFIRM_GONE = 90
 
-local function leoAttempt(n)
+local function leoFight()
   local F = H.newFightDriver("Kefka vs Leo", { tactical = true, boost = true,
     bank = 3, items = true, cure = false, healPercent = 50 })
-  local notBattle, giveUp = 0, 0
-  return H.cond(function() return leoWon end, {}, {
+  local notBattle = 0
+  return seq({
     H.logStep(function()
-      return string.format("battle 124 attempt %d at f%d", n, H.frame)
+      return string.format("battle 124 at f%d", H.frame)
     end),
-    n > 1 and seq({
-      lossReload(function() return leoBlob end, "battle 124"),
-    }) or seq({}),
-    L124.spread(n),
     H.hold({ "up" }), H.waitFrames(6), H.release(), H.waitFrames(8),
     (function() local ph = 0
       return H.driveUntil(function()
@@ -131,8 +116,8 @@ local function leoAttempt(n)
       }, "edge-A into the Kefka NPC -> battle 124")
     end)(),
     H.waitUntil(function() return H.battleActive() end, 3000, "battle 124 up", 10),
-    -- PHASE 1: drive the fight until the battle module is gone for
-    -- CONFIRM_GONE frames, or the GameOver read-canary fires (loss).
+    -- drive the fight until the battle module is gone for CONFIRM_GONE
+    -- frames, or the GameOver read-canary fires (loss)
     H.driveUntil(function()
       if H.gameOverFired > 0 then return true end
       if H.battleLoadStarted() or H.battleActive() then notBattle = 0
@@ -143,26 +128,20 @@ local function leoAttempt(n)
         if H.gameOverFired > 0 then H.setPad({}); return end
         F.frame()
       end),
-    }, "battle 124, Leo solo (attempt " .. n .. ")"),
-    H.call(function()
-      H.log(string.format("[battle 124] phase1 done, attempt %d, f%d, "
-        .. "gameOverFired=%d map=%d", n, H.frame, H.gameOverFired, map()))
-    end),
+    }, "battle 124, Leo solo"),
     H.call(function()
       H.setPad({})
-      if H.gameOverFired == 0 and partyOf(WEDGE) ~= 0 then
-        leoWon = true
-        H.log(string.format("battle 124 WON on attempt %d, f%d map=%d "
-          .. "(Leo lives, no GameOver)", n, H.frame, map()))
-        H.screenshot("battle124_won")
-      else
-        H.log(string.format("battle 124 attempt %d LOST -- gameOverFired=%d "
-          .. "partyWEDGE=%d, f%d", n, H.gameOverFired, partyOf(WEDGE), H.frame))
+      H.log(string.format("[battle 124] done, f%d, gameOverFired=%d map=%d",
+        H.frame, H.gameOverFired, map()))
+      if H.gameOverFired ~= 0 or partyOf(WEDGE) == 0 then
+        error(string.format("battle 124 (Kefka vs Leo): THE PARTY IS WIPED -- " ..
+          "gameOverFired=%d partyWEDGE=%d at f%d", H.gameOverFired,
+          partyOf(WEDGE), H.frame), 0)
       end
+      H.log(string.format("battle 124 WON, f%d map=%d (Leo lives, no GameOver)",
+        H.frame, map()))
+      H.screenshot("battle124_won")
     end),
-    H.cond(function() return not leoWon end, {
-      lossReload(function() return leoBlob end, "battle 124"),
-    }, {}),
   })
 end
 
@@ -272,10 +251,10 @@ H.run({ maxFrames = 6000000, allowGameOver = true }, {
     H.screenshot("massacre_solo_leo")
   end),
 
-  -- ---- 4. approach the Kefka NPC (24,18); battle 124 seed sweep --------
+  -- ---- 4. approach the Kefka NPC (24,18); battle 124 ------------------
   -- Stage at (24,19), one tile below Kefka, avoiding the exit-row triggers
   -- (x=9 col; y=45-46; x=24-28 y=15-16) that fire battle 75 in the Leo
-  -- window.  navTo the approach tile, then capture the pre-battle-124 blob.
+  -- window.  navTo the approach tile, then the fight.
   H.navTo(24, 19, { maxFrames = 15000, playBattles = "tactical",
     avoid = { { 9, 28 }, { 9, 29 }, { 9, 30 }, { 9, 31 }, { 9, 32 }, { 9, 33 },
               { 9, 34 }, { 24, 16 }, { 25, 16 }, { 27, 16 }, { 28, 15 },
@@ -290,33 +269,7 @@ H.run({ maxFrames = 6000000, allowGameOver = true }, {
     H.log(string.format("[ot6] staged for battle 124 at (%d,%d)",
       H.fieldX(), H.fieldY()))
   end),
-  (function()
-    local ckReq
-    return seq({
-      H.call(function() ckReq = H.requestSaveState() end),
-      H.waitFrames(2),
-      H.call(function()
-        H.checkReq(ckReq, "pre-battle-124 checkpoint")
-        leoBlob = ckReq.blob
-        H.log("[ot6] pre-battle-124 savestate captured")
-      end),
-    })
-  end)(),
-  L124.watch(),
-  leoAttempt(1),
-  leoAttempt(2),
-  leoAttempt(3),
-  leoAttempt(4),
-  leoAttempt(5),
-  H.call(function()
-    if not leoWon then
-      error(L124.report() .. " -- all 5 battle-124 seed-sweep attempts lost "
-        .. "(GameOver each); the per-attempt numbers above are the balance "
-        .. "finding (#74-style; a solo-guest wall for the owner) -- do not "
-        .. "touch enemy stats", 0)
-    end
-    H.log(L124.report())
-  end),
+  leoFight(),
 
   -- ---- 5. ride the scripted tail to world (249,128) ---------------------
   -- $009B=1, theater battle 105, the esper flyover, reload 341, Kefka's drain,

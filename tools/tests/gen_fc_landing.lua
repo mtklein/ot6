@@ -108,6 +108,57 @@ end
 
 local u4Req = nil                         -- the ultros4_entry capture
 local DECK = { S = H.newPartySelect(PICK), helmT = 0, formed = false, careD = nil }
+-- Ultros IV's fight, armed from the deck: Ultros IV ($168) and Chupon
+-- ($12F), who steps in mid-fight (battle_ultros4).  The deck kit's Relic
+-- session lets the game's Optimum re-pick LOCKE's hands (the kit's note
+-- below), element-blind; when the ThunderBlade is not his to keep (the
+-- Sealed Gate's ladder can hand it to TERRA), that pick was the Flame
+-- Sabre, which Chupon ABSORBS -- the absorb guard stopped the f77db439
+-- chain: "char 1's R-hand item $0D (fire) is ABSORBED by slot 0 species
+-- $012F".  A person re-arms before walking up to Ultros: each hand whose
+-- weapon either of them absorbs (read off the ROM, M.absorbClashesFor)
+-- takes the strongest blade in the bag neither absorbs, strongest first.
+local U4_SPECIES = { { slot = 0, species = 0x0168 }, { slot = 1, species = 0x012F } }
+local U4_BLADES = { 0x0F, 0x0B, 0x0E, 0x0A, 0x0C, 0x0D, 0x09, 0x05, 0x08, 0x02,
+                    0x07, 0x04, 0x03, 0x01, 0x00 }
+local function u4Arms()
+  local inner
+  local function build()
+    local steps = {}
+    for _, c in ipairs(H.absorbClashesFor(H.partyWeapons(), U4_SPECIES)) do
+      local slot = c.hand == "R" and 0 or 1
+      local items = {}
+      for _, it in ipairs(U4_BLADES) do
+        if H.invCountOf(it) > 0 and #H.absorbClashesFor(
+             { { char = c.char, hand = c.hand, item = it } }, U4_SPECIES) == 0 then
+          items[#items + 1] = { slot, it }
+        end
+      end
+      H.log(string.format("[u4 arms] %s -- re-arming from %d bag candidate(s)",
+        H.clashStr(c), #items))
+      if #items > 0 then
+        steps[#steps + 1] = H.equipKit(c.char, items,
+          { tag = string.format("u4 arms char %d %s-hand", c.char, c.hand), ladder = true })
+      end
+    end
+    steps[#steps + 1] = H.call(function()
+      local left = H.absorbClashesFor(H.partyWeapons(), U4_SPECIES)
+      local lines = {}
+      for _, c in ipairs(left) do lines[#lines + 1] = H.clashStr(c) end
+      H.assertEq(#left, 0, "no hand walks up to Ultros IV holding a weapon he " ..
+        "or Chupon absorbs" .. (#left > 0 and (": " .. table.concat(lines, "; ")) or ""))
+    end)
+    return H.seqStep(steps)
+  end
+  return {
+    tick = function(self)
+      if inner == nil then inner = build() end
+      return inner:tick()
+    end,
+    reset = function(self) inner = nil end,
+  }
+end
+
 local function deckDrive(untilKit)
     local S = DECK.S
     local C = H.newChoice(0, { ready = "count", min = 1, press = choicePress,
@@ -258,16 +309,31 @@ H.run({ maxFrames = 600000 }, flatten({
   H.buyItem(REVIVIFY, 5, function() return 3 - H.invCountOf(REVIVIFY) end, "REVIVIFY to 3"),
   H.buyItem(TINCTURE, 2, function() return 7 - H.invCountOf(TINCTURE) end, "TINCTURE to 7"),
   H.buyItem(TENT, 7, function() return 10 - H.invCountOf(TENT) end, "TENT to 10"),
+  -- #361: the continent's map 394 deals Apokryphos and Misfits in half its
+  -- draws (battle_procboost's pool decode, build/attempts/wt/procboost-v024/
+  -- summary.txt), and both cast Mute, which greys TERRA's and CELES's
+  -- Magic until cured.  The bag came here with one Echo Screen and at most
+  -- one Remedy, so a second Mute had no cure (that suite's K5: "the magic
+  -- row greyed (status bytes 00 08)" for 26000 frames once the one Echo
+  -- Screen had gone to SHADOW).  This counter sells no Echo Screen; its
+  -- Remedy (row 3) carries Mute's STATUS2 bit (M.statusCure reads it off
+  -- the ROM), and at 1000 gil against a six-figure purse a person carries
+  -- one for each of the three legs (the gauntlet, the alcove, the escape)
+  -- before the World of Ruin's first counter, plus two for a leg that
+  -- meets more.
+  H.buyItem(REMEDY, 3, function() return 5 - H.invCountOf(REMEDY) end, "REMEDY to 5"),
   H.buyItem(TONIC, 0, function() return 99 - H.invCountOf(TONIC) end, "TONIC to 99"),
   H.shopClose("Thamasa item shop"),
   H.call(function()
-    H.log(string.format("[prep] shop done: tonic=%d potion=%d fenix=%d tincture=%d tent=%d gil=%d f%d",
+    H.log(string.format("[prep] shop done: tonic=%d potion=%d fenix=%d tincture=%d tent=%d remedy=%d echo=%d gil=%d f%d",
       H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN),
-      H.invCountOf(TINCTURE), H.invCountOf(TENT), H.gil(), H.frame))
+      H.invCountOf(TINCTURE), H.invCountOf(TENT), H.invCountOf(REMEDY),
+      H.invCountOf(0xFB), H.gil(), H.frame))
     H.assertEq(H.invCountOf(POTION) >= 65, true, "Potions stocked to 65 for the gauntlet -- the L29 band plus the measured FC spend")
     H.assertEq(H.invCountOf(FENIX_DOWN) >= 25, true, "Fenix Downs stocked to 25")
     H.assertEq(H.invCountOf(TINCTURE) >= 7, true, "Tinctures stocked to 7 -- the L28 MP band (#231)")
     H.assertEq(H.invCountOf(TENT) >= 10, true, "Tents at 10 for the continent's save points (#231)")
+    H.assertEq(H.invCountOf(REMEDY) >= 5, true, "Remedies at 5: a Mute on the continent has a cure (#361)")
   end),
   H.bagArrange({ POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY }, { tag = "bag: combat items on top" }),
   H.call(function()
@@ -357,6 +423,7 @@ H.run({ maxFrames = 600000 }, flatten({
   H.call(function()
     H.log(string.format("[deck] the Ultros teaser is up ($01F0) at f%d, at (%d,%d); walking to (22,6)", H.frame, H.fieldX(), H.fieldY()))
   end),
+  u4Arms(),
   -- ultros4_entry: the deck, controllable, one walk from arming Ultros IV
   -- (battle_ultros4 boots it).  Captured with no frames spent (H.saveState
   -- waits 2, which moved every IAF battle after it and changed the play;

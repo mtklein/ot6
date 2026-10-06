@@ -3,8 +3,8 @@
 -- outside the sand.  Generates three states:
 --   figaro_intro.mss    after the first audience ($0004 set)
 --   figaro_matron.mss   after the flashback ($0308 set again)
---   figaro_cleared.mss  first controllable frame on the world map,
---                       TERRA + LOCKE + EDGAR, tools carried
+--   figaro_cleared.mss  on the world map, off the chocobo and cared for
+--                       (#297), TERRA + LOCKE + EDGAR, tools carried
 --
 -- The party roster changes several times through the chapter; every
 -- position read goes through the $0803 party-object offset (H.fieldX/Y)
@@ -78,6 +78,13 @@ end
 local function seq(steps) return H.cond(function() return true end, steps) end
 
 local aPhase = 0
+
+-- the care threshold the party leaves the castle at (#297): the pre-danger
+-- top-up the generators' explicit cares use, not the walk's 0.65
+local LEAVE_CARE = 0.9
+
+-- the tool shop's two purchases, each price asserted at its buyItem below
+local TOOL_BILL = 750 + 500
 
 -- Cross the entrance whose source tile is (sx,sy), landing on map dm at
 -- (dx,dy).  The door tile is a wall until CheckDoor opens it, so BFS
@@ -365,6 +372,32 @@ H.run({ maxFrames = 120000 }, {
   -- failing that assertion and blocking the whole downstream tree).
   H.buyItem(0xE8, 0, function() return 30 - invCount(0xE8) end, "TONIC to 30"),
   H.waitUntil(inState(0x26), 2400, "item shop: back at the buy list", 2),
+  -- #307: Fenix Downs before the desert.  The chain reaches this counter
+  -- with the one Fenix Down it found, and the next counter that sells them
+  -- is South Figaro's, across the desert and the cave, where TERRA (94 HP)
+  -- falls about one battle in six (battle_steal's own measurement).  The
+  -- band is ~level (docs/design/level-curve.md); a person watching their
+  -- gil keeps the tool shop's bill (BioBlaster 750 + NoiseBlaster 500, each
+  -- asserted at its purchase below) and spends at most half of what is left
+  -- on 500-gil Fenix Downs: South Figaro sells them at the same price, so
+  -- the rest is better carried there with the Antidotes and Softs its
+  -- counter buys before the grind.  On the 2026-10-05 chain (3978 gil here,
+  -- party L5/L7) that is two, carrying three into the desert.
+  H.buyItem(0xF0, 5, function()
+    local price = H.readWord(0x9f09 + 5 * 2)
+    local spare = gil() - TOOL_BILL
+    local lv = 0
+    for _, c in ipairs(H.partyMembers()) do
+      lv = math.max(lv, H.readByte(0x1600 + 37 * c + 8))
+    end
+    local afford = (spare // 2) // price
+    local want = math.max(0, math.min(lv - invCount(0xF0), afford))
+    H.log(string.format("[shop] Fenix Down: band %d (L%d), have %d, %d gil " ..
+      "spare after the tool bill of %d, half of it buys %d at %d: buying %d",
+      lv, lv, invCount(0xF0), spare, TOOL_BILL, afford, price, want))
+    return want
+  end, "FENIX DOWN toward the band"),
+  H.waitUntil(inState(0x26), 2400, "item shop: back at the buy list", 2),
   shopPress("b", inState(0x25), "item shop: back to options"),
   shopPress("b", function() return H.hasControl() and map() == 59 end,
     "item shop: closed"),
@@ -376,6 +409,8 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(invCount(0xE8) >= 25, true,
       string.format("Tonics restocked at the Figaro item shop (have %d)",
         invCount(0xE8)))
+    H.assertEq(gil() >= TOOL_BILL, true, string.format(
+      "the tool shop's bill (%d) is still in the purse (%d)", TOOL_BILL, gil()))
     H.log(string.format("[shop] item shop done: gil=%d tonic=%d potion=%d "
       .. "fenix=%d", gil(), invCount(0xE8), invCount(0xE9), invCount(0xF0)))
     where("item shop done")
@@ -616,18 +651,11 @@ H.run({ maxFrames = 120000 }, {
           H.readByte(0x1850 + c)))
       end
     end
-    H.screenshot("figaro_cleared")
-  end),
-  H.saveState("figaro_cleared.mss"),
-  H.logStep(function()
-    return string.format("figaro_cleared generated at frame %d", H.frame)
   end),
 
-  -- Off the chocobo, and a world save where it sets the party down: the
-  -- cut gen_kolts boots from (savestate_graph.py; lib/ot6_contract.lua
-  -- "world-figaro-v1").  B held while riding dismounts: LandAirship
-  -- stages the tile into $1F60/$1F61, ExitVehicle clears $11FA, and
-  -- InitWorld seeds $E0/$E2 (gen_kolts's header).
+  -- Off the chocobo: B held while riding dismounts.  LandAirship stages the
+  -- tile into $1F60/$1F61, ExitVehicle clears $11FA, and InitWorld seeds
+  -- $E0/$E2 (gen_kolts's header).
   H.hold({ "b" }),
   H.driveUntil(function() return H.readByte(0x11fa) & 3 == 0 end, 900, {
     H.waitFrames(1),
@@ -641,5 +669,32 @@ H.run({ maxFrames = 120000 }, {
       "world position is live (InitWorld ran, not InitChoco)")
     where("dismounted")
   end),
+  -- #297: a person heals before setting out across the desert.  The
+  -- escape's battle can end with someone hurt, and the care advanceStory
+  -- runs after it cannot help: control comes back on the chocobo, where
+  -- the menu does not open ("the menu never opened; giving up on this care
+  -- stop", build/attempts/wt/steal-evidence/regen_figaro_cleared.log, EDGAR
+  -- left at 94/169).  On foot the menu opens, so the care stop is here, at
+  -- the pre-desert top-up threshold, and the fixture asserts it took.
+  H.careStop("care before the desert", { threshold = LEAVE_CARE }),
+  H.call(function()
+    for _, c in ipairs(H.partyMembers()) do
+      local base = 0x1600 + 37 * c
+      local hp, mhp = H.readWord(base + 9), H.readWord(base + 11) & 0x3fff
+      H.log(string.format("[leave] char %d L%d %d/%d hp", c,
+        H.readByte(base + 8), hp, mhp))
+      H.assertEq(hp > 0 and hp >= LEAVE_CARE * mhp, true, string.format(
+        "char %d leaves Figaro topped up (%d/%d, threshold %.2f)", c, hp, mhp,
+        LEAVE_CARE))
+    end
+    H.screenshot("figaro_cleared")
+  end),
+  H.saveState("figaro_cleared.mss"),
+  H.logStep(function()
+    return string.format("figaro_cleared generated at frame %d", H.frame)
+  end),
+
+  -- A world save where the party stands: the cut gen_kolts boots from
+  -- (savestate_graph.py; lib/ot6_contract.lua "world-figaro-v1").
   H.saveAtCheckpoint("world-figaro-v1"),
 })

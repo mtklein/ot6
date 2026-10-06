@@ -2,9 +2,9 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "post-opera.sram",
   "size": 32768,
-  "sha256": "b4a5cd0795b933719364b2d9b669306b17a589a89e1f0535e916e195ae3b5fc7",
+  "sha256": "608cf006a42afb35b991d86c539674f562cf2accb244b9a3ec99e5da87077a41",
   "slot": 3,
   "milestone": "negative-stale-check",
-  "provenance": "Deliberately wrong fixture for `make checkpoint-negatives` (#25). A copy of post-opera-v1's payload with one byte changed: the slot-3 element-codex row (SRAM 0x293D, SNES $31693D, ULTROS2) flipped 0x00 -> 0x01, with the sha256 recomputed so it re-validates and cold-boots. It models a checkpoint whose content drifted from its contract, and post-opera-v1's entry contract must fail naming that one field. It is not produced by the game's save routine, which is the point; no generate rule may name it. Rebuilt 2026-08-11 from the re-cut post-opera-v1: the previous copy predated e65af20, differed from it in 98 bytes, and perturbed a row the re-cut contract no longer expected, so the negative fired on the class-codex row while the script grepped for the element-codex one.",
+  "provenance": "Deliberately wrong fixture for `make checkpoint-negatives` (#25). A copy of post-opera-v1's payload with one byte changed: the slot-3 element-codex row (SRAM 0x293D, SNES $31693D, ULTROS2) flipped 0x00 -> 0x01, with the sha256 recomputed so it re-validates and cold-boots. It models a checkpoint whose content drifted from its contract, and post-opera-v1's entry contract must fail naming that one field. It is not produced by the game's save routine, which is the point; no generate rule may name it. Rebuilt 2026-08-11 from the re-cut post-opera-v1: the previous copy predated e65af20, differed from it in 98 bytes, and perturbed a row the re-cut contract no longer expected, so the negative fired on the class-codex row while the script grepped for the element-codex one.  Rebuilt again 2026-10-06 from the current post-opera-v1 payload (sha256 670f3cd09ecf2b03345cee0f8144f963f55bf65fa75e9ad6f1a47aa5ba7ce05f), the same one byte flipped: the 2026-08-11 copy predated #305 (362 bytes adrift, TERRA's and CELES's Antdot learned, #335).",
   "persistent_layout": "ot6-codex-o8-v1"
 }

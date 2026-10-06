@@ -1326,3 +1326,29 @@ of 150 at L30 from the same two draws (`arms/L32_base_c68`,
 | the castle on the world | trigger (81,85)/(82,85) `_ca5f0b` `:14227` (`$0106`) |
 | Seize / Discard | `TargetEffect_2e` `battle_main.asm` @3cce; `TargetEffect_44` @3cfd; drain `Cmd_2d` @51b2 |
 | inns | Nikeah `_ca8ee5` `:21563` (150 GP); South Figaro `_ca7894` `:18320` (80 GP) |
+
+### 12.6 The Tentacles, labbed again on the v0.25 chain (#333)
+
+The mechanics, decoded (`build/attempts/wt/v026-route/tentacles/mechanics.md`):
+all four bodies Seize, and only a Slowed member (each one's Special,
+labelled "Seize", is Slow); a held member cannot act and cannot be healed,
+and is released only by its holder's death or, after ~1000-1900 frames, a
+Discard.  The informed kill order is $13E, $13D, $13C, $11B (fastest,
+most-Slowing, lowest HP first).  Played from two engine-room snapshots
+of `gen_wor_edgar`'s own run (shifts 0 and 23; CELES L32, SABIN L31) with
+the stop's care below Gerad, waits 1-60 each, retries off
+(`tentacles/lab/keys.txt`, by distinct battle key):
+
+| arm | snapshot s0 | snapshot s23 |
+|---|---|---|
+| shipped (Air Blade, the driver's own targets) | 51 keys, 1 lost | 54 keys, 1 lost |
+| the kill order above (`focus`), Air Blade | 51 keys, 0 lost | 54 keys, 2 lost |
+| the kill order, SABIN's default Pummel | 51 keys, 4 lost | 54 keys, 5 lost |
+
+On this chain the Tentacles are won from full about 103 draws in 105 as
+shipped, not the ~1 in 10 lost the old chain measured; the kill order is
+no measured improvement (2 of 105 either way) and dropping Air Blade for
+Pummel is worse (9 of 105).  So the generator keeps its plan.  What the
+losses show (mechanics.md, section 4) is driver-side: heals aimed at held
+members, Fenix raises to 200 HP with no follow-up, a body one hit from
+death left standing -- filed for the driver's owner.
