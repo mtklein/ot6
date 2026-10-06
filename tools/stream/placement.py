@@ -18,10 +18,11 @@ import os
 import time
 
 CLAIM_SEC = 120           # how long a --claim holds its emulators
-# Whose machines they are: batches fill px13 (ours alone) first, then the
-# Air (the owner's travel laptop, often away), then the Pro (the owner's
-# desk machine); a machine not named comes after, in --peer order.
-PREFER = ("px13", "air", "mbp")
+# Whose machines they are: batches fill px13 (ours alone) first, then mini
+# (the owner's GPD Win Mini handheld, lent to the pool 2026-10-06), then the
+# Air (the owner's travel laptop, often away), then the Pro (the owner's desk
+# machine); a machine not named comes after, in --peer order.
+PREFER = ("px13", "mini", "air", "mbp")
 
 
 def held(claims, machine, active, now):

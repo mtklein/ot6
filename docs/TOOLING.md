@@ -228,7 +228,7 @@ its emulator starts and keeps it until the run ends (`tools/tests/lib/emu_slot.p
 a kernel flock per slot under `~/.cache/ot6/emu-slots/`, dropped when the
 holder dies). The slot count is the machine's own, the first integer in
 `~/.config/ot6/emulator-slots` (CPU count when absent): mbp 12, the Air 8,
-px13 24 (2026-10-06). A batch larger than that queues inside run.sh and logs
+px13 24, mini 8 (2026-10-06). A batch larger than that queues inside run.sh and logs
 `[emu-slot] waited Ns for slot k of N`; the wait comes before the load grace
 and the wall-clock cap start, so queueing never fails a run. Placement
 (`live.py --place`) still says where work should go; the slots are the hard
@@ -307,6 +307,13 @@ those.
   from a Mac, `python3 configure.py`, `ninja build/ot6.sfc`. Savestates come
   from running `ninja` there. A worktree seeds from `~/ot6` with
   `tools/worktree-setup.sh`, as on the Macs.
+
+`mini` (`ssh mini.local`: the owner's GPD Win Mini handheld, Ubuntu 26.04,
+Ryzen 7 7840U 8c/16t, 22 GB, battery) is set up the same way, with px13's
+Mesen builds copied in (same Ubuntu, same arch). It is a gaming handheld
+first: GNOME suspends it when idle (run long jobs under `systemd-inhibit`),
+and `/usr/local/bin/handheld-autotune` lowers CPU clock ceilings while a
+Steam game runs, so our emulators slow down whenever the owner plays.
 
 What differs from macOS:
 

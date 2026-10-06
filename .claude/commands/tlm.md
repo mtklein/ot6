@@ -60,15 +60,20 @@ interpreting runs.
   there: run long jobs under `systemd-inhibit --what=idle --who=ot6
   --why=<job>`; a closed lid still suspends it. Add `--peer px13.local` to
   live.py to see its workers.
+- **Fourth machine:** mini, the owner's GPD Win Mini handheld (Ubuntu
+  26.04, Ryzen 7 7840U 8c/16t, 22 GB, battery; `ssh mini.local`, clone at
+  `~/ot6`, work under `~/work/`). Set up like px13 (docs/TOOLING.md "Linux
+  worker"); long jobs under `systemd-inhibit`. It is the owner's gaming
+  device: its handheld-autotune caps clocks while a Steam game runs.
 - **Where batches go:** fixed slots, enforced. Each machine has a hard
   emulator limit that `tools/tests/run.sh` takes a slot from before every
-  emulator (`~/.config/ot6/emulator-slots`: mbp 12, the Air 8, px13 24;
+  emulator (`~/.config/ot6/emulator-slots`: mbp 12, the Air 8, px13 24, mini 8;
   docs/TOOLING.md "The machine-wide emulator limit"); a bigger batch queues
   inside run.sh instead of swamping the machine (owner, 2026-10-06: agents
   can't be trusted to keep a reasonable load). `python3
   tools/stream/live.py --place N --claim <branch>` (on the Mac, where
   live.py runs) says where the next N should go -- slots less what runs now
-  and live claims, px13 first, then the Air, then the Pro -- and holds them
+  and live claims, px13 first, then mini, then the Air, then the Pro -- and holds them
   for a couple of minutes so agents asking at once don't double-book.
   Launch prompts give agents that command, and say a batch never exceeds
   its claim. Change a machine's limit by editing its file. (The learned
