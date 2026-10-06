@@ -170,25 +170,51 @@ def fenix_short(have: int, level: int) -> bool:
 TONIC_HP, POTION_HP = 50, 250
 
 
+def wor_field_hp(tonic: int, potion: int, level: int) -> int:
+    """The bag's field-care HP in the World of Ruin: Tonics at 50, and the
+    Potions above the combat reserve the Potion band holds at this level
+    at 250 (supply.md section 1's yields)."""
+    return tonic * TONIC_HP + max(0, potion - potion_band(level)) * POTION_HP
+
+
+def wor_heal_band(level: int) -> int:
+    """The Tonic band in HP, uncapped: ~level x5 Tonics at 50 HP is 250 x
+    level (supply.md:226; the 99 is a bag slot's limit, not the band's)."""
+    return 5 * level * TONIC_HP
+
+
 def wor_heal_short(tonic: int, potion: int, level: int) -> bool:
-    """The World of Ruin's field-care rule (#255, calibrated by #411): the
-    Tonic band where a counter sells Tonics, and where a stretch has none,
-    Potions carry the field care (docs/guidelines.md, "Heal outside
-    battles").  So the bag's field-care HP -- Tonics at 50, Potions at 250
-    (supply.md's yields) -- is measured against the Tonic band's HP."""
-    return tonic * TONIC_HP + potion * POTION_HP < tonic_band(level) * TONIC_HP
+    """The World of Ruin's field-care rule (#255, #411): where a stretch has
+    no Tonic counter, Potions carry the field care (docs/guidelines.md,
+    "Heal outside battles") -- but only the Potions above the combat
+    reserve.  Short when that field-care HP is under the uncapped band."""
+    return wor_field_hp(tonic, potion, level) < wor_heal_band(level)
 
 
 def party_level(raw: bytes, cb: int):
     """The active party's highest level, or None if none is flagged active."""
-    act = [m for m in party_at(raw, cb) if m.get("active")]
-    # #411: a cut taken in a scene whose cursor party is UMARO alone (the
-    # World of Balance's scenario select, gen_scenario's hub, and the
-    # captures beside it) has no playing party; its level says nothing.
+    return party_level_why(raw, cb)[0]
+
+
+SCENARIO_CUTS = []                      # fixtures banded by the scenario parties
+
+
+def party_level_why(raw: bytes, cb: int):
+    """(level, None) for the active party; for a cut taken in a scene whose
+    cursor party is UMARO alone (the World of Balance's scenario select:
+    gen_scenario's hub and the captures beside it, #411), the highest level
+    among the scenario parties' members -- every member seated in a party
+    group but UMARO -- and the note that says so."""
+    members = party_at(raw, cb)
+    act = [m for m in members if m.get("active")]
     if len(act) == 1 and act[0]["name"] == "UMARO":
-        return None
+        sc = [m for m in members if m["name"] != "UMARO"]
+        if not sc:
+            return None, "UMARO alone and no scenario party seated"
+        top = max(sc, key=lambda m: m["level"])
+        return top["level"], f"scenario select: banded at the scenario parties' L{top['level']} ({top['name']})"
     levels = [m["level"] for m in act]
-    return max(levels) if levels else None
+    return (max(levels) if levels else None), None
 
 
 # Cached: a fixture with multiple children would otherwise be decoded once
@@ -207,7 +233,8 @@ def bag_of_mss(path: str):
             "tonic": count_in(raw, cb, TONIC),
             "tincture": count_in(raw, cb, TINCTURE),
             "revivify": count_in(raw, cb, REVIVIFY),
-            "level": party_level(raw, cb)}, None
+            "level": party_level(raw, cb),
+            "level_note": party_level_why(raw, cb)[1]}, None
 
 
 def revives_of_mss(path: str):
@@ -432,10 +459,13 @@ def selftest(repo: str = ".") -> int:
     check("17 Fenix Downs at L30 is short", fenix_short(17, 30), True)
     check("18 Fenix Downs at L30 is not", fenix_short(18, 30), False)
     # the WoR field-care rule: Tonic+Potion HP against the Tonic band's HP
-    check("4 Tonics + 45 Potions at L25 carries the band (11450 HP >= 4950)",
-          wor_heal_short(4, 45, 25), False)
-    check("4 Tonics + 18 Potions at L25 is short (4700 HP < 4950)",
-          wor_heal_short(4, 18, 25), True)
+    check("the WoR band at L25 is 6250 HP, uncapped", wor_heal_band(25), 6250)
+    check("4 Tonics + 44 Potions at L25 is short (200 + 6x250 = 1700 < 6250)",
+          wor_heal_short(4, 44, 25), True)
+    check("99 Tonics + 38 Potions at L25 is not (4950 + 0 < 6250: short too)",
+          wor_heal_short(99, 38, 25), True)
+    check("4 Tonics + 63 Potions at L25 is not (200 + 25x250 = 6450, negative control)",
+          wor_heal_short(4, 63, 25), False)
 
     # Checked against mrf-save-room-v1, which carries two Fenix Downs.
     # The tracked copy: the reader's canary needs bytes that hold still
@@ -588,6 +618,8 @@ def main() -> int:
             continue
         here = bag["fenix"]
         scanned += 1
+        if bag.get("level_note"):
+            SCENARIO_CUTS.append((name, bag["level_note"]))
         if in_potion_band(name, states) and bag["level"] is not None:
             band = potion_band(bag["level"])
             if bag["potion"] < band:
@@ -609,7 +641,8 @@ def main() -> int:
         if (in_world_of_ruin(name, states) and bag["level"] is not None
                 and wor_heal_short(bag["tonic"], bag["potion"], bag["level"])):
             wshort.append((name, bag["tonic"], bag["potion"],
-                           tonic_band(bag["level"]), bag["level"]))
+                           wor_field_hp(bag["tonic"], bag["potion"], bag["level"]),
+                           wor_heal_band(bag["level"]), bag["level"]))
         edge = states.get(name, {"prev": None, "checkpoint": None})
         pred, label, perr = predecessor_revives(edge)
         if perr:
@@ -633,6 +666,8 @@ def main() -> int:
               f"(unseeded tree); skipped")
         return 0
 
+    for name, note in SCENARIO_CUTS:
+        print(f"  note {name}: {note}")
     print(f"supply audit: {scanned} fixtures read"
           + (f", {len(skipped)} unreadable" if skipped else ""))
     for name, err in skipped:
@@ -709,14 +744,14 @@ def main() -> int:
             print("    " + " ".join(n for n, _, _, _ in fshort))
 
     if wshort:
-        print(f"  WARNING: {len(wshort)} World of Ruin fixture(s) whose Tonics "
-              f"and Potions together are under the Tonic band (field care: "
-              f"Tonics, or Potions where no counter sells Tonics)"
+        print(f"  WARNING: {len(wshort)} World of Ruin fixture(s) whose field-care "
+              f"HP (Tonics at 50, Potions above the combat reserve at 250) is under "
+              f"the uncapped Tonic band of 250 x level HP"
               + ("" if args.verbose else "; -v lists them") + ":")
         if args.verbose:
-            for name, t, p_, band, level in wshort:
+            for name, t, p_, hp, band, level in wshort:
                 print(f"    WOR HEAL SHORT {name:25s} tonic={t:3d} potion={p_:3d} "
-                      f"< band {band} (L{level})")
+                      f"field-care {hp} HP < band {band} HP (L{level})")
         else:
             print("    " + " ".join(n for n, *_ in wshort))
 

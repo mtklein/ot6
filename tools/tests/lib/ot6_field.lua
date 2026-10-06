@@ -6477,11 +6477,6 @@ function M.absorbSafeArms(chars, species, opts)
       local slot = c.hand == "R" and 0 or 1
       local items = {}
       local bag = M.bagWeapons(c.char)
-      for i = 2, #bag do
-        M.assertEq(M.itemPower(bag[i - 1]) >= M.itemPower(bag[i]), true, string.format(
-          "%s: the candidates run strongest first ($%02X power %d before $%02X power %d)",
-          tag, bag[i - 1], M.itemPower(bag[i - 1]), bag[i], M.itemPower(bag[i])))
-      end
       for _, it in ipairs(bag) do
         if #M.absorbClashesFor({ { char = c.char, hand = c.hand, item = it } }, sp) == 0 then
           items[#items + 1] = { slot, it }
@@ -6492,6 +6487,21 @@ function M.absorbSafeArms(chars, species, opts)
       if #items > 0 then
         steps[#steps + 1] = M.equipKit(c.char, items,
           { tag = string.format("%s: char %d %s-hand", tag, c.char, c.hand), ladder = true })
+        -- the hand holds the best absorb-safe weapon: the strongest by the
+        -- ROM's power byte among every bag weapon this actor can equip that
+        -- none of the fights ahead absorbs (a ladder that stopped early, or
+        -- a pick by list order, fails here)
+        local best, cc, hand = items[1][2], c.char, slot
+        for _, it in ipairs(items) do
+          if M.itemPower(it[2]) > M.itemPower(best) then best = it[2] end
+        end
+        steps[#steps + 1] = M.call(function()
+          local got = M.readByte(0x1600 + 37 * cc + 0x1F + hand)
+          M.assertEq(M.itemPower(got) >= M.itemPower(best), true, string.format(
+            "%s: char %d's %s-hand took the best absorb-safe weapon ($%02X power %d; "
+            .. "the best was $%02X power %d)", tag, cc, hand == 0 and "R" or "L", got,
+            M.itemPower(got), best, M.itemPower(best)))
+        end)
       end
     end
     steps[#steps + 1] = M.call(function()

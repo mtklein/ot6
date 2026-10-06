@@ -392,7 +392,8 @@ reads **`$08`, poison absorbed**; +24 is `$00`.)
   two snapshot sets (2 of 45 at six shields), deaths rise 10 -> 11 and
   23 -> 28, and one key per set turns into an attrition wipe
   (build/attempts/wt/v026-route2/e400/by_key.txt).  Not a hard fight for
-  players; no further tuning is planned.
+  players; no further tuning is planned.  Since #410 the route's fighter
+  Suplexes first, so its own fight now ends on that Suplex.
 - **Telegraph:** the whistle sounds down the corridor → **Evil
   Toot**, a party-wide random status attack. Break the boiler before
   the move lands; Acid Rain between fuses keeps pressure on your
@@ -409,8 +410,10 @@ reads **`$08`, poison absorbed**; +24 is `$00`.)
   train's car B (shop record 85) sells **Fire Skean**, giving Shadow
   a chip key in this scenario; fire rather than bolt because fire
   also opens Specter, the monster-in-a-box below.
-- **Jank ✦: Suplex still works.** It is also mechanically consistent:
-  Suplex is bludgeoning and the train is bludgeon-weak. The undead
+- **Jank ✦: Suplex kills it outright (#410).** A landed Suplex ($5f) on
+  the train deals its whole current HP (Ot6SuplexTrain, ot6_break.asm):
+  the classic joke, made true, on this species only (battle_suplextrain,
+  with battle_suplex as the control).  The undead
   flag stays as well, so one Fenix Down kills the train instantly
   regardless of break state. Vanilla shortcuts take precedence over
   the break system.

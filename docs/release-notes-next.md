@@ -8,17 +8,12 @@ release's notes.
 
 ## What's changed
 
-**Yes, you can suplex the train.** Sabin's Suplex on the Phantom Train
-now wins the fight on the spot, as every FF6 player always hoped it
-would. It works on that train and nothing else.
-
-**The Phantom Train is meant to be broken.** With Sabin's Blitzes and
-Shadow's throws now spending their Boost Points, the train usually died
-before its shields came down, so its break (and Cyan's first Cleave) rarely
-happened. It now carries four shields instead of six and more HP, so about
-half the time you break it with plenty left to finish while it is Broken;
-the fight takes about as long as before, though it can wear your party down
-more.
+**The Phantom Train: four shields, more HP -- and yes, Suplex.** The
+train now carries four shields instead of six over more HP, so a party
+that spends its Boost Points can break it (and give Cyan his first Cleave)
+before it falls. And Sabin's Suplex on the train wins the fight on the
+spot, the classic FF6 joke made true; it works on that train and nothing
+else.
 
 **A bigger boosted hit is never a smaller one.** A Boost Point's doubling
 used to roll over to a lower number when a very strong attack doubled past

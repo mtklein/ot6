@@ -723,7 +723,8 @@ local function makePlan(actor)
   -- #410: a player who knows the joke suplexes the train, and in OT6 that
   -- wins (Ot6SuplexTrain): SABIN's first free turn is a Suplex whenever he
   -- can pay for it.
-  if actor == sabinE and not imp and pMP(sabinE) >= (H.abilityCost(SUPLEX) or 13) then
+  if actor == sabinE and not imp and pMP(sabinE) >= (H.abilityCost(SUPLEX) or 13)
+     and H.readWord(MHP(gSlot)) > 0 then
     b68Log(string.format("cast: SABIN Suplexes the train (the joke, #410; mp %d) trainHP=%d [%s]",
       pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
     return { kind = "blitz", skill = SUPLEX, boost = 0, row = cmdRowOf(actor, CMD_BLITZ) }
