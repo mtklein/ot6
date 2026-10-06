@@ -1483,8 +1483,15 @@ end
 --                  may drink), deathCost (gil to undo a death),
 --                  hit = 0..1 (the chance its lines land, default 1) }
 --   enemies[k]   { hp, sh, eta, period, ends = true for a body whose death
---                  ends the fight, act = { aoe, dmg = { [partyKey] = n },
---                  hit = 0..1 } }
+--                  ends the fight, act = { aoe, dmg = { [partyKey] = n }
+--                  (its typical landed hit), worst = { [partyKey] = n }
+--                  (its largest; default dmg), hit = 0..1 (the share of its
+--                  actions that land), aim = "random" (default: uniformly
+--                  among the living) | "worst" (the member it leaves
+--                  lowest) | partyKey (the script's fixed target) } }
+--   samples      plays per candidate (M.RACE_SAMPLES): each draws the
+--                enemy's targets and landings from one fixed seed list,
+--                the same for every candidate (common random numbers)
 --   focus        enemy keys in kill order (single-target lines hit the
 --                first standing)
 --   bankAt       the continuation spends its bank from this many pips
@@ -1505,11 +1512,8 @@ M.RACE_HORIZON = 8
 M.RACE_TICK_MARGIN = nil       -- nil: the quickest enemy's period
 M.RACE_LEFT_MARGIN = 0.05      -- of the enemy's effective HP at the start
 M.RACE_COST_MARGIN = 200       -- gil
+M.RACE_SAMPLES = 16
 
--- the cost of a consumable: its gil, dearer as the bag nears the reserve
--- the rest of the leg wants (a supply band's floor): the last Fenix Downs
--- before a boss are dear, the 40th Potion is cheap.  x1 above reserve + 1,
--- rising to x4 for the last one at reserve 0.
 -- The chance a blockable hit lands (#415): the hit check (battle_main
 -- @233f) multiplies the attacker's hit rate by the target's inverted
 -- M.Block ($3B55; Evade is never what it reads: the carry there is
@@ -1520,6 +1524,10 @@ function M.hitChance(hitRate, block)
   return math.min(100, (hitRate * block) >> 8) / 100
 end
 
+-- the cost of a consumable: its gil, dearer as the bag nears the reserve
+-- the rest of the leg wants (a supply band's floor): the last Fenix Downs
+-- before a boss are dear, the 40th Potion is cheap.  x1 above reserve + 1,
+-- rising to x4 for the last one at reserve 0.
 function M.raceItemCost(gil, count, reserve)
   reserve, count = reserve or 0, count or 1
   local short = math.max(0, reserve + 1 - (count - 1))
@@ -1563,7 +1571,10 @@ local function fightOver(E)
   return not standing
 end
 
-function M.raceSim(st, first)
+function M.raceSim(st, first, draw)
+  -- draw: nil plays the worst case (every action lands at its worst on
+  -- the member it leaves lowest, the no-wipe guard); a function returning
+  -- 0..1 plays one sample (the aim and the landing drawn from it)
   local P, E = {}, {}
   for k, p in pairs(st.party) do
     P[k] = { hp = p.hp, maxhp = p.maxhp, eta = p.eta or 0, period = p.period or 300, bp = p.bp or 0,
@@ -1658,21 +1669,40 @@ function M.raceSim(st, first)
       r.acts = r.acts + 1
       if r.acts > horizon then break end
       local e = E[nk]
-      local dmg, hit = e.act.dmg or {}, e.act.hit or 1
-      if e.act.aoe then
+      local dmg, lands, aim = e.act.dmg or {}, true, e.act.aim or "random"
+      if draw == nil then
+        dmg, aim = e.act.worst or dmg, "worst"
+      else
+        lands = draw() < (e.act.hit or 1)
+        if aim == "random" then
+          local alive = {}
+          for k, p in pairs(P) do if p.hp > 0 then alive[#alive + 1] = k end end
+          table.sort(alive)
+          aim = alive[1 + math.floor(draw() * #alive)]
+        elseif aim ~= "worst" and (P[aim] == nil or P[aim].hp <= 0) then
+          aim = "worst"
+        end
+      end
+      if not lands then
+        -- a miss or a turn that took nothing
+      elseif e.act.aoe then
         for k, p in pairs(P) do
           if p.hp > 0 then
-            p.hp = p.hp - (dmg[k] or 0) * hit
+            p.hp = p.hp - (dmg[k] or 0)
             if p.hp <= 0 then p.hp = 0; death(nt) end
           end
         end
+      elseif aim ~= "worst" then
+        local q = P[aim]
+        q.hp = q.hp - (dmg[aim] or 0)
+        if q.hp <= 0 then q.hp = 0; death(nt) end
       else
         -- pessimistic: the hit goes where it does the most harm, the
         -- member it would leave lowest (a kill first)
         local tk, low = nil, nil
         for k, p in pairs(P) do
           if p.hp > 0 then
-            local after = p.hp - (dmg[k] or 0) * hit
+            local after = p.hp - (dmg[k] or 0)
             if low == nil or after < low then tk, low = k, after end
           end
         end
@@ -1713,7 +1743,7 @@ end
 -- a better than b (both raceSim results) under the state's margins
 function M.raceBetter(a, b, st)
   if a.wipe ~= b.wipe then return not a.wipe end
-  if a.deaths ~= b.deaths then return a.deaths < b.deaths end
+  if math.abs(a.deaths - b.deaths) > 1e-9 then return a.deaths < b.deaths end
   if a.deaths > 0 and a.firstDeath ~= b.firstDeath then
     return (a.firstDeath or math.huge) > (b.firstDeath or math.huge)
   end
@@ -1743,10 +1773,47 @@ function M.raceBetter(a, b, st)
 end
 
 -- the best candidate: its index, its result, and every result
+-- One candidate's score: the samples' mean (deaths, cost, HP left), their
+-- median kill and first death (a sample not over by the horizon counts as
+-- never), the share that wipe; and the wipe flag from the worst-case play
+-- (criterion 1 is the guard: a line the worst case wipes on loses to one
+-- it does not)
+local RACE_SEEDS = {}
+do
+  local x = 12345
+  for i = 1, 4096 do x = (x * 1103515245 + 12345) % 2147483648; RACE_SEEDS[i] = x / 2147483648 end
+end
+function M.raceEval(st, c)
+  local n = st.samples or M.RACE_SAMPLES
+  local worst = M.raceSim(st, c, nil)
+  if n <= 0 then worst.pWipe = worst.wipe and 1 or 0; worst.worstWipe = worst.wipe; return worst end
+  local rs = {}
+  for i = 1, n do
+    local j = (i - 1) * 64
+    local function draw() j = j + 1; return RACE_SEEDS[(j - 1) % #RACE_SEEDS + 1] end
+    rs[i] = M.raceSim(st, c, draw)
+  end
+  local function med(f)
+    local v = {}
+    for i = 1, n do v[i] = f(rs[i]) or math.huge end
+    table.sort(v)
+    local m = v[(n + 1) // 2]
+    return m ~= math.huge and m or nil
+  end
+  local function mean(f) local t = 0 for i = 1, n do t = t + f(rs[i]) end return t / n end
+  local r = { deaths = mean(function(x) return x.deaths end), kill = med(function(x) return x.kill end),
+    firstDeath = med(function(x) return x.firstDeath end), left = mean(function(x) return x.left end),
+    left0 = rs[1].left0, spent = mean(function(x) return x.spent end), bill = mean(function(x) return x.bill end),
+    cost = mean(function(x) return x.cost end), acts = worst.acts,
+    pWipe = mean(function(x) return x.wipe and 1 or 0 end), worstWipe = worst.wipe, worstDeaths = worst.deaths }
+  r.wipe = worst.wipe
+  return r
+end
+
 function M.raceChoose(st, candidates)
   local best, bestR, all = nil, nil, {}
   for i, c in ipairs(candidates) do
-    local r = M.raceSim(st, c)
+    local r = M.raceEval(st, c)
     all[i] = r
     if bestR == nil or M.raceBetter(r, bestR, st) then best, bestR = i, r end
   end
@@ -7183,6 +7250,19 @@ function M.ledgerCommit(L, act, drops)
   L.maxOn = L.maxOn or {}
   local per = {}
   for _, d in ipairs(hits) do per[d.e] = (per[d.e] or 0) + d.drop end
+  -- the care race's sample (#415): each landed action's take on each
+  -- member it hit, and how many it hit
+  if counted then
+    L.landN = (L.landN or 0) + 1
+    L.landOn = L.landOn or {}
+    local nm = 0
+    for e, v in pairs(per) do
+      nm = nm + 1
+      L.landOn[e] = L.landOn[e] or {}
+      table.insert(L.landOn[e], v)
+    end
+    if nm > 1 then L.multiN = (L.multiN or 0) + 1 end
+  end
   for e, v in pairs(per) do
     if L.maxOn[e] == nil or v > L.maxOn[e] then L.maxOn[e] = v end
     if L.max == nil or v > L.max then L.max = v end
@@ -7548,14 +7628,18 @@ end
 --   party lines: bestLine's chips and hits at each boost, the damage watch's
 --     per-hit figure (dmgHit; a member not yet measured takes the mean of
 --     the measured ones, and with none measured the decision is not raced)
---   enemy actions: each standing slot's worst landed hit on each member
---     (roundEnemies: the ledger, else the script's worst from the ROM),
---     single-target, so the sim assigns it pessimistically
+--   enemy actions: each standing slot's typical landed hit on each member
+--     (the median of its landings, from M.RACE_TYPICAL_MIN of them), the
+--     share of its actions that land, area when most landings hit more
+--     than one member, aimed at random among the living; its worst
+--     (roundEnemies: the ledger, else the script's worst from the ROM) is
+--     the worst-case play's, the no-wipe guard
 --   heals: the bag's (bagHeals) on each hurt member, each at its gil and
 --     scarcity against M.CARE_RESERVE; a raise: the Fenix Down on each
 --     fallen member, raised to 1/8 max HP
 M.CARE_RACE = M.CARE_RACE or false
 M.RACE_RAISE_RESERVE = 2
+M.RACE_TYPICAL_MIN = 3
 function Driver:raceState(actor, R)
   local st = { actor = actor, party = {}, enemies = {}, focus = {}, hpRate = M.shopRates().hp or 1.2,
                bankAt = self.opts.bank or 0, horizon = M.RACE_HORIZON }
@@ -7633,7 +7717,17 @@ function Driver:raceState(actor, R)
       local en = { hp = M.readWord(BATTLE.MON_HP + s * 2),
         sh = M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0 and 0 or M.readByte(BATTLE.SH_CUR + s * 2),
         eta = etaOf(8 + s * 2) or 600, period = mconst > 0 and math.ceil(0xFF00 / mconst) or 600,
-        act = { aoe = false, dmg = {} } }
+        act = { aoe = false, dmg = {}, worst = {} } }
+      -- the share of its actions that landed, and whether a landing hits
+      -- more than one member (from M.RACE_TYPICAL_MIN of them); aimed at
+      -- random among the living
+      local L = self.hitLedger[s]
+      if L and (L.actN or 0) >= M.RACE_TYPICAL_MIN then
+        en.act.hit = math.min(1, (L.landN or 0) / L.actN)
+      end
+      if L and (L.landN or 0) >= M.RACE_TYPICAL_MIN then
+        en.act.aoe = (L.multiN or 0) * 2 > L.landN
+      end
       st.enemies[s] = en
     end
   end
@@ -7642,7 +7736,30 @@ function Driver:raceState(actor, R)
     local _, enemies, fallback = self:roundEnemies(e, false)
     for _, en in ipairs(enemies or {}) do
       local E = st.enemies[en.slot]
-      if E then E.act.dmg[e] = en.worst or en.rom or fallback or 0 end
+      if E then
+        -- typical: the median of what this slot has landed on e (else
+        -- on anyone), from M.RACE_TYPICAL_MIN landings; short of that,
+        -- the worst it has landed (else the script's worst, the fallback)
+        local worst = en.worst or en.rom or fallback or 0
+        local L = self.hitLedger[en.slot]
+        local typ = nil
+        if L and L.landOn and (L.landN or 0) >= M.RACE_TYPICAL_MIN then
+          local v = L.landOn[e]
+          if v == nil or #v == 0 then
+            v = {}
+            for _, l in pairs(L.landOn) do for _, x in ipairs(l) do v[#v + 1] = x end end
+          end
+          if #v > 0 then
+            local c = {}
+            for i, x in ipairs(v) do c[i] = x end
+            table.sort(c)
+            typ = c[(#c + 1) // 2]
+          end
+        end
+        E.act.dmg[e] = typ or worst
+        E.act.worst[e] = math.max(worst, typ or 0)
+        E.typed = E.typed or (typ ~= nil)
+      end
     end
   end
   if parts and parts.body ~= nil and st.enemies[parts.body] then st.enemies[parts.body].ends = true end
@@ -7718,9 +7835,9 @@ local function raceOfPlan(st, actor, plan)
 end
 
 local function raceDesc(c, r)
-  return string.format("%s [%s%d down%s, %s, left %d, cost %d]", c.what or c.kind,
-    r.wipe and "WIPE, " or "", r.deaths, r.firstDeath and ("@" .. r.firstDeath) or "",
-    r.kill and ("ends @" .. r.kill) or "not over", math.floor(r.left), math.floor(r.cost))
+  return string.format("%s [%s%.2f down%s, wipe %.2f, %s, left %d, cost %d]", c.what or c.kind,
+    r.wipe and "worst case WIPES, " or "", r.deaths, r.firstDeath and ("@" .. math.floor(r.firstDeath)) or "",
+    r.pWipe or 0, r.kill and ("ends @" .. math.floor(r.kill)) or "not over", math.floor(r.left), math.floor(r.cost))
 end
 
 function Driver:raceLog(actor, plan, R)
@@ -7745,7 +7862,61 @@ function Driver:raceLog(actor, plan, R)
   else agree = "DISAGREE" end
   M.log(string.format("[%s] [race] actor=%d %s: race %s%s; %d candidate(s)", self.tag or "fight", actor, agree,
     raceDesc(cands[i], best), ri and (" | rules " .. raceDesc(cands[ri], all[ri])) or "", #cands))
+  self._racePred = { st = st, race = all[i], rules = ri and all[ri] or nil }
   if agree == "DISAGREE" then return cands[i] end
+end
+
+-- Calibration (#415): the prediction for the plan that was played (its
+-- samples' mean deaths and wipe share, the worst case's wipe and deaths)
+-- against what happened over the same horizon of enemy actions, or to the
+-- fight's end: one [race-cal] line each
+function Driver:raceCalPush(actor, pred, st, which)
+  if pred == nil then return end
+  local alive = {}
+  for e, p in pairs(st.party) do alive[e] = p.hp > 0 end
+  self.raceCal = self.raceCal or {}
+  self.raceCal[#self.raceCal + 1] = { actor = actor, pred = pred, which = which, frame = M.frame,
+    acts0 = self.monActN or 0, horizon = st.horizon or M.RACE_HORIZON, seated = st.party, alive = alive }
+end
+
+function Driver:raceCalSay(c, why)
+  local down, died, n = 0, 0, 0
+  for e, _ in pairs(c.seated) do
+    n = n + 1
+    local hp = M.readWord(0x3BF4 + e * 2)
+    if hp == 0 or hp == 0xFFFF then
+      down = down + 1
+      if c.alive[e] then died = died + 1 end
+    end
+  end
+  local p = c.pred
+  M.log(string.format("[%s] [race-cal] actor=%d f%d %s: predicted down %.2f, wipe %.2f, worst case %s%d down"
+    .. " | actual down %d (%d fell), %s, over %d enemy action(s) (%s)",
+    self.tag or "fight", c.actor, c.frame, c.which, p.deaths or 0, p.pWipe or 0,
+    p.worstWipe and "WIPE, " or "", p.worstDeaths or p.deaths or 0,
+    down, died, down >= n and "WIPE" or "no wipe", (self.monActN or 0) - c.acts0, why))
+end
+
+function Driver:raceCalTick(flush)
+  if self.raceCal == nil or #self.raceCal == 0 then return end
+  local standing, anyMon = false, false
+  for e = 0, 3 do
+    local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+    if hp > 0 and hp ~= 0xFFFF and mx > 0 and mx ~= 0xFFFF then standing = true end
+  end
+  for sl = 0, 5 do if monAlive(sl) then anyMon = true end end
+  for i = #self.raceCal, 1, -1 do
+    local c = self.raceCal[i]
+    local why = nil
+    if flush then why = "the battle ended"
+    elseif not standing then why = "the party is down"
+    elseif not anyMon then why = "no monster stands"
+    elseif (self.monActN or 0) - c.acts0 >= c.horizon then why = "the horizon" end
+    if why then
+      self:raceCalSay(c, why)
+      table.remove(self.raceCal, i)
+    end
+  end
 end
 
 -- The race's choice as a plan the driver executes (M.CARE_RACE = "act"):
@@ -7774,7 +7945,9 @@ function Driver:makePlan(actor)
   self._race = nil
   local plan = self:makePlanRules(actor)
   if M.CARE_RACE and self._race ~= nil and self._race.actor == actor then
+    self._racePred = nil
     local ok, c = pcall(self.raceLog, self, actor, plan, self._race)
+    local played = "rules"
     if not ok then
       M.log(string.format("[%s] [race] actor=%d error: %s", self.tag or "fight", actor, tostring(c)))
     elseif c and M.CARE_RACE == "act" then
@@ -7783,8 +7956,14 @@ function Driver:makePlan(actor)
         M.log(string.format("[%s] [race] actor=%d act: %s in place of the rules' %s", self.tag or "fight",
           actor, c.what or c.kind, tostring(plan and plan.kind)))
         plan = alt
+        played = "race"
       end
     end
+    local rp = self._racePred
+    if ok and rp then
+      pcall(self.raceCalPush, self, actor, played == "race" and rp.race or rp.rules, rp.st, played)
+    end
+    self._racePred = nil
   end
   self._race = nil
   return plan
@@ -10611,6 +10790,7 @@ function Driver:button(actor)
 end
 
 function Driver:idle()
+  if self.raceCal then pcall(self.raceCalTick, self, true) end
   -- the fallback: a battle whose end the UpdateSRAM hook did not see
   -- (the [outcome] says "no end reading")
   if self.battleTick > 6 and self.reward ~= nil and self.seatXp ~= nil and not self.outcomeSaid then
@@ -13584,6 +13764,7 @@ function Driver:frame()
   self:watchPendingCare()
   self:watchUnmuddleHit()
   self:watchHits()
+  if self.raceCal then self:raceCalTick(false) end
   self:watchLanders()
   self:watchParts()
   self:watchStatues()

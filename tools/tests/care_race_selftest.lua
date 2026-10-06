@@ -205,6 +205,42 @@ do
   check(c.kind == "attack", "a 90-gil trade does not buy a turn, got " .. c.kind)
 end
 
+-- 13. Calibration (#415 review): an enemy action is priced at its typical
+-- landed hit, aimed as the game aims it, with the worst case kept only as
+-- the no-wipe guard.  The Air Force's log read "WIPE, 3 down" in fights
+-- the party won, from every slot's worst hit on the member it left lowest.
+do
+  local function party3(lowHp)
+    return { member(lowHp, 1000, 0, { lines = lines(100, 1, 1) }), member(1000, 1000, 400), member(1000, 1000, 450) }
+  end
+  local function pick(st)
+    return choose(st, {
+      { kind = "attack", line = st.party[1].lines[0], boost = 0 },
+      { kind = "heal", target = 1, restore = 500, cost = 100 },
+      { kind = "heal", all = true, restore = 600, cost = 300 } }).kind
+  end
+  -- (a) worst 900 once, 300 typically: a member at 500 is not in danger
+  local st = { actor = 1, hpRate = 0, focus = { 1 }, party = party3(650),
+    enemies = { { hp = 700, sh = 0, eta = 50, period = 300, ends = true,
+                  act = { dmg = { 300, 300, 300 }, worst = { 900, 900, 900 } } } } }
+  check(pick(st) == "attack", "a 900 worst with a 300 typical hit does not heal a member at 650 (two typical hits before the kill)")
+  -- (b) the script's fixed target: a member at 200 the enemy never aims at
+  st = { actor = 1, hpRate = 0, focus = { 1 }, party = party3(200),
+    enemies = { { hp = 700, sh = 0, eta = 50, period = 300, ends = true,
+                  act = { dmg = { 300, 300, 300 }, aim = 2 } } } }
+  check(pick(st) == "attack", "an enemy aimed at a full member leaves the one at 200 be")
+  st.enemies[1].act.aim = nil
+  check(pick(st) ~= "attack", "aimed at random, the member at 200 is one draw in three from dying")
+  -- (c) the guard: typically 100 a member, at worst 700 on everyone; two
+  -- members at 600 and one at 650 -- the worst case wipes unless a
+  -- heal lifts one, the typical play loses no one either way
+  st = { actor = 1, hpRate = 0, focus = { 1 },
+    party = { member(600, 1000, 0, { lines = lines(100, 1, 1) }), member(600, 1000, 400), member(650, 1000, 450) },
+    enemies = { { hp = 700, sh = 0, eta = 50, period = 300, ends = true,
+                  act = { aoe = true, dmg = { 100, 100, 100 }, worst = { 700, 700, 700 } } } } }
+  check(pick(st) == "heal", "the worst case wipes on the attack (at 50, before any typical death): a heal stands guard")
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration", n))
