@@ -486,6 +486,11 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
     H.assertEq(H.shopRowOf(8, 0xE8) ~= nil, true, "shop 8 sells Tonics")
   end),
   H.buyItem(0xE8, function() return 78 - H.invCountOf(0xE8) end, "TONIC to 78"),
+  -- #411: the Antidotes for the scenario's poison: the d5971e85 line
+  -- reached tunnelarmr_entry with LOCKE poisoned and "antidote=0", which
+  -- the field care cannot answer (audit_party_hp "POISONED").  Shop 8
+  -- sells them (ff6/src/menu/shop_prop.dat); 3 at 50 gil.
+  H.buyItem(0xF2, function() return 3 - H.invCountOf(0xF2) end, "ANTIDOTE to 3"),
   H.shopClose("South Figaro item shop (occupied)"),
   H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 },
     { tag = "bag: combat items on top (South Figaro item shop)" }),

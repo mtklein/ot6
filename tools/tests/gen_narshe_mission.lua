@@ -172,7 +172,9 @@ local TONIC_TRIP = TONIC_BAND * 3 // 4
 -- and before the Tents.
 local GRIND_BAND = { potion = 35, fenix = 20, tincture = 6, revivify = 3, tent = 10 }
 -- what the party leaves the plains with for the Sealed Gate (the header)
-local DEPART_BAND = { potion = 60, fenix = 23, tincture = 6, revivify = 3, tent = 10 }
+-- tincture 7 (#411): the gate cave and the crash spent one more than the
+-- band on the d5971e85 line (gate_cave_save and vector_crash at 5 < 6)
+local DEPART_BAND = { potion = 60, fenix = 23, tincture = 7, revivify = 3, tent = 10 }
 local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
 local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
 local function gil() return H.gil() end

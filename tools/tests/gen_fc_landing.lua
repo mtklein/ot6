@@ -286,9 +286,10 @@ H.run({ maxFrames = 600000 }, flatten({
   -- continent and the escape spent 13 Potions and 95 Tonics on the bf19d581
   -- line (65 / 99 -> escape_start 52 / 4), and the WoR landing's bag is
   -- what the WoR walks to Albrook carry: H.careStockPotions with the Tonics
-  -- topped to 99 below, spend 13 + 4750 HP at 250 = 32.
+  -- topped to 99 below, spend 13 + 4750 HP at 250 = 32, and 4 more the
+  -- d5971e85 line spent (escape_start potion=60, 3 short).
   H.buyItem(POTION, 1, function()
-    return H.careStockPotions(H.activeTopLevel(), { tonics = 99, spend = 32 }) - H.invCountOf(POTION)
+    return H.careStockPotions(H.activeTopLevel(), { tonics = 99, spend = 36 }) - H.invCountOf(POTION)
   end, "POTION for the band and the field care to Albrook (WoR)"),
   H.buyItem(FENIX_DOWN, 6, function() return 25 - H.invCountOf(FENIX_DOWN) end, "FENIX DOWN to 25"),
   -- #231 (docs/design/supply.md): the last counter in the WoB.  REVIVIFY

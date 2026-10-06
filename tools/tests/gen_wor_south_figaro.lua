@@ -40,7 +40,9 @@ local OBJ_SF_GERAD = 21                             -- South Figaro inn NPC_6 (8
 -- care the legs to the next shop spend; Fenix Downs to about the level.
 -- FIELD_CARE_POTIONS is the Tzen -> Nikeah walk's measured spend, rounded
 -- up (build/attempts/wt/wor-edgar/leg1/: potion 47 -> 43, tonic 5 -> 4).
-local FIELD_CARE_POTIONS = 6
+-- 10 (#411): the walks on from here to Figaro and its sweep spent 4 more on
+-- the d5971e85 line (wor_figaro_sweep potion=66 at L33, 3 under the band)
+local FIELD_CARE_POTIONS = 10
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
