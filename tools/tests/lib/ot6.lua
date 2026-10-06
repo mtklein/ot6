@@ -99,10 +99,20 @@ function M.b64decode(s)
   return table.concat(out)
 end
 
+-- Savestates captured with the PPU's palette address unknown (render on
+-- demand, #394; M.requestSaveState), and the fixtures emitted from them
+local unknownBlobs = {}
+M.fixturesUnknown = {}
+
 -- Emit a binary blob to stdout as base64 chunks; run.sh decodes them.
 -- "*.mss" tags land in build/states/<tag> (+ .lua sidecar); anything else in
 -- build/states/shots/<tag>.
 function M.emitBlob(tag, data)
+  if unknownBlobs[data] and tag:match("%.mss$") then
+    M.fixturesUnknown[#M.fixturesUnknown + 1] = tag
+    M.log(string.format("fixture %s: its savestate carries the PPU's palette address UNKNOWN "
+      .. "(render on demand, #394); the run will fail", tag))
+  end
   local enc = M.b64encode(data)
   for i = 1, #enc, 4000 do
     print("[b64:" .. tag .. "] " .. enc:sub(i, i + 3999))
@@ -395,6 +405,13 @@ function M.requestSaveState()
     M.pendingStateReqs = M.pendingStateReqs - 1
     local ok, err = pcall(function() req.blob = emu.createSavestate() end)
     req.ok = ok and type(req.blob) == "string" and #req.blob > 0
+    -- render on demand (#394): a state whose PPU palette address is not
+    -- known to be a drawn frame's carries the flag (ppu.icaStale); kept, so a
+    -- fixture made from it fails the run by name (M.emitBlob)
+    if req.ok and renderOn then
+      local okS, st = pcall(emu.getState)
+      if okS and type(st) == "table" and st["ppu.icaStale"] == true then unknownBlobs[req.blob] = true end
+    end
     req.error = err
     req.done = true
     emu.removeMemoryCallback(ref, emu.callbackType.exec, 0x000000, 0xFFFFFF)
@@ -14402,6 +14419,11 @@ function M.run(opts, steps)
   -- inside a frame not drawn; tools/mesen/README.md): the reason, or nil
   local function renderInexact()
     if not (RENDER_API and type(emu.getRenderOnDemandInexact) == "function") then return nil end
+    if #M.fixturesUnknown > 0 then
+      return string.format("render on demand: fixture(s) %s saved with the PPU's palette address "
+        .. "unknown (#394; '[render-on-demand] ... UNKNOWN (carried)'): a fixture must be exact; call "
+        .. "H.renderAlways() in this generator", table.concat(M.fixturesUnknown, ", "))
+    end
     local n = emu.getRenderOnDemandInexact()
     if n == 0 then return nil end
     return string.format("render on demand: %d CGRAM access(es) during rendering where the PPU's "

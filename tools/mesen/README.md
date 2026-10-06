@@ -125,14 +125,22 @@ cleared only by an evaluated chunk that wrote the address), and a CGRAM
 access during rendering while it is set, or a savestate anywhere inside the
 visible lines of a frame not drawn (whose per-line draw and fetch state
 isn't a drawn frame's), is counted (`emu.getRenderOnDemandInexact()`;
-`lib/ot6.lua` fails such a run, verdict and seed probe alike). A savestate
+`lib/ot6.lua` fails such a run, verdict and seed probe alike). Only a
+fade's line-start forced blank is made exact; forced blank turning on
+before a line's first pixel anywhere else leaves the address unknown, and
+that is flagged, not fixed: counted when a CGRAM access during rendering
+reads it, carried when a savestate is taken. A savestate
 carries the flag (ot6-2.2.1-6: the savestate format grows one field,
 SnesPpu's `_icaStale`; a state from an earlier build loads it clear), so
 the run that loads a state with the address unknown counts the access
 that would read it, as the run that saved it would have; every savestate
 under render on demand says which it is on stdout (`[render-on-demand]
 savestate at frame F scanline S: palette address known` or `UNKNOWN
-(carried)`). Before -6 such a savestate was counted itself, and failed
+(carried)`). A fixture must be exact: `lib/ot6.lua` fails a generator
+whose emitted `.mss` was captured with the flag set, by name ("fixture(s)
+... saved with the PPU's palette address unknown"; it reads the flag from
+`emu.getState()` at the capture), while a suite's throwaway savestates
+(retry and battle snapshots) only carry it. Before -6 such a savestate was counted itself, and failed
 gen_wor_tomb at seed shift 33: a battle exit's fade turned forced blank on
 before a line's first pixel, and the next savestate, in vblank, carried
 the address unknown (build/attempts/wt/v026-lib/394/carry/). The harness
@@ -283,7 +291,10 @@ ot6-2.2.1-6 (03b19fc4) is deployed on all three (2026-10-06), each machine
 its own build of it: mbp executable `d459b803...b479` (core `3d975cb0...0ea8`),
 the Air `0b27c26f...68e8` (core `15db205d...a317`), px13 `7ea8e063...54ab` (core
 `9ed4d8d2...cf92`); every build passed the smoke test
-(build/attempts/wt/v026-lib/394/pin6/build_*.txt). On px13 the three replays
+(build/attempts/wt/v026-lib/394/pin6/build_*.txt). mini.local runs px13's
+build (same Ubuntu and arch, copied with the -5 one); its smoke test, by hand
+against the stock reference copied from px13, passed for both
+(pin6/mini/: 29 battle_banner [ot6] lines each). On px13 the three replays
 end as the old build's (`identity.txt` there: WRAM, ARAM, VRAM, OAM, CGRAM,
 SRAM, `emu.getState` with the new `ppu.icaStale=false` set aside, every
 128th screenshot and the address at every frame's start), and their 13
