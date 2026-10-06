@@ -778,6 +778,16 @@ check("check_states", "python3 tools/tests/lib/compose.py --check-states",
 capture_files = sorted(p for paths in captures.values() for p in paths
                        if not p.endswith(".record"))
 AUDIT_COMMON = all_stamps + capture_files + checkpoint_files
+# #335: every checkpoint's learned spells against the grant sources the
+# built ROM has (no tier, nothing unsourced), and its control (one
+# unsourced spell planted in memory must read BAD in every checkpoint).
+# It reads the saves the legs Continue, the captures
+# (savestate_party.checkpoint_payloads), as the audits do.
+check("spells_all",
+      "python3 tools/spells_all.py --control && python3 tools/spells_all.py",
+      ["tools/spells_all.py", "tools/check_spell_grants.py",
+       "tools/savestate_party.py", "ff6/rom/ff6-en.dbg",
+       copy_if_changed_from("build/ot6.sfc")] + capture_files)
 check("audit_equipment", "python3 tools/audit_equipment.py",
       ["tools/audit_equipment.py"] + AUDIT_COMMON)
 check("check_mog_gear", "python3 tools/check_mog_gear.py",
