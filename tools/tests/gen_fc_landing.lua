@@ -336,6 +336,15 @@ H.run({ maxFrames = 600000 }, flatten({
   -- under boost) and, once a battle, his Bolt Fist on every part.  A person
   -- puts the stone on her before the gauntlet; here, in town, where the
   -- menu has no wave timer running.
+  -- the Skills menu will not open for a fallen member (#406): she is
+  -- stood up first, as the deck kit does, and must stand
+  H.cond(function() return H.charHp(TERRA) == 0 or (H.charStatus1(TERRA) & 0xC2) ~= 0 end, {
+    H.fieldCare({ tag = "raise before RAMUH -> TERRA", threshold = 0.9 }),
+  }, {}),
+  H.call(function()
+    H.assertEq(H.charHp(TERRA) > 0 and (H.charStatus1(TERRA) & 0xC2) == 0, true,
+      string.format("TERRA stands before RAMUH -> TERRA (status1 $%02X, HP %d)", H.charStatus1(TERRA), H.charHp(TERRA)))
+  end),
   H.equipEsper(charPos(TERRA), RAMUH, { tag = "RAMUH -> TERRA" }),
   H.call(function()
     H.assertEq(H.readByte(0x1600 + 37 * TERRA + 0x1E), RAMUH, "TERRA wears RAMUH into the gauntlet")

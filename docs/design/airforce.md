@@ -415,7 +415,8 @@ a1:0/1215 bp0 a4:0/1130 bp0`).  Read off those fights
 (build/attempts/wt/v026-airforce/412/qual_bf19d581/airforce.txt): the
 party's turns went to Potions against rounds of 600-900 (`heal entity 1
 (592/1215) with $E9 -- restores 250, a round costs 818 (covering an
-ally)`, nine of them in the lost fight), and TERRA, whose Fight lands 83
+ally)`, nine of them in the lost fight; the line is in
+build/attempts/wt/v026-route2/final-bf19d581-px13/final_ninja.out), and TERRA, whose Fight lands 83
 a hit, still came with no stone ("TERRA wears no esper", above) while
 RAMUH sat in the bag ($1A69).  Every part is bolt-weak.
 
@@ -429,13 +430,14 @@ Measured from the line's own thamasa-done-v1 capture (route2's final
 tree, the content of main 6e72075d), the whole leg, retries off, by
 distinct Air Force key (build/attempts/wt/v026-airforce/412/):
 
-| arm | runs | runs won | distinct keys | keys always won | Air Force deaths |
+| arm | Air Force fights | won | distinct keys | keys always won | Air Force deaths |
 |---|---|---|---|---|---|
-| main 6e72075d | 24 (shifts 0-23) | 17 | 17 | 11 (3 mixed, 3 lost) | 30 |
-| RAMUH on TERRA | 56 (shifts 0-55) | 55 | 29 | 28 | 7 |
+| main 6e72075d | 23 (shifts 0-23; s11 wiped in an IAF wave before it, formation 0043 0043 00E3) | 17 | 17 | 11 (3 mixed, 3 lost) | 30 |
+| RAMUH on TERRA (400c0ff9, the same change as merged) | 56 (shifts 0-55) | 55 | 29 | 28 | 7 |
 
-On the 6 keys both met: 5 wins against 4.5 (per-key means), 3 deaths
-against 6.5, 56,835 ticks against 76,268.  The one loss left is key beBC
+The result rests on the unshared keys: always-won 28 of 29 against 11 of
+17.  The 6 keys both arms met (5 wins against 4.5 by per-key means, 3
+deaths against 6.5) are too few to carry it on their own.  The one loss left is key beBC
 (shift 31), which main also lost once and won once: TERRA died to the
 first Atomic Ray at 289/1039, the Fenix Down's 129 HP was refused against
 a 594 round, and the two left traded Potions with the rounds until both

@@ -8651,7 +8651,16 @@ function Driver:makePlan(actor)
     -- caster plans a summon whose esper window can never open and
     -- parks in the magic list.
     local stone = M.readByte(0x3344 + actor * 2)
-    if mp >= (sm.mp or 50) and used == 0 and row and stone ~= 0xFF then
+    -- the summon's own attack (FixPlayerAttack: $36 + the esper) goes
+    -- through the cast guards as a spell does (#412): an element something
+    -- in the formation absorbs or nulls refuses it.  Its MagicProp price
+    -- (+5) is a floor under the caller's reserve (sm.mp, 50 by default)
+    local sat = stone ~= 0xFF and (0x36 + stone) or nil
+    local need = math.max(sm.mp or 50,
+      sat and M.readRomByte((M.sym("MagicProp") & 0x3FFFFF) + sat * 14 + 5) or 0)
+    if sat and mp >= need and used == 0 and row and self:castVetoed(sat, "summon") then
+      sat = nil
+    elseif mp >= need and used == 0 and row and stone ~= 0xFF then
       return { kind = "summon", row = row }
     elseif self.summonWhyN < 8 then
       -- the summon line has historically never fired: say why, per refusal
@@ -8659,7 +8668,7 @@ function Driver:makePlan(actor)
       M.log(string.format(
         "[%s] summon refused for char %d: mp=%d (need %d) used=$%04x "
         .. "row=%s stone=$%02X",
-        self.tag or "fight", id, mp, sm.mp or 50, used, tostring(row), stone))
+        self.tag or "fight", id, mp, need, used, tostring(row), stone))
     end
   end
   -- opts.magic = { [charId] = { spell = id, boost = false } }: the
