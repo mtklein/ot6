@@ -64,20 +64,11 @@ H.run({ maxFrames = 300000 }, {
       battles = battles + 1
       H.assertEq(battles <= 6, true, string.format("the 3 and 2 BP hires within six battles (stage %d)", stage))
     end),
-    -- A fresh care step every visit: one H.fieldCare step serves once (its
-    -- kernel's served latch and refused-plan list outlive the driveUntil's
-    -- reset), so on today's draw the second visit that had work -- c4 dead,
-    -- c5 and c9 zombied -- opened the menu, served nothing in 0 frames, and
-    -- the party walked on with one member standing into a wipe.
-    (function()
-      local care
-      return { tick = function()
-        care = care or H.fieldCare({ tag = "care between the hires' battles", threshold = 0.8 })
-        local r = care:tick()
-        if r == "done" then care = nil end
-        return r
-      end, reset = function() care = nil end }
-    end)(),
+    -- the care between battles: the driveUntil resets it each lap, and the
+    -- reset rebuilds its kernel (#409; before, the second visit with work
+    -- -- c4 dead, c5 and c9 zombied -- served nothing in 0 frames and the
+    -- party walked on with one member standing into a wipe)
+    H.fieldCare({ tag = "care between the hires' battles", threshold = 0.8 }),
     -- the precondition the hires' battles stand on: the party walks into
     -- each one whole, nobody dead, zombied or stone (the care's job)
     H.call(function()
