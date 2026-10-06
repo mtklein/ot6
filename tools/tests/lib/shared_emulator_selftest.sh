@@ -46,10 +46,18 @@ fi
 PIN_COMMIT=$(cut -d' ' -f3 "$ROOT/tools/mesen/EMULATOR" 2>/dev/null)
 PIN_DIR="$HOME/mesen-pins/$PIN_COMMIT"
 PIN12=$(echo "$PIN_COMMIT" | cut -c1-12)
+# (the directory as deployed: on Linux the binary with its Mesen.buildinfo
+# beside it, so the shared copy holds both; tools/mesen/README.md
+# "Deploying").  A fresh clone has no tools/Mesen-linux at all: the pin is
+# the only build there.
+PINNED=""
 if [ -n "$PIN_COMMIT" ] && [ "$(uname -s)" = Darwin ] && [ -x "$PIN_DIR/Mesen.app/Contents/MacOS/Mesen" ]; then
   APP="$CACHE/Mesen-test-$PIN12.app"; SRC_BIN="$PIN_DIR/Mesen.app/Contents/MacOS/Mesen"
+  DEFAULT_APP="Mesen-test-$PIN12.app"; PINNED=1
 elif [ -n "$PIN_COMMIT" ] && [ "$(uname -s)" != Darwin ] && [ -x "$PIN_DIR/Mesen" ]; then
   APP="$CACHE/Mesen-test-$PIN12"; SRC_BIN="$PIN_DIR/Mesen"
+  DEFAULT_APP="Mesen-test-$PIN12"; PINNED=1
+  TOP=$(ls -A "$PIN_DIR" | grep -v '^settings' | tr '\n' ' ' | sed 's/ $//')
 fi
 N=16
 fails=0
@@ -88,14 +96,17 @@ wave() {  # <label> <stagger seconds> <builds wanted>
 bundle_ok() {  # the shape the gate promises, and nothing the build leaves behind
   [ -x "$APP$BIN_SUB/Mesen" ] || fail "$1: no executable at $APP$BIN_SUB/Mesen"
   [ ! -e "$APP$BIN_SUB/settings.json" ] || fail "$1: settings.json survived into the shared copy"
-  [ "$(ls -A "$APP")" = "$TOP" ] || fail "$1: the bundle holds more than $TOP: $(ls -A "$APP" | tr '\n' ' ')"
+  [ "$(ls -A "$APP" | tr '\n' ' ' | sed 's/ $//')" = "$TOP" ] || fail "$1: the bundle holds more than $TOP: $(ls -A "$APP" | tr '\n' ' ')"
   [ "$(cat "$APP.stamp")" = "$(file_stamp "$SRC_BIN")" ] || fail "$1: stamp does not name the source binary"
   [ ! -e "$CACHE/.build.lock" ] || fail "$1: the lock was left held"
   [ -z "$(ls -d "$CACHE"/.build.* 2>/dev/null)" ] || fail "$1: build leftovers: $(ls -d "$CACHE"/.build.* | tr '\n' ' ')"
 }
 
 # The override's default is the machine-wide path: a worker given no
-# OT6_MESEN_CACHE provisions under HOME, here a scratch one.
+# OT6_MESEN_CACHE provisions under HOME, here a scratch one -- holding the
+# machine's deployed pin (a link to it), as a fresh clone would find it.
+mkdir -p "$TMP/home/mesen-pins"
+[ -n "$PINNED" ] && ln -s "$PIN_DIR" "$TMP/home/mesen-pins/$PIN_COMMIT"
 ( HOME="$TMP/home" XDG_CACHE_HOME= OT6_PROVISION_PROBE_OUT="$TMP/default.app" \
     "$ROOT/tools/tests/run.sh" "$TMP/probe.lua" "$TMP/default.log" > "$TMP/default.out" 2>&1 ) || fail "default cache: $(tail -n 1 "$TMP/default.out")"
 if [ "$(cat "$TMP/default.app" 2>/dev/null)" = "$TMP/home/$DEFAULT_CACHE/$DEFAULT_APP" ]; then
