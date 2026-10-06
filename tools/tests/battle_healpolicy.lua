@@ -787,6 +787,19 @@ H.run({ maxFrames = 3000 }, {
       "...not for a heal that leaves him inside the round (30 + 250 = 280)")
     H.assertEq(H.liftReopens({ hp = 400, cost = 286, restores = { 676 } }), false,
       "...nor for a member outside the round: that is a top-up, the budget's to keep")
+    -- ...and only for a heal that outpaces the round (#402): the Air Force at
+    -- shift 40 (build/attempts/wt/v026-driver2/402/base2/base_s40) reopened the
+    -- budget every turn for Potions that lifted LOCKE over an 818 round he lost
+    -- again the next ("592 + 250 = 842 survives the 818 round"), all three
+    -- members caring until the party wiped with the Laser Gun at 2511 of 3300
+    H.assertEq(H.liftReopens({ hp = 592, cost = 818, restores = { 250 }, outpace = true }), false,
+      "LOCKE at 592 under an 818 round, a Potion's 250: lifts him one round, never outpaces it -- no reopen")
+    H.assertEq(H.liftReopens({ hp = 121, cost = 603, restores = { 250, 1094 }, outpace = true }), true,
+      "...an X-Potion's 1094 over a 603 round outpaces it: the budget reopens")
+    H.assertEq(H.liftReopens({ hp = 144, cost = 286, restores = { 250, 676 }, outpace = true }), true,
+      "...and the Gate's LOCKE (144 under 286, the X-Potion's 676) still reopens it")
+    H.assertEq(H.liftReopens({ hp = 300, cost = 500, restores = { 300 }, outpace = true }), false,
+      "...not a heal that lifts (300 + 300 over 500) but puts back less than the round takes (300 < 500)")
     -- the wipe class
     local d = function(tick, from, maxhp, bp, one)
       return { tick = tick, from = from, maxhp = maxhp, bp = bp, oneAction = one }

@@ -1139,11 +1139,15 @@ end
 -- SPEND (attack): 144/820 is inside one round of death (286) ...").
 --   hp, cost   the member's HP and their round
 --   restores   what each heal in hand would put back
+--   outpace    (#402) the heal must also put back at least what the round
+--              takes (r >= cost): one that only lifts the member over a
+--              round it loses again next round delays the death by a turn
+--              and spends the party's turn doing it
 function M.liftReopens(o)
   local hp, cost = o.hp or 0, o.cost or 0
   if hp <= 0 or cost <= 0 or hp > cost then return false end
   for _, r in ipairs(o.restores or {}) do
-    if r ~= nil and hp + r > cost then return true end
+    if r ~= nil and hp + r > cost and (not o.outpace or r >= cost) then return true end
   end
   return false
 end
@@ -7543,7 +7547,8 @@ function Driver:makePlan(actor)
             end
           end
         end
-        if M.liftReopens({ hp = hp, cost = cost, restores = restores }) then
+        if M.liftReopens({ hp = hp, cost = cost, restores = restores,
+                           outpace = M.LIFT_OUTPACES ~= false }) then
           careOpen, liftOnly = true, true
           local said = string.format("[%s] actor=%d: entity %d at %d/%d is inside a %d round "
             .. "and a heal in hand lifts them (%s) -- the round's care budget (actor %d's) "
@@ -8331,6 +8336,14 @@ function Driver:makePlan(actor)
           end
           if cell ~= nil then
             local gain, src = self:castRestoreOf(spell, actor, c.e)
+            if liftOnly and M.LIFT_OUTPACES ~= false and gain ~= nil and gain < cost then
+              -- the reopened budget's extra care turn (#402): a cure that
+              -- does not outpace the round is not worth it
+              gain, cell = nil, nil
+            end
+          end
+          if cell ~= nil then
+            local gain, src = self:castRestoreOf(spell, actor, c.e)
             local why = gain == nil and "not yet measured"
               or M.healDecision({ hp = c.hp, maxhp = c.maxhp, restore = gain,
                    roundCost = cost, allies = allies, threshold = threshold,
@@ -8359,6 +8372,15 @@ function Driver:makePlan(actor)
       -- a real heal (owner guideline -- Tonics are the field resource),
       -- so a weak flat item is only ever the last one standing.
       local heals = row ~= nil and self:bagHeals(c.e, c.hp) or {}
+      if liftOnly and M.LIFT_OUTPACES ~= false then
+        -- the budget reopened for a lift (#402): only a heal that outpaces
+        -- the round is worth the extra care turn
+        local keep = {}
+        for _, h in ipairs(heals) do
+          if (h.restore or 0) >= cost then keep[#keep + 1] = h end
+        end
+        heals = keep
+      end
       if #heals > 0 then
         local cap = M.deathGil(c.maxhp)
         local it, why, refused = M.itemChoice({ hp = c.hp, maxhp = c.maxhp, roundCost = cost,
