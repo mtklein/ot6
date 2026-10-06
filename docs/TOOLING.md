@@ -62,8 +62,9 @@ So the play is one serial line of runs, and it is the build's critical
 path: after a ROM change, an emulator pin change or a `tools/tests/replay.txt`
 bump, `ninja` replays it once, from power-on, with the suites, the branches
 and the checks running beside it. Everything else that runs an emulator is
-in the `side` pool, sized to the cores, so the line's next run never waits
-for a `-j` slot (run plain `ninja`, whose default `-j` is cores + 2). A
+in the `side` pool, one short of the machine's emulator slots (below), so
+the line's next run never waits for a `-j` slot or an emulator slot behind
+it (run plain `ninja`, whose default `-j` is cores + 2). A
 generator edit replays that leg and every run its new bytes reach; a
 library edit (`tools/tests/lib/*.lua`) replays nothing and re-runs the
 suites (provenance drift, docs/TESTING.md). `ninja chain` is an alias for

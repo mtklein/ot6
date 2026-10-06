@@ -154,15 +154,18 @@ w("  description = ca65 $obj")
 w()
 sn.emit_state_rules(w)
 # #344/#363: the play from power-on is one serial line and it is the build's
-# critical path, so its next run must never wait for a -j slot.  Everything
-# else that runs an emulator (suites, branch states, `ninja quick`) shares
-# this pool, sized to the cores: ninja's default -j is cores + 2, which
-# leaves the line its slots.  (Ninja 1.13 ranks ready edges by downstream
+# critical path, so its next run must never wait behind side work.  Two
+# things could hold it: a -j slot and one of the machine's emulator slots
+# (run.sh holds one per run, lib/emu_slot.py: the machine's own setting, else
+# its CPU count).  Everything else that runs an emulator (suites, branch
+# states, `ninja quick`) shares this pool, one short of the emulator slots,
+# so one slot is always left for the line, and ninja's default -j (cores +
+# 2) is above the pool's depth.  (Ninja 1.13 ranks ready edges by downstream
 # edge count, not by duration, so a ready line edge goes first anyway; the
 # pool is what keeps a slot free for it.)
-import os  # noqa: E402
+import emu_slot  # noqa: E402
 w("pool side")
-w(f"  depth = {max(1, (os.cpu_count() or 2))}")
+w(f"  depth = {max(1, emu_slot.slots() - 1)}")
 w()
 w("# One suite test: compose, boot Mesen headless, publish the log, touch the")
 w("# ok.  $env carries the per-test environment (dirty-RAM pins, checkpoint")
