@@ -257,12 +257,30 @@ for _, c in ipairs(CLASS) do
   assert(got == CLASSOF[c[1]], string.format("$%03X %s: class %s, want %s", c[1], c[2], got, CLASSOF[c[1]]))
   classes[got] = (classes[got] or 0) + 1
 end
+-- which counter bodies the rule takes first (M.lastStandCounted): the class
+-- under the lever, then the gate's if_cmd pair against the commands the
+-- driver uses on a monster (Fight, and Magic when it casts at them)
+local counted = H.lastStandCounted
+assert(counted("removal", {}, nil, false) == true, "removal, ungated: taken first by default")
+assert(counted("status", {}, nil, false) == false and select(2, counted("status", {}, nil, false)):find("class"),
+  "status: not a default class")
+assert(counted("status", {}, { status = true }, false) == true, "status under a lever that names it")
+assert(counted("damage", {}, true, false) == true, "lever true: every class")
+assert(counted("removal", {}, false, false) == false, "lever false: the rule off")
+assert(counted("removal", { cmds = { 0x05, 0x06 } }, nil, true) == false, "Mind Candy's Steal/Capture: never")
+assert(counted("removal", { cmds = { 0x02, 0x02 } }, nil, false) == false, "Muus's Magic, a driver that casts nothing")
+assert(counted("removal", { cmds = { 0x02, 0x02 } }, nil, true) == true, "...and one that casts at monsters")
+assert(counted("removal", { cmds = { 0x00, 0xFF } }, nil, false) == true, "Ing's Fight: taken")
+assert(counted("removal", { guarded = true, deathOnly = true }, nil, false) == true, "guarded/death-only: said, not acted on")
+assert(H.castsAtMonsters({}) == false and H.castsAtMonsters({ magic = false, nuke = false }) == false
+  and H.castsAtMonsters({ magic = {} }) == true and H.castsAtMonsters({ nuke = true }) == true,
+  "castsAtMonsters: magic = false casts nothing")
 -- mutant: the Chitonid's Sneeze read as a Battle ($EE): damage, not removal
 assert(H.lastStandClass(0x07C, { 0xEE }) == "damage", "$07C's counter as Battle: damage")
 
 print("parts_selftest: PASS -- the 17 last-stand species' counters and gates as docs/design/last-stand.md "
   .. "reads them (#401), their classes (" .. (classes.removal or 0) .. " removal, " .. (classes.status or 0)
-  .. " status, " .. (classes.damage or 0) .. " damage), and four mutants; $1BA {0} with the blades respawning, $1CB {2,0} with the gun "
+  .. " status, " .. (classes.damage or 0) .. " damage), the counted rule (class, lever, if_cmd), and four mutants; $1BA {0} with the blades respawning, $1CB {2,0} with the gun "
   .. "arming 0.0 and the Speck the body's; 9 linked formations, " .. plain
   .. " other multi-slot formations plan nothing; last-stand counters: $07C SNEEZE and $02C "
   .. "SPECIAL at N=1, $021 and $0E6 none, $0CC's one in slot 1, the party-count mutant none")

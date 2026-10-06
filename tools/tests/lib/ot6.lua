@@ -6146,10 +6146,12 @@ end
 --            Battle, Fire Ball);
 -- and the gate: guarded (its retaliation opens with `if_self_dead /
 -- end_if`: never on its own killing blow), death-only (only there), and
--- an `if_cmd` pair.  A counter gated on a command the driver never uses
--- on a monster is no exposure at all and is never taken first: Steal or
--- Capture (Mind Candy); Magic (Muus) unless the driver casts at monsters
--- (opts.magic or opts.nuke).
+-- an `if_cmd` pair.  Guarded and death-only are said, not acted on: the
+-- order is the same for both.  Only the `if_cmd` pair decides
+-- (M.lastStandCounted): a counter gated on a command the driver never
+-- uses on a monster is no exposure at all and is never taken first: Steal
+-- or Capture (Mind Candy); Magic (Muus) unless the driver casts at
+-- monsters (opts.magic or opts.nuke set and not false).
 -- Which classes go first, the lever M.LAST_STAND_CLASSES (or
 -- opts.lastStand as a table; true is every class, false the rule off):
 -- removal by default.  Measured with status bodies first and damage
@@ -6175,11 +6177,34 @@ function M.lastStandClass(species, attacks)
   end
   return status and "status" or "damage"
 end
+-- Whether a counter body of `class` gated by `gate` (M.partRoles'
+-- lastStandGate) is taken first under `lever` (opts.lastStand: nil for the
+-- default classes, true for every class, a table of classes), for a driver
+-- that casts at monsters or not: true, or false and why.
+function M.lastStandCounted(class, gate, lever, castsAtMonsters)
+  if lever == false then return false, "the rule is off" end
+  if lever == true then return true end
+  local classes = type(lever) == "table" and lever or M.LAST_STAND_CLASSES
+  if not classes[class] then return false, "not a class this rule takes first" end
+  if gate and gate.cmds then
+    for _, c in ipairs(gate.cmds) do
+      if c == BATTLE.CMD_FIGHT or (c == BATTLE.CMD_MAGIC and castsAtMonsters) then return true end
+    end
+    return false, string.format("only command $%02X/$%02X on it fires it, which this driver does not use",
+      gate.cmds[1], gate.cmds[2])
+  end
+  return true
+end
+-- whether a driver with these opts casts at monsters (opts.magic or
+-- opts.nuke set, and not false)
+function M.castsAtMonsters(opts)
+  return (opts.magic ~= nil and opts.magic ~= false) or (opts.nuke ~= nil and opts.nuke ~= false)
+end
 function Driver:readLastStand(slots)
   self.lastStand = false
   local lever = self.opts.lastStand
   if lever == false then return end
-  local castsAtMonsters = self.opts.magic ~= nil or self.opts.nuke ~= nil
+  local castsAtMonsters = M.castsAtMonsters(self.opts)
   local entries, said, any = {}, {}, false
   for slot = 0, 5 do
     local p = slots[slot]
@@ -6189,21 +6214,7 @@ function Driver:readLastStand(slots)
         local g = p.roles.lastStandGate or {}
         local class = M.lastStandClass(p.species, atks)
         local classes = type(lever) == "table" and lever or M.LAST_STAND_CLASSES
-        local counted, why = true, nil
-        if lever ~= true then
-          if not classes[class] then
-            counted, why = false, "not a class this rule takes first"
-          elseif g.cmds then
-            local uses = false
-            for _, c in ipairs(g.cmds) do
-              if c == 0x00 or (c == 0x02 and castsAtMonsters) then uses = true end
-            end
-            if not uses then
-              counted, why = false, string.format("only command $%02X/$%02X on it fires it, which "
-                .. "this driver does not use", g.cmds[1], g.cmds[2])
-            end
-          end
-        end
+        local counted, why = M.lastStandCounted(class, g, lever, castsAtMonsters)
         local atk = {}
         for _, a in ipairs(atks) do atk[#atk + 1] = string.format("$%02X", a) end
         local gate = g.guarded and "guarded: never on its own killing blow"
