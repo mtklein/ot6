@@ -60,24 +60,19 @@ interpreting runs.
   there: run long jobs under `systemd-inhibit --what=idle --who=ot6
   --why=<job>`; a closed lid still suspends it. Add `--peer px13.local` to
   live.py to see its workers.
-- **Where batches go:** measured, not remembered. live.py shows each
-  machine's emulators running and its room as dots, and `python3
+- **Where batches go:** fixed slots, enforced. Each machine has a hard
+  emulator limit that `tools/tests/run.sh` takes a slot from before every
+  emulator (`~/.config/ot6/emulator-slots`: mbp 12, the Air 8, px13 24;
+  docs/TOOLING.md "The machine-wide emulator limit"); a bigger batch queues
+  inside run.sh instead of swamping the machine (owner, 2026-10-06: agents
+  can't be trusted to keep a reasonable load). `python3
   tools/stream/live.py --place N --claim <branch>` (on the Mac, where
-  live.py runs) says where the next N emulators should go and holds them
-  for a couple of minutes, so agents asking at once do not double-book. It
-  reads `build/throughput.jsonl` in the main tree: one line per run live.py
-  watched from its start (machine, test, frames, wall, concurrency), so
-  each machine's curve of speed per emulator against emulators running
-  builds up from normal work; recent runs move the whole curve, so it
-  follows other load, heat and power. A machine's room is its knee (the
-  fewest emulators within 5% of its best total) minus what it runs now.
-  Batches fill px13 first, then the Air, then the Pro; the owner's machines
-  (the Air and the Pro) back off by load our emulators don't explain, and
-  the Pro also keeps a reserve (`PREFER` and `RESERVE` in
-  tools/stream/placement.py). Launch prompts give agents that command
-  rather than a cap; it is a guide, and a machine an agent is told to leave
-  alone stays alone. `tools/bench_throughput.py` seeds concurrency levels
-  normal work has not reached, after anything changes the hardware.
+  live.py runs) says where the next N should go -- slots less what runs now
+  and live claims, px13 first, then the Air, then the Pro -- and holds them
+  for a couple of minutes so agents asking at once don't double-book.
+  Launch prompts give agents that command, and say a batch never exceeds
+  its claim. Change a machine's limit by editing its file. (The learned
+  speed-curve model this replaced was retired 2026-10-06.)
 
 # 1. Start: state of the world
 
