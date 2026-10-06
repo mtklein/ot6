@@ -621,7 +621,10 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
   -- the relics through the relic rule over the kit (H.relicKit): a relic in
   -- the bag it ranks above the Star Pendant or the Jewel Ring goes on in
   -- their place (a Ribbon stolen from AtmaWeapon, guidelines "Ribbons")
-  H.equipKit(6, { { 0, 0x11 }, { 0, 0x0E }, { 0, 0x0A } }, { tag = "CELES escape kit", ladder = true,
+  -- No Blizzard ($0E) on the ladder: the escape pool's $0169 absorbs ice,
+  -- and a rung that put it on would cost a re-arm session on the live
+  -- clock.  absorbs stays as the check (it opens no menu when nothing clashes).
+  H.equipKit(6, { { 0, 0x11 }, { 0, 0x0A } }, { tag = "CELES escape kit", ladder = true,
     absorbs = escPool }),
   H.relicKit(6, "CELES", { [4] = 0xB1, [5] = 0xB5 }, { tag = "CELES escape kit (relics)" }),
   H.call(function()

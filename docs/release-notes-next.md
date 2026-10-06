@@ -11,9 +11,10 @@ release's notes.
 **The Phantom Train is meant to be broken.** With Sabin's Blitzes and
 Shadow's throws now spending their Boost Points, the train usually died
 before its shields came down, so its break (and Cyan's first Cleave) rarely
-happened. It now carries four shields instead of six and more HP, so in
-most fights you break it first and finish it while it is Broken; the fight
-takes about as long as before.
+happened. It now carries four shields instead of six and more HP, so about
+half the time you break it with plenty left to finish while it is Broken;
+the fight takes about as long as before, though it can wear your party down
+more.
 
 **A bigger boosted hit is never a smaller one.** A Boost Point's doubling
 used to roll over to a lower number when a very strong attack doubled past

@@ -121,8 +121,24 @@ local DECK = { S = H.newPartySelect(PICK), helmT = 0, formed = false, careD = ni
 -- is one stop after the last wave, before the walk that arms Ultros IV:
 -- H.absorbSafeArms, the strongest bag weapon by the ROM's power byte that
 -- none of them absorbs, then asserted.
+-- Ultros IV's fight-mates come from the formation table, not a list: every
+-- species in any slot (present or held back for restore_monsters, which is
+-- how Chupon steps in) of a formation that holds Ultros IV ($168).
+local ULTROS4 = 0x0168
 local function fcAhead()
-  local out = { 0x0168, 0x012F }
+  local out, seen = {}, {}
+  local bm = H.sym("BattleMonsters") & 0x3FFFFF
+  for id = 0, 575 do
+    local rec = H.formationRecord(function(i) return H.readRomByte(bm + id * 15 + i) end)
+    local has = false
+    for _, sp in pairs(rec.species) do if sp == ULTROS4 then has = true end end
+    if has then
+      for _, sp in pairs(rec.species) do
+        if not seen[sp] then seen[sp] = true; out[#out + 1] = sp end
+      end
+    end
+  end
+  H.assertEq(seen[ULTROS4] == true, true, "a formation holds Ultros IV ($168)")
   for _, r in ipairs(H.poolSpecies(H.fieldEncounterGroup(394))) do out[#out + 1] = r.species end
   return out
 end
@@ -366,7 +382,9 @@ H.run({ maxFrames = 600000 }, flatten({
     H.log(string.format("[deck kit] between-wave window at f%d after %d battle(s): dressing", H.frame, seenBattles))
   end),
   -- #406: the first window can open with a member down (TERRA, SHIVA's
-  -- wearer, died in IAF battle 1 at 4 of 32 shifts), and the Skills menu
+  -- wearer, died in IAF battle 1 at 4 of 32 shifts on the driver branch's
+  -- run, build/attempts/wt/v026-driver2/402/base2/base_s{19,22,34,36};
+  -- also 402/ab/new_s{28,53}), and the Skills menu
   -- will not open for a dead member, so the stone cannot move.  A person
   -- raises them first: the field care (Fenix Down from the bag), with the
   -- menu open the wave timers paused.

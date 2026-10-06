@@ -37,7 +37,7 @@
 -- reveals HOLY) and Pummel (chips another, reveals OT6_BLUDG); after that
 -- all three attack with banked-boost Fights, healing under 50% from the
 -- ghost merchant's bag, reviving the fallen with Fenix Down and curing an
--- Imp with the bag's cure. The train killed before its sixth shield comes
+-- Imp with the bag's cure. The train killed before its last shield comes
 -- off is a win (docs/guidelines.md, #311), logged as a [tuning] line.
 --
 -- Win tail: victory scene -> the souls' station (Cyan's family) -> map 137
@@ -902,7 +902,7 @@ local function b68Button()
     return { "a" }                            -- -> target select (enemy)
   end
   if st == ST_TGT then
-    if plan.kind ~= "item" and plan.target == nil then
+    if plan.kind ~= "item" then
       if actor == sabinE then b68.sabinCmdAt = H.frame end
       b68.plan, b68.planActor = nil, nil      -- Fight commits on this confirm
       return { "a" }                          -- default target
@@ -924,17 +924,10 @@ local function b68Button()
     if chars == wantMask then
       if plan.item == FENIX_DOWN then b68Watch.fenix(actor, plan.target) end
       if actor == sabinE then b68.sabinCmdAt = H.frame end
-      b68.plan, b68.planActor = nil, nil      -- item or swing commits on this confirm
+      b68.plan, b68.planActor = nil, nil      -- item commits on this confirm
       return { "a" }
     end
     plan.tgtStall = (plan.tgtStall or 0) + 1
-    if plan.tgtStall > 20 and plan.kind == "fight" then
-      -- a swing on the wrong ally is not harmless: back out, replan
-      b68Log(string.format("wake-up swing's target steer stalled (chars=%02X want=%02X) " ..
-        "-- backing out", chars, wantMask))
-      b68.plan, b68.planActor = nil, nil
-      return { "b" }
-    end
     if plan.tgtStall > 20 then
       b68Log(string.format("target steer stalled (chars=%02X want=%02X) " ..
         "-- accepting the current party target", chars, wantMask))
@@ -1191,8 +1184,6 @@ local function b68Fight()
         gSlot, sabinE, lv, pMP(sabinE), H.readWord(0x3C30 + sabinE * 2),
         cyanE, shadowE, invCount(TONIC), invCount(POTION), gil()))
       H.assertEq(lv >= 6, true, "SABIN level 6+ -- AuraBolt learned")
-      -- the authored row, live: the runtime proof of GhostTrain's 6-shield
-      -- OT6_BLUDG entry in Ot6ShieldTbl
       -- the authored row and the record, read from the ROM (#400 retunes
       -- them): Ot6ShieldTbl's (species word, shields, classes) record and
       -- MonsterProp's max HP word (+$08)

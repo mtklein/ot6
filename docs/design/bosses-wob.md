@@ -388,19 +388,34 @@ reads **`$08`, poison absorbed**; +24 is `$00`.)
   spend their banked pips (#366), the vanilla 1900-HP train died before its
   sixth shield in most fights, so the break -- and Cyan's Cleave, which
   needs it -- went unexercised.  Four shields over 2600 HP.  Measured on
-  two snapshot sets (4 boot shifts x 15 waits, 45 distinct battle keys
-  each; build/attempts/wt/v026-route2/e400/), breaks landing with HP left,
-  keys lost, deaths:
+  two snapshot sets, 4 boot shifts x 15 waits each (45 distinct battle
+  keys), counted by key: the first run of each key, waits in order
+  (build/attempts/wt/v026-route2/e400/by_key.txt, an.py).  "Broken phase"
+  is a break that lands with HP left; a "same-blow" break comes off on the
+  killing hit, so the train is never Broken while alive.
 
-  | train | v0.25 chain's snapshots | the re-cut chain's snapshots |
-  |---|---|---|
-  | 6 / 1900 | 2 keys, 0 lost, 14 deaths | 2 keys, 1 lost, 32 deaths |
-  | 4 / 2600 | 33 keys, 1 lost, 14 deaths | 26 keys, 2 lost, 39 deaths |
-  | 4 / 3400 | 37 keys, 1 lost, 14 deaths | 31 keys, 3 lost, 51 deaths |
+  | train | snapshots | Broken phase | same-blow | deaths | keys lost |
+  |---|---|---|---|---|---|
+  | 6 / 1900 | v0.25 chain | 2 | 11 | 10 | none |
+  | 4 / 2200 | v0.25 chain | 26 | 14 | 10 | be14 (\*) |
+  | 4 / 2600 | v0.25 chain | 31 | 11 | 11 | be70 |
+  | 4 / 3000 | v0.25 chain | 32 | 11 | 11 | be70 |
+  | 5 / 3000 | v0.25 chain | 10 | 30 | 16 | be14 (\*), be70 |
+  | 4 / 3400 | v0.25 chain | 35 | 8 | 11 | be70 |
+  | 6 / 1900 | re-cut chain | 2 | 10 | 23 | beB8 |
+  | 4 / 2600 | re-cut chain | 24 | 16 | 28 | be60, beB8 |
+  | 4 / 3400 | re-cut chain | 30 | 11 | 38 | be60, beB4, beB8 |
 
-  2600 makes the break the usual win at the smaller cost in deaths and
-  losses; the fight is no longer than before (median kill frame 4572
-  against 4798).
+  (\*) the 2200 and 5/3000 arms ran the fighter with the wake-up swing
+  #403 later removed; their be14 losses are that swing's stuck target
+  select, not the train.  What the extra HP costs: at 2600 one key per
+  snapshot set turns from a win into an attrition wipe -- be70-g01B5 on
+  the v0.25 snapshots, be60-g01B5 on the re-cut ones -- where Fenix-raised
+  members come back at 1/8 HP and fall to the next hit (be60: CYAN and
+  SHADOW each down three times before the wipe), and deaths rise 23 -> 28
+  on the re-cut set.  2600 gives a Broken phase in about half the keys
+  (24 and 31 of 45) at the smaller cost; the fight is no longer than
+  before (median kill frame 4572 against 4798, all runs).
 - **Telegraph:** the whistle sounds down the corridor → **Evil
   Toot**, a party-wide random status attack. Break the boiler before
   the move lands; Acid Rain between fuses keeps pressure on your

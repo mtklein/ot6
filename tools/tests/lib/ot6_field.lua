@@ -5915,19 +5915,6 @@ function M.equipEsper(pos, esperIdx, opts)
         "freeing it there first (one-owner rule)", tag, esperIdx, owner, posOf(owner))
     end),
   }
-  -- The Skills menu refuses a member whose status1 holds $C2 (dead,
-  -- Zombie, Petrify: CheckSkillValid, field_menu.asm:722-731), so a stone
-  -- worn by one cannot be freed there (#406: TERRA down after IAF battle 1,
-  -- "4 A presses on the target were not taken").  Say so by name; the
-  -- caller raises or cures the owner first.
-  freeSteps[#freeSteps + 1] = M.call(function()
-    local st1 = M.charStatus1(owner)
-    if (st1 & 0xC2) ~= 0 then
-      error(string.format("%s: stone $%02X is worn by char %d, whose status1 $%02X "
-        .. "(dead/Zombie/Petrify) the Skills menu refuses -- raise or cure them before "
-        .. "moving the stone", tag, esperIdx, owner, st1), 0)
-    end
-  end)
   for _, s in ipairs(listWalk(tag .. " (free)", function() return posOf(owner) end)) do
     freeSteps[#freeSteps + 1] = s
   end
@@ -5983,6 +5970,23 @@ function M.equipEsper(pos, esperIdx, opts)
       if owner ~= nil and owner ~= target and not inActiveParty(owner) then
         error(string.format("%s: stone $%02X is worn by char %d, who is not " ..
           "in the active party; this menu cannot free it", tag, esperIdx, owner), 0)
+      end
+      -- The Skills menu will not open for a member whose status1 holds
+      -- $C2 (wound, Petrify, Zombie): field_menu.asm:740-752, @1e9c's
+      -- `lda a:$0014,x / and #$c2 / bne @1eb1`.  So neither the stone's
+      -- owner (to free it) nor the member receiving it can be reached
+      -- there (#406: TERRA, SHIVA's owner, down after IAF battle 1, gave
+      -- "SHIVA -> EDGAR (free): skills submenu: 4 A presses on the target
+      -- were not taken", build/attempts/wt/v026-driver2/402/ab/new_s28.log.gz).
+      -- Say which by name; the caller raises or cures them first.
+      for _, who in ipairs({ target, owner ~= target and owner or nil }) do
+        local st1 = M.charStatus1(who)
+        if (st1 & 0xC2) ~= 0 then
+          error(string.format("%s: char %d (%s of stone $%02X) has status1 $%02X "
+            .. "(wound/Petrify/Zombie), which the Skills menu refuses -- raise or cure "
+            .. "them before moving the stone", tag, who, who == target and "receiving" or "owner",
+            esperIdx, st1), 0)
+        end
       end
     end),
     M.cond(function() return owner ~= nil and owner == target end, {
@@ -6461,7 +6465,13 @@ function M.absorbSafeArms(chars, species, opts)
     for _, c in ipairs(clashes(sp)) do
       local slot = c.hand == "R" and 0 or 1
       local items = {}
-      for _, it in ipairs(M.bagWeapons(c.char)) do
+      local bag = M.bagWeapons(c.char)
+      for i = 2, #bag do
+        M.assertEq(M.itemPower(bag[i - 1]) >= M.itemPower(bag[i]), true, string.format(
+          "%s: the candidates run strongest first ($%02X power %d before $%02X power %d)",
+          tag, bag[i - 1], M.itemPower(bag[i - 1]), bag[i], M.itemPower(bag[i])))
+      end
+      for _, it in ipairs(bag) do
         if #M.absorbClashesFor({ { char = c.char, hand = c.hand, item = it } }, sp) == 0 then
           items[#items + 1] = { slot, it }
         end
