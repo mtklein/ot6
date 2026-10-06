@@ -249,6 +249,7 @@ checked spliced into that host. The instruments today:
 | `battle_smoke.lua` | the harness end to end: `first_battle` loads, the battle RAM is live, a monster carries seeded shields |
 | `metrics_battle.lua` | one fight played by policy, per-side actions, damage, BP and breaks ([balance-metrics.md](../../docs/design/balance-metrics.md)) |
 | `parts_selftest.lua` | the multi-part reader and planner against the built ROM's formations (no emulator) |
+| `slot_selftest.lua` | the driver's reel arithmetic (#353: stop rule, drift window, result, aim) against the built ROM's SlotReelTbl, SlotRateTbl, SlotAttackTbl and MagicProp (no emulator) |
 | `recovery_trace_selftest.lua` | the recovery-trace ledger (no emulator) |
 | `fight_drops_selftest.lua` | every plan drop goes through `Driver:dropPlan` (no emulator) |
 | `counter_selftest.lua` | the counter rule's readers (#372): the AI walker over retaliation scripts and the magical/physical damage models, against the built ROM and hand-checked numbers, each assertion failed by its own mutant (no emulator) |
@@ -359,6 +360,13 @@ global and asserts which boot actually ran (`H.lastState` is set by
   them in a one-shot trampoline (`H.requestSaveState`/`H.requestLoadState`).
 - Screenshots: `emu.takeScreenshot()` works headless, returns a 256x224 RGB
   PNG string; empty during the first ~100 frames.
+- Render on demand (#394, tools/mesen/README.md): under `H.run` the
+  emulator draws only the frames the lib asks for, so a frame's pixels
+  exist only if it was asked for a callback ahead.  `H.screenshot` handles
+  it (a frame not drawn is shot on the next one); a script that reads
+  pixels itself (`emu.takeScreenshot`, `emu.getScreenBuffer`) calls
+  `H.renderAlways()` first, or `H.requestRender()` the callback before the
+  read.  A read of a frame that was not drawn raises.
 - `emu.getState()` returns a flat dotted-key table: `s["ppu.scanline"]`,
   `s["cpu.pc"]`; `s.ppu` is nil, and indexing it inside a callback throws
   silently, skipping the rest of that invocation.

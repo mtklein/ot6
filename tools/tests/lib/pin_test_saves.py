@@ -28,6 +28,11 @@ with open(src, encoding="utf-8-sig") as f:
 prefs = cfg.setdefault("Preferences", {})
 prefs["OverrideSaveDataFolder"] = True
 prefs["SaveDataFolder"] = saves          # dedicated, isolated from the user's
+# No rewind buffer: nothing rewinds a headless run, and recording one cost
+# 1.4-1.8% of a run's wall time with identical results (#394,
+# tools/mesen/experiments/render-cost/summary.txt, "norewind").
+# OT6_REWIND=1 keeps it, to measure what it costs.
+prefs["EnableRewind"] = os.environ.get("OT6_REWIND") == "1"
 
 # Mesen's per-Lua-slice watchdog defaults to 1 second; a slow frame callback
 # (e.g. a BFS over the collision grid) can be killed at that setting with no

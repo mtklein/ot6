@@ -112,6 +112,9 @@ H.run({ maxFrames = 12000 }, {
   H.waitUntil(function()
     return H.readByte(0x896f) % 128 < 64 and H.fieldHudPresent()
   end, 600, "bg3 back to 8x8, hud repainted", 5),
+  -- the screen check below reads pixels: ask for the frame it reads (#394)
+  H.call(H.requestRender),
+  H.waitFrames(1),
 
   H.call(function()
     -- 0. the instrument ran

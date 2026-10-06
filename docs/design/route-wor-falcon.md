@@ -2112,8 +2112,12 @@ flight taken out, `assertEq failed: (25,160): on foot ($11FA): got 1, want
 - **The Exp. Egg** (from the tomb) is still in the bag; the relic rule does
   not rank it and no member wears it.
 - **SETZER's Slot** was not played in these fights (the driver's `opts.slot`
-  was off); the Coin Toss relic stays in the bag.  Since #319/#353 the
-  driver plays his table (13.10).
+  was off then); the Coin Toss relic stays in the bag.  It is played now:
+  since #353 the driver spins Slot in a random battle against two or more
+  from 2 BP, with the reels timed on the icon the latched tier pays best
+  (H-Bomb at 2 BP, the 7s at 3; `Driver:setzerLine`, `Driver:slotTimed`;
+  measured in build/attempts/wt/v026-driver2/353/), beside the rest of his
+  table (13.10).
 - **The tombstone puzzle** (299 (12,39)) was not done.
 - The Dullahan care-model and the auto-Shell relic notes above (13.6).
 
@@ -2159,8 +2163,9 @@ keys nothing, Hired Help is his way in: the sellsword strikes the Whelk
 Head with piercing (`SETZER Hired Help on slot 1: 1550 gil of 247857; his
 Fight keys nothing there`), and the policy arm spent 28 Potions to the
 control's 40 and no Fenix Down to its 2. Slot and Coin Toss were not chosen
-on this arc: the tomb's random fights end before his bank reaches 3, and
-Coin Toss waits for two revealed ¤ bodies.
+on this arc then: Slot waited for 3 BP, which the tomb's random fights end
+before his bank reaches (since #353 it spins from 2, its reels timed; 13.9),
+and Coin Toss waits for two revealed ¤ bodies.
 
 The table above measured the first Jackpot and Hired Help (a floor the
 boost raised to certain sixes; one hire whose fee the boost doubled), on ROM
