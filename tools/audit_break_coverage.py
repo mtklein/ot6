@@ -169,8 +169,20 @@ FOUGHT = fought_by_map(LOGS)
 WALKED = {w: secs for w, secs in WALKED.items() if len(TILESEEN[w]) >= 100}
 
 
+def expand(word):
+    """A RandBattleGroup word's formation ids: bit 15 ($8000) is the
+    "+Rand(0..3)" flag (battle_main.asm:8215-8224, audit_encounters.py's
+    resolve), so the slot draws one of base..base+3; formations are 9-bit."""
+    base = word & 0x01FF
+    return [base + k for k in range(4)] if word & 0x8000 else [base]
+
+
+def group_words(g):
+    return [rbg[g*8+i] | (rbg[g*8+i+1] << 8) for i in range(0, 8, 2)]
+
+
 def group_forms(g):
-    return {rbg[g*8+i] | (rbg[g*8+i+1] << 8) for i in range(0, 8, 2)}
+    return {f for w in group_words(g) for f in expand(w)}
 
 
 CLAIMED_FIELD = {m for m in range(len(props)//33)
@@ -223,7 +235,7 @@ unclaimed = []
 for m in range(len(props)//33):
     if not (props[m*33+5] & 0x80): continue
     g = sbg[m]
-    forms = [rbg[g*8+i] | (rbg[g*8+i+1] << 8) for i in range(0, 8, 2)]
+    forms = sorted(group_forms(g))
     lines = pool_report(f'map {m}', forms)
     tag = '' if m in CLAIMED_FIELD else '  [UNCLAIMED/UNTUNED]'
     if m not in CLAIMED_FIELD:
@@ -239,7 +251,7 @@ for sec in range(512):
     g = wbg[sec]
     if g == 0xFF or g in seen: continue
     seen.add(g)
-    forms = [rbg[g*8+i] | (rbg[g*8+i+1] << 8) for i in range(0, 8, 2)]
+    forms = sorted(group_forms(g))
     lines = pool_report(f'sector {sec}', forms)
     if lines:
         tag = '' if claimed else '  [UNCLAIMED/UNTUNED]'
@@ -256,6 +268,21 @@ print(f'tuning claim, from {len(LOGS)} generator log(s) in build/states '
       f'{len(unclaimed)} battle-enabled maps UNCLAIMED')
 if not LOGS:
     print('  (no generator logs: nothing is claimed until the route is played)')
+
+# Every formation a walked pool can deal must resolve to bodies: a word
+# read raw (a "+Rand" flag left on) indexes past the formation table and its
+# fights silently go unaudited (#255; map 394's group 112 is four such words).
+UNRESOLVED = []
+for kind, n, g in ([('map', m, sbg[m]) for m in range(len(props)//33) if props[m*33+5] & 0x80]
+                   + [('sector', sec, wbg[sec]) for sec in range(512) if wbg[sec] != 0xFF]):
+    for f in group_forms(g):
+        if not formation_species(f):
+            UNRESOLVED.append(f'{kind} {n} group {g}: formation {f:#x} resolves to no bodies')
+if UNRESOLVED:
+    for l in sorted(set(UNRESOLVED))[:20]: print('UNRESOLVED ' + l)
+    print(f'RATCHET: {len(set(UNRESOLVED))} pool formation(s) resolve to no bodies -- unaudited')
+    sys.exit(1)
+print('every pool formation resolves to bodies (the +Rand flag expanded)')
 
 if NOKEY[0]:
     print(f'RATCHET: {NOKEY[0]} no-key formation(s) -- the build gate refuses')
