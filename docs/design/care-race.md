@@ -199,3 +199,32 @@ read every disagreement.
   the race's own choices make later turns better, the one-step estimate
   undervalues setup moves such as Defend into a bank.  That is accepted
   for now; rewind search shows where it matters.
+
+## After the review (coordinator, 2026-10-06)
+
+- **Scarcity, not just gil.**  A consumable costs its gil times a scarcity
+  factor from the bag count against the reserve the rest of the leg wants
+  (`M.raceItemCost`: x1 above reserve + 1, rising to x4 for the last
+  one), so the race does not spend the last Fenix Downs or Elixirs to
+  shave ticks.
+- **The aftermath counts.**  The cost criterion adds the post-fight care
+  bill: missing HP at the shops' rate, and a member down at its raise
+  (`deathCost`).  So "ends a tick sooner with the party at 10%" does not
+  beat "ends a little later at 80%" when deaths tie.  The tick margin
+  stays.
+- **The continuation may heal, one level.**  With `contCare`, a
+  continuation turn takes the classic lift before its attack: a heal in
+  hand that lifts a member who is inside the next hit clear of it.  It
+  does not recurse into the race.  The lab watches for over-healing on
+  easy World of Ruin fights.
+- **Per-decision cost** is measured in the frame callback: wall time per
+  command and the total over a leg.  Candidates or the horizon are capped
+  if it shows in leg wall time.
+- **Misses and crits.**  A line's and an enemy action's `hit` (0..1)
+  scale their damage where the ROM gives the rate cheaply (the spell's
+  hit rate, the monster's evade against a Fight).  Otherwise damage is
+  deterministic.
+
+Built so far: `M.raceSim`, `M.raceBetter`, `M.raceChoose`, `M.raceItemCost`
+(`lib/ot6.lua`), and `tools/tests/care_race_selftest.lua`: the old rules'
+cases, 16 checks, each of six mutants of the score caught.

@@ -252,6 +252,7 @@ checked spliced into that host. The instruments today:
 | `slot_selftest.lua` | the driver's reel arithmetic (#353: stop rule, drift window, result, aim) against the built ROM's SlotReelTbl, SlotRateTbl, SlotAttackTbl and MagicProp (no emulator) |
 | `recovery_trace_selftest.lua` | the recovery-trace ledger (no emulator) |
 | `fight_drops_selftest.lua` | every plan drop goes through `Driver:dropPlan` (no emulator) |
+| `care_race_selftest.lua` | the care race (#415): the old care rules' cases as race states, and the score's order (no emulator) |
 | `field_care_selftest.lua` | an `H.fieldCare` step a loop resets cares on every visit: the reset rebuilds its kernel (#409; no emulator) |
 | `counter_selftest.lua` | the counter rule's readers (#372): the AI walker over retaliation scripts and the magical/physical damage models, against the built ROM and hand-checked numbers, each assertion failed by its own mutant (no emulator) |
 | `rewind_search.lua` (+ `rewind_search.py`) | a lab: at a character's battle decisions, every option the command window offers, each played out from a whole-machine snapshot with the script's Lua heap rolled back alongside, scored across draws (#375); never route or balance evidence |

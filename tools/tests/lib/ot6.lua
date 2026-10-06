@@ -1468,6 +1468,271 @@ function M.roundCost(o)
   return cost, actions, why, rate, acts
 end
 
+-- ---- the care race (#415, docs/design/care-race.md) ----------------------
+-- One decision for every command: which action best improves the race --
+-- the party's turns-to-kill against the enemy's turns-to-wipe-or-cripple,
+-- ATB order deciding who acts first.  M.raceSim plays a race state forward
+-- from one candidate action; M.raceChoose scores every candidate and picks.
+-- Plain arithmetic on plain tables, so care_race_selftest can put the old
+-- rules' measured cases through it with no emulator.
+--
+-- A race state:
+--   actor        the party key deciding now
+--   party[k]     { hp, maxhp, eta, period, bp, lines = { [b] = line },
+--                  heals = { { restore, cost } ... } (what the continuation
+--                  may drink), deathCost (gil to undo a death),
+--                  hit = 0..1 (the chance its lines land, default 1) }
+--   enemies[k]   { hp, sh, eta, period, ends = true for a body whose death
+--                  ends the fight, act = { aoe, dmg = { [partyKey] = n },
+--                  hit = 0..1 } }
+--   focus        enemy keys in kill order (single-target lines hit the
+--                first standing)
+--   bankAt       the continuation spends its bank from this many pips
+--                (the driver's opts.bank, default 0); the boost is
+--                min(bank, 3), and an unboosted turn banks one
+--   hpRate       gil per HP at the shops (the aftermath bill); mpRate unused
+--   horizon      enemy actions to play (M.RACE_HORIZON)
+--   contCare     the continuation takes the classic lift (a heal that
+--                lifts a member inside the next hit clear of it) before
+--                its attack; false plays attacks only
+-- A line: { per, hits, chips, aoe } -- per is one hit's damage on a
+-- shielded body (shielded-equivalent, the damage watch's figure); a hit
+-- past the break lands x4 (Ot6ShieldedDmg x0.5, Ot6BrokenDmg x2), each of
+-- the first `chips` hits chips one shield.
+-- A candidate: { kind = "attack", line, boost, target? } | { kind = "heal",
+--   target, restore, cost, all? } | { kind = "raise", target, hp, cost }.
+M.RACE_HORIZON = 8
+M.RACE_TICK_MARGIN = nil       -- nil: the quickest enemy's period
+M.RACE_LEFT_MARGIN = 0.05      -- of the enemy's effective HP at the start
+
+-- the cost of a consumable: its gil, dearer as the bag nears the reserve
+-- the rest of the leg wants (a supply band's floor): the last Fenix Downs
+-- before a boss are dear, the 40th Potion is cheap.  x1 above reserve + 1,
+-- rising to x4 for the last one at reserve 0.
+function M.raceItemCost(gil, count, reserve)
+  reserve, count = reserve or 0, count or 1
+  local short = math.max(0, reserve + 1 - (count - 1))
+  return gil * (1 + 3 * short / (reserve + 1))
+end
+
+-- one line's hits on enemy e (mutated), times the line's hit chance
+local function strike(e, line, hit)
+  if e.hp <= 0 then return end
+  local chips = line.chips or 0
+  for i = 1, (line.hits or 1) do
+    if e.hp <= 0 then break end
+    local per = line.per or 0
+    if (e.sh or 0) > 0 then
+      e.hp = e.hp - per * hit
+      if i <= chips then e.sh = e.sh - 1 end
+    else
+      e.hp = e.hp - per * 4 * hit
+    end
+  end
+  if e.hp < 0 then e.hp = 0 end
+end
+
+local function effLeft(E)
+  -- effective HP left: HP, plus each standing shield priced as the hits it costs
+  local n = 0
+  for _, e in pairs(E) do if e.hp > 0 then n = n + e.hp * (1 + (e.sh or 0)) end end
+  return n
+end
+
+local function fightOver(E)
+  local anyEnds, standing = false, false
+  for _, e in pairs(E) do
+    if e.ends then
+      anyEnds = true
+      if e.hp <= 0 then return true end
+    end
+    if e.hp > 0 then standing = true end
+  end
+  return not standing
+end
+
+function M.raceSim(st, first)
+  local P, E = {}, {}
+  for k, p in pairs(st.party) do
+    P[k] = { hp = p.hp, maxhp = p.maxhp, eta = p.eta or 0, period = p.period or 300, bp = p.bp or 0,
+             lines = p.lines or {}, heals = p.heals or {}, deathCost = p.deathCost or 0, hit = p.hit or 1 }
+  end
+  for k, e in pairs(st.enemies) do
+    E[k] = { hp = e.hp, sh = e.sh or 0, eta = e.eta or 0, period = e.period or 300, ends = e.ends, act = e.act or {} }
+  end
+  local left0 = effLeft(E)
+  local r = { deaths = 0, firstDeath = nil, kill = nil, wipe = false, spent = 0, acts = 0 }
+  local function target(lineAoe, fixed)
+    if fixed and E[fixed] and E[fixed].hp > 0 then return fixed end
+    for _, k in ipairs(st.focus or {}) do if E[k] and E[k].hp > 0 then return k end end
+    local best
+    for k, e in pairs(E) do if e.hp > 0 and (best == nil or e.hp < E[best].hp) then best = k end end
+    return best
+  end
+  local function attack(p, line, fixed)
+    if line == nil then return end
+    if line.aoe then
+      for _, e in pairs(E) do strike(e, line, p.hit) end
+    else
+      local k = target(false, fixed)
+      if k then strike(E[k], line, p.hit) end
+    end
+  end
+  local function act(k, c, t)
+    local p = P[k]
+    if c.kind == "attack" then
+      attack(p, c.line, c.target)
+      p.bp = (c.boost or 0) > 0 and (p.bp - c.boost) or math.min(p.bp + 1, 5)
+    elseif c.kind == "heal" then
+      local who = c.all and P or { [c.target] = P[c.target] }
+      for _, q in pairs(who) do
+        if q.hp > 0 then q.hp = math.min(q.maxhp, q.hp + c.restore) end
+      end
+      p.bp = math.min(p.bp + 1, 5)
+      r.spent = r.spent + (c.cost or 0)
+    elseif c.kind == "raise" then
+      local q = P[c.target]
+      if q and q.hp <= 0 then q.hp = c.hp; q.eta = t + q.period end
+      p.bp = math.min(p.bp + 1, 5)
+      r.spent = r.spent + (c.cost or 0)
+    end
+  end
+  -- the worst one enemy action can do to member k next (its own price)
+  local function threat(k)
+    local w = 0
+    for _, e in pairs(E) do
+      if e.hp > 0 and e.act.dmg and (e.act.dmg[k] or 0) * (e.act.hit or 1) > w then w = e.act.dmg[k] * (e.act.hit or 1) end
+    end
+    return w
+  end
+  local function continuation(k)
+    local p = P[k]
+    if st.contCare ~= false then
+      local worst, wk = nil, nil
+      for q, m in pairs(P) do
+        if m.hp > 0 and m.hp <= threat(q) and (worst == nil or m.hp < worst) then worst, wk = m.hp, q end
+      end
+      if wk then
+        for _, h in ipairs(p.heals) do
+          if P[wk].hp + h.restore > threat(wk) then
+            return { kind = "heal", target = wk, restore = h.restore, cost = h.cost }
+          end
+        end
+      end
+    end
+    local b = 0
+    if p.bp >= (st.bankAt or 0) then b = math.min(p.bp, 3) end
+    while b > 0 and p.lines[b] == nil do b = b - 1 end
+    return { kind = "attack", line = p.lines[b], boost = b }
+  end
+  local function death(t)
+    r.deaths = r.deaths + 1
+    if r.firstDeath == nil then r.firstDeath = t end
+  end
+
+  -- the decision itself, now
+  local a = P[st.actor]
+  act(st.actor, first, 0)
+  a.eta = a.period
+  if fightOver(E) then r.kill = 0 end
+  local horizon = st.horizon or M.RACE_HORIZON
+  while r.kill == nil do
+    -- the next to act: the earliest ETA among the living
+    local nk, nt, enemy = nil, nil, false
+    for k, p in pairs(P) do if p.hp > 0 and (nt == nil or p.eta < nt) then nk, nt, enemy = k, p.eta, false end end
+    for k, e in pairs(E) do if e.hp > 0 and (nt == nil or e.eta < nt) then nk, nt, enemy = k, e.eta, true end end
+    if nk == nil then break end
+    if enemy then
+      r.acts = r.acts + 1
+      if r.acts > horizon then break end
+      local e = E[nk]
+      local dmg, hit = e.act.dmg or {}, e.act.hit or 1
+      if e.act.aoe then
+        for k, p in pairs(P) do
+          if p.hp > 0 then
+            p.hp = p.hp - (dmg[k] or 0) * hit
+            if p.hp <= 0 then p.hp = 0; death(nt) end
+          end
+        end
+      else
+        -- pessimistic: the hit goes where it does the most harm, the
+        -- member it would leave lowest (a kill first)
+        local tk, low = nil, nil
+        for k, p in pairs(P) do
+          if p.hp > 0 then
+            local after = p.hp - (dmg[k] or 0) * hit
+            if low == nil or after < low then tk, low = k, after end
+          end
+        end
+        if tk then
+          P[tk].hp = math.max(0, low)
+          if P[tk].hp <= 0 then death(nt) end
+        end
+      end
+      e.eta = e.eta + e.period
+      local alive = false
+      for _, p in pairs(P) do if p.hp > 0 then alive = true end end
+      if not alive then r.wipe = true; break end
+    else
+      act(nk, continuation(nk), nt)
+      P[nk].eta = P[nk].eta + P[nk].period
+      if fightOver(E) then r.kill = nt end
+    end
+  end
+  -- deaths: the members down when the play ends, a member down from the
+  -- start (one a raise could stand up) included
+  r.deaths = 0
+  for _, p in pairs(P) do if p.hp <= 0 then r.deaths = r.deaths + 1 end end
+  r.left = effLeft(E)
+  r.left0 = left0
+  -- the aftermath bill: what restoring the party costs at the fight's end
+  -- (or the horizon), in gil -- missing HP at the shops' rate, a death at
+  -- its raise
+  local bill = 0
+  for _, p in pairs(P) do
+    if p.hp <= 0 then bill = bill + p.deathCost
+    else bill = bill + (p.maxhp - p.hp) * (st.hpRate or 0) end
+  end
+  r.bill = bill
+  r.cost = r.spent + bill
+  return r
+end
+
+-- a better than b (both raceSim results) under the state's margins
+function M.raceBetter(a, b, st)
+  if a.wipe ~= b.wipe then return not a.wipe end
+  if a.deaths ~= b.deaths then return a.deaths < b.deaths end
+  if a.deaths > 0 and a.firstDeath ~= b.firstDeath then
+    return (a.firstDeath or math.huge) > (b.firstDeath or math.huge)
+  end
+  local tm = st.tickMargin or M.RACE_TICK_MARGIN
+  if tm == nil then
+    tm = math.huge
+    for _, e in pairs(st.enemies) do if (e.period or 0) > 0 and e.period < tm then tm = e.period end end
+    if tm == math.huge then tm = 0 end
+  end
+  if a.kill and b.kill then
+    if math.abs(a.kill - b.kill) > tm then return a.kill < b.kill end
+  elseif a.kill or b.kill then
+    return a.kill ~= nil
+  else
+    local lm = (st.leftMargin or M.RACE_LEFT_MARGIN) * math.max(a.left0 or 0, 1)
+    if math.abs(a.left - b.left) > lm then return a.left < b.left end
+  end
+  return a.cost < b.cost
+end
+
+-- the best candidate: its index, its result, and every result
+function M.raceChoose(st, candidates)
+  local best, bestR, all = nil, nil, {}
+  for i, c in ipairs(candidates) do
+    local r = M.raceSim(st, c)
+    all[i] = r
+    if bestR == nil or M.raceBetter(r, bestR, st) then best, bestR = i, r end
+  end
+  return best, bestR, all
+end
+
 -- Is a heal worth the turn it costs?  All of newFightDriver's heal policy,
 -- kept out here as arithmetic on plain numbers so battle_healpolicy can put
 -- the measured cases through it without an emulated fight.

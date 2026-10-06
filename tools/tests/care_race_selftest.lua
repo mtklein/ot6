@@ -1,0 +1,173 @@
+-- @manual standalone: lua tools/tests/care_race_selftest.lua
+-- care_race_selftest.lua -- the care race (#415, docs/design/care-race.md):
+-- the old care rules' measured cases as race states, and the decision each
+-- should come to.  No emulator: M.raceSim / M.raceChoose are arithmetic.
+emu = { eventType = { inputPolled = 1 }, addEventCallback = function() return 1 end }
+local H = dofile("tools/tests/lib/ot6.lua")
+
+local n = 0
+local function check(ok, what) assert(ok, what); n = n + 1 end
+
+-- a line at boost 0..3: Fight-like, `per` shielded-equivalent a hit
+local function lines(per, hits, chips)
+  local t = {}
+  for b = 0, 3 do t[b] = { per = per * (1 + b), hits = hits, chips = chips } end
+  return t
+end
+local function member(hp, maxhp, eta, o)
+  o = o or {}
+  return { hp = hp, maxhp = maxhp, eta = eta, period = o.period or 300, bp = o.bp or 0,
+           lines = o.lines or lines(100, 1, 1), heals = o.heals or {}, deathCost = o.deathCost or 1500 }
+end
+local function choose(st, cands)
+  local i, r, all = H.raceChoose(st, cands)
+  return cands[i], r, all
+end
+
+-- 1. The Gate's LOCKE (#312/#402): 144/820 under a 286 round, an X-Potion
+-- (676) in hand that lifts him; the enemy has 3000 HP behind 3 shields.
+do
+  local st = { actor = 1, hpRate = 1.2, focus = { 1 },
+    party = { member(144, 820, 0, { lines = lines(150, 1, 1) }), member(700, 900, 150), member(650, 800, 220) },
+    enemies = { { hp = 3000, sh = 3, eta = 100, period = 300, ends = true,
+                  act = { aoe = false, dmg = { 286, 286, 286 } } } } }
+  local c = choose(st, {
+    { kind = "attack", line = st.party[1].lines[0], boost = 0 },
+    { kind = "heal", target = 1, restore = 676, cost = 2000 } })
+  check(c.kind == "heal", "the Gate's LOCKE at 144/820 under 286: the lifting X-Potion stands, got " .. c.kind)
+end
+
+-- 2. #414's review case: a member at 357/1130 under an 838 round, an
+-- X-Potion's 773 lifts her; the alternative is a Tools turn chipping nothing
+do
+  local st = { actor = 2, hpRate = 1.2, focus = { 1 },
+    party = { member(900, 1039, 200), member(357, 1130, 0, { bp = 3, lines = lines(80, 3, 0) }), member(1000, 1215, 250) },
+    enemies = { { hp = 8000, sh = 8, eta = 60, period = 280, ends = true,
+                  act = { aoe = true, dmg = { 420, 838, 450 } } } } }
+  local c = choose(st, {
+    { kind = "attack", line = st.party[2].lines[3], boost = 3 },
+    { kind = "heal", target = 2, restore = 773, cost = 2000 } })
+  check(c.kind == "heal", "357/1130 under an 838 round, an X-Potion's 773: the heal stands, got " .. c.kind)
+end
+
+-- 3. The lift (#312): a 250 Potion on a member at 523 under a 905 round
+-- leaves her inside it -- the heal prevents nothing, the turn attacks
+do
+  local st = { actor = 1, hpRate = 1.2, focus = { 1 }, contCare = false,
+    party = { member(900, 1000, 0, { lines = lines(300, 1, 1) }), member(523, 1100, 200) },
+    enemies = { { hp = 2000, sh = 1, eta = 50, period = 300, ends = true,
+                  act = { aoe = false, dmg = { 400, 905 } } } } }
+  local c = choose(st, {
+    { kind = "attack", line = st.party[1].lines[0], boost = 0 },
+    { kind = "heal", target = 2, restore = 250, cost = 300 } })
+  check(c.kind == "attack", "a 250 Potion on 523 under 905 lifts nothing: attack, got " .. c.kind)
+end
+
+-- 4. Spend before dying (#175): EDGAR at 240/1048 inside a 729 round with
+-- 3 BP; the Potion does not save him; the 3-BP line beats the 0-BP one
+do
+  local st = { actor = 1, hpRate = 1.2, focus = { 1 }, contCare = false,
+    party = { member(240, 1048, 0, { bp = 3, lines = lines(400, 3, 1) }), member(900, 1129, 150) },
+    enemies = { { hp = 6000, sh = 3, eta = 80, period = 300, ends = true,
+                  act = { aoe = true, dmg = { 729, 500 } } } } }
+  local c = choose(st, {
+    { kind = "attack", line = st.party[1].lines[0], boost = 0 },
+    { kind = "attack", line = st.party[1].lines[3], boost = 3 },
+    { kind = "heal", target = 1, restore = 250, cost = 300 } })
+  check(c.kind == "attack" and c.boost == 3, "240/1048 inside 729 with 3 BP: spend them, got "
+    .. c.kind .. " " .. tostring(c.boost))
+end
+
+-- 5. The finisher (#204): the enemy dies to this turn's attack
+do
+  local st = { actor = 1, hpRate = 1.2, focus = { 1 },
+    party = { member(500, 1000, 0, { lines = lines(300, 1, 1) }), member(400, 900, 100) },
+    enemies = { { hp = 250, sh = 0, eta = 40, period = 300, ends = true,
+                  act = { aoe = true, dmg = { 300, 300 } } } } }
+  local c = choose(st, {
+    { kind = "attack", line = st.party[1].lines[0], boost = 0 },
+    { kind = "heal", target = 2, restore = 250, cost = 300 } })
+  check(c.kind == "attack", "the kill this turn goes first, got " .. c.kind)
+end
+
+-- 6. A raise that dies again (#374): Fenix Down's 1/8 (300 of 2400) under
+-- a 600 AoE coming before the raised member can act -- attack instead; and
+-- a raise that stands (the AoE is 30) -- raise
+do
+  local function st(aoe)
+    return { actor = 1, hpRate = 1.2, focus = { 1 }, contCare = false,
+      party = { member(1800, 2000, 0, { lines = lines(200, 1, 1) }), member(0, 2400, 300) },
+      enemies = { { hp = 5000, sh = 2, eta = 50, period = 400, ends = true,
+                    act = { aoe = true, dmg = { aoe, aoe } } } } }
+  end
+  local s1 = st(600)
+  local c = choose(s1, { { kind = "attack", line = s1.party[1].lines[0], boost = 0 },
+                         { kind = "raise", target = 2, hp = 300, cost = 500 } })
+  check(c.kind == "attack", "a raise to 300 under a 600 AoE dies again: attack, got " .. c.kind)
+  local s2 = st(30)
+  c = choose(s2, { { kind = "attack", line = s2.party[1].lines[0], boost = 0 },
+                   { kind = "raise", target = 2, hp = 300, cost = 500 } })
+  check(c.kind == "raise", "a raise that stands under a 30 AoE: raise, got " .. c.kind)
+end
+
+-- 7. Scarcity: two heals that both lift -- the last Elixir before a boss
+-- is dear, the 40th Potion cheap
+do
+  check(H.raceItemCost(300, 40, 4) == 300, "the 40th Potion at its gil")
+  check(H.raceItemCost(300, 1, 4) > 3 * 300, "the last one, reserve 4: over three times its gil")
+  local st = { actor = 1, hpRate = 1.2, focus = { 1 },
+    party = { member(900, 1000, 0), member(200, 1000, 150) },
+    enemies = { { hp = 9000, sh = 8, eta = 40, period = 300, ends = true,
+                  act = { aoe = false, dmg = { 50, 50 } } } } }
+  local c = choose(st, {
+    { kind = "heal", target = 2, restore = 800, cost = H.raceItemCost(4000, 1, 2), item = "elixir" },
+    { kind = "heal", target = 2, restore = 250, cost = H.raceItemCost(300, 40, 4), item = "potion" } })
+  check(c.item == "potion", "both lift: the plentiful Potion, not the last Elixir, got " .. tostring(c.item))
+end
+
+-- 8. The aftermath: two turns that end the fight inside the margin; the
+-- one that leaves the party whole costs less to restore
+do
+  local st = { actor = 1, hpRate = 1.2, focus = { 1 }, contCare = false,
+    party = { member(900, 1000, 0, { lines = lines(500, 1, 0) }), member(200, 1000, 100, { lines = lines(500, 1, 0) }) },
+    enemies = { { hp = 900, sh = 0, eta = 500, period = 600, ends = true,
+                  act = { aoe = true, dmg = { 50, 50 } } } } }
+  local c = choose(st, {
+    { kind = "attack", line = st.party[1].lines[0], boost = 0 },
+    { kind = "heal", target = 2, restore = 800, cost = 300 } })
+  -- the attack (4x on the bare body: 2000) kills at t=0; the heal leaves
+  -- the kill to the ally at t=100, inside the margin (600): the cheaper bill
+  check(c.kind == "heal", "a kill 100 ticks later with the party whole beats the kill now at 200/1000, got " .. c.kind)
+end
+
+-- 9. The horizon sees past the next hit: a member at 400 under 286 hits
+-- dies on the second; the heal that delays it is seen only by a race that
+-- plays more than one enemy action
+do
+  local st = { actor = 1, hpRate = 1.2, focus = { 1 }, contCare = false,
+    party = { member(1000, 1000, 0, { lines = lines(150, 1, 1) }), member(400, 1100, 900) },
+    enemies = { { hp = 6000, sh = 4, eta = 50, period = 300, ends = true,
+                  act = { aoe = false, dmg = { 286, 286 } } } } }
+  local c = choose(st, {
+    { kind = "attack", line = st.party[1].lines[0], boost = 0 },
+    { kind = "heal", target = 2, restore = 676, cost = 2000 } })
+  check(c.kind == "heal", "a death on the second hit is put off by the heal, got " .. c.kind)
+end
+
+-- 10. The score's order: no wipe, then deaths, then the kill, then the cost
+do
+  local st = { enemies = { { period = 300 } } }
+  local function r(t) t.left = t.left or 1000; t.left0 = 2000; t.cost = t.cost or 0; return t end
+  check(H.raceBetter(r({ deaths = 0 }), r({ deaths = 1, kill = 100, firstDeath = 50 }), st),
+    "no death beats a kill with a death")
+  check(H.raceBetter(r({ deaths = 1, firstDeath = 900 }), r({ deaths = 1, firstDeath = 100 }), st),
+    "the later first death")
+  check(H.raceBetter(r({ deaths = 0, wipe = false }), r({ deaths = 0, wipe = true, kill = 10 }), st),
+    "no wipe first")
+  check(H.raceBetter(r({ deaths = 0, kill = 100, cost = 900 }), r({ deaths = 0, kill = 1000, cost = 0 }), st),
+    "the kill sooner by more than the margin beats the cheaper")
+end
+
+print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
+  .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order", n))
