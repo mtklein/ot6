@@ -168,6 +168,43 @@ do
     "the kill sooner by more than the margin beats the cheaper")
 end
 
+-- 11. A Fight that lands half the time (#415, M.hitChance): the member at
+-- 400/1000 under a 450 hit would kill with two landed swings before the
+-- enemy acts; at 1 in 2 the race lifts him first
+do
+  check(H.hitChance(255, 0) == 1, "hit rate $FF always lands")
+  check(H.hitChance(200, 128) == 1 and H.hitChance(100, 128) == 0.5, "hit rate x block / 256, out of 100")
+  local function st(hit)
+    local l = lines(400, 2, 0)
+    for b = 0, 3 do l[b].hit = hit end
+    return { actor = 1, hpRate = 1.2, focus = { 1 },
+      party = { member(400, 1000, 0, { lines = l }), member(900, 900, 280) },
+      enemies = { { hp = 800, sh = 1, eta = 60, period = 300, ends = true,
+                    act = { aoe = false, dmg = { 450, 450 } } } } }
+  end
+  local function c(s)
+    return choose(s, { { kind = "attack", line = s.party[1].lines[0], boost = 0 },
+      { kind = "heal", target = 1, restore = 600, cost = 300 } }).kind
+  end
+  check(c(st(1)) == "attack", "two sure swings end it")
+  check(c(st(H.hitChance(100, 128))) == "heal", "half of them land: lift first")
+end
+
+-- 12. A heal that only trades its gil for the aftermath's (#415 lab, the
+-- Gate: an Elixir priced at a few gil won 30 of 33 decisions): a 100-HP
+-- top-up at 30 gil saves 120 of the bill, 90 net, inside the 200-gil
+-- margin, so the kill a turn sooner stands
+do
+  local st = { actor = 1, hpRate = 1.2, focus = { 1 },
+    party = { member(800, 1000, 0, { lines = lines(100, 1, 1) }), member(900, 900, 2000) },
+    enemies = { { hp = 250, sh = 1, eta = 350, period = 400, ends = true,
+                  act = { aoe = false, dmg = { 10, 10 } } } } }
+  local c = choose(st, {
+    { kind = "attack", line = st.party[1].lines[0], boost = 0 },
+    { kind = "heal", target = 1, restore = 100, cost = 30 } })
+  check(c.kind == "attack", "a 90-gil trade does not buy a turn, got " .. c.kind)
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin", n))

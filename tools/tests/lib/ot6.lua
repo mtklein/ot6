@@ -1510,6 +1510,16 @@ M.RACE_COST_MARGIN = 200       -- gil
 -- the rest of the leg wants (a supply band's floor): the last Fenix Downs
 -- before a boss are dear, the 40th Potion is cheap.  x1 above reserve + 1,
 -- rising to x4 for the last one at reserve 0.
+-- The chance a blockable hit lands (#415): the hit check (battle_main
+-- @233f) multiplies the attacker's hit rate by the target's inverted
+-- M.Block ($3B55; Evade is never what it reads: the carry there is
+-- always clear) over 256 and lands under a 0..99 roll.  Hit rate $FF
+-- always lands.
+function M.hitChance(hitRate, block)
+  if hitRate >= 0xFF then return 1 end
+  return math.min(100, (hitRate * block) >> 8) / 100
+end
+
 function M.raceItemCost(gil, count, reserve)
   reserve, count = reserve or 0, count or 1
   local short = math.max(0, reserve + 1 - (count - 1))
@@ -1519,6 +1529,7 @@ end
 -- one line's hits on enemy e (mutated), times the line's hit chance
 local function strike(e, line, hit)
   if e.hp <= 0 then return end
+  hit = line.hit or hit
   local chips = line.chips or 0
   for i = 1, (line.hits or 1) do
     if e.hp <= 0 then break end
@@ -7579,7 +7590,11 @@ function Driver:raceState(actor, R)
         local l = R.bestLine(e, slot, b)
         if l then
           local mult = (l.kind == "fight") and 1 or (1 + b)
-          lines[b] = { per = per * mult, hits = l.hits or 1, chips = l.chips or 0, what = l.what, plan = l }
+          -- a Fight lands at its hand's hit rate ($3B7C) against the
+          -- target's M.Block ($3B55); the kit lines at 1
+          local hit = (l.kind == "fight")
+            and M.hitChance(M.readByte(0x3B7C + e * 2), M.readByte(0x3B55 + 8 + slot * 2)) or 1
+          lines[b] = { per = per * mult, hits = l.hits or 1, chips = l.chips or 0, hit = hit, what = l.what, plan = l }
         end
       end
       local heals = {}
