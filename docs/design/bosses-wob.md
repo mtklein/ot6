@@ -384,38 +384,14 @@ AirForce assembly carry — and `$01a` Doberman weak = **fire**.)
 **fire|bolt|holy** — `monster_prop.dat` +25 reads `$25` — and +23
 reads **`$08`, poison absorbed**; +24 is `$00`.)
 
-- **Tuning (#400, 2026-10-06):** once SABIN's chips and SHADOW's throws
-  spend their banked pips (#366), the vanilla 1900-HP train died before its
-  sixth shield in most fights, so the break -- and Cyan's Cleave, which
-  needs it -- went unexercised.  Four shields over 2600 HP.  Measured on
-  two snapshot sets, 4 boot shifts x 15 waits each (45 distinct battle
-  keys), counted by key: the first run of each key, waits in order
-  (build/attempts/wt/v026-route2/e400/by_key.txt, an.py).  "Broken phase"
-  is a break that lands with HP left; a "same-blow" break comes off on the
-  killing hit, so the train is never Broken while alive.
-
-  | train | snapshots | Broken phase | same-blow | deaths | keys lost |
-  |---|---|---|---|---|---|
-  | 6 / 1900 | v0.25 chain | 2 | 11 | 10 | none |
-  | 4 / 2200 | v0.25 chain | 26 | 14 | 10 | be14 (\*) |
-  | 4 / 2600 | v0.25 chain | 31 | 11 | 11 | be70 |
-  | 4 / 3000 | v0.25 chain | 32 | 11 | 11 | be70 |
-  | 5 / 3000 | v0.25 chain | 10 | 30 | 16 | be14 (\*), be70 |
-  | 4 / 3400 | v0.25 chain | 35 | 8 | 11 | be70 |
-  | 6 / 1900 | re-cut chain | 2 | 10 | 23 | beB8 |
-  | 4 / 2600 | re-cut chain | 24 | 16 | 28 | be60, beB8 |
-  | 4 / 3400 | re-cut chain | 30 | 11 | 38 | be60, beB4, beB8 |
-
-  (\*) the 2200 and 5/3000 arms ran the fighter with the wake-up swing
-  #403 later removed; their be14 losses are that swing's stuck target
-  select, not the train.  What the extra HP costs: at 2600 one key per
-  snapshot set turns from a win into an attrition wipe -- be70-g01B5 on
-  the v0.25 snapshots, be60-g01B5 on the re-cut ones -- where Fenix-raised
-  members come back at 1/8 HP and fall to the next hit (be60: CYAN and
-  SHADOW each down three times before the wipe), and deaths rise 23 -> 28
-  on the re-cut set.  2600 gives a Broken phase in about half the keys
-  (24 and 31 of 45) at the smaller cost; the fight is no longer than
-  before (median kill frame 4572 against 4798, all runs).
+- **Tuning (#400, 2026-10-06):** four shields over 2600 HP (vanilla 1900,
+  six shields), so that once the party spends its pips (#366) the train is
+  usually Broken while alive and Cyan's Cleave gets its target.  By
+  distinct key, the train is Broken with HP left in 31 and 24 of 45 keys on
+  two snapshot sets (2 of 45 at six shields), deaths rise 10 -> 11 and
+  23 -> 28, and one key per set turns into an attrition wipe
+  (build/attempts/wt/v026-route2/e400/by_key.txt).  Not a hard fight for
+  players; no further tuning is planned.
 - **Telegraph:** the whistle sounds down the corridor → **Evil
   Toot**, a party-wide random status attack. Break the boiler before
   the move lands; Acid Rain between fuses keeps pressure on your
