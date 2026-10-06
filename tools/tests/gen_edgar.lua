@@ -370,7 +370,9 @@ H.run({ maxFrames = 120000 }, {
   -- gil; buying more starves gen_kolts's own South Figaro Fenix/Soft
   -- targets (measured: 60 here left South Figaro too poor to buy 2 Softs,
   -- failing that assertion and blocking the whole downstream tree).
-  H.buyItem(0xE8, 0, function() return 30 - invCount(0xE8) end, "TONIC to 30"),
+  -- #411: 32, the band (~level x5) at the L8 the desert reaches less the
+  -- two levels' slack the supply audit allows, plus the one the walk spends.
+  H.buyItem(0xE8, 0, function() return 32 - invCount(0xE8) end, "TONIC to 32"),
   H.waitUntil(inState(0x26), 2400, "item shop: back at the buy list", 2),
   -- #307: Fenix Downs before the desert.  The chain reaches this counter
   -- with the one Fenix Down it found, and the next counter that sells them

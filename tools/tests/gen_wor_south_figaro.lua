@@ -70,7 +70,9 @@ end
 local function whole(ch)
   return H.charHp(ch) == H.charMaxHp(ch) and H.charMp(ch) == H.charMaxMp(ch) and H.charStatus1(ch) == 0
 end
-local function potionBand() return math.ceil(topLevel() * 1.5) + FIELD_CARE_POTIONS end
+-- #411: no Tonic seller -- the 99-Tonic field care rides on Potions too
+-- (H.careStockPotions: the reserve a few levels ahead, the Tonics' HP, the spend)
+local function potionBand() return H.careStockPotions(topLevel(), { spend = FIELD_CARE_POTIONS }) end
 
 -- hold a direction onto an exit until the map changes, paging any dialog
 local function holdOut(dir, dst, what)

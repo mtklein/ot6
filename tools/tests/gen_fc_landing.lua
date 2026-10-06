@@ -282,7 +282,14 @@ H.run({ maxFrames = 600000 }, flatten({
   -- against their fixtures), 21 in all: 44 + 21 = 65.  Held for #179 (the
   -- bigger purchase moved the RNG under an IAF wave) until the segment
   -- runner (#178) retried such losses.
-  H.buyItem(POTION, 1, function() return 65 - H.invCountOf(POTION) end, "POTION to 65"),
+  -- #411: from here to the World of Ruin's first counter (Albrook) the
+  -- continent and the escape spent 13 Potions and 95 Tonics on the bf19d581
+  -- line (65 / 99 -> escape_start 52 / 4), and the WoR landing's bag is
+  -- what the WoR walks to Albrook carry: H.careStockPotions with the Tonics
+  -- topped to 99 below, spend 13 + 4750 HP at 250 = 32.
+  H.buyItem(POTION, 1, function()
+    return H.careStockPotions(H.activeTopLevel(), { tonics = 99, spend = 32 }) - H.invCountOf(POTION)
+  end, "POTION for the band and the field care to Albrook (WoR)"),
   H.buyItem(FENIX_DOWN, 6, function() return 25 - H.invCountOf(FENIX_DOWN) end, "FENIX DOWN to 25"),
   -- #231 (docs/design/supply.md): the last counter in the WoB.  REVIVIFY
   -- to 3; TINCTURE to 7, the MP band at L28 (~level / 4) for the walks

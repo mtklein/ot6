@@ -16,6 +16,22 @@ measured design for the MP half of the band.  Every number is read off the
 ROM's own tables or a generated fixture; the readers and their output are
 under `build/lab/mp-supply/`.
 
+## Field care where no Tonic is sold (#411)
+
+Owner's rule (2026-10-06): **top up to 99 Tonics at every town shop that
+sells them, purse permitting.**  Tonics are on only nine counters
+(`shop_prop.dat`: shops 3, 4, 8, 12, 15, 35, 36, 39, 85 -- Narshe, Figaro
+Castle, South Figaro, Mobliz, Nikeah, Thamasa, the merchant at Shadow's
+house, the ghost train); Jidoor's, Albrook's and every World of Ruin
+counter sell none.  Where none is sold, the field care rides on Potions
+(guidelines, "Heal outside battles"): a counter stocks the combat reserve
+(the Potion band) a few levels ahead, plus the HP the 99 Tonics would have
+carried and the bag's Tonics do not, at 250 a Potion, plus the Potions the
+legs to the next counter measured spending (`H.careStockPotions`).
+`tools/audit_supplies.py` measures every fixture the same way: Tonics at
+50 HP plus Potions over the reserve at 250, against ~(level - 2) x5 Tonics'
+HP capped at 99 Tonics.
+
 ## 1. Prices and yields, off the ROM
 
 `ff6/src/menu/item_prop_en.dat`, 30 bytes per item, decoded the way the
