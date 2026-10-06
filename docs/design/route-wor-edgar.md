@@ -734,7 +734,7 @@ a2d49b67); every formation stays keyed for the party that meets it
 | the castle's shops | map 59 | refuse SABIN/EDGAR | shop in South Figaro before the cave |
 | the draw | everywhere | save data (`$1FA1-$1FA5`) | vary it by using up encounters (varlab), not by seeds |
 
-Out of scope, noted: Mobliz (v0.26), Duncan (north of Narshe, v0.32:
+Out of scope, noted: Mobliz (v0.26), Duncan (north of Narshe, v0.33:
 "He's meditating just north of Narshe", `$0936`), and Kohlingen (v0.24)
 are the next arcs. South Figaro's basement passage is UNVERIFIED as
 open (2.4).

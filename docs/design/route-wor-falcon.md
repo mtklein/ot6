@@ -341,7 +341,7 @@ the Nikeah ferry: the South Figaro continent, the Tzen continent (Tzen,
 Albrook, Nikeah, **Mobliz**), and the Kohlingen continent, whose component
 (`components.txt`: 1,704 tiles from (53,59)) also holds the World of Ruin
 **Colosseum** (50,17), 52 steps from Kohlingen, and a chocobo stable
-(62,39). The Colosseum is v0.35's and Mobliz v0.27's; this arc does not go
+(62,39). The Colosseum is v0.37's and Mobliz v0.27's; this arc does not go
 in. The Falcon opens the rest: Jidoor, Zozo, Maranda, Narshe, Thamasa, the
 Veldt's cave, Doma, the Solitary Island's Palidor, and the castle's
 stratum.
@@ -921,7 +921,7 @@ other break suites pass on the re-cut ROM (`ninja_checks.log`).
 | the draw | everywhere | save data (`$1FA1-$1FA5`) | vary it by using up encounters (varlab), not by seeds |
 
 Out of scope, noted: the World of Ruin Colosseum is on foot from Kohlingen
-(v0.35); Mobliz (v0.27) is on the Tzen continent; the castle's stratum
+(v0.37); Mobliz (v0.27) is on the Tzen continent; the castle's stratum
 (`$00CD`) and Palidor (`$039B`) open with the Falcon.
 
 ---
