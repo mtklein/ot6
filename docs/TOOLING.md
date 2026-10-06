@@ -310,10 +310,10 @@ those.
 
 `mini` (`ssh mini.local`: the owner's GPD Win Mini handheld, Ubuntu 26.04,
 Ryzen 7 7840U 8c/16t, 22 GB, battery) is set up the same way, with px13's
-Mesen builds copied in (same Ubuntu, same arch). It is a gaming handheld
-first: GNOME suspends it when idle (run long jobs under `systemd-inhibit`),
-and `/usr/local/bin/handheld-autotune` lowers CPU clock ceilings while a
-Steam game runs, so our emulators slow down whenever the owner plays.
+Mesen builds copied in (same Ubuntu, same arch). Its gaming setup is
+switched off (2026-10-06: hhd, handheld-autotune and steamos-manager-hhd
+disabled, idle suspend off, power profile `performance`); a closed lid or
+the power button still sleeps it.
 
 What differs from macOS:
 

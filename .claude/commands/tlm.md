@@ -63,8 +63,8 @@ interpreting runs.
 - **Fourth machine:** mini, the owner's GPD Win Mini handheld (Ubuntu
   26.04, Ryzen 7 7840U 8c/16t, 22 GB, battery; `ssh mini.local`, clone at
   `~/ot6`, work under `~/work/`). Set up like px13 (docs/TOOLING.md "Linux
-  worker"); long jobs under `systemd-inhibit`. It is the owner's gaming
-  device: its handheld-autotune caps clocks while a Steam game runs.
+  worker"); long jobs under `systemd-inhibit`. Its gaming setup is
+  switched off; it is a worker now.
 - **Where batches go:** fixed slots, enforced. Each machine has a hard
   emulator limit that `tools/tests/run.sh` takes a slot from before every
   emulator (`~/.config/ot6/emulator-slots`: mbp 12, the Air 8, px13 24, mini 8;
