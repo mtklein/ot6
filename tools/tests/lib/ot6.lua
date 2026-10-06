@@ -7646,7 +7646,7 @@ function Driver:raceCandidates(actor, st)
   for e, p in pairs(st.party) do
     if p.hp > 0 and p.hp < p.maxhp then
       for _, h in ipairs(p.heals or {}) do
-        c[#c + 1] = { kind = "heal", target = e, restore = h.restore, cost = h.cost,
+        c[#c + 1] = { kind = "heal", target = e, restore = h.restore, cost = h.cost, id = h.id,
           what = string.format("item $%02X on entity %d", h.id, e) }
       end
     elseif p.hp == 0 and self:battInvIdx(BATTLE.FENIX_DOWN) then
@@ -7719,14 +7719,46 @@ function Driver:raceLog(actor, plan, R)
   else agree = "DISAGREE" end
   M.log(string.format("[%s] [race] actor=%d %s: race %s%s; %d candidate(s)", self.tag or "fight", actor, agree,
     raceDesc(cands[i], best), ri and (" | rules " .. raceDesc(cands[ri], all[ri])) or "", #cands))
+  if agree == "DISAGREE" then return cands[i] end
+end
+
+-- The race's choice as a plan the driver executes (M.CARE_RACE = "act"):
+-- an attack is bestLine's own plan at that boost; a heal or a raise is
+-- the Item command on that member.  nil when the window cannot take it
+-- (the rules' plan then stands).
+function Driver:racePlan(actor, c)
+  if c.kind == "attack" then
+    local p = c.line and c.line.plan
+    if p == nil then return nil end
+    local q = {}
+    for k, v in pairs(p) do q[k] = v end
+    q.reason = "the care race"
+    return q
+  end
+  local row = cmdRow(actor, BATTLE.CMD_ITEM)
+  if row == nil then return nil end
+  local id = c.kind == "raise" and BATTLE.FENIX_DOWN or c.id
+  local idx = id and self:battInvIdx(id)
+  if idx == nil then return nil end
+  return { kind = "item", item = id, target = c.target, row = row, idx = idx, restore = c.restore,
+           reason = c.kind == "raise" and "revive" or "the care race" }
 end
 
 function Driver:makePlan(actor)
   self._race = nil
   local plan = self:makePlanRules(actor)
   if M.CARE_RACE and self._race ~= nil and self._race.actor == actor then
-    local ok, err = pcall(self.raceLog, self, actor, plan, self._race)
-    if not ok then M.log(string.format("[%s] [race] actor=%d error: %s", self.tag or "fight", actor, tostring(err))) end
+    local ok, c = pcall(self.raceLog, self, actor, plan, self._race)
+    if not ok then
+      M.log(string.format("[%s] [race] actor=%d error: %s", self.tag or "fight", actor, tostring(c)))
+    elseif c and M.CARE_RACE == "act" then
+      local alt = self:racePlan(actor, c)
+      if alt then
+        M.log(string.format("[%s] [race] actor=%d act: %s in place of the rules' %s", self.tag or "fight",
+          actor, c.what or c.kind, tostring(plan and plan.kind)))
+        plan = alt
+      end
+    end
   end
   self._race = nil
   return plan
