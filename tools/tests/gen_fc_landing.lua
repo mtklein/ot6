@@ -90,7 +90,12 @@ local F = H.newFightDriver("IAF", FIGHT)
 -- which the body's script counts from, the body's death ends the fight,
 -- the Speck is the body's own and the bay's death changes nothing --
 -- kill order {2, 0}, the same driver on the same options.
-local FAF = H.newFightDriver("IAF", FIGHT)
+-- #412: the Air Force's driver also spends TERRA's once-a-battle RAMUH
+-- summon (Bolt Fist, every part, each bolt-weak)
+local FAF_OPTS = {}
+for k, v in pairs(FIGHT) do FAF_OPTS[k] = v end
+FAF_OPTS.summon = { [TERRA] = {} }
+local FAF = H.newFightDriver("IAF", FAF_OPTS)
 local function airForceUp() return H.formationHas({ [0x0113] = true }) end
 
 local function kitSteps(char, name, pairs_)
@@ -323,6 +328,17 @@ H.run({ maxFrames = 600000 }, flatten({
   H.call(function()
     H.assertEq(H.readByte(0x1869), POTION, "slot 0 is Potion: the combat heal is one press away")
     H.assertEq(H.readByte(0x186A), FENIX_DOWN, "slot 1 is Fenix Down")
+  end),
+  -- #412: RAMUH on TERRA.  The Air Force's every part is bolt-weak ($84),
+  -- and TERRA came to it with no stone and no Bolt: her free turns were a
+  -- Fight landing 83 a hit (airforce.md "TERRA wears no esper"), while
+  -- RAMUH sat in the bag.  Worn, he gives her Bolt (folds to Bolt2/Bolt3
+  -- under boost) and, once a battle, his Bolt Fist on every part.  A person
+  -- puts the stone on her before the gauntlet; here, in town, where the
+  -- menu has no wave timer running.
+  H.equipEsper(charPos(TERRA), RAMUH, { tag = "RAMUH -> TERRA" }),
+  H.call(function()
+    H.assertEq(H.readByte(0x1600 + 37 * TERRA + 0x1E), RAMUH, "TERRA wears RAMUH into the gauntlet")
   end),
   H.crossDoor(36, 45, 340, 26, 39, "item shop door 347(36,45)->340(26,39), return", { healer = TERRA }),
   H.navTo(23, 46, { maxFrames = 9000, playBattles = "tactical", items = true, healer = TERRA }),
