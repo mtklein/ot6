@@ -54,29 +54,6 @@ local STAGES = {
   { { row = "defend" }, { row = HIRE, boost = 2 } },
 }
 local stage, battles, recs = 1, 0, {}
-local passed, fled = false, 0
-
--- The east room's randoms include the Mad Oscar's pack ($0F8: one $06F
--- beside two statue $091s).  H.setzerBattle has everyone but SETZER Defend
--- while his plan runs, and a pack that takes a member's control on any of
--- its turns (H.judgeFormation, the ROM's AI scripts) wins that: main
--- 53b6a887's qualification met it twice in stage 2 -- the first fight left
--- c4 dead and c5, c9 zombied before SETZER's second window, the second
--- wiped the party with the 2 BP hire still queued.  A pack like that is
--- run from (fought out when it cannot be), the party cared for, and the
--- next one met: the hires want a battle the party can stand still in.
-local function judge()
-  local live, names = {}, {}
-  for _, sp in ipairs(H.formationSpecies()) do
-    live[#live + 1] = sp.species
-    names[#names + 1] = string.format("$%03X", sp.species)
-  end
-  local suits, hp, srcs = H.judgeFormation(live, 1, 0)
-  passed = not suits
-  H.log(string.format("[hirecrew] the battle: species %s, %d max HP%s -> %s", table.concat(names, " "), hp,
-    #srcs > 0 and (" {" .. table.concat(srcs, "; ") .. "}") or "",
-    passed and "run from it (it takes a member's control on any turn)" or "play the stage"))
-end
 
 H.run({ maxFrames = 300000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
@@ -85,8 +62,7 @@ H.run({ maxFrames = 300000 }, {
   H.driveUntil(function() return stage > #STAGES end, 280000, {
     H.call(function()
       battles = battles + 1
-      H.assertEq(battles - fled <= 6, true, string.format("the 3 and 2 BP hires within six battles played (stage %d)", stage))
-      H.assertEq(fled <= 8, true, string.format("at most eight control-taking packs run from (%d so far)", fled))
+      H.assertEq(battles <= 6, true, string.format("the 3 and 2 BP hires within six battles (stage %d)", stage))
     end),
     -- the care between battles: the driveUntil resets it each lap, and the
     -- reset rebuilds its kernel (#409; before, the second visit with work
@@ -107,17 +83,6 @@ H.run({ maxFrames = 300000 }, {
       end
     end),
     walkToBattle(),
-    H.waitUntil(function() return H.battleActive() end, 900, "the battle is up (judged)", 30),
-    H.call(judge),
-    H.cond(function() return passed end, {
-      H.fleeBattle(9000, { onCantRun = "fight" }),
-      H.call(function()
-        fled = fled + 1
-        H.log(string.format("[hirecrew] the pack run from (%d): %s", fled, tostring(H.fleeOutcome)))
-      end),
-      H.waitUntil(function() return not H.battleLoadStarted() and H.hasControl() end, 3000,
-        "back in the room after the pack run from", 10),
-    }, {
     (function()
       local step
       return { tick = function()
@@ -140,10 +105,8 @@ H.run({ maxFrames = 300000 }, {
         return r
       end, reset = function() step = nil end }
     end)(),
-    }),
   }, "the 3 and 2 BP hires resolve"),
   H.call(function()
-    H.log(string.format("[hirecrew] PASSED: %d hires (3 and 2 BP) over %d battle(s), %d control-taking "
-      .. "pack(s) run from", #recs, battles - fled, fled))
+    H.log(string.format("[hirecrew] PASSED: %d hires (3 and 2 BP) over %d battle(s)", #recs, battles))
   end),
 })
