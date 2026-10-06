@@ -7606,8 +7606,9 @@ function Driver:makePlan(actor)
   -- no heal of another's in flight on them, and a heal in hand -- the bag's
   -- (M.itemChoice's candidates, an unsold one included: the member is
   -- inside) or a cure measured this battle -- that lifts them clear.  The
-  -- reopened block cares for those members only (liftOnly).
-  local liftOnly = false
+  -- reopened block cares for those members only (liftOnly: the members a
+  -- heal in hand lifts, each judged on its own).
+  local liftOnly, liftSet = false, {}
   if not careOpen and (row ~= nil or cureRow ~= nil) then
     for e = 0, 3 do
       local hp, maxhp, cost = hpNow[e], maxOf(e), price[e] or 0
@@ -7629,15 +7630,14 @@ function Driver:makePlan(actor)
             end
           end
         end
-        if M.liftReopens({ hp = hp, cost = cost, restores = restores,
+        if M.liftReopens({ hp = hp, maxhp = maxhp, cost = cost, restores = restores,
                            outpace = M.LIFT_OUTPACES ~= false }) then
-          careOpen, liftOnly = true, true
+          careOpen, liftOnly, liftSet[e] = true, true, true
           local said = string.format("[%s] actor=%d: entity %d at %d/%d is inside a %d round "
             .. "and a heal in hand lifts them (%s) -- the round's care budget (actor %d's) "
             .. "reopens for the lift", self.tag or "fight", actor, e, hp, maxhp, cost,
             table.concat(what, ", "), self.careActor)
           if said ~= self.healSaid then self.healSaid = said; M.log(said) end
-          break
         end
       end
     end
@@ -8251,8 +8251,8 @@ function Driver:makePlan(actor)
           .. "on it is confirmed (tick %d) and has not landed", self.tag or "fight", actor, e, hp, maxhp,
           inFlight.by, inFlight.what, inFlight.tick)
         if said ~= self.healSaid then self.healSaid = said; M.log(said) end
-      elseif liftOnly and not (hp > 0 and (price[e] or 0) > 0 and hp <= price[e]) then
-        -- (the budget reopened for a lift: a member outside their round
+      elseif liftOnly and not liftSet[e] then
+        -- (the budget reopened for a lift: a member it did not reopen for
         -- waits for the next round's care turn)
       elseif hp > 0 and maxhp > 0 and hp < maxhp and not status1Has(e, M.ST1_ZOMBIE) then
         local pct = hp * 100 // maxhp
