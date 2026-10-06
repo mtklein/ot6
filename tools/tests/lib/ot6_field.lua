@@ -1238,11 +1238,57 @@ end
 -- every pairing of a stretch tile with a saved position the walk
 -- can leave (any stretch tile, where its battles happen, and the live one,
 -- which the first encounter reads) rolls that one group.
+--
+-- opts.want(group) -> bool names the pools the caller can use (a pool that
+-- can deal what the test needs within its budget); plan() asserts the
+-- stretch's group is one.  When the party's own row has no such stretch,
+-- P.findStart(radius) names the nearest walkable tile within radius whose
+-- row gives one (two or more tiles of a wanted group), for the caller to
+-- walk to before plan(): camp_escaped boots on Doma's x 179..180, group 1,
+-- which never deals battle_assassinate's three-body formation ("group 1
+-- deals a suitable formation within the 40 draws built (worst counter
+-- state: 1024)"), with group 8 a tile away at x 181..
+-- (build/attempts/wt/v026-pacer/).
 function M.newPacer(opts)
   opts = opts or {}
   local width, tag = opts.width or 4, opts.tag or "pace"
   local P = { group = nil }
   local pace, rolled = nil, nil
+  -- the stretch of row y through x: lo, hi and the group, or nil where the
+  -- tile rolls nothing
+  local function stretchAt(x, y)
+    local function own(xx) return M.worldEncounterGroup(xx, y, xx, y) end
+    local g = M.worldPassable(x, y) and own(x) or nil
+    if g == nil then return nil end
+    local lo, hi = x, x
+    while lo > x - width and M.worldPassable(lo - 1, y) and own(lo - 1) == g do lo = lo - 1 end
+    while hi < x + width and M.worldPassable(hi + 1, y) and own(hi + 1) == g do hi = hi + 1 end
+    return lo, hi, g
+  end
+  function P.findStart(radius)
+    local x0, y0 = M.worldX(), M.worldY()
+    local cands = {}
+    for dy = -radius, radius do
+      for dx = -radius, radius do
+        local x, y = x0 + dx, y0 + dy
+        local lo, hi, g = stretchAt(x, y)
+        if g ~= nil and hi - lo >= 1 and (not opts.want or opts.want(g)) then
+          cands[#cands + 1] = { x = x, y = y, g = g, d = math.abs(dx) + math.abs(dy) }
+        end
+      end
+    end
+    table.sort(cands, function(a, b) return a.d < b.d end)
+    for _, c in ipairs(cands) do
+      local path = c.d > 0 and M.worldBfs(c.x, c.y) or nil
+      if c.d == 0 or (path and #path > 0) then
+        M.log(string.format("[%s] start: (%d,%d), group %d, %d step(s) from (%d,%d)",
+          tag, c.x, c.y, c.g, c.d, x0, y0))
+        return c.x, c.y
+      end
+    end
+    M.assertEq(false, true, string.format("[%s] a reachable tile within %d of (%d,%d) on a "
+      .. "stretch of two or more tiles of a wanted group", tag, radius, x0, y0))
+  end
   function P.plan()
     -- the watch is registered on every plan: a retried attempt replays its
     -- body and finds the last attempt's watch made inert (lib/ot6.lua, the
@@ -1294,6 +1340,10 @@ function M.newPacer(opts)
     M.assertEq(#list == 1 and list[1] == tostring(g), true, string.format(
       "[%s] every encounter on the stretch rolls group %d, whatever the saved "
       .. "position (rolls %s)", tag, g, table.concat(list, ",")))
+    if opts.want then
+      M.assertEq(opts.want(g), true, string.format("[%s] group %d is one the caller "
+        .. "can use (opts.want)", tag, g))
+    end
     pace = { y = y0, lo = lo, hi = hi, dir = "left" }
     P.group = g
     return P
