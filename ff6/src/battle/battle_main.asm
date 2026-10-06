@@ -16998,8 +16998,21 @@ CondBattle:
 .segment "monster_prop"
 
 ; cf/0000
+; OT6 (#400): the Ghost Train's max HP, spliced over vanilla's 1900.  Once
+; SABIN's chips and SHADOW's throws spend their banked pips (#366) the
+; vanilla train died before its sixth shield in most fights, and the break
+; (Cyan's Cleave needs a Broken target, bosses-wob.md section 8) went
+; unexercised; build/attempts/wt/v026-route2/e400/ has the measurement.
+; A monster record is 32 bytes and max HP is the word at +$08.
+MONSTER_PROP_REC     = 32
+MONSTER_PROP_SIZE    = 384 * MONSTER_PROP_REC
+GHOSTTRAIN_HP_AT     = MONSTER::GHOSTTRAIN * MONSTER_PROP_REC + 8
+GHOSTTRAIN_HP_OT6    = 1900
 MonsterProp:
-        .incbin "monster_prop.dat"
+        .incbin "monster_prop.dat", 0, GHOSTTRAIN_HP_AT
+        .word   GHOSTTRAIN_HP_OT6                       ; $106 +$08 (was 1900)
+        .incbin "monster_prop.dat", GHOSTTRAIN_HP_AT + 2, MONSTER_PROP_SIZE - GHOSTTRAIN_HP_AT - 2
+.assert * - MonsterProp = MONSTER_PROP_SIZE, error, "MonsterProp splice changed the table length"
 
 ; cf/3000
 MonsterItems:

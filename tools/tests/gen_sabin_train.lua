@@ -581,7 +581,7 @@ local function closeShop()
 end
 
 local b68 = {
-  casts = 0, chips = {}, plan = nil, planActor = nil, impCure = {}, reviveFor = {}, chipAt = {}, castAt = {},
+  casts = 0, chips = {}, plan = nil, planActor = nil, impCure = {}, reviveFor = {}, wakeFor = {}, chipAt = {}, castAt = {},
   brokeAt = nil, impossible = nil, itemsOut = false,
   lastSH, lastHP,
 }
@@ -654,6 +654,26 @@ local function makePlan(actor)
                  row = itemRow }
       end
     end
+  end
+  -- #403: a Muddled SABIN acts on his own and may turn on the party.  No
+  -- item in this ROM removes Muddle or Berserk (item_prop: no record
+  -- carries STATUS2 $20 or $10 with the remove flag), so a person wakes a
+  -- Muddled ally the way the game allows: a plain, unboosted Fight on him
+  -- (a physical hit clears Muddle).  One swing in flight, the imp cure's
+  -- rule; not when the swing could fell him (a hit under a quarter of his
+  -- HP is the bound).  Berserk has no cure at all: he fights the train on
+  -- his own, which is what the plan wanted of him anyway.
+  for e, rec in pairs(b68.wakeFor) do
+    if rec.by == actor or pHP(rec.by) == 0
+       or (H.readByte(0x3EE5 + e * 2) & H.ST2_MUDDLE) == 0 then b68.wakeFor[e] = nil end
+  end
+  if sabinE and actor ~= sabinE and pHP(sabinE) > 0 and not b68.wakeFor[sabinE]
+     and (H.readByte(0x3EE5 + sabinE * 2) & H.ST2_MUDDLE) ~= 0
+     and (H.readByte(0x3EE4 + actor * 2) & H.ST1_IMP) == 0
+     and pHP(sabinE) * 4 > pMaxHP(sabinE) then
+    b68Log(string.format("wake e%d: SABIN (e%d) is Muddled -- an unboosted Fight on him [%s]",
+      actor, sabinE, partyLine()))
+    return { kind = "fight", boost = 0, target = sabinE }
   end
   local st1 = H.readByte(0x3EE4 + actor * 2)
   if (st1 & 0x04) ~= 0 and itemRow and battInvIdx(ANTIDOTE) then
@@ -840,10 +860,16 @@ local function b68Button()
     b68.sideN = (b68.sideN or 0) + 1
     b68Log(string.format("side window $%02X open (actor=%d plan=%s, #%d this battle) -- B out",
       st, actor, plan.kind, b68.sideN))
-    if b68.sideN > 6 then
+    -- The bound, derived: this fighter presses no LEFT/RIGHT at the command
+    -- window.  A side window can open only from a direction held into the
+    -- battle (once) or a target steer's RIGHT that landed after its window
+    -- closed under it (at most once per RIGHT sent), so more openings than
+    -- RIGHTs + 1 means something else is pressing.
+    if b68.sideN > (b68.rightN or 0) + 1 then
       error(string.format("battle 68: the Row/Def. side window ($%02X) opened %d times " ..
-        "-- something keeps pressing LEFT/RIGHT on the command window (actor %d, plan %s)",
-        st, b68.sideN, actor, plan.kind), 0)
+        "against %d target-steer RIGHT(s) + 1 -- something presses LEFT/RIGHT on the " ..
+        "command window (actor %d, plan %s)", st, b68.sideN, b68.rightN or 0, actor,
+        plan.kind), 0)
     end
     return { "b" }
   end
@@ -886,22 +912,33 @@ local function b68Button()
     return { "a" }                            -- -> target select (enemy)
   end
   if st == ST_TGT then
-    if plan.kind ~= "item" then
+    if plan.kind ~= "item" and plan.target == nil then
       if actor == sabinE then b68.sabinCmdAt = H.frame end
       b68.plan, b68.planActor = nil, nil      -- Fight commits on this confirm
       return { "a" }                          -- default target
     end
     local chars = H.readByte(TGTCHARS)
     local mons = H.readByte(TGTMONS)
-    if mons ~= 0 then return { "right" } end  -- off the monster side
+    if mons ~= 0 then                         -- off the monster side
+      b68.rightN = (b68.rightN or 0) + 1      -- a RIGHT that could land on $05
+      return { "right" }
+    end
     local wantMask = 1 << plan.target
     if chars == wantMask then
       if plan.item == FENIX_DOWN then b68Watch.fenix(actor, plan.target) end
       if actor == sabinE then b68.sabinCmdAt = H.frame end
-      b68.plan, b68.planActor = nil, nil      -- item commits on this confirm
+      if plan.kind == "fight" then b68.wakeFor[plan.target] = { by = actor } end
+      b68.plan, b68.planActor = nil, nil      -- item or swing commits on this confirm
       return { "a" }
     end
     plan.tgtStall = (plan.tgtStall or 0) + 1
+    if plan.tgtStall > 20 and plan.kind == "fight" then
+      -- a swing on the wrong ally is not harmless: back out, replan
+      b68Log(string.format("wake-up swing's target steer stalled (chars=%02X want=%02X) " ..
+        "-- backing out", chars, wantMask))
+      b68.plan, b68.planActor = nil, nil
+      return { "b" }
+    end
     if plan.tgtStall > 20 then
       b68Log(string.format("target steer stalled (chars=%02X want=%02X) " ..
         "-- accepting the current party target", chars, wantMask))
@@ -1105,6 +1142,7 @@ local function b68Fight()
       b68.killParty, b68.wiped = nil, false
       b68.holyAt, b68.bludgAt, b68.chipAt, b68.castAt = nil, nil, {}, {}
       b68.chipWild, b68.sideN, b68.wildAt, b68.sabinCmdAt = {}, 0, nil, nil
+      b68.rightN = 0
       b68.holyBy, b68.bludgBy = nil, nil
       b68.shieldsOff = 0
       b68.holyRevealed, b68.bludgRevealed = false, false
@@ -1112,7 +1150,7 @@ local function b68Fight()
       b68.lastSH, b68.lastHP = nil, nil
       b68.tornDown, b68.mstreak = 0, 0
       b68.oddState, b68.oddN, b68.impSaid = nil, 0, false
-      b68.impCure, b68.reviveFor = {}, {}
+      b68.impCure, b68.reviveFor, b68.wakeFor = {}, {}, {}
       gSlot, sabinE, cyanE, shadowE = nil, nil, nil, nil
       b68Watch.reset()
     end),
