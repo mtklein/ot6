@@ -242,6 +242,7 @@ checked spliced into that host. The instruments today:
 | `battle_smoke.lua` | the harness end to end: `first_battle` loads, the battle RAM is live, a monster carries seeded shields |
 | `metrics_battle.lua` | one fight played by policy, per-side actions, damage, BP and breaks ([balance-metrics.md](../../docs/design/balance-metrics.md)) |
 | `parts_selftest.lua` | the multi-part reader and planner against the built ROM's formations (no emulator) |
+| `slot_selftest.lua` | the driver's reel arithmetic (#353: stop rule, drift window, result, aim) against the built ROM's SlotReelTbl, SlotRateTbl, SlotAttackTbl and MagicProp (no emulator) |
 | `recovery_trace_selftest.lua` | the recovery-trace ledger (no emulator) |
 | `fight_drops_selftest.lua` | every plan drop goes through `Driver:dropPlan` (no emulator) |
 | `counter_selftest.lua` | the counter rule's readers (#372): the AI walker over retaliation scripts and the magical/physical damage models, against the built ROM and hand-checked numbers, each assertion failed by its own mutant (no emulator) |

@@ -5078,13 +5078,14 @@ local BATTLE = {
   -- $05; A commits ($38 -> $05 -> $0F -> $01 -> $10 -> $01 -> $00).
   CMD_RUNIC = 0x0B,
   -- SETZER's Slot (probe_slot.lua, deleted in bd50a973; last version at f1f26173): A on Slot $05 -> $06 (OpenSlotWindow)
-  -- -> $01 -> $32 -> $39 -> $08, the reel state.  In $08 the first A starts
-  -- the spin and each later A stops the next reel once it is ready; the
-  -- reel-3 stop commits.  B closes only before the first A ($08 -> $3A ->
+  -- -> $01 -> $32 -> $39 -> $08, the reel state.  In $08 the reels spin
+  -- from the window's opening; the first A stops reel 1 (at the next icon
+  -- boundary, M.slotStopPos) and each later A the next reel once it is
+  -- ready; the reel-3 stop commits.  B closes only before the first A ($08 -> $3A ->
   -- $01 -> $34 -> $33 -> $01 -> $05); after it B is not read.  The commit
   -- walks $07 -> $3A -> $01 -> $34 -> $33 -> $01 -> $05 -> $0F -> ...
   CMD_SLOT = 0x0F, ST_SLOT = 0x08,
-  SLOT_PRESS1 = 0x7B92,
+  SLOT_PRESS1 = 0x7B92, SLOT_POS1 = 0x7B8C, SLOT_STOP1 = 0x7B8F,
   -- The transitional states every turn walks, measured by the four probes
   -- (each one frame unless noted): $04 the command window opening ($01 ->
   -- $04 -> $01 -> $05, UpdateMenuState_04); $0F/$10 the command window
@@ -6288,6 +6289,70 @@ function M.setzerJackpot(face, level)
   return math.min(65535, face * face * face * level * 2 * face)
 end
 
+-- ---- the reels (#353) ----------------------------------------------------
+-- The reels spin from the window's opening (UpdateMenuState_08 @8000): each
+-- frame a reel not yet stopped steps its position byte down 4 ($7B8C-$7B8E;
+-- the icon on the line is SlotReelTbl[reel][pos >> 4], @a800).  An A
+-- press marks the reel ($7B92-$7B94) and the reel stops at the first
+-- position after it whose low nibble is 0, so a press read with the reel
+-- at `pos` (before that frame's step) stops it at the first pos - 4k,
+-- k >= 1, on a 16 boundary.  Reel 1 stops exactly there; reels 2 and 3
+-- drift toward reel 1's icon by the rig (ot6_slot.asm): up to 4 icons at
+-- 1-2 BP, until matched at 3 BP.  The result is the triple's icon + 1
+-- (_c2b4a3), 7-7-Bar is 0 (Joker Doom on the party: JokerTargetTbl $0f),
+-- anything else 7 (Lagomorph); SlotAttackTbl maps 1-6 to Joker Doom on the
+-- monsters, Bahamut, a random esper, H-Bomb, Chocobop and 7-Flush.
+M.SLOT_REELS = {
+  { 0, 4, 5, 3, 4, 5, 2, 5, 1, 4, 5, 3, 5, 2, 3, 1 },
+  { 0, 4, 1, 5, 3, 4, 1, 5, 4, 3, 2, 5, 4, 3, 2, 5 },
+  { 0, 1, 3, 4, 2, 5, 4, 3, 1, 5, 4, 3, 2, 5, 4, 5 },
+}
+M.SLOT_ATTACK = { [0] = 0x94, 0x94, 0x43, 0xFF, 0x80, 0x7F, 0x81, 0xFE }
+-- the position a reel stops at for a press read with it at `pos`
+function M.slotStopPos(pos)
+  local p = pos
+  repeat p = (p - 4) & 0xFF until p & 0x0F == 0
+  return p
+end
+function M.slotIcon(reel, pos) return M.SLOT_REELS[reel][(pos >> 4) + 1] end
+-- the result index of three landed icons (_c2b4a3)
+function M.slotResult(i1, i2, i3)
+  if i1 == i2 and i1 == i3 then return i1 + 1 end
+  if i1 == 0 and i2 == 0 and i3 == 2 then return 0 end
+  return 7
+end
+-- SlotRateTbl (btlgfx_main.asm @7ee1): the rig byte ANDed with an icon's
+-- rate is 0 when the machine blesses it (reels 2 and 3 drift to it, a pair
+-- of it is not refused).  Icons 4 and 5 rate 0: blessed under every rig.
+M.SLOT_RATE = { [0] = 0x1F, 0x03, 0x01, 0x01, 0x00, 0x00 }
+-- The icon to time the reels on at tier `tier` (the boost the spin latches
+-- at its first A), with `gate` the battle's $2F49.2 (Joker Doom refused).
+-- 3 BP chooses the triple, so the 7s (Joker Doom on every monster) where
+-- the battle allows it; else, and at 2 BP, where the rig blesses every icon
+-- but the 7s under the gate and reels 2 and 3 drift four icons toward the
+-- timed press (Driver:slotTimed), the strongest attack by its MagicProp
+-- power; below 2 BP, where the rig is drawn at the first A, the strongest
+-- of the icons every rig blesses (rate 0).  Never the 7s below 3 BP: that
+-- triple is the one 3 BP buys outright, and a 7 pair reel 3 misses can stop
+-- on the Bar (Joker Doom on the party).  `power(attack)` is the caller's
+-- reading of the ROM (icon 2's esper is drawn, so it is left out).
+function M.slotAim(tier, gate, power)
+  if tier >= 3 and not gate then return 0 end
+  local best, bestV
+  for icon = 1, 5 do
+    if icon ~= 2 and (tier >= 2 or M.SLOT_RATE[icon] == 0) then
+      local v = power(M.SLOT_ATTACK[icon + 1])
+      if bestV == nil or v > bestV then best, bestV = icon, v end
+    end
+  end
+  return best
+end
+-- Whether reel 1 stops on `icon` if A goes down now with the reel at `pos`
+-- and the press is read `lag` frames on (M.SLOT_LAG, measured below)
+function M.slotPressLands(pos, icon, lag)
+  return M.slotIcon(1, M.slotStopPos((pos - 4 * lag) & 0xFF)) == icon
+end
+
 -- The button that walks SETZER's open table (the Tools shell, $30) onto
 -- its Slot row and confirms it, for a test or driver that spins the reels
 -- by hand: a direction while the cursor is elsewhere, "a" on the row, "b"
@@ -6380,21 +6445,38 @@ function Driver:setzerLine(actor, have)
   -- route's bank policy spends at 2, so SETZER never held 3 in a random
   -- battle (v0.25's chain logs: no "SETZER Slot" line; route-wor-falcon.md
   -- 13.9).  o.slotAt / M.SLOT_AT is the lever (3 is the driver before).
-  -- Measured (build/attempts/wt/v026-driver/353/): it fires in one random
-  -- battle a run at most -- 2 of 2 tomb runs and 1 of 2 Narshe-mission runs
-  -- under the new rule (353/slot), 3 of 13 tomb runs with 0-12 encounters
-  -- used up (353/tomb) -- and the five distinct battles it fired in took
-  -- +16 (slot/tomb/new_s0 = tomb/slot2_k0), +200 (slot/tomb/new_s23), +8
-  -- (slot/nm/new_s0), -208 (tomb/slot2_k11) and -120 (tomb/slot2_k12)
-  -- ticks against the same battle without it (-104 in all), no death
-  -- moved -- the verb played at no measured cost; what would
-  -- make it pay (reel 1 timed on a chosen icon) is not built yet.
+  -- The reels are timed (Driver:slotTimed, M.slotAim; o.timed = false /
+  -- M.SLOT_TIMED = false spins them untimed, the driver before).  Measured
+  -- on -6 (build/attempts/wt/v026-driver2/353/ab7/: gen_wor_tomb from
+  -- wor-kohlingen-v1 at 16 seed shifts, gen_narshe_mission from
+  -- terra-returned-v1 at 4, retries off): timed, 13 spins and 13 aimed
+  -- triples (12 H-Bomb, one 7-Flush where an R was not taken and the spin
+  -- latched tier 1); untimed, 12 spins and 8 triples.  The battles timed
+  -- Slot fired in took -680 ticks in the tomb (9 same-key battles, 3 deaths
+  -- against 5) and +488 on the mission (2, none) against the same battles
+  -- with no Slot; the runs in all, 484,948 ticks against 488,829, deaths 12
+  -- against 12.  From any bank (SLOT_AT 0: below 2 BP the 7-Flush every rig
+  -- blesses) it split by world: the mission's runs -12,722 ticks and 0
+  -- deaths against 1, the tomb's +14,003 and 23 deaths against 11 (it took
+  -- SETZER's keyed Fight from the shields), so 2 stays the default.  The
+  -- bank held at 2 for the 7s at 3 (tried, retired) reached 3 in none of 15
+  -- battles it held in (ab6/).
   local slotAt = o.slotAt or M.SLOT_AT or 2
+  local timed = o.timed ~= false and M.SLOT_TIMED ~= false
+  local gate = (M.readByte(0x2F49) & 0x04) ~= 0
   if o.slot ~= false and have >= slotAt and M.readByte(M.RANDBTL) ~= 0 and livingMonsters() >= 2 then
     local b = math.min(have, 3)
-    M.log(string.format("[%s] actor=%d SETZER Slot at %d BP: %s against %d", tag, actor, b,
-      b >= 3 and "a chosen triple" or "every icon blessed", livingMonsters()))
-    return { kind = "slot", row = row, skill = BATTLE.SETZER.SLOT, boostLeft = b, reason = "slot" }
+    local aim
+    if timed then
+      local MP = M.sym("MagicProp") & 0x3FFFFF
+      aim = M.slotAim(b, gate, function(a) return M.readRomByte(MP + a * 14 + 6) end)
+    end
+    M.log(string.format("[%s] actor=%d SETZER Slot at %d BP: %s against %d%s", tag, actor, b,
+      b >= 3 and "a chosen triple" or "every icon blessed", livingMonsters(),
+      aim and string.format("; the reels timed on icon %d (attack $%02X%s)", aim,
+        M.SLOT_ATTACK[aim + 1], gate and ", Joker Doom refused here" or "") or "; the reels untimed"))
+    return { kind = "slot", row = row, skill = BATTLE.SETZER.SLOT, boostLeft = b, reason = "slot",
+             aimIcon = aim, boostPlanned = b }
   end
   -- the gil rows are for the fights that matter: a random battle is won
   -- with the free Fight (measured, gm.sh: in the WoB grind Hired Help took
@@ -9482,7 +9564,8 @@ function Driver:button(actor)
   end
   -- Slot's open and close walks ($06 $32 $39 / $07 $3A $34 $33) are in
   -- ST_TRANSITIONAL and fall through to the wait below.  In the reel
-  -- state every pulse is an A: the first starts the spin, each later one
+  -- state every pulse is an A: the first stops reel 1 (timed by the frame
+  -- hook, Driver:slotTimed, when the plan aims an icon), each later one
   -- stops the next reel once it is ready (an early A is not read), and
   -- the third stop commits.  The boost was spent at $05 with R, where
   -- the engine latches it at the first A (Ot6SlotRig).
@@ -9881,6 +9964,7 @@ function Driver:idle()
   self.healWatch, self.healSaid, self.finisherSaid, self.inertSaid = nil, nil, nil, {}
   self.priceSaid = {}
   self.dmgWatch, self.dmgSeen, self.monHpLast = {}, {}, {}
+  self.slotWatch = nil
   self.dmgHit, self.hitLedger, self.partyHpLast = {}, {}, {}
   self.monAct, self.deathSaid, self.battleDeaths, self.wipeSaid = nil, {}, {}, false
   self.monTurn = {}
@@ -11915,6 +11999,11 @@ function Driver:watchDamage()
   for s = 0, 5 do
     local hp = M.readWord(BATTLE.MON_HP + s * 2)
     local last = self.monHpLast[s]
+    local sw = self.slotWatch
+    if sw and who == sw.actor and last ~= nil and hp < last then
+      sw.seen = sw.seen + (last - hp)
+      if hp == 0 then sw.kills = sw.kills + 1 end
+    end
     if who ~= nil and last ~= nil and hp < last then
       local _, w = self:dmgWatchOf(who)
       if w then
@@ -11933,6 +12022,13 @@ function Driver:watchDamage()
   end
   while execDone[1] ~= nil and M.frame - execDone[1].frame > BATTLE.DMG_SETTLE do
     local done = table.remove(execDone, 1)
+    local sw = self.slotWatch
+    if sw and done.actor == sw.actor and done.cmd == BATTLE.CMD_SLOT then
+      -- the spin's landing (#353), said for a lab; it plans nothing
+      M.log(string.format("[%s] actor=%d [slot] the spin's $%02X took %d off the monsters, %d killed "
+        .. "(%d standing before)", self.tag or "fight", sw.actor, done.atk or 0xFF, sw.seen, sw.kills, sw.standing))
+      self.slotWatch = nil
+    end
     local i, w = self:dmgWatchOf(done.actor)
     if w then
       self.dmgSeen[w.actor] = w.norm
@@ -12847,6 +12943,7 @@ function Driver:frame()
   -- than wall clock since the first offer, so another actor's slow turn
   -- between two pursuits cannot fire it.
   if self.plan and self.plan.kind == "lore" then self.loreSpinN = self.loreSpinN + 1 end
+  if self:slotTimed(actor) then return end
   if ph == 0 then
     self.held = self:button(actor) or {}
     self.heldFast, self.held.fast = self.held.fast or false, nil
@@ -12876,6 +12973,125 @@ function Driver:frame()
   if self.heldFast then
     M.setPad(held < self:cadence() and held % 10 < 5 and self.held or {})
   else M.setPad(held < 6 and self.held or {}) end
+end
+
+-- The reels timed (#353): while SETZER's reels spin under a plan that aims
+-- an icon (Driver:setzerLine, M.slotAim), the driver watches the next
+-- reel's position every frame and puts A down, after one frame released so
+-- the press is a new edge:
+--   reel 1 on the frame whose stop is the icon (M.slotPressLands, a window
+--     of four frames; M.SLOT_LAG frames from pad to read);
+--   reels 2 and 3, which drift toward reel 1's icon (and its pair) by up to
+--     four icons when the rig blesses it, on the frame whose first stop has
+--     that icon two of the drift's five stops on (M.slotDriftAt), so a
+--     frame early or late still lands it; a reel 3 with no pair to complete
+--     is pressed at once.
+-- A person watching the reels does the same.  True while the hook owns the
+-- pad (the commit press after reel 3 is the pulse's).  Each reel's press
+-- and stop are logged, with the read's frame, so a lab can measure
+-- M.SLOT_LAG rather than assume it.
+M.SLOT_LAG = M.SLOT_LAG or 1
+-- How many of a drifting reel's stops pass before `icon`, pressed with the
+-- reel at `pos` and read `lag` frames on: 0-`drift`, or nil when the drift
+-- does not reach it
+function M.slotDriftAt(reel, pos, icon, lag, drift)
+  local stop = M.slotStopPos((pos - 4 * lag) & 0xFF)
+  for k = 0, drift do
+    if M.slotIcon(reel, (stop - 16 * k) & 0xFF) == icon then return k end
+  end
+  return nil
+end
+function Driver:slotTimed(actor)
+  local p = self.plan
+  if p == nil or p.kind ~= "slot" then return false end
+  local st = M.readByte(BATTLE.MSTATE)
+  local press = { M.readByte(BATTLE.SLOT_PRESS1), M.readByte(BATTLE.SLOT_PRESS1 + 1), M.readByte(BATTLE.SLOT_PRESS1 + 2) }
+  local stop = { M.readByte(BATTLE.SLOT_STOP1), M.readByte(BATTLE.SLOT_STOP1 + 1), M.readByte(BATTLE.SLOT_STOP1 + 2) }
+  p.sr = p.sr or { {}, {}, {} }
+  for r = 1, 3 do
+    local t = p.sr[r]
+    if t.press and press[r] ~= 0 and t.read == nil then
+      t.read, t.readPos = M.frame, M.readByte(BATTLE.SLOT_POS1 + r - 1)
+    end
+    if t.press and not t.said and stop[r] ~= 0 then
+      t.said = true
+      local at = M.readByte(BATTLE.SLOT_POS1 + r - 1)
+      local icon = M.slotIcon(r, at)
+      M.log(string.format("[%s] actor=%d [slot] reel %d stopped at $%02X, icon %d (aimed %d, %s): "
+        .. "A down at $%02X f%d, read by f%d (reel at $%02X then)", self.tag or "fight", actor, r,
+        at, icon, t.aim or -1, t.aim == nil and "no pair to complete" or (icon == t.aim and "landed" or "MISSED"),
+        t.pressPos, t.press, t.read or -1, t.readPos or 0))
+    end
+  end
+  if not p.slotReels and stop[3] ~= 0 and press[3] ~= 0 then
+    p.slotReels = true
+    local i1, i2, i3 = M.slotIcon(1, M.readByte(BATTLE.SLOT_POS1)), M.slotIcon(2, M.readByte(BATTLE.SLOT_POS1 + 1)),
+      M.slotIcon(3, M.readByte(BATTLE.SLOT_POS1 + 2))
+    local r = M.slotResult(i1, i2, i3)
+    local standing = 0
+    for s = 0, 5 do if monAlive(s) then standing = standing + 1 end end
+    self.slotWatch = { actor = actor, seen = 0, kills = 0, standing = standing }
+    M.log(string.format("[%s] actor=%d [slot] reels %d-%d-%d: result %d, attack $%02X%s; tier %d, rig $%02X, "
+      .. "reel-3 mark $%02X, drift left %d", self.tag or "fight",
+      actor, i1, i2, i3, r, M.SLOT_ATTACK[r], r == 0 and " (Joker Doom on the PARTY)" or
+      (r == 7 and " (no triple)" or (i1 == p.aimIcon and " (the aimed triple)" or "")),
+      M.readByte(0x57BA), M.readByte(0x6179), M.readByte(0x617C), M.readByte(0x617D)))
+  end
+  if p.aimIcon == nil then return false end
+  if st ~= BATTLE.ST_SLOT or M.readByte(BATTLE.ACTOR) & 3 ~= actor then return false end
+  -- the reel to stop next: the first not yet marked, once the one before it stopped
+  local r
+  if press[1] == 0 then r = 1
+  elseif press[2] == 0 and stop[1] ~= 0 then r = 2
+  elseif press[3] == 0 and stop[2] ~= 0 then r = 3
+  else return false end
+  if not p.committed then
+    p.committed = M.frame
+    M.log(string.format("[%s] actor=%d Slot: spinning (bank %d), reel 1 timed on icon %d",
+      self.tag or "fight", actor, M.readByte(BATTLE.BP + actor * 2), p.aimIcon))
+  end
+  local t = p.sr[r]
+  local pos = M.readByte(BATTLE.SLOT_POS1 + r - 1)
+  if t.press then
+    local held = M.frame - t.press
+    if held < 6 then M.setPad({ "a" }); return true end
+    -- not read in 12 frames: released, and the next landing frame tries again
+    if held < 12 then M.setPad({}); return true end
+    M.log(string.format("[%s] actor=%d [slot] reel %d's A at f%d was not read; timing again", self.tag or "fight",
+      actor, r, t.press))
+    t.press = nil
+  end
+  local want
+  if r == 1 then
+    -- the tier the first A will latch is the pending boost now (Ot6SlotRig);
+    -- an R the menu did not take leaves it below the plan's, so aim for it
+    local tier = math.min(M.readByte(0x3E9D + actor * 2), 3)
+    if p.aimTier ~= tier then
+      local MP = M.sym("MagicProp") & 0x3FFFFF
+      local aim = M.slotAim(tier, (M.readByte(0x2F49) & 0x04) ~= 0,
+        function(a) return M.readRomByte(MP + a * 14 + 6) end)
+      if p.aimTier ~= nil or aim ~= p.aimIcon then
+        M.log(string.format("[%s] actor=%d [slot] the spin will latch tier %d (pending boost; planned %d): "
+          .. "the reels timed on icon %d", self.tag or "fight", actor, tier, p.boostPlanned or -1, aim))
+      end
+      p.aimTier, p.aimIcon = tier, aim
+    end
+    t.aim = p.aimIcon
+    want = M.slotPressLands(pos, p.aimIcon, M.SLOT_LAG)
+  else
+    local i1 = M.slotIcon(1, M.readByte(BATTLE.SLOT_POS1))
+    local paired = r == 2 or M.slotIcon(2, M.readByte(BATTLE.SLOT_POS1 + 1)) == i1
+    t.aim = paired and i1 or nil
+    want = not paired or M.slotDriftAt(r, pos, i1, M.SLOT_LAG, 4) == 2
+  end
+  if t.free and want then
+    t.press, t.pressPos = M.frame, pos
+    M.setPad({ "a" })
+  else
+    t.free = true
+    M.setPad({})
+  end
+  return true
 end
 
 -- A monster that still holds HP but the engine has counted out (#362):
