@@ -217,14 +217,51 @@ read every disagreement.
   hand that lifts a member who is inside the next hit clear of it.  It
   does not recurse into the race.  The lab watches for over-healing on
   easy World of Ruin fights.
-- **Per-decision cost** is measured in the frame callback: wall time per
-  command and the total over a leg.  Candidates or the horizon are capped
-  if it shows in leg wall time.
-- **Misses and crits.**  A line's and an enemy action's `hit` (0..1)
-  scale their damage where the ROM gives the rate cheaply (the spell's
-  hit rate, the monster's evade against a Fight).  Otherwise damage is
-  deterministic.
+- **Per-decision cost.**  Standalone Lua on the mbp, 4 members, 6
+  enemies, 16 candidates, horizon 8, 16 samples plus the worst case: about
+  5 ms a decision with `contCare`, 3.7 without (0.2 ms before sampling).
+  No cap so far.
+- **Hit chance.**  A Fight lands at `M.hitChance(hand hit rate $3B7C,
+  target M.Block $3B55)`: hit x block / 256, out of 100, $FF always lands.
+  The hit check (battle_main @233f) reads M.Block for every attack; Evade
+  is never read there because the carry is always clear.  Kit lines count
+  as landing.
+- **Pricing.**  A sold item costs its price x scarcity.  An unsold one
+  (Elixir) costs bagHeals' `M.itemGil`, its effect at the shops' rates,
+  already scarcity-priced.  Cost decides only beyond a 200-gil margin
+  (`M.RACE_COST_MARGIN`); inside it, the sooner kill wins.  A heal that
+  only trades its gil for the aftermath bill does not buy a turn.
 
-Built so far: `M.raceSim`, `M.raceBetter`, `M.raceChoose`, `M.raceItemCost`
-(`lib/ot6.lua`), and `tools/tests/care_race_selftest.lua`: the old rules'
-cases, 16 checks, each of six mutants of the score caught.
+## Calibration (coordinator, 2026-10-06)
+
+The first Air Force log predicted "WIPE, 3 down" in fights the party won.
+The cause: every slot's worst landed hit, always aimed at the member it
+would leave lowest.  The model is now:
+
+- **Typical hit.**  An enemy action does its typical landed hit, the
+  median of that slot's landings on that member (on anyone, if none),
+  once the slot has `M.RACE_TYPICAL_MIN` (3) landings.  Short of that it
+  uses its worst.
+- **Landing share.**  `act.hit` is the share of the slot's actions that
+  landed.  An action counts as area when most of its landings hit more
+  than one member.
+- **Aim.**  The default is uniform among the living; `act.aim` can name a
+  fixed target where the script is deterministic.  The driver does not
+  read the script's targeting yet, so every action is aimed at random.
+- **Sampling.**  `M.raceEval` plays each candidate 16 times
+  (`M.RACE_SAMPLES`) on one fixed list of draws shared by every candidate,
+  so the candidates are compared on the same luck.  The score uses the
+  samples' mean deaths, cost and HP left, their median kill and first
+  death, and the share that wipe.
+- **Worst case.**  One play at every slot's worst hit, aimed at the member
+  it leaves lowest, sets the wipe flag (criterion 1): a line the worst
+  case wipes on loses to one it does not.
+- **Checking it.**  Each decision's prediction for the plan played is
+  logged against what happened over the same horizon of enemy actions
+  (`[race-cal]`).
+
+Built so far: `M.raceSim`, `M.raceEval`, `M.raceBetter`, `M.raceChoose`,
+`M.raceItemCost`, `M.hitChance` (`lib/ot6.lua`), and the driver's
+`[race]` log and `"act"` mode behind `M.CARE_RACE`.  The unit tests
+(`tools/tests/care_race_selftest.lua`) run 25 checks and catch twelve
+mutants.
