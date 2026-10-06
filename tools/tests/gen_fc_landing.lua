@@ -365,6 +365,26 @@ H.run({ maxFrames = 600000 }, flatten({
   H.call(function()
     H.log(string.format("[deck kit] between-wave window at f%d after %d battle(s): dressing", H.frame, seenBattles))
   end),
+  -- #406: the first window can open with a member down (TERRA, SHIVA's
+  -- wearer, died in IAF battle 1 at 4 of 32 shifts), and the Skills menu
+  -- will not open for a dead member, so the stone cannot move.  A person
+  -- raises them first: the field care (Fenix Down from the bag), with the
+  -- menu open the wave timers paused.
+  H.cond(function()
+    for _, c in ipairs(H.partyMembers()) do
+      if (H.charStatus1(c) & 0xC2) ~= 0 or H.charHp(c) == 0 then return true end
+    end
+    return false
+  end, {
+    H.fieldCare({ tag = "raise before the deck kit", threshold = 0.9 }),
+    H.call(function()
+      for _, c in ipairs(H.partyMembers()) do
+        H.assertEq((H.charStatus1(c) & 0xC2) == 0 and H.charHp(c) > 0, true,
+          string.format("char %d stands before the deck kit (status1 $%02X, HP %d)",
+            c, H.charStatus1(c), H.charHp(c)))
+      end
+    end),
+  }, {}),
   H.equipEsper(charPos(EDGAR), SHIVA, { tag = "SHIVA -> EDGAR" }),
   H.equipKit(EDGAR, { { 0, 0x0B }, { 0, 0x0A },
                       { 1, 0x5B }, { 1, 0x5A },

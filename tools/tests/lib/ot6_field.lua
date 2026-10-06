@@ -5915,6 +5915,19 @@ function M.equipEsper(pos, esperIdx, opts)
         "freeing it there first (one-owner rule)", tag, esperIdx, owner, posOf(owner))
     end),
   }
+  -- The Skills menu refuses a member whose status1 holds $C2 (dead,
+  -- Zombie, Petrify: CheckSkillValid, field_menu.asm:722-731), so a stone
+  -- worn by one cannot be freed there (#406: TERRA down after IAF battle 1,
+  -- "4 A presses on the target were not taken").  Say so by name; the
+  -- caller raises or cures the owner first.
+  freeSteps[#freeSteps + 1] = M.call(function()
+    local st1 = M.charStatus1(owner)
+    if (st1 & 0xC2) ~= 0 then
+      error(string.format("%s: stone $%02X is worn by char %d, whose status1 $%02X "
+        .. "(dead/Zombie/Petrify) the Skills menu refuses -- raise or cure them before "
+        .. "moving the stone", tag, esperIdx, owner, st1), 0)
+    end
+  end)
   for _, s in ipairs(listWalk(tag .. " (free)", function() return posOf(owner) end)) do
     freeSteps[#freeSteps + 1] = s
   end
