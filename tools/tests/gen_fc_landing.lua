@@ -108,55 +108,23 @@ end
 
 local u4Req = nil                         -- the ultros4_entry capture
 local DECK = { S = H.newPartySelect(PICK), helmT = 0, formed = false, careD = nil }
--- Ultros IV's fight, armed from the deck: Ultros IV ($168) and Chupon
--- ($12F), who steps in mid-fight (battle_ultros4).  The deck kit's Relic
--- session lets the game's Optimum re-pick LOCKE's hands (the kit's note
--- below), element-blind; when the ThunderBlade is not his to keep (the
--- Sealed Gate's ladder can hand it to TERRA), that pick was the Flame
--- Sabre, which Chupon ABSORBS -- the absorb guard stopped the f77db439
--- chain: "char 1's R-hand item $0D (fire) is ABSORBED by slot 0 species
--- $012F".  A person re-arms before walking up to Ultros: each hand whose
--- weapon either of them absorbs (read off the ROM, M.absorbClashesFor)
--- takes the strongest blade in the bag neither absorbs, strongest first.
-local U4_SPECIES = { { slot = 0, species = 0x0168 }, { slot = 1, species = 0x012F } }
-local U4_BLADES = { 0x0F, 0x0B, 0x0E, 0x0A, 0x0C, 0x0D, 0x09, 0x05, 0x08, 0x02,
-                    0x07, 0x04, 0x03, 0x01, 0x00 }
-local function u4Arms()
-  local inner
-  local function build()
-    local steps = {}
-    for _, c in ipairs(H.absorbClashesFor(H.partyWeapons(), U4_SPECIES)) do
-      local slot = c.hand == "R" and 0 or 1
-      local items = {}
-      for _, it in ipairs(U4_BLADES) do
-        if H.invCountOf(it) > 0 and #H.absorbClashesFor(
-             { { char = c.char, hand = c.hand, item = it } }, U4_SPECIES) == 0 then
-          items[#items + 1] = { slot, it }
-        end
-      end
-      H.log(string.format("[u4 arms] %s -- re-arming from %d bag candidate(s)",
-        H.clashStr(c), #items))
-      if #items > 0 then
-        steps[#steps + 1] = H.equipKit(c.char, items,
-          { tag = string.format("u4 arms char %d %s-hand", c.char, c.hand), ladder = true })
-      end
-    end
-    steps[#steps + 1] = H.call(function()
-      local left = H.absorbClashesFor(H.partyWeapons(), U4_SPECIES)
-      local lines = {}
-      for _, c in ipairs(left) do lines[#lines + 1] = H.clashStr(c) end
-      H.assertEq(#left, 0, "no hand walks up to Ultros IV holding a weapon he " ..
-        "or Chupon absorbs" .. (#left > 0 and (": " .. table.concat(lines, "; ")) or ""))
-    end)
-    return H.seqStep(steps)
-  end
-  return {
-    tick = function(self)
-      if inner == nil then inner = build() end
-      return inner:tick()
-    end,
-    reset = function(self) inner = nil end,
-  }
+-- The fights after the IAF waves (#404): Ultros IV ($168) and Chupon
+-- ($12F), who steps into his fight (battle_ultros4), then the Floating
+-- Continent's own pool (map 394), read from the ROM.  The deck kit's Relic
+-- session lets the game's Optimum re-pick hands element-blind (it handed
+-- LOCKE the Flame Sabre Chupon absorbs, the f77db439 chain), but the deck
+-- kit runs in the between-wave window, whose timer runs while the menu is
+-- closed: an absorb-aware deck kit (H.equipKit's opts.absorbs) re-armed
+-- TERRA there and the next wave took LOCKE's session ("timeout after 900
+-- frames driving toward LOCKE deck kit (relics): cursor on the menu row",
+-- 3 of 3 attempts, build/attempts/wt/v026-route2/e404/).  So the re-arm
+-- is one stop after the last wave, before the walk that arms Ultros IV:
+-- H.absorbSafeArms, the strongest bag weapon by the ROM's power byte that
+-- none of them absorbs, then asserted.
+local function fcAhead()
+  local out = { 0x0168, 0x012F }
+  for _, r in ipairs(H.poolSpecies(H.fieldEncounterGroup(394))) do out[#out + 1] = r.species end
+  return out
 end
 
 local function deckDrive(untilKit)
@@ -423,7 +391,7 @@ H.run({ maxFrames = 600000 }, flatten({
   H.call(function()
     H.log(string.format("[deck] the Ultros teaser is up ($01F0) at f%d, at (%d,%d); walking to (22,6)", H.frame, H.fieldX(), H.fieldY()))
   end),
-  u4Arms(),
+  H.absorbSafeArms(nil, fcAhead, { tag = "arms for Ultros IV and the continent" }),
   -- ultros4_entry: the deck, controllable, one walk from arming Ultros IV
   -- (battle_ultros4 boots it).  Captured with no frames spent (H.saveState
   -- waits 2, which moved every IAF battle after it and changed the play;
