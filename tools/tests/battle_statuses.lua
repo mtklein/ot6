@@ -24,9 +24,9 @@
 -- legs' pool is Stray Cat x3 (no CrassHoppr) at 80/256 beside two
 -- CrassHoppr formations at 176/256, so one fixture meets CrassHopprs every
 -- battle and the next can meet eight Stray Cat packs in a row.  So the
--- walk PACES one pool's stretch of the plain beside the route (H.newPacer:
--- the nearest stretch of two or more tiles whose pool can deal the
--- exposures within the cap, P.findStart; #399) until a turn-denying status
+-- walk PACES one pool's stretch of the route's own leg (H.newPacer: the
+-- nearest stretch of two or more tiles of a pool the leg rolls that can
+-- deal the exposures within the cap, P.findStart; #399) until a turn-denying status
 -- has actually landed, and only then turns into the forest; and it bounds
 -- the pacing by what can deny a turn, read from the ROM: an EXPOSURE
 -- battle is one whose formation holds a species whose
@@ -296,8 +296,29 @@ local function worstFor(g)
   worsts[g] = worst
   return worst
 end
+-- The pools the walk may pace: those the route's own leg to the forest
+-- rolls ((176,71) <-> (178,81), both on the line camp_escaped's walker
+-- plans through to the forest mouth; H.worldPathGroups over the walkers'
+-- BFS paths), since EXPOSURES' landing rate was measured on those legs'
+-- CrassHopprs (the header), and within them one that deals the exposures
+-- within the cap.  The decode alone is not enough: Doma's plain beside the
+-- boot tile (group 1) decodes as an exposure pool (species $05D, a Stop
+-- special) and in 16 of its exposure battles nothing landed, at 0, 1, 2, 3
+-- and 5 encounters used up (build/attempts/wt/v026-field2/399/
+-- new_statuses_*.log, before this restriction).
+local ROUTE_A, ROUTE_B = { 176, 71 }, { 178, 81 }
+local routeGroups = nil
+local function onRoute(g)
+  if routeGroups == nil then
+    routeGroups = {}
+    local order = H.worldPathGroups({ ROUTE_A, ROUTE_B, ROUTE_A })
+    for _, x in ipairs(order) do routeGroups[x] = true end
+    H.log(string.format("[test] the route leg's groups: %s", table.concat(order, ",")))
+  end
+  return routeGroups[g] == true
+end
 local P = H.newPacer({ tag = "statuses pace",
-  want = function(g) return worstFor(g) <= MAXBATTLES end })
+  want = function(g) return onRoute(g) and worstFor(g) <= MAXBATTLES end })
 local function budget()
   return H.call(function()
     battleBudget, pacedFrom = worstFor(P.group), fought()
