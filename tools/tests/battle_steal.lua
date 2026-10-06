@@ -121,6 +121,30 @@ local function armWatches()
   emu.addMemoryCallback(function(_, v)
     if rec and rec.code >= 1 and v ~= NONE and not rec.done then rec.grant = v end
   end, emu.callbackType.write, 0x7E32F4, 0x7E32F4 + 18)
+  -- which slot Ot6StealSlot read: its rare arm is `lda $3308,y / rtl`
+  -- (B9 08 33 6B) and its common arm `lda $3309,y / rtl` (B9 09 33 6B),
+  -- each once in the proc.  The slot the ROM chose, not the item it
+  -- handed back: on group 1's Sand Ray ($05C) the rare and common slots
+  -- hold the same item ($F2), so "the grant is the rare item" passed
+  -- whichever slot was read (#252)
+  local base = H.sym("Ot6StealSlot")
+  local arms = {}
+  for off = 0, 0x60 do
+    local b0, b1, b2, b3 = H.readRomByte((base & 0x3FFFFF) + off), H.readRomByte((base & 0x3FFFFF) + off + 1),
+      H.readRomByte((base & 0x3FFFFF) + off + 2), H.readRomByte((base & 0x3FFFFF) + off + 3)
+    if b0 == 0xB9 and b2 == 0x33 and b3 == 0x6B and (b1 == 0x08 or b1 == 0x09) then
+      local k = b1 == 0x08 and "rare" or "common"
+      H.assertEq(arms[k], nil, "Ot6StealSlot has one " .. k .. " arm")
+      arms[k] = base + off
+    end
+  end
+  H.assertEq(arms.rare ~= nil and arms.common ~= nil, true,
+    "Ot6StealSlot's rare and common arms are found by their bytes")
+  for k, a in pairs(arms) do
+    emu.addMemoryCallback(function()
+      if rec and not rec.done then rec.slot = k end
+    end, emu.callbackType.exec, a, a)
+  end
   -- the mp-cost queue store (CreateAction), filtered to command $05: exactly
   -- what Ot6AbilityCost handed back for this Steal, captured at the source.
   -- battle_stealmp owns the economy; this file needs the number only to show
@@ -369,7 +393,7 @@ end
 --
 -- The budget holds only while every encounter rolls from that one pool, so
 -- the walk paces a stretch of the dismount row whose every tile rolls the
--- same group (planPace, from the ROM's zone and background tables via
+-- same group (H.newPacer, from the ROM's zone and background tables via
 -- H.worldEncounterGroup), turning at its ends, and each battle asserts the
 -- group its CheckBattleWorld rolled.  The walk used to alternate left and
 -- right on the clock; its turns drifted with each battle's timing, and a
@@ -379,8 +403,7 @@ end
 local ITEMS = H.sym("MonsterItems") & 0x3FFFFF
 local MAXTRIES = 40                -- steps built per battle; the budget must fit
 local PACE = 4                     -- tiles each way from the dismount tile, at most
-local worldGroup = nil             -- the group the last CheckBattleWorld rolled
-local pace = nil                   -- { y, lo, hi, group, dir }, set by planPace
+local P = H.newPacer({ tag = "desert", width = PACE })   -- the stretch (lib)
 local budgets = {}                 -- [group .. mode] = worst, decoded once
 local function formationSuits(f, wantFb)
   local rare, fb = false, false
@@ -420,60 +443,12 @@ local function budgetFor(group, wantFb)
   budgets[key] = worst
   return worst
 end
--- The stretch to pace: from the tile the party stands on, out to PACE tiles
--- each way along its row while the next tile is walkable and rolls the same
--- group; then every pairing of a stretch tile with a saved position the walk
--- can leave (any stretch tile, where its battles happen, and the live one,
--- which the first encounter reads) must roll that group too.
-local function planPace()
-  local x0, y0 = H.worldX(), H.worldY()
-  local function own(x) return H.worldEncounterGroup(x, y0, x, y0) end
-  local g = own(x0)
-  H.assertEq(g ~= nil, true, string.format("the dismount tile (%d,%d) rolls "
-    .. "random battles", x0, y0))
-  local lo, hi = x0, x0
-  while lo > x0 - PACE and H.worldPassable(lo - 1, y0) and own(lo - 1) == g do
-    lo = lo - 1
-  end
-  while hi < x0 + PACE and H.worldPassable(hi + 1, y0) and own(hi + 1) == g do
-    hi = hi + 1
-  end
-  local zx, zy = H.worldZonePos()
-  local groups = {}
-  for x = lo, hi do
-    for z = lo, hi do
-      local gg = H.worldEncounterGroup(x, y0, z, y0)
-      if gg ~= nil then groups[gg] = true end
-    end
-    local gg = H.worldEncounterGroup(x, y0, zx, zy)
-    if gg ~= nil then groups[gg] = true end
-  end
-  local list = {}
-  for gg in pairs(groups) do list[#list+1] = tostring(gg) end
-  table.sort(list)
-  H.log(string.format("[test] pace: row %d, x %d..%d (dismount x %d, saved "
-    .. "position (%d,%d)); the groups it can roll: %s", y0, lo, hi, x0, zx, zy,
-    table.concat(list, ",")))
-  H.assertEq(hi - lo >= 2, true, string.format("the dismount row gives a "
-    .. "stretch of at least three tiles that roll group %d (x %d..%d)", g, lo, hi))
-  H.assertEq(#list == 1 and list[1] == tostring(g), true, string.format(
-    "every encounter on the stretch rolls group %d, whatever the saved "
-    .. "position (rolls %s)", g, table.concat(list, ",")))
-  pace = { y = y0, lo = lo, hi = hi, group = g, dir = "left" }
-end
 -- one walk until an encounter opens, pacing the stretch
 local function desertWalk(tag)
   return H.driveUntil(function() return H.battleLoadStarted() end, 25000, {
     H.call(function()
-      if not H.worldMode() or not H.worldHasControl() then
-        plan = nil; H.setPad({}); return
-      end
-      if H.worldAligned() then
-        local x = H.worldX()
-        if x <= pace.lo then pace.dir = "right"
-        elseif x >= pace.hi then pace.dir = "left" end
-      end
-      H.setPad({ [pace.dir] = true })
+      if not H.worldMode() or not H.worldHasControl() then plan = nil end
+      H.setPad(P.pad())
     end),
   }, tag)
 end
@@ -481,7 +456,7 @@ local function enterDesertBattle(n, wantFb)
   local budget, group = nil, nil
   local steps = { H.call(function()
     needFb = wantFb or false
-    group = pace.group
+    group = P.group
     budget = budgetFor(group, wantFb)
   end) }
   for try = 1, MAXTRIES do
@@ -509,7 +484,7 @@ local function enterDesertBattle(n, wantFb)
         H.assertEq(cmdRowOf(locke, CMD_STEAL) ~= nil, true,
           "his real Steal exists")
         -- the budget belongs to the pool that dealt this encounter
-        H.assertEq(worldGroup, group, string.format("battle %d try %d was "
+        H.assertEq(P.rolled(), group, string.format("battle %d try %d was "
           .. "dealt by group %d, the pool its budget was decoded from", n, try, group))
         classify()
         H.log(string.format("battle %d try %d formation (group %d, budget %d): "
@@ -531,11 +506,6 @@ H.run({ maxFrames = 150000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(30),
-  H.call(function()
-    local check = H.sym("CheckBattleWorld")
-    emu.addMemoryCallback(function() worldGroup = H.worldCheckGroup() end,
-      emu.callbackType.exec, check, check)
-  end),
   H.hold({ "b" }),                    -- real chocobo dismount (gen_kolts)
   H.driveUntil(function() return H.readByte(0x11fa) & 3 == 0 end, 900, {
     H.waitFrames(1),
@@ -544,7 +514,7 @@ H.run({ maxFrames = 150000 }, {
   H.waitFrames(120),
   H.waitUntil(function() return H.worldSettled() end, 1500,
     "the world map settled", 5),
-  H.call(planPace),
+  H.call(function() P.plan() end),
 
   -- ================= battle 1: the 3-bp guarantee, and no re-looting ====
   enterDesertBattle(1),
@@ -569,8 +539,9 @@ H.run({ maxFrames = 150000 }, {
         H.assertEq(rec.code, 3, "3 bp is a guaranteed success")
         H.assertEq(#rec.draws, 0,
           "...and draws NO success RNG at all (the clamp overflows first)")
+        H.assertEq(rec.slot, "rare", "3 bp read the RARE slot (Ot6StealSlot's rare arm ran)")
         H.assertEq(rec.grant, wantRare,
-          "3 bp took the RARE slot's item (species-authored, read live)")
+          "...and granted its item (species-authored, read live)")
         H.assertEq(stealRare(rareT), NONE,
           "the game's own clear emptied the rare slot")
         H.assertEq(stealCommon(rareT), NONE, "...and the common slot")

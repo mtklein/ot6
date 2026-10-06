@@ -66,11 +66,10 @@
 -- machine's own reading -- he stood below the hp line his own last turn
 -- drew, with a pip in the bank, and it is not a counterattack -- decided
 -- without reference to the dump, so a ROM without the hook reaches the
--- verdict and fails AT the assertion.  A seed on which the fight ends
--- before he is provoked on a non-Fight arm runs out the budget instead,
--- which the segment runner retries at the next shift.  Which arms a run
--- covers is the roll's; the run logs them, and the 8-shift sweep's union
--- is where all three non-Fight arms are seen.
+-- verdict and fails AT the assertion.  A battle key on which the fight
+-- ends before he is provoked on a non-Fight arm is one branch of the
+-- search below (THE DRAW), not a retry.  Which arms a run covers is the
+-- roll's; the run logs them.
 local H = dofile("tools/tests/lib/ot6.lua")
 local ENTRY = "build/states/tunnelarmr_entry.mss.lua"
 local TUNNELARMR = 0x0104                -- formation species word (const.inc)
@@ -107,8 +106,13 @@ end
 local D = {}                            -- base, perBp, cap, unctl, mark, jmp, sites
 local SUBJ = nil
 
-local L = { windows = {}, dumps = {}, ends = {}, hurts = 0, markAtStart = 0,
-            provokedSpecial = 0, staged = false }
+local function freshLedger()
+  return { windows = {}, dumps = {}, ends = {}, hurts = 0, markAtStart = 0,
+           provokedSpecial = 0, staged = false }
+end
+local L = freshLedger()                 -- the live branch's
+local boot = { n = 0, found = nil, key = nil }   -- the branch search (THE DRAW, below)
+local ALL = { windows = {}, dumps = 0, hurts = 0, branches = {} }   -- every branch's
 local W = nil                           -- the open window
 
 -- A window opens at his chooser, RESOLVES at SaveForMimic (no more passes
@@ -117,7 +121,7 @@ local W = nil                           -- the open window
 -- battle_main.asm:324/344), reads the bank Ot6ActionEnd LEFT on the next
 -- frame start, and only then is finalized into the ledger.
 local function newWindow()
-  return { f = H.frame, bankBefore = bp(SUBJ), pendBefore = pend(SUBJ),
+  return { f = H.frame, subj = SUBJ, bankBefore = bp(SUBJ), pendBefore = pend(SUBJ),
     hp = hp(SUBJ), mark = L.markAtStart, arm = nil, pendAtRoll = nil,
     a70AtRoll = nil, a70 = 0, passes = 0, dumpBeforeRoll = false, rolled = false,
     dmg = {}, entered = {}, charge = nil, bankAfter = nil, resolved = false }
@@ -306,6 +310,21 @@ local function installObservers()
       H.frame, SUBJ, H.readByte(0x32CC + SUBJ * 2), st2(SUBJ)))
   end, emu.callbackType.exec, sQA, sQA)
 
+  local sEA = H.sym("ExecAction")
+  emu.addMemoryCallback(function()
+    care.monster = (emu.getState()["cpu.x"] & 0xFF) >= 8
+  end, emu.callbackType.exec, sEA, sEA)
+  emu.addMemoryCallback(function()
+    care.monster = false
+  end, emu.callbackType.exec, sAE, sAE)
+
+  local seedAt = H.seedStoreAddr()
+  emu.addMemoryCallback(function()
+    -- the seeder is `lda $021e / asl / asl / sta $be`, hooked at its first
+    -- byte: the seed it is about to store is the game clock's low byte x 4
+    boot.key = H.firstBattleKey((H.readByte(0x021E) * 4) & 0xFF, H.readWord(0x11E0))
+  end, emu.callbackType.exec, seedAt, seedAt)
+
   local lastHp, hb = nil, -1000
   emu.addEventCallback(function()
     if SUBJ == nil or not H.battleLoadStarted() then lastHp = nil; return end
@@ -333,6 +352,134 @@ local function installObservers()
   end, emu.eventType.startFrame)
 end
 
+-- THE OTHER SEAT KEEPS ITSELF STANDING.  It used to hand every turn
+-- straight back (X), so nothing healed anyone: TunnelArmr's blows (236 off
+-- the subject's 310 at f3151, build/attempts/wt/v026-rom2/umaro/) took the
+-- other seat first and then the subject, and the fight ended in a wipe --
+-- a game over, before the verdict -- on 16 of 16 seed shifts (old_s*.log.gz).
+-- Now it spends its window on a Potion (an X-Potion under a quarter of
+-- max HP, a Tonic when the Potions are gone) for whichever of the two
+-- stands within one blow of falling, and defers otherwise -- the subject
+-- only while no provocation of his is pending (he stands on or above the
+-- hurt line his last turn drew).  A heal while he stands under it lifts
+-- him over the line and the provocation is gone: a first cut that healed
+-- him regardless saw "hp 310 vs line 310" on every turn until his own
+-- Storms killed TunnelArmr, 15 of 16 shifts timing out (n2_s*.log.gz), and
+-- one that never healed him lost him to the second blow, with only a
+-- provoked Fight on two of four battle keys (n3_s*.log.gz).  With the other
+-- seat up, his fall ends no run: measured() takes one provoked non-Fight
+-- arm and his fall as the measurement's end.  It never attacks: the fight
+-- lasting is the point.
+-- "One blow" is the largest single HP drop either seat has taken from a
+-- monster's action so far (ExecAction with x >= 8), and LETHAL_PRIOR before
+-- any is seen.  Healing does not hide a provocation: the hurt line is the
+-- HP his own last turn drew, so a heal between his turns can lift him over
+-- it (that turn is then honestly unprovoked, and the ledger says so).
+local LETHAL_PRIOR = 250
+local TONIC, POTION, XPOTION = 0xE8, 0xE9, 0xEA
+local ST_ITEM, ST_TGT = 0x0A, 0x38
+local BATTINV, ITEMSCR, ITEMROW, CMDROW = 0x2686, 0x8947, 0x894F, 0x890F
+local tcCare = H.targetCursor({ mask = 0x7B7D, dirs = { "down", "up", "left", "right" } })
+local TRANSITIONAL = {}
+for _, v in ipairs({ 0x01, 0x02, 0x04, 0x06, 0x07, 0x09, 0x0F, 0x10, 0x26, 0x31, 0x32,
+                     0x33, 0x34, 0x39, 0x3A, 0x40, 0x41 }) do TRANSITIONAL[v] = true end
+local care = { blow = nil, plan = nil, tick = 0, last = {}, monster = false, said = nil }
+local function bagIdx(id)
+  for i = 0, 251 do
+    if H.readByte(BATTINV + i * 5) == id and H.readByte(BATTINV + i * 5 + 3) > 0 then return i end
+  end
+end
+local function seatedAlive(e) return H.readWord(0x3C1C + e * 2) > 0 and hp(e) > 0 end
+-- every frame: the largest drop a monster's action has dealt either seat
+local function watchBlows()
+  for e = 0, 3 do
+    local h = hp(e)
+    if care.last[e] ~= nil and h < care.last[e] and care.monster then
+      local d = care.last[e] - h
+      if care.blow == nil or d > care.blow then care.blow = d end
+    end
+    care.last[e] = h
+  end
+end
+local function carePlan(a)
+  local lethal = care.blow or LETHAL_PRIOR
+  local pick, pickHp = nil, nil
+  for e = 0, 3 do
+    -- the subject only while no provocation is pending: he stands on or
+    -- above the line his last turn drew (OT6_HPMARK, read), so lifting
+    -- him hides nothing -- the next blow still has to bring him under it
+    -- (or holds no pip: an empty bank dumps nothing, so no provocation
+    -- can be spent and a heal hides none)
+    local free = e ~= SUBJ or bp(e) == 0 or (D.mark ~= nil and H.readWord(D.mark) ~= 0
+                               and hp(e) >= H.readWord(D.mark))
+    if free and seatedAlive(e) and hp(e) <= lethal and (pick == nil or hp(e) < pickHp) then
+      pick, pickHp = e, hp(e)
+    end
+  end
+  if pick == nil then return nil end
+  local mx = H.readWord(0x3C1C + pick * 2)
+  local item = (pickHp * 4 < mx and bagIdx(XPOTION) and XPOTION)
+    or (bagIdx(POTION) and POTION) or (bagIdx(TONIC) and TONIC) or nil
+  if item == nil then return nil end
+  return { item = item, tgt = pick, why = string.format("hp %d within one blow (%d)", pickHp, lethal) }
+end
+-- the other seat's window: returns the button to press, or nil
+local function careButton(a, st)
+  if st == ST_CMD then
+    -- one plan per window, chosen as it opens (re-deciding every frame let
+    -- a plan flicker off mid-walk and the walk's next press be the defer)
+    if not care.open then care.open, care.plan = true, carePlan(a) end
+    if care.plan == nil then return "x" end            -- defer, as before
+    local row
+    for r = 0, 3 do if H.readByte(CMDTBL + a * 12 + r * 3) == 0x01 then row = r end end
+    if row == nil then care.plan = nil return "x" end
+    local cur = H.readByte(CMDROW + a) & 3
+    return (cur == row) and "a" or ((cur < row) and "down" or "up")
+  elseif st == ST_ITEM then
+    local want = care.plan and bagIdx(care.plan.item)
+    if want == nil then return "b" end
+    local cur = H.readByte(ITEMSCR + a) + H.readByte(ITEMROW + a)
+    return (cur < want and "down") or (cur > want and "up") or "a"
+  elseif st == ST_TGT then
+    if care.plan == nil then return "b" end
+    local b = tcCare.steer(care.plan.tgt, care.tick)
+    if b == "a" and care.said ~= care.plan then
+      care.said = care.plan
+      H.log(string.format("[care] f%d e%d gives item $%02X to e%d (%s) | %s", H.frame, a,
+        care.plan.item, care.plan.tgt, care.plan.why, partyLine()))
+    end
+    return b
+  end
+  -- the windows' own transitions ($09 the item list opening, $41/$40 the
+  -- target window opening and closing, $31/$02, ...) read no button a plan
+  -- needs, and a B in $41 lands in the target select as a cancel (the
+  -- first cut of this seat bounced $41 -> $38 -> $40 -> $0A for 39000
+  -- frames): wait them out
+  if TRANSITIONAL[st] then
+    if st == 0x0F or st == 0x10 then care.open = false end   -- the window closing
+    return nil
+  end
+  return "b"
+end
+
+-- THE DRAW.  Which turns TunnelArmr aims at the subject, and which arm
+-- each of the subject's turns rolls, is the battle RNG's, and the fight is
+-- short: his own Storms (1862 at f2604, n2_s4.log.gz) end it in a few turns.
+-- On some battle keys no provoked turn rolls anything but Fight before
+-- TunnelArmr falls or he does (3 of 11 keys with the care seat below:
+-- EC, 1C and 2C, n5_s*.log.gz), so the suite leaned on the segment runner's
+-- retries (attempts 3/3 in the v0.26 qualification).  It now searches the
+-- draw itself, as strategy discovery (docs/TESTING.md): one snapshot one
+-- step from the fight, and each branch idles BRANCH_IDLE more frames there
+-- than the last before stepping in -- a new battle key each, $be read at
+-- InitBattle's seed store and logged -- until a branch's staged Umaro has
+-- taken a provoked non-Fight arm.  Every window of every branch is in the
+-- ledger the verdict reads.  A branch whose party falls ends there and the
+-- boot comes back before the game over.  MAX_BRANCHES is the least N with
+-- q^N <= 1e-3 for the measured share of keys that fail, q = 3/11.
+local BRANCH_IDLE, BRANCH_FAIL, KEY_MISS = 8, 1e-3, 3 / 11
+local MAX_BRANCHES = math.ceil(math.log(BRANCH_FAIL) / math.log(KEY_MISS))
+
 local phase = 0
 local function measured()
   if L.provokedSpecial >= 2 then return true end
@@ -341,8 +488,12 @@ local function measured()
   end
   return false
 end
+local function branchDone()
+  return measured() or H.partyWipedInBattle() or not H.battleLoadStarted()
+end
 
-H.run({ maxFrames = 60000, retries = 3 }, {
+H.run({ maxFrames = 3000 + 2 * MAX_BRANCHES * (2 * BRANCH_IDLE * MAX_BRANCHES + 6000 + 3000
+                                              + 120 + 40000 + 20) }, {
   H.loadState(ENTRY),
   H.waitFrames(30),
 
@@ -429,54 +580,134 @@ H.run({ maxFrames = 60000, retries = 3 }, {
     H.assertEq(H.fieldX() == 47 and H.fieldY() == 37, true,
       "one tile above the TunnelArmr trigger")
   end),
-  H.hold({ "down" }), H.waitFrames(12), H.release(), H.waitFrames(4),
-  H.driveUntil(function() return H.battleLoadStarted() end, 6000, {
-    H.call(function() H.setPad((H.frame % 8 < 4) and { a = true } or {}) end),
-  }, "battle 67 loads"),
-  H.release(),
-  H.waitUntil(function() return H.battleActive() end, 3000, "battle up", 10),
-  H.waitFrames(120),
+  -- the boot of every branch: the machine one step from the fight
+  H.call(function() boot.req = H.requestSaveState() end),
+  H.waitFrames(2),
+  H.call(function() H.checkReq(boot.req, "boot snapshot one step from the fight") end),
+  H.repeatN(1, (function()
+    local t = {}
+    -- a branch whose idle the game absorbed deals a key already tried (the
+    -- same fight again): it is run and logged, and the bound counts
+    -- DISTINCT keys, so up to twice as many branches are built
+    for _ = 1, 2 * MAX_BRANCHES do
+      t[#t + 1] = H.cond(function()
+        local seen, n = {}, 0
+        for _, b in ipairs(ALL.branches) do
+          if not seen[b.key or "?"] then seen[b.key or "?"], n = true, n + 1 end
+        end
+        return boot.found == nil and n < MAX_BRANCHES
+      end, {
+          H.call(function()
+            H.setPad({})
+            if boot.n > 0 then boot.load = H.requestLoadState(boot.req.blob) end
+          end),
+          H.waitFrames(2),
+          H.call(function()
+            if boot.n > 0 then
+              H.checkReq(boot.load, "boot snapshot restore")
+              H.rearmInputInjection()
+            end
+            boot.n = boot.n + 1
+            L, SUBJ, W = freshLedger(), nil, nil
+            care.blow, care.plan, care.open, care.last, care.monster, care.said = nil, nil, false, {}, false, nil
+            H.log(string.format("[branch] %d of at most %d: %d idle frame(s) before the step",
+              boot.n, MAX_BRANCHES, (boot.n - 1) * BRANCH_IDLE))
+          end),
+          H.waitFrames(1),
+          H.cond(function() return boot.n > 1 end, {
+            (function()
+              local w = 0
+              return H.driveUntil(function() w = w + 1 return w >= (boot.n - 1) * BRANCH_IDLE end,
+                2 * MAX_BRANCHES * BRANCH_IDLE + 10, { H.call(function() H.setPad({}) end) }, "branch idle")
+            end)(),
+          }, {}),
+          H.hold({ "down" }), H.waitFrames(12), H.release(), H.waitFrames(4),
+          H.driveUntil(function() return H.battleLoadStarted() end, 6000, {
+            H.call(function() H.setPad((H.frame % 8 < 4) and { a = true } or {}) end),
+          }, "battle 67 loads"),
+          H.release(),
+          H.waitUntil(function() return H.battleActive() end, 3000, "battle up", 10),
+          H.waitFrames(120),
 
+          H.call(function()
+            H.log("[seed] " .. partyLine())
+            H.assertEq(H.formationHas({ [TUNNELARMR] = true }), true, "battle 67: TunnelArmr")
+            H.assertEq(L.staged and SUBJ ~= nil, true,
+              "the rename landed on the battle's first CheckPlayerAction pass")
+            H.assertEq(charOf(SUBJ), CHAR_UMARO, "and it stuck")
+            H.assertEq(H.readByte(0x3AA0 + SUBJ * 2) & 0x02, 0,
+              "$3aa0.1 never set for him: his full gauge auto-commands, as the "
+              .. "real Umaro's does")
+            -- A name-refused character's full gauge already auto-commands through
+            -- RandCharAction, Berserk or not, so at some seeds the engine has
+            -- chosen a turn for him (a random command row of the staged
+            -- character's, and the flag) before this point; logged, not asserted.
+            H.log(string.format("[stage] f%d before the relics and Berserk: bank %d, "
+              .. "hurt line %d, OT6_UNCTL $%02X, %d action end(s) of his so far",
+              H.frame, bp(SUBJ), H.readWord(D.mark), H.readByte(D.unctl), #L.ends))
+            -- ---- STATE WRITES 2-4 of 4 (waiver file): relics and Berserk ------ --
+            H.writeByte(0x3CD0 + SUBJ * 2, BLIZZARD_ORB)
+            H.writeByte(0x3CD1 + SUBJ * 2, RAGE_RING)
+            H.writeByte(0x3EE5 + SUBJ * 2, st2(SUBJ) | BERSERK)
+            H.log(string.format("[stage] f%d e%d is character $%02X with relics "
+              .. "$%02X/$%02X and STATUS2 $%02X; hp %d, bank %d, battle power %d",
+              H.frame, SUBJ, charOf(SUBJ), H.readByte(0x3CD0 + SUBJ * 2),
+              H.readByte(0x3CD1 + SUBJ * 2), st2(SUBJ), hp(SUBJ), bp(SUBJ), batPwr(SUBJ)))
+          end),
+
+          H.driveUntil(branchDone, 40000, {
+            H.call(function()
+              phase = (phase + 1) % 8
+              watchBlows()
+              tcCare.observe()
+              if not H.battleLoadStarted() then H.setPad({}); return end
+              if H.partyWipedInBattle() then H.setPad({}); return end
+              if H.readByte(MENU) == 0 then
+                care.open = false
+                H.setPad(phase < 4 and { a = true } or {})
+                return
+              end
+              local st = H.readByte(MSTATE)
+              if st == ST_TGT then
+                -- the target cursor keeps its own 16-frame press cycle
+                care.tick = care.tick + 1
+                local b = careButton(H.readByte(ACTOR) & 3, st)
+                H.setPad((b and (care.tick - 1) % 16 < 4) and { [b] = true } or {})
+                return
+              end
+              if phase >= 4 then H.setPad({}); return end
+              if st == ST_TRANS then H.setPad({}); return end
+              local b = careButton(H.readByte(ACTOR) & 3, st)
+              H.setPad(b and { [b] = true } or {})
+            end),
+          }, "the branch: two provoked non-Fight arms, or one and his fall, or the fight's end"),
+          H.call(function()
+            H.setPad({})
+            local why = (measured() and "measured")
+              or (H.partyWipedInBattle() and "the party fell (the branch ends; the boot comes back)")
+              or (not H.battleLoadStarted() and "the fight ended") or "?"
+            ALL.branches[#ALL.branches + 1] = { n = boot.n, key = boot.key, special = L.provokedSpecial,
+                                                windows = #L.windows, why = why }
+            for _, w in ipairs(L.windows) do ALL.windows[#ALL.windows + 1] = w end
+            ALL.dumps, ALL.hurts = ALL.dumps + #L.dumps, ALL.hurts + L.hurts
+            if L.provokedSpecial >= 1 then boot.found = boot.n end
+            H.log(string.format("[branch] %d (battle key %s): %d action(s), %d provoked non-Fight; %s",
+              boot.n, tostring(boot.key), #L.windows, L.provokedSpecial, why))
+          end),
+      }, {})
+    end
+    return t
+  end)()),
   H.call(function()
-    H.log("[seed] " .. partyLine())
-    H.assertEq(H.formationHas({ [TUNNELARMR] = true }), true, "battle 67: TunnelArmr")
-    H.assertEq(L.staged and SUBJ ~= nil, true,
-      "the rename landed on the battle's first CheckPlayerAction pass")
-    H.assertEq(charOf(SUBJ), CHAR_UMARO, "and it stuck")
-    H.assertEq(H.readByte(0x3AA0 + SUBJ * 2) & 0x02, 0,
-      "$3aa0.1 never set for him: his full gauge auto-commands, as the "
-      .. "real Umaro's does")
-    -- A name-refused character's full gauge already auto-commands through
-    -- RandCharAction, Berserk or not, so at some seeds the engine has
-    -- chosen a turn for him (a random command row of the staged
-    -- character's, and the flag) before this point; logged, not asserted.
-    H.log(string.format("[stage] f%d before the relics and Berserk: bank %d, "
-      .. "hurt line %d, OT6_UNCTL $%02X, %d action end(s) of his so far",
-      H.frame, bp(SUBJ), H.readWord(D.mark), H.readByte(D.unctl), #L.ends))
-    -- ---- STATE WRITES 2-4 of 4 (waiver file): relics and Berserk ------ --
-    H.writeByte(0x3CD0 + SUBJ * 2, BLIZZARD_ORB)
-    H.writeByte(0x3CD1 + SUBJ * 2, RAGE_RING)
-    H.writeByte(0x3EE5 + SUBJ * 2, st2(SUBJ) | BERSERK)
-    H.log(string.format("[stage] f%d e%d is character $%02X with relics "
-      .. "$%02X/$%02X and STATUS2 $%02X; hp %d, bank %d, battle power %d",
-      H.frame, SUBJ, charOf(SUBJ), H.readByte(0x3CD0 + SUBJ * 2),
-      H.readByte(0x3CD1 + SUBJ * 2), st2(SUBJ), hp(SUBJ), bp(SUBJ), batPwr(SUBJ)))
+    local lines = {}
+    for _, b in ipairs(ALL.branches) do
+      lines[#lines + 1] = string.format("%d:%s:%d", b.n, tostring(b.key), b.special)
+    end
+    H.log("[branch] search: " .. table.concat(lines, " "))
+    H.assertEq(boot.found ~= nil, true, string.format("precondition: a branch whose staged "
+      .. "Umaro took a provoked Throw, Storm or Charge, within %d distinct battle keys (%s)",
+      MAX_BRANCHES, table.concat(lines, " ")))
   end),
-
-  H.driveUntil(measured, 40000, {
-    H.call(function()
-      phase = (phase + 1) % 8
-      if not H.battleLoadStarted() then H.setPad({}); return end
-      if H.readByte(MENU) == 0 then
-        H.setPad(phase < 4 and { a = true } or {})
-        return
-      end
-      if phase >= 4 then H.setPad({}); return end
-      local st = H.readByte(MSTATE)
-      if st == ST_TRANS then H.setPad({}); return end
-      H.setPad(st == ST_CMD and { x = true } or { b = true })
-    end),
-  }, "two provoked non-Fight actions of the staged Umaro resolve"),
 
   -- ================================================================== --
   -- the verdict
@@ -484,7 +715,7 @@ H.run({ maxFrames = 60000, retries = 3 }, {
   H.call(function()
     H.setPad({})
     local seen, prov = {}, {}
-    for _, w in ipairs(L.windows) do
+    for _, w in ipairs(ALL.windows) do
       local n = ARM[w.arm] or "?"
       seen[n] = (seen[n] or 0) + 1
       if w.provoked then prov[n] = (prov[n] or 0) + 1 end
@@ -495,16 +726,18 @@ H.run({ maxFrames = 60000, retries = 3 }, {
       return table.concat(o, ", ")
     end
     H.log(string.format("[ledger] %d action(s): %s; provoked: %s; %d hp "
-      .. "drop(s), %d dump(s)", #L.windows, hist(seen), hist(prov), L.hurts,
-      #L.dumps))
+      .. "drop(s), %d dump(s)", #ALL.windows, hist(seen), hist(prov), ALL.hurts,
+      ALL.dumps))
 
-    H.assertEq(L.provokedSpecial >= 1, true, string.format(
-      "at least one provoked Throw/Storm/Charge resolved (%d)", L.provokedSpecial))
+    local special = 0
+    for _, w in ipairs(ALL.windows) do if w.provoked and w.arm ~= 3 then special = special + 1 end end
+    H.assertEq(special >= 1, true, string.format(
+      "at least one provoked Throw/Storm/Charge resolved (%d)", special))
 
     -- THE CLAIM, FIRST: every provoked non-Fight arm carried the dump,
     -- armed at the chooser before the roll -- a ROM whose dump hooks into
     -- FightAttack alone arrives here with pending 0 on every one of them
-    for _, w in ipairs(L.windows) do
+    for _, w in ipairs(ALL.windows) do
       if w.provoked and w.arm ~= 3 then
         local want = math.min(w.bankBefore, D.cap)
         H.assertEq(w.pendAtRoll, want, string.format(
@@ -521,7 +754,7 @@ H.run({ maxFrames = 60000, retries = 3 }, {
     -- then what each arm bought with it.  The roll's pick is the first arm
     -- entered; the arm that EXECUTED is the last, which differs only when
     -- Throw found no ally to throw and fell back to Charge.
-    for _, w in ipairs(L.windows) do
+    for _, w in ipairs(ALL.windows) do
       H.assertEq(w.entered[1], w.arm, string.format(
         "f%d: the arm the roll picked (%s) is the one entered first", w.f,
         ARM[w.arm] or "?"))
@@ -545,7 +778,7 @@ H.run({ maxFrames = 60000, retries = 3 }, {
             "f%d provoked Throw: %d throws, and NOT the 1 an unboosted Throw "
             .. "runs", w.f, 1 + p))
           for _, d in ipairs(w.dmg) do
-            H.assertEq(d.x ~= SUBJ * 2, true, string.format(
+            H.assertEq(d.x ~= w.subj * 2, true, string.format(
               "f%d Throw: the damage roll's attacker record is the thrown "
               .. "ally (x = %d), not Umaro", w.f, d.x))
             H.assertEq(d.after, d.before, string.format(
@@ -558,7 +791,7 @@ H.run({ maxFrames = 60000, retries = 3 }, {
           H.assertEq(#w.dmg >= 1, true, string.format(
             "f%d provoked %s reached Ot6BoostDmg", w.f, name))
           for _, d in ipairs(w.dmg) do
-            H.assertEq(d.x, SUBJ * 2, string.format(
+            H.assertEq(d.x, w.subj * 2, string.format(
               "f%d %s: Ot6BoostDmg ran for Umaro himself (x = %d)", w.f, name, d.x))
             H.assertEq(d.pendX, p, string.format(
               "f%d %s: with his pending %d", w.f, name, p))
@@ -589,12 +822,12 @@ H.run({ maxFrames = 60000, retries = 3 }, {
           .. "(capped at %d)", w.f, name, w.charge.bank, w.bankAfter, BANK_CAP))
       end
     end
-    H.assertEq(#L.dumps <= L.hurts, true, string.format(
+    H.assertEq(ALL.dumps <= ALL.hurts, true, string.format(
       "%d dump(s) over %d hp drop(s): never conjured out of a turn nothing "
-      .. "hurt", #L.dumps, L.hurts))
+      .. "hurt", ALL.dumps, ALL.hurts))
     H.log(string.format("[result] e%d as Umaro: %d action(s), %d provoked "
-      .. "non-Fight; arms seen: %s; provoked arms: %s", SUBJ, #L.windows,
-      L.provokedSpecial, hist(seen), hist(prov)))
+      .. "non-Fight; arms seen: %s; provoked arms: %s (%d branch(es))", SUBJ, #ALL.windows,
+      special, hist(seen), hist(prov), #ALL.branches))
     H.screenshot("retaliate_umaro")
   end),
 })

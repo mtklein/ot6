@@ -41,10 +41,11 @@
 -- Cases 2-5 test the HP heal's fallbacks, so each switches the MP side's
 -- two arms off (opts.tent = false, opts.tincture = false).  The landing
 -- is on the world map, where the item list offers a Tent, and the care
--- pitches one ahead of any heal whenever the party is 1200 HP short in
--- total or anybody is under the MP band (docs/design/supply.md).  A walk
--- that leaves that big a hole makes the Tent the right call, so with the
--- arm on, "the Potion heals" held only for draws that left less (the
+-- pitches one ahead of any heal whenever the heals the bag would spend on
+-- the party's HP hole cost at least the Tent's 1200 gil, or anybody is
+-- under the MP band (docs/design/supply.md; field_tenthp).  A walk that
+-- leaves that big a hole makes the Tent the right call, so with the arm
+-- on, "the Potion heals" held only for draws that left less (the
 -- 2026-09-28 chain's case 2: 1296 HP short, a Tent pitched, no Potion).
 -- With no Tent on offer the Potion is what heals under any draw, and with
 -- the Tincture arm off only a cast can move TERRA's MP.
@@ -197,8 +198,15 @@ local function drainTonics()
         H.assertEq(stop(), true, string.format("drain round %d: a battle left somebody short "
           .. "of max HP within %d legs", drinkN, LEGS_PER_STOP))
       end),
+      -- the Tent and Tincture arms off: the drain's job is the Tonics, and
+      -- with one Tonic left and the Potions held back the care pitches a
+      -- Tent instead (the bag cannot lift everyone: "pitch a Tent (the
+      -- party 240 hp and 0 mp short, ... (1 tonic + 0 potion = 50 gil))",
+      -- build/attempts/wt/v026-field/final2/emptybag.log), which is the
+      -- right call in play and no drink here
       H.fieldCare({ tag = "drinking the Tonics down " .. drinkN,
-        threshold = 1.0, magic = false, reserve = { [POTION] = 99 } }),
+        threshold = 1.0, magic = false, reserve = { [POTION] = 99 },
+        tent = false, tincture = false }),
       H.call(function()
         roster("drain " .. drinkN)
         H.assertEq(H.invCountOf(TONIC) < before, true, string.format("drain round %d "
