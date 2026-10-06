@@ -28,14 +28,12 @@ Nothing is installed or left running there and no port is opened.  The local
 machine goes through the same snapshot path, minus the ssh.
 
 Throughput and placement.  Each machine's line shows its emulated frames per
-second, summed over its active emulators across the last 30 s.  Every run
-watched from its start on any machine appends one line to the main tree's
-build/throughput.jsonl when it finishes: machine, test, frames, wall seconds,
-and the concurrency it ran at (emulators, and the load average).  From that
-log tools/stream/placement.py gives each machine a curve and a knee that
-follow other load, heat and power as they change, and from the knee and what
-the machine runs right now, how many more emulators it can take.  That is
-placement.json, the hollow dots on the page (one per emulator of room), and:
+second, summed over its active emulators across the last 30 s.  Placement is
+fixed, not learned: each machine's room is its emulator slots (run.sh's hard
+ceiling, ~/.config/ot6/emulator-slots; tools/tests/lib/emu_slot.py) less the
+emulators it runs now and live claims, filled px13 first, then the Air, then
+the Pro (tools/stream/placement.py).  That is placement.json, the hollow dots
+on the page (one per emulator of room), and:
 
     python3 tools/stream/live.py --place 8     # where the next 8 should go
     python3 tools/stream/live.py --place 8 --claim wt/foo   # and hold them
@@ -663,6 +661,20 @@ def _run_start(ws):
         return None, None
 
 
+def _emu_slots():
+    """This machine's emulator slot count, run.sh's hard ceiling
+    (tools/tests/lib/emu_slot.py): ~/.config/ot6/emulator-slots, else the
+    CPU count."""
+    try:
+        with open(os.path.expanduser("~/.config/ot6/emulator-slots")) as f:
+            for tok in f.read().split():
+                if tok.isdigit() and int(tok) > 0:
+                    return int(tok)
+    except OSError:
+        pass
+    return os.cpu_count() or 1
+
+
 RUN_START_GRACE = 5    # seconds from a run dir appearing to its emulator (a tile shows late, never dead)
 
 
@@ -828,6 +840,7 @@ class Scanner:
             load = None
         done = self._settle(active, len(workers), load, now)
         snap = {"host": HOST, "ts": now, "load": load, "ncpu": os.cpu_count(),
+                "slots": _emu_slots(),
                 "workers": workers, "pngs": pngs, "fps": self._fps(now)}
         if done:
             snap["done"] = done
@@ -914,7 +927,7 @@ PNG_RESEND_SEC = 15   # an unchanged screenshot is sent again this often
 PNG_GRACE_SEC = 60    # a worker's picture outlives its last listing this long
 
 # ---- placement: where the next emulators should go ------------------------
-# The model (curves, knees, claims, fill order) is tools/stream/placement.py;
+# Slots, claims and fill order are tools/stream/placement.py;
 # only the viewer and --place need it, never a peer's emitter.
 def _placement():
     return _load_stream_module("placement")
@@ -937,39 +950,12 @@ class Board:
         self.pngs = {n: set() for n in names}   # PNG files on disk per machine
         self.png_seen = {}                      # machine -> worker id -> last listed
         self.procs = {}   # name -> its live ssh child (peer_thread)
-        # The run log lives in the main tree, like build/attempts, so every
-        # viewer (whichever tree it runs from) adds to and reads one history.
+        # Claims live in the main tree, like build/attempts, so every viewer
+        # (whichever tree it runs from) reads one set.
         worktree_roots()
-        self.log = os.path.join(_TREES["main"], "build", "throughput.jsonl")
         self.claims = os.path.join(_TREES["main"], "build",
                                    "placement-claims.jsonl")
         self.pl = _placement()
-        self.records, self.seen = self.pl.load_records(self.log, t)
-        self.pruned = t
-        self.mods, self.mods_key = {}, None
-
-    def _remember(self, rec):
-        """Keep one finished-run record; False if it is already known (two
-        viewers watching the same machine both report its runs)."""
-        key = (rec["machine"], rec["id"])
-        if key in self.seen:
-            return False
-        self.seen.add(key)
-        self.records.append(rec)
-        return True
-
-    def _log_runs(self, name, done):
-        lines = []
-        with self.lock:
-            for d in done:
-                rec = dict(d, machine=name)
-                if self._remember(rec):
-                    lines.append(json.dumps(rec) + "\n")
-        if lines:
-            try:   # under the lock the daily prune takes, so none is lost
-                self.pl.append(self.log, lines)
-            except OSError as e:
-                print(f"live: {self.log}: {e}", file=sys.stderr)
 
     def _png(self, name, wid):
         return os.path.join(self.gdir, _safe_id(f"{name}_{wid}") + ".png")
@@ -998,8 +984,6 @@ class Board:
             if now - seen.get(wid, 0) > PNG_GRACE_SEC:
                 self._drop_png(name, wid)
                 seen.pop(wid, None)
-        if snap.get("done"):
-            self._log_runs(name, snap["done"])
         with self.lock:
             st = self.m[name]
             st["snap"] = dict(snap, pngs=None)
@@ -1009,7 +993,10 @@ class Board:
                 print(f"live: {time.strftime('%H:%M:%S')} {name} up "
                       f"(down since {time.strftime('%H:%M:%S', time.localtime(st['down_since']))})",
                       file=sys.stderr, flush=True)
-                st["up_since"] = time.time()
+                # settling is for a peer that came back (a laptop's brief
+                # wake), not for this viewer's own first connection
+                if st["err"] != "connecting":
+                    st["up_since"] = time.time()
             st.update(ok_ts=time.time(), down_since=None, err=None)
 
     def _drop_png(self, name, wid):
@@ -1071,21 +1058,12 @@ class Board:
                 "up_since": None if n == HOST else st.get("up_since"),
                 "down_since": st["down_since"], "err": st["err"],
                 "load": (snap or {}).get("load"), "ncpu": (snap or {}).get("ncpu"),
-                "fps": (snap or {}).get("fps"),
+                "fps": (snap or {}).get("fps"), "slots": (snap or {}).get("slots"),
                 "active": len(mine), "frozen": sum(w["stuck"] for w in mine),
                 "trees": [{"branch": b, "tree": t, "tests": sorted(ts)}
                           for (b, t), ts in sorted(trees.items())]})
         pl = self.pl
-        with self.lock:
-            if now - self.pruned > 86400:   # once a day, as at start-up
-                self.records, self.seen = pl.load_records(self.log, now)
-                self.pruned = now
-            # the curves change only with a new record, or slowly with age
-            key = (len(self.records), int(now // 60))
-            if key != self.mods_key:
-                self.mods, self.mods_key = pl.models(self.records, now), key
-        place = pl.placement(machines, self.mods,
-                             pl.read_claims(self.claims, now), now)
+        place = pl.placement(machines, pl.read_claims(self.claims, now), now)
         for mc, pm in zip(machines, place["machines"]):
             mc.update({k: pm[k] for k in ("room", "peak") if k in pm})
         out = {"workers": workers, "count": len(workers), "ts": int(now),
@@ -1586,28 +1564,22 @@ def place(n, port, who=None):
         take = p["order"][:n]
     counts = collections.Counter(take)   # keeps the fill order
     got = ", ".join(f"{m} {c}" for m, c in counts.items()) or "nowhere"
-    reserve = ", ".join(f"{k} {v}" for k, v in p["reserve"].items())
-    print(f"place {n}: {got}  (fill order {', '.join(p['prefer'])}; "
-          f"reserve {reserve}" + (f"; claimed for {who}" if who else "") + ")")
+    print(f"place {n}: {got}  (fill order {', '.join(p['prefer'])}"
+          + (f"; claimed for {who}" if who else "") + ")")
     if n > len(take):
         print(f"  only {len(take)} have room now; the other {n - len(take)} "
-              "would slow every emulator where they land: queue them")
+              "would only queue for a slot: start them later or elsewhere")
     for m in p["machines"]:
         if "room" not in m:
-            why = ("down" if not m["up"] else "no runs logged yet"
-                   if not m.get("curve") else "no room figure")
-            print(f"  {m['name']}: {why}")
+            print(f"  {m['name']}: {'down' if not m['up'] else 'no slots'}")
             continue
         if "settling" in m:    # back from sleep: no room until it stays up
             print(f"  {m['name']}: room 0 (settling, {m['settling']} s more)")
             continue
-        held = "".join(f" - {k.replace('_', ' ')} {m[k]}"
-                       for k in ("claimed", "reserve", "owner_load") if k in m)
-        cv = " ".join(f"{k}:{v[0]:.2f}" for k, v in m["curve"].items())
-        print(f"  {m['name']}: room {m['room']} = knee {m['peak']} - "
-              f"{m['active']} running{held} (shift {m['shift']}, load "
-              f"{m['load1']}, {m['ncpu']} cores) · speed per emulator (1 = "
-              f"the test alone) by emulators running: {cv} ({m['runs']} runs)")
+        held = f" - claimed {m['claimed']}" if "claimed" in m else ""
+        print(f"  {m['name']}: room {m['room']} = slots {m['peak']} - "
+              f"{m['active']} running{held} (load {m['load1']}, "
+              f"{m['ncpu']} cores)")
     return 0
 
 
