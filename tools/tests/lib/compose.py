@@ -275,8 +275,12 @@ def stamp_status(name, root, _memo=None):
     are exactly what its stamp records, but they grew from a state that
     is no longer the tree's, so the chain below the moved link is stale all
     the way down -- the same set ninja regenerates, since every prev= edge
-    depends on its parent's outputs.  Only a build/states stamp ancestor is
-    followed; a checkpoint manifest is its own binding.  A DRIFT or
+    depends on its parent's outputs.  A build/states stamp ancestor is
+    followed, and so is a capture's sealed manifest
+    (build/checkpoints/<key>/manifest.json, a cut's ancestor, #363): through
+    it to the state whose run made the save (the producer's stamp; for a
+    cutter, the state it booted).  A tracked checkpoint manifest is its own
+    binding.  A DRIFT or
     UNVERIFIED ancestor passes nothing down, so a lib-only edit still stales
     no descendant.  `_memo` lets a whole-tree caller check each stamp once.
     """
@@ -319,8 +323,12 @@ def _stamp_status(base, root, memo):
 
 
 def _stamp_ancestor(base, root):
-    """The build/states stamp this fixture's `ancestor` line names, as a base
-    name; None for no stamp, no ancestor, or a checkpoint manifest."""
+    """The state this fixture grew from, as a base name: the build/states
+    stamp its `ancestor` line names, or, through a capture's sealed manifest
+    (build/checkpoints/<key>/manifest.json), the state whose run made that
+    save (savestate_ninja.py producers: the producer's own state, or the
+    state a cutter booted).  None for no stamp, no ancestor, or a tracked
+    checkpoint manifest."""
     try:
         lines = (root / "build" / "states" / (base + ".stamp")).read_text() \
             .splitlines()
@@ -330,8 +338,25 @@ def _stamp_ancestor(base, root):
         parts = line.split()
         if len(parts) >= 2 and parts[0] == "ancestor":
             m = re.fullmatch(r"build/states/([^/]+)\.stamp", parts[1])
-            return m.group(1) if m else None
+            if m:
+                return m.group(1)
+            m = re.fullmatch(r"build/checkpoints/([^/]+)/manifest\.json",
+                             parts[1])
+            return _capture_producer(m.group(1), root) if m else None
     return None
+
+
+def _capture_producer(key, root):
+    """The state whose run saved the capture `key`, or that a cutter booted
+    to save it; None when the graph names no run for it."""
+    try:
+        import savestate_ninja as sn
+        run = sn.producers(sn.load(Path(root))).get(key)
+    except Exception:
+        return None
+    if run is None:
+        return None
+    return run[1] if run[0] == "run" else run[2]
 
 
 def _own_stamp_status(base, root):
@@ -473,6 +498,37 @@ def stamp_check(name, root):
     return msg if verdict in (STALE, UNBOUND, UNVERIFIED) else None
 
 
+def play_current(root):
+    """`compose.py --play-current`: the release's bound on play staleness
+    (#363 review B1).  Every state the graph declares must be FRESH: played
+    on this ROM and pin, by today's generator, AND under today's lib halves.
+    A DRIFT state (provenance drift: played under other lib halves) is fine
+    for qualification but not for a release, which ships the play its
+    library makes.  The remedy is one replay of the line: bump
+    tools/tests/replay.txt and run `ninja`.  Exit 1, naming each state."""
+    declared = _graph_order(str(root))
+    memo, drift, other = {}, [], []
+    for name in declared:
+        verdict, msg = stamp_status(name, root, memo)
+        if verdict == FRESH:
+            continue
+        (drift if verdict == DRIFT else other).append(
+            (name, msg or "no stamp"))
+    for name, msg in other:
+        print(f"play-current: {name} is not a current fixture: {msg}")
+    for name, msg in drift:
+        print(f"play-current: {name} was played under other lib halves: {msg}")
+    if drift or other:
+        print(f"play-current: {len(drift) + len(other)} of {len(declared)} "
+              f"state(s) were not played under this tree's library; a release "
+              f"needs the play replayed under it: bump tools/tests/replay.txt "
+              f"(a dated line saying why) and run `ninja`")
+        return 1
+    print(f"play-current: all {len(declared)} states were played under this "
+          f"tree's ROM, pin, generators and library")
+    return 0
+
+
 def check_states(root):
     """`compose.py --check-states`: the same freshness question stamp_check()
     answers, asked of the whole fixture set at once instead of one sidecar at
@@ -511,13 +567,13 @@ def check_states(root):
         if not any(l.startswith("rom ") for l in s.read_text().splitlines()):
             legacy += 1
     tail = ""
-    # `ninja chain`'s chain_<state> copies (savestate_ninja.py chain_plan)
-    # are not qualification fixtures: nothing boots them but the chain.
+    # `ninja quick`'s quick_<state> copies (savestate_ninja.py QUICK) are
+    # not qualification fixtures: only the quick suites boot them.
     copies = [s for s in orphans
-              if s.stem.startswith("chain_") and s.stem[6:] in declared]
+              if s.stem.startswith("quick_") and s.stem[6:] in declared]
     orphans = [s for s in orphans if s not in copies]
     if copies:
-        tail += f"; {len(copies)} chain_ copies (ninja chain) not checked"
+        tail += f"; {len(copies)} quick_ copies (ninja quick) not checked"
     if orphans:
         tail += f"; {len(orphans)} obsolete build stamp(s) ignored"
     if legacy:
@@ -2050,6 +2106,9 @@ def main() -> int:
     # any time a red test might not be caused by your change.
     if len(sys.argv) == 2 and sys.argv[1] == "--check-states":
         return check_states(ROOT)
+    # --play-current: the release's play-staleness gate (configure.py).
+    if len(sys.argv) == 2 and sys.argv[1] == "--play-current":
+        return play_current(ROOT)
     # --adopt-stamps: upgrade pre-ROM-identity stamps to the full format
     # where the tree's own records prove the missing lines (adopt_stamps).
     if len(sys.argv) == 2 and sys.argv[1] == "--adopt-stamps":

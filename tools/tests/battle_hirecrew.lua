@@ -64,7 +64,33 @@ H.run({ maxFrames = 300000 }, {
       battles = battles + 1
       H.assertEq(battles <= 6, true, string.format("the 3 and 2 BP hires within six battles (stage %d)", stage))
     end),
-    H.fieldCare({ tag = "care between the hires' battles", threshold = 0.8 }),
+    -- A fresh care step every visit: one H.fieldCare step serves once (its
+    -- kernel's served latch and refused-plan list outlive the driveUntil's
+    -- reset), so on today's draw the second visit that had work -- c4 dead,
+    -- c5 and c9 zombied -- opened the menu, served nothing in 0 frames, and
+    -- the party walked on with one member standing into a wipe.
+    (function()
+      local care
+      return { tick = function()
+        care = care or H.fieldCare({ tag = "care between the hires' battles", threshold = 0.8 })
+        local r = care:tick()
+        if r == "done" then care = nil end
+        return r
+      end, reset = function() care = nil end }
+    end)(),
+    -- the precondition the hires' battles stand on: the party walks into
+    -- each one whole, nobody dead, zombied or stone (the care's job)
+    H.call(function()
+      local active = H.readByte(0x1A6D) & 0x07
+      for _, c in ipairs(H.partyMembers()) do
+        if (H.readByte(0x1850 + c) & 0x07) == active then
+          H.assertEq(H.charHp(c) > 0 and (H.charStatus1(c) & 0xC2) == 0, true,
+            string.format("the care stood char %d up before battle %d (%d/%d hp, status1 %02X; fenix %d revivify %d)",
+              c, battles, H.charHp(c), H.charMaxHp(c), H.charStatus1(c),
+              H.invCountOf(0xF0), H.invCountOf(0xF1)))
+        end
+      end
+    end),
     walkToBattle(),
     (function()
       local step

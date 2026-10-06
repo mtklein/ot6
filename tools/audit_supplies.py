@@ -70,7 +70,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from savestate_party import (biggest_stream, checkpoint_payloads,
+from savestate_party import (biggest_stream, checkpoint_payloads, tracked_payloads,
                              declared_states, find_char_block, party_at)
 
 WAIVERS = "tools/supply_waivers.txt"
@@ -402,7 +402,9 @@ def selftest(repo: str = ".") -> int:
           wor_heal_short(0, 99, 25), False)
 
     # Checked against mrf-save-room-v1, which carries two Fenix Downs.
-    cps = dict(checkpoint_payloads(repo))
+    # The tracked copy: the reader's canary needs bytes that hold still
+    # between re-cuts, and the capture moves with every replay.
+    cps = dict(tracked_payloads(repo))
     if "mrf-save-room-v1" not in cps:
         ok = False
         print("  SELFTEST FAIL mrf-save-room-v1 not among tracked checkpoints")

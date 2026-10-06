@@ -361,9 +361,10 @@ def main() -> int:
     # ---- control 2: something must have been read ------------------------
     if not sources or len(unreadable) == len(sources):
         print("  NOTHING READ -- no fixture under "
-              f"{args.dir} and no tracked SRAM checkpoint could be decoded.\n"
-              "  The checkpoints are tracked in git, so this is the reader "
-              "broken, not an empty tree.")
+              f"{args.dir} and no checkpoint capture under build/checkpoints "
+              "could be decoded.\n"
+              "  Under ninja every capture is built first, so this is the "
+              "reader broken, not an empty tree.")
         return 1
     for name in unreadable:
         print(f"  ?    {name}: character table not located")

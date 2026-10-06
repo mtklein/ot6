@@ -18,7 +18,9 @@
 # * Exit code: 0 = pass, 1 = assertion/Lua error, 2 = frame budget exceeded.
 #   The [ot6] PASS/FAIL verdict in the log takes precedence over the raw
 #   process code.
-# * The emulator is tools/Mesen-linux (tools/Mesen.app on macOS), or the
+# * The emulator is the build tools/mesen/EMULATOR pins, deployed on this
+#   machine at ~/mesen-pins/<commit>/Mesen.app (macOS; ~/mesen-pins/<commit>/Mesen
+#   on Linux), else tools/Mesen-linux (tools/Mesen.app on macOS), or the
 #   directory/bundle in OT6_MESEN_APP, which then needs an OT6_MESEN_CACHE
 #   other than the machine-wide one.  Its sha256 is recorded as an
 #   `[emulator]` line at the end of the log, with the sha256 of the core
@@ -73,6 +75,24 @@ if [ "${1:-}" = "--verdict-selftest" ]; then
     echo "run.sh --verdict-selftest: $fails FAILURE(S)"; exit 1
   fi
   echo "run.sh --verdict-selftest: OK"; exit 0
+fi
+
+# The build lock: the shell's own exclusive create (noclobber `>` opens with
+# O_CREAT|O_EXCL), so exactly one of any number of concurrent takers gets
+# it, whatever mkdir(1) the machine has.  It used to be `mkdir "$LOCK"`, and
+# px13's mkdir is uutils coreutils 0.10.0 (Ubuntu 26.04), which is not
+# atomic: of 16 concurrent `mkdir L`, more than one reported success in 145
+# of 300 rounds on ext4 and 114 of 300 on tmpfs (GNU mkdir, os.mkdir and
+# this lock: 0 of 300; build/attempts/wt/v026-graph/371/mkdirrace.txt), so
+# two workers built the shared copy at once, the second mv nesting its
+# build inside the first's (#371).
+take_lock() { ( set -C; : > "$1" ) 2>/dev/null; }
+# --take-lock <path> [<go>]: the primitive alone, for
+# shared_emulator_selftest.sh; with <go>, spin (no forks) until it exists,
+# so concurrent takers all reach the lock in the same instant.
+if [ "${1:-}" = "--take-lock" ]; then
+  if [ -n "${3:-}" ]; then while [ ! -e "$3" ]; do :; done; fi
+  take_lock "${2:?--take-lock <path> [<go>]}"; exit
 fi
 
 SCRIPT="${1:?usage: run.sh <script.lua> [logfile]}"
@@ -180,21 +200,39 @@ fi
 # into each fresh home itself (~0.05s).
 # OT6_MESEN_CACHE relocates the cache (shared_emulator_selftest.sh provisions
 # into a scratch one); the default is the machine-wide path above.
+# Deployed per pin (#394): each machine keeps every pinned build at
+# ~/mesen-pins/<commit>/ (tools/mesen/README.md, Deploying), and a tree runs
+# the one its tools/mesen/EMULATOR names, through a shared copy of its own
+# (Mesen-test-<commit12>).  So trees on different pins run side by side, and
+# a pin bump deploys without touching anyone else's tree.  A machine without
+# the pin's directory falls back to the tree's tools/Mesen.app (Mesen-linux),
+# and the check below holds that to the pin.
+PIN_COMMIT=$(cut -d' ' -f3 "$ROOT/tools/mesen/EMULATOR" 2>/dev/null)
+PIN_DIR="$HOME/mesen-pins/$PIN_COMMIT"
+PIN_TAG=""
 if [ "$(uname -s)" = Darwin ]; then
-  SRC_APP="${OT6_MESEN_APP:-$ROOT/tools/Mesen.app}"
+  DEF_APP="$ROOT/tools/Mesen.app"
+  if [ -n "$PIN_COMMIT" ] && [ -x "$PIN_DIR/Mesen.app/Contents/MacOS/Mesen" ]; then
+    DEF_APP="$PIN_DIR/Mesen.app"; PIN_TAG="-$(echo "$PIN_COMMIT" | cut -c1-12)"
+  fi
+  SRC_APP="${OT6_MESEN_APP:-$DEF_APP}"
   DEFAULT_CACHE="$HOME/Library/Caches/ot6"
   MESEN_CACHE="${OT6_MESEN_CACHE:-$DEFAULT_CACHE}"
-  SHARED_APP="$MESEN_CACHE/Mesen-test"; APP_EXT=.app
+  SHARED_APP="$MESEN_CACHE/Mesen-test$PIN_TAG"; APP_EXT=.app
   BIN_SUB=/Contents/MacOS          # the executable's directory in the bundle
   file_stamp() { stat -Lf '%z %m' "$1"; }
   clone_cp() { cp -c "$@" 2>/dev/null || cp "$@"; }   # APFS clonefile
   GATEKEEPER_NOTE="; expect a Gatekeeper scan"
 else
   GATEKEEPER_NOTE=
-  SRC_APP="${OT6_MESEN_APP:-$ROOT/tools/Mesen-linux}"
+  DEF_APP="$ROOT/tools/Mesen-linux"
+  if [ -n "$PIN_COMMIT" ] && [ -x "$PIN_DIR/Mesen" ]; then
+    DEF_APP="$PIN_DIR"; PIN_TAG="-$(echo "$PIN_COMMIT" | cut -c1-12)"
+  fi
+  SRC_APP="${OT6_MESEN_APP:-$DEF_APP}"
   DEFAULT_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/ot6"
   MESEN_CACHE="${OT6_MESEN_CACHE:-$DEFAULT_CACHE}"
-  SHARED_APP="$MESEN_CACHE/Mesen-test"; APP_EXT=
+  SHARED_APP="$MESEN_CACHE/Mesen-test$PIN_TAG"; APP_EXT=
   BIN_SUB=
   file_stamp() { stat -Lc '%s %Y' "$1"; }
   clone_cp() { cp --reflink=auto "$@"; }
@@ -233,15 +271,15 @@ shared_app_why() {
 }
 
 if ! shared_app_ready; then
-  # Many workers can arrive here at once on a cold cache.  Whoever wins the
-  # mkdir builds it; the rest wait for that one build instead of racing to
+  # Many workers can arrive here at once on a cold cache.  Whoever takes the
+  # lock builds it; the rest wait for that one build instead of racing to
   # install over each other (mv of a directory onto an existing directory
   # nests it rather than replacing it, which would corrupt the bundle).
   mkdir -p "$MESEN_CACHE"
   LOCK="$MESEN_CACHE/.build.lock"
   held=""; waited=0
   until shared_app_ready; do
-    if mkdir "$LOCK" 2>/dev/null; then held=1; break; fi
+    if take_lock "$LOCK"; then held=1; break; fi
     sleep 1; waited=$((waited + 1))
     [ "$waited" -gt 180 ] && { echo "stale lock $LOCK; remove it and retry"; exit 2; }
   done
@@ -322,7 +360,7 @@ fi
 EMULATOR_COMMIT=$(printf '%s' "$EMULATOR_REC" | cut -d' ' -f3)
 PIN=$(cat "$ROOT/tools/mesen/EMULATOR" 2>/dev/null)
 if [ -z "${OT6_MESEN_APP:-}" ] && [ "$EMULATOR_REC" != "$PIN" ]; then
-  echo "[ot6] FAIL: the deployed emulator $SRC_APP is the build '$EMULATOR_REC', but tools/mesen/EMULATOR pins '$PIN': deploy the pinned build on this machine first (tools/mesen/README.md, Deploying); refused BEFORE boot"
+  echo "[ot6] FAIL: the deployed emulator $SRC_APP is the build '$EMULATOR_REC', but tools/mesen/EMULATOR pins '$PIN': deploy the pinned build on this machine first, at $PIN_DIR/ (tools/mesen/README.md, Deploying); refused BEFORE boot"
   exit 2
 fi
 
@@ -471,8 +509,10 @@ while :; do
   mesen_pid=$!
   load_grace="${OT6_LOAD_GRACE:-120}"
   load_dead=0
+  # Polled every half second: the loop's sleep is the wall time a run spends
+  # after Mesen has exited (it was 5 s, 2.5 s a run on average, #394).
   while kill -0 "$mesen_pid" 2>/dev/null; do
-    sleep 5
+    sleep 0.5
     if [ "$load_dead" -eq 0 ] && [ $(( $(date +%s) - t0 )) -ge "$load_grace" ] \
        && ! grep -q '^\[ot6' "$RUN_LOG" 2>/dev/null; then
       load_dead=1

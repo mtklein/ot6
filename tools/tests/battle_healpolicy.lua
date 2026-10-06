@@ -405,48 +405,77 @@ H.run({ maxFrames = 3000 }, {
                                                 topUpFirst = false, topUp = 250 })
     H.assertEq(tostring(ok), "false",
       "...and with the enemy first and no kill in reach, not raised to die again (" .. why .. ")")
-    -- heading for a wipe (#374): battle_healerdown's riders (chain14 on
-    -- the care-items branch) wiped holding 2 Fenix Downs on "7 HP, and even
-    -- an ally's top-up first (7 + 0 = 7) does not clear the 16 round" -- an
-    -- empty top-up bag, every member standing inside its round.  The raise
-    -- that buys a turn goes; with someone standing clear it does not.
+    -- heading for a wipe (#374, as hits needed #395): o.wipe as Driver:raiseOk
+    -- builds it, H.wipeRisk on the members still standing.  Each member
+    -- carries its own window (a full gauge, in ticks) and the enemies' prices
+    -- on it (H.roundCost's input, landed hits only); the actions inside the
+    -- quickest member's window are the round, and a wipe is those actions
+    -- shared out to drop every member, one action on one member.
+    -- en(n, worst): n enemies, each acting once inside a 300-tick window.
+    local function en(n, worst, first)
+      local t = {}
+      for k = 1, n do
+        t[k] = { slot = k - 1, eta = 50, period = 400, worst = (k == 1 and first) or worst }
+      end
+      return t
+    end
+    local function m(e, hp, maxhp, enemies, window)   -- window false: no gauge
+      if window == false then window = nil else window = window or 300 end
+      return { e = e, hp = hp, maxhp = maxhp, window = window, enemies = enemies }
+    end
+    -- battle_healerdown's riders (chain14 on the care-items branch) wiped
+    -- holding 2 Fenix Downs on "7 HP, and even an ally's top-up first (7 + 0
+    -- = 7) does not clear the 16 round" -- an empty top-up bag, every member
+    -- inside its round.  The raise that buys a turn goes; with someone
+    -- standing clear it does not.
+    local w = H.wipeRisk({ m(1, 13, 68, en(2, 16)), m(2, 9, 70, en(2, 16)) })
+    H.assertEq(w ~= nil, true, "healerdown: 13 and 9 HP under two landed 16s, one each: a wipe ("
+      .. tostring(w) .. ")")
     raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 60, power = 2, smallestHit = 9, roundCost = 16,
-                                                topUpFirst = true, topUp = 0,
-                                                wipe = "2 standing, every one inside its round: e1 13 under 16, e2 9 under 16" })
+                                                topUpFirst = true, topUp = 0, wipe = w })
     H.assertEq(tostring(raiseHp) .. "/" .. tostring(ok) .. "/" .. tostring(needs), "7/true/false",
       "7 HP under a 16 round with nothing to top it up, the party heading for a wipe: raised, no top-up owed (" .. why .. ")")
     raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 60, power = 2, smallestHit = 9, roundCost = 16,
                                                 topUpFirst = true, topUp = 0 })
     H.assertEq(tostring(ok), "false",
       "...and the same raise with a member standing clear of the round is refused (" .. why .. ")")
-    -- ...and o.wipe as Driver:raiseOk builds it (H.wipeRisk on the members
-    -- still standing, each round priced from landed hits only).  A member's
-    -- round prices every enemy action in its window as if all fell on it, so
-    -- a wipe is the party's pooled HP inside the round that lands before any
-    -- of them acts, never the round counted once against each member (review
-    -- of 63473f75: four landed 250s, a 1000 round, read as a wipe over
-    -- 900/950/990, build/attempts/wt/v026-driver-review3/wiperisk_probe.log).
     -- A full-HP member counts like any other (review of 0e0e4150).
-    local w = H.wipeRisk({ { e = 1, hp = 900, maxhp = 900, round = 1400 },
-                           { e = 3, hp = 300, maxhp = 978, round = 1300 } })
-    H.assertEq(w ~= nil, true, "1200 HP between a full-HP member and a hurt one, under the 1300 "
-      .. "round that lands before either acts: heading for a wipe (" .. tostring(w) .. ")")
-    w = H.wipeRisk({ { e = 2, hp = 200, maxhp = 600, round = 250 } })
-    H.assertEq(w ~= nil, true, "one member standing at 200 under a landed 250: inside it, a wipe ("
+    w = H.wipeRisk({ m(1, 900, 900, en(4, 325)), m(3, 300, 978, en(4, 325)) })
+    H.assertEq(w ~= nil, true, "900 at full HP takes 3 of four landed 325s and 300 takes the "
+      .. "fourth: heading for a wipe (" .. tostring(w) .. ")")
+    w = H.wipeRisk({ m(2, 200, 600, en(1, 250)) })
+    H.assertEq(w ~= nil, true, "one member standing at 200 under one landed 250: a wipe ("
       .. tostring(w) .. ")")
-    H.assertEq(H.wipeRisk({ { e = 1, hp = 900, maxhp = 900, round = 1000 },
-                            { e = 2, hp = 950, maxhp = 950, round = 1000 },
-                            { e = 3, hp = 990, maxhp = 990, round = 1000 } }), nil,
-      "the reviewer's spread: a 1000 round over 900/950/990 at full HP kills nobody: no wipe read")
-    H.assertEq(H.wipeRisk({ { e = 1, hp = 900, maxhp = 900, round = 600 },
-                            { e = 3, hp = 300, maxhp = 978, round = 600 } }), nil,
-      "one member inside the 600 round and one standing clear of it: no wipe read")
-    H.assertEq(H.wipeRisk({ { e = 1, hp = 500, maxhp = 900, round = 2000 },
-                            { e = 3, hp = 500, maxhp = 978, round = 600 } }), nil,
-      "1000 HP over the 600 that lands before e3 acts (e1's slower gauge sees 2000): no wipe read")
-    H.assertEq(H.wipeRisk({ { e = 1, hp = 900, maxhp = 900, round = 0 },
-                            { e = 3, hp = 300, maxhp = 978, round = 0 } }), nil,
-      "nothing landed yet (both rounds 0): no wipe read")
+    -- the review of 63473f75: four landed 250s over 900/950/990 need twelve
+    -- (build/attempts/wt/v026-driver-review3/wiperisk_probe.log)
+    H.assertEq(H.wipeRisk({ m(1, 900, 900, en(4, 250)), m(2, 950, 950, en(4, 250)),
+                            m(3, 990, 990, en(4, 250)) }), nil,
+      "the reviewer's spread: four 250s over 900/950/990 at full HP need twelve: no wipe read")
+    H.assertEq(H.wipeRisk({ m(1, 900, 900, en(2, 300)), m(3, 300, 978, en(2, 300)) }), nil,
+      "two 300s drop the member at 300 and leave the one at 900: no wipe read")
+    -- the window is the quickest member's: e3's gauge refills in 300 ticks
+    -- (two actions), e1's in 2000 (ten)
+    H.assertEq(H.wipeRisk({ m(1, 500, 900, en(2, 300), 2000), m(3, 500, 978, en(2, 300), 300) }), nil,
+      "500 and 500 under the two 300s that land before e3 acts again (e1's slower gauge sees ten): no wipe read")
+    H.assertEq(H.wipeRisk({ m(1, 900, 900, en(2, nil)), m(3, 300, 978, en(2, nil)) }), nil,
+      "nothing landed yet (no price on anyone): no wipe read")
+    -- the review of wt/v026-driver (wiperisk_probe2.log): the pooled form
+    -- missed the uneven hit and over-read the overkill
+    w = H.wipeRisk({ m(1, 100, 900, en(4, 50)), m(2, 300, 600, en(4, 400)) })
+    H.assertEq(w ~= nil, true, "uneven: 50s on e1 at 100 (two) and 400s on e2 at 300 (one), "
+      .. "3 of the 4 actions drop both: a wipe (" .. tostring(w) .. ")")
+    H.assertEq(H.wipeRisk({ m(0, 400, 900, en(4, 250)), m(1, 400, 900, en(4, 250)),
+                            m(2, 100, 900, en(4, 250)) }), nil,
+      "overkill: 900 HP under four 250s, but 400/400/100 need 2+2+1 = 5: no wipe read")
+    -- mixed prices share out exactly: the one 400 drops one member at 100,
+    -- the three 10s drop nobody
+    H.assertEq(H.wipeRisk({ m(1, 100, 900, en(4, 10, 400)), m(2, 100, 900, en(4, 10, 400)),
+                            m(3, 100, 900, en(4, 10, 400)) }), nil,
+      "one 400 and three 10s over three members at 100: one goes down, not three: no wipe read")
+    -- a standing member with no gauge of its own (no window) still has to go
+    -- down: the two 100s drop e1 and leave e2 at 900 (#395 review)
+    H.assertEq(H.wipeRisk({ m(1, 100, 900, en(2, 100)), m(2, 900, 900, en(2, 100), false) }), nil,
+      "a member with no gauge at 900 under two 100s is still standing: no wipe read")
     raiseHp, ok, why, needs = H.raiseDecision({ maxhp = 363, power = 2, smallestHit = nil })
     H.assertEq(tostring(ok) .. "/" .. tostring(needs), "true/true",
       "nothing measured: the raise stands, and its top-up is owed -- not judged to survive alone (" .. why .. ")")
@@ -758,6 +787,45 @@ H.run({ maxFrames = 3000 }, {
       "...not for a heal that leaves him inside the round (30 + 250 = 280)")
     H.assertEq(H.liftReopens({ hp = 400, cost = 286, restores = { 676 } }), false,
       "...nor for a member outside the round: that is a top-up, the budget's to keep")
+    -- ...and only for a heal that outpaces the round (#402): the Air Force at
+    -- shift 40 (build/attempts/wt/v026-driver2/402/base2/base_s40) reopened the
+    -- budget every turn for Potions that lifted LOCKE over an 818 round he lost
+    -- again the next ("592 + 250 = 842 survives the 818 round"), all three
+    -- members caring until the party wiped with the Laser Gun at 2511 of 3300
+    H.assertEq(H.liftReopens({ hp = 592, cost = 818, restores = { 250 }, outpace = true }), false,
+      "LOCKE at 592 under an 818 round, a Potion's 250: lifts him one round, never outpaces it -- no reopen")
+    H.assertEq(H.liftReopens({ hp = 121, cost = 603, restores = { 250, 1094 }, outpace = true }), true,
+      "...an X-Potion's 1094 over a 603 round outpaces it: the budget reopens")
+    H.assertEq(H.liftReopens({ hp = 144, cost = 286, restores = { 250, 676 }, outpace = true }), true,
+      "...and the Gate's LOCKE (144 under 286, the X-Potion's 676) still reopens it")
+    H.assertEq(H.liftReopens({ hp = 300, cost = 500, restores = { 300 }, outpace = true }), false,
+      "...not a heal that lifts (300 + 300 over 500) but puts back less than the round takes (300 < 500)")
+    -- ...and a heal that fills the member outpaces any round (review B1 of
+    -- 4bd463d9): the IAF's first battle (key beEC-g00AF-e5E5E5D5D, shifts
+    -- 28 and 53) had TERRA at 537/960 under a 599 round, the Elixir's capped
+    -- 423 filling her; r >= cost refused it, the budget stayed shut, and she
+    -- died at 255/960 ("[death] f+3098 entity 0 char 0 from 255/960")
+    H.assertEq(H.liftReopens({ hp = 537, maxhp = 960, cost = 599, restores = { 250, 50, 423 }, outpace = true }), true,
+      "TERRA at 537/960 under a 599 round, an Elixir's 423 fills her: outpaces, the budget reopens")
+    H.assertEq(H.liftOutpaces(537, 960, 423, 599), true, "a heal that fills the member outpaces the round")
+    H.assertEq(H.liftOutpaces(537, 960, 250, 599), false, "a Potion's 250 neither fills her nor covers 599")
+    H.assertEq(H.liftOutpaces(200, 960, 2000, 599), true, "a flat restore counts up to the HP missing: 760 >= 599")
+    H.assertEq(H.liftOutpaces(200, 1500, 1000, 1400), false, "1000 on 200/1500 under 1400: neither")
+    H.assertEq(H.liftReopens({ hp = 100, maxhp = 500, cost = 600, restores = { 1000 }, outpace = true }), false,
+      "...and a heal counts only up to the HP missing: 1000 on 100/500 cannot lift her over a 600 round")
+    H.assertEq(H.liftOutpaces(200, 1500, 1300, 1400), true, "1300 on 200/1500 fills her: outpaces")
+    -- the reopened block's two filters (Driver: the cures by M.liftKeepsHeal,
+    -- the bag by M.liftFilterHeals)
+    H.assertEq(H.liftKeepsHeal(537, 960, 423, 599), true, "the cure filter keeps a cure that fills her")
+    H.assertEq(H.liftKeepsHeal(537, 960, 344, 599), false, "...and drops one that does not outpace (344 of 423 missing)")
+    H.assertEq(H.liftKeepsHeal(537, 960, nil, 599), false, "...and an unmeasured cure")
+    do
+      local kept = H.liftFilterHeals({ { id = 0xE9, restore = 250 }, { id = 0xE8, restore = 50 },
+        { id = 0xEE, restore = 423 } }, 537, 960, 599)
+      H.assertEq(#kept == 1 and kept[1].id or -1, 0xEE, "the bag filter keeps the Elixir alone (fills her)")
+      kept = H.liftFilterHeals({ { id = 0xE9, restore = 250 }, { id = 0xEA, restore = 1094 } }, 121, 2000, 603)
+      H.assertEq(#kept == 1 and kept[1].id or -1, 0xEA, "...the X-Potion alone over a 603 round at 121/2000")
+    end
     -- the wipe class
     local d = function(tick, from, maxhp, bp, one)
       return { tick = tick, from = from, maxhp = maxhp, bp = bp, oneAction = one }

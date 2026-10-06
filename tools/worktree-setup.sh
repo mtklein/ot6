@@ -45,6 +45,11 @@ if [ ! -d "$HERE/build/states" ]; then
     cp -Rp "$SEED/build/states" "$HERE/build/states"
     [ -d "$SEED/build/ninja" ] && [ ! -d "$HERE/build/ninja" ] && \
       cp -Rp "$SEED/build/ninja" "$HERE/build/ninja"
+    # The captured saves the cut legs Continue (build/checkpoints/<key>/,
+    # #363): a cut state's stamp binds its capture, so states without them
+    # would replay from the first cut.
+    [ -d "$SEED/build/checkpoints" ] && [ ! -d "$HERE/build/checkpoints" ] && \
+      cp -Rp "$SEED/build/checkpoints" "$HERE/build/checkpoints"
   fi
 fi
 
