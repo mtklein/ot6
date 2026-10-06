@@ -158,7 +158,6 @@ local function recCmd(c, r) return 0x1600 + 37 * c + 0x16 + r end
 
 -- ---- the draw: Sneeze counters (see the header) -----------------------------
 local MAXDRAWS = 24          -- draws built after BURN; the budget must fit
-local worldGroup = nil       -- the group the last CheckBattleWorld rolled
 local battleKey = nil        -- the last battle's key (H.firstBattleKey)
 local function aiByte(species)
   local ptrs, base = H.sym("AIScriptPtrs") & 0x3FFFFF, H.sym("AIScript") & 0x3FFFFF
@@ -254,8 +253,6 @@ local function installObservers()
   installed = true
   local function cx() return emu.getState()["cpu.x"] & 0xFFFF end
   local function cy() return emu.getState()["cpu.y"] & 0xFFFF end
-  local cbw = H.sym("CheckBattleWorld")
-  emu.addMemoryCallback(function() worldGroup = H.worldCheckGroup() end, emu.callbackType.exec, cbw, cbw)
   -- each battle's key (seed at its store, formation, encounter counters),
   -- so a sweep counts its draws by distinct battle, not by run
   local ss = H.seedStoreAddr()
@@ -614,35 +611,24 @@ local steps = {
     installObservers()
   end),
   (function()
-    -- lap between the Continue tile and a tile a few steps off it, each leg
-    -- planned on the settled tilemap (M.worldBfs), until an encounter fires;
-    -- a draw whose Sneeze counter is armed from the opening is run from and
-    -- the lap goes on (see the header)
-    local home, away, goal, plan, idx
+    -- pace one pool's stretch of the Continue tile's row (H.newPacer, #306)
+    -- until an encounter fires; a draw whose Sneeze counter is armed from the
+    -- opening is run from and the pacing goes on (see the header).  The lap
+    -- this file used (the Continue tile <-> a BFS tile a few steps off it)
+    -- could cross into another pool; the budget is decoded for one.
+    local P = H.newPacer({ tag = "mimic pace" })
+    local planned = false
     local function lapWalk(what)
       return H.driveUntil(function() return H.battleLoadStarted() end, 30000, {
         H.call(function()
-          if not H.worldHasControl() or not H.worldSettled() then plan = nil; H.setPad({}) return end
-          if not H.worldAligned() then return end
-          local x, y = H.worldX(), H.worldY()
-          if home == nil then
-            home = { x, y }
-            for _, o in ipairs({ { 0, -4 }, { 0, 4 }, { -4, 0 }, { 4, 0 }, { 0, -3 }, { 0, 3 },
-                                 { -3, 0 }, { 3, 0 }, { 2, 2 }, { -2, -2 }, { 2, -2 }, { -2, 2 } }) do
-              local p = H.worldBfs(x + o[1], y + o[2])
-              if p and #p >= 3 and #p <= 10 then away = { x + o[1], y + o[2] } break end
+          if not planned then
+            if not (H.worldHasControl() and H.worldSettled() and H.worldAligned()) then
+              H.setPad({}) return
             end
-            assert(away, "a reachable tile a few steps from the Continue tile")
-            goal = away
-            H.log(string.format("[mimic] encounter lap (%d,%d) <-> (%d,%d)", x, y, away[1], away[2]))
+            P.plan()
+            planned = true
           end
-          if plan == nil or idx > #plan then
-            if x == goal[1] and y == goal[2] then goal = (goal == away) and home or away end
-            plan, idx = H.worldBfs(goal[1], goal[2]), 1
-            if not plan or #plan == 0 then plan = nil; H.setPad({}) return end
-          end
-          local dir = plan[idx]; idx = idx + 1
-          H.setPad({ [dir] = true })
+          H.setPad(P.pad())
         end),
       }, what)
     end
@@ -665,15 +651,15 @@ local steps = {
             verdict = string.format("used up (BURN %d)", BURN)
           else
             -- the budget belongs to the pool that dealt this encounter
-            group0 = group0 or (MUTANT == "other-group" and worldGroup + 1 or worldGroup)
-            H.assertEq(worldGroup, group0, string.format("draw %d was dealt by group %s, the pool "
-              .. "the budget was decoded from", try, tostring(group0)))
+            group0 = group0 or (MUTANT == "other-group" and P.group + 1 or P.group)
+            H.assertEq(P.rolled(), group0, string.format("draw %d was dealt by group %s, the pool "
+              .. "the budget was decoded from (the paced stretch's)", try, tostring(group0)))
             budget = budget or (MUTANT == "budget-1" and 1 or budgetFor(group0))
             measured = why == nil or MUTANT == "take-any"
             verdict = measured and ("measured" .. (why and " (MUTANT take-any)" or "")) or "run from"
           end
           H.log(string.format("[mimic] draw %d: key %s group %s, formation %s%s -> %s", try,
-            tostring(battleKey), tostring(worldGroup), table.concat(names, " "),
+            tostring(battleKey), tostring(P.rolled()), table.concat(names, " "),
             why and ("; armed: " .. why) or "; no Sneeze counter armed", verdict))
           if try > BURN and not measured then
             H.assertEq(try - BURN < budget, true, string.format("a formation with no Sneeze "

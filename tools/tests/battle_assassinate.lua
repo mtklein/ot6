@@ -79,6 +79,16 @@
 --      ~200), so it claimed a check it did not make.  It is required now.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/camp_escaped.mss.lua"
+-- Lever, for evidence only (the suite runs BURN 0): run from that many
+-- encounters on the paced stretch before battle 1, to vary the encounter
+-- history (TESTING.md: the draw moves with encounters used up, not seeds).
+local BURN = 0
+-- The walk paces one pool's stretch of the boot row (H.newPacer, #306): the
+-- clock pattern this file used (down, down, left, left, up, up, right,
+-- right, 25 frames each) left the pool its budget was decoded from -- main
+-- at 995d4a28: "battle 1 draw 1 was dealt by group 1, the pool its budget
+-- was decoded from (8)" (build/attempts/main/qual-995d4a28-px13/).
+local P = H.newPacer({ tag = "pace" })
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_TRANS, ST_CMD, ST_DEF, ST_TGT = 0x01, 0x05, 0x27, 0x38
@@ -392,9 +402,6 @@ local function suitableDraw()
   return pierce >= 2 and bodies >= 3
 end
 local function walkSteps(n)
-  local ph = 0
-  local pattern = { "down", "down", "left", "left", "up", "up",
-                    "right", "right" }
   return {
     H.waitUntil(function()
       return H.worldMode() and H.worldHasControl() and H.worldAligned()
@@ -402,10 +409,7 @@ local function walkSteps(n)
     H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
       H.call(function()
         if H.battleLoadStarted() then H.setPad({}) return end
-        if not H.worldHasControl() then H.setPad({}) return end
-        ph = ph + 1
-        local dir = pattern[(math.floor(ph / 25) % #pattern) + 1]
-        H.setPad({ [dir] = true })
+        H.setPad(P.pad())
       end),
     }, "a real world encounter fires (draw " .. n .. ")"),
     H.call(function() H.setPad({}) end),
@@ -438,16 +442,11 @@ end
 -- every formation suits (suitableDraw's test, decoded from the ROM: three or
 -- more bodies, two of them PIERCE-weak by their class row,
 -- H.speciesClassRow, with shields -- an authored Ot6ShieldTbl count, else
--- the level formula's 2 or more), over the group the first draw's
--- CheckBattleWorld rolled.  Every draw asserts it came from that group.  The
--- six draws this file used to build were a bare number.
+-- the level formula's 2 or more), over the group the paced stretch rolls
+-- (P.group).  Every draw asserts CheckBattleWorld rolled that group
+-- (P.assertGroup).  The six draws this file used to build were a bare
+-- number.
 local MAXDRAWS = 40          -- draws built per fight; the decoded budget must fit
-local worldGroup = nil       -- the group the last CheckBattleWorld rolled
-do
-  local check = H.sym("CheckBattleWorld")
-  emu.addMemoryCallback(function() worldGroup = H.worldCheckGroup() end,
-    emu.callbackType.exec, check, check)
-end
 local budgets = {}
 local function speciesShields(sp)
   local t = H.sym("Ot6ShieldTbl") & 0x3FFFFF
@@ -496,9 +495,8 @@ local function encounter(tag)
   for n = 1, MAXDRAWS do
     local w = walkSteps(n)
     table.insert(w, 5, H.call(function()
-      if group == nil then group, budget = worldGroup, budgetFor(worldGroup) end
-      H.assertEq(worldGroup, group, string.format("%s draw %d was dealt by group %s, the "
-        .. "pool its budget was decoded from (%s)", tag, n, tostring(worldGroup), tostring(group)))
+      group, budget = P.group, budgetFor(P.group)
+      P.assertGroup(string.format("%s draw %d", tag, n))
     end))
     if n == 1 then
       for _, s in ipairs(w) do steps[#steps + 1] = s end
@@ -545,7 +543,21 @@ add({
   -- back row halves his physical damage, so the bodies outlive more of
   -- his chips (arm 2's second break, arm 3's hook point half).
   H.setRows({ [SHADOW] = true }, { tag = "shadow back row" }),
+  H.waitUntil(function() return H.worldSettled() end, 1500, "the world map settled", 5),
+  H.call(function() P.plan() end),
 })
+for i = 1, BURN do
+  add({
+    H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
+      H.call(function() H.setPad(P.pad()) end),
+    }, "BURN encounter " .. i),
+    H.release(),
+    H.waitUntil(function() return H.battleActive() end, 1200, "BURN battle " .. i .. " active", 5),
+    H.call(function() P.assertGroup("BURN encounter " .. i) end),
+    H.fleeBattle(9000, { onCantRun = "fight" }),
+    H.waitUntil(function() return H.worldSettled() end, 1500, "settled after BURN " .. i, 5),
+  })
+end
 
 -- ===================== battle 1: arms 1 and 2 ==============================
 -- arm 1: the breaking hit.  A fight Interceptor empties before Shadow
