@@ -24,6 +24,7 @@
 #     rom <identity of the ROM the run booted (rom_version.py identity)>
 #     generator <sha256(GATE_CONTRACT ++ gen ++ extras...)>
 #     lib <path> <sha256(<path>'s token stream)>      (one per lib half)
+#     raw <path> <sha256(file bytes)>                (generator and lib halves)
 #     artifact <sha256(build/states/<state>.mss)>
 #     ancestor <path> <sha256(<path> file bytes)>        (non-root states only)
 #     emulator <sha256 of the Mesen executable that made the .mss, or unknown>
@@ -267,6 +268,12 @@ case "$cmd" in
       liblines="${liblines}lib $h $lh
 "
     done
+    rawlines=""
+    for h in "tools/tests/$gen.lua" $LIB_HALVES; do
+      rh=$(filehash "$ROOT/$h") || exit 2
+      rawlines="${rawlines}raw $h $rh
+"
+    done
     {
       printf '%s\n' "$sigline"
       printf 'rom %s\n' "$rom_hash"
@@ -277,6 +284,8 @@ case "$cmd" in
         printf 'ancestor %s %s\n' "$ancestor" "$anc_hash"
       printf 'emulator %s\n' "$emu_hash"
       printf 'pin %s\n' "$pin_commit"
+      # Raw capture provenance is retained, never compared for freshness.
+      printf '%s' "$rawlines"
     } > "$STATES/$state.stamp"
     ;;
   *)

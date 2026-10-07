@@ -147,10 +147,31 @@ want_art="artifact $(shasum -a 256 "$TMP/build/states/fake.mss" | cut -c1-64)"
 [ "$(sed -n 7p "$TMP/build/states/fake.stamp")" = "$want_art" ] &&
   echo "  pass write binds the generated artifact's hash" ||
   { echo "  FAIL artifact binding wrong or missing"; ok=0; }
-[ "$(wc -l < "$TMP/build/states/fake.stamp" | tr -d ' ')" = 9 ] &&
+[ "$(wc -l < "$TMP/build/states/fake.stamp" | tr -d ' ')" = 13 ] &&
   ! grep -q '^ancestor ' "$TMP/build/states/fake.stamp" &&
   echo "  pass a root state (ancestor -) carries no ancestor line" ||
   { echo "  FAIL unexpected ancestor line on a root state"; ok=0; }
+for source in tools/tests/gen_fake.lua tools/tests/lib/ot6.lua \
+              tools/tests/lib/ot6_field.lua tools/tests/lib/ot6_contract.lua; do
+  grep -qx "raw $source $(shasum -a 256 "$TMP/$source" | cut -c1-64)" "$TMP/build/states/fake.stamp" &&
+    echo "  pass raw capture provenance: $source" ||
+    { echo "  FAIL raw provenance missing: $source"; ok=0; }
+done
+# A comment/whitespace edit keeps both signatures, but raw provenance differs.
+for source in tools/tests/gen_fake.lua tools/tests/lib/ot6.lua \
+              tools/tests/lib/ot6_field.lua tools/tests/lib/ot6_contract.lua; do
+  old=$(cat "$TMP/$source")
+  original_sig=$(sh "$GATE" sig gen_fake "$extra")
+  original_gen=$(sh "$GATE" gensig gen_fake "$extra")
+  printf '  %s  -- documentation only\n\n' "$old" > "$TMP/$source"
+  check "comment/whitespace sig: $source" SAME "$original_sig" "$(sh "$GATE" sig gen_fake "$extra")"
+  check "comment/whitespace gensig: $source" SAME "$original_gen" "$(sh "$GATE" gensig gen_fake "$extra")"
+  ! grep -qx "raw $source $(shasum -a 256 "$TMP/$source" | cut -c1-64)" "$TMP/build/states/fake.stamp" &&
+    echo "  pass capture's raw bytes retained after comment edit: $source" ||
+    { echo "  FAIL raw capture provenance changed"; ok=0; }
+  printf '%s\n' "$old" > "$TMP/$source"
+done
+
 # The emulator line: copied from the [emulator] line run.sh publishes beside
 # the .mss (<state>.mss.emulator); "unknown" with no such record, or with one
 # older than the .mss (provenance never stops a stamp).
