@@ -1517,7 +1517,9 @@ M.RACE_COST_MARGIN = 200       -- gil
 M.RACE_SAMPLES = 16
 M.RACE_NEAR_FATAL = 0.5        -- a member left at or under max/8 HP, in members down
 M.RACE_DEATH_MARGIN = 0.07     -- mean deaths: one play in sixteen is the draws
-M.RACE_STAND_SLACK = 1.5       -- the worst-case play's hit, against a last stand
+M.RACE_STAND_SLACK = 2.0       -- the worst-case play's hit, against a last stand
+                               -- (1.5 missed one: the WoR's s5 at 19cc3147, a 1-BP
+                               -- Fight read at 94 a hit landed 154 and two fell)
 
 -- The chance a blockable hit lands (#415): the hit check (battle_main
 -- @233f) multiplies the attacker's hit rate by the target's inverted
