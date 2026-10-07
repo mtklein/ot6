@@ -1,6 +1,7 @@
 # The care race: one decision for every command (#415)
 
-Status: implemented, default-on; final matched validation in progress.
+Status: default-on augmentation implemented; final matched validation does
+not meet the original all-command/no-regression acceptance bar.
 Owner and coordinator, 2026-10-06; validation updated 2026-10-07.
 
 ## Why
@@ -195,9 +196,10 @@ line that counts the leg's decisions, disagreements and overrides.
   make the race cautious.  It should still choose damage when no member
   is in reach of a kill within the horizon, so check that it does not
   over-heal on the plain WoR stretches.
-- **Statuses** beyond death and the ticks (Muddle, Sleep, Stop) enter
-  only as "this member loses its turns until cured".  The cure candidates
-  score through that.
+- **Statuses** beyond death and the ticks are not simulated faithfully.
+  While a standing member is Muddled, asleep, stopped, frozen, Berserk,
+  petrified, a Zombie or departed, the rules play the fight. The Gate
+  validation below caught the cost of imagining their planned turns.
 - **The continuation policy** is the driver's current attack choice.  If
   the race's own choices make later turns better, the one-step estimate
   undervalues setup moves such as Defend into a bank.  That is accepted
@@ -380,11 +382,87 @@ the rules (43 shared keys). The first fight in shifts 8 and 11 was
 At shift 11 frame 10,439 the race raised EDGAR while SABIN was Muddled;
 its simulated continuation still used SABIN's planned attacks. The race
 now defers while a standing member cannot take a planned turn, covering
-the status class rather than naming that formation. New matched Gate
-validation is required before counting that fix as effective. Raw logs:
+the status class rather than naming that formation. At d567f6f6, both
+arms take 3,563 ticks and finish with one member down on that key. The
+new Gate sweep passes all segment attempts and improves the aggregate
+shared-key results below. Raw old logs:
 `build/attempts/wt/v026-race/final-play/gate/`.
 
 The Train generator's battle 68 uses its own local `makePlan`, not this
 driver, and now ends through Suplex. Its on/off segment comparison
 measures the random battles on the approach, not a race-policy change in
 battle 68. It cannot satisfy that part of #415's original acceptance bar.
+
+
+At d567f6f6, the final matched sweeps use the same legal starting
+checkpoint within each segment, seed shifts 0–15, no retries, and eight
+claimed emulator slots on px13. The retained provenance records the
+library, ROM and emulator, along with the actual starting states. Counts
+below are distinct shared battle keys; ticks, deaths and wins are **sums
+of per-key means**, not independent attempts or measured probabilities.
+
+| Segment | Shared keys | Race ticks / rules ticks | Race down / rules down | Race wins / rules wins |
+| --- | ---: | ---: | ---: | ---: |
+| Air Force boss (01CB) | 4 | 34,321 / 36,154 | 0 / 0 | 4 / 4 |
+| Sealed Gate | 45 | 164,750 / 169,508 | 3 / 4 | 45 / 45 |
+| Train approach | 65 | 107,422 / 106,721 | 0 / 0 | 49 / 49 |
+| Tzen Sneezer (00CC) | 22 | 79,408 / 84,468 | 0 / 0 | 19 / 20 |
+
+Raw summaries, per-key rows and all controller-play logs are retained in
+`build/attempts/wt/v026-race/final-play/d567/`; the portable archive is
+`final-play/d567-final-evidence.tgz`. The table quotes the lines beginning
+`keys:` and `shared keys, sum of per-key means:` in the corresponding
+`race-d567f6f6-*-keypair.txt` files. The Train comparison contains flee
+outcomes; not every observed approach battle is intended to be won.
+
+All race Air Force segments pass; the rules' shift 14 wipes in IAF trash
+before the boss. Both arms complete every Gate, Train and Tzen segment.
+This does not establish domination on each battle key: the Air Force
+`beE0-g01CB-e5E655D5D` race takes 8,008 ticks against 6,633. The Sneezer
+`beD0-g00CC-eBD9E95A6` logs `PARTY LEFT` at 2,716 ticks under the race,
+against a win at 2,639 under the rules. No race override occurs inside
+that lost fight; earlier play changes the arriving resources and timing,
+so deferring the Sneezer's decisions does not prove no downstream harm.
+A passing segment target can hide an unrewarded fight.
+
+The status guard has a narrow synthetic red/green check: removing it
+fails `Muddle contributes no imagined continuation`. Current unit output
+begins `care_race_selftest: PASS -- 71 checks:` and all 37 retained negative
+controls fail their expected assertions. The earlier boost-continuation
+check's first fixture was invalid (both arms died before the next turn);
+the corrected fixture and diagnostic are retained, and the correction
+was committed without rewriting the published failed attempt.
+
+These results support the Gate fix and faster aggregate Air Force/Gate
+play. They leave the original all-command coverage, direct battle 68
+improvement, every-key no-regression, and final whole-route matched
+comparison open. The historical aac04024 whole-route comparison cannot
+qualify later library changes. Independent review and final release play
+under the landed release library are still required.
+
+
+The clean bare branch qualification at d567f6f6 is **red**, not a release
+qualification. Its result is `end 2026-10-07T15:40:57Z rc=1 wall=5215s`.
+The log reports `FAILED: [code=1]` for `battle_cointoss`,
+`battle_setzeraim` and `battle_passside`: respectively a paying pass with
+no body hit, zero aimed Hired Help executions, and missing emptied-side
+coverage. All three fail the same assertions with `CARE_RACE=false` from
+the exact generated `wor-tomb-v1` battery. Coin Toss and the aimed Hire
+originally log zero raced decisions and zero overrides. This shows an immediate
+race override is not required for the failures. The arriving state and
+scripted controller remain to be investigated; the failed checks remain
+failed. No assertions, seed
+budgets or timeouts were changed, and the qualification was not retried.
+
+The complete qualification log, generated-state logs and original
+provenance are retained in `final-play/d567-qualification.tgz`; extracted
+terminal logs are in `final-play/qualification/build/`. The original
+failing workers and Tomb battery are in
+`final-play/race-d567-failure-artifacts.tgz`. Matched rules-only
+assertion failures are in `final-play/race-d567-suite-off.tgz`. These
+paths are all beneath `build/attempts/wt/v026-race/`. The first archive's
+retained tar diagnostic names absent optional screenshot/hash paths;
+the separate failure archive supplies the original worker artifacts.
+Both tracked-status files are empty. All branch jobs exited before the
+report. This remaining coverage failure needs a separate controller or
+fixture decision; a green build has not been claimed.
