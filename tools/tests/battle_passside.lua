@@ -15,16 +15,18 @@
 -- within M.setzerCrowdBudget's decoded worst case), and snapshot its
 -- opening.  Each case restores that snapshot, writes, and plays SETZER
 -- through the real menu while the others Defend:
---   party:      one ally's HP is set to 1, and SETZER (one weapon: two swings
+--   party:      one ally's HP is set to 1 as the selected Fight begins, and SETZER (one weapon: two swings
 --               a boost point) Fights it at 1 BP (an entry with `ally`): the
 --               first swing fells the ally, and the second stays on that
 --               ally (the Fight's backup target) or lands nowhere (check H).
 --               Each ally in turn until one falls to the first swing.
---   emptied:    every monster's HP is set to 1 and SETZER's bank to 3; he
+--   emptied:    every monster's HP is set to 1 as the selected Fight begins,
+--               and SETZER's bank to 3 before the menu; he
 --               Fights his default target at 3 BP (then 2 BP): each swing
 --               fells a monster and the next goes to another (F, A, B, C),
 --               and the swings after the last land on no party member (G).
---   emptystart: every monster's HP is set to 1 and SETZER's bank to 3; he
+--   emptystart: every monster's HP is set to 1 as Coin Toss begins,
+--               and SETZER's bank to 3 before the menu; he
 --               throws Coin Toss at 3 BP over the group, and the tosses
 --               fell the crowd with tosses to spare: the toss after the last
 --               body falls starts on the fallen and lands nowhere (G), and
@@ -58,6 +60,12 @@
 -- (Muddling an ally at the battle's start instead did not take: it kept
 -- its command window and Defended at 3 BP --
 -- build/attempts/wt/pass-retarget/round2/side/passside_menumuddle.log.)
+-- HP staging is armed only for the selected command, actor, boost and target
+-- side at ExecCmd, with SETZER's control free.  A hostile status that lands
+-- after the window opens can cancel/re-aim a queued command: that interrupted
+-- execution is logged without staging HP, and the same case is entered again
+-- on the same continuation after controller care, never a snapshot re-roll.
+-- If that command spent its pips, real Defends rebuild the requested bank.
 -- Every pass of every action is held to M.passCheck, whose checks name
 -- what they assert.
 -- Negative controls (build/attempts/wt/pass-retarget/round3/mutants/): a
@@ -93,6 +101,28 @@ local function armExec()
     local x = emu.getState()["cpu.x"] & 0xff
     if x ~= w.e or H.readByte(0x3A7C) ~= w.cmd then return end
     atExec = nil
+    local c = H.controlTaken(x // 2)
+    local chars, mons = H.readByte(0xB8), H.readByte(0xB9)
+    local eligible = c == nil and (w.ally ~= nil and chars == (1 << w.ally) and mons == 0
+      or w.ally == nil and chars == 0 and mons ~= 0)
+    w.valid = false
+    if not eligible then
+      w.interrupted = c and c.name or string.format("targets chars=%02X monsters=%02X", chars, mons)
+      H.log(string.format("[%s] f%d %s command interrupted before its setup: %s; no mechanism HP staged",
+        TAG, H.frame, w.kind, w.interrupted))
+      return
+    end
+    -- CPU callback exceptions are not the suite's failure path. Preserve
+    -- the first error and rethrow on the normal tick before consuming any
+    -- eligibility or pass evidence. Only fully staged commands are valid.
+    local ok, err = pcall(function()
+    H.assertEq(H.readByte(0x3ED8 + x), SETZER, "the staged case executes as SETZER")
+    H.assertEq(H.readByte(0x3A7C), w.cmd, w.kind .. ": its selected command executes")
+    H.assertEq(H.readByte(0x3E9D + x), w.boost, w.kind .. ": requested boost at execution")
+    H.assertEq(chars, w.ally ~= nil and (1 << w.ally) or 0, w.kind .. ": its selected party target")
+    H.assertEq(w.ally ~= nil and mons == 0 or w.ally == nil and mons ~= 0, true,
+      w.kind .. ": its selected target side at execution")
+    if w.prepare then w.prepare() end
     if w.muddle then H.writeByte(0x3EE5 + x, H.readByte(0x3EE5 + x) | 0x20) end
     local t = H.readByte(0xB9)
     if w.fell then
@@ -106,6 +136,8 @@ local function armExec()
     H.log(string.format("[%s] f%d SETZER's action $%02X starts: %s%s (queued on monsters $%02X)", TAG, H.frame,
       w.cmd, w.muddle and string.format("Muddled ($3EE5 = %02X)", H.readByte(0x3EE5 + x)) or "",
       w.fell and "its queued target felled" or "", t))
+    end)
+    if ok then w.valid = true else w.error = tostring(err) end
   end, emu.callbackType.exec, ec, ec)
 end
 local function judgeNew()
@@ -181,42 +213,42 @@ local function play()
       local x = c.e * 2
       S.mark, S.before = #PW.acts, #seen[c.kind]
       if c.kind == "party" then
-        H.writeWord(0x3BF4 + x, 1)
-        H.log(string.format("[%s] party, ally slot %d: its HP set to 1; SETZER Fights it at 1 BP", TAG, c.e))
+        H.log(string.format("[%s] party, ally slot %d: its HP armed for 1 at controlled execution; SETZER Fights it at 1 BP", TAG, c.e))
         S.actor, S.want = slotOf(SETZER) * 2, "fight"
+        atExec = { e = S.actor, cmd = 0x00, ally = c.e, kind = c.kind, boost = 1,
+          prepare = function() H.writeWord(0x3BF4 + x, 1) end }
         S.step = H.setzerBattle({ { row = "fight", cmd = 0x00, boost = 1, ally = c.e }, { row = "defend" },
-          { row = "defend" } }, { untilPlanDone = true })
+          { row = "defend" } }, { untilPlanDone = true, fullBoost = true })
       elseif c.kind == "emptied" then
-        crowdTo1()
         H.writeByte(0x3E9C + x, 3)
-        atExec = { e = x, cmd = 0x00, muddle = true }
-        H.log(string.format("[%s] emptied: every monster at 1 HP, SETZER's bank 3; he Fights at %d BP", TAG, c.boost))
+        atExec = { e = x, cmd = 0x00, muddle = true, kind = c.kind, boost = c.boost, prepare = crowdTo1 }
+        H.log(string.format("[%s] emptied: monster HP armed for 1 at controlled execution, SETZER's bank 3; he Fights at %d BP", TAG, c.boost))
         S.actor, S.want = x, "fight"
         S.step = H.setzerBattle({ { row = "fight", cmd = 0x00, boost = c.boost }, { row = "defend" },
-          { row = "defend" } }, { untilPlanDone = true })
+          { row = "defend" } }, { untilPlanDone = true, fullBoost = true })
       elseif c.kind == "emptystart" then
-        crowdTo1()
         H.writeByte(0x3E9C + x, 3)
-        atExec = { e = x, cmd = 0x0F, muddle = true }
-        H.log(string.format("[%s] emptystart: every monster at 1 HP, SETZER's bank 3; Coin Toss at %d BP", TAG,
+        atExec = { e = x, cmd = 0x0F, muddle = true, kind = c.kind, boost = c.boost, prepare = crowdTo1 }
+        H.log(string.format("[%s] emptystart: monster HP armed for 1 at controlled execution, SETZER's bank 3; Coin Toss at %d BP", TAG,
           c.boost))
         S.actor, S.want = x, "coin"
-        S.step = H.setzerBattle({ { row = COIN, boost = c.boost }, { row = "defend" } }, { untilPlanDone = true })
+        S.step = H.setzerBattle({ { row = COIN, boost = c.boost }, { row = "defend" } }, { untilPlanDone = true, fullBoost = true })
       else
-        swapHands(x)
+        if S.swappedCi ~= S.ci then swapHands(x); S.swappedCi = S.ci end
         H.assertEq(H.readByte(0x3B68 + x) == 0 and H.readByte(0x3B69 + x) ~= 0, true, "offhand: after the swap "
           .. "SETZER's main hand is empty and his off hand holds the weapon")
-        atExec = { e = x, cmd = 0x00, fell = true }
+        atExec = { e = x, cmd = 0x00, fell = true, kind = c.kind, boost = c.boost }
         H.log(string.format("[%s] offhand: SETZER's weapon in his off hand (power $3B68/9 = %d/%d); he Fights at %d "
           .. "BP, his queued target felled as it starts", TAG, H.readByte(0x3B68 + x), H.readByte(0x3B69 + x),
           c.boost))
         S.actor, S.want = x, "fight"
         S.step = H.setzerBattle({ { row = "fight", cmd = 0x00, boost = c.boost }, { row = "defend" },
-          { row = "defend" } }, { untilPlanDone = true })
+          { row = "defend" } }, { untilPlanDone = true, fullBoost = true })
       end
-      S.phase = "play"
+      S.exec, S.phase = atExec, "play"
     end
     if S.phase == "play" then
+      if S.exec and S.exec.error then error(S.exec.error, 0) end
       local c = S.cases[S.ci]
       local r = S.step:tick()
       judgeNew()
@@ -226,7 +258,17 @@ local function play()
         if a.e == S.actor and a.kind == S.want then got = a; break end
       end
       if got == nil and r ~= "done" and H.battleLoadStarted() then return r end
-      local met = #seen[c.kind] > S.before
+      local eligible = S.exec and S.exec.valid == true
+      if not eligible and H.battleLoadStarted() then
+        S.interrupted = (S.interrupted or 0) + 1
+        H.log(string.format("[%s] %s interruption #%d: %s; cure and enter the same case again on this "
+          .. "continuation (no snapshot restore)", TAG, c.kind, S.interrupted,
+          S.exec and S.exec.interrupted or "its selected command never executed"))
+        atExec = nil
+        S.phase = "write"
+        return "frame"
+      end
+      local met = eligible and got ~= nil and #seen[c.kind] > S.before
       atExec = nil
       H.log(string.format("[%s] %s, slot %d%s: %s", TAG, c.kind, c.e, c.boost and (" at " .. c.boost .. " BP") or "",
         got == nil and "the action never ran" or met and "the draw is met" or "no draw"))
