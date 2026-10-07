@@ -6417,11 +6417,22 @@ end
 -- + opts.spend: the Potions the legs to the next counter measured spending.
 -- opts.tonics: the Tonics the bag will hold leaving the counter (a counter
 -- that sells them tops up to 99 after the Potions), else the bag's count.
+-- The stack holds 99 and no counter sells an HP item above the Potion
+-- (shop_prop.dat: X-Potion $EA is in no shop record), so a target past 99
+-- cannot be bought; it raises instead of being quietly capped, naming
+-- the level at which this counter's arithmetic stops fitting the bag.
 function M.careStockPotions(level, opts)
   opts = opts or {}
-  local reserve = math.ceil((level + (opts.ahead or 4)) * 1.5)
+  local ahead = opts.ahead or 4
+  local reserve = math.ceil((level + ahead) * 1.5)
   local gap = math.max(0, 99 * 50 - 50 * (opts.tonics or M.invCountOf(0xE8)))
-  return reserve + math.ceil(gap / 250) + (opts.spend or 0)
+  local want = reserve + math.ceil(gap / 250) + (opts.spend or 0)
+  if want > 99 then
+    error(string.format("careStockPotions: L%d+%d needs %d Potions (reserve %d + field care %d "
+      .. "+ spend %d) past the 99 stack, and no counter sells an HP item above the Potion",
+      level, ahead, want, reserve, math.ceil(gap / 250), opts.spend or 0))
+  end
+  return want
 end
 
 -- M.bagWeapons(c): the weapons in the bag ($1869 ids with a count), each

@@ -18,19 +18,33 @@ under `build/lab/mp-supply/`.
 
 ## Field care where no Tonic is sold (#411)
 
-Owner's rule (2026-10-06): **top up to 99 Tonics at every town shop that
-sells them, purse permitting.**  Tonics are on only nine counters
+Owner's rule (2026-10-06): "in the World of Ruin, stock up to 99 Tonics at
+any town that sells them."  Tonics are on only nine counters
 (`shop_prop.dat`: shops 3, 4, 8, 12, 15, 35, 36, 39, 85 -- Narshe, Figaro
-Castle, South Figaro, Mobliz, Nikeah, Thamasa, the merchant at Shadow's
-house, the ghost train); Jidoor's, Albrook's and every World of Ruin
-counter sell none.  Where none is sold, the field care rides on Potions
-(guidelines, "Heal outside battles"): a counter stocks the combat reserve
-(the Potion band) a few levels ahead, plus the HP the 99 Tonics would have
-carried and the bag's Tonics do not, at 250 a Potion, plus the Potions the
-legs to the next counter measured spending (`H.careStockPotions`).
-`tools/audit_supplies.py` measures every fixture the same way: Tonics at
-50 HP plus Potions over the reserve at 250, against ~(level - 2) x5 Tonics'
-HP capped at 99 Tonics.
+Castle, South Figaro, the World of Balance's Mobliz and Nikeah, Thamasa,
+the merchant at Shadow's house, the ghost train); Jidoor's, Albrook's and
+every World of Ruin counter (Nikeah 58, South Figaro 63, Albrook 48,
+Kohlingen 67, ...) sell none.  So in the World of Ruin the rule is carried
+as 99 Tonics' HP in Potions -- the owner confirmed that translation
+("good translation", 2026-10-06).  A counter stocks
+(`H.careStockPotions`):
+
+- the combat reserve (the Potion band, level x1.5) a few levels ahead,
+- plus the HP the 99 Tonics would have carried and the bag's Tonics do
+  not, at 250 a Potion,
+- plus the Potions the legs to the next counter measured spending.
+
+The stack holds 99 and no counter sells an HP item above the Potion (no
+shop row holds the X-Potion `$EA`), so a target past 99 cannot be bought:
+`H.careStockPotions` raises rather than quietly capping, and the counter
+that sits nearest the stack (Kohlingen) carries its derivation in
+`gen_wor_kohlingen.lua`.
+
+`tools/audit_supplies.py` measures every fixture past Figaro Castle the
+same way: Tonics at 50 HP plus Potions over the reserve at 250, against
+~level x5 Tonics' HP, no slack, capped at 99 Tonics (4950 HP).  The cap is
+the owner's 99 and reverses, on purpose, bf19d581's uncapped World of Ruin
+reading (~level x5 Tonics' HP past 99, in Potions).
 
 ## 1. Prices and yields, off the ROM
 
@@ -43,7 +57,7 @@ the data file (`build/lab/mp-supply/item_records.txt`):
 
 | item | id | restores | price | gil per HP | gil per MP | where it comes from |
 |---|---|---|---|---|---|---|
-| Tonic | `$E8` | +50 HP, one member | 50 | 1.0 | -- | every item counter but Jidoor's and Albrook's |
+| Tonic | `$E8` | +50 HP, one member | 50 | 1.0 | -- | shops 3, 4, 8, 12, 15, 35, 36, 39, 85 only (the list above) -- no World of Ruin counter, nor Jidoor's or Albrook's |
 | Potion | `$E9` | +250 HP | 300 | 1.2 | -- | every counter from the Phantom Train on |
 | X-Potion | `$EA` | full HP | 2 | -- | -- | not sold (no shop row holds `$EA`); chests |
 | Tincture | `$EB` | +50 MP | 1500 | -- | 30 | Figaro Castle 4, Narshe 3, Jidoor 22, Albrook 24, Thamasa 35 |

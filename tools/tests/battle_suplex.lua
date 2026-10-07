@@ -30,11 +30,16 @@ local BLCOL, BLROW = 0x8963, 0x8967
 local sabinE = nil
 local inCmd = false
 local throwable, fleeN = false, 0
-local SUPLEX_MP = H.abilityCost(SUPLEX) or 13
+local SUPLEX_MP = nil  -- Suplex's MP, off Ot6AbilityCostTbl in arm()
+-- the encounter budget: up to ENCOUNTERS, each bounded by its waits below
+local ENCOUNTERS = 10
+local W_CONTROL, W_ENCOUNTER, W_ARM, W_SETTLE, W_FIGHT = 6000, 40000, 1200, 90, 40000
 local spellWrites, gateHits, kills, cast = 0, {}, 0, false
 local refs = {}
 
 local function arm()
+  SUPLEX_MP = H.abilityCost(SUPLEX)
+  H.assertEq(SUPLEX_MP ~= nil, true, "Suplex ($5F) has a price in Ot6AbilityCostTbl")
   refs.spell = emu.addMemoryCallback(function(_, v)
     if v == SUPLEX then spellWrites = spellWrites + 1 end
   end, emu.callbackType.write, 0x7E3410, 0x7E3410)
@@ -101,8 +106,8 @@ local function encounter(k)
   return H.cond(function() return #gateHits == 0 end, {
     H.waitUntil(function()
       return H.worldMode() and H.worldHasControl() and H.worldAligned()
-    end, 6000, "world control on the Veldt (encounter " .. k .. ")"),
-    H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
+    end, W_CONTROL, "world control on the Veldt (encounter " .. k .. ")"),
+    H.driveUntil(function() return H.battleLoadStarted() end, W_ENCOUNTER, {
       H.call(function()
         if H.battleLoadStarted() or not H.worldHasControl() then H.setPad({}); return end
         if not H.worldAligned() then return end
@@ -111,8 +116,8 @@ local function encounter(k)
       end),
     }, "a Veldt encounter fires (" .. k .. ")"),
     H.call(function() H.setPad({}) end),
-    H.waitUntil(function() return H.battleActive() end, 1200, "battle armed", 5),
-    H.waitFrames(90),
+    H.waitUntil(function() return H.battleActive() end, W_ARM, "battle armed", 5),
+    H.waitFrames(W_SETTLE),
     H.call(function()
       sabinE, cast, t, F, throwable, fleeN = nil, false, 0, nil, false, 0
       for e = 0, 3 do if H.readByte(0x3ED8 + e * 2) == 0x05 then sabinE = e end end
@@ -129,7 +134,7 @@ local function encounter(k)
       H.log(string.format("[suplex] encounter %d: %s", k, throwable
         and "a throwable body stands -- SABIN Suplexes" or "every body is throw-immune -- fleeing"))
     end),
-    H.driveUntil(function() return not H.battleLoadStarted() end, 40000, {
+    H.driveUntil(function() return not H.battleLoadStarted() end, W_FIGHT, {
       H.call(function()
         t = t + 1
         F = F or H.newFightDriver("suplex-bench", { items = true, tactical = true, healer = 2 })
@@ -162,7 +167,7 @@ local steps = {
   H.waitFrames(20),
   H.call(function() arm() end),
 }
-for k = 1, 10 do steps[#steps + 1] = encounter(k) end
+for k = 1, ENCOUNTERS do steps[#steps + 1] = encounter(k) end
 steps[#steps + 1] = H.call(function()
   disarm()
   H.log(string.format("[suplex] Suplex writes %d, gate hits %d (first on y=$%02X species $%04X), kill hook %d",
@@ -173,4 +178,4 @@ steps[#steps + 1] = H.call(function()
   H.assertEq(gateHits[1].species ~= GHOSTTRAIN, true, "on a monster that is not the Ghost Train")
   H.assertEq(kills, 0, "Ot6SuplexTrainKill never ran: a Suplex on another monster is untouched")
 end)
-H.run({ maxFrames = 300000 }, steps)
+H.run({ maxFrames = 20 + ENCOUNTERS * (W_CONTROL + W_ENCOUNTER + W_ARM + W_SETTLE + W_FIGHT) }, steps)

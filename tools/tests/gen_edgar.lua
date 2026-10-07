@@ -370,9 +370,13 @@ H.run({ maxFrames = 120000 }, {
   -- gil; buying more starves gen_kolts's own South Figaro Fenix/Soft
   -- targets (measured: 60 here left South Figaro too poor to buy 2 Softs,
   -- failing that assertion and blocking the whole downstream tree).
-  -- #411: 32, the band (~level x5) at the L8 the desert reaches less the
-  -- two levels' slack the supply audit allows, plus the one the walk spends.
-  H.buyItem(0xE8, 0, function() return 32 - invCount(0xE8) end, "TONIC to 32"),
+  -- #411: 42, the field-care band (~level x5 Tonics, no slack) at the L8
+  -- the desert reaches -- 40 -- plus the two the walk to South Figaro
+  -- spent on 3b1bc7c5/57e5cae2 (32 bought -> figaro_cleared 31 ->
+  -- south_figaro 30).  The purse question this raises -- does South
+  -- Figaro's counter still cover gen_kolts's Fenix/Soft/Antidote buys --
+  -- is answered by gen_kolts's own assertions on the run.
+  H.buyItem(0xE8, 0, function() return 42 - invCount(0xE8) end, "TONIC to 42"),
   H.waitUntil(inState(0x26), 2400, "item shop: back at the buy list", 2),
   -- #307: Fenix Downs before the desert.  The chain reaches this counter
   -- with the one Fenix Down it found, and the next counter that sells them

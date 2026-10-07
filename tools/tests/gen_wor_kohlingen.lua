@@ -418,13 +418,21 @@ end
 -- (the Mad Oscar): Remedy and Revivify to TOMB_CURES each (informed: the
 -- tomb's scripts, route-wor-falcon 3.5 and 4.4).  The scarcest-by-price
 -- item last.
--- #411: the legs from Kohlingen to the Falcon spend 18-25 Potions (the
+-- #411: the legs from Kohlingen to the Falcon spend 17-25 Potions (the
 -- bf19d581 line: wor_kohlingen potion=56 -> wor_flight 38; 3b1bc7c5: 93 ->
--- 68), the last counter before them.  At L33 this fills the bag's 99.
-local FIELD_CARE_POTIONS, TOMB_CURES = 24, 10
+-- 68 with the arc ending at L34; 57e5cae2: 99 -> 82), the last counter
+-- before them; the arc gains at most one level (L33 -> L34, 3b1bc7c5).
+-- The derivation, with the bag's 4 Tonics: the field-care band past L20 is
+-- 4950 HP, 4750 of it in Potions over the reserve = 19, so arriving at
+-- level A needs ceil(1.5A) + 19 Potions.  Stocked at level L with
+-- ahead = 2 and the spend 25 the counter buys ceil(1.5(L+2)) + 19 + 25 --
+-- 97 at L33, 98 at L34, and past the 99 stack (careStockPotions raises)
+-- from L35 -- and arrives with ceil(1.5(L+2)) + 19, the band at L+2: one
+-- level of margin over the arc's measured gain.
+local FIELD_CARE_POTIONS, CARE_AHEAD, TOMB_CURES = 25, 2, 10
 -- Fenix Downs: about the level, capped near 20 (guidelines "Supply band")
 local FENIX_CAP = 20
-local function potionBand() return H.careStockPotions(topLevel(), { spend = FIELD_CARE_POTIONS }) end
+local function potionBand() return H.careStockPotions(topLevel(), { spend = FIELD_CARE_POTIONS, ahead = CARE_AHEAD }) end
 local function stock(shopId, what)
   local gil0 = 0
   return H.seqStep({

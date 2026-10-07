@@ -61,10 +61,12 @@ of Ruin rule): the owner's rule (2026-10-06) is 99 Tonics at every town
 counter that sells them, and Jidoor's, Albrook's and every World of Ruin
 counter sell none (shop_prop.dat), so field care is measured in HP --
 Tonics at 50 plus the Potions over the combat reserve at 250 -- against
-~level x5 Tonics' HP capped at 99 Tonics, the level less two (a counter
-stocks for its level and the legs to the next gain one or two; the Fenix
-band's slack, which the Tincture band shares).  The route sizes Potions
-where no Tonic is sold with H.careStockPotions.
+~level x5 Tonics' HP capped at 99 Tonics, with no slack: a counter that
+sells Tonics stocks for the level the legs to the next one reach.  The cap
+reverses bf19d581's uncapped World of Ruin reading (wor_heal, ~level x5
+past 99 in Potions) on purpose: the owner's rule stops at 99 Tonics, and
+docs/guidelines.md holds the bag to what a player would carry.  The route
+sizes Potions where no Tonic is sold with H.careStockPotions.
 
 Usage:  python3 tools/audit_supplies.py [--repo .] [--selftest] [-v]
 Exit 0 clean, 1 if a fixture dropped to no revives across a boundary, or if a
@@ -180,8 +182,6 @@ def fenix_short(have: int, level: int) -> bool:
 TONIC_HP, POTION_HP = 50, 250
 
 
-FIELD_CARE_SLACK = 2
-
 
 def field_hp(tonic: int, potion: int, level: int) -> int:
     """The bag's field-care HP: Tonics at 50, and the Potions above the
@@ -195,10 +195,10 @@ def field_band(level: int) -> int:
     every counter that sells them (2026-10-06, docs/design/supply.md), so
     the band is ~level x5 Tonics' HP capped at 99 Tonics' 4950; where no
     counter sells Tonics (the World of Ruin's, Jidoor's, Albrook's) Potions
-    over the reserve carry it.  The level is less FIELD_CARE_SLACK: a
-    counter stocks for the party's level and the legs to the next one gain
-    a level or two (the Fenix band's slack, #411)."""
-    return TONIC_HP * min(TONIC_BAND_CAP, 5 * max(0, level - FIELD_CARE_SLACK))
+    over the reserve carry it.  No slack: a counter stocks for the level
+    the legs ahead reach.  The cap is the owner's 99, on purpose against
+    bf19d581's uncapped World of Ruin reading."""
+    return TONIC_HP * min(TONIC_BAND_CAP, 5 * level)
 
 
 def field_short(tonic: int, potion: int, level: int) -> bool:
@@ -474,16 +474,17 @@ def selftest(repo: str = ".") -> int:
     check("18 Fenix Downs at L30 is not", fenix_short(18, 30), False)
     # the WoR field-care rule: Tonic+Potion HP against the Tonic band's HP
     # the field-care band: Tonic HP + Potions over the reserve, against
-    # ~(level-2) x5 Tonics' HP capped at 99 Tonics
-    check("field band at L13 is L11's 55 Tonics", field_band(13), 2750)
+    # ~level x5 Tonics' HP capped at 99 Tonics
+    check("field band at L13 is 65 Tonics", field_band(13), 3250)
+    check("field band at L8 is 40 Tonics, no slack", field_band(8), 2000)
     check("field band at L25 caps at 99 Tonics", field_band(25), 4950)
     check("99 Tonics and the reserve at L25 hold the band", field_short(99, 38, 25), False)
     check("4 Tonics + 52 Potions at L25 is short (200 + 14x250 = 3700)",
           field_short(4, 52, 25), True)
     check("4 Tonics + 57 Potions at L25 is not (200 + 19x250, negative control)",
           field_short(4, 57, 25), False)
-    check("61 Tonics at L13 holds (3050 >= 2750)", field_short(61, 3, 13), False)
-    check("54 Tonics at L13 is short (2700 < 2750)", field_short(54, 3, 13), True)
+    check("65 Tonics at L13 holds (3250 >= 3250)", field_short(65, 3, 13), False)
+    check("64 Tonics at L13 is short (3200 < 3250)", field_short(64, 3, 13), True)
 
     # Checked against mrf-save-room-v1, which carries two Fenix Downs.
     # The tracked copy: the reader's canary needs bytes that hold still
@@ -649,8 +650,7 @@ def main() -> int:
                            field_hp(bag["tonic"], bag["potion"], bag["level"]),
                            field_band(bag["level"]), bag["level"]))
         if in_tincture_band(name, states) and bag["level"] is not None:
-            # the level less the slack the counters' stocking allows (#411)
-            mband = tincture_band(max(1, bag["level"] - FIELD_CARE_SLACK))
+            mband = tincture_band(bag["level"])
             if bag["tincture"] < mband:
                 mpshort.append((name, bag["tincture"], mband, bag["level"]))
         if in_revivify_band(name, states) and revivify_short(bag["revivify"]):
@@ -709,7 +709,7 @@ def main() -> int:
     if tshort:
         print(f"  WARNING: {len(tshort)} fixture(s) under the field-care band "
               f"(Tonics at 50 HP plus Potions over the combat reserve at 250, "
-              f"against ~(level less {FIELD_CARE_SLACK}) x5 Tonics' HP, cap "
+              f"against ~level x5 Tonics' HP, cap "
               f"{TONIC_BAND_CAP}; docs/design/supply.md) -- TONIC to 99 at a "
               f"counter that sells them, else Potions sized for the field care "
               f"(H.careStockPotions)"
