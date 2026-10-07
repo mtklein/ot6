@@ -27,7 +27,7 @@ def summarize(lines):
                 deaths.append(e)
                 continue
             if e['v'] != 1 or e['event'] not in {
-                'plan', 'confirm', 'submit', 'start', 'resolve', 'drop', 'unresolved'
+                'plan', 'confirm', 'submit', 'start', 'hp_effect', 'resolve', 'drop', 'unresolved'
             }:
                 raise ValueError('unsupported event/version')
             for field in ('id', 'frame', 'elapsed_frames'):
@@ -35,6 +35,8 @@ def summarize(lines):
                     raise ValueError(f'invalid {field}')
             required = {
                 'submit': ('navigation_frames',),
+                'hp_effect': ('actor', 'command', 'attack', 'effect_target',
+                              'hp_before', 'hp_after', 'hp_change', 'effect_index'),
                 'resolve': ('kind', 'requested', 'actor', 'command', 'attack',
                             'targets', 'hp_net'),
             }
@@ -53,13 +55,30 @@ def summarize(lines):
             allowed = {
                 'plan': {None}, 'confirm': {'plan', 'confirm'},
                 'submit': {'plan', 'confirm'}, 'start': {'submit'},
-                'resolve': {'start'}, 'drop': {'plan', 'confirm'},
-                'unresolved': {'submit', 'start'},
+                'hp_effect': {'start', 'hp_effect'},
+                'resolve': {'start', 'hp_effect'}, 'drop': {'plan', 'confirm'},
+                'unresolved': {'submit', 'start', 'hp_effect'},
             }
             if prev not in allowed[e['event']]:
                 raise ValueError(f'invalid transition {prev} -> {e["event"]}')
             if events and e['frame'] < events[-1]['frame']:
                 raise ValueError('frame moved backwards')
+            if e['event'] == 'hp_effect':
+                for field in required['hp_effect']:
+                    if type(e[field]) is not int:
+                        raise ValueError(f'invalid {field}')
+                if not 0 <= e['effect_target'] < 10 or e['effect_index'] <= 0:
+                    raise ValueError('invalid HP effect target/index')
+                if not all(0 <= e[f] <= 0xffff for f in ('hp_before', 'hp_after')):
+                    raise ValueError('invalid HP effect values')
+                if e['hp_change'] != e['hp_after'] - e['hp_before'] or e['hp_change'] == 0:
+                    raise ValueError('inconsistent HP effect delta')
+                start = next(x for x in events if x['event'] == 'start')
+                if any(e[f] != start.get(f) for f in ('actor', 'command', 'attack')):
+                    raise ValueError('HP effect does not match accepted command')
+                effects = [x for x in events if x['event'] == 'hp_effect']
+                if e['effect_index'] != len(effects) + 1:
+                    raise ValueError('HP effect index is not consecutive')
             events.append(e)
         except (ValueError, KeyError, TypeError) as exc:
             errors.append(f'line {line_no}: {exc}')
@@ -84,6 +103,7 @@ def render(s):
              f'Confirm attempts: {c.get("confirm", 0)}',
              f'Engine submissions: {c.get("submit", 0)}',
              f'Commands started / resolved: {c.get("start", 0)} / {c.get("resolve", 0)}',
+             f'Attributed HP effects: {c.get("hp_effect", 0)}',
              f'Dropped before submission: {c.get("drop", 0)}',
              f'Unresolved after submission: {c.get("unresolved", 0)}',
              f'Incomplete at end of log: {s["incomplete"]}',
@@ -125,6 +145,20 @@ def selftest():
     assert summarize([line('plan', 0), line('resolve', 5)])['errors']
     assert summarize([PREFIX + '{bad'])['errors']
     assert summarize(['[ot6note] 10 ' + line('plan', 0)])['counts'] == {}
+    start = line('start', 8, actor=0, command=0, attack=255)
+    effect = dict(actor=0, command=0, attack=255, effect_target=4,
+                  hp_before=100, hp_after=50, hp_change=-50, effect_index=1)
+    opening = [line('plan', 0), line('submit', 5, navigation_frames=5), start]
+    s = summarize(opening + [line('hp_effect', 10, **effect)])
+    assert not s['errors'] and s['incomplete'] == 1 and not s['counts'].get('resolve')
+    s = summarize(opening + [line('hp_effect', 10, **effect),
+        line('resolve', 12, kind='fight', requested=0, actor=0, command=0,
+             attack=255, targets=256, hp_net='0,0,0,0')])
+    assert not s['errors'] and s['counts']['hp_effect'] == 1 and not s['incomplete']
+    assert summarize(opening + [line('hp_effect', 10, **(effect | {'attack': 1}))])['errors']
+    assert summarize(opening + [line('hp_effect', 10, **(effect | {'hp_change': 1}))])['errors']
+    assert summarize(opening + [line('hp_effect', 10, **(effect | {'effect_index': 2}))])['errors']
+    assert summarize([line('plan', 0), line('hp_effect', 10, **effect)])['errors']
     print('action_trace selftest: PASS')
 
 
