@@ -335,7 +335,7 @@ do
     party = { member(900, 1043, 0, { lines = L, bp = 2, period = 202 }) },
     enemies = { { hp = 500, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } } },
                 { hp = 900, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } }, stand = { n = 1 } },
-                { hp = 500, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } } } } }
+                { hp = 1100, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } } } } }
   local r2 = H.raceEval(st, { kind = "attack", line = L[2], boost = 2 })
   check(r2.deaths >= 1, "the 2-BP Fight leaves the Sneezer alone: CELES gone")
   check(choose(st, { { kind = "attack", line = L[0], boost = 0 }, { kind = "attack", line = L[2], boost = 2 } }).boost == 0,
