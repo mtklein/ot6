@@ -1515,6 +1515,7 @@ M.RACE_TICK_MARGIN = nil       -- nil: the quickest enemy's period
 M.RACE_LEFT_MARGIN = 0.05      -- of the enemy's effective HP at the start
 M.RACE_COST_MARGIN = 200       -- gil
 M.RACE_SAMPLES = 16
+M.RACE_STAND_SLACK = 1.5       -- the worst-case play's hit, against a last stand
 
 -- The chance a blockable hit lands (#415): the hit check (battle_main
 -- @233f) multiplies the attacker's hit rate by the target's inverted
@@ -1604,7 +1605,7 @@ function M.raceSim(st, first, draw)
   -- a single-target line's swings past its body's death go on to the next
   -- standing one (the engine retargets a dead target's remaining strikes),
   -- chipping nothing there: the chips were counted against the first body
-  local death, t_now
+  local death, t_now, wouldStand
   local function attack(p, line, fixed)
     if line == nil then return end
     if line.aoe then
@@ -1624,31 +1625,80 @@ function M.raceSim(st, first, draw)
   -- monsters standing takes the hitter out of the fight -- a member gone,
   -- priced as a death (#415: the WoR's CELES, sneezed away from three of
   -- six g00CC fights by a boosted Fight's carried swings)
-  local function lastStand(k, before)
+  -- whether a last stand fires on the bodies EE after an action (before:
+  -- who stood before it)
+  local function standFires(EE, before)
     local standing = 0
-    for _, e in pairs(E) do if e.hp > 0 then standing = standing + 1 end end
-    for j, e in pairs(E) do
+    for _, e in pairs(EE) do if e.hp > 0 then standing = standing + 1 end end
+    for j, e in pairs(EE) do
       local st = e.stand
       if st and before[j] and standing <= (st.n or 1) then
         local alive = e.hp > 0
-        local fires = (st.guarded and alive) or (st.deathOnly and not alive)
-          or (not st.guarded and not st.deathOnly)
-        if fires and P[k].hp > 0 then
-          P[k].hp = 0
-          death(t_now)
-          return
+        if (st.guarded and alive) or (st.deathOnly and not alive) or (not st.guarded and not st.deathOnly) then
+          return true
         end
       end
     end
+    return false
+  end
+  local function removed(k)
+    if P[k].hp <= 0 then return end
+    P[k].hp = 0
+    death(t_now)
+    local any = false
+    for _, q in pairs(P) do if q.hp > 0 then any = true end end
+    -- the whole party gone: the fight is lost (no reward), scored as a wipe
+    if not any then r.wipe = true end
+  end
+  -- whether line on member p would set a last stand off now (the worst-
+  -- case play reads it at M.RACE_STAND_SLACK)
+  function wouldStand(p, line)
+    if line == nil then return false end
+    local before, anyStand = {}, false
+    for j, e in pairs(E) do
+      before[j] = e.hp > 0
+      if e.stand and e.hp > 0 then anyStand = true end
+    end
+    if not anyStand then return false end
+    local fired = false
+    for _, f in ipairs(draw == nil and { M.RACE_STAND_SLACK, 1 } or { 1 }) do
+      local save = {}
+      for j, e in pairs(E) do save[j] = { e.hp, e.sh } end
+      local L = {}
+      for key, v in pairs(line) do L[key] = v end
+      L.per = (L.per or 0) * f
+      attack(p, L, nil)
+      fired = fired or standFires(E, before)
+      for j, e in pairs(E) do e.hp, e.sh = save[j][1], save[j][2] end
+    end
+    return fired
   end
   local function act(k, c, t)
     local p = P[k]
     t_now = t
     if c.kind == "attack" then
-      local before = {}
-      for j, e in pairs(E) do before[j] = e.hp > 0 end
+      local before, anyStand = {}, false
+      for j, e in pairs(E) do
+        before[j] = e.hp > 0
+        if e.stand and e.hp > 0 then anyStand = true end
+      end
+      -- the worst-case play reads a last stand against the hit landing
+      -- harder than measured (M.RACE_STAND_SLACK): a carried swing that
+      -- kills the second body leaves the Sneezer alone (the WoR's s5: the
+      -- race's 2-BP Fight read two standing; three fell)
+      local slack = false
+      if draw == nil and anyStand and c.line then
+        local save = {}
+        for j, e in pairs(E) do save[j] = { e.hp, e.sh } end
+        local L = {}
+        for key, v in pairs(c.line) do L[key] = v end
+        L.per = (L.per or 0) * M.RACE_STAND_SLACK
+        attack(p, L, c.target)
+        slack = standFires(E, before)
+        for j, e in pairs(E) do e.hp, e.sh = save[j][1], save[j][2] end
+      end
       attack(p, c.line, c.target)
-      lastStand(k, before)
+      if slack or standFires(E, before) then removed(k) end
       p.bp = (c.boost or 0) > 0 and (p.bp - c.boost) or math.min(p.bp + 1, 5)
     elseif c.kind == "heal" then
       local who = c.all and P or { [c.target] = P[c.target] }
@@ -1715,6 +1765,12 @@ function M.raceSim(st, first, draw)
     local b = 0
     if p.bp >= (st.bankAt or 0) then b = math.min(p.bp, 3) end
     while b > 0 and p.lines[b] == nil do b = b - 1 end
+    -- a player who knows the Sneezer is there holds back the boost whose
+    -- swings would leave it alone (the stand read as the decision reads it)
+    while b > 0 and wouldStand(p, p.lines[b]) do
+      b = b - 1
+      while b > 0 and p.lines[b] == nil do b = b - 1 end
+    end
     return { kind = "attack", line = p.lines[b], boost = b }
   end
   function death(t)

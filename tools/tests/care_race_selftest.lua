@@ -342,6 +342,40 @@ do
     "the Fight that leaves two standing")
 end
 
+-- 21. The worst case reads a last stand against a harder hit (the WoR's
+-- s5: the 2-BP Fight read two standing on paper, three fell, CELES was
+-- sneezed away): a Fight that leaves the second body 1 HP short of death on
+-- paper is guarded against; the party gone is the fight lost
+do
+  local L = {}
+  for b = 0, 3 do L[b] = { per = 100, hits = 2 + 2 * b, chips = 0 } end
+  local st = { actor = 1, hpRate = 1.2, focus = { 2, 1, 3 },
+    party = { member(900, 1043, 0, { lines = L, bp = 2, period = 202 }) },
+    enemies = { { hp = 500, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } } },
+                { hp = 300, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } }, stand = { n = 1 } },
+                { hp = 900, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } } } } }
+  -- 2-BP Fight: 6 swings of 100 on the Sneezer (300 HP behind a shield):
+  -- three kill it, three carry to slot 1 (500 HP): 300 off, two standing;
+  -- at 150 a swing two kill it and four take slot 1's 500: one standing
+  local r = H.raceEval(st, { kind = "attack", line = L[2], boost = 2 })
+  check(r.worstWipe and r.wipe, "at 1.5x the carried swings would leave one standing: the guard reads the party gone")
+end
+
+-- 22. The continuation holds back a boost that would set the last stand
+-- off (the WoR's s5: the rules' Cure read "1.00 down" because the race's
+-- continuation then swung 3 BP into the Sneezer's stand)
+do
+  local L = {}
+  for b = 0, 3 do L[b] = { per = 100, hits = 2 + 2 * b, chips = 0 } end
+  local st = { actor = 1, hpRate = 1.2, focus = { 2, 1, 3 },
+    party = { member(500, 1043, 0, { lines = L, bp = 3, period = 202, heals = {} }) },
+    enemies = { { hp = 500, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } } },
+                { hp = 300, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } }, stand = { n = 1 } },
+                { hp = 900, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } } } } }
+  local r = H.raceEval(st, { kind = "heal", target = 1, restore = 300, cost = 5 })
+  check(r.deaths == 0 and not r.wipe, "after the heal the continuation's Fight leaves two standing")
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard", n))
