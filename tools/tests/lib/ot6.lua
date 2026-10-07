@@ -1860,6 +1860,9 @@ function M.raceSim(st, first, draw)
   end
   local used = {}
   local function continuation(k, t)
+    -- Speculative shield changes use this planning event, even before
+    -- the delayed first command has executed.
+    t_now = t
     local p = P[k]
     if st.contCare ~= false then
       local worst, wk = nil, nil

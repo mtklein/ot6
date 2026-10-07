@@ -925,6 +925,21 @@ do
   check(H.raceSim(st,a).standNow,"broken death counter remains admitted after lethal hit")
 end
 
+-- 50. Another ready member can plan before the delayed first command.
+-- Its speculative last-stand check must have the current planning time.
+do
+  local L={[0]={per=10,hits=1,chips=1},[1]={per=20,hits=1,chips=1}}
+  local st={actor=1,samples=0,contCare=false,horizon=2,
+    party={member(1000,1000,0,{period=1000}),
+      member(1000,1000,0,{period=1000,bp=1,lines=L})},
+    enemies={{hp=1000,sh=1,shMax=1,breakDuration=100,eta=50,period=200,
+      stand={n=1,guarded=true},act={dmg={100,100}}}}}
+  local a={kind="attack",line={per=10,hits=1,chips=0},delay=100,boost=0}
+  local r=H.raceSim(st,a)
+  check(not r.invalid and r.resources.enemies[1].breakUntil==nil,
+    "early continuation plans safely and its break expires on the event timeline")
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
   .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise, near fatal, the carried swing, zombie and left-member candidate vetoes", n))
