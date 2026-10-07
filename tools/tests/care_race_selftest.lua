@@ -853,6 +853,63 @@ do
     "sampled misses requiring an unsupported continuation invalidate the whole estimate")
 end
 
+-- 48. Engine break contract: suppressed turns, finite shield recovery,
+-- and naturally shieldless bodies. These are arithmetic, not played wins.
+do
+  local st={actor=1,samples=0,contCare=false,horizon=2,
+    party={member(1000,1000,0,{period=2000,lines={}})},
+    enemies={{hp=1000,sh=1,shMax=1,breakDuration=10,eta=5,period=20,act={dmg={100}}}}}
+  local a={kind="attack",line={per=10,hits=1,chips=1},boost=0}
+  local r=H.raceSim(st,a)
+  check(r.resources.party[1].hp==900 and r.breakSkips==1,
+    "new break suppresses turn5; recovered turn25 deals100")
+  st.enemies[1].sh=0;st.enemies[1].shMax=3;st.enemies[1].brokenLeft=10
+  st.enemies[1].eta=20;st.enemies[1].period=100;st.horizon=1
+  a.line.chips=0;a.delay=15
+  r=H.raceSim(st,a)
+  check(r.leftNow==3960,"break expiry restores3 shields before hit15:990HP*4")
+  st.enemies[1].shMax=0;st.enemies[1].brokenLeft=0;a.delay=0
+  r=H.raceSim(st,a)
+  check(r.leftNow==980,"shieldless normal body takes20, not40 broken damage")
+  check(H.raceDamageBase(80,0,false)==40 and H.raceDamageBase(80,3,true)==20
+    and H.raceDamageBase(80,3,false)==80,"race-only damage normalization respects all three states")
+  check(H.raceBreakClock(1,192,64,4,4)==1,
+    "next entity visit overflowing consumes final broken count in one ATB update")
+  check(H.raceBreakClock(1,0,64,4,5)==64,
+    "just visited entity needs four visits for normal-speed final count")
+  check(H.raceBreakClock(16,0,64,4,5)==1024,
+    "full normal-speed break occupies sixteen status overflows")
+  check(H.raceBreakClock(0,192,64,4,4)==0,"unbroken counter has no remaining window")
+  for _,speed in ipairs({32,64,84}) do
+    for _,acc in ipairs({0,63,192,255}) do
+      for _,phase in ipairs({0,4,5,15}) do
+        for _,count in ipairs({1,16}) do
+          local ticks,left,a,nextEntity=0,count,acc,phase
+          while left>0 do
+            ticks=ticks+1
+            if nextEntity==4 then
+              a=a+speed
+              if a>=256 then a=a-256;left=left-1 end
+            end
+            nextEntity=(nextEntity+1)%16
+          end
+          check(H.raceBreakClock(count,acc,speed,4,phase)==ticks,
+            "break clock agrees with per-update DecCounters recurrence")
+        end
+      end
+    end
+  end
+  local center,bounds=H.raceBreakDuration(64)
+  check(bounds.lo==961 and bounds.hi==1024 and center>bounds.lo and center<bounds.hi,
+    "new break bounds cover speed-accumulator and entity-phase uncertainty")
+  local fast=H.raceBreakDuration(84);local slow=H.raceBreakDuration(32)
+  check(fast<center and slow>center,"haste shortens break; slow lengthens it")
+  st.enemies[1].breakDurationBounds=bounds
+  local early=H.raceTimingScenario(st,a,"lo");local late=H.raceTimingScenario(st,a,"hi")
+  check(early.enemies[1].breakDuration==961 and late.enemies[1].breakDuration==1024
+    and st.enemies[1].breakDuration==10,"break timing sensitivity copies both arms without mutating input")
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
   .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise, near fatal, the carried swing, zombie and left-member candidate vetoes", n))

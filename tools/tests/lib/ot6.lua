@@ -1566,9 +1566,33 @@ function M.raceLine(plan, per, effects)
     what = plan.what, plan = plan }
 end
 
+-- UpdateBattleTime visits each entity once in sixteen ATB updates.
+-- DecCounters adds its speed constant; overflow consumes one broken tick.
+function M.raceBreakClock(count, accumulator, speed, entity, nextEntity)
+  if count <= 0 then return 0 end
+  if speed <= 0 then return math.huge end
+  local visits = math.ceil((256 * count - accumulator) / speed)
+  return ((entity - nextEntity) % 16) + 1 + 16 * (visits - 1)
+end
+function M.raceBreakDuration(speed)
+  if speed <= 0 then return math.huge, { lo=math.huge, hi=math.huge } end
+  local lo = 1 + 16 * (math.ceil((256 * 16 - 255) / speed) - 1)
+  local hi = 16 * math.ceil(256 * 16 / speed)
+  return (lo + hi) / 2, { lo=lo, hi=hi }
+end
+function M.raceDamageBase(drop, shieldMax, broken)
+  return drop / (broken and 4 or shieldMax == 0 and 2 or 1)
+end
+
 -- one line's hits on enemy e (mutated), times the line's hit chance
 -- one line on one body; returns the hits left when the body fell first
-local function strike(e, line, hit, draw)
+local function raceRecover(e, t)
+  if e.breakUntil and t >= e.breakUntil then
+    e.breakUntil = nil
+    e.sh = e.shMax
+  end
+end
+local function strike(e, line, hit, draw, t)
   local effect = line.byTarget and line.byTarget[e.key]
   if effect then
     local copy = {}
@@ -1593,8 +1617,13 @@ local function strike(e, line, hit, draw)
     if draw and hit > 0 and hit < 1 then landed = draw() < hit and 1 or 0 end
     -- Ot6HitJoin chips first: the hit removing the final shield receives
     -- the broken-body damage multiplier itself, not only its next swing.
-    if (e.sh or 0) > 0 and i <= chips then e.sh = math.max(0, e.sh - landed) end
-    e.hp = e.hp - per * ((e.sh or 0) > 0 and 1 or 4) * landed
+    if (e.sh or 0) > 0 and i <= chips then
+      e.sh = math.max(0, e.sh - landed)
+      if e.sh == 0 and e.shMax ~= nil then e.breakUntil = t + e.breakDuration end
+    end
+    local mult = (e.sh or 0) > 0 and 1
+      or ((e.shMax == nil or e.breakUntil) and 4 or 2)
+    e.hp = e.hp - per * mult * landed
   end
   if e.hp < 0 then e.hp = 0 end
   return 0
@@ -1637,7 +1666,8 @@ function M.raceSim(st, first, draw)
   end
   for k, e in pairs(st.enemies) do
     E[k] = { key = k, hp = e.hp, sh = e.sh or 0, eta = e.eta or 0, period = e.period or 300, ends = e.ends, act = e.act or {},
-             stand = e.stand }
+             stand = e.stand, shMax = e.shMax, breakDuration = e.breakDuration or 1024,
+             breakUntil = (e.brokenLeft or 0) > 0 and e.brokenLeft or nil }
   end
   local left0 = effLeft(E)
   local r = { deaths = 0, firstDeath = nil, kill = nil, wipe = false, spent = 0, acts = 0 }
@@ -1663,16 +1693,16 @@ function M.raceSim(st, first, draw)
   local function attack(p, line, fixed)
     if line == nil then return end
     if line.aoe then
-      for _, e in pairs(E) do strike(e, line, p.hit, draw) end
+      for _, e in pairs(E) do strike(e, line, p.hit, draw, t_now) end
     else
       local k = target(false, fixed)
-      local left = k and strike(E[k], line, p.hit, draw) or 0
+      local left = k and strike(E[k], line, p.hit, draw, t_now) or 0
       while left > 0 and st.retarget ~= false do
         k = target(false, nil)
         if k == nil then break end
         local hp0 = E[k].hp
         left = strike(E[k], { per = line.per, hits = left, chips = 0, hit = line.hit,
-                             byTarget = line.byTarget }, p.hit, draw)
+                             byTarget = line.byTarget }, p.hit, draw, t_now)
         -- a carry that took half or more of a body it left standing
         if E[k].hp > 0 and (hp0 - E[k].hp) * 2 >= hp0 then carried = true end
       end
@@ -1721,14 +1751,14 @@ function M.raceSim(st, first, draw)
     local fired = false
     for _, f in ipairs(draw == nil and { M.RACE_STAND_SLACK, 1 } or { 1 }) do
       local save = {}
-      for j, e in pairs(E) do save[j] = { e.hp, e.sh } end
+      for j, e in pairs(E) do save[j] = { e.hp, e.sh, e.breakUntil } end
       local L = {}
       for key, v in pairs(line) do L[key] = v end
       L.per = (L.per or 0) * f
       carried = false
       attack(p, L, nil)
       fired = fired or standFires(E, before, (f > 1 and carried) and 1 or 0)
-      for j, e in pairs(E) do e.hp, e.sh = save[j][1], save[j][2] end
+      for j, e in pairs(E) do e.hp, e.sh, e.breakUntil = save[j][1], save[j][2], save[j][3] end
     end
     return fired
   end
@@ -1759,7 +1789,7 @@ function M.raceSim(st, first, draw)
       if first_act ~= true or st.noStand then anyStand = false end
       if draw == nil and anyStand and c.line then
         local save = {}
-        for j, e in pairs(E) do save[j] = { e.hp, e.sh } end
+        for j, e in pairs(E) do save[j] = { e.hp, e.sh, e.breakUntil } end
         local L = {}
         for key, v in pairs(c.line) do L[key] = v end
         L.per = (L.per or 0) * M.RACE_STAND_SLACK
@@ -1769,7 +1799,7 @@ function M.raceSim(st, first, draw)
         -- of it: the WoR's s5 at f7e822c8, a 1-BP Fight's fourth swing
         -- went on from the Sneezer and the plain body fell with it)
         slack = standFires(E, before, carried and 1 or 0)
-        for j, e in pairs(E) do e.hp, e.sh = save[j][1], save[j][2] end
+        for j, e in pairs(E) do e.hp, e.sh, e.breakUntil = save[j][1], save[j][2], save[j][3] end
       end
       attack(p, c.line, c.target)
       if anyStand and (slack or standFires(E, before)) then
@@ -1805,8 +1835,12 @@ function M.raceSim(st, first, draw)
     for _, m in pairs(P) do if m.hp > 0 then alive = alive + 1 end end
     local sum, one = 0, 0
     for _, e in pairs(E) do
-      if e.hp > 0 and e.eta <= till then
-        local n = math.floor((till - e.eta) / e.period) + 1
+      local eta = e.eta
+      if e.breakUntil and eta < e.breakUntil then
+        eta = eta + math.ceil((e.breakUntil-eta)/e.period)*e.period
+      end
+      if e.hp > 0 and eta <= till then
+        local n = math.floor((till - eta) / e.period) + 1
         local v
         if draw == nil then
           v = (e.act.worst or e.act.dmg or {})[k] or 0
@@ -1881,6 +1915,7 @@ function M.raceSim(st, first, draw)
     end
     if ek ~= nil and (nt == nil or et <= nt) then nk, nt, enemy = ek, et, true end
     if nk == nil then break end
+    for _,e in pairs(E) do raceRecover(e,nt) end
     if enemy then
       r.acts = r.acts + 1
       if r.acts > horizon then break end
@@ -1888,6 +1923,9 @@ function M.raceSim(st, first, draw)
       for _, p in pairs(P) do if p.hp > 0 then anyUp = true end end
       if not anyUp then break end      -- the party is gone (a removal)
       local e = E[nk]
+      if e.breakUntil and e.breakUntil > nt then
+        r.breakSkips = (r.breakSkips or 0) + 1
+      else
       local dmg, lands, aim = e.act.dmg or {}, true, e.act.aim or "random"
       if draw == nil then
         dmg, aim = e.act.worst or dmg, "worst"
@@ -1930,6 +1968,7 @@ function M.raceSim(st, first, draw)
           if P[tk].hp <= 0 then death(nt) end
         end
       end
+      end -- a broken monster consumes this queued opportunity without acting
       e.eta = e.eta + e.period
       local alive = false
       for _, p in pairs(P) do if p.hp > 0 then alive = true end end
@@ -1994,7 +2033,7 @@ function M.raceSim(st, first, draw)
   r.bill = bill
   r.cost = r.spent + bill
   r.pending = pendingFirst and not r.wipe and not r.invalid or nil
-  r.resources = { bag = bag, party = P }
+  r.resources = { bag = bag, party = P, enemies = E }
   return r
 end
 
@@ -2143,6 +2182,12 @@ end
 function M.raceTimingScenario(st, action, point)
   local ss = {}
   for k,v in pairs(st) do ss[k]=v end
+  ss.enemies = {}
+  for k,e in pairs(st.enemies) do
+    local q = {};for f,v in pairs(e) do q[f]=v end
+    if point ~= "central" and e.breakDurationBounds then q.breakDuration=e.breakDurationBounds[point] end
+    ss.enemies[k]=q
+  end
   ss.party = {}
   for k,p in pairs(st.party) do
     local q = {};for f,v in pairs(p) do q[f]=v end
@@ -6017,7 +6062,7 @@ local BATTLE = {
   -- OT6's per-monster state, slot-indexed: monsters are entities 4..9 at a
   -- 2-byte stride, so slot s sits 8 bytes past the ot6_memory.inc base.
   MON_HP = 0x3BFC, MON_PRESENT = 0x3AA8,
-  SH_CUR = 0x3E40, BRK_TICKS = 0x3E90, -- OT6_SHIELD_CUR/BROKEN_TICKS + 8
+  SH_CUR = 0x3E40, SH_MAX = 0x3E41, BRK_TICKS = 0x3E90, -- OT6_SHIELD_CUR/BROKEN_TICKS + 8
   RV_ELEM = 0x3E91, RV_CLASS = 0x3EA5, -- OT6_REVEALED_ELEM/BOOST_REVEALED + 8
   -- A tool is one hit (Ot6HitCountTbl: the Drill x2); boost multiplies
   -- its damage, not its swings (Ot6FightBoost lives in FightAttack).
@@ -8352,7 +8397,14 @@ function Driver:raceState(actor, R)
   for s = 0, 5 do
     if monAlive(s) then
       local mconst = M.readWord(BATTLE.ATB_CONST + 8 + s * 2)
+      local entity = 4 + s
+      local speed = M.readByte(0x3ADD + entity * 2)
+      local duration, durationBounds = M.raceBreakDuration(speed)
+      local brokenLeft = M.raceBreakClock(M.readByte(BATTLE.BRK_TICKS + s * 2),
+        M.readByte(0x3ADC + entity * 2), speed, entity, M.readByte(0x3A91) % 16)
       local en = { hp = M.readWord(BATTLE.MON_HP + s * 2),
+        shMax = M.readByte(BATTLE.SH_MAX + s * 2),
+        brokenLeft = brokenLeft, breakDuration = duration, breakDurationBounds = durationBounds,
         sh = M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0 and 0 or M.readByte(BATTLE.SH_CUR + s * 2),
         eta = etaOf(8 + s * 2) or 600, period = mconst > 0 and math.ceil(0xFF00 / mconst) or 600,
         act = { aoe = false, dmg = {}, worst = {} } }
@@ -13839,6 +13891,8 @@ function Driver:watchDamage()
         -- must not average the two
         w.norm = w.norm
           + ((M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0) and (drop // 4) or drop)
+        w.raceNorm = (w.raceNorm or 0) + M.raceDamageBase(drop,
+          M.readByte(BATTLE.SH_MAX + s * 2), M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0)
         w.n = w.n + 1
       end
     end
@@ -13867,7 +13921,7 @@ function Driver:watchDamage()
         self.raceHitLog = self.raceHitLog or {}
         local key = w.actor .. ":" .. w.kind .. ":" .. tostring(w.skill or w.spell)
         local hl = self.raceHitLog[key] or {}
-        local base = w.norm / w.n
+        local base = (w.raceNorm or w.norm) / w.n
         if w.kind == "skill" and (w.cmd == BATTLE.CMD_TOOLS
            or (w.cmd == BATTLE.CMD_BLITZ and w.skill == BATTLE.PUMMEL)) then
           base = base / (1 + (w.boost or 0))

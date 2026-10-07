@@ -582,3 +582,31 @@ sampled wipe/down/fall risk in every scenario. The model still approximates
 queued action serialization and aggregates a volley at one event; a full
 monster gauge wins ties conservatively. The default remains off while
 these assumptions receive legal-play observation and independent review.
+
+
+### Finite break stage (experimental)
+
+A race body now carries its authored maximum shields separately from its
+current gauge and remaining broken window. `Ot6ShieldedDmg` distinguishes
+three states: shielded damage is half normal, a naturally shieldless body
+takes normal damage, and a broken body takes double normal damage. Race
+measurement normalizes those as 1/2/4 shielded equivalents without changing
+the existing rules' damage ledger.
+
+Breaking suppresses modeled enemy opportunities until expiry; expiry
+restores the authored shield maximum before the next event. The engine's
+`DecCounters` visits each entity once per sixteen `UpdateBattleTime` updates
+and consumes a broken count when its speed accumulator overflows. Existing
+remaining time is read from that accumulator, the next entity phase and
+`BROKEN_TICKS`. A newly created break uses bounds covering every phase of
+the sixteen-count timer at its current speed; both compared commands use
+the same early/central/late duration scenario. Haste or slow changes during
+the projected window remain unmodelled.
+
+The enemy timeline still uses estimated periodic opportunities rather than
+reproducing the queue: a full gauge held behind the queue-time break gate
+may act earlier on recovery than this estimate, and a command already
+executing can finish its current hits. These are explicit remaining gaps,
+not a claim of faithful queue emulation. The three retained before-fix
+contract failures and new arithmetic checks establish suppression, finite
+recovery and shieldless damage; they do not establish acting-policy wins.
