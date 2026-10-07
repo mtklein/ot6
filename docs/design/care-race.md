@@ -616,3 +616,25 @@ The model horizon counts enemy opportunities, including suppressed ones;
 the historical action-count calibration is not yet a matched observation
 of that revised horizon. It must be aligned before it supports acting
 claims.
+
+### Accepted execution token observation (experimental)
+
+Every ExecCmd entry creates a fresh execution token, including enemy,
+engine, counter and untraced commands. Only a normal party invocation with
+matching queued command `$3A7C` can consume that actor's submitted plan.
+The token freezes its actor, trace ID, accepted command/attack and stable
+queued `$3A7C/$3A7D` identity. ApplyDmg brackets retain the token and queued
+identity at entry and require both to remain current at return. Reload and
+replacement contexts invalidate ownership; same-actor retaliation cannot
+consume a waiting normal action.
+
+Fight rotates `$B6` for the hand, Tools and Pummel rebase ability IDs, and
+weapon magic changes `$B5/$B6` within its parent dispatcher. An attributed
+HP event therefore retains accepted command/attack separately from raw
+`raw_effect_command`/`raw_effect_attack`. The immutable token, stable queue
+identity and actor are the attribution guard; raw engine commands remain
+excluded. Source references are InitPlayerAction, ExecCmd, Cmd_09, Cmd_0a,
+CheckWeaponMagic and ExecRetal in `battle_main.asm`. Synthetic controls
+exercise internal children and unrelated/stale contexts. This observation
+stage does not authorize the default acting policy or close catalogue and
+queue-model gaps.

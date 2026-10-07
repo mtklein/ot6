@@ -5463,7 +5463,7 @@ end
 -- A confirm press is an attempt, never proof of submission or resolution.
 local actionTraceSerial = 0
 function M.newRecoveryTrace(tag, emit, observe, tickReader)
-  local T = { pending = {}, queued = {}, running = {} }
+  local T = { pending = {}, queued = {}, running = {}, context = nil, contextSerial = 0 }
   local function event(p, stage, frame, fields)
     local e = { v = 1, id = p.id, tag = tag or "fight", actor = p.actor,
       kind = p.kind, requested = p.requested, target = p.target,
@@ -5520,41 +5520,70 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
     event(p, "submit", frame, { command = cmd, attack = attack,
       targets = targets, navigation_frames = frame - p.frame })
   end
-  function T.start(actor, frame, cmd, attack, targets, hp, mp, bp)
+  -- Every dispatcher invocation creates a new scope, including an enemy,
+  -- counter or engine action which has no accepted controller command.
+  function T.start(actor, frame, cmd, attack, targets, hp, mp, bp, meta)
+    meta = meta or {}
+    T.contextSerial = T.contextSerial + 1
+    local scope = { id = T.contextSerial, actor = actor, command = cmd, attack = attack,
+      queued_command = meta.queued_command or cmd, queued_attack = meta.queued_attack or attack,
+      counter = meta.counter == true }
+    T.context = scope
+    if actor == nil or actor < 0 or actor > 3 or cmd >= 0x1E or scope.counter
+      or scope.queued_command ~= cmd then return end
     local queue = T.queued[actor] or {}
     local p = queue[1]
     if not p or p.accepted_command ~= cmd then return end
     table.remove(queue, 1)
-    T.running[actor] = p
+    if T.running[actor] then
+      event(T.running[actor], "unresolved", frame,
+        { reason = "execution_superseded", last_stage = "start" })
+    end
+    T.running[actor], scope.trace_id = p, p.id
     p.stage, p.started = "start", frame
     p.started_tick = tickReader and tickReader()
     p.command, p.attack, p.targets = cmd, attack, targets
+    p.context_id, p.queued_command, p.queued_attack = scope.id, scope.queued_command, scope.queued_attack
     p.hp, p.mp, p.bp = hp, mp, bp
     event(p, "start", frame, { command = cmd, attack = attack,
-      targets = targets, queue_frames = frame - p.submitted })
+      targets = targets, queue_frames = frame - p.submitted,
+      context_id = scope.id, queued_command = scope.queued_command,
+      queued_attack = scope.queued_attack, counter = scope.counter })
+    return scope
   end
-  -- Called at ApplyDmg's return, after the engine has clamped lethal HP.
-  -- The accepted command identity, not an HP heuristic, owns each effect.
-  function T.hpEffect(actor, frame, target, before, after, cmd, attack)
+  -- The frozen accepted action owns its internal hand/tool/spell effects.
+  -- Mutable B5/B6 is retained as raw evidence, never mistaken for its ID.
+  function T.hpEffect(actor, frame, target, before, after, cmd, attack, evidence)
+    evidence = evidence or {}
+    local scope = evidence.context or T.context
     local p = T.running[actor]
-    if not p or p.command ~= cmd or p.attack ~= attack or before == after then return end
+    if not p or scope == nil or scope ~= T.context or scope.actor ~= actor
+      or scope.trace_id ~= p.id or scope.id ~= p.context_id or scope.counter
+      or scope.queued_command ~= (evidence.queued_command or scope.queued_command)
+      or scope.queued_attack ~= (evidence.queued_attack or scope.queued_attack)
+      or scope.queued_command ~= p.queued_command or scope.queued_attack ~= p.queued_attack
+      or cmd >= 0x1E or before == after then return end
     p.effectN = (p.effectN or 0) + 1
-    event(p, "hp_effect", frame, { command = cmd, attack = attack,
-      effect_target = target, hp_before = before, hp_after = after,
+    event(p, "hp_effect", frame, { command = p.command, attack = p.attack,
+      raw_effect_command = cmd, raw_effect_attack = attack,
+      queued_command = scope.queued_command, queued_attack = scope.queued_attack,
+      context_id = scope.id, effect_target = target, hp_before = before, hp_after = after,
       hp_change = after - before, effect_index = p.effectN,
       navigation_frames = p.submitted - p.frame,
       queue_frames = p.started - p.submitted,
       execution_frames = frame - p.started })
   end
   function T.resolve(actor, frame, hp, mp, bp)
-    local p = T.running[actor]
-    if not p then return end
+    local p, scope = T.running[actor], T.context
+    if not p or not scope or scope.actor ~= actor or scope.trace_id ~= p.id
+      or scope.id ~= p.context_id then return end
     local deltas = {}
     for i = 1, 4 do deltas[i] = hp[i] - p.hp[i] end
     -- Net HP across the command, not an attributed healing amount (Runic,
     -- counters, misses and caps can change the outcome). Preserve raw facts.
     event(p, "resolve", frame, { command = p.command, attack = p.attack,
-      targets = p.targets, hp_net = table.concat(deltas, ","),
+      targets = p.targets, hp_net = table.concat(deltas, ","), context_id = scope.id,
+      queued_command = scope.queued_command, queued_attack = scope.queued_attack,
       mp_net = mp - p.mp, bp_net = bp - p.bp,
       execution_frames = frame - p.started,
       navigation_frames = p.submitted - p.frame,
@@ -5562,7 +5591,7 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
       navigation_atb_ticks = p.submitted_tick and ((p.submitted_tick-p.atb_tick)&0xFFFF),
       queue_atb_ticks = p.started_tick and ((p.started_tick-p.submitted_tick)&0xFFFF),
       execution_atb_ticks = p.started_tick and ((tickReader()-p.started_tick)&0xFFFF) })
-    T.running[actor] = nil
+    T.running[actor], T.context = nil, nil
   end
   -- A party death (#175), outside the per-plan lifecycle: the member,
   -- the HP the killing action found them at, the pips they held and the
@@ -5583,7 +5612,7 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
       if p then event(p, "unresolved", frame,
         { reason = reason, last_stage = p.stage }) end
     end
-    T.queued, T.running = {}, {}
+    T.queued, T.running, T.context = {}, {}, nil
   end
   return T
 end
@@ -5636,11 +5665,11 @@ local function recoveryActivate(trace)
   -- now contain the command/attack after queue-time spell folding.
   hook(M.sym("ExecCmd@battle_code"), function(t, cpu)
     local x = cpu["cpu.x"] & 0xffff
-    if x < 8 and x % 2 == 0 then
-      t.start(x // 2, M.frame, M.readByte(0xB5), M.readByte(0xB6),
-        M.readWord(0xB8), recoveryHP(), M.readWord(0x3C08 + x),
-        M.readByte(0x3E9C + x))
-    end
+    t.start(x < 8 and x % 2 == 0 and x // 2 or nil, M.frame,
+      M.readByte(0xB5), M.readByte(0xB6), M.readWord(0xB8), recoveryHP(),
+      M.readWord(0x3C08 + x), M.readByte(0x3E9C + x),
+      { queued_command = M.readByte(0x3A7C), queued_attack = M.readByte(0x3A7D),
+        counter = (M.readByte(0xB1) & 1) ~= 0 })
   end)
   -- ApplyDmg saves the attacker X before using it for HP/MP dispatch.
   -- Its common return comes after HP healing/damage and lethal clamping.
@@ -5656,7 +5685,8 @@ local function recoveryActivate(trace)
     local x, y = cpu["cpu.x"] & 0xffff, cpu["cpu.y"] & 0xffff
     effects[#effects + 1] = { offset = x, actor = x < 8 and x % 2 == 0 and x // 2 or nil,
       target = y // 2, hp = M.readWord(0x3BF4 + y),
-      cmd = M.readByte(0xB5), attack = M.readByte(0xB6) }
+      cmd = M.readByte(0xB5), attack = M.readByte(0xB6), context = t.context,
+      queued_command = M.readByte(0x3A7C), queued_attack = M.readByte(0x3A7D) }
   end)
   hook(apply + 0x27, function(t)
     local e = table.remove(effects)
@@ -5664,11 +5694,16 @@ local function recoveryActivate(trace)
       local hp = M.readWord(0x3BF4 + e.target * 2)
       if M.RACE_EFFECT_DIAGNOSTIC and hp ~= e.hp then
         local p = e.actor ~= nil and t.running[e.actor] or nil
-        print(string.format("[ot6effect] frame=%d x=$%02X target=%d hp=%d->%d cmd=$%02X atk=$%02X running=%s:%s",
+        print(string.format("[ot6effect] frame=%d x=$%02X target=%d hp=%d->%d cmd=$%02X atk=$%02X running=%s:%s queued=$%02X:$%02X context=%s:%s counter=%s",
           M.frame,e.offset,e.target,e.hp,hp,e.cmd,e.attack,
-          tostring(p and p.command),tostring(p and p.attack)))
+          tostring(p and p.command),tostring(p and p.attack),e.queued_command,e.queued_attack,
+          tostring(e.context and e.context.id),tostring(e.context and e.context.trace_id),
+          tostring(e.context and e.context.counter)))
       end
-      if e.actor ~= nil then t.hpEffect(e.actor,M.frame,e.target,e.hp,hp,e.cmd,e.attack) end
+      if e.actor ~= nil and e.queued_command == M.readByte(0x3A7C)
+        and e.queued_attack == M.readByte(0x3A7D) then
+        t.hpEffect(e.actor,M.frame,e.target,e.hp,hp,e.cmd,e.attack,e)
+      end
     end
   end)
   -- Immediately after ExecCmd returns to the normal-action path, including

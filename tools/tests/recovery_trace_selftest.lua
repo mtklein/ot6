@@ -49,4 +49,16 @@ local n = #events
 t.close(200, 'state_reload')
 t.close(201, 'run_ended')
 assert(#events == n) -- no duplicate terminal records
+-- Internal physical rebases are not new commands. A counter with the
+-- same actor and command cannot steal the pending player's queue entry.
+plan(0,210)
+t.submit(0,220,2,45,2)
+t.start(0,230,2,45,2,{100,100,100,100},20,0,{counter=true})
+assert(#t.queued[0]==1 and t.running[0]==nil)
+local scope=t.start(0,240,2,45,2,{100,100,100,100},20,0)
+t.hpEffect(0,250,1,100,200,2,47,{context=scope})
+assert(events[#events].event=='hp_effect' and events[#events].attack==45
+  and events[#events].raw_effect_attack==47)
+t.resolve(0,260,{100,200,100,100},15,0)
+assert(events[#events].event=='resolve')
 print('recovery_trace_selftest: PASS')

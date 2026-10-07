@@ -63,6 +63,20 @@ def summarize(lines):
                 raise ValueError(f'invalid transition {prev} -> {e["event"]}')
             if events and e['frame'] < events[-1]['frame']:
                 raise ValueError('frame moved backwards')
+            if e['event'] == 'start' and 'context_id' in e:
+                if type(e['context_id']) is not int or e['context_id'] <= 0:
+                    raise ValueError('invalid execution context')
+                for field in ('queued_command', 'queued_attack'):
+                    if type(e.get(field)) is not int or not 0 <= e[field] <= 255:
+                        raise ValueError(f'invalid {field}')
+                if e.get('counter') is not False or e['queued_command'] != e.get('command'):
+                    raise ValueError('accepted execution is not a normal queued command')
+            if e['event'] in {'hp_effect', 'resolve'} and any(x['event'] == 'start' for x in events):
+                start = next(x for x in events if x['event'] == 'start')
+                if 'context_id' in start:
+                    for field in ('context_id', 'queued_command', 'queued_attack'):
+                        if e.get(field) != start[field]:
+                            raise ValueError('event does not match accepted execution context')
             if e['event'] == 'hp_effect':
                 for field in required['hp_effect']:
                     if type(e[field]) is not int:
@@ -76,6 +90,12 @@ def summarize(lines):
                 start = next(x for x in events if x['event'] == 'start')
                 if any(e[f] != start.get(f) for f in ('actor', 'command', 'attack')):
                     raise ValueError('HP effect does not match accepted command')
+                if 'context_id' in start:
+                    for field in ('raw_effect_command', 'raw_effect_attack'):
+                        if type(e.get(field)) is not int or not 0 <= e[field] <= 255:
+                            raise ValueError(f'invalid {field}')
+                    if e['raw_effect_command'] >= 0x1e:
+                        raise ValueError('engine effect cannot own a normal accepted command')
                 effects = [x for x in events if x['event'] == 'hp_effect']
                 if e['effect_index'] != len(effects) + 1:
                     raise ValueError('HP effect index is not consecutive')
@@ -159,6 +179,20 @@ def selftest():
     assert summarize(opening + [line('hp_effect', 10, **(effect | {'hp_change': 1}))])['errors']
     assert summarize(opening + [line('hp_effect', 10, **(effect | {'effect_index': 2}))])['errors']
     assert summarize([line('plan', 0), line('hp_effect', 10, **effect)])['errors']
+    token_start = line('start', 8, actor=0, command=0, attack=255,
+        context_id=7, queued_command=0, queued_attack=255, counter=False)
+    token_effect = effect | dict(context_id=7, queued_command=0, queued_attack=255,
+        raw_effect_command=2, raw_effect_attack=14)
+    token_opening = opening[:-1] + [token_start]
+    token_resolve = line('resolve', 12, kind='fight', requested=0, actor=0, command=0, attack=255,
+        context_id=7, queued_command=0, queued_attack=255,
+        targets=256, hp_net='0,0,0,0')
+    assert not summarize(token_opening + [line('hp_effect', 10, **token_effect), token_resolve])['errors']
+    for field,value in [('context_id',8),('queued_attack',170),('queued_command',9),
+                        ('raw_effect_command',0x22),('raw_effect_attack',256)]:
+        assert summarize(token_opening + [line('hp_effect',10,**(token_effect | {field:value}))])['errors']
+    assert summarize(token_opening + [line('hp_effect',10,**token_effect),
+        line('resolve',12,context_id=8,queued_command=0,queued_attack=255)])['errors']
     print('action_trace selftest: PASS')
 
 

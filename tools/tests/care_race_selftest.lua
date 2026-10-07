@@ -940,6 +940,79 @@ do
     "early continuation plans safely and its break expires on the event timeline")
 end
 
+-- Accepted execution tokens own internal hand/tool/spell effects, while
+-- unrelated dispatcher entries cannot borrow a waiting or stale plan.
+do
+  local function prepared(cmd,atk,kind)
+    local ev={}
+    local T=H.newRecoveryTrace("token unit",function(e) ev[#ev+1]=e end)
+    T.plan(0,{kind=kind or "fight",skill=atk},0)
+    T.submit(0,10,cmd,atk,0x100)
+    local scope=T.start(0,20,cmd,atk,0x100,{100,100,100,100},20,0,
+      {queued_command=cmd,queued_attack=atk,counter=false})
+    return T,ev,scope
+  end
+  for _,v in ipairs({{0,255,0,127,"fight"},{9,170,9,7,"skill"},
+    {10,93,10,0,"skill"},{0,255,2,14,"fight"}}) do
+    local T,ev,scope=prepared(v[1],v[2],v[5])
+    T.hpEffect(0,30,4,100,50,v[3],v[4],{context=scope,
+      queued_command=v[1],queued_attack=v[2]})
+    local e=ev[#ev]
+    check(e.event=="hp_effect" and e.command==v[1] and e.attack==v[2]
+      and e.raw_effect_command==v[3] and e.raw_effect_attack==v[4]
+      and e.context_id==scope.id,"accepted Fight/Tools/Pummel/weapon-spell identity remains separate from its raw effect")
+    T.resolve(0,40,{100,100,100,100},20,0)
+    check(ev[#ev].event=="resolve" and ev[#ev].context_id==scope.id,
+      "a matching dispatcher token resolves its accepted command")
+  end
+  local T,ev,scope=prepared(0,255)
+  local before=#ev
+  T.hpEffect(1,30,4,100,50,0,127,{context=scope,queued_command=0,queued_attack=255})
+  check(#ev==before,"wrong actor cannot own a matching-looking HP effect")
+  scope.actor=1
+  T.hpEffect(0,23,4,100,50,0,127)
+  check(#ev==before,"changed context actor cannot own running actor effect")
+  scope.actor=0
+  T.hpEffect(0,30,4,100,50,0,127,{context=scope,queued_command=9,queued_attack=255})
+  check(#ev==before,"stable queued command mismatch rejects effect")
+  T.hpEffect(0,30,4,100,50,0,127,{context=scope,queued_command=0,queued_attack=170})
+  check(#ev==before,"stable queued attack mismatch rejects effect")
+  local saved=scope.trace_id;scope.trace_id=saved+1
+  T.hpEffect(0,30,4,100,50,0,127,{context=scope})
+  check(#ev==before,"stale trace ID cannot own effect")
+  scope.trace_id=saved
+  local id=scope.id;scope.id=id+1
+  T.hpEffect(0,30,4,100,50,0,127,{context=scope})
+  check(#ev==before,"stale execution ID cannot own effect")
+  scope.id=id
+  T.hpEffect(0,30,4,100,50,0x22,0,{context=scope})
+  check(#ev==before,"engine tick cannot be an accepted command's HP effect")
+  T.start(nil,31,0,119,0x1,{100,100,100,100},20,0)
+  T.hpEffect(0,32,4,100,50,0,127,{context=scope})
+  check(#ev==before,"enemy dispatcher invalidates a bracket's earlier context")
+  T.resolve(0,33,{100,100,100,100},20,0)
+  check(#ev==before,"changed context cannot resolve a stale running command")
+  T.close(34,"state_reload")
+  local after=#ev
+  T.hpEffect(0,35,4,100,50,0,127,{context=scope})
+  check(#ev==after and T.context==nil,"reload discards the running trace and execution scope")
+  for _,entry in ipairs({{0,255,true},{0x22,0,false},{2,14,false}}) do
+    local ev={};local T=H.newRecoveryTrace("waiting token unit",function(e) ev[#ev+1]=e end)
+    T.plan(0,{kind="fight"},0);T.submit(0,10,0,255,0x100)
+    local waiting=ev[#ev].id
+    T.start(0,20,entry[1],entry[2],0x100,{100,100,100,100},20,0,
+      {counter=entry[3],queued_command=entry[1],queued_attack=entry[2]})
+    T.hpEffect(0,21,4,100,50,entry[1],entry[2])
+    T.resolve(0,22,{100,100,100,100},20,0)
+    check(#ev==2 and T.queued[0][1].id==waiting,
+      "same-actor counter/engine/untraced command cannot consume the normal Fight queue entry")
+    local good=T.start(0,30,0,255,0x100,{100,100,100,100},20,0)
+    T.hpEffect(0,31,4,100,50,0,127,{context=good})
+    check(ev[#ev].event=="hp_effect" and ev[#ev].id==waiting,
+      "the waiting accepted Fight owns effects only when its own normal dispatcher starts")
+  end
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
   .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise, near fatal, the carried swing, zombie and left-member candidate vetoes", n))
