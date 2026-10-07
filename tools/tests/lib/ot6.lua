@@ -6200,7 +6200,7 @@ function Driver:scriptWorst(slot, e)
   local key = string.format("%d:%d:%d", slot, species, e)
   self.romWorst = self.romWorst or {}
   local c = self.romWorst[key]
-  if c ~= nil then return c.v, c.a end
+  if c ~= nil then return c.v, c.a, c.m end
   local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
   local off = M.readRomWord(ptrs + species * 2)
   local function b(i) return M.readRomByte(base + off + i) end
@@ -6231,8 +6231,12 @@ function Driver:scriptWorst(slot, e)
   end
   local price = best
   if M.UNSEEN_PRICE == "mean" and n > 0 and best ~= nil then price = math.max(1, sum // n) end
-  self.romWorst[key] = { v = price, a = bestA }
-  return price, bestA
+  -- (the third value, the mean over every attack it names, a buff or a
+  -- status a 0, is the care race's typical action before the slot has
+  -- landed enough to read one, #415)
+  local mean = n > 0 and (sum // n) or nil
+  self.romWorst[key] = { v = price, a = bestA, m = mean }
+  return price, bestA, mean
 end
 
 function Driver:counterVetoed(actor, use, slots, what)
@@ -7763,6 +7767,10 @@ function Driver:raceState(actor, R)
         local worst = en.worst or en.rom or fallback or 0
         local L = self.hitLedger[en.slot]
         local typ = nil
+        -- short of M.RACE_TYPICAL_MIN landings: its landings' median once
+        -- it has any, before that the mean of what its script names (the
+        -- ROM), else its worst
+        local _, _, romMean = self:scriptWorst(en.slot, e)
         if L and L.landOn and (L.landN or 0) >= M.RACE_TYPICAL_MIN then
           local v = L.landOn[e]
           if v == nil or #v == 0 then
@@ -7776,6 +7784,13 @@ function Driver:raceState(actor, R)
             typ = c[(#c + 1) // 2]
           end
         end
+        if typ == nil and L and L.landOn and L.landOn[e] and #L.landOn[e] > 0 then
+          local c = {}
+          for i, x in ipairs(L.landOn[e]) do c[i] = x end
+          table.sort(c)
+          typ = c[(#c + 1) // 2]
+        end
+        if typ == nil and (L == nil or (L.landN or 0) == 0) then typ = romMean end
         E.act.dmg[e] = typ or worst
         E.act.worst[e] = math.max(worst, typ or 0)
         E.typed = E.typed or (typ ~= nil)
