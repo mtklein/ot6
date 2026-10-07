@@ -1785,7 +1785,7 @@ function M.raceSim(st, first, draw)
       end
     end
     local b = 0
-    if p.bp >= (st.bankAt or 0) then b = math.min(p.bp, 3) end
+    if st.boost ~= false and p.bp >= (st.bankAt or 0) then b = math.min(p.bp, 3) end
     while b > 0 and p.lines[b] == nil do b = b - 1 end
     -- a player who knows the Sneezer is there holds back the boost whose
     -- swings would leave it alone (the stand read as the decision reads it)
@@ -7975,7 +7975,7 @@ end
 function Driver:raceState(actor, R)
   local st = { actor = actor, party = {}, enemies = {}, focus = {}, hpRate = M.shopRates().hp or 1.2,
                bankAt = self.opts.bank or 0, horizon = M.RACE_HORIZON,
-               careItems = R.careItems, careCasts = R.careCasts }
+               careItems = R.careItems, careCasts = R.careCasts, boost = self.opts.boost == true }
   local slot = self:pressTarget()
   if slot == nil then
     for s = 0, 5 do if monAlive(s) then slot = s; break end end
