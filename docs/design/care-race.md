@@ -362,8 +362,29 @@ The list above describes the intended coverage. The implementation offers
 `bestLine` at each available boost, bag heals, individual Cure casts, and
 Fenix Downs. It can score a measured offensive spell or summon selected by
 the rules, but does not generally enumerate alternative offensive spells,
-summons, Life, Defend or Row. Decisions before the first measured hit and
-while a removal last stand remains use the rules. It therefore augments
+summons, Life, Defend or Row. Decisions before the first measured hit, while a removal last stand
+remains, and while a standing party member cannot take a planned turn
+(Muddle, Sleep, Stop, Frozen, Berserk, Petrify, Zombie or departure) use
+the rules. It therefore augments
 the rule stack rather than replacing every decision. Menu time is also
 still outside its estimate. The issue's no-regression and attrition
 improvement bar requires final matched evidence before closure.
+
+
+## Final validation findings (2026-10-07)
+
+The 5b4cb9f6 Gate comparison failed the acceptance bar. Shared-key totals
+were 164,606 ticks and 6 deaths for the race, 163,108 ticks and 4 deaths for
+the rules (43 shared keys). The first fight in shifts 8 and 11 was
+`be88-g009B-eFEEEEDED`: 10,283 ticks and 4 deaths against 3,563 and 1.
+At shift 11 frame 10,439 the race raised EDGAR while SABIN was Muddled;
+its simulated continuation still used SABIN's planned attacks. The race
+now defers while a standing member cannot take a planned turn, covering
+the status class rather than naming that formation. New matched Gate
+validation is required before counting that fix as effective. Raw logs:
+`build/attempts/wt/v026-race/final-play/gate/`.
+
+The Train generator's battle 68 uses its own local `makePlan`, not this
+driver, and now ends through Suplex. Its on/off segment comparison
+measures the random battles on the approach, not a race-policy change in
+battle 68. It cannot satisfy that part of #415's original acceptance bar.

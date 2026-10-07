@@ -7973,6 +7973,18 @@ function M.median(v)
   return c[(#c + 1) // 2]
 end
 function Driver:raceState(actor, R)
+  -- A party member the player cannot command contributes no planned
+  -- continuation. Until status clears, leave the fight with the rules
+  -- rather than inventing that member's attack/heal: the Gate's be88
+  -- at 5b4cb9f6 counted Muddled SABIN's turns and kept raising EDGAR into
+  -- a 1293 round (four deaths to the rules' one, on matched first fights).
+  for e = 0, 3 do
+    if (R.hpNow[e] or 0) > 0 and (denied(e) ~= nil
+       or (M.readByte(BATTLE.ST2 + e * 2) & 0x20) ~= 0
+       or (M.leftMask() >> e) & 1 == 1) then
+      return nil, "a standing party member cannot take a planned turn (the rules play it)"
+    end
+  end
   local st = { actor = actor, party = {}, enemies = {}, focus = {}, hpRate = M.shopRates().hp or 1.2,
                bankAt = self.opts.bank or 0, horizon = M.RACE_HORIZON,
                careItems = R.careItems, careCasts = R.careCasts, boost = self.opts.boost == true }
