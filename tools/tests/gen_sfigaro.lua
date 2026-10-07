@@ -465,8 +465,10 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
   -- for the whole scenario -- Tonic row 0, Fenix Down, no Potion.  It is
   -- the scenario's only Tonic counter: the seeded chain walked in with 20
   -- and reached locke_done with 7 (sfigaro_passage 18, sfigaro_escape 7).
-  -- TONIC to 78: the L13 band the scenario reaches (65) plus that
-  -- measured spend (13).  Fenix Down stays at the 12 the common route
+  -- TONIC to 85 (#411): the L13 band the scenario reaches (65) plus the
+  -- spend a4e9f966 measured after this counter (78 -> tunnelarmr_entry and
+  -- sabin_world 60: 18) and two more; the audit's band has no slack.  It
+  -- was 78 on a 13-Tonic spend.  Fenix Down stays at the 12 the common route
   -- carries (~level).  Probe: 58 Tonics, gil 10825 -> 7925.
   -- ===================================================================== --
   H.call(function()
@@ -485,7 +487,7 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
     H.assertEq(H.shopId(), 8, "the counter opened shop 8 ($0201) -- $00A4 clear")
     H.assertEq(H.shopRowOf(8, 0xE8) ~= nil, true, "shop 8 sells Tonics")
   end),
-  H.buyItem(0xE8, function() return 78 - H.invCountOf(0xE8) end, "TONIC to 78"),
+  H.buyItem(0xE8, function() return 85 - H.invCountOf(0xE8) end, "TONIC to 85"),
   -- #411: the Antidotes for the scenario's poison: the d5971e85 line
   -- reached tunnelarmr_entry with LOCKE poisoned and "antidote=0", which
   -- the field care cannot answer (audit_party_hp "POISONED").  Shop 8
@@ -495,8 +497,8 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
   H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 },
     { tag = "bag: combat items on top (South Figaro item shop)" }),
   H.call(function()
-    H.assertEq(H.invCountOf(0xE8) >= 78, true,
-      "LOCKE leaves the shop with 78 Tonics -- the L13 band plus the scenario's measured spend")
+    H.assertEq(H.invCountOf(0xE8) >= 85, true,
+      "LOCKE leaves the shop with 85 Tonics -- the L13 band plus the scenario's measured spend")
     H.log(string.format("[shop] item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
       H.invCountOf(0xE8), H.invCountOf(0xE9), H.invCountOf(0xF0), H.gil(), H.frame))
   end),

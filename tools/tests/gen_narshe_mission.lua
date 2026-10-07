@@ -172,9 +172,10 @@ local TONIC_TRIP = TONIC_BAND * 3 // 4
 -- and before the Tents.
 local GRIND_BAND = { potion = 35, fenix = 20, tincture = 6, revivify = 3, tent = 10 }
 -- what the party leaves the plains with for the Sealed Gate (the header)
--- tincture 7 (#411): the gate cave and the crash spent one more than the
--- band on the d5971e85 line (gate_cave_save and vector_crash at 5 < 6)
-local DEPART_BAND = { potion = 60, fenix = 23, tincture = 7, revivify = 3, tent = 10 }
+-- tincture 8 (#411): the band at the L26 vector_crash reaches (7) plus the
+-- one the gate cave spends (a4e9f966: 7 -> gate_cave_save 6 -> vector_crash
+-- 6 < 7; the audit's Tincture band has no slack)
+local DEPART_BAND = { potion = 60, fenix = 23, tincture = 8, revivify = 3, tent = 10 }
 local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
 local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
 local function gil() return H.gil() end
@@ -617,6 +618,7 @@ H.run({ maxFrames = 600000 }, {
     return H.invCountOf(POTION) < DEPART_BAND.potion
         or H.invCountOf(FENIX) < DEPART_BAND.fenix
         or H.invCountOf(REVIVIFY) < DEPART_BAND.revivify
+        or H.invCountOf(TINCTURE) < DEPART_BAND.tincture
   end, jidoorRestock("departure", DEPART_BAND), {}),
   -- back to the ship on foot, fighting what the walk meets like the legs do
   H.worldNavTo(24, 121, { maxFrames = 45000, playBattles = "tactical",
