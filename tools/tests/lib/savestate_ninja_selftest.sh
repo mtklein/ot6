@@ -148,6 +148,18 @@ touch "$TMP/build/ot6.sfc" "$TMP/tools/mesen/EMULATOR" "$TMP/tools/tests/gen_a.l
 run
 check "mtime-only touch plays nothing (restat)" "" "$ran"
 
+# 3a. Generator prose and re-indent changes copy the new bytes but play
+# nothing; a code change below still replays its descendants.
+sleep 1
+before=$(cat "$TMP/build/states/a.stamp")
+printf '  gen  a   v1 -- comment only\n\n' > "$TMP/tools/tests/gen_a.lua"
+run
+check "generator comment/whitespace plays nothing" "" "$ran"
+check "generator comment leaves captured stamp untouched" "$before" "$(cat "$TMP/build/states/a.stamp")"
+cmp -s "$TMP/tools/tests/gen_a.lua" "$TMP/build/ninja/src/tools/tests/gen_a.lua" &&
+  echo "  pass generator copy retains new raw bytes" ||
+  { echo "  FAIL generator copy lost raw bytes"; ok=0; }
+
 # 4. ROM content change: every run, once.
 sleep 1
 edit build/ot6.sfc "rom v2"
@@ -285,6 +297,51 @@ grep -q "^rom $(python3 "$REAL/tools/build/rom_version.py" identity "$TMP/build/
   grep -q "^ancestor build/states/h.stamp $(shasum -a 256 "$TMP/build/states/h.stamp" | cut -c1-64)\$" "$rec" &&
   echo "  pass the cutter's record names its ROM, its sig, the payload and its boot" ||
   { echo "  FAIL the cutter's record"; cat "$rec"; ok=0; }
+
+# 11. Real copy rules with a journalled mock suite: exercise the same
+# library/suite copies configure.py emits, without claiming game play.
+cat > "$TMP/suite_graph.py" <<'PYGRAPH'
+from pathlib import Path
+import sys
+sys.path.insert(0, "tools/tests/lib")
+import savestate_ninja as sn
+lines=[]
+sn.emit_state_rules(lines.append)
+lines += ["rule copy_if_changed", "  command = cp $in $out", "  restat = 1",
+          "rule suite", "  command = echo suite >> build/suite_journal && touch $out"]
+sources = list(sn.LIB_HALVES) + ["tools/tests/battle_toy.lua"]
+for src in sources:
+    dst = sn.copy_if_changed_from(src)
+    lines.append(f"build {dst}: {sn.copy_rule(src, [])} {src}")
+lines.append("build build/toy.ok: suite " + " ".join(sn.copy_if_changed_from(s) for s in sources))
+Path("build/suite.ninja").write_text("\n".join(lines) + "\n")
+PYGRAPH
+printf 'return true\n' > "$TMP/tools/tests/battle_toy.lua"
+(cd "$TMP" && python3 suite_graph.py && ninja -f build/suite.ninja) > "$NIN" 2>&1
+check "mock suite starts" 0 "$?"
+for source in tools/tests/gen_a.lua tools/tests/lib/ot6.lua \
+              tools/tests/lib/ot6_field.lua tools/tests/lib/ot6_contract.lua \
+              tools/tests/battle_toy.lua; do
+  sleep 1
+  saved=$(cat "$TMP/$source")
+  printf '  %s -- prose edit\n\n' "$saved" > "$TMP/$source"
+  : > "$TMP/build/suite_journal"
+  run
+  check "comment edit plays nothing: $source" "" "$ran"
+  (cd "$TMP" && ninja -f build/suite.ninja) > "$NIN" 2>&1
+  check "comment edit runs no suite: $source" "" "$(cat "$TMP/build/suite_journal")"
+  cmp -s "$TMP/$source" "$TMP/build/ninja/src/$source" &&
+    echo "  pass new raw bytes copied: $source" ||
+    { echo "  FAIL raw copy: $source"; ok=0; }
+  case "$source" in */gen_a.lua) continue ;; esac
+  sleep 1
+  printf '%s\nreturn false\n' "$saved" > "$TMP/$source"
+  (cd "$TMP" && ninja -f build/suite.ninja) > "$NIN" 2>&1
+  case "$source" in
+    */gen_a.lua) : ;; # generator code replay was exercised above
+    *) check "code edit re-runs suite: $source" suite "$(cat "$TMP/build/suite_journal")" ;;
+  esac
+done
 
 [ "$ok" -eq 1 ] && { echo "savestate_ninja selftest: ok"; exit 0; }
 echo "savestate_ninja selftest: FAILED"; exit 1
