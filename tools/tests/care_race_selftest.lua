@@ -440,6 +440,19 @@ do
   check(c.kind == "raise" and c.target == 2, "CELES raises EDGAR, not another Potion on herself, got " .. c.kind)
 end
 
+-- 27. A member left near fatal counts as half a member down (the full
+-- ninja at 5b46dbd6: falls_done shipped CYAN at 5/358 after the race's
+-- Fights; audit_party_hp red): CYAN at 40/358 and the last body two Fights
+-- from dead -- the Potion first, though the kill comes a turn later
+do
+  local st = { actor = 1, hpRate = 1.2, focus = { 1 },
+    party = { member(900, 1000, 0, { lines = lines(100, 1, 0), period = 200 }), member(40, 358, 500) },
+    enemies = { { hp = 300, sh = 1, eta = 900, period = 150, ends = true, act = { dmg = { 10, 10 } } } } }
+  local c = choose(st, { { kind = "attack", line = st.party[1].lines[0], boost = 0 },
+    { kind = "heal", target = 2, restore = 250, cost = 50 } })
+  check(c.kind == "heal", "CYAN at 40/358 is lifted before the kill, got " .. c.kind)
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise, near fatal", n))

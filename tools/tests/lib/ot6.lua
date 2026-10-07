@@ -1515,6 +1515,7 @@ M.RACE_TICK_MARGIN = nil       -- nil: the quickest enemy's period
 M.RACE_LEFT_MARGIN = 0.05      -- of the enemy's effective HP at the start
 M.RACE_COST_MARGIN = 200       -- gil
 M.RACE_SAMPLES = 16
+M.RACE_NEAR_FATAL = 0.5        -- a member left at or under max/8 HP, in members down
 M.RACE_DEATH_MARGIN = 0.07     -- mean deaths: one play in sixteen is the draws
 M.RACE_STAND_SLACK = 1.5       -- the worst-case play's hit, against a last stand
 
@@ -1872,6 +1873,18 @@ function M.raceSim(st, first, draw)
   -- start (one a raise could stand up) included
   r.deaths = 0
   for _, p in pairs(P) do if p.hp <= 0 then r.deaths = r.deaths + 1 end end
+  -- a member left near fatal (HP at or under max/8, the engine's own
+  -- floor, battle_main @11544) counts as half a member down: the next
+  -- fight can open before any care, and a leg can end on the fight (the
+  -- full ninja at 5b46dbd6: falls_done shipped CYAN at 5/358 and
+  -- esper_tubes_entry EDGAR at 71/752, red in audit_party_hp)
+  r.nearFatal = 0
+  for _, p in pairs(P) do
+    if p.hp > 0 and p.hp <= (p.maxhp >> 3) then
+      r.deaths = r.deaths + M.RACE_NEAR_FATAL
+      r.nearFatal = r.nearFatal + 1
+    end
+  end
   r.left = effLeft(E)
   r.left0 = left0
   -- the aftermath bill: what restoring the party costs at the fight's end
