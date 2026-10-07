@@ -275,6 +275,11 @@ do
   check(choose(st, { a, h }).kind == "attack", "the Fight's damage now breaks the tie")
 end
 
+-- 16. A line's per-hit figure is the median of its last landings, not the
+-- last alone (the WoR's CELES: 83 a hit off one swing, 328 off the next)
+check(H.median({ 83, 328, 300 }) == 300 and H.median({ 83, 328 }) == 83 and H.median({}) == nil,
+  "the median of the landings")
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit", n))

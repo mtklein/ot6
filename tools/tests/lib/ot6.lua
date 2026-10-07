@@ -7655,6 +7655,15 @@ end
 M.CARE_RACE = M.CARE_RACE or false
 M.RACE_RAISE_RESERVE = 2
 M.RACE_TYPICAL_MIN = 3
+M.RACE_HIT_KEEP = 8
+-- the median of a list of numbers (the lower middle of an even count)
+function M.median(v)
+  if v == nil or #v == 0 then return nil end
+  local c = {}
+  for i, x in ipairs(v) do c[i] = x end
+  table.sort(c)
+  return c[(#c + 1) // 2]
+end
 function Driver:raceState(actor, R)
   local st = { actor = actor, party = {}, enemies = {}, focus = {}, hpRate = M.shopRates().hp or 1.2,
                bankAt = self.opts.bank or 0, horizon = M.RACE_HORIZON }
@@ -13006,9 +13015,17 @@ function Driver:watchDamage()
                             per = w.norm // w.n, n = w.n }
         -- the care race's per-line figure: the last landed hit of each
         -- line (kind and skill or spell) each actor used (#415)
+        -- (the median of its last M.RACE_HIT_KEEP, not the last alone: the
+        -- WoR's CELES read 83 a hit off one swing and 328 off the next)
         self.raceHitBy = self.raceHitBy or {}
+        self.raceHitLog = self.raceHitLog or {}
+        local key = w.actor .. ":" .. w.kind .. ":" .. tostring(w.skill or w.spell)
+        local hl = self.raceHitLog[key] or {}
+        hl[#hl + 1] = w.norm // w.n
+        while #hl > M.RACE_HIT_KEEP do table.remove(hl, 1) end
+        self.raceHitLog[key] = hl
         self.raceHitBy[w.actor] = self.raceHitBy[w.actor] or {}
-        self.raceHitBy[w.actor][w.kind .. ":" .. tostring(w.skill or w.spell)] = w.norm // w.n
+        self.raceHitBy[w.actor][w.kind .. ":" .. tostring(w.skill or w.spell)] = M.median(hl)
       end
       M.log(string.format("[%s] actor=%d's %s took %d off the monsters "
         .. "(%d shielded-equivalent over %d hit(s), %d a hit; the press "
