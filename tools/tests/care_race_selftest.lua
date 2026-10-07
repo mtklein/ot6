@@ -257,6 +257,24 @@ do
   check(H.raceSim(st(nil), a).deaths == 0, "no limit: the member drinks forever")
 end
 
+-- 15. A tie on paper goes to the damage done now (#415, the WoR from Tzen:
+-- CELES cast Cure where her Fight tied it, "ends @202" both, cost 225 vs
+-- 312, and the fight took two more Fights): the banked pip lets the heal's
+-- next turn kill as soon as the Fight's would, and the cost is inside its
+-- margin -- the Fight's damage now decides
+do
+  local st = { actor = 1, hpRate = 1.2, focus = { 1 },
+    party = { member(700, 1000, 0, { lines = lines(100, 1, 1), period = 202 }) },
+    enemies = { { hp = 150, sh = 1, eta = 150, period = 400, ends = true,
+                  act = { aoe = false, dmg = { 30 } } } } }
+  local a, h = { kind = "attack", line = st.party[1].lines[0], boost = 0 },
+               { kind = "heal", target = 1, restore = 100, cost = 20 }
+  local ra, rh = H.raceEval(st, a), H.raceEval(st, h)
+  check(ra.kill == rh.kill and math.abs(ra.cost - rh.cost) <= H.RACE_COST_MARGIN,
+    "the case is a tie on kill and inside the cost margin")
+  check(choose(st, { a, h }).kind == "attack", "the Fight's damage now breaks the tie")
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now", n))

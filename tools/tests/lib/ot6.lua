@@ -1660,6 +1660,7 @@ function M.raceSim(st, first, draw)
   -- the decision itself, now
   local a = P[st.actor]
   act(st.actor, first, 0)
+  r.leftNow = effLeft(E)
   a.eta = a.period
   if fightOver(E) then r.kill = 0 end
   local horizon = st.horizon or M.RACE_HORIZON
@@ -1773,6 +1774,11 @@ function M.raceBetter(a, b, st)
   if math.abs(a.cost - b.cost) > cm then return a.cost < b.cost end
   if a.kill and b.kill and a.kill ~= b.kill then return a.kill < b.kill end
   if (a.left or 0) ~= (b.left or 0) then return (a.left or 0) < (b.left or 0) end
+  -- then the damage done now: the play's kill time leans on every later
+  -- swing landing as modelled, the decision's own damage does not (the
+  -- WoR's CELES cast Cure where a Fight tied it on paper, both "ends @202",
+  -- and the fight took two more Fights)
+  if (a.leftNow or 0) ~= (b.leftNow or 0) then return (a.leftNow or 0) < (b.leftNow or 0) end
   return a.cost < b.cost
 end
 
@@ -1807,7 +1813,8 @@ function M.raceEval(st, c)
   local function mean(f) local t = 0 for i = 1, n do t = t + f(rs[i]) end return t / n end
   local r = { deaths = mean(function(x) return x.deaths end), kill = med(function(x) return x.kill end),
     firstDeath = med(function(x) return x.firstDeath end), left = mean(function(x) return x.left end),
-    left0 = rs[1].left0, spent = mean(function(x) return x.spent end), bill = mean(function(x) return x.bill end),
+    left0 = rs[1].left0, leftNow = worst.leftNow,
+    spent = mean(function(x) return x.spent end), bill = mean(function(x) return x.bill end),
     cost = mean(function(x) return x.cost end), acts = worst.acts,
     pWipe = mean(function(x) return x.wipe and 1 or 0 end), worstWipe = worst.wipe, worstDeaths = worst.deaths }
   r.wipe = worst.wipe
