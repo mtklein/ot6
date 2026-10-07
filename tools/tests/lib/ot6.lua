@@ -8317,7 +8317,7 @@ function Driver:raceCalSay(c, why)
     end
   end
   local p = c.pred
-  M.log(string.format("[%s] [race-cal] actor=%d f%d %s: predicted down %.2f, wipe %.2f, worst case %s%d down"
+  M.log(string.format("[%s] [race-cal] actor=%d f%d %s: predicted down %.2f, wipe %.2f, worst case %s%.1f down"
     .. " | actual down %d (%d fell), %s, over %d enemy action(s) (%s)",
     self.tag or "fight", c.actor, c.frame, c.which, p.deaths or 0, p.pWipe or 0,
     p.worstWipe and "WIPE, " or "", p.worstDeaths or p.deaths or 0,
@@ -14285,7 +14285,13 @@ function Driver:frame()
   self:watchPendingCare()
   self:watchUnmuddleHit()
   self:watchHits()
-  if self.raceCal then self:raceCalTick(false) end
+  if self.raceCal then
+    local ok, err = pcall(self.raceCalTick, self, false)
+    if not ok then
+      self.raceCal = nil
+      M.log(string.format("[%s] [race-cal] error: %s", self.tag or "fight", tostring(err)))
+    end
+  end
   self:watchLanders()
   self:watchParts()
   self:watchStatues()
