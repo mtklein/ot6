@@ -1,6 +1,7 @@
 # The care race: one decision for every command (#415)
 
-Status: design, not built.  Owner and coordinator, 2026-10-06.
+Status: implemented, default-on; final matched validation in progress.
+Owner and coordinator, 2026-10-06; validation updated 2026-10-07.
 
 ## Why
 
@@ -32,7 +33,8 @@ experience; consistency matters more than precision.
 ## The estimate
 
 Each `makePlan` builds a small race state from readings the driver
-already makes.  It reads nothing a person could not know.
+already makes.  It reads live memory and ROM pricing as an informed policy; its actions
+use the normal controller inputs.
 
 - **Party, each seated member.**
   - HP, max HP, alive/statue/Doom, MP, BP.
@@ -311,7 +313,7 @@ wor_tzen_door (47,589 against 37,920).
   from the driver's own last-stand read:
   - the hitter is removed, a death, and the whole party removed is the
     fight lost (a wipe);
-  - the worst-case play reads it against a hit 1.5x as hard
+  - the worst-case play reads it against a hit 2x as hard
     (`M.RACE_STAND_SLACK`);
   - it is read on the decision's own action only, and not at all when
     every attack the window offers sets it off, or the race stalls on
@@ -350,4 +352,18 @@ Built so far: `M.raceSim`, `M.raceEval`, `M.raceBetter`, `M.raceChoose`,
 `M.raceItemCost`, `M.hitChance`, `M.median` (`lib/ot6.lua`), and the
 driver's `[race]` log, `[race-cal]` lines and `"act"` mode behind
 `M.CARE_RACE`.  The unit tests (`tools/tests/care_race_selftest.lua`)
-run 46 checks and catch 27 mutants.
+run 52 checks, including synthetic driver candidate vetoes for zombies and
+members who left; 29 negative controls fail. The synthetic reads do not
+produce emulator states or constitute gameplay evidence.
+
+## Current candidate coverage
+
+The list above describes the intended coverage. The implementation offers
+`bestLine` at each available boost, bag heals, individual Cure casts, and
+Fenix Downs. It can score a measured offensive spell or summon selected by
+the rules, but does not generally enumerate alternative offensive spells,
+summons, Life, Defend or Row. Decisions before the first measured hit and
+while a removal last stand remains use the rules. It therefore augments
+the rule stack rather than replacing every decision. Menu time is also
+still outside its estimate. The issue's no-regression and attrition
+improvement bar requires final matched evidence before closure.

@@ -469,6 +469,36 @@ do
   check(c.boost == 0, "the 1-BP Fight whose last swing carries is held back, got " .. c.boost)
 end
 
+-- 29. Candidate vetoes are driver rules, tested with synthetic memory reads
+-- only (no emulator state and no gameplay claim). A zombie and a member
+-- who left receive neither healing nor a raise; the same seated patient
+-- offers both normally.
+do
+  local D = H.newFightDriver("candidate veto unit").driver
+  local readByte, leftMask, itemPower, itemPrice = H.readByte, H.leftMask, H.itemPower, H.itemPrice
+  local zombie, left = false, false
+  H.readByte = function(addr) return zombie and 2 or 0 end
+  H.leftMask = function() return left and 2 or 0 end
+  H.itemPower = function() return 2 end
+  H.itemPrice = function() return 500 end
+  D.battInvIdx = function() return 0 end
+  local st = { actor = 0, party = {
+    [0] = { hp = 1000, maxhp = 1000, bp = 0, lines = {}, heals = {} },
+    [1] = { hp = 100, maxhp = 1000, heals = { { restore = 250, cost = 300, id = 0xE9 } } } } }
+  check(#D:raceCandidates(0, st) == 1, "a seated hurt member offers a heal")
+  zombie = true
+  check(#D:raceCandidates(0, st) == 0, "a zombie offers no heal")
+  st.party[1].hp = 0
+  check(#D:raceCandidates(0, st) == 0, "a zombie offers no Fenix Down")
+  zombie, left = false, true
+  check(#D:raceCandidates(0, st) == 0, "a member who left offers no Fenix Down")
+  st.party[1].hp = 100
+  check(#D:raceCandidates(0, st) == 0, "a member who left offers no heal")
+  st.party[1].hp, left = 0, false
+  check(#D:raceCandidates(0, st) == 1, "a seated fallen member offers a Fenix Down")
+  H.readByte, H.leftMask, H.itemPower, H.itemPrice = readByte, leftMask, itemPower, itemPrice
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise, near fatal, the carried swing", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise, near fatal, the carried swing, zombie and left-member candidate vetoes", n))
