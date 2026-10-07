@@ -7962,6 +7962,7 @@ function M.raceReport()
     T.unmodelled, T.skipped, T.override, T.err)
 end
 M.RACE_TYPICAL_MIN = 3
+M.RACE_DEFER_STAND = true
 M.RACE_HIT_KEEP = 8
 -- the median of a list of numbers (the lower middle of an even count)
 function M.median(v)
@@ -8139,6 +8140,13 @@ function Driver:raceState(actor, R)
   -- driver's own last-stand read has them
   if self.lastStand and self.lastStand.entries then
     for slot, en in pairs(self.lastStand.entries) do
+      -- the rules' own kill order plays a removal stand (M.RACE_DEFER_STAND):
+      -- the race read it as the Sneeze it is, but held its boosts so long
+      -- that the WoR from Tzen ran 147,344 ticks on its shared keys to the
+      -- rules' 117,523 at 62cb732f (12 shifts)
+      if en.class == "removal" and st.enemies[slot] and monAlive(slot) and M.RACE_DEFER_STAND then
+        return nil, "a last-stand removal stands (the rules' kill order plays it)"
+      end
       if en.class == "removal" and st.enemies[slot] then
         st.enemies[slot].stand = { n = en.n or 1, guarded = en.gate and en.gate.guarded,
                                    deathOnly = en.gate and en.gate.deathOnly }
