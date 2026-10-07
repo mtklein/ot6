@@ -8131,7 +8131,12 @@ function Driver:raceCandidates(actor, st)
     if a.lines[b] then c[#c + 1] = { kind = "attack", line = a.lines[b], boost = b, what = a.lines[b].what } end
   end
   for e, p in pairs(st.party) do
-    if p.hp > 0 and p.hp < p.maxhp then
+    -- a ZOMBIE takes neither a heal (it is damage) nor a Fenix Down (it
+    -- never lands, #245): battle_zombieraise caught the race throwing one
+    local zombie = (M.readByte(BATTLE.ST1 + e * 2) & 0x02) ~= 0
+    if zombie or (M.leftMask() >> e) & 1 == 1 then
+      -- nothing to offer on this member
+    elseif p.hp > 0 and p.hp < p.maxhp then
       for _, h in ipairs(p.heals or {}) do
         if not h.cast then
           c[#c + 1] = { kind = "heal", target = e, restore = h.restore, cost = h.cost, id = h.id,
