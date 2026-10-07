@@ -8344,6 +8344,10 @@ function Driver:racePlan(actor, c)
     local q = {}
     for k, v in pairs(p) do q[k] = v end
     q.reason = "the care race"
+    -- a Fight aims as the rules' Fight does: at the body its class keys
+    -- (chipAim; battle_classtarget caught the race's Fight on the unkeyed
+    -- Tusker while a pierce-keyed Cirpius stood)
+    if q.kind == "fight" and q.aim == nil then q.aim = self:chipAim(actor, q.boostLeft or 0) end
     return q
   end
   if c.spell then
