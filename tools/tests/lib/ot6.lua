@@ -11073,7 +11073,11 @@ end
 -- at its own assertion.  The budget is M.setzerCrowdBudget's, decoded from
 -- the group the room rolls: at most that many encounters from one crowd
 -- to the next, and each crowd must give at least one throw, so the run is
--- bounded by budget x the throws.  o.onBattle(n), when given, runs once a
+-- bounded by budget x the throws -- except a crowd in which SETZER's
+-- control was taken (M.controlTaken: Zombie, Sleep, Death ...; sampled every
+-- frame of the battle): it owes none, and the walk takes the next crowd
+-- within the budget (#411: f8ee51f3's wor-tomb-v1 draw zombied him in
+-- crowd battle 2 before his first window).  o.onBattle(n), when given, runs once a
 -- battle is up.  Returns the step and S = { done, all, battles, crowds }.
 function M.setzerCrowdBattles(o)
   local S = { done = {}, all = {}, battles = 0, crowds = 0, since = 0 }
@@ -11100,7 +11104,7 @@ function M.setzerCrowdBattles(o)
     return yes
   end
   local function play()
-    local step, F, seen, crowdBattle = nil, nil, 0, nil
+    local step, F, seen, crowdBattle, out = nil, nil, 0, nil, nil
     return { tick = function()
       if step == nil and F == nil then
         M.vars.setzer = {}     -- no record of an earlier battle is read again
@@ -11118,6 +11122,14 @@ function M.setzerCrowdBattles(o)
         return "frame"
       end
       local r = step:tick()
+      if out == nil and M.battleActive() and M.controlTaken then
+        for s = 0, 3 do
+          if M.readByte(0x3ED8 + s * 2) == 9 then
+            local c = M.controlTaken(s)
+            if c then out = { name = c.name, frame = M.frame } end
+          end
+        end
+      end
       local recs = M.vars.setzer or {}
       while seen < #recs do
         seen = seen + 1
@@ -11126,11 +11138,16 @@ function M.setzerCrowdBattles(o)
         S.done[i] = rec
       end
       if r == "done" then
-        M.assertEq(seen > 0, true, string.format("%s: crowd battle %d gave at least one throw", tag, crowdBattle))
-        seen, step = 0, nil
+        if seen == 0 and out then
+          M.log(string.format("[%s] crowd battle %d gave no throw: SETZER's control was taken (%s at f%d), so it "
+            .. "owes none -- the next crowd within the budget", tag, crowdBattle, out.name, out.frame))
+        else
+          M.assertEq(seen > 0, true, string.format("%s: crowd battle %d gave at least one throw", tag, crowdBattle))
+        end
+        seen, step, out = 0, nil, nil
       end
       return r
-    end, reset = function() step, F, seen = nil, nil, 0 end }
+    end, reset = function() step, F, seen, out = nil, nil, 0, nil end }
   end
   local steps = {
     M.call(function()
