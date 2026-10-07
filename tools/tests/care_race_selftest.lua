@@ -324,6 +324,24 @@ check(not H.runicAwake(0, H.ST2_SLEEP, 0, 0) and not H.runicAwake(0, 0, H.ST3_ST
   and not H.runicAwake(0, 0, 0, 0x20) and not H.runicAwake(0x80, 0, 0, 0),
   "asleep, stopped, petrified, frozen, hidden or dead, it takes nothing")
 
+-- 20. A last-stand removal (#415, the WoR's g00CC: slot 1 throws Sneeze at
+-- a hit that leaves one monster standing): a boosted Fight whose swings
+-- carry from the plain body into the second plain body leaves the Sneezer
+-- alone, and CELES is sneezed away; the unboosted Fight does not
+do
+  local L = {}
+  for b = 0, 3 do L[b] = { per = 300, hits = 2 + 2 * b, chips = 0 } end
+  local st = { actor = 1, hpRate = 1.2, focus = { 1, 3, 2 },
+    party = { member(900, 1043, 0, { lines = L, bp = 2, period = 202 }) },
+    enemies = { { hp = 500, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } } },
+                { hp = 900, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } }, stand = { n = 1 } },
+                { hp = 500, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } } } } }
+  local r2 = H.raceEval(st, { kind = "attack", line = L[2], boost = 2 })
+  check(r2.deaths >= 1, "the 2-BP Fight leaves the Sneezer alone: CELES gone")
+  check(choose(st, { { kind = "attack", line = L[0], boost = 0 }, { kind = "attack", line = L[2], boost = 2 } }).boost == 0,
+    "the Fight that leaves two standing")
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand", n))

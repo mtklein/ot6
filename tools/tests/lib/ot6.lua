@@ -1589,7 +1589,8 @@ function M.raceSim(st, first, draw)
              lines = p.lines or {}, heals = p.heals or {}, deathCost = p.deathCost or 0, hit = p.hit or 1 }
   end
   for k, e in pairs(st.enemies) do
-    E[k] = { hp = e.hp, sh = e.sh or 0, eta = e.eta or 0, period = e.period or 300, ends = e.ends, act = e.act or {} }
+    E[k] = { hp = e.hp, sh = e.sh or 0, eta = e.eta or 0, period = e.period or 300, ends = e.ends, act = e.act or {},
+             stand = e.stand }
   end
   local left0 = effLeft(E)
   local r = { deaths = 0, firstDeath = nil, kill = nil, wipe = false, spent = 0, acts = 0 }
@@ -1603,6 +1604,7 @@ function M.raceSim(st, first, draw)
   -- a single-target line's swings past its body's death go on to the next
   -- standing one (the engine retargets a dead target's remaining strikes),
   -- chipping nothing there: the chips were counted against the first body
+  local death, t_now
   local function attack(p, line, fixed)
     if line == nil then return end
     if line.aoe then
@@ -1617,10 +1619,36 @@ function M.raceSim(st, first, draw)
       end
     end
   end
+  -- a last-stand removal counter (the Sneeze, M.lastStandClass): a body
+  -- whose retaliation answers a hit that leaves `stand.n` or fewer
+  -- monsters standing takes the hitter out of the fight -- a member gone,
+  -- priced as a death (#415: the WoR's CELES, sneezed away from three of
+  -- six g00CC fights by a boosted Fight's carried swings)
+  local function lastStand(k, before)
+    local standing = 0
+    for _, e in pairs(E) do if e.hp > 0 then standing = standing + 1 end end
+    for j, e in pairs(E) do
+      local st = e.stand
+      if st and before[j] and standing <= (st.n or 1) then
+        local alive = e.hp > 0
+        local fires = (st.guarded and alive) or (st.deathOnly and not alive)
+          or (not st.guarded and not st.deathOnly)
+        if fires and P[k].hp > 0 then
+          P[k].hp = 0
+          death(t_now)
+          return
+        end
+      end
+    end
+  end
   local function act(k, c, t)
     local p = P[k]
+    t_now = t
     if c.kind == "attack" then
+      local before = {}
+      for j, e in pairs(E) do before[j] = e.hp > 0 end
       attack(p, c.line, c.target)
+      lastStand(k, before)
       p.bp = (c.boost or 0) > 0 and (p.bp - c.boost) or math.min(p.bp + 1, 5)
     elseif c.kind == "heal" then
       local who = c.all and P or { [c.target] = P[c.target] }
@@ -1689,7 +1717,7 @@ function M.raceSim(st, first, draw)
     while b > 0 and p.lines[b] == nil do b = b - 1 end
     return { kind = "attack", line = p.lines[b], boost = b }
   end
-  local function death(t)
+  function death(t)
     r.deaths = r.deaths + 1
     if r.firstDeath == nil then r.firstDeath = t end
   end
@@ -1710,6 +1738,9 @@ function M.raceSim(st, first, draw)
     if enemy then
       r.acts = r.acts + 1
       if r.acts > horizon then break end
+      local anyUp = false
+      for _, p in pairs(P) do if p.hp > 0 then anyUp = true end end
+      if not anyUp then break end      -- the party is gone (a removal)
       local e = E[nk]
       local dmg, lands, aim = e.act.dmg or {}, true, e.act.aim or "random"
       if draw == nil then
@@ -6763,7 +6794,7 @@ function Driver:readLastStand(slots)
           ((class == "damage" and lever ~= true and classes.damage == "thin")
             and " -- taken first while the party is thin" or ""))
         if counted then
-          entries[slot] = { class = class, gate = g,
+          entries[slot] = { class = class, gate = g, n = p.roles.lastStandN or 1,
                             thinOnly = lever ~= true and classes[class] == "thin" }
           any = true
         end
@@ -7976,6 +8007,16 @@ function Driver:raceState(actor, R)
     end
   end
   if parts and parts.body ~= nil and st.enemies[parts.body] then st.enemies[parts.body].ends = true end
+  -- the bodies whose last stand removes the hitter (a Sneeze), as the
+  -- driver's own last-stand read has them
+  if self.lastStand and self.lastStand.entries then
+    for slot, en in pairs(self.lastStand.entries) do
+      if en.class == "removal" and st.enemies[slot] then
+        st.enemies[slot].stand = { n = en.n or 1, guarded = en.gate and en.gate.guarded,
+                                   deathOnly = en.gate and en.gate.deathOnly }
+      end
+    end
+  end
   return st
 end
 
