@@ -652,3 +652,12 @@ is deliberately untraced; it cannot consume the first entry's provenance.
 Synthetic cancellation, reuse, folded spell and collision cases cover
 this origin contract. The earlier 8e96d516 Gate observation establishes
 physical child identity only; it predates this queue-origin correction.
+
+Production observation rejects absent queue provenance. The captured
+InitPlayerAction index is consumed and cleared at every dispatcher entry;
+a canceled/no-action dispatcher cannot reuse its predecessor's index.
+Token arithmetic tests use an explicitly separate `legacyStart` helper
+when they have no engine queue. ApplyDmg brackets live on the trace object,
+not a callback-local stack, so the existing H/Driver Lua-heap snapshot
+can reach them. Reload clears that stack; this source property is not yet
+a measured mid-instruction rewind compatibility claim.

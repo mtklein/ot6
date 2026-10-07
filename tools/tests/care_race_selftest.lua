@@ -709,7 +709,7 @@ do
   trace.plan(0, plan, 100)
   trace.confirm(0, 110, 0, 0)
   trace.submit(0, 120, 1, 0xE9, 1)
-  trace.start(0, 140, 1, 0xE9, 1, {100,100,100,100}, 20, 0)
+  trace.legacyStart(0, 140, 1, 0xE9, 1, {100,100,100,100}, 20, 0)
   check(D:raceDelay(0, plan) == nil, "accepted but unresolved command is not a latency sample")
   trace.resolve(0, 180, {200,100,100,100}, 20, 0)
   local timing = D.raceTiming["0:item:233:0"]
@@ -763,7 +763,7 @@ do
     function(e) D:raceObserve(e) end,function() return clock end)
   local p={kind="skill",skill=0xAB,boostLeft=1}
   T.plan(0,p,100); T.submit(0,120,9,0xAB,0x300)
-  T.start(0,140,9,0xAB,0x300,{100,100,100,100},20,1)
+  T.legacyStart(0,140,9,0xAB,0x300,{100,100,100,100},20,1)
   T.hpEffect(1,145,4,100,50,9,0xAB)
   T.hpEffect(0,146,4,100,50,0x22,0xAB)
   T.hpEffect(0,147,4,100,100,9,0xAB)
@@ -781,7 +781,7 @@ do
   check(D.raceTiming["0:skill:171:1"].finished==120,
     "completion latency is preserved as a separate fact")
   T.plan(0,p,300);T.submit(0,320,9,0xAB,0x300)
-  T.start(0,340,9,0xAB,0x300,{100,100,100,100},20,1)
+  T.legacyStart(0,340,9,0xAB,0x300,{100,100,100,100},20,1)
   T.hpEffect(0,350,4,100,50,9,0xAB);T.close(360,"battle_ended")
   local _,after=D:raceDelay(0,p)
   check(after.n==1 and next(D.raceEffectOpen)==nil,
@@ -948,7 +948,7 @@ do
     local T=H.newRecoveryTrace("token unit",function(e) ev[#ev+1]=e end)
     T.plan(0,{kind=kind or "fight",skill=atk},0)
     T.submit(0,10,cmd,atk,0x100)
-    local scope=T.start(0,20,cmd,atk,0x100,{100,100,100,100},20,0,
+    local scope=T.legacyStart(0,20,cmd,atk,0x100,{100,100,100,100},20,0,
       {queued_command=cmd,queued_attack=atk,counter=false})
     return T,ev,scope
   end
@@ -987,7 +987,7 @@ do
   scope.id=id
   T.hpEffect(0,30,4,100,50,0x22,0,{context=scope})
   check(#ev==before,"engine tick cannot be an accepted command's HP effect")
-  T.start(nil,31,0,119,0x1,{100,100,100,100},20,0)
+  T.legacyStart(nil,31,0,119,0x1,{100,100,100,100},20,0)
   T.hpEffect(0,32,4,100,50,0,127,{context=scope})
   check(#ev==before,"enemy dispatcher invalidates a bracket's earlier context")
   T.resolve(0,33,{100,100,100,100},20,0)
@@ -1000,13 +1000,13 @@ do
     local ev={};local T=H.newRecoveryTrace("waiting token unit",function(e) ev[#ev+1]=e end)
     T.plan(0,{kind="fight"},0);T.submit(0,10,0,255,0x100)
     local waiting=ev[#ev].id
-    T.start(0,20,entry[1],entry[2],0x100,{100,100,100,100},20,0,
+    T.legacyStart(0,20,entry[1],entry[2],0x100,{100,100,100,100},20,0,
       {counter=entry[3],queued_command=entry[1],queued_attack=entry[2]})
     T.hpEffect(0,21,4,100,50,entry[1],entry[2])
     T.resolve(0,22,{100,100,100,100},20,0)
     check(#ev==2 and T.queued[0][1].id==waiting,
       "same-actor counter/engine/untraced command cannot consume the normal Fight queue entry")
-    local good=T.start(0,30,0,255,0x100,{100,100,100,100},20,0)
+    local good=T.legacyStart(0,30,0,255,0x100,{100,100,100,100},20,0)
     T.hpEffect(0,31,4,100,50,0,127,{context=good})
     check(ev[#ev].event=="hp_effect" and ev[#ev].id==waiting,
       "the waiting accepted Fight owns effects only when its own normal dispatcher starts")
@@ -1037,8 +1037,16 @@ do
   local generation=b.generation;b.generation=generation+1
   check(not start(2,0,255,7),"queue binding with stale generation is rejected")
   b.generation=generation
+  check(not start(nil,0,255,7) and #T.queued[0]==1,
+    "missing InitPlayerAction index cannot fall back to same opcode")
+  T.executionIndex=2
+  check(T.takeExecutionIndex()==2 and T.takeExecutionIndex()==nil,
+    "dispatcher consumes InitPlayerAction index exactly once")
   check(start(2,0,255,7)~=nil,"only original allocated queue origin starts Fight")
   T.resolve(0,8,hp,10,0)
+  submit(0,255,9);T.queueStore(0,8,0,255,10)
+  check(not start(nil,0,255,11),"no-Init canceled dispatcher after previous scope cannot reuse provenance")
+  T.cancelQueued(0,11)
   submit(2,45,10);T.queueStore(0,2,2,46,12)
   local scope=start(2,2,46,13)
   check(scope~=nil and ev[#ev].attack==46,"queue-time folded spell binds actual stored attack")
@@ -1062,7 +1070,8 @@ do
     "XMagic second queue entry remains untraced and cannot consume first")
   check(start(2,0x17,46,56)~=nil,"XMagic first folded queue entry preserves provenance")
   T.resolve(0,57,hp,10,0)
-  submit(0,255,60);T.queueStore(0,2,0,255,62);T.close(63,"reload")
+  submit(0,255,60);T.queueStore(0,2,0,255,62);T.effects={{context=T.context}};T.close(63,"reload")
+  check(#T.effects==0,"reload clears trace-owned ApplyDmg bracket stack")
   check(not start(2,0,255,64),"reload clears queue bindings as well as traces")
 end
 

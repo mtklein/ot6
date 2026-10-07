@@ -5556,6 +5556,11 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
     end
     T.bindings[index], T.staging = b, nil
   end
+  function T.takeExecutionIndex()
+    local index = T.executionIndex
+    T.executionIndex = nil
+    return index
+  end
   -- Every dispatcher invocation creates a new scope, including an enemy,
   -- counter or engine action which has no accepted controller command.
   function T.start(actor, frame, cmd, attack, targets, hp, mp, bp, meta)
@@ -5577,7 +5582,7 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
         or b.command ~= scope.queued_command or b.attack ~= scope.queued_attack
         or p.engine_command ~= cmd then return end
       scope.queue_index, scope.queue_generation = meta.queue_index, b.generation
-    elseif p.accepted_command ~= cmd then return end
+    elseif not meta.legacyArithmetic or p.accepted_command ~= cmd then return end
     table.remove(queue, 1)
     if T.running[actor] then
       event(T.running[actor], "unresolved", frame,
@@ -5595,6 +5600,15 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
       queued_attack = scope.queued_attack, counter = scope.counter,
       queue_index = scope.queue_index, queue_generation = scope.queue_generation })
     return scope
+  end
+  -- Arithmetic-only compatibility for token tests without an engine queue.
+  -- CPU observers always call strict start and never use this helper.
+  function T.legacyStart(actor, frame, cmd, attack, targets, hp, mp, bp, meta)
+    local q = {}
+    for k,v in pairs(meta or {}) do q[k] = v end
+    meta = q
+    meta.legacyArithmetic = true
+    return T.start(actor,frame,cmd,attack,targets,hp,mp,bp,meta)
   end
   -- The frozen accepted action owns its internal hand/tool/spell effects.
   -- Mutable B5/B6 is retained as raw evidence, never mistaken for its ID.
@@ -5660,7 +5674,7 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
         { reason = reason, last_stage = p.stage }) end
     end
     T.queued, T.running, T.context = {}, {}, nil
-    T.bindings, T.staging, T.executionIndex = {}, nil, nil
+    T.bindings, T.staging, T.executionIndex, T.effects = {}, nil, nil, {}
   end
   return T
 end
@@ -5725,10 +5739,11 @@ local function recoveryActivate(trace)
   -- now contain the command/attack after queue-time spell folding.
   hook(M.sym("ExecCmd@battle_code"), function(t, cpu)
     local x = cpu["cpu.x"] & 0xffff
+    local index = t.takeExecutionIndex()
     t.start(x < 8 and x % 2 == 0 and x // 2 or nil, M.frame,
       M.readByte(0xB5), M.readByte(0xB6), M.readWord(0xB8), recoveryHP(),
       M.readWord(0x3C08 + x), M.readByte(0x3E9C + x),
-      { queue_index = t.executionIndex,
+      { queue_index = index,
         queued_command = M.readByte(0x3A7C), queued_attack = M.readByte(0x3A7D),
         counter = (M.readByte(0xB1) & 1) ~= 0 })
   end)
@@ -5741,16 +5756,16 @@ local function recoveryActivate(trace)
     and M.readRomByte((apply + 0x28) & 0x3FFFFF) == 0xFA
     and M.readRomByte((apply + 0x29) & 0x3FFFFF) == 0x60,
     "ApplyDmg common return moved: effect observer must follow the source")
-  local effects = {}
   hook(apply, function(t, cpu)
     local x, y = cpu["cpu.x"] & 0xffff, cpu["cpu.y"] & 0xffff
-    effects[#effects + 1] = { offset = x, actor = x < 8 and x % 2 == 0 and x // 2 or nil,
+    t.effects = t.effects or {}
+    t.effects[#t.effects + 1] = { offset = x, actor = x < 8 and x % 2 == 0 and x // 2 or nil,
       target = y // 2, hp = M.readWord(0x3BF4 + y),
       cmd = M.readByte(0xB5), attack = M.readByte(0xB6), context = t.context,
       queued_command = M.readByte(0x3A7C), queued_attack = M.readByte(0x3A7D) }
   end)
   hook(apply + 0x27, function(t)
-    local e = table.remove(effects)
+    local e = table.remove(t.effects or {})
     if e then
       local hp = M.readWord(0x3BF4 + e.target * 2)
       if M.RACE_EFFECT_DIAGNOSTIC and hp ~= e.hp then
