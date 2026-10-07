@@ -474,7 +474,7 @@ end
 do
   local st = { actor = 1, boost = false, samples = 0, contCare = false,
     party = { member(1000, 1000, 0, { bp = 3, lines = lines(100, 1, 0), period = 100 }) },
-    enemies = { { hp = 250, sh = 0, eta = 1000, period = 1000, act = { dmg = { 1 } } } } }
+    enemies = { { hp = 1000, sh = 0, eta = 1000, period = 1000, act = { dmg = { 1 } } } } }
   local c = { kind = "attack", line = st.party[1].lines[0], boost = 0 }
   check(H.raceSim(st, c).kill == 200, "boost disabled: three unboosted attacks")
   st.boost = true
