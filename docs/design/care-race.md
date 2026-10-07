@@ -291,8 +291,41 @@ showed it wrong:
 Not modelled: menu time.  An item deep in the list takes hundreds of
 frames to reach, and the enemy acts meanwhile.
 
+## The slow legs (before default-on)
+
+Act was slower than the rules on two legs of the whole-route run at
+aac04024: narshe_mission (100,413 against 77,707 frames) and
+wor_tzen_door (47,589 against 37,920).
+
+- **narshe_mission is upstream XP.**  The leg grinds until the party's best
+  level reaches 23.  The act chain arrived 1,312 XP a member short, from
+  different encounter draws on the legs before it.  It fought 17 battles
+  to the off chain's 12, at the same ticks a battle (3,806 against 3,744).
+  From the same checkpoint (terra-returned-v1, shifts 0-5) the arms tie:
+  458,357 against 460,026 frames, 12 battles each but one.
+- **wor_tzen_door was the Sneeze.**  The leg also grinds to a level, and
+  in group 00CC slot 1 ($07C) throws Sneeze ($CB) at a hit that leaves one
+  monster standing.  The race's boosted Fight carried its swings from a
+  dead body into the next, left the Sneezer alone, and CELES was sneezed
+  away, losing the fight's XP.  The race now prices a last-stand removal
+  from the driver's own last-stand read:
+  - the hitter is removed, a death, and the whole party removed is the
+    fight lost (a wipe);
+  - the worst-case play reads it against a hit 1.5x as hard
+    (`M.RACE_STAND_SLACK`);
+  - it is read on the decision's own action only, and not at all when
+    every attack the window offers sets it off, or the race stalls on
+    heals;
+  - the continuation holds back a boost that would set it off.
+
+  Two more fixes came out of the same leg.  Mean deaths now count only
+  beyond one play in sixteen (`M.RACE_DEATH_MARGIN`): a Fight that died in
+  1 of 16 plays was losing to a Cure that only stalled.  The draws now come
+  from splitmix64: the old LCG fed the sixteen plays their draws at stride
+  64, and a 1-in-3 random aim fell 1, 9 and 6 times.
+
 Built so far: `M.raceSim`, `M.raceEval`, `M.raceBetter`, `M.raceChoose`,
 `M.raceItemCost`, `M.hitChance`, `M.median` (`lib/ot6.lua`), and the
 driver's `[race]` log, `[race-cal]` lines and `"act"` mode behind
 `M.CARE_RACE`.  The unit tests (`tools/tests/care_race_selftest.lua`)
-run 33 checks and catch 18 mutants.
+run 42 checks and catch 24 mutants.
