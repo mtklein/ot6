@@ -1515,6 +1515,7 @@ M.RACE_TICK_MARGIN = nil       -- nil: the quickest enemy's period
 M.RACE_LEFT_MARGIN = 0.05      -- of the enemy's effective HP at the start
 M.RACE_COST_MARGIN = 200       -- gil
 M.RACE_SAMPLES = 16
+M.RACE_DEATH_MARGIN = 0.07     -- mean deaths: one play in sixteen is the draws
 M.RACE_STAND_SLACK = 1.5       -- the worst-case play's hit, against a last stand
 
 -- The chance a blockable hit lands (#415): the hit check (battle_main
@@ -1881,7 +1882,11 @@ end
 -- a better than b (both raceSim results) under the state's margins
 function M.raceBetter(a, b, st)
   if a.wipe ~= b.wipe then return not a.wipe end
-  if math.abs(a.deaths - b.deaths) > 1e-9 then return a.deaths < b.deaths end
+  -- deaths beyond one sample's worth (M.RACE_DEATH_MARGIN): a death in one
+  -- play of sixteen is the draws, not the line (the WoR's s5: a Fight that
+  -- died in 1 of 16 plays lost to a Cure that only stalled, three times)
+  local dm = (st.samples or M.RACE_SAMPLES) > 0 and M.RACE_DEATH_MARGIN or 1e-9
+  if math.abs(a.deaths - b.deaths) > dm then return a.deaths < b.deaths end
   if a.deaths > 0 and a.firstDeath ~= b.firstDeath then
     return (a.firstDeath or math.huge) > (b.firstDeath or math.huge)
   end
@@ -1921,10 +1926,19 @@ end
 -- never), the share that wipe; and the wipe flag from the worst-case play
 -- (criterion 1 is the guard: a line the worst case wipes on loses to one
 -- it does not)
+-- (splitmix64: the LCG this replaced fed sample i its draws at stride 64,
+-- and 16 plays aimed a 1-in-3 random target 1, 9 and 6 times)
 local RACE_SEEDS = {}
 do
-  local x = 12345
-  for i = 1, 4096 do x = (x * 1103515245 + 12345) % 2147483648; RACE_SEEDS[i] = x / 2147483648 end
+  local x = 0
+  for i = 1, 4096 do
+    x = x + 0x9E3779B97F4A7C15
+    local z = x
+    z = (z ~ (z >> 30)) * 0xBF58476D1CE4E5B9
+    z = (z ~ (z >> 27)) * 0x94D049BB133111EB
+    z = z ~ (z >> 31)
+    RACE_SEEDS[i] = (z >> 11) / 9007199254740992.0
+  end
 end
 function M.raceEval(st, c)
   local n = st.samples or M.RACE_SAMPLES

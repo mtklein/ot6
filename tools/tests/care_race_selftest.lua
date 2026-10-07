@@ -391,6 +391,17 @@ do
   check(c.kind == "attack", "with every attack setting it off, the race attacks, got " .. c.kind)
 end
 
+-- 24. One death in sixteen plays is the draws (#415, the WoR's s5: a Fight
+-- that died in 1 of 16 plays lost three times to a Cure that only stalled)
+do
+  local st = { enemies = { { period = 300 } } }
+  local function r(t) t.left = t.left or 1000; t.left0 = 2000; t.cost = t.cost or 0; return t end
+  check(H.raceBetter(r({ deaths = 0.0625, kill = 600 }), r({ deaths = 0, left = 1500 }), st),
+    "a kill with a death in one play of sixteen beats a stall")
+  check(not H.raceBetter(r({ deaths = 0.25, kill = 600 }), r({ deaths = 0, left = 1500 }), st),
+    "four plays in sixteen is the line")
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws", n))
