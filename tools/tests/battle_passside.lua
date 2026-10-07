@@ -103,14 +103,19 @@ local function armExec()
     atExec = nil
     local c = H.controlTaken(x // 2)
     local chars, mons = H.readByte(0xB8), H.readByte(0xB9)
-    w.valid = c == nil and (w.ally ~= nil and chars == (1 << w.ally) and mons == 0
+    local eligible = c == nil and (w.ally ~= nil and chars == (1 << w.ally) and mons == 0
       or w.ally == nil and chars == 0 and mons ~= 0)
-    if not w.valid then
+    w.valid = false
+    if not eligible then
       w.interrupted = c and c.name or string.format("targets chars=%02X monsters=%02X", chars, mons)
       H.log(string.format("[%s] f%d %s command interrupted before its setup: %s; no mechanism HP staged",
         TAG, H.frame, w.kind, w.interrupted))
       return
     end
+    -- CPU callback exceptions are not the suite's failure path. Preserve
+    -- the first error and rethrow on the normal tick before consuming any
+    -- eligibility or pass evidence. Only fully staged commands are valid.
+    local ok, err = pcall(function()
     H.assertEq(H.readByte(0x3ED8 + x), SETZER, "the staged case executes as SETZER")
     H.assertEq(H.readByte(0x3A7C), w.cmd, w.kind .. ": its selected command executes")
     H.assertEq(H.readByte(0x3E9D + x), w.boost, w.kind .. ": requested boost at execution")
@@ -131,6 +136,8 @@ local function armExec()
     H.log(string.format("[%s] f%d SETZER's action $%02X starts: %s%s (queued on monsters $%02X)", TAG, H.frame,
       w.cmd, w.muddle and string.format("Muddled ($3EE5 = %02X)", H.readByte(0x3EE5 + x)) or "",
       w.fell and "its queued target felled" or "", t))
+    end)
+    if ok then w.valid = true else w.error = tostring(err) end
   end, emu.callbackType.exec, ec, ec)
 end
 local function judgeNew()
@@ -241,6 +248,7 @@ local function play()
       S.exec, S.phase = atExec, "play"
     end
     if S.phase == "play" then
+      if S.exec and S.exec.error then error(S.exec.error, 0) end
       local c = S.cases[S.ci]
       local r = S.step:tick()
       judgeNew()
@@ -260,7 +268,7 @@ local function play()
         S.phase = "write"
         return "frame"
       end
-      local met = eligible and #seen[c.kind] > S.before
+      local met = eligible and got ~= nil and #seen[c.kind] > S.before
       atExec = nil
       H.log(string.format("[%s] %s, slot %d%s: %s", TAG, c.kind, c.e, c.boost and (" at " .. c.boost .. " BP") or "",
         got == nil and "the action never ran" or met and "the draw is met" or "no draw"))
