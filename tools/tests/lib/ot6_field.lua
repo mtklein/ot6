@@ -6638,8 +6638,14 @@ M.ARC_THREATS = {
 -- status-1/2 guard covers.  The Czarina Ring in place of CELES's Ribbon
 -- cut Potions 37 -> 21 and Fenix Downs 2 -> 0 on the same four entry
 -- states (dullczar/ against dull/, 32/32 won either way).
+-- "tentacles": event battle 84 (Figaro's engine room), an informed reading
+-- of the four Tentacles' scripts (route-wor-edgar 6, AIScript _283 and
+-- _316-_318): Bio (power 53, Bio-sized hits of 525-535) and Poison are
+-- magic and inflict Poison (STATUS1 $04); their Battle hits run 57-122;
+-- Entwine's and the Special's Slow is STATUS3, which no relic guards.
 M.FIGHT_THREATS = {
   dullahan = { s1 = 0x00, s2 = 0x00, magic = true, boss = true },
+  tentacles = { s1 = 0x04, s2 = 0x00, magic = true, boss = true },
 }
 local RELIC_NAMES = {
   [0xB0] = "Goggles", [0xB1] = "Star Pendant", [0xB2] = "Peace Ring", [0xB3] = "Amulet",
