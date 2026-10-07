@@ -130,7 +130,13 @@ local function checkJackpot(r, i)
   -- (after the rolls' class check, so a mutant that loses null-break fails
   -- there, on the class, before it fails here, on what the class did)
   for b = 0, 5 do
-    if r.mon0[b].present then
+    if r.mon0[b].present and r.mon0[b].brk ~= 0 and r.mon1[b].brk == 0 then
+      -- its break ran out inside the action: Ot6Tick puts the shields back
+      -- to max on the tick the timer reaches 0, whatever the roll did
+      H.assertEq(r.mon1[b].sh, H.readByte(0x3E41 + b * 2), string.format("Jackpot %d: slot %d's break "
+        .. "ended inside the action (%d ticks left at the exec), and its shields came back to max", i, b,
+        r.mon0[b].brk))
+    elseif r.mon0[b].present then
       H.assertEq(r.mon1[b].sh, r.mon0[b].sh, string.format("Jackpot %d: slot %d's shields do not move", i, b))
     end
   end
