@@ -486,12 +486,12 @@ local function albrookStop(what, after)
     H.call(function()
       shopGil0, fenixBefore = H.gil(), H.invCountOf(FENIX)
       H.assertEq(H.shopId(), SHOP_ALBROOK_ITEMS, "the counter opened shop 48 ($0201)")
-      H.log(string.format("[albrook] %s: shop open: %s; targets potion %d (L%d x1.5 + %d field care), fenix %d, remedy %d",
-        what, supplies(), math.ceil(level() * 1.5) + FIELD_CARE_POTIONS, level(), FIELD_CARE_POTIONS, level(),
+      H.log(string.format("[albrook] %s: shop open: %s; targets potion %d (careStockPotions at L%d: the reserve at L+4 x1.5, the 99 Tonics' HP in Potions, spend %d), fenix %d, remedy %d",
+        what, supplies(), H.careStockPotions(level(), { spend = FIELD_CARE_POTIONS }), level(), FIELD_CARE_POTIONS, level(),
         REMEDY_TARGET))
     end),
     H.buyItem(POTION, function()
-      return math.max(0, math.ceil(level() * 1.5) + FIELD_CARE_POTIONS - H.invCountOf(POTION))
+      return math.max(0, H.careStockPotions(level(), { spend = FIELD_CARE_POTIONS }) - H.invCountOf(POTION))
     end, "POTION to the band"),
     H.buyItem(REMEDY, function() return math.max(0, REMEDY_TARGET - H.invCountOf(REMEDY)) end,
       "REMEDY to " .. REMEDY_TARGET),
@@ -500,8 +500,8 @@ local function albrookStop(what, after)
     H.call(function()
       fenixBought = fenixBought + H.invCountOf(FENIX) - fenixBefore
       H.log(string.format("[albrook] %s: bought: %s (spent %d GP)", what, supplies(), shopGil0 - H.gil()))
-      H.assertEq(H.invCountOf(POTION) >= math.ceil(level() * 1.5) + FIELD_CARE_POTIONS, true,
-        "Potions at the band (level x 1.5 + the measured field care)")
+      H.assertEq(H.invCountOf(POTION) >= H.careStockPotions(level(), { spend = FIELD_CARE_POTIONS }), true,
+        "Potions at careStockPotions (the reserve, the 99 Tonics' HP, the measured spend)")
       H.assertEq(H.invCountOf(FENIX) >= level(), true, "Fenix Downs at about the level")
       H.assertEq(H.invCountOf(REMEDY) >= REMEDY_TARGET, true, "Remedies at " .. REMEDY_TARGET)
     end),

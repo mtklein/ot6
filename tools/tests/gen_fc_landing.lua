@@ -287,16 +287,27 @@ H.run({ maxFrames = 600000 }, flatten({
   -- against their fixtures), 21 in all: 44 + 21 = 65.  Held for #179 (the
   -- bigger purchase moved the RNG under an IAF wave) until the segment
   -- runner (#178) retried such losses.
-  H.buyItem(POTION, 1, function() return 65 - H.invCountOf(POTION) end, "POTION to 65"),
+  -- #411: from here to the World of Ruin's first counter (Albrook) the
+  -- continent and the escape spent 13 Potions and 95 Tonics on the bf19d581
+  -- line (65 / 99 -> escape_start 52 / 4), and the WoR landing's bag is
+  -- what the WoR walks to Albrook carry: H.careStockPotions with the Tonics
+  -- topped to 99 below, and the spend in Potions: the Tonics drained to
+  -- the care floor (99 -> 4, 4750 HP = 19 Potions) plus the Potions spent,
+  -- 23 on a4e9f966 (bought to 83 -> escape_start 60 at L29, 3 under the
+  -- 63 the band wants) -- 42.  At L27 that buys to 89 and arrives near 66.
+  H.buyItem(POTION, 1, function()
+    return H.careStockPotions(H.activeTopLevel(), { tonics = 99, spend = 42 }) - H.invCountOf(POTION)
+  end, "POTION for the band and the field care to Albrook (WoR)"),
   H.buyItem(FENIX_DOWN, 6, function() return 25 - H.invCountOf(FENIX_DOWN) end, "FENIX DOWN to 25"),
   -- #231 (docs/design/supply.md): the last counter in the WoB.  REVIVIFY
-  -- to 3; TINCTURE to 7, the MP band at L28 (~level / 4) for the walks
+  -- to 3; TINCTURE to 8, the MP band at the L29 the alcove reaches (~level
+  -- / 4; a4e9f966: fc_alcove L29 tincture 7 < 8, none spent) for the walks
   -- between the continent's save points; TENT to 10 for those save points
   -- (394 (7,12) and 358 (8,10)), where a Tent restores the whole party's
   -- both pools for 1200 -- fc_landing stood on the first at TERRA 178/228,
   -- LOCKE 73/256, EDGAR 114/218 MP with ten of them unpitched.
   H.buyItem(REVIVIFY, 5, function() return 3 - H.invCountOf(REVIVIFY) end, "REVIVIFY to 3"),
-  H.buyItem(TINCTURE, 2, function() return 7 - H.invCountOf(TINCTURE) end, "TINCTURE to 7"),
+  H.buyItem(TINCTURE, 2, function() return 8 - H.invCountOf(TINCTURE) end, "TINCTURE to 8"),
   H.buyItem(TENT, 7, function() return 10 - H.invCountOf(TENT) end, "TENT to 10"),
   -- #361: the continent's map 394 deals Apokryphos and Misfits in half its
   -- draws (battle_procboost's pool decode, build/attempts/wt/procboost-v024/
@@ -320,7 +331,7 @@ H.run({ maxFrames = 600000 }, flatten({
       H.invCountOf(0xFB), H.gil(), H.frame))
     H.assertEq(H.invCountOf(POTION) >= 65, true, "Potions stocked to 65 for the gauntlet -- the L29 band plus the measured FC spend")
     H.assertEq(H.invCountOf(FENIX_DOWN) >= 25, true, "Fenix Downs stocked to 25")
-    H.assertEq(H.invCountOf(TINCTURE) >= 7, true, "Tinctures stocked to 7 -- the L28 MP band (#231)")
+    H.assertEq(H.invCountOf(TINCTURE) >= 8, true, "Tinctures stocked to 8 -- the L29 MP band (#231, #411)")
     H.assertEq(H.invCountOf(TENT) >= 10, true, "Tents at 10 for the continent's save points (#231)")
     H.assertEq(H.invCountOf(REMEDY) >= 5, true, "Remedies at 5: a Mute on the continent has a cure (#361)")
   end),

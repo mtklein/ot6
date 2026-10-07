@@ -288,7 +288,12 @@ H.run({ maxFrames = 160000 }, {
     H.assertEq(shopRow(24, 4), REVIVIFY, "shop 24 row 4 is Revivify")
     H.assertEq(shopRow(24, 6), TENT, "shop 24 row 6 is Tent")
   end),
-  H.buyItem(POTION, 0, function() return 50 - H.invCountOf(POTION) end, "POTION to 50"),
+  -- #411: Albrook sells no Tonics; to the next counter (Nikeah, before the
+  -- gate) the factory and the mines spend 16-23 Potions (50 -> 34 on the
+  -- bf19d581 line, 70 -> 47 on d5971e85): H.careStockPotions, spend 24.
+  H.buyItem(POTION, 0, function()
+    return H.careStockPotions(H.activeTopLevel(), { spend = 24 }) - H.invCountOf(POTION)
+  end, "POTION for the band and the field care to Nikeah"),
   H.buyItem(FENIX_DOWN, 5, function() return 16 - H.invCountOf(FENIX_DOWN) end,
     "FENIX DOWN to 16"),
   -- #231 (docs/design/supply.md): the factory ahead is the Vector approach

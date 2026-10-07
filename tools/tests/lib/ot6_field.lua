@@ -6392,6 +6392,49 @@ function M.equipKit(charId, items, opts)
   return M.seqStep(steps)
 end
 
+-- M.activeTopLevel(): the highest level in the active party.
+function M.activeTopLevel()
+  local act, top = M.readByte(0x1A6D) & 0x07, 0
+  for c = 0, 15 do
+    if (M.readByte(0x1850 + c) & 0x07) == act then
+      top = math.max(top, M.readByte(0x1600 + 37 * c + 8))
+    end
+  end
+  return top
+end
+
+-- M.careStockPotions(level, opts): the Potion target at a counter that
+-- sells no Tonics (#411; docs/design/supply.md "Field care where no Tonic
+-- is sold").  The owner's rule (2026-10-06): top up to 99 Tonics at every
+-- town shop that sells them -- and no World of Ruin counter does, nor
+-- Jidoor's or Albrook's (shop_prop.dat: $E8 only in shops 3, 4, 8, 12, 15,
+-- 35, 36, 39, 85).  Where none is sold the field care rides on Potions, so
+-- a counter stocks:
+--   the combat reserve (the Potion band, level x 1.5) at the level the
+--     legs ahead reach (opts.ahead levels on, default 4),
+-- + the field-care HP the 99 Tonics would have carried and the bag's
+--     Tonics do not (4950 HP less 50 a Tonic held), in Potions at 250,
+-- + opts.spend: the Potions the legs to the next counter measured spending.
+-- opts.tonics: the Tonics the bag will hold leaving the counter (a counter
+-- that sells them tops up to 99 after the Potions), else the bag's count.
+-- The stack holds 99 and no counter sells an HP item above the Potion
+-- (shop_prop.dat: X-Potion $EA is in no shop record), so a target past 99
+-- cannot be bought; it raises instead of being quietly capped, naming
+-- the level at which this counter's arithmetic stops fitting the bag.
+function M.careStockPotions(level, opts)
+  opts = opts or {}
+  local ahead = opts.ahead or 4
+  local reserve = math.ceil((level + ahead) * 1.5)
+  local gap = math.max(0, 99 * 50 - 50 * (opts.tonics or M.invCountOf(0xE8)))
+  local want = reserve + math.ceil(gap / 250) + (opts.spend or 0)
+  if want > 99 then
+    error(string.format("careStockPotions: L%d+%d needs %d Potions (reserve %d + field care %d "
+      .. "+ spend %d) past the 99 stack, and no counter sells an HP item above the Potion",
+      level, ahead, want, reserve, math.ceil(gap / 250), opts.spend or 0))
+  end
+  return want
+end
+
 -- M.bagWeapons(c): the weapons in the bag ($1869 ids with a count), each
 -- once, strongest first by the ROM's power byte (ItemProp +$14; the
 -- record's type +$00 low bits = 1 is a weapon); with a character id, only
