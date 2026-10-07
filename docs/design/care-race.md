@@ -64,7 +64,8 @@ use the normal controller inputs.
 
 **The forward play.**  From the state, play an event queue forward until
 one of these happens: the fight ends, the party wipes, or a horizon of
-`M.RACE_HORIZON` enemy actions (default 8) runs out.
+`M.RACE_HORIZON` enemy opportunities (default 8), including suppressed
+opportunities, runs out.
 
 - **Party turns** take the **continuation policy**: the member's best
   damage line at the boost the bank allows under the current bank rule
@@ -610,3 +611,8 @@ executing can finish its current hits. These are explicit remaining gaps,
 not a claim of faithful queue emulation. The three retained before-fix
 contract failures and new arithmetic checks establish suppression, finite
 recovery and shieldless damage; they do not establish acting-policy wins.
+
+The model horizon counts enemy opportunities, including suppressed ones;
+the historical action-count calibration is not yet a matched observation
+of that revised horizon. It must be aligned before it supports acting
+claims.
