@@ -47,6 +47,9 @@
 --   when       function(driver, actor, plan) -> true for a decision to
 --              search (nil: every one); a host may set REWIND.when after
 --              the splice, e.g. the care race's disagreements (#415)
+--   extra      function(driver, actor) -> a plan to play as one more
+--              branch, said "race: ..." (nil: none), e.g. the care race's
+--              own choice where the window's options do not hold it
 --   capFrames  a branch not over after this many frames is scored "open"
 --   boosts     boost levels offered (default 0..3, capped by the bank)
 do
@@ -200,7 +203,14 @@ do
   end
 
   -- ---- what the command window offers ------------------------------------
-  local function describe(p)
+  local describe
+  function describe(p)
+    if p.rwRace then
+      local q = {}
+      for k, v in pairs(p) do q[k] = v end
+      q.rwRace = nil
+      return "race: " .. describe(q)
+    end
     if p.kind == "fight" then
       return string.format("Fight bp%d%s", p.boostLeft or 0,
         p.rwTarget and string.format(" -> s%d", p.rwTarget) or " (driver's aim)")
@@ -210,6 +220,8 @@ do
         p.rwTarget and string.format(" -> s%d", p.rwTarget) or "")
     elseif p.kind == "item" then
       return string.format("Item $%02X -> e%d", p.item or 0, p.target or -1)
+    elseif p.spell ~= nil then
+      return string.format("%s $%02X%s", p.kind, p.spell, p.target and string.format(" -> e%d", p.target) or "")
     end
     return p.kind
   end
@@ -271,6 +283,15 @@ do
             end
           end
         end
+      end
+    end
+    if RW.extra then
+      local p = RW.extra(D, actor)
+      if p then
+        local q = {}
+        for key, v in pairs(p) do q[key] = v end
+        q.rwRace = true
+        out[#out + 1] = q
       end
     end
     return out

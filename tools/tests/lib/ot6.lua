@@ -7910,6 +7910,10 @@ function Driver:raceLog(actor, plan, R)
     raceDesc(cands[i], best), ri and (" | rules " .. raceDesc(cands[ri], all[ri])) or "", #cands))
   self._racePred = { st = st, race = all[i], rules = ri and all[ri] or nil }
   self.raceLast = { actor = actor, frame = M.frame, agree = agree, race = cands[i].what or cands[i].kind }
+  if agree == "DISAGREE" then
+    local ok, rp = pcall(self.racePlan, self, actor, cands[i])
+    if ok then self.raceLast.plan = rp end
+  end
   -- the state behind a prediction of a death (calibration, #415)
   if (best.deaths or 0) >= 0.5 or (ri and (all[ri].deaths or 0) >= 0.5) then
     local t = {}
