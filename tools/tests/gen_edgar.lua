@@ -375,7 +375,10 @@ H.run({ maxFrames = 120000 }, {
   -- spent on 3b1bc7c5/57e5cae2 (32 bought -> figaro_cleared 31 ->
   -- south_figaro 30).  The purse question this raises -- does South
   -- Figaro's counter still cover gen_kolts's Fenix/Soft/Antidote buys --
-  -- is answered by gen_kolts's own assertions on the run.
+  -- measured on a4e9f966: the Antidotes, Softs and Tonics are all bought,
+  -- and one Fenix Down moves from South Figaro's first counter (purse-bound
+  -- already: "FENIX DOWN to 15: have 4, ... buying 4", 5 before) to the
+  -- later stop's "FENIX DOWN to the band"; kolts_entry still holds 11.
   H.buyItem(0xE8, 0, function() return 42 - invCount(0xE8) end, "TONIC to 42"),
   H.waitUntil(inState(0x26), 2400, "item shop: back at the buy list", 2),
   -- #307: Fenix Downs before the desert.  The chain reaches this counter
