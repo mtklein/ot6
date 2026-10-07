@@ -36,9 +36,25 @@
 -- below the hp line his own last turn drew, with a pip in the bank.  That
 -- condition is decided by the machine's own cells and not by the dump, so a
 -- ROM without the flag reaches the verdict and fails AT the assertion
--- rather than timing out.  A seed on which the soldiers never provoke him
--- across the three waves runs out the budget instead, which the segment
--- runner classifies as seed-dependent and retries at the next shift.
+-- rather than timing out.
+--
+-- THE DRAW.  Whether the soldiers hurt him between two of his turns, and
+-- whether the script's turn after that is a Fight (BATTLE, two in three)
+-- rather than Dispatch, is the battle RNG's, seeded from the game clock
+-- as each wave opens.  On some draws all three waves pass with nothing
+-- provoked (`[scripted] f8592 all three waves fought and nothing provoked
+-- him`, build/attempts/wt/v026-driver/final/suite_battle_retaliate_script_air.log),
+-- and the suite leaned on the segment runner's retries (attempt 2/3 in at
+-- least four full runs, #416).  It now searches the draw itself, as
+-- strategy discovery (docs/TESTING.md), the way battle_retaliate_umaro.lua
+-- does: one snapshot at the boot point, before the walk to CYAN, and each
+-- branch idles BRANCH_IDLE more frames there than the last before walking
+-- -- a new first-wave battle key each, every wave's key read at
+-- InitBattle's seed store and logged -- until a branch's CYAN has made a
+-- provoked plain Fight.  A branch ends at that Fight's measurement, at the
+-- third wave's end, or at a party wipe, and the boot comes back.  Every
+-- branch's ledger is in the verdict.  MAX_BRANCHES (below) is the least N
+-- with q^N <= 1e-3 for the measured share q of distinct draws that miss.
 --
 -- EVERY EXPECTED NUMBER IS DERIVED from the built ROM, never pinned, the
 -- same way battle_retaliate.lua derives them.
@@ -74,26 +90,37 @@ end
 local D = {}                            -- base, perBp, cap, unctl, mark, hands
 local SUBJ = nil                        -- CYAN's entity index, read at battle up
 
--- the run's ledger
-local L = {
-  scriptActs = 0,                       -- ExecMonsterAction with x = CYAN
-  randActs = 0,                         -- RandCharAction with x = CYAN
-  flagAtFirstAct = nil,                -- OT6_UNCTL's CYAN bit, one frame after his first scripted act
-  fights = {},                          -- every plain Fight of his: {f, pending, bank, hp, mark, provoked}
-  counters = 0,                         -- Ot6FightBoost reached under $b1.0
-  ends = {},                            -- every Ot6ActionEnd for him: {f, bank, pending}
-  dumps = {},                           -- every nonzero pending write for him
-  hurts = 0,
-  markWrites = {},
-  charges = {},
-  waves = 0,                            -- battles seen
-  markAtStart = 0,
-}
+-- a branch's ledger (THE DRAW: one per branch, every one kept for the verdict)
+local function freshLedger()
+  return {
+    scriptActs = 0,                     -- ExecMonsterAction with x = CYAN
+    randActs = 0,                       -- RandCharAction with x = CYAN
+    flagAtFirstAct = nil,               -- OT6_UNCTL's CYAN bit, one frame after his first scripted act
+    fights = {},                        -- every plain Fight of his: {f, pending, bank, hp, mark, provoked}
+    counters = 0,                       -- Ot6FightBoost reached under $b1.0
+    ends = {},                          -- every Ot6ActionEnd for him: {f, bank, pending}
+    dumps = {},                         -- every nonzero pending write for him
+    hurts = 0,
+    markWrites = {},
+    charges = {},
+    waves = 0,                          -- battles seen
+    markAtStart = 0,
+    keys = {},                          -- each wave's battle key, at InitBattle's seed store
+  }
+end
+local L = freshLedger()
+local ALL = { branches = {} }           -- {n, keys, L, why} for every branch run
+local boot = { n = 0, found = nil }
 -- the ONE action under the microscope: the first provoked plain Fight.
 -- Opened at Ot6FightBoost (before the dump is or is not armed), closed by
 -- SaveForMimic.
-local W = { open = false, closed = false, ended = false, swings = 0, hits = 0,
-            hand = { [0] = 0, [1] = 0 }, a70 = 0, pendAfter = 0 }
+local W
+local function freshWindow()
+  return { open = false, closed = false, ended = false, swings = 0, hits = 0,
+           hand = { [0] = 0, [1] = 0 }, a70 = 0, pendAfter = 0 }
+end
+W = freshWindow()
+local obs = { lastHp = nil, lastFlag = nil }   -- the frame watcher's memory
 
 local function romBytes(base, n)
   local t = {}
@@ -102,7 +129,8 @@ local function romBytes(base, n)
 end
 
 -- ------------------------------------------------------- the observers --
--- Installed once, at the first battle up; SUBJ is re-read at every battle up.
+-- Installed once, before the first walk (InitBattle's seed store is hooked);
+-- SUBJ is re-read at every battle up.
 local installed = false
 local function installObservers()
   if installed then return end
@@ -206,18 +234,17 @@ local function installObservers()
 
   -- his hurt line, from its writes; and hp drops, flag, and the line as
   -- it stood at the start of the frame
-  local lastHp, lastFlag = nil, nil
   emu.addEventCallback(function()
-    if SUBJ == nil or not H.battleLoadStarted() then lastHp = nil; return end
+    if SUBJ == nil or not H.battleLoadStarted() then obs.lastHp = nil; return end
     local h = hp(SUBJ)
-    if lastHp ~= nil and h < lastHp then L.hurts = L.hurts + 1 end
-    lastHp = h
+    if obs.lastHp ~= nil and h < obs.lastHp then L.hurts = L.hurts + 1 end
+    obs.lastHp = h
     L.markAtStart = H.readWord(D.mark)
     local flag = H.readByte(D.unctl)
-    if flag ~= lastFlag then
+    if flag ~= obs.lastFlag then
       H.log(string.format("[flag] f%d OT6_UNCTL $%02X -> $%02X (e%d's bit $%02X)",
-        H.frame, lastFlag or 0, flag, SUBJ, H.readByte(0x3018 + SUBJ * 2)))
-      lastFlag = flag
+        H.frame, obs.lastFlag or 0, flag, SUBJ, H.readByte(0x3018 + SUBJ * 2)))
+      obs.lastFlag = flag
     end
     if L.scriptActs >= 1 and L.flagAtFirstAct == nil then
       L.flagAtFirstAct = (flag & H.readByte(0x3018 + SUBJ * 2)) ~= 0
@@ -228,6 +255,15 @@ local function installObservers()
         .. "charged %d)", H.frame, SUBJ, W.bankAfter, W.bankAtEnd, W.chargeP))
     end
   end, emu.eventType.startFrame)
+  local seedAt = H.seedStoreAddr()
+  emu.addMemoryCallback(function()
+    -- `lda $021e / asl / asl / sta $be`, hooked at its first byte: the
+    -- seed about to be stored is the game clock's low byte x 4
+    L.keys[#L.keys + 1] = H.firstBattleKey((H.readByte(0x021E) * 4) & 0xFF,
+      H.readWord(0x11E0))
+    H.log(string.format("[draw] branch %d wave %d: battle key %s", boot.n,
+      #L.keys, L.keys[#L.keys]))
+  end, emu.callbackType.exec, seedAt, seedAt)
   emu.addMemoryCallback(function(addr)
     if SUBJ == nil or D.mark == nil or addr < D.mark or addr > D.mark + 1 then
       return
@@ -244,6 +280,22 @@ end
 
 local battleUp, wavesDone = false, false
 local phase = 0
+-- THE DRAW's bound.  KEY_MISS is the share of distinct draws (every wave's
+-- battle key) on which all three waves passed with no provoked Fight,
+-- measured by this search run without its stop from camp_cleared at shift
+-- 0, 30 distinct draws, BRANCH_IDLE 7 (coprime to the clock's 60-frame
+-- period, so 60 branches before a first-wave seed repeats): `[lab]
+-- distinct draws 30: hit 26 miss 4` (build/attempts/wt/v026-retries/
+-- retaliate_script/lab_s0.log.gz).  MAX_BRANCHES is the least N with
+-- KEY_MISS^N <= BRANCH_FAIL.
+local BRANCH_IDLE, BRANCH_FAIL, KEY_MISS = 7, 1e-3, 4 / 30
+local MAX_BRANCHES = math.ceil(math.log(BRANCH_FAIL) / math.log(KEY_MISS))
+local BRANCH_BUDGET = 30000            -- three waves ran out at f8509 (the miss above)
+local function branchKey(l) return table.concat(l.keys, "+") end
+local function branchDone()
+  return measured() or (wavesDone and not H.battleLoadStarted())
+      or H.partyWipedInBattle()
+end
 local function fieldFrame()
   if H.dialogWaiting() then H.setPad(phase < 4 and { a = true } or {}); return end
   local nextWave = nil
@@ -254,7 +306,7 @@ local function fieldFrame()
     if not wavesDone then
       wavesDone = true
       H.log(string.format("[scripted] f%d all three waves fought and nothing "
-        .. "provoked him: idling out the budget (seed-dependent)", H.frame))
+        .. "provoked him: this branch's draw misses", H.frame))
     end
     H.setPad({})
     return
@@ -286,7 +338,6 @@ local function battleFrame()
     for e = 0, 3 do
       if charOf(e) == CHAR_CYAN then SUBJ = e end
     end
-    installObservers()
     H.log(string.format("[wave %d] f%d battle up: %s; CYAN is e%s",
       L.waves, H.frame, partyLine(), tostring(SUBJ)))
     W.open, W.closed, W.ended = false, false, false
@@ -302,7 +353,8 @@ local function battleFrame()
   H.setPad(st == ST_CMD and { x = true } or { b = true })
 end
 
-H.run({ maxFrames = 60000, retries = 3 }, {
+H.run({ maxFrames = 3000 + 2 * MAX_BRANCHES * (2 * BRANCH_IDLE * MAX_BRANCHES
+                                              + BRANCH_BUDGET + 20) }, {
   H.loadState(ENTRY),
   H.waitFrames(30),
 
@@ -347,23 +399,98 @@ H.run({ maxFrames = 60000, retries = 3 }, {
       H.fieldX(), H.fieldY(), CYAN_OBJ, objX(CYAN_OBJ), objY(CYAN_OBJ)))
   end),
 
-  -- the camp's defence, wave by wave, until a provoked Fight resolves
-  H.driveUntil(measured, 45000, {
-    H.call(function()
-      phase = (phase + 1) % 8
-      if H.battleLoadStarted() then
-        if SUBJ ~= nil then D.mark = D.markBase + SUBJ * 2 end
-        battleFrame()
-      else
-        if battleUp then
-          battleUp = false
-          H.log(string.format("[wave %d] f%d battle over: %s", L.waves,
-            H.frame, partyLine()))
+  H.call(installObservers),
+  -- the boot of every branch: the machine before the walk to CYAN
+  H.call(function() boot.req = H.requestSaveState() end),
+  H.waitFrames(2),
+  H.call(function() H.checkReq(boot.req, "boot snapshot before the walk to CYAN") end),
+  H.repeatN(1, (function()
+    local t = {}
+    -- a branch whose idle the game absorbed deals draws already tried: it
+    -- is run and logged, and the bound counts DISTINCT draws (every wave's
+    -- key), so up to twice as many branches are built
+    for _ = 1, 2 * MAX_BRANCHES do
+      t[#t + 1] = H.cond(function()
+        local seen, n = {}, 0
+        for _, br in ipairs(ALL.branches) do
+          local k = branchKey(br.L)
+          if not seen[k] then seen[k], n = true, n + 1 end
         end
-        fieldFrame()
-      end
-    end),
-  }, "a provoked scripted Fight of CYAN's resolves"),
+        return boot.found == nil and n < MAX_BRANCHES
+      end, {
+        H.call(function()
+          H.setPad({})
+          if boot.n > 0 then boot.load = H.requestLoadState(boot.req.blob) end
+        end),
+        H.waitFrames(2),
+        H.call(function()
+          if boot.n > 0 then
+            H.checkReq(boot.load, "boot snapshot restore")
+            H.rearmInputInjection()
+          end
+          boot.n = boot.n + 1
+          L, W, SUBJ = freshLedger(), freshWindow(), nil
+          obs.lastHp, obs.lastFlag = nil, nil
+          battleUp, wavesDone, phase = false, false, 0
+          H.log(string.format("[branch] %d of at most %d distinct: %d idle "
+            .. "frame(s) before the walk", boot.n, MAX_BRANCHES,
+            (boot.n - 1) * BRANCH_IDLE))
+        end),
+        H.waitFrames(1),
+        H.cond(function() return boot.n > 1 end, {
+          (function()
+            local w = 0
+            return H.driveUntil(function() w = w + 1 return w >= (boot.n - 1) * BRANCH_IDLE end,
+              2 * MAX_BRANCHES * BRANCH_IDLE + 10, { H.call(function() H.setPad({}) end) }, "branch idle")
+          end)(),
+        }, {}),
+        -- the camp's defence, wave by wave, until a provoked Fight resolves
+        -- or the third wave is over
+        H.driveUntil(branchDone, BRANCH_BUDGET, {
+          H.call(function()
+            phase = (phase + 1) % 8
+            if H.battleLoadStarted() then
+              if H.partyWipedInBattle() then H.setPad({}); return end
+              if SUBJ ~= nil then D.mark = D.markBase + SUBJ * 2 end
+              battleFrame()
+            else
+              if battleUp then
+                battleUp = false
+                H.log(string.format("[wave %d] f%d battle over: %s", L.waves,
+                  H.frame, partyLine()))
+              end
+              fieldFrame()
+            end
+          end),
+        }, "the branch: a provoked scripted Fight of CYAN's resolves, or the third wave ends"),
+        H.call(function()
+          H.setPad({})
+          local why = (measured() and "measured")
+            or (H.partyWipedInBattle() and "the party fell (the branch ends; the boot comes back)")
+            or "all three waves fought, nothing provoked"
+          ALL.branches[#ALL.branches + 1] = { n = boot.n, L = L, why = why }
+          if measured() then boot.found = boot.n end
+          H.log(string.format("[branch] %d (battle keys %s): %d wave(s), %d "
+            .. "scripted act(s), %d plain Fight(s), %d provoked; %s", boot.n,
+            branchKey(L), L.waves, L.scriptActs, #L.fights,
+            (function() local c = 0 for _, f in ipairs(L.fights) do
+              if f.provoked then c = c + 1 end end return c end)(), why))
+        end),
+      }, {})
+    end
+    return t
+  end)()),
+  H.call(function()
+    local lines = {}
+    for _, br in ipairs(ALL.branches) do
+      lines[#lines + 1] = string.format("%d:%s:%s", br.n, branchKey(br.L),
+        br.why == "measured" and "hit" or "miss")
+    end
+    H.log("[branch] search: " .. table.concat(lines, " "))
+    H.assertEq(boot.found ~= nil, true, string.format("precondition: a branch "
+      .. "whose CYAN made a provoked plain Fight, within %d distinct draws (%s)",
+      MAX_BRANCHES, table.concat(lines, " ")))
+  end),
 
   -- ================================================================== --
   -- the verdict
@@ -381,12 +508,16 @@ H.run({ maxFrames = 60000, retries = 3 }, {
     H.log("[ledger] bank at each of his action ends (* = charged): "
       .. table.concat(banks, " "))
 
-    -- who drove him: the script, every time, and vanilla's random chooser never
-    H.assertEq(L.scriptActs >= 1, true, string.format(
-      "the SCRIPT chose CYAN's actions (ExecMonsterAction with x = e%d, %d "
-      .. "time(s))", SUBJ or -1, L.scriptActs))
-    H.assertEq(L.randActs, 0,
-      "and RandCharAction never did: this is the path #236 could not see")
+    -- who drove him: the script, every time, and vanilla's random chooser
+    -- never -- in every branch the search ran, not only the one it kept
+    for _, br in ipairs(ALL.branches) do
+      local b = br.L
+      H.assertEq(b.scriptActs >= 1, true, string.format(
+        "branch %d: the SCRIPT chose CYAN's actions (ExecMonsterAction, %d "
+        .. "time(s))", br.n, b.scriptActs))
+      H.assertEq(b.randActs, 0, string.format("branch %d: and RandCharAction "
+        .. "never did: this is the path #236 could not see", br.n))
+    end
 
     -- the claim, FIRST: his provoked Fight dumped
     local r = W.rec
@@ -397,9 +528,12 @@ H.run({ maxFrames = 60000, retries = 3 }, {
       .. "the dump: pending %d = min(bank, cap %d), and NOT the 0 a "
       .. "scripted character was left with before #238", r.f, r.hp, r.mark,
       r.bank, want, D.cap))
-    H.assertEq(L.flagAtFirstAct, true,
-      "OT6_UNCTL carried his bit from his first scripted action on: the "
-      .. "flag is set where the script chooses for him")
+
+    for _, br in ipairs(ALL.branches) do
+      H.assertEq(br.L.flagAtFirstAct, true, string.format("branch %d: OT6_UNCTL "
+        .. "carried his bit from his first scripted action on: the flag is "
+        .. "set where the script chooses for him", br.n))
+    end
 
     -- the swings the dump bought, and the pips it cost
     local wantA70 = D.base + D.perBp * want
@@ -429,14 +563,18 @@ H.run({ maxFrames = 60000, retries = 3 }, {
       "the bank fell from %d to %d: the pips LEFT it, and NOT the %d the "
       .. "gain arm would have left", W.bankAtEnd, W.bankAfter,
       math.min(W.bankAtEnd + 1, BANK_CAP)))
-    H.assertEq(#L.dumps <= L.hurts, true, string.format(
-      "%d dump(s) over %d hp drop(s): a dump is never conjured out of a turn "
-      .. "nothing hurt", #L.dumps, L.hurts))
+    for _, br in ipairs(ALL.branches) do
+      local b = br.L
+      H.assertEq(#b.dumps <= b.hurts, true, string.format(
+        "branch %d: %d dump(s) over %d hp drop(s): a dump is never conjured "
+        .. "out of a turn nothing hurt", br.n, #b.dumps, b.hurts))
+    end
     H.log(string.format("[result] CYAN e%d: bank %d -> %d; pending %d; $3a70 "
       .. "%d; %d passes (%d main, %d off); %d landed of a possible %d; %d hp "
-      .. "drop(s), %d dump(s), %d scripted act(s) over %d wave(s)",
+      .. "drop(s), %d dump(s), %d scripted act(s) over %d wave(s); %d branch(es)",
       SUBJ, W.bankAtEnd, W.bankAfter, want, W.a70, W.swings, W.hand[0],
-      W.hand[1], W.hits, main + off, L.hurts, #L.dumps, L.scriptActs, L.waves))
+      W.hand[1], W.hits, main + off, L.hurts, #L.dumps, L.scriptActs, L.waves,
+      #ALL.branches))
     H.screenshot("retaliate_script_dump")
   end),
 })
