@@ -834,6 +834,25 @@ do
   check(H.raceBetter(b,a,{samples=16,enemies={}}),"sampled wipe disadvantage outranks faster mean kill")
 end
 
+-- 47. Overrides use the ranking's actual enemy-period margin; required
+-- sampled plays cannot hide unsupported continuations behind a mean hit.
+do
+  local st={actor=1,samples=0,contCare=false,horizon=2,
+    party={member(1000,1000,0,{period=1000})},
+    enemies={{hp=400,sh=0,eta=1000,period=600,act={dmg={0}}}}}
+  local a={kind="attack",line={per=100,hits=1},boost=0,delay=100}
+  local b={kind="attack",line={per=100,hits=1},boost=0,delay=180}
+  local safe,why=H.raceRobustBetter(st,a,b)
+  check(not safe and why=="inside uncertainty margin",
+    "80 ticks does not beat the shared 600-tick enemy-period margin")
+  st.samples=16
+  st.party[1].lines={[0]={per=100,hits=1,latencyKnown=false}}
+  a.line={per=300,hits=1,hit=0.5};a.delay=0
+  check(not H.raceSim(st,a).invalid,"deterministic expected hit ends before the unsupported continuation")
+  check(H.raceEval(st,a).invalid,
+    "sampled misses requiring an unsupported continuation invalidate the whole estimate")
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
   .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise, near fatal, the carried swing, zombie and left-member candidate vetoes", n))

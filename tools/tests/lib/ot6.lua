@@ -1998,6 +1998,17 @@ function M.raceSim(st, first, draw)
   return r
 end
 
+-- One material time margin for ranking and override eligibility.
+function M.raceTickMargin(st)
+  if st.tickMargin ~= nil then return st.tickMargin end
+  if M.RACE_TICK_MARGIN ~= nil then return M.RACE_TICK_MARGIN end
+  local margin=math.huge
+  for _,e in pairs(st.enemies or {}) do
+    if (e.period or 0)>0 then margin=math.min(margin,e.period) end
+  end
+  return margin==math.huge and 0 or margin
+end
+
 -- a better than b (both raceSim results) under the state's margins
 function M.raceBetter(a, b, st)
   if a.invalid ~= b.invalid then return not a.invalid end
@@ -2014,12 +2025,7 @@ function M.raceBetter(a, b, st)
   if a.deaths > 0 and a.firstDeath ~= b.firstDeath then
     return (a.firstDeath or math.huge) > (b.firstDeath or math.huge)
   end
-  local tm = st.tickMargin or M.RACE_TICK_MARGIN
-  if tm == nil then
-    tm = math.huge
-    for _, e in pairs(st.enemies) do if (e.period or 0) > 0 and e.period < tm then tm = e.period end end
-    if tm == math.huge then tm = 0 end
-  end
+  local tm = M.raceTickMargin(st)
   if a.kill and b.kill then
     if math.abs(a.kill - b.kill) > tm then return a.kill < b.kill end
   elseif a.kill or b.kill then
@@ -2091,6 +2097,13 @@ function M.raceEval(st, c)
     pWipe = mean(function(x) return x.wipe and 1 or 0 end), worstWipe = worst.wipe, worstDeaths = worst.deaths,
     standNow = worst.standNow, invalid = worst.invalid, pending = worst.pending }
   r.wipe = worst.wipe
+  -- A required random play which reaches an unsupported continuation or
+  -- unresolved first action is not a valid partial estimate. Decline the
+  -- comparison rather than averaging its truncated score with completed ones.
+  for _,sample in ipairs(rs) do
+    if sample.invalid then r.invalid=true end
+    if sample.pending then r.pending=true end
+  end
   return r
 end
 
@@ -2160,7 +2173,7 @@ function M.raceRobustBetter(st, candidate, rules)
   local gain = (b.deaths-a.deaths)>dm or ((b.falls or 0)-(a.falls or 0))>dm
     or (b.pWipe or 0)-(a.pWipe or 0)>dm
     or (a.kill and not b.kill)
-    or (a.kill and b.kill and b.kill-a.kill>(st.tickMargin or M.RACE_TICK_MARGIN or 30))
+    or (a.kill and b.kill and b.kill-a.kill>M.raceTickMargin(st))
     or (not a.kill and not b.kill and b.left-a.left>(st.leftMargin or M.RACE_LEFT_MARGIN)*math.max(a.left0 or 0,1))
     or b.cost-a.cost>(st.costMargin or M.RACE_COST_MARGIN)
   return gain and M.raceBetter(a,b,st),gain and "stable material gain" or "inside uncertainty margin",results
@@ -5589,15 +5602,21 @@ local function recoveryActivate(trace)
   local effects = {}
   hook(apply, function(t, cpu)
     local x, y = cpu["cpu.x"] & 0xffff, cpu["cpu.y"] & 0xffff
-    effects[#effects + 1] = { actor = x < 8 and x % 2 == 0 and x // 2 or nil,
+    effects[#effects + 1] = { offset = x, actor = x < 8 and x % 2 == 0 and x // 2 or nil,
       target = y // 2, hp = M.readWord(0x3BF4 + y),
       cmd = M.readByte(0xB5), attack = M.readByte(0xB6) }
   end)
   hook(apply + 0x27, function(t)
     local e = table.remove(effects)
-    if e and e.actor ~= nil then
-      t.hpEffect(e.actor, M.frame, e.target, e.hp,
-        M.readWord(0x3BF4 + e.target * 2), e.cmd, e.attack)
+    if e then
+      local hp = M.readWord(0x3BF4 + e.target * 2)
+      if M.RACE_EFFECT_DIAGNOSTIC and hp ~= e.hp then
+        local p = e.actor ~= nil and t.running[e.actor] or nil
+        print(string.format("[ot6effect] frame=%d x=$%02X target=%d hp=%d->%d cmd=$%02X atk=$%02X running=%s:%s",
+          M.frame,e.offset,e.target,e.hp,hp,e.cmd,e.attack,
+          tostring(p and p.command),tostring(p and p.attack)))
+      end
+      if e.actor ~= nil then t.hpEffect(e.actor,M.frame,e.target,e.hp,hp,e.cmd,e.attack) end
     end
   end)
   -- Immediately after ExecCmd returns to the normal-action path, including
