@@ -109,6 +109,7 @@ local FIRE, FIRE3 = 0x00, 0x09
 -- its replay); ROUND_FRAMES is twice the largest.
 local FIGHT_TRIES, ROUND_FRAMES = 12, 2 * 3345
 local GAU, RAGE_ENTRIES = 0x0B, 8          -- the rage window lists at most eight
+local GAU_ENCOUNTERS = 4                   -- Veldt encounters taken for GAU's window (#411)
 local GAU_STATE = "build/states/gau_joined.mss.lua"
 local RAGECOUNT, RAGEBEAST, MP = 0x3A9A, 0x33A8, 0x3C08
 
@@ -1218,7 +1219,15 @@ for _, s in ipairs({
   H.call(function() snap, armed, inbound = nil, nil, {} end),
   H.loadState(GAU_STATE),
   H.waitFrames(20),
-  H.waitUntil(function() return H.worldMode() and H.worldHasControl() end, 3000, "world control", 5),
+}) do steps[#steps + 1] = s end
+-- #411: GAU can end an encounter unready (Berserk -- no cure is sold, #403
+-- -- or the pack dead first); the Veldt is walked again, up to GAU_ENCOUNTERS
+-- times, until his window is snapshotted.  On the a4e9f966 line's
+-- gau_joined the first encounter berserked him and ended, and the
+-- single-encounter drive read a closed battle for 30000 frames.
+local function gauEncounter(k)
+  return H.cond(function() return snap == nil end, {
+  H.waitUntil(function() return H.worldMode() and H.worldHasControl() end, 6000, "world control (encounter " .. k .. ")", 5),
   (function()
     local dirs = { "left", "right", "up", "down" }
     local di, lastPos, n = 1, nil, 0
@@ -1234,7 +1243,7 @@ for _, s in ipairs({
         end
         H.setPad({ [dirs[di]] = true })
       end),
-    }, "a Veldt encounter")
+    }, "a Veldt encounter (" .. k .. ")")
   end)(),
   H.release(),
   H.waitUntil(function() return H.battleActive() end, 900, "Veldt battle up", 5),
@@ -1255,7 +1264,7 @@ for _, s in ipairs({
   -- BOOST, the party ready (activeCases is the Rage row now), the pad left
   -- alone for SETTLE frames on it
   H.call(function() activeCases, settled, unreadySaid = RAGE, 0, -1200 end),
-  H.driveUntil(function() return snap ~= nil end, 30000, {
+  H.driveUntil(function() return snap ~= nil or not H.battleLoadStarted() end, 30000, {
     H.call(function()
       local s = slotOf[GAU]
       if H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_CMD and (H.readByte(ACTOR) & 3) == s
@@ -1280,7 +1289,18 @@ for _, s in ipairs({
       bench(-1)
     end),
   }, string.format("GAU's window with %d pips, every member alive at %d%% of max HP and GAU "
-    .. "free to Rage", BOOST, READY_PCT)),
+    .. "free to Rage (encounter " .. k .. ")", BOOST, READY_PCT)),
+  H.call(function()
+    H.setPad({})
+    if snap == nil then
+      H.log(string.format("[procboost] encounter %d ended before GAU's window was ready -- "
+        .. "the next encounter", k))
+    end
+  end),
+  }, {})
+end
+for k = 1, GAU_ENCOUNTERS do steps[#steps + 1] = gauEncounter(k) end
+for _, s in ipairs({
   H.waitFrames(2),
   H.call(function()
     H.checkReq(snap, "snapshot at GAU's window")
@@ -1345,7 +1365,7 @@ local function runBudget()
   for _, c in ipairs(CASES) do
     for n = 1, c.tries do f = f + 2 + 6000 + (n - 1) * ROUND_FRAMES + 6000 end
   end
-  f = f + 20 + 3000 + 30000 + 900 + 30000 + 2
+  f = f + 20 + GAU_ENCOUNTERS * (6000 + 30000 + 900 + 30000) + 2
   for _ = 1, #RAGE do f = f + 2 + 6000 + 6000 end
   return f
 end

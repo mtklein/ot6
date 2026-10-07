@@ -56,6 +56,18 @@ alone is not the rule -- a stretch with no Tonic counter carries its field
 care in Potions -- so there the bag's Tonics plus Potions are measured
 against the Tonic band, a WARNING when short.
 
+The field-care band (#411, replacing the Tonic count band and #255's World
+of Ruin rule): the owner's rule (2026-10-06) is 99 Tonics at every town
+counter that sells them, and Jidoor's, Albrook's and every World of Ruin
+counter sell none (shop_prop.dat), so field care is measured in HP --
+Tonics at 50 plus the Potions over the combat reserve at 250 -- against
+~level x5 Tonics' HP capped at 99 Tonics, with no slack: a counter that
+sells Tonics stocks for the level the legs to the next one reach.  The cap
+reverses bf19d581's uncapped World of Ruin reading (wor_heal, ~level x5
+past 99 in Potions) on purpose: the owner's rule stops at 99 Tonics, and
+docs/guidelines.md holds the bag to what a player would carry.  The route
+sizes Potions where no Tonic is sold with H.careStockPotions.
+
 Usage:  python3 tools/audit_supplies.py [--repo .] [--selftest] [-v]
 Exit 0 clean, 1 if a fixture dropped to no revives across a boundary, or if a
 waiver has gone stale.
@@ -170,25 +182,27 @@ def fenix_short(have: int, level: int) -> bool:
 TONIC_HP, POTION_HP = 50, 250
 
 
-def wor_field_hp(tonic: int, potion: int, level: int) -> int:
-    """The bag's field-care HP in the World of Ruin: Tonics at 50, and the
-    Potions above the combat reserve the Potion band holds at this level
-    at 250 (supply.md section 1's yields)."""
+
+def field_hp(tonic: int, potion: int, level: int) -> int:
+    """The bag's field-care HP: Tonics at 50, and the Potions above the
+    combat reserve the Potion band holds at this level at 250 (supply.md
+    section 1's yields)."""
     return tonic * TONIC_HP + max(0, potion - potion_band(level)) * POTION_HP
 
 
-def wor_heal_band(level: int) -> int:
-    """The Tonic band in HP, uncapped: ~level x5 Tonics at 50 HP is 250 x
-    level (supply.md:226; the 99 is a bag slot's limit, not the band's)."""
-    return 5 * level * TONIC_HP
+def field_band(level: int) -> int:
+    """The field-care band in HP (#411): the owner's rule is 99 Tonics at
+    every counter that sells them (2026-10-06, docs/design/supply.md), so
+    the band is ~level x5 Tonics' HP capped at 99 Tonics' 4950; where no
+    counter sells Tonics (the World of Ruin's, Jidoor's, Albrook's) Potions
+    over the reserve carry it.  No slack: a counter stocks for the level
+    the legs ahead reach.  The cap is the owner's 99, on purpose against
+    bf19d581's uncapped World of Ruin reading."""
+    return TONIC_HP * min(TONIC_BAND_CAP, 5 * level)
 
 
-def wor_heal_short(tonic: int, potion: int, level: int) -> bool:
-    """The World of Ruin's field-care rule (#255, #411): where a stretch has
-    no Tonic counter, Potions carry the field care (docs/guidelines.md,
-    "Heal outside battles") -- but only the Potions above the combat
-    reserve.  Short when that field-care HP is under the uncapped band."""
-    return wor_field_hp(tonic, potion, level) < wor_heal_band(level)
+def field_short(tonic: int, potion: int, level: int) -> bool:
+    return field_hp(tonic, potion, level) < field_band(level)
 
 
 def party_level(raw: bytes, cb: int):
@@ -459,13 +473,18 @@ def selftest(repo: str = ".") -> int:
     check("17 Fenix Downs at L30 is short", fenix_short(17, 30), True)
     check("18 Fenix Downs at L30 is not", fenix_short(18, 30), False)
     # the WoR field-care rule: Tonic+Potion HP against the Tonic band's HP
-    check("the WoR band at L25 is 6250 HP, uncapped", wor_heal_band(25), 6250)
-    check("4 Tonics + 44 Potions at L25 is short (200 + 6x250 = 1700 < 6250)",
-          wor_heal_short(4, 44, 25), True)
-    check("99 Tonics + 38 Potions at L25 is not (4950 + 0 < 6250: short too)",
-          wor_heal_short(99, 38, 25), True)
-    check("4 Tonics + 63 Potions at L25 is not (200 + 25x250 = 6450, negative control)",
-          wor_heal_short(4, 63, 25), False)
+    # the field-care band: Tonic HP + Potions over the reserve, against
+    # ~level x5 Tonics' HP capped at 99 Tonics
+    check("field band at L13 is 65 Tonics", field_band(13), 3250)
+    check("field band at L8 is 40 Tonics, no slack", field_band(8), 2000)
+    check("field band at L25 caps at 99 Tonics", field_band(25), 4950)
+    check("99 Tonics and the reserve at L25 hold the band", field_short(99, 38, 25), False)
+    check("4 Tonics + 52 Potions at L25 is short (200 + 14x250 = 3700)",
+          field_short(4, 52, 25), True)
+    check("4 Tonics + 57 Potions at L25 is not (200 + 19x250, negative control)",
+          field_short(4, 57, 25), False)
+    check("65 Tonics at L13 holds (3250 >= 3250)", field_short(65, 3, 13), False)
+    check("64 Tonics at L13 is short (3200 < 3250)", field_short(64, 3, 13), True)
 
     # Checked against mrf-save-room-v1, which carries two Fenix Downs.
     # The tracked copy: the reader's canary needs bytes that hold still
@@ -607,7 +626,7 @@ def main() -> int:
         return None, "root", "no predecessor"
 
     scanned, skipped, cliffs, short, tshort, mpshort, zshort = 0, [], [], [], [], [], []
-    fshort, wshort = [], []
+    fshort = []
     for name in sorted(declared):
         path = os.path.join(args.dir, name + ".mss")
         if not os.path.exists(path):
@@ -624,10 +643,12 @@ def main() -> int:
             band = potion_band(bag["level"])
             if bag["potion"] < band:
                 short.append((name, bag["potion"], band, bag["level"]))
-        if in_tonic_band(name, states) and bag["level"] is not None:
-            tband = tonic_band(bag["level"])
-            if bag["tonic"] < tband:
-                tshort.append((name, bag["tonic"], tband, bag["level"]))
+        if ((in_tonic_band(name, states) or in_world_of_ruin(name, states))
+                and bag["level"] is not None
+                and field_short(bag["tonic"], bag["potion"], bag["level"])):
+            tshort.append((name, bag["tonic"], bag["potion"],
+                           field_hp(bag["tonic"], bag["potion"], bag["level"]),
+                           field_band(bag["level"]), bag["level"]))
         if in_tincture_band(name, states) and bag["level"] is not None:
             mband = tincture_band(bag["level"])
             if bag["tincture"] < mband:
@@ -638,11 +659,6 @@ def main() -> int:
             fband = fenix_band(bag["level"])
             if fenix_short(bag["fenix"], bag["level"]):
                 fshort.append((name, bag["fenix"], fband, bag["level"]))
-        if (in_world_of_ruin(name, states) and bag["level"] is not None
-                and wor_heal_short(bag["tonic"], bag["potion"], bag["level"])):
-            wshort.append((name, bag["tonic"], bag["potion"],
-                           wor_field_hp(bag["tonic"], bag["potion"], bag["level"]),
-                           wor_heal_band(bag["level"]), bag["level"]))
         edge = states.get(name, {"prev": None, "checkpoint": None})
         pred, label, perr = predecessor_revives(edge)
         if perr:
@@ -691,18 +707,19 @@ def main() -> int:
             print("    " + " ".join(n for n, _, _, _ in short))
 
     if tshort:
-        print(f"  WARNING: {len(tshort)} fixture(s) under the Tonic band "
-              f"(~level x5, cap {TONIC_BAND_CAP}; the field-care heal, "
-              f"docs/design/level-curve.md) -- top up with a TONIC to N "
-              f"line at a shop that sells them, or size the Potion target "
-              f"for the field care where none is reachable"
+        print(f"  WARNING: {len(tshort)} fixture(s) under the field-care band "
+              f"(Tonics at 50 HP plus Potions over the combat reserve at 250, "
+              f"against ~level x5 Tonics' HP, cap "
+              f"{TONIC_BAND_CAP}; docs/design/supply.md) -- TONIC to 99 at a "
+              f"counter that sells them, else Potions sized for the field care "
+              f"(H.careStockPotions)"
               + ("" if args.verbose else "; -v lists them") + ":")
         if args.verbose:
-            for name, have, band, level in tshort:
-                print(f"    TONIC SHORT   {name:26s} tonic={have:3d} "
-                      f"< band {band} (L{level})")
+            for name, t, p_, hp, band, level in tshort:
+                print(f"    FIELD CARE SHORT {name:23s} tonic={t:3d} potion={p_:3d} "
+                      f"field-care {hp} HP < band {band} HP (L{level})")
         else:
-            print("    " + " ".join(n for n, _, _, _ in tshort))
+            print("    " + " ".join(n for n, *_ in tshort))
 
     if mpshort:
         print(f"  WARNING: {len(mpshort)} fixture(s) under the Tincture band "
@@ -742,18 +759,6 @@ def main() -> int:
                       f"< band {band} (L{level})")
         else:
             print("    " + " ".join(n for n, _, _, _ in fshort))
-
-    if wshort:
-        print(f"  WARNING: {len(wshort)} World of Ruin fixture(s) whose field-care "
-              f"HP (Tonics at 50, Potions above the combat reserve at 250) is under "
-              f"the uncapped Tonic band of 250 x level HP"
-              + ("" if args.verbose else "; -v lists them") + ":")
-        if args.verbose:
-            for name, t, p_, hp, band, level in wshort:
-                print(f"    WOR HEAL SHORT {name:25s} tonic={t:3d} potion={p_:3d} "
-                      f"field-care {hp} HP < band {band} HP (L{level})")
-        else:
-            print("    " + " ".join(n for n, *_ in wshort))
 
     stale = sorted(waivers - used)
     if stale:

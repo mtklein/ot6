@@ -460,8 +460,13 @@ H.run({ maxFrames = 1200000 }, {
   H.call(function()
     H.assertEq(H.readByte(0x0201), 22, "the counter opened shop 22 ($0201)")
   end),
-  H.buyItem(POTION, 0, function() return 39 - invCount(POTION) end,
-    "POTION to 39"),
+  -- #411: Jidoor sells no Tonics, and from here to Albrook the field care
+  -- spends the bag's Tonics (50 -> 4 on the bf19d581 line) and 4 Potions:
+  -- the field-care HP rides on Potions (H.careStockPotions), spend 14 =
+  -- 4 Potions + 46 Tonics' 2300 HP at 250.
+  H.buyItem(POTION, 0, function()
+    return H.careStockPotions(H.activeTopLevel(), { spend = 14 }) - invCount(POTION)
+  end, "POTION for the band and the field care to Albrook"),
   H.buyItem(FENIX, 5, function() return 20 - invCount(FENIX) end,
     "FENIX DOWN to 20"),
   -- REVIVIFY to 3 and TINCTURE to 5 (#231, docs/design/supply.md): the

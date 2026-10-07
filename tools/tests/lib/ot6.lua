@@ -12145,7 +12145,13 @@ end
 -- at its own assertion.  The budget is M.setzerCrowdBudget's, decoded from
 -- the group the room rolls: at most that many encounters from one crowd
 -- to the next, and each crowd must give at least one throw, so the run is
--- bounded by budget x the throws.  o.onBattle(n), when given, runs once a
+-- bounded by budget x the throws -- except a crowd in which SETZER never
+-- had a window he could use: his control taken (M.controlTaken: Zombie,
+-- Sleep, Death ...) and no frame of his command window ($7BCA open, $62CA
+-- his seat, $7BC2 = $05) with it free.  Such a crowd owes none, and the
+-- walk takes the next crowd within the budget (#411: f8ee51f3's
+-- wor-tomb-v1 draw zombied him in crowd battle 2 before his first window).
+-- One usable window and no throw is the driver's failure, and red.  o.onBattle(n), when given, runs once a
 -- battle is up.  Returns the step and S = { done, all, battles, crowds }.
 function M.setzerCrowdBattles(o)
   local S = { done = {}, all = {}, battles = 0, crowds = 0, since = 0 }
@@ -12172,7 +12178,8 @@ function M.setzerCrowdBattles(o)
     return yes
   end
   local function play()
-    local step, F, seen, crowdBattle = nil, nil, 0, nil
+    local step, F, seen, crowdBattle, out, able = nil, nil, 0, nil, nil, nil
+    local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
     return { tick = function()
       if step == nil and F == nil then
         M.vars.setzer = {}     -- no record of an earlier battle is read again
@@ -12190,6 +12197,18 @@ function M.setzerCrowdBattles(o)
         return "frame"
       end
       local r = step:tick()
+      if M.battleActive() and M.controlTaken then
+        for s = 0, 3 do
+          if M.readByte(0x3ED8 + s * 2) == 9 then
+            local c = M.controlTaken(s)
+            if c and out == nil then out = { name = c.name, frame = M.frame } end
+            if not c and able == nil and M.readByte(MENU) ~= 0 and (M.readByte(ACTOR) & 3) == s
+               and M.readByte(MSTATE) == 0x05 then
+              able = M.frame
+            end
+          end
+        end
+      end
       local recs = M.vars.setzer or {}
       while seen < #recs do
         seen = seen + 1
@@ -12198,11 +12217,18 @@ function M.setzerCrowdBattles(o)
         S.done[i] = rec
       end
       if r == "done" then
-        M.assertEq(seen > 0, true, string.format("%s: crowd battle %d gave at least one throw", tag, crowdBattle))
-        seen, step = 0, nil
+        if seen == 0 and out and not able then
+          M.log(string.format("[%s] crowd battle %d gave no throw: SETZER's control was taken (%s at f%d) and no "
+            .. "command window of his came with it free, so it owes none -- the next crowd within the budget",
+            tag, crowdBattle, out.name, out.frame))
+        else
+          M.assertEq(seen > 0, true, string.format("%s: crowd battle %d gave at least one throw%s", tag, crowdBattle,
+            able and string.format(" (SETZER's command window stood free at f%d)", able) or ""))
+        end
+        seen, step, out, able = 0, nil, nil, nil
       end
       return r
-    end, reset = function() step, F, seen = nil, nil, 0 end }
+    end, reset = function() step, F, seen, out, able = nil, nil, 0, nil, nil end }
   end
   local steps = {
     M.call(function()
