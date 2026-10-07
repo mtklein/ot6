@@ -1799,7 +1799,15 @@ function M.raceSim(st, first, draw)
     -- the next to act: the earliest ETA among the living
     local nk, nt, enemy = nil, nil, false
     for k, p in pairs(P) do if p.hp > 0 and (nt == nil or p.eta < nt) then nk, nt, enemy = k, p.eta, false end end
-    for k, e in pairs(E) do if e.hp > 0 and (nt == nil or e.eta < nt) then nk, nt, enemy = k, e.eta, true end end
+    -- (a tie goes to the monster: its full gauge acts at once, while a
+    -- member's still waits on a command and its walk -- the Air Force's
+    -- EDGAR at 155 with his gauge full fell to slot 0's, also full, after
+    -- the race read his own turn coming first; ties among monsters by key)
+    local et, ek = nil, nil
+    for k, e in pairs(E) do
+      if e.hp > 0 and (et == nil or e.eta < et or (e.eta == et and k < ek)) then ek, et = k, e.eta end
+    end
+    if ek ~= nil and (nt == nil or et <= nt) then nk, nt, enemy = ek, et, true end
     if nk == nil then break end
     if enemy then
       r.acts = r.acts + 1

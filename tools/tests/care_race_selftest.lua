@@ -402,6 +402,19 @@ do
     "four plays in sixteen is the line")
 end
 
+-- 25. A monster whose gauge is full acts before a member whose gauge is
+-- full (#415, the Air Force at a726743e: the race healed TERRA at 129 and
+-- read EDGAR at 155, gauge full, healing himself before slot 0, gauge
+-- full too, hit him for 224; he fell)
+do
+  local st = { actor = 1, hpRate = 1.2, focus = { 1 }, samples = 0,
+    party = { member(900, 1000, 0, { lines = lines(100, 1, 0) }),
+              member(155, 1130, 0, { heals = { { restore = 900, cost = 50, n = 5 } } }) },
+    enemies = { { hp = 9000, sh = 4, eta = 0, period = 250, ends = true, act = { dmg = { 224, 224 } } } } }
+  local r = H.raceSim(st, { kind = "attack", line = st.party[1].lines[0], boost = 0 })
+  check(r.deaths >= 1, "slot 0's full gauge strikes EDGAR before his own turn")
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge", n))
