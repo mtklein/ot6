@@ -1218,6 +1218,20 @@ function M.boostStep(o)
   end
   return "r"
 end
+-- A scored race action owns an exact TOTAL boost, including zero.
+-- Re-plan if the bank can no longer buy it; never settle at a different
+-- effect/cost. Repeated unacknowledged presses use the driver's existing
+-- parked-window and plan-pulse watchdogs.
+function M.exactBoostStep(pending, want, bank)
+  if type(want) ~= "number" or want % 1 ~= 0 or want < 0 or want > 3
+    or type(pending) ~= "number" or pending % 1 ~= 0 or pending < 0 or pending > 3
+    or type(bank) ~= "number" or bank % 1 ~= 0 or bank < 0 or bank > 5
+    or bank < want then return "drop" end
+  if pending > want then return "l" end
+  if pending < want then return "r" end
+  return "go"
+end
+
 function M.liftFilterHeals(heals, hp, maxhp, cost)
   local keep = {}
   for _, h in ipairs(heals) do
@@ -8988,6 +9002,7 @@ function Driver:racePlan(actor, c)
     local q = {}
     for k, v in pairs(p) do q[k] = v end
     q.reason = "the care race"
+    q.exactBoost, q.boostWant = true, c.boost or q.boostLeft or 0
     -- a Fight aims as the rules' Fight does: at the body its class keys
     -- (chipAim; battle_classtarget caught the race's Fight on the unkeyed
     -- Tusker while a pierce-keyed Cirpius stood)
@@ -11323,11 +11338,16 @@ function Driver:button(actor)
     if self.plan.kind == "switch" or self.plan.kind == "defer" then return { "x" } end
     -- the boost (#408): R until the pending boost the engine shows reads
     -- what the plan wants (M.boostStep), not a count of R pulses sent
-    if self.plan.boostLeft and self.plan.boostLeft > 0 and M.BOOST_PULSES then
+    if self.plan.exactBoost then
+      local step = M.exactBoostStep(M.readByte(BATTLE.PEND_BP + actor * 2),
+        self.plan.boostWant, M.readByte(BATTLE.BP + actor * 2))
+      if step == "drop" then self:dropPlan("race_boost_unavailable"); return nil end
+      if step == "r" or step == "l" then return { step } end
+    elseif self.plan.boostLeft and self.plan.boostLeft > 0 and M.BOOST_PULSES then
       self.plan.boostLeft = self.plan.boostLeft - 1
       return { "r" }
     end
-    if not M.BOOST_PULSES and (self.plan.boostLeft or 0) > 0 or self.plan.boostWant then
+    if not self.plan.exactBoost and ((not M.BOOST_PULSES and (self.plan.boostLeft or 0) > 0) or self.plan.boostWant) then
       local pend = M.readByte(BATTLE.PEND_BP + actor * 2)
       local p = self.plan
       if p.boostWant == nil then

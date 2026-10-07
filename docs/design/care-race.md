@@ -690,3 +690,14 @@ and malformed input. It is not yet connected to candidate discovery or
 execution. That connection must preserve total boost, resolved effect,
 menu identity and targets, and establish the corresponding controller
 acknowledgments. These arithmetic checks are not played spell evidence.
+
+Race attack compilation now marks the copied line plan with its exact
+total boost. At command selection the driver presses normal L/R inputs
+until pending BP equals that total, including stepping down to zero.
+A bank that no longer pays the scored total drops the plan rather than
+settling at a different action. Unacknowledged presses remain bounded by
+the existing parked-window and plan-pulse watchdogs. Synthetic tests call
+the real compiler and button method across actor offsets, banks and
+pending totals. This establishes command-window acknowledgment only;
+it does not establish final targets or resolved effects for the broader
+catalogue, nor improve the retained acting-route outcome claim.
