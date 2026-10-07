@@ -9,9 +9,9 @@
 --
 -- The fixture is gau_joined (SABIN, CYAN, GAU on the Veldt).  A natural
 -- encounter is walked into; SABIN's real Blitz menu is opened and Suplex
--- picked with the d-pad and A; the bench is deferred with X.  The battle is
--- then fled (L+R), or won through the menus by the library driver if it
--- cannot be fled.  No state is written.
+-- picked with the d-pad and A; every other window is the library fight
+-- driver's, and encounters are fought until one Suplex has landed (a
+-- body too heavy to throw takes none).  No state is written.
 --
 -- Asserted:
 --   1. the Suplex executed ($3410 <- $5f);
@@ -28,10 +28,18 @@ local CMDTBL, ITEMLIST, CMDROW = 0x202E, 0x4005, 0x890F
 local BLCOL, BLROW = 0x8963, 0x8967
 
 local sabinE = nil
+local inCmd = false
+local throwable, fleeN = false, 0
+local SUPLEX_MP = nil  -- Suplex's MP, off Ot6AbilityCostTbl in arm()
+-- the encounter budget: up to ENCOUNTERS, each bounded by its waits below
+local ENCOUNTERS = 10
+local W_CONTROL, W_ENCOUNTER, W_ARM, W_SETTLE, W_FIGHT = 6000, 40000, 1200, 90, 40000
 local spellWrites, gateHits, kills, cast = 0, {}, 0, false
 local refs = {}
 
 local function arm()
+  SUPLEX_MP = H.abilityCost(SUPLEX)
+  H.assertEq(SUPLEX_MP ~= nil, true, "Suplex ($5F) has a price in Ot6AbilityCostTbl")
   refs.spell = emu.addMemoryCallback(function(_, v)
     if v == SUPLEX then spellWrites = spellWrites + 1 end
   end, emu.callbackType.write, 0x7E3410, 0x7E3410)
@@ -89,70 +97,85 @@ local function pulse()
 end
 
 local flip = false
-H.run({ maxFrames = 120000 }, {
-  H.loadState("build/states/gau_joined.mss.lua"),
-  H.waitFrames(20),
-  H.waitUntil(function()
-    return H.worldMode() and H.worldHasControl() and H.worldAligned()
-  end, 6000, "world control on the Veldt"),
-  H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
+-- One encounter: walk into it, SABIN Suplexes at his first window, the
+-- library driver fights every other window to the end.  A Suplex that does
+-- not land (a body too heavy to throw, or the pack dead first) consults
+-- nothing, so encounters are taken until one Suplex hit has been seen.
+local function encounter(k)
+  local t, btn, F = 0, {}, nil
+  return H.cond(function() return #gateHits == 0 end, {
+    H.waitUntil(function()
+      return H.worldMode() and H.worldHasControl() and H.worldAligned()
+    end, W_CONTROL, "world control on the Veldt (encounter " .. k .. ")"),
+    H.driveUntil(function() return H.battleLoadStarted() end, W_ENCOUNTER, {
+      H.call(function()
+        if H.battleLoadStarted() or not H.worldHasControl() then H.setPad({}); return end
+        if not H.worldAligned() then return end
+        flip = not flip
+        H.setPad({ [flip and "left" or "right"] = true })
+      end),
+    }, "a Veldt encounter fires (" .. k .. ")"),
+    H.call(function() H.setPad({}) end),
+    H.waitUntil(function() return H.battleActive() end, W_ARM, "battle armed", 5),
+    H.waitFrames(W_SETTLE),
     H.call(function()
-      if H.battleLoadStarted() or not H.worldHasControl() then H.setPad({}); return end
-      if not H.worldAligned() then return end
-      flip = not flip
-      H.setPad({ [flip and "left" or "right"] = true })
+      sabinE, cast, t, F, throwable, fleeN = nil, false, 0, nil, false, 0
+      for e = 0, 3 do if H.readByte(0x3ED8 + e * 2) == 0x05 then sabinE = e end end
+      H.assertEq(sabinE ~= nil, true, "SABIN is in the battle party")
+      -- a body Suplex can throw: present, standing, and without the
+      -- throw-immune bit ($3C80 bit 2, TargetEffect_30) -- many Veldt
+      -- species carry it, and a Suplex at only those misses
+      for s = 0, 5 do
+        H.assertEq(H.readWord(0x57C0 + s * 2) ~= GHOSTTRAIN, true,
+          string.format("slot %d is not the Ghost Train", s))
+        if (H.readByte(0x3AA8 + s * 2) & 1) == 1 and H.readWord(0x3BFC + s * 2) > 0
+           and (H.readByte(0x3C80 + 8 + s * 2) & 0x04) == 0 then throwable = true end
+      end
+      H.log(string.format("[suplex] encounter %d: %s", k, throwable
+        and "a throwable body stands -- SABIN Suplexes" or "every body is throw-immune -- fleeing"))
     end),
-  }, "a Veldt encounter fires"),
-  H.call(function() H.setPad({}) end),
-  H.waitUntil(function() return H.battleActive() end, 1200, "battle armed", 5),
-  H.waitFrames(90),
-  H.call(function()
-    for e = 0, 3 do if H.readByte(0x3ED8 + e * 2) == 0x05 then sabinE = e end end
-    H.assertEq(sabinE ~= nil, true, "SABIN is in the battle party")
-    for s = 0, 5 do
-      H.assertEq(H.readWord(0x57C0 + s * 2) ~= GHOSTTRAIN, true,
-        string.format("slot %d is not the Ghost Train", s))
-    end
-    arm()
-  end),
-  (function()
-    local t, btn = 0, {}
-    return H.driveUntil(function()
-      return #gateHits > 0 or not H.battleLoadStarted()
-    end, 20000, {
+    H.driveUntil(function() return not H.battleLoadStarted() end, W_FIGHT, {
       H.call(function()
         t = t + 1
+        F = F or H.newFightDriver("suplex-bench", { items = true, tactical = true, healer = 2 })
+        -- SABIN Suplexes at every window until a Suplex has landed (one that
+        -- picks only throw-immune bodies misses, TargetEffect_30), MP permitting
+        if not throwable then
+          -- nothing to throw here: run (L+R), the driver if it cannot
+          fleeN = fleeN + 1
+          if fleeN < 1200 and (H.readByte(0x00B1) & 0x02) == 0 then H.setPad({ l = true, r = true }); return end
+        end
+        local mine = throwable and H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == sabinE
+          and #gateHits == 0 and H.readWord(0x3C08 + sabinE * 2) >= SUPLEX_MP
+        if mine and H.readByte(MSTATE) == ST_CMD and not inCmd then cast, inCmd = false, true end
+        if H.readByte(MSTATE) ~= ST_CMD then inCmd = false end
+        if not mine then F.frame(); return end
         if t % 12 == 0 then btn = pulse() end
         H.setPad(t % 12 < 4 and btn or {})
       end),
-    }, "SABIN's Suplex lands on a Veldt monster")
-  end)(),
-  H.waitFrames(120),
-  H.call(function()
-    H.setPad({})
-    disarm()
-    H.log(string.format("[suplex] Suplex writes %d, gate hits %d (first on y=$%02X species $%04X), kill hook %d",
-      spellWrites, #gateHits, gateHits[1] and gateHits[1].y or 0xFF,
-      gateHits[1] and gateHits[1].species or 0xFFFF, kills))
-    H.assertEq(spellWrites >= 1, true, "the Suplex executed ($3410 <- $5f)")
-    H.assertEq(#gateHits >= 1, true, "Ot6SuplexTrain was consulted on the Suplex's hit")
-    H.assertEq(gateHits[1].species ~= GHOSTTRAIN, true, "on a monster that is not the Ghost Train")
-    H.assertEq(kills, 0, "Ot6SuplexTrainKill never ran: a Suplex on another monster is untouched")
-  end),
-  (function()
-    local n, refusedN, F = 0, 0, nil
-    return H.driveUntil(function() return not H.battleLoadStarted() end, 30000, {
-      H.call(function()
-        n = n + 1
-        refusedN = ((H.readByte(0x00B1) & 0x02) ~= 0) and refusedN + 1 or 0
-        if F == nil and n < 1200 and refusedN < 60 then
-          H.setPad({ l = true, r = true })
-        else
-          F = F or H.newFightDriver("suplex-win", { items = true, tactical = true, healer = 2 })
-          F.frame()
-        end
-      end),
-    }, "the battle resolved")
-  end)(),
-  H.call(function() H.setPad({}) end),
-})
+    }, "encounter " .. k .. " fought out"),
+    H.call(function()
+      H.setPad({})
+      H.log(string.format("[suplex] encounter %d: Suplex writes so far %d, gate hits %d", k,
+        spellWrites, #gateHits))
+    end),
+  }, {})
+end
+
+local steps = {
+  H.loadState("build/states/gau_joined.mss.lua"),
+  H.waitFrames(20),
+  H.call(function() arm() end),
+}
+for k = 1, ENCOUNTERS do steps[#steps + 1] = encounter(k) end
+steps[#steps + 1] = H.call(function()
+  disarm()
+  H.log(string.format("[suplex] Suplex writes %d, gate hits %d (first on y=$%02X species $%04X), kill hook %d",
+    spellWrites, #gateHits, gateHits[1] and gateHits[1].y or 0xFF,
+    gateHits[1] and gateHits[1].species or 0xFFFF, kills))
+  H.assertEq(spellWrites >= 1, true, "the Suplex executed ($3410 <- $5f)")
+  H.assertEq(#gateHits >= 1, true, "Ot6SuplexTrain was consulted on a Suplex's hit (within 10 encounters)")
+  H.assertEq(gateHits[1].species ~= GHOSTTRAIN, true, "on a monster that is not the Ghost Train")
+  H.assertEq(kills, 0, "Ot6SuplexTrainKill never ran: a Suplex on another monster is untouched")
+end)
+H.run({ maxFrames = 20 + ENCOUNTERS * (W_CONTROL + W_ENCOUNTER + W_ARM + W_SETTLE + W_FIGHT) }, steps)

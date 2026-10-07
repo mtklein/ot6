@@ -1176,7 +1176,14 @@ local steps = {
   -- 9, the seeded fixtures), so the bag still holds the band at its end:
   -- 39 + 6 = 45.  Held for #179 (the bigger purchase moved the RNG under
   -- the walk out) until the segment runner (#178) retried such losses.
-  H.buyItem(POTION, 1, function() return 45 - H.invCountOf(POTION) end, "POTION to 45"),
+  -- #411: the stretch to the next counter (Esper Mountain, Ultros, the
+  -- massacre) spent 22 Potions and 74 Tonics on the bf19d581 line (fire_out
+  -- potion=61 tonic=99 at the counter -> thamasa_done 39 / 25): the band's
+  -- field-care HP is held by Potions over the reserve too (H.careStockPotions,
+  -- the Tonics topped to 99 below; spend 22 + 3700 HP at 250 = 37).
+  H.buyItem(POTION, 1, function()
+    return H.careStockPotions(H.activeTopLevel(), { tonics = 99, spend = 37 }) - H.invCountOf(POTION)
+  end, "POTION for the band and the field care to the massacre"),
   H.buyItem(FENIX_DOWN, 6, function() return 20 - H.invCountOf(FENIX_DOWN) end,
     "FENIX DOWN to 20"),
   -- #231 (docs/design/supply.md): REVIVIFY to 3, TINCTURE to 7 (the MP

@@ -148,7 +148,8 @@ local function whole(ch)
   return H.charHp(ch) == H.charMaxHp(ch) and H.charMp(ch) == H.charMaxMp(ch)
     and H.charStatus1(ch) == 0
 end
-local function potionBand() return math.ceil(level() * 1.5) + FIELD_CARE_POTIONS end
+-- #411: no Tonic seller -- see H.careStockPotions
+local function potionBand() return H.careStockPotions(level(), { spend = FIELD_CARE_POTIONS }) end
 local function short()
   return H.invCountOf(POTION) < potionBand() or H.invCountOf(FENIX) < level()
 end
