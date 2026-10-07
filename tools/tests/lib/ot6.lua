@@ -1550,7 +1550,8 @@ function M.raceAttack(line, requested)
   return { kind = "attack", line = line, boost = boost,
     target = line and line.target, mp = line and line.mp or 0,
     cost = line and line.cost or 0, delay = line and line.delay or 0,
-    what = line and line.what, latencyKnown = line and line.latencyKnown }
+    what = line and line.what, latencyKnown = line and line.latencyKnown,
+    delayBounds = line and line.delayBounds }
 end
 
 function M.raceLine(plan, per, effects)
@@ -1561,12 +1562,13 @@ function M.raceLine(plan, per, effects)
     hit = effects.hit or 1, target = plan.aim, aoe = effects.aoe,
     byTarget = effects.byTarget, boost = boost, mp = plan.mp or 0,
     cost = effects.cost or 0, delay = effects.delay or 0, latencyKnown = effects.latencyKnown,
+    delayBounds = effects.delayBounds,
     what = plan.what, plan = plan }
 end
 
 -- one line's hits on enemy e (mutated), times the line's hit chance
 -- one line on one body; returns the hits left when the body fell first
-local function strike(e, line, hit)
+local function strike(e, line, hit, draw)
   local effect = line.byTarget and line.byTarget[e.key]
   if effect then
     local copy = {}
@@ -1584,10 +1586,15 @@ local function strike(e, line, hit)
       return n - i + 1
     end
     local per = line.per or 0
+    -- A missed swing neither chips nor damages. Sample each swing in the
+    -- random plays; the deterministic estimate uses expected chips and
+    -- damage under the same hit probability (zero never breaks a shield).
+    local landed = hit
+    if draw and hit > 0 and hit < 1 then landed = draw() < hit and 1 or 0 end
     -- Ot6HitJoin chips first: the hit removing the final shield receives
     -- the broken-body damage multiplier itself, not only its next swing.
-    if (e.sh or 0) > 0 and i <= chips then e.sh = e.sh - 1 end
-    e.hp = e.hp - per * ((e.sh or 0) > 0 and 1 or 4) * hit
+    if (e.sh or 0) > 0 and i <= chips then e.sh = math.max(0, e.sh - landed) end
+    e.hp = e.hp - per * ((e.sh or 0) > 0 and 1 or 4) * landed
   end
   if e.hp < 0 then e.hp = 0 end
   return 0
@@ -1656,16 +1663,16 @@ function M.raceSim(st, first, draw)
   local function attack(p, line, fixed)
     if line == nil then return end
     if line.aoe then
-      for _, e in pairs(E) do strike(e, line, p.hit) end
+      for _, e in pairs(E) do strike(e, line, p.hit, draw) end
     else
       local k = target(false, fixed)
-      local left = k and strike(E[k], line, p.hit) or 0
+      local left = k and strike(E[k], line, p.hit, draw) or 0
       while left > 0 and st.retarget ~= false do
         k = target(false, nil)
         if k == nil then break end
         local hp0 = E[k].hp
         left = strike(E[k], { per = line.per, hits = left, chips = 0, hit = line.hit,
-                             byTarget = line.byTarget }, p.hit)
+                             byTarget = line.byTarget }, p.hit, draw)
         -- a carry that took half or more of a body it left standing
         if E[k].hp > 0 and (hp0 - E[k].hp) * 2 >= hp0 then carried = true end
       end
@@ -1825,7 +1832,7 @@ function M.raceSim(st, first, draw)
         for _, h in ipairs(p.heals) do
           local c = { kind = "heal", target = wk, restore = h.restore, cost = h.cost,
                       id = h.id, mp = h.mp, spell = h.spell, delay = h.delay,
-                      latencyKnown = h.latencyKnown }
+                      latencyKnown = h.latencyKnown, delayBounds = h.delayBounds }
           if P[wk].hp + h.restore > threat(wk, t, k) and affordable(p, c)
              and (h.id ~= nil or h.mp ~= nil or h.n == nil or (used[h] or 0) < h.n) then
             if h.id == nil and h.mp == nil then used[h] = (used[h] or 0) + 1 end
@@ -1996,6 +2003,8 @@ function M.raceBetter(a, b, st)
   if a.invalid ~= b.invalid then return not a.invalid end
   if a.pending ~= b.pending then return not a.pending end
   if a.wipe ~= b.wipe then return not a.wipe end
+  local pm = (st.samples or M.RACE_SAMPLES) > 0 and M.RACE_DEATH_MARGIN or 1e-9
+  if math.abs((a.pWipe or 0)-(b.pWipe or 0)) > pm then return (a.pWipe or 0)<(b.pWipe or 0) end
   -- deaths beyond one sample's worth (M.RACE_DEATH_MARGIN): a death in one
   -- play of sixteen is the draws, not the line (the WoR's s5: a Fight that
   -- died in 1 of 16 plays lost to a Cure that only stalled, three times)
@@ -2107,6 +2116,54 @@ function M.raceChoose(st, candidates)
     if bestR == nil or M.raceBetter(all[i], bestR, st) then best, bestR = i, all[i] end
   end
   return best, bestR, all
+end
+
+-- The early/central/late convention applies to BOTH arms, including every
+-- continuation. Bounds are player estimates, not confidence intervals.
+local function raceTimedCopy(record, point)
+  if record == nil then return nil end
+  local q = {}
+  for k,v in pairs(record) do q[k]=v end
+  if point ~= "central" and record.delayBounds then q.delay=record.delayBounds[point] end
+  return q
+end
+function M.raceTimingScenario(st, action, point)
+  local ss = {}
+  for k,v in pairs(st) do ss[k]=v end
+  ss.party = {}
+  for k,p in pairs(st.party) do
+    local q = {};for f,v in pairs(p) do q[f]=v end
+    q.lines = {};for b,line in pairs(p.lines or {}) do q.lines[b]=raceTimedCopy(line,point) end
+    q.heals = {};for i,h in ipairs(p.heals or {}) do q.heals[i]=raceTimedCopy(h,point) end
+    q.fallback = raceTimedCopy(p.fallback,point)
+    ss.party[k]=q
+  end
+  return ss,raceTimedCopy(action,point)
+end
+function M.raceRobustBetter(st, candidate, rules)
+  local results = {}
+  local dm = (st.samples or M.RACE_SAMPLES)>0 and M.RACE_DEATH_MARGIN or 1e-9
+  for _,point in ipairs({"lo","central","hi"}) do
+    local ss,a=M.raceTimingScenario(st,candidate,point)
+    local _,b=M.raceTimingScenario(st,rules,point)
+    local ra,rb=M.raceEval(ss,a),M.raceEval(ss,b)
+    results[point]={race=ra,rules=rb}
+    if ra.invalid or rb.invalid or ra.pending or rb.pending then return false,"unresolved comparison",results end
+    if (ra.wipe and not rb.wipe) or (ra.pWipe or 0)>(rb.pWipe or 0)+dm
+      or ra.deaths>rb.deaths+dm or (ra.falls or 0)>(rb.falls or 0)+dm then
+      return false,"timing scenario adds wipe/down/fall risk",results
+    end
+    if M.raceBetter(rb,ra,ss) then return false,"timing scenario reverses preference",results end
+  end
+  local a,b=results.central.race,results.central.rules
+  -- Raw tie-breakers choose among candidates; overrides need material gain.
+  local gain = (b.deaths-a.deaths)>dm or ((b.falls or 0)-(a.falls or 0))>dm
+    or (b.pWipe or 0)-(a.pWipe or 0)>dm
+    or (a.kill and not b.kill)
+    or (a.kill and b.kill and b.kill-a.kill>(st.tickMargin or M.RACE_TICK_MARGIN or 30))
+    or (not a.kill and not b.kill and b.left-a.left>(st.leftMargin or M.RACE_LEFT_MARGIN)*math.max(a.left0 or 0,1))
+    or b.cost-a.cost>(st.costMargin or M.RACE_COST_MARGIN)
+  return gain and M.raceBetter(a,b,st),gain and "stable material gain" or "inside uncertainty margin",results
 end
 
 -- Is a heal worth the turn it costs?  All of newFightDriver's heal policy,
@@ -5340,7 +5397,7 @@ end
 -- Recovery action evidence. Pure ledger first; CPU observers below only read.
 -- A confirm press is an attempt, never proof of submission or resolution.
 local actionTraceSerial = 0
-function M.newRecoveryTrace(tag, emit, observe)
+function M.newRecoveryTrace(tag, emit, observe, tickReader)
   local T = { pending = {}, queued = {}, running = {} }
   local function event(p, stage, frame, fields)
     local e = { v = 1, id = p.id, tag = tag or "fight", actor = p.actor,
@@ -5348,6 +5405,11 @@ function M.newRecoveryTrace(tag, emit, observe)
       all = p.all, boost = p.boost, event = stage, frame = frame,
       elapsed_frames = frame - p.frame }
     for k, v in pairs(fields or {}) do e[k] = v end
+    if tickReader and p.atb_tick ~= nil then
+      e.atb_tick = tickReader()
+      e.elapsed_atb_ticks = (e.atb_tick - p.atb_tick) & 0xFFFF
+      e.time_unit = "atb_updates"
+    end
     if observe then observe(e) end
     emit(e)
   end
@@ -5371,7 +5433,7 @@ function M.newRecoveryTrace(tag, emit, observe)
       requested = plan.spell or plan.item or plan.skill or plan.lore or 0,
       target = plan.target,
       all = plan.all or false, boost = plan.boostLeft or 0,
-      frame = frame, stage = "plan" }
+      frame = frame, stage = "plan", atb_tick = tickReader and tickReader() }
     T.pending[actor] = p
     event(p, "plan", frame, { reason = plan.reason or "recovery" })
   end
@@ -5385,6 +5447,7 @@ function M.newRecoveryTrace(tag, emit, observe)
     local p = T.pending[actor]
     if not p or p.stage ~= "plan" then return end
     p.stage, p.submitted = "submit", frame
+    p.submitted_tick = tickReader and tickReader()
     p.accepted_command = cmd
     T.pending[actor] = nil
     T.queued[actor] = T.queued[actor] or {}
@@ -5399,10 +5462,24 @@ function M.newRecoveryTrace(tag, emit, observe)
     table.remove(queue, 1)
     T.running[actor] = p
     p.stage, p.started = "start", frame
+    p.started_tick = tickReader and tickReader()
     p.command, p.attack, p.targets = cmd, attack, targets
     p.hp, p.mp, p.bp = hp, mp, bp
     event(p, "start", frame, { command = cmd, attack = attack,
       targets = targets, queue_frames = frame - p.submitted })
+  end
+  -- Called at ApplyDmg's return, after the engine has clamped lethal HP.
+  -- The accepted command identity, not an HP heuristic, owns each effect.
+  function T.hpEffect(actor, frame, target, before, after, cmd, attack)
+    local p = T.running[actor]
+    if not p or p.command ~= cmd or p.attack ~= attack or before == after then return end
+    p.effectN = (p.effectN or 0) + 1
+    event(p, "hp_effect", frame, { command = cmd, attack = attack,
+      effect_target = target, hp_before = before, hp_after = after,
+      hp_change = after - before, effect_index = p.effectN,
+      navigation_frames = p.submitted - p.frame,
+      queue_frames = p.started - p.submitted,
+      execution_frames = frame - p.started })
   end
   function T.resolve(actor, frame, hp, mp, bp)
     local p = T.running[actor]
@@ -5416,7 +5493,10 @@ function M.newRecoveryTrace(tag, emit, observe)
       mp_net = mp - p.mp, bp_net = bp - p.bp,
       execution_frames = frame - p.started,
       navigation_frames = p.submitted - p.frame,
-      queue_frames = p.started - p.submitted })
+      queue_frames = p.started - p.submitted,
+      navigation_atb_ticks = p.submitted_tick and ((p.submitted_tick-p.atb_tick)&0xFFFF),
+      queue_atb_ticks = p.started_tick and ((p.started_tick-p.submitted_tick)&0xFFFF),
+      execution_atb_ticks = p.started_tick and ((tickReader()-p.started_tick)&0xFFFF) })
     T.running[actor] = nil
   end
   -- A party death (#175), outside the per-plan lifecycle: the member,
@@ -5495,6 +5575,29 @@ local function recoveryActivate(trace)
       t.start(x // 2, M.frame, M.readByte(0xB5), M.readByte(0xB6),
         M.readWord(0xB8), recoveryHP(), M.readWord(0x3C08 + x),
         M.readByte(0x3E9C + x))
+    end
+  end)
+  -- ApplyDmg saves the attacker X before using it for HP/MP dispatch.
+  -- Its common return comes after HP healing/damage and lethal clamping.
+  -- The pinned source's return is +$27: verify PLP/PLX/RTS before hooking
+  -- rather than silently attributing effects at an instruction that moved.
+  local apply = M.sym("ApplyDmg")
+  assert(M.readRomByte((apply + 0x27) & 0x3FFFFF) == 0x28
+    and M.readRomByte((apply + 0x28) & 0x3FFFFF) == 0xFA
+    and M.readRomByte((apply + 0x29) & 0x3FFFFF) == 0x60,
+    "ApplyDmg common return moved: effect observer must follow the source")
+  local effects = {}
+  hook(apply, function(t, cpu)
+    local x, y = cpu["cpu.x"] & 0xffff, cpu["cpu.y"] & 0xffff
+    effects[#effects + 1] = { actor = x < 8 and x % 2 == 0 and x // 2 or nil,
+      target = y // 2, hp = M.readWord(0x3BF4 + y),
+      cmd = M.readByte(0xB5), attack = M.readByte(0xB6) }
+  end)
+  hook(apply + 0x27, function(t)
+    local e = table.remove(effects)
+    if e and e.actor ~= nil then
+      t.hpEffect(e.actor, M.frame, e.target, e.hp,
+        M.readWord(0x3BF4 + e.target * 2), e.cmd, e.attack)
     end
   end)
   -- Immediately after ExecCmd returns to the normal-action path, including
@@ -8029,7 +8132,7 @@ end
 --   heals: the bag's (bagHeals) on each hurt member, each at its gil and
 --     scarcity against M.CARE_RESERVE; a raise: the Fenix Down on each
 --     fallen member, raised to 1/8 max HP
--- "act" (the default, #415): the race plays its choice where it disagrees
+-- "act" (experimental, default off, #415): the race plays its choice where it disagrees
 -- with the rule stack; "log" (or true): the rules play and the race is
 -- logged beside them; false or "off": the rules alone, no race
 if M.CARE_RACE == nil then M.CARE_RACE = false end
@@ -8149,11 +8252,11 @@ function Driver:raceState(actor, R)
       effects[s] = { chips = chips, hit = plan.kind == "fight"
         and M.hitChance(M.readByte(0x3B7C + e * 2), M.readByte(0x3B55 + 8 + s * 2)) or 1 }
     end end
-    local delay = self:raceDelay(e, plan)
+    local delay, bounds = self:raceDelay(e, plan)
     return M.raceLine(plan, perOf(e, plan.kind, plan.skill), {
       chips = (effects[plan.aim] or {}).chips, hit = (effects[plan.aim] or {}).hit,
       byTarget = effects, aoe = aoe, cost = (plan.mp or 0) * (M.shopRates().mp or 0),
-      delay = delay, latencyKnown = delay ~= nil })
+      delay = delay, delayBounds = bounds, latencyKnown = delay ~= nil })
   end
   for e = 0, 3 do
     local maxhp = R.maxOf(e)
@@ -8183,7 +8286,7 @@ function Driver:raceState(actor, R)
           local cost = h.unsold and (h.gil or M.PRICELESS)
             or M.raceItemCost(M.itemPrice(h.id), h.count, (M.CARE_RESERVE or {})[h.id] or 0)
           heals[#heals + 1] = { restore = h.restore or 0, cost = cost, id = h.id, n = h.count }
-          heals[#heals].delay = self:raceDelay(e, { kind = "item", item = h.id })
+          heals[#heals].delay, heals[#heals].delayBounds = self:raceDelay(e, { kind = "item", item = h.id })
           heals[#heals].latencyKnown = heals[#heals].delay ~= nil
         end
       end
@@ -8199,7 +8302,7 @@ function Driver:raceState(actor, R)
             if gain and gain > 0 then
               heals[#heals + 1] = { restore = gain, cost = mp * (M.shopRates().mp or 0), spell = spell,
                                     mp = mp, n = mpNow // mp, cast = true }
-              heals[#heals].delay = self:raceDelay(e, { kind = "heal", spell = spell })
+              heals[#heals].delay, heals[#heals].delayBounds = self:raceDelay(e, { kind = "heal", spell = spell })
               heals[#heals].latencyKnown = heals[#heals].delay ~= nil
             end
           end
@@ -8317,8 +8420,20 @@ local function raceDelayKey(actor, kind, id, boost)
 end
 
 function Driver:raceObserve(e)
-  if e.event ~= "resolve" then return end
   local key = raceDelayKey(e.actor, e.kind, e.requested, e.boost)
+  if e.event == "hp_effect" then
+    if e.time_unit ~= "atb_updates" then return end
+    self.raceEffectOpen = self.raceEffectOpen or {}
+    local q = self.raceEffectOpen[e.id] or { first = e.elapsed_atb_ticks, first_frames = e.elapsed_frames, key = key }
+    q.last, q.last_frames = e.elapsed_atb_ticks, e.elapsed_frames
+    self.raceEffectOpen[e.id] = q
+    return
+  end
+  if e.event == "unresolved" then
+    if self.raceEffectOpen then self.raceEffectOpen[e.id] = nil end
+    return -- censored commands cannot supply a completed-volley sample
+  end
+  if e.event ~= "resolve" then return end
   self.raceLatency = self.raceLatency or {}
   local samples = self.raceLatency[key] or {}
   samples[#samples + 1] = e.elapsed_frames
@@ -8326,16 +8441,58 @@ function Driver:raceObserve(e)
   self.raceLatency[key] = samples
   self.raceTiming = self.raceTiming or {}
   self.raceTiming[key] = { navigation = e.navigation_frames, queue = e.queue_frames,
-    execution = e.execution_frames, finished = e.elapsed_frames }
-  -- Resolve identifies the end of execution, not the first damaging or
-  -- healing effect. Keep the observations, but do not manufacture effect
-  -- timing from them. A future per-effect observer supplies effect samples.
+    execution = e.execution_frames, finished = e.elapsed_frames,
+    navigation_ticks = e.navigation_atb_ticks, queue_ticks = e.queue_atb_ticks, execution_ticks = e.execution_atb_ticks }
+  local q = self.raceEffectOpen and self.raceEffectOpen[e.id]
+  if q then
+    self.raceEffectLatency = self.raceEffectLatency or {}
+    local effects = self.raceEffectLatency[key] or {}
+    effects[#effects + 1] = q
+    while #effects > M.RACE_HIT_KEEP do table.remove(effects, 1) end
+    self.raceEffectLatency[key], self.raceEffectOpen[e.id] = effects, nil
+  end
 end
 
+-- Bounds are experience-based timing estimates, not confidence intervals.
+-- Aggregate hits at the last effect; sensitivity compares the first effect
+-- too, with one controller pulse of slack on either side of observed extrema.
 function Driver:raceDelay(actor, plan)
   local key = raceDelayKey(actor, plan.kind, plan.spell or plan.item or plan.skill or plan.lore,
     plan.boostLeft)
-  return M.median((self.raceEffectLatency or {})[key])
+  local samples = (self.raceEffectLatency or {})[key]
+  if samples == nil or #samples == 0 then
+    if self.opts.raceTimingGuesses == false then return nil end
+    if plan.kind ~= "fight" and plan.kind ~= "skill" and plan.kind ~= "item" and plan.kind ~= "heal" then return nil end
+    -- Controller pulses are 30 frames. Base walks are two pulses for
+    -- Fight, four for a list; an item adds its observed cursor distance.
+    -- Queue/animation uncertainty uses accepted lifecycle observations
+    -- where available, otherwise a declared coarse 0..900-frame range.
+    local pulses = plan.kind == "fight" and 2 or 4
+    if plan.kind == "item" then
+      local idx = self:battInvIdx(plan.item)
+      if idx == nil then return nil end
+      local cursor = M.readByte(BATTLE.ITEMSCR + actor) + M.readByte(BATTLE.ITEMROW + actor)
+      pulses = pulses + math.abs(idx - cursor)
+    end
+    local queue, execution = 900, 900
+    for k, timing in pairs(self.raceTiming or {}) do
+      if k:sub(1, #(actor .. ":" .. plan.kind .. ":")) == actor .. ":" .. plan.kind .. ":" then
+        queue = math.max(queue, (timing.queue_ticks or 0) * 2)
+        execution = math.max(execution, (timing.execution_ticks or 0) * 2)
+      end
+    end
+    local lo = math.max(15, (pulses - 1) * 15)
+    local hi = (pulses + 1) * 15 + (queue + execution) // 2
+    return pulses * 15 + (queue + execution) // 4,
+      { lo = lo, hi = hi, n = 0, source = "coarse controller pulses + observed lifecycle envelope (minimum 900 queue/900 execution)" }
+  end
+  local last, lo, hi = {}, math.huge, 0
+  for _, q in ipairs(samples) do
+    last[#last + 1] = q.last
+    lo, hi = math.min(lo, q.first), math.max(hi, q.last)
+  end
+  return M.median(last), { lo = math.max(0, lo - 15), hi = hi + 15,
+    n = #samples, source = "attributed HP effects in ATB-update ticks; 15-tick pulse slack" }
 end
 
 function Driver:raceCandidates(actor, st)
@@ -8397,7 +8554,7 @@ function Driver:raceCandidates(actor, st)
     if action.kind ~= "attack" and st.delayOf then
       local plan = { kind = action.spell and "heal" or "item", spell = action.spell,
         item = action.id }
-      action.delay = st.delayOf(plan)
+      action.delay, action.delayBounds = st.delayOf(plan)
       action.latencyKnown = action.delay ~= nil
     end
   end
@@ -8469,7 +8626,7 @@ function Driver:raceLog(actor, plan, R)
     M.raceTally.unmodelled = M.raceTally.unmodelled + 1
     return -- do not compare alternatives with an invented rules action
   end
-  if st.delayOf then rc.delay = st.delayOf(plan) end
+  if st.delayOf then rc.delay, rc.delayBounds = st.delayOf(plan) end
   rc.latencyKnown = rc.delay ~= nil
   if not rc.latencyKnown then
     M.raceTally.skipped = M.raceTally.skipped + 1
@@ -8531,7 +8688,15 @@ function Driver:raceLog(actor, plan, R)
     end
     M.log(string.format("[%s] [race] actor=%d state: %s", self.tag or "fight", actor, table.concat(t, "; ")))
   end
-  if agree == "DISAGREE" then return cands[i] end
+  if agree == "DISAGREE" then
+    local safe, why = M.raceRobustBetter(st,cands[i],rc)
+    M.log(string.format("[%s] [race] timing sensitivity: %s (%s); race delay %d..%d, rules %d..%d",
+      self.tag or "fight", safe and "eligible" or "keep rules", why,
+      (cands[i].delayBounds or {}).lo or cands[i].delay or 0,
+      (cands[i].delayBounds or {}).hi or cands[i].delay or 0,
+      (rc.delayBounds or {}).lo or rc.delay or 0,(rc.delayBounds or {}).hi or rc.delay or 0))
+    if safe then return cands[i] end
+  end
 end
 
 -- Calibration (#415): the prediction for the plan that was played (its
@@ -14866,7 +15031,7 @@ function M.newFightDriver(tag, opts)
     tgtCycled = false,                 -- a steer press landed back on one
     recovery = (opts.actionTrace or OT6_ACTION_TRACE or M.CARE_RACE) and
 M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end,
-  function(e) D:raceObserve(e) end),
+  function(e) D:raceObserve(e) end, function() return M.readWord(0x3A3E) end),
     menuStreak = 0, tick = 0, battleTick = 0,
     -- A focus slot the graph ran out on (#189): slot -> { live, tick }.  A
     -- part can stand alive and present yet not be selectable -- NUMBER 128's

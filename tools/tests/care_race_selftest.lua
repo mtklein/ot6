@@ -701,7 +701,7 @@ end
 
 -- 40. Measure the complete accepted action lifecycle, not button attempts.
 do
-  local D = H.newFightDriver("latency unit").driver
+  local D = H.newFightDriver("latency unit", {raceTimingGuesses=false}).driver
   local trace = H.newRecoveryTrace("latency unit", function() end,
     function(e) D:raceObserve(e) end)
   local plan = { kind = "item", item = 0xE9, boostLeft = 0 }
@@ -752,6 +752,86 @@ do
   local r=H.raceSim(st,{kind="attack",line=p.lines[0],boost=0,delay=0,latencyKnown=true})
   check(r.invalid and r.resources.party[1].mp==10,
     "unknown later Cure invalidates the comparison without spending or healing")
+end
+
+-- 44. Only the matching running command owns an HP effect; animation end
+-- is kept separately from target effect times, and censored volleys expire.
+do
+  local D = H.newFightDriver("effect timing unit", {raceTimingGuesses=false}).driver
+  local events,clock = {},0xFFF0
+  local T = H.newRecoveryTrace("effect timing unit", function(e) events[#events+1]=e end,
+    function(e) D:raceObserve(e) end,function() return clock end)
+  local p={kind="skill",skill=0xAB,boostLeft=1}
+  T.plan(0,p,100); T.submit(0,120,9,0xAB,0x300)
+  T.start(0,140,9,0xAB,0x300,{100,100,100,100},20,1)
+  T.hpEffect(1,145,4,100,50,9,0xAB)
+  T.hpEffect(0,146,4,100,50,0x22,0xAB)
+  T.hpEffect(0,147,4,100,100,9,0xAB)
+  check(#events==3,"unrelated actor, engine command and zero HP change supply no effect")
+  clock=4; T.hpEffect(0,150,4,100,50,9,0xAB)
+  clock=14; T.hpEffect(0,160,5,300,200,9,0xAB)
+  check(events[4].effect_target==4 and events[5].effect_target==5
+    and events[4].hp_change==-50 and events[5].effect_index==2,
+    "retain each attributed target, signed HP change and pass timing")
+  check(D:raceDelay(0,p)==nil,"an unfinished volley is not a completed timing sample")
+  T.resolve(0,220,{100,100,100,100},16,0)
+  local delay,bounds=D:raceDelay(0,p)
+  check(delay==30 and bounds.lo==5 and bounds.hi==45,
+    "first/last HP effects bound aggregate delay without using animation completion")
+  check(D.raceTiming["0:skill:171:1"].finished==120,
+    "completion latency is preserved as a separate fact")
+  T.plan(0,p,300);T.submit(0,320,9,0xAB,0x300)
+  T.start(0,340,9,0xAB,0x300,{100,100,100,100},20,1)
+  T.hpEffect(0,350,4,100,50,9,0xAB);T.close(360,"battle_ended")
+  local _,after=D:raceDelay(0,p)
+  check(after.n==1 and next(D.raceEffectOpen)==nil,
+    "an incomplete final command cannot masquerade as a short completed volley")
+end
+
+-- 45. A miss cannot strip the last shield; random samples land whole hits.
+do
+  local st={actor=1,samples=0,contCare=false,horizon=1,
+    party={member(1000,1000,0,{period=1000})},
+    enemies={{hp=500,sh=1,eta=100,period=1000,act={dmg={0}}}}}
+  local c={kind="attack",line={per=50,hits=1,chips=1,hit=0},boost=0}
+  check(H.raceSim(st,c).leftNow==1000,"zero hit chance preserves both HP and shield")
+  c.line.hit=0.5
+  local miss=H.raceSim(st,c,function() return 0.9 end)
+  local land=H.raceSim(st,c,function() return 0.1 end)
+  check(miss.leftNow==1000 and land.leftNow==300,
+    "a sampled hit chips before damage; a sampled miss does neither")
+end
+
+-- 46. Guesses are explicit bounded estimates; paired scenarios must not
+-- reverse preference or buy a new fall, and tie-breakers cannot override.
+do
+  local D=H.newFightDriver("coarse timing unit").driver
+  local delay,bounds=D:raceDelay(0,{kind="fight"})
+  check(delay>0 and bounds.lo<delay and bounds.hi>delay and bounds.n==0,
+    "unobserved supported Fight uses a declared pulse/queue estimate, never zero")
+  local p=member(50,1000,0,{period=1000})
+  local st={actor=1,samples=0,contCare=false,horizon=2,tickMargin=5,
+    party={p},enemies={{hp=600,sh=0,eta=100,period=1000,act={dmg={50}}}}}
+  local rules={kind="attack",line={per=150,hits=1},boost=0,delay=50,delayBounds={lo=50,hi=50}}
+  local alt={kind="attack",line={per=200,hits=1},boost=0,delay=40,delayBounds={lo=20,hi=150}}
+  local safe,why=H.raceRobustBetter(st,alt,rules)
+  check(not safe and why=="timing scenario adds wipe/down/fall risk",
+    "late effect's lethal intervening enemy turn vetoes nominal faster kill")
+  alt.delayBounds.hi=40
+  check(H.raceRobustBetter(st,alt,rules),"material earlier kill with stable risk may override")
+  alt.delay=49;alt.delayBounds={lo=49,hi=49}
+  local ok,reason=H.raceRobustBetter(st,alt,rules)
+  check(not ok and reason=="inside uncertainty margin","one-tick tie-break is not material evidence")
+  p.heals={{restore=250,delay=20,delayBounds={lo=5,hi=40}}}
+  p.lines={[0]={per=100,delay=10,delayBounds={lo=2,hi=30}}}
+  local early=H.raceTimingScenario(st,rules,"lo")
+  local late=H.raceTimingScenario(st,rules,"hi")
+  check(early.party[1].heals[1].delay==5 and late.party[1].lines[0].delay==30
+    and p.heals[1].delay==20 and p.lines[0].delay==10,
+    "same timing convention reaches continuations without mutating the original state")
+  local a={wipe=false,pWipe=0.25,deaths=0,falls=0,kill=10,cost=0}
+  local b={wipe=false,pWipe=0,deaths=0,falls=0,kill=20,cost=0}
+  check(H.raceBetter(b,a,{samples=16,enemies={}}),"sampled wipe disadvantage outranks faster mean kill")
 end
 
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "

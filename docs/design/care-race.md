@@ -536,3 +536,49 @@ The revision is still an experimental branch. A log/off Gate batch at
 d7e854df collects command traces from the same legitimate Narshe battery;
 it is observation of the earlier timing approximation, not qualification
 of the corrected timing model or an acting policy.
+
+
+### Attributed effect timing stage
+
+The next observer brackets `ApplyDmg` with read-only CPU hooks. Its entry
+identifies the attacker and target; the return reads the changed HP after
+healing, damage and lethal clamping. Only a matching accepted/running
+menu command owns the effect; an enemy, engine tick or unrelated queued
+command cannot supply its sample. Every nonzero HP change retains its
+target and time, including multiple targets and boosted passes. Raw
+accepted command/attack identity remains distinct from the requested
+spell or item (tier folding may change it).
+
+The current simulator aggregates a command's hits at one event. Its
+explicit approximation will place that event between the observed first
+and last HP-effect times, rather than equating it with animation end.
+Using the last effect is conservative about when a whole volley can kill;
+using the first bounds the opposite ordering. Both compared commands and
+their continuations use the same early/late scenarios. The interval spans
+retained observed minima/maxima with one 30-frame controller pulse of
+slack; this is an experience-based estimate, not a hard guarantee. Close
+calls or a reversal across these scenarios keep the rules. Per-hit event
+scheduling remains a later refinement if retained disagreements require
+it. No acting or balance claim follows from the observer itself.
+
+
+The effect stage's timeline uses the engine's `$3A3E` update counter,
+modulo 16 bits. `UpdateBattleTime` advances gauges once per two video
+frames and can pause under the battle-program/wait mask. Raw video-frame
+navigation/queue/execution fields remain diagnostic facts; they are not
+added directly to a gauge ETA. Effect estimates span the observed first
+and last HP effects in update ticks, with 15 update ticks (one controller
+pulse at the unpaused rate) of slack. Before an exact action has landed,
+supported commands use a declared coarse pulse/queue/execution estimate,
+with minima of 900 video frames each for queue and execution, enlarged by
+observed lifecycle update counts. These are bounded experience guesses,
+not causal guarantees or hard statistical bounds. The first pulse-count
+estimate ignores freezes; its broad range and paired sensitivity are
+intended to reveal unstable choices.
+
+Early, central and late estimates apply to both first actions and all
+continuations. A candidate must retain material gain and avoid added
+sampled wipe/down/fall risk in every scenario. The model still approximates
+queued action serialization and aggregates a volley at one event; a full
+monster gauge wins ties conservatively. The default remains off while
+these assumptions receive legal-play observation and independent review.
