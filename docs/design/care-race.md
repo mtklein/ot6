@@ -1,7 +1,8 @@
 # The care race: one decision for every command (#415)
 
-Status: default-on augmentation implemented; final matched validation does
-not meet the original all-command/no-regression acceptance bar.
+Status: experimental action model under revision; final matched validation
+of the earlier default-on augmentation did not meet the original
+all-command/no-regression acceptance bar. No release qualification claimed.
 Owner and coordinator, 2026-10-06; validation updated 2026-10-07.
 
 ## Why
@@ -160,8 +161,9 @@ button walk.  It hands the choice of *what* to do to `M.raceChoose(state,
 candidates)`, a pure function that `battle_healpolicy` can drive with
 plain tables.
 
-The lever is `M.CARE_RACE`, and its default is `"act"`: where the race
-disagrees with the rule stack, the race's choice is played.  `"log"` (or
+The lever is `M.CARE_RACE`. The holistic revision defaults to `false`
+while its executable-action model is being qualified. Explicit `"act"`
+plays the race's choice where it disagrees with the rule stack.  `"log"` (or
 true) plays the rules and logs the race's choice beside them: one
 `[race]` line per decision, with the scores of both choices.  `false` (or
 `"off"`) plays the rules alone.  Every run ends with a `[race] mode ...`
@@ -466,3 +468,53 @@ the separate failure archive supplies the original worker artifacts.
 Both tracked-status files are empty. All branch jobs exited before the
 report. This remaining coverage failure needs a separate controller or
 fixture decision; a green build has not been claimed.
+
+## Holistic revision: executable actions, shared resources, and time
+
+Owner, 2026-10-07: spend another few hours on the big idea, rather than
+reduce #415 to its latest local regression. The independent read exposed
+one recurring problem: the action scored was not necessarily the action
+the controller could play. The model is being revised around three
+contracts, before measuring a new strategy.
+
+1. **Executable action.** Freeze verb, actual affordable boost, MP price,
+   target, per-body hit chance and shield effect before comparison. The
+   same record supplies the controller plan. A requested three-BP tool
+   stepped down to zero is one zero-BP action, not a fourfold attack.
+   Enumerate the currently supported Fight/Tools/Pummel alternatives
+   before the old chip heuristic selects one, deduplicating affordable
+   downgrades. Project the rules' actual action, never the different
+   `bestLine` that happens to share its boost index. Unknown verbs remain
+   unmodelled; they need an explicit effect record, not a guessed stand-in.
+2. **Shared resource state.** Every candidate starts with its own copy of
+   the party's shared bag and each member's MP/BP. The first command and
+   subsequent commands debit those same pools. A Potion is not available
+   once per actor; kit and cure turns share MP. When a kit runs out, the
+   continuation may take the real free Fight. A pending heal or raise is
+   a commitment, not another new care opportunity. Repeated falls count
+   separately from members still down at the end, so raising everyone
+   does not erase the damage the policy did during the fight.
+3. **One event timeline.** The first command resolves at its action's
+   delay, with enemy turns and target changes advanced before it. A full
+   monster gauge wins the tie. A model must be able to distinguish an
+   item reached after the next hit from a cure reached before it. The
+   driver records plan-to-resolve frames from the recovery action trace,
+   retaining a median for each actor, verb, item/skill and actual boost.
+   Unknown latency excludes a live candidate; it does not imply zero.
+   These observations include navigation, queueing and execution, but
+   their portability across changing menu positions remains to be measured.
+
+The new synthetic controls cover these contracts; their results are not
+legal play or balance evidence. Raw development failures and mutants are
+retained under `build/attempts/wt/v026-race/holistic/`. Older whole-route
+and d567f6f6 comparisons describe the old policy and do not qualify this
+revision.
+
+Still required: a complete command catalogue (including alternative
+spells, summons, Life, Defend and Row with faithful effects), validation of measured
+navigation/queue/execution latency across menu and battle states, treatment of actions already in flight, and independent review.
+Then branch both commands at disagreements from legitimate coherent
+snapshots, and evaluate fixed policies independently across fresh route
+attempts. Retain local controls and upstream arrival-state effects: the
+Sneezer's lost reward must survive in the inventory until explained and
+fixed, even if a segment still reaches its destination.

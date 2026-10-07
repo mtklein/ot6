@@ -562,6 +562,174 @@ do
   H.readByte, H.readWord, H.leftMask, H.shopRates = readByte, readWord, leftMask, shopRates
 end
 
+-- 31. Executable records retain the affordable boost, target and MP price.
+-- The requested three pips must not turn a zero-pip tool into fourfold damage.
+do
+  local plan = { kind = "skill", cmd = 9, skill = 0xAA, boostLeft = 0, mp = 4,
+                 hits = 1, chips = 1, aim = 2 }
+  local line = H.raceLine(plan, 100, { cost = 120, aoe = true })
+  local c = H.raceAttack(line, 3)
+  check(c.boost == 0 and line.per == 100, "score the executable zero-boost tool")
+  check(c.mp == 4 and c.cost == 120 and c.target == 2, "one action retains price and target")
+  check(line.aoe == true, "the area tool remains an area action")
+end
+
+-- 32. One Potion belongs to the shared bag, not separately to each actor.
+do
+  local function state()
+    local heal = { id = 0xE9, n = 1, restore = 500, cost = 300 }
+    return { actor = 1, samples = 0, contCare = true, horizon = 3, bag = { [0xE9] = 1 },
+      party = { member(200, 1000, 0, { period = 100, heals = { heal }, lines = lines(0, 1, 0) }),
+                member(200, 1000, 10, { period = 100, heals = { { id = 0xE9, n = 1, restore = 500, cost = 300 } },
+                  lines = lines(0, 1, 0) }) },
+      enemies = { { hp = 10000, sh = 0, eta = 20, period = 100,
+                    act = { aoe = true, dmg = { 300, 300 } } } } }
+  end
+  local st = state()
+  local first = { kind = "attack", line = st.party[1].lines[0], boost = 0 }
+  local r = H.raceSim(st, first)
+  check(r.spent == 300 and r.resources.bag[0xE9] == 0, "two actors share exactly one Potion")
+  check(st.bag[0xE9] == 1, "each candidate receives an independent copied bag")
+  st = state()
+  r = H.raceSim(st, { kind = "heal", target = 1, id = 0xE9, restore = 500, cost = 300 })
+  check(r.spent == 300 and r.resources.bag[0xE9] == 0, "the first action also exhausts the Potion")
+end
+
+-- 33. First action and continuation share one member's MP, across verbs.
+do
+  local function state()
+    local l = { [0] = { per = 25, hits = 1, chips = 0, mp = 4, cost = 120 } }
+    local p = member(100, 1000, 0, { period = 100, lines = l,
+      heals = { { spell = 0x2D, mp = 4, n = 1, restore = 500, cost = 120 } } })
+    p.mp = 4
+    return { actor = 1, samples = 0, horizon = 3, party = { p },
+      enemies = { { hp = 10000, sh = 0, eta = 150, period = 100, act = { dmg = { 300 } } } } }
+  end
+  local st = state()
+  local r = H.raceSim(st, H.raceAttack(st.party[1].lines[0], 0))
+  check(r.resources.party[1].mp == 0 and r.spent == 120, "the kit consumes the MP a cure would need")
+  check(r.wipe, "imaginary continuation Cure cannot save the depleted member")
+  st = state()
+  r = H.raceSim(st, { kind = "heal", target = 1, restore = 500, spell = 0x2D, mp = 4, cost = 120 })
+  check(r.resources.party[1].mp == 0 and r.spent == 120, "Cure consumes the MP future kit turns need")
+  local unavailable = { kind = "attack", line = st.party[1].lines[0], mp = 5, cost = 150 }
+  r = H.raceEval(st, unavailable)
+  check(r.invalid and r.resources.party[1].mp == 4, "unpayable first command is invalid without consuming MP")
+end
+
+-- 34. Controller latency advances enemies before the candidate resolves.
+-- Deep-item versus fast cure is a timing property, independent of damage.
+do
+  local st = { actor = 1, samples = 0, contCare = false, horizon = 1,
+    party = { member(100, 1000, 0) },
+    enemies = { { hp = 1000, sh = 0, eta = 20, period = 100, act = { dmg = { 200 } } } } }
+  local r = H.raceSim(st, { kind = "heal", target = 1, restore = 900, delay = 30 })
+  check(r.wipe and not r.firstExecuted, "enemy kills the actor during the deep item walk")
+  r = H.raceSim(st, { kind = "heal", target = 1, restore = 900, delay = 10 })
+  check(not r.wipe and r.firstExecuted, "the faster cure resolves before the hit")
+  st.enemies[1].eta = 0
+  r = H.raceSim(st, { kind = "attack", line = { per = 1000 }, boost = 0, delay = 0 })
+  check(r.wipe and not r.firstExecuted, "full enemy gauge acts before the first command")
+end
+
+-- 35. Area effects and fixed targets are known before comparison.
+do
+  local st = { actor = 1, samples = 0, contCare = false, horizon = 1,
+    party = { member(1000, 1000, 0, { period = 1000, lines = lines(0, 1, 0) }) },
+    enemies = { { hp = 100, sh = 1, eta = 100, period = 1000, act = { dmg = { 0 } } },
+                { hp = 100, sh = 1, eta = 100, period = 1000, act = { dmg = { 0 } } } } }
+  local line = H.raceLine({ kind = "skill", boostLeft = 0, hits = 1, aim = 2 }, 100,
+    { aoe = true, byTarget = { [1] = { hit = 0 }, [2] = { hit = 1, chips = 1 } } })
+  local r = H.raceSim(st, H.raceAttack(line, 0))
+  check(r.leftNow == 200, "area effects use each body's hit chance and shields")
+  line = H.raceLine({ kind = "fight", boostLeft = 0, hits = 1, aim = 2 }, 50,
+    { byTarget = { [1] = { hit = 0 }, [2] = { hit = 1, chips = 1 } } })
+  r = H.raceSim(st, H.raceAttack(line, 0))
+  check(r.leftNow == 250, "score the frozen target rather than the lowest HP/default target")
+end
+
+-- 36. Pending care is a commitment, not a second new candidate.
+do
+  local D = H.newFightDriver("pending care unit").driver
+  local readByte, leftMask = H.readByte, H.leftMask
+  H.readByte, H.leftMask = function() return 0 end, function() return 0 end
+  local st = { actor = 0, careItems = true, careCasts = false, pendingHeal = { [1] = { by = 2 } },
+    party = { [0] = { hp = 1000, maxhp = 1000, bp = 0, lines = {}, heals = {} },
+              [1] = { hp = 100, maxhp = 1000, heals = { { id = 0xE9, restore = 250, cost = 300 } } } } }
+  check(#D:raceCandidates(0, st) == 0, "no duplicate heal offered for a pending heal")
+  st.pendingHeal = {}
+  check(#D:raceCandidates(0, st) == 1, "the heal is offered without a pending commitment")
+  H.readByte, H.leftMask = readByte, leftMask
+end
+
+-- 37. Enumerate executable alternatives before selecting by shield chips.
+-- An affordable downgrade offered at several requested boosts is one action.
+do
+  local D = H.newFightDriver("canonical enumeration unit", { boost = true }).driver
+  local readByte, leftMask = H.readByte, H.leftMask
+  H.readByte, H.leftMask = function() return 0 end, function() return 0 end
+  local tool = H.raceLine({ kind = "skill", cmd = 9, skill = 0xAA, boostLeft = 0, mp = 4 }, 100)
+  local fight = H.raceLine({ kind = "fight", boostLeft = 1 }, 100)
+  local st = { actor = 0, party = { [0] = { hp = 1000, maxhp = 1000, bp = 3, lines = {},
+    actions = { tool, tool, tool, tool, fight }, heals = {} } } }
+  local c = D:raceCandidates(0, st)
+  check(#c == 2 and c[1].boost == 0 and c[2].boost == 1, "retain both verbs, deduplicate requested boost downgrades")
+  st.party[0].bp = 0
+  c = D:raceCandidates(0, st)
+  check(#c == 1 and c[1].boost == 0, "a command cannot spend BP absent from the bank")
+  H.readByte, H.leftMask = readByte, leftMask
+end
+
+-- 38. Depleted kit MP falls back to a real free Fight, not repeated tools.
+do
+  local l = { [0] = { per = 25, hits = 1, mp = 4, cost = 120 } }
+  local p = member(1000, 1000, 0, { period = 100, lines = l })
+  p.mp, p.fallback = 4, { per = 25, hits = 1, boost = 0, mp = 0 }
+  local st = { actor = 1, samples = 0, contCare = false, party = { p },
+    enemies = { { hp = 300, sh = 0, eta = 1000, period = 1000, act = { dmg = { 0 } } } } }
+  local r = H.raceSim(st, H.raceAttack(l[0], 0))
+  check(r.kill == 200 and r.spent == 120 and r.resources.party[1].mp == 0,
+    "one paid tool followed by two free Fights")
+end
+
+-- 39. A party revived by the end still paid for its falls during the fight.
+do
+  local a = { wipe = false, deaths = 0, falls = 2, kill = 100, cost = 0 }
+  local b = { wipe = false, deaths = 0, falls = 0, kill = 200, cost = 0 }
+  check(H.raceBetter(b, a, { samples = 0, enemies = {} }), "fewer repeated falls beats a quicker ending with everyone raised")
+end
+
+-- 40. Measure the complete accepted action lifecycle, not button attempts.
+do
+  local D = H.newFightDriver("latency unit").driver
+  local trace = H.newRecoveryTrace("latency unit", function() end,
+    function(e) D:raceObserve(e) end)
+  local plan = { kind = "item", item = 0xE9, boostLeft = 0 }
+  check(D:raceDelay(0, plan) == nil, "unknown command latency is absent, never zero")
+  trace.plan(0, plan, 100)
+  trace.confirm(0, 110, 0, 0)
+  trace.submit(0, 120, 1, 0xE9, 1)
+  trace.start(0, 140, 1, 0xE9, 1, {100,100,100,100}, 20, 0)
+  check(D:raceDelay(0, plan) == nil, "accepted but unresolved command is not a latency sample")
+  trace.resolve(0, 180, {200,100,100,100}, 20, 0)
+  check(D:raceDelay(0, plan) == 80, "latency includes navigation, queue and execution")
+  check(D:raceDelay(1, plan) == nil and D:raceDelay(0, {kind="item", item=0xEA}) == nil,
+    "latency samples do not cross actor or item identity")
+  D:raceObserve({event="resolve", actor=0, kind="item", requested=0xE9, boost=0, elapsed_frames=100})
+  D:raceObserve({event="resolve", actor=0, kind="item", requested=0xE9, boost=0, elapsed_frames=90})
+  check(D:raceDelay(0, plan) == 90, "use the median resolved command latency")
+end
+
+-- 41. A pending command at the horizon has not performed its imagined heal.
+do
+  local st = { actor=1, samples=0, contCare=false, horizon=1,
+    party={member(500,1000,0)},
+    enemies={{hp=10000,sh=0,eta=10,period=10,act={dmg={1}}}} }
+  local r=H.raceSim(st,{kind="heal",target=1,restore=500,delay=100})
+  check(r.pending and not r.firstExecuted and r.resources.party[1].hp==499,
+    "horizon does not credit a command that has not resolved")
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
   .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise, near fatal, the carried swing, zombie and left-member candidate vetoes", n))
