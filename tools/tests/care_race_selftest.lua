@@ -376,6 +376,21 @@ do
   check(r.deaths == 0 and not r.wipe, "after the heal the continuation's Fight leaves two standing")
 end
 
+-- 23. A last stand every attack sets off does not stall the race on heals
+-- (the WoR's s5 at dce53c3e: the Sneezer and one body left, every Fight
+-- read as the party gone, and CELES cast Cure three times running)
+do
+  local L = {}
+  for b = 0, 3 do L[b] = { per = 200, hits = 2 + 2 * b, chips = 0 } end
+  local st = { actor = 1, hpRate = 1.2, focus = { 2, 1 },
+    party = { member(500, 1043, 0, { lines = L, bp = 1, period = 202, heals = {} }) },
+    enemies = { { hp = 200, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } } },
+                { hp = 300, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } }, stand = { n = 1 } } } }
+  local c = choose(st, { { kind = "attack", line = L[0], boost = 0 }, { kind = "attack", line = L[1], boost = 1 },
+    { kind = "heal", target = 1, restore = 300, cost = 5 } })
+  check(c.kind == "attack", "with every attack setting it off, the race attacks, got " .. c.kind)
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
   .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard", n))

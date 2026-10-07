@@ -1605,7 +1605,7 @@ function M.raceSim(st, first, draw)
   -- a single-target line's swings past its body's death go on to the next
   -- standing one (the engine retargets a dead target's remaining strikes),
   -- chipping nothing there: the chips were counted against the first body
-  local death, t_now, wouldStand
+  local death, t_now, wouldStand, first_act
   local function attack(p, line, fixed)
     if line == nil then return end
     if line.aoe then
@@ -1687,6 +1687,10 @@ function M.raceSim(st, first, draw)
       -- kills the second body leaves the Sneezer alone (the WoR's s5: the
       -- race's 2-BP Fight read two standing; three fell)
       local slack = false
+      -- (the decision's own action only: a later kill the fight cannot
+      -- avoid is no reason to stall now; and not when every attack the
+      -- window offers sets it off -- st.noStand, M.raceChoose)
+      if first_act ~= true or st.noStand then anyStand = false end
       if draw == nil and anyStand and c.line then
         local save = {}
         for j, e in pairs(E) do save[j] = { e.hp, e.sh } end
@@ -1698,7 +1702,10 @@ function M.raceSim(st, first, draw)
         for j, e in pairs(E) do e.hp, e.sh = save[j][1], save[j][2] end
       end
       attack(p, c.line, c.target)
-      if slack or standFires(E, before) then removed(k) end
+      if anyStand and (slack or standFires(E, before)) then
+        r.standNow = true
+        removed(k)
+      end
       p.bp = (c.boost or 0) > 0 and (p.bp - c.boost) or math.min(p.bp + 1, 5)
     elseif c.kind == "heal" then
       local who = c.all and P or { [c.target] = P[c.target] }
@@ -1780,7 +1787,9 @@ function M.raceSim(st, first, draw)
 
   -- the decision itself, now
   local a = P[st.actor]
+  first_act = true
   act(st.actor, first, 0)
+  first_act = false
   r.leftNow = effLeft(E)
   a.eta = a.period
   if fightOver(E) then r.kill = 0 end
@@ -1940,17 +1949,32 @@ function M.raceEval(st, c)
     left0 = rs[1].left0, leftNow = worst.leftNow,
     spent = mean(function(x) return x.spent end), bill = mean(function(x) return x.bill end),
     cost = mean(function(x) return x.cost end), acts = worst.acts,
-    pWipe = mean(function(x) return x.wipe and 1 or 0 end), worstWipe = worst.wipe, worstDeaths = worst.deaths }
+    pWipe = mean(function(x) return x.wipe and 1 or 0 end), worstWipe = worst.wipe, worstDeaths = worst.deaths,
+    standNow = worst.standNow }
   r.wipe = worst.wipe
   return r
 end
 
 function M.raceChoose(st, candidates)
   local best, bestR, all = nil, nil, {}
+  local attacks, fire = 0, 0
   for i, c in ipairs(candidates) do
     local r = M.raceEval(st, c)
     all[i] = r
-    if bestR == nil or M.raceBetter(r, bestR, st) then best, bestR = i, r end
+    if c.kind == "attack" then
+      attacks = attacks + 1
+      if r.standNow then fire = fire + 1 end
+    end
+  end
+  -- a last stand every attack sets off is the fight's, not this choice's:
+  -- read the window again without it (else the race stalls on heals)
+  if attacks > 0 and fire == attacks and not st.noStand then
+    st.noStand = true
+    for i, c in ipairs(candidates) do all[i] = M.raceEval(st, c) end
+    st.noStand = nil
+  end
+  for i in ipairs(candidates) do
+    if bestR == nil or M.raceBetter(all[i], bestR, st) then best, bestR = i, all[i] end
   end
   return best, bestR, all
 end
