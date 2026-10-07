@@ -672,3 +672,21 @@ swings and keeps each hit's damage unchanged. Tier-family spells require
 the resolved tier's own effect; the supported skill multiplier is not a
 blanket recipe for those spells. A retained before-fix arithmetic contract
 shows Tools at two BP predicted 300 from base100 where the ROM buys400.
+
+### Caster-aware catalogue prices
+
+`battleSpellPrice(actor, menuAbility, totalBoost)` reads the ability's raw
+`MagicProp` cost, resolves a family head once, and applies that caster's
+relic byte. Economizer wins over Gold Hairpin; Hairpin uses the ROM's
+rounded half. Family tiers stop there, while other abilities take the
+2.5x price ladder, including the equipped esper's ability record. A live
+list price already includes pending boost and cannot be used as a base:
+rounding and the cap make inversion ambiguous. The legacy `spellPrice`
+unboosted-base API remains unchanged.
+
+This catalogue API has synthetic contracts for all four caster offsets,
+boost amounts, relic combinations, family/owned-tier/nonfamily/esper costs
+and malformed input. It is not yet connected to candidate discovery or
+execution. That connection must preserve total boost, resolved effect,
+menu identity and targets, and establish the corresponding controller
+acknowledgments. These arithmetic checks are not played spell evidence.

@@ -2817,6 +2817,33 @@ function M.spellPrice(id, base, boost)
   return M.boostPrice(base, boost), id
 end
 
+-- Ot6SpellMP's caster discount, before Ot6MagicPrice's boost ladder.
+-- The INC runs in eight-bit mode; retain its wrap even for synthetic ROM
+-- costs. Economizer wins when both relic flags are set.
+function M.casterSpellMp(raw, relic)
+  if (relic & 0x40) ~= 0 then return 1 end
+  if (relic & 0x20) ~= 0 then return ((raw + 1) & 0xFF) >> 1 end
+  return raw
+end
+
+-- A battle catalogue price starts from MagicProp, never the live list's
+-- already-pending-boosted byte. `boost` is the desired TOTAL pending BP.
+-- This is separate from spellPrice's legacy unboosted-base API: callers
+-- cannot recover a raw price from a capped/rounded menu price.
+function M.battleSpellPrice(actor, id, boost)
+  assert(type(actor) == "number" and actor % 1 == 0 and actor >= 0 and actor <= 3,
+    "battle spell price requires a seated caster")
+  assert(type(id) == "number" and id % 1 == 0 and id >= 0 and id <= 0xFF,
+    "battle spell price requires an ability record")
+  assert(type(boost) == "number" and boost % 1 == 0 and boost >= 0 and boost <= 3,
+    "battle spell price requires total boost 0..3")
+  local family = M.inFoldTbl(id)
+  local resolved = family and M.foldTier(id, boost) or id
+  local raw = M.spellMpCost(resolved)
+  local base = M.casterSpellMp(raw, M.readByte(0x3C45 + actor * 2))
+  return family and base or M.boostPrice(base, boost), resolved
+end
+
 -- The dearest Tool the battle bag holds (#230), and its unboosted price.
 --
 -- Why a ceiling rather than a name.  The Tools shell lists the tools the
