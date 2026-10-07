@@ -1013,6 +1013,59 @@ do
   end
 end
 
+-- Actual engine queue allocation, cancellation and folding provenance.
+do
+  local ev={};local T=H.newRecoveryTrace("queue unit",function(e) ev[#ev+1]=e end)
+  local hp={100,100,100,100}
+  local function submit(cmd,atk,frame)
+    T.plan(0,{kind="fight"},frame);T.submit(0,frame+1,cmd,atk,256)
+  end
+  local function start(index,cmd,atk,frame)
+    return T.start(0,frame,cmd,atk,256,hp,10,0,
+      {queue_index=index,queued_command=cmd,queued_attack=atk,counter=false})
+  end
+  submit(0,255,0);T.queueStore(0,2,0,255,2)
+  T.queueStore(0,4,0,127,3)
+  check(not start(4,0,127,4) and #T.queued[0]==1,
+    "same-command untraced different-attack allocation cannot steal Fight")
+  T.queueStore(0,6,0,255,5)
+  check(not start(6,0,255,6) and #T.queued[0]==1,
+    "same-command same-attack different queue origin cannot steal Fight")
+  local b=T.bindings[2];local trace=b.trace_id;b.trace_id=trace+1
+  check(not start(2,0,255,7),"queue binding with stale trace ID is rejected")
+  b.trace_id=trace
+  local generation=b.generation;b.generation=generation+1
+  check(not start(2,0,255,7),"queue binding with stale generation is rejected")
+  b.generation=generation
+  check(start(2,0,255,7)~=nil,"only original allocated queue origin starts Fight")
+  T.resolve(0,8,hp,10,0)
+  submit(2,45,10);T.queueStore(0,2,2,46,12)
+  local scope=start(2,2,46,13)
+  check(scope~=nil and ev[#ev].attack==46,"queue-time folded spell binds actual stored attack")
+  T.resolve(0,14,hp,10,0)
+  submit(0,255,20);T.queueStore(0,2,0,255,22)
+  T.cancelQueued(0,23)
+  check(ev[#ev].reason=="queue_cancelled" and #T.queued[0]==0,
+    "RemoveAllActions cancels submitted trace and provenance")
+  T.queueStore(0,2,0,255,24)
+  check(not start(2,0,255,25),"automatic same-opcode action after cancellation stays untraced")
+  submit(0,255,30);T.queueStore(0,2,0,255,32)
+  T.queueStore(0,2,0,255,33)
+  check(ev[#ev].reason=="queue_reallocated" and not start(2,0,255,34),
+    "slot reuse invalidates old provenance even with identical command/attack")
+  submit(0,255,40);T.queueStore(0,2,0,255,42)
+  check(start(2,0,255,43)~=nil,"new legitimate submission owns reused slot generation")
+  T.resolve(0,44,hp,10,0)
+  submit(0x17,45,50);T.queueStore(0,2,0x17,46,52)
+  T.submit(0,53,0x17,47,256);T.queueStore(0,4,0x17,47,54)
+  check(not start(4,0x17,47,55) and #T.queued[0]==1,
+    "XMagic second queue entry remains untraced and cannot consume first")
+  check(start(2,0x17,46,56)~=nil,"XMagic first folded queue entry preserves provenance")
+  T.resolve(0,57,hp,10,0)
+  submit(0,255,60);T.queueStore(0,2,0,255,62);T.close(63,"reload")
+  check(not start(2,0,255,64),"reload clears queue bindings as well as traces")
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
   .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise, near fatal, the carried swing, zombie and left-member candidate vetoes", n))

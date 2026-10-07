@@ -69,6 +69,11 @@ def summarize(lines):
                 for field in ('queued_command', 'queued_attack'):
                     if type(e.get(field)) is not int or not 0 <= e[field] <= 255:
                         raise ValueError(f'invalid {field}')
+                if 'queue_index' in e:
+                    if type(e['queue_index']) is not int or not 0 <= e['queue_index'] <= 254 or e['queue_index'] % 2:
+                        raise ValueError('invalid engine queue index')
+                    if type(e.get('queue_generation')) is not int or e['queue_generation'] <= 0:
+                        raise ValueError('invalid engine queue generation')
                 if e.get('counter') is not False or e['queued_command'] != e.get('command'):
                     raise ValueError('accepted execution is not a normal queued command')
             if e['event'] in {'hp_effect', 'resolve'} and any(x['event'] == 'start' for x in events):
@@ -77,6 +82,10 @@ def summarize(lines):
                     for field in ('context_id', 'queued_command', 'queued_attack'):
                         if e.get(field) != start[field]:
                             raise ValueError('event does not match accepted execution context')
+                    if 'queue_index' in start:
+                        for field in ('queue_index','queue_generation'):
+                            if e.get(field) != start[field]:
+                                raise ValueError('event does not match engine queue provenance')
             if e['event'] == 'hp_effect':
                 for field in required['hp_effect']:
                     if type(e[field]) is not int:
@@ -193,6 +202,12 @@ def selftest():
         assert summarize(token_opening + [line('hp_effect',10,**(token_effect | {field:value}))])['errors']
     assert summarize(token_opening + [line('hp_effect',10,**token_effect),
         line('resolve',12,context_id=8,queued_command=0,queued_attack=255)])['errors']
+    queued_start = json.loads(token_start[len(PREFIX):]) | dict(queue_index=2,queue_generation=4)
+    queued_opening = token_opening[:-1] + [PREFIX+json.dumps(queued_start)]
+    queued_effect = token_effect | dict(queue_index=2,queue_generation=4)
+    assert not summarize(queued_opening+[line('hp_effect',10,**queued_effect)])['errors']
+    for field,value in [('queue_index',4),('queue_generation',5)]:
+        assert summarize(queued_opening+[line('hp_effect',10,**(queued_effect|{field:value}))])['errors']
     print('action_trace selftest: PASS')
 
 

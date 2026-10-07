@@ -638,3 +638,17 @@ CheckWeaponMagic and ExecRetal in `battle_main.asm`. Synthetic controls
 exercise internal children and unrelated/stale contexts. This observation
 stage does not authorize the default acting policy or close catalogue and
 queue-model gaps.
+
+The token is now tied to an engine queue allocation, rather than merely a
+matching opcode. A zero-byte source label observes CreateAction after
+Ot6QueueFold stores its actual command/attack and targets. Each store
+replaces that slot's provenance with a fresh generation, traced or
+untraced. InitPlayerAction supplies the executing slot; ExecCmd must find
+that exact trace, generation, actor and stored identity before consuming
+it. RemoveAllActions cancels queued traces and clears their bindings.
+An automatic same-opcode action therefore cannot steal an earlier user
+submission, even when its attack byte is identical. XMagic's second entry
+is deliberately untraced; it cannot consume the first entry's provenance.
+Synthetic cancellation, reuse, folded spell and collision cases cover
+this origin contract. The earlier 8e96d516 Gate observation establishes
+physical child identity only; it predates this queue-origin correction.

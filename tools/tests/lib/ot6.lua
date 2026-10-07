@@ -5463,7 +5463,7 @@ end
 -- A confirm press is an attempt, never proof of submission or resolution.
 local actionTraceSerial = 0
 function M.newRecoveryTrace(tag, emit, observe, tickReader)
-  local T = { pending = {}, queued = {}, running = {}, context = nil, contextSerial = 0 }
+  local T = { pending = {}, queued = {}, running = {}, context = nil, contextSerial = 0, bindings = {}, queueSerial = 0 }
   local function event(p, stage, frame, fields)
     local e = { v = 1, id = p.id, tag = tag or "fight", actor = p.actor,
       kind = p.kind, requested = p.requested, target = p.target,
@@ -5509,16 +5509,52 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
     end
   end
   function T.submit(actor, frame, cmd, attack, targets)
+    T.staging = nil
     local p = T.pending[actor]
     if not p or p.stage ~= "plan" then return end
     p.stage, p.submitted = "submit", frame
     p.submitted_tick = tickReader and tickReader()
     p.accepted_command = cmd
+    T.staging = p
     T.pending[actor] = nil
     T.queued[actor] = T.queued[actor] or {}
     table.insert(T.queued[actor], p)
     event(p, "submit", frame, { command = cmd, attack = attack,
       targets = targets, navigation_frames = frame - p.frame })
+  end
+  function T.cancelQueued(actor, frame)
+    for _,p in ipairs(T.queued[actor] or {}) do
+      event(p,"unresolved",frame,{reason="queue_cancelled",last_stage=p.stage})
+    end
+    T.queued[actor] = {}
+    for index,b in pairs(T.bindings) do
+      if b.actor == actor then T.bindings[index] = nil end
+    end
+    if T.staging and T.staging.actor == actor then T.staging = nil end
+  end
+  -- Every allocation overwrites provenance, even when no trace owns it.
+  -- Called after queue-time folding, at the actual command/target store.
+  function T.queueStore(actor, index, cmd, attack, frame)
+    local old = T.bindings[index]
+    if old and old.trace_id then
+      local q = T.queued[old.actor] or {}
+      for i,p in ipairs(q) do
+        if p.id == old.trace_id then
+          event(p,"unresolved",frame or p.submitted,{reason="queue_reallocated",last_stage=p.stage})
+          table.remove(q,i)
+          break
+        end
+      end
+    end
+    T.queueSerial = T.queueSerial + 1
+    local p = T.staging
+    local b = { generation = T.queueSerial, actor = actor, command = cmd, attack = attack }
+    if p and p.actor == actor then
+      b.trace_id = p.id
+      p.engine_command, p.engine_attack = cmd, attack
+      p.queue_index, p.queue_generation = index, b.generation
+    end
+    T.bindings[index], T.staging = b, nil
   end
   -- Every dispatcher invocation creates a new scope, including an enemy,
   -- counter or engine action which has no accepted controller command.
@@ -5533,7 +5569,15 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
       or scope.queued_command ~= cmd then return end
     local queue = T.queued[actor] or {}
     local p = queue[1]
-    if not p or p.accepted_command ~= cmd then return end
+    if not p then return end
+    if meta.queue_index ~= nil then
+      local b = T.bindings[meta.queue_index]
+      if not b or b.actor ~= actor or b.trace_id ~= p.id
+        or b.generation ~= p.queue_generation or p.queue_index ~= meta.queue_index
+        or b.command ~= scope.queued_command or b.attack ~= scope.queued_attack
+        or p.engine_command ~= cmd then return end
+      scope.queue_index, scope.queue_generation = meta.queue_index, b.generation
+    elseif p.accepted_command ~= cmd then return end
     table.remove(queue, 1)
     if T.running[actor] then
       event(T.running[actor], "unresolved", frame,
@@ -5548,7 +5592,8 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
     event(p, "start", frame, { command = cmd, attack = attack,
       targets = targets, queue_frames = frame - p.submitted,
       context_id = scope.id, queued_command = scope.queued_command,
-      queued_attack = scope.queued_attack, counter = scope.counter })
+      queued_attack = scope.queued_attack, counter = scope.counter,
+      queue_index = scope.queue_index, queue_generation = scope.queue_generation })
     return scope
   end
   -- The frozen accepted action owns its internal hand/tool/spell effects.
@@ -5567,6 +5612,7 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
     event(p, "hp_effect", frame, { command = p.command, attack = p.attack,
       raw_effect_command = cmd, raw_effect_attack = attack,
       queued_command = scope.queued_command, queued_attack = scope.queued_attack,
+      queue_index = scope.queue_index, queue_generation = scope.queue_generation,
       context_id = scope.id, effect_target = target, hp_before = before, hp_after = after,
       hp_change = after - before, effect_index = p.effectN,
       navigation_frames = p.submitted - p.frame,
@@ -5583,6 +5629,7 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
     -- counters, misses and caps can change the outcome). Preserve raw facts.
     event(p, "resolve", frame, { command = p.command, attack = p.attack,
       targets = p.targets, hp_net = table.concat(deltas, ","), context_id = scope.id,
+      queue_index = scope.queue_index, queue_generation = scope.queue_generation,
       queued_command = scope.queued_command, queued_attack = scope.queued_attack,
       mp_net = mp - p.mp, bp_net = bp - p.bp,
       execution_frames = frame - p.started,
@@ -5613,6 +5660,7 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
         { reason = reason, last_stage = p.stage }) end
     end
     T.queued, T.running, T.context = {}, {}, nil
+    T.bindings, T.staging, T.executionIndex = {}, nil, nil
   end
   return T
 end
@@ -5661,6 +5709,18 @@ local function recoveryActivate(trace)
         M.readByte(0x2BB0 + y), M.readWord(0x2BB1 + y))
     end
   end)
+  hook(M.sym("RecoveryQueueStored"), function(t, cpu)
+    local x, y = cpu["cpu.x"] & 0xffff, cpu["cpu.y"] & 0xffff
+    t.queueStore(x < 8 and x % 2 == 0 and x // 2 or nil, y,
+      M.readByte(0x3420+y), M.readByte(0x3421+y), M.frame)
+  end)
+  hook(M.sym("RemoveAllActions"), function(t, cpu)
+    local x = cpu["cpu.x"] & 0xffff
+    if x < 8 and x % 2 == 0 then t.cancelQueued(x // 2,M.frame) end
+  end)
+  hook(M.sym("InitPlayerAction"), function(t, cpu)
+    t.executionIndex = cpu["cpu.y"] & 0xffff
+  end)
   -- ExecAction calls ExecCmd with X restored to the acting entity. $b5/$b6
   -- now contain the command/attack after queue-time spell folding.
   hook(M.sym("ExecCmd@battle_code"), function(t, cpu)
@@ -5668,7 +5728,8 @@ local function recoveryActivate(trace)
     t.start(x < 8 and x % 2 == 0 and x // 2 or nil, M.frame,
       M.readByte(0xB5), M.readByte(0xB6), M.readWord(0xB8), recoveryHP(),
       M.readWord(0x3C08 + x), M.readByte(0x3E9C + x),
-      { queued_command = M.readByte(0x3A7C), queued_attack = M.readByte(0x3A7D),
+      { queue_index = t.executionIndex,
+        queued_command = M.readByte(0x3A7C), queued_attack = M.readByte(0x3A7D),
         counter = (M.readByte(0xB1) & 1) ~= 0 })
   end)
   -- ApplyDmg saves the attacker X before using it for HP/MP dispatch.

@@ -13332,6 +13332,7 @@ CreateAction:
         sta     $3420,y     ; add to command/attack queue
         lda     $b8         ; targets
         sta     $3520,y     ; add to targets queue
+RecoveryQueueStored:                    ; observation only: no emitted bytes
         plp
         ply
         rts
