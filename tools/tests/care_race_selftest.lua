@@ -910,6 +910,21 @@ do
     and st.enemies[1].breakDuration==10,"break timing sensitivity copies both arms without mutating input")
 end
 
+-- 49. A living broken body's attack counter is suppressed, while
+-- if_self_dead retaliation remains admitted by the engine's died branch.
+do
+  local st={actor=1,samples=0,contCare=false,horizon=1,
+    party={member(1000,1000,0,{period=2000})},
+    enemies={{hp=1000,sh=1,shMax=1,breakDuration=100,eta=50,period=100,
+      stand={n=1,guarded=true},act={dmg={100}}}}}
+  local a={kind="attack",line={per=10,hits=1,chips=1},boost=0}
+  check(not H.raceSim(st,a).standNow,"final shield chip suppresses living attack retaliation")
+  a.line.chips=0
+  check(H.raceSim(st,a).standNow,"unbroken living last-stand retaliation still fires")
+  st.enemies[1].stand={n=1,deathOnly=true};a.line.chips=1;a.line.per=300
+  check(H.raceSim(st,a).standNow,"broken death counter remains admitted after lethal hit")
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
   .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise, near fatal, the carried swing, zombie and left-member candidate vetoes", n))

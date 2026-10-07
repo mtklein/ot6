@@ -1722,7 +1722,11 @@ function M.raceSim(st, first, draw)
       local st = e.stand
       if st and before[j] and standing <= (st.n or 1) then
         local alive = e.hp > 0
-        if (st.guarded and alive) or (st.deathOnly and not alive) or (not st.guarded and not st.deathOnly) then
+        -- Ot6MayAct suppresses a living broken body's attack counters.
+        -- Death counters still run; story-only blocks do not attack.
+        local suppressed = alive and e.breakUntil ~= nil
+        if not suppressed and ((st.guarded and alive) or (st.deathOnly and not alive)
+          or (not st.guarded and not st.deathOnly)) then
           return true
         end
       end
