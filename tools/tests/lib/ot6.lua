@@ -7863,6 +7863,24 @@ function Driver:raceLog(actor, plan, R)
   M.log(string.format("[%s] [race] actor=%d %s: race %s%s; %d candidate(s)", self.tag or "fight", actor, agree,
     raceDesc(cands[i], best), ri and (" | rules " .. raceDesc(cands[ri], all[ri])) or "", #cands))
   self._racePred = { st = st, race = all[i], rules = ri and all[ri] or nil }
+  -- the state behind a prediction of a death (calibration, #415)
+  if (best.deaths or 0) >= 0.5 or (ri and (all[ri].deaths or 0) >= 0.5) then
+    local t = {}
+    for k, p in pairs(st.party) do
+      local ln = p.lines[0]
+      t[#t + 1] = string.format("e%d %d/%d eta %d period %d per %d x%d heals %d", k, p.hp, p.maxhp,
+        math.floor(p.eta), math.floor(p.period), ln and math.floor(ln.per) or 0, ln and ln.hits or 0, #p.heals)
+    end
+    for k, e in pairs(st.enemies) do
+      local d, w = {}, {}
+      for m, v in pairs(e.act.dmg) do d[#d + 1] = string.format("%d:%d", m, math.floor(v)) end
+      for m, v in pairs(e.act.worst or {}) do w[#w + 1] = string.format("%d:%d", m, math.floor(v)) end
+      t[#t + 1] = string.format("s%d hp %d sh %d eta %d period %d%s hit %.2f%s typical {%s} worst {%s}", k, e.hp,
+        e.sh, math.floor(e.eta), math.floor(e.period), e.ends and " ends" or "", e.act.hit or 1,
+        e.act.aoe and " area" or "", table.concat(d, " "), table.concat(w, " "))
+    end
+    M.log(string.format("[%s] [race] actor=%d state: %s", self.tag or "fight", actor, table.concat(t, "; ")))
+  end
   if agree == "DISAGREE" then return cands[i] end
 end
 
