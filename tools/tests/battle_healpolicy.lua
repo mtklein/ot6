@@ -826,6 +826,46 @@ H.run({ maxFrames = 3000 }, {
       kept = H.liftFilterHeals({ { id = 0xE9, restore = 250 }, { id = 0xEA, restore = 1094 } }, 121, 2000, 603)
       H.assertEq(#kept == 1 and kept[1].id or -1, 0xEA, "...the X-Potion alone over a 603 round at 121/2000")
     end
+    -- the treadmill (#414): a heal that does not lift its target clear of
+    -- the round (hp + restore <= round) buys nothing, and yields to a bank
+    -- of a full action's boost (3); one that lifts stands (review of
+    -- fe60af44: "heal entity 2 (357/1130) with $EA -- restores 773, a
+    -- round costs 838" had become "Tools $AA at 3 BP (0 chip(s))")
+    local T = H.treadmillSpends
+    H.assertEq(T({ bp = 5, hp = 300, restore = 250, cost = 917, bpAt = 3 }), true,
+      "5 BP, a member at 300 under a 917 round, a 250 Potion: 550 does not lift -- spend")
+    H.assertEq(T({ bp = 3, hp = 357, restore = 773, cost = 838, bpAt = 3 }), false,
+      "357 + 773 over an 838 round lifts her: the heal stands")
+    H.assertEq(T({ bp = 5, hp = 807, restore = 250, cost = 917, bpAt = 3 }), false,
+      "807 + 250 = 1057 over 917 lifts: the heal stands")
+    H.assertEq(T({ bp = 3, hp = 600, restore = 317, cost = 917, bpAt = 3 }), true,
+      "600 + 317 = 917, not over the round: spend")
+    H.assertEq(T({ bp = 2, hp = 300, restore = 250, cost = 917, bpAt = 3 }), false,
+      "2 BP: the heal stands (the bank is not a full action)")
+    H.assertEq(T({ bp = 5, hp = 300, restore = nil, cost = 900, bpAt = 3 }), false,
+      "an unmeasured cure stands (it may lift)")
+    H.assertEq(T({ bp = 5, hp = nil, restore = 250, cost = 900, bpAt = 3 }), false,
+      "an unread HP stands")
+    H.assertEq(T({ bp = 5, hp = 300, restore = 250, cost = 900, all = true, bpAt = 3 }), false,
+      "a party heal stands")
+    H.assertEq(T({ bp = 5, hp = 300, restore = 250, cost = 0, bpAt = 3 }), false,
+      "no round measured yet: stands")
+    H.assertEq(T({ bp = 5, hp = 300, restore = 250, cost = 917, bpAt = false }), false,
+      "the lever off: stands")
+    -- ...and what the bank goes to: a line that chips (or hits a Broken
+    -- target), else the summon, else the heal stands (never a 0-chip spend)
+    local L = H.treadmillLine
+    H.assertEq(L({ chips = 2 }), "line", "a line that chips")
+    H.assertEq(L({ chips = 0, broken = true }), "line", "a 0-chip line on a Broken target: every hit x4")
+    H.assertEq(L({ chips = 0, summon = true }), "summon", "nothing chips: the summon")
+    H.assertEq(L({ chips = 0 }), nil, "nothing chips, no summon: the heal stands")
+    -- the enemy Runic (#413): the Speck ($146, MonsterProp+30 = $02) takes
+    -- every runic-able spell while it stands, whatever it was aimed at
+    H.assertEq(H.runicTakes(0x28, { [0] = 0x00, [3] = 0x02 }), 3, "Bolt (+3 $28) with the Speck up: slot 3 takes it")
+    H.assertEq(H.runicTakes(0x28, { [0] = 0x00, [2] = 0x00 }), nil, "Bolt with no Runic up: cast")
+    H.assertEq(H.runicTakes(0x02, { [3] = 0x02 }), nil, "RAMUH's summon (+3 $02, not runic-able): cast")
+    H.assertEq(H.runicTakes(0x28, { [0] = 0x04 }), nil, "$3E4C bit 2 is a character's Runic, not the enemy's")
+    H.assertEq(H.runicTakes(0x09, { [3] = 0x02 }), 3, "Cure (+3 $09) is runic-able too")
     -- the wipe class
     local d = function(tick, from, maxhp, bp, one)
       return { tick = tick, from = from, maxhp = maxhp, bp = bp, oneAction = one }
