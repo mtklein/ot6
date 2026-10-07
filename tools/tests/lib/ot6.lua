@@ -7921,13 +7921,20 @@ function Driver:raceLog(actor, plan, R)
     local ok, rp = pcall(self.racePlan, self, actor, cands[i])
     if ok then self.raceLast.plan = rp end
   end
-  -- the state behind a prediction of a death (calibration, #415)
-  if (best.deaths or 0) >= 0.5 or (ri and (all[ri].deaths or 0) >= 0.5) then
-    local t = {}
+  -- the state behind a prediction of a death (calibration, #415), or
+  -- behind every disagreement under the lab lever M.RACE_STATE_LOG
+  if (best.deaths or 0) >= 0.5 or (ri and (all[ri].deaths or 0) >= 0.5)
+     or (M.RACE_STATE_LOG and agree == "DISAGREE") then
+    local t = { string.format("bankAt %d", st.bankAt or 0) }
     for k, p in pairs(st.party) do
-      local ln = p.lines[0]
-      t[#t + 1] = string.format("e%d %d/%d eta %d period %d per %d x%d heals %d", k, p.hp, p.maxhp,
-        math.floor(p.eta), math.floor(p.period), ln and math.floor(ln.per) or 0, ln and ln.hits or 0, #p.heals)
+      local ls = {}
+      for b = 0, 3 do
+        local ln = p.lines[b]
+        if ln then ls[#ls + 1] = string.format("b%d %dx%d c%d h%.2f", b, math.floor(ln.per), ln.hits or 1,
+          ln.chips or 0, ln.hit or 1) end
+      end
+      t[#t + 1] = string.format("e%d %d/%d bp %d eta %d period %d [%s] heals %d", k, p.hp, p.maxhp, p.bp or 0,
+        math.floor(p.eta), math.floor(p.period), table.concat(ls, ", "), #p.heals)
     end
     for k, e in pairs(st.enemies) do
       local d, w = {}, {}
