@@ -1610,6 +1610,9 @@ function M.raceSim(st, first, draw)
   -- standing one (the engine retargets a dead target's remaining strikes),
   -- chipping nothing there: the chips were counted against the first body
   local death, t_now, wouldStand, first_act
+  -- whether the last attack's carried swings took half or more of a body
+  -- they did not kill (the last-stand read counts that body as fallen)
+  local carried = false
   local function attack(p, line, fixed)
     if line == nil then return end
     if line.aoe then
@@ -1620,7 +1623,10 @@ function M.raceSim(st, first, draw)
       while left > 0 and st.retarget ~= false do
         k = target(false, nil)
         if k == nil then break end
+        local hp0 = E[k].hp
         left = strike(E[k], { per = line.per, hits = left, chips = 0, hit = line.hit }, p.hit)
+        -- a carry that took half or more of a body it left standing
+        if E[k].hp > 0 and (hp0 - E[k].hp) * 2 >= hp0 then carried = true end
       end
     end
   end
@@ -1631,8 +1637,8 @@ function M.raceSim(st, first, draw)
   -- six g00CC fights by a boosted Fight's carried swings)
   -- whether a last stand fires on the bodies EE after an action (before:
   -- who stood before it)
-  local function standFires(EE, before)
-    local standing = 0
+  local function standFires(EE, before, extra)
+    local standing = -(extra or 0)
     for _, e in pairs(EE) do if e.hp > 0 then standing = standing + 1 end end
     for j, e in pairs(EE) do
       local st = e.stand
@@ -1671,8 +1677,9 @@ function M.raceSim(st, first, draw)
       local L = {}
       for key, v in pairs(line) do L[key] = v end
       L.per = (L.per or 0) * f
+      carried = false
       attack(p, L, nil)
-      fired = fired or standFires(E, before)
+      fired = fired or standFires(E, before, (f > 1 and carried) and 1 or 0)
       for j, e in pairs(E) do e.hp, e.sh = save[j][1], save[j][2] end
     end
     return fired
@@ -1701,8 +1708,12 @@ function M.raceSim(st, first, draw)
         local L = {}
         for key, v in pairs(c.line) do L[key] = v end
         L.per = (L.per or 0) * M.RACE_STAND_SLACK
+        carried = false
         attack(p, L, c.target)
-        slack = standFires(E, before)
+        -- (a carried swing that takes half a body is read as taking all
+        -- of it: the WoR's s5 at f7e822c8, a 1-BP Fight's fourth swing
+        -- went on from the Sneezer and the plain body fell with it)
+        slack = standFires(E, before, carried and 1 or 0)
         for j, e in pairs(E) do e.hp, e.sh = save[j][1], save[j][2] end
       end
       attack(p, c.line, c.target)

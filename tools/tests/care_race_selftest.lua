@@ -335,9 +335,9 @@ do
     party = { member(900, 1043, 0, { lines = L, bp = 2, period = 202 }) },
     enemies = { { hp = 500, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } } },
                 { hp = 900, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } }, stand = { n = 1 } },
-                { hp = 1100, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } } } } }
+                { hp = 1500, sh = 1, eta = 300, period = 303, act = { dmg = { 60 } } } } }
   local r2 = H.raceEval(st, { kind = "attack", line = L[2], boost = 2 })
-  check(r2.deaths >= 1, "the 2-BP Fight leaves the Sneezer alone: CELES gone")
+  check(r2.wipe, "the 2-BP Fight can leave the Sneezer alone: the worst case reads CELES gone")
   check(choose(st, { { kind = "attack", line = L[0], boost = 0 }, { kind = "attack", line = L[2], boost = 2 } }).boost == 0,
     "the Fight that leaves two standing")
 end
@@ -453,6 +453,22 @@ do
   check(c.kind == "heal", "CYAN at 40/358 is lifted before the kill, got " .. c.kind)
 end
 
+-- 28. A carried swing that takes half a body, against a last stand, is read
+-- as taking all of it (the WoR's s5 at f7e822c8: a 1-BP Fight read the
+-- Sneezer dead on its fourth swing with two bodies standing; the swing
+-- carried, the plain body fell, CELES was sneezed away)
+do
+  local L = {}
+  for b = 0, 3 do L[b] = { per = 138, hits = 2 + 2 * b, chips = 1 + b } end
+  local st = { actor = 1, hpRate = 1.2, focus = { 2, 3, 1 },
+    party = { member(586, 1125, 0, { lines = L, bp = 2, period = 202 }) },
+    enemies = { { hp = 850, sh = 2, eta = 20, period = 303, act = { dmg = { 133 } } },
+                { hp = 922, sh = 2, eta = 240, period = 303, act = { dmg = { 71 } }, stand = { n = 1 } },
+                { hp = 458, sh = 2, eta = 222, period = 272, act = { dmg = { 61 } } } } }
+  local c = choose(st, { { kind = "attack", line = L[0], boost = 0 }, { kind = "attack", line = L[1], boost = 1 } })
+  check(c.boost == 0, "the 1-BP Fight whose last swing carries is held back, got " .. c.boost)
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise, near fatal", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise, near fatal, the carried swing", n))
