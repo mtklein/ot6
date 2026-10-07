@@ -324,8 +324,30 @@ wor_tzen_door (47,589 against 37,920).
   from splitmix64: the old LCG fed the sixteen plays their draws at stride
   64, and a 1-in-3 random aim fell 1, 9 and 6 times.
 
+## Before default-on: what the full ninja and the labs caught
+
+- **The Sneezer is the rules' fight.**  A last-stand removal is read on the
+  decision's own action at a 2x hit, and a carried swing that takes half
+  a body counts as taking it.  Even so, the race kept losing time in
+  group 00CC.  At 62cb732f, held boosts cost the WoR from Tzen 147,344
+  ticks on its shared keys against the rules' 117,523.  The race now does
+  not race a fight while a removal stand is up (`M.RACE_DEFER_STAND`), and
+  the rules' kill order plays it.
+- **Zombies and members who left.**  The race offers no heal and no Fenix
+  Down on a ZOMBIE, and nothing on a member who left.  battle_zombieraise
+  was red in the full ninja at 963ea402.
+- **Aim.**  The race's Fight aims as the rules' Fight does (`chipAim`).
+  battle_classtarget was red at 5b46dbd6.
+- **Near fatal.**  A member the play leaves at or under max/8 HP counts as
+  half a member down.  audit_party_hp was red at 5b46dbd6: falls_done
+  shipped CYAN at 5/358 and esper_tubes_entry EDGAR at 71/752.
+- **Full gauges.**  A monster's full gauge acts before a member's.
+- **Kefka.**  The race raises EDGAR where the rules held the raise and
+  CELES healed herself until she died (wt/v026-supply a4e9f966).  That is
+  unit case 26.
+
 Built so far: `M.raceSim`, `M.raceEval`, `M.raceBetter`, `M.raceChoose`,
 `M.raceItemCost`, `M.hitChance`, `M.median` (`lib/ot6.lua`), and the
 driver's `[race]` log, `[race-cal]` lines and `"act"` mode behind
 `M.CARE_RACE`.  The unit tests (`tools/tests/care_race_selftest.lua`)
-run 42 checks and catch 24 mutants.
+run 46 checks and catch 27 mutants.
