@@ -34,7 +34,10 @@ differ, and `restat = 1` prunes everything downstream when it did not move.
 A generator is copied by `copy_if_lua_changed` instead (lua_fingerprint.py
 copy-if-changed): the copy takes the new bytes but keeps its mtime when the
 Lua token stream did not move, so a comment or whitespace edit regenerates
-nothing, the same rule the stamps' generator hash follows (#247).  The ROM
+nothing, the same rule the stamps' generator hash follows (#247).  Every
+other Lua source routed through a copy (the lib halves and suite tests
+configure.py feeds its suite, audit and selftest edges) goes the same way
+(#417), so a comment-only lib edit re-runs no suite either.  The ROM
 is copied by `copy_if_rom_identity_changed` (tools/build/rom_version.py): the
 same shape, keyed on the ROM identity, the ROM with its version fields
 masked, so a VERSION bump regenerates nothing, the same rule the stamps'
@@ -708,15 +711,17 @@ def emit_quick_edges(w, states, root, copy_if_changed_from, side_pool=None):
 
 
 def copy_rule(src, states):
-    """The copy rule for one copy_if_changed source: a generator the graph
-    runs is copied by its Lua token stream, the ROM by its identity
-    (rom_version.py: the version fields masked), anything else by its
-    bytes."""
+    """The copy rule for one copy_if_changed source: any Lua source (a
+    generator, a cutter, a lib half, a suite test, an instrument) is copied
+    by its token stream, the ROM by its identity (rom_version.py: the
+    version fields masked), anything else by its bytes.  #417: the lib
+    halves and suite tests went by bytes, so a comment-only lib edit re-ran
+    every suite, audit and selftest behind them; a comment changes nothing a
+    run does (lua_fingerprint.py keeps the `-- OT6_NAME:` directives run.sh
+    reads), so it now re-runs only the copies."""
     if src == ROM:
         return "copy_if_rom_identity_changed"
-    gens = {f"tools/tests/{e[k]}.lua" for e in states
-            for k in ("gen", "cutter") if e.get(k)}
-    return "copy_if_lua_changed" if src in gens else "copy_if_changed"
+    return "copy_if_lua_changed" if str(src).endswith(".lua") else "copy_if_changed"
 
 
 def copy_if_changed_sources(states, root):
@@ -1100,6 +1105,20 @@ def selftest():
               any(e.startswith("k4-v1:") for e in errs))
         check("negative-* fixtures are never asked for", not any(
             "negative" in e for e in coverage(full, root, (), {})))
+
+    # #417: every Lua source is copied by its token stream, the rest by bytes
+    check("a generator is copied by its token stream",
+          copy_rule("tools/tests/gen_ok.lua", [s(state="o", gen="gen_ok")])
+          == "copy_if_lua_changed")
+    check("a lib half is copied by its token stream (#417)",
+          all(copy_rule(h, []) == "copy_if_lua_changed" for h in LIB_HALVES))
+    check("a suite test is copied by its token stream (#417)",
+          copy_rule("tools/tests/battle_x.lua", []) == "copy_if_lua_changed")
+    check("NEGATIVE the emulator pin and the replay lever go by bytes",
+          copy_rule(EMULATOR, []) == "copy_if_changed"
+          and copy_rule(REPLAY, []) == "copy_if_changed")
+    check("the ROM goes by its identity",
+          copy_rule(ROM, []) == "copy_if_rom_identity_changed")
     print("savestate_ninja selftest:", "ok" if ok else "FAILED")
     return 0 if ok else 1
 

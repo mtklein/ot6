@@ -259,6 +259,9 @@ def stamp_status(name, root, _memo=None):
                               edit shared by every generator does not make
                               a legitimately reached snapshot illegitimate;
                               it is reported as DRIFT.
+        `raw <path> <sha256>`  original generator/lib bytes at capture time;
+                              informational, never a freshness input. Older
+                              stamps have no raw hashes; none are invented.
 
     Migration: a stamp written before the rom/generator lines existed has
     neither.  Nothing is invented for it; it stays on the older conservative
@@ -1522,6 +1525,17 @@ def selftest() -> int:
         check("...and its verdict is FRESH", stamp_status("fake", root),
               (FRESH, None))
 
+        recorded_stamp = (st / "fake.stamp").read_bytes()
+        for rel in ["tools/tests/gen_fake.lua", *LIB_HALVES]:
+            source = root / rel
+            saved = source.read_bytes()
+            source.write_bytes(b"--[=[ documentation [[nested]] ]=]\n\n" + saved)
+            check("comment/whitespace leaves FRESH: " + rel,
+                  stamp_status("fake", root), (FRESH, None))
+            check("capture provenance is not rewritten: " + rel,
+                  (st / "fake.stamp").read_bytes(), recorded_stamp)
+            source.write_bytes(saved)
+
         # -- compatibility versus provenance (docs/TESTING.md).  The same
         #    fresh stamp, one input moved at a time.
         # A ROM change: the snapshot belongs to the ROM it was captured on.
@@ -1936,6 +1950,18 @@ def selftest() -> int:
             return subprocess.run(
                 ["sh", str(SAVESTATE_STAMP), *args], env=env,
                 capture_output=True, text=True, check=True).stdout
+
+        original_gate = gate
+
+        def gate(*args):
+            result = original_gate(*args)
+            if args[0] == "write":
+                # Model the historical writer, before raw provenance existed.
+                # Adoption must not invent missing generation-time raw bytes.
+                p = st / (args[1] + ".stamp")
+                p.write_text("\n".join(l for l in p.read_text().splitlines()
+                                       if not l.startswith("raw ")) + "\n")
+            return result
 
         COPY_AT, FAKE_AT, CHILD_AT = T, T + 5 * 10**9, T + 65 * 10**9
         FAKE_DUR, CHILD_DUR = 60_000, 90_000       # ms
