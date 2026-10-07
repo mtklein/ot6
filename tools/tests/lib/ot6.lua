@@ -7788,6 +7788,19 @@ function Driver:raceState(actor, R)
     end
   end
   if st.party[actor] == nil then return nil, "the actor is not seated" end
+  -- the aftermath's HP rate: the cheapest way the field restores HP after
+  -- the fight -- a cure cast's MP at the shops' MP rate when someone casts
+  -- one, else the shops' HP rate -- so a cure now that the field would
+  -- cast anyway saves no gil (the WoR's CELES cast Cure in place of a Fight
+  -- on a 300-gil aftermath that her own field Cure pays for in MP)
+  for _, p in pairs(st.party) do
+    for _, h in ipairs(p.heals or {}) do
+      if h.cast and (h.restore or 0) > 0 then
+        local r = (h.cost or 0) / h.restore
+        if r < st.hpRate then st.hpRate = r end
+      end
+    end
+  end
   for s = 0, 5 do
     if monAlive(s) then
       local mconst = M.readWord(BATTLE.ATB_CONST + 8 + s * 2)
