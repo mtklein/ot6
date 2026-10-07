@@ -415,6 +415,31 @@ do
   check(r.deaths >= 1, "slot 0's full gauge strikes EDGAR before his own turn")
 end
 
+-- 26. battle_kefka on wt/v026-supply a4e9f966 (build/attempts/wt/v026-supply/
+-- run-a4e9f966-px13/suite_battle_kefka.log, f+8400): CELES alone at 244/310
+-- with 5 BP, TERRA and EDGAR down, Kefka at 1124 behind 2 shields.  The rules
+-- held the raise (#312) and CELES healed herself turn after turn until she
+-- died holding 5 BP.  The race raises EDGAR: his Tools (235 a hit) end the
+-- fight sooner, and a second body takes a share of Kefka's hits
+do
+  local function fl(per, h0) local t = {} for b = 0, 3 do t[b] = { per = per, hits = h0 + b, chips = 1 } end return t end
+  local function kl(per) local t = {} for b = 0, 3 do t[b] = { per = per * (1 + b), hits = 1, chips = 1 } end return t end
+  local st = { actor = 3, hpRate = 1.2, focus = { 1 },
+    party = { member(0, 306, 0, { lines = fl(40, 2), period = 206 }),
+              member(0, 315, 0, { lines = kl(235), period = 202 }),
+              member(244, 310, 0, { lines = fl(45, 2), period = 250, bp = 5,
+                                    heals = { { restore = 250, cost = 300, n = 20 } } }) },
+    enemies = { { hp = 1124, sh = 2, eta = 60, period = 250, ends = true,
+                  act = { dmg = { 231, 160, 120 }, worst = { 306, 314, 243 } } } } }
+  local L = st.party[3].lines
+  local c = choose(st, {
+    { kind = "attack", line = L[0], boost = 0 }, { kind = "attack", line = L[3], boost = 3 },
+    { kind = "heal", target = 3, restore = 250, cost = 300 },
+    { kind = "raise", target = 2, hp = 39, cost = 500 },
+    { kind = "raise", target = 1, hp = 38, cost = 500 } })
+  check(c.kind == "raise" and c.target == 2, "CELES raises EDGAR, not another Potion on herself, got " .. c.kind)
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise", n))
