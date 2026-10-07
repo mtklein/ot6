@@ -352,8 +352,8 @@ Built so far: `M.raceSim`, `M.raceEval`, `M.raceBetter`, `M.raceChoose`,
 `M.raceItemCost`, `M.hitChance`, `M.median` (`lib/ot6.lua`), and the
 driver's `[race]` log, `[race-cal]` lines and `"act"` mode behind
 `M.CARE_RACE`.  The unit tests (`tools/tests/care_race_selftest.lua`)
-run 62 checks, including synthetic driver candidate vetoes for zombies and
-members who left, closed item/cure lines, disabled boost, Doom and statues; 36 negative controls fail. The synthetic reads do not
+run 71 checks, including synthetic driver candidate vetoes for zombies and
+members who left, closed item/cure lines, disabled boost, Doom and statues; 37 negative controls fail. The synthetic reads do not
 produce emulator states or constitute gameplay evidence.
 
 ## Current candidate coverage

@@ -531,6 +531,37 @@ do
   H.readByte, H.leftMask, H.itemPower, H.itemPrice = readByte, leftMask, itemPower, itemPrice
 end
 
+-- 30. The Gate regression's party-status class: simulated continuation
+-- must not use a turn the player cannot command. Synthetic reads only.
+do
+  local D = H.newFightDriver("party status guard unit").driver
+  D.pressTarget = function() return nil end
+  local readByte, readWord, leftMask, shopRates = H.readByte, H.readWord, H.leftMask, H.shopRates
+  local bytes, left = {}, 0
+  H.readByte = function(addr) return bytes[addr] or 0 end
+  H.readWord = function() return 0 end
+  H.shopRates = function() return { hp = 1.2 } end
+  H.leftMask = function() return left end
+  local R = { hpNow = { [0] = 0, [1] = 1000, [2] = 0, [3] = 0 } }
+  for _, status in ipairs({
+    { "Muddle", 0x3EE5, 0x20 }, { "Sleep", 0x3EE5, H.ST2_SLEEP },
+    { "Stop", 0x3EF8, H.ST3_STOP }, { "Frozen", 0x3EF9, H.ST4_FROZEN },
+    { "Berserk", 0x3EE5, H.ST2_BERSERK }, { "Petrify", 0x3EE4, H.ST1_PETRIFY },
+    { "Zombie", 0x3EE4, H.ST1_ZOMBIE } }) do
+    bytes = { [status[2] + 2] = status[3] }
+    local st, why = D:raceState(0, R)
+    check(st == nil and why:find("cannot take a planned turn", 1, true),
+      status[1] .. " contributes no imagined continuation")
+  end
+  bytes, left = {}, 2
+  local st, why = D:raceState(0, R)
+  check(st == nil and why:find("cannot take a planned turn", 1, true), "a departed member contributes no continuation")
+  left = 0
+  st, why = D:raceState(0, R)
+  check(st == nil and why == "no monster stands", "a healthy party passes the status guard")
+  H.readByte, H.readWord, H.leftMask, H.shopRates = readByte, readWord, leftMask, shopRates
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
   .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise, near fatal, the carried swing, zombie and left-member candidate vetoes", n))

@@ -7979,7 +7979,7 @@ function Driver:raceState(actor, R)
   -- at 5b4cb9f6 counted Muddled SABIN's turns and kept raising EDGAR into
   -- a 1293 round (four deaths to the rules' one, on matched first fights).
   for e = 0, 3 do
-    if (R.hpNow[e] or 0) > 0 and (denied(e) ~= nil
+    if (R.hpNow[e] or 0) > 0 and (denied(e) ~= nil or status1Has(e, M.ST1_ZOMBIE)
        or (M.readByte(BATTLE.ST2 + e * 2) & 0x20) ~= 0
        or (M.leftMask() >> e) & 1 == 1) then
       return nil, "a standing party member cannot take a planned turn (the rules play it)"
