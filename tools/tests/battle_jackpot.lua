@@ -49,6 +49,36 @@ local STATE = "build/states/wor_grave.mss.lua"
 local JACKPOT = 0x5B
 local DULLAHAN = 0x11C
 
+-- Ot6Tick's shield restore (`sta OT6_SHIELD_CUR,x` once the broken timer
+-- reaches 0), found by its bytes in the proc, and every Ot6ActionEnd: the
+-- frames checkJackpot's shield excuse reads.  x is the entity's doubled
+-- index, a monster slot's 8 + 2 * slot.
+local TICK = { restores = {}, ends = {}, installed = false }
+local function installTick()
+  if TICK.installed then return end
+  TICK.installed = true
+  local cur = H.sym("OT6_SHIELD_CUR") & 0xFFFF
+  TICK.max = H.sym("OT6_SHIELD_MAX") & 0xFFFF
+  local base = H.sym("Ot6Tick")
+  local at = nil
+  for o = 0, 31 do
+    local a = (base & 0x3FFFFF) + o
+    if H.readRomByte(a) == 0x9D and H.readRomByte(a + 1) == (cur & 0xFF) and H.readRomByte(a + 2) == (cur >> 8) then
+      at = base + o; break
+    end
+  end
+  H.assertEq(at ~= nil, true, "Ot6Tick stores OT6_SHIELD_CUR,x (the restore on recovery)")
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xFFFF
+    if x >= 8 then TICK.restores[#TICK.restores + 1] = { f = H.frame, slot = (x - 8) // 2 } end
+  end, emu.callbackType.exec, at, at)
+  local ae = H.sym("Ot6ActionEnd")
+  emu.addMemoryCallback(function()
+    TICK.ends[#TICK.ends + 1] = { f = H.frame, x = emu.getState()["cpu.x"] & 0xFFFF }
+  end, emu.callbackType.exec, ae, ae)
+  H.log(string.format("[jackpot] Ot6Tick's shield restore hooked at $%06X; shield max at $%04X", at, TICK.max))
+end
+
 local function checkJackpot(r, i)
   H.log(string.format("[jackpot] %d at %d BP, L%d: %d roll(s); MP %d -> %d, purse %d -> %d, bank %d -> %d, "
     .. "divine %02X -> %02X", i, r.boost, r.level, #r.dice, r.mp0, r.mp1, r.gil0, r.gil1, r.bank0, r.bank1,
@@ -129,13 +159,31 @@ local function checkJackpot(r, i)
   end
   -- (after the rolls' class check, so a mutant that loses null-break fails
   -- there, on the class, before it fails here, on what the class did)
+  -- A body whose break ran out inside the action is the one excuse: Ot6Tick
+  -- (ot6_break.asm) puts its shields back to max on the status tick its
+  -- timer reaches 0, whatever the roll did.  The excuse holds only where
+  -- that store was SEEN for that slot between the exec and SETZER's
+  -- Ot6ActionEnd (TICK, above); any other way a break ends or the shields
+  -- move inside a Jackpot (a death path, the Jackpot itself) still fails.
+  local endF = nil
+  for _, e in ipairs(TICK.ends) do
+    if e.f >= r.f and e.x == r.entity then endF = e.f; break end
+  end
+  H.assertEq(endF ~= nil, true, string.format("Jackpot %d: SETZER's Ot6ActionEnd seen after the exec", i))
   for b = 0, 5 do
-    if r.mon0[b].present and r.mon0[b].brk ~= 0 and r.mon1[b].brk == 0 then
-      -- its break ran out inside the action: Ot6Tick puts the shields back
-      -- to max on the tick the timer reaches 0, whatever the roll did
-      H.assertEq(r.mon1[b].sh, H.readByte(0x3E41 + b * 2), string.format("Jackpot %d: slot %d's break "
-        .. "ended inside the action (%d ticks left at the exec), and its shields came back to max", i, b,
-        r.mon0[b].brk))
+    local restored = nil
+    for _, t in ipairs(TICK.restores) do
+      if t.slot == b and t.f >= r.f and t.f <= endF then restored = t end
+    end
+    if r.mon0[b].present and restored then
+      H.assertEq(r.mon0[b].brk ~= 0 and r.mon1[b].brk == 0, true, string.format("Jackpot %d: slot %d's "
+        .. "shields were restored by Ot6Tick at f%d, inside the action: Broken at the exec (%d ticks) and "
+        .. "not after", i, b, restored.f, r.mon0[b].brk))
+      H.assertEq(r.mon1[b].sh, H.readByte(TICK.max + 8 + b * 2), string.format("Jackpot %d: slot %d's break "
+        .. "ran out inside the action (Ot6Tick at f%d), and its shields came back to max", i, b, restored.f))
+      H.log(string.format("[jackpot]   slot %d: its break ran out at f%d inside the action (exec f%d, end "
+        .. "f%d): shields %d -> %d by Ot6Tick's restore", b, restored.f, r.f, endF, r.mon0[b].sh,
+        r.mon1[b].sh))
     elseif r.mon0[b].present then
       H.assertEq(r.mon1[b].sh, r.mon0[b].sh, string.format("Jackpot %d: slot %d's shields do not move", i, b))
     end
@@ -354,6 +402,7 @@ local search = H.seqStep({
 })
 
 H.run({ maxFrames = 2500000 }, {
+  H.call(installTick),
   pass(1, { { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3 } }, 3),
   pass(2, { { row = JACKPOT, boost = 1 }, { row = JACKPOT, refused = true } }, 1),
   pass(3, { { row = "defend" }, { row = JACKPOT, boost = 0 }, { row = JACKPOT, refused = true } }, 0),

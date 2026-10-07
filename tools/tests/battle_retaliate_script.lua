@@ -49,12 +49,13 @@
 -- strategy discovery (docs/TESTING.md), the way battle_retaliate_umaro.lua
 -- does: one snapshot at the boot point, before the walk to CYAN, and each
 -- branch idles BRANCH_IDLE more frames there than the last before walking
--- -- a new first-wave battle key each, every wave's key read at
--- InitBattle's seed store and logged -- until a branch's CYAN has made a
+-- -- a new draw each (the tuple of every wave's battle key, read at
+-- InitBattle's seed store and logged) -- until a branch's CYAN has made a
 -- provoked plain Fight.  A branch ends at that Fight's measurement, at the
 -- third wave's end, or at a party wipe, and the boot comes back.  Every
 -- branch's ledger is in the verdict.  MAX_BRANCHES (below) is the least N
--- with q^N <= 1e-3 for the measured share q of distinct draws that miss.
+-- with q^N <= 1e-3, q the 95% upper bound on the measured share of
+-- distinct draws that miss.
 --
 -- EVERY EXPECTED NUMBER IS DERIVED from the built ROM, never pinned, the
 -- same way battle_retaliate.lua derives them.
@@ -257,8 +258,9 @@ local function installObservers()
   end, emu.eventType.startFrame)
   local seedAt = H.seedStoreAddr()
   emu.addMemoryCallback(function()
-    -- `lda $021e / asl / asl / sta $be`, hooked at its first byte: the
-    -- seed about to be stored is the game clock's low byte x 4
+    -- `lda $021e / asl / asl / sta $be`, hooked at the `sta $be`
+    -- (H.seedStoreAddr): the seed being stored is the game clock's low
+    -- byte x 4, and the clock has not moved since the `lda`
     L.keys[#L.keys + 1] = H.firstBattleKey((H.readByte(0x021E) * 4) & 0xFF,
       H.readWord(0x11E0))
     H.log(string.format("[draw] branch %d wave %d: battle key %s", boot.n,
@@ -282,13 +284,18 @@ local battleUp, wavesDone = false, false
 local phase = 0
 -- THE DRAW's bound.  KEY_MISS is the share of distinct draws (every wave's
 -- battle key) on which all three waves passed with no provoked Fight,
--- measured by this search run without its stop from camp_cleared at shift
--- 0, 30 distinct draws, BRANCH_IDLE 7 (coprime to the clock's 60-frame
--- period, so 60 branches before a first-wave seed repeats): `[lab]
--- distinct draws 30: hit 26 miss 4` (build/attempts/wt/v026-retries/
--- retaliate_script/lab_s0.log.gz).  MAX_BRANCHES is the least N with
--- KEY_MISS^N <= BRANCH_FAIL.
-local BRANCH_IDLE, BRANCH_FAIL, KEY_MISS = 7, 1e-3, 4 / 30
+-- measured by this search run without its stop.  The walk and the talk
+-- absorb a branch's idle to a 4-frame phase, so the first wave meets only
+-- 15 distinct seeds; the later waves' keys (and the frame inside a seed)
+-- are what make the draws distinct, so a draw is the tuple of every wave's
+-- key.  On the 25ae708b chain's camp_cleared, shifts 0 and 30, `[lab]
+-- distinct draws 30: hit 25 miss 5` and `hit 26 miss 4`: 8 misses in 51
+-- distinct draws pooled (build/attempts/wt/v026-retries/retaliate_script/
+-- rv/; the 672be132 chain's was 4 of 30, lab_s0.log.gz).  KEY_MISS is the
+-- 95% upper bound on that share (Clopper-Pearson, 0.286), not the point
+-- estimate (0.157), so MAX_BRANCHES -- the least N with KEY_MISS^N <=
+-- BRANCH_FAIL -- is 6.
+local BRANCH_IDLE, BRANCH_FAIL, KEY_MISS = 7, 1e-3, 0.286
 local MAX_BRANCHES = math.ceil(math.log(BRANCH_FAIL) / math.log(KEY_MISS))
 local BRANCH_BUDGET = 30000            -- three waves ran out at f8509 (the miss above)
 local function branchKey(l) return table.concat(l.keys, "+") end
