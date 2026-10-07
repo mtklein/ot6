@@ -7785,8 +7785,23 @@ end
 --   heals: the bag's (bagHeals) on each hurt member, each at its gil and
 --     scarcity against M.CARE_RESERVE; a raise: the Fenix Down on each
 --     fallen member, raised to 1/8 max HP
-M.CARE_RACE = M.CARE_RACE or false
+-- "act" (the default, #415): the race plays its choice where it disagrees
+-- with the rule stack; "log" (or true): the rules play and the race is
+-- logged beside them; false or "off": the rules alone, no race
+if M.CARE_RACE == nil then M.CARE_RACE = "act" end
+if M.CARE_RACE == "off" then M.CARE_RACE = false end
 M.RACE_RAISE_RESERVE = 2
+-- the leg's race ledger, for the end-of-run [race] line (M.raceReport):
+-- decisions raced, not raced (nothing measured yet), the rules' plan not
+-- modelled, agreements, disagreements, overrides played, errors
+M.raceTally = { raced = 0, skipped = 0, unmodelled = 0, agree = 0, disagree = 0, override = 0, err = 0 }
+function M.raceReport()
+  local T = M.raceTally
+  local mode = M.CARE_RACE == "act" and "act" or (M.CARE_RACE and "log" or "off")
+  return string.format("mode %s: %d decision(s) raced (%d agreed, %d disagreed, %d with the rules' plan not "
+    .. "modelled), %d not raced, %d override(s) played, %d error(s)", mode, T.raced, T.agree, T.disagree,
+    T.unmodelled, T.skipped, T.override, T.err)
+end
 M.RACE_TYPICAL_MIN = 3
 M.RACE_HIT_KEEP = 8
 -- the median of a list of numbers (the lower middle of an even count)
@@ -8056,6 +8071,7 @@ end
 function Driver:raceLog(actor, plan, R)
   local st, why = self:raceState(actor, R)
   if st == nil then
+    M.raceTally.skipped = M.raceTally.skipped + 1
     if self.raceSkipSaid ~= why then
       self.raceSkipSaid = why
       M.log(string.format("[%s] [race] actor=%d not raced: %s", self.tag or "fight", actor, why))
@@ -8073,6 +8089,13 @@ function Driver:raceLog(actor, plan, R)
   if ri == nil then agree = "rules plan not modelled (" .. tostring(plan and plan.kind) .. ")"
   elseif i == ri or not M.raceBetter(best, all[ri], st) then agree = "agree"
   else agree = "DISAGREE" end
+  do
+    local T = M.raceTally
+    T.raced = T.raced + 1
+    if ri == nil then T.unmodelled = T.unmodelled + 1
+    elseif agree == "agree" then T.agree = T.agree + 1
+    else T.disagree = T.disagree + 1 end
+  end
   M.log(string.format("[%s] [race] actor=%d %s: race %s%s; %d candidate(s)", self.tag or "fight", actor, agree,
     raceDesc(cands[i], best), ri and (" | rules " .. raceDesc(cands[ri], all[ri])) or "", #cands))
   self._racePred = { st = st, race = all[i], rules = ri and all[ri] or nil }
@@ -8198,10 +8221,12 @@ function Driver:makePlan(actor)
     local ok, c = pcall(self.raceLog, self, actor, plan, self._race)
     local played = "rules"
     if not ok then
+      M.raceTally.err = M.raceTally.err + 1
       M.log(string.format("[%s] [race] actor=%d error: %s", self.tag or "fight", actor, tostring(c)))
     elseif c and M.CARE_RACE == "act" then
       local alt = self:racePlan(actor, c)
       if alt then
+        M.raceTally.override = M.raceTally.override + 1
         M.log(string.format("[%s] [race] actor=%d act: %s in place of the rules' %s", self.tag or "fight",
           actor, c.what or c.kind, tostring(plan and plan.kind)))
         plan = alt
@@ -15385,6 +15410,7 @@ local function watchReport()
   -- log as anything but a turn that did nothing.
   M.log("[watch] " .. M.fizzleReport())
   M.log("[watch] " .. M.refusalReport())
+  M.log("[race] " .. M.raceReport())
 end
 
 -- The recovery cap (#185's other half).  A driver that drops its plan and

@@ -157,11 +157,12 @@ button walk.  It hands the choice of *what* to do to `M.raceChoose(state,
 candidates)`, a pure function that `battle_healpolicy` can drive with
 plain tables.
 
-The lever is `M.CARE_RACE`, false by default until it is measured.  While
-it is false, the rule stack decides as today.  While it is true, the rule
-stack only logs what it would have done beside the race's choice: one
-`[race]` line per decision, with each candidate's score, so a lab can
-read every disagreement.
+The lever is `M.CARE_RACE`, and its default is `"act"`: where the race
+disagrees with the rule stack, the race's choice is played.  `"log"` (or
+true) plays the rules and logs the race's choice beside them: one
+`[race]` line per decision, with the scores of both choices.  `false` (or
+`"off"`) plays the rules alone.  Every run ends with a `[race] mode ...`
+line that counts the leg's decisions, disagreements and overrides.
 
 ## Measuring it
 
