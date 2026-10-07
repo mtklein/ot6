@@ -54,6 +54,7 @@ local CAVE_DOOR = { 106, 98 }
 local REGALCUTLASS, METALKNUCKLE, MITHRIL_SHLD, ENHANCER = 0x0B, 0x53, 0x5C, 0x13
 local THUNDERBLADE, FIRE_KNUCKLE, SOUL_SABRE = 0x0F, 0x57, 0x16
 local JEWEL_RING, STAR_PENDANT, PEACE_RING, BLACK_BELT = 0xB5, 0xB1, 0xB2, 0xD5
+local CZARINA_RING = 0xC1                           -- Safe and Shell, always
 local BACK_GUARD = 0xE1                             -- no back or pincer attacks (ChooseBattleType @2e3a)
 local RAMUH = 0                                     -- esper index
 local AIR_BLADE = 0x62                              -- SABIN's blitz, learned at L30
@@ -166,6 +167,30 @@ local function usualRelics(what, hands)
                { tag = m[2] .. ": the usual relic back (" .. what .. ")" })
              or H.equipKit(m[1], { { 5, USUAL_RELIC[m[1]] } }, { tag = m[2] .. ": the usual relic back (" .. what .. ")" }),
            keep and handsBack(m, keep, what) or H.seqStep({}) }, {})
+  end
+  return H.seqStep(steps)
+end
+-- the Tentacles' relics on slot 5 (the stop before Edgar), from the bag,
+-- and each member's own back after the fight; the hands are set by the
+-- kit steps that follow each (a relic change on a Genji wearer re-runs the
+-- game's Optimum, above)
+local TENTACLE_RELIC = { { CELES, "CELES", CZARINA_RING }, { SABIN, "SABIN", STAR_PENDANT } }
+local function tentacleRelics()
+  local steps = {}
+  for _, m in ipairs(TENTACLE_RELIC) do
+    steps[#steps + 1] = H.cond(function()
+      return H.readByte(c(m[1], 0x24)) ~= m[3] and H.invCountOf(m[3]) > 0
+    end, { H.equipKit(m[1], { { 5, m[3] } }, { tag = m[2] .. ": the Tentacles' relic" }) }, {})
+  end
+  return H.seqStep(steps)
+end
+local function tentacleRelicsOff()
+  local steps = {}
+  for _, m in ipairs(TENTACLE_RELIC) do
+    steps[#steps + 1] = H.cond(function()
+      return H.readByte(c(m[1], 0x24)) == m[3] and H.invCountOf(USUAL_RELIC[m[1]]) > 0
+    end, { H.equipKit(m[1], { { 5, USUAL_RELIC[m[1]] } },
+             { tag = m[2] .. ": the usual relic back (after the Tentacles)" }) }, {})
   end
   return H.seqStep(steps)
 end
@@ -537,6 +562,19 @@ H.run({ maxFrames = 600000 }, {
   -- change on a Genji Glove wearer re-runs the game's Optimum (above), and
   -- the hands are set after it
   usualRelics("the stop before Edgar"),
+  -- The relics for this boss (informed, the ROM's data: each Tentacle's
+  -- Bio and Poison are magic that inflict Poison).  CELES's Jewel Ring
+  -- (Dark, Petrify: nothing here inflicts either) gives way to the bag's
+  -- Czarina Ring (Safe and Shell, always on), SABIN's Black Belt to a Star
+  -- Pendant (no Poison).  Measured from three of this generator's own
+  -- engine-room stops (shifts 0, 11, 23), each talked to Gerad at 60
+  -- shifts, retries off: as shipped before, 10 of 180 runs lost (3 of 45
+  -- distinct battle keys); both rings, 4 of 180 (4 of 90 keys); the
+  -- Czarina Ring alone, 5 of 180 (4 of 108 keys).  By key that is within
+  -- the noise; the losses left are the driver's (wipes with 3-5 BP banked,
+  -- heals landing after the Bio), build/attempts/wt/v026-retries/wor_edgar/
+  -- (#416).  Both go back after the fight (tentacleRelicsOff).
+  tentacleRelics(),
   H.equipKit(CELES, { { 0, ENHANCER }, { 1, REGALCUTLASS } }, { tag = "CELES: no element for the Tentacles" }),
   H.equipKit(SABIN, { { 0, METALKNUCKLE }, { 1, MITHRIL_SHLD } }, { tag = "SABIN: no element for the Tentacles" }),
   H.fieldCare({ threshold = 1.0, tag = "before the Tentacles" }),
@@ -604,6 +642,7 @@ H.run({ maxFrames = 600000 }, {
 
   -- ---- after the fight: care, the kits back, EDGAR dressed ------------------------------------
   H.fieldCare({ tag = "after the Tentacles" }),
+  tentacleRelicsOff(),
   H.equipKit(EDGAR, { { 4, JEWEL_RING }, { 5, STAR_PENDANT } }, { tag = "EDGAR relics" }),
   peaceRings("after the Tentacles"),
   backGuard("after the Tentacles"),
