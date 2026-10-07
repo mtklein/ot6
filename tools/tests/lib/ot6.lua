@@ -5549,6 +5549,11 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
       target = plan.target,
       all = plan.all or false, boost = plan.boostLeft or 0,
       frame = frame, stage = "plan", atb_tick = tickReader and tickReader() }
+    if plan.targetContract then
+      p.expected_targets = plan.targetContract.chars | (plan.targetContract.monsters << 8)
+      p.expected_attack, p.expected_command = plan.executionSpell, 2
+      p.expected_boost = plan.boostWant
+    end
     T.pending[actor] = p
     event(p, "plan", frame, { reason = plan.reason or "recovery" })
   end
@@ -5558,23 +5563,35 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
       event(p, "confirm", frame, { chars = chars, mons = mons })
     end
   end
-  function T.submit(actor, frame, cmd, attack, targets)
+  function T.submit(actor, frame, cmd, attack, targets, acceptedBoost)
     T.staging = nil
     local p = T.pending[actor]
     if not p or p.stage ~= "plan" then return end
     p.stage, p.submitted = "submit", frame
     p.submitted_tick = tickReader and tickReader()
     p.accepted_command = cmd
-    T.staging = p
     T.pending[actor] = nil
+    event(p, "submit", frame, { command = cmd, attack = attack,
+      targets = targets, accepted_boost = acceptedBoost, navigation_frames = frame - p.frame })
+    if p.expected_targets ~= nil and (targets ~= p.expected_targets or cmd ~= p.expected_command
+      or acceptedBoost ~= p.expected_boost) then
+      -- The engine consumed the command. Keep its actual submission,
+      -- but do not give it ownership of the proposed scored execution.
+      event(p,"unresolved",frame,{reason="race_submission_mismatch",last_stage=p.stage,
+        expected_targets=p.expected_targets,expected_command=p.expected_command,
+        expected_boost=p.expected_boost})
+      return
+    end
+    T.staging = p
     T.queued[actor] = T.queued[actor] or {}
     table.insert(T.queued[actor], p)
-    event(p, "submit", frame, { command = cmd, attack = attack,
-      targets = targets, navigation_frames = frame - p.frame })
   end
-  function T.cancelQueued(actor, frame)
+  function T.cancelQueued(actor, frame, reason, evidence)
     for _,p in ipairs(T.queued[actor] or {}) do
-      event(p,"unresolved",frame,{reason="queue_cancelled",last_stage=p.stage})
+      local fields = {reason=reason or "queue_cancelled",last_stage=p.stage}
+      for k,v in pairs(evidence or {}) do fields[k]=v end
+      fields.expected_attack, fields.expected_targets = p.expected_attack, p.expected_targets
+      event(p,"unresolved",frame,fields)
     end
     T.queued[actor] = {}
     for index,b in pairs(T.bindings) do
@@ -5584,7 +5601,7 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
   end
   -- Every allocation overwrites provenance, even when no trace owns it.
   -- Called after queue-time folding, at the actual command/target store.
-  function T.queueStore(actor, index, cmd, attack, frame)
+  function T.queueStore(actor, index, cmd, attack, frame, storedTargets)
     local old = T.bindings[index]
     if old and old.trace_id then
       local q = T.queued[old.actor] or {}
@@ -5599,6 +5616,12 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
     T.queueSerial = T.queueSerial + 1
     local p = T.staging
     local b = { generation = T.queueSerial, actor = actor, command = cmd, attack = attack }
+    if p and p.actor == actor and p.expected_attack ~= nil
+      and (attack ~= p.expected_attack or cmd ~= p.expected_command or storedTargets ~= p.expected_targets) then
+      T.cancelQueued(actor,frame or p.submitted,"race_queue_identity_mismatch",
+        {stored_command=cmd,stored_attack=attack,stored_targets=storedTargets})
+      p = nil
+    end
     if p and p.actor == actor then
       b.trace_id = p.id
       p.engine_command, p.engine_attack = cmd, attack
@@ -5770,13 +5793,13 @@ local function recoveryActivate(trace)
     local x, y = cpu["cpu.x"] & 0xffff, cpu["cpu.y"] & 0xffff
     if x < 8 and x % 2 == 0 then
       t.submit(x // 2, M.frame, M.readByte(0x2BAF + y),
-        M.readByte(0x2BB0 + y), M.readWord(0x2BB1 + y))
+        M.readByte(0x2BB0 + y), M.readWord(0x2BB1 + y), M.readByte(0x3E9D+x))
     end
   end)
   hook(M.sym("RecoveryQueueStored"), function(t, cpu)
     local x, y = cpu["cpu.x"] & 0xffff, cpu["cpu.y"] & 0xffff
     t.queueStore(x < 8 and x % 2 == 0 and x // 2 or nil, y,
-      M.readByte(0x3420+y), M.readByte(0x3421+y), M.frame)
+      M.readByte(0x3420+y), M.readByte(0x3421+y), M.frame, M.readWord(0x3520+y))
   end)
   hook(M.sym("RemoveAllActions"), function(t, cpu)
     local x = cpu["cpu.x"] & 0xffff
@@ -8992,10 +9015,51 @@ function Driver:raceCalTick(flush)
 end
 
 -- The race's choice as a plan the driver executes (M.CARE_RACE = "act"):
--- an attack is bestLine's own plan at that boost; a heal or a raise is
--- the Item command on that member.  nil when the window cannot take it
--- (the rules' plan then stands).
+-- Existing single-ally cures gain an exact spell contract. Other spells
+-- require an explicit HP effect role and target masks; discovery stays
+-- unchanged. nil leaves the rules' plan in force.
 function Driver:racePlan(actor, c)
+  local attackPlan = c.kind == "attack" and c.line and c.line.plan
+  if c.spell or (attackPlan and attackPlan.spell) then
+    local p = c.controller
+    local implicitCure = p == nil and c.kind == "heal" and not c.all
+      and (c.boost or 0) == 0 and type(c.target) == "number" and c.target % 1 == 0
+      and c.target >= 0 and c.target <= 3
+    if implicitCure then
+      p = { kind = "heal", effectRole = "heal",
+        targetContract = { chars = 1 << c.target, monsters = 0, all = false } }
+    end
+    if not p or not ((p.kind == "heal" and p.effectRole == "heal")
+      or (p.kind == "magic" and p.effectRole == "damage")) then return nil end
+    if c.kind ~= p.kind and not (c.kind == "attack" and p.kind == "magic") then return nil end
+    local t = p.targetContract
+    if not t or type(t.chars) ~= "number" or t.chars % 1 ~= 0 or t.chars < 0 or t.chars > 15
+      or type(t.monsters) ~= "number" or t.monsters % 1 ~= 0 or t.monsters < 0 or t.monsters > 63
+      or type(t.all) ~= "boolean" or (t.chars == 0) == (t.monsters == 0)
+      or (c.all ~= nil and c.all ~= t.all)
+      or (not t.all and ((t.chars | t.monsters) & ((t.chars | t.monsters)-1)) ~= 0)
+      or (p.kind == "heal" and (t.monsters ~= 0 or type(c.target) ~= "number" or c.target % 1 ~= 0
+        or c.target < 0 or c.target > 3 or (t.chars & (1 << c.target)) == 0))
+      or (p.kind == "magic" and t.chars ~= 0)
+      or M.readByte(0x2F47) ~= 0 then return nil end
+    local spell, boost = c.spell or attackPlan.spell, c.boost or 0
+    if type(boost) ~= "number" or boost % 1 ~= 0 or boost < 0 or boost > 3
+      or M.readByte(BATTLE.BP + actor*2) < boost then return nil end
+    local row = cmdRow(actor, BATTLE.CMD_MAGIC)
+    if row == nil or spellCell(actor, spell, true) == nil then return nil end
+    local price, resolved = M.battleSpellPrice(actor, spell, boost)
+    if price > M.readWord(BATTLE.CURMP + actor*2) or (c.mp ~= nil and c.mp ~= price)
+      or (c.executionSpell ~= nil and c.executionSpell ~= resolved) then return nil end
+    local q = {}
+    for k,v in pairs(p) do q[k] = v end
+    q.kind, q.spell, q.executionSpell, q.spellCost = p.kind, spell, resolved, price
+    q.target, q.restore, q.row, q.reason = c.target, c.restore, row, "the care race"
+    q.exactBoost, q.boostWant, q.raceBoost, q.boostLeft = true, boost, boost, boost
+    q.all, q.targetContract = t.all, { chars=t.chars, monsters=t.monsters, all=t.all }
+    q.ally = nil
+    q.aim = nil
+    return q
+  end
   if c.kind == "attack" then
     local p = c.line and c.line.plan
     if p == nil then return nil end
@@ -9009,12 +9073,6 @@ function Driver:racePlan(actor, c)
     q.aim = c.target
     return q
   end
-  if c.spell then
-    local mrow = cmdRow(actor, BATTLE.CMD_MAGIC)
-    if mrow == nil then return nil end
-    return { kind = "heal", spell = c.spell, target = c.target, restore = c.restore, row = mrow,
-             reason = "the care race" }
-  end
   local row = cmdRow(actor, BATTLE.CMD_ITEM)
   if row == nil then return nil end
   local id = c.kind == "raise" and BATTLE.FENIX_DOWN or c.id
@@ -9022,6 +9080,17 @@ function Driver:racePlan(actor, c)
   if idx == nil then return nil end
   return { kind = "item", item = id, target = c.target, row = row, idx = idx, restore = c.restore,
            reason = c.kind == "raise" and "revive" or "the care race" }
+end
+
+-- Race spells acknowledge the live list after total boost has settled.
+-- Ordinary plans retain their existing stale-grey-bit tolerance.
+function Driver:raceSpellReady(actor, p)
+  local cell, menuPrice = spellCell(actor,p.spell,true)
+  local price, resolved = M.battleSpellPrice(actor,p.spell,p.boostWant)
+  return cell ~= nil and menuPrice == price and price == p.spellCost
+    and resolved == p.executionSpell and cmdRow(actor,BATTLE.CMD_MAGIC) == p.row
+    and M.readByte(BATTLE.PEND_BP+actor*2) == p.boostWant
+    and M.readByte(BATTLE.BP+actor*2) >= p.boostWant and M.readByte(0x2F47) == 0
 end
 
 function Driver:makePlan(actor)
@@ -11414,6 +11483,9 @@ function Driver:button(actor)
     return { "a" }
   end
   if st == BATTLE.ST_MAGIC and (self.plan.kind == "magic" or self.plan.kind == "heal") then
+    if self.plan.targetContract and not self:raceSpellReady(actor,self.plan) then
+      self:dropPlan("race_spell_changed"); return { "b" }
+    end
     -- The same two-column walk for both magic lines.  The cell was
     -- resolved at plan time, but the list is rebuilt when the window
     -- opens, so it is re-read here: a cell that has moved (or a spell the
@@ -11595,6 +11667,20 @@ function Driver:button(actor)
     return { "a" }
   end
   if st == BATTLE.ST_TGT then
+    if self.plan.targetContract then
+      local p, t = self.plan, self.plan.targetContract
+      if not self:raceSpellReady(actor,p) then
+        self:dropPlan("race_spell_changed"); return { "b" }
+      end
+      local chars,mons = M.readByte(BATTLE.TGTCHARS),M.readByte(BATTLE.TGTMONS)
+      if (t.chars ~= 0 and (mons ~= 0 or chars == 0)) then return self:cross("chars") end
+      if (t.monsters ~= 0 and (chars ~= 0 or mons == 0)) then return self:cross("monsters") end
+      if t.all and M.readByte(BATTLE.TGTALL) == 0 then
+        self.tgtSpin = self.tgtSpin + 1
+        if self.tgtSpin >= 40 then self:dropPlan("race_group_unavailable"); return { "b" } end
+        return (self.tgtSpin % 4) < 2 and { "r" } or {}
+      end
+    end
     -- Every ally-targeted line steers the same way: an item and a cure
     -- differ only in which window chose them, and the Muddle rule's
     -- Fight on an ally (plan.ally, #170) crosses to the party column
@@ -11621,20 +11707,23 @@ function Driver:button(actor)
         -- confirm once the latch reads back.  If it never takes (a spell
         -- without MULTI_TARGET), drop to the single-target steer.
         if M.readByte(BATTLE.TGTALL) ~= 0 then
-          if self.recovery then self.recovery.confirm(actor, M.frame, chars, mons) end
-          return { "a" }
+          if not self.plan.targetContract then
+            if self.recovery then self.recovery.confirm(actor, M.frame, chars, mons) end
+            return { "a" }
+          end
+        else
+          self.tgtSpin = self.tgtSpin + 1
+          if self.tgtSpin >= 40 then
+            M.log(string.format("[%s] all-ally latch never took -- "
+              .. "single-target fallback", self.tag or "fight"))
+            self.plan.all, self.tgtSpin = nil, 0
+            return {}
+          end
+          return (self.tgtSpin % 4) < 2 and { "r" } or {}
         end
-        self.tgtSpin = self.tgtSpin + 1
-        if self.tgtSpin >= 40 then
-          M.log(string.format("[%s] all-ally latch never took -- "
-            .. "single-target fallback", self.tag or "fight"))
-          self.plan.all, self.tgtSpin = nil, 0
-          return {}
-        end
-        return (self.tgtSpin % 4) < 2 and { "r" } or {}
       end
       local wantMask = 1 << self.plan.target
-      if chars ~= wantMask and not (self.plan.all and self.plan.auto) then
+      if chars ~= wantMask and not (self.plan.all and (self.plan.auto or self.plan.targetContract)) then
         local cur = 0
         for e = 0, 3 do
           if chars & (1 << e) ~= 0 then cur = e; break end
@@ -11674,6 +11763,13 @@ function Driver:button(actor)
     -- A lore is multi-target: the focus rotation would spin against a
     -- whole-side mask it can never match, so it confirms on the default.
     local focus = self:focusList()
+    if self.plan.targetContract then
+      focus = nil
+      local t = self.plan.targetContract
+      if not t.all and t.monsters ~= 0 then
+        for slot=0,5 do if t.monsters == 1 << slot then focus={{slot=slot,mask=t.monsters}} end end
+      end
+    end
     -- With no authored or multi-part kill order, a plain Fight may still
     -- name the monster slot its class breaks best (plan.aim, chipAim/#161):
     -- steer to it through the same focus graph, as a one-entry list.  An
@@ -11768,7 +11864,7 @@ function Driver:button(actor)
     -- cast the live stage now refuses is backed out of (B) and re-planned
     -- against what stands there.
     if (self.plan.kind == "magic" and self.plan.spell ~= nil) or self.plan.kind == "lore" then
-      local id = self.plan.kind == "magic" and self.plan.spell or (0x8B + self.plan.lore)
+      local id = self.plan.kind == "magic" and (self.plan.executionSpell or self.plan.spell) or (0x8B + self.plan.lore)
       if self:castVetoed(id, self.plan.kind == "magic" and "cast (at the confirm)"
                         or "lore (at the confirm)") then
         self:dropPlan("stage_changed")
@@ -11793,6 +11889,13 @@ function Driver:button(actor)
           self.plan.all and "party cure" or "heal"))
         self:dropPlan("zombie_target")
         return { "b" }
+      end
+    end
+    if self.plan.targetContract then
+      local t = self.plan.targetContract
+      if M.readByte(BATTLE.TGTCHARS) ~= t.chars or M.readByte(BATTLE.TGTMONS) ~= t.monsters
+        or (M.readByte(BATTLE.TGTALL) ~= 0) ~= t.all then
+        self:dropPlan("race_target_mismatch"); return { "b" }
       end
     end
     if self.opts.traceTgt then
@@ -11820,6 +11923,7 @@ function Driver:button(actor)
       watch = { into = self.itemRestore, id = self.plan.item, what = "item",
                 lo = pw > 0 and pw or nil, hi = pw > 0 and pw or nil }
     elseif self.plan.kind == "heal" and not self.plan.all
+       and (not self.plan.targetContract or self.plan.boostWant == 0)
        and self.castRestore[self.plan.spell] == nil then
       -- an all-ally cast is boosted and spread, so its per-head number
       -- would poison the single-cast ledger; it goes unmeasured
@@ -11869,7 +11973,8 @@ function Driver:button(actor)
         and not (type(self.plan.reason) == "string" and self.plan.reason:sub(1, 5) == "cure ")))
        and self.plan.target ~= nil then
       for e = 0, 3 do
-        if (self.plan.all and M.readWord(0x3C1C + e * 2) > 0) or e == self.plan.target then
+        if self.plan.targetContract and (self.plan.targetContract.chars & (1 << e)) ~= 0
+          or (not self.plan.targetContract and ((self.plan.all and M.readWord(0x3C1C + e * 2) > 0) or e == self.plan.target)) then
           self.healQueued[e] = { by = actor, tick = self.battleTick, hp = M.readWord(0x3BF4 + e * 2),
                                  restore = not self.plan.all and self.plan.restore or nil,
                                  what = self.plan.kind == "heal" and string.format("cure $%02X", self.plan.spell or 0)

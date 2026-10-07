@@ -701,3 +701,36 @@ the real compiler and button method across actor offsets, banks and
 pending totals. This establishes command-window acknowledgment only;
 it does not establish final targets or resolved effects for the broader
 catalogue, nor improve the retained acting-route outcome claim.
+
+### Spell compilation and initial target contracts
+
+The compiler preserves menu spell identity separately from the resolved
+execution ability and caster-aware price. Existing single-ally unboosted
+cures receive total boost zero and a single-character mask. Other spell
+records require an explicit controller kind, HP effect role and exact
+character/monster masks with single/group intent. New offensive/group
+spell discovery remains absent; revival, status, summon, mixed-side and
+special-layout remapping remain unsupported.
+
+Strict spell plans acknowledge the live list price, usability, caster
+price and total boost again before selecting and confirming. Their target
+masks override authored focus. A changed mask or failed group latch drops
+the scored plan instead of silently becoming another body or a single
+cast. Ally groups go through common safety, watch and trace bookkeeping.
+A boosted single heal skips the legacy unboosted-menu restore ledger until
+learning is keyed by the resolved effect recipe.
+
+The observer retains actual submitted command/attack/targets/boost before
+rejecting a mismatched scored contract as unresolved. Folded queue stores
+must match the expected ability and initial targets before acquiring
+execution ownership; mismatch records retain observed and expected data.
+Rejection cannot undo a command already accepted by the engine. Optimistic
+confirmation watches retain ordinary settlement behavior. The initial
+target contract permits the engine's subsequent carried/retargeted hits.
+
+Compilation currently conservatively checks the live list before changing
+pending boost. An expensive or grey pending tier can exclude an affordable
+lower-total candidate until replanning. Candidate discovery must eventually
+price availability at its desired total rather than inherit that exclusion.
+Synthetic contracts establish these mechanisms, not legal spell execution
+or whole-policy improvement.
