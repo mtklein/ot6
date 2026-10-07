@@ -44,6 +44,9 @@
 --   species    list of species words; a decision counts only in a
 --              formation holding one (nil: any battle)
 --   decisions  list of decision numbers to search (nil: every one)
+--   when       function(driver, actor, plan) -> true for a decision to
+--              search (nil: every one); a host may set REWIND.when after
+--              the splice, e.g. the care race's disagreements (#415)
 --   capFrames  a branch not over after this many frames is scored "open"
 --   boosts     boost levels offered (default 0..3, capped by the bank)
 do
@@ -335,7 +338,7 @@ do
       if cur ~= nil or saveFlag ~= nil then return p end
       if H.readByte(BCHID + actor * 2) ~= RW.char or not formationHas() then return p end
       nDecision = nDecision + 1
-      if not wanted(nDecision) then
+      if not wanted(nDecision) or (RW.when ~= nil and not RW.when(self, actor, p)) then
         log("D%d f%d key %s actor %d: %s (not searched)", nDecision, H.frame, battleKey,
           actor, describe(p))
         return p

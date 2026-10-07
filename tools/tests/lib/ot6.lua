@@ -7909,6 +7909,7 @@ function Driver:raceLog(actor, plan, R)
   M.log(string.format("[%s] [race] actor=%d %s: race %s%s; %d candidate(s)", self.tag or "fight", actor, agree,
     raceDesc(cands[i], best), ri and (" | rules " .. raceDesc(cands[ri], all[ri])) or "", #cands))
   self._racePred = { st = st, race = all[i], rules = ri and all[ri] or nil }
+  self.raceLast = { actor = actor, frame = M.frame, agree = agree, race = cands[i].what or cands[i].kind }
   -- the state behind a prediction of a death (calibration, #415)
   if (best.deaths or 0) >= 0.5 or (ri and (all[ri].deaths or 0) >= 0.5) then
     local t = {}
@@ -8012,7 +8013,7 @@ function Driver:racePlan(actor, c)
 end
 
 function Driver:makePlan(actor)
-  self._race = nil
+  self._race, self.raceLast = nil, nil
   local plan = self:makePlanRules(actor)
   if M.CARE_RACE and self._race ~= nil and self._race.actor == actor then
     self._racePred = nil
