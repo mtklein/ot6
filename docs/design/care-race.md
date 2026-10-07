@@ -498,11 +498,14 @@ contracts, before measuring a new strategy.
    delay, with enemy turns and target changes advanced before it. A full
    monster gauge wins the tie. A model must be able to distinguish an
    item reached after the next hit from a cure reached before it. The
-   driver records plan-to-resolve frames from the recovery action trace,
-   retaining a median for each actor, verb, item/skill and actual boost.
-   Unknown latency excludes a live candidate; it does not imply zero.
-   These observations include navigation, queueing and execution, but
-   their portability across changing menu positions remains to be measured.
+   driver records navigation, queue and execution intervals separately from
+   the recovery action trace. Execution end is not first-effect time:
+   damage can kill a monster during an animation before another actor
+   gets a turn. The observer retains those facts but supplies no effect
+   latency until an attributed effect observer exists. Unknown timing
+   excludes first commands and invalidates required continuations; it
+   never implies zero. Consequently this revision observes real play
+   without making live race overrides yet.
 
 The new synthetic controls cover these contracts; their results are not
 legal play or balance evidence. Raw development failures and mutants are
@@ -518,3 +521,18 @@ snapshots, and evaluate fixed policies independently across fresh route
 attempts. Retain local controls and upstream arrival-state effects: the
 Sneezer's lost reward must survive in the inventory until explained and
 fixed, even if a segment still reaches its destination.
+
+Independent review of d7e854df found that execution completion cannot stand
+in for effect timing, unknown continuations could still act instantly, and
+the final shield chip was applied after its hit's damage. The follow-up
+keeps trace stages separate and withholds unobserved effect delays, rejects
+unknown continuation timing, and chips before damage as `Ot6HitJoin` does.
+The synthetic tie fixture now deliberately has no matching break key;
+the old one-shield fixture actually ends on the first Fight under the
+correct engine ordering. Raw failures are retained in
+`holistic/break-order-first.log` and `break-order-second.log`.
+
+The revision is still an experimental branch. A log/off Gate batch at
+d7e854df collects command traces from the same legitimate Narshe battery;
+it is observation of the earlier timing approximation, not qualification
+of the corrected timing model or an acting policy.

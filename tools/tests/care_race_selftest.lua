@@ -264,7 +264,7 @@ end
 -- margin -- the Fight's damage now decides
 do
   local st = { actor = 1, hpRate = 1.2, focus = { 1 },
-    party = { member(700, 1000, 0, { lines = lines(100, 1, 1), period = 202 }) },
+    party = { member(700, 1000, 0, { lines = lines(100, 1, 0), period = 202 }) },
     enemies = { { hp = 150, sh = 1, eta = 150, period = 400, ends = true,
                   act = { aoe = false, dmg = { 30 } } } } }
   local a, h = { kind = "attack", line = st.party[1].lines[0], boost = 0 },
@@ -645,7 +645,7 @@ do
   line = H.raceLine({ kind = "fight", boostLeft = 0, hits = 1, aim = 2 }, 50,
     { byTarget = { [1] = { hit = 0 }, [2] = { hit = 1, chips = 1 } } })
   r = H.raceSim(st, H.raceAttack(line, 0))
-  check(r.leftNow == 250, "score the frozen target rather than the lowest HP/default target")
+  check(r.leftNow == 200, "score the frozen target rather than the lowest HP/default target")
 end
 
 -- 36. Pending care is a commitment, not a second new candidate.
@@ -712,12 +712,15 @@ do
   trace.start(0, 140, 1, 0xE9, 1, {100,100,100,100}, 20, 0)
   check(D:raceDelay(0, plan) == nil, "accepted but unresolved command is not a latency sample")
   trace.resolve(0, 180, {200,100,100,100}, 20, 0)
-  check(D:raceDelay(0, plan) == 80, "latency includes navigation, queue and execution")
+  local timing = D.raceTiming["0:item:233:0"]
+  check(timing.navigation == 20 and timing.queue == 20 and timing.execution == 40
+    and timing.finished == 80, "retain navigation, queue and execution separately")
+  check(D:raceDelay(0, plan) == nil, "execution end is not an observed first-effect delay")
   check(D:raceDelay(1, plan) == nil and D:raceDelay(0, {kind="item", item=0xEA}) == nil,
     "latency samples do not cross actor or item identity")
   D:raceObserve({event="resolve", actor=0, kind="item", requested=0xE9, boost=0, elapsed_frames=100})
   D:raceObserve({event="resolve", actor=0, kind="item", requested=0xE9, boost=0, elapsed_frames=90})
-  check(D:raceDelay(0, plan) == 90, "use the median resolved command latency")
+  check(H.median(D.raceLatency["0:item:233:0"]) == 90, "retain the median resolved command latency")
 end
 
 -- 41. A pending command at the horizon has not performed its imagined heal.
@@ -728,6 +731,27 @@ do
   local r=H.raceSim(st,{kind="heal",target=1,restore=500,delay=100})
   check(r.pending and not r.firstExecuted and r.resources.party[1].hp==499,
     "horizon does not credit a command that has not resolved")
+end
+
+-- 42. The final shield-breaking hit receives the break it causes.
+do
+  local st={actor=1, samples=0, contCare=false, horizon=1,
+    party={member(1000,1000,0,{period=1000})},
+    enemies={{hp=500,sh=1,eta=100,period=1000,act={dmg={0}}}}}
+  local r=H.raceSim(st,{kind="attack",line={per=50,hits=1,chips=1},boost=0})
+  check(r.leftNow==300,"the last shield chips before this hit's damage is priced")
+end
+
+-- 43. An unknown continuation cannot obtain an instantaneous saving Cure.
+do
+  local p=member(500,1000,0,{period=100, lines=lines(1,1,0),
+    heals={{restore=900,cost=10,mp=1,latencyKnown=false}}})
+  p.mp=10
+  local st={actor=1,samples=0,party={p},
+    enemies={{hp=10000,sh=0,eta=50,period=100,act={dmg={300}}}}}
+  local r=H.raceSim(st,{kind="attack",line=p.lines[0],boost=0,delay=0,latencyKnown=true})
+  check(r.invalid and r.resources.party[1].mp==10,
+    "unknown later Cure invalidates the comparison without spending or healing")
 end
 
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "

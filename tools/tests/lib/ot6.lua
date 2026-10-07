@@ -1584,12 +1584,10 @@ local function strike(e, line, hit)
       return n - i + 1
     end
     local per = line.per or 0
-    if (e.sh or 0) > 0 then
-      e.hp = e.hp - per * hit
-      if i <= chips then e.sh = e.sh - 1 end
-    else
-      e.hp = e.hp - per * 4 * hit
-    end
+    -- Ot6HitJoin chips first: the hit removing the final shield receives
+    -- the broken-body damage multiplier itself, not only its next swing.
+    if (e.sh or 0) > 0 and i <= chips then e.sh = e.sh - 1 end
+    e.hp = e.hp - per * ((e.sh or 0) > 0 and 1 or 4) * hit
   end
   if e.hp < 0 then e.hp = 0 end
   return 0
@@ -1826,7 +1824,8 @@ function M.raceSim(st, first, draw)
       if wk then
         for _, h in ipairs(p.heals) do
           local c = { kind = "heal", target = wk, restore = h.restore, cost = h.cost,
-                      id = h.id, mp = h.mp, spell = h.spell, delay = h.delay }
+                      id = h.id, mp = h.mp, spell = h.spell, delay = h.delay,
+                      latencyKnown = h.latencyKnown }
           if P[wk].hp + h.restore > threat(wk, t, k) and affordable(p, c)
              and (h.id ~= nil or h.mp ~= nil or h.n == nil or (used[h] or 0) < h.n) then
             if h.id == nil and h.mp == nil then used[h] = (used[h] or 0) + 1 end
@@ -1934,6 +1933,10 @@ function M.raceSim(st, first, draw)
       local c = first_act and first or p.pending
       if c == nil then
         c = continuation(nk, nt)
+        if c.latencyKnown == false then
+          r.invalid = true
+          break -- an unknown later command cannot buy an instantaneous cure
+        end
         if (c.delay or 0) > 0 then
           p.pending, p.eta = c, nt + c.delay
           c = nil
@@ -5411,7 +5414,9 @@ function M.newRecoveryTrace(tag, emit, observe)
     event(p, "resolve", frame, { command = p.command, attack = p.attack,
       targets = p.targets, hp_net = table.concat(deltas, ","),
       mp_net = mp - p.mp, bp_net = bp - p.bp,
-      execution_frames = frame - p.started })
+      execution_frames = frame - p.started,
+      navigation_frames = p.submitted - p.frame,
+      queue_frames = p.started - p.submitted })
     T.running[actor] = nil
   end
   -- A party death (#175), outside the per-plan lifecycle: the member,
@@ -8179,6 +8184,7 @@ function Driver:raceState(actor, R)
             or M.raceItemCost(M.itemPrice(h.id), h.count, (M.CARE_RESERVE or {})[h.id] or 0)
           heals[#heals + 1] = { restore = h.restore or 0, cost = cost, id = h.id, n = h.count }
           heals[#heals].delay = self:raceDelay(e, { kind = "item", item = h.id })
+          heals[#heals].latencyKnown = heals[#heals].delay ~= nil
         end
       end
       -- this member's own cures, for the continuation: each known cure at
@@ -8194,6 +8200,7 @@ function Driver:raceState(actor, R)
               heals[#heals + 1] = { restore = gain, cost = mp * (M.shopRates().mp or 0), spell = spell,
                                     mp = mp, n = mpNow // mp, cast = true }
               heals[#heals].delay = self:raceDelay(e, { kind = "heal", spell = spell })
+              heals[#heals].latencyKnown = heals[#heals].delay ~= nil
             end
           end
         end
@@ -8317,12 +8324,18 @@ function Driver:raceObserve(e)
   samples[#samples + 1] = e.elapsed_frames
   while #samples > M.RACE_HIT_KEEP do table.remove(samples, 1) end
   self.raceLatency[key] = samples
+  self.raceTiming = self.raceTiming or {}
+  self.raceTiming[key] = { navigation = e.navigation_frames, queue = e.queue_frames,
+    execution = e.execution_frames, finished = e.elapsed_frames }
+  -- Resolve identifies the end of execution, not the first damaging or
+  -- healing effect. Keep the observations, but do not manufacture effect
+  -- timing from them. A future per-effect observer supplies effect samples.
 end
 
 function Driver:raceDelay(actor, plan)
   local key = raceDelayKey(actor, plan.kind, plan.spell or plan.item or plan.skill or plan.lore,
     plan.boostLeft)
-  return M.median((self.raceLatency or {})[key])
+  return M.median((self.raceEffectLatency or {})[key])
 end
 
 function Driver:raceCandidates(actor, st)
