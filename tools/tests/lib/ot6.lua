@@ -1537,12 +1537,17 @@ function M.raceItemCost(gil, count, reserve)
 end
 
 -- one line's hits on enemy e (mutated), times the line's hit chance
+-- one line on one body; returns the hits left when the body fell first
 local function strike(e, line, hit)
-  if e.hp <= 0 then return end
+  local n = line.hits or 1
+  if e.hp <= 0 then return n end
   hit = line.hit or hit
   local chips = line.chips or 0
-  for i = 1, (line.hits or 1) do
-    if e.hp <= 0 then break end
+  for i = 1, n do
+    if e.hp <= 0 then
+      e.hp = 0
+      return n - i + 1
+    end
     local per = line.per or 0
     if (e.sh or 0) > 0 then
       e.hp = e.hp - per * hit
@@ -1552,6 +1557,7 @@ local function strike(e, line, hit)
     end
   end
   if e.hp < 0 then e.hp = 0 end
+  return 0
 end
 
 local function effLeft(E)
@@ -1594,13 +1600,21 @@ function M.raceSim(st, first, draw)
     for k, e in pairs(E) do if e.hp > 0 and (best == nil or e.hp < E[best].hp) then best = k end end
     return best
   end
+  -- a single-target line's swings past its body's death go on to the next
+  -- standing one (the engine retargets a dead target's remaining strikes),
+  -- chipping nothing there: the chips were counted against the first body
   local function attack(p, line, fixed)
     if line == nil then return end
     if line.aoe then
       for _, e in pairs(E) do strike(e, line, p.hit) end
     else
       local k = target(false, fixed)
-      if k then strike(E[k], line, p.hit) end
+      local left = k and strike(E[k], line, p.hit) or 0
+      while left > 0 and st.retarget ~= false do
+        k = target(false, nil)
+        if k == nil then break end
+        left = strike(E[k], { per = line.per, hits = left, chips = 0, hit = line.hit }, p.hit)
+      end
     end
   end
   local function act(k, c, t)

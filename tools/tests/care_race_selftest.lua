@@ -297,6 +297,24 @@ do
   check(not r.worstWipe, "the Cure line survives the worst case, its continuation curing again")
 end
 
+-- 18. A boosted Fight's swings past its target's death go on to the next
+-- body (#415 rewind lab, the WoR from Tzen: the rules' boosted Fight ended
+-- the fight sooner than the race's banked one in all 8 distinct pairs,
+-- e.g. 1177 frames against 4009): CELES, 328 a swing, two monsters at 582
+-- and 850 -- 4 swings now kill the first and carry into the second
+do
+  local L = {}
+  for b = 0, 3 do L[b] = { per = 328, hits = 2 + 2 * b, chips = 0 } end
+  local st = { actor = 1, hpRate = 1.2, focus = { 1 },
+    party = { member(900, 1043, 0, { lines = L, bp = 1, period = 202 }) },
+    enemies = { { hp = 582, sh = 2, eta = 42, period = 303, act = { dmg = { 98 } } },
+                { hp = 850, sh = 2, eta = 62, period = 303, act = { dmg = { 91 } } } } }
+  local r1 = H.raceEval(st, { kind = "attack", line = L[1], boost = 1 })
+  check(r1.leftNow < 850 * 3, "the 1-BP Fight's last two swings land on the second monster")
+  check(choose(st, { { kind = "attack", line = L[0], boost = 0 }, { kind = "attack", line = L[1], boost = 1 } }).boost == 1,
+    "the boost now, not the bank")
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget", n))
