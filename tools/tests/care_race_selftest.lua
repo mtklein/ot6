@@ -241,6 +241,22 @@ do
   check(pick(st) == "heal", "the worst case wipes on the attack (at 50, before any typical death): a heal stands guard")
 end
 
+-- 14. The continuation's heals run out (#415 calibration): a solo member
+-- at 300 under a 250 hit every 300 ticks, against an enemy the horizon
+-- does not see die, drinks to stay up while the bag lasts -- one Potion
+-- puts the death off, an endless bag never lets it come
+do
+  local function st(n)
+    return { actor = 1, hpRate = 1.2, focus = { 1 }, samples = 0,
+      party = { member(300, 1000, 0, { lines = lines(10, 1, 0), heals = { { restore = 400, cost = 50, n = n } } }) },
+      enemies = { { hp = 90000, sh = 4, eta = 50, period = 300, ends = true,
+                    act = { aoe = false, dmg = { 250 } } } } }
+  end
+  local a = { kind = "attack", line = lines(10, 1, 0)[0], boost = 0 }
+  check(H.raceSim(st(1), a).deaths == 1, "one Potion: the member falls inside the horizon")
+  check(H.raceSim(st(nil), a).deaths == 0, "no limit: the member drinks forever")
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count", n))

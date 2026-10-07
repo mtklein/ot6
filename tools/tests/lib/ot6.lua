@@ -1479,8 +1479,10 @@ end
 -- A race state:
 --   actor        the party key deciding now
 --   party[k]     { hp, maxhp, eta, period, bp, lines = { [b] = line },
---                  heals = { { restore, cost } ... } (what the continuation
---                  may drink), deathCost (gil to undo a death),
+--                  heals = { { restore, cost, n } ... } (what the
+--                  continuation may give: the bag's items and this
+--                  member's own cures, n uses each, nil for no limit),
+--                  deathCost (gil to undo a death),
 --                  hit = 0..1 (the chance its lines land, default 1) }
 --   enemies[k]   { hp, sh, eta, period, ends = true for a body whose death
 --                  ends the fight, act = { aoe, dmg = { [partyKey] = n }
@@ -1628,6 +1630,7 @@ function M.raceSim(st, first, draw)
     end
     return w
   end
+  local used = {}
   local function continuation(k)
     local p = P[k]
     if st.contCare ~= false then
@@ -1637,7 +1640,8 @@ function M.raceSim(st, first, draw)
       end
       if wk then
         for _, h in ipairs(p.heals) do
-          if P[wk].hp + h.restore > threat(wk) then
+          if P[wk].hp + h.restore > threat(wk) and (h.n == nil or (used[h] or 0) < h.n) then
+            used[h] = (used[h] or 0) + 1
             return { kind = "heal", target = wk, restore = h.restore, cost = h.cost }
           end
         end
@@ -7703,7 +7707,23 @@ function Driver:raceState(actor, R)
           -- scarce-priced: M.itemGil)
           local cost = h.unsold and (h.gil or M.PRICELESS)
             or M.raceItemCost(M.itemPrice(h.id), h.count, (M.CARE_RESERVE or {})[h.id] or 0)
-          heals[#heals + 1] = { restore = h.restore or 0, cost = cost, id = h.id }
+          heals[#heals + 1] = { restore = h.restore or 0, cost = cost, id = h.id, n = h.count }
+        end
+      end
+      -- this member's own cures, for the continuation: each known cure at
+      -- its measured (else the ROM's least) restore, as many casts as the
+      -- MP pays for, priced at the shops' MP rate
+      if self.opts.cure ~= false and cmdRow(e, BATTLE.CMD_MAGIC) and R.hpNow[e] > 0 then
+        local mpNow = M.readWord(BATTLE.CURMP + e * 2)
+        for _, spell in ipairs(type(self.opts.cure) == "table" and self.opts.cure or BATTLE.CURES) do
+          local cell, mp = spellCell(e, spell, true)
+          if cell ~= nil and (mp or 0) > 0 and mpNow >= mp then
+            local gain = self:castRestoreOf(spell, e, e)
+            if gain and gain > 0 then
+              heals[#heals + 1] = { restore = gain, cost = mp * (M.shopRates().mp or 0), spell = spell,
+                                    n = mpNow // mp, cast = true }
+            end
+          end
         end
       end
       st.party[e] = { hp = R.hpNow[e], maxhp = maxhp, eta = eta, period = period,
@@ -7777,8 +7797,16 @@ function Driver:raceCandidates(actor, st)
   for e, p in pairs(st.party) do
     if p.hp > 0 and p.hp < p.maxhp then
       for _, h in ipairs(p.heals or {}) do
-        c[#c + 1] = { kind = "heal", target = e, restore = h.restore, cost = h.cost, id = h.id,
-          what = string.format("item $%02X on entity %d", h.id, e) }
+        if not h.cast then
+          c[#c + 1] = { kind = "heal", target = e, restore = h.restore, cost = h.cost, id = h.id,
+            what = string.format("item $%02X on entity %d", h.id, e) }
+        end
+      end
+      for _, h in ipairs(a.heals or {}) do
+        if h.cast then
+          c[#c + 1] = { kind = "heal", target = e, restore = h.restore, cost = h.cost, spell = h.spell,
+            what = string.format("cast $%02X on entity %d", h.spell, e) }
+        end
       end
     elseif p.hp == 0 and self:battInvIdx(BATTLE.FENIX_DOWN) then
       local count = 0
@@ -7825,7 +7853,10 @@ local function raceOfPlan(st, actor, plan)
       -- priced as the race prices the same item on the same member
       local cost = plan.item and M.itemPrice(plan.item) or 0
       for _, h in ipairs((st.party[plan.target] or {}).heals or {}) do
-        if h.id == plan.item then cost = h.cost end
+        if plan.item and h.id == plan.item then cost = h.cost end
+      end
+      for _, h in ipairs((st.party[actor] or {}).heals or {}) do
+        if plan.spell and h.spell == plan.spell then cost = h.cost end
       end
       return { kind = "heal", target = plan.target, restore = plan.restore,
         cost = cost, what = "rules: " .. plan.kind }
@@ -7949,6 +7980,12 @@ function Driver:racePlan(actor, c)
     for k, v in pairs(p) do q[k] = v end
     q.reason = "the care race"
     return q
+  end
+  if c.spell then
+    local mrow = cmdRow(actor, BATTLE.CMD_MAGIC)
+    if mrow == nil then return nil end
+    return { kind = "heal", spell = c.spell, target = c.target, restore = c.restore, row = mrow,
+             reason = "the care race" }
   end
   local row = cmdRow(actor, BATTLE.CMD_ITEM)
   if row == nil then return nil end
