@@ -1075,6 +1075,21 @@ do
   check(not start(2,0,255,64),"reload clears queue bindings as well as traces")
 end
 
+-- 54. Tools/Pummel buy exponential damage, while Fight buys swings.
+-- Source authority: Ot6BoostDmg ASL once per BP, with Fight exempt.
+do
+  for b=0,3 do
+    for _,cmd in ipairs({9,10}) do
+      local line=H.raceLine({kind="skill",cmd=cmd,skill=cmd==9 and 0xAA or 0x5D,
+        boostLeft=b,hits=cmd==9 and 1 or 2},100)
+      check(line.per==100*(1<<b),"Tools/Pummel damage follows the ROM's exponential boost")
+      check(H.raceUnboostHit(line.per,b)==100,"learned hit returns to the same unboosted base at every BP")
+    end
+    local line=H.raceLine({kind="fight",boostLeft=b,hits=1+b},100)
+    check(line.per==100 and line.hits==1+b,"Fight's extra swings do not also multiply each hit")
+  end
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
   .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure, the last stand and its guard, the draws, the full gauge, Kefka's raise, near fatal, the carried swing, zombie and left-member candidate vetoes", n))

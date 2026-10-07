@@ -661,3 +661,14 @@ when they have no engine queue. ApplyDmg brackets live on the trace object,
 not a callback-local stack, so the existing H/Driver Lua-heap snapshot
 can reach them. Reload clears that stack; this source property is not yet
 a measured mid-instruction rewind compatibility claim.
+
+
+### Supported skill boost arithmetic
+
+Tools and Pummel buy the damage multiplier in `Ot6BoostDmg`: one left shift
+per BP, giving x1/x2/x4/x8. Their learned per-hit values are normalized by
+that same factor before being reused at another boost. Fight buys extra
+swings and keeps each hit's damage unchanged. Tier-family spells require
+the resolved tier's own effect; the supported skill multiplier is not a
+blanket recipe for those spells. A retained before-fix arithmetic contract
+shows Tools at two BP predicted 300 from base100 where the ROM buys400.

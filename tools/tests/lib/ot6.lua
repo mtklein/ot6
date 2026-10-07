@@ -1554,10 +1554,19 @@ function M.raceAttack(line, requested)
     delayBounds = line and line.delayBounds }
 end
 
+-- The supported Tools/Pummel damage purchase is Ot6BoostDmg's ASL loop.
+-- Fight purchases swings instead; folded spells need their own recipe.
+function M.raceDamageMultiplier(boost)
+  assert(boost >= 0 and boost <= 3 and boost % 1 == 0, "damage boost must be 0..3")
+  return 1 << boost
+end
+function M.raceUnboostHit(per, boost)
+  return per / M.raceDamageMultiplier(boost)
+end
 function M.raceLine(plan, per, effects)
   effects = effects or {}
   local boost = plan.boostLeft or 0
-  local mult = plan.kind == "fight" and 1 or 1 + boost
+  local mult = plan.kind == "fight" and 1 or M.raceDamageMultiplier(boost)
   return { per = per * mult, hits = plan.hits or 1, chips = effects.chips or plan.chips or 0,
     hit = effects.hit or 1, target = plan.aim, aoe = effects.aoe,
     byTarget = effects.byTarget, boost = boost, mp = plan.mp or 0,
@@ -14061,7 +14070,7 @@ function Driver:watchDamage()
         local base = (w.raceNorm or w.norm) / w.n
         if w.kind == "skill" and (w.cmd == BATTLE.CMD_TOOLS
            or (w.cmd == BATTLE.CMD_BLITZ and w.skill == BATTLE.PUMMEL)) then
-          base = base / (1 + (w.boost or 0))
+          base = M.raceUnboostHit(base, w.boost or 0)
         end
         hl[#hl + 1] = base
         while #hl > M.RACE_HIT_KEEP do table.remove(hl, 1) end
