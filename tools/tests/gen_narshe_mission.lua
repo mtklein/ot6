@@ -174,8 +174,11 @@ local GRIND_BAND = { potion = 35, fenix = 20, tincture = 6, revivify = 3, tent =
 -- what the party leaves the plains with for the Sealed Gate (the header)
 -- tincture 8 (#411): the band at the L26 vector_crash reaches (7) plus the
 -- one the gate cave spends (a4e9f966: 7 -> gate_cave_save 6 -> vector_crash
--- 6 < 7; the audit's Tincture band has no slack)
-local DEPART_BAND = { potion = 60, fenix = 23, tincture = 8, revivify = 3, tent = 10 }
+-- 6 < 7; the audit's Tincture band has no slack).  revivify 4 (#411): the
+-- band (3) plus the one the gate cave's Zombones took on ea1499a5 (3 ->
+-- gate_cave_save, vector_crash, banquet_done 2 < 3); the next counter that
+-- sells them is past the banquet.
+local DEPART_BAND = { potion = 60, fenix = 23, tincture = 8, revivify = 4, tent = 10 }
 local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
 local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
 local function gil() return H.gil() end
