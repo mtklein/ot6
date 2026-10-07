@@ -280,6 +280,23 @@ end
 check(H.median({ 83, 328, 300 }) == 300 and H.median({ 83, 328 }) == 83 and H.median({}) == nil,
   "the median of the landings")
 
+-- 17. The worst-case play's continuation lifts against the worst hits
+-- (#415, the WoR's CELES at 75/1043 under three slots, worst 68 + 107 + 133):
+-- a Cure (357) now and the Cure again when the worst hits bring her low keeps
+-- her standing; read against the typical hits, the continuation would wait
+-- too long and the guard would call the Cure line a wipe
+do
+  local st = { actor = 1, hpRate = 1.2, focus = { 1 },
+    party = { member(75, 1043, 0, { lines = lines(150, 1, 0), period = 202,
+                                    heals = { { restore = 357, cost = 5, n = 20 } } }) },
+    enemies = {
+      { hp = 3000, sh = 3, eta = 129, period = 303, act = { dmg = { 10 }, worst = { 68 } } },
+      { hp = 3000, sh = 3, eta = 48, period = 303, act = { dmg = { 15 }, worst = { 107 } } },
+      { hp = 3000, sh = 3, eta = 176, period = 272, act = { dmg = { 20 }, worst = { 133 } } } } }
+  local r = H.raceEval(st, { kind = "heal", target = 1, restore = 357, cost = 5 })
+  check(not r.worstWipe, "the Cure line survives the worst case, its continuation curing again")
+end
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift", n))

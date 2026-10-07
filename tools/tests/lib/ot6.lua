@@ -1622,25 +1622,48 @@ function M.raceSim(st, first, draw)
       r.spent = r.spent + (c.cost or 0)
     end
   end
-  -- the worst one enemy action can do to member k next (its own price)
-  local function threat(k)
-    local w = 0
+  -- what the enemy can do to member k before k's next turn, from time t
+  -- (the round, its own price): every enemy action inside the window, an
+  -- area action in full, a single-target one at its share of the living
+  -- (aimed at random) but never less than the largest one hit.  The
+  -- worst-case play reads its own hits, every one on k: its continuation
+  -- lifts against the hits that play deals, or the guard would read a wipe
+  -- into any line the continuation could have kept alive (the WoR's CELES
+  -- at 75/1043 under three slots reached for an Elixir 17 rows down over
+  -- the Cure that saved her, and died while the menu walked)
+  local function threat(k, t, actor)
+    local q = P[k]
+    local till = (k == actor) and (t + q.period) or q.eta
+    local alive = 0
+    for _, m in pairs(P) do if m.hp > 0 then alive = alive + 1 end end
+    local sum, one = 0, 0
     for _, e in pairs(E) do
-      if e.hp > 0 and e.act.dmg and (e.act.dmg[k] or 0) * (e.act.hit or 1) > w then w = e.act.dmg[k] * (e.act.hit or 1) end
+      if e.hp > 0 and e.eta <= till then
+        local n = math.floor((till - e.eta) / e.period) + 1
+        local v
+        if draw == nil then
+          v = (e.act.worst or e.act.dmg or {})[k] or 0
+          sum = sum + n * v
+        else
+          v = ((e.act.dmg or {})[k] or 0) * (e.act.hit or 1)
+          sum = sum + n * v * ((e.act.aoe or alive <= 1) and 1 or 1 / alive)
+        end
+        if v > one then one = v end
+      end
     end
-    return w
+    return math.max(sum, one)
   end
   local used = {}
-  local function continuation(k)
+  local function continuation(k, t)
     local p = P[k]
     if st.contCare ~= false then
       local worst, wk = nil, nil
       for q, m in pairs(P) do
-        if m.hp > 0 and m.hp <= threat(q) and (worst == nil or m.hp < worst) then worst, wk = m.hp, q end
+        if m.hp > 0 and m.hp <= threat(q, t, k) and (worst == nil or m.hp < worst) then worst, wk = m.hp, q end
       end
       if wk then
         for _, h in ipairs(p.heals) do
-          if P[wk].hp + h.restore > threat(wk) and (h.n == nil or (used[h] or 0) < h.n) then
+          if P[wk].hp + h.restore > threat(wk, t, k) and (h.n == nil or (used[h] or 0) < h.n) then
             used[h] = (used[h] or 0) + 1
             return { kind = "heal", target = wk, restore = h.restore, cost = h.cost }
           end
@@ -1721,7 +1744,7 @@ function M.raceSim(st, first, draw)
       for _, p in pairs(P) do if p.hp > 0 then alive = true end end
       if not alive then r.wipe = true; break end
     else
-      act(nk, continuation(nk), nt)
+      act(nk, continuation(nk, nt), nt)
       P[nk].eta = P[nk].eta + P[nk].period
       if fightOver(E) then r.kill = nt end
     end
