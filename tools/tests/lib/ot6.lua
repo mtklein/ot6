@@ -10281,6 +10281,13 @@ end
 -- qty, flags, mode } }; opts.onList(list, pend) runs at each opening.
 function M.setzerBattle(plan, opts)
   opts = opts or {}
+  for _, p in ipairs(plan) do
+    local boost = p.boost or 0
+    M.assertEq(type(boost) == "number" and boost % 1 == 0 and boost >= 0 and boost <= 3, true,
+      "SETZER's scripted boost is an integer from 0 to 3")
+  end
+  -- The declared boost is reached by Defending when needed.  fullBoost=false
+  -- is the diagnostic lever for the older min(requested, bank) behaviour.
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
   local k, cool, listSeen = 1, 0, {}
   -- One token per call: the callbacks a call registers act only while it
@@ -10288,6 +10295,12 @@ function M.setzerBattle(plan, opts)
   -- each) never has an earlier call's watchers writing into this one's.
   local token = nil
   local Z = { rec = nil, entity = nil }
+  local function seat()
+    for s = 0, 3 do if M.readByte(0x3ED8 + s * 2) == 9 then return s end end
+  end
+  local care = M.newSpinnerCare({ spinner = seat })
+  local careActor
+
   local function gil() return M.readWord(0x1860) + M.readByte(0x1862) * 65536 end
   local function mons()
     local t = {}
@@ -10540,6 +10553,7 @@ function M.setzerBattle(plan, opts)
     arm()
     close()
     if M.readByte(MENU) == 0 then
+      care.reset(); careActor = nil
       -- the engine's own count of enemies still in the fight ($3A77): a
       -- petrified body that keeps its HP is out of it, as the battle's end
       -- test (`lda $3a77`) has it
@@ -10568,24 +10582,23 @@ function M.setzerBattle(plan, opts)
     local a = M.readByte(ACTOR) & 3
     local st = M.readByte(MSTATE)
     local p = plan[k]
+    -- A status may take control while a command window remains visible.
+    -- Give SETZER his turn back through the bag/ally's controller inputs;
+    -- never enter a scripted row into a Zombie's stale window.
+    if p ~= nil then
+      care.watch("SETZER's scripted plan")
+      if care.spinnerTaken() or careActor == a then
+        careActor = a
+        care.window()
+        return
+      end
+    end
+    if careActor ~= nil then care.reset(); careActor = nil end
     if M.readByte(0x3ED8 + a * 2) ~= 9 then
-      -- the others Defend while SETZER's plan has turns left, unless his
-      -- control is taken (M.controlTaken: Zombie, Sleep, Death ...): then
-      -- no turn of his comes, and Defending waits on nothing.  Main
-      -- 53b6a887's qualification had battle_hirecrew's party Defend under
-      -- the Mad Oscar's pack with SETZER zombied for 17,000 frames, then
-      -- wipe with his queued hire never run.  They Fight it out instead; a
-      -- plan the battle ends first is the caller's to play again.
-      local out = nil
-      for s = 0, 3 do
-        if M.readByte(0x3ED8 + s * 2) == 9 then out = M.controlTaken and M.controlTaken(s) end
-      end
-      if out and p ~= nil and not Z.outSaid then
-        Z.outSaid = true
-        M.log(string.format("[setzer] f%d SETZER cannot take a command (%s): the others Fight the battle out",
-          M.frame, out.name))
-      end
-      if p ~= nil and not opts.othersFight and not out then defend(st) else fight(a, st) end
+      -- Preserve the formation while SETZER has a plan.  His lost control
+      -- is handled by care above, through actual cures rather than attacks
+      -- that could end the encounter before its property is exercised.
+      if p ~= nil and not opts.othersFight then defend(st) else fight(a, st) end
       return
     end
     Z.entity = a * 2
@@ -10602,6 +10615,12 @@ function M.setzerBattle(plan, opts)
       return
     end
     if st == 0x05 then
+      if opts.fullBoost ~= false and M.readByte(0x3E9C + entity) < (p.boost or 0) then
+        -- Scripted callers need the requested pass count, including after
+        -- an interrupted command spent its pips.  Bank through real Defends.
+        if M.readByte(0x3E9D + entity) > 0 then pulse("l") else pulse("right") end
+        return
+      end
       local want = math.min(p.boost or 0, M.readByte(0x3E9C + entity), 3)
       if M.readByte(0x3E9D + entity) < want then pulse("r"); return end
       if M.readByte(0x3E9D + entity) > want then pulse("l"); return end
