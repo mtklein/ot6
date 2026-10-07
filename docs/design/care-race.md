@@ -260,8 +260,38 @@ would leave lowest.  The model is now:
   logged against what happened over the same horizon of enemy actions
   (`[race-cal]`).
 
+## What the rewind lab changed (stage 3)
+
+The rewind lab (`tools/tests/rewind_search.lua`, which now takes
+`REWIND.when` and `REWIND.extra`) branched each decision where the race
+disagreed with the rules.  At each one it played the race's own choice
+and the rules' plan to the fight's end.  The model changed where the lab
+showed it wrong:
+
+- **Swings carry over.**  A single-target line's swings past its target's
+  death go on to the next standing body.  Before this, a boosted Fight
+  wasted them, so the race banked BP where the rules boosted.  On the WoR
+  from Tzen, the rules' boosted Fight ended the fight sooner in all 8
+  distinct pairs, for example 1177 frames against 4009.
+- **The damage done now breaks ties.**  When the kill time and the HP left
+  are tied and the cost is inside its margin, the damage the decision
+  itself deals decides.  Later swings may not land as modelled; this
+  one's damage is certain.  The WoR's CELES had cast Cure where a Fight
+  tied it on paper, and the fight took two more Fights.
+- **The per-hit figure is a median.**  A line's per-hit figure is the
+  median of its last eight landings, not the last one.  CELES read 83 a
+  hit off one swing and 328 off the next.
+- **Lifts read the round.**  The continuation lifts against the round
+  before the member's next turn, not one hit.  The worst-case play reads
+  the worst hits.  Before this, the guard read a wipe into the Cure line,
+  so CELES reached for an Elixir 17 rows down and died while the menu
+  walked.
+
+Not modelled: menu time.  An item deep in the list takes hundreds of
+frames to reach, and the enemy acts meanwhile.
+
 Built so far: `M.raceSim`, `M.raceEval`, `M.raceBetter`, `M.raceChoose`,
-`M.raceItemCost`, `M.hitChance` (`lib/ot6.lua`), and the driver's
-`[race]` log and `"act"` mode behind `M.CARE_RACE`.  The unit tests
-(`tools/tests/care_race_selftest.lua`) run 25 checks and catch twelve
-mutants.
+`M.raceItemCost`, `M.hitChance`, `M.median` (`lib/ot6.lua`), and the
+driver's `[race]` log, `[race-cal]` lines and `"act"` mode behind
+`M.CARE_RACE`.  The unit tests (`tools/tests/care_race_selftest.lua`)
+run 33 checks and catch 18 mutants.
