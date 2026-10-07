@@ -539,16 +539,20 @@ H.run({ maxFrames = 600000 }, {
   usualRelics("the stop before Edgar"),
   -- The relics for this boss through the lib's relic rule, armed against
   -- the Tentacles' own threats (H.FIGHT_THREATS.tentacles: Bio and Poison,
-  -- magic that inflicts Poison; an informed reading of their scripts): the
-  -- rule ranks a Shell ward first for a magic fight, so the bag's Czarina
-  -- Ring goes on CELES, the caster, and SABIN keeps his Black Belt.  After
-  -- the fight the Back Guard and the usual relics come back as before.
-  -- Measured from three of this generator's own engine-room stops (shifts
-  -- 0, 11, 23), each talked to Gerad at 60 shifts, retries off: as shipped
-  -- before, 10 of 180 runs lost (3 of 45 distinct battle keys); the Czarina
-  -- Ring on CELES, 5 of 180 (4 of 108 keys); with a Star Pendant on SABIN
-  -- too, 4 of 180 (4 of 90 keys).  No measured difference (p 0.17 by runs,
-  -- 0.69 by keys): a player's choice, not a fix.  The losses left are the
+  -- magic that inflicts Poison; an informed reading of their scripts).  On
+  -- the 1791fcdf chain the rule put the widest Poison guard (a Star
+  -- Pendant) on CELES, the caster, and a Shell ward (the Barrier Ring) on
+  -- SABIN over his Black Belt (`Star Pendant $B1 goes to CELES's slot 5`,
+  -- `Barrier Ring $B7 goes to SABIN's slot 5`); whatever it picks, the
+  -- Back Guard and the usual relics come back after the fight as before
+  -- (SABIN's only by way of a Peace Ring, once Muddle has been seen).
+  -- Relics against these threats were labbed from three of this
+  -- generator's own engine-room stops (shifts 0, 11, 23), each talked to
+  -- Gerad at 60 shifts, retries off: as shipped before, 10 of 180 runs
+  -- lost (3 of 45 distinct battle keys); the Czarina Ring on CELES, 5 of
+  -- 180 (4 of 108 keys); with a Star Pendant on SABIN too, 4 of 180 (4 of
+  -- 90 keys).  No measured difference (p 0.17 by runs, 0.69 by keys): a
+  -- player's choice, not a fix.  The losses left are the
   -- driver's (wipes with 3-5 BP banked, heals landing after the Bio),
   -- build/attempts/wt/v026-retries/wor_edgar/ (#416).
   H.dressRelics({ { CELES, "CELES" }, { SABIN, "SABIN" } },
