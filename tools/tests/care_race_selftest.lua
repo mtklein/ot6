@@ -315,6 +315,15 @@ do
     "the boost now, not the bank")
 end
 
+-- 19. An enemy Runic takes a cure too, unless it cannot act (review of
+-- 187f73c0: 8 of 8 cures cast with the Speck up landed no HP; RunicEffect
+-- skips a dead, petrified, sleeping, stopped, frozen or hidden body)
+check(H.runicAwake(0, 0, 0, 0), "a Speck standing takes the cast")
+check(not H.runicAwake(0, H.ST2_SLEEP, 0, 0) and not H.runicAwake(0, 0, H.ST3_STOP, 0)
+  and not H.runicAwake(H.ST1_PETRIFY, 0, 0, 0) and not H.runicAwake(0, 0, 0, H.ST4_FROZEN)
+  and not H.runicAwake(0, 0, 0, 0x20) and not H.runicAwake(0x80, 0, 0, 0),
+  "asleep, stopped, petrified, frozen, hidden or dead, it takes nothing")
+
 print(string.format("care_race_selftest: PASS -- %d checks: the Gate's lift, #414's review case, the 250 "
   .. "Potion that lifts nothing, spend before dying, the finisher, the raise that dies again and the one that "
-  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget", n))
+  .. "stands, scarcity, the aftermath bill, the horizon, the score's order, the hit chance, the cost margin, calibration, the bag's count, the damage now, the median hit, the worst case's lift, the retarget, the Runic's cure", n))

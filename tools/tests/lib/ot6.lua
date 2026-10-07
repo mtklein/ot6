@@ -6196,6 +6196,39 @@ function M.runicTakes(flags3, special)
   end
   return nil
 end
+-- Whether a monster's Runic can take a cast at all (RunicEffect @352b
+-- skips a body that is dead, petrified or asleep, or stopped, frozen or
+-- hidden: CheckStatus on STATUS12 {DEAD, PETRIFY, SLEEP}, STATUS34 {STOP,
+-- FROZEN, HIDE}); st1..st4 its $3EE4/$3EE5/$3EF8/$3EF9 bytes
+function M.runicAwake(st1, st2, st3, st4)
+  if (st1 & (0x80 | M.ST1_PETRIFY)) ~= 0 then return false end
+  if (st2 & M.ST2_SLEEP) ~= 0 then return false end
+  if (st3 & M.ST3_STOP) ~= 0 then return false end
+  if (st4 & (M.ST4_FROZEN | 0x20)) ~= 0 then return false end
+  return true
+end
+-- The standing slots' $3E4C bytes for M.runicTakes, a slot whose Runic
+-- cannot take a cast left out (M.runicAwake)
+function Driver:runicSpecial()
+  local special = {}
+  for s = 0, 5 do
+    if monAlive(s) then
+      local x = 8 + s * 2
+      if M.runicAwake(M.readByte(0x3EE4 + x), M.readByte(0x3EE5 + x), M.readByte(0x3EF8 + x),
+                      M.readByte(0x3EF9 + x)) then
+        special[s] = M.readByte(0x3E4C + x)
+      end
+    end
+  end
+  return special
+end
+-- the slot whose enemy Runic would take spell id now, or nil (a cure too:
+-- the review of 187f73c0 saw 8 of 8 cures cast with the Speck up land no HP)
+function Driver:runicSlot(id)
+  if M.ENEMY_RUNIC_VETO == false or id == nil or id > 0xFF then return nil end
+  local MP = M.sym("MagicProp") & 0x3FFFFF
+  return M.runicTakes(M.readRomByte(MP + id * 14 + 3), self:runicSpecial())
+end
 function Driver:castVetoed(abilityId, what)
   -- An enemy Runic (#413): a monster carrying $3E4C bit 1 (the Speck's
   -- MonsterProp+30, "A Speck absorbs magic!" on its launch) takes every
@@ -6205,11 +6238,7 @@ function Driver:castVetoed(abilityId, what)
   -- no such bit and pass.
   local MP = M.sym("MagicProp") & 0x3FFFFF
   if M.ENEMY_RUNIC_VETO ~= false then
-    local special = {}
-    for s = 0, 5 do
-      if monAlive(s) then special[s] = M.readByte(0x3E4C + 8 + s * 2) end
-    end
-    local rs = M.runicTakes(M.readRomByte(MP + abilityId * 14 + 3), special)
+    local rs = M.runicTakes(M.readRomByte(MP + abilityId * 14 + 3), self:runicSpecial())
     if rs ~= nil then
       M.log(string.format("[%s] %s $%02X refused: slot %d ($%03X) holds an enemy Runic and would absorb it "
         .. "(#413) -- falling through", self.tag or "fight", what, abilityId, rs,
@@ -7803,6 +7832,7 @@ function Driver:raceState(actor, R)
   end
   st.perOf = perOf
   st.raceHitBy = by
+  st.runicSlot = function(id) return self:runicSlot(id) end
   for e = 0, 3 do
     local maxhp = R.maxOf(e)
     if maxhp > 0 and maxhp ~= 0xFFFF and M.readByte(BATTLE.BCHID + e * 2) ~= 0xFF then
@@ -7841,7 +7871,7 @@ function Driver:raceState(actor, R)
         local mpNow = M.readWord(BATTLE.CURMP + e * 2)
         for _, spell in ipairs(type(self.opts.cure) == "table" and self.opts.cure or BATTLE.CURES) do
           local cell, mp = spellCell(e, spell, true)
-          if cell ~= nil and (mp or 0) > 0 and mpNow >= mp then
+          if cell ~= nil and (mp or 0) > 0 and mpNow >= mp and self:runicSlot(spell) == nil then
             local gain = self:castRestoreOf(spell, e, e)
             if gain and gain > 0 then
               heals[#heals + 1] = { restore = gain, cost = mp * (M.shopRates().mp or 0), spell = spell,
@@ -8005,6 +8035,10 @@ local function raceOfPlan(st, actor, plan)
       end
       for _, h in ipairs((st.party[actor] or {}).heals or {}) do
         if plan.spell and h.spell == plan.spell then cost = h.cost end
+      end
+      if plan.spell and st.runicSlot and st.runicSlot(plan.spell) ~= nil then
+        return { kind = "heal", target = plan.target, restore = 0, cost = cost,
+                 what = "rules: " .. plan.kind .. " (into an enemy Runic)" }
       end
       return { kind = "heal", target = plan.target, restore = plan.restore,
         cost = cost, what = "rules: " .. plan.kind }
