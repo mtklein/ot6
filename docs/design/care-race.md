@@ -734,3 +734,33 @@ lower-total candidate until replanning. Candidate discovery must eventually
 price availability at its desired total rather than inherit that exclusion.
 Synthetic contracts establish these mechanisms, not legal spell execution
 or whole-policy improvement.
+
+Three retained normal-controller probes at `75fc2a89` establish legal
+execution for single Fire (zero boost), Fire2 against two enemies (two
+boost), and Cure2 on the party (two boost, two meaningful recipients).
+Submitted and queued identities, accepted boosts, initial target masks and
+attributed HP effects matched. The initial Fire policy repeatedly offered
+a fire-absorbed cast and lost; that failure and an earlier singleton group
+cast are retained. These are mechanism examples, not a spell policy rate.
+Evidence: `build/attempts/wt/v026-race/holistic/spell-75fc2a89/`.
+
+### Observed reward eligibility
+
+The optional race observer records seated character identities, positive-HP
+Zombie and other `$C2` status changes, HP death, removal and restoration
+separately. At the UpdateSRAM reward snapshot it records the engine's alive
+mask, calculated due XP and actual per-character XP change. A last-watch
+fallback is explicitly labelled with its original sample frame and ATB
+tick; it must not be reported as a reward-boundary observation. Changed or
+missing character identities leave eligibility, status and reference
+allocation unknown, while measured XP stays attached to the original seat.
+
+A separate equal-share reference divides the battle's reward pool among
+all original seated members, applying their Exp Eggs. A foregone reference
+share is counterfactual accounting, not the engine's redistributed due XP.
+Later field curing cannot rewrite the finalized record. Each battle gets a
+new ledger, including when the route reuses its driver. This observer is
+read-only, enabled with the race or explicit `raceEligibility` option;
+it changes neither candidate discovery nor scores. Status evolution and
+predicted terminal eligibility remain unmodelled. Evidence:
+`build/attempts/wt/v026-race/holistic/eligibility/`.

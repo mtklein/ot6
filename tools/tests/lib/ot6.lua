@@ -3260,6 +3260,74 @@ function M.rewardDue(o)
   return sum // o.alive
 end
 
+-- Eligibility is separate from HP and command availability. This is an
+-- observation predicate, not a prediction of status spells. At rewards the
+-- engine's alive mask is authoritative; transient RAM can disagree here.
+function M.raceRewardEligible(member)
+  return member.hp > 0 and member.hp ~= 0xFFFF and (member.st1 & 0xC2) == 0 and not member.left
+end
+
+-- Stable seated identities and copied observations survive later curing.
+-- Only read-only evidence: no candidate ranking or controller changes.
+function M.newRaceEligibility(seats, emit)
+  local L = { seats = {}, last = {}, history = {}, terminal = nil }
+  for e,seat in pairs(seats) do L.seats[e] = seat.actor end
+  function L.observe(party, frame, tick)
+    for e,char in pairs(L.seats) do
+      local m = party[e]
+      if m and m.char == char then
+        local q = { entity=e,char=char,hp=m.hp,st1=m.st1,left=m.left,
+          eligible=M.raceRewardEligible(m),frame=frame,atb_tick=tick }
+        local old = L.last[e]
+        if old == nil or old.eligible ~= q.eligible or (old.st1 & 0xC2) ~= (q.st1 & 0xC2)
+          or old.left ~= q.left or (old.hp == 0) ~= (q.hp == 0) then
+          q.event = old and "transition" or "initial"
+          L.history[#L.history+1] = q
+          if emit then emit(q) end
+        end
+        -- Never alias caller-owned RAM samples or historical observations.
+        L.last[e] = { entity=e,char=char,hp=m.hp,st1=m.st1,left=m.left,eligible=q.eligible }
+      end
+    end
+  end
+  function L.finish(o, got, reward, frame, tick, atEnd)
+    if L.terminal then return L.terminal end
+    if reward.party then L.observe(reward.party,frame,tick) end
+    local r = { frame=frame,atb_tick=tick,kind=o.kind,members={},aliveMask=reward.aliveMask,
+      atEnd=atEnd==true,observation_source=atEnd and "UpdateSRAM" or "last-watch" }
+    local count=0;for _ in pairs(L.seats) do count=count+1 end
+    local reference=0
+    if o.kind == "won" and count > 0 then
+      local input={};for k,v in pairs(reward) do input[k]=v end
+      input.alive=count
+      reference=M.rewardDue(input)
+    end
+    for e,char in pairs(L.seats) do
+      local m = reward.party and reward.party[e]
+      local identity = m ~= nil and m.char == char
+      local eligible
+      if identity then eligible = o.kind == "won" and ((reward.aliveMask or 0) >> e) & 1 == 1 end
+      local ref = reference * ((reward.egg and reward.egg[e]) and 2 or 1)
+      r.members[e] = { entity=e,char=char,identity_match=identity,eligible=eligible,paid=got[e] or 0,
+        due=identity and (o.share[e] or 0) or nil,
+        hp=identity and m.hp or nil,st1=identity and m.st1 or nil,
+        left=nil,
+        equal_share_reference=identity and ref or nil,
+        foregone_equal_share=identity and (not eligible and ref or 0) or nil }
+      if identity then r.members[e].left=m.left end
+      if emit then
+        local event={event="reward",frame=frame,atb_tick=tick,
+          atEnd=r.atEnd,observation_source=r.observation_source}
+        for k,v in pairs(r.members[e]) do event[k]=v end
+        emit(event)
+      end
+    end
+    L.terminal=r
+    return r
+  end
+  return L
+end
+
 -- The battle's outcome from its end reading (the UpdateSRAM hook's
 -- snapshot, or the driver's last watchLeavers reading when the hook did
 -- not see the end; see there): kind "won", "party left" (every seated member
@@ -12047,6 +12115,7 @@ function Driver:idle()
   end
   self.outcomeSaid = false
   self.seatXp, self.seatChar, self.filled = nil, nil, nil
+  self.raceEligibility = nil
   self.leftSaid, self.escSaid, self.reward = {}, {}, nil
   self.timed, self.tailSaid, self.runDecided, self.running = nil, false, nil, nil
   if self.recovery then
@@ -13597,7 +13666,7 @@ local function xpAt(off)
        + M.readByte(0x1613 + off) * 65536
 end
 local function speciesAt(s) return M.readWord(M.FORMATION + s * 2) & 0x1FF end
-local function readReward()
+local function readReward(eligibility)
   if rewardMul16 == nil then rewardMul16 = M.readRomWord(M.sym("Ot6RewardMulW") & 0x3FFFFF) end
   local r = { xp = {}, st1 = {}, hp = {}, egg = {}, species = {} }
   for s = 0, 5 do
@@ -13610,6 +13679,15 @@ local function readReward()
   r.random, r.mul16 = M.readByte(M.RANDBTL) ~= 0, rewardMul16
   r.alive, r.aliveMask = M.readByte(0x3A76), M.readByte(0x3A74)
   r.left, r.gone = M.readByte(0x3A39), M.readByte(0x3A3A)
+  if eligibility then
+    r.sample_frame=M.frame
+    r.sample_tick=M.readWord(0x3A3E)
+    r.party={}
+    for e=0,3 do
+      r.party[e]={char=M.readByte(BATTLE.BCHID+e*2),hp=M.readWord(0x3BF4+e*2),
+        st1=M.readByte(BATTLE.ST1+e*2),left=((r.left >> e)&1)==1}
+    end
+  end
   r.lost = M.partyWipedInBattle ~= nil and M.partyWipedInBattle() or false
   r.form = M.readWord(0x11E0)
   r.veldt = (M.readByte(0x11E4) & 0x02) ~= 0
@@ -13620,7 +13698,7 @@ local function endActivate()
   endHooked = true
   local a = M.sym("UpdateSRAM")
   emu.addMemoryCallback(function()
-    endSnap = { frame = M.frame, reward = readReward() }
+    endSnap = { frame = M.frame, reward = readReward(endWatcher and endWatcher.raceEligibility ~= nil) }
     local d = endWatcher
     endWatcher = nil
     -- only the driver that watched THIS battle: one that stopped watching
@@ -13692,7 +13770,20 @@ function Driver:watchLeavers()
     for s = 0, 5 do self.filled[s] = (mask >> s) & 1 == 1 end
   end
   endWatcher, self.watchFrame = self, M.frame
-  local r = readReward()
+  if self.raceEligibility == nil and (M.CARE_RACE or self.opts.raceEligibility) then
+    self.raceEligibility=M.newRaceEligibility(self.seatChar,function(e)
+      if e.event == "reward" then
+        M.log(string.format("[%s] [race-eligibility] reward source=%s f%d tick%d char%d entity%d identity-match=%s eligible=%s paid=%d due=%s equal-share-reference=%s foregone-equal-share=%s",
+          self.tag or "fight",e.observation_source,e.frame,e.atb_tick,e.char,e.entity,tostring(e.identity_match),tostring(e.eligible),e.paid,tostring(e.due),
+          tostring(e.equal_share_reference),tostring(e.foregone_equal_share)))
+      else
+        M.log(string.format("[%s] [race-eligibility] %s f%d char%d entity%d eligible=%s hp=%d status1=$%02X left=%s",
+          self.tag or "fight",e.event,e.frame,e.char,e.entity,tostring(e.eligible),e.hp,e.st1,tostring(e.left)))
+      end
+    end)
+  end
+  local r = readReward(self.raceEligibility ~= nil)
+  if self.raceEligibility then self.raceEligibility.observe(r.party,M.frame,M.readWord(0x3A3E)) end
   self.reward = r
   local seated, still = 0, 0
   for e = 0, 3 do
@@ -13901,6 +13992,10 @@ function Driver:sayOutcome()
   local rec = { kind = o.kind, form = r.form, kills = o.kills, escaped = o.escaped,
                 due = o.due, share = o.share, got = got, ok = ok, leftN = o.leftN,
                 seatedN = o.seatedN, random = r.random, tick = self.battleTick, atEnd = atEnd }
+  if self.raceEligibility then
+    rec.eligibility=self.raceEligibility.finish(o,got,r,r.sample_frame,r.sample_tick,atEnd)
+    rec.eligibilityHistory=self.raceEligibility.history
+  end
   M.lastOutcome = rec
   M.outcomes[#M.outcomes + 1] = rec
   M.log(string.format("[%s] [outcome] battle $%03X %s after %d ticks%s: killed %s; escaped %s; "
