@@ -482,7 +482,7 @@ do
   H.itemPower = function() return 2 end
   H.itemPrice = function() return 500 end
   D.battInvIdx = function() return 0 end
-  local st = { actor = 0, party = {
+  local st = { actor = 0, careItems = true, careCasts = true, party = {
     [0] = { hp = 1000, maxhp = 1000, bp = 0, lines = {}, heals = {} },
     [1] = { hp = 100, maxhp = 1000, heals = { { restore = 250, cost = 300, id = 0xE9 } } } } }
   check(#D:raceCandidates(0, st) == 1, "a seated hurt member offers a heal")
@@ -496,6 +496,26 @@ do
   check(#D:raceCandidates(0, st) == 0, "a member who left offers no heal")
   st.party[1].hp, left = 0, false
   check(#D:raceCandidates(0, st) == 1, "a seated fallen member offers a Fenix Down")
+  st.careItems = false
+  check(#D:raceCandidates(0, st) == 0, "the actor's closed item line offers no raise")
+  st.party[1].hp = 100
+  check(#D:raceCandidates(0, st) == 0, "the actor's closed item line offers no bag heal")
+  st.careItems = true
+  st.party[1].noCare = true
+  check(#D:raceCandidates(0, st) == 0, "a patient whose Doom beats the next turn offers no heal")
+  st.party[1].noCare = false
+  H.readByte = function() return H.ST1_PETRIFY end
+  check(#D:raceCandidates(0, st) == 0, "a statue offers no heal")
+  H.readByte = function() return 0 end
+  st.party[0].bp, st.party[0].lines = 3, lines(100, 1, 1)
+  check(#D:raceCandidates(0, st) == 2, "boost disabled offers only the unboosted attack and heal")
+  D.opts.boost = true
+  check(#D:raceCandidates(0, st) == 5, "boost enabled offers all four attacks and heal")
+  st.party[0].heals = { { cast = true, spell = 0x2D, restore = 100, cost = 0 } }
+  st.careCasts, st.careItems = false, false
+  check(#D:raceCandidates(0, st) == 4, "the actor's closed cure line offers no cast")
+  st.careCasts = true
+  check(#D:raceCandidates(0, st) == 5, "the actor's open cure line offers a cast")
   H.readByte, H.leftMask, H.itemPower, H.itemPrice = readByte, leftMask, itemPower, itemPrice
 end
 

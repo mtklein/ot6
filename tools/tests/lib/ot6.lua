@@ -7974,7 +7974,8 @@ function M.median(v)
 end
 function Driver:raceState(actor, R)
   local st = { actor = actor, party = {}, enemies = {}, focus = {}, hpRate = M.shopRates().hp or 1.2,
-               bankAt = self.opts.bank or 0, horizon = M.RACE_HORIZON }
+               bankAt = self.opts.bank or 0, horizon = M.RACE_HORIZON,
+               careItems = R.careItems, careCasts = R.careCasts }
   local slot = self:pressTarget()
   if slot == nil then
     for s = 0, 5 do if monAlive(s) then slot = s; break end end
@@ -8029,7 +8030,8 @@ function Driver:raceState(actor, R)
         end
       end
       local heals = {}
-      if R.hpNow[e] > 0 then
+      local noCare = status1Has(e, M.ST1_PETRIFY) or doomLast(e, actor) == "last"
+      if R.hpNow[e] > 0 and not noCare and self.opts.items then
         for _, h in ipairs(self:bagHeals(e, R.hpNow[e])) do
           -- a sold item at its price, dearer near the reserve; an unsold one
           -- at bagHeals' own gil (its effect at the shops' rates, already
@@ -8042,7 +8044,7 @@ function Driver:raceState(actor, R)
       -- this member's own cures, for the continuation: each known cure at
       -- its measured (else the ROM's least) restore, as many casts as the
       -- MP pays for, priced at the shops' MP rate
-      if self.opts.cure ~= false and cmdRow(e, BATTLE.CMD_MAGIC) and R.hpNow[e] > 0 then
+      if self.opts.cure ~= false and cmdRow(e, BATTLE.CMD_MAGIC) and R.hpNow[e] > 0 and not noCare then
         local mpNow = M.readWord(BATTLE.CURMP + e * 2)
         for _, spell in ipairs(type(self.opts.cure) == "table" and self.opts.cure or BATTLE.CURES) do
           local cell, mp = spellCell(e, spell, true)
@@ -8056,7 +8058,8 @@ function Driver:raceState(actor, R)
         end
       end
       st.party[e] = { hp = R.hpNow[e], maxhp = maxhp, eta = eta, period = period,
-        bp = M.readByte(BATTLE.BP + e * 2), lines = lines, heals = heals, deathCost = M.deathGil(maxhp) }
+        bp = M.readByte(BATTLE.BP + e * 2), lines = lines, heals = heals, noCare = noCare,
+        deathCost = M.deathGil(maxhp) }
     end
   end
   if st.party[actor] == nil then return nil, "the actor is not seated" end
@@ -8161,29 +8164,30 @@ end
 function Driver:raceCandidates(actor, st)
   local c = {}
   local a = st.party[actor]
-  for b = 0, math.min(a.bp, 3) do
+  for b = 0, self.opts.boost and math.min(a.bp, 3) or 0 do
     if a.lines[b] then c[#c + 1] = { kind = "attack", line = a.lines[b], boost = b, what = a.lines[b].what } end
   end
   for e, p in pairs(st.party) do
     -- a ZOMBIE takes neither a heal (it is damage) nor a Fenix Down (it
     -- never lands, #245): battle_zombieraise caught the race throwing one
     local zombie = (M.readByte(BATTLE.ST1 + e * 2) & 0x02) ~= 0
-    if zombie or (M.leftMask() >> e) & 1 == 1 then
+    if zombie or (M.leftMask() >> e) & 1 == 1 or p.noCare
+       or status1Has(e, M.ST1_PETRIFY) then
       -- nothing to offer on this member
     elseif p.hp > 0 and p.hp < p.maxhp then
       for _, h in ipairs(p.heals or {}) do
-        if not h.cast then
+        if not h.cast and st.careItems then
           c[#c + 1] = { kind = "heal", target = e, restore = h.restore, cost = h.cost, id = h.id,
             what = string.format("item $%02X on entity %d", h.id, e) }
         end
       end
       for _, h in ipairs(a.heals or {}) do
-        if h.cast then
+        if h.cast and st.careCasts then
           c[#c + 1] = { kind = "heal", target = e, restore = h.restore, cost = h.cost, spell = h.spell,
             what = string.format("cast $%02X on entity %d", h.spell, e) }
         end
       end
-    elseif p.hp == 0 and self:battInvIdx(BATTLE.FENIX_DOWN) then
+    elseif p.hp == 0 and st.careItems and self:battInvIdx(BATTLE.FENIX_DOWN) then
       local count = 0
       for i = 0, 251 do
         if M.readByte(BATTLE.BATTINV + i * 5) == BATTLE.FENIX_DOWN then count = count + M.readByte(BATTLE.BATTINV + i * 5 + 3) end
@@ -9025,7 +9029,8 @@ function Driver:makePlanRules(actor)
     return best
   end
   -- the care race's view of this decision (#415, Driver:raceLog)
-  self._race = { actor = actor, bestLine = bestLine, hpNow = hpNow, maxOf = maxOf, price = price }
+  self._race = { actor = actor, bestLine = bestLine, hpNow = hpNow, maxOf = maxOf, price = price,
+    careItems = row ~= nil and self.parkDropN < 3, careCasts = cureRow ~= nil and self.parkDropN < 3 }
   -- The spend rule (#175): this actor inside one round of death, holding
   -- BP, with no heal in hand that lifts them clear of the round, spends
   -- every pip now on their strongest line instead of a heal that only
