@@ -9,7 +9,7 @@ H.run({maxFrames=12000}, {
   H.waitFrames(45),
   H.call(function()
     H.assertEq(H.mapId() & 0x1ff, 386, "retained Gate map")
-    H.assertEq(xp(0), 5311, "Terra retained actual missed XP")
+    H.assertEq(xp(0), 28143, "Terra retained total XP (22832 entry + 5311 earned)")
     for _,c in ipairs({0,1,4,5}) do
       H.log(string.format("[xp-continuation-entry] char=%d xp=%d", c,xp(c)))
     end
@@ -17,7 +17,7 @@ H.run({maxFrames=12000}, {
   end),
   H.saveGame({slot=3, tag="retained ACT Gate continuation"}),
   H.call(function()
-    H.assertEq(xp(0), 5311, "Save UI preserves Terra XP")
+    H.assertEq(xp(0), 28143, "Save UI preserves Terra XP")
     H.assertExitContract("gate-cave-save-v1")
     H.screenshot("xp_continuation_saved")
   end),
