@@ -24,6 +24,7 @@ import fcntl
 import os
 import sys
 import time
+import power_source
 
 SLOT_DIR = os.path.expanduser("~/.cache/ot6/emu-slots")
 CONF = os.path.expanduser("~/.config/ot6/emulator-slots")
@@ -134,12 +135,28 @@ def main():
         return 2
     owner, ready = int(sys.argv[2]), sys.argv[3]
     t0 = time.time()
+    previous_reason = None
     while True:
         if not alive(owner):
             return 0
         n = slots()   # re-read: a machine's setting can change while we queue
+        # Recheck while queued: a placement claim may precede unplugging.
+        # Private slot selftests launch only sleep stand-ins, never emulators.
+        reason = None if os.environ.get("EMU_SLOT_SELFTEST_DIR") else power_source.blocked(
+            power_source.observe(), time.time())
+        if reason != previous_reason:
+            print(f"[emu-slot] {('waiting: ' + reason) if reason else 'AC power restored'}", flush=True)
+            previous_reason = reason
+        if reason:
+            time.sleep(1)
+            continue
         k, fd = try_take(n)
         if fd is not None:
+            # Power could change while acquiring the slot; no running job is stopped.
+            if not os.environ.get("EMU_SLOT_SELFTEST_DIR") and power_source.blocked(
+                    power_source.observe(), time.time()):
+                os.close(fd)
+                continue
             break
         time.sleep(1)
     tmp = ready + ".tmp"

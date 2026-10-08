@@ -48,6 +48,14 @@ needs key-based ssh (BatchMode) and the repo checked out there; it opens no
 port.  A peer that goes silent for 20s is shown down and redialled every
 10s.
 
+Placement (`live.py --place N --claim <branch>`) offers room only on
+machines with a fresh AC-power observation. Battery-powered hosts still
+show their existing workers, but receive no new work; the machine line
+explains the exclusion. Unknown or stale power observations also offer no
+room. Peer checkouts need `tools/tests/lib/power_source.py`; update them
+when deploying the viewer. The slot gate also checks power before admission,
+so a queued job waits if the host was unplugged after placement.
+
 Check it from the viewer's machine:
 
 ```sh

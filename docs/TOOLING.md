@@ -255,6 +255,23 @@ ceiling on any one machine, whatever a caller launches.
 `python3 tools/tests/lib/emu_slot.py --status` prints held and total;
 `--selftest` checks the limit on a private pool.
 
+New work requires a fresh observation that the host is on AC power.
+`live.py --place` excludes battery-powered machines and reports the reason
+in its output and worker grid; unknown or stale power observations also
+exclude a host. macOS uses `pmset`'s current power source, Linux the system
+power supplies' `online` flags (not charge percentage or battery status;
+peripheral batteries are ignored). Peer checkouts must have the observation
+helper to advertise available room. Claims expire normally and do not
+promise a machine will remain plugged in.
+
+The slot admission gate rechecks power while waiting and just after taking
+its slot. A queued run waits without consuming its execution timeout until
+AC returns; an already admitted run continues if the machine is unplugged.
+This protects new launches even after an older placement claim or when a
+batch bypasses placement. No power settings are changed. Run
+`python3 tools/stream/power_scheduling_selftest.py` for synthetic AC/battery,
+stale observation, claim, and queued admission checks without emulators.
+
 ## Mesen facts the harness depends on
 
 - With no config file, Mesen ignores `--testrunner` and launches the GUI

@@ -4,7 +4,8 @@ Each machine's room is its emulator slots (run.sh's hard ceiling: the first
 integer in that machine's ~/.config/ot6/emulator-slots, else its CPU count;
 tools/tests/lib/emu_slot.py) less the emulators it runs now and the live
 claims on it.  "order" lists machines for the next emulators, each machine's
-room in PREFER order.
+room in PREFER order. Battery, unknown and stale power observations offer
+no room; running workers and their slot locks are left alone.
 
 This replaced a model learned from a log of finished runs (speed against
 emulators running, a fitted knee and shift), retired 2026-10-06: an overload
@@ -16,6 +17,13 @@ import fcntl
 import json
 import os
 import time
+import importlib.util
+from pathlib import Path
+
+_spec = importlib.util.spec_from_file_location(
+    "power_source", Path(__file__).resolve().parents[1] / "tests/lib/power_source.py")
+power_source = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(power_source)
 
 CLAIM_SEC = 120           # how long a --claim holds its emulators
 # Whose machines they are: batches fill px13 (ours alone) first, then mini
@@ -46,9 +54,14 @@ def placement(machines, claims, now):
         slots = m.get("slots") or m.get("ncpu")
         rec = {"name": m["name"], "up": m["up"], "active": m["active"],
                "load1": (m["load"] or [None])[0], "ncpu": m["ncpu"],
-               "fps": m.get("fps"), "slots": slots}
+               "fps": m.get("fps"), "slots": slots, "power": m.get("power")}
         out.append(rec)
         if not m["up"] or not slots:
+            continue
+        rec["peak"] = slots
+        reason = power_source.blocked(m.get("power"), now)
+        if reason:
+            rec.update(room=0, blocked=reason)
             continue
         # A peer that has only just come back (a sleeping laptop's brief
         # network wake) gets no room until it has stayed up a while: work
@@ -63,12 +76,14 @@ def placement(machines, claims, now):
             room -= h
             rec["claimed"] = h
         rec.update(peak=slots, room=max(0, room))
-    return {"ts": now, "prefer": PREFER, "machines": out, **fill(out)}
+    return {"ts": now, "prefer": PREFER, "machines": out, **fill(out, now)}
 
 
-def fill(machines):
+def fill(machines, now=None):
+    now = time.time() if now is None else now
     rank = {n: i for i, n in enumerate(PREFER)}
-    ranked = sorted((r for r in machines if r.get("room")),
+    ranked = sorted((r for r in machines if r.get("room")
+                     and not power_source.blocked(r.get("power"), now)),
                     key=lambda r: rank.get(r["name"], len(PREFER)))
     order = [r["name"] for r in ranked for _ in range(r["room"])]
     return {"order": order, "room": len(order)}
@@ -106,7 +121,7 @@ def claim(path, p, n, who):
             if "room" in m:
                 m["room"] = max(0, m["room"] - held(
                     unseen, m["name"], m["active"], now))
-        take = fill(ms)["order"][:n]
+        take = fill(ms, now)["order"][:n]
         act = {m["name"]: m["active"] for m in ms}
         new = [{"ts": now, "by": who, "machine": name, "n": take.count(name),
                 "active0": act[name]} for name in dict.fromkeys(take)]
