@@ -821,3 +821,23 @@ matching command/attack/queued identity/targets at resolution. The integration
 contract drives production plan/submit/queueStore/start/resolve emitters;
 legacy arithmetic starts without queue provenance remain censored. The first
 batch is retained as evidence of the observer defect, not live calibration.
+
+Prospective Gate shift2 play at `149a4f71` passed scoped independent raw
+review. The acting policy with diagnostics off/on produced identical4790
+pad entries and six outcomes, both PASS40993 first attempt; the rules
+shadow passed40529 first attempt. Acting18/rules19 windows have17 verified
+first actions each and five exact deadlines each, with four/five uncensored
+views respectively. Trace20 was accepted but unexecuted at the end snapshot
+and canceled afterward. Early termination and unsupported status history
+remain censored. No calibration accuracy or policy-rate claim follows.
+The first `b1b701e8` batch remains a failed observer-integration attempt;
+the repaired producer contract does not retroactively change its verdict.
+Evidence: `build/attempts/wt/v026-race/holistic/time-shadow-play/`, especially
+`fix-149a4f71/independent-review.md` and `comparison.json`.
+
+The prior XP regression still reproduces: Terra5311 versus6383 under rules,
+others6740 versus6383 each. The shadow instrument changes no acting scores.
+Selected-plan ownership, modeled opportunities and observed closed ledger
+units are now separable within one elapsed window. Queue occupancy,
+in-flight effects and future status prediction remain the next modeling
+work before broad acting comparisons or closure of #415.
