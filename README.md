@@ -17,6 +17,8 @@ repaired Blackjack, the IAF gauntlet, the Floating Continent and AtmaWeapon,
 and the escape — and into the World of Ruin as far as the Falcon, with Setzer back and
 Darill's Tomb cleared.
 
+Main is v0.27 development; the latest published release is v0.26.
+
 Break and boost are the two central systems. Enemies carry shields and hidden
 weaknesses, hitting a weakness chips a shield, and breaking drops defenses
 hard. Boost banks turns and folds spell tiers (Fire → Fira → Firaga).
