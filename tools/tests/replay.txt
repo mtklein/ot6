@@ -4,3 +4,4 @@
 # (a library edit alone replays nothing: docs/TESTING.md, provenance).
 # Bump it with the date and the reason when a full replay is wanted.
 2026-10-05 the graph played once from power-on (#363)
+2026-10-08 isolated wt/v026-fresh-play: acting race policy, fresh serial power-on lineage, seed shift 2
