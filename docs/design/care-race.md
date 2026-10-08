@@ -783,3 +783,32 @@ at the same predeclared deadline, actual terminal readings before battle
 clock reset, and explicit near-fatal penalty versus actual down count.
 Queue/in-flight effects and continuation policy remain approximations.
 Evidence: `build/attempts/wt/v026-race/holistic/time-window/`.
+
+### Opt-in selected-policy time shadows
+
+`RACE_TIME_DIAGNOSTIC` defaults off. With the race enabled, it evaluates
+both original candidates under one predecision elapsed-ATB budget alongside
+the existing scores. The extra estimates do not choose or steer an action.
+They retain pure HP-down and near-fatal counts separately from the ranking's
+fractional penalty. Modeled removal still counts as HP-down; observed removal
+is recorded separately and censored rather than claiming matched semantics.
+
+The observer samples the global clock even while gauges are full, saving
+initial, changed party and final readings rather than a snapshot every frame.
+Its terminal record identifies the selected actor, original frame/tick, bound
+first-action trace, accepted/start/resolved facts, and final frame/tick/source.
+Only the selected policy is observed; the other candidate is a prediction.
+`calibration=false` remains explicit even for an uncensored fixed endpoint.
+A valid bound first action is necessary to interpret that endpoint; it does
+not establish the modeled continuation or counterfactual outcome as correct.
+
+The UpdateSRAM hook supplies one pre-reset HP/status/identity/clock sample.
+Missing end snapshots, early endings, overshoot, resets, identity/status or
+removal changes, unverified/canceled first actions, and predictions terminating by the
+cutoff are censored. Unsupported/pending alternatives are declined.
+Terminal records stay with the outcome when the driver starts another
+battle. HP-down is not a comprehensive incapacitation or XP-eligibility
+measure: positive-HP Zombie and other status changes remain raw observations.
+The original completed-action calibration remains unchanged and unmatched.
+Evidence: `build/attempts/wt/v026-race/holistic/time-shadow/`; standalone
+synthetic wiring contracts, not a played or general policy claim.

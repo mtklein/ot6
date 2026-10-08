@@ -2106,6 +2106,7 @@ function M.raceSim(st, first, draw)
   r.falls = r.deaths
   r.deaths = 0
   for _, p in pairs(P) do if p.hp <= 0 then r.deaths = r.deaths + 1 end end
+  r.actualDown = r.deaths -- before the ranking-only near-fatal penalty
   -- a member left near fatal (HP at or under max/8, the engine's own
   -- floor, battle_main @11544) counts as half a member down: the next
   -- fight can open before any care, and a leg can end on the fight (the
@@ -2210,7 +2211,7 @@ end
 function M.raceEval(st, c)
   local n = st.samples or M.RACE_SAMPLES
   local worst = M.raceSim(st, c, nil)
-  if n <= 0 then worst.pWipe = worst.wipe and 1 or 0; worst.worstWipe = worst.wipe; return worst end
+  if n <= 0 then worst.pWipe = worst.wipe and 1 or 0; worst.worstWipe = worst.wipe; worst.timeSource="worst-case"; worst.countSource="worst-case"; return worst end
   local rs = {}
   for i = 1, n do
     local j = (i - 1) * 64
@@ -2226,6 +2227,9 @@ function M.raceEval(st, c)
   end
   local function mean(f) local t = 0 for i = 1, n do t = t + f(rs[i]) end return t / n end
   local r = { deaths = mean(function(x) return x.deaths end), falls = mean(function(x) return x.falls end),
+    actualDown = mean(function(x) return x.actualDown end),
+    nearFatal = mean(function(x) return x.nearFatal end),
+    earlySamples = mean(function(x) return st.timeHorizon and x.elapsed < st.timeHorizon and 1 or 0 end) * n,
     kill = med(function(x) return x.kill end),
     firstDeath = med(function(x) return x.firstDeath end), left = mean(function(x) return x.left end),
     left0 = rs[1].left0, leftNow = worst.leftNow,
@@ -2235,7 +2239,7 @@ function M.raceEval(st, c)
     unsuppressedTurns = mean(function(x) return x.unsuppressedTurns end),
     breakSkips = mean(function(x) return x.breakSkips or 0 end),
     -- Timing endpoint is the worst-case path; counts above are sample means.
-    elapsed = worst.elapsed,timeCutoff=worst.timeCutoff,timeSource="worst-case",
+    elapsed = worst.elapsed,timeCutoff=worst.timeCutoff,timeSource="worst-case",countSource="sample-means",
     pWipe = mean(function(x) return x.wipe and 1 or 0 end), worstWipe = worst.wipe, worstDeaths = worst.deaths,
     standNow = worst.standNow, invalid = worst.invalid, pending = worst.pending }
   r.wipe = worst.wipe
@@ -8531,6 +8535,7 @@ end
 -- "act" (experimental, default off, #415): the race plays its choice where it disagrees
 -- with the rule stack; "log" (or true): the rules play and the race is
 -- logged beside them; false or "off": the rules alone, no race
+M.RACE_TIME_DIAGNOSTIC = false -- opt-in selected-policy shadow evidence only
 if M.CARE_RACE == nil then M.CARE_RACE = false end
 if M.CARE_RACE == "off" then M.CARE_RACE = false end
 M.RACE_RAISE_RESERVE = 2
@@ -8823,6 +8828,7 @@ local function raceDelayKey(actor, kind, id, boost)
 end
 
 function Driver:raceObserve(e)
+  if self.raceTimeActive then self:raceTimeEvent(e) end
   local key = raceDelayKey(e.actor, e.kind, e.requested, e.boost)
   if e.event == "hp_effect" then
     if e.time_unit ~= "atb_updates" then return end
@@ -9060,7 +9066,8 @@ function Driver:raceLog(actor, plan, R)
   end
   M.log(string.format("[%s] [race] actor=%d %s: race %s%s; %d candidate(s)", self.tag or "fight", actor, agree,
     raceDesc(cands[i], best), ri and (" | rules " .. raceDesc(cands[ri], all[ri])) or "", #cands))
-  self._racePred = { st = st, race = all[i], rules = ri and all[ri] or nil }
+  self._racePred = { st = st, race = all[i], rules = ri and all[ri] or nil,
+    raceCandidate = cands[i], rulesCandidate = rc }
   self.raceLast = { actor = actor, frame = M.frame, agree = agree, race = cands[i].what or cands[i].kind }
   if agree == "DISAGREE" then
     local ok, rp = pcall(self.racePlan, self, actor, cands[i])
@@ -9099,6 +9106,157 @@ function Driver:raceLog(actor, plan, R)
       (cands[i].delayBounds or {}).hi or cands[i].delay or 0,
       (rc.delayBounds or {}).lo or rc.delay or 0,(rc.delayBounds or {}).hi or rc.delay or 0))
     if safe then return cands[i] end
+  end
+end
+
+-- Both alternatives use one original timetable budget. These estimates do
+-- not feed raceChoose, the acting gate, or the legacy calibration.
+function M.raceTimePair(st, race, rules)
+  if not race or not rules then return nil,"missing-candidate" end
+  local budget=M.raceTimeBudget(st)
+  if not budget then return nil,"unbounded-timetable" end
+  local ss={};for k,v in pairs(st) do ss[k]=v end
+  ss.timeHorizon=budget
+  local a,b=M.raceEval(ss,race),M.raceEval(ss,rules)
+  if a.invalid or b.invalid then return nil,"unsupported-prediction" end
+  if a.pending or b.pending then return nil,"pending-prediction" end
+  return {budget=budget,race=a,rules=b}
+end
+
+-- One coherent read supplies the tick, identity, HP and status endpoint.
+-- All added RAM reads are opt-in; statuses are observations, not predictions.
+function M.raceTimeSample()
+  local r={sample_frame=M.frame,sample_tick=M.readWord(0x3A3E),party={}}
+  local left=M.readByte(0x3A39)
+  for e=0,3 do
+    r.party[e]={char=M.readByte(BATTLE.BCHID+e*2),hp=M.readWord(0x3BF4+e*2),
+      maxhp=M.readWord(0x3C1C+e*2),st1=M.readByte(BATTLE.ST1+e*2),
+      st2=M.readByte(BATTLE.ST2+e*2),st3=M.readByte(0x3EF8+e*2),
+      st4=M.readByte(0x3EF9+e*2),left=((left>>e)&1)==1}
+  end
+  return r
+end
+
+function Driver:raceTimePush(actor,rp,which,plan)
+  if not M.RACE_TIME_DIAGNOSTIC then return end
+  local pair,why=M.raceTimePair(rp.st,rp.raceCandidate,rp.rulesCandidate)
+  if not pair then
+    M.log(string.format("[%s] [race-time] declined %s",self.tag or "fight",why))
+    return
+  end
+  local sample=M.raceTimeSample()
+  local c={actor=actor,selected=which,prediction=pair,plan=plan,initial={},history={},unknown={},
+    frame=sample.sample_frame,start_tick=sample.sample_tick,clock=M.newRaceTimeObservation(sample.sample_tick,pair.budget),
+    lifecycle={stage="selected"},scope="selected-policy",calibration=false,units0=self.monActN or 0}
+  for e in pairs(rp.st.party) do
+    local m=sample.party[e];c.initial[e]={}
+    for k,v in pairs(m) do c.initial[e][k]=v end
+  end
+  self.raceTimeActive=self.raceTimeActive or {}
+  self.raceTimeActive[#self.raceTimeActive+1]=c
+  self:raceTimeTick(sample,false,"selection")
+end
+
+-- Bind to the trace created for this exact selected plan, never the next
+-- action by the same actor. Acceptance and resolution remain separate facts.
+function Driver:raceTimeBind(actor,plan)
+  local p=self.recovery and self.recovery.pending[actor]
+  for i=#(self.raceTimeActive or {}),1,-1 do
+    local c=self.raceTimeActive[i]
+    if c.actor==actor and c.plan==plan and c.frame==M.frame and c.lifecycle.id==nil and p then
+      c.lifecycle.id=p.id;c.lifecycle.stage="plan"
+      break
+    end
+  end
+end
+function Driver:raceTimeEvent(e)
+  for _,c in ipairs(self.raceTimeActive or {}) do
+    if c.lifecycle.id~=nil and c.lifecycle.id==e.id then
+      c.lifecycle.stage=e.event
+      if e.event=="submit" then c.lifecycle.accepted=true end
+      if e.event=="start" then c.lifecycle.started=true end
+      if e.event=="resolve" then c.lifecycle.resolved=true;c.lifecycle.valid=e.valid end
+      if e.event=="drop" or e.event=="unresolved" then c.lifecycle.canceled=e.reason or e.event end
+    end
+  end
+end
+
+function Driver:raceTimeTick(sample,ended,source)
+  for i=#(self.raceTimeActive or {}),1,-1 do
+    local c=self.raceTimeActive[i]
+    local down,near,removed,n=0,0,0,0
+    local observation={frame=sample.sample_frame,tick=sample.sample_tick,source=source,party={}}
+    for e,initial in pairs(c.initial) do
+      local m=sample.party[e];n=n+1
+      if not m or m.char~=initial.char then c.unknown["identity-changed"]=true
+      else
+        local copy={};for k,v in pairs(m) do copy[k]=v end;observation.party[e]=copy
+        if m.left then removed=removed+1 end
+        if m.left~=initial.left then c.unknown["removal-changed"]=true end
+        if m.hp==0 or m.hp==0xFFFF then down=down+1
+        elseif m.hp <= (m.maxhp>>3) then near=near+1 end
+        if m.st1~=initial.st1 or m.st2~=initial.st2 or m.st3~=initial.st3
+          or m.st4~=initial.st4 then c.unknown["status-changed"]=true end
+      end
+    end
+    local changed=#c.history==0
+    local old=c.history[#c.history]
+    if old then
+      for e in pairs(c.initial) do
+        local a,b=old.party[e],observation.party[e]
+        if (a==nil)~=(b==nil) then changed=true
+        elseif a and b then for k,v in pairs(b) do if a[k]~=v then changed=true end end end
+      end
+    end
+    local terminal=c.clock.observe(sample.sample_tick,ended)
+    if changed or ended or terminal then
+      c.history[#c.history+1]=observation
+      for e,initial in pairs(c.initial) do
+        local m=observation.party[e]
+        if m then
+          M.log(string.format("[%s] [race-time-state] actor=%d selection_frame=%d sample_frame=%d tick=%d source=%s entity=%d char=%d hp=%d maxhp=%d status1=%02X status2=%02X status3=%02X status4=%02X left=%s",
+            self.tag or "fight",c.actor,c.frame,observation.frame,observation.tick,source,e,m.char,m.hp,m.maxhp,m.st1,m.st2,m.st3,m.st4,tostring(m.left)))
+        else
+          M.log(string.format("[%s] [race-time-state] actor=%d selection_frame=%d sample_frame=%d tick=%d source=%s entity=%d original_char=%d identity=unknown",
+            self.tag or "fight",c.actor,c.frame,observation.frame,observation.tick,source,e,initial.char))
+        end
+      end
+    end
+    if terminal then
+      local r={};for k,v in pairs(terminal) do r[k]=v end
+      r.source=source;r.frame=sample.sample_frame;r.tick=sample.sample_tick
+      r.actor=c.actor;r.selection_frame=c.frame;r.start_tick=c.start_tick
+      r.actualDown=down;r.actualNearFatal=near;r.actualRemoved=removed;r.members=n
+      r.closedLedgerUnits=(self.monActN or 0)-c.units0
+      r.endpoint=observation
+      r.prediction=c.prediction;r.selected=c.selected;r.scope=c.scope;r.calibration=false
+      r.lifecycle={};for k,v in pairs(c.lifecycle) do r.lifecycle[k]=v end
+      r.history=c.history;r.initial=c.initial
+      r.censorReasons={}
+      local function censor(reason) r.censored=true;r.censorReasons[#r.censorReasons+1]=reason end
+      if r.censored then censor(r.reason) end
+      if source=="last-watch" then censor("missing-end-snapshot") end
+      for _,reason in ipairs({"identity-changed","status-changed","removal-changed"}) do
+        if c.unknown[reason] then censor(reason) end
+      end
+      r.identityKnown=not c.unknown["identity-changed"]
+      if c.lifecycle.canceled then censor("first-action-canceled")
+      elseif not c.lifecycle.resolved or c.lifecycle.valid~=true then censor("first-action-unverified") end
+      if not c.prediction.race.timeCutoff or not c.prediction.rules.timeCutoff
+        or (c.prediction.race.earlySamples or 0)>0 or (c.prediction.rules.earlySamples or 0)>0 then
+        censor("prediction-terminated")
+      end
+      self.raceTimeRecords=self.raceTimeRecords or {};self.raceTimeRecords[#self.raceTimeRecords+1]=r
+      M.log(string.format("[%s] [race-time] actor=%d selection_frame=%d start_tick=%d trace_id=%s selected=%s scope=selected-policy calibration=false f%d tick%d source=%s elapsed=%d budget=%d overshoot=%d reason=%s censored=%s (%s) first=%s accepted=%s resolved=%s identity-known=%s actual-down=%d near-fatal=%d removed=%d closed-ledger-units=%d | race down=%.2f near-fatal=%.2f rules down=%.2f near-fatal=%.2f endpoint=worst-case counts=%s race-opportunities=%.2f race-skips=%.2f race-unsuppressed=%.2f rules-opportunities=%.2f rules-skips=%.2f rules-unsuppressed=%.2f",
+        self.tag or "fight",r.actor,r.selection_frame,r.start_tick,tostring(r.lifecycle.id),r.selected,r.frame,r.tick,r.source,r.elapsed,r.budget,r.overshoot or 0,r.reason,
+        tostring(r.censored),table.concat(r.censorReasons,","),r.lifecycle.stage,tostring(r.lifecycle.accepted==true),
+        tostring(r.lifecycle.resolved==true),tostring(r.identityKnown),down,near,removed,r.closedLedgerUnits,
+        r.prediction.race.actualDown or 0,r.prediction.race.nearFatal or 0,
+        r.prediction.rules.actualDown or 0,r.prediction.rules.nearFatal or 0,r.prediction.race.countSource,
+        r.prediction.race.opportunities or 0,r.prediction.race.breakSkips or 0,r.prediction.race.unsuppressedTurns or 0,
+        r.prediction.rules.opportunities or 0,r.prediction.rules.breakSkips or 0,r.prediction.rules.unsuppressedTurns or 0))
+      table.remove(self.raceTimeActive,i)
+    end
   end
 end
 
@@ -9259,6 +9417,10 @@ function Driver:makePlan(actor)
     local rp = self._racePred
     if ok and rp then
       pcall(self.raceCalPush, self, actor, played == "race" and rp.race or rp.rules, rp.st, played)
+      if M.RACE_TIME_DIAGNOSTIC then
+        local timeOk,timeErr=pcall(self.raceTimePush,self,actor,rp,played,plan)
+        if not timeOk then M.log(string.format("[%s] [race-time] declined error: %s",self.tag or "fight",tostring(timeErr))) end
+      end
     end
     self._racePred = nil
   end
@@ -11513,6 +11675,7 @@ function Driver:button(actor)
     end
     self.plan, self.planActor, self.tgtSpin = self:makePlan(actor), actor, 0
     if self.recovery then self.recovery.plan(actor, self.plan, M.frame) end
+    if self.raceTimeActive then self:raceTimeBind(actor,self.plan) end
     self.planPulses, self.steerTrail = 0, {}
     if self.plan.kind == "heal" or self.plan.kind == "item" then self.careActor = actor end
     M.log(string.format("[%s] actor=%d char=%d plan=%s",
@@ -12191,6 +12354,8 @@ function Driver:idle()
   self.outcomeSaid = false
   self.seatXp, self.seatChar, self.filled = nil, nil, nil
   self.raceEligibility = nil
+  self.raceTimeActive = nil -- terminal records remain attached to outcomes
+  self.raceTimeRecords = nil
   self.leftSaid, self.escSaid, self.reward = {}, {}, nil
   self.timed, self.tailSaid, self.runDecided, self.running = nil, false, nil, nil
   if self.recovery then
@@ -13755,13 +13920,8 @@ local function readReward(eligibility)
   r.alive, r.aliveMask = M.readByte(0x3A76), M.readByte(0x3A74)
   r.left, r.gone = M.readByte(0x3A39), M.readByte(0x3A3A)
   if eligibility then
-    r.sample_frame=M.frame
-    r.sample_tick=M.readWord(0x3A3E)
-    r.party={}
-    for e=0,3 do
-      r.party[e]={char=M.readByte(BATTLE.BCHID+e*2),hp=M.readWord(0x3BF4+e*2),
-        st1=M.readByte(BATTLE.ST1+e*2),left=((r.left >> e)&1)==1}
-    end
+    local sample=M.raceTimeSample()
+    r.sample_frame,r.sample_tick,r.party=sample.sample_frame,sample.sample_tick,sample.party
   end
   r.lost = M.partyWipedInBattle ~= nil and M.partyWipedInBattle() or false
   r.form = M.readWord(0x11E0)
@@ -13773,7 +13933,7 @@ local function endActivate()
   endHooked = true
   local a = M.sym("UpdateSRAM")
   emu.addMemoryCallback(function()
-    endSnap = { frame = M.frame, reward = readReward(endWatcher and endWatcher.raceEligibility ~= nil) }
+    endSnap = { frame = M.frame, reward = readReward(endWatcher and (endWatcher.raceEligibility ~= nil or endWatcher.raceTimeActive ~= nil)) }
     local d = endWatcher
     endWatcher = nil
     -- only the driver that watched THIS battle: one that stopped watching
@@ -13857,8 +14017,9 @@ function Driver:watchLeavers()
       end
     end)
   end
-  local r = readReward(self.raceEligibility ~= nil)
+  local r = readReward(self.raceEligibility ~= nil or self.raceTimeActive ~= nil)
   if self.raceEligibility then self.raceEligibility.observe(r.party,M.frame,M.readWord(0x3A3E)) end
+  if self.raceTimeActive then self:raceTimeTick(r,false,"watch") end
   self.reward = r
   local seated, still = 0, 0
   for e = 0, 3 do
@@ -14071,6 +14232,8 @@ function Driver:sayOutcome()
     rec.eligibility=self.raceEligibility.finish(o,got,r,r.sample_frame,r.sample_tick,atEnd)
     rec.eligibilityHistory=self.raceEligibility.history
   end
+  if self.raceTimeActive then self:raceTimeTick(r,true,atEnd and "UpdateSRAM" or "last-watch") end
+  rec.timeShadows=self.raceTimeRecords
   M.lastOutcome = rec
   M.outcomes[#M.outcomes + 1] = rec
   M.log(string.format("[%s] [outcome] battle $%03X %s after %d ticks%s: killed %s; escaped %s; "
