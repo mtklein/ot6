@@ -1671,7 +1671,66 @@ local function fightOver(E)
   return not standing
 end
 
+-- One predecision elapsed-ATB budget for shadow comparisons. Derive it
+-- from the original enemy timetable, before either candidate changes it.
+-- This is optional diagnostic machinery; the acting score keeps its
+-- opportunity horizon until played comparisons justify a policy change.
+function M.raceTimeBudget(st)
+  local n=st.horizon or M.RACE_HORIZON
+  if n < 1 or n % 1 ~= 0 then return nil end
+  local nexts={}
+  for k,e in pairs(st.enemies or {}) do
+    if e.hp > 0 then
+      if type(e.eta) ~= "number" or e.eta < 0 or e.eta ~= e.eta
+        or type(e.period) ~= "number" or e.period <= 0 or e.period ~= e.period or e.period == math.huge then return nil end
+      nexts[k]={eta=e.eta,period=e.period}
+    end
+  end
+  local deadline
+  for _=1,n do
+    local key,t=nil,nil
+    for k,e in pairs(nexts) do
+      if t==nil or e.eta<t or (e.eta==t and k<key) then key,t=k,e.eta end
+    end
+    if key==nil or t==math.huge then return nil end
+    deadline=t;nexts[key].eta=t+nexts[key].period
+  end
+  -- A zero-time interval cannot observe queued full-gauge actions.
+  local budget=math.max(1,math.ceil(deadline))
+  if budget >= 0x8000 then return nil end
+  return budget
+end
+
+-- Wrap-aware sampled global ATB clock. Menu pauses add no time; gauge
+-- fullness is irrelevant. Ambiguous backwards/reset jumps are censored.
+function M.newRaceTimeObservation(tick, budget)
+  assert(budget >= 0 and budget < 0x8000,"bounded ATB observation budget")
+  local L={last=tick,elapsed=0,budget=budget,terminal=nil}
+  function L.observe(now,ended)
+    if L.terminal then return L.terminal end
+    local delta=(now-L.last)&0xFFFF
+    L.last=now
+    if delta>=0x8000 then
+      L.terminal={reason="clock-discontinuity",censored=true,elapsed=L.elapsed,budget=budget}
+    else
+      L.elapsed=L.elapsed+delta
+      if L.elapsed>=budget or ended then
+        local early=L.elapsed<budget
+        L.terminal={reason=early and "early-end" or (L.elapsed>budget and "overshoot" or "deadline"),
+          censored=early or L.elapsed>budget,
+          elapsed=L.elapsed,budget=budget,overshoot=math.max(0,L.elapsed-budget)}
+      end
+    end
+    return L.terminal
+  end
+  return L
+end
+
 function M.raceSim(st, first, draw)
+  if st.timeHorizon ~= nil then
+    assert(type(st.timeHorizon)=="number" and st.timeHorizon>=0
+      and st.timeHorizon<0x8000,"bounded simulation time horizon")
+  end
   -- draw: nil plays the worst case (every action lands at its worst on
   -- the member it leaves lowest, the no-wipe guard); a function returning
   -- 0..1 plays one sample (the aim and the landing drawn from it)
@@ -1693,7 +1752,7 @@ function M.raceSim(st, first, draw)
              breakUntil = (e.brokenLeft or 0) > 0 and e.brokenLeft or nil }
   end
   local left0 = effLeft(E)
-  local r = { deaths = 0, firstDeath = nil, kill = nil, wipe = false, spent = 0, acts = 0 }
+  local r = { deaths = 0, firstDeath = nil, kill = nil, wipe = false, spent = 0, acts = 0, opportunities = 0, unsuppressedTurns = 0, elapsed = 0 }
   local function affordable(p, c)
     return (c.mp or 0) <= p.mp and (c.boost or 0) <= p.bp
       and (c.id == nil or (bag[c.id] or 0) > 0)
@@ -1945,17 +2004,26 @@ function M.raceSim(st, first, draw)
     end
     if ek ~= nil and (nt == nil or et <= nt) then nk, nt, enemy = ek, et, true end
     if nk == nil then break end
+    if st.timeHorizon ~= nil and nt > st.timeHorizon then
+      r.elapsed=st.timeHorizon
+      for _,e in pairs(E) do raceRecover(e,st.timeHorizon) end
+      r.timeCutoff=true
+      break
+    end
+    r.elapsed=nt
     for _,e in pairs(E) do raceRecover(e,nt) end
     if enemy then
       r.acts = r.acts + 1
-      if r.acts > horizon then break end
+      if st.timeHorizon == nil and r.acts > horizon then break end
       local anyUp = false
       for _, p in pairs(P) do if p.hp > 0 then anyUp = true end end
       if not anyUp then break end      -- the party is gone (a removal)
       local e = E[nk]
+      r.opportunities=r.opportunities+1
       if e.breakUntil and e.breakUntil > nt then
         r.breakSkips = (r.breakSkips or 0) + 1
       else
+      r.unsuppressedTurns=r.unsuppressedTurns+1
       local dmg, lands, aim = e.act.dmg or {}, true, e.act.aim or "random"
       if draw == nil then
         dmg, aim = e.act.worst or dmg, "worst"
@@ -2163,6 +2231,11 @@ function M.raceEval(st, c)
     left0 = rs[1].left0, leftNow = worst.leftNow,
     spent = mean(function(x) return x.spent end), bill = mean(function(x) return x.bill end),
     cost = mean(function(x) return x.cost end), acts = worst.acts,
+    opportunities = mean(function(x) return x.opportunities end),
+    unsuppressedTurns = mean(function(x) return x.unsuppressedTurns end),
+    breakSkips = mean(function(x) return x.breakSkips or 0 end),
+    -- Timing endpoint is the worst-case path; counts above are sample means.
+    elapsed = worst.elapsed,timeCutoff=worst.timeCutoff,timeSource="worst-case",
     pWipe = mean(function(x) return x.wipe and 1 or 0 end), worstWipe = worst.wipe, worstDeaths = worst.deaths,
     standNow = worst.standNow, invalid = worst.invalid, pending = worst.pending }
   r.wipe = worst.wipe
@@ -9031,8 +9104,10 @@ end
 
 -- Calibration (#415): the prediction for the plan that was played (its
 -- samples' mean deaths and wipe share, the worst case's wipe and deaths)
--- against what happened over the same horizon of enemy actions, or to the
--- fight's end: one [race-cal] line each
+-- against completed enemy actions, or to the fight's end. This legacy
+-- comparison is not a matched horizon: the model counts opportunities
+-- (including broken turns), the observer counts completed actions. An
+-- elapsed-ATB shadow window must be wired before claiming calibration.
 function Driver:raceCalPush(actor, pred, st, which)
   if pred == nil then return end
   local alive = {}

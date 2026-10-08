@@ -764,3 +764,22 @@ read-only, enabled with the race or explicit `raceEligibility` option;
 it changes neither candidate discovery nor scores. Status evolution and
 predicted terminal eligibility remain unmodelled. Evidence:
 `build/attempts/wt/v026-race/holistic/eligibility/`.
+
+### Elapsed-ATB comparison primitives
+
+Optional `timeHorizon` simulation now stops at an inclusive elapsed-ATB
+cutoff, recovering break state at that instant even between events. Its
+opportunities, suppressed opportunities and unsuppressed modeled turns
+are separate; none is an observed completed-action ledger count. A budget
+helper derives one cutoff from the original enemy timetable before either
+candidate acts. A sampled global-clock observer handles wrap and paused
+menus; early endings, reset/ambiguous jumps and overshoot are censored.
+
+These primitives are not wired into live calibration or acting scores.
+The existing opportunity-horizon policy remains unchanged. Its legacy
+calibration counts observed closed action units, so it still lacks a
+matched horizon. Next: shadow predictions for both original alternatives
+at the same predeclared deadline, actual terminal readings before battle
+clock reset, and explicit near-fatal penalty versus actual down count.
+Queue/in-flight effects and continuation policy remain approximations.
+Evidence: `build/attempts/wt/v026-race/holistic/time-window/`.
