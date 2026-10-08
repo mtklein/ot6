@@ -9159,6 +9159,8 @@ end
 
 -- Bind to the trace created for this exact selected plan, never the next
 -- action by the same actor. Acceptance and resolution remain separate facts.
+-- Resolution has no emitter "valid" flag: compare the strict queue/context
+-- identity carried by production start and resolve events instead.
 function Driver:raceTimeBind(actor,plan)
   local p=self.recovery and self.recovery.pending[actor]
   for i=#(self.raceTimeActive or {}),1,-1 do
@@ -9171,12 +9173,28 @@ function Driver:raceTimeBind(actor,plan)
 end
 function Driver:raceTimeEvent(e)
   for _,c in ipairs(self.raceTimeActive or {}) do
-    if c.lifecycle.id~=nil and c.lifecycle.id==e.id then
-      c.lifecycle.stage=e.event
-      if e.event=="submit" then c.lifecycle.accepted=true end
-      if e.event=="start" then c.lifecycle.started=true end
-      if e.event=="resolve" then c.lifecycle.resolved=true;c.lifecycle.valid=e.valid end
-      if e.event=="drop" or e.event=="unresolved" then c.lifecycle.canceled=e.reason or e.event end
+    if c.lifecycle.id~=nil and c.lifecycle.id==e.id and c.actor==e.actor then
+      local L=c.lifecycle
+      L.stage=e.event
+      if e.event=="submit" then
+        L.accepted=true;L.acceptedCommand=e.command
+      end
+      if e.event=="start" then
+        L.started=true;L.start={}
+        L.strictStart=L.accepted and e.command==L.acceptedCommand and e.counter==false
+        for _,key in ipairs({"context_id","queue_index","queue_generation","command","attack","queued_command","queued_attack","targets"}) do
+          L.start[key]=e[key]
+          if e[key]==nil then L.strictStart=false end
+        end
+        if e.queued_command~=e.command then L.strictStart=false end
+      end
+      if e.event=="resolve" then
+        L.resolved=true;L.valid=L.strictStart==true
+        for _,key in ipairs({"context_id","queue_index","queue_generation","command","attack","queued_command","queued_attack","targets"}) do
+          if not L.start or e[key]==nil or e[key]~=L.start[key] then L.valid=false end
+        end
+      end
+      if e.event=="drop" or e.event=="unresolved" then L.canceled=e.reason or e.event end
     end
   end
 end
@@ -9247,10 +9265,13 @@ function Driver:raceTimeTick(sample,ended,source)
         censor("prediction-terminated")
       end
       self.raceTimeRecords=self.raceTimeRecords or {};self.raceTimeRecords[#self.raceTimeRecords+1]=r
-      M.log(string.format("[%s] [race-time] actor=%d selection_frame=%d start_tick=%d trace_id=%s selected=%s scope=selected-policy calibration=false f%d tick%d source=%s elapsed=%d budget=%d overshoot=%d reason=%s censored=%s (%s) first=%s accepted=%s resolved=%s identity-known=%s actual-down=%d near-fatal=%d removed=%d closed-ledger-units=%d | race down=%.2f near-fatal=%.2f rules down=%.2f near-fatal=%.2f endpoint=worst-case counts=%s race-opportunities=%.2f race-skips=%.2f race-unsuppressed=%.2f rules-opportunities=%.2f rules-skips=%.2f rules-unsuppressed=%.2f",
+      M.log(string.format("[%s] [race-time] actor=%d selection_frame=%d start_tick=%d trace_id=%s selected=%s scope=selected-policy calibration=false f%d tick%d source=%s elapsed=%d budget=%d overshoot=%d reason=%s censored=%s (%s) first=%s accepted=%s resolved=%s first_valid=%s context_id=%s queue_index=%s queue_generation=%s identity-known=%s actual-down=%d near-fatal=%d removed=%d closed-ledger-units=%d | race down=%.2f near-fatal=%.2f rules down=%.2f near-fatal=%.2f endpoint=worst-case counts=%s race-opportunities=%.2f race-skips=%.2f race-unsuppressed=%.2f rules-opportunities=%.2f rules-skips=%.2f rules-unsuppressed=%.2f",
         self.tag or "fight",r.actor,r.selection_frame,r.start_tick,tostring(r.lifecycle.id),r.selected,r.frame,r.tick,r.source,r.elapsed,r.budget,r.overshoot or 0,r.reason,
         tostring(r.censored),table.concat(r.censorReasons,","),r.lifecycle.stage,tostring(r.lifecycle.accepted==true),
-        tostring(r.lifecycle.resolved==true),tostring(r.identityKnown),down,near,removed,r.closedLedgerUnits,
+        tostring(r.lifecycle.resolved==true),tostring(r.lifecycle.valid==true),
+        tostring(r.lifecycle.start and r.lifecycle.start.context_id),
+        tostring(r.lifecycle.start and r.lifecycle.start.queue_index),
+        tostring(r.lifecycle.start and r.lifecycle.start.queue_generation),tostring(r.identityKnown),down,near,removed,r.closedLedgerUnits,
         r.prediction.race.actualDown or 0,r.prediction.race.nearFatal or 0,
         r.prediction.rules.actualDown or 0,r.prediction.rules.nearFatal or 0,r.prediction.race.countSource,
         r.prediction.race.opportunities or 0,r.prediction.race.breakSkips or 0,r.prediction.race.unsuppressedTurns or 0,

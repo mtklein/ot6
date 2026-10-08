@@ -812,3 +812,12 @@ measure: positive-HP Zombie and other status changes remain raw observations.
 The original completed-action calibration remains unchanged and unmatched.
 Evidence: `build/attempts/wt/v026-race/holistic/time-shadow/`; standalone
 synthetic wiring contracts, not a played or general policy claim.
+
+The first live shadow batch exposed over-censoring: production resolution
+records carry no `valid` flag, whereas the first synthetic tests invented
+one. First-action verification now follows the actual emitter: accepted
+ID/actor, strict queue index/generation and execution context at start, then
+matching command/attack/queued identity/targets at resolution. The integration
+contract drives production plan/submit/queueStore/start/resolve emitters;
+legacy arithmetic starts without queue provenance remain censored. The first
+batch is retained as evidence of the observer defect, not live calibration.

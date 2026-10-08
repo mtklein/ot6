@@ -24,7 +24,21 @@ local function rp()
  local st=state();return {st=st,raceCandidate=candidate(st),rulesCandidate=candidate(st)}
 end
 local function driver()return H.newFightDriver('shadow wiring',{}).driver end
-local d=driver();local plan={kind='fight',boostLeft=0};local pred=rp()
+local plan={kind='fight',boostLeft=0}
+local function traceLifecycle(x)
+ local events={}
+ local T=H.newRecoveryTrace('production shadow lifecycle',function(e)events[#events+1]=e end,
+   function(e)x:raceObserve(e)end,function()return H.readWord(0x3A3E)end)
+ x.recovery=T;T.plan(0,plan,H.frame);x:raceTimeBind(0,plan)
+ local id=T.pending[0].id
+ T.submit(0,H.frame+1,0,255,256,0)
+ T.queueStore(0,244,0,255,H.frame+2,256)
+ local scope=T.start(0,H.frame+3,0,255,256,{1000,0,0,0},0,0,
+   {queue_index=244,queued_command=0,queued_attack=255})
+ T.resolve(0,H.frame+4,{1000,0,0,0},0,0)
+ return events,id,scope
+end
+local d=driver();local pred=rp()
 d:raceTimePush(0,pred,'rules',plan)
 check(d.raceTimeActive==nil,'default off does not create observer')
 H.RACE_TIME_DIAGNOSTIC=true
@@ -46,14 +60,16 @@ local bad=candidate(pred.st);bad.mp=1;pred.st.party[0].mp=0
 check(H.raceTimePair(pred.st,bad,pred.rulesCandidate)==nil,'unaffordable or unsupported prediction is declined')
 pred=rp();word(0x3A3E,65530);d:raceTimePush(0,pred,'rules',plan)
 local c=d.raceTimeActive[1]
-d:raceTimeEvent({event='submit'});d:raceTimeEvent({event='resolve',valid=true})
+d:raceTimeEvent({actor=0,event='submit'});d:raceTimeEvent({actor=0,event='resolve'})
 check(not c.lifecycle.accepted and not c.lifecycle.resolved,'missing trace ID cannot advance unbound first action')
 check(c.scope=='selected-policy' and not c.calibration and c.lifecycle.stage=='selected','selection does not invent accepted or resolved ownership')
 d.recovery={pending={[0]={id=7}}};d:raceTimeBind(0,{kind='fight'})
 check(c.lifecycle.id==nil,'a different plan table cannot bind ownership')
-d:raceTimeBind(0,plan);d:raceTimeEvent({id=8,event='resolve',valid=true})
+d:raceTimeEvent({actor=0,id=8,event='resolve'})
 check(not c.lifecycle.resolved,'different trace cannot resolve selected first action')
-d:raceTimeEvent({id=7,event='submit'});d:raceTimeEvent({id=7,event='start'});d:raceTimeEvent({id=7,event='resolve',valid=true})
+local realEvents,realId=traceLifecycle(d)
+check(realEvents[#realEvents].event=='resolve' and realEvents[#realEvents].valid==nil and c.lifecycle.valid,
+ 'production resolver has no validity flag; strict queue/context identity establishes ownership')
 check(c.lifecycle.accepted and c.lifecycle.started and c.lifecycle.resolved,'acceptance start and resolution separately observed for bound trace')
 d:raceTimeTick(H.raceTimeSample(),false,'watch')
 check(c.clock.elapsed==0 and #c.history==1,'paused menus consume no clock/history interval')
@@ -63,27 +79,70 @@ check(terminal.elapsed==200 and terminal.reason=='deadline' and not terminal.cen
 check(terminal.closedLedgerUnits==4 and terminal.actualDown==0 and terminal.scope=='selected-policy' and not terminal.calibration,'ledger count is distinct and record disclaims calibration')
 check(terminal.endpoint.tick==194 and terminal.endpoint.frame==500,'endpoint clock/frame belong to same sample')
 check(terminal.history[#terminal.history]==terminal.endpoint,'final endpoint retained even when HP/status unchanged')
-check(terminal.actor==0 and terminal.selection_frame==100 and terminal.start_tick==65530 and terminal.lifecycle.id==7,
+check(terminal.actor==0 and terminal.selection_frame==100 and terminal.start_tick==65530 and terminal.lifecycle.id==realId,
  'summary retains decision origin and trace attribution')
-check(logs[#logs]:find('trace_id=7') and logs[#logs]:find('race%-opportunities=3.00') and logs[#logs]:find('rules%-unsuppressed=3.00'),
+check(logs[#logs]:find('trace_id='..realId) and logs[#logs]:find('race%-opportunities=3.00') and logs[#logs]:find('rules%-unsuppressed=3.00'),
  'raw summary includes ownership and separate model opportunity units')
+check(logs[#logs]:find('first_valid=true') and logs[#logs]:find('queue_index=244') and logs[#logs]:find('queue_generation=1'),
+ 'summary exposes derived strict ownership and original queue/context identity')
 local function push()
  local x=driver();word(0x3A3E,100);H.frame=1000;x:raceTimePush(0,rp(),'rules',plan);return x
 end
-local function bindValid(x,id)
- x.recovery={pending={[0]={id=id or 19}}};x:raceTimeBind(0,plan)
- x:raceTimeEvent({id=id or 19,event='submit'});x:raceTimeEvent({id=id or 19,event='resolve',valid=true})
-end
+local function bindValid(x) return traceLifecycle(x) end
 local function finish(x,t,ended,source)
  word(0x3A3E,t);H.frame=1100;x:raceTimeTick(H.raceTimeSample(),ended,source or 'watch');return x.raceTimeRecords[1]
 end
+-- Fault injection copies production events; never invent resolver fields.
+for _,key in ipairs({'context_id','queue_index','queue_generation','command','attack','queued_command','queued_attack','targets'}) do
+ local badDriver=push();local events=traceLifecycle(badDriver)
+ local corrupted={};for k,v in pairs(events[#events])do corrupted[k]=v end
+ corrupted[key]=corrupted[key]+1;badDriver:raceTimeEvent(corrupted)
+ local badTerminal=finish(badDriver,300,false)
+ check(badTerminal.censored and not badTerminal.lifecycle.valid,
+   'resolve must preserve strict started identity '..key)
+end
+local noAccept=push();local productionEvents=traceLifecycle(driver())
+local before=H.newRecoveryTrace('no accepted command',function()end)
+noAccept.recovery=before;before.plan(0,plan,H.frame);noAccept:raceTimeBind(0,plan)
+local pendingId=before.pending[0].id
+for _,event in ipairs(productionEvents)do
+ if event.event=='start' or event.event=='resolve' then
+  local copied={};for k,v in pairs(event)do copied[k]=v end
+  copied.id=pendingId;noAccept:raceTimeEvent(copied)
+ end
+end
+terminal=finish(noAccept,300,false)
+check(terminal.censored and not terminal.lifecycle.accepted and not terminal.lifecycle.valid,
+ 'matching copied context cannot establish an unaccepted first action')
+local counterDriver=push();local counterEvents=traceLifecycle(counterDriver)
+for _,event in ipairs(counterEvents)do
+ if event.event=='start' or event.event=='resolve' then
+  local copied={};for k,v in pairs(event)do copied[k]=v end
+  if copied.event=='start' then copied.counter=true end
+  counterDriver:raceTimeEvent(copied)
+ end
+end
+terminal=finish(counterDriver,300,false)
+check(terminal.censored and not terminal.lifecycle.valid,'counter scope cannot verify selected controller action')
+local wrongActor=push();local actorEvents=traceLifecycle(wrongActor)
+local foreign={};for k,v in pairs(actorEvents[#actorEvents])do foreign[k]=v end
+foreign.actor=1;foreign.queue_generation=999;wrongActor:raceTimeEvent(foreign)
+check(wrongActor.raceTimeActive[1].lifecycle.valid,'same trace ID from another actor cannot overwrite valid owned resolution')
+local legacyDriver=push();local legacy=H.newRecoveryTrace('legacy arithmetic',function()end,
+ function(e)legacyDriver:raceObserve(e)end,function()return H.readWord(0x3A3E)end)
+legacyDriver.recovery=legacy;legacy.plan(0,plan,H.frame);legacyDriver:raceTimeBind(0,plan)
+legacy.submit(0,H.frame+1,0,255,256,0)
+legacy.legacyStart(0,H.frame+2,0,255,256,{1000,0,0,0},0,0)
+legacy.resolve(0,H.frame+3,{1000,0,0,0},0,0)
+terminal=finish(legacyDriver,300,false)
+check(terminal.censored and terminal.lifecycle.resolved and not terminal.lifecycle.valid,
+ 'arithmetic legacy trace without real queue provenance stays censored')
 local unverified=push();terminal=finish(unverified,300,false)
 check(terminal.censored and table.concat(terminal.censorReasons,','):find('first%-action%-unverified'),
  'unbound selected action remains censored at an otherwise exact endpoint')
 local early=rp();early.st.party[0].lines[0].per=2000
 local earlyDriver=driver();word(0x3A3E,100);H.frame=1000;earlyDriver:raceTimePush(0,early,'rules',plan)
-earlyDriver.recovery={pending={[0]={id=9}}};earlyDriver:raceTimeBind(0,plan)
-earlyDriver:raceTimeEvent({id=9,event='submit'});earlyDriver:raceTimeEvent({id=9,event='resolve',valid=true})
+traceLifecycle(earlyDriver)
 terminal=finish(earlyDriver,300,false)
 check(terminal.censored and table.concat(terminal.censorReasons,','):find('prediction%-terminated'),
  'early simulated victory cannot become a full-window prediction')
@@ -93,9 +152,9 @@ x=push();terminal=finish(x,150,true,'UpdateSRAM')
 check(terminal.censored and terminal.reason=='early-end' and terminal.source=='UpdateSRAM','early end retains authoritative source and censorship')
 x=push();terminal=finish(x,90,false)
 check(terminal.censored and terminal.reason=='clock-discontinuity','reset/backwards jump is censored')
-x=push();x:raceTimeBind(0,plan);x:raceTimeEvent({id=7,event='unresolved',reason='battle_ended'})
+x=push();x:raceTimeBind(0,plan);x:raceTimeEvent({actor=0,id=7,event='unresolved',reason='battle_ended'})
 -- No pending trace in this new driver: canceled ownership is tested bound below.
-x.recovery={pending={[0]={id=19}}};x:raceTimeBind(0,plan);x:raceTimeEvent({id=19,event='submit'});x:raceTimeEvent({id=19,event='unresolved',reason='battle_ended'})
+x.recovery={pending={[0]={id=19}}};x:raceTimeBind(0,plan);x:raceTimeEvent({actor=0,id=19,event='submit'});x:raceTimeEvent({actor=0,id=19,event='unresolved',reason='battle_ended'})
 terminal=finish(x,300,false)
 check(terminal.censored and terminal.lifecycle.accepted and terminal.lifecycle.canceled=='battle_ended' and not terminal.lifecycle.resolved,'accepted canceled action cannot claim resolved calibration')
 x=push();bindValid(x);ram[0x3EE4]=2;word(0x3BF4,543);terminal=finish(x,300,false)
