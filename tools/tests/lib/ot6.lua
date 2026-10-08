@@ -8536,7 +8536,7 @@ end
 -- with the rule stack; "log" (or true): the rules play and the race is
 -- logged beside them; false or "off": the rules alone, no race
 M.RACE_TIME_DIAGNOSTIC = false -- opt-in selected-policy shadow evidence only
-if M.CARE_RACE == nil then M.CARE_RACE = false end
+if M.CARE_RACE == nil then M.CARE_RACE = "act" end -- isolated XP continuation policy
 if M.CARE_RACE == "off" then M.CARE_RACE = false end
 M.RACE_RAISE_RESERVE = 2
 -- the leg's race ledger, for the end-of-run [race] line (M.raceReport):
