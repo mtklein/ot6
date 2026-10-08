@@ -1218,6 +1218,20 @@ function M.boostStep(o)
   end
   return "r"
 end
+-- A scored race action owns an exact TOTAL boost, including zero.
+-- Re-plan if the bank can no longer buy it; never settle at a different
+-- effect/cost. Repeated unacknowledged presses use the driver's existing
+-- parked-window and plan-pulse watchdogs.
+function M.exactBoostStep(pending, want, bank)
+  if type(want) ~= "number" or want % 1 ~= 0 or want < 0 or want > 3
+    or type(pending) ~= "number" or pending % 1 ~= 0 or pending < 0 or pending > 3
+    or type(bank) ~= "number" or bank % 1 ~= 0 or bank < 0 or bank > 5
+    or bank < want then return "drop" end
+  if pending > want then return "l" end
+  if pending < want then return "r" end
+  return "go"
+end
+
 function M.liftFilterHeals(heals, hp, maxhp, cost)
   local keep = {}
   for _, h in ipairs(heals) do
@@ -1466,6 +1480,855 @@ function M.roundCost(o)
   local why = string.format("%d enemy action(s) inside %d ticks%s [%s]", actions, window,
     #parts > 0 and (": " .. table.concat(parts, " + ")) or "", table.concat(gauges, ", "))
   return cost, actions, why, rate, acts
+end
+
+-- ---- the care race (#415, docs/design/care-race.md) ----------------------
+-- One decision for every command: which action best improves the race --
+-- the party's turns-to-kill against the enemy's turns-to-wipe-or-cripple,
+-- ATB order deciding who acts first.  M.raceSim plays a race state forward
+-- from one candidate action; M.raceChoose scores every candidate and picks.
+-- Plain arithmetic on plain tables, so care_race_selftest can put the old
+-- rules' measured cases through it with no emulator.
+--
+-- A race state:
+--   actor        the party key deciding now
+--   party[k]     { hp, maxhp, eta, period, bp, lines = { [b] = line },
+--                  heals = { { restore, cost, n } ... } (what the
+--                  continuation may give: the bag's items and this
+--                  member's own cures, n uses each, nil for no limit),
+--                  deathCost (gil to undo a death),
+--                  hit = 0..1 (the chance its lines land, default 1) }
+--   enemies[k]   { hp, sh, eta, period, ends = true for a body whose death
+--                  ends the fight, act = { aoe, dmg = { [partyKey] = n }
+--                  (its typical landed hit), worst = { [partyKey] = n }
+--                  (its largest; default dmg), hit = 0..1 (the share of its
+--                  actions that land), aim = "random" (default: uniformly
+--                  among the living) | "worst" (the member it leaves
+--                  lowest) | partyKey (the script's fixed target) } }
+--   samples      plays per candidate (M.RACE_SAMPLES): each draws the
+--                enemy's targets and landings from one fixed seed list,
+--                the same for every candidate (common random numbers)
+--   focus        enemy keys in kill order (single-target lines hit the
+--                first standing)
+--   bankAt       the continuation spends its bank from this many pips
+--                (the driver's opts.bank, default 0); the boost is
+--                min(bank, 3), and an unboosted turn banks one
+--   hpRate       gil per HP at the shops (the aftermath bill); mpRate unused
+--   horizon      enemy actions to play (M.RACE_HORIZON)
+--   contCare     the continuation takes the classic lift (a heal that
+--                lifts a member inside the next hit clear of it) before
+--                its attack; false plays attacks only
+-- A line: { per, hits, chips, aoe } -- per is one hit's damage on a
+-- shielded body (shielded-equivalent, the damage watch's figure); a hit
+-- past the break lands x4 (Ot6ShieldedDmg x0.5, Ot6BrokenDmg x2), each of
+-- the first `chips` hits chips one shield.
+-- A candidate: { kind = "attack", line, boost, target? } | { kind = "heal",
+--   target, restore, cost, all? } | { kind = "raise", target, hp, cost }.
+M.RACE_HORIZON = 8
+M.RACE_TICK_MARGIN = nil       -- nil: the quickest enemy's period
+M.RACE_LEFT_MARGIN = 0.05      -- of the enemy's effective HP at the start
+M.RACE_COST_MARGIN = 200       -- gil
+M.RACE_SAMPLES = 16
+M.RACE_NEAR_FATAL = 0.5        -- a member left at or under max/8 HP, in members down
+M.RACE_DEATH_MARGIN = 0.07     -- mean deaths: one play in sixteen is the draws
+M.RACE_STAND_SLACK = 2.0       -- the worst-case play's hit, against a last stand
+                               -- (1.5 missed one: the WoR's s5 at 19cc3147, a 1-BP
+                               -- Fight read at 94 a hit landed 154 and two fell)
+
+-- The chance a blockable hit lands (#415): the hit check (battle_main
+-- @233f) multiplies the attacker's hit rate by the target's inverted
+-- M.Block ($3B55; Evade is never what it reads: the carry there is
+-- always clear) over 256 and lands under a 0..99 roll.  Hit rate $FF
+-- always lands.
+function M.hitChance(hitRate, block)
+  if hitRate >= 0xFF then return 1 end
+  return math.min(100, (hitRate * block) >> 8) / 100
+end
+
+-- the cost of a consumable: its gil, dearer as the bag nears the reserve
+-- the rest of the leg wants (a supply band's floor): the last Fenix Downs
+-- before a boss are dear, the 40th Potion is cheap.  x1 above reserve + 1,
+-- rising to x4 for the last one at reserve 0.
+function M.raceItemCost(gil, count, reserve)
+  reserve, count = reserve or 0, count or 1
+  local short = math.max(0, reserve + 1 - (count - 1))
+  return gil * (1 + 3 * short / (reserve + 1))
+end
+
+-- One executable attack record, shared by scoring and continuation. The
+-- controller's affordable boost wins over the boost the caller requested.
+function M.raceAttack(line, requested)
+  local plan = line and line.plan
+  local boost = line and line.boost
+  if boost == nil then boost = plan and plan.boostLeft or requested or 0 end
+  return { kind = "attack", line = line, boost = boost,
+    target = line and line.target, mp = line and line.mp or 0,
+    cost = line and line.cost or 0, delay = line and line.delay or 0,
+    what = line and line.what, latencyKnown = line and line.latencyKnown,
+    delayBounds = line and line.delayBounds }
+end
+
+-- The supported Tools/Pummel damage purchase is Ot6BoostDmg's ASL loop.
+-- Fight purchases swings instead; folded spells need their own recipe.
+function M.raceDamageMultiplier(boost)
+  assert(boost >= 0 and boost <= 3 and boost % 1 == 0, "damage boost must be 0..3")
+  return 1 << boost
+end
+function M.raceUnboostHit(per, boost)
+  return per / M.raceDamageMultiplier(boost)
+end
+function M.raceLine(plan, per, effects)
+  effects = effects or {}
+  local boost = plan.boostLeft or 0
+  local mult = plan.kind == "fight" and 1 or M.raceDamageMultiplier(boost)
+  return { per = per * mult, hits = plan.hits or 1, chips = effects.chips or plan.chips or 0,
+    hit = effects.hit or 1, target = plan.aim, aoe = effects.aoe,
+    byTarget = effects.byTarget, boost = boost, mp = plan.mp or 0,
+    cost = effects.cost or 0, delay = effects.delay or 0, latencyKnown = effects.latencyKnown,
+    delayBounds = effects.delayBounds,
+    what = plan.what, plan = plan }
+end
+
+-- UpdateBattleTime visits each entity once in sixteen ATB updates.
+-- DecCounters adds its speed constant; overflow consumes one broken tick.
+function M.raceBreakClock(count, accumulator, speed, entity, nextEntity)
+  if count <= 0 then return 0 end
+  if speed <= 0 then return math.huge end
+  local visits = math.ceil((256 * count - accumulator) / speed)
+  return ((entity - nextEntity) % 16) + 1 + 16 * (visits - 1)
+end
+function M.raceBreakDuration(speed)
+  if speed <= 0 then return math.huge, { lo=math.huge, hi=math.huge } end
+  local lo = 1 + 16 * (math.ceil((256 * 16 - 255) / speed) - 1)
+  local hi = 16 * math.ceil(256 * 16 / speed)
+  return (lo + hi) / 2, { lo=lo, hi=hi }
+end
+function M.raceDamageBase(drop, shieldMax, broken)
+  return drop / (broken and 4 or shieldMax == 0 and 2 or 1)
+end
+
+-- one line's hits on enemy e (mutated), times the line's hit chance
+-- one line on one body; returns the hits left when the body fell first
+local function raceRecover(e, t)
+  if e.breakUntil and t >= e.breakUntil then
+    e.breakUntil = nil
+    e.sh = e.shMax
+  end
+end
+local function strike(e, line, hit, draw, t)
+  local effect = line.byTarget and line.byTarget[e.key]
+  if effect then
+    local copy = {}
+    for k, v in pairs(line) do copy[k] = v end
+    for k, v in pairs(effect) do copy[k] = v end
+    line = copy
+  end
+  local n = line.hits or 1
+  if e.hp <= 0 then return n end
+  hit = line.hit or hit
+  local chips = line.chips or 0
+  for i = 1, n do
+    if e.hp <= 0 then
+      e.hp = 0
+      return n - i + 1
+    end
+    local per = line.per or 0
+    -- A missed swing neither chips nor damages. Sample each swing in the
+    -- random plays; the deterministic estimate uses expected chips and
+    -- damage under the same hit probability (zero never breaks a shield).
+    local landed = hit
+    if draw and hit > 0 and hit < 1 then landed = draw() < hit and 1 or 0 end
+    -- Ot6HitJoin chips first: the hit removing the final shield receives
+    -- the broken-body damage multiplier itself, not only its next swing.
+    if (e.sh or 0) > 0 and i <= chips then
+      e.sh = math.max(0, e.sh - landed)
+      if e.sh == 0 and e.shMax ~= nil then e.breakUntil = t + e.breakDuration end
+    end
+    local mult = (e.sh or 0) > 0 and 1
+      or ((e.shMax == nil or e.breakUntil) and 4 or 2)
+    e.hp = e.hp - per * mult * landed
+  end
+  if e.hp < 0 then e.hp = 0 end
+  return 0
+end
+
+local function effLeft(E)
+  -- effective HP left: HP, plus each standing shield priced as the hits it costs
+  local n = 0
+  for _, e in pairs(E) do if e.hp > 0 then n = n + e.hp * (1 + (e.sh or 0)) end end
+  return n
+end
+
+local function fightOver(E)
+  local anyEnds, standing = false, false
+  for _, e in pairs(E) do
+    if e.ends then
+      anyEnds = true
+      if e.hp <= 0 then return true end
+    end
+    if e.hp > 0 then standing = true end
+  end
+  return not standing
+end
+
+-- One predecision elapsed-ATB budget for shadow comparisons. Derive it
+-- from the original enemy timetable, before either candidate changes it.
+-- This is optional diagnostic machinery; the acting score keeps its
+-- opportunity horizon until played comparisons justify a policy change.
+function M.raceTimeBudget(st)
+  local n=st.horizon or M.RACE_HORIZON
+  if n < 1 or n % 1 ~= 0 then return nil end
+  local nexts={}
+  for k,e in pairs(st.enemies or {}) do
+    if e.hp > 0 then
+      if type(e.eta) ~= "number" or e.eta < 0 or e.eta ~= e.eta
+        or type(e.period) ~= "number" or e.period <= 0 or e.period ~= e.period or e.period == math.huge then return nil end
+      nexts[k]={eta=e.eta,period=e.period}
+    end
+  end
+  local deadline
+  for _=1,n do
+    local key,t=nil,nil
+    for k,e in pairs(nexts) do
+      if t==nil or e.eta<t or (e.eta==t and k<key) then key,t=k,e.eta end
+    end
+    if key==nil or t==math.huge then return nil end
+    deadline=t;nexts[key].eta=t+nexts[key].period
+  end
+  -- A zero-time interval cannot observe queued full-gauge actions.
+  local budget=math.max(1,math.ceil(deadline))
+  if budget >= 0x8000 then return nil end
+  return budget
+end
+
+-- Wrap-aware sampled global ATB clock. Menu pauses add no time; gauge
+-- fullness is irrelevant. Ambiguous backwards/reset jumps are censored.
+function M.newRaceTimeObservation(tick, budget)
+  assert(budget >= 0 and budget < 0x8000,"bounded ATB observation budget")
+  local L={last=tick,elapsed=0,budget=budget,terminal=nil}
+  function L.observe(now,ended)
+    if L.terminal then return L.terminal end
+    local delta=(now-L.last)&0xFFFF
+    L.last=now
+    if delta>=0x8000 then
+      L.terminal={reason="clock-discontinuity",censored=true,elapsed=L.elapsed,budget=budget}
+    else
+      L.elapsed=L.elapsed+delta
+      if L.elapsed>=budget or ended then
+        local early=L.elapsed<budget
+        L.terminal={reason=early and "early-end" or (L.elapsed>budget and "overshoot" or "deadline"),
+          censored=early or L.elapsed>budget,
+          elapsed=L.elapsed,budget=budget,overshoot=math.max(0,L.elapsed-budget)}
+      end
+    end
+    return L.terminal
+  end
+  return L
+end
+
+function M.raceSim(st, first, draw)
+  if st.timeHorizon ~= nil then
+    assert(type(st.timeHorizon)=="number" and st.timeHorizon>=0
+      and st.timeHorizon<0x8000,"bounded simulation time horizon")
+  end
+  -- draw: nil plays the worst case (every action lands at its worst on
+  -- the member it leaves lowest, the no-wipe guard); a function returning
+  -- 0..1 plays one sample (the aim and the landing drawn from it)
+  local P, E, bag = {}, {}, {}
+  for id, n in pairs(st.bag or {}) do bag[id] = n end
+  for k, p in pairs(st.party) do
+    P[k] = { hp = p.hp, maxhp = p.maxhp, eta = p.eta or 0, period = p.period or 300, bp = p.bp or 0,
+             lines = p.lines or {}, heals = p.heals or {}, deathCost = p.deathCost or 0, hit = p.hit or 1,
+             mp = p.mp == nil and math.huge or p.mp, fallback = p.fallback }
+    -- Legacy isolated model cases may omit a bag; a named item still has
+    -- one shared count, rather than one allowance for every member.
+    for _, h in ipairs(p.heals or {}) do
+      if st.bag == nil and h.id and bag[h.id] == nil then bag[h.id] = h.n or 0 end
+    end
+  end
+  for k, e in pairs(st.enemies) do
+    E[k] = { key = k, hp = e.hp, sh = e.sh or 0, eta = e.eta or 0, period = e.period or 300, ends = e.ends, act = e.act or {},
+             stand = e.stand, shMax = e.shMax, breakDuration = e.breakDuration or 1024,
+             breakUntil = (e.brokenLeft or 0) > 0 and e.brokenLeft or nil }
+  end
+  local left0 = effLeft(E)
+  local r = { deaths = 0, firstDeath = nil, kill = nil, wipe = false, spent = 0, acts = 0, opportunities = 0, unsuppressedTurns = 0, elapsed = 0 }
+  local function affordable(p, c)
+    return (c.mp or 0) <= p.mp and (c.boost or 0) <= p.bp
+      and (c.id == nil or (bag[c.id] or 0) > 0)
+  end
+  r.invalid = not affordable(P[st.actor], first) or nil
+  local function target(lineAoe, fixed)
+    if fixed and E[fixed] and E[fixed].hp > 0 then return fixed end
+    for _, k in ipairs(st.focus or {}) do if E[k] and E[k].hp > 0 then return k end end
+    local best
+    for k, e in pairs(E) do if e.hp > 0 and (best == nil or e.hp < E[best].hp) then best = k end end
+    return best
+  end
+  -- a single-target line's swings past its body's death go on to the next
+  -- standing one (the engine retargets a dead target's remaining strikes),
+  -- chipping nothing there: the chips were counted against the first body
+  local death, t_now, wouldStand, first_act
+  -- whether the last attack's carried swings took half or more of a body
+  -- they did not kill (the last-stand read counts that body as fallen)
+  local carried = false
+  local function attack(p, line, fixed)
+    if line == nil then return end
+    if line.aoe then
+      for _, e in pairs(E) do strike(e, line, p.hit, draw, t_now) end
+    else
+      local k = target(false, fixed)
+      local left = k and strike(E[k], line, p.hit, draw, t_now) or 0
+      while left > 0 and st.retarget ~= false do
+        k = target(false, nil)
+        if k == nil then break end
+        local hp0 = E[k].hp
+        left = strike(E[k], { per = line.per, hits = left, chips = 0, hit = line.hit,
+                             byTarget = line.byTarget }, p.hit, draw, t_now)
+        -- a carry that took half or more of a body it left standing
+        if E[k].hp > 0 and (hp0 - E[k].hp) * 2 >= hp0 then carried = true end
+      end
+    end
+  end
+  -- a last-stand removal counter (the Sneeze, M.lastStandClass): a body
+  -- whose retaliation answers a hit that leaves `stand.n` or fewer
+  -- monsters standing takes the hitter out of the fight -- a member gone,
+  -- priced as a death (#415: the WoR's CELES, sneezed away from three of
+  -- six g00CC fights by a boosted Fight's carried swings)
+  -- whether a last stand fires on the bodies EE after an action (before:
+  -- who stood before it)
+  local function standFires(EE, before, extra)
+    local standing = -(extra or 0)
+    for _, e in pairs(EE) do if e.hp > 0 then standing = standing + 1 end end
+    for j, e in pairs(EE) do
+      local st = e.stand
+      if st and before[j] and standing <= (st.n or 1) then
+        local alive = e.hp > 0
+        -- Ot6MayAct suppresses a living broken body's attack counters.
+        -- Death counters still run; story-only blocks do not attack.
+        local suppressed = alive and e.breakUntil ~= nil
+        if not suppressed and ((st.guarded and alive) or (st.deathOnly and not alive)
+          or (not st.guarded and not st.deathOnly)) then
+          return true
+        end
+      end
+    end
+    return false
+  end
+  local function removed(k)
+    if P[k].hp <= 0 then return end
+    P[k].hp = 0
+    death(t_now)
+    local any = false
+    for _, q in pairs(P) do if q.hp > 0 then any = true end end
+    -- the whole party gone: the fight is lost (no reward), scored as a wipe
+    if not any then r.wipe = true end
+  end
+  -- whether line on member p would set a last stand off now (the worst-
+  -- case play reads it at M.RACE_STAND_SLACK)
+  function wouldStand(p, line)
+    if line == nil then return false end
+    local before, anyStand = {}, false
+    for j, e in pairs(E) do
+      before[j] = e.hp > 0
+      if e.stand and e.hp > 0 then anyStand = true end
+    end
+    if not anyStand then return false end
+    local fired = false
+    for _, f in ipairs(draw == nil and { M.RACE_STAND_SLACK, 1 } or { 1 }) do
+      local save = {}
+      for j, e in pairs(E) do save[j] = { e.hp, e.sh, e.breakUntil } end
+      local L = {}
+      for key, v in pairs(line) do L[key] = v end
+      L.per = (L.per or 0) * f
+      carried = false
+      attack(p, L, nil)
+      fired = fired or standFires(E, before, (f > 1 and carried) and 1 or 0)
+      for j, e in pairs(E) do e.hp, e.sh, e.breakUntil = save[j][1], save[j][2], save[j][3] end
+    end
+    return fired
+  end
+  local function act(k, c, t)
+    local p = P[k]
+    t_now = t
+    if not affordable(p, c) then
+      if first_act then r.invalid = true end
+      return
+    end
+    p.mp = p.mp - (c.mp or 0)
+    if c.id then bag[c.id] = bag[c.id] - 1 end
+    r.spent = r.spent + (c.cost or 0)
+    if c.kind == "attack" then
+      local before, anyStand = {}, false
+      for j, e in pairs(E) do
+        before[j] = e.hp > 0
+        if e.stand and e.hp > 0 then anyStand = true end
+      end
+      -- the worst-case play reads a last stand against the hit landing
+      -- harder than measured (M.RACE_STAND_SLACK): a carried swing that
+      -- kills the second body leaves the Sneezer alone (the WoR's s5: the
+      -- race's 2-BP Fight read two standing; three fell)
+      local slack = false
+      -- (the decision's own action only: a later kill the fight cannot
+      -- avoid is no reason to stall now; and not when every attack the
+      -- window offers sets it off -- st.noStand, M.raceChoose)
+      if first_act ~= true or st.noStand then anyStand = false end
+      if draw == nil and anyStand and c.line then
+        local save = {}
+        for j, e in pairs(E) do save[j] = { e.hp, e.sh, e.breakUntil } end
+        local L = {}
+        for key, v in pairs(c.line) do L[key] = v end
+        L.per = (L.per or 0) * M.RACE_STAND_SLACK
+        carried = false
+        attack(p, L, c.target)
+        -- (a carried swing that takes half a body is read as taking all
+        -- of it: the WoR's s5 at f7e822c8, a 1-BP Fight's fourth swing
+        -- went on from the Sneezer and the plain body fell with it)
+        slack = standFires(E, before, carried and 1 or 0)
+        for j, e in pairs(E) do e.hp, e.sh, e.breakUntil = save[j][1], save[j][2], save[j][3] end
+      end
+      attack(p, c.line, c.target)
+      if anyStand and (slack or standFires(E, before)) then
+        r.standNow = true
+        removed(k)
+      end
+      p.bp = (c.boost or 0) > 0 and (p.bp - c.boost) or math.min(p.bp + 1, 5)
+    elseif c.kind == "heal" then
+      local who = c.all and P or { [c.target] = P[c.target] }
+      for _, q in pairs(who) do
+        if q.hp > 0 then q.hp = math.min(q.maxhp, q.hp + c.restore) end
+      end
+      p.bp = math.min(p.bp + 1, 5)
+    elseif c.kind == "raise" then
+      local q = P[c.target]
+      if q and q.hp <= 0 then q.hp = c.hp; q.eta = t + q.period end
+      p.bp = math.min(p.bp + 1, 5)
+    end
+  end
+  -- what the enemy can do to member k before k's next turn, from time t
+  -- (the round, its own price): every enemy action inside the window, an
+  -- area action in full, a single-target one at its share of the living
+  -- (aimed at random) but never less than the largest one hit.  The
+  -- worst-case play reads its own hits, every one on k: its continuation
+  -- lifts against the hits that play deals, or the guard would read a wipe
+  -- into any line the continuation could have kept alive (the WoR's CELES
+  -- at 75/1043 under three slots reached for an Elixir 17 rows down over
+  -- the Cure that saved her, and died while the menu walked)
+  local function threat(k, t, actor)
+    local q = P[k]
+    local till = (k == actor) and (t + q.period) or q.eta
+    local alive = 0
+    for _, m in pairs(P) do if m.hp > 0 then alive = alive + 1 end end
+    local sum, one = 0, 0
+    for _, e in pairs(E) do
+      local eta = e.eta
+      if e.breakUntil and eta < e.breakUntil then
+        eta = eta + math.ceil((e.breakUntil-eta)/e.period)*e.period
+      end
+      if e.hp > 0 and eta <= till then
+        local n = math.floor((till - eta) / e.period) + 1
+        local v
+        if draw == nil then
+          v = (e.act.worst or e.act.dmg or {})[k] or 0
+          sum = sum + n * v
+        else
+          v = ((e.act.dmg or {})[k] or 0) * (e.act.hit or 1)
+          sum = sum + n * v * ((e.act.aoe or alive <= 1) and 1 or 1 / alive)
+        end
+        if v > one then one = v end
+      end
+    end
+    return math.max(sum, one)
+  end
+  local used = {}
+  local function continuation(k, t)
+    -- Speculative shield changes use this planning event, even before
+    -- the delayed first command has executed.
+    t_now = t
+    local p = P[k]
+    if st.contCare ~= false then
+      local worst, wk = nil, nil
+      for q, m in pairs(P) do
+        if m.hp > 0 and m.hp <= threat(q, t, k) and (worst == nil or m.hp < worst) then worst, wk = m.hp, q end
+      end
+      if wk then
+        for _, h in ipairs(p.heals) do
+          local c = { kind = "heal", target = wk, restore = h.restore, cost = h.cost,
+                      id = h.id, mp = h.mp, spell = h.spell, delay = h.delay,
+                      latencyKnown = h.latencyKnown, delayBounds = h.delayBounds }
+          if P[wk].hp + h.restore > threat(wk, t, k) and affordable(p, c)
+             and (h.id ~= nil or h.mp ~= nil or h.n == nil or (used[h] or 0) < h.n) then
+            if h.id == nil and h.mp == nil then used[h] = (used[h] or 0) + 1 end
+            return c
+          end
+        end
+      end
+    end
+    local b = 0
+    if st.boost ~= false and p.bp >= (st.bankAt or 0) then b = math.min(p.bp, 3) end
+    while b > 0 and (p.lines[b] == nil or not affordable(p, M.raceAttack(p.lines[b], b))) do b = b - 1 end
+    -- a player who knows the Sneezer is there holds back the boost whose
+    -- swings would leave it alone (the stand read as the decision reads it)
+    while b > 0 and wouldStand(p, p.lines[b]) do
+      b = b - 1
+      while b > 0 and p.lines[b] == nil do b = b - 1 end
+    end
+    local c = M.raceAttack(p.lines[b], b)
+    if not affordable(p, c) and p.fallback then c = M.raceAttack(p.fallback, 0) end
+    return c
+  end
+  function death(t)
+    r.deaths = r.deaths + 1
+    if r.firstDeath == nil then r.firstDeath = t end
+  end
+
+  -- A command resolves after its controller walk, on the same timeline
+  -- as enemy actions. A monster whose gauge is full goes first even when
+  -- the command needs no further menu frames.
+  local a = P[st.actor]
+  local pendingFirst = true
+  a.eta = first.delay or 0
+  r.leftNow = left0
+  local horizon = st.horizon or M.RACE_HORIZON
+  while r.kill == nil and not r.invalid do
+    -- the next to act: the earliest ETA among the living
+    local nk, nt, enemy = nil, nil, false
+    for k, p in pairs(P) do if p.hp > 0 and (nt == nil or p.eta < nt) then nk, nt, enemy = k, p.eta, false end end
+    -- (a tie goes to the monster: its full gauge acts at once, while a
+    -- member's still waits on a command and its walk -- the Air Force's
+    -- EDGAR at 155 with his gauge full fell to slot 0's, also full, after
+    -- the race read his own turn coming first; ties among monsters by key)
+    local et, ek = nil, nil
+    for k, e in pairs(E) do
+      if e.hp > 0 and (et == nil or e.eta < et or (e.eta == et and k < ek)) then ek, et = k, e.eta end
+    end
+    if ek ~= nil and (nt == nil or et <= nt) then nk, nt, enemy = ek, et, true end
+    if nk == nil then break end
+    if st.timeHorizon ~= nil and nt > st.timeHorizon then
+      r.elapsed=st.timeHorizon
+      for _,e in pairs(E) do raceRecover(e,st.timeHorizon) end
+      r.timeCutoff=true
+      break
+    end
+    r.elapsed=nt
+    for _,e in pairs(E) do raceRecover(e,nt) end
+    if enemy then
+      r.acts = r.acts + 1
+      if st.timeHorizon == nil and r.acts > horizon then break end
+      local anyUp = false
+      for _, p in pairs(P) do if p.hp > 0 then anyUp = true end end
+      if not anyUp then break end      -- the party is gone (a removal)
+      local e = E[nk]
+      r.opportunities=r.opportunities+1
+      if e.breakUntil and e.breakUntil > nt then
+        r.breakSkips = (r.breakSkips or 0) + 1
+      else
+      r.unsuppressedTurns=r.unsuppressedTurns+1
+      local dmg, lands, aim = e.act.dmg or {}, true, e.act.aim or "random"
+      if draw == nil then
+        dmg, aim = e.act.worst or dmg, "worst"
+      else
+        lands = draw() < (e.act.hit or 1)
+        if aim == "random" then
+          local alive = {}
+          for k, p in pairs(P) do if p.hp > 0 then alive[#alive + 1] = k end end
+          table.sort(alive)
+          aim = alive[1 + math.floor(draw() * #alive)]
+        elseif aim ~= "worst" and (P[aim] == nil or P[aim].hp <= 0) then
+          aim = "worst"
+        end
+      end
+      if not lands then
+        -- a miss or a turn that took nothing
+      elseif e.act.aoe then
+        for k, p in pairs(P) do
+          if p.hp > 0 then
+            p.hp = p.hp - (dmg[k] or 0)
+            if p.hp <= 0 then p.hp = 0; death(nt) end
+          end
+        end
+      elseif aim ~= "worst" then
+        local q = P[aim]
+        q.hp = q.hp - (dmg[aim] or 0)
+        if q.hp <= 0 then q.hp = 0; death(nt) end
+      else
+        -- pessimistic: the hit goes where it does the most harm, the
+        -- member it would leave lowest (a kill first)
+        local tk, low = nil, nil
+        for k, p in pairs(P) do
+          if p.hp > 0 then
+            local after = p.hp - (dmg[k] or 0)
+            if low == nil or after < low then tk, low = k, after end
+          end
+        end
+        if tk then
+          P[tk].hp = math.max(0, low)
+          if P[tk].hp <= 0 then death(nt) end
+        end
+      end
+      end -- a broken monster consumes this queued opportunity without acting
+      e.eta = e.eta + e.period
+      local alive = false
+      for _, p in pairs(P) do if p.hp > 0 then alive = true end end
+      if not alive then r.wipe = true; break end
+    else
+      first_act = pendingFirst and nk == st.actor
+      local p = P[nk]
+      local c = first_act and first or p.pending
+      if c == nil then
+        c = continuation(nk, nt)
+        if c.latencyKnown == false then
+          r.invalid = true
+          break -- an unknown later command cannot buy an instantaneous cure
+        end
+        if (c.delay or 0) > 0 then
+          p.pending, p.eta = c, nt + c.delay
+          c = nil
+        end
+      end
+      if c then
+        p.pending = nil
+        act(nk, c, nt)
+        if first_act then
+          pendingFirst = false
+          r.firstExecuted = not r.invalid
+          r.leftNow = effLeft(E)
+        end
+        p.eta = nt + p.period
+        if fightOver(E) then r.kill = nt end
+      end
+      first_act = false
+      if r.invalid then break end
+    end
+  end
+  -- deaths: the members down when the play ends, a member down from the
+  -- start (one a raise could stand up) included
+  r.falls = r.deaths
+  r.deaths = 0
+  for _, p in pairs(P) do if p.hp <= 0 then r.deaths = r.deaths + 1 end end
+  r.actualDown = r.deaths -- before the ranking-only near-fatal penalty
+  -- a member left near fatal (HP at or under max/8, the engine's own
+  -- floor, battle_main @11544) counts as half a member down: the next
+  -- fight can open before any care, and a leg can end on the fight (the
+  -- full ninja at 5b46dbd6: falls_done shipped CYAN at 5/358 and
+  -- esper_tubes_entry EDGAR at 71/752, red in audit_party_hp)
+  r.nearFatal = 0
+  for _, p in pairs(P) do
+    if p.hp > 0 and p.hp <= (p.maxhp >> 3) then
+      r.deaths = r.deaths + M.RACE_NEAR_FATAL
+      r.nearFatal = r.nearFatal + 1
+    end
+  end
+  r.left = effLeft(E)
+  r.left0 = left0
+  -- the aftermath bill: what restoring the party costs at the fight's end
+  -- (or the horizon), in gil -- missing HP at the shops' rate, a death at
+  -- its raise
+  local bill = 0
+  for _, p in pairs(P) do
+    if p.hp <= 0 then bill = bill + p.deathCost
+    else bill = bill + (p.maxhp - p.hp) * (st.hpRate or 0) end
+  end
+  r.bill = bill
+  r.cost = r.spent + bill
+  r.pending = pendingFirst and not r.wipe and not r.invalid or nil
+  r.resources = { bag = bag, party = P, enemies = E }
+  return r
+end
+
+-- One material time margin for ranking and override eligibility.
+function M.raceTickMargin(st)
+  if st.tickMargin ~= nil then return st.tickMargin end
+  if M.RACE_TICK_MARGIN ~= nil then return M.RACE_TICK_MARGIN end
+  local margin=math.huge
+  for _,e in pairs(st.enemies or {}) do
+    if (e.period or 0)>0 then margin=math.min(margin,e.period) end
+  end
+  return margin==math.huge and 0 or margin
+end
+
+-- a better than b (both raceSim results) under the state's margins
+function M.raceBetter(a, b, st)
+  if a.invalid ~= b.invalid then return not a.invalid end
+  if a.pending ~= b.pending then return not a.pending end
+  if a.wipe ~= b.wipe then return not a.wipe end
+  local pm = (st.samples or M.RACE_SAMPLES) > 0 and M.RACE_DEATH_MARGIN or 1e-9
+  if math.abs((a.pWipe or 0)-(b.pWipe or 0)) > pm then return (a.pWipe or 0)<(b.pWipe or 0) end
+  -- deaths beyond one sample's worth (M.RACE_DEATH_MARGIN): a death in one
+  -- play of sixteen is the draws, not the line (the WoR's s5: a Fight that
+  -- died in 1 of 16 plays lost to a Cure that only stalled, three times)
+  local dm = (st.samples or M.RACE_SAMPLES) > 0 and M.RACE_DEATH_MARGIN or 1e-9
+  if math.abs(a.deaths - b.deaths) > dm then return a.deaths < b.deaths end
+  if math.abs((a.falls or 0) - (b.falls or 0)) > dm then return (a.falls or 0) < (b.falls or 0) end
+  if a.deaths > 0 and a.firstDeath ~= b.firstDeath then
+    return (a.firstDeath or math.huge) > (b.firstDeath or math.huge)
+  end
+  local tm = M.raceTickMargin(st)
+  if a.kill and b.kill then
+    if math.abs(a.kill - b.kill) > tm then return a.kill < b.kill end
+  elseif a.kill or b.kill then
+    return a.kill ~= nil
+  else
+    local lm = (st.leftMargin or M.RACE_LEFT_MARGIN) * math.max(a.left0 or 0, 1)
+    if math.abs(a.left - b.left) > lm then return a.left < b.left end
+  end
+  -- the cost, by more than its margin (a heal that only trades its gil
+  -- for the aftermath's is no better than the attack: the field care
+  -- after the fight restores the same HP at the same price, without the
+  -- turn); inside it, the sooner kill or the lower HP left, raw
+  local cm = st.costMargin or M.RACE_COST_MARGIN
+  if math.abs(a.cost - b.cost) > cm then return a.cost < b.cost end
+  if a.kill and b.kill and a.kill ~= b.kill then return a.kill < b.kill end
+  if (a.left or 0) ~= (b.left or 0) then return (a.left or 0) < (b.left or 0) end
+  -- then the damage done now: the play's kill time leans on every later
+  -- swing landing as modelled, the decision's own damage does not (the
+  -- WoR's CELES cast Cure where a Fight tied it on paper, both "ends @202",
+  -- and the fight took two more Fights)
+  if (a.leftNow or 0) ~= (b.leftNow or 0) then return (a.leftNow or 0) < (b.leftNow or 0) end
+  return a.cost < b.cost
+end
+
+-- the best candidate: its index, its result, and every result
+-- One candidate's score: the samples' mean (deaths, cost, HP left), their
+-- median kill and first death (a sample not over by the horizon counts as
+-- never), the share that wipe; and the wipe flag from the worst-case play
+-- (criterion 1 is the guard: a line the worst case wipes on loses to one
+-- it does not)
+-- (splitmix64: the LCG this replaced fed sample i its draws at stride 64,
+-- and 16 plays aimed a 1-in-3 random target 1, 9 and 6 times)
+local RACE_SEEDS = {}
+do
+  local x = 0
+  for i = 1, 4096 do
+    x = x + 0x9E3779B97F4A7C15
+    local z = x
+    z = (z ~ (z >> 30)) * 0xBF58476D1CE4E5B9
+    z = (z ~ (z >> 27)) * 0x94D049BB133111EB
+    z = z ~ (z >> 31)
+    RACE_SEEDS[i] = (z >> 11) / 9007199254740992.0
+  end
+end
+function M.raceEval(st, c)
+  local n = st.samples or M.RACE_SAMPLES
+  local worst = M.raceSim(st, c, nil)
+  if n <= 0 then worst.pWipe = worst.wipe and 1 or 0; worst.worstWipe = worst.wipe; worst.timeSource="worst-case"; worst.countSource="worst-case"; return worst end
+  local rs = {}
+  for i = 1, n do
+    local j = (i - 1) * 64
+    local function draw() j = j + 1; return RACE_SEEDS[(j - 1) % #RACE_SEEDS + 1] end
+    rs[i] = M.raceSim(st, c, draw)
+  end
+  local function med(f)
+    local v = {}
+    for i = 1, n do v[i] = f(rs[i]) or math.huge end
+    table.sort(v)
+    local m = v[(n + 1) // 2]
+    return m ~= math.huge and m or nil
+  end
+  local function mean(f) local t = 0 for i = 1, n do t = t + f(rs[i]) end return t / n end
+  local r = { deaths = mean(function(x) return x.deaths end), falls = mean(function(x) return x.falls end),
+    actualDown = mean(function(x) return x.actualDown end),
+    nearFatal = mean(function(x) return x.nearFatal end),
+    earlySamples = mean(function(x) return st.timeHorizon and x.elapsed < st.timeHorizon and 1 or 0 end) * n,
+    kill = med(function(x) return x.kill end),
+    firstDeath = med(function(x) return x.firstDeath end), left = mean(function(x) return x.left end),
+    left0 = rs[1].left0, leftNow = worst.leftNow,
+    spent = mean(function(x) return x.spent end), bill = mean(function(x) return x.bill end),
+    cost = mean(function(x) return x.cost end), acts = worst.acts,
+    opportunities = mean(function(x) return x.opportunities end),
+    unsuppressedTurns = mean(function(x) return x.unsuppressedTurns end),
+    breakSkips = mean(function(x) return x.breakSkips or 0 end),
+    -- Timing endpoint is the worst-case path; counts above are sample means.
+    elapsed = worst.elapsed,timeCutoff=worst.timeCutoff,timeSource="worst-case",countSource="sample-means",
+    pWipe = mean(function(x) return x.wipe and 1 or 0 end), worstWipe = worst.wipe, worstDeaths = worst.deaths,
+    standNow = worst.standNow, invalid = worst.invalid, pending = worst.pending }
+  r.wipe = worst.wipe
+  -- A required random play which reaches an unsupported continuation or
+  -- unresolved first action is not a valid partial estimate. Decline the
+  -- comparison rather than averaging its truncated score with completed ones.
+  for _,sample in ipairs(rs) do
+    if sample.invalid then r.invalid=true end
+    if sample.pending then r.pending=true end
+  end
+  return r
+end
+
+function M.raceChoose(st, candidates)
+  local best, bestR, all = nil, nil, {}
+  local attacks, fire = 0, 0
+  for i, c in ipairs(candidates) do
+    local r = M.raceEval(st, c)
+    all[i] = r
+    if c.kind == "attack" then
+      attacks = attacks + 1
+      if r.standNow then fire = fire + 1 end
+    end
+  end
+  -- a last stand every attack sets off is the fight's, not this choice's:
+  -- read the window again without it (else the race stalls on heals)
+  if attacks > 0 and fire == attacks and not st.noStand then
+    st.noStand = true
+    for i, c in ipairs(candidates) do all[i] = M.raceEval(st, c) end
+    st.noStand = nil
+  end
+  for i in ipairs(candidates) do
+    if bestR == nil or M.raceBetter(all[i], bestR, st) then best, bestR = i, all[i] end
+  end
+  return best, bestR, all
+end
+
+-- The early/central/late convention applies to BOTH arms, including every
+-- continuation. Bounds are player estimates, not confidence intervals.
+local function raceTimedCopy(record, point)
+  if record == nil then return nil end
+  local q = {}
+  for k,v in pairs(record) do q[k]=v end
+  if point ~= "central" and record.delayBounds then q.delay=record.delayBounds[point] end
+  return q
+end
+function M.raceTimingScenario(st, action, point)
+  local ss = {}
+  for k,v in pairs(st) do ss[k]=v end
+  ss.enemies = {}
+  for k,e in pairs(st.enemies) do
+    local q = {};for f,v in pairs(e) do q[f]=v end
+    if point ~= "central" and e.breakDurationBounds then q.breakDuration=e.breakDurationBounds[point] end
+    ss.enemies[k]=q
+  end
+  ss.party = {}
+  for k,p in pairs(st.party) do
+    local q = {};for f,v in pairs(p) do q[f]=v end
+    q.lines = {};for b,line in pairs(p.lines or {}) do q.lines[b]=raceTimedCopy(line,point) end
+    q.heals = {};for i,h in ipairs(p.heals or {}) do q.heals[i]=raceTimedCopy(h,point) end
+    q.fallback = raceTimedCopy(p.fallback,point)
+    ss.party[k]=q
+  end
+  return ss,raceTimedCopy(action,point)
+end
+function M.raceRobustBetter(st, candidate, rules)
+  local results = {}
+  local dm = (st.samples or M.RACE_SAMPLES)>0 and M.RACE_DEATH_MARGIN or 1e-9
+  for _,point in ipairs({"lo","central","hi"}) do
+    local ss,a=M.raceTimingScenario(st,candidate,point)
+    local _,b=M.raceTimingScenario(st,rules,point)
+    local ra,rb=M.raceEval(ss,a),M.raceEval(ss,b)
+    results[point]={race=ra,rules=rb}
+    if ra.invalid or rb.invalid or ra.pending or rb.pending then return false,"unresolved comparison",results end
+    if (ra.wipe and not rb.wipe) or (ra.pWipe or 0)>(rb.pWipe or 0)+dm
+      or ra.deaths>rb.deaths+dm or (ra.falls or 0)>(rb.falls or 0)+dm then
+      return false,"timing scenario adds wipe/down/fall risk",results
+    end
+    if M.raceBetter(rb,ra,ss) then return false,"timing scenario reverses preference",results end
+  end
+  local a,b=results.central.race,results.central.rules
+  -- Raw tie-breakers choose among candidates; overrides need material gain.
+  local gain = (b.deaths-a.deaths)>dm or ((b.falls or 0)-(a.falls or 0))>dm
+    or (b.pWipe or 0)-(a.pWipe or 0)>dm
+    or (a.kill and not b.kill)
+    or (a.kill and b.kill and b.kill-a.kill>M.raceTickMargin(st))
+    or (not a.kill and not b.kill and b.left-a.left>(st.leftMargin or M.RACE_LEFT_MARGIN)*math.max(a.left0 or 0,1))
+    or b.cost-a.cost>(st.costMargin or M.RACE_COST_MARGIN)
+  return gain and M.raceBetter(a,b,st),gain and "stable material gain" or "inside uncertainty margin",results
 end
 
 -- Is a heal worth the turn it costs?  All of newFightDriver's heal policy,
@@ -2045,6 +2908,33 @@ function M.spellPrice(id, base, boost)
   return M.boostPrice(base, boost), id
 end
 
+-- Ot6SpellMP's caster discount, before Ot6MagicPrice's boost ladder.
+-- The INC runs in eight-bit mode; retain its wrap even for synthetic ROM
+-- costs. Economizer wins when both relic flags are set.
+function M.casterSpellMp(raw, relic)
+  if (relic & 0x40) ~= 0 then return 1 end
+  if (relic & 0x20) ~= 0 then return ((raw + 1) & 0xFF) >> 1 end
+  return raw
+end
+
+-- A battle catalogue price starts from MagicProp, never the live list's
+-- already-pending-boosted byte. `boost` is the desired TOTAL pending BP.
+-- This is separate from spellPrice's legacy unboosted-base API: callers
+-- cannot recover a raw price from a capped/rounded menu price.
+function M.battleSpellPrice(actor, id, boost)
+  assert(type(actor) == "number" and actor % 1 == 0 and actor >= 0 and actor <= 3,
+    "battle spell price requires a seated caster")
+  assert(type(id) == "number" and id % 1 == 0 and id >= 0 and id <= 0xFF,
+    "battle spell price requires an ability record")
+  assert(type(boost) == "number" and boost % 1 == 0 and boost >= 0 and boost <= 3,
+    "battle spell price requires total boost 0..3")
+  local family = M.inFoldTbl(id)
+  local resolved = family and M.foldTier(id, boost) or id
+  local raw = M.spellMpCost(resolved)
+  local base = M.casterSpellMp(raw, M.readByte(0x3C45 + actor * 2))
+  return family and base or M.boostPrice(base, boost), resolved
+end
+
 -- The dearest Tool the battle bag holds (#230), and its unboosted price.
 --
 -- Why a ceiling rather than a name.  The Tools shell lists the tools the
@@ -2445,6 +3335,74 @@ function M.rewardDue(o)
   if o.random then sum = math.min((sum * (o.mul16 or 16)) >> 4, 0xFFFFFF) end
   if (o.alive or 0) == 0 then return 0 end
   return sum // o.alive
+end
+
+-- Eligibility is separate from HP and command availability. This is an
+-- observation predicate, not a prediction of status spells. At rewards the
+-- engine's alive mask is authoritative; transient RAM can disagree here.
+function M.raceRewardEligible(member)
+  return member.hp > 0 and member.hp ~= 0xFFFF and (member.st1 & 0xC2) == 0 and not member.left
+end
+
+-- Stable seated identities and copied observations survive later curing.
+-- Only read-only evidence: no candidate ranking or controller changes.
+function M.newRaceEligibility(seats, emit)
+  local L = { seats = {}, last = {}, history = {}, terminal = nil }
+  for e,seat in pairs(seats) do L.seats[e] = seat.actor end
+  function L.observe(party, frame, tick)
+    for e,char in pairs(L.seats) do
+      local m = party[e]
+      if m and m.char == char then
+        local q = { entity=e,char=char,hp=m.hp,st1=m.st1,left=m.left,
+          eligible=M.raceRewardEligible(m),frame=frame,atb_tick=tick }
+        local old = L.last[e]
+        if old == nil or old.eligible ~= q.eligible or (old.st1 & 0xC2) ~= (q.st1 & 0xC2)
+          or old.left ~= q.left or (old.hp == 0) ~= (q.hp == 0) then
+          q.event = old and "transition" or "initial"
+          L.history[#L.history+1] = q
+          if emit then emit(q) end
+        end
+        -- Never alias caller-owned RAM samples or historical observations.
+        L.last[e] = { entity=e,char=char,hp=m.hp,st1=m.st1,left=m.left,eligible=q.eligible }
+      end
+    end
+  end
+  function L.finish(o, got, reward, frame, tick, atEnd)
+    if L.terminal then return L.terminal end
+    if reward.party then L.observe(reward.party,frame,tick) end
+    local r = { frame=frame,atb_tick=tick,kind=o.kind,members={},aliveMask=reward.aliveMask,
+      atEnd=atEnd==true,observation_source=atEnd and "UpdateSRAM" or "last-watch" }
+    local count=0;for _ in pairs(L.seats) do count=count+1 end
+    local reference=0
+    if o.kind == "won" and count > 0 then
+      local input={};for k,v in pairs(reward) do input[k]=v end
+      input.alive=count
+      reference=M.rewardDue(input)
+    end
+    for e,char in pairs(L.seats) do
+      local m = reward.party and reward.party[e]
+      local identity = m ~= nil and m.char == char
+      local eligible
+      if identity then eligible = o.kind == "won" and ((reward.aliveMask or 0) >> e) & 1 == 1 end
+      local ref = reference * ((reward.egg and reward.egg[e]) and 2 or 1)
+      r.members[e] = { entity=e,char=char,identity_match=identity,eligible=eligible,paid=got[e] or 0,
+        due=identity and (o.share[e] or 0) or nil,
+        hp=identity and m.hp or nil,st1=identity and m.st1 or nil,
+        left=nil,
+        equal_share_reference=identity and ref or nil,
+        foregone_equal_share=identity and (not eligible and ref or 0) or nil }
+      if identity then r.members[e].left=m.left end
+      if emit then
+        local event={event="reward",frame=frame,atb_tick=tick,
+          atEnd=r.atEnd,observation_source=r.observation_source}
+        for k,v in pairs(r.members[e]) do event[k]=v end
+        emit(event)
+      end
+    end
+    L.terminal=r
+    return r
+  end
+  return L
 end
 
 -- The battle's outcome from its end reading (the UpdateSRAM hook's
@@ -4699,14 +5657,20 @@ end
 -- Recovery action evidence. Pure ledger first; CPU observers below only read.
 -- A confirm press is an attempt, never proof of submission or resolution.
 local actionTraceSerial = 0
-function M.newRecoveryTrace(tag, emit)
-  local T = { pending = {}, queued = {}, running = {} }
+function M.newRecoveryTrace(tag, emit, observe, tickReader)
+  local T = { pending = {}, queued = {}, running = {}, context = nil, contextSerial = 0, bindings = {}, queueSerial = 0 }
   local function event(p, stage, frame, fields)
     local e = { v = 1, id = p.id, tag = tag or "fight", actor = p.actor,
       kind = p.kind, requested = p.requested, target = p.target,
       all = p.all, boost = p.boost, event = stage, frame = frame,
       elapsed_frames = frame - p.frame }
     for k, v in pairs(fields or {}) do e[k] = v end
+    if tickReader and p.atb_tick ~= nil then
+      e.atb_tick = tickReader()
+      e.elapsed_atb_ticks = (e.atb_tick - p.atb_tick) & 0xFFFF
+      e.time_unit = "atb_updates"
+    end
+    if observe then observe(e) end
     emit(e)
   end
   function T.drop(actor, frame, reason)
@@ -4729,7 +5693,13 @@ function M.newRecoveryTrace(tag, emit)
       requested = plan.spell or plan.item or plan.skill or plan.lore or 0,
       target = plan.target,
       all = plan.all or false, boost = plan.boostLeft or 0,
-      frame = frame, stage = "plan" }
+      frame = frame, stage = "plan", atb_tick = tickReader and tickReader() }
+    if plan.targetContract then
+      p.expected_targets = plan.targetContract.chars | (plan.targetContract.monsters << 8)
+      p.expected_attack = plan.executionSpell or plan.contractAttack
+      p.expected_command = plan.spell and 2 or plan.contractCommand
+      p.expected_boost = plan.boostWant
+    end
     T.pending[actor] = p
     event(p, "plan", frame, { reason = plan.reason or "recovery" })
   end
@@ -4739,41 +5709,170 @@ function M.newRecoveryTrace(tag, emit)
       event(p, "confirm", frame, { chars = chars, mons = mons })
     end
   end
-  function T.submit(actor, frame, cmd, attack, targets)
+  function T.submit(actor, frame, cmd, attack, targets, acceptedBoost)
+    T.staging = nil
     local p = T.pending[actor]
     if not p or p.stage ~= "plan" then return end
     p.stage, p.submitted = "submit", frame
+    p.submitted_tick = tickReader and tickReader()
     p.accepted_command = cmd
     T.pending[actor] = nil
+    event(p, "submit", frame, { command = cmd, attack = attack,
+      targets = targets, accepted_boost = acceptedBoost, navigation_frames = frame - p.frame })
+    if p.expected_targets ~= nil and (targets ~= p.expected_targets or cmd ~= p.expected_command
+      or acceptedBoost ~= p.expected_boost) then
+      -- The engine consumed the command. Keep its actual submission,
+      -- but do not give it ownership of the proposed scored execution.
+      event(p,"unresolved",frame,{reason="race_submission_mismatch",last_stage=p.stage,
+        expected_targets=p.expected_targets,expected_command=p.expected_command,
+        expected_boost=p.expected_boost})
+      return
+    end
+    T.staging = p
     T.queued[actor] = T.queued[actor] or {}
     table.insert(T.queued[actor], p)
-    event(p, "submit", frame, { command = cmd, attack = attack,
-      targets = targets, navigation_frames = frame - p.frame })
   end
-  function T.start(actor, frame, cmd, attack, targets, hp, mp, bp)
+  function T.cancelQueued(actor, frame, reason, evidence)
+    for _,p in ipairs(T.queued[actor] or {}) do
+      local fields = {reason=reason or "queue_cancelled",last_stage=p.stage}
+      for k,v in pairs(evidence or {}) do fields[k]=v end
+      fields.expected_attack, fields.expected_targets = p.expected_attack, p.expected_targets
+      event(p,"unresolved",frame,fields)
+    end
+    T.queued[actor] = {}
+    for index,b in pairs(T.bindings) do
+      if b.actor == actor then T.bindings[index] = nil end
+    end
+    if T.staging and T.staging.actor == actor then T.staging = nil end
+  end
+  -- Every allocation overwrites provenance, even when no trace owns it.
+  -- Called after queue-time folding, at the actual command/target store.
+  function T.queueStore(actor, index, cmd, attack, frame, storedTargets)
+    local old = T.bindings[index]
+    if old and old.trace_id then
+      local q = T.queued[old.actor] or {}
+      for i,p in ipairs(q) do
+        if p.id == old.trace_id then
+          event(p,"unresolved",frame or p.submitted,{reason="queue_reallocated",last_stage=p.stage})
+          table.remove(q,i)
+          break
+        end
+      end
+    end
+    T.queueSerial = T.queueSerial + 1
+    local p = T.staging
+    local b = { generation = T.queueSerial, actor = actor, command = cmd, attack = attack }
+    if p and p.actor == actor and p.expected_targets ~= nil
+      and ((p.expected_attack ~= nil and attack ~= p.expected_attack)
+        or cmd ~= p.expected_command or storedTargets ~= p.expected_targets) then
+      T.cancelQueued(actor,frame or p.submitted,"race_queue_identity_mismatch",
+        {stored_command=cmd,stored_attack=attack,stored_targets=storedTargets})
+      p = nil
+    end
+    if p and p.actor == actor then
+      b.trace_id = p.id
+      p.engine_command, p.engine_attack = cmd, attack
+      p.queue_index, p.queue_generation = index, b.generation
+    end
+    T.bindings[index], T.staging = b, nil
+  end
+  function T.takeExecutionIndex()
+    local index = T.executionIndex
+    T.executionIndex = nil
+    return index
+  end
+  -- Every dispatcher invocation creates a new scope, including an enemy,
+  -- counter or engine action which has no accepted controller command.
+  function T.start(actor, frame, cmd, attack, targets, hp, mp, bp, meta)
+    meta = meta or {}
+    T.contextSerial = T.contextSerial + 1
+    local scope = { id = T.contextSerial, actor = actor, command = cmd, attack = attack,
+      queued_command = meta.queued_command or cmd, queued_attack = meta.queued_attack or attack,
+      counter = meta.counter == true }
+    T.context = scope
+    if actor == nil or actor < 0 or actor > 3 or cmd >= 0x1E or scope.counter
+      or scope.queued_command ~= cmd then return end
     local queue = T.queued[actor] or {}
     local p = queue[1]
-    if not p or p.accepted_command ~= cmd then return end
+    if not p then return end
+    if meta.queue_index ~= nil then
+      local b = T.bindings[meta.queue_index]
+      if not b or b.actor ~= actor or b.trace_id ~= p.id
+        or b.generation ~= p.queue_generation or p.queue_index ~= meta.queue_index
+        or b.command ~= scope.queued_command or b.attack ~= scope.queued_attack
+        or p.engine_command ~= cmd then return end
+      scope.queue_index, scope.queue_generation = meta.queue_index, b.generation
+    elseif not meta.legacyArithmetic or p.accepted_command ~= cmd then return end
     table.remove(queue, 1)
-    T.running[actor] = p
+    if T.running[actor] then
+      event(T.running[actor], "unresolved", frame,
+        { reason = "execution_superseded", last_stage = "start" })
+    end
+    T.running[actor], scope.trace_id = p, p.id
     p.stage, p.started = "start", frame
+    p.started_tick = tickReader and tickReader()
     p.command, p.attack, p.targets = cmd, attack, targets
+    p.context_id, p.queued_command, p.queued_attack = scope.id, scope.queued_command, scope.queued_attack
     p.hp, p.mp, p.bp = hp, mp, bp
     event(p, "start", frame, { command = cmd, attack = attack,
-      targets = targets, queue_frames = frame - p.submitted })
+      targets = targets, queue_frames = frame - p.submitted,
+      context_id = scope.id, queued_command = scope.queued_command,
+      queued_attack = scope.queued_attack, counter = scope.counter,
+      queue_index = scope.queue_index, queue_generation = scope.queue_generation })
+    return scope
+  end
+  -- Arithmetic-only compatibility for token tests without an engine queue.
+  -- CPU observers always call strict start and never use this helper.
+  function T.legacyStart(actor, frame, cmd, attack, targets, hp, mp, bp, meta)
+    local q = {}
+    for k,v in pairs(meta or {}) do q[k] = v end
+    meta = q
+    meta.legacyArithmetic = true
+    return T.start(actor,frame,cmd,attack,targets,hp,mp,bp,meta)
+  end
+  -- The frozen accepted action owns its internal hand/tool/spell effects.
+  -- Mutable B5/B6 is retained as raw evidence, never mistaken for its ID.
+  function T.hpEffect(actor, frame, target, before, after, cmd, attack, evidence)
+    evidence = evidence or {}
+    local scope = evidence.context or T.context
+    local p = T.running[actor]
+    if not p or scope == nil or scope ~= T.context or scope.actor ~= actor
+      or scope.trace_id ~= p.id or scope.id ~= p.context_id or scope.counter
+      or scope.queued_command ~= (evidence.queued_command or scope.queued_command)
+      or scope.queued_attack ~= (evidence.queued_attack or scope.queued_attack)
+      or scope.queued_command ~= p.queued_command or scope.queued_attack ~= p.queued_attack
+      or cmd >= 0x1E or before == after then return end
+    p.effectN = (p.effectN or 0) + 1
+    event(p, "hp_effect", frame, { command = p.command, attack = p.attack,
+      raw_effect_command = cmd, raw_effect_attack = attack,
+      queued_command = scope.queued_command, queued_attack = scope.queued_attack,
+      queue_index = scope.queue_index, queue_generation = scope.queue_generation,
+      context_id = scope.id, effect_target = target, hp_before = before, hp_after = after,
+      hp_change = after - before, effect_index = p.effectN,
+      navigation_frames = p.submitted - p.frame,
+      queue_frames = p.started - p.submitted,
+      execution_frames = frame - p.started })
   end
   function T.resolve(actor, frame, hp, mp, bp)
-    local p = T.running[actor]
-    if not p then return end
+    local p, scope = T.running[actor], T.context
+    if not p or not scope or scope.actor ~= actor or scope.trace_id ~= p.id
+      or scope.id ~= p.context_id then return end
     local deltas = {}
     for i = 1, 4 do deltas[i] = hp[i] - p.hp[i] end
     -- Net HP across the command, not an attributed healing amount (Runic,
     -- counters, misses and caps can change the outcome). Preserve raw facts.
     event(p, "resolve", frame, { command = p.command, attack = p.attack,
-      targets = p.targets, hp_net = table.concat(deltas, ","),
+      targets = p.targets, hp_net = table.concat(deltas, ","), context_id = scope.id,
+      queue_index = scope.queue_index, queue_generation = scope.queue_generation,
+      queued_command = scope.queued_command, queued_attack = scope.queued_attack,
       mp_net = mp - p.mp, bp_net = bp - p.bp,
-      execution_frames = frame - p.started })
-    T.running[actor] = nil
+      execution_frames = frame - p.started,
+      navigation_frames = p.submitted - p.frame,
+      queue_frames = p.started - p.submitted,
+      navigation_atb_ticks = p.submitted_tick and ((p.submitted_tick-p.atb_tick)&0xFFFF),
+      queue_atb_ticks = p.started_tick and ((p.started_tick-p.submitted_tick)&0xFFFF),
+      execution_atb_ticks = p.started_tick and ((tickReader()-p.started_tick)&0xFFFF) })
+    T.running[actor], T.context = nil, nil
   end
   -- A party death (#175), outside the per-plan lifecycle: the member,
   -- the HP the killing action found them at, the pips they held and the
@@ -4794,7 +5893,8 @@ function M.newRecoveryTrace(tag, emit)
       if p then event(p, "unresolved", frame,
         { reason = reason, last_stage = p.stage }) end
     end
-    T.queued, T.running = {}, {}
+    T.queued, T.running, T.context = {}, {}, nil
+    T.bindings, T.staging, T.executionIndex, T.effects = {}, nil, nil, {}
   end
   return T
 end
@@ -4840,17 +5940,66 @@ local function recoveryActivate(trace)
     local x, y = cpu["cpu.x"] & 0xffff, cpu["cpu.y"] & 0xffff
     if x < 8 and x % 2 == 0 then
       t.submit(x // 2, M.frame, M.readByte(0x2BAF + y),
-        M.readByte(0x2BB0 + y), M.readWord(0x2BB1 + y))
+        M.readByte(0x2BB0 + y), M.readWord(0x2BB1 + y), M.readByte(0x3E9D+x))
     end
+  end)
+  hook(M.sym("RecoveryQueueStored"), function(t, cpu)
+    local x, y = cpu["cpu.x"] & 0xffff, cpu["cpu.y"] & 0xffff
+    t.queueStore(x < 8 and x % 2 == 0 and x // 2 or nil, y,
+      M.readByte(0x3420+y), M.readByte(0x3421+y), M.frame, M.readWord(0x3520+y))
+  end)
+  hook(M.sym("RemoveAllActions"), function(t, cpu)
+    local x = cpu["cpu.x"] & 0xffff
+    if x < 8 and x % 2 == 0 then t.cancelQueued(x // 2,M.frame) end
+  end)
+  hook(M.sym("InitPlayerAction"), function(t, cpu)
+    t.executionIndex = cpu["cpu.y"] & 0xffff
   end)
   -- ExecAction calls ExecCmd with X restored to the acting entity. $b5/$b6
   -- now contain the command/attack after queue-time spell folding.
   hook(M.sym("ExecCmd@battle_code"), function(t, cpu)
     local x = cpu["cpu.x"] & 0xffff
-    if x < 8 and x % 2 == 0 then
-      t.start(x // 2, M.frame, M.readByte(0xB5), M.readByte(0xB6),
-        M.readWord(0xB8), recoveryHP(), M.readWord(0x3C08 + x),
-        M.readByte(0x3E9C + x))
+    local index = t.takeExecutionIndex()
+    t.start(x < 8 and x % 2 == 0 and x // 2 or nil, M.frame,
+      M.readByte(0xB5), M.readByte(0xB6), M.readWord(0xB8), recoveryHP(),
+      M.readWord(0x3C08 + x), M.readByte(0x3E9C + x),
+      { queue_index = index,
+        queued_command = M.readByte(0x3A7C), queued_attack = M.readByte(0x3A7D),
+        counter = (M.readByte(0xB1) & 1) ~= 0 })
+  end)
+  -- ApplyDmg saves the attacker X before using it for HP/MP dispatch.
+  -- Its common return comes after HP healing/damage and lethal clamping.
+  -- The pinned source's return is +$27: verify PLP/PLX/RTS before hooking
+  -- rather than silently attributing effects at an instruction that moved.
+  local apply = M.sym("ApplyDmg")
+  assert(M.readRomByte((apply + 0x27) & 0x3FFFFF) == 0x28
+    and M.readRomByte((apply + 0x28) & 0x3FFFFF) == 0xFA
+    and M.readRomByte((apply + 0x29) & 0x3FFFFF) == 0x60,
+    "ApplyDmg common return moved: effect observer must follow the source")
+  hook(apply, function(t, cpu)
+    local x, y = cpu["cpu.x"] & 0xffff, cpu["cpu.y"] & 0xffff
+    t.effects = t.effects or {}
+    t.effects[#t.effects + 1] = { offset = x, actor = x < 8 and x % 2 == 0 and x // 2 or nil,
+      target = y // 2, hp = M.readWord(0x3BF4 + y),
+      cmd = M.readByte(0xB5), attack = M.readByte(0xB6), context = t.context,
+      queued_command = M.readByte(0x3A7C), queued_attack = M.readByte(0x3A7D) }
+  end)
+  hook(apply + 0x27, function(t)
+    local e = table.remove(t.effects or {})
+    if e then
+      local hp = M.readWord(0x3BF4 + e.target * 2)
+      if M.RACE_EFFECT_DIAGNOSTIC and hp ~= e.hp then
+        local p = e.actor ~= nil and t.running[e.actor] or nil
+        print(string.format("[ot6effect] frame=%d x=$%02X target=%d hp=%d->%d cmd=$%02X atk=$%02X running=%s:%s queued=$%02X:$%02X context=%s:%s counter=%s",
+          M.frame,e.offset,e.target,e.hp,hp,e.cmd,e.attack,
+          tostring(p and p.command),tostring(p and p.attack),e.queued_command,e.queued_attack,
+          tostring(e.context and e.context.id),tostring(e.context and e.context.trace_id),
+          tostring(e.context and e.context.counter)))
+      end
+      if e.actor ~= nil and e.queued_command == M.readByte(0x3A7C)
+        and e.queued_attack == M.readByte(0x3A7D) then
+        t.hpEffect(e.actor,M.frame,e.target,e.hp,hp,e.cmd,e.attack,e)
+      end
     end
   end)
   -- Immediately after ExecCmd returns to the normal-action path, including
@@ -5251,7 +6400,7 @@ local BATTLE = {
   -- OT6's per-monster state, slot-indexed: monsters are entities 4..9 at a
   -- 2-byte stride, so slot s sits 8 bytes past the ot6_memory.inc base.
   MON_HP = 0x3BFC, MON_PRESENT = 0x3AA8,
-  SH_CUR = 0x3E40, BRK_TICKS = 0x3E90, -- OT6_SHIELD_CUR/BROKEN_TICKS + 8
+  SH_CUR = 0x3E40, SH_MAX = 0x3E41, BRK_TICKS = 0x3E90, -- OT6_SHIELD_CUR/BROKEN_TICKS + 8
   RV_ELEM = 0x3E91, RV_CLASS = 0x3EA5, -- OT6_REVEALED_ELEM/BOOST_REVEALED + 8
   -- A tool is one hit (Ot6HitCountTbl: the Drill x2); boost multiplies
   -- its damage, not its swings (Ot6FightBoost lives in FightAttack).
@@ -5689,6 +6838,15 @@ function M.careRefund(reason)
   return true
 end
 function Driver:dropPlan(reason)
+  -- A scored command that cannot be steered/acknowledged must not win
+  -- the same comparison again forever. Use ordinary rules for this battle.
+  -- Accepted commands and their later queue diagnostics are separate.
+  if self.plan and self.plan.targetContract and not self.plan.committed
+    and reason ~= "confirm_attempt" then
+    self.raceActDeclined = reason or "back_out"
+    M.log(string.format("[%s] [race] scored command declined (%s); ordinary rules for this battle",
+      self.tag or "fight", self.raceActDeclined))
+  end
   if reason ~= "confirm_attempt" then self:traceDrop(reason or "back_out") end
   if self.careActor ~= nil and self.careActor == self.planActor and M.careRefund(reason) then
     self.careActor = nil
@@ -5796,6 +6954,39 @@ function M.runicTakes(flags3, special)
   end
   return nil
 end
+-- Whether a monster's Runic can take a cast at all (RunicEffect @352b
+-- skips a body that is dead, petrified or asleep, or stopped, frozen or
+-- hidden: CheckStatus on STATUS12 {DEAD, PETRIFY, SLEEP}, STATUS34 {STOP,
+-- FROZEN, HIDE}); st1..st4 its $3EE4/$3EE5/$3EF8/$3EF9 bytes
+function M.runicAwake(st1, st2, st3, st4)
+  if (st1 & (0x80 | M.ST1_PETRIFY)) ~= 0 then return false end
+  if (st2 & M.ST2_SLEEP) ~= 0 then return false end
+  if (st3 & M.ST3_STOP) ~= 0 then return false end
+  if (st4 & (M.ST4_FROZEN | 0x20)) ~= 0 then return false end
+  return true
+end
+-- The standing slots' $3E4C bytes for M.runicTakes, a slot whose Runic
+-- cannot take a cast left out (M.runicAwake)
+function Driver:runicSpecial()
+  local special = {}
+  for s = 0, 5 do
+    if monAlive(s) then
+      local x = 8 + s * 2
+      if M.runicAwake(M.readByte(0x3EE4 + x), M.readByte(0x3EE5 + x), M.readByte(0x3EF8 + x),
+                      M.readByte(0x3EF9 + x)) then
+        special[s] = M.readByte(0x3E4C + x)
+      end
+    end
+  end
+  return special
+end
+-- the slot whose enemy Runic would take spell id now, or nil (a cure too:
+-- the review of 187f73c0 saw 8 of 8 cures cast with the Speck up land no HP)
+function Driver:runicSlot(id)
+  if M.ENEMY_RUNIC_VETO == false or id == nil or id > 0xFF then return nil end
+  local MP = M.sym("MagicProp") & 0x3FFFFF
+  return M.runicTakes(M.readRomByte(MP + id * 14 + 3), self:runicSpecial())
+end
 function Driver:castVetoed(abilityId, what)
   -- An enemy Runic (#413): a monster carrying $3E4C bit 1 (the Speck's
   -- MonsterProp+30, "A Speck absorbs magic!" on its launch) takes every
@@ -5805,11 +6996,7 @@ function Driver:castVetoed(abilityId, what)
   -- no such bit and pass.
   local MP = M.sym("MagicProp") & 0x3FFFFF
   if M.ENEMY_RUNIC_VETO ~= false then
-    local special = {}
-    for s = 0, 5 do
-      if monAlive(s) then special[s] = M.readByte(0x3E4C + 8 + s * 2) end
-    end
-    local rs = M.runicTakes(M.readRomByte(MP + abilityId * 14 + 3), special)
+    local rs = M.runicTakes(M.readRomByte(MP + abilityId * 14 + 3), self:runicSpecial())
     if rs ~= nil then
       M.log(string.format("[%s] %s $%02X refused: slot %d ($%03X) holds an enemy Runic and would absorb it "
         .. "(#413) -- falling through", self.tag or "fight", what, abilityId, rs,
@@ -5911,7 +7098,7 @@ function Driver:scriptWorst(slot, e)
   local key = string.format("%d:%d:%d", slot, species, e)
   self.romWorst = self.romWorst or {}
   local c = self.romWorst[key]
-  if c ~= nil then return c.v, c.a end
+  if c ~= nil then return c.v, c.a, c.m end
   local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
   local off = M.readRomWord(ptrs + species * 2)
   local function b(i) return M.readRomByte(base + off + i) end
@@ -5942,8 +7129,12 @@ function Driver:scriptWorst(slot, e)
   end
   local price = best
   if M.UNSEEN_PRICE == "mean" and n > 0 and best ~= nil then price = math.max(1, sum // n) end
-  self.romWorst[key] = { v = price, a = bestA }
-  return price, bestA
+  -- (the third value, the mean over every attack it names, a buff or a
+  -- status a 0, is the care race's typical action before the slot has
+  -- landed enough to read one, #415)
+  local mean = n > 0 and (sum // n) or nil
+  self.romWorst[key] = { v = price, a = bestA, m = mean }
+  return price, bestA, mean
 end
 
 function Driver:counterVetoed(actor, use, slots, what)
@@ -6330,7 +7521,7 @@ function Driver:readLastStand(slots)
           ((class == "damage" and lever ~= true and classes.damage == "thin")
             and " -- taken first while the party is thin" or ""))
         if counted then
-          entries[slot] = { class = class, gate = g,
+          entries[slot] = { class = class, gate = g, n = p.roles.lastStandN or 1,
                             thinOnly = lever ~= true and classes[class] == "thin" }
           any = true
         end
@@ -6965,6 +8156,19 @@ function M.ledgerCommit(L, act, drops)
   L.maxOn = L.maxOn or {}
   local per = {}
   for _, d in ipairs(hits) do per[d.e] = (per[d.e] or 0) + d.drop end
+  -- the care race's sample (#415): each landed action's take on each
+  -- member it hit, and how many it hit
+  if counted then
+    L.landN = (L.landN or 0) + 1
+    L.landOn = L.landOn or {}
+    local nm = 0
+    for e, v in pairs(per) do
+      nm = nm + 1
+      L.landOn[e] = L.landOn[e] or {}
+      table.insert(L.landOn[e], v)
+    end
+    if nm > 1 then L.multiN = (L.multiN or 0) + 1 end
+  end
   for e, v in pairs(per) do
     if L.maxOn[e] == nil or v > L.maxOn[e] then L.maxOn[e] = v end
     if L.max == nil or v > L.max then L.max = v end
@@ -7322,7 +8526,961 @@ function Driver:nukeFloor(actor)
   return self.opts.nukeFloor or (M.readWord(BATTLE.MAXMP + actor * 2) // 4)
 end
 
+-- The care race in the driver (#415): the race state built from the
+-- driver's own readings at a decision, the candidates the window offers,
+-- and the [race] line beside the rule stack's choice.  M.CARE_RACE = "log"
+-- (or true) scores and logs every decision and leaves the rules' plan in
+-- force; "act" (stage 3) will play the race's choice.  Off by default.
+--   party lines: bestLine's chips and hits at each boost, the damage watch's
+--     per-hit figure (dmgHit; a member not yet measured takes the mean of
+--     the measured ones, and with none measured the decision is not raced)
+--   enemy actions: each standing slot's typical landed hit on each member
+--     (the median of its landings, from M.RACE_TYPICAL_MIN of them), the
+--     share of its actions that land, area when most landings hit more
+--     than one member, aimed at random among the living; its worst
+--     (roundEnemies: the ledger, else the script's worst from the ROM) is
+--     the worst-case play's, the no-wipe guard
+--   heals: the bag's (bagHeals) on each hurt member, each at its gil and
+--     scarcity against M.CARE_RESERVE; a raise: the Fenix Down on each
+--     fallen member, raised to 1/8 max HP
+-- "act" (experimental, default off, #415): the race plays its choice where it disagrees
+-- with the rule stack; "log" (or true): the rules play and the race is
+-- logged beside them; false or "off": the rules alone, no race
+M.RACE_TIME_DIAGNOSTIC = false -- opt-in selected-policy shadow evidence only
+if M.CARE_RACE == nil then M.CARE_RACE = false end
+if M.CARE_RACE == "off" then M.CARE_RACE = false end
+M.RACE_RAISE_RESERVE = 2
+-- the leg's race ledger, for the end-of-run [race] line (M.raceReport):
+-- decisions raced, not raced (nothing measured yet), the rules' plan not
+-- modelled, agreements, disagreements, overrides played, errors
+M.raceTally = { raced = 0, skipped = 0, unmodelled = 0, agree = 0, disagree = 0, override = 0, err = 0 }
+function M.raceReport()
+  local T = M.raceTally
+  local mode = M.CARE_RACE == "act" and "act" or (M.CARE_RACE and "log" or "off")
+  return string.format("mode %s: %d decision(s) raced (%d agreed, %d disagreed, %d with the rules' plan not "
+    .. "modelled), %d not raced, %d override(s) played, %d error(s)", mode, T.raced, T.agree, T.disagree,
+    T.unmodelled, T.skipped, T.override, T.err)
+end
+M.RACE_TYPICAL_MIN = 3
+M.RACE_DEFER_STAND = true
+M.RACE_HIT_KEEP = 8
+-- the median of a list of numbers (the lower middle of an even count)
+function M.median(v)
+  if v == nil or #v == 0 then return nil end
+  local c = {}
+  for i, x in ipairs(v) do c[i] = x end
+  table.sort(c)
+  return c[(#c + 1) // 2]
+end
+function Driver:raceState(actor, R)
+  if next(self.healQueued or {}) or next(self.raiseQueued or {}) then
+    return nil, "a confirmed care action is in flight (its resolution is not modelled yet)"
+  end
+  -- A party member the player cannot command contributes no planned
+  -- continuation. Until status clears, leave the fight with the rules
+  -- rather than inventing that member's attack/heal: the Gate's be88
+  -- at 5b4cb9f6 counted Muddled SABIN's turns and kept raising EDGAR into
+  -- a 1293 round (four deaths to the rules' one, on matched first fights).
+  for e = 0, 3 do
+    if (R.hpNow[e] or 0) > 0 and (denied(e) ~= nil or status1Has(e, M.ST1_ZOMBIE)
+       or (M.readByte(BATTLE.ST2 + e * 2) & 0x20) ~= 0
+       or (M.leftMask() >> e) & 1 == 1) then
+      return nil, "a standing party member cannot take a planned turn (the rules play it)"
+    end
+  end
+  local st = { actor = actor, party = {}, enemies = {}, focus = {}, hpRate = M.shopRates().hp or 1.2,
+               bankAt = self.opts.bank or 0, horizon = M.RACE_HORIZON,
+               careItems = R.careItems, careCasts = R.careCasts, boost = self.opts.boost == true }
+  st.bag, st.pendingHeal, st.pendingRaise = {}, self.healQueued or {}, self.raiseQueued or {}
+  for i = 0, 251 do
+    local id = M.readByte(BATTLE.BATTINV + i * 5)
+    if id ~= 0xFF then st.bag[id] = (st.bag[id] or 0) + M.readByte(BATTLE.BATTINV + i * 5 + 3) end
+  end
+  local slot = self:pressTarget()
+  if slot == nil then
+    for s = 0, 5 do if monAlive(s) then slot = s; break end end
+  end
+  if slot == nil then return nil, "no monster stands" end
+  local list = self:focusList()
+  if list then
+    for _, s in ipairs(list) do st.focus[#st.focus + 1] = type(s) == "table" and s.slot or s end
+  end
+  st.focus[#st.focus + 1] = slot
+  -- a line's per-hit figure: this actor's own last landed hit with that
+  -- line (raceHitBy), else for a Fight the mean of the party's measured
+  -- Fights, else the mean of every measured hit
+  local by = self.raceHitBy or {}
+  local function meanOf(kind)
+    local t, n = 0, 0
+    for e = 0, 3 do
+      for k, v in pairs(by[e] or {}) do
+        if (kind == nil or k:sub(1, #kind + 1) == kind .. ":") and v > 0 then t, n = t + v, n + 1 end
+      end
+    end
+    return n > 0 and t // n or nil
+  end
+  local meanPer = meanOf(nil)
+  if meanPer == nil then return nil, "no hit measured yet" end
+  local function perOf(e, kind, key)
+    local v = (by[e] or {})[kind .. ":" .. tostring(key)]
+    if v and v > 0 then return v end
+    return meanOf(kind) or meanPer
+  end
+  st.perOf = perOf
+  st.raceHitBy = by
+  st.runicSlot = function(id) return self:runicSlot(id) end
+  st.delayOf = function(plan) return self:raceDelay(actor, plan) end
+  -- Freeze the executable plan before estimating it. The actual target,
+  -- affordable boost and MP price are part of the action, not steering
+  -- decisions to be changed after the comparison.
+  st.lineOf = function(e, input)
+    if input == nil then return nil end
+    if input.kind ~= "fight" and input.kind ~= "skill" then return nil end
+    if input.kind == "skill" and self.parkDropN >= 3 then return nil end
+    local plan = {}
+    for k, v in pairs(input) do plan[k] = v end
+    local b = plan.boostLeft or 0
+    plan.aim = plan.aim or (plan.kind == "fight" and self:chipAim(e, b)) or st.focus[1] or slot
+    local aoe = false
+    if plan.kind == "fight" then
+      local _, off = handsOf(e)
+      local mainHits, offHits = M.fightHits(off ~= nil and 2 or 1, b)
+      plan.hits = mainHits + offHits
+    elseif plan.kind == "skill" then
+      if plan.cmd ~= BATTLE.CMD_TOOLS and (plan.cmd ~= BATTLE.CMD_BLITZ or plan.skill ~= BATTLE.PUMMEL) then
+        return nil -- this verb needs its own effect/price record
+      end
+      local paid, mp = M.kitBoost(e, plan.skill, b)
+      if paid ~= b then return nil end
+      plan.mp = mp
+      plan.hits = plan.cmd == BATTLE.CMD_TOOLS and (BATTLE.TOOL_HITS[plan.skill] or 1) or 2
+      aoe = plan.cmd == BATTLE.CMD_TOOLS
+        and (plan.skill == BATTLE.AUTOCROSSBOW or plan.skill == M.BIO_BLASTER)
+    end
+    local effects = {}
+    for s = 0, 5 do if monAlive(s) then
+      local chips = plan.kind == "fight" and fightChips(e, s, b)
+        or (plan.cmd == BATTLE.CMD_TOOLS and toolChips(s, plan.skill) or 2 * hitChips(s, 0x04, 0))
+      effects[s] = { chips = chips, hit = plan.kind == "fight"
+        and M.hitChance(M.readByte(0x3B7C + e * 2), M.readByte(0x3B55 + 8 + s * 2)) or 1 }
+    end end
+    local delay, bounds = self:raceDelay(e, plan)
+    return M.raceLine(plan, perOf(e, plan.kind, plan.skill), {
+      chips = (effects[plan.aim] or {}).chips, hit = (effects[plan.aim] or {}).hit,
+      byTarget = effects, aoe = aoe, cost = (plan.mp or 0) * (M.shopRates().mp or 0),
+      delay = delay, delayBounds = bounds, latencyKnown = delay ~= nil })
+  end
+  for e = 0, 3 do
+    local maxhp = R.maxOf(e)
+    if maxhp > 0 and maxhp ~= 0xFFFF and M.readByte(BATTLE.BCHID + e * 2) ~= 0xFF then
+      local const = M.readWord(BATTLE.ATB_CONST + e * 2)
+      local period = (const > 0 and const ~= 0xFFFF) and math.ceil(0xFF00 / const) or 600
+      local eta = etaOf(e * 2) or period
+      if e == actor then eta = 0 end
+      local lines, actions = {}, {}
+      for b = 0, 3 do
+        local l, offered = R.bestLine(e, slot, b)
+        if l then
+          lines[b] = st.lineOf(e, l)
+        end
+        for _, p in ipairs(offered or (l and { l } or {})) do
+          local line = st.lineOf(e, p)
+          if line and (self.opts.boost or line.boost == 0) then actions[#actions + 1] = line end
+        end
+      end
+      local heals = {}
+      local noCare = status1Has(e, M.ST1_PETRIFY) or doomLast(e, actor) == "last"
+      if R.hpNow[e] > 0 and not noCare and self.opts.items then
+        for _, h in ipairs(self:bagHeals(e, R.hpNow[e])) do
+          -- a sold item at its price, dearer near the reserve; an unsold one
+          -- at bagHeals' own gil (its effect at the shops' rates, already
+          -- scarce-priced: M.itemGil)
+          local cost = h.unsold and (h.gil or M.PRICELESS)
+            or M.raceItemCost(M.itemPrice(h.id), h.count, (M.CARE_RESERVE or {})[h.id] or 0)
+          heals[#heals + 1] = { restore = h.restore or 0, cost = cost, id = h.id, n = h.count }
+          heals[#heals].delay, heals[#heals].delayBounds = self:raceDelay(e, { kind = "item", item = h.id })
+          heals[#heals].latencyKnown = heals[#heals].delay ~= nil
+        end
+      end
+      -- this member's own cures, for the continuation: each known cure at
+      -- its measured (else the ROM's least) restore, as many casts as the
+      -- MP pays for, priced at the shops' MP rate
+      if self.opts.cure ~= false and cmdRow(e, BATTLE.CMD_MAGIC) and R.hpNow[e] > 0 and not noCare then
+        local mpNow = M.readWord(BATTLE.CURMP + e * 2)
+        for _, spell in ipairs(type(self.opts.cure) == "table" and self.opts.cure or BATTLE.CURES) do
+          local cell, mp = spellCell(e, spell, true)
+          if cell ~= nil and (mp or 0) > 0 and mpNow >= mp and self:runicSlot(spell) == nil then
+            local gain = self:castRestoreOf(spell, e, e)
+            if gain and gain > 0 then
+              heals[#heals + 1] = { restore = gain, cost = mp * (M.shopRates().mp or 0), spell = spell,
+                                    mp = mp, n = mpNow // mp, cast = true }
+              heals[#heals].delay, heals[#heals].delayBounds = self:raceDelay(e, { kind = "heal", spell = spell })
+              heals[#heals].latencyKnown = heals[#heals].delay ~= nil
+            end
+          end
+        end
+      end
+      st.party[e] = { hp = R.hpNow[e], maxhp = maxhp, eta = eta, period = period,
+        bp = M.readByte(BATTLE.BP + e * 2), lines = lines, actions = actions, heals = heals, noCare = noCare,
+        mp = M.readWord(BATTLE.CURMP + e * 2),
+        deathCost = M.deathGil(maxhp) }
+      local row = cmdRow(e, BATTLE.CMD_FIGHT)
+      if row then st.party[e].fallback = st.lineOf(e, { kind = "fight", row = row, boostLeft = 0 }) end
+    end
+  end
+  if st.party[actor] == nil then return nil, "the actor is not seated" end
+  -- the aftermath's HP rate: the cheapest way the field restores HP after
+  -- the fight -- a cure cast's MP at the shops' MP rate when someone casts
+  -- one, else the shops' HP rate -- so a cure now that the field would
+  -- cast anyway saves no gil (the WoR's CELES cast Cure in place of a Fight
+  -- on a 300-gil aftermath that her own field Cure pays for in MP)
+  for _, p in pairs(st.party) do
+    for _, h in ipairs(p.heals or {}) do
+      if h.cast and (h.restore or 0) > 0 then
+        local r = (h.cost or 0) / h.restore
+        if r < st.hpRate then st.hpRate = r end
+      end
+    end
+  end
+  for s = 0, 5 do
+    if monAlive(s) then
+      local mconst = M.readWord(BATTLE.ATB_CONST + 8 + s * 2)
+      local entity = 4 + s
+      local speed = M.readByte(0x3ADD + entity * 2)
+      local duration, durationBounds = M.raceBreakDuration(speed)
+      local brokenLeft = M.raceBreakClock(M.readByte(BATTLE.BRK_TICKS + s * 2),
+        M.readByte(0x3ADC + entity * 2), speed, entity, M.readByte(0x3A91) % 16)
+      local en = { hp = M.readWord(BATTLE.MON_HP + s * 2),
+        shMax = M.readByte(BATTLE.SH_MAX + s * 2),
+        brokenLeft = brokenLeft, breakDuration = duration, breakDurationBounds = durationBounds,
+        sh = M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0 and 0 or M.readByte(BATTLE.SH_CUR + s * 2),
+        eta = etaOf(8 + s * 2) or 600, period = mconst > 0 and math.ceil(0xFF00 / mconst) or 600,
+        act = { aoe = false, dmg = {}, worst = {} } }
+      -- the share of its actions that landed, and whether a landing hits
+      -- more than one member (from M.RACE_TYPICAL_MIN of them); aimed at
+      -- random among the living
+      local L = self.hitLedger[s]
+      if L and (L.actN or 0) >= M.RACE_TYPICAL_MIN then
+        en.act.hit = math.min(1, (L.landN or 0) / L.actN)
+      end
+      if L and (L.landN or 0) >= M.RACE_TYPICAL_MIN then
+        en.act.aoe = (L.multiN or 0) * 2 > L.landN
+      end
+      st.enemies[s] = en
+    end
+  end
+  local parts = self.parts
+  for e, p in pairs(st.party) do
+    local _, enemies, fallback = self:roundEnemies(e, false)
+    for _, en in ipairs(enemies or {}) do
+      local E = st.enemies[en.slot]
+      if E then
+        -- typical: the median of what this slot has landed on e (else
+        -- on anyone), from M.RACE_TYPICAL_MIN landings; short of that,
+        -- the worst it has landed (else the script's worst, the fallback)
+        local worst = en.worst or en.rom or fallback or 0
+        local L = self.hitLedger[en.slot]
+        local typ = nil
+        -- short of M.RACE_TYPICAL_MIN landings: its landings' median once
+        -- it has any, before that the mean of what its script names (the
+        -- ROM), else its worst
+        local _, _, romMean = self:scriptWorst(en.slot, e)
+        if L and L.landOn and (L.landN or 0) >= M.RACE_TYPICAL_MIN then
+          local v = L.landOn[e]
+          if v == nil or #v == 0 then
+            v = {}
+            for _, l in pairs(L.landOn) do for _, x in ipairs(l) do v[#v + 1] = x end end
+          end
+          if #v > 0 then
+            local c = {}
+            for i, x in ipairs(v) do c[i] = x end
+            table.sort(c)
+            typ = c[(#c + 1) // 2]
+          end
+        end
+        if typ == nil and L and L.landOn and L.landOn[e] and #L.landOn[e] > 0 then
+          local c = {}
+          for i, x in ipairs(L.landOn[e]) do c[i] = x end
+          table.sort(c)
+          typ = c[(#c + 1) // 2]
+        end
+        if typ == nil and (L == nil or (L.landN or 0) == 0) then typ = romMean end
+        E.act.dmg[e] = typ or worst
+        E.act.worst[e] = math.max(worst, typ or 0)
+        E.typed = E.typed or (typ ~= nil)
+      end
+    end
+  end
+  if parts and parts.body ~= nil and st.enemies[parts.body] then st.enemies[parts.body].ends = true end
+  -- the bodies whose last stand removes the hitter (a Sneeze), as the
+  -- driver's own last-stand read has them
+  if self.lastStand and self.lastStand.entries then
+    for slot, en in pairs(self.lastStand.entries) do
+      -- the rules' own kill order plays a removal stand (M.RACE_DEFER_STAND):
+      -- the race read it as the Sneeze it is, but held its boosts so long
+      -- that the WoR from Tzen ran 147,344 ticks on its shared keys to the
+      -- rules' 117,523 at 62cb732f (12 shifts)
+      if en.class == "removal" and st.enemies[slot] and monAlive(slot) and M.RACE_DEFER_STAND then
+        return nil, "a last-stand removal stands (the rules' kill order plays it)"
+      end
+      if en.class == "removal" and st.enemies[slot] then
+        st.enemies[slot].stand = { n = en.n or 1, guarded = en.gate and en.gate.guarded,
+                                   deathOnly = en.gate and en.gate.deathOnly }
+      end
+    end
+  end
+  return st
+end
+
+-- the candidates: the attack lines at each boost the bank holds, a heal from
+-- the bag on each hurt member, a Fenix Down on each fallen one
+local function raceDelayKey(actor, kind, id, boost)
+  return table.concat({ actor, kind, id or 0, boost or 0 }, ":")
+end
+
+function Driver:raceObserve(e)
+  if self.raceTimeActive then self:raceTimeEvent(e) end
+  local key = raceDelayKey(e.actor, e.kind, e.requested, e.boost)
+  if e.event == "hp_effect" then
+    if e.time_unit ~= "atb_updates" then return end
+    self.raceEffectOpen = self.raceEffectOpen or {}
+    local q = self.raceEffectOpen[e.id] or { first = e.elapsed_atb_ticks, first_frames = e.elapsed_frames, key = key }
+    q.last, q.last_frames = e.elapsed_atb_ticks, e.elapsed_frames
+    self.raceEffectOpen[e.id] = q
+    return
+  end
+  if e.event == "unresolved" then
+    if self.raceEffectOpen then self.raceEffectOpen[e.id] = nil end
+    return -- censored commands cannot supply a completed-volley sample
+  end
+  if e.event ~= "resolve" then return end
+  self.raceLatency = self.raceLatency or {}
+  local samples = self.raceLatency[key] or {}
+  samples[#samples + 1] = e.elapsed_frames
+  while #samples > M.RACE_HIT_KEEP do table.remove(samples, 1) end
+  self.raceLatency[key] = samples
+  self.raceTiming = self.raceTiming or {}
+  self.raceTiming[key] = { navigation = e.navigation_frames, queue = e.queue_frames,
+    execution = e.execution_frames, finished = e.elapsed_frames,
+    navigation_ticks = e.navigation_atb_ticks, queue_ticks = e.queue_atb_ticks, execution_ticks = e.execution_atb_ticks }
+  local q = self.raceEffectOpen and self.raceEffectOpen[e.id]
+  if q then
+    self.raceEffectLatency = self.raceEffectLatency or {}
+    local effects = self.raceEffectLatency[key] or {}
+    effects[#effects + 1] = q
+    while #effects > M.RACE_HIT_KEEP do table.remove(effects, 1) end
+    self.raceEffectLatency[key], self.raceEffectOpen[e.id] = effects, nil
+  end
+end
+
+-- Bounds are experience-based timing estimates, not confidence intervals.
+-- Aggregate hits at the last effect; sensitivity compares the first effect
+-- too, with one controller pulse of slack on either side of observed extrema.
+function Driver:raceDelay(actor, plan)
+  local key = raceDelayKey(actor, plan.kind, plan.spell or plan.item or plan.skill or plan.lore,
+    plan.boostLeft)
+  local samples = (self.raceEffectLatency or {})[key]
+  if samples == nil or #samples == 0 then
+    if self.opts.raceTimingGuesses == false then return nil end
+    if plan.kind ~= "fight" and plan.kind ~= "skill" and plan.kind ~= "item" and plan.kind ~= "heal" then return nil end
+    -- Controller pulses are 30 frames. Base walks are two pulses for
+    -- Fight, four for a list; an item adds its observed cursor distance.
+    -- Queue/animation uncertainty uses accepted lifecycle observations
+    -- where available, otherwise a declared coarse 0..900-frame range.
+    local pulses = plan.kind == "fight" and 2 or 4
+    if plan.kind == "item" then
+      local idx = self:battInvIdx(plan.item)
+      if idx == nil then return nil end
+      local cursor = M.readByte(BATTLE.ITEMSCR + actor) + M.readByte(BATTLE.ITEMROW + actor)
+      pulses = pulses + math.abs(idx - cursor)
+    end
+    local queue, execution = 900, 900
+    for k, timing in pairs(self.raceTiming or {}) do
+      if k:sub(1, #(actor .. ":" .. plan.kind .. ":")) == actor .. ":" .. plan.kind .. ":" then
+        queue = math.max(queue, (timing.queue_ticks or 0) * 2)
+        execution = math.max(execution, (timing.execution_ticks or 0) * 2)
+      end
+    end
+    local lo = math.max(15, (pulses - 1) * 15)
+    local hi = (pulses + 1) * 15 + (queue + execution) // 2
+    return pulses * 15 + (queue + execution) // 4,
+      { lo = lo, hi = hi, n = 0, source = "coarse controller pulses + observed lifecycle envelope (minimum 900 queue/900 execution)" }
+  end
+  local last, lo, hi = {}, math.huge, 0
+  for _, q in ipairs(samples) do
+    last[#last + 1] = q.last
+    lo, hi = math.min(lo, q.first), math.max(hi, q.last)
+  end
+  return M.median(last), { lo = math.max(0, lo - 15), hi = hi + 15,
+    n = #samples, source = "attributed HP effects in ATB-update ticks; 15-tick pulse slack" }
+end
+
+function Driver:raceCandidates(actor, st)
+  local c = {}
+  local seen = {}
+  local a = st.party[actor]
+  local function offer(line, b)
+    if line then
+      local action = M.raceAttack(line, b)
+      if action.boost > a.bp or (not self.opts.boost and action.boost > 0) then return end
+      local p = line.plan
+      local key = p and table.concat({ p.kind, p.cmd or -1, p.skill or -1, action.boost, action.target or -1 }, ":")
+      if key == nil or not seen[key] then
+        c[#c + 1] = action
+        if key then seen[key] = true end
+      end
+    end
+  end
+  if a.actions then
+    for _, line in ipairs(a.actions) do offer(line, line.boost) end
+  else
+    for b = 0, self.opts.boost and math.min(a.bp, 3) or 0 do offer(a.lines[b], b) end
+  end
+  for e, p in pairs(st.party) do
+    -- a ZOMBIE takes neither a heal (it is damage) nor a Fenix Down (it
+    -- never lands, #245): battle_zombieraise caught the race throwing one
+    local zombie = (M.readByte(BATTLE.ST1 + e * 2) & 0x02) ~= 0
+    if zombie or (M.leftMask() >> e) & 1 == 1 or p.noCare
+       or status1Has(e, M.ST1_PETRIFY) then
+      -- nothing to offer on this member
+    elseif p.hp > 0 and p.hp < p.maxhp and not (st.pendingHeal or {})[e] then
+      for _, h in ipairs(p.heals or {}) do
+        if not h.cast and st.careItems then
+          c[#c + 1] = { kind = "heal", target = e, restore = h.restore, cost = h.cost, id = h.id,
+            what = string.format("item $%02X on entity %d", h.id, e) }
+        end
+      end
+      for _, h in ipairs(a.heals or {}) do
+        if h.cast and st.careCasts then
+          c[#c + 1] = { kind = "heal", target = e, restore = h.restore, cost = h.cost, spell = h.spell,
+            mp = h.mp,
+            what = string.format("cast $%02X on entity %d", h.spell, e) }
+        end
+      end
+    elseif p.hp == 0 and not (st.pendingRaise or {})[e] and st.careItems and self:battInvIdx(BATTLE.FENIX_DOWN) then
+      local count = 0
+      for i = 0, 251 do
+        if M.readByte(BATTLE.BATTINV + i * 5) == BATTLE.FENIX_DOWN then count = count + M.readByte(BATTLE.BATTINV + i * 5 + 3) end
+      end
+      c[#c + 1] = { kind = "raise", target = e, hp = (p.maxhp * M.itemPower(BATTLE.FENIX_DOWN)) >> 4,
+        id = BATTLE.FENIX_DOWN,
+        cost = M.raceItemCost(M.itemPrice(BATTLE.FENIX_DOWN), count, M.RACE_RAISE_RESERVE),
+        what = string.format("Fenix Down on entity %d", e) }
+    end
+  end
+  -- The same actual plan shape used by the controller supplies care's
+  -- delay, too. Unknown latency is explicit and cannot override the rules.
+  for _, action in ipairs(c) do
+    if action.kind ~= "attack" and st.delayOf then
+      local plan = { kind = action.spell and "heal" or "item", spell = action.spell,
+        item = action.id }
+      action.delay, action.delayBounds = st.delayOf(plan)
+      action.latencyKnown = action.delay ~= nil
+    end
+  end
+  return c
+end
+
+-- the rules' plan as a race candidate (nil when the race does not model it)
+local function raceOfPlan(st, actor, plan)
+  if plan == nil then return nil end
+  local a = st.party[actor]
+  if (plan.kind == "magic" or plan.kind == "summon") and not plan.ally and st.perOf then
+    -- No free surrogate for a real cast. Its folded tier, price, targeting
+    -- and once-per-battle summon latch need a canonical record first.
+    return nil
+  end
+  if plan.kind == "fight" or plan.kind == "skill" then
+    if plan.ally then return nil end
+    local line = st.lineOf and st.lineOf(actor, plan)
+    return line and M.raceAttack(line, plan.boostLeft or 0) or nil
+  end
+  if (plan.kind == "item" or plan.kind == "heal") and plan.target ~= nil and not plan.all then
+    if plan.item == BATTLE.FENIX_DOWN then
+      local p = st.party[plan.target]
+      return p and { kind = "raise", target = plan.target, hp = (p.maxhp * M.itemPower(BATTLE.FENIX_DOWN)) >> 4,
+        id = BATTLE.FENIX_DOWN,
+        cost = M.raceItemCost(M.itemPrice(BATTLE.FENIX_DOWN),
+          (st.bag or {})[BATTLE.FENIX_DOWN] or 0, M.RACE_RAISE_RESERVE), what = "rules: raise" } or nil
+    end
+    if plan.restore then
+      -- priced as the race prices the same item on the same member
+      local cost = plan.item and M.itemPrice(plan.item) or 0
+      for _, h in ipairs((st.party[plan.target] or {}).heals or {}) do
+        if plan.item and h.id == plan.item then cost = h.cost end
+      end
+      for _, h in ipairs((st.party[actor] or {}).heals or {}) do
+        if plan.spell and h.spell == plan.spell then cost = h.cost end
+      end
+      if plan.spell and st.runicSlot and st.runicSlot(plan.spell) ~= nil then
+        return { kind = "heal", target = plan.target, restore = 0, cost = cost,
+                 what = "rules: " .. plan.kind .. " (into an enemy Runic)" }
+      end
+      return { kind = "heal", target = plan.target, restore = plan.restore,
+        id = plan.item, mp = plan.spell and select(2, spellCell(actor, plan.spell, true)) or 0,
+        cost = cost, what = "rules: " .. plan.kind }
+    end
+  end
+  return nil
+end
+
+local function raceDesc(c, r)
+  return string.format("%s [%s%.2f down%s, wipe %.2f, %s, left %d, cost %d]", c.what or c.kind,
+    r.wipe and "worst case WIPES, " or "", r.deaths, r.firstDeath and ("@" .. math.floor(r.firstDeath)) or "",
+    r.pWipe or 0, r.kill and ("ends @" .. math.floor(r.kill)) or "not over", math.floor(r.left), math.floor(r.cost))
+end
+
+function Driver:raceLog(actor, plan, R)
+  local st, why = self:raceState(actor, R)
+  if st == nil then
+    M.raceTally.skipped = M.raceTally.skipped + 1
+    if self.raceSkipSaid ~= why then
+      self.raceSkipSaid = why
+      M.log(string.format("[%s] [race] actor=%d not raced: %s", self.tag or "fight", actor, why))
+    end
+    return
+  end
+  local cands = self:raceCandidates(actor, st)
+  local rc = raceOfPlan(st, actor, plan)
+  if rc == nil then
+    M.raceTally.unmodelled = M.raceTally.unmodelled + 1
+    return -- do not compare alternatives with an invented rules action
+  end
+  if st.delayOf then rc.delay, rc.delayBounds = st.delayOf(plan) end
+  rc.latencyKnown = rc.delay ~= nil
+  if not rc.latencyKnown then
+    M.raceTally.skipped = M.raceTally.skipped + 1
+    return -- observe this real command before assigning it a measured delay
+  end
+  for j = #cands, 1, -1 do
+    if cands[j].latencyKnown == false then table.remove(cands, j) end
+  end
+  local ri = nil
+  if rc then cands[#cands + 1] = rc; ri = #cands end
+  if #cands == 0 then return end
+  local i, best, all = M.raceChoose(st, cands)
+  if best.invalid or best.pending or (ri and (all[ri].invalid or all[ri].pending)) then
+    M.raceTally.skipped = M.raceTally.skipped + 1
+    return -- the event bound did not evaluate this executable comparison
+  end
+  self.raceN = (self.raceN or 0) + 1
+  local agree
+  if ri == nil then agree = "rules plan not modelled (" .. tostring(plan and plan.kind) .. ")"
+  elseif i == ri or not M.raceBetter(best, all[ri], st) then agree = "agree"
+  else agree = "DISAGREE" end
+  do
+    local T = M.raceTally
+    T.raced = T.raced + 1
+    if ri == nil then T.unmodelled = T.unmodelled + 1
+    elseif agree == "agree" then T.agree = T.agree + 1
+    else T.disagree = T.disagree + 1 end
+  end
+  M.log(string.format("[%s] [race] actor=%d %s: race %s%s; %d candidate(s)", self.tag or "fight", actor, agree,
+    raceDesc(cands[i], best), ri and (" | rules " .. raceDesc(cands[ri], all[ri])) or "", #cands))
+  self._racePred = { st = st, race = all[i], rules = ri and all[ri] or nil,
+    raceCandidate = cands[i], rulesCandidate = rc }
+  self.raceLast = { actor = actor, frame = M.frame, agree = agree, race = cands[i].what or cands[i].kind }
+  if agree == "DISAGREE" then
+    local ok, rp = pcall(self.racePlan, self, actor, cands[i])
+    if ok then self.raceLast.plan = rp end
+  end
+  -- the state behind a prediction of a death (calibration, #415), or
+  -- behind every disagreement under the lab lever M.RACE_STATE_LOG
+  if (best.deaths or 0) >= 0.5 or (ri and (all[ri].deaths or 0) >= 0.5)
+     or (M.RACE_STATE_LOG and agree == "DISAGREE") then
+    local t = { string.format("bankAt %d", st.bankAt or 0) }
+    for k, p in pairs(st.party) do
+      local ls = {}
+      for b = 0, 3 do
+        local ln = p.lines[b]
+        if ln then ls[#ls + 1] = string.format("b%d %dx%d c%d h%.2f", b, math.floor(ln.per), ln.hits or 1,
+          ln.chips or 0, ln.hit or 1) end
+      end
+      t[#t + 1] = string.format("e%d %d/%d bp %d eta %d period %d [%s] heals %d", k, p.hp, p.maxhp, p.bp or 0,
+        math.floor(p.eta), math.floor(p.period), table.concat(ls, ", "), #p.heals)
+    end
+    for k, e in pairs(st.enemies) do
+      local d, w = {}, {}
+      for m, v in pairs(e.act.dmg) do d[#d + 1] = string.format("%d:%d", m, math.floor(v)) end
+      for m, v in pairs(e.act.worst or {}) do w[#w + 1] = string.format("%d:%d", m, math.floor(v)) end
+      t[#t + 1] = string.format("s%d hp %d sh %d eta %d period %d%s hit %.2f%s typical {%s} worst {%s}", k, e.hp,
+        e.sh, math.floor(e.eta), math.floor(e.period), e.ends and " ends" or "", e.act.hit or 1,
+        e.act.aoe and " area" or "", table.concat(d, " "), table.concat(w, " "))
+    end
+    M.log(string.format("[%s] [race] actor=%d state: %s", self.tag or "fight", actor, table.concat(t, "; ")))
+  end
+  if agree == "DISAGREE" then
+    local safe, why = M.raceRobustBetter(st,cands[i],rc)
+    M.log(string.format("[%s] [race] timing sensitivity: %s (%s); race delay %d..%d, rules %d..%d",
+      self.tag or "fight", safe and "eligible" or "keep rules", why,
+      (cands[i].delayBounds or {}).lo or cands[i].delay or 0,
+      (cands[i].delayBounds or {}).hi or cands[i].delay or 0,
+      (rc.delayBounds or {}).lo or rc.delay or 0,(rc.delayBounds or {}).hi or rc.delay or 0))
+    if safe then return cands[i] end
+  end
+end
+
+-- Both alternatives use one original timetable budget. These estimates do
+-- not feed raceChoose, the acting gate, or the legacy calibration.
+function M.raceTimePair(st, race, rules)
+  if not race or not rules then return nil,"missing-candidate" end
+  local budget=M.raceTimeBudget(st)
+  if not budget then return nil,"unbounded-timetable" end
+  local ss={};for k,v in pairs(st) do ss[k]=v end
+  ss.timeHorizon=budget
+  local a,b=M.raceEval(ss,race),M.raceEval(ss,rules)
+  if a.invalid or b.invalid then return nil,"unsupported-prediction" end
+  if a.pending or b.pending then return nil,"pending-prediction" end
+  return {budget=budget,race=a,rules=b}
+end
+
+-- One coherent read supplies the tick, identity, HP and status endpoint.
+-- All added RAM reads are opt-in; statuses are observations, not predictions.
+function M.raceTimeSample()
+  local r={sample_frame=M.frame,sample_tick=M.readWord(0x3A3E),party={}}
+  local left=M.readByte(0x3A39)
+  for e=0,3 do
+    r.party[e]={char=M.readByte(BATTLE.BCHID+e*2),hp=M.readWord(0x3BF4+e*2),
+      maxhp=M.readWord(0x3C1C+e*2),st1=M.readByte(BATTLE.ST1+e*2),
+      st2=M.readByte(BATTLE.ST2+e*2),st3=M.readByte(0x3EF8+e*2),
+      st4=M.readByte(0x3EF9+e*2),left=((left>>e)&1)==1}
+  end
+  return r
+end
+
+function Driver:raceTimePush(actor,rp,which,plan)
+  if not M.RACE_TIME_DIAGNOSTIC then return end
+  local pair,why=M.raceTimePair(rp.st,rp.raceCandidate,rp.rulesCandidate)
+  if not pair then
+    M.log(string.format("[%s] [race-time] declined %s",self.tag or "fight",why))
+    return
+  end
+  local sample=M.raceTimeSample()
+  local c={actor=actor,selected=which,prediction=pair,plan=plan,initial={},history={},unknown={},
+    frame=sample.sample_frame,start_tick=sample.sample_tick,clock=M.newRaceTimeObservation(sample.sample_tick,pair.budget),
+    lifecycle={stage="selected"},scope="selected-policy",calibration=false,units0=self.monActN or 0}
+  for e in pairs(rp.st.party) do
+    local m=sample.party[e];c.initial[e]={}
+    for k,v in pairs(m) do c.initial[e][k]=v end
+  end
+  self.raceTimeActive=self.raceTimeActive or {}
+  self.raceTimeActive[#self.raceTimeActive+1]=c
+  self:raceTimeTick(sample,false,"selection")
+end
+
+-- Bind to the trace created for this exact selected plan, never the next
+-- action by the same actor. Acceptance and resolution remain separate facts.
+-- Resolution has no emitter "valid" flag: compare the strict queue/context
+-- identity carried by production start and resolve events instead.
+function Driver:raceTimeBind(actor,plan)
+  local p=self.recovery and self.recovery.pending[actor]
+  for i=#(self.raceTimeActive or {}),1,-1 do
+    local c=self.raceTimeActive[i]
+    if c.actor==actor and c.plan==plan and c.frame==M.frame and c.lifecycle.id==nil and p then
+      c.lifecycle.id=p.id;c.lifecycle.stage="plan"
+      break
+    end
+  end
+end
+function Driver:raceTimeEvent(e)
+  for _,c in ipairs(self.raceTimeActive or {}) do
+    if c.lifecycle.id~=nil and c.lifecycle.id==e.id and c.actor==e.actor then
+      local L=c.lifecycle
+      L.stage=e.event
+      if e.event=="submit" then
+        L.accepted=true;L.acceptedCommand=e.command
+      end
+      if e.event=="start" then
+        L.started=true;L.start={}
+        L.strictStart=L.accepted and e.command==L.acceptedCommand and e.counter==false
+        for _,key in ipairs({"context_id","queue_index","queue_generation","command","attack","queued_command","queued_attack","targets"}) do
+          L.start[key]=e[key]
+          if e[key]==nil then L.strictStart=false end
+        end
+        if e.queued_command~=e.command then L.strictStart=false end
+      end
+      if e.event=="resolve" then
+        L.resolved=true;L.valid=L.strictStart==true
+        for _,key in ipairs({"context_id","queue_index","queue_generation","command","attack","queued_command","queued_attack","targets"}) do
+          if not L.start or e[key]==nil or e[key]~=L.start[key] then L.valid=false end
+        end
+      end
+      if e.event=="drop" or e.event=="unresolved" then L.canceled=e.reason or e.event end
+    end
+  end
+end
+
+function Driver:raceTimeTick(sample,ended,source)
+  for i=#(self.raceTimeActive or {}),1,-1 do
+    local c=self.raceTimeActive[i]
+    local down,near,removed,n=0,0,0,0
+    local observation={frame=sample.sample_frame,tick=sample.sample_tick,source=source,party={}}
+    for e,initial in pairs(c.initial) do
+      local m=sample.party[e];n=n+1
+      if not m or m.char~=initial.char then c.unknown["identity-changed"]=true
+      else
+        local copy={};for k,v in pairs(m) do copy[k]=v end;observation.party[e]=copy
+        if m.left then removed=removed+1 end
+        if m.left~=initial.left then c.unknown["removal-changed"]=true end
+        if m.hp==0 or m.hp==0xFFFF then down=down+1
+        elseif m.hp <= (m.maxhp>>3) then near=near+1 end
+        if m.st1~=initial.st1 or m.st2~=initial.st2 or m.st3~=initial.st3
+          or m.st4~=initial.st4 then c.unknown["status-changed"]=true end
+      end
+    end
+    local changed=#c.history==0
+    local old=c.history[#c.history]
+    if old then
+      for e in pairs(c.initial) do
+        local a,b=old.party[e],observation.party[e]
+        if (a==nil)~=(b==nil) then changed=true
+        elseif a and b then for k,v in pairs(b) do if a[k]~=v then changed=true end end end
+      end
+    end
+    local terminal=c.clock.observe(sample.sample_tick,ended)
+    if changed or ended or terminal then
+      c.history[#c.history+1]=observation
+      for e,initial in pairs(c.initial) do
+        local m=observation.party[e]
+        if m then
+          M.log(string.format("[%s] [race-time-state] actor=%d selection_frame=%d sample_frame=%d tick=%d source=%s entity=%d char=%d hp=%d maxhp=%d status1=%02X status2=%02X status3=%02X status4=%02X left=%s",
+            self.tag or "fight",c.actor,c.frame,observation.frame,observation.tick,source,e,m.char,m.hp,m.maxhp,m.st1,m.st2,m.st3,m.st4,tostring(m.left)))
+        else
+          M.log(string.format("[%s] [race-time-state] actor=%d selection_frame=%d sample_frame=%d tick=%d source=%s entity=%d original_char=%d identity=unknown",
+            self.tag or "fight",c.actor,c.frame,observation.frame,observation.tick,source,e,initial.char))
+        end
+      end
+    end
+    if terminal then
+      local r={};for k,v in pairs(terminal) do r[k]=v end
+      r.source=source;r.frame=sample.sample_frame;r.tick=sample.sample_tick
+      r.actor=c.actor;r.selection_frame=c.frame;r.start_tick=c.start_tick
+      r.actualDown=down;r.actualNearFatal=near;r.actualRemoved=removed;r.members=n
+      r.closedLedgerUnits=(self.monActN or 0)-c.units0
+      r.endpoint=observation
+      r.prediction=c.prediction;r.selected=c.selected;r.scope=c.scope;r.calibration=false
+      r.lifecycle={};for k,v in pairs(c.lifecycle) do r.lifecycle[k]=v end
+      r.history=c.history;r.initial=c.initial
+      r.censorReasons={}
+      local function censor(reason) r.censored=true;r.censorReasons[#r.censorReasons+1]=reason end
+      if r.censored then censor(r.reason) end
+      if source=="last-watch" then censor("missing-end-snapshot") end
+      for _,reason in ipairs({"identity-changed","status-changed","removal-changed"}) do
+        if c.unknown[reason] then censor(reason) end
+      end
+      r.identityKnown=not c.unknown["identity-changed"]
+      if c.lifecycle.canceled then censor("first-action-canceled")
+      elseif not c.lifecycle.resolved or c.lifecycle.valid~=true then censor("first-action-unverified") end
+      if not c.prediction.race.timeCutoff or not c.prediction.rules.timeCutoff
+        or (c.prediction.race.earlySamples or 0)>0 or (c.prediction.rules.earlySamples or 0)>0 then
+        censor("prediction-terminated")
+      end
+      self.raceTimeRecords=self.raceTimeRecords or {};self.raceTimeRecords[#self.raceTimeRecords+1]=r
+      M.log(string.format("[%s] [race-time] actor=%d selection_frame=%d start_tick=%d trace_id=%s selected=%s scope=selected-policy calibration=false f%d tick%d source=%s elapsed=%d budget=%d overshoot=%d reason=%s censored=%s (%s) first=%s accepted=%s resolved=%s first_valid=%s context_id=%s queue_index=%s queue_generation=%s identity-known=%s actual-down=%d near-fatal=%d removed=%d closed-ledger-units=%d | race down=%.2f near-fatal=%.2f rules down=%.2f near-fatal=%.2f endpoint=worst-case counts=%s race-opportunities=%.2f race-skips=%.2f race-unsuppressed=%.2f rules-opportunities=%.2f rules-skips=%.2f rules-unsuppressed=%.2f",
+        self.tag or "fight",r.actor,r.selection_frame,r.start_tick,tostring(r.lifecycle.id),r.selected,r.frame,r.tick,r.source,r.elapsed,r.budget,r.overshoot or 0,r.reason,
+        tostring(r.censored),table.concat(r.censorReasons,","),r.lifecycle.stage,tostring(r.lifecycle.accepted==true),
+        tostring(r.lifecycle.resolved==true),tostring(r.lifecycle.valid==true),
+        tostring(r.lifecycle.start and r.lifecycle.start.context_id),
+        tostring(r.lifecycle.start and r.lifecycle.start.queue_index),
+        tostring(r.lifecycle.start and r.lifecycle.start.queue_generation),tostring(r.identityKnown),down,near,removed,r.closedLedgerUnits,
+        r.prediction.race.actualDown or 0,r.prediction.race.nearFatal or 0,
+        r.prediction.rules.actualDown or 0,r.prediction.rules.nearFatal or 0,r.prediction.race.countSource,
+        r.prediction.race.opportunities or 0,r.prediction.race.breakSkips or 0,r.prediction.race.unsuppressedTurns or 0,
+        r.prediction.rules.opportunities or 0,r.prediction.rules.breakSkips or 0,r.prediction.rules.unsuppressedTurns or 0))
+      table.remove(self.raceTimeActive,i)
+    end
+  end
+end
+
+-- Calibration (#415): the prediction for the plan that was played (its
+-- samples' mean deaths and wipe share, the worst case's wipe and deaths)
+-- against completed enemy actions, or to the fight's end. This legacy
+-- comparison is not a matched horizon: the model counts opportunities
+-- (including broken turns), the observer counts completed actions. An
+-- elapsed-ATB shadow window must be wired before claiming calibration.
+function Driver:raceCalPush(actor, pred, st, which)
+  if pred == nil then return end
+  local alive = {}
+  for e, p in pairs(st.party) do alive[e] = p.hp > 0 end
+  self.raceCal = self.raceCal or {}
+  self.raceCal[#self.raceCal + 1] = { actor = actor, pred = pred, which = which, frame = M.frame,
+    acts0 = self.monActN or 0, horizon = st.horizon or M.RACE_HORIZON, seated = st.party, alive = alive }
+end
+
+function Driver:raceCalSay(c, why)
+  local down, died, n = 0, 0, 0
+  for e, _ in pairs(c.seated) do
+    n = n + 1
+    local hp = M.readWord(0x3BF4 + e * 2)
+    if hp == 0 or hp == 0xFFFF then
+      down = down + 1
+      if c.alive[e] then died = died + 1 end
+    end
+  end
+  local p = c.pred
+  M.log(string.format("[%s] [race-cal] actor=%d f%d %s: predicted down %.2f, wipe %.2f, worst case %s%.1f down"
+    .. " | actual down %d (%d fell), %s, over %d enemy action(s) (%s)",
+    self.tag or "fight", c.actor, c.frame, c.which, p.deaths or 0, p.pWipe or 0,
+    p.worstWipe and "WIPE, " or "", p.worstDeaths or p.deaths or 0,
+    down, died, down >= n and "WIPE" or "no wipe", (self.monActN or 0) - c.acts0, why))
+end
+
+function Driver:raceCalTick(flush)
+  if self.raceCal == nil or #self.raceCal == 0 then return end
+  local standing, anyMon = false, false
+  for e = 0, 3 do
+    local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+    if hp > 0 and hp ~= 0xFFFF and mx > 0 and mx ~= 0xFFFF then standing = true end
+  end
+  for sl = 0, 5 do if monAlive(sl) then anyMon = true end end
+  for i = #self.raceCal, 1, -1 do
+    local c = self.raceCal[i]
+    local why = nil
+    if flush then why = "the battle ended"
+    elseif not standing then why = "the party is down"
+    elseif not anyMon then why = "no monster stands"
+    elseif (self.monActN or 0) - c.acts0 >= c.horizon then why = "the horizon" end
+    if why then
+      self:raceCalSay(c, why)
+      table.remove(self.raceCal, i)
+    end
+  end
+end
+
+-- The race's choice as a plan the driver executes (M.CARE_RACE = "act"):
+-- Existing single-ally cures gain an exact spell contract. Other spells
+-- require an explicit HP effect role and target masks; discovery stays
+-- unchanged. nil leaves the rules' plan in force.
+function Driver:racePlan(actor, c)
+  local attackPlan = c.kind == "attack" and c.line and c.line.plan
+  if c.spell or (attackPlan and attackPlan.spell) then
+    local p = c.controller
+    local implicitCure = p == nil and c.kind == "heal" and not c.all
+      and (c.boost or 0) == 0 and type(c.target) == "number" and c.target % 1 == 0
+      and c.target >= 0 and c.target <= 3
+    if implicitCure then
+      p = { kind = "heal", effectRole = "heal",
+        targetContract = { chars = 1 << c.target, monsters = 0, all = false } }
+    end
+    if not p or not ((p.kind == "heal" and p.effectRole == "heal")
+      or (p.kind == "magic" and p.effectRole == "damage")) then return nil end
+    if c.kind ~= p.kind and not (c.kind == "attack" and p.kind == "magic") then return nil end
+    local t = p.targetContract
+    if not t or type(t.chars) ~= "number" or t.chars % 1 ~= 0 or t.chars < 0 or t.chars > 15
+      or type(t.monsters) ~= "number" or t.monsters % 1 ~= 0 or t.monsters < 0 or t.monsters > 63
+      or type(t.all) ~= "boolean" or (t.chars == 0) == (t.monsters == 0)
+      or (c.all ~= nil and c.all ~= t.all)
+      or (not t.all and ((t.chars | t.monsters) & ((t.chars | t.monsters)-1)) ~= 0)
+      or (p.kind == "heal" and (t.monsters ~= 0 or type(c.target) ~= "number" or c.target % 1 ~= 0
+        or c.target < 0 or c.target > 3 or (t.chars & (1 << c.target)) == 0))
+      or (p.kind == "magic" and t.chars ~= 0)
+      or M.readByte(0x2F47) ~= 0 then return nil end
+    local spell, boost = c.spell or attackPlan.spell, c.boost or 0
+    if type(boost) ~= "number" or boost % 1 ~= 0 or boost < 0 or boost > 3
+      or M.readByte(BATTLE.BP + actor*2) < boost then return nil end
+    local row = cmdRow(actor, BATTLE.CMD_MAGIC)
+    if row == nil or spellCell(actor, spell, true) == nil then return nil end
+    local price, resolved = M.battleSpellPrice(actor, spell, boost)
+    if price > M.readWord(BATTLE.CURMP + actor*2) or (c.mp ~= nil and c.mp ~= price)
+      or (c.executionSpell ~= nil and c.executionSpell ~= resolved) then return nil end
+    local q = {}
+    for k,v in pairs(p) do q[k] = v end
+    q.kind, q.spell, q.executionSpell, q.spellCost = p.kind, spell, resolved, price
+    q.target, q.restore, q.row, q.reason = c.target, c.restore, row, "the care race"
+    q.exactBoost, q.boostWant, q.raceBoost, q.boostLeft = true, boost, boost, boost
+    q.all, q.targetContract = t.all, { chars=t.chars, monsters=t.monsters, all=t.all }
+    q.ally = nil
+    q.aim = nil
+    return q
+  end
+  if c.kind == "attack" then
+    local p = c.line and c.line.plan
+    if p == nil then return nil end
+    -- Blitz commits from its list without a steerable target window.
+    -- Keep it in ordinary play until an enforceable initial-aim recipe exists.
+    if p.kind ~= "fight" and not (p.kind == "skill" and p.cmd == BATTLE.CMD_TOOLS) then return nil end
+    if type(c.target) ~= "number" or c.target % 1 ~= 0 or c.target < 0 or c.target > 5 then return nil end
+    local q = {}
+    for k, v in pairs(p) do q[k] = v end
+    q.reason = "the care race"
+    q.exactBoost, q.boostWant = true, c.boost or q.boostLeft or 0
+    -- a Fight aims as the rules' Fight does: at the body its class keys
+    -- (chipAim; battle_classtarget caught the race's Fight on the unkeyed
+    -- Tusker while a pierce-keyed Cirpius stood)
+    q.aim = c.target
+    local mask = 1 << c.target
+    if c.line.aoe then
+      mask = 0
+      for slot=0,5 do if monAlive(slot) then mask = mask | (1 << slot) end end
+      if mask == 0 then return nil end
+    end
+    q.all = c.line.aoe == true
+    q.targetContract = { chars=0, monsters=mask, all=q.all }
+    q.contractCommand = q.kind == "fight" and BATTLE.CMD_FIGHT or q.cmd
+    q.contractAttack = q.kind == "skill" and q.skill or nil
+    return q
+  end
+  if (c.kind ~= "heal" and c.kind ~= "raise") or type(c.target) ~= "number"
+    or c.target % 1 ~= 0 or c.target < 0 or c.target > 3 or c.all then return nil end
+  local row = cmdRow(actor, BATTLE.CMD_ITEM)
+  if row == nil then return nil end
+  local id = c.kind == "raise" and BATTLE.FENIX_DOWN or c.id
+  local idx = id and self:battInvIdx(id)
+  if idx == nil then return nil end
+  return { kind = "item", item = id, target = c.target, row = row, idx = idx, restore = c.restore,
+           exactBoost = true, boostWant = 0, boostLeft = 0,
+           targetContract = { chars=1 << c.target, monsters=0, all=false },
+           contractCommand = BATTLE.CMD_ITEM,
+           reason = c.kind == "raise" and "revive" or "the care race" }
+end
+
+-- Race spells acknowledge the live list after total boost has settled.
+-- Ordinary plans retain their existing stale-grey-bit tolerance.
+function Driver:raceSpellReady(actor, p)
+  local cell, menuPrice = spellCell(actor,p.spell,true)
+  local price, resolved = M.battleSpellPrice(actor,p.spell,p.boostWant)
+  return cell ~= nil and menuPrice == price and price == p.spellCost
+    and resolved == p.executionSpell and cmdRow(actor,BATTLE.CMD_MAGIC) == p.row
+    and M.readByte(BATTLE.PEND_BP+actor*2) == p.boostWant
+    and M.readByte(BATTLE.BP+actor*2) >= p.boostWant and M.readByte(0x2F47) == 0
+end
+
 function Driver:makePlan(actor)
+  self._race, self.raceLast = nil, nil
+  local plan = self:makePlanRules(actor)
+  if M.CARE_RACE and not self.raceActDeclined and self._race ~= nil and self._race.actor == actor then
+    self._racePred = nil
+    local ok, c = pcall(self.raceLog, self, actor, plan, self._race)
+    local played = "rules"
+    if not ok then
+      M.raceTally.err = M.raceTally.err + 1
+      M.log(string.format("[%s] [race] actor=%d error: %s", self.tag or "fight", actor, tostring(c)))
+    elseif c and M.CARE_RACE == "act" then
+      local alt = self:racePlan(actor, c)
+      if alt then
+        M.raceTally.override = M.raceTally.override + 1
+        M.log(string.format("[%s] [race] actor=%d act: %s in place of the rules' %s", self.tag or "fight",
+          actor, c.what or c.kind, tostring(plan and plan.kind)))
+        plan = alt
+        played = "race"
+      end
+    end
+    local rp = self._racePred
+    if ok and rp then
+      pcall(self.raceCalPush, self, actor, played == "race" and rp.race or rp.rules, rp.st, played)
+      if M.RACE_TIME_DIAGNOSTIC then
+        local timeOk,timeErr=pcall(self.raceTimePush,self,actor,rp,played,plan)
+        if not timeOk then M.log(string.format("[%s] [race-time] declined error: %s",self.tag or "fight",tostring(timeErr))) end
+      end
+    end
+    self._racePred = nil
+  end
+  self._race = nil
+  if plan then plan.raceBoost = plan.boostLeft or 0 end
+  return plan
+end
+
+function Driver:makePlanRules(actor)
   -- What a round costs this party, measured rather than assumed.  For each
   -- entity, the most HP it has lost between two consecutive turns of the
   -- actor now deciding: that is the damage that will land before this actor
@@ -7871,8 +10029,11 @@ function Driver:makePlan(actor)
   -- press rule (#156, #165) and the spend rule (#175) below.
   local function bestLine(actor, slot, bp)
     local id = M.readByte(BATTLE.BCHID + actor * 2)
-    local best = nil
-    local function offer(p) if best == nil or p.chips > best.chips then best = p end end
+    local best, offered = nil, {}
+    local function offer(p)
+      offered[#offered + 1] = p
+      if best == nil or p.chips > best.chips then best = p end
+    end
     -- The kit lines are offered at the boost the pool can PAY for
     -- (#219), not at the bank's: the price escalates 2.5x a level, so a
     -- bank the MP cannot follow buys a refused command and an
@@ -7882,7 +10043,7 @@ function Driver:makePlan(actor)
     -- swings do -- so the chip model still decides between them on the
     -- same terms, at the boost that will actually go through.
     local tool = self.opts.tool or BATTLE.AUTOCROSSBOW
-    if self.opts.tactical and self.opts.tools ~= false and id == 4
+    if self.parkDropN < 3 and self.opts.tactical and self.opts.tools ~= false and id == 4
        and cmdRow(actor, BATTLE.CMD_TOOLS) and self:battInvIdx(tool) then
       local tb = M.kitBoost(actor, tool, bp)
       if tb ~= nil then
@@ -7892,7 +10053,7 @@ function Driver:makePlan(actor)
                 what = string.format("Tools $%02X at %d BP", tool, tb) })
       end
     end
-    if self.opts.tactical and id == 5 and (self.opts.blitz or BATTLE.PUMMEL) == BATTLE.PUMMEL
+    if self.parkDropN < 3 and self.opts.tactical and id == 5 and (self.opts.blitz or BATTLE.PUMMEL) == BATTLE.PUMMEL
        and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
        and not self:counterVetoed(actor, { cmd = BATTLE.CMD_BLITZ, atk = BATTLE.PUMMEL },
          standingSlots(), "Pummel") then
@@ -7915,8 +10076,11 @@ function Driver:makePlan(actor)
               chips = fightChips(actor, slot, bp), hits = mainHits + offHits,
               what = string.format("Fight at %d BP", bp) })
     end
-    return best
+    return best, offered
   end
+  -- the care race's view of this decision (#415, Driver:raceLog)
+  self._race = { actor = actor, bestLine = bestLine, hpNow = hpNow, maxOf = maxOf, price = price,
+    careItems = row ~= nil and self.parkDropN < 3, careCasts = cureRow ~= nil and self.parkDropN < 3 }
   -- The spend rule (#175): this actor inside one round of death, holding
   -- BP, with no heal in hand that lifts them clear of the round, spends
   -- every pip now on their strongest line instead of a heal that only
@@ -9562,6 +11726,7 @@ function Driver:button(actor)
     end
     self.plan, self.planActor, self.tgtSpin = self:makePlan(actor), actor, 0
     if self.recovery then self.recovery.plan(actor, self.plan, M.frame) end
+    if self.raceTimeActive then self:raceTimeBind(actor,self.plan) end
     self.planPulses, self.steerTrail = 0, {}
     if self.plan.kind == "heal" or self.plan.kind == "item" then self.careActor = actor end
     M.log(string.format("[%s] actor=%d char=%d plan=%s",
@@ -9599,11 +11764,16 @@ function Driver:button(actor)
     if self.plan.kind == "switch" or self.plan.kind == "defer" then return { "x" } end
     -- the boost (#408): R until the pending boost the engine shows reads
     -- what the plan wants (M.boostStep), not a count of R pulses sent
-    if self.plan.boostLeft and self.plan.boostLeft > 0 and M.BOOST_PULSES then
+    if self.plan.exactBoost then
+      local step = M.exactBoostStep(M.readByte(BATTLE.PEND_BP + actor * 2),
+        self.plan.boostWant, M.readByte(BATTLE.BP + actor * 2))
+      if step == "drop" then self:dropPlan("race_boost_unavailable"); return nil end
+      if step == "r" or step == "l" then return { step } end
+    elseif self.plan.boostLeft and self.plan.boostLeft > 0 and M.BOOST_PULSES then
       self.plan.boostLeft = self.plan.boostLeft - 1
       return { "r" }
     end
-    if not M.BOOST_PULSES and (self.plan.boostLeft or 0) > 0 or self.plan.boostWant then
+    if not self.plan.exactBoost and ((not M.BOOST_PULSES and (self.plan.boostLeft or 0) > 0) or self.plan.boostWant) then
       local pend = M.readByte(BATTLE.PEND_BP + actor * 2)
       local p = self.plan
       if p.boostWant == nil then
@@ -9670,6 +11840,9 @@ function Driver:button(actor)
     return { "a" }
   end
   if st == BATTLE.ST_MAGIC and (self.plan.kind == "magic" or self.plan.kind == "heal") then
+    if self.plan.targetContract and not self:raceSpellReady(actor,self.plan) then
+      self:dropPlan("race_spell_changed"); return { "b" }
+    end
     -- The same two-column walk for both magic lines.  The cell was
     -- resolved at plan time, but the list is rebuilt when the window
     -- opens, so it is re-read here: a cell that has moved (or a spell the
@@ -9851,6 +12024,20 @@ function Driver:button(actor)
     return { "a" }
   end
   if st == BATTLE.ST_TGT then
+    if self.plan.targetContract then
+      local p, t = self.plan, self.plan.targetContract
+      if p.spell and not self:raceSpellReady(actor,p) then
+        self:dropPlan("race_spell_changed"); return { "b" }
+      end
+      local chars,mons = M.readByte(BATTLE.TGTCHARS),M.readByte(BATTLE.TGTMONS)
+      if (t.chars ~= 0 and (mons ~= 0 or chars == 0)) then return self:cross("chars") end
+      if (t.monsters ~= 0 and (chars ~= 0 or mons == 0)) then return self:cross("monsters") end
+      if p.spell and t.all and M.readByte(BATTLE.TGTALL) == 0 then
+        self.tgtSpin = self.tgtSpin + 1
+        if self.tgtSpin >= 40 then self:dropPlan("race_group_unavailable"); return { "b" } end
+        return (self.tgtSpin % 4) < 2 and { "r" } or {}
+      end
+    end
     -- Every ally-targeted line steers the same way: an item and a cure
     -- differ only in which window chose them, and the Muddle rule's
     -- Fight on an ally (plan.ally, #170) crosses to the party column
@@ -9877,20 +12064,23 @@ function Driver:button(actor)
         -- confirm once the latch reads back.  If it never takes (a spell
         -- without MULTI_TARGET), drop to the single-target steer.
         if M.readByte(BATTLE.TGTALL) ~= 0 then
-          if self.recovery then self.recovery.confirm(actor, M.frame, chars, mons) end
-          return { "a" }
+          if not self.plan.targetContract then
+            if self.recovery then self.recovery.confirm(actor, M.frame, chars, mons) end
+            return { "a" }
+          end
+        else
+          self.tgtSpin = self.tgtSpin + 1
+          if self.tgtSpin >= 40 then
+            M.log(string.format("[%s] all-ally latch never took -- "
+              .. "single-target fallback", self.tag or "fight"))
+            self.plan.all, self.tgtSpin = nil, 0
+            return {}
+          end
+          return (self.tgtSpin % 4) < 2 and { "r" } or {}
         end
-        self.tgtSpin = self.tgtSpin + 1
-        if self.tgtSpin >= 40 then
-          M.log(string.format("[%s] all-ally latch never took -- "
-            .. "single-target fallback", self.tag or "fight"))
-          self.plan.all, self.tgtSpin = nil, 0
-          return {}
-        end
-        return (self.tgtSpin % 4) < 2 and { "r" } or {}
       end
       local wantMask = 1 << self.plan.target
-      if chars ~= wantMask and not (self.plan.all and self.plan.auto) then
+      if chars ~= wantMask and not (self.plan.all and (self.plan.auto or self.plan.targetContract)) then
         local cur = 0
         for e = 0, 3 do
           if chars & (1 << e) ~= 0 then cur = e; break end
@@ -9930,6 +12120,13 @@ function Driver:button(actor)
     -- A lore is multi-target: the focus rotation would spin against a
     -- whole-side mask it can never match, so it confirms on the default.
     local focus = self:focusList()
+    if self.plan.targetContract then
+      focus = nil
+      local t = self.plan.targetContract
+      if not t.all and t.monsters ~= 0 then
+        for slot=0,5 do if t.monsters == 1 << slot then focus={{slot=slot,mask=t.monsters}} end end
+      end
+    end
     -- With no authored or multi-part kill order, a plain Fight may still
     -- name the monster slot its class breaks best (plan.aim, chipAim/#161):
     -- steer to it through the same focus graph, as a one-entry list.  An
@@ -10024,7 +12221,7 @@ function Driver:button(actor)
     -- cast the live stage now refuses is backed out of (B) and re-planned
     -- against what stands there.
     if (self.plan.kind == "magic" and self.plan.spell ~= nil) or self.plan.kind == "lore" then
-      local id = self.plan.kind == "magic" and self.plan.spell or (0x8B + self.plan.lore)
+      local id = self.plan.kind == "magic" and (self.plan.executionSpell or self.plan.spell) or (0x8B + self.plan.lore)
       if self:castVetoed(id, self.plan.kind == "magic" and "cast (at the confirm)"
                         or "lore (at the confirm)") then
         self:dropPlan("stage_changed")
@@ -10049,6 +12246,16 @@ function Driver:button(actor)
           self.plan.all and "party cure" or "heal"))
         self:dropPlan("zombie_target")
         return { "b" }
+      end
+    end
+    if self.plan.targetContract then
+      local t = self.plan.targetContract
+      if M.readByte(BATTLE.TGTCHARS) ~= t.chars or M.readByte(BATTLE.TGTMONS) ~= t.monsters
+        or (M.readByte(BATTLE.TGTALL) ~= 0) ~= t.all then
+        self:dropPlan("race_target_mismatch"); return { "b" }
+      end
+      if M.readByte(BATTLE.PEND_BP + actor*2) ~= self.plan.boostWant then
+        self:dropPlan("race_boost_changed"); return { "b" }
       end
     end
     if self.opts.traceTgt then
@@ -10076,6 +12283,7 @@ function Driver:button(actor)
       watch = { into = self.itemRestore, id = self.plan.item, what = "item",
                 lo = pw > 0 and pw or nil, hi = pw > 0 and pw or nil }
     elseif self.plan.kind == "heal" and not self.plan.all
+       and (not self.plan.targetContract or self.plan.boostWant == 0)
        and self.castRestore[self.plan.spell] == nil then
       -- an all-ally cast is boosted and spread, so its per-head number
       -- would poison the single-cast ledger; it goes unmeasured
@@ -10125,7 +12333,8 @@ function Driver:button(actor)
         and not (type(self.plan.reason) == "string" and self.plan.reason:sub(1, 5) == "cure ")))
        and self.plan.target ~= nil then
       for e = 0, 3 do
-        if (self.plan.all and M.readWord(0x3C1C + e * 2) > 0) or e == self.plan.target then
+        if self.plan.targetContract and (self.plan.targetContract.chars & (1 << e)) ~= 0
+          or (not self.plan.targetContract and ((self.plan.all and M.readWord(0x3C1C + e * 2) > 0) or e == self.plan.target)) then
           self.healQueued[e] = { by = actor, tick = self.battleTick, hp = M.readWord(0x3BF4 + e * 2),
                                  restore = not self.plan.all and self.plan.restore or nil,
                                  what = self.plan.kind == "heal" and string.format("cure $%02X", self.plan.spell or 0)
@@ -10149,7 +12358,8 @@ function Driver:button(actor)
         end
       end
       self.dmgWatch[#self.dmgWatch + 1] = { actor = actor, kind = self.plan.kind,
-                                  skill = self.plan.skill, seen = 0, norm = 0, n = 0,
+                                  skill = self.plan.skill, spell = self.plan.spell, cmd = self.plan.cmd,
+                                  boost = self.plan.raceBoost or 0, seen = 0, norm = 0, n = 0,
                                   until_ = self.battleTick + BATTLE.DMG_EXPIRE }
     end
     -- A confirmed lore is the progress the stall guard watches for.
@@ -10189,6 +12399,7 @@ function Driver:button(actor)
 end
 
 function Driver:idle()
+  if self.raceCal then pcall(self.raceCalTick, self, true) end
   -- the fallback: a battle whose end the UpdateSRAM hook did not see
   -- (the [outcome] says "no end reading")
   if self.battleTick > 6 and self.reward ~= nil and self.seatXp ~= nil and not self.outcomeSaid then
@@ -10196,6 +12407,9 @@ function Driver:idle()
   end
   self.outcomeSaid = false
   self.seatXp, self.seatChar, self.filled = nil, nil, nil
+  self.raceEligibility = nil
+  self.raceTimeActive = nil -- terminal records remain attached to outcomes
+  self.raceTimeRecords = nil
   self.leftSaid, self.escSaid, self.reward = {}, {}, nil
   self.timed, self.tailSaid, self.runDecided, self.running = nil, false, nil, nil
   if self.recovery then
@@ -10206,6 +12420,7 @@ function Driver:idle()
   self.menuStreak, self.tick, self.battleTick = 0, 0, 0
   self.plan, self.planActor, self.held, self.confirmed = nil, nil, {}, nil
   self.parkDropN = 0
+  self.raceActDeclined = nil
   self.layout, self.layoutUnreadSaid, self.steerLast, self.steerDead = nil, false, nil, {}
   self.parts, self.partsLast, self.partsFell, self.partsSwitch = nil, {}, {}, {}
   self.lastStand = nil
@@ -11746,7 +13961,7 @@ local function xpAt(off)
        + M.readByte(0x1613 + off) * 65536
 end
 local function speciesAt(s) return M.readWord(M.FORMATION + s * 2) & 0x1FF end
-local function readReward()
+local function readReward(eligibility)
   if rewardMul16 == nil then rewardMul16 = M.readRomWord(M.sym("Ot6RewardMulW") & 0x3FFFFF) end
   local r = { xp = {}, st1 = {}, hp = {}, egg = {}, species = {} }
   for s = 0, 5 do
@@ -11759,6 +13974,10 @@ local function readReward()
   r.random, r.mul16 = M.readByte(M.RANDBTL) ~= 0, rewardMul16
   r.alive, r.aliveMask = M.readByte(0x3A76), M.readByte(0x3A74)
   r.left, r.gone = M.readByte(0x3A39), M.readByte(0x3A3A)
+  if eligibility then
+    local sample=M.raceTimeSample()
+    r.sample_frame,r.sample_tick,r.party=sample.sample_frame,sample.sample_tick,sample.party
+  end
   r.lost = M.partyWipedInBattle ~= nil and M.partyWipedInBattle() or false
   r.form = M.readWord(0x11E0)
   r.veldt = (M.readByte(0x11E4) & 0x02) ~= 0
@@ -11769,7 +13988,7 @@ local function endActivate()
   endHooked = true
   local a = M.sym("UpdateSRAM")
   emu.addMemoryCallback(function()
-    endSnap = { frame = M.frame, reward = readReward() }
+    endSnap = { frame = M.frame, reward = readReward(endWatcher and (endWatcher.raceEligibility ~= nil or endWatcher.raceTimeActive ~= nil)) }
     local d = endWatcher
     endWatcher = nil
     -- only the driver that watched THIS battle: one that stopped watching
@@ -11841,7 +14060,21 @@ function Driver:watchLeavers()
     for s = 0, 5 do self.filled[s] = (mask >> s) & 1 == 1 end
   end
   endWatcher, self.watchFrame = self, M.frame
-  local r = readReward()
+  if self.raceEligibility == nil and (M.CARE_RACE or self.opts.raceEligibility) then
+    self.raceEligibility=M.newRaceEligibility(self.seatChar,function(e)
+      if e.event == "reward" then
+        M.log(string.format("[%s] [race-eligibility] reward source=%s f%d tick%d char%d entity%d identity-match=%s eligible=%s paid=%d due=%s equal-share-reference=%s foregone-equal-share=%s",
+          self.tag or "fight",e.observation_source,e.frame,e.atb_tick,e.char,e.entity,tostring(e.identity_match),tostring(e.eligible),e.paid,tostring(e.due),
+          tostring(e.equal_share_reference),tostring(e.foregone_equal_share)))
+      else
+        M.log(string.format("[%s] [race-eligibility] %s f%d char%d entity%d eligible=%s hp=%d status1=$%02X left=%s",
+          self.tag or "fight",e.event,e.frame,e.char,e.entity,tostring(e.eligible),e.hp,e.st1,tostring(e.left)))
+      end
+    end)
+  end
+  local r = readReward(self.raceEligibility ~= nil or self.raceTimeActive ~= nil)
+  if self.raceEligibility then self.raceEligibility.observe(r.party,M.frame,M.readWord(0x3A3E)) end
+  if self.raceTimeActive then self:raceTimeTick(r,false,"watch") end
   self.reward = r
   local seated, still = 0, 0
   for e = 0, 3 do
@@ -12050,6 +14283,12 @@ function Driver:sayOutcome()
   local rec = { kind = o.kind, form = r.form, kills = o.kills, escaped = o.escaped,
                 due = o.due, share = o.share, got = got, ok = ok, leftN = o.leftN,
                 seatedN = o.seatedN, random = r.random, tick = self.battleTick, atEnd = atEnd }
+  if self.raceEligibility then
+    rec.eligibility=self.raceEligibility.finish(o,got,r,r.sample_frame,r.sample_tick,atEnd)
+    rec.eligibilityHistory=self.raceEligibility.history
+  end
+  if self.raceTimeActive then self:raceTimeTick(r,true,atEnd and "UpdateSRAM" or "last-watch") end
+  rec.timeShadows=self.raceTimeRecords
   M.lastOutcome = rec
   M.outcomes[#M.outcomes + 1] = rec
   M.log(string.format("[%s] [outcome] battle $%03X %s after %d ticks%s: killed %s; escaped %s; "
@@ -12338,6 +14577,8 @@ function Driver:watchDamage()
         -- must not average the two
         w.norm = w.norm
           + ((M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0) and (drop // 4) or drop)
+        w.raceNorm = (w.raceNorm or 0) + M.raceDamageBase(drop,
+          M.readByte(BATTLE.SH_MAX + s * 2), M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0)
         w.n = w.n + 1
       end
     end
@@ -12358,6 +14599,24 @@ function Driver:watchDamage()
       if w.n > 0 then
         self.dmgHit[w.actor] = { kind = w.kind, skill = w.skill,
                             per = w.norm // w.n, n = w.n }
+        -- the care race's per-line figure: the last landed hit of each
+        -- line (kind and skill or spell) each actor used (#415)
+        -- (the median of its last M.RACE_HIT_KEEP, not the last alone: the
+        -- WoR's CELES read 83 a hit off one swing and 328 off the next)
+        self.raceHitBy = self.raceHitBy or {}
+        self.raceHitLog = self.raceHitLog or {}
+        local key = w.actor .. ":" .. w.kind .. ":" .. tostring(w.skill or w.spell)
+        local hl = self.raceHitLog[key] or {}
+        local base = (w.raceNorm or w.norm) / w.n
+        if w.kind == "skill" and (w.cmd == BATTLE.CMD_TOOLS
+           or (w.cmd == BATTLE.CMD_BLITZ and w.skill == BATTLE.PUMMEL)) then
+          base = M.raceUnboostHit(base, w.boost or 0)
+        end
+        hl[#hl + 1] = base
+        while #hl > M.RACE_HIT_KEEP do table.remove(hl, 1) end
+        self.raceHitLog[key] = hl
+        self.raceHitBy[w.actor] = self.raceHitBy[w.actor] or {}
+        self.raceHitBy[w.actor][w.kind .. ":" .. tostring(w.skill or w.spell)] = M.median(hl)
       end
       M.log(string.format("[%s] actor=%d's %s took %d off the monsters "
         .. "(%d shielded-equivalent over %d hit(s), %d a hit; the press "
@@ -13202,6 +15461,13 @@ function Driver:frame()
   self:watchPendingCare()
   self:watchUnmuddleHit()
   self:watchHits()
+  if self.raceCal then
+    local ok, err = pcall(self.raceCalTick, self, false)
+    if not ok then
+      self.raceCal = nil
+      M.log(string.format("[%s] [race-cal] error: %s", self.tag or "fight", tostring(err)))
+    end
+  end
   self:watchLanders()
   self:watchParts()
   self:watchStatues()
@@ -13494,7 +15760,8 @@ end
 
 function M.newFightDriver(tag, opts)
   opts = opts or {}
-  local D = setmetatable({
+  local D
+  D = setmetatable({
     tag = tag, opts = opts,
     -- The battle's layout, read not assumed (M.battleLayout, #176): which
     -- type of battle the engine set and therefore which way the target
@@ -13521,8 +15788,9 @@ function M.newFightDriver(tag, opts)
     tgtRouteSaid = nil,
     tgtVisited = {},                   -- nodes this target window stood on
     tgtCycled = false,                 -- a steer press landed back on one
-    recovery = (opts.actionTrace or OT6_ACTION_TRACE) and
-M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end),
+    recovery = (opts.actionTrace or OT6_ACTION_TRACE or M.CARE_RACE) and
+M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end,
+  function(e) D:raceObserve(e) end, function() return M.readWord(0x3A3E) end),
     menuStreak = 0, tick = 0, battleTick = 0,
     -- A focus slot the graph ran out on (#189): slot -> { live, tick }.  A
     -- part can stand alive and present yet not be selectable -- NUMBER 128's
@@ -14517,6 +16785,7 @@ local function watchReport()
   -- log as anything but a turn that did nothing.
   M.log("[watch] " .. M.fizzleReport())
   M.log("[watch] " .. M.refusalReport())
+  M.log("[race] " .. M.raceReport())
 end
 
 -- The recovery cap (#185's other half).  A driver that drops its plan and

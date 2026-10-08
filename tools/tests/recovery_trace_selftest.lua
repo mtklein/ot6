@@ -21,7 +21,7 @@ assert(events[4].event == 'drop' and events[4].elapsed_frames == 40)
 plan(0, 60, true)
 plan(1, 61)
 t.submit(0, 70, 2, 45, 15)
-t.start(0, 80, 2, 47, 15, {10,20,30,40}, 50, 2)
+t.legacyStart(0, 80, 2, 47, 15, {10,20,30,40}, 50, 2)
 t.resolve(1, 81, {20,30,40,50}, 10, 0) -- unrelated actor: no attribution
 assert(events[#events].event == 'start')
 t.resolve(0, 100, {10,120,130,40}, 10, 2)
@@ -41,7 +41,7 @@ t.submit(0, 160, 2, 45, 2)
 local queuedID = events[#events].id
 plan(0, 165)
 t.drop(0, 170, 'actor_changed')
-t.start(0, 180, 2, 45, 2, {10,20,30,40}, 20, 1)
+t.legacyStart(0, 180, 2, 45, 2, {10,20,30,40}, 20, 1)
 t.resolve(0, 190, {10,20,30,40}, 15, 1) -- zero-effect command still resolved
 assert(events[#events].id == queuedID)
 assert(events[#events].event == 'resolve' and events[#events].hp_net == '0,0,0,0')
@@ -49,4 +49,16 @@ local n = #events
 t.close(200, 'state_reload')
 t.close(201, 'run_ended')
 assert(#events == n) -- no duplicate terminal records
+-- Internal physical rebases are not new commands. A counter with the
+-- same actor and command cannot steal the pending player's queue entry.
+plan(0,210)
+t.submit(0,220,2,45,2)
+t.legacyStart(0,230,2,45,2,{100,100,100,100},20,0,{counter=true})
+assert(#t.queued[0]==1 and t.running[0]==nil)
+local scope=t.legacyStart(0,240,2,45,2,{100,100,100,100},20,0)
+t.hpEffect(0,250,1,100,200,2,47,{context=scope})
+assert(events[#events].event=='hp_effect' and events[#events].attack==45
+  and events[#events].raw_effect_attack==47)
+t.resolve(0,260,{100,200,100,100},15,0)
+assert(events[#events].event=='resolve')
 print('recovery_trace_selftest: PASS')

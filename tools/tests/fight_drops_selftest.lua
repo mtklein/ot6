@@ -32,6 +32,12 @@ OT6_SYMS = setmetatable({}, { __index = function() return 0 end })
 local rawPrint = print
 print = function(s) printed[#printed + 1] = s end   -- the trace flushes through print
 local H = dofile("tools/tests/lib/ot6.lua")
+-- frame() activates the read-only effect observer. This test supplies no
+-- real ROM; explicitly stub its pinned PLP/PLX/RTS return signature. No
+-- callback runs here and these bytes are not evidence of ROM correctness.
+H.readRomByte = function(a)
+  return ({ [0x27] = 0x28, [0x28] = 0xFA, [0x29] = 0x60 })[a] or 0
+end
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local MLISTPTR, ITEMLIST, BATTINV = 0x302C, 0x4005, 0x2686
