@@ -82,8 +82,9 @@ interpreting runs.
 # 1. Start: state of the world
 
 Before planning, know and report in one short block: uncommitted or
-unpushed work and where it belongs; release drift (VERSION/README naming a
-version with no tag and GitHub release, release/* ahead of main); open
+unpushed work and where it belongs; release drift (README claiming a
+published version with no tag and GitHub release, release/* ahead of main);
+VERSION may name the explicitly identified next development version; open
 issues and the current milestone; worktrees and `wt/*` branches, with
 whether each is finished, mid-stream or dead; live.py up with all three
 machines; px13's pending reboot (`/var/run/reboot-required.pkgs`; it
@@ -179,9 +180,14 @@ release is published:
 - The annotated tag `vX.Y`, main, the release branch and the tag pushed;
   `gh release create` with both assets and the notes; `gh release view`
   shows both (Obtainium installs the APK from there).
+- After publication, advance main's VERSION to the next development version
+  and identify it separately from the latest published release in README.
+  Verify the splash, Config display and ROM header show that development
+  version. Keep the published release commit, branch, tag and assets at X.Y.
 
-A version in VERSION and README without a tag and a GitHub release is
-drift; finish it or roll it back.
+A claimed published release without its tag and GitHub release is drift;
+finish it or roll it back. An explicitly named next development version on
+main is expected (owner, 2026-10-08).
 
 # 5. When you are stuck
 

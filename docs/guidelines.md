@@ -191,8 +191,13 @@ power, write like a human (owner, 2026-09-30).
   didn't.
 - **No-op releases are welcome** as progress and cadence markers; their
   notes say plainly that play is unchanged.
-- **A version in VERSION or README without a tag and a GitHub release is
-  drift.** An unshipped version number is reused rather than skipped.
+- **Advance main's version after each release.** The release commit, branch
+  and tag retain the version being published. After publication, bump main's
+  VERSION to the next development version, including the in-game splash and
+  Config displays it drives. README distinguishes the latest published
+  release from the development version; an explicitly identified next
+  development version is expected, not release drift. An unshipped version
+  number is reused rather than skipped.
 - **Push early, push often.** Keeping `main` on GitHub current matters: the
   laptop is a single point of failure, and agent worktrees branch from it.
 - **Git is the archive.** Stale probes, instruments and superseded scripts
