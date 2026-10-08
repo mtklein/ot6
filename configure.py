@@ -719,6 +719,9 @@ check("runner_isolation", "sh tools/tests/lib/runner_isolation_selftest.sh",
       ["tools/tests/lib/runner_isolation_selftest.sh", "tools/tests/run.sh"])
 check("shared_emulator", "sh tools/tests/lib/shared_emulator_selftest.sh",
       ["tools/tests/lib/shared_emulator_selftest.sh", "tools/tests/run.sh"])
+check("power_scheduling", "python3 tools/stream/power_scheduling_selftest.py",
+      ["tools/stream/power_scheduling_selftest.py", "tools/stream/placement.py",
+       "tools/tests/lib/power_source.py", "tools/tests/lib/emu_slot.py"])
 checkpoint_files = glob("tools/tests/checkpoints/*/manifest.json") \
     + glob("tools/tests/checkpoints/*/*.sram")
 # #218: every checkpoint validates, and every line says which save its

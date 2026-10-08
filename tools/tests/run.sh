@@ -476,7 +476,8 @@ CAP="${OT6_TIMEOUT:-600}"
 # when the holder dies; N from the machine's own ~/.config/ot6/emulator-slots,
 # else its CPU count) and keeps it for every attempt.  A batch larger than N
 # queues here instead of swamping the machine, whatever the caller asked
-# placement for.  The wait comes before t0, so it never eats the load grace
+# placement for. New runs also wait for AC power; active runs keep their slot
+# if unplugged. The wait comes before t0, so it never eats the load grace
 # or the wall-clock cap.
 SLOT_READY="$WDIR/emu-slot"
 python3 "$ROOT/tools/tests/lib/emu_slot.py" --hold $$ "$SLOT_READY" &

@@ -75,6 +75,10 @@ interpreting runs.
   live.py runs) says where the next N should go -- slots less what runs now
   and live claims, px13 first, then mini, then the Air, then the Pro -- and holds them
   for a couple of minutes so agents asking at once don't double-book.
+  Only machines with a fresh AC-power observation receive new work; battery,
+  unknown and stale power sources have no placement room. A claim is not a
+  promise that power stays connected: run.sh rechecks while queued and waits
+  for AC before admitting a new run. Already admitted jobs continue.
   Launch prompts give agents that command, and say a batch never exceeds
   its claim. Change a machine's limit by editing its file. (The learned
   speed-curve model this replaced was retired 2026-10-06.)

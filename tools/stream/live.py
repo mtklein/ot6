@@ -62,6 +62,15 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 # and has no path of its own.
 ROOT = os.path.abspath(os.environ.get("OT6_ROOT") or os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+# Emitters load the same observation code as the local admission gate.
+# Older peer checkouts fail closed until their tools are updated.
+try:
+    _power_spec = importlib.util.spec_from_file_location(
+        "power_source", os.path.join(ROOT, "tools/tests/lib/power_source.py"))
+    _power = importlib.util.module_from_spec(_power_spec)
+    _power_spec.loader.exec_module(_power)
+except (OSError, ImportError):
+    _power = None
 HOST = socket.gethostname().split(".")[0].lower()   # this machine's label
 
 # Runs happen in every git worktree of this repo (agents and the release
@@ -209,7 +218,9 @@ async function tick(){ try{
       + '<span style="color:#465">'+'○'.repeat(m.room||0)+'</span>';
     return '<div style="white-space:pre;overflow:hidden">'+nm
       + '<span style="color:#687">'+fps+' fps  </span>'
-      + '<span style="letter-spacing:1px">'+dots+'</span></div>'; }).join('');
+      + '<span style="letter-spacing:1px">'+dots+'</span>'
+      + (m.blocked ? ' <span style="color:#d9a24b">'+esc(m.blocked)+'</span>' : '')
+      + '</div>'; }).join('');
   const seen = new Set();
   ws.forEach(w=>{
     seen.add(w.id);
@@ -841,6 +852,7 @@ class Scanner:
         done = self._settle(active, len(workers), load, now)
         snap = {"host": HOST, "ts": now, "load": load, "ncpu": os.cpu_count(),
                 "slots": _emu_slots(),
+                "power": _power.observe() if _power else None,
                 "workers": workers, "pngs": pngs, "fps": self._fps(now)}
         if done:
             snap["done"] = done
@@ -1059,13 +1071,14 @@ class Board:
                 "down_since": st["down_since"], "err": st["err"],
                 "load": (snap or {}).get("load"), "ncpu": (snap or {}).get("ncpu"),
                 "fps": (snap or {}).get("fps"), "slots": (snap or {}).get("slots"),
+                "power": (snap or {}).get("power"),
                 "active": len(mine), "frozen": sum(w["stuck"] for w in mine),
                 "trees": [{"branch": b, "tree": t, "tests": sorted(ts)}
                           for (b, t), ts in sorted(trees.items())]})
         pl = self.pl
         place = pl.placement(machines, pl.read_claims(self.claims, now), now)
         for mc, pm in zip(machines, place["machines"]):
-            mc.update({k: pm[k] for k in ("room", "peak") if k in pm})
+            mc.update({k: pm[k] for k in ("room", "peak", "blocked") if k in pm})
         out = {"workers": workers, "count": len(workers), "ts": int(now),
                "machines": machines, "local": HOST}
         self._dump("grid.json", out)
@@ -1561,7 +1574,7 @@ def place(n, port, who=None):
         take = _placement().claim(os.path.join(
             _TREES["main"], "build", "placement-claims.jsonl"), p, n, who)
     else:
-        take = p["order"][:n]
+        take = _placement().fill(p["machines"])["order"][:n]
     counts = collections.Counter(take)   # keeps the fill order
     got = ", ".join(f"{m} {c}" for m, c in counts.items()) or "nowhere"
     print(f"place {n}: {got}  (fill order {', '.join(p['prefer'])}"
@@ -1572,6 +1585,10 @@ def place(n, port, who=None):
     for m in p["machines"]:
         if "room" not in m:
             print(f"  {m['name']}: {'down' if not m['up'] else 'no slots'}")
+            continue
+        reason = _placement().power_source.blocked(m.get("power"), time.time())
+        if reason:
+            print(f"  {m['name']}: room 0 ({reason}; {m['active']} running)")
             continue
         if "settling" in m:    # back from sleep: no room until it stays up
             print(f"  {m['name']}: room 0 (settling, {m['settling']} s more)")
