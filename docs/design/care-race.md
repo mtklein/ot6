@@ -1,8 +1,9 @@
 # The care race: one decision for every command (#415)
 
-Status: experimental action model under revision; final matched validation
-of the earlier default-on augmentation did not meet the original
-all-command/no-regression acceptance bar. No release qualification claimed.
+Status: bounded acting policy prepared for v0.26 route qualification.
+Earlier matched validation did not meet the original all-command/no-regression
+acceptance bar; those failures remain retained. No final release qualification
+is claimed until the landed-source replay and checks pass.
 Owner and coordinator, 2026-10-06; validation updated 2026-10-08.
 The owner now accepts a fresh supported-route clear as the practical success
 bar, with ordinary preparation and catch-up fights responding to the actual
@@ -168,15 +169,24 @@ button walk.  It hands the choice of *what* to do to `M.raceChoose(state,
 candidates)`, a pure function that `battle_healpolicy` can drive with
 plain tables.
 
-The lever is `M.CARE_RACE`. The holistic revision defaults to `false`
-while its executable-action model is being qualified. Explicit `"act"`
-plays the race's choice where it disagrees with the rule stack.  `"log"` (or
+The lever is `M.CARE_RACE`, now defaulting to `"act"` for the bounded
+policy being qualified for v0.26. It plays the race's choice where it
+disagrees with the rule stack and the command has an enforceable contract.
+A rejected scored command uses ordinary rules for the rest of that battle;
+unsupported recipes also keep the ordinary choice. Explicit `"act"` uses
+the same policy.  `"log"` (or
 true) plays the rules and logs the race's choice beside them: one
 `[race]` line per decision, with the scores of both choices.  `false` (or
 `"off"`) plays the rules alone.  Every run ends with a `[race] mode ...`
 line that counts the leg's decisions, disagreements and overrides.
 
 ## Measuring it
+
+The broad comparison protocol below remains useful research. It is not an
+additional release prerequisite under the owner's 2026-10-08 stopping bar:
+a supported-route clear with ordinary preparation, followed by final-source
+qualification and release checks. Such a clear is not a success-rate or
+forecast-accuracy claim.
 
 1. **Unit:** the cases above, plus mutants of the score's ordering and
    the horizon.
