@@ -39,4 +39,5 @@ ever, Crusader included.
 
 **Combat plans keep their aim and Boost Points.** Experimental combat choices
 back out and reconsider when the highlighted target differs from the plan,
-and healing items clear leftover pending boost before confirmation.
+and healing items clear leftover pending boost before confirmation. A rejected
+experimental command returns to ordinary combat choices for that battle.

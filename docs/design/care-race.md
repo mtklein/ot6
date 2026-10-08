@@ -380,7 +380,10 @@ Blitz/Pummel has no steerable target window and therefore remains ordinary
 rules play until its initial aim can be enforced. A rejected compilation
 leaves the existing rules plan in force; it removes no normal command access.
 Items and raises explicitly acknowledge zero pending boost. Strict targets
-back out and replan rather than accepting the steering fallback; subsequent
+back out rather than accepting the steering fallback. Any pre-confirmation
+scored-command drop conservatively returns to ordinary rules for the rest
+of that battle, so an incompatible choice cannot be selected repeatedly.
+The next battle boundary resets eligibility; subsequent
 engine retargeting after initial acceptance remains allowed.
 
 Decisions before the first measured hit, during removal last stands, or

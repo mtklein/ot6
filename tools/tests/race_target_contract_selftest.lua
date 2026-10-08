@@ -82,6 +82,25 @@ cases.ordinary=function()
   local d=driver();target(d,{kind='fight',row=0,aim=1},0,1)
   local b=d:button(0);assert(b and b[1]=='a','ordinary target fallback remains')
 end
-local names={'physical','item','zero','matched','queue','unsupported','tools','ordinary'}
+cases.repeated=function()
+  local d=driver();local old=H.CARE_RACE;H.CARE_RACE='act'
+  local rules={kind='fight',row=0,aim=0};local selections=0
+  d.makePlanRules=function(self,actor) self._race={actor=actor};return rules end
+  d.raceLog=function() selections=selections+1;return {kind='attack',target=1,boost=0,
+    line={aoe=true,plan={kind='skill',cmd=9,skill=0xaa,row=0}}} end
+  local p=d:makePlan(0);assert(p.targetContract,'first choice can use ACT')
+  target(d,p,0,1);local b=d:button(0);assert(b and b[1]=='b','first mismatch backs out')
+  for turn=1,3 do
+    p=d:makePlan(0);assert(p==rules and not p.targetContract,'repeated replans must keep ordinary fallback')
+    target(d,p,0,1);b=d:button(0);assert(b and b[1]=='a','ordinary fallback commits and progresses')
+  end
+  assert(selections==1,'failed scored choice is not repeatedly reconsidered')
+  d:idle();p=d:makePlan(0);assert(p.targetContract and selections==2,'new battle restores ACT eligibility')
+  d.plan,d.planActor=p,0;ram[0x7bc2],ram[0x3e9d]=5,4
+  b=d:button(0);assert(not b and d.raceActDeclined,'actual unavailable boost acknowledgment also falls back')
+  d:idle();assert(not d.raceActDeclined,'driver boundary reset clears fallback')
+  H.CARE_RACE=old
+end
+local names={'physical','item','zero','matched','queue','unsupported','tools','ordinary','repeated'}
 if arg[1] then assert(cases[arg[1]])() else for _,name in ipairs(names) do cases[name]() end end
 print('race_target_contract_selftest: PASS '..(arg[1] or 'all'))

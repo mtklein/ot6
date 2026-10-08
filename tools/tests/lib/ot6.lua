@@ -6838,6 +6838,15 @@ function M.careRefund(reason)
   return true
 end
 function Driver:dropPlan(reason)
+  -- A scored command that cannot be steered/acknowledged must not win
+  -- the same comparison again forever. Use ordinary rules for this battle.
+  -- Accepted commands and their later queue diagnostics are separate.
+  if self.plan and self.plan.targetContract and not self.plan.committed
+    and reason ~= "confirm_attempt" then
+    self.raceActDeclined = reason or "back_out"
+    M.log(string.format("[%s] [race] scored command declined (%s); ordinary rules for this battle",
+      self.tag or "fight", self.raceActDeclined))
+  end
   if reason ~= "confirm_attempt" then self:traceDrop(reason or "back_out") end
   if self.careActor ~= nil and self.careActor == self.planActor and M.careRefund(reason) then
     self.careActor = nil
@@ -9439,7 +9448,7 @@ end
 function Driver:makePlan(actor)
   self._race, self.raceLast = nil, nil
   local plan = self:makePlanRules(actor)
-  if M.CARE_RACE and self._race ~= nil and self._race.actor == actor then
+  if M.CARE_RACE and not self.raceActDeclined and self._race ~= nil and self._race.actor == actor then
     self._racePred = nil
     local ok, c = pcall(self.raceLog, self, actor, plan, self._race)
     local played = "rules"
@@ -12411,6 +12420,7 @@ function Driver:idle()
   self.menuStreak, self.tick, self.battleTick = 0, 0, 0
   self.plan, self.planActor, self.held, self.confirmed = nil, nil, {}, nil
   self.parkDropN = 0
+  self.raceActDeclined = nil
   self.layout, self.layoutUnreadSaid, self.steerLast, self.steerDead = nil, false, nil, {}
   self.parts, self.partsLast, self.partsFell, self.partsSwitch = nil, {}, {}, {}
   self.lastStand = nil
