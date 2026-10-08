@@ -30,6 +30,11 @@ power, write like a human (owner, 2026-09-30).
 - **Aim for competence across the route.** Segments should be played
   confidently; one the party can't reliably win on the first attempt is
   worth a lab until it can.
+- **Adapt across the whole game, too.** Plan from the party's actual levels,
+  gear, supplies and condition. Missed XP or a different encounter history
+  may call for another fight, a shop stop or a different kit before moving
+  on. Judge the route by whether it can prepare and keep progressing, rather
+  than by whether it reproduces a particular sequence of rewards.
 - **A lost battle is normal.** A person who wipes reloads and goes again.
   Segments can retry from their boot checkpoint on a wipe, bounded and
   counted, with the seed, cause and boosts at death logged. A loss here and
