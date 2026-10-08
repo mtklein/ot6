@@ -126,7 +126,11 @@ end
 
 H.run({ maxFrames = 60000 }, {
   H.bootCheckpoint("hub-v1"),
-  H.waitFrames(30),
+  -- The hub save-point event re-fires beneath Mog.  Its transient control
+  -- window depends on the saved history; wait for live control instead of
+  -- assuming the frame thirty ticks after Continue is walkable.
+  H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 1800,
+    "scenario hub: control after its save-point event", 1),
   H.call(function()
     H.assertEq(map(), 9, "booted on map 9, the scenario hub")
     H.assertEq(H.hasControl(), true, "controllable")
