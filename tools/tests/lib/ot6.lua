@@ -8924,7 +8924,13 @@ function Driver:raceCandidates(actor, st)
       local action = M.raceAttack(line, b)
       if action.boost > a.bp or (not self.opts.boost and action.boost > 0) then return end
       local p = line.plan
-      local key = p and table.concat({ p.kind, p.cmd or -1, p.skill or -1, action.boost, action.target or -1 }, ":")
+      -- Area attacks carry an ordered flat target list, not one slot.
+      -- Serialize its contents, never its table address; retain order and
+      -- distinguish a singleton list from a scalar or an absent target.
+      local targetKey = type(action.target) == "table"
+        and ("list[" .. table.concat(action.target, ",") .. "]")
+        or (action.target == nil and "absent" or "slot[" .. tostring(action.target) .. "]")
+      local key = p and table.concat({ p.kind, p.cmd or -1, p.skill or -1, action.boost, targetKey }, ":")
       if key == nil or not seen[key] then
         c[#c + 1] = action
         if key then seen[key] = true end

@@ -381,7 +381,10 @@ produce emulator states or constitute gameplay evidence.
 
 The list above describes intended coverage. Current scoring offers supported
 physical lines at available boost, bag heals, individual Cure casts, and
-Fenix Downs. Offensive spells and summons selected by rules are excluded
+Fenix Downs. Physical candidate deduplication preserves ordered area-target
+lists by their contents and distinguishes them from scalar targets; it does
+not use table identities or pass a target table directly to concatenation.
+Offensive spells and summons selected by rules are excluded
 until canonical effect/price/target records exist; alternative spells,
 summons, Life, Defend and Row are not generally enumerated. The spell compiler
 has focused contracts, which do not themselves establish live discovery.

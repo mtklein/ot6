@@ -101,6 +101,24 @@ cases.repeated=function()
   d:idle();assert(not d.raceActDeclined,'driver boundary reset clears fallback')
   H.CARE_RACE=old
 end
-local names={'physical','item','zero','matched','queue','unsupported','tools','ordinary','repeated'}
+cases.candidate_keys=function()
+  local d=driver();d.opts.boost=true
+  local function line(target,boost,skill)
+    return {target=target,boost=boost or 0,plan={kind='skill',cmd=9,skill=skill or 0xaa}}
+  end
+  local targets={{1},1,{1,2},{2,1},{1,3},{}}
+  local actions={}
+  for _,t in ipairs(targets) do actions[#actions+1]=line(t) end
+  actions[#actions+1]=line(nil)
+  actions[#actions+1]=line({1,2}) -- independently allocated equivalent list
+  actions[#actions+1]=line({1,2},1)
+  actions[#actions+1]=line({1,2},0,0xab)
+  local st={party={[0]={bp=3,hp=100,noCare=true,actions=actions}}}
+  local c=d:raceCandidates(0,st)
+  assert(#c==9,'keys distinguish scalar/list, order, contents, absent/empty, boost and skill; equivalent lists deduplicate')
+  for i,t in ipairs(targets) do assert(c[i].target==t,'candidate targets retain original ordered contents') end
+  assert(c[7].target==nil and c[8].boost==1 and c[9].line.plan.skill==0xab,'other action identity remains distinct')
+end
+local names={'physical','item','zero','matched','queue','unsupported','tools','ordinary','repeated','candidate_keys'}
 if arg[1] then assert(cases[arg[1]])() else for _,name in ipairs(names) do cases[name]() end end
 print('race_target_contract_selftest: PASS '..(arg[1] or 'all'))
