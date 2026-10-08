@@ -7,8 +7,11 @@ boost-point turn economy.
 
 ## Status
 
-v0.25 is the current release
-([tag](https://github.com/mtklein/ot6/releases/tag/v0.25)); Setzer has his whole kit (Coin Toss, Hired Help, and Jackpot in the World of Ruin), a boosted action's extra hits move on to another monster when theirs falls, and the game shows its version on the splash and Config screen (details in the release notes). The game is playable from the start through the end of
+v0.26 is the current release
+([tag](https://github.com/mtklein/ot6/releases/tag/v0.26)); this housekeeping
+release improves the Phantom Train fight, boosted damage, Special weapon
+weaknesses and boosted Magicite (details in the release notes). The game
+is playable from the start through the end of
 the World of Balance: the whole Thamasa arc, the world tour aboard the
 repaired Blackjack, the IAF gauntlet, the Floating Continent and AtmaWeapon,
 and the escape — and into the World of Ruin as far as the Falcon, with Setzer back and
