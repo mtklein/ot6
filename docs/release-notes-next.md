@@ -36,3 +36,7 @@ calls Crusader, whose boosted Purifier wiped your own party. A boosted
 Magicite now calls an Esper that strikes the enemy, or a healing one,
 and the boost multiplies it. Unboosted, Magicite is the same gamble as
 ever, Crusader included.
+
+**Combat plans keep their aim and Boost Points.** Experimental combat choices
+back out and reconsider when the highlighted target differs from the plan,
+and healing items clear leftover pending boost before confirmation.

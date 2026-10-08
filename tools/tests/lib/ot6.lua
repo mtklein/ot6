@@ -5696,7 +5696,8 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
       frame = frame, stage = "plan", atb_tick = tickReader and tickReader() }
     if plan.targetContract then
       p.expected_targets = plan.targetContract.chars | (plan.targetContract.monsters << 8)
-      p.expected_attack, p.expected_command = plan.executionSpell, 2
+      p.expected_attack = plan.executionSpell or plan.contractAttack
+      p.expected_command = plan.spell and 2 or plan.contractCommand
       p.expected_boost = plan.boostWant
     end
     T.pending[actor] = p
@@ -5761,8 +5762,9 @@ function M.newRecoveryTrace(tag, emit, observe, tickReader)
     T.queueSerial = T.queueSerial + 1
     local p = T.staging
     local b = { generation = T.queueSerial, actor = actor, command = cmd, attack = attack }
-    if p and p.actor == actor and p.expected_attack ~= nil
-      and (attack ~= p.expected_attack or cmd ~= p.expected_command or storedTargets ~= p.expected_targets) then
+    if p and p.actor == actor and p.expected_targets ~= nil
+      and ((p.expected_attack ~= nil and attack ~= p.expected_attack)
+        or cmd ~= p.expected_command or storedTargets ~= p.expected_targets) then
       T.cancelQueued(actor,frame or p.submitted,"race_queue_identity_mismatch",
         {stored_command=cmd,stored_attack=attack,stored_targets=storedTargets})
       p = nil
@@ -9385,6 +9387,10 @@ function Driver:racePlan(actor, c)
   if c.kind == "attack" then
     local p = c.line and c.line.plan
     if p == nil then return nil end
+    -- Blitz commits from its list without a steerable target window.
+    -- Keep it in ordinary play until an enforceable initial-aim recipe exists.
+    if p.kind ~= "fight" and not (p.kind == "skill" and p.cmd == BATTLE.CMD_TOOLS) then return nil end
+    if type(c.target) ~= "number" or c.target % 1 ~= 0 or c.target < 0 or c.target > 5 then return nil end
     local q = {}
     for k, v in pairs(p) do q[k] = v end
     q.reason = "the care race"
@@ -9393,14 +9399,29 @@ function Driver:racePlan(actor, c)
     -- (chipAim; battle_classtarget caught the race's Fight on the unkeyed
     -- Tusker while a pierce-keyed Cirpius stood)
     q.aim = c.target
+    local mask = 1 << c.target
+    if c.line.aoe then
+      mask = 0
+      for slot=0,5 do if monAlive(slot) then mask = mask | (1 << slot) end end
+      if mask == 0 then return nil end
+    end
+    q.all = c.line.aoe == true
+    q.targetContract = { chars=0, monsters=mask, all=q.all }
+    q.contractCommand = q.kind == "fight" and BATTLE.CMD_FIGHT or q.cmd
+    q.contractAttack = q.kind == "skill" and q.skill or nil
     return q
   end
+  if (c.kind ~= "heal" and c.kind ~= "raise") or type(c.target) ~= "number"
+    or c.target % 1 ~= 0 or c.target < 0 or c.target > 3 or c.all then return nil end
   local row = cmdRow(actor, BATTLE.CMD_ITEM)
   if row == nil then return nil end
   local id = c.kind == "raise" and BATTLE.FENIX_DOWN or c.id
   local idx = id and self:battInvIdx(id)
   if idx == nil then return nil end
   return { kind = "item", item = id, target = c.target, row = row, idx = idx, restore = c.restore,
+           exactBoost = true, boostWant = 0, boostLeft = 0,
+           targetContract = { chars=1 << c.target, monsters=0, all=false },
+           contractCommand = BATTLE.CMD_ITEM,
            reason = c.kind == "raise" and "revive" or "the care race" }
 end
 
@@ -11996,13 +12017,13 @@ function Driver:button(actor)
   if st == BATTLE.ST_TGT then
     if self.plan.targetContract then
       local p, t = self.plan, self.plan.targetContract
-      if not self:raceSpellReady(actor,p) then
+      if p.spell and not self:raceSpellReady(actor,p) then
         self:dropPlan("race_spell_changed"); return { "b" }
       end
       local chars,mons = M.readByte(BATTLE.TGTCHARS),M.readByte(BATTLE.TGTMONS)
       if (t.chars ~= 0 and (mons ~= 0 or chars == 0)) then return self:cross("chars") end
       if (t.monsters ~= 0 and (chars ~= 0 or mons == 0)) then return self:cross("monsters") end
-      if t.all and M.readByte(BATTLE.TGTALL) == 0 then
+      if p.spell and t.all and M.readByte(BATTLE.TGTALL) == 0 then
         self.tgtSpin = self.tgtSpin + 1
         if self.tgtSpin >= 40 then self:dropPlan("race_group_unavailable"); return { "b" } end
         return (self.tgtSpin % 4) < 2 and { "r" } or {}
@@ -12223,6 +12244,9 @@ function Driver:button(actor)
       if M.readByte(BATTLE.TGTCHARS) ~= t.chars or M.readByte(BATTLE.TGTMONS) ~= t.monsters
         or (M.readByte(BATTLE.TGTALL) ~= 0) ~= t.all then
         self:dropPlan("race_target_mismatch"); return { "b" }
+      end
+      if M.readByte(BATTLE.PEND_BP + actor*2) ~= self.plan.boostWant then
+        self:dropPlan("race_boost_changed"); return { "b" }
       end
     end
     if self.opts.traceTgt then

@@ -3,7 +3,10 @@
 Status: experimental action model under revision; final matched validation
 of the earlier default-on augmentation did not meet the original
 all-command/no-regression acceptance bar. No release qualification claimed.
-Owner and coordinator, 2026-10-06; validation updated 2026-10-07.
+Owner and coordinator, 2026-10-06; validation updated 2026-10-08.
+The owner now accepts a fresh supported-route clear as the practical success
+bar, with ordinary preparation and catch-up fights responding to the actual
+party. Exact XP parity and a perfect model are not prerequisites to moving on.
 
 ## Why
 
@@ -62,7 +65,9 @@ use the normal controller inputs.
 - **The fight's end:** every standing body dead, or the formation's ending
   body dead (`partsPlan`).
 
-**The forward play.**  From the state, play an event queue forward until
+**Design intent for forward play.** The catalogue and model below describe
+the intended destination; Current candidate coverage states what runs today.
+From the state, play an event queue forward until
 one of these happens: the fight ends, the party wipes, or a horizon of
 `M.RACE_HORIZON` enemy opportunities (default 8), including suppressed
 opportunities, runs out.
@@ -76,7 +81,8 @@ opportunities, runs out.
     else the lowest-HP member.  This is pessimistic, as a cautious player
     is.
   - An AoE hits everyone.
-  - Seizure/Poison ticks come from the measured tick rate.
+  - Future Seizure/Poison ticks would come from measured rates; they are
+    not currently simulated.
 - **A death** removes the member's future turns and banks nothing.
 - **A raise** brings a member back at its raise HP (1/8 max for Fenix
   Down) at the queue position the item's execution lands.
@@ -199,7 +205,7 @@ line that counts the leg's decisions, disagreements and overrides.
   make the race cautious.  It should still choose damage when no member
   is in reach of a kill within the horizon, so check that it does not
   over-heal on the plain WoR stretches.
-- **Statuses** beyond death and the ticks are not simulated faithfully.
+- **Statuses**, including future poison/seizure ticks, are not simulated faithfully.
   While a standing member is Muddled, asleep, stopped, frozen, Berserk,
   petrified, a Zombie or departed, the rules play the fight. The Gate
   validation below caught the cost of imagining their planned turns.
@@ -363,17 +369,26 @@ produce emulator states or constitute gameplay evidence.
 
 ## Current candidate coverage
 
-The list above describes the intended coverage. The implementation offers
-`bestLine` at each available boost, bag heals, individual Cure casts, and
-Fenix Downs. It can score a measured offensive spell or summon selected by
-the rules, but does not generally enumerate alternative offensive spells,
-summons, Life, Defend or Row. Decisions before the first measured hit, while a removal last stand
-remains, and while a standing party member cannot take a planned turn
-(Muddle, Sleep, Stop, Frozen, Berserk, Petrify, Zombie or departure) use
-the rules. It therefore augments
-the rule stack rather than replacing every decision. Menu time is also
-still outside its estimate. The issue's no-regression and attrition
-improvement bar requires final matched evidence before closure.
+The list above describes intended coverage. Current scoring offers supported
+physical lines at available boost, bag heals, individual Cure casts, and
+Fenix Downs. Offensive spells and summons selected by rules are excluded
+until canonical effect/price/target records exist; alternative spells,
+summons, Life, Defend and Row are not generally enumerated. The spell compiler
+has focused contracts, which do not themselves establish live discovery.
+ACT compilation binds Fight and Tools to their scored initial target masks.
+Blitz/Pummel has no steerable target window and therefore remains ordinary
+rules play until its initial aim can be enforced. A rejected compilation
+leaves the existing rules plan in force; it removes no normal command access.
+Items and raises explicitly acknowledge zero pending boost. Strict targets
+back out and replan rather than accepting the steering fallback; subsequent
+engine retargeting after initial acceptance remains allowed.
+
+Decisions before the first measured hit, during removal last stands, or
+while a standing member cannot take its modeled turn use the rules. Future
+status and speed evolution and actions already in flight remain model gaps.
+The race augments the rules. The owner's current acceptance is route-level
+progression with actual kit, supplies, care and ordinary catch-up fights,
+rather than matching an exact XP history or minimizing all grinding.
 
 
 ## Final validation findings (2026-10-07)
@@ -520,8 +535,9 @@ navigation/queue/execution latency across menu and battle states, treatment of a
 Then branch both commands at disagreements from legitimate coherent
 snapshots, and evaluate fixed policies independently across fresh route
 attempts. Retain local controls and upstream arrival-state effects: the
-Sneezer's lost reward must survive in the inventory until explained and
-fixed, even if a segment still reaches its destination.
+Sneezer's lost reward remains in the retained history. The owner's current
+acceptance allows that arrival-state variation if ordinary preparation and
+catch-up play can continue through the supported route.
 
 Independent review of d7e854df found that execution completion cannot stand
 in for effect timing, unknown continuations could still act instantly, and
@@ -835,9 +851,11 @@ the repaired producer contract does not retroactively change its verdict.
 Evidence: `build/attempts/wt/v026-race/holistic/time-shadow-play/`, especially
 `fix-149a4f71/independent-review.md` and `comparison.json`.
 
-The prior XP regression still reproduces: Terra5311 versus6383 under rules,
-others6740 versus6383 each. The shadow instrument changes no acting scores.
+The prior XP difference still reproduces: Terra earned5311 versus6383 under
+rules, others earned6740 versus6383 each. The continued Gate capture has
+Terra total XP28143; that accumulated total is distinct from earned5311. The shadow instrument changes no acting scores.
 Selected-plan ownership, modeled opportunities and observed closed ledger
 units are now separable within one elapsed window. Queue occupancy,
 in-flight effects and future status prediction remain the next modeling
-work before broad acting comparisons or closure of #415.
+work for later refinement. These gaps do not replace the owner's present
+supported-route acceptance bar.
