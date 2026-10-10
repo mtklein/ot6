@@ -1,9 +1,6 @@
-# OT6 next release — notes in progress
+# Next release
 
-Player-facing changes merged since the last release, one paragraph each, in
-play terms. Each commit that adds a line names its evidence in the commit
-message. At release this file becomes `release-notes-vX.Y.md` with the
-title, the how-to-play section and the save note from the previous
-release's notes.
+Add each player-visible change as one short paragraph. Describe the change
+and its effect. Cite evidence in the commit message.
 
 ## What's changed

@@ -1,116 +1,102 @@
-# OT6 — Octopath Traveler mechanics in Final Fantasy VI
+# OT6
 
-A mechanics-overhaul ROM hack of Final Fantasy VI (SNES, US "FF3" ROM). It
-keeps FF6's cast, story, and world, and replaces the combat system with
-Octopath Traveler's: per-character job identities, shield/break tactics, and a
-boost-point turn economy.
+OT6 is a Final Fantasy VI ROM hack. It adds Octopath Traveler combat
+mechanics while keeping the FF6 story, world, and characters.
 
 ## Status
 
-v0.26 is the current release
-([tag](https://github.com/mtklein/ot6/releases/tag/v0.26)); this housekeeping
-release improves the Phantom Train fight, boosted damage, Special weapon
-weaknesses and boosted Magicite (details in the release notes). The game
-is playable from the start through the end of
-the World of Balance: the whole Thamasa arc, the world tour aboard the
-repaired Blackjack, the IAF gauntlet, the Floating Continent and AtmaWeapon,
-and the escape — and into the World of Ruin as far as the Falcon, with Setzer back and
-Darill's Tomb cleared.
+v0.26 is the current release: [download it](https://github.com/mtklein/ot6/releases/tag/v0.26).
+`main` is v0.27 development.
 
-Main is v0.27 development; the latest published release is v0.26.
+The game is playable through the World of Balance and through Darill's Tomb
+in the World of Ruin.
 
-Break and boost are the two central systems. Enemies carry shields and hidden
-weaknesses, hitting a weakness chips a shield, and breaking drops defenses
-hard. Boost banks turns and folds spell tiers (Fire → Fira → Firaga).
-Magicite work as sub-jobs: equip an esper and its spells join your Magic list,
-along with a stat bump, while you hold it — in battle and in the field menu.
-Blitz is a menu, Steal guarantees the rare at three boost pips, and level-ups
-fully restore HP and MP.
+Main changes:
 
-See [docs/DESIGN.md](docs/DESIGN.md) for the mechanics design and
-[docs/TOOLING.md](docs/TOOLING.md) for tool installation.
+- Enemies have shields and weaknesses. Weak hits remove shields. Broken
+  enemies lose turns and take more damage.
+- Characters gain and spend Boost Points. Boost can add hits, raise spell
+  tiers, improve odds, or extend effects.
+- Equipped Magicite grant spells and stats. They do not teach spells
+  permanently.
+- Characters have distinct skill sets.
 
-## Playing on Android
+See [the design](docs/DESIGN.md) for mechanics and
+[the tooling guide](docs/TOOLING.md) for setup.
 
-Each release carries `ot6-vX.Y.apk`, OT6 Patcher: a small app that makes
-`OT6.sfc` from your own ROM and keeps it current. To get updates without
-lifting a finger, subscribe in [Obtainium](https://obtainium.imranr.dev/):
+## Android
 
-1. Add an app with the URL `https://github.com/mtklein/ot6`, and under
-   "Filter APKs by regular expression" enter `ot6-.*\.apk`.
-2. Install it, open OT6 Patcher once, and choose the folder that holds your
-   own Final Fantasy III (USA) v1.0 ROM (it's never included, and never
-   changed). The app finds the ROM there and writes `OT6.sfc` beside it. If
-   it can't find it, it lists what it checked, and you can pick the ROM
-   file yourself.
-3. From then on, each update Obtainium installs quietly rewrites `OT6.sfc`,
-   with no notifications; open the app any time to see the last result.
+Each release includes `ot6-vX.Y.apk`. The app creates `OT6.sfc` from your
+own ROM.
 
-`OT6.sfc` keeps its name across updates, so your saves and save states
-carry over. RetroArch: put the ROM in a folder its playlist scans, and
-re-scan once so OT6.sfc shows up. If you used to soft-patch, delete the
-`Final Fantasy III (USA).bps` beside your vanilla ROM so vanilla stays
-vanilla, and keep any `OT6.bps` (or `.ips`, `.ups`, `.xdelta`, or a numbered
-one like `OT6.ips1`) out of OT6.sfc's folder, since RetroArch would apply it
-on top; the app warns if it sees one.
+1. Add `https://github.com/mtklein/ot6` to
+   [Obtainium](https://obtainium.imranr.dev/). Set the APK filter to
+   `ot6-.*\.apk`.
+2. Install and open OT6 Patcher. Select the folder containing your Final
+   Fantasy III (USA) v1.0 ROM. If needed, select the ROM file directly.
+3. Later app updates replace `OT6.sfc` with the new version.
+
+The original ROM is not changed. `OT6.sfc` keeps the same name so the
+emulator can keep using its save file.
+
+For RetroArch, scan the folder containing `OT6.sfc`. Remove
+`Final Fantasy III (USA).bps` from the original ROM's folder if you no longer
+use soft patching. Do not place another patch beside `OT6.sfc`.
+
+## Building
+
+Place `Final Fantasy III (USA).sfc` in the repository root. It must have
+SHA-1 `4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7`. The ROM is not included.
+
+```sh
+brew bundle
+python3 -m pip install numpy
+python3 configure.py
+ninja
+ninja release
+```
+
+Mesen and Flips require separate installation. See
+[the tooling guide](docs/TOOLING.md).
+
+`ninja` builds both ROMs and runs the full test graph. `ninja release` also
+runs release checks and creates the release archive. Specific outputs can be
+built directly:
+
+```sh
+ninja ff6/rom/ff6-en.sfc
+ninja build/results/suite/battle_break.ok
+ninja build/states/vargas_entry.mss.lua
+```
+
+`tools/gui.sh` opens the built ROM in Mesen. To record a test run:
+
+```sh
+OT6_RECORD=1 tools/tests/run.sh tools/tests/<test>.lua
+```
+
+See [the recording guide](tools/stream/README.md) for details.
+
+## Code
+
+OT6 assembly starts in [ff6/src/battle/ot6.asm](ff6/src/battle/ot6.asm).
+[ff6/src/battle/ot6_memory.inc](ff6/src/battle/ot6_memory.inc) defines shared
+WRAM and SRAM. `ff6/` is a vendored copy of the everything8215 FF6
+disassembly.
+
+See [the headless play guide](docs/playing-headless.md) and
+[the test harness guide](tools/tests/README.md).
+
+## Sketch warning
+
+The original FF6 1.0 Sketch bug remains. A missed Sketch can corrupt
+inventory or save data. Save before using Sketch.
 
 ## Contributing
 
 See [AGENTS.md](AGENTS.md).
 
-## Building
-
-You supply your own ROM; it is not included. The build verifies it by SHA-1
-and refuses anything else: `Final Fantasy III (USA).sfc`, sha1
-`4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7`, at the repo root.
-
-```sh
-brew bundle                 # cc65, sdl2, ninja, ffmpeg
-python3 -m pip install numpy
-python3 configure.py        # writes build.ninja
-ninja                       # builds and tests everything (qualification)
-ninja release               # ...then the release preflights and the zip
-```
-
-Mesen and Flips are not brew-installable; [docs/TOOLING.md](docs/TOOLING.md)
-has those steps.
-
-`ninja` runs the whole graph: both ROMs, every generated savestate (the
-story-chain fixtures are multi-minute scripted playthroughs; a cold build
-takes upward of an hour and a half), all 94 suite tests, the audits and
-selftests. `ninja release` adds the release preflights and packaging.
-Anything narrower is a real output path:
-
-```sh
-ninja ff6/rom/ff6-en.sfc                    # just the ROM
-ninja build/results/suite/battle_break.ok   # one suite test (and what it needs)
-ninja build/states/vargas_entry.mss.lua     # one savestate (and its chain)
-```
-
-`tools/gui.sh` opens the built ROM in the Mesen GUI.
-`OT6_RECORD=1 tools/tests/run.sh tools/tests/<test>.lua` records a run as a
-watchable video with a pad-input panel; see
-[tools/stream/README.md](tools/stream/README.md).
-
-## Where the code is
-
-OT6 code lives in feature modules emitted from
-[ff6/src/battle/ot6.asm](ff6/src/battle/ot6.asm) into expanded bank `$F0`;
-[ot6_memory.inc](ff6/src/battle/ot6_memory.inc) owns the shared WRAM/SRAM
-map. `ff6/` is a vendored copy of the everything8215/ff6 disassembly
-(GPL-3.0). The headless play harness is
-[docs/playing-headless.md](docs/playing-headless.md);
-[tools/tests/README.md](tools/tests/README.md) covers the test harness.
-
-## A warning about Sketch
-
-Relm's Sketch carries Final Fantasy VI 1.0's most famous bug, deliberately
-left in place: when a Sketch misses, the game can rarely corrupt your
-inventory or save. Save before experimenting with Sketch; the world map
-saves anywhere.
-
 ## License
 
-OT6's own code is MIT (see [LICENSE](LICENSE)). The Final Fantasy VI
-disassembly under `ff6/` is GPL v3, and so are the built ROM and release
-patch that include it.
+OT6 code is MIT licensed. See [LICENSE](LICENSE). The FF6 disassembly, built
+ROM, and release patch are GPL v3.

@@ -182,6 +182,10 @@ power, write like a human (owner, 2026-09-30).
 
 ## Releases and the repository
 
+- **Keep public prose short and factual.** Use ordinary words. State the
+  change and its effect. Remove taglines, jokes, scene-setting, rhetorical
+  transitions and promotional language. Do not repeat background that the
+  reader already has.
 - **The release bar** is a fluid, honest playthrough of the supported route
   with few game-overs. Retry sites in the qualification run are lab
   candidates, and each save point along it gets a checkpoint.
