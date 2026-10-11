@@ -7,7 +7,8 @@
 -- 7-10).  Played: Continue fc-alcove-v1 (TERRA L26 knows Break, her level-24
 -- spell), walk onto the continent into a random battle, and cast Break
 -- through the real menu at the shielded monster with the most shields, at
--- 1 BP, 0 BP and 3 BP (Defends bank the points); everyone else Defends.
+-- 1 BP, 0 BP and 3 BP (Defends bank the points, and wait out a Break before
+-- the next cast); everyone else Defends.
 -- Nothing is written.
 --
 -- Asserted per cast, from what the engine did (the spell's own $3410 write
@@ -19,8 +20,8 @@
 --   3. TERRA paid 25 MP at both boosts (the price is flat), and the bank
 --      paid the boost (an unboosted cast earns its turn's pip, as any turn).
 -- Each cast aims at the unbroken body with the most shields: the 1-BP cast
--- needs three (two chips counted exactly), the 0-BP cast two; the 3-BP cast
--- takes four, or asserts the Break when the body holds four or fewer.
+-- needs three (two chips counted exactly); the others take theirs, or
+-- assert the Break when the body holds no more.
 --
 -- Old-ROM red and mutants: build/attempts/wt/v027-kits/breakspell/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
@@ -132,10 +133,11 @@ local function check(r, boost, slot)
 end
 
 -- the casts, in order: 1 BP on the body with the most shields (it must hold
--- three, so the two chips are counted exactly), 0 BP on the next (two, so
--- the one is), then 3 BP (four chips, or the Break when it holds four or
--- fewer)
-local CASTS = { { boost = 1, need = 3 }, { boost = 0, need = 2 }, { boost = 3, need = 1 } }
+-- three, so the two chips are counted exactly), 0 BP (one chip), then 3 BP
+-- (four chips, or the Break when it holds four or fewer).  Before each, the
+-- party Defends until a live unbroken body holds shields: a lone body the
+-- 0-BP cast broke recovers its shields when its Break runs out (Ot6Tick).
+local CASTS = { { boost = 1, need = 3 }, { boost = 0, need = 1 }, { boost = 3, need = 1 } }
 local plan, targets = nil, {}
 local function planCast(i)
   return H.call(function()
@@ -173,7 +175,10 @@ local steps = {
   H.waitUntil(function() return H.battleActive() end, 1200, "the battle is up", 2),
   H.waitFrames(30),
 }
+local empty = {}
 for i = 1, #CASTS do
+  steps[#steps + 1] = H.kitBattle(empty, { untilPlanDone = true, idle = "defend", maxFrames = 30000,
+    planDone = function() local _, sh = pickTarget(); return sh ~= nil and sh >= 1 end })
   steps[#steps + 1] = planCast(i)
   steps[#steps + 1] = H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000,
     planDone = function() return close() end })
