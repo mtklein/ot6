@@ -1,0 +1,577 @@
+#!/usr/bin/env python3
+"""status -- the state of the world in one command, problems marked.
+
+    tools/status                 everything; exits 1 if anything is unhealthy
+    tools/status --no-fetch      skip `git fetch` (origin/* as last fetched)
+    tools/status --machine HOST  check these hosts instead of tools/machines.txt
+
+One line per item.  "ok" lines are healthy, "--" lines are information
+(branches, issues), and "!!" lines are problems: they set the exit status.
+It reports on the main tree of whatever checkout it runs from.
+
+  git       the main tree's uncommitted work, local main against origin/main
+            (fetched first), every worktree, and every wt/* branch, local or
+            on origin: commits ahead of origin/main, the tip's age, and how
+            many of those commits `git cherry` finds still missing from main
+            (0 missing = finished, delete it)
+  release   VERSION, the newest v* tag, GitHub's latest release and its .zip
+            and .apk, README's "vX.Y is the current release" line, and any
+            release/* branch carrying patches main lacks
+  github    `gh auth status`, and whether git itself can authenticate a push:
+            `git push --dry-run` of origin/main onto itself, which talks to
+            GitHub through the credential helper (keychain included) and
+            writes nothing
+  issues    open issues in the lowest open vX.Y milestone
+  live      live.py answering on its port (tools/machines.txt), the
+            machines it watches and whether each is up
+  machines  each machine in tools/machines.txt, one ssh each, in parallel:
+            reachable, AC power (tools/tests/lib/power_source.py), its
+            ~/.config/ot6/emulator-slots, load, emulators running, and a
+            pending reboot (/var/run/reboot-required.pkgs)
+
+live.py loads this file too: local_facts() rides in each machine's snapshot,
+judge_machine() and infra_checks() feed the page's health banner.
+Plain stdlib; runs under the macOS system Python 3.9.
+"""
+import concurrent.futures
+import json
+import os
+import platform
+import re
+import socket
+import subprocess
+import sys
+import time
+import types
+import urllib.request
+
+PROBLEM, OK, INFO = "!!", "ok", "--"
+SSH_TIMEOUT = 10        # seconds for one machine's whole probe
+LOCAL_NAME = socket.gethostname().split(".")[0].lower()
+
+
+def _root():
+    here = globals().get("__file__")
+    return os.path.dirname(os.path.dirname(os.path.abspath(here))) if here else os.getcwd()
+
+
+def run(cmd, cwd=None, timeout=20, env=None):
+    """(returncode, stdout, stderr); a timeout or missing binary is rc 124/127."""
+    try:
+        p = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
+                           timeout=timeout, env=env)
+        return p.returncode, p.stdout, p.stderr
+    except subprocess.TimeoutExpired:
+        return 124, "", f"timed out after {timeout}s"
+    except OSError as e:
+        return 127, "", str(e)
+
+
+def last_line(text):
+    lines = [l.strip() for l in (text or "").splitlines() if l.strip()]
+    return lines[-1][:160] if lines else ""
+
+
+def ago(seconds):
+    s = max(0, int(seconds))
+    for unit, n in (("d", 86400), ("h", 3600), ("m", 60)):
+        if s >= n:
+            return f"{s // n}{unit}"
+    return f"{s}s"
+
+
+# ---- config ---------------------------------------------------------------
+
+def load_config(root=None):
+    """tools/machines.txt -> {"machines": [{host, name, excluded}], "live": "host:port"}."""
+    path = os.path.join(root or _root(), "tools", "machines.txt")
+    machines, live = [], None
+    try:
+        with open(path) as f:
+            lines = f.read().splitlines()
+    except OSError:
+        lines = []
+    for line in lines:
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        head, _, rest = line.partition(" ")
+        if head == "live":
+            live = rest.strip()
+            continue
+        rest = rest.strip()
+        excluded = None
+        if rest.startswith("excluded"):
+            excluded = rest.partition(":")[2].strip() or "excluded"
+        machines.append({"host": head, "name": head.split(".")[0].lower(),
+                         "excluded": excluded})
+    return {"machines": machines, "live": live or "127.0.0.1:8611",
+            "excluded": {m["name"] for m in machines if m["excluded"]}}
+
+
+# ---- one machine's facts (run here, over ssh, and inside live.py) ---------
+
+def _power_module():
+    mod = sys.modules.get("power_source")
+    if mod is None:
+        import importlib.util
+        path = os.path.join(_root(), "tools", "tests", "lib", "power_source.py")
+        spec = importlib.util.spec_from_file_location("power_source", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        sys.modules["power_source"] = mod
+    return mod
+
+
+def local_facts():
+    """This machine, as a JSON-able dict.  Every key is a plain observation;
+    judge_machine() decides what is a problem."""
+    facts = {"name": LOCAL_NAME, "os": platform.system(), "ncpu": os.cpu_count()}
+    try:
+        facts["power"] = _power_module().observe()["source"]
+    except Exception as e:
+        facts["power"] = "unknown"
+        facts["power_err"] = str(e)[:80]
+    slots = None
+    try:
+        with open(os.path.expanduser("~/.config/ot6/emulator-slots")) as f:
+            for tok in f.read().split():
+                if tok.isdigit() and int(tok) > 0:
+                    slots = int(tok)
+                    break
+    except OSError:
+        pass
+    facts["slots_file"] = slots
+    try:
+        facts["load"] = [round(x, 2) for x in os.getloadavg()]
+    except OSError:
+        facts["load"] = None
+    rc, out, _ = run(["ps", "-axo", "args"], timeout=5)
+    facts["emulators"] = (sum("--testrunner" in l for l in out.splitlines())
+                          if rc == 0 else None)
+    if os.path.exists("/var/run/reboot-required"):
+        try:
+            with open("/var/run/reboot-required.pkgs") as f:
+                facts["reboot_pkgs"] = sorted(set(f.read().split()))
+        except OSError:
+            facts["reboot_pkgs"] = []
+    else:
+        facts["reboot_pkgs"] = None
+    return facts
+
+
+def _probe_script(root):
+    """A self-contained python3 program printing the far side's local_facts():
+    this file and power_source.py ride along, so the peer's checkout does not
+    matter."""
+    with open(os.path.join(root, "tools", "tests", "lib", "power_source.py")) as f:
+        ps = f.read()
+    with open(os.path.join(root, "tools", "status")) as f:
+        me = f.read()
+    return ("import sys, types, json\n"
+            "_ps = types.ModuleType('power_source')\n"
+            f"exec(compile({ps!r}, 'power_source.py', 'exec'), _ps.__dict__)\n"
+            "sys.modules['power_source'] = _ps\n"
+            "_st = types.ModuleType('ot6status')\n"
+            f"exec(compile({me!r}, 'status', 'exec'), _st.__dict__)\n"
+            "print(json.dumps(_st.local_facts()))\n")
+
+
+def probe(host, root, local=False):
+    """facts for one machine, or {"error": why} when it can't be reached."""
+    t0 = time.time()
+    if local:
+        facts = local_facts()
+    else:
+        cmd = ["ssh", "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=4",
+               host, "python3 -"]
+        try:
+            p = subprocess.run(cmd, input=_probe_script(root), capture_output=True,
+                               text=True, timeout=SSH_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            return {"error": f"no answer in {SSH_TIMEOUT}s"}
+        line = next((l for l in p.stdout.splitlines() if l.startswith("{")), None)
+        if p.returncode != 0 or line is None:
+            return {"error": last_line(p.stderr) or last_line(p.stdout)
+                    or f"ssh exit {p.returncode}"}
+        try:
+            facts = json.loads(line)
+        except ValueError:
+            return {"error": "unreadable probe output"}
+    facts["secs"] = round(time.time() - t0, 1)
+    return facts
+
+
+def judge_machine(facts):
+    """[(level, text)] for one machine's facts.  A key that is absent was not
+    observed (an older peer in live.py) and is not judged."""
+    if facts.get("error"):
+        return [(PROBLEM, "unreachable: " + facts["error"])]
+    out, bits = [], []
+    power = facts.get("power")
+    if power is not None:
+        if power != "ac":
+            out.append((PROBLEM, f"on {power} power: takes no new work"
+                        if power == "battery" else "power source unknown: takes no new work"))
+        else:
+            bits.append("AC")
+    if "slots_file" in facts:
+        if not facts["slots_file"]:
+            out.append((PROBLEM, "no ~/.config/ot6/emulator-slots (run.sh falls back "
+                        f"to {facts.get('ncpu')} CPUs)"))
+        else:
+            bits.append(f"slots {facts['slots_file']}")
+    if facts.get("emulators") is not None:
+        bits.append(f"{facts['emulators']} emulator" + ("" if facts["emulators"] == 1 else "s"))
+    if facts.get("load"):
+        bits.append(f"load {facts['load'][0]:g}/{facts.get('ncpu')}")
+    pkgs = facts.get("reboot_pkgs")
+    if pkgs is not None:
+        out.append((PROBLEM, "reboot pending for " + (", ".join(pkgs[:6]) +
+                    (f" (+{len(pkgs) - 6})" if len(pkgs) > 6 else "") if pkgs
+                    else "updates")))
+    if not out:
+        out.append((OK, ", ".join(bits)))
+    else:
+        out = [(lv, t + (" (" + ", ".join(bits) + ")" if bits and i == 0 else ""))
+               for i, (lv, t) in enumerate(out)]
+    return out
+
+
+# ---- git --------------------------------------------------------------------
+
+def git(root, *args, timeout=20):
+    return run(["git", "-C", root] + list(args), timeout=timeout,
+               env=dict(os.environ, GIT_TERMINAL_PROMPT="0", GCM_INTERACTIVE="never"))
+
+
+def main_tree(root):
+    rc, out, _ = git(root, "worktree", "list", "--porcelain")
+    for line in out.splitlines():
+        if line.startswith("worktree "):
+            return line[len("worktree "):]
+    return root
+
+
+def worktrees(main):
+    rc, out, _ = git(main, "worktree", "list", "--porcelain")
+    trees, cur = [], None
+    for line in out.splitlines() + [""]:
+        if line.startswith("worktree "):
+            cur = {"path": line[9:], "branch": None, "prunable": False}
+        elif cur is None:
+            continue
+        elif line.startswith("branch "):
+            cur["branch"] = line[7:].replace("refs/heads/", "", 1)
+        elif line == "detached":
+            cur["branch"] = "(detached)"
+        elif line.startswith("prunable"):
+            cur["prunable"] = True
+        elif line == "":
+            trees.append(cur)
+            cur = None
+    return trees
+
+
+def git_checks(main, fetched):
+    out = []
+    if fetched is not None:
+        rc, err = fetched
+        if rc != 0:
+            out.append((PROBLEM, "git", "fetch origin failed: " + last_line(err)))
+    rc, branch, _ = git(main, "rev-parse", "--abbrev-ref", "HEAD")
+    branch = branch.strip()
+    rc, st, _ = git(main, "status", "--porcelain")
+    dirty = [l for l in st.splitlines() if l.strip()]
+    rc, lr, _ = git(main, "rev-list", "--left-right", "--count", "main...origin/main")
+    ahead, behind = (int(x) for x in lr.split()) if rc == 0 else (None, None)
+    rc, head, _ = git(main, "log", "-1", "--format=%h %ct", "main")
+    sha, ct = head.split() if rc == 0 and head.strip() else ("?", "0")
+    where = f"main {sha} ({ago(time.time() - int(ct))} old)"
+    if branch != "main":
+        out.append((PROBLEM, "git", f"main tree {main} is on {branch}, not main"))
+    if dirty:
+        out.append((PROBLEM, "git", f"main tree has {len(dirty)} uncommitted: "
+                    + ", ".join(l[3:] for l in dirty[:4]) + (" ..." if len(dirty) > 4 else "")))
+    if ahead:
+        out.append((PROBLEM, "git", f"{where}: {ahead} commit(s) not pushed to origin/main"))
+    if behind:
+        out.append((INFO, "git", f"{where}: {behind} behind origin/main (pull)"))
+    if not dirty and not ahead and branch == "main":
+        out.append((OK, "git", f"{where}, clean, "
+                    + ("= origin/main" if not behind else "pushed")))
+    for t in worktrees(main):
+        if t["path"] == main:
+            continue
+        rel = os.path.relpath(t["path"], main) if t["path"].startswith(main) else t["path"]
+        if t["prunable"] or not os.path.isdir(t["path"]):
+            out.append((INFO, "worktree", f"{rel}: directory gone (git worktree prune)"))
+            continue
+        rc, st, _ = git(t["path"], "status", "--porcelain")
+        n = len([l for l in st.splitlines() if l.strip()])
+        out.append((INFO, "worktree", f"{rel} [{t['branch']}]"
+                    + (f" {n} uncommitted" if n else " clean")))
+    return out
+
+
+def branch_checks(main):
+    """wt/* (and release/*) branches, local and on origin, against origin/main."""
+    rc, out, _ = git(main, "for-each-ref", "--format=%(refname) %(objectname) %(committerdate:unix)",
+                     "refs/heads/wt", "refs/remotes/origin/wt",
+                     "refs/heads/release", "refs/remotes/origin/release")
+    refs = {}
+    for line in out.splitlines():
+        ref, sha, ct = line.split()
+        if ref.startswith("refs/heads/"):
+            refs.setdefault(ref[11:], {})["local"] = (sha, int(ct))
+        else:
+            refs.setdefault(ref[len("refs/remotes/origin/"):], {})["remote"] = (sha, int(ct))
+    checked_out = {t["branch"] for t in worktrees(main)}
+
+    def one(name):
+        r = refs[name]
+        sha, ct = r.get("local") or r.get("remote")
+        rc, n, _ = git(main, "rev-list", "--count", f"origin/main..{sha}")
+        ahead = int(n) if rc == 0 else -1
+        rc, ch, _ = git(main, "cherry", "-v", "origin/main", sha)
+        plus = [l.split(None, 2) for l in ch.splitlines() if l.startswith("+")]
+        missing = len(plus)
+        first = f" ({plus[0][1][:8]} {plus[0][2][:60]})" if plus and len(plus[0]) > 2 else ""
+        push = ""
+        if "local" in r and "remote" not in r:
+            push = ", local only"
+        elif "local" in r and r["local"][0] != r["remote"][0]:
+            rc, n, _ = git(main, "rev-list", "--count", r["local"][0],
+                           "^" + r["remote"][0], "^origin/main")
+            push = f", {n.strip()} unpushed" if rc == 0 and n.strip() != "0" else ", origin differs"
+        return name, ahead, missing, ct, push, first
+
+    with concurrent.futures.ThreadPoolExecutor(8) as ex:
+        rows = list(ex.map(one, sorted(refs)))
+    lines = []
+    now = time.time()
+    for name, ahead, missing, ct, push, first in rows:
+        tree = " [worktree]" if name in checked_out else ""
+        age = ago(now - ct)
+        if name.startswith("release/"):
+            if missing:
+                lines.append((PROBLEM, "release", f"{name}: {missing} commit(s) not on main{first}{push}"))
+            continue
+        if ahead == 0:
+            state = "merged: finished"
+        elif missing == 0:
+            state = f"{ahead} ahead, all on main by patch: finished"
+        else:
+            state = f"{missing} of {ahead} not on main"
+            if now - ct > 7 * 86400:
+                state += ", stale"
+        lines.append((INFO, "branch", f"{name}: {state}, {age} old{push}{tree}"))
+    if not any(l[1] == "release" for l in lines):
+        n = sum(1 for k in refs if k.startswith("release/"))
+        lines.insert(0, (OK, "release", f"{n} release/* branches, none ahead of main"))
+    return lines
+
+
+# ---- release drift, GitHub ---------------------------------------------------
+
+def gh_repo(main):
+    rc, url, _ = git(main, "remote", "get-url", "origin")
+    m = re.search(r"github\.com[:/]([^/]+)/([^/.\s]+)", url)
+    return f"{m.group(1)}/{m.group(2)}" if m else None
+
+
+def vkey(v):
+    return tuple(int(x) for x in re.findall(r"\d+", v))
+
+
+def release_checks(main, repo):
+    out = []
+    try:
+        with open(os.path.join(main, "VERSION")) as f:
+            version = f.read().strip()
+    except OSError:
+        version = None
+    rc, tags, _ = git(main, "tag", "--list", "v[0-9]*", "--sort=-v:refname")
+    tag = next(iter(tags.split()), None)
+    try:
+        with open(os.path.join(main, "README.md")) as f:
+            m = re.search(r"\bv(\d+\.\d+) is the current release", f.read())
+        readme = "v" + m.group(1) if m else None
+    except OSError:
+        readme = None
+    rc, rel, err = run(["gh", "release", "view", "--repo", repo, "--json",
+                        "tagName,assets,publishedAt"], timeout=20)
+    gh = json.loads(rel) if rc == 0 else None
+    if gh is None:
+        out.append((PROBLEM, "release", "gh release view failed: " + last_line(err)))
+        return out
+    latest = gh["tagName"]
+    assets = [a["name"] for a in gh.get("assets", [])]
+    want = [f"ot6-{latest}.zip", f"ot6-{latest}.apk"]
+    missing = [a for a in want if a not in assets]
+    if missing:
+        out.append((PROBLEM, "release", f"GitHub {latest} lacks " + ", ".join(missing)))
+    if tag != latest:
+        out.append((PROBLEM, "release", f"newest tag {tag} but GitHub's latest release is {latest}"))
+    if readme != latest:
+        out.append((PROBLEM, "release", f"README says {readme} is the current release; GitHub's latest is {latest}"))
+    if version and tag and vkey(version) < vkey(tag):
+        out.append((PROBLEM, "release", f"VERSION {version} is older than tag {tag}"))
+    if not out:
+        out.append((OK, "release", f"{latest} tagged, released ({', '.join(want)}), "
+                    f"README agrees; VERSION {version}"))
+    return out
+
+
+def github_checks(main):
+    out = []
+    rc, so, se = run(["gh", "auth", "status"], timeout=20)
+    text = so + se
+    if rc != 0:
+        bad = [l.strip() for l in text.splitlines() if "X " in l or "invalid" in l.lower()
+               or "failed" in l.lower()]
+        out.append((PROBLEM, "github", "gh auth status: " + ((bad or [last_line(text)])[0])[:160]))
+    else:
+        m = re.search(r"account (\S+)", text)
+        out.append((OK, "github", "gh logged in" + (f" as {m.group(1)}" if m else "")))
+    # git's own credentials: a dry-run push of origin/main onto itself.  It
+    # authenticates (GitHub asks before it lists refs for a push) and writes
+    # nothing.  "To <url>" means the remote answered.
+    rc, so, se = git(main, "push", "--dry-run", "--porcelain", "origin",
+                     "refs/remotes/origin/main:refs/heads/main", timeout=30)
+    if rc == 0 or re.search(r"^To \S", so, re.M):
+        out.append((OK, "github", "git push authenticates (dry run)"))
+    else:
+        out.append((PROBLEM, "github", "git push --dry-run cannot authenticate: "
+                    + (last_line(se) or last_line(so) or f"exit {rc}")))
+    return out
+
+
+def infra_checks(root):
+    """The checks that need neither ssh nor live.py: GitHub auth (gh and git)
+    and release drift.  live.py runs these now and then for its banner."""
+    main = main_tree(root)
+    repo = gh_repo(main)
+    with concurrent.futures.ThreadPoolExecutor(2) as ex:
+        a = ex.submit(github_checks, main)
+        b = ex.submit(release_checks, main, repo)
+        return a.result() + b.result()
+
+
+def issue_checks(repo):
+    rc, so, se = run(["gh", "api", f"repos/{repo}/milestones?state=open&per_page=100"], timeout=20)
+    if rc != 0:
+        return [(PROBLEM, "issues", "gh api milestones failed: " + last_line(se))]
+    ms = [m for m in json.loads(so) if re.match(r"v\d+\.\d+", m["title"])]
+    if not ms:
+        return [(INFO, "issues", "no open vX.Y milestone")]
+    cur = min(ms, key=lambda m: vkey(m["title"].split()[0]))
+    rc, so, se = run(["gh", "api", f"repos/{repo}/issues?milestone={cur['number']}"
+                      "&state=open&per_page=100"], timeout=20)
+    if rc != 0:
+        return [(PROBLEM, "issues", "gh api issues failed: " + last_line(se))]
+    items = sorted(json.loads(so), key=lambda i: i["number"])
+    out = [(INFO, "issues", f"milestone {cur['title']}: {len(items)} open")]
+    for i in items:
+        kind = "PR " if "pull_request" in i else ""
+        out.append((INFO, "issues", f"  {kind}#{i['number']} {i['title'][:90]}"))
+    return out
+
+
+# ---- live.py ------------------------------------------------------------------
+
+def live_checks(cfg):
+    host, _, port = cfg["live"].rpartition(":")
+    if host.split(".")[0].lower() == LOCAL_NAME:
+        host = "127.0.0.1"
+    url = f"http://{host}:{port}/grid.json"
+    try:
+        with urllib.request.urlopen(url, timeout=3) as r:
+            grid = json.load(r)
+    except Exception as e:
+        return [(PROBLEM, "live", f"live.py not answering at {cfg['live']}: {e}")]
+    age = time.time() - grid.get("ts", 0)
+    out = []
+    if age > 30:
+        out.append((PROBLEM, "live", f"live.py grid.json is {ago(age)} old"))
+    watched = {m["name"]: m for m in grid.get("machines", [])}
+    pool = {m["name"] for m in cfg["machines"] if not m["excluded"]}
+    excluded = cfg["excluded"]
+    for name in sorted(pool - set(watched)):
+        out.append((PROBLEM, "live", f"live.py does not watch {name} (no --peer)"))
+    down = [n for n, m in watched.items() if not m.get("up") and n not in excluded]
+    for n in down:
+        out.append((PROBLEM, "live", f"live.py sees {n} down: {watched[n].get('err')}"))
+    parts = [n + ("" if m.get("up") else " (down)") + (" (excluded)" if n in excluded else "")
+             for n, m in watched.items()]
+    banner = len(grid.get("health") or [])
+    if not out:
+        out.append((OK, "live", f"live.py up at {cfg['live']}: " + ", ".join(parts)
+                    + (f"; banner shows {banner} problem(s)" if banner else "")))
+    return out
+
+
+# ---- the report -----------------------------------------------------------------
+
+def machine_checks(cfg, root):
+    def one(m):
+        if m["excluded"]:
+            return m, None
+        return m, probe(m["host"], root, local=(m["name"] == LOCAL_NAME))
+    out = []
+    with concurrent.futures.ThreadPoolExecutor(max(1, len(cfg["machines"]))) as ex:
+        for m, facts in ex.map(one, cfg["machines"]):
+            label = m["name"]
+            if facts is None:
+                out.append((INFO, label, "excluded: " + m["excluded"]))
+                continue
+            for lv, text in judge_machine(facts):
+                out.append((lv, label, text))
+    return out
+
+
+def main():
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--no-fetch", action="store_true", help="skip git fetch")
+    ap.add_argument("--machine", action="append", metavar="HOST",
+                    help="check these hosts instead of tools/machines.txt (repeatable)")
+    args = ap.parse_args()
+    t0 = time.time()
+    root = _root()
+    cfg = load_config(root)
+    if args.machine:
+        cfg["machines"] = [{"host": h, "name": h.split(".")[0].lower(), "excluded": None}
+                           for h in args.machine]
+    main_dir = main_tree(root)
+    repo = gh_repo(main_dir)
+    ex = concurrent.futures.ThreadPoolExecutor(8)
+    fetch = None if args.no_fetch else ex.submit(
+        git, main_dir, "fetch", "--quiet", "--prune", "origin", timeout=30)
+    jobs = [ex.submit(github_checks, main_dir),
+            ex.submit(issue_checks, repo),
+            ex.submit(live_checks, cfg),
+            ex.submit(machine_checks, cfg, root)]
+    fetched = None
+    if fetch is not None:
+        rc, _, err = fetch.result()
+        fetched = (rc, err)
+    # release drift and branches read the refs the fetch just updated
+    release = ex.submit(release_checks, main_dir, repo)
+    branches = branch_checks(main_dir)
+    github, issues, live, machines = (j.result() for j in jobs)
+    lines = (git_checks(main_dir, fetched) + release.result()
+             + [l for l in branches if l[1] == "release"]
+             + github + live + machines + issues
+             + [l for l in branches if l[1] != "release"])
+    ex.shutdown()
+    w = max(len(l[1]) for l in lines)
+    for lv, label, text in lines:
+        print(f"{lv} {label.ljust(w)} {text}")
+    bad = sum(l[0] == PROBLEM for l in lines)
+    print(f"{'!!' if bad else 'ok'} {bad} problem(s) in {time.time() - t0:.1f}s")
+    return 1 if bad else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
