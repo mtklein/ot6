@@ -30,6 +30,13 @@
 | Esper Mtn / Ultros③ | TERRA 15 · LOCKE 16 · STRAGO 17 | L15–17 |
 | **FC entry (thamasa_done)** | **TERRA 15 · LOCKE 16 · STRAGO 17 · RELM 15** | **L15–17** |
 
+The rows from Zozo on predate the #158 grind and the re-cuts since.  The
+tracked checkpoints now read (`build/attempts/wt/v027-wor-plan/checkpoints.log`):
+`post-opera-v1` L19, `narshe-mission-v1` L19-23, `vector-crash-v1` L22-26,
+`thamasa-done-v1` L23-27 (`TERRA L24 960/960 ... LOCKE L27 1215/1215 ...
+STRAGO L25 ... RELM L23`), `fc-alcove-v1` L25-28.  The World of Ruin rows
+are in "The World of Ruin" below.
+
 ## The supply curve (what the bag carries at each level)
 
 The care split is a directive: **outside battle heal with Tonics** (the
@@ -68,9 +75,9 @@ short purse shorts Tonics.  The band is what the bag should hold *arriving*
 at the next fight, so the last shop before a shopless boss stretch buys the
 band plus that stretch's measured spend (the train merchant: 21 for L14
 plus the 9 the GhostTrain fight spent = 30, so Baren Falls still holds 21).
-It is a World of Balance band: `audit_supplies` stops applying it at the
-WoR landing's graph row (`wor_landing` and its `escape_start` sibling),
-where the party, the shops and the level curve are all different.
+The band runs on through the World of Ruin, where every item counter on
+the route sells Potions, and caps at 79 (L53; #386, "The World of Ruin"
+below).
 
 The WoB Potion shops on the route, decoded from `npc_prop.asm` (the
 counter NPC's event) and `shop_prop.dat` (the rows), with the stop each
@@ -196,6 +203,10 @@ per-attempt table and the levers: [map269-random.md](map269-random.md).
 
 ## The Floating Continent gap
 
+Superseded by the regenerated chain: it enters the FC at L23-27
+(`thamasa-done-v1`, above), not L15-17.  The section is kept for its
+reasoning about break and prep.
+
 The routed party reaches the **Floating Continent at L15–17**. Rough vanilla
 FF6 expectation for the same content is **~L25–30** (AtmaWeapon is a ~L30 fight
 in vanilla). So OT6 arrives at the FC roughly **ten levels light**, and the gap
@@ -283,6 +294,169 @@ Two things stand out:
   care-stop-less attrition punishes the lack of. The Blackjack reopens WoB shops
   (Thamasa and others), so gear/relic shopping is part of FC prep alongside a
   grind.
+
+## The World of Ruin (#386)
+
+Evidence: `build/attempts/wt/v027-wor-plan/` (`checkpoints.log`, the
+tracked checkpoints read by `wordump.py`; `xp_by_map.txt`,
+`town_pools.txt`, `bosses.txt` and `shops*.txt` from `build/ot6.sfc` via
+`route_data.py`; `projection.log`).  Levels past the Falcon are
+**estimates** until each arc plays them.
+
+### Measured: the landing to the Falcon
+
+| checkpoint | active party | Potion / Fenix / Tincture / Revivify | gil |
+|---|---|---|---|
+| `wor-start-v1` | CELES 25 | 85 / 31 / 11 / 5 | 181,494 |
+| `wor-tzen-door-v1` | CELES 27 | 85 / 31 / 11 / 5 | 201,220 |
+| `wor-sabin-v1` | SABIN 28 · CELES 28 | 85 / 31 / 11 / 5 | 184,572 |
+| `wor-edgar-v1` | EDGAR 31 · SABIN 31 · CELES 32 | 85 / 31 / 13 / 5 | 248,834 |
+| `wor-kohlingen-v1` | EDGAR 32 · SABIN 32 · CELES 33 · SETZER 32 | 97 / 31 / 13 / 10 | 239,364 |
+| `wor-falcon-v1` | EDGAR 33 · SABIN 33 · CELES 34 · SETZER 33 | 79 / 31 / 13 / 32 | 280,318 |
+
+`wor-falcon-v1 EDGAR L33 1207/1803 ... CELES L34 1313/1900 ... SETZER L33
+1402/1800`; `xp EDGAR 101737, SABIN 105683, CELES 111711, SETZER 103319`.
+
+### How the World of Ruin pays
+
+- A random pays its formation's XP x2 (`Ot6RewardMulW`), divided among the
+  living members (`battle_main.asm` @5db0: total / `$3a76`).  Bosses pay
+  none (`bosses.txt`: every boss below has `XP 0`), and neither do the
+  Veldt (`$11E4`) nor the Fanatics' Tower's pool (`map 365 ... L.90 Magic
+  ... XP 0`).
+- A level costs `LevelUpExp` x8 (`levels.txt`): 9,792 for L35, 12,792 for
+  L40, 20,000 for L50, 28,792 for L60.
+- The bench gains nothing.  A recruit joins at the available characters'
+  average (`norm_lvl`: TERRA `event_main.asm:88191`, CYAN `:86689`, MOG
+  `:85197`, RELM `:48897`, STRAGO `:89448`, LOCKE `:83903`, SHADOW
+  `:93791`; Gogo and Umaro through `InitChar`'s average, Gogo +2).  From
+  the Phoenix Cave (two parties) and Kefka's Tower (three) the route levels
+  more than four, so rotation keeps the extra members within
+  `audit_levels.py`'s straggler gap of 3.
+
+Expected XP per random, x2, before the split (`xp_by_map.txt`,
+`town_pools.txt`):
+
+| area | pool | top monster L | XP per random | per member of four |
+|---|---|---|---|---|
+| Mobliz's plain | world group 38 | 26 | 2,286 | 572 |
+| Thamasa's plain, Ebot's door | world group 55 | 42 | 5,035 | 1,259 |
+| Zozo, Jidoor, Maranda | world group 49 | 54 | 12,673 | 3,168 |
+| Narshe's plain | world group 51 | 54 | 14,811 | 3,703 |
+| Doma's plain | world group 52 | 55 | 16,710 | 4,178 |
+| Mt. Zozo | maps 176-179 | 35 | 3,990-7,402 | 1,000-1,850 |
+| Narshe, the moogle cave | maps 32-38 | 32 | 3,798-4,038 | ~1,000 |
+| Narshe's mines, Umaro's cave | maps 125/126/144, 317-322 | 40 | 4,822-6,092 | 1,200-1,520 |
+| Owzer's house | map 207 | 36 | 6,534 | 1,634 |
+| the Fanatics' Tower | maps 359-370 | 58 | 0 | 0 |
+| the Phoenix Cave | maps 313, 315 | 49 | 12,409-13,651 | 3,100-3,400 |
+| the Cave in the Veldt | map 353 | 36 | 4,998 | 1,250 |
+| the Zone Eater | maps 276-278 | 44 | 6,449-7,707 | 1,600-1,930 |
+| Ebot's Rock | maps 404, 405 | 38 | 4,790-5,596 | 1,200-1,400 |
+| Cyan's dream | maps 281-283 | 33 | 5,525-5,688 | ~1,400 |
+| the Ancient Castle | maps 401-407 | 47 | 8,306-8,772 | 2,100-2,200 |
+| Kefka's Tower | maps 287-355, 409, 410 | 59 | 8,775-23,375 | 2,200-5,800 |
+
+Areas are named from their species (`pool_names.txt`) and the world map's
+doors (`world-entrances 1`); the mines/Umaro's cave rows and Cyan's dream
+are named by species alone, not traced to their doors.  The plains around
+Narshe, Zozo and Doma (groups 49-52) pay two to four times what most arcs'
+dungeons pay (the Phoenix Cave matches them); they are the World of Ruin's grind, a
+short Falcon hop from any arc.
+
+### The plan by milestone
+
+Projected levels walk each arc with an assumed fight count (**estimate**;
+`projection.log` lists the counts) from `wor-falcon-v1`'s mean 105,612 XP.
+The target column is the healthy level for the stop's key fight; it is an
+estimate until a lab sets it, as the Tentacles' L30 (route-wor-edgar.md
+4.1) and Dullahan's were.
+
+| milestone | key fights (ROM: L, HP) | what bites (AI script) | projected | target |
+|---|---|---|---|---|
+| v0.27 Terra | Phunbaba (L26 60,000; L31 28,000 / 26,000) | Blow Fish, Bolt 3; absorbs bolt | 33-34 | as reached: the boss is under the party |
+| v0.28 Cyan | Storm Drgn (L74 42,000) | Aero, Cyclonic (Near Fatal), Wind Slash; absorbs wind, weak bolt | 36 | 38-40 |
+| v0.29 Narshe | Umaro (L33 17,200), Tritoch (L62 30,000), Ice Dragon (L74 24,400) | Tritoch: Ice 3, Cold Dust (Frozen); nulls bolt and five more, weak fire | 39 | 40 |
+| v0.30 Jidoor & Thamasa | Chadarnook (L37 56,000; L41 30,000), MagiMaster (L68 50,000), Holy Drgn (`White Drgn`, L71 18,500) | MagiMaster: Fire/Ice/Bolt 3, Doom, and **Ultima as his death counter**; the tower is magic-only | 41 | 45 for MagiMaster |
+| v0.32 Locke | Red Dragon (L67 30,000) | -- | 44 | 44 |
+| v0.34 Gogo | Hidon (L43 25,000), Doom Gaze (L68 55,555), Dirt Drgn (L53 28,500) | -- | 46 | 46 |
+| v0.35 Dreams | Wrexsoul (L53 23,066), Blue Drgn (L65 26,900) | -- | 49 | 49 |
+| v0.38 Kefka's Tower | Guardian (L71 50,000; L67 60,000), Inferno (L67 30,800), the statues (Doom L73 63,000, Goddess L68 44,000, Poltrgeist L67 58,000), Gold and Skull Drgn (L62) | -- | 51 | 52, each of three parties |
+| v0.39 The End | Kefka (L71 62,000) | Goner, Meteor, Havoc Wing; Ultima as a counter | 51 | 55 |
+
+Notes on the targets:
+
+- **The Fanatics' Tower is magic-only** (`battle_main.asm` @5354: with
+  `$3EBB` bit 0 set, Fight becomes Magic and every command but Magic,
+  Item and Mimic is removed).  Its pool pays no XP, so the party arrives
+  at MagiMaster with the level it brought in, and every member fights
+  with the spells its Esper or natural magic gives (magicite.md, "When
+  each stone arrives").  The grind for it is outside: groups 49 and 51,
+  about 3,200-3,700 per member a fight, about 15 fights for L41 to L45.
+- **MagiMaster's death counter is Ultima** (`counter: Ultima<pow 150>`).
+  Vanilla's answer is Life 3; here Life 3 is Phoenix's boost, and Phoenix
+  comes at v0.32.  At v0.30 the answers are Shell (Shiva, Carbunkl,
+  ZoneSeek at Jidoor's auction) and HP; the roll at the party's MDef is
+  the lab's first measurement, and it sets the target.
+- **Kefka's Tower takes three parties**, so the target applies to twelve
+  members (or as many as the route seats).  From v0.32 on, rotation is part
+  of the plan, not an afterthought.
+- **The eight dragons** stay at their milestones (Storm v0.28, Ice v0.29,
+  Holy v0.30, Red v0.32, Dirt v0.34, Blue v0.35, Gold and Skull v0.38); a
+  dragon the projected level cannot take on the first attempt is a lab and
+  a grind on the nearest of groups 49-52, not a skip.
+
+### Supplies and gil
+
+The bands run on from the WoB (`tools/audit_supplies.py`, #386): Potions
+~level x1.5, Tinctures ~level / 4, Revivify 3, Fenix Down ~level capped
+at 20, and the field care as HP (99 Tonics' 4950 capped).  No World of Ruin
+counter sells Tonics (supply.md), so the field care rides on Potions.
+Every tracked WoR checkpoint holds every band (`wor_bands.log`:
+`wor-falcon-v1 L34 potion 79/51 ok; field 7200/4950 HP ok; tincture 13/9
+ok; revivify 32/3 ok; fenix 31/20 ok`).
+
+The WoR item counters on the route, each selling Potion 300, Tincture
+1500, Fenix Down 500 and Revivify 300, and all but Tzen's Remedy 1000
+(`shops.txt`, `shops_wor_ahead.txt`): Albrook 48, Tzen 54, Nikeah 58,
+South Figaro 63, Kohlingen 67, Narshe 71, Thamasa 74, Jidoor 78.  Mobliz,
+Zozo and Maranda have none.
+
+**The Potion stack fills at L53.**  The bag holds 99 of an item, and the
+reserve plus the field care's 20 Potions reach 99 at a reserve of 79, so
+`audit_supplies` caps the band there.  Past it the field care moves to
+Tents (save points and the world map), inns and boosted Cure; X-Potions and
+Elixirs are chest and steal items only.  `H.careStockPotions`
+(`ot6_field.lua`), which adds a four-level look-ahead and the legs' spend,
+raises at about L43 with a spend of 10; the v0.30 and later counters need
+the same cap there (a library change, so a replay; not made here).
+
+**Gil is not the limit.**  `wor-falcon-v1` carries 280,318, and the plains
+of groups 49 and 51 pay 500-2,600 GP a body, x2 (`group49.txt`,
+`group51.txt`).  The stops' big buys:
+Golem (20,000) and ZoneSeek (10,000) at Jidoor's auction (`take_gil 20000`
+before `give_genju GOLEM`, `event_main.asm:49702`/`:49745`; `take_gil
+10000` before ZONESEEK, `:49987`/`:50029`); four Crystal Mails at Maranda
+(17,000 each).
+
+### Gear on the way
+
+| shop | where | best rows (GP) |
+|---|---|---|
+| 72 weapon | Thamasa | Gravity Rod 13,000, Pearl Rod 12,000, DaVinci Brsh 7,000, Trump 13,000, Man Eater 11,000 |
+| 73 armor | Thamasa | Light Robe 11,000, Diamond Vest 12,000, Dark Hood 7,500, Circlet 7,000 |
+| 75 relic | Thamasa | Guard Ring 5,000, Cure Ring 8,000, Czarina Ring 3,000, Wall Ring 6,000 |
+| 76 weapon | Jidoor | Crystal 15,000, Sniper 15,000, Partisan 13,000 |
+| 77 armor | Jidoor | Dark Gear 13,000, Crystal Helm 10,000 |
+| 79 relic | Jidoor | Cherub Down 6,300, Atlas Armlet 5,000, Guard Ring 5,000 |
+| 80 weapon | Maranda | Falchion 17,000, SwordBreaker 16,000, Gravity Rod 13,000, the five Edges |
+| 81 armor | Maranda | Crystal Mail 17,000, Tao Robe 13,000, Crystal Shld 7,000, Oath Veil 9,000 |
+| 68-70 | Narshe | empty (each row lists only `$00 Dirk`); the item counter 71 is open |
+
+Shop owners from the `shop_menu` lines' event regions (Thamasa 72-75 beside
+Gungho's scene, `event_main.asm` ~:55109; Maranda 80/81 beside its town
+talk, ~:92006; Jidoor 76-79 beside the WoB rows 20-23).  Chests and steals
+are each arc's route plan.
 
 ## How to regenerate
 

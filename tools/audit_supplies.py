@@ -11,12 +11,15 @@ The Potion band (docs/design/level-curve.md, "The supply curve"): Potions
 are the in-combat heal, carried at ~level x1.5 (minimum 10) from the first
 town on the route that sells them -- the Phantom Train's ghost merchant, so
 the band is measured from `train_done` on (a fixture whose `prev` chain
-reaches it, or one rooted at a checkpoint, all of which lie downstream).
-It is a World of Balance band: it ends at the WoR landing (the graph row
-that generates `wor_landing`, its `also=` siblings included, and anything
-downstream of it), where the party, the shops and the level curve are all
-different.  A fixture under the band is a WARNING (listed, exit code
-unaffected); the fix is a `POTION to N` line at the shop stop before it.
+reaches it, or one rooted at a checkpoint, all of which lie downstream),
+through the World of Ruin (#386: every WoR item counter on the route sells
+Potions -- Albrook 48, Tzen 54, Nikeah 58, South Figaro 63, Kohlingen 67,
+Narshe 71, Thamasa 74, Jidoor 78).  It caps at POTION_BAND_CAP (79, L53):
+one 99-stack holds the combat reserve and the field care's 20 Potions
+(the 4950 HP cap below), and past L53 the field care moves to Tents, inns
+and boosted Cure (docs/design/level-curve.md, "The World of Ruin").  A
+fixture under the band is a WARNING (listed, exit code unaffected); the
+fix is a `POTION to N` line at the shop stop before it.
 
 The Tonic band (the same section, #210): Tonics are the field-care heal,
 carried at ~level x5 (cap 99) from the first town that sells them --
@@ -29,18 +32,20 @@ The Tincture band (docs/design/supply.md, #231): Tinctures are the
 field-care MP restore, carried at ~level / 4 rounded up (one caster's
 pool per stretch) from the first counter whose purse can carry them --
 Narshe's shop 3, bought in `gen_zozo1_submerge`'s run (the
-`figaro_submerged` row) -- to the same WoR landing.  Figaro Castle sells
+`figaro_submerged` row) -- on through the World of Ruin, where every item
+counter the Potion band names sells them too (#386).  Figaro Castle sells
 them earlier and its purse cannot (supply.md, squeeze 1), so the band
 starts at Narshe.  Under it is a WARNING; the fix is a `TINCTURE to N`
 line at a counter that sells them (Narshe 3, Jidoor 22, Albrook 24,
-Thamasa 35).
+Thamasa 35; in the World of Ruin the counters above).
 
 The Revivify band (docs/design/supply.md, #231 and #349): Revivify is the
 Zombie cure, in the field and in battle, and nothing else in a WoB bag
 clears the bit (a Fenix Down never lands on a zombie, Remedy's mask leaves
 it).  It is carried at 3 from the first counter that sells it -- Jidoor's
 shop 22, bought in `gen_zozo2_arrival`'s run (the `zozo_arrival` row) --
-to the same WoR landing.  The WoB's one Zombie pool on the walked route is
+on through the World of Ruin (#386: Darill's Tomb is a Zombie pool, and
+every WoR item counter on the route sells it).  The WoB's one Zombie pool on the walked route is
 the Sealed Gate cave's Zombones (maps 384/385); #349 was a chain that
 walked it with none, because the checkpoint it booted was cut before the
 Jidoor stop bought any.  Under the band is a WARNING; the fix is a
@@ -100,6 +105,10 @@ INV_QTY = 0x1969 - 0x1600             # inventory counts, one byte each
 # Figaro's shop 8 stock none (shop_prop.dat), so the band applies from here.
 FIRST_POTION_SHOP = "train_done"
 POTION_BAND_MIN = 10
+# One 99-stack holds the combat reserve plus the field care's 20 Potions
+# (4950 HP, field_band's cap): the band stops growing at 79, reached at L53
+# (#386, level-curve.md "The World of Ruin").
+POTION_BAND_CAP = 79
 # The graph row whose run first buys Tonics (Figaro Castle's shop 4); the
 # row's `also=` artifacts carry the row name, so all three are in band.
 FIRST_TONIC_SHOP_ROW = "figaro_intro"
@@ -124,9 +133,11 @@ REVIVIFY_BAND = 3
 FENIX_BAND_CAP = 20
 FENIX_SLACK = 2
 FIRST_FENIX_STATE = "kolts_entry"
-# The band is a WoB band: the graph row that generates this state (with its
-# `also=` artifacts, escape_start today) and everything downstream of it is
-# the World of Ruin, out of band.
+# The graph row that generates this state (with its `also=` artifacts,
+# escape_start today) and everything downstream of it is the World of Ruin.
+# The Tonic count band ends there (no WoR counter sells Tonics); the
+# field-care band, read in HP, takes over.  The Potion, Tincture, Revivify
+# and Fenix bands run on through it (#386).
 WOR_LANDING = "wor_landing"
 
 
@@ -150,8 +161,8 @@ def revives_in(raw: bytes, cb: int) -> int:
 
 def potion_band(level: int) -> int:
     """Potions the bag should carry at this party level: ~level x1.5,
-    rounded up, never under POTION_BAND_MIN."""
-    return max(POTION_BAND_MIN, -(-3 * level // 2))
+    rounded up, never under POTION_BAND_MIN nor over POTION_BAND_CAP."""
+    return min(POTION_BAND_CAP, max(POTION_BAND_MIN, -(-3 * level // 2)))
 
 
 def tonic_band(level: int) -> int:
@@ -342,16 +353,14 @@ def in_tonic_band(name: str, states: dict) -> bool:
 
 def in_tincture_band(name: str, states: dict) -> bool:
     """The Tincture band applies from Narshe's shop 3 (after the Battle for
-    Narshe) to the WoR landing."""
-    return (past_row(name, states, FIRST_TINCTURE_SHOP_ROW)
-            and not in_world_of_ruin(name, states))
+    Narshe) on, the World of Ruin included (#386)."""
+    return past_row(name, states, FIRST_TINCTURE_SHOP_ROW)
 
 
 def in_revivify_band(name: str, states: dict) -> bool:
-    """The Revivify band applies from Jidoor's shop 22 (the Zozo stop) to
-    the WoR landing."""
-    return (past_row(name, states, FIRST_REVIVIFY_SHOP_ROW)
-            and not in_world_of_ruin(name, states))
+    """The Revivify band applies from Jidoor's shop 22 (the Zozo stop) on,
+    the World of Ruin included (#386)."""
+    return past_row(name, states, FIRST_REVIVIFY_SHOP_ROW)
 
 
 def in_fenix_band(name: str, states: dict) -> bool:
@@ -380,7 +389,8 @@ def revivify_short(have: int) -> bool:
 def in_world_of_ruin(name: str, states: dict) -> bool:
     """Whether the fixture lies at or past the WoR landing: it is generated
     by WOR_LANDING's graph row (its `also=` siblings included) or its `prev`
-    chain passes through that row.  The WoB band does not apply there."""
+    chain passes through that row.  The Tonic count band does not apply
+    there; the field-care band does."""
     seen = set()
     while name and name not in seen:
         seen.add(name)
@@ -394,8 +404,9 @@ def in_world_of_ruin(name: str, states: dict) -> bool:
 
 
 def in_potion_band(name: str, states: dict) -> bool:
-    """The band applies from the first Potion shop to the WoR landing."""
-    return past_first_potion_shop(name, states) and not in_world_of_ruin(name, states)
+    """The band applies from the first Potion shop on, the World of Ruin
+    included (#386)."""
+    return past_first_potion_shop(name, states)
 
 
 def load_waivers(repo: str, path: str) -> set:
@@ -444,6 +455,14 @@ def selftest(repo: str = ".") -> int:
     check("band at L14 (the train merchant)", potion_band(14), 21)
     check("band at L15 (Mobliz) rounds up", potion_band(15), 23)
     check("band at L27 (the FC entry)", potion_band(27), 41)
+    check("band at L34 (wor-falcon)", potion_band(34), 51)
+    check("band at L52 is still level x1.5", potion_band(52), 78)
+    check("band at L53 meets the cap", potion_band(53), 79)
+    check("band at L70 stays at the cap", potion_band(70), 79)
+    check("a full stack at L70 holds the reserve and the field care",
+          field_short(0, 99, 70), False)
+    check("98 Potions at L70 is short of the field care (negative control)",
+          field_short(0, 98, 70), True)
     # the Tonic band: ~level x5, capped at 99
     check("tonic band at L8 (Figaro Castle)", tonic_band(8), 40)
     check("tonic band at L19 (Zozo)", tonic_band(19), 95)
@@ -522,11 +541,13 @@ def selftest(repo: str = ".") -> int:
               past_first_potion_shop("terra_narshe", states), True)
         check("and at a checkpoint-rooted fixture (narshe_mission)",
               past_first_potion_shop("narshe_mission", states), True)
-        # a WoB band: it ends at the WoR landing's row
-        check("the WoB band still covers the FC alcove (fc_alcove)",
+        # it runs on into the World of Ruin (#386)
+        check("the band covers the FC alcove (fc_alcove)",
               in_potion_band("fc_alcove", states), True)
-        check("but not the WoR landing (wor_landing)",
-              in_potion_band("wor_landing", states), False)
+        check("and the WoR landing (wor_landing)",
+              in_potion_band("wor_landing", states), True)
+        check("and the Falcon (wor_falcon)",
+              in_potion_band("wor_falcon", states), True)
         # the Tonic band starts at Figaro Castle's shop, gen_edgar's row
         check("no Tonic band before Figaro Castle (figaro_entry)",
               in_tonic_band("figaro_entry", states), False)
@@ -539,7 +560,7 @@ def selftest(repo: str = ".") -> int:
         check("but not the WoR landing (wor_landing)",
               in_tonic_band("wor_landing", states), False)
         check("nor its row-mate, the escape's first frame (escape_start)",
-              in_potion_band("escape_start", states), False)
+              in_tonic_band("escape_start", states), False)
         check("a fixture before the train is not in the WoR either (forest_done)",
               in_world_of_ruin("forest_done", states), False)
         # the Tincture band starts at Narshe's shop 3, gen_zozo1_submerge's
@@ -560,8 +581,8 @@ def selftest(repo: str = ".") -> int:
               in_tincture_band("vector_entry", states), True)
         check("and the FC alcove (fc_alcove)",
               in_tincture_band("fc_alcove", states), True)
-        check("but not the WoR landing (wor_landing)",
-              in_tincture_band("wor_landing", states), False)
+        check("and the World of Ruin (wor_tomb)",
+              in_tincture_band("wor_tomb", states), True)
         # the Revivify band starts at Jidoor's counter, gen_zozo2_arrival's
         # row: none before it, the Sealed Gate cave legs inside it
         check("no Revivify band before Jidoor (figaro_submerged)",
@@ -571,8 +592,8 @@ def selftest(repo: str = ".") -> int:
         check("and covers the Sealed Gate cave legs (gate_cave_save)",
               in_revivify_band("gate_cave_save", states), True)
         check("and vector_crash", in_revivify_band("vector_crash", states), True)
-        check("but not the WoR landing (wor_landing)",
-              in_revivify_band("wor_landing", states), False)
+        check("and the World of Ruin, Darill's Tomb included (wor_tomb)",
+              in_revivify_band("wor_tomb", states), True)
         # the Fenix band starts at Figaro Castle and runs into the WoR
         check("no Fenix band before Figaro Castle (figaro_entry)",
               in_fenix_band("figaro_entry", states), False)
@@ -725,7 +746,8 @@ def main() -> int:
         print(f"  WARNING: {len(mpshort)} fixture(s) under the Tincture band "
               f"(~level / 4; the field-care MP restore, docs/design/supply.md) "
               f"-- top up with a TINCTURE to N line at a counter that sells "
-              f"them (Narshe 3, Jidoor 22, Albrook 24, Thamasa 35)"
+              f"them (Narshe 3, Jidoor 22, Albrook 24, Thamasa 35; in the "
+              f"World of Ruin every item counter on the route)"
               + ("" if args.verbose else "; -v lists them") + ":")
         if args.verbose:
             for name, have, band, level in mpshort:
@@ -738,7 +760,8 @@ def main() -> int:
         print(f"  WARNING: {len(zshort)} fixture(s) under the Revivify band "
               f"({REVIVIFY_BAND}; the Zombie cure, docs/design/supply.md) -- "
               f"top up with a REVIVIFY to N line at a counter that sells them "
-              f"(Jidoor 22, Albrook 24, Thamasa 35), or re-cut a checkpoint "
+              f"(Jidoor 22, Albrook 24, Thamasa 35, every WoR item counter), "
+              f"or re-cut a checkpoint "
               f"cut before that line"
               + ("" if args.verbose else "; -v lists them") + ":")
         if args.verbose:
