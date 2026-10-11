@@ -13161,6 +13161,7 @@ function M.kitBattle(plan, opts)
     elseif st == 0x38 then
       M.assertEq(p.refused == nil, true, string.format("entry %d (planned refused at the %s) reached target select",
         k, tostring(p.refused)))
+      if cool > 0 then pulse("a"); return end   -- (the pad rests; a confirm must be a real press)
       if p.self then
         if cool == 0 then done(p, a) end
         pulse("a")
