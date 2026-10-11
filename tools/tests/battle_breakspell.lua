@@ -16,8 +16,8 @@
 --      held no more), and no other body's shields moved;
 --   2. its HP did not move and it is not petrified or dead (no damage, no
 --      status: vanilla Break petrified);
---   3. TERRA paid 25 MP at both boosts (the price is flat), and the boost
---      was spent (bank down by the boost).
+--   3. TERRA paid 25 MP at both boosts (the price is flat), and the bank
+--      paid the boost (an unboosted cast earns its turn's pip, as any turn).
 -- A 3-BP cast that finds the target already short of four shields asserts
 -- the Break.  The target is re-chosen for the second cast by the same rule
 -- if the first one's fell.
@@ -126,7 +126,9 @@ local function check(r, boost, slot)
   H.assertEq(n.hp, o.hp, string.format("slot %d's HP did not move: Break deals no damage", slot))
   H.assertEq(n.st & 0xC0, o.st & 0xC0, string.format("slot %d was not petrified or killed", slot))
   H.assertEq(r.mp0 - r.mp1, BREAK_MP, string.format("Break cost its flat %d MP at %d BP", BREAK_MP, boost))
-  H.assertEq(r.bank0 - r.bank1, boost, string.format("the %d boost point(s) were spent", boost))
+  local regen = (boost == 0 and r.bank0 < 5) and 1 or 0   -- an unboosted turn earns its pip
+  H.assertEq(r.bank1, r.bank0 - boost + regen, string.format("the bank paid the %d boost point(s)%s", boost,
+    regen == 1 and " and earned the unboosted turn's pip" or ""))
 end
 
 local plan, target1, target2 = nil, nil, nil
