@@ -798,3 +798,20 @@ player prunes the kit all game. Same model, different collection verbs:
 - **Relm — Painter (special ¤: brush)**: Sketch ✦ signature (bug
   preserved ✦: it corrupts a save now and then, and that is canon —
   the full owner ruling is in `vanilla-destructive-bugs.md`).
+
+## The World of Ruin: Espers and the magic-only tower (#384)
+
+The World of Ruin adds no new lists to these kits; its twelve Espers are
+the breadth layer.  Their spell lists, stat packages and the milestone
+that grants each are in [magicite.md](magicite.md) ("World of Ruin
+Espers", "When each stone arrives"): Palidor and Fenrir at v0.27, Terrato,
+Tritoch and (probably) Ragnarok at v0.29, Starlet with Golem and ZoneSeek
+at v0.30, Phoenix at v0.32, Bahamut at v0.34, Odin/Raiden and Alexandr at
+v0.35, Crusader at v0.38.
+
+One stop bears on every kit: the Fanatics' Tower (v0.30) is magic-only.
+`battle_main.asm` @5354 turns Fight into Magic and removes every command
+but Magic, Item and Mimic, so Blitz, SwdTech, Tools, Slot, Lore, Rage,
+Sketch, Dance, Steal, Runic and Throw, and any divine that lives on one of
+those rows, are off for its randoms, MagiMaster and the Holy Dragon.  A kit verb planned for those fights needs either a
+Magic-row form or an explicit exception in that rewrite.

@@ -160,7 +160,7 @@ four stats, the capstone (owner, 2026-09-29: fine for now).
 | Esper | Source | Spells (base) | Stat vig/spd/stm/mag | Job | Notes |
 |---|---|---|---|---|---|
 | Palidor | Solitary Island beach, once the Falcon flies | Float, Slow | +2 / +4 / 0 / 0 (FIELD) | **the Tailwind**: lift the party, drag the enemy | first WoR stone; Float has no other source |
-| Fenrir | Mobliz, when Terra rejoins (Phunbaba) | Stop, X-Zone | 0 / +6 / −3 / +4 (BOSS) | **the Banisher**: take one enemy out of time, or a group out of the fight | no WoB plan grants Stop |
+| Fenrir | Mobliz, from Phunbaba (dropped in the first fight) | Stop, X-Zone | 0 / +6 / −3 / +4 (BOSS) | **the Banisher**: take one enemy out of time, or a group out of the fight | no WoB plan grants Stop |
 | Starlet | Jidoor, Owzer's mansion (Relm joins) | Cure, Regen, Remedy | 0 / +4 / −3 / +6 (BOSS) | **the second medic**: a heal-and-cleanse stone for a second party | deliberate copy of Kirin + Unicorn's Remedy |
 | Alexandr | Doma Castle, the end of Cyan's dream | Dispel, Safe, Shell | +4 / −3 / +6 / 0 (BOSS) | **the Bastion**: strip the enemy's buffs, wall the party | Dispel has no other source |
 | Terrato | Umaro's cave, the carving's eye | Quake, Quartr | 0 / −3 / +4 / +6 (BOSS) | **the Landslide**: whole-field attrition | Quake hits the party too, so wear it beside Palidor |
@@ -184,9 +184,66 @@ after "Follow that bird!") and hidden again when taken (`:12849`). So it is the
 first stone the World of Ruin offers once the Falcon flies; on the route the
 party then is Celes, Sabin, Edgar and Setzer. Raiden is `take_genju ODIN` followed by
 `give_genju RAIDEN` (`:81362`, `:81364`): the player trades Odin in rather
-than holding both. Ragnarok's shop door has its own gate (`if_switch $01A1=0`
-→ "Locked!"), and the switch was not traced. Terrato's event is followed by
-`battle 117` before the grant; the formation was not decoded.
+than holding both. The "Locked!" gate beside Ragnarok's script (`if_switch
+$01A1=0`, `:78246` on) follows `set_case PARTY_CHARS`, so `$01A1` is LOCKE
+in the party (`EVENT_CASE`, `event_cmd.inc`). Those lines belong to the
+lock objects on Narshe's map 32 (`$06C0-$06C7`, `npc_prop.asm:1798` on);
+the old man who gives the stone (`_cc0b1e`) stands on map 36, which map 32
+enters at (15,56) and (22,44), away from the locks. Whether a lock stands
+on the way was not walked. Terrato's event is followed by
+`battle 117` before the grant: event group 117 is formation 444, Umaro
+(`$110`, L33, 17,200 HP; `build/attempts/wt/v027-wor-plan/bosses.txt`).
+
+### When each stone arrives (#384)
+
+The route's milestones (GitHub, v0.27-v0.39) and the stop that grants each
+stone.  The milestone leads each row so that `check_spell_grants.py`, which
+reads rows led by an Esper's name, keeps to the table above.  The lists are
+that table's; the stat column ships when the
+stones' packages are built (below).
+
+| milestone | Esper | stop | met with |
+|---|---|---|---|
+| v0.27 Terra | Palidor | the Solitary Island beach, the Falcon's first stop | the Falcon arc's four |
+| v0.27 Terra | Fenrir | Mobliz: Phunbaba drops it when first driven off, before Terra rejoins (`event_main.asm:87832`) | Terra, later in the arc |
+| v0.29 Narshe | Terrato | Umaro's cave, after Umaro (event group 117) | Mog, Umaro |
+| v0.29 Narshe | Tritoch | the Narshe cliffs, after Tritoch (event group 119: `$144`, L62, 30,000 HP) | |
+| v0.29 Narshe | Ragnarok | Narshe's map 36; moves to v0.32 if a lock (LOCKE in the party) stands on the way | |
+| v0.30 Jidoor & Thamasa | Starlet | Owzer's house, after Chadarnook | Relm |
+| v0.30 Jidoor & Thamasa | Golem, ZoneSeek | Jidoor's auction, 20,000 and 10,000 (`event_main.asm:49702`, `:49987`); the route left both in the WoB (route-wor-falcon.md 4.2 lists its thirteen) | |
+| v0.32 Locke | Phoenix | the Phoenix Cave | Locke |
+| v0.34 Gogo & the odd corners | Bahamut | Doom Gaze, in the sky | Gogo |
+| v0.35 Dreams and ruins | Odin, then Raiden | the Ancient Castle; Raiden replaces Odin | |
+| v0.35 Dreams and ruins | Alexandr | Doma Castle, the end of Cyan's dream | Cyan's quest |
+| v0.38 Kefka's Tower | Crusader | the eighth dragon (Gold and Skull are in the tower) | |
+
+What the arcs need from them (`level-curve.md`, "The World of Ruin"):
+
+- **v0.30 is magic-only.** The Fanatics' Tower turns Fight into Magic and
+  removes every command but Magic, Item and Mimic (`battle_main.asm`
+  @5354), and MagiMaster and the Holy Dragon are inside it.  The party's
+  damage there is the stones' and natural magic's lists, boosted.  By then
+  the route holds the thirteen it carried to the Falcon, Palidor, Fenrir,
+  Terrato, Tritoch, probably Ragnarok, and Starlet, Golem and ZoneSeek from
+  the same arc: Fire, Ice, Bolt, Poison and Quake for damage, Ultima if
+  Ragnarok came at v0.29.
+- **MagiMaster's death counter is Ultima**, and Life 3 is Phoenix's boost,
+  two milestones later.  At v0.30 the stones' answer is Shell: Shiva,
+  Carbunkl and ZoneSeek grant it (Alexandr's comes at v0.35).
+- **Stones outnumber the members who can wear them** from v0.27 on: fifteen
+  stones for five members at v0.27, eighteen to twenty-one for ten at
+  v0.30.  Umaro and Gogo take none.  The one-copy rule binds on the four
+  in each party, not on the count, until the split parties: the Phoenix
+  Cave (two parties) and Kefka's Tower (three) are where a second medic
+  (Starlet) and a second caster (Tritoch) earn their copies.
+
+**Bonuses.**  The stat column above is a plan; `Ot6EsperStatTbl` holds
+zero for all twelve (`ot6_progression.asm:530-552`), and #328 (v1.0)
+reviews every package.  Build the twelve rows as one data change before
+v0.27 ships, so Palidor's and Fenrir's menu pages show a package from the
+first stone on.  Terrato's row is `menu_esperdetail_tube6`'s no-mod
+control today (`; 4 terrato (no-mod control; leave at $0000)`), so that
+change moves the control (to an unequipped slot).
 
 ### Why each list
 
