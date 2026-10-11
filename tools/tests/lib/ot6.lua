@@ -2865,21 +2865,45 @@ end
 -- multiplier.  Those are the spells #219 leaves on their vanilla MP
 -- (mp-economy.md, "Unchanged, already escalating by tier"), so the 2.5x
 -- must not be charged on top of them.
+-- Break ($0c, #398) answers yes as well: its boost buys shields
+-- (Ot6BreakSpell), so its price stays flat, the ROM's Ot6InFoldTbl arm.
+M.BREAK_SPELL = 0x0C
 function M.inFoldTbl(id)
   if id == nil then return false end
   for i = 0, FOLD_ROWS * 3 - 1 do
     if foldByte(i) == id then return true end
   end
-  return false
+  return id == M.BREAK_SPELL
+end
+
+-- Ot6FoldSteps: the tier steps a boost buys this actor, 0-2, and 3 for
+-- TERRA at 3 BP once she has rejoined in the World of Ruin (event switch
+-- $00BF), whose three-step Fire folds into Ultima (kits.md).  actor is a
+-- battle seat 0-3; nil asks for the general rule (no fourth fold).
+M.ULTIMA = 0x14
+function M.foldSteps(actor, boost)
+  boost = math.max(0, math.min(boost or 0, 3))
+  if boost < 3 then return boost end
+  if actor ~= nil and M.readByte(0x3ED8 + actor * 2) == 0
+      and (M.readByte(0x1E80 + (0xBF >> 3)) & (1 << (0xBF & 7))) ~= 0 then
+    return 3
+  end
+  return 2
 end
 
 -- Ot6FoldTier: the tier `steps` boosts buy a family HEAD, or the id
 -- unchanged when it is not a head.  Ot6FoldSteps caps the steps at 2,
 -- so a boost-3 cast folds no further than a boost-2 one.
 function M.foldTier(id, steps)
-  steps = math.max(0, math.min(steps or 0, 2))
+  steps = math.max(0, math.min(steps or 0, 3))
   for r = 0, FOLD_ROWS - 1 do
-    if foldByte(r * 3) == id then return foldByte(r * 3 + steps) end
+    if foldByte(r * 3) == id then
+      if steps == 3 then
+        if r == 0 then return M.ULTIMA end   -- Fire's row: the fourth fold
+        steps = 2
+      end
+      return foldByte(r * 3 + steps)
+    end
   end
   return id
 end
@@ -2894,11 +2918,11 @@ end
 -- its price moves; everything else is a multiplier verb and takes the
 -- 2.5x.  One function so the driver cannot charge a fold 2.5x on top of
 -- its tier, which would be charging twice for one boost.
-function M.spellPrice(id, base, boost)
+function M.spellPrice(id, base, boost, actor)
   base, boost = base or 0, boost or 0
   if boost <= 0 then return base, id end
   if M.inFoldTbl(id) then
-    local to = M.foldTier(id, boost)
+    local to = M.foldTier(id, M.foldSteps(actor, boost))
     if to == id then return base, id end
     -- MagicProp+5, the number Ot6SpellMP re-derives a folded tier's price
     -- from; M.spellMpCost (the nav half) already reads that byte, so the
@@ -2929,7 +2953,7 @@ function M.battleSpellPrice(actor, id, boost)
   assert(type(boost) == "number" and boost % 1 == 0 and boost >= 0 and boost <= 3,
     "battle spell price requires total boost 0..3")
   local family = M.inFoldTbl(id)
-  local resolved = family and M.foldTier(id, boost) or id
+  local resolved = family and M.foldTier(id, M.foldSteps(actor, boost)) or id
   local raw = M.spellMpCost(resolved)
   local base = M.casterSpellMp(raw, M.readByte(0x3C45 + actor * 2))
   return family and base or M.boostPrice(base, boost), resolved
@@ -3080,6 +3104,20 @@ local function boostPlanSaid(o, want, boost, ok, why)
     ok and why or (why .. " (falling back to Fight)")))
 end
 
+-- Edgar's Overclock (ot6_overclock.asm): EDGAR's Tool at a full 3-BP boost,
+-- once he has learned it (event switch $0068), fires twice and costs the
+-- two firings, capped at 99 -- the ROM's Ot6ToolPrice.  actor = battle
+-- seat 0-3, base = the tool's unboosted price.
+function M.overclocks(actor, boost)
+  return boost >= 3 and actor ~= nil and M.readByte(0x3ED8 + actor * 2) == 4
+    and (M.readByte(0x1E80 + (0x68 >> 3)) & (1 << (0x68 & 7))) ~= 0
+end
+function M.toolPrice(actor, base, boost)
+  local p = M.boostPrice(base, boost)
+  if p > 0 and M.overclocks(actor, boost) then p = math.min(99, p * 2) end
+  return p
+end
+
 function M.boostPlan(o)
   local want = o.want or 0
   local pool = o.pool or M.readWord(0x3C08 + (o.slot or 0) * 2)
@@ -3096,7 +3134,9 @@ function M.boostPlan(o)
   if base == 0 then return want, true, "free (base 0)", 0 end
   local priceAt = nil
   if o.spell then
-    priceAt = function(b) return (M.spellPrice(o.id, base, b)) end
+    priceAt = function(b) return (M.spellPrice(o.id, base, b, o.slot)) end
+  elseif o.slot ~= nil and o.id ~= nil and o.id >= 0xA3 and o.id <= 0xAA then
+    priceAt = function(b) return M.toolPrice(o.slot, base, b) end
   end
   -- The ration is applied by handing affordBoost a SMALLER pool, not a
   -- smaller want: it then steps the boost down to the deepest level the
@@ -7637,6 +7677,10 @@ BATTLE.SLOT_AIM2, BATTLE.SLOT_AIM3, BATTLE.SLOT_DRIFT = 0x617B, 0x617C, 0x617D
 function M.setzerGil(level, rate, boost)
   return level * rate * (1 + (boost or 0))
 end
+-- Jackpot's rolls a throw (OT6_JACKPOT_ROLLS, ot6_setzer.asm): the full
+-- 3-BP boost a divine takes buys this many, each its own triple.
+M.JACKPOT_ROLLS = 2
+
 function M.setzerJackpot(face, level)
   return math.min(65535, face * face * face * level * 2 * face)
 end
@@ -7793,12 +7837,13 @@ function Driver:setzerLine(actor, have)
   local broken = M.readByte(BATTLE.BRK_TICKS + slot * 2) ~= 0
   -- Jackpot
   local learned = (M.readByte(0x1E99) & 0x04) ~= 0
-  local spent = (M.readByte(0x3ECB) & M.readByte(0x3018 + e)) ~= 0
   local hp = M.readWord(BATTLE.MON_HP + slot * 2)
-  if o.jackpot ~= false and learned and not spent and mp >= 99 and hp >= (o.jackpotHp or 4000) then
+  -- a divine's one gate is a full 3-BP boost (kits.md "Divines", owner
+  -- 2026-10-11), and it buys a throw of M.JACKPOT_ROLLS rolls
+  if o.jackpot ~= false and learned and have >= 3 and mp >= 99 and hp >= (o.jackpotHp or 4000) then
     -- one roll's expected landed damage: the faces 1-6 at even odds, each
     -- face^4 x level x 2, halved by shields or doubled when Broken, capped
-    -- at 9,999 and at the HP; the boost buys one more roll a point
+    -- at 9,999 and at the HP
     local sum = 0
     for f = 1, 6 do
       local d = M.setzerJackpot(f, level)
@@ -7806,13 +7851,12 @@ function Driver:setzerLine(actor, have)
       sum = sum + math.min(d, 9999, hp)
     end
     local per = sum / 6
-    local want = math.max(0, math.min(math.min(have, 3), math.ceil(hp / per) - 1))
-    if per * (1 + want) >= (o.jackpotEv or 4000) then
-      M.log(string.format("[%s] actor=%d SETZER Jackpot on slot %d (%d HP, %d shield(s)%s) at %d BP: %d roll(s) "
-        .. "of expected %d each, 99 MP of %d", tag, actor, slot, hp, sh, broken and ", Broken" or "", want,
-        1 + want, math.floor(per), mp))
+    if per * M.JACKPOT_ROLLS >= (o.jackpotEv or 4000) then
+      M.log(string.format("[%s] actor=%d SETZER Jackpot on slot %d (%d HP, %d shield(s)%s) at 3 BP: %d roll(s) "
+        .. "of expected %d each, 99 MP of %d", tag, actor, slot, hp, sh, broken and ", Broken" or "",
+        M.JACKPOT_ROLLS, math.floor(per), mp))
       return { kind = "skill", cmd = BATTLE.CMD_SLOT, skill = BATTLE.SETZER.JACKPOT, row = row,
-               boostLeft = want, aim = slot, reason = "jackpot" }
+               boostLeft = 3, aim = slot, reason = "jackpot" }
     end
   end
   -- Slot in a random battle against two or more, at the bank's boost from
@@ -12954,6 +12998,193 @@ function M.setzerBattle(plan, opts)
     M.call(function()
       M.log(string.format("[setzer] the battle is over: %d row(s) played of %d planned (entry %d next)",
         #M.vars.setzer, #plan, k))
+    end),
+  })
+end
+
+-- ---- scripted kit turns, played by hand for the kit suites (v0.27) --------
+-- M.kitBattle(plan, opts) is one battle, already loading or up, in which the
+-- characters `plan` names take its turns through the real menu, the shape
+-- M.setzerBattle has for SETZER's table, for any character and command:
+--   { who = character id, cmd = command id, boost = 0..3,
+--     spell = id       the Magic list's cell holding this spell id (state $0E)
+--     row = id         a Tools-shell list's cell holding this id (state $30)
+--     slot = s         aim at monster slot s (else any live monster)
+--     self = true      the target select is the party side (Morph, Runic):
+--                      confirm where the cursor stands
+--     refused = "list" | "command"
+--                      the A press must be refused there: it buzzes and the
+--                      window stays up; after three refused presses the
+--                      entry is done (recorded refusedSeen) and the list, if
+--                      any, is backed out of
+--     defend = true    a Defend, which banks a point }
+-- The bank is filled to the entry's boost by real Defends first, then R
+-- raises and L lowers the pending boost to exactly it.  Everyone else
+-- Defends while the plan has entries; after it, everyone Fights a live
+-- monster until the battle ends (opts.idle = "defend": everyone keeps
+-- Defending instead; opts.untilPlanDone ends the step once the plan is spent
+-- and opts.planDone(), when given, says its last action has resolved).
+-- Nothing is written.  M.vars.kit[k] records each entry:
+-- { who, actor, boost (pending at the confirm), refusedSeen, frame }.
+function M.kitBattle(plan, opts)
+  opts = opts or {}
+  local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
+  local SPELL_PTR = { [0] = 0x0000, [1] = 0x013C, [2] = 0x0278, [3] = 0x03B4 }
+  local k, cool = 1, 0
+  local function pulse(btn)
+    if cool > 0 then cool = cool - 1; M.setPad({}); return end
+    M.setPad({ [btn] = true }); cool = 10
+  end
+  local function cmdRowOf(a, cmd)
+    for r = 0, 3 do if M.readByte(0x202E + a * 12 + r * 3) == cmd then return r end end
+  end
+  local function spellIdx(a, id)
+    for i = 0, 53 do
+      if M.readByte(0x2092 + SPELL_PTR[a] + i * 4) == id then return i end
+    end
+  end
+  local aim = nil
+  local function aimAt(want)
+    local chars, mons = M.readByte(0x7B7D), M.readByte(0x7B7E)
+    if chars == 0 and mons ~= 0 and (mons & M.readByte(0x3A75)) ~= 0 and (want == nil or mons == want) then
+      return "confirm"
+    end
+    if cool > 0 then pulse("a"); return "walk" end
+    aim = aim or { presses = 0 }
+    aim.presses = aim.presses + 1
+    if aim.presses > 30 then return "refuse" end
+    local L = M.battleLayout()
+    if chars ~= 0 or mons == 0 then
+      aim.cross = (aim.cross or 0) + 1
+      pulse(L.toMonsters[1 + (aim.cross - 1) % #L.toMonsters])
+    else
+      pulse(aim.presses % 12 < 6 and "down" or "up")
+    end
+    return "walk"
+  end
+  local function fight(a, st)
+    if st == 0x05 then
+      local row = cmdRowOf(a, 0x00)
+      if row == nil then pulse("right"); return end
+      local cur = M.readByte(0x890F + a) & 3
+      if cur ~= row then pulse(cur < row and "down" or "up") else pulse("a") end
+    elseif st == 0x38 then
+      if cool > 0 then pulse("a"); return end
+      local r = aimAt(nil)
+      if r == "confirm" then aim = nil; pulse("a") elseif r == "refuse" then aim = nil; pulse("b") end
+    elseif st == 0x27 then pulse("a")
+    elseif st == 0x30 or st == 0x0E or st == 0x0A or st == 0x08 then pulse("b")
+    else M.setPad({}) end
+  end
+  local function defend(st)
+    if st == 0x05 then pulse("right") elseif st == 0x27 then pulse("a")
+    elseif st == 0x30 or st == 0x0E or st == 0x38 then pulse("b") else M.setPad({}) end
+  end
+  local function done(p, a, refused)
+    M.vars.kit[#M.vars.kit + 1] = { who = p.who, actor = a, boost = M.readByte(0x3E9D + a * 2),
+      refusedSeen = refused or false, frame = M.frame, entry = k }
+    M.log(string.format("[kit] f%d entry %d of %d: %s, char $%02X (seat %d) at %d BP pending, bank %d", M.frame,
+      k, #plan, refused and "refused, as planned" or (p.defend and "a Defend" or "confirmed"), p.who, a,
+      M.readByte(0x3E9D + a * 2), M.readByte(0x3E9C + a * 2)))
+    k = k + 1
+    aim = nil
+  end
+  local function tick()
+    if M.readByte(MENU) == 0 then
+      if M.readByte(0x3A77) == 0 then pulse("a") else M.setPad({}) end
+      return
+    end
+    local a = M.readByte(ACTOR) & 3
+    local st = M.readByte(MSTATE)
+    local p = plan[k]
+    if p == nil then
+      if opts.idle == "defend" then defend(st) else fight(a, st) end
+      return
+    end
+    if M.readByte(0x3ED8 + a * 2) ~= p.who then defend(st); return end
+    local e = a * 2
+    if p.defend then
+      if st == 0x27 and cool == 0 then done(p, a) end
+      defend(st)
+      return
+    end
+    if st == 0x05 then
+      if M.readByte(0x3E9C + e) < (p.boost or 0) then
+        if M.readByte(0x3E9D + e) > 0 then pulse("l") else pulse("right") end
+        return
+      end
+      local want = math.min(p.boost or 0, 3)
+      if M.readByte(0x3E9D + e) < want then pulse("r"); return end
+      if M.readByte(0x3E9D + e) > want then pulse("l"); return end
+      local row = cmdRowOf(a, p.cmd)
+      M.assertEq(row ~= nil, true, string.format("char $%02X's command list holds command $%02X", p.who, p.cmd))
+      local cur = M.readByte(0x890F + a) & 3
+      if cur ~= row then pulse(cur < row and "down" or "up"); return end
+      if p.refused == "command" then
+        p.presses = (p.presses or 0) + (cool == 0 and 1 or 0)
+        if p.presses > 3 then
+          M.log(string.format("[kit] f%d command $%02X refused %d A presses; the command window stays up",
+            M.frame, p.cmd, p.presses - 1))
+          done(p, a, true)
+          M.setPad({})
+          return
+        end
+      end
+      pulse("a")
+    elseif st == 0x0E and p.spell ~= nil then
+      local i = spellIdx(a, p.spell)
+      M.assertEq(i ~= nil, true, string.format("char $%02X's magic list holds spell $%02X", p.who, p.spell))
+      local wantRow, wantCol = i // 2, i % 2
+      local absRow = M.readByte(0x8913 + a) + M.readByte(0x891B + a)
+      local col = M.readByte(0x8917 + a)
+      if absRow ~= wantRow then pulse(absRow < wantRow and "down" or "up"); return end
+      if col ~= wantCol then pulse(col < wantCol and "right" or "left"); return end
+      if p.refused == "list" then
+        p.presses = (p.presses or 0) + (cool == 0 and 1 or 0)
+        if p.presses > 3 then done(p, a, true); pulse("b"); return end
+      end
+      if opts.onList and cool == 0 then opts.onList(p, a) end
+      pulse("a")
+    elseif st == 0x30 and p.row ~= nil then
+      local want
+      for i = 0, 7 do if M.readByte(0x4005 + i * 3) == p.row then want = i end end
+      M.assertEq(want ~= nil, true, string.format("the list holds row $%02X", p.row))
+      local cc, cr = M.readByte(0x8963 + a), M.readByte(0x8967 + a)
+      if cc ~= want % 2 then pulse(want % 2 > cc and "right" or "left"); return end
+      if cr ~= want // 2 then pulse(want // 2 > cr and "down" or "up"); return end
+      if p.refused == "list" then
+        p.presses = (p.presses or 0) + (cool == 0 and 1 or 0)
+        if p.presses > 3 then done(p, a, true); pulse("b"); return end
+      end
+      if opts.onList and cool == 0 then opts.onList(p, a) end
+      pulse("a")
+    elseif st == 0x38 then
+      M.assertEq(p.refused == nil, true, string.format("entry %d (planned refused at the %s) reached target select",
+        k, tostring(p.refused)))
+      if p.self then
+        if cool == 0 then done(p, a) end
+        pulse("a")
+        return
+      end
+      local r = aimAt(p.slot ~= nil and (1 << p.slot) or nil)
+      if r == "refuse" then
+        M.assertEq(false, true, string.format("entry %d: the target select never reached monster %s", k,
+          tostring(p.slot)))
+      elseif r == "confirm" then done(p, a); pulse("a") end
+    elseif st == 0x27 then pulse("a")
+    else M.setPad({}) end
+  end
+  return M.seqStep({
+    M.call(function() M.vars.kit = {}; M.logRomIdentity("[kit]") end),
+    M.waitUntil(function() return M.battleActive() end, 1200, "the battle is up", 2),
+    M.driveUntil(function()
+      if opts.untilPlanDone and k > #plan and (opts.planDone == nil or opts.planDone()) then return true end
+      return not M.battleLoadStarted()
+    end, opts.maxFrames or 40000, {
+      { tick = function() tick(); return "frame" end, reset = function() end },
+    }, "the battle with the kit plan ends"),
+    M.call(function()
+      M.log(string.format("[kit] the battle step is over: %d entr(ies) played of %d planned", k - 1, #plan))
     end),
   })
 end
