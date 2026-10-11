@@ -51,6 +51,7 @@ import signal
 import socket
 import subprocess
 import sys
+import importlib.machinery
 import importlib.util
 import runpy
 import threading
@@ -71,7 +72,22 @@ try:
     _power_spec.loader.exec_module(_power)
 except (OSError, ImportError):
     _power = None
-HOST = socket.gethostname().split(".")[0].lower()   # this machine's label
+# tools/status's checks, shared with the health banner: each emitter adds its
+# machine's local_facts() to its snapshots, and the viewer judges them with
+# judge_machine() and runs infra_checks() every INFRA_SEC.  A peer checkout
+# without tools/status sends no facts; it is then judged on up/down and
+# power alone.
+try:
+    _status_loader = importlib.machinery.SourceFileLoader(
+        "ot6status", os.path.join(ROOT, "tools/status"))
+    _status = importlib.util.module_from_spec(
+        importlib.util.spec_from_loader("ot6status", _status_loader))
+    _status_loader.exec_module(_status)
+except Exception:
+    _status = None
+FACTS_SEC = 30      # how often an emitter re-reads its machine's facts
+INFRA_SEC = 600     # how often the viewer checks GitHub auth and releases
+HOST =socket.gethostname().split(".")[0].lower()   # this machine's label
 
 # Runs happen in every git worktree of this repo (agents and the release
 # qualification each get their own), not only under ROOT, and in plain clones
@@ -497,13 +513,39 @@ WAKE_JS = """<script>
 </script>"""
 
 
+# Unhealthy infrastructure, on top of every page: health.json (Board.write)
+# lists tools/status's problems -- machines unreachable, on battery, without
+# an emulator-slots file or waiting on a reboot; GitHub auth (gh and git push)
+# and release drift -- and the banner shows while there are any.
+HEALTH_JS = """<script>
+(function () {
+  const box = document.createElement('div');
+  box.style.cssText = 'display:none;background:#5a1414;color:#fdd;'
+    + 'border-bottom:2px solid #e05050;padding:8px 14px;'
+    + 'font:bold 14px ui-monospace,monospace;line-height:1.5';
+  document.body.insertBefore(box, document.body.firstChild);
+  const esc = t => String(t).replace(/[&<>]/g,
+    c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  async function tick() {
+    try {
+      const h = await (await fetch('health.json?' + Date.now())).json();
+      const p = h.problems || [];
+      box.style.display = p.length ? 'block' : 'none';
+      box.innerHTML = p.map(t => '<div>\\u26A0 ' + esc(t) + '</div>').join('');
+    } catch (e) {}
+  }
+  tick(); setInterval(tick, 5000);
+})();
+</script>"""
+
+
 def write_pages(webroot):
     # index.html is the worker grid (default landing); the classic
     # single-worker detail moves to live1.html
     with open(os.path.join(webroot, "index.html"), "w") as f:
-        f.write(GRID_PAGE + WAKE_JS)
+        f.write(GRID_PAGE + WAKE_JS + HEALTH_JS)
     with open(os.path.join(webroot, "live1.html"), "w") as f:
-        f.write(DETAIL_PAGE + WAKE_JS)
+        f.write(DETAIL_PAGE + WAKE_JS + HEALTH_JS)
     try:
         states = runpy.run_path(
             os.path.join(ROOT, "tools/tests/savestate_graph.py"))["STATES"]
@@ -512,7 +554,8 @@ def write_pages(webroot):
         coords = {}
     baked = {n: [round(x, 1), round(y, 1)] for n, (x, y) in coords.items()}
     with open(os.path.join(webroot, "progress.html"), "w") as f:
-        f.write(PROGRESS_PAGE.replace("__COORDS__", json.dumps(baked)) + WAKE_JS)
+        f.write(PROGRESS_PAGE.replace("__COORDS__", json.dumps(baked))
+                + WAKE_JS + HEALTH_JS)
 
 
 def ensure_map(webroot):
@@ -737,6 +780,7 @@ class Scanner:
         self.runs = {}         # worker id -> what one run has done so far
         self.recorded = set()  # worker ids already finished and reported
         self.incs = collections.deque()   # (ts, frames) advanced, all workers
+        self.facts, self.facts_ts = None, 0.0   # tools/status local_facts()
         # the stamp checks take seconds, so the route has its own thread and
         # never holds up the 1s worker scan
         threading.Thread(target=self._progress_loop, daemon=True).start()
@@ -856,6 +900,14 @@ class Scanner:
                 "workers": workers, "pngs": pngs, "fps": self._fps(now)}
         if done:
             snap["done"] = done
+        if _status is not None:
+            if now - self.facts_ts > FACTS_SEC:
+                try:
+                    self.facts = _status.local_facts()
+                except Exception as e:
+                    self.facts = {"facts_err": f"{type(e).__name__}: {e}"[:120]}
+                self.facts_ts = now
+            snap["facts"] = self.facts
         fresh, self.fresh = self.fresh, None
         if fresh is not None:
             snap["progress"] = fresh
@@ -968,6 +1020,48 @@ class Board:
         self.claims = os.path.join(_TREES["main"], "build",
                                    "placement-claims.jsonl")
         self.pl = _placement()
+        self.cfg = _status.load_config(ROOT) if _status else None
+        self.infra = []     # infra_checks() problems, as banner lines
+        if _status is not None:
+            threading.Thread(target=self._infra_loop, daemon=True).start()
+
+    def _infra_loop(self):
+        while True:
+            try:
+                self.infra = [f"{label}: {text}" for lv, label, text
+                              in _status.infra_checks(ROOT) if lv == _status.PROBLEM]
+            except Exception as e:
+                self.infra = [f"status checks failed: {type(e).__name__}: {e}"[:200]]
+            time.sleep(INFRA_SEC)
+
+    def health(self, m):
+        """Banner lines: tools/status's judgment of every watched machine
+        (excluded ones skipped), pool machines this viewer does not watch,
+        and the latest infra_checks()."""
+        out = []
+        cfg = self.cfg or {"machines": [], "excluded": set()}
+        for n in self.names:
+            if n in cfg["excluded"]:
+                continue
+            st, snap = m[n], m[n]["snap"]
+            if snap is None:
+                if st["err"] != "connecting":
+                    out.append(f"{n}: unreachable since "
+                               + time.strftime("%H:%M", time.localtime(st["down_since"]))
+                               + (f" ({st['err']})" if st["err"] else ""))
+                continue
+            if _status is None:
+                continue
+            facts = dict(snap.get("facts") or {})
+            facts.pop("error", None)
+            if isinstance(snap.get("power"), dict):
+                facts["power"] = snap["power"].get("source")
+            out += [f"{n}: {text}" for lv, text in _status.judge_machine(facts)
+                    if lv == _status.PROBLEM]
+        for mc in cfg["machines"]:
+            if not mc["excluded"] and mc["name"] not in self.names:
+                out.append(f"{mc['name']}: not watched (live.py --peer {mc['host']})")
+        return out + list(self.infra)
 
     def _png(self, name, wid):
         return os.path.join(self.gdir, _safe_id(f"{name}_{wid}") + ".png")
@@ -1081,7 +1175,9 @@ class Board:
             mc.update({k: pm[k] for k in ("room", "peak", "blocked") if k in pm})
         out = {"workers": workers, "count": len(workers), "ts": int(now),
                "machines": machines, "local": HOST}
+        out["health"] = self.health(m)
         self._dump("grid.json", out)
+        self._dump("health.json", {"problems": out["health"], "ts": int(now)})
         self._dump("placement.json", place)
         prog = self.merge_progress(m)
         if prog is not None:
@@ -1184,8 +1280,11 @@ def peer_thread(board, peer, stop):
                                  stderr=subprocess.STDOUT)
             board.procs[name] = p
             try:
-                p.stdin.write(src)
-                p.stdin.close()
+                try:
+                    p.stdin.write(src)
+                    p.stdin.close()
+                except BrokenPipeError:
+                    pass    # ssh already quit: its own reason is on stdout
                 for line in p.stdout:
                     if line.startswith(b"{"):
                         try:

@@ -85,7 +85,10 @@ interpreting runs.
 
 # 1. Start: state of the world
 
-Before planning, know and report in one short block: uncommitted or
+Run `tools/status` first ([TOOLING](../../docs/TOOLING.md#state-of-the-world-toolsstatus)).
+It covers everything in this paragraph except whether a branch is mid-stream
+or dead, and it marks each problem `!!`. Its exit status is 1 while any
+problem remains. Before planning, know and report in one short block: uncommitted or
 unpushed work and where it belongs; release drift (README claiming a
 published version with no tag and GitHub release, release/* ahead of main);
 VERSION may name the explicitly identified next development version; open

@@ -1,0 +1,11 @@
+# The machines tools/status checks and live.py's health banner judges.
+# One per line: host, then optionally "excluded:" and why.  An excluded
+# machine is shown as such and never counts as unhealthy.
+mbp.local
+air.local
+px13.local
+mini.local  excluded: out of the pool (coordinator, 2026-10-11)
+
+# Where live.py serves (tools/stream/live.py --port); status asks it which
+# machines it watches.  127.0.0.1 is used when this is the local host.
+live mbp.local:8611
