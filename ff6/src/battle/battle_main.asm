@@ -4177,6 +4177,8 @@ _c2192e:
 ; [ command $03: morph ]
 
 Cmd_03:
+        jsl     Ot6TranceGate   ; ot6: Trance takes a full 3-BP boost
+        bcc     _c2192e         ;   (ot6_trance.asm); without one, no morph
 @1936:  sec
 _1937:  php
         tyx
@@ -7144,11 +7146,40 @@ BUM_RUSH_POWER_VANILLA = 128            ; the byte this replaces
 ; neither price) keep casting it.
 LIFE3_MP_OT6       = 60
 LIFE3_MP_VANILLA   = 50                 ; the byte this replaces
+
+; ---- overrides 7-10: Break ($0c) chips shields instead of petrifying (#398) --
+; Vanilla Break is petrify: hit 120, power 0, death-class.  OT6's Break deals
+; no damage and inflicts no status; it takes shields off its one target,
+; class- and element-blind, 1 plus 1 per boost point (Ot6BreakSpell,
+; ot6_break.asm, from the per-target loop).  The record keeps its MP (25),
+; power 0 and single-target targeting ($41 has no spread bit in vanilla
+; already), and loses everything that made it a status roll:
+;   +$02  $02 -> $00   the instant-death flag: a boss's instant-death
+;                      protection ($3aa1.2) made CheckHit miss it
+;   +$04  $10 -> $20   the stamina-evade death check -> can't-dodge: a chip
+;                      takes no hit roll (CheckHit's @22a1 `bit #$20`)
+;   +$07  $01 -> $00   auto-miss when the target is immune to the status
+;   +$0a  $40 -> $00   Petrify
+; Every source casts the new Break: Shoat, Terra's natural magic (level 24)
+; and the Break Blade's on-hit spell.  A monster's Break on the party
+; chips nothing (characters carry no shields).
+BREAK_FLAGS1_OT6   = $00
+BREAK_FLAGS1_VANILLA = $02              ; the byte this replaces
+BREAK_FLAGS3_OT6   = $20
+BREAK_FLAGS3_VANILLA = $10              ; the byte this replaces
+BREAK_FLAGS4_OT6   = $00
+BREAK_FLAGS4_VANILLA = $01              ; the byte this replaces
+BREAK_STATUS1_OT6  = $00
+BREAK_STATUS1_VANILLA = $40             ; the byte this replaces (Petrify)
 ; ------------------------------------------------------------------------------
 
 ; c4/6ac0
 ; byte offsets of the overridden bytes within the blob.  They must stay in
 ; ascending order: the splice below walks the blob once.
+BREAK_FLAGS1_AT    = ATTACK::BREAK    * MAGIC_PROP_REC + 2
+BREAK_FLAGS3_AT    = ATTACK::BREAK    * MAGIC_PROP_REC + 4
+BREAK_FLAGS4_AT    = ATTACK::BREAK    * MAGIC_PROP_REC + 7
+BREAK_STATUS1_AT   = ATTACK::BREAK    * MAGIC_PROP_REC + 10
 OSMOSE_MP_AT       = ATTACK::OSMOSE   * MAGIC_PROP_REC + 5
 LIFE3_MP_AT        = ATTACK::LIFE_3   * MAGIC_PROP_REC + 5
 DDUST_POWER_AT     = ATTACK::SHIVA    * MAGIC_PROP_REC + 6
@@ -7160,7 +7191,15 @@ MAGIC_PROP_END     = MAGIC_PROP_COUNT * MAGIC_PROP_REC
 .define magic_prop_dat .sprintf("magic_prop_%s.dat", LANG_SUFFIX)
 
 MagicProp:
-        .incbin magic_prop_dat, 0, OSMOSE_MP_AT
+        .incbin magic_prop_dat, 0, BREAK_FLAGS1_AT
+        .byte   BREAK_FLAGS1_OT6                        ; $0c +$02 (was $02)
+        .incbin magic_prop_dat, BREAK_FLAGS1_AT + 1, BREAK_FLAGS3_AT - BREAK_FLAGS1_AT - 1
+        .byte   BREAK_FLAGS3_OT6                        ; $0c +$04 (was $10)
+        .incbin magic_prop_dat, BREAK_FLAGS3_AT + 1, BREAK_FLAGS4_AT - BREAK_FLAGS3_AT - 1
+        .byte   BREAK_FLAGS4_OT6                        ; $0c +$07 (was $01)
+        .incbin magic_prop_dat, BREAK_FLAGS4_AT + 1, BREAK_STATUS1_AT - BREAK_FLAGS4_AT - 1
+        .byte   BREAK_STATUS1_OT6                       ; $0c +$0a (was $40)
+        .incbin magic_prop_dat, BREAK_STATUS1_AT + 1, OSMOSE_MP_AT - BREAK_STATUS1_AT - 1
         .byte   OSMOSE_MP_OT6                           ; $29 +$05 (was 1)
         .incbin magic_prop_dat, OSMOSE_MP_AT + 1, LIFE3_MP_AT - OSMOSE_MP_AT - 1
         .byte   LIFE3_MP_OT6                            ; $35 +$05 (was 50)
@@ -8683,6 +8722,7 @@ CalcAttackEffect:
         beq     @346c
         stz     $3a48
         jsl     Ot6Life3Revive  ; ot6: Life 3 on a KO'd body revives it (#327)
+        jsl     Ot6BreakSpell   ; ot6: Break takes shields, not a petrify (#398)
         jsr     MagicStatusEffect
         jsr     DoTargetEffect
         lda     $3a48
@@ -9784,6 +9824,8 @@ TargetEffect_56:
         lda     $01,s
         ora     $3be0,y
         sta     $3be0,y
+        lda     $01,s
+        jsl     Ot6DebilReveal  ; ot6: the weakness it adds is revealed
         pla
         not_a
         pha
@@ -12859,6 +12901,9 @@ RemoveRetal:
 ; [ check for counterattacks ]
 
 CheckRetal:
+        jsl     Ot6BladeBounce  ; ot6: a RunicBlade sends back what it absorbed
+        bcc     @4c5b           ;   (ot6_runicblade.asm): x = Celes, the queue
+        jsr     CreateRetalAction ; bytes and the caster target already set
 @4c5b:  ldx     #$12        ; loop through all targets
 @4c5d:  lda     $3aa0,x     ; $3aa0.0 skip if target is not present
         lsr

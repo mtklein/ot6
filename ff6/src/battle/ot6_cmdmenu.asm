@@ -216,8 +216,9 @@
         ; column gap), cost -> +8/+9 (was the second $04,$21 font).  The name
         ; commands (+4,+10) and their ids (+5,+11, DrawToolsListText's) stay put.
         lda     $575a           ; +5 = column-1 tool id (DrawToolsListText wrote it)
-        jsl     Ot6CostFor      ;   id -> MP cost (0 if $ff/unpriced)
-        jsl     Ot6PendPrice    ;   ...x2.5 per pending boost (#219); a 0 stays 0
+        jsl     Ot6PendToolPrice ;  id -> MP cost (0 if $ff/unpriced), x2.5 per
+                                ;   pending boost (#219), twice when Edgar's
+                                ;   Overclock fires it (ot6_overclock.asm)
         pha                     ; park column-1 cost
         jsl     Ot6AbilityGrey  ;   cost -> $04 grey / $00 white; preserves X,Y
         ora     #$21            ; +1: font palette, $21 white or $25 grey
@@ -229,8 +230,7 @@
         pla
         sta     $5758           ; +3: column-1 cost value
         lda     $5760           ; +11 = column-2 tool id
-        jsl     Ot6CostFor
-        jsl     Ot6PendPrice
+        jsl     Ot6PendToolPrice
         pha                     ; park column-2 cost
         jsl     Ot6AbilityGrey
         ora     #$21            ; +7: font palette, $21 white or $25 grey
@@ -403,9 +403,13 @@
         beq     @thief
         cmp     #$04
         beq     @setzer
+        cmp     #$00
+        beq     @tools
         pla                     ; blitz
         jsl     Ot6CostFor
         jml     Ot6PendPrice
+@tools: pla                     ; real tools: the drawn price, Overclock and all
+        jml     Ot6PendToolPrice
 @setzer:
         pla                     ; Setzer's table: flat, like the thief rows
         jml     Ot6SetzerCost   ;   (Ot6BoostDmg gates cmd $0f); Coin Toss and
@@ -690,7 +694,7 @@
 ; other cell through the 8-cell (4x2) window. row i is boost i+1, since the
 ; 0x tier is retired, so the window is three rows deep and row 3 always stays
 ; $ff (blank, and the C1 confirm refuses it). tech[i] shares Ot6BushidoTech's
-; base+boost math and Ot6BushidoOblivion's top-tier swap with single-select, so
+; base+boost math with single-select, so
 ; the menu cannot offer a tech the confirm commit would not fire. When Cyan
 ; knows fewer than three techs (ceiling < 2) only the known rows are emitted; a
 ; boost past the ceiling would cap to a duplicate tech, so its row is left
@@ -721,7 +725,6 @@
 @row:   tya                         ; A = row i
         inc     a                   ; row i -> boost i+1 (no 0x tier)
         jsl     Ot6BushidoTech      ; A = tech (preserves Y; clobbers X)
-        jsl     Ot6BushidoOblivion  ; A = tech, top-tier swap (preserves Y)
         clc
         adc     #$55                ; A = attack id $55 + tech
         pha                         ; park id ($01,s; offset now $02,s, max $03,s)

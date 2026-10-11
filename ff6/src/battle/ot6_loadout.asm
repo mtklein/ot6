@@ -96,6 +96,31 @@
         rtl
 .endproc
 
+; [ may this tech stand in this boost slot?  Cleave needs the 3-BP slot ]
+; A divine's one gate is a full 3-BP boost (kits.md "Divines"), and Cleave
+; (tech 7) is Cyan's.  The auto window only ever puts it on the 3-BP row; a
+; manual loadout may not put it on the 1- or 2-BP row, where it would fire
+; for less.  One leaf for the three readers: the battle read hook
+; (Ot6BushidoTech), the configurator's draw (Ot6LoadoutSlotTech) and its
+; L/R cycle (Ot6LoadoutCycleCore), so the screen, the cycle and the battle
+; cannot disagree.  A stored Cleave on a lower slot (an old save's) falls
+; back to the auto window for that slot, the same fallback an unlearned
+; stored tech takes.
+; in: A = tech (0..7), X = slot (0..3), i16.  out: carry set = it may
+; stand.  A, X and Y preserved.
+.proc Ot6CleaveSlot
+        .a8
+        .i16
+        cmp     #$07
+        bne     @ok
+        cpx     #$0003
+        bcs     @ok                 ; the 3-BP slot
+        clc
+        rtl
+@ok:    sec
+        rtl
+.endproc
+
 ; [ unpack a slot's 3-bit tech field from the packed loadout word ]
 ; slot s occupies bits s*3 .. s*3+2 of the $7e1e1d word.  Both the battle read
 ; hook (Ot6BushidoTech) and the menu draw route through here, so they cannot
@@ -163,6 +188,15 @@
         lda     $01,s               ; slot
         jsl     Ot6LoadoutUnpack    ; A = stored tech (clobbers X, preserves Y)
         jsl     Ot6TechLearned      ; carry = learned (A preserved)
+        bcc     @auto
+        pha
+        lda     $02,s               ; the slot
+        longa
+        and     #$00ff
+        tax
+        shorta
+        pla
+        jsl     Ot6CleaveSlot       ; carry = the tech may stand in this slot
         bcc     @auto
         sta     $01,s               ; learned: return stored tech
         pla
@@ -278,8 +312,12 @@
         adc     $01,s               ; delta
         and     #$07                ; wrap 0..7
         jsl     Ot6TechLearned      ; carry = learned (A preserved)
+        bcc     @skip
+        ldx     $4e                 ; the cursored row -> its boost slot
+        inx
+        jsl     Ot6CleaveSlot       ; Cleave only in the 3-BP slot
         bcs     @found
-        dey
+@skip:  dey
         bne     @hop
 @found: ldx     $4e                 ; X = cursored row ($4f = 0, set by Open)
         inx                         ; -> the same row->slot mapping

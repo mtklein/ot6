@@ -1,69 +1,50 @@
 ; ------------------------------------------------------------------------------
-; Divine abilities (kit slot 8): the resolution-time gates
+; Divine abilities (kit slot 8): the resolution-time halves
 ;
-; Ot6Oblivion (Cyan) and Ot6Assassinate (Shadow): the two divines whose gate
-; cannot be read at command-select time, so they hook CalcAttackEffect instead.
-; The select-time half of Oblivion is Ot6BushidoOblivion, in ot6_bushido.asm.
-; Assassinate's gate is also reached from Ot6HitJoin (ot6_break.asm), on the
-; hit that breaks a body.
+; The owner's rule (2026-10-11, kits.md "Divines"): a divine's one gate is a
+; full 3-BP boost, as in Octopath Traveler.  No once-a-battle limit, no
+; Broken-target condition: a divine can be used again in the same battle
+; whenever the bank holds three points.  Each divine's 3-BP test sits where
+; its command already decides what the boost buys (Cyan's SwdTech window,
+; Setzer's table, Ot6FoldSteps, Ot6RunicRaise, the Tools passes, the Morph
+; gate); this file holds the two whose effect is decided where the target
+; exists:
+;   Ot6Oblivion     Cleave (Cyan), the SwdTech window's 3-BP row
+;   Ot6Assassinate  Shadow's divine, on a hit of a 3-BP action
+; BP is spent through Ot6ActionEnd like any boosted action.
 ; ------------------------------------------------------------------------------
 
-; ==============================================================================
-; Divine abilities (kit slot 8): resolution-time gates + once-per-battle flag
+; [ Cleave (Cyan, SwdTech tech 8): instant death, or the heaviest cut ]
 ;
-; The kit-8 divines whose gates cannot be read at command-select time land here,
-; gated at resolution, where the target exists. Each is once-per-battle
-; through OT6_DIVINE_USED (per-character bit, $3ecb): the flag is read at select
-; time (Ot6BushidoTier drops a spent Oblivion back to Tempest) and set when
-; the divine lands. Every divine uses the boost economy the same way its kit
-; does: BP is spent through Ot6ActionEnd like any boosted
-; action, and a countered action never reaches ActionEnd to charge, so the
-; divines inherit that invariant through the commands they ride.
-; ------------------------------------------------------------------------------
-
-; [ Oblivion (Cyan, Bushido tech 8): instant death iff the target is Broken ]
+; The tech is vanilla swdtech 8, attack id $5c, which magic_prop builds as a
+; pure instant-death strike: power 0, Status-1 $80 (Death), the $11a2.1
+; instant-death-spell flag, and $11a7.0 "auto-miss if the target is immune
+; to the status".  It is reached only on the SwdTech window's 3-BP row
+; (Ot6BushidoTech), so the boost has always been paid when this runs.
 ;
-; The tech is vanilla swdtech 8, attack id $5c, which magic_prop already builds
-; as a pure instant-death strike: power 0, Status-1 $80 (Death), the $11a2.1
-; instant-death-spell flag, and $11a7.0 "auto-miss if the target is immune to
-; the status". What it lacked was the Broken gate: that gate cannot be read at
-; command-latch time, since swdtech is in RetargetCmdTbl
-; (battle_main.asm:12810), which clears the target there; the target is then
-; re-chosen at resolution.
+; The target is read at the one point where it exists and the attack's
+; properties are still editable: immediately after ChooseTarget in
+; CalcAttackEffect (battle_main.asm), which fills $b8/$b9 for this attack
+; (swdtech is in RetargetCmdTbl, so the target is re-chosen here).
 ;
-; The gate is read at the one point where the target exists and
-; the attack's properties are still editable: immediately after ChooseTarget in
-; CalcAttackEffect (battle_main.asm:8185), which fills $b8/$b9 for this attack.
-; Here x is still the attacker (CalcAttackEffect indexes $3c08,x etc. right
-; below), $3a7d is the resolved attack id, and the loaded MagicProp bytes
-; ($11a6 power, $11aa Status-1, $11a2/$11a7 flags) are the ones the per-target
-; loop about to run will consume.
-;
-;   Broken and killable  -> mark Death directly in the target's "status to set"
-;                           ($3dd4, what SetStatus1 writes at :2254, applied by
-;                           UpdateStatus :11067 for every present entity inde-
-;                           pendent of the hit roll).  This is a guaranteed
-;                           kill, the same ruling Assassinate takes. Set the
-;                           once-per-battle flag.
-;   unbroken, OR a Broken
-;   but death-immune boss -> the props are patched to a Tempest-like hit in
-;                           place: power 70, Status-1 cleared (no Death), the
-;                           instant-death-spell and auto-miss flags cleared. The
-;                           per-target loop then lands a 70-power elementless
-;                           slash, the reduced fallback. Keeping a real hit as
-;                           the fallback is why Oblivion could rejoin
-;                           the BP3 tier without retiring Tempest, and the flag
-;                           stays clear (the divine was not spent), so the menu
-;                           keeps offering Oblivion until it lands.
-;
-; The death-immune fold matters because a boss can be Broken too: without it,
-; Oblivion against a Broken boss would spend the once-per-battle flag on a
-; target Death cannot kill. Folding it to a Tempest hit spends the turn on
-; damage and leaves the divine unspent.
+;   killable                -> mark Death directly in the target's "status to
+;                              set" ($3dd4, applied by UpdateStatus for every
+;                              present entity independent of the hit roll): a
+;                              guaranteed kill.
+;   death-immune (a boss)   -> the props are patched in place to the
+;                              heaviest single cut a record can carry: power
+;                              255, Status-1 cleared, the instant-death and
+;                              auto-miss flags cleared.  The record ignores
+;                              defence already ($11a2 $20).  A boss is the
+;                              case a full boost must still pay for, and the
+;                              old fallback (Quadra Slice's single 70) was
+;                              less than the 2-BP Quadra Slice row lands.
 ;
 ; entry: jsl from CalcAttackEffect just after ChooseTarget. a16/i8, db=$7e;
 ; x = attacker entity offset, $b8/$b9 = target mask, $3a7d = attack id. preserves
 ; x (the caller indexes it right after) and y; may edit $11a6/$11aa/$11a2/$11a7.
+
+OT6_CLEAVE_BOSS_POWER = 255
 
 .proc Ot6Oblivion
         php
@@ -71,7 +52,7 @@
         .a8
         .i8
         lda     $3a7d
-        cmp     #$5c            ; oblivion's attack id?
+        cmp     #$5c            ; cleave's attack id?
         bne     done            ; no: this attack is untouched
         phx                     ; save the attacker entity offset (i8, 1 byte)
         ; --- primary target -> entity offset. The mask is split: $b8 low byte
@@ -97,24 +78,16 @@
         plx                     ; no target bit: restore attacker, bail
         bra     done
 @have:  ; x = target entity offset
-        lda     OT6_BROKEN_TICKS,x         ; broken timer (nonzero = Broken)
-        beq     @tempest        ; not broken: reduced fallback
         lda     $3aa1,x
-        bit     #$04            ; Broken but death-immune (a boss)?
-        bne     @tempest        ; ... Death cannot kill it: fall back
-        ; --- Broken and killable: guaranteed kill + spend the divine ---
+        bit     #$04            ; death-immune (a boss)?
+        bne     @cut            ; ... Death cannot kill it: the heavy cut
         lda     $3dd4,x
-        ora     #$80            ; Death (status to set)
+        ora     #$80            ; Death (status to set): a guaranteed kill
         sta     $3dd4,x
         plx                     ; x = attacker entity offset
-        cpx     #$08
-        bcs     done            ; (defensive: only characters own a divine)
-        lda     $3018,x         ; attacker's entity bit ($01/$02/$04/$08)
-        tsb     OT6_DIVINE_USED ; flag: divine spent this battle
         bra     done
-@tempest:
-        plx                     ; discard the saved attacker (unused on this arm)
-        lda     #$46            ; Tempest power (70): the reduced fallback
+@cut:   plx
+        lda     #OT6_CLEAVE_BOSS_POWER
         sta     $11a6
         stz     $11aa           ; clear Status-1 to inflict, so no Death $80
         lda     $11a2
@@ -131,16 +104,18 @@ done:   plp
 
 ; [ Assassinate (Shadow, divine): the gate and the kill ]
 ;
-; x = attacker, y = target, both entity offsets.  Shadow's hit on a Broken
-; non-boss kills it: Death is marked in the target's "status to set" ($3dd4,
-; SetStatus1's byte, applied by UpdateStatus at the tail of the same action
-; for every present entity, whatever the hit roll) and the once-per-battle
-; flag is spent.  Anything else leaves the attack as it was: an attacker
-; who is not Shadow (char id $03, $3ed8 keyed by the entity offset since
-; offset = slot*2), a divine already spent (OT6_DIVINE_USED, the attacker's
-; $3018 bit), a character target, an unbroken target, or a boss ($3aa1 bit
-; 2, the instant-death protection ScimitarEffect reads at
-; battle_main.asm:9147; Death cannot kill it, so the flag is kept).
+; x = attacker, y = target, both entity offsets.  A hit of Shadow's, on an
+; action he boosted with all three points, kills a Broken non-boss: Death is
+; marked in the target's "status to set" ($3dd4, SetStatus1's byte, applied
+; by UpdateStatus at the tail of the same action for every present entity,
+; whatever the hit roll).  The 3-BP boost is the divine's one gate (kits.md
+; "Divines"); it can be used again in the same battle.  Anything else leaves
+; the attack as it was: an attacker who is not Shadow (char id $03, $3ed8
+; keyed by the entity offset since offset = slot*2), an action boosted by
+; fewer than three points (OT6_BOOST_REVEALED, still pending until
+; Ot6ActionEnd charges it), a character target, an unbroken target, or a
+; boss ($3aa1 bit 2, the instant-death protection ScimitarEffect reads;
+; Death cannot kill it).
 ;
 ; Two callers, because of where a break is decided inside one action.
 ; Ot6HitJoin (ot6_break.asm) calls it for every landed hit, after both chip
@@ -164,9 +139,9 @@ done:   plp
         lda     $3ed8,x         ; attacker char id
         cmp     #$03            ; CHAR::SHADOW
         bne     done            ; not shadow: dormant
-        lda     $3018,x         ; attacker's entity bit ($01/$02/$04/$08)
-        and     OT6_DIVINE_USED
-        bne     done            ; divine already spent this battle
+        lda     OT6_BOOST_REVEALED,x
+        cmp     #$03            ; the divine's one gate: a full 3-BP boost
+        bcc     done            ;   on the action this hit belongs to
         tya                     ; target entity offset, width-neutral test
         cmp     #$08
         bcc     done            ; a character target: not an enemy
@@ -174,12 +149,10 @@ done:   plp
         beq     done            ; not Broken, this hit's chip included
         lda     $3aa1,y
         bit     #$04            ; a boss (instant-death protected)?
-        bne     done            ; yes: Death cannot kill it, the flag is kept
+        bne     done            ; yes: Death cannot kill it
         lda     $3dd4,y
         ora     #$80            ; Death (status to set)
         sta     $3dd4,y
-        lda     $3018,x
-        tsb     OT6_DIVINE_USED ; flag: divine spent this battle
 done:   rts
 .endproc
 

@@ -76,17 +76,16 @@ OT6_LOREROWS         = 5
 .assert (OT6_LORELOAD & $ffff) + OT6_LORESLOTS - 1 <= $1ffd, error, "lore loadout must sit inside the checksum window"
 .assert (OT6_LORELOAD & $ffff) = (OT6_RAGELOAD & $ffff) + OT6_RAGESLOTS, error, "lore loadout must follow the rage bytes without a gap"
 
-; Battle-only scratch. InitBattle clears through $3ed3. OT6_DIVINE_USED is
-; one per-character bitmask; the walkers use the interleaved even words.
-; OT6_DIVINE_USED survives a Cmd_20 scene-change reload, so a multi-phase
-; boss keeps its "divine already spent" flag across the reload.
-OT6_DIVINE_USED      := $3ecb
+; Battle-only scratch. InitBattle clears through $3ed3.  The walkers use the
+; interleaved even words.  ($3ecb held the once-a-battle divine flag until
+; the owner's 2026-10-11 rule made a full 3-BP boost a divine's only gate;
+; it is free again.)
 OT6_SCR_SLOT2        := $3ecc
 OT6_SCR_BIT          := $3ece
 OT6_SCR_IDX          := $3ed0
 OT6_SCR_COLS         := $3ed2
 
-.assert OT6_DIVINE_USED >= $3ecb, error, "OT6 battle scratch precedes owned range"
+.assert OT6_SCR_SLOT2 >= $3ecb, error, "OT6 battle scratch precedes owned range"
 .assert OT6_SCR_COLS + 1 <= $3ed3, error, "OT6 battle scratch exceeds owned range"
 
 ; Battle/HUD global scratch.
@@ -180,7 +179,7 @@ OT6_NUMCTR           := $ed71   ; last-seen damage-numeral thread counter
                                 ;   past InitBP's clear on purpose: a stale
                                 ;   value costs one no-op commit (see the proc)
 OT6_COVERPAID        := $ed72   ; per-character bitmask (----1234, the
-                                ;   OT6_DIVINE_USED / $3f2f shape).  bit set =
+                                ;   $3f2f shape).  bit set =
                                 ;   that character's True Knight cover has
                                 ;   already banked its BP this round.  set by
                                 ;   Ot6CoverBP, cleared per character by
@@ -442,5 +441,41 @@ OT6_HIREAXIS         := $edd2
 .assert OT6_HIREAXIS = OT6_HIREPOSE + 3, error, "the hire's axis must follow its pose save"
 .assert OT6_HIREAXIS <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
+
+; Terra's fourth fold (ot6_boost.asm, Ot6FoldSteps): a per-character bitmask
+; (----1234, the OT6_COVERPAID shape).  Bit set = the Ultima this character
+; queued is a Fire folded past Fire 3, so its boost bought the tier and
+; Ot6BoostDmg must not also multiply it (an Ultima cast straight from a
+; Ragnarok's list keeps the multiplier).  Set by Ot6QueueFold when the fold
+; lands on Ultima, cleared for the actor by Ot6ActionEnd and wholesale by
+; InitBP; read only for an executing Ultima.
+OT6_ULTIMAFOLD       := $edd3
+.assert OT6_ULTIMAFOLD = OT6_HIREAXIS + 1, error, "the Ultima-fold mark must follow the hire's axis"
+.assert OT6_ULTIMAFOLD <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
+; Celes's RunicBlade (ot6_runicblade.asm).  OT6_RUNICBLADE: per-character
+; bitmask (----1234), bit set = that character's standing Runic is a
+; RunicBlade; set or cleared at every raise, cleared when the stance's turns
+; run out (Ot6RunicHold) and by InitBP.  OT6_BLADEPEND: the one bounce an
+; absorb banked this action, the absorber's entity offset | $80 (0 = none);
+; OT6_BLADECASTER the caster's entity offset and OT6_BLADESPELL the spell.
+; Banked in RunicEffect and consumed by the CheckRetal that ends the same
+; action; InitBP clears the pending byte.
+OT6_RUNICBLADE       := $edd4
+OT6_BLADEPEND        := $edd5
+OT6_BLADECASTER      := $edd6
+OT6_BLADESPELL       := $edd7
+.assert OT6_RUNICBLADE = OT6_ULTIMAFOLD + 1, error, "the RunicBlade bits must follow the Ultima-fold mark"
+.assert OT6_BLADESPELL <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
+; Debilitator's added weaknesses (ot6_debilitator.asm): one byte per monster
+; slot, stride 2, indexed by the slot offset 0,2..10 like OT6_RVPEND_* (so a
+; target in y writes OT6_DEBIL-8,y).  The element bits a Debilitator added
+; to this body this battle: revealed at once, and kept out of the species
+; codex (Ot6Chip), because the weakness is this body's, not its species'.
+; Cleared per slot by Ot6SeedShields at every seed.
+OT6_DEBIL            := $edd8   ; 12 bytes
+.assert OT6_DEBIL = OT6_BLADESPELL + 1, error, "the Debilitator mask must follow the RunicBlade state"
+.assert OT6_DEBIL + 12 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
 .endif

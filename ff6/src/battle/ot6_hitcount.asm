@@ -96,7 +96,13 @@ Ot6HitCountTbl:
         adc     f:$7e0000+$3a70 ; add, so a future +1 source composes
         sta     f:$7e0000+$3a70
         jsl     Ot6PassesAdded  ; a strike whose body fell retargets
-@done:  pla                     ; the ability id, back to the caller
+@done:  lda     $01,s           ; a Tool (item ids $a3-$aa)?  Edgar's
+        cmp     #$a3            ;   Overclock doubles its firings
+        bcc     @out            ;   (ot6_overclock.asm)
+        cmp     #$ab
+        bcs     @out
+        jsl     Ot6OverclockPasses
+@out:   pla                     ; the ability id, back to the caller
         plx
         plp
         rtl
