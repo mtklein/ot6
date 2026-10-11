@@ -7,7 +7,7 @@
 -- 7-10).  Played: Continue fc-alcove-v1 (TERRA L26 knows Break, her level-24
 -- spell), walk onto the continent into a random battle, and cast Break
 -- through the real menu at the shielded monster with the most shields, at
--- 0 BP and then at 3 BP (Defends bank the points); everyone else Defends.
+-- 1 BP, 0 BP and 3 BP (Defends bank the points); everyone else Defends.
 -- Nothing is written.
 --
 -- Asserted per cast, from what the engine did (the spell's own $3410 write
@@ -18,9 +18,9 @@
 --      status: vanilla Break petrified);
 --   3. TERRA paid 25 MP at both boosts (the price is flat), and the bank
 --      paid the boost (an unboosted cast earns its turn's pip, as any turn).
--- A 3-BP cast that finds the target already short of four shields asserts
--- the Break.  The target is re-chosen for the second cast by the same rule
--- if the first one's fell.
+-- Each cast aims at the unbroken body with the most shields: the 1-BP cast
+-- needs three (two chips counted exactly), the 0-BP cast two; the 3-BP cast
+-- takes four, or asserts the Break when the body holds four or fewer.
 --
 -- Old-ROM red and mutants: build/attempts/wt/v027-kits/breakspell/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
@@ -131,8 +131,30 @@ local function check(r, boost, slot)
     regen == 1 and " and earned the unboosted turn's pip" or ""))
 end
 
-local plan, target1, target2 = nil, nil, nil
-H.run({ maxFrames = 200000 }, {
+-- the casts, in order: 1 BP on the body with the most shields (it must hold
+-- three, so the two chips are counted exactly), 0 BP on the next (two, so
+-- the one is), then 3 BP (four chips, or the Break when it holds four or
+-- fewer)
+local CASTS = { { boost = 1, need = 3 }, { boost = 0, need = 2 }, { boost = 3, need = 1 } }
+local plan, targets = nil, {}
+local function planCast(i)
+  return H.call(function()
+    if terraSeat == nil then
+      for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == TERRA then terraSeat = s end end
+      H.assertEq(terraSeat ~= nil, true, "TERRA is seated")
+    end
+    local t, sh = pickTarget()
+    H.assertEq(t ~= nil and sh >= CASTS[i].need, true, string.format(
+      "cast %d (%d BP): a live unbroken monster holds %d+ shields (the best holds %s)", i, CASTS[i].boost,
+      CASTS[i].need, tostring(sh)))
+    targets[i] = t
+    H.log(string.format("[break] cast %d: %d BP at slot %d (%d shields); TERRA seat %d, MP %d, bank %d", i,
+      CASTS[i].boost, t, sh, terraSeat, H.readWord(0x3C08 + terraSeat * 2), H.readByte(0x3E9C + terraSeat * 2)))
+    plan = { { who = TERRA, cmd = CMD_MAGIC, spell = BREAK, boost = CASTS[i].boost, slot = t } }
+  end)
+end
+local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
+local steps = {
   H.bootCheckpoint("fc-alcove-v1"),
   H.call(function() arm() end),
   H.navTo(8, 9, { maxFrames = 3000 }),
@@ -150,33 +172,17 @@ H.run({ maxFrames = 200000 }, {
   encounter(),
   H.waitUntil(function() return H.battleActive() end, 1200, "the battle is up", 2),
   H.waitFrames(30),
-  H.call(function()
-    for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == TERRA then terraSeat = s end end
-    H.assertEq(terraSeat ~= nil, true, "TERRA is seated")
-    local sh
-    target1, sh = pickTarget()
-    H.assertEq(target1 ~= nil and sh >= 2, true, string.format(
-      "a live unbroken monster holds 2+ shields (the best holds %s)", tostring(sh)))
-    H.log(string.format("[break] TERRA seat %d, MP %d; target slot %d with %d shields", terraSeat,
-      H.readWord(0x3C08 + terraSeat * 2), target1, sh))
-    plan = { { who = TERRA, cmd = CMD_MAGIC, spell = BREAK, boost = 0, slot = target1 } }
-  end),
-  H.kitBattle(setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end }),
-    { untilPlanDone = true, idle = "defend", planDone = function() return close() end }),
-  H.call(function()
-    H.assertEq(#recs, 1, "the 0-BP cast was recorded")
-    check(recs[1], 0, target1)
-    local sh
-    target2, sh = pickTarget()
-    H.assertEq(target2 ~= nil, true, "a live unbroken shielded monster for the 3-BP cast")
-    H.log(string.format("[break] the 3-BP cast aims at slot %d (%d shields)", target2, sh))
-    plan = { { who = TERRA, cmd = CMD_MAGIC, spell = BREAK, boost = 3, slot = target2 } }
-  end),
-  H.kitBattle(setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end }),
-    { untilPlanDone = true, idle = "defend", planDone = function() return close() end, maxFrames = 60000 }),
-  H.call(function()
-    H.assertEq(#recs, 2, "the 3-BP cast was recorded")
-    check(recs[2], 3, target2)
-    H.log("[break] PASS: Break took 1 and then 1 + 3 shields, no damage, no petrify, 25 MP flat")
-  end),
-})
+}
+for i = 1, #CASTS do
+  steps[#steps + 1] = planCast(i)
+  steps[#steps + 1] = H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000,
+    planDone = function() return close() end })
+  steps[#steps + 1] = H.call(function()
+    H.assertEq(#recs, i, string.format("cast %d was recorded", i))
+    check(recs[i], CASTS[i].boost, targets[i])
+  end)
+end
+steps[#steps + 1] = H.call(function()
+  H.log("[break] PASS: Break took 1 + boost shields at 1, 0 and 3 BP, no damage, no petrify, 25 MP flat")
+end)
+H.run({ maxFrames = 200000 }, steps)
