@@ -2323,8 +2323,23 @@ end
 -- B over a tile whose property byte $C2 has bit 1 clear lands it
 -- (LandAirship): the party steps off on that tile and the airship is
 -- parked there ($1F62/$1F63).
+-- $11FA's vehicle bits are the map LOAD's (field-ram.txt: "map startup
+-- flags"): a load into the airship (the Falcon's rising, a battle's
+-- return) sets 1, but boarding the parked airship on foot (A on its tile,
+-- world/move.asm @204e) lifts off in place with no load, and $11FA keeps
+-- the on-foot load's $80 the whole flight.  What both share is the vehicle
+-- engine: VehicleNMI installed and the on-foot cells $E0/$E2 at 0
+-- (measured boarding at (25,160): `$11FA=80 ... E0/E2=0,0 ... nmi=EEA509
+-- (W EEA728 V EEA509)`, build/attempts/wt/v027-terra-route/board/).
 local AIRSHIP_VEHICLE = 0x11FA
-function M.aboardAirship() return M.worldMode() and M.readByte(AIRSHIP_VEHICLE) == 1 end
+local vehicleNmi
+function M.aboardAirship()
+  if not M.worldMode() then return false end
+  if M.readByte(AIRSHIP_VEHICLE) == 1 then return true end
+  vehicleNmi = vehicleNmi or M.sym("VehicleNMI")
+  return nmiJump() == vehicleNmi and (M.readByte(AIRSHIP_VEHICLE) & 0x03) ~= 2
+    and M.readByte(0x00e0) == 0 and M.readByte(0x00e2) == 0
+end
 -- the pilot's: aboard, the world lit, no world or vehicle event script
 -- running ($E7 bits 0 and 1; a scripted flight moves the airship itself)
 function M.airshipControl()
@@ -2408,7 +2423,7 @@ function M.flyTo(tx, ty, opts)
         .. "(its property word $%04X, bit 1 clear)", what, tx, ty, M.worldTileProp(tx, ty)))
     end),
     M.driveUntil(function()
-      landed = M.worldMode() and M.readByte(AIRSHIP_VEHICLE) == 0 and M.worldHasControl()
+      landed = M.worldMode() and not M.aboardAirship() and M.worldHasControl()
       return landed
     end, opts.maxFrames or 6000, {
       M.call(function()
