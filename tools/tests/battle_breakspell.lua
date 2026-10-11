@@ -19,9 +19,8 @@
 --      status: vanilla Break petrified);
 --   3. TERRA paid 25 MP at both boosts (the price is flat), and the bank
 --      paid the boost (an unboosted cast earns its turn's pip, as any turn).
--- Each cast aims at the unbroken body with the most shields: the 1-BP cast
--- needs three (two chips counted exactly); the others take theirs, or
--- assert the Break when the body holds no more.
+-- Each cast aims at the unbroken body with the most shields and takes 1 +
+-- boost, or asserts the Break when the body held no more than that.
 --
 -- Old-ROM red and mutants: build/attempts/wt/v027-kits/breakspell/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
@@ -132,12 +131,15 @@ local function check(r, boost, slot)
     regen == 1 and " and earned the unboosted turn's pip" or ""))
 end
 
--- the casts, in order: 1 BP on the body with the most shields (it must hold
--- three, so the two chips are counted exactly), 0 BP (one chip), then 3 BP
--- (four chips, or the Break when it holds four or fewer).  Before each, the
--- party Defends until a live unbroken body holds shields: a lone body the
--- 0-BP cast broke recovers its shields when its Break runs out (Ot6Tick).
-local CASTS = { { boost = 1, need = 3 }, { boost = 0, need = 1 }, { boost = 3, need = 1 } }
+-- the casts, in order: 1 BP on the body with the most shields (two chips:
+-- counted exactly on three or more, the Break on two), 0 BP on a body with
+-- two or more (one chip, counted exactly), then 3 BP (four chips, or the
+-- Break when the body holds four or fewer).  Every body on this map's pool
+-- holds two or three (route_data.py pool field 394).  Before each cast the
+-- party Defends until a live unbroken body holds what the cast needs: a
+-- lone body a cast broke recovers its shields when its Break runs out
+-- (Ot6Tick).
+local CASTS = { { boost = 1, need = 2 }, { boost = 0, need = 2 }, { boost = 3, need = 1 } }
 local plan, targets = nil, {}
 local function planCast(i)
   return H.call(function()
@@ -178,7 +180,7 @@ local steps = {
 local empty = {}
 for i = 1, #CASTS do
   steps[#steps + 1] = H.kitBattle(empty, { untilPlanDone = true, idle = "defend", maxFrames = 30000,
-    planDone = function() local _, sh = pickTarget(); return sh ~= nil and sh >= 1 end })
+    planDone = function() local _, sh = pickTarget(); return sh ~= nil and sh >= CASTS[i].need end })
   steps[#steps + 1] = planCast(i)
   steps[#steps + 1] = H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000,
     planDone = function() return close() end })
