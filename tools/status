@@ -350,12 +350,17 @@ def branch_checks(main):
         rows = list(ex.map(one, sorted(refs)))
     lines = []
     now = time.time()
+    # Only the newest release branch is drift; older ones carry history
+    # (e.g. release/v0.6's post-tag doc commit) and are listed, not flagged.
+    rels = [k for k in refs if k.startswith("release/v")]
+    newest = max(rels, default=None, key=lambda k: tuple(
+        int(x) for x in re.findall(r"\d+", k)))
     for name, ahead, missing, ct, push, first in rows:
         tree = " [worktree]" if name in checked_out else ""
         age = ago(now - ct)
         if name.startswith("release/"):
             if missing:
-                lines.append((PROBLEM, "release", f"{name}: {missing} commit(s) not on main{first}{push}"))
+                lines.append((PROBLEM if name == newest else INFO, "release", f"{name}: {missing} commit(s) not on main{first}{push}"))
             continue
         if ahead == 0:
             state = "merged: finished"
@@ -366,9 +371,9 @@ def branch_checks(main):
             if now - ct > 7 * 86400:
                 state += ", stale"
         lines.append((INFO, "branch", f"{name}: {state}, {age} old{push}{tree}"))
-    if not any(l[1] == "release" for l in lines):
+    if not any(l[1] == "release" and l[0] == PROBLEM for l in lines):
         n = sum(1 for k in refs if k.startswith("release/"))
-        lines.insert(0, (OK, "release", f"{n} release/* branches, none ahead of main"))
+        lines.insert(0, (OK, "release", f"{n} release/* branches, {newest} not ahead of main"))
     return lines
 
 

@@ -87,7 +87,7 @@ except Exception:
     _status = None
 FACTS_SEC = 30      # how often an emitter re-reads its machine's facts
 INFRA_SEC = 600     # how often the viewer checks GitHub auth and releases
-HOST =socket.gethostname().split(".")[0].lower()   # this machine's label
+HOST = socket.gethostname().split(".")[0].lower()   # this machine's label
 
 # Runs happen in every git worktree of this repo (agents and the release
 # qualification each get their own), not only under ROOT, and in plain clones
