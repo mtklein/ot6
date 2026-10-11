@@ -227,9 +227,9 @@ What the arcs need from them (`level-curve.md`, "The World of Ruin"):
   Terrato, Tritoch, probably Ragnarok, and Starlet, Golem and ZoneSeek from
   the same arc: Fire, Ice, Bolt, Poison and Quake for damage, Ultima if
   Ragnarok came at v0.29.
-- **MagiMaster's death counter is Ultima**, and Life 3 is Phoenix's boost,
-  two milestones later.  At v0.30 the stones' answer is Shell: Shiva,
-  Carbunkl and ZoneSeek grant it (Alexandr's comes at v0.35).
+- **MagiMaster's death counter is Ultima**, and the answer is Life
+  boosted to Life 3 (Terra's natural Life, Sraphim's), pre-cast, with
+  Shell (Shiva, Carbunkl, ZoneSeek; Alexandr's at v0.35) besides.
 - **Stones outnumber the members who can wear them** from v0.27 on: fifteen
   stones for five members at v0.27, eighteen to twenty-one for ten at
   v0.30.  Umaro and Gogo take none.  The one-copy rule binds on the four
