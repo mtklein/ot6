@@ -91,6 +91,15 @@ power, write like a human (owner, 2026-09-30).
 
 ## Designing the game
 
+- **What makes a fight good** (owner, 2026-10-11). The party should feel
+  power grow and resistance overcome: a challenge that is real but
+  surmountable, some drama in the outcome, and wins that come from the
+  player's choices -- gear, abilities, team building, kill order -- more
+  than from grinding levels. A fight that levels alone settle, or that
+  luck alone settles, is worth a second look. These are being made
+  measurable for v0.31; until then, note in reports where a fight falls
+  short of them.
+
 - **Boost pays once.** One action's boost buys one payoff. Fight and
   Capture: extra swings (a weapon's own on-hit spell isn't also multiplied).
   Tier spells: the tier. Rage: the special's likelihood. Slot, Steal,
