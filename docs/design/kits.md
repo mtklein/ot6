@@ -963,8 +963,8 @@ what a full boost buys.
 | Storm | with the Blizzard Orb | ice, every enemy | the damage multiplier |
 | **Storm** (divine) | a dump of all three points, relic or not | ice, every enemy | x8 |
 
-- **Charge and Throw bludgeon** (`Ot6SkillClass`, by the commands only
-  his chooser sets, `$b5` = `$23`/`$24`).  Each pass loads the classless
+- **Charge and Throw bludgeon** (`Ot6UmaroCharge`, `Ot6UmaroThrow`, the
+  last writes before each runs ExecAttack).  Each loads the classless
   "battle" record and swings no weapon, so before #380 neither chipped
   anything (measured: class `$00` at every Charge pass,
   build/attempts/wt/v028-kits/umaro/r1_battle_umaro.out).  A body

@@ -8,10 +8,10 @@
 ; Ot6UmaroRetaliate), so a full boost for him is a dump of all three points.
 ; Two things here make that a kit:
 ;
-;   * Charge and Throw are bludgeoning (Ot6SkillClass, ot6_break.asm, by
-;     their commands $23/$24 in $b5).  Each pass loads the "battle" record,
-;     which is classless, and neither swings a weapon, so neither chipped
-;     anything.  A body slammed or an ally
+;   * Charge and Throw are bludgeoning (Ot6UmaroCharge, Ot6UmaroThrow, just
+;     before each runs ExecAttack).  Each loads the classless "battle"
+;     record and swings no weapon, so neither chipped anything
+;     (measured: class $00 at every Charge pass).  A body slammed or an ally
 ;     hurled is a club's blow.  His Fight takes his weapon's class (a Bone
 ;     Club, or bare fists: bludgeoning) and Storm its element (ice), as they
 ;     did.
@@ -54,5 +54,31 @@
 @roll:  lda     $fe
         tax
         ora     #$30
+        rtl
+.endproc
+
+; [ Charge and Throw: the command they draw as, and the club's class ]
+; jsl from UmaroAttack_02 / UmaroAttack_00 (battle_main.asm) in place of
+; `lda #$23 / sta $b5` and `lda #$24 / sta $b5`, the last writes before each
+; jumps to ExecAttack: the "battle" record they loaded on the way here set
+; the class to none (Ot6SkillClass), and nothing between here and the chip
+; loads another.  a8, db=$7e.  clobbers A; preserves X and Y.
+.proc Ot6UmaroCharge
+        .a8
+        lda     #$23
+        bra     Ot6UmaroClub
+.endproc
+
+.proc Ot6UmaroThrow
+        .a8
+        lda     #$24
+        ; fall through
+.endproc
+
+.proc Ot6UmaroClub
+        .a8
+        sta     $b5             ; the command it draws as (vanilla's write)
+        lda     #OT6_BLUDG
+        sta     f:$7e0000+OT6_ATKCLASS
         rtl
 .endproc

@@ -3614,8 +3614,8 @@ UmaroAttack_02:
         tsb     $11a2
         lda     #$02
         trb     $b2
-        lda     #$23
-        sta     $b5
+        jsl     Ot6UmaroCharge  ; ot6 #380: `lda #$23 / sta $b5`, and the
+                                ;   bludgeoning class (ot6_umaro.asm)
         jmp     ExecAttack
 
 ; ------------------------------------------------------------------------------
@@ -3669,8 +3669,8 @@ UmaroAttack_00:
         bcc     @16eb
         lda     #$ff
 @16eb:  sta     $11a6
-        lda     #$24
-        sta     $b5
+        jsl     Ot6UmaroThrow   ; ot6 #380: `lda #$24 / sta $b5`, and the
+                                ;   bludgeoning class (ot6_umaro.asm)
         lda     #$20
         tsb     $11a2
         lda     #$02
