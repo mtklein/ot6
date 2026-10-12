@@ -246,7 +246,8 @@ What the arcs need from them (`level-curve.md`, "The World of Ruin"):
 `Ot6EsperStatTbl` (`ot6_progression.asm`) are those packages, so Palidor's
 and Fenrir's menu pages show a package from the first stone on, and #328
 (v1.0) reviews every package.  `battle_esperstats_wor` equips each of the
-twelve and reads its four deltas in battle.  No row of the table is `$0000`
+twelve and reads its four deltas in battle (red on the pre-#418 table and
+on one-nibble mutants: `build/attempts/wt/v027-esper-stats/lab/`).  No row of the table is `$0000`
 any more, so `menu_esperdetail_tube6`'s no-mod control (Terrato's row until
 #418) now zeroes Terrato's row in the emulator's ROM image for one page
 visit, beside a visit to the real row.
