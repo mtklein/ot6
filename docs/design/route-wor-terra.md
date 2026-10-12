@@ -218,4 +218,58 @@ kit against the Mantodea.
 
 ## 9. Played
 
-(filled from the variation set below)
+### 9.1 The run
+
+The bootstrap capture (`capture/capture1_bootstrap.log`): `contract
+wor-falcon-v1 (entry): all 30 fields hold` ... `[saved] wor-terra-v1: slot
+3 holds map 1 ($2401) world tile (238,135)`, `contract wor-terra-v1 (exit):
+all 30 fields hold`, `PASS (frame 43814) attempts=1/3`. The variation
+set's shift 0 (`var7/var7_s0.log`): `TERRA joined map 158 (11,21):
+TERRA(p1) L33 HP 1794/1794 MP 331/331 ... CELES(p1) L34 ... SABIN(p1)
+L33`, the cabin `roster ... EDGAR $1850=00 SETZER $1850=00` (the two the
+BabaBreaths sent away), `[wor] the stretch: TERRA(p1) L33 ... CELES(p1) L34
+... SABIN(p1) L33 ... EDGAR(p1) L33`, `PASS (frame 43870) attempts=1/1`.
+
+### 9.2 Under draw variation (`var7/`)
+
+Eighteen runs on the final rows: twelve seed shifts (0-44 by 4) and, to
+move the encounter draw, K = 2, 5 and 9 random battles used up on the
+Solitary Island's grass before the beach (`lab_terra_k*.lua`, the
+generator with that one step added; `make_kvariant.py`), each at shifts 0
+and 12. All eighteen pass (`PASS (frame 42850)` to `PASS (frame 61178)`,
+`attempts=1/1` each). By distinct battle key (`var7/analysis.txt`):
+
+| battle | fights | distinct keys | won | lost | party deaths | broken |
+|---|---|---|---|---|---|---|
+| 128 TERRA alone | 18 | 16 | 0 | 18 (scripted) | 18 (TERRA) | 0 (no gauge) |
+| 129 first visit | 18 | 11 | 18 | 0 | 0 | 0 |
+| 130 return | 18 | 14 | 18 | 0 | 0 | 6 |
+| 131 TERRA morphed | 18 | 15 | 18 | 0 | 9 | 18 |
+
+- **129 ends on SETZER's first turn** in most draws: his Jackpot is the
+  first action and its two rolls take 10032 (`SETZER Jackpot on slot 0
+  (28000 HP, 4 shield(s)) at 1 BP`, `took 10032 off the monsters`), past
+  the 7520 the fight lasts. A win; the gauge does not come into it.
+- **131 is the arc's real fight**, 3736 to 14455 ticks. Its counter is a
+  Bolt 2 on every hit taken, and the deaths are the two members beside
+  TERRA, from Bolt 2/Bolt 3 or Blow Fish when low (`[death] ... entity 2
+  char 4 from 225/1803 by slot 0 cmd $02 atk $07`); TERRA died in none.
+  Across the arc the bag spent 0-13 Potions and 0-3 Fenix Downs a run
+  (`potions 79 -> 66, fenix 31 -> 28` the most; the Fenix Down chest adds
+  one); five of eighteen runs used any Fenix Down. Not a coin flip (18 of
+  18 won); the worst draw is attrition, a candidate lab if later levels or
+  kits move it.
+- **TERRA's blade keys him**: 131 broke in 18 of 18 fights; the 21 breaks
+  landed at 3328-22137 of his 26000 HP, the median near 18000, two of
+  them on the killing blow (`[brk] ... $16D broken (0 of 12 shields) at HP
+  21138`; `at HP 0`).
+
+### 9.3 What was left
+
+- **The regroup's party** is fixed (TERRA, CELES, SABIN, EDGAR); SETZER
+  waits on the Falcon. A different four is one line (`REGROUP`).
+- **Palidor is unworn.** Each of the four wears a stone; the Esper plan
+  (magicite.md) gives it to "the Falcon arc's four" to learn from, which a
+  later arc's kit pass can decide.
+- **The chain's own capture** of `wor-terra-v1` replaces the bootstrap one
+  by `checkpoint_drift.py --recut` after a `ninja` that replays the line.
