@@ -509,6 +509,9 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
     "battle_debilitator": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
+    # CELES's RunicBlade, EDGAR's Bolt sent back, in Darill's Tomb's east room
+    "battle_runicblade": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     "battle_statuses": "OT6_TIMEOUT=3600",
     "battle_levelup": "OT6_TIMEOUT=3600",
 }
