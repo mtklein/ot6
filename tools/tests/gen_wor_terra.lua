@@ -8,6 +8,9 @@
 -- docs/design/route-wor-terra.md has the plan and what this measured.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
+-- Mobliz's cellar and Katarin's room have triggers that re-fire under the
+-- party; navTo holds its step through them (lib/ot6_field.lua navTo 3a)
+H.NAV_REFIRE_HOLD = true
 
 local TERRA, CELES, SABIN, EDGAR, SETZER = 0, 6, 5, 4, 9
 local TONIC, POTION, FENIX, REMEDY, SOFT = 0xE8, 0xE9, 0xF0, 0xF5, 0xF4

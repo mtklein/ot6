@@ -516,6 +516,10 @@ end
 -- genuinely unwinnable encounter (a scripted set-piece that must be run)
 -- opts back out with playBattles="mustflee".
 M.FIGHT_NOT_FLEE = true
+-- navTo keeps holding a pressed step through the control flicker of a
+-- trigger that re-fires under the party (step 3a in navTo); a generator
+-- whose maps have such tiles turns it on (gen_wor_terra: Mobliz's cellar)
+M.NAV_REFIRE_HOLD = false
 local function wantsFlee(mode)
   if mode == "mustflee" then return true end
   return mode == "flee" and not M.FIGHT_NOT_FLEE
@@ -716,8 +720,10 @@ function M.navTo(txIn, tyIn, opts)
       --     cellar, 154 (52,58) and (50,53): held Up moves on the second
       --     frame, build/attempts/wt/v027-terra-route/cellar/probe3.log).
       --     The hold goes on; a real scene (a dialog, a battle, a long
-      --     control loss) still takes the pad.
-      local refire = pend and pend.holding and battN == 0 and dlgN == 0 and lostN > 0
+      --     control loss) still takes the pad.  Opt-in (M.NAV_REFIRE_HOLD,
+      --     or opts.refireHold): on by default it moved gen_whelk_poweron's
+      --     play (PASS frame 36896 -> 36956) and with it every later draw.
+      local refire = (opts.refireHold or M.NAV_REFIRE_HOLD) and pend and pend.holding and battN == 0 and dlgN == 0 and lostN > 0
         and lostN < 60 and M.tileAligned() and M.fieldX() == pend.x and M.fieldY() == pend.y
       if (lostN > 0 or battN > 0 or dlgN > 0) and not refire then
         if lostN >= 3 then drop("control lost") end
