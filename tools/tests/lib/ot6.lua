@@ -13272,7 +13272,9 @@ end
 -- ---- into a random battle from where the party stands (the kit suites) ---
 -- M.paceToEncounter(tag) paces between the tile the party stands on and a
 -- walkable neighbour (3 or 2 tiles off, the first the BFS reaches) until a
--- random battle starts, then waits for it to be up.  M.fcAlcoveToBattle(tag)
+-- random battle starts, then waits for it to be up; the party takes field
+-- care first (and after every burned encounter), as a player would before
+-- walking into a fight.  M.fcAlcoveToBattle(tag)
 -- is the Floating Continent's: from the fc-alcove-v1 Continue (map 358) up
 -- through the alcove's exit (8,8) onto the continent (394), then the pace.
 -- Nothing is written.
@@ -13301,12 +13303,14 @@ function M.paceToEncounter(tag, burnOverride)
     }, tag .. ": a random battle")
   return M.seqStep({
     M.waitUntil(function() return M.hasControl() and M.tileAligned() end, 3000, tag .. ": control to pace", 5),
+    M.fieldCare({ tag = tag .. ": care before the pace", threshold = 0.95 }),
     M.call(function() A, B, burned = nil, nil, 0 end),
     M.driveUntil(function() return burned >= burn end, 400000, {
       one,
       M.waitUntil(function() return M.battleActive() end, 1200, tag .. ": a battle to burn is up", 2),
       M.fleeBattle(9000, { onCantRun = "fight" }),
       M.waitUntil(function() return M.hasControl() and M.tileAligned() end, 3000, tag .. ": control after the burn", 5),
+      M.fieldCare({ tag = tag .. ": care after a burned encounter", threshold = 0.95 }),
       M.call(function()
         burned = burned + 1
         M.log(string.format("[%s] burned encounter %d of %d (%s)", tag, burned, burn, tostring(M.fleeOutcome)))

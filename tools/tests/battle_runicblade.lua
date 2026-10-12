@@ -113,6 +113,8 @@ local BATTLES = 6
 local battles, ok = 0, false
 local body = {
   H.cond(function() return not inBattle() end, {
+    H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 3000, "control before the walk", 5),
+    H.fieldCare({ tag = "blade: care before the walk", threshold = 0.95 }),
     walkToBattle(),
     H.waitUntil(function() return H.battleActive() end, 1200, "the battle is up", 2),
     H.waitFrames(30),
@@ -126,6 +128,10 @@ local body = {
       if id == CELES then celes = s elseif id == EDGAR then edgar = s end
     end
     H.assertEq(celes ~= nil and edgar ~= nil, true, "CELES and EDGAR are seated")
+    for _, e2 in ipairs({ celes, edgar }) do
+      H.assertEq(H.readWord(0x3BF4 + e2 * 2) > 0 and (H.readByte(0x3EE4 + e2 * 2) & 0xC2) == 0, true,
+        string.format("seat %d stands (no Wound, Petrify or Zombie: the care before the walk saw to it)", e2))
+    end
     H.log(string.format("[blade] battle %d: CELES seat %d (MP %d), EDGAR seat %d (MP %d)", battles, celes,
       H.readWord(0x3C08 + celes * 2), edgar, H.readWord(0x3C08 + edgar * 2)))
   end),
@@ -191,6 +197,7 @@ local steps = {
       H.waitUntil(function() return H.battleActive() end, 1200, "a battle to burn is up", 2),
       H.fleeBattle(9000, { onCantRun = "fight" }),
       H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 3000, "control after the burn", 5),
+      H.fieldCare({ tag = "blade: care after a burned encounter", threshold = 0.95 }),
       H.call(function() burned = burned + 1; H.log(string.format("[blade] burned encounter %d of %d", burned, burn)) end),
     }, "the encounters PACE_BURN uses up")
   end)(),
