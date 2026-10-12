@@ -13036,6 +13036,7 @@ function M.kitBattle(plan, opts)
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
   local SPELL_PTR = { [0] = 0x0000, [1] = 0x013C, [2] = 0x0278, [3] = 0x03B4 }
   local k, cool = 1, 0
+  local hb = nil
   local function pulse(btn)
     if cool > 0 then cool = cool - 1; M.setPad({}); return end
     M.setPad({ [btn] = true }); cool = 10
@@ -13126,6 +13127,16 @@ function M.kitBattle(plan, opts)
     local a = M.readByte(ACTOR) & 3
     local st = M.readByte(MSTATE)
     local p = plan[k]
+    if M.frame - (hb or 0) >= 900 then
+      hb = M.frame
+      local t = {}
+      for e2 = 0, 3 do
+        t[#t + 1] = string.format("%02X:%d/%02X%02X", M.readByte(0x3ED8 + e2 * 2), M.readWord(0x3BF4 + e2 * 2),
+          M.readByte(0x3EE4 + e2 * 2), M.readByte(0x3EE5 + e2 * 2))
+      end
+      M.log(string.format("[kit] f%d entry %d/%d (%s) actor %d st %02X; party %s", M.frame, k, #plan,
+        p and string.format("char $%02X cmd $%02X", p.who, p.cmd or 0) or "none", a, st, table.concat(t, " ")))
+    end
     if p == nil then
       if opts.idle == "defend" then defend(st) else fight(a, st) end
       return
@@ -13289,6 +13300,7 @@ function M.paceToEncounter(tag, burnOverride)
       M.call(function() A, B = B, A end),
     }, tag .. ": a random battle")
   return M.seqStep({
+    M.waitUntil(function() return M.hasControl() and M.tileAligned() end, 3000, tag .. ": control to pace", 5),
     M.call(function() A, B, burned = nil, nil, 0 end),
     M.driveUntil(function() return burned >= burn end, 400000, {
       one,
