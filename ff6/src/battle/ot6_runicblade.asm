@@ -17,7 +17,8 @@
 ; of that spell.  It is the absorbed spell, not a stronger one: no fold and
 ; no multiplier (Ot6QueueFold keeps a counter's id; Ot6BoostDmg skips
 ; counters).  Only player-magic ids ($00-$35) bounce; anything else runic
-; can catch (none in the shipped data) is absorbed only.  A counter is not
+; can catch (none in the shipped data) is absorbed only, and so is a spell
+; of her own that her stance catches.  A counter is not
 ; countered (vanilla's rule), and a battle with counters off ($341a = 0)
 ; bounces nothing.
 ;
@@ -81,6 +82,12 @@ OT6_CHAR_CELES = $06
         lda     $3018,y
         and     f:$7e0000+OT6_RUNICBLADE
         beq     @out            ; a plain Runic
+        txa
+        sta     OT6_SCR_SLOT2   ; (scratch: the caster, for the self test)
+        tya
+        cmp     OT6_SCR_SLOT2
+        beq     @out            ; her own cast, caught by her own stance:
+                                ;   nothing to send back to anyone
         lda     $b6
         cmp     #$36
         bcs     @out            ; player magic only
