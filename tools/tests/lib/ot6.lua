@@ -13114,7 +13114,7 @@ function M.kitBattle(plan, opts)
   end
   local function tick()
     local p0 = plan[k]
-    if p0 ~= nil and p0.self and p0.opened and p0.seat ~= nil and cool == 0
+    if p0 ~= nil and p0.self and p0.opened and p0.seat ~= nil
         and (M.readByte(MENU) == 0 or (M.readByte(ACTOR) & 3) ~= p0.seat) then
       -- a self-targeted command whose target select confirmed itself (the
       -- window closed on the command's own A)
