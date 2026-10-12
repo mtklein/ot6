@@ -224,6 +224,18 @@ kit against the Mantodea.
 
 ### 9.1 The run
 
+The chain's own play (`qual/wor_terra.log`, `ninja` on px13 from power-on;
+it Continues the chain's capture of `wor-falcon-v1`, `CELES(p1) L33 ...
+EDGAR(p1) L32 ... SETZER(p1) L32`): battle 128 `lost after 1867 ticks, 1
+seated`, battle 129 `won after 1143 ticks`, `TERRA joined ... TERRA(p1) L32
+HP 1692/1692`, one random battle beside the Falcon (formation `$0D6`),
+`contract wor-terra-v1 (exit): all 30 fields hold`, `PASS (frame 51224)
+attempts=1/3`; its capture is the tracked `wor-terra-v1` (`checkpoint
+drift wor-terra-v1: none`, sha256 `dad40a6c...`). Its first try met that
+battle on the last step onto the Falcon and `board()` pressed A into it
+until it timed out (`qual/wor_terra_chain1_board_battle.log`); boarding
+now fights it.
+
 The bootstrap capture (`capture/capture1_bootstrap.log`): `contract
 wor-falcon-v1 (entry): all 30 fields hold` ... `[saved] wor-terra-v1: slot
 3 holds map 1 ($2401) world tile (238,135)`, `contract wor-terra-v1 (exit):

@@ -109,3 +109,6 @@
 254	map 89 South Figaro's cellar, Ribbon (101,43) -- Duncan's way in
 255	map 89 South Figaro's cellar, Ether (92,53) -- Duncan's way in
 256	map 89 South Figaro's cellar, RunningShoes (120,53) -- the rich man's way in
+61	map 163 Mobliz, Elixir (51,12) -- the house on the way to the cellar (gen_wor_terra)
+167	map 150 Mobliz, Ether (34,49) -- Katarin's room (gen_wor_terra)
+251	map 158 Mobliz, Fenix Down (9,17) -- after TERRA joins (gen_wor_terra)
