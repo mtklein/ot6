@@ -67,7 +67,7 @@ local AIR_BLADE = 0x62                              -- SABIN's blitz, learned at
 -- 20, 31, 40), 64 talk waits each, retries off, by distinct (stop, battle
 -- key), all on the #425 driver: without the bank, 3 of 90 lost, wins a
 -- median 10212 ticks with 9 wins losing a member; with it, 2 of 90 lost,
--- a median 6961 ticks and 4 (route-wor-edgar 12.7;
+-- a median 6961 ticks with 4 wins losing a member (route-wor-edgar 12.7;
 -- build/attempts/wt/v028-edgar-lab/).
 local TENTACLES_BANK = 3
 local TENTACLES_FORM = 454                          -- event battle 84
