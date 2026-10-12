@@ -42,7 +42,7 @@ local function arm()
     end
   end, emu.callbackType.exec, rb, rb)
   emu.addMemoryCallback(function(_, v)
-    if v ~= BOLT or celes == nil then return end
+    if v ~= BOLT or celes == nil or H.readByte(0x3A7C) ~= CMD_MAGIC then return end
     casts[#casts + 1] = { counter = (H.readByte(0xB1) & 1) == 1, b8 = H.readByte(0xB8), b9 = H.readByte(0xB9),
       cmd = H.readByte(0x3A7C), celesMp = H.readWord(0x3C08 + celes * 2), edgarMp = H.readWord(0x3C08 + edgar * 2),
       f = H.frame }
