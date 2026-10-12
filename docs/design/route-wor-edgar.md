@@ -1402,6 +1402,18 @@ Fenix Down plans in wins fall from 12 to 3. The two pairs it loses
 (`k13:be08`, `k20:be08`) die with 3-5 BP banked: the spend rule takes a
 3-BP Fight on one body rather than the 3-BP Air Blade on four.
 
+That was the driver: its chip model (`bestLine`) offered a Blitz only
+when the Blitz was Pummel, so with Air Blade set it never weighed one.
+It now offers the configured Blitz (Pummel, Aura Bolt, Suplex or Air
+Blade, each with its own class, element, hits and reach). Rerun as
+`bank3` from the same six stops (re-cut byte-identical: the same state
+hashes) and the same 384 talk waits, every run won: 0 of 90 pairs lost
+against `bank3`'s 2, with no pair lost the other way (exact two-sided
+McNemar p = 0.5 on 2 discordant pairs, so not a measured reduction).
+SABIN's 124 spends were all Air Blade where `bank3`'s 141 were all
+Fights; wins a median 6715.5 ticks (`bank3` 6961), 6 losing a member (`bank3` 4)
+(build/attempts/wt/v028-edgar-blitz/lab/).
+
 **`0 of 3 seated left` on a win** was the outcome line's wording: "left"
 counted members who left the battle (Run, Warp: `$3A39`), not members
 left standing. The qualification's winning attempt ended with all three

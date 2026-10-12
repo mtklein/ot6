@@ -6639,6 +6639,24 @@ local function toolChips(slot, tool)
   return (BATTLE.TOOL_HITS[tool] or 1) * hitChips(slot, M.weaponClass(tool), 0)
 end
 
+-- The Blitzes the chip model can price (#425 review): class
+-- (Ot6SkillClassTbl), element (MagicProp+1 unless given), landed hits
+-- (Ot6HitCountTbl) and whether it lands on every monster.  Pummel is
+-- bludgeon x2, Suplex bludgeon; Aura Bolt and Air Blade are classless and
+-- chip by element (holy, wind), Air Blade on every body.  A Blitz absent
+-- here is not offered to the chip model's lines (bestLine) or the race.
+-- (Table fields, not locals: the main chunk is at Lua's 200-local limit.)
+BATTLE.BLITZ_SHAPE = {
+  [0x5D] = { class = 0x04, elem = 0, hits = 2 },   -- Pummel
+  [0x5E] = {},                                     -- Aura Bolt
+  [0x5F] = { class = 0x04 },                       -- Suplex
+  [0x62] = { aoe = true },                         -- Air Blade
+}
+function M.blitzChips(slot, id)
+  local b = BATTLE.BLITZ_SHAPE[id]
+  return (b.hits or 1) * hitChips(slot, b.class or 0, b.elem or M.spellElement(id))
+end
+
 -- The one monster an untargeted attack lands on: the focus list's first
 -- living entry, else the only living monster on the field.  With
 -- several and no focus the engine's default cursor decides, and the
@@ -8700,20 +8718,22 @@ function Driver:raceState(actor, R)
       local mainHits, offHits = M.fightHits(off ~= nil and 2 or 1, b)
       plan.hits = mainHits + offHits
     elseif plan.kind == "skill" then
-      if plan.cmd ~= BATTLE.CMD_TOOLS and (plan.cmd ~= BATTLE.CMD_BLITZ or plan.skill ~= BATTLE.PUMMEL) then
+      if plan.cmd ~= BATTLE.CMD_TOOLS and (plan.cmd ~= BATTLE.CMD_BLITZ or BATTLE.BLITZ_SHAPE[plan.skill] == nil) then
         return nil -- this verb needs its own effect/price record
       end
       local paid, mp = M.kitBoost(e, plan.skill, b)
       if paid ~= b then return nil end
       plan.mp = mp
-      plan.hits = plan.cmd == BATTLE.CMD_TOOLS and (BATTLE.TOOL_HITS[plan.skill] or 1) or 2
-      aoe = plan.cmd == BATTLE.CMD_TOOLS
-        and (plan.skill == BATTLE.AUTOCROSSBOW or plan.skill == M.BIO_BLASTER)
+      plan.hits = plan.cmd == BATTLE.CMD_TOOLS and (BATTLE.TOOL_HITS[plan.skill] or 1)
+        or (BATTLE.BLITZ_SHAPE[plan.skill].hits or 1)
+      aoe = (plan.cmd == BATTLE.CMD_TOOLS
+        and (plan.skill == BATTLE.AUTOCROSSBOW or plan.skill == M.BIO_BLASTER))
+        or (plan.cmd == BATTLE.CMD_BLITZ and BATTLE.BLITZ_SHAPE[plan.skill].aoe == true)
     end
     local effects = {}
     for s = 0, 5 do if monAlive(s) then
       local chips = plan.kind == "fight" and fightChips(e, s, b)
-        or (plan.cmd == BATTLE.CMD_TOOLS and toolChips(s, plan.skill) or 2 * hitChips(s, 0x04, 0))
+        or (plan.cmd == BATTLE.CMD_TOOLS and toolChips(s, plan.skill) or M.blitzChips(s, plan.skill))
       effects[s] = { chips = chips, hit = plan.kind == "fight"
         and M.hitChance(M.readByte(0x3B7C + e * 2), M.readByte(0x3B55 + 8 + s * 2)) or 1 }
     end end
@@ -10114,16 +10134,21 @@ function Driver:makePlanRules(actor)
                 what = string.format("Tools $%02X at %d BP", tool, tb) })
       end
     end
-    if self.parkDropN < 3 and self.opts.tactical and id == 5 and (self.opts.blitz or BATTLE.PUMMEL) == BATTLE.PUMMEL
+    -- the configured Blitz, whichever it is (#425 review: with Air Blade
+    -- set, only a Pummel was ever offered here, so the spend rule took a
+    -- 3-BP Fight on one body over a 3-BP Air Blade on four)
+    local blitz = self.opts.blitz or BATTLE.PUMMEL
+    local bname = blitz == BATTLE.PUMMEL and "Pummel" or string.format("Blitz $%02X", blitz)
+    if self.parkDropN < 3 and self.opts.tactical and id == 5 and BATTLE.BLITZ_SHAPE[blitz] ~= nil
        and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
-       and not self:counterVetoed(actor, { cmd = BATTLE.CMD_BLITZ, atk = BATTLE.PUMMEL },
-         standingSlots(), "Pummel") then
-      local bb = M.kitBoost(actor, BATTLE.PUMMEL, bp)
+       and not self:counterVetoed(actor, { cmd = BATTLE.CMD_BLITZ, atk = blitz },
+         standingSlots(), bname) then
+      local bb = M.kitBoost(actor, blitz, bp)
       if bb ~= nil then
-        offer({ kind = "skill", cmd = BATTLE.CMD_BLITZ, skill = BATTLE.PUMMEL,
+        offer({ kind = "skill", cmd = BATTLE.CMD_BLITZ, skill = blitz,
                 row = cmdRow(actor, BATTLE.CMD_BLITZ), boostLeft = bb,
-                chips = 2 * hitChips(slot, 0x04, 0), hits = 2,
-                what = string.format("Pummel at %d BP", bb) })
+                chips = M.blitzChips(slot, blitz), hits = BATTLE.BLITZ_SHAPE[blitz].hits or 1,
+                what = string.format("%s at %d BP", bname, bb) })
       end
     end
     local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
@@ -14988,10 +15013,15 @@ function Driver:watchStatuses()
           end
         end
         -- the Seize (#425): held from the frame $3403 drops its bit until
-        -- the holder's Discard or death sets it again
-        local held = M.seized(e)
+        -- the holder's Discard or death sets it again.  Read only while the
+        -- battle is live: past its end hook, or in a hand-back tail
+        -- (watchLeavers), $3403 reads all held (431 SEIZED/RELEASED lines
+        -- after an [outcome] in #425's qualification)
+        local live = endSnap == nil or (endSnap.frame < (self.startFrame or 0)
+          and (self.startFrame or 0) - endSnap.frame >= 90)
+        local held = live and M.seized(e)
         local hkey = e .. ":Seized"
-        if held ~= (self.statusSaid[hkey] == "on") then
+        if live and held ~= (self.statusSaid[hkey] == "on") then
           self.statusSaid[hkey] = held and "on" or "off"
           local by = M.readByte(0x3359 + e * 2)
           M.log(string.format("[%s] [status] f+%d entity %d %s ($3403=%02X%s, HP %d)",
@@ -15158,7 +15188,7 @@ function Driver:watchDamage()
         local hl = self.raceHitLog[key] or {}
         local base = (w.raceNorm or w.norm) / w.n
         if w.kind == "skill" and (w.cmd == BATTLE.CMD_TOOLS
-           or (w.cmd == BATTLE.CMD_BLITZ and w.skill == BATTLE.PUMMEL)) then
+           or (w.cmd == BATTLE.CMD_BLITZ and BATTLE.BLITZ_SHAPE[w.skill] ~= nil)) then
           base = M.raceUnboostHit(base, w.boost or 0)
         end
         hl[#hl + 1] = base

@@ -986,8 +986,9 @@ what a full boost buys.
   every arm but Storm, and ice on Storm, which his first full dump brings
   whatever relics he wears.  Where the route picks up the Blizzard Orb and
   the Rage Ring, and whether bludgeoning and ice are keys the party lacks in
-  Narshe's mines and his cave, is the v0.29 route's to settle (the break rows
-  there are not designed yet).
+  Narshe's mines and his cave, is the v0.29 route's to settle: neither relic
+  is on v0.29 (the Rage Ring is in the Cave in the Veldt, the Blizzard Orb in
+  the Ancient Castle; route-wor-narshe.md 6.3).
 
 `battle_umaro` (a synthetic mechanism test: one seat of battle 67 staged as
 him, as `battle_retaliate_umaro` does) checks the divine and the class.
