@@ -245,9 +245,13 @@ free-to-use" floor), which is 6.9% of the pool Cyan
 joins with, against the 8–21% a vanilla spell costs at the level it is learned.
 Cleave is the most expensive at **99, the shared ceiling**: each character with
 an ultimate pays 99 for it.  Learned at level 70 it was 13.0% of that pool
-(762); learned at the Phantom Train farewell (#379) it is past his pool when
-he learns it, and the MP gate, not the level, decides when he first swings
-it (CYANMP below).  99 is also the largest number any OT6 price cell can render,
+(762).  Learned at the Phantom Train farewell (#379), it is just past his
+pool when he learns it: the play has him at level 14 with 96 MP there
+(falls-done-v1, the save after the train), 148 at level 19 (banquet-done-v1)
+and 205 at 24 (fc-alcove-v1), so the price, not the level, decides when he
+first swings it, and from the late World of Balance on it is one swing a bar.
+*Reason the price stays 99: the shared ceiling, and a guaranteed kill of any
+killable body is worth a full bar.*  99 is also the largest number any OT6 price cell can render,
 so it is the top of the table's range and not only its current maximum.
 Per-row measurement, and the baseline, are in mp-economy.md's "The baseline";
 checked by `tools/tests/battle_costtable.lua`.
@@ -963,7 +967,7 @@ what a full boost buys.
   his chooser sets, `$b5` = `$23`/`$24`).  Each pass loads the classless
   "battle" record and swings no weapon, so before #380 neither chipped
   anything (measured: class `$00` at every Charge pass,
-  build/attempts/wt/v028-kits/umaro/r1).  A body
+  build/attempts/wt/v028-kits/umaro/r1_battle_umaro.out).  A body
   slammed or an ally hurled is a club's blow; Fight and Storm load their own
   class or element over it, as before.
 - **The boost** is the retaliation dump (#236/#237, `Ot6UmaroRetaliate`): he
