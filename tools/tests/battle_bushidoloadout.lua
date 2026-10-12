@@ -34,7 +34,8 @@ local function inNumer() return H.readByte(MSTATE) == ST_BUSHIDO end
 
 local actor
 local ceiling = 4
-local learnedBits = 0xFF               -- $1cf7 mask (which techs are learned)
+local learnedBits = 0x1F               -- $1cf7 mask (which techs are learned):
+                                       --   techs 0..4, ceiling 4's own set
 local slots = { 0, 0, 0, 0 }
 local bpbank = 5
 local sawNumeral = false
@@ -134,6 +135,34 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(sawNumeral, false, "the vanilla numeral gauge never opened")
     assertRows({ 0x57, 0x58, 0x59 }, "auto ceiling 4")  -- $55+{2,3,4}
     H.log("AUTO (word 0) window = {2,3,4} at 1x/2x/3x -- byte-for-byte Layer A")
+  end),
+
+  -- 1a. Cleave learned at the Phantom Train farewell (#379), ahead of the
+  -- techs between: $1CF7 = techs 0..3 + Cleave counts 5, so InitSkills'
+  -- $2020 reads 4.  The window is his top two of the run he knows (Slash,
+  -- Quadra Slam) and Cleave on the 3-BP row -- never Empowerer (tech 4),
+  -- which he does not know.  And beside one tech of the run (Dispatch +
+  -- Cleave, $2020 = 1) the 2-BP row would repeat Dispatch, so it is blank.
+  closeSub(),
+  H.call(function()
+    ceiling, learnedBits = 4, 0x8F
+    slots = { 0, 0, 0, 0 }
+  end),
+  openSub("auto: Cleave learned beside techs 0..3"),
+  H.waitFrames(6),
+  H.call(function()
+    assertRows({ 0x57, 0x58, 0x5c }, "auto, techs 0..3 + Cleave")
+    H.log("CLEAVE GAP: $1CF7=$8F, $2020=4 -> {Slash, Quadra Slam, Cleave}, not Empowerer")
+  end),
+  closeSub(),
+  H.call(function()
+    ceiling, learnedBits = 1, 0x81
+  end),
+  openSub("auto: Cleave learned beside Dispatch alone"),
+  H.waitFrames(6),
+  H.call(function()
+    assertRows({ 0x55, nil, 0x5c }, "auto, Dispatch + Cleave")
+    H.log("CLEAVE GAP: $1CF7=$81, $2020=1 -> {Dispatch, blank, Cleave}")
   end),
 
   -- 1b. sentinel: an all-slot-0 loadout packs to word $0000, which the hook

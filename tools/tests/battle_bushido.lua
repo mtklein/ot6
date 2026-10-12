@@ -93,8 +93,13 @@ local function learnedBy(level)
   return n
 end
 -- the AUTO window at a ceiling: his top three learned techs, weakest first,
--- row r = boost r+1 (Ot6BushidoTech: base = max(0, ceiling-2))
+-- row r = boost r+1 (Ot6BushidoPick: base = max(0, ceiling-2)).  This
+-- fixture is before the Phantom Train farewell, so he has not learned
+-- Cleave (tech 7, #379), and the ceiling is that of techs 0..6: a count
+-- of 8 is capped at 6 (Ot6BushidoCeil), so the count alone never names
+-- Cleave.  Cleave's own row is battle_divines' and battle_cleave's.
 local function window(ceil)
+  ceil = math.min(ceil, 6)
   local w = {}
   for t = math.max(0, ceil - 2), ceil do w[#w + 1] = t end
   return w
@@ -939,10 +944,12 @@ H.run({ maxFrames = 150000 }, {
       steps[#steps+1] = H.cond(function() return swept(ceil) end, sweepOne, {})
     end
     steps[#steps+1] = H.call(function()
-      H.assertEq(H.readByte(ITEMLIST + 2 * 6), techId(7), string.format(
-        "ceiling 7 row 2 (boost 3) = tech 7 (%s/Oblivion, id $%02x) -- "
-        .. "the divine top tier, the named tech-8 ceiling arm", techName(7),
-        techId(7)))
+      H.assertEq(H.readByte(LEARNED) & 0x80, 0,
+        "Cleave is not learned here (before the Phantom Train farewell, #379)")
+      H.assertEq(H.readByte(ITEMLIST + 2 * 6), techId(6), string.format(
+        "a staged count of 8 with Cleave unlearned: row 2 (boost 3) = tech 6 "
+        .. "(%s, id $%02x), not %s -- the count never names the divine, "
+        .. "only learning it does (#379)", techName(6), techId(6), techName(7)))
       H.assertEq(findName(techSeq(0)), nil, string.format(
         "at ceiling 7 the retired \"%s\" is no longer drawn (the "
         .. "window slid weakest-out)", techName(0)))

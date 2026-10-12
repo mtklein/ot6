@@ -17,12 +17,16 @@
 -- real Defends bank the points.
 --
 -- Declared unit-test expedients (tools/state_write_waivers.txt), because
--- Cleave is SwdTech tech 8, reached by level at L70 and this Cyan is L11:
---   KNOWN ($2020) := 7 and MP := 999, so the window enumerates tech 8 and
---   the 99-MP cut is paid;
---   the learned SwdTechs ($1CF7) := all eight and the loadout word ($1E1D)
---   := Cleave in the 1- and 2-BP slots and Quadra Slice in the 3-BP slot,
---   read and set back to AUTO (0), for the gate's manual-loadout arm;
+-- Cleave is SwdTech tech 8, learned at the Phantom Train farewell (#379),
+-- and this Cyan is the L11 one of the Doma defence, before it (the soldiers
+-- and the commander are only here; battle_cleave reads the learned Cleave
+-- and its window from the play after the farewell):
+--   the learned SwdTechs ($1CF7) := all eight, KNOWN ($2020) := 7 (what
+--   InitSkills would have counted from them) and MP := 999, so the window
+--   enumerates tech 8 and the 99-MP cut is paid;
+--   the loadout word ($1E1D) := Cleave in the 1- and 2-BP slots and Quadra
+--   Slice in the 3-BP slot, read and set back to AUTO (0), for the gate's
+--   manual-loadout arm;
 --   in battle 2, the commander's $3aa1 bit 2 (the boss bit), since no
 --   generated battle fields a death-protected body beside Cyan, and his HP
 --   raised to 30,000 so the first heavy cut leaves him standing for the
@@ -80,9 +84,10 @@ emu.addMemoryCallback(function(_, v)
 end, emu.callbackType.write, 0x7E11A6, 0x7E11A6)
 
 local function stageCeiling(tag)
-  H.writeWord(KNOWN, 7)                       -- tech-8 window (L70 by play)
+  H.writeByte(0x1CF7, 0xFF)                   -- all eight learned (Cleave at
+  H.writeWord(KNOWN, 7)                       --   the farewell, #379), counted
   H.writeWord(0x3C08 + cyanSlot * 2, 999)     -- Cleave costs 99 (#57)
-  H.log("[" .. tag .. "] ceiling staged: KNOWN:=7, MP:=999 (declared expedient)")
+  H.log("[" .. tag .. "] ceiling staged: $1CF7:=FF, KNOWN:=7, MP:=999 (declared expedient)")
 end
 
 local function surveyBattle()
@@ -151,10 +156,9 @@ add({
     -- the manual loadout's arm: Cleave stored in the 1-BP slot (slot 1 =
     -- bits 3-5) and in the 2-BP slot (bits 6-8), the 3-BP slot left as the
     -- auto window's (Stunner's id 5 ... any learned tech; tech 6 here)
-    H.writeByte(0x1CF7, 0xFF)
     H.writeWord(LOADOUT, (7 << 3) | (7 << 6) | (6 << 9))
-    H.log("[battle 1] SwdTechs learned := all eight; loadout word := Cleave in the 1- and 2-BP slots, Quadra "
-      .. "Slice in the 3-BP slot (declared expedients)")
+    H.log("[battle 1] loadout word := Cleave in the 1- and 2-BP slots, Quadra "
+      .. "Slice in the 3-BP slot (declared expedient)")
   end),
   H.kitBattle({ { who = CYAN, cmd = CMD_SWDTECH, boost = 1, peek = true } },
     { untilPlanDone = true, idle = "defend", onList = function() rowsSeen.manual = readRows() end }),
