@@ -346,20 +346,20 @@ Expected XP per random, x2, before the split (`xp_by_map.txt`,
 | Doma's plain | world group 52 | 55 | 16,710 | 4,178 |
 | Mt. Zozo | maps 176-179 | 35 | 3,990-7,402 | 1,000-1,850 |
 | Narshe, the moogle cave | maps 32-38 | 32 | 3,798-4,038 | ~1,000 |
-| Narshe's mines, Umaro's cave | maps 125/126/144, 317-322 | 40 | 4,822-6,092 | 1,200-1,520 |
+| Cyan's dream | maps 125/126/144, 317-322 | 40 | 4,822-6,092 | 1,200-1,520 |
 | Owzer's house | map 207 | 36 | 6,534 | 1,634 |
 | the Fanatics' Tower | maps 359-370 | 58 | 0 | 0 |
 | the Phoenix Cave | maps 313, 315 | 49 | 12,409-13,651 | 3,100-3,400 |
 | the Cave in the Veldt | map 353 | 36 | 4,998 | 1,250 |
 | the Zone Eater | maps 276-278 | 44 | 6,449-7,707 | 1,600-1,930 |
 | Ebot's Rock | maps 404, 405 | 38 | 4,790-5,596 | 1,200-1,400 |
-| Cyan's dream | maps 281-283 | 33 | 5,525-5,688 | ~1,400 |
+| Umaro's cave | maps 281-283 | 33 | 5,525-5,688 | ~1,400 |
 | the Ancient Castle | maps 401-407 | 47 | 8,306-8,772 | 2,100-2,200 |
 | Kefka's Tower | maps 287-355, 409, 410 | 59 | 8,775-23,375 | 2,200-5,800 |
 
 Areas are named from their species (`pool_names.txt`) and the world map's
-doors (`world-entrances 1`); the mines/Umaro's cave rows and Cyan's dream
-are named by species alone, not traced to their doors.  The plains around
+doors (`world-entrances 1`); Cyan's dream is named by its CYAN NPCs (maps
+125, 126, 319, 320) and Umaro's cave by its events (route-wor-narshe.md).  The plains around
 Narshe, Zozo and Doma (groups 49-52) pay two to four times what most arcs'
 dungeons pay (the Phoenix Cave matches them); they are the World of Ruin's grind, a
 short Falcon hop from any arc.
@@ -420,8 +420,9 @@ ok; revivify 32/3 ok; fenix 31/20 ok`).
 The WoR item counters on the route, each selling Potion 300, Tincture
 1500, Fenix Down 500 and Revivify 300, and all but Tzen's Remedy 1000
 (`shops.txt`, `shops_wor_ahead.txt`): Albrook 48, Tzen 54, Nikeah 58,
-South Figaro 63, Kohlingen 67, Narshe 71, Thamasa 74, Jidoor 78.  Mobliz,
-Zozo and Maranda have none.
+South Figaro 63, Kohlingen 67, Thamasa 74, Jidoor 78.  Narshe's 71 is
+behind a door only LOCKE opens (route-wor-narshe.md).  Mobliz, Zozo and
+Maranda have none.
 
 **The Potion stack fills at L53.**  The bag holds 99 of an item, and the
 reserve plus the field care's 20 Potions reach 99 at a reserve of 79, so
@@ -452,7 +453,7 @@ before `give_genju GOLEM`, `event_main.asm:49702`/`:49745`; `take_gil
 | 79 relic | Jidoor | Cherub Down 6,300, Atlas Armlet 5,000, Guard Ring 5,000 |
 | 80 weapon | Maranda | Falchion 17,000, SwordBreaker 16,000, Gravity Rod 13,000, the five Edges |
 | 81 armor | Maranda | Crystal Mail 17,000, Tao Robe 13,000, Crystal Shld 7,000, Oath Veil 9,000 |
-| 68-70 | Narshe | empty (each row lists only `$00 Dirk`); the item counter 71 is open |
+| 68-70 | Narshe | empty (each row lists only `$00 Dirk`); the item counter 71 is behind LOCKE's lock |
 
 Shop owners from the `shop_menu` lines' event regions (Thamasa 72-75 beside
 Gungho's scene, `event_main.asm` ~:55109; Maranda 80/81 beside its town
