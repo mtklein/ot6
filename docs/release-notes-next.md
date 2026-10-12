@@ -9,7 +9,8 @@ and its effect. Cite evidence in the commit message.
 from its target, whatever the target's weaknesses, plus one more for each
 Boost Point spent (four at 3 points). It does no damage and costs 25 MP at
 any boost. Terra learns it at level 24, Shoat grants it, and the Break
-Blade sometimes casts it (one shield).
+Blade sometimes casts it (one shield). A monster's Break still petrifies,
+and so does Break through Control, Sketch or a Rage.
 
 **Divines need all 3 Boost Points.** Each character's strongest skill is
 used by spending a full 3-point boost, and can be used again in the same

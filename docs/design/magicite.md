@@ -70,7 +70,7 @@ describes the *proposed* system, not the shipped one.
 | Shiva | Magitek factory | Ice, Osmose, **Shell** | magicite-ifrit-shiva.md §5.2 | none, deliberately | none, deliberately | **"the Rime": economy** |
 | Unicorn | tube room | Remedy, Safe | +1 stamina | *Purity*: status durations halved | — | the paladin-adjacent |
 | Maduin | tube room | Fire, Ice, Bolt | +2 magic | *Trinity*: first spell each battle +1 tier | — | Terra's inheritance: the pure mage job |
-| Shoat | tube room | Break, Doom | +1 magic | *Gorgon Eye*: the stone's Break is the class-blind chip (one shield, one more a boost point; #398) -- no passive | — | the executioner (Doom) and the breaker (Break) |
+| Shoat | tube room | Break, Doom | +1 magic | *Gorgon Eye*: the stone's Break is the class-blind chip (one shield, one more a boost point; #398) -- no passive; a monster's Break (and Control, Sketch, a Rage) keeps vanilla's petrify, as monsters' Life 3 keeps vanilla's | — | the executioner (Doom) and the breaker (Break) |
 | Phantom | tube room | Vanish, Sleep | +1 speed | *Ghostwalk*: first hit taken each battle misses | — | the assassin's second |
 | Carbunkl | tube room | Rflect, Shell | +1 stamina | *Facet*: Runic feeds +1 more BP | — | Celes's natural pairing |
 | Bismark | tube room | Slow, (Water lore-alike) | +1 vigor | *Tidal*: water chip +1 | — | see open Q2 |

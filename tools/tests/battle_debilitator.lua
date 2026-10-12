@@ -9,13 +9,11 @@
 -- banked as a pending reveal, landed on the action's frame), so the HUD
 -- draws the element's glyph, and keeps it out of the species codex.
 --
--- Played: Continue fc-alcove-v1 (EDGAR L27), walk onto the continent into a
--- random battle, and EDGAR uses Debilitator on the first live monster
--- through the real menu (H.kitBattle); everyone else Defends.  One write, a
--- declared expedient: whether the play's bag holds a Debilitator here
--- varies with the play (v0.26's tracked capture has one; 20 of 21 chains
--- captured on px13 since, main's and branches', do not), so when the bag has none, one is put in its first
--- empty slot before the walk.  Asserted, between the action's start
+-- Played: Continue fc-alcove-v1 (EDGAR L27; the play bought the Debilitator
+-- at Vector's weapon shop on the way out of the banquet, gen_banquet_done),
+-- walk onto the continent into a random battle, and EDGAR uses Debilitator
+-- on the first live monster through the real menu (H.kitBattle); everyone
+-- else Defends.  Nothing is written.  Asserted, between the action's start
 -- (Debilitator's own Ot6ItemClass load) and its end (EDGAR's Ot6ActionEnd):
 --   1. exactly one element bit was added to the target's weak byte ($3BE0);
 --   2. that bit is in the target's revealed byte ($3E89), and was not before;
@@ -78,17 +76,7 @@ H.run({ maxFrames = 400000 }, {
   end),
   H.bootCheckpoint("fc-alcove-v1"),
   H.call(function()
-    local empty
-    for i = 0, 255 do
-      if H.readByte(0x1869 + i) == DEBIL and H.readByte(0x1969 + i) > 0 then
-        H.log("[debil] the bag holds a Debilitator"); return
-      end
-      if empty == nil and H.readByte(0x1869 + i) == 0xFF then empty = i end
-    end
-    H.assertEq(empty ~= nil, true, "the bag has an empty slot")
-    H.writeByte(0x1869 + empty, DEBIL)
-    H.writeByte(0x1969 + empty, 1)
-    H.log(string.format("[debil] the bag holds no Debilitator: one staged in slot %d (declared expedient)", empty))
+    H.assertEq(H.invCountOf(DEBIL) >= 1, true, "the bag holds a Debilitator (bought at Vector)")
   end),
   H.call(arm),
   H.fcAlcoveToBattle("debil"),

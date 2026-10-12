@@ -437,12 +437,15 @@ nowhere else. The World of Ruin adds Phoenix's Life (magicite.md, #327).
   status; one shield off its one target, ignoring class and element, plus
   one per boost point (four at 3 BP, the ceiling Quadra Slice and Bum Rush
   reach), at its flat 25 MP (the boost buys shields, never a tier or the
-  multiplier).  It reveals nothing (Filch's rule).  Every source casts it:
-  Terra, Shoat, the Break Blade's on-hit spell (one shield: the swing's
-  boost bought swings) and a monster's Break, which takes nothing from the
-  party (characters have no shields).  It works on bosses: shields are the
-  boss's own break system.  `Ot6BreakSpell`, MagicProp overrides 7-10;
-  `battle_breakspell`.
+  multiplier).  It reveals nothing (Filch's rule).  It is a character's
+  own cast: Magic or X-Magic (Terra, Shoat, a Mimic of one) or the Break
+  Blade's on-hit spell (one shield: the swing's boost bought swings).  A
+  monster's Break, and Control, Sketch and a Rage, which cast as the monster
+  does, keep vanilla's petrify -- the Life 3 precedent (magicite.md):
+  characters' casts get OT6's behaviour, monsters keep vanilla's.  It works
+  on bosses: shields are the boss's own break system.  `Ot6BreakOurs`,
+  `Ot6BreakProps` (the vanilla record, edited as it loads for OT6's cast)
+  and `Ot6BreakSpell`; `battle_breakspell`, `battle_breakmonster`.
 
 ### Locke — Thief (piercing: dagger)
 

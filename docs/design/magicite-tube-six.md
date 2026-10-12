@@ -266,6 +266,9 @@ byte allows it (§2.2's table says where).  Break `$0c` was the second
 deletion verb (25 MP, hit 120, sets PETRIFY) until #398 (2026-10-11): now
 it takes shields, class- and element-blind, one plus one per boost point,
 no damage and no status, at its flat 25 MP (kits.md, Terra; Ot6BreakSpell).
+That is a character's own cast (Magic, X-Magic, a Mimic, the Break Blade);
+a monster's Break, and Control, Sketch and a Rage, keep vanilla's petrify,
+as monsters' Life 3 keeps vanilla's (magicite.md).
 So the stone holds both halves of the break loop's shortcut: Break opens
 any body's shields without its key, and Doom deletes what Death can reach.
 That is the *Gorgon Eye* settled: the seed passive ("Break may (25%) chip
