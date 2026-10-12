@@ -11,7 +11,7 @@ his SwdTech list is Cleave (99 MP), and the 1- and 2-point rows are his two
 best other skills.
 
 **SwdTech weak points.** Retort and Empowerer no longer chip shields.
-Quadra Slice is wind: it chips wind shields, and deals wind damage.
+Quadra Slice is wind: it chips wind shields and deals wind damage, so it heals monsters that absorb wind.
 
 **Mog's Water Rondo needs all 3 Boost Points.** With fewer, the dance is
 greyed out. Danced with 3 points it never stumbles, wherever the battle is.
