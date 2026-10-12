@@ -13094,6 +13094,13 @@ function M.kitBattle(plan, opts)
     aim = nil
   end
   local function tick()
+    local p0 = plan[k]
+    if p0 ~= nil and p0.self and p0.opened and p0.seat ~= nil and cool == 0
+        and (M.readByte(MENU) == 0 or (M.readByte(ACTOR) & 3) ~= p0.seat) then
+      -- a self-targeted command whose target select confirmed itself (the
+      -- window closed on the command's own A)
+      done(p0, p0.seat)
+    end
     if M.readByte(MENU) == 0 then
       if M.readByte(0x3A77) == 0 then pulse("a") else M.setPad({}) end
       return
@@ -13134,7 +13141,7 @@ function M.kitBattle(plan, opts)
           return
         end
       end
-      if cool == 0 then p.opened = true end
+      if cool == 0 then p.opened, p.seat = true, a end
       pulse("a")
     elseif (st == 0x0E or st == 0x30) and not p.opened then
       pulse("b")   -- a window this entry did not open (an earlier entry's, closing)
@@ -13191,7 +13198,12 @@ function M.kitBattle(plan, opts)
     else M.setPad({}) end
   end
   return M.seqStep({
-    M.call(function() k, cool, aim = 1, 0, nil; M.vars.kit = {}; M.logRomIdentity("[kit]") end),
+    M.call(function()
+      k, cool, aim = 1, 0, nil
+      for i = 1, #plan do local q = plan[i]; q.opened, q.seat, q.presses = nil, nil, nil end
+      M.vars.kit = {}
+      M.logRomIdentity("[kit]")
+    end),
     M.waitUntil(function() return M.battleActive() end, 1200, "the battle is up", 2),
     M.driveUntil(function()
       if opts.untilPlanDone and k > #plan and (opts.planDone == nil or opts.planDone()) then return true end
@@ -13202,6 +13214,52 @@ function M.kitBattle(plan, opts)
     M.call(function()
       M.log(string.format("[kit] the battle step is over: %d entr(ies) played of %d planned", k - 1, #plan))
     end),
+  })
+end
+
+-- ---- into a random battle from where the party stands (the kit suites) ---
+-- M.paceToEncounter(tag) paces between the tile the party stands on and a
+-- walkable neighbour (3 or 2 tiles off, the first the BFS reaches) until a
+-- random battle starts, then waits for it to be up.  M.fcAlcoveToBattle(tag)
+-- is the Floating Continent's: from the fc-alcove-v1 Continue (map 358) up
+-- through the alcove's exit (8,8) onto the continent (394), then the pace.
+-- Nothing is written.
+function M.paceToEncounter(tag)
+  local A, B = nil, nil
+  return M.seqStep({
+    M.call(function() A, B = nil, nil end),
+    M.driveUntil(function() return M.battleLoadStarted() end, 60000, {
+      M.call(function()
+        if A ~= nil then return end
+        local x0, y0 = M.fieldX(), M.fieldY()
+        for _, d in ipairs({ { 0, 3 }, { 0, -3 }, { 3, 0 }, { -3, 0 }, { 0, 2 }, { 2, 0 }, { -2, 0 }, { 0, -2 } }) do
+          if M.bfsPath(x0 + d[1], y0 + d[2]) then A, B = { x0, y0 }, { x0 + d[1], y0 + d[2] }; break end
+        end
+        M.assertEq(A ~= nil, true, string.format("%s: a walkable pace from (%d,%d)", tag, x0, y0))
+        M.log(string.format("[%s] pacing (%d,%d) <-> (%d,%d)", tag, A[1], A[2], B[1], B[2]))
+      end),
+      M.navTo(function() return B[1] end, function() return B[2] end,
+        { maxFrames = 8000, arrive = function() return M.battleLoadStarted() end }),
+      M.call(function() A, B = B, A end),
+    }, tag .. ": a random battle"),
+    M.waitUntil(function() return M.battleActive() end, 1200, tag .. ": the battle is up", 2),
+    M.waitFrames(30),
+  })
+end
+
+function M.fcAlcoveToBattle(tag)
+  local t = 0
+  return M.seqStep({
+    M.navTo(8, 9, { maxFrames = 3000 }),
+    M.driveUntil(function() t = t + 1; return (M.mapId() & 0x3ff) == 394 end, 1800, {
+      M.call(function()
+        if M.dialogWaiting() then M.setPad(t % 16 < 4 and { a = true } or {}); return end
+        if not M.hasControl() then M.setPad({}); return end
+        M.setPad({ up = true })
+      end),
+    }, tag .. ": the alcove -> the continent (394)"),
+    M.waitUntil(function() return M.hasControl() and M.tileAligned() end, 900, tag .. ": control on 394", 10),
+    M.paceToEncounter(tag),
   })
 end
 

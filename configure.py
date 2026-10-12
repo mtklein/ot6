@@ -496,6 +496,19 @@ TEST_ENV = {
     # frames, 1,213 s at 80.7 frames/s): 1800 is 1.48x it
     # (build/attempts/wt/procboost-magicite/neg/nomeasure_k1.log.gz)
     "battle_procboost": "OT6_TIMEOUT=1800",
+    # v0.27 kits (#398, #378): TERRA, EDGAR and SHADOW on the Floating
+    # Continent, from the alcove's save; a run is the Continue, a walk and
+    # one battle of scripted turns (3-11k frames on the branch's runs)
+    "battle_breakspell": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
+    "battle_ultimafold": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
+    "battle_trance": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
+    "battle_overclock": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
+    "battle_debilitator": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
     "battle_statuses": "OT6_TIMEOUT=3600",
     "battle_levelup": "OT6_TIMEOUT=3600",
 }
