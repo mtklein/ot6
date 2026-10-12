@@ -10088,6 +10088,7 @@ function Driver:makePlanRules(actor)
   -- driver's own order, then the blitz, then the Fight.  Shared by the
   -- press rule (#156, #165) and the spend rule (#175) below.
   local function bestLine(actor, slot, bp)
+    bp = math.min(bp, 3)  -- one action buys at most 3 BP, whatever the bank holds (#425)
     local id = M.readByte(BATTLE.BCHID + actor * 2)
     local best, offered = nil, {}
     local function offer(p)
@@ -10258,7 +10259,12 @@ function Driver:makePlanRules(actor)
     if slot == nil then
       for s = 0, 5 do if monAlive(s) then slot = s; break end end
     end
-    local best = slot ~= nil and bestLine(actor, slot, have) or nil
+    -- one action buys at most 3 BP, whatever the bank holds (up to 5):
+    -- a line priced at the bank's 4 asserted in the race's damage model
+    -- when it landed (#425: `Tools $AA at 4 BP`, then `damage boost must
+    -- be 0..3`, build/attempts/wt/v028-edgar-lab/)
+    local spendBp = math.min(have, 3)
+    local best = slot ~= nil and bestLine(actor, slot, spendBp) or nil
     -- the summon: unreflectable and unabsorbed by construction (the
     -- summon line's own gates), and the strongest thing a caster with
     -- nothing to chip can do with the turn
@@ -10279,8 +10285,8 @@ function Driver:makePlanRules(actor)
     if best == nil then
       local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
       if fight == nil then return nil end
-      best = { kind = "fight", row = fight, boostLeft = have, chips = 0,
-               what = string.format("Fight at %d BP", have) }
+      best = { kind = "fight", row = fight, boostLeft = spendBp, chips = 0,
+               what = string.format("Fight at %d BP", spendBp) }
     end
     best.reason = "spend"
     self.healSaid = nil
