@@ -916,7 +916,11 @@ done:   pla
 ; set.  The guard instead compares the queue slot just written (y/2)
 ; against the actor's own counterattack pointer $32cd,x, written by
 ; CreateRetalAction (:13211) and left untouched by CreateNormalAction
-; (:13228) -- only a real counterattack matches.
+; (:13228) -- only a real counterattack matches.  It compares on every
+; queue, not only while $b1.0 is up: a RunicBlade's bounce
+; (ot6_runicblade.asm) is a counter queued from CheckRetal at the end of an
+; ordinary action, with $b1.0 clear, and must not fold on a pending boost
+; Celes may have raised in her open menu.
 ;
 ; Untaught tiers still fold: a borrowed Fire folds to Fire 3 whether or not
 ; the caster ever learned Fire 3.  The price must come from MagicProp
