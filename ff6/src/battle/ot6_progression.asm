@@ -516,8 +516,10 @@ out:    longi                   ; i16 to match the phx width
 
 ; Ot6EsperStatTbl: two bytes per esper index (GenjuProp order) in vanilla's own
 ; ItemProp+16/+17 nibble layout, read by Ot6EsperStatMod while that esper is
-; worn.  The rest are $0000 (no mod), a data-append like their spell lists
-; (genju_prop.asm).
+; worn.  Every row carries a package (docs/design/magicite.md: the WoB roster
+; table and "World of Ruin Espers", #418); no row is $0000 any more, so the
+; menu's no-mod path is reached only by menu_esperdetail_tube6's patched-row
+; control.
 ;
 ; Vanilla doubles vigor into $3b2c (battle_main.asm:6786-6791), so every
 ; table vigor value reads twice as large in battle.
@@ -527,19 +529,19 @@ Ot6EsperStatTbl:
         esper_stat   +6,   0,  +4,  -3   ;  1 ifrit
         esper_stat   -3,  +4,   0,  +6   ;  2 shiva
         esper_stat    0,  +4,   0,  +2   ;  3 siren
-        esper_stat    0,   0,   0,   0   ;  4 terrato (no-mod control; leave at $0000)
+        esper_stat    0,  -3,  +4,  +6   ;  4 terrato
         esper_stat   -2,  +6,  +2,   0   ;  5 shoat
         esper_stat   -3,   0,  +3,  +7   ;  6 maduin
         esper_stat   +5,  -2,  +3,   0   ;  7 bismark
         esper_stat    0,  +2,   0,  +4   ;  8 stray
-        esper_stat    0,   0,   0,   0   ;  9 palidor
-        esper_stat    0,   0,   0,   0   ; 10 tritoch
-        esper_stat    0,   0,   0,   0   ; 11 odin
-        esper_stat    0,   0,   0,   0   ; 12 raiden
-        esper_stat    0,   0,   0,   0   ; 13 bahamut
-        esper_stat    0,   0,   0,   0   ; 14 alexandr
-        esper_stat    0,   0,   0,   0   ; 15 crusader
-        esper_stat    0,   0,   0,   0   ; 16 ragnarok
+        esper_stat   +2,  +4,   0,   0   ;  9 palidor
+        esper_stat    0,  +3,  -3,  +7   ; 10 tritoch
+        esper_stat   +4,  +4,  -2,   0   ; 11 odin
+        esper_stat   +6,  +4,  -3,   0   ; 12 raiden
+        esper_stat   +3,   0,  -3,  +7   ; 13 bahamut
+        esper_stat   +4,  -3,  +6,   0   ; 14 alexandr
+        esper_stat   +3,  +3,  +3,  +3   ; 15 crusader
+        esper_stat   +5,   0,  -3,  +5   ; 16 ragnarok
         esper_stat    0,   0,  +2,  +4   ; 17 kirin
         esper_stat    0,   0,  +2,  +3   ; 18 zoneseek
         esper_stat    0,  -2,  +6,  +2   ; 19 carbunkl
@@ -547,8 +549,8 @@ Ot6EsperStatTbl:
         esper_stat    0,   0,  +4,  +2   ; 21 sraphim
         esper_stat    0,  -2,  +5,   0   ; 22 golem
         esper_stat    0,   0,  +5,  +2   ; 23 unicorn
-        esper_stat    0,   0,   0,   0   ; 24 fenrir
-        esper_stat    0,   0,   0,   0   ; 25 starlet
-        esper_stat    0,   0,   0,   0   ; 26 phoenix
+        esper_stat    0,  +6,  -3,  +4   ; 24 fenrir
+        esper_stat    0,  +4,  -3,  +6   ; 25 starlet
+        esper_stat   -2,  +2,  +6,   0   ; 26 phoenix
         calc_size Ot6EsperStatTbl
 .assert sizeof_Ot6EsperStatTbl = 27 * 2, error, "Ot6EsperStatTbl must be 2 bytes per esper for 27 espers"

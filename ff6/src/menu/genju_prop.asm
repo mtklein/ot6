@@ -87,7 +87,7 @@ make_genju_prop {BOLT, 0}, {RASP, 0}, {}, {}, {}
 ;   The vanilla FIRE_2 grant is dropped: a pre-folded tier is a dead,
 ;   un-foldable row beside the base spell, and it costs 20 MP for what the
 ;   4 MP base spell delivers under one boost.  Ifrit's third "slot" is the
-;   +5 vigor in Ot6EsperStatTbl (ot6_progression.asm).
+;   +6 vigor / +4 stamina / -3 mag.pwr in Ot6EsperStatTbl (ot6_progression.asm).
 make_genju_prop {FIRE, 0}, {DRAIN, 0}, {}, {}, {}
 
 ; 2: shiva.  Base-tier Ice (folds) + Osmose (the party's only MP income,

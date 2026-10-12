@@ -269,8 +269,9 @@ Every claim was checked against the code (2026-09-28):
   encounter rate) and `Ot6RewardMulW = $0020` (double Exp. and GP, random
   battles only).
 - Espers: learn rates 0 and the while-worn spell grant
-  (`Ot6EsperSpellKnown`); `Ot6EsperStatTbl` (several Espers carry no
-  stat change, hence "Many"); the vanilla level-up bonus bytes are $ff.
+  (`Ot6EsperSpellKnown`); `Ot6EsperStatTbl` ("Many" was
+  written when several Espers carried no stat change; since #418 every one
+  does, and "Many" is still true); the vanilla level-up bonus bytes are $ff.
 
 ## Kept vanilla (lesson still true)
 

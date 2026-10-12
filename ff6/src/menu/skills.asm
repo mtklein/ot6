@@ -3012,7 +3012,8 @@ DrawEsperDetailMenu:
 ; Terms pack upward from row 17: a stat with a zero delta costs no line.  Every
 ; row the terms do not reach is blanked to the same 10-cell width, and the old
 ; row-27 line is blanked outright, so a revisit always overwrites (the case the
-; no-mod control TERRATO asserts).
+; no-mod control asserts; no shipped row is $0000 since #418, so that test
+; zeroes Terrato's row in the emulator's ROM image for the one visit).
 ;
 ; State.  The walk needs two counters that survive DrawPosTextBuf.  $f5/$f6 is
 ; the one 16-bit scratch cell this proc has already proven safe across
