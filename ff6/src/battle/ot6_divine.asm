@@ -119,10 +119,12 @@ done:   plp
 ; through the hardware multiplier, saturating at $ffff (the 9,999 cap is
 ; downstream).  The /16 is taken from magic power x power before the level
 ; multiply, which floors at most 15/16 x level below vanilla's order.
-; a8/i8 (Ot6Oblivion's shortai), db = $7e; clobbers A and X.
+; a8/i8 (Ot6Oblivion's shortai), db = $7e; clobbers A; preserves X (the
+; attacker, which CalcAttackEffect indexes the MP charge by right after).
 .proc Ot6CleaveDmg
         .a8
         .i8
+        phx
         lda     $11ae           ; magic power
         sta     f:$004202       ; hWRMPYA
         lda     $11a6           ; power
@@ -153,6 +155,7 @@ done:   plp
 @sat:   lda     #$ffff
 @out:   sta     $11b0
         shorta
+        plx
         rts
 .endproc
 
