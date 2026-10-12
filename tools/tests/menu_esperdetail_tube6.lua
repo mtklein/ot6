@@ -170,9 +170,11 @@ local function assertRow(tag, slot, want, label)
 end
 
 -- An unused spell slot: DrawGenjuMagicName blanks all 15 tiles of the field.
-local function assertRowEmpty(tag, slot)
+-- On a row a stat term also uses, the term owns cols 17-19, so pass
+-- lastX = 16 there; the term's own assertions cover the rest.
+local function assertRowEmpty(tag, slot, lastX)
   local y = 17 + slot * 2
-  for x = 5, 19 do
+  for x = 5, lastX or 19 do
     H.assertEq(cell(x, y), BLANK,
       string.format("%s: row %d empty at {%d,%d}", tag, slot + 1, x, y))
   end
@@ -341,7 +343,7 @@ add({ H.call(function()
   logPage("terrato")
   assertRow("terrato", 0, NAME.QUAKE,  "Quake (magicite.md's WoR list, #327)")
   assertRow("terrato", 1, NAME.QUARTR, "Quartr (magicite.md's WoR list, #327)")
-  assertRowEmpty("terrato", 2)
+  assertRowEmpty("terrato", 2, 16)          -- term 2 (Mag.Pwr) shares this row
   assertRowEmpty("terrato", 3)
   assertRowEmpty("terrato", 4)
   assertCaption("terrato", true)
