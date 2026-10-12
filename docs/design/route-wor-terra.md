@@ -52,10 +52,10 @@ log there. Nothing was measured by writing game state.
    three. The bag the party brings is inside the band (section 4).
 7. **#365: the pool round the Falcon's landing is vanilla's late-game
    pool.** Formation `$143` (Mantodea, Sprinter, Spek Tor x2; L50-54)
-   wiped the L33-36 party in 8 of 27 fights; the Crawlers once in 47, a
+   wiped the L33-36 party in 7 of 26 fights; the Crawlers once in 46, a
    pincer the run-first arm met. A slot-0 monster's plain Battle (the
-   Mantodea's, vanilla attack 180) made 57 of the 63 kills, 19 of them in
-   one action from 80% HP or more.
+   Mantodea's, vanilla attack 180) made 52 of the 58 kills; 17 of the 58
+   came in one action from 80% HP or more.
    The Terra route boards at once and never walks it (section 8).
 
 ---
@@ -192,20 +192,21 @@ Measured with `lab_ruinwaste.lua` (`365/`): Continue `wor-falcon-v1`,
 care, then walk (25,165) <-> (25,158) (world group 49) fighting every
 battle with the route's tactical driver and its field care, up to ten
 battles or a wipe, at seed shifts 0-28 (`ruin_s*`; `ruin_k0` is an earlier
-copy of shift 0 and repeats its battle keys); `lab_ruinwaste_focus.lua`
+copy of shift 0, repeats its battle keys, and is left out of every count
+below); `lab_ruinwaste_focus.lua`
 (`ruinF_s*`) is the same with the Mantodea first in the kill order; and
 `ruin_k3` ran (L+R) from its first three battles before fighting, the
 tactical driver taking over at the flee cap.
 
 | formation | arm | fights (distinct battle keys) | lost |
 |---|---|---|---|
-| `$13F` Crawler x3 | route order | 30 (28) | 0 |
+| `$13F` Crawler x3 | route order | 29 (28) | 0 |
 | `$13F` Crawler x3 | Mantodea first | 16 (16) | 0 |
 | `$13F` Crawler x3 | run first | 1 (1) | 1 |
-| `$143` Mantodea, Sprinter, Spek Tor x2 | route order | 19 (15) | 6 (5 keys) |
+| `$143` Mantodea, Sprinter, Spek Tor x2 | route order | 18 (15) | 5 |
 | `$143` Mantodea, Sprinter, Spek Tor x2 | Mantodea first | 8 (8) | 2 |
 
-(`365/analysis.txt`, over every `ruin*.log`.) Every `$143` loss had the
+(`365/analysis.txt`, over every `ruin*.log` but `ruin_k0`.) Every `$143` loss had the
 Mantodea alive at the end (`battle $143 LOST ...: killed s1:$087 s2:$0B0
 s3:$0B0` or `killed s2:$0B0 s3:$0B0`). The one Crawler loss is the
 run-first arm's first battle, a pincer (`ruin_k3.log`: `wipe context: the
@@ -213,11 +214,11 @@ last battle up (f13650) was formation 5F5E 5D5C 005B 005B 005B 5F5E;
 seats ... a6:0/1900 ... a5:0/1812 ... a4:0/1803 ... a9:37/1800`, key
 `be1C-g013F`); that walk says no `[outcome]` and no `[death]` lines, so
 its course is not in the log. Under the route's own fight order the
-Crawlers won 46 of 46 fights (44 distinct keys); the wt/hire-sprite wipes
+Crawlers won 45 of 45 fights (44 distinct keys); the wt/hire-sprite wipes
 named in #365's title were a pincer lab whose policy was Defend and Hired
-Help (`round2/attempts/pincer_pw5.log`). Of the 63 party deaths logged in
-these runs, 57 were `by slot 0 cmd $00 atk $EE`, a slot-0 monster's plain
-Battle (the Mantodea in `$143`), 19 of them `ONE ACTION from >= 80%`. Wins
+Help (`round2/attempts/pincer_pw5.log`). Of the 58 party deaths logged in
+these runs, 52 were `by slot 0 cmd $00 atk $EE`, a slot-0 monster's plain
+Battle (the Mantodea in `$143`); 17 of the 58 were `ONE ACTION from >= 80%`. Wins
 came at L33-38; the losses at L33-36. The Mantodea's attack 180 is
 vanilla's (`Mantodea vanilla atk 180 lvl 54 | ot6 atk 180`), and its row is
 the floor (`6 * pierce`); the `$143` XP is 9617 (x2 as a random).
@@ -294,9 +295,13 @@ and 12. All eighteen pass (`PASS (frame 42850)` to `PASS (frame 61178)`,
 
 After wt/v027-kits merged (e410e209: Jackpot, Morph and the divines need 3
 Boost Points, Break chips shields), the chain was played again from
-power-on (`final/qual10.out`, `final/qual11.out`: `ninja` green, `generate
-wor_terra` `PASS (frame 46504) attempts=1/3`, `contract wor-terra-v1 (exit):
-all 30 fields hold`), and `wor-terra-v1` re-cut from that play
+power-on at 92254dd6 (`kits/qual9.out`: every state regenerated, `[314/323]
+generate wor_terra <- gen_wor_terra (captures wor-terra-v1)`; its one red
+edge, `battle_gprain`, was the suite's, fixed in 2a3d3564 and narrowed in
+2912cec9, `gprain/`). `kits/wor_terra_chain.log`: `PASS (frame 46504)
+attempts=1/3`. The later `ninja` runs (`final/qual10.out`, `qual11.out`)
+re-ran `wor_terra` (its generator changed: the boarding fix) and the suites
+the lib edits touched, and replayed no earlier state; `wor-terra-v1` is re-cut from the chain's `wor_terra` play
 (`final/drift_wor_terra.log`: `checkpoint drift wor-terra-v1: none -- the
 tracked save is the one the graph's play makes today`, sha256
 `2178ccdc...`).
