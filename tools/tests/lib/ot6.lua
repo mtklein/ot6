@@ -13134,7 +13134,10 @@ function M.kitBattle(plan, opts)
           return
         end
       end
+      if cool == 0 then p.opened = true end
       pulse("a")
+    elseif (st == 0x0E or st == 0x30) and not p.opened then
+      pulse("b")   -- a window this entry did not open (an earlier entry's, closing)
     elseif st == 0x0E and p.spell ~= nil then
       local i = spellIdx(a, p.spell)
       M.assertEq(i ~= nil, true, string.format("char $%02X's magic list holds spell $%02X", p.who, p.spell))
