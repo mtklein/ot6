@@ -32,6 +32,13 @@ build's debug file (ff6/rom/ff6-en.dbg) records.
      unknown name fails, so a typo cannot pass as inexpressible.  An Esper with no planned list
      is only held to property 1.
 
+3. The stat packages (#418).  Ot6EsperStatTbl (battle/ot6_progression.asm;
+   two bytes per Esper, four signed nibbles: vigor, speed, stamina, mag.pwr,
+   each [sign:1][magnitude:3]) equals the "Stat vig/spd/stm/mag" cell of that
+   Esper's row in docs/design/magicite.md, for every Esper: both roster
+   tables carry the column, and an Esper with no row or a cell that does not
+   read as four signed numbers fails.
+
 Nothing else writes the learned-spell table: the new-game init clears it,
 and vanilla's teach-spell event routine (GiveMagic) is in no event command
 slot.
@@ -90,7 +97,7 @@ class Input:
                 return f.read()
         self.rom = bytearray(read(rom_path, "rb"))
         syms, segs = dbg_symbols(read(dbg_path))
-        for s in ("NaturalMagic", "GenjuProp", "Ot6FoldTbl"):
+        for s in ("NaturalMagic", "GenjuProp", "Ot6FoldTbl", "Ot6EsperStatTbl"):
             if s not in syms:
                 raise SystemExit("check_spell_grants: %s not in %s" % (s, dbg_path))
         if segs.get("natural_magic") != 2 * NATURAL_PER_CHAR * len(NATURAL_CHARS):
@@ -105,6 +112,7 @@ class Input:
         self.genju = rom_offset(syms["GenjuProp"])
         self.genju_rows = gsize // GENJU_ROW
         self.fold = rom_offset(syms["Ot6FoldTbl"])
+        self.stat = rom_offset(syms["Ot6EsperStatTbl"])
         self.boost_asm = read(BOOST_ASM)
         self.nfold = fold_rows_in_source(self.boost_asm)
         self.enum = spell_names(read(CONST_INC))
@@ -182,6 +190,14 @@ def natural_pairs(inp, c):
 
 def esper_spells(inp, e):
     return [inp.rom[inp.genju + e * GENJU_ROW + off] for off in GENJU_SPELL_BYTES]
+
+
+def esper_stats(inp, e):
+    """(vigor, speed, stamina, mag.pwr) from Ot6EsperStatTbl's two bytes:
+    byte 0 = [speed:4][vigor:4], byte 1 = [magpwr:4][stamina:4]."""
+    b0, b1 = inp.rom[inp.stat + 2 * e], inp.rom[inp.stat + 2 * e + 1]
+    nib = lambda n: -(n & 7) if n & 8 else n
+    return (nib(b0 & 15), nib(b0 >> 4), nib(b1 & 15), nib(b1 >> 4))
 
 
 # ---------------------------------------------------------------- the docs --
@@ -285,6 +301,26 @@ def esper_plans(inp):
     return plans
 
 
+_STAT_CELL = re.compile(r"([+−-]?\d+) / ([+−-]?\d+) / ([+−-]?\d+) / ([+−-]?\d+)(?:\s|$)")
+
+
+def stat_plans(inp):
+    """{esper index: (vigor, speed, stamina, mag.pwr)} from magicite.md's
+    roster tables' fourth cell."""
+    idx = {n.lower(): i for i, n in enumerate(inp.espers)}
+    plans = {}
+    for l in inp.magicite.splitlines():
+        cells = [c.strip() for c in l.strip().strip("|").split("|")]
+        if len(cells) < 4 or cells[0].lower() not in idx:
+            continue
+        m = _STAT_CELL.match(cells[3])
+        if not m:
+            raise SystemExit("check_spell_grants: %s's %s row has stat cell '%s', not "
+                             "'vig / spd / stm / mag'" % (MAGICITE_MD, cells[0], cells[3]))
+        plans[idx[cells[0].lower()]] = tuple(int(v.replace("−", "-")) for v in m.groups())
+    return plans
+
+
 # ----------------------------------------------------------------- checks --
 
 def check_fold(inp):
@@ -354,8 +390,24 @@ def check_esper_plans(inp):
     return out, notes
 
 
+def check_stat_plans(inp):
+    out = []
+    plans = stat_plans(inp)
+    fmt = lambda t: " / ".join("%+d" % v if v else "0" for v in t)
+    for e in range(inp.genju_rows):
+        got = esper_stats(inp, e)
+        if e not in plans:
+            out.append("%s (Esper %d) stat is %s; %s has no row for it"
+                       % (inp.espers[e], e, fmt(got), MAGICITE_MD))
+        elif got != plans[e]:
+            out.append("%s (Esper %d) stat is %s; %s plans %s"
+                       % (inp.espers[e], e, fmt(got), MAGICITE_MD, fmt(plans[e])))
+    return out
+
+
 def run_checks(inp):
     probs = check_fold(inp)
+    probs += check_stat_plans(inp)
     p, tiers = check_tiers(inp)
     probs += p
     p, n1 = check_natural_plan(inp)
@@ -415,6 +467,33 @@ def selftest(root, rom_path, dbg_path):
         ("kits.md: Terra's Drain 50 levels later",
          kits_mutant, "TERRA natural magic is ["),
     ]
+    # the stat packages (#418): a ROM nibble moved by one on the last Esper
+    # (a World of Ruin row), each stat in turn, and a doc cell edited on the
+    # first (a World of Balance row)
+    nesp = base_inp.genju_rows - 1
+    for k, stat in enumerate(("vigor", "speed", "stamina", "mag.pwr")):
+        off = base_inp.stat + 2 * nesp + k // 2
+        sh = 4 * (k % 2)
+        n = (base_inp.rom[off] >> sh) & 15
+        n2 = (n & 8) | (((n & 7) + 1) & 7) if (n & 7) != 7 else (n & 8) | 6
+        mutants.append(("%s's %s nibble $%X -> $%X" % (base_inp.espers[nesp], stat, n, n2),
+                        rom_mutant(off, (base_inp.rom[off] & ~(15 << sh) & 0xFF) | (n2 << sh)),
+                        "%s (Esper %d) stat is " % (base_inp.espers[nesp], nesp)))
+
+    def stat_doc_mutant(inp):
+        inp.magicite, n = re.subn(r"(\| Ramuh \|[^|]*\|[^|]*\| [^|]*/ )(\+?\d+)( \|)",
+                                  lambda m: m.group(1) + "+%d" % (int(m.group(2)) + 1)
+                                  + m.group(3), inp.magicite, count=1)
+        assert n == 1, "magicite.md has no Ramuh stat cell to mutate"
+    mutants.append(("magicite.md: Ramuh's mag.pwr + 1", stat_doc_mutant,
+                    "%s (Esper 0) stat is " % base_inp.espers[0]))
+
+    def stat_row_gone(inp):
+        inp.magicite, n = re.subn(r"\n\| Palidor \|[^\n]*", "", inp.magicite, count=1)
+        assert n == 1, "magicite.md has no Palidor row to remove"
+    pal = next(i for i, n in enumerate(base_inp.espers) if n.lower() == "palidor")
+    mutants.append(("magicite.md: Palidor's row removed", stat_row_gone,
+                    "%s (Esper %d) stat is " % (base_inp.espers[pal], pal)))
     ok = True
     for what, mutate, tag in mutants:
         inp = Input(root, rom_path, dbg_path)
@@ -438,6 +517,18 @@ def selftest(root, rom_path, dbg_path):
         ok = False
     except SystemExit as e:
         print("selftest: magicite.md Stray 'Mudle' -> red: %s" % e)
+    # a stat cell that is not four signed numbers must fail, not be skipped
+    inp = Input(root, rom_path, dbg_path)
+    inp.magicite, n = re.subn(r"(\| Kirin \|[^|]*\|[^|]*\| )[^|]*\|", r"\g<1>+1 stamina |",
+                              inp.magicite, count=1)
+    try:
+        if n != 1:
+            raise AssertionError("magicite.md has no Kirin row to mutate")
+        stat_plans(inp)
+        print("selftest FAIL: magicite.md Kirin '+1 stamina' was not reported")
+        ok = False
+    except SystemExit as e:
+        print("selftest: magicite.md Kirin '+1 stamina' -> red: %s" % e)
     print("selftest: the untouched inputs report %d problem(s)" % len(base))
     print("selftest %s" % ("ok" if ok else "FAILED"))
     return 0 if ok else 1
@@ -464,9 +555,11 @@ def main():
         return 1
     plans = esper_plans(inp)
     print("check_spell_grants: ok, no grant names one of the %d tiers (%s); TERRA's and "
-          "CELES's natural magic is %s's plan; %d Espers grant their planned list (%s)"
+          "CELES's natural magic is %s's plan; %d Espers grant their planned list (%s); "
+          "all %d Espers carry %s's stat package"
           % (len(tiers), ", ".join(inp.name(t) for t in sorted(tiers)), KITS_MD,
-             len(plans), ", ".join(inp.espers[e] for e in sorted(plans))))
+             len(plans), ", ".join(inp.espers[e] for e in sorted(plans)),
+             inp.genju_rows, MAGICITE_MD))
     return 0
 
 

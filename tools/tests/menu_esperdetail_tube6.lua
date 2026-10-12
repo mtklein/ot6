@@ -16,16 +16,22 @@
 -- PHANTOM UNICORN.  MADUIN and UNICORN are rendered for stones the save
 -- owns, with no inventory write.
 --
--- One labeled isolation arm: the TERRATO page is the page's empty control
--- (Ot6EsperStatTbl $0000, no caption and no terms), and no stone this save
--- owns carries a $0000 row, so the single write below ORs Terrato's bit into
--- $1a69, adding one list row.
+-- Two labeled isolation arms.  The save owns no World of Ruin stone, so one
+-- write ORs Terrato's bit into $1a69, adding one list row.  And since #418
+-- no row of Ot6EsperStatTbl is $0000, so the page's empty control (no
+-- caption and no terms) is constructed: Terrato's two table bytes are zeroed
+-- in the emulator's ROM image for one visit and put back after it.  The
+-- control visit comes right after a visit to Terrato's real row, so it also
+-- shows a revisit overwriting three terms already on screen.
 --
--- The three pages:
+-- The pages, in order:
 --   MADUIN  (6)  three spell rows Fire / Ice / Bolt, and a three-term stat
 --                block: vigor -3, stamina +3, mag.pwr +7.  Speed is zero and
 --                costs no line.
---   TERRATO (4)  the no-mod control: no caption and no term anywhere.
+--   TERRATO (4)  Quake / Quartr, and its #418 package: speed -3, stamina +4,
+--                mag.pwr +6 (vigor zero, no line).
+--   TERRATO (4)  the no-mod control, its row zeroed: no caption and no term
+--                anywhere.
 --   UNICORN (23) the Pearl grant.  Two spell rows (Pearl, Remedy); rows 3-5
 --                are blank.  Its stat block is the two-term shape (stamina
 --                +5, mag.pwr +2) with no downside.
@@ -98,6 +104,23 @@ local STAT = {
 
 local function st() return H.readByte(ZMENUSTATE) end
 
+-- Terrato's Ot6EsperStatTbl row: the ROM image offset (HiROM, headerless)
+-- and the CPU-bus address the menu reads it through.
+local STATTBL = H.sym("Ot6EsperStatTbl")
+local TERRATO_ROW_ROM = (STATTBL & 0x3FFFFF) + 2 * TERRATO
+local TERRATO_ROW_BUS = STATTBL + 2 * TERRATO
+local function rowBus()
+  return emu.read(TERRATO_ROW_BUS, emu.memType.snesMemory),
+    emu.read(TERRATO_ROW_BUS + 1, emu.memType.snesMemory)
+end
+-- the second isolation arm (header): one write site, both bytes
+local function setTerratoRow(b0, b1)
+  for i, v in ipairs({ b0, b1 }) do
+    emu.write(TERRATO_ROW_ROM + i - 1, v, emu.memType.snesPrgRom)
+  end
+end
+local terratoRow = nil              -- the shipped bytes, read before the patch
+
 -- Walk the esper list cursor onto the slot holding esper `idx`.  Two-column
 -- grid: $4b is a linear slot index whose parity is the column, so down/up
 -- move by 2 and a parity change needs a left/right press first.
@@ -147,9 +170,11 @@ local function assertRow(tag, slot, want, label)
 end
 
 -- An unused spell slot: DrawGenjuMagicName blanks all 15 tiles of the field.
-local function assertRowEmpty(tag, slot)
+-- On a row a stat term also uses, the term owns cols 17-19, so pass
+-- lastX = 16 there; the term's own assertions cover the rest.
+local function assertRowEmpty(tag, slot, lastX)
   local y = 17 + slot * 2
-  for x = 5, 19 do
+  for x = 5, lastX or 19 do
     H.assertEq(cell(x, y), BLANK,
       string.format("%s: row %d empty at {%d,%d}", tag, slot + 1, x, y))
   end
@@ -318,14 +343,49 @@ add({ H.call(function()
   logPage("terrato")
   assertRow("terrato", 0, NAME.QUAKE,  "Quake (magicite.md's WoR list, #327)")
   assertRow("terrato", 1, NAME.QUARTR, "Quartr (magicite.md's WoR list, #327)")
-  assertRowEmpty("terrato", 2)
+  assertRowEmpty("terrato", 2, 16)          -- term 2 (Mag.Pwr) shares this row
   assertRowEmpty("terrato", 3)
   assertRowEmpty("terrato", 4)
-  assertCaption("terrato", false)
-  for slot = 0, 4 do assertTermRowBlank("terrato", slot) end
+  assertCaption("terrato", true)
+  assertTerm("terrato", 0, STAT.SPEED,   "Speed",   CH_MINUS, 3)
+  assertTerm("terrato", 1, STAT.STAMINA, "Stamina", CH_PLUS,  4)
+  assertTerm("terrato", 2, STAT.MAGPWR,  "Mag.Pwr", CH_PLUS,  6)
+  assertTermRowBlank("terrato", 3)
+  assertTermRowBlank("terrato", 4)
   assertOldLineGone("terrato")
   H.screenshot("esper_detail_terrato_tube6")
-  H.log("TERRATO: still the no-mod control after #62; no caption, no terms")
+  H.log("TERRATO: Quake / Quartr; Speed -3 / Stamina +4 / Mag.Pwr +6 (#418)")
+end) })
+add(backToList())
+
+-- the no-mod control: Terrato's row zeroed for this one visit (header)
+add({ H.call(function()
+  local b0, b1 = rowBus()
+  H.assertEq(b0 | b1 ~= 0, true,
+    string.format("Terrato's shipped row is a package ($%02x%02x), not $0000", b0, b1))
+  terratoRow = { b0, b1 }
+  setTerratoRow(0, 0)
+  local z0, z1 = rowBus()
+  H.assertEq(z0 | z1, 0, "the patched row reads $0000 through the CPU bus")
+  H.log(string.format("[isolation arm] Terrato's row $%02x%02x -> $0000 in the ROM image "
+    .. "for the control visit", b0, b1))
+end) })
+add(page(TERRATO, "Terrato (no-mod control)"))
+add({ H.call(function()
+  H.assertEq(H.readByte(Z99), TERRATO, "detail page is TERRATO's (control)")
+  logPage("terrato-control")
+  assertRow("terrato-control", 0, NAME.QUAKE,  "Quake")
+  assertRow("terrato-control", 1, NAME.QUARTR, "Quartr")
+  assertCaption("terrato-control", false)
+  for slot = 0, 4 do assertTermRowBlank("terrato-control", slot) end
+  assertOldLineGone("terrato-control")
+  H.screenshot("esper_detail_terrato_nomod")
+  H.log("TERRATO with a $0000 row: no caption, no terms; the three terms of the "
+    .. "visit before are gone")
+  setTerratoRow(terratoRow[1], terratoRow[2])
+  local r0, r1 = rowBus()
+  H.assertEq(r0 == terratoRow[1] and r1 == terratoRow[2], true,
+    string.format("Terrato's row restored ($%02x%02x)", r0, r1))
 end) })
 add(backToList())
 

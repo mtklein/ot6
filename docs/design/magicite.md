@@ -25,8 +25,8 @@ Five slots, all data-table work:
    `UpdateEquipBattle`); the learnable half is not built. It follows
    Octopath's Support-Skill shape: a large bump that does not
    compound. Octopath sizes these at about +50 on a 999-scale stat;
-   translate to FF6's stat ranges at tuning, so the roster
-   magnitudes below are placeholders.
+   the roster tables below give the packages as built, in FF6's
+   ranges, and #328 (v1.0) reviews every one.
 3. **Passive** — active while equipped, and **teachable ✦**: carry
    the esper long enough and its passives are learned. They join
    the character's permanent passive pool and can be slotted even
@@ -58,26 +58,27 @@ and the passives are the part of that job the character keeps.
 
 **Ifrit and Shiva** are built; `docs/design/magicite-ifrit-shiva.md` is the
 authority for both, alongside the data in `ff6/src/menu/genju_prop.asm` and
-`Ot6EsperStatTbl` (`ff6/src/battle/ot6_progression.asm`). Every other row
-describes the *proposed* system, not the shipped one.
+`Ot6EsperStatTbl` (`ff6/src/battle/ot6_progression.asm`). For every other
+row, the Spells and Stat columns are built (below) and the Passive and
+Permit columns describe the *proposed* system, not the shipped one.
 
-| Esper | Source | Spells (base) | Stat passive | Passive | Permit | Notes |
+| Esper | Source | Spells (base) | Stat vig/spd/stm/mag | Passive | Permit | Notes |
 |---|---|---|---|---|---|---|
-| Ramuh | Zozo | Bolt, Rasp | +1 magic | *Conductor*: bolt spells chip +1 | piercing | the storm-lancer job |
-| Kirin | Zozo | Cure, Regen | +1 stamina | *Mender*: heals never miss the row | — | the medic job |
-| Stray | Zozo | Muddle, Imp | +1 speed | *Alley Cat*: +5 evade | slashing (claws) | the trickster job |
-| Siren | Zozo | Mute, Sleep | +1 speed | *Lullaby*: sleepers take +50% chip | — | the controller job |
-| Ifrit | Magitek factory | Fire, Drain | magicite-ifrit-shiva.md §4.2 | none, deliberately | none, deliberately | **"the Furnace": weight** |
-| Shiva | Magitek factory | Ice, Osmose, **Shell** | magicite-ifrit-shiva.md §5.2 | none, deliberately | none, deliberately | **"the Rime": economy** |
-| Unicorn | tube room | Remedy, Safe | +1 stamina | *Purity*: status durations halved | — | the paladin-adjacent |
-| Maduin | tube room | Fire, Ice, Bolt | +2 magic | *Trinity*: first spell each battle +1 tier | — | Terra's inheritance: the pure mage job |
-| Shoat | tube room | Break, Doom | +1 magic | *Gorgon Eye*: the stone's Break is the class-blind chip (one shield, one more a boost point; #398) -- no passive; a monster's Break (and Control, Sketch, a Rage) keeps vanilla's petrify, as monsters' Life 3 keeps vanilla's | — | the executioner (Doom) and the breaker (Break) |
-| Phantom | tube room | Vanish, Sleep | +1 speed | *Ghostwalk*: first hit taken each battle misses | — | the assassin's second |
-| Carbunkl | tube room | Rflect, Shell | +1 stamina | *Facet*: Runic feeds +1 more BP | — | Celes's natural pairing |
-| Bismark | tube room | Slow, (Water lore-alike) | +1 vigor | *Tidal*: water chip +1 | — | see open Q2 |
-| Golem | Jidoor auction | Safe, Protect-alike | +2 stamina | *Bulwark*: party takes −10% physical | piercing | the wall job |
-| ZoneSeek | Jidoor auction | Shell, Haste | +1 magic | *Ward*: magic taken −10% (party) | — | the abjurer |
-| Sraphim | Tzen (buy) | Cure, Life | +1 stamina | *Grace*: KO'd allies keep their BP | — | the white-mage job |
+| Ramuh | Zozo | Bolt, Rasp | 0 / 0 / +4 / +2 | *Conductor*: bolt spells chip +1 | piercing | the storm-lancer job |
+| Kirin | Zozo | Cure, Regen | 0 / 0 / +2 / +4 | *Mender*: heals never miss the row | — | the medic job |
+| Stray | Zozo | Muddle, Imp | 0 / +2 / 0 / +4 | *Alley Cat*: +5 evade | slashing (claws) | the trickster job |
+| Siren | Zozo | Mute, Sleep | 0 / +4 / 0 / +2 | *Lullaby*: sleepers take +50% chip | — | the controller job |
+| Ifrit | Magitek factory | Fire, Drain | +6 / 0 / +4 / −3 | none, deliberately | none, deliberately | **"the Furnace": weight** |
+| Shiva | Magitek factory | Ice, Osmose, **Shell** | −3 / +4 / 0 / +6 | none, deliberately | none, deliberately | **"the Rime": economy** |
+| Unicorn | tube room | Remedy, Safe | 0 / 0 / +5 / +2 | *Purity*: status durations halved | — | the paladin-adjacent |
+| Maduin | tube room | Fire, Ice, Bolt | −3 / 0 / +3 / +7 | *Trinity*: first spell each battle +1 tier | — | Terra's inheritance: the pure mage job |
+| Shoat | tube room | Break, Doom | −2 / +6 / +2 / 0 | *Gorgon Eye*: the stone's Break is the class-blind chip (one shield, one more a boost point; #398) -- no passive; a monster's Break (and Control, Sketch, a Rage) keeps vanilla's petrify, as monsters' Life 3 keeps vanilla's | — | the executioner (Doom) and the breaker (Break) |
+| Phantom | tube room | Vanish, Sleep | 0 / +6 / −2 / +2 | *Ghostwalk*: first hit taken each battle misses | — | the assassin's second |
+| Carbunkl | tube room | Rflect, Shell | 0 / −2 / +6 / +2 | *Facet*: Runic feeds +1 more BP | — | Celes's natural pairing |
+| Bismark | tube room | Slow, (Water lore-alike) | +5 / −2 / +3 / 0 | *Tidal*: water chip +1 | — | see open Q2 |
+| Golem | Jidoor auction | Safe, Protect-alike | 0 / −2 / +5 / 0 | *Bulwark*: party takes −10% physical | piercing | the wall job |
+| ZoneSeek | Jidoor auction | Shell, Haste | 0 / 0 / +2 / +3 | *Ward*: magic taken −10% (party) | — | the abjurer |
+| Sraphim | Tzen (buy) | Cure, Life | 0 / 0 / +4 / +2 | *Grace*: KO'd allies keep their BP | — | the white-mage job |
 
 The tube room grants Unicorn, Maduin, Shoat, Phantom, Carbunkl and Bismark
 together, in one scene; see `magicite-tube-six.md`.
@@ -86,8 +87,11 @@ The **Spells** column ships for every row (#305): each stone grants exactly
 its listed spells, except the tube room's six, which grant the lists in
 `magicite-tube-six.md` §11, and Golem, whose "Protect-alike" names no FF6
 spell, so it grants Safe alone. `tools/check_spell_grants.py` checks this on
-the built ROM. The other columns of every row but Ifrit's and Shiva's are
-still proposals.
+the built ROM. The **Stat** column ships for every row too: it is
+`Ot6EsperStatTbl`'s row (vigor, speed, stamina, mag.pwr; vigor reads
+doubled in battle), and the same script checks it against the built ROM. The
+Passive and Permit columns of every row but Ifrit's and Shiva's are still
+proposals.
 
 The World of Ruin stones grant the lists in the last section's table
 (#327), checked the same way.
@@ -128,8 +132,9 @@ Slow 2, Haste2), a while-worn stat package in `Ot6EsperStatTbl`'s four signed
 nibbles, and the vanilla summon kept as the summon, unchanged. There is no
 passive or permit channel, so none is planned.
 
-**What ships.** The Spells column. The stat column is still a proposal:
-`Ot6EsperStatTbl`'s rows for these twelve are zero (no while-worn change).
+**What ships.** The Spells column and the stat column (#418):
+`Ot6EsperStatTbl`'s rows for these twelve are the packages below, and
+`check_spell_grants.py` holds both columns to the built ROM.
 
 **Every base spell has a source.** The route lands in the World of Ruin with
 twelve stones (Ramuh, Ifrit, Shiva, Siren, Shoat, Maduin, Bismark, Stray,
@@ -200,8 +205,7 @@ on the way was not walked. Terrato's event is followed by
 The route's milestones (GitHub, v0.27-v0.39) and the stop that grants each
 stone.  The milestone leads each row so that `check_spell_grants.py`, which
 reads rows led by an Esper's name, keeps to the table above.  The lists are
-that table's; the stat column ships when the
-stones' packages are built (below).
+that table's, and so are the stat packages (built, #418).
 
 | milestone | Esper | stop | met with |
 |---|---|---|---|
@@ -238,13 +242,15 @@ What the arcs need from them (`level-curve.md`, "The World of Ruin"):
   Cave (two parties) and Kefka's Tower (three) are where a second medic
   (Starlet) and a second caster (Tritoch) earn their copies.
 
-**Bonuses.**  The stat column above is a plan; `Ot6EsperStatTbl` holds
-zero for all twelve (`ot6_progression.asm:530-552`), and #328 (v1.0)
-reviews every package.  Build the twelve rows as one data change before
-v0.27 ships, so Palidor's and Fenrir's menu pages show a package from the
-first stone on.  Terrato's row is `menu_esperdetail_tube6`'s no-mod
-control today (`; 4 terrato (no-mod control; leave at $0000)`), so that
-change moves the control (to an unequipped slot).
+**Bonuses.**  The stat column above is built (#418): the twelve rows of
+`Ot6EsperStatTbl` (`ot6_progression.asm`) are those packages, so Palidor's
+and Fenrir's menu pages show a package from the first stone on, and #328
+(v1.0) reviews every package.  `battle_esperstats_wor` equips each of the
+twelve and reads its four deltas in battle (red on the pre-#418 table and
+on one-nibble mutants: `build/attempts/wt/v027-esper-stats/lab/`).  No row of the table is `$0000`
+any more, so `menu_esperdetail_tube6`'s no-mod control (Terrato's row until
+#418) now zeroes Terrato's row in the emulator's ROM image for one page
+visit, beside a visit to the real row.
 
 ### Why each list
 
@@ -437,8 +443,6 @@ does not, and some try drew again.
 
 ### Open questions for the owner
 
-1. **Stat packages.** The stat column above is not built; the twelve rows of
-   `Ot6EsperStatTbl` are zero.
-2. **Verbs that boost cannot touch.** This table carries twelve verbs outside
+1. **Verbs that boost cannot touch.** This table carries twelve verbs outside
    both boost axes. Whether BP should buy duration or certainty on them is
    DESIGN.md's open canon, not this table's to settle.

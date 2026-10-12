@@ -39,3 +39,9 @@ Figaro; Debilitator is sold in Vector's weapon shop after the banquet.
 **Phunbaba has shields.** In Mobliz, blunt and Special attacks hit his
 weak points in every fight the party joins, and Terra's sword does too in
 the last one. Terra's solo fight shows no shields.
+
+**World of Ruin Espers change stats.** The twelve Espers found in the
+World of Ruin now change their holder's stats while equipped, as the
+World of Balance Espers already do; the Esper's page in the menu shows
+the change. Palidor gives +2 Vigor and +4 Speed. Fenrir gives +6 Speed
+and +4 Mag.Pwr, and -3 Stamina.

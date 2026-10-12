@@ -68,6 +68,7 @@ tools/tests/battle_dotchip.lua	.writeByte(	39
 tools/tests/battle_dotchip.lua	.writeWord(	4
 tools/tests/battle_esperstats.lua	.writeByte(	1
 tools/tests/battle_esperstats_tube6.lua	.writeByte(	1
+tools/tests/battle_esperstats_wor.lua	.writeByte(	2	quarantine: #418 mechanism test -- the twelve World of Ruin stones' bits OR'd into $1A69 on a World of Balance fixture so the menu lists them, and the party's worn stones bared (battle_esperstats_tube6's shape); every equip after that is menu input, and the property is each stone's stat row in battle, not play
 tools/tests/battle_fleesolo.lua	.writeByte(	1	quarantine: #245 mechanism staging -- two members are poked dead (hp=0 + STATUS1 $80, the engine's own corpse shape) under a third's open Item list, because a natural double death under an open list is a roll no fixture near a save point makes on cue; the property under test is the flee step's read of the window and the engine's own run counter
 tools/tests/battle_fleesolo.lua	.writeWord(	1	quarantine: #245 mechanism staging, same reason as its writeByte line
 tools/tests/battle_fontrestore.lua	.writeByte(	1	quarantine: deliberate VRAM corruption for the font-restore path (owner-named)
@@ -123,6 +124,7 @@ tools/tests/lib/ot6.lua	emu.write	1
 tools/tests/lib/ot6.lua	emu.writeWord	1
 tools/tests/menu_blitzpage.lua	.writeByte(	1
 tools/tests/menu_esperdetail_tube6.lua	.writeByte(	1
+tools/tests/menu_esperdetail_tube6.lua	emu.write	1	quarantine: #418 constructed control -- no Ot6EsperStatTbl row is $0000 since #418, so Terrato's two bytes are zeroed in the emulator's ROM image for one detail-page visit and put back after it; the property is that a $0000 row draws no caption and no term
 # menu_lorepage.lua (#122): unit-style expedient, the menu_ragepage.lua
 # precedent.  Strago is unreachable by play until the v0.13 route lands (he
 # joins in that unrouted stretch), so no savestate in the chain contains him;
