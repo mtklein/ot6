@@ -179,8 +179,7 @@ def log_tree(log):
 # (live1.html) for that worker.
 GRID_PAGE = """<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OT6 workers</title>
 <body style="margin:0;background:#111;color:#cdc;font:13px ui-monospace,monospace">
-<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 14px">
-<b style="font-size:16px">live workers</b>
+<div style="display:flex;justify-content:flex-end;padding:10px 14px">
 <a href="progress.html" style="color:#8ac">route map &rarr;</a></div>
 <div id=machines style="padding:0 14px 10px;line-height:1.6"></div>
 <div id=grid style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;padding:0 14px 18px"></div>
