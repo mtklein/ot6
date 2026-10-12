@@ -1296,7 +1296,14 @@ done:   rts
         bra     @scan
 @hit:   lda     f:Ot6SkillClassTbl+1,x
         bra     @store
-@miss:  lda     #$00
+@miss:  lda     $b5             ; Umaro's Charge ($23) and Throw ($24),
+        cmp     #$23            ;   the two commands only his chooser
+        beq     @club           ;   sets (#380, ot6_umaro.asm): no weapon
+        cmp     #$24            ;   or spell gives them a class, and a
+        beq     @club           ;   body slammed or an ally hurled is a
+        lda     #$00            ;   club's blow
+        bra     @store
+@club:  lda     #OT6_BLUDG
 @store: sta     f:$7e0000+OT6_ATKCLASS
         pla
         plx

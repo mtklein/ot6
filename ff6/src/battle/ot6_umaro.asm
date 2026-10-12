@@ -8,9 +8,10 @@
 ; Ot6UmaroRetaliate), so a full boost for him is a dump of all three points.
 ; Two things here make that a kit:
 ;
-;   * Charge and Throw are bludgeoning.  Neither loads a weapon or a spell
-;     record, so neither set an attack class, and each chipped with whatever
-;     class the last attack loaded left behind.  A body slammed or an ally
+;   * Charge and Throw are bludgeoning (Ot6SkillClass, ot6_break.asm, by
+;     their commands $23/$24 in $b5).  Each pass loads the "battle" record,
+;     which is classless, and neither swings a weapon, so neither chipped
+;     anything.  A body slammed or an ally
 ;     hurled is a club's blow.  His Fight takes his weapon's class (a Bone
 ;     Club, or bare fists: bludgeoning) and Storm its element (ice), as they
 ;     did.
@@ -26,7 +27,7 @@
 
 .segment "ot6_code"
 
-; [ Umaro's chooser: the arm mask, the divine, and Charge/Throw's class ]
+; [ Umaro's chooser: the arm mask and the divine ]
 ; jsl from _163b (battle_main.asm) in place of `lda $fe / tax / ora #$30`,
 ; after the relic tests built $fe ($04 Rage Ring, $08 Blizzard Orb) and
 ; before RandBitWithRate rolls the arm.  out: X = the rate-table row (vanilla:
@@ -38,8 +39,6 @@
 ; offset, db=$7e.
 .proc Ot6UmaroArm
         .a8
-        lda     #OT6_BLUDG      ; Charge and Throw: a club's blow (Fight and
-        sta     f:$7e0000+OT6_ATKCLASS  ; Storm load their own over it)
         xba
         lda     #$00
         xba                     ; B = 0, so each tax below is the byte

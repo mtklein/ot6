@@ -88,6 +88,14 @@ local function installObservers()
     if T.arm == 0 or T.arm == 2 then T.classes[#T.classes + 1] = H.readByte(ATKCLASS) end
   end, emu.callbackType.exec, sExec, sExec)
 
+  if UMARO_TRACE then
+    emu.addMemoryCallback(function(_, v)
+      if T == nil or T.done then return end
+      local st = emu.getState()
+      H.log(string.format("[trace] f%d $57B8 <- %02X at $%02X%04X (arm %s)", H.frame, v, st["cpu.k"], st["cpu.pc"],
+        tostring(T.arm)))
+    end, emu.callbackType.write, 0x7E57B8, 0x7E57B8)
+  end
   local sAE = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
     if T == nil or T.arm == nil or T.done then return end

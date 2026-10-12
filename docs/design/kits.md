@@ -959,9 +959,11 @@ what a full boost buys.
 | Storm | with the Blizzard Orb | ice, every enemy | the damage multiplier |
 | **Storm** (divine) | a dump of all three points, relic or not | ice, every enemy | x8 |
 
-- **Charge and Throw bludgeon** (`Ot6UmaroArm`, at the chooser).  Neither
-  loads a weapon or a spell record, so neither set an attack class, and each
-  chipped with whatever class the last attack loaded left behind.  A body
+- **Charge and Throw bludgeon** (`Ot6SkillClass`, by the commands only
+  his chooser sets, `$b5` = `$23`/`$24`).  Each pass loads the classless
+  "battle" record and swings no weapon, so before #380 neither chipped
+  anything (measured: class `$00` at every Charge pass,
+  build/attempts/wt/v028-kits/umaro/r1).  A body
   slammed or an ally hurled is a club's blow; Fight and Storm load their own
   class or element over it, as before.
 - **The boost** is the retaliation dump (#236/#237, `Ot6UmaroRetaliate`): he

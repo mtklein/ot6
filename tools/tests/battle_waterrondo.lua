@@ -415,6 +415,7 @@ local body = {
     rec = nil
   end),
   backToCmd("A: back out of the list"),
+  raiseBoost(0, "A: L back to pending 0, so the Defends bank"),
 
   -- ---- B. three points: the divine never stumbles --------------------------
   mogDefends("B: MOG Defends (a point banked)"),
