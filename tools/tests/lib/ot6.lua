@@ -13471,7 +13471,8 @@ end
 --      round3/sweep-strictI/r4_new_k4.log);
 --   H. a pass that starts on a party member spreads to no other one: it
 --      lands on that member or nowhere;
---   E. a Setzer row runs 1 + boost passes.
+--   E. a Setzer coin row runs 1 + boost passes, and a Jackpot (always at
+--      3 BP) its fixed M.JACKPOT_ROLLS.
 -- And vanilla's own: an unboosted two-hand Fight (a Genji pair, two
 -- passes) keeps vanilla's rule, its second hand swinging at the body the
 -- first hand felled.
@@ -13486,8 +13487,11 @@ function M.passCheck(a, check, note, tag)
     a.ab and string.format(" (id $%02X)", a.ab) or "", a.offering and " (Offering)" or "", #a.passes, a.key or "?",
     table.concat(lines, "; ")))
   if a.cmd == 0x0F and a.row and PASS_ROW[a.row] and a.boost >= 1 then
-    check(#a.passes, 1 + a.boost, string.format("E: %s at %d BP runs 1 + boost passes", a.kind, a.boost), a.kind,
-      a.key)
+    -- Jackpot's full boost buys a fixed throw of M.JACKPOT_ROLLS rolls; the
+    -- coin rows buy one pass a point
+    local want = a.row == 0x5B and M.JACKPOT_ROLLS or 1 + a.boost
+    check(#a.passes, want, string.format("E: %s at %d BP runs %s passes", a.kind, a.boost,
+      a.row == 0x5B and "Jackpot's fixed" or "1 + boost"), a.kind, a.key)
   end
   local famN = 0
   for _, q in ipairs(a.passes) do if q.b5 ~= 0x02 then famN = famN + 1 end end

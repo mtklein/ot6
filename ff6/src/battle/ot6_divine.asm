@@ -172,7 +172,8 @@ done:   plp
 ; the attack as it was: an attacker who is not Shadow (char id $03, $3ed8
 ; keyed by the entity offset since offset = slot*2), an action boosted by
 ; fewer than three points (OT6_BOOST_REVEALED, still pending until
-; Ot6ActionEnd charges it), a character target, an unbroken target, or a
+; Ot6ActionEnd charges it), a counterattack (Interceptor's, which no
+; ActionEnd charges), a character target, an unbroken target, or a
 ; boss ($3aa1 bit 2, the instant-death protection ScimitarEffect reads;
 ; Death cannot kill it).
 ;
@@ -201,6 +202,10 @@ done:   plp
         lda     OT6_BOOST_REVEALED,x
         cmp     #$03            ; the divine's one gate: a full 3-BP boost
         bcc     done            ;   on the action this hit belongs to
+        lda     $b1             ; ...and not a counterattack (Interceptor's
+        lsr                     ;   bite, $b1.0): a counter is no action of
+        bcs     done            ;   his, and a boost raised in his open menu
+                                ;   is not spent on it
         tya                     ; target entity offset, width-neutral test
         cmp     #$08
         bcc     done            ; a character target: not an enemy
