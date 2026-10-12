@@ -112,22 +112,22 @@ done:   plp
 ; [ a SwdTech picked at random: never Cleave ]
 ;
 ; RandBushido (battle_main.asm) picks a random known tech for a Muddled or
-; Charmed Cyan and at the Colosseum: vanilla's range is 0..$2020 (the
-; highest tech known).  Cleave (tech 7, attack $5c) is the divine, whose one
-; gate is a full 3-BP boost, and a random pick spends none, so the range
-; stops at tech 6 (Quadra Slice).  The Mimic exception (kits.md "Divines":
-; a Gogo's copy of a Cleave is free) is a copy, not a pick, and is untouched.
+; Charmed Cyan and at the Colosseum: vanilla's range is 0..$2020, every tech
+; known, which assumed the techs are learned in order.  Cleave (tech 7,
+; attack $5c) is the divine, whose one gate is a full 3-BP boost, and a
+; random pick spends none; and since #379 Cleave is learned at the Phantom
+; Train farewell, ahead of the techs between, so vanilla's range would also
+; reach techs he does not know (Dispatch..Quadra Slam plus Cleave counts 5,
+; and 0..4 names Empowerer).  The range is the run of techs 0..6 he knows,
+; Ot6BushidoCeil's ceiling + 1: Cleave out, and nothing unlearned in.  The
+; Mimic exception (kits.md "Divines": a Gogo's copy of a Cleave is free) is a
+; copy, not a pick, and is untouched.
 ; jsl in place of `lda $2020 / inc`.  a8, db = $7e.  out: A = the number of
-; techs the pick ranges over (RandA's bound).  rtl.
-OT6_CLEAVE_TECH = 7
-
+; techs the pick ranges over (RandA's bound, 1..7).  rtl.
 .proc Ot6RandBushidoTop
         .a8
-        lda     $2020           ; the highest tech known (0-7)
-        cmp     #OT6_CLEAVE_TECH
-        bcc     :+
-        lda     #OT6_CLEAVE_TECH - 1    ; Cleave known: the pick stops below it
-:       inc     a
+        jsl     Ot6BushidoCeil  ; the highest tech of the run (0-6)
+        inc     a
         rtl
 .endproc
 

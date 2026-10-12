@@ -599,6 +599,8 @@ set_script_mode EVENT
 .define remove_equip(char_id) _e_cmd_byte $8d, EVENT_OBJ::char_id
 .define give_bushido _e_cmd_impl $8f
 .define give_blitz _e_cmd_impl $90
+; OT6 (#379): learn the SwdTech n (0-7); $9e was unused in vanilla
+.define give_bushido_tech(n) _e_cmd_byte $9e, 1 << (n)
 
 .mac wait_15f dur
         .ifblank dur

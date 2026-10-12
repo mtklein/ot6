@@ -36,20 +36,96 @@
 ; is bank-agnostic.  With the word = 0 the battle path is unchanged.
 ; ==============================================================================
 
-; [ Bushido ceiling: techs-known-minus-1, read safe ]
+OT6_CLEAVE_TECH = 7             ; Cleave, Cyan's divine: SwdTech tech 8
+
+; [ Bushido ceiling: the highest non-divine tech known, read safe ]
 ; InitSkills stores $2020 with a 16-bit `stx` over CountBits's uninitialized
 ; high byte ($ff02 in the Doma solo fight, $ffff before Cyan joins); read as a
 ; word, the junk high byte made even a real 2-tech ceiling `>= 8` and collapse
 ; to 0, pinning Cyan to Dispatch. Read a8 the junk is ignored, and an
 ; unlearned $ff (low byte) still trips >= 8 into the nothing-learned path.
-; a8.  out: A = ceiling (0..7).  preserves X and Y.
+;
+; $2020 is vanilla's count of every tech known, minus 1.  Cleave (tech 7) is
+; learned by story at the Phantom Train farewell (#379), long before the
+; techs between, so the count includes a tech that is not at the top of a
+; contiguous run: Dispatch..Quadra Slam plus Cleave counts 5, and a ceiling
+; of 4 would name Empowerer, which he does not know.  So Cleave is taken out
+; of the count here, and the ceiling is that of techs 0..6, which the level
+; table teaches in order; Cleave stands apart, on the 3-BP row only
+; (Ot6BushidoPick).  Capped at 6 for the same reason: tech 7 is never a
+; window tech by index.
+; a8.  out: A = ceiling (0..6).  preserves X and Y.
 .proc Ot6BushidoCeil
         .a8
         lda     $2020           ; techs known - 1, low byte only
         cmp     #$08
-        bcc     :+
-        lda     #$00            ; nothing learned: only tech 0 (Dispatch) exists
-:       rtl
+        bcs     @none           ; nothing learned: only tech 0 (Dispatch) exists
+        pha
+        lda     f:$7e1cf7
+        bpl     :+              ; Cleave not known: the count is the run's
+        lda     $01,s
+        beq     :+              ; (Cleave alone: the run is Dispatch's 0)
+        dec     a               ; Cleave out of the count
+        sta     $01,s
+:       pla
+        cmp     #OT6_CLEAVE_TECH
+        bcc     @out
+        lda     #OT6_CLEAVE_TECH - 1
+@out:   rtl
+@none:  lda     #$00
+        rtl
+.endproc
+
+; [ the window's pick: boost -> tech, given the ceiling and Cleave ]
+; One leaf for the battle (Ot6BushidoTech's AUTO arm) and the field
+; configurator (Ot6LoadoutAutoTech), so the two cannot pick differently.
+;   Cleave not known: the moving window of three, Cyan's top three techs,
+;     weakest -> strongest: base = max(0, ceiling-2), tech = min(base +
+;     boost-1, ceiling).
+;   Cleave known (#379): the 3-BP row is Cleave, the divine's one gate
+;     (kits.md "Divines"), and the 1- and 2-BP rows are his top two of the
+;     rest: base = max(0, ceiling-1), tech = min(base + boost-1, ceiling).
+;     At full kit that is Stunner / Quadra Slice / Cleave, the window it
+;     always was.
+; boost 0 is clamped to 1 (the menu never offers it).
+; a8/i16.  in: A = boost (0..3), X = ceiling (0..6) | $80 if Cleave is
+; known.  out: A = tech (0..7).  clobbers X.  preserves Y.
+.proc Ot6BushidoPick
+        .a8
+        .i16
+        cmp     #$01            ; the floor is 1 BP, clamp a stray 0 up
+        bcs     :+
+        lda     #$01
+:       pha                     ; park boost ($01,s)
+        txa
+        pha                     ; park ceiling|cleave ($01,s; boost $02,s)
+        bpl     @three          ; Cleave not known: three wide
+        lda     $02,s
+        cmp     #$03
+        bcc     @two            ; the 1- and 2-BP rows
+        lda     #OT6_CLEAVE_TECH ; the 3-BP row: Cleave
+        bra     @done
+@two:   lda     $01,s
+        and     #$7f
+        sta     $01,s           ; the ceiling alone
+        dec     a               ; ceiling - 1: the rest's window is two wide
+        bpl     @base
+        lda     #$00
+        bra     @base
+@three: sec
+        sbc     #$02            ; ceiling - 2: three wide
+        bcs     @base
+        lda     #$00            ; base floors at 0
+@base:  clc
+        adc     $02,s           ; base + boost
+        dec     a               ;   ... - 1 (boost >= 1 after the clamp)
+        cmp     $01,s           ; vs the ceiling
+        bcc     @done
+        lda     $01,s           ; cap at the ceiling
+@done:  sta     $02,s
+        pla                     ; drop the parked ceiling
+        pla                     ; A = tech
+        rtl
 .endproc
 
 ; [ Bushido moving window of three: boost -> tech ]
@@ -102,27 +178,19 @@
         pla                     ; A = tech (mirrors @auto's balanced tail)
         rtl
 @auto:
-        jsl     Ot6BushidoCeil  ; A = ceiling (preserves nothing we need)
-        pha                     ; park ceiling ($01,s ; boost now $02,s)
-        sec
-        sbc     #$02            ; ceiling - 2 (A still = ceiling); the window
-        bcs     :+              ;   is three tiers wide, not four
-        lda     #$00            ; ceiling < 2: base floors at 0 (the window is all
-:       ;                       ;   of {0..ceiling}, fewer than three techs)
-        clc
-        adc     $02,s           ; base + boost
-        dec     a               ;   ... - 1 -> the tentative tech (boost >= 1 is
-                                ;   guaranteed by the clamp at entry, so this
-                                ;   cannot underflow; dec leaves C alone for the
-                                ;   cmp below)
-        cmp     $01,s           ; vs the ceiling
-        bcc     :+
-        lda     $01,s           ; cap at ceiling; applies only when boost overruns
-:       ;                       ;   a <4-tech window (e.g. 3 bp, 3 techs known)
-        sta     $02,s           ; stash the chosen tech over the parked boost byte
-        pla                     ; drop the parked ceiling
-        pla                     ; a = chosen tech 0-7 (stack balanced)
-        rtl
+        jsl     Ot6BushidoCeil  ; A = ceiling (0..6)
+        pha                     ; park it ($01,s; the boost is $02,s)
+        lda     f:$7e1cf7
+        and     #$80            ; Cleave known?
+        ora     $01,s
+        sta     $01,s
+        pla                     ; A = ceiling | $80 if Cleave
+        longa
+        and     #$00ff
+        tax
+        shorta
+        pla                     ; A = boost (parked at entry)
+        jml     Ot6BushidoPick  ; its rtl returns for us
 .endproc
 
 .proc Ot6BushidoTier

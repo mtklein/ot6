@@ -224,8 +224,22 @@ H.run({ maxFrames = 20000 }, {
         levels = learnLevels(H.sym("BushidoLevelTbl")) },
     }
     local JOIN = 10
+    local story = 0
     for _, kit in ipairs(kits) do
       for i, r in ipairs(kit.rows) do
+       -- a row the level table never teaches (255: Cleave, learned at the
+       -- Phantom Train farewell, #379) has no level to measure against: it
+       -- is the 99 anchor (2b), and the price, not a level, says when it is
+       -- first paid for -- the level a pool first holds it is logged
+       if kit.levels[i] == 0xFF then
+        H.assertEq(r[2], ANCHOR, string.format("%s %s, learned by story, is the %d anchor",
+          kit.name, r[3], ANCHOR))
+        local first = nil
+        for l = 1, 99 do if first == nil and pool(kit.id, l) >= r[2] then first = l end end
+        H.log(string.format("%-8s %-13s by story; %d MP, first paid from a full pool at L%s",
+          kit.name, r[3], r[2], tostring(first)))
+        story = story + 1
+       else
         local lv = math.max(kit.levels[i], JOIN)
         local p = pool(kit.id, lv)
         local pct = 100 * r[2] / p
@@ -243,9 +257,11 @@ H.run({ maxFrames = 20000 }, {
         assert(math.floor(p / r[2]) >= MIN_USES, string.format(
           "%s %s affords only %d uses from a full LV%d pool", kit.name, r[3],
           math.floor(p / r[2]), lv))
+       end
       end
     end
-    H.log("ruler + payability hold for all 16 kit rows")
+    H.log(string.format("ruler + payability hold for all %d level-taught kit rows (%d by story)",
+      16 - story, story))
   end),
 
   H.call(function()

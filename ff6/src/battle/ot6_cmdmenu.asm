@@ -270,28 +270,27 @@
         .a8
         .i16
         lda     $575a           ; +5 = column-1 dance id (caller wrote it)
-        jsl     Ot6DanceRowCost ;   id -> cost (0 for an $ff empty cell)
-        pha                     ; park column-1 cost
-        jsl     Ot6AbilityGrey  ;   cost -> $04 grey / $00 white
+        jsl     Ot6DanceRowColor ;  id -> $04 grey / $00 white (the MP, and
+                                ;   Water Rondo's full boost, #380)
         ora     #$21
         sta     $5756           ; +1: font palette (colors cost + name)
         lda     #$04
         sta     $5755           ; +0: font command
         lda     #$02
         sta     $5757           ; +2: number command
-        pla
+        lda     $575a
+        jsl     Ot6DanceRowCost ;   id -> cost (0 for an $ff empty cell)
         sta     $5758           ; +3: column-1 cost value
         lda     $5760           ; +11 = column-2 dance id
-        jsl     Ot6DanceRowCost
-        pha                     ; park column-2 cost
-        jsl     Ot6AbilityGrey
+        jsl     Ot6DanceRowColor
         ora     #$21
         sta     $575c           ; +7: font palette
         lda     #$04
         sta     $575b           ; +6: font command
         lda     #$02
         sta     $575d           ; +8: number command
-        pla
+        lda     $5760
+        jsl     Ot6DanceRowCost
         sta     $575e           ; +9: column-2 cost value
         plp
         rtl
@@ -492,8 +491,7 @@
         php
         rep     #$10
         .i16
-        jsl     Ot6DanceRowCost
-        jsl     Ot6AbilityGrey
+        jsl     Ot6DanceRowColor ; the MP, and Water Rondo's full boost (#380)
         plp
         bra     Ot6ConfirmVerdict
 .endproc
@@ -714,7 +712,14 @@
         cpx     #$0018
         bcc     @pad
         ; --- rowcount-1 = min(2, ceiling): boost past the ceiling duplicates ---
-        jsl     Ot6BushidoCeil      ; A = ceiling (0..7)
+        ; (with Cleave known the 3-BP row is always Cleave, so three rows)
+        jsl     Ot6BushidoCeil      ; A = ceiling (0..6)
+        pha
+        lda     f:$7e1cf7
+        bpl     :+                  ; Cleave not known
+        lda     #$02
+        sta     $01,s               ; Cleave known: three rows
+:       pla
         cmp     #$03
         bcc     :+
         lda     #$02                ; cap the window at three rows (1x/2x/3x)
@@ -734,7 +739,19 @@
         tax                         ; X = write offset
         shorta0
         pla                         ; A = id (offset back at $01,s)
-        sta     $4005,x             ; wItemList::Index at row r's left cell
+        cpx     #$0000
+        beq     @put                ; row 0 has no row above it
+        cmp     $3fff,x             ; the row above's id (wItemList::Index - 6)
+        bne     @put
+        pha
+        jsl     Ot6LoadoutIsAuto    ; carry set = AUTO (a manual loadout may
+        pla                         ;   repeat a tech on purpose: it stands)
+        bcc     @put
+        lda     #$ff                ; the auto window's duplicate of the row
+                                    ;   above (Cleave known beside one tech of
+                                    ;   the run): the cell stays blank and
+                                    ;   unselectable
+@put:   sta     $4005,x             ; wItemList::Index at row r's left cell
         lda     $01,s               ; advance offset += 6 (one row)
         clc
         adc     #$06

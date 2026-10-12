@@ -663,7 +663,8 @@ check("shield_rows",
       ["tools/check_shield_rows.py", "build/ot6.sfc",
        "ff6/src/battle/ot6_hud.asm", "ff6/src/battle/ot6_break.asm"])
 check("break_reach", "python3 tools/check_break_reach.py",
-      ["tools/check_break_reach.py"] + glob("src/battle/ot6_*.asm", "ff6"))
+      ["tools/check_break_reach.py", "ff6/src/battle/battle_main.asm"]
+      + glob("src/battle/ot6_*.asm", "ff6"))
 # The $1600-$1FFF save block is a compatibility contract
 # (docs/design/save-layout.md): every OT6 symbol in it is documented at the
 # address and width the build assembled it at, no two fields overlap, and none

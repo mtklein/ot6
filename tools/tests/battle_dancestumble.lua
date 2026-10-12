@@ -23,8 +23,8 @@
 -- written.  Everything after that is real menus: in the second wave he
 -- takes the pip every character opens with, presses R once, and starts
 -- that dance.  His squad Defends.  The first command window is snapshotted
--- and branched (each branch idles 7 frames longer there, its own draw of the
--- 50% roll) at least MIN_BRANCHES times and until both outcomes, a stumble
+-- and branched (each branch idles 7 frames longer there and Defends (k-1) % 4
+-- turns first, its own draw of the 50% roll) at least MIN_BRANCHES times and until both outcomes, a stumble
 -- and a started dance, have been seen, at most MAX_BRANCHES.  Observed,
 -- never written: the stumble arm's execution (Cmd_13's `lda #$06 / sta
 -- $3401`, "Stumbled!!", found by its bytes so the same test runs on any
@@ -273,6 +273,27 @@ local function branch(k, wait)
       H.log(string.format("[dancestumble] branch %d: %d idle frames at MOG's window", k, wait))
     end),
     H.waitFrames(wait + 1),
+    -- the draw: MOG Defends (k-1) % 4 turns first, so monster turns and
+    -- ATB time move the battle RNG ($be) between branches; idling at his
+    -- window alone left it within a few entries of one place, and on the
+    -- fixture this ROM's play made every one of them stumbled (16 of 16,
+    -- $be $73-$AF, build/attempts/wt/v028-kits/px13-lab2/stumble/lab.out)
+    H.repeatN((k - 1) % 4, {
+      H.driveUntil(function()
+        return H.readByte(MENU) == 0 or H.readByte(ACTOR) ~= mogSlot
+      end, 1800, {
+        H.call(function()
+          ph = ph + 1
+          if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == mogSlot then
+            if pend(mogSlot) > 0 and H.readByte(MSTATE) == ST_CMD then
+              H.setPad(ph % 10 < 5 and { l = true } or {})
+            else bystander() end
+          else H.setPad({}) end
+        end),
+        H.waitFrames(1),
+      }, "MOG Defends (the draw)"),
+      mogMenu("MOG's next window"),
+    }),
     raiseBoost("R to boost " .. BOOST),
     openDance("the dance list opens"),
     H.waitFrames(20),
