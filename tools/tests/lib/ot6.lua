@@ -13009,6 +13009,8 @@ end
 --   { who = character id, cmd = command id, boost = 0..3,
 --     spell = id       the Magic list's cell holding this spell id (state $0E)
 --     row = id         a Tools-shell list's cell holding this id (state $30)
+--     direct = true    the list's A commits the action itself, with no target
+--                      select (SwdTech, Blitz)
 --     slot = s         aim at monster slot s (else any live monster)
 --     self = true      the target select is the party side (Morph, Runic):
 --                      confirm where the cursor stands
@@ -13017,7 +13019,9 @@ end
 --                      window stays up; after three refused presses the
 --                      entry is done (recorded refusedSeen) and the list, if
 --                      any, is backed out of
---     defend = true    a Defend, which banks a point }
+--     defend = true    a Defend, which banks a point
+--     peek = true      open the command's window (Magic or a Tools-shell
+--                      list), hand it to opts.onList, and back out }
 -- The bank is filled to the entry's boost by real Defends first, then R
 -- raises and L lowers the pending boost to exactly it.  Everyone else
 -- Defends while the plan has entries; after it, everyone Fights a live
@@ -13145,6 +13149,13 @@ function M.kitBattle(plan, opts)
       end
       if opts.onList and cool == 0 then opts.onList(p, a) end
       pulse("a")
+    elseif (st == 0x30 or st == 0x0E) and p.peek then
+      -- open the window, let the caller read it, back out
+      if cool == 0 then
+        if opts.onList then opts.onList(p, a) end
+        done(p, a, true)
+      end
+      pulse("b")
     elseif st == 0x30 and p.row ~= nil then
       local want
       for i = 0, 7 do if M.readByte(0x4005 + i * 3) == p.row then want = i end end
@@ -13157,6 +13168,7 @@ function M.kitBattle(plan, opts)
         if p.presses > 3 then done(p, a, true); pulse("b"); return end
       end
       if opts.onList and cool == 0 then opts.onList(p, a) end
+      if p.direct and cool == 0 then done(p, a) end
       pulse("a")
     elseif st == 0x38 then
       M.assertEq(p.refused == nil, true, string.format("entry %d (planned refused at the %s) reached target select",

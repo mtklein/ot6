@@ -60,8 +60,8 @@ tools/tests/battle_counterfold.lua	.writeByte(	5
 tools/tests/battle_dancemp.lua	.writeWord(	3
 tools/tests/battle_dancestumble.lua	.writeByte(	1	quarantine: #313 synthetic setup -- one off-terrain dance added to MOG's known-dance mask ($1D4C) between the defense's waves, because moogle_defense is the route's only MOG-with-Dance window and holds one terrain, so the vanilla stumble roll never runs by play; the property is that a stumbled boosted start charges no MP and spends no pips
 tools/tests/battle_dlgmenu.lua	.writeByte(	2	quarantine: #292 review, synthetic step -- one monster slot's shield-count upload planted pending mid-dialogue (OT6_SHWANT/OT6_SHPEND), because a count change landing while a battle dialogue is up is not a thing a fixture produces on cue; the property is that the nmi holds the upload until the dialogue and its re-lay are done
-tools/tests/battle_divines.lua	.writeByte(	3
-tools/tests/battle_divines.lua	.writeWord(	3
+tools/tests/battle_divines.lua	.writeByte(	1
+tools/tests/battle_divines.lua	.writeWord(	4
 tools/tests/battle_doom.lua	.writeByte(	5	quarantine: #190 mechanism staging -- Condemned is poked in the engine's own shape (STATUS2 $01 and the $3B05 count, all StartCondemn writes) because the route's only source is Nerapa on the FC escape; the property under test is the driver's read of the count.  Also zeroes the battle-bag Fenix Down (BATTINV $2686 count) so the condemned member's care decision is the heal #190 refuses, not a legitimate revive of the corpse doomedA's own Doom leaves
 tools/tests/battle_doom.lua	.writeWord(	1	quarantine: #190 mechanism staging -- the patient's HP is set to a third so the heal line has a member to refuse, battle_healerdown's shape
 tools/tests/battle_dotchip.lua	.writeByte(	39
