@@ -320,8 +320,11 @@ local function candidateBattle()
       for _ = 1, 3 do plan[#plan + 1] = { row = "defend" } end
       plan[#plan + 1] = { row = JACKPOT, boost = 3 }
       step = H.setzerBattle(plan, { untilPlanDone = true, othersFight = S.cur.othersFight })
-      wipedN, S.lost, S.execF = 0, nil, nil
+      wipedN, S.lost, S.execF, S.alive = 0, nil, nil, nil
     end
+    -- the live-monster mask ($3A75) while the battle is up: 0 at the end
+    -- means Dullahan fell (to the others' Fights, or the first Jackpot)
+    if H.battleActive() then S.alive = H.readByte(0x3A75) end
     wipedN = H.partyWipedInBattle() and wipedN + 1 or 0
     if wipedN >= 90 then
       S.lost = string.format("the party wiped (the lib's wipe predicate, 90 frames, at f%d)", H.frame)
@@ -357,9 +360,12 @@ local search = H.seqStep({
           S.lost, S.lostN))
         return
       end
-      H.assertEq(#recs >= 1 and (#recs == 2 or S.lost ~= nil), true, label .. ": both Jackpots resolved, or the "
-        .. "party fell after the first" .. (S.lost and string.format(" (exec seen at f%s, then %s)",
-        tostring(S.execF), S.lost) or ""))
+      if #recs == 1 and S.alive == 0 then
+        H.log(string.format("[jackpot] %s: Dullahan fell before the second Jackpot", label))
+      end
+      H.assertEq(#recs >= 1 and (#recs == 2 or S.lost ~= nil or S.alive == 0), true, label .. ": both Jackpots "
+        .. "resolved, or the party or Dullahan fell after the first" .. (S.lost and string.format(
+        " (exec seen at f%s, then %s)", tostring(S.execF), S.lost) or ""))
       H.assertEq(S.execF ~= nil, true, label .. ": the exec hook saw this Jackpot (the lost-candidate check reads it)")
       local got = { empty = 0, redraws = 0 }
       local sig = {}
