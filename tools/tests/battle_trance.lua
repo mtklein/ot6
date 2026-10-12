@@ -95,10 +95,25 @@ local function arm()
 end
 
 local function lastEnd() return ends[#ends] end
+-- the party is in trouble: a member down or under a third of max HP.  A
+-- step does not start then, and one under way is let go (the route's
+-- driver plays the battle out and the step waits for the next battle):
+-- holding a battle up with Defends while two Ninjas cut the party down
+-- wiped it (build/attempts/wt/v029-kits/r7/new__battle_trance_k3.out)
+local function danger()
+  for s = 0, 3 do
+    if (H.readByte(0x3AA0 + s * 2) & 1) == 1 then
+      local hp, mx = H.readWord(0x3BF4 + s * 2), H.readWord(0x3C1C + s * 2)
+      if hp == 0 or hp * 3 < mx then return true end
+    end
+  end
+  return false
+end
 -- the step's Morph has resolved (its ActionEnd, the bank read after it), and:
 --   under 3 BP, the clock ran out (or she is no longer morphed: a death);
 --   at 3 BP, HOLD ticks passed since she morphed
 local function stepDone()
+  if cur ~= nil and danger() then cur.abandoned = true; return true end
   if cur == nil or #ends <= cur.mark or lastEnd().post == nil then return false end
   if cur.m0 == nil then return H.frame > lastEnd().f + 120 end   -- resolved, no morph: the step decides
   if cur.b < 3 then return not morphed() end   -- her clock ran out and the revert landed (or she fell)
@@ -133,11 +148,16 @@ end
 local function step(b)
   local entry = { who = TERRA, cmd = MORPH, boost = b, self = true }
   if b == 2 then entry = { who = TERRA, cmd = MORPH, boost = 3, self = true, takeBack = 2 } end
-  return H.cond(function() return not done[b] and not stepped and inBattle() end, {
+  return H.cond(function() return not done[b] and not stepped and inBattle() and not danger() end, {
     H.call(function() cur = { b = b, mark = #ends, f0 = H.frame } end),
     watched(H.kitBattle({ entry }, ONE)),
     H.call(function()
       local x = lastEnd()
+      if cur.abandoned then
+        H.log(string.format("[trance] the party is in trouble: the %d-BP step is let go, the next battle", b))
+        stepped = true
+        return
+      end
       if #ends <= cur.mark or x.post == nil then
         H.log(string.format("[trance] battle %d ended before the %d-BP Morph resolved: the next", battles, b))
         return
