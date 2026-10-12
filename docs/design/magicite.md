@@ -70,7 +70,7 @@ describes the *proposed* system, not the shipped one.
 | Shiva | Magitek factory | Ice, Osmose, **Shell** | magicite-ifrit-shiva.md §5.2 | none, deliberately | none, deliberately | **"the Rime": economy** |
 | Unicorn | tube room | Remedy, Safe | +1 stamina | *Purity*: status durations halved | — | the paladin-adjacent |
 | Maduin | tube room | Fire, Ice, Bolt | +2 magic | *Trinity*: first spell each battle +1 tier | — | Terra's inheritance: the pure mage job |
-| Shoat | tube room | Break, Doom | +1 magic | *Gorgon Eye*: Break may (25%) chip 2 | — | the executioner |
+| Shoat | tube room | Break, Doom | +1 magic | *Gorgon Eye*: the stone's Break is the class-blind chip (one shield, one more a boost point; #398) -- no passive | — | the executioner (Doom) and the breaker (Break) |
 | Phantom | tube room | Vanish, Sleep | +1 speed | *Ghostwalk*: first hit taken each battle misses | — | the assassin's second |
 | Carbunkl | tube room | Rflect, Shell | +1 stamina | *Facet*: Runic feeds +1 more BP | — | Celes's natural pairing |
 | Bismark | tube room | Slow, (Water lore-alike) | +1 vigor | *Tidal*: water chip +1 | — | see open Q2 |
@@ -201,9 +201,9 @@ than holding both. Ragnarok's shop door has its own gate (`if_switch $01A1=0`
   party jumps).
 - **Fenrir, the Banisher.** Vanilla's Warp, X-Zone and Stop hold no tiers.
   Stop (10 MP, single) and X-Zone (53 MP, a group, death-class, hit 85)
-  differ from Shoat's Break/Doom by target (a group, not one body) and by a
-  non-lethal option. Terra rejoins here with Break in her own list, so Fenrir
-  brings deletion that reaches a whole group. Warp moves to Ragnarok, the
+  differ from Shoat's Doom by target (a group, not one body) and by a
+  non-lethal option. Shoat's Break takes shields rather than lives since
+  #398, so Fenrir brings deletion that reaches a whole group. Warp moves to Ragnarok, the
   one-spell stone. Divine: Moon Song (`$4E`, Image on the party).
 - **Starlet, the second medic.** Vanilla's list is Cure, Cure 2, Cure 3,
   Regen, Remedy; the two tiers go, and the rest stays. It duplicates Kirin
@@ -247,7 +247,7 @@ than holding both. Ragnarok's shop door has its own gate (`if_switch $01A1=0`
   dragon's wingbeat: it cuts every body on the field, the party included, to
   a fraction of its HP, so it opens a fight against a group before Flare
   finishes one body. Mega Flare (`$43`) is the all-enemies version of Flare,
-  the same single-to-all shape as Shoat's Break and Demon Eye.
+  the single-to-all shape Shoat's Doom and Demon Eye also have.
 - **Phoenix, the Rebirth.** Vanilla's list is Life, Life 2, Life 3, Cure 3,
   Fire 3. The owner's call (2026-09-29): Phoenix grants Life, which boosts to
   Life 2 and then Life 3, so `Ot6FoldTbl`'s life row is Life, Life 2, Life 3

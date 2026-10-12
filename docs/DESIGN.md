@@ -39,7 +39,7 @@ touches vanilla behavior where a pillar requires it.
 | Setzer | Gambler/Merchant | Cards & dice | — | Slot from the start (signature), with Coin Toss and Hired Help (paid in gil) behind it; divine: Jackpot, a Fixed-Dice triple, never Slot itself (kits.md) |
 | Strago | Scholar | Rod | Fire/Ice/Lightning | 8 Lores, Aqua Breath as the free signature; **Analyze** (reveals shields and weaknesses) cheap at #2 -- planned, not in the game |
 | Relm | Painter | Brush | — | Sketch stays as signature |
-| Shadow | Assassin | Dagger (thrown) | Dark | Throw (signature); divine: Assassinate, once a battle: the hit of his that breaks an enemy kills it outright, as does a hit on one already Broken; a boss is only Broken |
+| Shadow | Assassin | Dagger (thrown) | Dark | Throw (signature); divine: Assassinate, at a full 3-BP boost (kits.md "Divines"): the hit of his that breaks an enemy kills it outright, as does a hit on one already Broken; a boss is only Broken |
 | Mog | Dancer | Spear | varies by dance | the 8 Dances, verbatim |
 | Umaro / Gogo | Berserker / Mime | — | — | bonus characters; Gogo has access to every job and masters none |
 

@@ -85,9 +85,9 @@ rule.
 |---|---|---|---|
 | Blitz | **Bum Rush** `$64` | **yes** | divine, L70, the top row of the kit |
 | SwdTech | **Cleave** `$5c` | **yes** | divine, the window's conditional top tier |
-| Tools | **Overclock** | **no, not yet** | Edgar's divine, and it is not built. It has no tool item id and therefore no row in `Ot6AbilityCostTbl`; kits.md prices it as the sum of the two tools it fires (max 34). |
+| Tools | **Overclock** | **yes** | Edgar's divine: a Tool at the full 3-BP boost fires twice and costs the two firings, each at the 3-BP price, capped at 99 (`Ot6ToolPrice`; kits.md "Edgar") |
 | Steal / Slot / Rage / Dance | — | **no** | flat verbs, no ladder |
-| Setzer's table | **Jackpot** (row `$5b`) | **yes** | divine, from his World of Ruin return; once a battle, so 99 is a third of his L31 pool (297) and still a boss answer rather than a loop (kits.md, #319) |
+| Setzer's table | **Jackpot** (row `$5b`) | **yes** | divine, from his World of Ruin return; a full 3-BP boost buys a throw of two rolls, and 99 is a third of his L31 pool (297), so a pool buys three throws a fight (kits.md "Setzer", #319, #378) |
 
 Air Anchor is not the Tools capstone. kits.md states: "Air Anchor
 stays a findable *item* mid-kit gag, not the capstone." Tools therefore
@@ -457,7 +457,7 @@ table out of the built ROM, flat rows marked.
 | **Steal** (chance verb, flat) | 4 | 4 | 4 | 4 |
 | **Rage** (chance verb, flat) | 8 | 8 | 8 | 8 |
 | **Slot** (chance verb, unpriced) | 0 | 0 | 0 | 0 |
-| **Jackpot** (chance verb: the boost buys rolls) | 99 | 99 | 99 | 99 |
+| **Jackpot** (divine: offered at 3 BP only) | -- | -- | -- | 99 |
 | Pummel / AutoCrossbow | 4 | 10 | 25 | 63 |
 | Bestow (flat, buys nothing) | 5 | 5 | 5 | 5 |
 | NoiseBlaster / Flash | 6 | 15 | 38 | 94 |
