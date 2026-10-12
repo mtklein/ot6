@@ -23,7 +23,9 @@
 --   the loadout word ($1E1D) set to Cleave in the 1-BP slot, read and set
 --   back to AUTO (0), for the gate's manual-loadout arm;
 --   in battle 2, the commander's $3aa1 bit 2 (the boss bit), since no
---   generated battle fields a death-protected body beside Cyan.
+--   generated battle fields a death-protected body beside Cyan, and his HP
+--   raised to 30,000 so the first heavy cut leaves him standing for the
+--   second.
 --
 -- Asserted:
 --   battle 1 (the soldiers): the window's rows 0 and 1 (1 and 2 BP) are not
@@ -32,9 +34,9 @@
 --     kills an unbroken soldier (one in-proc Death mark, the body dead),
 --     and, after three Defends bank the points again, a second Cleave in the
 --     same battle kills the second soldier;
---   battle 2 (the commander, the boss bit set): Cleave marks no Death and
---     cuts at power 255 (an in-proc $11a6 write), and the commander loses
---     HP.
+--   battle 2 (the commander, the boss bit set): two Cleaves in the same
+--     battle, each marking no Death, cutting at power 255 (an in-proc $11a6
+--     write) and landing (the commander's HP falls at each).
 -- A kill is checked against the mechanism with pc-gated write watches
 -- (Death marks and the power write from inside Ot6Oblivion), so a cut that
 -- damage-kills cannot be mistaken for the divine.  Old-ROM red and mutants:
@@ -186,8 +188,9 @@ add({
   H.call(function()
     local m = msPresent[1]
     H.writeByte(0x3AA1 + ent(m), H.readByte(0x3AA1 + ent(m)) | 0x04)
+    H.writeWord(0x3BFC + m * 2, 30000)
     hp0 = mhp(m)
-    H.log(string.format("[battle 2] commander m%d hp %d, $3aa1.2 SET (declared expedient)", m, hp0))
+    H.log(string.format("[battle 2] commander m%d: $3aa1.2 SET and HP := %d (declared expedient)", m, hp0))
   end),
   H.kitBattle(cleave(2), { untilPlanDone = true, idle = "defend",
     planDone = function() return #cuts >= 2 and H.readByte(0x3E9D + cyanSlot * 2) == 0 end }),

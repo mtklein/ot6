@@ -34,11 +34,18 @@
 ;   death-immune (a boss)   -> the props are patched in place to the
 ;                              heaviest single cut a record can carry: power
 ;                              255, Status-1 cleared, the instant-death and
-;                              auto-miss flags cleared.  The record ignores
-;                              defence already ($11a2 $20).  A boss is the
-;                              case a full boost must still pay for, and the
-;                              old fallback (Quadra Slice's single 70) was
-;                              less than the 2-BP Quadra Slice row lands.
+;                              auto-miss flags cleared, and the base damage
+;                              recomputed at that power (Ot6CleaveDmg).  The
+;                              record ignores defence already ($11a2 $20).
+;                              A boss is the case a full boost must still
+;                              pay for: the old fallback set Quadra Slice's
+;                              power of 70 after CalcDmg had run, so it
+;                              landed nothing at all.
+;
+; The patch and the kill read the primary target; Cleave's record strikes
+; the enemy group (targeting $7a), and the other bodies take the record as
+; it stands on this pass: its own Death roll beside a killable primary, the
+; heavy cut beside a boss.
 ;
 ; entry: jsl from CalcAttackEffect just after ChooseTarget. a16/i8, db=$7e;
 ; x = attacker entity offset, $b8/$b9 = target mask, $3a7d = attack id. preserves
@@ -96,8 +103,57 @@ OT6_CLEAVE_BOSS_POWER = 255
         lda     $11a7
         and     #$fe            ; clear auto-miss-if-status-immune (bit 0)
         sta     $11a7
+        jsr     Ot6CleaveDmg    ; and the cut's damage, which CalcDmg priced
+                                ;   at the record's power 0 before this hook
 done:   plp
         rtl
+.endproc
+
+; [ the heavy cut's base damage: CalcMagicDmg's formula at the new power ]
+;
+; ExecAttack runs CalcDmg before CalcAttackEffect, so the base damage in
+; $11b0 was computed from the record's power, 0, before Ot6Oblivion knew the
+; target was a boss.  This recomputes it the way CalcMagicDmg does
+; (battle_main.asm): power x 4 + magic power x power x level / 16, with
+; $11ae = the attacker's magic power and $11af = its level (InitAttacker's),
+; through the hardware multiplier, saturating at $ffff (the 9,999 cap is
+; downstream).  The /16 is taken from magic power x power before the level
+; multiply, which floors at most 15/16 x level below vanilla's order.
+; a8/i8 (Ot6Oblivion's shortai), db = $7e; clobbers A and X.
+.proc Ot6CleaveDmg
+        .a8
+        .i8
+        lda     $11ae           ; magic power
+        sta     f:$004202       ; hWRMPYA
+        lda     $11a6           ; power
+        sta     f:$004203       ; hWRMPYB
+        nop
+        nop
+        nop
+        nop
+        longa
+        lda     f:$004216       ; magic power x power
+        lsr
+        lsr
+        lsr
+        lsr                     ; / 16
+        sta     OT6_SCR_SLOT2
+        lda     $11a6
+        and     #$00ff
+        asl
+        asl                     ; power x 4
+        ldx     $11af           ; level, counted down
+        beq     @out
+@lv:    clc
+        adc     OT6_SCR_SLOT2
+        bcs     @sat
+        dex
+        bne     @lv
+        bra     @out
+@sat:   lda     #$ffff
+@out:   sta     $11b0
+        shorta
+        rts
 .endproc
 
 ; ------------------------------------------------------------------------------
