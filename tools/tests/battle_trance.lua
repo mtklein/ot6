@@ -31,10 +31,14 @@
 -- that ends before its step is done starts it over in the next, up to
 -- BATTLES.  Each span's log line also counts
 -- TERRA's turns inside it (the duration design's measurement, kits.md).
+-- Old-ROM red (main's ROM refuses Morph under 3 BP at the command) and
+-- mutants (a span's speed off by one, 3 BP clocked, the boost never
+-- reaching the span): build/attempts/wt/v029-kits/r7/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TERRA, MORPH = 0x00, 0x03
+local FD = H.newFightDriver("trance", { tactical = true, boost = true, items = true, healPercent = 60, nuke = { 0x02 } })
 local BATTLES = 12
 -- the designed spans, in battle ticks, for speeds 110, 82, 66 (a speed s
 -- runs $FFFF out in floor(65535 / s) + 1 subtractions)
@@ -103,19 +107,24 @@ end
 
 local ONE = { untilPlanDone = true, idle = "defend", others = "thin", maxFrames = 150000, planDone = stepDone }
 
--- the pick must land: TERRA morphs within PICK frames of the step's start
--- (the bank filled by Defends and the menu walked: 80-380 frames on the
--- branch's runs; three Defends from an empty bank, at her ~230 ticks a
--- turn, are ~1,500), unless she falls first.  A ROM that refuses the Morph
--- at the command fails here, by name (main's ROM at 4000 lost her first:
--- build/attempts/wt/v029-kits/r3/old__battle_trance.out).
-local PICK = 2400
+-- the pick must land: TERRA morphs before her command window ($62CA her
+-- seat, $7BC2 state $05) has been up PICK frames in the step (a Defend or
+-- the Morph pick each take it for well under a hundred), unless she falls
+-- first.  A ROM that refuses the Morph at the command keeps it up and fails
+-- here, by name.  (Counted in frames since the step began, 2400 was too
+-- few when a fresh battle's bank had to be filled and too many on main's
+-- ROM, which lost her first: build/attempts/wt/v029-kits/r6/ and r3/.)
+local PICK = 900
 local function alive() return seat ~= nil and (H.readByte(0x3EE4 + e()) & 0xC2) == 0 end
 local function watched(inner)
   return { tick = function(_)
-    if cur ~= nil and cur.m0 == nil and alive() and H.battleActive() and H.frame - cur.f0 > PICK then
-      H.assertEq(false, true, string.format("Morph at %d BP: TERRA morphs within %d frames of the pick's start "
-        .. "(it was refused at the command, or never confirmed)", cur.b, PICK))
+    if cur ~= nil and cur.m0 == nil and H.battleActive() and H.readByte(0x62CA) == seat
+        and H.readByte(0x7BC2) == 0x05 then
+      cur.window = (cur.window or 0) + 1   -- a frame of her command window up
+    end
+    if cur ~= nil and cur.m0 == nil and alive() and H.battleActive() and (cur.window or 0) > PICK then
+      H.assertEq(false, true, string.format("Morph at %d BP: TERRA morphs before her command window has been "
+        .. "up %d frames (it was refused at the command, or never confirmed)", cur.b, PICK))
     end
     return inner:tick()
   end, reset = function(_) if inner.reset then inner:reset() end end }
@@ -201,7 +210,12 @@ H.run({ maxFrames = 900000 }, {
       end
     end),
     H.cond(function() return not (done[0] and done[1] and done[2] and done[3]) and inBattle() end, {
-      H.kitBattle({}, { untilPlanDone = false }),   -- fight this one out
+      -- the rest of this battle: the route's fight driver plays it out
+      -- (Bolt for the Floating Continent's bolt-weak pool, care, boosts);
+      -- everyone's plain Fights lost to two Vanished Ninjas (r6, k3)
+      H.driveUntil(function() return not inBattle() end, 60000, {
+        H.call(function() FD.frame() end),
+      }, "the battle played out"),
     }, {}),
   }, "TERRA's four Morphs"),
 })

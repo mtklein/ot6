@@ -24,10 +24,13 @@
 --          end, so what the engine did with the pending byte stands).
 -- Declared unit-test expedients (tools/state_write_waivers.txt), because no
 -- generated battle Muddles TERRA after Zozo: Muddle ($3EE5 bit 5) set on her
--- again whenever it clears, the party's HP put back to max under three quarters and
+-- again whenever it clears, the party's HP put back to max every frame and
 -- the monsters' HP to 30,000 (so the battle lasts for the picks), and, in
 -- the stale arm, her pending boost and bank as above.  The others' windows
 -- take A (a Fight).  The pick, the command and the morph are the engine's.
+-- Old-ROM red (main's ROM: the engine's Morph does not morph) and mutants
+-- (the 0-BP speed off by one; the engine's pick keeping its pending boost):
+-- build/attempts/wt/v029-kits/r7/.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/fc_alcove.mss.lua"
 
@@ -91,12 +94,23 @@ local function stage(stale)
     H.log(string.format("[mrand] f%d formation %04X monsters (slot:hp/present/status1) %s; TERRA status1 %02X/%02X",
       H.frame, H.readWord(0x11E0), table.concat(t, " "), H.readByte(0x3EE4 + e()), H.readByte(0x3EE5 + e())))
   end
-  if alive() and (H.readByte(0x3EE5 + e()) & 0x20) == 0 then
+  if not alive() then
+    -- she fell anyway (one hit past her max): this battle is no use, so its
+    -- monsters go to 1 HP and the others' Fights end it; the arm goes on in
+    -- the next battle, after the walk's field care revives her
+    for m = 0, 5 do
+      if (H.readByte(0x3AA8 + m * 2) & 1) == 1 and H.readWord(0x3BFC + m * 2) > 1 then
+        H.writeWord(0x3BFC + m * 2, 1)
+      end
+    end
+    return
+  end
+  if (H.readByte(0x3EE5 + e()) & 0x20) == 0 then
     H.writeByte(0x3EE5 + e(), H.readByte(0x3EE5 + e()) | 0x20)
   end
   for s = 0, 3 do
     local hp, mx = H.readWord(0x3BF4 + s * 2), H.readWord(0x3C1C + s * 2)
-    if hp > 0 and hp < mx * 3 // 4 then H.writeWord(0x3BF4 + s * 2, mx) end
+    if hp > 0 and hp < mx then H.writeWord(0x3BF4 + s * 2, mx) end
   end
   for m = 0, 5 do
     if (H.readByte(0x3AA8 + m * 2) & 1) == 1 and H.readWord(0x3BFC + m * 2) < 20000 then
