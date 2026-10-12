@@ -905,11 +905,10 @@ _054f:  dec     $f5
 ; [ morph command (random) ]
 
 RandMorph:
-@0557:  lda     #$0f
-        cmp     $1cf6       ; morph counter
-        clr_a
-        bcs     RandCmdInvalid
-        rts
+@0557:  clr_a               ; ot6 #427: always valid -- was `lda #$0f / cmp
+        rts                 ;   $1cf6 / clr_a / bcs RandCmdInvalid`: the morph
+                            ;   gauge is gone (ot6_trance.asm); an engine's
+                            ;   Morph buys nothing and takes the 0-BP span
 
 ; ------------------------------------------------------------------------------
 
@@ -1776,9 +1775,8 @@ UpdateMorph:
         bcc     @0b01       ; branch if character is morphed
 
 ; revert
-        php
-        jsr     SaveMorphCounter
-        lda     #$ff
+        php                 ; ot6 #427: `jsr SaveMorphCounter` dropped (the
+        lda     #$ff        ;   gauge does not carry between battles)
         sta     $3ee2       ; no character is morphed
         stz     $3b04,x     ; morph gauge is not shown
         cpx     #$08
@@ -1799,22 +1797,9 @@ UpdateMorph:
         lsr2
         ror
         bcs     @0b33       ; return if morph is permanent (phunbaba battle)
-        asl
-        stx     $3ee2       ; set morphed character
-        clr_a
-        longa
-        dec
-        sta     $3f30       ; morph counter
-        ldx     $1cf6       ; sram morph counter
-        jsr     Div
-        bcc     @0b24       ; branch if morph lasts twice as long (after phunbaba battle)
-        lsr
-@0b24:  lsr3
-        cmp     #$0800
-        bcc     @0b2f
-        lda     #$07ff
-@0b2f:  inc
-        sta     $3f32       ; set morph counter speed
+        jsl     Ot6MorphSpan    ; ot6 #427: the boost buys the span, and 3 BP
+                                ;   lasts the battle (ot6_trance.asm); replaces
+                                ;   vanilla's speed from the $1cf6 gauge
 @0b33:  plp
         .a8
         plx
@@ -1822,18 +1807,8 @@ UpdateMorph:
 
 ; ------------------------------------------------------------------------------
 
-; [ update morph counter in SRAM ]
-
-SaveMorphCounter:
-@0b36:  lda     $3ee2       ; morphed character
-        bmi     @0b49       ; return if not valid
-        lda     $1cf6       ; sram morph counter
-        xba
-        lda     $3f31       ; battle morph counter
-        jsr     MultAB
-        xba
-        sta     $1cf6       ; set remaining morph counter
-@0b49:  rts
+; ot6 #427: SaveMorphCounter (drain $1cf6 by the morph's use) is gone; the
+; morph gauge does not carry between battles (ot6_trance.asm).
 
 ; ------------------------------------------------------------------------------
 
@@ -2892,8 +2867,7 @@ DecMorphCounter:
         shorta
         bcs     @1234       ; branch if counter didn't expire
         stz     $3f31       ; clear morph counter
-        jsr     SaveMorphCounter
-        lda     #$ff
+        lda     #$ff        ; ot6 #427: `jsr SaveMorphCounter` dropped
         sta     $3ee2       ; clear morphed character index
         lda     #$04
         sta     $3a7a       ; command $04 (revert)
@@ -4185,8 +4159,8 @@ _c2192e:
 ; [ command $03: morph ]
 
 Cmd_03:
-        jsl     Ot6TranceGate   ; ot6: Trance takes a full 3-BP boost
-        bcc     _c2192e         ;   (ot6_trance.asm); without one, no morph
+        jsl     Ot6MorphTake    ; ot6 #427: keep the boost this Morph was
+                                ;   bought with, for its span (ot6_trance.asm)
 @1936:  sec
 _1937:  php
         tyx
@@ -12445,8 +12419,7 @@ BattleEndTbl:
 
 _c24903:
 _winallclose:
-@4903:  jsr     SaveMorphCounter
-        ldx     #$06
+@4903:  ldx     #$06        ; ot6 #427: `jsr SaveMorphCounter` dropped
 @4908:  stz     $3b04,x     ; hide morph gauge
         txa
         lsr
@@ -14109,9 +14082,8 @@ UpdateCmd_01:
 ; [ morph ]
 
 UpdateCmd_00:
-@5326:  lda     #$0f
-        cmp     $1cf6
-        rts
+@5326:  clc                 ; ot6 #427: never greyed -- was `lda #$0f / cmp
+        rts                 ;   $1cf6`, the gauge (ot6_trance.asm)
 
 ; ------------------------------------------------------------------------------
 

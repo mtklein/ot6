@@ -1,155 +1,175 @@
 -- @suite slow
--- battle_trance.lua -- Terra's Trance (her Morph) takes a full 3-BP boost (#378).
+-- battle_trance.lua -- Terra's Morph: any boost, and the boost buys its
+-- duration; at 3 BP (Trance, the divine) it lasts the battle (#378, #427).
 --
--- kits.md "Divines": a divine's one gate is a full 3-BP boost, and Trance is
--- TERRA's Morph command (vanilla's esper form: magic x2, damage taken
--- halved, for as long as the morph gauge lasts).  Picked with fewer than
--- three points pending, Morph buzzes and the command window stays up
--- (Ot6TranceOffer, the C1 stub OpenCmdMenuTbl[$03] points at); picked at
--- three and taken back at target select, it does nothing and charges
--- nothing (Ot6TranceGate zeroes the pending boost); at 3 BP she morphs, the
--- three points are spent, and she can do it again in the same battle
--- (Revert is free).
+-- kits.md, Terra: Morph is vanilla's esper form (magic x2, damage taken
+-- halved).  Under 3 BP it lasts a fixed span that grows with the boost
+-- (ot6_trance.asm OT6_MORPH_SPEED: the counter's speed, DecMorphCounter
+-- subtracting it from $FFFF once a battle tick); at 3 BP it is vanilla's
+-- permanent morph, no morphed character in $3EE2 and nothing clocked, so she
+-- stays morphed until the battle ends or she reverts.  Vanilla's
+-- cross-battle gauge ($1CF6) neither sets the span nor locks the command.
 --
--- Played: Continue fc-alcove-v1 (TERRA L26, Morph learned at Zozo, the
--- gauge partly full), walk onto the continent into a random battle, and
--- play TERRA through the real menu (H.kitBattle); the others Fight while two
--- or more monsters stand and Defend once one is left, so the party outlasts
--- the continent's hardest draws and the battle stays up.  Nothing is
--- written.  In one battle:
---   1. Morph at 0, 1 and 2 BP: each refused at the command (three A
---      presses, the window stays up), and she does not morph;
---   2. Morph picked at 3 BP and taken back to 2 at target select (L): her
---      action resolves, she does not morph, and the bank pays nothing;
---   3. Morph at 3 BP: she morphs ($3EF9 bit 3), and the bank pays all
---      three points (read at her Morph's Ot6ActionEnd and the frame after);
---   4. Revert, then Morph at 3 BP again: she morphs a second time.
--- A battle that ends before all four (the others' Fights fell the last
--- body) is left and the next random battle starts them over, up to BATTLES.
--- Old-ROM red and mutants: build/attempts/wt/v027-kits/final-matrix/
--- (<rom>__battle_trance.out).
+-- Played: Continue fc-alcove-v1 (TERRA L26, Morph learned at Zozo), walk
+-- onto the continent into a random battle, and play TERRA through the real
+-- menu (H.kitBattle); the others Fight while two or more monsters stand and
+-- Defend once one is left, so the battle stays up.  Nothing is written.
+-- Four steps, each once:
+--   0, 1  Morph at 0 BP, then at 1 BP: she morphs, the clock starts
+--         ($3EE2 = her seat), and it runs out after SPAN[b] ticks (the
+--         battle tick counter $3A3E); the bank pays b (at 0, it banks);
+--   2     Morph picked at 3 BP and taken back to 2 at target select (L):
+--         she morphs for the 2-BP span and the bank pays two;
+--   3     Morph at 3 BP: she morphs, nothing is clocked ($3EE2 stays $FF,
+--         no gauge in $3B04), the bank pays three, and she is still morphed
+--         HOLD ticks later (longer than the 2-BP span), or when the battle
+--         ends if it ends after the 2-BP span.
+-- A battle that ends with steps left starts the remaining ones over in the
+-- next random battle, up to BATTLES.  Each span's log line also counts
+-- TERRA's turns inside it (the duration design's measurement, kits.md).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local TERRA, MORPH, REVERT = 0x00, 0x03, 0x04
-local BATTLES = 6
+local TERRA, MORPH = 0x00, 0x03
+local BATTLES = 8
+-- the designed spans, in battle ticks: 65536 / speed for speeds 164, 82, 41
+-- (a speed s runs $FFFF out in floor(65535 / s) + 1 subtractions)
+local SPAN = { [0] = 400, [1] = 800, [2] = 1599 }
+local HOLD = 1700
 
-local seat = nil
-local morphs, refused, done, battles = 0, false, false, 0
-local tookBack, spent = false, false
--- TERRA's Ot6ActionEnd for her Morph command ($3A7C): { f, pre = the bank
--- at its entry, post = the bank the frame after (the charge landed) }
-local ends = {}
+local seat, battles = nil, 0
+local done = { [0] = false, [1] = false, [2] = false, [3] = false }
 local function e() return seat * 2 end
+local function ticks() return H.readByte(0x3A3E) | (H.readByte(0x3A3F) << 8) end
 local function morphed() return seat ~= nil and (H.readByte(0x3EF9 + e()) & 0x08) ~= 0 end
+local function inBattle() return H.battleLoadStarted() end
 
+-- TERRA's Ot6ActionEnd for her Morph ($3A7C = $03): bank at entry, the frame
+-- after; her ActionEnds of any command, for the turn count
+local ends, turns = {}, 0
+-- the morph now watched: { t0 = ticks at the clock's start (or the morph's,
+-- at 3 BP), turns0, clocked, t1 = ticks when the clock ran out }
+local cur = nil
 local function arm()
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
-    if seat ~= nil and (emu.getState()["cpu.x"] & 0xff) == seat * 2 and H.readByte(0x3A7C) == MORPH then
+    if seat == nil or (emu.getState()["cpu.x"] & 0xff) ~= seat * 2 then return end
+    turns = turns + 1
+    if H.readByte(0x3A7C) == MORPH then
       ends[#ends + 1] = { f = H.frame, pre = H.readByte(0x3E9C + seat * 2) }
     end
   end, emu.callbackType.exec, ae, ae)
+  local lastM, lastC = false, false
   emu.addEventCallback(function()
+    if seat == nil or not H.battleActive() then lastM, lastC = false, false; return end
     local x = ends[#ends]
-    if x ~= nil and x.post == nil and H.frame > x.f and seat ~= nil and H.battleActive() then
-      x.post = H.readByte(0x3E9C + seat * 2)
+    if x ~= nil and x.post == nil and H.frame > x.f then x.post = H.readByte(0x3E9C + e()) end
+    local m, c = morphed(), H.readByte(0x3EE2) == e()
+    if m and not lastM and cur ~= nil and cur.m0 == nil then
+      cur.m0, cur.t0m, cur.turns0 = H.frame, ticks(), turns
+      H.log(string.format("[trance] f%d TERRA morphed (%d BP), clock %s, $3EE2=%02X speed $3F32=%d gauge $3B04=%d",
+        H.frame, cur.b, c and "running" or "off", H.readByte(0x3EE2), H.readByte(0x3F32) | (H.readByte(0x3F33) << 8),
+        H.readByte(0x3B04 + e())))
     end
-  end, emu.eventType.endFrame)
-  -- each morph: $3EF9 bit 3 going up for TERRA's seat, read at each
-  -- frame's end (a write callback sees the byte before the write lands)
-  local last = false
-  emu.addEventCallback(function()
-    if seat == nil or not H.battleActive() then return end   -- (battle RAM is torn down at the end)
-    local now = morphed()
-    if now and not last then
-      morphs = morphs + 1
-      H.log(string.format("[trance] f%d TERRA morphed (%d this battle), bank %d, pending %d", H.frame, morphs,
-        H.readByte(0x3E9C + e()), H.readByte(0x3E9D + e())))
+    if c and not lastC and cur ~= nil then cur.clocked, cur.t0 = true, ticks() end
+    if lastC and not c and cur ~= nil and cur.t1 == nil then
+      cur.t1, cur.turns1 = ticks(), turns
+      H.log(string.format("[trance] f%d the %d-BP clock ran out after %d ticks (%d of TERRA's turns inside it)",
+        H.frame, cur.b, cur.t1 - cur.t0, cur.turns1 - cur.turns0))
     end
-    last = now
+    lastM, lastC = m, c
   end, emu.eventType.endFrame)
 end
 
-local function inBattle() return H.battleLoadStarted() end
--- a Morph of hers picked in this step has resolved: its Ot6ActionEnd came
--- (after ends.mark) and the frame after it read the bank
-local function resolved()
-  return #ends > ends.mark and ends[#ends].post ~= nil and H.frame > ends[#ends].f + 30
+local function lastEnd() return ends[#ends] end
+-- the step's Morph has resolved (its ActionEnd, the bank read after it), and:
+--   under 3 BP, the clock ran out (or she is no longer morphed: a death);
+--   at 3 BP, HOLD ticks passed since she morphed
+local function stepDone()
+  if cur == nil or #ends <= cur.mark or lastEnd().post == nil then return false end
+  if cur.m0 == nil then return H.frame > lastEnd().f + 120 end   -- resolved, no morph: the step decides
+  if cur.b < 3 then return not morphed() end   -- her clock ran out and the revert landed (or she fell)
+  return ticks() - cur.t0m >= HOLD or not morphed()
 end
-local ONE = { untilPlanDone = true, idle = "defend", others = "thin", maxFrames = 60000 }
 
-H.run({ maxFrames = 600000 }, {
+local ONE = { untilPlanDone = true, idle = "defend", others = "thin", maxFrames = 150000, planDone = stepDone }
+
+local function step(b)
+  local entry = { who = TERRA, cmd = MORPH, boost = b, self = true }
+  if b == 2 then entry = { who = TERRA, cmd = MORPH, boost = 3, self = true, takeBack = 2 } end
+  return H.cond(function() return not done[b] and inBattle() end, {
+    H.call(function() cur = { b = b, mark = #ends } end),
+    H.kitBattle({ entry }, ONE),
+    H.call(function()
+      local x = lastEnd()
+      if #ends <= cur.mark or x.post == nil then
+        H.log(string.format("[trance] battle %d ended before the %d-BP Morph resolved: the next", battles, b))
+        return
+      end
+      if b == 2 then
+        H.assertEq(H.vars.kit[1] ~= nil and H.vars.kit[1].boost, 2, "the Morph was taken back to 2 BP at target select")
+      end
+      H.assertEq(cur.m0 ~= nil, true, string.format("Morph at %d BP: TERRA morphed", b))
+      if b == 0 then
+        H.assertEq(x.post >= x.pre, true, "Morph at 0 BP: the bank paid nothing")
+      else
+        H.assertEq(x.pre - x.post, b, string.format("Morph at %d BP: the bank paid %d", b, b))
+      end
+      if b < 3 then
+        if cur.t1 == nil then
+          H.log(string.format("[trance] the %d-BP morph ended without its clock running out (morphed %s): the next battle",
+            b, tostring(morphed())))
+          return
+        end
+        H.assertEq(cur.clocked, true, string.format("Morph at %d BP is clocked ($3EE2 = her seat)", b))
+        H.assertEq(cur.t1 - cur.t0, SPAN[b], string.format("Morph at %d BP lasts its span, in battle ticks", b))
+      else
+        H.assertEq(cur.clocked == true, false, "Morph at 3 BP is not clocked ($3EE2 stays $FF)")
+        H.assertEq(H.readByte(0x3B04 + e()), 0, "and shows no gauge")
+        local held = ticks() - cur.t0m
+        if not morphed() then
+          H.assertEq(inBattle(), false, string.format("Morph at 3 BP: she is morphed until the battle ends (reverted after %d ticks)", held))
+        end
+        if held < HOLD then
+          H.log(string.format("[trance] the 3-BP morph held %d ticks before the battle ended: the next", held))
+          return
+        end
+        H.log(string.format("[trance] the 3-BP morph held %d ticks (%d of TERRA's turns), clock off, still morphed",
+          held, turns - cur.turns0))
+      end
+      done[b] = true
+    end),
+  }, {})
+end
+
+H.run({ maxFrames = 900000 }, {
   H.bootCheckpoint("fc-alcove-v1"),
   H.call(arm),
   H.fcAlcoveToBattle("trance"),
-  H.driveUntil(function() return done end, 500000, {
+  H.driveUntil(function() return done[0] and done[1] and done[2] and done[3] end, 850000, {
     H.cond(function() return not inBattle() end, { H.fcPace("trance") }, {}),
     H.call(function()
       battles = battles + 1
       H.assertEq(battles <= BATTLES, true, string.format("the four steps within %d battles", BATTLES))
-      seat, morphs, refused, tookBack, spent = nil, 0, false, false, false
+      seat = nil
       for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == TERRA then seat = s end end
       H.assertEq(seat ~= nil, true, "TERRA is seated")
       local has = false
       for r = 0, 3 do if H.readByte(0x202E + seat * 12 + r * 3) == MORPH then has = true end end
       H.assertEq(has, true, "TERRA's command list holds Morph (learned at Zozo)")
-      H.log(string.format("[trance] battle %d: TERRA seat %d, bank %d, gauge $1CF6 = %02X", battles, seat,
-        H.readByte(0x3E9C + e()), H.readByte(0x1CF6)))
+      H.log(string.format("[trance] battle %d: TERRA seat %d, bank %d, vanilla's gauge $1CF6 = %02X (unread)", battles,
+        seat, H.readByte(0x3E9C + e()), H.readByte(0x1CF6)))
     end),
-    H.kitBattle({ { who = TERRA, cmd = MORPH, boost = 0, refused = "command" },
-      { who = TERRA, cmd = MORPH, boost = 1, refused = "command" },
-      { who = TERRA, cmd = MORPH, boost = 2, refused = "command" } }, ONE),
+    step(0), step(1), step(2), step(3),
     H.call(function()
-      if not inBattle() then return end
-      local kit = H.vars.kit
-      refused = #kit == 3
-      for i = 1, #kit do refused = refused and kit[i].refusedSeen end
-      H.assertEq(refused, true, "Morph at 0, 1 and 2 BP was refused at the command")
-      H.assertEq(morphed(), false, "and TERRA did not morph")
-    end),
-    H.call(function() ends.mark = #ends end),
-    H.kitBattle({ { who = TERRA, cmd = MORPH, boost = 3, self = true, takeBack = 2 } },
-      { untilPlanDone = true, idle = "defend", others = "thin", maxFrames = 60000, planDone = resolved }),
-    H.call(function()
-      if not inBattle() or #ends == ends.mark then return end
-      local x = ends[#ends]
-      H.log(string.format("[trance] taken back: her Morph resolved at f%d, bank %d -> %d, morphs %d", x.f, x.pre,
-        x.post, morphs))
-      H.assertEq(H.vars.kit[1] ~= nil and H.vars.kit[1].boost, 2, "the Morph was taken back to 2 BP at target select")
-      H.assertEq(morphs, 0, "Morph taken back under 3 BP: TERRA did not morph")
-      H.assertEq(x.post >= x.pre, true, "and the bank paid nothing (Ot6TranceGate zeroed the pending boost)")
-      tookBack = true
-    end),
-    H.call(function() ends.mark = #ends end),
-    -- her Morph has resolved (her Ot6ActionEnd for command $03 after the
-    -- pick; an earlier Defend of hers can end after it), whatever it did
-    H.kitBattle({ { who = TERRA, cmd = MORPH, boost = 3, self = true } },
-      { untilPlanDone = true, idle = "defend", others = "thin", maxFrames = 60000, planDone = resolved }),
-    H.call(function()
-      if not inBattle() or #ends == ends.mark then return end
-      local x = ends[#ends]
-      H.log(string.format("[trance] at 3 BP: her Morph resolved at f%d, bank %d -> %d", x.f, x.pre, x.post))
-      H.assertEq(morphs, 1, "Morph at 3 BP: TERRA morphed")
-      H.assertEq(x.pre - x.post, 3, "and the bank paid all three points")
-      spent = true
-    end),
-    H.kitBattle({ { who = TERRA, cmd = REVERT, boost = 0, self = true },
-      { who = TERRA, cmd = MORPH, boost = 3, self = true } },
-      { untilPlanDone = true, idle = "defend", others = "thin", maxFrames = 90000,
-        planDone = function() return morphs >= 2 end }),
-    H.call(function()
-      if refused and tookBack and spent and morphs >= 2 then
-        done = true
-        H.log(string.format("[trance] PASS: refused at 0, 1 and 2 BP, taken back at target select for nothing, "
-          .. "morphed at 3 BP for all three points, and again in the same battle (battle %d)", battles))
-      else
-        H.log(string.format("[trance] battle %d ended before the four steps (refused %s, taken back %s, spent %s, "
-          .. "morphs %d): the next", battles, tostring(refused), tostring(tookBack), tostring(spent), morphs))
+      if done[0] and done[1] and done[2] and done[3] then
+        H.log(string.format("[trance] PASS: Morph at 0, 1 and 2 BP lasts %d, %d and %d ticks and pays its boost "
+          .. "(2 by a take-back from 3); at 3 BP nothing is clocked and she holds the morph (battle %d)",
+          SPAN[0], SPAN[1], SPAN[2], battles))
       end
     end),
-    H.cond(function() return not done and inBattle() end, {
+    H.cond(function() return not (done[0] and done[1] and done[2] and done[3]) and inBattle() end, {
       H.kitBattle({}, { untilPlanDone = false }),   -- fight this one out
     }, {}),
-  }, "TERRA's four steps in one battle"),
+  }, "TERRA's four Morphs"),
 })

@@ -1,72 +1,88 @@
 ; ------------------------------------------------------------------------------
-; OT6: Terra's Trance, the divine of her Morph (#378)
+; OT6: Terra's Morph, and Trance, its divine (#378, #427)
 ;
-; kits.md: Trance is Terra's esper-state apex, and it is vanilla's Morph
-; command: once Terra has awakened at Zozo (battle switch $42, which vanilla
-; already reads to give her the Morph row, InitCmd_00), Morph sends her into
-; her esper form, doubling her magic and halving the damage she takes for as
-; long as the morph gauge lasts, all vanilla.  What OT6 adds is the divine's
-; one gate, a full 3-BP boost (kits.md "Divines", owner 2026-10-11): no
-; once-a-battle limit and no other condition.  Revert stays free.
+; kits.md: Morph is vanilla's esper form (magic x2, damage taken halved),
+; learned at the Zozo awakening (battle switch $42).  It is usable at any
+; boost, and the boost buys its duration, once (guidelines "boost pays
+; once"):
+;   0-2 BP   a fixed span that grows with the boost (OT6_MORPH_SPEED);
+;   3 BP     Trance, the divine: she stays morphed until the battle ends or
+;            she reverts, vanilla's permanent morph (the Phunbaba battle's).
+; Vanilla's cross-battle gauge ($1CF6: filled by magicite points, drained
+; by each morph and saved between battles) no longer sets the duration or
+; locks the command: battle_main.asm's RandMorph, UpdateCmd_00 and the
+; morph's start no longer read it, and SaveMorphCounter is gone.  Revert
+; stays free, so she can morph again in the same battle.
 ;
-; Two halves, one rule:
-;   the menu   Ot6TranceOffer, from the C1 stub OpenCmdMenuTbl[$03] now
-;              points at: Morph picked with fewer than three points pending
-;              buzzes and leaves the command window up, so the turn and the
-;              pips stay with the player (magic's refused-confirm shape);
-;   the cast   Ot6TranceGate, at Cmd_03's head: a Morph whose boost was taken
-;              back after the pick, or one the engine chose (Muddle,
-;              Berserk), does not morph; the pending boost is dropped so
-;              Ot6ActionEnd charges nothing for it.
+; Two halves:
+;   Ot6MorphTake, at Cmd_03's head: keeps the boost this Morph was bought
+;     with (OT6_MORPHBOOST), because her morph status lands in UpdateMorph
+;     after Ot6ActionEnd has charged and cleared the pending byte.  A Morph
+;     the engine chose (Muddle, Berserk, Charm, the Colosseum: OT6_UNCTL)
+;     bought nothing; its pending byte is dropped and it takes the 0-BP span.
+;     Mimic, Control and monsters never reach Cmd_03 as a character's Morph
+;     (BattleCmdProp[$03] has neither GOGO nor MIMIC).
+;   Ot6MorphSpan, in UpdateMorph where vanilla divided the counter speed out
+;     of $1CF6: at 3 BP it leaves the morph unclocked (no morphed character
+;     in $3EE2, no gauge), as vanilla's Phunbaba path does; under 3 it
+;     starts the counter ($3F30 = $FFFF) at the span's speed ($3F32), which
+;     DecMorphCounter subtracts once a battle tick (two frames of running
+;     battle time) and shows as the gauge.  A span lasts 65536 / speed
+;     ticks.
 ; ------------------------------------------------------------------------------
 
 .segment "ot6_code"
 
-; [ the command window: may the active character pick Morph? ]
-; jsl from the C1 stub, a8, either index width.  out: carry set = yes.
-; clobbers A; preserves X and Y.
-.proc Ot6TranceOffer
-        .a8
-        phx
-        php
-        rep     #$10
-        .i16
-        lda     f:$7e62ca       ; the active character's slot
-        and     #$03
-        asl
-        longa
-        and     #$00ff
-        tax
-        shorta
-        lda     f:$7e0000+OT6_BOOST_REVEALED,x
-        cmp     #$03            ; carry set iff a full boost is pending
-        bcs     @yes
-        plp
-        plx
-        clc
-        rtl
-@yes:   plp
-        plx
-        sec
-        rtl
-.endproc
+; the counter's speed per boost, 0..2 BP: 65536 / speed battle ticks each
+; (a tick is two frames of running battle time).  Measured on TERRA L26 in
+; the Floating Continent's battles (kits.md, Terra): see there.
+OT6_MORPH_SPEED:
+        .byte   164, 82, 41
 
-; [ Cmd_03's head: does this Morph happen? ]
-; jsl from Cmd_03, a8/i8, db = $7e, y = the attacker.  out: carry set = morph
-; (vanilla runs on); carry clear = not, and the pending boost is dropped.
-; clobbers A; preserves X and Y.
-.proc Ot6TranceGate
+; [ Cmd_03's head: keep the boost this Morph was bought with ]
+; jsl from Cmd_03, a8/i8, db = $7e, y = the attacker.  clobbers A; preserves
+; X, Y and carry is not an output.
+.proc Ot6MorphTake
         .a8
         tya                     ; width-neutral character test
         cmp     #$08
-        bcs     @yes            ; (a monster never morphs; vanilla's business)
-        lda     OT6_BOOST_REVEALED,y
-        cmp     #$03
-        bcs     @yes            ; a full boost: Trance
+        bcs     @out            ; (a monster never morphs; vanilla's business)
+        lda     f:$7e0000+OT6_UNCTL
+        and     $3018,y
+        beq     @own            ; the player picked it
         lda     #$00
-        sta     OT6_BOOST_REVEALED,y    ; nothing bought, nothing charged
+        sta     OT6_BOOST_REVEALED,y    ; the engine's pick buys nothing
+@own:   lda     OT6_BOOST_REVEALED,y
+        sta     OT6_MORPHBOOST
+@out:   rtl
+.endproc
+
+; [ UpdateMorph: how long does this morph last? ]
+; jsl from UpdateMorph's morph arm, a8, either index width, db = $7e,
+; x = the morpher, no character morphed yet ($3EE2 negative).  out: carry set = a 3-BP Trance,
+; which lasts the battle (nothing is clocked); carry clear = the morph is
+; clocked: $3EE2 = x, $3F30 = $FFFF, $3F32 = the span's speed.
+; clobbers A; preserves X and Y.
+.proc Ot6MorphSpan
+        .a8
+        lda     OT6_MORPHBOOST
+        cmp     #$03
+        bcs     @out            ; a full boost: until the battle ends or she reverts
+        php
+        sep     #$10            ; (either index width at the call: x < $14)
+        .i8
+        stx     $3ee2           ; the morphed character
+        phx
+        tax
+        lda     f:OT6_MORPH_SPEED,x
+        sta     $3f32           ; the counter speed (a word)
+        stz     $3f33
+        lda     #$ff
+        sta     $3f30           ; the counter starts full
+        sta     $3f31
+        plx
+        plp
+        .i16                    ; (the assembler's default again; plp restored the caller's)
         clc
-        rtl
-@yes:   sec
-        rtl
+@out:   rtl
 .endproc
