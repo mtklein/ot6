@@ -177,7 +177,7 @@ release is published:
   critic is an optional extra look.
 - The release commit: `VERSION` bumped, the notes moved to
   docs/release-notes-vX.Y.md with the previous release's title, how-to-play
-  and save sections, a fresh release-notes-next.md, README's current-release
+  and save sections (how-to-play names the zip's `saves/` folder), a fresh release-notes-next.md, README's current-release
   line and tag link; branch `release/vX.Y` at it. The bump relinks only the
   ROM's two version fields (tools/build/rom_version.py); states bind to
   the ROM's identity with those masked, so it regenerates nothing.

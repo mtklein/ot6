@@ -918,12 +918,33 @@ w.edge([bps], "sh", [BASE, "build/ot6.sfc"], implicit=qual + release_pre,
 w.edge([f"{rel_dir}/RELEASE_NOTES.md"], "sh", [notes, "VERSION"],
        cmd=f'mkdir -p "{rel_dir}" && cp "{notes}" "{rel_dir}/RELEASE_NOTES.md"',
        desc="release notes")
-w.edge([f"build/release/ot6-v{VERSION}.zip"], "sh",
-       [bps, f"{rel_dir}/RELEASE_NOTES.md"],
-       cmd=f'rm -f "build/release/ot6-v{VERSION}.zip" && cd build/release &&'
+# saves/: every tracked checkpoint's battery save, named in story order,
+# and a README (tools/release_saves.py).  Staged without qualification;
+# the zip still needs it.
+saves_readme = f"{rel_dir}/saves/README.txt"
+saves_inputs = ["tools/release_saves.py", "tools/tests/lib/sram_checkpoint.py",
+                "tools/tests/lib/savestate_ninja.py", sn.GRAPH] + \
+    [p for m in glob("tools/tests/checkpoints/*/manifest.json")
+     if not Path(m).parent.name.startswith("negative")
+     for p in sn.checkpoint_inputs(ROOT, Path(m).parent.name)]
+read_deps.add("tools/tests/checkpoints")   # a new checkpoint re-runs this
+w.edge([saves_readme], "sh", implicit=saves_inputs,
+       cmd=f'python3 tools/release_saves.py stage "{rel_dir}"',
+       desc="release saves")
+release_zip = f"build/release/ot6-v{VERSION}.zip"
+w.edge([release_zip], "sh",
+       [bps, f"{rel_dir}/RELEASE_NOTES.md", saves_readme],
+       cmd=f'rm -f "{release_zip}" && cd build/release &&'
            f' zip -q -j "ot6-v{VERSION}.zip" "ot6-v{VERSION}/{BASE[:-4]}.bps"'
-           f' "ot6-v{VERSION}/RELEASE_NOTES.md"',
+           f' "ot6-v{VERSION}/RELEASE_NOTES.md"'
+           f' && cd "ot6-v{VERSION}" && zip -q -D "../ot6-v{VERSION}.zip"'
+           f' saves/*.srm saves/README.txt',
        desc=f"release zip v{VERSION}")
+w.edge(["build/checks/release_saves.ok"], "sh", [release_zip],
+       implicit=saves_inputs,
+       cmd=f'python3 tools/release_saves.py check "{release_zip}"'
+           f' && touch build/checks/release_saves.ok',
+       desc="release zip holds every tracked checkpoint's save")
 
 # The OT6 Patcher APK (android/, docs/TOOLING.md "Android patcher"): carries
 # the patch and writes the patched ROM on the player's device.  Only `ninja
@@ -986,7 +1007,7 @@ w.edge(["build.ninja"], "configure",
        ["configure.py", sn.GRAPH, "tools/tests/lib/savestate_ninja.py",
         "VERSION", "tools/build/rom_version.py", "ff6/include/ot6_version.inc"])
 w()
-w.edge(["release"], "phony", [f"build/release/ot6-v{VERSION}.zip", apk,
+w.edge(["release"], "phony", [release_zip, "build/checks/release_saves.ok", apk,
                               "build/checks/android_apk.ok",
                               "build/checks/android_apk_release.ok"])
 # `chain` is the one other alias: the play from power-on's last state
