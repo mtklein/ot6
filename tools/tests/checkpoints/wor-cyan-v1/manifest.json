@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-cyan.sram",
+  "slot": 3,
+  "milestone": "wor-cyan",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "map": 1,
+      "x": 36,
+      "y": 156
+    }
+  },
+  "size": 32768,
+  "sha256": "183c2d2d3716381d7a758ad202d884ebf4aa6736dbaefb6bc387fd43c243548d",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "183c2d2d3716381d7a758ad202d884ebf4aa6736dbaefb6bc387fd43c243548d",
+    "generator_sig": "a7a05082f3852329bcd1d3d66fda63e87b4bbbb93b68553d65ee522e40f8333d gen_wor_storm tools/tests/checkpoints/wor-mtzozo-v1/manifest.json tools/tests/checkpoints/wor-mtzozo-v1/wor-mtzozo.sram",
+    "ancestors": [
+      {
+        "path": "tools/tests/checkpoints/wor-mtzozo-v1/manifest.json",
+        "sha256": "7f0e78373b8c686b502fbcdd571a511b9eb8492d99cea7002069b8346015ecfd"
+      }
+    ]
+  }
+}

@@ -2250,6 +2250,54 @@ Ot6ShieldTbl:
         .byte   12, OT6_SLASH|OT6_BLUDG|OT6_SPECIAL ; phunbaba 4: terra
                                 ;   morphed with two of the four, 26000 hp
                                 ;   to the kill; slash is her blade's key
+        ; ---- the world of ruin: cyan (the plains round zozo, jidoor and
+        ; maranda, mt. zozo, the storm dragon; docs/design/route-wor-cyan.md
+        ; section 6) -------------------------------------------------------
+        ; The plains' six (world groups 48-50, met a step from the falcon)
+        ; are vanilla's late-game pool; their vanilla elements stay (ice,
+        ; fire, bolt, water).  Mt. zozo's five come in packs and pairs:
+        ; cyan's stunner cuts every body at once.
+        .word   $005b
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; crawler: a shelled crawler; the
+                                ;   blow cracks it, the point finds the
+                                ;   joints.  ice vanilla
+        .word   $0099
+        .byte   3, OT6_SLASH|OT6_PIERCE ; geckorex: lizard hide.  ice
+                                ;   vanilla
+        .word   $003b
+        .byte   2, OT6_BLUDG    ; reach frog: soft, crushed.  ice vanilla
+        .word   $00d2
+        .byte   3, OT6_SLASH|OT6_BLUDG ; mantodea: cut or crush the scythes;
+                                ;   three, so the party breaks it before
+                                ;   its battle lands (route-wor-terra 8).
+                                ;   fire vanilla
+        .word   $0087
+        .byte   3, OT6_PIERCE|OT6_SLASH ; sprinter: a running bird.  bolt
+                                ;   vanilla
+        .word   $00b0
+        .byte   1, OT6_SLASH|OT6_PIERCE|OT6_BLUDG ; spek tor: 250 hp, any
+                                ;   blow.  water vanilla
+        .word   $008e
+        .byte   2, OT6_SLASH|OT6_PIERCE ; luridan: horned, in herds of three
+                                ;   and six.  fire|wind vanilla (cyan's
+                                ;   tempest)
+        .word   $00f2
+        .byte   4, OT6_BLUDG|OT6_SLASH ; borras: the brute; break it before
+                                ;   the uppercut.  poison vanilla
+        .word   $00dd
+        .byte   3, OT6_SLASH|OT6_PIERCE ; punisher.  poison vanilla
+        .word   $00c5
+        .byte   2, OT6_SLASH|OT6_BLUDG ; scrapper: absorbs poison (vanilla),
+                                ;   so the bio blaster heals it beside the
+                                ;   punishers
+        .word   $0014
+        .byte   2, OT6_BLUDG|OT6_SLASH ; ursus: two, so it breaks before it
+                                ;   runs.  fire vanilla
+        .word   $014b
+        .byte   14, OT6_SLASH|OT6_PIERCE ; storm drgn: 42000 hp; blades cut
+                                ;   the hide (cyan's quadra slam chips four
+                                ;   a turn), bolt (vanilla) finds it; wind
+                                ;   it absorbs (cyan's tempest heals it)
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian

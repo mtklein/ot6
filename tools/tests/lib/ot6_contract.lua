@@ -1656,6 +1656,97 @@ M.contracts["wor-terra-v1"] = {
   },
 }
 
+-- wor-mtzozo-v1: Mt. Zozo's save point (179 (40,15)), the Storm Dragon's
+-- retry point: Lola's letters read and the reply sent by carrier pigeon
+-- ($0298), the Rust-Rid bought ($01DB) and Zozo's rusted door opened ($0356
+-- cleared), CYAN joined on the cliff ($00D2), his key and chest ($0297,
+-- $01D9), Lola again with him ($029C, $029D), and the party regrouped to
+-- CYAN, TERRA, CELES and SABIN, CYAN wearing Palidor; the Storm Dragon not
+-- yet fought ($029A) (docs/design/route-wor-cyan.md).  No timer.
+M.contracts["wor-mtzozo-v1"] = {
+  slot = 3,
+  field = { map = 179, x = 40, y = 15 },   -- the vanilla save point ($0632)
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00BF, 1, "Phunbaba beaten, TERRA rejoined (_cc4c1b)" },
+    { 0x0298, 1, "Lola's reply flown by carrier pigeon (_cc3f12)" },
+    { 0x01DB, 1, "the Rust-Rid bought (_ca951d)" },
+    { 0x0356, 0, "Zozo's rusted door dissolved (_ca95be)" },
+    { 0x00D2, 1, "CYAN joined (_cc3fa7)" },
+    { 0x0297, 1, "the key to CYAN's chest (_cc4355)" },
+    { 0x01D9, 1, "CYAN's chest opened (_cc42c9)" },
+    { 0x029C, 1, "Lola met CYAN (_cc3e45)" },
+    { 0x029D, 1, "CYAN exchanged the letters (_cc3eef)" },
+    { 0x029A, 0, "the Storm Dragon not yet fought (_cc43cd)" },
+  },
+  party = {
+    size = 4,                     -- CYAN, TERRA, CELES and SABIN
+    members = {
+      { 0x02, "CYAN" },
+      { 0x00, "TERRA" },
+      { 0x06, "CELES" },
+      { 0x05, "SABIN" },
+    },
+  },
+  ram = {
+    { 0x1600 + 37 * 2 + 0x1E, 0xFF, 9, "CYAN wears Palidor" },
+    { 0x1F62, 0xFF, 45, "the Falcon parked at x 45, beside Zozo (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 130, "the Falcon parked at y 130 (save-block cell $1F63)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+    { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
+    { 0x1190, 0xFF, 0x00, "timer 1 counter high" },
+    { 0x1195, 0xFF, 0x00, "timer 2 counter low" },
+    { 0x1196, 0xFF, 0x00, "timer 2 counter high" },
+    { 0x119B, 0xFF, 0x00, "timer 3 counter low" },
+    { 0x119C, 0xFF, 0x00, "timer 3 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
+-- wor-cyan-v1: the World of Ruin map, on foot beside the Falcon parked
+-- outside Jidoor (36,156), after the Storm Dragon on Mt. Zozo (event battle
+-- 133, _cc43cd: $029A), the walk down and Jidoor's item counter; CYAN,
+-- TERRA, CELES and SABIN (docs/design/route-wor-cyan.md).  No timer.
+M.contracts["wor-cyan-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 36, y = 156 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00D2, 1, "CYAN joined (_cc3fa7)" },
+    { 0x029D, 1, "CYAN exchanged the letters (_cc3eef)" },
+    { 0x029A, 1, "the Storm Dragon beaten (_cc43cd)" },
+  },
+  party = {
+    size = 4,                     -- CYAN, TERRA, CELES and SABIN
+    members = {
+      { 0x02, "CYAN" },
+      { 0x00, "TERRA" },
+      { 0x06, "CELES" },
+      { 0x05, "SABIN" },
+    },
+  },
+  ram = {
+    { 0x1F62, 0xFF, 36, "the Falcon parked at x 36 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 156, "the Falcon parked at y 156 (save-block cell $1F63)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+    { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
+    { 0x1190, 0xFF, 0x00, "timer 1 counter high" },
+    { 0x1195, 0xFF, 0x00, "timer 2 counter low" },
+    { 0x1196, 0xFF, 0x00, "timer 2 counter high" },
+    { 0x119B, 0xFF, 0x00, "timer 3 counter low" },
+    { 0x119C, 0xFF, 0x00, "timer 3 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
