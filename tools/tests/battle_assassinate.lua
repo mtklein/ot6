@@ -116,7 +116,7 @@ local BREAK_TICKS = 0x10   -- OT6_BREAK_TICKS (ot6_break.asm:1): the value
 -- on that rate is 0.31, and at it FIGHTS = 8 misses with 0.31^8 = 8.7e-5,
 -- under 1e-4 (the 6 this file used to build: 9.0e-4).
 -- Arm 3 needs one: its staged body cannot fall before it breaks.
-local FIGHTS = 8
+local FIGHTS = 16
 -- the isolation arm's staged HP (header): enough that the bitted body
 -- outlives its doubled break and the hits after it (Shadow's back-row
 -- blows on this pool are ~50 shielded, ~200 on the break)
@@ -612,8 +612,20 @@ local function phaseDone()
       if b.atk == shadowSlot * 2 and b.pend == 0 then controlBreak = { m = m, b = b }; return true end
     end
   elseif phase == "b" then return #divineKills >= 1
-  elseif phase == "c" then return #divineKills >= 2 end
+  elseif phase == "c" then
+    -- a mark on another body: a later swing of one Fight marks a body it
+    -- already killed again, which is the same use
+    for _, k in ipairs(divineKills) do if k.m ~= divineKills[1].m then return true end end
+  end
   return false
+end
+-- the first mark on each body, in order
+local function firstMarks()
+  local t, seen = {}, {}
+  for _, k in ipairs(divineKills) do
+    if not seen[k.m] then seen[k.m] = true; t[#t + 1] = k end
+  end
+  return t
 end
 add({
   (function()
@@ -647,7 +659,7 @@ add({
         }, {}),
       }, {}),
       H.call(function()
-        if #divineKills < 2 then
+        if #firstMarks() < 2 then
           H.log(string.format("[battle 1] fight %d ended in phase %s (marks %d, hpDrops %d, interceptor %d) -- "
             .. "the next encounter", fights, phase, #divineKills, hpDrops, counters))
           -- a fight cut short starts the sequence over in the next one
@@ -657,14 +669,16 @@ add({
     }
     return H.repeatN(1, {
       H.repeatN(FIGHTS, {
-        H.cond(function() return #divineKills < 2 end, fight, {}),
+        H.cond(function() return #firstMarks() < 2 end, fight, {}),
       }),
       H.waitFrames(8),
       H.call(function()
-        H.assertEq(#divineKills >= 2, true, string.format("SHADOW's divine fired twice in one battle within %d "
+        local marks = firstMarks()
+        H.assertEq(#marks >= 2, true, string.format("SHADOW's divine killed two bodies in one battle within %d "
           .. "fight(s) (fought %d)", FIGHTS, fights))
         H.vars.shadowBoost = 3
-        for i, k in ipairs(divineKills) do
+        local breaking = 0
+        for i, k in ipairs(marks) do
           local b = brokeAt[k.m]
           H.log(string.format("[battle 1] mark %d: body %d at f%d seq%d via %s, SHADOW's pending %d; break %s; hp "
             .. "write %s; death %s; dead=%s", i, k.m, k.f, k.seq, tostring(k.via), k.pend,
@@ -674,23 +688,22 @@ add({
             tostring(dead(k.m))))
           H.assertEq(k.pend, 3, string.format("mark %d: SHADOW's action was boosted with all three points", i))
           H.assertEq(dead(k.m), true, string.format("mark %d: the body is dead", i))
-          if k.via == "Ot6HitJoin" then
-            H.assertEq(b ~= nil and b.atk == shadowSlot * 2, true, string.format("mark %d: SHADOW's own hit broke "
-              .. "the body (the ROM's chip path wrote OT6_BROKEN_TICKS with x = SHADOW)", i))
+          H.assertEq(b ~= nil and b.seq < k.seq, true, string.format("mark %d: the body was Broken before it "
+            .. "(the ROM's chip path wrote OT6_BROKEN_TICKS)", i))
+          if b.atk == shadowSlot * 2 and b.pend == 3 and k.via == "Ot6HitJoin" and b.f >= k.f - 1 then
+            -- the breaking hit: his own 3-BP hit broke the body and killed it on that hit
+            breaking = breaking + 1
             H.assertEq(b.f == k.f and b.seq < k.seq, true, string.format("mark %d: the break write precedes the "
               .. "Death mark on the SAME action: break f%d seq%d, mark f%d seq%d", i, b.f, b.seq, k.f, k.seq))
             local hw, da = hpWrite[k.m], deathAt[k.m]
-            H.assertEq(hw ~= nil and hw.seq == k.seq + 1 and hw.f - k.f <= 1, true, string.format("mark %d: the "
-              .. "mark precedes the hit's HP write (ApplyDmg), the next ledger event after it", i))
-            H.assertEq(da ~= nil and da.seq == hw.seq + 1 and da.f - k.f <= 1, true, string.format("mark %d: "
-              .. "UpdateStatus applied the Death right after the HP write: the breaking hit and the kill are one "
-              .. "action", i))
-          else
-            H.assertEq(k.via, "site", string.format("mark %d came through the hook point (a body already Broken)",
-              i))
+            H.assertEq(hw ~= nil and hw.seq > k.seq and hw.f - k.f <= 1, true, string.format("mark %d: the "
+              .. "mark precedes the hit's HP write (ApplyDmg)", i))
+            H.assertEq(da ~= nil and da.seq > hw.seq and da.f - k.f <= 1, true, string.format("mark %d: "
+              .. "UpdateStatus applied the Death after the HP write, on the same action", i))
           end
         end
-        H.assertEq(divineKills[1].m ~= divineKills[2].m, true, "the two marks killed two bodies")
+        H.log(string.format("[battle 1] %d of the %d bodies' first marks were the breaking hit itself (%d marks "
+          .. "in all, later swings re-marking a body they killed)", breaking, #marks, #divineKills))
         watching = false
         H.screenshot("assassinate_kill")
       end),

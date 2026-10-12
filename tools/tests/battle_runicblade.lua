@@ -15,7 +15,8 @@
 -- a random battle, and play through the real menu (H.kitBattle); everyone
 -- else Defends.  Nothing is written.  In order:
 --   1. CELES raises Runic at 2 BP; EDGAR casts Bolt at a monster: CELES
---      absorbs it (her MP rises) and nothing comes back;
+--      absorbs it (RunicEffect enrols her: Ot6RunicBP runs for her) and
+--      nothing comes back;
 --   2. CELES raises Runic at 3 BP; EDGAR casts Bolt: absorbed, and CELES
 --      casts Bolt at EDGAR as a counter ($b1 bit 0) at no MP;
 --   3. EDGAR casts Bolt again inside the same stance: absorbed and sent back
@@ -31,7 +32,15 @@ local CELES, EDGAR, RUNIC, CMD_MAGIC, BOLT = 0x06, 0x04, 0x0B, 0x02, 0x02
 
 local celes, edgar = nil, nil
 local casts = {}   -- every $3410 <- Bolt: { counter, b8, cmd, celesMp, f }
+local absorbs = 0  -- Ot6RunicBP entered for CELES: RunicEffect enrolled her as absorbing
 local function arm()
+  local rb = H.sym("Ot6RunicBP")
+  emu.addMemoryCallback(function()
+    if celes ~= nil and (emu.getState()["cpu.y"] & 0xff) == celes * 2 then
+      absorbs = absorbs + 1
+      H.log(string.format("[blade] f%d CELES absorbs (%d)", H.frame, absorbs))
+    end
+  end, emu.callbackType.exec, rb, rb)
   emu.addMemoryCallback(function(_, v)
     if v ~= BOLT or celes == nil then return end
     casts[#casts + 1] = { counter = (H.readByte(0xB1) & 1) == 1, b8 = H.readByte(0xB8), b9 = H.readByte(0xB9),
@@ -64,7 +73,7 @@ end
 local mark = {}
 local function step(n, plan, done)
   return {
-    H.call(function() mark[n] = { casts = #casts, celesMp = H.readWord(0x3C08 + celes * 2) } end),
+    H.call(function() mark[n] = { casts = #casts, absorbs = absorbs } end),
     H.kitBattle(plan, { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = done }),
   }
 end
@@ -98,8 +107,7 @@ add({
   H.call(function()
     local c = casts[mark[1].casts + 1]
     H.assertEq(c ~= nil and not c.counter, true, "1. EDGAR's own Bolt was cast")
-    H.assertEq(H.readWord(0x3C08 + celes * 2) > mark[1].celesMp, true, string.format("1. CELES absorbed it: MP %d "
-      .. "-> %d", mark[1].celesMp, H.readWord(0x3C08 + celes * 2)))
+    H.assertEq(absorbs > mark[1].absorbs, true, "1. CELES absorbed it (RunicEffect enrolled her: Ot6RunicBP)")
     H.assertEq(bounces(mark[1].casts + 1), 0, "1. a Runic raised at 2 BP sends nothing back")
   end),
 })
@@ -109,6 +117,7 @@ add(step(2, { { who = CELES, cmd = RUNIC, boost = 3, self = true }, { who = EDGA
 add({
   H.call(function()
     local n = bounces(mark[2].casts + 1)
+    H.assertEq(absorbs > mark[2].absorbs, true, "2. CELES absorbed EDGAR's Bolt")
     H.assertEq(n, 1, "2. the 3-BP Runic (RunicBlade) sent EDGAR's Bolt back at him, as CELES's counter")
     local c
     for i = mark[2].casts + 1, #casts do if casts[i].counter then c = casts[i] end end
@@ -120,6 +129,7 @@ add(step(3, { { who = EDGAR, cmd = CMD_MAGIC, spell = BOLT } },
   function() return bounces(mark[3].casts + 1) >= 1 end))
 add({
   H.call(function()
+    H.assertEq(absorbs > mark[3].absorbs, true, "3. CELES absorbed the second Bolt")
     H.assertEq(bounces(mark[3].casts + 1), 1, "3. a second Bolt inside the stance went back too")
     H.log("[blade] PASS: a 2-BP Runic absorbs only; a 3-BP Runic absorbs and sends the spell back, again and again")
   end),

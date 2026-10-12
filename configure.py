@@ -496,6 +496,9 @@ TEST_ENV = {
     # frames, 1,213 s at 80.7 frames/s): 1800 is 1.48x it
     # (build/attempts/wt/procboost-magicite/neg/nomeasure_k1.log.gz)
     "battle_procboost": "OT6_TIMEOUT=1800",
+    # the 3-BP gate (#378): up to 16 fights for the two-kill battle, and the
+    # isolation arm's up to 16 more; a fight is 2-9k frames (round b5)
+    "battle_assassinate": "OT6_TIMEOUT=3600",
     # v0.27 kits (#398, #378): TERRA, EDGAR and SHADOW on the Floating
     # Continent, from the alcove's save; a run is the Continue, a walk and
     # one battle of scripted turns (3-11k frames on the branch's runs)
