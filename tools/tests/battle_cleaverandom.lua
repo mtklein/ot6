@@ -14,8 +14,10 @@
 -- generated battle Muddles Cyan on cue: the highest tech known ($2020) := 7
 -- and the learned set ($1CF7) := all eight, MP := 999, both soldiers' HP :=
 -- 30,000 (so his own techs do not end the battle before the picks are
--- counted), and Muddle ($3EE5 bit 5) set on him again whenever a hit
--- clears it.  Nothing else is touched: the command, the pick and the
+-- counted), Muddle ($3EE5 bit 5) set on him again whenever a hit clears
+-- it, and his HP put back to his max whenever it falls under half (Muddled,
+-- his techs land on himself too: the first run, at 14f02de1, lost him after
+-- three picks).  Nothing else is touched: the command, the pick and the
 -- attack are the engine's.
 --
 -- Watched: each RandBushido entry, and the bound RandA takes right after
@@ -86,6 +88,10 @@ H.run({ maxFrames = 120000 }, {
       if H.battleActive() and not muddled() and (H.readByte(0x3EE4 + cyanSlot * 2) & 0xC2) == 0 then
         H.writeByte(0x3EE5 + cyanSlot * 2, H.readByte(0x3EE5 + cyanSlot * 2) | 0x20)
       end
+      -- Muddled, his techs land on himself too: his HP is put back to his
+      -- max whenever it falls under half, so he lasts for the picks
+      local hp, mx = H.readWord(0x3BF4 + cyanSlot * 2), H.readWord(0x3C1C + cyanSlot * 2)
+      if H.battleActive() and hp > 0 and hp < mx // 2 then H.writeWord(0x3BF4 + cyanSlot * 2, mx) end
       H.setPad(H.frame % 8 < 4 and { a = true } or {})   -- the menus Muddle leaves him: none; dialogs: A
     end),
   }, "PICKS random SwdTechs"),
