@@ -57,6 +57,19 @@ local JEWEL_RING, STAR_PENDANT, PEACE_RING, BLACK_BELT = 0xB5, 0xB1, 0xB2, 0xD5
 local BACK_GUARD = 0xE1                             -- no back or pincer attacks (ChooseBattleType @2e3a)
 local RAMUH = 0                                     -- esper index
 local AIR_BLADE = 0x62                              -- SABIN's blitz, learned at L30
+-- The Tentacles are fought banking pips: each member acts unboosted until
+-- it holds 3 BP, then spends all 3, so EDGAR's AutoCrossbow and SABIN's
+-- Air Blade land at x8 on all four bodies (a 3-BP AutoCrossbow took
+-- 16647 in one turn) instead of chipping 1-BP hits the Seize and its drain
+-- heal back.  Informed: 22,000 HP over four bodies that each Seize a
+-- Slowed member is a damage race, and boost is the lever that wins it.
+-- Measured from six engine-room stops of this generator (shifts 0, 7, 13,
+-- 20, 31, 40), 64 talk waits each, retries off, by distinct (stop, battle
+-- key), all on the #425 driver: without the bank, 3 of 90 lost, wins a
+-- median 10212 ticks with 9 wins losing a member; with it, 2 of 90 lost,
+-- a median 6961 ticks and 4 (route-wor-edgar 12.7;
+-- build/attempts/wt/v028-edgar-lab/).
+local TENTACLES_BANK = 3
 local TENTACLES_FORM = 454                          -- event battle 84
 local B2_EXITS = { { 13, 12 }, { 14, 8 }, { 2, 13 }, { 4, 6 }, { 8, 18 }, { 8, 6 } }  -- map 62's doors
 local MAP_CAVE1, MAP_CAVE2, MAP_CAVE3, MAP_CAVE4 = 68, 90, 92, 53
@@ -607,7 +620,7 @@ H.run({ maxFrames = 600000 }, {
   H.advanceStory(function()
     return sw(0x00C6) == 1 and H.hasControl() and H.tileAligned() and not H.dialogWaiting()
       and bright() >= 15
-  end, 60000, { playBattles = "tactical", fight = { blitz = AIR_BLADE } }),
+  end, 60000, { playBattles = "tactical", fight = { blitz = AIR_BLADE, bank = TENTACLES_BANK } }),
   H.call(function()
     say("castle", "EDGAR joined, the Tentacles beaten")
     local o = H.outcomes[#H.outcomes]
