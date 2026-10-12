@@ -7,8 +7,11 @@
 -- 7-10).  Played: Continue fc-alcove-v1 (TERRA L26 knows Break, her level-24
 -- spell), walk onto the continent into a random battle, and cast Break
 -- through the real menu at the shielded monster with the most shields, at
--- 1 BP, 0 BP and 3 BP (Defends bank the points, and wait out a Break before
--- the next cast); everyone else Defends.
+-- 0, 1 and 3 BP (Defends bank the points, and wait out a Break before the
+-- next cast); everyone else Defends.  A battle where TERRA cannot cast (this
+-- map's Apokryphos mutes) is fought out and the next one taken, and a cast
+-- the battle's end cuts off, or one that charged no MP, is not counted.
+
 -- Nothing is written.
 --
 -- Asserted per cast, from what the engine did (the spell's own $3410 write
@@ -119,16 +122,30 @@ end
 -- unboosted Break, checked but not counted, breaks it, and the party
 -- Defends until its Break runs out and its shields come back (Ot6Tick).
 local CASTS = { { boost = 0, need = 2 }, { boost = 1, need = 2 }, { boost = 3, need = 1 } }
-local doneCast, cur, nDone, fillers = {}, nil, 0, 0
-local plan, targets = {}, {}
+local doneCast, cur, nDone, fillers, turns = {}, nil, 0, 0, 0
+local plan, targets, mode, nrec = {}, {}, nil, 0
+-- TERRA can cast: standing (no Wound, Petrify, Imp or Zombie) and not Mute,
+-- Sleep, Muddle or Berserk -- this map's Apokryphos casts Silencer (Mute)
+local function terraCasts()
+  local e = terraSeat * 2
+  return H.readWord(0x3BF4 + e) > 0 and (H.readByte(0x3EE4 + e) & 0xE2) == 0
+    and (H.readByte(0x3EE5 + e) & 0xB8) == 0
+end
 local function decide()
-  if terraSeat == nil then
-    for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == TERRA then terraSeat = s end end
-    H.assertEq(terraSeat ~= nil, true, "TERRA is seated")
+  turns = turns + 1
+  H.assertEq(turns <= 16, true, "the three counted casts within 16 tries")
+  for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == TERRA then terraSeat = s end end
+  H.assertEq(terraSeat ~= nil, true, "TERRA is seated")
+  cur, plan, mode, nrec = nil, {}, "cast", #recs
+  if not terraCasts() then
+    mode = "fightout"
+    H.log(string.format("[break] TERRA cannot cast here (status %02X %02X): this battle is fought out and the "
+      .. "next one taken", H.readByte(0x3EE4 + terraSeat * 2), H.readByte(0x3EE5 + terraSeat * 2)))
+    return
   end
   local t, sh = pickTarget()
-  cur, plan = nil, {}
   if t == nil or sh < 1 then
+    mode = "wait"
     H.log("[break] no live unbroken shielded body: the party Defends until a Break runs out")
     return
   end
@@ -146,28 +163,39 @@ local function decide()
 end
 local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
 
-H.run({ maxFrames = 400000 }, {
+H.run({ maxFrames = 600000 }, {
   H.bootCheckpoint("fc-alcove-v1"),
   H.call(function() arm() end),
   H.fcAlcoveToBattle("break"),
-  H.driveUntil(function() return nDone == #CASTS end, 180000, {
+  H.driveUntil(function() return nDone == #CASTS end, 500000, {
+    H.cond(function() return not H.battleLoadStarted() end, { H.paceToEncounter("break", 0) }, {}),
     H.call(decide),
-    H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000,
-      planDone = function()
-        if #plan == 0 then local t, sh = pickTarget(); return t ~= nil and sh >= 1 end
-        return close()
-      end }),
-    H.call(function()
-      if #plan == 0 then return end
-      local r = recs[#recs]
-      if cur ~= nil then
-        check(r, CASTS[cur].boost, targets[cur])
-        doneCast[cur] = true
-        nDone = nDone + 1
-      else
-        check(r, 0, targets[0])
-      end
-    end),
+    H.cond(function() return mode == "fightout" end, { H.kitBattle({}, {}) }, {
+      H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000,
+        planDone = function()
+          if mode == "wait" then local t, sh = pickTarget(); return t ~= nil and sh >= 1 end
+          return close()
+        end }),
+      H.call(function()
+        if mode ~= "cast" then return end
+        if #recs == nrec then
+          H.log("[break] the battle ended before the cast resolved: not counted")
+          return
+        end
+        local r = recs[#recs]
+        if r.mp0 == r.mp1 then
+          H.log("[break] the cast charged no MP (it did not resolve): not counted")
+          return
+        end
+        if cur ~= nil then
+          check(r, CASTS[cur].boost, targets[cur])
+          doneCast[cur] = true
+          nDone = nDone + 1
+        else
+          check(r, 0, targets[0])
+        end
+      end),
+    }),
   }, "the three counted casts"),
   H.call(function()
     H.log(string.format("[break] PASS: Break took 1 + boost shields at 0, 1 and 3 BP (%d filler cast(s)), no "

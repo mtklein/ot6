@@ -11,7 +11,10 @@
 --
 -- Played: Continue fc-alcove-v1 (TERRA L26 knows Fire and Drain), walk onto
 -- the continent into a random battle, and cast through the real menu
--- (H.kitBattle); everyone else Defends.  In order:
+-- (H.kitBattle); everyone else Defends.  Each cast in whatever battle is
+-- up: one where TERRA cannot cast (this map's Apokryphos mutes) is fought
+-- out and the next taken, and a cast cut off or charged no MP is played
+-- again.  In order:
 --   1. Drain at 1 BP -- the control for the multiplier watch: a spell
 --      outside the tier families is multiplied, and the watch sees
 --      Ot6BoostDmg write $11b0;
@@ -75,39 +78,28 @@ local function close()
 end
 
 local listCost = {}
-local function cast(spell, boost, tag)
-  return H.kitBattle({ { who = TERRA, cmd = CMD_MAGIC, spell = spell, boost = boost } },
-    { untilPlanDone = true, idle = "defend", maxFrames = 60000,
-      onList = function() listCost[tag] = costOf(spell) end,
-      planDone = function() return close() end })
+-- the casts, in order; each in whatever battle is up (a battle that ends
+-- before a cast resolves, or one where TERRA cannot cast -- this map's
+-- Apokryphos mutes -- is fought out and the next one taken; a cast that
+-- charged no MP is not counted and is played again)
+local CASTS = {
+  { spell = DRAIN, boost = 1, tag = "drain" },
+  { spell = FIRE, boost = 3, tag = "fire3" },
+  { spell = FIRE, boost = 3, tag = "ultima" },
+}
+local nDone, turns, mode, nrec = 0, 0, nil, 0
+local plan = {}
+local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
+local function terraCasts()
+  local e = seat * 2
+  return H.readWord(0x3BF4 + e) > 0 and (H.readByte(0x3EE4 + e) & 0xE2) == 0
+    and (H.readByte(0x3EE5 + e) & 0xB8) == 0
 end
-
-H.run({ maxFrames = 400000 }, {
-  H.bootCheckpoint("fc-alcove-v1"),
-  H.call(function()
-    arm()
-    H.assertEq(H.readByte(SW) & SWBIT, 0, "switch $00BF is clear at the alcove (TERRA has not rejoined in the WoR)")
-  end),
-  H.fcAlcoveToBattle("ultima"),
-  H.call(function()
-    for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == TERRA then seat = s end end
-    H.assertEq(seat ~= nil, true, "TERRA is seated")
-    H.log(string.format("[ultima] TERRA seat %d, MP %d, bank %d", seat, mp(), H.readByte(0x3E9C + seat * 2)))
-  end),
-  cast(DRAIN, 1, "drain"),
-  H.call(function()
-    local r = recs[1]
+local function checkCast(i, r)
+  if i == 1 then
     H.assertEq(r.spell == DRAIN and r.pend == 1, true, "cast 1 was Drain at 1 BP")
-    if r.mp0 - r.mp1 > 0 then
-      H.assertEq(r.writes >= 1, true, "the watch sees Ot6BoostDmg multiply a boosted Drain (the control)")
-    else
-      H.log("[ultima] the Drain charged no MP (it did not resolve as a paid cast): no control from it this "
-        .. "run; the mutant ultima_mult is the watch's control (build/attempts/wt/v027-kits/)")
-    end
-  end),
-  cast(FIRE, 3, "fire3"),
-  H.call(function()
-    local r = recs[2]
+    H.assertEq(r.writes >= 1, true, "the watch sees Ot6BoostDmg multiply a boosted Drain (the control)")
+  elseif i == 2 then
     H.log(string.format("[ultima] the list priced Fire at %s with 3 BP pending, the switch clear",
       tostring(listCost.fire3)))
     H.assertEq(listCost.fire3, 51, "the list prices a 3-BP Fire at Fire 3's 51")
@@ -115,16 +107,57 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(r.mp0 - r.mp1, 51, "and costs Fire 3's 51")
     H.writeByte(SW, H.readByte(SW) | SWBIT)
     H.log("[ultima] switch $00BF set (declared expedient: TERRA's World of Ruin return)")
-  end),
-  cast(FIRE, 3, "ultima"),
-  H.call(function()
-    local r = recs[3]
+  else
     H.log(string.format("[ultima] the list priced Fire at %s with 3 BP pending, the switch set",
       tostring(listCost.ultima)))
     H.assertEq(listCost.ultima, 80, "the list prices a 3-BP Fire at Ultima's 80")
     H.assertEq(r.spell, ULTIMA, "a 3-BP Fire after the unlock casts Ultima ($14)")
     H.assertEq(r.mp0 - r.mp1, 80, "and costs Ultima's 80")
     H.assertEq(r.writes, 0, "the folded Ultima takes no damage multiplier (Ot6BoostDmg wrote no $11b0)")
+  end
+end
+
+H.run({ maxFrames = 600000 }, {
+  H.bootCheckpoint("fc-alcove-v1"),
+  H.call(function()
+    arm()
+    H.assertEq(H.readByte(SW) & SWBIT, 0, "switch $00BF is clear at the alcove (TERRA has not rejoined in the WoR)")
+  end),
+  H.fcAlcoveToBattle("ultima"),
+  H.driveUntil(function() return nDone == #CASTS end, 500000, {
+    H.cond(function() return not H.battleLoadStarted() end, { H.paceToEncounter("ultima", 0) }, {}),
+    H.call(function()
+      turns = turns + 1
+      H.assertEq(turns <= 12, true, "the three casts within 12 tries")
+      seat = nil
+      for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == TERRA then seat = s end end
+      H.assertEq(seat ~= nil, true, "TERRA is seated")
+      nrec, plan, mode = #recs, {}, "cast"
+      if not terraCasts() then
+        mode = "fightout"
+        H.log(string.format("[ultima] TERRA cannot cast here (status %02X %02X): this battle is fought out",
+          H.readByte(0x3EE4 + seat * 2), H.readByte(0x3EE5 + seat * 2)))
+        return
+      end
+      local c = CASTS[nDone + 1]
+      H.log(string.format("[ultima] cast %d: $%02X at %d BP; TERRA seat %d, MP %d, bank %d", nDone + 1, c.spell,
+        c.boost, seat, mp(), H.readByte(0x3E9C + seat * 2)))
+      plan = { { who = TERRA, cmd = CMD_MAGIC, spell = c.spell, boost = c.boost } }
+    end),
+    H.cond(function() return mode == "fightout" end, { H.kitBattle({}, {}) }, {
+      H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000,
+        onList = function() local c = CASTS[nDone + 1]; listCost[c.tag] = costOf(c.spell) end,
+        planDone = function() return close() end }),
+      H.call(function()
+        if #recs == nrec then H.log("[ultima] the battle ended before the cast resolved: not counted"); return end
+        local r = recs[#recs]
+        if r.mp0 == r.mp1 then H.log("[ultima] the cast charged no MP (it did not resolve): not counted"); return end
+        checkCast(nDone + 1, r)
+        nDone = nDone + 1
+      end),
+    }),
+  }, "the three casts"),
+  H.call(function()
     H.log("[ultima] PASS: Fire 3 before the unlock, Ultima after it, priced 80, unmultiplied")
   end),
 })
