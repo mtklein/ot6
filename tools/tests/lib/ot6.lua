@@ -10104,25 +10104,36 @@ function Driver:makePlanRules(actor)
     end
   end
   -- This actor's strongest unreflectable line against `slot` by the
-  -- chip model, at `bp` boost: the tool first so a tie keeps the
-  -- driver's own order, then the blitz, then the Fight.  Shared by the
-  -- press rule (#156, #165) and the spend rule (#175) below.
+  -- chip model, at `bp` boost: the most chips on the slot; a tie goes to
+  -- the most hits x bodies (a line's landed hits, times every standing
+  -- body for one that reaches them all), then to the higher boost, then
+  -- to the order offered (the tool, the Blitz, the Fight).  Before, a
+  -- tie kept the first offered, so a 1-BP Pummel the MP could pay for
+  -- (2 hits on one body) beat a 3-BP Fight with the same chips on the
+  -- slot (wt/v028-edgar-blitz review).  Shared by the press rule (#156,
+  -- #165) and the spend rule (#175) below.
   local function bestLine(actor, slot, bp)
     bp = math.min(bp, 3)  -- one action buys at most 3 BP, whatever the bank holds (#425)
     local id = M.readByte(BATTLE.BCHID + actor * 2)
     local best, offered = nil, {}
+    local function reach(p) return (p.hits or 1) * (p.bodies or 1) end
     local function offer(p)
       offered[#offered + 1] = p
-      if best == nil or p.chips > best.chips then best = p end
+      if best == nil or p.chips > best.chips
+         or (p.chips == best.chips and (reach(p) > reach(best)
+           or (reach(p) == reach(best) and p.boostLeft > best.boostLeft))) then
+        best = p
+      end
     end
     -- The kit lines are offered at the boost the pool can PAY for
     -- (#219), not at the bank's: the price escalates 2.5x a level, so a
     -- bank the MP cannot follow buys a refused command and an
-    -- evaporated turn.  Stepping the level down costs this comparison
-    -- nothing -- a tool is its own hit count and a Pummel its own two,
-    -- so neither line's `chips` moves with the boost; only the Fight's
-    -- swings do -- so the chip model still decides between them on the
-    -- same terms, at the boost that will actually go through.
+    -- evaporated turn.  Stepping the level down moves no kit line's
+    -- `chips` -- a tool's hits and a Blitz's (BATTLE.BLITZ_SHAPE) are
+    -- fixed; only the Fight's swings grow with the boost -- so the chip
+    -- model still decides between them on the same terms, at the boost
+    -- that will actually go through, and a tie goes to the reach and
+    -- then the boost (above).
     local tool = self.opts.tool or BATTLE.AUTOCROSSBOW
     if self.parkDropN < 3 and self.opts.tactical and self.opts.tools ~= false and id == 4
        and cmdRow(actor, BATTLE.CMD_TOOLS) and self:battInvIdx(tool) then
@@ -10131,6 +10142,7 @@ function Driver:makePlanRules(actor)
         offer({ kind = "skill", cmd = BATTLE.CMD_TOOLS, skill = tool,
                 row = cmdRow(actor, BATTLE.CMD_TOOLS), boostLeft = tb,
                 chips = toolChips(slot, tool), hits = BATTLE.TOOL_HITS[tool] or 1,
+                bodies = (tool == BATTLE.AUTOCROSSBOW or tool == M.BIO_BLASTER) and #standingSlots() or 1,
                 what = string.format("Tools $%02X at %d BP", tool, tb) })
       end
     end
@@ -10148,6 +10160,7 @@ function Driver:makePlanRules(actor)
         offer({ kind = "skill", cmd = BATTLE.CMD_BLITZ, skill = blitz,
                 row = cmdRow(actor, BATTLE.CMD_BLITZ), boostLeft = bb,
                 chips = M.blitzChips(slot, blitz), hits = BATTLE.BLITZ_SHAPE[blitz].hits or 1,
+                bodies = BATTLE.BLITZ_SHAPE[blitz].aoe == true and #standingSlots() or 1,
                 what = string.format("%s at %d BP", bname, bb) })
       end
     end
@@ -12656,7 +12669,7 @@ function M.setzerBattle(plan, opts)
     if token ~= nil then return end
     token = {}
     M.setzerToken = token
-    M.vars.setzer, M.vars.setzerList = {}, {}
+    M.vars.setzer, M.vars.setzerList, M.vars.setzerTaken = {}, {}, {}
     local mine = token
     local function live() return M.setzerToken == mine end
     local a = M.sym("Ot6SetzerExec")
@@ -12669,6 +12682,7 @@ function M.setzerBattle(plan, opts)
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
         entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {}, passes = {} }
+      Z.rec.taken = M.controlTaken and M.controlTaken(e // 2)
     end, emu.callbackType.exec, a, a)
     -- the Coin Toss relic's GP Rain (command $18, no table): its own record
     local g = M.sym("Cmd_18")
@@ -12680,6 +12694,7 @@ function M.setzerBattle(plan, opts)
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
         entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {}, passes = {} }
+      Z.rec.taken = M.controlTaken and M.controlTaken(e // 2)
     end, emu.callbackType.exec, g, g)
     local t = M.sym("TakeGil")
     emu.addMemoryCallback(function()
@@ -12748,13 +12763,29 @@ function M.setzerBattle(plan, opts)
       do
         r.gil1, r.mp1, r.bank1 = gil(), M.readWord(0x3C08 + x), M.readByte(0x3E9C + x)
         r.mon1, r.divine1 = mons(), M.readByte(0x3ECB)
-        M.vars.setzer[#M.vars.setzer + 1] = r
         Z.rec = nil
+        local ys = {}
+        for _, ev in ipairs(r.chips) do ys[#ys + 1] = string.format("$%02X", ev.y) end
+        if r.taken and (r.taken.name == "Zombie" or r.taken.name == "Muddle") then
+          -- the row ran with SETZER's control taken after its confirm: a
+          -- Zombie or a Muddle turns the engine's targets on his own side
+          -- (vanilla; main's v0.28 chain, wor-tomb-v1: GP Rain from his f8638
+          -- window ran at f9452 with $b9 = $00, six chip calls and no
+          -- monster's HP moved, Zombie read at his next window), so it is
+          -- not the plan's throw and is not checked as one
+          M.vars.setzerTaken[#M.vars.setzerTaken + 1] = r
+          M.log(string.format("[setzer] f%d row $%02X at %d BP ran under %s (exec f%d, targets $%02X, chip "
+            .. "call(s) on %s): his control was taken after the confirm, so it is set aside, not the plan's throw",
+            M.frame, r.row, r.boost, r.taken.name, r.f, r.targets, #ys > 0 and table.concat(ys, " ") or "none"))
+          return
+        end
+        M.vars.setzer[#M.vars.setzer + 1] = r
         M.log(string.format("[setzer] f%d row $%02X at %d BP (L%d): gil %d -> %d (TakeGil %s), MP %d -> %d, "
           .. "bank %d -> %d, divine %02X -> %02X, targets %02X, %d chip call(s)%s", M.frame, r.row, r.boost,
           r.level, r.gil0, r.gil1, tostring(r.cost), r.mp0, r.mp1, r.bank0, r.bank1, r.divine0, r.divine1,
           r.targets, #r.chips, r.dmg and string.format(", dice b6=%02X b7=%02X dmg %d class %02X", r.b6, r.b7,
           r.dmg, r.class) or ""))
+        M.log(string.format("[setzer]   chip calls on y %s", #ys > 0 and table.concat(ys, " ") or "none"))
         M.log(string.format("[setzer]   exec f%d, Ot6ActionEnd f%d (bank %d, pending %d at its entry), closed f%d",
           r.f, r.ended, r.endBank, r.endPend, M.frame))
         for k, q in ipairs(r.passes) do
@@ -13865,6 +13896,10 @@ end
 -- a usable window and no throw is the driver's failure, and red: a window
 -- at the plan's bank with nothing confirmed, whatever the allies did
 -- (M.SETZER_NEVER_CONFIRM, the negative control, goes red there).
+-- A crowd whose only row ran with SETZER Zombied or Muddled after his
+-- confirm owes none either: the engine turned that row on his own side,
+-- and M.setzerBattle sets it aside ($b9 = $00, every coin on the party:
+-- main's v0.28 chain, build/attempts/wt/v028-edgar-blitz/qual/gprain/).
 -- o.onBattle(n), when given, runs once a battle is up.  Returns the step and S = { done, all, battles, crowds }.
 function M.setzerCrowdBattles(o)
   local S = { done = {}, all = {}, battles = 0, crowds = 0, since = 0 }
@@ -13897,6 +13932,7 @@ function M.setzerCrowdBattles(o)
     return { tick = function()
       if step == nil and F == nil then
         M.vars.setzer = {}     -- no record of an earlier battle is read again
+        M.vars.setzerTaken = {}
         if crowdHere() then
           S.crowds, S.since, crowdBattle = S.crowds + 1, 0, S.battles
           local rem = remaining()
@@ -13945,7 +13981,12 @@ function M.setzerCrowdBattles(o)
         S.done[i] = rec
       end
       if r == "done" then
-        if seen == 0 and out and not able then
+        local taken = (M.vars.setzerTaken or {})[1]
+        if seen == 0 and taken then
+          M.log(string.format("[%s] crowd battle %d gave no throw: SETZER's row ran under %s, his control taken "
+            .. "after the confirm (exec f%d), so it owes none -- the next crowd within the budget", tag, crowdBattle,
+            taken.taken.name, taken.f))
+        elseif seen == 0 and out and not able then
           M.log(string.format("[%s] crowd battle %d gave no throw: SETZER's control was taken (%s at f%d) and no "
             .. "command window of his came with it free, so it owes none -- the next crowd within the budget",
             tag, crowdBattle, out.name, out.frame))
