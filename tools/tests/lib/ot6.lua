@@ -12072,6 +12072,20 @@ function Driver:button(actor)
       M.log(string.format("[%s] actor=%d %s $%02X committed from the list "
         .. "(no target select)", self.tag or "fight", actor,
         self.plan.cmd == BATTLE.CMD_BLITZ and "Blitz" or "SwdTech", self.plan.skill))
+      -- what it lands goes on the damage ledger as a target-selected
+      -- skill's does at its confirm (the dmgWatch below): without it an
+      -- all-target Blitz (Air Blade) was never credited, so SABIN's
+      -- damage was missing from the press window and the race's per-hit
+      -- figures (#425: no "actor=1's skill took" line in any Tentacles run)
+      for i = #self.dmgWatch, 1, -1 do
+        if self.dmgWatch[i].actor == actor and self.dmgWatch[i].seen == 0 then
+          table.remove(self.dmgWatch, i)
+        end
+      end
+      self.dmgWatch[#self.dmgWatch + 1] = { actor = actor, kind = self.plan.kind,
+                                  skill = self.plan.skill, spell = self.plan.spell, cmd = self.plan.cmd,
+                                  boost = self.plan.raceBoost or 0, seen = 0, norm = 0, n = 0,
+                                  until_ = self.battleTick + BATTLE.DMG_EXPIRE }
     end
     return { "a" }
   end
