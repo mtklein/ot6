@@ -13791,7 +13791,7 @@ function M.setzerCrowdBattles(o)
     return yes
   end
   local function play()
-    local step, F, seen, crowdBattle, out, able = nil, nil, 0, nil, nil, nil
+    local step, F, seen, crowdBattle, out, able, allyOut = nil, nil, 0, nil, nil, nil, nil
     local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
     return { tick = function()
       if step == nil and F == nil then
@@ -13812,7 +13812,14 @@ function M.setzerCrowdBattles(o)
       local r = step:tick()
       if M.battleActive() and M.controlTaken then
         for s = 0, 3 do
-          if M.readByte(0x3ED8 + s * 2) == 9 then
+          local actor = M.readByte(0x3ED8 + s * 2)
+          if actor ~= 9 and actor ~= 0xFF and allyOut == nil then
+            -- an ally out of the policy's hands (a Zombie, a Muddle...)
+            -- acts on its own and can end the crowd before SETZER's turn
+            local c = M.controlTaken(s)
+            if c then allyOut = { name = c.name, frame = M.frame, actor = actor } end
+          end
+          if actor == 9 then
             local c = M.controlTaken(s)
             if c and out == nil then out = { name = c.name, frame = M.frame } end
             if not c and able == nil and M.readByte(MENU) ~= 0 and (M.readByte(ACTOR) & 3) == s
@@ -13834,14 +13841,24 @@ function M.setzerCrowdBattles(o)
           M.log(string.format("[%s] crowd battle %d gave no throw: SETZER's control was taken (%s at f%d) and no "
             .. "command window of his came with it free, so it owes none -- the next crowd within the budget",
             tag, crowdBattle, out.name, out.frame))
+        elseif seen == 0 and out and allyOut then
+          -- both: SETZER lost turns to his own status and an ally's (out of
+          -- the policy's hands) ended the crowd while he banked for his
+          -- row (wor-tomb-v1 on the v0.27 chain: SETZER Zombied twice,
+          -- SABIN Zombied, the crowd gone before SETZER's window could
+          -- bank its pips; build/attempts/wt/v027-terra-route/kits/)
+          M.log(string.format("[%s] crowd battle %d gave no throw: SETZER's control was taken (%s at f%d) and an "
+            .. "ally's (char %d, %s at f%d) took the crowd out of the policy's hands%s, so it owes none -- the "
+            .. "next crowd within the budget", tag, crowdBattle, out.name, out.frame, allyOut.actor, allyOut.name,
+            allyOut.frame, able and string.format(" (his window came free at f%d)", able) or ""))
         else
           M.assertEq(seen > 0, true, string.format("%s: crowd battle %d gave at least one throw%s", tag, crowdBattle,
             able and string.format(" (SETZER's command window stood free at f%d)", able) or ""))
         end
-        seen, step, out, able = 0, nil, nil, nil
+        seen, step, out, able, allyOut = 0, nil, nil, nil, nil
       end
       return r
-    end, reset = function() step, F, seen, out, able = nil, nil, 0, nil, nil end }
+    end, reset = function() step, F, seen, out, able, allyOut = nil, nil, 0, nil, nil, nil end }
   end
   local steps = {
     M.call(function()
