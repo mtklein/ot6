@@ -5,11 +5,10 @@ mechanics while keeping the FF6 story, world, and characters.
 
 ## Status
 
-v0.26 is the current release: [download it](https://github.com/mtklein/ot6/releases/tag/v0.26).
-`main` is v0.27 development.
+v0.27 is the current release: [download it](https://github.com/mtklein/ot6/releases/tag/v0.27).
 
-The game is playable through the World of Balance and through Darill's Tomb
-in the World of Ruin.
+The game is playable through the World of Balance and through Mobliz in the
+World of Ruin, where Terra rejoins.
 
 Main changes:
 
