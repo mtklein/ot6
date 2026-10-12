@@ -26,8 +26,8 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20
 -- species -> { name, shields, class mask, vanilla weak byte }
 local WANT = {
   [0x16A] = { "Phunbaba 1 (TERRA alone)", 0, 0, POISON },
-  [0x16B] = { "Phunbaba 2 (the first visit)", 6, BLUDG | SPECIAL, POISON },
-  [0x16C] = { "Phunbaba 3 (the return)", 8, BLUDG | SPECIAL, POISON },
+  [0x16B] = { "Phunbaba 2 (the first visit)", 4, BLUDG | SPECIAL, POISON },
+  [0x16C] = { "Phunbaba 3 (the return)", 5, BLUDG | SPECIAL, POISON },
   [0x16D] = { "Phunbaba 4 (TERRA morphed)", 12, SLASH | BLUDG | SPECIAL, POISON },
 }
 

@@ -2236,13 +2236,16 @@ Ot6ShieldTbl:
                                 ;   invincible demon (ai _362), a loss the
                                 ;   story plays on from: no gauge
         .word   $016b
-        .byte   6, OT6_BLUDG|OT6_SPECIAL ; phunbaba 2: the first visit; he
-                                ;   flees once hit under 20480 hp (7520 in):
-                                ;   six so a break lands inside that
+        .byte   4, OT6_BLUDG|OT6_SPECIAL ; phunbaba 2: the first visit; he
+                                ;   flees once hit under 20480 hp (7520 in),
+                                ;   a miniboss's budget: four (six never
+                                ;   broke in 18 fights, setzer's jackpot
+                                ;   ending it first)
         .word   $016c
-        .byte   8, OT6_BLUDG|OT6_SPECIAL ; phunbaba 3: the return; two
+        .byte   5, OT6_BLUDG|OT6_SPECIAL ; phunbaba 3: the return; two
                                 ;   bababreaths and the end when hit under
-                                ;   15360 hp (10640 in)
+                                ;   15360 hp (10640 in); eight never broke
+                                ;   in 18 fights
         .word   $016d
         .byte   12, OT6_SLASH|OT6_BLUDG|OT6_SPECIAL ; phunbaba 4: terra
                                 ;   morphed with two of the four, 26000 hp

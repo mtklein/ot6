@@ -196,8 +196,58 @@ local function board()
   }, "board the Falcon"), function() n, ph = 0, 0 end)
 end
 
+
+-- ---- what each Phunbaba fight did (reads only) ------------------------------
+-- Every battle's draw at InitBattle's seed store ([key]: the seed $be and
+-- the battle group $11E0), every monster action at ExecCmd ([monact]), and
+-- slot 0's gauge each frame ([brk]: OT6_SHIELD_CUR/MAX at $3E38/$3E39 and
+-- the HP word $3BF4, entity 4 = monster slot 0, ot6_memory.inc): the
+-- break, the HP it landed at, and how long the window held.
+local ATTACKS = { [0x08] = "Bolt 2", [0x09] = "Bolt 3", [0x90] = "Blow Fish", [0xEE] = "Battle", [0xEF] = "Special" }
+local watchOn = false
+local function watches()
+  return H.call(function()
+    if watchOn then return end
+    watchOn = true
+    local addr = H.seedStoreAddr()
+    emu.addMemoryCallback(function()
+      H.log(string.format("[key] battle key be%02X-g%04X f%d map %d", emu.getState()["cpu.a"] & 0xff,
+        H.readWord(0x11e0), H.frame, map()))
+    end, emu.callbackType.exec, addr, addr)
+    local a = H.sym("ExecCmd@battle_code")
+    emu.addMemoryCallback(function()
+      local x = emu.getState()["cpu.x"] & 0xffff
+      if x >= 8 and x < 20 and x % 2 == 0 then
+        local cmd, atk = H.readByte(0xB5), H.readByte(0xB6)
+        if cmd ~= 0x2E and cmd ~= 0x2F then
+          H.log(string.format("[monact] f%d slot %d $%03X cmd $%02X atk $%02X%s", H.frame, x // 2 - 4,
+            H.readWord(0x57C0 + (x - 8)), cmd, atk, ATTACKS[atk] and (" " .. ATTACKS[atk]) or ""))
+        end
+      end
+    end, emu.callbackType.exec, a, a)
+    local was, since = nil, 0
+    emu.addEventCallback(function()
+      if not H.battleLoadStarted() then was = nil; return end
+      local sp = H.readWord(0x57C0)
+      if sp < 0x16A or sp > 0x16D then return end
+      local cur, max = H.readByte(0x3E40), H.readByte(0x3E41)
+      local broken = max > 0 and cur == 0
+      if was == nil then was = broken; return end
+      if broken and not was then
+        since = H.frame
+        H.log(string.format("[brk] f%d $%03X broken (0 of %d shields) at HP %d", H.frame, sp, max, H.readWord(0x3BFC)))
+      elseif was and not broken then
+        H.log(string.format("[brk] f%d $%03X window over after %d frames: shields %d of %d, HP %d", H.frame, sp,
+          H.frame - since, cur, max, H.readWord(0x3BFC)))
+      end
+      was = broken
+    end, emu.eventType.endFrame)
+  end)
+end
+
 H.run({ maxFrames = 300000, allowGameOver = true }, {
   H.bootCheckpoint("wor-falcon-v1"),
+  watches(),
   H.call(function()
     H.log(string.format("[wor] boot f%d: world (%d,%d), %s; %s; %s; TERRA's record: %s",
       H.frame, H.worldX(), H.worldY(), whereLine(), kitLine(), supplies(), member(TERRA, "TERRA")))
@@ -246,26 +296,65 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
   -- Phunbaba (AIScript _362: invincible_on SELF); the event plays on after
   -- her loss (no _ca5ea9 after it, event_main.asm _cc4990), so the loss is
   -- the story's, answered at the Annihilated screen as a person does
-  ride(function() return sw(0x0291) == 1 and map() == MAP_CELLAR end, 60000, "Phunbaba's first visit: TERRA alone",
+  -- (a ride may end on the canary's wipe count, or ride on through 129;
+  -- either way the outcomes since the trigger are judged below)
+  H.call(function() lossesSeen = #H.outcomes end),
+  -- Battle 128's wipe reading outlives the battle: the seat table keeps
+  -- TERRA at 0 HP (and $3EBC's LoseBattle bit) until battle 129's
+  -- InitBattle clears it, so a ride's wipe canary may end on it in the
+  -- scene between the two (measured: the ride ended there in 4 of 8
+  -- seeds).  After the loss the scene's dialog is answered until battle 129
+  -- is up, then the party's fight is ridden.
+  ride(function() return sw(0x0291) == 1 and map() == MAP_CELLAR end, 120000, "Phunbaba's first visit: TERRA alone",
     { wipeEndsRide = true }),
+  (function()
+    local ph = 0
+    local function past128()
+      if sw(0x0291) == 1 then return true end
+      for i = lossesSeen + 1, #H.outcomes do
+        if (H.outcomes[i].form & 0x1FF) == 0x1A5 then return true end
+      end
+      return H.battleLoadStarted() and H.formationWords()[1] == 0x016B
+    end
+    return H.withReset(H.driveUntil(past128, 12000, {
+      H.call(function()
+        ph = (ph + 1) % 8
+        H.setPad((H.dialogWaiting() or (H.battleLoadStarted() and H.formationWords()[1] == 0x016A)) and ph < 4
+          and { "a" } or {})
+      end),
+    }, "the scene after battle 128, to battle 129"), function() ph = 0 end)
+  end)(),
+  H.release(),
   H.call(function()
-    local o = H.lastOutcome
-    H.assertEq(o ~= nil and (o.form & 0x1FF) == 0x1A4 and o.kind == "lost" and o.seatedN == 1, true,
-      "the only loss is battle 128's: TERRA alone against Phunbaba 1 (formation $1A4)")
-    H.log(string.format("[phunbaba] the scripted loss: battle $%03X %s, %d seated; game over counted %d, "
-      .. "answered at the Annihilated screen", o.form & 0x1FF, o.kind, o.seatedN, H.gameOverFired or 0))
+    H.log(string.format("[phunbaba] battle 128 behind (game over counted %d by its wipe reading); battle 129 next",
+      H.gameOverFired or 0))
     H.gameOverFired = 0
-    lossesSeen = #H.outcomes
   end),
   ride(function() return sw(0x0291) == 1 and map() == MAP_CELLAR end, 120000, "Phunbaba's first visit: the party",
     { wipeEndsRide = true }),
   H.call(function()
-    H.assertEq(H.gameOverFired or 0, 0, "no game over after battle 128 (battle 129 is a party's fight to win)")
-    H.assertEq(sw(0x0291), 1, "Phunbaba driven off ($0291, _cc4990)")
+    local lost, won = 0, 0
     for i = lossesSeen + 1, #H.outcomes do
       local o = H.outcomes[i]
-      H.log(string.format("[phunbaba] after the loss: battle $%03X %s after %d ticks", o.form & 0x1FF, o.kind, o.tick or -1))
+      local f = o.form & 0x1FF
+      H.log(string.format("[phunbaba] battle $%03X %s after %d ticks, %d seated", f, o.kind, o.tick or -1, o.seatedN or -1))
+      if o.kind == "lost" and f ~= 0x1A4 then
+        -- a lost battle 129 is the game's game over (_ca5ea9): a person
+        -- reloads; the runner retries from the boot, counted
+        error(string.format("LOST: battle $%03X (Phunbaba's first visit) lost", f), 0)
+      elseif o.kind == "lost" then
+        lost = lost + 1
+        H.assertEq(o.seatedN, 1, "battle 128 seats TERRA alone")
+      elseif f == 0x1A5 then
+        won = won + 1
+      end
     end
+    H.assertEq(sw(0x0291), 1, "Phunbaba driven off ($0291, _cc4990)")
+    H.assertEq(lost, 1, "battle 128 was lost once (the scripted loss)")
+    H.assertEq(won, 1, "battle 129 (formation $1A5) was won")
+    H.log(string.format("[phunbaba] the scripted loss answered at the Annihilated screen (game over counted %d); "
+      .. "battle 129 won", H.gameOverFired or 0))
+    H.gameOverFired = 0
   end),
   H.saveState("wor_terra_after1.mss"),
   stepOn(50, 53, function() return sw(0x02D7) == 1 end),
@@ -318,7 +407,11 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
     return H.seqStep({
       H.call(function()
         for _, n in ipairs(CABIN_NPCS) do
-          if sw(n[3]) == 1 then obj = n; break end
+          local ox, oy = H.objX(n[2]), H.objY(n[2])
+          if sw(n[3]) == 1 and (H.bfsPath(ox, oy + 1) or H.bfsPath(ox - 1, oy) or H.bfsPath(ox + 1, oy)
+              or H.bfsPath(ox, oy - 1)) then
+            obj = n; break
+          end
         end
         H.assertEq(obj ~= nil, true, "a member waits in the cabin to talk to")
         H.log(string.format("[regroup] talking to %s (obj $%02X, show-switch $%04X)", obj[1], obj[2], obj[3]))
