@@ -13025,7 +13025,8 @@ end
 -- The bank is filled to the entry's boost by real Defends first, then R
 -- raises and L lowers the pending boost to exactly it.  Everyone else
 -- Defends while the plan has entries (opts.others = "fight": Fights a live
--- monster instead); after it, everyone Fights a live
+-- monster instead; "thin": Fights while two or more monsters stand, so the
+-- incoming damage thins and the battle stays up); after it, everyone Fights a live
 -- monster until the battle ends (opts.idle = "defend": everyone keeps
 -- Defending instead; opts.untilPlanDone ends the step once the plan is spent
 -- and opts.planDone(), when given, says its last action has resolved).
@@ -13142,7 +13143,9 @@ function M.kitBattle(plan, opts)
       return
     end
     if M.readByte(0x3ED8 + a * 2) ~= p.who then
-      if opts.others == "fight" then fight(a, st) else defend(st) end
+      local live, m = 0, M.readByte(0x3A75)
+      while m ~= 0 do live = live + (m & 1); m = m >> 1 end
+      if opts.others == "fight" or (opts.others == "thin" and live > 1) then fight(a, st) else defend(st) end
       return
     end
     local e = a * 2

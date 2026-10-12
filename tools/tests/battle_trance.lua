@@ -11,8 +11,9 @@
 --
 -- Played: Continue fc-alcove-v1 (TERRA L26, Morph learned at Zozo, the
 -- gauge partly full), walk onto the continent into a random battle, and
--- play TERRA through the real menu (H.kitBattle); the others Fight, so the
--- party outlasts the continent's hardest draws.  Nothing is written.  In one
+-- play TERRA through the real menu (H.kitBattle); the others Fight while two
+-- or more monsters stand and Defend once one is left, so the party outlasts
+-- the continent's hardest draws and the battle stays up.  Nothing is written.  In one
 -- battle:
 --   1. Morph at 0 BP: refused at the command (three A presses, the window
 --      stays up), and she does not morph;
@@ -49,7 +50,7 @@ local function arm()
 end
 
 local function inBattle() return H.battleLoadStarted() end
-local ONE = { untilPlanDone = true, idle = "defend", others = "fight", maxFrames = 60000 }
+local ONE = { untilPlanDone = true, idle = "defend", others = "thin", maxFrames = 60000 }
 
 H.run({ maxFrames = 600000 }, {
   H.bootCheckpoint("fc-alcove-v1"),
@@ -77,11 +78,11 @@ H.run({ maxFrames = 600000 }, {
       H.assertEq(morphed(), false, "and TERRA did not morph")
     end),
     H.kitBattle({ { who = TERRA, cmd = MORPH, boost = 3, self = true } },
-      { untilPlanDone = true, idle = "defend", others = "fight", maxFrames = 60000,
+      { untilPlanDone = true, idle = "defend", others = "thin", maxFrames = 60000,
         planDone = function() return morphs >= 1 and H.readByte(0x3E9D + e()) == 0 end }),
     H.kitBattle({ { who = TERRA, cmd = REVERT, boost = 0, self = true },
       { who = TERRA, cmd = MORPH, boost = 3, self = true } },
-      { untilPlanDone = true, idle = "defend", others = "fight", maxFrames = 90000,
+      { untilPlanDone = true, idle = "defend", others = "thin", maxFrames = 90000,
         planDone = function() return morphs >= 2 end }),
     H.call(function()
       if refused and morphs >= 2 then
