@@ -13134,6 +13134,12 @@ function M.kitBattle(plan, opts)
   local function cmdRowOf(a, cmd)
     for r = 0, 3 do if M.readByte(0x202E + a * 12 + r * 3) == cmd then return r end end
   end
+  -- the command's row greyed for seat a (bit 7 of its second byte: Magic
+  -- under Mute, say), so the cursor skips it and an A on it would buzz
+  local function cmdGreyed(a, cmd)
+    local r = cmdRowOf(a, cmd)
+    return r ~= nil and (M.readByte(0x202E + a * 12 + r * 3 + 1) & 0x80) ~= 0
+  end
   local function spellIdx(a, id)
     for i = 0, 53 do
       if M.readByte(0x2092 + SPELL_PTR[a] + i * 4) == id then return i end
@@ -13221,8 +13227,9 @@ function M.kitBattle(plan, opts)
       hb = M.frame
       local t = {}
       for e2 = 0, 3 do
-        t[#t + 1] = string.format("%02X:%d/%02X%02X", M.readByte(0x3ED8 + e2 * 2), M.readWord(0x3BF4 + e2 * 2),
-          M.readByte(0x3EE4 + e2 * 2), M.readByte(0x3EE5 + e2 * 2))
+        t[#t + 1] = string.format("%02X:%d/%02X%02X bp%d+%d", M.readByte(0x3ED8 + e2 * 2), M.readWord(0x3BF4 + e2 * 2),
+          M.readByte(0x3EE4 + e2 * 2), M.readByte(0x3EE5 + e2 * 2), M.readByte(0x3E9C + e2 * 2),
+          M.readByte(0x3E9D + e2 * 2))
       end
       M.log(string.format("[kit] f%d entry %d/%d (%s) actor %d st %02X; party %s", M.frame, k, #plan,
         p and string.format("char $%02X cmd $%02X", p.who, p.cmd or 0) or "none", a, st, table.concat(t, " ")))
@@ -13247,10 +13254,24 @@ function M.kitBattle(plan, opts)
         p.goneLogged = true
         M.log(string.format("[kit] f%d char $%02X is out of the fight: the others fight the battle out", M.frame, p.who))
       end
-      if gone or opts.others == "fight" or (opts.others == "thin" and live > 1) then fight(a, st) else defend(st) end
+      if gone or p.greyed or opts.others == "fight" or (opts.others == "thin" and live > 1) then fight(a, st) else defend(st) end
       return
     end
     local e = a * 2
+    -- the planned command greyed for its character since the plan began (a
+    -- Mute landed mid-battle: battle_ultimafold's cursor hunted the greyed
+    -- Magic row for 20,000 frames while the others Defended until they fell,
+    -- build/attempts/wt/v028-cyan-route/ultimafold/): the plan cannot be
+    -- played in this battle, so the party fights it out
+    if p.cmd ~= nil and p.refused == nil and not p.opened and cmdGreyed(a, p.cmd) then
+      if not p.greyLogged then
+        p.greyLogged = true
+        M.log(string.format("[kit] f%d char $%02X's command $%02X is greyed (status %02X %02X): the battle is "
+          .. "fought out", M.frame, p.who, p.cmd, M.readByte(0x3EE4 + e), M.readByte(0x3EE5 + e)))
+      end
+      p.greyed = true
+    end
+    if p.greyed then fight(a, st); return end
     if p.defend then
       if st == 0x27 and cool == 0 then done(p, a) end
       defend(st)
