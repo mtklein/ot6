@@ -22,7 +22,9 @@
 -- (being hurt below his last turn's line) is battle_retaliate_umaro's; this
 -- suite is about what three points buy at the roll.  Also staged, so the
 -- fight lasts for the turns: TunnelArmr's HP put back to 30,000 under
--- 20,000, and either seat's HP put back to its max under half.  Everything else is the engine's: the
+-- 20,000, and either seat's HP put back to its max whenever it falls (on
+-- main's ROM a seat put back only under half fell to one blow from above
+-- it: build/attempts/wt/v028-kits/px13-lab/old/battle_umaro.out).  Everything else is the engine's: the
 -- roll, the arm, the class, the damage.
 --
 -- Watched: the arm each turn rolls (the `jmp (UmaroAttackTbl,x)`), the
@@ -146,7 +148,7 @@ local function keepStanding()
   if not H.battleActive() then return end
   for e = 0, 3 do
     local h, mx = hp(e), H.readWord(0x3C1C + e * 2)
-    if h > 0 and mx > 0 and h < mx // 2 then H.writeWord(0x3BF4 + e * 2, mx) end
+    if h > 0 and mx > 0 and h < mx then H.writeWord(0x3BF4 + e * 2, mx) end
   end
   for m = 0, 5 do
     if (H.readByte(0x3AA8 + m * 2) & 1) == 1 and H.readWord(0x3BFC + m * 2) < 20000 then
