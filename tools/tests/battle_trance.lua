@@ -55,6 +55,8 @@ local function arm()
   emu.addMemoryCallback(function()
     if seat == nil or (emu.getState()["cpu.x"] & 0xff) ~= seat * 2 then return end
     turns = turns + 1
+    H.log(string.format("[trance] f%d tick %d: TERRA's action ends (command $%02X), morphed %s", H.frame, ticks(),
+      H.readByte(0x3A7C), tostring(morphed())))
     if H.readByte(0x3A7C) == MORPH then
       ends[#ends + 1] = { f = H.frame, pre = H.readByte(0x3E9C + seat * 2) }
     end
@@ -67,11 +69,13 @@ local function arm()
     local m, c = morphed(), H.readByte(0x3EE2) == e()
     if m and not lastM and cur ~= nil and cur.m0 == nil then
       cur.m0, cur.t0m, cur.turns0 = H.frame, ticks(), turns
-      H.log(string.format("[trance] f%d TERRA morphed (%d BP), clock %s, $3EE2=%02X speed $3F32=%d gauge $3B04=%d",
-        H.frame, cur.b, c and "running" or "off", H.readByte(0x3EE2), H.readByte(0x3F32) | (H.readByte(0x3F33) << 8),
-        H.readByte(0x3B04 + e())))
+      H.log(string.format("[trance] f%d tick %d: TERRA morphed (%d BP)", H.frame, ticks(), cur.b))
     end
-    if c and not lastC and cur ~= nil then cur.clocked, cur.t0 = true, ticks() end
+    if c and not lastC and cur ~= nil then
+      cur.clocked, cur.t0 = true, ticks()
+      H.log(string.format("[trance] f%d tick %d: her clock starts, speed $3F32 = %d", H.frame, cur.t0,
+        H.readByte(0x3F32) | (H.readByte(0x3F33) << 8)))
+    end
     if lastC and not c and cur ~= nil and cur.t1 == nil then
       cur.t1, cur.turns1 = ticks(), turns
       H.log(string.format("[trance] f%d the %d-BP clock ran out after %d ticks (%d of TERRA's turns inside it)",
@@ -94,16 +98,36 @@ end
 
 local ONE = { untilPlanDone = true, idle = "defend", others = "thin", maxFrames = 150000, planDone = stepDone }
 
+-- the pick must land: TERRA morphs within PICK frames of the step's start
+-- (the bank filled by Defends and the menu walked: 80-380 frames on the
+-- branch's runs), unless she falls first.  A ROM that refuses the Morph at
+-- the command fails here, by name.
+local PICK = 4000
+local function alive() return seat ~= nil and (H.readByte(0x3EE4 + e()) & 0xC2) == 0 end
+local function watched(inner)
+  return { tick = function()
+    if cur ~= nil and cur.m0 == nil and alive() and H.battleActive() and H.frame - cur.f0 > PICK then
+      H.assertEq(false, true, string.format("Morph at %d BP: TERRA morphs within %d frames of the pick's start "
+        .. "(it was refused at the command, or never confirmed)", cur.b, PICK))
+    end
+    return inner.tick()
+  end, reset = inner.reset }
+end
+
 local function step(b)
   local entry = { who = TERRA, cmd = MORPH, boost = b, self = true }
   if b == 2 then entry = { who = TERRA, cmd = MORPH, boost = 3, self = true, takeBack = 2 } end
   return H.cond(function() return not done[b] and inBattle() end, {
-    H.call(function() cur = { b = b, mark = #ends } end),
-    H.kitBattle({ entry }, ONE),
+    H.call(function() cur = { b = b, mark = #ends, f0 = H.frame } end),
+    watched(H.kitBattle({ entry }, ONE)),
     H.call(function()
       local x = lastEnd()
       if #ends <= cur.mark or x.post == nil then
         H.log(string.format("[trance] battle %d ended before the %d-BP Morph resolved: the next", battles, b))
+        return
+      end
+      if cur.m0 == nil and not alive() then
+        H.log(string.format("[trance] TERRA fell before the %d-BP Morph: the next battle", b))
         return
       end
       if b == 2 then
