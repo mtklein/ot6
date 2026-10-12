@@ -2224,6 +2224,29 @@ Ot6ShieldTbl:
         .word   $0135
         .byte   6, OT6_PIERCE   ; whelk head (the WoR head): the narshe
                                 ;   head's 4 * pierce, grown.  fire vanilla
+        ; ---- the world of ruin: terra (mobliz, phunbaba's four records;
+        ; docs/design/route-wor-terra.md section 6) ------------------------
+        ; One demon, four records.  Vanilla poison stays (edgar's bio
+        ; blaster); bolt stays absorbed (his bolt 2/3 are celes's runic).
+        ; Blows and special open the hide in both of the party's fights; the
+        ; last record, where terra fights morphed beside the two the second
+        ; bababreath left, takes her blade too.
+        .word   $016a
+        .byte   0, $00          ; phunbaba 1: terra alone against an
+                                ;   invincible demon (ai _362), a loss the
+                                ;   story plays on from: no gauge
+        .word   $016b
+        .byte   6, OT6_BLUDG|OT6_SPECIAL ; phunbaba 2: the first visit; he
+                                ;   flees once hit under 20480 hp (7520 in):
+                                ;   six so a break lands inside that
+        .word   $016c
+        .byte   8, OT6_BLUDG|OT6_SPECIAL ; phunbaba 3: the return; two
+                                ;   bababreaths and the end when hit under
+                                ;   15360 hp (10640 in)
+        .word   $016d
+        .byte   12, OT6_SLASH|OT6_BLUDG|OT6_SPECIAL ; phunbaba 4: terra
+                                ;   morphed with two of the four, 26000 hp
+                                ;   to the kill; slash is her blade's key
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian

@@ -709,7 +709,17 @@ function M.navTo(txIn, tyIn, opts)
       -- 3. any other control loss (event walking the party, fades, or a
       --    yet-undebounced battle/dialog): neutral pad and wait, because
       --    jamming directions or A only corrupts state
-      if lostN > 0 or battN > 0 or dlgN > 0 then
+      -- 3a. ...except a step already held on a tile whose trigger re-fires
+      --     under the party: its event returns at once, but it runs again
+      --     every few frames while the party stands there, so control reads
+      --     lost on most frames although the field takes the press (Mobliz's
+      --     cellar, 154 (52,58) and (50,53): held Up moves on the second
+      --     frame, build/attempts/wt/v027-terra-route/cellar/probe3.log).
+      --     The hold goes on; a real scene (a dialog, a battle, a long
+      --     control loss) still takes the pad.
+      local refire = pend and pend.holding and battN == 0 and dlgN == 0 and lostN > 0
+        and lostN < 60 and M.tileAligned() and M.fieldX() == pend.x and M.fieldY() == pend.y
+      if (lostN > 0 or battN > 0 or dlgN > 0) and not refire then
         if lostN >= 3 then drop("control lost") end
         M.setPad({})
         return

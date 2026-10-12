@@ -1607,6 +1607,55 @@ M.contracts["wor-falcon-v1"] = {
   },
 }
 
+-- wor-terra-v1: the World of Ruin map, on foot beside the Falcon parked
+-- outside Mobliz (238,135), after Palidor from the Solitary Island's beach
+-- (_ca55e9), Phunbaba's two visits (event battles 128-131, _cc4990 and
+-- _cc4c1b: $00BF), Fenrir (_cc4abd: $02D7) and TERRA rejoining, and the
+-- party regrouped aboard to TERRA, CELES, SABIN and EDGAR
+-- (docs/design/route-wor-terra.md sections 2, 7 and 9).  No timer.
+M.contracts["wor-terra-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 238, y = 135 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00CD, 1, "the Falcon has risen (_ca4502, :11258)" },
+    { 0x0291, 1, "Phunbaba driven off the first time (_cc4990)" },
+    { 0x02D7, 1, "Fenrir handed over (_cc4abd)" },
+    { 0x00BE, 1, "Katarin's flight seen (_cc4af0)" },
+    { 0x00BF, 1, "Phunbaba beaten, TERRA rejoined (_cc4c1b)" },
+  },
+  party = {
+    size = 4,                     -- TERRA, CELES, SABIN and EDGAR
+    members = {
+      { 0x00, "TERRA" },
+      { 0x06, "CELES" },
+      { 0x05, "SABIN" },
+      { 0x04, "EDGAR" },
+    },
+  },
+  ram = {
+    { 0x1A69 + (9 >> 3), 1 << (9 & 7), 1 << (9 & 7), "Palidor owned ($1A69 bit 9, give_genju _ca55e9)" },
+    { 0x1A69 + (24 >> 3), 1 << (24 & 7), 1 << (24 & 7), "Fenrir owned ($1A69 bit 24, give_genju _cc4abd)" },
+    { 0x1600 + 0x1E, 0xFF, 0x18, "TERRA wears Fenrir" },
+    { 0x1F62, 0xFF, 238, "the Falcon parked at x 238 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 135, "the Falcon parked at y 135 (save-block cell $1F63)" },
+    -- ($1F64 bits 12-13 are the facing direction (field-ram.txt "--ddnzpm"),
+    -- not an aboard flag: the landing's own heading sets them, $2401 here)
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+    { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
+    { 0x1190, 0xFF, 0x00, "timer 1 counter high" },
+    { 0x1195, 0xFF, 0x00, "timer 2 counter low" },
+    { 0x1196, 0xFF, 0x00, "timer 2 counter high" },
+    { 0x119B, 0xFF, 0x00, "timer 3 counter low" },
+    { 0x119C, 0xFF, 0x00, "timer 3 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
