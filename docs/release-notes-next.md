@@ -5,6 +5,6 @@ and its effect. Cite evidence in the commit message.
 
 ## What's changed
 
-- Phunbaba now has shields in Mobliz. Blunt and Special attacks break him in
-  both of the party's fights, and Terra's sword breaks him in the last one.
-  Terra's solo fight shows no shields.
+- Phunbaba now has shields in Mobliz. Blunt and Special attacks hit his
+  weak points in every fight the party joins, and Terra's sword does too
+  in the last one. Terra's solo fight shows no shields.

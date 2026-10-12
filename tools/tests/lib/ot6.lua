@@ -16885,6 +16885,14 @@ M.totalFrames = 0
 -- so a later stall is filed as itself rather than as that loss.  The body
 -- asserts the loss was the scripted one before it calls this.
 function M.scriptedLossAnswered(why)
+  -- exactly the one loss: the battle-wipe canary's count (at most one) and
+  -- its record, nothing else (a GameOver script or a title screen is a
+  -- real game over, never answered here)
+  M.assertEq((M.gameOverFired or 0) <= 1, true, string.format("scriptedLossAnswered (%s): at most one counted "
+    .. "game over (got %d)", why, M.gameOverFired or 0))
+  M.assertEq(RUN.goUnhandled == nil or RUN.goUnhandled.what == "the party was wiped in battle", true,
+    string.format("scriptedLossAnswered (%s): the unanswered record is the battle wipe (got %s)", why,
+    RUN.goUnhandled and RUN.goUnhandled.what or "none"))
   M.log(string.format("[retry] scripted loss answered (%s): game over count %d and the unanswered "
     .. "record (%s) cleared", why, M.gameOverFired or 0,
     RUN.goUnhandled and RUN.goUnhandled.what or "none"))

@@ -8,9 +8,6 @@
 -- docs/design/route-wor-terra.md has the plan and what this measured.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
--- Mobliz's cellar and Katarin's room have triggers that re-fire under the
--- party; navTo holds its step through them (lib/ot6_field.lua navTo 3a)
-H.NAV_REFIRE_HOLD = true
 
 local TERRA, CELES, SABIN, EDGAR, SETZER = 0, 6, 5, 4, 9
 local TONIC, POTION, FENIX, REMEDY, SOFT = 0xE8, 0xE9, 0xF0, 0xF5, 0xF4
@@ -92,6 +89,15 @@ local function lazy(build)
   }
 end
 local lossesSeen = 0
+-- Mobliz's cellar (154) and Katarin's room (150) have triggers that re-fire
+-- under the party; navTo holds its step through them there only
+-- (lib/ot6_field.lua navTo 3a)
+local function refireHold(on, where)
+  return H.call(function()
+    H.NAV_REFIRE_HOLD = on
+    H.log(string.format("[nav] refire hold %s: %s", on and "ON" or "OFF", where))
+  end)
+end
 local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15 and not H.dialogWaiting()
 end
@@ -260,7 +266,7 @@ local function watches()
   end)
 end
 
-H.run({ maxFrames = 300000, allowGameOver = true }, {
+H.run({ maxFrames = 300000 }, {
   H.bootCheckpoint("wor-falcon-v1"),
   watches(),
   H.call(function()
@@ -300,12 +306,16 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
   chestAt(51, 12, 0x03D, "Elixir (163 (51,12))", ELIXIR),
   walkInto(43, 22, MAP_SHELTER, "the house -> the cellar stairs 165", { avoid = { { 50, 17 } } }),
   walkInto(10, 43, MAP_CELLAR, "the stairs -> the cellar 154"),
+  refireHold(true, "the cellar 154"),
   H.saveState("wor_terra_cellar.mss"),
   stepOn(52, 57, function() return sw(0x028F) == 1 end),
   ride(function() return sw(0x028F) == 1 end, 12000, "TERRA and the children"),
   H.talkToObj(0x11, "TERRA (154 NPC_2)"),
   ride(function() return sw(0x0290) == 1 end, 20000, "TERRA's story"),
   H.saveState("wor_terra_phun1.mss"),
+  -- battle 128 is a loss the story plays on from: a counted game over is
+  -- survivable across the first visit only (battles 128 and 129)
+  H.setAllowGameOver(true, "Phunbaba's first visit: battle 128 is TERRA's scripted loss"),
   stepOn(52, 58, function() return sw(0x0291) == 1 or H.battleLoadStarted() end),
   -- battle 128: TERRA alone (char_party TERRA, 2) against an invincible
   -- Phunbaba (AIScript _362: invincible_on SELF); the event plays on after
@@ -380,16 +390,19 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
       .. "battle 129 won", H.gameOverFired or 0))
     H.assertEq(H.gameOverFired or 0, 0, "no game over counted after battle 128's")
   end),
+  H.setAllowGameOver(false, "after Phunbaba's first visit: any later wipe is a lost attempt"),
   H.saveState("wor_terra_after1.mss"),
   stepOn(50, 53, function() return sw(0x02D7) == 1 end),
   ride(function() return sw(0x02D7) == 1 end, 6000, "Fenrir"),
   walkInto(52, 59, MAP_SHELTER, "the cellar -> the stairs 165"),
+  refireHold(false, "out of the cellar"),
   walkInto(18, 39, MAP_HOUSE, "the stairs -> the house 163"),
   walkInto(50, 17, MAP_MOBLIZ, "the house -> Mobliz"),
   stepOn(27, 16, function() return sw(0x00BE) == 1 end),
   ride(function() return sw(0x00BE) == 1 end, 6000, "Katarin is gone"),
   H.crossDoor(6, 20, MAP_SHELTER, 11, 25, "Mobliz 158 (6,20) -> the shelter 165 (11,25)"),
   walkInto(7, 17, MAP_KATARIN, "the shelter -> Katarin's room 150", { avoid = { { 11, 26 } } }),
+  refireHold(true, "Katarin's room 150"),
   chestAt(34, 49, 0x0A7, "Ether (150 (34,49))", ETHER),
   H.saveState("wor_terra_katarin.mss"),
   stepOn(40, 52, function() return sw(0x0292) == 1 end),
@@ -398,6 +411,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
   stepOn(40, 50, function() return sw(0x00BF) == 1 or H.battleLoadStarted() end),
   ride(function() return sw(0x00BF) == 1 and inParty(TERRA) end, 120000, "Phunbaba's return: TERRA joins"),
   H.saveState("wor_terra_joined.mss"),
+  refireHold(false, "TERRA joined, out of Katarin's room"),
   H.call(function()
     say("wor", "TERRA joined")
     H.log("[wor] " .. kitLine() .. "; " .. rosterLine())
