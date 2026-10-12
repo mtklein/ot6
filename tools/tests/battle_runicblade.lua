@@ -36,11 +36,12 @@ local CELES, EDGAR, RUNIC, CMD_MAGIC, BOLT = 0x06, 0x04, 0x0B, 0x02, 0x02
 local celes, edgar = nil, nil
 local casts = {}   -- every $3410 <- Bolt: { counter, b8, cmd, celesMp, f }
 local absorbs = 0  -- Ot6RunicBP entered for CELES: RunicEffect enrolled her as absorbing
+local absorbF = 0  -- the frame of the last such entry
 local function arm()
   local rb = H.sym("Ot6RunicBP")
   emu.addMemoryCallback(function()
     if celes ~= nil and (emu.getState()["cpu.y"] & 0xff) == celes * 2 then
-      absorbs = absorbs + 1
+      absorbs, absorbF = absorbs + 1, H.frame
       if casts[#casts] then casts[#casts].absorbed = true end
       H.log(string.format("[blade] f%d CELES absorbs (%d)", H.frame, absorbs))
     end
@@ -63,8 +64,18 @@ local function bounces(from)
   end
   return n
 end
--- every bounce reached EDGAR: no stance absorbed it, and his HP fell
+-- every bounce reached EDGAR: no stance absorbed it, and his HP fell.  A
+-- bounce that finds him already fallen (the monsters' turns go on between
+-- the absorb and the bounce) has nothing to land on: the step is not
+-- counted, and the battle is fought out and the next one taken.
 local function landed(from)
+  for i = from, #casts do
+    local c = casts[i]
+    if c.counter and c.edgarHp == 0 then
+      H.log(string.format("[blade] the bounce at f%d found EDGAR fallen: not counted", c.f))
+      return false
+    end
+  end
   for i = from, #casts do
     local c = casts[i]
     if c.counter then
@@ -78,6 +89,7 @@ local function landed(from)
         mpAfter))
     end
   end
+  return true
 end
 
 local function walkToBattle()
@@ -151,7 +163,19 @@ local body = {
   end),
 }
 local function add(t) for _, s in ipairs(t) do body[#body + 1] = s end end
-local function live(fn) return H.call(function() if inBattle() then fn() end end) end
+-- a step's checks run only while the battle is up and CELES stands (a
+-- fallen CELES holds no stance: the step is not counted, and the battle is
+-- fought out and the next one taken)
+local function live(fn)
+  return H.call(function()
+    if not inBattle() then return end
+    if H.readWord(0x3BF4 + celes * 2) == 0 then
+      H.log("[blade] CELES has fallen: this step is not counted")
+      return
+    end
+    fn()
+  end)
+end
 -- 1. the control: Runic at 2 BP absorbs and sends nothing back
 add(step(1, { { who = CELES, cmd = RUNIC, boost = 2, self = true }, { who = EDGAR, cmd = CMD_MAGIC, spell = BOLT } },
   function() return ownBolt(mark[1].casts + 1) ~= nil and H.readByte(0x7BCA) ~= 0 end))
@@ -164,31 +188,37 @@ end) })
 -- 2. the divine: Runic at 3 BP absorbs and sends the Bolt back at EDGAR
 add(step(2, { { who = CELES, cmd = RUNIC, boost = 3, self = true }, { who = EDGAR, cmd = CMD_MAGIC, spell = BOLT } },
   function()
-    -- EDGAR's Bolt has been cast, and its bounce has come or 600 frames have passed
+    -- EDGAR's Bolt has been absorbed, and its bounce has come or 900
+    -- frames have passed since the absorb (the bounce is CELES's counter,
+    -- queued behind the turns already waiting: 556 frames after the absorb
+    -- in one run)
     local c = ownBolt(mark[2].casts + 1)
-    return c ~= nil and (bounces(mark[2].casts + 1) >= 1 or H.frame > c.f + 600)
+    if c ~= nil and absorbs == mark[2].absorbs then return H.frame > c.f + 1500 end   -- never absorbed
+    return c ~= nil and (bounces(mark[2].casts + 1) >= 1 or H.frame > absorbF + 900)
   end))
 add({ H.waitFrames(120), live(function()
   if ownBolt(mark[2].casts + 1) == nil then return end
   H.assertEq(absorbs > mark[2].absorbs, true, "2. CELES absorbed EDGAR's Bolt")
   H.assertEq(bounces(mark[2].casts + 1), 1, "2. the 3-BP Runic (RunicBlade) sent EDGAR's Bolt back at him, as "
     .. "CELES's counter")
-  landed(mark[2].casts + 1)
-  mark.two = true
+  if landed(mark[2].casts + 1) then mark.two = true end
 end) })
 -- 3. again, inside the same stance
 add(step(3, { { who = EDGAR, cmd = CMD_MAGIC, spell = BOLT } },
   function()
-    -- EDGAR's Bolt has been cast, and its bounce has come or 600 frames have passed
+    -- EDGAR's Bolt has been absorbed, and its bounce has come or 900
+    -- frames have passed since the absorb (the bounce is CELES's counter,
+    -- queued behind the turns already waiting: 556 frames after the absorb
+    -- in one run)
     local c = ownBolt(mark[3].casts + 1)
-    return c ~= nil and (bounces(mark[3].casts + 1) >= 1 or H.frame > c.f + 600)
+    if c ~= nil and absorbs == mark[3].absorbs then return H.frame > c.f + 1500 end   -- never absorbed
+    return c ~= nil and (bounces(mark[3].casts + 1) >= 1 or H.frame > absorbF + 900)
   end))
 add({ H.waitFrames(120), live(function()
   if ownBolt(mark[3].casts + 1) == nil then return end
   H.assertEq(absorbs > mark[3].absorbs, true, "3. CELES absorbed the second Bolt")
   H.assertEq(bounces(mark[3].casts + 1), 1, "3. a second Bolt inside the stance went back too")
-  landed(mark[3].casts + 1)
-  if mark.one and mark.two then ok = true end
+  if landed(mark[3].casts + 1) and mark.one and mark.two then ok = true end
 end) })
 add({
   H.call(function()
