@@ -630,7 +630,8 @@ ice/order/tempo. The pairing is clearer here than in vanilla.
   `Ot6BladeBounce`).  The bounce is the absorbed spell, not a stronger one,
   and no Runic stance absorbs it again (`Ot6BladeNoRunic`: her own stance
   stands while it flies).  An ally's spell she absorbs goes back at the ally
-  -- vanilla's ally-spell quirk, kept.  Only player magic ($00-$35) bounces;
+  -- vanilla's ally-spell quirk, kept -- and a spell of her own that her
+  stance catches goes nowhere.  Only player magic ($00-$35) bounces;
   a counter is not countered back, and a battle with counters off bounces
   nothing.  *Reason: the old objection to making the divine "Runic at 3
   BP" -- that the canon would have an exception at its top tier and the
