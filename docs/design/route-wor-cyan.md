@@ -218,16 +218,19 @@ Slam and Stunner (`[advanceStory] actor=0 SwdTech row 2: tech $5A at 3 BP`).
 
 ### 5.4 What makes a fight good (guidelines.md)
 
-- *Real but surmountable:* at L38-40, 12 of 12 won, with deaths in 4.
+- *Real but surmountable:* at L38-40, 30 of 30 won (sections 5.3, 8.2),
+  with party deaths in 13 of them.
 - *Drama:* Wind Slash hits all four at once and kills from as much as
-  1,032 HP (`l38/st5_s0.out`: `SABIN from 1032/2442 by Wind Slash`).
+  1,032 HP (`l38/st5_s0.out`: `SABIN from 1032/2442 by Wind Slash`); one
+  draw in eighteen took four Fenix Downs (`stormB/stB_s44`), the
+  guidelines' signal for a lab if it recurs.
 - *Choices over levels:* the choices that count are reading its elements
   (the ThunderBlade, the Tempest off) and Runic against its spells; but the
-  measured difference between losing a third and winning every time is
-  three levels of grind, so levels settle more of it than choices do.
-  Worth the v0.31 second look.
-- *Luck:* at the arrival level the outcome turned on whether Wind Slash
-  came twice before a break.
+  measured difference between losing 3 of 14 and winning 30 of 30 is three
+  levels of grind, so levels settle more of it than choices do. Worth the
+  v0.31 second look.
+- *Luck:* at the arrival level a loss in about one fight in five; at the
+  route's level none, so luck moves only the cost (0-24 Potions).
 
 ## 6. Break rows (authored)
 
@@ -268,7 +271,53 @@ bolt (`storm/floor/`: 3 of 4 won, 14 deaths, on the pre-row ROM).
 
 ## 8. Played
 
-(section 8 is filled from the variation sets)
+### 8.1 The bootstrap runs
+
+`dev/full2.log`: `gen_wor_cyan` from the tracked `wor-terra-v1`, `PASS
+(frame 200228) attempts=1/3`, 66 battles and no death, the grind `done
+after 41 battles`, `contract wor-mtzozo-v1 (exit): all 33 fields hold`.
+`dev/storm3.log`: `gen_wor_storm` from that capture, the dragon `WON after
+9810 ticks`, `contract wor-cyan-v1 (exit): all 25 fields hold`, `PASS
+(frame 40814) attempts=1/3`. The tracked checkpoints are these captures;
+the chain's own replace them by `checkpoint_drift.py --recut`.
+
+### 8.2 Under draw variation (`cyanB/`, `stormB/`)
+
+Each leg eighteen times from its tracked boot: twelve seed shifts (0-44 by
+4) and, to move the encounter draw, K = 2, 5 and 9 random battles used up
+before the leg's body (the cyan leg on Mobliz's plain, world group 38; the
+storm leg on Mt. Zozo's east face, group 160), each at shifts 0 and 12
+(`build/lab/cyan/make_kvariant.py`, retained beside the logs).
+
+- **The cyan leg**: 18 of 18 reach the save point; 17 pass, and the
+  18th (`varB_k5_s0`) failed on the lab's own back-to-back savestates
+  after the save point (`render on demand: fixture(s) wor_cyan.mss saved
+  with the PPU's palette address unknown`), the lab's edit, not the
+  route's; rerun with a wait in its place it passes (`varC_k5_s0.log`:
+  `PASS (frame 205334)`). 1,190 battles over 321 distinct battle keys and
+  no party death (`analysis_leg.txt`: `TOTAL battles 1190 (321 distinct
+  keys), deaths 0`). The grind takes 34-46 battles; the save point holds
+  TERRA 38-39, CYAN 38, SABIN 39, CELES 39-40 and 87-98 Potions.
+- **The storm leg**: 18 of 18 pass; the dragon over 12 distinct battle
+  keys, won 18, lost 0, broken in all 18, 15 party deaths
+  (`analysis_storm.txt`); Potions 0-24 and Fenix Downs 0-4 a fight, the
+  worst one draw (`stB_s44`: four deaths, `potions 24 fenix 4`).
+  `wor-cyan-v1` holds 95-97 Potions.
+- **Who breaks the dragon** (the party action before each break,
+  `who_breaks.txt`): SABIN's Fight 11, TERRA's (the ThunderBlade) 6,
+  CYAN's Quadra Slam 5, his Fight 2 and Empowerer 1, CELES 1. CYAN lands
+  a quarter of them in the fight he joins for.
+
+The first variation set (`varA/`, the generator before b429308e) stalled in
+9 of 12 seeds on Zozo's outside stair, a battle under the pressed walk
+(`where.txt`); the stair now fights it. The first storm run stopped one
+tile short of the ledge (`dev/storm1.log`), fixed the same commit.
+
+### 8.3 Retry sites
+
+None in the runs above (`attempts=1/1` and `1/3` throughout). The Storm
+Dragon is the leg's game-over risk; at the route's levels it was not lost
+in 30 fights (sections 5.3, 8.2).
 
 ## 9. What was left
 
