@@ -1352,3 +1352,64 @@ Pummel is worse (9 of 105).  So the generator keeps its plan.  What the
 losses show (mechanics.md, section 4) is driver-side: heals aimed at held
 members, Fenix raises to 200 HP with no follow-up, a body one hit from
 death left standing -- filed for the driver's owner.
+
+### 12.7 The Tentacles on the v0.27 chain (#425)
+
+v0.27's qualification lost the Tentacles twice before winning
+(`build/attempts/wt/v027-release-qualification/ninja.log`: `battle $1C6
+LOST after 21212 ticks: killed none`, then `LOST after 14021 ticks`, then
+`WON after 7674 ticks`). The lab replayed the leg from the
+`wor-south-figaro-v1` checkpoint to the tile below Gerad at shifts 0, 7,
+13, 20, 31 and 40 (every stop: CELES L32 1696 HP, SABIN L31 1609, EDGAR
+joins at L31 1600), then talked to Gerad after 0-63 frames: 384 runs an
+arm, 90 distinct (stop, battle key) pairs, retries off
+(`build/attempts/wt/v028-edgar-lab/lab/`). Stop 0 at key `be44`
+reproduces the qualification's first loss exactly (`LOST after 21212
+ticks`).
+
+| arm | driver | bank | pairs with a loss | runs not won | wins: median ticks, with a death |
+|---|---|---|---|---|---|
+| `base` | v0.27 | none | 7 (5 wipes, 2 crashes) | 27 | 10468, 11 |
+| `fix` | Seize-aware, 3-BP cap | none | 3 | 12 | 10212, 9 |
+| `credit` | `fix` + the Blitz on the ledger | none | 3 | 12 | 10212, 9 |
+| `b3main` | v0.27 | 3 | 5 (1 wipe, 4 crashes) | 20 | 6919, 2 |
+| **`bank3`** | `credit` | **3** | **2** | **10** | **6961, 4** |
+| `runic` (stopped at 177 runs) | `credit`, CELES Runics | none | 4 of 43 | 22 of 177 | 12359, 5 |
+
+What the losses were: one or two members held at any moment, each drain
+healing its holder, Bio and Poison on the rest, and turns spent on heals
+and raises that could not land. Three driver defects, fixed in
+`tools/tests/lib/ot6.lua`:
+
+- **Heals and raises aimed at a held member.** The driver did not know
+  the Seize. No targeting reaches a held member (`_c25917` masks with
+  `$3403`), so it now aims none at one, and says the Seize and the release.
+- **A planned line could buy 4-5 BP.** The bank holds up to 5 and one
+  action buys 3; the spend rule priced `Tools $AA at 4 BP`, and the race's
+  damage model failed the run when it landed (`damage boost must be
+  0..3`): the two `base` crashes and four of `b3main`'s pairs. Banking
+  makes it common, so the bank needs this fix.
+- **An Air Blade was never credited.** A Blitz committed from the list
+  took no damage-ledger entry, so SABIN's damage was missing from the
+  press window. No measured effect here (`fix` and `credit` match).
+
+The play fix is the bank: each member acts unboosted until it holds 3 BP,
+then spends all 3, so EDGAR's AutoCrossbow and SABIN's Air Blade land at x8
+on all four bodies (`actor=2's skill took 16647 off the monsters ... 4161
+a hit`). Against `credit` it is no measured change in losses (2 against 3
+pairs), but the wins are a third shorter, half as many lose a member, and
+Fenix Down plans in wins fall from 12 to 3. The two pairs it loses
+(`k13:be08`, `k20:be08`) die with 3-5 BP banked: the spend rule takes a
+3-BP Fight on one body rather than the 3-BP Air Blade on four.
+
+**`0 of 3 seated left` on a win** was the outcome line's wording: "left"
+counted members who left the battle (Run, Warp: `$3A39`), not members
+left standing. The qualification's winning attempt ended with all three
+standing (1404, 1036 and 1155 HP after the fight). The line now reads
+`0 of 3 seated fled (Run, Warp)`.
+
+**What makes a fight good:** the Tentacles are won or lost by how the
+Slows and Seizes fall more than by the party's choices: nothing in the
+party's kit or the shops answers Slow, and a held member can do nothing.
+Banking for one big AoE is a real choice and it shortens the fight, but
+the Seize lottery still decides the losses.
