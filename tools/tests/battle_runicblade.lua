@@ -18,7 +18,9 @@
 --      absorbs it (RunicEffect enrols her: Ot6RunicBP runs for her) and
 --      nothing comes back;
 --   2. CELES raises Runic at 3 BP; EDGAR casts Bolt: absorbed, and CELES
---      casts Bolt at EDGAR as a counter ($b1 bit 0) at no MP;
+--      casts Bolt at EDGAR as a counter ($b1 bit 0) at no MP, which no
+--      Runic stance absorbs (her own stands: Ot6BladeNoRunic) and which
+--      lands on him;
 --   3. EDGAR casts Bolt again inside the same stance: absorbed and sent back
 --      again.
 -- Recorded at every $3410 write (the spell an attack pass is using) with
@@ -38,6 +40,7 @@ local function arm()
   emu.addMemoryCallback(function()
     if celes ~= nil and (emu.getState()["cpu.y"] & 0xff) == celes * 2 then
       absorbs = absorbs + 1
+      if casts[#casts] then casts[#casts].absorbed = true end
       H.log(string.format("[blade] f%d CELES absorbs (%d)", H.frame, absorbs))
     end
   end, emu.callbackType.exec, rb, rb)
@@ -45,7 +48,7 @@ local function arm()
     if v ~= BOLT or celes == nil or H.readByte(0x3A7C) ~= CMD_MAGIC then return end
     casts[#casts + 1] = { counter = (H.readByte(0xB1) & 1) == 1, b8 = H.readByte(0xB8), b9 = H.readByte(0xB9),
       cmd = H.readByte(0x3A7C), celesMp = H.readWord(0x3C08 + celes * 2), edgarMp = H.readWord(0x3C08 + edgar * 2),
-      f = H.frame }
+      edgarHp = H.readWord(0x3BF4 + edgar * 2), f = H.frame }
     local c = casts[#casts]
     H.log(string.format("[blade] f%d Bolt: counter=%s targets chars $%02X mons $%02X, cmd $%02X, CELES MP %d, "
       .. "EDGAR MP %d", c.f, tostring(c.counter), c.b8, c.b9, c.cmd, c.celesMp, c.edgarMp))
@@ -58,6 +61,22 @@ local function bounces(from)
     if c.counter and c.b8 == (1 << edgar) and c.b9 == 0 then n = n + 1 end
   end
   return n
+end
+-- every bounce reached EDGAR: no stance absorbed it, and his HP fell
+local function landed(from)
+  for i = from, #casts do
+    local c = casts[i]
+    if c.counter then
+      local after = casts[i + 1] and casts[i + 1].edgarHp or H.readWord(0x3BF4 + edgar * 2)
+      H.log(string.format("[blade] the bounce at f%d: absorbed=%s, EDGAR HP %d -> %d", c.f, tostring(c.absorbed),
+        c.edgarHp, after))
+      H.assertEq(c.absorbed, nil, "the bounce was not absorbed by a Runic stance (Ot6BladeNoRunic)")
+      H.assertEq(after < c.edgarHp, true, "the bounced Bolt landed on EDGAR")
+      local mpAfter = casts[i + 1] and casts[i + 1].celesMp or H.readWord(0x3C08 + celes * 2)
+      H.assertEq(mpAfter >= c.celesMp, true, string.format("the bounce cost CELES no MP (%d -> %d)", c.celesMp,
+        mpAfter))
+    end
+  end
 end
 
 local function walkToBattle()
@@ -125,8 +144,10 @@ add({
   end),
 })
 -- 3. again, inside the same stance
+add({ H.waitFrames(60), H.call(function() landed(mark[2].casts + 1) end) })
 add(step(3, { { who = EDGAR, cmd = CMD_MAGIC, spell = BOLT } },
   function() return bounces(mark[3].casts + 1) >= 1 end))
+add({ H.waitFrames(60), H.call(function() landed(mark[3].casts + 1) end) })
 add({
   H.call(function()
     H.assertEq(absorbs > mark[3].absorbs, true, "3. CELES absorbed the second Bolt")

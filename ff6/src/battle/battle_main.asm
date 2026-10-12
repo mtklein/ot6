@@ -8832,6 +8832,7 @@ CalcReflectDmg:
 RunicEffect:
 @352b:  .a8
         .i8
+        jsl     Ot6BladeNoRunic ; ot6: a RunicBlade's bounce is not absorbed again
         lda     $11a3
         bit     #$08
         beq     @35ac

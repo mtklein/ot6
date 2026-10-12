@@ -136,3 +136,33 @@ OT6_CHAR_CELES = $06
 @no:    clc
         rtl
 .endproc
+
+; [ RunicEffect's head: the bounce goes through every Runic stance ]
+; The bounce is CELES's own cast, and her stance stands while it flies: a
+; Runic stance absorbs every runic-able spell, a friendly one included
+; (kits.md's "ally-spell quirk"), so the bounce was eaten by the stance that
+; sent it.  A counterattack ($b1.0) of Magic by a character whose stance is
+; a RunicBlade is that bounce (her only magic counter), and it is made
+; un-absorbable for this pass: $11a3 bit 3 cleared, the bit RunicEffect
+; tests first.
+; jsl from RunicEffect's head, a8/i8, x = the attacker, db = $7e.  clobbers
+; A; preserves X and Y.
+.proc Ot6BladeNoRunic
+        .a8
+        lda     $b1
+        lsr
+        bcc     @out            ; not a counterattack
+        txa
+        cmp     #$08
+        bcs     @out            ; a monster's counter
+        lda     $3a7c
+        cmp     #$02
+        bne     @out            ; not Magic
+        lda     $3018,x
+        and     f:$7e0000+OT6_RUNICBLADE
+        beq     @out            ; not a RunicBlade's
+        lda     $11a3
+        and     #$f7            ; runic-able off for this pass
+        sta     $11a3
+@out:   rtl
+.endproc
