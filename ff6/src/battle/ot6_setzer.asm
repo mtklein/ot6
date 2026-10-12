@@ -1392,8 +1392,9 @@ OT6_HIRE_YX    = $61d4-$61c7    ; a pincer walks with X this far back
 ; boost (kits.md "Divines", owner 2026-10-11), and that boost buys a throw of
 ; OT6_JACKPOT_ROLLS rolls (Ot6SetzerEffect adds them to the action's attack
 ; count), each its own triple and its own hit.  A throw whose boost was taken
-; back after the pick (L during target select) rolls nothing, and its price
-; was not charged (Ot6AbilityCost's slot arm).  Nothing else is bought: no
+; back after the pick (L during target select) rolls nothing and charges
+; nothing: no MP (Ot6AbilityCost's slot arm priced it 0) and no points (the
+; pending boost is dropped here, so Ot6ActionEnd takes none).  Nothing else is bought: no
 ; multiplier (the command is in Ot6BoostDmg's gate, and this damage is set
 ; here, after CalcDmg), and the MP price is flat.
 ;
@@ -1426,9 +1427,11 @@ Ot6JackpotCubeTbl:
 @jackpot:
         lda     OT6_BOOST_REVEALED,y
         cmp     #$03            ; a throw queued under a full boost only: the
-        bcc     @none           ;   boost taken back after the pick (L during
-                                ;   target select) leaves nothing to roll
-        lda     $b8             ; no body left for this roll: skip it
+        bcs     @full           ;   boost taken back after the pick (L during
+        lda     #$00            ;   target select) leaves nothing to roll,
+        sta     OT6_BOOST_REVEALED,y    ; and nothing bought is nothing
+        bra     @none           ;   charged (Ot6ActionEnd reads 0)
+@full:  lda     $b8             ; no body left for this roll: skip it
         ora     $b9
         bne     @aimed
 @none:
