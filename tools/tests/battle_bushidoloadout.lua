@@ -137,6 +137,8 @@ H.run({ maxFrames = 40000 }, {
     H.log("AUTO (word 0) window = {2,3,4} at 1x/2x/3x -- byte-for-byte Layer A")
   end),
 
+  -- (old-ROM red: build/attempts/wt/v028-kits/px13-lab/old/battle_bushidoloadout.out;
+  -- mutants: px13-lab/mut/{pick,ceil}/battle_bushidoloadout.out)
   -- 1a. Cleave learned at the Phantom Train farewell (#379), ahead of the
   -- techs between: $1CF7 = techs 0..3 + Cleave counts 5, so InitSkills'
   -- $2020 reads 4.  The window is his top two of the run he knows (Slash,

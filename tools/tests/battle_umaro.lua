@@ -37,7 +37,9 @@
 --   1. every turn with three points pending rolls Storm (arm 1);
 --   2. no turn with fewer rolls Storm (no Blizzard Orb: vanilla never can);
 --   3. every Charge and Throw pass carries the bludgeoning class ($04).
--- Old-ROM red and mutants: build/attempts/wt/v028-kits/.
+-- Old-ROM red: build/attempts/wt/v028-kits/px13-lab/old/battle_umaro2.out.  Mutants (the
+-- gate at two points, the club class off):
+-- build/attempts/wt/v028-kits/px13-lab2/mut/{ugate,uclass}/.
 local H = dofile("tools/tests/lib/ot6.lua")
 local ENTRY = "build/states/tunnelarmr_entry.mss.lua"
 

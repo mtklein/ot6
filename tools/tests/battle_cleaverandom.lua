@@ -35,7 +35,8 @@
 -- PICKS random SwdTechs: every bound is the arm's, and no Cleave executed.
 -- Old-ROM red and mutant: build/attempts/wt/v027-kits/final-matrix/
 -- (<rom>__battle_cleaverandom.out) for the full arm;
--- build/attempts/wt/v028-kits/ for the gap arm.
+-- build/attempts/wt/v028-kits/px13-lab/old/ and px13-lab/mut/ceil/ (Ot6BushidoCeil
+-- counting Cleave) for the gap arm.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/cyan_defence.mss.lua"
 

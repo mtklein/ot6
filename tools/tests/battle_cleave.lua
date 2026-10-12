@@ -22,8 +22,8 @@
 --      Cleave ($5c) at its price, rows 0 and 1 are his top two techs of the
 --      run (blank where the run has only one), and row 3 is empty.
 -- Old-ROM red (main's ROM and fixtures, where Cleave is still L70's):
--- build/attempts/wt/v028-kits/.  Mutant (the farewell's grant removed):
--- the same directory.
+-- build/attempts/wt/v028-kits/px13-lab/old/battle_cleave.out.  Mutant (Ot6BushidoPick
+-- blind to Cleave): build/attempts/wt/v028-kits/px13-lab/mut/pick/battle_cleave.out.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/gau_joined.mss.lua"
 

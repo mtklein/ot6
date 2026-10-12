@@ -15,7 +15,7 @@
 --   2. each SwdTech's record element is the plan's: wind ($10) for Quadra
 --      Slice, none for the other seven.
 -- Old-ROM red (main's ROM: all eight slashing, Quadra Slice elementless):
--- build/attempts/wt/v028-kits/.
+-- build/attempts/wt/v028-kits/px13-lab/old/battle_swdtechclass.out.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SLASH, WIND = 0x01, 0x10

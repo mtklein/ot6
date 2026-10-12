@@ -43,7 +43,9 @@
 --      draw RandDance makes from the known dances ($ff path: the mask
 --      RandBit is handed) must leave Water Rondo out.  Without the rule a
 --      Water Rondo start stumbles only off its roll, 1/2.
--- Old-ROM red and mutants: build/attempts/wt/v028-kits/.
+-- Old-ROM red: build/attempts/wt/v028-kits/px13-lab/old/battle_waterrondo.out.
+-- Mutants (the gate at one point, the terrain rule off, the random mask
+-- whole): build/attempts/wt/v028-kits/px13-lab/mut/{grey,terrain,mask}/.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/moogle_defense.mss.lua"
 
