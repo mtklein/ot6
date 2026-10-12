@@ -38,7 +38,7 @@ local function arm()
   -- each morph: $3EF9 bit 3 going up for TERRA's seat
   local last = false
   emu.addMemoryCallback(function()
-    if seat == nil then return end
+    if seat == nil or not H.battleActive() then return end   -- (battle RAM is torn down at the end)
     local now = morphed()
     if now and not last then
       morphs = morphs + 1
