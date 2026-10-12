@@ -303,12 +303,19 @@ end
 -- library's planner reads no path across it (its z-level model mispredicts
 -- the stair, as gen_zozo4_dadaluma's corridor), so the climb is pressed:
 -- each press held until the party leaves the tile, then released.
+-- A random battle on the stair (Zozo's street rolls group 78) is fought
+-- with the route's tactical driver and the presses go on after it (the
+-- first variation set stalled on one with the pad released:
+-- build/attempts/wt/v028-cyan-route/varA/varA_s4.log, 'no-progress').
 local function pressSeq(SEQ)
   local i, rest, held = 1, 0, 0
+  local drv = H.fightDriverFor("stair", { tactical = true, boost = true, items = true, healPercent = 55 }, FIGHT)
+  local fought = false
   return H.withReset({
     tick = function()
       if i > #SEQ then H.setPad({}); return "done" end
-      if H.battleLoadStarted() then H.setPad({}); return "frame" end
+      if H.battleLoadStarted() then fought = true; held = 0; drv.frame(); return "frame" end
+      if fought then fought = false; drv.idle() end
       if not (H.hasControl() and H.tileAligned()) and held == 0 then H.setPad({}); return "frame" end
       if SEQ[i][2]() and H.tileAligned() then
         H.setPad({})
@@ -325,8 +332,8 @@ local function pressSeq(SEQ)
       H.setPad({ [SEQ[i][1]] = true })
       return "frame"
     end,
-    reset = function() i, rest, held = 1, 0, 0 end,
-  }, function() i, rest, held = 1, 0, 0 end)
+    reset = function() i, rest, held, fought = 1, 0, 0, false end,
+  }, function() i, rest, held, fought = 1, 0, 0, false end)
 end
 local function climbStair()
   return pressSeq({ { "down", function() return H.fieldY() >= 40 end },
