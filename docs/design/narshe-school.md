@@ -197,7 +197,7 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> Shadow: at 3 Boost Points, his hit that breaks a monster, or hits a broken one, kills it. Most bosses just stay broken.
+> Shadow: with 3 points, his hit that breaks a monster, or hits a broken one, kills it. Most bosses just stay broken.
 
 **$025D — the practice fight (right room, beside the monster chest):**
 

@@ -84705,7 +84705,7 @@ _cc36b9:
                 ; Cyan’s SwdTech: there is no charge gauge. It lists his three best skills, for 1, 2 and 3 Boost Points.
                 ; Steal, Slot and Rage: each Boost Point improves the odds instead of adding damage.
                 ; With 3 points, Steal always works and gets the rare item, if any, and Rage always uses its special.
-                ; Shadow: at 3 Boost Points, his hit that breaks a monster, or hits a broken one, kills it. Most bosses just stay broken.
+                ; Shadow: with 3 points, his hit that breaks a monster, or hits a broken one, kills it. Most bosses just stay broken.
         return
 _cc36bd:
         switch $02A0=1
