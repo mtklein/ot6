@@ -84657,9 +84657,9 @@ _cc3692:
 _cc3696:
         dlg $026F
                 ; “Runic”
-                ; Turns many magic attacks into MP and a Boost Point. At 3 Boost Points it also sends them back.
+                ; Turns magic attacks into MP and a Boost Point. With 3 points, also sends them back.
                 ; “Morph”
-                ; Increases Attack and Magic power. Needs 3 Boost Points. Duration increases with battles fought.
+                ; Needs 3 Boost Points. Increases Attack and Magic power. Lasts longer as battles are fought.
                 ; “Dance” and “Rage”
                 ; Once selected, will continue until the battle is over.
         return

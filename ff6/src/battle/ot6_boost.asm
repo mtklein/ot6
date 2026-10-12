@@ -1958,12 +1958,12 @@ OT6_LIFE3_ID = $35
         lda     $3a7b
         jsl     Ot6SetzerCost
         beq     :+
-        lda     OT6_BOOST_REVEALED,x    ; Jackpot, the one priced row: a throw
-        cmp     #$03                    ;   queued under a full boost pays its
-        lda     #$00                    ;   price; one queued under less rolls
-        bcc     :+                      ;   nothing (Ot6JackpotDice) and pays
-        lda     $3a7b                   ;   nothing
-        jsl     Ot6SetzerCost
+        pha                             ; Jackpot, the one priced row: a throw
+        lda     OT6_BOOST_REVEALED,x    ;   queued under a full boost pays its
+        cmp     #$03                    ;   price; one queued under less rolls
+        pla                             ;   nothing (Ot6JackpotDice) and pays
+        bcs     :+                      ;   nothing (pla keeps the carry)
+        lda     #$00
 :       plp
         rtl
 @swdtech:
