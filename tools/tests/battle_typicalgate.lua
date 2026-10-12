@@ -56,7 +56,7 @@ end
 -- THE DRAW.  Whether Dullahan's counter lands in the fight is the battle
 -- RNG's, and the precondition needs one: on the fixture the v0.28 kits
 -- chain made, the one fight from the boot landed none (build/attempts/wt/
--- v028-kits/px13-qual/battle_typicalgate.log).  So the fight is branched
+-- v028-kits/px13-qual/suite_battle_typicalgate.log).  So the fight is branched
 -- from a snapshot at the grave (strategy discovery, docs/TESTING.md), each
 -- branch idling BRANCH_IDLE frames longer there, until one lands a
 -- counter; every branch's ledger is checked against the engine's, the
