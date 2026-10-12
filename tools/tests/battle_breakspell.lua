@@ -131,34 +131,44 @@ local function check(r, boost, slot)
     regen == 1 and " and earned the unboosted turn's pip" or ""))
 end
 
--- the casts, in order: 1 BP on the body with the most shields (two chips:
--- counted exactly on three or more, the Break on two), 0 BP on a body with
--- two or more (one chip, counted exactly), then 3 BP (four chips, or the
--- Break when the body holds four or fewer).  Every body on this map's pool
--- holds two or three (route_data.py pool field 394).  Before each cast the
--- party Defends until a live unbroken body holds what the cast needs: a
--- lone body a cast broke recovers its shields when its Break runs out
--- (Ot6Tick).
-local CASTS = { { boost = 1, need = 2 }, { boost = 0, need = 2 }, { boost = 3, need = 1 } }
-local plan, targets = nil, {}
-local function planCast(i)
-  return H.call(function()
-    if terraSeat == nil then
-      for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == TERRA then terraSeat = s end end
-      H.assertEq(terraSeat ~= nil, true, "TERRA is seated")
-    end
-    local t, sh = pickTarget()
-    H.assertEq(t ~= nil and sh >= CASTS[i].need, true, string.format(
-      "cast %d (%d BP): a live unbroken monster holds %d+ shields (the best holds %s)", i, CASTS[i].boost,
-      CASTS[i].need, tostring(sh)))
-    targets[i] = t
-    H.log(string.format("[break] cast %d: %d BP at slot %d (%d shields); TERRA seat %d, MP %d, bank %d", i,
-      CASTS[i].boost, t, sh, terraSeat, H.readWord(0x3C08 + terraSeat * 2), H.readByte(0x3E9C + terraSeat * 2)))
-    plan = { { who = TERRA, cmd = CMD_MAGIC, spell = BREAK, boost = CASTS[i].boost, slot = t } }
-  end)
+-- The three counted casts: 0 BP on a body holding two or more (one chip,
+-- counted exactly), 1 BP on a body holding two or more (two chips: counted
+-- exactly on three or more, the Break on exactly two), and 3 BP on any
+-- shielded body (four chips, or the Break when it holds four or fewer).
+-- Every body on this map's pool holds two or three (route_data.py pool
+-- field 394).  Each turn plays the first counted cast a live unbroken body
+-- can take; when none can (a lone body worn to one shield), a filler
+-- unboosted Break, checked but not counted, breaks it, and the party
+-- Defends until its Break runs out and its shields come back (Ot6Tick).
+local CASTS = { { boost = 0, need = 2 }, { boost = 1, need = 2 }, { boost = 3, need = 1 } }
+local doneCast, cur, nDone, fillers = {}, nil, 0, 0
+local plan, targets = {}, {}
+local function decide()
+  if terraSeat == nil then
+    for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == TERRA then terraSeat = s end end
+    H.assertEq(terraSeat ~= nil, true, "TERRA is seated")
+  end
+  local t, sh = pickTarget()
+  cur, plan = nil, {}
+  if t == nil or sh < 1 then
+    H.log("[break] no live unbroken shielded body: the party Defends until a Break runs out")
+    return
+  end
+  for i, c in ipairs(CASTS) do
+    if not doneCast[i] and sh >= c.need then cur = i; break end
+  end
+  local boost = cur and CASTS[cur].boost or 0
+  if cur == nil then fillers = fillers + 1 end
+  H.assertEq(fillers <= 4, true, "at most four filler casts")
+  targets[cur or 0] = t
+  H.log(string.format("[break] %s: %d BP at slot %d (%d shields); TERRA seat %d, MP %d, bank %d",
+    cur and ("cast " .. cur) or "a filler cast (not counted)", boost, t, sh, terraSeat,
+    H.readWord(0x3C08 + terraSeat * 2), H.readByte(0x3E9C + terraSeat * 2)))
+  plan = { { who = TERRA, cmd = CMD_MAGIC, spell = BREAK, boost = boost, slot = t } }
 end
 local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
-local steps = {
+
+H.run({ maxFrames = 200000 }, {
   H.bootCheckpoint("fc-alcove-v1"),
   H.call(function() arm() end),
   H.navTo(8, 9, { maxFrames = 3000 }),
@@ -176,20 +186,27 @@ local steps = {
   encounter(),
   H.waitUntil(function() return H.battleActive() end, 1200, "the battle is up", 2),
   H.waitFrames(30),
-}
-local empty = {}
-for i = 1, #CASTS do
-  steps[#steps + 1] = H.kitBattle(empty, { untilPlanDone = true, idle = "defend", maxFrames = 30000,
-    planDone = function() local _, sh = pickTarget(); return sh ~= nil and sh >= CASTS[i].need end })
-  steps[#steps + 1] = planCast(i)
-  steps[#steps + 1] = H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000,
-    planDone = function() return close() end })
-  steps[#steps + 1] = H.call(function()
-    H.assertEq(#recs, i, string.format("cast %d was recorded", i))
-    check(recs[i], CASTS[i].boost, targets[i])
-  end)
-end
-steps[#steps + 1] = H.call(function()
-  H.log("[break] PASS: Break took 1 + boost shields at 1, 0 and 3 BP, no damage, no petrify, 25 MP flat")
-end)
-H.run({ maxFrames = 200000 }, steps)
+  H.driveUntil(function() return nDone == #CASTS end, 180000, {
+    H.call(decide),
+    H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000,
+      planDone = function()
+        if #plan == 0 then local t, sh = pickTarget(); return t ~= nil and sh >= 1 end
+        return close()
+      end }),
+    H.call(function()
+      if #plan == 0 then return end
+      local r = recs[#recs]
+      if cur ~= nil then
+        check(r, CASTS[cur].boost, targets[cur])
+        doneCast[cur] = true
+        nDone = nDone + 1
+      else
+        check(r, 0, targets[0])
+      end
+    end),
+  }, "the three counted casts"),
+  H.call(function()
+    H.log(string.format("[break] PASS: Break took 1 + boost shields at 0, 1 and 3 BP (%d filler cast(s)), no "
+      .. "damage, no petrify, 25 MP flat", fillers))
+  end),
+})
