@@ -149,7 +149,11 @@ add({ H.waitFrames(120), live(function()
 end) })
 -- 2. the divine: Runic at 3 BP absorbs and sends the Bolt back at EDGAR
 add(step(2, { { who = CELES, cmd = RUNIC, boost = 3, self = true }, { who = EDGAR, cmd = CMD_MAGIC, spell = BOLT } },
-  function() return ownBolt(mark[2].casts + 1) ~= nil and H.readByte(0x7BCA) ~= 0 end))
+  function()
+    -- EDGAR's Bolt has been cast, and its bounce has come or 600 frames have passed
+    local c = ownBolt(mark[2].casts + 1)
+    return c ~= nil and (bounces(mark[2].casts + 1) >= 1 or H.frame > c.f + 600)
+  end))
 add({ H.waitFrames(120), live(function()
   if ownBolt(mark[2].casts + 1) == nil then return end
   H.assertEq(absorbs > mark[2].absorbs, true, "2. CELES absorbed EDGAR's Bolt")
@@ -160,7 +164,11 @@ add({ H.waitFrames(120), live(function()
 end) })
 -- 3. again, inside the same stance
 add(step(3, { { who = EDGAR, cmd = CMD_MAGIC, spell = BOLT } },
-  function() return ownBolt(mark[3].casts + 1) ~= nil and H.readByte(0x7BCA) ~= 0 end))
+  function()
+    -- EDGAR's Bolt has been cast, and its bounce has come or 600 frames have passed
+    local c = ownBolt(mark[3].casts + 1)
+    return c ~= nil and (bounces(mark[3].casts + 1) >= 1 or H.frame > c.f + 600)
+  end))
 add({ H.waitFrames(120), live(function()
   if ownBolt(mark[3].casts + 1) == nil then return end
   H.assertEq(absorbs > mark[3].absorbs, true, "3. CELES absorbed the second Bolt")
