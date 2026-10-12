@@ -313,9 +313,35 @@ The first variation set (`varA/`, the generator before b429308e) stalled in
 (`where.txt`); the stair now fights it. The first storm run stopped one
 tile short of the ledge (`dev/storm1.log`), fixed the same commit.
 
-### 8.3 Retry sites
+### 8.3 On the kits ROM (`chain_a57087a5/`, `cyanC/`, `stormC/`)
 
-None in the runs above (`attempts=1/1` and `1/3` throughout). The Storm
+After wt/v028-kits and wt/v028-edgar-lab merged (a57087a5: CYAN learns
+Cleave at the Phantom Train farewell, his window is his two best other
+techs and Cleave on 3 BP, Retort and Empowerer classless; plans capped at
+3 BP), `ninja chain` played the line from power-on on px13
+(`chain_a57087a5/`: `wor_terra` `PASS (frame 48418) attempts=1/3`,
+`wor_cyan` `PASS (frame 212900) attempts=1/3`, `wor_storm` `PASS (frame
+39420) attempts=1/3`), and both checkpoints are re-cut from its captures.
+The variation sets again, the cyan leg booted from that chain's
+`wor-terra-v1` capture (its CYAN knows Cleave), the storm leg from the
+re-cut `wor-mtzozo-v1`:
+
+- **The cyan leg**: 18 of 18 pass; `TOTAL battles 1190 (327 distinct
+  keys), deaths 0` (`cyanC/analysis_leg.txt`).
+- **The storm leg**: 18 of 18 pass; `runs 18, distinct battle keys 15,
+  won 18, lost 0, party deaths 5, broken in 18`; Potions 0-13 and Fenix
+  Downs 0-2 a fight (`stormC/analysis_storm.txt`).
+- **CYAN's turns**: the driver spends his bank as it comes, so his
+  SwdTech is mostly Empowerer at 1 BP (36 of 49 picks), Stunner 8, Cleave
+  5; with Empowerer classless he lands 1 of 27 breaks (`who_breaks.txt`:
+  `TERRA Fight 14, SABIN Fight 9, CELES Fight 3, CYAN SwdTech $5A 1`). A
+  player would bank three for Cleave against a boss; the driver's per-actor
+  banking is the lever (section 9).
+
+### 8.4 Retry sites
+
+None in the runs above (`attempts=1/1` and `1/3` throughout, the chain's
+included). The Storm
 Dragon is the leg's game-over risk; at the route's levels it was not lost
 in 30 fights (sections 5.3, 8.2).
 
@@ -329,3 +355,8 @@ in 30 fights (sections 5.3, 8.2).
   generators, so the waypoints stay generator-local.
 - **EDGAR waits aboard.** His Ramuh stays on him; the next arc's kit pass
   can move it.
+- **CYAN's bank against a boss.** `opts.bushido` takes the deepest row the
+  bank pays this turn, so on the kits ROM he spends 1 BP on Empowerer most
+  turns instead of saving three for Cleave (8.3); a per-actor bank target
+  in the fight driver would let him save for it.  The rows were tuned on
+  the measured fights and need no change for it.
