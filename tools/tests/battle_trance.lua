@@ -31,18 +31,21 @@ local BATTLES = 6
 
 local seat = nil
 local morphs, refused, done, battles = 0, false, false, 0
-local ends = {}   -- TERRA's Ot6ActionEnd frames: an action of hers has resolved
+local ends = {}   -- TERRA's Ot6ActionEnd frames for her Morph command ($3A7C): it has resolved
 local function e() return seat * 2 end
 local function morphed() return seat ~= nil and (H.readByte(0x3EF9 + e()) & 0x08) ~= 0 end
 
 local function arm()
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
-    if seat ~= nil and (emu.getState()["cpu.x"] & 0xff) == seat * 2 then ends[#ends + 1] = H.frame end
+    if seat ~= nil and (emu.getState()["cpu.x"] & 0xff) == seat * 2 and H.readByte(0x3A7C) == MORPH then
+      ends[#ends + 1] = H.frame
+    end
   end, emu.callbackType.exec, ae, ae)
-  -- each morph: $3EF9 bit 3 going up for TERRA's seat
+  -- each morph: $3EF9 bit 3 going up for TERRA's seat, read at each
+  -- frame's end (a write callback sees the byte before the write lands)
   local last = false
-  emu.addMemoryCallback(function()
+  emu.addEventCallback(function()
     if seat == nil or not H.battleActive() then return end   -- (battle RAM is torn down at the end)
     local now = morphed()
     if now and not last then
@@ -51,7 +54,7 @@ local function arm()
         H.readByte(0x3E9C + e()), H.readByte(0x3E9D + e())))
     end
     last = now
-  end, emu.callbackType.write, 0x7E3EF9, 0x7E3EF9 + 6)
+  end, emu.eventType.endFrame)
 end
 
 local function inBattle() return H.battleLoadStarted() end
@@ -84,7 +87,8 @@ H.run({ maxFrames = 600000 }, {
     end),
     H.kitBattle({ { who = TERRA, cmd = MORPH, boost = 3, self = true } },
       { untilPlanDone = true, idle = "defend", others = "thin", maxFrames = 60000,
-        -- her Morph has resolved (her Ot6ActionEnd after the pick), whatever it did
+        -- her Morph has resolved (her Ot6ActionEnd for command $03 after the
+        -- pick; an earlier Defend of hers can end after it), whatever it did
         planDone = function()
           local d = H.vars.kit[1]
           if d == nil or #ends == 0 or ends[#ends] < d.frame then return false end
