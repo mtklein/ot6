@@ -16,7 +16,7 @@
 -- every body, no damage), so the battle stands for both uses (an
 -- AutoCrossbow at x8 twice fells this map's smaller draws first), and its
 -- 3-BP price sits under the cap where the doubling shows: 3 BP = 94,
--- overclocked 99 (2 x 94, capped).  EDGAR's pool here (201) pays two
+-- overclocked 99 (2 x 94, capped).  EDGAR rests at the save first, so his pool pays two
 -- overclocks and little more, so the one-firing control
 -- is the old ROM's run of this suite and the mutant without the passes arm
 -- (below), where the same 3-BP use fires once.  Asserted per use (the use
@@ -87,6 +87,12 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq((H.readByte(0x1E80 + (0x68 >> 3)) >> (0x68 & 7)) & 1, 1,
       "switch $0068 is set: the Magitek factory's way out has opened (Overclock learned)")
   end),
+  -- the two uses take 198 MP, and what the alcove's save holds is the
+  -- route's draw (164 of EDGAR's 230 in the v0.29 kits qualification,
+  -- build/attempts/wt/v029-kits/qual/): at the save point a person rests
+  -- first, so the care's MP band is set where his pool pays them (a Tent,
+  -- or Tinctures)
+  H.fieldCare({ tag = "overclock: rest for two overclocks", threshold = 0.95, mpBand = 0.9 }),
   H.fcAlcoveToBattle("overclock"),
   H.call(function()
     for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == EDGAR then seat = s end end
