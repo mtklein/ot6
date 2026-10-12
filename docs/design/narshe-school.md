@@ -197,7 +197,7 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> Shadow: once a battle, his hit that breaks a monster, or hits a broken one, kills it. Most bosses just stay broken.
+> Shadow: at 3 Boost Points, his hit that breaks a monster, or hits a broken one, kills it. Most bosses just stay broken.
 
 **$025D — the practice fight (right room, beside the monster chest):**
 
@@ -288,17 +288,21 @@ chocobo (shared with stables), $025D's first page.
 
 Runic absorbs the next spell for MP **and** +1 BP (Ot6RunicBP,
 ff6/src/battle/ot6.asm, hooked into vanilla's RunicEffect), so $026F
-(Runic/Morph/Dance/Rage) says so. Only page 1 changes; the Morph and
-Dance/Rage pages are untouched:
+(Runic/Morph/Dance/Rage) says so, and since v0.27 the two pages say what
+a full 3-BP boost does to them (RunicBlade and Trance, kits.md
+"Divines"); the Dance/Rage page is untouched:
 
 > ``Runic''
-> Turns many magic attacks into MP, and earns a Boost Point! Can be
-> used repeatedly.
+> Turns many magic attacks into MP and a Boost Point. At 3 Boost Points
+> it also sends them back.
+>
+> ``Morph''
+> Increases Attack and Magic power. Needs 3 Boost Points. Duration
+> increases with battles fought.
 
-"Boost Point" is the term $026D teaches, so this line reuses
-vocabulary the player has already seen instead of introducing a new one.
-Page 1 renders 4 lines, which is the page maximum and the same count the
-Morph page already uses, so no 5th-line auto-pause is introduced.
+"Boost Point" is the term $026D teaches, so these lines reuse vocabulary
+the player has already seen instead of introducing a new one.  Each page
+is held to four lines by school.lua's page count.
 
 ## Text-machine constraints (measured)
 
