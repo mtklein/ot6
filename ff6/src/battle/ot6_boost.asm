@@ -1570,6 +1570,7 @@ OT6_LIFE3_ID = $35
         sep     #$20
         .a8
         pha
+        jsr     Ot6BreakProps   ; ot6: a character's Break is OT6's (#398)
         jsr     Ot6Life3Cast
         bne     @out
         lda     #$08            ; can hit dead targets

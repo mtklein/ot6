@@ -504,6 +504,8 @@ TEST_ENV = {
     # one battle of scripted turns (3-11k frames on the branch's runs)
     "battle_breakspell": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
+    "battle_breakmonster": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
     "battle_ultimafold": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
     "battle_trance": "OT6_TIMEOUT=1800 "

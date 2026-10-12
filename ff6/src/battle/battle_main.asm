@@ -7147,39 +7147,27 @@ BUM_RUSH_POWER_VANILLA = 128            ; the byte this replaces
 LIFE3_MP_OT6       = 60
 LIFE3_MP_VANILLA   = 50                 ; the byte this replaces
 
-; ---- overrides 7-10: Break ($0c) chips shields instead of petrifying (#398) --
-; Vanilla Break is petrify: hit 120, power 0, death-class.  OT6's Break deals
-; no damage and inflicts no status; it takes shields off its one target,
-; class- and element-blind, 1 plus 1 per boost point (Ot6BreakSpell,
-; ot6_break.asm, from the per-target loop).  The record keeps its MP (25),
-; power 0 and single-target targeting ($41 has no spread bit in vanilla
-; already), and loses everything that made it a status roll:
-;   +$02  $02 -> $00   the instant-death flag: a boss's instant-death
-;                      protection ($3aa1.2) made CheckHit miss it
-;   +$04  $10 -> $20   the stamina-evade death check -> can't-dodge: a chip
-;                      takes no hit roll (CheckHit's @22a1 `bit #$20`)
-;   +$07  $01 -> $00   auto-miss when the target is immune to the status
-;   +$0a  $40 -> $00   Petrify
-; Every source casts the new Break: Shoat, Terra's natural magic (level 24)
-; and the Break Blade's on-hit spell.  A monster's Break on the party
-; chips nothing (characters carry no shields).
-BREAK_FLAGS1_OT6   = $00
-BREAK_FLAGS1_VANILLA = $02              ; the byte this replaces
-BREAK_FLAGS3_OT6   = $20
-BREAK_FLAGS3_VANILLA = $10              ; the byte this replaces
-BREAK_FLAGS4_OT6   = $00
-BREAK_FLAGS4_VANILLA = $01              ; the byte this replaces
-BREAK_STATUS1_OT6  = $00
-BREAK_STATUS1_VANILLA = $40             ; the byte this replaces (Petrify)
+; ---- Break ($0c): no record override (#398) ---------------------------------
+; Vanilla Break is petrify: hit 120, power 0, death-class.  The record stays
+; vanilla's, so a monster's Break -- and Control, Sketch and a Rage, which
+; cast as monsters do -- still petrifies.  A character's Break through Magic
+; or X-Magic (a Mimic of one included) or the Break Blade's on-hit cast is
+; OT6's: Ot6BreakProps (ot6_breakspell.asm), from CalcAttackEffect's head
+; before ChooseTarget and CheckHit, clears the four bytes that made it a
+; status roll in the loaded record ($11a0..$11ad):
+;   $11a2 bit 1   the instant-death flag: a boss's instant-death protection
+;                 ($3aa1.2) made CheckHit miss it
+;   $11a4 $10->$20  the stamina-evade death check -> can't-dodge: a chip
+;                 takes no hit roll (CheckHit's @22a1 `bit #$20`)
+;   $11a7 bit 0   auto-miss when the target is immune to the status
+;   $11aa bit 6   Petrify
+; and Ot6BreakSpell, in the per-target loop, takes the shields.  Characters
+; carry no shields, so OT6's Break on a party member does nothing.
 ; ------------------------------------------------------------------------------
 
 ; c4/6ac0
 ; byte offsets of the overridden bytes within the blob.  They must stay in
 ; ascending order: the splice below walks the blob once.
-BREAK_FLAGS1_AT    = ATTACK::BREAK    * MAGIC_PROP_REC + 2
-BREAK_FLAGS3_AT    = ATTACK::BREAK    * MAGIC_PROP_REC + 4
-BREAK_FLAGS4_AT    = ATTACK::BREAK    * MAGIC_PROP_REC + 7
-BREAK_STATUS1_AT   = ATTACK::BREAK    * MAGIC_PROP_REC + 10
 OSMOSE_MP_AT       = ATTACK::OSMOSE   * MAGIC_PROP_REC + 5
 LIFE3_MP_AT        = ATTACK::LIFE_3   * MAGIC_PROP_REC + 5
 DDUST_POWER_AT     = ATTACK::SHIVA    * MAGIC_PROP_REC + 6
@@ -7191,15 +7179,7 @@ MAGIC_PROP_END     = MAGIC_PROP_COUNT * MAGIC_PROP_REC
 .define magic_prop_dat .sprintf("magic_prop_%s.dat", LANG_SUFFIX)
 
 MagicProp:
-        .incbin magic_prop_dat, 0, BREAK_FLAGS1_AT
-        .byte   BREAK_FLAGS1_OT6                        ; $0c +$02 (was $02)
-        .incbin magic_prop_dat, BREAK_FLAGS1_AT + 1, BREAK_FLAGS3_AT - BREAK_FLAGS1_AT - 1
-        .byte   BREAK_FLAGS3_OT6                        ; $0c +$04 (was $10)
-        .incbin magic_prop_dat, BREAK_FLAGS3_AT + 1, BREAK_FLAGS4_AT - BREAK_FLAGS3_AT - 1
-        .byte   BREAK_FLAGS4_OT6                        ; $0c +$07 (was $01)
-        .incbin magic_prop_dat, BREAK_FLAGS4_AT + 1, BREAK_STATUS1_AT - BREAK_FLAGS4_AT - 1
-        .byte   BREAK_STATUS1_OT6                       ; $0c +$0a (was $40)
-        .incbin magic_prop_dat, BREAK_STATUS1_AT + 1, OSMOSE_MP_AT - BREAK_STATUS1_AT - 1
+        .incbin magic_prop_dat, 0, OSMOSE_MP_AT
         .byte   OSMOSE_MP_OT6                           ; $29 +$05 (was 1)
         .incbin magic_prop_dat, OSMOSE_MP_AT + 1, LIFE3_MP_AT - OSMOSE_MP_AT - 1
         .byte   LIFE3_MP_OT6                            ; $35 +$05 (was 50)

@@ -3,8 +3,8 @@
 --
 -- Break ($0c) deals no damage and sets no status: it takes shields off its
 -- one target, ignoring class and element, one plus one per boost point, at
--- its flat 25 MP (Ot6BreakSpell, ot6_breakspell.asm; MagicProp overrides
--- 7-10).  Played: Continue fc-alcove-v1 (TERRA L26 knows Break, her level-24
+-- its flat 25 MP (Ot6BreakProps and Ot6BreakSpell, ot6_breakspell.asm; a
+-- monster's Break stays vanilla's: battle_breakmonster).  Played: Continue fc-alcove-v1 (TERRA L26 knows Break, her level-24
 -- spell), walk onto the continent into a random battle, and cast Break
 -- through the real menu at the shielded monster with the most shields, at
 -- 0, 1 and 3 BP (Defends bank the points, and wait out a Break before the
