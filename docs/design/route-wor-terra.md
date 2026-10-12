@@ -256,7 +256,7 @@ L33`, the cabin `roster ... EDGAR $1850=00 SETZER $1850=00` (the two the
 BabaBreaths sent away), `[wor] the stretch: TERRA(p1) L33 ... CELES(p1) L34
 ... SABIN(p1) L33 ... EDGAR(p1) L33`, `PASS (frame 43870) attempts=1/1`.
 
-### 9.2 Under draw variation (`var7/`)
+### 9.2 Under draw variation, before the kits merge (`var7/`)
 
 Eighteen runs on the final rows: twelve seed shifts (0-44 by 4) and, to
 move the encounter draw, K = 2, 5 and 9 random battles used up on the
@@ -290,8 +290,65 @@ and 12. All eighteen pass (`PASS (frame 42850)` to `PASS (frame 61178)`,
   them on the killing blow (`[brk] ... $16D broken (0 of 12 shields) at HP
   21138`; `at HP 0`).
 
-### 9.3 What was left
+### 9.3 On the kits ROM (`var9/`, `final/`)
 
+After wt/v027-kits merged (e410e209: Jackpot, Morph and the divines need 3
+Boost Points, Break chips shields), the chain was played again from
+power-on (`final/qual10.out`, `final/qual11.out`: `ninja` green, `generate
+wor_terra` `PASS (frame 46504) attempts=1/3`, `contract wor-terra-v1 (exit):
+all 30 fields hold`), and `wor-terra-v1` re-cut from that play
+(`final/drift_wor_terra.log`: `checkpoint drift wor-terra-v1: none -- the
+tracked save is the one the graph's play makes today`, sha256
+`2178ccdc...`).
+
+The variation set was run again at 457304fa, booted from the chain's own
+capture of `wor-falcon-v1` (`build/checkpoints/`, not the tracked v0.26
+copy): the same twelve seed shifts and K = 2, 5, 9 at shifts 0 and 12. All
+eighteen pass (`PASS (frame 45706)` to `PASS (frame 63493)`, `attempts=1/1`
+each). By distinct battle key (`var9/analysis.txt`):
+
+| battle | fights | distinct keys | won | lost | party deaths | broken |
+|---|---|---|---|---|---|---|
+| 128 TERRA alone | 18 | 15 | 0 | 18 (scripted) | 18 (TERRA) | 0 (no gauge) |
+| 129 first visit | 18 | 15 | 18 | 0 | 0 | 18 |
+| 130 return | 18 | 16 | 18 | 0 | 1 | 18 |
+| 131 TERRA morphed | 18 | 17 | 18 | 0 | 0 | 18 |
+
+With Jackpot behind a full boost, SETZER no longer ends battle 129 on his
+first turn, and every party fight breaks: the 4 and 5 shields of 129 and
+130 now land inside the fights, and 131 breaks at 15271-21265 of 26000 HP.
+Battle 131's attrition is gone: no party death in 18 fights (9 before the
+merge), and the arc spends 0-7 Potions (`potions 73 -> 66` the most) and
+one Fenix Down in one run of eighteen. The rows stay as they are; nothing
+here is a lab candidate now.
+
+**A battle on the step onto the Falcon.** None of these draws put one
+there, so `lab_board_battle.lua` (`board/`) boards and lands beside Mobliz
+until one does, from the chain's `wor-terra-v1`. Before the fix the battle
+(formation `$0D6`) was fought and the party, handed back on (238,136) below
+the parked Falcon, pressed A there until `timeout after 30000 frames
+driving toward board the Falcon` (`board/boardlab_red_before.log`); now
+`[board] f4851 on (238,136), the Falcon parked at (238,135): walking back
+onto it`, `[boardlab] DONE after 5 round(s): 1 boarding(s) a battle
+interrupted`, `PASS (frame 5030)` (`board/boardlab_green_after.log`).
+
+**Battle 128's handling** is asserted in every run: `allowGameOver ON`
+only from the first visit's trigger to battle 129's verdict, `[retry]
+scripted loss answered (Mobliz battle 128 ...): game over count 1 and the
+unanswered record (the party was wiped in battle) cleared`, then
+`allowGameOver OFF` (`fix/fix_s0.log`, and each `var9/` log).
+
+### 9.4 What was left
+
+- **Two suites the reshuffled chain exposed.** The Phunbaba rows lengthen
+  `Ot6ShieldTbl`, and the chain's play moves from `arvis_wake` on
+  (`PASS (frame 18017)` on main, `17983` here); suites whose fixtures come
+  from that play meet new draws. `battle_assassinate` was red on the
+  pre-kits chain and green on main's (`assassinate/`); the kits rewrite
+  passes on both (`assassinate/main_e410e209_pass.log`,
+  `branch_92254dd6_pass.log`). `battle_gprain` went red on this chain when
+  SETZER and then SABIN were Zombied in a crowd; its exemption now covers an
+  ally's lost control (`kits/`).
 - **The regroup's party** is fixed (TERRA, CELES, SABIN, EDGAR); SETZER
   waits on the Falcon. A different four is one line (`REGROUP`).
 - **Palidor is unworn.** Each of the four wears a stone; the Esper plan
