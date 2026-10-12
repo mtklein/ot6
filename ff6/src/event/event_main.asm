@@ -66120,6 +66120,7 @@ _cbbd4e:
         dlg $02DD, TEXT_ONLY
                 ; Dad!
                 ; I’ll make sure Mom’s all right!
+        give_bushido_tech 7     ; ot6 #379: the farewell teaches CYAN Cleave
         scroll_bg BG1, {29, 0}, ALT
         wait_15f
         scroll_bg BG1, {30, 0}, ALT

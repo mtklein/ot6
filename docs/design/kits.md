@@ -91,20 +91,32 @@ it (a Jackpot), and is free where it does not (a Cleave).
 | Terra | Trance | her Morph: esper form (magic x2, damage taken halved) for as long as the morph gauge lasts | yes (`ot6_trance.asm`) |
 | Celes | RunicBlade | a 3-turn Runic that also sends every spell it absorbs back at its caster | yes (`ot6_runicblade.asm`) |
 | Edgar | Overclock | the Tool fires twice, at the boost's x8 each, priced as the two firings | yes (`ot6_overclock.asm`) |
-| Cyan | Cleave | the SwdTech window's 3-BP row: instant death on a killable target, a power-255 cut on a death-immune one | yes (`ot6_divine.asm`) |
+| Cyan | Cleave | the SwdTech window's 3-BP row, from the Phantom Train farewell on: instant death on a killable target, a power-255 cut on a death-immune one | yes (`ot6_divine.asm`, learned by story since #379) |
 | Setzer | Jackpot | a throw of two triple rolls, 99 MP | yes (`ot6_setzer.asm`) |
 | Shadow | Assassinate | his 3-BP action: a hit of it that breaks a non-boss, or lands on a Broken one, kills it (the effect, not a gate) | yes (`ot6_divine.asm`) |
 | Sabin | Bum Rush | (built today as a 99-MP Blitz row at any boost; as a divine it will take the full boost) | no |
 | Locke | Master's Mark | steal from all enemies and reveal everything, at 3 BP | no |
-| Mog | Water Rondo | at 3 BP | no |
+| Mog | Water Rondo | the dance at 3 BP: every step x8 for the battle, 99 MP, and it never stumbles, wherever the party fights | yes (`ot6_waterrondo.asm`) |
+| Umaro | Storm | a dump of all three points: Storm, ice on every enemy at x8, with or without the Blizzard Orb | yes (`ot6_umaro.asm`) |
 | Gau | (open, kit-gau.md) | at 3 BP | no |
 
 Terra's Ultima is a fold, not a divine, but it too is what a full boost buys
 (Fire at 3 BP, after her World of Ruin return; see Terra below).  `$3ecb`,
 the once-a-battle flag (`OT6_DIVINE_USED`), is retired.
-Suites: `battle_divines` (Cleave), `battle_jackpot`, `battle_assassinate`,
-`battle_trance`, `battle_runicblade`, `battle_overclock`, each with its gate
-(under 3 BP no divine), a second use in one battle, and an old-ROM red.
+Suites: `battle_divines` and `battle_cleave` (Cleave), `battle_jackpot`,
+`battle_assassinate`, `battle_trance`, `battle_runicblade`,
+`battle_overclock`, `battle_waterrondo`, `battle_umaro`, each with its gate
+(under 3 BP no divine), and an old-ROM red; the menu divines also with a
+second use in one battle.
+
+The engine picks a command for a character the player is not driving
+(Muddle, Charm, the Colosseum, Berserk) and spends no boost doing it, so
+every divine closes that path: a random SwdTech's range stops short of
+Cleave (`Ot6RandBushidoTop`), a random Dance draws from the known dances
+less Water Rondo and a Water Rondo start under three points stumbles
+(`Ot6DanceKnownRand`, `Ot6DanceTerrain`), a Morph the engine chose does not
+morph (`Ot6TranceGate`), and Umaro's Storm is his only on a dump of all
+three points, which only being hurt makes (`Ot6UmaroArm`).
 
 ---
 
@@ -213,7 +225,7 @@ against upstream for something a comment already handles.
 | 5 | Empowerer | 2 | 18 | — (drain; strikes ×2 at quarter power) | 24 |
 | 6 | Stunner | 3 | 28 | slashing, all enemies | 34 |
 | 7 | Quadra Slice | 3 | 50 | wind ×4 | 44 |
-| 8 | **Cleave** (divine) | 3 | **99** | — (instant death; a boss takes a power-255 cut) | Phantom Train farewell (story) |
+| 8 | **Cleave** (divine) | 3 | **99** | — (instant death; a boss takes a power-255 cut) | Phantom Train farewell (story, #379) |
 
 SwdTech prices at **parity with the Blitz row of the same index**. This is a
 level claim rather than an index coincidence: `BlitzLevelTbl` is
@@ -232,9 +244,14 @@ Dispatch is the cheapest row of any kit at 4 MP (the "free-to-learn is not
 free-to-use" floor), which is 6.9% of the pool Cyan
 joins with, against the 8–21% a vanilla spell costs at the level it is learned.
 Cleave is the most expensive at **99, the shared ceiling**: each character with
-an ultimate pays 99 for it, which is 13.0% of the L70 pool Cleave is
-gated behind (762), inside the baseline range and payable at 7
-casts from full. 99 is also the largest number any OT6 price cell can render,
+an ultimate pays 99 for it.  Learned at level 70 it was 13.0% of that pool
+(762).  Learned at the Phantom Train farewell (#379), it is just past his
+pool when he learns it: the play has him at level 14 with 96 MP there
+(falls-done-v1, the save after the train), 148 at level 19 (banquet-done-v1)
+and 205 at 24 (fc-alcove-v1), so the price, not the level, decides when he
+first swings it, and from the late World of Balance on it is one swing a bar.
+*Reason the price stays 99: the shared ceiling, and a guaranteed kill of any
+killable body is worth a full bar.*  99 is also the largest number any OT6 price cell can render,
 so it is the top of the table's range and not only its current maximum.
 Per-row measurement, and the baseline, are in mp-economy.md's "The baseline";
 checked by `tools/tests/battle_costtable.lua`.
@@ -268,26 +285,35 @@ resulting table and the rulings behind it (the 99 cap flattening dear rows;
 an unaffordable boost greyed and refused) are in mp-economy.md's "Boosting
 costs MP".
 
-`Ot6BushidoTier` (ff6/src/battle/ot6_kits.asm)
+`Ot6BushidoTier` (ff6/src/battle/ot6_bushido.asm)
 replaces the charge gauge's clock in `UpdateMenuState_37`; the window, its
 numerals, the grey-out of unlearned techs, the A press that stops the gauge,
 `FixPlayerAttack`'s `+$55` and `Cmd_07` are all vanilla and untouched. Boost
-1/2/3 selects a **moving window of three**: Cyan's top three *learned* techs,
-weakest → strongest. There is no 0× tier: `Ot6BushidoTech` clamps a stray 0 up,
-and the menu never offers one. With `ceiling` = vanilla's own `$2020` (techs
-known − 1, the value that used to cap the bar), `base = max(0, ceiling−2)` and
-boost picks `min(base+boost−1, ceiling)`. This is arithmetic only, with no
-table.
+1/2/3 selects a **moving window**: Cyan's top *learned* techs, weakest →
+strongest. There is no 0× tier: `Ot6BushidoTech` clamps a stray 0 up, and the
+menu never offers one.  Techs 1-7 come by level, in order, so what he knows of
+them is a run 0..`ceiling`; Cleave comes by story at the Phantom Train farewell
+(#379), ahead of the run's end, and stands apart from it.  `ceiling` is
+vanilla's own `$2020` (techs known − 1, the value that used to cap the bar)
+less Cleave, capped at 6 (`Ot6BushidoCeil`; `Ot6LoadoutCeil` is the field's
+twin, off `$1cf7`).  One leaf, `Ot6BushidoPick`, makes the pick for the battle
+and the configurator: before Cleave, the window is three wide, `base =
+max(0, ceiling−2)` and boost picks `min(base+boost−1, ceiling)`; with Cleave,
+the 3-BP row is Cleave and the 1- and 2-BP rows are the run's top two, `base =
+max(0, ceiling−1)`.  This is arithmetic only, with no table.
 
 | techs known | window (BP 1 / 2 / 3) | retired |
 |---|---|---|
-| ≤ 3 | all of them, in learn order | — (every learned tech reachable) |
-| 5 (through Empowerer) | Slash / Quadra Slam / Empowerer | Dispatch, Retort |
-| 6 (through Stunner) | Quadra Slam / Empowerer / Stunner | Dispatch…Slash |
+| ≤ 3, before the farewell | all of them, in learn order | — (every learned tech reachable) |
+| Dispatch + Cleave | Dispatch / — / **Cleave** | — (the 2-BP row would repeat Dispatch, so it is blank) |
+| Dispatch, Retort + Cleave | Dispatch / Retort / **Cleave** | — |
+| through Quadra Slam + Cleave | Slash / Quadra Slam / **Cleave** | Dispatch, Retort |
+| through Empowerer + Cleave | Quadra Slam / Empowerer / **Cleave** | Dispatch…Slash |
+| through Stunner + Cleave | Empowerer / Stunner / **Cleave** | Dispatch…Quadra Slam |
 | 8 (full kit) | Stunner / Quadra Slice / **Cleave** | Dispatch…Empowerer |
 
 The window never skips a middle
-tech; only the weakest retire, as Cyan outgrows them.
+tech of the run; only the weakest retire, as Cyan outgrows them.
 
 Three rulings, documented in `Ot6BushidoTier`'s header:
 
@@ -300,15 +326,21 @@ Three rulings, documented in `Ot6BushidoTier`'s header:
 - **No affordable floor.** The 1× slot is always the cheapest tech *in the
   window*, so it gets pricier as Cyan levels. This is accepted, because his
   MP pool grows on the same schedule.
-- **Cleave is the window's 3-BP row**, the divine's one gate (see
-  "Divines").  At full kit the window is Stunner/Quadra Slice/Cleave and BP3
-  lands on Cleave (tech 7) by the same `base+boost` sum as any other tier,
-  so it needs no extra code.  A manual loadout may not put it on the 1- or
+- **Cleave is the window's 3-BP row** from the Phantom Train farewell on, the
+  divine's one gate (see "Divines").  *Reason for the farewell (#379): it is
+  the moment his story turns, and a divine comes by story; at level 70 it was
+  out of reach of any playthrough that does not grind for it.*  The farewell
+  script teaches it with event command `$9e` (`give_bushido_tech`, which
+  vanilla left unused), and `BushidoLevelTbl`'s eighth entry is 255, a level
+  nobody reaches; Cyan's World of Ruin dream still teaches every tech.  A
+  manual loadout may not put it on the 1- or
   2-BP row: `Ot6CleaveSlot` (one leaf for the battle read, the
   configurator's draw and its cycle) refuses it there, and a stored one
   falls back to the auto window for that slot.  A random SwdTech (a
   Muddled or Charmed Cyan, the Colosseum) spends no boost, so its pick
-  stops at Quadra Slice (`Ot6RandBushidoTop`).  At resolution `Ot6Oblivion`
+  ranges over the run he knows and never Cleave (`Ot6RandBushidoTop`:
+  vanilla's 0..`$2020` would also have reached a tech he does not know,
+  since Cleave sits ahead of the run).  At resolution `Ot6Oblivion`
   reads the target: a killable one takes a guaranteed Death (no Broken
   condition any more); a death-immune one (a boss) takes the heaviest
   single cut a record can carry, power 255 with its damage recomputed
@@ -319,7 +351,9 @@ Three rulings, documented in `Ot6BushidoTier`'s header:
   a single 70 was less than the 2-BP Quadra Slice row; 255 is the most one
   hit can carry, about Quadra Slice's four strikes.*  It can be used again
   in the same battle.  `battle_divines` checks the rows, the loadout, a kill
-  on an unbroken soldier and two boss cuts in one battle.
+  on an unbroken soldier and two boss cuts in one battle; `battle_cleave`
+  the learned Cleave and the window from the play past the farewell;
+  `battle_bushidoloadout` the windows beside a short run.
 
 **BP is read, never written.** `Ot6ActionEnd` consumes the spend and skips that
 turn's regen exactly as for any other action, and the ≤3 / never-past-bank caps
@@ -382,10 +416,13 @@ call — so manual mode governs display, fire, and damage together; a stored tec
 that is no longer learned (`$1cf7` bit clear) falls back to the auto window for
 that slot.
 
-Note the Chip column above is finer-grained than what ships: the class
-table (`ot6_class.asm:185-192`) marks all eight slashing, per
-weapon-classes.md's "Cyan is a slashing specialist". Retort's and Empowerer's
-"—" and Quadra Slice's wind are unbuilt refinements rather than a contradiction.
+The Chip column is what ships (#379): `Ot6SkillClassTbl` (`ot6_class.asm`)
+marks Dispatch, Slash, Quadra Slam, Stunner and Cleave slashing; Retort (a
+counter stance) and Empowerer (a drain) are classless and chip nothing; and
+Quadra Slice is wind, its MagicProp element (battle_main.asm's override 7),
+which also moves its damage as any wind attack's (double on a wind-weak body,
+nothing on an immune one).  No monster casts Quadra Slice, so no monster's
+behaviour moves.  `battle_swdtechclass` reads both from the built ROM.
 
 Test: `tools/tests/battle_bushido.lua`.
 
@@ -890,9 +927,70 @@ route-wor-falcon.md 13.10).
   passive.
 - **Setzer — Gambler/Merchant**: built; see "Setzer" above (#319).
 - **Mog — Dancer (piercing: spear)**: the 8 Dances verbatim ✦,
-  learned by dancing on each terrain ✦; divine **Water Rondo** (at 3 BP,
-  not built), kept
-  WoB-missable, vanilla-style. This kit needs no further design work.
+  learned by dancing on each terrain ✦; divine **Water Rondo** (built,
+  #380, `ot6_waterrondo.asm`), kept WoB-missable, vanilla-style: learned on
+  the Lete River.  Its one gate is the full boost: under three points its row
+  greys and the confirm buzzes (`Ot6DanceRowColor`, the draw's and the
+  confirm's one verdict).  Three points buy what three points buy any dance
+  (every step x8 for the battle, the start at 99 MP), and one thing more: it
+  never stumbles.  Off its own terrain a dance start stumbles half the time
+  (vanilla's roll in Cmd_13), and the party almost never fights on a river
+  again; a three-point Water Rondo starts wherever it stands and turns the
+  background to the river, so every later step matches (`Ot6DanceTerrain`).
+  *Reason it is worth three points: El Nino and Plasma at x8 every turn for
+  the rest of the battle, and the only dance a player can count on starting
+  anywhere.*  The engine's picks spend no boost: a random Dance (Muddle,
+  Charm, the Colosseum) draws from the known dances less Water Rondo
+  (`Ot6DanceKnownRand`), and a Water Rondo start that still arrives under
+  three points (a dance id left by an earlier start, a Gogo's Mimic he did
+  not boost) stumbles, charging nothing, and clears the id.  A Gogo's Mimic
+  reads Gogo's own pending boost, the Jackpot precedent.  `battle_waterrondo`.
+- **Umaro — Berserker (bludgeoning: club, fists)**: see "Umaro" below
+  (#380).
+
+## Umaro — Berserker (bludgeoning: club, fists) (#380)
+
+Umaro takes no orders: the game refuses him a command window by name, and
+each turn his chooser (`_163b`) rolls one of four arms.  His kit is those
+arms, not a list of eight, and what OT6 adds is what each one breaks and
+what a full boost buys.
+
+| Arm | When the roll can pick it | Chip | What the boost buys |
+|---|---|---|---|
+| Fight | always | his weapon's class: Bone Club or bare fists, bludgeoning | swings (`Ot6FightBoost`) |
+| Charge | always | bludgeoning | the damage multiplier |
+| Throw | with the Rage Ring | bludgeoning (an ally hurled as a club) | one more throw per point (`Ot6ThrowBoost`) |
+| Storm | with the Blizzard Orb | ice, every enemy | the damage multiplier |
+| **Storm** (divine) | a dump of all three points, relic or not | ice, every enemy | x8 |
+
+- **Charge and Throw bludgeon** (`Ot6UmaroCharge`, `Ot6UmaroThrow`, the
+  last writes before each runs ExecAttack).  Each loads the classless
+  "battle" record and swings no weapon, so before #380 neither chipped
+  anything (measured: class `$00` at every Charge pass,
+  build/attempts/wt/v028-kits/umaro/r1_battle_umaro.out).  A body
+  slammed or an ally hurled is a club's blow; Fight and Storm load their own
+  class or element over it, as before.
+- **The boost** is the retaliation dump (#236/#237, `Ot6UmaroRetaliate`): he
+  banks a point a turn, and when he has been hurt since his last turn he
+  spends the bank, up to three points, on his next action.
+- **His divine: a dump of all three points is Storm.**  With three points
+  pending at his chooser the roll is not made; he Storms, ice on every enemy
+  at the boost's x8, with or without the Blizzard Orb.  Its one gate is the
+  rule's full boost: only a dump spends three, and only being hurt makes him
+  dump, so a Muddled, Charmed or Colosseum turn of his never reaches it
+  without them.  *Reason: a full boost on a character the player cannot aim
+  should buy the arm that needs no aim, and an ice key on a whole
+  formation.*  He has no MP (mp-economy.md: Umaro 0), so the price is the
+  three points alone.
+- **On arrival** (Narshe, World of Ruin, v0.29, with Mog): bludgeoning on
+  every arm but Storm, and ice on Storm, which his first full dump brings
+  whatever relics he wears.  Where the route picks up the Blizzard Orb and
+  the Rage Ring, and whether bludgeoning and ice are keys the party lacks in
+  Narshe's mines and his cave, is the v0.29 route's to settle (the break rows
+  there are not designed yet).
+
+`battle_umaro` (a synthetic mechanism test: one seat of battle 67 staged as
+him, as `battle_retaliate_umaro` does) checks the divine and the class.
 
 ## Curated kits (the Ochette/Hikari pair)
 

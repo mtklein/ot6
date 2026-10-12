@@ -11,9 +11,11 @@
 -- has already decided the charge and the sound would acknowledge input the
 -- reels ignore.
 
--- The boosted verb here is Bushido ($59 Dragon, single target, so the
+-- The boosted verb here is Bushido ($57 Slash, single target, so the
 -- same-species propagation is a real assertion rather than a multi-hit
--- side effect).  Fight, Blitz and spell pip timing use the same
+-- side effect).  It was Empowerer ($59) until #379 made Empowerer
+-- classless: it reveals nothing now, so the staged ceiling is 2, whose
+-- 3-BP row is Slash.  Fight, Blitz and spell pip timing use the same
 -- Ot6ActionEnd/Ot6PipStage pair (one charge site, one painter), and
 -- battle_boost keeps the Fight path's arrow and consume coverage.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -33,7 +35,7 @@ local function bp() return H.readByte(0x3E9C + actor * 2) end
 local function pend() return H.readByte(0x3E9D + actor * 2) end
 
 local function pinField()
-  H.writeWord(KNOWN, 4)                               -- ceiling 4: window {1..4}
+  H.writeWord(KNOWN, 2)                               -- ceiling 2: window {0..2}
   for s = 0, 3 do
     if H.readByte(0x3ED8 + s * 2) ~= 0xFF then
       local st1 = 0x3EE4 + s * 2
@@ -57,7 +59,7 @@ local function pinField()
   end
   if actor and pinActor then
     H.writeByte(0x3E9C + actor * 2, 5)                -- full bp bank
-    H.writeByte(0x3E9D + actor * 2, 3)                -- pending 3 -> Dragon
+    H.writeByte(0x3E9D + actor * 2, 3)                -- pending 3 -> Slash
   end
   for _, m in ipairs(msPresent) do
     local e = 8 + m * 2
@@ -150,7 +152,7 @@ H.run({ maxFrames = 40000 }, {
   }, "a battle menu opens"),
   H.call(function()
     actor = H.readByte(ACTOR)
-    H.log("actor slot " .. actor .. " (CYAN, pending 3 -> Dragon, single target)")
+    H.log("actor slot " .. actor .. " (CYAN, pending 3 -> Slash, single target)")
     pinField()
     emu.addEventCallback(function() sample() end, emu.eventType.startFrame)
   end),
@@ -165,7 +167,7 @@ H.run({ maxFrames = 40000 }, {
     pinField()
     H.writeByte(0x895F + actor, 0)
     H.writeByte(0x8963 + actor, 0)
-    H.writeByte(0x8967 + actor, 2)          -- row 2 = boost 3 -> Dragon
+    H.writeByte(0x8967 + actor, 2)          -- row 2 = boost 3 -> Slash
   end),
   H.waitFrames(2),
   H.driveUntil(function() return not inWindow() end, 900, {

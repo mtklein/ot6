@@ -53,40 +53,77 @@ local function tick()
   F.frame()
 end
 
-H.run({ maxFrames = 30000 }, {
+-- THE DRAW.  Whether Dullahan's counter lands in the fight is the battle
+-- RNG's, and the precondition needs one: on the fixture the v0.28 kits
+-- chain made, the one fight from the boot landed none (build/attempts/wt/
+-- v028-kits/px13-qual/suite_battle_typicalgate.log).  So the fight is branched
+-- from a snapshot at the grave (strategy discovery, docs/TESTING.md), each
+-- branch idling BRANCH_IDLE frames longer there, until one lands a
+-- counter; every branch's ledger is checked against the engine's, the
+-- property under test, and the precondition is asserted across them.
+local BRANCH_IDLE, MAX_BRANCHES = 9, 6
+local snap, landedAll, branches = nil, 0, 0
+
+local function verdict()
+  F.driver:flushLedger()
+  local want, lines = TRUTH.expected()
+  for _, l in ipairs(lines) do H.log("[typicalgate] " .. l) end
+  local landed = 0
+  for _, u in ipairs(TRUTH.units) do
+    local v = 0
+    for _, d in pairs(u.per) do if d > v then v = d end end
+    if u.counter and v > 0 then landed = landed + 1 end
+  end
+  landedAll = landedAll + landed
+  H.log(string.format("[typicalgate] branch %d: %d counter(s) landed HP", branches, landed))
+  for s = 0, 5 do
+    local w, L = want[s], F.driver.hitLedger[s]
+    if w ~= nil or (L and (L.actN or 0) > 0) then
+      local wn, ws = w and w.n or 0, w and w.sum or 0
+      local gn, gs = L and L.actN or 0, L and L.actSum or 0
+      H.log(string.format("[typicalgate] slot %d: the engine's units %d (sum %d), the driver's ledger %d (sum %d)",
+        s, wn, ws, gn, gs))
+      H.assertEq(gn, wn, string.format("slot %d: the driver's typical-action count is the engine's", s))
+      H.assertEq(gs, ws, string.format("slot %d: the driver's typical-action sum is the engine's", s))
+    end
+  end
+end
+
+local function branch(k)
+  local req
+  return H.cond(function() return landedAll == 0 and branches < MAX_BRANCHES end, {
+    H.call(function()
+      H.setPad({})
+      if k > 1 then req = H.requestLoadState(snap.blob) end
+    end),
+    H.waitFrames(2),
+    H.call(function()
+      if k > 1 then H.checkReq(req, "snapshot load (branch " .. k .. ")"); H.rearmInputInjection() end
+      branches = branches + 1
+      TRUTH.reset()
+      F = H.newFightDriver("typicalgate", { tactical = true, boost = true, items = true, runic = true })
+    end),
+    H.waitFrames((k - 1) * BRANCH_IDLE + 1),
+    H.faceAndHoldA("up", function() return H.battleLoadStarted() end, 3000, "the grave: face up, A"),
+    H.release(),
+    H.waitUntil(function() return up() end, 3000, "the fight is up", 1),
+    H.driveUntil(function() return not up() end, 25000, { H.call(tick) }, "the driver's play"),
+    H.release(),
+    H.call(verdict),
+  }, {})
+end
+
+local body = {
   H.loadState(STATE),
   H.waitFrames(10),
-  H.call(function()
-    TRUTH.reset()
-    F = H.newFightDriver("typicalgate", { tactical = true, boost = true, items = true, runic = true })
-  end),
-  H.faceAndHoldA("up", function() return H.battleLoadStarted() end, 3000, "the grave: face up, A"),
-  H.release(),
-  H.waitUntil(function() return up() end, 3000, "the fight is up", 1),
-  H.driveUntil(function() return not up() end, 25000, { H.call(tick) }, "the driver's play"),
-  H.release(),
-  H.call(function()
-    F.driver:flushLedger()
-    local want, lines = TRUTH.expected()
-    for _, l in ipairs(lines) do H.log("[typicalgate] " .. l) end
-    local landed = 0
-    for _, u in ipairs(TRUTH.units) do
-      local v = 0
-      for _, d in pairs(u.per) do if d > v then v = d end end
-      if u.counter and v > 0 then landed = landed + 1 end
-    end
-    H.assertEq(landed >= 1, true, "precondition: a counterattack landed HP in the fight (Dullahan's retal Battle)")
-    for s = 0, 5 do
-      local w, L = want[s], F.driver.hitLedger[s]
-      if w ~= nil or (L and (L.actN or 0) > 0) then
-        local wn, ws = w and w.n or 0, w and w.sum or 0
-        local gn, gs = L and L.actN or 0, L and L.actSum or 0
-        H.log(string.format("[typicalgate] slot %d: the engine's units %d (sum %d), the driver's ledger %d (sum %d)",
-          s, wn, ws, gn, gs))
-        H.assertEq(gn, wn, string.format("slot %d: the driver's typical-action count is the engine's", s))
-        H.assertEq(gs, ws, string.format("slot %d: the driver's typical-action sum is the engine's", s))
-      end
-    end
-    H.log("[typicalgate] PASSED")
-  end),
-})
+  H.call(function() snap = H.requestSaveState() end),
+  H.waitFrames(2),
+  H.call(function() H.checkReq(snap, "snapshot at the grave") end),
+}
+for k = 1, MAX_BRANCHES do body[#body + 1] = branch(k) end
+body[#body + 1] = H.call(function()
+  H.assertEq(landedAll >= 1, true, "precondition: a counterattack landed HP in the fight (Dullahan's retal Battle)")
+  H.log("[typicalgate] PASSED")
+end)
+
+H.run({ maxFrames = 30000 * MAX_BRANCHES }, body)
