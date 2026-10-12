@@ -16878,6 +16878,20 @@ RUN = {
 }
 M.totalFrames = 0
 
+-- A body that has checked a loss the story plays on from (an event battle
+-- with no _ca5ea9 after it: Mobliz's battle 128, TERRA alone against an
+-- invincible Phunbaba) says so here: the canary's count and the runner's
+-- record of an unanswered game over are cleared, with a line naming why,
+-- so a later stall is filed as itself rather than as that loss.  The body
+-- asserts the loss was the scripted one before it calls this.
+function M.scriptedLossAnswered(why)
+  M.log(string.format("[retry] scripted loss answered (%s): game over count %d and the unanswered "
+    .. "record (%s) cleared", why, M.gameOverFired or 0,
+    RUN.goUnhandled and RUN.goUnhandled.what or "none"))
+  M.gameOverFired = 0
+  RUN.goUnhandled = nil
+end
+
 -- What the earlier attempts of this run fell to, oldest first: one record
 -- { attempt, class, msg, frame, context } per `[retry] attempt n/N FAILED`
 -- line (`context` is the wipe context line's text, for class wipe only).

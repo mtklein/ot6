@@ -187,16 +187,28 @@ end
 -- @204e: $08 bit 7, ($E0,$E2) == ($1F62,$1F63))
 local function board()
   local n, ph = 0, 0
+  -- a random battle can come up on the last step onto the Falcon's tile:
+  -- fought with the route's tactical driver, then the boarding goes on
+  -- (the chain's first wor_terra: formation $0D6 beside Mobliz, and the
+  -- boarding timed out with the battle up)
+  local drv = H.fightDriverFor("board", { tactical = true, boost = true, items = true, healPercent = 55 }, FIGHT)
+  local battleFrames = 0
   return H.withReset(H.driveUntil(function()
     n = H.airshipControl() and n + 1 or 0
     return n >= 30
-  end, 3000, {
+  end, 30000, {
     H.call(function()
+      if H.battleLoadStarted() then
+        battleFrames = battleFrames + 1
+        if battleFrames >= 3 then drv.frame() end
+        return
+      end
+      if battleFrames > 0 then drv.idle() end
       ph = (ph + 1) % 16
       if H.aboardAirship() then H.setPad({}); return end
       H.setPad(ph < 4 and { "a" } or {})
     end),
-  }, "board the Falcon"), function() n, ph = 0, 0 end)
+  }, "board the Falcon"), function() n, ph, battleFrames = 0, 0, 0 end)
 end
 
 
@@ -329,9 +341,18 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
   end)(),
   H.release(),
   H.call(function()
+    local seen128 = false
+    for i = lossesSeen + 1, #H.outcomes do
+      local o = H.outcomes[i]
+      if (o.form & 0x1FF) == 0x1A4 then
+        H.assertEq(o.kind == "lost" and o.seatedN == 1, true, "battle 128 is TERRA's loss, seated alone")
+        seen128 = true
+      end
+    end
+    H.assertEq(seen128, true, "battle 128 was fought")
     H.log(string.format("[phunbaba] battle 128 behind (game over counted %d by its wipe reading); battle 129 next",
       H.gameOverFired or 0))
-    H.gameOverFired = 0
+    H.scriptedLossAnswered("Mobliz battle 128, TERRA alone against an invincible Phunbaba")
   end),
   ride(function() return sw(0x0291) == 1 and map() == MAP_CELLAR end, 120000, "Phunbaba's first visit: the party",
     { wipeEndsRide = true }),
@@ -357,7 +378,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
     H.assertEq(won, 1, "battle 129 (formation $1A5) was won")
     H.log(string.format("[phunbaba] the scripted loss answered at the Annihilated screen (game over counted %d); "
       .. "battle 129 won", H.gameOverFired or 0))
-    H.gameOverFired = 0
+    H.assertEq(H.gameOverFired or 0, 0, "no game over counted after battle 128's")
   end),
   H.saveState("wor_terra_after1.mss"),
   stepOn(50, 53, function() return sw(0x02D7) == 1 end),
