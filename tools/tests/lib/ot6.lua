@@ -14941,7 +14941,7 @@ function Driver:watchStatuses()
             M.log(string.format("[%s] [status] f+%d entity %d's %s is CLEARED "
               .. "(STATUS1/2/3/4 $%02X/$%02X/$%02X/$%02X%s)", self.tag or "fight", self.battleTick, e,
               name, s1, s2, s3, s4, name == "Condemned"
-              and (M.readWord(0x3BF4 + e * 2) == 0 and "; the Doom landed"
+              and ((M.readWord(0x3BF4 + e * 2) == 0 or (s1 & 0x80) ~= 0) and "; the Doom landed"
                    or "; the count did not run out") or ""))
           end
         end
