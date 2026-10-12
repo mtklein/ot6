@@ -5,3 +5,4 @@
 # Bump it with the date and the reason when a full replay is wanted.
 2026-10-05 the graph played once from power-on (#363)
 2026-10-08 v0.26 qualification: bounded acting battle choices and live scenario-hub readiness under the final library
+2026-10-12 v0.27 qualification: the line replayed from power-on under the release library (gprain and the other lib changes since v0.26)
