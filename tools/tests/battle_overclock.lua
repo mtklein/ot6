@@ -17,8 +17,9 @@
 -- capped).  EDGAR's pool here (201) pays two overclocks and nothing more
 -- (a 0-BP AutoCrossbow beside them would be 202), so the one-firing control
 -- is the old ROM's run of this suite and the mutant without the passes arm
--- (below), where the same 3-BP use fires once.  Asserted per use, from
--- Ot6ItemClass, called once per pass as each firing loads the tool:
+-- (below), where the same 3-BP use fires once.  Asserted per use (the use
+-- opens at its Ot6ItemClass load, every pass of it calls Ot6PassTargeted
+-- after ChooseTarget with x = EDGAR, EDGAR's Ot6ActionEnd closes it):
 --   1. AutoCrossbow at 3 BP: two firings, 99 MP;
 --   2. again at 3 BP in the same battle: two firings, 99 MP.
 -- Old-ROM red and mutants: build/attempts/wt/v027-kits/overclock/.
@@ -40,8 +41,13 @@ local function arm()
       local e = seat * 2
       rec = { pend = H.readByte(0x3E9D + e), mp0 = mp(), passes = 0, f = H.frame }
     end
-    rec.passes = rec.passes + 1
   end, emu.callbackType.exec, ic, ic)
+  -- one call per pass: CalcAttackEffect's Ot6PassTargeted, after ChooseTarget
+  local pt = H.sym("Ot6PassTargeted")
+  emu.addMemoryCallback(function()
+    if rec == nil or rec.ended or seat == nil then return end
+    if (emu.getState()["cpu.x"] & 0xff) == seat * 2 then rec.passes = rec.passes + 1 end
+  end, emu.callbackType.exec, pt, pt)
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
     if rec == nil or rec.ended or seat == nil then return end
