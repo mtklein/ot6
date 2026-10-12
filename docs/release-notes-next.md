@@ -19,3 +19,9 @@ A confused Mog no longer picks it.
 
 **Umaro.** When he spends 3 Boost Points he always uses Storm, with or
 without the Blizzard Orb. His Charge and Throw chip bludgeoning shields.
+
+**Terra's Morph works at any boost.** Boost Points set how long it lasts:
+with 0 it lasts about two of her turns, longer with 1 or 2, and with 3 it
+lasts until the battle ends or she reverts. The morph gauge that carried
+over between battles is gone, so Morph is never greyed out. A confused
+Terra's Morph lasts the shortest time.

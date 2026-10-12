@@ -489,7 +489,21 @@ nowhere else. The World of Ruin adds Phoenix's Life (magicite.md, #327).
   (`BattleCmdProp[$03]` has neither GOGO nor MIMIC, and a Controlled
   monster uses its own attacks).  Only a real 3-BP pick is permanent.
   *Reason (the owner's): boost pays once, and the payoff is time; a divine's
-  one gate is the full boost.*  Spans, measured @MEASURE@
+  one gate is the full boost.*  The spans were set by measurement
+  (build/attempts/wt/v029-kits/): TERRA L26 on the Floating Continent acts
+  about every 260 ticks (her Defends at ticks 1917, 2195, 2456, 2714, r3),
+  so the 0-BP span covers two of her turns after the one Morph cost (the
+  first cut, 400, covered one or two: "3 of TERRA's turns inside it",
+  counting a queued Defend, r1); an AtmaWeapon fight played by the route's
+  driver runs about 2,100-3,200 ticks (atma1, new_none), so 2 BP is a
+  third to a half of a long boss fight (the first cut, 1599, was half to
+  three quarters).  Balance check, the same fight with TERRA's Morph at
+  3 BP at the open (atma1, two distinct draws each): on main's ROM the
+  gauge ($1CF6 = $BE) gave 1,691 ticks and ran out before AtmaWeapon fell
+  in one of the two; on this ROM she stayed morphed to the end in both.
+  The fight was won every time, and her share of the damage moves little:
+  3,900 and 4,812 (this ROM) against 6,438 and 4,956 (main) and 2,020 and
+  3,290 unmorphed, over one to three of her attacking turns.
   `battle_trance` (each span, permanence at 3, the take-back),
   `battle_morphrandom` (the engine's pick).
 - **Break (level 24, and Shoat's) takes shields** (#398): no damage and no

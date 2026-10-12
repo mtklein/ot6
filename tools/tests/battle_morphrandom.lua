@@ -80,6 +80,15 @@ end
 -- the stage, every frame of an arm (declared expedients, above)
 local function stage(stale)
   if not H.battleActive() then return end
+  if H.frame % 300 == 0 then
+    local t = {}
+    for m = 0, 5 do
+      t[#t + 1] = string.format("%d:%d/%02X/%02X", m, H.readWord(0x3BFC + m * 2), H.readByte(0x3AA8 + m * 2),
+        H.readByte(0x3EE4 + 8 + m * 2))
+    end
+    H.log(string.format("[mrand] f%d formation %04X monsters (slot:hp/present/status1) %s; TERRA status1 %02X/%02X",
+      H.frame, H.readWord(0x11E0), table.concat(t, " "), H.readByte(0x3EE4 + e()), H.readByte(0x3EE5 + e())))
+  end
   if alive() and (H.readByte(0x3EE5 + e()) & 0x20) == 0 then
     H.writeByte(0x3EE5 + e(), H.readByte(0x3EE5 + e()) | 0x20)
   end
