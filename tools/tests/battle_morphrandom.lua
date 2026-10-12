@@ -30,7 +30,8 @@
 -- take A (a Fight).  The pick, the command and the morph are the engine's.
 -- Old-ROM red (main's ROM: the engine's Morph does not morph) and mutants
 -- (the 0-BP speed off by one; the engine's pick keeping its pending boost):
--- build/attempts/wt/v029-kits/r7/.
+-- build/attempts/wt/v029-kits/r7/ (old ROM, and PACE_BURN 0-3 green) and r8/
+-- (mutants).
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/fc_alcove.mss.lua"
 

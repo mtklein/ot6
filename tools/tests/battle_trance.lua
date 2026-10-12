@@ -33,7 +33,8 @@
 -- TERRA's turns inside it (the duration design's measurement, kits.md).
 -- Old-ROM red (main's ROM refuses Morph under 3 BP at the command) and
 -- mutants (a span's speed off by one, 3 BP clocked, the boost never
--- reaching the span): build/attempts/wt/v029-kits/r7/.
+-- reaching the span): build/attempts/wt/v029-kits/r7/ (old ROM) and r8/
+-- (mutants; and four encounter histories, PACE_BURN 0-3, green).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
