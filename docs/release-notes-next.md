@@ -26,3 +26,8 @@ Jidoor and Maranda now have their own weak points instead of the default
 ones. Blades break most of them; Crawlers and Reach Frogs need blunt or
 piercing blows, and the Mantodea has three shields. The Storm Dragon has
 14 shields that blades and piercing attacks break.
+
+## Saves
+
+The zip has a `saves` folder: saves at points through the story, from
+Narshe to the World of Ruin. `saves/README.txt` says how to use one.
