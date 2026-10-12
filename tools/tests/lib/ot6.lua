@@ -13026,7 +13026,9 @@ end
 -- raises and L lowers the pending boost to exactly it.  Everyone else
 -- Defends while the plan has entries (opts.others = "fight": Fights a live
 -- monster instead; "thin": Fights while two or more monsters stand, so the
--- incoming damage thins and the battle stays up); after it, everyone Fights a live
+-- incoming damage thins and the battle stays up; and whenever the entry's
+-- character is out of the fight -- removed, dead, stone or zombie -- the
+-- others Fight, since the plan cannot be played); after it, everyone Fights a live
 -- monster until the battle ends (opts.idle = "defend": everyone keeps
 -- Defending instead; opts.untilPlanDone ends the step once the plan is spent
 -- and opts.planDone(), when given, says its last action has resolved).
@@ -13145,7 +13147,20 @@ function M.kitBattle(plan, opts)
     if M.readByte(0x3ED8 + a * 2) ~= p.who then
       local live, m = 0, M.readByte(0x3A75)
       while m ~= 0 do live = live + (m & 1); m = m >> 1 end
-      if opts.others == "fight" or (opts.others == "thin" and live > 1) then fight(a, st) else defend(st) end
+      -- the planned character out of the fight (removed from it, dead,
+      -- stone, zombie): the plan cannot be played here, so the others fight
+      -- the battle out rather than Defend until they fall
+      local gone = true
+      for s = 0, 3 do
+        if M.readByte(0x3ED8 + s * 2) == p.who then
+          gone = (M.readByte(0x3AA0 + s * 2) & 1) == 0 or (M.readByte(0x3EE4 + s * 2) & 0xC2) ~= 0
+        end
+      end
+      if gone and not p.goneLogged then
+        p.goneLogged = true
+        M.log(string.format("[kit] f%d char $%02X is out of the fight: the others fight the battle out", M.frame, p.who))
+      end
+      if gone or opts.others == "fight" or (opts.others == "thin" and live > 1) then fight(a, st) else defend(st) end
       return
     end
     local e = a * 2
