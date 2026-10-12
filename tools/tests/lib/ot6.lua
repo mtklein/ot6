@@ -13024,7 +13024,8 @@ end
 --                      list), hand it to opts.onList, and back out }
 -- The bank is filled to the entry's boost by real Defends first, then R
 -- raises and L lowers the pending boost to exactly it.  Everyone else
--- Defends while the plan has entries; after it, everyone Fights a live
+-- Defends while the plan has entries (opts.others = "fight": Fights a live
+-- monster instead); after it, everyone Fights a live
 -- monster until the battle ends (opts.idle = "defend": everyone keeps
 -- Defending instead; opts.untilPlanDone ends the step once the plan is spent
 -- and opts.planDone(), when given, says its last action has resolved).
@@ -13047,23 +13048,40 @@ function M.kitBattle(plan, opts)
       if M.readByte(0x2092 + SPELL_PTR[a] + i * 4) == id then return i end
     end
   end
+  -- the target walk is setzerBattle's (a confirm lands only on the side it
+  -- aims at): the battle's layout crosses from the party to the monsters,
+  -- then a route over the observed cursor graph (M.newTargetGraph) to the
+  -- monster asked for (want, a mask), or any live one
   local aim = nil
   local function aimAt(want)
-    local chars, mons = M.readByte(0x7B7D), M.readByte(0x7B7E)
-    if chars == 0 and mons ~= 0 and (mons & M.readByte(0x3A75)) ~= 0 and (want == nil or mons == want) then
-      return "confirm"
-    end
+    local chars, mons, alive = M.readByte(0x7B7D), M.readByte(0x7B7E), M.readByte(0x3A75)
     if cool > 0 then pulse("a"); return "walk" end
-    aim = aim or { presses = 0 }
-    aim.presses = aim.presses + 1
-    if aim.presses > 30 then return "refuse" end
+    aim = aim or { g = M.newTargetGraph(), presses = 0 }
+    local node = M.tgtNodeName(chars, mons)
+    if aim.last then aim.g.record(aim.last.node, aim.last.dir, node); aim.last = nil end
+    local function isGoal(n)
+      if n:sub(1, 5) ~= "mons=" then return false end
+      local m = tonumber(n:sub(6), 16)
+      if want then return m == want end
+      return m & alive ~= 0
+    end
+    if chars == 0 and mons ~= 0 and isGoal(node) and (mons & alive) ~= 0 then return "confirm" end
+    if want and (alive & want) == 0 then return "refuse" end
+    if aim.presses >= 30 then return "refuse" end
     local L = M.battleLayout()
+    local dir
     if chars ~= 0 or mons == 0 then
       aim.cross = (aim.cross or 0) + 1
-      pulse(L.toMonsters[1 + (aim.cross - 1) % #L.toMonsters])
+      dir = L.toMonsters[1 + (aim.cross - 1) % #L.toMonsters]
     else
-      pulse(aim.presses % 12 < 6 and "down" or "up")
+      local last = {}
+      for _, d in ipairs(L.toChars) do last[d] = true end
+      dir = aim.g.route(node, isGoal, function(n) return n:sub(1, 5) == "mons=" end, M.TGT_DIRS, last)
+      if dir == nil then return "refuse" end
     end
+    aim.presses = aim.presses + 1
+    aim.last = { node = node, dir = dir }
+    pulse(dir)
     return "walk"
   end
   local function fight(a, st)
@@ -13112,7 +13130,10 @@ function M.kitBattle(plan, opts)
       if opts.idle == "defend" then defend(st) else fight(a, st) end
       return
     end
-    if M.readByte(0x3ED8 + a * 2) ~= p.who then defend(st); return end
+    if M.readByte(0x3ED8 + a * 2) ~= p.who then
+      if opts.others == "fight" then fight(a, st) else defend(st) end
+      return
+    end
     local e = a * 2
     if p.defend then
       if st == 0x27 and cool == 0 then done(p, a) end
@@ -13195,25 +13216,39 @@ function M.kitBattle(plan, opts)
         pulse("a")
         return
       end
-      local r = aimAt(p.slot ~= nil and (1 << p.slot) or nil)
+      local want = p.slot ~= nil and (1 << p.slot) or nil
+      if want and (M.readByte(0x3A75) & want) == 0 then
+        -- the body asked for has fallen since the plan was made: any live one
+        if not p.retargeted then
+          M.log(string.format("[kit] f%d entry %d: monster %d has fallen; aiming at a live one", M.frame, k, p.slot))
+        end
+        p.retargeted, want = true, nil
+      end
+      local r = aimAt(want)
       if r == "refuse" then
-        M.assertEq(false, true, string.format("entry %d: the target select never reached monster %s", k,
-          tostring(p.slot)))
+        M.assertEq(false, true, string.format("entry %d: the target select never reached monster %s (%d presses)",
+          k, tostring(p.slot), aim and aim.presses or 0))
       elseif r == "confirm" then done(p, a); pulse("a") end
     elseif st == 0x27 then pulse("a")
     else M.setPad({}) end
   end
   return M.seqStep({
     M.call(function()
+      if not M.battleLoadStarted() then
+        -- (the battle the plan was meant for has ended: nothing to play)
+        k = #plan + 1
+        return
+      end
       k, cool, aim = 1, 0, nil
       for i = 1, #plan do local q = plan[i]; q.opened, q.seat, q.presses = nil, nil, nil end
       M.vars.kit = {}
       M.logRomIdentity("[kit]")
     end),
-    M.waitUntil(function() return M.battleActive() end, 1200, "the battle is up", 2),
+    M.waitUntil(function() return M.battleActive() or not M.battleLoadStarted() end, 1200, "the battle is up", 2),
     M.driveUntil(function()
+      if not M.battleLoadStarted() then return true end
       if opts.untilPlanDone and k > #plan and (opts.planDone == nil or opts.planDone()) then return true end
-      return not M.battleLoadStarted()
+      return false
     end, opts.maxFrames or 40000, {
       { tick = function() tick(); return "frame" end, reset = function() end },
     }, "the battle with the kit plan ends"),
@@ -13233,11 +13268,12 @@ end
 -- PACE_BURN (a global a lab sets ahead of the lib's run; 0 in the suites)
 -- flees that many encounters first (fought out when it cannot run), to vary
 -- the encounter history the suite's battle comes from (TESTING.md: the draw
--- moves with encounters used up, not with seeds).
-function M.paceToEncounter(tag)
+-- moves with encounters used up, not with seeds); a caller's second
+-- argument overrides it (0 for a suite's later battles).
+function M.paceToEncounter(tag, burnOverride)
   local A, B = nil, nil
   local burned = 0
-  local burn = type(PACE_BURN) == "number" and PACE_BURN or 0
+  local burn = burnOverride or (type(PACE_BURN) == "number" and PACE_BURN or 0)
   local one = M.driveUntil(function() return M.battleLoadStarted() end, 60000, {
       M.call(function()
         if A ~= nil then return end

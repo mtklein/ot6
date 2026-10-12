@@ -12,21 +12,22 @@
 -- Played: Continue fc-alcove-v1 (EDGAR L27 with his bag's Tools, the
 -- factory long behind him), walk onto the continent into a random battle,
 -- and play EDGAR through the real menu (H.kitBattle); everyone else
--- Defends.  Nothing is written.  The Tool is AutoCrossbow ($AA, 4 MP, hits
--- every body), the bag's cheapest: 3 BP = 63, overclocked 99 (2 x 63,
--- capped).  EDGAR's pool here (201) pays two overclocks and nothing more
--- (a 0-BP AutoCrossbow beside them would be 202), so the one-firing control
+-- Defends.  Nothing is written.  The Tool is Debilitator ($A7, 10 MP, one
+-- body, no damage), so the battle stands for both uses (an AutoCrossbow at
+-- x8 twice fells this map's smaller draws first): 3 BP = 99 (156, capped),
+-- overclocked 99 (2 x 99, capped).  EDGAR's pool here (201) pays two
+-- overclocks and little more, so the one-firing control
 -- is the old ROM's run of this suite and the mutant without the passes arm
 -- (below), where the same 3-BP use fires once.  Asserted per use (the use
 -- opens at its Ot6ItemClass load, every pass of it calls Ot6PassTargeted
 -- after ChooseTarget with x = EDGAR, EDGAR's Ot6ActionEnd closes it):
---   1. AutoCrossbow at 3 BP: two firings, 99 MP;
+--   1. Debilitator at 3 BP: two firings, 99 MP;
 --   2. again at 3 BP in the same battle: two firings, 99 MP.
 -- Old-ROM red and mutants: build/attempts/wt/v027-kits/overclock/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local EDGAR, CMD_TOOLS, XBOW = 0x04, 0x09, 0xAA
+local EDGAR, CMD_TOOLS, TOOL = 0x04, 0x09, 0xA7   -- Debilitator: no damage, so the battle stands
 
 local seat, recs, rec = nil, {}, nil
 local function mp() return H.readWord(0x3C08 + seat * 2) end
@@ -36,7 +37,7 @@ local function arm()
   emu.addMemoryCallback(function()
     if seat == nil then return end
     local a = emu.getState()["cpu.a"] & 0xff
-    if a ~= XBOW or H.readByte(0x3A7C) ~= CMD_TOOLS then return end
+    if a ~= TOOL or H.readByte(0x3A7C) ~= CMD_TOOLS then return end
     if rec == nil then
       local e = seat * 2
       rec = { pend = H.readByte(0x3E9D + e), mp0 = mp(), passes = 0, f = H.frame }
@@ -58,14 +59,14 @@ local function close()
   if rec == nil or not rec.ended or H.frame <= rec.ended + 1 then return false end
   rec.mp1 = mp()
   recs[#recs + 1] = rec
-  H.log(string.format("[overclock] use %d: AutoCrossbow at %d BP (f%d): %d firing(s), MP %d -> %d", #recs,
+  H.log(string.format("[overclock] use %d: Debilitator at %d BP (f%d): %d firing(s), MP %d -> %d", #recs,
     rec.pend, rec.f, rec.passes, rec.mp0, rec.mp1))
   rec = nil
   return true
 end
 
 local function use(boost)
-  return H.kitBattle({ { who = EDGAR, cmd = CMD_TOOLS, row = XBOW, boost = boost } },
+  return H.kitBattle({ { who = EDGAR, cmd = CMD_TOOLS, row = TOOL, boost = boost } },
     { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = function() return close() end })
 end
 
@@ -73,7 +74,7 @@ local function check(i, boost, firings, cost)
   local r = recs[i]
   H.assertEq(r ~= nil, true, string.format("use %d was recorded", i))
   H.assertEq(r.pend, boost, string.format("use %d ran at %d BP", i, boost))
-  H.assertEq(r.passes, firings, string.format("AutoCrossbow at %d BP fired %d time(s)", boost, firings))
+  H.assertEq(r.passes, firings, string.format("the Tool at %d BP fired %d time(s)", boost, firings))
   H.assertEq(r.mp0 - r.mp1, cost, string.format("and cost %d MP", cost))
 end
 

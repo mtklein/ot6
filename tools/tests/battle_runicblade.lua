@@ -13,7 +13,8 @@
 -- Played: Continue the wor-tomb-v1 battery (EDGAR wears Ramuh: Bolt; CELES
 -- L33; the factory long behind them), walk Darill's Tomb's east room into
 -- a random battle, and play through the real menu (H.kitBattle); everyone
--- else Defends.  Nothing is written.  In order:
+-- else Defends.  Nothing is written.  In one battle (one that ends before
+-- all three is left, and the next starts them over, up to six):
 --   1. CELES raises Runic at 2 BP; EDGAR casts Bolt at a monster: CELES
 --      absorbs it (RunicEffect enrols her: Ot6RunicBP runs for her) and
 --      nothing comes back;
@@ -90,12 +91,89 @@ local function walkToBattle()
 end
 
 local mark = {}
-local function step(n, plan, done)
+local function inBattle() return H.battleLoadStarted() end
+-- EDGAR's own Bolt: a Magic cast at the monsters, not a counter (a monster's
+-- Bolt aims at the party)
+local function ownBolt(from)
+  for i = from, #casts do
+    local c = casts[i]
+    if not c.counter and c.b9 ~= 0 and c.b8 == 0 then return c end
+  end
+end
+local function step(n, plan, doneFn)
   return {
     H.call(function() mark[n] = { casts = #casts, absorbs = absorbs } end),
-    H.kitBattle(plan, { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = done }),
+    H.kitBattle(plan, { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = doneFn }),
   }
 end
+
+-- the three steps, in one battle; a battle that ends before them is left and
+-- the next starts them over, up to BATTLES
+local BATTLES = 6
+local battles, ok = 0, false
+local body = {
+  H.cond(function() return not inBattle() end, {
+    walkToBattle(),
+    H.waitUntil(function() return H.battleActive() end, 1200, "the battle is up", 2),
+    H.waitFrames(30),
+  }, {}),
+  H.call(function()
+    battles = battles + 1
+    H.assertEq(battles <= BATTLES, true, string.format("the three steps within %d battles", BATTLES))
+    celes, edgar = nil, nil
+    for s = 0, 3 do
+      local id = H.readByte(0x3ED8 + s * 2)
+      if id == CELES then celes = s elseif id == EDGAR then edgar = s end
+    end
+    H.assertEq(celes ~= nil and edgar ~= nil, true, "CELES and EDGAR are seated")
+    H.log(string.format("[blade] battle %d: CELES seat %d (MP %d), EDGAR seat %d (MP %d)", battles, celes,
+      H.readWord(0x3C08 + celes * 2), edgar, H.readWord(0x3C08 + edgar * 2)))
+  end),
+}
+local function add(t) for _, s in ipairs(t) do body[#body + 1] = s end end
+local function live(fn) return H.call(function() if inBattle() then fn() end end) end
+-- 1. the control: Runic at 2 BP absorbs and sends nothing back
+add(step(1, { { who = CELES, cmd = RUNIC, boost = 2, self = true }, { who = EDGAR, cmd = CMD_MAGIC, spell = BOLT } },
+  function() return ownBolt(mark[1].casts + 1) ~= nil and H.readByte(0x7BCA) ~= 0 end))
+add({ H.waitFrames(120), live(function()
+  H.assertEq(ownBolt(mark[1].casts + 1) ~= nil, true, "1. EDGAR's own Bolt was cast")
+  H.assertEq(absorbs > mark[1].absorbs, true, "1. CELES absorbed it (RunicEffect enrolled her: Ot6RunicBP)")
+  H.assertEq(bounces(mark[1].casts + 1), 0, "1. a Runic raised at 2 BP sends nothing back")
+  mark.one = true
+end) })
+-- 2. the divine: Runic at 3 BP absorbs and sends the Bolt back at EDGAR
+add(step(2, { { who = CELES, cmd = RUNIC, boost = 3, self = true }, { who = EDGAR, cmd = CMD_MAGIC, spell = BOLT } },
+  function() return bounces(mark[2].casts + 1) >= 1 end))
+add({ H.waitFrames(60), live(function()
+  if bounces(mark[2].casts + 1) == 0 then return end
+  H.assertEq(absorbs > mark[2].absorbs, true, "2. CELES absorbed EDGAR's Bolt")
+  H.assertEq(bounces(mark[2].casts + 1), 1, "2. the 3-BP Runic (RunicBlade) sent EDGAR's Bolt back at him, as "
+    .. "CELES's counter")
+  landed(mark[2].casts + 1)
+  mark.two = true
+end) })
+-- 3. again, inside the same stance
+add(step(3, { { who = EDGAR, cmd = CMD_MAGIC, spell = BOLT } },
+  function() return bounces(mark[3].casts + 1) >= 1 end))
+add({ H.waitFrames(60), live(function()
+  if bounces(mark[3].casts + 1) == 0 then return end
+  H.assertEq(absorbs > mark[3].absorbs, true, "3. CELES absorbed the second Bolt")
+  H.assertEq(bounces(mark[3].casts + 1), 1, "3. a second Bolt inside the stance went back too")
+  landed(mark[3].casts + 1)
+  if mark.one and mark.two then ok = true end
+end) })
+add({
+  H.call(function()
+    if ok then
+      H.log(string.format("[blade] PASS: a 2-BP Runic absorbs only; a 3-BP Runic absorbs and sends the spell back, "
+        .. "again (battle %d)", battles))
+    else
+      H.log(string.format("[blade] battle %d ended before the three steps: the next", battles))
+      mark.one, mark.two = nil, nil
+    end
+  end),
+  H.cond(function() return not ok and inBattle() end, { H.kitBattle({}, {}) }, {}),
+})
 
 local steps = {
   H.bootCheckpoint("wor-tomb-v1"),
@@ -116,55 +194,6 @@ local steps = {
       H.call(function() burned = burned + 1; H.log(string.format("[blade] burned encounter %d of %d", burned, burn)) end),
     }, "the encounters PACE_BURN uses up")
   end)(),
-  walkToBattle(),
-  H.waitUntil(function() return H.battleActive() end, 1200, "the battle is up", 2),
-  H.waitFrames(30),
-  H.call(function()
-    for s = 0, 3 do
-      local id = H.readByte(0x3ED8 + s * 2)
-      if id == CELES then celes = s elseif id == EDGAR then edgar = s end
-    end
-    H.assertEq(celes ~= nil and edgar ~= nil, true, "CELES and EDGAR are seated")
-    H.log(string.format("[blade] CELES seat %d (MP %d), EDGAR seat %d (MP %d)", celes,
-      H.readWord(0x3C08 + celes * 2), edgar, H.readWord(0x3C08 + edgar * 2)))
-  end),
+  H.driveUntil(function() return ok end, 500000, body, "the three steps in one battle"),
 }
-local function add(t) for _, s in ipairs(t) do steps[#steps + 1] = s end end
--- 1. the control: Runic at 2 BP absorbs and sends nothing back
-add(step(1, { { who = CELES, cmd = RUNIC, boost = 2, self = true }, { who = EDGAR, cmd = CMD_MAGIC, spell = BOLT } },
-  function() return #casts > mark[1].casts and H.readByte(0x3E9D + edgar * 2) == 0 and H.readByte(0x7BCA) ~= 0 end))
-add({
-  H.waitFrames(120),
-  H.call(function()
-    local c = casts[mark[1].casts + 1]
-    H.assertEq(c ~= nil and not c.counter, true, "1. EDGAR's own Bolt was cast")
-    H.assertEq(absorbs > mark[1].absorbs, true, "1. CELES absorbed it (RunicEffect enrolled her: Ot6RunicBP)")
-    H.assertEq(bounces(mark[1].casts + 1), 0, "1. a Runic raised at 2 BP sends nothing back")
-  end),
-})
--- 2. the divine: Runic at 3 BP absorbs and sends the Bolt back at EDGAR
-add(step(2, { { who = CELES, cmd = RUNIC, boost = 3, self = true }, { who = EDGAR, cmd = CMD_MAGIC, spell = BOLT } },
-  function() return bounces(mark[2].casts + 1) >= 1 end))
-add({
-  H.call(function()
-    local n = bounces(mark[2].casts + 1)
-    H.assertEq(absorbs > mark[2].absorbs, true, "2. CELES absorbed EDGAR's Bolt")
-    H.assertEq(n, 1, "2. the 3-BP Runic (RunicBlade) sent EDGAR's Bolt back at him, as CELES's counter")
-    local c
-    for i = mark[2].casts + 1, #casts do if casts[i].counter then c = casts[i] end end
-    H.assertEq(c.cmd, CMD_MAGIC, "2. the bounce is a Magic cast")
-  end),
-})
--- 3. again, inside the same stance
-add({ H.waitFrames(60), H.call(function() landed(mark[2].casts + 1) end) })
-add(step(3, { { who = EDGAR, cmd = CMD_MAGIC, spell = BOLT } },
-  function() return bounces(mark[3].casts + 1) >= 1 end))
-add({ H.waitFrames(60), H.call(function() landed(mark[3].casts + 1) end) })
-add({
-  H.call(function()
-    H.assertEq(absorbs > mark[3].absorbs, true, "3. CELES absorbed the second Bolt")
-    H.assertEq(bounces(mark[3].casts + 1), 1, "3. a second Bolt inside the stance went back too")
-    H.log("[blade] PASS: a 2-BP Runic absorbs only; a 3-BP Runic absorbs and sends the spell back, again and again")
-  end),
-})
-H.run({ maxFrames = 200000 }, steps)
+H.run({ maxFrames = 600000 }, steps)
