@@ -119,8 +119,11 @@ local function step(n, plan, doneFn)
 end
 
 -- the three steps, in one battle; a battle that ends before them is left and
--- the next starts them over, up to BATTLES
-local BATTLES = 6
+-- the next starts them over, up to BATTLES.  On this branch's own
+-- wor-tomb-v1 capture one run took 5 battles (build/attempts/wt/v027-kits/
+-- mx7/new__battle_runicblade.out: an Imp'd EDGAR twice, two battles ended
+-- early), so 10, not the 6 the tracked capture's sweeps needed
+local BATTLES = 10
 local battles, ok = 0, false
 local body = {
   H.cond(function() return not inBattle() end, {
