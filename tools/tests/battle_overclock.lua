@@ -13,14 +13,14 @@
 -- factory long behind him), walk onto the continent into a random battle,
 -- and play EDGAR through the real menu (H.kitBattle); everyone else
 -- Defends.  Nothing is written.  The Tool is AutoCrossbow ($AA, 4 MP, hits
--- every body), the bag's cheapest, so its prices sit under the cap where
--- the doubling shows: 2 BP = 25, 3 BP = 63, overclocked 99 (2 x 63 capped).
--- Asserted per use, from the engine's own edges (Cmd_09's tool id, Ot6HitCount
--- at its entry -- the pass count is $3A70 + 1 once it returns -- and
--- Ot6ItemClass, called once per pass as each firing loads the tool):
---   1. AutoCrossbow at 2 BP: one firing, 25 MP;
---   2. AutoCrossbow at 3 BP: two firings, 99 MP;
---   3. again at 3 BP in the same battle: two firings, 99 MP.
+-- every body), the bag's cheapest: 3 BP = 63, overclocked 99 (2 x 63,
+-- capped).  EDGAR's pool here (201) pays two overclocks and nothing more
+-- (a 0-BP AutoCrossbow beside them would be 202), so the one-firing control
+-- is the old ROM's run of this suite and the mutant without the passes arm
+-- (below), where the same 3-BP use fires once.  Asserted per use, from
+-- Ot6ItemClass, called once per pass as each firing loads the tool:
+--   1. AutoCrossbow at 3 BP: two firings, 99 MP;
+--   2. again at 3 BP in the same battle: two firings, 99 MP.
 -- Old-ROM red and mutants: build/attempts/wt/v027-kits/overclock/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -82,16 +82,14 @@ H.run({ maxFrames = 300000 }, {
   H.call(function()
     for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == EDGAR then seat = s end end
     H.assertEq(seat ~= nil, true, "EDGAR is seated")
-    H.assertEq(mp() >= 25 + 99 + 99, true, string.format("EDGAR's pool (%d MP) pays the three uses", mp()))
+    H.assertEq(mp() >= 99 + 99, true, string.format("EDGAR's pool (%d MP) pays the two uses", mp()))
     H.log(string.format("[overclock] EDGAR seat %d, MP %d, bank %d", seat, mp(), H.readByte(0x3E9C + seat * 2)))
   end),
-  use(2),
-  H.call(function() check(1, 2, 1, 25) end),
   use(3),
-  H.call(function() check(2, 3, 2, 99) end),
+  H.call(function() check(1, 3, 2, 99) end),
   use(3),
   H.call(function()
-    check(3, 3, 2, 99)
-    H.log("[overclock] PASS: one firing at 2 BP, two at 3 BP, twice in the same battle, priced 25 and 99")
+    check(2, 3, 2, 99)
+    H.log("[overclock] PASS: two firings at 3 BP, twice in the same battle, priced 99")
   end),
 })

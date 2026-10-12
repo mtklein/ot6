@@ -28,6 +28,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local EDGAR, CMD_TOOLS, DEBIL, FLASH = 0x04, 0x09, 0xA7, 0xA5
 
 local seat, rec, target = nil, nil, nil
+local plan = { { who = EDGAR, cmd = CMD_TOOLS, row = DEBIL, boost = 0 } }
 local GLYPHS = H.sym("Ot6ElemGlyphTbl") & 0x3FFFFF
 local function glyphOf(bit)
   local i = 0
@@ -84,12 +85,11 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(target ~= nil, true, "a live monster")
     local t = 8 + target * 2
     H.assertEq(H.readByte(0x3BE0 + t) ~= 0xFF, true, "it is not already weak to every element")
+    plan[1].slot = target
     H.log(string.format("[debil] EDGAR seat %d, target slot %d (weak $%02X, revealed $%02X)", seat, target,
       H.readByte(0x3BE0 + t), H.readByte(0x3E89 + t)))
   end),
-  H.kitBattle(setmetatable({}, { __index = function(_, i)
-      if i == 1 then return { who = EDGAR, cmd = CMD_TOOLS, row = DEBIL, boost = 0, slot = target } end
-    end, __len = function() return 1 end }),
+  H.kitBattle(plan,
     { untilPlanDone = true, idle = "defend", maxFrames = 60000,
       planDone = function() return rec ~= nil and rec.ended ~= nil and H.frame > rec.ended + 30 end }),
   H.call(function()

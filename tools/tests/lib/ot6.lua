@@ -13128,7 +13128,9 @@ function M.kitBattle(plan, opts)
       if M.readByte(0x3E9D + e) < want then pulse("r"); return end
       if M.readByte(0x3E9D + e) > want then pulse("l"); return end
       local row = cmdRowOf(a, p.cmd)
-      M.assertEq(row ~= nil, true, string.format("char $%02X's command list holds command $%02X", p.who, p.cmd))
+      if row == nil then
+        M.assertEq(false, true, string.format("char $%02X's command list holds command $%02X", p.who, p.cmd))
+      end
       local cur = M.readByte(0x890F + a) & 3
       if cur ~= row then pulse(cur < row and "down" or "up"); return end
       if p.refused == "command" then
@@ -13147,7 +13149,9 @@ function M.kitBattle(plan, opts)
       pulse("b")   -- a window this entry did not open (an earlier entry's, closing)
     elseif st == 0x0E and p.spell ~= nil then
       local i = spellIdx(a, p.spell)
-      M.assertEq(i ~= nil, true, string.format("char $%02X's magic list holds spell $%02X", p.who, p.spell))
+      if i == nil then
+        M.assertEq(false, true, string.format("char $%02X's magic list holds spell $%02X", p.who, p.spell))
+      end
       local wantRow, wantCol = i // 2, i % 2
       local absRow = M.readByte(0x8913 + a) + M.readByte(0x891B + a)
       local col = M.readByte(0x8917 + a)
@@ -13169,7 +13173,7 @@ function M.kitBattle(plan, opts)
     elseif st == 0x30 and p.row ~= nil then
       local want
       for i = 0, 7 do if M.readByte(0x4005 + i * 3) == p.row then want = i end end
-      M.assertEq(want ~= nil, true, string.format("the list holds row $%02X", p.row))
+      if want == nil then M.assertEq(false, true, string.format("the list holds row $%02X", p.row)) end
       local cc, cr = M.readByte(0x8963 + a), M.readByte(0x8967 + a)
       if cc ~= want % 2 then pulse(want % 2 > cc and "right" or "left"); return end
       if cr ~= want // 2 then pulse(want // 2 > cr and "down" or "up"); return end
@@ -13181,8 +13185,10 @@ function M.kitBattle(plan, opts)
       if p.direct and cool == 0 then done(p, a) end
       pulse("a")
     elseif st == 0x38 then
-      M.assertEq(p.refused == nil, true, string.format("entry %d (planned refused at the %s) reached target select",
-        k, tostring(p.refused)))
+      if p.refused ~= nil then
+        M.assertEq(false, true, string.format("entry %d (planned refused at the %s) reached target select",
+          k, tostring(p.refused)))
+      end
       if cool > 0 then pulse("a"); return end   -- (the pad rests; a confirm must be a real press)
       if p.self then
         if cool == 0 then done(p, a) end
