@@ -1232,8 +1232,12 @@ LearnAbilityTbl:
 .segment "bushido_blitz_level"
 
 ; e6/f490
+; OT6 (#379): Cleave, the eighth, is learned by story at the Phantom Train
+; farewell (event command $9e, give_bushido_tech), not at level 70: 255 is a
+; level no character reaches, so UpdateCyan's run and the battle's
+; GetAbilityBit stop short of it.  kits.md "Cyan" is the plan.
 BushidoLevelTbl:
-        .byte   1,6,12,15,24,34,44,70
+        .byte   1,6,12,15,24,34,44,255
 
 ; e6/f498
 BlitzLevelTbl:
@@ -5171,6 +5175,23 @@ EventCmd_fe:
 
 ; these will cause the game to lock up
 
+; ------------------------------------------------------------------------------
+
+; [ event command $9e: learn swdtechs ]
+
+; OT6 (#379): $eb = a mask of SwdTechs to learn, OR'd into $1cf7.  Vanilla
+; left $9e unused (it locked the game up); the Phantom Train farewell uses it
+; to teach Cyan Cleave, the one SwdTech learned by story.
+
+EventCmd_9e:
+        lda     $1cf7
+        ora     $eb
+        sta     $1cf7
+        lda     #2
+        jmp     IncEventPtrContinue
+
+; ------------------------------------------------------------------------------
+
 EventCmd_66:
 EventCmd_67:
 EventCmd_68:
@@ -5180,7 +5201,6 @@ EventCmd_6e:
 EventCmd_6f:
 EventCmd_76:
 EventCmd_83:
-EventCmd_9e:
 EventCmd_9f:
 EventCmd_a3:
 EventCmd_a4:

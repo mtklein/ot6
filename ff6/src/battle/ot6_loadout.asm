@@ -18,15 +18,18 @@
 ; the shared Ot6CostFor leaf, as the spec requires.
 ; ------------------------------------------------------------------------------
 
-; [ menu-side ceiling: popcount($1cf7) - 1, floored at 0 (0..7) ]
+; [ menu-side ceiling: popcount($1cf7 & $7f) - 1, floored at 0 (0..6) ]
 ; The field cannot read $2020 (object-map data there), so derive the ceiling
-; from the learned bitmap the same way InitSkills does at battle start.
+; from the learned bitmap the same way InitSkills does at battle start, less
+; Cleave (bit 7), which is learned by story and stands apart from the run the
+; level table teaches (Ot6BushidoCeil, the battle side's twin).
 ; out: A = ceiling.  clobbers X.  preserves Y.
 .proc Ot6LoadoutCeil
         .a8
         .i16
         ldx     #$0000              ; running popcount in X low
         lda     f:$7e1cf7
+        and     #$7f                ; techs 0..6: Cleave is not in the run
 @lp:    beq     @done               ; no more set bits
         pha
         and     #$01
@@ -35,7 +38,7 @@
 @skip:  pla
         lsr
         bra     @lp
-@done:  txa                         ; A = popcount (0..8)
+@done:  txa                         ; A = popcount (0..7)
         beq     @zero               ; nothing learned -> ceiling 0 (only tech 0)
         dec     a                   ; ceiling = count - 1
         rtl
@@ -43,36 +46,31 @@
         rtl
 .endproc
 
-; [ auto-window tech for a slot: base = max(0,ceil-2), tech = min(base+slot-1,ceil) ]
-; The same math Ot6BushidoTech runs in AUTO mode, replicated menu-side off
-; $1cf7 so the seed baseline matches what battle would pick.  The slot
-; index is the boost (1..3) and slot 0 is retired, so a 0 clamps to 1 the same
-; way the battle leaf does; Ot6LoadoutSeedWord still walks 0..3 and relies on
-; that clamp to mirror slot 1 into the unused slot 0 (see there).
-; in: A = slot (0..3).  out: A = tech (0..ceiling).  clobbers X.  preserves Y.
+; [ auto-window tech for a slot ]
+; The pick Ot6BushidoTech's AUTO arm makes, through the same leaf
+; (Ot6BushidoPick), off $1cf7 so the seed baseline matches what battle would
+; pick.  The slot index is the boost (1..3) and slot 0 is retired, so a 0
+; clamps to 1 the same way the battle leaf does; Ot6LoadoutSeedWord still
+; walks 0..3 and relies on that clamp to mirror slot 1 into the unused slot 0
+; (see there).
+; in: A = slot (0..3).  out: A = tech (0..7).  clobbers X.  preserves Y.
 .proc Ot6LoadoutAutoTech
         .a8
         .i16
-        cmp     #$01                ; 1-BP floor, clamp the retired slot 0
-        bcs     :+
-        lda     #$01
-:       pha                         ; park slot ($01,s)
-        jsl     Ot6LoadoutCeil      ; A = ceiling
-        pha                         ; park ceiling ($01,s ; slot now $02,s)
-        sec
-        sbc     #$02                ; ceiling - 2  (three tiers, not four)
-        bcs     :+
-        lda     #$00                ; base floors at 0
-:       clc
-        adc     $02,s               ; base + slot
-        dec     a                   ;   ... - 1 (slot >= 1 after the clamp)
-        cmp     $01,s               ; vs ceiling
-        bcc     :+
-        lda     $01,s               ; cap at ceiling
-:       sta     $02,s               ; stash tech over the parked slot
-        pla                         ; drop ceiling
-        pla                         ; A = tech
-        rtl
+        pha                         ; park slot ($01,s)
+        jsl     Ot6LoadoutCeil      ; A = ceiling (0..6)
+        pha                         ; park it ($01,s; slot $02,s)
+        lda     f:$7e1cf7
+        and     #$80                ; Cleave known?
+        ora     $01,s
+        sta     $01,s
+        pla                         ; A = ceiling | $80 if Cleave
+        longa
+        and     #$00ff
+        tax
+        shorta
+        pla                         ; A = slot
+        jml     Ot6BushidoPick      ; its rtl returns for us
 .endproc
 
 ; [ is a tech learned? test bit t of $1cf7 ]

@@ -170,8 +170,12 @@ Ot6WeapClassTbl:
 ; (aurabolt is a holy chip, not a punch). WoB physical skills only;
 ; slots attacks, dances, and rage specials stay unclassified.
 ;
-;   - swdtechs are all slashing: cyan is the slashing specialist, and
-;     quadra slam/slice are the strongest slash chips in the game.
+;   - swdtechs slash: cyan is the slashing specialist, and quadra slam is
+;     the strongest slash chip in the game.  three are not slashes (#379,
+;     kits.md's chip column): retort ($56) is a counter stance and
+;     empowerer ($59) a drain, so both are classless and chip nothing; quadra
+;     slice ($5b) is wind, its element byte (battle_main.asm's MagicProp
+;     override), so it is absent here and chips wind shields four times.
 ;   - $55 dispatch doubles as slots' "joker doom" (vanilla reuses the
 ;     record, and renamed its attack-name slot), so a failed joker doom
 ;     is a slashing probe. that is vanilla behaviour, kept as it is.
@@ -181,12 +185,9 @@ Ot6WeapClassTbl:
 
 Ot6SkillClassTbl:
         .byte   $55, OT6_SLASH  ; dispatch
-        .byte   $56, OT6_SLASH  ; retort
         .byte   $57, OT6_SLASH  ; slash
         .byte   $58, OT6_SLASH  ; quadra slam (chips per hit)
-        .byte   $59, OT6_SLASH  ; empowerer
         .byte   $5a, OT6_SLASH  ; stunner
-        .byte   $5b, OT6_SLASH  ; quadra slice
         .byte   $5c, OT6_SLASH  ; cleave
         .byte   $5d, OT6_BLUDG  ; pummel
         .byte   $5f, OT6_BLUDG  ; suplex (the train is bludgeon-weak)

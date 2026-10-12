@@ -977,8 +977,9 @@ RandDance:
         lda     $32e1,y
         cmp     #$ff
         bne     @05b2
-        clr_a
-        lda     $1d4c       ; known dances
+        jsl     Ot6DanceKnownRand   ; ot6 #380: `clr_a / lda $1d4c`, less
+                                ;   Water Rondo, the divine (a random pick
+                                ;   spends no boost)
         jsr     RandBit
         jsr     GetBitID
         txa
@@ -3583,9 +3584,10 @@ _163b:  jsl     Ot6UmaroRetaliate       ; ot6 #237: a provoked Umaro dumps on
         bne     @1666
 @1662:  lda     #$08
         tsb     $fe
-@1666:  lda     $fe
-        tax
-        ora     #$30
+@1666:  jsl     Ot6UmaroArm     ; ot6 #380: `lda $fe / tax / ora #$30`,
+                                ;   and the divine (a full dump: Storm) and
+                                ;   Charge/Throw's class (ot6_umaro.asm)
+        nop                     ; ot6: keeps the roll below at its offset
         asl2
         jsr     RandBitWithRate
         txa
@@ -3842,9 +3844,13 @@ Cmd_13:
         bpl     @1794       ; branch if valid
         lda     $3a6f       ; default dance battle background
         sta     $32e1,y
-@1794:  ldx     $11e2       ; current battle background
-        cmp     f:BattleBGDance,x   ; dance for current background
+@1794:  jsl     Ot6DanceTerrain ; ot6 #380: vanilla's `ldx $11e2 / cmp
+                                ;   f:BattleBGDance,x`, and Water Rondo's
+                                ;   rule: at a full boost it never stumbles
+                                ;   (Z set), under one it stumbles (V set)
         beq     Cmd_02      ; branch if dance matches
+        bvs     @17af       ; ot6: the divine danced without its boost
+        nop                 ; ot6: keeps the roll below at its offset
         jsr     RandCarry
         bcc     @17af       ; 50% chance to branch
         tax
@@ -7149,6 +7155,20 @@ BUM_RUSH_POWER_VANILLA = 128            ; the byte this replaces
 LIFE3_MP_OT6       = 60
 LIFE3_MP_VANILLA   = 50                 ; the byte this replaces
 
+; ---- override 7: Quadra Slice ($5b) element, none -> wind (#379) -----------
+; Cyan's 2-BP row at full kit, four strikes at random targets (special $32).
+; kits.md's chip column has carried it as wind x4 since the kits were
+; planned: Quadra Slam is his four-strike slash, and Quadra Slice the same
+; four strikes on another axis, so his late window holds a slash key and a
+; wind key rather than two slash keys.  With the element set, the skill
+; leaves Ot6SkillClassTbl (ot6_class.asm): its element is its probe, as for
+; AuraBolt's holy.  The element also moves its damage the way any wind
+; attack's does (double on a wind-weak body, none on a wind-immune one,
+; healing on an absorber).  No monster script, rage, sketch or control
+; casts $5b, so no monster's behaviour moves.
+QSLICE_ELEM_OT6     = ELEMENT::WIND
+QSLICE_ELEM_VANILLA = ELEMENT::NONE     ; the byte this replaces
+
 ; ---- Break ($0c): no record override (#398) ---------------------------------
 ; Vanilla Break is petrify: hit 120, power 0, death-class.  The record stays
 ; vanilla's, so a monster's Break -- and Control, Sketch and a Rage, which
@@ -7174,6 +7194,7 @@ OSMOSE_MP_AT       = ATTACK::OSMOSE   * MAGIC_PROP_REC + 5
 LIFE3_MP_AT        = ATTACK::LIFE_3   * MAGIC_PROP_REC + 5
 DDUST_POWER_AT     = ATTACK::SHIVA    * MAGIC_PROP_REC + 6
 DDUST_STATUS3_AT   = ATTACK::SHIVA    * MAGIC_PROP_REC + 12
+QSLICE_ELEM_AT     = ATTACK::QUADRA_SLICE * MAGIC_PROP_REC + 1
 PUMMEL_POWER_AT    = ATTACK::PUMMEL   * MAGIC_PROP_REC + 6
 BUM_RUSH_POWER_AT  = ATTACK::BUM_RUSH * MAGIC_PROP_REC + 6
 MAGIC_PROP_END     = MAGIC_PROP_COUNT * MAGIC_PROP_REC
@@ -7189,7 +7210,9 @@ MagicProp:
         .byte   DDUST_POWER_OT6                         ; $38 +$06 (was 52)
         .incbin magic_prop_dat, DDUST_POWER_AT + 1, DDUST_STATUS3_AT - DDUST_POWER_AT - 1
         .byte   DDUST_STATUS3_OT6                       ; $38 +$0c (was $00)
-        .incbin magic_prop_dat, DDUST_STATUS3_AT + 1, PUMMEL_POWER_AT - DDUST_STATUS3_AT - 1
+        .incbin magic_prop_dat, DDUST_STATUS3_AT + 1, QSLICE_ELEM_AT - DDUST_STATUS3_AT - 1
+        .byte   QSLICE_ELEM_OT6                         ; $5b +$01 (was $00)
+        .incbin magic_prop_dat, QSLICE_ELEM_AT + 1, PUMMEL_POWER_AT - QSLICE_ELEM_AT - 1
         .byte   PUMMEL_POWER_OT6                        ; $5d +$06 (was 110)
         .incbin magic_prop_dat, PUMMEL_POWER_AT + 1, BUM_RUSH_POWER_AT - PUMMEL_POWER_AT - 1
         .byte   BUM_RUSH_POWER_OT6                      ; $64 +$06 (was 128)

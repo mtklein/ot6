@@ -191,6 +191,7 @@ FLOOR_INC = "ff6/src/battle/ot6_break_floor.inc"
 CHAR_PROP = "ff6/src/field/char_prop.asm"          # 22 B/actor; +2..+5 cmds
 
 MAGIC_PROP = "ff6/src/battle/magic_prop_en.dat"   # 14 B/attack; +1 element
+BATTLE_MAIN = "ff6/src/battle/battle_main.asm"     # MagicProp's OT6 overrides
 
 MAP_REC = 33
 ITEM_REC = 30
@@ -223,7 +224,8 @@ class Data:
         self.event = self._read(EVENT_GROUP)
         self.monsters = self._read(MONSTERS)
         self.items = self._read(ITEM_PROP)
-        self.magic = self._read(MAGIC_PROP)
+        self.magic = bytearray(self._read(MAGIC_PROP))
+        self._apply_magic_overrides()
         with open(os.path.join(root, MONSTER_NAMES), encoding="utf-8") as f:
             self.names = json.load(f)["text"]
         self.weap_class = self._parse_weap_tbl()
@@ -238,6 +240,40 @@ class Data:
         import check_boss_rows
         self.boss = check_boss_rows.Data(root)
         self._check_element_anchors()
+
+    def _apply_magic_overrides(self):
+        """battle_main.asm's MagicProp splice: the .dat is vanilla and OT6's
+        byte overrides sit beside it as `.byte NAME ; $id +$off (was ...)`
+        lines (Quadra Slice's wind, #379).  Apply the element ones, so the
+        element axis reads the record the ROM ships."""
+        src = self._text(BATTLE_MAIN).splitlines()
+        consts = {}
+        for l in src:
+            m = re.match(r"\s*([A-Z0-9_]+)\s*=\s*([^;]+?)\s*(;.*)?$", l)
+            if m:
+                consts[m.group(1)] = m.group(2).strip()
+        elem = {"FIRE": 0x01, "ICE": 0x02, "LIGHTNING": 0x04, "POISON": 0x08,
+                "WIND": 0x10, "HOLY": 0x20, "EARTH": 0x40, "WATER": 0x80,
+                "NONE": 0x00}
+        n = 0
+        for l in src:
+            m = re.match(r"\s*\.byte\s+([A-Z0-9_]+)\s*;\s*\$([0-9a-fA-F]{2})"
+                         r"\s*\+\$([0-9a-fA-F]{2})\s*\(was", l)
+            if not m or int(m.group(3), 16) != OFF_ATK_ELEM:
+                continue
+            v = consts.get(m.group(1), "")
+            e = re.fullmatch(r"ELEMENT::([A-Z]+)", v)
+            if e and e.group(1) in elem:
+                val = elem[e.group(1)]
+            elif re.fullmatch(r"\$[0-9a-fA-F]{1,2}|[0-9]+", v):
+                val = int(v[1:], 16) if v.startswith("$") else int(v)
+            else:
+                raise SystemExit("check_break_reach: MagicProp element override "
+                                 "%s = %r is not a value this parse reads"
+                                 % (m.group(1), v))
+            self.magic[int(m.group(2), 16) * MAGIC_REC + OFF_ATK_ELEM] = val
+            n += 1
+        self.magic_elem_overrides = n
 
     def _check_element_anchors(self):
         """Verify the offsets the element axis rides against known records
@@ -320,9 +356,9 @@ class Data:
             if re.match(r"\.byte\s+\$ff\s*$", code):
                 break
             break
-        if len(out) < 10:
+        if len(out) < 9:
             raise SystemExit("check_break_reach: Ot6SkillClassTbl parsed %d "
-                             "entries, want >= 10 (%s)" % (len(out), CLASS_ASM))
+                             "entries, want >= 9 (%s)" % (len(out), CLASS_ASM))
         return out
 
     def _parse_shield_tbl(self):
