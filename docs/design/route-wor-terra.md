@@ -110,9 +110,13 @@ the island; SETZER stays aboard. The next arcs can regroup the same way
   held direction (`cellar/probe3.log`: held Up leaves (52,58) on the second
   frame). `navTo` released its step on every lost frame and blocklisted the
   edge after 30 (`cellar/probe2_navto.log`: `nav: edge (52,58)->up blocked
-  in reality`); it now keeps holding a step already pressed while only
-  control flickers (`cellar/probe2_navto_fixed.log`: `[probe] arrived`,
-  `PASS (frame 24)`).
+  in reality`); with `H.NAV_REFIRE_HOLD` it keeps holding a step already
+  pressed while only control flickers (`cellar/probe2_navto_fixed.log`:
+  `[probe] arrived`, `PASS (frame 24)`). It is opt-in, on in
+  `gen_wor_terra` only: on for every walk it moved `gen_whelk_poweron`'s
+  play from power-on (`whelk_ab/`: `PASS (frame 36896)` on main's lib and
+  on this branch with the switch off, `PASS (frame 36956)` with it always
+  on), which reshuffled every later draw.
 - **A scripted loss whose wipe reading outlives it.** Battle 128 leaves
   the seat table reading wiped until battle 129's InitBattle, so the wipe
   canary can fire in the scene between them; the generator answers that
