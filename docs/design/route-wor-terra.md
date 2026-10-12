@@ -349,11 +349,20 @@ unanswered record (the party was wiped in battle) cleared`, then
   `Ot6ShieldTbl`, and the chain's play moves from `arvis_wake` on
   (`PASS (frame 18017)` on main, `17983` here); suites whose fixtures come
   from that play meet new draws. `battle_assassinate` was red on the
-  pre-kits chain and green on main's (`assassinate/`); the kits rewrite
-  passes on both (`assassinate/main_e410e209_pass.log`,
-  `branch_92254dd6_pass.log`). `battle_gprain` went red on this chain when
-  SETZER and then SABIN were Zombied in a crowd; its exemption now covers an
-  ally's lost control (`kits/`).
+  pre-kits chain: its isolation arm counted every Death mark in the battle,
+  and Shadow had legitimately killed body 3 (no boss bit) before he broke
+  the bitted body 2. The arm now counts only marks on the bitted body from
+  the breaking action on (`assassinate/`): on that recorded draw (e060fe75's
+  chain rebuilt on px13) the old suite is red (`predraw_e060fe75_red.log`)
+  and the attributed one passes (`predraw_e060fe75_fixed_green.log`; on that
+  ROM the divine was once a battle, so the fight whose divine went to body 3
+  is not a test and the arm takes another); on the kits chain it passes
+  (`asn_fixed.log`), and a mutant ROM with the gate's boss check removed is
+  red on the attributed assertion (`asn_mut.log`). `battle_gprain` went red on this chain when
+  SETZER and then SABIN were Zombied in a crowd; it now excuses a crowd an
+  ally's lost control ended only with that ally still out at the end and
+  SETZER's throw confirmed, or with no window of his at the plan's boost;
+  a SETZER who never confirms goes red on the same draw (`gprain/`).
 - **The regroup's party** is fixed (TERRA, CELES, SABIN, EDGAR); SETZER
   waits on the Falcon. A different four is one line (`REGROUP`).
 - **Palidor is unworn.** Each of the four wears a stone; the Esper plan
