@@ -9,7 +9,8 @@
 -- Ot6BushidoTech: word 0 (every existing save, and the all-slot-0 degenerate
 -- case) runs the vanilla moving window untouched; a nonzero word returns the
 -- stored tech for that boost, but only if it is still learned ($1cf7 bit set),
--- otherwise it falls back to the auto window for that slot.
+-- otherwise it falls back to the auto window for that slot, and so does a
+-- stored Cleave (tech 7, Cyan's divine) anywhere but the 3-BP slot.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
@@ -151,29 +152,55 @@ H.run({ maxFrames = 40000 }, {
     H.log("SENTINEL: word $0000 (all slots tech 0) reads as AUTO, not manual {0,0,0,0}")
   end),
 
-  -- 2. MANUAL enumeration: stored slots 1..3 {7,0,3} -> $5c,$55,$58 ----------
+  -- 2. MANUAL enumeration: stored slots 1..3 {6,0,3} -> $5b,$55,$58 ----------
   closeSub(),
   H.call(function()
     ceiling, learnedBits = 7, 0xFF          -- all eight learned, 3 rows
-    slots = { 0, 7, 0, 3 }                   -- packs $0638 (nonzero => MANUAL)
+    slots = { 0, 6, 0, 3 }                   -- packs $0630 (nonzero => MANUAL)
   end),
   openSub("manual: reopen with a stored loadout"),
   H.waitFrames(6),
   H.call(function()
-    assertRows({ 0x5c, 0x55, 0x58 }, "manual slots1-3 {7,0,3}")
+    assertRows({ 0x5b, 0x55, 0x58 }, "manual slots1-3 {6,0,3}")
     H.log("MANUAL enumerates the STORED techs in the STORED order")
   end),
 
   closeSub(),
   H.call(function()
     ceiling, learnedBits = 7, 0xFF
-    slots = { 5, 7, 0, 3 }                   -- slot 0 = 5: written, ignored
+    slots = { 5, 6, 0, 3 }                   -- slot 0 = 5: written, ignored
   end),
   openSub("manual: reopen with a junk value in the retired slot 0"),
   H.waitFrames(6),
   H.call(function()
-    assertRows({ 0x5c, 0x55, 0x58 }, "slot 0 ignored")
+    assertRows({ 0x5b, 0x55, 0x58 }, "slot 0 ignored")
     H.log("SLOT 0 RETIRED: a nonzero dead slot 0 changes nothing (#38)")
+  end),
+
+  -- 2b. Cleave (tech 7) is a divine: the 3-BP slot only (Ot6CleaveSlot, the
+  -- kits.md "Divines" rule).  Stored in slot 1 it falls back to the auto
+  -- window's tech for that slot ($5a); stored in slot 3 it stands ($5c). ----
+  closeSub(),
+  H.call(function()
+    ceiling, learnedBits = 7, 0xFF
+    slots = { 0, 7, 0, 3 }                   -- Cleave stored in the 1-BP slot
+  end),
+  openSub("manual: Cleave stored in the 1-BP slot"),
+  H.waitFrames(6),
+  H.call(function()
+    assertRows({ 0x5a, 0x55, 0x58 }, "Cleave in slot 1 falls back to the auto tech")
+    H.log("CLEAVE: stored in the 1-BP slot, refused there (auto fallback $5a)")
+  end),
+  closeSub(),
+  H.call(function()
+    ceiling, learnedBits = 7, 0xFF
+    slots = { 0, 0, 3, 7 }                   -- Cleave stored in the 3-BP slot
+  end),
+  openSub("manual: Cleave stored in the 3-BP slot"),
+  H.waitFrames(6),
+  H.call(function()
+    assertRows({ 0x55, 0x58, 0x5c }, "Cleave in slot 3 stands")
+    H.log("CLEAVE: stored in the 3-BP slot, offered there ($5c)")
   end),
 
   -- 3. validation fallback: slot1 = tech 2, but $1cf7 bit 2 is clear ---------
@@ -198,7 +225,7 @@ H.run({ maxFrames = 40000 }, {
   closeSub(),
   H.call(function()
     ceiling, learnedBits = 7, 0xFF
-    slots = { 0, 7, 0, 3 }
+    slots = { 0, 6, 0, 3 }
     bpbank = 5
   end),
   openSub("manual: reopen to confirm a row"),

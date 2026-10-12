@@ -4,8 +4,8 @@ Scope: the espers; the World of Balance roster, then the World of Ruin's
 twelve (last section). Locked ✦. Pillar (DESIGN.md ✦):
 equipping a magicite grants its kit *while equipped*. Spells are
 never taught permanently, level-up stat bonuses are deleted, one
-copy of each exists, and summon = once per battle as the sub-job's
-divine. One proposed later exception below is that **passives may be
+copy of each exists, and summon = vanilla's once-per-battle summon (not a kit
+divine). One proposed later exception below is that **passives may be
 learned**; that system is not implemented, and the while-equipped
 spell/stat model is canon.
 
@@ -47,7 +47,8 @@ Five slots, all data-table work:
 4. **Weapon permit** — at most one extra weapon class in the equip
    menu (see weapon-classes.md; battle code never checks it). Kept
    spare ✦: it is a development knob rather than a pillar.
-5. **Summon** — the divine, once per battle ✦.
+5. **Summon** — the summon, vanilla's once per battle ✦ (not a kit
+   divine: those are gated by a full 3-BP boost, kits.md).
 
 Sub-job check: a magicite should read as a *job* rather than a bag
 of spells. Its spells, passives, and permit should fit one theme,
@@ -70,7 +71,7 @@ describes the *proposed* system, not the shipped one.
 | Shiva | Magitek factory | Ice, Osmose, **Shell** | magicite-ifrit-shiva.md §5.2 | none, deliberately | none, deliberately | **"the Rime": economy** |
 | Unicorn | tube room | Remedy, Safe | +1 stamina | *Purity*: status durations halved | — | the paladin-adjacent |
 | Maduin | tube room | Fire, Ice, Bolt | +2 magic | *Trinity*: first spell each battle +1 tier | — | Terra's inheritance: the pure mage job |
-| Shoat | tube room | Break, Doom | +1 magic | *Gorgon Eye*: Break may (25%) chip 2 | — | the executioner |
+| Shoat | tube room | Break, Doom | +1 magic | *Gorgon Eye*: the stone's Break is the class-blind chip (one shield, one more a boost point; #398) -- no passive; a monster's Break (and Control, Sketch, a Rage) keeps vanilla's petrify, as monsters' Life 3 keeps vanilla's | — | the executioner (Doom) and the breaker (Break) |
 | Phantom | tube room | Vanish, Sleep | +1 speed | *Ghostwalk*: first hit taken each battle misses | — | the assassin's second |
 | Carbunkl | tube room | Rflect, Shell | +1 stamina | *Facet*: Runic feeds +1 more BP | — | Celes's natural pairing |
 | Bismark | tube room | Slow, (Water lore-alike) | +1 vigor | *Tidal*: water chip +1 | — | see open Q2 |
@@ -98,9 +99,9 @@ The World of Ruin stones grant the lists in the last section's table
   the party has to divide the espers between characters.
 - Espers granting *permits* stay rare (3 in WoB) so that a
   multi-weapon character reads as a deliberate build.
-- Summon-as-divine tier ✦: the summon does not replace the
-  character's own divine for the battle. Both exist, and both are
-  once-per-battle abilities used at the same point in a fight.
+- The summon tier ✦: the summon does not replace the character's own
+  divine. Both exist: the summon is vanilla's, once per battle; the kit
+  divine's one gate is a full 3-BP boost (kits.md "Divines").
 
 ## Learning summary
 
@@ -124,7 +125,7 @@ twelve are World of Ruin rewards. Each is planned the way
 per stone, one to three **base-tier** spells (nothing in `Ot6FoldTbl`'s
 second or third column: Fire 2/3, Ice 2/3, Bolt 2/3, Bio, Cure 2/3, Life 2/3,
 Slow 2, Haste2), a while-worn stat package in `Ot6EsperStatTbl`'s four signed
-nibbles, and the vanilla summon kept as the divine, unchanged. There is no
+nibbles, and the vanilla summon kept as the summon, unchanged. There is no
 passive or permit channel, so none is planned.
 
 **What ships.** The Spells column. The stat column is still a proposal:
@@ -254,39 +255,39 @@ change moves the control (to an unequipped slot).
   party) is the stone's own verb: floating bodies are out of reach of earth,
   which is what makes Terrato's Quake castable. The early World of Ruin
   party is three fighters and Celes, so the stat is a FIELD package on
-  vigor and speed, a pairing no WoB stone has. Divine: Sonic Dive (`$3F`, the
+  vigor and speed, a pairing no WoB stone has. Summon: Sonic Dive (`$3F`, the
   party jumps).
 - **Fenrir, the Banisher.** Vanilla's Warp, X-Zone and Stop hold no tiers.
   Stop (10 MP, single) and X-Zone (53 MP, a group, death-class, hit 85)
-  differ from Shoat's Break/Doom by target (a group, not one body) and by a
-  non-lethal option. Terra rejoins here with Break in her own list, so Fenrir
-  brings deletion that reaches a whole group. Warp moves to Ragnarok, the
-  one-spell stone. Divine: Moon Song (`$4E`, Image on the party).
+  differ from Shoat's Doom by target (a group, not one body) and by a
+  non-lethal option. Shoat's Break takes shields rather than lives since
+  #398, so Fenrir brings deletion that reaches a whole group. Warp moves to Ragnarok, the
+  one-spell stone. Summon: Moon Song (`$4E`, Image on the party).
 - **Starlet, the second medic.** Vanilla's list is Cure, Cure 2, Cure 3,
   Regen, Remedy; the two tiers go, and the rest stays. It duplicates Kirin
   (Cure, Regen) and Unicorn's Remedy on purpose: a split party needs a medic
   in each group. Relm joins in the same scene with Sketch as her kit
-  (kits.md), so Starlet is what makes her a healer. Divine: the party heal
+  (kits.md), so Starlet is what makes her a healer. Summon: the party heal
   (`$4F`).
 - **Alexandr, the Bastion.** Vanilla's five are Pearl, Shell, Safe, Dispel,
   Remedy. Pearl and Remedy are Unicorn's job and are dropped. Dispel (25 MP)
   is new. Safe and Shell are each already on two stones, but no stone grants
   both, so this is the one stone that walls both kinds of damage, plus the
   only way to strip an enemy's own buffs. The stone ends Cyan's quest, and
-  the stat (vigor and stamina) is built for a front-liner like him. Divine: Justice
+  the stat (vigor and stamina) is built for a front-liner like him. Summon: Justice
   (`$44`, holy, all enemies).
 - **Terrato, the Landslide.** Vanilla's Quake, Quartr and W Wind hold no
   tiers. Quake (50 MP, earth, `targ $04`) hits every body on the field, the
   caster's side included, unless it floats; Quartr (48 MP, all enemies, a
   fraction of current HP) is the enemy-only version of the same attrition. W
   Wind (75 MP, a fraction of every body's HP, both sides) is the both-sides
-  copy of Quartr, so it moves to Bahamut rather than sit beside it. Divine:
+  copy of Quartr, so it moves to Bahamut rather than sit beside it. Summon:
   Earth Aura (`$3A`, earth, all enemies).
 - **Tritoch, the second caster.** Vanilla's list is Fire 3, Ice 3, Bolt 3, all
   tiers. The stone keeps Ice and Bolt as the second copy of the caster job and
   replaces Fire with Poison. Fire is the best-covered element (Ifrit, Maduin,
   Terra, Sabin's Fire Dance), while Poison, the fourth fold family (3 MP, Bio
-  at 1 BP), is on no other stone. Its divine Tri-Dazer (`$40`, fire|ice|bolt)
+  at 1 BP), is on no other stone. Its summon Tri-Dazer (`$40`, fire|ice|bolt)
   keeps all three of vanilla's elements.
 - **Odin and Raiden, the Warlord.** Vanilla's lists are Meteor and Quick. The
   two are one stone: Raiden replaces Odin, so Raiden keeps Odin's list and
@@ -304,7 +305,7 @@ change moves the control (to an unequipped slot).
   dragon's wingbeat: it cuts every body on the field, the party included, to
   a fraction of its HP, so it opens a fight against a group before Flare
   finishes one body. Mega Flare (`$43`) is the all-enemies version of Flare,
-  the same single-to-all shape as Shoat's Break and Demon Eye.
+  the single-to-all shape Shoat's Doom and Demon Eye also have.
 - **Phoenix, the Rebirth.** Vanilla's list is Life, Life 2, Life 3, Cure 3,
   Fire 3. The owner's call (2026-09-29): Phoenix grants Life, which boosts to
   Life 2 and then Life 3, so `Ot6FoldTbl`'s life row is Life, Life 2, Life 3
@@ -312,7 +313,7 @@ change moves the control (to an unequipped slot).
   go (Cure is Kirin's and Starlet's; Fire is Ifrit's and Maduin's and in
   Terra's list). Antdot (3 MP, cures Poison) is the stretch: phoenix tears
   cure venom, and Tritoch's Poison is new in this world. The Phoenix Cave is
-  the two-party dungeon, and Phoenix is the second party's revival. Divine:
+  the two-party dungeon, and Phoenix is the second party's revival. Summon:
   Rebirth (`$50`, revives the party).
 - **Ragnarok, the Last Word.** Vanilla's Ultima holds no tier, and kits.md's
   Terra section already says "Everyone else gets Ultima by equipping
@@ -387,7 +388,7 @@ so the gate never matches it.
 ### Boost on these lists
 
 Poison, Ice, Bolt, Cure, Life and Slow fold. Flare, Meteor, Merton, Ultima,
-Quake and the damaging divines (Earth Aura, Tri-Dazer, Mega Flare, Justice,
+Quake and the damaging summons (Earth Aura, Tri-Dazer, Mega Flare, Justice,
 Purifier) take `Ot6BoostDmg`'s ×2/×4/×8 at the escalating price
 (mp-economy.md). Float, Stop, X-Zone, Quick, Dispel, Safe, Shell, Regen,
 Remedy, Bserk, Warp and Antdot deal no damage and fold nowhere, so they are

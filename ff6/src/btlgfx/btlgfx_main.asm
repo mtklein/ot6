@@ -18269,6 +18269,17 @@ _c1_slot_open:
         jmp     OpenToolsWindow
 @reels: jmp     OpenSlotWindow
 
+; ot6 (terra's kit): Morph is Trance, her divine, and a divine's one gate is a
+; full 3-BP boost.  Picked with less pending, it buzzes and the command window
+; stays up (Ot6TranceOffer, ot6_trance.asm); otherwise it goes on to Morph's
+; own target select, as before.
+_c1_morph_open:
+        jsl     Ot6TranceOffer
+        bcs     @morph
+        inc     $95             ; error sound; the command window stays open
+        rts
+@morph: jmp     _c17795
+
 ; ------------------------------------------------------------------------------
 
 ; [ init target cursor select ]
@@ -19051,7 +19062,9 @@ OpenCmdMenuTbl:
 @7ce9:  .addr   _c17792
         .addr   OpenItemWindow
         .addr   OpenMagicWindow
-        .addr   _c17795
+        .addr   _c1_morph_open          ; ot6: $03 morph -- was _c17795;
+                                        ;   Trance (Morph) takes a full 3-BP
+                                        ;   boost, refused here without one
         .addr   _c17795
         .addr   _c1_thief_open          ; ot6: $05 steal -- was _c17795
                                         ;   (straight to target select); now

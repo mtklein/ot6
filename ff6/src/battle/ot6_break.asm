@@ -135,6 +135,7 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         sta     OT6_BRKPAL-8,y       ;   these two sit past InitBP's shadow
                                      ;   clear, so this is also their only
                                      ;   power-on clear
+        sta     OT6_DEBIL-8,y        ; nor a Debilitator's added weakness
         ; weakness codex: pre-reveal anything this save learned in past battles
         jsr     Ot6CodexActive  ; x = this save's page offset
         longa
@@ -617,8 +618,14 @@ merge:  pla                     ; bank the matched weaknesses as pending:
         php
         longi
         phx
-        lda     OT6_RVPEND_ELEM-8,y
-        ora     OT6_REVEALED_ELEM,y
+        lda     OT6_DEBIL-8,y   ; a weakness Debilitator added is this body's,
+        eor     #$ff            ;   not the species': the codex never learns it
+        and     OT6_RVPEND_ELEM-8,y
+        sta     OT6_SCR_IDX
+        lda     OT6_DEBIL-8,y
+        eor     #$ff
+        and     OT6_REVEALED_ELEM,y
+        ora     OT6_SCR_IDX
         pha
         jsr     Ot6CodexActive
         longa

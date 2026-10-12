@@ -20,8 +20,8 @@ CODE_EXT_INC = 1
 .global Ot6CodexSaveAs          ; copy slot-local weakness knowledge on Save As
 .global Ot6CodexNewGame, Ot6CodexLoaded
 .global Ot6BushidoTier
-.global Ot6Oblivion              ; divine: Bushido tech 8, broken-gated in CalcAttackEffect
-.global Ot6Assassinate           ; divine: Shadow, broken non-boss instant-kill
+.global Ot6Oblivion              ; divine: Cleave, instant death or the heavy cut
+.global Ot6Assassinate           ; divine: Shadow, a 3-BP hit kills a Broken non-boss
 .global Ot6StealBoostLevel, Ot6StealSlot   ; boost-tiered steal (chance verb)
 .global Ot6SlotRig, Ot6SlotDrift           ; boost-tiered Slot (chance verb):
 .global Ot6SlotMiss, Ot6SlotCommit         ;   rig/drift/miss tiers + the
@@ -29,6 +29,7 @@ CODE_EXT_INC = 1
 .global Ot6ThiefListOpen         ; #55 locke's kit: steal -> tools-shell submenu
 .global Ot6ThiefExec             ;   Cmd_05's execute-side dispatch (filch/bestow)
 .global Ot6SetzerListOpen        ; setzer's kit: slot -> tools-shell table
+.global Ot6TranceOffer           ; terra's kit: Morph (Trance) takes a full boost
 .global Ot6SetzerConfirm         ;   the Slot row chains to the reels
 .global Ot6SetzerExec            ;   Cmd_0f's dispatch (coin toss/hired help/jackpot)
 .global Ot6SetzerEffect          ;   the row's attack props + special effect

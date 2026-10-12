@@ -61,6 +61,51 @@ Breadth is a different thing and is written out in words: AutoCrossbow hits
 every body once, which is four chips against a four-stack and one against a
 boss.
 
+## Divines
+
+**A divine's one gate is a full 3-BP boost** (owner, 2026-10-11), as in
+Octopath Traveler.  Each character's kit slot 8 is what spending all three
+points buys, and nothing else gates it: no once-a-battle limit and no other
+condition (the Broken-enemy condition Cleave and Trance used to carry is
+gone).  *Reason (the owner's): these are things a Final Fantasy player
+expects to use freely, and no further complications should be added.*  A
+divine can be used again in the same battle whenever the bank holds three.
+The bank itself paces it: points come one a turn and none on a boosted
+turn, so from an empty bank a divine is every fourth turn at most, and
+each divine's MP does the rest.
+
+With fewer than three points pending, a divine is not offered: its row
+greys and the A button buzzes (Jackpot, Morph), or the command does what it
+does at that boost (Cleave is only ever the SwdTech window's 3-BP row;
+Runic and Tools under three points are their plain selves; Shadow's hit
+under three points is a hit).  A divine picked at three and then taken
+back to fewer (L during target select) falls back at execution and charges
+nothing it did not deliver.  Each divine is tuned to be worth a full boost
+and to be used more than once a fight; each entry below gives its reason.
+Mimic copies a divine's action, not its price, but the gate is the boost:
+a Gogo's copy takes the full boost from Gogo's own bank where the copy reads
+it (a Jackpot), and is free where it does not (a Cleave).
+
+| Character | Divine | What three points buy | Built |
+|---|---|---|---|
+| Terra | Trance | her Morph: esper form (magic x2, damage taken halved) for as long as the morph gauge lasts | yes (`ot6_trance.asm`) |
+| Celes | RunicBlade | a 3-turn Runic that also sends every spell it absorbs back at its caster | yes (`ot6_runicblade.asm`) |
+| Edgar | Overclock | the Tool fires twice, at the boost's x8 each, priced as the two firings | yes (`ot6_overclock.asm`) |
+| Cyan | Cleave | the SwdTech window's 3-BP row: instant death on a killable target, a power-255 cut on a death-immune one | yes (`ot6_divine.asm`) |
+| Setzer | Jackpot | a throw of two triple rolls, 99 MP | yes (`ot6_setzer.asm`) |
+| Shadow | Assassinate | his 3-BP action: a hit of it that breaks a non-boss, or lands on a Broken one, kills it (the effect, not a gate) | yes (`ot6_divine.asm`) |
+| Sabin | Bum Rush | (built today as a 99-MP Blitz row at any boost; as a divine it will take the full boost) | no |
+| Locke | Master's Mark | steal from all enemies and reveal everything, at 3 BP | no |
+| Mog | Water Rondo | at 3 BP | no |
+| Gau | (open, kit-gau.md) | at 3 BP | no |
+
+Terra's Ultima is a fold, not a divine, but it too is what a full boost buys
+(Fire at 3 BP, after her World of Ruin return; see Terra below).  `$3ecb`,
+the once-a-battle flag (`OT6_DIVINE_USED`), is retired.
+Suites: `battle_divines` (Cleave), `battle_jackpot`, `battle_assassinate`,
+`battle_trance`, `battle_runicblade`, `battle_overclock`, each with its gate
+(under 3 BP no divine), a second use in one battle, and an old-ROM red.
+
 ---
 
 ## The constrained three
@@ -74,11 +119,11 @@ The 8 Tools, verbatim ✦, learned by acquisition.
 | 1 | AutoCrossbow ✦ | 4 | piercing, whole side (one hit per body) | join (signature) |
 | 2 | NoiseBlaster | 6 | — (confuse) | Figaro shop |
 | 3 | Bio Blaster | 8 | poison | Figaro shop |
-| 4 | Flash | 6 | — (blind) | Figaro shop, restocked South Figaro |
+| 4 | Flash | 6 | — (blind) | Figaro's tool merchant (shop 82), restocked at South Figaro (shop 5) |
 | 5 | Drill | 16 | piercing ×2 | Figaro castle, after the sand dive |
 | 6 | Chain Saw | 18 | slashing | Zozo chest (vanilla) |
-| 7 | Debilitator | 10 | adds + reveals a random weakness ✦ | Vector shop |
-| 8 | **Overclock** ✦ (divine) | Σ | — | Magitek factory (story) |
+| 7 | Debilitator | 10 | adds + reveals a random weakness ✦ | Vector's weapon shop (shop 27), open during the banquet |
+| 8 | **Overclock** ✦ (divine) | Σ | the Tool's own, twice | Magitek factory (story: switch `$0068`) |
 
 The MP column is mp-economy.md's "scaled by tier 3–20" (AutoCrossbow 3–4,
 Drill/Chain Saw 12–20, Debilitator 8–12): gil buys the tool once, and MP is
@@ -86,12 +131,32 @@ the per-use operating cost. It lives in `Ot6AbilityCostTbl` keyed by **tool
 item id** ($a3–$aa, the same keying ot6_class.asm uses for tool classes).
 The mid-kit gag Air Anchor ($a9, the findable
 harpoon) is costed 14 alongside them. **Overclock** fires two tools, so it has
-no single price; its cost is the **sum (Σ)** of the two it fires. That will be
-wired when Overclock is built, which has not happened yet.
+no single price; its cost is the **sum (Σ)** of the two it fires.
 
-- Divine locked ✦: **Overclock**, which uses two tools in one action.
-  Air Anchor stays a findable *item* mid-kit gag rather than the
-  capstone.
+- Divine ✦: **Overclock**, two tools' worth in one action.  Once EDGAR has
+  learned it (event switch `$0068`, set where Cid opens the tube room's way
+  out after the espers' scene, and never cleared), a Tool he boosts with all
+  three points fires twice: two whole passes, each at the boost's x8, so
+  Drill's two strikes become four.  Its price is the two firings, each at
+  the 3-BP price (x15.625), capped at 99 as every price is: AutoCrossbow 63
+  becomes 99.  The drawn number, the grey, the confirm, the charge and the
+  passes all ask `Ot6Overclocks` (`ot6_overclock.asm`).  *Reason: the Tools
+  shell picks one row and the engine runs one item record per action, so
+  "two tools" is the row the player picked, fired twice: one press, the
+  tool's own animation twice, and a price that says what it bought.  Under
+  the full-boost rule it is worth the boost by construction (twice a 3-BP
+  Tool), and its 99 MP bounds the repeat: two uses empty a L27 Edgar's 201.*
+  `battle_overclock` plays it.  Air Anchor stays a findable *item* mid-kit
+  gag rather than the capstone.
+- **Flash and Debilitator are sold where this table says** (shop
+  overrides in `ff6/src/menu/shop.asm`): Flash from Figaro's tool merchant
+  in the World of Balance and at South Figaro, Debilitator at Vector's
+  weapon shop during the banquet.  **Debilitator reveals the weakness it
+  adds**: vanilla's effect adds one element the body is not weak to, and the
+  break system reads the weak byte live, so it is a chip trigger at once;
+  `Ot6DebilReveal` banks the added bit as a pending reveal, so the HUD draws
+  its glyph instead of '?', and keeps it out of the species codex (the
+  weakness is this body's, for this battle).  `battle_debilitator`.
 - AutoCrossbow's piercing clears waves: one chip per body across a
   whole side, and exactly one chip against a solo boss. Drill answers armored
   bosses. Chain Saw covers slashing, so Edgar alone spans two physical
@@ -117,7 +182,7 @@ Levels below are `BlitzLevelTbl` (`field/event.asm:1240`).
 | 5 | Mantra | 16 | — (heal) | 23 |
 | 6 | Air Blade | 28 | wind | 30 |
 | 7 | Spiraler | 50 | — | 42 |
-| 8 | **Bum Rush** (divine) | **99** | bludgeoning ×4 | 70 / Duncan |
+| 8 | **Bum Rush** (divine; not built as one: a 99-MP Blitz row at any boost today) | **99** | bludgeoning ×4 | 70 / Duncan |
 
 The MP column lives in `Ot6AbilityCostTbl` keyed by attack id $5d–$64.
 Bum Rush is Sabin's ultimate and is
@@ -148,7 +213,7 @@ against upstream for something a comment already handles.
 | 5 | Empowerer | 2 | 18 | — (drain; strikes ×2 at quarter power) | 24 |
 | 6 | Stunner | 3 | 28 | slashing, all enemies | 34 |
 | 7 | Quadra Slice | 3 | 50 | wind ×4 | 44 |
-| 8 | **Cleave** (divine) | 3, target must be Broken | **99** | — | Phantom Train farewell (story) |
+| 8 | **Cleave** (divine) | 3 | **99** | — (instant death; a boss takes a power-255 cut) | Phantom Train farewell (story) |
 
 SwdTech prices at **parity with the Blitz row of the same index**. This is a
 level claim rather than an index coincidence: `BlitzLevelTbl` is
@@ -235,16 +300,26 @@ Three rulings, documented in `Ot6BushidoTier`'s header:
 - **No affordable floor.** The 1× slot is always the cheapest tech *in the
   window*, so it gets pricier as Cyan levels. This is accepted, because his
   MP pool grows on the same schedule.
-- **Cleave is the window's conditional top tier** rather than a case handled
-  outside it. At full kit the window is Stunner/Quadra Slice/Cleave and BP3
-  lands on Cleave (tech 7) by the same `base+boost` sum as any other tier, so
-  it needs no extra code and is simpler as the top tier than as a separate
-  invocation. It
-  fires as the divine pass built it: selected only when learned and
-  unspent, gated at resolution by `Ot6Oblivion` (target must be Broken), and
-  dropped back to Quadra Slice (6) here for the rest of any battle whose once-
-  per-battle flag is set. `battle_divines` checks that shape (BP3 = Cleave
-  clear, Quadra Slice spent).
+- **Cleave is the window's 3-BP row**, the divine's one gate (see
+  "Divines").  At full kit the window is Stunner/Quadra Slice/Cleave and BP3
+  lands on Cleave (tech 7) by the same `base+boost` sum as any other tier,
+  so it needs no extra code.  A manual loadout may not put it on the 1- or
+  2-BP row: `Ot6CleaveSlot` (one leaf for the battle read, the
+  configurator's draw and its cycle) refuses it there, and a stored one
+  falls back to the auto window for that slot.  A random SwdTech (a
+  Muddled or Charmed Cyan, the Colosseum) spends no boost, so its pick
+  stops at Quadra Slice (`Ot6RandBushidoTop`).  At resolution `Ot6Oblivion`
+  reads the target: a killable one takes a guaranteed Death (no Broken
+  condition any more); a death-immune one (a boss) takes the heaviest
+  single cut a record can carry, power 255 with its damage recomputed
+  (`Ot6CleaveDmg`; CalcDmg runs before the target is known, so the old
+  fallback's power of 70 landed nothing at all).  The record strikes the
+  enemy group, and the other bodies take the record as it stands on that
+  pass.  *Reason for the cut: a full boost must pay against a boss too, and
+  a single 70 was less than the 2-BP Quadra Slice row; 255 is the most one
+  hit can carry, about Quadra Slice's four strikes.*  It can be used again
+  in the same battle.  `battle_divines` checks the rows, the loadout, a kill
+  on an unbroken soldier and two boss cuts in one battle.
 
 **BP is read, never written.** `Ot6ActionEnd` consumes the spend and skips that
 turn's regen exactly as for any other action, and the ≤3 / never-past-bank caps
@@ -340,12 +415,39 @@ nowhere else. The World of Ruin adds Phoenix's Life (magicite.md, #327).
 - **Ultima is the fourth fold rather than a slot ✦.** Vanilla's table
   already teaches Terra Ultima at level 99, a level almost no player
   reaches. OT6 makes it reachable without spending a menu row: after a
-  very-late story unlock, Terra casting Fire at 3 BP folds past
-  Fire 3 into **Ultima**. It does not appear in her list until the
-  fold preview renders it. Everyone else gets Ultima by equipping
-  Ragnarok.
-- **Trance keeps the divine slot** as her esper-state apex, usable
-  only while an enemy is Broken.
+  very-late story unlock -- her World of Ruin return at Mobliz, event
+  switch `$00BF` -- Terra casting Fire at 3 BP folds past Fire 3 into
+  **Ultima** (`Ot6FoldSteps` gives her a third step, `Ot6FoldTier` folds
+  Fire's row to Ultima on it). It does not appear in her list until the
+  fold preview renders it. The fold is the boost's purchase, as every
+  fold's is: the cast is priced as Ultima (its own 80 MP) and takes no
+  damage multiplier (`Ot6QueueFold` marks it, `OT6_ULTIMAFOLD`). Before the
+  unlock, and for everyone else, Fire at 3 BP is Fire 3. Everyone else gets
+  Ultima by equipping Ragnarok, and that Ultima is a multiplier spell like
+  any other. `battle_ultimafold`.
+- **Trance is her divine, and it is her Morph** (vanilla's esper form:
+  magic x2, damage taken halved, for as long as the morph gauge lasts,
+  learned at the Zozo awakening, battle switch `$42`).  Its one gate is the
+  full boost: picked with fewer than three points it buzzes and the command
+  window stays up (`Ot6TranceOffer`, OpenCmdMenuTbl[$03]'s stub), and a
+  Morph the engine chooses (Muddle, Berserk) or one whose boost was taken
+  back does not morph and charges nothing (`Ot6TranceGate`, Cmd_03).  Revert
+  stays free, so she can Trance again in the same battle.  *Reason: vanilla
+  Morph is already an apex worth three points, and its own gauge bounds it
+  across battles.*  `battle_trance`.
+- **Break (level 24, and Shoat's) takes shields** (#398): no damage and no
+  status; one shield off its one target, ignoring class and element, plus
+  one per boost point (four at 3 BP, the ceiling Quadra Slice and Bum Rush
+  reach), at its flat 25 MP (the boost buys shields, never a tier or the
+  multiplier).  It reveals nothing (Filch's rule).  It is a character's
+  own cast: Magic or X-Magic (Terra, Shoat, a Mimic of one) or the Break
+  Blade's on-hit spell (one shield: the swing's boost bought swings).  A
+  monster's Break, and Control, Sketch and a Rage, which cast as the monster
+  does, keep vanilla's petrify -- the Life 3 precedent (magicite.md):
+  characters' casts get OT6's behaviour, monsters keep vanilla's.  It works
+  on bosses: shields are the boss's own break system.  `Ot6BreakOurs`,
+  `Ot6BreakProps` (the vanilla record, edited as it loads for OT6's cast)
+  and `Ot6BreakSpell`; `battle_breakspell`, `battle_breakmonster`.
 
 ### Locke — Thief (piercing: dagger)
 
@@ -362,7 +464,7 @@ probes, redistributes and corrodes, with some merchant work as well
 | 5 | Bestow ✦ (5 MP) | give an ally 1 BP | Vector (merchant beat) |
 | 6 | Dismantle | armor corrode: −defense, piercing chip | Sealed Gate |
 | 7 | Appraise | reveal one enemy's full weakness row | Thamasa |
-| 8 | **Master's Mark** (divine) | steal from all enemies + reveal everything | Floating Continent |
+| 8 | **Master's Mark** (divine, at 3 BP; not built) | steal from all enemies + reveal everything | Floating Continent |
 
 - Filch and Bestow move BP around: take from enemies, give to
   allies. Tactically he supplies tempo as well as loot.
@@ -484,7 +586,7 @@ ice/order/tempo. The pairing is clearer here than in vanilla.
 | 5 | Scan | 18 (vanilla) |
 | 6 | Safe | 22 (vanilla) |
 | 7 | Haste | 32 (vanilla) |
-| 8 | **RunicBlade** (divine, leaning) | Opera / Magitek factory (story) |
+| 8 | **RunicBlade** (divine) | Magitek factory (story: switch `$0068`) |
 
 - **Runic's absorb becomes MP and banks 1 BP** (`Ot6RunicBP`, ot6_boost.asm,
   hooked into vanilla's `RunicEffect`). Rulings, all covered by `battle_runic.lua`:
@@ -524,14 +626,23 @@ ice/order/tempo. The pairing is clearer here than in vanilla.
     the stance bit at `RunicEffect`:8671 without absorbing (vanilla's own
     `CheckStatus` gate), and the bit only comes back at her next turn. The
     duration is not shortened, but that spell is not absorbed. Left as vanilla.
-- **RunicBlade** is a Runic stance that also *reflects* what it absorbs
-  (absorb the MP as BP, bounce the spell). It is a separate ability
-  rather than what a boosted Runic becomes: boost buys *duration* on
-  reactive verbs, so if row 8 were "Runic at 3 BP" the canon would have
-  an exception at its own top tier, and the divine would be unreachable
-  for anyone out of BP. RunicBlade instead changes the *kind* of the
-  reaction (reflect as well as absorb) and takes duration from boost
-  like any other reactive verb.
+- **RunicBlade is what a full boost buys on Runic** once Celes has
+  learned it (event switch `$0068`, the Magitek factory, where she turns on
+  Kefka).  A 3-BP Runic stands for three of her turns as any 3-BP Runic
+  does, absorbs as Runic does (the MP, the once-a-round BP), and sends every
+  spell it absorbs back at its caster as her own free cast of it, through
+  vanilla's counterattack queue (`Ot6BladeRaise` / `Ot6BladeAbsorb` /
+  `Ot6BladeBounce`).  The bounce is the absorbed spell, not a stronger one,
+  and no Runic stance absorbs it again (`Ot6BladeNoRunic`: her own stance
+  stands while it flies).  An ally's spell she absorbs goes back at the ally
+  -- vanilla's ally-spell quirk, kept -- and a spell of her own that her
+  stance catches goes nowhere.  Only player magic ($00-$35) bounces;
+  a counter is not countered back, and a battle with counters off bounces
+  nothing.  *Reason: the old objection to making the divine "Runic at 3
+  BP" -- that the canon would have an exception at its top tier and the
+  divine would be out of reach without BP -- is the owner's rule now
+  (divines take the full boost), and as the 3-BP Runic it costs no menu row
+  and keeps duration the reactive verb's purchase.*  `battle_runicblade`.
 
 ### Setzer — Gambler/Merchant (special ¤: cards, dice; darts = piercing)
 
@@ -547,7 +658,7 @@ for #319 (2026-10-02), each with its reason.
 | 1 | Slot ✦ | free | the reel's attack | the rig's certainty (see Steal's ladder; `ot6_slot.asm`) | join |
 | 2 | Coin Toss | level × 30 gil a toss | ¤, one per body a toss (every enemy) | another toss a point (1 + boost tosses, each its own gil, hit and chip) | join |
 | 3 | Hired Help | level × 50 gil a hire | the target's own physical class (slashing, else piercing, else bludgeoning), one a hire | another hire a point (1 + boost hires, each its own fee, hit and chip) | join |
-| 4 | **Jackpot** (divine) | 99 MP, once a battle | null-break | another roll a point (1 + boost rolls, each its own gamble and its own hit) | his World of Ruin return (Kohlingen, switch `$00CA`) |
+| 4 | **Jackpot** (divine) | 99 MP, at 3 BP | null-break | the divine itself: the full boost buys a throw of two rolls, each its own gamble and its own hit | his World of Ruin return (Kohlingen, switch `$00CA`) |
 
 **The table behind Slot.** Setzer's rows are FIGHT, SLOT, MAGIC, ITEM and
 the menu is four rows, so like Locke he has no spare slot, and his third
@@ -660,19 +771,17 @@ face again for the triple (saturating at 65,535 as vanilla's loop does),
 then the hit as any hit lands: halved while the target's shields hold,
 doubled once it is Broken, capped at 9,999. Null-break: the Fixed Dice
 are the outliers, so it chips nothing and ignores the row. **It is a
-gamble, and the boost buys more of it** (owner, 2026-10-02: Jackpot is a
-gamble, and every point must land something under the cap): each roll is
-a face 1-6 at near-even odds, 42-44 of 256 a face, consistent with the
-measurement below (one battle Rand, drawn again past 251, mod 6; the
-redraw takes the table's next byte, a fixed successor), and the boost buys
-another roll a point -- 1 + boost passes, each its own triple and its own
-hit. A roll whose target fell to the roll before goes to another monster; a
-pass that finds no body left (the rolls before felled the last) is
-skipped: no triple, no dice, no draw. *Reason: a hit that can be a dud is
-the gambler's verb,
-and an extra roll is a purchase that always lands, at any level and
-shield state; playtesting tunes the power.* What one roll lands (the
-means at even odds; the 42-44 weights move them by under 2%):
+divine, so its one gate is the full 3-BP boost, and that boost buys a
+throw of two rolls** (owner, 2026-10-11; `OT6_JACKPOT_ROLLS`): each roll a
+face 1-6 at near-even odds, 42-44 of 256 a face, consistent with the
+measurement below (one battle Rand, drawn again past 251, mod 6; the redraw
+takes the table's next byte, a fixed successor), each its own triple and
+its own hit.  Under three points the row greys and is refused; a throw
+whose boost was taken back after the pick rolls nothing and pays nothing.
+A roll whose target fell to the roll before goes to another monster; a pass
+that finds no body left is skipped: no triple, no dice, no draw. What one
+roll lands (the means at even odds; the 42-44 weights move them by under
+2%):
 
 | face | L31 shielded | L31 unshielded | L31 Broken | L50 shielded | L50 unshielded |
 |---|---|---|---|---|---|
@@ -684,45 +793,42 @@ means at even odds; the 42-44 weights move them by under 2%):
 | 6 | 9,999 | 9,999 | 9,999 | 9,999 | 9,999 |
 | a roll's mean | 5,162 | 6,012 | 7,017 | 5,816 | 6,633 |
 
-so a throw's mean is (1 + boost) times the roll's, and the spread is the
-sum of 1 + boost independent rolls (the lab in
-`build/attempts/wt/kit-setzer/jackpot-dist/` measures the faces and what
-each lands, and tabulates the throws per boost). The battle Rand walks a
-256-byte table that holds every byte once, so its 252 bytes below 252 give
-each face 42; the four above redraw onto their successors, which is where
-the 43s and 44 come from. Measured in play
-(`build/attempts/wt/kit-setzer/labs-r3/`, round 3): a fight, dice
-included, is fixed by its battle key and the inputs, and from the grave
-the key takes 16 values, so runs repeat throws and the labs count each
-distinct throw once. Played throws at 3 BP, the fight varied by 15 keys and
-six in-battle stands: 30 distinct throws of 96, 120 rolls, faces 1-6
-14 / 24 / 19 / 27 / 19 / 17, chi2 5.6 (5 df; 11.07 is p = .05). The
-earlier fault-injected lab's 3-BP fives (34 of 320, chi2 14.0) were in
-part repeats: 64 distinct throws of 80, 256 rolls, 43 / 54 / 50 / 36 / 30
-/ 43, chi2 9.1. Nothing else is bought:
-no multiplier (cmd `$0f` is in Ot6BoostDmg's gate) and the MP is flat.
-(Two earlier curves were set aside the same day: a floor the boost raised
-to certain sixes at 3 BP, then a floor of 1 / 2 / 3 / 4 with even odds
-above it; both bought a bigger single hit, which the 9,999 cap wasted.)
-**Price 99 MP, once a battle** (`OT6_DIVINE_USED`): 99 is the shared
-ultimate ceiling, and the once-a-battle flag (Cleave's and Assassinate's)
-keeps up to four 9,999 hits a boss answer rather than a loop (33% of his
-L31 pool, above the baseline's band: the size of the payoff is the reason,
-and once a battle bounds it). **Learned on his World of Ruin return**
-(switch `$00CA`, set when he rejoins in Kohlingen's inn). *Reason:
-divines come by story, and his arc is the tomb and the Falcon; in the WoB
-his L16-25 Jackpot would land 9,999s against bosses of 5-10k HP, so it
-waits for the WoR, where it makes him a recruit that matters at once.*
-**Mimic copies it freely**, and that is intended (guidelines: "Mimic is
-free"): a Gogo mimicking Jackpot (or Cyan's Cleave) pays no MP and is not
-held to the once-a-battle flag, which is Setzer's own; it is a reason to
-bring Gogo.
+so a throw's mean is twice the roll's, about 10,300 shielded at L31.
+**Re-justified for repeated use** (the owner removed the once-a-battle
+limit): it was priced at 99 MP for up to four 9,999 hits *because* it came
+once a battle.  Now a throw can come every fourth turn, so the throw is two
+rolls, half the old ceiling, and the price stays 99, the shared ultimate
+ceiling: a third of his L31 pool (297), so a full pool buys three throws a
+fight, about 31,000 expected shielded at L31 over a dozen turns.  That is
+the strongest damage in his kit and worth the full boost (a 3-BP boosted
+Fight lands a few thousand), and it is a gamble: a sixth of rolls are a
+face 1 (31 damage), so a throw can whiff.  Two rolls rather than one keep a
+whole throw from being a single dud.  (The earlier "1 + boost rolls" and
+the once-a-battle flag are retired with the rule.)
+The labs that measured the faces (`build/attempts/wt/kit-setzer/
+jackpot-dist/`, `labs-r3/`): a fight, dice included, is fixed by its
+battle key and the inputs, and from the grave the key takes 16 values, so
+runs repeat throws and the labs count each distinct throw once. Played
+throws at 3 BP, the fight varied by 15 keys and six in-battle stands: 30
+distinct throws of 96, 120 rolls, faces 1-6 14 / 24 / 19 / 27 / 19 / 17,
+chi2 5.6 (5 df; 11.07 is p = .05). The earlier fault-injected lab's 3-BP
+fives (34 of 320, chi2 14.0) were in part repeats: 64 distinct throws of
+80, 256 rolls, 43 / 54 / 50 / 36 / 30 / 43, chi2 9.1. Nothing else is
+bought: no multiplier (cmd `$0f` is in Ot6BoostDmg's gate) and the MP is
+flat.  **Learned on his World of Ruin return** (switch `$00CA`, set when
+he rejoins in Kohlingen's inn). *Reason: divines come by story, and his arc
+is the tomb and the Falcon; in the WoB his L16-25 Jackpot would land
+9,999s against bosses of 5-10k HP, so it waits for the WoR, where it makes
+him a recruit that matters at once.*  **Mimic copies the throw**, and the
+gate is the copier's own boost (the dice read it at execution): a Gogo with
+three points pending throws two rolls free; one without throws nothing.
 
 **Prices.** Slot stays free. Coin Toss and Hired Help cost gil only (the
 row draws no MP; it greys and is refused when the purse cannot pay the
 price at the pending boost, `Ot6SetzerRowGrey`, the same grey the confirm
 reads). Jackpot greys for MP or once spent. One authority each:
-`Ot6SetzerCost` (MP, flat, Ot6AbilityCost's `@slot` arm) and `Ot6CoinGil`
+`Ot6SetzerCost` (MP, flat, Ot6AbilityCost's `@slot` arm, which charges a Jackpot only at
+the full boost) and `Ot6CoinGil`
 (gil a throw or a hire; `Ot6CoinTotal` the whole action's, which the grey
 reads). Tests: `battle_cointoss`, `battle_hiredhelp`, `battle_jackpot`,
 `battle_setzergrey` (the purse's grey and refusal), `battle_gprain` (the
@@ -749,11 +855,11 @@ c9fccbd6 cites (the floor curve's mutants) was lost with px13's worktree
 before it was copied, and the curve it tested is gone.
 
 **The route's driver plays the table** (`Driver:setzerLine`, lib/ot6.lua;
-#353), reading what an informed player would: Jackpot priced as the gamble
-it is, by a roll's expected landed damage (the six faces after the
-shields' halving or the Broken double, capped at 9,999 and the target's
-HP), with as many rolls as the HP wants and the bank holds, when the
-throw is expected to land 4,000 on a target of 4,000 HP or more; Slot
+#353), reading what an informed player would: Jackpot, when the bank holds
+three, priced as the gamble it is, by a roll's expected landed damage (the
+six faces after the shields' halving or the Broken double, capped at 9,999
+and the target's HP), when the throw's two rolls are expected to land 4,000
+on a target of 4,000 HP or more; Slot
 at 3 BP in a random battle against two or more (a chosen triple); Coin
 Toss when its revealed ¤ chips two or more bodies, with a toss a point up
 to the most shields among them; Hired Help when the
@@ -771,14 +877,21 @@ route-wor-falcon.md 13.10).
 ## Sketches (join order, WoB)
 
 - **Shadow — Assassin (piercing, thrown)**: Throw ✦ signature; smoke
-  and exit tricks; divine **Assassinate**: once a battle, the hit of his
-  that breaks an enemy kills it outright on that hit -- break it and it
-  dies -- and so does a hit of his on an enemy someone else already
-  Broke. A boss is only Broken, and the divine is kept for a body it can
-  kill (owner ruling, #239). Interceptor is a passive.
+  and exit tricks; divine **Assassinate** (built).  Its one gate is the
+  rule's: an action of his boosted with all three points (no once-a-battle
+  limit; a counterattack, Interceptor's, is no action of his and carries no
+  divine).  Its effect: a hit of that action that breaks an enemy kills it
+  outright on that hit -- break it and it dies -- and so does such a hit on
+  an enemy someone else already Broke; a hit that breaks nothing is a hit.
+  The break is what the divine does, not a condition on using it.  A boss
+  is only Broken (owner ruling, #239).
+  *Reason it is worth three points: a kill of any non-boss the party can
+  break, every fourth turn.*  `battle_assassinate`.  Interceptor is a
+  passive.
 - **Setzer — Gambler/Merchant**: built; see "Setzer" above (#319).
 - **Mog — Dancer (piercing: spear)**: the 8 Dances verbatim ✦,
-  learned by dancing on each terrain ✦; divine **Water Rondo**, kept
+  learned by dancing on each terrain ✦; divine **Water Rondo** (at 3 BP,
+  not built), kept
   WoB-missable, vanilla-style. This kit needs no further design work.
 
 ## Curated kits (the Ochette/Hikari pair)

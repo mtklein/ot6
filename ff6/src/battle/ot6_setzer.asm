@@ -43,6 +43,7 @@ OT6_SETZER_COIN    = $59        ; Coin Toss
 OT6_SETZER_HIRE    = $5a        ; Hired Help
 OT6_SETZER_JACKPOT = $5b        ; Jackpot (divine)
 OT6_SETZER_SLOT    = $5c        ; Slot: the reels
+OT6_JACKPOT_ROLLS  = 2          ; Jackpot's rolls a throw, at the full boost
 
 OT6_CHAR_SETZER    = $09
 
@@ -326,7 +327,9 @@ OT6_HIRE_RATE      = 50         ; Hired Help
 ;   Coin Toss, Hired Help: the purse cannot pay the row's gil at the boost
 ;     pending now (a boost pressed with the window up re-stages the rows, so
 ;     the grey follows R and L);
-;   Jackpot: already spent this battle (OT6_DIVINE_USED).
+;   Jackpot: fewer than three points pending.  A divine's one gate is a
+;     full 3-BP boost (kits.md "Divines"); a boost pressed or taken back with
+;     the window up re-stages the row, so the grey follows R and L.
 ; a8/i16.  in: A = the MP grey ($00/$04), Y = the row's wItemList offset.
 ; out: A = A | ($04 if refused).  preserves X and Y.  Reached by jml from
 ; Ot6BushidoRowGrey, so the rtl returns to its caller.
@@ -354,9 +357,9 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         bcs     @white
         bra     @grey
 @divine:
-        lda     $3018,x         ; the caster's bit
-        and     OT6_DIVINE_USED
-        beq     @white
+        lda     OT6_BOOST_REVEALED,x
+        cmp     #$03            ; a full boost pending?
+        bcs     @white
 @grey:  plx
         pla
         ora     #$04            ; magic's disabled bit ($21|$04 = $25)
@@ -495,11 +498,15 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         stz     $3414           ; damage modification off
         lda     #$60
         sta     $11a2           ; ignore defense, don't split
-        lda     OT6_BOOST_REVEALED,x    ; every row: the boost buys more hits --
-        and     #$03                    ;   one more pass of the attack a point
-        clc                             ;   (Ot6HitCount's counter), each its own
-        adc     $3a70                   ;   toss, hire or roll, so no point is
-        sta     $3a70                   ;   lost to the 9,999 cap on one hit
+        lda     f:$7e0000+OT6_SETZERROW
+        cmp     #OT6_SETZER_JACKPOT
+        beq     @rolls
+        lda     OT6_BOOST_REVEALED,x    ; a coin row: the boost buys more hits
+        and     #$03                    ;   -- one more pass of the attack a
+@passes:                                ;   point (Ot6HitCount's counter), each
+        clc                             ;   its own toss or hire, so no point is
+        adc     $3a70                   ;   lost to the 9,999 cap on one hit
+        sta     $3a70
         jsl     Ot6PassesAdded          ; a pass whose body fell retargets
         lda     f:$7e0000+OT6_SETZERROW
         cmp     #OT6_SETZER_JACKPOT
@@ -510,6 +517,11 @@ OT6_HIRE_RATE      = 50         ; Hired Help
         rtl
 @dice:  lda     #$12            ; attacker special effect $09 (dice)
         rtl
+@rolls: lda     #OT6_JACKPOT_ROLLS-1    ; Jackpot: the divine's full boost
+        bra     @passes                 ;   buys a fixed throw of two rolls
+                                        ;   (kits.md "Jackpot"); a throw
+                                        ;   queued under three points rolls
+                                        ;   nothing (Ot6JackpotDice)
 .endproc
 
 ; ------------------------------------------------------------------------------
@@ -1376,17 +1388,19 @@ OT6_HIRE_YX    = $61d4-$61c7    ; a pincer walks with X this far back
 ; The face is a gamble, near-even odds on 1-6 (one battle Rand, redrawn past
 ; 251, mod 6; the redraw takes the table's next byte, a fixed successor, so
 ; over the 256 places a roll can start each face is 42-44 of 256, consistent
-; with the measurement in kits.md), and the boost buys more of it: Ot6SetzerEffect adds the
-; boost to the action's attack count, so 1 + boost passes each roll their own
-; triple and land their own hit (owner, 2026-10-02: a gamble, and every point
-; must land something under the 9,999 cap on one hit; playtesting tunes it).
-; Nothing else is bought: no multiplier (the command is in Ot6BoostDmg's gate,
-; and this damage is set here, after CalcDmg), and the MP price is flat.
+; with the measurement in kits.md).  A divine's one gate is a full 3-BP
+; boost (kits.md "Divines", owner 2026-10-11), and that boost buys a throw of
+; OT6_JACKPOT_ROLLS rolls (Ot6SetzerEffect adds them to the action's attack
+; count), each its own triple and its own hit.  A throw whose boost was taken
+; back after the pick (L during target select) rolls nothing and charges
+; nothing: no MP (Ot6AbilityCost's slot arm priced it 0) and no points (the
+; pending boost is dropped here, so Ot6ActionEnd takes none).  Nothing else is bought: no
+; multiplier (the command is in Ot6BoostDmg's gate, and this damage is set
+; here, after CalcDmg), and the MP price is flat.
 ;
 ; Null-break (kits.md: the Fixed Dice are the outliers, large numbers and no
 ; chip): OT6_ATKCLASS = special | null-break, and the element is clear.  The
-; once-per-battle flag (OT6_DIVINE_USED) is spent here, where the triple
-; lands (can't dodge).  The dice faces go to $b6/$b7 and $b5 = $26, the
+; triple can't be dodged.  The dice faces go to $b6/$b7 and $b5 = $26, the
 ; dice-roll animation vanilla's effect queues.
 ;
 ; A roll that finds no body left standing (ChooseTarget's mask is empty: the
@@ -1411,9 +1425,16 @@ Ot6JackpotCubeTbl:
         clc
         rtl
 @jackpot:
-        lda     $b8             ; no body left for this roll: skip it
+        lda     OT6_BOOST_REVEALED,y
+        cmp     #$03            ; a throw queued under a full boost only: the
+        bcs     @full           ;   boost taken back after the pick (L during
+        lda     #$00            ;   target select) leaves nothing to roll,
+        sta     OT6_BOOST_REVEALED,y    ; and nothing bought is nothing
+        bra     @none           ;   charged (Ot6ActionEnd reads 0)
+@full:  lda     $b8             ; no body left for this roll: skip it
         ora     $b9
         bne     @aimed
+@none:
         lda     #$12            ; the pass queues no dice
         sta     $b5
         sec
@@ -1484,8 +1505,6 @@ Ot6JackpotCubeTbl:
         lda     #$26
         sta     $b5             ; the dice-roll animation (last: a watcher
                                 ;   on $b5 sees the whole triple set)
-        lda     $3018,y         ; the attacker's bit
-        tsb     OT6_DIVINE_USED ; the divine is spent this battle
         plx
         plp
         sec

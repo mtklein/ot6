@@ -800,6 +800,27 @@ local steps = {
   pressWalk("down", function() return map() == 253 end, 1200,
     "south rows -> 253 (29,2)"),
   H.waitUntil(landed(253, 10), 2400, "Vector 253 on the way out", 1),
+
+  -- The weapon shop (shop 27, map 246), its keeper out since the banquet's
+  -- end ($063C): OT6 stocks EDGAR's Debilitator there (#378, kits.md's
+  -- Tools table), and a player passing through buys one -- a tool is used
+  -- from the bag, never spent, so one is the whole need.  Door 253 (11,52)
+  -- -> 246 (27,15); the keeper at (29,10); out by 246's trigger (27,16)
+  -- -> 253 (11,54).
+  H.crossDoor(11, 52, 246, 27, 15, "Vector weapon shop door 253(11,52)->246(27,15)"),
+  H.shopTalk(29, 10, "Vector weapon shop"),
+  H.call(function()
+    H.assertEq(H.shopId(), 27, "the keeper opened shop 27 ($0201)")
+    H.log(string.format("[vector] weapon shop: gil=%d, Debilitators in the bag %d", H.gil(), H.invCountOf(0xA7)))
+  end),
+  H.cond(function() return H.invCountOf(0xA7) == 0 end, { H.buyItem(0xA7, 1, "Debilitator") }, {}),
+  H.shopClose("Vector weapon shop"),
+  H.call(function()
+    H.log(string.format("[vector] after the shop: gil=%d, Debilitators %d", H.gil(), H.invCountOf(0xA7)))
+    H.assertEq(H.invCountOf(0xA7) >= 1, true, "the bag holds a Debilitator")
+  end),
+  H.crossDoor(27, 16, 253, 11, 54, "Vector weapon shop exit 246(27,16)->253(11,54)"),
+
   H.navTo(30, 62, { maxFrames = 30000, playBattles = "tactical",
     arrive = function() return H.worldMode() end }),
   pressWalk("down", function() return H.worldMode() end, 1200,

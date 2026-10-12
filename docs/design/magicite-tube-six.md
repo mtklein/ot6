@@ -33,7 +33,7 @@ the per-esper reasoning.
 | esper (idx) | nickname | grants | stat vig/spd/stm/mag | divine (vanilla record, all kept) | the swap reason |
 |---|---|---|---|---|---|
 | Maduin (6) | **the Trinity** | Fire, Ice, Bolt | **−3 / 0 / +3 / +7** | **Chaos Wing** `$3c`: non-elem 55, all enemies, 44 MP | one caster, three fold families; the right element on demand |
-| Shoat (5) | **the Gorgon Eye** | Break, Doom | **−2 / +6 / +2 / 0** | **Demon Eye** `$3b`: petrify all, hit 96, 45 MP | delete one body per turn, where deletion is legal |
+| Shoat (5) | **the Gorgon Eye** | Break, Doom | **−2 / +6 / +2 / 0** | **Demon Eye** `$3b`: petrify all, hit 96, 45 MP | delete one body per turn where deletion is legal (Doom), and take any body's shields (Break) |
 | Phantom (20) | **the Ghostwalk** | Vanish, Demi | **0 / +6 / −2 / +2** | **Fader** `$4a`: Clear on the party, 38 MP | the party stops being hit by physicals |
 | Carbunkl (19) | **the Facet** | Rflect, Safe | **0 / −2 / +6 / +2** | **Ruby Power** `$49`: Rflect on the party, 36 MP | the enemy's magic is turned back on it |
 | Bismark (7) | **the Tide** | Haste, Slow | **+5 / −2 / +3 / 0** | **Sea Song** `$3d`: WATER 58, all enemies, 50 MP | tempo both ways, plus the game's only water verb |
@@ -187,7 +187,7 @@ re-expressed through the three real channels (list, stat, divine):
 | seed (unbuildable passive) | re-expression |
 |---|---|
 | Maduin *Trinity* — "first spell each battle +1 tier" | the only stone granting **all three** foldable attack elements; the biggest mag.pwr in the game |
-| Shoat *Gorgon Eye* — "Break may chip 2" | the two deletion verbs (Break/Doom) plus the petrify-all divine |
+| Shoat *Gorgon Eye* — "Break may chip 2" | Break itself is the chip since #398 (one shield, class-blind, one more a boost point), beside the deletion verb (Doom) and the petrify-all divine |
 | Phantom *Ghostwalk* — "first hit taken each battle misses" | **Fader is the same effect applied to the whole party**, so the divine covers the passive |
 | Carbunkl *Facet* — "Runic feeds +1 more BP" | undeliverable (Celes is absent for the whole stretch, §12); the stone keeps the gem's real verb: reflection, single and party-wide |
 | Bismark *Tidal* — "water chip +1" | no water spell exists to grant (§12); **Sea Song is the game's only water verb**, and the kit becomes tempo: Haste/Slow |
@@ -259,13 +259,21 @@ the tiering, so what is lost is flavour rather than function.
 | Stat (while worn) | **vig −2 / spd +6 / stm +2** |
 | Divine | **Demon Eye** `$3b` — petrify, all enemies, hit 96, blockable death-class (+0x04 `$10`), 45 MP. Vanilla, unchanged. |
 
-**The executioner's two verbs.** Break `$0c` (25 MP, hit 120, sets PETRIFY)
-and Doom `$0d` (35 MP, hit 95, sets DEAD): both power 0, both hit-rolled,
-both death-class (+0x04 `$10`). This is the stone for deleting one dangerous
-body instead of wearing it down, which bypasses the shield math. The break
-loop is chip, break, nuke; Shoat skips all three when the hit roll and
-the immunity byte allow it. The immunity byte is what makes him a
-swap choice rather than a general answer, and §2.2's table says where he works.
+**The executioner's verb and the breaker's.** Doom `$0d` (35 MP, hit 95,
+sets DEAD): power 0, hit-rolled, death-class (+0x04 `$10`): the stone for
+deleting one dangerous body instead of wearing it down, where the immunity
+byte allows it (§2.2's table says where).  Break `$0c` was the second
+deletion verb (25 MP, hit 120, sets PETRIFY) until #398 (2026-10-11): now
+it takes shields, class- and element-blind, one plus one per boost point,
+no damage and no status, at its flat 25 MP (kits.md, Terra; Ot6BreakSpell).
+That is a character's own cast (Magic, X-Magic, a Mimic, the Break Blade);
+a monster's Break, and Control, Sketch and a Rage, keep vanilla's petrify,
+as monsters' Life 3 keeps vanilla's (magicite.md).
+So the stone holds both halves of the break loop's shortcut: Break opens
+any body's shields without its key, and Doom deletes what Death can reach.
+That is the *Gorgon Eye* settled: the seed passive ("Break may (25%) chip
+2", §1) is the spell itself now, deterministic and priced in boost, and
+there is no passive.
 Bio is dropped (§1); two spells is the Ramuh/Ifrit precedent, and the third
 slot is deliberately the divine.
 
@@ -278,13 +286,13 @@ that undead resist death, his cave value drops to Coelecite (petrifiable)
 and the Ninja. **The design accepts either outcome**, since being
 situational is his identity.
 
-**Boost does nothing for Break or Doom.** This is a canon gap rather than a
-Shoat-specific problem (§12.4). They deal no damage (`Ot6BoostDmg` multiplies
-`$11b0`, which stays 0) and fold nowhere. DESIGN.md's canon says chance verbs
-answer to BP-buys-certainty, which is Steal's shipped shape, but no such
-mechanism exists for hit-rolled magic. Shoat is the first stone whose whole kit
-sits outside both boost axes, and the UI will let a player spend 3 BP on Doom
-for no effect.
+**Boost buys Break shields; it still does nothing for Doom.** Break's boost
+buys one more shield a point (four at 3 BP) and its price stays flat
+(`Ot6InFoldTbl` answers yes for it, so neither the fold nor the 2.5x
+escalation touches it).  Doom deals no damage (`Ot6BoostDmg` multiplies
+`$11b0`, which stays 0) and folds nowhere: a canon gap rather than a
+Shoat-specific problem (§12.4), and the UI will let a player spend 3 BP on
+Doom for no effect.
 
 **Stat.** +6 speed, −2 vigor, +2 stamina. His spells scale off nothing (fixed
 hit rates vs target m.block), so the natural bonus is speed, letting him act
@@ -294,7 +302,7 @@ Eye is a stare rather than a strike.
 **Divine.** Demon Eye is kept: petrify on all enemies at hit 96. It wipes trash
 where petrify is legal and misses everywhere §2.2 marks petrify blocked. 45 MP
 prices it as a fight-ender. The kit and the divine overlap as single-target to
-all-target scaling (Break → Demon Eye), the same shape as Phantom's
+all-target scaling (Doom → Demon Eye: one deletion, then a petrify wipe), the same shape as Phantom's
 Vanish → Fader, and that is accepted in both places because the all-target
 version is the once-per-battle apex of the same effect rather than a second
 copy of it.
@@ -524,12 +532,11 @@ There is no new battle code and no MagicProp overrides. Two files change.
 **`ff6/src/menu/genju_prop.asm`** — rows 5, 6, 7, 19, 20, 23:
 
 ```
-; 5: shoat -- "the Gorgon Eye".  The executioner: Break + Doom, the two
-;   deletion verbs.  BIO is DROPPED: it is the pre-folded CAP of the poison
-;   family (Ot6FoldTbl row 3 -- a 26 MP dead tier beside a 3 MP fold) and
-;   poison is Edgar's authored key.  Both spells are power-0 hit-rolled
-;   death-class: outside BOTH boost axes (no damage to multiply, no fold
-;   row, and no chance-verb certainty mechanism exists for magic).
+; 5: shoat -- "the Gorgon Eye".  The executioner: Break + Doom.  BIO is
+;   DROPPED: it is the pre-folded CAP of the poison family (Ot6FoldTbl row
+;   3 -- a 26 MP dead tier beside a 3 MP fold) and poison is Edgar's
+;   authored key.  (Since #398 Break takes shields, its boost buying more;
+;   Doom is power-0 hit-rolled death-class, outside both boost axes.)
 make_genju_prop {BREAK, 0}, {DOOM, 0}, {}, {}, {}
 
 ; 6: maduin -- "the Trinity".  Terra's inheritance: the pure mage job.  ALL
@@ -600,15 +607,17 @@ newly-instantiated items:
 1. **Maduin's *Trinity*** ("first spell each battle +1 tier") — no passive
    channel, and no per-battle-first-cast hook exists anywhere. Dropped;
    the fold engine carries the tiering fantasy.
-2. **Shoat's *Gorgon Eye*** ("Break may chip 2") — no passive channel, and
-   Break could not chip regardless: chip requires a damaging hit (DESIGN.md,
-   Break system) and Break deals none. Dropped.
+2. **Shoat's *Gorgon Eye*** ("Break may chip 2") — no passive channel.
+   Re-expressed by #398: Break itself takes shields (Ot6BreakSpell, a
+   per-target hook outside the damage path, which power 0 never reaches),
+   one plus one per boost point, so the seed's chip is the spell, priced in
+   boost rather than rolled.
 3. **Carbunkl's *Facet*** ("Runic feeds +1 more BP") — no passive channel,
    and its beneficiary is absent for the whole stretch. Dropped.
 4. **BP-buys-certainty for hit-rolled magic.** DESIGN.md's chance-verb canon
-   is implemented only for Steal (command-specific). Break, Doom and Vanish,
-   which are Shoat's and Phantom's whole lists, sit outside both boost axes,
-   and the UI accepts a 3-BP spend that does nothing.
+   is implemented only for Steal (command-specific). Doom and Vanish sit
+   outside both boost axes, and the UI accepts a 3-BP spend that does
+   nothing (Break left this list with #398: its boost buys shields).
 5. **A water spell in a kit** (Bismark's *Tidal*). Structural: no
    water-element record exists in the player-magic range (`magic_prop_en.dat`
    `$00-$35` scanned, +0x01 bit `$80`: none), and the grant channel cannot

@@ -84657,9 +84657,9 @@ _cc3692:
 _cc3696:
         dlg $026F
                 ; “Runic”
-                ; Turns many magic attacks into MP, and earns a Boost Point! Can be used repeatedly.
+                ; Turns magic attacks into MP and a Boost Point. At 3 points, sends them back.
                 ; “Morph”
-                ; Increases Attack and Magic power. Duration increases with battles fought.
+                ; Raises Attack and Magic; needs 3 Boost Points. Grows with battles fought.
                 ; “Dance” and “Rage”
                 ; Once selected, will continue until the battle is over.
         return
@@ -84705,7 +84705,7 @@ _cc36b9:
                 ; Cyan’s SwdTech: there is no charge gauge. It lists his three best skills, for 1, 2 and 3 Boost Points.
                 ; Steal, Slot and Rage: each Boost Point improves the odds instead of adding damage.
                 ; With 3 points, Steal always works and gets the rare item, if any, and Rage always uses its special.
-                ; Shadow: once a battle, his hit that breaks a monster, or hits a broken one, kills it. Most bosses just stay broken.
+                ; Shadow: with 3 points, his hit that breaks a monster, or hits a broken one, kills it. Most bosses just stay broken.
         return
 _cc36bd:
         switch $02A0=1

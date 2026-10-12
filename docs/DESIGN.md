@@ -29,7 +29,7 @@ touches vanilla behavior where a pillar requires it.
 
 | Character | Job read | Weapon class | Element lean | 8-skill kit |
 |---|---|---|---|---|
-| Terra | Mage | Sword | Fire | 8 spells; divine: Ultima |
+| Terra | Mage | Sword | Fire | 8 spells; divine: Trance (Morph at a full boost); Ultima is Fire's fourth fold |
 | Locke | Thief | Dagger | Wind | Steal grows into a full thief kit: Steal, Mug, armor/attack corrode |
 | Edgar | Machinist | Spear | Lightning | the 8 Tools, verbatim |
 | Sabin | Monk | Claw | Fire/Holy | the 8 Blitzes, selected from a menu |
@@ -39,7 +39,7 @@ touches vanilla behavior where a pillar requires it.
 | Setzer | Gambler/Merchant | Cards & dice | — | Slot from the start (signature), with Coin Toss and Hired Help (paid in gil) behind it; divine: Jackpot, a Fixed-Dice triple, never Slot itself (kits.md) |
 | Strago | Scholar | Rod | Fire/Ice/Lightning | 8 Lores, Aqua Breath as the free signature; **Analyze** (reveals shields and weaknesses) cheap at #2 -- planned, not in the game |
 | Relm | Painter | Brush | — | Sketch stays as signature |
-| Shadow | Assassin | Dagger (thrown) | Dark | Throw (signature); divine: Assassinate, once a battle: the hit of his that breaks an enemy kills it outright, as does a hit on one already Broken; a boss is only Broken |
+| Shadow | Assassin | Dagger (thrown) | Dark | Throw (signature); divine: Assassinate, at a full 3-BP boost (kits.md "Divines"): the hit of his that breaks an enemy kills it outright, as does a hit on one already Broken; a boss is only Broken |
 | Mog | Dancer | Spear | varies by dance | the 8 Dances, verbatim |
 | Umaro / Gogo | Berserker / Mime | — | — | bonus characters; Gogo has access to every job and masters none |
 
@@ -195,7 +195,7 @@ vanilla, is deleted. The 8 techniques are priced in BP:
 | 5 | Empowerer | 2 |
 | 6 | Stunner | 3 |
 | 7 | Quadra Slice | 3 |
-| 8 | Cleave | 3, usable only on a Broken enemy (divine) |
+| 8 | Cleave | 3 (divine: a full boost is its one gate) |
 
 Boost *selects* the tech, the way it folds a mage's spell tier, and
 vanilla's own count of techs known clamps the range to the best one Cyan has
@@ -216,11 +216,13 @@ greying by `Ot6BushidoRowGrey` (`ot6_cmdmenu.asm`) and a field-configurable load
 `$1e1d`. Boost selects the tech when the loadout is on AUTO; the submenu is
 an additional surface, not a replacement.
 
-Cleave is in the ladder and divine-gated: `Ot6BushidoOblivion`
-(`ot6_bushido.asm`) places tech 7 at boost 3 and drops a *spent* divine
-back to Quadra Slice for the rest of the battle; the resolution-time Broken
-gate is `Ot6Oblivion` (`ot6_divine.asm`), hooked after `ChooseTarget` in
-`CalcAttackEffect`, because the target does not exist when the command is entered.
+Cleave is in the ladder as the divine: tech 7 is only ever the window's
+3-BP row (`Ot6CleaveSlot` keeps it out of the 1- and 2-BP loadout slots),
+a random SwdTech (Muddle, Charm, the Colosseum) stops short of it
+(`Ot6RandBushidoTop`), and its effect is decided in `Ot6Oblivion`
+(`ot6_divine.asm`), hooked after `ChooseTarget` in `CalcAttackEffect`,
+because the target does not exist when the command is entered: Death on a
+killable body, a power-255 cut on a death-immune one.
 Mapping, consequences, and the reasoning: design/kits.md.
 
 **Celes converts defense into economy.** Runic still swallows the next spell;
@@ -258,7 +260,8 @@ Equipping a magicite grants, only while equipped:
 - its passives, one of them a stat bump — a fixed, constant upgrade, never
   a per-level bonus — learned for keeps by carrying the esper long enough
   (the one deliberate exception to while-equipped: design/magicite.md),
-- its summon, once per battle, as the sub-job's divine skill.
+- its summon, vanilla's once-per-battle summon (not a kit divine: the kit
+  divines' one gate is a full 3-BP boost, design/kits.md).
 
 Vanilla esper records already store a spell list with learn rates; we reuse
 the list and ignore the rates. Uniqueness needs no code: there is one of each

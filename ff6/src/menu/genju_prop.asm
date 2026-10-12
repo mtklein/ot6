@@ -110,9 +110,9 @@ make_genju_prop {QUAKE, 0}, {QUARTR, 0}, {}, {}, {}
 
 ; 5: shoat.  Break + Doom.  BIO is dropped: it is the pre-folded cap of the
 ;   poison family (Ot6FoldTbl row 3, ot6_boost.asm:344, a 26 MP dead tier
-;   beside a 3 MP fold).  Both spells are power-0 hit-rolled death-class,
-;   outside both boost axes: no damage to multiply, no fold row, and no
-;   chance-verb certainty mechanism exists for magic.
+;   beside a 3 MP fold).  Break takes shields since #398, its boost buying
+;   one more a point (ot6_breakspell.asm); Doom is power-0 hit-rolled
+;   death-class, outside both boost axes.
 make_genju_prop {BREAK, 0}, {DOOM, 0}, {}, {}, {}
 
 ; 6: maduin.  All three grants are base tiers of fold families (Ot6FoldTbl

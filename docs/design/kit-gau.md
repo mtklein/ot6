@@ -587,6 +587,7 @@ the turn count, or it asserts nothing.
    possession, priced into §6's "3 BP is a full-bank decision".
 9. **Gau's divine.** The 8 slots are all rages; the kit-slot-8-divine
    convention every other kit follows has no home here yet, and `kits.md`'s
-   open question (a capstone beast vs an upgraded slot) stays open. Recorded
-   here so the omission is a decision rather than an oversight.
+   open question (a capstone beast vs an upgraded slot) stays open. Whatever
+   it becomes, its one gate is a full 3-BP boost (kits.md "Divines").
+   Recorded here so the omission is a decision rather than an oversight.
 
