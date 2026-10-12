@@ -191,12 +191,13 @@ first stone the World of Ruin offers once the Falcon flies; on the route the
 party then is Celes, Sabin, Edgar and Setzer. Raiden is `take_genju ODIN` followed by
 `give_genju RAIDEN` (`:81362`, `:81364`): the player trades Odin in rather
 than holding both. The "Locked!" gate beside Ragnarok's script (`if_switch
-$01A1=0`, `:78246` on) follows `set_case PARTY_CHARS`, so `$01A1` is LOCKE
-in the party (`EVENT_CASE`, `event_cmd.inc`). Those lines belong to the
-lock objects on Narshe's map 32 (`$06C0-$06C7`, `npc_prop.asm:1798` on);
-the old man who gives the stone (`_cc0b1e`) stands on map 36, which map 32
-enters at (15,56) and (22,44), away from the locks. Whether a lock stands
-on the way was not walked. Terrato's event is followed by
+$01A1=0`, `:78247` on) follows `set_case PARTY_CHARS`, so `$01A1` is LOCKE
+in the party (`EventCmd_de`, `field/event.asm:4313`). Those lines belong to
+the lock objects on Narshe's map 32 (`$06C0-$06C7`, `npc_prop.asm:1798` on).
+The old man who gives the stone (`_cc0b1e`) stands in the weapon shop's
+back room, map 24 (43,50) (`npc_prop.asm:1529`), whose only World of Ruin
+door is map 32 (32,30), with a lock on the tile below it: Ragnarok needs
+LOCKE (route-wor-narshe.md, finding 1). Terrato's event is followed by
 `battle 117` before the grant: event group 117 is formation 444, Umaro
 (`$110`, L33, 17,200 HP; `build/attempts/wt/v027-wor-plan/bosses.txt`).
 
@@ -213,7 +214,7 @@ that table's, and so are the stat packages (built, #418).
 | v0.27 Terra | Fenrir | Mobliz: Phunbaba drops it when first driven off, before Terra rejoins (`event_main.asm:87832`) | Terra, later in the arc |
 | v0.29 Narshe | Terrato | Umaro's cave, after Umaro (event group 117) | Mog, Umaro |
 | v0.29 Narshe | Tritoch | the Narshe cliffs, after Tritoch (event group 119: `$144`, L62, 30,000 HP) | |
-| v0.29 Narshe | Ragnarok | Narshe's map 36; moves to v0.32 if a lock (LOCKE in the party) stands on the way | |
+| v0.32 Locke | Ragnarok | Narshe's weapon shop (map 24), behind LOCKE's lock (route-wor-narshe.md) | Locke |
 | v0.30 Jidoor & Thamasa | Starlet | Owzer's house, after Chadarnook | Relm |
 | v0.30 Jidoor & Thamasa | Golem, ZoneSeek | Jidoor's auction, 20,000 and 10,000 (`event_main.asm:49702`, `:49987`); the route left both in the WoB (route-wor-falcon.md 4.2 lists its thirteen) | |
 | v0.32 Locke | Phoenix | the Phoenix Cave | Locke |
@@ -229,9 +230,9 @@ What the arcs need from them (`level-curve.md`, "The World of Ruin"):
   @5354), and MagiMaster and the Holy Dragon are inside it.  The party's
   damage there is the stones' and natural magic's lists, boosted.  By then
   the route holds the thirteen it carried to the Falcon, Palidor, Fenrir,
-  Terrato, Tritoch, probably Ragnarok, and Starlet, Golem and ZoneSeek from
-  the same arc: Fire, Ice, Bolt, Poison and Quake for damage, Ultima if
-  Ragnarok came at v0.29.
+  Terrato, Tritoch, and Starlet, Golem and ZoneSeek from the same arc:
+  Fire, Ice, Bolt, Poison and Quake for damage. Ragnarok's Ultima comes
+  with LOCKE at v0.32.
 - **MagiMaster's death counter is Ultima**, and the answer is Life
   boosted to Life 3 (Terra's natural Life, Sraphim's), pre-cast, with
   Shell (Shiva, Carbunkl, ZoneSeek; Alexandr's at v0.35) besides.
