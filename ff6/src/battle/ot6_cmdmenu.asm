@@ -743,9 +743,14 @@
         beq     @put                ; row 0 has no row above it
         cmp     $3fff,x             ; the row above's id (wItemList::Index - 6)
         bne     @put
-        lda     #$ff                ; a duplicate of the row above (Cleave
-                                    ;   known beside one tech of the run): the
-                                    ;   cell stays blank and unselectable
+        pha
+        jsl     Ot6LoadoutIsAuto    ; carry set = AUTO (a manual loadout may
+        pla                         ;   repeat a tech on purpose: it stands)
+        bcc     @put
+        lda     #$ff                ; the auto window's duplicate of the row
+                                    ;   above (Cleave known beside one tech of
+                                    ;   the run): the cell stays blank and
+                                    ;   unselectable
 @put:   sta     $4005,x             ; wItemList::Index at row r's left cell
         lda     $01,s               ; advance offset += 6 (one row)
         clc
