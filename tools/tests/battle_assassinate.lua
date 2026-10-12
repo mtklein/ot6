@@ -80,10 +80,11 @@
 --      ~200), so it claimed a check it did not make.  It is required now.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/camp_escaped.mss.lua"
--- Lever, for evidence only (the suite runs BURN 0): run from that many
--- encounters on the paced stretch before battle 1, to vary the encounter
--- history (TESTING.md: the draw moves with encounters used up, not seeds).
-local BURN = 0
+-- Lever, for evidence only (the suite runs BURN 0; a lab sets the global
+-- ASSASSINATE_BURN ahead of the file): run from that many encounters on the
+-- paced stretch before battle 1, to vary the encounter history (TESTING.md:
+-- the draw moves with encounters used up, not seeds).
+local BURN = type(ASSASSINATE_BURN) == "number" and ASSASSINATE_BURN or 0
 -- The walk paces one pool's stretch of the boot row (H.newPacer, #306): the
 -- clock pattern this file used (down, down, left, left, up, up, right,
 -- right, 25 frames each) left the pool its budget was decoded from -- main
