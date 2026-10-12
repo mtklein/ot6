@@ -426,8 +426,8 @@ end
 -- 4950 HP, 4750 of it in Potions over the reserve = 19, so arriving at
 -- level A needs ceil(1.5A) + 19 Potions.  Stocked at level L with
 -- ahead = 2 and the spend 25 the counter buys ceil(1.5(L+2)) + 19 + 25 --
--- 97 at L33, 98 at L34, and past the 99 stack (careStockPotions raises)
--- from L35 -- and arrives with ceil(1.5(L+2)) + 19, the band at L+2: one
+-- 97 at L33, 98 at L34, and the stack's 99 from L35 (careStockPotions
+-- caps there, #419) -- and arrives with ceil(1.5(L+2)) + 19, the band at L+2: one
 -- level of margin over the arc's measured gain.
 local FIELD_CARE_POTIONS, CARE_AHEAD, TOMB_CURES = 25, 2, 10
 -- Fenix Downs: about the level, capped near 20 (guidelines "Supply band")
