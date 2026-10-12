@@ -33,11 +33,14 @@
 
 .segment "ot6_code"
 
-; the counter's speed per boost, 0..2 BP: 65536 / speed battle ticks each
-; (a tick is two frames of running battle time).  Measured on TERRA L26 in
-; the Floating Continent's battles (kits.md, Terra): see there.
+; the counter's speed per boost, 0..2 BP: floor(65535 / speed) + 1 battle
+; ticks each, 596, 800 and 993 (a tick is two frames of running battle
+; time).  Set by measurement (kits.md, Terra): TERRA L26 acts about every
+; 260 ticks, so 0 BP holds two of her turns after the one it cost, and an
+; AtmaWeapon fight runs 2,100-3,200 ticks, so 2 BP is a third to a half of
+; it.
 OT6_MORPH_SPEED:
-        .byte   164, 82, 41
+        .byte   110, 82, 66
 
 ; [ Cmd_03's head: keep the boost this Morph was bought with ]
 ; jsl from Cmd_03, a8/i8, db = $7e, y = the attacker.  clobbers A; preserves

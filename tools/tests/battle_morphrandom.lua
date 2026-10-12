@@ -18,7 +18,9 @@
 --          speed and lasts SPAN0 ticks;
 --   stale  the same, with her pending boost held at 3 (and her bank at 5)
 --          whenever she is not morphed: the engine's Morph still takes the
---          0-BP span, never the battle, and the bank pays nothing for it.
+--          0-BP span, never the battle, and the bank pays nothing for it
+--          (the stage stands off from her Morph's execution to its clock's
+--          end, so what the engine did with the pending byte stands).
 -- Declared unit-test expedients (tools/state_write_waivers.txt), because no
 -- generated battle Muddles TERRA after Zozo: Muddle ($3EE5 bit 5) set on her
 -- again whenever it clears, the party's HP put back to max under three quarters and
@@ -29,10 +31,11 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/fc_alcove.mss.lua"
 
 local TERRA, MORPH = 0x00, 0x03
-local SPAN0, PICKS = 400, 2
+local SPAN0, PICKS = 596, 2
 local BANK, PEND = 0x3E9C, 0x3E9D
 
 local seat, arm = nil, nil
+local hold = false        -- a Morph of hers executing or running: the stale stage stands off
 local picks = {}          -- { f, unctl, pend, bank0, bank1 (after its ActionEnd), m0, t0, speed, t1 }
 local function e() return seat * 2 end
 local function ticks() return H.readByte(0x3A3E) | (H.readByte(0x3A3F) << 8) end
@@ -45,6 +48,7 @@ local function hooks()
     if arm == nil or seat == nil or (emu.getState()["cpu.y"] & 0xff) ~= e() then return end
     local p = { f = H.frame, unctl = H.readByte(0xED97), pend = H.readByte(PEND + e()), bank0 = H.readByte(BANK + e()) }
     picks[#picks + 1] = p
+    hold = true
     H.log(string.format("[mrand] f%d %s: TERRA's Morph executes (OT6_UNCTL %02X, pending %d, bank %d)", H.frame,
       arm, p.unctl, p.pend, p.bank0))
   end, emu.callbackType.exec, take, take)
@@ -66,6 +70,7 @@ local function hooks()
     end
     if lastC and not c and p ~= nil and p.t0 ~= nil and p.t1 == nil then
       p.t1 = ticks()
+      hold = false
       H.log(string.format("[mrand] f%d the clock ran out after %d ticks", H.frame, p.t1 - p.t0))
     end
     lastC = c
@@ -87,7 +92,7 @@ local function stage(stale)
       H.writeWord(0x3BFC + m * 2, 30000)
     end
   end
-  if stale and not morphed() then
+  if stale and not hold and not morphed() then
     H.writeByte(BANK + e(), 5)
     H.writeByte(PEND + e(), 3)
   end
@@ -106,6 +111,10 @@ local function playArm(name, stale)
         if p.m0 == nil and H.frame - p.f > 600 then
           H.assertEq(false, true, string.format("%s: TERRA's Morph at f%d morphed her within 600 frames", name, p.f))
         end
+        -- ...and her clock starts with it (an engine's Morph is never the battle-long one)
+        if p.m0 ~= nil and p.t0 == nil and H.frame - p.m0 > 600 then
+          H.assertEq(false, true, string.format("%s: TERRA's Morph at f%d is clocked within 600 frames", name, p.f))
+        end
       end
       return n >= PICKS or not H.battleLoadStarted()
     end, 120000, {
@@ -123,7 +132,7 @@ local function playArm(name, stale)
         if p.t1 ~= nil then
           n = n + 1
           H.assertEq(p.unctl & H.readByte(0x3018 + e()) ~= 0, true, string.format("%s: Morph %d was the engine's pick (OT6_UNCTL)", name, n))
-          H.assertEq(p.speed, 164, string.format("%s: Morph %d is clocked at the 0-BP speed", name, n))
+          H.assertEq(p.speed, 110, string.format("%s: Morph %d is clocked at the 0-BP speed", name, n))
           H.assertEq(p.t1 - p.t0, SPAN0, string.format("%s: Morph %d lasts the 0-BP span, in battle ticks", name, n))
           H.assertEq(p.bank1 ~= nil and p.bank1 >= p.bank0, true,
             string.format("%s: the bank paid nothing for Morph %d (%d -> %s)", name, n, p.bank0, tostring(p.bank1)))

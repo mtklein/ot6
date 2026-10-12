@@ -32,10 +32,10 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 local TERRA, MORPH = 0x00, 0x03
 local BATTLES = 8
--- the designed spans, in battle ticks: 65536 / speed for speeds 164, 82, 41
--- (a speed s runs $FFFF out in floor(65535 / s) + 1 subtractions)
-local SPAN = { [0] = 400, [1] = 800, [2] = 1599 }
-local HOLD = 1700
+-- the designed spans, in battle ticks, for speeds 110, 82, 66 (a speed s
+-- runs $FFFF out in floor(65535 / s) + 1 subtractions)
+local SPAN = { [0] = 596, [1] = 800, [2] = 993 }
+local HOLD = 1200
 
 local seat, battles = nil, 0
 local done = { [0] = false, [1] = false, [2] = false, [3] = false }
@@ -100,9 +100,11 @@ local ONE = { untilPlanDone = true, idle = "defend", others = "thin", maxFrames 
 
 -- the pick must land: TERRA morphs within PICK frames of the step's start
 -- (the bank filled by Defends and the menu walked: 80-380 frames on the
--- branch's runs), unless she falls first.  A ROM that refuses the Morph at
--- the command fails here, by name.
-local PICK = 4000
+-- branch's runs; three Defends from an empty bank, at her ~230 ticks a
+-- turn, are ~1,500), unless she falls first.  A ROM that refuses the Morph
+-- at the command fails here, by name (main's ROM at 4000 lost her first:
+-- build/attempts/wt/v029-kits/r3/old__battle_trance.out).
+local PICK = 2400
 local function alive() return seat ~= nil and (H.readByte(0x3EE4 + e()) & 0xC2) == 0 end
 local function watched(inner)
   return { tick = function(_)
