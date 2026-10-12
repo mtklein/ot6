@@ -15,10 +15,10 @@ and so does Break through Control, Sketch or a Rage.
 **Divines need all 3 Boost Points.** Each character's strongest skill is
 used by spending a full 3-point boost, and can be used again in the same
 battle. Cyan's Cleave is the 3-point SwdTech and no longer needs a Broken
-target; against a boss it is a heavy cut instead of instant death. Shadow's
-hit kills a monster it breaks, or one already broken, only on a 3-point
-action. Setzer's Jackpot needs 3 points, rolls the dice twice, and costs 99
-MP.
+target; against a boss it is a heavy cut instead of instant death. A
+confused Cyan no longer picks Cleave. Shadow's hit kills a monster it
+breaks, or one already broken, only on a 3-point action. Setzer's Jackpot
+needs 3 points, rolls the dice twice, and costs 99 MP.
 
 **Terra's Trance.** Morph needs 3 Boost Points. With fewer, the command
 buzzes and nothing is spent.
@@ -32,6 +32,6 @@ Boost Points also sends each spell it absorbs back at whoever cast it.
 **Edgar's Overclock.** After the Magitek factory, a Tool used with 3 Boost
 Points fires twice and costs twice as much (at most 99 MP).
 
-**Edgar's tools.** Debilitator now shows the weakness it adds. Flash is sold
-by Figaro's tool merchant and in South Figaro; Debilitator is sold in
-Vector during the banquet.
+**Edgar's tools.** Debilitator now shows the weakness it adds, on the
+monster it hit only. Flash is sold by Figaro's tool merchant and in South
+Figaro; Debilitator is sold in Vector's weapon shop after the banquet.

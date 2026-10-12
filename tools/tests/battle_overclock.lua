@@ -24,7 +24,8 @@
 -- after ChooseTarget with x = EDGAR, EDGAR's Ot6ActionEnd closes it):
 --   1. NoiseBlaster at 3 BP: two firings, 99 MP;
 --   2. again at 3 BP in the same battle: two firings, 99 MP.
--- Old-ROM red and mutants: build/attempts/wt/v027-kits/overclock/.
+-- Old-ROM red and mutants: build/attempts/wt/v027-kits/final-matrix/
+-- (<rom>__battle_overclock.out).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 

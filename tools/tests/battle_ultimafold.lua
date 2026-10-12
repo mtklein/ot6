@@ -24,7 +24,8 @@
 --      the unlock is World of Ruin story the route does not reach), then
 --      Fire at 3 BP: the list prices Fire at Ultima's 80, the cast is Ultima
 --      ($14) and costs 80, and Ot6BoostDmg writes no $11b0 for it.
--- Old-ROM red and mutants: build/attempts/wt/v027-kits/ultimafold/.
+-- Old-ROM red and mutants: build/attempts/wt/v027-kits/final-matrix/
+-- (<rom>__battle_ultimafold.out).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 

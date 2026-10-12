@@ -109,6 +109,28 @@ done:   plp
         rtl
 .endproc
 
+; [ a SwdTech picked at random: never Cleave ]
+;
+; RandBushido (battle_main.asm) picks a random known tech for a Muddled or
+; Charmed Cyan and at the Colosseum: vanilla's range is 0..$2020 (the
+; highest tech known).  Cleave (tech 7, attack $5c) is the divine, whose one
+; gate is a full 3-BP boost, and a random pick spends none, so the range
+; stops at tech 6 (Quadra Slice).  The Mimic exception (kits.md "Divines":
+; a Gogo's copy of a Cleave is free) is a copy, not a pick, and is untouched.
+; jsl in place of `lda $2020 / inc`.  a8, db = $7e.  out: A = the number of
+; techs the pick ranges over (RandA's bound).  rtl.
+OT6_CLEAVE_TECH = 7
+
+.proc Ot6RandBushidoTop
+        .a8
+        lda     $2020           ; the highest tech known (0-7)
+        cmp     #OT6_CLEAVE_TECH
+        bcc     :+
+        lda     #OT6_CLEAVE_TECH - 1    ; Cleave known: the pick stops below it
+:       inc     a
+        rtl
+.endproc
+
 ; [ the heavy cut's base damage: CalcMagicDmg's formula at the new power ]
 ;
 ; ExecAttack runs CalcDmg before CalcAttackEffect, so the base damage in

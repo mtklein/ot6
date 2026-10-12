@@ -920,8 +920,10 @@ RandBushido:
         ora     $3ba5,y
         bit     #$02
         beq     RandCmdInvalid
-        lda     $2020
-        inc
+        jsl     Ot6RandBushidoTop   ; ot6: the random pick stops short of
+                                ;   Cleave, the divine (ot6_divine.asm);
+                                ;   replaces `lda $2020 / inc`
+RandBushidoRange:               ; observation only: no emitted bytes
         jsr     RandA
         clc
         adc     #$55        ; dispatch (first swdtech)

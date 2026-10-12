@@ -151,3 +151,5 @@ tools/tests/battle_setzergrey.lua	.writeWord(	1	quarantine: #319 the purse set b
 tools/tests/battle_ultimafold.lua	.writeByte(	1	quarantine: #378 TERRA's World of Ruin return (switch $00BF) set mid-battle -- the route does not reach Mobliz; the fold before and after the unlock is the engine's own
 tools/tests/battle_breakmonster.lua	.writeByte(	3	quarantine: #398 a monster's queued action rewritten to Break at one party member -- the World of Ruin's Break casters are past the chain's end; the record, hit roll and status are the engine's own
 tools/tests/battle_breakmonster.lua	.writeWord(	1	quarantine: #398 that Break's target mask
+tools/tests/battle_cleaverandom.lua	.writeByte(	2	quarantine: Cleave staged learned ($1CF7) and Cyan Muddled on cue -- Cleave is learned at L70 and no generated battle Muddles him; the random pick and its range are the engine's own
+tools/tests/battle_cleaverandom.lua	.writeWord(	3	quarantine: the highest tech known ($2020), Cyan's MP and the soldiers' HP, so the battle lasts for the picks

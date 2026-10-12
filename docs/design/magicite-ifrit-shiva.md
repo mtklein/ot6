@@ -262,11 +262,11 @@ unblockable (+0x04 = `$20`, hit rate 0).
 
 ### 4.4 Divine tier: the summon does **not** replace the character's divine
 
-The summon and a kit divine are separate flags. The summon rides vanilla's
-`$3f2e`; kit divines ride OT6's `OT6_DIVINE_USED` at `$3ecb`
-(`ot6_memory.inc:42-44`, used by `Ot6Oblivion` / `Ot6Assassinate`,
-`ot6_kits.asm:264`, `:346`). They are different resources: the summon lives on
-a transferable stone and costs MP; the divine is a permanent property of the
+The summon and a kit divine are separate resources. The summon rides
+vanilla's once-per-battle flag `$3f2e`; a kit divine's one gate is a full
+3-BP boost (kits.md "Divines"; the once-a-battle flag `OT6_DIVINE_USED` the
+divines first carried is retired, v0.27). The summon lives on a
+transferable stone and costs MP; the divine is a permanent property of the
 character. Fusing them would mean handing Cyan a magicite disables Cleave.
 
 ---

@@ -12946,6 +12946,20 @@ function M.setzerBattle(plan, opts)
       -- target no walk reaches fails the battle with the reason, or with
       -- opts.aimRefusedOk backs out and skips the entry (p.aimRefused)
       if cool > 0 then pulse("a"); return end
+      -- p.takeBack = n: the row picked at its boost, then taken back to n
+      -- here, at target select (L lowers the pending boost), before the
+      -- confirm
+      if p.takeBack ~= nil and M.readByte(0x3E9D + a * 2) > p.takeBack then
+        p.lPresses = (p.lPresses or 0) + 1
+        M.assertEq(p.lPresses <= 8, true, "L at target select lowers the pending boost")
+        pulse("l")
+        return
+      end
+      if p.takeBack ~= nil and not p.tookBack then
+        p.tookBack = true
+        M.log(string.format("[setzer] f%d row $%02X taken back to %d BP at target select", M.frame,
+          type(p.row) == "number" and p.row or 0, M.readByte(0x3E9D + a * 2)))
+      end
       p.aim = p.aim or { g = M.newTargetGraph(), presses = 0 }
       local slot = p.slot
       local walkOk = opts.aimWalk
@@ -13020,6 +13034,8 @@ end
 --                      entry is done (recorded refusedSeen) and the list, if
 --                      any, is backed out of
 --     defend = true    a Defend, which banks a point
+--     takeBack = n     at target select, L until the pending boost is n,
+--                      then the confirm (a pick taken back; p.tookBack)
 --     peek = true      open the command's window (Magic or a Tools-shell
 --                      list), hand it to opts.onList, and back out }
 -- The bank is filled to the entry's boost by real Defends first, then R
@@ -13240,6 +13256,19 @@ function M.kitBattle(plan, opts)
           k, tostring(p.refused)))
       end
       if cool > 0 then pulse("a"); return end   -- (the pad rests; a confirm must be a real press)
+      -- p.takeBack = n: picked at its boost, then taken back to n here (L
+      -- lowers the pending boost at target select), before the confirm
+      if p.takeBack ~= nil and M.readByte(0x3E9D + a * 2) > p.takeBack then
+        p.lPresses = (p.lPresses or 0) + 1
+        M.assertEq(p.lPresses <= 8, true, "L at target select lowers the pending boost")
+        pulse("l")
+        return
+      end
+      if p.takeBack ~= nil and not p.tookBack then
+        p.tookBack = true
+        M.log(string.format("[kit] f%d entry %d taken back to %d BP at target select", M.frame, k,
+          M.readByte(0x3E9D + a * 2)))
+      end
       if p.self then
         if cool == 0 then done(p, a) end
         pulse("a")
@@ -13269,7 +13298,9 @@ function M.kitBattle(plan, opts)
         return
       end
       k, cool, aim = 1, 0, nil
-      for i = 1, #plan do local q = plan[i]; q.opened, q.seat, q.presses = nil, nil, nil end
+      for i = 1, #plan do
+        local q = plan[i]; q.opened, q.seat, q.presses, q.lPresses, q.tookBack = nil, nil, nil, nil, nil
+      end
       M.vars.kit = {}
       M.logRomIdentity("[kit]")
     end),

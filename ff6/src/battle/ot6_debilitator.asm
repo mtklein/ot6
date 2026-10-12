@@ -7,9 +7,12 @@
 ; the break system reads the weak byte live, so the added element is a chip
 ; trigger at once.  What it lacked was the reveal: the HUD drew the new
 ; weakness as '?' until an elemental hit on it chipped.  So the added bit is
-; banked as a pending reveal (OT6_RVPEND_ELEM), which Ot6RevealCommit lands
-; on the damage frame or at Ot6ActionEnd, the same path a chip's reveal
-; takes, and the HUD draws its element glyph.
+; set straight in this body's own revealed byte (OT6_REVEALED_ELEM), and the
+; HUD draws its element glyph.  Not through the pending reveal
+; (OT6_RVPEND_ELEM): Ot6RevealCommit copies a pending bit to every slot of
+; the same species, which is right for a weakness the species has and wrong
+; for this one -- a sibling would show the glyph, and its own weak-element
+; chip would write the false bit into the save's codex.
 ;
 ; It is recorded in OT6_DEBIL too, because the weakness belongs to this
 ; body for this battle, not to the species: Ot6Chip keeps those bits out of
@@ -30,8 +33,8 @@
         cmp     #$08
         bcc     @out            ; a character (a Debilitator on the party)
         lda     $01,s
-        ora     OT6_RVPEND_ELEM-8,y
-        sta     OT6_RVPEND_ELEM-8,y
+        ora     OT6_REVEALED_ELEM,y     ; this body only (not the species)
+        sta     OT6_REVEALED_ELEM,y
         lda     $01,s
         ora     OT6_DEBIL-8,y
         sta     OT6_DEBIL-8,y

@@ -27,7 +27,7 @@
 -- Recorded at every $3410 write (the spell an attack pass is using) with
 -- the command, the counter flag and the target mask, and the two MP pools
 -- around each cast.  Old-ROM red and mutants:
--- build/attempts/wt/v027-kits/runicblade/.
+-- build/attempts/wt/v027-kits/final-matrix/ (<rom>__battle_runicblade.out).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 

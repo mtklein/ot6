@@ -11,8 +11,9 @@
 ;     shields off its one target, ignoring class and element.  A Magic or
 ;     X-Magic cast takes 1 + the caster's pending boost (three points take
 ;     four, the ceiling Quadra Slice or Bum Rush x4 has); boost buys chips
-;     here, never a tier and never the damage multiplier (Break is a row of
-;     Ot6FoldTbl that folds to itself, so its MP stays 25 and Ot6BoostDmg
+;     here, never a tier and never the damage multiplier (Break is in no
+;     Ot6FoldTbl family, but Ot6InFoldTbl answers yes for it after the
+;     table scan, so the boost leaves its MP at 25 and Ot6BoostDmg
 ;     multiplies nothing).  The Break Blade's cast takes 1: the swing's
 ;     boost bought swings, not the spell it throws (owner ruling, v0.21).
 ;     It reveals nothing (Filch's rule: a shield taken is not a weakness

@@ -24,7 +24,9 @@
 -- 6), and every Break took no HP off its target.
 -- Old-ROM control (vanilla Break: passes) and reds: the branch's ROM before
 -- the gate, and a mutant that lets a monster's Break through the gate
--- (build/attempts/wt/v027-kits/).
+-- (build/attempts/wt/v027-kits/final-matrix/<rom>__battle_breakmonster.out; the
+-- branch's ROM before the gate: build/attempts/wt/v027-kits/mx8/
+-- mut2_real__battle_breakmonster.out).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 

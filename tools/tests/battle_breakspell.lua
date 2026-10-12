@@ -25,7 +25,8 @@
 -- Each cast aims at the unbroken body with the most shields and takes 1 +
 -- boost, or asserts the Break when the body held no more than that.
 --
--- Old-ROM red and mutants: build/attempts/wt/v027-kits/breakspell/.
+-- Old-ROM red and mutants: build/attempts/wt/v027-kits/final-matrix/
+-- (<rom>__battle_breakspell.out).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 

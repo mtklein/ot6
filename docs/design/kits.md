@@ -93,7 +93,7 @@ it (a Jackpot), and is free where it does not (a Cleave).
 | Edgar | Overclock | the Tool fires twice, at the boost's x8 each, priced as the two firings | yes (`ot6_overclock.asm`) |
 | Cyan | Cleave | the SwdTech window's 3-BP row: instant death on a killable target, a power-255 cut on a death-immune one | yes (`ot6_divine.asm`) |
 | Setzer | Jackpot | a throw of two triple rolls, 99 MP | yes (`ot6_setzer.asm`) |
-| Shadow | Assassinate | his 3-BP hit that breaks a non-boss, or lands on a Broken one, kills it | yes (`ot6_divine.asm`) |
+| Shadow | Assassinate | his 3-BP action: a hit of it that breaks a non-boss, or lands on a Broken one, kills it (the effect, not a gate) | yes (`ot6_divine.asm`) |
 | Sabin | Bum Rush | (built today as a 99-MP Blitz row at any boost; as a divine it will take the full boost) | no |
 | Locke | Master's Mark | steal from all enemies and reveal everything, at 3 BP | no |
 | Mog | Water Rondo | at 3 BP | no |
@@ -306,7 +306,9 @@ Three rulings, documented in `Ot6BushidoTier`'s header:
   so it needs no extra code.  A manual loadout may not put it on the 1- or
   2-BP row: `Ot6CleaveSlot` (one leaf for the battle read, the
   configurator's draw and its cycle) refuses it there, and a stored one
-  falls back to the auto window for that slot.  At resolution `Ot6Oblivion`
+  falls back to the auto window for that slot.  A random SwdTech (a
+  Muddled or Charmed Cyan, the Colosseum) spends no boost, so its pick
+  stops at Quadra Slice (`Ot6RandBushidoTop`).  At resolution `Ot6Oblivion`
   reads the target: a killable one takes a guaranteed Death (no Broken
   condition any more); a death-immune one (a boss) takes the heaviest
   single cut a record can carry, power 255 with its damage recomputed
@@ -875,12 +877,14 @@ route-wor-falcon.md 13.10).
 ## Sketches (join order, WoB)
 
 - **Shadow — Assassin (piercing, thrown)**: Throw ✦ signature; smoke
-  and exit tricks; divine **Assassinate** (built): a hit of his on an
-  action boosted with all three points that breaks an enemy kills it
+  and exit tricks; divine **Assassinate** (built).  Its one gate is the
+  rule's: an action of his boosted with all three points (no once-a-battle
+  limit; a counterattack, Interceptor's, is no action of his and carries no
+  divine).  Its effect: a hit of that action that breaks an enemy kills it
   outright on that hit -- break it and it dies -- and so does such a hit on
-  an enemy someone else already Broke.  No once-a-battle limit (the rule,
-  "Divines"); a counterattack (Interceptor's) is no action of his and
-  carries no divine.  A boss is only Broken (owner ruling, #239).
+  an enemy someone else already Broke; a hit that breaks nothing is a hit.
+  The break is what the divine does, not a condition on using it.  A boss
+  is only Broken (owner ruling, #239).
   *Reason it is worth three points: a kill of any non-boss the party can
   break, every fourth turn.*  `battle_assassinate`.  Interceptor is a
   passive.

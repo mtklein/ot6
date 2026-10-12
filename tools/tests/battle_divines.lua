@@ -40,8 +40,9 @@
 --     write) and landing (the commander's HP falls at each).
 -- A kill is checked against the mechanism with pc-gated write watches
 -- (Death marks and the power write from inside Ot6Oblivion), so a cut that
--- damage-kills cannot be mistaken for the divine.  Old-ROM red and mutants:
--- build/attempts/wt/v027-kits/divines/.
+-- damage-kills cannot be mistaken for the divine.  Old-ROM red (main's ROM
+-- on main's fixtures): build/attempts/wt/v027-kits/mx1/; mutants:
+-- build/attempts/wt/v027-kits/final-matrix/ (<rom>__battle_divines.out).
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/cyan_defence.mss.lua"
 
