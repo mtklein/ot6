@@ -6710,6 +6710,16 @@ local function status1Has(e, bit)
   return (M.readByte(BATTLE.ST1 + e * 2) & bit) ~= 0
 end
 
+-- Whether party entity e is held by a monster's Seize (the Tentacles):
+-- TargetEffect_2e clears its bit in $3403 and _c25917 masks every
+-- targeting with $3403, so no heal, item or Fenix Down reaches a held
+-- member, alive or dead, until the holder's Discard or death
+-- (battle_main.asm @3cce, @5917; #425).
+function M.seized(e)
+  return e >= 0 and e <= 3 and ((M.readByte(0x3403) >> e) & 1) == 0
+end
+local seized = M.seized
+
 -- Whether the Doom takes entity e before it can act again
 -- (M.doomRule), and the count over it (M.doomCount; nil when not
 -- condemned): for the member acting now, its next turn is a full
@@ -10008,7 +10018,8 @@ function Driver:makePlanRules(actor)
     for e = 0, 3 do
       local hp, maxhp, cost = hpNow[e], maxOf(e), price[e] or 0
       if hp > 0 and maxhp > 0 and hp < maxhp and cost > 0 and hp <= cost
-         and not M.inFlightHolds(self.healQueued[e], hp, cost) and not status1Has(e, M.ST1_ZOMBIE) then
+         and not M.inFlightHolds(self.healQueued[e], hp, cost) and not status1Has(e, M.ST1_ZOMBIE)
+         and not seized(e) then
         local restores, what = {}, {}
         if row ~= nil then
           for _, it in ipairs(self:bagHeals(e, hp)) do
@@ -10376,7 +10387,7 @@ function Driver:makePlanRules(actor)
       local chips = best and best.chips or 0
       local window = 0
       for e = 0, 3 do
-        if hpNow[e] > 0 and self.dmgSeen[e] then window = window + self.dmgSeen[e] * 4 end
+        if hpNow[e] > 0 and self.dmgSeen[e] and not seized(e) then window = window + self.dmgSeen[e] * 4 end
       end
       if need == 0 or chips > 0 then
         local toBreak = need == 0 and 0 or math.ceil(need / chips)
@@ -10403,7 +10414,7 @@ function Driver:makePlanRules(actor)
     for e = 0, 3 do
       local hp, maxhp = hpNow[e], maxOf(e)
       local cost = price[e] or 0
-      if hp > 0 and maxhp > 0 and hp < maxhp and (cost > 0 or (priceRate[e] or 0) > 0) then
+      if hp > 0 and maxhp > 0 and hp < maxhp and (cost > 0 or (priceRate[e] or 0) > 0) and not seized(e) then
         if cost > 0 and hp <= cost then
           return string.format("entity %d (%d/%d) is inside one round of death "
             .. "(%d)", e, hp, maxhp, cost)
@@ -10466,7 +10477,9 @@ function Driver:makePlanRules(actor)
       local threshold = self:healPct()
       for e = 0, 3 do
         local hp, maxhp = hpNow[e], maxOf(e)
-        if maxhp > 0 and hp == 0 and row ~= nil and self:battInvIdx(BATTLE.FENIX_DOWN)
+        if seized(e) then
+          -- held: nothing the party does reaches it (#425)
+        elseif maxhp > 0 and hp == 0 and row ~= nil and self:battInvIdx(BATTLE.FENIX_DOWN)
            and self:raiseOk(e, actor) then
           needsCare = true
         elseif hp > 0 and maxhp > 0 and hp < maxhp and not status1Has(e, M.ST1_ZOMBIE)
@@ -10484,7 +10497,7 @@ function Driver:makePlanRules(actor)
       local lethal = nil
       for e = 0, 3 do
         local hp, maxhp = hpNow[e], maxOf(e)
-        if hp > 0 and hp < maxhp and hp <= (price[e] or 0) then
+        if hp > 0 and hp < maxhp and hp <= (price[e] or 0) and not seized(e) then
           lethal = e
           break
         end
@@ -10606,7 +10619,12 @@ function Driver:makePlanRules(actor)
     if row ~= nil then
       for e = 0, 3 do
         local queued = self.raiseQueued[e]
-        if queued and queued.by ~= actor then
+        if maxOf(e) > 0 and hpNow[e] == 0 and seized(e) then
+          local said = string.format("[%s] actor=%d no raise on entity %d: it is SEIZED "
+            .. "(held, $3403), and no Fenix Down reaches a held member until its holder "
+            .. "Discards it or dies (#425)", self.tag or "fight", actor, e)
+          if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+        elseif queued and queued.by ~= actor then
           local said = string.format("[%s] actor=%d no raise on entity %d: actor %d's "
             .. "Fenix Down on them is confirmed (tick %d) and has not landed", self.tag or "fight",
             actor, e, queued.by, queued.tick)
@@ -10699,6 +10717,11 @@ function Driver:makePlanRules(actor)
         local said = string.format("[%s] actor=%d no heal on entity %d (%d/%d): actor %d's %s "
           .. "on it is confirmed (tick %d) and has not landed", self.tag or "fight", actor, e, hp, maxhp,
           inFlight.by, inFlight.what, inFlight.tick)
+        if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+      elseif hp < maxhp and seized(e) then
+        local said = string.format("[%s] actor=%d no heal on entity %d (%d/%d): it is SEIZED "
+          .. "(held, $3403), and no heal reaches a held member until its holder Discards it "
+          .. "or dies (#425)", self.tag or "fight", actor, e, hp, maxhp)
         if said ~= self.healSaid then self.healSaid = said; M.log(said) end
       elseif liftOnly and not liftSet[e] then
         -- (the budget reopened for a lift: a member it did not reopen for
@@ -14786,7 +14809,7 @@ function Driver:sayOutcome()
   M.lastOutcome = rec
   M.outcomes[#M.outcomes + 1] = rec
   M.log(string.format("[%s] [outcome] battle $%03X %s after %d ticks%s: killed %s; escaped %s; "
-    .. "%d of %d seated left; %s reward due %d a member (%s): %s%s", self.tag or "fight",
+    .. "%d of %d seated fled (Run, Warp); %s reward due %d a member (%s): %s%s", self.tag or "fight",
     r.form & 0x1FF, o.kind:upper(), self.battleTick, atEnd and "" or " (no end reading: the last frame's)",
     slots(o.kills), slots(o.escaped), o.leftN,
     o.seatedN, r.random and "random" or "event", o.due, table.concat(paid, ", "),
@@ -14944,6 +14967,19 @@ function Driver:watchStatuses()
               and (M.readWord(0x3BF4 + e * 2) == 0 and "; the Doom landed"
                    or "; the count did not run out") or ""))
           end
+        end
+        -- the Seize (#425): held from the frame $3403 drops its bit until
+        -- the holder's Discard or death sets it again
+        local held = seized(e)
+        local hkey = e .. ":Seized"
+        if held ~= (self.statusSaid[hkey] == "on") then
+          self.statusSaid[hkey] = held and "on" or "off"
+          local by = M.readByte(0x3359 + e * 2)
+          M.log(string.format("[%s] [status] f+%d entity %d %s ($3403=%02X%s, HP %d)",
+            self.tag or "fight", self.battleTick, e,
+            held and "is SEIZED: it cannot act and no heal, item or raise reaches it" or "is RELEASED",
+            M.readByte(0x3403), held and by >= 8 and by < 0x14 and string.format(", by slot %d", (by - 8) // 2) or "",
+            M.readWord(0x3BF4 + e * 2)))
         end
       end
     end
