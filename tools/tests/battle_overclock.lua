@@ -12,22 +12,23 @@
 -- Played: Continue fc-alcove-v1 (EDGAR L27 with his bag's Tools, the
 -- factory long behind him), walk onto the continent into a random battle,
 -- and play EDGAR through the real menu (H.kitBattle); everyone else
--- Defends.  Nothing is written.  The Tool is Debilitator ($A7, 10 MP, one
--- body, no damage), so the battle stands for both uses (an AutoCrossbow at
--- x8 twice fells this map's smaller draws first): 3 BP = 99 (156, capped),
--- overclocked 99 (2 x 99, capped).  EDGAR's pool here (201) pays two
+-- Defends.  Nothing is written.  The Tool is NoiseBlaster ($A3, 6 MP,
+-- every body, no damage), so the battle stands for both uses (an
+-- AutoCrossbow at x8 twice fells this map's smaller draws first), and its
+-- 3-BP price sits under the cap where the doubling shows: 3 BP = 94,
+-- overclocked 99 (2 x 94, capped).  EDGAR's pool here (201) pays two
 -- overclocks and little more, so the one-firing control
 -- is the old ROM's run of this suite and the mutant without the passes arm
 -- (below), where the same 3-BP use fires once.  Asserted per use (the use
 -- opens at its Ot6ItemClass load, every pass of it calls Ot6PassTargeted
 -- after ChooseTarget with x = EDGAR, EDGAR's Ot6ActionEnd closes it):
---   1. Debilitator at 3 BP: two firings, 99 MP;
+--   1. NoiseBlaster at 3 BP: two firings, 99 MP;
 --   2. again at 3 BP in the same battle: two firings, 99 MP.
 -- Old-ROM red and mutants: build/attempts/wt/v027-kits/overclock/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local EDGAR, CMD_TOOLS, TOOL = 0x04, 0x09, 0xA7   -- Debilitator: no damage, so the battle stands
+local EDGAR, CMD_TOOLS, TOOL = 0x04, 0x09, 0xA3   -- NoiseBlaster: no damage, so the battle stands
 
 local seat, recs, rec = nil, {}, nil
 local function mp() return H.readWord(0x3C08 + seat * 2) end
@@ -59,7 +60,7 @@ local function close()
   if rec == nil or not rec.ended or H.frame <= rec.ended + 1 then return false end
   rec.mp1 = mp()
   recs[#recs + 1] = rec
-  H.log(string.format("[overclock] use %d: Debilitator at %d BP (f%d): %d firing(s), MP %d -> %d", #recs,
+  H.log(string.format("[overclock] use %d: NoiseBlaster at %d BP (f%d): %d firing(s), MP %d -> %d", #recs,
     rec.pend, rec.f, rec.passes, rec.mp0, rec.mp1))
   rec = nil
   return true

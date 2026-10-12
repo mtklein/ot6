@@ -149,9 +149,9 @@ add({ H.waitFrames(120), live(function()
 end) })
 -- 2. the divine: Runic at 3 BP absorbs and sends the Bolt back at EDGAR
 add(step(2, { { who = CELES, cmd = RUNIC, boost = 3, self = true }, { who = EDGAR, cmd = CMD_MAGIC, spell = BOLT } },
-  function() return bounces(mark[2].casts + 1) >= 1 end))
-add({ H.waitFrames(60), live(function()
-  if bounces(mark[2].casts + 1) == 0 then return end
+  function() return ownBolt(mark[2].casts + 1) ~= nil and H.readByte(0x7BCA) ~= 0 end))
+add({ H.waitFrames(120), live(function()
+  if ownBolt(mark[2].casts + 1) == nil then return end
   H.assertEq(absorbs > mark[2].absorbs, true, "2. CELES absorbed EDGAR's Bolt")
   H.assertEq(bounces(mark[2].casts + 1), 1, "2. the 3-BP Runic (RunicBlade) sent EDGAR's Bolt back at him, as "
     .. "CELES's counter")
@@ -160,9 +160,9 @@ add({ H.waitFrames(60), live(function()
 end) })
 -- 3. again, inside the same stance
 add(step(3, { { who = EDGAR, cmd = CMD_MAGIC, spell = BOLT } },
-  function() return bounces(mark[3].casts + 1) >= 1 end))
-add({ H.waitFrames(60), live(function()
-  if bounces(mark[3].casts + 1) == 0 then return end
+  function() return ownBolt(mark[3].casts + 1) ~= nil and H.readByte(0x7BCA) ~= 0 end))
+add({ H.waitFrames(120), live(function()
+  if ownBolt(mark[3].casts + 1) == nil then return end
   H.assertEq(absorbs > mark[3].absorbs, true, "3. CELES absorbed the second Bolt")
   H.assertEq(bounces(mark[3].casts + 1), 1, "3. a second Bolt inside the stance went back too")
   landed(mark[3].casts + 1)

@@ -31,10 +31,15 @@ local BATTLES = 6
 
 local seat = nil
 local morphs, refused, done, battles = 0, false, false, 0
+local ends = {}   -- TERRA's Ot6ActionEnd frames: an action of hers has resolved
 local function e() return seat * 2 end
 local function morphed() return seat ~= nil and (H.readByte(0x3EF9 + e()) & 0x08) ~= 0 end
 
 local function arm()
+  local ae = H.sym("Ot6ActionEnd")
+  emu.addMemoryCallback(function()
+    if seat ~= nil and (emu.getState()["cpu.x"] & 0xff) == seat * 2 then ends[#ends + 1] = H.frame end
+  end, emu.callbackType.exec, ae, ae)
   -- each morph: $3EF9 bit 3 going up for TERRA's seat
   local last = false
   emu.addMemoryCallback(function()
@@ -77,9 +82,15 @@ H.run({ maxFrames = 600000 }, {
       H.assertEq(refused, true, "Morph at 0 BP was refused at the command")
       H.assertEq(morphed(), false, "and TERRA did not morph")
     end),
+    H.call(function() ends.mark = #ends end),
     H.kitBattle({ { who = TERRA, cmd = MORPH, boost = 3, self = true } },
       { untilPlanDone = true, idle = "defend", others = "thin", maxFrames = 60000,
-        planDone = function() return morphs >= 1 and H.readByte(0x3E9D + e()) == 0 end }),
+        -- her Morph has resolved (her Ot6ActionEnd after the pick), whatever it did
+        planDone = function() return #ends > ends.mark and H.frame > ends[#ends] + 30 end }),
+    H.call(function()
+      if not inBattle() then return end
+      H.assertEq(morphs, 1, "Morph at 3 BP: TERRA morphed")
+    end),
     H.kitBattle({ { who = TERRA, cmd = REVERT, boost = 0, self = true },
       { who = TERRA, cmd = MORPH, boost = 3, self = true } },
       { untilPlanDone = true, idle = "defend", others = "thin", maxFrames = 90000,
