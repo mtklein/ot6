@@ -13176,7 +13176,7 @@ function M.kitBattle(plan, opts)
     else M.setPad({}) end
   end
   return M.seqStep({
-    M.call(function() M.vars.kit = {}; M.logRomIdentity("[kit]") end),
+    M.call(function() k, cool, aim = 1, 0, nil; M.vars.kit = {}; M.logRomIdentity("[kit]") end),
     M.waitUntil(function() return M.battleActive() end, 1200, "the battle is up", 2),
     M.driveUntil(function()
       if opts.untilPlanDone and k > #plan and (opts.planDone == nil or opts.planDone()) then return true end
