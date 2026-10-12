@@ -191,6 +191,7 @@ end
 
 -- boarding: on foot on the parked airship's tile, A boards (world/move.asm
 -- @204e: $08 bit 7, ($E0,$E2) == ($1F62,$1F63))
+local boardBattles = 0
 local function board()
   local n, ph = 0, 0
   -- a random battle can come up on the last step onto the Falcon's tile:
@@ -199,13 +200,36 @@ local function board()
   -- boarding timed out with the battle up)
   local drv = H.fightDriverFor("board", { tactical = true, boost = true, items = true, healPercent = 55 }, FIGHT)
   local battleFrames = 0
+  -- A battle on the step onto the Falcon's tile hands the party back on the
+  -- tile it stepped from (the world reload restores the pre-battle tile;
+  -- lab_board_battle.lua: the party below the parked Falcon after formation
+  -- $0D6, and A pressed there boards nothing), so off the parked tile the
+  -- party walks back onto it first.
+  local function offTile()
+    return not H.battleLoadStarted() and H.worldSettled() and not H.aboardAirship()
+      and (H.worldX() ~= H.readByte(0x1F62) or H.worldY() ~= H.readByte(0x1F63))
+  end
   return H.withReset(H.driveUntil(function()
     n = H.airshipControl() and n + 1 or 0
     return n >= 30
   end, 30000, {
+    H.cond(offTile, {
+      H.call(function()
+        H.log(string.format("[board] f%d on (%d,%d), the Falcon parked at (%d,%d): walking back onto it", H.frame,
+          H.worldX(), H.worldY(), H.readByte(0x1F62), H.readByte(0x1F63)))
+      end),
+      H.worldNavTo(function() return H.readByte(0x1F62) end, function() return H.readByte(0x1F63) end,
+        { maxFrames = 6000, playBattles = "tactical", fight = FIGHT }),
+    }, {}),
     H.call(function()
       if H.battleLoadStarted() then
         battleFrames = battleFrames + 1
+        if battleFrames == 3 then
+          local w = H.formationWords()
+          H.log(string.format("[board] f%d a battle came up while boarding (%04X %04X %04X %04X): fought, then "
+            .. "the boarding goes on", H.frame, w[1], w[2], w[3], w[4]))
+          boardBattles = boardBattles + 1
+        end
         if battleFrames >= 3 then drv.frame() end
         return
       end
