@@ -1,31 +1,35 @@
 -- @suite savestate=wor_grave slow
--- battle_jackpot.lua -- SETZER's divine, Jackpot (#319, kits.md "Setzer"):
--- the Fixed Dice come up a triple, a roll more a Boost Point, 99 MP, once a
--- battle, and no chip.
+-- battle_jackpot.lua -- SETZER's divine, Jackpot (#319, kits.md "Setzer" and
+-- "Divines"): a full 3-BP boost buys a throw of two rolls, each the Fixed
+-- Dice coming up a triple, 99 MP, no chip, and no once-a-battle limit.
 --
 -- Played, not staged: wor_grave is gen_wor_falcon's own frame on Daryl's
 -- grave (the party armed and cared for, the gil's digit settled, before
 -- the press), reached by play from the wor-tomb-v1 battery; SETZER rejoined
 -- in the World of Ruin there (event switch $00CA), so Jackpot is learned.
--- Five passes from that frame, each pressing the grave and playing SETZER
+-- Passes from that frame, each pressing the grave and playing SETZER
 -- through the real menu (H.setzerBattle) against Dullahan (23,450 HP, ten
 -- shields):
---   pass 1: Defend twice (the bank to 3), Jackpot at 3 BP: four rolls;
---   pass 2: Jackpot at 1 BP (two rolls), then Jackpot again;
---   pass 3: Defend once, Jackpot unboosted (one roll), then Jackpot again;
---   then a bounded search (below) for two draws the passes above may not
---     meet: one whose early rolls fell Dullahan, so the passes after find
---     no body, and one whose roll meets a table byte past 251 and draws
---     again.  Every candidate that throws is held to everything below; one
---     whose party falls before its Jackpot executes (no Ot6SetzerExec for
---     it) throws nothing, and is counted and logged as such.
+--   pass 1: Defend twice (the bank to 3), Jackpot at 3 BP; three Defends
+--     (the bank back to 3), and Jackpot at 3 BP again in the same battle;
+--   pass 2: Jackpot at 0, 1 and 2 BP: each refused at the list (three A
+--     presses, the list stays up, nothing queued);
+--   pass 3: Jackpot picked at 3 BP, taken back to 2 at target select (L):
+--     it rolls nothing, charges no MP and no points, and no HP moves;
+--   then a bounded search (below) for the two draws the passes above may
+--     not meet: a roll that meets a table byte past 251 and draws again,
+--     and a pass that finds no body (the throw's first roll felled
+--     Dullahan, whom the throw before had worn down).  Every
+--     candidate that throws is held to everything below; one whose party
+--     falls before its first Jackpot executes (no Ot6SetzerExec for it)
+--     throws nothing, and is counted and logged as such.
 -- What it holds, per Jackpot (at Ot6SetzerExec's entry and SETZER's
 -- Ot6ActionEnd; each pass at Ot6JackpotDice's entry and the dice effect's
 -- return; each roll as the effect sets the dice animation):
---   * 1 + boost passes (the boost buys rolls: owner, 2026-10-02); a pass
+--   * two passes (the full boost's fixed throw, M.JACKPOT_ROLLS); a pass
 --     that finds a body rolls once, its face the first byte of the battle
 --     RNG table below 252 after $be, mod 6, and $be stops on that byte; a
---     pass that finds none (the rolls before felled the last body) rolls
+--     pass that finds none (the roll before felled the last body) rolls
 --     nothing, queues no dice and draws no Rand ($be unmoved);
 --   * each roll three dice of one face (b7 = face-1 in both nybbles, b6 =
 --     face-1), the face 1-6, its damage face^3 x level x 2 times the face
@@ -34,15 +38,19 @@
 --     Broken, capped at 9,999 and at the HP the roll found;
 --   * null-break: every roll's class is special | null-break ($88) and no
 --     monster's shields move;
---   * 99 MP whatever the boost, no gil, the bank less the boost, and the
---     once-a-battle flag (OT6_DIVINE_USED) set for SETZER by it;
---   * the second Jackpot of the battle is refused at the list: three A
---     presses, the list stays up, nothing is queued.
+--   * 99 MP, no gil, and the bank less the three points.
+-- A pass with no body left: Dullahan's 23,450 HP outlast one throw (two
+-- rolls, 9,999 each at most), but not two -- the first throw leaves him
+-- low, and when the second throw's first roll fells him its second pass
+-- finds no body (this branch's mx7 run met it at searches 4, 8, 11 and 19:
+-- build/attempts/wt/v027-kits/mx7/new__battle_jackpot.out).
 -- The face odds are a distribution: measured by the labs in
 -- build/attempts/wt/kit-setzer/ (jackpot-dist/, labs-r3/), not by these
 -- draws; these hold each roll to the draw rule that makes them.
 -- The run ends once the plan is spent; Dullahan's fight is not finished.
--- Negative controls: the mutant ROMs in build/attempts/wt/kit-setzer/.
+-- Old-ROM red (main's ROM on main's fixtures): build/attempts/wt/v027-kits/
+-- mx1/; mutants: build/attempts/wt/v027-kits/final-matrix/ (<rom>__battle_jackpot.out);
+-- the earlier controls in build/attempts/wt/kit-setzer/.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/wor_grave.mss.lua"
 
@@ -80,23 +88,20 @@ local function installTick()
 end
 
 local function checkJackpot(r, i)
-  H.log(string.format("[jackpot] %d at %d BP, L%d: %d roll(s); MP %d -> %d, purse %d -> %d, bank %d -> %d, "
-    .. "divine %02X -> %02X", i, r.boost, r.level, #r.dice, r.mp0, r.mp1, r.gil0, r.gil1, r.bank0, r.bank1,
-    r.divine0, r.divine1))
+  H.log(string.format("[jackpot] %d at %d BP, L%d: %d roll(s); MP %d -> %d, purse %d -> %d, bank %d -> %d", i,
+    r.boost, r.level, #r.dice, r.mp0, r.mp1, r.gil0, r.gil1, r.bank0, r.bank1))
   H.assertEq(r.mp0 - r.mp1, 99, string.format("Jackpot %d: 99 MP, whatever the boost", i))
   H.assertEq(r.gil1, r.gil0, string.format("Jackpot %d: no gil", i))
-  H.assertEq(r.bank1, r.boost == 0 and math.min(5, r.bank0 + 1) or r.bank0 - r.boost,
-    string.format("Jackpot %d: the bank less the boost (or +1, unboosted)", i))
-  H.assertEq(r.divine0 & r.setzerBit, 0, string.format("Jackpot %d: unspent before", i))
-  H.assertEq(r.divine1 & r.setzerBit, r.setzerBit, string.format("Jackpot %d: spent by it", i))
+  H.assertEq(r.boost, 3, string.format("Jackpot %d: at the full 3 BP a divine takes", i))
+  H.assertEq(r.bank1, r.bank0 - 3, string.format("Jackpot %d: the bank less the three points", i))
   H.assertEq(r.targets ~= 0, true, string.format("Jackpot %d was aimed at the monsters", i))
   local alive = 0
   for b = 0, 5 do if r.mon1[b].present and r.mon1[b].alive then alive = alive + 1 end end
-  -- the passes: 1 + boost of them; one that finds a body rolls once, by the
+  -- the passes: the fixed throw's two; one that finds a body rolls once, by the
   -- draw rule (the first byte of the battle RNG table below 252 after $be,
   -- mod 6; $be stops there), and one that finds none -- the rolls before it
   -- felled the last body -- rolls nothing and draws nothing
-  H.assertEq(#r.passes, 1 + r.boost, string.format("Jackpot %d: 1 + boost passes (%d BP)", i, r.boost))
+  H.assertEq(#r.passes, H.JACKPOT_ROLLS, string.format("Jackpot %d: the throw's %d passes", i, H.JACKPOT_ROLLS))
   local rng = H.sym("RNGTbl") & 0x3FFFFF
   local aimed, empty, redraws = 0, 0, 0
   for k, q in ipairs(r.passes) do
@@ -191,7 +196,7 @@ local function checkJackpot(r, i)
   return { empty = empty, redraws = redraws }
 end
 
-local function pass(n, plan, wantBoost, o)
+local function pass(n, plan, wantN, o)
   o = o or {}
   local recs
   -- o.wait: frames stood on the grave before the press (the battle key);
@@ -216,26 +221,20 @@ local function pass(n, plan, wantBoost, o)
       for _, s in ipairs(H.formationSpecies()) do ids[#ids + 1] = s.species end
       H.assertEq(ids[1], DULLAHAN, "the grave's fight is Dullahan")
       recs = H.vars.setzer
-      H.assertEq(#recs, 1, string.format("pass %d: exactly one Jackpot resolved", n))
-      H.assertEq(recs[1].row, JACKPOT, string.format("pass %d: the row is Jackpot", n))
-      H.assertEq(recs[1].boost, wantBoost, string.format("pass %d: at %d BP", n, wantBoost))
-      local got = checkJackpot(recs[1], n)
-      if o.wantEmpty then
-        H.assertEq(got.empty > 0, true, string.format("pass %d: this draw fells Dullahan before the last roll, "
-          .. "so a pass finds no body (%s)", n, o.why))
-      end
-      if o.wantRedraw then
-        H.assertEq(got.redraws > 0, true, string.format("pass %d: this draw meets a table byte past 251 and "
-          .. "redraws (%s)", n, o.why))
-      end
-      if plan[#plan].refused then
-        H.assertEq(plan[#plan].refusedSeen == true, true,
-          string.format("pass %d: the second Jackpot was refused at the list", n))
-      end
+      H.assertEq(#recs, wantN, string.format("pass %d: %d Jackpot(s) resolved", n, wantN))
       local faces = {}
-      for _, d in ipairs(recs[1].dice) do faces[#faces + 1] = d.b6 + 1 end
-      H.log(string.format("[jackpot] pass %d held: faces %s at %d BP%s", n, table.concat(faces, ","), wantBoost,
-        plan[#plan].refused and "; the second Jackpot refused" or ""))
+      for k, r in ipairs(recs) do
+        H.assertEq(r.row, JACKPOT, string.format("pass %d: Jackpot %d's row is Jackpot", n, k))
+        checkJackpot(r, n * 10 + k)
+        for _, d in ipairs(r.dice) do faces[#faces + 1] = d.b6 + 1 end
+      end
+      for k, p in ipairs(plan) do
+        if p.refused then
+          H.assertEq(p.refusedSeen == true, true, string.format("pass %d: entry %d (Jackpot at %d BP) was refused "
+            .. "at the list", n, k, p.boost or 0))
+        end
+      end
+      H.log(string.format("[jackpot] pass %d held: %d Jackpot(s), faces %s", n, #recs, table.concat(faces, ",")))
     end)
   return H.seqStep(steps)
 end
@@ -325,9 +324,14 @@ local function candidateBattle()
       local plan = {}
       for _ = 1, S.cur.defends do plan[#plan + 1] = { row = "defend" } end
       plan[#plan + 1] = { row = JACKPOT, boost = 3 }
+      for _ = 1, 3 do plan[#plan + 1] = { row = "defend" } end
+      plan[#plan + 1] = { row = JACKPOT, boost = 3 }
       step = H.setzerBattle(plan, { untilPlanDone = true, othersFight = S.cur.othersFight })
-      wipedN, S.lost, S.execF = 0, nil, nil
+      wipedN, S.lost, S.execF, S.alive = 0, nil, nil, nil
     end
+    -- the live-monster mask ($3A75) while the battle is up: 0 at the end
+    -- means Dullahan fell (to the others' Fights, or the first Jackpot)
+    if H.battleActive() then S.alive = H.readByte(0x3A75) end
     wipedN = H.partyWipedInBattle() and wipedN + 1 or 0
     if wipedN >= 90 then
       S.lost = string.format("the party wiped (the lib's wipe predicate, 90 frames, at f%d)", H.frame)
@@ -338,9 +342,35 @@ local function candidateBattle()
   end, reset = function() step, wipedN = nil, 0 end }
 end
 
+-- pass 3: Jackpot picked at 3 BP and taken back to 2 at target select (L):
+-- it executes at 2, so Ot6JackpotDice zeroes the pending and rolls
+-- nothing, Ot6AbilityCost priced it at 2 (no MP), and the bank pays nothing
+local takeBack = H.seqStep({
+  H.loadState(STATE),
+  H.faceAndHoldA("up", function() return H.battleLoadStarted() end, 3000, "the grave (100,14): face up, A"),
+  H.release(),
+  H.setzerBattle({ { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3, takeBack = 2 } },
+    { untilPlanDone = true }),
+  H.call(function()
+    local recs = H.vars.setzer
+    H.assertEq(#recs, 1, "pass 3: the taken-back Jackpot executed once")
+    local r = recs[1]
+    H.log(string.format("[jackpot] pass 3: row $%02X at %d BP, MP %d -> %d, bank %d -> %d, %d roll(s)", r.row,
+      r.boost, r.mp0, r.mp1, r.bank0, r.bank1, #r.dice))
+    H.assertEq(r.row, JACKPOT, "pass 3: the row is Jackpot")
+    H.assertEq(r.boost, 2, "pass 3: it executed at the 2 BP it was taken back to")
+    H.assertEq(#r.dice, 0, "pass 3: a Jackpot taken back under 3 BP rolls nothing")
+    H.assertEq(r.mp1, r.mp0, "pass 3: and charges no MP")
+    H.assertEq(r.bank1 >= r.bank0, true, string.format("pass 3: and no points (bank %d -> %d)", r.bank0, r.bank1))
+    for b, m in pairs(r.mon0) do
+      H.assertEq(r.mon1[b].hp, m.hp, string.format("pass 3: slot %d's HP did not move", b))
+    end
+  end),
+})
+
 local search = H.seqStep({
   H.driveUntil(function()
-    return (S.found.empty and S.found.redraw) or S.played >= #CAND
+    return (S.found.redraw and S.found.empty) or S.played >= #CAND
   end, 2000000, {
     H.call(function()
       S.i = S.i + 1
@@ -363,13 +393,21 @@ local search = H.seqStep({
           S.lost, S.lostN))
         return
       end
-      H.assertEq(#recs, 1, label .. ": one Jackpot resolved" .. (S.lost and string.format(" (its exec seen at f%s, "
-        .. "then %s)", tostring(S.execF), S.lost) or ""))
+      if #recs == 1 and S.alive == 0 then
+        H.log(string.format("[jackpot] %s: Dullahan fell before the second Jackpot", label))
+      end
+      H.assertEq(#recs >= 1 and (#recs == 2 or S.lost ~= nil or S.alive == 0), true, label .. ": both Jackpots "
+        .. "resolved, or the party or Dullahan fell after the first" .. (S.lost and string.format(
+        " (exec seen at f%s, then %s)", tostring(S.execF), S.lost) or ""))
       H.assertEq(S.execF ~= nil, true, label .. ": the exec hook saw this Jackpot (the lost-candidate check reads it)")
-      H.assertEq(recs[1].row == JACKPOT and recs[1].boost == 3, true, label .. ": a Jackpot at 3 BP")
-      local got = checkJackpot(recs[1], S.i + 3)
+      local got = { empty = 0, redraws = 0 }
       local sig = {}
-      for _, q in ipairs(recs[1].passes) do sig[#sig + 1] = string.format("%04X:%02X", q.mask, q.be0) end
+      for k, r in ipairs(recs) do
+        H.assertEq(r.row == JACKPOT and r.boost == 3, true, label .. ": a Jackpot at 3 BP")
+        local g = checkJackpot(r, (S.i + 3) * 10 + k)
+        got.empty, got.redraws = got.empty + g.empty, got.redraws + g.redraws
+        for _, q in ipairs(r.passes) do sig[#sig + 1] = string.format("%04X:%02X", q.mask, q.be0) end
+      end
       sig = table.concat(sig, " ")
       if not S.seen[sig] then S.seen[sig] = true; S.distinct = S.distinct + 1 end
       H.log(string.format("[jackpot] %s: %d empty pass(es), %d redraw(s) | %s | %d distinct of %d", label,
@@ -389,26 +427,28 @@ local search = H.seqStep({
         (S.foundAll or {}).redraw or 0, ENTRY))
       return
     end
-    H.assertEq(S.found.empty ~= nil, true, string.format("the search met a throw whose early rolls fell "
-      .. "Dullahan, leaving a pass with no body, within its %d candidates (%d distinct throws tried, %d lost to a "
-      .. "wipe before the throw)", #CAND, S.distinct, S.lostN or 0))
+    H.assertEq(S.found.empty ~= nil, true, string.format("the search met a pass that finds no body within its %d "
+      .. "candidates (%d distinct)", #CAND, S.distinct))
     H.assertEq(S.found.redraw ~= nil, true, string.format("the search met a throw that redraws past 251 within "
-      .. "its %d candidates (%d distinct throws tried, %d lost to a wipe before the throw; none redrawing has "
-      .. "p = 0.939^%d = %.4f)", #CAND, S.distinct, S.lostN or 0, S.distinct, 0.939 ^ S.distinct))
-    H.log(string.format("[jackpot] search: an empty pass at %s, a redraw at %s; %d candidate(s), %d distinct, "
-      .. "%d lost to a wipe before the throw (entry shift %d)", S.found.empty, S.found.redraw, S.played, S.distinct,
-      S.lostN or 0, ENTRY))
+      .. "its %d candidates (%d distinct candidates tried, %d lost to a wipe before the first throw; a candidate "
+      .. "is two throws of two rolls, so none redrawing has p = 0.939^%d = %.4f)", #CAND, S.distinct, S.lostN or 0,
+      S.distinct, 0.939 ^ S.distinct))
+    H.log(string.format("[jackpot] search: an empty pass at %s", S.found.empty))
+    H.log(string.format("[jackpot] search: a redraw at %s; %d candidate(s), %d distinct, %d lost to a wipe before "
+      .. "the first throw (entry shift %d)", S.found.redraw, S.played, S.distinct, S.lostN or 0, ENTRY))
   end),
 })
 
 H.run({ maxFrames = 2500000 }, {
   H.call(installTick),
-  pass(1, { { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3 } }, 3),
-  pass(2, { { row = JACKPOT, boost = 1 }, { row = JACKPOT, refused = true } }, 1),
-  pass(3, { { row = "defend" }, { row = JACKPOT, boost = 0 }, { row = JACKPOT, refused = true } }, 0),
+  pass(1, { { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3 },
+    { row = "defend" }, { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3 } }, 2),
+  pass(2, { { row = JACKPOT, boost = 0, refused = true }, { row = JACKPOT, boost = 1, refused = true },
+    { row = JACKPOT, boost = 2, refused = true } }, 0),
+  takeBack,
   search,
   H.call(function()
-    H.log("[jackpot] PASSED: 1 + boost passes at 3, 1 and 0 BP, a pass with no body rolls nothing, the draw rule "
-      .. "(a redraw past 251 included), 99 MP, no chip, once a battle")
+    H.log("[jackpot] PASSED: refused under 3 BP, two rolls at 3 BP, twice in one battle, the draw rule (a "
+      .. "redraw past 251 included), 99 MP, no chip")
   end),
 })

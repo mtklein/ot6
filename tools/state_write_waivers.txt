@@ -60,8 +60,8 @@ tools/tests/battle_counterfold.lua	.writeByte(	5
 tools/tests/battle_dancemp.lua	.writeWord(	3
 tools/tests/battle_dancestumble.lua	.writeByte(	1	quarantine: #313 synthetic setup -- one off-terrain dance added to MOG's known-dance mask ($1D4C) between the defense's waves, because moogle_defense is the route's only MOG-with-Dance window and holds one terrain, so the vanilla stumble roll never runs by play; the property is that a stumbled boosted start charges no MP and spends no pips
 tools/tests/battle_dlgmenu.lua	.writeByte(	2	quarantine: #292 review, synthetic step -- one monster slot's shield-count upload planted pending mid-dialogue (OT6_SHWANT/OT6_SHPEND), because a count change landing while a battle dialogue is up is not a thing a fixture produces on cue; the property is that the nmi holds the upload until the dialogue and its re-lay are done
-tools/tests/battle_divines.lua	.writeByte(	3
-tools/tests/battle_divines.lua	.writeWord(	3
+tools/tests/battle_divines.lua	.writeByte(	2
+tools/tests/battle_divines.lua	.writeWord(	5
 tools/tests/battle_doom.lua	.writeByte(	5	quarantine: #190 mechanism staging -- Condemned is poked in the engine's own shape (STATUS2 $01 and the $3B05 count, all StartCondemn writes) because the route's only source is Nerapa on the FC escape; the property under test is the driver's read of the count.  Also zeroes the battle-bag Fenix Down (BATTINV $2686 count) so the condemned member's care decision is the heal #190 refuses, not a legitimate revive of the corpse doomedA's own Doom leaves
 tools/tests/battle_doom.lua	.writeWord(	1	quarantine: #190 mechanism staging -- the patient's HP is set to a third so the heal line has a member to refuse, battle_healerdown's shape
 tools/tests/battle_dotchip.lua	.writeByte(	39
@@ -148,3 +148,8 @@ tools/tests/battle_passside.lua	.writeWord(	3	quarantine: wt/pass-retarget mecha
 tools/tests/battle_phoenixprice.lua	.writeByte(	1	quarantine: #293 mechanism staging -- no fixture has Phoenix (World of Ruin magicite); one field byte equips it on TERRA before the first encounter, and the list, menus, queue and charge after are the engine's own
 tools/tests/battle_setzergrey.lua	.writeByte(	1	quarantine: #319 the purse set below one boosted throw before the walk -- the battery carries a quarter of a million gil and nothing on the route empties it on cue; everything after is the engine's own
 tools/tests/battle_setzergrey.lua	.writeWord(	1	quarantine: #319 the purse set below one boosted throw before the walk -- the battery carries a quarter of a million gil and nothing on the route empties it on cue; everything after is the engine's own
+tools/tests/battle_ultimafold.lua	.writeByte(	1	quarantine: #378 TERRA's World of Ruin return (switch $00BF) set mid-battle -- the route does not reach Mobliz; the fold before and after the unlock is the engine's own
+tools/tests/battle_breakmonster.lua	.writeByte(	3	quarantine: #398 a monster's queued action rewritten to Break at one party member -- the World of Ruin's Break casters are past the chain's end; the record, hit roll and status are the engine's own
+tools/tests/battle_breakmonster.lua	.writeWord(	1	quarantine: #398 that Break's target mask
+tools/tests/battle_cleaverandom.lua	.writeByte(	2	quarantine: Cleave staged learned ($1CF7) and Cyan Muddled on cue -- Cleave is learned at L70 and no generated battle Muddles him; the random pick and its range are the engine's own
+tools/tests/battle_cleaverandom.lua	.writeWord(	4	quarantine: the highest tech known ($2020), Cyan's MP and HP, and the soldiers' HP, so the battle lasts for the picks

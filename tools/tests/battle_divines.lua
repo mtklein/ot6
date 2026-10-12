@@ -1,99 +1,92 @@
 -- @suite slow
--- battle_divines.lua -- the kit-8 divines whose gates are read at resolution.
-
+-- battle_divines.lua -- Cleave (Cyan's divine) on the 3-BP gate.
+--
 --   tools/tests/run.sh tools/tests/battle_divines.lua
-
--- These finishers cannot be gated at command-select time (their command is in
--- RetargetCmdTbl, so the target is cleared and re-chosen at resolution), so OT6
--- gates them where the attack lands.  Each is once-per-battle via
--- OT6_DIVINE_USED ($3ECB, per-character bit).
-
--- OBLIVION (Cyan, Bushido tech 8, attack $5C).  Ot6Oblivion (hooked right
--- after ChooseTarget in CalcAttackEffect) reads the target's broken timer:
---   * Broken and killable   -> marks Death in the target's $3dd4 directly and
---     sets the once-per-battle flag.
---   * unbroken or Broken boss -> rewrites the loaded props to a Tempest hit in
---     place (power 70, Death cleared): the reduced fallback, with the flag
---     left clear.
 --
--- Boots cyan_defence: a real solo Cyan (L11, katana) on map 120, surrounded
--- by the map's own battle-43 grinding soldiers (2x species $001, 100 hp, 2
--- shields, weak $03, which his slash chips) and the battle-46 commander
--- (species $14E, 456 hp, 3 shields, weak $01, also chippable). Cyan opens
--- at 1 bp with real MP 67 and 2 real techs ($1cf7=03). His front-row Fight
--- would kill a 100-hp soldier before its 2-shield gauge breaks, so he
--- fights from the back row (H.setRows through the real Order screen).
--- Bank is earned, not pinned: each unboosted Fight regens +1 bp, and
--- picking submenu row 2 spends the banked 3. Targets break by real
--- chipping: the commander's 456 hp survives the 3-chip break where a
--- 100-hp soldier dies exactly on its breaking hit, so his solo formation
--- leaves the resolution-time retarget only one body. Kills are checked
--- against the mechanism with a pc-gated write watch counting Death marks
--- written from inside Ot6Oblivion, so a fallback that damage-kills cannot
--- be mistaken for a divine.
+-- The owner's rule (2026-10-11, kits.md "Divines"): a divine's one gate is a
+-- full 3-BP boost.  No once-a-battle limit, no Broken condition.  Cleave is
+-- SwdTech tech 8 (attack $5c), the SwdTech window's 3-BP row; Ot6Oblivion,
+-- after ChooseTarget in CalcAttackEffect, marks Death on a killable target
+-- ($3dd4) and turns the cut on a death-immune one into the heaviest single
+-- cut (power 255, Death and the auto-miss cleared).
 --
--- Oblivion is Bushido tech 8, normally reached at L68 with 99 MP; the
--- input-driven Cyan here is L11 with 67 max MP, so the ceiling is staged
--- explicitly in each battle below: KNOWN ($2020) := 7 so the window can
--- enumerate the divine, and MP := 999 so the 99-MP cast is not refused.
--- The boss-gate negative additionally sets the target's $3aa1 bit 2 (the
--- boss bit), since no generated battle fields a death-protected body
--- beside Cyan. The flag-driven enumeration keeps its own flag pokes,
--- since the only real setter in play is the kill, and killing the solo
--- commander ends the battle before the window could reopen.
-
+-- Boots cyan_defence: a real solo Cyan (L11, katana) on map 120 beside the
+-- map's own battle-43 grinding soldiers (2x species $001, 100 hp) and the
+-- battle-46 commander (species $14E, 456 hp).  Cyan is played through the
+-- real menu (H.kitBattle): the SwdTech row, the cursor onto the row, A;
+-- real Defends bank the points.
+--
+-- Declared unit-test expedients (tools/state_write_waivers.txt), because
+-- Cleave is SwdTech tech 8, reached by level at L70 and this Cyan is L11:
+--   KNOWN ($2020) := 7 and MP := 999, so the window enumerates tech 8 and
+--   the 99-MP cut is paid;
+--   the learned SwdTechs ($1CF7) := all eight and the loadout word ($1E1D)
+--   := Cleave in the 1- and 2-BP slots and Quadra Slice in the 3-BP slot,
+--   read and set back to AUTO (0), for the gate's manual-loadout arm;
+--   in battle 2, the commander's $3aa1 bit 2 (the boss bit), since no
+--   generated battle fields a death-protected body beside Cyan, and his HP
+--   raised to 30,000 so the first heavy cut leaves him standing for the
+--   second.
+--
+-- Asserted:
+--   battle 1 (the soldiers): the window's rows 0 and 1 (1 and 2 BP) are not
+--     Cleave and row 2 (3 BP) is; with Cleave stored in the 1-BP slot of a
+--     manual loadout, row 0 still is not (Ot6CleaveSlot); Cleave at 3 BP
+--     kills an unbroken soldier (one in-proc Death mark, the body dead),
+--     and, after three Defends bank the points again, a second Cleave in the
+--     same battle kills the second soldier;
+--   battle 2 (the commander, the boss bit set): two Cleaves in the same
+--     battle, each marking no Death, cutting at power 255 (an in-proc $11a6
+--     write) and landing (the commander's HP falls at each).
+-- A kill is checked against the mechanism with pc-gated write watches
+-- (Death marks and the power write from inside Ot6Oblivion), so a cut that
+-- damage-kills cannot be mistaken for the divine.  Old-ROM red (main's ROM
+-- on main's fixtures): build/attempts/wt/v027-kits/mx1/; mutants:
+-- build/attempts/wt/v027-kits/final-matrix/ (<rom>__battle_divines.out).
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/cyan_defence.mss.lua"
 
-local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
-local ST_CMD, ST_TGT, ST_SUB = 0x05, 0x38, 0x30
+local MENU = 0x7BCA
 local KNOWN = 0x2020
 local ITEMLIST = 0x4005
-local DIVINE_USED = 0x3ECB
-local CYAN = 0x02
+local LOADOUT = 0x1E1D
+local CYAN, CMD_SWDTECH, CLEAVE = 0x02, 0x07, 0x5C
 
 local function ent(m) return 8 + m * 2 end
-local function sh(m) return H.readByte(0x3E38 + ent(m)) end
-local function brk(m) return H.readByte(0x3E88 + ent(m)) end
 local function mhp(m) return H.readWord(0x3BFC + m * 2) end
 local function present(m) return H.readByte(0x3AA8 + m * 2) % 2 == 1 end
 local function dead(m) return H.readByte(0x3EE4 + ent(m)) & 0x80 ~= 0 end
 
 local cyanSlot, msPresent = nil, {}
-local b1HpBefore = nil
-local function bp() return H.readByte(0x3E9C + cyanSlot * 2) end
-local function pend() return H.readByte(0x3E9D + cyanSlot * 2) end
-local function flagSet() return (H.readByte(DIVINE_USED) & (1 << cyanSlot)) ~= 0 end
-local function inWindow() return H.readByte(MSTATE) == ST_SUB end
-local function rowId(r) return H.readByte(ITEMLIST + r * 6) end
 
--- ---- the in-proc kill watch (battle_assassinate's idiom) ----------------
+-- ---- the in-proc watches -------------------------------------------------
 local OBLIV = H.sym("Ot6Oblivion")
-local divineKills = {}
+local divineKills, cuts = {}, {}
 local watching = false
+local function inProc()
+  local s = emu.getState()
+  local pc = (s["cpu.k"] << 16) | s["cpu.pc"]
+  return pc >= OBLIV and pc < OBLIV + 0x100
+end
 emu.addMemoryCallback(function(addr, v)
   if not watching or (v & 0x80) == 0 then return end
   pcall(function()
-    local s = emu.getState()
-    local pc = (s["cpu.k"] << 16) | s["cpu.pc"]
-    if pc >= OBLIV and pc < OBLIV + 0x100 then
-      divineKills[#divineKills + 1] = ((addr - 0x7E0000 - 0x3DD4) - 8) // 2
-    end
+    if inProc() then divineKills[#divineKills + 1] = ((addr - 0x7E0000 - 0x3DD4) - 8) // 2 end
   end)
 end, emu.callbackType.write, 0x7E3DD4 + 8, 0x7E3DD4 + 0x13)
+emu.addMemoryCallback(function(_, v)
+  if not watching then return end
+  pcall(function() if inProc() then cuts[#cuts + 1] = v end end)
+end, emu.callbackType.write, 0x7E11A6, 0x7E11A6)
 
--- the labeled isolation arm's ceiling block (see header)
 local function stageCeiling(tag)
-  H.writeWord(KNOWN, 7)                       -- tech-8 window (L68 by play)
-  H.writeWord(0x3C08 + cyanSlot * 2, 999)     -- Oblivion costs 99 (#57)
-  H.writeWord(0x3C30 + cyanSlot * 2, 999)
-  H.log("[" .. tag .. "] ceiling staged: KNOWN:=7, MP:=999 (labeled arm)")
+  H.writeWord(KNOWN, 7)                       -- tech-8 window (L70 by play)
+  H.writeWord(0x3C08 + cyanSlot * 2, 999)     -- Cleave costs 99 (#57)
+  H.log("[" .. tag .. "] ceiling staged: KNOWN:=7, MP:=999 (declared expedient)")
 end
 
--- ---- shared drive helpers ----------------------------------------------
 local function surveyBattle()
   cyanSlot, msPresent = nil, {}
-  b1HpBefore = nil
   for s = 0, 3 do
     if H.readByte(0x3ED8 + s * 2) == CYAN then cyanSlot = s end
   end
@@ -104,135 +97,19 @@ local function surveyBattle()
   assert(#msPresent > 0, "the battle has monsters")
 end
 
--- one real Fight per call window; wantTarget(m) picks the body to steer the
--- target cursor onto (nil = confirm whatever is up)
-local function fightPulse(wantTarget)
-  if H.readByte(MENU) == 0 then
-    H.setPad(H.frame % 8 < 4 and { a = true } or {})
-    return
-  end
-  local st = H.readByte(MSTATE)
-  local btn
-  if st == ST_CMD then
-    local cur = H.readByte(0x890F + cyanSlot) & 3
-    btn = (cur == 0) and "a" or "up"
-  elseif st == ST_TGT then
-    local want = wantTarget and wantTarget()
-    local mask = H.readByte(0x7B7E)
-    if want == nil or mask == (1 << want) then btn = "a"
-    elseif mask == 0 then btn = "left"
-    else btn = "down" end
-  elseif st == ST_SUB then
-    btn = "b"                     -- not casting in a bank phase
-  else
-    btn = nil
-  end
-  H.setPad(btn and { [btn] = true } or {})
+-- the SwdTech window's rows, read as Cyan's window opens (opts.onList)
+local rowsSeen = {}
+local function readRows()
+  local t = {}
+  for r = 0, 2 do t[r] = H.readByte(ITEMLIST + r * 6) end
+  return t
 end
 
--- drive real Fights until pred; steer per wantTarget
-local function bankUntil(pred, wantTarget, budget, what)
-  local ph = 0
-  return H.driveUntil(pred, budget, {
-    H.call(function()
-      ph = ph + 1
-      if ph % 8 < 4 then fightPulse(wantTarget) else H.setPad({}) end
-    end),
-    H.waitFrames(2),
-  }, what)
-end
-
--- open the swdtech submenu from the command window
-local function openWindow(what)
-  local ph = 0
-  return H.driveUntil(inWindow, 3000, {
-    H.call(function()
-      ph = ph + 1
-      if ph % 8 >= 4 then H.setPad({}); return end
-      if H.readByte(MENU) == 0 then H.setPad({ a = true }); return end
-      local st = H.readByte(MSTATE)
-      if st == ST_CMD then
-        local cur = H.readByte(0x890F + cyanSlot) & 3
-        H.setPad(cur == 1 and { a = true } or
-                 { [cur < 1 and "down" or "up"] = true })
-      else
-        H.setPad({ b = true })
-      end
-    end),
-    H.waitFrames(2),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(9),
-  }, what)
-end
-local function closeWindow(what)
-  return H.driveUntil(function() return not inWindow() end, 500, {
-    H.call(function() H.setPad({ b = true }) end),
-    H.waitFrames(2),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(6),
-  }, what or "the submenu closes")
-end
-
--- steer the submenu cursor to row 2 (boost 3) with the d-pad; the cells
--- are read, never written (scroll $895f, col $8963, row $8967)
-local function castRow2(what)
-  return {
-    H.driveUntil(function()
-      return inWindow()
-         and H.readByte(0x895F + cyanSlot) + H.readByte(0x8967 + cyanSlot) == 2
-         and H.readByte(0x8963 + cyanSlot) == 0
-    end, 1500, {
-      H.call(function()
-        if not inWindow() then H.setPad({}); return end
-        local row = H.readByte(0x895F + cyanSlot) + H.readByte(0x8967 + cyanSlot)
-        if H.readByte(0x8963 + cyanSlot) > 0 then H.setPad({ left = true })
-        elseif row < 2 then H.setPad({ down = true })
-        elseif row > 2 then H.setPad({ up = true })
-        else H.setPad({}) end
-      end),
-      H.waitFrames(2),
-      H.call(function() H.setPad({}) end),
-      H.waitFrames(8),
-    }, what .. ": cursor steered to row 2 (d-pad, no pokes)"),
-    H.driveUntil(function() return not inWindow() end, 900, {
-      H.call(function() H.setPad({ a = true }) end),
-      H.waitFrames(2),
-      H.call(function() H.setPad({}) end),
-      H.waitFrames(14),
-    }, what .. ": Oblivion flagged from row 2"),
-  }
-end
-
--- ride the queued cast to resolution: A on any non-window menu
-local function resolveCast(what)
-  local ph = 0
-  return H.driveUntil(function() return pend() == 0 end, 12000, {
-    H.call(function()
-      ph = ph + 1
-      if ph % 8 >= 4 then H.setPad({}); return end
-      if H.readByte(MENU) ~= 0 and not inWindow() then
-        local st = H.readByte(MSTATE)
-        H.setPad(st == ST_TGT and { a = true }
-                 or (st == 0x01 and {} or { b = true }))
-      else
-        H.setPad({})
-      end
-    end),
-    H.waitFrames(4),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(16),
-  }, what)
-end
-
--- boot one fresh commander/soldier battle from the fixture; obj 16 is the
--- commander (battle 46), objs 17+ the battle-43 soldiers (gen_sabin_camp's
--- object survey; positions logged by the recon)
 local function bootBattle(obj, what)
   return {
     H.waitFrames(20),
     H.loadState(STATE),
     H.waitFrames(30),
-    -- CYAN to the back row through the real Order screen; see the header
     H.setRows({ [CYAN] = true }, { tag = what .. " back row" }),
     H.talkToObj(obj, what .. ": engage", 20000),
     (function()
@@ -247,178 +124,92 @@ local function bootBattle(obj, what)
       surveyBattle()
       local parts = {}
       for _, m in ipairs(msPresent) do
-        parts[#parts + 1] = string.format("m%d hp=%d sh=%d brk=%02x", m,
-          mhp(m), sh(m), brk(m))
+        parts[#parts + 1] = string.format("m%d hp=%d", m, mhp(m))
       end
-      H.log(string.format("[%s] cyan slot %d bp=%d flag=%02x | %s", what,
-        cyanSlot, bp(), H.readByte(DIVINE_USED), table.concat(parts, " | ")))
-      H.assertEq(flagSet(), false, what .. ": divine flag clear at start")
-      divineKills = {}
+      H.log(string.format("[%s] cyan slot %d bp=%d | %s", what, cyanSlot,
+        H.readByte(0x3E9C + cyanSlot * 2), table.concat(parts, " | ")))
+      stageCeiling(what)
+      divineKills, cuts = {}, {}
       watching = true
     end),
   }
 end
 
+local function cleave(n, onList)
+  local plan = {}
+  for _ = 1, n do plan[#plan + 1] = { who = CYAN, cmd = CMD_SWDTECH, row = CLEAVE, boost = 3, direct = true } end
+  return plan
+end
+
 local steps = {}
 local function add(t) for _, s in ipairs(t) do steps[#steps + 1] = s end end
 
--- ============ battle 1: selection and the unbroken fallback (commander) ====
-add(bootBattle(16, "battle 1"))
+-- ============ battle 1: the soldiers -- the gate, and two Cleaves =========
+add(bootBattle(17, "battle 1"))
 add({
-  -- bank 3 bp with two real Fights; each chips one shield, 3 -> 1, so the
-  -- commander stays unbroken
-  bankUntil(function() return bp() >= 3 end, nil, 20000,
-    "battle 1: two real Fights bank 3 bp (and leave the gauge unbroken)"),
   H.call(function()
-    local m = msPresent[1]
-    H.assertEq(brk(m), 0, "the commander is still UNBROKEN after the bank")
-    H.assertEq(sh(m) > 0, true, "shields remain on the gauge")
-    stageCeiling("battle 1")
+    -- the manual loadout's arm: Cleave stored in the 1-BP slot (slot 1 =
+    -- bits 3-5) and in the 2-BP slot (bits 6-8), the 3-BP slot left as the
+    -- auto window's (Stunner's id 5 ... any learned tech; tech 6 here)
+    H.writeByte(0x1CF7, 0xFF)
+    H.writeWord(LOADOUT, (7 << 3) | (7 << 6) | (6 << 9))
+    H.log("[battle 1] SwdTechs learned := all eight; loadout word := Cleave in the 1- and 2-BP slots, Quadra "
+      .. "Slice in the 3-BP slot (declared expedients)")
   end),
-  openWindow("battle 1: swdtech submenu opens"),
-  H.waitFrames(6),
+  H.kitBattle({ { who = CYAN, cmd = CMD_SWDTECH, boost = 1, peek = true } },
+    { untilPlanDone = true, idle = "defend", onList = function() rowsSeen.manual = readRows() end }),
   H.call(function()
-    H.assertEq(rowId(2), 0x5C,
-      "flag CLEAR: row 2 (boost 3) enumerates Oblivion ($5c)")
-    H.screenshot("divine_oblivion_selectable")
+    local r = rowsSeen.manual
+    H.assertEq(r ~= nil, true, "the manual-loadout window was read")
+    H.log(string.format("[battle 1] manual loadout rows: %02X %02X %02X", r[0], r[1], r[2]))
+    H.assertEq(r[0] ~= CLEAVE and r[1] ~= CLEAVE, true,
+      "Cleave stored (and learned) in the 1- and 2-BP slots is not offered there (Ot6CleaveSlot)")
+    H.assertEq(r[2], 0x5B, "the 3-BP slot holds the stored Quadra Slice ($5b): the manual loadout is being read")
+    H.writeWord(LOADOUT, 0)
+    H.log("[battle 1] loadout word := 0 (AUTO) again")
   end),
-  -- labeled arm: the flag-driven enumeration (see header).  The set
-  -- side cannot be produced by play here, because the only setter in normal
-  -- play kills the solo commander and ends the battle, so the flag bit is
-  -- poked set, read, and poked clear again; the poke never leaves this block.
-  closeWindow("battle 1: close, then set the flag and reopen"),
+  H.kitBattle(cleave(1), { untilPlanDone = true, idle = "defend",
+    onList = function() rowsSeen.auto = readRows() end,
+    planDone = function() return #divineKills >= 1 and H.readByte(0x3E9D + cyanSlot * 2) == 0 end }),
   H.call(function()
-    H.writeByte(DIVINE_USED, H.readByte(DIVINE_USED) | (1 << cyanSlot))
+    local r = rowsSeen.auto
+    H.log(string.format("[battle 1] auto window rows: %02X %02X %02X", r[0], r[1], r[2]))
+    H.assertEq(r[0] ~= CLEAVE and r[1] ~= CLEAVE, true, "rows 0 and 1 (1 and 2 BP) are not Cleave")
+    H.assertEq(r[2], CLEAVE, "row 2 (3 BP) is Cleave ($5c)")
+    H.assertEq(#divineKills, 1, "the first Cleave marked one Death from inside Ot6Oblivion")
   end),
-  openWindow("battle 1: reopen with the flag SET (labeled poke)"),
-  H.waitFrames(6),
+  H.waitFrames(120),
   H.call(function()
-    H.assertEq(rowId(2), 0x5B, "flag SET: row 2 falls back to Tempest ($5b)")
-  end),
-  closeWindow("battle 1: close, then clear the flag and reopen"),
-  H.call(function()
-    H.writeByte(DIVINE_USED,
-      H.readByte(DIVINE_USED) & (~(1 << cyanSlot) & 0xFF))
-  end),
-  openWindow("battle 1: reopen with the flag CLEAR again"),
-  H.waitFrames(6),
-  H.call(function()
-    H.assertEq(rowId(2), 0x5C, "flag cleared: Oblivion ($5c) returns")
-    H.assertEq(flagSet(), false, "flag left clear for the fallback cast")
-  end),
-})
-add({ H.call(function() b1HpBefore = mhp(msPresent[1]) end) })
-add(castRow2("battle 1"))
-add({
-  resolveCast("battle 1: the unbroken action resolves"),
-  H.waitFrames(50),
-  H.call(function()
-    local m = msPresent[1]
-    H.log(string.format("[battle 1] after: hp=%d dead=%s present=%s "
-      .. "inProcKills=%d flag=%02x", mhp(m), tostring(dead(m)),
-      tostring(present(m)), #divineKills, H.readByte(DIVINE_USED)))
-    H.assertEq(#divineKills, 0,
-      "the UNBROKEN target drew NO in-proc Death mark -- the gate "
-      .. "surgeried the hit to Tempest")
-    H.assertEq(dead(m), false, "the unbroken commander took no Death")
-    H.assertEq(present(m), true, "and is still present")
-    H.assertEq(flagSet(), false, "the divine flag stays CLEAR on a fallback")
-    H.assertEq(mhp(m) < b1HpBefore, true, string.format(
-      "the reduced fallback DEALT damage (hp %d -> %d) -- a power-0 or "
-      .. "bailing unbroken arm fails here", b1HpBefore, mhp(m)))
+    local m = divineKills[1]
+    H.assertEq(dead(m) or not present(m), true, string.format("soldier %d, unbroken, is dead", m))
     watching = false
-    H.screenshot("divine_oblivion_fallback")
   end),
 })
 
--- ============ battle 2: the broken kill (the commander, broken by play) ====
+-- ============ battle 2: the commander as a boss -- the heavy cut ==========
+local hp0 = nil
 add(bootBattle(16, "battle 2"))
 add({
-  -- break the commander by real chipping: 3 shields, ~50 per back-row
-  -- slash, 456 hp, so he is Broken at ~300 hp and still alive.  The three
-  -- unboosted Fights also bank 1+3 = 4 bp.
-  bankUntil(function()
-    local m = msPresent[1]
-    return brk(m) ~= 0 and bp() >= 3
-  end, nil, 30000,
-    "battle 2: the commander broken by real chips, 3+ bp banked"),
   H.call(function()
     local m = msPresent[1]
-    H.log(string.format("[battle 2] body %d hp=%d sh=%d brk=%02x", m,
-      mhp(m), sh(m), brk(m)))
-    H.assertEq(mhp(m) > 0, true, "and he is alive to be assassinated")
-    stageCeiling("battle 2")
-  end),
-  openWindow("battle 2: swdtech submenu opens"),
-  H.waitFrames(6),
-  H.call(function()
-    H.assertEq(rowId(2), 0x5C, "Oblivion ($5c) on row 2 (flag clear)")
-  end),
-})
-add(castRow2("battle 2"))
-add({
-  resolveCast("battle 2: the broken-target action resolves"),
-  H.waitFrames(60),
-  H.call(function()
-    H.log(string.format("[battle 2] after: inProcKills=%d flag=%02x",
-      #divineKills, H.readByte(DIVINE_USED)))
-    H.assertEq(#divineKills, 1,
-      "Oblivion inflicted its guaranteed Death on the Broken commander -- "
-      .. "one in-proc mark, no more")
-    H.assertEq(dead(divineKills[1]), true,
-      "and that body is dead (the engine's own resolution)")
-    H.assertEq(flagSet(), true,
-      "the engine SET the divine flag on the kill -- the set-side "
-      .. "flag edge (battle 1's poked pair covers only the enumeration)")
-    watching = false
-    H.screenshot("divine_oblivion_kill")
-  end),
-})
-
--- ==== battle 3: the boss refusal, broken by play, with the one written bit =
-add(bootBattle(16, "battle 3"))
-add({
-  -- chip the commander to Broken for real: 3 shields, back-row slashes
-  bankUntil(function()
-    local m = msPresent[1]
-    return brk(m) ~= 0 and bp() >= 3
-  end, nil, 30000,
-    "battle 3: the commander broken by real chips, 3+ bp banked"),
-  H.call(function()
-    local m = msPresent[1]
-    H.assertEq(brk(m) ~= 0, true, "commander Broken by play")
-    -- the labeled arm's boss bit (see header): no generated battle fields
-    -- a death-protected body beside Cyan, so the one bit is written on the
-    -- commander that real play broke
     H.writeByte(0x3AA1 + ent(m), H.readByte(0x3AA1 + ent(m)) | 0x04)
-    stageCeiling("battle 3")
-    H.log(string.format("[battle 3] body %d broken (brk=%02x), $3aa1.2 SET",
-      m, brk(m)))
+    H.writeWord(0x3BFC + m * 2, 30000)
+    hp0 = mhp(m)
+    H.log(string.format("[battle 2] commander m%d: $3aa1.2 SET and HP := %d (declared expedient)", m, hp0))
   end),
-  openWindow("battle 3: swdtech submenu opens"),
-  H.waitFrames(6),
-  H.call(function()
-    H.assertEq(rowId(2), 0x5C,
-      "fresh battle: the flag is battle-scoped, Oblivion ($5c) returns "
-      .. "with no poke ever having touched $3ecb")
-  end),
-})
-add(castRow2("battle 3"))
-add({
-  resolveCast("battle 3: the broken-boss action resolves"),
-  H.waitFrames(50),
+  H.kitBattle(cleave(2), { untilPlanDone = true, idle = "defend",
+    planDone = function() return #cuts >= 2 and H.readByte(0x3E9D + cyanSlot * 2) == 0 end }),
+  H.waitFrames(120),
   H.call(function()
     local m = msPresent[1]
-    H.log(string.format("[battle 3] after: hp=%d dead=%s inProcKills=%d "
-      .. "flag=%02x", mhp(m), tostring(dead(m)), #divineKills,
-      H.readByte(DIVINE_USED)))
-    H.assertEq(#divineKills, 0,
-      "a Broken BOSS drew NO in-proc Death mark -- the gate withholds the "
-      .. "kill from a death-protected body")
-    H.assertEq(dead(m), false, "the boss took no Death")
-    H.assertEq(flagSet(), false, "and no divine was spent on it")
+    H.log(string.format("[battle 2] after: hp %d -> %d, in-proc Death marks %d, in-proc power writes %s", hp0,
+      mhp(m), #divineKills, table.concat((function() local t = {}; for _, v in ipairs(cuts) do t[#t + 1] = tostring(v)
+        end; return t end)(), ",")))
+    H.assertEq(#divineKills, 0, "a death-immune body drew no Death mark")
+    H.assertEq(#cuts, 2, "two Cleaves in the same battle, each cut by Ot6Oblivion")
+    H.assertEq(cuts[1] == 255 and cuts[2] == 255, true, "Ot6Oblivion set each cut's power to 255")
+    H.assertEq(mhp(m) < hp0, true, "and the cuts landed")
     watching = false
-    H.screenshot("divine_oblivion_boss")
   end),
 })
 

@@ -69,3 +69,18 @@
 ; a boosted Magicite draws an esper its boost pays for (#368), appended for
 ; the same reason.
         .include "ot6_magicite.asm"
+
+; the Break spell takes shields (#398), appended for the same reason.
+        .include "ot6_breakspell.asm"
+
+; Edgar's Overclock (#378), appended for the same reason.
+        .include "ot6_overclock.asm"
+
+; Celes's RunicBlade (#378), appended for the same reason.
+        .include "ot6_runicblade.asm"
+
+; Terra's Trance (#378), appended for the same reason.
+        .include "ot6_trance.asm"
+
+; Debilitator reveals the weakness it adds (#378), appended for the same reason.
+        .include "ot6_debilitator.asm"

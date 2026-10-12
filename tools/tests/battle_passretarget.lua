@@ -6,7 +6,7 @@
 --
 -- OT6 buys extra passes of an action through the engine's multi-hit counter
 -- $3a70: a boosted Fight or Capture (two swings a point), Setzer's Coin Toss,
--- Hired Help and Jackpot (one toss, hire or roll a point), Pummel, Bum Rush
+-- Hired Help (one toss or hire a point) and Jackpot (its two rolls), Pummel, Bum Rush
 -- and Drill (Ot6HitCountTbl), a dumped Throw.  Vanilla's loop does not
 -- retarget a pass whose body fell on the pass before: a hire's next pass
 -- landed nowhere and the one after retargeted (wt/hire-sprite: a 3 BP Hired
@@ -26,8 +26,9 @@
 --   hire:    Hired Help at 1 BP on the weakest body: a hire lands 1,550 on
 --            a shielded body at L31 (kits.md) and an Exoray has 1,200 HP, so
 --            the first hire kills it and the second must find another body;
---   jackpot: Jackpot at 1 BP on the default target (a face of 3 or more,
---            2,511 shielded at L31, kills any body of the crowd at full HP);
+--   jackpot: Jackpot (a divine: 3 BP, its two rolls) on the default target
+--            (a face of 3 or more, 2,511 shielded at L31, kills any body of
+--            the crowd at full HP, so the second roll must find another);
 --   resplit: Hired Help unboosted on the strongest body (2,058 -> 458 on a
 --            PowerDemon), then Coin Toss at 2 BP over the group, so a toss
 --            fells one body and the next splits over the rest; or Coin Toss
@@ -150,7 +151,7 @@ local function cands(fn, more)
 end
 local PLANS = {
   { kind = "hire", crowds = 4, cands = cands(function() return { aim({ row = HIRE, boost = 1 }, "weak") } end) },
-  { kind = "jackpot", crowds = 6, cands = cands(function() return { { row = JACKPOT, boost = 1 } } end) },
+  { kind = "jackpot", crowds = 6, cands = cands(function() return { { row = JACKPOT, boost = 3 } } end) },
   { kind = "resplit", crowds = 10, cands = cands(function() return { aim({ row = HIRE, boost = 0 }, "strong"),
     { row = COIN, boost = 2 } } end, { others = "fight", fn = function() return { { row = COIN, boost = 1 } } end }) },
 }

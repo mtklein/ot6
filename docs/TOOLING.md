@@ -240,6 +240,45 @@ shared_prefs/ot6.xml` shows the last result.
 Only the ROMs, `build/`, `build.ninja`, `tools/Mesen.app`, and `tools/bin`
 are git-ignored. Ripped assets are tracked.
 
+## State of the world: tools/status
+
+`tools/status` prints one line per item and exits 1 if any line is a
+problem. `ok` lines are healthy, `--` lines are information, and `!!` lines
+are problems. It runs in about a second (`--no-fetch` skips `git fetch`).
+An unresolvable host takes about 5 s, because mDNS waits that long. It
+reports on the main tree of the checkout it runs from:
+
+- **git**: the main tree's uncommitted work, and local `main` against
+  `origin/main` after a fetch. Then every worktree, and every `wt/*` branch
+  local or on origin, with its commits ahead of `origin/main`, its tip's
+  age, and how many of those commits `git cherry` finds missing from main.
+  `finished` (none missing) means it can be deleted. Unpushed commits are
+  shown too.
+- **release**: `VERSION`, the newest `v*` tag, GitHub's latest release and
+  its `ot6-vX.Y.zip`/`.apk`, and README's "vX.Y is the current release". A
+  `release/*` branch with patches main lacks is shown as well.
+- **github**: `gh auth status`, and a `git push --dry-run` of `origin/main`
+  onto itself. The dry run authenticates through git's credential helper
+  (`gh auth git-credential` for github.com) and writes nothing.
+- **issues**: the open issues in the lowest open `vX.Y` milestone.
+- **live**: whether live.py answers, which machines it watches, and which
+  of them are down.
+- **machines**: each host in `tools/machines.txt`, checked over one ssh
+  connection each, all in parallel. It shows reachability, AC power
+  (`tools/tests/lib/power_source.py`), `~/.config/ot6/emulator-slots`, the
+  load, the emulators running, and a pending reboot
+  (`/var/run/reboot-required.pkgs`). The probe carries its own code, so the
+  far checkout's version does not matter. A machine marked `excluded:` in
+  `tools/machines.txt` is shown as excluded and never counts as a problem.
+  `--machine HOST` (repeatable) checks other hosts instead.
+
+live.py shows the same problems in a red banner at the top of every page
+(`health.json`). Each machine's snapshot carries `local_facts()`, read every
+30 s, and the viewer judges it with `judge_machine()`. The viewer also runs
+the GitHub and release checks every 10 minutes. A peer whose checkout lacks
+`tools/status` sends no facts, so it is judged only on whether it is up and
+on its power.
+
 ## The machine-wide emulator limit
 
 Every `tools/tests/run.sh` takes one of its machine's emulator slots before

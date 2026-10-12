@@ -394,10 +394,11 @@ Notes on the targets:
   each stone arrives").  The grind for it is outside: groups 49 and 51,
   about 3,200-3,700 per member a fight, about 15 fights for L41 to L45.
 - **MagiMaster's death counter is Ultima** (`counter: Ultima<pow 150>`).
-  Vanilla's answer is Life 3; here Life 3 is Phoenix's boost, and Phoenix
-  comes at v0.32.  At v0.30 the answers are Shell (Shiva, Carbunkl,
-  ZoneSeek at Jidoor's auction) and HP; the roll at the party's MDef is
-  the lab's first measurement, and it sets the target.
+  Vanilla's answer is Life 3, and here it is any Life boosted two or
+  more: Terra's natural Life (L18) and Sraphim's are in hand, so Life 3
+  pre-cast on the party answers it, with Shell (Shiva, Carbunkl, ZoneSeek)
+  and HP besides; the roll at the party's MDef is the lab's first
+  measurement, and it sets the target.
 - **Kefka's Tower takes three parties**, so the target applies to twelve
   members (or as many as the route seats).  From v0.32 on, rotation is part
   of the plan, not an afterthought.

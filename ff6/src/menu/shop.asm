@@ -2306,7 +2306,7 @@ ShopOnlyOneMsgText:             pos_text SHOP_ONLY_ONE_MSG
 .segment "shop_prop"
 
 ; ------------------------------------------------------------------------------
-; ShopProp is the vanilla blob plus one named byte override.
+; ShopProp is the vanilla blob plus named byte overrides.
 ;
 ; Why the splice and not an edited .dat.  Same reason MagicProp is spliced in
 ; battle_main.asm: shop_prop.dat is 128 fixed 9-byte records with no source
@@ -2338,11 +2338,35 @@ SHOP_PROP_COUNT = 128
 ; is fire|holy weak, so one item covers both monsters in the scenario.
 GHOST_TRAIN_SHOP     = 85
 GHOST_TRAIN_SLOT8_AT = GHOST_TRAIN_SHOP * SHOP_PROP_REC + 8
+
+; ---- overrides 2-4: Edgar's Flash and Debilitator where kits.md sources them
+; (#378).  Vanilla stocks Flash only from the Figaro tool merchant's later
+; lists (shops 83 and 84) and Debilitator only from the World of Ruin's (84)
+; or a steal.  kits.md's Tools table sources Flash from the Figaro shop,
+; restocked at South Figaro, and Debilitator from the Vector shop, so:
+;   shop 82 (Figaro's tool merchant, World of Balance) slot 4: Flash
+;   shop 5  (South Figaro's weapon shop, which already sells NoiseBlaster
+;           and Bio Blaster) slot 7: Flash
+;   shop 27 (Vector's weapon shop, open during the banquet) slot 5:
+;           Debilitator
+; Each slot was an empty $ff; no other stock moves.
+SF_TOOLS_SHOP        = 5
+SF_TOOLS_SLOT7_AT    = SF_TOOLS_SHOP * SHOP_PROP_REC + 7
+VECTOR_SHOP          = 27
+VECTOR_SLOT5_AT      = VECTOR_SHOP * SHOP_PROP_REC + 5
+FIGARO_TOOLS_SHOP    = 82
+FIGARO_TOOLS_SLOT4_AT = FIGARO_TOOLS_SHOP * SHOP_PROP_REC + 4
 SHOP_PROP_END        = SHOP_PROP_COUNT * SHOP_PROP_REC
 
 ; c4/7ac0
 ShopProp:
-        .incbin "shop_prop.dat", 0, GHOST_TRAIN_SLOT8_AT
+        .incbin "shop_prop.dat", 0, SF_TOOLS_SLOT7_AT
+        .byte   ITEM::FLASH                             ; shop 5 slot 7 (was $ff)
+        .incbin "shop_prop.dat", SF_TOOLS_SLOT7_AT + 1, VECTOR_SLOT5_AT - SF_TOOLS_SLOT7_AT - 1
+        .byte   ITEM::DEBILITATOR                       ; shop 27 slot 5 (was $ff)
+        .incbin "shop_prop.dat", VECTOR_SLOT5_AT + 1, FIGARO_TOOLS_SLOT4_AT - VECTOR_SLOT5_AT - 1
+        .byte   ITEM::FLASH                             ; shop 82 slot 4 (was $ff)
+        .incbin "shop_prop.dat", FIGARO_TOOLS_SLOT4_AT + 1, GHOST_TRAIN_SLOT8_AT - FIGARO_TOOLS_SLOT4_AT - 1
         .byte   ITEM::FIRE_SKEAN                        ; shop 85 slot 8 (was $ff)
         .incbin "shop_prop.dat", GHOST_TRAIN_SLOT8_AT + 1, SHOP_PROP_END - GHOST_TRAIN_SLOT8_AT - 1
 

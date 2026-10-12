@@ -78,9 +78,9 @@
         ; ($1cf7 bit set); otherwise fall back to the auto window for this slot
         ; rather than offer an uncastable tech.  Unpack and learned-test are the
         ; same leaves the menu draw uses (Ot6LoadoutUnpack / Ot6TechLearned),
-        ; so battle and menu cannot decode the word differently.  Callers run
-        ; Ot6BushidoOblivion after this proc, so a manually-placed Oblivion
-        ; (tech 7) keeps its spent-divine -> Tempest swap.
+        ; so battle and menu cannot decode the word differently.  Cleave
+        ; (tech 7) stands only in the 3-BP slot (Ot6CleaveSlot): a divine's
+        ; one gate is a full boost.
         longa
         lda     f:OT6_LOADOUT   ; packed loadout word (0 = AUTO)
         shorta                  ; plain SEP #$20, keeps Z (shorta0's tdc wipes it)
@@ -89,6 +89,15 @@
         jsl     Ot6LoadoutUnpack    ; A = stored tech for this slot (clobbers X)
         jsl     Ot6TechLearned      ; carry = learned (A and Y preserved)
         bcc     @auto           ; stored tech not learned -> auto fallback
+        pha
+        lda     $02,s           ; the boost = the slot
+        longa
+        and     #$00ff
+        tax
+        shorta
+        pla
+        jsl     Ot6CleaveSlot   ; Cleave stands only in the 3-BP slot
+        bcc     @auto
         sta     $01,s           ; learned: overwrite the parked boost with tech
         pla                     ; A = tech (mirrors @auto's balanced tail)
         rtl
@@ -116,39 +125,6 @@
         rtl
 .endproc
 
-; [ Bushido Oblivion top-tier swap ]
-; the window's top tier is Oblivion (tech 7) once Cyan has learned all eight:
-; ceiling 7, boost 3 -> base 4 + 3 = 7, by the same base+boost sum as any other
-; tier, so the divine comes out of the window itself with no special case
-; outside it. it is selected here only when learned and unspent, and gated at
-; resolution by Ot6Oblivion (hooked after ChooseTarget in CalcAttackEffect,
-; because the target does not exist at command-latch time, swdtech being in
-; RetargetCmdTbl). read the once-per-battle flag here and drop a spent
-; Oblivion back to Tempest (6) so BP3 keeps a live top tier. (a divine is spent
-; only on a broken, killable target; an unbroken/boss target folds to tempest at
-; resolution and leaves the flag clear, so the menu keeps offering it.)
-; a8/i16.  in: A = tech (0..7).  out: A = tech (a spent tech-7 -> 6).  clobbers X.
-.proc Ot6BushidoOblivion
-        .a8
-        .i16
-        cmp     #$07
-        bne     @done           ; not oblivion: the chosen tech stands
-        lda     $62ca           ; re-derive the active char's entity bit
-        and     #$03
-        asl                     ; slot * 2 = entity offset
-        longa
-        and     #$00ff
-        tax
-        shorta0
-        lda     $3018,x         ; active char's bit ($01/$02/$04/$08)
-        and     OT6_DIVINE_USED ; already spent the divine this battle?
-        beq     @obl            ; no: oblivion stands
-        lda     #$06            ; yes: revert to tempest for the rest of it
-        rtl
-@obl:   lda     #$07            ; oblivion
-@done:  rtl
-.endproc
-
 .proc Ot6BushidoTier
         .a8
         .i16
@@ -163,7 +139,6 @@
         bcc     :+
         lda     #$03            ; (defensive: Ot6Boost already caps at 3)
 :       jsl     Ot6BushidoTech      ; boost -> tech (shared window math)
-        jsl     Ot6BushidoOblivion  ; spent-divine top tier -> tempest
         pha
         asl5                    ; level * 32, the counter value vanilla's
         sta     $7b82           ;   bar drew, so w7e7b82 still feeds the

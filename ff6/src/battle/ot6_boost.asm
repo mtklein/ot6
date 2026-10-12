@@ -45,6 +45,9 @@
                                 ;   standing magic shield she never paid for
         sta     f:$7e0000+OT6_WEAPSPELL ; nor a weapon-spell flag from the
                                 ;   last battle's final pass
+        sta     f:$7e0000+OT6_ULTIMAFOLD ; nor a folded-Ultima mark
+        sta     f:$7e0000+OT6_RUNICBLADE ; nor a RunicBlade nobody raised
+        sta     f:$7e0000+OT6_BLADEPEND  ; nor a bounce from the last battle
         sta     f:$7e0000+OT6_UNCTL     ; nor a stale "the engine is driving
                                 ;   this one" flag (#236): it would hand the
                                 ;   first uncontrolled swing of this battle a
@@ -194,6 +197,10 @@
         sta     f:$7e0000+OT6_RUNICPAID  ;   Separate ledger from COVERPAID
                                 ;   on purpose: see OT6_RUNICPAID in
                                 ;   ot6_memory.inc.
+        lda     $3018,x         ; and a folded Ultima's mark is spent with
+        eor     #$ff            ;   the action that cast it
+        and     f:$7e0000+OT6_ULTIMAFOLD
+        sta     f:$7e0000+OT6_ULTIMAFOLD
         ; #346: an action that never ran buys nothing, so it costs nothing.
         ; ExecAction runs a fresh turn whose command list is empty -- the
         ; action was removed after its entry reached the action queue: a
@@ -398,7 +405,8 @@ done:   jsr     Ot6PipPending
         lda     $3e4c,y
         ora     #$04
         sta     $3e4c,y
-@earn:  lda     $3018,y         ; this character's bit ($01/$02/$04/$08)
+@earn:  jsl     Ot6BladeAbsorb  ; a RunicBlade banks its bounce
+        lda     $3018,y         ; this character's bit ($01/$02/$04/$08)
         and     f:$7e0000+OT6_RUNICPAID
         bne     done            ; already banked an absorb this round
         lda     OT6_BP_CLASS,y
@@ -447,6 +455,7 @@ done:   rtl
         bcc     :+
         lda     #$03            ; (defensive: Ot6Boost already caps at 3)
 :       sta     f:$7e0000+OT6_RUNICTURNS,x
+        jsl     Ot6BladeRaise   ; a full boost raises a RunicBlade
 done:   rtl
 .endproc
 
@@ -482,13 +491,14 @@ done:   rtl
         cmp     #$08
         bcs     done            ; monsters hold no duration
         lda     f:$7e0000+OT6_RUNICTURNS,x
-        beq     done            ; no extended stance: vanilla's clear stands
+        beq     ended           ; no extended stance: vanilla's clear stands
         dec
         sta     f:$7e0000+OT6_RUNICTURNS,x   ; one turn of shield spent
         lda     $3e4c,x
         ora     #$04            ; ...and the stance survives her acting
         sta     $3e4c,x
 done:   rtl
+ended:  jml     Ot6BladeEnd     ; the stance ends, and a RunicBlade with it
 .endproc
 
 ; ------------------------------------------------------------------------------
@@ -906,7 +916,11 @@ done:   pla
 ; set.  The guard instead compares the queue slot just written (y/2)
 ; against the actor's own counterattack pointer $32cd,x, written by
 ; CreateRetalAction (:13211) and left untouched by CreateNormalAction
-; (:13228) -- only a real counterattack matches.
+; (:13228) -- only a real counterattack matches.  It compares on every
+; queue, not only while $b1.0 is up: a RunicBlade's bounce
+; (ot6_runicblade.asm) is a counter queued from CheckRetal at the end of an
+; ordinary action, with $b1.0 clear, and must not fold on a pending boost
+; Celes may have raised in her open menu.
 ;
 ; Untaught tiers still fold: a borrowed Fire folds to Fire 3 whether or not
 ; the caster ever learned Fire 3.  The price must come from MagicProp
@@ -930,9 +944,6 @@ done:   pla
         ; to the actor's counterattack slot $32cd,x (battle_main.asm:13211);
         ; CreateNormalAction writes $32cc,x instead (:13228), so the two
         ; never match for an ordinary action.
-        lda     $b1             ; is a counterattack executing at all?
-        lsr                     ;   ($b1.0, set by ExecRetal, :12676)
-        bcc     @cmd            ; no: nothing to disambiguate
         tya                     ; the queue slot, pointer * 2
         lsr                     ;   -> the pointer just queued
         cmp     $32cd,x         ; the actor's pending counterattack pointer
@@ -967,7 +978,13 @@ done:   pla
                                 ;   multiplier, so neither its id nor its price
                                 ;   moves
         sta     $3a7b           ; queue the folded tier
-        xba                     ; (park it: the mimic test needs A)
+        cmp     #OT6_ULTIMA_ID  ; Terra's fourth fold: mark it, so the
+        bne     :+              ;   boost that bought the tier does not also
+        lda     $3018,x         ;   buy Ot6BoostDmg's multiplier
+        ora     f:$7e0000+OT6_ULTIMAFOLD
+        sta     f:$7e0000+OT6_ULTIMAFOLD
+        lda     #OT6_ULTIMA_ID
+:       xba                     ; (park it: the mimic test needs A)
         lda     $02,s           ; the caller's P, pushed by the php above
         and     #$40            ;   V: a mimic's copy (CreateAction, #260)
         bne     @keep           ;   buys the tier and keeps GetMPCost's 0
@@ -1053,16 +1070,34 @@ done:   pla
 ; Life 3 top the deep lines, and the shallow families (Poison, Slow, Haste)
 ; repeat their second entry so a 3-BP spend is never dead.
 ;
+; One exception, and it is a fourth fold rather than a fourth column: TERRA,
+; once she has rejoined in the World of Ruin (event switch $00bf, set by the
+; Mobliz scene where she finds her reason to fight, event_main.asm), gets
+; three steps for three points, and Ot6FoldTier folds a three-step Fire
+; past Fire 3 into Ultima (kits.md: "Ultima is the fourth fold").  Every
+; other family, and everyone else, stops at two steps.
+;
 ; in: x = the character's entity offset.  out: A = OT6_SCR_BIT = tier steps
-; (0-2), Z set when the character has no boost pending.  a8, db=$7e;
+; (0-3), Z set when the character has no boost pending.  a8, db=$7e;
 ; preserves x/y.
+OT6_ULTIMA_SW   = $1e80 + ($bf >> 3)    ; switch $00bf: Terra's WoR return
+OT6_ULTIMA_BIT  = 1 << ($bf & 7)
+OT6_ULTIMA_ID   = $14
 .proc Ot6FoldSteps
         .a8
         lda     OT6_BOOST_REVEALED,x
         beq     @out
         cmp     #$02
         bcc     @out
-        lda     #$02            ; at most two tiers up
+        beq     @two
+        lda     $3ed8,x         ; three points: TERRA, after her WoR return,
+        bne     @two            ;   folds a step further (char id 0)
+        lda     f:$7e0000+OT6_ULTIMA_SW
+        and     #OT6_ULTIMA_BIT
+        beq     @two
+        lda     #$03
+        bra     @out
+@two:   lda     #$02            ; at most two tiers up
 @out:   sta     OT6_SCR_BIT     ; tier steps
         lda     OT6_SCR_BIT     ; re-load so Z reflects the value, not a leftover
         rtl
@@ -1229,7 +1264,11 @@ done:   pla
         bcc     @scan
         pla
         plx
+        cmp     #OT6_BREAK_SPELL ; Break: its boost buys shields
+        beq     @flat           ;   (Ot6BreakSpell), so its price stays flat
         clc
+        rtl
+@flat:  sec
         rtl
 @yes:   pla
         plx
@@ -1272,10 +1311,23 @@ done:   pla
         pla                     ; not a tier family: hand the id back unchanged
         plx
         rtl
-@hit:   txa                     ; row offset (< $18, fits 8 bits)
+@hit:   lda     OT6_SCR_BIT
+        cmp     #$03            ; Terra's fourth fold (Ot6FoldSteps)
+        bcc     @tier
+        txa
+        bne     @cap            ; only Fire's row (offset 0) folds four deep
+        lda     #OT6_ULTIMA_ID
+        sta     $01,s
+        pla
+        plx
+        rtl
+@cap:   clc                     ; every other family stops at its third
+        adc     #$02            ;   column (A = the row offset, from txa)
+        bra     @idx
+@tier:  txa                     ; row offset (< $18, fits 8 bits)
         clc
         adc     OT6_SCR_BIT
-        longa
+@idx:   longa
         and     #$00ff
         tax
         shorta0
@@ -1518,6 +1570,7 @@ OT6_LIFE3_ID = $35
         sep     #$20
         .a8
         pha
+        jsr     Ot6BreakProps   ; ot6: a character's Break is OT6's (#398)
         jsr     Ot6Life3Cast
         bne     @out
         lda     #$08            ; can hit dead targets
@@ -1815,7 +1868,7 @@ OT6_LIFE3_ID = $35
         beq     @swdtech        ; swdtech: boost bought the tech tier, and the
                                 ;   row it picked is priced at its own price
         cmp     #$09
-        beq     @boosted        ; tools
+        beq     @tools          ; tools
         cmp     #$0a
         beq     @boosted        ; blitz
         pla                     ; some other verb: hand back vanilla's cost
@@ -1909,7 +1962,14 @@ OT6_LIFE3_ID = $35
         pla                     ; drop the parked cost (0 for slot)
         lda     $3a7b
         jsl     Ot6SetzerCost
-        plp
+        beq     :+
+        pha                             ; Jackpot, the one priced row: a throw
+        lda     OT6_BOOST_REVEALED,x    ;   queued under a full boost pays its
+        cmp     #$03                    ;   price; one queued under less rolls
+        pla                             ;   nothing (Ot6JackpotDice) and pays
+        bcs     :+                      ;   nothing (pla keeps the carry)
+        lda     #$00
+:       plp
         rtl
 @swdtech:
         ; SwdTech's boost was already spent, on the tech: Ot6BushidoTier left
@@ -1920,6 +1980,13 @@ OT6_LIFE3_ID = $35
         pla                     ; drop the parked cost (it is 0 for these)
         lda     $3a7b           ; the resolved attack id
         jsl     Ot6CostFor      ; pure table scan: id -> cost in A
+        plp
+        rtl
+@tools: ; a Tool is the @boosted price, twice when Edgar's Overclock fires
+        ; it (Ot6ToolPrice, the leaf the drawn row and the confirm take)
+        pla
+        lda     $3a7b
+        jsl     Ot6ToolPrice
         plp
         rtl
 @boosted:
@@ -2122,7 +2189,15 @@ Ot6ThiefCostTbl:
         bcc     @pend
         lda     f:$7e0000+OT6_DANCETIER,x
         rtl
-@pend:  lda     OT6_BOOST_REVEALED,x
+@pend:  lda     $3a7d           ; Terra's fourth fold: an Ultima the boost
+        cmp     #OT6_ULTIMA_ID  ;   bought as a tier (Ot6QueueFold marked
+        bne     @live           ;   it) takes no multiplier on top, the
+        lda     $3018,x         ;   fold's own rule; an Ultima cast from a
+        and     f:$7e0000+OT6_ULTIMAFOLD  ; Ragnarok's list keeps it
+        beq     @live
+        lda     #$00
+        rtl
+@live:  lda     OT6_BOOST_REVEALED,x
         rtl
 .endproc
 

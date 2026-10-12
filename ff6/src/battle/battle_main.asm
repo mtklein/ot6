@@ -920,8 +920,10 @@ RandBushido:
         ora     $3ba5,y
         bit     #$02
         beq     RandCmdInvalid
-        lda     $2020
-        inc
+        jsl     Ot6RandBushidoTop   ; ot6: the random pick stops short of
+                                ;   Cleave, the divine (ot6_divine.asm);
+                                ;   replaces `lda $2020 / inc`
+RandBushidoRange:               ; observation only: no emitted bytes
         jsr     RandA
         clc
         adc     #$55        ; dispatch (first swdtech)
@@ -4177,6 +4179,8 @@ _c2192e:
 ; [ command $03: morph ]
 
 Cmd_03:
+        jsl     Ot6TranceGate   ; ot6: Trance takes a full 3-BP boost
+        bcc     _c2192e         ;   (ot6_trance.asm); without one, no morph
 @1936:  sec
 _1937:  php
         tyx
@@ -7144,6 +7148,23 @@ BUM_RUSH_POWER_VANILLA = 128            ; the byte this replaces
 ; neither price) keep casting it.
 LIFE3_MP_OT6       = 60
 LIFE3_MP_VANILLA   = 50                 ; the byte this replaces
+
+; ---- Break ($0c): no record override (#398) ---------------------------------
+; Vanilla Break is petrify: hit 120, power 0, death-class.  The record stays
+; vanilla's, so a monster's Break -- and Control, Sketch and a Rage, which
+; cast as monsters do -- still petrifies.  A character's Break through Magic
+; or X-Magic (a Mimic of one included) or the Break Blade's on-hit cast is
+; OT6's: Ot6BreakProps (ot6_breakspell.asm), from CalcAttackEffect's head
+; before ChooseTarget and CheckHit, clears the four bytes that made it a
+; status roll in the loaded record ($11a0..$11ad):
+;   $11a2 bit 1   the instant-death flag: a boss's instant-death protection
+;                 ($3aa1.2) made CheckHit miss it
+;   $11a4 $10->$20  the stamina-evade death check -> can't-dodge: a chip
+;                 takes no hit roll (CheckHit's @22a1 `bit #$20`)
+;   $11a7 bit 0   auto-miss when the target is immune to the status
+;   $11aa bit 6   Petrify
+; and Ot6BreakSpell, in the per-target loop, takes the shields.  Characters
+; carry no shields, so OT6's Break on a party member does nothing.
 ; ------------------------------------------------------------------------------
 
 ; c4/6ac0
@@ -8683,6 +8704,7 @@ CalcAttackEffect:
         beq     @346c
         stz     $3a48
         jsl     Ot6Life3Revive  ; ot6: Life 3 on a KO'd body revives it (#327)
+        jsl     Ot6BreakSpell   ; ot6: Break takes shields, not a petrify (#398)
         jsr     MagicStatusEffect
         jsr     DoTargetEffect
         lda     $3a48
@@ -8792,6 +8814,7 @@ CalcReflectDmg:
 RunicEffect:
 @352b:  .a8
         .i8
+        jsl     Ot6BladeNoRunic ; ot6: a RunicBlade's bounce is not absorbed again
         lda     $11a3
         bit     #$08
         beq     @35ac
@@ -9784,6 +9807,8 @@ TargetEffect_56:
         lda     $01,s
         ora     $3be0,y
         sta     $3be0,y
+        lda     $01,s
+        jsl     Ot6DebilReveal  ; ot6: the weakness it adds is revealed
         pla
         not_a
         pha
@@ -12859,6 +12884,9 @@ RemoveRetal:
 ; [ check for counterattacks ]
 
 CheckRetal:
+        jsl     Ot6BladeBounce  ; ot6: a RunicBlade sends back what it absorbed
+        bcc     @4c5b           ;   (ot6_runicblade.asm): x = Celes, the queue
+        jsr     CreateRetalAction ; bytes and the caster target already set
 @4c5b:  ldx     #$12        ; loop through all targets
 @4c5d:  lda     $3aa0,x     ; $3aa0.0 skip if target is not present
         lsr

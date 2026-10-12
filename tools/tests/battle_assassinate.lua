@@ -4,11 +4,12 @@
 --
 --   tools/tests/run.sh tools/tests/battle_assassinate.lua
 --
--- The rule (#239, owner ruling 2026-09-21).  When Shadow's own hit breaks a
--- non-boss body, the divine kills it on that hit; a hit of his on a body
--- already Broken kills it too.  Once per battle (OT6_DIVINE_USED $3ecb,
--- Shadow's entity bit), never a boss ($3aa1 bit 2, the instant-death
--- protection ScimitarEffect reads).
+-- The rule (#239, owner ruling 2026-09-21; the 3-BP gate, owner 2026-10-11,
+-- kits.md "Divines").  When Shadow's own hit, on an action he boosted with
+-- all three points, breaks a non-boss body, the divine kills it on that
+-- hit; such a hit on a body already Broken kills it too.  Under three
+-- points there is no divine; there is no once-a-battle limit; never a boss
+-- ($3aa1 bit 2, the instant-death protection ScimitarEffect reads).
 --
 -- Where the kill lives, against the action's order in battle_main.asm.
 -- ExecAttack -> CalcAttackEffect: ChooseTarget, then Ot6Oblivion and
@@ -53,23 +54,23 @@
 -- shielded non-boss bodies and at least three bodies in all (arm 2 needs
 -- hits to keep landing after the kill); the rest are fled.
 --
---   1. the breaking hit: Shadow's Fight empties a PIERCE-weak non-boss
---      body's last shield.  On that hit the ROM's chip path writes
---      OT6_BROKEN_TICKS for the body with x = Shadow's entity offset; the
---      in-proc $3dd4 Death mark inside Ot6AssassinateGate, reached from
---      Ot6HitJoin (the caller is read off the stack), follows in the same
---      frame with the next sequence number; the body's HP write and its
---      Death status are the next two ledger events (the frame counter may
---      tick once inside the action); and the flag is set.
---   2. once per battle: the same battle continues, Shadow breaks or strikes
---      further bodies, monster HP keeps falling (hpDrops, the loud control),
---      and no second in-proc mark comes; the flag byte never changes again.
+--   1. battle 1: at 3 BP SHADOW's hits kill two bodies in one battle (no
+--      once-a-battle limit); at least one is the breaking hit itself, whose
+--      ledger order is checked: the chip path's break store with x =
+--      SHADOW, then the in-proc $3dd4 Death mark inside Ot6AssassinateGate,
+--      reached from Ot6HitJoin -- the caller read off the stack -- then the
+--      body's HP write and its Death status, the frame counter ticking at
+--      most once inside the action.  SHADOW's pending boost is read at every
+--      break and mark.
+--   2. battle 2, the gate: unboosted, his breaking hit and his hits on the
+--      body it broke draw no mark.
 --   3. the boss check: no boss shares a battle with Shadow anywhere in the
---      generated tree, so the negative is an isolation arm.  A fresh battle
---      (fresh flag), a PIERCE-weak body given $3aa1.2 -- the bit a boss
+--      generated tree, so the negative is an isolation arm, played at 3 BP
+--      (so the gate the boss check guards is open).  A fresh battle, a
+--      PIERCE-weak body given $3aa1.2 -- the bit a boss
 --      carries -- and STAGED_HP hit points before any chip (this file's two
 --      writes), then Shadow breaks it by real chips: the break write comes,
---      no mark, no flag spent.  Then his next attack on it reaches the hook
+--      no mark.  Then his next attack on it reaches the hook
 --      point (Ot6Assassinate puts the Broken body to the gate before the hit
 --      roll, read off the gate's entry: caller, x = Shadow, y = the body,
 --      its OT6_BROKEN_TICKS nonzero) and draws no mark either.  The HP is
@@ -79,10 +80,11 @@
 --      ~200), so it claimed a check it did not make.  It is required now.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/camp_escaped.mss.lua"
--- Lever, for evidence only (the suite runs BURN 0): run from that many
--- encounters on the paced stretch before battle 1, to vary the encounter
--- history (TESTING.md: the draw moves with encounters used up, not seeds).
-local BURN = 0
+-- Lever, for evidence only (the suite runs BURN 0; a lab sets the global
+-- ASSASSINATE_BURN ahead of the file): run from that many encounters on the
+-- paced stretch before battle 1, to vary the encounter history (TESTING.md:
+-- the draw moves with encounters used up, not seeds).
+local BURN = type(ASSASSINATE_BURN) == "number" and ASSASSINATE_BURN or 0
 -- The walk paces one pool's stretch of the boot row (H.newPacer, #306): the
 -- clock pattern this file used (down, down, left, left, up, up, right,
 -- right, 25 frames each) left the pool its budget was decoded from -- main
@@ -101,22 +103,23 @@ local P = H.newPacer({ tag = "pace",
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_TRANS, ST_CMD, ST_DEF, ST_TGT = 0x01, 0x05, 0x27, 0x38
-local DIVINE_USED = 0x3ECB
 local SHADOW = 0x03
 local OT6_PIERCE = 0x02
 local BREAK_TICKS = 0x10   -- OT6_BREAK_TICKS (ot6_break.asm:1): the value
                            -- the "shields down: break" store writes; the
                            -- timer's own ticks write less
--- Arm 1's fights: a suitable fight shows the divine unless Interceptor's
--- counters empty it before Shadow breaks a body, a matter of play, not the
--- pool.  Measured (#296): 6 of 35 arm-1 fights ended with no divine
--- (build/attempts/wt/suite-anydraw/lab/logs/assassinate_*, and this branch's
--- sweeps over 0-13 encounters used up and seed shifts,
--- build/attempts/wt/v026-suites/assassinate/); the one-sided 95% upper bound
--- on that rate is 0.31, and at it FIGHTS = 8 misses with 0.31^8 = 8.7e-5,
--- under 1e-4 (the 6 this file used to build: 9.0e-4).
+-- Arm 1's fights: battle 1 wants two kills in one fight (the divine has no
+-- once-a-battle limit), and a fight falls short when Interceptor's counters
+-- or the others' turns empty it first -- a matter of play, not the pool.
+-- Measured at 9d364dc1 on this branch's own camp_escaped, over 0-7
+-- encounters used up first (ASSASSINATE_BURN, the history lever): 8
+-- successes in 25 fights, the fight counts 1, 3, 2, 10, 4, 2, 1, 2
+-- (build/attempts/wt/v027-kits/budgets/battle_assassinate_*.out).  The rate
+-- is 0.32; its one-sided 95% lower bound is 0.17, and at it FIGHTS = 50
+-- misses with 0.83^50 = 9.0e-5, under 1e-4 (at the measured rate,
+-- 0.68^50 = 4e-9).  A fight is paid for only when it is needed.
 -- Arm 3 needs one: its staged body cannot fall before it breaks.
-local FIGHTS = 8
+local FIGHTS = 50
 -- the isolation arm's staged HP (header): enough that the bitted body
 -- outlives its doubled break and the hits after it (Shadow's back-row
 -- blows on this pool are ~50 shielded, ~200 on the break)
@@ -131,10 +134,9 @@ local function mhp(m) return H.readWord(0x3BFC + m * 2) end
 local function present(m) return H.readByte(0x3AA8 + m * 2) % 2 == 1 end
 local function alive(m) return present(m) and mhp(m) > 0 end
 local function dead(m) return H.readByte(0x3EE4 + ent(m)) & 0x80 ~= 0 end
-local function flagByte() return H.readByte(DIVINE_USED) end
 
 local shadowSlot, msPresent = nil, {}
-local function shadowBit() return 1 << shadowSlot end
+local function shadowPend() return shadowSlot and H.readByte(0x3E9D + shadowSlot * 2) or -1 end
 
 -- ---- the ledger: the ROM's writes, in the ROM's order -------------------
 -- One sequence counter across every callback below, so two writes in the
@@ -190,7 +192,7 @@ emu.addMemoryCallback(function()
     local x, y = st["cpu.x"] & 0xFF, st["cpu.y"] & 0xFF
     if gateVia == "site" and shadowSlot and x == shadowSlot * 2 and y >= 8
       and H.readByte(0x3E88 + y) ~= 0 then
-      hookReads[#hookReads + 1] = { f = H.frame, y = y, seq = stamp() }
+      hookReads[#hookReads + 1] = { f = H.frame, y = y, seq = stamp(), pend = shadowPend() }
       H.log(string.format("[hook] f%d seq%d the hook point puts Broken body %d to the gate "
         .. "under SHADOW's attack ($3aa1=$%02x)", H.frame, seq, (y - 8) // 2,
         H.readByte(0x3AA1 + y)))
@@ -203,7 +205,7 @@ emu.addMemoryCallback(function(addr, v)
     local pc = cpu()
     if pc >= GATE and pc < SITE then
       local m = ((addr - 0x7E0000 - 0x3DD4) - 8) // 2
-      local k = { m = m, f = H.frame, seq = stamp(), pc = pc, via = gateVia }
+      local k = { m = m, f = H.frame, seq = stamp(), pc = pc, via = gateVia, pend = shadowPend() }
       divineKills[#divineKills + 1] = k
       killPending[m] = true
       H.log(string.format("[divine] f%d seq%d body %d: Death marked in "
@@ -218,7 +220,7 @@ emu.addMemoryCallback(function(addr, v)
     local m = ((addr - 0x7E0000 - 0x3E88) - 8) // 2
     if brokeAt[m] ~= nil then return end
     local pc, atk = cpu()
-    brokeAt[m] = { f = H.frame, seq = stamp(), atk = atk, pc = pc }
+    brokeAt[m] = { f = H.frame, seq = stamp(), atk = atk, pc = pc, pend = shadowPend() }
     local site = (pc >= CLASSCHIP and pc < CLASSCHIP + 0x80) and "Ot6ClassChip"
       or ((pc >= ELEMCHIP and pc < ELEMCHIP + 0x80) and "Ot6Chip" or "?")
     H.log(string.format("[break] f%d seq%d body %d broke: %s store, "
@@ -324,9 +326,10 @@ local function fightPulse()
         brk(m) ~= 0 and "B" or "")
     end
     H.log(string.format("[pulse f%d] menu=%02x act=%d st=%02x drops=%d "
-      .. "broken=%d ic=%d kills=%d flag=$%02x tgt=%s %s", H.frame,
+      .. "broken=%d ic=%d kills=%d shadow bp=%d pend=%d want=%d tgt=%s %s", H.frame,
       H.readByte(MENU), H.readByte(ACTOR) & 3, H.readByte(MSTATE), hpDrops,
-      brokenHits, counters, #divineKills, flagByte(), tostring(pickTarget()),
+      brokenHits, counters, #divineKills, shadowSlot and H.readByte(0x3E9C + shadowSlot * 2) or -1,
+      shadowPend(), H.vars.shadowBoost or 0, tostring(pickTarget()),
       table.concat(parts, " ")))
   end
   if H.readByte(MENU) == 0 then
@@ -359,9 +362,19 @@ local function fightPulse()
     else btn = nil end
     if not edge then btn = nil end
   elseif st == ST_CMD then
+    -- the boost the arm wants (H.vars.shadowBoost, 0 or 3): Defend while the
+    -- bank is short of it, then R (or L) to exactly it, then Fight
+    local want = H.vars.shadowBoost or 0
+    local e = shadowSlot * 2
+    local pend, bank = H.readByte(0x3E9D + e), H.readByte(0x3E9C + e)
     local cur = H.readByte(0x890F + shadowSlot) & 3
-    btn = (cur == 0) and "a" or "up"   -- Fight is row 0
+    if want > 0 and bank < want and pend == 0 then btn = "right"
+    elseif pend < want and bank >= want then btn = "r"
+    elseif pend > want then btn = "l"
+    else btn = (cur == 0) and "a" or "up" end   -- Fight is row 0
     if not edge then btn = nil end
+  elseif st == ST_DEF then
+    btn = edge and "a" or nil           -- SHADOW's own Defend, banking
   elseif st == ST_TGT then
     -- H.targetCursor: "a" once the cursor sits on the wanted body, else a
     -- direction, decided once per 16-frame cycle at whatever phase the
@@ -526,8 +539,6 @@ local function encounter(tag)
       if H.readByte(0x3ED8 + s * 2) == SHADOW then shadowSlot = s end
     end
     H.assertEq(shadowSlot ~= nil, true, tag .. ": SHADOW is really here")
-    H.assertEq(flagByte() & shadowBit(), 0,
-      tag .. ": Shadow's divine flag clear at battle start")
     for _, m in ipairs(msPresent) do
       H.assertEq(aa1(m) & 0x04, 0, string.format(
         "%s: body %d is a non-boss (no $3aa1.2) -- the pool precondition",
@@ -580,131 +591,156 @@ for i = 1, BURN do
   })
 end
 
--- ===================== battle 1: arms 1 and 2 ==============================
--- arm 1: the breaking hit.  A fight Interceptor empties before Shadow
--- breaks anything is pressed out and the next one is taken, up to FIGHTS
--- of them; the arm asserts the divine fired within them, with the ledger
--- of every fight in the log.
+-- ===================== battle 1: the divine, twice in one battle ==========
+-- In one battle (a fight that ends before both is pressed out and the next
+-- one is taken, up to FIGHTS of them, each starting over), SHADOW Defends
+-- to 3 BP and Fights at 3 BP until a mark comes, then does it again until a
+-- mark comes on another body: the divine again in the same battle.  Every
+-- body's first mark is checked: SHADOW's pending boost was 3 when it was
+-- written, the body was Broken before it, and one whose break was his own
+-- 3-BP hit on the same action is the breaking hit itself, its ledger in
+-- order (the break store, the mark, the HP write, the Death status, the
+-- frame counter ticking at most once); and the body is dead.
+local phase, fights = "b", 0
+local function firstMarks()
+  local t, seen = {}, {}
+  for _, k in ipairs(divineKills) do
+    if not seen[k.m] then seen[k.m] = true; t[#t + 1] = k end
+  end
+  return t
+end
 add({
   (function()
-    local fights = 0
     local fight = {
       nextFight("battle 1"),
       H.call(function()
         fights = fights + 1
-        H.log(string.format("[arm 1] fight %d of up to %d", fights, FIGHTS))
+        phase = "b"
+        H.vars.shadowBoost = 3
+        H.log(string.format("[battle 1] fight %d of up to %d", fights, FIGHTS))
       end),
-      drive(function()
-        return #divineKills >= 1 or not H.battleLoadStarted()
-      end, 30000, "Shadow's hit breaks a body and the divine kills it"),
+      drive(function() return #firstMarks() >= 2 or not H.battleLoadStarted() end, 40000,
+        "SHADOW at 3 BP: the divine, twice"),
       H.call(function()
-        if #divineKills == 0 then
-          H.log(string.format("[arm 1] fight %d ended with no divine: "
-            .. "hpDrops=%d brokenHits=%d interceptor=%d -- the next encounter",
-            fights, hpDrops, brokenHits, counters))
+        if #firstMarks() < 2 then
+          H.log(string.format("[battle 1] fight %d ended with %d body(ies) marked (marks %d, hpDrops %d, interceptor "
+            .. "%d) -- the next encounter", fights, #firstMarks(), #divineKills, hpDrops, counters))
+          divineKills, brokeAt, hookReads = {}, {}, {}
         end
       end),
     }
     return H.repeatN(1, {
       H.repeatN(FIGHTS, {
-        H.cond(function() return #divineKills == 0 end, fight, {}),
+        H.cond(function() return #firstMarks() < 2 end, fight, {}),
       }),
+      H.waitFrames(8),
       H.call(function()
-        H.assertEq(#divineKills >= 1, true, string.format(
-          "the divine fired within %d fight(s) (fought %d; this fight's "
-          .. "hpDrops=%d)", FIGHTS, fights, hpDrops))
+        local marks = firstMarks()
+        H.assertEq(#marks >= 2, true, string.format("SHADOW's divine killed two bodies in one battle within %d "
+          .. "fight(s) (fought %d)", FIGHTS, fights))
+        local breaking = 0
+        for i, k in ipairs(marks) do
+          local b = brokeAt[k.m]
+          H.log(string.format("[battle 1] mark %d: body %d at f%d seq%d via %s, SHADOW's pending %d; break %s; hp "
+            .. "write %s; death %s; dead=%s", i, k.m, k.f, k.seq, tostring(k.via), k.pend,
+            b and string.format("f%d seq%d x=$%02x pend %d", b.f, b.seq, b.atk, b.pend) or "none",
+            hpWrite[k.m] and string.format("f%d seq%d", hpWrite[k.m].f, hpWrite[k.m].seq) or "none",
+            deathAt[k.m] and string.format("f%d seq%d", deathAt[k.m].f, deathAt[k.m].seq) or "none",
+            tostring(dead(k.m))))
+          H.assertEq(k.pend, 3, string.format("mark %d: SHADOW's action was boosted with all three points", i))
+          H.assertEq(dead(k.m), true, string.format("mark %d: the body is dead", i))
+          H.assertEq(b ~= nil and b.seq < k.seq, true, string.format("mark %d: the body was Broken before it "
+            .. "(the ROM's chip path wrote OT6_BROKEN_TICKS)", i))
+          if b.atk == shadowSlot * 2 and b.pend == 3 and k.via == "Ot6HitJoin" and b.seq + 1 == k.seq then
+            breaking = breaking + 1
+            H.assertEq(b.f == k.f, true, string.format("mark %d: the breaking hit's break write and Death mark "
+              .. "are one frame: break f%d, mark f%d", i, b.f, k.f))
+            local hw, da = hpWrite[k.m], deathAt[k.m]
+            H.assertEq(hw ~= nil and hw.seq == k.seq + 1 and hw.f - k.f <= 1, true, string.format("mark %d: "
+              .. "the mark precedes the hit's HP write (ApplyDmg), the next ledger event after it", i))
+            H.assertEq(da ~= nil and da.seq == hw.seq + 1 and da.f - k.f <= 1, true, string.format("mark %d: "
+              .. "UpdateStatus applied the Death right after the HP write: the breaking hit and the kill are "
+              .. "one action", i))
+          end
+        end
+        H.log(string.format("[battle 1] %d of the %d bodies' first marks were the breaking hit itself (%d marks "
+          .. "in all: a later swing of one Fight re-marks a body it killed)", breaking, #marks, #divineKills))
+        H.assertEq(breaking >= 1, true, "at least one kill was the breaking hit itself (#239)")
+        watching = false
+        H.screenshot("assassinate_kill")
       end),
     })
   end)(),
-  -- the mark's action finishes (ApplyDmg, UpdateStatus) inside the same
-  -- main-loop pass; a few frames let the ledger's HP and Death entries land
-  -- before they are read
-  H.waitFrames(8),
+})
+
+-- ===================== battle 2: the gate, under three points ==============
+-- SHADOW Fights unboosted until his own hit breaks a PIERCE-weak body: the
+-- break store comes (x = SHADOW, his pending boost 0) and no in-proc Death
+-- mark; then he Fights on, unboosted, until another hit of his lands on the
+-- Broken body (the hook point puts it to the gate): no mark either.
+local control, controlFights = nil, 0
+add({
   H.call(function()
-    local k = divineKills[1]
-    local b = brokeAt[k.m]
-    H.log(string.format("divine kill: body %d marked at f%d seq%d; break %s; "
-      .. "hp write %s; death %s; flag=$%02x hp=%d dead=%s hpDrops=%d "
-      .. "interceptor=%d", k.m, k.f, k.seq,
-      b and string.format("f%d seq%d x=$%02x", b.f, b.seq, b.atk) or "none",
-      hpWrite[k.m] and string.format("f%d seq%d", hpWrite[k.m].f, hpWrite[k.m].seq) or "none",
-      deathAt[k.m] and string.format("f%d seq%d", deathAt[k.m].f, deathAt[k.m].seq) or "none",
-      flagByte(), mhp(k.m), tostring(dead(k.m)), hpDrops, counters))
-    H.assertEq(b ~= nil, true,
-      "the ROM's own chip path broke the body (a nonzero OT6_BROKEN_TICKS "
-      .. "store) -- the gauge was chipped by real play, not painted on")
-    H.assertEq(b.atk, shadowSlot * 2,
-      "the break store's attacker (cpu x at the store) is SHADOW: his own "
-      .. "hit broke it")
-    H.assertEq(k.via, "Ot6HitJoin",
-      "the mark came through Ot6HitJoin, the chip path of the hit that "
-      .. "broke the body -- not the hook point on a later swing or a later action "
-      .. "(the pre-#239 rule, still live for a body already Broken)")
-    H.assertEq(b.f == k.f and b.seq < k.seq, true, string.format(
-      "the break write precedes the Death mark on the SAME action: break "
-      .. "f%d seq%d, mark f%d seq%d", b.f, b.seq, k.f, k.seq))
-    -- ExecAttack is one call chain, but the frame counter can tick inside
-    -- it (an NMI between two of its instructions: sweep shift 42, hp write
-    -- f2376 seq3, Death f2377 seq4), so "one action" is the ledger's order
-    -- with nothing between, and at most one frame boundary crossed.
-    local hw, da = hpWrite[k.m], deathAt[k.m]
-    H.assertEq(hw ~= nil and hw.seq == k.seq + 1 and hw.f - k.f <= 1, true,
-      "the mark precedes the hit's HP write (ApplyDmg), the next ledger "
-      .. "event after it")
-    H.assertEq(da ~= nil and da.seq == hw.seq + 1 and da.f - k.f <= 1, true,
-      "and UpdateStatus applied the Death right after the HP write: the "
-      .. "breaking hit and the kill are one action")
-    H.assertEq(dead(k.m), true, "the body is dead")
-    H.assertEq(flagByte() & shadowBit() ~= 0, true,
-      "Shadow's once-per-battle flag is SET by the kill")
-    H.vars.flagAfterKill = flagByte()
-    H.vars.brokenHits0 = brokenHits
-    H.vars.hpDrops0 = hpDrops
-    H.vars.killSeq = k.seq
-    H.screenshot("assassinate_kill")
+    -- battle 1's fight may still be up: battle 2 continues it (nextFight
+    -- draws only once it is over), with a fresh ledger
+    divineKills, brokeAt, hookReads, hpWrite, deathAt, killPending = {}, {}, {}, {}, {}, {}
+    watching = true
   end),
-  -- arm 2: the battle continues; more breaks, more landed hits, no 2nd spend
-  drive(function()
-    -- done when Shadow (or anyone) broke another body, a hit landed on a
-    -- live-Broken body, a second mark came (the failure, caught below), or
-    -- the battle ended
-    if #divineKills >= 2 then return true end
-    if breaksAfter(H.vars.killSeq) >= 1 then return true end
-    if brokenHits > H.vars.brokenHits0 then return true end
-    return not H.battleLoadStarted()
-  end, 30000, "the once-per-battle window rides out"),
-  H.call(function()
-    local later = {}
-    for m, b in pairs(brokeAt) do
-      if b.seq > H.vars.killSeq then
-        later[#later + 1] = string.format("body %d f%d x=$%02x%s", m, b.f,
-          b.atk, b.atk == shadowSlot * 2 and " (SHADOW)" or "")
-      end
-    end
-    H.log(string.format("after the kill: divineKills=%d flag=$%02x "
-      .. "hpDrops=%d (was %d) brokenHits=%d (was %d) interceptor=%d "
-      .. "later breaks: %s", #divineKills, flagByte(), hpDrops,
-      H.vars.hpDrops0, brokenHits, H.vars.brokenHits0, counters,
-      #later > 0 and table.concat(later, ", ") or "none"))
-    H.assertEq(#divineKills, 1,
-      "ONCE PER BATTLE: the divine's in-proc Death mark happened exactly "
-      .. "once, though hits kept landing (hpDrops is the loud control)")
-    H.assertEq(hpDrops > H.vars.hpDrops0, true, string.format(
-      "loud control: monster HP kept falling after the kill (%d drops, "
-      .. "was %d at the kill)", hpDrops, H.vars.hpDrops0))
-    if H.battleLoadStarted() then
-      H.assertEq(flagByte(), H.vars.flagAfterKill,
-        "and the flag byte never changed again")
-    end
-    watching = false
-  end),
+  (function()
+    local fight = {
+      nextFight("battle 2"),
+      H.call(function()
+        controlFights = controlFights + 1
+        H.vars.shadowBoost = 0
+        H.log(string.format("[battle 2] fight %d of up to %d (unboosted)", controlFights, FIGHTS))
+      end),
+      drive(function()
+        for m, b in pairs(brokeAt) do
+          if b.atk == shadowSlot * 2 and b.pend == 0 then control = { m = m, b = b }; return true end
+        end
+        return not H.battleLoadStarted()
+      end, 30000, "SHADOW's unboosted hit breaks a body"),
+      H.cond(function() return control ~= nil and H.battleLoadStarted() end, {
+        H.call(function() H.vars.hookReads0 = #hookReads end),
+        drive(function()
+          for i = H.vars.hookReads0 + 1, #hookReads do
+            if hookReads[i].y == ent(control.m) then return true end
+          end
+          return not alive(control.m) or brk(control.m) == 0 or not H.battleLoadStarted()
+        end, 30000, "his next unboosted attack on the Broken body reaches the hook point"),
+      }, {}),
+      H.waitFrames(8),
+      H.call(function()
+        if control == nil then
+          H.log(string.format("[battle 2] fight %d ended with no unboosted break by SHADOW", controlFights))
+        end
+      end),
+    }
+    return H.repeatN(1, {
+      H.repeatN(FIGHTS, { H.cond(function() return control == nil end, fight, {}) }),
+      H.call(function()
+        H.assertEq(control ~= nil, true, string.format("SHADOW's unboosted hit broke a body within %d fight(s)",
+          FIGHTS))
+        local hooked = nil
+        for i = (H.vars.hookReads0 or 0) + 1, #hookReads do
+          if hookReads[i].y == ent(control.m) then hooked = hookReads[i] end
+        end
+        H.log(string.format("[battle 2] body %d broke at f%d seq%d by SHADOW at %d BP pending; hook point %s; marks %d",
+          control.m, control.b.f, control.b.seq, control.b.pend, hooked and string.format("read it at f%d (pending %d)",
+          hooked.f, hooked.pend) or "not reached", #divineKills))
+        H.assertEq(#divineKills, 0, "under three points SHADOW's breaking hit, and his hits on the Broken body, "
+          .. "drew no in-proc Death mark")
+        watching = false
+      end),
+    })
+  end)(),
 })
 
 -- ============== battle 3: the labeled isolation arm ========================
 -- The boss check, with the injected bit and HP; see the header.  A fresh
--- battle (fresh flag), the PIERCE-weak body with the most HP given
--- $3aa1.2 and STAGED_HP before any chip, then Shadow's chips break it: the
--- break write comes with no in-proc Death mark and no flag spend; then his
+-- battle, the PIERCE-weak body with the most HP given $3aa1.2 and
+-- STAGED_HP before any chip, then Shadow's chips, at 3 BP, break it: the
+-- break write comes with no in-proc Death mark; then his
 -- next attack's hook point reads it Broken: no mark either.  The writes
 -- below are this file's only ones and may never produce fixtures.  With
 -- the staged HP neither Interceptor's counters nor the doubled break can
@@ -720,10 +756,7 @@ add({
       nextFight("isolation arm"),
       H.call(function()
         fights = fights + 1
-        H.assertEq(flagByte() & shadowBit(), 0, "isolation arm: flag clear "
-          .. "(the gate reads in order shadow -> flag -> target -> broken -> "
-          .. "boss, so an unspent flag is what routes execution to the boss "
-          .. "check)")
+        H.vars.shadowBoost = 3   -- the gate open, so the boss check is what refuses
         local best, bh = nil, nil
         for _, m in ipairs(msPresent) do
           if alive(m) and (weak(m) & OT6_PIERCE) ~= 0 and sh(m) > 0
@@ -751,16 +784,15 @@ add({
         if b ~= nil then
           broke = true
           H.log(string.format("[isolation arm] body %d broke at f%d seq%d by "
-            .. "x=$%02x%s: divineKills=%d flag=$%02x hp=%d alive=%s", m, b.f,
-            b.seq, b.atk, b.atk == shadowSlot * 2 and " (SHADOW)" or "",
-            #divineKills, flagByte(), mhp(m), tostring(alive(m))))
+            .. "x=$%02x%s at %d BP pending: divineKills=%d hp=%d alive=%s", m, b.f,
+            b.seq, b.atk, b.atk == shadowSlot * 2 and " (SHADOW)" or "", b.pend,
+            #divineKills, mhp(m), tostring(alive(m))))
           H.assertEq(b.atk, shadowSlot * 2,
             "isolation arm: SHADOW's own hit broke the bitted body")
+          H.assertEq(b.pend, 3, "isolation arm: on an action boosted with all three points (the gate open)")
           H.assertEq(#divineKills, 0,
             "a bitted body is NOT assassinated on its break: the breaking "
             .. "hit fired no in-proc Death mark")
-          H.assertEq(flagByte() & shadowBit(), 0,
-            "and no divine was spent on it")
         else
           H.log(string.format("[isolation arm] body %d went (hp=%d, "
             .. "interceptor=%d, battle=%s) before Shadow broke it -- another",
@@ -803,15 +835,14 @@ add({
             if hookReads[i].y == ent(m) then read = hookReads[i] end
           end
           H.log(string.format("[isolation arm] hook point half: %s divineKills=%d "
-            .. "flag=$%02x hp=%d alive=%s broken=%02x", read and string.format(
-            "the hook point read it Broken at f%d seq%d;", read.f, read.seq) or
-            "NOT reached;", #divineKills, flagByte(), mhp(m), tostring(alive(m)), brk(m)))
+            .. "hp=%d alive=%s broken=%02x", read and string.format(
+            "the hook point read it Broken at f%d seq%d (SHADOW pending %d);", read.f, read.seq, read.pend) or
+            "NOT reached;", #divineKills, mhp(m), tostring(alive(m)), brk(m)))
           if read then
+            H.assertEq(read.pend, 3, "the hook point read it on a 3-BP action (the gate open)")
             H.assertEq(#divineKills, 0,
               "a Broken BOSS is never assassinated: the hook point's gate fired no "
               .. "in-proc Death mark")
-            H.assertEq(flagByte() & shadowBit(), 0,
-              "and no divine was spent on it")
             H.vars.siteHalf = true
           end
         end),
@@ -826,8 +857,8 @@ add({
           "Shadow broke a body carrying the boss bit within %d fight(s) "
           .. "(fought %d)", FIGHTS, fights))
         H.log(string.format("[isolation arm] done: fights=%d hook point half %s "
-          .. "divineKills=%d flag=$%02x interceptor=%d", fights,
-          H.vars.siteHalf and "reached" or "NOT reached", #divineKills, flagByte(), counters))
+          .. "divineKills=%d interceptor=%d", fights,
+          H.vars.siteHalf and "reached" or "NOT reached", #divineKills, counters))
         H.assertEq(H.vars.siteHalf == true, true, "the hook point half was reached: "
           .. "Shadow's attack put the Broken 'boss' to the gate from the hook point (#296)")
         H.assertEq(#divineKills, 0, "no in-proc Death mark in the whole arm")
