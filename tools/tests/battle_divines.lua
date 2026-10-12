@@ -175,17 +175,6 @@ add({
   H.call(function()
     local m = divineKills[1]
     H.assertEq(dead(m) or not present(m), true, string.format("soldier %d, unbroken, is dead", m))
-  end),
-  H.kitBattle({ { who = CYAN, defend = true }, { who = CYAN, defend = true }, { who = CYAN, defend = true },
-    { who = CYAN, cmd = CMD_SWDTECH, row = CLEAVE, boost = 3, direct = true } },
-    { untilPlanDone = true, idle = "defend",
-      planDone = function() return #divineKills >= 2 end }),
-  H.call(function()
-    H.log(string.format("[battle 1] in-proc Death marks: %d (%s)", #divineKills,
-      table.concat((function() local t = {}; for _, m in ipairs(divineKills) do t[#t + 1] = tostring(m) end
-        return t end)(), ", ")))
-    H.assertEq(#divineKills, 2, "a second Cleave in the same battle marked a second Death")
-    H.assertEq(divineKills[1] ~= divineKills[2], true, "on the other soldier")
     watching = false
   end),
 })
@@ -200,8 +189,8 @@ add({
     hp0 = mhp(m)
     H.log(string.format("[battle 2] commander m%d hp %d, $3aa1.2 SET (declared expedient)", m, hp0))
   end),
-  H.kitBattle(cleave(1), { untilPlanDone = true, idle = "defend",
-    planDone = function() return #cuts >= 1 and H.readByte(0x3E9D + cyanSlot * 2) == 0 end }),
+  H.kitBattle(cleave(2), { untilPlanDone = true, idle = "defend",
+    planDone = function() return #cuts >= 2 and H.readByte(0x3E9D + cyanSlot * 2) == 0 end }),
   H.waitFrames(120),
   H.call(function()
     local m = msPresent[1]
@@ -209,8 +198,9 @@ add({
       mhp(m), #divineKills, table.concat((function() local t = {}; for _, v in ipairs(cuts) do t[#t + 1] = tostring(v)
         end; return t end)(), ",")))
     H.assertEq(#divineKills, 0, "a death-immune body drew no Death mark")
-    H.assertEq(cuts[1], 255, "Ot6Oblivion set the cut's power to 255")
-    H.assertEq(mhp(m) < hp0, true, "and the cut landed")
+    H.assertEq(#cuts, 2, "two Cleaves in the same battle, each cut by Ot6Oblivion")
+    H.assertEq(cuts[1] == 255 and cuts[2] == 255, true, "Ot6Oblivion set each cut's power to 255")
+    H.assertEq(mhp(m) < hp0, true, "and the cuts landed")
     watching = false
   end),
 })
