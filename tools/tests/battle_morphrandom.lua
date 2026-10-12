@@ -12,8 +12,9 @@
 -- Morph: BattleCmdProp[$03] has neither GOGO nor MIMIC.)
 --
 -- Boots fc_alcove (TERRA L26 with Morph, LOCKE, SHADOW, EDGAR), walks onto
--- the continent into a random battle, and plays two arms in it, PICKS
--- random Morphs each:
+-- the continent into a random battle, and plays two arms, PICKS random
+-- Morphs each (a battle that ends first is left and the arm goes on in the
+-- next random battle):
 --   plain  TERRA Muddled: each Morph she picks is clocked at the 0-BP
 --          speed and lasts SPAN0 ticks;
 --   stale  the same, with her pending boost held at 3 (and her bank at 5)
@@ -36,6 +37,7 @@ local BANK, PEND = 0x3E9C, 0x3E9D
 
 local seat, arm = nil, nil
 local hold = false        -- a Morph of hers executing or running: the stale stage stands off
+local battles = 0
 local picks = {}          -- { f, unctl, pend, bank0, bank1 (after its ActionEnd), m0, t0, speed, t1 }
 local function e() return seat * 2 end
 local function ticks() return H.readByte(0x3A3E) | (H.readByte(0x3A3F) << 8) end
@@ -46,7 +48,7 @@ local function hooks()
   local take, ae = H.sym("Cmd_03"), H.sym("Ot6ActionEnd")   -- (Cmd_03: on any ROM)
   emu.addMemoryCallback(function()
     if arm == nil or seat == nil or (emu.getState()["cpu.y"] & 0xff) ~= e() then return end
-    local p = { f = H.frame, unctl = H.readByte(0xED97), pend = H.readByte(PEND + e()), bank0 = H.readByte(BANK + e()) }
+    local p = { battle = battles, f = H.frame, unctl = H.readByte(0xED97), pend = H.readByte(PEND + e()), bank0 = H.readByte(BANK + e()) }
     picks[#picks + 1] = p
     hold = true
     H.log(string.format("[mrand] f%d %s: TERRA's Morph executes (OT6_UNCTL %02X, pending %d, bank %d)", H.frame,
@@ -107,6 +109,20 @@ local function stage(stale)
   end
 end
 
+-- a battle is up: TERRA's seat, and Morph in her list
+local BATTLES = 8
+local function enter()
+  battles, hold = battles + 1, false
+  H.assertEq(battles <= BATTLES, true, string.format("both arms within %d battles", BATTLES))
+  seat = nil
+  for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == TERRA then seat = s end end
+  H.assertEq(seat ~= nil, true, "TERRA is in this battle")
+  local has = false
+  for r = 0, 3 do if H.readByte(0x202E + seat * 12 + r * 3) == MORPH then has = true end end
+  H.assertEq(has, true, "TERRA's command list holds Morph (learned at Zozo)")
+  H.log(string.format("[mrand] battle %d: formation %04X, TERRA seat %d", battles, H.readWord(0x11E0), seat))
+end
+
 local function playArm(name, stale)
   local from
   return H.seqStep({
@@ -117,16 +133,25 @@ local function playArm(name, stale)
         local p = picks[i]
         if p.t1 ~= nil and not morphed() then n = n + 1 end
         -- a Morph that executed must morph her and start her clock
-        if p.m0 == nil and H.frame - p.f > 600 then
+        if p.battle == battles and p.m0 == nil and H.frame - p.f > 600 and H.battleActive() then
           H.assertEq(false, true, string.format("%s: TERRA's Morph at f%d morphed her within 600 frames", name, p.f))
         end
         -- ...and her clock starts with it (an engine's Morph is never the battle-long one)
-        if p.m0 ~= nil and p.t0 == nil and H.frame - p.m0 > 600 then
+        if p.battle == battles and p.m0 ~= nil and p.t0 == nil and H.frame - p.m0 > 600 and H.battleActive() then
           H.assertEq(false, true, string.format("%s: TERRA's Morph at f%d is clocked within 600 frames", name, p.f))
         end
       end
-      return n >= PICKS or not H.battleLoadStarted()
-    end, 120000, {
+      return n >= PICKS
+    end, 240000, {
+      -- a battle that ends first (an instant kill, a Broken body's death:
+      -- HP alone does not hold it up) is left, and the arm goes on in the
+      -- next random battle, up to BATTLES
+      H.cond(function() return not H.battleLoadStarted() end, {
+        H.call(function() H.setPad({}) end),
+        H.fcPace("morphrandom"),
+        H.waitUntil(function() return H.battleActive() end, 1200, "the next battle is up", 5),
+        H.call(enter),
+      }, {}),
       H.call(function()
         stage(stale)
         H.setPad(H.frame % 8 < 4 and { a = true } or {})   -- the others' windows: Fight; dialogs: A
@@ -147,7 +172,7 @@ local function playArm(name, stale)
             string.format("%s: the bank paid nothing for Morph %d (%d -> %s)", name, n, p.bank0, tostring(p.bank1)))
         end
       end
-      H.assertEq(n >= PICKS, true, string.format("%s: %d random Morphs ran their span in the battle", name, PICKS))
+      H.assertEq(n >= PICKS, true, string.format("%s: %d random Morphs ran their span", name, PICKS))
       H.log(string.format("[mrand] arm %s PASS: %d random Morphs, each clocked at the 0-BP span", name, n))
     end),
   })
@@ -159,13 +184,7 @@ H.run({ maxFrames = 300000 }, {
   H.call(hooks),
   H.fcAlcoveToBattle("morphrandom"),
   H.waitUntil(function() return H.battleActive() end, 1200, "the battle is up", 5),
-  H.call(function()
-    for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == TERRA then seat = s end end
-    H.assertEq(seat ~= nil, true, "TERRA is in this battle")
-    local has = false
-    for r = 0, 3 do if H.readByte(0x202E + seat * 12 + r * 3) == MORPH then has = true end end
-    H.assertEq(has, true, "TERRA's command list holds Morph (learned at Zozo)")
-  end),
+  H.call(enter),
   playArm("plain", false),
   playArm("stale", true),
   H.call(function() H.log("[mrand] PASS: a Morph the engine picks takes the 0-BP span and costs nothing") end),

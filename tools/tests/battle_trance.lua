@@ -24,20 +24,25 @@
 --         no gauge in $3B04), the bank pays three, and she is still morphed
 --         HOLD ticks later (longer than the 2-BP span), or when the battle
 --         ends if it ends after the 2-BP span.
--- A battle that ends with steps left starts the remaining ones over in the
--- next random battle, up to BATTLES.  Each span's log line also counts
+-- One step a battle: once it is done the party Fights the battle out and
+-- the next step waits for the next random battle (holding one battle up
+-- for every span cost a wipe, two Ninjas the party's Fights cannot touch:
+-- build/attempts/wt/v029-kits/mac4/new__battle_trance_k3.out).  A battle
+-- that ends before its step is done starts it over in the next, up to
+-- BATTLES.  Each span's log line also counts
 -- TERRA's turns inside it (the duration design's measurement, kits.md).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TERRA, MORPH = 0x00, 0x03
-local BATTLES = 8
+local BATTLES = 12
 -- the designed spans, in battle ticks, for speeds 110, 82, 66 (a speed s
 -- runs $FFFF out in floor(65535 / s) + 1 subtractions)
 local SPAN = { [0] = 596, [1] = 800, [2] = 993 }
 local HOLD = 1200
 
 local seat, battles = nil, 0
+local stepped = false     -- a step finished in this battle: the rest wait for the next
 local done = { [0] = false, [1] = false, [2] = false, [3] = false }
 local function e() return seat * 2 end
 local function ticks() return H.readByte(0x3A3E) | (H.readByte(0x3A3F) << 8) end
@@ -119,7 +124,7 @@ end
 local function step(b)
   local entry = { who = TERRA, cmd = MORPH, boost = b, self = true }
   if b == 2 then entry = { who = TERRA, cmd = MORPH, boost = 3, self = true, takeBack = 2 } end
-  return H.cond(function() return not done[b] and inBattle() end, {
+  return H.cond(function() return not done[b] and not stepped and inBattle() end, {
     H.call(function() cur = { b = b, mark = #ends, f0 = H.frame } end),
     watched(H.kitBattle({ entry }, ONE)),
     H.call(function()
@@ -164,6 +169,7 @@ local function step(b)
           held, turns - cur.turns0))
       end
       done[b] = true
+      stepped = true
     end),
   }, {})
 end
@@ -177,7 +183,7 @@ H.run({ maxFrames = 900000 }, {
     H.call(function()
       battles = battles + 1
       H.assertEq(battles <= BATTLES, true, string.format("the four steps within %d battles", BATTLES))
-      seat = nil
+      seat, stepped = nil, false
       for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == TERRA then seat = s end end
       H.assertEq(seat ~= nil, true, "TERRA is seated")
       local has = false
