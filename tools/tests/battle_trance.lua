@@ -82,11 +82,14 @@ H.run({ maxFrames = 600000 }, {
       H.assertEq(refused, true, "Morph at 0 BP was refused at the command")
       H.assertEq(morphed(), false, "and TERRA did not morph")
     end),
-    H.call(function() ends.mark = #ends end),
     H.kitBattle({ { who = TERRA, cmd = MORPH, boost = 3, self = true } },
       { untilPlanDone = true, idle = "defend", others = "thin", maxFrames = 60000,
         -- her Morph has resolved (her Ot6ActionEnd after the pick), whatever it did
-        planDone = function() return #ends > ends.mark and H.frame > ends[#ends] + 30 end }),
+        planDone = function()
+          local d = H.vars.kit[1]
+          if d == nil or #ends == 0 or ends[#ends] < d.frame then return false end
+          return H.frame > ends[#ends] + 30
+        end }),
     H.call(function()
       if not inBattle() then return end
       H.assertEq(morphs, 1, "Morph at 3 BP: TERRA morphed")
