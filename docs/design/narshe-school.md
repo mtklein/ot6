@@ -293,12 +293,12 @@ a full 3-BP boost does to them (RunicBlade and Trance, kits.md
 "Divines"); the Dance/Rage page is untouched:
 
 > ``Runic''
-> Turns magic attacks into MP and a Boost Point. With 3 points, also
-> sends them back.
+> Turns magic attacks into MP and a Boost Point. At 3 points, sends them
+> back.
 >
 > ``Morph''
-> Needs 3 Boost Points. Increases Attack and Magic power. Lasts longer
-> as battles are fought.
+> Raises Attack and Magic; needs 3 Boost Points. Grows with battles
+> fought.
 
 "Boost Point" is the term $026D teaches, so these lines reuse vocabulary
 the player has already seen instead of introducing a new one.  Each page
