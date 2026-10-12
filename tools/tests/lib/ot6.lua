@@ -6718,7 +6718,6 @@ end
 function M.seized(e)
   return e >= 0 and e <= 3 and ((M.readByte(0x3403) >> e) & 1) == 0
 end
-local seized = M.seized
 
 -- Whether the Doom takes entity e before it can act again
 -- (M.doomRule), and the count over it (M.doomCount; nil when not
@@ -10019,7 +10018,7 @@ function Driver:makePlanRules(actor)
       local hp, maxhp, cost = hpNow[e], maxOf(e), price[e] or 0
       if hp > 0 and maxhp > 0 and hp < maxhp and cost > 0 and hp <= cost
          and not M.inFlightHolds(self.healQueued[e], hp, cost) and not status1Has(e, M.ST1_ZOMBIE)
-         and not seized(e) then
+         and not M.seized(e) then
         local restores, what = {}, {}
         if row ~= nil then
           for _, it in ipairs(self:bagHeals(e, hp)) do
@@ -10387,7 +10386,7 @@ function Driver:makePlanRules(actor)
       local chips = best and best.chips or 0
       local window = 0
       for e = 0, 3 do
-        if hpNow[e] > 0 and self.dmgSeen[e] and not seized(e) then window = window + self.dmgSeen[e] * 4 end
+        if hpNow[e] > 0 and self.dmgSeen[e] and not M.seized(e) then window = window + self.dmgSeen[e] * 4 end
       end
       if need == 0 or chips > 0 then
         local toBreak = need == 0 and 0 or math.ceil(need / chips)
@@ -10414,7 +10413,7 @@ function Driver:makePlanRules(actor)
     for e = 0, 3 do
       local hp, maxhp = hpNow[e], maxOf(e)
       local cost = price[e] or 0
-      if hp > 0 and maxhp > 0 and hp < maxhp and (cost > 0 or (priceRate[e] or 0) > 0) and not seized(e) then
+      if hp > 0 and maxhp > 0 and hp < maxhp and (cost > 0 or (priceRate[e] or 0) > 0) and not M.seized(e) then
         if cost > 0 and hp <= cost then
           return string.format("entity %d (%d/%d) is inside one round of death "
             .. "(%d)", e, hp, maxhp, cost)
@@ -10477,7 +10476,7 @@ function Driver:makePlanRules(actor)
       local threshold = self:healPct()
       for e = 0, 3 do
         local hp, maxhp = hpNow[e], maxOf(e)
-        if seized(e) then
+        if M.seized(e) then
           -- held: nothing the party does reaches it (#425)
         elseif maxhp > 0 and hp == 0 and row ~= nil and self:battInvIdx(BATTLE.FENIX_DOWN)
            and self:raiseOk(e, actor) then
@@ -10497,7 +10496,7 @@ function Driver:makePlanRules(actor)
       local lethal = nil
       for e = 0, 3 do
         local hp, maxhp = hpNow[e], maxOf(e)
-        if hp > 0 and hp < maxhp and hp <= (price[e] or 0) and not seized(e) then
+        if hp > 0 and hp < maxhp and hp <= (price[e] or 0) and not M.seized(e) then
           lethal = e
           break
         end
@@ -10619,7 +10618,7 @@ function Driver:makePlanRules(actor)
     if row ~= nil then
       for e = 0, 3 do
         local queued = self.raiseQueued[e]
-        if maxOf(e) > 0 and hpNow[e] == 0 and seized(e) then
+        if maxOf(e) > 0 and hpNow[e] == 0 and M.seized(e) then
           local said = string.format("[%s] actor=%d no raise on entity %d: it is SEIZED "
             .. "(held, $3403), and no Fenix Down reaches a held member until its holder "
             .. "Discards it or dies (#425)", self.tag or "fight", actor, e)
@@ -10718,7 +10717,7 @@ function Driver:makePlanRules(actor)
           .. "on it is confirmed (tick %d) and has not landed", self.tag or "fight", actor, e, hp, maxhp,
           inFlight.by, inFlight.what, inFlight.tick)
         if said ~= self.healSaid then self.healSaid = said; M.log(said) end
-      elseif hp < maxhp and seized(e) then
+      elseif hp < maxhp and M.seized(e) then
         local said = string.format("[%s] actor=%d no heal on entity %d (%d/%d): it is SEIZED "
           .. "(held, $3403), and no heal reaches a held member until its holder Discards it "
           .. "or dies (#425)", self.tag or "fight", actor, e, hp, maxhp)
@@ -14970,7 +14969,7 @@ function Driver:watchStatuses()
         end
         -- the Seize (#425): held from the frame $3403 drops its bit until
         -- the holder's Discard or death sets it again
-        local held = seized(e)
+        local held = M.seized(e)
         local hkey = e .. ":Seized"
         if held ~= (self.statusSaid[hkey] == "on") then
           self.statusSaid[hkey] = held and "on" or "off"
