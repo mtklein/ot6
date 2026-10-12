@@ -21,7 +21,7 @@
 --          0-BP span, never the battle, and the bank pays nothing for it.
 -- Declared unit-test expedients (tools/state_write_waivers.txt), because no
 -- generated battle Muddles TERRA after Zozo: Muddle ($3EE5 bit 5) set on her
--- again whenever it clears, the party's HP put back to max under half and
+-- again whenever it clears, the party's HP put back to max under three quarters and
 -- the monsters' HP to 30,000 (so the battle lasts for the picks), and, in
 -- the stale arm, her pending boost and bank as above.  The others' windows
 -- take A (a Fight).  The pick, the command and the morph are the engine's.
@@ -80,7 +80,7 @@ local function stage(stale)
   end
   for s = 0, 3 do
     local hp, mx = H.readWord(0x3BF4 + s * 2), H.readWord(0x3C1C + s * 2)
-    if hp > 0 and hp < mx // 2 then H.writeWord(0x3BF4 + s * 2, mx) end
+    if hp > 0 and hp < mx * 3 // 4 then H.writeWord(0x3BF4 + s * 2, mx) end
   end
   for m = 0, 5 do
     if (H.readByte(0x3AA8 + m * 2) & 1) == 1 and H.readWord(0x3BFC + m * 2) < 20000 then

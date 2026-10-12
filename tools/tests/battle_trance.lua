@@ -105,13 +105,13 @@ local ONE = { untilPlanDone = true, idle = "defend", others = "thin", maxFrames 
 local PICK = 4000
 local function alive() return seat ~= nil and (H.readByte(0x3EE4 + e()) & 0xC2) == 0 end
 local function watched(inner)
-  return { tick = function()
+  return { tick = function(_)
     if cur ~= nil and cur.m0 == nil and alive() and H.battleActive() and H.frame - cur.f0 > PICK then
       H.assertEq(false, true, string.format("Morph at %d BP: TERRA morphs within %d frames of the pick's start "
         .. "(it was refused at the command, or never confirmed)", cur.b, PICK))
     end
-    return inner.tick()
-  end, reset = inner.reset }
+    return inner:tick()
+  end, reset = function(_) if inner.reset then inner:reset() end end }
 end
 
 local function step(b)
