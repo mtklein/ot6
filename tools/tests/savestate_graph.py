@@ -32,7 +32,7 @@
 #       boundaries (the A-F sequence lettered in the comments below) are
 #       cut this way.
 #
-#   S("wor_falcon", ..., saves="wor-falcon-v1")
+#   S("wor_terra", ..., saves="wor-terra-v1")
 #       this state's own run ends by saving a tracked checkpoint that no
 #       cut boots yet (the frontier), so its run captures it too.
 #
@@ -830,12 +830,25 @@ STATES = [
     # the one run: wor_chest (the party armed, below the monster chest,
     # before the press) and wor_grave (on the grave, before the press): the
     # chest and Dullahan labs' fixtures; and wor_flight (the pilot's first
-    # control after the rising): field_flyto's fixture.  saves=: the
-    # frontier; no leg boots wor-falcon-v1 yet, and the chain captures it
-    # all the same.  Re-cut by checkpoint_drift.py --recut.
+    # control after the rising): field_flyto's fixture.  wor_terra below
+    # boots its checkpoint.  Re-cut by checkpoint_drift.py --recut.
     S("wor_falcon", gen="gen_wor_falcon", prev="wor_tomb",
-      checkpoint="wor-tomb-v1", saves="wor-falcon-v1", timeout=3600,
+      checkpoint="wor-tomb-v1", timeout=3600,
       also=["wor_chest", "wor_grave", "wor_flight"]),
+
+    # wor-falcon-v1 -> the World of Ruin map beside the Falcon parked outside
+    # Mobliz: board, Palidor from the Solitary Island's beach, Mobliz, the
+    # children and TERRA in the cellar, Phunbaba's first visit (event
+    # battles 128, TERRA's scripted loss, and 129), Fenrir, Katarin's
+    # flight, Phunbaba's return (130 and 131: TERRA joins), the party
+    # regrouped in the Falcon's cabin, and Save beside it at (238,135): the
+    # `wor-terra-v1` checkpoint (docs/design/route-wor-terra.md).  A cut.
+    # saves=: the frontier; no leg boots wor-terra-v1 yet.
+    # timeout=3600: an attempt ends at frame ~44k from the Continue (the
+    # dev run `PASS (frame 43814)`); three are ~132k frames, ~1650 s at a
+    # loaded machine's ~80 frames/s.  Re-cut by checkpoint_drift.py --recut.
+    S("wor_terra", gen="gen_wor_terra", prev="wor_falcon",
+      checkpoint="wor-falcon-v1", saves="wor-terra-v1", timeout=3600),
 ]
 
 # Tracked checkpoints the release gate does not check, each with its reason.

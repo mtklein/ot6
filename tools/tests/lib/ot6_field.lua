@@ -516,6 +516,10 @@ end
 -- genuinely unwinnable encounter (a scripted set-piece that must be run)
 -- opts back out with playBattles="mustflee".
 M.FIGHT_NOT_FLEE = true
+-- navTo keeps holding a pressed step through the control flicker of a
+-- trigger that re-fires under the party (step 3a in navTo); a generator
+-- whose maps have such tiles turns it on (gen_wor_terra: Mobliz's cellar)
+M.NAV_REFIRE_HOLD = false
 local function wantsFlee(mode)
   if mode == "mustflee" then return true end
   return mode == "flee" and not M.FIGHT_NOT_FLEE
@@ -709,7 +713,19 @@ function M.navTo(txIn, tyIn, opts)
       -- 3. any other control loss (event walking the party, fades, or a
       --    yet-undebounced battle/dialog): neutral pad and wait, because
       --    jamming directions or A only corrupts state
-      if lostN > 0 or battN > 0 or dlgN > 0 then
+      -- 3a. ...except a step already held on a tile whose trigger re-fires
+      --     under the party: its event returns at once, but it runs again
+      --     every few frames while the party stands there, so control reads
+      --     lost on most frames although the field takes the press (Mobliz's
+      --     cellar, 154 (52,58) and (50,53): held Up moves on the second
+      --     frame, build/attempts/wt/v027-terra-route/cellar/probe3.log).
+      --     The hold goes on; a real scene (a dialog, a battle, a long
+      --     control loss) still takes the pad.  Opt-in (M.NAV_REFIRE_HOLD,
+      --     or opts.refireHold): on by default it moved gen_whelk_poweron's
+      --     play (PASS frame 36896 -> 36956) and with it every later draw.
+      local refire = (opts.refireHold or M.NAV_REFIRE_HOLD) and pend and pend.holding and battN == 0 and dlgN == 0 and lostN > 0
+        and lostN < 60 and M.tileAligned() and M.fieldX() == pend.x and M.fieldY() == pend.y
+      if (lostN > 0 or battN > 0 or dlgN > 0) and not refire then
         if lostN >= 3 then drop("control lost") end
         M.setPad({})
         return
@@ -2323,8 +2339,23 @@ end
 -- B over a tile whose property byte $C2 has bit 1 clear lands it
 -- (LandAirship): the party steps off on that tile and the airship is
 -- parked there ($1F62/$1F63).
+-- $11FA's vehicle bits are the map LOAD's (field-ram.txt: "map startup
+-- flags"): a load into the airship (the Falcon's rising, a battle's
+-- return) sets 1, but boarding the parked airship on foot (A on its tile,
+-- world/move.asm @204e) lifts off in place with no load, and $11FA keeps
+-- the on-foot load's $80 the whole flight.  What both share is the vehicle
+-- engine: VehicleNMI installed and the on-foot cells $E0/$E2 at 0
+-- (measured boarding at (25,160): `$11FA=80 ... E0/E2=0,0 ... nmi=EEA509
+-- (W EEA728 V EEA509)`, build/attempts/wt/v027-terra-route/board/).
 local AIRSHIP_VEHICLE = 0x11FA
-function M.aboardAirship() return M.worldMode() and M.readByte(AIRSHIP_VEHICLE) == 1 end
+local vehicleNmi
+function M.aboardAirship()
+  if not M.worldMode() then return false end
+  if M.readByte(AIRSHIP_VEHICLE) == 1 then return true end
+  vehicleNmi = vehicleNmi or M.sym("VehicleNMI")
+  return nmiJump() == vehicleNmi and (M.readByte(AIRSHIP_VEHICLE) & 0x03) ~= 2
+    and M.readByte(0x00e0) == 0 and M.readByte(0x00e2) == 0
+end
 -- the pilot's: aboard, the world lit, no world or vehicle event script
 -- running ($E7 bits 0 and 1; a scripted flight moves the airship itself)
 function M.airshipControl()
@@ -2408,7 +2439,7 @@ function M.flyTo(tx, ty, opts)
         .. "(its property word $%04X, bit 1 clear)", what, tx, ty, M.worldTileProp(tx, ty)))
     end),
     M.driveUntil(function()
-      landed = M.worldMode() and M.readByte(AIRSHIP_VEHICLE) == 0 and M.worldHasControl()
+      landed = M.worldMode() and not M.aboardAirship() and M.worldHasControl()
       return landed
     end, opts.maxFrames or 6000, {
       M.call(function()

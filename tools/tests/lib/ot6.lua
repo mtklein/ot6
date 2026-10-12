@@ -12874,6 +12874,9 @@ function M.setzerBattle(plan, opts)
         #plan, p and tostring(p.row) or "done", M.readByte(0x3E9C + entity), M.readWord(0x3C08 + entity)))
     end
     if p == nil then fight(a, st); return end
+    -- the negative control's lever (battle_gprain's mutant, a lab): SETZER
+    -- never confirms a planned row; every window of his is a Defend
+    if M.SETZER_NEVER_CONFIRM and p.row ~= "defend" then defend(st); return end
     if p.row == "defend" then
       if st == 0x27 and cool == 0 then k = k + 1 end
       defend(st)
@@ -13010,6 +13013,7 @@ function M.setzerBattle(plan, opts)
       { tick = function() tick(); return "frame" end, reset = function() end },
     }, "the battle with SETZER's plan ends"),
     M.call(function()
+      M.vars.setzerConfirmed = k - 1
       M.log(string.format("[setzer] the battle is over: %d row(s) played of %d planned (entry %d next)",
         #M.vars.setzer, #plan, k))
     end),
@@ -13764,8 +13768,16 @@ end
 -- his seat, $7BC2 = $05) with it free.  Such a crowd owes none, and the
 -- walk takes the next crowd within the budget (#411: f8ee51f3's
 -- wor-tomb-v1 draw zombied him in crowd battle 2 before his first window).
--- One usable window and no throw is the driver's failure, and red.  o.onBattle(n), when given, runs once a
--- battle is up.  Returns the step and S = { done, all, battles, crowds }.
+-- And a crowd an ally out of the policy's hands (a Zombie, a Muddle)
+-- ended: the ally still out of control when the crowd ended, and SETZER's
+-- planned throw confirmed but not yet resolved (the v0.27 chain's
+-- wor-tomb-v1 draw: SABIN Zombied, the crowd dead before SETZER's queued
+-- GP Rain ran); or every free window of his came with his bank below the
+-- plan's boost, so he was still banking for the row.  Any other crowd with
+-- a usable window and no throw is the driver's failure, and red: a window
+-- at the plan's bank with nothing confirmed, whatever the allies did
+-- (M.SETZER_NEVER_CONFIRM, the negative control, goes red there).
+-- o.onBattle(n), when given, runs once a battle is up.  Returns the step and S = { done, all, battles, crowds }.
 function M.setzerCrowdBattles(o)
   local S = { done = {}, all = {}, battles = 0, crowds = 0, since = 0 }
   local W, wp = nil, 1
@@ -13791,14 +13803,18 @@ function M.setzerCrowdBattles(o)
     return yes
   end
   local function play()
-    local step, F, seen, crowdBattle, out, able = nil, nil, 0, nil, nil, nil
+    local step, F, seen, crowdBattle, out, able, allyOut = nil, nil, 0, nil, nil, nil, nil
+    local atBank, allyEnd, want = nil, nil, 0
     local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
     return { tick = function()
       if step == nil and F == nil then
         M.vars.setzer = {}     -- no record of an earlier battle is read again
         if crowdHere() then
           S.crowds, S.since, crowdBattle = S.crowds + 1, 0, S.battles
-          step = M.setzerBattle(remaining(), o.setzerOpts or {})
+          local rem = remaining()
+          want = rem[1] and math.min(rem[1].boost or 0, 3) or 0
+          M.vars.setzerConfirmed = 0
+          step = M.setzerBattle(rem, o.setzerOpts or {})
         else
           F = M.newFightDriver(tag .. " fight-out " .. S.battles,
             { tactical = true, boost = true, items = true, bank = 0, healPercent = 55, setzer = false })
@@ -13812,12 +13828,23 @@ function M.setzerCrowdBattles(o)
       local r = step:tick()
       if M.battleActive() and M.controlTaken then
         for s = 0, 3 do
-          if M.readByte(0x3ED8 + s * 2) == 9 then
+          local actor = M.readByte(0x3ED8 + s * 2)
+          if actor ~= 9 and actor ~= 0xFF then
+            -- an ally out of the policy's hands (a Zombie, a Muddle...)
+            -- acts on its own and can end the crowd before SETZER's turn;
+            -- allyEnd follows that ally to the crowd's last frame
+            local c = M.controlTaken(s)
+            if allyOut == nil and c then allyOut = { name = c.name, frame = M.frame, actor = actor, slot = s } end
+            if allyOut ~= nil and allyOut.slot == s then allyEnd = c ~= nil end
+          end
+          if actor == 9 then
             local c = M.controlTaken(s)
             if c and out == nil then out = { name = c.name, frame = M.frame } end
-            if not c and able == nil and M.readByte(MENU) ~= 0 and (M.readByte(ACTOR) & 3) == s
+            if not c and M.readByte(MENU) ~= 0 and (M.readByte(ACTOR) & 3) == s
                and M.readByte(MSTATE) == 0x05 then
-              able = M.frame
+              able = able or M.frame
+              local bank = M.readByte(0x3E9C + s * 2)
+              if bank >= want and atBank == nil then atBank = { frame = M.frame, bank = bank } end
             end
           end
         end
@@ -13834,14 +13861,30 @@ function M.setzerCrowdBattles(o)
           M.log(string.format("[%s] crowd battle %d gave no throw: SETZER's control was taken (%s at f%d) and no "
             .. "command window of his came with it free, so it owes none -- the next crowd within the budget",
             tag, crowdBattle, out.name, out.frame))
+        elseif seen == 0 and allyOut and ((allyEnd and (M.vars.setzerConfirmed or 0) >= 1) or atBank == nil) then
+          -- an ally out of the policy's hands ended the crowd: still out at
+          -- its end with SETZER's throw confirmed and unresolved, or SETZER
+          -- never had a free window at the plan's bank (wor-tomb-v1 on the
+          -- v0.27 chain: SABIN Zombied to the end, SETZER's GP Rain queued;
+          -- build/attempts/wt/v027-terra-route/kits/)
+          M.log(string.format("[%s] crowd battle %d gave no throw: an ally's control was taken (char %d, %s at "
+            .. "f%d; %s at the crowd's end), SETZER confirmed %d planned row(s), %s, so it owes none -- the next "
+            .. "crowd within the budget", tag, crowdBattle, allyOut.actor, allyOut.name, allyOut.frame,
+            allyEnd and "still out" or "back", M.vars.setzerConfirmed or 0, atBank
+            and string.format("his first window at the plan's %d BP at f%d", want, atBank.frame)
+            or string.format("no window of his reached the plan's %d BP", want)))
         else
-          M.assertEq(seen > 0, true, string.format("%s: crowd battle %d gave at least one throw%s", tag, crowdBattle,
-            able and string.format(" (SETZER's command window stood free at f%d)", able) or ""))
+          M.assertEq(seen > 0, true, string.format("%s: crowd battle %d gave at least one throw%s%s", tag, crowdBattle,
+            able and string.format(" (SETZER's command window stood free at f%d)", able) or "",
+            allyOut and string.format(" (an ally's control was taken: char %d, %s; %s at the end; %d row(s) "
+              .. "confirmed; %s)", allyOut.actor, allyOut.name, allyEnd and "still out" or "back",
+              M.vars.setzerConfirmed or 0, atBank and string.format("a window at the plan's %d BP at f%d", want,
+              atBank.frame) or "no window at the plan's bank") or ""))
         end
-        seen, step, out, able = 0, nil, nil, nil
+        seen, step, out, able, allyOut, atBank, allyEnd = 0, nil, nil, nil, nil, nil, nil
       end
       return r
-    end, reset = function() step, F, seen, out, able = nil, nil, 0, nil, nil end }
+    end, reset = function() step, F, seen, out, able, allyOut, atBank, allyEnd = nil, nil, 0, nil, nil, nil, nil, nil end }
   end
   local steps = {
     M.call(function()
@@ -17322,6 +17365,29 @@ RUN = {
   trace = nil,         -- probe mode: $021e / control transitions after the boot point
 }
 M.totalFrames = 0
+M.SETZER_NEVER_CONFIRM = false
+
+-- A body that has checked a loss the story plays on from (an event battle
+-- with no _ca5ea9 after it: Mobliz's battle 128, TERRA alone against an
+-- invincible Phunbaba) says so here: the canary's count and the runner's
+-- record of an unanswered game over are cleared, with a line naming why,
+-- so a later stall is filed as itself rather than as that loss.  The body
+-- asserts the loss was the scripted one before it calls this.
+function M.scriptedLossAnswered(why)
+  -- exactly the one loss: the battle-wipe canary's count (at most one) and
+  -- its record, nothing else (a GameOver script or a title screen is a
+  -- real game over, never answered here)
+  M.assertEq((M.gameOverFired or 0) <= 1, true, string.format("scriptedLossAnswered (%s): at most one counted "
+    .. "game over (got %d)", why, M.gameOverFired or 0))
+  M.assertEq(RUN.goUnhandled == nil or RUN.goUnhandled.what == "the party was wiped in battle", true,
+    string.format("scriptedLossAnswered (%s): the unanswered record is the battle wipe (got %s)", why,
+    RUN.goUnhandled and RUN.goUnhandled.what or "none"))
+  M.log(string.format("[retry] scripted loss answered (%s): game over count %d and the unanswered "
+    .. "record (%s) cleared", why, M.gameOverFired or 0,
+    RUN.goUnhandled and RUN.goUnhandled.what or "none"))
+  M.gameOverFired = 0
+  RUN.goUnhandled = nil
+end
 
 -- What the earlier attempts of this run fell to, oldest first: one record
 -- { attempt, class, msg, frame, context } per `[retry] attempt n/N FAILED`

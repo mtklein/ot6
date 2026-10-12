@@ -737,6 +737,25 @@ add({
 })
 
 -- ============== battle 3: the labeled isolation arm ========================
+-- The isolation arm's Death marks, attributed (docs/TESTING.md: attribute a
+-- change to the action that made it): those on the bitted body m, from the
+-- ledger seq `from` on.  A mark on another body is that body's own break
+-- (it carries no bit, so the gate may kill it) and is only logged.
+local function marksOn(m, from)
+  local t = {}
+  for _, k in ipairs(divineKills) do
+    if k.m == m and k.seq >= (from or 0) then t[#t + 1] = k end
+  end
+  return t
+end
+local function otherMarks(m)
+  local t = {}
+  for _, k in ipairs(divineKills) do
+    if k.m ~= m then t[#t + 1] = string.format("body %d at f%d seq%d", k.m, k.f, k.seq) end
+  end
+  return #t > 0 and table.concat(t, ", ") or "none"
+end
+
 -- The boss check, with the injected bit and HP; see the header.  A fresh
 -- battle, the PIERCE-weak body with the most HP given $3aa1.2 and
 -- STAGED_HP before any chip, then Shadow's chips, at 3 BP, break it: the
@@ -790,9 +809,11 @@ add({
           H.assertEq(b.atk, shadowSlot * 2,
             "isolation arm: SHADOW's own hit broke the bitted body")
           H.assertEq(b.pend, 3, "isolation arm: on an action boosted with all three points (the gate open)")
-          H.assertEq(#divineKills, 0,
+          H.log(string.format("[isolation arm] marks on other bodies (no bit, theirs to take): %s",
+            otherMarks(m)))
+          H.assertEq(#marksOn(m, b.seq), 0,
             "a bitted body is NOT assassinated on its break: the breaking "
-            .. "hit fired no in-proc Death mark")
+            .. "hit fired no in-proc Death mark on it")
         else
           H.log(string.format("[isolation arm] body %d went (hp=%d, "
             .. "interceptor=%d, battle=%s) before Shadow broke it -- another",
@@ -840,9 +861,9 @@ add({
             "NOT reached;", #divineKills, mhp(m), tostring(alive(m)), brk(m)))
           if read then
             H.assertEq(read.pend, 3, "the hook point read it on a 3-BP action (the gate open)")
-            H.assertEq(#divineKills, 0,
+            H.assertEq(#marksOn(m, read.seq), 0,
               "a Broken BOSS is never assassinated: the hook point's gate fired no "
-              .. "in-proc Death mark")
+              .. "in-proc Death mark on it")
             H.vars.siteHalf = true
           end
         end),
@@ -861,7 +882,9 @@ add({
           H.vars.siteHalf and "reached" or "NOT reached", #divineKills, counters))
         H.assertEq(H.vars.siteHalf == true, true, "the hook point half was reached: "
           .. "Shadow's attack put the Broken 'boss' to the gate from the hook point (#296)")
-        H.assertEq(#divineKills, 0, "no in-proc Death mark in the whole arm")
+        H.log(string.format("[isolation arm] marks on bodies without the bit: %s",
+          otherMarks(H.vars.bossBody)))
+        H.assertEq(#marksOn(H.vars.bossBody, 0), 0, "no in-proc Death mark on the bitted body in the whole arm")
         watching = false
         H.screenshot("assassinate_boss")
       end),

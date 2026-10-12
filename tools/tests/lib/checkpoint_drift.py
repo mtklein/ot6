@@ -480,13 +480,13 @@ def selftest() -> int:
     # the state whose run saved it, or a cutter's own record (it publishes
     # no state)
     rec = {k: producer_record(k) for k in ("wor-tomb-v1", "post-opera-v1",
-                                           "wor-falcon-v1")}
+                                           "wor-terra-v1")}
     check("a WoR leg's capture is recorded by the state whose run saved it",
           str(rec["wor-tomb-v1"]).endswith("build/states/wor_tomb.stamp"))
     check("a cutter's capture is recorded beside it",
           str(rec["post-opera-v1"]).endswith("build/checkpoints/post-opera-v1.record"))
     check("the frontier's capture is recorded by its saves= state",
-          str(rec["wor-falcon-v1"]).endswith("build/states/wor_falcon.stamp"))
+          str(rec["wor-terra-v1"]).endswith("build/states/wor_terra.stamp"))
     check("a checkpoint no run saves has no record",
           producer_record("negative-stale-check-v1") is None)
     check("--recut exits non-zero when it refuses (no capture to copy)",

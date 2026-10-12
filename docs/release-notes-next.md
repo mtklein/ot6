@@ -35,3 +35,7 @@ Points fires twice and costs twice as much (at most 99 MP).
 **Edgar's tools.** Debilitator now shows the weakness it adds, on the
 monster it hit only. Flash is sold by Figaro's tool merchant and in South
 Figaro; Debilitator is sold in Vector's weapon shop after the banquet.
+
+**Phunbaba has shields.** In Mobliz, blunt and Special attacks hit his
+weak points in every fight the party joins, and Terra's sword does too in
+the last one. Terra's solo fight shows no shields.

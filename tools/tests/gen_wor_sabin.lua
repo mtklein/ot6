@@ -81,6 +81,7 @@ local TONIC, POTION, FENIX, REMEDY, SOFT = 0xE8, 0xE9, 0xF0, 0xF5, 0xF4
 local MAP_TZEN, MAP_HOUSE = 305, 311
 local MAP_ITEMSHOP, MAP_INN, MAP_WEAPON, MAP_ARMOR = 307, 308, 309, 310
 local SHOP_ITEMS, SHOP_WEAPON, SHOP_ARMOR = 54, 52, 53
+local MAP_RELIC, SHOP_RELIC = 312, 55
 local TZEN_DOOR = { 130, 179 }                      -- ShortEntrance map 1 -> 305 (23,29)
 local SAVE_TILE = { 131, 179 }                      -- where Tzen's exit returns the party
 -- the house (docs/design/route-wor-sabin.md 3.2): the same-map links and
@@ -520,6 +521,21 @@ H.run({ maxFrames = 200000 }, {
   H.shopClose("Tzen armor shop"),
   H.navTo(56, 51, { maxFrames = 6000, playBattles = "tactical" }),
   holdOut("down", MAP_TZEN, "the armor shop's (56,52) trigger -> Tzen 305"),
+  -- SABIN's Black Belt comes from the bag when the World of Balance left
+  -- one there; when it did not, Tzen's relic shop (55, 5000 GP) sells it
+  -- (route-wor-sabin.md section 6).  The v0.27 chain reached here without
+  -- one ("$D5 is not in the bag; skipped", build/attempts/wt/
+  -- v027-terra-route/qual/), and the kit's assertion below failed.
+  H.cond(function() return H.invCountOf(BLACK_BELT) == 0 and H.readByte(0x1600 + 37 * SABIN + 0x24) ~= BLACK_BELT
+      and H.readByte(0x1600 + 37 * SABIN + 0x23) ~= BLACK_BELT end, {
+    H.crossDoor(25, 7, MAP_RELIC, 81, 21, "Tzen relic shop door 305(25,7)->312(81,21)"),
+    H.shopTalk(80, 16, "Tzen relic shop"),
+    H.call(function() H.assertEq(H.shopId(), SHOP_RELIC, "the counter opened shop 55 ($0201)") end),
+    H.buyItem(BLACK_BELT, function() return math.max(0, 1 - H.invCountOf(BLACK_BELT)) end, "BLACK BELT"),
+    H.shopClose("Tzen relic shop"),
+    H.navTo(81, 21, { maxFrames = 6000, playBattles = "tactical" }),
+    holdOut("down", MAP_TZEN, "the relic shop's (81,22) trigger -> Tzen 305"),
+  }, {}),
   -- CELES's own kit back (gen_wor_tzen_door's: the Genji Glove, the
   -- ThunderBlade in the left hand, the Blizzard in the right), then
   -- SABIN's relics first: the second Fire Knuckle needs the Genji Glove on
