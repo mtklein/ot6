@@ -19,3 +19,8 @@ A confused Mog no longer picks it.
 
 **Umaro.** When he spends 3 Boost Points he always uses Storm, with or
 without the Blizzard Orb. His Charge and Throw chip bludgeoning shields.
+
+## Saves
+
+The zip has a `saves` folder: saves at points through the story, from
+Narshe to the World of Ruin. `saves/README.txt` says how to use one.

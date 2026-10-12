@@ -13,7 +13,7 @@ expanded bank $F0) plus minimal jsl shims in vanilla banks.
 
 `python3 configure.py` writes `build.ninja`; `ninja` builds and tests
 everything (qualification), and `ninja release` goes on to the release
-preflights and the zip. Any narrower need is a
+preflights and the zip (the patch, the notes and the saves). Any narrower need is a
 real output path (`ninja ff6/rom/ff6-en.sfc`,
 `ninja build/results/suite/battle_break.ok`). The graph regenerates itself
 when `configure.py`, the savestate graph, `VERSION`, or any globbed
@@ -119,6 +119,17 @@ checkpoint_coverage, the audits that read the tracked bytes, the drift
 gate and the release edges (on the Air, 486 s with the drift gate's old
 cost, build/attempts/wt/v026-graph/romchange/after-2.ninja_log). The contracts stay light: a suite that needs a
 level or an item asserts its own precondition.
+
+The release zip ships the tracked checkpoints as player saves: `saves/NN -
+Title.srm`, one per non-negative checkpoint, numbered in the graph's story
+order and named by `TITLES` in `tools/release_saves.py`, plus
+`saves/README.txt`. A new checkpoint needs a title there, or the staging
+edge fails. Every save holds slot 3 (the slot the harness saves to) with
+slots 1 and 2 empty; they ship unchanged, and the README says to load slot
+3. `build/checks/release_saves.ok` (part of `ninja release`) checks that the
+zip holds every one, 32768 bytes, with the tracked SHA-256, slot 3's
+checksum valid by the ROM's own rule, and nothing else under `saves/`.
+`python3 tools/release_saves.py list` prints the names.
 
 ## Installed pieces
 
