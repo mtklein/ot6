@@ -13271,8 +13271,8 @@ end
 
 -- ---- into a random battle from where the party stands (the kit suites) ---
 -- M.paceToEncounter(tag) paces between the tile the party stands on and a
--- walkable neighbour (3 or 2 tiles off, the first the BFS reaches) until a
--- random battle starts, then waits for it to be up; the party takes field
+-- walkable neighbour (3 or 2 tiles off, the first the BFS reaches; or the
+-- two tiles `fixed` names) until a random battle starts, then waits for it to be up; the party takes field
 -- care first (and after every burned encounter), as a player would before
 -- walking into a fight.  M.fcAlcoveToBattle(tag)
 -- is the Floating Continent's: from the fc-alcove-v1 Continue (map 358) up
@@ -13283,13 +13283,18 @@ end
 -- the encounter history the suite's battle comes from (TESTING.md: the draw
 -- moves with encounters used up, not with seeds); a caller's second
 -- argument overrides it (0 for a suite's later battles).
-function M.paceToEncounter(tag, burnOverride)
+function M.paceToEncounter(tag, burnOverride, fixed)
   local A, B = nil, nil
   local burned = 0
   local burn = burnOverride or (type(PACE_BURN) == "number" and PACE_BURN or 0)
   local one = M.driveUntil(function() return M.battleLoadStarted() end, 60000, {
       M.call(function()
         if A ~= nil then return end
+        if fixed then
+          A, B = { fixed[1][1], fixed[1][2] }, { fixed[2][1], fixed[2][2] }
+          M.log(string.format("[%s] pacing (%d,%d) <-> (%d,%d)", tag, A[1], A[2], B[1], B[2]))
+          return
+        end
         local x0, y0 = M.fieldX(), M.fieldY()
         for _, d in ipairs({ { 0, 3 }, { 0, -3 }, { 3, 0 }, { -3, 0 }, { 0, 2 }, { 2, 0 }, { -2, 0 }, { 0, -2 } }) do
           if M.bfsPath(x0 + d[1], y0 + d[2]) then A, B = { x0, y0 }, { x0 + d[1], y0 + d[2] }; break end
@@ -13334,9 +13339,16 @@ function M.fcAlcoveToBattle(tag)
       end),
     }, tag .. ": the alcove -> the continent (394)"),
     M.waitUntil(function() return M.hasControl() and M.tileAligned() end, 900, tag .. ": control on 394", 10),
-    M.paceToEncounter(tag),
+    M.paceToEncounter(tag, nil, M.FC_PACE),
   })
 end
+
+-- the continent's pace: two tiles of the stretch the alcove's exit lands
+-- on, clear of the alcove's own entrance at (90,43) (a pace onto it walks
+-- the party back into the alcove).  M.fcPace(tag) is the pace for a suite's
+-- later battles there.
+M.FC_PACE = { { 90, 42 }, { 90, 39 } }
+function M.fcPace(tag) return M.paceToEncounter(tag, 0, M.FC_PACE) end
 
 -- ---- OT6's added passes, watched pass by pass (wt/pass-retarget) --------
 -- The instrument battle_passretarget (played) and battle_passside (its

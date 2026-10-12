@@ -56,7 +56,7 @@ H.run({ maxFrames = 600000 }, {
   H.call(arm),
   H.fcAlcoveToBattle("trance"),
   H.driveUntil(function() return done end, 500000, {
-    H.cond(function() return not inBattle() end, { H.paceToEncounter("trance", 0) }, {}),
+    H.cond(function() return not inBattle() end, { H.fcPace("trance") }, {}),
     H.call(function()
       battles = battles + 1
       H.assertEq(battles <= BATTLES, true, string.format("the three steps within %d battles", BATTLES))

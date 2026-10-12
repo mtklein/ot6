@@ -125,7 +125,7 @@ H.run({ maxFrames = 600000 }, {
   end),
   H.fcAlcoveToBattle("ultima"),
   H.driveUntil(function() return nDone == #CASTS end, 500000, {
-    H.cond(function() return not H.battleLoadStarted() end, { H.paceToEncounter("ultima", 0) }, {}),
+    H.cond(function() return not H.battleLoadStarted() end, { H.fcPace("ultima") }, {}),
     H.call(function()
       turns = turns + 1
       H.assertEq(turns <= 12, true, "the three casts within 12 tries")

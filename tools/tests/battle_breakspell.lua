@@ -168,7 +168,7 @@ H.run({ maxFrames = 600000 }, {
   H.call(function() arm() end),
   H.fcAlcoveToBattle("break"),
   H.driveUntil(function() return nDone == #CASTS end, 500000, {
-    H.cond(function() return not H.battleLoadStarted() end, { H.paceToEncounter("break", 0) }, {}),
+    H.cond(function() return not H.battleLoadStarted() end, { H.fcPace("break") }, {}),
     H.call(decide),
     H.cond(function() return mode == "fightout" end, { H.kitBattle({}, {}) }, {
       H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000,
