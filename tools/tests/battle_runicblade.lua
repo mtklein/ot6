@@ -131,11 +131,15 @@ local function step(n, plan, doneFn)
 end
 
 -- the three steps, in one battle; a battle that ends before them is left and
--- the next starts them over, up to BATTLES.  On this branch's own
--- wor-tomb-v1 capture one run took 5 battles (build/attempts/wt/v027-kits/
--- mx7/new__battle_runicblade.out: an Imp'd EDGAR twice, two battles ended
--- early), so 10, not the 6 the tracked capture's sweeps needed
-local BATTLES = 10
+-- the next starts them over, up to BATTLES.  Measured at 1a22db99 on this
+-- branch's own wor-tomb-v1, over 0-15 encounters used up first
+-- (PACE_BURN): 16 successes in 34 battles, the battle counts 1, 2, 1, 5, 3,
+-- 1, 3, 3, 3, 1, 4, 1, 1, 1, 3, 1 for burns 0-15
+-- (build/attempts/wt/v027-kits/budgets/battle_runicblade_*.out).  The rate
+-- is 0.47; its one-sided 95% lower bound is 0.32, and at it BATTLES = 24
+-- misses with 0.678^24 = 8.9e-5, under 1e-4 (at the measured rate,
+-- 0.53^24 = 2.3e-7).
+local BATTLES = 24
 local battles, ok = 0, false
 local body = {
   H.cond(function() return not inBattle() end, {
