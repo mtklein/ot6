@@ -82,7 +82,7 @@ local function cast(spell, boost, tag)
       planDone = function() return close() end })
 end
 
-H.run({ maxFrames = 200000 }, {
+H.run({ maxFrames = 400000 }, {
   H.bootCheckpoint("fc-alcove-v1"),
   H.call(function()
     arm()

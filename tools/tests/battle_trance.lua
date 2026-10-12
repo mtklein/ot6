@@ -44,7 +44,7 @@ local function arm()
   end, emu.callbackType.write, 0x7E3EF9, 0x7E3EF9 + 6)
 end
 
-H.run({ maxFrames = 200000 }, {
+H.run({ maxFrames = 400000 }, {
   H.bootCheckpoint("fc-alcove-v1"),
   H.call(arm),
   H.fcAlcoveToBattle("trance"),

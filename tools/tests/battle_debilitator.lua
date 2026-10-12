@@ -64,7 +64,7 @@ local function shopSlot(shop, slot)
   return H.readRomByte((H.sym("ShopProp") & 0x3FFFFF) + shop * 9 + slot)
 end
 
-H.run({ maxFrames = 200000 }, {
+H.run({ maxFrames = 400000 }, {
   H.call(function()
     for _, c in ipairs({ { 82, 4, FLASH, "Figaro's tool merchant (WoB)" }, { 5, 7, FLASH, "South Figaro" },
                          { 27, 5, DEBIL, "Vector" } }) do

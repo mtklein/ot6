@@ -29,8 +29,6 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local TERRA, BREAK, CMD_MAGIC, CMD_DEFEND = 0x00, 0x0C, 0x02, nil
 local BREAK_MP = 25
 
-local function map() return H.mapId() & 0x3ff end
-local function mapIs(m) return map() == m end
 
 local function shields(s) return H.readByte(0x3E40 + s * 2) end
 local function broken(s) return H.readByte(0x3E90 + s * 2) ~= 0 end
@@ -41,26 +39,6 @@ local function mons()
       st = H.readByte(0x3EEC + s * 2), present = (H.readByte(0x3AA8 + s * 2) & 1) == 1 }
   end
   return t
-end
-
--- the continent, a random battle: pace between the arrival tile and a
--- walkable neighbour until one starts
-local function encounter()
-  local A, B = nil, nil
-  return H.driveUntil(function() return H.battleLoadStarted() end, 60000, {
-    H.call(function()
-      if A ~= nil then return end
-      local x0, y0 = H.fieldX(), H.fieldY()
-      for _, d in ipairs({ { 0, 3 }, { 0, -3 }, { 3, 0 }, { -3, 0 }, { 0, 2 }, { 2, 0 }, { -2, 0 }, { 0, -2 } }) do
-        if H.bfsPath(x0 + d[1], y0 + d[2]) then A, B = { x0, y0 }, { x0 + d[1], y0 + d[2] }; break end
-      end
-      H.assertEq(A ~= nil, true, string.format("a walkable pace on the continent from (%d,%d)", x0, y0))
-      H.log(string.format("[break] pacing (%d,%d) <-> (%d,%d)", A[1], A[2], B[1], B[2]))
-    end),
-    H.navTo(function() return B[1] end, function() return B[2] end,
-      { maxFrames = 8000, arrive = function() return H.battleLoadStarted() end }),
-    H.call(function() A, B = B, A end),
-  }, "a random battle on the continent")
 end
 
 local terraSeat, recs, rec = nil, {}, nil
@@ -168,24 +146,10 @@ local function decide()
 end
 local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
 
-H.run({ maxFrames = 200000 }, {
+H.run({ maxFrames = 400000 }, {
   H.bootCheckpoint("fc-alcove-v1"),
   H.call(function() arm() end),
-  H.navTo(8, 9, { maxFrames = 3000 }),
-  (function()
-    local t = 0
-    return H.driveUntil(function() t = t + 1; return mapIs(394) end, 1800, {
-      H.call(function()
-        if H.dialogWaiting() then H.setPad(t % 16 < 4 and { a = true } or {}); return end
-        if not H.hasControl() then H.setPad({}); return end
-        H.setPad({ up = true })
-      end),
-    }, "alcove -> the continent (394)")
-  end)(),
-  H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 900, "control on 394", 10),
-  encounter(),
-  H.waitUntil(function() return H.battleActive() end, 1200, "the battle is up", 2),
-  H.waitFrames(30),
+  H.fcAlcoveToBattle("break"),
   H.driveUntil(function() return nDone == #CASTS end, 180000, {
     H.call(decide),
     H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000,

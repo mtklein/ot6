@@ -13230,11 +13230,15 @@ end
 -- is the Floating Continent's: from the fc-alcove-v1 Continue (map 358) up
 -- through the alcove's exit (8,8) onto the continent (394), then the pace.
 -- Nothing is written.
+-- PACE_BURN (a global a lab sets ahead of the lib's run; 0 in the suites)
+-- flees that many encounters first (fought out when it cannot run), to vary
+-- the encounter history the suite's battle comes from (TESTING.md: the draw
+-- moves with encounters used up, not with seeds).
 function M.paceToEncounter(tag)
   local A, B = nil, nil
-  return M.seqStep({
-    M.call(function() A, B = nil, nil end),
-    M.driveUntil(function() return M.battleLoadStarted() end, 60000, {
+  local burned = 0
+  local burn = type(PACE_BURN) == "number" and PACE_BURN or 0
+  local one = M.driveUntil(function() return M.battleLoadStarted() end, 60000, {
       M.call(function()
         if A ~= nil then return end
         local x0, y0 = M.fieldX(), M.fieldY()
@@ -13247,7 +13251,20 @@ function M.paceToEncounter(tag)
       M.navTo(function() return B[1] end, function() return B[2] end,
         { maxFrames = 8000, arrive = function() return M.battleLoadStarted() end }),
       M.call(function() A, B = B, A end),
-    }, tag .. ": a random battle"),
+    }, tag .. ": a random battle")
+  return M.seqStep({
+    M.call(function() A, B, burned = nil, nil, 0 end),
+    M.driveUntil(function() return burned >= burn end, 400000, {
+      one,
+      M.waitUntil(function() return M.battleActive() end, 1200, tag .. ": a battle to burn is up", 2),
+      M.fleeBattle(9000, { onCantRun = "fight" }),
+      M.waitUntil(function() return M.hasControl() and M.tileAligned() end, 3000, tag .. ": control after the burn", 5),
+      M.call(function()
+        burned = burned + 1
+        M.log(string.format("[%s] burned encounter %d of %d (%s)", tag, burned, burn, tostring(M.fleeOutcome)))
+      end),
+    }, tag .. ": the encounters PACE_BURN uses up"),
+    one,
     M.waitUntil(function() return M.battleActive() end, 1200, tag .. ": the battle is up", 2),
     M.waitFrames(30),
   })

@@ -77,7 +77,7 @@ local function check(i, boost, firings, cost)
   H.assertEq(r.mp0 - r.mp1, cost, string.format("and cost %d MP", cost))
 end
 
-H.run({ maxFrames = 300000 }, {
+H.run({ maxFrames = 400000 }, {
   H.bootCheckpoint("fc-alcove-v1"),
   H.call(function()
     arm()

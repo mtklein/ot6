@@ -104,6 +104,18 @@ local steps = {
     H.assertEq((H.readByte(0x1E80 + (0x68 >> 3)) >> (0x68 & 7)) & 1, 1,
       "switch $0068 is set: the Magitek factory's way out has opened (RunicBlade learned)")
   end),
+  -- PACE_BURN (a lab's global, 0 here): flee that many encounters first, to
+  -- vary the encounter history (lib's M.paceToEncounter has the same lever)
+  (function()
+    local burned, burn = 0, type(PACE_BURN) == "number" and PACE_BURN or 0
+    return H.driveUntil(function() return burned >= burn end, 400000, {
+      walkToBattle(),
+      H.waitUntil(function() return H.battleActive() end, 1200, "a battle to burn is up", 2),
+      H.fleeBattle(9000, { onCantRun = "fight" }),
+      H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 3000, "control after the burn", 5),
+      H.call(function() burned = burned + 1; H.log(string.format("[blade] burned encounter %d of %d", burned, burn)) end),
+    }, "the encounters PACE_BURN uses up")
+  end)(),
   walkToBattle(),
   H.waitUntil(function() return H.battleActive() end, 1200, "the battle is up", 2),
   H.waitFrames(30),
