@@ -114,7 +114,10 @@ local BREAK_TICKS = 0x10   -- OT6_BREAK_TICKS (ot6_break.asm:1): the value
 -- sweeps over 0-13 encounters used up and seed shifts,
 -- build/attempts/wt/v026-suites/assassinate/); the one-sided 95% upper bound
 -- on that rate is 0.31, and at it FIGHTS = 8 misses with 0.31^8 = 8.7e-5,
--- under 1e-4 (the 6 this file used to build: 9.0e-4).
+-- under 1e-4 (the 6 this file used to build: 9.0e-4).  That rate was
+-- measured for one divine per fight; battle 1 now wants two kills in one
+-- fight (the divine has no once-per-battle limit), a rate not measured, so
+-- FIGHTS doubles the old 8 rather than claiming a bound.
 -- Arm 3 needs one: its staged body cannot fall before it breaks.
 local FIGHTS = 16
 -- the isolation arm's staged HP (header): enough that the bitted body
