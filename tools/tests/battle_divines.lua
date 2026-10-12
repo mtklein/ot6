@@ -20,8 +20,9 @@
 -- Cleave is SwdTech tech 8, reached by level at L70 and this Cyan is L11:
 --   KNOWN ($2020) := 7 and MP := 999, so the window enumerates tech 8 and
 --   the 99-MP cut is paid;
---   the loadout word ($1E1D) set to Cleave in the 1-BP slot, read and set
---   back to AUTO (0), for the gate's manual-loadout arm;
+--   the learned SwdTechs ($1CF7) := all eight and the loadout word ($1E1D)
+--   := Cleave in the 1- and 2-BP slots and Quadra Slice in the 3-BP slot,
+--   read and set back to AUTO (0), for the gate's manual-loadout arm;
 --   in battle 2, the commander's $3aa1 bit 2 (the boss bit), since no
 --   generated battle fields a death-protected body beside Cyan, and his HP
 --   raised to 30,000 so the first heavy cut leaves him standing for the
@@ -149,8 +150,10 @@ add({
     -- the manual loadout's arm: Cleave stored in the 1-BP slot (slot 1 =
     -- bits 3-5) and in the 2-BP slot (bits 6-8), the 3-BP slot left as the
     -- auto window's (Stunner's id 5 ... any learned tech; tech 6 here)
+    H.writeByte(0x1CF7, 0xFF)
     H.writeWord(LOADOUT, (7 << 3) | (7 << 6) | (6 << 9))
-    H.log("[battle 1] loadout word := Cleave in the 1- and 2-BP slots (declared expedient)")
+    H.log("[battle 1] SwdTechs learned := all eight; loadout word := Cleave in the 1- and 2-BP slots, Quadra "
+      .. "Slice in the 3-BP slot (declared expedients)")
   end),
   H.kitBattle({ { who = CYAN, cmd = CMD_SWDTECH, boost = 1, peek = true } },
     { untilPlanDone = true, idle = "defend", onList = function() rowsSeen.manual = readRows() end }),
@@ -159,7 +162,8 @@ add({
     H.assertEq(r ~= nil, true, "the manual-loadout window was read")
     H.log(string.format("[battle 1] manual loadout rows: %02X %02X %02X", r[0], r[1], r[2]))
     H.assertEq(r[0] ~= CLEAVE and r[1] ~= CLEAVE, true,
-      "Cleave stored in the 1- and 2-BP slots is not offered there (Ot6CleaveSlot)")
+      "Cleave stored (and learned) in the 1- and 2-BP slots is not offered there (Ot6CleaveSlot)")
+    H.assertEq(r[2], 0x5B, "the 3-BP slot holds the stored Quadra Slice ($5b): the manual loadout is being read")
     H.writeWord(LOADOUT, 0)
     H.log("[battle 1] loadout word := 0 (AUTO) again")
   end),
