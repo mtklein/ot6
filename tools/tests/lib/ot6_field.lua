@@ -6449,6 +6449,537 @@ function M.equipKit(charId, items, opts)
   return M.seqStep(steps)
 end
 
+-- ---------------------------------------------------------- the gear policy --
+-- Buy power with gil (#434; docs/guidelines.md "Buy power with gil"): at a
+-- town with weapon and armor counters, upgrade the seated party the way a
+-- player would, keeping the supply reserve, and put the upgrades on.  One
+-- shared policy for every generator:
+--
+--   M.gearStop(opts)   standing on a town map with control: walk to each of
+--                      the town's weapon and armor counters (GEAR_TOWNS,
+--                      decoded from the map and event data), buy what the
+--                      plan says, come back out, and dress the party.
+--   M.gearBuy(opts)    with a weapon/armor/vendor counter open at its
+--                      options window ($25, M.shopTalk's exit): plan from
+--                      the live state and buy.
+--   M.gearDress(opts)  equip each seated member from the bag where the bag
+--                      holds a better piece than the one worn.
+--
+-- What it scores (M.gearValue), per character and slot, from ItemProp:
+-- weapon power, defense and magic defense, evade and magic block (+26),
+-- the stat bonuses (+16/+17), elemental halves/absorbs/nulls and
+-- weaknesses (+15, +22..+24), status protection (+6/+7) and granted
+-- statuses (+8); and OT6's break keys: a weapon's class (Ot6WeapClassTbl)
+-- is a key, so a weapon that brings a class nobody else in the party holds
+-- is worth GEAR_KEY more, and one that drops a class only it held is worth
+-- that much less (keep the pierce or the blunt holder).  A weapon a
+-- member's command needs keeps its property: Runic needs a runic blade,
+-- SwdTech a swdtech one (ItemProp +19 bits 7 and 1).
+--
+-- What it leaves alone: the relic slots (the Ribbon, relic kits and
+-- dressRelics own them), Espers, and any slot opts.keep names.  A route's
+-- deliberate weapon (an element-safe swap, a Genji pair) is re-equipped by
+-- its own kit step after this, as before.
+--
+-- The budget is the purse less the supply reserve: what the supply band
+-- (tools/audit_supplies.py: Tonic ~5L cap 99, Potion ~1.5L min 10 cap 79,
+-- Fenix ~L cap 20, Tincture ~L/4, Revivify 3) would cost to refill from the
+-- bag at two levels ahead, plus a quarter of the whole band's price for the
+-- legs' spend, plus opts.reserve.
+
+local GEAR_KEY = 30
+local GEAR_NAMES = { [0] = "TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN",
+  "CELES", "STRAGO", "RELM", "SETZER", "MOG", "GAU", "GOGO", "UMARO" }
+local GEAR_EVADE = { [0] = 0, 10, 20, 30, 40, 50, -10, -20, -30, -40, -50 }
+-- slot -> the ItemProp type it takes (slot 1 takes a shield, or a weapon
+-- under a two-weapon relic)
+local GEAR_SLOT_TYPE = { [0] = 1, [1] = 3, [2] = 4, [3] = 2 }
+local CMD_SWDTECH, CMD_RUNIC = 7, 11
+local PROP_SWDTECH, PROP_RUNIC = 0x02, 0x80
+
+local function gearRec(id) return (M.sym("ItemProp") & 0x3FFFFF) + id * 30 end
+local function gearByte(id, off) return M.readRomByte(gearRec(id) + off) end
+local function gearType(id)
+  local t = gearByte(id, 0)
+  if (t & 0x80) ~= 0 then return nil end
+  return t & 0x07
+end
+local function bits(v) local n = 0; while v ~= 0 do n = n + (v & 1); v = v >> 1 end; return n end
+local function gearName(id)
+  if id == nil or id == 0xFF then return "(empty)" end
+  return string.format("$%02X", id)
+end
+local function charRec(c) return 0x1600 + 37 * c end
+local function gearWorn(c, slot) return M.readByte(charRec(c) + 0x1F + slot) end
+local function wearable(c, id)
+  if id == nil or id == 0xFF then return false end
+  local mask = gearByte(id, 1) | (gearByte(id, 2) << 8)
+  if (gearByte(id, 2) & 0x40) ~= 0 then return false end    -- an Imp item
+  return ((mask >> c) & 1) == 1
+end
+local function relicBits(c, off)
+  local v = 0
+  for s = 4, 5 do
+    local r = gearWorn(c, s)
+    if r ~= 0xFF then v = v | gearByte(r, off) end
+  end
+  return v
+end
+-- slot 1 takes a weapon under a Genji Glove (relic +12 bit 4), and is left
+-- empty under a Gauntlet (bit 3) whose two-handed grip an empty hand buys
+local function leftHand(c)
+  local rb = relicBits(c, 12)
+  if (rb & 0x10) ~= 0 then return "weapon" end
+  if (rb & 0x08) ~= 0 and gearWorn(c, 1) == 0xFF then return "none" end
+  return "shield"
+end
+local function hasCommand(c, cmd)
+  for k = 0, 3 do if M.readByte(charRec(c) + 0x16 + k) == cmd then return true end end
+  return false
+end
+local function nib(v) if (v & 8) ~= 0 then return -(v & 7) end return v & 7 end
+
+-- M.gearValue(c, id): what an item is worth on character c, before keys.
+-- Points are battle/defense power; everything else is priced against them.
+function M.gearValue(c, id)
+  if id == nil or id == 0xFF then return 0 end
+  local t = gearType(id)
+  local v = 0
+  local stats = gearByte(id, 16) | (gearByte(id, 17) << 8)
+  for k = 0, 3 do v = v + 3 * nib((stats >> (4 * k)) & 0x0F) end
+  local prot = gearByte(id, 6) | (gearByte(id, 7) << 8)
+  -- Death/Petrify/Zombie (status 1 bits 7, 6, 1) at double weight
+  v = v + 4 * bits(prot) + 4 * bits(prot & 0xC2)
+  v = v + 10 * bits(gearByte(id, 8))
+  if t == 1 then
+    v = v + gearByte(id, 20)
+    if gearByte(id, 15) ~= 0 then v = v + 4 end          -- an element is a chip key too
+  else
+    v = v + gearByte(id, 20) + gearByte(id, 21)
+    local ev = gearByte(id, 26)
+    v = v + ((GEAR_EVADE[ev & 0x0F] or 0) + (GEAR_EVADE[(ev >> 4) & 0x0F] or 0)) // 2
+    v = v + 4 * bits(gearByte(id, 15)) + 8 * bits(gearByte(id, 22))
+      + 6 * bits(gearByte(id, 23)) - 6 * bits(gearByte(id, 24))
+  end
+  return v
+end
+
+-- the break classes the other hands hold: every weapon in a seated (or
+-- planned) member's hands but (c, slot)'s, read through `wornOf`
+local function keysElsewhere(members, wornOf, c, slot)
+  local k = 0
+  for _, m in ipairs(members) do
+    for s = 0, 1 do
+      if not (m == c and s == slot) then
+        local id = wornOf(m, s)
+        if id ~= 0xFF and gearType(id) == 1 then k = k | M.weaponClass(id) end
+      end
+    end
+  end
+  return k
+end
+
+-- does item `id` fit character c's slot (type, mask, and what the slot's
+-- command needs)?
+local function fits(c, slot, id)
+  if not wearable(c, id) then return false end
+  local t = gearType(id)
+  if slot == 1 then
+    local lh = leftHand(c)
+    if lh == "none" then return false end
+    if t ~= (lh == "weapon" and 1 or 3) then return false end
+  elseif t ~= GEAR_SLOT_TYPE[slot] then
+    return false
+  end
+  if t == 1 and slot == 0 then
+    local p = gearByte(id, 19)
+    if hasCommand(c, CMD_RUNIC) and (p & PROP_RUNIC) == 0 then return false end
+    if hasCommand(c, CMD_SWDTECH) and (p & PROP_SWDTECH) == 0 then return false end
+  end
+  return true
+end
+
+-- the score of `id` in (c, slot) given the other hands' keys
+local function slotScore(c, slot, id, others)
+  if id == 0xFF then return 0 end
+  local v = M.gearValue(c, id)
+  if gearType(id) == 1 then v = v + GEAR_KEY * bits(M.weaponClass(id) & ~others) end
+  return v
+end
+
+-- the bag, as id -> count
+local function bagCounts()
+  local out = {}
+  for s = 0, 255 do
+    local id, n = M.readByte(0x1869 + s), M.readByte(0x1969 + s)
+    if id ~= 0xFF and n > 0 then out[id] = (out[id] or 0) + n end
+  end
+  return out
+end
+
+local function seated()
+  local act, out = M.readByte(0x1A6D) & 0x07, {}
+  for c = 0, 15 do
+    if (M.readByte(0x1850 + c) & 0x07) == act then out[#out + 1] = c end
+  end
+  return out
+end
+M.seatedMembers = seated
+
+-- M.gearReserve(opts): the gil the policy will not spend (the comment at
+-- the top of this section), and a line saying how it was reached.
+function M.gearReserve(opts)
+  opts = opts or {}
+  local lv = M.activeTopLevel()
+  local ahead = lv + 2
+  local band = {
+    { 0xE8, math.min(99, 5 * ahead) },                          -- Tonic
+    { 0xE9, math.min(79, math.max(10, -(-3 * ahead // 2))) },   -- Potion
+    { 0xF0, math.min(20, ahead) },                              -- Fenix Down
+    { 0xEB, -(-ahead // 4) },                                   -- Tincture
+    { 0xF1, 3 },                                                -- Revivify
+  }
+  local short, whole = 0, 0
+  for _, b in ipairs(band) do
+    local p = M.itemPrice(b[1])
+    short = short + p * math.max(0, b[2] - M.invCountOf(b[1]))
+    whole = whole + p * b[2]
+  end
+  local extra = opts.reserve or 0
+  local r = short + whole // 4 + extra
+  return r, string.format("reserve %d = band shortfall %d + a quarter of the L%d band %d + %d",
+    r, short, ahead, whole, extra)
+end
+
+-- M.gearPlan(stock, opts): what to buy from `stock` (a list of item ids on
+-- the open counter, with prices) for the seated party and opts.joining,
+-- within the purse less the reserve.  Returns a list of
+-- { char, slot, item, gain, price } in buying order, and logs every pick.
+function M.gearPlan(stock, opts)
+  opts = opts or {}
+  local tag = opts.tag or "gear"
+  local members = seated()
+  for _, j in ipairs(opts.joining or {}) do
+    local dup = false
+    for _, m in ipairs(members) do if m == j then dup = true end end
+    if not dup then members[#members + 1] = j end
+  end
+  local keep = opts.keep or {}
+  local bag = bagCounts()
+  local planned = {}            -- c -> slot -> id (what the plan puts on)
+  local function wornOf(c, s)
+    if planned[c] and planned[c][s] then return planned[c][s] end
+    return gearWorn(c, s)
+  end
+  local reserve, why = M.gearReserve(opts)
+  local budget = M.gil() - reserve
+  M.log(string.format("[%s] gil %d, %s: budget %d", tag, M.gil(), why, budget))
+  -- every (member, slot) candidate: the best of the stock that beats both
+  -- what is worn and the bag's best, scored against the other hands' keys
+  local cands = {}
+  for _, c in ipairs(members) do
+    for slot = 0, 3 do
+      if not (keep[c] and keep[c][slot]) then
+        local others = keysElsewhere(members, wornOf, c, slot)
+        local cur = gearWorn(c, slot)
+        local curScore = (cur == 0xFF or fits(c, slot, cur)) and slotScore(c, slot, cur, others) or 0
+        local base = curScore
+        for id, n in pairs(bag) do
+          if n > 0 and fits(c, slot, id) then base = math.max(base, slotScore(c, slot, id, others)) end
+        end
+        local best, bestScore, bestPrice = nil, base, 0
+        for _, it in ipairs(stock) do
+          if fits(c, slot, it.id) then
+            local s = slotScore(c, slot, it.id, others)
+            if s > bestScore or (s == bestScore and best and it.price < bestPrice) then
+              best, bestScore, bestPrice = it.id, s, it.price
+            end
+          end
+        end
+        if best then
+          cands[#cands + 1] = { char = c, slot = slot, item = best, gain = bestScore - base,
+            price = bestPrice, from = cur, fromScore = curScore, base = base, score = bestScore }
+        end
+      end
+    end
+  end
+  -- the biggest upgrades first, each if the budget still covers it
+  table.sort(cands, function(a, b)
+    if a.gain ~= b.gain then return a.gain > b.gain end
+    if a.price ~= b.price then return a.price < b.price end
+    if a.char ~= b.char then return a.char < b.char end
+    return a.slot < b.slot
+  end)
+  local out = {}
+  for _, k in ipairs(cands) do
+    local ok = k.price <= budget
+    M.log(string.format("[%s] %s slot %d: %s (score %d, bag best %d) -> %s score %d, gain %d, %d GP: %s",
+      tag, GEAR_NAMES[k.char] or tostring(k.char), k.slot, gearName(k.from), k.fromScore, k.base,
+      gearName(k.item), k.score, k.gain, k.price, ok and "BUY" or ("over the budget " .. budget)))
+    if ok then
+      budget = budget - k.price
+      planned[k.char] = planned[k.char] or {}
+      planned[k.char][k.slot] = k.item
+      out[#out + 1] = k
+    end
+  end
+  return out
+end
+
+-- the open counter's stock, with the prices the menu will charge
+-- (CalcShopPrice's adjustment, shop byte 0 bits 3-5: 0 none, 1 +50%,
+-- 2 +100%, 3 -50%, 4-6 depend on who is shown and are budgeted at +50%)
+local function gearStock(shop)
+  local adj = (M.readRomByte((M.sym("ShopProp") & 0x3FFFFF) + shop * 9) >> 3) & 0x07
+  local out = {}
+  for _, id in pairs(M.shopStock(shop)) do
+    local p = M.itemPrice(id)
+    if adj == 2 then p = p * 2 elseif adj == 3 then p = p >> 1 elseif adj ~= 0 then p = p + (p >> 1) end
+    local t = gearType(id)
+    if t and t >= 1 and t <= 4 then out[#out + 1] = { id = id, price = p } end
+  end
+  return out
+end
+
+-- a step built when it is first reached (the plan needs the live state)
+function M.lazy(build)
+  local step = nil
+  return {
+    tick = function()
+      if step == nil then step = build() end
+      return step:tick()
+    end,
+    reset = function()
+      if step and step.reset then step:reset() end
+      step = nil
+    end,
+  }
+end
+
+M.gearLog = {}     -- every purchase this run: { shop, char, slot, item, price }
+
+-- M.gearBuy(opts): the counter is open at its options window; plan and buy.
+function M.gearBuy(opts)
+  opts = opts or {}
+  return M.lazy(function()
+    local shop = M.shopId()
+    local _, typeName = M.shopType(shop)
+    local tag = (opts.tag or "gear") .. string.format(" shop %d (%s)", shop, typeName)
+    local plan = M.gearPlan(gearStock(shop), { tag = tag, joining = opts.joining,
+      keep = opts.keep, reserve = opts.reserve })
+    local want = {}
+    local order = {}
+    for _, k in ipairs(plan) do
+      if not want[k.item] then order[#order + 1] = k.item; want[k.item] = 0 end
+      want[k.item] = want[k.item] + 1
+    end
+    local steps = {}
+    local gil0
+    steps[#steps + 1] = M.call(function() gil0 = M.gil() end)
+    for _, id in ipairs(order) do
+      local n = want[id]
+      steps[#steps + 1] = M.buyItem(id, function() return n end,
+        string.format("%s: %d x %s", tag, n, gearName(id)))
+    end
+    steps[#steps + 1] = M.call(function()
+      for _, k in ipairs(plan) do
+        M.gearLog[#M.gearLog + 1] = { shop = shop, char = k.char, slot = k.slot, item = k.item, price = k.price }
+      end
+      M.log(string.format("[%s] spent %d GP on %d piece(s); gil %d", tag, gil0 - M.gil(), #plan, M.gil()))
+    end)
+    if #plan == 0 then
+      return M.logStep(string.format("[%s] nothing worth buying within the budget", tag))
+    end
+    return M.seqStep(steps)
+  end)
+end
+
+-- M.gearDress(opts): put on whatever in the bag beats what each seated
+-- member wears (the slots opts.keep names, and the relics, left alone).
+-- One Equip session per member who changes.
+function M.gearDress(opts)
+  opts = opts or {}
+  local tag = opts.tag or "gear dress"
+  return M.lazy(function()
+    local members = seated()
+    local keep = opts.keep or {}
+    local bag = bagCounts()
+    local planned = {}
+    local function wornOf(c, s)
+      if planned[c] and planned[c][s] then return planned[c][s] end
+      return gearWorn(c, s)
+    end
+    local kits = {}
+    for _, c in ipairs(members) do
+      -- shields and armor first, the weapons last (their keys read the others)
+      for _, slot in ipairs({ 3, 2, 1, 0 }) do
+        if not (keep[c] and keep[c][slot]) then
+          local others = keysElsewhere(members, wornOf, c, slot)
+          local cur = gearWorn(c, slot)
+          local curScore = (cur == 0xFF or fits(c, slot, cur)) and slotScore(c, slot, cur, others) or 0
+          local best, bestScore = nil, curScore
+          for id, n in pairs(bag) do
+            if n > 0 and fits(c, slot, id) then
+              local s = slotScore(c, slot, id, others)
+              if s > bestScore then best, bestScore = id, s end
+            end
+          end
+          if best then
+            bag[best] = bag[best] - 1
+            if cur ~= 0xFF then bag[cur] = (bag[cur] or 0) + 1 end
+            planned[c] = planned[c] or {}
+            planned[c][slot] = best
+            kits[c] = kits[c] or {}
+            table.insert(kits[c], 1, { slot, best })
+            M.log(string.format("[%s] %s slot %d: %s (score %d) -> %s (score %d)", tag,
+              GEAR_NAMES[c] or tostring(c), slot, gearName(cur), curScore, gearName(best), bestScore))
+          end
+        end
+      end
+    end
+    local steps = {}
+    for _, c in ipairs(members) do
+      if kits[c] then
+        steps[#steps + 1] = M.equipKit(c, kits[c], { tag = tag .. " " .. (GEAR_NAMES[c] or tostring(c)) })
+      end
+    end
+    steps[#steps + 1] = M.call(function()
+      for c, kit in pairs(kits) do
+        for _, e in ipairs(kit) do
+          M.assertEq(gearWorn(c, e[1]), e[2], string.format("%s: %s slot %d holds %s", tag,
+            GEAR_NAMES[c] or tostring(c), e[1], gearName(e[2])))
+        end
+      end
+      local parts = {}
+      for _, c in ipairs(members) do
+        parts[#parts + 1] = string.format("%s %02X %02X %02X %02X", GEAR_NAMES[c] or tostring(c),
+          gearWorn(c, 0), gearWorn(c, 1), gearWorn(c, 2), gearWorn(c, 3))
+      end
+      M.log(string.format("[%s] worn: %s", tag, table.concat(parts, "; ")))
+    end)
+    return M.seqStep(steps)
+  end)
+end
+
+-- The towns' weapon and armor counters, decoded from the ROM's data
+-- (route_data.py `map`: the town map's short entrances, the shop map's
+-- shopkeeper NPC and the shop_menu its event runs, event_main.asm).  Each
+-- entry: the town's door, the shop map and the tile the door lands on, the
+-- keeper(s), and the way out (the landing tile, then DOWN onto the exit row
+-- -- every one of these maps' exits sits under its landing).  A town whose
+-- counters stand on the street (Nikeah) has keepers and no door.
+local GEAR_TOWNS = {}
+local function town(maps, counters)
+  for _, m in ipairs(maps) do GEAR_TOWNS[m] = counters end
+end
+town({ 20, 32 }, {                                   -- Narshe
+  { what = "weapon", door = { 32, 30 }, map = 24, land = { 25, 13 }, keeper = { 28, 10 } },
+  { what = "armor", door = { 43, 11 }, map = 25, land = { 6, 14 }, keeper = { 6, 7 } },
+})
+town({ 74, 75 }, {                                   -- South Figaro's arsenal
+  { what = "weapon", door = { 29, 17 }, map = 77, land = { 103, 16 }, keeper = { 103, 9 } },
+  { what = "armor", door = { 35, 17 }, map = 77, land = { 114, 16 }, keeper = { 114, 10 } },
+})
+town({ 157 }, {                                      -- Mobliz's arsenal
+  { what = "weapon", door = { 8, 29 }, map = 161, land = { 10, 47 }, keeper = { 11, 37 } },
+  { what = "armor", door = { 12, 29 }, map = 161, land = { 23, 47 }, keeper = { 22, 37 } },
+})
+town({ 169 }, {                                      -- Nikeah: the street stalls
+  { what = "weapon", keeper = { 17, 42 } },
+  { what = "armor", keeper = { 26, 47 } },
+})
+town({ 188, 189 }, {                                 -- Kohlingen's general store
+  { what = "weapon", door = { 11, 11 }, map = 194, land = { 12, 39 }, keeper = { 9, 35 } },
+  { what = "armor", door = { 11, 11 }, map = 194, land = { 12, 39 }, keeper = { 15, 35 } },
+})
+town({ 198 }, {                                      -- Jidoor
+  { what = "weapon", door = { 16, 41 }, map = 204, land = { 39, 50 }, keeper = { 39, 43 } },
+  { what = "armor", door = { 6, 56 }, map = 203, land = { 56, 51 }, keeper = { 58, 45 } },
+})
+town({ 242, 253 }, {                                 -- Vector
+  { what = "weapon", door = { 11, 52 }, map = 246, land = { 27, 15 }, keeper = { 29, 10 } },
+  { what = "armor", door = { 11, 41 }, map = 248, land = { 8, 14 }, keeper = { 8, 10 } },
+})
+town({ 284 }, {                                      -- Maranda
+  { what = "weapon", door = { 18, 9 }, map = 289, land = { 54, 22 }, keeper = { 54, 16 } },
+  { what = "armor", door = { 6, 12 }, map = 290, land = { 44, 13 }, keeper = { 44, 8 } },
+})
+town({ 305, 306 }, {                                 -- Tzen
+  { what = "weapon", door = { 6, 22 }, map = 309, land = { 39, 50 }, keeper = { 38, 43 } },
+  { what = "armor", door = { 8, 17 }, map = 310, land = { 56, 51 }, keeper = { 58, 45 } },
+})
+town({ 323, 324 }, {                                 -- Albrook
+  { what = "weapon", door = { 23, 19 }, map = 326, land = { 4, 55 }, keeper = { 3, 51 } },
+  { what = "armor", door = { 39, 19 }, map = 327, land = { 101, 23 }, keeper = { 102, 18 } },
+})
+town({ 340, 341, 343, 344 }, {                       -- Thamasa's arsenal
+  { what = "weapon", door = { 14, 37 }, map = 345, land = { 10, 47 }, keeper = { 11, 37 } },
+  { what = "armor", door = { 20, 37 }, map = 345, land = { 23, 47 }, keeper = { 22, 37 } },
+})
+M.GEAR_TOWNS = GEAR_TOWNS
+
+local function gearSettled(m)
+  return function()
+    return mapLow() == m and M.hasControl() and M.tileAligned() and not M.dialogWaiting()
+      and (emu.getState()["ppu.screenBrightness"] or 0) >= 15
+  end
+end
+
+-- M.gearStop(opts): the town stop.  Standing on a town map in GEAR_TOWNS
+-- with control, visit its weapon and armor counters (opts.only = "weapon"
+-- or "armor" for one), buy by the plan, and dress the seated party.
+-- opts.joining, opts.keep, opts.reserve pass to the plan; opts.fight and
+-- opts.healer to the walks.  Ends back on the town map, where it began.
+function M.gearStop(opts)
+  opts = opts or {}
+  local tag = opts.tag or "gear"
+  return M.lazy(function()
+    local townMap = mapLow()
+    local counters = GEAR_TOWNS[townMap]
+    if counters == nil then
+      error(string.format("[%s] map %d is not a town with weapon/armor counters in GEAR_TOWNS",
+        tag, townMap), 0)
+    end
+    local gil0 = M.gil()
+    local nav = { maxFrames = 9000, playBattles = "tactical", fight = opts.fight, healer = opts.healer }
+    local steps = { M.logStep(string.format("[%s] town map %d: %d counter(s), gil %d, f%d",
+      tag, townMap, #counters, gil0, M.frame)) }
+    for _, k in ipairs(counters) do
+      if opts.only == nil or opts.only == k.what then
+        local what = string.format("%s: %s counter", tag, k.what)
+        if k.door then
+          steps[#steps + 1] = M.crossDoor(k.door[1], k.door[2], k.map, k.land[1], k.land[2],
+            string.format("%s door %d(%d,%d)->%d", what, townMap, k.door[1], k.door[2], k.map),
+            { fight = opts.fight })
+        end
+        steps[#steps + 1] = M.shopTalk(k.keeper[1], k.keeper[2], what, { fight = opts.fight, healer = opts.healer })
+        steps[#steps + 1] = M.gearBuy({ tag = tag, joining = opts.joining, keep = opts.keep,
+          reserve = opts.reserve })
+        steps[#steps + 1] = M.shopClose(what)
+        if k.door then
+          steps[#steps + 1] = M.navTo(k.land[1], k.land[2], nav)
+          local hb = 0
+          steps[#steps + 1] = M.driveUntil(function() return mapLow() == townMap end, 900, {
+            M.call(function()
+              hb = hb + 1
+              if M.dialogWaiting() then M.setPad(hb % 8 < 4 and { "a" } or {}); return end
+              M.setPad({ down = true })
+            end),
+          }, what .. ": out to the street")
+          steps[#steps + 1] = M.release()
+          steps[#steps + 1] = M.waitUntil(gearSettled(townMap), 2400, what .. ": street control", 5)
+          steps[#steps + 1] = M.waitFrames(20)
+        end
+      end
+    end
+    steps[#steps + 1] = M.gearDress({ tag = tag .. " dress", keep = opts.keep })
+    steps[#steps + 1] = M.call(function()
+      M.log(string.format("[%s] stop done: spent %d GP, gil %d, f%d", tag, gil0 - M.gil(), M.gil(), M.frame))
+    end)
+    return M.seqStep(steps)
+  end)
+end
+
 -- M.activeTopLevel(): the highest level in the active party.
 function M.activeTopLevel()
   local act, top = M.readByte(0x1A6D) & 0x07, 0
