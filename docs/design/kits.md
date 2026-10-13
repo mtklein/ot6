@@ -475,7 +475,9 @@ nowhere else. The World of Ruin adds Phoenix's Life (magicite.md, #327).
   `$3EE2` and nothing clocked (`Ot6MorphSpan`, in UpdateMorph).  The boost
   is read at Cmd_03's head (`Ot6MorphTake`, `OT6_MORPHBOOST`), so a pick
   taken back at target select gets the span of what it pays.  Revert stays
-  free, so she can morph again in the same battle.
+  free, so she can morph again in the same battle; it buys nothing, so a
+  boost raised on it is refunded at Cmd_04's head (`Ot6RevertTake`, #430)
+  and the turn regens a point like any unboosted one.
   Vanilla's cross-battle gauge is gone: `$1CF6` (filled by magicite
   points after battles, drained by each morph, saved) no longer sets the
   duration, greys the command (`UpdateCmd_00`) or gates a random pick
@@ -504,7 +506,8 @@ nowhere else. The World of Ruin adds Phoenix's Life (magicite.md, #327).
   The fight was won every time, and her share of the damage moves little:
   3,900 and 4,812 (this ROM) against 6,438 and 4,956 (main) and 2,020 and
   3,290 unmorphed, over one to three of her attacking turns.
-  `battle_trance` (each span, permanence at 3, the take-back),
+  `battle_trance` (each span, permanence at 3, the take-back, and a 2-BP
+  Revert after a 3-BP Morph: it reverts and is refunded),
   `battle_morphrandom` (the engine's pick).
 - **Break (level 24, and Shoat's) takes shields** (#398): no damage and no
   status; one shield off its one target, ignoring class and element, plus
