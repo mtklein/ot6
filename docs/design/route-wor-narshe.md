@@ -463,8 +463,8 @@ The route plays the arc in two legs. Evidence is under
   learn data, against "stronger spells come from boosting" (spells_all on
   the first `wor-narshe-v1`, `spells_all/`). The three elemental shields now
   teach nothing, and check_spell_grants holds items to "no tier". The
-  variation sets below ran before that change; neither spell is one the
-  bosses take (they absorb ice; Tritoch nulls bolt).
+  variation sets below ran before that change; the driver casts only fire
+  at the bosses, so neither spell was cast in them.
 - **A lift-off and a landing on one tile** stalled the pilot one tile off
   it (`varA/tritoch_k2_s12.log`: `timeout after 6000 frames`); the arc's
   save is three tiles south of where the Falcon waited.
