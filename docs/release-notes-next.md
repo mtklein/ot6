@@ -21,3 +21,7 @@ Dragon, Tritoch and Umaro, now have their own weak points instead of the
 default ones. Test Riders break only to piercing weapons. The Ice Dragon (10
 shields) breaks to piercing and blunt weapons, Tritoch (10) and Umaro (6) to
 blades and piercing weapons, and all three to fire.
+
+**The Flame, Ice and Thunder Shields no longer teach spells.** They taught
+Fire 2, Ice 2 and Bolt 2. Those come from boosting Fire, Ice and Bolt, as
+every stronger spell does.
