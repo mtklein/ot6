@@ -478,4 +478,13 @@ OT6_DEBIL            := $edd8   ; 12 bytes
 .assert OT6_DEBIL = OT6_BLADESPELL + 1, error, "the Debilitator mask must follow the RunicBlade state"
 .assert OT6_DEBIL + 12 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
+; Terra's Morph (ot6_trance.asm): the boost the Morph now executing was
+; bought with (0-3), written at Cmd_03's head for every character's Morph and
+; read when her morph status lands (UpdateMorph), after Ot6ActionEnd has
+; already charged and cleared the pending byte.  Under 3 it picks the span,
+; at 3 the morph lasts the battle.
+OT6_MORPHBOOST       := $ede4
+.assert OT6_MORPHBOOST = OT6_DEBIL + 12, error, "the Morph's boost must follow the Debilitator mask"
+.assert OT6_MORPHBOOST <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
 .endif

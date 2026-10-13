@@ -75,8 +75,9 @@ turn, so from an empty bank a divine is every fourth turn at most, and
 each divine's MP does the rest.
 
 With fewer than three points pending, a divine is not offered: its row
-greys and the A button buzzes (Jackpot, Morph), or the command does what it
-does at that boost (Cleave is only ever the SwdTech window's 3-BP row;
+greys and the A button buzzes (Jackpot), or the command does what it
+does at that boost (Morph lasts a shorter span; Cleave is only ever the
+SwdTech window's 3-BP row;
 Runic and Tools under three points are their plain selves; Shadow's hit
 under three points is a hit).  A divine picked at three and then taken
 back to fewer (L during target select) falls back at execution and charges
@@ -88,7 +89,7 @@ it (a Jackpot), and is free where it does not (a Cleave).
 
 | Character | Divine | What three points buy | Built |
 |---|---|---|---|
-| Terra | Trance | her Morph: esper form (magic x2, damage taken halved) for as long as the morph gauge lasts | yes (`ot6_trance.asm`) |
+| Terra | Trance | her Morph (esper form: magic x2, damage taken halved) until the battle ends or she reverts; under 3 BP Morph lasts a shorter span | yes (`ot6_trance.asm`) |
 | Celes | RunicBlade | a 3-turn Runic that also sends every spell it absorbs back at its caster | yes (`ot6_runicblade.asm`) |
 | Edgar | Overclock | the Tool fires twice, at the boost's x8 each, priced as the two firings | yes (`ot6_overclock.asm`) |
 | Cyan | Cleave | the SwdTech window's 3-BP row, from the Phantom Train farewell on: instant death on a killable target, a power-255 cut on a death-immune one | yes (`ot6_divine.asm`, learned by story since #379) |
@@ -104,7 +105,7 @@ Terra's Ultima is a fold, not a divine, but it too is what a full boost buys
 (Fire at 3 BP, after her World of Ruin return; see Terra below).  `$3ecb`,
 the once-a-battle flag (`OT6_DIVINE_USED`), is retired.
 Suites: `battle_divines` and `battle_cleave` (Cleave), `battle_jackpot`,
-`battle_assassinate`, `battle_trance`, `battle_runicblade`,
+`battle_assassinate`, `battle_trance` and `battle_morphrandom`, `battle_runicblade`,
 `battle_overclock`, `battle_waterrondo`, `battle_umaro`, each with its gate
 (under 3 BP no divine), and an old-ROM red; the menu divines also with a
 second use in one battle.
@@ -114,8 +115,8 @@ The engine picks a command for a character the player is not driving
 every divine closes that path: a random SwdTech's range stops short of
 Cleave (`Ot6RandBushidoTop`), a random Dance draws from the known dances
 less Water Rondo and a Water Rondo start under three points stumbles
-(`Ot6DanceKnownRand`, `Ot6DanceTerrain`), a Morph the engine chose does not
-morph (`Ot6TranceGate`), and Umaro's Storm is his only on a dump of all
+(`Ot6DanceKnownRand`, `Ot6DanceTerrain`), a Morph the engine chose takes
+the 0-BP span, whatever is pending (`Ot6MorphTake`), and Umaro's Storm is his only on a dump of all
 three points, which only being hurt makes (`Ot6UmaroArm`).
 
 ---
@@ -462,16 +463,49 @@ nowhere else. The World of Ruin adds Phoenix's Life (magicite.md, #327).
   unlock, and for everyone else, Fire at 3 BP is Fire 3. Everyone else gets
   Ultima by equipping Ragnarok, and that Ultima is a multiplier spell like
   any other. `battle_ultimafold`.
-- **Trance is her divine, and it is her Morph** (vanilla's esper form:
-  magic x2, damage taken halved, for as long as the morph gauge lasts,
-  learned at the Zozo awakening, battle switch `$42`).  Its one gate is the
-  full boost: picked with fewer than three points it buzzes and the command
-  window stays up (`Ot6TranceOffer`, OpenCmdMenuTbl[$03]'s stub), and a
-  Morph the engine chooses (Muddle, Berserk) or one whose boost was taken
-  back does not morph and charges nothing (`Ot6TranceGate`, Cmd_03).  Revert
-  stays free, so she can Trance again in the same battle.  *Reason: vanilla
-  Morph is already an apex worth three points, and its own gauge bounds it
-  across battles.*  `battle_trance`.
+- **Morph takes any boost, and the boost buys its duration; Trance, her
+  divine, is Morph at 3 BP** (#427, owner 2026-10-12).  Morph is vanilla's
+  esper form (magic x2, damage taken halved), learned at the Zozo
+  awakening (battle switch `$42`).  Under 3 BP it lasts a fixed span, in
+  battle ticks (two frames of running battle time, `$3A3E`): 596 at 0 BP,
+  800 at 1, 993 at 2 (`OT6_MORPH_SPEED` 110/82/66: the morph counter runs
+  from `$FFFF` down by that much a tick, and the gauge shows it).  At 3 BP
+  she stays morphed until the battle ends or she reverts: vanilla's
+  permanent-morph path (the Phunbaba battle's), no morphed character in
+  `$3EE2` and nothing clocked (`Ot6MorphSpan`, in UpdateMorph).  The boost
+  is read at Cmd_03's head (`Ot6MorphTake`, `OT6_MORPHBOOST`), so a pick
+  taken back at target select gets the span of what it pays.  Revert stays
+  free, so she can morph again in the same battle.
+  Vanilla's cross-battle gauge is gone: `$1CF6` (filled by magicite
+  points after battles, drained by each morph, saved) no longer sets the
+  duration, greys the command (`UpdateCmd_00`) or gates a random pick
+  (`RandMorph`), and SaveMorphCounter is deleted; vanilla's doubling after
+  the Phunbaba battle went with it.  `$1CF6` is still filled after battles
+  and read by nothing.
+  Every engine path that starts a Morph: Muddle, Charm and the Colosseum
+  pick it through RandCharAction (Berserk's table has no Morph), and that
+  pick buys nothing, so its pending byte is dropped and it takes the 0-BP
+  span (`Ot6MorphTake`, `OT6_UNCTL`); Mimic and Control never reach it
+  (`BattleCmdProp[$03]` has neither GOGO nor MIMIC, and a Controlled
+  monster uses its own attacks).  Only a real 3-BP pick is permanent.
+  *Reason (the owner's): boost pays once, and the payoff is time; a divine's
+  one gate is the full boost.*  The spans were set by measurement
+  (build/attempts/wt/v029-kits/): TERRA L26 on the Floating Continent acts
+  about every 260 ticks (her Defends at ticks 1917, 2195, 2456, 2714, r3),
+  so the 0-BP span covers two of her turns after the one Morph cost (the
+  first cut, 400, covered one or two: "3 of TERRA's turns inside it",
+  counting a queued Defend, r1); an AtmaWeapon fight played by the route's
+  driver runs about 2,100-3,200 ticks (atma1, new_none), so 2 BP is a
+  third to a half of a long boss fight (the first cut, 1599, was half to
+  three quarters).  Balance check, the same fight with TERRA's Morph at
+  3 BP at the open (atma1, two distinct draws each): on main's ROM the
+  gauge ($1CF6 = $BE) gave 1,691 ticks and ran out before AtmaWeapon fell
+  in one of the two; on this ROM she stayed morphed to the end in both.
+  The fight was won every time, and her share of the damage moves little:
+  3,900 and 4,812 (this ROM) against 6,438 and 4,956 (main) and 2,020 and
+  3,290 unmorphed, over one to three of her attacking turns.
+  `battle_trance` (each span, permanence at 3, the take-back),
+  `battle_morphrandom` (the engine's pick).
 - **Break (level 24, and Shoat's) takes shields** (#398): no damage and no
   status; one shield off its one target, ignoring class and element, plus
   one per boost point (four at 3 BP, the ceiling Quadra Slice and Bum Rush

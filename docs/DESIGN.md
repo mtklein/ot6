@@ -270,7 +270,8 @@ magicite.
 ## Skill learning
 
 Planned, not in the game: no JP exists (esper learn rates are all zero,
-and a battle's magic points feed only Terra's Morph). The plan: magic AP
+and a battle's magic points feed only vanilla's morph gauge, which
+nothing reads since #427). The plan: magic AP
 is rebadged as JP. Skill #1 — the signature — is free and known on
 join. The remaining seven are bought in any order at escalating costs
 (e.g. 80/200/450/800/1400/2200; divine: 3000 and requires the other seven).

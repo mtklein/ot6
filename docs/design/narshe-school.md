@@ -291,15 +291,16 @@ Runic absorbs the next spell for MP **and** +1 BP (Ot6RunicBP,
 ff6/src/battle/ot6.asm, hooked into vanilla's RunicEffect), so $026F
 (Runic/Morph/Dance/Rage) says so, and since v0.27 the two pages say what
 a full 3-BP boost does to them (RunicBlade and Trance, kits.md
-"Divines"); the Dance/Rage page is untouched:
+"Divines"; since v0.29 Morph takes any boost and each point buys time,
+#427); the Dance/Rage page is untouched:
 
 > ``Runic''
 > Turns magic attacks into MP and a Boost Point. At 3 points, sends them
 > back.
 >
 > ``Morph''
-> Raises Attack and Magic; needs 3 Boost Points. Grows with battles
-> fought.
+> Raises Attack and Magic. Each Boost Point adds time; with 3 it lasts
+> the battle.
 
 "Boost Point" is the term $026D teaches, so these lines reuse vocabulary
 the player has already seen instead of introducing a new one.  Each page

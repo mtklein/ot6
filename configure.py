@@ -508,8 +508,12 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
     "battle_ultimafold": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
-    "battle_trance": "OT6_TIMEOUT=1800 "
+    # #427: one Morph a battle, four battles at least (11-16k frames on the
+    # branch's runs, build/attempts/wt/v029-kits/r6)
+    "battle_trance": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
+    # #427: a Muddled TERRA's random Morphs, two arms, across battles
+    "battle_morphrandom": "OT6_TIMEOUT=3600",
     "battle_overclock": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
     "battle_debilitator": "OT6_TIMEOUT=1800 "
