@@ -5,11 +5,10 @@ mechanics while keeping the FF6 story, world, and characters.
 
 ## Status
 
-v0.28 is the current release: [download it](https://github.com/mtklein/ot6/releases/tag/v0.28).
-`main` is v0.29 development.
+v0.29 is the current release: [download it](https://github.com/mtklein/ot6/releases/tag/v0.29).
 
-The game is playable through the World of Balance and through Mt. Zozo in the
-World of Ruin, where Cyan rejoins.
+The game is playable through the World of Balance and through Narshe in the
+World of Ruin, where Umaro joins.
 
 Main changes:
 
