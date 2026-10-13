@@ -484,13 +484,13 @@ Shell stones; it grants Rflect and Safe (`espers.txt`), corrected there.
 - **Naming menus:** none (RELM and STRAGO are named in the World of
   Balance).
 
-## 10. Open questions (vision-level)
+## 10. Decisions (coordinator, 2026-10-13)
 
-1. **The tower's randoms pay nothing.** Fighting them is a pure cost (MP,
-   turns); "fight rather than flee" says fight. A player would likely run
-   from some. The plan fights them and counts the MP; if the climb's spend
-   makes MagiMaster a coin flip, fleeing the 0-XP randoms is the lever, and
-   that is the owner's call to make, not the driver's.
-2. **STRAGO's divine.** kits.md gives him an eight-row kit (five lores,
-   Analyze, Aqua Rake) and no slot-8 divine; none is planned. Off in the
-   tower either way.
+1. **The tower's randoms are fought** (guidelines.md, "fight rather than
+   flee"), 0 XP or not. If the lab shows the climb's MP spend makes
+   MagiMaster a coin flip, the answer is supplies (Ethers, Tinctures, Tents)
+   and the saves outside, not fleeing.
+2. **STRAGO's full boost** is Study (#432, built on this branch): his Scan
+   at 3 BP learns every lore the monsters present could cast (kits.md
+   "Strago"). On this arc it pays on the plains (Dischord, Rippler, Pearl
+   Wind, Aero); no tower species casts a lore.
