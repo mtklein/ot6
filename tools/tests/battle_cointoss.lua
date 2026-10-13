@@ -70,6 +70,23 @@ local function checkList(l)
   H.assertEq(l.flags[4], 0x43, "Hired Help targets one enemy ($43)")
 end
 
+-- The precondition: no ally is a Zombie at the throw (read as the record
+-- is checked; a Zombie stands until cured).  The east
+-- room's PowerDemon zombifies ("You'd best be a zombie!"), and with EDGAR a
+-- Zombie the toss that followed went to the party side: chip calls on y $04
+-- $02 $00, monster targets $00, the gil paid (build/attempts/
+-- wt-v029-waterrondo/cointoss/: the qualification's own wor-tomb-v1, run
+-- twice, statuses `e4 0200`).  That draw cannot hold the toss to the enemy
+-- side, so it is a LOST battle the runner replays at another seed, as
+-- battle_suplextrain's Imp is.
+local function noZombieAlly()
+  for e = 0, 6, 2 do
+    if (H.readByte(0x3EE4 + e) & 0x02) ~= 0 then
+      error(string.format("LOST: party entity %d is a Zombie at the throw (the PowerDemon's line)", e), 0)
+    end
+  end
+end
+
 local function checkThrow(r, i)
   return H.setzerCheckCoins(r, i, 30, function() return 0x08 end, "cointoss")
 end
@@ -79,13 +96,14 @@ local walk, S = H.setzerCrowdBattles({
   tag = "cointoss", want = WANT, wps = { { 124, 26 }, { 120, 11 } },
   setzerOpts = { onList = checkList, shot = "cointoss_table" },
   check = function(rec, i)
+    noZombieAlly()
     H.assertEq(rec.row, COIN, string.format("record %d is a Coin Toss", i))
     H.assertEq(rec.boost, WANT[i].boost, string.format("record %d ran at its planned boost", i))
     return checkThrow(rec, i)
   end,
 })
 
-H.run({ maxFrames = 1200000 }, {
+H.run({ maxFrames = 1200000, retries = 3 }, {
   H.bootCheckpoint("wor-tomb-v1"),
   walk,
   H.call(function()

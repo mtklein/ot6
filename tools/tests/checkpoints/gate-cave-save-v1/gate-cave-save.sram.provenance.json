@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "c9fca4361959de0f5968a81a0c8144656fff5b67a78c64942de19c43c645416e",
-  "generator_sig": "f35604aff855a1abb831847b0d011a6e159b76499083657a2fb66d7466b07868 gen_gate_cave_save build/checkpoints/narshe-mission-v1/manifest.json build/checkpoints/narshe-mission-v1/narshe-mission.sram",
+  "payload_sha256": "9e5946aaf3b3d3784bcb5585b0186fe0ef05538fcb69ea65781798e061f4d690",
+  "generator_sig": "57e1766c0ebbbec69a148803cb4fa594b1c68f0d3670cec5a70fc065e1ab8bf5 gen_gate_cave_save build/checkpoints/water-rondo-v1/manifest.json build/checkpoints/water-rondo-v1/water-rondo.sram",
   "ancestors": [
     {
-      "path": "build/checkpoints/narshe-mission-v1/manifest.json",
-      "sha256": "fd9f0195ee4151838a0543042cca94ffb82a7f806ccab0ad301e654f9a453de1"
+      "path": "build/checkpoints/water-rondo-v1/manifest.json",
+      "sha256": "3976eecac79e744b68600dca41746ae4be511b6e812dd114618ae0c25f5ac86a"
     }
   ]
 }

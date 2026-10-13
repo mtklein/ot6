@@ -17,11 +17,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "f16527f957d5e984f75dee296b1623aeb3f34ce77fcc40f7ea99b8a3f5ef5f0b",
-    "generator_sig": "9df5d1d09b3d7a1721a79f7c4022ad2f187a008dc70357e2125c20096766709b gen_mrf_save_room_checkpoint",
+    "generator_sig": "a672f1798a612af5bdb2146173f8ca8383bf1b75035ea99ff07ba4039cc0d600 gen_mrf_save_room_checkpoint",
     "ancestors": [
       {
         "path": "build/states/ifrit_entry.stamp",
-        "sha256": "a254dc5a08bcf4ca67b54b9e9196fc59e14eed3418529aebbf8314a1de82c2d4"
+        "sha256": "9814d985a79c2b562d1e9a28391fc34da06f4305f3f2a216650dc83405d7acd8"
       }
     ]
   }

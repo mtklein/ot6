@@ -523,8 +523,9 @@ H.run({ maxFrames = 400000 }, {
   via({ { 15, 34 }, { 18, 27 }, { 15, 18 } }, "the back room to MOG's door", { { 20, 35 } }),
   door(14, 7, MAP_MOG, "the back room -> MOG's room (44)", { { 20, 35 } }),
   via({ { 121, 48 } }, "MOG's room to MOG", { { 106, 55 }, { 121, 61 } }),
-  -- MOG (44 NPC_1 (121,46), _cc396c): $029F clear, so his first meeting
-  -- (_cc3a4c): the naming menu, and he joins into the empty seat
+  -- MOG (44 NPC_1 (121,46), _cc396c): $029F is set by his World of Balance
+  -- join (gen_water_rondo, #428), so "You're alive!" and no naming menu,
+  -- and he joins into the empty seat
   walkTo(121, 47, "below MOG", { { 106, 55 }, { 121, 61 } }),
   talkTo(121, 46, "MOG (44 NPC_1)"),
   rideNaming(function() return sw(0x02FA) == 1 and inParty(MOG) and map() == MAP_MOG end, 20000, "MOG joins"),

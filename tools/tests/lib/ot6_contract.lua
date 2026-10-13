@@ -524,6 +524,53 @@ M.contracts["narshe-mission-v1"] = {
   },
 }
 
+-- water-rondo-v1: the World of Balance detour that teaches MOG Water Rondo
+-- (#428, gen_water_rondo): the Lone Wolf chase resolved in MOG's favour
+-- ($02FA, $029F; the Gold Hairpin given up), the Nikeah chocobo to Barren
+-- Falls, the leap to the Veldt, the Serpent Trench dive from Crescent
+-- Mountain with MOG in the party, and back at Nikeah.  A world save on
+-- foot on the Blackjack's tile outside Nikeah, (116,61).  The step G->H
+-- state is otherwise narshe-mission-v1's: TERRA is seated next, in the
+-- swap room.
+M.contracts["water-rondo-v1"] = {
+  slot = 3,
+  world = { map = 0, x = 116, y = 61 },
+  ram = {
+    { 0x1f62, 0xFF, 116, "the Blackjack parked at x 116 (save-block cell $1f62)" },
+    { 0x1f63, 0xFF, 61, "the Blackjack parked at y 61 (save-block cell $1f63)" },
+    { 0x11FA, 0x03, 0x00, "ON FOOT (not aboard a vehicle)" },
+    { 0x1D4C, 0x20, 0x20, "MOG knows Water Rondo ($1D4C bit 5), learned in the trench" },
+  },
+  switches = {
+    { 0x02FA, 1, "MOG is available (_ccd5df)" },
+    { 0x029F, 1, "MOG met in the World of Balance (the WoR meeting reads it, _cc396c)" },
+    { 0x023F, 1, "the Lone Wolf chase is over (_ccd52d)" },
+    { 0x0076, 1, "the Narshe mission meeting has run (event_main.asm:94170)" },
+    { 0x045E, 0, "the Imperial-Base soldiers were withdrawn (:94171-94180)" },
+    { 0x0079, 0, "CLEAR -- the Sealed Gate scene is still ahead" },
+    { 0x02F0, 1, "TERRA is available (she is seated in step G->H)" },
+    { 0x0070, 1, "the Blackjack party-swap room is armed" },
+    { 0x02F9, 1, "SETZER is available" },
+    { 0x007A, 0, "CLEAR -- the airship still flies" },
+  },
+  party = {
+    size = 4,
+    members = {
+      { 0x01, "LOCKE" },
+      { 0x04, "EDGAR (pierce+Tools)" },
+      { 0x05, "SABIN (bludgeon)" },
+      { 0x0A, "MOG" },
+    },
+  },
+  items = {
+    { 0xF1, 1, "Revivify (the Zombie cure for the cave's Zombones, #349)" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- gate-cave-save-v1: boundary H, the vanilla save point on map 386 at
 -- (74,53), the only interior save in the v0.7 area, reached off map 384
 -- (64,10).  The 385 timed-floor crossing is handled by lib/ot6_field.lua's
@@ -1758,7 +1805,8 @@ M.contracts["wor-narshe-cliffs-v1"] = {
   switches = {
     { 0x00A4, 1, "the World of Ruin (:12423)" },
     { 0x029A, 1, "the Storm Dragon beaten (_cc43cd)" },
-    { 0x02FA, 1, "MOG available (_cc3a4c)" },
+    { 0x02FA, 1, "MOG available (_cc396c)" },
+    { 0x029F, 1, "MOG met in the World of Balance (#428): his WoR meeting's second branch" },
     { 0x029E, 0, "Tritoch not yet freed (_cc3719)" },
     { 0x027A, 0, "Umaro's carving not yet touched (_ccd709)" },
   },
@@ -1772,6 +1820,7 @@ M.contracts["wor-narshe-cliffs-v1"] = {
     },
   },
   ram = {
+    { 0x1D4C, 0x20, 0x20, "MOG knows Water Rondo ($1D4C bit 5), from the World of Balance trench (#428)" },
     { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
     { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
     { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
@@ -1798,7 +1847,7 @@ M.contracts["wor-narshe-v1"] = {
   world = { map = 1, x = 115, y = 38 },
   switches = {
     { 0x00A4, 1, "the World of Ruin (:12423)" },
-    { 0x02FA, 1, "MOG available (_cc3a4c)" },
+    { 0x02FA, 1, "MOG available (_cc396c)" },
     { 0x0695, 0, "the Ice Dragon beaten (_cc36df)" },
     { 0x029E, 1, "Tritoch freed (_cc3719)" },
     { 0x027A, 1, "Terrato taken, Umaro beaten (_ccd709)" },
@@ -1814,6 +1863,7 @@ M.contracts["wor-narshe-v1"] = {
     },
   },
   ram = {
+    { 0x1D4C, 0x20, 0x20, "MOG knows Water Rondo ($1D4C bit 5), from the World of Balance trench (#428)" },
     { 0x1F62, 0xFF, 115, "the Falcon parked at x 115 (save-block cell $1F62)" },
     { 0x1F63, 0xFF, 38, "the Falcon parked at y 38 (save-block cell $1F63)" },
     { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
