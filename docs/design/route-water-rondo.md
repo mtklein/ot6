@@ -55,3 +55,12 @@ Evidence: the dev run on px13 (`build/lab/wr/g2.log`) reads
 `[wr] dive attempt 1 LANDED at Nikeah f54321, dances $61` and
 `PASS (frame 56786)`. `$61` is bit 5 (Water Rondo), bit 6 (Dusk Requiem, known at
 boot), and bit 0 (Wind Song, from the Veldt's grass).
+
+Varied luck (8628f28d, from the qualified narshe-mission-v1): twelve seed
+shifts, plus K = 1 to 4 world battles fought outside Narshe before the
+chase (K = 2 and K = 4 also at shift 7). 18 of 18 passed, each on its
+first attempt, with no retries, no deaths, and every dive landing on
+attempt 1 with `dances $61`. The runs fought 97 battles over 155
+distinct battle keys (`be..-g....`). Logs are in
+`build/attempts/wt-v029-waterrondo/varied-keys-8628f28d/`, and the lab
+generator is `build/lab/make_wr_variant.py`.
