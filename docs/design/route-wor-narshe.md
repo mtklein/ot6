@@ -480,7 +480,7 @@ Umaro; every boss absorbs ice and is weak to fire): `PASS` on this ROM,
 (`rows/`).
 
 **Tritoch's defense 254**: a 1-damage Fight chips. Without fire the party
-broke it three times on Fight and took 485 of its 30,000 HP in 12,000
+broke it three times on Fight and took 485 of its 30,000 HP in 17,100
 frames (`dev/t2`); the bosses are fought with fire.
 
 ### 11.4 The bosses

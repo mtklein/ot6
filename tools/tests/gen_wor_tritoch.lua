@@ -35,7 +35,7 @@ local ICEDRAGON_FORMATION, TRITOCH_FORMATION, UMARO_FORMATION = 366, 487, 444
 -- they learn it), boosted toward Fire 2 and 3; CELES on Runic (N. Cross, Ice
 -- 3 and Blizzard are Runic-able), CYAN on his SwdTech (route-wor-narshe.md
 -- 5).  The first Tritoch fight without fire (build/lab/narshe/t2) broke it
--- three times on Fight and took 485 of its 30,000 HP in 12,000 frames.
+-- three times on Fight and took 485 of its 30,000 HP in 17,100 frames.
 local FIRE = 0x00
 -- TERRA opens with Trance once three points are banked (her Morph at 3 BP,
 -- which lasts the battle: magic x2, damage taken halved; kits.md, Terra),
