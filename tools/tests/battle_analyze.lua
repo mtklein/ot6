@@ -12,20 +12,29 @@
 -- Played: Continue fire-out-v1 (STRAGO L24 seated with TERRA and LOCKE,
 -- wearing Bismark; he has learned no spell, $1A6E + 7*54 + $18 is not $ff),
 -- walk to random battles near Thamasa and, through the real menu
--- (H.kitBattle), have STRAGO cast Scan: first unboosted on a body with a
--- weakness the HUD has not revealed, then at 1 BP when another species on
--- the field still has one.  Everyone else Defends.  A battle with no such
--- body is fought out and the next taken.  Nothing is written.
+-- (H.kitBattle), have STRAGO cast Scan: first unboosted on a live body (one
+-- whose weaknesses the HUD has not all revealed, when the field has one),
+-- then at 1 BP in a battle with two or more scannable bodies.  Everyone
+-- else Defends.  A battle with no such body is fought out and the next
+-- taken.  Nothing is written.
+--
+-- Which bodies a cast read is taken from the reveal itself: the pending
+-- bytes Ot6AnalyzeOne writes (OT6_RVPEND_ELEM $7EED45 + 2*slot, _CLS
+-- $7EED51 + 2*slot), counted only when Ot6AnalyzeOne is the writer.  So the
+-- breadth is measured whatever the save's codex already knows (a species
+-- revealed in earlier battles still has its pending written).
 --
 -- Asserted, between the cast's start (Scan's own $3410 write under Magic)
 -- and STRAGO's Ot6ActionEnd:
 --   0. STRAGO's battle Magic list holds Scan, castable (the grant);
---   1. unboosted: the target's revealed elements ($3E89) and classes ($3E9D)
---      now hold all its weak elements ($3BE0) and weak classes ($3E9C), as
---      does every body of its species; no other species' revealed bytes
---      moved; the save's codex holds them for the species;
---   2. at 1 BP: every present, scannable body's revealed bytes hold its
---      weaknesses, the other species' too;
+--   1. unboosted: Ot6AnalyzeOne read the target alone, and what it wrote
+--      holds the target's weak elements ($3BE0, less a Debilitator's) and
+--      weak classes ($3E9C); afterwards the target's revealed elements
+--      ($3E89) and classes ($3E9D) hold them, as does every body of its
+--      species; no other species' revealed bytes moved; the save's codex
+--      holds them for the species;
+--   2. at 1 BP: Ot6AnalyzeOne read every present, scannable body, and each
+--      one's revealed bytes hold its weaknesses afterwards;
 --   3. Scan cost its 3 MP at both boosts, and the bank paid the boost.
 -- Old-ROM red and mutants: build/attempts/wt/v030-plan-kits/kit/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
@@ -57,13 +66,27 @@ local function unread(b)
 end
 
 local seat, rec, recs = nil, nil, {}
+local function inAnalyzeOne(st)
+  local pc = (st["cpu.k"] << 16) | st["cpu.pc"]
+  local a = H.sym("Ot6AnalyzeOne")
+  return pc >= a and pc < a + 76      -- the proc's size (ff6-en.dbg)
+end
 local function arm()
+  -- the pending reveal Ot6AnalyzeOne writes, per slot (elements, classes)
+  emu.addMemoryCallback(function(addr, v)
+    if rec == nil or rec.ended or not inAnalyzeOne(emu.getState()) then return end
+    local o = addr - 0x7EED45
+    local cls = o >= 12
+    local s = (cls and o - 12 or o) // 2
+    rec.read[s] = rec.read[s] or { elem = 0, cls = 0 }
+    if cls then rec.read[s].cls = rec.read[s].cls | v else rec.read[s].elem = rec.read[s].elem | v end
+  end, emu.callbackType.write, 0x7EED45, 0x7EED5C)
   emu.addMemoryCallback(function(_, v)
     if v ~= SCAN or seat == nil or rec ~= nil then return end
     if H.readByte(0x3A7C) ~= CMD_MAGIC then return end
     local e = seat * 2
     rec = { pend = H.readByte(0x3E9D + e), bank0 = H.readByte(0x3E9C + e), mp0 = H.readWord(0x3C08 + e),
-      b0 = bodies(), f = H.frame }
+      b0 = bodies(), f = H.frame, read = {} }
   end, emu.callbackType.write, 0x7E3410, 0x7E3410)
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
@@ -83,8 +106,12 @@ local function close()
         o.scan and "" or " (can't be scanned)", o.rev, o.rcls, n.rev, n.rcls, codexElem(o.sp), codexCls(o.sp)))
     end
   end
-  H.log(string.format("[analyze] cast %d: MP %d -> %d, bank %d -> %d", #recs + 1, rec.mp0, rec.mp1, rec.bank0,
-    rec.bank1))
+  local rd = {}
+  for s = 0, 5 do
+    if rec.read[s] then rd[#rd + 1] = string.format("%d:$%02X/$%02X", s, rec.read[s].elem, rec.read[s].cls) end
+  end
+  H.log(string.format("[analyze] cast %d: MP %d -> %d, bank %d -> %d; Ot6AnalyzeOne read slots %s", #recs + 1,
+    rec.mp0, rec.mp1, rec.bank0, rec.bank1, #rd > 0 and table.concat(rd, " ") or "none"))
   recs[#recs + 1] = rec
   rec = nil
   return true
@@ -101,8 +128,20 @@ local function checkPrice(r, boost)
   H.assertEq(r.bank1, r.bank0 - boost + regen, string.format("the bank paid the %d boost point(s)%s", boost,
     regen == 1 and " and earned the unboosted turn's pip" or ""))
 end
+local function readHolds(r, s, what)
+  local rd, o = r.read[s], r.b0[s]
+  H.assertEq(rd ~= nil, true, what .. ": Ot6AnalyzeOne read it")
+  H.assertEq(rd.elem & o.weak, o.weak, what .. ": the reveal it wrote holds its weak elements")
+  H.assertEq(rd.cls & o.cls, o.cls, what .. ": the reveal it wrote holds its weak classes")
+end
 local function checkOne(r, t)
   checkPrice(r, 0)
+  readHolds(r, t, string.format("unboosted, the target (slot %d)", t))
+  for s = 0, 5 do
+    if s ~= t then
+      H.assertEq(r.read[s] == nil, true, string.format("unboosted: slot %d (not the target) was not read", s))
+    end
+  end
   local tsp = r.b0[t].sp
   for s = 0, 5 do
     local o, n = r.b0[s], r.b1[s]
@@ -119,14 +158,21 @@ local function checkOne(r, t)
 end
 local function checkAll(r)
   checkPrice(r, 1)
+  local n = 0
   for s = 0, 5 do
-    local o, n = r.b0[s], r.b1[s]
-    if o.present and o.scan then holds(n, o, string.format("at 1 BP, slot %d (species $%03X)", s, o.sp)) end
+    local o = r.b0[s]
+    if o.present and o.scan then
+      n = n + 1
+      local what = string.format("at 1 BP, slot %d (species $%03X)", s, o.sp)
+      readHolds(r, s, what)
+      holds(r.b1[s], o, what)
+    end
   end
+  H.assertEq(n >= 2, true, "the 1 BP cast met two or more scannable bodies (the precondition held at the cast)")
 end
 
--- the cast to play next: 1 = unboosted on an unread body, 2 = 1 BP with an
--- unread body of a species other than its target's
+-- the cast to play next: 1 = unboosted on a live body (an unread one when
+-- the field has one), 2 = 1 BP with two or more scannable bodies present
 local stage, plan, target, battles, mode = 1, {}, nil, 0, nil
 local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
 local function stragoCasts()
@@ -163,17 +209,15 @@ local function decide()
     H.log("[analyze] STRAGO cannot cast here: fought out, the next battle taken")
     return
   end
+  local scan = 0
+  for s = 0, 5 do if b[s].present and b[s].scan then scan = scan + 1 end end
   for s = 0, 5 do
-    if target == nil and live(s) and unread(b[s]) then
-      if stage == 1 then
-        target = s
-      else
-        for u = 0, 5 do
-          if u ~= s and unread(b[u]) and b[u].sp ~= b[s].sp then target = s end
-        end
-      end
-    end
+    if target == nil and live(s) and b[s].scan and unread(b[s]) then target = s end
   end
+  for s = 0, 5 do
+    if target == nil and live(s) and b[s].scan then target = s end
+  end
+  if stage == 2 and scan < 2 then target = nil end
   if target == nil then
     mode = "fightout"
     H.log(string.format("[analyze] no body for stage %d here: fought out, the next battle taken", stage))
