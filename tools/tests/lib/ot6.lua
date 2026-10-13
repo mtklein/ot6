@@ -662,13 +662,21 @@ end
 -- which it is: the engine sits on the Annihilated screen until a press,
 -- and a driver keeps its frame() -- the [death] and [wipe] lines a solo
 -- loss never got, and the A a person presses there.
+-- One more shape (2026-10-13, battle_jackpot in qual2): vanilla's damage
+-- arithmetic subtracts first and clamps a borrow to 0 one instruction later
+-- (ApplyDmg, battle_main.asm @1339 then @1388), and an NMI can fall between,
+-- so one seat reads an underflow ($FEDB, seat 0, f47186) for a frame while
+-- the others hold live HP.  That is not "not an HP table": a seat above 9999
+-- other than the out-of-battle fills $FFFF and $FF00, beside a live seat,
+-- reads as a seat at 0.
 function M.battleLoadStarted()
-  local anyLive = false
+  local anyLive, odd = false, false
   for i = 0, 3 do
     local hp = M.readWord(M.BATTLE_HP + i * 2)
-    if hp >= 10000 then return false end   -- $FFFF, $FF00: not an HP table
-    if hp > 0 then anyLive = true end
+    if hp == 0xFFFF or hp == 0xFF00 then return false end   -- not an HP table
+    if hp >= 10000 then odd = true elseif hp > 0 then anyLive = true end
   end
+  if odd and not anyLive then return false end
   if anyLive then return true end
   return M.partyWipedInBattle ~= nil and M.partyWipedInBattle() or false
 end
