@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "f0d19c1b9403bd801033c273fb6269d65b94c478db555c93cbe3883d74e78e85",
-  "generator_sig": "992a3d21a927c3eee94d3de36e9882015cbd2adc297bf35f3c7fcccc03c1a620 gen_wor_island",
+  "payload_sha256": "761fa0248419a9abfdbbe2e7ec19a73d45e214f173c4eec931b8e0c96f935825",
+  "generator_sig": "aeaacc591bf74484e2e9a25a752d40c353a877cfb3d7008c579e5c5bdc78ffd3 gen_wor_island",
   "ancestors": [
     {
       "path": "build/states/wor_landing.stamp",
-      "sha256": "473398b28324dc4bbd0d5716d4311b5cfcf9835c67ce7d7584b1990f6ef3a9fe"
+      "sha256": "a4df55a4e2fe4ed6d2ad8171e86d94beaf6b7ea1c872cbcbb228a52643821850"
     }
   ]
 }
