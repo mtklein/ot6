@@ -471,7 +471,8 @@ The route plays the arc in two legs. Evidence is under
 
 ### 11.3 Break rows (built)
 
-As proposed in section 4, with three changes: the Wizard takes slash as
+As proposed in section 4, with four changes: the Ice Dragon has six
+shields, not ten (section 11.4); the Wizard takes slash as
 well (2, slash|pierce|special: the moogle cave's Wizards meet CYAN, TERRA
 and CELES before MOG joins, and none of them holds pierce or ¤), the Pugs
 get a row (4, slash|special, the Pug's), and the Test Rider keeps pierce
@@ -502,13 +503,22 @@ bank holds three).
 |---|---|---|---|
 | no Trance, 10 shields (`varA/`, `dragonA/dragon10`) | 11 won, 1 lost of 12 (11 keys); 11 deaths; 5,423-20,615 ticks; Fenix 0-4 | 11 of 11, no deaths | 11 of 11, no deaths |
 | no Trance, 6 shields (`dragonA/dragon6`, a lab ROM) | 12 of 12 (11 keys); 3 deaths; 4,743-12,782 ticks | -- | -- |
-| Trance, 10 shields (`varB/`, the route) | 12 of 12 (10 keys); no deaths; broken in 12; 6,510-9,879 ticks; Potions 0-4 | 12 of 12 (10 keys); no deaths; broken in 12; 6,145-7,947 | 12 of 12 (12 keys); no deaths; broken in 12; 4,123-5,125 |
+| Trance, 10 shields (`varB/`, before the shields' spells went) | 12 of 12 (10 keys); no deaths; broken in 12; 6,510-9,879 ticks; Potions 0-4 | 12 of 12 (10 keys); no deaths; broken in 12; 6,145-7,947 | 12 of 12 (12 keys); no deaths; broken in 12; 4,123-5,125 |
+| Trance, 10 shields, the qualified ROM (`varC/`, a35a908a's captures) | 8 of 8 (7 keys); 19 deaths; 5,335-45,207 ticks; Fenix 0-13; TERRA Tranced in 4 | 8 of 8 (8 keys); no deaths | 8 of 8 (8 keys); no deaths |
+| Trance banked past heals, 10 shields (`drT/`, the same draws) | 8 of 8; 12 deaths; 5,335-39,327 ticks; Fenix 0-9; Tranced in 7 | -- | -- |
+| Trance banked past heals, 6 shields (`dr6T/`, the same draws) | 8 of 8; 1 death; 4,879-10,054 ticks; Potions 0-8, Fenix 0-1 | -- | -- |
 
 The Ice Dragon was the arc's attrition fight and a loss in one draw of
 twelve (`varA/tritoch_s24.log`, `dragonA/dragon10_s24.log`: `GAME OVER
-fired`). Spending TERRA's divine settles it, so its ten shields stay: the
-win comes from the player's choice (guidelines.md, "What makes a fight
-good"). Who breaks (`varB/who_breaks.txt`, the last party action before
+fired`). Spending TERRA's divine looked like it settled it (`varB/`), but on
+the qualified ROM the same policy lost 19 members in eight fights
+(`varC/tritoch_s28.log`: `won 45207 ticks ... fenix 13 deaths 13`): her
+boosted party cures kept her bank under three, so the driver now banks her
+past heals (`opts.trance`), and with ten shields the party, keyed only by
+the spear and fire, still waited out Absolute 0 for the break. So it has six:
+on the same draws `won 8, lost 0, party deaths 1, broken in 8`
+(`dr6T/`). The win comes from the player's choices, the divine and the
+break (guidelines.md, "What makes a fight good"). Who breaks (`varB/who_breaks.txt`, the last party action before
 each break): the Ice Dragon CYAN's Fire/Fire 2 4, TERRA 4, CELES's Fire 2 3,
 MOG's Fight 1; Tritoch MOG's Fight 6, TERRA 3, CELES 3; Umaro TERRA 7,
 CELES 3, CYAN 1, MOG 1. MOG lands half of Tritoch's breaks in the arc he
@@ -516,7 +526,7 @@ joins for.
 
 **Short of "What makes a fight good"**: Tritoch and Umaro never threatened
 the party in 23 fights (no deaths, at most 2 Potions); they are passages,
-not contests, at L40-43. The Ice Dragon is a contest only without Trance.
+not contests, at L40-43. The Ice Dragon is the arc's one contest.
 
 ### 11.5 The variation sets
 

@@ -18,7 +18,7 @@ as on any unboosted turn.
 **Weak points around Narshe in the World of Ruin.** The monsters in the
 town, the mines, the cliffs, the moogle cave and Umaro's cave, and the Ice
 Dragon, Tritoch and Umaro, now have their own weak points instead of the
-default ones. Test Riders break only to piercing weapons. The Ice Dragon (10
+default ones. Test Riders break only to piercing weapons. The Ice Dragon (6
 shields) breaks to piercing and blunt weapons, Tritoch (10) and Umaro (6) to
 blades and piercing weapons, and all three to fire.
 

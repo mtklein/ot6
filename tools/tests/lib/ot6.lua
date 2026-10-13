@@ -9560,6 +9560,18 @@ function Driver:makePlan(actor)
   return plan
 end
 
+-- opts.trance: TERRA (char 0), unmorphed, with Morph in her list, is
+-- banking toward Trance: her attack magic goes at its base tier, and she
+-- takes neither the boosted party cure nor a care turn's boost dump, so
+-- her bank fills a point a turn (the final ROM's variation set: in four of
+-- eight Ice Dragon fights her boosted party cures kept the bank under
+-- three and she never Tranced; build/attempts/wt/v029-narshe-route/varC/)
+function Driver:tranceDue(actor)
+  if not self.opts.trance or M.readByte(BATTLE.BCHID + actor * 2) ~= 0 then return false end
+  if self.skillDead[BATTLE.CMD_MORPH] or not cmdRow(actor, BATTLE.CMD_MORPH) then return false end
+  return (M.readByte(BATTLE.ST4 + actor * 2) & 0x08) == 0
+end
+
 function Driver:makePlanRules(actor)
   -- What a round costs this party, measured rather than assumed.  For each
   -- entity, the most HP it has lost between two consecutive turns of the
@@ -10385,6 +10397,7 @@ function Driver:makePlanRules(actor)
     return best
   end
   local function orSpend(plan, what)
+    if plan ~= nil and self:tranceDue(actor) then return plan end
     if plan ~= nil then
       local t = treadmillSpend(plan, what)
       if t then return t end
@@ -10849,7 +10862,7 @@ function Driver:makePlanRules(actor)
         .. "cure that reaches it is damage", self.tag or "fight", actor, zombieSeated)
       if said ~= self.healSaid then self.healSaid = said; M.log(said) end
     end
-    if cureRow ~= nil and #cands >= 2 and zombieSeated == nil then
+    if cureRow ~= nil and #cands >= 2 and zombieSeated == nil and not self:tranceDue(actor) then
       local spell = (type(self.opts.cure) == "table" and self.opts.cure or BATTLE.CURES)[1]
       local cell, cellMp = spellCell(actor, spell, true)
       local bank = M.readByte(BATTLE.BP + actor * 2)
@@ -11087,8 +11100,7 @@ function Driver:makePlanRules(actor)
   -- the attack-magic line, which would otherwise spend her bank on every
   -- cast; until three points are banked her casts go at their base tier,
   -- so the bank fills a point a turn
-  local tranceDue = self.opts.trance and id == 0 and not self.skillDead[BATTLE.CMD_MORPH]
-     and cmdRow(actor, BATTLE.CMD_MORPH) and (M.readByte(BATTLE.ST4 + actor * 2) & 0x08) == 0
+  local tranceDue = self:tranceDue(actor)
   if tranceDue and have >= 3 then
     return { kind = "morph", row = cmdRow(actor, BATTLE.CMD_MORPH), boostLeft = 3 }
   end

@@ -2362,9 +2362,13 @@ Ot6ShieldTbl:
                                 ;   spear chip what they barely hurt; fire
                                 ;   (vanilla) burns it; absorbs ice
         .word   $0149
-        .byte   10, OT6_PIERCE|OT6_BLUDG ; ice dragon: 24400 hp; mog's spear
+        .byte   6, OT6_PIERCE|OT6_BLUDG ; ice dragon: 24400 hp; mog's spear
                                 ;   is the class key, fire (vanilla)
-                                ;   everyone's; absorbs ice
+                                ;   everyone's; absorbs ice.  six, not the
+                                ;   plan's ten: with only the spear and
+                                ;   fire keying it, ten held the break off
+                                ;   long enough for absolute 0 to wear the
+                                ;   party down (route-wor-narshe.md 11.4)
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian

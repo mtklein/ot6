@@ -44,7 +44,7 @@ local WANT = {
   [0x0FF] = { "Pugs", 4, SLASH | SPECIAL, FIRE, WATER },
   [0x110] = { "Umaro", 6, SLASH | PIERCE, FIRE | POISON, ICE },
   [0x144] = { "Tritoch", 10, SLASH | PIERCE, FIRE, ICE },
-  [0x149] = { "Ice Dragon", 10, PIERCE | BLUDG, FIRE, ICE },
+  [0x149] = { "Ice Dragon", 6, PIERCE | BLUDG, FIRE, ICE },
 }
 
 -- the hands (route-wor-narshe.md 5.4, 6): the three who walk into Narshe
