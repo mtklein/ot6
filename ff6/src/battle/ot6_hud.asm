@@ -1634,6 +1634,8 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 ; monster data.
 ;   - guardian/tritoch: multiple records each, and WoB story order cannot
 ;     tell them apart from here, so all are drawn shieldless for the WoB.
+;     tritoch's $0144 is the World of Ruin's (only battle 119 reaches it)
+;     and has a real row (the narshe block).
 ;
 ; kefka has one row; the imperial camp gags need none: MONSTER::KEFKA_NARSHE
 ; ($14a, const.inc:1222) appears in exactly two formation records (489,
@@ -2298,6 +2300,71 @@ Ot6ShieldTbl:
                                 ;   the hide (cyan's quadra slam chips four
                                 ;   a turn), bolt (vanilla) finds it; wind
                                 ;   it absorbs (cyan's tempest heals it)
+        ; ---- the world of ruin: narshe (the town, the mines, the moogle
+        ; cave, the cliffs, umaro's cave; the ice dragon, tritoch and umaro;
+        ; docs/design/route-wor-narshe.md section 4) ------------------------
+        ; The party holds slash (terra, celes, cyan), pierce (mog's spear)
+        ; and fire; bludgeon arrives with umaro at the end.  Vanilla elements
+        ; stay: the arc is ice, and every boss absorbs it and is weak to fire.
+        .word   $00f8
+        .byte   2, OT6_SLASH|OT6_PIERCE ; red wolf: a wolf, as the wob lobo
+        .word   $00ce
+        .byte   2, OT6_SLASH|OT6_BLUDG ; nastidon: a hide; fire vanilla
+        .word   $009c
+        .byte   3, OT6_PIERCE   ; test rider: the lance-rider; mog's spear
+                                ;   unseats it (the recruit's key: before
+                                ;   he joins, the town's riders cannot be
+                                ;   broken, only worn down).  poison vanilla
+        .word   $00c4
+        .byte   2, OT6_SLASH|OT6_PIERCE|OT6_SPECIAL ; wizard: a robed
+                                ;   caster, met in the moogle cave before
+                                ;   mog, so blades key it; special for a
+                                ;   magical body; celes's runic eats its
+                                ;   whole list.  bolt|poison vanilla
+        .word   $00da
+        .byte   1, OT6_PIERCE|OT6_SPECIAL ; psychot: floats; absorbs fire
+                                ;   (vanilla), the one body here fire heals;
+                                ;   ice vanilla
+        .word   $00e7
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; mag roader (ice): a wheel, punctured
+                                ;   or crushed
+        .word   $00f3
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; mag roader (fire): the same body
+        .word   $00c9
+        .byte   1, OT6_SLASH|OT6_PIERCE ; poppers: in fours.  fire vanilla
+        .word   $00cd
+        .byte   2, OT6_SLASH|OT6_PIERCE ; kiwok: a bird.  ice vanilla
+        .word   $00c6
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; ceritops: horned and plated, the
+                                ;   cave's tank.  fire vanilla; absorbs bolt
+        .word   $00b4
+        .byte   2, OT6_SLASH    ; anemone: a plant.  fire|bolt vanilla;
+                                ;   absorbs bolt and water (its bolt
+                                ;   weakness never applies)
+        .word   $009e
+        .byte   2, OT6_PIERCE|OT6_SPECIAL ; tomb thumb: a cursed body (special
+                                ;   for cursed bodies).  bolt|water vanilla
+        .word   $0054
+        .byte   4, OT6_SLASH|OT6_SPECIAL ; pug: the rare one in umaro's cave,
+                                ;   miniboss-grade.  fire|bolt vanilla
+        .word   $00ff
+        .byte   4, OT6_SLASH|OT6_SPECIAL ; pugs: the same body, the chest in
+                                ;   umaro's cave (event group 152)
+        .word   $0110
+        .byte   6, OT6_SLASH|OT6_PIERCE ; umaro: 17200 hp; break him before
+                                ;   his green cherry (under 10240 hp).
+                                ;   fire|poison vanilla; absorbs ice
+        .word   $0144
+        .byte   10, OT6_SLASH|OT6_PIERCE ; tritoch (the world of ruin's
+                                ;   record: only battle 119 reaches it;
+                                ;   $0114/$0115 stay shieldless below):
+                                ;   30000 hp, def 254, so blades and the
+                                ;   spear chip what they barely hurt; fire
+                                ;   (vanilla) burns it; absorbs ice
+        .word   $0149
+        .byte   10, OT6_PIERCE|OT6_BLUDG ; ice dragon: 24400 hp; mog's spear
+                                ;   is the class key, fire (vanilla)
+                                ;   everyone's; absorbs ice
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian
@@ -2306,8 +2373,6 @@ Ot6ShieldTbl:
         .word   $0114
         .byte   0, $00          ; tritoch
         .word   $0115
-        .byte   0, $00          ; tritoch
-        .word   $0144
         .byte   0, $00          ; tritoch
         .word   $ffff
 
