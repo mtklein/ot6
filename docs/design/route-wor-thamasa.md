@@ -1,0 +1,494 @@
+# World of Ruin: Jidoor and Thamasa (Relm, Chadarnook, Strago, the Fanatics' Tower)
+
+The plan for milestone v0.30, #267: from the save beside the Falcon outside
+Narshe (`wor-narshe-v1`, where the v0.29 route ends) to RELM and STRAGO
+joined, Chadarnook, the Holy Dragon (`White Drgn`) and MagiMaster beaten,
+Starlet owned, and a save beside the Falcon. It folds in #365 (the
+Mantodea's formation on the Jidoor continent), #388 (where this arc
+learns lores, SwdTechs and Blitzes) and #420 (the tower stays
+magic-only). Sections 0-10 are the plan as written before play.
+
+Line numbers are into `ff6/src/event/event_main.asm` unless a file is named.
+Evidence is under `build/attempts/wt/v030-plan-kits/`, read from
+`build/ot6.sfc` built at db6c8daf (`rom_commit.txt`) by `tools/route_data.py`
+and the scripts beside the logs, and from the tracked `wor-narshe-v1` SRAM at
+db6c8daf (`wor-narshe-v1_db6c8daf.sram`, slot 3). Estimates are marked.
+
+---
+
+## 0. Findings
+
+1. **Both recruits join into an empty seat.** RELM joins after Chadarnook
+   (`_cb4dc6`, :48855: `give_genju STARLET` :48869, `char_party RELM, 1`
+   :48894 only when `$01A3` is clear after `_cac5c1`'s `set_case`), and
+   STRAGO at the tower's foot (`_cc5275`, :89137; `char_party STRAGO, 1`
+   :89446, same test). With four seated, each is made available but waits
+   on the Falcon. Both are `norm_lvl` (:48897, :89449): raised to the mean
+   level of the available characters (`CalcAverageLevel`,
+   `field/event.asm:892`), which `wor-narshe-v1` puts at (41+40+34+40+42+33
+   +43+39)/8 = 39 (`wor-narshe-v1_roster.txt`). Both arrive at about L39
+   (**estimate**), two to six under the tower's target (section 5).
+2. **STRAGO needs RELM in the party, nothing else.** The four triggers round
+   the cultists on map 362 (`_cc522e` :89106, `_cc5248` :89117, `_cc5262`
+   :89128, `_cc5275` :89137) test only `$00BA` (not yet joined) and `$01A8`
+   (RELM seated, `set_case PARTY_CHARS`); `$022F` is never set, so every
+   trigger falls into the join. Thamasa is not on the critical path.
+3. **The Fanatics' Tower pays no XP** (every tower formation `XP 0`,
+   `maps_tower.txt`, `maps_tower2.txt`) and is magic-only: map 363's init
+   (`_cc5173`, :88973) sets battle switch `$38`, map 362's clears it
+   (:88985), and `InitCmdList` (`battle_main.asm:14112-14139`) turns Fight
+   into Magic and drops every row but Magic, Item and Mimic (#420: kept).
+   Lore, Sketch, SwdTech, Blitz, Analyze and every divine on those rows are
+   off inside; levels for MagiMaster come from outside.
+4. **Three of the tower's species start with Reflect** (L.20 Magic `$130`,
+   L.70 `$143`, L.90 `$164`, `species.txt`), and every party damage spell
+   but Drain, Demi, Quartr, X-Zone, Quake and Merton is reflectable
+   (MagicProp +3 bit 1, `reflect.txt`). Fire, Ice, Bolt, Poison, Pearl and
+   OT6's Break bounce off them.
+5. **MagiMaster's weakness moves.** His counter to every hit is WallChange
+   (`AIScript::_358`, `ai_script.asm:3551`), which sets `$3BE0` (weak) to
+   one random element, `$3BCD` (null) to the other seven and `$3BCC`
+   (absorb) to one random element (`TargetEffect_26`,
+   `battle_main.asm:9650`). OT6's chip reads `$3BE0` live (`Ot6Chip`,
+   `ot6_break.asm:589`), so his elemental key is whichever element the last
+   counter drew, and every other element does nothing. OT6's Break chips him
+   regardless of element (`ot6_breakspell.asm`).
+6. **The Gem Box is the X-Magic relic** (`items.txt`: `magic->x-magic`).
+   Taking it (366 (7,8), `_cc5440` :89462) arms MagiMaster, who triggers on
+   the way out (`_cc544b` :89467, battle 145 :89675), so a player equips it
+   in room 366 before stepping onto (8,8): two casts a turn for the boss.
+7. **#365's Mantodea is on this arc's doorstep.** Jidoor's gate (34,156)
+   sits on world group 49, whose slots 1 and 3 (96/256) are formation 323
+   (`$143`: Mantodea, Sprinter, Spek Tor x2, L50-54), the wipe in
+   route-wor-terra.md section 8. Two tiles west is group 48 (Crawler x3;
+   Geckorex x2 and Reach Frog), which has no Mantodea (`worldgroups.txt`,
+   `pools_groups.txt`). Section 5.1 plans against it.
+8. **The auction is random.** Golem (20,000) and ZoneSeek (10,000) are two
+   arms of a chain of `if_rand` (:49241, `_cb5197` :49524, `_cb5312`
+   :49792), one item a visit (`$016D`/`$016C` mark each sold). A player
+   re-enters until they come up; the route counts its visits.
+9. **No species here has an authored row** but the plains' (groups 37, 48,
+   49, already authored on earlier arcs). Owzer's house, the tower, Thamasa's
+   plain (groups 55, 56) and the three bosses ride the floor (`break floor
+   6 * slash` and the like, `species.txt`).
+
+## 1. The start state (`wor-narshe-v1`)
+
+From the tracked SRAM (`wor-narshe-v1_dump.txt`, `wor-narshe-v1_roster.txt`):
+
+- Party: `TERRA L41 HP 2645/2645`, `CELES L42 HP 2762/2762`, `MOG L43 HP
+  2871/2871`, `UMARO L39 HP 2444/2444`. Aboard: `CYAN L40`, `SABIN L40`,
+  `EDGAR L34`, `SETZER L33`. Not yet available: `STRAGO L25`, `RELM L22`,
+  `LOCKE L29`, `GAU L33`.
+- Stones worn: TERRA Fenrir, CELES Tritoch, MOG Terrato, CYAN Ifrit, EDGAR
+  Ramuh, SETZER Unicorn; owned: Ramuh, Ifrit, Shiva, Siren, Terrato, Shoat,
+  Maduin, Bismark, Stray, Palidor, Tritoch, Kirin, Carbunkl, Phantom,
+  Sraphim, Unicorn, Fenrir.
+- Natural magic: TERRA `Fire, Drain, Break, Pearl, Merton, Cure, Life`;
+  CELES `Ice, Scan, Safe, Haste, Imp, Cure`.
+- Known: SwdTech `$1CF7 = $BF` (all but Quadra Slice), Blitz `$1D28 = $3F`
+  (through Air Blade), lores `$1D29 = $900088: Aqua Rake, Revenge, Stone,
+  Exploder`.
+- Bag: `Potion x88, Fenix Down x29, ... Remedy x11, ... Revivify x31, ...
+  Elixir x8, ... Tincture x10, ... Tent x3, ... X-Potion x3, ... Ether x6,
+  ... Echo Screen x2, ... X-Ether x1`; `gil 830121`.
+- Saved on world 1 (115,38), beside the Falcon outside Narshe.
+
+## 2. The order
+
+1. **Jidoor, before Owzer's.** Land beside the gate (34,156) (`world 1
+   (34,156) -> map 198`, `world_entrances1.txt`); the item counter (shop 78)
+   for the arc's spend (section 7). The auction (map 200): one visit, and
+   re-entry while Golem or ZoneSeek has not come up, bounded (finding 8).
+2. **The cabin.** Seat three, TERRA, CELES and CYAN, and leave the fourth
+   seat for RELM; MOG and UMARO wait aboard (section 5.4).
+3. **Owzer's house** (map 198 (16,12) -> 209 (118,28)). The hall: the
+   Tincture (209 (125,11), already opened, `tools/chests_opened.txt` 66);
+   the two paintings that fight when read, A facing up (209 (99,30)
+   `_cb47ae` :47963, battle 146: Dahling x2; (111,18) `_cb47f4` :47994,
+   battle 147: Nightshade x3); the diary (116,17), `_cb4893` :48094, open
+   only after (114,11) `_cb4776` :47940 sets `$024A`. Down the door 209
+   (99,29) to the basement, 207 (127,51).
+4. **The basement (207).** The lamp at (95,60) (`_cb4962` :48196) starts a
+   160-frame rotation of three doors (88,50), (90,50), (92,50) (`_cb4987`,
+   `_cb49ab`, `_cb49cf`, :48210-48254; blockers NPC_3-5, switches
+   `$0494`-`$0496`). (88,50) is the real door (to (90,61)); (90,50) and
+   (92,50) drop the party into a 2-tile cell at (113,54) (`_cb4b86`
+   :48500). The painting at (85,50) (`_cb4bb5` :48527) carries the party to
+   (71,49); the four chest-monsters (NPC_7-10 at (73,50), (75,49), (77,50),
+   (79,49); `_cb4a4e` :48316 and the three after; battle 151 each:
+   SoulDancer, Wild Cat x4) give 293 GP, a Tonic, a Tincture and a Soft;
+   Still Life (76,52), A facing up (`_cb4c47` :48603, battle 148), opens
+   (75,47); (76,51) (`_cb4c94` :48635) lands at (85,46), the pocket with the
+   save point (87,41) and the door (88,35) to map 208
+   (`components.txt`). Chests: Moogle Suit (92,58), Relic Ring (90,47), and
+   the old woman (107,51)/(107,56) (`_cb49f3` :48255, battle 151).
+5. **The save point** (207 (87,41)): `wor-owzer-v1` (section 8), the retry
+   point for Chadarnook.
+6. **Chadarnook.** Map 208: (75,20) (`_cb4ce1` :48680) is Owzer's line;
+   Owzer at (75,14), A facing up (`_cb4cfa` :48701), plays the scene and
+   battle 86 (:48727), a game over when lost (`_ca5ea9`). `$0253` is set at
+   :48853.
+7. **Starlet and RELM.** (80,14), A facing up (`_cb4dc6` :48855): Starlet
+   (:48869), then RELM into the empty seat; the map reloads to Jidoor
+   (198 (16,14), :48904). RELM's gear goes on (section 6.2).
+8. **The Fanatics' Tower's foot.** The cabin is not needed: the Falcon flies
+   to the tower, world (160,126) -> map 362 (8,13). Stepping onto any of
+   (8,12), (7,13), (9,13), (8,14) with RELM seated plays the scene and
+   STRAGO joins into the fourth seat (finding 2); map 362 reloads at (8,13)
+   (:89459).
+9. **Out to level** (section 5.1): back to the Falcon and to the Jidoor
+   continent's group 48 (west of the gate), the four that will climb
+   (TERRA, CELES, RELM, STRAGO) fighting toward the target the lab sets,
+   STRAGO learning what the plain casts (section 6.4).
+10. **Thamasa** (world (251,230) -> map 344): its four counters (shops
+    72-75, section 7) for the tower's gear and supplies, and the inn (346).
+11. **The tower.** A world-map save beside it, `wor-tower-v1` (Tent; the
+    tower has no save point). The climb: 362 (8,1) -> 363 -> 359 -> 360 ->
+    361 -> 364, each floor's (10,10) to its side room and back:
+    - 365 (off 363): Safety Bit (7,6); (8,6), A facing up (`_cc55a6`
+      :89699) sets `$02DC`, which opens 363 (10,12)-(10,14) (`_cc5173`
+      :88975) to room 370, the Air Anchor (7,6).
+    - 367 (off 359): Genji Shld (7,6).
+    - 368 (off 360): the Holy Dragon (NPC_1 (5,9), touch-to-fight:
+      `_cc55a3` :89696 `collision_on`; `_cc558b` :89682, battle 139, then
+      the Pearl Lance :89692) and the Stunner (7,6).
+    - 369 (off 361): Force Armor (7,6).
+    - 364 (7,6) -> 366: the Gem Box (7,7), whose tile event (7,8)
+      (`_cc5440`) sets `$02DA` and shows the cultists (`$0699`). The Gem
+      Box goes on here (finding 6).
+    - Back onto 364 (8,8): MagiMaster (`_cc544b`, battle 145), then the map
+      reloads at (8,8) (:89679) and the party walks down.
+12. **The save.** Out of the tower to the Falcon, the cabin regroup (section
+    5.4) and the save beside the Falcon: `wor-thamasa-v1`.
+
+Not on the way: the Hidon and Gungho at Thamasa and Ebot's Rock (v0.34,
+Gogo); Duncan's Bum Rush (v0.33). Thamasa's chests (343) were opened in
+the World of Balance (`tools/chests_opened.txt` 246-250).
+
+## 3. Maps, switches and battles
+
+| map | what | switches and events | battles |
+|---|---|---|---|
+| 198 Jidoor (WoR) | town; shops 76-79; door (16,12) to Owzer's | init `_cb43e4` (:47451, sets `$025F`, the WoR gate every Owzer event tests) | none |
+| 200 the auction | Golem, ZoneSeek, by chance | `if_rand` chain :49241, :49524, :49792; `$016C`, `$016D` | none |
+| 209 Owzer's hall | the paintings, the diary, the lamp switch (118,14) | `_cb47ae`, `_cb47f4` (`$0252`, `$0156`); `_cb4776` (`$024A`); `_cb4930` (`$0243`, `$0251`) | event 146, 147; random off |
+| 207 the basement | rotating doors, the painting warps, chest-monsters, save point (87,41) | `_cb4962` (`$01B5`, `$01FC`-`$01FE`); `_cb4b86`, `_cb4bb5` (`$024C`), `_cb4bea`, `_cb4c94`; `_cb4c47` (`$0254`); chests `$0258`-`$025C` | group 157; event 148, 151 |
+| 208 the goddess | Owzer, Chadarnook, Starlet, RELM | `_cb4ce1`; `_cb4cfa` (`$0253`); `_cb4dc6` (`$0240`, `$02F8`, `$00D9`) | event 86 |
+| 362 the tower's foot | cultists, STRAGO | `_cc522e`-`_cc5275` (`$00BA`, `$02F7`, `$0679`); init clears battle switch `$38` | random off |
+| 363, 359, 360, 361 the climb | the outer stair, a side room off each | 363 init `_cc5173` (battle switch `$38`; `$02DC` opens 370) | groups 152, 153, 154, 155 |
+| 364 the top | the cultists' ghosts (`$0699`), MagiMaster | `_cc544b` (`$02DA`, `$02DB`) | group 155; event 145 |
+| 365-370 side rooms | Safety Bit, Gem Box, Genji Shld, Stunner + the Holy Dragon, Force Armor, Air Anchor | `_cc55a6` (`$02DC`); `_cc5440` (`$02DA`); `_cc558b` (`$0694`) | group 156 (365-369), 159 (370); event 139 |
+| 344 Thamasa (WoR) | shops 72-75, inn | -- | random off |
+
+Event groups (`pool event`): 86 is formation 456 (Chadarnook `$11E`, with
+`$148` shown by its script), 139 is 481 (White Drgn `$024`), 145 is 354
+(MagiMaster `$166`), 146 is 288 (Dahling x2), 147 is 289 (Nightshade x3),
+148 is 290 (Still Life), 151 is 287 (SoulDancer, Wild Cat x4). Map 207's
+random group 157: Vindr x2 (286), SoulDancer x2 + Crusher x2 (284), Vindr
+x2 + Wild Cat + Crusher x2 (285) (`maps_jidoor.txt`).
+
+## 4. Species and proposed break rows
+
+Vanilla stats (`species.txt`). Shields follow ot6_hud.asm's tiers. The party
+holds slash (TERRA, CELES, CYAN), fire (TERRA, CYAN's Ifrit), holy (TERRA's
+Pearl) and bolt/ice (CELES's Tritoch) going into Owzer's; RELM adds ¤ (the
+brush) and STRAGO bludgeon (the rod). Inside the tower only spells chip:
+an element on a weakness, or OT6's Break (one shield, one more a boost
+point; `ot6_breakspell.asm`), so the tower's rows are designed around
+elements and around which spells reach each body (finding 4). **Counts and
+keys are a proposal**; the route's play sets them.
+
+### 4.1 Owzer's house
+
+| species | where | L / HP | vanilla elements; notes | shields | classes | why |
+|---|---|---|---|---|---|---|
+| Vindr `$0CC` | 207 | 36 / 885 | weak fire; Float, evade 90; Beak (Petrify) | 1 | slash, pierce | a bird that dodges blades: fire is the key that lands |
+| SoulDancer `$0AD` | 207, event 151 | 22 / 2,539 | weak poison; Red Dance (drain) | 2 | slash, special | a dancing spirit (guidelines.md: ¤ for spirits) |
+| Crusher `$092` | 207 | 36 / 2,095 | weak fire; Blow (x5); counter Lifeshaver | 3 | pierce, bludg | the house's tank; break it before Blow |
+| Wild Cat `$077` | 207, event 151 | 36 / 1,115 | weak fire, water; Fire Ball | 1 | slash, pierce | in fours |
+| Dahling `$009` | event 146 | 37 / 3,580 | weak poison; Mute, Ice 2, Bolt 2 (Runic-able); counter Cure 2 | 2 | slash, special | a painting; CELES's Runic eats its list |
+| Nightshade `$033` | event 147 | 37 / 2,200 | weak fire; absorbs water; Charm | 2 | slash | a painted flower |
+| Still Life `$050` | event 148 | 37 / 4,889 | weak fire; Lullaby; counter Condemned | 4 | slash, special | the basement's miniboss painting |
+| Chadarnook (painting) `$11E` | event 86 | 37 / 56,000 | weak fire; absorbs holy, water; counter Phantasm | 0 | -- | the goddess: hitting her is the fight's mistake, so she carries no shields to chip |
+| Chadarnook (demon) `$148` | event 86 | 41 / 30,000 | weak fire, holy; absorbs bolt; Bolt 2/3 (Runic-able), Flash Rain | 6 | slash, pierce | the boss: the three blades (or MOG's spear), with fire and Pearl |
+
+### 4.2 The Fanatics' Tower
+
+| species | floors | L / HP | vanilla elements; notes | shields | key inside the tower | why |
+|---|---|---|---|---|---|---|
+| L.10 Magic `$132` | 363, 359, 360 | 48 / 1,000 | weak fire, holy; Float | 1 | fire, holy | the first lesson: a weakness and a cast |
+| L.20 Magic `$130` | 363, 359 | 51 / 2,000 | none; absorbs poison; **Reflect** | 2 | **+earth** (element add): Quake | Reflect bounces the party's tier spells; Quake ignores it and it is not floating |
+| L.30 Magic `$125` | 363, 359, 360 | 54 / 3,000 | weak poison; absorbs holy | 2 | poison (Tritoch), Break | |
+| L.40 Magic `$12B` | 363, 359, 360 | 55 / 4,000 | weak bolt; Float; Break (Petrify) | 2 | bolt, Break | |
+| L.50 Magic `$133` | 359, 360, 365-369 | 57 / 5,000 | weak fire, holy; Doom | 2 | fire, holy, Break | |
+| L.60 Magic `$139` | 359-361, 364 | 58 / 6,000 | weak fire; absorbs ice; Float; Quake, W Wind, Pearl | 3 | fire, Break | |
+| L.70 Magic `$143` | 360 | 56 / 7,000 | weak ice, water; absorbs fire; **Reflect**; Fire 3/Ice 3/Bolt 3 | 3 | **+earth**: Quake | as L.20; ice bounces |
+| L.80 Magic `$163` | 361, 364 | 53 / 8,000 | weak poison; heals, Life 3 | 3 | poison, Break | |
+| L.90 Magic `$164` | 361, 364-369 | 55 / 9,000 | none; absorbs wind; nulls holy, earth, water; **Reflect**; Meteor, Merton, Flare | 0 | -- (full damage: Drain, Demi, X-Zone fails on its Death immunity) | nothing the party casts reaches a weakness through Reflect and its nulls, so it carries no shields and takes full damage rather than half |
+| Magic Urn `$055` | every floor | 31 / 100 | absorbs all eight; heals the party, then Escapes | 0 | -- | a gift, not a fight |
+| White Drgn `$024` | event 139 | 71 / 18,500 | none; absorbs holy; Pearl x2 a turn; counter Dispel to Magic | 6 | Break (no Reflect) | the Holy Dragon: OT6's Break is its only key, and its counter strips the party's buffs |
+| MagiMaster `$166` | event 145 | 68 / 50,000 | WallChange: one random weakness, the rest null (finding 5) | 8 | the wall's element; Break | read the wall, or break through it |
+
+The tower species' classes do not matter inside (no Fight). Outside the
+tower they appear only in random groups 84 and 85 and event groups 58, 96,
+102, 108 and 110 (`sharing.txt`), none of them on this arc; each takes
+`special`, the ¤ of a magical body, for those. The element adds are `Ot6ElemAddTbl` rows (`ot6_break.asm:206`),
+the tool earlier arcs used (Whelk Head + fire, Vargas + holy).
+
+### 4.3 The plains and Thamasa
+
+| species | where | L / HP | vanilla elements | row today | proposal |
+|---|---|---|---|---|---|
+| Crawler `$05B`, Sprinter `$087`, Spek Tor `$0B0`, Geckorex `$099`, Reach Frog `$03B` | groups 48-52 | 50-54 | (`species.txt`) | authored (3/3/1/3/2) | as built |
+| Mantodea `$0D2` | groups 49-52 | 54 / 4,500 | weak fire; atk 180 | authored 3, slash, bludg | **+special**: RELM's brush becomes a key on the arc's one killer, the day she joins |
+| Bloompire `$035`, Buffalax `$058`, Lizard `$03C` | group 37 (the tower's plain) | 26 | | authored | as built |
+| Harpy `$02B` | group 55 (Thamasa's plain) | 42 / 3,615 | none; Aero (a lore) | floor | 2, pierce, special |
+| GloomShell `$08A` | group 56 (Thamasa's gate) | 41 / 2,905 | weak ice; Net (Stop) | floor | 3, pierce, bludg (a shell: STRAGO's rod) |
+| Prussian `$0D4` | groups 55, 56 | 41 / 3,300 | none; Bear Hug (x3) | floor | 3, slash, bludg |
+
+## 5. The bosses and the levels
+
+The party arrives at L41-43 (section 1); level-curve.md projected 41, with a
+target of 45 for MagiMaster. RELM and STRAGO arrive at about L39 (finding 1).
+XP (`event.asm:1336`, `LevelUpExp` x8): L41 to L45 is 60,584 and L39 to L45
+86,816. A random on group 48 pays 5,111 x2 = 10,222 (formations 319 and
+326, 160/96 of 256, `pools_groups.txt`), about 2,555 a member of four; group
+49 pays 3,168 a member (level-curve.md). So L41 to L45 is about 24 fights on
+group 48 and about 19 on group 49, and RELM and STRAGO need about 34 and 27
+(**estimates**; XP is split among the living).
+
+### 5.1 The Mantodea (#365) and the grind
+
+The Mantodea's Battle (atk 180, L54) is what killed the L33-36 party: 52 of
+58 deaths, 17 from 80% HP or more in one hit (route-wor-terra.md section 8).
+By vanilla's monster formula, level² x (4 x attack + vigor) / 256 then
+x (255 - def)/256, one hit is about 3,600-5,400 at def 100-150, about half
+that from the back row and two thirds of that under Safe (**estimate**),
+against 2,400-2,900 HP here. So:
+
+- **Grind on group 48, not 49.** It is the same continent two tiles west of
+  Jidoor's gate (`worldgroups.txt`: `group 48 ... Jidoor gate (34,156) 2
+  tiles at (32, 156)`), pays 80% of group 49's XP and has no Mantodea.
+  Walking in and out of the gate still crosses group 49, so every draw there
+  can deal formation 323, and the rows and the kill order have to take it.
+- **The kill order puts the Mantodea first, and breaks it.** Its row is 3,
+  slash and bludgeon (with RELM's ¤, section 4.3); TERRA and CELES's blades,
+  UMARO's or STRAGO's bludgeon. Fire is its weakness. The back row and Safe
+  (CELES's natural Safe, Carbunkl, Golem) for the casters.
+- **Measure before the grind.** The lab Continues `wor-owzer-v1` and walks
+  group 49 (as `lab_ruinwaste.lua` did), counting formation 323 by battle key
+  and the Mantodea's hits at the party's def; and it captures MagiMaster at
+  the party's arrival level (section 5.3). The two set the target. A
+  45-level grind of thirty fights is the plan only if MagiMaster says so.
+
+### 5.2 Chadarnook (event 86; `AIScript::_286`, `ai_script.asm:5505`; `_328`, :6873)
+
+The goddess (`$11E`) opens: "The girl in the picture is mine!", then Charm,
+Lullaby, Battle, Doom Kiss (Condemned), and her counter to any hit is
+Phantasm. On a battle variable she hides and the demon (`$148`) shows. The
+demon casts Bolt 3 and Bolt 2 (Runic-able), Flash Rain (ice/water) below
+15,360 HP, counters every hit with Bolt 2, and after five hits, or a
+40-tick timer, the goddess returns. Killing the demon ends the fight
+(`boss_death`).
+
+- **Kit.** Hit the demon only: fire (TERRA, CYAN's Ifrit) and Pearl
+  (TERRA's natural L30) on its fire and holy weaknesses, blades for its
+  slash key; CELES on Runic for Bolt 2/3. The demon absorbs bolt, so
+  CELES's Tritoch does nothing to it. The windows are short (five hits),
+  so boosted spells, not several small hits.
+- **Expectation (estimate).** L37/L41 against L40-42: under the party, as
+  Tritoch and Umaro were (route-wor-narshe.md 11.4). A lab if the
+  goddess's Condemned or Charm costs more than Fenix Downs 0-2 a fight.
+- **Lab question.** Whether a Broken demon's counter still counts its five
+  hits (its `if_hit` block), which decides how long a break window is.
+
+### 5.3 MagiMaster (event 145; `AIScript::_358`, `ai_script.asm:3551`)
+
+A loop of Fire 2/Ice 2/Bolt 2, then pairs of Fire 3/Ice 3/Bolt 3, then
+Doom, Mute and Bio; while every monster has Reflect, tier 3 only. Every hit
+draws WallChange (finding 5). On death, Ultima (power 150) on the party.
+
+- **Reading the wall.** CELES's natural Scan (L18; vanilla's Scan names
+  the weakness) reads it; the HUD shows
+  a weakness once a cast chips it; the driver may read `$3BE0` (TESTING.md:
+  reading is full power). The cast that matches it chips and does double;
+  every other element does nothing.
+- **Kit.** Magic only, and the Gem Box on the main caster (X-Magic, two
+  casts a turn). Damage: boosted tier spells on the wall (TERRA's Fire,
+  CELES's Ice, Maduin's fire, ice and bolt, Tritoch's ice, bolt and
+  poison, Terrato's Quake for earth), so a Maduin wearer matches any
+  fire/ice/bolt wall; a wind, holy or water wall has only Pearl (holy) to
+  answer it, and Break. Shields: OT6's Break
+  (TERRA's natural, Shoat's), boosted to take four. Defence: the Force
+  Armor (369; halves fire, ice, bolt) on TERRA or CELES, the Safety Bit
+  (365) against Doom, Remedies for Mute (Echo Screens: 2), Shell (Shiva,
+  ZoneSeek) on all four.
+- **Ultima.** Vanilla's monster spell at L68, mag 25: 150 x 4 + 68 x 25 x
+  150 / 32 = 8,568 before magic defence, halved across four targets, about
+  3,100 at mdef 60 and about 2,050 under Shell (**estimate**; whether
+  Ultima splits is the lab's first measurement). That is about the party's
+  HP at L45, so: **Shell on all four, then Life 3 pre-cast** (Life at two
+  or three points, magicite.md "Life 3 is Life's third tier": TERRA's
+  natural Life, Sraphim's) when his HP says the next hits can kill him
+  (the driver reads his HP), with Fenix Downs as the backstop.
+- **Reflect.** Wall Ring or Rflect (Carbunkl) on the party would bounce his
+  single-target spells onto him, where seven elements in eight are null;
+  but it bounces the party's own Cure too. A lab branch, not the plan.
+- **Expectation.** The arc's contest: the target level comes from it.
+
+### 5.4 The Holy Dragon (event 139; `AIScript::_36`, `ai_script.asm:3253`)
+
+Pearl twice a turn (holy, power 108), then once, then a wait; any Magic
+draws Dispel on every character. Absorbs holy, no weakness.
+
+- **Kit.** Fight it on its own, before MagiMaster's floor (it strips Shell
+  and Life 3). Break (it has no Reflect) for its six shields, then the tier
+  spells on the broken body. No Pearl (it absorbs holy) and no Pearl Rod
+  hits. Fenix Downs over Life 3 here.
+- **Expectation (estimate).** Pearl at mag 9, L71: 108 x 4 + 71 x 9 x
+  108 / 32 = 2,589 before mdef, single target, twice a turn. Measure.
+
+### 5.5 The party
+
+**Into Owzer's:** TERRA, CELES, CYAN, and RELM when she joins; MOG, UMARO,
+SABIN, EDGAR, SETZER aboard. CYAN (L40) earns XP toward Quadra Slice (L44)
+and carries Ifrit's fire. **Into the tower:** TERRA, CELES, RELM, STRAGO:
+the four with Magic and the most magic power (Umaro has no Magic; the
+tower's Fight row becomes Magic). **Out of the tower:** as the next arc
+needs; RELM and STRAGO stay seated for the plains' lores.
+
+## 6. Espers, arrivals and abilities
+
+### 6.1 Espers
+
+| Esper | where | how | spells (`espers.txt`) |
+|---|---|---|---|
+| Starlet | map 208 (80,14) | after Chadarnook (:48869) | Cure, Regen, Remedy |
+| Golem | the auction | 20,000 GP, by chance (finding 8) | Safe |
+| ZoneSeek | the auction | 10,000 GP, by chance | Shell, Haste |
+
+**Tower loadouts** (proposal): TERRA Maduin (Fire, Ice, Bolt over her own
+Fire, Drain, Break, Pearl, Life); CELES Tritoch (Ice, Bolt, Poison over her
+Ice, Scan, Safe); RELM Shiva (Ice, Osmose, Shell) or ZoneSeek (Shell,
+Haste); STRAGO Sraphim (Cure, Life) or Shoat (Break, Doom). Life is then
+on two casters (TERRA, Sraphim's wearer), Break on two (TERRA, Shoat's),
+Shell on one. level-curve.md and magicite.md listed Carbunkl among the
+Shell stones; it grants Rflect and Safe (`espers.txt`), corrected there.
+
+### 6.2 RELM on arrival
+
+- **Her key:** the brush is the party's only ¤ (CYAN's katana, TERRA's and
+  CELES's swords are slash). The proposed rows make ¤ a key on the
+  Mantodea (the plain's killer) and the Harpy (Thamasa's plain).
+- **Gear:** the Moogle Suit from map 207 (92,58) (STRAGO or RELM; nulls
+  poison); Thamasa's DaVinci Brsh (7,000), Mystery Veil (5,500) or Circlet,
+  Light Robe (11,000; mdef 43, `items.txt`).
+- **In the tower:** Magic with a stone, her magic power the party's best.
+
+### 6.3 STRAGO on arrival
+
+- **His key:** the rod (bludgeon): GloomShell and Prussian (proposed) and
+  the Mantodea and Crawlers on the plains.
+- **His kit:** the lores (below), and Analyze and Aqua Rake as free rows
+  (#381, built on this branch: kits.md "Strago"). Lore and Analyze are off
+  in the tower; there he is a Magic caster.
+- **Gear:** Pearl Rod (Thamasa, 12,000; holy, casts Pearl), Light Robe,
+  the Moogle Suit.
+
+### 6.4 What this arc teaches (#388)
+
+- **STRAGO's lores** are learned by seeing them cast with him in the party.
+  On this arc, after he joins (`lores.txt`): Dischord (Crawler, groups 48,
+  49), Rippler (Reach Frog, groups 48, 50, 51), Pearl Wind (Sprinter, groups
+  49, 51, 52; on 49 only in formation 323), Aero (Harpy, group 55, at
+  Thamasa's door). Condemned is Still Life's counter (event 148) and Owzer's
+  house comes before he joins, so it is not on this arc. The tower's species
+  cast no lores. The grind on group 48 teaches Dischord and Rippler as a
+  matter of course.
+- **What the driver uses:** Aqua Rake (water, every enemy: the Spek Tor and
+  Wild Cats' weakness) through `opts.nukeLore` as built; Pearl Wind as the
+  party heal in place of a care action once learned; Dischord on a single
+  tank (it halves level). Rippler, Stone, Exploder and Revenge are not worth
+  a turn here.
+- **CYAN's SwdTechs:** all but Quadra Slice (L44) are known (`$1CF7 =
+  $BF`); CYAN at L40 learns it on this arc only if he fights it (the Owzer
+  party, section 5.5). Cleave is known.
+- **SABIN's Blitzes:** through Air Blade (`$1D28 = $3F`); Spiraler at L42
+  needs two levels he will not get aboard; Bum Rush is Duncan's (v0.33). Not
+  on this arc unless the route seats him.
+
+## 7. Shops, supplies and items
+
+- **The counters.** Jidoor (shop 78: Potion, Tincture, Fenix Down,
+  Revivify, Remedy, Warp Stone, Sleeping Bag, Tent) at the start; Thamasa
+  (shop 74: the same with Smoke Bomb for Warp Stone) before the climb; its
+  weapons (72: DaVinci Brsh, Pearl Rod, Gravity Rod, Trump, Gold Lance),
+  armor (73: Mystery Veil, Circlet, Dark Hood, Light Robe, Diamond Vest) and
+  relics (75: Wall Ring, Cure Ring and the rings) (`shops.txt`). Narshe sells
+  nothing without LOCKE (route-wor-narshe.md finding 2). Inns: Jidoor (206),
+  Thamasa (346).
+- **The band** at L45 (level-curve.md): Potion ~68, Tincture ~11, Revivify
+  3, Fenix Down 20. Held: 88, 10, 31, 29. The tower is MP: every random is
+  fought with spells and pays nothing back, so Tinctures to about 20 and the
+  6 Ethers, 1 X-Ether and 8 Elixirs kept for MagiMaster (**estimate**;
+  the climb's spend is the first measurement). Remedies (11) for Mute.
+- **Chests on the way:** Moogle Suit, Relic Ring (207); four chest-monsters'
+  293 GP, Tonic, Tincture, Soft; the tower's Safety Bit, Gem Box, Genji Shld,
+  Stunner, Force Armor, Air Anchor (EDGAR's tool); the Pearl Lance (MOG's,
+  holy) after the Holy Dragon. None of these bits is in
+  `tools/chests_opened.txt` (the hall's Tincture, 66, is).
+
+## 8. Checkpoints
+
+- `wor-owzer-v1`: map 207's save point (87,41), RELM not joined, `$0253`
+  clear. The retry point for Chadarnook.
+- `wor-tower-v1`: the world map beside the tower, STRAGO and RELM seated,
+  the plains done, `$02DB` clear. The retry point for the climb, the Holy
+  Dragon and MagiMaster (the tower has no save point; `maps_tower*.txt`).
+- `wor-thamasa-v1`: beside the Falcon after the tower; `$02F7`, `$02F8`,
+  `$0240`, `$02DB` set; Starlet owned.
+
+## 9. Harness risks
+
+- **The rotating doors** (207 (88,50)-(92,50)) are NPC blockers on a
+  160-frame timer started by the lamp (95,60); the wrong two drop the party
+  into the (113,54) cell. The walk has to read the blocker switches
+  (`$0494`-`$0496`) and step through on the right phase.
+- **A-facing-up events.** The paintings (209 (99,30), (111,18); 207 (76,52)),
+  Owzer (208 (75,14)), the stone (208 (80,14)) and 365's switch (8,6)
+  answer A pressed facing up (`if_any $01B0=0 / $01B4=0`); stepping on them
+  does nothing.
+- **Painting warps** (207 (85,50), (86,38), (76,51), (90,50), (92,50)) move
+  the party without a door; the static model shows them as 2-27 tile pockets
+  (`components.txt`). The walk detects the tile jump, as v0.29's mines did.
+- **Chest-monsters are NPCs**: four on the (71,49) path, each a battle.
+- **The auction's chance** (finding 8): bounded re-entries, each counted.
+- **Magic-only command lists.** The battle menu has one Magic row (Fight
+  becomes Magic, Magic is dropped; `battle_main.asm:14125-14139`): menu
+  indices shift, and any verb the driver opens by row (Lore, Sketch,
+  Analyze) is absent.
+- **Reflect bounces** (finding 4): the driver's veto (`H.castVeto`,
+  `spellReflectable`) has to keep tier spells off L.20, L.70 and L.90 and
+  pick Quake, Drain or Demi there; Quake misses Float (L.10, L.40, L.60) and
+  heals nothing of the party's.
+- **The Holy Dragon on contact**: a touch-to-fight NPC (368 (5,9)); a walk
+  to the Stunner (7,6) can brush it.
+- **The Gem Box arms MagiMaster** on the next step onto 364 (8,8): the relic
+  goes on in room 366, before that step.
+- **Pre-casting Life 3** needs a boost of two and the driver's own read of
+  MagiMaster's HP; a Life 3 spent on a member at full HP is a turn, and the
+  Holy Dragon's Dispel removes it.
+- **Naming menus:** none (RELM and STRAGO are named in the World of
+  Balance).
+
+## 10. Open questions (vision-level)
+
+1. **The tower's randoms pay nothing.** Fighting them is a pure cost (MP,
+   turns); "fight rather than flee" says fight. A player would likely run
+   from some. The plan fights them and counts the MP; if the climb's spend
+   makes MagiMaster a coin flip, fleeing the 0-XP randoms is the lever, and
+   that is the owner's call to make, not the driver's.
+2. **STRAGO's divine.** kits.md gives him an eight-row kit (five lores,
+   Analyze, Aqua Rake) and no slot-8 divine; none is planned. Off in the
+   tower either way.
