@@ -7,3 +7,4 @@
 2026-10-08 v0.26 qualification: bounded acting battle choices and live scenario-hub readiness under the final library
 2026-10-12 v0.27 qualification: the line replayed from power-on under the release library (gprain and the other lib changes since v0.26)
 2026-10-12 v0.28 qualification: the line replayed from power-on under the release library (the fight-driver, kitBattle and setzerBattle changes since v0.27)
+2026-10-13 v0.29 qualification: the line replayed from power-on under the release library (the MOG/Water Rondo route, elemental shield grants and the lib changes since v0.28)

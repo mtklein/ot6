@@ -148,6 +148,18 @@ local PICK = 900
 local function alive() return seat ~= nil and (H.readByte(0x3EE4 + e()) & 0xC2) == 0 end
 local function watched(inner)
   return { tick = function(_)
+    -- the party in trouble while the step still waits for her pick (others
+    -- Defending, her bank filling): the step is let go here too, before the
+    -- Morph, not only after it -- otherwise the Defends hold the battle up
+    -- while a hard monster cuts the party down and the step spends her turn
+    -- on the Morph (a Floating Continent single took four from full HP to
+    -- 392/267/329/52 before her 3-BP pick, and the party wiped:
+    -- build/attempts/wt/v029-release-qualification/attempt2-abf9a89b/)
+    if cur ~= nil and cur.m0 == nil and #(H.vars.kit or {}) == 0 and H.battleActive() and danger() then
+      cur.abandoned = true
+      H.setPad({})
+      return "done"
+    end
     if cur ~= nil and cur.m0 == nil and H.battleActive() and H.readByte(0x62CA) == seat
         and H.readByte(0x7BC2) == 0x05 then
       cur.window = (cur.window or 0) + 1   -- a frame of her command window up
