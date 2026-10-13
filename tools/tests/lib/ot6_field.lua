@@ -1561,10 +1561,11 @@ end
 -- something else (a Fight on a muddled member who then falls leaves him
 -- needing a Fenix Down).
 -- C.watch(what) says when the spinner's control is taken and given back,
--- and fails at once, naming it, on a status no cure in reach answers
--- (Berserk, Stop, Frozen; an empty bag; a hit with no ally in control
+-- and fails at once, naming it, on a status whose cure is out of reach
+-- (Berserk with no Remedy; an empty bag; a hit with no ally in control
 -- holding a Fight row), or one still on him o.denyMax frames after it
--- landed.  C.lostPoint() (below) is when a fight is no longer one the
+-- landed; a status only time clears (Stop, Frozen) is waited out within
+-- that.  C.lostPoint() (below) is when a fight is no longer one the
 -- test can finish; the caller checks it before C.watch.
 --   o.spinner()   the spinner's party entity (0..3), or nil
 --   o.name        his name for the messages (default "SETZER")
@@ -1895,7 +1896,11 @@ function M.newSpinnerCare(o)
         M.log(string.format("[control] f%d %s: %s cannot take a command: %s (#%d) | party %s",
           M.frame, what, NAME, c.name, taken.n, partyLine()))
       end
-      if cureOf(c, o.spinner()) == nil then
+      -- a status only time clears (Stop, Frozen: no cure row) is waited
+      -- out, as a player waits, within DENY_MAX below; failing at once
+      -- failed battle_jackpot's search on v029's chain on a Frozen SETZER
+      -- (Dullahan's ice; build/attempts/wt/v029-shield-grants/jackpot/)
+      if cureOf(c, o.spinner()) == nil and (c.cure ~= nil or c.items ~= nil) then
         error(string.format("%s: %s cannot take a command: %s, and nothing in reach "
           .. "cures it (%s)", what, NAME, c.name, c.cure == "hit"
           and "no ally with control has a Fight row" or c.items
@@ -3685,11 +3690,32 @@ function M.knowsSpell(c, spell)
   if M.readByte(0x1A6E + 54 * actor + spell) == 0xFF then return true end
   -- `c` selects the roster record; `actor` selects the learned table.  They
   -- agree in the World of Balance and are not an ABI synonym later.
+  if M.itemGrants(c, spell) then return true end
   local esper = M.readByte(0x1600 + 37 * c + 0x1E)
   if esper >= 0x80 then return false end
   local row = (M.sym("GenjuProp") & 0x3FFFFF) + 11 * esper
   for _, off in ipairs({ 1, 3, 5, 7, 9 }) do
     if M.readRomByte(row + off) == spell then return true end
+  end
+  return false
+end
+
+-- Whether an item record `c` wears grants `spell` while worn, as the ROM's
+-- Ot6ItemGrantTbl says ((item, spell) pairs ended by $ff; Ot6ItemGrants,
+-- battle/ot6_progression.asm, #431): the elemental shields' Fire, Ice and
+-- Bolt.  Absent from a ROM that predates the table: no item grants.
+function M.itemGrants(c, spell)
+  local ok, tbl = pcall(function() return M.sym("Ot6ItemGrantTbl") end)
+  if not ok or not tbl then return false end
+  tbl = tbl & 0x3FFFFF
+  for k = 0, 63 do
+    local item = M.readRomByte(tbl + 2 * k)
+    if item == 0xFF then return false end
+    if M.readRomByte(tbl + 2 * k + 1) == spell then
+      for s = 0x1F, 0x24 do
+        if M.readByte(0x1600 + 37 * c + s) == item then return true end
+      end
+    end
   end
   return false
 end

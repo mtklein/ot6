@@ -132,6 +132,14 @@
 ; are scanned; the learn-rate bytes are all zero (genju_prop.asm) and
 ; irrelevant to the grant, which keys on the id alone.
 ;
+; A worn item grants too (Ot6ItemGrants, #431: the elemental shields grant
+; their family's base spell while worn).  The record those items sit in is
+; found through ValidateSpellList's battle slot, which its head pushed (`phx`,
+; then `php`; it is called once per slot, from InitChars) before
+; AddToSpellList_02's 16-bit `phy` and this jsl: at entry the slot's low byte is
+; at 7,s whichever width X had (phx pushes the high byte first), 9,s after the
+; phx below.
+;
 ; Contract: a8/i16, D=0, DBR = the caller's (jsl preserves it, so `($f0),y`
 ; reads the same $1a6e region ValidateSpellList does).  Preserves X (the loop's
 ; dispatch selector, live across every iteration) and Y, the spell id the
@@ -143,9 +151,9 @@
         lda     ($f0),y         ; vanilla learned status for spell id Y
         inc
         beq     @grant          ; $ff -> innately known: keep it ($ff)
-        lda     $f7             ; this character's equipped esper (neg = none)
-        bmi     @vanilla        ; no esper worn -> the vanilla (non-$ff) status
         phx                     ; X is the loop's dispatch selector; preserve it
+        lda     $f7             ; this character's equipped esper (neg = none)
+        bmi     @items          ; no esper worn -> only the worn items can grant
         longa                   ; 16-bit for the *11 product (max 26*11 = 286)
         and     #$00ff          ; A = esper index e (0..26)
         sta     $ee             ; local scratch: stored and reloaded within this
@@ -169,8 +177,19 @@
         beq     @hit
         cmp     f:GenjuProp+9,x
         beq     @hit
+@items: lda     9,s             ; ValidateSpellList's battle slot (contract above)
+        longa
+        and     #$00ff
+        tax
+        lda     $3010,x         ; that slot's record offset
+        clc
+        adc     #$1600
+        tax                     ; X = record address
+        shorta
+        tya                     ; A = spell id
+        jsl     Ot6ItemGrants
+        bcs     @hit
         plx                     ; not granted: restore X, fall to the vanilla read
-@vanilla:
         lda     ($f0),y         ; the real (< $ff) learn%, Y intact
         rtl
 @hit:   plx                     ; granted: restore X, then resolve as known
@@ -226,7 +245,7 @@
                                 ; it must sit ABOVE the 16-bit saved Y
         tyx                     ; long addressing supports X, not Y
         lda     f:$7e001e,x     ; that record's equipped esper
-        bmi     @vanilla        ; $ff = none
+        bmi     @items          ; $ff = none: only the worn items can grant
         sta     hWRMPYA
         lda     #11
         sta     hWRMPYB
@@ -243,7 +262,10 @@
         beq     @granted
         cmp     f:GenjuProp+9,x
         beq     @granted
-@vanilla:
+@items: tyx                     ; X = the selected record (Y, intact)
+        lda     f:$7e00e0       ; the spell id
+        jsl     Ot6ItemGrants   ; a worn item's grant (#431)
+        bcs     @granted
         pla                     ; untouched learned percentage
         ply
         rtl
@@ -265,8 +287,9 @@
 ; member knows has no slot for the per-character hook (Ot6EsperSpellKnown) to
 ; keep.  Measured: equip Ramuh with nobody knowing Bolt/Rasp and $208e never
 ; lists them.  This adds each equipped esper's GenjuProp spell-ids to $3034 so
-; the slots exist; ValidateSpellList's per-character pruning then keeps each
-; spell only for the character wearing the granting esper (the additive core).
+; the slots exist, and likewise each worn item's grant (Ot6ItemGrantTbl, #431);
+; ValidateSpellList's per-character pruning then keeps each spell only for the
+; character wearing the granting esper or item (the additive core).
 ; So the core needs two hooks: this union seed and the per-character grant.
 ;
 ; Entered from InitSpellList's a8/i8 world.  $3010 (record pointers) is already
@@ -285,7 +308,7 @@
         phx
         ldy     $3010,x         ; this slot's record pointer
         lda     $161e,y         ; equipped esper (neg = none)
-        bmi     @done
+        bmi     @items
         longa                   ; row = esper*11 (GetGenjuPropPtr, :16155)
         and     #$00ff
         sta     $ee
@@ -308,6 +331,30 @@
         jsr     @add
         lda     f:GenjuProp+9,x
         jsr     @add
+@items: plx                     ; this slot
+        phx
+        longa
+        lda     $3010,x         ; its record offset
+        clc
+        adc     #$1600
+        tay                     ; Y = record address (Ot6ItemGrants takes it in X)
+        shorta
+        ldx     #0
+@grant: lda     f:Ot6ItemGrantTbl,x   ; next (item, spell) pair
+        cmp     #$ff
+        beq     @done           ; the table's end
+        lda     f:Ot6ItemGrantTbl+1,x ; its spell
+        phx
+        phy
+        tyx
+        jsl     Ot6ItemGrants   ; does a worn item grant it?
+        bcc     @skip
+        jsr     @add            ; (clobbers Y; restored below)
+@skip:  ply
+        plx
+        inx
+        inx
+        bra     @grant
 @done:  plx
 @next:  dex
         dex
@@ -324,6 +371,73 @@
         sta     $3034,y         ; A low byte = id -> $3034[id]
 @ret:   rts
 .endproc
+
+; ------------------------------------------------------------------------------
+
+; [ a worn item grants a spell, as an equipped esper does (#431) ]
+;
+; Ot6ItemGrantTbl is (item, spell) pairs ended by $ff: while that item is worn
+; in any of the record's six equipment slots ($1f-$24 past the record address),
+; the spell is in the wearer's Magic list, in battle (Ot6UnionEspers,
+; Ot6EsperSpellKnown) and in the field (Ot6FieldSpellKnown), the three hooks
+; that read GenjuProp for an equipped esper.  Never learned: take the item off
+; and the grant goes.  Each spell is a family's base (the head of an
+; Ot6FoldTbl row), never a tier: boost folds up the tiers, as for a stone's
+; spells.  docs/design/magicite.md "Items that grant" is the plan, and
+; tools/check_spell_grants.py holds this table to it.
+;
+; in:  a8/i16, A = spell id, X = record address ($1600 + record offset).
+; out: carry set if a worn item grants A.  Preserves A, X, Y and the DBR; reads
+;      the record in bank $7e whatever the caller's DBR.
+.proc Ot6ItemGrants
+        .a8
+        .i16
+        phb
+        phy
+        phx
+        pha                     ; 1,s = the spell asked about
+        lda     #$7e
+        pha
+        plb                     ; DBR = $7e: the record's slots are WRAM
+        txy                     ; Y = record address
+        ldx     #0
+@pair:  lda     f:Ot6ItemGrantTbl,x   ; this pair's item
+        cmp     #$ff
+        beq     @no             ; the table's end
+        lda     f:Ot6ItemGrantTbl+1,x ; this pair's spell
+        cmp     1,s
+        bne     @next
+        lda     f:Ot6ItemGrantTbl,x
+        cmp     $001f,y         ; right hand
+        beq     @yes
+        cmp     $0020,y         ; left hand
+        beq     @yes
+        cmp     $0021,y         ; helmet
+        beq     @yes
+        cmp     $0022,y         ; armor
+        beq     @yes
+        cmp     $0023,y         ; relic 1
+        beq     @yes
+        cmp     $0024,y         ; relic 2
+        beq     @yes
+@next:  inx
+        inx
+        bra     @pair
+@no:    clc
+        bra     @out
+@yes:   sec
+@out:   pla                     ; (pulls leave carry alone)
+        plx
+        ply
+        plb
+        rtl
+.endproc
+
+Ot6ItemGrantTbl:
+        .byte   ITEM::FLAME_SHLD, ATTACK::FIRE
+        .byte   ITEM::ICE_SHLD, ATTACK::ICE
+        .byte   ITEM::THUNDER_SHLD, ATTACK::BOLT
+        .byte   $ff
 
 ; ------------------------------------------------------------------------------
 

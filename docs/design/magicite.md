@@ -115,6 +115,22 @@ Passives, including the stat bump: learned by battles-carried
 vanilla's stat-bonus grind with collecting passives. Character
 passives (kits.md) and esper passives share the same slots.
 
+## Items that grant
+
+Some equipment grants a spell the way a stone does (#431): while worn, never
+learned. Each grant is a family's base, which boost folds up its tiers, never
+a tier. This table is `Ot6ItemGrantTbl` (`ff6/src/battle/ot6_progression.asm`),
+read by the same three hooks that read an equipped stone's `GenjuProp` row
+(the battle Magic list's union and per-character pruning, and the field Magic
+list). `tools/check_spell_grants.py` holds it to this table, in order, and
+holds every item to "a family's base, never a tier".
+
+| Item | Spell (base) |
+|---|---|
+| Flame Shld | Fire |
+| Ice Shld | Ice |
+| Thunder Shld | Bolt |
+
 ## World of Ruin Espers
 
 Owner-approved 2026-09-29 (#327) and built. The table below is what

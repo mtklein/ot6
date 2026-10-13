@@ -433,8 +433,9 @@ TEST_ENV = {
     # battery cut on its save point (SETZER back in the World of Ruin, so
     # Jackpot is learned).  A run is the Continue, a walk and one to four
     # battles: 6-30k frames (battle_jackpot plays Dullahan from wor_grave)
-    # battle_jackpot: three passes and a bounded search (at most 192 throws)
-    "battle_jackpot": "OT6_TIMEOUT=3600",
+    # battle_jackpot: three passes and a bounded search (at most 320
+    # candidates, about 2,800 frames each)
+    "battle_jackpot": "OT6_TIMEOUT=9000",
     "battle_cointoss": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     "battle_hiredhelp": "OT6_TIMEOUT=1800 "
@@ -523,6 +524,9 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     "battle_statuses": "OT6_TIMEOUT=3600",
     "battle_levelup": "OT6_TIMEOUT=3600",
+    # an elemental shield's spell, worn and taken off, beside Jidoor (#431)
+    "battle_shieldgrant": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-cyan-v1",
 }
 
 # Tests about the version fields themselves (tools/build/rom_version.py):
