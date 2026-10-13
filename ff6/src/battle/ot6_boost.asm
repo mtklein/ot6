@@ -1003,8 +1003,9 @@ done:   pla
         and     #$40            ;   (#260): its boost buys the multiplier and
         bne     @keep           ;   GetMPCost's 0 stands
         lda     $3a7b           ; the attack id again
-        jsl     Ot6SpellMP      ; the base price, relics included
-        jsl     Ot6BoostPriceFor
+        jsl     Ot6MagicPrice   ; Ot6SpellMP then Ot6BoostPriceFor, the price
+                                ;   authority the list stamps with (and
+                                ;   Strago's study at 99, #432)
         sta     $3620,y
 @keep:  pla
         plp
