@@ -25,3 +25,12 @@ blades and piercing weapons, and all three to fire.
 **The Flame, Ice and Thunder Shields no longer teach spells.** They taught
 Fire 2, Ice 2 and Bolt 2. Those come from boosting Fire, Ice and Bolt, as
 every stronger spell does.
+
+**Aqua Rake no longer takes a lore slot.** Once Strago knows it, Aqua Rake
+is in his Lore list in every battle, beside the five lores he equips.
+
+**Strago knows Scan from the start, and Scan shows every weak point.** Scan
+now marks all of the target's weak elements and weapon types at once, for
+that monster and every monster of its kind, and they stay marked in later
+battles. Boosted by one point or more, it reads every enemy on the field.
+It costs 3 MP. Celes still learns Scan at level 18.

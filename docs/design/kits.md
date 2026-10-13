@@ -1043,6 +1043,26 @@ player prunes the kit all game. Same model, different collection verbs:
   kit that also carries Analyze and Aqua Rake, so his curation slice is
   smaller than Gau's kit-length list. Machinery: `OT6_LORELOAD`, the
   third loadout configurator (ot6_lore.asm / ot6_lore_page.asm).
+  - **Aqua Rake is the free row** (built, #381): once learned it is in his
+    battle Lore list every battle, outside the five, and never a slot's
+    lore (`Ot6LoreSlottable`: AUTO's window, the page's L/R cycle and a
+    stored slot pass over it).  Its price is the lore's own 22 MP
+    (mp-economy.md: free at join, priced like any lore).
+  - **Analyze is the Scan spell** (built, #381, `ot6_analyze.asm`).  Magic
+    names hold six letters, so the game prints "Scan", FF's own name for
+    it.  Strago always knows it: the stone-grant hooks
+    (`Ot6EsperSpellKnown`, `Ot6UnionEspers`, `Ot6FieldSpellKnown`) grant
+    it to him whatever he wears, so his Magic row is there from the day he
+    joins.  A character's Scan puts every weak element and weak class of
+    its target's species on the HUD and in the save's codex, as chips
+    would, without chipping; vanilla's text still runs, and a body vanilla
+    will not scan stays unread.  The boost buys breadth: a point or more
+    reads every enemy on the field (one payoff).  3 MP, flat.  CELES
+    learns Scan at 18 (her natural table above), and it does the same for
+    her.  It is a Magic-row spell, so the Fanatics' Tower keeps it (#420
+    removes the kit rows, not Magic).  `battle_analyze`, `battle_lore`
+    and `menu_lorepage` check the two.
+  - **No divine is planned** for him (slot 8).
 
 - **Relm — Painter (special ¤: brush)**: Sketch ✦ signature (bug
   preserved ✦: it corrupts a save now and then, and that is canon —

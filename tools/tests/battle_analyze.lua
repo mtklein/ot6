@@ -203,9 +203,29 @@ local function lap()
   }, "a random encounter")
 end
 
+local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
+
 H.run({ maxFrames = 600000 }, {
-  H.bootCheckpoint("fire-out-v1"),
+  -- the cold Continue (battle_lifefold's): title, Continue, the world map
+  H.waitFrames(350),
+  H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
+  H.waitFrames(120),
+  (function()
+    local ph = 0
+    return H.driveUntil(function()
+      return H.worldMode() and bright() >= 15 and H.worldHasControl()
+    end, 6000, {
+      H.call(function()
+        ph = (ph + 1) % 48
+        if bright() < 15 then H.setPad({}); return end
+        H.setPad(ph < 8 and { "a" } or {})
+      end),
+    }, "cold Continue -> world map control")
+  end)(),
+  H.release(),
+  H.waitFrames(60),
   H.call(function()
+    H.assertEntryContract("fire-out-v1")
     H.assertEq((H.readByte(0x1850 + STRAGO) & 7) ~= 0, true, "STRAGO is in the party")
     H.assertEq(H.readByte(0x1A6E + STRAGO * 54 + SCAN) ~= 0xFF, true,
       "STRAGO has not learned Scan himself: what makes it castable is the grant")

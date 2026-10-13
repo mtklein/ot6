@@ -38,8 +38,9 @@ db6c8daf (`wor-narshe-v1_db6c8daf.sram`, slot 3). Estimates are marked.
    (`_cc5173`, :88973) sets battle switch `$38`, map 362's clears it
    (:88985), and `InitCmdList` (`battle_main.asm:14112-14139`) turns Fight
    into Magic and drops every row but Magic, Item and Mimic (#420: kept).
-   Lore, Sketch, SwdTech, Blitz, Analyze and every divine on those rows are
-   off inside; levels for MagiMaster come from outside.
+   Lore, Sketch, SwdTech, Blitz and every divine on those rows are off
+   inside; Analyze is the Scan spell on the Magic row (#381) and stays.
+   Levels for MagiMaster come from outside.
 4. **Three of the tower's species start with Reflect** (L.20 Magic `$130`,
    L.70 `$143`, L.90 `$164`, `species.txt`), and every party damage spell
    but Drain, Demi, Quartr, X-Zone, Quake and Merton is reflectable
@@ -309,8 +310,9 @@ A loop of Fire 2/Ice 2/Bolt 2, then pairs of Fire 3/Ice 3/Bolt 3, then
 Doom, Mute and Bio; while every monster has Reflect, tier 3 only. Every hit
 draws WallChange (finding 5). On death, Ultima (power 150) on the party.
 
-- **Reading the wall.** CELES's natural Scan (L18; vanilla's Scan names
-  the weakness) reads it; the HUD shows
+- **Reading the wall.** STRAGO's Analyze (Scan, #381) or CELES's natural
+  Scan marks the current wall on the HUD (vanilla's text names it too); the
+  HUD also shows
   a weakness once a cast chips it; the driver may read `$3BE0` (TESTING.md:
   reading is full power). The cast that matches it chips and does double;
   every other element does nothing.
@@ -390,9 +392,9 @@ Shell stones; it grants Rflect and Safe (`espers.txt`), corrected there.
 
 - **His key:** the rod (bludgeon): GloomShell and Prussian (proposed) and
   the Mantodea and Crawlers on the plains.
-- **His kit:** the lores (below), and Analyze and Aqua Rake as free rows
-  (#381, built on this branch: kits.md "Strago"). Lore and Analyze are off
-  in the tower; there he is a Magic caster.
+- **His kit:** the lores (below), Aqua Rake as the free row and Analyze
+  (Scan, always his; #381, kits.md "Strago"). Lore is off in the tower;
+  his Magic row, Scan with it, is not: he reads MagiMaster's wall.
 - **Gear:** Pearl Rod (Thamasa, 12,000; holy, casts Pearl), Light Robe,
   the Moogle Suit.
 
@@ -466,8 +468,8 @@ Shell stones; it grants Rflect and Safe (`espers.txt`), corrected there.
 - **The auction's chance** (finding 8): bounded re-entries, each counted.
 - **Magic-only command lists.** The battle menu has one Magic row (Fight
   becomes Magic, Magic is dropped; `battle_main.asm:14125-14139`): menu
-  indices shift, and any verb the driver opens by row (Lore, Sketch,
-  Analyze) is absent.
+  indices shift, and any verb the driver opens by row (Lore, Sketch) is
+  absent.
 - **Reflect bounces** (finding 4): the driver's veto (`H.castVeto`,
   `spellReflectable`) has to keep tier spells off L.20, L.70 and L.90 and
   pick Quake, Drain or Demi there; Quake misses Float (L.10, L.40, L.60) and
