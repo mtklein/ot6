@@ -12682,7 +12682,7 @@ function M.setzerBattle(plan, opts)
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
         entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {}, passes = {} }
-      Z.rec.taken = M.controlTaken and M.controlTaken(e // 2)
+      Z.rec.taken, Z.fixedTaken = Z.fixedTaken, nil
     end, emu.callbackType.exec, a, a)
     -- the Coin Toss relic's GP Rain (command $18, no table): its own record
     local g = M.sym("Cmd_18")
@@ -12694,8 +12694,19 @@ function M.setzerBattle(plan, opts)
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
         entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {}, passes = {} }
-      Z.rec.taken = M.controlTaken and M.controlTaken(e // 2)
+      Z.rec.taken, Z.fixedTaken = Z.fixedTaken, nil
     end, emu.callbackType.exec, g, g)
+    -- FixPlayerCmd (@4d77): a pending command turned into the action it
+    -- runs; with its actor Muddled or Zombied there ($3ee4 & $2002) the
+    -- engine clears the targets ($b8/$b9 = 0) and the action draws its own,
+    -- either side.  Read for SETZER, it marks the row he runs next.
+    local fx = M.sym("FixPlayerCmd")
+    emu.addMemoryCallback(function()
+      local s0 = live() and seat()
+      if not s0 or (emu.getState()["cpu.x"] & 0xff) ~= s0 * 2 then return end
+      local st = M.readWord(0x3EE4 + s0 * 2)
+      Z.fixedTaken = (st & 0x0002) ~= 0 and "Zombie" or (st & 0x2000) ~= 0 and "Muddle" or nil
+    end, emu.callbackType.exec, fx, fx)
     local t = M.sym("TakeGil")
     emu.addMemoryCallback(function()
       if live() and Z.rec then
@@ -12766,17 +12777,27 @@ function M.setzerBattle(plan, opts)
         Z.rec = nil
         local ys = {}
         for _, ev in ipairs(r.chips) do ys[#ys + 1] = string.format("$%02X", ev.y) end
-        if r.taken and (r.taken.name == "Zombie" or r.taken.name == "Muddle") then
-          -- the row ran with SETZER's control taken after its confirm: a
-          -- Zombie or a Muddle turns the engine's targets on his own side
-          -- (vanilla; main's v0.28 chain, wor-tomb-v1: GP Rain from his f8638
-          -- window ran at f9452 with $b9 = $00, six chip calls and no
-          -- monster's HP moved, Zombie read at his next window), so it is
-          -- not the plan's throw and is not checked as one
+        if r.taken then
+          -- SETZER was Zombied or Muddled when the engine turned his
+          -- confirmed row into its action (FixPlayerCmd, above): the
+          -- targets he chose were cleared and the row drew its own, either
+          -- side (vanilla; main's v0.28 chain, wor-tomb-v1: GP Rain from his
+          -- f8638 window ran at f9452 with $b9 = $00, six chip calls and no
+          -- monster's HP moved), so it is not the plan's throw and is not
+          -- checked as one
           M.vars.setzerTaken[#M.vars.setzerTaken + 1] = r
+          -- and the plan entry it confirmed is played again (his next
+          -- window comes after this row ran, so nothing was confirmed since)
+          local back = Z.confirmedK
+          if back ~= nil and back < k then
+            k, listSeen[back] = back, nil
+            plan[back].aim, plan[back].presses, plan[back].lPresses, plan[back].tookBack = nil, nil, nil, nil
+          end
           M.log(string.format("[setzer] f%d row $%02X at %d BP ran under %s (exec f%d, targets $%02X, chip "
-            .. "call(s) on %s): his control was taken after the confirm, so it is set aside, not the plan's throw",
-            M.frame, r.row, r.boost, r.taken.name, r.f, r.targets, #ys > 0 and table.concat(ys, " ") or "none"))
+            .. "call(s) on %s): his targets were cleared as his confirm became the action, so it is set aside, not "
+            .. "the plan's throw; "
+            .. "plan entry %s is played again", M.frame, r.row, r.boost, r.taken, r.f, r.targets,
+            #ys > 0 and table.concat(ys, " ") or "none", tostring(back)))
           return
         end
         M.vars.setzer[#M.vars.setzer + 1] = r
@@ -13084,10 +13105,11 @@ function M.setzerBattle(plan, opts)
         M.log(string.format("[setzer] f%d the aim reached %s in %d press(es)", M.frame,
           M.tgtNodeName(M.readByte(0x7B7D), M.readByte(0x7B7E)), p.aim.presses))
       end
+      Z.confirmedK = k
       k = k + 1
       pulse("a")
     elseif st == 0x08 then
-      if cool == 0 and M.readByte(0x7B92) == 0 then k = k + 1 end
+      if cool == 0 and M.readByte(0x7B92) == 0 then Z.confirmedK = k; k = k + 1 end
       pulse("a")
     elseif st == 0x27 then
       pulse("a")
@@ -13983,9 +14005,9 @@ function M.setzerCrowdBattles(o)
       if r == "done" then
         local taken = (M.vars.setzerTaken or {})[1]
         if seen == 0 and taken then
-          M.log(string.format("[%s] crowd battle %d gave no throw: SETZER's row ran under %s, his control taken "
-            .. "after the confirm (exec f%d), so it owes none -- the next crowd within the budget", tag, crowdBattle,
-            taken.taken.name, taken.f))
+          M.log(string.format("[%s] crowd battle %d gave no throw: SETZER's row became its action under %s, "
+            .. "its targets cleared (exec f%d), so it owes none -- the next crowd within the budget", tag, crowdBattle,
+            taken.taken, taken.f))
         elseif seen == 0 and out and not able then
           M.log(string.format("[%s] crowd battle %d gave no throw: SETZER's control was taken (%s at f%d) and no "
             .. "command window of his came with it free, so it owes none -- the next crowd within the budget",
