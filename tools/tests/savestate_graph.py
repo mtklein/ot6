@@ -843,12 +843,32 @@ STATES = [
     # flight, Phunbaba's return (130 and 131: TERRA joins), the party
     # regrouped in the Falcon's cabin, and Save beside it at (238,135): the
     # `wor-terra-v1` checkpoint (docs/design/route-wor-terra.md).  A cut.
-    # saves=: the frontier; no leg boots wor-terra-v1 yet.
+    # wor_cyan below boots its checkpoint.
     # timeout=3600: an attempt ends at frame ~44k from the Continue (the
     # dev run `PASS (frame 43814)`); three are ~132k frames, ~1650 s at a
     # loaded machine's ~80 frames/s.  Re-cut by checkpoint_drift.py --recut.
     S("wor_terra", gen="gen_wor_terra", prev="wor_falcon",
-      checkpoint="wor-falcon-v1", saves="wor-terra-v1", timeout=3600),
+      checkpoint="wor-falcon-v1", timeout=3600),
+
+    # wor-terra-v1 -> Mt. Zozo's save point (179 (40,15)): Maranda's letters
+    # (Lola, the reply by carrier pigeon), Zozo's Rust-Rid and rusted door,
+    # Mt. Zozo's chests and CYAN joining on the cliff, down to the Falcon,
+    # CYAN into the party in the cabin, Jidoor's item counter, Maranda's
+    # armor counter and Lola again with CYAN, and back up to the save point:
+    # the `wor-mtzozo-v1` checkpoint, the Storm Dragon's retry point
+    # (docs/design/route-wor-cyan.md).  A cut.  Re-cut by
+    # checkpoint_drift.py --recut.
+    S("wor_cyan", gen="gen_wor_cyan", prev="wor_terra",
+      checkpoint="wor-terra-v1", timeout=5400),
+
+    # wor-mtzozo-v1 -> the World of Ruin map beside the Falcon parked
+    # outside Zozo (45,130): the Storm Dragon (event battle 133, a game over
+    # when lost: the runner retries from the save point), the walk down,
+    # and Save there: the `wor-cyan-v1` checkpoint
+    # (docs/design/route-wor-cyan.md).  A cut.  saves=: the frontier; no
+    # leg boots wor-cyan-v1 yet.  Re-cut by checkpoint_drift.py --recut.
+    S("wor_storm", gen="gen_wor_storm", prev="wor_cyan",
+      checkpoint="wor-mtzozo-v1", saves="wor-cyan-v1", timeout=3600),
 ]
 
 # Tracked checkpoints the release gate does not check, each with its reason.

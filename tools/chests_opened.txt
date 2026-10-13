@@ -112,3 +112,8 @@
 61	map 163 Mobliz, Elixir (51,12) -- the house on the way to the cellar (gen_wor_terra)
 167	map 150 Mobliz, Ether (34,49) -- Katarin's room (gen_wor_terra)
 251	map 158 Mobliz, Fenix Down (9,17) -- after TERRA joins (gen_wor_terra)
+162	map 179 Mt. Zozo, Red Cap (19,30) -- the west face (gen_wor_cyan)
+163	map 179 Mt. Zozo, Ice Shld (11,21) -- the west face (gen_wor_cyan)
+164	map 179 Mt. Zozo, Aegis Shld (13,16) -- the west face (gen_wor_cyan)
+165	map 179 Mt. Zozo, Thunder Shld (3,51) -- the west face (gen_wor_cyan)
+166	map 177 Mt. Zozo, Gold Hairpin (9,7) -- the west cave (gen_wor_cyan)

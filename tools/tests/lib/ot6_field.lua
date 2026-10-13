@@ -6448,20 +6448,23 @@ end
 -- + opts.spend: the Potions the legs to the next counter measured spending.
 -- opts.tonics: the Tonics the bag will hold leaving the counter (a counter
 -- that sells them tops up to 99 after the Potions), else the bag's count.
--- The stack holds 99 and no counter sells an HP item above the Potion
--- (shop_prop.dat: X-Potion $EA is in no shop record), so a target past 99
--- cannot be bought; it raises instead of being quietly capped, naming
--- the level at which this counter's arithmetic stops fitting the bag.
+-- The reserve stops at the Potion band's cap, 79 (audit_supplies.py
+-- POTION_BAND_CAP: one 99-stack holds that reserve and the field care's 20
+-- Potions, docs/design/level-curve.md "The World of Ruin"), and the target
+-- at the stack's 99: past it the field care moves to Tents, inns and
+-- boosted Cure.  #419: the target used to raise past 99, which the
+-- look-ahead and a spend of 10 reach from about L43.
+M.POTION_BAND_CAP = 79
 function M.careStockPotions(level, opts)
   opts = opts or {}
   local ahead = opts.ahead or 4
-  local reserve = math.ceil((level + ahead) * 1.5)
+  local reserve = math.min(M.POTION_BAND_CAP, math.ceil((level + ahead) * 1.5))
   local gap = math.max(0, 99 * 50 - 50 * (opts.tonics or M.invCountOf(0xE8)))
   local want = reserve + math.ceil(gap / 250) + (opts.spend or 0)
   if want > 99 then
-    error(string.format("careStockPotions: L%d+%d needs %d Potions (reserve %d + field care %d "
-      .. "+ spend %d) past the 99 stack, and no counter sells an HP item above the Potion",
-      level, ahead, want, reserve, math.ceil(gap / 250), opts.spend or 0))
+    M.log(string.format("careStockPotions: L%d+%d wants %d Potions (reserve %d + field care %d + spend %d); "
+      .. "the stack holds 99", level, ahead, want, reserve, math.ceil(gap / 250), opts.spend or 0))
+    want = 99
   end
   return want
 end

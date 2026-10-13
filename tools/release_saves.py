@@ -72,6 +72,8 @@ TITLES = {
     "wor-tomb-v1": "Darill's Tomb, save point",
     "wor-falcon-v1": "The Falcon, after Darill's Tomb",
     "wor-terra-v1": "Mobliz, after Terra joins",
+    "wor-mtzozo-v1": "Mt. Zozo, save point after Cyan joins",
+    "wor-cyan-v1": "The Falcon, after the Storm Dragon",
 }
 
 README = """\

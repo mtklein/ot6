@@ -868,6 +868,24 @@ add({
           end
         end),
       }, {}),
+      -- the Broken window closed (or the body went) before Shadow's next hit
+      -- on it: the hook point half is untested in this fight, so it is fought
+      -- out and the arm takes another (the v0.28 chain's draw: "hook point
+      -- half: NOT reached; ... broken=00", build/attempts/wt/v028-cyan-route/
+      -- qual_3cd80eac/suite_battle_assassinate.log)
+      H.cond(function() return broke and not H.vars.siteHalf end, {
+        H.call(function()
+          H.log(string.format("[isolation arm] fight %d: the window closed before Shadow's next hit on "
+            .. "body %d; fought out, another fight", fights, H.vars.bossBody))
+          forced = nil
+          broke = false
+        end),
+        H.cond(function() return H.battleLoadStarted() end, {
+          drive(function() return not H.battleLoadStarted() end, 30000,
+            "the isolation arm's fight without the hook point half is fought out"),
+        }, {}),
+        H.call(function() watching = false end),
+      }, {}),
     }
     return H.repeatN(1, {
       H.repeatN(FIGHTS, {

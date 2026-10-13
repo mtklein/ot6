@@ -10104,25 +10104,36 @@ function Driver:makePlanRules(actor)
     end
   end
   -- This actor's strongest unreflectable line against `slot` by the
-  -- chip model, at `bp` boost: the tool first so a tie keeps the
-  -- driver's own order, then the blitz, then the Fight.  Shared by the
-  -- press rule (#156, #165) and the spend rule (#175) below.
+  -- chip model, at `bp` boost: the most chips on the slot; a tie goes to
+  -- the most hits x bodies (a line's landed hits, times every standing
+  -- body for one that reaches them all), then to the higher boost, then
+  -- to the order offered (the tool, the Blitz, the Fight).  Before, a
+  -- tie kept the first offered, so a 1-BP Pummel the MP could pay for
+  -- (2 hits on one body) beat a 3-BP Fight with the same chips on the
+  -- slot (wt/v028-edgar-blitz review).  Shared by the press rule (#156,
+  -- #165) and the spend rule (#175) below.
   local function bestLine(actor, slot, bp)
     bp = math.min(bp, 3)  -- one action buys at most 3 BP, whatever the bank holds (#425)
     local id = M.readByte(BATTLE.BCHID + actor * 2)
     local best, offered = nil, {}
+    local function reach(p) return (p.hits or 1) * (p.bodies or 1) end
     local function offer(p)
       offered[#offered + 1] = p
-      if best == nil or p.chips > best.chips then best = p end
+      if best == nil or p.chips > best.chips
+         or (p.chips == best.chips and (reach(p) > reach(best)
+           or (reach(p) == reach(best) and p.boostLeft > best.boostLeft))) then
+        best = p
+      end
     end
     -- The kit lines are offered at the boost the pool can PAY for
     -- (#219), not at the bank's: the price escalates 2.5x a level, so a
     -- bank the MP cannot follow buys a refused command and an
-    -- evaporated turn.  Stepping the level down costs this comparison
-    -- nothing -- a tool is its own hit count and a Pummel its own two,
-    -- so neither line's `chips` moves with the boost; only the Fight's
-    -- swings do -- so the chip model still decides between them on the
-    -- same terms, at the boost that will actually go through.
+    -- evaporated turn.  Stepping the level down moves no kit line's
+    -- `chips` -- a tool's hits and a Blitz's (BATTLE.BLITZ_SHAPE) are
+    -- fixed; only the Fight's swings grow with the boost -- so the chip
+    -- model still decides between them on the same terms, at the boost
+    -- that will actually go through, and a tie goes to the reach and
+    -- then the boost (above).
     local tool = self.opts.tool or BATTLE.AUTOCROSSBOW
     if self.parkDropN < 3 and self.opts.tactical and self.opts.tools ~= false and id == 4
        and cmdRow(actor, BATTLE.CMD_TOOLS) and self:battInvIdx(tool) then
@@ -10131,6 +10142,7 @@ function Driver:makePlanRules(actor)
         offer({ kind = "skill", cmd = BATTLE.CMD_TOOLS, skill = tool,
                 row = cmdRow(actor, BATTLE.CMD_TOOLS), boostLeft = tb,
                 chips = toolChips(slot, tool), hits = BATTLE.TOOL_HITS[tool] or 1,
+                bodies = (tool == BATTLE.AUTOCROSSBOW or tool == M.BIO_BLASTER) and #standingSlots() or 1,
                 what = string.format("Tools $%02X at %d BP", tool, tb) })
       end
     end
@@ -10148,6 +10160,7 @@ function Driver:makePlanRules(actor)
         offer({ kind = "skill", cmd = BATTLE.CMD_BLITZ, skill = blitz,
                 row = cmdRow(actor, BATTLE.CMD_BLITZ), boostLeft = bb,
                 chips = M.blitzChips(slot, blitz), hits = BATTLE.BLITZ_SHAPE[blitz].hits or 1,
+                bodies = BATTLE.BLITZ_SHAPE[blitz].aoe == true and #standingSlots() or 1,
                 what = string.format("%s at %d BP", bname, bb) })
       end
     end
@@ -12656,7 +12669,7 @@ function M.setzerBattle(plan, opts)
     if token ~= nil then return end
     token = {}
     M.setzerToken = token
-    M.vars.setzer, M.vars.setzerList = {}, {}
+    M.vars.setzer, M.vars.setzerList, M.vars.setzerTaken = {}, {}, {}
     local mine = token
     local function live() return M.setzerToken == mine end
     local a = M.sym("Ot6SetzerExec")
@@ -12669,6 +12682,7 @@ function M.setzerBattle(plan, opts)
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
         entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {}, passes = {} }
+      Z.rec.taken, Z.fixedTaken = Z.fixedTaken, nil
     end, emu.callbackType.exec, a, a)
     -- the Coin Toss relic's GP Rain (command $18, no table): its own record
     local g = M.sym("Cmd_18")
@@ -12680,7 +12694,19 @@ function M.setzerBattle(plan, opts)
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
         entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {}, passes = {} }
+      Z.rec.taken, Z.fixedTaken = Z.fixedTaken, nil
     end, emu.callbackType.exec, g, g)
+    -- FixPlayerCmd (@4d77): a pending command turned into the action it
+    -- runs; with its actor Muddled or Zombied there ($3ee4 & $2002) the
+    -- engine clears the targets ($b8/$b9 = 0) and the action draws its own,
+    -- either side.  Read for SETZER, it marks the row he runs next.
+    local fx = M.sym("FixPlayerCmd")
+    emu.addMemoryCallback(function()
+      local s0 = live() and seat()
+      if not s0 or (emu.getState()["cpu.x"] & 0xff) ~= s0 * 2 then return end
+      local st = M.readWord(0x3EE4 + s0 * 2)
+      Z.fixedTaken = (st & 0x0002) ~= 0 and "Zombie" or (st & 0x2000) ~= 0 and "Muddle" or nil
+    end, emu.callbackType.exec, fx, fx)
     local t = M.sym("TakeGil")
     emu.addMemoryCallback(function()
       if live() and Z.rec then
@@ -12748,13 +12774,39 @@ function M.setzerBattle(plan, opts)
       do
         r.gil1, r.mp1, r.bank1 = gil(), M.readWord(0x3C08 + x), M.readByte(0x3E9C + x)
         r.mon1, r.divine1 = mons(), M.readByte(0x3ECB)
-        M.vars.setzer[#M.vars.setzer + 1] = r
         Z.rec = nil
+        local ys = {}
+        for _, ev in ipairs(r.chips) do ys[#ys + 1] = string.format("$%02X", ev.y) end
+        if r.taken then
+          -- SETZER was Zombied or Muddled when the engine turned his
+          -- confirmed row into its action (FixPlayerCmd, above): the
+          -- targets he chose were cleared and the row drew its own, either
+          -- side (vanilla; main's v0.28 chain, wor-tomb-v1: GP Rain from his
+          -- f8638 window ran at f9452 with $b9 = $00, six chip calls and no
+          -- monster's HP moved), so it is not the plan's throw and is not
+          -- checked as one
+          M.vars.setzerTaken[#M.vars.setzerTaken + 1] = r
+          -- and the plan entry it confirmed is played again (his next
+          -- window comes after this row ran, so nothing was confirmed since)
+          local back = Z.confirmedK
+          if back ~= nil and back < k then
+            k, listSeen[back] = back, nil
+            plan[back].aim, plan[back].presses, plan[back].lPresses, plan[back].tookBack = nil, nil, nil, nil
+          end
+          M.log(string.format("[setzer] f%d row $%02X at %d BP ran under %s (exec f%d, targets $%02X, chip "
+            .. "call(s) on %s): his targets were cleared as his confirm became the action, so it is set aside, not "
+            .. "the plan's throw; "
+            .. "plan entry %s is played again", M.frame, r.row, r.boost, r.taken, r.f, r.targets,
+            #ys > 0 and table.concat(ys, " ") or "none", tostring(back)))
+          return
+        end
+        M.vars.setzer[#M.vars.setzer + 1] = r
         M.log(string.format("[setzer] f%d row $%02X at %d BP (L%d): gil %d -> %d (TakeGil %s), MP %d -> %d, "
           .. "bank %d -> %d, divine %02X -> %02X, targets %02X, %d chip call(s)%s", M.frame, r.row, r.boost,
           r.level, r.gil0, r.gil1, tostring(r.cost), r.mp0, r.mp1, r.bank0, r.bank1, r.divine0, r.divine1,
           r.targets, #r.chips, r.dmg and string.format(", dice b6=%02X b7=%02X dmg %d class %02X", r.b6, r.b7,
           r.dmg, r.class) or ""))
+        M.log(string.format("[setzer]   chip calls on y %s", #ys > 0 and table.concat(ys, " ") or "none"))
         M.log(string.format("[setzer]   exec f%d, Ot6ActionEnd f%d (bank %d, pending %d at its entry), closed f%d",
           r.f, r.ended, r.endBank, r.endPend, M.frame))
         for k, q in ipairs(r.passes) do
@@ -13053,10 +13105,11 @@ function M.setzerBattle(plan, opts)
         M.log(string.format("[setzer] f%d the aim reached %s in %d press(es)", M.frame,
           M.tgtNodeName(M.readByte(0x7B7D), M.readByte(0x7B7E)), p.aim.presses))
       end
+      Z.confirmedK = k
       k = k + 1
       pulse("a")
     elseif st == 0x08 then
-      if cool == 0 and M.readByte(0x7B92) == 0 then k = k + 1 end
+      if cool == 0 and M.readByte(0x7B92) == 0 then Z.confirmedK = k; k = k + 1 end
       pulse("a")
     elseif st == 0x27 then
       pulse("a")
@@ -13133,6 +13186,12 @@ function M.kitBattle(plan, opts)
   end
   local function cmdRowOf(a, cmd)
     for r = 0, 3 do if M.readByte(0x202E + a * 12 + r * 3) == cmd then return r end end
+  end
+  -- the command's row greyed for seat a (bit 7 of its second byte: Magic
+  -- under Mute, say), so the cursor skips it and an A on it would buzz
+  local function cmdGreyed(a, cmd)
+    local r = cmdRowOf(a, cmd)
+    return r ~= nil and (M.readByte(0x202E + a * 12 + r * 3 + 1) & 0x80) ~= 0
   end
   local function spellIdx(a, id)
     for i = 0, 53 do
@@ -13221,8 +13280,9 @@ function M.kitBattle(plan, opts)
       hb = M.frame
       local t = {}
       for e2 = 0, 3 do
-        t[#t + 1] = string.format("%02X:%d/%02X%02X", M.readByte(0x3ED8 + e2 * 2), M.readWord(0x3BF4 + e2 * 2),
-          M.readByte(0x3EE4 + e2 * 2), M.readByte(0x3EE5 + e2 * 2))
+        t[#t + 1] = string.format("%02X:%d/%02X%02X bp%d+%d", M.readByte(0x3ED8 + e2 * 2), M.readWord(0x3BF4 + e2 * 2),
+          M.readByte(0x3EE4 + e2 * 2), M.readByte(0x3EE5 + e2 * 2), M.readByte(0x3E9C + e2 * 2),
+          M.readByte(0x3E9D + e2 * 2))
       end
       M.log(string.format("[kit] f%d entry %d/%d (%s) actor %d st %02X; party %s", M.frame, k, #plan,
         p and string.format("char $%02X cmd $%02X", p.who, p.cmd or 0) or "none", a, st, table.concat(t, " ")))
@@ -13247,10 +13307,24 @@ function M.kitBattle(plan, opts)
         p.goneLogged = true
         M.log(string.format("[kit] f%d char $%02X is out of the fight: the others fight the battle out", M.frame, p.who))
       end
-      if gone or opts.others == "fight" or (opts.others == "thin" and live > 1) then fight(a, st) else defend(st) end
+      if gone or p.greyed or opts.others == "fight" or (opts.others == "thin" and live > 1) then fight(a, st) else defend(st) end
       return
     end
     local e = a * 2
+    -- the planned command greyed for its character since the plan began (a
+    -- Mute landed mid-battle: battle_ultimafold's cursor hunted the greyed
+    -- Magic row for 20,000 frames while the others Defended until they fell,
+    -- build/attempts/wt/v028-cyan-route/ultimafold/): the plan cannot be
+    -- played in this battle, so the party fights it out
+    if p.cmd ~= nil and p.refused == nil and not p.opened and cmdGreyed(a, p.cmd) then
+      if not p.greyLogged then
+        p.greyLogged = true
+        M.log(string.format("[kit] f%d char $%02X's command $%02X is greyed (status %02X %02X): the battle is "
+          .. "fought out", M.frame, p.who, p.cmd, M.readByte(0x3EE4 + e), M.readByte(0x3EE5 + e)))
+      end
+      p.greyed = true
+    end
+    if p.greyed then fight(a, st); return end
     if p.defend then
       if st == 0x27 and cool == 0 then done(p, a) end
       defend(st)
@@ -13844,6 +13918,10 @@ end
 -- a usable window and no throw is the driver's failure, and red: a window
 -- at the plan's bank with nothing confirmed, whatever the allies did
 -- (M.SETZER_NEVER_CONFIRM, the negative control, goes red there).
+-- A crowd whose only row ran with SETZER Zombied or Muddled after his
+-- confirm owes none either: the engine turned that row on his own side,
+-- and M.setzerBattle sets it aside ($b9 = $00, every coin on the party:
+-- main's v0.28 chain, build/attempts/wt/v028-edgar-blitz/qual/gprain/).
 -- o.onBattle(n), when given, runs once a battle is up.  Returns the step and S = { done, all, battles, crowds }.
 function M.setzerCrowdBattles(o)
   local S = { done = {}, all = {}, battles = 0, crowds = 0, since = 0 }
@@ -13876,6 +13954,7 @@ function M.setzerCrowdBattles(o)
     return { tick = function()
       if step == nil and F == nil then
         M.vars.setzer = {}     -- no record of an earlier battle is read again
+        M.vars.setzerTaken = {}
         if crowdHere() then
           S.crowds, S.since, crowdBattle = S.crowds + 1, 0, S.battles
           local rem = remaining()
@@ -13924,7 +14003,12 @@ function M.setzerCrowdBattles(o)
         S.done[i] = rec
       end
       if r == "done" then
-        if seen == 0 and out and not able then
+        local taken = (M.vars.setzerTaken or {})[1]
+        if seen == 0 and taken then
+          M.log(string.format("[%s] crowd battle %d gave no throw: SETZER's row became its action under %s, "
+            .. "its targets cleared (exec f%d), so it owes none -- the next crowd within the budget", tag, crowdBattle,
+            taken.taken, taken.f))
+        elseif seen == 0 and out and not able then
           M.log(string.format("[%s] crowd battle %d gave no throw: SETZER's control was taken (%s at f%d) and no "
             .. "command window of his came with it free, so it owes none -- the next crowd within the budget",
             tag, crowdBattle, out.name, out.frame))
