@@ -17,8 +17,9 @@
 ;     body vanilla will not scan ($3c80 bit 4) stays unread.
 ;   * The boost buys breadth (guidelines.md, "boost pays once"): with a
 ;     point or more pending, the cast reads every enemy on the field, not
-;     only its target.  The price stays 3 MP; the pips are spent as on any
-;     boosted turn (Ot6ActionEnd).
+;     only its target.  The price is MagicProp's 3 MP, on the boost ladder
+;     every boosted spell pays (8 at one point); the pips are spent as on
+;     any boosted turn (Ot6ActionEnd).
 ; The reveal goes through the pending bytes (OT6_RVPEND_*), so it lands
 ; with the same commit a chip's does (Ot6RevealCommit, which Ot6ActionEnd
 ; runs for an action with no numeral) on every slot of the species.  A

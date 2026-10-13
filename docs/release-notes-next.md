@@ -33,4 +33,4 @@ is in his Lore list in every battle, beside the five lores he equips.
 now marks all of the target's weak elements and weapon types at once, for
 that monster and every monster of its kind, and they stay marked in later
 battles. Boosted by one point or more, it reads every enemy on the field.
-It costs 3 MP. Celes still learns Scan at level 18.
+Celes still learns Scan at level 18.

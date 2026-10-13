@@ -1057,7 +1057,8 @@ player prunes the kit all game. Same model, different collection verbs:
     its target's species on the HUD and in the save's codex, as chips
     would, without chipping; vanilla's text still runs, and a body vanilla
     will not scan stays unread.  The boost buys breadth: a point or more
-    reads every enemy on the field (one payoff).  3 MP, flat.  CELES
+    reads every enemy on the field (one payoff).  3 MP, on the boost
+    ladder every spell pays (8 at one point).  CELES
     learns Scan at 18 (her natural table above), and it does the same for
     her.  It is a Magic-row spell, so the Fanatics' Tower keeps it (#420
     removes the kit rows, not Magic).  `battle_analyze`, `battle_lore`

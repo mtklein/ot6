@@ -35,12 +35,14 @@
 --      holds them for the species;
 --   2. at 1 BP: Ot6AnalyzeOne read every present, scannable body, and each
 --      one's revealed bytes hold its weaknesses afterwards;
---   3. Scan cost its 3 MP at both boosts, and the bank paid the boost.
+--   3. Scan cost its price at each boost (3 MP; at 1 BP the x2.5 ladder
+--      every boosted spell pays, H.battleSpellPrice), and the bank paid the
+--      boost.
 -- Old-ROM red and mutants: build/attempts/wt/v030-plan-kits/kit/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local STRAGO, SCAN, CMD_MAGIC, SCAN_MP = 0x07, 0x18, 0x02, 3
+local STRAGO, SCAN, CMD_MAGIC, SCAN_MP = 0x07, 0x18, 0x02, 3   -- MagicProp's own, unboosted
 
 local function ent(s) return 8 + s * 2 end
 local function present(s) return (H.readByte(0x3AA8 + s * 2) & 1) == 1 end
@@ -123,7 +125,9 @@ local function holds(n, o, what)
 end
 local function checkPrice(r, boost)
   H.assertEq(r.pend, boost, string.format("the cast ran at the %d BP planned", boost))
-  H.assertEq(r.mp0 - r.mp1, SCAN_MP, string.format("Scan cost its %d MP at %d BP", SCAN_MP, boost))
+  local want = H.battleSpellPrice(seat, SCAN, boost)
+  if boost == 0 then H.assertEq(want, SCAN_MP, "Scan's unboosted price is MagicProp's 3 MP") end
+  H.assertEq(r.mp0 - r.mp1, want, string.format("Scan cost its %d MP at %d BP", want, boost))
   local regen = (boost == 0 and r.bank0 < 5) and 1 or 0
   H.assertEq(r.bank1, r.bank0 - boost + regen, string.format("the bank paid the %d boost point(s)%s", boost,
     regen == 1 and " and earned the unboosted turn's pip" or ""))
@@ -309,6 +313,6 @@ H.run({ maxFrames = 600000 }, {
   }, "the two counted casts"),
   H.call(function()
     H.log("[analyze] PASS: STRAGO's Magic list holds Scan; unboosted it read its target's species, at 1 BP every "
-      .. "enemy; 3 MP flat; the codex learned them")
+      .. "enemy; 3 MP and the boost ladder; the codex learned them")
   end),
 })
