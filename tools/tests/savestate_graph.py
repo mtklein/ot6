@@ -865,10 +865,33 @@ STATES = [
     # outside Zozo (45,130): the Storm Dragon (event battle 133, a game over
     # when lost: the runner retries from the save point), the walk down,
     # and Save there: the `wor-cyan-v1` checkpoint
-    # (docs/design/route-wor-cyan.md).  A cut.  saves=: the frontier; no
-    # leg boots wor-cyan-v1 yet.  Re-cut by checkpoint_drift.py --recut.
+    # (docs/design/route-wor-cyan.md).  A cut.  wor_narshe below boots its
+    # checkpoint.  Re-cut by checkpoint_drift.py --recut.
     S("wor_storm", gen="gen_wor_storm", prev="wor_cyan",
-      checkpoint="wor-mtzozo-v1", saves="wor-cyan-v1", timeout=3600),
+      checkpoint="wor-mtzozo-v1", timeout=3600),
+
+    # wor-cyan-v1 -> the cliffs above Narshe, map 34's save point (25,5):
+    # Jidoor's weapon counter (a Partisan for MOG) and item counter, the
+    # cabin (CYAN, TERRA and CELES; Ifrit to CYAN), Narshe, the elder's house
+    # to the moogle cave, MOG joining into the empty seat, back through the
+    # town and the mines to the cliffs: the `wor-narshe-cliffs-v1`
+    # checkpoint, the retry point for the Ice Dragon, Tritoch and Umaro's
+    # cave (docs/design/route-wor-narshe.md).  A cut.  Re-cut by
+    # checkpoint_drift.py --recut.
+    S("wor_narshe", gen="gen_wor_narshe", prev="wor_storm",
+      checkpoint="wor-cyan-v1", timeout=3600),
+
+    # wor-narshe-cliffs-v1 -> the World of Ruin map beside the Falcon parked
+    # south of Narshe (115,38): the Ice Dragon (event battle 132), Tritoch
+    # (119), Umaro's cave, the carving (117: Terrato), UMARO's join, down
+    # to the Falcon, the cabin (UMARO, MOG, TERRA and CELES; Terrato and
+    # Tritoch onto wearers), and Save there: the `wor-narshe-v1` checkpoint
+    # (docs/design/route-wor-narshe.md).  Each fight is a game over when
+    # lost: the runner retries from the save point.  A cut.  saves=: the
+    # frontier; no leg boots wor-narshe-v1 yet.  Re-cut by
+    # checkpoint_drift.py --recut.
+    S("wor_tritoch", gen="gen_wor_tritoch", prev="wor_narshe",
+      checkpoint="wor-narshe-cliffs-v1", saves="wor-narshe-v1", timeout=5400),
 ]
 
 # Tracked checkpoints the release gate does not check, each with its reason.

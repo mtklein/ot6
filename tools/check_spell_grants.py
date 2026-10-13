@@ -39,9 +39,14 @@ build's debug file (ff6/rom/ff6-en.dbg) records.
    tables carry the column, and an Esper with no row or a cell that does not
    read as four signed numbers fails.
 
-Nothing else writes the learned-spell table: the new-game init clears it,
-and vanilla's teach-spell event routine (GiveMagic) is in no event command
-slot.
+Equipment also teaches: ItemProp +3 (the learn rate) and +4 (the spell) make
+a worn piece teach its spell after battles, as an Esper does, so property 1
+holds for every item too (#266: vanilla's Flame, Ice and Thunder Shld taught
+Fire 2, Ice 2 and Bolt 2, and the World of Ruin route's CYAN and MOG learned
+Ice 2 and Bolt 2 wearing them; build/attempts/wt/v029-narshe-route/
+spells_all/).  Nothing else writes the learned-spell table: the new-game
+init clears it, and vanilla's teach-spell event routine (GiveMagic) is in no
+event command slot.
 
 Usage:  python3 tools/check_spell_grants.py [--repo ROOT] [--rom PATH]
             [--dbg PATH] [--selftest]
@@ -110,6 +115,7 @@ class Input:
                              "whole %d-byte rows" % (gsize, GENJU_ROW))
         self.nat = rom_offset(syms["NaturalMagic"])
         self.genju = rom_offset(syms["GenjuProp"])
+        self.items = rom_offset(syms["ItemProp"])
         self.genju_rows = gsize // GENJU_ROW
         self.fold = rom_offset(syms["Ot6FoldTbl"])
         self.stat = rom_offset(syms["Ot6EsperStatTbl"])
@@ -337,6 +343,9 @@ def check_fold(inp):
     return []
 
 
+ITEMS, ITEM_ROW = 256, 30
+
+
 def check_tiers(inp):
     tiers = tiers_of(inp.rom[inp.fold:inp.fold + 3 * inp.nfold])
     out = []
@@ -352,6 +361,11 @@ def check_tiers(inp):
                 out.append("%s (Esper %d), spell slot %d grants %s ($%02X), a tier of %s: "
                            "boosting %s casts it" % (inp.espers[e], e, s + 1, inp.name(sp), sp,
                                                      inp.name(tiers[sp]), inp.name(tiers[sp])))
+    for it in range(ITEMS):
+        rate, sp = inp.rom[inp.items + it * ITEM_ROW + 3], inp.rom[inp.items + it * ITEM_ROW + 4]
+        if rate and sp in tiers:
+            out.append("item $%02X teaches %s ($%02X, learn rate %d), a tier of %s: boosting %s casts it"
+                       % (it, inp.name(sp), sp, rate, inp.name(tiers[sp]), inp.name(tiers[sp])))
     return out, tiers
 
 
@@ -462,6 +476,10 @@ def selftest(root, rom_path, dbg_path):
          rom_mutant(base_inp.nat + NATURAL_PER_CHAR * 2 + 3,
                     base_inp.rom[base_inp.nat + NATURAL_PER_CHAR * 2 + 3] + 1),
          "CELES natural magic is ["),
+        ("item $61 (Ice Shld) teaches %s again" % base_inp.name(tier),
+         lambda inp: (inp.rom.__setitem__(inp.items + 0x61 * ITEM_ROW + 3, 5),
+                      inp.rom.__setitem__(inp.items + 0x61 * ITEM_ROW + 4, tier)),
+         "item $61 teaches "),
         ("TERRA's first level -> $ff (out of level order)",
          rom_mutant(base_inp.nat + 1, NATURAL_NONE), "TERRA natural magic"),
         ("kits.md: Terra's Drain 50 levels later",

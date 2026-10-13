@@ -117,3 +117,7 @@
 164	map 179 Mt. Zozo, Aegis Shld (13,16) -- the west face (gen_wor_cyan)
 165	map 179 Mt. Zozo, Thunder Shld (3,51) -- the west face (gen_wor_cyan)
 166	map 177 Mt. Zozo, Gold Hairpin (9,7) -- the west cave (gen_wor_cyan)
+207	map 44 Mog's room, Moogle Charm (121,45) -- after MOG joins (gen_wor_narshe)
+13	map 44 Mog's room, Ribbon (98,53) (gen_wor_narshe)
+168	map 282 Umaro's cave, X-Ether (14,25) (gen_wor_tritoch)
+169	map 281 Umaro's cave, Gauntlet (41,58) (gen_wor_tritoch)

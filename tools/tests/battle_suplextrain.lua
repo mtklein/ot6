@@ -64,6 +64,17 @@ end
 local function pulse()
   if H.readByte(MENU) == 0 then return {} end
   local actor, st = H.readByte(ACTOR), H.readByte(MSTATE)
+  -- The precondition: SABIN can Blitz.  The train's opening Evil Toot
+  -- (attack $D3, the whole party) can make him an Imp (status 1 bit 5), and
+  -- an Imp's confirmed Blitz runs as a Fight that never reaches
+  -- Ot6SuplexTrainKill (build/attempts/wt/v029-narshe-route/suplextrain/:
+  -- `cmd/atk D30C targets 0007`, then `e0 20000000`, then SABIN's action
+  -- `b5=00`).  That draw cannot exercise the gag, so it is a LOST battle the
+  -- runner replays at another seed (counted, as a person reloads), rather
+  -- than a red one.
+  if actor == sabinE and not cast and (H.readByte(0x3EE4 + sabinE * 2) & 0x20) ~= 0 then
+    error("LOST: SABIN is an Imp at his window (the train's Evil Toot): an Imp cannot Blitz", 0)
+  end
   if actor ~= sabinE or cast then
     if st == ST_CMD then return { "x" } end
     return { "b" }
@@ -91,7 +102,7 @@ end
 
 local function trainHP() return H.readWord(MHP(gSlot)) end
 
-H.run({ maxFrames = 60000 }, {
+H.run({ maxFrames = 60000, retries = 3 }, {
   H.loadState("build/states/train_b68_entry.mss.lua"),
   H.waitFrames(30),
   H.navTo(32, 7, { maxFrames = 8000, playBattles = "tactical" }),

@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-narshe-cliffs.sram",
+  "slot": 3,
+  "milestone": "wor-narshe-cliffs",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 34,
+      "x": 25,
+      "y": 5
+    }
+  },
+  "size": 32768,
+  "sha256": "8cd2ff454105b84cbe3faed0df4dac441167bce03e79ad844c341de53c35fc43",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "8cd2ff454105b84cbe3faed0df4dac441167bce03e79ad844c341de53c35fc43",
+    "generator_sig": "aa4ba77ad73b8734cc0b51da836aca3436e75b190e60015cfd33f28c5b16d8f3 gen_wor_narshe build/checkpoints/wor-cyan-v1/manifest.json build/checkpoints/wor-cyan-v1/wor-cyan.sram",
+    "ancestors": [
+      {
+        "path": "build/checkpoints/wor-cyan-v1/manifest.json",
+        "sha256": "7487185d6b8477a6f3d6333dad5cc2c7843c99aaeb8c70fe299d8835dc186663"
+      }
+    ]
+  }
+}

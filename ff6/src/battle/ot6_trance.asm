@@ -89,3 +89,28 @@ OT6_MORPH_SPEED:
         clc
 @out:   rtl
 .endproc
+
+; [ Cmd_04's head: a Revert buys nothing, so it costs nothing (#430) ]
+; Revert has no payoff a boost could buy (guidelines "boost pays once": a
+; boost that costs pips and buys nothing is a bug), so a pending boost on it
+; is dropped before Ot6ActionEnd can charge it: the turn ends as an
+; unboosted one, regen pip included, and the magic rows fall back off any
+; folded prices the raise put on them (the same request Ot6ActionEnd's spend
+; arm makes).  Refunding is simpler than greying the boost at the command
+; window, which would need the R press to know the cursor's command.
+; jsl from Cmd_04, a8/i8, db = $7e, y = the actor (Cmd_03's context).
+; clobbers A; preserves X and Y.
+.proc Ot6RevertTake
+        .a8
+        tya                     ; width-neutral character test
+        cmp     #$08
+        bcs     @out            ; (a monster has no bank)
+        lda     OT6_BOOST_REVEALED,y
+        beq     @out            ; nothing raised: nothing to refund
+        lda     #$00
+        sta     OT6_BOOST_REVEALED,y
+        lda     $3204,y
+        ora     #$80            ; vanilla's "recheck enabled magic" request
+        sta     $3204,y
+@out:   rtl
+.endproc

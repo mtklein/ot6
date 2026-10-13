@@ -3,8 +3,8 @@
 The plan for milestone v0.29, #266: from the save beside the Falcon outside
 Jidoor (`wor-cyan-v1`, where the v0.28 route ends) to MOG and UMARO joined,
 Terrato and Tritoch owned, the Ice Dragon beaten, and a save beside the
-Falcon outside Narshe. A plan only: nothing here has been played, and the
-break rows are a proposal for the route agent to build and measure.
+Falcon outside Narshe. Sections 0-10 are the plan as written before play;
+section 11 is what the route built and measured.
 
 Line numbers are into `ff6/src/event/event_main.asm` unless a file is named.
 Evidence is under `build/attempts/wt/v029-plan/`, read from `build/ot6.sfc`
@@ -196,6 +196,8 @@ Only one of these species appears anywhere else (Nastidon, random group 86,
 `sharing.txt`). The party here holds slash (TERRA, CELES, CYAN, SABIN's claw),
 pierce (MOG's spear) and fire; bludgeon arrives with UMARO at the end.
 **Counts and keys are a proposal**; the route agent's play sets them.
+(Built as proposed but for the Wizard, the Pugs and the Test Rider's
+lesson: section 11.3.)
 
 | species | where | L / HP | vanilla elements; notes | shields | classes | why |
 |---|---|---|---|---|---|---|
@@ -406,3 +408,175 @@ them. His showcase is the regroup and the Narshe plain beside the Falcon
 2. **Ragnarok.** LOCKE's lock decides when the stone arrives; the plan moves
    it to v0.32 (Locke). The stone-or-sword choice stays a player's choice
    there.
+
+## 11. Played (v0.29)
+
+The route plays the arc in two legs. Evidence is under
+`build/attempts/wt/v029-narshe-route/`; the lab scripts beside the logs
+(`make_kvariant.py`, `make_dragonlab.py`, `analyze_leg.py`,
+`analyze_tritoch.py`, `mypath.py`).
+
+### 11.1 The legs
+
+- `gen_wor_narshe` (`wor-cyan-v1` -> `wor-narshe-cliffs-v1`): Jidoor's
+  weapon counter (a Partisan, 13,000 GP) and item counter; Ifrit from SABIN
+  to CYAN; the cabin seats CYAN, TERRA and CELES; Narshe, the elder's house,
+  the moogle cave, MOG (named, joins into the empty seat); out through the
+  elder's house, the town's north exit, the mines chain, the cliffs' west
+  side to the save point.
+- `gen_wor_tritoch` (`wor-narshe-cliffs-v1` -> `wor-narshe-v1`): armed for
+  the ice and dressed once, the Ice Dragon, Tritoch, "Hop into it?", the
+  X-Ether, the drop (14,30), the Gauntlet, the lair's floor (A held facing
+  up), the carving (Terrato, Umaro), UMARO named and waiting aboard; out by
+  the lair's slide, the mines and the town; the cabin seats UMARO, MOG,
+  TERRA and CELES; Terrato on MOG, Tritoch on CELES (Maduin back in the
+  bag); the Falcon lands at world (115,38) and the arc saves there.
+
+### 11.2 What the walk learned
+
+- **Doors in walls.** The elder's house door (32 (49,12)) is a wall tile
+  entered by holding Up from (49,13); the route's `door()` walks onto a
+  door when the planner reaches it and presses into it from below when not.
+- **MOG's room is entered from the back.** Map 38's (49,21) door could not
+  be entered from (49,22) (`dev/d3/run.log`: `no-effect: up for 320
+  frames`); the route goes 38 (49,11) -> 37 -> (14,7) -> 44 (121,60), and out
+  the same way.
+- **Three of the plan's chests were opened in the World of Balance**: the
+  elder's Elixir (bit $002) and the moogle cave's Pod Bracelet and Elixir
+  ($00B, $00C share bits with the mines chase's chests) (`dev/d3`:
+  `already open`). The route opens the Ribbon, the Moogle Charm, the X-Ether
+  and the Gauntlet (`tools/chests_opened.txt`).
+- **The Ice Dragon wanders** (`set_npc_movement RANDOM`): its object stood
+  at (20,16), (17,18) and (16,20) in three runs. The touch reads its live
+  tile; the walk up keeps to the cliffs' west side.
+- **The mines' inner doors** (36 (113,45) -> (58,11), (57,21) -> (25,58),
+  and back) are taken as warps the route detects by the party's tile
+  jumping; the planner's radius cap needs waypoints on the longer walks
+  (`mypath.py`, the plan's step model, bounded).
+- **Relics are dressed once.** Dressing them again before Umaro, with the
+  Gauntlet in the bag, planned a swap between two members that the relic
+  rule cannot make from the bag (`dev/t4`: `a member's new relics are all
+  in the bag (no swap deadlock)`). The library has no unequip, so the swap
+  is left for later (section 11.7).
+- **The elemental shields taught tier spells.** CYAN (Ice Shld) and MOG
+  (Thunder Shld) learned Ice 2 and Bolt 2 over the arc, vanilla's ItemProp
+  learn data, against "stronger spells come from boosting" (spells_all on
+  the first `wor-narshe-v1`, `spells_all/`). The three elemental shields now
+  teach nothing, and check_spell_grants holds items to "no tier". The
+  variation sets below ran before that change; the driver casts only fire
+  at the bosses, so neither spell was cast in them.
+- **A lift-off and a landing on one tile** stalled the pilot one tile off
+  it (`varA/tritoch_k2_s12.log`: `timeout after 6000 frames`); the arc's
+  save is three tiles south of where the Falcon waited.
+
+### 11.3 Break rows (built)
+
+As proposed in section 4, with four changes: the Ice Dragon has six
+shields, not ten (section 11.4); the Wizard takes slash as
+well (2, slash|pierce|special: the moogle cave's Wizards meet CYAN, TERRA
+and CELES before MOG joins, and none of them holds pierce or ¤), the Pugs
+get a row (4, slash|special, the Pug's), and the Test Rider keeps pierce
+alone on purpose: before MOG joins, the town's riders cannot be broken,
+only worn down, and his spear is what breaks them after. Tritoch's
+World of Ruin record `$144` has its row; `$114`/`$115` stay shieldless.
+`battle_breakwor_narshe` checks every row, every species the arc's groups
+can draw against the hands that meet it (the Test Rider before MOG is the
+one declared exception), and the lessons (MOG's spear the Test Rider's only
+key and the Ice Dragon's class key; each of the four keys Tritoch and
+Umaro; every boss absorbs ice and is weak to fire): `PASS` on this ROM,
+`got 65 ($41)` mismatches on main's, and three row mutants each red by name
+(`rows/`).
+
+**Tritoch's defense 254**: a 1-damage Fight chips. Without fire the party
+broke it three times on Fight and took 485 of its 30,000 HP in 17,100
+frames (`dev/t2`); the bosses are fought with fire.
+
+### 11.4 The bosses
+
+The driver casts fire at all three (TERRA's natural Fire at its tier; CYAN
+and CELES once Ifrit and Maduin teach it), CELES's Runic and CYAN's
+SwdTech on, and TERRA opens with **Trance** (`opts.trance`, new: her Morph
+at 3 BP, which lasts the battle; her casts stay at base tier until the
+bank holds three).
+
+| set | the Ice Dragon | Tritoch | Umaro |
+|---|---|---|---|
+| no Trance, 10 shields (`varA/`, `dragonA/dragon10`) | 11 won, 1 lost of 12 (11 keys); 11 deaths; 5,423-20,615 ticks; Fenix 0-4 | 11 of 11, no deaths | 11 of 11, no deaths |
+| no Trance, 6 shields (`dragonA/dragon6`, a lab ROM) | 12 of 12 (11 keys); 3 deaths; 4,743-12,782 ticks | -- | -- |
+| Trance, 10 shields (`varB/`, before the shields' spells went) | 12 of 12 (10 keys); no deaths; broken in 12; 6,510-9,879 ticks; Potions 0-4 | 12 of 12 (10 keys); no deaths; broken in 12; 6,145-7,947 | 12 of 12 (12 keys); no deaths; broken in 12; 4,123-5,125 |
+| Trance, 10 shields, the qualified ROM (`varC/`, a35a908a's captures) | 8 of 8 (7 keys); 19 deaths; 5,335-45,207 ticks; Fenix 0-13; TERRA Tranced in 4 | 8 of 8 (8 keys); no deaths | 8 of 8 (8 keys); no deaths |
+| Trance banked past heals, 10 shields (`drT/`, the same draws) | 8 of 8; 12 deaths; 5,335-39,327 ticks; Fenix 0-9; Tranced in 7 | -- | -- |
+| Trance banked past heals, 6 shields (`dr6T/`, the same draws) | 8 of 8; 1 death; 4,879-10,054 ticks; Potions 0-8, Fenix 0-1 | -- | -- |
+| the route as qualified (`varD/`, f0ae114c's captures) | 10 of 10 (9 keys); 1 death; broken in 10; 4,879-10,054 ticks; Potions 0-8, Fenix 0-1 | 10 of 10 (9 keys); no deaths; broken in 10; 6,156-8,433 | 10 of 10 (9 keys); no deaths; broken in 10; 4,140-4,934 |
+
+The Ice Dragon was the arc's attrition fight and a loss in one draw of
+twelve (`varA/tritoch_s24.log`, `dragonA/dragon10_s24.log`: `GAME OVER
+fired`). Spending TERRA's divine looked like it settled it (`varB/`), but on
+the qualified ROM the same policy lost 19 members in eight fights
+(`varC/tritoch_s28.log`: `won 45207 ticks ... fenix 13 deaths 13`): her
+boosted party cures kept her bank under three, so the driver now banks her
+past heals (`opts.trance`), and with ten shields the party, keyed only by
+the spear and fire, still waited out Absolute 0 for the break. So it has six:
+on the same draws `won 8, lost 0, party deaths 1, broken in 8`
+(`dr6T/`). The win comes from the player's choices, the divine and the
+break (guidelines.md, "What makes a fight good"). Who breaks (`varB/who_breaks.txt`, the last party action before
+each break): the Ice Dragon CYAN's Fire/Fire 2 4, TERRA 4, CELES's Fire 2 3,
+MOG's Fight 1; Tritoch MOG's Fight 6, TERRA 3, CELES 3; Umaro TERRA 7,
+CELES 3, CYAN 1, MOG 1. MOG lands half of Tritoch's breaks in the arc he
+joins for.
+
+**Short of "What makes a fight good"**: Tritoch and Umaro never threatened
+the party in 23 fights (no deaths, at most 2 Potions); they are passages,
+not contests, at L40-43. The Ice Dragon is the arc's one contest.
+
+### 11.5 The variation sets
+
+The route as qualified (f0ae114c), each leg from the qualification's own
+captures (`varD/`): `gen_wor_tritoch` at seed shifts 0-28 by 4 and with K =
+2 and 5 random battles used up below the cliffs' save point (shift 0), ten
+runs; `gen_wor_narshe` at shifts 0, 8, 16 and 24 and K = 5 outside Jidoor,
+five runs; retries off.
+
+- **`gen_wor_tritoch`**: 10 of 10 pass; `TOTAL battles 119 (111 distinct
+  keys), deaths 1` (`varD/analysis_leg_tritoch.txt`, the one death the Ice
+  Dragon's, 11.4); TERRA Tranced one to three times a run;
+  `wor-narshe-v1` holds 72-88 Potions.
+- **`gen_wor_narshe`**: 5 of 5 pass; `TOTAL battles 74 (67 distinct keys),
+  deaths 0` (`varD/analysis_leg_narshe.txt`).
+
+The earlier sets, each leg twelve times from its tracked boot (eight seed
+shifts and K = 2 and 5 at shifts 0 and 12), ran before the shield changes
+and the Ice Dragon's six shields:
+
+- **`gen_wor_narshe`** (`varA/`): 12 of 12 pass (the first K runs walked
+  to an unwalkable tile, `varA/failed1/`, and were rerun); `TOTAL battles
+  178 (143 distinct keys), deaths 0` (`varA/analysis_narshe.txt`). MOG
+  joins at L42; the save point holds TERRA 40-41, CYAN 39-40, CELES 41-42,
+  MOG 42-43, and 91-97 Potions in the shift runs.
+- **`gen_wor_tritoch`** (`varB/`, the route's generator): 12 of 12 pass;
+  `TOTAL battles 148 (133 distinct keys), deaths 0`
+  (`varB/analysis_leg.txt`); the bosses as in 11.4. `wor-narshe-v1` holds
+  TERRA 41, CELES 42, MOG 43, UMARO 38 and 47-88 Potions; under the band
+  (about 63 at L42) in one draw, so the next arc stocks up before its
+  fights (Narshe sells nothing without LOCKE).
+
+### 11.6 Retry sites
+
+None: both legs `attempts=1/3` in the qualifications of a35a908a and
+f0ae114c (`qual-a35a908a/`, `qual/`), `attempts=1/1` throughout `varD/`.
+Before Trance and six shields the Ice Dragon was the game-over risk (one
+wipe in twelve, `varA/`).
+
+### 11.7 What was left
+
+- **Mog's Water Rondo (#428).** The Serpent Trench can be re-entered in
+  the World of Balance (the jump gates only on $0041) and its battles teach
+  Water Rondo (`UNDERWATER`), but MOG is in the World of Balance party only
+  through the Lone Wolf choice, in the airship era, and the dive ends in
+  Nikeah, cut off on foot from where the airship has to be parked to reach
+  Crescent Mountain (`428/findings.txt`). Not built; back to the
+  coordinator.
+- **Dance.** The driver has no Dance verb; MOG Fights.
+- **The relic swap** (11.2): the relic rule needs an unequip to make a swap
+  between two members.
+- **Ragnarok** is v0.32 (finding 1).

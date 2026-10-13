@@ -42,7 +42,20 @@ local SPARE = 900
 local ST1, MENU, ACTOR = 0x3EE4, 0x7BCA, 0x62CA
 
 local o0 = nil
-local function up() return H.battleLoadStarted() and H.monstersPresent() > 0 end
+-- the battle is up while a monster of it still stands: present ($3AA8 bit
+-- 0) with HP.  monstersPresent() reads the opening line-up, so it stayed
+-- true through the victory text, and a battle whose last blow fell 711
+-- frames after the window read as "up 900 frames after it"
+-- (build/attempts/wt/v029-narshe-route/zombiecure/zc_trace3.log: both
+-- monsters 0 HP at f714-715, the window at f3, the battle unloaded at
+-- f1469; the Revivify planned at f430 never ran)
+local function up()
+  if not H.battleLoadStarted() then return false end
+  for s = 0, 5 do
+    if (H.readByte(0x3AA8 + s * 2) & 1) == 1 and H.readWord(0x3BFC + s * 2) > 0 then return true end
+  end
+  return false
+end
 local key = "?"
 local cand = nil          -- the held landing: { e, f, key, req, window }
 local skipped, qualified, emitted, landings = 0, 0, false, {}

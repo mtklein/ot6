@@ -160,8 +160,14 @@ local function playArm(name, stale)
     end, 240000, {
       -- a battle that ends first (an instant kill, a Broken body's death:
       -- HP alone does not hold it up) is left, and the arm goes on in the
-      -- next random battle, up to BATTLES
-      H.cond(function() return not H.battleLoadStarted() end, {
+      -- next random battle, up to BATTLES.  The pace starts once the party
+      -- has the field again: a frame between battles with no battle loaded
+      -- and no control yet sent it to wait for control while the next
+      -- battle came up (build/attempts/wt/v029-narshe-route/morphrandom/:
+      -- `timeout after 3000 frames waiting for morphrandom: control to
+      -- pace`, a battle on screen); until then the A presses below page
+      -- the victory text
+      H.cond(function() return not H.battleLoadStarted() and H.hasControl() and H.tileAligned() end, {
         H.call(function() H.setPad({}) end),
         H.fcPace("morphrandom"),
         H.waitUntil(function() return H.battleActive() end, 1200, "the next battle is up", 5),
