@@ -290,6 +290,19 @@ the GitHub and release checks every 10 minutes. A peer whose checkout lacks
 `tools/status` sends no facts, so it is judged only on whether it is up and
 on its power.
 
+Above the machine lines, the grid page shows the work in flight and the
+week's quota, both re-read every 5 minutes by the viewer (never per page
+load):
+
+- **Active work**: open issues labelled `active`, grouped under their
+  milestones, each linked to GitHub (`gh api`). `live.py --active 428 431`
+  labels issues and `--inactive 428` clears the label.
+- **Weekly quota**: the account's weekly all-models usage and its reset time,
+  from `claude -p /usage --output-format stream-json --verbose`. That is
+  Claude Code's own `/usage`, a local command: no model turn, no tokens; its
+  `usage_report.rate_limits.limits` entry `weekly_all` carries `percent` and
+  `resets_at`. A reading older than 15 minutes shows its age.
+
 ## The machine-wide emulator limit
 
 Every `tools/tests/run.sh` takes one of its machine's emulator slots before
