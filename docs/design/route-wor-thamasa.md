@@ -113,9 +113,9 @@ From the tracked SRAM (`wor-narshe-v1_dump.txt`, `wor-narshe-v1_roster.txt`):
 4. **The basement (207).** The lamp at (95,60) (`_cb4962` :48196) starts a
    160-frame rotation of three doors (88,50), (90,50), (92,50) (`_cb4987`,
    `_cb49ab`, `_cb49cf`, :48210-48254; blockers NPC_3-5, switches
-   `$0494`-`$0496`). (88,50) is the real door (to (90,61)); (90,50) and
-   (92,50) drop the party into a 2-tile cell at (113,54) (`_cb4b86`
-   :48500). The painting at (85,50) (`_cb4bb5` :48527) carries the party to
+   `$0494`-`$0496`). (88,50) is a door (to (90,61)); (90,50) and (92,50)
+   drop the party into a 2-tile cell at (113,54) (`_cb4b86` :48500); which
+   phase lets the party through is for the emulator to settle. The painting at (85,50) (`_cb4bb5` :48527) carries the party to
    (71,49); the four chest-monsters (NPC_7-10 at (73,50), (75,49), (77,50),
    (79,49); `_cb4a4e` :48316 and the three after; battle 151 each:
    SoulDancer, Wild Cat x4) give 293 GP, a Tonic, a Tincture and a Soft;
@@ -328,7 +328,7 @@ draws WallChange (finding 5). On death, Ultima (power 150) on the party.
   ZoneSeek) on all four.
 - **Ultima.** Vanilla's monster spell at L68, mag 25: 150 x 4 + 68 x 25 x
   150 / 32 = 8,568 before magic defence, halved across four targets, about
-  3,100 at mdef 60 and about 2,050 under Shell (**estimate**; whether
+  3,260 at mdef 60 and about 2,170 under Shell (**estimate**; whether
   Ultima splits is the lab's first measurement). That is about the party's
   HP at L45, so: **Shell on all four, then Life 3 pre-cast** (Life at two
   or three points, magicite.md "Life 3 is Life's third tier": TERRA's
