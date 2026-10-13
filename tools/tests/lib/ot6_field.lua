@@ -3685,11 +3685,32 @@ function M.knowsSpell(c, spell)
   if M.readByte(0x1A6E + 54 * actor + spell) == 0xFF then return true end
   -- `c` selects the roster record; `actor` selects the learned table.  They
   -- agree in the World of Balance and are not an ABI synonym later.
+  if M.itemGrants(c, spell) then return true end
   local esper = M.readByte(0x1600 + 37 * c + 0x1E)
   if esper >= 0x80 then return false end
   local row = (M.sym("GenjuProp") & 0x3FFFFF) + 11 * esper
   for _, off in ipairs({ 1, 3, 5, 7, 9 }) do
     if M.readRomByte(row + off) == spell then return true end
+  end
+  return false
+end
+
+-- Whether an item record `c` wears grants `spell` while worn, as the ROM's
+-- Ot6ItemGrantTbl says ((item, spell) pairs ended by $ff; Ot6ItemGrants,
+-- battle/ot6_progression.asm, #431): the elemental shields' Fire, Ice and
+-- Bolt.  Absent from a ROM that predates the table: no item grants.
+function M.itemGrants(c, spell)
+  local ok, tbl = pcall(function() return M.sym("Ot6ItemGrantTbl") end)
+  if not ok or not tbl then return false end
+  tbl = tbl & 0x3FFFFF
+  for k = 0, 63 do
+    local item = M.readRomByte(tbl + 2 * k)
+    if item == 0xFF then return false end
+    if M.readRomByte(tbl + 2 * k + 1) == spell then
+      for s = 0x1F, 0x24 do
+        if M.readByte(0x1600 + 37 * c + s) == item then return true end
+      end
+    end
   end
   return false
 end

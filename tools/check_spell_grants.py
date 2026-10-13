@@ -44,7 +44,14 @@ a worn piece teach its spell after battles, as an Esper does, so property 1
 holds for every item too (#266: vanilla's Flame, Ice and Thunder Shld taught
 Fire 2, Ice 2 and Bolt 2, and the World of Ruin route's CYAN and MOG learned
 Ice 2 and Bolt 2 wearing them; build/attempts/wt/v029-narshe-route/
-spells_all/).  Nothing else writes the learned-spell table: the new-game
+spells_all/).
+
+And equipment grants while worn, as an Esper does (#431): Ot6ItemGrantTbl
+(battle/ot6_progression.asm; (item, spell) pairs ended by $ff) gives the
+wearer its spell, never learned.  Items may grant a family's base -- the head
+of an Ot6FoldTbl row, which boost folds up its tiers -- and never a tier or a
+spell no row heads; and the table equals docs/design/magicite.md's "Items
+that grant" table, in order.  Nothing else writes the learned-spell table: the new-game
 init clears it, and vanilla's teach-spell event routine (GiveMagic) is in no
 event command slot.
 
@@ -71,6 +78,7 @@ BOOST_ASM = "ff6/src/battle/ot6_boost.asm"
 CONST_INC = "ff6/include/const.inc"
 GENJU_NAMES = "ff6/src/text/genju_name_en.json"
 MAGIC_NAMES = "ff6/src/text/magic_name_en.json"
+ITEM_NAMES = "ff6/src/text/item_name_en.json"
 KITS_MD = "docs/design/kits.md"
 MAGICITE_MD = "docs/design/magicite.md"
 TUBE_SIX_MD = "docs/design/magicite-tube-six.md"
@@ -102,7 +110,8 @@ class Input:
                 return f.read()
         self.rom = bytearray(read(rom_path, "rb"))
         syms, segs = dbg_symbols(read(dbg_path))
-        for s in ("NaturalMagic", "GenjuProp", "Ot6FoldTbl", "Ot6EsperStatTbl"):
+        for s in ("NaturalMagic", "GenjuProp", "Ot6FoldTbl", "Ot6EsperStatTbl",
+                  "Ot6ItemGrantTbl"):
             if s not in syms:
                 raise SystemExit("check_spell_grants: %s not in %s" % (s, dbg_path))
         if segs.get("natural_magic") != 2 * NATURAL_PER_CHAR * len(NATURAL_CHARS):
@@ -119,6 +128,9 @@ class Input:
         self.genju_rows = gsize // GENJU_ROW
         self.fold = rom_offset(syms["Ot6FoldTbl"])
         self.stat = rom_offset(syms["Ot6EsperStatTbl"])
+        self.grant = rom_offset(syms["Ot6ItemGrantTbl"])
+        self.item_names = [re.sub(r"^\{[a-z]+\}", "", t)
+                           for t in json.loads(read(ITEM_NAMES))["text"]]
         self.boost_asm = read(BOOST_ASM)
         self.nfold = fold_rows_in_source(self.boost_asm)
         self.enum = spell_names(read(CONST_INC))
@@ -204,6 +216,17 @@ def esper_stats(inp, e):
     b0, b1 = inp.rom[inp.stat + 2 * e], inp.rom[inp.stat + 2 * e + 1]
     nib = lambda n: -(n & 7) if n & 8 else n
     return (nib(b0 & 15), nib(b0 >> 4), nib(b1 & 15), nib(b1 >> 4))
+
+
+def item_grants(inp):
+    """[(item, spell)] from Ot6ItemGrantTbl, up to its $ff end."""
+    out = []
+    for k in range(ITEMS):
+        it = inp.rom[inp.grant + 2 * k]
+        if it == 0xFF:
+            return out
+        out.append((it, inp.rom[inp.grant + 2 * k + 1]))
+    raise SystemExit("check_spell_grants: Ot6ItemGrantTbl has no $ff end")
 
 
 # ---------------------------------------------------------------- the docs --
@@ -307,6 +330,30 @@ def esper_plans(inp):
     return plans
 
 
+GRANT_SECTION = "## Items that grant"
+
+
+def item_grant_plan(inp):
+    """[(item, spell)] from magicite.md's "Items that grant" table: rows whose
+    first cell is an item's name, in order."""
+    start = inp.magicite.find("\n" + GRANT_SECTION)
+    if start < 0:
+        raise SystemExit("check_spell_grants: %s has no '%s' section" % (MAGICITE_MD, GRANT_SECTION))
+    end = inp.magicite.find("\n## ", start + 1)
+    idx = {n.strip().lower(): i for i, n in enumerate(inp.item_names) if n.strip()}
+    plan = []
+    for l in inp.magicite[start:end if end > 0 else len(inp.magicite)].splitlines():
+        cells = [c.strip() for c in l.strip().strip("|").split("|")]
+        if len(cells) < 2 or cells[0].lower() not in idx:
+            continue
+        sp = spell_id(inp, cells[1])
+        if sp is None:
+            raise SystemExit("check_spell_grants: %s's '%s' row grants '%s', which is no spell name"
+                             % (MAGICITE_MD, cells[0], cells[1]))
+        plan.append((idx[cells[0].lower()], sp))
+    return plan
+
+
 _STAT_CELL = re.compile(r"([+−-]?\d+) / ([+−-]?\d+) / ([+−-]?\d+) / ([+−-]?\d+)(?:\s|$)")
 
 
@@ -366,7 +413,24 @@ def check_tiers(inp):
         if rate and sp in tiers:
             out.append("item $%02X teaches %s ($%02X, learn rate %d), a tier of %s: boosting %s casts it"
                        % (it, inp.name(sp), sp, rate, inp.name(tiers[sp]), inp.name(tiers[sp])))
+    heads = set(inp.rom[inp.fold:inp.fold + 3 * inp.nfold][0::3])
+    for it, sp in item_grants(inp):
+        if sp in tiers:
+            out.append("item $%02X (%s) grants %s ($%02X) while worn, a tier of %s: boosting %s casts it"
+                       % (it, inp.item_names[it], inp.name(sp), sp, inp.name(tiers[sp]),
+                          inp.name(tiers[sp])))
+        elif sp not in heads:
+            out.append("item $%02X (%s) grants %s ($%02X) while worn, which heads no Ot6FoldTbl row: "
+                       "an item grants a family's base" % (it, inp.item_names[it], inp.name(sp), sp))
     return out, tiers
+
+
+def check_item_plan(inp):
+    got, plan = item_grants(inp), item_grant_plan(inp)
+    if got != plan:
+        fmt = lambda ps: ", ".join("%s: %s" % (inp.item_names[i], inp.name(s)) for i, s in ps)
+        return ["Ot6ItemGrantTbl grants [%s]; %s plans [%s]" % (fmt(got), MAGICITE_MD, fmt(plan))]
+    return []
 
 
 def check_natural_plan(inp):
@@ -422,6 +486,7 @@ def check_stat_plans(inp):
 def run_checks(inp):
     probs = check_fold(inp)
     probs += check_stat_plans(inp)
+    probs += check_item_plan(inp)
     p, tiers = check_tiers(inp)
     probs += p
     p, n1 = check_natural_plan(inp)
@@ -458,6 +523,10 @@ def selftest(root, rom_path, dbg_path):
                               lambda m: m.group(1) + str(int(m.group(2)) + 50), inp.kits, count=1)
         assert n == 1, "kits.md has no Terra Drain row to mutate"
 
+    def grant_doc_mutant(inp):
+        inp.magicite, n = re.subn(r"\n\| Flame Shld \|[^\n]*", "", inp.magicite, count=1)
+        assert n == 1, "magicite.md has no Flame Shld row to remove"
+
     mutants = [
         ("TERRA's first natural spell -> %s" % base_inp.name(tier),
          rom_mutant(base_inp.nat, tier), "TERRA natural magic, entry 1 "),
@@ -480,6 +549,14 @@ def selftest(root, rom_path, dbg_path):
          lambda inp: (inp.rom.__setitem__(inp.items + 0x61 * ITEM_ROW + 3, 5),
                       inp.rom.__setitem__(inp.items + 0x61 * ITEM_ROW + 4, tier)),
          "item $61 teaches "),
+        ("Ice Shld's grant -> %s" % base_inp.name(tier),
+         rom_mutant(base_inp.grant + 3, tier), "item $61 (Ice Shld) grants "),
+        ("Thunder Shld's grant -> Drain (no family)",
+         rom_mutant(base_inp.grant + 5, 0x04), "item $62 (Thunder Shld) grants "),
+        ("Ice Shld's grant -> Fire (plan)",
+         rom_mutant(base_inp.grant + 3, 0x00), "Ot6ItemGrantTbl grants ["),
+        ("magicite.md: the Flame Shld's row removed",
+         grant_doc_mutant, "Ot6ItemGrantTbl grants ["),
         ("TERRA's first level -> $ff (out of level order)",
          rom_mutant(base_inp.nat + 1, NATURAL_NONE), "TERRA natural magic"),
         ("kits.md: Terra's Drain 50 levels later",
@@ -574,10 +651,12 @@ def main():
     plans = esper_plans(inp)
     print("check_spell_grants: ok, no grant names one of the %d tiers (%s); TERRA's and "
           "CELES's natural magic is %s's plan; %d Espers grant their planned list (%s); "
-          "all %d Espers carry %s's stat package"
+          "all %d Espers carry %s's stat package; %d items grant their planned family base "
+          "while worn (%s)"
           % (len(tiers), ", ".join(inp.name(t) for t in sorted(tiers)), KITS_MD,
              len(plans), ", ".join(inp.espers[e] for e in sorted(plans)),
-             inp.genju_rows, MAGICITE_MD))
+             inp.genju_rows, MAGICITE_MD, len(item_grants(inp)),
+             ", ".join("%s: %s" % (inp.item_names[i], inp.name(s)) for i, s in item_grants(inp))))
     return 0
 
 

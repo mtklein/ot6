@@ -523,6 +523,9 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     "battle_statuses": "OT6_TIMEOUT=3600",
     "battle_levelup": "OT6_TIMEOUT=3600",
+    # an elemental shield's spell, worn and taken off, beside Jidoor (#431)
+    "battle_shieldgrant": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-cyan-v1",
 }
 
 # Tests about the version fields themselves (tools/build/rom_version.py):
