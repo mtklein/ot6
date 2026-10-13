@@ -119,7 +119,8 @@
 ;      the read happens before the esper check: the augment/replace fork
 ;      differs only in whether innate spells are later suppressed, and
 ;      suppression is not built here.
-;   2. granted: the character's equipped esper ($f7, the byte ValidateSpellList
+;   2. Strago's Analyze (Scan, ot6_analyze.asm): always granted to him.
+;   3. granted: the character's equipped esper ($f7, the byte ValidateSpellList
 ;      already banked at its head; negative = none) lists this spell id in its
 ;      GenjuProp row.  UpdateEnabledMagic/CheckMagicEnabled then enable and draw
 ;      it with no further work.  Equip Ramuh and Bolt/Rasp become castable;
@@ -143,7 +144,16 @@
         lda     ($f0),y         ; vanilla learned status for spell id Y
         inc
         beq     @grant          ; $ff -> innately known: keep it ($ff)
-        lda     $f7             ; this character's equipped esper (neg = none)
+        cpy     #OT6_ANALYZE_SPELL
+        bne     @stone
+        rep     #$20            ; Strago always knows Analyze (#381,
+        .a16                    ;   ot6_analyze.asm): his learned table is
+        lda     $f0             ;   the one at $1a6e + 7 * $36
+        cmp     #$1a6e + OT6_CHAR_STRAGO * $36
+        sep     #$20            ; (plain SEP: keeps the compare's Z)
+        .a8
+        beq     @grant
+@stone: lda     $f7             ; this character's equipped esper (neg = none)
         bmi     @vanilla        ; no esper worn -> the vanilla (non-$ff) status
         phx                     ; X is the loop's dispatch selector; preserve it
         longa                   ; 16-bit for the *11 product (max 26*11 = 286)
@@ -187,7 +197,8 @@
 ; castable in battle but absent between fights.  This is the field equivalent
 ; of Ot6EsperSpellKnown.  It returns $ff when the spell is either innately
 ; learned or present in the actor's equipped esper row, otherwise the untouched
-; learn percentage.  Unequipping therefore removes only the grant.
+; learn percentage.  Unequipping therefore removes only the grant.  Strago's
+; Analyze (Scan) is known whatever he wears (#381, ot6_analyze.asm).
 ;
 ; Contract: called by JSL from menu/skills.asm in a8/i16, A = actor id,
 ; Y = the selected character-record pointer, and the menu's $e0 = spell id.
@@ -199,7 +210,15 @@
 .proc Ot6FieldSpellKnown
         .a8
         .i16
-        phy
+        cmp     #OT6_CHAR_STRAGO
+        bne     @begin
+        lda     f:$7e00e0       ; Strago always knows Analyze (#381)
+        cmp     #OT6_ANALYZE_SPELL
+        bne     :+
+        lda     #$ff
+        rtl
+:       lda     #OT6_CHAR_STRAGO        ; A was his actor id
+@begin: phy
         longa
         and     #$00ff
         tay                     ; Y = actor id, clean 16-bit
@@ -282,7 +301,11 @@
 @slot:  lda     $3ed8,x         ; actor id
         cmp     #$0c
         bcs     @next           ; empty/special/gogo/umaro: no esper to grant
-        phx
+        cmp     #OT6_CHAR_STRAGO
+        bne     :+
+        lda     #OT6_ANALYZE_SPELL      ; Strago's Analyze has a slot too
+        jsr     @add            ;   (#381); clobbers A and Y, keeps X
+:       phx
         ldy     $3010,x         ; this slot's record pointer
         lda     $161e,y         ; equipped esper (neg = none)
         bmi     @done

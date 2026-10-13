@@ -429,6 +429,10 @@ TEST_ENV = {
     # #327: TERRA knows Life and pays Life 3 here; no write needed
     "battle_lifefold":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # #381: STRAGO is seated here and has learned no spell; a run is the
+    # Continue, a walk and one to a few battles of scripted turns
+    "battle_analyze": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
     # #319: SETZER's kit, played in Darill's Tomb's east room from the
     # battery cut on its save point (SETZER back in the World of Ruin, so
     # Jackpot is learned).  A run is the Continue, a walk and one to four

@@ -8705,6 +8705,7 @@ CalcAttackEffect:
         stz     $3a48
         jsl     Ot6Life3Revive  ; ot6: Life 3 on a KO'd body revives it (#327)
         jsl     Ot6BreakSpell   ; ot6: Break takes shields, not a petrify (#398)
+        jsl     Ot6Analyze      ; ot6: a character's Scan reads every weakness (#381)
         jsr     MagicStatusEffect
         jsr     DoTargetEffect
         lda     $3a48
