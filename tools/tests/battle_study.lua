@@ -167,7 +167,10 @@ H.run({ maxFrames = 900000 }, {
     H.assertEq(H.worldBfs(home[1], home[2]) ~= nil, true, "the lap's tiles are reachable")
   end),
   H.driveUntil(function() return stage > 2 end, 850000, {
-    H.cond(function() return not H.battleLoadStarted() end, { lap(), H.release() }, {}),
+    -- field care between battles, as a player heals (guidelines.md): the
+    -- first run walked TERRA in at 60 HP, poisoned, and lost the fight-out
+    H.cond(function() return not H.battleLoadStarted() end,
+      { H.fieldCare({ tag = "study" }), lap(), H.release() }, {}),
     H.waitUntil(function() return H.battleActive() end, 900, "battle up", 5),
     H.call(decide),
     H.cond(function() return mode == "fightout" end, { H.kitBattle({}, {}) }, {
