@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "e2fbecc37bdd21f6996d8513652a62d01f547153ed15abbdf0ec536d8c11dcbf",
+  "sha256": "8cd2ff454105b84cbe3faed0df4dac441167bce03e79ad844c341de53c35fc43",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "e2fbecc37bdd21f6996d8513652a62d01f547153ed15abbdf0ec536d8c11dcbf",
-    "generator_sig": "b53079561b9d787cb8b924e2cdcd728cf75fb066fecdd2b57d97d04fc812bdbe gen_wor_narshe tools/tests/checkpoints/wor-cyan-v1/manifest.json tools/tests/checkpoints/wor-cyan-v1/wor-cyan.sram",
+    "payload_sha256": "8cd2ff454105b84cbe3faed0df4dac441167bce03e79ad844c341de53c35fc43",
+    "generator_sig": "37ce84239e9304854731669b72add142c04c62c728c52fc87345ebe40720702c gen_wor_narshe build/checkpoints/wor-cyan-v1/manifest.json build/checkpoints/wor-cyan-v1/wor-cyan.sram",
     "ancestors": [
       {
-        "path": "tools/tests/checkpoints/wor-cyan-v1/manifest.json",
-        "sha256": "840197ec21c9edd497333cb71ba15c5202d41a9b3b3aadb4bffca1614334b784"
+        "path": "build/checkpoints/wor-cyan-v1/manifest.json",
+        "sha256": "6d131dde6ef9ca56a491c0c137def00dada34e04af4331ba7c556da2cdc41a7e"
       }
     ]
   }
