@@ -74,6 +74,8 @@ TITLES = {
     "wor-terra-v1": "Mobliz, after Terra joins",
     "wor-mtzozo-v1": "Mt. Zozo, save point after Cyan joins",
     "wor-cyan-v1": "The Falcon, after the Storm Dragon",
+    "wor-narshe-cliffs-v1": "Narshe cliffs, save point after Mog joins",
+    "wor-narshe-v1": "The Falcon outside Narshe, after Umaro joins",
 }
 
 README = """\

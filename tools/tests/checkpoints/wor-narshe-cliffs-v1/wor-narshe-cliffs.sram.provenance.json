@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "e2fbecc37bdd21f6996d8513652a62d01f547153ed15abbdf0ec536d8c11dcbf",
+  "generator_sig": "b53079561b9d787cb8b924e2cdcd728cf75fb066fecdd2b57d97d04fc812bdbe gen_wor_narshe tools/tests/checkpoints/wor-cyan-v1/manifest.json tools/tests/checkpoints/wor-cyan-v1/wor-cyan.sram",
+  "ancestors": [
+    {
+      "path": "tools/tests/checkpoints/wor-cyan-v1/manifest.json",
+      "sha256": "840197ec21c9edd497333cb71ba15c5202d41a9b3b3aadb4bffca1614334b784"
+    }
+  ]
+}

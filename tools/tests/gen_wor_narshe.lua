@@ -39,6 +39,16 @@ local NARSHE_DOORS = { { 41, 36 }, { 52, 37 }, { 32, 30 }, { 29, 25 }, { 18, 22 
   { 43, 11 }, { 46, 10 }, { 49, 12 }, { 53, 9 }, { 15, 56 }, { 22, 44 }, { 10, 36 }, { 26, 8 }, { 33, 54 } }
 -- the elder's house (map 30): its exits to the town
 local ELDER_DOORS = { { 55, 35 }, { 67, 26 }, { 110, 26 }, { 80, 36 }, { 79, 18 } }
+-- the moogle cave (map 38), the mines (36) and the cliffs (33): their doors
+local MOOGLE_DOORS = { { 37, 24 }, { 49, 11 }, { 49, 21 }, { 79, 58 }, { 111, 10 }, { 111, 29 }, { 79, 9 }, { 87, 32 } }
+local MINES_DOORS = { { 57, 11 }, { 57, 21 }, { 25, 59 }, { 18, 51 }, { 107, 12 }, { 117, 12 }, { 113, 45 },
+  { 108, 60 }, { 73, 61 }, { 111, 29 }, { 112, 29 }, { 113, 29 } }
+local CLIFF_DOORS = { { 37, 25 }, { 24, 10 }, { 31, 10 }, { 30, 20 }, { 31, 20 }, { 32, 20 } }
+-- the Ice Dragon's tile on map 34 and the tiles beside it, kept off a walk
+-- past it (it is a touch-to-fight NPC: route-wor-narshe.md 9), and the
+-- long exit to map 35
+local DRAGON_AVOID = { { 22, 20 }, { 21, 20 }, { 23, 20 }, { 22, 21 }, { 22, 19 }, { 18, 1 }, { 19, 1 }, { 20, 1 },
+  { 21, 1 }, { 22, 1 } }
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -123,25 +133,48 @@ local function walkInto(x, y, dst, what, avoid)
     end),
   })
 end
--- a door that leads to another place on the same map (the moogle cave's
--- inner doors): walk onto it until the party stands far from it
-local function warpVia(x, y, what, avoid)
-  local function moved()
-    return math.abs(H.fieldX() - x) + math.abs(H.fieldY() - y) > 4 and H.hasControl() and H.tileAligned()
-      and bright() >= 15
-  end
-  local x0, y0 = nil, nil
-  return H.withReset(H.seqStep({
-    H.call(function() x0, y0 = H.fieldX(), H.fieldY() end),
-    H.navTo(x, y, { maxFrames = 12000, playBattles = "tactical", fight = FIGHT, avoid = avoid,
-      arrive = function()
-        return math.abs(H.fieldX() - x) + math.abs(H.fieldY() - y) > 4
-          and math.abs(H.fieldX() - x0) + math.abs(H.fieldY() - y0) > 4
-      end }),
+-- through a door in a wall: stand below it and hold Up until the map
+-- changes (gen_wor_cyan's enterUp: Narshe's elder's door (49,12) is a wall
+-- tile; (49,13) below it takes the press)
+local function enterUp(x, y, dst, what, avoid)
+  return H.seqStep({
+    H.navTo(x, y + 1, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, avoid = avoid }),
+    H.driveUntil(function() return map() == dst end, 600, { H.hold({ "up" }), H.waitFrames(4) }, what),
     H.release(),
-    H.waitUntil(moved, 1200, what .. ": through the door", 1),
+    H.waitUntil(function() return map() == dst and settled() end, 1200, what .. ": control on map " .. dst, 1),
     H.call(function() H.log(string.format("[route] %s: on map %d at (%d,%d)", what, map(), H.fieldX(), H.fieldY())) end),
-  }), function() x0, y0 = nil, nil end)
+  })
+end
+-- a door: walked onto when the planner reaches its tile, else entered from
+-- below it (a door in a wall)
+local function door(x, y, dst, what, avoid)
+  return lazy(function()
+    local av = {}
+    for _, d in ipairs(avoid or {}) do av[((d[2] & 0xFF) << 8) | (d[1] & 0xFF)] = true end
+    if H.bfsPath(x, y, nil, av) then return walkInto(x, y, dst, what, avoid) end
+    H.log(string.format("[route] %s: (%d,%d) is not walked onto from (%d,%d); entered from below", what, x, y,
+      H.fieldX(), H.fieldY()))
+    return enterUp(x, y, dst, what, avoid)
+  end)
+end
+-- a door that leads to another place on the same map (the mines' inner
+-- doors): walk onto it until the party's tile jumps (a step moves one)
+local function warpVia(x, y, what, avoid)
+  local lx, ly, jumped = nil, nil, false
+  local function track()
+    local fx, fy = H.fieldX(), H.fieldY()
+    if lx ~= nil and math.abs(fx - lx) + math.abs(fy - ly) > 2 then jumped = true end
+    lx, ly = fx, fy
+    return jumped
+  end
+  return H.withReset(H.seqStep({
+    H.call(function() lx, ly, jumped = nil, nil, false; track() end),
+    H.navTo(x, y, { maxFrames = 12000, playBattles = "tactical", fight = FIGHT, avoid = avoid,
+      arrive = function() return not H.battleLoadStarted() and track() end }),
+    H.release(),
+    H.waitUntil(function() track(); return jumped and settled() end, 1200, what .. ": through the door", 1),
+    H.call(function() H.log(string.format("[route] %s: on map %d at (%d,%d)", what, map(), H.fieldX(), H.fieldY())) end),
+  }), function() lx, ly, jumped = nil, nil, false end)
 end
 -- the live object an NPC's posted tile names, the nearest within four tiles
 local function npcAt(x, y, what)
@@ -167,6 +200,20 @@ local function walkTo(x, y, what, avoid)
     H.navTo(x, y, { maxFrames = 12000, playBattles = "tactical", fight = FIGHT, avoid = avoid }),
     H.call(function() H.log(string.format("[route] %s: at (%d,%d)", what, H.fieldX(), H.fieldY())) end),
   })
+end
+-- a walk by waypoints: the library's planner gives up past 4096 search
+-- nodes (bfsPath's radius cap), so a far target is reached through near
+-- ones (the waypoints read off route_data's step model, build/lab/mypath.py
+-- in the route's evidence)
+local function via(points, what, avoid)
+  local steps = {}
+  for _, p in ipairs(points) do
+    steps[#steps + 1] = H.navTo(p[1], p[2], { maxFrames = 8000, playBattles = "tactical", fight = FIGHT, avoid = avoid })
+  end
+  steps[#steps + 1] = H.call(function()
+    H.log(string.format("[route] %s: at (%d,%d)", what, H.fieldX(), H.fieldY()))
+  end)
+  return H.seqStep(steps)
 end
 -- a story stretch that may open a naming menu (MOG's, `name_menu`): the
 -- ride taps A through the dialogs, and while a field menu is up ($0059)
@@ -451,21 +498,31 @@ H.run({ maxFrames = 400000 }, {
   -- ---- 3. through the elder's house to the moogle cave ---------------------
   -- @@stage town
   -- the gate's pickpocket (_cc36f2, (37-39,50)) is one dialog the walk taps
-  -- through.  The elder's house (map 32 (49,12) -> 30 (55,34)): an Elixir
-  -- (55,30); its back door (67,26) -> 32 (53,8), the pocket that holds the
-  -- moogle cave's upper door (26,8) -> 38 (78,58)
-  walkInto(49, 12, MAP_ELDER, "Narshe -> the elder's house (30)", exceptOf(NARSHE_DOORS, 49, 12)),
-  chestAt(55, 30, 0x002, "Elixir (30 (55,30))", ELIXIR, ELDER_DOORS),
-  walkInto(67, 26, MAP_NARSHE, "the elder's house -> Narshe's north ledge (32 (53,8))", exceptOf(ELDER_DOORS, 67, 26)),
-  walkInto(26, 8, MAP_MOOGLE, "Narshe -> the moogle cave (38)", exceptOf(NARSHE_DOORS, 26, 8)),
+  -- through.  The elder's house (map 32 (49,12), a door in a wall, -> 30
+  -- (55,34)); its back door (67,26) -> 32 (53,8), the pocket that holds the
+  -- moogle cave's upper door (26,8) -> 38 (78,58).  The house's Elixir
+  -- (30 (55,30), bit $002) and the cave's Pod Bracelet and Elixir (38, bits
+  -- $00B, $00C) were opened in the World of Balance: build/lab/narshe/d3,
+  -- 'already open'
+  via({ { 38, 48 }, { 40, 38 }, { 46, 32 }, { 47, 23 }, { 50, 18 } }, "Narshe's street to the elder's door", NARSHE_DOORS),
+  door(49, 12, MAP_ELDER, "Narshe -> the elder's house (30)", exceptOf(NARSHE_DOORS, 49, 12)),
+  door(67, 26, MAP_NARSHE, "the elder's house -> Narshe's north ledge (32 (53,8))", exceptOf(ELDER_DOORS, 67, 26)),
+  via({ { 41, 8 }, { 29, 8 } }, "the north ledge to the moogle cave's door", NARSHE_DOORS),
+  door(26, 8, MAP_MOOGLE, "Narshe -> the moogle cave (38)", exceptOf(NARSHE_DOORS, 26, 8)),
   H.saveState("wor_narshe_cave.mss"),
 
   -- ---- 4. the moogle cave and MOG --------------------------------------------
   -- @@stage cave
-  chestAt(65, 28, 0x00B, "Pod Bracelet (38 (65,28))", 0xC8, {}),
-  chestAt(52, 33, 0x00C, "Elixir (38 (52,33))", ELIXIR, {}),
-  walkInto(49, 21, MAP_MOG, "the moogle cave -> MOG's room (44)", { { 49, 11 }, { 37, 24 }, { 79, 58 } }),
-  chestAt(98, 53, 0x00D, "Ribbon (44 (98,53))", RIBBON, { { 106, 55 }, { 121, 61 } }),
+  -- map 38's (49,21) door to MOG's room is a wall the party cannot press
+  -- into from (49,22) (build/lab/narshe/d3: 'no-effect: up for 320
+  -- frames'); the way in is the back room: 38 (49,11) -> 37 (20,37), 37
+  -- (14,7) -> 44 (121,60)
+  via({ { 71, 53 }, { 65, 47 }, { 62, 38 }, { 57, 31 }, { 56, 26 }, { 59, 17 }, { 54, 10 } },
+    "the moogle cave to its back room's door", MOOGLE_DOORS),
+  door(49, 11, MAP_MOOGLE_B, "the moogle cave -> its back room (37)", exceptOf(MOOGLE_DOORS, 49, 11)),
+  via({ { 15, 34 }, { 18, 27 }, { 15, 18 } }, "the back room to MOG's door", { { 20, 35 } }),
+  door(14, 7, MAP_MOG, "the back room -> MOG's room (44)", { { 20, 35 } }),
+  via({ { 121, 48 } }, "MOG's room to MOG", { { 106, 55 }, { 121, 61 } }),
   -- MOG (44 NPC_1 (121,46), _cc396c): $029F clear, so his first meeting
   -- (_cc3a4c): the naming menu, and he joins into the empty seat
   walkTo(121, 47, "below MOG", { { 106, 55 }, { 121, 61 } }),
@@ -477,6 +534,8 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(partyOf(MOG), 1, "MOG joined the party, into the empty seat")
   end),
   chestAt(121, 45, 0x0CF, "Moogle Charm (44 (121,45))", MOOGLE_CHARM, { { 106, 55 }, { 121, 61 } }),
+  via({ { 111, 46 }, { 100, 47 } }, "MOG's room to the Ribbon", { { 106, 55 }, { 121, 61 } }),
+  chestAt(98, 53, 0x00D, "Ribbon (44 (98,53))", RIBBON, { { 106, 55 }, { 121, 61 } }),
   -- dressed: the Partisan, the bag's best armor he can wear, and relics (the
   -- Ribbon goes on at once; the Moogle Charm, which stops random battles,
   -- stays in the bag: the route fights them)
@@ -499,26 +558,40 @@ H.run({ maxFrames = 400000 }, {
 
   -- ---- 5. back through the town and up the cliffs ----------------------------
   -- @@stage cliffs
-  -- out the way in: 44 -> 38 (49,22), the upper door (79,58) -> 32 (27,8),
+  -- out the way in: 44 (121,61) -> 37 -> 38, the upper door (79,58) -> 32 (27,8),
   -- the elder's back door (53,9) -> 30 (67,28), (55,35) -> 32 (49,14); the
   -- main street north to the long exit (35-38,1) -> 33 (26,50)
-  walkInto(106, 55, MAP_MOOGLE, "MOG's room -> the moogle cave", { { 121, 61 } }),
-  walkInto(79, 58, MAP_NARSHE, "the moogle cave -> Narshe's north ledge", { { 49, 11 }, { 37, 24 }, { 49, 21 } }),
-  walkInto(53, 9, MAP_ELDER, "Narshe's north ledge -> the elder's house", exceptOf(NARSHE_DOORS, 53, 9)),
-  walkInto(55, 35, MAP_NARSHE, "the elder's house -> Narshe", exceptOf(ELDER_DOORS, 55, 35)),
+  via({ { 111, 46 }, { 121, 48 } }, "MOG's room to its lower door", { { 106, 55 } }),
+  door(121, 61, MAP_MOOGLE_B, "MOG's room -> the back room (37)", { { 106, 55 } }),
+  via({ { 15, 18 }, { 18, 27 }, { 15, 34 } }, "the back room to its door", { { 14, 7 } }),
+  door(20, 35, MAP_MOOGLE, "the back room -> the moogle cave (38)", { { 14, 7 } }),
+  via({ { 54, 10 }, { 59, 17 }, { 56, 26 }, { 57, 31 }, { 62, 38 }, { 65, 47 }, { 71, 53 } },
+    "the moogle cave to its upper door", MOOGLE_DOORS),
+  door(79, 58, MAP_NARSHE, "the moogle cave -> Narshe's north ledge", exceptOf(MOOGLE_DOORS, 79, 58)),
+  via({ { 29, 8 }, { 41, 8 } }, "the north ledge to the elder's back door", NARSHE_DOORS),
+  door(53, 9, MAP_ELDER, "Narshe's north ledge -> the elder's house", exceptOf(NARSHE_DOORS, 53, 9)),
+  door(55, 35, MAP_NARSHE, "the elder's house -> Narshe", exceptOf(ELDER_DOORS, 55, 35)),
+  via({ { 49, 24 }, { 48, 29 }, { 41, 24 }, { 38, 15 }, { 38, 3 } }, "Narshe's street to the north exit", NARSHE_DOORS),
   walkInto(36, 1, MAP_CLIFF_LO, "Narshe -> the cliffs (33)", NARSHE_DOORS),
   -- map 33 to map 34 is a chain through the mines (route-wor-narshe.md 2.5):
   -- 33's (30-32,20) -> 36 (108,59); 36 (18,51) -> 33 (36,25); 33 (24,10) ->
   -- 36 (108,12); 36 (117,12) -> 33 (32,10); 33 (34-38,1) -> 34 (19,39)
-  walkInto(31, 20, MAP_MINES, "the cliffs -> the mines (36 (108,59))", { { 37, 25 }, { 24, 10 }, { 31, 10 } }),
-  walkInto(18, 51, MAP_CLIFF_LO, "the mines -> the cliffs (33 (36,25))", { { 107, 12 }, { 117, 12 }, { 108, 60 } }),
-  walkInto(24, 10, MAP_MINES, "the cliffs -> the mines (36 (108,12))", { { 37, 25 }, { 31, 10 } }),
-  walkInto(117, 12, MAP_CLIFF_LO, "the mines -> the cliffs (33 (32,10))", { { 107, 12 }, { 18, 51 }, { 108, 60 } }),
-  walkInto(35, 1, MAP_CLIFF_SAVE, "the cliffs -> the cliffs' save point (34)", { { 24, 10 }, { 31, 10 }, { 37, 25 } }),
+  via({ { 27, 39 }, { 29, 31 } }, "the cliffs to the mines' mouth", CLIFF_DOORS),
+  walkInto(31, 20, MAP_MINES, "the cliffs -> the mines (36 (108,59))", exceptOf(CLIFF_DOORS, 31, 20)),
+  -- in the mines: (113,45) -> (58,11), (57,21) -> (25,58), then (18,51)
+  via({ { 108, 47 } }, "the mines to their first inner door", MINES_DOORS),
+  warpVia(113, 45, "the mines (113,45) -> (58,11)", exceptOf(MINES_DOORS, 113, 45)),
+  via({ { 63, 11 }, { 63, 23 } }, "the mines to their second inner door", MINES_DOORS),
+  warpVia(57, 21, "the mines (57,21) -> (25,58)", exceptOf(MINES_DOORS, 57, 21)),
+  walkInto(18, 51, MAP_CLIFF_LO, "the mines -> the cliffs (33 (36,25))", exceptOf(MINES_DOORS, 18, 51)),
+  via({ { 26, 27 }, { 21, 20 } }, "the cliffs' ledge to the mines", CLIFF_DOORS),
+  walkInto(24, 10, MAP_MINES, "the cliffs -> the mines (36 (108,12))", exceptOf(CLIFF_DOORS, 24, 10)),
+  walkInto(117, 12, MAP_CLIFF_LO, "the mines -> the cliffs (33 (32,10))", exceptOf(MINES_DOORS, 117, 12)),
+  walkInto(35, 1, MAP_CLIFF_SAVE, "the cliffs -> the cliffs' save point (34)", CLIFF_DOORS),
   -- the save point (25,5), the walk kept off the Ice Dragon's tile (22,20)
   -- and the tiles beside it (route-wor-narshe.md 9)
-  walkTo(25, 6, "below the cliffs' save point",
-    { { 22, 20 }, { 21, 20 }, { 23, 20 }, { 22, 21 }, { 22, 19 }, { 18, 1 }, { 19, 1 }, { 20, 1 }, { 21, 1 } }),
+  via({ { 18, 28 }, { 16, 22 }, { 18, 12 } }, "the cliffs' west side toward the save point", DRAGON_AVOID),
+  walkTo(25, 6, "below the cliffs' save point", DRAGON_AVOID),
   H.fieldCare({ tag = "at the cliffs' save point", threshold = H.CARE_BEFORE_FIGHTS }),
   H.call(function()
     say("wor", "at the cliffs' save point")

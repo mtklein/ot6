@@ -1787,6 +1787,50 @@ M.contracts["wor-narshe-cliffs-v1"] = {
   },
 }
 
+-- wor-narshe-v1: the World of Ruin map, on foot beside the Falcon parked
+-- outside Narshe's gate (115,35), after the Ice Dragon (event battle 132,
+-- _cc36df: $0695 cleared), Tritoch (119, _cc3719: $029E, given), Umaro's
+-- carving (117, _ccd709: $027A, Terrato given) and UMARO's join (_ccd793:
+-- $02FD), the party regrouped to UMARO, MOG, TERRA and CELES
+-- (docs/design/route-wor-narshe.md).  No timer.
+M.contracts["wor-narshe-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 115, y = 35 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x02FA, 1, "MOG available (_cc3a4c)" },
+    { 0x0695, 0, "the Ice Dragon beaten (_cc36df)" },
+    { 0x029E, 1, "Tritoch freed (_cc3719)" },
+    { 0x027A, 1, "Terrato taken, Umaro beaten (_ccd709)" },
+    { 0x02FD, 1, "UMARO available (_ccd793)" },
+  },
+  party = {
+    size = 4,                     -- UMARO, MOG, TERRA and CELES
+    members = {
+      { 0x0D, "UMARO" },
+      { 0x0A, "MOG" },
+      { 0x00, "TERRA" },
+      { 0x06, "CELES" },
+    },
+  },
+  ram = {
+    { 0x1F62, 0xFF, 115, "the Falcon parked at x 115 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 35, "the Falcon parked at y 35 (save-block cell $1F63)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+    { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
+    { 0x1190, 0xFF, 0x00, "timer 1 counter high" },
+    { 0x1195, 0xFF, 0x00, "timer 2 counter low" },
+    { 0x1196, 0xFF, 0x00, "timer 2 counter high" },
+    { 0x119B, 0xFF, 0x00, "timer 3 counter low" },
+    { 0x119C, 0xFF, 0x00, "timer 3 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
