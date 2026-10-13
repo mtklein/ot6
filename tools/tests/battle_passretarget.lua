@@ -134,9 +134,12 @@ end
 --     misses only when he cannot act first; met in the first crowd in 8 of
 --     8 variations (round 3's sweep, build/attempts/wt/pass-retarget/
 --     round3/sweep/, as round 2's);
---   jackpot, 6: a face of 3+ is 4 of 6; met in 8 of 8 crowds tried in round
---     3 and 8 of 9 in round 2, so a miss within six is about (1/9)^6, under
---     0.001%;
+--   jackpot, 10: a face of 3+ is 4 of 6; met in 8 of 8 crowds tried in
+--     round 3 and 8 of 9 in round 2.  v029's chain (the tomb's PowerDemon and
+--     Exoray Zombie SETZER while he banks the three points, and the party
+--     cures him) met it in 5 of 9 crowds over PASS_SKIP 0-4 (crowds 1, 2, 1,
+--     4, 1; build/attempts/wt/v029-shield-grants/passretarget2/), so at that
+--     rate a miss within ten is about (4/9)^10, 0.03%;
 --   resplit, 10: met in 8 of 17 crowds tried in round 3 (8 of 14 in round
 --     2, 6 of 12 by key with the blind aim); at round 3's rate a miss within
 --     ten is about (9/17)^10 = 0.2%.
@@ -151,7 +154,7 @@ local function cands(fn, more)
 end
 local PLANS = {
   { kind = "hire", crowds = 4, cands = cands(function() return { aim({ row = HIRE, boost = 1 }, "weak") } end) },
-  { kind = "jackpot", crowds = 6, cands = cands(function() return { { row = JACKPOT, boost = 3 } } end) },
+  { kind = "jackpot", crowds = 10, cands = cands(function() return { { row = JACKPOT, boost = 3 } } end) },
   { kind = "resplit", crowds = 10, cands = cands(function() return { aim({ row = HIRE, boost = 0 }, "strong"),
     { row = COIN, boost = 2 } } end, { others = "fight", fn = function() return { { row = COIN, boost = 1 } } end }) },
 }
@@ -196,6 +199,33 @@ local function crowdHere()
   return alive >= 2 and weak >= 1, alive
 end
 
+-- the cure in reach for SETZER's control-taking status (M.controlTaken's
+-- row): an item the battle bag holds, or for a hit cure an ally in control
+-- with a Fight row (what H.setzerBattle's care plays); nil when none is
+local function cureInReach(s)
+  local c = H.controlTaken(s)
+  if c == nil then return nil end
+  if c.cure == "hit" then
+    for a = 0, 3 do
+      if a ~= s and H.readByte(0x3ED8 + a * 2) ~= 0xFF and H.readWord(0x3BF4 + a * 2) > 0
+          and H.controlTaken(a) == nil then
+        for r = 0, 3 do
+          if H.readByte(0x202E + a * 12 + r * 3) == 0x00 then return c.name .. ": an ally's Fight" end
+        end
+      end
+    end
+    return nil
+  end
+  for _, item in ipairs(c.items or {}) do
+    for i = 0, 251 do
+      if H.readByte(0x2686 + i * 5) == item and H.readByte(0x2686 + i * 5 + 3) > 0 then
+        return string.format("%s: $%02X in the bag", c.name, item)
+      end
+    end
+  end
+  return nil
+end
+
 -- one battle: SETZER's pending kinds from its opening snapshot (a crowd past
 -- PASS_SKIP), then the fight driver to its end
 local function play()
@@ -222,7 +252,8 @@ local function play()
       if not S.req.done then return "frame" end
       H.checkReq(S.req, "restoring the crowd battle's opening snapshot")
       PW.open = {}
-      S.phase = "stand"
+      S.wipedN = 0
+      S.phase = S.ki <= #S.kinds and "stand" or "fight"
     end
     if S.phase == "stand" then
       local p = S.kinds[S.ki]
@@ -236,8 +267,26 @@ local function play()
       local r = S.step:tick()
       judgeNew()
       -- SETZER out before his throw (Wounded, Petrified or a Zombie;
-      -- Berserk, Muddled or asleep; Stopped): the party would Defend on
-      -- waiting for a turn that cannot come, so this candidate ends here
+      -- Berserk, Muddled or asleep; Stopped).  While the bag (or an ally's
+      -- Fight) holds the cure, the party gives him his turn back, as a
+      -- player would: H.setzerBattle's care (M.newSpinnerCare) cures him and
+      -- the plan goes on.  The tomb's PowerDemon (Soul Out) and Exoray
+      -- (DoomPollen) Zombie him while he banks Jackpot's three points; ending
+      -- the candidate there met no Jackpot in six crowds on v029's chain
+      -- (build/attempts/wt/v029-shield-grants/passretarget/).  With no cure
+      -- in reach the party would Defend on waiting for a turn that cannot
+      -- come, so this candidate ends here
+      -- a candidate the party does not survive (a Zombie SETZER's own hits,
+      -- the formation's): the lib's wipe predicate held 90 frames, under the
+      -- canary's 300 (battle_jackpot's rule), ends it with no throw, and the
+      -- opening snapshot is restored for whatever plays next
+      S.wipedN = H.partyWipedInBattle() and (S.wipedN or 0) + 1 or 0
+      if r ~= "done" and S.wipedN >= 90 then
+        H.log(string.format("[%s] the party wiped before SETZER threw (f%d): this candidate ends", TAG, H.frame))
+        H.setPad({})
+        S.wiped = true
+        r = "done"
+      end
       if r ~= "done" then
         local out = nil
         for e = 0, 6, 2 do
@@ -245,6 +294,14 @@ local function play()
             local s1, s2, s3 = H.readByte(0x3EE4 + e), H.readByte(0x3EE5 + e), H.readByte(0x3EF8 + e)
             if (s1 & 0xC2) ~= 0 or (s2 & 0xB0) ~= 0 or (s3 & 0x10) ~= 0 then
               out = string.format("status %02X %02X %02X", s1, s2, s3)
+              local why = cureInReach(e // 2)
+              if why then
+                if S.cureSaid ~= out then
+                  S.cureSaid = out
+                  H.log(string.format("[%s] SETZER is out (%s): %s, so the party gives him his turn back", TAG, out, why))
+                end
+                out = nil
+              end
             end
           end
         end
@@ -277,7 +334,8 @@ local function play()
           p.crowds, #p.cands, count(throws[p.kind])))
         S.ki, S.try = S.ki + 1, 1
       end
-      if S.ki <= #S.kinds then
+      if S.ki <= #S.kinds or S.wiped then
+        S.wiped = false
         S.req, S.phase = H.requestLoadState(S.blob), "restore"
         return "frame"
       end
