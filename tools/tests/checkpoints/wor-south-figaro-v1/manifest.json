@@ -17,11 +17,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "738608157f5ba924883a3b49bfdbe9c9c6a5ec0447e1ae408e340153e8f1503e",
-    "generator_sig": "258a19b40e7ee3786995233c7aa35d2681f39091e6da68ba47447706d96fd021 gen_wor_south_figaro build/checkpoints/wor-nikeah-v1/manifest.json build/checkpoints/wor-nikeah-v1/wor-nikeah.sram",
+    "generator_sig": "0f737ab50de2baed11bdf29c3471f325292e1421a238fe74f6d1a45edfafa804 gen_wor_south_figaro build/checkpoints/wor-nikeah-v1/manifest.json build/checkpoints/wor-nikeah-v1/wor-nikeah.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/wor-nikeah-v1/manifest.json",
-        "sha256": "92954f0c89f33b315a989d8c8ad26cc983661020eb79683751ee06f9a438f18d"
+        "sha256": "3055717c9d23365c5789afe74a12cb30f513a7ca8abf3a38a8e424ef47b3481f"
       }
     ]
   }
