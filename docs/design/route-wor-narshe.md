@@ -507,6 +507,7 @@ bank holds three).
 | Trance, 10 shields, the qualified ROM (`varC/`, a35a908a's captures) | 8 of 8 (7 keys); 19 deaths; 5,335-45,207 ticks; Fenix 0-13; TERRA Tranced in 4 | 8 of 8 (8 keys); no deaths | 8 of 8 (8 keys); no deaths |
 | Trance banked past heals, 10 shields (`drT/`, the same draws) | 8 of 8; 12 deaths; 5,335-39,327 ticks; Fenix 0-9; Tranced in 7 | -- | -- |
 | Trance banked past heals, 6 shields (`dr6T/`, the same draws) | 8 of 8; 1 death; 4,879-10,054 ticks; Potions 0-8, Fenix 0-1 | -- | -- |
+| the route as qualified (`varD/`, f0ae114c's captures) | 10 of 10 (9 keys); 1 death; broken in 10; 4,879-10,054 ticks; Potions 0-8, Fenix 0-1 | 10 of 10 (9 keys); no deaths; broken in 10; 6,156-8,433 | 10 of 10 (9 keys); no deaths; broken in 10; 4,140-4,934 |
 
 The Ice Dragon was the arc's attrition fight and a loss in one draw of
 twelve (`varA/tritoch_s24.log`, `dragonA/dragon10_s24.log`: `GAME OVER
@@ -530,9 +531,22 @@ not contests, at L40-43. The Ice Dragon is the arc's one contest.
 
 ### 11.5 The variation sets
 
-Each leg twelve times from its tracked boot: eight seed shifts (0-28 by 4)
-and K = 2 and 5 random battles used up before the body (outside Jidoor;
-below the cliffs' save point), each at shifts 0 and 12; retries off.
+The route as qualified (f0ae114c), each leg from the qualification's own
+captures (`varD/`): `gen_wor_tritoch` at seed shifts 0-28 by 4 and with K =
+2 and 5 random battles used up below the cliffs' save point (shift 0), ten
+runs; `gen_wor_narshe` at shifts 0, 8, 16 and 24 and K = 5 outside Jidoor,
+five runs; retries off.
+
+- **`gen_wor_tritoch`**: 10 of 10 pass; `TOTAL battles 119 (111 distinct
+  keys), deaths 1` (`varD/analysis_leg_tritoch.txt`, the one death the Ice
+  Dragon's, 11.4); TERRA Tranced one to three times a run;
+  `wor-narshe-v1` holds 72-88 Potions.
+- **`gen_wor_narshe`**: 5 of 5 pass; `TOTAL battles 74 (67 distinct keys),
+  deaths 0` (`varD/analysis_leg_narshe.txt`).
+
+The earlier sets, each leg twelve times from its tracked boot (eight seed
+shifts and K = 2 and 5 at shifts 0 and 12), ran before the shield changes
+and the Ice Dragon's six shields:
 
 - **`gen_wor_narshe`** (`varA/`): 12 of 12 pass (the first K runs walked
   to an unwalkable tile, `varA/failed1/`, and were rerun); `TOTAL battles
@@ -548,8 +562,10 @@ below the cliffs' save point), each at shifts 0 and 12; retries off.
 
 ### 11.6 Retry sites
 
-None in `varB/` or the leg-1 runs (`attempts=1/1` throughout). Before
-Trance the Ice Dragon was the game-over risk (one wipe in twelve).
+None: both legs `attempts=1/3` in the qualifications of a35a908a and
+f0ae114c (`qual-a35a908a/`, `qual/`), `attempts=1/1` throughout `varD/`.
+Before Trance and six shields the Ice Dragon was the game-over risk (one
+wipe in twelve, `varA/`).
 
 ### 11.7 What was left
 
