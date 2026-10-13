@@ -39,7 +39,10 @@ local function arm()
   refs.spell = emu.addMemoryCallback(function(_, v)
     if v == SUPLEX then
       spellWrites = spellWrites + 1
-      suplexAt = suplexAt or H.frame
+      -- only a Suplex SABIN chose counts toward the wait: a Muddled
+      -- SABIN's pick is the engine's and lands where it likes (2026-10-13,
+      -- qual2: the train Muddled him first, his Suplex left it at 2600 HP)
+      if (H.readByte(0x3EE5 + sabinE * 2) & 0x20) == 0 then suplexAt = suplexAt or H.frame end
     end
   end, emu.callbackType.write, 0x7E3410, 0x7E3410)
   refs.kill = emu.addMemoryCallback(function()

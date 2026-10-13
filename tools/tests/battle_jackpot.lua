@@ -327,12 +327,19 @@ local function candidateBattle()
       for _ = 1, 3 do plan[#plan + 1] = { row = "defend" } end
       plan[#plan + 1] = { row = JACKPOT, boost = 3 }
       step = H.setzerBattle(plan, { untilPlanDone = true, othersFight = S.cur.othersFight })
-      wipedN, S.lost, S.execF, S.alive = 0, nil, nil, nil
+      wipedN, S.lost, S.execF, S.alive, S.wipeSeen, S.partyHP = 0, nil, nil, nil, nil, nil
     end
     -- the live-monster mask ($3A75) while the battle is up: 0 at the end
     -- means Dullahan fell (to the others' Fights, or the first Jackpot)
-    if H.battleActive() then S.alive = H.readByte(0x3A75) end
+    if H.battleActive() then
+      S.alive = H.readByte(0x3A75)
+      local hp = {}
+      for e = 0, 3 do hp[#hp + 1] = H.readWord(0x3BF4 + e * 2) end
+      S.partyHP = table.concat(hp, "/")
+    end
     wipedN = H.partyWipedInBattle() and wipedN + 1 or 0
+    -- a wipe the game ends faster than the 90-frame predicate still lost it
+    if wipedN > 0 then S.wipeSeen = H.frame end
     if wipedN >= 90 then
       S.lost = string.format("the party wiped (the lib's wipe predicate, 90 frames, at f%d)", H.frame)
       H.setPad({})
@@ -392,6 +399,12 @@ local search = H.seqStep({
         H.log(string.format("[jackpot] %s: no throw -- %s before the Jackpot resolved (%d lost so far)", label,
           S.lost, S.lostN))
         return
+      end
+      H.log(string.format("[jackpot] %s: %d throw(s); at the end live monsters $%02X, party HP %s%s", label, #recs,
+        S.alive or 0, tostring(S.partyHP), S.wipeSeen and string.format(", the party wiped (seen at f%d)", S.wipeSeen) or ""))
+      if S.lost == nil and S.wipeSeen and #recs < 2 then
+        S.lost = string.format("the party wiped (seen at f%d; the game ended the battle inside the 90-frame "
+          .. "predicate)", S.wipeSeen)
       end
       if #recs == 1 and S.alive == 0 then
         H.log(string.format("[jackpot] %s: Dullahan fell before the second Jackpot", label))
