@@ -458,6 +458,13 @@ The route plays the arc in two legs. Evidence is under
   rule cannot make from the bag (`dev/t4`: `a member's new relics are all
   in the bag (no swap deadlock)`). The library has no unequip, so the swap
   is left for later (section 11.7).
+- **The elemental shields taught tier spells.** CYAN (Ice Shld) and MOG
+  (Thunder Shld) learned Ice 2 and Bolt 2 over the arc, vanilla's ItemProp
+  learn data, against "stronger spells come from boosting" (spells_all on
+  the first `wor-narshe-v1`, `spells_all/`). The three elemental shields now
+  teach nothing, and check_spell_grants holds items to "no tier". The
+  variation sets below ran before that change; neither spell is one the
+  bosses take (they absorb ice; Tritoch nulls bolt).
 - **A lift-off and a landing on one tile** stalled the pilot one tile off
   it (`varA/tritoch_k2_s12.log`: `timeout after 6000 frames`); the arc's
   save is three tiles south of where the Falcon waited.
