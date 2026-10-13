@@ -666,17 +666,21 @@ end
 -- arithmetic subtracts first and clamps a borrow to 0 one instruction later
 -- (ApplyDmg, battle_main.asm @1339 then @1388), and an NMI can fall between,
 -- so one seat reads an underflow ($FEDB, seat 0, f47186) for a frame while
--- the others hold live HP.  That is not "not an HP table": a seat above 9999
--- other than the out-of-battle fills $FFFF and $FF00, beside a live seat,
--- reads as a seat at 0.
+-- the others hold live HP.  So a seat above 9999 reads as "not an HP table"
+-- unless the frame before read a battle and a live seat stands beside it.
+-- (Tolerating any odd seat beside a live one read field garbage, species
+-- $5554, as a battle: qual3, six suites.)
+local blsSeen = nil         -- the last frame this read a battle
 function M.battleLoadStarted()
   local anyLive, odd = false, false
   for i = 0, 3 do
     local hp = M.readWord(M.BATTLE_HP + i * 2)
-    if hp == 0xFFFF or hp == 0xFF00 then return false end   -- not an HP table
     if hp >= 10000 then odd = true elseif hp > 0 then anyLive = true end
   end
-  if odd and not anyLive then return false end
+  if odd then
+    return anyLive and blsSeen ~= nil and M.frame - blsSeen <= 1
+  end
+  if anyLive then blsSeen = M.frame end
   if anyLive then return true end
   return M.partyWipedInBattle ~= nil and M.partyWipedInBattle() or false
 end
