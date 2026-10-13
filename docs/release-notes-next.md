@@ -14,3 +14,10 @@ Terra's Morph lasts the shortest time.
 **Revert no longer spends Boost Points.** A boosted Revert used to spend
 the points and gain nothing. Now the points stay banked, and Terra gains one
 as on any unboosted turn.
+
+**Weak points around Narshe in the World of Ruin.** The monsters in the
+town, the mines, the cliffs, the moogle cave and Umaro's cave, and the Ice
+Dragon, Tritoch and Umaro, now have their own weak points instead of the
+default ones. Test Riders break only to piercing weapons. The Ice Dragon (10
+shields) breaks to piercing and blunt weapons, Tritoch (10) and Umaro (6) to
+blades and piercing weapons, and all three to fire.
