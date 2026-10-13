@@ -49,12 +49,13 @@ marked.
    chase and the Mog-or-Gold-Hairpin choice are World of Balance events:
    `_ccd3ce` (:110050) returns at once once `$00A4` (the World of Ruin) is
    set (:110051), and the choice is on a 240-frame timer (`_ccd52d`,
-   :110283). The route never ran it (`$0239 = 0`, `$023F = 0`), so `$029F`
-   (set when MOG joins there, :110594) is clear, and Mog's World of Ruin
-   meeting (`_cc396c`, :85056; map 44 (121,46), `npc_prop.asm:1972`) takes
-   its first-meeting branch `_cc3a4c` (:85212): his naming menu (`name_menu
-   MOG`, :85284), then the join. The WoR "pickpocket" at Narshe's gate
-   (`_cc36f2`, :84739, triggers (37-39,50)) is one dialog.
+   :110283). Since #428 the route runs it in the World of Balance, for MOG
+   (`gen_water_rondo`, [route-water-rondo.md](route-water-rondo.md)), so
+   `$029F` (set when MOG joins there, :110594) is set, and Mog's World of
+   Ruin meeting (`_cc396c`, :85056; map 44 (121,46), `npc_prop.asm:1972`)
+   takes its second-meeting branch (:85060): "You're alive!", no naming
+   menu, then the join (`char_party MOG, 1`, :85195). The WoR "pickpocket"
+   at Narshe's gate (`_cc36f2`, :84739, triggers (37-39,50)) is one dialog.
 4. **Tritoch is not optional on this route.** The opening to Umaro's cave
    (`_cc37e7`, :84872, map 35 (9,12)) returns unless Tritoch is freed
    (`if_switch $029E=0, EventReturn`, :84873), and the only way to that
@@ -124,10 +125,11 @@ From the tracked SRAM (`wor-cyan-v1_dump.txt`, `wor-cyan-v1_roster.txt`):
    press; the emulator settles which the walk takes.
 4. **Mog.** Map 38: the Pod Bracelet (65,28) and Elixir (52,33); the door
    (49,21) to map 44; the Ribbon (98,53), the Moogle Charm (121,45), and
-   MOG at (121,46): naming, join into the empty seat (`char_party MOG, 1`
-   when `$01A3` is clear, :85310-85312). The Ribbon goes on at once
-   (guidelines.md); the Moogle Charm stays in the bag (it stops random
-   battles, and the route fights them).
+   MOG at (121,46): "You're alive!" (the WoB join set `$029F`), join into
+   the empty seat (`char_party MOG, 1` when `$01A3` is clear,
+   :85193-85195). The Ribbon goes on at once (guidelines.md); the Moogle
+   Charm stays in the bag (it stops random battles, and the route fights
+   them).
 5. **Back out and up.** The same way back to the town's main street, the
    north exit (35-39,1) to map 33 (61 steps from the gate, `paths.txt`). Map 33 to map 34 is a chain through the mines
    (`components.txt`, `components_mines.txt`): 33's lower pocket, its long
@@ -380,8 +382,8 @@ them. His showcase is the regroup and the Narshe plain beside the Falcon
   through map 36 (section 2.5); the moogle cave is reached through map 36
   too, or through the elder's house. The static model reaches these in
   parts; the emulator settles it.
-- **Naming menus.** MOG's (:85284) and UMARO's (:110811) open the naming
-  menu; `gen_moogle.lua` commits LOCKE's the same way.
+- **Naming menus.** UMARO's (:110811) opens the naming menu (MOG was
+  named at his World of Balance join); `gen_moogle.lua` commits LOCKE's the same way.
 - **Choices.** "Hop into it?" (:84878), "Remove the Magicite?" (:110625).
 - **The Ice Dragon on contact.** It is a touch-to-fight NPC beside the save
   point: a walk that brushes (22,20) starts battle 132. The static shortest
@@ -569,13 +571,9 @@ wipe in twelve, `varA/`).
 
 ### 11.7 What was left
 
-- **Mog's Water Rondo (#428).** The Serpent Trench can be re-entered in
-  the World of Balance (the jump gates only on $0041) and its battles teach
-  Water Rondo (`UNDERWATER`), but MOG is in the World of Balance party only
-  through the Lone Wolf choice, in the airship era, and the dive ends in
-  Nikeah, cut off on foot from where the airship has to be parked to reach
-  Crescent Mountain (`428/findings.txt`). Not built; back to the
-  coordinator.
+- **Mog's Water Rondo (#428).** Built in v0.29's follow-up as a World of
+  Balance detour (`gen_water_rondo`, [route-water-rondo.md](route-water-rondo.md)):
+  MOG arrives in the World of Ruin knowing Water Rondo.
 - **Dance.** The driver has no Dance verb; MOG Fights.
 - **The relic swap** (11.2): the relic rule needs an unequip to make a swap
   between two members.

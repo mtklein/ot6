@@ -464,9 +464,20 @@ STATES = [
     S("narshe_mission", gen="gen_narshe_mission", prev="n128_won",
       checkpoint="terra-returned-v1", cutter="gen_terra_returned_checkpoint",
       timeout=3600),
-    # ---- boundary G -> boundary H ------------------------------------------
-    # Step G->H, whole in one generator (gen_narshe_mission's shape): cold-
-    # boot the narshe-mission-v1 checkpoint, seat TERRA / bench SETZER in the
+    # ---- boundary G -> G' (#428) -------------------------------------------
+    # The World of Balance detour that teaches MOG Water Rondo, the first
+    # time the airship is the party's own (docs/design/route-water-rondo.md):
+    # cold-boot narshe-mission-v1, the Lone Wolf chase for MOG, MOG seated
+    # in the swap room, Nikeah's chocobo to Barren Falls, the leap to the
+    # Veldt, the Serpent Trench dive from Crescent Mountain, and the world
+    # save on the Blackjack's tile outside Nikeah -- `water-rondo-v1`.
+    # timeout=3600: ~57k frames of play, a dive retry ladder on top.
+    # Re-cut by checkpoint_drift.py --recut.
+    S("water_rondo", gen="gen_water_rondo", prev="narshe_mission",
+      checkpoint="narshe-mission-v1", timeout=3600),
+    # ---- boundary G' -> boundary H -----------------------------------------
+    # Step G'->H, whole in one generator (gen_narshe_mission's shape): cold-
+    # boot the water-rondo-v1 checkpoint, seat TERRA / bench MOG in the
     # Blackjack swap room (chase-talk the wandering NPC, YES on $0528, the
     # NO_RESET party menu), fly to the base pass, walk the Imperial Base
     # ($0172 -- TERRA is the hard gate, _cb25d6), the cave 382 -> 383 ->
@@ -476,8 +487,8 @@ STATES = [
     # ($0173), and the map-386 vanilla save point (74,53) -- boundary H,
     # `gate-cave-save-v1`, the area's only interior save.  Re-cut by `ninja
     # chain` and checkpoint_drift.py --recut.
-    S("gate_cave_save", gen="gen_gate_cave_save", prev="narshe_mission",
-      checkpoint="narshe-mission-v1"),
+    S("gate_cave_save", gen="gen_gate_cave_save", prev="water_rondo",
+      checkpoint="water-rondo-v1"),
     # ---- boundary H -> boundary I ------------------------------------------
     # Step H->I, whole in one generator: cold-boot the gate-cave-save-v1
     # checkpoint, back down to BASEMENT 3, the WEST traverse (two levers --

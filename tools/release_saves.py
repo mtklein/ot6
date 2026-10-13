@@ -49,6 +49,7 @@ TITLES = {
     "minecart-platform-v1": "Magitek Research Facility, minecart platform",
     "terra-returned-v1": "After Terra's return",
     "narshe-mission-v1": "Narshe, after the meeting",
+    "water-rondo-v1": "Nikeah, after Mog learns Water Rondo",
     "gate-cave-save-v1": "Cave to the Sealed Gate, save point",
     "vector-crash-v1": "After the airship crash",
     "banquet-done-v1": "Vector, after the banquet",

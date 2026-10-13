@@ -268,27 +268,16 @@ local function landed(m, n)
 end
 
 H.run({ maxFrames = 480000 }, {
-  H.waitFrames(350),
-  H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
-  H.waitFrames(120),
-  H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(40) }),
-  H.waitFrames(300),
-  H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
-  H.waitUntil(function() return H.worldMode() end, 3000,
-    "cold Continue to the narshe-mission world entry point", 10),
-  H.waitUntil(function() return bright() >= 15 end, 900,
-    "cold Continue fade-in", 10),
-  H.waitFrames(60),
+  -- water-rondo-v1 (#428, gen_water_rondo): on foot on the Blackjack's
+  -- tile outside Nikeah, MOG in the party and knowing Water Rondo
+  H.bootCheckpoint("water-rondo-v1"),
   H.call(function()
-    H.assertEntryContract("narshe-mission-v1")
-    H.assertEq(H.worldX(), 84, "boot world x (the Narshe exit spawn)")
-    H.assertEq(H.worldY(), 34, "boot world y")
-    H.assertEq(H.readByte(0x1F62), 84, "the Blackjack is parked at (84,.) -- $1F62")
-    H.assertEq(H.readByte(0x1F63), 36, "the Blackjack is parked at (.,36) -- $1F63")
+    H.assertEq(H.readByte(0x1F62), 116, "the Blackjack is parked at (116,.) -- $1F62")
+    H.assertEq(H.readByte(0x1F63), 61, "the Blackjack is parked at (.,61) -- $1F63")
   end),
 
   -- ---- 1. board + lift off, X to the deck, down to the swap room --------
-  worldGrind(84, 36, "walk onto the parked ship tile (84,36)"),
+  worldGrind(116, 61, "onto the parked ship tile (116,61)"),
   H.pressButtons({ "a" }, 8),
   H.waitUntil(function()
     return H.readByte(0xe0) == 0 and H.readByte(0xe2) == 0
@@ -323,6 +312,7 @@ H.run({ maxFrames = 480000 }, {
     H.assertEq(partyOf(0x04), 1, "EDGAR in party 1")
     H.assertEq(partyOf(0x05), 1, "SABIN in party 1")
     H.assertEq(partyOf(0x09), 0, "SETZER benched")
+    H.assertEq(partyOf(0x0A), 0, "MOG benched (he dove for Water Rondo; TERRA is the base's gate)")
     H.screenshot("step_gh_swapped")
   end),
 
