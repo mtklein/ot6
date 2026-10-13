@@ -47,6 +47,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import signal
 import socket
 import subprocess
@@ -87,6 +88,8 @@ except Exception:
     _status = None
 FACTS_SEC = 30      # how often an emitter re-reads its machine's facts
 INFRA_SEC = 600     # how often the viewer checks GitHub auth and releases
+ACTIVE_SEC = 300    # how often it re-reads active issues and the weekly quota
+ACTIVE_LABEL = "active"   # an open issue with this label has an agent on it
 HOST = socket.gethostname().split(".")[0].lower()   # this machine's label
 
 # Runs happen in every git worktree of this repo (agents and the release
@@ -173,14 +176,17 @@ def log_tree(log):
 # The default landing: a worker grid of EVERY active run worker,
 # one tile per live workspace, growing/shrinking as workers start and finish.
 # Data comes from grid.json (Board.write); each tile's screenshot is a cached
-# PNG under build/live/grid/.  Above the tiles, one line per machine: up or
+# PNG under build/live/grid/.  At the top, the week's quota and the active
+# issues by milestone (Board._active_loop).  Above the tiles, one line per machine: up or
 # unreachable, load, active and frozen counts, and which branch/worktree each
 # of its workers belongs to.  A tile click opens the single-worker detail
 # (live1.html) for that worker.
 GRID_PAGE = """<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OT6 workers</title>
 <body style="margin:0;background:#111;color:#cdc;font:13px ui-monospace,monospace">
-<div style="display:flex;justify-content:flex-end;padding:10px 14px">
-<a href="progress.html" style="color:#8ac">route map &rarr;</a></div>
+<div style="display:flex;justify-content:space-between;gap:10px;padding:10px 14px">
+<span id=quota style="color:#8a8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
+<a href="progress.html" style="color:#8ac;white-space:nowrap;flex-shrink:0">route map &rarr;</a></div>
+<div id=active style="padding:0 14px 8px;line-height:1.5"></div>
 <div id=machines style="padding:0 14px 10px;line-height:1.6"></div>
 <div id=grid style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;padding:0 14px 18px"></div>
 <div id=starting style="color:#575;padding:0 14px 14px;font-size:11px;line-height:1.7"></div>
@@ -216,6 +222,39 @@ async function tick(){ try{
     + '</div>'; });
   $('starting').innerHTML = html;
   const hm=t=>new Date(t*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  // Active work, from GitHub (open issues labelled "active", re-read every
+  // few minutes): each milestone, and under it its issues, all linked.
+  const ago=t=>{ const s=Date.now()/1000-t; return s<90?Math.round(s)+'s'
+    : s<5400?Math.round(s/60)+'m' : s<172800?Math.round(s/3600)+'h'
+    : Math.round(s/86400)+'d'; };
+  const lk=(u,t,c)=>u ? '<a href="'+esc(u)+'" style="color:'+c
+    + ';text-decoration:none">'+t+'</a>' : t;
+  const one='white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+  const A = j.active||{};
+  $('active').innerHTML = (A.milestones||[]).map(m=>
+      '<div style="'+one+'">'+lk(m.url,'<b>'+esc(m.title)+'</b>','#cdc')+'</div>'
+      + m.issues.map(i=>'<div style="'+one+';padding-left:14px">'
+        + lk(i.url,'<span style="color:#8ac">#'+i.n+'</span> '+esc(i.title),'#9a9')
+        + '</div>').join('')).join('')
+    + (A.err ? '<div style="color:#d9a24b;'+one+'">issues: '+esc(A.err)
+      + (A.ts?' (as of '+ago(A.ts)+' ago)':'')+'</div>' : '');
+  // Weekly usage, all models, as Claude Code's /usage reports it.
+  const Q = j.quota||{};
+  if(Q.percent!=null){
+    const p=Math.max(0,Math.min(100,Q.percent)), n=8, f=Math.round(p*n/100);
+    const col = p>=90?'#e06060':p>=75?'#e0a93e':'#8c8';
+    // to the minute: the endpoint says 22:59:59.5 as often as 23:00:00
+    const r = new Date(Math.round(Date.parse(Q.resets_at)/60000)*60000);
+    $('quota').innerHTML = 'week <span style="color:'+col+'">'
+      + '\u2588'.repeat(f)+'</span><span style="color:#354">'
+      + '\u2588'.repeat(n-f)+'</span> <span style="color:'+col+'">'+p+'%</span>'
+      + ' to '+r.toLocaleDateString([], {weekday:'short'})+' '
+      + r.toLocaleTimeString([], r.getMinutes() ? {hour:'numeric',
+        minute:'2-digit'} : {hour:'numeric'}).replace(' ','').toLowerCase()
+      + (Date.now()/1000-Q.ts>900 || Q.err ? ' <span style="color:#d9a24b">('
+        + ago(Q.ts)+' old)</span>' : '');
+  } else $('quota').innerHTML = Q.err ? '<span style="color:#d9a24b">quota: '
+    + esc(Q.err).slice(0,60)+'</span>' : '';
   // One line per machine, in columns: name, frames/s right-justified to
   // four digits, then a filled dot per emulator running (red if frozen)
   // and a hollow dot per one more it has room for, trailing off the right.
@@ -1023,6 +1062,24 @@ class Board:
         self.infra = []     # infra_checks() problems, as banner lines
         if _status is not None:
             threading.Thread(target=self._infra_loop, daemon=True).start()
+        # active issues by milestone, and the weekly quota: each keeps its
+        # last good reading (with its time) when a fetch fails
+        self.active = {"milestones": [], "ts": None, "err": None}
+        self.quota = {"ts": None, "err": None}
+        threading.Thread(target=self._active_loop, daemon=True).start()
+
+    def _active_loop(self):
+        while True:
+            for attr, fn in (("active", active_issues), ("quota", weekly_quota)):
+                cur = getattr(self, attr)
+                try:
+                    got = fn()
+                    new = ({"milestones": got} if attr == "active" else got)
+                    setattr(self, attr, dict(new, ts=int(time.time()), err=None))
+                except Exception as e:
+                    setattr(self, attr, dict(
+                        cur, err=f"{type(e).__name__}: {e}"[:200]))
+            time.sleep(ACTIVE_SEC)
 
     def _infra_loop(self):
         while True:
@@ -1173,7 +1230,8 @@ class Board:
         for mc, pm in zip(machines, place["machines"]):
             mc.update({k: pm[k] for k in ("room", "peak", "blocked") if k in pm})
         out = {"workers": workers, "count": len(workers), "ts": int(now),
-               "machines": machines, "local": HOST}
+               "machines": machines, "local": HOST,
+               "active": self.active, "quota": self.quota}
         out["health"] = self.health(m)
         self._dump("grid.json", out)
         self._dump("health.json", {"problems": out["health"], "ts": int(now)})
@@ -1655,6 +1713,74 @@ def follow(log_path, webroot, test, stop, hop=False, live_ref=None):
         time.sleep(0.25)
 
 
+def active_issues():
+    """Open issues labelled ACTIVE_LABEL, grouped by milestone: the list of
+    {"title", "url", "issues": [{"n", "title", "url"}]} the grid page shows
+    at its top.  Read with `gh api` (its own login) from the viewer's slow
+    loop, never per page load."""
+    r = subprocess.run(
+        ["gh", "api", "repos/{owner}/{repo}/issues?state=open&per_page=100"
+         f"&labels={ACTIVE_LABEL}"],
+        cwd=ROOT, capture_output=True, text=True, timeout=60)
+    if r.returncode:
+        raise RuntimeError((r.stderr or r.stdout).strip()[:200])
+    groups = {}
+    for i in json.loads(r.stdout):
+        if "pull_request" in i:
+            continue
+        m = i.get("milestone") or {}
+        g = groups.setdefault(m.get("title") or "", {
+            "title": m.get("title") or "no milestone",
+            "url": m.get("html_url"), "issues": []})
+        g["issues"].append({"n": i["number"], "title": i["title"],
+                            "url": i["html_url"]})
+    # v0.29 before v0.30 before "no milestone"
+    key = lambda t: (t == "", [int(x) if x.isdigit() else x
+                               for x in re.split(r"(\d+)", t)])
+    out = [groups[t] for t in sorted(groups, key=key)]
+    for g in out:
+        g["issues"].sort(key=lambda i: i["n"])
+    return out
+
+
+def weekly_quota():
+    """The account's weekly all-models usage, as Claude Code's own /usage
+    reports it: `claude -p /usage` is a local command (no model turn, no
+    tokens) whose stream-json carries the plan-usage endpoint's structured
+    limits.  Returns {"percent", "resets_at", "session_percent",
+    "session_resets_at"}."""
+    exe = shutil.which("claude") or "/opt/homebrew/bin/claude"
+    r = subprocess.run([exe, "-p", "/usage", "--output-format", "stream-json",
+                        "--verbose"], cwd=ROOT, capture_output=True, text=True,
+                       timeout=90, stdin=subprocess.DEVNULL)
+    for line in r.stdout.splitlines():
+        try:
+            j = json.loads(line)
+        except ValueError:
+            continue
+        lim = {l.get("kind"): l for l in
+               ((j.get("usage_report") or {}).get("rate_limits") or {})
+               .get("limits", [])}
+        if "weekly_all" in lim:
+            w, s = lim["weekly_all"], lim.get("session") or {}
+            return {"percent": w.get("percent"), "resets_at": w.get("resets_at"),
+                    "session_percent": s.get("percent"),
+                    "session_resets_at": s.get("resets_at")}
+    raise RuntimeError(f"no weekly_all limit in claude -p /usage "
+                       f"(rc {r.returncode}): {r.stderr.strip()[:160]}")
+
+
+def label_active(numbers, on):
+    """--active / --inactive: add or remove ACTIVE_LABEL on these issues."""
+    rc = 0
+    for n in numbers:
+        r = subprocess.run(["gh", "issue", "edit", str(n),
+                            "--add-label" if on else "--remove-label",
+                            ACTIVE_LABEL], cwd=ROOT)
+        rc = rc or r.returncode
+    return rc
+
+
 def place(n, port, who=None):
     """--place N [--claim WHO]: the running viewer's placement.json, read for
     N emulators.  With --claim, the N are also held for WHO (placement.py's
@@ -1715,8 +1841,16 @@ def main():
     ap.add_argument("--claim", metavar="WHO",
                     help="with --place: hold those emulators for WHO for a "
                     "couple of minutes, so parallel callers do not double-book")
+    ap.add_argument("--active", type=int, nargs="+", metavar="ISSUE",
+                    help=f"label these issues '{ACTIVE_LABEL}' (an agent is on "
+                    "them; the grid page lists them) and exit")
+    ap.add_argument("--inactive", type=int, nargs="+", metavar="ISSUE",
+                    help=f"remove the '{ACTIVE_LABEL}' label and exit")
     ap.add_argument("--emit", action="store_true", help=argparse.SUPPRESS)
     args = ap.parse_args()
+    if args.active or args.inactive:
+        return (label_active(args.active or [], True)
+                or label_active(args.inactive or [], False))
     if args.emit:     # the far end of a --peer connection
         return emit()
     if args.place is not None:
@@ -1778,4 +1912,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

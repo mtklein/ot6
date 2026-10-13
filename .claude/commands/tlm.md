@@ -106,7 +106,9 @@ session), read under the tracked policy above, and in
 # 2. Launching agents
 
 Delegate whatever unit is coherent: a lab, an arc, a milestone's issues, a
-redesign of a tool. Size it by what one agent can hold and check, not by
+redesign of a tool. Label an agent's issues active when you launch it
+(`tools/stream/live.py --active N...`) and clear them (`--inactive N...`) on
+merge or close: live.py's grid lists the active ones for the owner. Size it by what one agent can hold and check, not by
 caution. Prefer parallel independent agents; never two agents on the same
 files. Each agent works in its own worktree:
 
