@@ -159,17 +159,12 @@ H.run({ maxFrames = 900000 }, {
   end),
   H.waitUntil(function() return H.worldSettled() end, 1200, "world settled", 5),
   H.call(function()
-    local x, y = H.worldX(), H.worldY()
-    home = { x, y }
-    -- the plain east and north of the Continue tile is world group 25 (the
-    -- Chimera's, worldgroups: x 226-251, y 126-150)
-    for dx = -8, 2 do
-      for dy = -2, 8 do
-        local p = H.worldBfs(x + dx, y + dy)
-        if not away and p and #p >= 6 and #p <= 12 then away = { x + dx, y + dy } end
-      end
-    end
-    assert(away, "a tile 6-12 steps from the Continue tile, on the settled map")
+    -- world group 25 (the Chimera's) east of the Continue tile is the four
+    -- tiles (250-251, 126-127) (build/attempts/wt/v030-plan-kits/study/
+    -- g25.txt, route_data's world_group over world 0's tile props): the lap
+    -- runs between two of them
+    home, away = { 250, 126 }, { 251, 127 }
+    H.assertEq(H.worldBfs(home[1], home[2]) ~= nil, true, "the lap's tiles are reachable")
   end),
   H.driveUntil(function() return stage > 2 end, 850000, {
     H.cond(function() return not H.battleLoadStarted() end, { lap(), H.release() }, {}),
