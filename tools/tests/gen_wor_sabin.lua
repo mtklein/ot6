@@ -536,6 +536,7 @@ H.run({ maxFrames = 200000 }, {
     H.navTo(81, 21, { maxFrames = 6000, playBattles = "tactical" }),
     holdOut("down", MAP_TZEN, "the relic shop's (81,22) trigger -> Tzen 305"),
   }, {}),
+  H.gearStop({ tag = "gear Tzen" }),     -- #434: buy power with gil; the kits below re-equip their picks
   -- CELES's own kit back (gen_wor_tzen_door's: the Genji Glove, the
   -- ThunderBlade in the left hand, the Blizzard in the right), then
   -- SABIN's relics first: the second Fire Knuckle needs the Genji Glove on

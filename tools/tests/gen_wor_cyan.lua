@@ -764,6 +764,7 @@ H.run({ maxFrames = 400000 }, {
   dressFromBag(SABIN, "SABIN"),
   H.call(function() say("shop", "Maranda's armor: " .. kitLine()) end),
   walkInto(44, 14, MAP_MARANDA, "the armor shop -> Maranda"),
+  H.gearStop({ tag = "gear Maranda", fight = FIGHT }),     -- #434: buy power with gil
   via({ { 9, 25 }, { 20, 17 }, { 26, 12 } }, "Maranda's street to Lola's door"),
   walkInto(26, 11, MAP_LOLA, "Maranda -> Lola's house (196)"),
   -- Lola with CYAN (_cc3e45, $029C), and the letters he exchanges

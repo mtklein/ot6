@@ -395,6 +395,7 @@ local function jidoorRestock(tag, band)
       what .. ": held DOWN out of the shop 201 (34,21) -> map 198"),
     H.waitUntil(fieldSettled(198), 1800, what .. ": Jidoor control again", 5),
     H.waitFrames(30),
+    H.gearStop({ tag = "gear Jidoor (" .. tag .. ")" }),     -- #434: buy power with gil
     H.navTo(15, 62, { playBattles = "tactical", maxFrames = 20000,
       arrive = function() return H.worldMode() end }),
     pressWalk("down", function() return H.worldMode() end, 1200,

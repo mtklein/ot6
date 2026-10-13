@@ -1901,6 +1901,7 @@ H.run({ maxFrames = 500000, allowGameOver = true }, {
   H.navTo(29, 53, { maxFrames = 4000, playBattles = "tactical", arrive = function()
     return mapIdx() == 157 end }),
   settle(157, "town again"),
+  H.gearStop({ tag = "gear Mobliz" }),     -- #434: buy power with gil
   -- (18,41) is Mobliz's south exit ROW, and a row you leave a town by is a
   -- tile you STEP THROUGH, never one you come to rest on.  navTo to the
   -- entry point and press SOUTH through the row.

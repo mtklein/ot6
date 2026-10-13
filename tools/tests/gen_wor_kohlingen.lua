@@ -639,6 +639,7 @@ H.run({ maxFrames = 200000 }, {
   control("the store, after the menu"),
   H.waitFrames(30),
   walkInto(12, 40, MAP_KOHLINGEN, "the store -> Kohlingen"),
+  H.gearStop({ tag = "gear Kohlingen" }),     -- #434: buy power with gil
 
   -- ---- 8. out to the world map, and the save ----------------------------------------------
   -- the town's arrival tile (23,29), then down off the south edge (the

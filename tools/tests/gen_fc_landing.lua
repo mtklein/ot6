@@ -361,6 +361,7 @@ H.run({ maxFrames = 600000 }, flatten({
     H.assertEq(H.readByte(0x1600 + 37 * TERRA + 0x1E), RAMUH, "TERRA wears RAMUH into the gauntlet")
   end),
   H.crossDoor(36, 45, 340, 26, 39, "item shop door 347(36,45)->340(26,39), return", { healer = TERRA }),
+  H.gearStop({ tag = "gear Thamasa (FC prep)", healer = TERRA }),     -- #434: buy power with gil
   H.navTo(23, 46, { maxFrames = 9000, playBattles = "tactical", items = true, healer = TERRA }),
   H.driveUntil(function() return H.worldMode() end, 2000, {
     H.call(function() H.setPad({ down = true }) end),

@@ -6928,8 +6928,8 @@ end
 -- M.gearStop(opts): the town stop.  Standing on a town map in GEAR_TOWNS
 -- with control, visit its weapon and armor counters (opts.only = "weapon"
 -- or "armor" for one), buy by the plan, and dress the seated party.
--- opts.joining, opts.keep, opts.reserve pass to the plan; opts.fight and
--- opts.healer to the walks.  Ends back on the town map, where it began.
+-- opts.joining, opts.keep, opts.reserve pass to the plan; opts.fight,
+-- opts.healer and opts.avoid (tiles the town's walks keep off) to the walks.  Ends back on the town map, where it began.
 function M.gearStop(opts)
   opts = opts or {}
   local tag = opts.tag or "gear"
@@ -6941,7 +6941,8 @@ function M.gearStop(opts)
         tag, townMap), 0)
     end
     local gil0 = M.gil()
-    local nav = { maxFrames = 9000, playBattles = "tactical", fight = opts.fight, healer = opts.healer }
+    local nav = { maxFrames = 9000, playBattles = "tactical", fight = opts.fight, healer = opts.healer,
+      avoid = opts.avoid }
     local steps = { M.logStep(string.format("[%s] town map %d: %d counter(s), gil %d, f%d",
       tag, townMap, #counters, gil0, M.frame)) }
     for _, k in ipairs(counters) do
@@ -6950,7 +6951,7 @@ function M.gearStop(opts)
         if k.door then
           steps[#steps + 1] = M.crossDoor(k.door[1], k.door[2], k.map, k.land[1], k.land[2],
             string.format("%s door %d(%d,%d)->%d", what, townMap, k.door[1], k.door[2], k.map),
-            { fight = opts.fight })
+            { fight = opts.fight, avoid = opts.avoid })
         end
         steps[#steps + 1] = M.shopTalk(k.keeper[1], k.keeper[2], what, { fight = opts.fight, healer = opts.healer })
         steps[#steps + 1] = M.gearBuy({ tag = tag, joining = opts.joining, keep = opts.keep,

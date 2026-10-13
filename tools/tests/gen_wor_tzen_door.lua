@@ -509,6 +509,7 @@ local function albrookStop(what, after)
     H.bagArrange({ POTION, FENIX, REMEDY, SOFT, TONIC }, { tag = "bag: combat items on top (Albrook)" }),
     H.navTo(37, 54, { maxFrames = 6000, playBattles = "tactical" }),
     holdOut("down", MAP_ALBROOK, "the item shop's (37,55) trigger -> Albrook 324"),
+    H.gearStop({ tag = "gear Albrook (" .. what .. ")" }),     -- #434: buy power with gil
     -- the inn, 300 GP: door (54,12) -> 325 (58,56), keeper (56,51) behind the
     -- counter, talk spot (56,53) facing up; out by the (58,57) trigger.  A
     -- night when anything is short (HP, MP, a status the care left).

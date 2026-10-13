@@ -200,6 +200,7 @@ H.run({ maxFrames = 120000 }, {
   -- ---- 2. the item seller, NPC_1 at (24,39) (shop 58) -----------------------------------
   H.shopTalk(24, 39, "Nikeah item seller"),
   stock(SHOP_NK_ITEMS, "Nikeah item seller"),
+  H.gearStop({ tag = "gear Nikeah" }),     -- #434: buy power with gil
 
   -- ---- 3. the cafe's four thieves -----------------------------------------------------
   H.crossDoor(16, 54, MAP_CAFE, 26, 37, "Nikeah cafe door 169(16,54)->172(26,37)"),
@@ -330,6 +331,7 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(H.readByte(c(CELES, 0x1F)), ENHANCER, "CELES's right hand holds the Enhancer")
     H.assertEq(H.readByte(c(CELES, 0x20)), THUNDERBLADE, "CELES's left hand keeps the ThunderBlade")
   end),
+  H.gearStop({ tag = "gear South Figaro" }),     -- #434: buy power with gil
 
   -- ---- 9. out to the World of Ruin map, and the save ------------------------------------
   -- the west column (0,0) len 47 -> map 511: the parent map, which the ship
