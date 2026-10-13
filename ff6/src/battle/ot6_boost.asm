@@ -1424,7 +1424,20 @@ OT6_ULTIMA_ID   = $14
 .proc Ot6MagicPrice
         .a8
         .i16
-        jsl     Ot6InFoldTbl    ; carry set = tier family (A preserved)
+        cmp     #OT6_ANALYZE_SPELL      ; Strago's Scan at the full boost is
+        bne     @plain                  ;   his study (#432, ot6_analyze.asm),
+        pha                             ;   priced at the shared ceiling
+        lda     $3ed8,x
+        cmp     #OT6_CHAR_STRAGO
+        bne     :+
+        lda     OT6_BOOST_REVEALED,x
+        cmp     #OT6_STUDY_BOOST
+        bcc     :+
+        pla
+        lda     #OT6_STUDY_MP
+        rtl
+:       pla
+@plain: jsl     Ot6InFoldTbl    ; carry set = tier family (A preserved)
         bcs     @tier
         jsl     Ot6SpellMP      ; the base price, relics included
         jml     Ot6BoostPriceFor        ; ...x2.5 per pending boost; its rtl

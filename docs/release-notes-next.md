@@ -34,3 +34,7 @@ now marks all of the target's weak elements and weapon types at once, for
 that monster and every monster of its kind, and they stay marked in later
 battles. Boosted by one point or more, it reads every enemy on the field.
 Celes still learns Scan at level 18.
+
+**Strago's Scan at three Boost Points teaches him lores.** He learns every
+lore the monsters in the battle could use, without being hit by them. The
+lores are learned when the battle is won. It costs 99 MP.
