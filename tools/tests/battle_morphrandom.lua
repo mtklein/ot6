@@ -17,6 +17,10 @@
 -- next random battle):
 --   plain  TERRA Muddled: each Morph she picks is clocked at the 0-BP
 --          speed and lasts SPAN0 ticks;
+--          Each Morph's clock running out reverts her within REVERT frames
+--          (a Revert queued while her own action was resolving was dropped,
+--          leaving her morphed for the battle: ExecRetal now runs it, #427;
+--          build/attempts/wt/v029-shield-grants/morphrandom/).
 --   stale  the same, with her pending boost held at 3 (and her bank at 5)
 --          whenever she is not morphed: the engine's Morph still takes the
 --          0-BP span, never the battle, and the bank pays nothing for it
@@ -37,6 +41,7 @@ local STATE = "build/states/fc_alcove.mss.lua"
 
 local TERRA, MORPH = 0x00, 0x03
 local SPAN0, PICKS = 596, 2
+local REVERT = 1200
 local BANK, PEND = 0x3E9C, 0x3E9D
 
 local seat, arm = nil, nil
@@ -75,7 +80,7 @@ local function hooks()
       H.log(string.format("[mrand] f%d tick %d: her clock starts, speed %d", H.frame, p.t0, p.speed))
     end
     if lastC and not c and p ~= nil and p.t0 ~= nil and p.t1 == nil then
-      p.t1 = ticks()
+      p.t1, p.t1f = ticks(), H.frame
       hold = false
       H.log(string.format("[mrand] f%d the clock ran out after %d ticks", H.frame, p.t1 - p.t0))
     end
@@ -125,7 +130,14 @@ local function stage(stale)
 end
 
 -- a battle is up: TERRA's seat, and Morph in her list
-local BATTLES = 8
+-- The budget, from measured odds: a battle can end before its picks (an
+-- instant kill, a Broken body's death), and the arms need four Morphs run
+-- to their span between them.  Measured on the 5e4e75a1 chain's fc_alcove
+-- at seed shifts 0, 7, 23 and 41: 15 spans in 21 battles (5, 3+, 5 and 3
+-- battles; shift 7 met 3 in its first 8 and failed the old budget of 8:
+-- build/attempts/wt/v029-shield-grants/morphrandom2/).  At 0.71 a battle
+-- (Poisson), fewer than four in 20 battles is 0.04%.
+local BATTLES = 20
 local function enter()
   battles, hold = battles + 1, false
   H.assertEq(battles <= BATTLES, true, string.format("both arms within %d battles", BATTLES))
@@ -155,9 +167,16 @@ local function playArm(name, stale)
         if p.battle == battles and p.m0 ~= nil and p.t0 == nil and H.frame - p.m0 > 600 and H.battleActive() then
           H.assertEq(false, true, string.format("%s: TERRA's Morph at f%d is clocked within 600 frames", name, p.f))
         end
+        -- ...and when her clock runs out she reverts (the Revert it queues
+        -- is not dropped: ExecRetal runs it); 2-248 frames after in the lab (morphrandom/)
+        if i == #picks and p.battle == battles and p.t1f ~= nil and morphed() and H.frame - p.t1f > REVERT
+            and H.battleActive() then
+          H.assertEq(false, true, string.format("%s: TERRA reverts within %d frames of her clock running out "
+            .. "(f%d)", name, REVERT, p.t1f))
+        end
       end
       return n >= PICKS
-    end, 240000, {
+    end, 400000, {
       -- a battle that ends first (an instant kill, a Broken body's death:
       -- HP alone does not hold it up) is left, and the arm goes on in the
       -- next random battle, up to BATTLES.  The pace starts once the party
@@ -199,7 +218,7 @@ local function playArm(name, stale)
   })
 end
 
-H.run({ maxFrames = 300000 }, {
+H.run({ maxFrames = 700000 }, {
   H.loadState(STATE),
   H.waitFrames(30),
   H.call(hooks),

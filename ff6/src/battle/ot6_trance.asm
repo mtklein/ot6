@@ -90,6 +90,23 @@ OT6_MORPH_SPEED:
 @out:   rtl
 .endproc
 
+; [ Revert: an expired span's Revert is never dropped ]
+; The span's end queues her Revert as a counterattack (DecMorphCounter's
+; CreateRetalAction), and ExecRetal dropped a character's counterattack
+; unexecuted while her $3aa0.4 or $3aa0.6 was set (the stretch from her own
+; action's execution to her ATB gauge's restart).  A Revert dropped there
+; was lost for good: $3EE2 was already cleared, so nothing clocked her
+; again and the 0-BP span became the battle-long morph only a 3-BP Trance
+; buys.  Measured on the battle_morphrandom stale arm (fc_alcove,
+; wt/v029-shield-grants 770d5925 qual): `CreateRetalAction x=00 3A7A=04` at
+; f27772 and no Cmd_04 after, $3aa0 reading $41 and $3EF9 bit 3 still set
+; 230,000 frames on (build/attempts/wt/v029-shield-grants/morphrandom/).
+; ExecRetal now runs a Revert ($b5 = $04) in that stretch instead of
+; dropping it (battle_main.asm @4b9c's test): the span ends when the clock
+; does, and she reverts at the next counterattack slot.  (Holding the clock
+; at 0 until the stretch ended, the first cut, lengthened the 0-BP span to
+; 701 ticks; build/attempts/wt/v029-shield-grants/qual-5e4e75a1.../.)
+
 ; [ Cmd_04's head: a Revert buys nothing, so it costs nothing (#430) ]
 ; Revert has no payoff a boost could buy (guidelines "boost pays once": a
 ; boost that costs pips and buys nothing is a bug), so a pending boost on it

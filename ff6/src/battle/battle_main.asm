@@ -12806,7 +12806,10 @@ ExecRetal:
         beq     @4be3       ; branch if no enemies are still alive
         lda     $3aa0,x
         bit     #$50
-        bne     @4be3       ; branch if $3aa0.4 or $3aa0.6 are set (atb gauge needs to be updated ???)
+        beq     @4bd5       ; branch if $3aa0.4 and $3aa0.6 are clear
+        lda     $b5         ; ot6 #427: a character's counterattack is dropped
+        cmp     #$04        ;   here, but not an expired Morph's Revert
+        bne     @4be3       ;   (DecMorphCounter's; ot6_trance.asm, "Revert")
 @4bd5:  lda     $3204,x
         ora     #$04
         sta     $3204,x
