@@ -13118,6 +13118,22 @@ function M.setzerBattle(plan, opts)
       local r, why = aimStep(p.aim, slot ~= nil and (1 << slot) or nil, walkOk,
         p.ally ~= nil and (1 << p.ally) or nil)
       if r == "walk" then return end
+      if r == "refuse" and slot == nil and p.ally == nil and M.readByte(0x3A75) == 0 then
+        -- no monster stands at all ($3A75 = 0: the last body fell to the
+        -- others between SETZER's window opening and this confirm), so
+        -- there is no target to confirm or to miss: the battle is ending.
+        -- The entry is skipped (p.noBody) and the caller reads an unplayed
+        -- row as it reads a battle that ended first.  Measured on
+        -- battle_jackpot's search 55 (v029 chain): `no monster stands
+        -- ($3A77 = 0, $3A75 = 00)` at f361216, SETZER's window at f361244,
+        -- and this walk refused (build/attempts/wt/v029-shield-grants/jackpot/)
+        M.log(string.format("[setzer] f%d row $%02X at %d BP: no monster stands ($3A75 = 0) -- skipped, the battle "
+          .. "is ending", M.frame, type(p.row) == "number" and p.row or 0, p.boost or 0))
+        p.noBody = true
+        k = k + 1
+        pulse("b")
+        return
+      end
       if r == "refuse" then
         local what = string.format("row $%02X at %d BP aimed at %s: %s", type(p.row) == "number" and p.row or 0,
           p.boost or 0, p.ally ~= nil and ("party slot " .. p.ally) or slot ~= nil and ("monster slot " .. slot)

@@ -16,8 +16,9 @@
 --     presses, the list stays up, nothing queued);
 --   pass 3: Jackpot picked at 3 BP, taken back to 2 at target select (L):
 --     it rolls nothing, charges no MP and no points, and no HP moves;
---   then a bounded search (below) for the two draws the passes above may
---     not meet: a roll that meets a table byte past 251 and draws again,
+--   then a staged redraw (below: $be written, a declared expedient) and
+--     a bounded search for the draws the passes above may not meet: a
+--     roll that meets a table byte past 251 and draws again (held when met),
 --     and a pass that finds no body (the throw's first roll felled
 --     Dullahan, whom the throw before had worn down).  Every
 --     candidate that throws is held to everything below; one whose party
@@ -78,7 +79,11 @@ local function installTick()
   H.assertEq(at ~= nil, true, "Ot6Tick stores OT6_SHIELD_CUR,x (the restore on recovery)")
   emu.addMemoryCallback(function()
     local x = emu.getState()["cpu.x"] & 0xFFFF
-    if x >= 8 then TICK.restores[#TICK.restores + 1] = { f = H.frame, slot = (x - 8) // 2 } end
+    -- the max it restores to, read as it restores: read after the battle
+    -- (a 4-6 Defend search candidate whose last roll felled Dullahan) the
+    -- cleared slot reads $FF (v029 jackpot4: `got 10, want 255`)
+    if x >= 8 then TICK.restores[#TICK.restores + 1] = { f = H.frame, slot = (x - 8) // 2,
+      max = H.readByte(TICK.max + x) } end
   end, emu.callbackType.exec, at, at)
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
@@ -184,7 +189,7 @@ local function checkJackpot(r, i)
       H.assertEq(r.mon0[b].brk ~= 0 and r.mon1[b].brk == 0, true, string.format("Jackpot %d: slot %d's "
         .. "shields were restored by Ot6Tick at f%d, inside the action: Broken at the exec (%d ticks) and "
         .. "not after", i, b, restored.f, r.mon0[b].brk))
-      H.assertEq(r.mon1[b].sh, H.readByte(TICK.max + 8 + b * 2), string.format("Jackpot %d: slot %d's break "
+      H.assertEq(r.mon1[b].sh, restored.max, string.format("Jackpot %d: slot %d's break "
         .. "ran out inside the action (Ot6Tick at f%d), and its shields came back to max", i, b, restored.f))
       H.log(string.format("[jackpot]   slot %d: its break ran out at f%d inside the action (exec f%d, end "
         .. "f%d): shields %d -> %d by Ot6Tick's restore", b, restored.f, r.f, endF, r.mon0[b].sh,
@@ -249,15 +254,27 @@ end
 -- stand 0 then 640 (a stand under ~300 ends inside the load and changes
 -- nothing, labs-r4; 330-520 mostly repeat stand 0), each over 2 then 3
 -- Defends, each over the others Defending then Fighting, each over the 16
--- keys -- 128 at most.  The entry shift (OT6_SEED_SHIFT, the runner's own
+-- keys -- 128 -- and then the same over 4, 5 and 6 Defends: 320 at most.
+-- v029's grave (wt/v029-shield-grants) threw no redraw in the first 128 at
+-- entry shifts 0, 13 and 29 (jackpot2/), nor over the other 48 keys (the
+-- wait one to three frames longer, jackpot3/): a pass redraws only when it
+-- starts on one of the four positions before a byte past 251 ($37, $50,
+-- $91, $B5), and the throws' first pass started on 134 positions in 914
+-- throws, none of them $35/$4E/$8F/$B3 or those four -- the keys repeat the
+-- fight's Rand history, so its "distinct" throws are far from independent.
+-- More Defends play more of Dullahan's turns before the throw, which moves
+-- it; a candidate lost to a wipe is counted, not failed (below).  The
+-- entry shift (OT6_SEED_SHIFT, the runner's own
 -- idle at the boot point) is added to every wait, so a varied entry walks
 -- the same keys in another order.  Each candidate is a full throw at 3 BP,
--- checked by checkJackpot like the passes above; the search stops once
--- both draws are met.  Longer fights were measured and dropped: a 760-frame
--- stand and 4 Defends each wiped the party on one key (labs-r5,
--- search_all-r8, search_all-r9), and a wipe would fail the suite by luck.
+-- checked by checkJackpot like the passes above; the search stops once it
+-- meets the empty pass (the redraw is staged above, and held here too when
+-- a throw meets it).  A 760-frame stand and 4 Defends each wiped the party
+-- on one key (labs-r5, search_all-r8, search_all-r9): a wipe before the
+-- throw is a lost candidate, counted (below).
 --
--- The bound, for the redraw (the rarer): the table holds 4 bytes past 251
+-- The bound the redraw had, when the search was its only source (it no
+-- longer gates the run; see the staged redraw): the table holds 4 bytes past 251
 -- of 256, a throw is four rolls, so a throw redraws with p = 1 - (252/256)^4
 -- = 6.1%.  Throws that repeat one state repeat one outcome, so what counts
 -- is the distinct throws among the candidates: with D distinct, the chance
@@ -286,10 +303,12 @@ end
 -- wipe anywhere else still fails the run.
 local ENTRY = (type(OT6_SEED_SHIFT) == "number" and OT6_SEED_SHIFT or 0)
 local CAND = {}
-for _, st in ipairs({ 0, 640 }) do
-  for _, d in ipairs({ 2, 3 }) do
-    for _, of in ipairs({ false, true }) do
-      for i = 0, 15 do CAND[#CAND + 1] = { wait = ENTRY + 1 + 4 * i, stand = st, defends = d, othersFight = of } end
+for _, ds in ipairs({ { 2, 3 }, { 4, 5, 6 } }) do
+  for _, st in ipairs({ 0, 640 }) do
+    for _, d in ipairs(ds) do
+      for _, of in ipairs({ false, true }) do
+        for i = 0, 15 do CAND[#CAND + 1] = { wait = ENTRY + 1 + 4 * i, stand = st, defends = d, othersFight = of } end
+      end
     end
   end
 end
@@ -368,9 +387,73 @@ local takeBack = H.seqStep({
   end),
 })
 
+-- ---- the redraw, staged ------------------------------------------------
+-- The draw rule's second branch (a roll that meets a byte past 251 draws
+-- again) is a property of the battle RNG table and a pass's $be, and a
+-- fight reaches it only when a pass starts on one of the four positions
+-- before such a byte.  v029's grave fight never did: no redraw over every
+-- key (512 candidates) or 2-6 Defends (320) at entry shifts 0, 13 and 29,
+-- the throws' first pass starting on 139 of the 256 positions and never on
+-- one of the eight that lead to a redraw (build/attempts/wt/
+-- v029-shield-grants/jackpot2/ to jackpot4/).  So the redraw is staged, a
+-- declared mechanism expedient (state_write_waivers.txt), never play: the
+-- grave's battle is played twice from the same frame with the same inputs
+-- (two Defends, Jackpot at 3 BP), once to read how many Rands the action
+-- draws between Ot6SetzerExec and its first pass, and once with $be written
+-- at Ot6SetzerExec so that the first pass starts on a position before a
+-- byte past 251.  That throw is held to everything checkJackpot holds, the
+-- redraw included.  A redraw the search meets in play is held to the same
+-- rule.
+local RS = { phase = nil, be = nil, n = nil, trig = nil, hooked = false }
+local function stagedPlay(phase)
+  return H.seqStep({
+    H.call(function()
+      RS.phase, RS.be = phase, nil
+      if RS.hooked then return end
+      RS.hooked = true
+      local rng = H.sym("RNGTbl") & 0x3FFFFF
+      for t = 0, 255 do
+        if RS.trig == nil and H.readRomByte(rng + ((t + 1) & 0xFF)) >= 252 then RS.trig = t end
+      end
+      H.assertEq(RS.trig ~= nil, true, "the battle RNG table holds a byte past 251")
+      local a = H.sym("Ot6SetzerExec")
+      emu.addMemoryCallback(function()
+        if RS.phase == nil or RS.be ~= nil or H.readByte(0xB6) ~= JACKPOT then return end
+        if RS.phase == "write" then H.writeByte(0xBE, (RS.trig - RS.n) & 0xFF) end
+        RS.be = H.readByte(0xBE)
+      end, emu.callbackType.exec, a, a)
+    end),
+    H.loadState(STATE),
+    H.faceAndHoldA("up", function() return H.battleLoadStarted() end, 3000, "the grave (100,14): face up, A"),
+    H.release(),
+    H.setzerBattle({ { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3 } }, { untilPlanDone = true }),
+    H.call(function()
+      local recs = H.vars.setzer
+      H.assertEq(#recs, 1, "staged (" .. phase .. "): the Jackpot executed once")
+      local q = recs[1].passes[1]
+      H.assertEq(RS.be ~= nil and q ~= nil, true, "staged (" .. phase .. "): Ot6SetzerExec and the first pass seen")
+      if phase == "measure" then
+        RS.n = (q.be0 - RS.be) & 0xFF
+        H.log(string.format("[jackpot] staged: $be %02X at Ot6SetzerExec, %02X at the first pass: %d Rand(s) "
+          .. "between; a pass on %02X meets the byte past 251 at %02X", RS.be, q.be0, RS.n, RS.trig,
+          (RS.trig + 1) & 0xFF))
+        return
+      end
+      RS.phase = nil
+      H.assertEq(q.be0, RS.trig, string.format("staged: the first pass starts on $%02X ($be written to %02X at "
+        .. "Ot6SetzerExec, %d Rand(s) before it)", RS.trig, RS.be, RS.n))
+      local g = checkJackpot(recs[1], 900)
+      H.assertEq(g.redraws >= 1, true, "staged: a roll that meets a byte past 251 draws again")
+      H.log(string.format("[jackpot] staged: the first pass on %02X redrew (%d redraw(s)), held to the draw rule",
+        RS.trig, g.redraws))
+    end),
+  })
+end
+local staged = H.seqStep({ stagedPlay("measure"), stagedPlay("write") })
+
 local search = H.seqStep({
   H.driveUntil(function()
-    return (S.found.redraw and S.found.empty) or S.played >= #CAND
+    return S.found.empty or S.played >= #CAND
   end, 2000000, {
     H.call(function()
       S.i = S.i + 1
@@ -429,13 +512,10 @@ local search = H.seqStep({
     end
     H.assertEq(S.found.empty ~= nil, true, string.format("the search met a pass that finds no body within its %d "
       .. "candidates (%d distinct)", #CAND, S.distinct))
-    H.assertEq(S.found.redraw ~= nil, true, string.format("the search met a throw that redraws past 251 within "
-      .. "its %d candidates (%d distinct candidates tried, %d lost to a wipe before the first throw; a candidate "
-      .. "is two throws of two rolls, so none redrawing has p = 0.939^%d = %.4f)", #CAND, S.distinct, S.lostN or 0,
-      S.distinct, 0.939 ^ S.distinct))
-    H.log(string.format("[jackpot] search: an empty pass at %s", S.found.empty))
-    H.log(string.format("[jackpot] search: a redraw at %s; %d candidate(s), %d distinct, %d lost to a wipe before "
-      .. "the first throw (entry shift %d)", S.found.redraw, S.played, S.distinct, S.lostN or 0, ENTRY))
+    H.log(string.format("[jackpot] search: an empty pass at %s; a redraw in play %s; %d candidate(s), %d "
+      .. "distinct, %d lost to a wipe before the first throw (entry shift %d)", S.found.empty,
+      S.found.redraw and ("at " .. S.found.redraw) or "not met (the staged one holds the rule)", S.played,
+      S.distinct, S.lostN or 0, ENTRY))
   end),
 })
 
@@ -446,6 +526,7 @@ H.run({ maxFrames = 2500000 }, {
   pass(2, { { row = JACKPOT, boost = 0, refused = true }, { row = JACKPOT, boost = 1, refused = true },
     { row = JACKPOT, boost = 2, refused = true } }, 0),
   takeBack,
+  staged,
   search,
   H.call(function()
     H.log("[jackpot] PASSED: refused under 3 BP, two rolls at 3 BP, twice in one battle, the draw rule (a "
