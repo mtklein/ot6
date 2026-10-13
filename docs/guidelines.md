@@ -81,6 +81,12 @@ power, write like a human (owner, 2026-09-30).
   that land on a boosted Fight, so it usually belongs on the main
   boost-Fighter. Readiness-audit flags (an empty relic slot with a spare in
   the bag, a better weapon on offer) are worth acting on.
+- **Buy power with gil** (owner, 2026-10-13). At a shop with weapons or
+  armor, upgrade the seated party the way a player would, keeping the
+  supply reserve. Gear can stand in for levels, so a well-equipped party
+  should need less grinding; plenty of gil is the easy way to buy power. In
+  OT6 a weapon's class is also a break key, so weigh the keys a weapon
+  brings, not only its attack.
 - **Ribbons are worth going out of your way for** (owner, 2026-10-01), and
   so is gear like them: a detour for a Ribbon is what a player does, and
   it goes on the moment it's in the bag. Route and kit choices follow what
