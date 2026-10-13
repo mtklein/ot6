@@ -16,11 +16,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "06b3bfa1054ab1d403491bfdb897c9f89fca3b3bab48e8b1e06d22445737171d",
-    "generator_sig": "138f639d112c418bf8626adb642dd1e872e7267f12f45e0780e752ebd7da955c gen_zozo2_arrival",
+    "generator_sig": "e43ee13d6c09cc4bf37b4433ca90fa90ed7ea2fd011d8d4ef53fff59e6ad6417 gen_zozo2_arrival",
     "ancestors": [
       {
         "path": "build/states/figaro_submerged.stamp",
-        "sha256": "3afb2efaa7e4675c3e5b0a1955316f88a6ffa697b753919962249fb976a48097"
+        "sha256": "be7f8609540da6eea9eee21851d1e854856c44313ebe85ff0ff9c1175c6c0791"
       }
     ]
   }

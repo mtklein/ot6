@@ -17,11 +17,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "6e1a2cd5812e1330c640e1a807d42d06a5c0ba895d3cba86f92d4f2354fb542d",
-    "generator_sig": "f659dd9967b26de01386bac14a23b79fee3927513c8b00ff0c11b664562c8e2e gen_water_rondo tools/tests/checkpoints/narshe-mission-v1/manifest.json tools/tests/checkpoints/narshe-mission-v1/narshe-mission.sram",
+    "generator_sig": "32adb4b784a68ef72995473b347f42506ead6419d092a5ca92a15b7460cac459 gen_water_rondo build/checkpoints/narshe-mission-v1/manifest.json build/checkpoints/narshe-mission-v1/narshe-mission.sram",
     "ancestors": [
       {
-        "path": "tools/tests/checkpoints/narshe-mission-v1/manifest.json",
-        "sha256": "fd9f0195ee4151838a0543042cca94ffb82a7f806ccab0ad301e654f9a453de1"
+        "path": "build/checkpoints/narshe-mission-v1/manifest.json",
+        "sha256": "e2fe0c17f7f11fe29492b506f6ba390ae27cdfa9a9b242236073dfc749d0b464"
       }
     ]
   }

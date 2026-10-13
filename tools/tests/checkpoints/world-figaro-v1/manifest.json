@@ -16,11 +16,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "c676d7ac117dd703947c79898c95bc54fe8a512a9dac456bcf8cb3ba1e16d607",
-    "generator_sig": "73505a9eaa4f51c4601ac6665003f39d128d8f3e03fea1c1cdcaadfec69637d3 gen_edgar",
+    "generator_sig": "9942f8633a11736c5743630cccdef104f7d8fd7822aaca005804954b34210921 gen_edgar",
     "ancestors": [
       {
         "path": "build/states/figaro_entry.stamp",
-        "sha256": "5410cb9ebeb07cf3b8284bdfcf518478cdabd6845fcca3b90dcfdf5a2a9a2550"
+        "sha256": "66e86b89587e5b470772a4a11f06b24c10a2e39a167035708af7c8eb314fc5e0"
       }
     ]
   }

@@ -17,11 +17,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "433dc195d3a0e1f259cf264226a4cb3937a3c4c47009712b7c9bdef0056dd48d",
-    "generator_sig": "d310779fdf29d01ad5c73261861ff00101086dc828cbb29124c514c1a01c170d gen_n024_save_checkpoint",
+    "generator_sig": "673ac48a88a13f4a7e4f570ebc89927ff8b3f83360f2033bdd3aa6acfee74738 gen_n024_save_checkpoint",
     "ancestors": [
       {
         "path": "build/states/n024_entry.stamp",
-        "sha256": "34c93de85dc68cb75ad536a6c6155f53565303ba466c6c22c140fb16250f117f"
+        "sha256": "91a8696d491207b2f312d20f0f25d3813c2aa4387f6c06e1d913b283a4e2023a"
       }
     ]
   }

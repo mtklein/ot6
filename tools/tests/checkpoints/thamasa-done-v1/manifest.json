@@ -12,15 +12,15 @@
     }
   },
   "size": 32768,
-  "sha256": "b801367dfc46988c6bde4e980d37457298d23ee0d51b752b695d93587ef21915",
+  "sha256": "9f3dac5acd168fa3f3d6d2a5014326fbc76d6ae4a08baa8df3b63235de9c8460",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "b801367dfc46988c6bde4e980d37457298d23ee0d51b752b695d93587ef21915",
-    "generator_sig": "91ffe58e06aeabc4e6df40a2a7642219a74d174bdff4767bf86c7f19dfb46e95 gen_massacre build/checkpoints/ultros-won-v1/manifest.json build/checkpoints/ultros-won-v1/ultros-won.sram",
+    "payload_sha256": "9f3dac5acd168fa3f3d6d2a5014326fbc76d6ae4a08baa8df3b63235de9c8460",
+    "generator_sig": "55fb7e2ea0fbd8686fb1c44d6f6edffde17bdced054e826fc0dbea245f5fe55a gen_massacre build/checkpoints/ultros-won-v1/manifest.json build/checkpoints/ultros-won-v1/ultros-won.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/ultros-won-v1/manifest.json",
-        "sha256": "6ebc2f9de9b4737b7b5a068edf6c494c90c6f88b84194286cf5f3720ee8f8108"
+        "sha256": "f19c85847401bd3b062e5f148d1bb8987b2da9c913feddfd748018a4c8e7748b"
       }
     ]
   }
