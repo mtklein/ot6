@@ -670,7 +670,7 @@ end
 -- unless the frame before read a battle and a live seat stands beside it.
 -- (Tolerating any odd seat beside a live one read field garbage, species
 -- $5554, as a battle: qual3, six suites.)
-local blsSeen = nil         -- the last frame this read a battle
+M.blsSeen = nil              -- the last frame this read a battle (a field: the chunk is at its local cap)
 function M.battleLoadStarted()
   local anyLive, odd = false, false
   for i = 0, 3 do
@@ -678,9 +678,9 @@ function M.battleLoadStarted()
     if hp >= 10000 then odd = true elseif hp > 0 then anyLive = true end
   end
   if odd then
-    return anyLive and blsSeen ~= nil and M.frame - blsSeen <= 1
+    return anyLive and M.blsSeen ~= nil and M.frame - M.blsSeen <= 1
   end
-  if anyLive then blsSeen = M.frame end
+  if anyLive then M.blsSeen = M.frame end
   if anyLive then return true end
   return M.partyWipedInBattle ~= nil and M.partyWipedInBattle() or false
 end
