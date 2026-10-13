@@ -6375,6 +6375,7 @@ local BATTLE = {
   -- $05 -> $38 with the target latched on herself (chars = 1<<actor); B ->
   -- $05; A commits ($38 -> $05 -> $0F -> $01 -> $10 -> $01 -> $00).
   CMD_RUNIC = 0x0B,
+  CMD_MORPH = 0x03,
   -- SETZER's Slot (probe_slot.lua, deleted in bd50a973; last version at f1f26173): A on Slot $05 -> $06 (OpenSlotWindow)
   -- -> $01 -> $32 -> $39 -> $08, the reel state.  In $08 the reels spin
   -- from the window's opening; the first A stops reel 1 (at the next icon
@@ -11082,7 +11083,17 @@ function Driver:makePlanRules(actor)
   -- opts.magic[id].boost = false keeps the cast at its base tier, which is
   -- what a caller wants when the point is the element rather than the
   -- damage and the BP is owed to somebody's break.
+  -- opts.trance (TERRA's divine, the skill verbs' note below): ahead of
+  -- the attack-magic line, which would otherwise spend her bank on every
+  -- cast; until three points are banked her casts go at their base tier,
+  -- so the bank fills a point a turn
+  local tranceDue = self.opts.trance and id == 0 and not self.skillDead[BATTLE.CMD_MORPH]
+     and cmdRow(actor, BATTLE.CMD_MORPH) and (M.readByte(BATTLE.ST4 + actor * 2) & 0x08) == 0
+  if tranceDue and have >= 3 then
+    return { kind = "morph", row = cmdRow(actor, BATTLE.CMD_MORPH), boostLeft = 3 }
+  end
   local mg = self.opts.magic and self.opts.magic[id]
+  if mg and tranceDue then mg = { spell = mg.spell, boost = false } end
   if mg and cmdRow(actor, BATTLE.CMD_MAGIC) then
     -- The absorb and Reflect guards, at plan time, for the ability's
     -- element and reflectability (castVetoed above).
@@ -11203,6 +11214,10 @@ function Driver:makePlanRules(actor)
   -- real menu (the probe_* files above the constants):
   --   opts.runic   -- CELES raises Runic.  true, or a function(actor)
   --                   answering whether this turn is a Runic turn.
+  --   opts.trance  -- TERRA, not morphed, with three points banked, Morphs
+  --                   at 3 BP: Trance, her divine, which lasts the battle
+  --                   (kits.md, Terra: magic x2, damage taken halved).
+  --                   Its target select is her own, latched like Runic's.
   --   opts.slot    -- SETZER spins Slot at this turn's boost (the same
   --                   opts.boost / opts.bank rule the Fight uses; 3 BP
   --                   buys the triple of reel 1's icon).
@@ -12142,11 +12157,13 @@ function Driver:button(actor)
     end
     return { "a" }
   end
-  if st == BATTLE.ST_TGT and self.plan.kind == "runic" then
+  if st == BATTLE.ST_TGT and (self.plan.kind == "runic" or self.plan.kind == "morph") then
     -- the engine latched the target on the caster (chars = 1<<actor,
-    -- probe_runic.lua, deleted in bd50a973); there is nothing to steer
-    M.log(string.format("[%s] actor=%d Runic confirmed (target chars=%02X)",
-      self.tag or "fight", actor, M.readByte(BATTLE.TGTCHARS)))
+    -- probe_runic.lua, deleted in bd50a973); there is nothing to steer.
+    -- Morph's target select is the same shape (battle_trance's `self`).
+    M.log(string.format("[%s] actor=%d %s confirmed (target chars=%02X, pending %d BP)",
+      self.tag or "fight", actor, self.plan.kind == "morph" and "Morph" or "Runic", M.readByte(BATTLE.TGTCHARS),
+      M.readByte(BATTLE.PEND_BP + actor * 2)))
     if self.recovery then self.recovery.confirm(actor, M.frame,
       M.readByte(BATTLE.TGTCHARS), M.readByte(BATTLE.TGTMONS)) end
     self.confirmed = { actor = actor, side = "chars", kind = self.plan.kind }

@@ -19,7 +19,12 @@ local X_ETHER, GAUNTLET = 0xED, 0xD0
 local MAP_NARSHE, MAP_CLIFF_LO, MAP_CLIFF_SAVE, MAP_TRITOCH, MAP_MINES = 32, 33, 34, 35, 36
 local MAP_CAVE, MAP_CAVE_B, MAP_LAIR = 281, 282, 283
 local NARSHE_WORLD = { { 115, 33 } }
-local NARSHE_LANDING = { 115, 35 }
+-- after the regroup the Falcon lifts off and lands three tiles south of
+-- where it waited, and the arc saves there: a lift-off and a landing on
+-- the same tile stalled the pilot one tile off it (build/attempts/wt/
+-- v029-narshe-route/varA/tritoch_k2_s12.log, '[fly] ... tile (115,36) ->
+-- (115,35): 0.7 tiles ... speed 0', then 'timeout after 6000 frames')
+local SAVE_LANDING = { 115, 38 }
 -- magicite: give_genju's receipt order (Ramuh 0)
 local TERRATO, TRITOCH = 4, 10
 -- the bosses (route_data.py pool event 132, 119, 117)
@@ -32,7 +37,11 @@ local ICEDRAGON_FORMATION, TRITOCH_FORMATION, UMARO_FORMATION = 366, 487, 444
 -- 5).  The first Tritoch fight without fire (build/lab/narshe/t2) broke it
 -- three times on Fight and took 485 of its 30,000 HP in 12,000 frames.
 local FIRE = 0x00
-local BOSS_FIGHT = { runic = true, bushido = true, magic = { [0] = { spell = FIRE } }, nuke = { FIRE } }
+-- TERRA opens with Trance once three points are banked (her Morph at 3 BP,
+-- which lasts the battle: magic x2, damage taken halved; kits.md, Terra),
+-- as a player spends her divine on a boss.
+local BOSS_FIGHT = { runic = true, bushido = true, magic = { [0] = { spell = FIRE } }, nuke = { FIRE },
+  trance = true }
 -- their threats for the relic rule (an informed reading of their scripts:
 -- ice spells and Frozen, which no relic in the bag guards; the damage is
 -- mostly magic)
@@ -478,11 +487,19 @@ local function stepOn(x, y, done, avoid)
 end
 
 -- ---- the bosses' fights (reads only) ----------------------------------------
--- every monster action at ExecCmd ([monact]), and the boss's gauge each
--- frame ([brk]: OT6_SHIELD_CUR/MAX at $3E40/$3E41 for monster slot 0, its
--- HP word $3BFC), as gen_wor_storm's lines
+-- every boss action at ExecCmd ([monact]), and the boss's gauge each frame
+-- ([brk]: OT6_SHIELD_CUR/MAX at $3E40/$3E41 + 2 x its monster slot, its HP
+-- word $3BFC + 2 x slot), as gen_wor_storm's lines.  The boss's slot is
+-- read from the formation ($57C0 + 2 x slot): the Ice Dragon stands in
+-- slot 4, not 0 (build/lab/narshe/n2: '[death] ... by slot 4')
 local BOSSES = { [ICEDRAGON] = true, [TRITOCH_SP] = true, [UMARO_SP] = true }
 local ATTACKS = { [0xEE] = "Battle", [0xEF] = "Special" }
+local function bossSlot()
+  for sl = 0, 5 do
+    local sp = H.readWord(0x57C0 + sl * 2)
+    if BOSSES[sp] then return sl, sp end
+  end
+end
 local fightOn = false
 local function fightWatch()
   return H.call(function()
@@ -491,16 +508,17 @@ local function fightWatch()
     local a = H.sym("ExecCmd@battle_code")
     local lastAct = "-"
     emu.addMemoryCallback(function()
+      if not H.battleLoadStarted() then return end
+      local sl, boss = bossSlot()
+      if sl == nil then return end
       local x = emu.getState()["cpu.x"] & 0xffff
-      local boss = H.readWord(0x57C0)
-      if not BOSSES[boss] then return end
-      if x < 8 and x % 2 == 0 and H.battleLoadStarted() then
+      if x < 8 and x % 2 == 0 then
         lastAct = string.format("entity %d cmd $%02X atk $%02X", x // 2, H.readByte(0xB5), H.readByte(0xB6))
       end
-      if x >= 8 and x < 20 and x % 2 == 0 and H.readWord(0x57C0 + (x - 8)) == boss then
+      if x == 8 + sl * 2 then
         local cmd, atk = H.readByte(0xB5), H.readByte(0xB6)
         if cmd ~= 0x2E and cmd ~= 0x2F then
-          H.log(string.format("[monact] f%d slot %d $%03X cmd $%02X atk $%02X%s", H.frame, x // 2 - 4, boss, cmd,
+          H.log(string.format("[monact] f%d slot %d $%03X cmd $%02X atk $%02X%s", H.frame, sl, boss, cmd,
             atk, ATTACKS[atk] and (" " .. ATTACKS[atk]) or ""))
         end
       end
@@ -508,18 +526,18 @@ local function fightWatch()
     local was, since = nil, 0
     emu.addEventCallback(function()
       if not H.battleLoadStarted() then was = nil; return end
-      local boss = H.readWord(0x57C0)
-      if not BOSSES[boss] then return end
-      local cur, max = H.readByte(0x3E40), H.readByte(0x3E41)
+      local sl, boss = bossSlot()
+      if sl == nil then return end
+      local cur, max = H.readByte(0x3E40 + sl * 2), H.readByte(0x3E41 + sl * 2)
       local broken = max > 0 and cur == 0
       if was == nil then was = broken; return end
       if broken and not was then
         since = H.frame
         H.log(string.format("[brk] f%d $%03X broken (0 of %d shields) at HP %d, the last party action %s", H.frame,
-          boss, max, H.readWord(0x3BFC), lastAct))
+          boss, max, H.readWord(0x3BFC + sl * 2), lastAct))
       elseif was and not broken then
         H.log(string.format("[brk] f%d $%03X window over after %d frames: shields %d of %d, HP %d", H.frame, boss,
-          H.frame - since, cur, max, H.readWord(0x3BFC)))
+          H.frame - since, cur, max, H.readWord(0x3BFC + sl * 2)))
       end
       was = broken
     end, emu.eventType.endFrame)
@@ -817,7 +835,7 @@ H.run({ maxFrames = 500000 }, {
     say("regroup", "dressed: " .. kitLine())
   end),
   liftOff(),
-  H.flyTo(NARSHE_LANDING[1], NARSHE_LANDING[2], { what = "the Falcon to Narshe's gate" }),
+  H.flyTo(SAVE_LANDING[1], SAVE_LANDING[2], { what = "the Falcon to the plain south of Narshe" }),
   H.waitWorldSettled("landed beside Narshe", 1800, 30),
   H.saveAtCheckpoint("wor-narshe-v1"),
   H.call(function()

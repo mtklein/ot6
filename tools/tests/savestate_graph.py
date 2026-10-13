@@ -882,7 +882,7 @@ STATES = [
       checkpoint="wor-cyan-v1", timeout=3600),
 
     # wor-narshe-cliffs-v1 -> the World of Ruin map beside the Falcon parked
-    # outside Narshe (115,35): the Ice Dragon (event battle 132), Tritoch
+    # south of Narshe (115,38): the Ice Dragon (event battle 132), Tritoch
     # (119), Umaro's cave, the carving (117: Terrato), UMARO's join, down
     # to the Falcon, the cabin (UMARO, MOG, TERRA and CELES; Terrato and
     # Tritoch onto wearers), and Save there: the `wor-narshe-v1` checkpoint

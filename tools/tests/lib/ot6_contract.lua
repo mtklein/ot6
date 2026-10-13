@@ -1788,14 +1788,14 @@ M.contracts["wor-narshe-cliffs-v1"] = {
 }
 
 -- wor-narshe-v1: the World of Ruin map, on foot beside the Falcon parked
--- outside Narshe's gate (115,35), after the Ice Dragon (event battle 132,
+-- on the plain south of Narshe's gate (115,38), after the Ice Dragon (event battle 132,
 -- _cc36df: $0695 cleared), Tritoch (119, _cc3719: $029E, given), Umaro's
 -- carving (117, _ccd709: $027A, Terrato given) and UMARO's join (_ccd793:
 -- $02FD), the party regrouped to UMARO, MOG, TERRA and CELES
 -- (docs/design/route-wor-narshe.md).  No timer.
 M.contracts["wor-narshe-v1"] = {
   slot = 3,
-  world = { map = 1, x = 115, y = 35 },
+  world = { map = 1, x = 115, y = 38 },
   switches = {
     { 0x00A4, 1, "the World of Ruin (:12423)" },
     { 0x02FA, 1, "MOG available (_cc3a4c)" },
@@ -1815,7 +1815,7 @@ M.contracts["wor-narshe-v1"] = {
   },
   ram = {
     { 0x1F62, 0xFF, 115, "the Falcon parked at x 115 (save-block cell $1F62)" },
-    { 0x1F63, 0xFF, 35, "the Falcon parked at y 35 (save-block cell $1F63)" },
+    { 0x1F63, 0xFF, 38, "the Falcon parked at y 38 (save-block cell $1F63)" },
     { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
     { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
     { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
