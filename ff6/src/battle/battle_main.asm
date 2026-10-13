@@ -4143,6 +4143,9 @@ Cmd_18:
 ; [ command $04: revert ]
 
 Cmd_04:
+        jsl     Ot6RevertTake   ; ot6 #430: a Revert buys nothing, so a boost
+                                ;   raised on it is dropped, not charged
+                                ;   (ot6_trance.asm)
 @1927:  lda     $3ef9,y
         bit     #$08
         bne     _1937

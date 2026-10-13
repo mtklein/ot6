@@ -24,6 +24,11 @@
 --         no gauge in $3B04), the bank pays three, and she is still morphed
 --         HOLD ticks later (longer than the 2-BP span), or when the battle
 --         ends if it ends after the 2-BP span.
+--   4     Morph at 3 BP, then Revert boosted to 2 BP (#430): the permanent
+--         morph reverts (her morph bit clears in the battle), and the
+--         Revert charges nothing: a boost on it buys nothing, so it is
+--         refunded (Ot6RevertTake) and the turn ends as an unboosted one,
+--         its regen pip included (bank after = bank before + 1, capped at 5).
 -- One step a battle: once it is done the party Fights the battle out and
 -- the next step waits for the next random battle (holding one battle up
 -- for every span cost a wipe, two Ninjas the party's Fights cannot touch:
@@ -38,9 +43,9 @@
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local TERRA, MORPH = 0x00, 0x03
+local TERRA, MORPH, REVERT = 0x00, 0x03, 0x04
 local FD = H.newFightDriver("trance", { tactical = true, boost = true, items = true, healPercent = 60, nuke = { 0x02 } })
-local BATTLES = 12
+local BATTLES = 15
 -- the designed spans, in battle ticks, for speeds 110, 82, 66 (a speed s
 -- runs $FFFF out in floor(65535 / s) + 1 subtractions)
 local SPAN = { [0] = 596, [1] = 800, [2] = 993 }
@@ -48,7 +53,7 @@ local HOLD = 1200
 
 local seat, battles = nil, 0
 local stepped = false     -- a step finished in this battle: the rest wait for the next
-local done = { [0] = false, [1] = false, [2] = false, [3] = false }
+local done = { [0] = false, [1] = false, [2] = false, [3] = false, [4] = false }
 local function e() return seat * 2 end
 local function ticks() return H.readByte(0x3A3E) | (H.readByte(0x3A3F) << 8) end
 local function morphed() return seat ~= nil and (H.readByte(0x3EF9 + e()) & 0x08) ~= 0 end
@@ -57,6 +62,7 @@ local function inBattle() return H.battleLoadStarted() end
 -- TERRA's Ot6ActionEnd for her Morph ($3A7C = $03): bank at entry, the frame
 -- after; her ActionEnds of any command, for the turn count
 local ends, turns = {}, 0
+local revEnds = {}   -- her Reverts' ActionEnds: { f, pre, post }
 -- the morph now watched: { t0 = ticks at the clock's start (or the morph's,
 -- at 3 BP), turns0, clocked, t1 = ticks when the clock ran out }
 local cur = nil
@@ -70,12 +76,20 @@ local function arm()
     if H.readByte(0x3A7C) == MORPH then
       ends[#ends + 1] = { f = H.frame, pre = H.readByte(0x3E9C + seat * 2) }
     end
+    if H.readByte(0x3A7C) == REVERT then
+      revEnds[#revEnds + 1] = { f = H.frame, pre = H.readByte(0x3E9C + seat * 2),
+        pending = H.readByte(0x3E9D + seat * 2) }
+      H.log(string.format("[trance] f%d her Revert ends: bank %d, pending %d at Ot6ActionEnd", H.frame,
+        revEnds[#revEnds].pre, revEnds[#revEnds].pending))
+    end
   end, emu.callbackType.exec, ae, ae)
   local lastM, lastC = false, false
   emu.addEventCallback(function()
     if seat == nil or not H.battleActive() then lastM, lastC = false, false; return end
     local x = ends[#ends]
     if x ~= nil and x.post == nil and H.frame > x.f then x.post = H.readByte(0x3E9C + e()) end
+    local r = revEnds[#revEnds]
+    if r ~= nil and r.post == nil and H.frame > r.f then r.post = H.readByte(0x3E9C + e()) end
     local m, c = morphed(), H.readByte(0x3EE2) == e()
     if m and not lastM and cur ~= nil and cur.m0 == nil then
       cur.m0, cur.t0m, cur.turns0 = H.frame, ticks(), turns
@@ -204,11 +218,62 @@ local function step(b)
   }, {})
 end
 
+-- step 4 (#430): Morph at 3 BP, then Revert at 2 BP in the same battle.
+-- The Revert's resolution is its ActionEnd (command $04) and the bank read
+-- the frame after; the morph bit is read some frames on, when the revert's
+-- animation has run.
+local REVERT_BOOST = 2
+local function revertDone()
+  if cur ~= nil and danger() then cur.abandoned = true; return true end
+  if cur == nil then return false end
+  local r = revEnds[#revEnds]
+  if #revEnds <= cur.rmark or r.post == nil then return false end
+  return H.frame > r.f + 120
+end
+local function step4()
+  local plan = { { who = TERRA, cmd = MORPH, boost = 3, self = true },
+    { who = TERRA, cmd = REVERT, boost = REVERT_BOOST, self = true } }
+  local opts = { untilPlanDone = true, idle = "defend", others = "thin", maxFrames = 150000, planDone = revertDone }
+  return H.cond(function() return not done[4] and not stepped and inBattle() and not danger() and not morphed() end, {
+    H.call(function() cur = { b = 3, mark = #ends, rmark = #revEnds, f0 = H.frame } end),
+    watched(H.kitBattle(plan, opts)),
+    H.call(function()
+      local r = revEnds[#revEnds]
+      if cur.abandoned then
+        H.log("[trance] the party is in trouble: the Revert step is let go, the next battle")
+        stepped = true
+        return
+      end
+      if cur.m0 == nil then
+        H.log(string.format("[trance] battle %d: the 3-BP Morph before the Revert did not land: the next", battles))
+        return
+      end
+      if #revEnds <= cur.rmark or r.post == nil then
+        H.log(string.format("[trance] battle %d ended before the Revert resolved: the next", battles))
+        return
+      end
+      H.assertEq(cur.clocked == true, false, "the Morph before the Revert is the 3-BP one (not clocked)")
+      local k = H.vars.kit[#H.vars.kit]
+      H.assertEq(k ~= nil and k.boost, REVERT_BOOST, string.format("the Revert was confirmed at %d BP pending",
+        REVERT_BOOST))
+      H.assertEq(morphed(), false, "after a 3-BP Morph, Revert reverts her (her morph bit clears)")
+      H.assertEq(r.pending, 0, string.format("the Revert's %d-BP boost is dropped before Ot6ActionEnd (pending 0)",
+        REVERT_BOOST))
+      H.assertEq(r.post, math.min(r.pre + 1, 5), string.format("Revert at %d BP charges nothing and the turn "
+        .. "regens a pip (bank %d -> %d)", REVERT_BOOST, r.pre, r.post))
+      H.log(string.format("[trance] the Revert at %d BP after a 3-BP Morph: reverted, bank %d -> %d (battle %d)",
+        REVERT_BOOST, r.pre, r.post, battles))
+      done[4] = true
+      stepped = true
+    end),
+  }, {})
+end
+
 H.run({ maxFrames = 900000 }, {
   H.bootCheckpoint("fc-alcove-v1"),
   H.call(arm),
   H.fcAlcoveToBattle("trance"),
-  H.driveUntil(function() return done[0] and done[1] and done[2] and done[3] end, 850000, {
+  H.driveUntil(function() return done[0] and done[1] and done[2] and done[3] and done[4] end, 850000, {
     H.cond(function() return not inBattle() end, { H.fcPace("trance") }, {}),
     H.call(function()
       battles = battles + 1
@@ -222,15 +287,16 @@ H.run({ maxFrames = 900000 }, {
       H.log(string.format("[trance] battle %d: TERRA seat %d, bank %d, vanilla's gauge $1CF6 = %02X (unread)", battles,
         seat, H.readByte(0x3E9C + e()), H.readByte(0x1CF6)))
     end),
-    step(0), step(1), step(2), step(3),
+    step(0), step(1), step(2), step(3), step4(),
     H.call(function()
-      if done[0] and done[1] and done[2] and done[3] then
+      if done[0] and done[1] and done[2] and done[3] and done[4] then
         H.log(string.format("[trance] PASS: Morph at 0, 1 and 2 BP lasts %d, %d and %d ticks and pays its boost "
-          .. "(2 by a take-back from 3); at 3 BP nothing is clocked and she holds the morph (battle %d)",
+          .. "(2 by a take-back from 3); at 3 BP nothing is clocked and she holds the morph; a boosted Revert "
+          .. "after it reverts and charges nothing (battle %d)",
           SPAN[0], SPAN[1], SPAN[2], battles))
       end
     end),
-    H.cond(function() return not (done[0] and done[1] and done[2] and done[3]) and inBattle() end, {
+    H.cond(function() return not (done[0] and done[1] and done[2] and done[3] and done[4]) and inBattle() end, {
       -- the rest of this battle: the route's fight driver plays it out
       -- (Bolt for the Floating Continent's bolt-weak pool, care, boosts);
       -- everyone's plain Fights lost to two Vanished Ninjas (r6, k3)
@@ -238,5 +304,5 @@ H.run({ maxFrames = 900000 }, {
         H.call(function() FD.frame() end),
       }, "the battle played out"),
     }, {}),
-  }, "TERRA's four Morphs"),
+  }, "TERRA's four Morphs and a Revert"),
 })
