@@ -764,11 +764,13 @@ H.run({ maxFrames = 1500000 }, {
   -- $02DA and shows the cultists: MagiMaster waits on 364 (8,8)
   door(7, 6, MAP_GEMBOX, "the top -> the Gem Box's room (366)"),
   chestAt(7, 7, 0x0B8, "Gem Box (366 (7,7))", GEM_BOX),
-  -- the relics, then the Gem Box onto TERRA (X-Magic: two casts a turn,
-  -- route-wor-thamasa.md finding 6) and the Force Armor (halves fire, ice
-  -- and bolt) onto CELES
+  -- the relics, and the Force Armor (halves fire, ice and bolt) onto
+  -- CELES.  The Gem Box stays in the bag: it turns its wearer's Magic row
+  -- into X-Magic (command $17), which the driver does not drive, and TERRA
+  -- in it passed every turn of MagiMaster's fight ('cmds=17,FF,FF,01',
+  -- 'actor=0 char=0 plan=switch': build/attempts/wt/v030-route/lab/tower/
+  -- cap2)
   wallRingsOff("MagiMaster"),
-  lazy(function() return H.equipKit(TERRA, { { 4, GEM_BOX } }, { tag = "TERRA: the Gem Box" }) end),
   lazy(function() return H.equipKit(CELES, { { 3, FORCE_ARMOR } }, { tag = "CELES: the Force Armor" }) end),
   H.call(function() say("wor", "dressed for MagiMaster: " .. kitLine()) end),
   door(7, 13, MAP_TOP, "the Gem Box's room -> the top (364 (7,7))"),
