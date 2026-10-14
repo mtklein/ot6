@@ -8169,12 +8169,15 @@ function Driver:magicOnlyLine(actor, boost)
     end
   end
   -- opts.reraiseHold = { [species] = fraction }: once one of these stands at
-  -- or under that fraction, no member attacks while a living member lacks
-  -- Life 3 (or Shell, under opts.shellVs): the casters above put them on,
-  -- and the rest read the field with Scan, which is no hit.  MagiMaster's
-  -- Ultima as he dies killed members at full HP ('from 3591/3591 by ... atk
-  -- $14 (ONE ACTION from >= 80%)') when the blow that ended him landed
-  -- before the buffs did (build/attempts/wt/v031-tower/lab/mm5_*)
+  -- or under that fraction, no member attacks while a member is down, lacks
+  -- Shell (under opts.shellVs) or stands under 90% HP: MagiMaster's Ultima
+  -- as he dies must leave one member standing.  Life 3 does not answer it:
+  -- two members with it set ('life3=1') died to that Ultima and the run
+  -- was lost, the battle ending before the revive's queued action
+  -- (ReraiseEffect, battle_main.asm @0799; build/attempts/wt/v031-tower/
+  -- lab/mm8_*, '[end] ... e0 3059 shell=1 life3=1').  A member who cannot
+  -- cast the missing Shell raises the fallen (a Fenix Down) or tops up
+  -- the most hurt (a Potion), else reads the field with Scan, no hit
   local rh = self.opts.reraiseHold
   if rh then
     local hold, boss = false, nil
@@ -8187,33 +8190,35 @@ function Driver:magicOnlyLine(actor, boost)
       end
     end
     if hold then
-      local bare = nil
+      local dead, bare, low, lowFrac = nil, nil, nil, 1
       for e = 0, 3 do
-        if M.readWord(0x3BF4 + e * 2) > 0 then
-          local st3, st4 = M.readByte(0x3EF8 + e * 2), M.readByte(0x3EF9 + e * 2)
-          if (st4 & 0x04) == 0 or (self.opts.shellVs and (st3 & 0x20) == 0 and (st3 & 0x80) == 0) then bare = bare or e end
+        local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+        if mx > 0 and hp == 0 then dead = dead or e end
+        if hp > 0 then
+          local st3 = M.readByte(0x3EF8 + e * 2)
+          if self.opts.shellVs and (st3 & 0x20) == 0 and (st3 & 0x80) == 0 then bare = bare or e end
+          if hp < mx * 0.9 and hp / mx < lowFrac then low, lowFrac = e, hp / mx end
         end
       end
-      if bare ~= nil then
-        local key = string.format("hold:%d:%d", actor, bare)
+      if dead ~= nil or bare ~= nil or low ~= nil then
+        local key = string.format("hold:%d:%s:%s:%s", actor, tostring(dead), tostring(bare), tostring(low))
         if not self.statusSaid[key] then
           self.statusSaid[key] = true
-          M.log(string.format("[%s] actor=%d holds the attack: entity %d lacks Life 3 or Shell before the boss's end",
-            self.tag or "fight", actor, bare))
+          M.log(string.format("[%s] actor=%d holds the attack before the boss's end: down %s, without Shell %s, "
+            .. "hurt %s", self.tag or "fight", actor, tostring(dead), tostring(bare), tostring(low)))
+        end
+        local row = cmdRow(actor, BATTLE.CMD_ITEM)
+        local fenix = row and dead ~= nil and self:battInvIdx(0xF0)
+        if fenix then
+          return { kind = "item", item = 0xF0, target = dead, row = row, idx = fenix, reason = "reraise_hold" }
+        end
+        local potion = row and low ~= nil and self:battInvIdx(0xE9)
+        if potion then
+          return { kind = "item", item = 0xE9, target = low, row = row, idx = potion, reason = "reraise_hold" }
         end
         if spellCell(actor, M.STUDY_SPELL, true) ~= nil then
           return { kind = "magic", spell = M.STUDY_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0,
                    aim = boss, vetoOk = true, reason = "reraise_hold" }
-        end
-        -- no Scan: a Potion on the most hurt living member is the turn
-        local row, low, lowHp = cmdRow(actor, BATTLE.CMD_ITEM), nil, nil
-        for e = 0, 3 do
-          local hp = M.readWord(0x3BF4 + e * 2)
-          if hp > 0 and (lowHp == nil or hp < lowHp) then low, lowHp = e, hp end
-        end
-        local idx = row and self:battInvIdx(0xE9)
-        if idx ~= nil and low ~= nil then
-          return { kind = "item", item = 0xE9, target = low, row = row, idx = idx, reason = "reraise_hold" }
         end
       end
     end
