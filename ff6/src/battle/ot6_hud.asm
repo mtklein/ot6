@@ -2269,9 +2269,11 @@ Ot6ShieldTbl:
         .word   $003b
         .byte   2, OT6_BLUDG    ; reach frog: soft, crushed.  ice vanilla
         .word   $00d2
-        .byte   3, OT6_SLASH|OT6_BLUDG ; mantodea: cut or crush the scythes;
-                                ;   three, so the party breaks it before
-                                ;   its battle lands (route-wor-terra 8).
+        .byte   3, OT6_SLASH|OT6_BLUDG|OT6_SPECIAL ; mantodea: cut or crush
+                                ;   the scythes; three, so the party breaks
+                                ;   it before its battle lands (route-wor-
+                                ;   terra 8); relm's brush keys it the day
+                                ;   she joins (route-wor-thamasa 4.3).
                                 ;   fire vanilla
         .word   $0087
         .byte   3, OT6_PIERCE|OT6_SLASH ; sprinter: a running bird.  bolt
@@ -2369,6 +2371,85 @@ Ot6ShieldTbl:
                                 ;   fire keying it, ten held the break off
                                 ;   long enough for absolute 0 to wear the
                                 ;   party down (route-wor-narshe.md 11.4)
+        ; ---- the world of ruin: jidoor and thamasa (owzer's house and
+        ; chadarnook, the plains, the fanatics' tower; the holy dragon and
+        ; magimaster; docs/design/route-wor-thamasa.md section 4) ---------
+        ; Into owzer's the party holds slash (terra, celes, cyan), fire,
+        ; holy (terra's pearl) and ice/bolt/poison (celes's tritoch); relm
+        ; adds special, strago bludgeon.  Vanilla elements stay.
+        .word   $00cc
+        .byte   1, OT6_SLASH|OT6_PIERCE ; vindr: a bird that dodges blades
+                                ;   (evade 90): fire (vanilla) is the key
+                                ;   that lands
+        .word   $00ad
+        .byte   2, OT6_SLASH|OT6_SPECIAL ; souldancer: a dancing spirit.
+                                ;   poison vanilla
+        .word   $0092
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; crusher: the house's tank; no
+                                ;   blade keys it, fire (vanilla) does
+        .word   $0077
+        .byte   1, OT6_SLASH|OT6_PIERCE ; wild cat: in fours.  fire|water
+                                ;   vanilla
+        .word   $0009
+        .byte   2, OT6_SLASH|OT6_SPECIAL ; dahling: a painting; celes's
+                                ;   runic eats its ice 2 and bolt 2.  poison
+                                ;   vanilla
+        .word   $0033
+        .byte   2, OT6_SLASH    ; nightshade: a painted flower.  fire
+                                ;   vanilla; absorbs water
+        .word   $0050
+        .byte   4, OT6_SLASH|OT6_SPECIAL ; still life: the basement's
+                                ;   miniboss painting.  fire vanilla
+        .word   $011e
+        .byte   0, $00          ; chadarnook (the goddess): hitting her is
+                                ;   the fight's mistake, so no gauge
+        .word   $0148
+        .byte   6, OT6_SLASH|OT6_PIERCE ; chadarnook (the demon): the
+                                ;   blades, with fire and pearl (vanilla
+                                ;   fire|holy); absorbs bolt
+        .word   $002b
+        .byte   2, OT6_PIERCE|OT6_SPECIAL ; harpy: thamasa's plain; relm's
+                                ;   brush
+        .word   $008a
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; gloomshell: a shell, strago's rod.
+                                ;   ice vanilla
+        .word   $00d4
+        .byte   3, OT6_SLASH|OT6_BLUDG ; prussian: a bear
+        ; The fanatics' tower is magic-only (battle switch $38): only spells
+        ; chip, on a weakness or by ot6's break.  The species meet no class
+        ; on this arc; special, the magical body's key, stands for the few
+        ; places outside the tower they appear.  L.20 and L.70 start with
+        ; reflect: quake (earth, added in Ot6ElemAddTbl) reaches them.
+        .word   $0132
+        .byte   1, OT6_SPECIAL  ; l.10 magic: fire|holy vanilla
+        .word   $0130
+        .byte   2, OT6_SPECIAL  ; l.20 magic: reflect; +earth
+        .word   $0125
+        .byte   2, OT6_SPECIAL  ; l.30 magic: poison vanilla; absorbs holy
+        .word   $012b
+        .byte   2, OT6_SPECIAL  ; l.40 magic: bolt vanilla
+        .word   $0133
+        .byte   2, OT6_SPECIAL  ; l.50 magic: fire|holy vanilla
+        .word   $0139
+        .byte   3, OT6_SPECIAL  ; l.60 magic: fire vanilla; absorbs ice
+        .word   $0143
+        .byte   3, OT6_SPECIAL  ; l.70 magic: reflect; +earth; ice|water
+                                ;   vanilla, absorbs fire
+        .word   $0163
+        .byte   3, OT6_SPECIAL  ; l.80 magic: poison vanilla
+        .word   $0164
+        .byte   0, $00          ; l.90 magic: reflect and nulls holy, earth,
+                                ;   water: nothing the party casts reaches
+                                ;   a weakness, so no gauge and full damage
+        .word   $0055
+        .byte   0, $00          ; magic urn: a gift, not a fight
+        .word   $0024
+        .byte   6, OT6_SPECIAL  ; white drgn (the holy dragon): no
+                                ;   weakness and no reflect: ot6's break is
+                                ;   its key
+        .word   $0166
+        .byte   8, OT6_SPECIAL  ; magimaster: his wall's one weakness
+                                ;   (wallchange), or ot6's break
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian
