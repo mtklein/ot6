@@ -331,6 +331,7 @@ H.run({ maxFrames = 400000 }, {
       H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
   end),
   H.crossDoor(44, 14, 20, 41, 24, "item shop door 26(44,14)->20(41,24), return"),
+  H.gearStop({ tag = "gear Narshe" }),     -- #434: buy power with gil
   H.call(function()
     H.log(string.format("[shop] Narshe stop cost %d frames (f%d -> f%d)",
       H.frame - H.vars.shopStart, H.vars.shopStart, H.frame))

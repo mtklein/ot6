@@ -420,6 +420,7 @@ local steps = {
   end),
   crossDoor(36, 45, 343, 26, 39, "item shop door 347(36,45)->343(26,39), return",
     { avoid = VIGNETTES }),
+  H.gearStop({ tag = "gear Thamasa", avoid = VIGNETTES }),     -- #434: buy power with gil
 
   chestAuto(31, 37, 249, "Eyedrop", 0xF3, { avoid = VIGNETTES }),
   chestAuto(43, 30, 248, "Soft", 0xF4, { avoid = VIGNETTES }),

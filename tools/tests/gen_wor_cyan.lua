@@ -553,7 +553,14 @@ end
 -- fighting what comes (field group 160) and cared for after each fight,
 -- until its lowest member reaches GRIND_LEVEL; the lab's walk took 41
 -- battles and no death for CYAN 33 -> 38.  GRIND_BATTLES bounds it.
-local GRIND_LEVEL, GRIND_BATTLES = 38, 90
+-- #434: with the gear policy's armor and blades (Maranda's Falchions, the
+-- Diamond and Gaia gear) L35 stands where L38 stood: the Storm Dragon by
+-- distinct battle key, 16 seeds a sweep (build/attempts/wt/gear-policy/
+-- storm/), main's route at L38: 12 keys, 1 wipe, 15 deaths; the policy at
+-- L38: 12 keys, 0 lost, 2 deaths; at L35: 13 keys, 0 lost, 12 deaths, the
+-- grind 22 battles where it was 55; with no grind (CYAN L32): 13 keys, 0
+-- lost, 34 deaths, fights up to 28,729 ticks -- attrition, so not that.
+local GRIND_LEVEL, GRIND_BATTLES = 35, 90
 local function lowest()
   local m = 99
   for _, ch in ipairs(REGROUP) do m = math.min(m, level(ch)) end
@@ -764,6 +771,7 @@ H.run({ maxFrames = 400000 }, {
   dressFromBag(SABIN, "SABIN"),
   H.call(function() say("shop", "Maranda's armor: " .. kitLine()) end),
   walkInto(44, 14, MAP_MARANDA, "the armor shop -> Maranda"),
+  H.gearStop({ tag = "gear Maranda", fight = FIGHT }),     -- #434: buy power with gil
   via({ { 9, 25 }, { 20, 17 }, { 26, 12 } }, "Maranda's street to Lola's door"),
   walkInto(26, 11, MAP_LOLA, "Maranda -> Lola's house (196)"),
   -- Lola with CYAN (_cc3e45, $029C), and the letters he exchanges

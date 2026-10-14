@@ -618,6 +618,7 @@ H.run({ maxFrames = 300000 }, {
   H.bagArrange({ POTION, FENIX, TONIC, REMEDY }, { tag = "bag: combat items on top (Jidoor)" }),
   H.call(function() say("shop", "Jidoor after the dragon") end),
   H.crossDoor(34, 21, MAP_JIDOOR, 27, 43, "Jidoor's item shop -> the street", { fight = FIGHT }),
+  H.gearStop({ tag = "gear Jidoor", fight = FIGHT }),     -- #434: buy power with gil
   toFalconBy(16, 61, "down", "Jidoor", JIDOOR_WORLD),
   H.fieldCare({ tag = "beside the Falcon" }),
   H.saveAtCheckpoint("wor-cyan-v1"),

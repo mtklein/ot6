@@ -476,6 +476,7 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(H.invCountOf(POTION) >= potionTarget(), true, "Potions at the target leaving Jidoor")
   end),
   H.crossDoor(34, 21, MAP_JIDOOR, 27, 43, "Jidoor's item shop -> the street", { fight = FIGHT }),
+  H.gearStop({ tag = "gear Jidoor", fight = FIGHT, joining = { MOG } }),     -- #434: buy power with gil
   toFalconBy(16, 61, "down", "Jidoor", JIDOOR_WORLD),
   -- Ifrit from SABIN, who waits aboard, to CYAN, so a third member learns
   -- fire for the arc's fire-weak bosses (route-wor-narshe.md 5.4); CYAN's

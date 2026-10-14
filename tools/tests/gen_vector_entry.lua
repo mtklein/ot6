@@ -343,6 +343,7 @@ H.run({ maxFrames = 160000 }, {
     return map() == 323 and H.hasControl() and H.tileAligned() and bright() >= 15
   end, 2400, "back on Albrook's streets", 5),
   H.waitFrames(30),
+  H.gearStop({ tag = "gear Albrook" }),     -- #434: buy power with gil
   H.call(function()
     H.log(string.format("[shop] Albrook stop cost %d frames (f%d -> f%d); back at (%d,%d)",
       H.frame - H.vars.shopStart, H.vars.shopStart, H.frame, H.fieldX(), H.fieldY()))

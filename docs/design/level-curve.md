@@ -375,7 +375,7 @@ estimate until a lab sets it, as the Tentacles' L30 (route-wor-edgar.md
 | milestone | key fights (ROM: L, HP) | what bites (AI script) | projected | target |
 |---|---|---|---|---|
 | v0.27 Terra | Phunbaba (L26 60,000; L31 28,000 / 26,000) | Blow Fish, Bolt 3; absorbs bolt | 33-34 | as reached: the boss is under the party |
-| v0.28 Cyan | Storm Drgn (L74 42,000) | Aero, Cyclonic (Near Fatal), Wind Slash; absorbs wind, weak bolt | 36 | 38-40 |
+| v0.28 Cyan | Storm Drgn (L74 42,000) | Aero, Cyclonic (Near Fatal), Wind Slash; absorbs wind, weak bolt | 36 | 35 with the gear policy's kit (38 before; "Buying power" below) |
 | v0.29 Narshe | Umaro (L33 17,200), Tritoch (L62 30,000), Ice Dragon (L74 24,400) | Tritoch: Ice 3, Cold Dust (Frozen); nulls bolt and five more, weak fire | 39 | 40 |
 | v0.30 Jidoor & Thamasa | Chadarnook (L37 56,000; L41 30,000), MagiMaster (L68 50,000), Holy Drgn (`White Drgn`, L71 18,500) | MagiMaster: Fire/Ice/Bolt 3, Doom, and **Ultima as his death counter**; the tower is magic-only | 41 | 45 for MagiMaster |
 | v0.32 Locke | Red Dragon (L67 30,000) | -- | 44 | 44 |
@@ -440,6 +440,41 @@ Golem (20,000) and ZoneSeek (10,000) at Jidoor's auction (`take_gil 20000`
 before `give_genju GOLEM`, `event_main.asm:49702`/`:49745`; `take_gil
 10000` before ZONESEEK, `:49987`/`:50029`); four Crystal Mails at Maranda
 (17,000 each).
+
+### Buying power (#434)
+
+Every town stop with weapon and armor counters runs `H.gearStop`
+(`ot6_field.lua`, "the gear policy"): it plans upgrades for the seated
+party by item value (power, defense, magic defense, evade, stats,
+elements, status protection) plus the break keys a weapon's class and
+element bring, one pick at a time within the purse less the supply
+reserve, then dresses the party from the bag.  Relics, Espers and the
+hands of a two-weapon relic's wearer stay the kits'.  Nikeah's street
+stalls are left out (no talk tile reaches them).  What it bought on the
+qualification play at 04756857 (`build/attempts/wt/gear-policy/qual3/
+qual3-buys.txt`):
+
+| stop | spent | pieces |
+|---|---|---|
+| Narshe (kefka_won, L13) | 6,800 | Mithril Claw, Mithril Shld x2, Iron Armor x2, Iron Helmet, Magus Hat, Silk Robe |
+| Jidoor (after the Zozo grind, L18) | 11,000 | Kaiser, Ninja Gear x2, Mithril Vest, White Dress, Head Band x2, Mithril Shld |
+| Albrook (vector_entry, L19) | 17,500 | Epee x2, Poison Claw, Bard's Hat x3 |
+| Albrook (voyage, for SHADOW) | 3,200 | Blossom |
+| Thamasa (arrival, FC prep) | 29,000 | Power Sash x2, Gaia Gear, Mystery Veil, Gold Shld, Morning Star |
+| South Figaro, Kohlingen, Maranda (WoR) | 62,500 | Diamond Armor x2, Gold Lance, Diamond Shld, Falchion |
+| Jidoor (WoR) | 46,000 | Man Eater, Circlet x5 |
+
+Against main's play of the same route with nothing else changed
+(`chain-base/`, `chain-policy-r6/`): deaths over the line 11 -> 7, the
+one event loss (wor_terra) in both, the Air Force gauntlet (fc_landing)
+2 deaths -> 0.  Two grinds were tried against it.  The Zozo grind as an HP
+floor that follows each member's magic defense still needed L18 (LOCKE's
+magic defense stays at 65 after Jidoor; `zozo-hpfloor/`), so it stays.
+The Storm Dragon's grind went from L38 to L35, 22 battles where it was
+55 (gen_wor_cyan; `storm/`): by distinct battle key, 16 seeds a sweep,
+main at L38 12 keys, 1 wipe, 15 deaths; the policy at L38 12 keys, 0
+lost, 2 deaths; at L35 13 keys, 0 lost, 18 deaths (the final policy) or
+12 (before the pair rule); with no grind 13 keys, 0 lost, 34 deaths.
 
 ### Gear on the way
 

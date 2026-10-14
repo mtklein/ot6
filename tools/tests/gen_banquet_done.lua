@@ -820,6 +820,7 @@ local steps = {
     H.assertEq(H.invCountOf(0xA7) >= 1, true, "the bag holds a Debilitator")
   end),
   H.crossDoor(27, 16, 253, 11, 54, "Vector weapon shop exit 246(27,16)->253(11,54)"),
+  H.gearStop({ tag = "gear Vector" }),     -- #434: buy power with gil
 
   H.navTo(30, 62, { maxFrames = 30000, playBattles = "tactical",
     arrive = function() return H.worldMode() end }),

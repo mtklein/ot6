@@ -355,6 +355,8 @@ local steps = {
     "held DOWN onto the (37,55) trigger -> Albrook 323"),
   H.waitUntil(landed(323, 10), 2400, "back on Albrook's streets", 1),
   H.waitFrames(30),
+  -- #434: buy power with gil, for SHADOW too, who is hired at the dock
+  H.gearStop({ tag = "gear Albrook", joining = { 3 } }),
   H.call(function()
     H.log(string.format("[shop] Albrook stop cost %d frames (f%d -> f%d); back at (%d,%d)",
       H.frame - H.vars.shopStart, H.vars.shopStart, H.frame, H.fieldX(), H.fieldY()))

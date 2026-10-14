@@ -536,6 +536,7 @@ H.run({ maxFrames = 200000 }, {
     H.navTo(81, 21, { maxFrames = 6000, playBattles = "tactical" }),
     holdOut("down", MAP_TZEN, "the relic shop's (81,22) trigger -> Tzen 305"),
   }, {}),
+  H.gearStop({ tag = "gear Tzen" }),     -- #434: buy power with gil; the kits below re-equip their picks
   -- CELES's own kit back (gen_wor_tzen_door's: the Genji Glove, the
   -- ThunderBlade in the left hand, the Blizzard in the right), then
   -- SABIN's relics first: the second Fire Knuckle needs the Genji Glove on
@@ -553,8 +554,10 @@ H.run({ maxFrames = 200000 }, {
     say("tzen", "SABIN dressed")
     H.assertEq(kit(SABIN), string.format("%02X %02X %02X %02X %02X %02X %02X", IFRIT, FIRE_KNUCKLE,
       FIRE_KNUCKLE, TIGER_MASK, POWER_SASH, GENJI, BLACK_BELT), "SABIN wears IFRIT and his kit")
-    H.assertEq(kit(CELES):sub(1, 17), "06 0E 0F 76 8F D1", "CELES wears the stretch's kit again: MADUIN, "
-      .. "Blizzard + ThunderBlade, Gold Helmet, Gold Armor, Genji Glove")
+    -- her helmet and armor are the gear policy's (#434), whatever beats
+    -- the Gold Helmet and Gold Armor she arrived in
+    H.assertEq(kit(CELES):sub(1, 8) .. " " .. kit(CELES):sub(16, 17), "06 0E 0F D1", "CELES wears the stretch's "
+      .. "kit again: MADUIN, Blizzard + ThunderBlade, Genji Glove")
     -- the other relic is the relic rule's (H.relicKit above): the Jewel
     -- Ring, or a guard covering Petrify and more (a Ribbon)
     local r5 = H.readByte(c(CELES, 0x24))

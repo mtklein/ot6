@@ -491,6 +491,7 @@ H.run({ maxFrames = 1200000 }, {
     H.assertEq(invCount(REVIVIFY) >= 3, true, "Revivifies at 3 leaving Jidoor (#231)")
   end),
   H.crossDoor(34, 21, 198, 27, 43, "Jidoor item shop -> street", { fight = FIGHT }),
+  H.gearStop({ tag = "gear Jidoor", fight = FIGHT, healer = CELES }),     -- #434: buy power with gil
   H.navTo(16, 61, { maxFrames = 24000, playBattles = "tactical", fight = FIGHT }),
   H.driveUntil(function() return H.worldMode() end, 6000, {
     H.hold({ "down" }), H.waitFrames(4),
