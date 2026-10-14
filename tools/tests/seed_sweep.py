@@ -245,8 +245,16 @@ def main():
     step = a.step if a.step is not None else max(1, 60 // max(a.seeds, 1))
     timeout = a.timeout or e.get("timeout") or 1800
     env_extra = {}
+    # The graph Continues the capture its own play made (build/checkpoints/
+    # <key>/, docs/TOOLING.md "One play from power-on"); the tracked copy is
+    # an older build's save.  So does the sweep, when this tree has one
+    # (#434: two sweeps of trees whose play differed booted the same tracked
+    # save and drew identical fights).
+    boot_ckpt = None
     if e.get("checkpoint"):
-        env_extra["OT6_SRAM_CHECKPOINT"] = f"tools/tests/checkpoints/{e['checkpoint']}"
+        cap = f"build/checkpoints/{e['checkpoint']}"
+        boot_ckpt = cap if (ROOT / cap / "manifest.json").exists() else f"tools/tests/checkpoints/{e['checkpoint']}"
+        env_extra["OT6_SRAM_CHECKPOINT"] = boot_ckpt
     if e.get("stack"):
         env_extra["OT6_STACK"] = e["stack"]
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -260,7 +268,7 @@ def main():
     if e.get("prev"):
         print(f"  boots build/states/{e['prev']}.mss.lua as the graph does")
     if e.get("checkpoint"):
-        print(f"  cold-boots checkpoint {e['checkpoint']} as the graph does")
+        print(f"  cold-boots checkpoint {e['checkpoint']} from {boot_ckpt}")
 
     results = []
 
