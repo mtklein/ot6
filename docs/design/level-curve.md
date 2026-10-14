@@ -1,41 +1,50 @@
 # The OT6 level curve — party levels by area
 
 > This is the authoritative party-level reference, and it is *empirical*: the
-> levels below are read directly off the routed **checkpoint savestate chain**
-> (`build/states/*.mss`), not from a vanilla walkthrough — so they are the
-> levels OT6's own route actually reaches, which is what tuning must answer to.
+> levels below are read off the routed **tracked checkpoints**
+> (`tools/tests/checkpoints/*-v1`), not from a vanilla walkthrough, so they
+> are the levels OT6's own route reaches, which is what tuning must answer to.
 >
-> Regenerate with `tools/savestate_party.py`'s `read_party` over the checkpoints
-> (the snippet at the bottom). Requires `make savestates` to have built the
-> chain.
+> Regenerate with `tools/savestate_party.py`'s `read_party_sram` (the snippet
+> at the bottom).
 
 ## The curve (active party at each checkpoint)
 
+Read from the tracked checkpoints (`tools/tests/checkpoints/*-v1`) with
+`read_party_sram`, re-read for v0.31 after the v0.30 re-cut and the gear
+policy (#434): `build/attempts/wt/v031-cleanup/levels-421.log`.  The
+scenario rows show the one member saved in that slot.
+
 | area / checkpoint | party (name L) | range |
 |---|---|---|
-| Narshe start (arvis_wake) | TERRA 4 | L4 |
-| Figaro (figaro_intro) | TERRA 5 | L5 |
-| Mt. Kolts (kolts_cave) | TERRA 8 · LOCKE 9 · EDGAR 10 | L8–10 |
-| Vargas (vargas_won) | TERRA 10 · LOCKE 10 · EDGAR 11 · SABIN 12 | L10–12 |
-| Returner Hideout | TERRA 10 · LOCKE 11 · EDGAR 11 · SABIN 12 | L10–12 |
-| Lete River (banon aboard) | TERRA 10 · EDGAR 11 · SABIN 12 · BANON | L10–12 |
-| Sabin scenario (camp/Doma) | CYAN 13 · SHADOW 11 · SABIN 13 | L11–13 |
-| Sabin's leap done (sabin_done) | UMARO-slot 17 | ~L17 |
-| Battle for Narshe (kefka_won) | LOCKE 12 · EDGAR 13 · SABIN 13 · CELES 12 | L12–13 |
-| Zozo arrival (zozo_arrival) | LOCKE 18 · EDGAR 18 · SABIN 19 · CELES 18 | L18–19 |
-| Zozo (zozo_done) | LOCKE 18 · EDGAR 19 · SABIN 19 · CELES 18 | L18–19 |
-| Opera / Vector (ultros2_entry) | LOCKE 14 · EDGAR 15 · SABIN 15 | L14–15 |
-| Blackjack (post-Vector) | LOCKE 14 · EDGAR 15 · SABIN 15 · CELES 14 | L14–15 |
-| Crescent → Thamasa | TERRA 14 · LOCKE 15 · SHADOW 14 | L14–15 |
-| Esper Mtn / Ultros③ | TERRA 15 · LOCKE 16 · STRAGO 17 | L15–17 |
-| **FC entry (thamasa_done)** | **TERRA 15 · LOCKE 16 · STRAGO 17 · RELM 15** | **L15–17** |
+| Narshe, on the world map (`world-narshe-v1`) | TERRA 5 · LOCKE 7 | L5–7 |
+| Figaro, on the world map (`world-figaro-v1`) | TERRA 5 · LOCKE 7 · EDGAR 8 | L5–8 |
+| Mt. Kolts summit (`kolts-summit-v1`) | TERRA 10 · LOCKE 11 · EDGAR 11 | L10–11 |
+| Sabin's scenario, the camp (`camp-escaped-v1`) | CYAN 14 · SHADOW 12 · SABIN 14 | L12–14 |
+| Sabin's scenario, the falls (`falls-done-v1`) | CYAN 14 · SABIN 14 | L14 |
+| Scenario hub / Locke done / Sabin done | one member, L17–18 | L17–18 |
+| Battle for Narshe (`kefka-won-v1`) | LOCKE 13 · EDGAR 13 · SABIN 14 · CELES 13 | L13–14 |
+| Zozo (`zozo-outside-v1`) | LOCKE 18 · EDGAR 18 · SABIN 18 · CELES 18 | L18 |
+| After the opera (`post-opera-v1`) | LOCKE 19 · EDGAR 19 · SABIN 19 · CELES 19 | L19 |
+| Vector, the MRF save room (`mrf-save-room-v1`) | LOCKE 20 · EDGAR 20 · SABIN 20 · CELES 20 | L20 |
+| The MRF, after Ifrit and Shiva (`n024-entry-save-v1`) | LOCKE 21 · EDGAR 21 · SABIN 21 · CELES 21 | L21 |
+| The minecart (`minecart-platform-v1`) | LOCKE 21 · EDGAR 21 · SABIN 21 | L21 |
+| Terra returned (`terra-returned-v1`) | LOCKE 21 · EDGAR 21 · SABIN 22 · SETZER 18 | L18–22 |
+| Narshe mission (`narshe-mission-v1`) | LOCKE 22 · EDGAR 22 · SABIN 23 · SETZER 19 | L19–23 |
+| Water Rondo (`water-rondo-v1`) | LOCKE 22 · EDGAR 22 · SABIN 23 · MOG 25 | L22–25 |
+| Esper Gate cave (`gate-cave-save-v1`) | TERRA 20 · LOCKE 23 · EDGAR 24 · SABIN 24 | L20–24 |
+| Vector crash (`vector-crash-v1`) | TERRA 22 · LOCKE 25 · EDGAR 25 · SABIN 25 | L22–25 |
+| Banquet (`banquet-done-v1`) | TERRA 22 · LOCKE 25 | L22–25 |
+| Crescent landing (`crescent-landing-v1`) | TERRA 22 · LOCKE 25 · SHADOW 22 | L22–25 |
+| Thamasa, the night (`thamasa-night-v1`) | TERRA 22 · LOCKE 25 · SHADOW 22 | L22–25 |
+| Thamasa fire (`fire-out-v1`) | TERRA 23 · LOCKE 26 · STRAGO 25 | L23–26 |
+| Esper Mtn (`esper-mtn-save-v1`) | TERRA 24 · LOCKE 26 · STRAGO 26 | L24–26 |
+| Ultros③ (`ultros-won-v1`) | TERRA 24 · LOCKE 26 · STRAGO 26 · RELM 23 | L23–26 |
+| **FC entry (`thamasa-done-v1`)** | **TERRA 24 · LOCKE 26 · STRAGO 26 · RELM 23** | **L23–26** |
+| FC landing (`fc-landing-v1`) | TERRA 25 · LOCKE 26 · EDGAR 25 | L25–26 |
+| FC alcove (`fc-alcove-v1`) | TERRA 26 · LOCKE 28 · SHADOW 25 · EDGAR 26 | L25–28 |
 
-The rows from Zozo on predate the #158 grind and the re-cuts since.  The
-tracked checkpoints now read (`build/attempts/wt/v027-wor-plan/checkpoints.log`):
-`post-opera-v1` L19, `narshe-mission-v1` L19-23, `vector-crash-v1` L22-26,
-`thamasa-done-v1` L23-27 (`TERRA L24 960/960 ... LOCKE L27 1215/1215 ...
-STRAGO L25 ... RELM L23`), `fc-alcove-v1` L25-28.  The World of Ruin rows
-are in "The World of Ruin" below.
+The World of Ruin rows are in "The World of Ruin" below.
 
 ## The supply curve (what the bag carries at each level)
 
@@ -203,18 +212,13 @@ per-attempt table and the levers: [map269-random.md](map269-random.md).
 
 ## The Floating Continent gap
 
-Superseded by the regenerated chain: it enters the FC at L23-27
-(`thamasa-done-v1`, above), not L15-17.  The section is kept for its
-reasoning about break and prep.
+The routed party reaches the **Floating Continent at L23–26**
+(`thamasa-done-v1`). Rough vanilla FF6 expectation for the same content is
+**~L25–30** (AtmaWeapon is a ~L30 fight in vanilla), so OT6 arrives a few
+levels light, not the ten an earlier cut showed (L15–17, before the #158
+grind and the re-cuts since).
 
-The routed party reaches the **Floating Continent at L15–17**. Rough vanilla
-FF6 expectation for the same content is **~L25–30** (AtmaWeapon is a ~L30 fight
-in vanilla). So OT6 arrives at the FC roughly **ten levels light**, and the gap
-is widest here — the WoB's hardest stretch against its lowest-relative party.
-
-The deficit is real, and there are two answers, not one — a player can lean on
-tactics, **or grind to close part of the gap** with the Blackjack. See
-"Pre-FC grinding" below. Two things carry the deficit even without grinding:
+What carries the remaining gap:
 
 - **Break, not levels, is the damage.** OT6's fights are Octopath shield/break
   tactics; boss shield and weakness rows are authored *against the routed
@@ -222,14 +226,13 @@ tactics, **or grind to close part of the gap** with the Blackjack. See
   data already matches the party they will actually meet). Raw level gates HP
   and survivability more than damage output.
 - **Prep is the lever.** Row, boost banking, weakness coverage, and the field
-  care between fights (the humane line) are what a player spends to clear a
-  stretch they are under-levelled for — the same discipline the Thamasa arc
-  already shipped (`ROADMAP.md`: "winnable at route level with a player's
-  prep").
+  care between fights are what a player spends to clear a stretch they are
+  under-levelled for, and the Blackjack grind ("Pre-FC grinding" below) closes
+  the rest.
 
 Practical consequences of the route as it stands:
 - The IAF gauntlet is eight fights with **no save and a real Game Over on a
-  loss** (the `_ca5ea9` handler). At L15–17 that is a survivability test, not a
+  loss** (the `_ca5ea9` handler). At L23–26 that is a survivability test, not a
   damage race — budget for HP attrition across the chain and lean on break to
   end fights fast.
 - The FC's random pool (forms 177–188) includes **pincer-capable formations**
@@ -274,26 +277,22 @@ Notes and cautions:
 
 ## Gear at the FC entry (thamasa_done)
 
-The owner's warning was "behind in gear **and** levels"; the gear half, read
-from the same checkpoint:
+Read from `thamasa-done-v1` (`build/attempts/wt/v031-cleanup/thamasa-done-gear-421.log`):
 
-| char | weapon | armor | relic |
-|---|---|---|---|
-| TERRA | **ThunderBlade** (bolt) | Mithril Vest | — |
-| LOCKE | **ThunderBlade** (bolt) | Kung Fu Suit | — |
-| STRAGO | Fire Rod | Cotton Robe | — |
-| RELM | Chocobo Brush | Silk Robe | Memento Ring |
+| char | weapon | shield | helmet | armor | relic |
+|---|---|---|---|---|---|
+| TERRA | Blizzard (ice) | Mithril Shld | Bandana | Mithril Vest | — |
+| LOCKE | **ThunderBlade** (bolt) | Guardian | Head Band | Kung Fu Suit | Genji Glove |
+| STRAGO | Fire Rod | Mithril Shld | Plumed Hat | Cotton Robe | — |
+| RELM | Chocobo Brsh | Mithril Shld | Plumed Hat | Silk Robe | Memento Ring |
 
-Two things stand out:
-- **Two ThunderBlades** — the party already carries bolt weapons, and the whole
-  IAF (and AtmaWeapon) is bolt-weak (`floating-continent-route.md` §3). Front-row
-  Terra/Locke swings, or their Thunder, are a natural break answer; a bolt-leaning
-  three is available without new purchases.
-- **Empty relic slots on three of four**, mid-tier (Mithril/cloth) armor. Relics
-  are the clearest under-gear, and survivability relics are exactly what the IAF's
-  care-stop-less attrition punishes the lack of. The Blackjack reopens WoB shops
-  (Thamasa and others), so gear/relic shopping is part of FC prep alongside a
-  grind.
+- **One ThunderBlade.** The IAF (and AtmaWeapon) is bolt-weak
+  (`floating-continent-route.md` §3); Locke's swings and its Thunder are the
+  party's bolt key.
+- **Empty relic slots on two of four**, mid-tier (Mithril/cloth) armor.
+  Survivability relics are what the IAF's care-stop-less attrition punishes
+  the lack of. The Blackjack reopens WoB shops (Thamasa and others), so
+  gear/relic shopping is part of FC prep ("Buying power" below).
 
 ## The World of Ruin (#386)
 
@@ -498,12 +497,12 @@ are each arc's route plan.
 ## How to regenerate
 
 ```py
-import sys; sys.path.insert(0, "tools")
+import glob, os, sys; sys.path.insert(0, "tools")
 import savestate_party as sp
-for stem in ("arvis_wake", "kolts_cave", ..., "thamasa_done"):
-    party, err = sp.read_party("build/states/%s.mss" % stem)
-    active = [m for m in party if m["active"]]
-    print(stem, [(m["name"], m["level"]) for m in active])
+for d in sorted(glob.glob("tools/tests/checkpoints/*-v1")):
+    party, err = sp.read_party_sram(glob.glob(d + "/*.sram")[0])
+    active = [m for m in party or [] if m["active"]]
+    print(os.path.basename(d), [(m["name"], m["level"]) for m in active])
 ```
 
 Each member dict carries `name`, `level`, `hp`/`maxhp`, `mp`/`maxmp`, `weapon`,

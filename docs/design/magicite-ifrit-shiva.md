@@ -24,7 +24,7 @@ so it needs to be visible in review.
 
 | Channel | Shipped? | Shape | Evidence |
 |---|---|---|---|
-| Spell grant | ✅ | **≤ 5 spell ids** per esper, from the vanilla esper record | `ot6_progression.asm:142-181` (`Ot6EsperSpellKnown`, scans `GenjuProp+1,+3,+5,+7,+9`) and `:203-252` (`Ot6UnionEspers`, seeds the union so a spell nobody knows still gets a list slot) |
+| Spell grant | ✅ | **≤ 5 spell ids** per esper, from the vanilla esper record | `ot6_progression.asm` `Ot6EsperSpellKnown` (scans `GenjuProp+1,+3,+5,+7,+9`) and `Ot6UnionEspers` (seeds the union so a spell nobody knows still gets a list slot) |
 | Stat mod | ✅ | up to **four** stats, **signed**, −7..+7 each, in vanilla's own equipment layout | `ot6_progression.asm` `Ot6EsperStatMod` + `Ot6EsperStatTbl`: two bytes per esper, `byte0 = [speed:4][vigor:4]`, `byte1 = [magpwr:4][stamina:4]`, each nibble `[sign:1][mag:3]`; `$0000` = no mod. Mirrors `CalcEquipEffect`, `battle_main.asm:2521-2539`. Baseline: `esper-stat-baseline.md` |
 | Summon | ✅ (vanilla) | one attack record per esper, `id = esper + $36`; once per battle **per character** | `FixPlayerAttack` sets the character's bit in `$3f2e` (`battle_main.asm:12739-12747`); the Magic menu's esper row is disabled when that bit is set (`battle_main.asm:14436-14439`) |
 | Boost-tier folding | ✅ | **8 families only**: fire, ice, bolt, poison→bio, cure, life, slow, haste | `Ot6FoldTbl`, `ot6_boost.asm:340-348`; scanned with a hard `cpx #$0018` bound at `:255`, `:317` |
@@ -239,13 +239,13 @@ instead. He does not grant Fire 2 (a dead pre-folded tier), Poison/Bio
 
 Ifrit's `Ot6EsperStatTbl` row is **+6 vigor / +4 stamina / −3 mag.pwr**, the
 opposite specialisation to Shiva's (§5.2); see
-`docs/design/esper-stat-baseline.md` §4. The four Zozo rows are Ramuh +3
-stamina, Siren +2 speed, Stray +3 mag.pwr, Kirin +3 mag.pwr
-(`ot6_progression.asm:392-409`). Character base vigor at these levels sits at
+`docs/design/esper-stat-baseline.md` §4. The four Zozo rows (vig/spd/stm/mag) are Ramuh
+0/0/+4/+2, Siren 0/+4/0/+2, Stray 0/+2/0/+4, Kirin 0/0/+2/+4
+(`ot6_progression.asm`, `Ot6EsperStatTbl`). Character base vigor at these levels sits at
 31–47 (`char_prop.asm`: Terra 31, Locke 37, Cyan 40, Edgar 39, Sabin 47,
 Celes 34); vanilla's per-level esper bonuses are deleted
 (`genju_prop.asm:65-71`), and vanilla doubles vigor into the battle stat
-`$3b2c` (`ot6_progression.asm:269-271`), so the effective bump is doubled too.
+`$3b2c` (`battle_main.asm`, the `vigor * 2` stored at `@2896`), so the effective bump is doubled too.
 
 ### 4.3 The divine: Inferno
 
@@ -452,7 +452,7 @@ is §6's problem stated as a number.
 ## 12. What the shipped machinery cannot express
 
 - **HP% / MP% mods.** Structurally unsupported: the `Ot6EsperStatTbl` selector
-  has no encoding for them (`ot6_progression.asm:299-303`).
+  has no encoding for them (`Ot6EsperStatTbl`'s two bytes hold four stat nibbles and nothing else).
 - **Named passives.** There is no passive pool, no slots and no learning meter
   (ROADMAP M4, ⬜). Neither esper carries one; both are designed around their
   spell lists and stat packages instead.
