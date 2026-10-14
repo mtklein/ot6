@@ -57,7 +57,15 @@ local BOSS_FIGHT = { runic = true, bushido = true, magic = { [0] = { spell = FIR
 -- body that can teach him a lore
 local AQUA_RAKE = 3
 local STRAGO_KIT = { study = true, pearlWind = true, dischord = { [0x0D2] = true } }
-local FIGHT = { nukeLore = { AQUA_RAKE }, strago = STRAGO_KIT }
+-- the kill order in Owzer's basement (field group 157): the SoulDancers
+-- first.  Formation 284 (SoulDancer x2, Crusher x2) is the one that wipes
+-- the three: in 16 fights from the save point at each of four seed shifts,
+-- the default order lost 1 of 31 meetings (9 deaths), the SoulDancers first
+-- none of 36 (0 deaths, 25 distinct battle keys), and the Crushers first 4
+-- of 7 (16 deaths) (build/attempts/wt/v031-tower/lab/base16_s*,
+-- b16fsd_s*, b16fcr_s*)
+local SOULDANCER = 0x0AD
+local FIGHT = { nukeLore = { AQUA_RAKE }, strago = STRAGO_KIT, focus = { { species = SOULDANCER } } }
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
