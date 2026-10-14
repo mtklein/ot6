@@ -580,6 +580,13 @@ end
 -- at (20,16), (17,18), (16,20) in three runs), so it is the one object
 -- standing anywhere but the save point
 
+-- the one live object in room 368 (its only NPC, the Holy Dragon)
+local function dragonObj()
+  for o = 0x10, 0x2F do
+    if H.objX(o) ~= 0 or H.objY(o) ~= 0 then return o end
+  end
+  return nil
+end
 local function owns(esper) return (H.readByte(0x1A69 + (esper >> 3)) >> (esper & 7)) & 1 == 1 end
 local function examineUp(x, y, begun, what, avoid)
   return H.seqStep({
@@ -743,17 +750,17 @@ H.run({ maxFrames = 1500000 }, {
   -- 368 NPC_1 (5,9), touch-to-fight (_cc558b): event battle 139, then the
   -- Pearl Lance (route-wor-thamasa.md 5.4)
   H.cond(function() return sw(0x0694) == 1 end, {
-    -- the room's objects come back a few frames after the field menu
-    -- closes: read at once, every object but the party's stood at (0,0)
-    -- (build/attempts/wt/v031-tower/lab/p3t_p3r_k2_wor_relm_s9: 'the
-    -- objects: $10(8,11) $11(0,0) ...')
-    H.waitUntil(function()
-      for o = 0x11, 0x2F do
-        if math.abs(H.objX(o) - 5) + math.abs(H.objY(o) - 9) <= 4 then return true end
-      end
-      return false
-    end, 600, "the Holy Dragon's object stands near (5,9)", 1),
-    touchNpc(function() return npcAt(5, 9, "the Holy Dragon (368 NPC_1)") end, function()
+    -- the dragon wanders from its posted tile (5,9): read live as the one
+    -- object standing in the room ($10 at (8,11) when the walk to the
+    -- Stunner had not brushed it: build/attempts/wt/v031-tower/lab/
+    -- p3t_p3r_k2_wor_relm_s9, 'the objects: $10(8,11) $11(0,0) ...'), as
+    -- gen_wor_storm finds the Ice Dragon
+    H.waitUntil(function() return dragonObj() ~= nil end, 600, "the Holy Dragon's object stands in room 368", 1),
+    touchNpc(function()
+      local o = dragonObj()
+      H.log(string.format("[npc] the Holy Dragon (368 NPC_1): object $%02X at (%d,%d)", o, H.objX(o), H.objY(o)))
+      return o
+    end, function()
       return (H.battleLoadStarted() and H.formationHas({ [WHITE_DRGN] = true })) or sw(0x0694) == 0
     end, "the Holy Dragon (368 NPC_1)"),
     H.advanceStory(function()
