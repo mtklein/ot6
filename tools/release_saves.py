@@ -77,6 +77,8 @@ TITLES = {
     "wor-cyan-v1": "The Falcon, after the Storm Dragon",
     "wor-narshe-cliffs-v1": "Narshe cliffs, save point after Mog joins",
     "wor-narshe-v1": "The Falcon outside Narshe, after Umaro joins",
+    "wor-owzer-v1": "Owzer's basement, save point before Chadarnook",
+    "wor-tower-v1": "Outside the Fanatics' Tower, after Strago joins",
 }
 
 README = """\

@@ -1881,6 +1881,121 @@ M.contracts["wor-narshe-v1"] = {
   },
 }
 
+-- wor-owzer-v1: Owzer's basement, map 207's save point (87,41), the retry
+-- point for Chadarnook: the lady's portrait and Still Life fought ($0252,
+-- $0254), Chadarnook not yet ($0253), RELM not yet joined ($02F8); CYAN,
+-- TERRA and CELES seated, the fourth seat empty for RELM
+-- (docs/design/route-wor-thamasa.md).  The basement's turning doors run on
+-- timers 1-3 (_cb4987), so no timer is pinned.
+M.contracts["wor-owzer-v1"] = {
+  slot = 3,
+  field = { map = 207, x = 87, y = 41 },   -- the vanilla save point (207 NPC_6)
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x02FD, 1, "UMARO available (_ccd793)" },
+    { 0x0252, 1, "the lady's portrait fought (_cb47ae)" },
+    { 0x0254, 1, "Still Life fought (_cb4c47)" },
+    { 0x0253, 0, "Chadarnook not yet fought (_cb4cfa)" },
+    { 0x02F8, 0, "RELM not yet joined (_cb4dc6)" },
+  },
+  party = {
+    size = 3,                     -- CYAN, TERRA and CELES
+    members = {
+      { 0x02, "CYAN" },
+      { 0x00, "TERRA" },
+      { 0x06, "CELES" },
+    },
+  },
+  ram = {
+    { 0x1D4C, 0x20, 0x20, "MOG knows Water Rondo ($1D4C bit 5), from the World of Balance trench (#428)" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
+-- wor-tower-v1: the World of Ruin map, on foot beside the Falcon parked one
+-- tile south of the Fanatics' Tower's door (160,127): Chadarnook beaten
+-- ($0253), Starlet given ($0240), RELM and STRAGO joined ($02F8, $02F7),
+-- MagiMaster not yet ($02DB); TERRA, CELES, RELM and STRAGO seated.  The
+-- retry point for the climb, the Holy Dragon and MagiMaster (the tower has
+-- no save point; docs/design/route-wor-thamasa.md).  No timer.
+M.contracts["wor-tower-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 160, y = 127 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x0253, 1, "Chadarnook beaten (_cb4cfa)" },
+    { 0x0240, 1, "Starlet given (_cb4dc6)" },
+    { 0x02F8, 1, "RELM joined (_cb4dc6)" },
+    { 0x02F7, 1, "STRAGO joined (_cc5275)" },
+    { 0x02DB, 0, "MagiMaster not yet beaten (_cc544b)" },
+  },
+  party = {
+    size = 4,                     -- TERRA, CELES, RELM and STRAGO
+    members = {
+      { 0x00, "TERRA" },
+      { 0x06, "CELES" },
+      { 0x08, "RELM" },
+      { 0x07, "STRAGO" },
+    },
+  },
+  ram = {
+    { 0x1F62, 0xFF, 160, "the Falcon parked at x 160 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 127, "the Falcon parked at y 127 (save-block cell $1F63)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+    { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
+    { 0x1190, 0xFF, 0x00, "timer 1 counter high" },
+    { 0x1195, 0xFF, 0x00, "timer 2 counter low" },
+    { 0x1196, 0xFF, 0x00, "timer 2 counter high" },
+    { 0x119B, 0xFF, 0x00, "timer 3 counter low" },
+    { 0x119C, 0xFF, 0x00, "timer 3 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
+-- wor-thamasa-v1: the World of Ruin map, on foot beside the Falcon at the
+-- Fanatics' Tower (160,127), after the climb: the Holy Dragon beaten
+-- ($0694 cleared, _cc558b) and MagiMaster ($02DB, _cc544b); TERRA, CELES,
+-- RELM and STRAGO seated (docs/design/route-wor-thamasa.md).  No timer.
+M.contracts["wor-thamasa-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 160, y = 127 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x0240, 1, "Starlet given (_cb4dc6)" },
+    { 0x02F8, 1, "RELM joined (_cb4dc6)" },
+    { 0x02F7, 1, "STRAGO joined (_cc5275)" },
+    { 0x0694, 0, "the Holy Dragon beaten (_cc558b)" },
+    { 0x02DA, 1, "the Gem Box taken (_cc5440)" },
+    { 0x02DB, 1, "MagiMaster beaten (_cc544b)" },
+  },
+  party = {
+    size = 4,                     -- TERRA, CELES, RELM and STRAGO
+    members = {
+      { 0x00, "TERRA" },
+      { 0x06, "CELES" },
+      { 0x08, "RELM" },
+      { 0x07, "STRAGO" },
+    },
+  },
+  ram = {
+    { 0x1F62, 0xFF, 160, "the Falcon parked at x 160 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 127, "the Falcon parked at y 127 (save-block cell $1F63)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
