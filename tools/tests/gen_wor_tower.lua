@@ -786,6 +786,9 @@ H.run({ maxFrames = 1500000 }, {
   -- 'actor=0 char=0 plan=switch': build/attempts/wt/v030-route/lab/tower/
   -- cap2)
   wallRingsOff("MagiMaster"),
+  -- STRAGO onto Maduin (fire, ice and bolt: three of MagiMaster's eight
+  -- walls; Float is not needed against him), freed by TERRA's Shiva
+  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, MADUIN } }, "stones for MagiMaster"),
   lazy(function() return H.equipKit(CELES, { { 3, FORCE_ARMOR } }, { tag = "CELES: the Force Armor" }) end),
   H.call(function() say("wor", "dressed for MagiMaster: " .. kitLine()) end),
   door(7, 13, MAP_TOP, "the Gem Box's room -> the top (364 (7,7))"),
