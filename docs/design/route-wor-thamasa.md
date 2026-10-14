@@ -494,3 +494,53 @@ Shell stones; it grants Rflect and Safe (`espers.txt`), corrected there.
    at 3 BP learns every lore the monsters present could cast (kits.md
    "Strago"). On this arc it pays on the plains (Dischord, Rippler, Pearl
    Wind, Aero); no tower species casts a lore.
+
+## 11. Played (v0.30)
+
+The route plays the arc in three legs. Evidence is under
+`build/attempts/wt/v030-route/` (`lab/` holds the dev and variant runs,
+`grind/` the world tables, `rows/` and `study/`, `scanally/` the suites').
+
+### 11.1 The legs
+
+- `gen_wor_owzer` (`wor-narshe-v1` -> `wor-owzer-v1`): the cabin seats CYAN,
+  TERRA and CELES; the Falcon to Jidoor; the item counter; the auction, up
+  to 16 visits; Owzer's hall: the switch at the stair's foot, the two
+  paintings; the basement: the lamp, the turning door, the painting warp,
+  Still Life; the save point.
+- `gen_wor_relm` (`wor-owzer-v1` -> `wor-tower-v1`): Owzer and Chadarnook;
+  Starlet and RELM; Jidoor's item counter again; STRAGO at the tower's foot
+  (he waits aboard: the party is full); the cabin seats TERRA, CELES, RELM
+  and STRAGO; the grind; Thamasa's item and relic counters; the save beside
+  the Falcon at the tower (160,127).
+- `gen_wor_tower` (`wor-tower-v1` -> `wor-thamasa-v1`): the stones and Wall
+  Rings, the climb with each floor's side room, the Holy Dragon, the Gem
+  Box, MagiMaster, the walk down and the save beside the Falcon.
+
+### 11.2 What the walk learned
+
+- **Owzer's hall is dark until its switch.** The landing (114,11) answers
+  "Stay...away..." and turns the party back while `$0243` is clear
+  (`lab/owzer/a1`: `control lost at (114,11)`, then `planned 20 steps from
+  (118,14)` until no-progress); A facing up at (118,14) (`_cb4930`) lights
+  it.
+- **The turning door.** Of the three, (88,50) leads on (to (90,61)) while
+  `$01FC` is set; the walk waits below it and presses up then
+  (`lab/owzer/b2`: `$01FC-$01FE 100 ... through the turning door`).
+- **The old woman at (107,56)** stands on the only way west (row 56), so
+  her fight (event 151) is part of the walk.
+- **The Moogle Suit and the Relic Ring** are not reached from the save
+  point's pocket; the route leaves them.
+- **The auction's World of Ruin chain** (`_cb55b0`) is the Hero Ring, then
+  an item, then Golem, then ZoneSeek, each behind a coin flip: Golem one
+  visit in eight, ZoneSeek one in sixteen before Golem is owned. The run
+  (and its K=3 variant) met ZoneSeek on visit 12 and no Golem in 16
+  (`lab/owzer/cap1`, `lab/var/owzer_k3`).
+- **The plan's grind spot is unreachable on foot**: no landing reaches world
+  rows 160-162 south of the gate (`lab/relm/s1`: `no path (34,158)->
+  (31,161)`). Row 135 north-west of Jidoor, x 16-22, is group 48 throughout
+  and takes a landing (17,135) (`grind/grindspot.txt`, `grind/wg_lap.txt`).
+- **Thamasa's (22,39) and (23,39)** start STRAGO and RELM's scene at their
+  house (`_cb75bf`); the walks keep off them.
+- **Landings** that take the airship: the tower (160,127), Thamasa (250,229)
+  (`grind/land_tower.txt`).

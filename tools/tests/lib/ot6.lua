@@ -8093,60 +8093,174 @@ end
 -- is.  The target is the press target, else the first standing monster.
 -- (Quake, $15, is left out: it strikes the whole field, the party with it, and
 -- a party that does not float takes its own earthquake; Merton the same)
-M.MAGIC_ONLY_SPELLS = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x0C, 0x0E, 0x0F, 0x10, 0x11, 0x13, 0x16, 0x14 }
+M.MAGIC_ONLY_SPELLS = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x0C, 0x0E, 0x0F, 0x10, 0x11, 0x13, 0x16, 0x14, 0x29 }
 M.BREAK_SPELL = 0x0C
 function Driver:magicOnlyLine(actor, boost)
-  local slot = self:pressTarget()
-  -- the press target can name a slot the formation leaves empty (a tower
-  -- fight in slots 0, 2 and 3 was aimed at slot 1, and the target select
-  -- opened and backed out for 90,000 frames: build/attempts/wt/v030-route/lab/tower/c3)
-  if slot ~= nil and not monAlive(slot) then slot = nil end
-  if slot == nil then for s = 0, 5 do if monAlive(s) then slot = s; break end end end
-  if slot == nil then return nil end
+  -- every standing body is weighed against every castable spell, so a caster
+  -- whose spells answer one body's weakness aims there (CELES's Poison at a
+  -- poison-weak L.30 while RELM's Ice found nothing to chip): the press
+  -- target, when standing, wins a tie.  The press target can name a slot the
+  -- formation leaves empty (a tower fight in slots 0, 2 and 3 was aimed at
+  -- slot 1, and the target select opened and backed out for 90,000 frames:
+  -- build/attempts/wt/v030-route/lab/tower/c3), so only standing slots count
+  -- opts.shellVs = { [species] = true }: while one of these stands, Shell
+  -- (halves magic damage) goes on each living member without it and not in
+  -- Reflect (it would rebound), a member at a time, before any attack.
+  -- The L.90 Magic's Bolt 3, Merton, Meteor and Flare wiped the four on the
+  -- fourth floor without it (build/attempts/wt/v030-route/lab/tower/c15)
+  local sv = self.opts.shellVs
+  if sv and spellCell(actor, 0x25, true) ~= nil then
+    local danger = false
+    for s = 0, 5 do if monAlive(s) and sv[M.readWord(0x57C0 + s * 2)] then danger = true end end
+    self.shellAt = self.shellAt or {}
+    for e = 0, 3 do
+      local st3 = M.readByte(0x3EF8 + e * 2)
+      if danger and M.readWord(0x3BF4 + e * 2) > 0 and (st3 & 0x20) == 0 and (st3 & 0x80) == 0
+         and M.frame - (self.shellAt[e] or -100000) > 900 then
+        self.shellAt[e] = M.frame
+        M.log(string.format("[%s] actor=%d Shell on entity %d (a body that casts hard stands)", self.tag or "fight",
+          actor, e))
+        return { kind = "magic", spell = 0x25, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0, ally = true,
+                 target = e, buff = true, vetoOk = true, reason = "shell" }
+      end
+    end
+  end
+  local press = self:pressTarget()
   local MP = M.sym("MagicProp") & 0x3FFFFF
-  local x = 8 + slot * 2
-  local weak, half = M.readByte(0x3BE0 + x), M.readByte(0x3BE1 + x)
-  local absorb, null = M.readByte(0x3BCC + x), M.readByte(0x3BCD + x)
-  local reflect = (M.readByte(0x3F00 + slot * 2) & 0x80) ~= 0
-  local shields = M.readByte(BATTLE.SH_CUR + slot * 2)
-  local best, bestScore, said = nil, nil, {}
+  local spells, castable = {}, {}
   for _, id in ipairs(self.opts.magicOnly or M.MAGIC_ONLY_SPELLS) do
     local cell, cost = spellCell(actor, id, true)
     if cell ~= nil then
-      local elem = M.readRomByte(MP + id * 14 + 1)
-      local power = M.readRomByte(MP + id * 14 + 6)
-      local score
-      -- the confirm runs the party-wide cast guards (castVetoed: any body in
-      -- the formation that absorbs, nulls or reflects it), so the plan runs
-      -- them too: a Break planned on the L.40 Magic beside two reflecting
-      -- L.20s was refused at every confirm and re-planned for 90,000 frames
-      -- (build/attempts/wt/v030-route/lab/tower/c3: 'magic plan: wanted 2 ... going at 1', 'Need MP')
-      if (elem ~= 0 and ((absorb & elem) ~= 0 or (null & elem) == elem))
-         or (reflect and M.spellReflectable(id)) or self:castVetoed(id, "magic-only") then
-        score = -1
-      elseif id == M.BREAK_SPELL then
-        score = shields > 0 and 1000 or -1
-      else
-        score = power
-        if elem ~= 0 and (weak & elem) ~= 0 then score = score * 2
-        elseif elem ~= 0 and (half & elem) ~= 0 then score = score // 2 end
-        score = score + 1000 * hitChips(slot, 0, elem)
+      castable[#castable + 1] = { id = id, cost = cost, elem = M.readRomByte(MP + id * 14 + 1),
+        power = M.readRomByte(MP + id * 14 + 6) }
+    end
+    -- the confirm runs the party-wide cast guards (castVetoed: any body in
+    -- the formation that absorbs, nulls or reflects it), so the plan runs
+    -- them too: a Break planned on the L.40 Magic beside two reflecting
+    -- L.20s was refused at every confirm and re-planned for 90,000 frames
+    -- (build/attempts/wt/v030-route/lab/tower/c3: 'magic plan: wanted 2 ...
+    -- going at 1', 'Need MP')
+    if cell ~= nil and not self:castVetoed(id, "magic-only") then spells[#spells + 1] = castable[#castable] end
+  end
+  -- The bounce: while a monster stands under Reflect and a party member
+  -- wears it (the tower's Wall Rings), a reflectable spell cast on that
+  -- member rebounds onto the monsters, and a rebound is not reflected again
+  -- -- the way through the L.20 and L.70 Magic a person uses.  Offered when
+  -- the direct line finds no weakness to hit, on a spell no standing
+  -- monster absorbs or nulls (the rebound picks its monster).
+  local bounce = nil
+  do
+    local mirror, anyReflect = nil, false
+    for e = 0, 3 do
+      if M.readWord(0x3BF4 + e * 2) > 0 and (M.readByte(0x3EF8 + e * 2) & 0x80) ~= 0 then mirror = mirror or e end
+    end
+    for s = 0, 5 do
+      if monAlive(s) and (M.readByte(0x3F00 + s * 2) & 0x80) ~= 0 then anyReflect = true end
+    end
+    if mirror ~= nil and anyReflect then
+      for _, sp in ipairs(castable) do
+        if M.spellReflectable(sp.id) and sp.id ~= M.BREAK_SPELL and sp.power > 0 then
+          local ok, weakAll = true, true
+          for s = 0, 5 do
+            if monAlive(s) then
+              local x = 8 + s * 2
+              local absorb, null = M.readByte(0x3BCC + x), M.readByte(0x3BCD + x)
+              if sp.elem ~= 0 and ((absorb & sp.elem) ~= 0 or (null & sp.elem) == sp.elem) then ok = false end
+              if sp.elem == 0 or (M.readByte(0x3BE0 + x) & sp.elem) == 0 then weakAll = false end
+            end
+          end
+          local score = sp.power * (weakAll and 2 or 1)
+          if ok and (bounce == nil or score > bounce.score) then bounce = { sp = sp, score = score, to = mirror } end
+        end
       end
-      said[#said + 1] = string.format("$%02X elem $%02X -> %d", id, elem, score)
-      if score >= 0 and (bestScore == nil or score > bestScore) then best, bestScore = { id = id, cost = cost }, score end
     end
   end
-  if best == nil then return nil end
-  local b, mp = castBoost(actor, best.id, best.cost, boost or 0, self:nukeFloor(actor))
+  local best, bestScore, bestSlot, said = nil, nil, nil, {}
+  for slot = 0, 5 do
+    if monAlive(slot) then
+      local x = 8 + slot * 2
+      local weak, half = M.readByte(0x3BE0 + x), M.readByte(0x3BE1 + x)
+      local absorb, null = M.readByte(0x3BCC + x), M.readByte(0x3BCD + x)
+      local reflect = (M.readByte(0x3F00 + slot * 2) & 0x80) ~= 0
+      local shields = M.readByte(BATTLE.SH_CUR + slot * 2)
+      for _, sp in ipairs(spells) do
+        local id, elem = sp.id, sp.elem
+        local score
+        if (elem ~= 0 and ((absorb & elem) ~= 0 or (null & elem) == elem))
+           or (reflect and M.spellReflectable(id)) then
+          score = -1
+        elseif id == M.BREAK_SPELL then
+          score = shields > 0 and 1000 or -1
+        elseif id == 0x29 then
+          -- Osmose takes MP, not HP: a dry caster's last resort before an item
+          local cur, top = M.readWord(BATTLE.CURMP + actor * 2), M.readWord(BATTLE.MAXMP + actor * 2)
+          score = (cur * 4 < top and M.readWord(0x3C08 + x) > 0) and 1 or -1
+        else
+          score = sp.power
+          if elem ~= 0 and (weak & elem) ~= 0 then score = score * 2
+          elseif elem ~= 0 and (half & elem) ~= 0 then score = score // 2 end
+          score = score + 1000 * hitChips(slot, 0, elem)
+        end
+        if score >= 0 and slot == press then score = score + 1 end
+        if score >= 0 then said[#said + 1] = string.format("s%d $%02X -> %d", slot, id, score) end
+        if score >= 0 and (bestScore == nil or score > bestScore) then best, bestScore, bestSlot = sp, score, slot end
+      end
+    end
+  end
+  if bounce ~= nil and (best == nil or bestScore < 100) then
+    local b = castBoost(actor, bounce.sp.id, bounce.sp.cost, boost or 0, self:nukeFloor(actor)) or 0
+    local key = string.format("bounce:%d:%d", actor, bounce.sp.id)
+    if not self.statusSaid[key] then
+      self.statusSaid[key] = true
+      M.log(string.format("[%s] actor=%d magic-only: $%02X on entity %d (Reflect) to rebound onto the monsters, "
+        .. "%d BP (the direct line's best: %s)", self.tag or "fight", actor, bounce.sp.id, bounce.to, b,
+        best and string.format("$%02X at %d", best.id, bestScore) or "none"))
+    end
+    return { kind = "magic", spell = bounce.sp.id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = b,
+             ally = true, target = bounce.to, bounce = true, reason = "magic_only_bounce" }
+  end
+  if best == nil then
+    -- nothing castable: a caster out of MP drinks it back (an Ether, a
+    -- Tincture, an X-Ether) rather than pass the turn: inside the tower a
+    -- seat that passes has no other attack, and the last L.20 Magic outlived
+    -- two dry casters for 90,000 frames (build/attempts/wt/v030-route/lab/
+    -- tower/c6: 'plan=switch')
+    local row = cmdRow(actor, BATTLE.CMD_ITEM)
+    local mp, maxmp = M.readWord(BATTLE.CURMP + actor * 2), M.readWord(BATTLE.MAXMP + actor * 2)
+    -- a caster with MP and nothing that hurts (a lone Magic Urn absorbs all
+    -- eight elements and holds no shield) reads the field with an unboosted
+    -- Scan rather than pass: four passes in a row are the menu's park, a
+    -- recovery-cap failure (build/attempts/wt/v030-route/lab/tower/c9:
+    -- 'budget:switch/05 4 times in one battle')
+    if mp * 2 >= maxmp and spellCell(actor, M.STUDY_SPELL, true) ~= nil then
+      for s = 0, 5 do
+        if monAlive(s) then
+          return { kind = "magic", spell = M.STUDY_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0,
+                   aim = s, vetoOk = true, reason = "magic_only_scan" }
+        end
+      end
+    end
+    if row ~= nil and mp * 2 < maxmp then
+      for _, it in ipairs({ 0xEC, 0xEB, 0xED }) do   -- Ether, Tincture, X-Ether
+        local idx = self:battInvIdx(it)
+        if idx ~= nil then
+          M.log(string.format("[%s] actor=%d magic-only: nothing to cast at %d/%d MP; item $%02X on itself",
+            self.tag or "fight", actor, mp, maxmp, it))
+          return { kind = "item", item = it, target = actor, row = row, idx = idx, reason = "magic_only_mp" }
+        end
+      end
+    end
+    return nil
+  end
+  local b = castBoost(actor, best.id, best.cost, boost or 0, self:nukeFloor(actor))
   if b == nil then b = 0 end
-  local key = string.format("monly:%d:%d:%d", actor, slot, best.id)
+  local key = string.format("monly:%d:%d:%d", actor, bestSlot, best.id)
   if not self.statusSaid[key] then
     self.statusSaid[key] = true
-    M.log(string.format("[%s] actor=%d magic-only: $%02X at slot %d, %d BP (weak $%02X, shields %d%s): %s",
-      self.tag or "fight", actor, best.id, slot, b, weak, shields, reflect and ", Reflect" or "",
-      table.concat(said, "; ")))
+    M.log(string.format("[%s] actor=%d magic-only: $%02X at slot %d, %d BP: %s", self.tag or "fight", actor,
+      best.id, bestSlot, b, table.concat(said, "; ")))
   end
-  return { kind = "magic", spell = best.id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = b, aim = slot,
+  return { kind = "magic", spell = best.id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = b, aim = bestSlot,
            reason = "magic_only" }
 end
 
@@ -12565,7 +12679,11 @@ function Driver:button(actor)
     -- Shiva (ice absorb) entered, two zero-damage casts a battle.  A
     -- cast the live stage now refuses is backed out of (B) and re-planned
     -- against what stands there.
-    if (self.plan.kind == "magic" and self.plan.spell ~= nil) or self.plan.kind == "lore" then
+    -- (a bounce, magicOnlyLine's, is aimed at a reflecting member on purpose;
+    -- its idle Scan may bounce off a reflecting body and harm nobody: c14
+    -- held its target select 30,000 frames on that refusal)
+    if ((self.plan.kind == "magic" and self.plan.spell ~= nil) or self.plan.kind == "lore") and not self.plan.bounce
+       and not self.plan.vetoOk then
       local id = self.plan.kind == "magic" and (self.plan.executionSpell or self.plan.spell) or (0x8B + self.plan.lore)
       if self:castVetoed(id, self.plan.kind == "magic" and "cast (at the confirm)"
                         or "lore (at the confirm)") then
@@ -12645,7 +12763,7 @@ function Driver:button(actor)
     -- The raise-then-top-up pair (#168): a confirmed Fenix Down is
     -- pending until the target's HP moves (watchPendingCare); a confirmed heal
     -- on a raised member pays the top-up owed.
-    if self.plan.ally then
+    if self.plan.ally and not self.plan.bounce and not self.plan.buff then
       self.unmuddlePending = { e = self.plan.target, by = actor, tick = self.battleTick }
       -- the hit itself, until the hitter's command runs (#320): it lands
       -- even when something else cleared the Muddle first

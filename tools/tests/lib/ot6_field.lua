@@ -737,7 +737,7 @@ function M.navTo(txIn, tyIn, opts)
         sawBattle, owed = false, false
         if opts.care ~= false and not M.eventTimerLive() then
           careD = M.newCareDriver({
-            threshold = opts.careThreshold or 0.65, reserve = opts.reserve,
+            threshold = opts.careThreshold or 0.65, reserve = opts.reserve, mpBand = opts.careMpBand or M.careMpBand,
             party = fought, tag = "care after battle (navTo)" })
           careD.frame()
           if not careD.done() then return end
@@ -972,7 +972,7 @@ function M.advanceStory(pred, maxFrames, opts)
         sawBattle = false
         if opts.care ~= false and not M.eventTimerLive() then
           careD = M.newCareDriver({
-            threshold = opts.careThreshold or 0.65, reserve = opts.reserve,
+            threshold = opts.careThreshold or 0.65, reserve = opts.reserve, mpBand = opts.careMpBand or M.careMpBand,
             party = fought, tag = "care after battle (advanceStory)" })
           careD.frame()
           if not careD.done() then return end
@@ -2640,7 +2640,7 @@ function M.worldNavTo(txIn, tyIn, opts)
         sawBattle = false
         if opts.care ~= false and not M.eventTimerLive() then
           careD = M.newCareDriver({
-            threshold = opts.careThreshold or 0.65, reserve = opts.reserve,
+            threshold = opts.careThreshold or 0.65, reserve = opts.reserve, mpBand = opts.careMpBand or M.careMpBand,
             tag = "care after battle (worldNavTo)" })
           careD.frame()
           if not careD.done() then return end
@@ -4479,7 +4479,25 @@ local function careKernel(opts)
       if w == nil and useMagic then w = pickCast(h.c) end
       if w ~= nil then return w end
     end
-    return pickTincture()
+    local t = pickTincture()
+    if t ~= nil then return t end
+    -- opts.float (M.careFloat for a whole run): Float on every living
+    -- member who lacks it (status 4 bit 7, the record's +$15), cast from
+    -- the menu by whoever knows Float and can pay; it carries into battle,
+    -- where Quake misses a floating member (the Fanatics' Tower's L.60
+    -- Magic: two Quakes wiped the four, build/attempts/wt/v030-route/lab/
+    -- tower/c8 'by slot 2 cmd $02 atk $15')
+    if opts.float or M.careFloat then
+      for _, target in ipairs(careParty()) do
+        if M.charHp(target) > 0 and (M.readByte(0x1600 + 37 * target + 21) & 0x80) == 0 then
+          for _, c in ipairs(careParty()) do
+            local w = { kind = "cast", char = target, caster = c, spell = 0x22, why = "float" }
+            if canCast(c, 0x22) and not failed[key(w)] then return w end
+          end
+        end
+      end
+    end
+    return nil
   end
 
   local function anyNeed() return pick() ~= nil end
@@ -4977,6 +4995,17 @@ M.careKernel = careKernel
 -- entry snapshots lost nobody.  The World of Balance legs' pre-danger
 -- cares sit at 0.85-0.95; this is that figure, named once.
 M.CARE_BEFORE_FIGHTS = 0.9
+-- The MP band of the after-battle care (careKernel's opts.mpBand, 0.25 when
+-- nil) for a whole run: a leg whose fights are all spells (the Fanatics'
+-- Tower: magic-only, gen_wor_tower) sets it higher, so the casters walk into
+-- each fight with something to cast.  nil leaves every caller's default.
+M.careMpBand = nil
+-- Float kept on the party by the care (careKernel opts.float) for a whole run
+M.careFloat = nil
+-- The automatic post-battle care casts cures for a whole run (newCareDriver
+-- otherwise never casts): a leg where the bag cannot keep up (the Fanatics'
+-- Tower: Potions give 250 HP, its Tinctures refill the MP) sets it
+M.careMagic = nil
 
 -- M.fieldCare: the step form -- behaviorally what it has always been
 -- (open the menu, serve the plans, close, settle), built on careKernel.
@@ -5104,7 +5133,7 @@ function M.newCareDriver(opts)
   -- grind that empties the bag walks on rather than spending the fight's
   -- MP.  An explicit fieldCare keeps the cast fallback unless it passes
   -- magic=false.
-  if opts.magic == nil then opts.magic = false end
+  if opts.magic == nil then opts.magic = M.careMagic or false end
   local K = careKernel(opts)
   local mode, ph, n, idle = "start", 0, 0, 0
   local closed = careClose(function()

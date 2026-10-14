@@ -15,7 +15,8 @@ local TERRA, CYAN, EDGAR, SABIN, CELES, STRAGO, RELM, SETZER, MOG, UMARO = 0, 2,
 local TONIC, POTION, FENIX, REMEDY, SOFT = 0xE8, 0xE9, 0xF0, 0xF5, 0xF4
 local REVIVIFY, TENT, XPOTION, ETHER, ELIXIR, TINCTURE = 0xF1, 0xF7, 0xEA, 0xEC, 0xEE, 0xEB
 local MAP_JIDOOR, MAP_JIDOOR_SHOP, MAP_BASEMENT, MAP_GODDESS = 198, 201, 207, 208
-local MAP_TOWER_FOOT, MAP_THAMASA, MAP_THAMASA_ITEMS = 362, 344, 347
+local MAP_TOWER_FOOT, MAP_THAMASA, MAP_THAMASA_ITEMS, MAP_THAMASA_RELICS = 362, 344, 347, 350
+local WALL_RING = 0xBB
 local TOWER_DOOR, TOWER_LANDING = { 160, 126 }, { 160, 127 }
 local THAMASA_DOOR, THAMASA_LANDING = { 251, 230 }, { 250, 229 }
 local THAMASA_AVOID = { { 22, 39 }, { 23, 39 } }
@@ -28,7 +29,7 @@ local THAMASA_AVOID = { { 22, 39 }, { 23, 39 } }
 local GRIND_LANDING, GRIND_LAP = { 17, 135 }, { { 16, 135 }, { 22, 135 } }
 -- the level the tower asks of its four (route-wor-thamasa.md 5): the lowest
 -- of TERRA, CELES, RELM and STRAGO, bounded by GRIND_BATTLES
-local GRIND_LEVEL, GRIND_BATTLES = 43, 60
+local GRIND_LEVEL, GRIND_BATTLES = 46, 90
 -- magicite: give_genju's receipt order (Ramuh 0)
 local STARLET, GOLEM, ZONESEEK = 25, 22, 18
 -- Chadarnook (route_data pool event 86: formation 456; the goddess $11E,
@@ -697,7 +698,12 @@ H.run({ maxFrames = 1800000 }, {
   H.shopTalk(34, 15, "Jidoor's item shop", { fight = FIGHT }),
   H.call(function() H.assertEq(H.shopId(), 78, "the counter opened shop 78 ($0201)") end),
   H.buyItem(POTION, function() return math.max(0, 99 - H.invCountOf(POTION)) end, "POTION to 99 for the grind"),
-  H.buyItem(REMEDY, function() return math.max(0, 10 - H.invCountOf(REMEDY)) end, "REMEDY to 10"),
+  -- the grind to L46 is some 55 fights: 99 Potions and 10 Remedies were
+  -- gone by its 33rd (build/attempts/wt/v030-route/lab/var/relm_k3: 'potion=2
+  -- ... remedy=0'), so Remedies to 20 and Tents, which the care pitches on
+  -- the world map when the heals would cost more
+  H.buyItem(REMEDY, function() return math.max(0, 20 - H.invCountOf(REMEDY)) end, "REMEDY to 20"),
+  H.buyItem(TENT, function() return math.max(0, 15 - H.invCountOf(TENT)) end, "TENT to 15 for the grind"),
   H.buyItem(FENIX, function() return math.max(0, math.min(20, H.activeTopLevel()) - H.invCountOf(FENIX)) end,
     "FENIX DOWN to the level, capped at 20"),
   H.shopClose("Jidoor's item shop"),
@@ -752,8 +758,11 @@ H.run({ maxFrames = 1800000 }, {
   H.shopTalk(36, 39, "Thamasa's item shop", { fight = FIGHT }),
   H.call(function() H.assertEq(H.shopId(), 74, "the counter opened shop 74 ($0201)") end),
   -- the tower is MP: every random is fought with spells and pays nothing
-  -- back (route-wor-thamasa.md 7), so Tinctures to 20 over the band
-  H.buyItem(TINCTURE, function() return math.max(0, 20 - H.invCountOf(TINCTURE)) end, "TINCTURE to 20 for the tower"),
+  -- back (route-wor-thamasa.md 7).  A Tincture gives 50 MP; the climb from
+  -- the second floor to the top spent 32 of them and reached MagiMaster's
+  -- floor with TERRA at 6 MP and RELM at 2, and the four fell there
+  -- (build/attempts/wt/v030-route/lab/tower/c10).  So the stack, 99
+  H.buyItem(TINCTURE, function() return math.max(0, 99 - H.invCountOf(TINCTURE)) end, "TINCTURE to 99 for the tower"),
   H.buyItem(POTION, function() return math.max(0, H.careStockPotions(H.activeTopLevel(), { spend = 40 })
     - H.invCountOf(POTION)) end, "POTION to the band"),
   H.buyItem(FENIX, function() return math.max(0, math.min(20, H.activeTopLevel()) - H.invCountOf(FENIX)) end,
@@ -762,6 +771,20 @@ H.run({ maxFrames = 1800000 }, {
   H.bagArrange({ POTION, FENIX, TONIC, REMEDY }, { tag = "bag: combat items on top (Thamasa)" }),
   H.call(function() say("shop", "Thamasa") end),
   H.crossDoor(36, 45, MAP_THAMASA, 26, 39, "Thamasa's item shop -> the street", { fight = FIGHT }),
+  -- the relic counter (344 (40,30) -> 350, shop 75): a Wall Ring for each of
+  -- the four.  Inside the tower the monsters only cast, mostly reflectable
+  -- tier spells, and the four at L43-47 lost the first floor's L.30 Magic
+  -- three times over on casts alone (build/attempts/wt/v030-route/lab/
+  -- tower/c1, c4, c5: 'battle $0AD LOST'); a person who reads the tower's
+  -- spell lists wears Reflect there and lets the spells bounce
+  -- (route-wor-thamasa.md 5.3 named it a lab branch)
+  H.crossDoor(40, 30, MAP_THAMASA_RELICS, 44, 13, "Thamasa's relic shop door 344 (40,30) -> 350",
+    { fight = FIGHT, avoid = THAMASA_AVOID }),
+  H.shopTalk(43, 8, "Thamasa's relic shop", { fight = FIGHT }),
+  H.call(function() H.assertEq(H.shopId(), 75, "the counter opened shop 75 ($0201)") end),
+  H.buyItem(WALL_RING, function() return math.max(0, 4 - H.invCountOf(WALL_RING)) end, "WALL RING for each of the four"),
+  H.shopClose("Thamasa's relic shop"),
+  H.crossDoor(44, 14, MAP_THAMASA, 40, 32, "Thamasa's relic shop -> the street", { fight = FIGHT }),
   H.navTo(22, 47, { maxFrames = 12000, playBattles = "tactical", fight = FIGHT, avoid = THAMASA_AVOID }),
   H.driveUntil(function() return H.worldMode() end, 6000, { H.hold({ "down" }), H.waitFrames(4) }, "off Thamasa's edge"),
   H.release(),
