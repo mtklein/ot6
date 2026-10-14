@@ -42,8 +42,13 @@ local FIGHT = { cure = false, shellVs = { [0x164] = true }, magicFirst = { [0x16
 -- is down, unshelled or hurt below 15%.  Elements stay in: fought with
 -- Drain, Break and Ultima alone (no element for his wall to null or
 -- absorb), two of four won in 180,000 ticks and two ran out of time
--- (lab/mm12_*), against two of three in 116,000 with the elements (mm11)
-local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.4 }, reraiseHold = { [0x166] = 0.15 } }
+-- (lab/mm12_*), against two of three in 116,000 with the elements (mm11).
+-- Drain heals him: his HP rose 38,578 -> 41,594 on RELM's Drain ('took 0
+-- off ... atk $04', lab/t6_p3r_k5_wor_relm_s0), and two full climbs ran
+-- out of time in his fight.  So the casts on him are the tier spells (read
+-- against the wall at the confirm), Pearl, Break and TERRA's Ultima
+local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.4 }, reraiseHold = { [0x166] = 0.15 },
+  magicOnly = { 0x00, 0x01, 0x02, 0x03, 0x0C, 0x0E } }
 local WALL_RING = 0xBB
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
