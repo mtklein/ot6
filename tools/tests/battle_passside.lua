@@ -93,6 +93,16 @@ local PW, judgedN = nil, 0
 -- by the case that needs it: { e = entity, cmd = queued command, muddle =
 -- bool, fell = bool (fell the queued monster target) }
 local atExec = nil
+-- the case's plan, its first entry noted on atExec: an action of SETZER's
+-- that runs before that entry was confirmed (H.setzerBattle's confirmedAt)
+-- was queued before the case -- a Zombie's own Fight that ran after his
+-- cure (the v031-robust chain's wor-tomb-v1: "emptied: requested boost at
+-- execution: got 0", build/attempts/wt/v031-robust/final/) -- and is not
+-- the case's execution
+local function battleFor(plan, opts)
+  atExec.entry = plan[1]
+  return H.setzerBattle(plan, opts)
+end
 local function armExec()
   local ec = H.sym("ExecCmd@battle_code")
   emu.addMemoryCallback(function()
@@ -100,6 +110,11 @@ local function armExec()
     if w == nil then return end
     local x = emu.getState()["cpu.x"] & 0xff
     if x ~= w.e or H.readByte(0x3A7C) ~= w.cmd then return end
+    if w.entry and w.entry.confirmedAt == nil then
+      H.log(string.format("[%s] f%d an action of SETZER's ($%02X) runs before the case's row was confirmed: "
+        .. "queued before the case, not its execution", TAG, H.frame, w.cmd))
+      return
+    end
     atExec = nil
     local c = H.controlTaken(x // 2)
     local chars, mons = H.readByte(0xB8), H.readByte(0xB9)
@@ -217,14 +232,14 @@ local function play()
         S.actor, S.want = slotOf(SETZER) * 2, "fight"
         atExec = { e = S.actor, cmd = 0x00, ally = c.e, kind = c.kind, boost = 1,
           prepare = function() H.writeWord(0x3BF4 + x, 1) end }
-        S.step = H.setzerBattle({ { row = "fight", cmd = 0x00, boost = 1, ally = c.e }, { row = "defend" },
+        S.step = battleFor({ { row = "fight", cmd = 0x00, boost = 1, ally = c.e }, { row = "defend" },
           { row = "defend" } }, { untilPlanDone = true, fullBoost = true })
       elseif c.kind == "emptied" then
         H.writeByte(0x3E9C + x, 3)
         atExec = { e = x, cmd = 0x00, muddle = true, kind = c.kind, boost = c.boost, prepare = crowdTo1 }
         H.log(string.format("[%s] emptied: monster HP armed for 1 at controlled execution, SETZER's bank 3; he Fights at %d BP", TAG, c.boost))
         S.actor, S.want = x, "fight"
-        S.step = H.setzerBattle({ { row = "fight", cmd = 0x00, boost = c.boost }, { row = "defend" },
+        S.step = battleFor({ { row = "fight", cmd = 0x00, boost = c.boost }, { row = "defend" },
           { row = "defend" } }, { untilPlanDone = true, fullBoost = true })
       elseif c.kind == "emptystart" then
         H.writeByte(0x3E9C + x, 3)
@@ -232,7 +247,7 @@ local function play()
         H.log(string.format("[%s] emptystart: monster HP armed for 1 at controlled execution, SETZER's bank 3; Coin Toss at %d BP", TAG,
           c.boost))
         S.actor, S.want = x, "coin"
-        S.step = H.setzerBattle({ { row = COIN, boost = c.boost }, { row = "defend" } }, { untilPlanDone = true, fullBoost = true })
+        S.step = battleFor({ { row = COIN, boost = c.boost }, { row = "defend" } }, { untilPlanDone = true, fullBoost = true })
       else
         if S.swappedCi ~= S.ci then swapHands(x); S.swappedCi = S.ci end
         H.assertEq(H.readByte(0x3B68 + x) == 0 and H.readByte(0x3B69 + x) ~= 0, true, "offhand: after the swap "
@@ -242,7 +257,7 @@ local function play()
           .. "BP, his queued target felled as it starts", TAG, H.readByte(0x3B68 + x), H.readByte(0x3B69 + x),
           c.boost))
         S.actor, S.want = x, "fight"
-        S.step = H.setzerBattle({ { row = "fight", cmd = 0x00, boost = c.boost }, { row = "defend" },
+        S.step = battleFor({ { row = "fight", cmd = 0x00, boost = c.boost }, { row = "defend" },
           { row = "defend" } }, { untilPlanDone = true, fullBoost = true })
       end
       S.exec, S.phase = atExec, "play"
