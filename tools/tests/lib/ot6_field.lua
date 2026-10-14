@@ -7864,7 +7864,13 @@ function M.dressRelics(members, opts)
                          and ((M.readRomByte(ip + id * 30 + 1) | (M.readRomByte(ip + id * 30 + 2) << 8)) & mask) ~= 0 then
                         M.log(string.format("[%s] %s: %s stands in slot %d so %s reaches the bag for another member "
                           .. "(a swap)", tag, q.name, relicName(id), c[1], relicName(held)))
-                        cur = M.equipKit(q.ch, { { c[1], id } }, { tag = string.format("%s: %s (a swap)", tag, q.name) })
+                        -- (and a pause: the next member's session, opened on
+                        -- the frame this one closed, timed out at the main
+                        -- menu's cursor: build/attempts/wt/v031-tower/lab/c_relm_k0)
+                        cur = M.seqStep({
+                          M.equipKit(q.ch, { { c[1], id } }, { tag = string.format("%s: %s (a swap)", tag, q.name) }),
+                          M.waitFrames(40),
+                        })
                         pick = -1
                         break
                       end
