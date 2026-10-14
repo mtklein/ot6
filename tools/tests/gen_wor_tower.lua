@@ -36,16 +36,14 @@ local BOSS_SPECIES = { [WHITE_DRGN] = true, [MAGIMASTER] = true }
 -- Shell goes up while an L.90 Magic stands (its Bolt 3, Merton, Meteor and
 -- Flare), and on all four against MagiMaster (route-wor-thamasa.md 5.3)
 local FIGHT = { cure = false, shellVs = { [0x164] = true }, magicFirst = { [0x164] = true } }
--- MagiMaster: no element.  Every hit draws WallChange, which also sets the
--- element he absorbs, so a cast aimed at his weakness lands on whatever wall
--- the hits before it left: his HP climbed 7,048 -> 9,571 -> 15,350 ->
--- 20,815 under the party's elemental casts, and three fights ran out of
--- time (build/attempts/wt/v031-tower/lab/t5_p3r_k5_wor_relm_s0).  Drain
--- (TERRA's own, RELM's Ifrit), Break (TERRA's own, CELES's Shoat) for his
--- eight shields, and TERRA's Ultima (her Fire at three points) carry no
--- element
-local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.4 }, reraiseHold = { [0x166] = 0.15 },
-  magicOnly = { 0x04, 0x0C } }
+-- MagiMaster: Shell on all four and Life 3 from 40% of his HP (his
+-- Ultima as he dies; the revive it queues lands: build/attempts/wt/
+-- v031-tower/lab/mm11_*, two of three won), and no attack while a member
+-- is down, unshelled or hurt below 15%.  Elements stay in: fought with
+-- Drain, Break and Ultima alone (no element for his wall to null or
+-- absorb), two of four won in 180,000 ticks and two ran out of time
+-- (lab/mm12_*), against two of three in 116,000 with the elements (mm11)
+local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.4 }, reraiseHold = { [0x166] = 0.15 } }
 local WALL_RING = 0xBB
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -849,7 +847,7 @@ H.run({ maxFrames = 1500000 }, {
   -- caster lost him the fight he had already won, his Ultima falling on
   -- STRAGO alone: build/attempts/wt/v031-tower/lab/
   -- f4b_p3t_p3r_k0_wor_relm_s9_wor_tower_f4_s0)
-  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM }, { CELES, SHOAT } }, "stones for MagiMaster"),
+  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM }, { CELES, TRITOCH } }, "stones for MagiMaster"),
   lazy(function() return H.equipKit(CELES, { { 3, FORCE_ARMOR } }, { tag = "CELES: the Force Armor" }) end),
   H.call(function() say("wor", "dressed for MagiMaster: " .. kitLine()) end),
   door(7, 13, MAP_TOP, "the Gem Box's room -> the top (364 (7,7))"),
@@ -858,7 +856,7 @@ H.run({ maxFrames = 1500000 }, {
 
   -- ---- 5. MagiMaster ---------------------------------------------------------------
   -- @@stage magimaster
-  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM }, { CELES, SHOAT } }, "stones for MagiMaster"),
+  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM }, { CELES, TRITOCH } }, "stones for MagiMaster"),
   H.call(function() H.assertEq(sw(0x02DA), 1, "the Gem Box's tile armed MagiMaster ($02DA, _cc5440)") end),
   stepOn(8, 8, function() return H.battleLoadStarted() or sw(0x02DB) == 1 end),
   H.advanceStory(function()
@@ -883,6 +881,10 @@ H.run({ maxFrames = 1500000 }, {
   downFloor(MAP_F2, "the third floor -> the second (359 (7,2))"),
   downFloor(MAP_F1, "the second floor -> the first (363 (7,2))"),
   downFloor(MAP_FOOT, "the first floor -> the tower's foot (362 (7,2))"),
+  -- the foot's stair head turns like the floors' (route_data: 7,2 6,3 5,3
+  -- 5,2 6,2 7,2 7,3 ... 8,14); planned straight, the walk stepped onto (8,1),
+  -- back up (build/attempts/wt/v031-tower/lab/dn3_*_s0: 'no path (8,1)->(8,14)')
+  via({ { 5, 3 }, { 5, 2 }, { 7, 3 } }, "the tower's foot: round the stair's head", { { 8, 1 } }),
   toFalconBy(8, 14, "down", "the tower's foot", { { TOWER_DOOR[1], TOWER_DOOR[2] } }),
   H.fieldCare({ threshold = 1.0, tag = "beside the Falcon" }),
   H.call(function()
