@@ -2249,6 +2249,18 @@ def main() -> int:
             return 1
     if os.environ.get("OT6_COVERAGE"):
         preamble.append("OT6_COVERAGE = true  -- lib/ot6.lua coverageFlush (#130)\n")
+    # The measuring policies (#422, lib/ot6.lua Driver:policyPlan;
+    # tools/fight_report.py): OT6_POLICY a comma list of naive, nocare,
+    # noboost, noskill; OT6_POLICY_FORMS the formations it applies to.
+    for var, pat in (("OT6_POLICY", r"(naive|nocare|noboost|noskill)(,(naive|nocare|noboost|noskill))*"),
+                     ("OT6_POLICY_FORMS", r"[0-9A-Fa-f]{1,3}(,[0-9A-Fa-f]{1,3})*")):
+        raw = os.environ.get(var)
+        if not raw:
+            continue
+        if not re.fullmatch(pat, raw):
+            print(f"error: {var}={raw!r} does not match {pat}")
+            return 1
+        preamble.append('%s = "%s"  -- #422\n' % (var, raw))
     # The SRAM checkpoint run.sh installed for this run, if any (#217).  A
     # script that boots differently depending on whether it was handed a
     # checkpoint cannot read the environment -- os.getenv is nil under

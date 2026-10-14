@@ -9831,8 +9831,89 @@ function Driver:makePlan(actor)
     self._racePred = nil
   end
   self._race = nil
+  plan = self:policyPlan(actor, plan)
   if plan then plan.raceBoost = plan.boostLeft or 0 end
+  self:sayTurn(actor, plan)
   return plan
+end
+
+-- The measuring policies (#422, tools/fight_report.py): the real driver
+-- with choices taken away, to see how much of a fight's result the choices
+-- bought.  OT6_POLICY (a compose.py preamble global, like OT6_SEED_SHIFT)
+-- is a comma list:
+--   naive    every turn is a plain Fight at 0 BP on the cursor's default
+--            target: no skills, spells, items, boosts or break aiming
+--   nocare   the in-battle heals, items and raises become that Fight
+--   noboost  a boosted Fight goes unboosted; any other boosted plan
+--            becomes the plain Fight
+--   noskill  a non-Fight attack (skill, magic, Runic, Lore, Slot, summon,
+--            Throw, Morph, Magitek) becomes a Fight at the plan's boost
+-- OT6_POLICY_FORMS ("14B,1B6", the [outcome] line's formation numbers)
+-- limits it to those formations, so the walk to a boss plays as the real
+-- driver does and the boss meets the same levels, gear and draws.  A
+-- muddled actor's defer and a window with no Fight are left alone: no
+-- choice there to take away.  Unset, nothing changes.
+M.POLICY = type(OT6_POLICY) == "string" and OT6_POLICY ~= "" and OT6_POLICY or nil
+M.POLICY_FORMS = nil
+if type(OT6_POLICY_FORMS) == "string" and OT6_POLICY_FORMS ~= "" then
+  M.POLICY_FORMS = {}
+  for h in OT6_POLICY_FORMS:gmatch("[0-9A-Fa-f]+") do M.POLICY_FORMS[tonumber(h, 16)] = true end
+end
+local POLICY_SKILL = { skill = true, magic = true, runic = true, lore = true, slot = true,
+  summon = true, throw = true, morph = true, magitek = true }
+function Driver:policyPlan(actor, plan)
+  local pol = M.POLICY
+  if pol == nil or plan == nil or plan.kind == "defer" or plan.kind == "switch" then return plan end
+  local form = M.readWord(0x11E0) & 0x1FF
+  if M.POLICY_FORMS and not M.POLICY_FORMS[form] then return plan end
+  local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
+  if fight == nil then return plan end
+  local out, why = nil, nil
+  for flag in pol:gmatch("[^,%s]+") do
+    if flag == "naive" then
+      out, why = { kind = "fight", row = fight, boostLeft = 0 }, "naive"
+    elseif flag == "nocare" and (plan.kind == "heal" or plan.kind == "item" or plan.kind == "raise") then
+      out, why = { kind = "fight", row = fight, boostLeft = 0 }, "nocare"
+    elseif flag == "noskill" and POLICY_SKILL[plan.kind] then
+      local b = plan.boostLeft or 0
+      out, why = { kind = "fight", row = fight, boostLeft = b, aim = self:chipAim(actor, b) }, "noskill"
+    elseif flag == "noboost" and (plan.boostLeft or 0) > 0 then
+      out, why = { kind = "fight", row = fight, boostLeft = 0, aim = plan.kind == "fight"
+        and self:chipAim(actor, 0) or nil }, "noboost"
+    end
+    if out then break end
+  end
+  if out == nil then return plan end
+  M.log(string.format("[%s] [policy] %s: actor=%d's %s at %d BP becomes a Fight at %d BP",
+    self.tag or "fight", why, actor, plan.kind, plan.boostLeft or 0, out.boostLeft))
+  return out
+end
+
+-- The [turn] line (#422, tools/fight_report.py): one per plan, the board
+-- as the actor decides -- party HP/max and banked BP, each monster's
+-- HP/max and shields -- so a fight's low point, its swings and its turn
+-- count read off the log.  Read-only.
+function Driver:sayTurn(actor, plan)
+  self.turnN = (self.turnN or 0) + 1
+  local party, mons = {}, {}
+  for e = 0, 3 do
+    local mx = M.readWord(0x3C1C + e * 2)
+    if mx > 0 and mx ~= 0xFFFF then
+      party[#party + 1] = string.format("e%d:%d/%d/%d", e, M.readWord(0x3BF4 + e * 2), mx,
+        M.readByte(BATTLE.BP + e * 2))
+    end
+  end
+  for s = 0, 5 do
+    if M.monStanding(s) then
+      mons[#mons + 1] = string.format("s%d:%d/%d/%d", s, M.readWord(0x3BFC + s * 2),
+        M.readWord(0x3C24 + s * 2), M.readByte(0x3E40 + s * 2))
+    end
+  end
+  M.log(string.format("[%s] [turn] n=%d tick=%d form=$%03X actor=%d char=%d plan=%s bp=%d "
+    .. "party=%s mons=%s", self.tag or "fight", self.turnN, self.battleTick,
+    M.readWord(0x11E0) & 0x1FF, actor, M.readByte(BATTLE.BCHID + actor * 2),
+    plan and plan.kind or "-", plan and plan.boostLeft or 0,
+    table.concat(party, ","), table.concat(mons, ",")))
 end
 
 -- opts.trance: TERRA (char 0), unmorphed, with Morph in her list, is
@@ -12921,6 +13002,7 @@ function Driver:idle()
   self.menuStreak, self.tick, self.battleTick = 0, 0, 0
   self.plan, self.planActor, self.held, self.confirmed = nil, nil, {}, nil
   self.parkDropN = 0
+  self.turnN = 0                        -- the [turn] lines' count (#422)
   self.raceActDeclined = nil
   self.layout, self.layoutUnreadSaid, self.steerLast, self.steerDead = nil, false, nil, {}
   self.parts, self.partsLast, self.partsFell, self.partsSwitch = nil, {}, {}, {}
