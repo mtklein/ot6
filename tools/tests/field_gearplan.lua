@@ -1,4 +1,4 @@
--- @suite savestate=kefka_won
+-- @suite savestate=wor_kohlingen
 -- field_gearplan.lua -- the gear policy's plan (#434, H.gearPlan), read on
 -- the Narshe party after the battle (kefka_won: LOCKE, EDGAR, SABIN and
 -- CELES in Arvis's house, the purse and bag as the leg left them).
@@ -20,7 +20,7 @@
 -- The negative controls (each rule switched off turns this red) are
 -- recorded in the commit that adds the file.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/kefka_won.mss.lua"
+local STATE = "build/states/wor_kohlingen.mss.lua"
 local RUNIC = 11
 local function prop(id, off) return H.readRomByte((H.sym("ItemProp") & 0x3FFFFF) + id * 30 + off) end
 local function wears(ch, id) return (((prop(id, 1) | (prop(id, 2) << 8)) >> ch) & 1) == 1 and (prop(id, 2) & 0x40) == 0 end
@@ -54,7 +54,7 @@ H.run({ maxFrames = 600 }, {
 
     -- 1. the budget
     local narshe = {}
-    for _, shop in ipairs({ 0, 1 }) do
+    for _, shop in ipairs({ 80, 81 }) do
       for _, id in pairs(H.shopStock(shop)) do narshe[#narshe + 1] = id end
     end
     local reserve = H.gearReserve()
@@ -63,7 +63,7 @@ H.run({ maxFrames = 600 }, {
     local spent = 0
     for _, k in ipairs(plan) do spent = spent + k.price end
     H.log(string.format("[gearplan] 1: %d piece(s), %d GP of the budget %d", #plan, spent, budget))
-    H.assertEq(#plan > 0, true, "Narshe's counters offer this party an upgrade it can afford")
+    H.assertEq(#plan > 0, true, "Maranda's counters (shops 80 and 81) offer this party an upgrade it can afford")
     H.assertEq(spent <= budget, true, string.format("the plan (%d GP) stays within the budget (%d GP)", spent, budget))
     local none = H.gearPlan(stockOf(narshe), { tag = "gearplan all reserved", reserve = H.gil() })
     H.assertEq(#none, 0, "a reserve of the whole purse plans nothing")
