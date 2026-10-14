@@ -34,9 +34,10 @@ fight-quality.md read off these columns:
                (naive, nocare, ...): win rate and turns side by side, and
                the keys both played, paired
 
---min N drops formations seen in fewer than N keys; --story keeps only
-battles the driver played as story fights ([advanceStory], the bosses and
-events) plus any formation named with --form.
+--min N drops formations seen in fewer than N keys; --events keeps only
+event battles -- formations no random-encounter group in the built ROM
+(RandBattleGroup, tools/route_data.py) can deal: the bosses -- plus any
+formation named with --form (a notable random).
 """
 import argparse
 import gzip
@@ -50,7 +51,7 @@ from collections import defaultdict
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 P = r"^\[ot6\] "
-KEY = re.compile(P + r"\[key\] battle key (\S+)")
+KEY = re.compile(P + r"(?:\[key\] battle key |\[seed\] (?:first )?battle: .* key )(be[0-9A-F]{2}-g[0-9A-F]{4})")
 TAG = re.compile(P + r"\[([^]]+)\] ")
 TURN = re.compile(P + r"\[[^]]+\] \[(?:board|turn)\] n=(\d+) tick=(\d+) form=\$([0-9A-F]+) actor=(\d+) "
                   r"char=(\d+) plan=(\S+) bp=(\d+) party=(\S*) mons=(\S*)")
@@ -70,6 +71,14 @@ def mon_names():
             return [re.sub(r"\{[^}]*\}", "", s).strip() for s in json.load(f)["text"]]
     except OSError:
         return []
+
+
+def random_forms():
+    """every formation a random-encounter group can deal (needs build/ot6.sfc)"""
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import route_data
+    d = route_data.Data()
+    return {w & 0x1FF for g in range(256) for w in d.group_words(g)}
 
 
 def opener(path):
@@ -129,6 +138,8 @@ def parse(path, policy, out):
                 continue
             m = KEY.match(line)
             if m:
+                if f is not None and f.key == m.group(1) and not f.samples:
+                    continue           # the [seed] and [key] lines name one battle
                 f = Fight(m.group(1), arc, path, policy)
                 f.lines.append(line.rstrip())
                 have_turn = False
@@ -232,8 +243,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("inputs", nargs="+")
     ap.add_argument("--min", type=int, default=1)
-    ap.add_argument("--story", action="store_true")
-    ap.add_argument("--form", action="append", default=[], help="formation (hex) to keep with --story")
+    ap.add_argument("--events", action="store_true")
+    ap.add_argument("--form", action="append", default=[], help="formation (hex) to keep with --events")
     ap.add_argument("--tsv", help="write the per-formation table here")
     ap.add_argument("--fights", help="write one row per fight, with its raw lines, here")
     a = ap.parse_args()
@@ -245,9 +256,9 @@ def main():
         for p in files_of(path):
             parse(p, label or "real", fights)
     keep_forms = {int(x, 16) for x in a.form}
-    story_forms = {f.form for f in fights if f.story}
-    if a.story:
-        fights = [f for f in fights if f.form in story_forms or f.form in keep_forms]
+    if a.events:
+        rnd = random_forms()
+        fights = [f for f in fights if f.form not in rnd or f.form in keep_forms]
     # one fight per (policy, formation, key): repeats of a key are not new draws
     by = {}
     for f in fights:
