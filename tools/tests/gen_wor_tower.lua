@@ -20,7 +20,7 @@ local MAP_FOOT, MAP_F1, MAP_F2, MAP_F3, MAP_F4, MAP_TOP = 362, 363, 359, 360, 36
 local MAP_SAFETY, MAP_GEMBOX, MAP_GENJI, MAP_DRAGON, MAP_FORCE, MAP_ANCHOR = 365, 366, 367, 368, 369, 370
 local TOWER_DOOR, TOWER_LANDING = { 160, 126 }, { 160, 127 }
 -- magicite: give_genju's receipt order (Ramuh 0)
-local IFRIT, SHIVA, MADUIN, PALIDOR, TRITOCH, ZONESEEK, PHANTOM, SRAPHIM = 1, 2, 6, 9, 10, 18, 20, 21
+local IFRIT, SHIVA, SHOAT, MADUIN, PALIDOR, TRITOCH, ZONESEEK, PHANTOM, SRAPHIM = 1, 2, 5, 6, 9, 10, 18, 20, 21
 -- the bosses (route_data pool event 139, 145)
 local WHITE_DRGN, MAGIMASTER = 0x024, 0x166
 local DRAGON_FORMATION, MAGIMASTER_FORMATION = 481, 354
@@ -36,7 +36,16 @@ local BOSS_SPECIES = { [WHITE_DRGN] = true, [MAGIMASTER] = true }
 -- Shell goes up while an L.90 Magic stands (its Bolt 3, Merton, Meteor and
 -- Flare), and on all four against MagiMaster (route-wor-thamasa.md 5.3)
 local FIGHT = { cure = false, shellVs = { [0x164] = true }, magicFirst = { [0x164] = true } }
-local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.4 }, reraiseHold = { [0x166] = 0.15 } }
+-- MagiMaster: no element.  Every hit draws WallChange, which also sets the
+-- element he absorbs, so a cast aimed at his weakness lands on whatever wall
+-- the hits before it left: his HP climbed 7,048 -> 9,571 -> 15,350 ->
+-- 20,815 under the party's elemental casts, and three fights ran out of
+-- time (build/attempts/wt/v031-tower/lab/t5_p3r_k5_wor_relm_s0).  Drain
+-- (TERRA's own, RELM's Ifrit), Break (TERRA's own, CELES's Shoat) for his
+-- eight shields, and TERRA's Ultima (her Fire at three points) carry no
+-- element
+local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.4 }, reraiseHold = { [0x166] = 0.15 },
+  magicOnly = { 0x04, 0x0C } }
 local WALL_RING = 0xBB
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -840,7 +849,7 @@ H.run({ maxFrames = 1500000 }, {
   -- caster lost him the fight he had already won, his Ultima falling on
   -- STRAGO alone: build/attempts/wt/v031-tower/lab/
   -- f4b_p3t_p3r_k0_wor_relm_s9_wor_tower_f4_s0)
-  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM } }, "stones for MagiMaster"),
+  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM }, { CELES, SHOAT } }, "stones for MagiMaster"),
   lazy(function() return H.equipKit(CELES, { { 3, FORCE_ARMOR } }, { tag = "CELES: the Force Armor" }) end),
   H.call(function() say("wor", "dressed for MagiMaster: " .. kitLine()) end),
   door(7, 13, MAP_TOP, "the Gem Box's room -> the top (364 (7,7))"),
@@ -849,7 +858,7 @@ H.run({ maxFrames = 1500000 }, {
 
   -- ---- 5. MagiMaster ---------------------------------------------------------------
   -- @@stage magimaster
-  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM } }, "stones for MagiMaster"),
+  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM }, { CELES, SHOAT } }, "stones for MagiMaster"),
   H.call(function() H.assertEq(sw(0x02DA), 1, "the Gem Box's tile armed MagiMaster ($02DA, _cc5440)") end),
   stepOn(8, 8, function() return H.battleLoadStarted() or sw(0x02DB) == 1 end),
   H.advanceStory(function()
