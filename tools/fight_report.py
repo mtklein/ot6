@@ -76,11 +76,26 @@ def mon_names():
         return []
 
 
+_ROM = []
+
+
+def rom():
+    """tools/route_data.py over build/ot6.sfc, or None without a built ROM"""
+    if not _ROM:
+        try:
+            sys.path.insert(0, os.path.join(ROOT, "tools"))
+            import route_data
+            _ROM.append(route_data.Data())
+        except (OSError, KeyError, ImportError):
+            _ROM.append(None)
+    return _ROM[0]
+
+
 def random_forms():
     """every formation a random-encounter group can deal (needs build/ot6.sfc)"""
-    sys.path.insert(0, os.path.join(ROOT, "tools"))
-    import route_data
-    d = route_data.Data()
+    d = rom()
+    if d is None:
+        sys.exit("--events needs build/ot6.sfc (ninja build/ot6.sfc)")
     return {w & 0x1FF for g in range(256) for w in d.group_words(g)}
 
 
@@ -292,7 +307,11 @@ def main():
     for f in by.values():
         groups[(f.form, f.policy)].append(f)
     fname = {}
+    d = rom()
     for f in fights:
+        if d is not None and f.form is not None and f.form not in fname:
+            sp = d.formation(f.form)
+            fname[f.form] = "+".join(sorted({names[x] if x < len(names) else "$%03X" % x for x in sp}))
         if f.kills and f.form not in fname:
             sp = [int(x, 16) for x in re.findall(r"\$([0-9A-F]{3})", f.kills)]
             nm = sorted({names[s] if s < len(names) else "$%03X" % s for s in sp})
