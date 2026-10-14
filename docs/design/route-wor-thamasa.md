@@ -544,3 +544,55 @@ The route plays the arc in three legs. Evidence is under
   house (`_cb75bf`); the walks keep off them.
 - **Landings** that take the airship: the tower (160,127), Thamasa (250,229)
   (`grind/land_tower.txt`).
+
+### 11.3 Chadarnook, the grind and STRAGO's kit
+
+- **Chadarnook** fell in every run, slowly: 38,786 ticks with three deaths
+  (`lab/relm/cap1`, one by Doom Kiss from full HP), 32,031 ticks and three
+  deaths with three encounters used up first (`lab/var/relm_k3`). The
+  goddess is drawn on most of the clock; the driver aims at the demon
+  (`focus`) and waits her out. Short of "what makes a fight good": it is
+  attrition, decided by Fenix Downs rather than by a choice.
+- **The grind** north-west of Jidoor: to L43 for the lowest of the four in
+  26 fights (`lab/relm/r1`), to L46 in about 55 (`lab/relm/r3`). Potions and
+  Remedies ran out by the 33rd fight (`lab/var/relm_k3`: `potion=2 ...
+  remedy=0`); with 15 Tents from Jidoor the care pitches one when the heals
+  would cost more, and the run arrives whole (`lab/relm/cap2`: about 15
+  Tents, "potion=98" at the save).
+- **STRAGO's kit (#388).** Study (Scan at 3 BP) fired on the plain when a
+  Reach Frog could teach Rippler (`lab/relm/r1`: `study: Scan at 3 BP on
+  slot 2 ($03B), lores $080000 he lacks`); Dischord was learned by being
+  cast on (Crawlers); Aqua Rake is the plain's nuke (55 casts in 26 fights).
+  Pearl Wind is not on this route (the Sprinter casts it on group 49 only
+  beside the Mantodea), so the driver's Pearl Wind line went unexercised,
+  and so did Dischord on the Mantodea (group 48 holds none).
+
+### 11.4 The Fanatics' Tower
+
+Every fight inside is spells (no Fight row), so the driver gained a
+magic-only line (`Driver:magicOnlyLine`) and the climb its own kit:
+
+- **Every seat casts.** RELM on ZoneSeek and STRAGO on Sraphim had no
+  attack and passed every turn while three L.30 Magic killed the party
+  (`lab/tower/c1`: `plan=switch`, `battle $0AD LOST`). TERRA Maduin, CELES
+  Tritoch, RELM Shiva (Ice, Osmose, Shell); STRAGO Palidor (Float).
+- **Wall Rings** (Thamasa's relic counter) through the third floor: the
+  monsters' tier spells rebound, and a reflectable spell cast on a member in
+  Reflect rebounds onto the L.20 and L.70 Magic past their Reflect; a
+  reflecting body otherwise refuses every reflectable cast at the confirm
+  (`lab/tower/c3`: a Break re-planned for 90,000 frames).
+- **Float** kept on the four from the menu (the L.60 Magic's Quake took
+  3,400 of 3,600 from each, twice: `lab/tower/c8`).
+- **MP**: Tinctures to 99 at Thamasa (the climb from the second floor spent
+  32 and reached the top dry: `lab/tower/c10`); the after-battle care keeps
+  the casters above 60% and, inside, casts cures when Potions (250 HP) cannot
+  keep up.
+- **The Holy Dragon** fell every time it was met: 17,518 to 45,491 ticks,
+  broken twice a fight by TERRA's Break (`lab/tower/c10`, `c11`, `c15`,
+  `cap2` x3: `$024 broken (0 of 6 shields)`).
+- **The fourth floor's L.90 Magic** is where the climb ends at L46 (TERRA
+  and CELES L49): with the rings off above the third floor (cures again) and
+  Shell going up, the L.90 and L.80 Magic won all three attempts of a full
+  run, the L.90's Merton taking about 2,300 from each member
+  (`lab/tower/cap2`: `attempt 3/3 FAILED class=wipe`, `formation 0164
+  0163`). MagiMaster has not been reached.

@@ -8125,6 +8125,38 @@ function Driver:magicOnlyLine(actor, boost)
       end
     end
   end
+  -- opts.reraiseVs = { [species] = fraction }: once one of these stands at
+  -- or under that fraction of its HP, Life boosted two points (Life 3: the
+  -- member rises once on dying) goes on each living member without it,
+  -- before any attack: MagiMaster's Ultima falls on the party as he dies
+  -- (route-wor-thamasa.md 5.3)
+  local rv = self.opts.reraiseVs
+  if rv and spellCell(actor, 0x30, true) ~= nil and (M.readByte(BATTLE.BP + actor * 2) >= 2) then
+    local due = false
+    for s = 0, 5 do
+      local frac = monAlive(s) and rv[M.readWord(0x57C0 + s * 2)]
+      if frac then
+        local x = 8 + s * 2
+        local hp, mx = M.readWord(0x3BF4 + x), M.readWord(0x3C1C + x)
+        if mx > 0 and hp <= mx * frac then due = true end
+      end
+    end
+    self.reraiseAt = self.reraiseAt or {}
+    for e = 0, 3 do
+      local st3 = M.readByte(0x3EF8 + e * 2)
+      if due and M.readWord(0x3BF4 + e * 2) > 0 and (st3 & 0x01) == 0
+         and M.frame - (self.reraiseAt[e] or -100000) > 900 then
+        local b = castBoost(actor, 0x30, select(2, spellCell(actor, 0x30, true)), 2, 0)
+        if b ~= nil and b >= 2 then
+          self.reraiseAt[e] = M.frame
+          M.log(string.format("[%s] actor=%d Life at 2 BP (Life 3) on entity %d before the boss's end", self.tag or "fight",
+            actor, e))
+          return { kind = "magic", spell = 0x30, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 2, ally = true,
+                   target = e, buff = true, vetoOk = true, reason = "reraise" }
+        end
+      end
+    end
+  end
   local press = self:pressTarget()
   local MP = M.sym("MagicProp") & 0x3FFFFF
   local spells, castable = {}, {}
@@ -16273,9 +16305,20 @@ function Driver:watchHits()
     -- with the pips they were holding.  The killer is the action
     -- being attributed (or nobody: a poison tick, a bounced spell).
     local maxhp = M.readWord(0x3C1C + e * 2)
+    -- A Condemned member's Doom is nobody's action, even when a monster's
+    -- action is open on the frame it lands: a member whose Condemned count
+    -- ($3B05, M.doomCount) read its last step within the last 30 frames
+    -- and is at 0 now met the count's Doom (battle_doom on v0.30's ROM: the
+    -- Doom read as 'by slot 4 cmd $00 atk $EE ... from 241/241' because a
+    -- Battle was open as it landed)
+    self.condemnedAt = self.condemnedAt or {}
+    local dc = M.doomCount({ s2 = M.readByte(0x3EE5 + e * 2), count = M.readByte(BATTLE.COUNTER.Doom + e * 2) })
+    if dc ~= nil and dc <= 0 then self.condemnedAt[e] = M.frame end
     if last ~= nil and last ~= 0xFFFF and last > 0 and hp == 0 and maxhp > 0
        and not self.deathSaid[e] then
       self.deathSaid[e] = true
+      local savedAct = self.monAct
+      if self.condemnedAt[e] ~= nil and M.frame - self.condemnedAt[e] <= 30 then self.monAct = nil end
       local from = last
       if self.monAct ~= nil and self.monAct.hp0[e] ~= nil and self.monAct.hp0[e] ~= 0xFFFF then
         from = self.monAct.hp0[e]
@@ -16309,6 +16352,7 @@ function Driver:watchHits()
           from = from, maxhp = maxhp, bp = bp, party_bp = table.concat(pbp, ","),
           slot = rec.slot, cmd = rec.cmd, atk = rec.atk, one_action = oneAction })
       end
+      self.monAct = savedAct
     elseif hp > 0 and hp ~= 0xFFFF then
       self.deathSaid[e] = nil
     end

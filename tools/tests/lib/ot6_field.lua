@@ -737,7 +737,8 @@ function M.navTo(txIn, tyIn, opts)
         sawBattle, owed = false, false
         if opts.care ~= false and not M.eventTimerLive() then
           careD = M.newCareDriver({
-            threshold = opts.careThreshold or 0.65, reserve = opts.reserve, mpBand = opts.careMpBand or M.careMpBand,
+            threshold = opts.careThreshold or M.careThreshold or 0.65, reserve = opts.reserve,
+            mpBand = opts.careMpBand or M.careMpBand,
             party = fought, tag = "care after battle (navTo)" })
           careD.frame()
           if not careD.done() then return end
@@ -972,7 +973,8 @@ function M.advanceStory(pred, maxFrames, opts)
         sawBattle = false
         if opts.care ~= false and not M.eventTimerLive() then
           careD = M.newCareDriver({
-            threshold = opts.careThreshold or 0.65, reserve = opts.reserve, mpBand = opts.careMpBand or M.careMpBand,
+            threshold = opts.careThreshold or M.careThreshold or 0.65, reserve = opts.reserve,
+            mpBand = opts.careMpBand or M.careMpBand,
             party = fought, tag = "care after battle (advanceStory)" })
           careD.frame()
           if not careD.done() then return end
@@ -2640,7 +2642,8 @@ function M.worldNavTo(txIn, tyIn, opts)
         sawBattle = false
         if opts.care ~= false and not M.eventTimerLive() then
           careD = M.newCareDriver({
-            threshold = opts.careThreshold or 0.65, reserve = opts.reserve, mpBand = opts.careMpBand or M.careMpBand,
+            threshold = opts.careThreshold or M.careThreshold or 0.65, reserve = opts.reserve,
+            mpBand = opts.careMpBand or M.careMpBand,
             tag = "care after battle (worldNavTo)" })
           careD.frame()
           if not careD.done() then return end
@@ -5006,6 +5009,8 @@ M.careFloat = nil
 -- otherwise never casts): a leg where the bag cannot keep up (the Fanatics'
 -- Tower: Potions give 250 HP, its Tinctures refill the MP) sets it
 M.careMagic = nil
+-- The after-battle care's HP threshold for a whole run (0.65 when nil)
+M.careThreshold = nil
 
 -- M.fieldCare: the step form -- behaviorally what it has always been
 -- (open the menu, serve the plans, close, settle), built on careKernel.

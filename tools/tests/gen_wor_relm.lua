@@ -28,7 +28,13 @@ local THAMASA_AVOID = { { 22, 39 }, { 23, 39 } }
 -- (34,158)->(31,161)', build/attempts/wt/v030-route/lab/relm/s1; route_data world-path agrees)
 local GRIND_LANDING, GRIND_LAP = { 17, 135 }, { { 16, 135 }, { 22, 135 } }
 -- the level the tower asks of its four (route-wor-thamasa.md 5): the lowest
--- of TERRA, CELES, RELM and STRAGO, bounded by GRIND_BATTLES
+-- of TERRA, CELES, RELM and STRAGO, bounded by GRIND_BATTLES.  At L46 (TERRA and
+-- CELES L49) the four lost the fourth floor's L.90 and L.80 Magic in all three
+-- attempts of a run, the L.90's Merton taking 2,300 from each, after the Holy
+-- Dragon fell in all three (build/attempts/wt/v030-route/lab/tower/cap2); at
+-- L50 (TERRA L52, CELES L53; 95 fights, 533,402 frames) they lost the same
+-- floor's first fight (lab/tower/c18), so the levels are not the answer
+-- there and the grind stays at L46 (route-wor-thamasa.md 11.4)
 local GRIND_LEVEL, GRIND_BATTLES = 46, 90
 -- magicite: give_genju's receipt order (Ramuh 0)
 local STARLET, GOLEM, ZONESEEK = 25, 22, 18
@@ -767,6 +773,12 @@ H.run({ maxFrames = 1800000 }, {
     - H.invCountOf(POTION)) end, "POTION to the band"),
   H.buyItem(FENIX, function() return math.max(0, math.min(20, H.activeTopLevel()) - H.invCountOf(FENIX)) end,
     "FENIX DOWN to the level, capped at 20"),
+  -- the plain's poison outlasts the grind's Remedies (the L50 grind reached
+  -- Thamasa with CELES and STRAGO poisoned and 'remedy=0', and the care
+  -- beside the tower spent 34 Potions on the poison: build/attempts/wt/
+  -- v030-route/lab/relm/cap3), so Remedies to 10 here, for the care and
+  -- the tower (no counter inside)
+  H.buyItem(REMEDY, function() return math.max(0, 10 - H.invCountOf(REMEDY)) end, "REMEDY to 10"),
   H.shopClose("Thamasa's item shop"),
   H.bagArrange({ POTION, FENIX, TONIC, REMEDY }, { tag = "bag: combat items on top (Thamasa)" }),
   H.call(function() say("shop", "Thamasa") end),
