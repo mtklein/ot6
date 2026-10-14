@@ -64,6 +64,7 @@ DEATH = re.compile(P + r"\[[^]]+\] \[death\]")
 WIPE = re.compile(P + r"\[[^]]+\] \[wipe\]")
 OUTCOME = re.compile(P + r"\[([^]]+)\] \[outcome\] battle \$([0-9A-F]{3}) (WON|LOST|PARTY LEFT) "
                      r"after (\d+) ticks[^:]*: killed (.*?); escaped")
+FAILED = re.compile(P + r"\[retry\] attempt \d+/\d+ FAILED class=(\S+)")
 POLICY = re.compile(P + r"\[[^]]+\] \[policy\] ")
 
 
@@ -196,6 +197,17 @@ def parse(path, policy, out):
             if POLICY.match(line):
                 f.policy_lines += 1
                 continue
+            m = FAILED.match(line)
+            if m:
+                # the runner gave up inside the battle: its wipe watchdog
+                # fires before the driver's [wipe] line can; any other
+                # class leaves the fight unfinished (not a loss, not a win)
+                if f.form is not None:
+                    f.result = "LOST" if m.group(1) == "wipe" else "ABORT"
+                    f.lines.append(line.rstrip()[:300])
+                    out.append(f)
+                f = None
+                continue
             m = WIPE.match(line)
             if m:
                 f.result, f.ticks = "LOST", None
@@ -290,7 +302,7 @@ def main():
         if arc not in arcs[form]:
             arcs[form].append(arc)
     policies = sorted({f.policy for f in by.values()}, key=lambda p: (p != "real", p))
-    hdr = ["formation", "fight", "arc", "policy", "keys", "won", "low_med", "low_worst", "down_max",
+    hdr = ["formation", "fight", "arc", "policy", "keys", "won", "unfinished", "low_med", "low_worst", "down_max",
            "deaths/fight", "turns_med", "ticks_med", "doubt_med", "flips_med", "paired"]
     rows = []
     seen_forms = []
@@ -298,9 +310,11 @@ def main():
         if form in seen_forms:
             continue
         seen_forms.append(form)
-        real = {f.key: f for f in groups.get((form, "real"), [])}
+        real = {f.key: f for f in groups.get((form, "real"), []) if f.result != "ABORT"}
         for pol in policies:
             g = groups.get((form, pol), [])
+            unfinished = sum(f.result == "ABORT" for f in g)
+            g = [f for f in g if f.result != "ABORT"]
             if len(g) < a.min:
                 continue
             won = [f for f in g if f.result == "WON"]
@@ -314,7 +328,7 @@ def main():
                     pw = sum(f.result == "WON" for f in both)
                     paired = "%d keys: real %d won, %s %d won" % (len(both), rw, pol, pw)
             rows.append(["$%03X" % form, fname.get(form, "?"), ",".join(arcs[form]), pol, len(g),
-                         len(won), pct(med([m["low"] for m in mw])),
+                         len(won), unfinished, pct(med([m["low"] for m in mw])),
                          pct(min([m["low"] for m in mw]) if mw else None),
                          max([m["down"] for m in mall]) if mall else "-",
                          num(sum(f.deaths for f in g) / len(g), "%.2f"),
