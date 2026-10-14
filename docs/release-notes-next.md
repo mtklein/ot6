@@ -16,3 +16,8 @@ Celes still learns Scan at level 18.
 **Strago's Scan at three Boost Points teaches him lores.** He learns every
 lore the monsters in the battle could use, without being hit by them. The
 lores are learned when the battle is won. It costs 99 MP.
+
+The party in the included saves now shops for weapons and armor at every
+town on the way, as a player would, and wears what it buys.  In the World
+of Ruin it reaches the Storm Dragon about three levels lower than before,
+better equipped.

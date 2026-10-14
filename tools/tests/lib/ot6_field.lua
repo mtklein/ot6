@@ -7810,8 +7810,29 @@ function M.dressRelics(members, opts)
                       back[#back + 1] = { s, before[s] }
                     end
                   end
-                  restore = #back > 0 and M.equipKit(p.ch, back,
-                    { tag = string.format("%s: %s's gear back", tag, p.name) }) or M.call(function() end)
+                  -- A re-equip that swapped the hands leaves each piece in
+                  -- the other hand, not the bag, where the Equip list never
+                  -- offers it (#434's qualification, wor_terra: CELES's
+                  -- Morning Star and Enhancer traded hands, and "nothing to
+                  -- do" put neither back).  Then empty the four slots
+                  -- first and put all four back from the bag.
+                  local swapped = false
+                  for _, b in ipairs(back) do
+                    if M.invCountOf(b[2]) < 1 then swapped = true end
+                  end
+                  if swapped then
+                    local all = {}
+                    for s = 0, 3 do if before[s] ~= 0xFF then all[#all + 1] = { s, before[s] } end end
+                    M.log(string.format("[%s] %s: a piece to put back is in another slot, not the bag; "
+                      .. "emptying the four slots and putting all back", tag, p.name))
+                    restore = M.seqStep({
+                      M.emptyEquip(p.ch, { tag = string.format("%s: %s emptied", tag, p.name) }),
+                      M.equipKit(p.ch, all, { tag = string.format("%s: %s's gear back", tag, p.name) }),
+                    })
+                  else
+                    restore = #back > 0 and M.equipKit(p.ch, back,
+                      { tag = string.format("%s: %s's gear back", tag, p.name) }) or M.call(function() end)
+                  end
                 end
                 local r = restore:tick()
                 if r == "frame" then return "frame" end
