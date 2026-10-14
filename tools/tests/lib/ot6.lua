@@ -8277,7 +8277,10 @@ function Driver:magicOnlyLine(actor, boost)
       if monAlive(s) and M.readWord(0x3BF4 + 8 + s * 2) >= 5000 then big = true end
     end
     local _, cost = spellCell(actor, 0x00, true)
-    local b = big and castBoost(actor, 0x00, cost, 3, 0) or nil
+    -- the bank must hold the three points now: planned on the price alone,
+    -- the cast went at 0 or 1 BP ('wanted 3, the bank holds 0: going at
+    -- 0'), a plain Fire MagiMaster's wall nulls
+    local b = big and M.readByte(BATTLE.BP + actor * 2) >= 3 and castBoost(actor, 0x00, cost, 3, 0) or nil
     if b == 3 then
       local aim
       for s = 0, 5 do if aim == nil and monAlive(s) then aim = s end end
