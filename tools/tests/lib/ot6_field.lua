@@ -6693,52 +6693,68 @@ function M.gearPlan(stock, opts)
   M.log(string.format("[%s] gil %d, %s: budget %d", tag, M.gil(), why, budget))
   -- every (member, slot) candidate: the best of the stock that beats both
   -- what is worn and the bag's best, scored against the other hands' keys
-  local cands = {}
-  for _, c in ipairs(members) do
-    for slot = 0, 3 do
-      if not (keep[c] and keep[c][slot]) then
-        local others = keysElsewhere(members, wornOf, c, slot)
-        local cur = gearWorn(c, slot)
-        local curScore = (cur == 0xFF or fits(c, slot, cur)) and slotScore(c, slot, cur, others) or 0
-        local base = curScore
-        for id, n in pairs(bag) do
-          if n > 0 and fits(c, slot, id) then base = math.max(base, slotScore(c, slot, id, others)) end
-        end
-        local best, bestScore, bestPrice = nil, base, 0
-        for _, it in ipairs(stock) do
-          if fits(c, slot, it.id) then
-            local s = slotScore(c, slot, it.id, others)
-            if s > bestScore or (s == bestScore and best and it.price < bestPrice) then
-              best, bestScore, bestPrice = it.id, s, it.price
+  -- as the plan so far leaves them.  One pick at a time, the biggest
+  -- upgrade the budget still covers, and the rest scored again: a key the
+  -- first pick brings is no longer new to the second (the first cut scored
+  -- all at once and bought LOCKE two Full Moons at Narshe, each for the
+  -- blunt key the other was bringing).
+  local function candidates(decided)
+    local cands = {}
+    for _, c in ipairs(members) do
+      for slot = 0, 3 do
+        if not (keep[c] and keep[c][slot]) and not decided[c * 8 + slot] then
+          local others = keysElsewhere(members, wornOf, c, slot)
+          local cur = gearWorn(c, slot)
+          local curScore = (cur == 0xFF or fits(c, slot, cur)) and slotScore(c, slot, cur, others) or 0
+          local base = curScore
+          for id, n in pairs(bag) do
+            if n > 0 and fits(c, slot, id) then base = math.max(base, slotScore(c, slot, id, others)) end
+          end
+          local best, bestScore, bestPrice = nil, base, 0
+          for _, it in ipairs(stock) do
+            if fits(c, slot, it.id) then
+              local s = slotScore(c, slot, it.id, others)
+              if s > bestScore or (s == bestScore and best and it.price < bestPrice) then
+                best, bestScore, bestPrice = it.id, s, it.price
+              end
             end
           end
-        end
-        if best then
-          cands[#cands + 1] = { char = c, slot = slot, item = best, gain = bestScore - base,
-            price = bestPrice, from = cur, fromScore = curScore, base = base, score = bestScore }
+          if best then
+            cands[#cands + 1] = { char = c, slot = slot, item = best, gain = bestScore - base,
+              price = bestPrice, from = cur, fromScore = curScore, base = base, score = bestScore }
+          end
         end
       end
     end
+    table.sort(cands, function(a, b)
+      if a.gain ~= b.gain then return a.gain > b.gain end
+      if a.price ~= b.price then return a.price < b.price end
+      if a.char ~= b.char then return a.char < b.char end
+      return a.slot < b.slot
+    end)
+    return cands
   end
-  -- the biggest upgrades first, each if the budget still covers it
-  table.sort(cands, function(a, b)
-    if a.gain ~= b.gain then return a.gain > b.gain end
-    if a.price ~= b.price then return a.price < b.price end
-    if a.char ~= b.char then return a.char < b.char end
-    return a.slot < b.slot
-  end)
-  local out = {}
-  for _, k in ipairs(cands) do
-    local ok = k.price <= budget
+  local function say(k, verdict)
     M.log(string.format("[%s] %s slot %d: %s (score %d, bag best %d) -> %s score %d, gain %d, %d GP: %s",
       tag, GEAR_NAMES[k.char] or tostring(k.char), k.slot, gearName(k.from), k.fromScore, k.base,
-      gearName(k.item), k.score, k.gain, k.price, ok and "BUY" or ("over the budget " .. budget)))
-    if ok then
-      budget = budget - k.price
-      planned[k.char] = planned[k.char] or {}
-      planned[k.char][k.slot] = k.item
-      out[#out + 1] = k
+      gearName(k.item), k.score, k.gain, k.price, verdict))
+  end
+  local out, decided = {}, {}
+  while true do
+    local cands, pick = candidates(decided), nil
+    for _, k in ipairs(cands) do
+      if k.price <= budget then pick = k; break end
     end
+    if pick == nil then
+      for _, k in ipairs(cands) do say(k, "over the budget " .. budget) end
+      break
+    end
+    say(pick, "BUY")
+    budget = budget - pick.price
+    decided[pick.char * 8 + pick.slot] = true
+    planned[pick.char] = planned[pick.char] or {}
+    planned[pick.char][pick.slot] = pick.item
+    out[#out + 1] = pick
   end
   return out
 end
