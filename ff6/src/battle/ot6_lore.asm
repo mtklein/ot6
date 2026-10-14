@@ -10,6 +10,12 @@
 ; Storage: OT6_LORELOAD, five bytes at $7e1e27, next in the save-block scrap.
 ; byte = lore id + 1 (ids 0..23); $00 = unset; all five zero = AUTO.
 ;
+; Aqua Rake is the free row (#381, kits.md "Strago"): his signature, offered
+; in every battle once learned, outside the five.  It is never a slot's lore:
+; Ot6LoreSlottable answers no for it, so AUTO's window, the page's cycling
+; and a stored slot all pass over it, and Ot6LoreMask adds its bit after the
+; five.  The battle list holds up to six lores.
+;
 ; The battle read is one choke point, and it is smaller than Gau's: vanilla's
 ; lore-list walk in InitSpellList (battle_main.asm @556a) tests one bit per
 ; lore against $1d29,x and everything downstream (count $3a87, the $310f/$306a
@@ -59,10 +65,26 @@
         rtl
 .endproc
 
+; [ can a slot hold this lore?  learned, and not the free row ]
+; a8/i16.  in: A = lore id (0..23).  out: carry = learned and not Aqua Rake,
+;   A preserved.  clobbers X.  preserves Y.
+OT6_LORE_FREE = 3                       ; Aqua Rake: lore id 3, ability $8e
+.proc Ot6LoreSlottable
+        .a8
+        .i16
+        cmp     #OT6_LORE_FREE
+        beq     @no                     ; the free row is never a slot's
+        jmp     Ot6LoreLearned          ; tail-call: carry = learned
+@no:    clc
+        rtl
+.endproc
+
 ; [ a loadout slot's lore, validated: the single source of truth ]
 ; The stored byte only counts if the bit is still set.  Learning is monotonic
 ; and nothing clears $1d29, so staleness needs a corrupt or hand-edited save;
 ; the validation is against feeding the battle menu a lore never observed.
+; A slot storing Aqua Rake (a save from before the free row) reads as unset:
+; the free row offers it anyway, and the slot is the player's to refill.
 ; a8/i16.  in: A = slot (0..4).  out: carry set + A = lore id, or carry clear
 ;   (unset / not learned).  clobbers X.  preserves Y.
 .proc Ot6LoreSlot
@@ -75,15 +97,16 @@
         lda     f:OT6_LORELOAD,x
         beq     @none           ; $00 = unset
         dec     a               ; stored byte - 1 = lore id
-        jsl     Ot6LoreLearned  ; carry = learned (A preserved)
+        jsl     Ot6LoreSlottable ; carry = learned, not the free row
         bcc     @none
         rtl                     ; carry set, A = the id
 @none:  clc
         rtl
 .endproc
 
-; [ the n-th learned lore in id order (AUTO's definition) ]
-; AUTO is "the first five known lores in id order".  Both readers resolve
+; [ the n-th slottable lore in id order (AUTO's definition) ]
+; AUTO is "the first five known lores in id order", the free row (Aqua
+; Rake) passed over.  Both readers resolve
 ; through this (the page via Ot6LoreShow, the battle mask via Ot6LoreMask's
 ; AUTO arm walking the same bits in the same order), so the page and the
 ; battle menu show the same five by construction.  24 candidates, so the
@@ -98,7 +121,7 @@
         phy                     ; [$01,s..$02,s] caller Y (n now $03,s)
         ldy     #$0000          ; candidate id
 @try:   tya
-        jsl     Ot6LoreLearned  ; carry = learned; preserves Y, clobbers X
+        jsl     Ot6LoreSlottable ; carry = slottable; preserves Y, clobbers X
         bcc     @next
         lda     $03,s
         beq     @hit
@@ -162,6 +185,7 @@
 ;     first five known lores in id order.  AUTO truncates past five so the
 ;     full list is not reachable through inaction, though at 24 candidates
 ;     the stakes are comfort, not usability.
+;   Either way, then the free row: Aqua Rake's bit, if learned (#381).
 ;
 ; This runs in every battle's init.  The AUTO arm is one pass over 24 bits
 ; through Ot6LoreLearned and the MANUAL arm five Ot6LoreSlot resolutions;
@@ -193,7 +217,7 @@
         lda     #$00
         pha                     ; [$01,s] candidate id
 @atry:  lda     $01,s
-        jsl     Ot6LoreLearned  ; carry = learned (A preserved, Y preserved)
+        jsl     Ot6LoreSlottable ; carry = slottable (A preserved, Y preserved)
         bcc     @anext
         phy                     ; Ot6LoreMaskSet clobbers Y
         jsl     Ot6LoreMaskSet
@@ -207,8 +231,7 @@
         cmp     #$18
         bcc     @atry
 @adone: pla                     ; drop the candidate id
-        plp
-        rtl
+        bra     @free
 @manual:
         lda     #$00
         pha                     ; [$01,s] slot
@@ -222,7 +245,11 @@
         cmp     #OT6_LORESLOTS
         bcc     @slot
         pla                     ; drop the slot
-        plp
+@free:  lda     #OT6_LORE_FREE  ; the free row, outside the five
+        jsl     Ot6LoreLearned  ; carry = learned (A preserved)
+        bcc     :+
+        jsl     Ot6LoreMaskSet
+:       plp
         rtl
 .endproc
 
@@ -310,8 +337,9 @@
 .endproc
 
 ; [ cycle the cursored slot to the prev/next learned lore; go MANUAL ]
-; The Ot6RageCycleCore shape over 24 ids, wrapping 0..23.  A slot showing
-; nothing starts its walk at id 0.  Uses menu scratch $e0 (D=0).
+; The Ot6RageCycleCore shape over 24 ids, wrapping 0..23, passing over the
+; free row.  A slot showing nothing starts its walk at id 0.  Uses menu
+; scratch $e0 (D=0).
 ; in: A = step delta ($01 = next, $ff = previous).  clobbers A,X,Y.
 .proc Ot6LoreCycleCore
         .a8
@@ -337,11 +365,11 @@
         bra     @have
 @low:   lda     #$17
 @have:  sta     $e0
-        jsl     Ot6LoreLearned      ; carry = learned (A preserved)
+        jsl     Ot6LoreSlottable    ; carry = slottable (A preserved)
         bcs     @found
         dey
         bne     @hop
-        pla                         ; nothing learned at all: leave it alone
+        pla                         ; nothing slottable: leave it alone
         rtl
 @found: jsl     Ot6LoreCurSlot      ; A = the cursored slot
         longa

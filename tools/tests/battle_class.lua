@@ -482,6 +482,26 @@ H.run({ maxFrames = 90000 }, {
   H.call(function()
     H.writeByte(0x3E44, 2)
     H.writeWord(0x3C00, 3000); H.vars.ph = 3000
+    -- the property itself, per hit: Ot6ShieldedDmg's entry and its one
+    -- exit (`done: rts`, the byte before Ot6SkillClass) on guard
+    -- 1 (entity $0C) with a resolved heal ($F2 bit 0) and shields up.  The
+    -- window means below mix whichever berserk ally swung (2026-10-13,
+    -- qual2: 62.0 vs 83.8 over 12 heals each, no attenuation involved), so
+    -- the gate is read where it acts.
+    local sd = H.sym("Ot6ShieldedDmg")
+    local sdEnd = H.sym("Ot6SkillClass") - 1
+    H.assertEq(H.readRomByte(sdEnd & 0x3FFFFF), 0x60, "the byte before Ot6SkillClass is Ot6ShieldedDmg's rts")
+    H.vars.shHeal, H.vars.shOpen = {}, nil
+    emu.addMemoryCallback(function()
+      local st = emu.getState()
+      if (st["cpu.y"] & 0xFF) ~= 0x0C or (H.readByte(0xF2) & 1) == 0 or H.readByte(0x3E44) == 0 then return end
+      H.vars.shOpen = H.readWord(0xF0)
+    end, emu.callbackType.exec, sd, sd)
+    emu.addMemoryCallback(function()
+      if H.vars.shOpen == nil then return end
+      H.vars.shHeal[#H.vars.shHeal + 1] = { inp = H.vars.shOpen, out = H.readWord(0xF0) }
+      H.vars.shOpen = nil
+    end, emu.callbackType.exec, sdEnd, sdEnd)
   end),
   H.driveUntil(function() return H.vars.cntsh >= 12 end, 15000, {
     H.call(function()
@@ -522,8 +542,12 @@ H.run({ maxFrames = 90000 }, {
     -- unattenuated: the means match within the roll spread.  A 0.5x
     -- attenuation of the shielded window would drop its mean to about half,
     -- far under this floor (0.8x).
-    H.assertEq(avgsh * 5 >= avgno * 4, true,
-      "mean heal while shielded is NOT attenuated (>= 0.8x the shieldless mean)")
+    local n, kept = #H.vars.shHeal, 0
+    for _, r in ipairs(H.vars.shHeal) do if r.out == r.inp then kept = kept + 1 end end
+    H.log(string.format("guard 1 shielded heals through Ot6ShieldedDmg: %d, %d left whole%s", n, kept,
+      n > 0 and string.format(" (first %d -> %d)", H.vars.shHeal[1].inp, H.vars.shHeal[1].out) or ""))
+    H.assertEq(n >= 4, true, "at least four resolved heals reached Ot6ShieldedDmg on the shielded guard")
+    H.assertEq(kept, n, "every resolved heal on the shielded guard left Ot6ShieldedDmg unscaled")
   end),
 
   H.call(function()

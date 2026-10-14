@@ -662,13 +662,27 @@ end
 -- which it is: the engine sits on the Annihilated screen until a press,
 -- and a driver keeps its frame() -- the [death] and [wipe] lines a solo
 -- loss never got, and the A a person presses there.
+-- One more shape (2026-10-13, battle_jackpot in qual2): vanilla's damage
+-- arithmetic subtracts first and clamps a borrow to 0 one instruction later
+-- (ApplyDmg, battle_main.asm @1339 then @1388), and an NMI can fall between,
+-- so one seat reads an underflow ($FEDB, seat 0, f47186) for a frame while
+-- the others hold live HP.  So a seat above 9999 reads as "not an HP table"
+-- unless the frame before read a battle, a live seat stands beside it, and
+-- no seat holds a field fill ($FFFF, $FF00: battle_loadgate's scribble).
+-- (Tolerating any odd seat beside a live one read field garbage, species
+-- $5554, as a battle: qual3, six suites.)
+M.blsSeen = nil              -- the last frame this read a battle (a field: the chunk is at its local cap)
 function M.battleLoadStarted()
-  local anyLive = false
+  local anyLive, odd = false, false
   for i = 0, 3 do
     local hp = M.readWord(M.BATTLE_HP + i * 2)
-    if hp >= 10000 then return false end   -- $FFFF, $FF00: not an HP table
-    if hp > 0 then anyLive = true end
+    if hp == 0xFFFF or hp == 0xFF00 then return false end   -- the field's fills
+    if hp >= 10000 then odd = true elseif hp > 0 then anyLive = true end
   end
+  if odd then
+    return anyLive and M.blsSeen ~= nil and M.frame - M.blsSeen <= 1
+  end
+  if anyLive then M.blsSeen = M.frame end
   if anyLive then return true end
   return M.partyWipedInBattle ~= nil and M.partyWipedInBattle() or false
 end
@@ -13279,7 +13293,40 @@ function M.kitBattle(plan, opts)
     pulse(dir)
     return "walk"
   end
+  -- An instant-death hand (ItemProp +27 effect 3 or 13: the Assassin, the
+  -- Trump, the Scimitar) on an undead body revives it at full HP: vanilla's
+  -- TargetEffect_35 tail (battle_main.asm @3d63, $3C95 bit 7 = undead,
+  -- MonsterProp +18) queues command $24 with MonsterDeath_00.  A player
+  -- stops stabbing a Misfit that heals on every kill roll; so does the
+  -- fight-out: such a seat aims at a live body that is not undead, and
+  -- Defends while every live body is (2026-10-13: battle_debilitator's
+  -- fight-out held SHADOW's Assassin on an undead Misfit for 40,000 frames).
+  local function fightWant(a)
+    local deadly = false
+    for h = 0, 1 do
+      local fx = M.readByte(0x3CBC + a * 2 + h) >> 4
+      if M.readByte(0x3B68 + a * 2 + h) > 0 and (fx == 3 or fx == 13) then deadly = true end
+    end
+    if not deadly then return nil end
+    local alive = M.readByte(0x3A75)
+    for s = 0, 5 do
+      if (alive >> s) & 1 == 1 and (M.readByte(0x3C95 + 8 + s * 2) & 0x80) == 0 then return 1 << s end
+    end
+    return false
+  end
+  local stoodDown = {}
   local function fight(a, st)
+    local want = fightWant(a)
+    if want == false then
+      if not stoodDown[a] then
+        stoodDown[a] = true
+        M.log(string.format("[kit] seat %d's hand kills outright, and every live body is undead (it would revive): "
+          .. "it Defends", a))
+      end
+      if st == 0x05 then pulse("right") elseif st == 0x27 then pulse("a")
+      elseif st == 0x30 or st == 0x0E or st == 0x38 then pulse("b") else M.setPad({}) end
+      return
+    end
     if st == 0x05 then
       local row = cmdRowOf(a, 0x00)
       if row == nil then pulse("right"); return end
@@ -13287,7 +13334,7 @@ function M.kitBattle(plan, opts)
       if cur ~= row then pulse(cur < row and "down" or "up") else pulse("a") end
     elseif st == 0x38 then
       if cool > 0 then pulse("a"); return end
-      local r = aimAt(nil)
+      local r = aimAt(want)
       if r == "confirm" then aim = nil; pulse("a") elseif r == "refuse" then aim = nil; pulse("b") end
     elseif st == 0x27 then pulse("a")
     elseif st == 0x30 or st == 0x0E or st == 0x0A or st == 0x08 then pulse("b")

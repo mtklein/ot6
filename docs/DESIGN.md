@@ -37,7 +37,7 @@ touches vanilla behavior where a pillar requires it.
 | Celes | Rune Knight | Sword | Ice/Holy | Runic from the start (signature) + spells (see below) |
 | Gau | Beast Tamer | Fangs (innate) | Earth | Rage learned without limit on the Veldt, 8 equipped (see below) |
 | Setzer | Gambler/Merchant | Cards & dice | — | Slot from the start (signature), with Coin Toss and Hired Help (paid in gil) behind it; divine: Jackpot, a Fixed-Dice triple, never Slot itself (kits.md) |
-| Strago | Scholar | Rod | Fire/Ice/Lightning | 8 Lores, Aqua Breath as the free signature; **Analyze** (reveals shields and weaknesses) cheap at #2 -- planned, not in the game |
+| Strago | Scholar | Rod | Fire/Ice/Lightning | Lores (five equipped), Aqua Rake as the free row; **Analyze** (Scan: reveals every weakness of a species), always his, 3 MP (kits.md) |
 | Relm | Painter | Brush | — | Sketch stays as signature |
 | Shadow | Assassin | Dagger (thrown) | Dark | Throw (signature); divine: Assassinate, at a full 3-BP boost (kits.md "Divines"): the hit of his that breaks an enemy kills it outright, as does a hit on one already Broken; a boss is only Broken |
 | Mog | Dancer | Spear | varies by dance | the 8 Dances, verbatim |
@@ -99,8 +99,9 @@ return on BP, which is intended.
 **Reveal.** Weaknesses start hidden. Chipping one reveals that entry
 (`Ot6RevealCommit`, for every monster of the species) and it stays revealed,
 across battles too: the per-save codex seeds it at the next battle's start
-(`Ot6SeedShields`). Nothing reveals everything at once; Strago's planned
-Analyze (the role Cyrus fills in Octopath) is not in the game.
+(`Ot6SeedShields`). A character's Scan reveals every weakness of its
+target's species at once (Strago's Analyze, the role Cyrus fills in
+Octopath; kits.md "Strago").
 
 **Display ships with the break system**, not as later polish: the shield
 count and revealed-weakness icons are how an Octopath battle reads to the

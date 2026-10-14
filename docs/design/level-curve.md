@@ -396,7 +396,7 @@ Notes on the targets:
 - **MagiMaster's death counter is Ultima** (`counter: Ultima<pow 150>`).
   Vanilla's answer is Life 3, and here it is any Life boosted two or
   more: Terra's natural Life (L18) and Sraphim's are in hand, so Life 3
-  pre-cast on the party answers it, with Shell (Shiva, Carbunkl, ZoneSeek)
+  pre-cast on the party answers it, with Shell (Shiva, ZoneSeek)
   and HP besides; the roll at the party's MDef is the lab's first
   measurement, and it sets the target.
 - **Kefka's Tower takes three parties**, so the target applies to twelve

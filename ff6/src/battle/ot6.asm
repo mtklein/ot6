@@ -91,3 +91,6 @@
 
 ; Umaro's kit (#380), appended for the same reason.
         .include "ot6_umaro.asm"
+
+; Strago's Analyze (#381), appended for the same reason.
+        .include "ot6_analyze.asm"

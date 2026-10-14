@@ -24,8 +24,9 @@
 -- HUD slot rather than adding a second party member.
 --
 -- InitLore's three starting lores (ids 3, 7, 20) are fewer than the five
--- loadout slots, so AUTO's window fills slots 0-2 and leaves 3-4 genuinely
--- empty, and the "- EMPTY -" marker is reachable on the first open.
+-- loadout slots.  Aqua Rake (3) is the free row (#381), never a slot's, so
+-- AUTO's window fills slots 0-1 and leaves 2-4 genuinely empty, and the
+-- "- EMPTY -" marker is reachable on the first open.
 --
 -- Geometry: this window shows only odd tilemap rows 1-15 whole; row 1
 -- title, row 3 hint + Y=AUTO, rows 5/7/9/11/13 the five slots (name col 3,
@@ -273,8 +274,11 @@ local function assertPage(win, nKnown, what)
   for n = 0, NSLOTS - 1 do assertCursorGutter(n, what) end
 end
 
--- KNOWN: the save's own learned-lore ids, ascending.
-local KNOWN = {}
+-- KNOWN: the save's own learned-lore ids, ascending.  SLOTTABLE: the same
+-- less Aqua Rake (lore id 3), the free row (#381): offered in every battle
+-- outside the five, so AUTO's window and the R/L cycle pass over it.
+local KNOWN, SLOTTABLE = {}, {}
+local FREE = 3
 
 H.run({ maxFrames = 40000 }, {
   H.waitFrames(20),
@@ -332,7 +336,13 @@ H.run({ maxFrames = 40000 }, {
       end
     end
     local names = {}
-    for _, id in ipairs(KNOWN) do names[#names + 1] = id .. ":" .. nameText(id) end
+    for _, id in ipairs(KNOWN) do
+      names[#names + 1] = id .. ":" .. nameText(id)
+      if id ~= FREE then SLOTTABLE[#SLOTTABLE + 1] = id end
+    end
+    H.assertEq(#SLOTTABLE >= 2 and #SLOTTABLE < #KNOWN, true,
+      "InitLore holds Aqua Rake and at least two other lores, so the page shows the free row "
+      .. "passed over and R has a next lore to cycle to")
     H.log(string.format("$1d29-$1d2b as saved (InitLore, unpoked): %d lores -- %s",
       #KNOWN, table.concat(names, " ")))
     H.assertEq(#KNOWN > 0 and #KNOWN < NSLOTS, true,
@@ -393,8 +403,8 @@ H.run({ maxFrames = 40000 }, {
 
   H.call(function()
     local win = {}
-    for s = 1, #KNOWN do win[s] = KNOWN[s] end
-    assertPage(win, #KNOWN, "AUTO, opened untouched")
+    for s = 1, #SLOTTABLE do win[s] = SLOTTABLE[s] end
+    assertPage(win, #KNOWN, "AUTO, opened untouched (Aqua Rake, the free row, in no slot)")
     for i = 0, NSLOTS - 1 do
       H.assertEq(H.readByte(0x1e27 + i), 0,
         string.format("opening the page did not seed OT6_LORELOAD+%d", i))
@@ -412,24 +422,36 @@ H.run({ maxFrames = 40000 }, {
   H.pressButtons({ "r" }, 3),
   H.waitFrames(40),
   H.call(function()
-    H.assertEq(H.readByte(0x1e27 + 0), KNOWN[2] + 1,
-      "R cycled slot 0 to the next learned lore (stored byte = id + 1)")
-    for i = 2, #KNOWN do
-      H.assertEq(H.readByte(0x1e27 + i - 1), KNOWN[i] + 1,
+    H.assertEq(H.readByte(0x1e27 + 0), SLOTTABLE[2] + 1,
+      "R cycled slot 0 to the next slottable lore (stored byte = id + 1)")
+    for i = 2, #SLOTTABLE do
+      H.assertEq(H.readByte(0x1e27 + i - 1), SLOTTABLE[i] + 1,
         string.format("the first edit froze AUTO's window into slot %d", i - 1))
     end
-    for i = #KNOWN, NSLOTS - 1 do
+    for i = #SLOTTABLE, NSLOTS - 1 do
       H.assertEq(H.readByte(0x1e27 + i), 0,
         string.format("slot %d had no AUTO window entry to freeze, stays unset", i))
     end
-    assertFilledRow(0, KNOWN[2])
-    for slot = #KNOWN, NSLOTS - 1 do assertEmptyRow(slot) end
+    assertFilledRow(0, SLOTTABLE[2])
+    for slot = #SLOTTABLE, NSLOTS - 1 do assertEmptyRow(slot) end
     assertModeBlock(false, "after the first edit")
     H.assertEq(H.readByte(ZMENUSTATE), ST_LORELOAD, "still on the lore page")
     H.screenshot("lorepage_after_cycle")
-    H.log("LIVE: R redrew slot 0 as '" .. nameText(KNOWN[2])
+    H.log("LIVE: R redrew slot 0 as '" .. nameText(SLOTTABLE[2])
       .. "', the first edit froze the AUTO window into the loadout bytes, and "
       .. "the mode indicator followed it from AUTO to MANUAL in the same frame")
+  end),
+
+  -- R walks slot 0 on through the slottable lores and wraps: Aqua Rake,
+  -- learned and lower than the first, is never a stop
+  H.pressButtons({ "r" }, 3),
+  H.waitFrames(40),
+  H.call(function()
+    local want = SLOTTABLE[3] or SLOTTABLE[1]
+    H.assertEq(H.readByte(0x1e27 + 0), want + 1,
+      string.format("R from '%s' went to '%s', past Aqua Rake (the free row is never a slot's)",
+        nameText(SLOTTABLE[2]), nameText(want)))
+    assertFilledRow(0, want)
   end),
 
   H.pressButtons({ "y" }, 3),
@@ -441,7 +463,7 @@ H.run({ maxFrames = 40000 }, {
     end
     assertModeBlock(true, "after Y")
     local win = {}
-    for s = 1, #KNOWN do win[s] = KNOWN[s] end
+    for s = 1, #SLOTTABLE do win[s] = SLOTTABLE[s] end
     for slot = 0, NSLOTS - 1 do
       if win[slot + 1] then assertFilledRow(slot, win[slot + 1])
       else assertEmptyRow(slot) end

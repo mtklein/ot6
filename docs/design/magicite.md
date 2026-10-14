@@ -251,7 +251,7 @@ What the arcs need from them (`level-curve.md`, "The World of Ruin"):
   with LOCKE at v0.32.
 - **MagiMaster's death counter is Ultima**, and the answer is Life
   boosted to Life 3 (Terra's natural Life, Sraphim's), pre-cast, with
-  Shell (Shiva, Carbunkl, ZoneSeek; Alexandr's at v0.35) besides.
+  Shell (Shiva, ZoneSeek; Alexandr's at v0.35) besides.
 - **Stones outnumber the members who can wear them** from v0.27 on: fifteen
   stones for five members at v0.27, eighteen to twenty-one for ten at
   v0.30.  Umaro and Gogo take none.  The one-copy rule binds on the four

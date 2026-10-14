@@ -429,6 +429,14 @@ TEST_ENV = {
     # #327: TERRA knows Life and pays Life 3 here; no write needed
     "battle_lifefold":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # #381: STRAGO is seated here and has learned no spell; a run is the
+    # Continue, a walk and one to a few battles of scripted turns
+    "battle_analyze": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # #432: STRAGO's study, beside the Chimera on the plain east of Thamasa;
+    # the Continue, a walk and up to sixteen battles
+    "battle_study": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
     # #319: SETZER's kit, played in Darill's Tomb's east room from the
     # battery cut on its save point (SETZER back in the World of Ruin, so
     # Jackpot is learned).  A run is the Continue, a walk and one to four
@@ -690,6 +698,12 @@ check("save_layout",
 # spell tier (guidelines.md, "Stronger spells come from boosting, never from
 # a list").  Reads the grant tables and Ot6FoldTbl out of the built ROM at
 # the addresses ff6-en.dbg records; the selftest runs one mutant per rule.
+# #432: Ot6StudyTbl (species -> the lores its AI script can cast) is the
+# scripts' own list; the selftest runs one mutant per rule.
+check("study_table",
+      "python3 tools/check_study_table.py --selftest"
+      " && python3 tools/check_study_table.py",
+      ["tools/check_study_table.py", copy_if_changed_from("build/ot6.sfc")])
 check("spell_grants",
       "python3 tools/check_spell_grants.py --selftest"
       " && python3 tools/check_spell_grants.py",

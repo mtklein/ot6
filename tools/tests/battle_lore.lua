@@ -13,6 +13,11 @@
 -- effective mask -- leaves both cells at whatever InitBattle's own $ff fill
 -- left them ($2000-$341f, battle_main.asm InitBattle @2402), which this file
 -- measures rather than assumes (arm 1 below).
+--
+-- Aqua Rake (lore id 3) is the free row (#381, kits.md "Strago"): once
+-- learned it is offered in every battle, outside the five, and it is never
+-- a slot's lore (AUTO's window, and a stored slot, pass over it).  So the
+-- walk offers up to six.  Arms 2, 5 and 6.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
@@ -25,6 +30,7 @@ local COUNT = 0x3A87                   -- $3a87: how many lores passed the mask
 local TBL_310F, TBL_306A = 0x310F, 0x306A  -- the two per-id list tables (y = lore id)
 
 local INITLORE = H.sym("InitLore") & 0x3FFFFF
+local FREE = 3                         -- Aqua Rake, the free row
 
 local function teach(ids)
   for i = 0, 2 do H.writeByte(LOREBITS + i, 0) end
@@ -132,19 +138,23 @@ end, function()
 end))
 
 -- ---------------------------------------------------------------- arm 2 --
--- AUTO truncation: 8 learned (ids 0..7), AUTO loadout -> only the first 5.
+-- AUTO truncation: 8 learned (ids 0..7), AUTO loadout -> the first five
+-- other than Aqua Rake (0, 1, 2, 4, 5), and Aqua Rake as the free row: six.
 add(arm("auto-truncation", function()
   teach({ 0, 1, 2, 3, 4, 5, 6, 7 })
   loadout(nil)
 end, function()
-  H.assertEq(H.readByte(COUNT), 5, "auto-truncation: $3a87 == 5 (cap, not 8)")
-  for id = 0, 4 do
+  H.assertEq(H.readByte(COUNT), 6,
+    "auto-truncation: $3a87 == 6 (AUTO's five past Aqua Rake, and Aqua Rake free; not 8)")
+  for id = 0, 5 do
     H.assertEq(cellA(id), id + 0x37,
-      string.format("auto-truncation: id %d (offered) $310f cell written", id))
+      string.format("auto-truncation: id %d (offered%s) $310f cell written", id,
+        id == FREE and ", the free row" or ""))
     H.assertEq(cellB(id), id + 0x8b,
-      string.format("auto-truncation: id %d (offered) $306a cell written", id))
+      string.format("auto-truncation: id %d (offered%s) $306a cell written", id,
+        id == FREE and ", the free row" or ""))
   end
-  for id = 5, 7 do
+  for id = 6, 7 do
     H.assertEq(cellA(id), fillA,
       string.format("auto-truncation: id %d (learned but past the cap) "
         .. "$310f cell NOT written", id))
@@ -152,8 +162,8 @@ end, function()
       string.format("auto-truncation: id %d (learned but past the cap) "
         .. "$306a cell NOT written", id))
   end
-  H.log("AUTO TRUNCATION: 8 learned, 5 offered -- ids 5-7 stay learned "
-    .. "(the collection) but do not reach the battle menu (the walk)")
+  H.log("AUTO TRUNCATION: 8 learned, 6 offered (five and the free row) -- "
+    .. "ids 6-7 stay learned (the collection) but do not reach the battle menu")
 end))
 
 -- ---------------------------------------------------------------- arm 3 --
@@ -198,6 +208,49 @@ end, function()
     "stale-validation: id 5 (stored but unlearned) $306a cell NOT written")
   H.log("STALE-BYTE VALIDATION: a loadout slot naming an unlearned lore is "
     .. "skipped -- a corrupt or hand-edited save cannot offer an uncastable lore")
+end))
+
+-- ---------------------------------------------------------------- arm 5 --
+-- the free row beside a full MANUAL loadout: Aqua Rake learned and stored in
+-- no slot, five other lores stored -> all six offered.
+add(arm("free-row", function()
+  teach({ FREE, 10, 11, 12, 13, 14, 15 })
+  loadout({ 10, 11, 12, 13, 14 })
+end, function()
+  H.assertEq(H.readByte(COUNT), 6, "free-row: $3a87 == 6 (the five stored, and Aqua Rake)")
+  for _, id in ipairs({ FREE, 10, 11, 12, 13, 14 }) do
+    H.assertEq(cellA(id), id + 0x37, string.format("free-row: id %d $310f cell written", id))
+    H.assertEq(cellB(id), id + 0x8b, string.format("free-row: id %d $306a cell written", id))
+  end
+  H.assertEq(cellA(15), fillA, "free-row: id 15 (learned, in no slot) $310f cell NOT written")
+  H.assertEq(cellB(15), fillB, "free-row: id 15 (learned, in no slot) $306a cell NOT written")
+  H.log("FREE ROW: Aqua Rake is offered beside a full five-slot loadout")
+end))
+
+-- ---------------------------------------------------------------- arm 6 --
+-- a slot storing Aqua Rake (a save from before the free row) reads as
+-- unset: Aqua Rake is offered once, as the free row, beside the other slot.
+add(arm("stored-free-row", function()
+  teach({ FREE, 9 })
+  loadout({ FREE, 9 })
+end, function()
+  H.assertEq(H.readByte(COUNT), 2, "stored-free-row: $3a87 == 2 (lore 9, and Aqua Rake once)")
+  for _, id in ipairs({ FREE, 9 }) do
+    H.assertEq(cellA(id), id + 0x37, string.format("stored-free-row: id %d $310f cell written", id))
+    H.assertEq(cellB(id), id + 0x8b, string.format("stored-free-row: id %d $306a cell written", id))
+  end
+  H.log("STORED FREE ROW: a slot naming Aqua Rake is passed over; the free row offers it")
+end))
+
+-- ---------------------------------------------------------------- arm 7 --
+-- the free row needs the lore learned: five stored, Aqua Rake not learned.
+add(arm("free-row-unlearned", function()
+  teach({ 10, 11, 12, 13, 14 })
+  loadout({ 10, 11, 12, 13, 14 })
+end, function()
+  H.assertEq(H.readByte(COUNT), 5, "free-row-unlearned: $3a87 == 5 (no Aqua Rake to offer)")
+  H.assertEq(cellA(FREE), fillA, "free-row-unlearned: Aqua Rake's $310f cell NOT written")
+  H.assertEq(cellB(FREE), fillB, "free-row-unlearned: Aqua Rake's $306a cell NOT written")
 end))
 
 H.run({ maxFrames = 60000 }, steps)

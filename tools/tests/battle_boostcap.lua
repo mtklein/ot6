@@ -123,12 +123,18 @@ H.run({ maxFrames = 60000 }, {
           elseif pend(actor) > c.b then btn = "l"
           else btn = "a" end                  -- open the magitek list
         elseif st == ST_MAGITEK then
-          -- the list keeps its cursor between turns, so only the first
-          -- case walks it down to the row-2 beam (battle_boost's beam)
-          if k == 1 and downs < 2 then
-            if (mf - 1) % 8 == 0 then downs = downs + 1 end
-            btn = "down"
-          else btn = "a" end                  -- the row-2 beam
+          -- walk the cursor to the second row's first beam (Ice Beam,
+          -- entry 2; battle_boost's beam) by reading it: the column at
+          -- $893F and the row at $8943 per actor (UpdateMenuState_2a).  The
+          -- list's cursor is remembered from the fixture's own play, so a
+          -- counted walk from an assumed start (two downs) landed on Heal
+          -- Force's empty right neighbour once the regenerated fixture
+          -- remembered another row (2026-10-13, qual2, a 50,000-frame hang)
+          local col, row = H.readByte(0x893F + actor), H.readByte(0x8943 + actor)
+          if row < 1 then btn = "down"
+          elseif row > 1 then btn = "up"
+          elseif col > 0 then btn = "left"
+          else btn = "a" end
         elseif st == ST_TGT then btn = "a"    -- the default (enemy) target
         elseif st == 0x01 then H.setPad({}); return
         end
