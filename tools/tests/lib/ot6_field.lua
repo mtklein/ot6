@@ -6487,8 +6487,11 @@ end
 -- The budget is the purse less the supply reserve: what the supply band
 -- (tools/audit_supplies.py: Tonic ~5L cap 99, Potion ~1.5L min 10 cap 79,
 -- Fenix ~L cap 20, Tincture ~L/4, Revivify 3) would cost to refill from the
--- bag at two levels ahead, plus a quarter of the whole band's price for the
--- legs' spend, plus opts.reserve.
+-- bag at the party's level, plus an eighth of the whole band's price for
+-- the legs' spend, plus opts.reserve.  (The first cut priced the band two
+-- levels ahead plus a quarter, and left Mobliz's L14 party a budget of
+-- -3594 on 10,331 gil: gau_joined "[gear Mobliz shop 9 (Weapon)] gil
+-- 10331, reserve 13925".)
 
 local GEAR_KEY = 30
 M.GEAR_KEY = GEAR_KEY
@@ -6635,7 +6638,7 @@ M.seatedMembers = seated
 function M.gearReserve(opts)
   opts = opts or {}
   local lv = M.activeTopLevel()
-  local ahead = lv + 2
+  local ahead = lv
   local band = {
     { 0xE8, math.min(99, 5 * ahead) },                          -- Tonic
     { 0xE9, math.min(79, math.max(10, -(-3 * ahead // 2))) },   -- Potion
@@ -6650,8 +6653,8 @@ function M.gearReserve(opts)
     whole = whole + p * b[2]
   end
   local extra = opts.reserve or 0
-  local r = short + whole // 4 + extra
-  return r, string.format("reserve %d = band shortfall %d + a quarter of the L%d band %d + %d",
+  local r = short + whole // 8 + extra
+  return r, string.format("reserve %d = band shortfall %d + an eighth of the L%d band %d + %d",
     r, short, ahead, whole, extra)
 end
 
