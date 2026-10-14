@@ -7871,7 +7871,7 @@ function M.dressRelics(members, opts)
                         cur = M.seqStep({
                           M.equipKit(q.ch, { { c[1], id } }, { tag = string.format("%s: %s (a swap)", tag, q.name) }),
                           M.waitUntil(function()
-                            held = (M.fieldControl() and (emu.getState()["ppu.screenBrightness"] or 0) >= 15)
+                            held = (menuHome() and (emu.getState()["ppu.screenBrightness"] or 0) >= 15)
                               and held + 1 or 0
                             return held >= 30
                           end, 900, string.format("%s: %s: the field settled after the swap", tag, q.name), 1),
@@ -7949,7 +7949,7 @@ function M.dressRelics(members, opts)
                     local held = 0
                     restore = M.seqStep({
                       M.waitUntil(function()
-                        held = (M.fieldControl() and (emu.getState()["ppu.screenBrightness"] or 0) >= 15)
+                        held = (menuHome() and (emu.getState()["ppu.screenBrightness"] or 0) >= 15)
                           and held + 1 or 0
                         return held >= 30
                       end, 900, string.format("%s: %s: the field settled after the Relic menu", tag, p.name), 1),
