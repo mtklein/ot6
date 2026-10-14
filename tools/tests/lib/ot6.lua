@@ -8189,9 +8189,12 @@ function Driver:magicOnlyLine(actor, boost)
   -- monster absorbs or nulls (the rebound picks its monster).
   local bounce = nil
   do
-    local mirror, anyReflect = nil, false
+    local mirror, anyReflect, mirrors = nil, false, 0
     for e = 0, 3 do
-      if M.readWord(0x3BF4 + e * 2) > 0 and (M.readByte(0x3EF8 + e * 2) & 0x80) ~= 0 then mirror = mirror or e end
+      if M.readWord(0x3BF4 + e * 2) > 0 and (M.readByte(0x3EF8 + e * 2) & 0x80) ~= 0 then
+        mirror = mirror or e
+        mirrors = mirrors + 1
+      end
     end
     for s = 0, 5 do
       if monAlive(s) and (M.readByte(0x3F00 + s * 2) & 0x80) ~= 0 then anyReflect = true end
@@ -8208,8 +8211,14 @@ function Driver:magicOnlyLine(actor, boost)
               if sp.elem == 0 or (M.readByte(0x3BE0 + x) & sp.elem) == 0 then weakAll = false end
             end
           end
-          local score = sp.power * (weakAll and 2 or 1)
-          if ok and (bounce == nil or score > bounce.score) then bounce = { sp = sp, score = score, to = mirror } end
+          -- a spell that can be spread (MagicProp +0 bit 5) cast on every
+          -- member in Reflect rebounds once off each: with three or more
+          -- mirrors, the party-wide cast is the strongest line in the tower
+          local spread = mirrors >= 2 and (M.readRomByte(MP + sp.id * 14) & 0x20) ~= 0
+          local score = sp.power * (weakAll and 2 or 1) * (spread and mirrors or 1)
+          if ok and (bounce == nil or score > bounce.score) then
+            bounce = { sp = sp, score = score, to = mirror, all = spread, mirrors = mirrors }
+          end
         end
       end
     end
@@ -8253,17 +8262,18 @@ function Driver:magicOnlyLine(actor, boost)
       end
     end
   end
-  if bounce ~= nil and (best == nil or bestScore < 100) then
+  if bounce ~= nil and (best == nil or bestScore < 100 or (bounce.all and bounce.mirrors >= 3)) then
     local b = castBoost(actor, bounce.sp.id, bounce.sp.cost, boost or 0, self:nukeFloor(actor)) or 0
     local key = string.format("bounce:%d:%d", actor, bounce.sp.id)
     if not self.statusSaid[key] then
       self.statusSaid[key] = true
-      M.log(string.format("[%s] actor=%d magic-only: $%02X on entity %d (Reflect) to rebound onto the monsters, "
-        .. "%d BP (the direct line's best: %s)", self.tag or "fight", actor, bounce.sp.id, bounce.to, b,
+      M.log(string.format("[%s] actor=%d magic-only: $%02X on %s (Reflect) to rebound onto the monsters, "
+        .. "%d BP (the direct line's best: %s)", self.tag or "fight", actor, bounce.sp.id,
+        bounce.all and string.format("all %d mirrors", bounce.mirrors) or string.format("entity %d", bounce.to), b,
         best and string.format("$%02X at %d", best.id, bestScore) or "none"))
     end
     return { kind = "magic", spell = bounce.sp.id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = b,
-             ally = true, target = bounce.to, bounce = true, reason = "magic_only_bounce" }
+             ally = true, target = bounce.to, all = bounce.all or nil, bounce = true, reason = "magic_only_bounce" }
   end
   if best == nil then
     -- nothing castable: a caster out of MP drinks it back (an Ether, a

@@ -773,22 +773,21 @@ H.run({ maxFrames = 1500000 }, {
   wallRingsOn(),
   door(7, 13, MAP_F3, "the Holy Dragon's room -> the third floor (360)"),
   door(8, 1, MAP_F4, "the third floor -> the fourth (361)"),
-  -- above the third floor no L.20 or L.70 Magic stands (groups 155 and 156:
-  -- L.50, L.60, L.80, L.90), and the L.90's Merton and Meteor are not
-  -- reflectable: in Wall Rings the four could heal only with Potions, 250
-  -- HP against a 2,300-HP Merton, and two climbs fell at the top
-  -- (build/attempts/wt/v030-route/lab/tower/c10, c11: 'atk $17').  So the
-  -- rings come off here and the care casts again, but for STRAGO's: the
-  -- L.90 reflects too, and a rebound off him is the party's way through it
-  wallRingsOff("the fourth floor and the top", STRAGO),
-  H.call(function() FIGHT.cure = nil end),
+  -- the Wall Rings stay on above the third floor.  Off (the v0.30 lab: cures
+  -- again, STRAGO's ring kept for a rebound), the L.90 Magic's Merton, Flare
+  -- and Bolt 3 wiped the four on the fourth floor in every run, Drain on
+  -- the L.90 first or not (build/attempts/wt/v031-tower/lab/t2_*, p3t_*:
+  -- 'formation 0164 0139').  On, its Flare and Bolt 3 rebound onto the
+  -- monsters, and a spell the party spreads over its four mirrors rebounds
+  -- four times (Driver:magicOnlyLine's bounce); the care heals with items
   spend("on the fourth floor"),
   H.saveState("wor_tower_f4.mss"),
 
   -- ---- 4. the fourth floor: the Force Armor; the top: the Gem Box --------------------
   -- @@stage f4
-  H.call(function() FIGHT.cure = nil end),   -- (as set on arriving: a stage boots here too)
-  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT } }, "stones for the fourth floor"),
+  H.call(function() FIGHT.cure = false end),   -- (as set on arriving: a stage boots here too)
+  stonesFor({ { TERRA, MADUIN }, { RELM, IFRIT } }, "stones for the fourth floor"),
+  wallRingsOn(),
   sideRoom(MAP_F4, MAP_FORCE, 0x0B7, FORCE_ARMOR, "Force Armor (369 (7,6))"),
   door(8, 1, MAP_TOP, "the fourth floor -> the top (364)"),
   spend("at the top"),
