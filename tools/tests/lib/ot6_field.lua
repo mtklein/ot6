@@ -7867,9 +7867,14 @@ function M.dressRelics(members, opts)
                         -- (and a pause: the next member's session, opened on
                         -- the frame this one closed, timed out at the main
                         -- menu's cursor: build/attempts/wt/v031-tower/lab/c_relm_k0)
+                        local held = 0
                         cur = M.seqStep({
                           M.equipKit(q.ch, { { c[1], id } }, { tag = string.format("%s: %s (a swap)", tag, q.name) }),
-                          M.waitFrames(40),
+                          M.waitUntil(function()
+                            held = (M.fieldControl() and (emu.getState()["ppu.screenBrightness"] or 0) >= 15)
+                              and held + 1 or 0
+                            return held >= 30
+                          end, 900, string.format("%s: %s: the field settled after the swap", tag, q.name), 1),
                         })
                         pick = -1
                         break
@@ -7933,6 +7938,23 @@ function M.dressRelics(members, opts)
                   else
                     restore = #back > 0 and M.equipKit(p.ch, back,
                       { tag = string.format("%s: %s's gear back", tag, p.name) }) or M.call(function() end)
+                  end
+                  -- the gear-back session opened on the frame the Relic
+                  -- session closed (its re-equip made the back-out 142
+                  -- frames), read the closing menu's $05 as its own main
+                  -- menu in 19 frames, and timed out steering a cursor that
+                  -- was gone (build/attempts/wt/v031-tower/lab/c_relm_k0,
+                  -- attempt 2): the field holds 30 frames first
+                  if #back > 0 or swapped then
+                    local held = 0
+                    restore = M.seqStep({
+                      M.waitUntil(function()
+                        held = (M.fieldControl() and (emu.getState()["ppu.screenBrightness"] or 0) >= 15)
+                          and held + 1 or 0
+                        return held >= 30
+                      end, 900, string.format("%s: %s: the field settled after the Relic menu", tag, p.name), 1),
+                      restore,
+                    })
                   end
                 end
                 local r = restore:tick()
