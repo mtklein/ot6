@@ -5404,7 +5404,10 @@ function M.shopTalk(nx, ny, what, opts)
         local sx, sy = nx + c[1], ny + c[2]
         if M.bfsPath(sx, sy) then pick = { sx, sy, c[3] }; break end
       end
-      pick = pick or { nx, ny + 1, "up" }
+      -- none reachable this frame (a town walker on the one street, #434's
+      -- Nikeah stalls): head for the tile below and pick again next frame,
+      -- as crossDoor does, rather than keep a fallback no walk can reach
+      if not pick then return { nx, ny + 1, "up" } end
       M.log(string.format("[shop] %s: staging (%d,%d) face %s",
         what, pick[1], pick[2], pick[3]))
     end
@@ -6488,6 +6491,7 @@ end
 -- legs' spend, plus opts.reserve.
 
 local GEAR_KEY = 30
+M.GEAR_KEY = GEAR_KEY
 local GEAR_NAMES = { [0] = "TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN",
   "CELES", "STRAGO", "RELM", "SETZER", "MOG", "GAU", "GOGO", "UMARO" }
 local GEAR_EVADE = { [0] = 0, 10, 20, 30, 40, 50, -10, -20, -30, -40, -50 }
