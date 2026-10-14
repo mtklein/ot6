@@ -870,6 +870,14 @@ H.run({ maxFrames = 1500000 }, {
 
   -- ---- 6. down and out, and the save -------------------------------------------------
   -- @@stage down
+  -- the climb's kit back on for the walk down: the floors' randoms are the
+  -- climb's, and in MagiMaster's kit (no Wall Rings, no Float caster) the
+  -- fourth floor's L.60 and L.90 Magic wiped the four with Quake and
+  -- Merton (build/attempts/wt/v031-tower/lab/dn2_*: 'atk $15', 'atk $17')
+  H.call(function() FIGHT.cure = false end),
+  stonesFor({ { TERRA, MADUIN }, { RELM, IFRIT }, { STRAGO, PALIDOR }, { CELES, TRITOCH } }, "stones for the walk down"),
+  wallRingsOn(),
+  H.fieldCare({ tag = "Float on the four, down" }),
   door(7, 14, MAP_F4, "the top -> the fourth floor (361 (7,2))"),
   downFloor(MAP_F3, "the fourth floor -> the third (360 (7,2))"),
   downFloor(MAP_F2, "the third floor -> the second (359 (7,2))"),
