@@ -667,7 +667,8 @@ end
 -- (ApplyDmg, battle_main.asm @1339 then @1388), and an NMI can fall between,
 -- so one seat reads an underflow ($FEDB, seat 0, f47186) for a frame while
 -- the others hold live HP.  So a seat above 9999 reads as "not an HP table"
--- unless the frame before read a battle and a live seat stands beside it.
+-- unless the frame before read a battle, a live seat stands beside it, and
+-- no seat holds a field fill ($FFFF, $FF00: battle_loadgate's scribble).
 -- (Tolerating any odd seat beside a live one read field garbage, species
 -- $5554, as a battle: qual3, six suites.)
 M.blsSeen = nil              -- the last frame this read a battle (a field: the chunk is at its local cap)
@@ -675,6 +676,7 @@ function M.battleLoadStarted()
   local anyLive, odd = false, false
   for i = 0, 3 do
     local hp = M.readWord(M.BATTLE_HP + i * 2)
+    if hp == 0xFFFF or hp == 0xFF00 then return false end   -- the field's fills
     if hp >= 10000 then odd = true elseif hp > 0 then anyLive = true end
   end
   if odd then
