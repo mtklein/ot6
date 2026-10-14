@@ -7838,6 +7838,43 @@ function M.dressRelics(members, opts)
             for _, c in ipairs(p.changes) do if M.invCountOf(c[2]) < 1 then ok = false end end
             if ok then pick = i; break end
           end
+          if pick == nil then
+            -- A swap: each member wants a relic the other wears (main's
+            -- wor_relm at the gear policy's levels: CYAN's Peace Ring is
+            -- CELES's, CELES's Hyper Wrist is CYAN's, and "relics for
+            -- Chadarnook: a member's new relics are all in the bag (no swap
+            -- deadlock)").  The Relic menu has no Empty for one slot, so a
+            -- spare relic from the bag stands in a wanted relic's slot for a
+            -- moment: the relic it held reaches the bag, the other member
+            -- takes it, and the queue moves.
+            local ip = M.sym("ItemProp") & 0x3FFFFF
+            for _, q in ipairs(queue) do
+              for _, c in ipairs(q.changes) do
+                if pick == nil and M.invCountOf(c[2]) < 1 then
+                  local held = charByte(q.ch, 0x1F + c[1])
+                  local wanted = false
+                  for _, o in ipairs(queue) do
+                    for _, oc in ipairs(o.changes) do if o ~= q and oc[2] == held then wanted = true end end
+                  end
+                  if wanted then
+                    local mask = 1 << M.charActor(q.ch)
+                    for slot = 0, 255 do
+                      local id, n = M.readByte(0x1869 + slot), M.readByte(0x1969 + slot)
+                      if id ~= 0xFF and n > 0 and id ~= held and (M.readRomByte(ip + id * 30) & 7) == 5
+                         and ((M.readRomByte(ip + id * 30 + 1) | (M.readRomByte(ip + id * 30 + 2) << 8)) & mask) ~= 0 then
+                        M.log(string.format("[%s] %s: %s stands in slot %d so %s reaches the bag for another member "
+                          .. "(a swap)", tag, q.name, relicName(id), c[1], relicName(held)))
+                        cur = M.equipKit(q.ch, { { c[1], id } }, { tag = string.format("%s: %s (a swap)", tag, q.name) })
+                        pick = -1
+                        break
+                      end
+                    end
+                  end
+                end
+              end
+            end
+            if pick == -1 then goto ticked end
+          end
           M.assertEq(pick ~= nil, true, tag .. ": a member's new relics are all in the bag (no swap deadlock)")
           local p = table.remove(queue, pick)
           -- The Relic menu re-equips by Optimum on the way out whenever the
@@ -7905,6 +7942,7 @@ function M.dressRelics(members, opts)
             },
           })
         end
+        ::ticked::
         local r = cur:tick()
         if r == "frame" then return "frame" end
         cur = nil
