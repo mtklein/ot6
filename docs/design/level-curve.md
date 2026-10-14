@@ -448,30 +448,33 @@ Every town stop with weapon and armor counters runs `H.gearStop`
 party by item value (power, defense, magic defense, evade, stats,
 elements, status protection) plus the break keys a weapon's class and
 element bring, one pick at a time within the purse less the supply
-reserve, then dresses the party from the bag.  Relics and Espers stay the
-kits'.  Nikeah's street stalls are left out (no talk tile reaches them).
-What it bought on the qualification play (`build/attempts/wt/gear-policy/
-qual/qual1-buys.txt`):
+reserve, then dresses the party from the bag.  Relics, Espers and the
+hands of a two-weapon relic's wearer stay the kits'.  Nikeah's street
+stalls are left out (no talk tile reaches them).  What it bought on the
+qualification play at 04756857 (`build/attempts/wt/gear-policy/qual3/
+qual3-buys.txt`):
 
 | stop | spent | pieces |
 |---|---|---|
-| Narshe (kefka_won, L13) | 6,650 | Full Moon, Air Lancet, Mithril Claw, Mithril Shld, Magus Hat, Silk Robe |
-| Jidoor (after the Zozo grind, L18) | 12,200 | Kaiser, Ninja Gear x2, Mithril Vest, White Dress, Head Band x2, Mithril Shld x2 |
+| Narshe (kefka_won, L13) | 6,800 | Mithril Claw, Mithril Shld x2, Iron Armor x2, Iron Helmet, Magus Hat, Silk Robe |
+| Jidoor (after the Zozo grind, L18) | 11,000 | Kaiser, Ninja Gear x2, Mithril Vest, White Dress, Head Band x2, Mithril Shld |
 | Albrook (vector_entry, L19) | 17,500 | Epee x2, Poison Claw, Bard's Hat x3 |
 | Albrook (voyage, for SHADOW) | 3,200 | Blossom |
 | Thamasa (arrival, FC prep) | 29,000 | Power Sash x2, Gaia Gear, Mystery Veil, Gold Shld, Morning Star |
-| South Figaro, Kohlingen, Maranda (WoR) | 116,500 | Enhancer x2, Diamond Armor x2, Gold Lance, Diamond Shld, Falchion x3 |
-| Jidoor (WoR) | 35,000 | Circlet x5 |
+| South Figaro, Kohlingen, Maranda (WoR) | 62,500 | Diamond Armor x2, Gold Lance, Diamond Shld, Falchion |
+| Jidoor (WoR) | 46,000 | Man Eater, Circlet x5 |
 
-Against main's play of the same route, with nothing else changed
-(`chain-base/`, `chain-policy-r6/`, `base-r1.tsv`, `policy-r6.tsv`):
-deaths over the line 11 -> 7, the one event loss (wor_terra) in both, and
-the Air Force gauntlet (fc_landing) 2 deaths -> 0.  Two grinds were tried
-against it.  The Zozo grind as an HP floor that follows each member's
-magic defense still needed L18 (LOCKE's Jidoor armor leaves his magic
-defense at 65; `zozo-hpfloor/`), so it stays at L18.  The Storm Dragon's
-grind went from L38 to L35 (gen_wor_cyan's comment holds the sweep:
-`storm/`).
+Against main's play of the same route with nothing else changed
+(`chain-base/`, `chain-policy-r6/`): deaths over the line 11 -> 7, the
+one event loss (wor_terra) in both, the Air Force gauntlet (fc_landing)
+2 deaths -> 0.  Two grinds were tried against it.  The Zozo grind as an HP
+floor that follows each member's magic defense still needed L18 (LOCKE's
+magic defense stays at 65 after Jidoor; `zozo-hpfloor/`), so it stays.
+The Storm Dragon's grind went from L38 to L35, 22 battles where it was
+55 (gen_wor_cyan; `storm/`): by distinct battle key, 16 seeds a sweep,
+main at L38 12 keys, 1 wipe, 15 deaths; the policy at L38 12 keys, 0
+lost, 2 deaths; at L35 13 keys, 0 lost, 18 deaths (the final policy) or
+12 (before the pair rule); with no grind 13 keys, 0 lost, 34 deaths.
 
 ### Gear on the way
 
