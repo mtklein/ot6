@@ -919,10 +919,22 @@ STATES = [
     # tower's foot (STRAGO), the cabin (TERRA, CELES, RELM and STRAGO), the
     # grind north-west of Jidoor, Thamasa's item counter, and Save there: the
     # `wor-tower-v1` checkpoint (docs/design/route-wor-thamasa.md).  A cut.
-    # saves=: the frontier; no leg boots wor-tower-v1 yet.  Re-cut by
-    # checkpoint_drift.py --recut.
+    # wor_tower below boots its checkpoint.  Re-cut by checkpoint_drift.py
+    # --recut.
     S("wor_relm", gen="gen_wor_relm", prev="wor_owzer",
-      checkpoint="wor-owzer-v1", saves="wor-tower-v1", timeout=7200),
+      checkpoint="wor-owzer-v1", timeout=7200),
+
+    # wor-tower-v1 -> the World of Ruin map beside the Falcon at the
+    # Fanatics' Tower (160,127): the climb (magic-only; the randoms fought
+    # for no XP), each floor's side room, the Holy Dragon (event battle
+    # 139), the Gem Box, MagiMaster (event battle 145, a game over when
+    # lost: the runner retries from the save), the walk down and Save
+    # there: the `wor-thamasa-v1` checkpoint
+    # (docs/design/route-wor-thamasa.md).  A cut.  saves=: the frontier;
+    # no leg boots wor-thamasa-v1 yet.  Re-cut by checkpoint_drift.py
+    # --recut.
+    S("wor_tower", gen="gen_wor_tower", prev="wor_relm",
+      checkpoint="wor-tower-v1", saves="wor-thamasa-v1", timeout=7200),
 
 ]
 

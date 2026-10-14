@@ -79,6 +79,7 @@ TITLES = {
     "wor-narshe-v1": "The Falcon outside Narshe, after Umaro joins",
     "wor-owzer-v1": "Owzer's basement, save point before Chadarnook",
     "wor-tower-v1": "Outside the Fanatics' Tower, after Strago joins",
+    "wor-thamasa-v1": "Outside the Fanatics' Tower, after MagiMaster",
 }
 
 README = """\

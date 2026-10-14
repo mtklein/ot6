@@ -694,6 +694,8 @@ H.run({ maxFrames = 1800000 }, {
   H.dressRelics({ { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" } },
     { tag = "relics with RELM" }),
   H.call(function() say("wor", "RELM dressed: " .. kitLine()) end),
+  -- #434: buy power with gil; Jidoor's counters for RELM and the three
+  H.gearStop({ tag = "gear Jidoor (RELM)", fight = FIGHT }),
   -- the item counter again before the grind (RELM's join lands the party in
   -- Jidoor): the plain's fights are cared for with Potions (Jidoor sells no
   -- Tonics) and the poison the plain deals with Remedies; the first grind
@@ -756,6 +758,11 @@ H.run({ maxFrames = 1800000 }, {
   H.worldNavTo(THAMASA_DOOR[1], THAMASA_DOOR[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
     arrive = function() return map() == MAP_THAMASA and not H.worldMode() end }),
   H.waitUntil(function() return map() == MAP_THAMASA and settled() end, 2400, "Thamasa: map 344", 1),
+  -- #434: buy power with gil.  Thamasa's armor counter is the tower's
+  -- (Light Robe, Mystery Veil, Circlet: magic defense and evade against
+  -- the L.90 Magic's Meteor, Merton and Flare, which wiped the four on the
+  -- fourth floor at L46 and at L50: route-wor-thamasa.md 11.4)
+  H.gearStop({ tag = "gear Thamasa (the tower)", fight = FIGHT, avoid = THAMASA_AVOID }),
   -- (22,39) and (23,39) start STRAGO and RELM's scene at their house
   -- (_cb75bf, with both seated; the Hidon side quest, not this arc:
   -- build/attempts/wt/v030-route/lab/relm/r1 'control lost at (23,39)'), so the walks keep off them
