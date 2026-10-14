@@ -13043,6 +13043,25 @@ function M.setzerBattle(plan, opts)
     M.vars.setzer, M.vars.setzerList, M.vars.setzerTaken = {}, {}, {}
     local mine = token
     local function live() return M.setzerToken == mine end
+    -- Is the row about to run SETZER's aim, or the engine's?  Vanilla
+    -- clears a queued action's targets twice over: at FixPlayerCmd when
+    -- its actor is Muddled or Zombied as the confirm becomes the action
+    -- (Z.fixedTaken, below), and at InitPlayerAction when the actor's
+    -- status changed after that (`trb $3a4a / stz $b8 / stz $b9`; the
+    -- Zombie and Muddle set and clear handlers mark $3a4a).  Either way
+    -- ChooseTarget's Retarget then aims it by his status at execution: a
+    -- Zombie's multi-target row takes both sides and CheckTargetsBattleType
+    -- keeps one at random (#433: wor-tomb-v1, SETZER Zombied at f3157
+    -- after his f3057 confirm, his Coin Toss on y $04 $02 $00 at f3361;
+    -- build/attempts/wt/v031-robust/433/).  So a row that executes with
+    -- SETZER Zombied or Muddled is the engine's.
+    local function takenAtExec(e)
+      if Z.fixedTaken then return Z.fixedTaken end
+      local st = M.readWord(0x3EE4 + e)
+      if (st & 0x0002) ~= 0 then return "Zombie (after his confirm)" end
+      if (st & 0x2000) ~= 0 then return "Muddle (after his confirm)" end
+      return nil
+    end
     local a = M.sym("Ot6SetzerExec")
     emu.addMemoryCallback(function()
       if not live() or Z.entity == nil then return end
@@ -13053,7 +13072,7 @@ function M.setzerBattle(plan, opts)
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
         entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {}, passes = {} }
-      Z.rec.taken, Z.fixedTaken = Z.fixedTaken, nil
+      Z.rec.taken, Z.fixedTaken = takenAtExec(e), nil
     end, emu.callbackType.exec, a, a)
     -- the Coin Toss relic's GP Rain (command $18, no table): its own record
     local g = M.sym("Cmd_18")
@@ -13065,7 +13084,7 @@ function M.setzerBattle(plan, opts)
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
         entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {}, passes = {} }
-      Z.rec.taken, Z.fixedTaken = Z.fixedTaken, nil
+      Z.rec.taken, Z.fixedTaken = takenAtExec(e), nil
     end, emu.callbackType.exec, g, g)
     -- FixPlayerCmd (@4d77): a pending command turned into the action it
     -- runs; with its actor Muddled or Zombied there ($3ee4 & $2002) the
@@ -13150,9 +13169,10 @@ function M.setzerBattle(plan, opts)
         for _, ev in ipairs(r.chips) do ys[#ys + 1] = string.format("$%02X", ev.y) end
         if r.taken then
           -- SETZER was Zombied or Muddled when the engine turned his
-          -- confirmed row into its action (FixPlayerCmd, above): the
-          -- targets he chose were cleared and the row drew its own, either
-          -- side (vanilla; main's v0.28 chain, wor-tomb-v1: GP Rain from his
+          -- confirmed row into its action, or by the time it ran
+          -- (takenAtExec, above): the targets he chose were cleared and
+          -- the row drew its own, either side (vanilla; main's v0.28
+          -- chain, wor-tomb-v1: GP Rain from his
           -- f8638 window ran at f9452 with $b9 = $00, six chip calls and no
           -- monster's HP moved), so it is not the plan's throw and is not
           -- checked as one
@@ -13165,7 +13185,7 @@ function M.setzerBattle(plan, opts)
             plan[back].aim, plan[back].presses, plan[back].lPresses, plan[back].tookBack = nil, nil, nil, nil
           end
           M.log(string.format("[setzer] f%d row $%02X at %d BP ran under %s (exec f%d, targets $%02X, chip "
-            .. "call(s) on %s): his targets were cleared as his confirm became the action, so it is set aside, not "
+            .. "call(s) on %s): the engine cleared his targets and aimed it by his status, so it is set aside, not "
             .. "the plan's throw; "
             .. "plan entry %s is played again", M.frame, r.row, r.boost, r.taken, r.f, r.targets,
             #ys > 0 and table.concat(ys, " ") or "none", tostring(back)))
@@ -13342,7 +13362,7 @@ function M.setzerBattle(plan, opts)
     -- never enter a scripted row into a Zombie's stale window.
     if p ~= nil then
       care.watch("SETZER's scripted plan")
-      if care.spinnerTaken() or careActor == a then
+      if care.spinnerTaken() or careActor == a or care.allyZombie() then
         careActor = a
         care.window()
         return

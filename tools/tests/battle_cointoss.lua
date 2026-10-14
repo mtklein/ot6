@@ -70,23 +70,15 @@ local function checkList(l)
   H.assertEq(l.flags[4], 0x43, "Hired Help targets one enemy ($43)")
 end
 
--- The precondition: no ally is a Zombie at the throw (read as the record
--- is checked; a Zombie stands until cured).  The east
--- room's PowerDemon zombifies ("You'd best be a zombie!"), and with EDGAR a
--- Zombie the toss that followed went to the party side: chip calls on y $04
--- $02 $00, monster targets $00, the gil paid (build/attempts/
--- wt-v029-waterrondo/cointoss/: the qualification's own wor-tomb-v1, run
--- twice, statuses `e4 0200`).  That draw cannot hold the toss to the enemy
--- side, so it is a LOST battle the runner replays at another seed, as
--- battle_suplextrain's Imp is.
-local function noZombieAlly()
-  for e = 0, 6, 2 do
-    if (H.readByte(0x3EE4 + e) & 0x02) ~= 0 then
-      error(string.format("LOST: party entity %d is a Zombie at the throw (the PowerDemon's line)", e), 0)
-    end
-  end
-end
-
+-- A Zombie on the party side does not move SETZER's aim; SETZER Zombied
+-- or Muddled himself does (#433, vanilla: InitPlayerAction clears a queued
+-- action's targets when its actor's status changed after his confirm, and
+-- Retarget aims a Zombie's multi-target row at both sides, one kept at
+-- random -- the wor-tomb-v1 draw that sent a toss onto CELES, SABIN and
+-- EDGAR, build/attempts/wt/v031-robust/433/).  H.setzerBattle sets such a
+-- row aside and plays the plan entry again, and its care cures a Zombied
+-- ally with a Revivify before SETZER's next throw; every throw checked
+-- below ran on SETZER's own aim.
 local function checkThrow(r, i)
   return H.setzerCheckCoins(r, i, 30, function() return 0x08 end, "cointoss")
 end
@@ -96,14 +88,13 @@ local walk, S = H.setzerCrowdBattles({
   tag = "cointoss", want = WANT, wps = { { 124, 26 }, { 120, 11 } },
   setzerOpts = { onList = checkList, shot = "cointoss_table" },
   check = function(rec, i)
-    noZombieAlly()
     H.assertEq(rec.row, COIN, string.format("record %d is a Coin Toss", i))
     H.assertEq(rec.boost, WANT[i].boost, string.format("record %d ran at its planned boost", i))
     return checkThrow(rec, i)
   end,
 })
 
-H.run({ maxFrames = 1200000, retries = 3 }, {
+H.run({ maxFrames = 1200000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
   walk,
   H.call(function()

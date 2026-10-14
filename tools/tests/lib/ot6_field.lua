@@ -1550,8 +1550,9 @@ end
 --     first when the hit could drop him: under hitFloor % of his max HP,
 --     the fight driver's unmeasured unmuddle floor, a quarter); the item
 --     the ROM's records say cures Petrify, Zombie, Imp or Berserk; then
---     an ally asleep or muddled gets the same hit (a muddled ally's own
---     turns are the engine's to aim, at the formation or the party);
+--     an ally asleep or muddled gets the same hit, and a Zombied ally its
+--     cure (a Revivify; #433) -- a muddled or Zombied ally's own turns are
+--     the engine's to aim, at the formation or the party;
 --   * else a dead member raised with a Fenix Down;
 --   * else a living member under carePct % gets a Potion (a Tonic
 --     without), the spinner first, else the most hurt;
@@ -1649,6 +1650,18 @@ function M.newSpinnerCare(o)
       has = function(item) return invIdx(item) ~= nil end })
   end
 
+  -- a seated member other than the spinner Zombied, with its cure in the
+  -- bag and none in flight: the spinner's caller lets care take the window
+  -- (#433: a player cures the Zombie before the spinner's turn)
+  function C.allyZombie()
+    local sp = o.spinner()
+    for s = 0, 3 do
+      local c = s ~= sp and seated(s) and M.controlTaken(s) or nil
+      if c and c.name == "Zombie" and inFlight[s] == nil and cureOf(c, s) then return s end
+    end
+    return nil
+  end
+
   -- The lost point (review of 3c0d68d8: h3_k9_s15, one all-target Stone
   -- muddled three members, nobody attacked the lone 333-HP Iron Fist, and
   -- the party wiped with banks of 4, 2 and 5 standing): the moment the
@@ -1729,7 +1742,7 @@ function M.newSpinnerCare(o)
     for s = 0, 3 do if s ~= actor then order[#order + 1] = s end end
     for _, e in ipairs(order) do
       local c = seated(e) and M.controlTaken(e) or nil
-      if c and e ~= a and inFlight[e] == nil and (e == actor or c.cure == "hit") then
+      if c and e ~= a and inFlight[e] == nil and (e == actor or c.cure == "hit" or c.name == "Zombie") then
         local cure = cureOf(c, e)
         if c.name == "Death" and cure and itemCell then
           return { plan = "raise", tgt = e, idx = invIdx(cure), cell = itemCell, item = cure, why = c.name }
