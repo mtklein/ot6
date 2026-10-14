@@ -554,8 +554,10 @@ H.run({ maxFrames = 200000 }, {
     say("tzen", "SABIN dressed")
     H.assertEq(kit(SABIN), string.format("%02X %02X %02X %02X %02X %02X %02X", IFRIT, FIRE_KNUCKLE,
       FIRE_KNUCKLE, TIGER_MASK, POWER_SASH, GENJI, BLACK_BELT), "SABIN wears IFRIT and his kit")
-    H.assertEq(kit(CELES):sub(1, 17), "06 0E 0F 76 8F D1", "CELES wears the stretch's kit again: MADUIN, "
-      .. "Blizzard + ThunderBlade, Gold Helmet, Gold Armor, Genji Glove")
+    -- her helmet and armor are the gear policy's (#434), whatever beats
+    -- the Gold Helmet and Gold Armor she arrived in
+    H.assertEq(kit(CELES):sub(1, 8) .. " " .. kit(CELES):sub(16, 17), "06 0E 0F D1", "CELES wears the stretch's "
+      .. "kit again: MADUIN, Blizzard + ThunderBlade, Genji Glove")
     -- the other relic is the relic rule's (H.relicKit above): the Jewel
     -- Ring, or a guard covering Petrify and more (a Ribbon)
     local r5 = H.readByte(c(CELES, 0x24))
