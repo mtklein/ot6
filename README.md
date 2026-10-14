@@ -5,11 +5,10 @@ mechanics while keeping the FF6 story, world, and characters.
 
 ## Status
 
-v0.29 is the current release: [download it](https://github.com/mtklein/ot6/releases/tag/v0.29).
-`main` is v0.30 development.
+v0.30 is the current release: [download it](https://github.com/mtklein/ot6/releases/tag/v0.30).
 
-The game is playable through the World of Balance and through Narshe in the
-World of Ruin, where Umaro joins.
+The game is playable through the World of Balance and through Thamasa in the
+World of Ruin, where Strago joins.
 
 Main changes:
 
