@@ -673,6 +673,11 @@ H.run({ maxFrames = 1800000 }, {
 
   -- ---- 1. Chadarnook ------------------------------------------------------------
   -- @@stage goddess
+  -- off the save point first: its script re-fires under the party every
+  -- ~30 frames, and back-to-back Relic sessions there timed out at the main
+  -- menu's cursor three attempts in three (build/attempts/wt/v031-tower/
+  -- lab/c2_relm_k0, 'relics for Chadarnook')
+  walkTo(86, 42, "off the save point"),
   H.fieldCare({ threshold = 1.0, tag = "before Chadarnook" }),
   H.dressRelics({ { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" } }, { tag = "relics for Chadarnook" }),
   door(88, 35, MAP_GODDESS, "the basement -> the goddess's room (208 (75,36))"),
