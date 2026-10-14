@@ -200,11 +200,22 @@ CLAIMED_WORLD_SECTORS = {sec for sec in range(512)
 PARTY_CLASSES = 0x01 | 0x02 | 0x04          # slash+pierce+bludg, broadly held
 PARTY_ELEMS   = 0x01 | 0x02 | 0x04          # fire+ice+bolt once espers exist
 
-def species_key(sid):
-    """(authored?, chippable-by-broad-kit?)"""
+# The Fanatics' Tower is magic-only (battle switch $38, set by map 363's init
+# and cleared by 362's: route-wor-thamasa.md finding 3): no Fight, so no
+# class lands there, and the kit is spells -- among them OT6's Break, which
+# chips any shield whatever the body's keys (ot6_breakspell.asm).  Every
+# shielded body there is keyed by it.
+MAGIC_ONLY_MAPS = {359, 360, 361, 363, 364, 365, 366, 367, 368, 369, 370}
+
+def species_key(sid, magic_only=False):
+    """(authored?, chippable-by-broad-kit?)  An authored row of 0 shields
+    (no gauge: the body takes full damage from the start) has nothing to
+    break, so it is never what makes a formation keyless."""
     weak = mp[sid*32+25]
     if sid in AUTHORED:
         sh, mask = AUTHORED[sid]
+        if sh == 0 or magic_only:
+            return True, True
         return True, (mask & PARTY_CLASSES) != 0 or (weak & PARTY_ELEMS) != 0
     fl = floor.get(sid, 1)
     return False, (fl & PARTY_CLASSES) != 0 or (weak & PARTY_ELEMS) != 0
@@ -219,12 +230,12 @@ def formation_species(f):
     return out
 
 NOKEY = [0]
-def pool_report(tag, forms):
+def pool_report(tag, forms, magic_only=False):
     lines = []
     for f in sorted(set(forms)):
         sps = formation_species(f)
         if not sps: continue
-        keys = [species_key(s) for s in sps]
+        keys = [species_key(s, magic_only) for s in sps]
         unauth = [mname(s) for s, (a, _) in zip(sps, keys) if not a]
         if not any(ch for _, ch in keys):
             lines.append(f'  NO-KEY  form {f}: ' + ', '.join(mname(s) for s in sps))
@@ -239,7 +250,7 @@ for m in range(len(props)//33):
     if not (props[m*33+5] & 0x80): continue
     g = sbg[m]
     forms = sorted(group_forms(g))
-    lines = pool_report(f'map {m}', forms)
+    lines = pool_report(f'map {m}', forms, m in MAGIC_ONLY_MAPS)
     tag = '' if m in CLAIMED_FIELD else '  [UNCLAIMED/UNTUNED]'
     if m not in CLAIMED_FIELD:
         unclaimed.append(m)

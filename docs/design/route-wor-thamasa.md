@@ -596,3 +596,25 @@ magic-only line (`Driver:magicOnlyLine`) and the climb its own kit:
   run, the L.90's Merton taking about 2,300 from each member
   (`lab/tower/cap2`: `attempt 3/3 FAILED class=wipe`, `formation 0164
   0163`). MagiMaster has not been reached.
+- **More levels did not change it.** Ground to L50 (TERRA L52, CELES L53;
+  95 fights, `lab/relm/cap3`), the four lost the fourth floor's first fight,
+  the L.90 and L.60 Magic, without denting the L.90 (`lab/tower/c18`:
+  `monhp=s0:9000/sh0` until the wipe): the party spent its turns on the
+  L.60 and on Shell and heals while the L.90's Meteor, Merton and Flare
+  fell. So leg B grinds to L46 and the tower leg stays off the graph; its
+  generator is kept at `build/attempts/wt/v030-route/wip/gen_wor_tower.lua`.
+
+### 11.5 Open
+
+- **The tower's fourth floor and top** (groups 155, 156: the L.90 Magic
+  with an L.80 or L.60). What the driver lacks there, read from the runs: a
+  kill order that puts the L.90 first through the rebound (the direct line
+  prefers the L.60's weakness), and a party heal that is not a turn per
+  member. Then MagiMaster (Shell, Life 3 at his end: `opts.shellVs`,
+  `opts.reraiseVs`, built and not yet met).
+- **Golem** came up in none of the 16 visits of any run (ZoneSeek on the
+  12th each time: the auction's draw does not follow the encounter history).
+- **The basement can wipe the Owzer party.** With six encounters used up at
+  the save point before Chadarnook, SoulDancer x2 and Crusher x2 won
+  (`lab/var/relm_k6`: `battle $11C LOST`); the base run and K=3 did not meet
+  it.
