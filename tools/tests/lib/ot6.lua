@@ -9890,7 +9890,7 @@ function Driver:policyPlan(actor, plan)
   return out
 end
 
--- The [turn] line (#422, tools/fight_report.py): one per plan, the board
+-- The [board] line (#422, tools/fight_report.py): one per plan, the board
 -- as the actor decides -- party HP/max and banked BP, each monster's
 -- HP/max and shields -- so a fight's low point, its swings and its turn
 -- count read off the log.  Read-only.
@@ -9910,7 +9910,7 @@ function Driver:sayTurn(actor, plan)
         M.readWord(0x3C24 + s * 2), M.readByte(0x3E40 + s * 2))
     end
   end
-  M.log(string.format("[%s] [turn] n=%d tick=%d form=$%03X actor=%d char=%d plan=%s bp=%d "
+  M.log(string.format("[%s] [board] n=%d tick=%d form=$%03X actor=%d char=%d plan=%s bp=%d "
     .. "party=%s mons=%s", self.tag or "fight", self.turnN, self.battleTick,
     M.readWord(0x11E0) & 0x1FF, actor, M.readByte(BATTLE.BCHID + actor * 2),
     plan and plan.kind or "-", plan and plan.boostLeft or 0,
@@ -13003,7 +13003,7 @@ function Driver:idle()
   self.menuStreak, self.tick, self.battleTick = 0, 0, 0
   self.plan, self.planActor, self.held, self.confirmed = nil, nil, {}, nil
   self.parkDropN = 0
-  self.turnN = 0                        -- the [turn] lines' count (#422)
+  self.turnN = 0                        -- the [board] lines' count (#422)
   self.raceActDeclined = nil
   self.layout, self.layoutUnreadSaid, self.steerLast, self.steerDead = nil, false, nil, {}
   self.parts, self.partsLast, self.partsFell, self.partsSwitch = nil, {}, {}, {}
