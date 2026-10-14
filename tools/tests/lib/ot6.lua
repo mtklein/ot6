@@ -3901,6 +3901,13 @@ function M.absorbGuardTick()
     guardArmed, guardSettle, guardSeen, guardRandom = true, 0, {}, false
     return nil
   end
+  -- A magic-only battle ($3EBB bit 0, the Fanatics' Tower: InitCmdList
+  -- turns Fight into Magic) swings no weapon, so no weapon can heal a
+  -- body there: STRAGO's Pearl Rod (holy) failed the Holy Dragon's fight,
+  -- which absorbs holy, though nobody can swing it inside
+  -- (build/attempts/wt/v031-tower/lab/t1_relm_k2_wor_relm_s0: "char 7's
+  -- R-hand item $39 (holy) is ABSORBED by slot 0 species $0024")
+  if (M.readByte(0x3EBB) & 0x01) ~= 0 then return nil end
   if not guardArmed then
     local fresh = {}
     for _, st in ipairs(M.activeSlots()) do
