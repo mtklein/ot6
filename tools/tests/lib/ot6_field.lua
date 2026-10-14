@@ -7827,7 +7827,33 @@ function M.dressRelics(members, opts)
             for _, c in ipairs(p.changes) do if M.invCountOf(c[2]) < 1 then ok = false end end
             if ok then pick = i; break end
           end
-          M.assertEq(pick ~= nil, true, tag .. ": a member's new relics are all in the bag (no swap deadlock)")
+          if pick == nil then
+            -- A cycle: each member waiting wants a relic another waiting
+            -- member wears (wor_relm on the v031-robust chain: CYAN for
+            -- CELES's Peace Ring, CELES for CYAN's Hyper Wrist), and the
+            -- Relic menu equips only from the bag.  The first member in the
+            -- queue keeps what he wears in the slots the bag cannot fill and
+            -- takes the rest; that frees nothing for the others, so the
+            -- cycle unwinds one member at a time and every member ends on
+            -- relics he holds (the plan's slots re-read as what stays).
+            local p = queue[1]
+            local keep = {}
+            for _, c in ipairs(p.changes) do
+              if M.invCountOf(c[2]) >= 1 then keep[#keep + 1] = c
+              else
+                M.log(string.format("[%s] %s keeps %s in slot %d: the plan's %s is worn by a member still waiting "
+                  .. "on one of his (a swap the Relic menu cannot make from the bag)", tag, p.name,
+                  relicName(p.cur[c[1]]), c[1], relicName(c[2])))
+                p.want[c[1]] = p.cur[c[1]]
+              end
+            end
+            p.changes = keep
+            if #keep == 0 then
+              table.remove(queue, 1)
+              goto continue
+            end
+            pick = 1
+          end
           local p = table.remove(queue, pick)
           -- The Relic menu re-equips by Optimum on the way out whenever the
           -- relics changed and the old or new pair holds a Genji Glove,
@@ -7897,6 +7923,7 @@ function M.dressRelics(members, opts)
         local r = cur:tick()
         if r == "frame" then return "frame" end
         cur = nil
+        ::continue::
       end
     end,
     reset = function() plan, queue, cur, restore = nil, nil, nil, nil end,

@@ -88,7 +88,16 @@ local function play()
       H.log(string.format("[%s] c: aimed at slot %d, the hire's targets $%02X, purse %d -> %d (fee %d)", TAG, far,
         recs[1].targets, S.gil0, gil(), recs[1].level * 50))
       H.assertEq(recs[1].targets, 1 << far, string.format("the aimed hire lands on slot %d and no other", far))
-      H.assertEq(S.gil0 - gil(), recs[1].level * 50, "the purse paid one fee: no refused hire was paid for")
+      -- a hire the engine aimed (SETZER Zombied or Muddled by the time it
+      -- ran, set aside by H.setzerBattle and its plan entry played again,
+      -- #433) paid its own fee, read at its TakeGil
+      local aside, asideN = 0, 0
+      for _, t in ipairs(H.vars.setzerTaken or {}) do
+        asideN = asideN + 1
+        for _, c in ipairs(t.costs or {}) do aside = aside + c end
+      end
+      H.log(string.format("[%s] set aside (the engine's aim): %d row(s), %d gil", TAG, asideN, aside))
+      H.assertEq(S.gil0 - gil() - aside, recs[1].level * 50, "the purse paid one fee: no refused hire was paid for")
       done = true
       S.phase = "fight"
     end
