@@ -70,12 +70,12 @@ Permit columns describe the *proposed* system, not the shipped one.
 | Siren | Zozo | Mute, Sleep | 0 / +4 / 0 / +2 | *Lullaby*: sleepers take +50% chip | — | the controller job |
 | Ifrit | Magitek factory | Fire, Drain | +6 / 0 / +4 / −3 | none, deliberately | none, deliberately | **"the Furnace": weight** |
 | Shiva | Magitek factory | Ice, Osmose, **Shell** | −3 / +4 / 0 / +6 | none, deliberately | none, deliberately | **"the Rime": economy** |
-| Unicorn | tube room | Remedy, Safe | 0 / 0 / +5 / +2 | *Purity*: status durations halved | — | the paladin-adjacent |
+| Unicorn | tube room | Pearl, Remedy | 0 / 0 / +5 / +2 | *Purity*: status durations halved | — | the paladin-adjacent |
 | Maduin | tube room | Fire, Ice, Bolt | −3 / 0 / +3 / +7 | *Trinity*: first spell each battle +1 tier | — | Terra's inheritance: the pure mage job |
 | Shoat | tube room | Break, Doom | −2 / +6 / +2 / 0 | *Gorgon Eye*: the stone's Break is the class-blind chip (one shield, one more a boost point; #398) -- no passive; a monster's Break (and Control, Sketch, a Rage) keeps vanilla's petrify, as monsters' Life 3 keeps vanilla's | — | the executioner (Doom) and the breaker (Break) |
-| Phantom | tube room | Vanish, Sleep | 0 / +6 / −2 / +2 | *Ghostwalk*: first hit taken each battle misses | — | the assassin's second |
-| Carbunkl | tube room | Rflect, Shell | 0 / −2 / +6 / +2 | *Facet*: Runic feeds +1 more BP | — | Celes's natural pairing |
-| Bismark | tube room | Slow, (Water lore-alike) | +5 / −2 / +3 / 0 | *Tidal*: water chip +1 | — | see open Q2 |
+| Phantom | tube room | Vanish, Demi | 0 / +6 / −2 / +2 | *Ghostwalk*: first hit taken each battle misses | — | the assassin's second |
+| Carbunkl | tube room | Rflect, Safe | 0 / −2 / +6 / +2 | *Facet*: Runic feeds +1 more BP | — | Celes's natural pairing |
+| Bismark | tube room | Haste, Slow | +5 / −2 / +3 / 0 | *Tidal*: water chip +1 | — | water lives on its divine, Sea Song (`magicite-tube-six.md` §8) |
 | Golem | Jidoor auction | Safe, Protect-alike | 0 / −2 / +5 / 0 | *Bulwark*: party takes −10% physical | piercing | the wall job |
 | ZoneSeek | Jidoor auction | Shell, Haste | 0 / 0 / +2 / +3 | *Ward*: magic taken −10% (party) | — | the abjurer |
 | Sraphim | Tzen (buy) | Cure, Life | 0 / 0 / +4 / +2 | *Grace*: KO'd allies keep their BP | — | the white-mage job |
@@ -84,8 +84,8 @@ The tube room grants Unicorn, Maduin, Shoat, Phantom, Carbunkl and Bismark
 together, in one scene; see `magicite-tube-six.md`.
 
 The **Spells** column ships for every row (#305): each stone grants exactly
-its listed spells, except the tube room's six, which grant the lists in
-`magicite-tube-six.md` §11, and Golem, whose "Protect-alike" names no FF6
+its listed spells (the tube room's six are also held to
+`magicite-tube-six.md` §11), except Golem, whose "Protect-alike" names no FF6
 spell, so it grants Safe alone. `tools/check_spell_grants.py` checks this on
 the built ROM. The **Stat** column ships for every row too: it is
 `Ot6EsperStatTbl`'s row (vigor, speed, stamina, mag.pwr; vigor reads

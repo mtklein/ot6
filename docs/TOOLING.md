@@ -17,11 +17,18 @@ preflights and the zip (the patch, the notes and the saves). Any narrower need i
 real output path (`ninja ff6/rom/ff6-en.sfc`,
 `ninja build/results/suite/battle_break.ok`). The graph regenerates itself
 when `configure.py`, the savestate graph, `VERSION`, or any globbed
-directory changes.
+directory changes.  A build leaves those directories and its own inputs as
+it found them, so `ninja -n` after a green `ninja` has nothing to do, on a
+fresh clone too (#426): `configure.py` creates beforehand what the build
+would add to a globbed directory (each missing output there, dated 1970 so
+its edge still runs, and a `__pycache__` beside any Python), and the
+dlg1/dlg2 edge restores the mtime of the json it rewrites when the bytes
+come back unchanged.
 
 To run a gate in the background, `sh tools/gate.sh -k 0 [target...]`
 passes its arguments to ninja, exits with ninja's status and ends with
-the FAILED edges (the log in `build/gate.log`). A wrapper like
+the FAILED edges (the log in `build/gate.log`, which opens with the commit
+and closes with `rc=`, #424). A wrapper like
 `(ninja ...; echo $?)` exits with echo's 0, and a red gate has been read
 green that way.
 

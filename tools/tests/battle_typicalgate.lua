@@ -62,7 +62,7 @@ end
 -- counter; every branch's ledger is checked against the engine's, the
 -- property under test, and the precondition is asserted across them.
 local BRANCH_IDLE, MAX_BRANCHES = 9, 6
-local snap, landedAll, branches = nil, 0, 0
+local snap, landedAll, branches, landedIn = nil, 0, 0, nil
 
 local function verdict()
   F.driver:flushLedger()
@@ -75,6 +75,7 @@ local function verdict()
     if u.counter and v > 0 then landed = landed + 1 end
   end
   landedAll = landedAll + landed
+  if landed > 0 and landedIn == nil then landedIn = branches end
   H.log(string.format("[typicalgate] branch %d: %d counter(s) landed HP", branches, landed))
   for s = 0, 5 do
     local w, L = want[s], F.driver.hitLedger[s]
@@ -123,7 +124,8 @@ local body = {
 for k = 1, MAX_BRANCHES do body[#body + 1] = branch(k) end
 body[#body + 1] = H.call(function()
   H.assertEq(landedAll >= 1, true, "precondition: a counterattack landed HP in the fight (Dullahan's retal Battle)")
-  H.log("[typicalgate] PASSED")
+  H.log(string.format("[typicalgate] PASSED: branch %d of %d (idled %d frame(s) at the grave) landed the counter; "
+    .. "every branch's ledger matched the engine's", landedIn, branches, (landedIn - 1) * BRANCH_IDLE + 1))
 end)
 
 H.run({ maxFrames = 30000 * MAX_BRANCHES }, body)

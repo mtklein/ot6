@@ -58,7 +58,7 @@ MagicProp splice gains no new overrides.
 ## 1. The constraint budget
 
 magicite-ifrit-shiva.md §1 is the authority on what the machinery can express:
-≤5 spell ids per stone (`ot6_progression.asm:142-181` `Ot6EsperSpellKnown`,
+≤5 spell ids per stone (`ot6_progression.asm` `Ot6EsperSpellKnown`,
 `:203-252` `Ot6UnionEspers`), a while-worn stat package of four *signed*
 nibbles, −7..+7 each, over Vigor/Speed/Stamina/Mag.Pwr in vanilla's own
 `ItemProp+16/+17` layout (`ot6_progression.asm`, `Ot6EsperStatMod`), the
@@ -244,7 +244,7 @@ pool at these levels, so it is one cast per battle by design.
 
 **Trinity, the passive, is dropped** (§12.1) because there is no passive
 channel. The first-cast-free-tier idea was flagged "too strong a folding
-interaction?" in magicite.md's own open questions; the fold engine already gives
+interaction?" in an earlier draft of magicite.md; the fold engine already gives
 the tiering, so what is lost is flavour rather than function.
 
 ---
@@ -414,8 +414,8 @@ at 1 BP (row 6, `:347`). One wearer spending 15 MP and 2 BP changes the action
 economy on both sides. Party-wide haste for 10 MP (vanilla
 Haste2 costs 38) is this stone's version of the 10×-value fold engine.
 
-**Water is only expressible on the divine.** magicite.md's open question 2 asks
-whether Bismark grants the game's only Water spell. The machinery answers it:
+**Water is only expressible on the divine.** An earlier draft of magicite.md
+asked whether Bismark grants the game's only Water spell. The machinery answers it:
 there is **no water-element record in the player-magic range** to
 grant (scanned `magic_prop_en.dat` records `$00-$35`, +0x01 bit `$80`: none),
 and the grant channel cannot create new spells (§12.5). Sea Song is the

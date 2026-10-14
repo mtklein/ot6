@@ -58,7 +58,9 @@
 --      ExecAction's placeholder clears $3a4c, that UpdateEnabledMagic's
 --      scratch is what it is, and that MagicProp's whole 256-record MP
 --      column is <= 99 but for Phoenix, the three-digit exception.
---   5. the Serpent-Trench section. gau_joined is the entry point
+--   5. the Serpent-Trench section (and Cleave's first payable level held
+--      within 2 of Cyan's level there, a few fights past the Phantom Train
+--      farewell where he learns it, #423). gau_joined is the entry point
 --      gen_sabin_trench.lua boots from, so the trio's pools are read live
 --      out of the fixture and every ability each has learned at that
 --      level is checked for uses-per-pool. Gau's Rage price is read too
@@ -140,6 +142,10 @@ local function romOfs(addr) return addr & 0x3FFFFF end
 
 -- pool(charId, level) exactly as InitMaxMP builds it.
 local levelUpMp, charProp
+-- Cleave's first payable level (a full pool holds its 99), from step 2,
+-- held near the Phantom Train farewell in step 5 (#423)
+local cleaveFirst
+local NEAR = 2
 local function pool(id, level)
   local mp = H.readRomByte(charProp + id * CHARPROP_SIZE + CHARPROP_MP)
   for i = 0, level - 2 do mp = mp + H.readRomByte(levelUpMp + i) end
@@ -238,6 +244,7 @@ H.run({ maxFrames = 20000 }, {
         for l = 1, 99 do if first == nil and pool(kit.id, l) >= r[2] then first = l end end
         H.log(string.format("%-8s %-13s by story; %d MP, first paid from a full pool at L%s",
           kit.name, r[3], r[2], tostring(first)))
+        if r[3] == "Cleave" then cleaveFirst = first end
         story = story + 1
        else
         local lv = math.max(kit.levels[i], JOIN)
@@ -742,6 +749,18 @@ H.run({ maxFrames = 20000 }, {
       H.log(string.format("trench  %s LV%d pool %d: %d uses of %s (dearest)",
         m.who, lv, mp, uses, worstName))
     end
+    -- Cleave is learned at the Phantom Train farewell (#379), and this
+    -- fixture is the scenario a few fights past it: Cyan's level here is
+    -- the farewell's level or a little more.  A Cleave first paid for far
+    -- past it is a divine nobody can cast for levels after learning it; one
+    -- paid for long before it says the 99 anchor no longer prices the top
+    -- of the ladder (v0.28 kits review: L15, one past the L14 farewell).
+    local cyanLv = H.readByte(REC + REC_SIZE * CHAR.Cyan + REC_LEVEL)
+    H.log(string.format("trench  Cleave first paid from a full pool at L%s; Cyan is L%d here, past the farewell",
+      tostring(cleaveFirst), cyanLv))
+    H.assertEq(cleaveFirst ~= nil and math.abs(cleaveFirst - cyanLv) <= NEAR, true, string.format(
+      "Cleave's first payable level (L%s) is within %d of Cyan's level past the Phantom Train farewell (L%d)",
+      tostring(cleaveFirst), NEAR, cyanLv))
     local rage = H.readRomByte(romOfs(H.sym("Ot6DanceCost")) + 1)
     H.assertEq(rage, 8, "the possess-verb price (Dance/Rage) is unchanged at 8")
     local gb = REC + REC_SIZE * CHAR.Gau
