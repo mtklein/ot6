@@ -36,7 +36,7 @@ local BOSS_SPECIES = { [WHITE_DRGN] = true, [MAGIMASTER] = true }
 -- Shell goes up while an L.90 Magic stands (its Bolt 3, Merton, Meteor and
 -- Flare), and on all four against MagiMaster (route-wor-thamasa.md 5.3)
 local FIGHT = { cure = false, shellVs = { [0x164] = true }, magicFirst = { [0x164] = true } }
-local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.4 } }
+local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.4 }, reraiseHold = { [0x166] = 0.15 } }
 local WALL_RING = 0xBB
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

@@ -8168,6 +8168,44 @@ function Driver:magicOnlyLine(actor, boost)
       end
     end
   end
+  -- opts.reraiseHold = { [species] = fraction }: once one of these stands at
+  -- or under that fraction, no member attacks while a living member lacks
+  -- Life 3 (or Shell, under opts.shellVs): the casters above put them on,
+  -- and the rest read the field with Scan, which is no hit.  MagiMaster's
+  -- Ultima as he dies killed members at full HP ('from 3591/3591 by ... atk
+  -- $14 (ONE ACTION from >= 80%)') when the blow that ended him landed
+  -- before the buffs did (build/attempts/wt/v031-tower/lab/mm5_*)
+  local rh = self.opts.reraiseHold
+  if rh then
+    local hold, boss = false, nil
+    for s = 0, 5 do
+      local frac = monAlive(s) and rh[M.readWord(0x57C0 + s * 2)]
+      if frac then
+        local x = 8 + s * 2
+        local hp, mx = M.readWord(0x3BF4 + x), M.readWord(0x3C1C + x)
+        if mx > 0 and hp <= mx * frac then hold, boss = true, s end
+      end
+    end
+    if hold then
+      local bare = nil
+      for e = 0, 3 do
+        if M.readWord(0x3BF4 + e * 2) > 0 then
+          local st3, st4 = M.readByte(0x3EF8 + e * 2), M.readByte(0x3EF9 + e * 2)
+          if (st4 & 0x04) == 0 or (self.opts.shellVs and (st3 & 0x20) == 0 and (st3 & 0x80) == 0) then bare = bare or e end
+        end
+      end
+      if bare ~= nil and spellCell(actor, M.STUDY_SPELL, true) ~= nil then
+        local key = string.format("hold:%d:%d", actor, bare)
+        if not self.statusSaid[key] then
+          self.statusSaid[key] = true
+          M.log(string.format("[%s] actor=%d holds the attack: entity %d lacks Life 3 or Shell before the boss's end; "
+            .. "Scan instead", self.tag or "fight", actor, bare))
+        end
+        return { kind = "magic", spell = M.STUDY_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0,
+                 aim = boss, vetoOk = true, reason = "reraise_hold" }
+      end
+    end
+  end
   local press = self:pressTarget()
   local MP = M.sym("MagicProp") & 0x3FFFFF
   local spells, castable = {}, {}
