@@ -17,11 +17,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "449894b3292bdc8e22623da15b22900c4fad2812a7320d73a3b61fad1ad3cdef",
-    "generator_sig": "d5df5e0dac48b5f70f4b1330405ce0fbe9ae81fb142531c695da17548d5213c5 gen_wor_tomb build/checkpoints/wor-kohlingen-v1/manifest.json build/checkpoints/wor-kohlingen-v1/wor-kohlingen.sram",
+    "generator_sig": "66f366e727337a93a680cdc3834dff8d6c11e18b3c288bb504e22a4a65264095 gen_wor_tomb build/checkpoints/wor-kohlingen-v1/manifest.json build/checkpoints/wor-kohlingen-v1/wor-kohlingen.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/wor-kohlingen-v1/manifest.json",
-        "sha256": "8dcf8e7efd8bf6d853686a0a5e9c428e1fd3175f1be20ca5ae830d3356c61351"
+        "sha256": "785b89338dc7f80687b91bdc7586389a760a4f769259de507e2c0dfca3f2bda5"
       }
     ]
   }

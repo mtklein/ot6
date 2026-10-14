@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
   "payload_sha256": "95c6843526d14a1221021b5e0892a8c650f8ee57ca50dc0ae5674751c16baf5a",
-  "generator_sig": "a807525975175bfe04fddb233c1e0e19b455fe20f605c8606ae48827b31f920d gen_voyage build/checkpoints/banquet-done-v1/manifest.json build/checkpoints/banquet-done-v1/banquet-done.sram",
+  "generator_sig": "7ee9fec0e2a080d8bbfb5e2fc61e710a39ba9ecec442cb1de8d2a31e868a1fbd gen_voyage build/checkpoints/banquet-done-v1/manifest.json build/checkpoints/banquet-done-v1/banquet-done.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/banquet-done-v1/manifest.json",
-      "sha256": "760d3be1fbe57a1d4c5e63b3f679ffefade6ecffd468d3eca5768e6922b513d7"
+      "sha256": "5dc25d64f5e63ced18fc5a5abc6c84379adc0b473186a6184ba94c1a63d96c65"
     }
   ]
 }

@@ -17,11 +17,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "ee4026443b31c07a01268ae16bb02c12e3572a48756b470797ddb75dca4e0c86",
-    "generator_sig": "ff893282852ab35af8585d583d352616c9922cbcbedda7e8c362a8729aa431fc gen_esper_mtn build/checkpoints/fire-out-v1/manifest.json build/checkpoints/fire-out-v1/fire-out.sram",
+    "generator_sig": "a68ca43349038c7e8246299f8c7321da2606af1b9461264d5fabbe85513083f7 gen_esper_mtn build/checkpoints/fire-out-v1/manifest.json build/checkpoints/fire-out-v1/fire-out.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/fire-out-v1/manifest.json",
-        "sha256": "7388548e53b359bcfd00717b87531e0387e0e7114b9fa10c3d37c6c35041b116"
+        "sha256": "4f16cce7e1c361123f4f734392767428eeda0252d35cac172da550e4ab1ad23e"
       }
     ]
   }
