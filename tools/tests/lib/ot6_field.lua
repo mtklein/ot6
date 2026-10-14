@@ -345,11 +345,11 @@ end
 -- deliberately.
 -- Returns a list of MOVES names (four cardinals plus the four diagonals a
 -- press turns into on a diagonal tile), or nil (unreachable / >4096 nodes).
-function M.bfsPath(tx, ty, blockedEdges, avoid)
+function M.bfsPath(tx, ty, blockedEdges, avoid, zStart)
   blockedEdges = blockedEdges or {}
   avoid = avoid or {}
   local sx, sy = M.fieldX(), M.fieldY()
-  local sz = M.readByte(0x00b2) & 0x03
+  local sz = zStart or (M.readByte(0x00b2) & 0x03)
   local function nkey(x, y, z) return (z << 16) | ((y & 0xFF) << 8) | (x & 0xFF) end
   local seen = { [nkey(sx, sy, sz)] = true }
   local q, qi = { { sx, sy, sz } }, 1
@@ -805,6 +805,26 @@ function M.navTo(txIn, tyIn, opts)
       if plan and idx > #plan then plan = nil end
       if not plan then
         plan = M.bfsPath(resolve(txIn), resolve(tyIn), NAV.blocked, avoidSet)
+        if not plan then
+          -- the party's z-level ($b2) as the model reads it can disagree
+          -- with where it stands: the Fanatics' Tower's outer stair, after a
+          -- battle on (7,14), read 'no path (7,14)->(10,13)' twenty times
+          -- with the six tiles back up the stair the only ones reachable
+          -- (build/attempts/wt/v031-tower/lab/t1_relm_k1_wor_relm_s0).  A
+          -- plan from another z-level is tried; a step it gets wrong is
+          -- blocklisted like any other
+          local live = M.readByte(0x00b2) & 0x03
+          for _, z in ipairs({ 1, 2, 0, 3 }) do
+            if z ~= live then
+              plan = M.bfsPath(resolve(txIn), resolve(tyIn), NAV.blocked, avoidSet, z)
+              if plan then
+                M.log(string.format("nav: no path (%d,%d)->(%d,%d) at the live z-level %d; planned at z-level %d",
+                  x, y, resolve(txIn), resolve(tyIn), live, z))
+                break
+              end
+            end
+          end
+        end
         idx = 1
         if not plan then
           -- transient blockage patience: idle 45 frames and re-search.
