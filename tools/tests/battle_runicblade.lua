@@ -55,6 +55,28 @@ local function arm()
     H.log(string.format("[blade] f%d Bolt: counter=%s targets chars $%02X mons $%02X, cmd $%02X, CELES MP %d, "
       .. "EDGAR MP %d", c.f, tostring(c.counter), c.b8, c.b9, c.cmd, c.celesMp, c.edgarMp))
   end, emu.callbackType.write, 0x7E3410, 0x7E3410)
+  -- #423: what felled CELES, when a step finds her fallen -- the attack
+  -- in flight ($b6), its command ($3A7C) and whether it was a counter
+  -- ($b1 bit 0), at the write that took her HP to 0
+  local down = false
+  emu.addMemoryCallback(function(a, v)
+    local o = (a & 0xFFFF) - 0x3BF4
+    if celes == nil or o // 2 ~= celes then return end
+    -- a battle's set-up and tear-down write these cells too: only a live
+    -- battle with CELES still in her seat counts
+    if not H.battleActive() or H.readByte(0x3ED8 + celes * 2) ~= CELES then return end
+    -- the word as this write leaves it (the callback may run before the
+    -- byte lands)
+    local base = 0x3BF4 + celes * 2
+    local hp = (o & 1) == 0 and ((H.readByte(base + 1) << 8) | v) or ((v << 8) | H.readByte(base))
+    if hp ~= 0 then down = false; return end
+    if down then return end
+    down = true
+    H.log(string.format("[blade] f%d CELES's HP fell to 0: attack $%02X, command $%02X, counter=%s, status "
+      .. "%02X %02X %02X %02X", H.frame, H.readByte(0xB6), H.readByte(0x3A7C), tostring((H.readByte(0xB1) & 1) == 1),
+      H.readByte(0x3EE4 + celes * 2), H.readByte(0x3EE5 + celes * 2), H.readByte(0x3EF8 + celes * 2),
+      H.readByte(0x3EF9 + celes * 2)))
+  end, emu.callbackType.write, 0x7E3BF4, 0x7E3BFB)
 end
 local function bounces(from)
   local n = 0
@@ -174,7 +196,10 @@ local function live(fn)
   return H.call(function()
     if not inBattle() then return end
     if H.readWord(0x3BF4 + celes * 2) == 0 then
-      H.log("[blade] CELES has fallen: this step is not counted")
+      local e = celes * 2
+      H.log(string.format("[blade] CELES has fallen: this step is not counted (f%d: HP %d/%d, status %02X %02X "
+        .. "%02X %02X, MP %d)", H.frame, H.readWord(0x3BF4 + e), H.readWord(0x3C1C + e), H.readByte(0x3EE4 + e),
+        H.readByte(0x3EE5 + e), H.readByte(0x3EF8 + e), H.readByte(0x3EF9 + e), H.readWord(0x3C08 + e)))
       return
     end
     fn()

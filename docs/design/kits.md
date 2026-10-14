@@ -716,7 +716,11 @@ ice/order/tempo. The pairing is clearer here than in vanilla.
   -- vanilla's ally-spell quirk, kept -- and a spell of her own that her
   stance catches goes nowhere.  Only player magic ($00-$35) bounces;
   a counter is not countered back, and a battle with counters off bounces
-  nothing.  *Reason: the old objection to making the divine "Runic at 3
+  nothing.  The bounce waits in the counter queue behind turns already
+  waiting, so its caster can fall first; it then lands nothing (it is not
+  retargeted, as no counter is).  Left as vanilla: skipping it would take a
+  hook at the queued action's execution for a turn that costs nothing (#423).
+  *Reason: the old objection to making the divine "Runic at 3
   BP" -- that the canon would have an exception at its top tier and the
   divine would be out of reach without BP -- is the owner's rule now
   (divines take the full boost), and as the 3-BP Runic it costs no menu row
