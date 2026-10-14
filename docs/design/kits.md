@@ -99,6 +99,7 @@ it (a Jackpot), and is free where it does not (a Cleave).
 | Locke | Master's Mark | steal from all enemies and reveal everything, at 3 BP | no |
 | Mog | Water Rondo | the dance at 3 BP: every step x8 for the battle, 99 MP, and it never stumbles, wherever the party fights | yes (`ot6_waterrondo.asm`) |
 | Umaro | Storm | a dump of all three points: Storm, ice on every enemy at x8, with or without the Blizzard Orb | yes (`ot6_umaro.asm`) |
+| Strago | Study | his Scan at 3 BP: reads every enemy and learns every lore any monster present could cast, 99 MP | yes (`ot6_analyze.asm`) |
 | Gau | (open, kit-gau.md) | at 3 BP | no |
 
 Terra's Ultima is a fold, not a divine, but it too is what a full boost buys
@@ -1043,6 +1044,40 @@ player prunes the kit all game. Same model, different collection verbs:
   kit that also carries Analyze and Aqua Rake, so his curation slice is
   smaller than Gau's kit-length list. Machinery: `OT6_LORELOAD`, the
   third loadout configurator (ot6_lore.asm / ot6_lore_page.asm).
+  - **Aqua Rake is the free row** (built, #381): once learned it is in his
+    battle Lore list every battle, outside the five, and never a slot's
+    lore (`Ot6LoreSlottable`: AUTO's window, the page's L/R cycle and a
+    stored slot pass over it).  Its price is the lore's own 22 MP
+    (mp-economy.md: free at join, priced like any lore).
+  - **Analyze is the Scan spell** (built, #381, `ot6_analyze.asm`).  Magic
+    names hold six letters, so the game prints "Scan", FF's own name for
+    it.  Strago always knows it: the stone-grant hooks
+    (`Ot6EsperSpellKnown`, `Ot6UnionEspers`, `Ot6FieldSpellKnown`) grant
+    it to him whatever he wears, so his Magic row is there from the day he
+    joins.  A character's Scan puts every weak element and weak class of
+    its target's species on the HUD and in the save's codex, as chips
+    would, without chipping; vanilla's text still runs, and a body vanilla
+    will not scan stays unread.  The boost buys breadth: a point or more
+    reads every enemy on the field (one payoff).  3 MP, on the boost
+    ladder every spell pays (8 at one point).  CELES
+    learns Scan at 18 (her natural table above), and it does the same for
+    her.  It is a Magic-row spell, so the Fanatics' Tower keeps it (#420
+    removes the kit rows, not Magic).  `battle_analyze`, `battle_lore`
+    and `menu_lorepage` check the two.
+  - **Study, his full boost** (built, #432, owner 2026-10-13): his Scan
+    with all three points pending reads every enemy and learns every lore
+    any monster on the field could cast, without being hit by it.  Each
+    present body's row of `Ot6StudyTbl` (the lores its AI script names,
+    main or counter section; `tools/check_study_table.py` builds it and
+    checks it against the scripts at build time) goes into $3A84, vanilla's
+    "lores learned this battle", less what he knows, and the victory
+    teaches them.  The full boost is the only gate; under it Scan is Scan.
+    99 MP, the shared ceiling (`Ot6MagicPrice`).  An engine pick spends no
+    boost, so it never studies; a Gogo's copy is a plain Scan.  It rides the
+    Magic row, so it works in the Fanatics' Tower, where no species casts a
+    lore.  *Placement: the Lore window's 24 records are one per lore id, so
+    it takes no extra row; Analyze is his row and Study its top rung, the
+    shape Cleave has on the SwdTech window.*  `battle_study`.
 
 - **Relm — Painter (special ¤: brush)**: Sketch ✦ signature (bug
   preserved ✦: it corrupts a save now and then, and that is canon —
