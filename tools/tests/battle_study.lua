@@ -20,8 +20,12 @@
 --   2. STRAGO's Scan at 3 BP: Ot6StudyOne's writes to $3A84 add exactly the
 --      present species' lores he lacks (Aqua Rake), the cast costs 99 MP,
 --      and after the victory $1D29 holds Aqua Rake again.
--- Everyone else Defends until the cast resolves.  A battle without a
--- Chimera, or where STRAGO cannot cast, is fought out and the next taken.
+-- Everyone else Fights while STRAGO banks his points and Defends from the
+-- cast until it resolves: Defending through the bank let the Chimera kill
+-- TERRA and LOCKE before the cast on a later ROM's draw, and STRAGO alone
+-- lost the fight-out (build/attempts/wt/v030-route/study/).  A battle
+-- without a Chimera, where STRAGO cannot cast, or whose Chimera falls
+-- before the cast is fought out and the next taken.
 -- Old-ROM red and mutants: build/attempts/wt/v030-plan-kits/study/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -174,7 +178,8 @@ H.run({ maxFrames = 900000 }, {
     H.waitUntil(function() return H.battleActive() end, 900, "battle up", 5),
     H.call(decide),
     H.cond(function() return mode == "fightout" end, { H.kitBattle({}, {}) }, {
-      H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = closed }),
+      H.kitBattle(proxy, { untilPlanDone = true, others = "fight", idle = "defend", maxFrames = 60000,
+        planDone = closed }),
       H.call(function()
         if not closed() then
           H.log("[study] the battle ended before the cast resolved: not counted")
@@ -183,20 +188,26 @@ H.run({ maxFrames = 900000 }, {
         end
         H.log(string.format("[study] cast at %d BP (f%d): MP %d -> %d; want $%06X; Ot6StudyOne wrote $%06X; "
           .. "$3A84 $%06X -> $%06X", rec.pend, rec.f, rec.mp0, rec.mp1, rec.want, rec.studied, rec.pend0, rec.pend1))
+        if stage == 2 and rec.want == 0 then
+          -- the Chimera fell to the others' Fights before the cast: nothing
+          -- on the field had a lore to teach, so this cast is not counted
+          H.log("[study] no present species could teach a lore at the cast: not counted")
+          mode = "skip"
+          return
+        end
         if stage == 1 then
           H.assertEq(rec.pend, 2, "the cast ran at the 2 BP planned")
           H.assertEq(rec.studied, 0, "at 2 BP the study wrote nothing (the full boost is its one gate)")
           H.assertEq(rec.mp0 - rec.mp1, H.battleSpellPrice(seat, SCAN, 2), "at 2 BP Scan pays its boosted price")
         else
           H.assertEq(rec.pend, 3, "the cast ran at the 3 BP planned")
-          H.assertEq(rec.want ~= 0, true, "precondition: a present species can teach a lore STRAGO lacks")
           H.assertEq(rec.studied & ~rec.pend0 & 0xFFFFFF, rec.want & ~rec.pend0 & 0xFFFFFF,
             "at 3 BP the study added exactly the present species' lores he lacks")
           H.assertEq(rec.pend1 & rec.want, rec.want, "$3A84 holds them at the action's end")
           H.assertEq(rec.mp0 - rec.mp1, STUDY_MP, "the study cost the shared ceiling, 99 MP")
         end
       end),
-      H.cond(function() return mode == "cast" and H.battleLoadStarted() end, { H.kitBattle({}, {}) }, {}),
+      H.cond(function() return H.battleLoadStarted() end, { H.kitBattle({}, {}) }, {}),
       H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000,
         "back on the world map", 5),
       H.call(function()
