@@ -9852,14 +9852,15 @@ end
 -- limits it to those formations, so the walk to a boss plays as the real
 -- driver does and the boss meets the same levels, gear and draws.  A
 -- muddled actor's defer and a window with no Fight are left alone: no
--- choice there to take away.  Unset, nothing changes.
+-- choice there to take away.  Unset, nothing changes.  (No new file-scope
+-- locals: the main chunk sits at Lua 5.4's 200.)
 M.POLICY = type(OT6_POLICY) == "string" and OT6_POLICY ~= "" and OT6_POLICY or nil
 M.POLICY_FORMS = nil
 if type(OT6_POLICY_FORMS) == "string" and OT6_POLICY_FORMS ~= "" then
   M.POLICY_FORMS = {}
   for h in OT6_POLICY_FORMS:gmatch("[0-9A-Fa-f]+") do M.POLICY_FORMS[tonumber(h, 16)] = true end
 end
-local POLICY_SKILL = { skill = true, magic = true, runic = true, lore = true, slot = true,
+Driver.POLICY_SKILL = { skill = true, magic = true, runic = true, lore = true, slot = true,
   summon = true, throw = true, morph = true, magitek = true }
 function Driver:policyPlan(actor, plan)
   local pol = M.POLICY
@@ -9874,7 +9875,7 @@ function Driver:policyPlan(actor, plan)
       out, why = { kind = "fight", row = fight, boostLeft = 0 }, "naive"
     elseif flag == "nocare" and (plan.kind == "heal" or plan.kind == "item" or plan.kind == "raise") then
       out, why = { kind = "fight", row = fight, boostLeft = 0 }, "nocare"
-    elseif flag == "noskill" and POLICY_SKILL[plan.kind] then
+    elseif flag == "noskill" and Driver.POLICY_SKILL[plan.kind] then
       local b = plan.boostLeft or 0
       out, why = { kind = "fight", row = fight, boostLeft = b, aim = self:chipAim(actor, b) }, "noskill"
     elseif flag == "noboost" and (plan.boostLeft or 0) > 0 then
