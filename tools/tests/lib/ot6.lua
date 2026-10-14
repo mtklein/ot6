@@ -18514,7 +18514,15 @@ function M.run(opts, steps)
   M.gameOverFired = 0
   local goReadFired, titleExecFired, wipeFired = 0, 0, 0
   local WIPE_FRAMES = 300
+  -- Every seat at 0 HP with LoseBattle's bit still clear is not yet a loss:
+  -- a member with Life 3 is revived by a queued action (ReraiseEffect,
+  -- battle_main.asm @0799) that runs after the killing action's animation,
+  -- and MagiMaster's Ultima as he dies took every seat to 0 and read
+  -- '$3ebc=0C' when the 300 frames ran out (build/attempts/wt/v031-tower/
+  -- lab/mm8_*).  Without the bit, the canary waits WIPE_FRAMES_UNLOST.
+  local WIPE_FRAMES_UNLOST = 1800
   local wipeN = 0
+  local wipeLatched = false
   local canaryInGame = false
   do
     local ok, addr = pcall(function() return M.sym("GameOver") end)
@@ -18789,7 +18797,7 @@ function M.run(opts, steps)
         resetLibState()
         M.rearmInputInjection()
         canaryInGame = false
-        goReadFired, titleExecFired, wipeFired, wipeN = 0, 0, 0, 0
+        goReadFired, titleExecFired, wipeFired, wipeN, wipeLatched = 0, 0, 0, 0, false
         RUN.installing = true
         local ok, err = pcall(M.__body)
         RUN.installing = false
@@ -18821,7 +18829,9 @@ function M.run(opts, steps)
     if M.battleLoadStarted() and M.frame % 30 == 0 then sampleBattle() end
     if canaryInGame and M.partyWipedInBattle and M.partyWipedInBattle() then
       wipeN = wipeN + 1
-      if wipeN == WIPE_FRAMES then
+      if not wipeLatched and wipeN >= WIPE_FRAMES
+         and ((M.readByte(0x3ebc) & 0x01) ~= 0 or wipeN >= WIPE_FRAMES_UNLOST) then
+        wipeLatched = true
         wipeFired = wipeFired + 1
         M.gameOverFired = M.gameOverFired + 1
         local seats = {}
@@ -18835,7 +18845,7 @@ function M.run(opts, steps)
           "read wiped for %d frames (seats [%s], $3ebc=%02X: every present " ..
           "seat at 0 HP or LoseBattle's bit 0 set); the engine is sitting " ..
           "on the annihilated screen waiting for a press.  Counted as a " ..
-          "game over (f%d).", WIPE_FRAMES, table.concat(seats, " "),
+          "game over (f%d).", wipeN, table.concat(seats, " "),
           M.readByte(0x3ebc), M.frame))
         RUN.goUnhandled = { frame = M.frame, what = "the party was wiped in battle" }
         -- Under allowGameOver the pad stays live (#205): the body declared
@@ -18855,7 +18865,7 @@ function M.run(opts, steps)
         end
       end
     else
-      wipeN = 0
+      wipeN, wipeLatched = 0, false
     end
     if M.gameOverFired > 0 and not RUN.opts.allowGameOver then
       failed("wipe", string.format("GAME OVER fired (GameOver read x%d, " ..

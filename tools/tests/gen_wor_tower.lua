@@ -512,8 +512,8 @@ local function fightWatch()
       if bmax > 0 and bhp * 10 <= bmax and H.frame % 120 == 0 then
         local t = {}
         for e = 0, 3 do
-          t[#t + 1] = string.format("e%d %d shell=%d life3=%d", e, H.readWord(0x3BF4 + e * 2),
-            (H.readByte(0x3EF8 + e * 2) >> 5) & 1, (H.readByte(0x3EF9 + e * 2) >> 2) & 1)
+          t[#t + 1] = string.format("e%d %d shell=%d life3=%d mdef=%d", e, H.readWord(0x3BF4 + e * 2),
+            (H.readByte(0x3EF8 + e * 2) >> 5) & 1, (H.readByte(0x3EF9 + e * 2) >> 2) & 1, H.readByte(0x3BB9 + e * 2))
         end
         H.log(string.format("[end] f%d $%03X HP %d: %s", H.frame, boss, bhp, table.concat(t, ", ")))
       end
