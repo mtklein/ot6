@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "15d9d7d574d6ac1ab59bef7d07d6ad202e11251d9f083e2f928688227b094f06",
+  "generator_sig": "eec4963c23bb177aed51d010cf3fa3229df554605e88852736336786532fe8ed gen_wor_relm build/checkpoints/wor-owzer-v1/manifest.json build/checkpoints/wor-owzer-v1/wor-owzer.sram",
+  "ancestors": [
+    {
+      "path": "build/checkpoints/wor-owzer-v1/manifest.json",
+      "sha256": "358145fe5a16ebc1fd3c7ff6332cdb11b0f4cb75eda62d4aa64971ac7ac96ad2"
+    }
+  ]
+}

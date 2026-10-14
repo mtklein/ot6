@@ -69,7 +69,12 @@ local function hasItemRow(e)
   end
   return false
 end
+-- the battle's bag while it is up, the field's once it has ended (the end
+-- writes the battle bag back): on v0.30's ROM the battle ended inside the
+-- three windows and the battle bag read 0 after it (build/attempts/wt/
+-- v030-route/qual/zombieraise/)
 local function fenixCount()
+  if not H.battleLoadStarted() then return H.invCountOf(FENIX_DOWN) end
   for i = 0, 251 do
     if H.readByte(BATTINV + i * 5) == FENIX_DOWN then return H.readByte(BATTINV + i * 5 + 3) end
   end

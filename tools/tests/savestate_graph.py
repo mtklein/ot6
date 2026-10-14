@@ -898,11 +898,32 @@ STATES = [
     # to the Falcon, the cabin (UMARO, MOG, TERRA and CELES; Terrato and
     # Tritoch onto wearers), and Save there: the `wor-narshe-v1` checkpoint
     # (docs/design/route-wor-narshe.md).  Each fight is a game over when
-    # lost: the runner retries from the save point.  A cut.  saves=: the
-    # frontier; no leg boots wor-narshe-v1 yet.  Re-cut by
-    # checkpoint_drift.py --recut.
+    # lost: the runner retries from the save point.  A cut.  wor_owzer
+    # below boots its checkpoint.  Re-cut by checkpoint_drift.py --recut.
     S("wor_tritoch", gen="gen_wor_tritoch", prev="wor_narshe",
-      checkpoint="wor-narshe-cliffs-v1", saves="wor-narshe-v1", timeout=5400),
+      checkpoint="wor-narshe-cliffs-v1", timeout=5400),
+
+    # wor-narshe-v1 -> Owzer's basement, map 207's save point (87,41): the
+    # cabin (CYAN, TERRA and CELES), the Falcon to Jidoor, the item counter,
+    # the auction (up to 16 visits for Golem and ZoneSeek), Owzer's hall
+    # (the switch, the two paintings), the basement's turning doors, the
+    # painting warp, Still Life: the `wor-owzer-v1` checkpoint, the retry
+    # point for Chadarnook (docs/design/route-wor-thamasa.md).  A cut.
+    # Re-cut by checkpoint_drift.py --recut.
+    S("wor_owzer", gen="gen_wor_owzer", prev="wor_tritoch",
+      checkpoint="wor-narshe-v1", timeout=5400),
+
+    # wor-owzer-v1 -> the World of Ruin map beside the Falcon at the
+    # Fanatics' Tower (160,127): Chadarnook (event battle 86, a game over when
+    # lost: the runner retries from the save point), Starlet and RELM, the
+    # tower's foot (STRAGO), the cabin (TERRA, CELES, RELM and STRAGO), the
+    # grind north-west of Jidoor, Thamasa's item counter, and Save there: the
+    # `wor-tower-v1` checkpoint (docs/design/route-wor-thamasa.md).  A cut.
+    # saves=: the frontier; no leg boots wor-tower-v1 yet.  Re-cut by
+    # checkpoint_drift.py --recut.
+    S("wor_relm", gen="gen_wor_relm", prev="wor_owzer",
+      checkpoint="wor-owzer-v1", saves="wor-tower-v1", timeout=7200),
+
 ]
 
 # Tracked checkpoints the release gate does not check, each with its reason.

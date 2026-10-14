@@ -2932,9 +2932,46 @@ end
 -- its price moves; everything else is a multiplier verb and takes the
 -- 2.5x.  One function so the driver cannot charge a fold 2.5x on top of
 -- its tier, which would be charging twice for one boost.
+-- STRAGO's Scan at the full boost is his study (#432), priced at the shared
+-- ceiling whatever his relics (Ot6MagicPrice's first arm)
+M.STUDY_SPELL, M.STUDY_BOOST, M.STUDY_MP, M.STRAGO_ID = 0x18, 3, 99, 0x07
+function M.isStudy(id, boost, actor)
+  return id == M.STUDY_SPELL and (boost or 0) >= M.STUDY_BOOST and actor ~= nil
+    and M.readByte(0x3ED8 + actor * 2) == M.STRAGO_ID
+end
+M.LORE_PEARL_WIND, M.LORE_DISCHORD = 8, 16   -- $1D29 bit order
+-- A species' row of Ot6StudyTbl: the lores its AI script can cast, in
+-- $1D29's bit order (0 for none), read from the ROM and cached
+M.studyRows = nil
+function M.studyRow(sp)
+  if M.studyRows == nil then
+    M.studyRows = {}
+    local a = M.sym("Ot6StudyTbl") & 0x3FFFFF
+    while true do
+      local s = M.readRomByte(a) | (M.readRomByte(a + 1) << 8)
+      if s == 0xFFFF then break end
+      M.studyRows[s] = M.readRomByte(a + 2) | (M.readRomByte(a + 3) << 8) | (M.readRomByte(a + 4) << 16)
+      a = a + 5
+    end
+  end
+  return M.studyRows[sp] or 0
+end
+-- The first standing monster whose species can teach a lore STRAGO lacks
+-- ($1D29-$1D2B), and those lores; nil when none
+function M.studySlot()
+  local known = M.readByte(0x1D29) | (M.readByte(0x1D2A) << 8) | (M.readByte(0x1D2B) << 16)
+  for s = 0, 5 do
+    if M.monStanding(s) then
+      local want = M.studyRow(M.readWord(0x57C0 + s * 2)) & ~known & 0xFFFFFF
+      if want ~= 0 then return s, want end
+    end
+  end
+  return nil, 0
+end
 function M.spellPrice(id, base, boost, actor)
   base, boost = base or 0, boost or 0
   if boost <= 0 then return base, id end
+  if M.isStudy(id, boost, actor) then return M.STUDY_MP, id end
   if M.inFoldTbl(id) then
     local to = M.foldTier(id, M.foldSteps(actor, boost))
     if to == id then return base, id end
@@ -2966,6 +3003,7 @@ function M.battleSpellPrice(actor, id, boost)
     "battle spell price requires an ability record")
   assert(type(boost) == "number" and boost % 1 == 0 and boost >= 0 and boost <= 3,
     "battle spell price requires total boost 0..3")
+  if M.isStudy(id, boost, actor) then return M.STUDY_MP, id end
   local family = M.inFoldTbl(id)
   local resolved = family and M.foldTier(id, M.foldSteps(actor, boost)) or id
   local raw = M.spellMpCost(resolved)
@@ -3858,8 +3896,14 @@ end
 -- that every slot that steps in the formation (M.activeSlots, $3AA8 -- a part or a
 -- tag-team sibling the script materialises later, #177: battle 70's
 -- Shiva is not in $3F45 at all) is checked the first time it is seen.
+-- A battle has a formation: the battle-HP table read live in the field with
+-- the formation word ($11E0) at $0000 is not one.  After a retry restored
+-- its boot snapshot, wor_tzen_door's walk read two such field frames as
+-- battles and the runner's count ran ahead of the [outcome] lines ("got 1,
+-- want 2"; the guard counted 'formation 0000' at f1254 and f4121:
+-- build/attempts/wt/v030-route/lab/tzen/t2).
 function M.absorbGuardTick()
-  if not M.battleLoadStarted() then
+  if not M.battleLoadStarted() or M.readWord(0x11E0) == 0 then
     guardArmed, guardSettle, guardSeen, guardRandom = true, 0, {}, false
     return nil
   end
@@ -8041,6 +8085,223 @@ function Driver:magitekLine(actor)
            skill = bestAtk, aim = slot, boostLeft = 0 }
 end
 
+-- The magic-only command table (the Fanatics' Tower: battle switch $38,
+-- InitCmdList turns Fight into Magic and drops every row but Magic, Item and
+-- Mimic; route-wor-thamasa.md finding 3): no Fight row, so the attack turn
+-- is a cast, chosen the way a person reads the target (magitekLine's
+-- shape).  The candidates are the attack spells in the actor's live list
+-- (spellCell: known, castable, affordable), each scored on the target: out
+-- if it absorbs or nulls the element, or if Reflect would bounce it (L.20,
+-- L.70, L.90 Magic start with it); a weakness doubles the spell's power and
+-- a chip (hitChips) outweighs any damage; OT6's Break chips a shield
+-- whatever the element (ot6_breakspell.asm), so it scores as a chip while
+-- the target holds shields.  The boost is the bank's, priced as the nuke's
+-- is.  The target is the press target, else the first standing monster.
+-- (Quake, $15, is left out: it strikes the whole field, the party with it, and
+-- a party that does not float takes its own earthquake; Merton the same)
+M.MAGIC_ONLY_SPELLS = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x0C, 0x0E, 0x0F, 0x10, 0x11, 0x13, 0x16, 0x14, 0x29 }
+M.BREAK_SPELL = 0x0C
+function Driver:magicOnlyLine(actor, boost)
+  -- every standing body is weighed against every castable spell, so a caster
+  -- whose spells answer one body's weakness aims there (CELES's Poison at a
+  -- poison-weak L.30 while RELM's Ice found nothing to chip): the press
+  -- target, when standing, wins a tie.  The press target can name a slot the
+  -- formation leaves empty (a tower fight in slots 0, 2 and 3 was aimed at
+  -- slot 1, and the target select opened and backed out for 90,000 frames:
+  -- build/attempts/wt/v030-route/lab/tower/c3), so only standing slots count
+  -- opts.shellVs = { [species] = true }: while one of these stands, Shell
+  -- (halves magic damage) goes on each living member without it and not in
+  -- Reflect (it would rebound), a member at a time, before any attack.
+  -- The L.90 Magic's Bolt 3, Merton, Meteor and Flare wiped the four on the
+  -- fourth floor without it (build/attempts/wt/v030-route/lab/tower/c15)
+  local sv = self.opts.shellVs
+  if sv and spellCell(actor, 0x25, true) ~= nil then
+    local danger = false
+    for s = 0, 5 do if monAlive(s) and sv[M.readWord(0x57C0 + s * 2)] then danger = true end end
+    self.shellAt = self.shellAt or {}
+    for e = 0, 3 do
+      local st3 = M.readByte(0x3EF8 + e * 2)
+      if danger and M.readWord(0x3BF4 + e * 2) > 0 and (st3 & 0x20) == 0 and (st3 & 0x80) == 0
+         and M.frame - (self.shellAt[e] or -100000) > 900 then
+        self.shellAt[e] = M.frame
+        M.log(string.format("[%s] actor=%d Shell on entity %d (a body that casts hard stands)", self.tag or "fight",
+          actor, e))
+        return { kind = "magic", spell = 0x25, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0, ally = true,
+                 target = e, buff = true, vetoOk = true, reason = "shell" }
+      end
+    end
+  end
+  -- opts.reraiseVs = { [species] = fraction }: once one of these stands at
+  -- or under that fraction of its HP, Life boosted two points (Life 3: the
+  -- member rises once on dying) goes on each living member without it,
+  -- before any attack: MagiMaster's Ultima falls on the party as he dies
+  -- (route-wor-thamasa.md 5.3)
+  local rv = self.opts.reraiseVs
+  if rv and spellCell(actor, 0x30, true) ~= nil and (M.readByte(BATTLE.BP + actor * 2) >= 2) then
+    local due = false
+    for s = 0, 5 do
+      local frac = monAlive(s) and rv[M.readWord(0x57C0 + s * 2)]
+      if frac then
+        local x = 8 + s * 2
+        local hp, mx = M.readWord(0x3BF4 + x), M.readWord(0x3C1C + x)
+        if mx > 0 and hp <= mx * frac then due = true end
+      end
+    end
+    self.reraiseAt = self.reraiseAt or {}
+    for e = 0, 3 do
+      local st3 = M.readByte(0x3EF8 + e * 2)
+      if due and M.readWord(0x3BF4 + e * 2) > 0 and (st3 & 0x01) == 0
+         and M.frame - (self.reraiseAt[e] or -100000) > 900 then
+        local b = castBoost(actor, 0x30, select(2, spellCell(actor, 0x30, true)), 2, 0)
+        if b ~= nil and b >= 2 then
+          self.reraiseAt[e] = M.frame
+          M.log(string.format("[%s] actor=%d Life at 2 BP (Life 3) on entity %d before the boss's end", self.tag or "fight",
+            actor, e))
+          return { kind = "magic", spell = 0x30, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 2, ally = true,
+                   target = e, buff = true, vetoOk = true, reason = "reraise" }
+        end
+      end
+    end
+  end
+  local press = self:pressTarget()
+  local MP = M.sym("MagicProp") & 0x3FFFFF
+  local spells, castable = {}, {}
+  for _, id in ipairs(self.opts.magicOnly or M.MAGIC_ONLY_SPELLS) do
+    local cell, cost = spellCell(actor, id, true)
+    if cell ~= nil then
+      castable[#castable + 1] = { id = id, cost = cost, elem = M.readRomByte(MP + id * 14 + 1),
+        power = M.readRomByte(MP + id * 14 + 6) }
+    end
+    -- the confirm runs the party-wide cast guards (castVetoed: any body in
+    -- the formation that absorbs, nulls or reflects it), so the plan runs
+    -- them too: a Break planned on the L.40 Magic beside two reflecting
+    -- L.20s was refused at every confirm and re-planned for 90,000 frames
+    -- (build/attempts/wt/v030-route/lab/tower/c3: 'magic plan: wanted 2 ...
+    -- going at 1', 'Need MP')
+    if cell ~= nil and not self:castVetoed(id, "magic-only") then spells[#spells + 1] = castable[#castable] end
+  end
+  -- The bounce: while a monster stands under Reflect and a party member
+  -- wears it (the tower's Wall Rings), a reflectable spell cast on that
+  -- member rebounds onto the monsters, and a rebound is not reflected again
+  -- -- the way through the L.20 and L.70 Magic a person uses.  Offered when
+  -- the direct line finds no weakness to hit, on a spell no standing
+  -- monster absorbs or nulls (the rebound picks its monster).
+  local bounce = nil
+  do
+    local mirror, anyReflect = nil, false
+    for e = 0, 3 do
+      if M.readWord(0x3BF4 + e * 2) > 0 and (M.readByte(0x3EF8 + e * 2) & 0x80) ~= 0 then mirror = mirror or e end
+    end
+    for s = 0, 5 do
+      if monAlive(s) and (M.readByte(0x3F00 + s * 2) & 0x80) ~= 0 then anyReflect = true end
+    end
+    if mirror ~= nil and anyReflect then
+      for _, sp in ipairs(castable) do
+        if M.spellReflectable(sp.id) and sp.id ~= M.BREAK_SPELL and sp.power > 0 then
+          local ok, weakAll = true, true
+          for s = 0, 5 do
+            if monAlive(s) then
+              local x = 8 + s * 2
+              local absorb, null = M.readByte(0x3BCC + x), M.readByte(0x3BCD + x)
+              if sp.elem ~= 0 and ((absorb & sp.elem) ~= 0 or (null & sp.elem) == sp.elem) then ok = false end
+              if sp.elem == 0 or (M.readByte(0x3BE0 + x) & sp.elem) == 0 then weakAll = false end
+            end
+          end
+          local score = sp.power * (weakAll and 2 or 1)
+          if ok and (bounce == nil or score > bounce.score) then bounce = { sp = sp, score = score, to = mirror } end
+        end
+      end
+    end
+  end
+  local best, bestScore, bestSlot, said = nil, nil, nil, {}
+  for slot = 0, 5 do
+    if monAlive(slot) then
+      local x = 8 + slot * 2
+      local weak, half = M.readByte(0x3BE0 + x), M.readByte(0x3BE1 + x)
+      local absorb, null = M.readByte(0x3BCC + x), M.readByte(0x3BCD + x)
+      local reflect = (M.readByte(0x3F00 + slot * 2) & 0x80) ~= 0
+      local shields = M.readByte(BATTLE.SH_CUR + slot * 2)
+      for _, sp in ipairs(spells) do
+        local id, elem = sp.id, sp.elem
+        local score
+        if (elem ~= 0 and ((absorb & elem) ~= 0 or (null & elem) == elem))
+           or (reflect and M.spellReflectable(id)) then
+          score = -1
+        elseif id == M.BREAK_SPELL then
+          score = shields > 0 and 1000 or -1
+        elseif id == 0x29 then
+          -- Osmose takes MP, not HP: a dry caster's last resort before an item
+          local cur, top = M.readWord(BATTLE.CURMP + actor * 2), M.readWord(BATTLE.MAXMP + actor * 2)
+          score = (cur * 4 < top and M.readWord(0x3C08 + x) > 0) and 1 or -1
+        else
+          score = sp.power
+          if elem ~= 0 and (weak & elem) ~= 0 then score = score * 2
+          elseif elem ~= 0 and (half & elem) ~= 0 then score = score // 2 end
+          score = score + 1000 * hitChips(slot, 0, elem)
+        end
+        if score >= 0 and slot == press then score = score + 1 end
+        if score >= 0 then said[#said + 1] = string.format("s%d $%02X -> %d", slot, id, score) end
+        if score >= 0 and (bestScore == nil or score > bestScore) then best, bestScore, bestSlot = sp, score, slot end
+      end
+    end
+  end
+  if bounce ~= nil and (best == nil or bestScore < 100) then
+    local b = castBoost(actor, bounce.sp.id, bounce.sp.cost, boost or 0, self:nukeFloor(actor)) or 0
+    local key = string.format("bounce:%d:%d", actor, bounce.sp.id)
+    if not self.statusSaid[key] then
+      self.statusSaid[key] = true
+      M.log(string.format("[%s] actor=%d magic-only: $%02X on entity %d (Reflect) to rebound onto the monsters, "
+        .. "%d BP (the direct line's best: %s)", self.tag or "fight", actor, bounce.sp.id, bounce.to, b,
+        best and string.format("$%02X at %d", best.id, bestScore) or "none"))
+    end
+    return { kind = "magic", spell = bounce.sp.id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = b,
+             ally = true, target = bounce.to, bounce = true, reason = "magic_only_bounce" }
+  end
+  if best == nil then
+    -- nothing castable: a caster out of MP drinks it back (an Ether, a
+    -- Tincture, an X-Ether) rather than pass the turn: inside the tower a
+    -- seat that passes has no other attack, and the last L.20 Magic outlived
+    -- two dry casters for 90,000 frames (build/attempts/wt/v030-route/lab/
+    -- tower/c6: 'plan=switch')
+    local row = cmdRow(actor, BATTLE.CMD_ITEM)
+    local mp, maxmp = M.readWord(BATTLE.CURMP + actor * 2), M.readWord(BATTLE.MAXMP + actor * 2)
+    -- a caster with MP and nothing that hurts (a lone Magic Urn absorbs all
+    -- eight elements and holds no shield) reads the field with an unboosted
+    -- Scan rather than pass: four passes in a row are the menu's park, a
+    -- recovery-cap failure (build/attempts/wt/v030-route/lab/tower/c9:
+    -- 'budget:switch/05 4 times in one battle')
+    if mp * 2 >= maxmp and spellCell(actor, M.STUDY_SPELL, true) ~= nil then
+      for s = 0, 5 do
+        if monAlive(s) then
+          return { kind = "magic", spell = M.STUDY_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0,
+                   aim = s, vetoOk = true, reason = "magic_only_scan" }
+        end
+      end
+    end
+    if row ~= nil and mp * 2 < maxmp then
+      for _, it in ipairs({ 0xEC, 0xEB, 0xED }) do   -- Ether, Tincture, X-Ether
+        local idx = self:battInvIdx(it)
+        if idx ~= nil then
+          M.log(string.format("[%s] actor=%d magic-only: nothing to cast at %d/%d MP; item $%02X on itself",
+            self.tag or "fight", actor, mp, maxmp, it))
+          return { kind = "item", item = it, target = actor, row = row, idx = idx, reason = "magic_only_mp" }
+        end
+      end
+    end
+    return nil
+  end
+  local b = castBoost(actor, best.id, best.cost, boost or 0, self:nukeFloor(actor))
+  if b == nil then b = 0 end
+  local key = string.format("monly:%d:%d:%d", actor, bestSlot, best.id)
+  if not self.statusSaid[key] then
+    self.statusSaid[key] = true
+    M.log(string.format("[%s] actor=%d magic-only: $%02X at slot %d, %d BP: %s", self.tag or "fight", actor,
+      best.id, bestSlot, b, table.concat(said, "; ")))
+  end
+  return { kind = "magic", spell = best.id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = b, aim = bestSlot,
+           reason = "magic_only" }
+end
+
 function Driver:dmgWatchOf(e)
   for i, w in ipairs(self.dmgWatch) do if w.actor == e then return i, w end end
   return nil
@@ -10876,6 +11137,21 @@ function Driver:makePlanRules(actor)
         .. "cure that reaches it is damage", self.tag or "fight", actor, zombieSeated)
       if said ~= self.healSaid then self.healSaid = said; M.log(said) end
     end
+    -- STRAGO's Pearl Wind (#388, opts.strago.pearlWind): his party heal, as
+    -- much HP to each member as he has standing, for no boost, ahead of a
+    -- boosted party cure when he is the one deciding and stands above half
+    local so = self.opts.strago
+    if so and so.pearlWind and #cands >= 2 and zombieSeated == nil
+       and M.readByte(BATTLE.BCHID + actor * 2) == M.STRAGO_ID and cmdRow(actor, BATTLE.CMD_LORE)
+       and loreOffered(M.LORE_PEARL_WIND) and hpNow[actor] * 2 >= maxOf(actor) then
+      local cell, cost = loreCell(actor, M.LORE_PEARL_WIND, true)
+      if cell ~= nil and M.readWord(BATTLE.CURMP + actor * 2) >= cost then
+        M.log(string.format("[%s] actor=%d party heal: Pearl Wind, %d hurt (worst %d%%), %d HP each, %d MP",
+          self.tag or "fight", actor, #cands, cands[1].pct, hpNow[actor], cost))
+        return orSpend({ kind = "lore", lore = M.LORE_PEARL_WIND, row = cmdRow(actor, BATTLE.CMD_LORE),
+                         reason = "party_hurt_lore" }, "Pearl Wind")
+      end
+    end
     if cureRow ~= nil and #cands >= 2 and zombieSeated == nil and not self:tranceDue(actor) then
       local spell = (type(self.opts.cure) == "table" and self.opts.cure or BATTLE.CURES)[1]
       local cell, cellMp = spellCell(actor, spell, true)
@@ -11117,6 +11393,44 @@ function Driver:makePlanRules(actor)
   local tranceDue = self:tranceDue(actor)
   if tranceDue and have >= 3 then
     return { kind = "morph", row = cmdRow(actor, BATTLE.CMD_MORPH), boostLeft = 3 }
+  end
+  -- opts.strago (#388): STRAGO's kit beyond the nuke repertoire.
+  --   study = true     with three points banked, his Scan at the full boost
+  --                    (Study, #432) on a body whose species' AI can cast a
+  --                    lore he lacks (Ot6StudyTbl, read from the ROM), while
+  --                    the 99 MP leaves the nuke floor standing
+  --   dischord = { [species] = true }
+  --                    Dischord (lore 16: halves the target's level) once a
+  --                    battle on the first live body of one of these
+  -- Pearl Wind, his party heal, is the care block's (opts.strago.pearlWind).
+  local so = self.opts.strago
+  if so and id == M.STRAGO_ID then
+    if so.study and have >= M.STUDY_BOOST and cmdRow(actor, BATTLE.CMD_MAGIC) then
+      local slot, want = M.studySlot()
+      local cell = spellCell(actor, M.STUDY_SPELL, true)
+      local mp = M.readWord(BATTLE.CURMP + actor * 2)
+      if slot ~= nil and cell ~= nil and mp - M.STUDY_MP >= self:nukeFloor(actor) then
+        M.log(string.format("[%s] actor=%d study: Scan at %d BP on slot %d ($%03X), lores $%06X he lacks, %d MP of %d",
+          self.tag or "fight", actor, M.STUDY_BOOST, slot, M.readWord(0x57C0 + slot * 2), want, M.STUDY_MP, mp))
+        return { kind = "magic", spell = M.STUDY_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC),
+                 boostLeft = M.STUDY_BOOST, aimHard = slot, reason = "study" }
+      end
+    end
+    if so.dischord and cmdRow(actor, BATTLE.CMD_LORE) and loreOffered(M.LORE_DISCHORD) then
+      self.dischorded = self.dischorded or {}
+      for s = 0, 5 do
+        if monAlive(s) and so.dischord[M.readWord(0x57C0 + s * 2)] and not self.dischorded[s] then
+          local cell, cost = loreCell(actor, M.LORE_DISCHORD, true)
+          if cell ~= nil and M.readWord(BATTLE.CURMP + actor * 2) - cost >= self:nukeFloor(actor) then
+            self.dischorded[s] = true
+            M.log(string.format("[%s] actor=%d Dischord on slot %d ($%03X), row %d, %d MP", self.tag or "fight",
+              actor, s, M.readWord(0x57C0 + s * 2), cell, cost))
+            return { kind = "lore", lore = M.LORE_DISCHORD, row = cmdRow(actor, BATTLE.CMD_LORE), aimHard = s,
+                     reason = "dischord" }
+          end
+        end
+      end
+    end
   end
   local mg = self.opts.magic and self.opts.magic[id]
   if mg and tranceDue then mg = { spell = mg.spell, boost = false } end
@@ -11419,6 +11733,10 @@ function Driver:makePlanRules(actor)
   if fight == nil and cmdRow(actor, BATTLE.CMD_MAGITEK) and not self.skillDead[BATTLE.CMD_MAGITEK]
      and M.MAGITEK_OFF ~= true then
     local line = self:magitekLine(actor)
+    if line then return line end
+  end
+  if fight == nil and cmdRow(actor, BATTLE.CMD_MAGIC) then
+    local line = self:magicOnlyLine(actor, boost)
     if line then return line end
   end
   if fight == nil then return { kind = "switch" } end
@@ -12308,8 +12626,14 @@ function Driver:button(actor)
     if focus == nil and self.plan.aim ~= nil then
       focus = { { slot = self.plan.aim, mask = 1 << self.plan.aim } }
     end
+    -- a plan that names its body (STRAGO's study and Dischord, #388) is
+    -- steered to it over any kill order, a single-target lore included
+    if self.plan.aimHard ~= nil then
+      focus = { { slot = self.plan.aimHard, mask = 1 << self.plan.aimHard } }
+    end
     if focus and self.plan.kind ~= "item" and self.plan.kind ~= "summon"
-       and self.plan.kind ~= "heal" and self.plan.kind ~= "lore" and not self.plan.ally then
+       and self.plan.kind ~= "heal" and (self.plan.kind ~= "lore" or self.plan.aimHard ~= nil)
+       and not self.plan.ally then
       local want, wantSlot = nil, nil
       -- the first entry standing on the stage now: alive, and its
       -- presence bit ($3AA8) set -- a part that has not entered yet (or
@@ -12393,7 +12717,11 @@ function Driver:button(actor)
     -- Shiva (ice absorb) entered, two zero-damage casts a battle.  A
     -- cast the live stage now refuses is backed out of (B) and re-planned
     -- against what stands there.
-    if (self.plan.kind == "magic" and self.plan.spell ~= nil) or self.plan.kind == "lore" then
+    -- (a bounce, magicOnlyLine's, is aimed at a reflecting member on purpose;
+    -- its idle Scan may bounce off a reflecting body and harm nobody: c14
+    -- held its target select 30,000 frames on that refusal)
+    if ((self.plan.kind == "magic" and self.plan.spell ~= nil) or self.plan.kind == "lore") and not self.plan.bounce
+       and not self.plan.vetoOk then
       local id = self.plan.kind == "magic" and (self.plan.executionSpell or self.plan.spell) or (0x8B + self.plan.lore)
       if self:castVetoed(id, self.plan.kind == "magic" and "cast (at the confirm)"
                         or "lore (at the confirm)") then
@@ -12473,7 +12801,7 @@ function Driver:button(actor)
     -- The raise-then-top-up pair (#168): a confirmed Fenix Down is
     -- pending until the target's HP moves (watchPendingCare); a confirmed heal
     -- on a raised member pays the top-up owed.
-    if self.plan.ally then
+    if self.plan.ally and not self.plan.bounce and not self.plan.buff then
       self.unmuddlePending = { e = self.plan.target, by = actor, tick = self.battleTick }
       -- the hit itself, until the hitter's command runs (#320): it lands
       -- even when something else cleared the Muddle first
@@ -13211,6 +13539,9 @@ end
 --     slot = s         aim at monster slot s (else any live monster)
 --     self = true      the target select is the party side (Morph, Runic):
 --                      confirm where the cursor stands
+--     ally = true      aim at the party side (a spell that opens on the
+--                      monsters): cross over and confirm the member the
+--                      cursor lands on
 --     refused = "list" | "command"
 --                      the A press must be refused there: it buzzes and the
 --                      window stays up; after three refused presses the
@@ -13511,6 +13842,21 @@ function M.kitBattle(plan, opts)
         pulse("a")
         return
       end
+      if p.ally then
+        -- cross to the party side and confirm on the member the cursor lands on
+        if M.readByte(0x7B7D) ~= 0 and M.readByte(0x7B7E) == 0 then
+          if cool == 0 then done(p, a) end
+          pulse("a")
+          return
+        end
+        if cool == 0 then
+          p.allyPresses = (p.allyPresses or 0) + 1
+          M.assertEq(p.allyPresses <= 8, true, "the target select crosses to the party side")
+        end
+        local L = M.battleLayout()
+        pulse(L.toChars[1 + ((p.allyPresses or 1) - 1) % #L.toChars])
+        return
+      end
       local want = p.slot ~= nil and (1 << p.slot) or nil
       if want and (M.readByte(0x3A75) & want) == 0 then
         -- the body asked for has fallen since the plan was made: any live one
@@ -13536,7 +13882,7 @@ function M.kitBattle(plan, opts)
       end
       k, cool, aim = 1, 0, nil
       for i = 1, #plan do
-        local q = plan[i]; q.opened, q.seat, q.presses, q.lPresses, q.tookBack = nil, nil, nil, nil, nil
+        local q = plan[i]; q.opened, q.seat, q.presses, q.lPresses, q.tookBack, q.allyPresses = nil, nil, nil, nil, nil, nil
       end
       M.vars.kit = {}
       M.logRomIdentity("[kit]")
@@ -15965,9 +16311,20 @@ function Driver:watchHits()
     -- with the pips they were holding.  The killer is the action
     -- being attributed (or nobody: a poison tick, a bounced spell).
     local maxhp = M.readWord(0x3C1C + e * 2)
+    -- A Condemned member's Doom is nobody's action, even when a monster's
+    -- action is open on the frame it lands: a member whose Condemned count
+    -- ($3B05, M.doomCount) read its last step within the last 30 frames
+    -- and is at 0 now met the count's Doom (battle_doom on v0.30's ROM: the
+    -- Doom read as 'by slot 4 cmd $00 atk $EE ... from 241/241' because a
+    -- Battle was open as it landed)
+    self.condemnedAt = self.condemnedAt or {}
+    local dc = M.doomCount({ s2 = M.readByte(0x3EE5 + e * 2), count = M.readByte(BATTLE.COUNTER.Doom + e * 2) })
+    if dc ~= nil and dc <= 0 then self.condemnedAt[e] = M.frame end
     if last ~= nil and last ~= 0xFFFF and last > 0 and hp == 0 and maxhp > 0
        and not self.deathSaid[e] then
       self.deathSaid[e] = true
+      local savedAct = self.monAct
+      if self.condemnedAt[e] ~= nil and M.frame - self.condemnedAt[e] <= 30 then self.monAct = nil end
       local from = last
       if self.monAct ~= nil and self.monAct.hp0[e] ~= nil and self.monAct.hp0[e] ~= 0xFFFF then
         from = self.monAct.hp0[e]
@@ -16001,6 +16358,7 @@ function Driver:watchHits()
           from = from, maxhp = maxhp, bp = bp, party_bp = table.concat(pbp, ","),
           slot = rec.slot, cmd = rec.cmd, atk = rec.atk, one_action = oneAction })
       end
+      self.monAct = savedAct
     elseif hp > 0 and hp ~= 0xFFFF then
       self.deathSaid[e] = nil
     end

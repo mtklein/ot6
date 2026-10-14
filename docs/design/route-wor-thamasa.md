@@ -494,3 +494,127 @@ Shell stones; it grants Rflect and Safe (`espers.txt`), corrected there.
    at 3 BP learns every lore the monsters present could cast (kits.md
    "Strago"). On this arc it pays on the plains (Dischord, Rippler, Pearl
    Wind, Aero); no tower species casts a lore.
+
+## 11. Played (v0.30)
+
+The route plays the arc in three legs. Evidence is under
+`build/attempts/wt/v030-route/` (`lab/` holds the dev and variant runs,
+`grind/` the world tables, `rows/` and `study/`, `scanally/` the suites').
+
+### 11.1 The legs
+
+- `gen_wor_owzer` (`wor-narshe-v1` -> `wor-owzer-v1`): the cabin seats CYAN,
+  TERRA and CELES; the Falcon to Jidoor; the item counter; the auction, up
+  to 16 visits; Owzer's hall: the switch at the stair's foot, the two
+  paintings; the basement: the lamp, the turning door, the painting warp,
+  Still Life; the save point.
+- `gen_wor_relm` (`wor-owzer-v1` -> `wor-tower-v1`): Owzer and Chadarnook;
+  Starlet and RELM; Jidoor's item counter again; STRAGO at the tower's foot
+  (he waits aboard: the party is full); the cabin seats TERRA, CELES, RELM
+  and STRAGO; the grind; Thamasa's item and relic counters; the save beside
+  the Falcon at the tower (160,127).
+- `gen_wor_tower` (`wor-tower-v1` -> `wor-thamasa-v1`): the stones and Wall
+  Rings, the climb with each floor's side room, the Holy Dragon, the Gem
+  Box, MagiMaster, the walk down and the save beside the Falcon.
+
+### 11.2 What the walk learned
+
+- **Owzer's hall is dark until its switch.** The landing (114,11) answers
+  "Stay...away..." and turns the party back while `$0243` is clear
+  (`lab/owzer/a1`: `control lost at (114,11)`, then `planned 20 steps from
+  (118,14)` until no-progress); A facing up at (118,14) (`_cb4930`) lights
+  it.
+- **The turning door.** Of the three, (88,50) leads on (to (90,61)) while
+  `$01FC` is set; the walk waits below it and presses up then
+  (`lab/owzer/b2`: `$01FC-$01FE 100 ... through the turning door`).
+- **The old woman at (107,56)** stands on the only way west (row 56), so
+  her fight (event 151) is part of the walk.
+- **The Moogle Suit and the Relic Ring** are not reached from the save
+  point's pocket; the route leaves them.
+- **The auction's World of Ruin chain** (`_cb55b0`) is the Hero Ring, then
+  an item, then Golem, then ZoneSeek, each behind a coin flip: Golem one
+  visit in eight, ZoneSeek one in sixteen before Golem is owned. The run
+  (and its K=3 variant) met ZoneSeek on visit 12 and no Golem in 16
+  (`lab/owzer/cap1`, `lab/var/owzer_k3`).
+- **The plan's grind spot is unreachable on foot**: no landing reaches world
+  rows 160-162 south of the gate (`lab/relm/s1`: `no path (34,158)->
+  (31,161)`). Row 135 north-west of Jidoor, x 16-22, is group 48 throughout
+  and takes a landing (17,135) (`grind/grindspot.txt`, `grind/wg_lap.txt`).
+- **Thamasa's (22,39) and (23,39)** start STRAGO and RELM's scene at their
+  house (`_cb75bf`); the walks keep off them.
+- **Landings** that take the airship: the tower (160,127), Thamasa (250,229)
+  (`grind/land_tower.txt`).
+
+### 11.3 Chadarnook, the grind and STRAGO's kit
+
+- **Chadarnook** fell in every run, slowly: 38,786 ticks with three deaths
+  (`lab/relm/cap1`, one by Doom Kiss from full HP), 32,031 ticks and three
+  deaths with three encounters used up first (`lab/var/relm_k3`). The
+  goddess is drawn on most of the clock; the driver aims at the demon
+  (`focus`) and waits her out. Short of "what makes a fight good": it is
+  attrition, decided by Fenix Downs rather than by a choice.
+- **The grind** north-west of Jidoor: to L43 for the lowest of the four in
+  26 fights (`lab/relm/r1`), to L46 in about 55 (`lab/relm/r3`). Potions and
+  Remedies ran out by the 33rd fight (`lab/var/relm_k3`: `potion=2 ...
+  remedy=0`); with 15 Tents from Jidoor the care pitches one when the heals
+  would cost more, and the run arrives whole (`lab/relm/cap2`: about 15
+  Tents, "potion=98" at the save).
+- **STRAGO's kit (#388).** Study (Scan at 3 BP) fired on the plain when a
+  Reach Frog could teach Rippler (`lab/relm/r1`: `study: Scan at 3 BP on
+  slot 2 ($03B), lores $080000 he lacks`); Dischord was learned by being
+  cast on (Crawlers); Aqua Rake is the plain's nuke (55 casts in 26 fights).
+  Pearl Wind is not on this route (the Sprinter casts it on group 49 only
+  beside the Mantodea), so the driver's Pearl Wind line went unexercised,
+  and so did Dischord on the Mantodea (group 48 holds none).
+
+### 11.4 The Fanatics' Tower
+
+Every fight inside is spells (no Fight row), so the driver gained a
+magic-only line (`Driver:magicOnlyLine`) and the climb its own kit:
+
+- **Every seat casts.** RELM on ZoneSeek and STRAGO on Sraphim had no
+  attack and passed every turn while three L.30 Magic killed the party
+  (`lab/tower/c1`: `plan=switch`, `battle $0AD LOST`). TERRA Maduin, CELES
+  Tritoch, RELM Shiva (Ice, Osmose, Shell); STRAGO Palidor (Float).
+- **Wall Rings** (Thamasa's relic counter) through the third floor: the
+  monsters' tier spells rebound, and a reflectable spell cast on a member in
+  Reflect rebounds onto the L.20 and L.70 Magic past their Reflect; a
+  reflecting body otherwise refuses every reflectable cast at the confirm
+  (`lab/tower/c3`: a Break re-planned for 90,000 frames).
+- **Float** kept on the four from the menu (the L.60 Magic's Quake took
+  3,400 of 3,600 from each, twice: `lab/tower/c8`).
+- **MP**: Tinctures to 99 at Thamasa (the climb from the second floor spent
+  32 and reached the top dry: `lab/tower/c10`); the after-battle care keeps
+  the casters above 60% and, inside, casts cures when Potions (250 HP) cannot
+  keep up.
+- **The Holy Dragon** fell every time it was met: 17,518 to 45,491 ticks,
+  broken twice a fight by TERRA's Break (`lab/tower/c10`, `c11`, `c15`,
+  `cap2` x3: `$024 broken (0 of 6 shields)`).
+- **The fourth floor's L.90 Magic** is where the climb ends at L46 (TERRA
+  and CELES L49): with the rings off above the third floor (cures again) and
+  Shell going up, the L.90 and L.80 Magic won all three attempts of a full
+  run, the L.90's Merton taking about 2,300 from each member
+  (`lab/tower/cap2`: `attempt 3/3 FAILED class=wipe`, `formation 0164
+  0163`). MagiMaster has not been reached.
+- **More levels did not change it.** Ground to L50 (TERRA L52, CELES L53;
+  95 fights, `lab/relm/cap3`), the four lost the fourth floor's first fight,
+  the L.90 and L.60 Magic, without denting the L.90 (`lab/tower/c18`:
+  `monhp=s0:9000/sh0` until the wipe): the party spent its turns on the
+  L.60 and on Shell and heals while the L.90's Meteor, Merton and Flare
+  fell. So leg B grinds to L46 and the tower leg stays off the graph; its
+  generator is kept at `build/attempts/wt/v030-route/wip/gen_wor_tower.lua`.
+
+### 11.5 Open
+
+- **The tower's fourth floor and top** (groups 155, 156: the L.90 Magic
+  with an L.80 or L.60). What the driver lacks there, read from the runs: a
+  kill order that puts the L.90 first through the rebound (the direct line
+  prefers the L.60's weakness), and a party heal that is not a turn per
+  member. Then MagiMaster (Shell, Life 3 at his end: `opts.shellVs`,
+  `opts.reraiseVs`, built and not yet met).
+- **Golem** came up in none of the 16 visits of any run (ZoneSeek on the
+  12th each time: the auction's draw does not follow the encounter history).
+- **The basement can wipe the Owzer party.** With six encounters used up at
+  the save point before Chadarnook, SoulDancer x2 and Crusher x2 won
+  (`lab/var/relm_k6`: `battle $11C LOST`); the base run and K=3 did not meet
+  it.

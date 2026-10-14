@@ -204,6 +204,11 @@ done:   rtl
 ; per-species element adds: .word species id, .byte element mask
 ; (fire $01 .. water $80), .byte pad; $ffff terminates.
 Ot6ElemAddTbl:
+        .word   $0130
+        .byte   $40, $00        ; l.20 magic: + earth (reflect: quake reaches
+                                ;   it; route-wor-thamasa 4.2)
+        .word   $0143
+        .byte   $40, $00        ; l.70 magic: + earth (the same)
         .word   $0134
         .byte   $01, $00        ; whelk head: + fire
         .word   $0103
