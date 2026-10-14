@@ -17,11 +17,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "e666328d327dba9e6d27c38d0af136acef4b16d646fd82c7d30484d61cd8822a",
-    "generator_sig": "32c67d9abe424571581c3f6f54ac2e89bf0ecfbced0e4a51146c38ea72fbce99 gen_sabin_trench",
+    "generator_sig": "e19b773eb8b43bd484c3714a2034b9d7f5e4d6476f2a86e02b44d31aa00af923 gen_sabin_trench",
     "ancestors": [
       {
         "path": "build/states/gau_joined.stamp",
-        "sha256": "89d4a7d3f3ae7575531bbcb9837ecb098ce41fefc388ffe51b9d6442390de4d3"
+        "sha256": "6670eeb1dfe4857374c0e08074f2e319d8cb71d908b499dd08d156192b0a1ffb"
       }
     ]
   }

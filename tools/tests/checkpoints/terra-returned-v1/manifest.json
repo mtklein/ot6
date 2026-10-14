@@ -16,11 +16,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "3ffed540bf31d36fd06da1ffe35caecc0a31b0c0ea822cea3414c0cdc8abd034",
-    "generator_sig": "be6f3f5e7e0749e2b7959281eedab2df079224a13f1a844003a459957c0139b2 gen_terra_returned_checkpoint",
+    "generator_sig": "895285dfc70b49bbfb739c61863e3df3c02d47b84805f0f01efb1bdf6e115af3 gen_terra_returned_checkpoint",
     "ancestors": [
       {
         "path": "build/states/n128_won.stamp",
-        "sha256": "8f7fdb3f571a035a593bc71c66e9cd2edadfda247b53a7be8b485d1c4c7a22c3"
+        "sha256": "3f39276711e804ded733a263d31a65462755b70fa35ce5ce0049c09770e7ea35"
       }
     ]
   }
