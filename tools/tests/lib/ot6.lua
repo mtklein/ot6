@@ -8156,7 +8156,7 @@ function Driver:magicOnlyLine(actor, boost)
       -- Ultima (build/attempts/wt/v031-tower/lab/mm4_*)
       local st4 = M.readByte(0x3EF9 + e * 2)
       if due and M.readWord(0x3BF4 + e * 2) > 0 and (st4 & 0x04) == 0
-         and M.frame - (self.reraiseAt[e] or -100000) > 900 then
+         and M.frame - (self.reraiseAt[e] or -100000) > 400 then
         local b = castBoost(actor, 0x30, select(2, spellCell(actor, 0x30, true)), 2, 0)
         if b ~= nil and b >= 2 then
           self.reraiseAt[e] = M.frame
@@ -8194,15 +8194,27 @@ function Driver:magicOnlyLine(actor, boost)
           if (st4 & 0x04) == 0 or (self.opts.shellVs and (st3 & 0x20) == 0 and (st3 & 0x80) == 0) then bare = bare or e end
         end
       end
-      if bare ~= nil and spellCell(actor, M.STUDY_SPELL, true) ~= nil then
+      if bare ~= nil then
         local key = string.format("hold:%d:%d", actor, bare)
         if not self.statusSaid[key] then
           self.statusSaid[key] = true
-          M.log(string.format("[%s] actor=%d holds the attack: entity %d lacks Life 3 or Shell before the boss's end; "
-            .. "Scan instead", self.tag or "fight", actor, bare))
+          M.log(string.format("[%s] actor=%d holds the attack: entity %d lacks Life 3 or Shell before the boss's end",
+            self.tag or "fight", actor, bare))
         end
-        return { kind = "magic", spell = M.STUDY_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0,
-                 aim = boss, vetoOk = true, reason = "reraise_hold" }
+        if spellCell(actor, M.STUDY_SPELL, true) ~= nil then
+          return { kind = "magic", spell = M.STUDY_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0,
+                   aim = boss, vetoOk = true, reason = "reraise_hold" }
+        end
+        -- no Scan: a Potion on the most hurt living member is the turn
+        local row, low, lowHp = cmdRow(actor, BATTLE.CMD_ITEM), nil, nil
+        for e = 0, 3 do
+          local hp = M.readWord(0x3BF4 + e * 2)
+          if hp > 0 and (lowHp == nil or hp < lowHp) then low, lowHp = e, hp end
+        end
+        local idx = row and self:battInvIdx(0xE9)
+        if idx ~= nil and low ~= nil then
+          return { kind = "item", item = 0xE9, target = low, row = row, idx = idx, reason = "reraise_hold" }
+        end
       end
     end
   end
