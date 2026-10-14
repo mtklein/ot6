@@ -743,6 +743,16 @@ H.run({ maxFrames = 1500000 }, {
   -- 368 NPC_1 (5,9), touch-to-fight (_cc558b): event battle 139, then the
   -- Pearl Lance (route-wor-thamasa.md 5.4)
   H.cond(function() return sw(0x0694) == 1 end, {
+    -- the room's objects come back a few frames after the field menu
+    -- closes: read at once, every object but the party's stood at (0,0)
+    -- (build/attempts/wt/v031-tower/lab/p3t_p3r_k2_wor_relm_s9: 'the
+    -- objects: $10(8,11) $11(0,0) ...')
+    H.waitUntil(function()
+      for o = 0x11, 0x2F do
+        if math.abs(H.objX(o) - 5) + math.abs(H.objY(o) - 9) <= 4 then return true end
+      end
+      return false
+    end, 600, "the Holy Dragon's object stands near (5,9)", 1),
     touchNpc(function() return npcAt(5, 9, "the Holy Dragon (368 NPC_1)") end, function()
       return (H.battleLoadStarted() and H.formationHas({ [WHITE_DRGN] = true })) or sw(0x0694) == 0
     end, "the Holy Dragon (368 NPC_1)"),
