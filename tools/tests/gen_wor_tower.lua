@@ -816,6 +816,7 @@ H.run({ maxFrames = 1500000 }, {
 
   -- ---- 5. MagiMaster ---------------------------------------------------------------
   -- @@stage magimaster
+  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM } }, "stones for MagiMaster"),
   H.call(function() H.assertEq(sw(0x02DA), 1, "the Gem Box's tile armed MagiMaster ($02DA, _cc5440)") end),
   stepOn(8, 8, function() return H.battleLoadStarted() or sw(0x02DB) == 1 end),
   H.advanceStory(function()
