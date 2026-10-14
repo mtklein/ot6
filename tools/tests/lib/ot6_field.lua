@@ -6891,10 +6891,11 @@ town({ 157 }, {                                      -- Mobliz's arsenal
   { what = "weapon", door = { 8, 29 }, map = 161, land = { 10, 47 }, keeper = { 11, 37 } },
   { what = "armor", door = { 12, 29 }, map = 161, land = { 23, 47 }, keeper = { 22, 37 } },
 })
-town({ 169 }, {                                      -- Nikeah: the street stalls
-  { what = "weapon", keeper = { 17, 42 } },
-  { what = "armor", keeper = { 26, 47 } },
-})
+-- Nikeah (169) is left out: its weapon and armor keepers stand behind the
+-- street's crates, and from the one reachable tile below the weapon keeper,
+-- (17,44), A opened nothing in 3000 frames (sabin_done, three attempts:
+-- "timeout after 3000 frames driving toward gear Nikeah: weapon counter:
+-- shop opens").  A talk tile for them is a follow-up.
 town({ 188, 189 }, {                                 -- Kohlingen's general store
   { what = "weapon", door = { 11, 11 }, map = 194, land = { 12, 39 }, keeper = { 9, 35 } },
   { what = "armor", door = { 11, 11 }, map = 194, land = { 12, 39 }, keeper = { 15, 35 } },

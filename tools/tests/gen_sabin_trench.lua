@@ -486,7 +486,6 @@ H.run({ maxFrames = 200000, allowGameOver = true }, {
     H.log(string.format("[shop] leaving the shop: gil=%d tonics=%d potions=%d fenix=%d",
       H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
   end),
-  H.gearStop({ tag = "gear Nikeah" }),     -- #434: buy power with gil
   H.navTo(13, 62, { maxFrames = 8000, playBattles = "tactical" }),
   (function() local ph = 0
     return H.driveUntil(function() return mapIdx() == 187 end, 900, {
