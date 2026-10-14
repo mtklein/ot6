@@ -3896,8 +3896,14 @@ end
 -- that every slot that steps in the formation (M.activeSlots, $3AA8 -- a part or a
 -- tag-team sibling the script materialises later, #177: battle 70's
 -- Shiva is not in $3F45 at all) is checked the first time it is seen.
+-- A battle has a formation: the battle-HP table read live in the field with
+-- the formation word ($11E0) at $0000 is not one.  After a retry restored
+-- its boot snapshot, wor_tzen_door's walk read two such field frames as
+-- battles and the runner's count ran ahead of the [outcome] lines ("got 1,
+-- want 2"; the guard counted 'formation 0000' at f1254 and f4121:
+-- build/attempts/wt/v030-route/lab/tzen/t2).
 function M.absorbGuardTick()
-  if not M.battleLoadStarted() then
+  if not M.battleLoadStarted() or M.readWord(0x11E0) == 0 then
     guardArmed, guardSettle, guardSeen, guardRandom = true, 0, {}, false
     return nil
   end
