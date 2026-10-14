@@ -15,9 +15,13 @@
 -- one declared write clears that bit of $1D29 (state_write_waivers.txt): no
 -- fixture seats STRAGO beside a lore caster whose lore he lacks.  Then, each
 -- in a battle that fields a Chimera, through the real menu (H.kitBattle):
---   1. STRAGO's Scan at 2 BP: Ot6StudyOne writes nothing; the battle is
+--   1. STRAGO's Scan picked at 3 BP and aimed at a party member: it reads
+--      nothing at any boost, so the boost buys nothing and is dropped
+--      (Ot6QueueFold): plain Scan's price, not 99 MP; no study; the turn
+--      ends unboosted (pending 0 at Ot6ActionEnd, the bank regens a pip);
+--   2. STRAGO's Scan at 2 BP: Ot6StudyOne writes nothing; the battle is
 --      fought out;
---   2. STRAGO's Scan at 3 BP: Ot6StudyOne's writes to $3A84 add exactly the
+--   3. STRAGO's Scan at 3 BP: Ot6StudyOne's writes to $3A84 add exactly the
 --      present species' lores he lacks (Aqua Rake), the cast costs 99 MP,
 --      and after the victory $1D29 holds Aqua Rake again.
 -- Everyone else Fights while STRAGO banks his points and Defends from the
@@ -26,7 +30,8 @@
 -- lost the fight-out (build/attempts/wt/v030-route/study/).  A battle
 -- without a Chimera, where STRAGO cannot cast, or whose Chimera falls
 -- before the cast is fought out and the next taken.
--- Old-ROM red and mutants: build/attempts/wt/v030-plan-kits/study/.
+-- Old-ROM red and mutants: build/attempts/wt/v030-plan-kits/study/; stage
+-- 1's: build/attempts/wt/v030-route/scanally/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -80,14 +85,20 @@ local function arm()
     if rec == nil or rec.ended or seat == nil then return end
     if (emu.getState()["cpu.x"] & 0xff) == seat * 2 then
       rec.ended, rec.mp1, rec.pend1 = H.frame, H.readWord(0x3C08 + seat * 2), pending()
+      rec.bank0, rec.pendEnd = H.readByte(0x3E9C + seat * 2), H.readByte(0x3E9D + seat * 2)
     end
   end, emu.callbackType.exec, ae, ae)
+  emu.addEventCallback(function()
+    if rec ~= nil and rec.ended ~= nil and rec.bank1 == nil and H.frame > rec.ended then
+      rec.bank1 = H.readByte(0x3E9C + seat * 2)
+    end
+  end, emu.eventType.endFrame)
 end
 local function closed() return rec ~= nil and rec.ended ~= nil and H.frame > rec.ended + 30 end
 
 local function decide()
   battles = battles + 1
-  H.assertEq(battles <= 16, true, "the two counted casts within 16 battles")
+  H.assertEq(battles <= 16, true, "the three counted casts within 16 battles")
   seat, plan, mode, rec = nil, {}, "cast", nil
   for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == STRAGO then seat = s end end
   H.assertEq(seat ~= nil, true, "STRAGO is seated")
@@ -103,12 +114,12 @@ local function decide()
     and (H.readByte(0x3EE5 + e) & 0xB8) == 0 and H.readWord(0x3C08 + e) >= STUDY_MP
   H.log(string.format("[study] battle %d, stage %d: %s; STRAGO seat %d MP %d; lores $%06X", battles, stage,
     table.concat(ids, " "), seat, H.readWord(0x3C08 + e), lores()))
-  if not chim or not can then
+  if (stage > 1 and not chim) or not can then
     mode = "fightout"
     H.log("[study] no Chimera here, or STRAGO cannot cast: fought out, the next battle taken")
     return
   end
-  plan = { { who = STRAGO, cmd = CMD_MAGIC, spell = SCAN, boost = stage == 1 and 2 or 3 } }
+  plan = { { who = STRAGO, cmd = CMD_MAGIC, spell = SCAN, boost = stage == 2 and 2 or 3, ally = stage == 1 } }
 end
 
 local home, away
@@ -170,7 +181,7 @@ H.run({ maxFrames = 900000 }, {
     home, away = { 250, 126 }, { 251, 127 }
     H.assertEq(H.worldBfs(home[1], home[2]) ~= nil, true, "the lap's tiles are reachable")
   end),
-  H.driveUntil(function() return stage > 2 end, 850000, {
+  H.driveUntil(function() return stage > 3 end, 850000, {
     -- field care between battles, as a player heals (guidelines.md): the
     -- first run walked TERRA in at 60 HP, poisoned, and lost the fight-out
     H.cond(function() return not H.battleLoadStarted() end,
@@ -188,7 +199,7 @@ H.run({ maxFrames = 900000 }, {
         end
         H.log(string.format("[study] cast at %d BP (f%d): MP %d -> %d; want $%06X; Ot6StudyOne wrote $%06X; "
           .. "$3A84 $%06X -> $%06X", rec.pend, rec.f, rec.mp0, rec.mp1, rec.want, rec.studied, rec.pend0, rec.pend1))
-        if stage == 2 and rec.want == 0 then
+        if stage == 3 and rec.want == 0 then
           -- the Chimera fell to the others' Fights before the cast: nothing
           -- on the field had a lore to teach, so this cast is not counted
           H.log("[study] no present species could teach a lore at the cast: not counted")
@@ -196,6 +207,15 @@ H.run({ maxFrames = 900000 }, {
           return
         end
         if stage == 1 then
+          local k = H.vars.kit[#H.vars.kit]
+          H.assertEq(k ~= nil and k.boost, 3, "the Scan was confirmed at 3 BP pending, on a party member")
+          H.assertEq(rec.studied, 0, "Scan on a party member studied nothing")
+          H.assertEq(rec.mp0 - rec.mp1, H.battleSpellPrice(seat, SCAN, 0),
+            "Scan on a party member at 3 BP pays plain Scan's price (its boost buys nothing)")
+          H.assertEq(rec.pendEnd, 0, "its boost is dropped before Ot6ActionEnd (pending 0)")
+          H.assertEq(rec.bank1, math.min(rec.bank0 + 1, 5),
+            string.format("the turn ends unboosted and regens a pip (bank %d -> %s)", rec.bank0, tostring(rec.bank1)))
+        elseif stage == 2 then
           H.assertEq(rec.pend, 2, "the cast ran at the 2 BP planned")
           H.assertEq(rec.studied, 0, "at 2 BP the study wrote nothing (the full boost is its one gate)")
           H.assertEq(rec.mp0 - rec.mp1, H.battleSpellPrice(seat, SCAN, 2), "at 2 BP Scan pays its boosted price")
@@ -214,9 +234,9 @@ H.run({ maxFrames = 900000 }, {
         if mode ~= "cast" or rec == nil or not rec.ended then return end
         local k = lores()
         H.log(string.format("[study] after the battle: lores $%06X", k))
-        if stage == 1 then
+        if stage < 3 then
           if k & 0x08 ~= 0 then
-            H.log("[study] the Chimera taught Aqua Rake the vanilla way: cleared again for stage 2")
+            H.log("[study] the Chimera taught Aqua Rake the vanilla way: cleared again for the study")
             H.writeByte(0x1D29, H.readByte(0x1D29) & 0xF7)
           end
         else
@@ -225,9 +245,9 @@ H.run({ maxFrames = 900000 }, {
         stage = stage + 1
       end),
     }),
-  }, "the two counted casts"),
+  }, "the three counted casts"),
   H.call(function()
-    H.log("[study] PASS: at 2 BP Scan studies nothing; at 3 BP it learns exactly the present species' lores, "
-      .. "99 MP, taught at the victory")
+    H.log("[study] PASS: at 3 BP on a party member Scan is plain Scan, boost kept; at 2 BP it studies nothing; "
+      .. "at 3 BP it learns exactly the present species' lores, 99 MP, taught at the victory")
   end),
 })

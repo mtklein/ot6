@@ -13211,6 +13211,9 @@ end
 --     slot = s         aim at monster slot s (else any live monster)
 --     self = true      the target select is the party side (Morph, Runic):
 --                      confirm where the cursor stands
+--     ally = true      aim at the party side (a spell that opens on the
+--                      monsters): cross over and confirm the member the
+--                      cursor lands on
 --     refused = "list" | "command"
 --                      the A press must be refused there: it buzzes and the
 --                      window stays up; after three refused presses the
@@ -13511,6 +13514,21 @@ function M.kitBattle(plan, opts)
         pulse("a")
         return
       end
+      if p.ally then
+        -- cross to the party side and confirm on the member the cursor lands on
+        if M.readByte(0x7B7D) ~= 0 and M.readByte(0x7B7E) == 0 then
+          if cool == 0 then done(p, a) end
+          pulse("a")
+          return
+        end
+        if cool == 0 then
+          p.allyPresses = (p.allyPresses or 0) + 1
+          M.assertEq(p.allyPresses <= 8, true, "the target select crosses to the party side")
+        end
+        local L = M.battleLayout()
+        pulse(L.toChars[1 + ((p.allyPresses or 1) - 1) % #L.toChars])
+        return
+      end
       local want = p.slot ~= nil and (1 << p.slot) or nil
       if want and (M.readByte(0x3A75) & want) == 0 then
         -- the body asked for has fallen since the plan was made: any live one
@@ -13536,7 +13554,7 @@ function M.kitBattle(plan, opts)
       end
       k, cool, aim = 1, 0, nil
       for i = 1, #plan do
-        local q = plan[i]; q.opened, q.seat, q.presses, q.lPresses, q.tookBack = nil, nil, nil, nil, nil
+        local q = plan[i]; q.opened, q.seat, q.presses, q.lPresses, q.tookBack, q.allyPresses = nil, nil, nil, nil, nil, nil
       end
       M.vars.kit = {}
       M.logRomIdentity("[kit]")

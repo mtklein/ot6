@@ -958,7 +958,13 @@ done:   pla
 @cmdok: txa                     ; width-neutral character test
         cmp     #$08
         bcs     @keep           ; monsters never boost
-        jsl     Ot6FoldSteps    ; pending boost -> OT6_SCR_BIT tier steps
+        lda     $3a7b
+        cmp     #OT6_ANALYZE_SPELL
+        bne     @fold
+        lda     $b9             ; Scan aimed at no monster: see @scan
+        bne     @fold
+        jmp     @scan
+@fold:  jsl     Ot6FoldSteps    ; pending boost -> OT6_SCR_BIT tier steps
         beq     @keep           ; unboosted: nothing to fold and nothing to
                                 ;   escalate
         lda     $3a7b
@@ -1010,6 +1016,27 @@ done:   pla
 @keep:  pla
         plp
         rtl
+@scan:  ; Scan aimed at no monster reads nothing (Ot6Analyze), at any boost,
+        ; so its boost buys nothing (guidelines "boost pays once"): the
+        ; pending boost is dropped, as Ot6RevertTake drops Revert's, so the
+        ; turn ends unboosted, regen pip included; and the cast is priced as
+        ; plain Scan, not the boosted price (or the study's 99) the list's
+        ; cost byte held at the confirm.  Refunding is simpler than refusing
+        ; the party side at target select.
+        lda     OT6_BOOST_REVEALED,x
+        beq     @keep           ; unboosted: plain Scan already
+        lda     #$00
+        sta     OT6_BOOST_REVEALED,x
+        lda     $3204,x
+        ora     #$80            ; vanilla's "recheck enabled magic" request
+        sta     $3204,x
+        lda     $02,s           ; a mimic's copy keeps GetMPCost's 0 (#260)
+        and     #$40
+        bne     @keep
+        lda     #OT6_ANALYZE_SPELL
+        jsl     Ot6SpellMP      ; 3 MP, relics included
+        sta     $3620,y
+        bra     @keep
 .endproc
 
 ; ------------------------------------------------------------------------------
