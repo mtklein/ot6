@@ -3,7 +3,7 @@
 -- stones for the climb, the climb (magic-only: battle switch $38, the
 -- randoms fought for no XP), each floor's side room (the Safety Bit and the
 -- switch to the Air Anchor's room, the Genji Shld, the Stunner and the Holy
--- Dragon, the Force Armor), the top: the Gem Box onto the main caster, and
+-- Dragon, the Force Armor), the top: the Gem Box (kept in the bag), and
 -- MagiMaster (event battle 145, a game over when lost: the runner retries
 -- from the battery), down and out to the Falcon, and the save beside it: the
 -- `wor-thamasa-v1` battery.
@@ -734,23 +734,16 @@ H.run({ maxFrames = 1500000 }, {
   -- of the first floor's second fight while the L.30 and L.40 Magic killed
   -- the party (build/attempts/wt/v030-route/lab/tower/c1: 'actor=2 char=8 plan=switch', 'battle
   -- $0AD LOST').  TERRA Maduin (fire, ice, bolt over her own Fire, Drain,
-  -- Break, Pearl, Life), CELES Tritoch (ice, bolt, poison), RELM Shiva (ice,
-  -- Osmose for MP, Shell for MagiMaster's Ultima; Ifrit is CYAN's, aboard,
-  -- and the party menu cannot free a stone a waiting member wears), STRAGO
-  -- Palidor (Float, which the care keeps on the four from the menu: the
-  -- L.60 Magic's Quake took 3,400 of 3,600 from each of them, twice, and
+  -- Break, Pearl, Life, and Ultima: her Fire at three points), CELES
+  -- Tritoch (ice, bolt, poison), RELM Ifrit (Fire, and Drain, which no
+  -- element or Reflect turns: gen_wor_relm took it off CYAN at Jidoor),
+  -- STRAGO Palidor (Float, which the care keeps on the four from the menu:
+  -- the L.60 Magic's Quake took 3,400 of 3,600 from each of them, twice, and
   -- wiped them on the second floor; build/attempts/wt/v030-route/lab/tower/
   -- c8 'by slot 2 cmd $02 atk $15').  The Wall Rings carry the attack
-  -- through the reflecting L.20 and L.70 Magic: a spell cast on a member in
-  -- Reflect rebounds onto the monsters (Driver:magicOnlyLine)
-  H.equipEsper(function() return posOf(TERRA) end, MADUIN, { tag = "MADUIN -> TERRA" }),
-  H.cond(function() return H.readByte(c(CELES, 0x1E)) ~= TRITOCH end, {
-    H.equipEsper(function() return posOf(CELES) end, TRITOCH, { tag = "TRITOCH -> CELES" }),
-  }, {}),
-  H.cond(function() return H.readByte(c(RELM, 0x1E)) ~= IFRIT end, {
-    H.equipEsper(function() return posOf(RELM) end, SHIVA, { tag = "SHIVA -> RELM" }),
-  }, {}),
-  H.equipEsper(function() return posOf(STRAGO) end, PALIDOR, { tag = "PALIDOR -> STRAGO" }),
+  -- through the reflecting L.20, L.70 and L.90 Magic: a spell cast on a
+  -- member in Reflect rebounds onto the monsters (Driver:magicOnlyLine)
+  stonesFor({ { TERRA, MADUIN }, { CELES, TRITOCH }, { RELM, IFRIT }, { STRAGO, PALIDOR } }, "stones for the climb"),
   H.call(function() say("wor", "stones: " .. kitLine()) end),
   wallRingsOn(),
   H.fieldCare({ tag = "Float on the four" }),
