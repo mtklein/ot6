@@ -27,7 +27,8 @@ come back unchanged.
 
 To run a gate in the background, `sh tools/gate.sh -k 0 [target...]`
 passes its arguments to ninja, exits with ninja's status and ends with
-the FAILED edges (the log in `build/gate.log`). A wrapper like
+the FAILED edges (the log in `build/gate.log`, which opens with the commit
+and closes with `rc=`, #424). A wrapper like
 `(ninja ...; echo $?)` exits with echo's 0, and a red gate has been read
 green that way.
 

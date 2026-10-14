@@ -522,7 +522,10 @@ nowhere else. The World of Ruin adds Phoenix's Life (magicite.md, #327).
   characters' casts get OT6's behaviour, monsters keep vanilla's.  It works
   on bosses: shields are the boss's own break system.  `Ot6BreakOurs`,
   `Ot6BreakProps` (the vanilla record, edited as it loads for OT6's cast)
-  and `Ot6BreakSpell`; `battle_breakspell`, `battle_breakmonster`.
+  and `Ot6BreakSpell`; `battle_breakspell` (0 and 1 BP), `battle_breakfour`
+  (four at 3 BP, on a five-shield body), `battle_breakblade` (the Break
+  Blade's one, with 3 BP pending), `battle_breakmonster` (a monster's, and a
+  Break in Rage's or Sketch's context, staged).
 
 ### Locke — Thief (piercing: dagger)
 
@@ -717,7 +720,8 @@ ice/order/tempo. The pairing is clearer here than in vanilla.
   BP" -- that the canon would have an exception at its top tier and the
   divine would be out of reach without BP -- is the owner's rule now
   (divines take the full boost), and as the 3-BP Runic it costs no menu row
-  and keeps duration the reactive verb's purchase.*  `battle_runicblade`.
+  and keeps duration the reactive verb's purchase.*  `battle_runicblade`
+  (an ally's Bolt), `battle_runicmonster` (a monster's spell).
 
 ### Setzer — Gambler/Merchant (special ¤: cards, dice; darts = piercing)
 

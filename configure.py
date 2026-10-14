@@ -525,8 +525,18 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
     "battle_breakmonster": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
+    # TERRA's Ultima from the save the play makes as she rejoins (#424), and
+    # the Break Blade she wears there
     "battle_ultimafold": "OT6_TIMEOUT=1800 "
-        "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-terra-v1",
+    "battle_breakblade": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-terra-v1",
+    # #424: a 3-BP Break on Esper Mountain's four- and five-shield bodies,
+    # and RunicBlade sending a Wizard's spell back on the Narshe cliffs
+    "battle_breakfour": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/esper-mtn-save-v1",
+    "battle_runicmonster": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-narshe-cliffs-v1",
     # #427: one Morph a battle, four battles at least (11-16k frames on the
     # branch's runs, build/attempts/wt/v029-kits/r6)
     "battle_trance": "OT6_TIMEOUT=3600 "
