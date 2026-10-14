@@ -92,7 +92,7 @@ H.run({ maxFrames = 600 }, {
       for _, m in ipairs(seated) do
         for s = 0, 1 do
           local id = worn(m, s)
-          if not (m == ch and s == slot) and id ~= 0xFF and isWeapon(id) then k = k | H.weaponClass(id) end
+          if not (m == ch and s == slot) and id ~= 0xFF and isWeapon(id) then k = k | H.gearWeaponKeys(id) end
         end
       end
       return k
@@ -103,7 +103,7 @@ H.run({ maxFrames = 600 }, {
         for s = 0, 1 do
           local id = worn(ch, s)
           if holder == nil and id ~= 0xFF and isWeapon(id) then
-            local own = H.weaponClass(id) & ~others(ch, s)
+            local own = H.gearWeaponKeys(id) & ~others(ch, s)
             if own ~= 0 then holder, hslot, key = ch, s, own end
           end
         end
@@ -114,7 +114,7 @@ H.run({ maxFrames = 600 }, {
     local drop, keep = {}, {}
     for id = 0, 0xFE do
       if isWeapon(id) and wears(holder, id) and id ~= held then
-        local cls, gain = H.weaponClass(id), H.gearValue(holder, id) - H.gearValue(holder, held)
+        local cls, gain = H.gearWeaponKeys(id), H.gearValue(holder, id) - H.gearValue(holder, held)
         local new = cls & ~others(holder, hslot) & ~key
         if (cls & key) == 0 and new == 0 and gain > 0 and gain < H.GEAR_KEY then drop[#drop + 1] = id end
         if (cls & key) == key and gain > 0 then keep[#keep + 1] = id end
@@ -129,7 +129,7 @@ H.run({ maxFrames = 600 }, {
     H.assertEq(#keep > 0, true, "the ROM holds a stronger weapon that keeps the class")
     plan = H.gearPlan(stockOf(keep), { tag = "gearplan keep", reserve = UNBOUNDED })
     local k = planned(plan, holder, hslot)
-    H.assertEq(k ~= nil and (H.weaponClass(k.item) & key) == key, true,
+    H.assertEq(k ~= nil and (H.gearWeaponKeys(k.item) & key) == key, true,
       "the sole holder is planned a stronger weapon that keeps the class")
     H.log("[gearplan] ok")
   end),

@@ -6473,9 +6473,12 @@ end
 -- the stat bonuses (+16/+17), elemental halves/absorbs/nulls and
 -- weaknesses (+15, +22..+24), status protection (+6/+7) and granted
 -- statuses (+8); and OT6's break keys: a weapon's class (Ot6WeapClassTbl)
--- is a key, so a weapon that brings a class nobody else in the party holds
--- is worth GEAR_KEY more, and one that drops a class only it held is worth
--- that much less (keep the pierce or the blunt holder).  A weapon a
+-- and its element are keys, so a weapon that brings a key nobody else in
+-- the party holds is worth GEAR_KEY more for each, and one that drops a key
+-- only it held is worth that much less (keep the pierce or the blunt
+-- holder, and the bolt blade: the first cut counted the class alone and
+-- traded solo CELES's ThunderBlade for a Morning Star, and wor_tzen_door
+-- wiped twice, "class=worn down", against a run that never lost).  A weapon a
 -- member's command needs keeps its property: Runic needs a runic blade,
 -- SwdTech a swdtech one (ItemProp +19 bits 7 and 1).
 --
@@ -6560,7 +6563,6 @@ function M.gearValue(c, id)
   v = v + 10 * bits(gearByte(id, 8))
   if t == 1 then
     v = v + gearByte(id, 20)
-    if gearByte(id, 15) ~= 0 then v = v + 4 end          -- an element is a chip key too
   else
     v = v + gearByte(id, 20) + gearByte(id, 21)
     local ev = gearByte(id, 26)
@@ -6571,7 +6573,15 @@ function M.gearValue(c, id)
   return v
 end
 
--- the break classes the other hands hold: every weapon in a seated (or
+-- a weapon's break keys: its class (Ot6WeapClassTbl, bits 0-3) and its
+-- element (ItemProp +15, bits 8-15) -- a weapon chips both
+-- (docs/design/weapon-classes.md "Weapons as chip carriers")
+local function weaponKeys(id)
+  return M.weaponClass(id) | (gearByte(id, 15) << 8)
+end
+M.gearWeaponKeys = weaponKeys
+
+-- the break keys the other hands hold: every weapon in a seated (or
 -- planned) member's hands but (c, slot)'s, read through `wornOf`
 local function keysElsewhere(members, wornOf, c, slot)
   local k = 0
@@ -6579,7 +6589,7 @@ local function keysElsewhere(members, wornOf, c, slot)
     for s = 0, 1 do
       if not (m == c and s == slot) then
         local id = wornOf(m, s)
-        if id ~= 0xFF and gearType(id) == 1 then k = k | M.weaponClass(id) end
+        if id ~= 0xFF and gearType(id) == 1 then k = k | weaponKeys(id) end
       end
     end
   end
@@ -6610,7 +6620,7 @@ end
 local function slotScore(c, slot, id, others)
   if id == 0xFF then return 0 end
   local v = M.gearValue(c, id)
-  if gearType(id) == 1 then v = v + GEAR_KEY * bits(M.weaponClass(id) & ~others) end
+  if gearType(id) == 1 then v = v + GEAR_KEY * bits(weaponKeys(id) & ~others) end
   return v
 end
 
