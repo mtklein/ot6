@@ -20,7 +20,7 @@ local MAP_FOOT, MAP_F1, MAP_F2, MAP_F3, MAP_F4, MAP_TOP = 362, 363, 359, 360, 36
 local MAP_SAFETY, MAP_GEMBOX, MAP_GENJI, MAP_DRAGON, MAP_FORCE, MAP_ANCHOR = 365, 366, 367, 368, 369, 370
 local TOWER_DOOR, TOWER_LANDING = { 160, 126 }, { 160, 127 }
 -- magicite: give_genju's receipt order (Ramuh 0)
-local SHIVA, MADUIN, PALIDOR, TRITOCH, ZONESEEK, SRAPHIM = 2, 6, 9, 10, 18, 21
+local SHIVA, MADUIN, PALIDOR, TRITOCH, ZONESEEK, PHANTOM, SRAPHIM = 2, 6, 9, 10, 18, 20, 21
 -- the bosses (route_data pool event 139, 145)
 local WHITE_DRGN, MAGIMASTER = 0x024, 0x166
 local DRAGON_FORMATION, MAGIMASTER_FORMATION = 481, 354
@@ -591,6 +591,18 @@ local function examineUp(x, y, begun, what, avoid)
   })
 end
 local PARTY = { { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" }, { STRAGO, "STRAGO" } }
+-- the stones by member, in order: each is equipped only where it is not
+-- worn already (H.equipEsper frees a stone from its seated owner first)
+local function stonesFor(set, tag)
+  local steps = {}
+  for _, e in ipairs(set) do
+    steps[#steps + 1] = H.cond(function() return H.readByte(c(e[1], 0x1E)) ~= e[2] end, {
+      H.equipEsper(function() return posOf(e[1]) end, e[2], { tag = string.format("%s: stone %d -> char %d", tag, e[2], e[1]) }),
+    }, {})
+  end
+  steps[#steps + 1] = H.call(function() say("wor", tag .. ": " .. kitLine()) end)
+  return H.seqStep(steps)
+end
 -- the Wall Rings on and off: each member's second relic (slot 5) gives way
 -- to a Wall Ring and comes back before a boss
 local heldRelic = {}
@@ -757,6 +769,7 @@ H.run({ maxFrames = 1500000 }, {
   -- ---- 4. the fourth floor: the Force Armor; the top: the Gem Box --------------------
   -- @@stage f4
   H.call(function() FIGHT.cure = nil end),   -- (as set on arriving: a stage boots here too)
+  stonesFor({ { TERRA, PALIDOR }, { RELM, PHANTOM }, { STRAGO, MADUIN }, { CELES, TRITOCH } }, "stones for the fourth floor"),
   sideRoom(MAP_F4, MAP_FORCE, 0x0B7, FORCE_ARMOR, "Force Armor (369 (7,6))"),
   door(8, 1, MAP_TOP, "the fourth floor -> the top (364)"),
   spend("at the top"),
