@@ -36,19 +36,16 @@ local BOSS_SPECIES = { [WHITE_DRGN] = true, [MAGIMASTER] = true }
 -- Shell goes up while an L.90 Magic stands (its Bolt 3, Merton, Meteor and
 -- Flare), and on all four against MagiMaster (route-wor-thamasa.md 5.3)
 local FIGHT = { cure = false, shellVs = { [0x164] = true }, magicFirst = { [0x164] = true } }
--- MagiMaster: Shell on all four and Life 3 from 40% of his HP (his
--- Ultima as he dies; the revive it queues lands: build/attempts/wt/
--- v031-tower/lab/mm11_*, two of three won), and no attack while a member
--- is down, unshelled or hurt below 15%.  Elements stay in: fought with
--- Drain, Break and Ultima alone (no element for his wall to null or
--- absorb), two of four won in 180,000 ticks and two ran out of time
--- (lab/mm12_*), against two of three in 116,000 with the elements (mm11).
--- Drain heals him: his HP rose 38,578 -> 41,594 on RELM's Drain ('took 0
--- off ... atk $04', lab/t6_p3r_k5_wor_relm_s0), and two full climbs ran
--- out of time in his fight.  So the casts on him are the tier spells (read
--- against the wall at the confirm), Pearl, Break and TERRA's Ultima
-local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.4 }, reraiseHold = { [0x166] = 0.15 },
-  magicOnly = { 0x00, 0x01, 0x02, 0x03, 0x0C, 0x0E } }
+-- MagiMaster: Shell on all four, Life 3 from 40% of his HP, and below 15%
+-- no attack while a living member lacks Life 3 (his Ultima as he dies
+-- ignores Shell; the revive Life 3 queues lands: build/attempts/wt/
+-- v031-tower/lab/mm11_*).  The casts on him are the magic-only line's
+-- (tier spells read against his wall at the confirm, Break, Drain) and
+-- TERRA's Ultima.  Fought with Drain, Break and Ultima alone (no element
+-- for his wall to null or absorb), two of four won in 180,000 ticks and two
+-- ran out of time (lab/mm12_*), against two of three in 116,000 with the
+-- elements (mm11)
+local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.4 }, reraiseHold = { [0x166] = 0.15 } }
 local WALL_RING = 0xBB
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

@@ -8169,15 +8169,16 @@ function Driver:magicOnlyLine(actor, boost)
     end
   end
   -- opts.reraiseHold = { [species] = fraction }: once one of these stands at
-  -- or under that fraction, no member attacks while a member is down, lacks
-  -- Shell (under opts.shellVs) or stands under 90% HP: MagiMaster's Ultima
-  -- as he dies must leave one member standing.  Life 3 does not answer it:
-  -- two members with it set ('life3=1') died to that Ultima and the run
-  -- was lost, the battle ending before the revive's queued action
-  -- (ReraiseEffect, battle_main.asm @0799; build/attempts/wt/v031-tower/
-  -- lab/mm8_*, '[end] ... e0 3059 shell=1 life3=1').  A member who cannot
-  -- cast the missing Shell raises the fallen (a Fenix Down) or tops up
-  -- the most hurt (a Potion), else reads the field with Scan, no hit
+  -- or under that fraction, no member attacks while a living member lacks
+  -- Life 3: MagiMaster's Ultima as he dies ignores Shell and defense
+  -- (AttackFlag $20 skips CalcDmgMod's defense and Shell, battle_main.asm
+  -- @0cc4) and took every seat to 0, and the members with Life 3 rose
+  -- (build/attempts/wt/v031-tower/lab/mm11_*: '[end] ... e0 448', won).  The
+  -- casters above put it on; the rest read the field with Scan, which is no
+  -- hit, or top up the most hurt with a Potion.  A fallen member is not
+  -- waited for, and the hold gives way after 3,600 frames (the first cut
+  -- waited on the fallen and on HP, and four fights ran out of time:
+  -- lab/mm13_*, 'holds the attack ... down 2')
   local rh = self.opts.reraiseHold
   if rh then
     local hold, boss = false, nil
@@ -8190,28 +8191,24 @@ function Driver:magicOnlyLine(actor, boost)
       end
     end
     if hold then
-      local dead, bare, low, lowFrac = nil, nil, nil, 1
+      self.holdSince = self.holdSince or M.frame
+      local bare = nil
       for e = 0, 3 do
-        local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
-        if mx > 0 and hp == 0 then dead = dead or e end
-        if hp > 0 then
-          local st3 = M.readByte(0x3EF8 + e * 2)
-          if self.opts.shellVs and (st3 & 0x20) == 0 and (st3 & 0x80) == 0 then bare = bare or e end
-          if hp < mx * 0.9 and hp / mx < lowFrac then low, lowFrac = e, hp / mx end
-        end
+        if M.readWord(0x3BF4 + e * 2) > 0 and (M.readByte(0x3EF9 + e * 2) & 0x04) == 0 then bare = bare or e end
       end
-      if dead ~= nil or bare ~= nil or low ~= nil then
-        local key = string.format("hold:%d:%s:%s:%s", actor, tostring(dead), tostring(bare), tostring(low))
+      if bare ~= nil and M.frame - self.holdSince < 3600 then
+        local key = string.format("hold:%d:%d", actor, bare)
         if not self.statusSaid[key] then
           self.statusSaid[key] = true
-          M.log(string.format("[%s] actor=%d holds the attack before the boss's end: down %s, without Shell %s, "
-            .. "hurt %s", self.tag or "fight", actor, tostring(dead), tostring(bare), tostring(low)))
+          M.log(string.format("[%s] actor=%d holds the attack before the boss's end: entity %d lacks Life 3",
+            self.tag or "fight", actor, bare))
+        end
+        local low, lowFrac = nil, 0.9
+        for e = 0, 3 do
+          local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+          if hp > 0 and mx > 0 and hp / mx < lowFrac then low, lowFrac = e, hp / mx end
         end
         local row = cmdRow(actor, BATTLE.CMD_ITEM)
-        local fenix = row and dead ~= nil and self:battInvIdx(0xF0)
-        if fenix then
-          return { kind = "item", item = 0xF0, target = dead, row = row, idx = fenix, reason = "reraise_hold" }
-        end
         local potion = row and low ~= nil and self:battInvIdx(0xE9)
         if potion then
           return { kind = "item", item = 0xE9, target = low, row = row, idx = potion, reason = "reraise_hold" }
@@ -8221,6 +8218,8 @@ function Driver:magicOnlyLine(actor, boost)
                    aim = boss, vetoOk = true, reason = "reraise_hold" }
         end
       end
+    else
+      self.holdSince = nil
     end
   end
   local press = self:pressTarget()
