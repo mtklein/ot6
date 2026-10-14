@@ -6,7 +6,9 @@
 
 Each PATH is a log (a state's .log, a sweep's <state>.seedNN.log, .gz
 too) or a directory searched for them; LABEL names the policy that played
-it (real, naive, nocare, ...; default real).  Every battle in the logs --
+it (real, naive, nocare, ...; default real).  LABEL@14B,1B6 says the
+policy was limited to those formations (OT6_POLICY_FORMS): the run's other
+fights are counted as real.  Every battle in the logs --
 from its `[key] battle key` line to its `[outcome]` or `[wipe]` -- becomes
 one fight, read off lines the harness already writes:
 
@@ -252,9 +254,16 @@ def main():
     fights = []
     order = []
     for spec in a.inputs:
-        label, _, path = spec.rpartition("=") if "=" in spec else ("real", "", spec)
+        label, _, path = spec.partition("=") if "=" in spec else ("real", "", spec)
+        label, _, scope = label.partition("@")
+        forms = {int(x, 16) for x in scope.split(",") if x}
         for p in files_of(path):
-            parse(p, label or "real", fights)
+            got = []
+            parse(p, label or "real", got)
+            for f in got:
+                if forms and f.form not in forms:
+                    f.policy = "real"
+            fights.extend(got)
     keep_forms = {int(x, 16) for x in a.form}
     if a.events:
         rnd = random_forms()
