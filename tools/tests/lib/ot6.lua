@@ -8267,8 +8267,32 @@ function Driver:magicOnlyLine(actor, boost)
       end
     end
   end
+  -- TERRA's Fire at three points folds into Ultima (M.foldSteps): no
+  -- element, no Reflect, every monster.  Against a body of 5,000 HP or more
+  -- (the tower's L.90 Magic, MagiMaster) with three points banked it is the
+  -- strongest cast she has; the confirm's guards read it as Ultima
+  if spellCell(actor, 0x00, true) ~= nil and M.foldSteps(actor, 3) == 3 then
+    local big = false
+    for s = 0, 5 do
+      if monAlive(s) and M.readWord(0x3BF4 + 8 + s * 2) >= 5000 then big = true end
+    end
+    local _, cost = spellCell(actor, 0x00, true)
+    local b = big and castBoost(actor, 0x00, cost, 3, 0) or nil
+    if b == 3 then
+      local aim
+      for s = 0, 5 do if aim == nil and monAlive(s) then aim = s end end
+      M.log(string.format("[%s] actor=%d magic-only: Fire at 3 BP (Ultima) on the monsters", self.tag or "fight", actor))
+      return { kind = "magic", spell = 0x00, executionSpell = M.ULTIMA, row = cmdRow(actor, BATTLE.CMD_MAGIC),
+               boostLeft = 3, aim = aim, reason = "magic_only_ultima" }
+    end
+  end
   if bounce ~= nil and (best == nil or bestScore < 100 or (bounce.all and bounce.mirrors >= 3)) then
     local b = castBoost(actor, bounce.sp.id, bounce.sp.cost, boost or 0, self:nukeFloor(actor)) or 0
+    -- a rebound must stay reflectable: TERRA's Fire at three points is
+    -- Ultima, which no mirror turns, and spread over the party it fell on
+    -- the party (build/attempts/wt/v031-tower/lab/f4c_p3t_p3r_k0_wor_relm_s0_wor_tower_f4_s0:
+    -- TERRA killed 'by entity 0 char 0 ... atk $14 (its own action)')
+    if b >= 3 and M.foldSteps(actor, b) == 3 then b = 2 end
     local key = string.format("bounce:%d:%d", actor, bounce.sp.id)
     if not self.statusSaid[key] then
       self.statusSaid[key] = true
