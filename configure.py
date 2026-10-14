@@ -59,6 +59,7 @@ every file AND directory this script read, so adding a test or a source
 file re-configures).
 """
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -212,18 +213,27 @@ for j in glob("src/text/*_en.json", "ff6") + ["ff6/src/text/mte_tbl_jp.json"]:
            desc=f"encode_text {j}")
     generated += outs
 # the dlg pair: split, encode both, recombine -- one edge, both dats out.
-# The json INPUTS arrive through copy_if_changed edges because split/combine
-# rewrite them in place (strings migrate across the two-file boundary and
-# back, byte-identically): the copy re-runs on the mtime bump, finds the
-# bytes unchanged, and restat prunes this edge instead of cycling it.
+# split/combine rewrite the json INPUTS in place (strings migrate across the
+# two-file boundary and back, byte-identically).  The edge saves each json
+# with its mtime first and, when combine gives the same bytes back, restores
+# that mtime, so the build leaves its own inputs as it found them and a
+# clean `ninja -n` afterwards has nothing to do (#426).  The inputs still
+# arrive through copy_if_changed edges, so a combine that did change bytes
+# costs one more pass rather than a cycle.
+DLG_SAVE = "../build/ninja/dlg-in"
 w.edge(["ff6/src/text/dlg1_en.dat", "ff6/src/text/dlg2_en.dat",
         "ff6/include/text/dlg1_en.inc", "ff6/include/text/dlg2_en.inc"],
        "sh", [copy_if_changed_from(j) for j in sorted(dlg)],
        implicit=codec + ["ff6/tools/fix_dlg.py"],
-       cmd="cd ff6 && python3 tools/fix_dlg.py split en"
+       cmd=f"cd ff6 && mkdir -p {DLG_SAVE}"
+           f" && cp -p src/text/dlg1_en.json src/text/dlg2_en.json {DLG_SAVE}/"
+           " && python3 tools/fix_dlg.py split en"
            " && python3 tools/encode_text.py src/text/dlg1_en.json"
            " && python3 tools/encode_text.py src/text/dlg2_en.json"
            " && python3 tools/fix_dlg.py combine en"
+           " && for j in dlg1_en.json dlg2_en.json; do"
+           f" if cmp -s {DLG_SAVE}/$$j src/text/$$j;"
+           f" then touch -r {DLG_SAVE}/$$j src/text/$$j; fi; done"
            # split AND combine rewrite the dlg json INPUTS in place (strings
            # migrate across the two-file boundary and back), so without this
            # the inputs are always newer than the outputs and the edge re-runs
@@ -1047,6 +1057,36 @@ w()
 # ------------------------------------------------------------------ write --
 text = "\n".join(w.lines)
 out = ROOT / "build.ninja"
+
+
+def settle_dirs(text):
+    """Make the first build settle in one pass (#426).  The depfile lists
+    globbed directories, so adding a source file re-configures, but the
+    build itself creates entries in some of them: an .lz beside its source,
+    and a __pycache__ wherever a build step imports a module (Linux's
+    Python writes it in-tree).  Each creation bumps the directory, and the
+    next `ninja` re-configured for nothing.  Create those entries now,
+    before the depfile's reference time: a missing output of this graph in
+    a recorded directory as an empty file dated 1970 (still older than its
+    inputs, so the edge runs and rewrites it in place), and an empty
+    __pycache__ in a recorded directory that holds Python."""
+    outs = set()
+    for line in text.splitlines():
+        if line.startswith("build "):
+            head = line[len("build "):].replace("$ ", "\0").split(":", 1)[0]
+            outs.update(o.replace("\0", " ") for o in head.split() if o != "|")
+    dirs = {d for d in read_deps if (ROOT / d).is_dir()}
+    for o in sorted(outs):
+        p = ROOT / o
+        if str(Path(o).parent) in dirs and not p.exists():
+            p.touch()
+            os.utime(p, (0, 0))
+    for d in sorted(dirs):
+        if any((ROOT / d).glob("*.py")):
+            (ROOT / d / "__pycache__").mkdir(exist_ok=True)
+
+
+settle_dirs(text)
 (ROOT / "build/ninja").mkdir(parents=True, exist_ok=True)
 dep_targets = " ".join(sorted(esc(d) for d in read_deps))
 (ROOT / "build/ninja/configure.d").write_text(f"build.ninja: {dep_targets}\n")
