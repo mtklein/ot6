@@ -674,6 +674,21 @@ local function spend(what)
     say("climb", what .. ": " .. table.concat(t, ", "))
   end)
 end
+-- down a floor of the outer stair, from (7,2) where the stair above lands
+-- to (7,29): route_data's step model walks it as 7,2 6,3 5,3 5,2 6,2 7,2
+-- 8,2 9,2 9,3 8,4 ... 8,28 7,29 (90 steps: the loop at the top takes the
+-- stair's other level).  Planned straight from (7,2), the live walk found
+-- no path at its z-level and, planned from another, stepped onto (8,1),
+-- the way back up (build/attempts/wt/v031-tower/lab/dn1_*: 'no path
+-- (8,13)->(7,29)' on the top).  So the loop's corners are waypoints, and
+-- the up stair and the side doors are kept off
+local STAIR_AVOID = { { 8, 1 }, { 10, 10 }, { 10, 13 } }
+local function downFloor(dst, what)
+  return H.seqStep({
+    via({ { 5, 3 }, { 5, 2 }, { 9, 2 }, { 9, 3 } }, what .. ": round the stair's head", STAIR_AVOID),
+    door(7, 29, dst, what, STAIR_AVOID),
+  })
+end
 -- a side room off a floor's (10,10): in, its chest, back to the floor
 local function sideRoom(floorMap, roomMap, bit, item, what, extra)
   local steps = {
@@ -847,10 +862,10 @@ H.run({ maxFrames = 1500000 }, {
   -- ---- 6. down and out, and the save -------------------------------------------------
   -- @@stage down
   door(7, 14, MAP_F4, "the top -> the fourth floor (361 (7,2))"),
-  door(7, 29, MAP_F3, "the fourth floor -> the third (360 (7,2))"),
-  door(7, 29, MAP_F2, "the third floor -> the second (359 (7,2))"),
-  door(7, 29, MAP_F1, "the second floor -> the first (363 (7,2))"),
-  door(7, 29, MAP_FOOT, "the first floor -> the tower's foot (362 (7,2))"),
+  downFloor(MAP_F3, "the fourth floor -> the third (360 (7,2))"),
+  downFloor(MAP_F2, "the third floor -> the second (359 (7,2))"),
+  downFloor(MAP_F1, "the second floor -> the first (363 (7,2))"),
+  downFloor(MAP_FOOT, "the first floor -> the tower's foot (362 (7,2))"),
   toFalconBy(8, 14, "down", "the tower's foot", { { TOWER_DOOR[1], TOWER_DOOR[2] } }),
   H.fieldCare({ threshold = 1.0, tag = "beside the Falcon" }),
   H.call(function()
