@@ -8150,8 +8150,12 @@ function Driver:magicOnlyLine(actor, boost)
     end
     self.reraiseAt = self.reraiseAt or {}
     for e = 0, 3 do
-      local st3 = M.readByte(0x3EF8 + e * 2)
-      if due and M.readWord(0x3BF4 + e * 2) > 0 and (st3 & 0x01) == 0
+      -- Life 3 is status 4's RERAISE ($3EF9 bit 2, const.inc STATUS4); the
+      -- first cut read status 3's DANCE bit, never saw it land, and cast
+      -- Life 3 on one member four times while the others fell to the
+      -- Ultima (build/attempts/wt/v031-tower/lab/mm4_*)
+      local st4 = M.readByte(0x3EF9 + e * 2)
+      if due and M.readWord(0x3BF4 + e * 2) > 0 and (st4 & 0x04) == 0
          and M.frame - (self.reraiseAt[e] or -100000) > 900 then
         local b = castBoost(actor, 0x30, select(2, spellCell(actor, 0x30, true)), 2, 0)
         if b ~= nil and b >= 2 then
