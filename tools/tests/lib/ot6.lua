@@ -8189,8 +8189,9 @@ function Driver:magicOnlyLine(actor, boost)
   -- monster absorbs or nulls (the rebound picks its monster).
   local bounce = nil
   do
-    local mirror, anyReflect, mirrors = nil, false, 0
+    local mirror, anyReflect, mirrors, living = nil, false, 0, 0
     for e = 0, 3 do
+      if M.readWord(0x3BF4 + e * 2) > 0 then living = living + 1 end
       if M.readWord(0x3BF4 + e * 2) > 0 and (M.readByte(0x3EF8 + e * 2) & 0x80) ~= 0 then
         mirror = mirror or e
         mirrors = mirrors + 1
@@ -8214,7 +8215,11 @@ function Driver:magicOnlyLine(actor, boost)
           -- a spell that can be spread (MagicProp +0 bit 5) cast on every
           -- member in Reflect rebounds once off each: with three or more
           -- mirrors, the party-wide cast is the strongest line in the tower
-          local spread = mirrors >= 2 and (M.readRomByte(MP + sp.id * 14) & 0x20) ~= 0
+          -- (only while every living member reflects: a spread cast lands on
+          -- a member without Reflect, and TERRA's boosted Fire spread over
+          -- three mirrors and her own unringed self killed her:
+          -- build/attempts/wt/v031-tower/lab/f4b_p3t_p3r_k0_wor_relm_s0_wor_tower_f4_s0)
+          local spread = mirrors >= 2 and mirrors == living and (M.readRomByte(MP + sp.id * 14) & 0x20) ~= 0
           local score = sp.power * (weakAll and 2 or 1) * (spread and mirrors or 1)
           if ok and (bounce == nil or score > bounce.score) then
             bounce = { sp = sp, score = score, to = mirror, all = spread, mirrors = mirrors }

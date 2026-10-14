@@ -36,7 +36,7 @@ local BOSS_SPECIES = { [WHITE_DRGN] = true, [MAGIMASTER] = true }
 -- Shell goes up while an L.90 Magic stands (its Bolt 3, Merton, Meteor and
 -- Flare), and on all four against MagiMaster (route-wor-thamasa.md 5.3)
 local FIGHT = { cure = false, shellVs = { [0x164] = true }, magicFirst = { [0x164] = true } }
-local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.3 } }
+local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.4 } }
 local WALL_RING = 0xBB
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -802,9 +802,12 @@ H.run({ maxFrames = 1500000 }, {
   -- 'actor=0 char=0 plan=switch': build/attempts/wt/v030-route/lab/tower/
   -- cap2)
   wallRingsOff("MagiMaster"),
-  -- STRAGO onto Maduin (fire, ice and bolt: three of MagiMaster's eight
-  -- walls; Float is not needed against him), freed by TERRA's Shiva
-  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, MADUIN } }, "stones for MagiMaster"),
+  -- TERRA onto Shiva (Shell for his Ultima; her own Life, Drain, Break and
+  -- Pearl stay), STRAGO onto Sraphim (Cure and a second Life: one Life 3
+  -- caster lost him the fight he had already won, his Ultima falling on
+  -- STRAGO alone: build/attempts/wt/v031-tower/lab/
+  -- f4b_p3t_p3r_k0_wor_relm_s9_wor_tower_f4_s0)
+  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM } }, "stones for MagiMaster"),
   lazy(function() return H.equipKit(CELES, { { 3, FORCE_ARMOR } }, { tag = "CELES: the Force Armor" }) end),
   H.call(function() say("wor", "dressed for MagiMaster: " .. kitLine()) end),
   door(7, 13, MAP_TOP, "the Gem Box's room -> the top (364 (7,7))"),
