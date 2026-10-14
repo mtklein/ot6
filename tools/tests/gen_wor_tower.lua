@@ -138,7 +138,14 @@ local function door(x, y, dst, what, avoid)
   return lazy(function()
     local av = {}
     for _, d in ipairs(avoid or {}) do av[((d[2] & 0xFF) << 8) | (d[1] & 0xFF)] = true end
-    if H.bfsPath(x, y, nil, av) then return walkInto(x, y, dst, what, avoid) end
+    -- planned from each z-level, as navTo does: arriving down the stair at
+    -- the fourth floor's (7,2), the live z-level planned no path to (7,29),
+    -- 90 steps away by route_data's static model, and the walk tried the
+    -- wall below it (build/attempts/wt/v031-tower/lab/mm11_*_s0: 'no path
+    -- (7,2)->(7,30)')
+    for _, z in ipairs({ false, 1, 2, 0, 3 }) do
+      if H.bfsPath(x, y, nil, av, z or nil) then return walkInto(x, y, dst, what, avoid) end
+    end
     H.log(string.format("[route] %s: (%d,%d) is not walked onto from (%d,%d); entered from below", what, x, y,
       H.fieldX(), H.fieldY()))
     return enterUp(x, y, dst, what, avoid)
