@@ -83,7 +83,7 @@ H.run({ maxFrames = 600 }, {
     H.log(string.format("[gearplan] 2: char %d wears $%02X; %d stronger blades without the runic property",
       runic, cur, #strong))
     H.assertEq(#strong > 0, true, "the ROM holds a stronger non-runic blade the Runic member can wear")
-    plan = H.gearPlan(stockOf(strong), { tag = "gearplan runic", reserve = UNBOUNDED })
+    plan = H.gearPlan(stockOf(strong), { tag = "gearplan runic", reserve = UNBOUNDED, pairs = true })
     H.assertEq(planned(plan, runic, 0) == nil, true, "the Runic member is planned no blade without the runic property")
 
     -- 3. the break keys

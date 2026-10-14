@@ -6483,7 +6483,8 @@ end
 -- SwdTech a swdtech one (ItemProp +19 bits 7 and 1).
 --
 -- What it leaves alone: the relic slots (the Ribbon, relic kits and
--- dressRelics own them), Espers, and any slot opts.keep names.  A route's
+-- dressRelics own them), Espers, both hands of a member under a two-weapon
+-- relic (a kit's pair; kitHand below), and any slot opts.keep names.  A route's
 -- deliberate weapon (an element-safe swap, a Genji pair) is re-equipped by
 -- its own kit step after this, as before.
 --
@@ -6543,6 +6544,17 @@ local function leftHand(c)
   if (rb & 0x08) ~= 0 and gearWorn(c, 1) == 0xFF then return "none" end
   return "shield"
 end
+-- A member under a two-weapon relic wears a pair the route chose (a kit's
+-- Genji pair: SABIN's two Fire Knuckles, CELES's Blizzard and ThunderBlade),
+-- so the policy leaves both hands to the kit, as it leaves the relics
+-- (#434: qualification at ba554e0d traded one of SABIN's Fire Knuckles for a
+-- Poison Claw and CELES's ThunderBlade for a second Enhancer before
+-- Darill's Tomb, and battle_cointoss, battle_passside and battle_setzergrey
+-- went red on the wor-tomb-v1 that made, where main's fresh play passes).
+local function kitHand(c, slot)
+  return slot <= 1 and (relicBits(c, 12) & 0x10) ~= 0
+end
+
 local function hasCommand(c, cmd)
   for k = 0, 3 do if M.readByte(charRec(c) + 0x16 + k) == cmd then return true end end
   return false
@@ -6670,7 +6682,8 @@ end
 
 -- M.gearPlan(stock, opts): what to buy from `stock` (a list of item ids on
 -- the open counter, with prices) for the seated party and opts.joining,
--- within the purse less the reserve.  Returns a list of
+-- within the purse less the reserve (opts.pairs: plan the hands of a
+-- two-weapon relic's wearer too, for a test of the weapon rules).  Returns a list of
 -- { char, slot, item, gain, price } in buying order, and logs every pick.
 function M.gearPlan(stock, opts)
   opts = opts or {}
@@ -6702,7 +6715,8 @@ function M.gearPlan(stock, opts)
     local cands = {}
     for _, c in ipairs(members) do
       for slot = 0, 3 do
-        if not (keep[c] and keep[c][slot]) and not decided[c * 8 + slot] then
+        if not (keep[c] and keep[c][slot]) and (opts.pairs or not kitHand(c, slot))
+            and not decided[c * 8 + slot] then
           local others = keysElsewhere(members, wornOf, c, slot)
           local cur = gearWorn(c, slot)
           local curScore = (cur == 0xFF or fits(c, slot, cur)) and slotScore(c, slot, cur, others) or 0
@@ -6846,7 +6860,7 @@ function M.gearDress(opts)
     for _, c in ipairs(members) do
       -- shields and armor first, the weapons last (their keys read the others)
       for _, slot in ipairs({ 3, 2, 1, 0 }) do
-        if not (keep[c] and keep[c][slot]) then
+        if not (keep[c] and keep[c][slot]) and not kitHand(c, slot) then
           local others = keysElsewhere(members, wornOf, c, slot)
           local cur = gearWorn(c, slot)
           local curScore = (cur == 0xFF or fits(c, slot, cur)) and slotScore(c, slot, cur, others) or 0
