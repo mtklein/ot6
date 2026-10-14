@@ -506,6 +506,17 @@ local function fightWatch()
       if not H.battleLoadStarted() then was = nil; return end
       local sl, boss = bossSlot()
       if sl == nil then return end
+      -- the party's Shell and Life 3 as the boss nears its end (status 3
+      -- bit 5, status 4 bit 2), every 120 frames below a tenth of its HP
+      local bhp, bmax = H.readWord(0x3BFC + sl * 2), H.readWord(0x3C24 + sl * 2)
+      if bmax > 0 and bhp * 10 <= bmax and H.frame % 120 == 0 then
+        local t = {}
+        for e = 0, 3 do
+          t[#t + 1] = string.format("e%d %d shell=%d life3=%d", e, H.readWord(0x3BF4 + e * 2),
+            (H.readByte(0x3EF8 + e * 2) >> 5) & 1, (H.readByte(0x3EF9 + e * 2) >> 2) & 1)
+        end
+        H.log(string.format("[end] f%d $%03X HP %d: %s", H.frame, boss, bhp, table.concat(t, ", ")))
+      end
       local cur, max = H.readByte(0x3E40 + sl * 2), H.readByte(0x3E41 + sl * 2)
       local broken = max > 0 and cur == 0
       if was == nil then was = broken; return end
