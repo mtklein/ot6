@@ -192,10 +192,13 @@ emu.addMemoryCallback(function()
     local x, y = st["cpu.x"] & 0xFF, st["cpu.y"] & 0xFF
     if gateVia == "site" and shadowSlot and x == shadowSlot * 2 and y >= 8
       and H.readByte(0x3E88 + y) ~= 0 then
-      hookReads[#hookReads + 1] = { f = H.frame, y = y, seq = stamp(), pend = shadowPend() }
+      -- pend: the boost the gate reads (OT6_BOOST_REVEALED, $3e9d); ctr: $b1.0,
+      -- a counterattack, which the gate also refuses (Ot6AssassinateGate)
+      hookReads[#hookReads + 1] = { f = H.frame, y = y, seq = stamp(), pend = shadowPend(),
+        ctr = H.readByte(0xB1) & 1 }
       H.log(string.format("[hook] f%d seq%d the hook point puts Broken body %d to the gate "
-        .. "under SHADOW's attack ($3aa1=$%02x)", H.frame, seq, (y - 8) // 2,
-        H.readByte(0x3AA1 + y)))
+        .. "under SHADOW's attack ($3aa1=$%02x, %d BP, counter %d)", H.frame, seq, (y - 8) // 2,
+        H.readByte(0x3AA1 + y), shadowPend(), H.readByte(0xB1) & 1))
     end
   end)
 end, emu.callbackType.exec, GATE, GATE)
@@ -836,29 +839,41 @@ add({
           watching = false
         end),
       }, {}),
-      -- the hook point half, when the body outlived its doubled break: Shadow's
-      -- next landed hit on the Broken 'boss' draws no mark either
+      -- the hook point half, when the body outlived its doubled break: a hit
+      -- of Shadow's at 3 BP that reaches the hook point with the 'boss'
+      -- Broken draws no mark either.  The baseline is the break's own
+      -- sequence number, not the reads seen by the time this step runs: a
+      -- later swing of the breaking action reads it in the break's frame
+      -- (#437: main 63137df5's camp_escaped, break seq29 and hook reads
+      -- seq30/31 at f48039, all before this step began), and a later
+      -- action of his may run under 3 BP (the same log: "the hook point
+      -- read it Broken at f49330 seq32 (SHADOW pending 0)"), where the gate
+      -- is shut (as it is on a counter, $b1.0) and a missing mark proves
+      -- nothing, so only a 3-BP read off his own action counts.
       H.cond(function()
         return broke and alive(H.vars.bossBody) and H.battleLoadStarted()
       end, {
-        H.call(function() H.vars.hookReads0 = #hookReads end),
         drive(function()
           local m = H.vars.bossBody
-          for i = H.vars.hookReads0 + 1, #hookReads do
-            if hookReads[i].y == ent(m) then return true end
+          for _, r in ipairs(hookReads) do
+            if r.y == ent(m) and r.seq > brokeAt[m].seq and r.pend == 3 and r.ctr == 0 then return true end
           end
           return not alive(m) or brk(m) == 0 or not H.battleLoadStarted()
-        end, 30000, "Shadow's next attack on the Broken 'boss' reaches the hook point (isolation arm)"),
+        end, 30000, "a 3-BP hit of Shadow's reaches the hook point on the Broken 'boss' (isolation arm)"),
         H.waitFrames(8),
         H.call(function()
-          local m, read = H.vars.bossBody, nil
-          for i = H.vars.hookReads0 + 1, #hookReads do
-            if hookReads[i].y == ent(m) then read = hookReads[i] end
+          local m, read, under = H.vars.bossBody, nil, {}
+          for _, r in ipairs(hookReads) do
+            if r.y == ent(m) and r.seq > brokeAt[m].seq then
+              if r.pend == 3 and r.ctr == 0 then read = read or r
+              else under[#under + 1] = string.format("f%d seq%d at %d BP%s", r.f, r.seq, r.pend, r.ctr == 1 and " (a counter)" or "") end
+            end
           end
           H.log(string.format("[isolation arm] hook point half: %s divineKills=%d "
-            .. "hp=%d alive=%s broken=%02x", read and string.format(
+            .. "hp=%d alive=%s broken=%02x; reads under 3 BP or by a counter (the gate shut): %s", read and string.format(
             "the hook point read it Broken at f%d seq%d (SHADOW pending %d);", read.f, read.seq, read.pend) or
-            "NOT reached;", #divineKills, mhp(m), tostring(alive(m)), brk(m)))
+            "NOT reached;", #divineKills, mhp(m), tostring(alive(m)), brk(m),
+            #under > 0 and table.concat(under, ", ") or "none"))
           if read then
             H.assertEq(read.pend, 3, "the hook point read it on a 3-BP action (the gate open)")
             H.assertEq(#marksOn(m, read.seq), 0,
