@@ -13512,11 +13512,11 @@ function M.setzerBattle(plan, opts)
         M.log(string.format("[setzer] f%d the aim reached %s in %d press(es)", M.frame,
           M.tgtNodeName(M.readByte(0x7B7D), M.readByte(0x7B7E)), p.aim.presses))
       end
-      Z.confirmedK = k
-      k = k + 1
+      Z.confirmedK, p.confirmedAt = k, M.frame   -- confirmedAt: for a caller telling his row's
+      k = k + 1                                   --   execution from one queued before it
       pulse("a")
     elseif st == 0x08 then
-      if cool == 0 and M.readByte(0x7B92) == 0 then Z.confirmedK = k; k = k + 1 end
+      if cool == 0 and M.readByte(0x7B92) == 0 then Z.confirmedK, p.confirmedAt = k, M.frame; k = k + 1 end
       pulse("a")
     elseif st == 0x27 then
       pulse("a")
