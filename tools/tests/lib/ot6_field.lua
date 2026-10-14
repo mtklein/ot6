@@ -90,6 +90,10 @@ local function wipeCanary(tag, soft)
   return function()
     n = M.partyWiped() and n + 1 or 0
     if n < 300 then return false end
+    -- in battle with LoseBattle's bit ($3ebc bit 0) clear, a queued Life 3
+    -- revive can still land (the run's canary waits 1800 frames there:
+    -- lib/ot6.lua WIPE_FRAMES_UNLOST, MagiMaster's Ultima as he dies)
+    if n < 1800 and M.battleLoadStarted() and (M.readByte(0x3ebc) & 0x01) == 0 then return false end
     if not soft then
       error(string.format("%s: THE PARTY IS WIPED -- every member of the " ..
         "party has read 0 hp for 300 consecutive frames.  This is a lost " ..
