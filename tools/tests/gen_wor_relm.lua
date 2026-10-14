@@ -37,7 +37,7 @@ local GRIND_LANDING, GRIND_LAP = { 17, 135 }, { { 16, 135 }, { 22, 135 } }
 -- there and the grind stays at L46 (route-wor-thamasa.md 11.4)
 local GRIND_LEVEL, GRIND_BATTLES = 46, 90
 -- magicite: give_genju's receipt order (Ramuh 0)
-local STARLET, GOLEM, ZONESEEK = 25, 22, 18
+local IFRIT, STARLET, GOLEM, ZONESEEK = 1, 25, 22, 18
 -- Chadarnook (route_data pool event 86: formation 456; the goddess $11E,
 -- the demon $148)
 local GODDESS_SP, DEMON_SP, CHADARNOOK_FORMATION = 0x11E, 0x148, 456
@@ -699,6 +699,13 @@ H.run({ maxFrames = 1800000 }, {
     H.assertEq(partyOf(RELM), 1, "RELM joined the party, into the empty seat")
   end),
   dressFromBag(RELM, "RELM"),
+  -- Ifrit (Fire, Drain) onto RELM while CYAN, who wears it, is still seated:
+  -- he waits aboard from the cabin on, and a stone a waiting member wears
+  -- cannot be freed from the party menu.  Drain is the tower's answer to
+  -- the reflecting L.90 Magic and to MagiMaster's wall (no element, no
+  -- Reflect), and RELM's magic power is the party's best
+  -- (route-wor-thamasa.md 11.4)
+  H.equipEsper(function() return posOf(RELM) end, IFRIT, { tag = "IFRIT -> RELM" }),
   H.dressRelics({ { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" } },
     { tag = "relics with RELM" }),
   H.call(function() say("wor", "RELM dressed: " .. kitLine()) end),

@@ -20,7 +20,7 @@ local MAP_FOOT, MAP_F1, MAP_F2, MAP_F3, MAP_F4, MAP_TOP = 362, 363, 359, 360, 36
 local MAP_SAFETY, MAP_GEMBOX, MAP_GENJI, MAP_DRAGON, MAP_FORCE, MAP_ANCHOR = 365, 366, 367, 368, 369, 370
 local TOWER_DOOR, TOWER_LANDING = { 160, 126 }, { 160, 127 }
 -- magicite: give_genju's receipt order (Ramuh 0)
-local SHIVA, MADUIN, PALIDOR, TRITOCH, ZONESEEK, PHANTOM, SRAPHIM = 2, 6, 9, 10, 18, 20, 21
+local IFRIT, SHIVA, MADUIN, PALIDOR, TRITOCH, ZONESEEK, PHANTOM, SRAPHIM = 1, 2, 6, 9, 10, 18, 20, 21
 -- the bosses (route_data pool event 139, 145)
 local WHITE_DRGN, MAGIMASTER = 0x024, 0x166
 local DRAGON_FORMATION, MAGIMASTER_FORMATION = 481, 354
@@ -35,7 +35,7 @@ local BOSS_SPECIES = { [WHITE_DRGN] = true, [MAGIMASTER] = true }
 -- MagiMaster absorbs one element and nulls the rest), cures allowed
 -- Shell goes up while an L.90 Magic stands (its Bolt 3, Merton, Meteor and
 -- Flare), and on all four against MagiMaster (route-wor-thamasa.md 5.3)
-local FIGHT = { cure = false, shellVs = { [0x164] = true } }
+local FIGHT = { cure = false, shellVs = { [0x164] = true }, magicFirst = { [0x164] = true } }
 local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.3 } }
 local WALL_RING = 0xBB
 local function map() return H.mapId() & 0x1ff end
@@ -700,7 +700,9 @@ H.run({ maxFrames = 1500000 }, {
   H.cond(function() return H.readByte(c(CELES, 0x1E)) ~= TRITOCH end, {
     H.equipEsper(function() return posOf(CELES) end, TRITOCH, { tag = "TRITOCH -> CELES" }),
   }, {}),
-  H.equipEsper(function() return posOf(RELM) end, SHIVA, { tag = "SHIVA -> RELM" }),
+  H.cond(function() return H.readByte(c(RELM, 0x1E)) ~= IFRIT end, {
+    H.equipEsper(function() return posOf(RELM) end, SHIVA, { tag = "SHIVA -> RELM" }),
+  }, {}),
   H.equipEsper(function() return posOf(STRAGO) end, PALIDOR, { tag = "PALIDOR -> STRAGO" }),
   H.call(function() say("wor", "stones: " .. kitLine()) end),
   wallRingsOn(),
@@ -769,7 +771,7 @@ H.run({ maxFrames = 1500000 }, {
   -- ---- 4. the fourth floor: the Force Armor; the top: the Gem Box --------------------
   -- @@stage f4
   H.call(function() FIGHT.cure = nil end),   -- (as set on arriving: a stage boots here too)
-  stonesFor({ { TERRA, PALIDOR }, { RELM, PHANTOM }, { STRAGO, MADUIN }, { CELES, TRITOCH } }, "stones for the fourth floor"),
+  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT } }, "stones for the fourth floor"),
   sideRoom(MAP_F4, MAP_FORCE, 0x0B7, FORCE_ARMOR, "Force Armor (369 (7,6))"),
   door(8, 1, MAP_TOP, "the fourth floor -> the top (364)"),
   spend("at the top"),

@@ -8241,6 +8241,13 @@ function Driver:magicOnlyLine(actor, boost)
           score = score + 1000 * hitChips(slot, 0, elem)
         end
         if score >= 0 and slot == press then score = score + 1 end
+        -- opts.magicFirst = { [species] = true }: a body to kill before the
+        -- rest, whatever their weaknesses offer (the tower's L.90 Magic, whose
+        -- Merton, Meteor and Flare wipe the party while the casts go to the
+        -- L.60's fire weakness beside it: build/attempts/wt/v031-tower/lab/
+        -- t2_*, 'formation 0164 0139')
+        local mf = self.opts.magicFirst
+        if score >= 0 and mf and mf[M.readWord(0x57C0 + slot * 2)] then score = score + 10000 end
         if score >= 0 then said[#said + 1] = string.format("s%d $%02X -> %d", slot, id, score) end
         if score >= 0 and (bestScore == nil or score > bestScore) then best, bestScore, bestSlot = sp, score, slot end
       end
