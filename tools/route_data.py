@@ -19,7 +19,9 @@ Subcommands (maps are decimal; worlds are 0 = WoB, 1 = WoR):
   field-path M X0 Y0 X1 Y1 [--avoid X,Y ...]
                         BFS over a field map's BG1 (tile properties,
                         z-levels, diagonals, same-map entrances as edges;
-                        NPCs and map-init mod_bg_tiles are not modelled)
+                        NPCs and map-init mod_bg_tiles are not modelled;
+                        coordinates wrap at the map's masks, so an
+                        unreachable target ends the search: exit 1)
   pool field M | pool world W X Y | pool group G | pool event G
                         a pool's slots, odds, formations, species
   species ID...         level, HP, stats, elements, XP/GP, OT6 break row,
@@ -518,7 +520,13 @@ class FieldMap:
         """shortest step count (x,y) -> (tx,ty), taking same-map entrances
         as free hops and never stepping on a tile in `avoid` (trigger
         tiles to route around); returns (steps, path of (x,y)) or
-        (None, [])."""
+        (None, []).  Coordinates wrap at the map's size masks, as the
+        game's do (ot6_field.lua maptile), so the search covers at most
+        (xm+1)*(ym+1)*3 states and an unreachable target ends it (#429)."""
+        for name, (x, y) in (("start", (sx, sy)), ("target", (tx, ty))):
+            if not (0 <= x <= self.xm and 0 <= y <= self.ym):
+                raise SystemExit(f"route_data: field-path {name} ({x},{y}) is off map "
+                                 f"{self.m} (x 0..{self.xm}, y 0..{self.ym})")
         sz = self.p1[self.tile(sx, sy)] & 0x03 or 0x01
         start = (sx, sy, sz)
         prev = {start: None}
@@ -536,11 +544,12 @@ class FieldMap:
             for mv in DELTA:
                 if not self.allowed(x, y, mv, z):
                     continue
-                nx, ny = x + DELTA[mv][0], y + DELTA[mv][1]
+                nx, ny = (x + DELTA[mv][0]) & self.xm, (y + DELTA[mv][1]) & self.ym
                 if (nx, ny) in avoid:
                     continue
                 if (nx, ny) in self.links and (nx, ny) != (tx, ty):
                     nx, ny = self.links[(nx, ny)]
+                    nx, ny = nx & self.xm, ny & self.ym
                 k = (nx, ny, zn)
                 if k not in prev:
                     prev[k] = (x, y, z)
@@ -743,6 +752,8 @@ def cmd_field_path(d, args):
           + (f"{steps} steps" if steps is not None else "NO PATH (NPCs not modelled)"))
     if route:
         print("  path: " + " ".join(f"{x},{y}" for x, y in route))
+    else:
+        sys.exit(1)
 
 
 def cmd_pool(d, args):

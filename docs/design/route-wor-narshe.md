@@ -393,10 +393,11 @@ them. His showcase is the regroup and the Narshe plain beside the Falcon
 - **Lock objects are NPCs.** `route_data.py field-path` does not model NPCs
   and finds paths through the locked doors (`paths.txt`: 35 steps to the
   weapon shop's (32,31)).
-- **The planner's search.** `route_data.py field-path` does not bound
-  coordinates, so a target it cannot reach never returns (it ran past 5
-  minutes and 10 GB before it was stopped, `field_path_unbounded.txt`);
-  `paths.py` and `components.py` here bound them.
+- **The planner's search.** `route_data.py field-path` once left
+  coordinates unbounded, so a target it could not reach never returned (it
+  ran past 5 minutes and 10 GB before it was stopped,
+  `field_path_unbounded.txt`); it now wraps them at the map's masks and
+  exits 1 on no path (#429).
 - **Scripted scenes:** the thaw before Tritoch (:84770-84784), the carving
   and Umaro's entrance (:110627-110704), the exit's slide (:84922). Each
   ends in a battle or player control.
