@@ -28,7 +28,7 @@ build's debug file (ff6/rom/ff6-en.dbg) records.
      (base)"), overridden by the make_genju_prop rows of
      docs/design/magicite-tube-six.md §11 for the tube room's six.  A planned
      entry that names no spell is reported and skipped only when it is in
-     INEXPRESSIBLE ("Protect-alike", "(Water lore-alike)"); any other
+     INEXPRESSIBLE ("Protect-alike"); any other
      unknown name fails, so a typo cannot pass as inexpressible.  An Esper with no planned list
      is only held to property 1.
 
@@ -94,7 +94,7 @@ GENJU_NONE = 0xFF
 NOT_SPELLS = {"Runic"}
 # planned Esper entries that name no FF6 spell, reported rather than checked;
 # any other unknown name in a plan is a typo and fails
-INEXPRESSIBLE = {"Protect-alike", "(Water lore-alike)"}
+INEXPRESSIBLE = {"Protect-alike"}
 
 _VAL = re.compile(r"\bval=0x([0-9A-Fa-f]+)")
 _NAME = re.compile(r'\bname="([^"]*)"')

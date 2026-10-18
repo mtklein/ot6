@@ -39,7 +39,16 @@ local EDGAR, CMD_TOOLS, DEBIL, FLASH = 0x04, 0x09, 0xA7, 0xA5
 local seat, rec, target, sib, species = nil, nil, nil, nil, nil
 local plan = {}
 local proxy = setmetatable({}, { __index = function(_, k) return plan[k] end, __len = function() return #plan end })
-local battles, BATTLES, done, addedBit = 0, 8, false, 0
+-- BATTLES from the pool (route_data.py pool field 394, group 112; the
+-- pace's battles are all drawn there): a same-species pair is formation
+-- 178 (Misfit x2) in slot 0's four, 181/182/183 (Wirey Drgn x3, Apokryphos
+-- x3, Brainpan x2) in slot 1's, 183/184/186 in slot 2's and 186/187 in slot
+-- 3's, so (80*1/4 + 80*3/4 + 80*3/4 + 16*2/4)/256 = 148/256 = 0.578 of
+-- battles field one.  A battle without one is missed with 0.422; at
+-- BATTLES = 11 all of them miss with 0.422^11 = 7.6e-5, under 1e-4.  (The
+-- v0.27 runs needed 1-2.)  A pair battle that ends before the Debilitator
+-- resolves also costs one; none was seen.
+local battles, BATTLES, done, addedBit = 0, 11, false, 0
 local function live(m) return (H.readByte(0x3AA8 + m * 2) & 1) == 1 and H.readWord(0x3BFC + m * 2) > 0 end
 local function codexBase()
   local slot = H.readByte(0x021F)   -- wSaveSlotToLoad: 0 transient, 1..3 saved
