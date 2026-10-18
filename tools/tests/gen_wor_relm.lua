@@ -756,6 +756,14 @@ H.run({ maxFrames = 1800000 }, {
   H.worldNavTo(THAMASA_DOOR[1], THAMASA_DOOR[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
     arrive = function() return map() == MAP_THAMASA and not H.worldMode() end }),
   H.waitUntil(function() return map() == MAP_THAMASA and settled() end, 2400, "Thamasa: map 344", 1),
+  -- care before the counter, so the Potions it spends are bought back
+  -- there.  Healed after the counter instead, beside the tower, the four
+  -- (3221-4023 max HP, 250 a Potion, no Tents or Tonics left) spent 34 of
+  -- the 99 and reached the tower at "potion=65", under the band ("POTION
+  -- SHORT wor_relm potion= 65 < band 74 (L49)": build/attempts/wt/
+  -- v031-robust/final/wor_relm_rerun.log, build/attempts/wt/
+  -- v031-robust-2/base/audit_supplies_v.txt)
+  H.fieldCare({ threshold = 1.0, tag = "at Thamasa, before the counter" }),
   -- (22,39) and (23,39) start STRAGO and RELM's scene at their house
   -- (_cb75bf, with both seated; the Hidon side quest, not this arc:
   -- build/attempts/wt/v030-route/lab/relm/r1 'control lost at (23,39)'), so the walks keep off them
