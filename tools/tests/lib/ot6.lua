@@ -18033,22 +18033,36 @@ function M.onReplay(fn) replayHooks[#replayHooks + 1] = fn end
 -- removed from outside a CPU callback).  Installed once, before the first
 -- attempt runs.  Removal still works: the shim hands back Mesen's own ref.
 local shimmed = false
+-- An error raised inside a memory or event callback never reaches the
+-- script: Mesen swallows it, so an assert there was a no-op (#438,
+-- battle_breakmonster's monster-arm check never failed).  The shim runs
+-- every callback under xpcall and keeps the FIRST error, message and
+-- traceback, in RUN.cbError; the runner's next frame fails the run with it.
+local function cbHandler(e)
+  local tb = (type(debug) == "table" and debug.traceback) and debug.traceback(tostring(e), 2) or tostring(e)
+  return tb
+end
+local function guarded(fn, mine, kind)
+  return function(...)
+    if mine ~= RUN.epoch then return end
+    local r = table.pack(xpcall(fn, cbHandler, ...))
+    if not r[1] then
+      if RUN.cbError == nil then
+        RUN.cbError = { kind = kind, frame = M.frame, msg = r[2] }
+      end
+      return
+    end
+    return table.unpack(r, 2, r.n)
+  end
+end
 local function installShim()
   if shimmed then return end
   shimmed = true
   emu.addMemoryCallback = function(fn, ...)
-    local mine = RUN.epoch
-    return rawAddMemoryCallback(function(...)
-      if mine ~= RUN.epoch then return end
-      return fn(...)
-    end, ...)
+    return rawAddMemoryCallback(guarded(fn, RUN.epoch, "memory"), ...)
   end
   emu.addEventCallback = function(fn, ...)
-    local mine = RUN.epoch
-    return rawAddEventCallback(function(...)
-      if mine ~= RUN.epoch then return end
-      return fn(...)
-    end, ...)
+    return rawAddEventCallback(guarded(fn, RUN.epoch, "event"), ...)
   end
 end
 
@@ -18204,6 +18218,7 @@ end
 
 local function resetLibState()
   RUN.epoch = RUN.epoch + 1          -- the old attempt's callbacks go inert
+  RUN.cbError = nil
   M.frame = 0
   M.gameOverFired = 0
   M.thawPad()
@@ -18692,6 +18707,17 @@ function M.run(opts, steps)
         stopWith(1, "other", "retry: the savestate load trampoline never "
           .. "fired in 600 frames")
       end
+      return
+    end
+
+    -- An error a callback raised since the last frame (#438): fail with
+    -- the original message and traceback, as a raised step would.
+    if RUN.cbError then
+      local e = RUN.cbError
+      RUN.cbError = nil
+      failed("other", string.format("an error was raised inside a %s callback "
+        .. "at f%d (Mesen swallows these; the run fails at the next frame): %s",
+        e.kind, e.frame or -1, tostring(e.msg)), 1)
       return
     end
 
