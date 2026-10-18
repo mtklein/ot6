@@ -822,6 +822,14 @@ check("retry_negative", "nice sh tools/tests/lib/retry_negative.sh",
        copy_if_changed_from("tools/tests/lib/retry_negative.lua"),
        copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR)]
       + [copy_if_changed_from(h) for h in LIBS])
+# the callback-error negative control (#438): an assertEq inside a memory
+# callback fails the run (Mesen swallows the error itself)
+check("callback_negative", "nice sh tools/tests/lib/callback_negative.sh",
+      ["tools/tests/lib/callback_negative.sh", "tools/tests/run.sh",
+       "tools/tests/lib/compose.py",
+       copy_if_changed_from("tools/tests/lib/callback_negative.lua"),
+       copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(sn.EMULATOR)]
+      + [copy_if_changed_from(h) for h in LIBS])
 # #309: every instrument left in tools/tests (`-- @manual`) composes and
 # starts (docs/TESTING.md "Scripts that stay in the tree").
 def splice_hosts(lua_path):

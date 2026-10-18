@@ -18038,26 +18038,27 @@ local shimmed = false
 -- battle_breakmonster's monster-arm check never failed).  The shim runs
 -- every callback under xpcall and keeps the FIRST error, message and
 -- traceback, in RUN.cbError; the runner's next frame fails the run with it.
-local function cbHandler(e)
-  local tb = (type(debug) == "table" and debug.traceback) and debug.traceback(tostring(e), 2) or tostring(e)
-  return tb
-end
-local function guarded(fn, mine, kind)
-  return function(...)
-    if mine ~= RUN.epoch then return end
-    local r = table.pack(xpcall(fn, cbHandler, ...))
-    if not r[1] then
-      if RUN.cbError == nil then
-        RUN.cbError = { kind = kind, frame = M.frame, msg = r[2] }
-      end
-      return
-    end
-    return table.unpack(r, 2, r.n)
-  end
-end
 local function installShim()
   if shimmed then return end
   shimmed = true
+  -- (locals live in this function: the chunk is at Lua's 200-local limit)
+  local function cbHandler(e)
+    if type(debug) == "table" and debug.traceback then return debug.traceback(tostring(e), 2) end
+    return tostring(e)
+  end
+  local function guarded(fn, mine, kind)
+    return function(...)
+      if mine ~= RUN.epoch then return end
+      local r = table.pack(xpcall(fn, cbHandler, ...))
+      if not r[1] then
+        if RUN.cbError == nil then
+          RUN.cbError = { kind = kind, frame = M.frame, msg = r[2] }
+        end
+        return
+      end
+      return table.unpack(r, 2, r.n)
+    end
+  end
   emu.addMemoryCallback = function(fn, ...)
     return rawAddMemoryCallback(guarded(fn, RUN.epoch, "memory"), ...)
   end

@@ -542,6 +542,14 @@ suite cannot expect: an assert failing on attempt 1 of 3, no `attempt
 msg, frame }` records, which is how a suite asserts on attempt 1 from
 attempt 2.
 
+An error raised inside an `emu.addMemoryCallback` / `addEventCallback`
+callback never reaches the script (Mesen swallows it), so the library's
+callback shim catches it, keeps the first one with its traceback, and
+fails the run at the next frame (`class=other`, no replay): an `assertEq`
+in a callback is a real assertion (#438).
+`lib/callback_negative.sh` (`ninja build/checks/callback_negative.ok`)
+proves it with a callback that asserts falsely.
+
 ## Retaining a worktree's evidence
 
 ```sh
