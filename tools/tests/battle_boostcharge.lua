@@ -240,6 +240,27 @@ end
 -- corpse, and a bench that plain-Fights can end the battle out from under a
 -- measurement that has not been taken yet.  Healing comes first: a deferring
 -- bench is what wiped battle_magicite's party on this same fixture.
+--
+-- A Muddled LOCKE gets no command window, so an arm still waiting for its
+-- queue cannot go out until something wakes him, and in battle 72 nothing
+-- need: the bench Defends and NUMBER 024 casts.  Measured on the
+-- v031-robust chain's n024_entry: Muddle ($3EE5 bit 5) landed by f2769,
+-- with the fold-control's Fire queued (its charge at f2849 reads
+-- STATUS2=$20), and was still set at f15370; the Drain arm armed at f2850,
+-- LOCKE's own muddled casts took his pool from 103 to 71, and the arm timed
+-- out at f32850 "driving toward [nontier] the action reaches the queue"
+-- (build/attempts/wt/v031-robust-2/boostcharge/bc_diag0.log).
+-- Physical damage clears Sleep and Muddle on its target (CalcMaxDmg: "remove
+-- sleep and muddled status from target"), so the bench does what a player
+-- does and Fights him.  Only before the arm's queue: a muddled LOCKE's
+-- already-queued cast still goes out and is charged (the note at
+-- castBlocked), and his pool, not his HP, is the instrument.
+local ST2_MUDDLE = 0x20
+local function lockeMuddledBeforeQueue()
+  return locke ~= nil and alive(locke) and want.mode ~= "idle" and rec ~= nil
+    and not rec.queued and rec.short == nil
+    and (H.readByte(0x3EE5 + locke * 2) & ST2_MUDDLE) ~= 0
+end
 local function carePlan()
   for s = 0, 3 do
     if maxHp(s) > 0 and hp(s) == 0 and bagIdxOf(FENIX) then
@@ -262,6 +283,11 @@ local function carePlan()
                why = string.format("at %d%%", wpct) }
     end
   end
+  if lockeMuddledBeforeQueue() then
+    return { fight = true, target = locke, why = string.format("LOCKE Muddled "
+      .. "($3EE5 = $%02X) before the %s arm's queue: a hit wakes him",
+      H.readByte(0x3EE5 + locke * 2), rec.tag) }
+  end
   return nil
 end
 
@@ -281,18 +307,19 @@ local function benchTurn(a, st)
   local btn
   if st == ST_CMD then
     local p = carePlan()
-    local key = p and string.format("%02X/%d", p.item, p.target) or "-"
+    local what = p and (p.fight and "Fight" or string.format("item $%02X", p.item))
+    local key = p and string.format("%s/%d", what, p.target) or "-"
     if key ~= planKey[a] then
       planKey[a] = key
       if p then
-        H.log(string.format("[bench f%d] actor=%d item $%02X on slot %d (%s) "
-          .. "-- hp %d/%d/%d/%d", H.frame, a, p.item, p.target, p.why,
+        H.log(string.format("[bench f%d] actor=%d %s on slot %d (%s) "
+          .. "-- hp %d/%d/%d/%d", H.frame, a, what, p.target, p.why,
           hp(0), hp(1), hp(2), hp(3)))
       end
     end
     plans[a] = p
     if p then
-      local cell = cmdCellOf(a, CMD_ITEM)
+      local cell = cmdCellOf(a, p.fight and CMD_FIGHT or CMD_ITEM)
       if cell == nil then btn = "right" else
         local cur = H.readByte(CMDROW + a) & 3
         btn = (cur == cell) and "a" or ((cur < cell) and "down" or "up")
