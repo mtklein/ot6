@@ -8373,6 +8373,46 @@ function Driver:magicOnlyLine(actor, boost)
     -- tower/c6: 'plan=switch')
     local row = cmdRow(actor, BATTLE.CMD_ITEM)
     local mp, maxmp = M.readWord(BATTLE.CURMP + actor * 2), M.readWord(BATTLE.MAXMP + actor * 2)
+    -- a fallen member first: with nothing that hurts, the turn is better
+    -- spent on a Fenix Down than on a Scan, even into a likely re-kill
+    -- (the care rules decline that raise).  MagiMaster's wall nulled all
+    -- of STRAGO's elements with the other three down, and he Scanned for
+    -- 200,000 frames while MagiMaster healed (build/attempts/wt/v031-tower/
+    -- lab/mm14_*_s9: 'no raise ... no kill is in reach', 'took 0 ... atk
+    -- $18').  The fallen member chosen holds a castable spell no standing
+    -- monster absorbs or nulls, when one does
+    local fenix = row ~= nil and self:battInvIdx(BATTLE.FENIX_DOWN)
+    if fenix then
+      local pick, pickOpen = nil, false
+      for e = 0, 3 do
+        local q = self.raiseQueued and self.raiseQueued[e]
+        if e ~= actor and M.readWord(0x3C1C + e * 2) > 0 and M.readWord(0x3BF4 + e * 2) == 0
+           and not M.seized(e) and q == nil then
+          local open = false
+          for _, id in ipairs(self.opts.magicOnly or M.MAGIC_ONLY_SPELLS) do
+            if not open and spellCell(e, id) ~= nil then
+              local elem = M.readRomByte(MP + id * 14 + 1)
+              local ok = true
+              for s = 0, 5 do
+                if monAlive(s) and elem ~= 0 then
+                  local x = 8 + s * 2
+                  if (M.readByte(0x3BCC + x) & elem) ~= 0 or (M.readByte(0x3BCD + x) & elem) == elem then ok = false end
+                end
+              end
+              open = ok
+            end
+          end
+          if pick == nil or (open and not pickOpen) then pick, pickOpen = e, open end
+        end
+      end
+      if pick ~= nil then
+        M.log(string.format("[%s] actor=%d magic-only: nothing to cast that hurts; Fenix Down on entity %d "
+          .. "(%s)", self.tag or "fight", actor, pick,
+          pickOpen and "it holds a spell the field does not null" or "the first fallen"))
+        return { kind = "item", item = BATTLE.FENIX_DOWN, target = pick, row = row, idx = fenix,
+                 reason = "revive" }
+      end
+    end
     -- a caster with MP and nothing that hurts (a lone Magic Urn absorbs all
     -- eight elements and holds no shield) reads the field with an unboosted
     -- Scan rather than pass: four passes in a row are the menu's park, a
