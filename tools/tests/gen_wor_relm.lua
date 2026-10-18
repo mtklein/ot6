@@ -756,14 +756,6 @@ H.run({ maxFrames = 1800000 }, {
   H.worldNavTo(THAMASA_DOOR[1], THAMASA_DOOR[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
     arrive = function() return map() == MAP_THAMASA and not H.worldMode() end }),
   H.waitUntil(function() return map() == MAP_THAMASA and settled() end, 2400, "Thamasa: map 344", 1),
-  -- care before the counter, so the Potions it spends are bought back
-  -- there.  Healed after the counter instead, beside the tower, the four
-  -- (3221-4023 max HP, 250 a Potion, no Tents or Tonics left) spent 34 of
-  -- the 99 and reached the tower at "potion=65", under the band ("POTION
-  -- SHORT wor_relm potion= 65 < band 74 (L49)": build/attempts/wt/
-  -- v031-robust/final/wor_relm_rerun.log, build/attempts/wt/
-  -- v031-robust-2/base/audit_supplies_v.txt)
-  H.fieldCare({ threshold = 1.0, tag = "at Thamasa, before the counter" }),
   -- (22,39) and (23,39) start STRAGO and RELM's scene at their house
   -- (_cb75bf, with both seated; the Hidon side quest, not this arc:
   -- build/attempts/wt/v030-route/lab/relm/r1 'control lost at (23,39)'), so the walks keep off them
@@ -788,6 +780,23 @@ H.run({ maxFrames = 1800000 }, {
   -- the tower (no counter inside)
   H.buyItem(REMEDY, function() return math.max(0, 10 - H.invCountOf(REMEDY)) end, "REMEDY to 10"),
   H.shopClose("Thamasa's item shop"),
+  -- care at the counter, then the Potions it spent bought back.  Healed
+  -- only beside the tower, the four (3221-4023 max HP, 250 a Potion, no
+  -- Tents or Tonics left) spent 34 of the 99 and reached the tower at
+  -- "potion=65", under the band ("POTION SHORT wor_relm potion= 65 < band
+  -- 74 (L49)": build/attempts/wt/v031-robust/final/wor_relm_rerun.log,
+  -- build/attempts/wt/v031-robust-2/base/audit_supplies_v.txt).  It has to
+  -- come after the counter: the plain's poison arrives with "remedy=0",
+  -- and a care in Thamasa before it healed HP the poisoned walk then took
+  -- back ("[at Thamasa, before the counter] done: ... status1=04 ...
+  -- remedy=0", then 32 Potions beside the tower: build/attempts/wt/
+  -- v031-robust-2/final1/wor_relm.log.gz)
+  H.fieldCare({ threshold = 1.0, tag = "at Thamasa's item counter" }),
+  H.shopTalk(36, 39, "Thamasa's item shop, after the care", { fight = FIGHT }),
+  H.call(function() H.assertEq(H.shopId(), 74, "the counter opened shop 74 ($0201) again") end),
+  H.buyItem(POTION, function() return math.max(0, H.careStockPotions(H.activeTopLevel(), { spend = 40 })
+    - H.invCountOf(POTION)) end, "POTION back to the band after the care"),
+  H.shopClose("Thamasa's item shop, after the care"),
   H.bagArrange({ POTION, FENIX, TONIC, REMEDY }, { tag = "bag: combat items on top (Thamasa)" }),
   H.call(function() say("shop", "Thamasa") end),
   H.crossDoor(36, 45, MAP_THAMASA, 26, 39, "Thamasa's item shop -> the street", { fight = FIGHT }),
