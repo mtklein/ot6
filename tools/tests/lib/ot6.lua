@@ -8366,6 +8366,31 @@ function Driver:magicOnlyLine(actor, boost)
              ally = true, target = bounce.to, all = bounce.all or nil, bounce = true, reason = "magic_only_bounce" }
   end
   if best == nil then
+    -- what the list holds, once per distinct reading: each candidate's cell,
+    -- its greyed bit, its price against the live MP, and whether the cast
+    -- guards refuse it
+    do
+      local base = M.readWord(BATTLE.MLISTPTR + actor * 2)
+      local parts = {}
+      for _, id in ipairs(self.opts.magicOnly or M.MAGIC_ONLY_SPELLS) do
+        if base >= 0x2000 and base <= 0x2600 then
+          for cell = 0, 53 do
+            local a = base + (cell + 1) * 4
+            if M.readByte(a) == id then
+              parts[#parts + 1] = string.format("$%02X c%d %s %d", id, cell,
+                (M.readByte(a + 1) & 0x80) ~= 0 and "grey" or "lit", M.readByte(a + 3))
+            end
+          end
+        end
+      end
+      local x = 8
+      local said = string.format("[%s] actor=%d magic-only: no line at %d MP (status1 $%02X status2 $%02X): %s; "
+        .. "slot 0 weak $%02X null $%02X absorb $%02X", self.tag or "fight", actor,
+        M.readWord(BATTLE.CURMP + actor * 2), M.readByte(0x3EE4 + actor * 2), M.readByte(0x3EE5 + actor * 2),
+        #parts > 0 and table.concat(parts, ", ") or "no candidate in the list",
+        M.readByte(0x3BE0 + x), M.readByte(0x3BCD + x), M.readByte(0x3BCC + x))
+      if said ~= self.noLineSaid then self.noLineSaid = said; M.log(said) end
+    end
     -- nothing castable: a caster out of MP drinks it back (an Ether, a
     -- Tincture, an X-Ether) rather than pass the turn: inside the tower a
     -- seat that passes has no other attack, and the last L.20 Magic outlived
