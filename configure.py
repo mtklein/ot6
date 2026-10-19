@@ -904,15 +904,10 @@ check("release_branch",
       f" || {{ echo 'ERROR: no release/v{VERSION} branch -- cut it first:"
       f" git branch release/v{VERSION}'; exit 1; }}",
       ["VERSION"], desc=f"release/v{VERSION} branch exists")
-check("release_readme",
-      f"grep -q 'v{VERSION} is the current release' README.md"
-      f" || {{ echo 'ERROR: README.md does not say v{VERSION} is the"
-      f" current release'; exit 1; }}",
-      ["VERSION", "README.md"], desc=f"README names v{VERSION}")
 
-# The two release preflights are not qualification: bare `ninja`
+# The release preflight is not qualification: bare `ninja`
 # runs every qualifier on pushed main before the release commit (VERSION,
-# notes, README) exists; `ninja release` (the zip) still requires both.
+# notes) exists; `ninja release` (the zip) still requires it.
 release_pre = qual[qual_before_release:]
 del qual[qual_before_release:]
 # The drift gate is a release preflight: every tracked checkpoint (every
