@@ -327,21 +327,30 @@ local function play()
       local cut = S.exec and S.exec.interrupted ~= nil
       if got == nil and r ~= "done" and not cut and H.battleLoadStarted() then return r end
       local eligible = S.exec and S.exec.valid == true
+      local owed = false
       if not eligible and H.battleLoadStarted() then
         local why = S.exec and S.exec.interrupted or "its selected command never executed"
         c.lead = (c.lead or 0) + 1
         c.why = c.why or {}
         c.why[#c.why + 1] = why
-        H.assertEq(c.lead <= MAX_LEAD, true, string.format("%s at %s BP: the case executes uninterrupted "
-          .. "within %d entries from the opening, SETZER Defending 0..%d times first (interrupted by: %s)",
-          c.kind, tostring(c.boost or 1), MAX_LEAD, MAX_LEAD - 1, table.concat(c.why, "; ")))
-        H.log(string.format("[%s] %s interruption #%d: %s; restore the opening and enter the case again "
-          .. "with %d Defend(s) of SETZER's first", TAG, c.kind, c.lead, why, c.lead))
-        atExec = nil
-        S.req, S.phase = H.requestLoadState(S.blob), "restore"
-        return "frame"
+        if c.lead <= MAX_LEAD then
+          H.log(string.format("[%s] %s interruption #%d: %s; restore the opening and enter the case again "
+            .. "with %d Defend(s) of SETZER's first", TAG, c.kind, c.lead, why, c.lead))
+          atExec = nil
+          S.req, S.phase = H.requestLoadState(S.blob), "restore"
+          return "frame"
+        end
+        -- MAX_LEAD reached: this opening does not let the case run (the
+        -- v0.32 aura chain's wor-tomb-v1 crowd Zombies SETZER before his
+        -- first command on every restore, so his own Zombie Fight runs
+        -- whatever he Defends first).  The case is owed to the next crowd,
+        -- the third way a crowd leaves a case owed (MAX_CROWDS, above),
+        -- which bounds it.
+        H.log(string.format("[%s] %s at %s BP: interrupted %d times from this opening (%s); owed to the next "
+          .. "crowd", TAG, c.kind, tostring(c.boost or 1), c.lead, table.concat(c.why, "; ")))
+        owed = true
       end
-      local met = eligible and got ~= nil and #seen[c.kind] > S.before
+      local met = not owed and eligible and got ~= nil and #seen[c.kind] > S.before
       atExec = nil
       H.log(string.format("[%s] %s, slot %d%s: %s", TAG, c.kind, c.e, c.boost and (" at " .. c.boost .. " BP") or "",
         got == nil and "the action never ran" or met and "the draw is met" or "no draw"))

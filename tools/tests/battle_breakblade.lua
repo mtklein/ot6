@@ -8,8 +8,8 @@
 -- (Ot6BreakChips' OT6_WEAPSPELL bit 6 arm, owner ruling v0.21).  A boosted
 -- Magic Break takes 1 + boost (battle_breakspell, battle_breakfour).
 --
--- Played: Continue the wor-terra-v1 battery (TERRA wears the Break Blade
--- the route gave her; the save stands on the World of Ruin map by Mobliz),
+-- Played: Continue the wor-terra-v1 battery (TERRA takes the Break Blade
+-- from the bag through Equip if the route left it there; the save stands on the World of Ruin map by Mobliz),
 -- pace two world tiles into a random battle, and TERRA Fights at 3 BP
 -- through the real menu (H.kitBattle; Defends bank the points) at the
 -- unbroken body with the most shields, two or more; everyone else Defends.
@@ -186,6 +186,18 @@ end
 local n0 = 0
 H.run({ maxFrames = 600000 }, {
   H.bootCheckpoint("wor-terra-v1"),
+  -- TERRA must wield the Break Blade.  The route leaves it in her hand or
+  -- in the bag, as its own shop upgrades decide (the v0.32 aura chain's
+  -- replay armed her with $13 and bagged the Blade), so a Blade in the bag
+  -- goes into her right hand through the Equip menu, as a player would.
+  H.call(function()
+    local worn = H.readByte(0x1600 + 37 * TERRA + 0x1F)
+    H.log(string.format("[bblade] TERRA's right hand $%02X, Break Blades in the bag %d", worn,
+      H.invCountOf(BREAK_BLADE)))
+    H.assertEq(worn == BREAK_BLADE or H.invCountOf(BREAK_BLADE) > 0, true,
+      "precondition: the Break Blade is in TERRA's hand or in the bag")
+  end),
+  H.equipLoadout(TERRA, { { 0, BREAK_BLADE } }, { tag = "TERRA takes the Break Blade" }),
   H.call(function()
     H.assertEq(H.readByte(0x1600 + 37 * TERRA + 0x1F), BREAK_BLADE, "TERRA wears the Break Blade")
     arm()

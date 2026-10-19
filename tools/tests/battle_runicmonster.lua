@@ -121,6 +121,26 @@ local function verdict()
   end
 end
 
+-- back to walkable field control after a battle, paging any dialog with A
+-- (4 frames on, 4 off: one edge per page).  A fought-out battle can end in
+-- one: on the v0.32 aura chain's battery the cliffs dealt formation $16E,
+-- a dragon, and its fall shows vanilla's "6 dragons left." until a key is
+-- pressed, which a bare wait for control never gets past.
+local function toControl()
+  local t = 0
+  return H.driveUntil(function() return H.hasControl() and H.tileAligned() end, 3000, {
+    H.call(function()
+      t = t + 1
+      if H.dialogWaiting() then
+        if t % 8 == 0 then H.log(string.format("[rbm] f%d a dialog waits after the battle: A", H.frame)) end
+        H.setPad(t % 8 < 4 and { a = true } or {})
+      else
+        H.setPad({})
+      end
+    end),
+  }, "rbm: field control after the battle")
+end
+
 local steps = {
   H.bootCheckpoint("wor-narshe-cliffs-v1"),
   H.call(function()
@@ -131,7 +151,7 @@ local steps = {
   H.paceToEncounter("rbm", nil, PACE),
   H.driveUntil(function() return ok end, 800000, {
     H.cond(function() return not H.battleLoadStarted() end,
-      { H.paceToEncounter("rbm", 0, PACE), H.call(function() fresh = true end) }, {}),
+      { toControl(), H.paceToEncounter("rbm", 0, PACE), H.call(function() fresh = true end) }, {}),
     H.call(function()
       if fresh then
         fresh = false
