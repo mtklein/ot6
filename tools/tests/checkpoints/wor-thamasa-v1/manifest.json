@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "c60e2c35b7375d770cbb4063dbbe8c478f76fb2f43d1ee6044da3f29627cacde",
+  "sha256": "936c978b23861894bab744058bec7d31795c95bdd4ffc4d1af4f6c87ccca7abd",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "c60e2c35b7375d770cbb4063dbbe8c478f76fb2f43d1ee6044da3f29627cacde",
-    "generator_sig": "d05ca72e8ad5a45a1493c4ad6f9fdb27999822677e6eb60764b611df94fefbba gen_wor_tower build/cap/cap2/wor-tower-v1/manifest.json build/cap/cap2/wor-tower-v1/wor-tower.sram",
+    "payload_sha256": "936c978b23861894bab744058bec7d31795c95bdd4ffc4d1af4f6c87ccca7abd",
+    "generator_sig": "b44cd06a2d69b87fd62d1dd3aec7229fbe08dba9b2c00b5642ab5357790f39ee gen_wor_tower build/checkpoints/wor-tower-v1/manifest.json build/checkpoints/wor-tower-v1/wor-tower.sram",
     "ancestors": [
       {
-        "path": "build/cap/cap2/wor-tower-v1/manifest.json",
-        "sha256": "7fb46d470f1f194b8a5bf42ed605bae07c27231939ae8a4fefa5825dd1321c67"
+        "path": "build/checkpoints/wor-tower-v1/manifest.json",
+        "sha256": "9f383d6840c50532de3a880fa114cd597995313e8470978d2b554578f9553e64"
       }
     ]
   }
