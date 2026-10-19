@@ -185,6 +185,16 @@ H.run({ maxFrames = 2400000 }, {
     H.assertEq(sw(0x02F1), 1, "LOCKE available ($02F1)")
     H.assertEq(sw(0x01CE), 0, "party switching off: one party again (_cc3178 .. $01CE)")
   end),
+  -- LOCKE joins with nothing on (his record is empty since the World of
+  -- Balance; the scene gives a ValiantKnife and a Flame Shld to the bag:
+  -- _cc3178 .. give_item), so he is dressed from the bag at once
+  -- (tools/audit_equipment.py: 'BARE wor_locke.mss: LOCKE', lab/l2)
+  H.gearDress({ tag = "LOCKE's gear from the bag" }),
+  H.dressRelics({ { CELES, "CELES" }, { LOCKE, "LOCKE" } }, { tag = "relics, CELES and LOCKE" }),
+  H.call(function()
+    H.assertEq(H.readByte(0x1600 + 37 * LOCKE + 0x1F) ~= 0xFF, true, "LOCKE holds a weapon")
+    say("wor", "LOCKE dressed")
+  end),
   H.saveState("wor_locke.mss"),
   H.logStep(function()
     return string.format("wor_locke generated: LOCKE L%d joined; %s", H.readByte(0x1600 + 37 * LOCKE + 8),
