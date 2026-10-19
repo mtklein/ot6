@@ -2610,7 +2610,7 @@ function M.flyTo(tx, ty, opts)
   opts = opts or {}
   local what = opts.what or string.format("fly to (%d,%d) and land", tx, ty)
   local hb, pulse, landed, presses = -600, 0, false, 0
-  local bn, flown, fought = 0, 0, false
+  local bn, flown, fought, offWorld = 0, 0, false, 0
   local drv = M.fightDriverFor("flyTo", { tactical = true, boost = true, items = true, healPercent = 55 }, opts.fight)
   local function heading() return M.readWord(0x73) - 270 end
   local function pressFor()
@@ -2697,6 +2697,14 @@ function M.flyTo(tx, ty, opts)
         if bn > 0 then M.setPad({}); return end
         if fought then fought = false; drv.idle() end
         if not M.worldMode() then
+          -- the deck scene has its own small budget (opts.offWorldFrames,
+          -- default 3000; the scene and its dialogs take about 600), so a
+          -- stuck one fails here rather than at the flight's 400,000
+          offWorld = offWorld + 1
+          if offWorld > (opts.offWorldFrames or 3000) then
+            error(string.format("%s: %d frames off the world map with no landing pressed (map %d)", what, offWorld,
+              M.readWord(0x1f64) & 0x1FF), 0)
+          end
           M.setPad((M.dialogWaiting() and M.frame % 8 < 4) and { "a" } or {})
           return
         end
@@ -2723,7 +2731,7 @@ function M.flyTo(tx, ty, opts)
         .. "(standing on (%d,%d))", what, tx, ty, M.worldX(), M.worldY()))
     end),
     }),
-  }), function() hb, pulse, landed, presses, bn, flown, fought = -600, 0, false, 0, 0, 0, false end)
+  }), function() hb, pulse, landed, presses, bn, flown, fought, offWorld = -600, 0, false, 0, 0, 0, false, 0 end)
 end
 
 -- Walk to world tile (tx,ty): the field navTo's verified-step loop on
@@ -4443,6 +4451,27 @@ local function careParty()
   return out
 end
 
+-- With two or more parties on the field, the walking party must also
+-- stand on the save point: $01BF, which the save point's script sets,
+-- outlives a Y switch, and the game then offers the Tent to a party far
+-- from it (party 2 at the Phoenix Cave's lava switch pitched one in 9 of
+-- 12 runs, build/attempts/wt/v032-splitparty/lab/swp2_*).  The harness
+-- does not use that quirk (coordinator, 2026-10-19).  M.savePointAt is
+-- the point M.stepOntoSavePoint last stood on.  M.tentOffered: whether the
+-- care may use a Tent here (the world map, or a save point underfoot).
+function M.tentOffered()
+  if M.worldMode() then return true end
+  if (M.readByte(0x1EB7) & 0x80) == 0 then return false end
+  if M.partyNumbers and #M.partyNumbers() >= 2 then
+    local s = M.savePointAt
+    -- the save block's map and tile ($1F64, $1FC0/$1FC1): at rest they
+    -- are the walking party's, and the field menu leaves them alone
+    return s ~= nil and (M.readWord(0x1F64) & 0x1ff) == s.map and M.readByte(0x1FC0) == s.x
+      and M.readByte(0x1FC1) == s.y
+  end
+  return true
+end
+
 local function careKernel(opts)
   opts = opts or {}
   local tag = opts.tag or "care"
@@ -4490,9 +4519,7 @@ local function careKernel(opts)
   -- Where the item list offers a Tent: the world map, or a field map
   -- while the save-enable bit is up (it is set by the SavePoint script's
   -- sparkle and cleared again on the next orthogonal step).
-  local function tentUsable()
-    return M.worldMode() or (M.readByte(0x1EB7) & 0x80) ~= 0
-  end
+  local function tentUsable() return M.tentOffered() end
 
   -- MP a caster keeps back.  Below 1 the option is a fraction of their own
   -- maximum, so one number suits a level 7 TERRA and a level 30 one; at or
@@ -8233,7 +8260,20 @@ function M.dressRelics(members, opts)
   return {
     tick = function()
       if plan == nil then
-        plan = M.relicPlan(members, opts)
+        -- a KO'd, petrified or zombied member is left out: the Relic menu
+        -- refuses the A on him (gen_wor_locke, a zombied STRAGO: '4 A presses
+        -- on the target were not taken', build/attempts/wt/v032-splitparty/
+        -- lab/swl2_k4_s7); a caller cares first so this is rare
+        local fit = {}
+        for _, m in ipairs(members) do
+          if M.charHp(m[1]) > 0 and (M.charStatus1(m[1]) & 0xC2) == 0 then
+            fit[#fit + 1] = m
+          else
+            M.log(string.format("[%s] %s is down (HP %d, status1 $%02X): the Relic menu will not take him; "
+              .. "left out of the plan", tag, m[2] or tostring(m[1]), M.charHp(m[1]), M.charStatus1(m[1])))
+          end
+        end
+        plan = M.relicPlan(fit, opts)
         queue = {}
         for _, p in ipairs(plan) do if #p.changes > 0 then queue[#queue + 1] = p end end
       end

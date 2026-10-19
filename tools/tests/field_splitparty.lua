@@ -25,7 +25,10 @@
 --   F. the links: a link whose cond is false is not taken by the planner
 --      (H.bfsReach), the same link with cond true is; with party 1 off the
 --      bridge plate (23,19) no route takes party 2 to (19,25), with party 1
---      on it H.navLinks walks there through the link (19,22) -> (19,25).
+--      on it H.navLinks walks there through the link (19,22) -> (19,25);
+--   G. the Tent: with party 2 walking off the save point the game's own
+--      save-point bit ($01BF) is still up, and H.tentOffered() (the care's
+--      Tent rule) says no; with party 1 back on the point it says yes.
 -- Mutants and the evidence: build/attempts/wt/v032-splitparty/lab/ (mut2_*, sws3_*;
 -- docs/design/split-party.md section 8).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
@@ -67,16 +70,20 @@ H.run({ maxFrames = 400000 }, {
       string.format("A: party 2's leader stands on 315 (20,11) (read map %s (%s,%s))", tostring(m), tostring(x), tostring(y)))
   end),
 
-  -- ---- B. switching from the save point ----------------------------------------
+  -- ---- B. switching from the save point (and G, the Tent) ------------------------
+  H.stepOntoSavePoint(37, 28),
   H.switchParty(2, { tag = "B: to party 2 from the save point" }),
   H.call(function()
     H.assertEq(H.activeParty(), 2, "B: $1A6D reads 2")
     H.assertEq(H.fieldX() == 20 and H.fieldY() == 11, true, "B: walking party 2's leader at (20,11)")
+    H.assertEq((H.readByte(0x1EB7) & 0x80) ~= 0, true, "G: precondition: $01BF is still up with party 2 walking")
+    H.assertEq(H.tentOffered(), false, "G: no Tent for party 2 off the save point")
   end),
   H.switchParty(1, { tag = "B: back to party 1 on the save point" }),
   H.call(function()
     H.assertEq(H.activeParty(), 1, "B: $1A6D reads 1")
     H.assertEq(H.fieldX() == 37 and H.fieldY() == 28, true, "B: party 1 back on the save point (37,28)")
+    H.assertEq(H.tentOffered(), true, "G: the Tent for party 1 on the save point")
   end),
 
   -- ---- C. the absorb guard's list -------------------------------------------------

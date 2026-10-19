@@ -111,7 +111,9 @@ end
 H.run({ maxFrames = 2400000 }, {
   H.bootCheckpoint("wor-phoenix-v1"),
   watches(),
-  H.splitBegin(),
+  -- party 2 walks the longer half (the Red Dragon, four of the five
+  -- battles in l2), so it takes two thirds of the bag's care stock
+  H.splitBegin({ shares = { [1] = 1, [2] = 2 } }),
   H.call(function() say("wor", "boot") end),
   -- @@setup-end
 
@@ -152,14 +154,13 @@ H.run({ maxFrames = 2400000 }, {
   -- jumps of 313's west side; it goes on at once (guidelines.md, "Ribbons
   -- are worth going out of your way for")
   chestIfNear(13, 20, 0x0AB, "Ribbon (313 (13,20))", RIBBON),
+  -- a care first: the Relic menu refuses a member who is down, and the care
+  -- revives and cures Zombie with a Revivify (lab/swl2_k4_s7: STRAGO zombied
+  -- at 0 HP, '4 A presses on the target were not taken')
+  H.fieldCare({ tag = "before the Ribbon goes on" }),
   H.lazy(function()
     local m = {}
-    -- the members the Relic menu takes: a KO'd or zombied member's A is
-    -- refused there (lab/swl2_k4_s7: STRAGO zombied at 0 HP, '4 A presses
-    -- on the target were not taken')
-    for _, c in ipairs(H.partyRoster(1)) do
-      if H.charHp(c) > 0 and (H.charStatus1(c) & 0xC2) == 0 then m[#m + 1] = { c, H.SPLIT_NAMES[c] } end
-    end
+    for _, c in ipairs(H.partyRoster(1)) do m[#m + 1] = { c, H.SPLIT_NAMES[c] } end
     return H.dressRelics(m, { tag = "relics with the Ribbon, party 1" })
   end),
   door(6, 7, MAP_CAVE, "party 1: -> 315 (6,12)"),

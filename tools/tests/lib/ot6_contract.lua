@@ -2385,6 +2385,9 @@ function M.stepOntoSavePoint(x, y, opts)
     M.call(function()
       M.assertEq(onSaveTile(x, y), true, string.format(
         "on the save point (%d,%d) with $01BF set", x, y))
+      -- where the save point is, for the care's Tent rule in a split
+      -- dungeon (careKernel's tentUsable)
+      M.savePointAt = { map = M.mapId() & 0x1ff, x = x, y = y }
     end),
   })
 end

@@ -106,7 +106,8 @@ UMARO: two of the arc's four casters (L46-49) beside two of the bench
   `H.splitReserveFor(p)` is the care floor plus every other party's
   unspent share, and `fieldCare` and the after-battle care take it by
   default, read when they plan. `H.splitCare(opts)` cares for each party in
-  turn.
+  turn. The shares bind the field care only: an item used in battle (the
+  fight driver's heals and revives) ignores them, survival first.
 - `H.bfsReach(sx, sy, sz, links [, tx, ty])` and `H.navLinks(tx, ty,
   links, opts)`: reach and walk over the floor plus tile events that carry
   the party, each `{ x, y, move, tx, ty [, cond] }`, cond read live.
@@ -138,10 +139,14 @@ Rules that fell out:
   legs step party 2 off the lava switch before party 1 walks.
 - The save point is the only place a Tent is offered, and **the offer
   outlives the switch**: `$01BF`, which the save point's script sets, stays
-  set when Y hands the field to the other party, so party 2 at the lava
-  switch pitched a Tent too (g2: "[care at the save point, party 2]
-  pitched a Tent"). The game takes the press; it is a vanilla quirk, used
-  here and noted.
+  set when Y hands the field to the other party, and the game then lets
+  party 2 at the lava switch pitch one: it did in g2 ("[care at the save
+  point, party 2] pitched a Tent") and in 9 of the 12 runs of the first
+  phoenix sweep (lab/swp2_*). The harness does not use the quirk
+  (coordinator, 2026-10-19): `H.tentOffered()`, the care's Tent rule, asks
+  with two or more parties on the field that the walking party stand on
+  the save point `H.stepOntoSavePoint` last stood on (`M.savePointAt`), read
+  from the save block's map and tile; `field_splitparty` G checks it.
 - Kefka's Tower has three parties and save points of its own; the same
   contract fields and legs apply with `[3]`.
 
@@ -152,8 +157,8 @@ Rules that fell out:
   PASS (frame 44359) attempts=1/3 (lab/l2), and with LOCKE dressed at the
   end PASS (frame 47103) attempts=1/3 (lab/l3).
 - Per party, first half (g3): party 1 3 battles, party 2 5, all won;
-  Potions 99 -> 61 at the save point (party 1 spent 21, party 2 17, a Tent
-  each). Second half (l2): party 1 1 battle, party 2 4 (the Red Dragon
+  Potions 99 -> 61 at the save point (party 1 spent 21 and pitched a Tent
+  on the save point; party 2 spent 17 and pitched none). Second half (l2): party 1 1 battle, party 2 4 (the Red Dragon
   among them), 7 Potions.
 - The Red Dragon (L67, 30,000 HP, weak to ice and water) fell to party 2
   in 4,783 to 6,065 ticks with nobody dead (l1, phx17).
