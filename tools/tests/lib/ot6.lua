@@ -15471,6 +15471,34 @@ function Driver:watchTimer()
   -- from tick 6 on)
   if self.runDecided == nil and self.battleTick >= 6 then
     self.runDecided = true
+    -- opts.runWhenDry (the Fanatics' Tower's walk down): a random battle
+    -- the party cannot fight is run from -- inside the magic-only tower no
+    -- living member can pay for an attack spell and the bag holds nothing
+    -- that gives MP back.  A long MagiMaster fight spent the 99 Tinctures,
+    -- and on the way down TERRA at 0 MP passed four turns ('no line at 0
+    -- MP', 'recovery cap: ... budget:switch/05 4 times':
+    -- build/attempts/wt/v031-tower-2/lab/f4e_cap3b_wor_tower_f4_s2)
+    if self.opts.runWhenDry and M.readByte(M.RANDBTL) ~= 0 then
+      local armed = false
+      for e = 0, 3 do
+        if M.readWord(0x3BF4 + e * 2) > 0 then
+          for _, id in ipairs(self.opts.magicOnly or M.MAGIC_ONLY_SPELLS) do
+            if id ~= 0x29 and spellCell(e, id, true) ~= nil then armed = true end
+          end
+        end
+      end
+      local drink = nil
+      for _, it in ipairs({ 0xEB, 0xEC, 0xED, 0xEE }) do   -- Tincture, Ether, X-Ether, Elixir
+        if drink == nil and self:battInvIdx(it) ~= nil then drink = it end
+      end
+      if not armed and drink == nil then
+        M.log(string.format("[%s] f+%d battle $%03X (random) RUNS (L+R): no living member can pay for "
+          .. "an attack spell and the bag holds nothing that gives MP back", self.tag or "fight",
+          self.battleTick, M.readWord(0x11E0) & 0x1FF))
+        self.running = { tick = self.battleTick, refused = 0, left0 = 0 }
+        return
+      end
+    end
     local t = self:clock()
     if not t or self.opts.timedRun == false or not M.TIMED_RUN then return end
     local form = M.readWord(0x11E0) & 0x1FF

@@ -867,7 +867,10 @@ H.run({ maxFrames = 1500000 }, {
   -- climb's, and in MagiMaster's kit (no Wall Rings, no Float caster) the
   -- fourth floor's L.60 and L.90 Magic wiped the four with Quake and
   -- Merton (build/attempts/wt/v031-tower/lab/dn2_*: 'atk $15', 'atk $17')
-  H.call(function() FIGHT.cure = false end),
+  -- a random battle the party has no MP to fight is run from on the way
+  -- down (Driver opts.runWhenDry: a long MagiMaster fight can spend the
+  -- 99 Tinctures; lab f4e_cap3b_wor_tower_f4_s2)
+  H.call(function() FIGHT.cure = false; FIGHT.runWhenDry = true end),
   stonesFor({ { TERRA, MADUIN }, { RELM, IFRIT }, { STRAGO, PALIDOR }, { CELES, TRITOCH } }, "stones for the walk down"),
   wallRingsOn(),
   H.fieldCare({ tag = "Float on the four, down" }),
