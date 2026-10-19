@@ -487,4 +487,11 @@ OT6_MORPHBOOST       := $ede4
 .assert OT6_MORPHBOOST = OT6_DEBIL + 12, error, "the Morph's boost must follow the Debilitator mask"
 .assert OT6_MORPHBOOST <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
+; The boost aura's halo (ot6_aura.asm, Ot6AuraHalo): per-frame scratch, the
+; body entries found and the scanline budget being granted.  Written before
+; it is read on every frame anyone has a boost pending, so it needs no init.
+OT6_AURAWORK         := $ede5   ; 58 bytes
+.assert OT6_AURAWORK = OT6_MORPHBOOST + 1, error, "the aura's scratch must follow the Morph's boost"
+.assert OT6_AURAWORK + 58 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
 .endif

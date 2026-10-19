@@ -10,10 +10,13 @@
 ;     body brightens a little on the pulse;
 ;   * the halo (Ot6AuraHalo): copies of the character's own body sprites, a
 ;     pixel out, drawn behind them, so the glowing edge thickens outward.
+;     One character has it at a time (the menu's, else the highest boost),
+;     within the scanline sprite budget (see the halo's block comment).
 ; The level sets both:
 ;   1 BP  dark -> amber outline, copies left/right, a slow pulse (32 frames)
 ;   2 BP  amber -> gold, all four sides, twice as fast
-;   3 BP  orange <-> bright gold flicker (8 frames), four sides and above
+;   3 BP  orange <-> bright gold flicker (8 frames), four sides and rising
+;         off the head
 ;
 ; Built from what the character already has on screen: the battle's sprite
 ; palettes are all spoken for (objpal 0-2 monsters, 3 the animation/flash
@@ -36,10 +39,12 @@
 ; nonzero, the same test that skips UpdateCharPal) the glow leaves them alone
 ; too.
 ;
-; Cost, in CPU cycles of the NMI (measured, build/attempts/wt/v032-boost-aura/):
-; with no boost pending anywhere, four loads and a branch (the hook's whole
-; run is at most 22 cycles); at 3 BP, ~260 for the glow (averaged over its one
-; frame in four) and ~1500 for the halo, against an NMI of ~21000.
+; Cost, in CPU cycles of the NMI (measured, build/attempts/wt/v032-boost-aura/
+; and v032-boost-aura-2/): with no boost pending anywhere, four loads and a
+; branch (the hook's whole run is at most 22 cycles); with any, ~420 for the
+; glow per boosting character (averaged over its one frame in four) and
+; ~4,500 for the halo, against an NMI of ~21,000-24,500 in a ~45,200-cycle
+; frame.
 ; ------------------------------------------------------------------------------
 
 ; Ot6RestageGate_ext's caller in C1 now lands here first.
@@ -175,13 +180,43 @@
 ;
 ; The glow above recolours the sprite's outline colour (colour 1, which FF6's
 ; battle sprites use for the silhouette's edge and their inner lines).  The
-; halo thickens that edge outward: for each boosting character it draws extra
-; copies of the character's own two sprites, offset by a pixel, BEHIND the
-; character (higher OAM index = lower priority among equal-priority sprites),
-; so what shows of them is a ring of the copies' edge pixels -- colour 1, the
-; glowing outline -- just outside the character's own.  More boost, more
-; copies: 1 BP left/right, 2 BP all four sides, 3 BP all four plus three above
-; (the glow rises off the head).
+; halo thickens that edge outward: copies of the character's own two body
+; sprites, offset by a pixel, BEHIND the character (higher OAM index = lower
+; priority among sprites), so what shows of them is a ring of the copies'
+; edge pixels -- colour 1, the glowing outline -- just outside the
+; character's own.  More boost, more copies (Ot6HaloOff):
+;   top half (head):    1 BP left, right; 2 BP + up; 3 BP + two up,
+;                       up-left, up-right (the glow rises off the head)
+;   bottom half (feet): 1 BP left, right; 2-3 BP + down
+; The top half's copies only move up and the bottom half's only down, so the
+; two halves' copies never share a scanline: a line holds one half's copies
+; at most.
+;
+; The scanline budget.  The PPU draws at most 34 8-pixel sprite slivers on a
+; line (and 32 sprites); past that it drops slivers, the LOWEST-index
+; sprites' first, so an overfull line loses the character's own body before
+; the copies behind it (the v0.32 review: two neighbours at 3 BP, seven
+; copies a half each, reached 40 slivers on a line and their bodies went
+; see-through, build/attempts/wt/review-v032-boost-aura/).  So:
+;   * one character has the halo at a time: the one whose menu is open if
+;     it is boosting, else the highest boost (the lowest slot on a tie).
+;     Every other boosting character keeps the glow.  Two halos stacked on
+;     neighbouring rows is what overflowed, and one halo's cost is bounded;
+;   * its copies are granted against a measured budget.  Every sprite in
+;     the frame's OAM buffer whose rows touch the halo's rows -- vanilla's,
+;     the cursor, the monsters, the other characters, the character's own
+;     body -- adds its slivers (16x16 = 2, 32x32 = 4) to the 16-line bands
+;     it touches; a half then gets n copies only while its fullest band
+;     + 2n <= 34.  A band's count is at least the count on any one of its
+;     lines, so no line the halo touches ends above 34 whatever else is on
+;     screen, and a band already full gets no copies.  (34 slivers is at
+;     most 17 sprites, under the 32-sprite limit.)
+; The budget stops at line $97: FF6 parks nine 32x32 sprites from $97 down
+; (OAM entries 115-123) to overflow those lines on purpose and hide what
+; goes behind the menu window, so they are no budget of ours.  Cost (CPU
+; cycles in the NMI, of a ~45,200-cycle frame; build/attempts/wt/
+; v032-boost-aura-2/): ~3,100 for the band scan and ~1,300 for the copies,
+; whatever the number of boosting characters.
 ;
 ; Copies, not new graphics: the sprite VRAM is spoken for (characters $2000,
 ; animations $2400-$2dff, numerals/status $2e00, monsters $3000) and so is
@@ -191,87 +226,373 @@
 ; This hook runs after UpdateSprites has built the frame's OAM buffer ($0300,
 ; next free entry in $71; ClearSpriteData resets entries 8-114 each frame),
 ; so the character's entries are found by what DrawCharSprite wrote: the
-; slot's own tiles (slot * 4 + 0/2, first name table) in the slot's palette
-; (4 + slot).  The copies are appended at $71 and stop short of entry 112,
-; whose high-table byte ClearSpriteData does not clear.  A character drawn
-; at the floor DrawCharSprite clamps to (y = $97: parked) gets no copies.
+; slot's own tiles (slot * 4: + 0 the top half, + 2 the bottom; first name
+; table) in the slot's palette (4 + slot).  The copies are appended at $71
+; and stop short of entry 112, whose high-table byte ClearSpriteData does
+; not clear.  A half drawn at the floor DrawCharSprite clamps to (y = $97,
+; parked) is not found and gets no copies.
 ;
-; One pass over the frame's entries serves every boosting character: a
-; body tile ($00-$0f) names its slot (tile / 4), which names the palette
-; (4 + slot) and the pending boost to check.
-;
-; a8/i16, db=$7e.  Clobbers a and $36-$3f; preserves x/y.
+; a8/i16, db=$7e.  Clobbers a, $3f and OT6_AURAWORK; preserves x/y.
+
+AW_TOP   = OT6_AURAWORK+0               ; the halo's body entries * 4:
+AW_BOT   = OT6_AURAWORK+2               ;   top, bottom half (0 = none)
+AW_SLOT2 = OT6_AURAWORK+4               ; its entity offset
+AW_LEVEL = OT6_AURAWORK+6
+AW_TT    = OT6_AURAWORK+8               ; its top tile (byte)
+AW_AN    = OT6_AURAWORK+9               ; its attr low nibble (byte)
+AW_S     = OT6_AURAWORK+10              ; 0 top / 2 bottom
+AW_END   = OT6_AURAWORK+12              ; the frame's entries end * 4
+AW_WLO   = OT6_AURAWORK+14              ; the window: the copies' rows
+AW_WHI   = OT6_AURAWORK+16              ;   (the line past it)
+AW_HIDX  = OT6_AURAWORK+18              ; the high-table byte being read
+AW_LO    = OT6_AURAWORK+20              ; a half's copies' first row
+AW_HI    = OT6_AURAWORK+22              ; ... and last
+AW_NMAX  = OT6_AURAWORK+24              ; copies wanted, then fitting
+AW_X     = OT6_AURAWORK+26              ; Ot6HaloOff index: first, past last
+AW_ENDX  = OT6_AURAWORK+28
+AW_SUM   = OT6_AURAWORK+30              ; the fullest band's slivers
+AW_B0    = OT6_AURAWORK+32              ; a half's bands, first and last
+AW_B1    = OT6_AURAWORK+34
+AW_Y     = OT6_AURAWORK+36
+AW_HB    = OT6_AURAWORK+38
+AW_XY    = OT6_AURAWORK+40              ; the source's (y << 8) | x
+AW_TA    = OT6_AURAWORK+42              ; ... and its tile | attr << 8
+AW_HIST  = OT6_AURAWORK+44              ; slivers per 16-line band, bytes
+OT6_AURABANDS = 12                      ; bands 0-11: lines $00-$bf (+1 pad)
+
+; one OAM entry of the band scan, at y + K: if its rows touch the window,
+; its slivers go into the 16-line bands it touches.  a8 (b = 0)/i16.
+; $3e holds the group's high-table byte.
+.macro ot6_halo_entry K
+        .local large, next
+        lda     $0301+K,y
+        cmp     AW_WHI
+        bcs     next                    ; starts below the window (or the floor)
+        lda     $3e
+        and     #(2 << (K / 2))         ; this entry's size bit
+        bne     large
+        lda     $0301+K,y               ; 16x16: rows y .. y + 15, 2 slivers
+        clc
+        adc     #$0f
+        cmp     AW_WLO
+        bcc     next                    ; ends above it
+        lda     $0301+K,y
+        tax
+        lda     f:Ot6Band16,x
+        tax
+        lda     AW_HIST,x
+        clc
+        adc     #$02
+        sta     AW_HIST,x
+        lda     $0301+K,y
+        and     #$0f
+        beq     next
+        lda     AW_HIST+1,x
+        clc
+        adc     #$02
+        sta     AW_HIST+1,x
+        bra     next
+large:  lda     $0301+K,y               ; 32x32: rows y .. y + 31, 4 slivers
+        clc
+        adc     #$1f
+        bcs     :+                      ; (wraps past 255: it reaches the window)
+        cmp     AW_WLO
+        bcc     next
+:       lda     $0301+K,y
+        tax
+        lda     f:Ot6Band16,x
+        tax
+        lda     AW_HIST,x
+        clc
+        adc     #$04
+        sta     AW_HIST,x
+        lda     AW_HIST+1,x
+        clc
+        adc     #$04
+        sta     AW_HIST+1,x
+        lda     $0301+K,y
+        and     #$0f
+        beq     next
+        lda     AW_HIST+2,x
+        clc
+        adc     #$04
+        sta     AW_HIST+2,x
+next:
+.endmacro
 
 .proc Ot6AuraHalo
         .a8
         .i16
         phx
         phy
-        longa
-        lda     $71                     ; the frame's own entries end here;
-        and     #$00ff                  ;   copies appended below are not
-        asl     a                       ;   scanned
+        shorta0                         ; (b = 0 from here: tax moves 16 bits)
+        stz     AW_S+1
+        ; the halo's character: the one whose menu is open if it boosts,
+        ; else the highest boost, the lowest slot on a tie
+        lda     $7bca
+        beq     h_pick
+        lda     $62ca
+        and     #$03
         asl     a
-        pha
-        stz     $3c                     ; body entries left to find: two per
-        ldx     #$0006                  ;   boosting character, after which
-@count: lda     $3e9d,x                 ;   the scan stops (DrawCharSprite
-        and     #$00ff                  ;   draws them early, entries ~10-20)
-        beq     :+
-        inc     $3c
-        inc     $3c
+        tax
+        lda     $3e9d,x
+        bne     h_have
+h_pick: stz     $3f
+        ldx     #$0006
+:       lda     $3e9d,x
+        cmp     $3f
+        bcc     :+
+        sta     $3f
+        stx     AW_SLOT2
 :       dex
         dex
-        bpl     @count
-        ldy     #$0020                  ; entry 8, the first per-frame one
-@scan:  tya
-        cmp     $01,s
-        bcs     @end
-        lda     $3c
-        beq     @end
-        lda     $0302,y                 ; tile | attr << 8
-        bit     #$00f0                  ; character body tiles are $00-$0f
-        bne     @skip
-        and     #$000c
-        lsr     a
-        tax                             ; slot * 2: the entity offset
-        ora     #$0008                  ; palette 4 + slot, name table 0
-        sta     $3e
-        lda     $0303,y
-        and     #$000f
-        cmp     $3e
-        bne     @skip
-        lda     $3e9d,x                 ; pending boost
-        and     #$00ff
-        beq     @skip
-        dec     $3c                     ; one of the body entries sought
-        cmp     #$0004
+        bpl     :--
+        ldx     AW_SLOT2
+        lda     $3f
+        bne     h_have
+        jmp     h_out
+h_have: stx     AW_SLOT2
+        lda     $3e9d,x
+        cmp     #$04
         bcc     :+
-        lda     #$0003
-:       tax
-        lda     f:Ot6HaloCount-1,x      ; copies per sprite at this level
+        lda     #$03
+:       sta     AW_LEVEL
+        stz     AW_LEVEL+1
+        txa
+        asl     a
+        sta     AW_TT                   ; its top tile: slot * 4
+        txa
+        ora     #$08
+        sta     AW_AN                   ; its attr: palette 4 + slot, table 0
+        ; its two body entries: the first of each tile in its palette
+        longa
+        stz     AW_TOP
+        stz     AW_BOT
+        lda     $71
         and     #$00ff
         asl     a
-        sta     $36                     ; ... * 2: Ot6HaloOffsets' stride
+        asl     a
+        sta     AW_END                  ; the frame's own entries end
+        shorta0
+        ldy     #$0020                  ; entry 8, the first per-frame one
+h_find: cpy     AW_END
+        bcs     h_found
+        lda     $0302,y
+        eor     AW_TT
+        beq     :+                      ; the top tile
+        cmp     #$02
+        bne     h_fnext                 ; nor the bottom
+:       sta     AW_S                    ; 0 top, 2 bottom
+        lda     $0303,y
+        and     #$0f
+        cmp     AW_AN
+        bne     h_fnext
+        lda     $0301,y
+        cmp     #$97
+        bcs     h_fnext                 ; parked at the floor: no halo
+        ldx     AW_S
+        lda     AW_TOP,x
+        ora     AW_TOP+1,x
+        bne     h_fnext                 ; (the first found is the body)
+        longa
+        tya
+        sta     AW_TOP,x
+        lda     AW_TOP                  ; both found: done (DrawCharSprite
+        beq     :+                      ;   draws the bodies early, so this
+        lda     AW_BOT                  ;   stops in a few entries)
+        beq     :+
+        shorta0
+        bra     h_found
+:       shorta0
+h_fnext:
+        iny
+        iny
+        iny
+        iny
+        bra     h_find
+h_found:
+        longa
+        lda     AW_TOP
+        bne     :+
+        jmp     h_out
+:       tay
+        lda     $0301,y                 ; the window: the top half's copies'
+        and     #$00ff                  ;   first row (y - 2) ...
+        sec
+        sbc     #$0002
+        bcs     :+
+        lda     #$0000
+:       sta     AW_WLO
+        lda     $0301,y                 ; ... to the bottom's last (y + 16),
+        and     #$00ff                  ;   or the top's (y + 15) without one
+        clc
+        adc     #$0010
+        ldx     AW_BOT
+        beq     :+
+        lda     $0301,x
+        and     #$00ff
+        clc
+        adc     #$0011
+:       cmp     #$0097                  ; from the floor down: not ours
+        bcc     :+
+        lda     #$0097
+:       sta     AW_WHI                  ; (the line past the window)
+        ; the band histogram: every sprite touching the window, its slivers
+        ; into the 16-line bands it touches.  Entries 0 to the frame's end,
+        ; then the fixed 112-127, four a step (one high-table byte); those
+        ; between are ClearSpriteData's ($e0: off screen).
+        shorta0
+        ldx     #OT6_AURABANDS+2
+:       stz     AW_HIST,x
+        dex
+        bpl     :-
+        stz     AW_HIDX+1
+        stz     AW_HIDX
+        ldy     #$0000
+h_step: cpy     AW_END
+        bcc     :+
+        cpy     #$01c0
+        bcs     :+
+        ldy     #$01c0                  ; past the frame's: on to entry 112
+        lda     #$1c
+        sta     AW_HIDX
+:       cpy     #$0200
+        bcc     :+
+        jmp     h_grant
+:       ldx     AW_HIDX
+        lda     $0500,x
+        sta     $3e
+        inc     AW_HIDX
+        ot6_halo_entry 0
+        ot6_halo_entry 4
+        ot6_halo_entry 8
+        ot6_halo_entry 12
+        longa_clc
+        tya
+        adc     #$0010
+        tay
+        shorta0
+        jmp     h_step
+h_grant:
+        longa
+        ldy     AW_TOP                  ; the top half: rows y - 2 .. y + 15
         lda     $0301,y
         and     #$00ff
-        cmp     #$0097                  ; parked at the floor: no halo
-        bcs     @skip
-        jsr     Ot6HaloCopies
-@skip:  iny
-        iny
-        iny
-        iny
-        bra     @scan
-@end:   pla
-        shorta0
+        sec
+        sbc     #$0002
+        bcs     :+
+        lda     #$0000
+:       sta     AW_LO
+        clc
+        adc     #$0011
+        sta     AW_HI
+        ldx     AW_LEVEL
+        lda     f:Ot6HaloTopN-1,x
+        and     #$00ff
+        sta     AW_NMAX
+        stz     AW_X
+        jsr     Ot6HaloHalf
+        ldy     AW_BOT                  ; the bottom half: rows y .. y + 16
+        beq     h_out
+        lda     $0301,y
+        and     #$00ff
+        sta     AW_LO
+        clc
+        adc     #$0010
+        sta     AW_HI
+        ldx     AW_LEVEL
+        lda     f:Ot6HaloBotN-1,x
+        and     #$00ff
+        sta     AW_NMAX
+        lda     #OT6_HALOBOT
+        sta     AW_X
+        jsr     Ot6HaloHalf
+h_out:  shorta0
         ply
         plx
         rts
 .endproc
 
-; append copies of the OAM entry at y (entry * 4) at Ot6HaloDelta's first
-; $36 / 2 offsets, at $71 onward, stopping short of entry 112.
+; band of a line (16 lines a band), for every y
+Ot6Band16:
+        .repeat 256, I
+        .byte   I >> 4
+        .endrepeat
+
+; one half: y = its entry * 4, rows AW_LO..AW_HI (inclusive) its copies
+; cover, AW_NMAX copies wanted from Ot6HaloOff index AW_X.  The fullest band
+; those rows touch sets how many fit (2 slivers each, 34 a line); those are
+; placed and their slivers added to the bands.  a16/i16.  clobbers a, x, y.
+.proc Ot6HaloHalf
+        .a16
+        .i16
+        lda     AW_LO                   ; bands: 16 lines each
+        lsr     a
+        lsr     a
+        lsr     a
+        lsr     a
+        sta     AW_B0
+        lda     AW_HI
+        cmp     #$0097                  ; from the floor down: not ours
+        bcc     :+
+        lda     #$0096
+:       lsr     a
+        lsr     a
+        lsr     a
+        lsr     a
+        cmp     #OT6_AURABANDS
+        bcc     :+
+        lda     #OT6_AURABANDS-1
+:       sta     AW_B1
+        stz     AW_SUM                  ; the fullest band
+        ldx     AW_B0
+:       lda     AW_HIST,x
+        and     #$00ff
+        cmp     AW_SUM
+        bcc     :+
+        sta     AW_SUM
+:       cpx     AW_B1
+        inx
+        bcc     :--
+        lda     #34                     ; 2n <= 34 - fullest
+        sec
+        sbc     AW_SUM
+        bcs     :+
+        lda     #$0000
+:       lsr     a
+        cmp     AW_NMAX
+        bcc     :+
+        lda     AW_NMAX
+:       sta     AW_NMAX                 ; the copies that fit
+        beq     @none
+        asl     a
+        clc
+        adc     AW_X
+        sta     AW_ENDX
+        lda     $71                     ; (count what Ot6HaloCopies places)
+        and     #$00ff
+        pha
+        jsr     Ot6HaloCopies
+        lda     $71
+        and     #$00ff
+        sec
+        sbc     $01,s
+        asl     a                       ; slivers a line gained
+        sta     AW_SUM
+        pla
+        ldx     AW_B0
+:       lda     AW_HIST,x               ; (a byte count: the add never
+        clc                             ;   carries into the next band's)
+        adc     AW_SUM
+        sta     AW_HIST,x
+        cpx     AW_B1
+        inx
+        bcc     :-
+@none:  rts
+.endproc
+
+; append copies of the OAM entry at y (entry * 4) at Ot6HaloOff's offsets
+; [AW_X, AW_ENDX), at $71 onward, stopping short of entry 112.
 ;
 ; Characters are small (16x16) sprites well inside the screen, so the high
 ; table (x bit 8, size) is all zeroes for them and for their copies, and
@@ -281,11 +602,10 @@
 ; copies rather than a slower path.  With x in 3..252 and y below $97, a
 ; copy's position is one 16-bit add of (dy << 8) + dx to (y << 8) | x.
 ;
-; a16/i16, db=$7e.  preserves y; clobbers a, x, $38-$3b.
+; a16/i16, db=$7e.  clobbers a, x, y.
 .proc Ot6HaloCopies
         .a16
         .i16
-        phy
         tya
         lsr     a
         lsr     a
@@ -293,43 +613,42 @@
         lsr     a
         lsr     a
         tax
+        lda     $0500,x                 ; its high-table byte
+        sta     AW_HB
         pla
         and     #$0003
-        phx
         tax
-        lda     f:Ot6HiX,x              ; the entry's two high-table bits
+        lda     f:Ot6HiX,x              ; x bit 8 | size: both must be clear
         and     #$00ff
-        sta     $38
+        sta     AW_Y
         asl     a
-        tsb     $38
-        plx
-        lda     $0500,x
-        and     $38
+        ora     AW_Y
+        and     AW_HB
         bne     @done                   ; large or x >= 256: no halo
         lda     $0300,y                 ; (y << 8) | x
-        sta     $38
+        sta     AW_XY
         and     #$00ff
         cmp     #$0003
         bcc     @done                   ; at an edge: no halo
         cmp     #$00fd
         bcs     @done
         lda     $0302,y
-        sta     $3a                     ; tile | attr: copied as they are
+        sta     AW_TA                   ; tile | attr: copied as they are
         lda     $71
         and     #$00ff
         asl     a
         asl     a
         tay                             ; the first destination * 4
-        ldx     #$0000                  ; offset index * 2
-@copy:  cpx     $36
-        bcs     @end                    ; this level's copies all placed
+        ldx     AW_X
+@copy:  cpx     AW_ENDX
+        bcs     @end                    ; this half's copies all placed
         cpy     #$01c0
         bcs     @end                    ; entries 112+ are not ours to fill
-        lda     $38
+        lda     AW_XY
         clc
-        adc     f:Ot6HaloDelta,x
+        adc     f:Ot6HaloOff,x
         sta     $0300,y                 ; x, y
-        lda     $3a
+        lda     AW_TA
         sta     $0302,y                 ; tile, attr
         iny
         iny
@@ -344,25 +663,31 @@
         shorta
         sta     $71                     ; the next free entry
         longa
-@done:  ply
-        rts
+@done:  rts
 .endproc
 
-; copies per sprite at 1/2/3 BP
-Ot6HaloCount:
-        .byte   2, 4, 7
+; copies a half at 1/2/3 BP (before the budget)
+Ot6HaloTopN:
+        .byte   2, 3, 6
+Ot6HaloBotN:
+        .byte   2, 3, 3
 
-; x-bit-8 mask for an entry's position within its high-table byte
+; x-bit-8 mask for an entry's position within its high-table byte (its size
+; bit is the next one up)
 Ot6HiX:
         .byte   $01, $04, $10, $40
 
-; halo offsets as 16-bit (dy << 8) + dx deltas to (y << 8) | x: the first
-; n are used at a level
-Ot6HaloDelta:
-        .word   $ffff, $0001            ; left, right
-        .word   $ff00, $0100            ; up, down
-        .word   $feff, $ff01            ; up-left, up-right
-        .word   $fe00                   ; two up
+; halo offsets as 16-bit (dy << 8) + dx deltas to (y << 8) | x; a level
+; uses the first n of its half's run.  The top half's move up only, the
+; bottom half's down only (see the block comment).
+Ot6HaloOff:
+        .word   $ffff, $0001            ; top: left, right
+        .word   $ff00                   ;   up
+        .word   $fe00                   ;   two up
+        .word   $feff, $ff01            ;   up-left, up-right
+OT6_HALOBOT = * - Ot6HaloOff
+        .word   $ffff, $0001            ; bottom: left, right
+        .word   $0100                   ;   down
 
 ; intensity over the 8-step pulse: a triangle
 Ot6AuraTri:

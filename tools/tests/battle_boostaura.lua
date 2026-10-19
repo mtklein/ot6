@@ -8,7 +8,9 @@
 --     outline colour (colour 1) replaced from Ot6AuraOutline's row for the
 --     level, stepping through the row (the pulse);
 --   * the halo: copies of the character's two body sprites (tiles slot*4 +
---     0/2, palette 4 + slot), Ot6HaloCount per sprite: 2/4/7 at 1/2/3 BP.
+--     0/2, palette 4 + slot): 4/6/9 at 1/2/3 BP for one booster on its own
+--     (Ot6HaloTopN + Ot6HaloBotN; the scanline budget, battle_auraband,
+--     trims them only where other sprites crowd the lines).
 -- With no boost pending both are absent: two body sprites, and colour 1 is
 -- the character's unaltered colour (w7e81ad, the copy UpdateCharPal restores
 -- from).
@@ -21,7 +23,7 @@ local STATE = "build/states/kolts_cave.mss.lua"
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local OAM, CG = emu.memType.snesSpriteRam, emu.memType.snesCgRam
 local PRISTINE = 0x7E81AD                  -- w7e81ad: unaltered char palettes
-local COPIES = { 2, 4, 7 }                 -- Ot6HaloCount
+local COPIES = { 4, 6, 9 }                 -- Ot6HaloTopN + Ot6HaloBotN (top + bottom half)
 local actor
 local function pend(s) return H.readByte(0x3e9d + s * 2) end
 local function bp(s) return H.readByte(0x3e9c + s * 2) end
@@ -84,7 +86,7 @@ end
 
 local function checkLevel(level, what)
   return H.call(function()
-    local want = 2 + 2 * COPIES[level]
+    local want = 2 + COPIES[level]
     local row, seen, distinct = nil, {}, 0
     for k, s in ipairs(samples) do
       H.assertEq(s.pend, level, what .. ": pending boost held (frame " .. k .. ")")
@@ -215,7 +217,7 @@ H.run({ maxFrames = 40000 }, {
     for _, s in ipairs(samples) do
       if s.pend == 3 then
         held = held + 1
-        if s.n == 16 then full = full + 1 end
+        if s.n == 2 + COPIES[3] then full = full + 1 end
       end
     end
     H.log(string.format("[aura] boosted Fight: %d frames with 3 BP pending, %d of them with the full halo",

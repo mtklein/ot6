@@ -77,8 +77,10 @@
 -- This replaces af45ec3f's rule ("entered again on the same continuation,
 -- without snapshot rerolls"), by decision at the v031-robust-2 review: a
 -- restore is acceptable here because what follows it is a different
--- deterministic input (one more Defend) from a fixed opening, bounded by
--- MAX_LEAD and asserted, not the same draw re-rolled until it passes.  A
+-- deterministic input (one more Defend) from a fixed opening, not the same
+-- draw re-rolled until it passes.  MAX_LEAD bounds those retries within one
+-- crowd; a case still interrupted after them is owed to the next crowd, and
+-- MAX_CROWDS is the assert (every case met within that many crowds).  A
 -- wrong target side while SETZER's control is free is not an interruption
 -- and is never retried: it fails the run.
 -- If a command spent its pips, real Defends rebuild the requested bank.
