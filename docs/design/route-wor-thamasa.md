@@ -703,14 +703,26 @@ made to pass at one attempt across draws (`lab/` under
   the bag when Merton took 3,366 from each member on the walk down
   (`mm18_*_s4`).
 - **The walk down dry.** A long MagiMaster fight spent the 99 Tinctures and
-  TERRA passed at 0 MP (`f4e_*_s2`); on the walk down a random battle the
-  party has no MP to fight is run from (`opts.runWhenDry`).
+  TERRA passed at 0 MP (`f4e_*_s2`). Twenty Tinctures are kept out of the
+  care before MagiMaster and of his fight for the walk down (supplies, not
+  running: the decision of 2026-10-13; a run-when-dry rule was tried and
+  removed).
 - **A second MagiMaster battle.** His dying Ultima took all four to 0 and
   Life 3 raised them after his death; a new walker read that as a battle
   (`sw2_k3_s0`: `its formation was fought once: got 2`). A watch that
   opens with every seat at 0 HP and no monster standing is a tail.
-- **His fight is long.** Won fights ran 46,501 to 195,414 ticks (`sw4_*`),
-  and one ran out 200,000 at full party HP; the fight now has 400,000.
+- **His end.** Two Ultimas can take him from 45% to 5% inside 600
+  frames; Life 3 now starts at 60% of his HP and the hold at 40%, the hold
+  lasts while a member can still cast Life 3, and a held seat never falls
+  through to an attack (`re1`-`re3_k3_s0`: his dying Ultima wiped the four).
+- **A greyed Magic row.** With no Fight row and no Magic line a seat uses a
+  Tonic or Potion rather than a pass that parks the menu (`dbg1_k0_s25`).
+- **His fight is long.** Won fights ran 46,501 to 195,414 ticks (`sw4_*`).
+  sw4_k5_s3 was not slow but stalled: he reached 4,081 HP, every cast was
+  nulled for about 7,500 frames, and he healed to 21,230 by the old
+  200,000. The fight has 400,000 frames, and fails loudly when his HP sets
+  no new low in 120,000 ticks (`opts.progressVs`; the longest such stretch
+  in 72 won fights was 84,900).
   Three of the eight elements are no member's, and a cast that lands after
   his wall turned is absorbed. This is a fight won by attrition, a lab
   candidate: more elements (an earth, wind or water caster) or a way to
@@ -723,3 +735,10 @@ battle key ($be and group): MagiMaster in 26 keys of 36 meetings, the L.90
 and L.80 Magic in 35 of 42, the L.90 and L.60 Magic in 20 of 24. His fight
 ran 39,982 to 203,654 ticks. Before these changes the same sweep shape
 passed 13 of 18 (`sw2_*`) and 16 of 18 (`sw4_*`).
+
+After the review fixes, the same sweep at 3f3e7ea1 (`sw13_*`, `sw14_*`):
+36 of 36 at one attempt; MagiMaster in 26 keys of 36 meetings, the L.90
+and L.80 Magic in 31 of 42, the L.90 and L.60 Magic in 18 of 24; his fight
+ran 53,495 to 198,092 ticks. The draws of sw4_k5_s3 and sw2_k3_s0 passed
+(`re5_*`), and with the dead-open tail rule switched off (`mut6_k5_s3`)
+the k5 s3 draw failed `MagiMaster: its formation was fought once: got 2`.

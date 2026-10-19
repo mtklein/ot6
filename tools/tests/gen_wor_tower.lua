@@ -56,12 +56,12 @@ local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.6 }
 -- on RELM's Drain, f11a4a92), and with the default list back RELM cast it 64
 -- times in a fight that ran out of time at 17,531 of his 50,000 ('took 0 off
 -- the monsters ... atk $04': build/attempts/wt/v031-tower-2/lab/sw2_k4_s13)
--- MagiMaster's HP must set a new low every 90,000 battle ticks (Driver
--- opts.progressVs).  Over the 36 won fights of the sweep the longest
--- stretch without a new low was 71,400 ticks (sw5_k3_s5); the rest stayed
--- under 46,500 (build/attempts/wt/v031-tower-2/mmgap.sh over lab/sw5_*,
--- sw6_*)
-BOSS_FIGHT.progressVs = { [0x166] = 90000 }
+-- MagiMaster's HP must set a new low every 120,000 battle ticks (Driver
+-- opts.progressVs).  Over 72 won fights the longest stretch without a new
+-- low was 84,900 ticks (sw14_k0_s1, with the hold from 40%), then 71,400
+-- (sw5_k3_s5) (build/attempts/wt/v031-tower-2/mmgap.sh over lab/sw5_*,
+-- sw6_*, sw13_*, sw14_*)
+BOSS_FIGHT.progressVs = { [0x166] = 120000 }
 -- his counter to every hit is WallChange (AIScript::_358), so a seat with
 -- nothing that lands casts something he nulls to turn the wall (Driver
 -- opts.wallChangeVs)
@@ -915,7 +915,7 @@ H.run({ maxFrames = 1500000 }, {
   -- (f+165300), every party cast was nulled for about 7,500 frames ('took 0
   -- off the monsters', 'NULLS fire (live null byte $FD)'), then he healed
   -- to 21,230 by the old limit.  BOSS_FIGHT.progressVs fails a fight that
-  -- sets no new low in 90,000 ticks, well inside this bound
+  -- sets no new low in 120,000 ticks, inside this bound
   H.advanceStory(function()
     return sw(0x02DB) == 1 and not H.battleLoadStarted() and map() == MAP_TOP and settled()
   end, 400000, { playBattles = "tactical", fight = BOSS_FIGHT, reserve = walkDownReserve() }),
