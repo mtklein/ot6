@@ -155,6 +155,12 @@ compose inlines both, so scripts see one `H`):
   `opts.playBattles="tactical"` (or another human-executable battle mode).
   The legacy flag-writing path is not legitimate play.
 - `H.navDump()` — one-line navigator state.
+- `H.bfsReach(sx, sy, sz, links [, tx, ty])`, `H.navLinks(tx, ty, links,
+  opts)` — reach and walk over the floor plus tile events that carry the
+  party (the Phoenix Cave's rock jumps).
+- Split parties (`H.switchParty`, `H.partyRoster`, `H.partyWhere`, the
+  ledger `H.splitBegin`/`H.splitReport`, `H.splitReserveFor`,
+  `H.splitCare`): [split-party.md](design/split-party.md).
 
 ### True passability (the engine's own rules, from RAM)
 

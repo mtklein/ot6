@@ -2658,9 +2658,14 @@ function M.flyTo(tx, ty, opts)
     -- build/attempts/wt/v032-splitparty/lab/g1, 'battle key be90-g01CF ...
     -- map 1') is fought with the walks' driver (opts.fight reaches it), and
     -- its frames are not the flight's: opts.maxFrames bounds the flying.
+    -- Doom Gaze killed in the air plays its scene on the Falcon's deck (map
+    -- 17, DoomGazeDefeated: Bahamut, then back aloft) before the flight
+    -- goes on: a field map with no landing pressed yet is that scene, ridden
+    -- with A on its dialogs, not the landing's event (lab/swp_k5_s0: the
+    -- deck read as the cave's landing and the party menu never came)
     M.driveUntil(function()
       if opts.entersMap then
-        landed = not M.worldMode() and (M.readWord(0x1f64) & 0x1FF) ~= 3
+        landed = presses > 0 and not M.worldMode() and (M.readWord(0x1f64) & 0x1FF) ~= 3
       else
         landed = M.worldMode() and not M.aboardAirship() and M.worldHasControl()
       end
@@ -2680,6 +2685,10 @@ function M.flyTo(tx, ty, opts)
         end
         if bn > 0 then M.setPad({}); return end
         if fought then fought = false; drv.idle() end
+        if not M.worldMode() then
+          M.setPad((M.dialogWaiting() and M.frame % 8 < 4) and { "a" } or {})
+          return
+        end
         flown = flown + 1
         if flown > (opts.maxFrames or 6000) then
           error(string.format("%s: not landed after %d frames in the air (battles excluded)", what, flown), 0)
