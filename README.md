@@ -21,8 +21,7 @@ Main changes:
   permanently.
 - Characters have distinct skill sets.
 
-See [the design](docs/DESIGN.md) for mechanics and
-[the tooling guide](docs/TOOLING.md) for setup.
+See [the design](docs/DESIGN.md) for details.
 
 ## Android
 
@@ -36,60 +35,15 @@ own ROM.
    Fantasy III (USA) v1.0 ROM. If needed, select the ROM file directly.
 3. Later app updates replace `OT6.sfc` with the new version.
 
-The original ROM is not changed. `OT6.sfc` keeps the same name so the
-emulator can keep using its save file.
+`OT6.sfc` keeps its name across updates, so your emulator keeps its save.
 
-For RetroArch, scan the folder containing `OT6.sfc`. Remove
-`Final Fantasy III (USA).bps` from the original ROM's folder if you no longer
-use soft patching. Do not place another patch beside `OT6.sfc`.
+For RetroArch, scan the folder containing `OT6.sfc`.
 
 ## Building
 
-Place `Final Fantasy III (USA).sfc` in the repository root. It must have
-SHA-1 `4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7`. The ROM is not included.
-
-```sh
-brew bundle
-python3 -m pip install numpy
-python3 configure.py
-ninja
-ninja release
-```
-
-Mesen and Flips require separate installation. See
-[the tooling guide](docs/TOOLING.md).
-
-`ninja` builds both ROMs and runs the full test graph. `ninja release` also
-runs release checks and creates the release archive. Specific outputs can be
-built directly:
-
-```sh
-ninja ff6/rom/ff6-en.sfc
-ninja build/results/suite/battle_break.ok
-ninja build/states/vargas_entry.mss.lua
-```
-
-`tools/gui.sh` opens the built ROM in Mesen. To record a test run:
-
-```sh
-OT6_RECORD=1 tools/tests/run.sh tools/tests/<test>.lua
-```
-
-See [the recording guide](tools/stream/README.md) for details.
-
-## Code
-
-OT6 assembly starts in [ff6/src/battle/ot6.asm](ff6/src/battle/ot6.asm).
-[ff6/src/battle/ot6_memory.inc](ff6/src/battle/ot6_memory.inc) defines shared
-WRAM and SRAM. `ff6/` is a vendored copy of the everything8215 FF6
-disassembly.
-
-See [the headless play guide](docs/playing-headless.md) and
-[the test harness guide](tools/tests/README.md).
-
-## Contributing
-
-See [AGENTS.md](AGENTS.md).
+Put `Final Fantasy III (USA).sfc` (SHA-1
+`4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7`) in the repository root, then run
+`python3 configure.py` and `ninja`. See [the tooling guide](docs/TOOLING.md).
 
 ## License
 
