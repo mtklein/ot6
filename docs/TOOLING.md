@@ -342,6 +342,60 @@ batch bypasses placement. No power settings are changed. Run
 `python3 tools/stream/power_scheduling_selftest.py` for synthetic AC/battery,
 stale observation, claim, and queued admission checks without emulators.
 
+## The run's heartbeat
+
+`tools/tests/run.sh` bounds a run by progress, not by a wall clock. The lib's
+runner prints `[ot6hb] <frame> - <n> <progress frame> <what>` at frame 20,
+every 1024 frames, and when progress was made (at most one such line per 128
+frames). `n` counts **progress**; run.sh polls the log's tail every 5 s and
+kills the run when `n` has not changed for `OT6_HEARTBEAT` seconds (default
+120). Frames advancing is not progress (owner, 2026-10-19): a game parked in
+the field menu ticks and animates forever.
+
+What counts, through the one hook `H.progress(why)` in `lib/ot6.lua`:
+
+- a top-level step of `H.run`'s list completing; `waitUntil`, `waitUntilSoft`
+  or `driveUntil` reaching its goal (not `waitFrames`, and not a step inside
+  a looping `driveUntil`);
+- a battle action resolving (an ExecCmd entry): a boss fight spends thousands
+  of frames on turns that change no HP;
+- the game state moving, sampled every 32 frames: the map, the party's
+  position, gil, the bag, the roster's stats and gear, the story's switches
+  and NPC bits, and every battler's HP and MP.
+
+Per-step budgets, no-progress watchdogs and `maxFrames` stay the script's
+own defence against in-game stalls; this is what ends a run that is hung or
+idling in a way they do not catch.
+
+A kill is reported as a stall, distinct from the backstop:
+
+    [ot6] KILLED BY A STALL: no verdict, and the run stopped making progress:
+    the last milestone (hp) was at frame 1120, 31s before the kill; the newest
+    heartbeat was at frame 19456 (window 30s, OT6_HEARTBEAT); ...
+
+The retry policy is unchanged: a stall or backstop kill is retried
+`OT6_TIMEOUT_RETRIES` times (default 1). The watch arms at the first
+heartbeat, so a script that never runs the lib's runner is bounded by the
+backstop alone. The last-resort backstop is `OT6_HARD_CAP` (default 21600 s,
+also Mesen's `--timeout`; reported as `KILLED BY THE TIMEOUT`). `OT6_TIMEOUT`,
+the old per-run cap, is accepted and ignored: configure.py's `TEST_ENV` and
+savestate_ninja.py's `timeout=` still pass it, and can drop it at leisure.
+
+**The window.** `tools/hb_gaps.py` follows one run and records the wall time
+between changes of `n`. On px13 (24 threads, nothing else of ours running; the
+runs below are the evidence, `build/attempts/wt/v031-heartbeat/`):
+
+| run | frames | wall | longest gap between milestones |
+|---|---|---|---|
+| gen_wor_relm, alone-ish (4 emulators) | 299,201 | 656-738 s | 5 s |
+| gen_wor_tower (MagiMaster), same | 366,063 | 714-807 s | 4 s with battle actions counted (40 s with HP alone: 18,000 frames of shielded turns) |
+| both, 106 frames/s (each on a quarter core: 2 emulators + 2 spinners pinned to one thread) | | 3113 s, 3327 s | tower 20 s (frame 35,712, a roster change), relm 10 s |
+
+A loaded machine emulates about 80-100 frames/s (savestate_ninja.py's
+CUTTER_TIMEOUT comment), unloaded about 500, so the loaded figures are the
+ones to size from: the longest gap was 20 s, and 120 s is six times that. The
+retired caps could not have passed the relm run (3327 s against a 600 s default).
+
 ## Mesen facts the harness depends on
 
 - With no config file, Mesen ignores `--testrunner` and launches the GUI
