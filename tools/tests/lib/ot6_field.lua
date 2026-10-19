@@ -482,15 +482,25 @@ end
 function M.navLinks(tx, ty, links, opts)
   opts = opts or {}
   local what = opts.what or string.format("to (%d,%d) by the links", tx, ty)
-  return M.lazy(function()
+  local tries = 0
+  local build
+  build = function()
     local legs = nil
     for _, z in ipairs({ false, 1, 2, 0, 3 }) do
       legs = M.bfsReach(nil, nil, z or nil, links, tx, ty, opts.avoid)
       if legs then break end
     end
     if not legs then
-      error(string.format("navLinks: no route (%d,%d)->(%d,%d) over the floor and %d link(s)", M.fieldX(),
-        M.fieldY(), tx, ty, #(links or {})), 0)
+      -- a wandering NPC can stand in the only corridor for a while (navTo's
+      -- own patience): idle 45 frames and plan again, opts.noPathRetries times
+      tries = tries + 1
+      if tries > (opts.noPathRetries or 20) then
+        error(string.format("navLinks: no route (%d,%d)->(%d,%d) over the floor and %d link(s) [%d retries]",
+          M.fieldX(), M.fieldY(), tx, ty, #(links or {}), tries - 1), 0)
+      end
+      M.log(string.format("[links] %s: no route (%d,%d)->(%d,%d); waiting (retry %d)", what, M.fieldX(), M.fieldY(),
+        tx, ty, tries))
+      return M.seqStep({ M.waitFrames(45), M.lazy(build) })
     end
     -- a walk leg's own plan must not step onto a link's tile (it would
     -- take the link where the plan meant to walk)
@@ -552,7 +562,8 @@ function M.navLinks(tx, ty, links, opts)
     end
     M.log(string.format("[links] %s from (%d,%d): %s", what, M.fieldX(), M.fieldY(), table.concat(desc, "; ")))
     return M.seqStep(steps)
-  end)
+  end
+  return M.withReset(M.lazy(function() return build() end), function() tries = 0 end)
 end
 
 -- ------------------------------------------------------- BFS navigation --
@@ -9294,7 +9305,12 @@ end
 -- held until it reads back, and only then is A edge-tapped.
 -- (M.chaseTalk above is the wandering-NPC variant with a choice-prompt
 -- terminator; this one is for posted NPCs and terminates on engagement.)
-function M.talkToObj(obj, what, maxF)
+-- done (optional): the talk's business is already settled, by another way
+-- than the talk -- a wandering NPC whose touch runs its event (the Phoenix
+-- Cave's Red Dragon met the party on the approach and was fought there,
+-- then the poke waited on a hidden object: build/attempts/wt/
+-- v032-splitparty/lab/swl2_k4_s0) -- and counts as engaged.
+function M.talkToObj(obj, what, maxF, done)
   local engaged = false
   local function objAt() return M.objX(obj), M.objY(obj) end
   local function adjacent()
@@ -9325,6 +9341,7 @@ function M.talkToObj(obj, what, maxF)
                    function() local p = approach(); return p and p[2] end, {
       maxFrames = maxF or 20000, playBattles = "tactical",
       arrive = function()
+        if done and done() then engaged = true end
         return engaged or (adjacent() and M.hasControl() and M.tileAligned())
       end,
     })
@@ -9332,6 +9349,7 @@ function M.talkToObj(obj, what, maxF)
   local function pokeStep(round, budget, hard)
     local started, waited, aPh = 0, 0, 0
     return M.withReset(M.driveUntil(function()
+      if engaged or (done and done()) then engaged = true; return true end
       started = (M.eventRunning() or M.dialogWaiting()) and started + 1 or 0
       if started >= 6 then engaged = true; return true end
       waited = waited + 1

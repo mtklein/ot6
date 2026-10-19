@@ -123,11 +123,19 @@ H.run({ maxFrames = 2400000 }, {
 
   -- ---- 2. the Red Dragon ---------------------------------------------------------------
   -- @@stage dragon
-  -- touch-to-fight (315 NPC_1 at (20,46), _cc2048: battle 138, a game over
-  -- when lost); party 2 tops up first
-  walk(20, 45, "party 2 above the Red Dragon"),
+  -- touch-to-fight (315 NPC_1, _cc2048: battle 138, a game over when
+  -- lost).  It wanders its room (18-21,44-48): the walk to its side met it
+  -- in the corridor and fought it there under the walk's driver, then the
+  -- talk waited on a dragon gone (lab/swl_k1_s0: 'battle $174 WON' then
+  -- 'activation round 2' timed out), and a walk planned onto (20,45) found
+  -- it in the way (swl_k2_s0: 'no route (19,25)->(20,45)').  So party 2
+  -- tops up in the corridor above its room, and the talk, which finds it
+  -- where it stands, is made only while it is still shown
+  walk(16, 38, "party 2 in the corridor above the Red Dragon's room"),
   H.fieldCare({ threshold = 0.95, tag = "before the Red Dragon" }),
-  H.talkToObj(0x10, "the Red Dragon (315 NPC_1)"),
+  H.cond(function() return sw(0x069C) == 1 end, {
+    H.talkToObj(0x10, "the Red Dragon (315 NPC_1)", nil, function() return sw(0x069C) == 0 end),
+  }, {}),
   H.advanceStory(function() return sw(0x069C) == 0 and map() == MAP_CAVE and settled() end, 200000,
     { playBattles = "tactical", fight = BOSS_FIGHT }),
   H.call(function() say("boss", "the Red Dragon beaten") end),
@@ -146,7 +154,12 @@ H.run({ maxFrames = 2400000 }, {
   chestIfNear(13, 20, 0x0AB, "Ribbon (313 (13,20))", RIBBON),
   H.lazy(function()
     local m = {}
-    for _, c in ipairs(H.partyRoster(1)) do m[#m + 1] = { c, H.SPLIT_NAMES[c] } end
+    -- the members the Relic menu takes: a KO'd or zombied member's A is
+    -- refused there (lab/swl2_k4_s7: STRAGO zombied at 0 HP, '4 A presses
+    -- on the target were not taken')
+    for _, c in ipairs(H.partyRoster(1)) do
+      if H.charHp(c) > 0 and (H.charStatus1(c) & 0xC2) == 0 then m[#m + 1] = { c, H.SPLIT_NAMES[c] } end
+    end
     return H.dressRelics(m, { tag = "relics with the Ribbon, party 1" })
   end),
   door(6, 7, MAP_CAVE, "party 1: -> 315 (6,12)"),
