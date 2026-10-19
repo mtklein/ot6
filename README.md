@@ -7,11 +7,15 @@ mechanics while keeping the FF6 story, world, and characters.
 
 - Enemies have shields and weaknesses. Weak hits remove shields. Broken
   enemies lose turns and take more damage.
+  ![A weak hit against a shielded enemy](docs/img/shields.png)
 - Characters gain and spend Boost Points. Boost can add hits, raise spell
   tiers, improve odds, or extend effects.
+  ![Boost arrows beside a character](docs/img/boost.png)
 - Equipped Magicite grant spells and stats. They do not teach spells
   permanently.
+  ![A character's equipped Magicite](docs/img/magicite.png)
 - Characters have distinct skill sets.
+  ![A character's skill list](docs/img/skills.png)
 
 See [the design](docs/DESIGN.md) for details.
 
