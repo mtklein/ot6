@@ -46,6 +46,14 @@ local FIGHT = { cure = false, shellVs = { [0x164] = true }, magicFirst = { [0x16
 -- ran out of time (lab/mm12_*), against two of three in 116,000 with the
 -- elements (mm11)
 local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.4 }, reraiseHold = { [0x166] = 0.15 } }
+-- no Drain on the bosses: it heals MagiMaster (his HP rose 38,578 -> 41,594
+-- on RELM's Drain, f11a4a92), and with the default list back RELM cast it 64
+-- times in a fight that ran out of time at 17,531 of his 50,000 ('took 0 off
+-- the monsters ... atk $04': build/attempts/wt/v031-tower-2/lab/sw2_k4_s13)
+BOSS_FIGHT.magicOnly = {}
+for _, id in ipairs(H.MAGIC_ONLY_SPELLS) do
+  if id ~= 0x04 then BOSS_FIGHT.magicOnly[#BOSS_FIGHT.magicOnly + 1] = id end
+end
 local WALL_RING = 0xBB
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
