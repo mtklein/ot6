@@ -7824,6 +7824,90 @@ function M.relicPlan(members, opts)
   return plan
 end
 
+-- M.unequipRelics(charId, slots, opts): take the relics out of the named
+-- slots (4 and/or 5) of one active-party member into the bag, through the
+-- Relic menu's Remove option (menu/equip.asm: relic options $59, column 1
+-- Remove, slot select $5c: A on a slot puts the relic back in the bag
+-- through IncItemQty and empties the slot).  A slot already empty is
+-- skipped; every named slot is asserted empty after.  One menu session.
+-- Reads and presses only.
+function M.unequipRelics(charId, slots, opts)
+  opts = opts or {}
+  local tag = opts.tag or string.format("unequip char %d", charId)
+  local base = 0x1600 + 37 * charId
+  local ZM, CUR, SLOTCUR = 0x26, 0x4b, 0x4b
+  local ST_MAIN, ST_CHAR, ST_OPT, ST_SLOT = 0x05, 0x06, 0x59, 0x5c
+  local MAINROW = 3
+  local pos
+  local function st() return M.readByte(ZM) end
+  local function slotByte(slot) return M.readByte(base + 0x1F + slot) end
+  local function anyToDo()
+    for _, slot in ipairs(slots) do if slotByte(slot) ~= 0xFF then return true end end
+    return false
+  end
+  local steps = {
+    M.waitUntil(function() return menuHome() and st() ~= ST_MAIN end, 600,
+      tag .. ": field settled before the menu", 5),
+    M.waitFrames(20),
+    M.driveUntil(function() return st() == ST_MAIN end, 1200,
+      { M.pressButtons({ "x" }, 4), M.waitFrames(30) }, tag .. ": main menu"),
+    M.waitFrames(20),
+    M.driveUntil(function() return st() == ST_MAIN and M.readByte(CUR) == MAINROW end, 900,
+      { M.pressButtons({ "down" }, 2), M.waitFrames(10) }, tag .. ": cursor on the Relic row"),
+    M.confirmA(tag .. ": character select",
+      function() return st() == ST_MAIN and M.readByte(CUR) == MAINROW end,
+      function() return st() == ST_CHAR end),
+    M.waitFrames(10),
+    M.driveUntil(function() return st() == ST_CHAR and M.readByte(CUR) == pos end, 600,
+      { M.pressButtons({ "down" }, 2), M.waitFrames(10) }, tag .. ": character cursor"),
+    M.confirmA(tag .. ": relic options",
+      function() return st() == ST_CHAR and M.readByte(CUR) == pos end,
+      function() return st() == ST_OPT end),
+    M.waitFrames(10),
+    M.driveUntil(function() return st() == ST_OPT and M.readByte(CUR) == 1 end, 600,
+      { M.pressButtons({ "right" }, 2), M.waitFrames(10) }, tag .. ": cursor on the Remove option"),
+    M.confirmA(tag .. ": remove slot select",
+      function() return st() == ST_OPT and M.readByte(CUR) == 1 end,
+      function() return st() == ST_SLOT end),
+    M.waitFrames(10),
+  }
+  for _, slot in ipairs(slots) do
+    local row = slot - 4
+    local held
+    local itag = string.format("%s slot %d", tag, slot)
+    steps[#steps + 1] = M.cond(function()
+      held = slotByte(slot)
+      return held ~= 0xFF
+    end, {
+      M.driveUntil(function() return st() == ST_SLOT and M.readByte(SLOTCUR) == row end, 600,
+        { M.pressButtons({ row == 1 and "down" or "up" }, 2), M.waitFrames(10) }, itag .. ": slot cursor"),
+      M.confirmA(itag .. ": removed",
+        function() return st() == ST_SLOT and M.readByte(SLOTCUR) == row end,
+        function() return slotByte(slot) == 0xFF end),
+      M.call(function()
+        M.log(string.format("[%s] slot %d: $%02X back in the bag (now %d)", tag, slot, held, M.invCountOf(held)))
+      end),
+    }, {})
+  end
+  steps[#steps + 1] = M.driveUntil(menuBack(), 1200,
+    { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, tag .. ": back out")
+  steps[#steps + 1] = M.waitFrames(20)
+  return M.seqStep({
+    M.call(function()
+      local partyByte = M.readByte(0x1850 + charId)
+      M.assertEq(partyByte & 0x07, M.readByte(0x1A6D) & 0x07, tag .. ": character is in the active party")
+      pos = (partyByte >> 3) & 0x03
+      M.log(string.format("[%s] char=%d row=%d relics before=%02X %02X", tag, charId, pos, slotByte(4), slotByte(5)))
+    end),
+    M.cond(anyToDo, steps, { M.logStep(function() return "[" .. tag .. "] nothing to remove" end) }),
+    M.call(function()
+      for _, slot in ipairs(slots) do
+        M.assertEq(slotByte(slot), 0xFF, string.format("%s: slot %d is empty", tag, slot))
+      end
+    end),
+  })
+end
+
 -- M.dressRelics(members, opts): M.relicPlan at the moment it is reached,
 -- then each member's changes through the Relic menu (M.equipKit), a member
 -- whose new relics are all in the bag first (a relic moving from one member
@@ -7833,9 +7917,10 @@ function M.dressRelics(members, opts)
   opts = opts or {}
   local tag = opts.tag or "relics"
   local plan, queue, cur, restore = nil, nil, nil, nil
+  local removals = 0
   -- a member's changes through the Relic menu, and the gear the menu's
   -- Optimum re-equip moved put back after (a swap's stand-in too)
-  local function relicStep(p, changes, label)
+  local function relicStep(p, changes, label, remove)
           -- The Relic menu re-equips by Optimum on the way out whenever the
           -- relics changed and the old or new pair holds a Genji Glove,
           -- Gauntlet or Merit Award, one that stays put included
@@ -7846,7 +7931,7 @@ function M.dressRelics(members, opts)
           local before = {}
           for s = 0, 3 do before[s] = charByte(p.ch, 0x1F + s) end
           return M.seqStep({
-            M.equipKit(p.ch, changes, { tag = label }),
+            remove and M.unequipRelics(p.ch, remove, { tag = label }) or M.equipKit(p.ch, changes, { tag = label }),
             {
               tick = function()
                 if restore == nil and p.handCome then
@@ -7981,29 +8066,59 @@ function M.dressRelics(members, opts)
             -- no spare relic stands in.  A cycle: each member waiting wants a relic another waiting
             -- member wears (wor_relm on the v031-robust chain: CYAN for
             -- CELES's Peace Ring, CELES for CYAN's Hyper Wrist), and the
-            -- Relic menu equips only from the bag.  The first member in the
-            -- queue keeps what he wears in the slots the bag cannot fill and
-            -- takes the rest; that frees nothing for the others, so the
-            -- cycle unwinds one member at a time and every member ends on
-            -- relics he holds (the plan's slots re-read as what stays).
-            local p = queue[1]
-            local keep = {}
-            for _, c in ipairs(p.changes) do
-              if M.invCountOf(c[2]) >= 1 then keep[#keep + 1] = c
-              else
-                M.log(string.format("[%s] %s keeps %s in slot %d: the plan's %s is worn by a member still waiting "
-                  .. "on one of his (a swap the Relic menu cannot make from the bag)", tag, p.name,
-                  relicName(charByte(p.ch, 0x1F + c[1])), c[1], relicName(c[2])))
-                p.cur[c[1]] = charByte(p.ch, 0x1F + c[1])
-                p.want[c[1]] = p.cur[c[1]]
+            -- Relic menu equips only from the bag.  The unwind (#439): a
+            -- member who wears a relic another waiting member wants takes
+            -- it off into the bag (the Relic menu's Remove), which frees
+            -- that member's change; his relic then reaches the bag when the
+            -- other takes his new one, and the queue moves.  Nothing is
+            -- left on a member the plan did not put there: a plan that
+            -- cannot be met this way (a wanted relic neither in the bag nor
+            -- worn by a waiting member) fails here, loudly.
+            for _, q in ipairs(queue) do
+              if pick == nil then
+                local rm = {}
+                for _, c in ipairs(q.changes) do
+                  if M.invCountOf(c[2]) < 1 then
+                    local held = charByte(q.ch, 0x1F + c[1])
+                    for _, o in ipairs(queue) do
+                      for _, oc in ipairs(o.changes) do
+                        if o ~= q and held ~= 0xFF and oc[2] == held then rm[#rm + 1] = c[1]; break end
+                      end
+                      if #rm > 0 and rm[#rm] == c[1] then break end
+                    end
+                  end
+                end
+                if #rm > 0 then
+                  removals = removals + #rm
+                  M.assertEq(removals <= 8, true, string.format(
+                    "%s: relics taken off %d times; the swap does not unwind (no swap deadlock)", tag, removals))
+                  local names = {}
+                  for _, slotN in ipairs(rm) do names[#names + 1] = relicName(charByte(q.ch, 0x1F + slotN)) end
+                  M.log(string.format("[%s] %s: takes off %s (slot%s %s) into the bag so the member who wants %s can "
+                    .. "put it on (a swap with no spare relic in the bag)", tag, q.name, table.concat(names, ", "),
+                    #rm == 1 and "" or "s", table.concat(rm, ", "), #rm == 1 and "it" or "them"))
+                  local qq, slotsN = q, rm
+                  cur = M.seqStep({
+                    relicStep({ ch = q.ch, name = q.name }, {}, string.format("%s: %s (a swap, unwound)", tag, q.name), slotsN),
+                    M.waitFrames(40),
+                    M.call(function() for _, sl in ipairs(slotsN) do qq.cur[sl] = 0xFF end end),
+                  })
+                  pick = -1
+                end
               end
             end
-            p.changes = keep
-            if #keep == 0 then
-              table.remove(queue, 1)
-              goto continue
+            if pick == -1 then goto ticked end
+            local lacking = {}
+            for _, q in ipairs(queue) do
+              for _, c in ipairs(q.changes) do
+                if M.invCountOf(c[2]) < 1 then
+                  lacking[#lacking + 1] = string.format("%s wants %s in slot %d (not in the bag; held by %s)", q.name,
+                    relicName(c[2]), c[1], relicName(charByte(q.ch, 0x1F + c[1])))
+                end
+              end
             end
-            pick = 1
+            M.assertEq(false, true, string.format("%s: a member's new relics are all in the bag (no swap deadlock): %s",
+              tag, table.concat(lacking, "; ")))
           end
           local p = table.remove(queue, pick)
           cur = relicStep(p, p.changes, string.format("%s: %s", tag, p.name))
@@ -8015,7 +8130,7 @@ function M.dressRelics(members, opts)
         ::continue::
       end
     end,
-    reset = function() plan, queue, cur, restore = nil, nil, nil, nil end,
+    reset = function() plan, queue, cur, restore, removals = nil, nil, nil, nil, 0 end,
   }
 end
 
@@ -9013,7 +9128,7 @@ end
 -- is not a menu helper (a walk, a BFS read in a test's own cond) until it
 -- is.  The strict wait sits there, before anything plans a route.
 for _, name in ipairs({ "fieldCare", "careStop", "bagArrange", "setRows", "equipEsper",
-                        "equipWeapon", "equipLoadout", "equipKit", "dressRelics", "relicKit", "emptyEquip" }) do
+                        "equipWeapon", "equipLoadout", "equipKit", "unequipRelics", "dressRelics", "relicKit", "emptyEquip" }) do
   local build = M[name]
   M[name] = function(...)
     return M.menuStep(build(...), name)
