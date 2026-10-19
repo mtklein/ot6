@@ -637,6 +637,12 @@ magic-only line (`Driver:magicOnlyLine`) and the climb its own kit:
   the save point before Chadarnook, SoulDancer x2 and Crusher x2 won
   (`lab/var/relm_k6`: `battle $11C LOST`); the base run and K=3 did not meet
   it.
+- **No Warp out of the tower (owner, 2026-10-19).** Every tower map (362-371)
+  has map_prop byte 1 bit 1 ($0521 & $02, the field menu's warp enable) clear
+  in vanilla, so neither Warp nor a Warp Stone works there; a Smoke Bomb only
+  ends one battle. We keep it: the walk down is the tower's design. If
+  MagiMaster's fight drains the party, shorten the fight (#442), don't open
+  the exit.
 
 ## 12. Played (v0.31)
 
