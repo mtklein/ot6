@@ -122,7 +122,7 @@ def emulated(rel: str, text: str, states: set[str]) -> tuple[bool, str]:
         return False, f"compose.py exit {res.returncode}: {tail[0][:160]}"
     with open(composed, "a") as f:
         f.write(TRAILER)
-    env = dict(os.environ, OT6_TIMEOUT=TIMEOUT, OT6_TIMEOUT_RETRIES="0",
+    env = dict(os.environ, OT6_HARD_CAP=TIMEOUT, OT6_TIMEOUT_RETRIES="0",
                OT6_WORKER="instrument_" + name)
     subprocess.run(["sh", os.path.join("tools", "tests", "run.sh"), composed, log],
                    cwd=ROOT, env=env, stdout=subprocess.DEVNULL,

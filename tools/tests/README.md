@@ -144,7 +144,7 @@ replay a route from a foreign boot, but the graph no longer uses it).
 ## run.sh
 
 ```sh
-Mesen --testrunner --timeout=$OT6_TIMEOUT --enableStdout build/ot6.sfc <composed.lua>
+Mesen --testrunner --timeout=$OT6_HARD_CAP --enableStdout build/ot6.sfc <composed.lua>
 ```
 
 run.sh captures all output to a log (second arg; default
@@ -578,11 +578,16 @@ to overwrite. `--dry-run` plans without writing, `--selftest` is the check
 
 ## Failure signatures
 
-- A 255 exit with truncated stdout is a wall-clock cap expiry, not a
-  mystery crash (testrunner default 100s; run.sh passes
-  `--timeout=${OT6_TIMEOUT:-600}`). Any error at script load has the same
-  signature: no callbacks register, the emulator free-runs, the cap kills
-  it.
+- `KILLED BY A STALL` means run.sh's heartbeat watch killed the run: no
+  script-level progress (a top-level step done, a goal reached, the map,
+  position, gil, bag, roster or any HP changing) for `OT6_HEARTBEAT` seconds
+  (default 120), whatever the frames did; the report names the last
+  progress frame and the seconds since (docs/TOOLING.md "The run's
+  heartbeat"). `KILLED BY THE TIMEOUT` is the last-resort backstop
+  (`OT6_HARD_CAP`, default 21600 s); a 255 exit with truncated stdout is
+  that backstop, not a mystery crash. `OT6_TIMEOUT` is accepted and
+  ignored. Any error at script load has the same no-callbacks signature:
+  the emulator free-runs and the load-grace check kills it.
 - Script errors are invisible headless: `--enableStdout` mirrors the
   emulator message log, not the script log. `print()` is the only channel
   out of a script; a test that goes quiet has told you nothing.

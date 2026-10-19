@@ -220,10 +220,12 @@ timeout.
 
 ## Runtime limits
 
-Two wall-clock caps apply to every headless run:
+Two wall-clock limits apply to every headless run:
 
-- `run.sh` passes `--timeout` (default 600 s, `OT6_TIMEOUT` overrides;
-  generation edges in the ninja graph run at 1800 s). Past it the process
+- `run.sh` kills a run that makes no script-level progress for 120 s
+  (`OT6_HEARTBEAT`; a stall: docs/TOOLING.md "The run's heartbeat") and
+  passes `--timeout` as a last-resort backstop (default 21600 s,
+  `OT6_HARD_CAP`; `OT6_TIMEOUT` is ignored). Past the backstop the process
   exits −1 with truncated, block-buffered stdout.
 - `pin_test_saves.py` sets `Debug.ScriptWindow.ScriptTimeout = 30`
   (seconds), the per-Lua-slice watchdog. Script errors are invisible
