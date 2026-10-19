@@ -178,7 +178,9 @@ local evalCalls=0;off.raceLog=function(self)self._racePred=rp();return nil end
 local realPair=H.raceTimePair;H.raceTimePair=function(...)evalCalls=evalCalls+1;return realPair(...)end
 check(off:makePlan(0)==plan and evalCalls==0 and off.raceTimeActive==nil,'default-off production selection does no shadow evaluation')
 H.RACE_TIME_DIAGNOSTIC=true;H.raceTimePair=function()error('injected shadow failure')end
-check(off:makePlan(0)==plan and logs[#logs]:find('declined error:'),'shadow failures are visible without altering ordinary selected plan')
+local before=#logs;local same=off:makePlan(0)==plan;local declined=false
+for i=before+1,#logs do if logs[i]:find('declined error:') then declined=true end end
+check(same and declined,'shadow failures are visible without altering ordinary selected plan')
 H.raceTimePair=realPair
 -- Real makePlan leaves its selected controller plan unchanged.
 H.CARE_RACE='log';x=driver();local originalPlan={kind='fight',boostLeft=0}
