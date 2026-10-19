@@ -15,13 +15,13 @@
 --      landing on the switched-to party's tile with $1A6D read;
 --   C. the absorb guard's weapon list (H.partyWeapons) is the walking
 --      party's only;
---   D. the ledger: party 2's first random battle is charged to party 2,
---      the battle's seats ($3ED8) are party 2's actors, party 1's members
---      gain no experience from it and party 1 is charged no item;
+--   D. the ledger: party 2's random battles are charged to party 2, their
+--      seats ($3ED8) are party 2's actors, party 1's members gain no
+--      experience from them and party 1 is charged no Potion;
 --   E. the split reserve: with party 1's share set to the whole bag's
 --      Potions (splitBegin shares 99:1), H.splitReserveFor(2) holds them
---      back, and party 2's care, hurt from D, spends no Potion while its
---      members are under the threshold;
+--      back, and party 2's care, hurt from D (its battles go on until a
+--      member is under full HP), spends no Potion;
 --   F. the links: a link whose cond is false is not taken by the planner
 --      (H.bfsReach), the same link with cond true is; with party 1 off the
 --      bridge plate (23,19) no route takes party 2 to (19,25), with party 1
@@ -104,36 +104,42 @@ H.run({ maxFrames = 400000 }, {
       "E: party 2's reserve is the floor plus party 1's unspent share")
     H.assertEq(reserve2 >= potions0, true, "E: precondition: the reserve holds every Potion back")
   end),
-  -- pace (20,11)-(24,10) until one battle has come and gone; the map's
-  -- rate is a battle per 60 steps on average (route_data map 315)
+  -- pace (20,11)-(24,10) until a battle has come and gone and left a
+  -- member of party 2 under full HP (a fight can end with everyone whole: a
+  -- level-up refills, sws2_k1_*), at most 6 battles; the map's rate is a
+  -- battle per 60 steps on average (route_data map 315)
   H.driveUntil(function()
     if n0 == nil then n0 = #H.split.battles end
-    return #H.split.battles - n0 >= 1 and H.hasControl()
-  end, 120000, {
+    local n = #H.split.battles - n0
+    if n == 0 or not H.hasControl() then return false end
+    local under = false
+    for _, c in ipairs(GROUP[2]) do
+      if H.charHp(c) < H.charMaxHp(c) then under = true end
+    end
+    H.assertEq(n <= 6, true, "D/E: precondition: a member of party 2 hurt within 6 battles")
+    return under
+  end, 400000, {
     H.navTo(function() return lap == 1 and 24 or 20 end, function() return lap == 1 and 10 or 11 end,
       { maxFrames = 4000, playBattles = "tactical", care = false }),
     H.call(function() lap = 3 - lap end),
-  }, "D: party 2 meets a random battle"),
+  }, "D: party 2 meets random battles"),
   H.call(function()
-    local b = H.split.battles[#H.split.battles]
-    H.log(string.format("[D] battle %d: party %d, seats %s, kind %s", b.n, b.party, table.concat(b.seats, ","), b.kind))
-    H.assertEq(b.party, 2, "D: the battle is charged to party 2")
-    H.assertEq(b.seatsMatch, true, "D: its seats are party 2's actors")
     local want = {}
     for _, c in ipairs(GROUP[2]) do want[H.charActor(c)] = true end
-    for _, a in ipairs(b.seats) do H.assertEq(want[a] == true, true, string.format("D: seat actor %d is party 2's", a)) end
+    for i = n0 + 1, #H.split.battles do
+      local b = H.split.battles[i]
+      H.log(string.format("[D] battle %d: party %d, seats %s, kind %s", b.n, b.party, table.concat(b.seats, ","), b.kind))
+      H.assertEq(b.party, 2, "D: the battle is charged to party 2")
+      H.assertEq(b.seatsMatch, true, "D: its seats are party 2's actors")
+      for _, a in ipairs(b.seats) do H.assertEq(want[a] == true, true, string.format("D: seat actor %d is party 2's", a)) end
+    end
     for _, c in ipairs(GROUP[1]) do
       H.assertEq(xp(c), xp1[c], string.format("D: %s (party 1) gained no experience", H.SPLIT_NAMES[c]))
     end
     H.assertEq(H.split.spent[1][POTION] or 0, spent1, "D: party 1 was charged no Potion")
   end),
   H.call(function()
-    local under = false
-    for _, c in ipairs(GROUP[2]) do
-      if H.charHp(c) < H.charMaxHp(c) then under = true end
-    end
-    H.log("[E] after the battle: " .. H.partiesLine() .. string.format("; potions %d", H.invCountOf(POTION)))
-    H.assertEq(under, true, "E: precondition: a member of party 2 is under full HP for the care to serve")
+    H.log("[E] after the battles: " .. H.partiesLine() .. string.format("; potions %d", H.invCountOf(POTION)))
     potions0 = H.invCountOf(POTION)
   end),
   H.fieldCare({ threshold = 1.0, magic = false, tent = false, tincture = false, tag = "E: party 2's care" }),

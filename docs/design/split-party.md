@@ -163,4 +163,48 @@ Rules that fell out:
 
 ## 7. Sweeps
 
-(filled from `suites/` when the runs are in)
+Each leg was run from its boot with 0 to 5 random battles used up first
+(the encounter draw moves; `build/lab/mkvar.py` in the evidence) at seed
+shifts 0 and 7, one attempt each, under the branch's final library. A
+battle's key is `$be` at its open with its group (`tally.py`).
+
+- **`gen_wor_phoenix`** from `wor-thamasa-v1`, the battles before it on the
+  world map beside the tower: 12 of 12 passed (`lab/swp2_*`, 75,468 to
+  100,204 frames). Doom Gaze met the Falcon in the air on every run (11
+  distinct keys): it escaped in 11 and was killed in one (`swp2_k5_s0`:
+  "battle $1CF WON ... killed s0:$11D", then Bahamut on the deck, the arc
+  ahead of the v0.34 plan). Potions left at the save point: 34 to 90 of 99.
+  Before the deck fix the killed draw failed ("timeout ... the cave's party
+  menu", `lab/swp_k5_s0`); the same sweep's other 11 passed (`lab/swp_*`).
+- **`gen_wor_locke`** from `wor-phoenix-v1`, the battles before it by party
+  1 in the north room: 12 of 12 passed (`lab/swl3_*`, 43,112 to 110,678
+  frames). The Red Dragon was met 12 times (11 keys) and won every time in
+  4,245 to 6,910 ticks. Potions left when LOCKE joined: 20 to 58; LOCKE L41.
+  The first two sweeps of this leg are the failures the wandering dragon
+  and the variants' missing care made (`lab/swl_*`: 5 of 12 passed;
+  `lab/swl2_*`: 10 of 12), each fixed at its cause (commit messages).
+- **`field_splitparty`** from `wor-phoenix-v1`, 0 to 2 battles by party 1
+  first, shifts 0 and 9: 6 of 6 passed (`lab/sws3_*`, 5,518 to 39,758
+  frames; with the plain run `lab/mut2_suite`, 12 of party 2's battles
+  checked in D). Its first version took one battle for E and failed where
+  that battle left party 2 whole (`lab/sws2_k1_s0`, `k1_s9`: "E:
+  precondition: a member of party 2 is under full HP"); it now fights on
+  until a member is hurt, at most six battles. The mutants: section 8.
+
+## 8. The suite and its mutants
+
+`field_splitparty` (section 4's mechanics, asserted A-F in its header).
+Each mutant overrides one library behaviour after the library loads
+(`build/lab/mkmut.py`) and turns the suite red where it should:
+
+| mutant | the change | red at |
+|---|---|---|
+| `switch_ctl` | `switchParty` pressing Y only on frames that read control, done on 8 calm frames | B: the switch back onto the save point times out |
+| `ledger_p1` | the ledger charges every battle to party 1 | D: "the battle is charged to party 2: got 1" |
+| `reserve_base` | `splitReserveFor` returns the floor alone | E: "party 2's reserve is the floor plus party 1's unspent share: got 4" |
+| `links_nocond` | `bfsReach` takes a link whatever its cond | F: "a link whose cond is false is not taken" |
+| `weapons_all` | the absorb guard lists every party's weapons | C: "weapon $15 of char 6 is the walking party's" |
+
+E's behaviour assertion turned red on the library before its fix, the
+reserve taken when `fieldCare`'s step was built: "party 2's care spent no
+Potion ... got 50, want 60" (`lab/s1`, its first run).
