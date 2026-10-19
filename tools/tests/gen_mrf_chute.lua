@@ -59,6 +59,8 @@ local function partyReport(tag)
 end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
+-- pairs() order is seeded per Lua state; the survey floods in this fixed order (#441)
+local DIRS = { "up", "right", "down", "left" }
 
 -- Tap `dir` whenever the party has control, hold off while a scene controls
 -- it, edge-A through dialogs.  Used to walk into a trigger whose scene then
@@ -113,7 +115,7 @@ local function survey(tag, targets)
   local seen, q, qi = { [(sy & ym) * 256 + (sx & xm)] = true }, { { sx, sy } }, 1
   while qi <= #q and qi <= 3000 do
     local x, y = q[qi][1], q[qi][2]; qi = qi + 1
-    for d, v in pairs(DELTA) do
+    for _, d in ipairs(DIRS) do local v = DELTA[d]
       if H.canStep(x, y, d) then
         local nx, ny = (x + v[1]) & xm, (y + v[2]) & ym
         local k = ny * 256 + nx

@@ -57,6 +57,8 @@ local function partyReport(tag)
 end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
+-- pairs() order is seeded per Lua state; the survey floods in this fixed order (#441)
+local DIRS = { "up", "right", "down", "left" }
 
 -- Flood the live map with H.canStep from the party's tile.  This runs the
 -- library's own passability model against the tilemap the engine has
@@ -74,7 +76,7 @@ local function survey(tag, targets)
     if x > maxx then maxx = x end
     if y < miny then miny = y end
     if y > maxy then maxy = y end
-    for d, v in pairs(DELTA) do
+    for _, d in ipairs(DIRS) do local v = DELTA[d]
       if H.canStep(x, y, d) then
         local nx, ny = x + v[1], y + v[2]
         local k = (ny & 0xFF) * 256 + (nx & 0xFF)
