@@ -15,22 +15,6 @@ mechanics while keeping the FF6 story, world, and characters.
 
 See [the design](docs/DESIGN.md) for details.
 
-## Android
-
-Each release includes `ot6-vX.Y.apk`. The app creates `OT6.sfc` from your
-own ROM.
-
-1. Add `https://github.com/mtklein/ot6` to
-   [Obtainium](https://obtainium.imranr.dev/). Set the APK filter to
-   `ot6-.*\.apk`.
-2. Install and open OT6 Patcher. Select the folder containing your Final
-   Fantasy III (USA) v1.0 ROM. If needed, select the ROM file directly.
-3. Later app updates replace `OT6.sfc` with the new version.
-
-`OT6.sfc` keeps its name across updates, so your emulator keeps its save.
-
-For RetroArch, scan the folder containing `OT6.sfc`.
-
 ## Building
 
 Put `Final Fantasy III (USA).sfc` (SHA-1
