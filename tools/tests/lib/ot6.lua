@@ -11189,6 +11189,21 @@ function Driver:makePlanRules(actor)
         elseif maxOf(e) > 0 and hpNow[e] == 0 and not liftOnly
            and self:battInvIdx(BATTLE.FENIX_DOWN) then
           local ok, raiseHp, hit, hitSlot, hitOn, why, needsTopUp = self:raiseOk(e, actor)
+          -- the last one standing whose last three actions took nothing
+          -- off the monsters raises anyway: waiting changes nothing, and
+          -- RELM alone cast Drain for 0 against a body that never hit
+          -- back until the time limit ('no raise ... smallest hit none
+          -- measured', 'took 0 off the monsters ... atk $04':
+          -- build/attempts/wt/v031-tower-2/lab/sw3_k0_s9)
+          if not ok and hpNow[actor] > 0 and (self.blankRun and self.blankRun[actor] or 0) >= 3 then
+            local alone = true
+            for o = 0, 3 do if o ~= actor and hpNow[o] > 0 then alone = false end end
+            if alone then
+              ok = true
+              why = string.format("the last one standing, its last %d actions took nothing off the "
+                .. "monsters: a raise is the move that changes the fight", self.blankRun[actor])
+            end
+          end
           local hitStr = hit and string.format("%d (slot %d on entity %d)", hit, hitSlot, hitOn)
             or "none measured"
           -- the actor's own lift first (#312): a reviver inside its own
@@ -13138,6 +13153,7 @@ function Driver:idle()
   self.raceTimeRecords = nil
   self.leftSaid, self.escSaid, self.reward = {}, {}, nil
   self.timed, self.tailSaid, self.runDecided, self.running = nil, false, nil, nil
+  self.blankRun, self.deadOpen = nil, nil
   if self.recovery then
     self.recovery.close(M.frame, "battle_ended")
     if recoveryObserver == self.recovery then recoveryObserver = nil end
@@ -16012,6 +16028,10 @@ function Driver:watchDamage()
         self.raceHitBy[w.actor] = self.raceHitBy[w.actor] or {}
         self.raceHitBy[w.actor][w.kind .. ":" .. tostring(w.skill or w.spell)] = M.median(hl)
       end
+      -- consecutive actions of this actor that took nothing (the lone
+      -- survivor's raise below reads it)
+      self.blankRun = self.blankRun or {}
+      self.blankRun[w.actor] = w.seen == 0 and (self.blankRun[w.actor] or 0) + 1 or 0
       M.log(string.format("[%s] actor=%d's %s took %d off the monsters "
         .. "(%d shielded-equivalent over %d hit(s), %d a hit; the press "
         .. "rule counts it) [exec cmd $%02X atk $%02X]", self.tag or "fight", w.actor,
