@@ -62,6 +62,26 @@ local function sample(n)
 end
 local function startSample() return H.call(function() samples = {} end) end
 
+-- press R until the pending boost reads `level`, as a player who sees the
+-- press not take presses again.  Ot6Boost samples the held buttons once per
+-- battle main-loop tick, and the main loop can stall for several frames
+-- (an enemy's turn being worked out), so a single short press can fall
+-- inside a stall and be missed: kolts_cave's regenerated fight did that to
+-- a 6-frame press (qualification, v0.32 #445).  Each attempt is a 6-frame
+-- hold and a 10-frame release; the boost is only ever raised one step.
+local function raiseTo(level)
+  local ph = 0
+  return H.driveUntil(function() return pend(actor) == level end, 600, {
+    H.call(function()
+      if pend(actor) > level then
+        error(string.format("R raised the boost past %d (now %d)", level, pend(actor)), 0)
+      end
+      H.setPad(ph % 16 < 6 and { r = true } or {})
+      ph = ph + 1
+    end),
+  }, "R raises the boost to " .. level)
+end
+
 local function checkLevel(level, what)
   return H.call(function()
     local want = 2 + 2 * COPIES[level]
@@ -163,9 +183,9 @@ H.run({ maxFrames = 40000 }, {
 
   -- R, R, R: each level's aura, sampled over 32 frames (the 1-BP pulse is
   -- 32 frames, so every level shows at least two outline colours)
-  H.pressButtons({ r = true }, 6), H.waitFrames(12), startSample(), sample(32), checkLevel(1, "command window"),
-  H.pressButtons({ r = true }, 6), H.waitFrames(12), startSample(), sample(32), checkLevel(2, "command window"),
-  H.pressButtons({ r = true }, 6), H.waitFrames(12), startSample(), sample(32), checkLevel(3, "command window"),
+  raiseTo(1), H.waitFrames(12), startSample(), sample(32), checkLevel(1, "command window"),
+  raiseTo(2), H.waitFrames(12), startSample(), sample(32), checkLevel(2, "command window"),
+  raiseTo(3), H.waitFrames(12), startSample(), sample(32), checkLevel(3, "command window"),
 
   -- a list open: the second command's window (Magic, Steal, Tools...)
   H.pressButtons({ down = true }, 4), H.waitFrames(8),
