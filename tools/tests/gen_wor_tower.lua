@@ -50,11 +50,30 @@ local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.4 }
 -- on RELM's Drain, f11a4a92), and with the default list back RELM cast it 64
 -- times in a fight that ran out of time at 17,531 of his 50,000 ('took 0 off
 -- the monsters ... atk $04': build/attempts/wt/v031-tower-2/lab/sw2_k4_s13)
+-- MagiMaster's HP must set a new low every 90,000 battle ticks (Driver
+-- opts.progressVs).  Over the 36 won fights of the sweep the longest
+-- stretch without a new low was 71,400 ticks (sw5_k3_s5); the rest stayed
+-- under 46,500 (build/attempts/wt/v031-tower-2/mmgap.sh over lab/sw5_*,
+-- sw6_*)
+BOSS_FIGHT.progressVs = { [0x166] = 90000 }
 BOSS_FIGHT.magicOnly = {}
 for _, id in ipairs(H.MAGIC_ONLY_SPELLS) do
   if id ~= 0x04 then BOSS_FIGHT.magicOnly[#BOSS_FIGHT.magicOnly + 1] = id end
 end
 local WALL_RING = 0xBB
+-- Tinctures kept back for the walk down, out of reach of the care before
+-- MagiMaster and of his fight (supplies, not running: the decision of
+-- 2026-10-13).  Sized from the sweep's walk downs: the runs that began it
+-- with 18 to 22 Tinctures spent 14 to 20 of them and passed, and one that
+-- began with 7 reached the save with none (build/attempts/wt/v031-tower-2/
+-- lab/sw5_*, sw6_*: '[wor] ... stones for the walk down: ... tincture=')
+local WALK_DOWN_TINCTURES = 20
+local function walkDownReserve()
+  local r = {}
+  for k, v in pairs(H.CARE_RESERVE or {}) do r[k] = v end
+  r[TINCTURE] = math.max(r[TINCTURE] or 0, WALK_DOWN_TINCTURES)
+  return r
+end
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
@@ -866,11 +885,12 @@ H.run({ maxFrames = 1500000 }, {
   end),
   H.call(function() say("wor", "dressed for MagiMaster: " .. kitLine()) end),
   door(7, 13, MAP_TOP, "the Gem Box's room -> the top (364 (7,7))"),
-  H.fieldCare({ threshold = 1.0, mpBand = 0.9, tag = "before MagiMaster" }),
+  H.fieldCare({ threshold = 1.0, mpBand = 0.9, tag = "before MagiMaster", reserve = walkDownReserve() }),
   H.saveState("wor_tower_magimaster.mss"),
 
   -- ---- 5. MagiMaster ---------------------------------------------------------------
   -- @@stage magimaster
+  H.call(function() BOSS_FIGHT.reserve = walkDownReserve() end),
   stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM }, { CELES, TRITOCH } }, "stones for MagiMaster"),
   H.call(function() H.assertEq(sw(0x02DA), 1, "the Gem Box's tile armed MagiMaster ($02DA, _cc5440)") end),
   stepOn(8, 8, function() return H.battleLoadStarted() or sw(0x02DB) == 1 end),
@@ -878,14 +898,16 @@ H.run({ maxFrames = 1500000 }, {
   -- open (three of the eight elements are no member's), and a cast that
   -- lands after the wall turned is absorbed.  Over a sweep's 16 wins the
   -- fight ran 46,501 to 195,414 ticks (build/attempts/wt/v031-tower-2/lab/
-  -- sw4_*: '[boss] MagiMaster: battle $162 won after ...'), and the one
-  -- loss ran out the old 200,000 at full party HP with him at 21,230
-  -- (sw4_k5_s3): a slow fight, not a stalled one -- the stalls (a lone
-  -- member with no attack, Drain healing him, a seat passing) are fixed
-  -- in the driver and the kit, and the no-progress watchdog stays on
+  -- sw4_*: '[boss] MagiMaster: battle $162 won after ...'), and over the
+  -- 36 of the next sweep 39,982 to 203,654 (sw5_*, sw6_*).  The one loss,
+  -- sw4_k5_s3, was a stall, not a slow win: he reached 4,081 HP
+  -- (f+165300), every party cast was nulled for about 7,500 frames ('took 0
+  -- off the monsters', 'NULLS fire (live null byte $FD)'), then he healed
+  -- to 21,230 by the old limit.  BOSS_FIGHT.progressVs fails a fight that
+  -- sets no new low in 90,000 ticks, well inside this bound
   H.advanceStory(function()
     return sw(0x02DB) == 1 and not H.battleLoadStarted() and map() == MAP_TOP and settled()
-  end, 400000, { playBattles = "tactical", fight = BOSS_FIGHT }),
+  end, 400000, { playBattles = "tactical", fight = BOSS_FIGHT, reserve = walkDownReserve() }),
   fought(MAGIMASTER_FORMATION, "MagiMaster"),
   H.fieldCare({ tag = "after MagiMaster" }),
   H.saveState("wor_tower_won.mss"),
@@ -896,10 +918,7 @@ H.run({ maxFrames = 1500000 }, {
   -- climb's, and in MagiMaster's kit (no Wall Rings, no Float caster) the
   -- fourth floor's L.60 and L.90 Magic wiped the four with Quake and
   -- Merton (build/attempts/wt/v031-tower/lab/dn2_*: 'atk $15', 'atk $17')
-  -- a random battle the party has no MP to fight is run from on the way
-  -- down (Driver opts.runWhenDry: a long MagiMaster fight can spend the
-  -- 99 Tinctures; lab f4e_cap3b_wor_tower_f4_s2)
-  H.call(function() FIGHT.cure = false; FIGHT.runWhenDry = true end),
+  H.call(function() FIGHT.cure = false end),
   stonesFor({ { TERRA, MADUIN }, { RELM, IFRIT }, { STRAGO, PALIDOR }, { CELES, TRITOCH } }, "stones for the walk down"),
   wallRingsOn(),
   H.fieldCare({ tag = "Float on the four, down" }),
