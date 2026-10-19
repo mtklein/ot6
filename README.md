@@ -3,15 +3,7 @@
 OT6 is a Final Fantasy VI ROM hack. It adds Octopath Traveler combat
 mechanics while keeping the FF6 story, world, and characters.
 
-## Status
-
-v0.30 is the current release: [download it](https://github.com/mtklein/ot6/releases/tag/v0.30).
-`main` is v0.31 development.
-
-The game is playable through the World of Balance and through Thamasa in the
-World of Ruin, where Strago joins.
-
-Main changes:
+## Changes
 
 - Enemies have shields and weaknesses. Weak hits remove shields. Broken
   enemies lose turns and take more damage.

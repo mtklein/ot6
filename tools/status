@@ -15,8 +15,7 @@ It reports on the main tree of whatever checkout it runs from.
             many of those commits `git cherry` finds still missing from main
             (0 missing = finished, delete it)
   release   VERSION, the newest v* tag, GitHub's latest release and its .zip
-            and .apk, README's "vX.Y is the current release" line, and any
-            release/* branch carrying patches main lacks
+            and .apk, and any release/* branch carrying patches main lacks
   github    `gh auth status`, and whether git itself can authenticate a push:
             `git push --dry-run` of origin/main onto itself, which talks to
             GitHub through the credential helper (keychain included) and
@@ -398,12 +397,6 @@ def release_checks(main, repo):
         version = None
     rc, tags, _ = git(main, "tag", "--list", "v[0-9]*", "--sort=-v:refname")
     tag = next(iter(tags.split()), None)
-    try:
-        with open(os.path.join(main, "README.md")) as f:
-            m = re.search(r"\bv(\d+\.\d+) is the current release", f.read())
-        readme = "v" + m.group(1) if m else None
-    except OSError:
-        readme = None
     rc, rel, err = run(["gh", "release", "view", "--repo", repo, "--json",
                         "tagName,assets,publishedAt"], timeout=20)
     gh = json.loads(rel) if rc == 0 else None
@@ -418,13 +411,11 @@ def release_checks(main, repo):
         out.append((PROBLEM, "release", f"GitHub {latest} lacks " + ", ".join(missing)))
     if tag != latest:
         out.append((PROBLEM, "release", f"newest tag {tag} but GitHub's latest release is {latest}"))
-    if readme != latest:
-        out.append((PROBLEM, "release", f"README says {readme} is the current release; GitHub's latest is {latest}"))
     if version and tag and vkey(version) < vkey(tag):
         out.append((PROBLEM, "release", f"VERSION {version} is older than tag {tag}"))
     if not out:
         out.append((OK, "release", f"{latest} tagged, released ({', '.join(want)}), "
-                    f"README agrees; VERSION {version}"))
+                    f"VERSION {version}"))
     return out
 
 
