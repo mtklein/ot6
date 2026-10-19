@@ -75,4 +75,90 @@ randoms on the way are whatever the fixture deals.
 
 ## First report
 
-FIRST_REPORT
+Evidence: `build/attempts/wt/v031-fightmeasure-2/` (`report.txt`, the
+table; `fights.tsv`, one row per fight with its raw `[outcome]` line and the
+board at its low point; `branch-states/`, the 252 logs of the one-line
+chain; `sweeps/<boss>-real|naive/`, eight seed shifts each). The party is
+whatever the generated line made it, at the commit that merged
+`e1f6a173` (v0.31 dev); the numbers describe that route, not the game in
+general. Every real row is the driver as it plays with `OT6_POLICY` unset.
+
+**Unset policy is the old play.** The same two segments (`wor_storm`,
+`wor_tritoch`, eight seed shifts each) run on this branch and on
+`e1f6a173` (same ROM, sha256 `64a87876...5166`, same machine) give
+log-for-log the same lines once the new `[board]` lines are dropped (16 of
+16 logs, `ab-unset-vs-main.txt`), and the whole 252-log chain built on both
+trees loads the same parent states (184 of 184 `state X sha=` lines
+equal) and 250 of the 252 logs are equal under the same filter. The two that
+differ: `wor_relm` (the assertion's line number in the composed file) and
+`mrf_entry`, whose `[survey]` line counts 3042 tiles on the branch and
+3046 on main from the same parent state; nothing else in that log differs. Unexplained; the survey reads map tiles, not
+anything this change touches, but it is not proven independent.
+
+**Resistance and drama.** Where the party's low point in a won fight sits
+(median over keys, the worst key, most members down at once), doubt turns, from the real policy:
+
+| Fight | keys | low (med / worst) | down | doubt | turns |
+|---|---|---|---|---|---|
+| Storm Dragon `$16F` | 8 | 50% / 16% | 2 | 9 | 31.5 |
+| Ice Dragon `$16E` | 5 | 58% / 23% | 3 | 7 | 16 |
+| Kefka `$1F9` | 9 | 86% / 73% | 0 | 5 | 23 |
+| Dullahan `$1C7` | 8 | 78% / 62% | 0 | 2 | 14.5 |
+| Ultros `$183` | 8 | 96% / 68% | 0 | 0 | 19 |
+| Phunbaba `$1A5` | 8 | 84% / 80% | 0 | 4 | 10.5 |
+| Tritoch `$1E7` | 5 | 96% / 65% | 0 | 0 | 14 |
+
+The Storm Dragon and the Ice Dragon are the two fights that took the party
+deep (a member down in most draws, a low point at or under 23%); Ultros and
+Tritoch never put the real party behind (doubt 0): their low points are
+chip damage. That fits "resistance" being the dragons' business.
+
+**Surmountable.** Real policy, eight shifts per boss: 8/8 on Storm Dragon,
+Kefka, Dullahan, Ultros and Phunbaba; the Ice Dragon every one of the 5 keys it met (4
+of the 8 shifts never reached it, below). No real loss on any boss in the sweeps, so the
+spread across draws shows no luck-driven loss: the Storm Dragon's worst key
+sits at 16%, the nearest miss.
+
+**Agency** (same keys, same levels and gear, naive = a plain Fight each
+turn at the boss only):
+
+| Fight | real won | naive won | real turns (med) | naive turns (med) | naive low (med) |
+|---|---|---|---|---|---|
+| Storm Dragon | 8/8 | 6/8 | 31.5 | 29.5 | 14% |
+| Kefka | 8/8 | 5/8 | 23 | 36 | 47% |
+| Ice Dragon | 4/4 | 4/4 | 16 | 28 | 27% |
+| Ultros | 8/8 | 8/8 | 19 | 37 | 76% |
+| Dullahan | 8/8 | 8/8 | 14.5 | 19.5 | 75% |
+
+Choices decide Kefka (3 of 8 keys lost without them) and the Storm Dragon
+(2 of 8), and the naive party survives the Ice Dragon only at a median low
+of 27% against 58%. Ultros and Dullahan are won by levels and gear: naive
+wins every key, slower (about twice the turns for Ultros) but never in
+doubt. That is the harness's answer to "does the choice matter" for
+fights it calls easy; it is not a verdict that Ultros should change
+(guidelines: fights players find easy need only reliable passage).
+
+**Power** needs arcs of comparable enemies; the chain holds Sky Armor
+(`$0B0` 4.5 turns, `$0AF` 6.5) -> Phunbaba (7 to 12) -> dragons (16 to 31)
+only as different fights, so no turns-to-kill trend is claimed yet. The
+column is there for a future pair (a kit landing between two reruns of the
+same fight).
+
+**What the report set aside.** Phunbaba's first visit (`$1A4`, 60000 HP,
+the script's own "scripted loss" line precedes it) and Ultros `$1DD`
+(`PARTY LEFT`, the party fled) are not samples; the tool prints them after
+the table instead of counting a loss.
+
+**Found on the way** (not tuned here): `wor_tritoch` on this ROM times out
+in 4 of 8 shifts driving the relics menu for the Ice Dragon (`CELES
+(relics): cursor on the menu row`, 900 frames, `sweeps/tritoch-real/
+summary.tsv`); main at `e1f6a173` does the same on the same shifts, so it
+predates this change. And `gen_wor_relm` fails on `no swap deadlock` on
+both trees (`branch-chain.log`, `main-chain.log`); main has since moved on
+that file.
+
+**Not yet done.** The issue asks to validate against the owner's play
+("numbers should match how a fight felt"); no record of how the owner
+found these fights is attached here, so that comparison is open. The
+counterfactuals that remove an Esper, a relic or a kill order need
+generator options (this tool's `OT6_POLICY` only touches in-battle plans).

@@ -66,6 +66,9 @@ OUTCOME = re.compile(P + r"\[([^]]+)\] \[outcome\] battle \$([0-9A-F]{3}) (WON|L
                      r"after (\d+) ticks[^:]*: killed (.*?); escaped")
 FAILED = re.compile(P + r"\[retry\] attempt \d+/\d+ FAILED class=(\S+)")
 POLICY = re.compile(P + r"\[[^]]+\] \[policy\] ")
+# the script's own announcement that the next battle is meant to be lost
+# (Phunbaba's first visit): that fight is no sample of the party's strength
+SCRIPTED = re.compile(P + r"\[retry\] allowGameOver ON .*scripted loss")
 
 
 def mon_names():
@@ -120,6 +123,7 @@ class Fight:
         self.mmax = {}             # slot -> max hp seen
         self.turns, self.plans, self.deaths, self.policy_lines = 0, 0, 0, 0
         self.kills = ""
+        self.scripted = False
         self.lines = []            # raw evidence: key, worst turn, outcome
 
     def sample(self, party, mons):
@@ -150,6 +154,7 @@ def parse(path, policy, out):
     arc = arc_of(path)
     f = None
     have_turn = False
+    scripted_next = False
     with opener(path) as fh:
         for line in fh:
             if not line.startswith("[ot6] "):
@@ -159,8 +164,12 @@ def parse(path, policy, out):
                 if f is not None and f.key == m.group(1) and not f.samples:
                     continue           # the [seed] and [key] lines name one battle
                 f = Fight(m.group(1), arc, path, policy)
+                f.scripted, scripted_next = scripted_next, False
                 f.lines.append(line.rstrip())
                 have_turn = False
+                continue
+            if SCRIPTED.match(line):
+                scripted_next = True
                 continue
             if f is None:
                 continue
@@ -218,14 +227,14 @@ def parse(path, policy, out):
                 # fires before the driver's [wipe] line can; any other
                 # class leaves the fight unfinished (not a loss, not a win)
                 if f.form is not None:
-                    f.result = "LOST" if m.group(1) == "wipe" else "ABORT"
+                    f.result = (("SCRIPTED" if f.scripted else "LOST") if m.group(1) == "wipe" else "ABORT")
                     f.lines.append(line.rstrip()[:300])
                     out.append(f)
                 f = None
                 continue
             m = WIPE.match(line)
             if m:
-                f.result, f.ticks = "LOST", None
+                f.result, f.ticks = "SCRIPTED" if f.scripted else "LOST", None
                 f.lines.append(line.rstrip())
                 if f.form is not None:
                     out.append(f)
@@ -235,6 +244,10 @@ def parse(path, policy, out):
             if m:
                 f.form = int(m.group(2), 16)
                 f.result = m.group(3)
+                if f.result == "LOST" and f.scripted:
+                    f.result = "SCRIPTED"      # meant to be lost: not a sample
+                elif f.result == "PARTY LEFT":
+                    f.result = "LEFT"          # the party fled or the script ended it
                 f.ticks = int(m.group(4))
                 f.kills = m.group(5)
                 if m.group(1) == "advanceStory":
@@ -329,11 +342,14 @@ def main():
         if form in seen_forms:
             continue
         seen_forms.append(form)
-        real = {f.key: f for f in groups.get((form, "real"), []) if f.result != "ABORT"}
+        real = {f.key: f for f in groups.get((form, "real"), []) if f.result in ("WON", "LOST")}
         for pol in policies:
             g = groups.get((form, pol), [])
             unfinished = sum(f.result == "ABORT" for f in g)
-            g = [f for f in g if f.result != "ABORT"]
+            aside = sum(f.result in ("LEFT", "SCRIPTED") for f in g)
+            g = [f for f in g if f.result in ("WON", "LOST")]
+            if not g and aside:
+                continue
             if len(g) < a.min:
                 continue
             won = [f for f in g if f.result == "WON"]
@@ -358,6 +374,14 @@ def main():
     w = [max(len(str(r[i])) for r in rows + [hdr]) for i in range(len(hdr))]
     for r in [hdr] + rows:
         print("  ".join(str(c).ljust(w[i]) for i, c in enumerate(r)).rstrip())
+    aside = defaultdict(int)
+    for f in by.values():
+        if f.result in ("LEFT", "SCRIPTED"):
+            aside[(f.form, f.policy, f.result)] += 1
+    if aside:
+        print("\nset aside (the party left, or the script meant the loss; not samples): " + "; ".join(
+            "$%03X %s x%d %s" % (k[0], fname.get(k[0], "?"), n, k[2].lower() + (" under " + k[1] if k[1] != "real" else ""))
+            for k, n in sorted(aside.items())))
     if a.tsv:
         with open(a.tsv, "w") as fh:
             for r in [hdr] + rows:
