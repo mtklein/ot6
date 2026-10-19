@@ -8165,7 +8165,16 @@ function Driver:magicOnlyLine(actor, boost)
       local st4 = M.readByte(0x3EF9 + e * 2)
       if due and M.readWord(0x3BF4 + e * 2) > 0 and (st4 & 0x04) == 0
          and M.frame - (self.reraiseAt[e] or -100000) > 400 then
-        local b = castBoost(actor, 0x30, select(2, spellCell(actor, 0x30, true)), 2, 0)
+        local b, price, why = castBoost(actor, 0x30, select(2, spellCell(actor, 0x30, true)), 2, 0)
+        if b == nil or b < 2 then
+          local key = string.format("noreraise:%d:%s", actor, tostring(why))
+          if not self.statusSaid[key] then
+            self.statusSaid[key] = true
+            M.log(string.format("[%s] actor=%d cannot cast Life at 2 BP on entity %d: boost %s, %s (bank %d, %d MP)",
+              self.tag or "fight", actor, e, tostring(b), tostring(why), M.readByte(BATTLE.BP + actor * 2),
+              M.readWord(BATTLE.CURMP + actor * 2)))
+          end
+        end
         if b ~= nil and b >= 2 then
           self.reraiseAt[e] = M.frame
           M.log(string.format("[%s] actor=%d Life at 2 BP (Life 3) on entity %d before the boss's end", self.tag or "fight",
@@ -8204,7 +8213,19 @@ function Driver:magicOnlyLine(actor, boost)
       for e = 0, 3 do
         if M.readWord(0x3BF4 + e * 2) > 0 and (M.readByte(0x3EF9 + e * 2) & 0x04) == 0 then bare = bare or e end
       end
-      if bare ~= nil and M.frame - self.holdSince < 3600 then
+      -- the hold gives way after 3,600 frames only while no living member
+      -- could cast Life at two points now (a caster with the points and
+      -- the MP keeps it, up to 30,000 frames): the 3,600 alone ran out
+      -- with STRAGO at 4 BP, one Life 3 cast, and his dying Ultima took
+      -- all four from full HP (build/attempts/wt/v031-tower-2/lab/
+      -- re1_k3_s0: 'died holding 4 BP', 'party_bp=0,1,4,4')
+      local canRaise = false
+      for e = 0, 3 do
+        if M.readWord(0x3BF4 + e * 2) > 0 and spellCell(e, 0x30, true) ~= nil
+           and M.readByte(BATTLE.BP + e * 2) >= 2 then canRaise = true end
+      end
+      local held = M.frame - self.holdSince
+      if bare ~= nil and (held < 3600 or (canRaise and held < 30000)) then
         local key = string.format("hold:%d:%d", actor, bare)
         if not self.statusSaid[key] then
           self.statusSaid[key] = true
