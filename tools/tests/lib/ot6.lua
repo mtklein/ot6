@@ -15296,8 +15296,28 @@ local function endActivate()
 end
 
 function Driver:watchLeavers()
-  if self.battleTick == 1 then self.startFrame = M.frame end
+  if self.battleTick == 1 then
+    self.startFrame = M.frame
+    -- a first reading with every seat at 0 HP and no monster standing is
+    -- the last battle still ending, not a battle: MagiMaster's dying
+    -- Ultima took all four to 0 and Life 3 raised them after his death,
+    -- and a new walker read that as a second MagiMaster battle ('battle
+    -- f+1 ... partyhp=0,0,0,0 ... monsters=0', 'its formation was fought
+    -- once: got 2': build/attempts/wt/v031-tower-2/lab/sw2_k3_s0)
+    local down = true
+    for e = 0, 3 do if M.readWord(0x3BF4 + e * 2) > 0 then down = false end end
+    self.deadOpen = down and liveMonMask() == 0
+  end
   endActivate()
+  if self.deadOpen then
+    if not self.tailSaid then
+      self.tailSaid = true
+      M.log(string.format("[%s] [tail] f+%d this watch began with every seat at 0 HP and no monster "
+        .. "standing: the last battle's end, not a battle -- nothing seated, no [outcome]",
+        self.tag or "fight", self.battleTick))
+    end
+    return
+  end
   -- a driver that first watched the battle AFTER the last end hook fired
   -- (said from its first frame, so nothing else is said or decided for it)
   -- is watching that hand-back, not a battle: measured on
