@@ -669,6 +669,12 @@ The tower leg is on the graph: `wor_tower` (`gen_wor_tower`) Continues
   battle reader's last-battle frame, which was what made field frames read
   as battles.
 
+- **Qualification.** A bare `ninja` on px13 played both legs: `wor_relm`
+  `PASS (frame 341376) attempts=1/3`; `wor_tower` lost its first attempt to
+  the 200,000-frame limit at MagiMaster and won the second (`MagiMaster:
+  battle $162 won after 143885 ticks`, `PASS (frame 508873) attempts=2/3`;
+  `build/attempts/wt/v031-tower-2/ninja/`).
+
 Open: the fourth floor's L.90 Magic, and MagiMaster's lone-survivor
 stalemate (a timeout the runner retries). Both pass within the runner's
 three attempts on the captured line; neither is reliable yet.
