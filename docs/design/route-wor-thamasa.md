@@ -283,6 +283,25 @@ against 2,400-2,900 HP here. So:
   the party's arrival level (section 5.3). The two set the target. A
   45-level grind of thirty fights is the plan only if MagiMaster says so.
 
+**Measured (v0.31, #365).** The route as played walks one group-49 tile:
+the Falcon's landing at (36,156), one step from Jidoor's door, which
+`route_data.py world-path 1 34 156 36 156` reads as "1 steps: no
+battles" onto (35,156) and "1 steps: ... group 49" onto (36,156). That
+step comes once a Jidoor exit (wor_cyan, wor_storm, wor_narshe and
+wor_relm in v0.30's play); its chance is the danger counter's high byte
+over 256 (`CheckBattleWorld`: +$60 a world step, cleared only by a
+battle). The grind is group 48's lap (16..22,135). In v0.30's
+qualification (`build/attempts/wt/v030-release-qualification/
+final-8efd9290/ninja.log`) no battle came from group 49: formation 319
+(Crawler x3) was fought 24 times (24 battle keys), all won, all on
+wor_relm's lap, and formation 323 never. The arc's labs add 170 Crawler
+fights, none lost (`build/attempts/wt/v030-route/lab/relm/*`,
+`lab/var/*`). v0.31's fresh play (`build/attempts/wt/v031-robust/final/
+ninja2.log.gz`, wor_relm) fought formation 319 32 times and 326 (Geckorex
+x2, Reach Frog) 22 times, every one a distinct key and won, and met 323
+never. The Mantodea is left to that one step, where a loss is a retried
+attempt.
+
 ### 5.2 Chadarnook (event 86; `AIScript::_286`, `ai_script.asm:5505`; `_328`, :6873)
 
 The goddess (`$11E`) opens: "The girl in the picture is mine!", then Charm,

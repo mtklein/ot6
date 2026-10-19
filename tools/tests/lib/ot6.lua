@@ -13151,6 +13151,25 @@ function M.setzerBattle(plan, opts)
     M.vars.setzer, M.vars.setzerList, M.vars.setzerTaken = {}, {}, {}
     local mine = token
     local function live() return M.setzerToken == mine end
+    -- Is the row about to run SETZER's aim, or the engine's?  Vanilla
+    -- clears a queued action's targets twice over: at FixPlayerCmd when
+    -- its actor is Muddled or Zombied as the confirm becomes the action
+    -- (Z.fixedTaken, below), and at InitPlayerAction when the actor's
+    -- status changed after that (`trb $3a4a / stz $b8 / stz $b9`; the
+    -- Zombie and Muddle set and clear handlers mark $3a4a).  Either way
+    -- ChooseTarget's Retarget then aims it by his status at execution: a
+    -- Zombie's multi-target row takes both sides and CheckTargetsBattleType
+    -- keeps one at random (#433: wor-tomb-v1, SETZER Zombied at f3157
+    -- after his f3057 confirm, his Coin Toss on y $04 $02 $00 at f3361;
+    -- build/attempts/wt/v031-robust/433/).  So a row that executes with
+    -- SETZER Zombied or Muddled is the engine's.
+    local function takenAtExec(e)
+      if Z.fixedTaken then return Z.fixedTaken end
+      local st = M.readWord(0x3EE4 + e)
+      if (st & 0x0002) ~= 0 then return "Zombie (after his confirm)" end
+      if (st & 0x2000) ~= 0 then return "Muddle (after his confirm)" end
+      return nil
+    end
     local a = M.sym("Ot6SetzerExec")
     emu.addMemoryCallback(function()
       if not live() or Z.entity == nil then return end
@@ -13161,7 +13180,7 @@ function M.setzerBattle(plan, opts)
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
         entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {}, passes = {} }
-      Z.rec.taken, Z.fixedTaken = Z.fixedTaken, nil
+      Z.rec.taken, Z.fixedTaken = takenAtExec(e), nil
     end, emu.callbackType.exec, a, a)
     -- the Coin Toss relic's GP Rain (command $18, no table): its own record
     local g = M.sym("Cmd_18")
@@ -13173,7 +13192,7 @@ function M.setzerBattle(plan, opts)
         gil0 = gil(), mp0 = M.readWord(0x3C08 + e), bank0 = M.readByte(0x3E9C + e),
         mon0 = mons(), targets = M.readByte(0xB9), chips = {}, divine0 = M.readByte(0x3ECB), f = M.frame,
         entity = e, setzerBit = M.readByte(0x3018 + e), costs = {}, dice = {}, seq = {}, passes = {} }
-      Z.rec.taken, Z.fixedTaken = Z.fixedTaken, nil
+      Z.rec.taken, Z.fixedTaken = takenAtExec(e), nil
     end, emu.callbackType.exec, g, g)
     -- FixPlayerCmd (@4d77): a pending command turned into the action it
     -- runs; with its actor Muddled or Zombied there ($3ee4 & $2002) the
@@ -13258,9 +13277,10 @@ function M.setzerBattle(plan, opts)
         for _, ev in ipairs(r.chips) do ys[#ys + 1] = string.format("$%02X", ev.y) end
         if r.taken then
           -- SETZER was Zombied or Muddled when the engine turned his
-          -- confirmed row into its action (FixPlayerCmd, above): the
-          -- targets he chose were cleared and the row drew its own, either
-          -- side (vanilla; main's v0.28 chain, wor-tomb-v1: GP Rain from his
+          -- confirmed row into its action, or by the time it ran
+          -- (takenAtExec, above): the targets he chose were cleared and
+          -- the row drew its own, either side (vanilla; main's v0.28
+          -- chain, wor-tomb-v1: GP Rain from his
           -- f8638 window ran at f9452 with $b9 = $00, six chip calls and no
           -- monster's HP moved), so it is not the plan's throw and is not
           -- checked as one
@@ -13273,7 +13293,7 @@ function M.setzerBattle(plan, opts)
             plan[back].aim, plan[back].presses, plan[back].lPresses, plan[back].tookBack = nil, nil, nil, nil
           end
           M.log(string.format("[setzer] f%d row $%02X at %d BP ran under %s (exec f%d, targets $%02X, chip "
-            .. "call(s) on %s): his targets were cleared as his confirm became the action, so it is set aside, not "
+            .. "call(s) on %s): the engine cleared his targets and aimed it by his status, so it is set aside, not "
             .. "the plan's throw; "
             .. "plan entry %s is played again", M.frame, r.row, r.boost, r.taken, r.f, r.targets,
             #ys > 0 and table.concat(ys, " ") or "none", tostring(back)))
@@ -13450,7 +13470,7 @@ function M.setzerBattle(plan, opts)
     -- never enter a scripted row into a Zombie's stale window.
     if p ~= nil then
       care.watch("SETZER's scripted plan")
-      if care.spinnerTaken() or careActor == a then
+      if care.spinnerTaken() or careActor == a or care.allyZombie() then
         careActor = a
         care.window()
         return
@@ -13600,11 +13620,11 @@ function M.setzerBattle(plan, opts)
         M.log(string.format("[setzer] f%d the aim reached %s in %d press(es)", M.frame,
           M.tgtNodeName(M.readByte(0x7B7D), M.readByte(0x7B7E)), p.aim.presses))
       end
-      Z.confirmedK = k
-      k = k + 1
+      Z.confirmedK, p.confirmedAt = k, M.frame   -- confirmedAt: for a caller telling his row's
+      k = k + 1                                   --   execution from one queued before it
       pulse("a")
     elseif st == 0x08 then
-      if cool == 0 and M.readByte(0x7B92) == 0 then Z.confirmedK = k; k = k + 1 end
+      if cool == 0 and M.readByte(0x7B92) == 0 then Z.confirmedK, p.confirmedAt = k, M.frame; k = k + 1 end
       pulse("a")
     elseif st == 0x27 then
       pulse("a")
@@ -18141,22 +18161,37 @@ function M.onReplay(fn) replayHooks[#replayHooks + 1] = fn end
 -- removed from outside a CPU callback).  Installed once, before the first
 -- attempt runs.  Removal still works: the shim hands back Mesen's own ref.
 local shimmed = false
+-- An error raised inside a memory or event callback never reaches the
+-- script: Mesen swallows it, so an assert there was a no-op (#438,
+-- battle_breakmonster's monster-arm check never failed).  The shim runs
+-- every callback under xpcall and keeps the FIRST error, message and
+-- traceback, in RUN.cbError; the runner's next frame fails the run with it.
 local function installShim()
   if shimmed then return end
   shimmed = true
-  emu.addMemoryCallback = function(fn, ...)
-    local mine = RUN.epoch
-    return rawAddMemoryCallback(function(...)
+  -- (locals live in this function: the chunk is at Lua's 200-local limit)
+  local function cbHandler(e)
+    if type(debug) == "table" and debug.traceback then return debug.traceback(tostring(e), 2) end
+    return tostring(e)
+  end
+  local function guarded(fn, mine, kind)
+    return function(...)
       if mine ~= RUN.epoch then return end
-      return fn(...)
-    end, ...)
+      local r = table.pack(xpcall(fn, cbHandler, ...))
+      if not r[1] then
+        if RUN.cbError == nil then
+          RUN.cbError = { kind = kind, frame = M.frame, msg = r[2] }
+        end
+        return
+      end
+      return table.unpack(r, 2, r.n)
+    end
+  end
+  emu.addMemoryCallback = function(fn, ...)
+    return rawAddMemoryCallback(guarded(fn, RUN.epoch, "memory"), ...)
   end
   emu.addEventCallback = function(fn, ...)
-    local mine = RUN.epoch
-    return rawAddEventCallback(function(...)
-      if mine ~= RUN.epoch then return end
-      return fn(...)
-    end, ...)
+    return rawAddEventCallback(guarded(fn, RUN.epoch, "event"), ...)
   end
 end
 
@@ -18312,6 +18347,7 @@ end
 
 local function resetLibState()
   RUN.epoch = RUN.epoch + 1          -- the old attempt's callbacks go inert
+  RUN.cbError = nil
   M.frame = 0
   -- the last battle frame is the old attempt's: M.frame restarts at 0, so a
   -- stale M.blsSeen ahead of it made battleLoadStarted read field garbage
@@ -18813,6 +18849,17 @@ function M.run(opts, steps)
         stopWith(1, "other", "retry: the savestate load trampoline never "
           .. "fired in 600 frames")
       end
+      return
+    end
+
+    -- An error a callback raised since the last frame (#438): fail with
+    -- the original message and traceback, as a raised step would.
+    if RUN.cbError then
+      local e = RUN.cbError
+      RUN.cbError = nil
+      failed("other", string.format("an error was raised inside a %s callback "
+        .. "at f%d (Mesen swallows these; the run fails at the next frame): %s",
+        e.kind, e.frame or -1, tostring(e.msg)), 1)
       return
     end
 

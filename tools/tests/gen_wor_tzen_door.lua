@@ -71,6 +71,7 @@ local MADUIN = 6                                    -- esper index (magicite $3C
 local BLIZZARD, THUNDERBLADE = 0x0E, 0x0F
 local GENJI, JEWEL_RING = 0xD1, 0xB5
 local TONIC, POTION, FENIX, REMEDY, SOFT, TENT = 0xE8, 0xE9, 0xF0, 0xF5, 0xF4, 0xF7
+local X_POTION = 0xEA
 local ALBROOK_DOOR = { 141, 209 }                   -- ShortEntrance map 1 -> 324 (2,17)
 local ALBROOK_OTHER = { 140, 209 }
 local TZEN_DOOR = { 130, 179 }                      -- ShortEntrance map 1 -> 305 (23,29)
@@ -506,7 +507,11 @@ local function albrookStop(what, after)
       H.assertEq(H.invCountOf(REMEDY) >= REMEDY_TARGET, true, "Remedies at " .. REMEDY_TARGET)
     end),
     H.shopClose("Albrook item shop"),
-    H.bagArrange({ POTION, FENIX, REMEDY, SOFT, TONIC }, { tag = "bag: combat items on top (Albrook)" }),
+    -- the X-Potion among them: the heal policy reaches for it when a Potion
+    -- buys back less than a round costs, and from row 32 the walk took
+    -- longer than she had (#436: v0.30's qualification, $0CC, "item steer:
+    -- row 0 -> 32" at 172 HP, dead at 51 before it landed)
+    H.bagArrange({ POTION, X_POTION, FENIX, REMEDY, SOFT, TONIC }, { tag = "bag: combat items on top (Albrook)" }),
     H.navTo(37, 54, { maxFrames = 6000, playBattles = "tactical" }),
     holdOut("down", MAP_ALBROOK, "the item shop's (37,55) trigger -> Albrook 324"),
     H.gearStop({ tag = "gear Albrook (" .. what .. ")" }),     -- #434: buy power with gil

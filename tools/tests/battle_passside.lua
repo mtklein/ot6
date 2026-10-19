@@ -14,7 +14,8 @@
 -- battle with two or more monsters (fighting out any other, care after,
 -- within M.setzerCrowdBudget's decoded worst case), and snapshot its
 -- opening.  Each case restores that snapshot, writes, and plays SETZER
--- through the real menu while the others Defend:
+-- through the real menu while the others Defend.  A case whose draw that
+-- crowd does not meet is owed to the next crowd (at most MAX_CROWDS):
 --   party:      one ally's HP is set to 1 as the selected Fight begins, and SETZER (one weapon: two swings
 --               a boost point) Fights it at 1 BP (an entry with `ally`): the
 --               first swing fells the ally, and the second stays on that
@@ -63,9 +64,24 @@
 -- HP staging is armed only for the selected command, actor, boost and target
 -- side at ExecCmd, with SETZER's control free.  A hostile status that lands
 -- after the window opens can cancel/re-aim a queued command: that interrupted
--- execution is logged without staging HP, and the same case is entered again
--- on the same continuation after controller care, never a snapshot re-roll.
--- If that command spent its pips, real Defends rebuild the requested bank.
+-- execution is logged without staging HP, the opening snapshot is restored,
+-- and the same case is entered again with SETZER Defending once more before
+-- its row (a different input sequence from the same opening, so a different
+-- continuation, not the same draw replayed), at most MAX_LEAD times.  It
+-- used to be entered again on the same continuation, which cannot survive
+-- every interruption: on the v031-robust chain's wor-tomb-v1 SETZER was
+-- Zombied after confirming the emptystart Coin Toss at 3 BP, the engine
+-- aimed it at the party (#433's vanilla retarget) and the tosses killed the
+-- other three ("emptystart command interrupted before its setup: Zombie",
+-- then "BATTLE WIPE", build/attempts/wt/v031-robust/final/rerun/).
+-- This replaces af45ec3f's rule ("entered again on the same continuation,
+-- without snapshot rerolls"), by decision at the v031-robust-2 review: a
+-- restore is acceptable here because what follows it is a different
+-- deterministic input (one more Defend) from a fixed opening, bounded by
+-- MAX_LEAD and asserted, not the same draw re-rolled until it passes.  A
+-- wrong target side while SETZER's control is free is not an interruption
+-- and is never retried: it fails the run.
+-- If a command spent its pips, real Defends rebuild the requested bank.
 -- Every pass of every action is held to M.passCheck, whose checks name
 -- what they assert.
 -- Negative controls (build/attempts/wt/pass-retarget/round3/mutants/): a
@@ -93,6 +109,22 @@ local PW, judgedN = nil, 0
 -- by the case that needs it: { e = entity, cmd = queued command, muddle =
 -- bool, fell = bool (fell the queued monster target) }
 local atExec = nil
+-- the case's plan, its first entry noted on atExec: an action of SETZER's
+-- that runs before that entry was confirmed (H.setzerBattle's confirmedAt)
+-- was queued before the case -- a Zombie's own Fight that ran after his
+-- cure (the v031-robust chain's wor-tomb-v1: "emptied: requested boost at
+-- execution: got 0", build/attempts/wt/v031-robust/final/) -- and is not
+-- the case's execution.  `lead` Defends go before the case's row: the
+-- case's entry again after an interruption (MAX_LEAD, above).
+-- MAX_LEAD is a chosen margin, not a measured need: over K 0-9 on the
+-- v031-robust chain every interrupted case was met with one extra Defend
+-- (build/attempts/wt/v031-robust-2/passside/batch2/).
+local MAX_LEAD = 3
+local function battleFor(plan, opts, lead)
+  atExec.entry = plan[1]
+  for _ = 1, lead or 0 do table.insert(plan, 1, { row = "defend" }) end
+  return H.setzerBattle(plan, opts)
+end
 local function armExec()
   local ec = H.sym("ExecCmd@battle_code")
   emu.addMemoryCallback(function()
@@ -100,12 +132,26 @@ local function armExec()
     if w == nil then return end
     local x = emu.getState()["cpu.x"] & 0xff
     if x ~= w.e or H.readByte(0x3A7C) ~= w.cmd then return end
+    if w.entry and w.entry.confirmedAt == nil then
+      H.log(string.format("[%s] f%d an action of SETZER's ($%02X) runs before the case's row was confirmed: "
+        .. "queued before the case, not its execution", TAG, H.frame, w.cmd))
+      return
+    end
     atExec = nil
     local c = H.controlTaken(x // 2)
     local chars, mons = H.readByte(0xB8), H.readByte(0xB9)
     local eligible = c == nil and (w.ally ~= nil and chars == (1 << w.ally) and mons == 0
       or w.ally == nil and chars == 0 and mons ~= 0)
     w.valid = false
+    if c == nil and not eligible then
+      -- SETZER's control is free, so nothing re-aimed the command: a wrong
+      -- side here is the ROM's or the driver's, and a retry must not hide it
+      w.error = string.format("%s: with SETZER's control free, the selected command executes on its selected "
+        .. "side (targets chars=%02X monsters=%02X, want %s)", w.kind, chars, mons,
+        w.ally ~= nil and string.format("chars=%02X monsters=00", 1 << w.ally) or "chars=00, monsters nonzero")
+      H.log(string.format("[%s] f%d %s", TAG, H.frame, w.error))
+      return
+    end
     if not eligible then
       w.interrupted = c and c.name or string.format("targets chars=%02X monsters=%02X", chars, mons)
       H.log(string.format("[%s] f%d %s command interrupted before its setup: %s; no mechanism HP staged",
@@ -178,6 +224,17 @@ end
 local W, since, wp, done = nil, 0, 1, false
 local WPS = { { 124, 26 }, { 120, 11 } }
 local KINDS = { "party", "emptied", "emptystart", "first" }
+-- the kinds whose draw is met so far, and the crowds the cases have used.
+-- MAX_CROWDS is a chosen margin, not a measured need: over K 0-9 no run
+-- used more than 2 crowds (passside/batch2/).  Three ways a crowd leaves a
+-- case owed: the precondition is never dealt (K1: no second monster stands
+-- for the offhand case), MAX_LEAD is reached, or the case's action never
+-- runs -- K8's emptystart: after the restore SETZER was Zombied again, and
+-- an ally cured of Zombie ran its queued 3-BP Fight through the crowd
+-- before SETZER's Coin Toss reached ExecCmd, so the battle ended with "the
+-- action never ran".  That last path counts no interruption, so only
+-- MAX_CROWDS bounds it.
+local metAll, crowds, MAX_CROWDS = {}, 0, 3
 
 -- one case: restore, write, play until its action has run
 local function play()
@@ -195,17 +252,21 @@ local function play()
       S.blob, S.allies = S.req.blob, allies()
       H.assertEq(#S.allies >= 1, true, "an ally with a Fight row stands beside SETZER")
       local sz = slotOf(SETZER)
+      crowds = crowds + 1
       S.cases = {}
-      for _, e in ipairs(S.allies) do S.cases[#S.cases + 1] = { kind = "party", e = e } end
-      for _, b in ipairs({ 3, 2 }) do S.cases[#S.cases + 1] = { kind = "emptied", e = sz, boost = b } end
-      for _, b in ipairs({ 3, 2 }) do S.cases[#S.cases + 1] = { kind = "emptystart", e = sz, boost = b } end
-      for _, b in ipairs({ 1, 2 }) do S.cases[#S.cases + 1] = { kind = "first", e = sz, boost = b } end
+      local function add(c) if not metAll[c.kind] then S.cases[#S.cases + 1] = c end end
+      for _, e in ipairs(S.allies) do add({ kind = "party", e = e }) end
+      for _, b in ipairs({ 3, 2 }) do add({ kind = "emptied", e = sz, boost = b }) end
+      for _, b in ipairs({ 3, 2 }) do add({ kind = "emptystart", e = sz, boost = b }) end
+      for _, b in ipairs({ 1, 2 }) do add({ kind = "first", e = sz, boost = b }) end
       S.ci, S.phase, S.met = 1, "write", {}
     end
     if S.phase == "restore" then
       if not S.req.done then return "frame" end
       H.checkReq(S.req, "restoring the opening snapshot")
       PW.open = {}
+      -- the snapshot holds his weapon in its own hand again
+      S.swappedCi = nil
       S.phase = "write"
     end
     if S.phase == "write" then
@@ -217,22 +278,22 @@ local function play()
         S.actor, S.want = slotOf(SETZER) * 2, "fight"
         atExec = { e = S.actor, cmd = 0x00, ally = c.e, kind = c.kind, boost = 1,
           prepare = function() H.writeWord(0x3BF4 + x, 1) end }
-        S.step = H.setzerBattle({ { row = "fight", cmd = 0x00, boost = 1, ally = c.e }, { row = "defend" },
-          { row = "defend" } }, { untilPlanDone = true, fullBoost = true })
+        S.step = battleFor({ { row = "fight", cmd = 0x00, boost = 1, ally = c.e }, { row = "defend" },
+          { row = "defend" } }, { untilPlanDone = true, fullBoost = true }, c.lead)
       elseif c.kind == "emptied" then
         H.writeByte(0x3E9C + x, 3)
         atExec = { e = x, cmd = 0x00, muddle = true, kind = c.kind, boost = c.boost, prepare = crowdTo1 }
         H.log(string.format("[%s] emptied: monster HP armed for 1 at controlled execution, SETZER's bank 3; he Fights at %d BP", TAG, c.boost))
         S.actor, S.want = x, "fight"
-        S.step = H.setzerBattle({ { row = "fight", cmd = 0x00, boost = c.boost }, { row = "defend" },
-          { row = "defend" } }, { untilPlanDone = true, fullBoost = true })
+        S.step = battleFor({ { row = "fight", cmd = 0x00, boost = c.boost }, { row = "defend" },
+          { row = "defend" } }, { untilPlanDone = true, fullBoost = true }, c.lead)
       elseif c.kind == "emptystart" then
         H.writeByte(0x3E9C + x, 3)
         atExec = { e = x, cmd = 0x0F, muddle = true, kind = c.kind, boost = c.boost, prepare = crowdTo1 }
         H.log(string.format("[%s] emptystart: monster HP armed for 1 at controlled execution, SETZER's bank 3; Coin Toss at %d BP", TAG,
           c.boost))
         S.actor, S.want = x, "coin"
-        S.step = H.setzerBattle({ { row = COIN, boost = c.boost }, { row = "defend" } }, { untilPlanDone = true, fullBoost = true })
+        S.step = battleFor({ { row = COIN, boost = c.boost }, { row = "defend" } }, { untilPlanDone = true, fullBoost = true }, c.lead)
       else
         if S.swappedCi ~= S.ci then swapHands(x); S.swappedCi = S.ci end
         H.assertEq(H.readByte(0x3B68 + x) == 0 and H.readByte(0x3B69 + x) ~= 0, true, "offhand: after the swap "
@@ -242,8 +303,8 @@ local function play()
           .. "BP, his queued target felled as it starts", TAG, H.readByte(0x3B68 + x), H.readByte(0x3B69 + x),
           c.boost))
         S.actor, S.want = x, "fight"
-        S.step = H.setzerBattle({ { row = "fight", cmd = 0x00, boost = c.boost }, { row = "defend" },
-          { row = "defend" } }, { untilPlanDone = true, fullBoost = true })
+        S.step = battleFor({ { row = "fight", cmd = 0x00, boost = c.boost }, { row = "defend" },
+          { row = "defend" } }, { untilPlanDone = true, fullBoost = true }, c.lead)
       end
       S.exec, S.phase = atExec, "play"
     end
@@ -251,21 +312,33 @@ local function play()
       if S.exec and S.exec.error then error(S.exec.error, 0) end
       local c = S.cases[S.ci]
       local r = S.step:tick()
+      -- the exec check's failure, raised in this tick: left to the next,
+      -- a battle ending now would move on and the next case would
+      -- overwrite S.exec with it unraised
+      if S.exec and S.exec.error then error(S.exec.error, 0) end
       judgeNew()
       local got = nil
       for n = S.mark + 1, #PW.acts do
         local a = PW.acts[n]
         if a.e == S.actor and a.kind == S.want then got = a; break end
       end
-      if got == nil and r ~= "done" and H.battleLoadStarted() then return r end
+      -- an interruption seen at ExecCmd is acted on there and then: the
+      -- engine's aim for it can be the party (the emptystart wipe above)
+      local cut = S.exec and S.exec.interrupted ~= nil
+      if got == nil and r ~= "done" and not cut and H.battleLoadStarted() then return r end
       local eligible = S.exec and S.exec.valid == true
       if not eligible and H.battleLoadStarted() then
-        S.interrupted = (S.interrupted or 0) + 1
-        H.log(string.format("[%s] %s interruption #%d: %s; cure and enter the same case again on this "
-          .. "continuation (no snapshot restore)", TAG, c.kind, S.interrupted,
-          S.exec and S.exec.interrupted or "its selected command never executed"))
+        local why = S.exec and S.exec.interrupted or "its selected command never executed"
+        c.lead = (c.lead or 0) + 1
+        c.why = c.why or {}
+        c.why[#c.why + 1] = why
+        H.assertEq(c.lead <= MAX_LEAD, true, string.format("%s at %s BP: the case executes uninterrupted "
+          .. "within %d entries from the opening, SETZER Defending 0..%d times first (interrupted by: %s)",
+          c.kind, tostring(c.boost or 1), MAX_LEAD, MAX_LEAD - 1, table.concat(c.why, "; ")))
+        H.log(string.format("[%s] %s interruption #%d: %s; restore the opening and enter the case again "
+          .. "with %d Defend(s) of SETZER's first", TAG, c.kind, c.lead, why, c.lead))
         atExec = nil
-        S.phase = "write"
+        S.req, S.phase = H.requestLoadState(S.blob), "restore"
         return "frame"
       end
       local met = eligible and got ~= nil and #seen[c.kind] > S.before
@@ -279,10 +352,27 @@ local function play()
         S.req, S.phase = H.requestLoadState(S.blob), "restore"
         return "frame"
       end
+      local unmet = {}
       for _, k in ipairs(KINDS) do
-        H.assertEq(S.met[k] == true, true, string.format("%s: the case's draw is met (its candidates tried)", k))
+        if S.met[k] then metAll[k] = true end
+        if not metAll[k] then unmet[#unmet + 1] = k end
       end
-      done = true
+      if #unmet == 0 then
+        done = true
+      else
+        -- what this crowd deals can leave a case's precondition unmet: on
+        -- the k1 history of this chain's wor-tomb-v1 (build/attempts/wt/
+        -- v031-robust-2/passside/), an ally cured of Zombie ran its queued
+        -- Fight into one of the two monsters before SETZER's offhand Fight,
+        -- so with his queued target felled no monster stood for the first
+        -- pass to retarget onto ("first, slot 3 at 1 BP: no draw", and at
+        -- 2 BP).  The cases still owed go to the next crowd.
+        H.assertEq(crowds < MAX_CROWDS, true, string.format("every case's draw is met within %d crowds "
+          .. "(still owed: %s)", MAX_CROWDS, table.concat(unmet, ", ")))
+        H.log(string.format("[%s] crowd %d left %s unmet: fight it out and take the next crowd for them", TAG,
+          crowds, table.concat(unmet, ", ")))
+        since = 0
+      end
       S.phase = "fight"
       if not H.battleLoadStarted() then return "done" end
     end

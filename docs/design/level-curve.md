@@ -306,15 +306,18 @@ tracked checkpoints read by `wordump.py`; `xp_by_map.txt`,
 
 | checkpoint | active party | Potion / Fenix / Tincture / Revivify | gil |
 |---|---|---|---|
-| `wor-start-v1` | CELES 25 | 85 / 31 / 11 / 5 | 181,494 |
-| `wor-tzen-door-v1` | CELES 27 | 85 / 31 / 11 / 5 | 201,220 |
-| `wor-sabin-v1` | SABIN 28 · CELES 28 | 85 / 31 / 11 / 5 | 184,572 |
-| `wor-edgar-v1` | EDGAR 31 · SABIN 31 · CELES 32 | 85 / 31 / 13 / 5 | 248,834 |
-| `wor-kohlingen-v1` | EDGAR 32 · SABIN 32 · CELES 33 · SETZER 32 | 97 / 31 / 13 / 10 | 239,364 |
-| `wor-falcon-v1` | EDGAR 33 · SABIN 33 · CELES 34 · SETZER 33 | 79 / 31 / 13 / 32 | 280,318 |
+| `wor-start-v1` | CELES 25 | 79 / 25 / 9 / 9 | 172,785 |
+| `wor-tzen-door-v1` | CELES 27 | 79 / 27 / 9 / 9 | 194,259 |
+| `wor-sabin-v1` | SABIN 28 · CELES 28 | 79 / 28 / 9 / 9 | 172,513 |
+| `wor-edgar-v1` | EDGAR 31 · SABIN 31 · CELES 31 | 77 / 29 / 9 / 9 | 232,131 |
+| `wor-kohlingen-v1` | EDGAR 31 · SABIN 32 · CELES 32 · SETZER 31 | 95 / 29 / 9 / 10 | 217,087 |
+| `wor-falcon-v1` | EDGAR 32 · SABIN 33 · CELES 33 · SETZER 31 | 70 / 29 / 9 / 25 | 248,627 |
 
-`wor-falcon-v1 EDGAR L33 1207/1803 ... CELES L34 1313/1900 ... SETZER L33
-1402/1800`; `xp EDGAR 101737, SABIN 105683, CELES 111711, SETZER 103319`.
+`wor-falcon-v1 EDGAR L32 1481/1701 ... SABIN L33 1414/1812 ... CELES L33
+1518/1798 ... SETZER L31 1360/1597`; `xp EDGAR 96891, SABIN 101443, CELES 104577,
+SETZER 91189`.  Re-read from the tracked checkpoints on 2026-10-18
+(`build/attempts/wt/v031-callbacks/wordump_falcon.log`, #438); the table
+had kept the v0.27 plan's figures.
 
 ### How the World of Ruin pays
 
@@ -366,7 +369,8 @@ short Falcon hop from any arc.
 ### The plan by milestone
 
 Projected levels walk each arc with an assumed fight count (**estimate**;
-`projection.log` lists the counts) from `wor-falcon-v1`'s mean 105,612 XP.
+`projection.log` lists the counts) from `wor-falcon-v1`'s mean 98,525 XP (re-read 2026-10-18; the
+projected levels below were walked from the older 105,612 and not re-run).
 The target column is the healthy level for the stop's key fight; it is an
 estimate until a lab sets it, as the Tentacles' L30 (route-wor-edgar.md
 4.1) and Dullahan's were.
@@ -432,7 +436,7 @@ Elixirs are chest and steal items only.  `H.careStockPotions`
 raises at about L43 with a spend of 10; the v0.30 and later counters need
 the same cap there (a library change, so a replay; not made here).
 
-**Gil is not the limit.**  `wor-falcon-v1` carries 280,318, and the plains
+**Gil is not the limit.**  `wor-falcon-v1` carries 248,627, and the plains
 of groups 49 and 51 pay 500-2,600 GP a body, x2 (`group49.txt`,
 `group51.txt`).  The stops' big buys:
 Golem (20,000) and ZoneSeek (10,000) at Jidoor's auction (`take_gil 20000`

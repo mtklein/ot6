@@ -222,6 +222,7 @@ H.run({ maxFrames = 200000 }, {
   H.call(function()
     hurtPatient()
     magicRun.castBag, magicRun.castMp = bag(), H.charMp(HEALER)
+    magicRun.castHp = H.charHp(PATIENT)
   end),
   H.fieldCare({ tag = "zozo bag reserved", threshold = 0.95,
     reserve = { [0xE8] = 99, [0xE9] = 99 } }),
@@ -234,9 +235,17 @@ H.run({ maxFrames = 200000 }, {
       "with the bag reserved away the healer casts, paying out of her own MP")
     H.assertEq(magicRun.castBag - bag(), 0,
       "and the bag was not opened at all")
-    H.assertEq(hp >= itemRun.hp, true, string.format(
-      "casting left the patient at least as healthy as drinking did " ..
-      "(%d vs %d)", hp, itemRun.hp))
+    -- Not "at least as healthy as drinking did": both policies stop at the
+    -- threshold, so where each lands above it is overshoot -- a Tonic run can
+    -- top the patient to the maximum (558) while one Cure from the same hole
+    -- stops at 549 (#440, the quick fixture's Cure roll).  The property is
+    -- that casting got the patient to the bar drinking is held to, and that
+    -- it was the cast that moved him.
+    H.assertEq(hp > magicRun.castHp, true, string.format(
+      "casting raised the patient (%d -> %d)", magicRun.castHp, hp))
+    H.assertEq(hp >= math.min(itemRun.hp, math.ceil(H.charMaxHp(PATIENT) * 0.95)),
+      true, string.format("casting left the patient at least as healthy as " ..
+      "the bar drinking is held to (%d, drinking left %d)", hp, itemRun.hp))
     H.assertEq(hp >= H.charMaxHp(PATIENT) * 0.95, true,
       string.format("the patient is back above the threshold (%d/%d)",
         hp, H.charMaxHp(PATIENT)))

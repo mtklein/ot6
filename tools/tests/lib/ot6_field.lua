@@ -1574,8 +1574,9 @@ end
 --     first when the hit could drop him: under hitFloor % of his max HP,
 --     the fight driver's unmeasured unmuddle floor, a quarter); the item
 --     the ROM's records say cures Petrify, Zombie, Imp or Berserk; then
---     an ally asleep or muddled gets the same hit (a muddled ally's own
---     turns are the engine's to aim, at the formation or the party);
+--     an ally asleep or muddled gets the same hit, and a Zombied ally its
+--     cure (a Revivify; #433) -- a muddled or Zombied ally's own turns are
+--     the engine's to aim, at the formation or the party;
 --   * else a dead member raised with a Fenix Down;
 --   * else a living member under carePct % gets a Potion (a Tonic
 --     without), the spinner first, else the most hurt;
@@ -1673,6 +1674,18 @@ function M.newSpinnerCare(o)
       has = function(item) return invIdx(item) ~= nil end })
   end
 
+  -- a seated member other than the spinner Zombied, with its cure in the
+  -- bag and none in flight: the spinner's caller lets care take the window
+  -- (#433: a player cures the Zombie before the spinner's turn)
+  function C.allyZombie()
+    local sp = o.spinner()
+    for s = 0, 3 do
+      local c = s ~= sp and seated(s) and M.controlTaken(s) or nil
+      if c and c.name == "Zombie" and inFlight[s] == nil and cureOf(c, s) then return s end
+    end
+    return nil
+  end
+
   -- The lost point (review of 3c0d68d8: h3_k9_s15, one all-target Stone
   -- muddled three members, nobody attacked the lone 333-HP Iron Fist, and
   -- the party wiped with banks of 4, 2 and 5 standing): the moment the
@@ -1753,7 +1766,7 @@ function M.newSpinnerCare(o)
     for s = 0, 3 do if s ~= actor then order[#order + 1] = s end end
     for _, e in ipairs(order) do
       local c = seated(e) and M.controlTaken(e) or nil
-      if c and e ~= a and inFlight[e] == nil and (e == actor or c.cure == "hit") then
+      if c and e ~= a and inFlight[e] == nil and (e == actor or c.cure == "hit" or c.name == "Zombie") then
         local cure = cureOf(c, e)
         if c.name == "Death" and cure and itemCell then
           return { plan = "raise", tgt = e, idx = invIdx(cure), cell = itemCell, item = cure, why = c.name }
@@ -7878,7 +7891,33 @@ function M.dressRelics(members, opts)
             end
             if pick == -1 then goto ticked end
           end
-          M.assertEq(pick ~= nil, true, tag .. ": a member's new relics are all in the bag (no swap deadlock)")
+          if pick == nil then
+            -- no spare relic stands in.  A cycle: each member waiting wants a relic another waiting
+            -- member wears (wor_relm on the v031-robust chain: CYAN for
+            -- CELES's Peace Ring, CELES for CYAN's Hyper Wrist), and the
+            -- Relic menu equips only from the bag.  The first member in the
+            -- queue keeps what he wears in the slots the bag cannot fill and
+            -- takes the rest; that frees nothing for the others, so the
+            -- cycle unwinds one member at a time and every member ends on
+            -- relics he holds (the plan's slots re-read as what stays).
+            local p = queue[1]
+            local keep = {}
+            for _, c in ipairs(p.changes) do
+              if M.invCountOf(c[2]) >= 1 then keep[#keep + 1] = c
+              else
+                M.log(string.format("[%s] %s keeps %s in slot %d: the plan's %s is worn by a member still waiting "
+                  .. "on one of his (a swap the Relic menu cannot make from the bag)", tag, p.name,
+                  relicName(p.cur[c[1]]), c[1], relicName(c[2])))
+                p.want[c[1]] = p.cur[c[1]]
+              end
+            end
+            p.changes = keep
+            if #keep == 0 then
+              table.remove(queue, 1)
+              goto continue
+            end
+            pick = 1
+          end
           local p = table.remove(queue, pick)
           -- The Relic menu re-equips by Optimum on the way out whenever the
           -- relics changed and the old or new pair holds a Genji Glove,
@@ -7949,6 +7988,7 @@ function M.dressRelics(members, opts)
         local r = cur:tick()
         if r == "frame" then return "frame" end
         cur = nil
+        ::continue::
       end
     end,
     reset = function() plan, queue, cur, restore = nil, nil, nil, nil end,
