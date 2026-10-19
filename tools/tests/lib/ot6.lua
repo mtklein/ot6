@@ -192,9 +192,10 @@ M.HB_IVL = 1024
 -- is the one hook; milestones are:
 --   a top-level step of H.run's list completing (seqStep, root only);
 --   a goal reached: waitUntil / waitUntilSoft / driveUntil satisfied;
+--   a battle action resolving (ExecCmd, below in M.run);
 --   the game state moving, sampled every PROG_IVL frames (progressSample):
 --     the map or the party's place on it, gil, the bag, the roster's
---     stats and gear, and every battler's HP -- so a field walk, a
+--     stats and gear, and every battler's HP and MP -- so a field walk, a
 --     purchase, an equip, a level, a hit landing, a battle ending all
 --     count, and an open menu with nothing happening does not.
 -- A milestone is a thing that happened; a loop that merely keeps pressing
@@ -229,7 +230,8 @@ function M.progressSample()
   -- 16 blocks of 37: level, HP, MP, experience, equipment...), each folded
   for i = 0, 511 do bag = (bag * 31 + rb(0x1869 + i)) % 4294967291 end
   for i = 0, 591 do roster = (roster * 31 + rb(0x1600 + i)) % 4294967291 end
-  for i = 0, 19 do hp = (hp * 31 + rb(0x3BF4 + i)) % 4294967291 end
+  -- the battlers' HP ($3BF4) and MP ($3C08), ten words each
+  for i = 0, 39 do hp = (hp * 31 + rb(0x3BF4 + i)) % 4294967291 end
   f.bag, f.roster, f.hp = bag, roster, hp
   for k, v in pairs(f) do
     if M.progLast[k] ~= nil and M.progLast[k] ~= v then
@@ -18879,6 +18881,15 @@ function M.run(opts, steps)
   end
   assert(not runnerStarted, "ot6.run() called twice")
   runnerStarted = true
+  -- A battle action resolving is progress (M.progress): a boss fight can
+  -- spend 18,000 frames on turns that change no HP (shielded or nulled
+  -- hits; gen_wor_tower's MagiMaster, build/attempts/wt/v031-heartbeat/
+  -- gaps_tower_a.tsv), and every one of those turns enters ExecCmd.
+  local okx, execCmd = pcall(M.sym, "ExecCmd@battle_code")
+  if okx and execCmd then
+    emu.addMemoryCallback(function() M.progress("action") end,
+      emu.callbackType.exec, execCmd, execCmd)
+  end
 
   local isSegment = type(OT6_SCRIPT) == "string"
     and OT6_SCRIPT:match("^gen_") ~= nil
