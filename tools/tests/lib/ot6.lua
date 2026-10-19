@@ -6993,8 +6993,8 @@ end
 -- shared across scenarios, so a party that spends the last Potion
 -- whenever the HP gap is large enough is not playing the way a player
 -- does.
-function Driver:battInvIdx(id)
-  local floor = (self.opts.reserve or {})[id] or 0
+function Driver:battInvIdx(id, reserve)
+  local floor = (reserve or self.opts.reserve or {})[id] or 0
   for i = 0, 251 do
     if M.readByte(BATTLE.BATTINV + i * 5) == id
        and M.readByte(BATTLE.BATTINV + i * 5 + 3) > floor then return i end
@@ -12116,14 +12116,16 @@ function Driver:makePlanRules(actor)
   -- no Fight row and no Magic line (the row greyed, or nothing in it to
   -- cast): a Tonic or Potion on the least-full member is still a turn,
   -- where a pass can fail to land and parks the menu into the recovery cap
-  -- (build/attempts/wt/v031-tower-2/lab/dbg1_k0_s25: a Muted seat's Magic row
-  -- greyed on the walk down -- UpdateCmd_05, battle_main.asm, greys it on
-  -- Mute, status byte $3EE5 bit 3 -- 'plan switch ... consumed 41 pulses in
-  -- state $05 without landing', 'recovery cap: navTo dropped and re-planned
-  -- budget:switch/05 4 times').  The bag's care floor holds (Driver:battInvIdx,
-  -- opts.reserve): the item comes from above it, and only when neither a
-  -- Tonic nor a Potion is left above it does the turn dip below, the last
-  -- of either being worth a landed turn (#443).
+  -- (build/attempts/wt/v031-tower-2/lab/dbg1_k0_s25: 'plan switch ... consumed
+  -- 41 pulses in state $05 without landing', 'recovery cap: navTo dropped and
+  -- re-planned budget:switch/05 4 times').  Why the Magic row greys: Mute --
+  -- UpdateCmd_05 (battle_main.asm) greys it on status byte $3EE5 bit 3 --
+  -- measured on the tower's randoms (build/attempts/wt/v031-relics-grey/lab/
+  -- rg1_k5_s11: 'Magic row greyed, status $00 $08 MUTE').  Other fires have the
+  -- row open and no line in it ('Magic row open', magicOnlyLine's "no
+  -- candidate").  The bag's care floor holds (Driver:battInvIdx, opts.reserve,
+  -- else M.CARE_RESERVE): the item comes from above it, and only when neither
+  -- a Tonic nor a Potion is left above it does the turn dip below (#443).
   if fight == nil then
     local irow = cmdRow(actor, BATTLE.CMD_ITEM)
     local least, leastFrac = nil, 2
@@ -12132,10 +12134,11 @@ function Driver:makePlanRules(actor)
       if hp > 0 and mx > 0 and hp / mx < leastFrac then least, leastFrac = e, hp / mx end
     end
     if irow ~= nil and least ~= nil then
-      local reserve = self.opts.reserve or {}
+      -- a driver given no floor of its own (a walk's fights) keeps the field care's (M.CARE_RESERVE)
+      local reserve = self.opts.reserve or M.CARE_RESERVE or {}
       local pick = nil
       for _, it in ipairs({ 0xE8, 0xE9 }) do   -- Tonic, Potion
-        local idx = self:battInvIdx(it)
+        local idx = self:battInvIdx(it, reserve)
         if pick == nil and idx ~= nil then pick = { it = it, idx = idx, floor = "within the care floor",
                                   have = M.readByte(BATTLE.BATTINV + idx * 5 + 3) } end
       end
