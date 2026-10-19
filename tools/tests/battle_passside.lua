@@ -74,6 +74,13 @@
 -- aimed it at the party (#433's vanilla retarget) and the tosses killed the
 -- other three ("emptystart command interrupted before its setup: Zombie",
 -- then "BATTLE WIPE", build/attempts/wt/v031-robust/final/rerun/).
+-- This replaces af45ec3f's rule ("entered again on the same continuation,
+-- without snapshot rerolls"), by decision at the v031-robust-2 review: a
+-- restore is acceptable here because what follows it is a different
+-- deterministic input (one more Defend) from a fixed opening, bounded by
+-- MAX_LEAD and asserted, not the same draw re-rolled until it passes.  A
+-- wrong target side while SETZER's control is free is not an interruption
+-- and is never retried: it fails the run.
 -- If a command spent its pips, real Defends rebuild the requested bank.
 -- Every pass of every action is held to M.passCheck, whose checks name
 -- what they assert.
@@ -109,6 +116,9 @@ local atExec = nil
 -- execution: got 0", build/attempts/wt/v031-robust/final/) -- and is not
 -- the case's execution.  `lead` Defends go before the case's row: the
 -- case's entry again after an interruption (MAX_LEAD, above).
+-- MAX_LEAD is a chosen margin, not a measured need: over K 0-9 on the
+-- v031-robust chain every interrupted case was met with one extra Defend
+-- (build/attempts/wt/v031-robust-2/passside/batch2/).
 local MAX_LEAD = 3
 local function battleFor(plan, opts, lead)
   atExec.entry = plan[1]
@@ -133,6 +143,15 @@ local function armExec()
     local eligible = c == nil and (w.ally ~= nil and chars == (1 << w.ally) and mons == 0
       or w.ally == nil and chars == 0 and mons ~= 0)
     w.valid = false
+    if c == nil and not eligible then
+      -- SETZER's control is free, so nothing re-aimed the command: a wrong
+      -- side here is the ROM's or the driver's, and a retry must not hide it
+      w.error = string.format("%s: with SETZER's control free, the selected command executes on its selected "
+        .. "side (targets chars=%02X monsters=%02X, want %s)", w.kind, chars, mons,
+        w.ally ~= nil and string.format("chars=%02X monsters=00", 1 << w.ally) or "chars=00, monsters nonzero")
+      H.log(string.format("[%s] f%d %s", TAG, H.frame, w.error))
+      return
+    end
     if not eligible then
       w.interrupted = c and c.name or string.format("targets chars=%02X monsters=%02X", chars, mons)
       H.log(string.format("[%s] f%d %s command interrupted before its setup: %s; no mechanism HP staged",
@@ -205,7 +224,16 @@ end
 local W, since, wp, done = nil, 0, 1, false
 local WPS = { { 124, 26 }, { 120, 11 } }
 local KINDS = { "party", "emptied", "emptystart", "first" }
--- the kinds whose draw is met so far, and the crowds the cases have used
+-- the kinds whose draw is met so far, and the crowds the cases have used.
+-- MAX_CROWDS is a chosen margin, not a measured need: over K 0-9 no run
+-- used more than 2 crowds (passside/batch2/).  Three ways a crowd leaves a
+-- case owed: the precondition is never dealt (K1: no second monster stands
+-- for the offhand case), MAX_LEAD is reached, or the case's action never
+-- runs -- K8's emptystart: after the restore SETZER was Zombied again, and
+-- an ally cured of Zombie ran its queued 3-BP Fight through the crowd
+-- before SETZER's Coin Toss reached ExecCmd, so the battle ended with "the
+-- action never ran".  That last path counts no interruption, so only
+-- MAX_CROWDS bounds it.
 local metAll, crowds, MAX_CROWDS = {}, 0, 3
 
 -- one case: restore, write, play until its action has run
@@ -284,6 +312,10 @@ local function play()
       if S.exec and S.exec.error then error(S.exec.error, 0) end
       local c = S.cases[S.ci]
       local r = S.step:tick()
+      -- the exec check's failure, raised in this tick: left to the next,
+      -- a battle ending now would move on and the next case would
+      -- overwrite S.exec with it unraised
+      if S.exec and S.exec.error then error(S.exec.error, 0) end
       judgeNew()
       local got = nil
       for n = S.mark + 1, #PW.acts do
