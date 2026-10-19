@@ -19369,8 +19369,9 @@ function M.run(opts, steps)
     -- COUNTER changing, never on the frame: a game parked in a menu ticks
     -- frames forever.  No [ot6] prefix: it is not terminal output.
     if M.frame == 20 or M.frame % M.HB_IVL == 0 then
-      local okT, now = pcall(os.time)
-      print(string.format("[ot6hb] %d %s %d %d %s", M.frame, okT and tostring(now) or "-",
+      -- (field 3 is reserved: the script sandbox has no os library, so no
+      -- wall-clock second; run.sh stamps its own)
+      print(string.format("[ot6hb] %d - %d %d %s", M.frame,
         M.progressN, M.progressFrame, M.progressWhy))
     end
 

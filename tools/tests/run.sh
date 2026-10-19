@@ -450,7 +450,7 @@ fi
 # --timeout: Mesen's testrunner has a default 100-second wall-clock cap
 # (exit -1/255 and truncated stdout on expiry) that killed long runs.  What
 # bounds a run now is its heartbeat, not a wall clock: lib/ot6.lua's runner
-# prints `[ot6hb] <frame> <time> <progress n> <progress frame> <what>` at
+# prints `[ot6hb] <frame> - <progress n> <progress frame> <what>` at
 # frame 20 and every 1024 frames, and this script kills a run whose progress
 # counter has not changed for OT6_HEARTBEAT seconds (default 120): a STALL,
 # reported as one below.  Progress is a script-level milestone (H.progress:
@@ -544,7 +544,7 @@ while :; do
       hb_n=0
       hb=$(tail -c 4194304 "$RUN_LOG" 2>/dev/null | grep -a '^\[ot6hb\] ' | tail -n 1)
       now=$(date +%s)
-      # `[ot6hb] <frame> <time> <progress n> <progress frame> <what>`: the
+      # `[ot6hb] <frame> - <progress n> <progress frame> <what>`: the
       # counter (field 4) is the progress; the frame (field 2) always moves.
       hbn=$(printf '%s' "$hb" | cut -d' ' -f4)
       if [ -n "$hbn" ] && [ "$hbn" != "$hb_last" ]; then
