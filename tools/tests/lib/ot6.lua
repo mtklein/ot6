@@ -680,7 +680,7 @@ function M.battleLoadStarted()
     if hp >= 10000 then odd = true elseif hp > 0 then anyLive = true end
   end
   if odd then
-    return anyLive and M.blsSeen ~= nil and M.frame - M.blsSeen <= 1
+    return anyLive and M.blsSeen ~= nil and M.frame - M.blsSeen <= 1 and M.frame >= M.blsSeen
   end
   if anyLive then M.blsSeen = M.frame end
   if anyLive then return true end
@@ -3896,18 +3896,20 @@ end
 -- that every slot that steps in the formation (M.activeSlots, $3AA8 -- a part or a
 -- tag-team sibling the script materialises later, #177: battle 70's
 -- Shiva is not in $3F45 at all) is checked the first time it is seen.
--- A battle has a formation: the battle-HP table read live in the field with
--- the formation word ($11E0) at $0000 is not one.  After a retry restored
--- its boot snapshot, wor_tzen_door's walk read two such field frames as
--- battles and the runner's count ran ahead of the [outcome] lines ("got 1,
--- want 2"; the guard counted 'formation 0000' at f1254 and f4121:
--- build/attempts/wt/v030-route/lab/tzen/t2).
 function M.absorbGuardTick()
-  if not M.battleLoadStarted() or M.readWord(0x11E0) == 0 then
+  if not M.battleLoadStarted() then
     guardArmed, guardSettle, guardSeen, guardRandom = true, 0, {}, false
     return nil
   end
+  -- A magic-only battle ($3EBB bit 0, the Fanatics' Tower: InitCmdList
+  -- turns Fight into Magic) swings no weapon, so no weapon can heal a
+  -- body there: STRAGO's Pearl Rod (holy) failed the Holy Dragon's fight,
+  -- which absorbs holy, though nobody can swing it inside
+  -- (build/attempts/wt/v031-tower/lab/t1_relm_k2_wor_relm_s0: "char 7's
+  -- R-hand item $39 (holy) is ABSORBED by slot 0 species $0024")
+  local magicOnly = (M.readByte(0x3EBB) & 0x01) ~= 0
   if not guardArmed then
+    if magicOnly then return nil end
     local fresh = {}
     for _, st in ipairs(M.activeSlots()) do
       local key = st.slot .. ":" .. st.species
@@ -3923,6 +3925,13 @@ function M.absorbGuardTick()
   end
   guardSettle = guardSettle + 1
   if guardSettle < GUARD_SETTLE then return nil end
+  -- a magic-only battle is inspected (counted) and found clean: nobody
+  -- swings, so no weapon can heal a body
+  if magicOnly then
+    guardArmed = false
+    M.absorbGuardBattles = M.absorbGuardBattles + 1
+    return nil
+  end
 
   -- A species outside 0..383 means the slot mask and the species stash
   -- are not both filled yet.  Keep waiting rather than failing a run on a
@@ -8149,10 +8158,23 @@ function Driver:magicOnlyLine(actor, boost)
     end
     self.reraiseAt = self.reraiseAt or {}
     for e = 0, 3 do
-      local st3 = M.readByte(0x3EF8 + e * 2)
-      if due and M.readWord(0x3BF4 + e * 2) > 0 and (st3 & 0x01) == 0
-         and M.frame - (self.reraiseAt[e] or -100000) > 900 then
-        local b = castBoost(actor, 0x30, select(2, spellCell(actor, 0x30, true)), 2, 0)
+      -- Life 3 is status 4's RERAISE ($3EF9 bit 2, const.inc STATUS4); the
+      -- first cut read status 3's DANCE bit, never saw it land, and cast
+      -- Life 3 on one member four times while the others fell to the
+      -- Ultima (build/attempts/wt/v031-tower/lab/mm4_*)
+      local st4 = M.readByte(0x3EF9 + e * 2)
+      if due and M.readWord(0x3BF4 + e * 2) > 0 and (st4 & 0x04) == 0
+         and M.frame - (self.reraiseAt[e] or -100000) > 400 then
+        local b, price, why = castBoost(actor, 0x30, select(2, spellCell(actor, 0x30, true)), 2, 0)
+        if b == nil or b < 2 then
+          local key = string.format("noreraise:%d:%s", actor, tostring(why))
+          if not self.statusSaid[key] then
+            self.statusSaid[key] = true
+            M.log(string.format("[%s] actor=%d cannot cast Life at 2 BP on entity %d: boost %s, %s (bank %d, %d MP)",
+              self.tag or "fight", actor, e, tostring(b), tostring(why), M.readByte(BATTLE.BP + actor * 2),
+              M.readWord(BATTLE.CURMP + actor * 2)))
+          end
+        end
         if b ~= nil and b >= 2 then
           self.reraiseAt[e] = M.frame
           M.log(string.format("[%s] actor=%d Life at 2 BP (Life 3) on entity %d before the boss's end", self.tag or "fight",
@@ -8161,6 +8183,90 @@ function Driver:magicOnlyLine(actor, boost)
                    target = e, buff = true, vetoOk = true, reason = "reraise" }
         end
       end
+    end
+  end
+  -- opts.reraiseHold = { [species] = fraction }: once one of these stands at
+  -- or under that fraction, no member attacks while a living member lacks
+  -- Life 3: MagiMaster's Ultima as he dies ignores Shell and defense
+  -- (AttackFlag $20 skips CalcDmgMod's defense and Shell, battle_main.asm
+  -- @0cc4) and took every seat to 0, and the members with Life 3 rose
+  -- (build/attempts/wt/v031-tower/lab/mm11_*: '[end] ... e0 448', won).  The
+  -- casters above put it on; the rest read the field with Scan, which is no
+  -- hit, or top up the most hurt with a Potion.  A fallen member is not
+  -- waited for, and the hold gives way after 3,600 frames (the first cut
+  -- waited on the fallen and on HP, and four fights ran out of time:
+  -- lab/mm13_*, 'holds the attack ... down 2')
+  local rh = self.opts.reraiseHold
+  if rh then
+    local hold, boss = false, nil
+    for s = 0, 5 do
+      local frac = monAlive(s) and rh[M.readWord(0x57C0 + s * 2)]
+      if frac then
+        local x = 8 + s * 2
+        local hp, mx = M.readWord(0x3BF4 + x), M.readWord(0x3C1C + x)
+        if mx > 0 and hp <= mx * frac then hold, boss = true, s end
+      end
+    end
+    if hold then
+      self.holdSince = self.holdSince or M.frame
+      local bare = nil
+      for e = 0, 3 do
+        if M.readWord(0x3BF4 + e * 2) > 0 and (M.readByte(0x3EF9 + e * 2) & 0x04) == 0 then bare = bare or e end
+      end
+      -- the hold gives way after 3,600 frames only while no living member
+      -- could cast Life at two points now (a caster with the points and
+      -- the MP keeps it, up to 30,000 frames): the 3,600 alone ran out
+      -- with STRAGO at 4 BP, one Life 3 cast, and his dying Ultima took
+      -- all four from full HP (build/attempts/wt/v031-tower-2/lab/
+      -- re1_k3_s0: 'died holding 4 BP', 'party_bp=0,1,4,4')
+      local canRaise = false
+      for e = 0, 3 do
+        if M.readWord(0x3BF4 + e * 2) > 0 and spellCell(e, 0x30, true) ~= nil
+           and M.readByte(BATTLE.BP + e * 2) >= 2 then canRaise = true end
+      end
+      local held = M.frame - self.holdSince
+      if bare ~= nil and (held < 3600 or (canRaise and held < 30000)) then
+        local key = string.format("hold:%d:%d", actor, bare)
+        if not self.statusSaid[key] then
+          self.statusSaid[key] = true
+          M.log(string.format("[%s] actor=%d holds the attack before the boss's end: entity %d lacks Life 3",
+            self.tag or "fight", actor, bare))
+        end
+        local low, lowFrac = nil, 0.9
+        for e = 0, 3 do
+          local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+          if hp > 0 and mx > 0 and hp / mx < lowFrac then low, lowFrac = e, hp / mx end
+        end
+        local row = cmdRow(actor, BATTLE.CMD_ITEM)
+        local potion = row and low ~= nil and self:battInvIdx(0xE9)
+        if potion then
+          return { kind = "item", item = 0xE9, target = low, row = row, idx = potion, reason = "reraise_hold" }
+        end
+        if spellCell(actor, M.STUDY_SPELL, true) ~= nil then
+          return { kind = "magic", spell = M.STUDY_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0,
+                   aim = boss, vetoOk = true, reason = "reraise_hold" }
+        end
+        -- no Scan and nobody under 90%: the least-full member's Potion
+        -- still holds the turn.  Falling through to the attack, TERRA's
+        -- Ice 2 killed him while three lacked Life 3, and his dying Ultima
+        -- took all four (build/attempts/wt/v031-tower-2/lab/re2_k3_s0:
+        -- 'actor=0 magic-only: $01 at slot 0', '[wipe] f+65324')
+        local least, leastFrac = nil, 2
+        for e = 0, 3 do
+          local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+          if hp > 0 and mx > 0 and hp / mx < leastFrac then least, leastFrac = e, hp / mx end
+        end
+        if least ~= nil and spellCell(actor, 0x2D, true) ~= nil then   -- Cure, unboosted
+          return { kind = "magic", spell = 0x2D, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0, ally = true,
+                   target = least, vetoOk = true, reason = "reraise_hold" }
+        end
+        local anyPotion = row and least ~= nil and self:battInvIdx(0xE9)
+        if anyPotion then
+          return { kind = "item", item = 0xE9, target = least, row = row, idx = anyPotion, reason = "reraise_hold" }
+        end
+      end
+    else
+      self.holdSince = nil
     end
   end
   local press = self:pressTarget()
@@ -8188,9 +8294,13 @@ function Driver:magicOnlyLine(actor, boost)
   -- monster absorbs or nulls (the rebound picks its monster).
   local bounce = nil
   do
-    local mirror, anyReflect = nil, false
+    local mirror, anyReflect, mirrors, living = nil, false, 0, 0
     for e = 0, 3 do
-      if M.readWord(0x3BF4 + e * 2) > 0 and (M.readByte(0x3EF8 + e * 2) & 0x80) ~= 0 then mirror = mirror or e end
+      if M.readWord(0x3BF4 + e * 2) > 0 then living = living + 1 end
+      if M.readWord(0x3BF4 + e * 2) > 0 and (M.readByte(0x3EF8 + e * 2) & 0x80) ~= 0 then
+        mirror = mirror or e
+        mirrors = mirrors + 1
+      end
     end
     for s = 0, 5 do
       if monAlive(s) and (M.readByte(0x3F00 + s * 2) & 0x80) ~= 0 then anyReflect = true end
@@ -8207,8 +8317,18 @@ function Driver:magicOnlyLine(actor, boost)
               if sp.elem == 0 or (M.readByte(0x3BE0 + x) & sp.elem) == 0 then weakAll = false end
             end
           end
-          local score = sp.power * (weakAll and 2 or 1)
-          if ok and (bounce == nil or score > bounce.score) then bounce = { sp = sp, score = score, to = mirror } end
+          -- a spell that can be spread (MagicProp +0 bit 5) cast on every
+          -- member in Reflect rebounds once off each: with three or more
+          -- mirrors, the party-wide cast is the strongest line in the tower
+          -- (only while every living member reflects: a spread cast lands on
+          -- a member without Reflect, and TERRA's boosted Fire spread over
+          -- three mirrors and her own unringed self killed her:
+          -- build/attempts/wt/v031-tower/lab/f4b_p3t_p3r_k0_wor_relm_s0_wor_tower_f4_s0)
+          local spread = mirrors >= 2 and mirrors == living and (M.readRomByte(MP + sp.id * 14) & 0x20) ~= 0
+          local score = sp.power * (weakAll and 2 or 1) * (spread and mirrors or 1)
+          if ok and (bounce == nil or score > bounce.score) then
+            bounce = { sp = sp, score = score, to = mirror, all = spread, mirrors = mirrors }
+          end
         end
       end
     end
@@ -8240,24 +8360,143 @@ function Driver:magicOnlyLine(actor, boost)
           score = score + 1000 * hitChips(slot, 0, elem)
         end
         if score >= 0 and slot == press then score = score + 1 end
+        -- opts.magicFirst = { [species] = true }: a body to kill before the
+        -- rest, whatever their weaknesses offer (the tower's L.90 Magic, whose
+        -- Merton, Meteor and Flare wipe the party while the casts go to the
+        -- L.60's fire weakness beside it: build/attempts/wt/v031-tower/lab/
+        -- t2_*, 'formation 0164 0139')
+        local mf = self.opts.magicFirst
+        if score >= 0 and mf and mf[M.readWord(0x57C0 + slot * 2)] then score = score + 10000 end
         if score >= 0 then said[#said + 1] = string.format("s%d $%02X -> %d", slot, id, score) end
         if score >= 0 and (bestScore == nil or score > bestScore) then best, bestScore, bestSlot = sp, score, slot end
       end
     end
   end
-  if bounce ~= nil and (best == nil or bestScore < 100) then
-    local b = castBoost(actor, bounce.sp.id, bounce.sp.cost, boost or 0, self:nukeFloor(actor)) or 0
+  -- How much of the bank a cast here spends.  A body the fight names to
+  -- kill first (opts.magicFirst) takes the whole bank: on the fourth floor
+  -- the four died holding points while the L.90 Magic's Meteor and Merton
+  -- took ~1,400 a round from each ('died holding 3 BP', 'party_bp=0,1,1,3':
+  -- build/attempts/wt/v031-tower-2/lab/cap3b).  A caster whose Fire folds
+  -- into Ultima at three points keeps her bank for it while a 5,000-HP body
+  -- stands (her two-point rebounds had kept it below three)
+  local function wantFor(slot)
+    local bank = M.readByte(BATTLE.BP + actor * 2)
+    if spellCell(actor, 0x00, true) ~= nil and M.foldSteps(actor, 3) == 3 and bank < 3 then
+      for s = 0, 5 do
+        if monAlive(s) and M.readWord(0x3BF4 + 8 + s * 2) >= 5000 then return 0 end
+      end
+    end
+    local mf = self.opts.magicFirst
+    if slot ~= nil and mf and monAlive(slot) and mf[M.readWord(0x57C0 + slot * 2)] then
+      return math.max(boost or 0, bank)
+    end
+    if slot == nil and mf then
+      for s = 0, 5 do
+        if monAlive(s) and mf[M.readWord(0x57C0 + s * 2)] then return math.max(boost or 0, bank) end
+      end
+    end
+    return boost or 0
+  end
+  -- TERRA's Fire at three points folds into Ultima (M.foldSteps): no
+  -- element, no Reflect, every monster.  Against a body of 5,000 HP or more
+  -- (the tower's L.90 Magic, MagiMaster) with three points banked it is the
+  -- strongest cast she has; the confirm's guards read it as Ultima
+  if spellCell(actor, 0x00, true) ~= nil and M.foldSteps(actor, 3) == 3 then
+    local big = false
+    for s = 0, 5 do
+      if monAlive(s) and M.readWord(0x3BF4 + 8 + s * 2) >= 5000 then big = true end
+    end
+    local _, cost = spellCell(actor, 0x00, true)
+    -- the bank must hold the three points now: planned on the price alone,
+    -- the cast went at 0 or 1 BP ('wanted 3, the bank holds 0: going at
+    -- 0'), a plain Fire MagiMaster's wall nulls
+    local b = big and M.readByte(BATTLE.BP + actor * 2) >= 3 and castBoost(actor, 0x00, cost, 3, 0) or nil
+    if b == 3 then
+      local aim
+      for s = 0, 5 do if aim == nil and monAlive(s) then aim = s end end
+      M.log(string.format("[%s] actor=%d magic-only: Fire at 3 BP (Ultima) on the monsters", self.tag or "fight", actor))
+      return { kind = "magic", spell = 0x00, executionSpell = M.ULTIMA, row = cmdRow(actor, BATTLE.CMD_MAGIC),
+               boostLeft = 3, aim = aim, reason = "magic_only_ultima" }
+    end
+  end
+  if bounce ~= nil and (best == nil or bestScore < 100 or (bounce.all and bounce.mirrors >= 3)) then
+    local b = castBoost(actor, bounce.sp.id, bounce.sp.cost, wantFor(nil), self:nukeFloor(actor)) or 0
+    -- a rebound must stay reflectable: TERRA's Fire at three points is
+    -- Ultima, which no mirror turns, and spread over the party it fell on
+    -- the party (build/attempts/wt/v031-tower/lab/f4c_p3t_p3r_k0_wor_relm_s0_wor_tower_f4_s0:
+    -- TERRA killed 'by entity 0 char 0 ... atk $14 (its own action)')
+    if b >= 3 and M.foldSteps(actor, b) == 3 then b = 2 end
     local key = string.format("bounce:%d:%d", actor, bounce.sp.id)
     if not self.statusSaid[key] then
       self.statusSaid[key] = true
-      M.log(string.format("[%s] actor=%d magic-only: $%02X on entity %d (Reflect) to rebound onto the monsters, "
-        .. "%d BP (the direct line's best: %s)", self.tag or "fight", actor, bounce.sp.id, bounce.to, b,
+      M.log(string.format("[%s] actor=%d magic-only: $%02X on %s (Reflect) to rebound onto the monsters, "
+        .. "%d BP (the direct line's best: %s)", self.tag or "fight", actor, bounce.sp.id,
+        bounce.all and string.format("all %d mirrors", bounce.mirrors) or string.format("entity %d", bounce.to), b,
         best and string.format("$%02X at %d", best.id, bestScore) or "none"))
     end
     return { kind = "magic", spell = bounce.sp.id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = b,
-             ally = true, target = bounce.to, bounce = true, reason = "magic_only_bounce" }
+             ally = true, target = bounce.to, all = bounce.all or nil, bounce = true, reason = "magic_only_bounce" }
   end
   if best == nil then
+    -- what the list holds, once per distinct reading: each candidate's cell,
+    -- its greyed bit, its price against the live MP, and whether the cast
+    -- guards refuse it
+    do
+      local base = M.readWord(BATTLE.MLISTPTR + actor * 2)
+      local parts = {}
+      for _, id in ipairs(self.opts.magicOnly or M.MAGIC_ONLY_SPELLS) do
+        if base >= 0x2000 and base <= 0x2600 then
+          for cell = 0, 53 do
+            local a = base + (cell + 1) * 4
+            if M.readByte(a) == id then
+              parts[#parts + 1] = string.format("$%02X c%d %s %d", id, cell,
+                (M.readByte(a + 1) & 0x80) ~= 0 and "grey" or "lit", M.readByte(a + 3))
+            end
+          end
+        end
+      end
+      local x = 8
+      local said = string.format("[%s] actor=%d magic-only: no line at %d MP (status1 $%02X status2 $%02X): %s; "
+        .. "slot 0 weak $%02X null $%02X absorb $%02X", self.tag or "fight", actor,
+        M.readWord(BATTLE.CURMP + actor * 2), M.readByte(0x3EE4 + actor * 2), M.readByte(0x3EE5 + actor * 2),
+        #parts > 0 and table.concat(parts, ", ") or "no candidate in the list",
+        M.readByte(0x3BE0 + x), M.readByte(0x3BCD + x), M.readByte(0x3BCC + x))
+      if said ~= self.noLineSaid then self.noLineSaid = said; M.log(said) end
+      -- The last member standing with no attack spell in the list at all
+      -- (not walled: absent) can only stall, so the turn raises a fallen
+      -- member, the one who holds an attack first.  STRAGO on Sraphim
+      -- (Cure, Life, Scan, no attack) was left alone against MagiMaster
+      -- and Scanned until the time limit ('no line at 488 MP ... no
+      -- candidate in the list', partyhp=0,0,0,3219:
+      -- build/attempts/wt/v031-tower-2/lab/mm16_*_s9).  Only then: a raise
+      -- whenever nothing hurt, the others standing, did worse (mm15_*)
+      local others = 0
+      for e = 0, 3 do
+        if e ~= actor and M.readWord(0x3BF4 + e * 2) > 0 then others = others + 1 end
+      end
+      local irow = cmdRow(actor, BATTLE.CMD_ITEM)
+      local fenix = irow ~= nil and self:battInvIdx(BATTLE.FENIX_DOWN)
+      if #parts == 0 and others == 0 and fenix then
+        local pick, pickArmed = nil, false
+        for e = 0, 3 do
+          if e ~= actor and M.readWord(0x3C1C + e * 2) > 0 and M.readWord(0x3BF4 + e * 2) == 0
+             and not M.seized(e) and (self.raiseQueued == nil or self.raiseQueued[e] == nil) then
+            local armed = false
+            for _, id in ipairs(self.opts.magicOnly or M.MAGIC_ONLY_SPELLS) do
+              if spellKnown(e, id) and spellCell(e, id) ~= nil then armed = true end
+            end
+            if pick == nil or (armed and not pickArmed) then pick, pickArmed = e, armed end
+          end
+        end
+        if pick ~= nil then
+          M.log(string.format("[%s] actor=%d magic-only: the last one standing holds no attack; Fenix Down on "
+            .. "entity %d (%s)", self.tag or "fight", actor, pick,
+            pickArmed and "it holds an attack spell" or "the first fallen"))
+          return { kind = "item", item = BATTLE.FENIX_DOWN, target = pick, row = irow, idx = fenix,
+                   reason = "revive" }
+        end
+      end
+    end
     -- nothing castable: a caster out of MP drinks it back (an Ether, a
     -- Tincture, an X-Ether) rather than pass the turn: inside the tower a
     -- seat that passes has no other attack, and the last L.20 Magic outlived
@@ -8278,6 +8517,42 @@ function Driver:magicOnlyLine(actor, boost)
         end
       end
     end
+    -- no Scan either: a body whose counter to any hit changes its wall
+    -- (MagiMaster's WallChange) is given a new one with the cheapest attack
+    -- the field nulls but nobody absorbs -- a turn that moves the fight,
+    -- where a pass parks the menu.  RELM on Ifrit (Fire, and Drain, which
+    -- heals him and is off his list) passed four turns into the recovery
+    -- cap in every run of a sweep ('no line at 456 MP ... $00 c6 lit 4',
+    -- 'plan=switch': build/attempts/wt/v031-tower-2/lab/sw3_*)
+    do
+      local pick = nil
+      for _, sp in ipairs(castable) do
+        if sp.power > 0 and sp.id ~= M.BREAK_SPELL and (pick == nil or sp.cost < pick.cost) then
+          local absorbed = false
+          for s = 0, 5 do
+            if monAlive(s) and sp.elem ~= 0 and (M.readByte(0x3BCC + 8 + s * 2) & sp.elem) ~= 0 then absorbed = true end
+          end
+          if not absorbed then pick = sp end
+        end
+      end
+      -- only at a body the caller names as one whose counter turns its wall
+      -- (opts.wallChangeVs = { [species] = true }: MagiMaster's WallChange)
+      local wc = self.opts.wallChangeVs
+      if pick ~= nil and mp >= pick.cost and wc then
+        for s = 0, 5 do
+          if monAlive(s) and wc[M.readWord(0x57C0 + s * 2)] then
+            local key = string.format("wallchange:%d:%d", actor, pick.id)
+            if not self.statusSaid[key] then
+              self.statusSaid[key] = true
+              M.log(string.format("[%s] actor=%d magic-only: nothing lands; $%02X (nulled, not absorbed) on slot %d "
+                .. "for its counter to change the wall", self.tag or "fight", actor, pick.id, s))
+            end
+            return { kind = "magic", spell = pick.id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0,
+                     aim = s, vetoOk = true, reason = "magic_only_wallchange" }
+          end
+        end
+      end
+    end
     if row ~= nil and mp * 2 < maxmp then
       for _, it in ipairs({ 0xEC, 0xEB, 0xED }) do   -- Ether, Tincture, X-Ether
         local idx = self:battInvIdx(it)
@@ -8290,7 +8565,7 @@ function Driver:magicOnlyLine(actor, boost)
     end
     return nil
   end
-  local b = castBoost(actor, best.id, best.cost, boost or 0, self:nukeFloor(actor))
+  local b = castBoost(actor, best.id, best.cost, wantFor(bestSlot), self:nukeFloor(actor))
   if b == nil then b = 0 end
   local key = string.format("monly:%d:%d:%d", actor, bestSlot, best.id)
   if not self.statusSaid[key] then
@@ -11048,6 +11323,21 @@ function Driver:makePlanRules(actor)
         elseif maxOf(e) > 0 and hpNow[e] == 0 and not liftOnly
            and self:battInvIdx(BATTLE.FENIX_DOWN) then
           local ok, raiseHp, hit, hitSlot, hitOn, why, needsTopUp = self:raiseOk(e, actor)
+          -- the last one standing whose last three actions took nothing
+          -- off the monsters raises anyway: waiting changes nothing, and
+          -- RELM alone cast Drain for 0 against a body that never hit
+          -- back until the time limit ('no raise ... smallest hit none
+          -- measured', 'took 0 off the monsters ... atk $04':
+          -- build/attempts/wt/v031-tower-2/lab/sw3_k0_s9)
+          if not ok and hpNow[actor] > 0 and (self.blankRun and self.blankRun[actor] or 0) >= 3 then
+            local alone = true
+            for o = 0, 3 do if o ~= actor and hpNow[o] > 0 then alone = false end end
+            if alone then
+              ok = true
+              why = string.format("the last one standing, its last %d actions took nothing off the "
+                .. "monsters: a raise is the move that changes the fight", self.blankRun[actor])
+            end
+          end
           local hitStr = hit and string.format("%d (slot %d on entity %d)", hit, hitSlot, hitOn)
             or "none measured"
           -- the actor's own lift first (#312): a reviver inside its own
@@ -11823,7 +12113,35 @@ function Driver:makePlanRules(actor)
     local line = self:magicOnlyLine(actor, boost)
     if line then return line end
   end
-  if fight == nil then return { kind = "switch" } end
+  -- no Fight row and no Magic line (the row greyed, or nothing in it to
+  -- cast): a Tonic or Potion on the least-full member is still a turn,
+  -- where a pass can fail to land and parks the menu into the recovery cap
+  -- (build/attempts/wt/v031-tower-2/lab/dbg1_k0_s25: RELM's Magic row
+  -- greyed on the walk down, 'plan switch ... consumed 41 pulses in state
+  -- $05 without landing', 'recovery cap: navTo ... budget:switch/05 4
+  -- times').  The bag's care floor gives way for this one turn
+  if fight == nil then
+    local irow = cmdRow(actor, BATTLE.CMD_ITEM)
+    local least, leastFrac = nil, 2
+    for e = 0, 3 do
+      local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+      if hp > 0 and mx > 0 and hp / mx < leastFrac then least, leastFrac = e, hp / mx end
+    end
+    if irow ~= nil and least ~= nil then
+      for _, it in ipairs({ 0xE8, 0xE9 }) do   -- Tonic, Potion
+        local idx = nil
+        for slot = 0, 251 do
+          if idx == nil and M.readByte(BATTLE.BATTINV + slot * 5) == it and M.readByte(BATTLE.BATTINV + slot * 5 + 3) > 0 then idx = slot end
+        end
+        if idx ~= nil then
+          M.log(string.format("[%s] actor=%d: nothing to cast and no Fight row; item $%02X on entity %d "
+            .. "rather than a pass", self.tag or "fight", actor, it, least))
+          return { kind = "item", item = it, target = least, row = irow, idx = idx, reason = "no_line_item" }
+        end
+      end
+    end
+    return { kind = "switch" }
+  end
   -- The plain boost-Fight through the randoms (#161): with no authored or
   -- multi-part kill order it aims at the slot this hand breaks best, so a
   -- pierce hand takes the pierce-keyed monster and a slash hand the
@@ -12997,6 +13315,7 @@ function Driver:idle()
   self.raceTimeRecords = nil
   self.leftSaid, self.escSaid, self.reward = {}, {}, nil
   self.timed, self.tailSaid, self.runDecided, self.running = nil, false, nil, nil
+  self.blankRun, self.deadOpen, self.progLow, self.noLineSaid = nil, nil, nil, nil
   if self.recovery then
     self.recovery.close(M.frame, "battle_ended")
     if recoveryObserver == self.recovery then recoveryObserver = nil end
@@ -15189,8 +15508,28 @@ local function endActivate()
 end
 
 function Driver:watchLeavers()
-  if self.battleTick == 1 then self.startFrame = M.frame end
+  if self.battleTick == 1 then
+    self.startFrame = M.frame
+    -- a first reading with every seat at 0 HP and no monster standing is
+    -- the last battle still ending, not a battle: MagiMaster's dying
+    -- Ultima took all four to 0 and Life 3 raised them after his death,
+    -- and a new walker read that as a second MagiMaster battle ('battle
+    -- f+1 ... partyhp=0,0,0,0 ... monsters=0', 'its formation was fought
+    -- once: got 2': build/attempts/wt/v031-tower-2/lab/sw2_k3_s0)
+    local down = true
+    for e = 0, 3 do if M.readWord(0x3BF4 + e * 2) > 0 then down = false end end
+    self.deadOpen = M.DEAD_OPEN_TAIL ~= false and down and liveMonMask() == 0   -- (false: the mutant)
+  end
   endActivate()
+  if self.deadOpen then
+    if not self.tailSaid then
+      self.tailSaid = true
+      M.log(string.format("[%s] [tail] f+%d this watch began with every seat at 0 HP and no monster "
+        .. "standing: the last battle's end, not a battle -- nothing seated, no [outcome]",
+        self.tag or "fight", self.battleTick))
+    end
+    return
+  end
   -- a driver that first watched the battle AFTER the last end hook fired
   -- (said from its first frame, so nothing else is said or decided for it)
   -- is watching that hand-back, not a battle: measured on
@@ -15398,6 +15737,33 @@ function Driver:watchTimer()
     if run then self.running = { tick = self.battleTick, refused = 0, left0 = t.frames } end
   end
 end
+-- opts.progressVs = { [species] = ticks }: while a body of that species
+-- stands, its HP must set a new low at least once every that many battle
+-- ticks, or the fight fails here, loudly, rather than run to the walker's
+-- frame budget: a fight whose damage the body takes back as fast as it
+-- lands (MagiMaster absorbing casts that land after his wall turned) is
+-- not one the party is winning.  The window is the caller's measurement
+function Driver:watchProgress()
+  local pv = self.opts.progressVs
+  if pv == nil or self.tailSaid or self.battleTick < 2 then return end
+  self.progLow = self.progLow or {}
+  for s = 0, 5 do
+    local sp = M.readWord(0x57C0 + s * 2)
+    local win = monAlive(s) and pv[sp]
+    if win then
+      local hp = M.readWord(0x3BF4 + 8 + s * 2)
+      local p = self.progLow[s]
+      if p == nil or p.sp ~= sp or hp < p.hp then
+        self.progLow[s] = { sp = sp, hp = hp, tick = self.battleTick }
+      elseif self.battleTick - p.tick > win then
+        error(string.format("[%s] no progress: slot %d species $%03X has set no new low under %d HP "
+          .. "in %d battle ticks (since f+%d; the window is %d) -- the party is not winning this fight",
+          self.tag or "fight", s, sp, p.hp, self.battleTick - p.tick, p.tick, win), 0)
+      end
+    end
+  end
+end
+
 -- Holding L+R for the run the rule above chose: true when it owns the pad
 -- this frame.  A formation that refuses the run, or does not let the party
 -- go inside M.TIMED_RUN_CAP frames, is fought out from here, and said.
@@ -15824,6 +16190,10 @@ function Driver:watchDamage()
         self.raceHitBy[w.actor] = self.raceHitBy[w.actor] or {}
         self.raceHitBy[w.actor][w.kind .. ":" .. tostring(w.skill or w.spell)] = M.median(hl)
       end
+      -- consecutive actions of this actor that took nothing (the lone
+      -- survivor's raise below reads it)
+      self.blankRun = self.blankRun or {}
+      self.blankRun[w.actor] = w.seen == 0 and (self.blankRun[w.actor] or 0) + 1 or 0
       M.log(string.format("[%s] actor=%d's %s took %d off the monsters "
         .. "(%d shielded-equivalent over %d hit(s), %d a hit; the press "
         .. "rule counts it) [exec cmd $%02X atk $%02X]", self.tag or "fight", w.actor,
@@ -16655,6 +17025,7 @@ function Driver:frame()
   self:watchStatuses()
   self:watchLeavers()
   self:watchTimer()
+  self:watchProgress()
   if self:runFrame() then return end
   -- VICTORY-DEADLOCK guard (measured, Thamasa grind bake fight 37): the
   -- killing blow can land while an actor's spell/item window is still
@@ -18326,6 +18697,11 @@ local function resetLibState()
   RUN.epoch = RUN.epoch + 1          -- the old attempt's callbacks go inert
   RUN.cbError = nil
   M.frame = 0
+  -- the last battle frame is the old attempt's: M.frame restarts at 0, so a
+  -- stale M.blsSeen ahead of it made battleLoadStarted read field garbage
+  -- as a battle (wor_tzen_door's retry counted two battles at f1254 and
+  -- f4121, 'formation 0000': build/attempts/wt/v030-route/lab/tzen/t2)
+  M.blsSeen = nil
   M.gameOverFired = 0
   M.thawPad()
   M.setPad(nil)
@@ -18521,7 +18897,15 @@ function M.run(opts, steps)
   M.gameOverFired = 0
   local goReadFired, titleExecFired, wipeFired = 0, 0, 0
   local WIPE_FRAMES = 300
+  -- Every seat at 0 HP with LoseBattle's bit still clear is not yet a loss:
+  -- a member with Life 3 is revived by a queued action (ReraiseEffect,
+  -- battle_main.asm @0799) that runs after the killing action's animation,
+  -- and MagiMaster's Ultima as he dies took every seat to 0 and read
+  -- '$3ebc=0C' when the 300 frames ran out (build/attempts/wt/v031-tower/
+  -- lab/mm8_*).  Without the bit, the canary waits WIPE_FRAMES_UNLOST.
+  local WIPE_FRAMES_UNLOST = 1800
   local wipeN = 0
+  local wipeLatched = false
   local canaryInGame = false
   do
     local ok, addr = pcall(function() return M.sym("GameOver") end)
@@ -18796,7 +19180,7 @@ function M.run(opts, steps)
         resetLibState()
         M.rearmInputInjection()
         canaryInGame = false
-        goReadFired, titleExecFired, wipeFired, wipeN = 0, 0, 0, 0
+        goReadFired, titleExecFired, wipeFired, wipeN, wipeLatched = 0, 0, 0, 0, false
         RUN.installing = true
         local ok, err = pcall(M.__body)
         RUN.installing = false
@@ -18839,7 +19223,9 @@ function M.run(opts, steps)
     if M.battleLoadStarted() and M.frame % 30 == 0 then sampleBattle() end
     if canaryInGame and M.partyWipedInBattle and M.partyWipedInBattle() then
       wipeN = wipeN + 1
-      if wipeN == WIPE_FRAMES then
+      if not wipeLatched and wipeN >= WIPE_FRAMES
+         and ((M.readByte(0x3ebc) & 0x01) ~= 0 or wipeN >= WIPE_FRAMES_UNLOST) then
+        wipeLatched = true
         wipeFired = wipeFired + 1
         M.gameOverFired = M.gameOverFired + 1
         local seats = {}
@@ -18853,7 +19239,7 @@ function M.run(opts, steps)
           "read wiped for %d frames (seats [%s], $3ebc=%02X: every present " ..
           "seat at 0 HP or LoseBattle's bit 0 set); the engine is sitting " ..
           "on the annihilated screen waiting for a press.  Counted as a " ..
-          "game over (f%d).", WIPE_FRAMES, table.concat(seats, " "),
+          "game over (f%d).", wipeN, table.concat(seats, " "),
           M.readByte(0x3ebc), M.frame))
         RUN.goUnhandled = { frame = M.frame, what = "the party was wiped in battle" }
         -- Under allowGameOver the pad stays live (#205): the body declared
@@ -18873,7 +19259,7 @@ function M.run(opts, steps)
         end
       end
     else
-      wipeN = 0
+      wipeN, wipeLatched = 0, false
     end
     if M.gameOverFired > 0 and not RUN.opts.allowGameOver then
       failed("wipe", string.format("GAME OVER fired (GameOver read x%d, " ..

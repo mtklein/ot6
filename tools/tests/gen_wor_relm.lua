@@ -37,7 +37,7 @@ local GRIND_LANDING, GRIND_LAP = { 17, 135 }, { { 16, 135 }, { 22, 135 } }
 -- there and the grind stays at L46 (route-wor-thamasa.md 11.4)
 local GRIND_LEVEL, GRIND_BATTLES = 46, 90
 -- magicite: give_genju's receipt order (Ramuh 0)
-local STARLET, GOLEM, ZONESEEK = 25, 22, 18
+local IFRIT, STARLET, GOLEM, ZONESEEK = 1, 25, 22, 18
 -- Chadarnook (route_data pool event 86: formation 456; the goddess $11E,
 -- the demon $148)
 local GODDESS_SP, DEMON_SP, CHADARNOOK_FORMATION = 0x11E, 0x148, 456
@@ -57,7 +57,15 @@ local BOSS_FIGHT = { runic = true, bushido = true, magic = { [0] = { spell = FIR
 -- body that can teach him a lore
 local AQUA_RAKE = 3
 local STRAGO_KIT = { study = true, pearlWind = true, dischord = { [0x0D2] = true } }
-local FIGHT = { nukeLore = { AQUA_RAKE }, strago = STRAGO_KIT }
+-- the kill order in Owzer's basement (field group 157): the SoulDancers
+-- first.  Formation 284 (SoulDancer x2, Crusher x2) is the one that wipes
+-- the three: in 16 fights from the save point at each of four seed shifts,
+-- the default order lost 1 of 31 meetings (9 deaths), the SoulDancers first
+-- none of 36 (0 deaths, 25 distinct battle keys), and the Crushers first 4
+-- of 7 (16 deaths) (build/attempts/wt/v031-tower/lab/base16_s*,
+-- b16fsd_s*, b16fcr_s*)
+local SOULDANCER = 0x0AD
+local FIGHT = { nukeLore = { AQUA_RAKE }, strago = STRAGO_KIT, focus = { { species = SOULDANCER } } }
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
@@ -665,6 +673,11 @@ H.run({ maxFrames = 1800000 }, {
 
   -- ---- 1. Chadarnook ------------------------------------------------------------
   -- @@stage goddess
+  -- off the save point first: its script re-fires under the party every
+  -- ~30 frames, and back-to-back Relic sessions there timed out at the main
+  -- menu's cursor three attempts in three (build/attempts/wt/v031-tower/
+  -- lab/c2_relm_k0, 'relics for Chadarnook')
+  walkTo(86, 42, "off the save point"),
   H.fieldCare({ threshold = 1.0, tag = "before Chadarnook" }),
   H.dressRelics({ { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" } }, { tag = "relics for Chadarnook" }),
   door(88, 35, MAP_GODDESS, "the basement -> the goddess's room (208 (75,36))"),
@@ -691,9 +704,18 @@ H.run({ maxFrames = 1800000 }, {
     H.assertEq(partyOf(RELM), 1, "RELM joined the party, into the empty seat")
   end),
   dressFromBag(RELM, "RELM"),
+  -- Ifrit (Fire, Drain) onto RELM while CYAN, who wears it, is still seated:
+  -- he waits aboard from the cabin on, and a stone a waiting member wears
+  -- cannot be freed from the party menu.  Drain reaches the reflecting
+  -- L.90 Magic (no element, no Reflect), and RELM's magic power is the
+  -- party's best (route-wor-thamasa.md 11.4); it is off MagiMaster's list,
+  -- whom it heals (gen_wor_tower's BOSS_FIGHT)
+  H.equipEsper(function() return posOf(RELM) end, IFRIT, { tag = "IFRIT -> RELM" }),
   H.dressRelics({ { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" } },
     { tag = "relics with RELM" }),
   H.call(function() say("wor", "RELM dressed: " .. kitLine()) end),
+  -- #434: buy power with gil; Jidoor's counters for RELM and the three
+  H.gearStop({ tag = "gear Jidoor (RELM)", fight = FIGHT }),
   -- the item counter again before the grind (RELM's join lands the party in
   -- Jidoor): the plain's fights are cared for with Potions (Jidoor sells no
   -- Tonics) and the poison the plain deals with Remedies; the first grind
@@ -756,6 +778,11 @@ H.run({ maxFrames = 1800000 }, {
   H.worldNavTo(THAMASA_DOOR[1], THAMASA_DOOR[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
     arrive = function() return map() == MAP_THAMASA and not H.worldMode() end }),
   H.waitUntil(function() return map() == MAP_THAMASA and settled() end, 2400, "Thamasa: map 344", 1),
+  -- #434: buy power with gil.  Thamasa's armor counter is the tower's
+  -- (Light Robe, Mystery Veil, Circlet: magic defense and evade against
+  -- the L.90 Magic's Meteor, Merton and Flare, which wiped the four on the
+  -- fourth floor at L46 and at L50: route-wor-thamasa.md 11.4)
+  H.gearStop({ tag = "gear Thamasa (the tower)", fight = FIGHT, avoid = THAMASA_AVOID }),
   -- (22,39) and (23,39) start STRAGO and RELM's scene at their house
   -- (_cb75bf, with both seated; the Hidon side quest, not this arc:
   -- build/attempts/wt/v030-route/lab/relm/r1 'control lost at (23,39)'), so the walks keep off them

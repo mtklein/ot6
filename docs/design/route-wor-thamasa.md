@@ -637,3 +637,108 @@ magic-only line (`Driver:magicOnlyLine`) and the climb its own kit:
   the save point before Chadarnook, SoulDancer x2 and Crusher x2 won
   (`lab/var/relm_k6`: `battle $11C LOST`); the base run and K=3 did not meet
   it.
+
+## 12. Played (v0.31)
+
+The tower leg is on the graph: `wor_tower` (`gen_wor_tower`) Continues
+`wor-tower-v1` and saves `wor-thamasa-v1`. Evidence is under
+`build/attempts/wt/v031-tower/lab/` and `build/attempts/wt/v031-tower-2/lab/`.
+
+- **The basement draw.** `gen_wor_relm` kills the SoulDancers first in
+  Owzer's basement. From `wor-owzer-v1` with 0 to 8 encounters used up
+  (K7 not run), every variant won the leg, K6 among them (`relm_k6`:
+  `PASS (frame 338319) attempts=1/1`).
+- **The fourth floor.** The L.90 Magic is killed first (`opts.magicFirst`),
+  above the third floor the rings come off and Shell goes up, and the
+  stones change (TERRA Palidor, RELM Phantom, STRAGO Maduin). It still wipes
+  some draws: the captured chain lost its first attempt to the L.90 and
+  L.80 Magic and won the second (`cap3b`: `attempt 1/3 FAILED class=wipe`,
+  `formation 0164 0163`; `PASS (frame 466591) attempts=2/3`).
+- **MagiMaster.** Shell on all four, Life 3 (Life at 2 BP) on the living
+  once he is low, the attack held until they have it (at most 3,600
+  frames), TERRA's Fire at 3 BP as Ultima, no Drain (it heals him). From
+  one state before his fight and four seed shifts: the hold that waited on
+  the fallen lost all four to the time limit (`mm13_*`); the bounded hold
+  won three (`mm14_*`: `MagiMaster: battle $162 won after 112839 ticks`
+  for s0). The fourth, s9, ended with STRAGO alone: the wall nulled every
+  element he holds, so he cast Scan until the time limit while MagiMaster
+  healed (`partyhp=0,0,0,3219`). A Fenix Down in place of that Scan was
+  tried and did worse (`mm15_*`: two of four; s0 spent 38 Fenix Downs into
+  re-kills), so it was reverted.
+- **Absorb guard.** The formation-0 test is gone: a retry now clears the
+  battle reader's last-battle frame, which was what made field frames read
+  as battles.
+
+- **Qualification.** A bare `ninja` on px13 played both legs: `wor_relm`
+  `PASS (frame 341376) attempts=1/3`; `wor_tower` lost its first attempt to
+  the 200,000-frame limit at MagiMaster and won the second (`MagiMaster:
+  battle $162 won after 143885 ticks`, `PASS (frame 508873) attempts=2/3`;
+  `build/attempts/wt/v031-tower-2/ninja/`).
+
+### 12.1 One attempt
+
+The qualification's tower leg needed its second attempt, so the leg was
+made to pass at one attempt across draws (`lab/` under
+`build/attempts/wt/v031-tower-2/`). What each failure was, and the answer:
+
+- **MagiMaster's stalls.** STRAGO on Sraphim holds no attack spell; left
+  alone he Scanned to the time limit (`mm16_*_s9`: `no candidate in the
+  list`). The last member standing with no attack now raises a fallen
+  member, the one holding an attack first; a raise whenever nothing hurt,
+  the others standing, did worse (`mm15_*`, reverted). Drain heals him and
+  was back on his list (`sw2_k4_s13`: RELM's Drain `took 0` 64 times); it is
+  off again. RELM on Ifrit, walled and without Scan, passed four turns
+  into the recovery cap (`sw3_*`); a seat with no line now casts the
+  cheapest attack his wall nulls but does not absorb, for the counter that
+  turns the wall.
+- **A lone survivor anywhere.** The last member standing whose last three
+  actions took nothing raises a fallen member (`sw3_k0_s9`: RELM's Drain
+  for 0 on the first floor to the time limit).
+- **The fourth floor and the top.** The four died holding points to the
+  L.90 Magic (`cap3b`): a `magicFirst` body now takes the whole bank, and
+  TERRA keeps hers for Ultima while a 5,000-HP body stands. The side
+  rooms' gear goes on after each (`H.gearDress`, magic defence counted three
+  times, defence once: every fight in the tower is spells):
+  STRAGO had worn a Mithril Shld (MDef 18) with the Genji Shld (MDef 50) in
+  the bag when Merton took 3,366 from each member on the walk down
+  (`mm18_*_s4`).
+- **The walk down dry.** A long MagiMaster fight spent the 99 Tinctures and
+  TERRA passed at 0 MP (`f4e_*_s2`). Twenty Tinctures are kept out of the
+  care before MagiMaster and of his fight for the walk down (supplies, not
+  running: the decision of 2026-10-13; a run-when-dry rule was tried and
+  removed).
+- **A second MagiMaster battle.** His dying Ultima took all four to 0 and
+  Life 3 raised them after his death; a new walker read that as a battle
+  (`sw2_k3_s0`: `its formation was fought once: got 2`). A watch that
+  opens with every seat at 0 HP and no monster standing is a tail.
+- **His end.** Two Ultimas can take him from 45% to 5% inside 600
+  frames; Life 3 now starts at 60% of his HP and the hold at 40%, the hold
+  lasts while a member can still cast Life 3, and a held seat never falls
+  through to an attack (`re1`-`re3_k3_s0`: his dying Ultima wiped the four).
+- **A greyed Magic row.** With no Fight row and no Magic line a seat uses a
+  Tonic or Potion rather than a pass that parks the menu (`dbg1_k0_s25`).
+- **His fight is long.** Won fights ran 46,501 to 195,414 ticks (`sw4_*`).
+  sw4_k5_s3 was not slow but stalled: he reached 4,081 HP, every cast was
+  nulled for about 7,500 frames, and he healed to 21,230 by the old
+  200,000. The fight has 400,000 frames, and fails loudly when his HP sets
+  no new low in 120,000 ticks (`opts.progressVs`; the longest such stretch
+  in 72 won fights was 84,900).
+  Three of the eight elements are no member's, and a cast that lands after
+  his wall turned is absorbed. This is a fight won by attrition, a lab
+  candidate: more elements (an earth, wind or water caster) or a way to
+  time casts to the wall would shorten it.
+
+The sweep at 86d84182: the tower leg from the tracked `wor-tower-v1`, 0 to
+5 world battles used up beside the tower first, six seed shifts, one
+attempt each (`sw5_*`, `sw6_*`): 36 of 36 passed. Counted by distinct
+battle key ($be and group): MagiMaster in 26 keys of 36 meetings, the L.90
+and L.80 Magic in 35 of 42, the L.90 and L.60 Magic in 20 of 24. His fight
+ran 39,982 to 203,654 ticks. Before these changes the same sweep shape
+passed 13 of 18 (`sw2_*`) and 16 of 18 (`sw4_*`).
+
+After the review fixes, the same sweep at 3f3e7ea1 (`sw13_*`, `sw14_*`):
+36 of 36 at one attempt; MagiMaster in 26 keys of 36 meetings, the L.90
+and L.80 Magic in 31 of 42, the L.90 and L.60 Magic in 18 of 24; his fight
+ran 53,495 to 198,092 ticks. The draws of sw4_k5_s3 and sw2_k3_s0 passed
+(`re5_*`), and with the dead-open tail rule switched off (`mut6_k5_s3`)
+the k5 s3 draw failed `MagiMaster: its formation was fought once: got 2`.
