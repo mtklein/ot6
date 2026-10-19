@@ -8470,6 +8470,39 @@ function Driver:magicOnlyLine(actor, boost)
         end
       end
     end
+    -- no Scan either: a body whose counter to any hit changes its wall
+    -- (MagiMaster's WallChange) is given a new one with the cheapest attack
+    -- the field nulls but nobody absorbs -- a turn that moves the fight,
+    -- where a pass parks the menu.  RELM on Ifrit (Fire, and Drain, which
+    -- heals him and is off his list) passed four turns into the recovery
+    -- cap in every run of a sweep ('no line at 456 MP ... $00 c6 lit 4',
+    -- 'plan=switch': build/attempts/wt/v031-tower-2/lab/sw3_*)
+    do
+      local pick = nil
+      for _, sp in ipairs(castable) do
+        if sp.power > 0 and sp.id ~= M.BREAK_SPELL and (pick == nil or sp.cost < pick.cost) then
+          local absorbed = false
+          for s = 0, 5 do
+            if monAlive(s) and sp.elem ~= 0 and (M.readByte(0x3BCC + 8 + s * 2) & sp.elem) ~= 0 then absorbed = true end
+          end
+          if not absorbed then pick = sp end
+        end
+      end
+      if pick ~= nil and mp >= pick.cost then
+        for s = 0, 5 do
+          if monAlive(s) then
+            local key = string.format("wallchange:%d:%d", actor, pick.id)
+            if not self.statusSaid[key] then
+              self.statusSaid[key] = true
+              M.log(string.format("[%s] actor=%d magic-only: nothing lands; $%02X (nulled, not absorbed) on slot %d "
+                .. "for its counter to change the wall", self.tag or "fight", actor, pick.id, s))
+            end
+            return { kind = "magic", spell = pick.id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0,
+                     aim = s, vetoOk = true, reason = "magic_only_wallchange" }
+          end
+        end
+      end
+    end
     if row ~= nil and mp * 2 < maxmp then
       for _, it in ipairs({ 0xEC, 0xEB, 0xED }) do   -- Ether, Tincture, X-Ether
         local idx = self:battInvIdx(it)
