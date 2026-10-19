@@ -12029,7 +12029,35 @@ function Driver:makePlanRules(actor)
     local line = self:magicOnlyLine(actor, boost)
     if line then return line end
   end
-  if fight == nil then return { kind = "switch" } end
+  -- no Fight row and no Magic line (the row greyed, or nothing in it to
+  -- cast): a Tonic or Potion on the least-full member is still a turn,
+  -- where a pass can fail to land and parks the menu into the recovery cap
+  -- (build/attempts/wt/v031-tower-2/lab/dbg1_k0_s25: RELM's Magic row
+  -- greyed on the walk down, 'plan switch ... consumed 41 pulses in state
+  -- $05 without landing', 'recovery cap: navTo ... budget:switch/05 4
+  -- times').  The bag's care floor gives way for this one turn
+  if fight == nil then
+    local irow = cmdRow(actor, BATTLE.CMD_ITEM)
+    local least, leastFrac = nil, 2
+    for e = 0, 3 do
+      local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+      if hp > 0 and mx > 0 and hp / mx < leastFrac then least, leastFrac = e, hp / mx end
+    end
+    if irow ~= nil and least ~= nil then
+      for _, it in ipairs({ 0xE8, 0xE9 }) do   -- Tonic, Potion
+        local idx = nil
+        for slot = 0, 251 do
+          if idx == nil and M.readByte(BATTLE.BATTINV + slot * 5) == it and M.readByte(BATTLE.BATTINV + slot * 5 + 3) > 0 then idx = slot end
+        end
+        if idx ~= nil then
+          M.log(string.format("[%s] actor=%d: nothing to cast and no Fight row; item $%02X on entity %d "
+            .. "rather than a pass", self.tag or "fight", actor, it, least))
+          return { kind = "item", item = it, target = least, row = irow, idx = idx, reason = "no_line_item" }
+        end
+      end
+    end
+    return { kind = "switch" }
+  end
   -- The plain boost-Fight through the randoms (#161): with no authored or
   -- multi-part kill order it aims at the slot this hand breaks best, so a
   -- pierce hand takes the pierce-keyed monster and a slash hand the
