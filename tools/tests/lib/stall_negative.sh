@@ -3,7 +3,7 @@
 #
 #   sh tools/tests/lib/stall_negative.sh [hang|menu]...    (default: both)
 #
-# hang: a script spinning in an infinite Lua loop inside a frame callback.
+# hang: a script that pauses emulation for good (emu.breakExecution).
 # menu: a script parked in the field menu: frames advance, nothing happens.
 # Each must be killed by run.sh as a STALL (not the wall-clock backstop),
 # within OT6_HEARTBEAT plus slack, with the last progress frame and the
