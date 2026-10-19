@@ -12121,9 +12121,11 @@ function Driver:makePlanRules(actor)
   -- re-planned budget:switch/05 4 times').  Why the Magic row greys: Mute --
   -- UpdateCmd_05 (battle_main.asm) greys it on status byte $3EE5 bit 3 --
   -- measured on the tower's randoms (build/attempts/wt/v031-relics-grey/lab/
-  -- rg1_k5_s11: 'Magic row greyed, status $00 $08 MUTE').  Other fires have the
-  -- row open and no line in it ('Magic row open', magicOnlyLine's "no
-  -- candidate").  The bag's care floor holds (Driver:battInvIdx, opts.reserve,
+  -- rg1_k5_s11: 'Magic row greyed, status $00 $08 MUTE'), 23 of 203 fires.
+  -- The other 180 have the row open and no line in it: 142 are RELM against
+  -- MagiMaster, whose only magic-only spell (Ifrit's Fire) his wall absorbs
+  -- ('fire is ABSORBED by slot 0 species $0166') -- a kit question (#444).
+  -- The bag's care floor holds (Driver:battInvIdx, opts.reserve,
   -- else M.CARE_RESERVE): the item comes from above it, and only when neither
   -- a Tonic nor a Potion is left above it does the turn dip below (#443).
   if fight == nil then
