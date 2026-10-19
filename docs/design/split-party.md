@@ -3,7 +3,7 @@
 #275, for milestone v0.32 (#268, LOCKE) and later Kefka's Tower (v0.35):
 how the driver plays a dungeon with the party split, labbed on the
 Phoenix Cave. Evidence is under `build/attempts/wt/v032-splitparty/`
-(`lab/` the probes and runs, `suites/` the suite, its mutants and the
+(`lab/` the probes, the legs, the suite, its mutants and the
 sweeps). Line numbers are into `ff6/src/event/event_main.asm` unless a
 file is named.
 
@@ -147,8 +147,10 @@ Rules that fell out:
 
 ## 6. Measured
 
-- The legs: `gen_wor_phoenix` PASS (frame 85177) attempts=1/3 (lab/g3);
-  `gen_wor_locke` from its capture PASS (frame 44359) attempts=1/3 (lab/l2).
+- The legs: `gen_wor_phoenix` PASS (frame 85177) attempts=1/3 (lab/g3),
+  whose capture is the tracked `wor-phoenix-v1`; `gen_wor_locke` from it
+  PASS (frame 44359) attempts=1/3 (lab/l2), and with LOCKE dressed at the
+  end PASS (frame 47103) attempts=1/3 (lab/l3).
 - Per party, first half (g3): party 1 3 battles, party 2 5, all won;
   Potions 99 -> 61 at the save point (party 1 spent 21, party 2 17, a Tent
   each). Second half (l2): party 1 1 battle, party 2 4 (the Red Dragon

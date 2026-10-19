@@ -26,7 +26,8 @@
 --      (H.bfsReach), the same link with cond true is; with party 1 off the
 --      bridge plate (23,19) no route takes party 2 to (19,25), with party 1
 --      on it H.navLinks walks there through the link (19,22) -> (19,25).
--- Mutants and the evidence: build/attempts/wt/v032-splitparty/suites/.
+-- Mutants and the evidence: build/attempts/wt/v032-splitparty/lab/ (mut2_*, sws3_*;
+-- docs/design/split-party.md section 8).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
