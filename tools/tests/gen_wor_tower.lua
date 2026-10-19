@@ -773,6 +773,11 @@ H.run({ maxFrames = 1500000 }, {
   -- ---- 3. the second floor: the Genji Shld; the third: the Stunner and the Holy Dragon
   -- @@stage f2
   sideRoom(MAP_F2, MAP_GENJI, 0x0B5, GENJI_SHLD, "Genji Shld (367 (7,6))"),
+  -- what the side room gave goes on, magic defence weighed up: every
+  -- fight here is spells, and on the walk down the L.90 Magic's Merton
+  -- took 3,366 from members at 130 MDef with STRAGO's Genji Shld still
+  -- in the bag (build/attempts/wt/v031-tower-2/lab/mm18_*_s4)
+  H.gearDress({ tag = "gear after the Genji Shld", mdefWeight = 2 }),
   door(8, 1, MAP_F3, "the second floor -> the third (360)"),
   spend("on the third floor"),
   door(10, 10, MAP_DRAGON, "the third floor -> the Holy Dragon's room (368)"),
@@ -824,6 +829,7 @@ H.run({ maxFrames = 1500000 }, {
   stonesFor({ { TERRA, MADUIN }, { RELM, IFRIT } }, "stones for the fourth floor"),
   wallRingsOn(),
   sideRoom(MAP_F4, MAP_FORCE, 0x0B7, FORCE_ARMOR, "Force Armor (369 (7,6))"),
+  H.gearDress({ tag = "gear after the Force Armor", mdefWeight = 2 }),
   door(8, 1, MAP_TOP, "the fourth floor -> the top (364)"),
   spend("at the top"),
   -- 364 (7,6) -> 366: the Gem Box (7,7); its tile (7,8) (_cc5440) sets
@@ -843,7 +849,13 @@ H.run({ maxFrames = 1500000 }, {
   -- STRAGO alone: build/attempts/wt/v031-tower/lab/
   -- f4b_p3t_p3r_k0_wor_relm_s9_wor_tower_f4_s0)
   stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM }, { CELES, TRITOCH } }, "stones for MagiMaster"),
-  lazy(function() return H.equipKit(CELES, { { 3, FORCE_ARMOR } }, { tag = "CELES: the Force Armor" }) end),
+  -- (unless the dress after its room already put it on someone)
+  lazy(function()
+    if H.invCountOf(FORCE_ARMOR) < 1 then
+      return H.logStep("[wor] the Force Armor is worn already (the dress after its room)")
+    end
+    return H.equipKit(CELES, { { 3, FORCE_ARMOR } }, { tag = "CELES: the Force Armor" })
+  end),
   H.call(function() say("wor", "dressed for MagiMaster: " .. kitLine()) end),
   door(7, 13, MAP_TOP, "the Gem Box's room -> the top (364 (7,7))"),
   H.fieldCare({ threshold = 1.0, mpBand = 0.9, tag = "before MagiMaster" }),

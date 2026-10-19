@@ -6923,6 +6923,15 @@ function M.gearDress(opts)
     local keep = opts.keep or {}
     local bag = bagCounts()
     local planned = {}
+    -- opts.mdefWeight: each point of an armor piece's magic defence counts
+    -- this much more (a fight of spells: the Fanatics' Tower)
+    local function score(c, slot, id, others)
+      local v = slotScore(c, slot, id, others)
+      if opts.mdefWeight and id ~= nil and id ~= 0xFF and gearType(id) ~= 1 then
+        v = v + opts.mdefWeight * gearByte(id, 21)
+      end
+      return v
+    end
     local function wornOf(c, s)
       if planned[c] and planned[c][s] then return planned[c][s] end
       return gearWorn(c, s)
@@ -6934,11 +6943,11 @@ function M.gearDress(opts)
         if not (keep[c] and keep[c][slot]) and not kitHand(c, slot) then
           local others = keysElsewhere(members, wornOf, c, slot)
           local cur = gearWorn(c, slot)
-          local curScore = (cur == 0xFF or fits(c, slot, cur)) and slotScore(c, slot, cur, others) or 0
+          local curScore = (cur == 0xFF or fits(c, slot, cur)) and score(c, slot, cur, others) or 0
           local best, bestScore = nil, curScore
           for id, n in pairs(bag) do
             if n > 0 and fits(c, slot, id) then
-              local s = slotScore(c, slot, id, others)
+              local s = score(c, slot, id, others)
               if s > bestScore then best, bestScore = id, s end
             end
           end
