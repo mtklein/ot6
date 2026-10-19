@@ -12116,10 +12116,14 @@ function Driver:makePlanRules(actor)
   -- no Fight row and no Magic line (the row greyed, or nothing in it to
   -- cast): a Tonic or Potion on the least-full member is still a turn,
   -- where a pass can fail to land and parks the menu into the recovery cap
-  -- (build/attempts/wt/v031-tower-2/lab/dbg1_k0_s25: RELM's Magic row
-  -- greyed on the walk down, 'plan switch ... consumed 41 pulses in state
-  -- $05 without landing', 'recovery cap: navTo ... budget:switch/05 4
-  -- times').  The bag's care floor gives way for this one turn
+  -- (build/attempts/wt/v031-tower-2/lab/dbg1_k0_s25: a Muted seat's Magic row
+  -- greyed on the walk down -- UpdateCmd_05, battle_main.asm, greys it on
+  -- Mute, status byte $3EE5 bit 3 -- 'plan switch ... consumed 41 pulses in
+  -- state $05 without landing', 'recovery cap: navTo dropped and re-planned
+  -- budget:switch/05 4 times').  The bag's care floor holds (Driver:battInvIdx,
+  -- opts.reserve): the item comes from above it, and only when neither a
+  -- Tonic nor a Potion is left above it does the turn dip below, the last
+  -- of either being worth a landed turn (#443).
   if fight == nil then
     local irow = cmdRow(actor, BATTLE.CMD_ITEM)
     local least, leastFrac = nil, 2
@@ -12128,16 +12132,37 @@ function Driver:makePlanRules(actor)
       if hp > 0 and mx > 0 and hp / mx < leastFrac then least, leastFrac = e, hp / mx end
     end
     if irow ~= nil and least ~= nil then
+      local reserve = self.opts.reserve or {}
+      local pick = nil
       for _, it in ipairs({ 0xE8, 0xE9 }) do   -- Tonic, Potion
-        local idx = nil
-        for slot = 0, 251 do
-          if idx == nil and M.readByte(BATTLE.BATTINV + slot * 5) == it and M.readByte(BATTLE.BATTINV + slot * 5 + 3) > 0 then idx = slot end
+        local idx = self:battInvIdx(it)
+        if pick == nil and idx ~= nil then pick = { it = it, idx = idx, floor = "within the care floor" } end
+      end
+      if pick == nil then
+        for _, it in ipairs({ 0xE8, 0xE9 }) do
+          for slot = 0, 251 do
+            if pick == nil and M.readByte(BATTLE.BATTINV + slot * 5) == it
+               and M.readByte(BATTLE.BATTINV + slot * 5 + 3) > 0 then
+              pick = { it = it, idx = slot, floor = "BELOW the care floor: nothing else left" }
+            end
+          end
         end
-        if idx ~= nil then
-          M.log(string.format("[%s] actor=%d: nothing to cast and no Fight row; item $%02X on entity %d "
-            .. "rather than a pass", self.tag or "fight", actor, it, least))
-          return { kind = "item", item = it, target = least, row = irow, idx = idx, reason = "no_line_item" }
+      end
+      if pick ~= nil then
+        -- why there is no line: the Magic row greyed (flags bit 7) or absent, or present and
+        -- empty-handed; Mute is status byte 2 bit 3
+        local magicRow = "absent"
+        for row = 0, 3 do
+          if M.readByte(BATTLE.CMDTBL + actor * 12 + row * 3) == BATTLE.CMD_MAGIC then
+            magicRow = cmdDisabled(actor, row) and "greyed" or "open"
+          end
         end
+        M.log(string.format("[%s] actor=%d: nothing to cast and no Fight row; item $%02X on entity %d "
+          .. "rather than a pass (%s: Tonic floor %d, Potion floor %d; Magic row %s, status $%02X $%02X%s, MP %d)",
+          self.tag or "fight", actor, pick.it, least, pick.floor, reserve[0xE8] or 0, reserve[0xE9] or 0,
+          magicRow, M.readByte(0x3EE4 + actor * 2), M.readByte(0x3EE5 + actor * 2),
+          (M.readByte(0x3EE5 + actor * 2) & 0x08) ~= 0 and " MUTE" or "", M.readWord(BATTLE.CURMP + actor * 2)))
+        return { kind = "item", item = pick.it, target = least, row = irow, idx = pick.idx, reason = "no_line_item" }
       end
     end
     return { kind = "switch" }
