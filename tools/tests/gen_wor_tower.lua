@@ -874,9 +874,18 @@ H.run({ maxFrames = 1500000 }, {
   stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM }, { CELES, TRITOCH } }, "stones for MagiMaster"),
   H.call(function() H.assertEq(sw(0x02DA), 1, "the Gem Box's tile armed MagiMaster ($02DA, _cc5440)") end),
   stepOn(8, 8, function() return H.battleLoadStarted() or sw(0x02DB) == 1 end),
+  -- 400,000 frames: his 50,000 HP fall only to the casts his wall leaves
+  -- open (three of the eight elements are no member's), and a cast that
+  -- lands after the wall turned is absorbed.  Over a sweep's 16 wins the
+  -- fight ran 46,501 to 195,414 ticks (build/attempts/wt/v031-tower-2/lab/
+  -- sw4_*: '[boss] MagiMaster: battle $162 won after ...'), and the one
+  -- loss ran out the old 200,000 at full party HP with him at 21,230
+  -- (sw4_k5_s3): a slow fight, not a stalled one -- the stalls (a lone
+  -- member with no attack, Drain healing him, a seat passing) are fixed
+  -- in the driver and the kit, and the no-progress watchdog stays on
   H.advanceStory(function()
     return sw(0x02DB) == 1 and not H.battleLoadStarted() and map() == MAP_TOP and settled()
-  end, 200000, { playBattles = "tactical", fight = BOSS_FIGHT }),
+  end, 400000, { playBattles = "tactical", fight = BOSS_FIGHT }),
   fought(MAGIMASTER_FORMATION, "MagiMaster"),
   H.fieldCare({ tag = "after MagiMaster" }),
   H.saveState("wor_tower_won.mss"),
