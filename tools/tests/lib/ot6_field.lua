@@ -8090,8 +8090,10 @@ function M.dressRelics(members, opts)
                 end
                 if #rm > 0 then
                   removals = removals + #rm
-                  M.assertEq(removals <= 8, true, string.format(
-                    "%s: relics taken off %d times; the swap does not unwind (no swap deadlock)", tag, removals))
+                  if removals > 8 then
+                    error(string.format("%s: relics taken off %d times; the swap does not unwind "
+                      .. "(no swap deadlock)", tag, removals), 0)
+                  end
                   local names = {}
                   for _, slotN in ipairs(rm) do names[#names + 1] = relicName(charByte(q.ch, 0x1F + slotN)) end
                   M.log(string.format("[%s] %s: takes off %s (slot%s %s) into the bag so the member who wants %s can "
