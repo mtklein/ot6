@@ -8325,6 +8325,31 @@ function Driver:magicOnlyLine(actor, boost)
       end
     end
   end
+  -- How much of the bank a cast here spends.  A body the fight names to
+  -- kill first (opts.magicFirst) takes the whole bank: on the fourth floor
+  -- the four died holding points while the L.90 Magic's Meteor and Merton
+  -- took ~1,400 a round from each ('died holding 3 BP', 'party_bp=0,1,1,3':
+  -- build/attempts/wt/v031-tower-2/lab/cap3b).  A caster whose Fire folds
+  -- into Ultima at three points keeps her bank for it while a 5,000-HP body
+  -- stands (her two-point rebounds had kept it below three)
+  local function wantFor(slot)
+    local bank = M.readByte(BATTLE.BP + actor * 2)
+    if spellCell(actor, 0x00, true) ~= nil and M.foldSteps(actor, 3) == 3 and bank < 3 then
+      for s = 0, 5 do
+        if monAlive(s) and M.readWord(0x3BF4 + 8 + s * 2) >= 5000 then return 0 end
+      end
+    end
+    local mf = self.opts.magicFirst
+    if slot ~= nil and mf and monAlive(slot) and mf[M.readWord(0x57C0 + slot * 2)] then
+      return math.max(boost or 0, bank)
+    end
+    if slot == nil and mf then
+      for s = 0, 5 do
+        if monAlive(s) and mf[M.readWord(0x57C0 + s * 2)] then return math.max(boost or 0, bank) end
+      end
+    end
+    return boost or 0
+  end
   -- TERRA's Fire at three points folds into Ultima (M.foldSteps): no
   -- element, no Reflect, every monster.  Against a body of 5,000 HP or more
   -- (the tower's L.90 Magic, MagiMaster) with three points banked it is the
@@ -8348,7 +8373,7 @@ function Driver:magicOnlyLine(actor, boost)
     end
   end
   if bounce ~= nil and (best == nil or bestScore < 100 or (bounce.all and bounce.mirrors >= 3)) then
-    local b = castBoost(actor, bounce.sp.id, bounce.sp.cost, boost or 0, self:nukeFloor(actor)) or 0
+    local b = castBoost(actor, bounce.sp.id, bounce.sp.cost, wantFor(nil), self:nukeFloor(actor)) or 0
     -- a rebound must stay reflectable: TERRA's Fire at three points is
     -- Ultima, which no mirror turns, and spread over the party it fell on
     -- the party (build/attempts/wt/v031-tower/lab/f4c_p3t_p3r_k0_wor_relm_s0_wor_tower_f4_s0:
@@ -8390,6 +8415,40 @@ function Driver:magicOnlyLine(actor, boost)
         #parts > 0 and table.concat(parts, ", ") or "no candidate in the list",
         M.readByte(0x3BE0 + x), M.readByte(0x3BCD + x), M.readByte(0x3BCC + x))
       if said ~= self.noLineSaid then self.noLineSaid = said; M.log(said) end
+      -- The last member standing with no attack spell in the list at all
+      -- (not walled: absent) can only stall, so the turn raises a fallen
+      -- member, the one who holds an attack first.  STRAGO on Sraphim
+      -- (Cure, Life, Scan, no attack) was left alone against MagiMaster
+      -- and Scanned until the time limit ('no line at 488 MP ... no
+      -- candidate in the list', partyhp=0,0,0,3219:
+      -- build/attempts/wt/v031-tower-2/lab/mm16_*_s9).  Only then: a raise
+      -- whenever nothing hurt, the others standing, did worse (mm15_*)
+      local others = 0
+      for e = 0, 3 do
+        if e ~= actor and M.readWord(0x3BF4 + e * 2) > 0 then others = others + 1 end
+      end
+      local irow = cmdRow(actor, BATTLE.CMD_ITEM)
+      local fenix = irow ~= nil and self:battInvIdx(BATTLE.FENIX_DOWN)
+      if #parts == 0 and others == 0 and fenix then
+        local pick, pickArmed = nil, false
+        for e = 0, 3 do
+          if e ~= actor and M.readWord(0x3C1C + e * 2) > 0 and M.readWord(0x3BF4 + e * 2) == 0
+             and not M.seized(e) and (self.raiseQueued == nil or self.raiseQueued[e] == nil) then
+            local armed = false
+            for _, id in ipairs(self.opts.magicOnly or M.MAGIC_ONLY_SPELLS) do
+              if spellKnown(e, id) and spellCell(e, id) ~= nil then armed = true end
+            end
+            if pick == nil or (armed and not pickArmed) then pick, pickArmed = e, armed end
+          end
+        end
+        if pick ~= nil then
+          M.log(string.format("[%s] actor=%d magic-only: the last one standing holds no attack; Fenix Down on "
+            .. "entity %d (%s)", self.tag or "fight", actor, pick,
+            pickArmed and "it holds an attack spell" or "the first fallen"))
+          return { kind = "item", item = BATTLE.FENIX_DOWN, target = pick, row = irow, idx = fenix,
+                   reason = "revive" }
+        end
+      end
     end
     -- nothing castable: a caster out of MP drinks it back (an Ether, a
     -- Tincture, an X-Ether) rather than pass the turn: inside the tower a
@@ -8423,7 +8482,7 @@ function Driver:magicOnlyLine(actor, boost)
     end
     return nil
   end
-  local b = castBoost(actor, best.id, best.cost, boost or 0, self:nukeFloor(actor))
+  local b = castBoost(actor, best.id, best.cost, wantFor(bestSlot), self:nukeFloor(actor))
   if b == nil then b = 0 end
   local key = string.format("monly:%d:%d:%d", actor, bestSlot, best.id)
   if not self.statusSaid[key] then

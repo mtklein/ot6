@@ -838,11 +838,15 @@ H.run({ maxFrames = 1500000 }, {
   -- cap2)
   wallRingsOff("MagiMaster"),
   -- TERRA onto Shiva (Shell for his Ultima; her own Life, Drain, Break and
-  -- Pearl stay), STRAGO onto Sraphim (Cure and a second Life: one Life 3
+  -- Pearl stay), CELES onto Sraphim (Cure and a second Life: one Life 3
   -- caster lost him the fight he had already won, his Ultima falling on
   -- STRAGO alone: build/attempts/wt/v031-tower/lab/
-  -- f4b_p3t_p3r_k0_wor_relm_s9_wor_tower_f4_s0)
-  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM }, { CELES, TRITOCH } }, "stones for MagiMaster"),
+  -- f4b_p3t_p3r_k0_wor_relm_s9_wor_tower_f4_s0; her own Ice and Bolt
+  -- stay), STRAGO on Maduin (fire, ice, bolt).  STRAGO on Sraphim held no
+  -- attack spell, and left alone he Scanned until the time limit
+  -- (build/attempts/wt/v031-tower-2/lab/mm16_*_s9: 'no candidate in the
+  -- list')
+  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, MADUIN }, { CELES, SRAPHIM } }, "stones for MagiMaster"),
   lazy(function() return H.equipKit(CELES, { { 3, FORCE_ARMOR } }, { tag = "CELES: the Force Armor" }) end),
   H.call(function() say("wor", "dressed for MagiMaster: " .. kitLine()) end),
   door(7, 13, MAP_TOP, "the Gem Box's room -> the top (364 (7,7))"),
@@ -851,7 +855,7 @@ H.run({ maxFrames = 1500000 }, {
 
   -- ---- 5. MagiMaster ---------------------------------------------------------------
   -- @@stage magimaster
-  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM }, { CELES, TRITOCH } }, "stones for MagiMaster"),
+  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, MADUIN }, { CELES, SRAPHIM } }, "stones for MagiMaster"),
   H.call(function() H.assertEq(sw(0x02DA), 1, "the Gem Box's tile armed MagiMaster ($02DA, _cc5440)") end),
   stepOn(8, 8, function() return H.battleLoadStarted() or sw(0x02DB) == 1 end),
   H.advanceStory(function()
