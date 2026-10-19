@@ -87,11 +87,6 @@ disassembly.
 See [the headless play guide](docs/playing-headless.md) and
 [the test harness guide](tools/tests/README.md).
 
-## Sketch warning
-
-The original FF6 1.0 Sketch bug remains. A missed Sketch can corrupt
-inventory or save data. Save before using Sketch.
-
 ## Contributing
 
 See [AGENTS.md](AGENTS.md).
