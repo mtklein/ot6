@@ -12,4 +12,5 @@ H.run({ maxFrames = 100000, retries = 1, watchdog = false }, {
     H.log("stall_hang_negative: pausing emulation for good")
     emu.breakExecution()
   end),
+  H.waitFrames(100000),   -- the run would end here, if a frame ever came
 })
