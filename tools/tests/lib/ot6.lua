@@ -200,10 +200,21 @@ M.HB_IVL = 1024
 -- A milestone is a thing that happened; a loop that merely keeps pressing
 -- buttons without any of them is a stall, however many frames it runs.
 M.progressN, M.progressFrame, M.progressWhy = 0, 0, "start"
+M.hbFrame = -1000
+function M.heartbeat()
+  M.hbFrame = M.frame
+  -- (field 3 is reserved: the script sandbox has no os library, so no
+  -- wall-clock second; run.sh stamps its own)
+  print(string.format("[ot6hb] %d - %d %d %s", M.frame,
+    M.progressN, M.progressFrame, M.progressWhy))
+end
 function M.progress(why)
   M.progressN = M.progressN + 1
   M.progressFrame = M.frame or 0
   M.progressWhy = tostring(why):gsub("%s+", "_")
+  -- say so now, not at the next periodic heartbeat, but at most one such
+  -- line per 128 frames (a battle's HP moves every few frames)
+  if M.frame and M.frame - M.hbFrame >= 128 then M.heartbeat() end
 end
 M.PROG_IVL = 32
 M.progLast = {}
@@ -19364,16 +19375,11 @@ function M.run(opts, steps)
     if M.frame == 20 or M.frame % LIVE_IVL == 0 then M.liveShot() end
     if M.frame % M.PROG_IVL == 0 then M.progressSample() end
     -- The run's heartbeat (docs/TOOLING.md "The run's heartbeat"): the
-    -- frame, the wall-clock second, and the progress counter with the frame
+    -- frame, a reserved field, and the progress counter with the frame
     -- and name of the newest milestone.  run.sh's stall watch resets on the
     -- COUNTER changing, never on the frame: a game parked in a menu ticks
     -- frames forever.  No [ot6] prefix: it is not terminal output.
-    if M.frame == 20 or M.frame % M.HB_IVL == 0 then
-      -- (field 3 is reserved: the script sandbox has no os library, so no
-      -- wall-clock second; run.sh stamps its own)
-      print(string.format("[ot6hb] %d - %d %d %s", M.frame,
-        M.progressN, M.progressFrame, M.progressWhy))
-    end
+    if M.frame == 20 or M.frame % M.HB_IVL == 0 then M.heartbeat() end
 
     -- The boot snapshot for the replay: collected here, a couple of
     -- frames after it was asked for (below, after the tick).

@@ -619,7 +619,7 @@ else
   # and the published log for anything reading it after the fact.
   timeout_note() { printf '[ot6] %s\n' "$@" >> "$RUN_LOG"; }
   if [ "$stalled" -eq 1 ]; then
-    timeout_note "KILLED BY A STALL: no verdict, and the run stopped making progress: the last milestone (${stall_what}) was at frame ${stall_frame}, ${stall_secs}s before the kill; the emulator was at frame ${stall_at} (window ${HB_WINDOW}s, OT6_HEARTBEAT); the run lasted ${elapsed}s.  run.sh killed it; it did not crash." \
+    timeout_note "KILLED BY A STALL: no verdict, and the run stopped making progress: the last milestone (${stall_what}) was at frame ${stall_frame}, ${stall_secs}s before the kill; the newest heartbeat was at frame ${stall_at} (window ${HB_WINDOW}s, OT6_HEARTBEAT); the run lasted ${elapsed}s.  run.sh killed it; it did not crash." \
          "  This is the FINAL attempt: the harness already retried it ${retried} time(s)" \
          "  automatically (OT6_TIMEOUT_RETRIES=${RETRIES})." \
          "  The script or the emulator is hung or idling (frames may still be advancing), or the machine starved it:" \
