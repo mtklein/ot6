@@ -45,7 +45,13 @@ local FIGHT = { cure = false, shellVs = { [0x164] = true }, magicFirst = { [0x16
 -- for his wall to null or absorb), two of four won in 180,000 ticks and two
 -- ran out of time (lab/mm12_*), against two of three in 116,000 with the
 -- elements (mm11)
-local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.4 }, reraiseHold = { [0x166] = 0.15 } }
+-- Life 3 from 60% of his HP and the hold from 40%: two of TERRA's Ultimas
+-- (9,999 each) took him from 22,555 to 2,557 inside 600 frames, past the
+-- old 40% and 15% marks before one Life 3 was on, and a queued hit killed
+-- him into a wipe (build/attempts/wt/v031-tower-2/lab/re3_k3_s0:
+-- 'monhp=s0:22555', 'monhp=s0:2557', '[wipe] f+65388').  40% of 50,000
+-- leaves two such hits between the hold and his end
+local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.6 }, reraiseHold = { [0x166] = 0.4 } }
 -- no Drain on the bosses: it heals MagiMaster (his HP rose 38,578 -> 41,594
 -- on RELM's Drain, f11a4a92), and with the default list back RELM cast it 64
 -- times in a fight that ran out of time at 17,531 of his 50,000 ('took 0 off
