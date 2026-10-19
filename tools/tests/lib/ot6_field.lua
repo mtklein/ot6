@@ -5954,7 +5954,9 @@ function M.equipEsper(pos, esperIdx, opts)
   local ST_MAIN, ST_CHAR, ST_SKILLS, ST_LIST, ST_DETAIL =
     0x05, 0x06, 0x0a, 0x1e, 0x4d
   local GENJULIST = 0x9d89
-  local function st() return M.readByte(ZM) end
+  -- $26 is the menu's state only while the menu module runs (M.menuRunning); in
+  -- the field it is a countdown that passes through 05 (#446)
+  local function st() return M.menuRunning() and M.readByte(ZM) or -1 end
   local function targetPos()
     return type(pos) == "function" and pos() or pos
   end
@@ -6197,7 +6199,9 @@ function M.equipWeapon(pos, itemId, opts)
   local ST_SLOT = relic and 0x5a or 0x55
   local ST_ITEM = relic and 0x5b or 0x57
   local slotRow = relic and (slot - 4) or slot
-  local function st() return M.readByte(ZM) end
+  -- $26 is the menu's state only while the menu module runs (M.menuRunning); in
+  -- the field it is a countdown that passes through 05 (#446)
+  local function st() return M.menuRunning() and M.readByte(ZM) or -1 end
   local function targetPos()
     return type(pos) == "function" and pos() or pos
   end
@@ -6375,7 +6379,9 @@ function M.equipKit(charId, items, opts)
   local base = 0x1600 + 37 * charId
   local ZM, CUR, SLOTCUR = 0x26, 0x4b, 0x4e
   local ST_MAIN, ST_CHAR = 0x05, 0x06
-  local function st() return M.readByte(ZM) end
+  -- $26 is the menu's state only while the menu module runs (M.menuRunning); in
+  -- the field it is a countdown that passes through 05 (#446)
+  local function st() return M.menuRunning() and M.readByte(ZM) or -1 end
   local function slotByte(slot) return M.readByte(base + 0x1F + slot) end
   local pos
   local doneSlot = {}
@@ -7839,7 +7845,9 @@ function M.unequipRelics(charId, slots, opts)
   local ST_MAIN, ST_CHAR, ST_OPT, ST_SLOT = 0x05, 0x06, 0x59, 0x5c
   local MAINROW = 3
   local pos
-  local function st() return M.readByte(ZM) end
+  -- $26 is the menu's state only while the menu module runs (M.menuRunning); in
+  -- the field it is a countdown that passes through 05 (#446)
+  local function st() return M.menuRunning() and M.readByte(ZM) or -1 end
   local function slotByte(slot) return M.readByte(base + 0x1F + slot) end
   local function anyToDo()
     for _, slot in ipairs(slots) do if slotByte(slot) ~= 0xFF then return true end end
@@ -8309,7 +8317,9 @@ function M.emptyEquip(charId, opts)
   local ST_MAIN, ST_CHAR, ST_OPT = 0x05, 0x06, 0x36
   local EQUIP_ROW, OPT_EMPTY = 2, 3
   local ph = 0
-  local function st() return M.readByte(ZM) end
+  -- $26 is the menu's state only while the menu module runs (M.menuRunning); in
+  -- the field it is a countdown that passes through 05 (#446)
+  local function st() return M.menuRunning() and M.readByte(ZM) or -1 end
   local function row() return (M.readByte(0x1850 + charId) >> 3) & 0x03 end
   local function four()
     return string.format("%02X %02X %02X %02X", M.readByte(base + 0x1F),
