@@ -13203,7 +13203,7 @@ function Driver:idle()
   self.raceTimeRecords = nil
   self.leftSaid, self.escSaid, self.reward = {}, {}, nil
   self.timed, self.tailSaid, self.runDecided, self.running = nil, false, nil, nil
-  self.blankRun, self.deadOpen, self.progLow = nil, nil, nil
+  self.blankRun, self.deadOpen, self.progLow, self.noLineSaid = nil, nil, nil, nil
   if self.recovery then
     self.recovery.close(M.frame, "battle_ended")
     if recoveryObserver == self.recovery then recoveryObserver = nil end
