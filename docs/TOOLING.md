@@ -385,11 +385,12 @@ savestate_ninja.py's `timeout=` still pass it, and can drop it at leisure.
 between changes of `n`. On px13 (24 threads, nothing else of ours running; the
 runs below are the evidence, `build/attempts/wt/v031-heartbeat/`):
 
-| run | frames | wall | longest gap between milestones |
+| run (px13, 4 of our emulators, load average 2-4) | frames | wall | longest gap between milestones |
 |---|---|---|---|
-| gen_wor_relm, alone-ish (4 emulators) | 299,201 | 656-738 s | 5 s |
-| gen_wor_tower (MagiMaster), same | 366,063 | 714-807 s | 4 s with battle actions counted (40 s with HP alone: 18,000 frames of shielded turns) |
-| both, 106 frames/s (each on a quarter core: 2 emulators + 2 spinners pinned to one thread) | | 3113 s, 3327 s | tower 20 s (frame 35,712, a roster change), relm 10 s |
+| gen_wor_relm | 299,201 | 656 s | 5 s (HP and steps only), 4 s with actions counted |
+| gen_wor_tower (MagiMaster) | 366,063 | 807 s | 40 s with HP and steps only (18,000 frames of shielded turns, frame 265,824); 3 s with battle actions counted |
+| same two, 106 frames/s (each on a quarter of one thread: 2 emulators and 2 spinners pinned there) | 366,063; 299,201 | 3113 s; 3327 s | tower 20 s (frame 35,712, a roster change), relm 10 s (frame 193,728) |
+| battle_shadowstays (by hand, no cap) | 127,459 | 301 s | 2 s |
 
 A loaded machine emulates about 80-100 frames/s (savestate_ninja.py's
 CUTTER_TIMEOUT comment), unloaded about 500, so the loaded figures are the
