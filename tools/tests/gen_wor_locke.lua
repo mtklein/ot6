@@ -12,7 +12,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TERRA, LOCKE, CELES = 0, 1, 6
-local POTION, FENIX, REMEDY, TENT, TINCTURE = 0xE9, 0xF0, 0xF5, 0xF7, 0xEB
+local POTION, FENIX, REMEDY, TENT, TINCTURE, RIBBON = 0xE9, 0xF0, 0xF5, 0xF7, 0xEB, 0xCA
 local MAP_CAVE, MAP_DEEP = 315, 313
 local AQUA_RAKE = 3
 local FIGHT = { nukeLore = { AQUA_RAKE }, strago = { study = true, pearlWind = true } }
@@ -73,13 +73,20 @@ local function hold(x, y, id, what)
     H.call(function() say("plate", what) end),
   })
 end
--- a chest, when a side of it can be walked to from here; else a line
+-- a chest, when a side of it can be reached from here over the floor and
+-- the links (the walk there by them, then the chest); else a line
 local function chestIfNear(cx, cy, bit, what, item)
   return H.lazy(function()
     for _, o in ipairs({ { 0, 1, "up" }, { -1, 0, "right" }, { 1, 0, "left" }, { 0, -1, "down" } }) do
-      if H.bfsPath(cx + o[1], cy + o[2]) then
-        return H.openChest({ stand = { cx + o[1], cy + o[2] }, face = o[3], bit = bit, what = what, item = item,
-          nav = { fight = FIGHT, playBattles = "tactical" } })
+      local sx, sy = cx + o[1], cy + o[2]
+      for _, z in ipairs({ false, 1, 2 }) do
+        if H.bfsReach(nil, nil, z or nil, LINKS[map()] or {}, sx, sy) then
+          return H.seqStep({
+            walk(sx, sy, what .. ": beside it"),
+            H.openChest({ stand = { sx, sy }, face = o[3], bit = bit, what = what, item = item,
+              nav = { fight = FIGHT, playBattles = "tactical" } }),
+          })
+        end
       end
     end
     return H.logStep(string.format("[chest] %s (%d,%d): no side of it is reachable from (%d,%d)", what, cx, cy,
@@ -133,6 +140,15 @@ H.run({ maxFrames = 2400000 }, {
   H.switchParty(1),
   walk(23, 21, "party 1 off the bridge plate"),
   door(11, 14, MAP_DEEP, "party 1: -> 313 (13,9)"),
+  -- the Ribbon (313 (13,20), treasure bit 171), reached from below by the
+  -- jumps of 313's west side; it goes on at once (guidelines.md, "Ribbons
+  -- are worth going out of your way for")
+  chestIfNear(13, 20, 0x0AB, "Ribbon (313 (13,20))", RIBBON),
+  H.lazy(function()
+    local m = {}
+    for _, c in ipairs(H.partyRoster(1)) do m[#m + 1] = { c, H.SPLIT_NAMES[c] } end
+    return H.dressRelics(m, { tag = "relics with the Ribbon, party 1" })
+  end),
   door(6, 7, MAP_CAVE, "party 1: -> 315 (6,12)"),
   hold(10, 32, 0x02C5, "party 1 across the jumps, on the step (10,32)"),
   H.switchParty(2),

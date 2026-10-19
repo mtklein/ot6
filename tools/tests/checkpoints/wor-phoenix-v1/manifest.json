@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-phoenix.sram",
+  "slot": 3,
+  "milestone": "wor-phoenix",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 315,
+      "x": 37,
+      "y": 28
+    }
+  },
+  "size": 32768,
+  "sha256": "9ac82b007b7e3f2647e465212846a7f774cd36b304b5b0762bd86eff38dae065",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "9ac82b007b7e3f2647e465212846a7f774cd36b304b5b0762bd86eff38dae065",
+    "generator_sig": "c620ad0922d3c9513753b7a143f1ab8a714d2da23b084c1db4c9bef3ea4ba8c9 gen_wor_phoenix tools/tests/checkpoints/wor-thamasa-v1/manifest.json tools/tests/checkpoints/wor-thamasa-v1/wor-thamasa.sram",
+    "ancestors": [
+      {
+        "path": "tools/tests/checkpoints/wor-thamasa-v1/manifest.json",
+        "sha256": "4adec23dce708ad4effd64985cbd58619c8a19680513fb64ca8b649b10039ad0"
+      }
+    ]
+  }
+}

@@ -100,6 +100,27 @@ local function hold(x, y, id, what)
   })
 end
 
+-- a chest, when a side of it can be reached from here over the floor and
+-- the links (the walk there by them, then the chest); else a line
+local function chestIfNear(cx, cy, bit, what, item)
+  return H.lazy(function()
+    for _, o in ipairs({ { 0, 1, "up" }, { -1, 0, "right" }, { 1, 0, "left" }, { 0, -1, "down" } }) do
+      local sx, sy = cx + o[1], cy + o[2]
+      for _, z in ipairs({ false, 1, 2 }) do
+        if H.bfsReach(nil, nil, z or nil, LINKS[map()] or {}, sx, sy) then
+          return H.seqStep({
+            walk(sx, sy, what .. ": beside it"),
+            H.openChest({ stand = { sx, sy }, face = o[3], bit = bit, what = what, item = item,
+              nav = { fight = FIGHT, playBattles = "tactical" } }),
+          })
+        end
+      end
+    end
+    return H.logStep(string.format("[chest] %s (%d,%d): no side of it is reachable from (%d,%d)", what, cx, cy,
+      H.fieldX(), H.fieldY()))
+  end)
+end
+
 -- boarding: on foot on the parked airship's tile, A boards (gen_wor_cyan's)
 local function board()
   local n, ph = 0, 0
@@ -255,7 +276,9 @@ H.run({ maxFrames = 2400000 }, {
   hold(35, 52, 0x02A3, "party 1 holds the north plate (35,52): the east gate (38,52)"),
   H.switchParty(2),
   -- off the south plate (the west gate closes behind party 1) and through
-  -- the east gate party 1 holds, down to the rocks
+  -- the east gate party 1 holds; the Warp Stone in the east room, then
+  -- down to the rocks
+  chestIfNear(55, 53, 0x0C3, "Warp Stone (315 (55,53))", 0xFD),
   door(45, 52, MAP_DEEP, "party 2: the east gate -> 313 (46,47)"),
   walk(40, 38, "party 2 to the rocks (40,38)"),
   H.waitUntil(function() return sw(0x02A8) == 1 and settled() end, 1200, "the rocks raised ($02A8)", 1),

@@ -5266,8 +5266,17 @@ function M.fieldCare(opts)
   -- Tonics to zero (measured: the pre-gate-cave care shipped an empty bag
   -- and a member the party then could not revive).  A caller that truly
   -- means to spend everything before a boss passes reserve = {}.
-  -- (in a split dungeon, plus the other parties' unspent shares)
-  if opts.reserve == nil then opts.reserve = M.splitReserveFor(nil) or M.CARE_RESERVE end
+  -- In a split dungeon the floor is also the other parties' unspent
+  -- shares (M.splitReserveFor), read when the care plans, not when the step
+  -- is built: a script builds its steps before the split begins, and the
+  -- floor taken then let party 2's care drink party 1's share
+  -- (build/attempts/wt/v032-splitparty/lab/s1: 'E: party 2's care spent no
+  -- Potion ... got 50, want 60')
+  if opts.reserve == nil then
+    opts.reserve = setmetatable({}, { __index = function(_, id)
+      return (M.splitReserveFor(nil) or M.CARE_RESERVE)[id]
+    end })
+  end
   local K = M.careKernel(opts)
   local phase = 0
   -- A battle can open under the visit: a wandering NPC whose touch is an

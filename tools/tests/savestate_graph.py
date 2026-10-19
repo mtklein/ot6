@@ -930,11 +930,28 @@ STATES = [
     # 139), the Gem Box, MagiMaster (event battle 145, a game over when
     # lost: the runner retries from the save), the walk down and Save
     # there: the `wor-thamasa-v1` checkpoint
-    # (docs/design/route-wor-thamasa.md).  A cut.  saves=: the frontier;
-    # no leg boots wor-thamasa-v1 yet.  Re-cut by checkpoint_drift.py
-    # --recut.
+    # (docs/design/route-wor-thamasa.md).  A cut.  wor_phoenix below boots
+    # its checkpoint.  Re-cut by checkpoint_drift.py --recut.
     S("wor_tower", gen="gen_wor_tower", prev="wor_relm",
-      checkpoint="wor-tower-v1", saves="wor-thamasa-v1", timeout=7200),
+      checkpoint="wor-tower-v1", timeout=7200),
+
+    # wor-thamasa-v1 -> the Phoenix Cave's save point, map 315 (37,28):
+    # Thamasa's inn and item counter, the Falcon to the cave (Doom Gaze may
+    # meet it in the air), the party menu's two groups, the gates, the
+    # rocks, the passage north, the lava, and Save there with the party
+    # split in two: the `wor-phoenix-v1` checkpoint, the retry point for the
+    # Red Dragon (docs/design/split-party.md).  A cut.  Re-cut by
+    # checkpoint_drift.py --recut.
+    S("wor_phoenix", gen="gen_wor_phoenix", prev="wor_tower",
+      checkpoint="wor-thamasa-v1", timeout=7200),
+
+    # wor-phoenix-v1 -> LOCKE joined, CELES and LOCKE on the Falcon (map
+    # 189): the bridge, the Red Dragon (event battle 138, a game over when
+    # lost: the runner retries from the save point), the jump plate, the
+    # last bridge, LOCKE (docs/design/split-party.md).  A cut; it saves
+    # nothing yet: the regroup and the save are the next arc's (#268).
+    S("wor_locke", gen="gen_wor_locke", prev="wor_phoenix",
+      checkpoint="wor-phoenix-v1", timeout=7200),
 
 ]
 

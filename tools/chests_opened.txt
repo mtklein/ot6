@@ -127,3 +127,6 @@
 183	map 369 the Fanatics' Tower, Force Armor (7,6) (gen_wor_tower)
 184	map 366 the Fanatics' Tower, Gem Box (7,7) (gen_wor_tower)
 185	map 370 the Fanatics' Tower, Air Anchor (7,6) (gen_wor_tower)
+195	map 315 the Phoenix Cave, Warp Stone (55,53) (gen_wor_phoenix)
+177	map 315 the Phoenix Cave, Dragon Horn (20,40) (gen_wor_locke)
+171	map 313 the Phoenix Cave, Ribbon (13,20) (gen_wor_locke)

@@ -555,6 +555,12 @@ TEST_ENV = {
     # an elemental shield's spell, worn and taken off, beside Jidoor (#431)
     "battle_shieldgrant": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-cyan-v1",
+    # #275: the split-party mechanics in the Phoenix Cave, from the save made
+    # there with the party in two; a run is the Continue, four Y switches,
+    # one random battle and two walks (6,461 frames on the branch's run,
+    # build/attempts/wt/v032-splitparty/lab/s1)
+    "field_splitparty": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-phoenix-v1",
 }
 
 # Tests about the version fields themselves (tools/build/rom_version.py):
