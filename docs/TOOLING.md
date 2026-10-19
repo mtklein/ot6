@@ -359,7 +359,7 @@ What counts, through the one hook `H.progress(why)` in `lib/ot6.lua`:
   a looping `driveUntil`);
 - a battle action resolving (an ExecCmd entry): a boss fight spends thousands
   of frames on turns that change no HP;
-- the game state moving, sampled every 32 frames: the map, the party's
+- the game state moving, sampled every 128 frames: the map, the party's
   position, gil, the bag, the roster's stats and gear, the story's switches
   and NPC bits, and every battler's HP and MP.
 

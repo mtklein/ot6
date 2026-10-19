@@ -217,7 +217,7 @@ function M.progress(why)
   -- line per 128 frames (a battle's HP moves every few frames)
   if M.frame and M.frame - M.hbFrame >= 128 then M.heartbeat() end
 end
-M.PROG_IVL = 32
+M.PROG_IVL = 128
 M.progLast = {}
 function M.progressSample()
   local rb, rw = M.readByte, M.readWord
