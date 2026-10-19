@@ -12136,14 +12136,16 @@ function Driver:makePlanRules(actor)
       local pick = nil
       for _, it in ipairs({ 0xE8, 0xE9 }) do   -- Tonic, Potion
         local idx = self:battInvIdx(it)
-        if pick == nil and idx ~= nil then pick = { it = it, idx = idx, floor = "within the care floor" } end
+        if pick == nil and idx ~= nil then pick = { it = it, idx = idx, floor = "within the care floor",
+                                  have = M.readByte(BATTLE.BATTINV + idx * 5 + 3) } end
       end
       if pick == nil then
         for _, it in ipairs({ 0xE8, 0xE9 }) do
           for slot = 0, 251 do
             if pick == nil and M.readByte(BATTLE.BATTINV + slot * 5) == it
                and M.readByte(BATTLE.BATTINV + slot * 5 + 3) > 0 then
-              pick = { it = it, idx = slot, floor = "BELOW the care floor: nothing else left" }
+              pick = { it = it, idx = slot, floor = "BELOW the care floor: nothing else left",
+                         have = M.readByte(BATTLE.BATTINV + slot * 5 + 3) }
             end
           end
         end
@@ -12158,8 +12160,8 @@ function Driver:makePlanRules(actor)
           end
         end
         M.log(string.format("[%s] actor=%d: nothing to cast and no Fight row; item $%02X on entity %d "
-          .. "rather than a pass (%s: Tonic floor %d, Potion floor %d; Magic row %s, status $%02X $%02X%s, MP %d)",
-          self.tag or "fight", actor, pick.it, least, pick.floor, reserve[0xE8] or 0, reserve[0xE9] or 0,
+          .. "rather than a pass (%s: %d in the bag, Tonic floor %d, Potion floor %d; Magic row %s, status $%02X $%02X%s, MP %d)",
+          self.tag or "fight", actor, pick.it, least, pick.floor, pick.have, reserve[0xE8] or 0, reserve[0xE9] or 0,
           magicRow, M.readByte(0x3EE4 + actor * 2), M.readByte(0x3EE5 + actor * 2),
           (M.readByte(0x3EE5 + actor * 2) & 0x08) ~= 0 and " MUTE" or "", M.readWord(BATTLE.CURMP + actor * 2)))
         return { kind = "item", item = pick.it, target = least, row = irow, idx = pick.idx, reason = "no_line_item" }
