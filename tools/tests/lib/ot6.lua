@@ -3907,8 +3907,9 @@ function M.absorbGuardTick()
   -- which absorbs holy, though nobody can swing it inside
   -- (build/attempts/wt/v031-tower/lab/t1_relm_k2_wor_relm_s0: "char 7's
   -- R-hand item $39 (holy) is ABSORBED by slot 0 species $0024")
-  if (M.readByte(0x3EBB) & 0x01) ~= 0 then return nil end
+  local magicOnly = (M.readByte(0x3EBB) & 0x01) ~= 0
   if not guardArmed then
+    if magicOnly then return nil end
     local fresh = {}
     for _, st in ipairs(M.activeSlots()) do
       local key = st.slot .. ":" .. st.species
@@ -3924,6 +3925,13 @@ function M.absorbGuardTick()
   end
   guardSettle = guardSettle + 1
   if guardSettle < GUARD_SETTLE then return nil end
+  -- a magic-only battle is inspected (counted) and found clean: nobody
+  -- swings, so no weapon can heal a body
+  if magicOnly then
+    guardArmed = false
+    M.absorbGuardBattles = M.absorbGuardBattles + 1
+    return nil
+  end
 
   -- A species outside 0..383 means the slot mask and the species stash
   -- are not both filled yet.  Keep waiting rather than failing a run on a
@@ -13153,7 +13161,7 @@ function Driver:idle()
   self.raceTimeRecords = nil
   self.leftSaid, self.escSaid, self.reward = {}, {}, nil
   self.timed, self.tailSaid, self.runDecided, self.running = nil, false, nil, nil
-  self.blankRun, self.deadOpen = nil, nil
+  self.blankRun, self.deadOpen, self.progLow = nil, nil, nil
   if self.recovery then
     self.recovery.close(M.frame, "battle_ended")
     if recoveryObserver == self.recovery then recoveryObserver = nil end
@@ -15540,34 +15548,6 @@ function Driver:watchTimer()
   -- from tick 6 on)
   if self.runDecided == nil and self.battleTick >= 6 then
     self.runDecided = true
-    -- opts.runWhenDry (the Fanatics' Tower's walk down): a random battle
-    -- the party cannot fight is run from -- inside the magic-only tower no
-    -- living member can pay for an attack spell and the bag holds nothing
-    -- that gives MP back.  A long MagiMaster fight spent the 99 Tinctures,
-    -- and on the way down TERRA at 0 MP passed four turns ('no line at 0
-    -- MP', 'recovery cap: ... budget:switch/05 4 times':
-    -- build/attempts/wt/v031-tower-2/lab/f4e_cap3b_wor_tower_f4_s2)
-    if self.opts.runWhenDry and M.readByte(M.RANDBTL) ~= 0 then
-      local armed = false
-      for e = 0, 3 do
-        if M.readWord(0x3BF4 + e * 2) > 0 then
-          for _, id in ipairs(self.opts.magicOnly or M.MAGIC_ONLY_SPELLS) do
-            if id ~= 0x29 and spellCell(e, id, true) ~= nil then armed = true end
-          end
-        end
-      end
-      local drink = nil
-      for _, it in ipairs({ 0xEB, 0xEC, 0xED, 0xEE }) do   -- Tincture, Ether, X-Ether, Elixir
-        if drink == nil and self:battInvIdx(it) ~= nil then drink = it end
-      end
-      if not armed and drink == nil then
-        M.log(string.format("[%s] f+%d battle $%03X (random) RUNS (L+R): no living member can pay for "
-          .. "an attack spell and the bag holds nothing that gives MP back", self.tag or "fight",
-          self.battleTick, M.readWord(0x11E0) & 0x1FF))
-        self.running = { tick = self.battleTick, refused = 0, left0 = 0 }
-        return
-      end
-    end
     local t = self:clock()
     if not t or self.opts.timedRun == false or not M.TIMED_RUN then return end
     local form = M.readWord(0x11E0) & 0x1FF
@@ -15602,6 +15582,33 @@ function Driver:watchTimer()
     if run then self.running = { tick = self.battleTick, refused = 0, left0 = t.frames } end
   end
 end
+-- opts.progressVs = { [species] = ticks }: while a body of that species
+-- stands, its HP must set a new low at least once every that many battle
+-- ticks, or the fight fails here, loudly, rather than run to the walker's
+-- frame budget: a fight whose damage the body takes back as fast as it
+-- lands (MagiMaster absorbing casts that land after his wall turned) is
+-- not one the party is winning.  The window is the caller's measurement
+function Driver:watchProgress()
+  local pv = self.opts.progressVs
+  if pv == nil or self.tailSaid or self.battleTick < 2 then return end
+  self.progLow = self.progLow or {}
+  for s = 0, 5 do
+    local sp = M.readWord(0x57C0 + s * 2)
+    local win = monAlive(s) and pv[sp]
+    if win then
+      local hp = M.readWord(0x3BF4 + 8 + s * 2)
+      local p = self.progLow[s]
+      if p == nil or p.sp ~= sp or hp < p.hp then
+        self.progLow[s] = { sp = sp, hp = hp, tick = self.battleTick }
+      elseif self.battleTick - p.tick > win then
+        error(string.format("[%s] no progress: slot %d species $%03X has set no new low under %d HP "
+          .. "in %d battle ticks (since f+%d; the window is %d) -- the party is not winning this fight",
+          self.tag or "fight", s, sp, p.hp, self.battleTick - p.tick, p.tick, win), 0)
+      end
+    end
+  end
+end
+
 -- Holding L+R for the run the rule above chose: true when it owns the pad
 -- this frame.  A formation that refuses the run, or does not let the party
 -- go inside M.TIMED_RUN_CAP frames, is fought out from here, and said.
@@ -16863,6 +16870,7 @@ function Driver:frame()
   self:watchStatuses()
   self:watchLeavers()
   self:watchTimer()
+  self:watchProgress()
   if self:runFrame() then return end
   -- VICTORY-DEADLOCK guard (measured, Thamasa grind bake fight 37): the
   -- killing blow can land while an actor's spell/item window is still
