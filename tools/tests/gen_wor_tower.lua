@@ -56,6 +56,10 @@ local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.4 }
 -- under 46,500 (build/attempts/wt/v031-tower-2/mmgap.sh over lab/sw5_*,
 -- sw6_*)
 BOSS_FIGHT.progressVs = { [0x166] = 90000 }
+-- his counter to every hit is WallChange (AIScript::_358), so a seat with
+-- nothing that lands casts something he nulls to turn the wall (Driver
+-- opts.wallChangeVs)
+BOSS_FIGHT.wallChangeVs = { [0x166] = true }
 BOSS_FIGHT.magicOnly = {}
 for _, id in ipairs(H.MAGIC_ONLY_SPELLS) do
   if id ~= 0x04 then BOSS_FIGHT.magicOnly[#BOSS_FIGHT.magicOnly + 1] = id end
@@ -800,7 +804,8 @@ H.run({ maxFrames = 1500000 }, {
   -- ---- 3. the second floor: the Genji Shld; the third: the Stunner and the Holy Dragon
   -- @@stage f2
   sideRoom(MAP_F2, MAP_GENJI, 0x0B5, GENJI_SHLD, "Genji Shld (367 (7,6))"),
-  -- what the side room gave goes on, magic defence weighed up: every
+  -- what the side room gave goes on, magic defence counted three times
+  -- (gearValue's once, and mdefWeight 2 on top), defence once: every
   -- fight here is spells, and on the walk down the L.90 Magic's Merton
   -- took 3,366 from members at 130 MDef with STRAGO's Genji Shld still
   -- in the bag (build/attempts/wt/v031-tower-2/lab/mm18_*_s4)

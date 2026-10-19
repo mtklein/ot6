@@ -8496,9 +8496,12 @@ function Driver:magicOnlyLine(actor, boost)
           if not absorbed then pick = sp end
         end
       end
-      if pick ~= nil and mp >= pick.cost then
+      -- only at a body the caller names as one whose counter turns its wall
+      -- (opts.wallChangeVs = { [species] = true }: MagiMaster's WallChange)
+      local wc = self.opts.wallChangeVs
+      if pick ~= nil and mp >= pick.cost and wc then
         for s = 0, 5 do
-          if monAlive(s) then
+          if monAlive(s) and wc[M.readWord(0x57C0 + s * 2)] then
             local key = string.format("wallchange:%d:%d", actor, pick.id)
             if not self.statusSaid[key] then
               self.statusSaid[key] = true
@@ -15363,7 +15366,7 @@ function Driver:watchLeavers()
     -- once: got 2': build/attempts/wt/v031-tower-2/lab/sw2_k3_s0)
     local down = true
     for e = 0, 3 do if M.readWord(0x3BF4 + e * 2) > 0 then down = false end end
-    self.deadOpen = down and liveMonMask() == 0
+    self.deadOpen = M.DEAD_OPEN_TAIL ~= false and down and liveMonMask() == 0   -- (false: the mutant)
   end
   endActivate()
   if self.deadOpen then

@@ -697,7 +697,8 @@ made to pass at one attempt across draws (`lab/` under
 - **The fourth floor and the top.** The four died holding points to the
   L.90 Magic (`cap3b`): a `magicFirst` body now takes the whole bank, and
   TERRA keeps hers for Ultima while a 5,000-HP body stands. The side
-  rooms' gear goes on after each (`H.gearDress`, magic defence weighed x2):
+  rooms' gear goes on after each (`H.gearDress`, magic defence counted three
+  times, defence once: every fight in the tower is spells):
   STRAGO had worn a Mithril Shld (MDef 18) with the Genji Shld (MDef 50) in
   the bag when Merton took 3,366 from each member on the walk down
   (`mm18_*_s4`).

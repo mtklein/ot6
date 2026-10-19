@@ -6924,7 +6924,8 @@ function M.gearDress(opts)
     local bag = bagCounts()
     local planned = {}
     -- opts.mdefWeight: each point of an armor piece's magic defence counts
-    -- this much more (a fight of spells: the Fanatics' Tower)
+    -- this much more, on top of gearValue's one (mdefWeight 2 counts it
+    -- three times): a fight of spells, the Fanatics' Tower
     local function score(c, slot, id, others)
       local v = slotScore(c, slot, id, others)
       if opts.mdefWeight and id ~= nil and id ~= 0xFF and gearType(id) ~= 1 then

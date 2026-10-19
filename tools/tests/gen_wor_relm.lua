@@ -706,10 +706,10 @@ H.run({ maxFrames = 1800000 }, {
   dressFromBag(RELM, "RELM"),
   -- Ifrit (Fire, Drain) onto RELM while CYAN, who wears it, is still seated:
   -- he waits aboard from the cabin on, and a stone a waiting member wears
-  -- cannot be freed from the party menu.  Drain is the tower's answer to
-  -- the reflecting L.90 Magic and to MagiMaster's wall (no element, no
-  -- Reflect), and RELM's magic power is the party's best
-  -- (route-wor-thamasa.md 11.4)
+  -- cannot be freed from the party menu.  Drain reaches the reflecting
+  -- L.90 Magic (no element, no Reflect), and RELM's magic power is the
+  -- party's best (route-wor-thamasa.md 11.4); it is off MagiMaster's list,
+  -- whom it heals (gen_wor_tower's BOSS_FIGHT)
   H.equipEsper(function() return posOf(RELM) end, IFRIT, { tag = "IFRIT -> RELM" }),
   H.dressRelics({ { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" } },
     { tag = "relics with RELM" }),
