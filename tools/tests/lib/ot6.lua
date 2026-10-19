@@ -179,10 +179,11 @@ end
 -- here is latched by the ROM at the frame's inputPolled, so it can land one
 -- frame after the stamp.
 local LIVE_IVL = 128
--- The heartbeat interval, in frames (first one at frame 20, with the first
+-- The heartbeat interval, in frames (the chunk is at Lua's 200-local limit,
+-- so these live on M) (first one at frame 20, with the first
 -- live shot).  A headless frame takes well under a second even loaded, so
 -- this is seconds apart; measured in docs/TOOLING.md.
-local HB_IVL = 1024
+M.HB_IVL = 1024
 
 -- ----------------------------------------------------------- progress --
 -- Script-level forward progress, the only thing run.sh's stall watch
@@ -204,9 +205,9 @@ function M.progress(why)
   M.progressFrame = M.frame or 0
   M.progressWhy = tostring(why):gsub("%s+", "_")
 end
-local PROG_IVL = 32
-local progLast = {}
-local function progressSample()
+M.PROG_IVL = 32
+M.progLast = {}
+function M.progressSample()
   local rb, rw = M.readByte, M.readWord
   local f = {
     map = rw(0x1F64), x = rb(0x1F60), y = rb(0x1F61),
@@ -220,14 +221,14 @@ local function progressSample()
   for i = 0, 19 do hp = (hp * 31 + rb(0x3BF4 + i)) % 4294967291 end
   f.bag, f.roster, f.hp = bag, roster, hp
   for k, v in pairs(f) do
-    if progLast[k] ~= nil and progLast[k] ~= v then
-      progLast[k] = v
+    if M.progLast[k] ~= nil and M.progLast[k] ~= v then
+      M.progLast[k] = v
       M.progress(k)
-      for k2, v2 in pairs(f) do progLast[k2] = v2 end
+      for k2, v2 in pairs(f) do M.progLast[k2] = v2 end
       return
     end
   end
-  for k, v in pairs(f) do progLast[k] = v end
+  for k, v in pairs(f) do M.progLast[k] = v end
 end
 
 -- ------------------------------------------------------ render on demand --
@@ -19361,13 +19362,13 @@ function M.run(opts, steps)
     end
     M.frame = M.frame + 1
     if M.frame == 20 or M.frame % LIVE_IVL == 0 then M.liveShot() end
-    if M.frame % PROG_IVL == 0 then progressSample() end
+    if M.frame % M.PROG_IVL == 0 then M.progressSample() end
     -- The run's heartbeat (docs/TOOLING.md "The run's heartbeat"): the
     -- frame, the wall-clock second, and the progress counter with the frame
     -- and name of the newest milestone.  run.sh's stall watch resets on the
     -- COUNTER changing, never on the frame: a game parked in a menu ticks
     -- frames forever.  No [ot6] prefix: it is not terminal output.
-    if M.frame == 20 or M.frame % HB_IVL == 0 then
+    if M.frame == 20 or M.frame % M.HB_IVL == 0 then
       local okT, now = pcall(os.time)
       print(string.format("[ot6hb] %d %s %d %d %s", M.frame, okT and tostring(now) or "-",
         M.progressN, M.progressFrame, M.progressWhy))
