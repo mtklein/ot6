@@ -195,7 +195,7 @@ M.HB_IVL = 1024
 --   a battle action resolving (ExecCmd, below in M.run);
 --   the game state moving, sampled every PROG_IVL frames (progressSample):
 --     the map or the party's place on it, gil, the bag, the roster's
---     stats and gear, and every battler's HP and MP -- so a field walk, a
+--     stats and gear, the story's switches, and every battler's HP and MP -- so a field walk, a
 --     purchase, an equip, a level, a hit landing, a battle ending all
 --     count, and an open menu with nothing happening does not.
 -- A milestone is a thing that happened; a loop that merely keeps pressing
@@ -232,7 +232,11 @@ function M.progressSample()
   for i = 0, 591 do roster = (roster * 31 + rb(0x1600 + i)) % 4294967291 end
   -- the battlers' HP ($3BF4) and MP ($3C08), ten words each
   for i = 0, 39 do hp = (hp * 31 + rb(0x3BF4 + i)) % 4294967291 end
-  f.bag, f.roster, f.hp = bag, roster, hp
+  -- the story's switches and NPC bits ($1E80-$1F5F): a long cutscene
+  -- changes none of the above but sets these as it goes
+  local sw = 0
+  for i = 0, 223 do sw = (sw * 31 + rb(0x1E80 + i)) % 4294967291 end
+  f.bag, f.roster, f.hp, f.sw = bag, roster, hp, sw
   for k, v in pairs(f) do
     if M.progLast[k] ~= nil and M.progLast[k] ~= v then
       M.progLast[k] = v
