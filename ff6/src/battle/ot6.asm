@@ -94,3 +94,6 @@
 
 ; Strago's Analyze (#381), appended for the same reason.
         .include "ot6_analyze.asm"
+
+; the boost aura (#445), appended for the same reason.
+        .include "ot6_aura.asm"

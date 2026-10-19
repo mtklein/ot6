@@ -129,7 +129,7 @@ CODE_EXT_INC = 1
 OT6_SM_NEG = $8
 .global Ot6DanceRowDecorate      ; #34: DrawDanceListText's per-row MP cost
                                  ;   (flat Ot6DanceCost)
-.global Ot6RestageGate_ext
+.global Ot6RestageGate_ext, Ot6FramePost_ext
 .global Ot6FontRestoreMark_ext
 .global Ot6DangerStep, Ot6MarkRandom, Ot6AllowSubBattle
 .global Ot6EntryExitVeil_ext

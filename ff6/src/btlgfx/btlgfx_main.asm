@@ -1753,7 +1753,7 @@ BattleNMI:
         lda     w7e62bf       ; branch if character color palettes are up to date
         bne     @0cdd
         jsr     UpdateCharPal
-@0cdd:  jsl     Ot6RestageGate_ext      ; ot6: boost moved while a list is
+@0cdd:  jsl     Ot6FramePost_ext        ; ot6: boost aura (ot6_aura.asm), then: boost moved while a list is
                                         ; open? re-fold its names in place
         jsr     _c15b14       ; update menu windows
         jsr     _c15a5c       ; update menu text
