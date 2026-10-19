@@ -618,3 +618,38 @@ magic-only line (`Driver:magicOnlyLine`) and the climb its own kit:
   the save point before Chadarnook, SoulDancer x2 and Crusher x2 won
   (`lab/var/relm_k6`: `battle $11C LOST`); the base run and K=3 did not meet
   it.
+
+## 12. Played (v0.31)
+
+The tower leg is on the graph: `wor_tower` (`gen_wor_tower`) Continues
+`wor-tower-v1` and saves `wor-thamasa-v1`. Evidence is under
+`build/attempts/wt/v031-tower/lab/` and `build/attempts/wt/v031-tower-2/lab/`.
+
+- **The basement draw.** `gen_wor_relm` kills the SoulDancers first in
+  Owzer's basement. From `wor-owzer-v1` with 0 to 8 encounters used up
+  (K7 not run), every variant won the leg, K6 among them (`relm_k6`:
+  `PASS (frame 338319) attempts=1/1`).
+- **The fourth floor.** The L.90 Magic is killed first (`opts.magicFirst`),
+  above the third floor the rings come off and Shell goes up, and the
+  stones change (TERRA Palidor, RELM Phantom, STRAGO Maduin). It still wipes
+  some draws: the captured chain lost its first attempt to the L.90 and
+  L.80 Magic and won the second (`cap3b`: `attempt 1/3 FAILED class=wipe`,
+  `formation 0164 0163`; `PASS (frame 466591) attempts=2/3`).
+- **MagiMaster.** Shell on all four, Life 3 (Life at 2 BP) on the living
+  once he is low, the attack held until they have it (at most 3,600
+  frames), TERRA's Fire at 3 BP as Ultima, no Drain (it heals him). From
+  one state before his fight and four seed shifts: the hold that waited on
+  the fallen lost all four to the time limit (`mm13_*`); the bounded hold
+  won three (`mm14_*`: `MagiMaster: battle $162 won after 112839 ticks`
+  for s0). The fourth, s9, ended with STRAGO alone: the wall nulled every
+  element he holds, so he cast Scan until the time limit while MagiMaster
+  healed (`partyhp=0,0,0,3219`). A Fenix Down in place of that Scan was
+  tried and did worse (`mm15_*`: two of four; s0 spent 38 Fenix Downs into
+  re-kills), so it was reverted.
+- **Absorb guard.** The formation-0 test is gone: a retry now clears the
+  battle reader's last-battle frame, which was what made field frames read
+  as battles.
+
+Open: the fourth floor's L.90 Magic, and MagiMaster's lone-survivor
+stalemate (a timeout the runner retries). Both pass within the runner's
+three attempts on the captured line; neither is reliable yet.
