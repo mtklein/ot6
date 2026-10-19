@@ -95,6 +95,16 @@ differ: `wor_relm` (the assertion's line number in the composed file) and
 3046 on main from the same parent state; nothing else in that log differs. Unexplained; the survey reads map tiles, not
 anything this change touches, but it is not proven independent.
 
+The `[board]` line first used `actor=N char=N plan=` fields, which
+`battle_zombieraise` counts as plans and failed on; it now says `who=`
+and `did=` (fight_report reads both). With that final format, eight
+`wor_storm` shifts on this branch head and on `origin/main` (`b7e17c25`)
+are again log-for-log equal (8 of 8, `ab-final-unset-vs-main.txt`). The
+full suite list (188) run on px13 ended with six red suites and
+`tomb_zombie`; on the branch head they all pass, as they do on
+`b7e17c25`, so the rest were main's own lag at the first merge
+(`suites-1st-run.log`, `suites-rerun-branch.log`, `suites-rerun-main.log`).
+
 **Resistance and drama.** Where the party's low point in a won fight sits
 (median over keys, the worst key, most members down at once), doubt turns, from the real policy:
 
