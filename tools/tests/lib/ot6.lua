@@ -9893,7 +9893,9 @@ end
 -- The [board] line (#422, tools/fight_report.py): one per plan, the board
 -- as the actor decides -- party HP/max and banked BP, each monster's
 -- HP/max and shields -- so a fight's low point, its swings and its turn
--- count read off the log.  Read-only.
+-- count read off the log.  Read-only.  (Its fields are who= and did=, not
+-- actor= and plan=: suites count the log's "actor=N char=N plan=" lines as
+-- plans, and this is not one.)
 function Driver:sayTurn(actor, plan)
   self.turnN = (self.turnN or 0) + 1
   local party, mons = {}, {}
@@ -9910,7 +9912,7 @@ function Driver:sayTurn(actor, plan)
         M.readWord(0x3C24 + s * 2), M.readByte(0x3E40 + s * 2))
     end
   end
-  M.log(string.format("[%s] [board] n=%d tick=%d form=$%03X actor=%d char=%d plan=%s bp=%d "
+  M.log(string.format("[%s] [board] n=%d tick=%d form=$%03X who=%d char=%d did=%s bp=%d "
     .. "party=%s mons=%s", self.tag or "fight", self.turnN, self.battleTick,
     M.readWord(0x11E0) & 0x1FF, actor, M.readByte(BATTLE.BCHID + actor * 2),
     plan and plan.kind or "-", plan and plan.boostLeft or 0,

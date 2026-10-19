@@ -55,8 +55,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 P = r"^\[ot6\] "
 KEY = re.compile(P + r"(?:\[key\] battle key |\[seed\] (?:first )?battle: .* key )(be[0-9A-F]{2}-g[0-9A-F]{4})")
 TAG = re.compile(P + r"\[([^]]+)\] ")
-TURN = re.compile(P + r"\[[^]]+\] \[(?:board|turn)\] n=(\d+) tick=(\d+) form=\$([0-9A-F]+) actor=(\d+) "
-                  r"char=(\d+) plan=(\S+) bp=(\d+) party=(\S*) mons=(\S*)")
+TURN = re.compile(P + r"\[[^]]+\] \[(?:board|turn)\] n=(\d+) tick=(\d+) form=\$([0-9A-F]+) (?:who|actor)=(\d+) "
+                  r"char=(\d+) (?:did|plan)=(\S+) bp=(\d+) party=(\S*) mons=(\S*)")
 PERIODIC = re.compile(P + r"\[[^]]+\] battle f\+(\d+) .*partyhp=(\S+) roundcost=\S+ monhp=(\S*) monsters")
 OPEN = re.compile(P + r"\[[^]]+\] \[open\] party HP as the battle opens: (.*)")
 PLAN = re.compile(P + r"\[[^]]+\] actor=\d+ char=\d+ plan=\S+$")
