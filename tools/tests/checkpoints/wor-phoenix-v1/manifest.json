@@ -17,7 +17,7 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "9ac82b007b7e3f2647e465212846a7f774cd36b304b5b0762bd86eff38dae065",
-    "generator_sig": "c620ad0922d3c9513753b7a143f1ab8a714d2da23b084c1db4c9bef3ea4ba8c9 gen_wor_phoenix tools/tests/checkpoints/wor-thamasa-v1/manifest.json tools/tests/checkpoints/wor-thamasa-v1/wor-thamasa.sram",
+    "generator_sig": "418fdc4079c23b30c1bd444841207ae8ba30cf3a50e69e4bdd5eab2ce2f8343a gen_wor_phoenix tools/tests/checkpoints/wor-thamasa-v1/manifest.json tools/tests/checkpoints/wor-thamasa-v1/wor-thamasa.sram",
     "ancestors": [
       {
         "path": "tools/tests/checkpoints/wor-thamasa-v1/manifest.json",
