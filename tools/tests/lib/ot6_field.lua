@@ -7832,102 +7832,9 @@ function M.dressRelics(members, opts)
   opts = opts or {}
   local tag = opts.tag or "relics"
   local plan, queue, cur, restore = nil, nil, nil, nil
-  return {
-    tick = function()
-      if plan == nil then
-        plan = M.relicPlan(members, opts)
-        queue = {}
-        for _, p in ipairs(plan) do if #p.changes > 0 then queue[#queue + 1] = p end end
-      end
-      while true do
-        if cur == nil then
-          if #queue == 0 then
-            for _, p in ipairs(plan) do
-              for s = 4, 5 do
-                if p.want[s] then
-                  M.assertEq(charByte(p.ch, 0x1F + s), p.want[s], string.format(
-                    "%s: %s's relic slot %d holds %s", tag, p.name, s, relicName(p.want[s])))
-                end
-              end
-              M.log(string.format("[%s] %s wears %s, %s", tag, p.name, relicName(charByte(p.ch, 0x23)),
-                relicName(charByte(p.ch, 0x24))))
-            end
-            return "done"
-          end
-          local pick = nil
-          for i, p in ipairs(queue) do
-            local ok = true
-            for _, c in ipairs(p.changes) do if M.invCountOf(c[2]) < 1 then ok = false end end
-            if ok then pick = i; break end
-          end
-          if pick == nil then
-            -- A swap: each member wants a relic the other wears (main's
-            -- wor_relm at the gear policy's levels: CYAN's Peace Ring is
-            -- CELES's, CELES's Hyper Wrist is CYAN's, and "relics for
-            -- Chadarnook: a member's new relics are all in the bag (no swap
-            -- deadlock)").  The Relic menu has no Empty for one slot, so a
-            -- spare relic from the bag stands in a wanted relic's slot for a
-            -- moment: the relic it held reaches the bag, the other member
-            -- takes it, and the queue moves.
-            local ip = M.sym("ItemProp") & 0x3FFFFF
-            for _, q in ipairs(queue) do
-              for _, c in ipairs(q.changes) do
-                if pick == nil and M.invCountOf(c[2]) < 1 then
-                  local held = charByte(q.ch, 0x1F + c[1])
-                  local wanted = false
-                  for _, o in ipairs(queue) do
-                    for _, oc in ipairs(o.changes) do if o ~= q and oc[2] == held then wanted = true end end
-                  end
-                  if wanted then
-                    local mask = 1 << M.charActor(q.ch)
-                    for slot = 0, 255 do
-                      local id, n = M.readByte(0x1869 + slot), M.readByte(0x1969 + slot)
-                      if id ~= 0xFF and n > 0 and id ~= held and (M.readRomByte(ip + id * 30) & 7) == 5
-                         and ((M.readRomByte(ip + id * 30 + 1) | (M.readRomByte(ip + id * 30 + 2) << 8)) & mask) ~= 0 then
-                        M.log(string.format("[%s] %s: %s stands in slot %d so %s reaches the bag for another member "
-                          .. "(a swap)", tag, q.name, relicName(id), c[1], relicName(held)))
-                        cur = M.seqStep({
-                          M.equipKit(q.ch, { { c[1], id } }, { tag = string.format("%s: %s (a swap)", tag, q.name) }),
-                          M.waitFrames(40),
-                        })
-                        pick = -1
-                        break
-                      end
-                    end
-                  end
-                end
-              end
-            end
-            if pick == -1 then goto ticked end
-          end
-          if pick == nil then
-            -- no spare relic stands in.  A cycle: each member waiting wants a relic another waiting
-            -- member wears (wor_relm on the v031-robust chain: CYAN for
-            -- CELES's Peace Ring, CELES for CYAN's Hyper Wrist), and the
-            -- Relic menu equips only from the bag.  The first member in the
-            -- queue keeps what he wears in the slots the bag cannot fill and
-            -- takes the rest; that frees nothing for the others, so the
-            -- cycle unwinds one member at a time and every member ends on
-            -- relics he holds (the plan's slots re-read as what stays).
-            local p = queue[1]
-            local keep = {}
-            for _, c in ipairs(p.changes) do
-              if M.invCountOf(c[2]) >= 1 then keep[#keep + 1] = c
-              else
-                M.log(string.format("[%s] %s keeps %s in slot %d: the plan's %s is worn by a member still waiting "
-                  .. "on one of his (a swap the Relic menu cannot make from the bag)", tag, p.name,
-                  relicName(p.cur[c[1]]), c[1], relicName(c[2])))
-                p.want[c[1]] = p.cur[c[1]]
-              end
-            end
-            p.changes = keep
-            if #keep == 0 then
-              table.remove(queue, 1)
-              goto continue
-            end
-            pick = 1
-          end
-          local p = table.remove(queue, pick)
+  -- a member's changes through the Relic menu, and the gear the menu's
+  -- Optimum re-equip moved put back after (a swap's stand-in too)
+  local function relicStep(p, changes, label)
           -- The Relic menu re-equips by Optimum on the way out whenever the
           -- relics changed and the old or new pair holds a Genji Glove,
           -- Gauntlet or Merit Award, one that stays put included
@@ -7937,8 +7844,8 @@ function M.dressRelics(members, opts)
           -- here and put back after.
           local before = {}
           for s = 0, 3 do before[s] = charByte(p.ch, 0x1F + s) end
-          cur = M.seqStep({
-            M.equipKit(p.ch, p.changes, { tag = string.format("%s: %s", tag, p.name) }),
+          return M.seqStep({
+            M.equipKit(p.ch, changes, { tag = label }),
             {
               tick = function()
                 if restore == nil and p.handCome then
@@ -7992,6 +7899,113 @@ function M.dressRelics(members, opts)
               reset = function() restore = nil end,
             },
           })
+  end
+  return {
+    tick = function()
+      if plan == nil then
+        plan = M.relicPlan(members, opts)
+        queue = {}
+        for _, p in ipairs(plan) do if #p.changes > 0 then queue[#queue + 1] = p end end
+      end
+      while true do
+        if cur == nil then
+          if #queue == 0 then
+            for _, p in ipairs(plan) do
+              for s = 4, 5 do
+                if p.want[s] then
+                  M.assertEq(charByte(p.ch, 0x1F + s), p.want[s], string.format(
+                    "%s: %s's relic slot %d holds %s", tag, p.name, s, relicName(p.want[s])))
+                end
+              end
+              M.log(string.format("[%s] %s wears %s, %s", tag, p.name, relicName(charByte(p.ch, 0x23)),
+                relicName(charByte(p.ch, 0x24))))
+            end
+            return "done"
+          end
+          local pick = nil
+          for i, p in ipairs(queue) do
+            local ok = true
+            for _, c in ipairs(p.changes) do if M.invCountOf(c[2]) < 1 then ok = false end end
+            if ok then pick = i; break end
+          end
+          if pick == nil then
+            -- A swap: each member wants a relic the other wears (main's
+            -- wor_relm at the gear policy's levels: CYAN's Peace Ring is
+            -- CELES's, CELES's Hyper Wrist is CYAN's, and "relics for
+            -- Chadarnook: a member's new relics are all in the bag (no swap
+            -- deadlock)").  The Relic menu has no Empty for one slot, so a
+            -- spare relic from the bag stands in a wanted relic's slot for a
+            -- moment: the relic it held reaches the bag, the other member
+            -- takes it, and the queue moves.
+            local ip = M.sym("ItemProp") & 0x3FFFFF
+            for _, q in ipairs(queue) do
+              for _, c in ipairs(q.changes) do
+                if pick == nil and M.invCountOf(c[2]) < 1 then
+                  local held = charByte(q.ch, 0x1F + c[1])
+                  local wanted = false
+                  for _, o in ipairs(queue) do
+                    for _, oc in ipairs(o.changes) do if o ~= q and oc[2] == held then wanted = true end end
+                  end
+                  if wanted then
+                    local mask = 1 << M.charActor(q.ch)
+                    for slot = 0, 255 do
+                      local id, n = M.readByte(0x1869 + slot), M.readByte(0x1969 + slot)
+                      -- (never a relic a member in the queue wants: the two
+                      -- would trade places for ever)
+                      local wantedSpare = false
+                      for _, o in ipairs(queue) do
+                        for _, oc in ipairs(o.changes) do if oc[2] == id then wantedSpare = true end end
+                      end
+                      if id ~= 0xFF and n > 0 and id ~= held and not wantedSpare and (M.readRomByte(ip + id * 30) & 7) == 5
+                         and ((M.readRomByte(ip + id * 30 + 1) | (M.readRomByte(ip + id * 30 + 2) << 8)) & mask) ~= 0 then
+                        M.log(string.format("[%s] %s: %s stands in slot %d so %s reaches the bag for another member "
+                          .. "(a swap)", tag, q.name, relicName(id), c[1], relicName(held)))
+                        local qq, slotN, spare = q, c[1], id
+                        cur = M.seqStep({
+                          relicStep({ ch = q.ch, name = q.name }, { { slotN, spare } }, string.format("%s: %s (a swap)", tag, q.name)),
+                          M.waitFrames(40),
+                          M.call(function() qq.cur[slotN] = spare end),
+                        })
+                        pick = -1
+                        break
+                      end
+                    end
+                  end
+                end
+              end
+            end
+            if pick == -1 then goto ticked end
+          end
+          if pick == nil then
+            -- no spare relic stands in.  A cycle: each member waiting wants a relic another waiting
+            -- member wears (wor_relm on the v031-robust chain: CYAN for
+            -- CELES's Peace Ring, CELES for CYAN's Hyper Wrist), and the
+            -- Relic menu equips only from the bag.  The first member in the
+            -- queue keeps what he wears in the slots the bag cannot fill and
+            -- takes the rest; that frees nothing for the others, so the
+            -- cycle unwinds one member at a time and every member ends on
+            -- relics he holds (the plan's slots re-read as what stays).
+            local p = queue[1]
+            local keep = {}
+            for _, c in ipairs(p.changes) do
+              if M.invCountOf(c[2]) >= 1 then keep[#keep + 1] = c
+              else
+                M.log(string.format("[%s] %s keeps %s in slot %d: the plan's %s is worn by a member still waiting "
+                  .. "on one of his (a swap the Relic menu cannot make from the bag)", tag, p.name,
+                  relicName(charByte(p.ch, 0x1F + c[1])), c[1], relicName(c[2])))
+                p.cur[c[1]] = charByte(p.ch, 0x1F + c[1])
+                p.want[c[1]] = p.cur[c[1]]
+              end
+            end
+            p.changes = keep
+            if #keep == 0 then
+              table.remove(queue, 1)
+              goto continue
+            end
+            pick = 1
+          end
+          local p = table.remove(queue, pick)
+          cur = relicStep(p, p.changes, string.format("%s: %s", tag, p.name))
         end
         ::ticked::
         local r = cur:tick()
