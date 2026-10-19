@@ -675,6 +675,50 @@ The tower leg is on the graph: `wor_tower` (`gen_wor_tower`) Continues
   battle $162 won after 143885 ticks`, `PASS (frame 508873) attempts=2/3`;
   `build/attempts/wt/v031-tower-2/ninja/`).
 
-Open: the fourth floor's L.90 Magic, and MagiMaster's lone-survivor
-stalemate (a timeout the runner retries). Both pass within the runner's
-three attempts on the captured line; neither is reliable yet.
+### 12.1 One attempt
+
+The qualification's tower leg needed its second attempt, so the leg was
+made to pass at one attempt across draws (`lab/` under
+`build/attempts/wt/v031-tower-2/`). What each failure was, and the answer:
+
+- **MagiMaster's stalls.** STRAGO on Sraphim holds no attack spell; left
+  alone he Scanned to the time limit (`mm16_*_s9`: `no candidate in the
+  list`). The last member standing with no attack now raises a fallen
+  member, the one holding an attack first; a raise whenever nothing hurt,
+  the others standing, did worse (`mm15_*`, reverted). Drain heals him and
+  was back on his list (`sw2_k4_s13`: RELM's Drain `took 0` 64 times); it is
+  off again. RELM on Ifrit, walled and without Scan, passed four turns
+  into the recovery cap (`sw3_*`); a seat with no line now casts the
+  cheapest attack his wall nulls but does not absorb, for the counter that
+  turns the wall.
+- **A lone survivor anywhere.** The last member standing whose last three
+  actions took nothing raises a fallen member (`sw3_k0_s9`: RELM's Drain
+  for 0 on the first floor to the time limit).
+- **The fourth floor and the top.** The four died holding points to the
+  L.90 Magic (`cap3b`): a `magicFirst` body now takes the whole bank, and
+  TERRA keeps hers for Ultima while a 5,000-HP body stands. The side
+  rooms' gear goes on after each (`H.gearDress`, magic defence weighed x2):
+  STRAGO had worn a Mithril Shld (MDef 18) with the Genji Shld (MDef 50) in
+  the bag when Merton took 3,366 from each member on the walk down
+  (`mm18_*_s4`).
+- **The walk down dry.** A long MagiMaster fight spent the 99 Tinctures and
+  TERRA passed at 0 MP (`f4e_*_s2`); on the walk down a random battle the
+  party has no MP to fight is run from (`opts.runWhenDry`).
+- **A second MagiMaster battle.** His dying Ultima took all four to 0 and
+  Life 3 raised them after his death; a new walker read that as a battle
+  (`sw2_k3_s0`: `its formation was fought once: got 2`). A watch that
+  opens with every seat at 0 HP and no monster standing is a tail.
+- **His fight is long.** Won fights ran 46,501 to 195,414 ticks (`sw4_*`),
+  and one ran out 200,000 at full party HP; the fight now has 400,000.
+  Three of the eight elements are no member's, and a cast that lands after
+  his wall turned is absorbed. This is a fight won by attrition, a lab
+  candidate: more elements (an earth, wind or water caster) or a way to
+  time casts to the wall would shorten it.
+
+The sweep at 86d84182: the tower leg from the tracked `wor-tower-v1`, 0 to
+5 world battles used up beside the tower first, six seed shifts, one
+attempt each (`sw5_*`, `sw6_*`): 36 of 36 passed. Counted by distinct
+battle key ($be and group): MagiMaster in 26 keys of 36 meetings, the L.90
+and L.80 Magic in 35 of 42, the L.90 and L.60 Magic in 20 of 24. His fight
+ran 39,982 to 203,654 ticks. Before these changes the same sweep shape
+passed 13 of 18 (`sw2_*`) and 16 of 18 (`sw4_*`).
