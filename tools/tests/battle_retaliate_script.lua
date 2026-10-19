@@ -240,6 +240,7 @@ local function installObservers()
     local h = hp(SUBJ)
     if obs.lastHp ~= nil and h < obs.lastHp then L.hurts = L.hurts + 1 end
     obs.lastHp = h
+    if D.mark == nil then return end   -- set by the step after SUBJ is (#438: this read nil, swallowed)
     L.markAtStart = H.readWord(D.mark)
     local flag = H.readByte(D.unctl)
     if flag ~= obs.lastFlag then

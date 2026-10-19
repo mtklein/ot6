@@ -105,6 +105,9 @@ end
 
 local D = {}                            -- base, perBp, cap, unctl, mark, jmp, sites
 local SUBJ = nil
+-- declared before installObservers: its ExecAction/ActionEnd watches write care.monster,
+-- and a local declared below them read as a nil global (#438: the error was swallowed)
+local care = { blow = nil, plan = nil, tick = 0, last = {}, monster = false, said = nil }
 
 local function freshLedger()
   return { windows = {}, dumps = {}, ends = {}, hurts = 0, markAtStart = 0,
@@ -383,7 +386,6 @@ local tcCare = H.targetCursor({ mask = 0x7B7D, dirs = { "down", "up", "left", "r
 local TRANSITIONAL = {}
 for _, v in ipairs({ 0x01, 0x02, 0x04, 0x06, 0x07, 0x09, 0x0F, 0x10, 0x26, 0x31, 0x32,
                      0x33, 0x34, 0x39, 0x3A, 0x40, 0x41 }) do TRANSITIONAL[v] = true end
-local care = { blow = nil, plan = nil, tick = 0, last = {}, monster = false, said = nil }
 local function bagIdx(id)
   for i = 0, 251 do
     if H.readByte(BATTINV + i * 5) == id and H.readByte(BATTINV + i * 5 + 3) > 0 then return i end
