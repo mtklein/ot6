@@ -172,40 +172,48 @@ Rules that fell out:
 
 Each leg was run from its boot with 0 to 5 random battles used up first
 (the encounter draw moves; `build/lab/mkvar.py` in the evidence) at seed
-shifts 0 and 7, one attempt each, under the branch's final library. A
-battle's key is `$be` at its open with its group (`tally.py`).
+shifts 0 and 7, one attempt each, from a committed tree (each run's
+`commit.txt`, and `diff.sha256` the empty diff's). A battle's key is `$be`
+at its open with its group (`tally.py`).
 
-- **`gen_wor_phoenix`** from `wor-thamasa-v1`, the battles before it on the
-  world map beside the tower: 12 of 12 passed (`lab/swp2_*`, 75,468 to
-  100,204 frames). Doom Gaze met the Falcon in the air on every run (11
-  distinct keys): it escaped in 11 and was killed in one (`swp2_k5_s0`:
-  "battle $1CF WON ... killed s0:$11D", then Bahamut on the deck, the arc
-  ahead of the v0.34 plan). Potions left at the save point: 34 to 90 of 99.
-  Before the deck fix the killed draw failed ("timeout ... the cave's party
-  menu", `lab/swp_k5_s0`); the same sweep's other 11 passed (`lab/swp_*`).
-- **`gen_wor_locke`** from `wor-phoenix-v1`, the battles before it by party
-  1 in the north room: 12 of 12 passed (`lab/swl3_*`, 43,112 to 110,678
-  frames). The Red Dragon was met 12 times (11 keys) and won every time in
-  4,245 to 6,910 ticks. Potions left when LOCKE joined: 20 to 58; LOCKE L41.
-  The first two sweeps of this leg are the failures the wandering dragon
-  and the variants' missing care made (`lab/swl_*`: 5 of 12 passed;
-  `lab/swl2_*`: 10 of 12), each fixed at its cause (commit messages).
+- **`gen_wor_phoenix`** from `wor-thamasa-v1` (e027ed89), the battles
+  before it on the world map beside the tower: 12 of 12 passed
+  (`lab/swp3_*`, 74,386 to 99,003 frames). Doom Gaze met the Falcon in the
+  air on every run (11 distinct keys): it escaped in 11 and was killed in
+  one (`swp3_k5_s0`: "killed s0:$11D", then Bahamut on the deck, ahead of
+  the v0.34 plan). Party 1 pitched a Tent on the save point in 11 runs,
+  party 2 none. Potions left at the save point: 28 to 82 of 99. The
+  re-cut of `wor-phoenix-v1` is the plain run of that tree (`lab/recut`,
+  PASS (frame 85177) attempts=1/3, the payload byte for byte g3's).
+  Earlier sweeps: `lab/swp_*` (11 of 12; the Doom Gaze kill failed before
+  the deck fix), `lab/swp2_*` (12 of 12, party 2 pitching the off-point
+  Tent in 9).
+- **`gen_wor_locke`** from `wor-phoenix-v1` (506b0f45), the battles
+  before it by party 1 in the north room: 12 of 12 passed (`lab/swl5_*`,
+  44,175 to 108,123 frames). The Red Dragon was met 12 times (11 keys) and
+  won every time in 4,245 to 6,910 ticks. LOCKE L41, dressed; Potions left:
+  27 to 58. Earlier sweeps, each failure fixed at its cause: `lab/swl_*`
+  5 of 12 and `lab/swl2_*` 10 of 12 (the wandering dragon, the variants'
+  missing care), `lab/swl3_*` 12 of 12, `lab/swl4_*` 11 of 12 (two Equip
+  sessions back to back: the second's X fell into the closing menu).
 - **`field_splitparty`** from `wor-phoenix-v1`, 0 to 2 battles by party 1
-  first, shifts 0 and 9: 6 of 6 passed (`lab/sws3_*`, 5,518 to 39,758
-  frames; with the plain run `lab/mut2_suite`, 12 of party 2's battles
-  checked in D). Its first version took one battle for E and failed where
-  that battle left party 2 whole (`lab/sws2_k1_s0`, `k1_s9`: "E:
-  precondition: a member of party 2 is under full HP"); it now fights on
-  until a member is hurt, at most six battles. The mutants: section 8.
+  first, shifts 0 and 9: 6 of 6 passed (`lab/sws4_*`); the plain run
+  passes (`lab/suite5`, PASS (frame 6165) attempts=1/1, 506b0f45). Its
+  first version took one battle for E and failed where that battle left
+  party 2 whole (`lab/sws2_k1_s0`, `k1_s9`: "E: precondition: a member of
+  party 2 is under full HP"); it now fights on until a member is hurt, at
+  most six battles. The mutants: section 8 (`lab/mut3_*`).
 
 ## 8. The suite and its mutants
 
-`field_splitparty` (section 4's mechanics, asserted A-F in its header).
+`field_splitparty` (section 4's mechanics and section 5's Tent rule,
+asserted A-G in its header).
 Each mutant overrides one library behaviour after the library loads
 (`build/lab/mkmut.py`) and turns the suite red where it should:
 
 | mutant | the change | red at |
 |---|---|---|
+| `tent_any` | `tentOffered` offers the Tent wherever `$01BF` is up | G: "no Tent for party 2 off the save point: got true" |
 | `switch_ctl` | `switchParty` pressing Y only on frames that read control, done on 8 calm frames | B: the switch back onto the save point times out |
 | `ledger_p1` | the ledger charges every battle to party 1 | D: "the battle is charged to party 2: got 1" |
 | `reserve_base` | `splitReserveFor` returns the floor alone | E: "party 2's reserve is the floor plus party 1's unspent share: got 4" |
