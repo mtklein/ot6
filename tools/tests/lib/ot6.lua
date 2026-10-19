@@ -3821,10 +3821,17 @@ end
 -- returns 0 for one, but a Genji Glove really does put a second weapon
 -- there, so both slots are read.  $1600 + 37*c + $1F/$20, the same record
 -- audit_equipment.py and the equipment audits read.
+-- The fighting party's: in a split dungeon (the Phoenix Cave, Kefka's
+-- Tower) every party's members have a party number, and only the walking
+-- one ($1A6D) is in the battle; SABIN's Flame Shld in the party not
+-- fighting failed the guard at the Red Dragon (build/attempts/wt/
+-- v032-splitparty/lab/phx17).
 function M.partyWeapons()
   local out = {}
+  local act = M.readByte(0x1A6D) & 0x07
   for c = 0, 15 do
-    if (M.readByte(0x1850 + c) & 0x07) ~= 0 then
+    local p = M.readByte(0x1850 + c) & 0x07
+    if p ~= 0 and (act == 0 or p == act) then
       for i, hand in ipairs({ "R", "L" }) do
         local item = M.readByte(0x1600 + 37 * c + 0x1E + i)
         if item ~= 0xFF then

@@ -391,6 +391,170 @@ function M.bfsPath(tx, ty, blockedEdges, avoid, zStart)
   return nil
 end
 
+-- Every tile reachable on the live map from (sx, sy) at z-level sz (default
+-- the party's tile and z), over stepAllowed edges plus `links`: a list of
+-- { x, y, move, tx, ty [, cond] } tile events that carry the party (a
+-- stepped-on trigger whose script moves it: the Phoenix Cave's rock jumps),
+-- taken when (x, y) is entered by `move` and landing on (tx, ty), while
+-- cond() (the switch the script tests, read live) holds.  For a split
+-- dungeon's planning: which plates, doors and chests a party can reach
+-- from where it stands, the other party's objects counted as walls.
+-- Returns a set keyed (y << 8) | x.
+-- With (tx, ty) given, returns instead the route there as legs: { walk =
+-- {x, y} } to walk with navTo, and { link = {x, y, move, tx, ty} } to take
+-- by stepping onto the event tile; nil when there is none.
+function M.bfsReach(sx, sy, sz, links, tx, ty, avoid)
+  sx, sy = sx or M.fieldX(), sy or M.fieldY()
+  sz = sz or (M.readByte(0x00b2) & 0x03)
+  local jump = {}
+  for _, l in ipairs(links or {}) do
+    jump[((l[2] & 0xFF) << 8 | (l[1] & 0xFF)) * 8 + MOVEIDX[l[3]]] = l
+  end
+  local av = {}
+  for _, t in ipairs(avoid or {}) do av[((t[2] & 0xFF) << 8) | (t[1] & 0xFF)] = true end
+  local function nkey(x, y, z) return (z << 16) | ((y & 0xFF) << 8) | (x & 0xFF) end
+  local seen, out = { [nkey(sx, sy, sz)] = true }, { [((sy & 0xFF) << 8) | (sx & 0xFF)] = true }
+  local parent = {}
+  local q, qi = { { sx, sy, sz } }, 1
+  while qi <= #q and qi <= 20000 do
+    local x, y, z = q[qi][1], q[qi][2], q[qi][3]
+    qi = qi + 1
+    if tx and x == tx and y == ty then
+      -- the edges from the start, then legs: a walk up to the tile each
+      -- link is taken from, the link, and a last walk to the target
+      local edges, k = {}, nkey(x, y, z)
+      while parent[k] do
+        table.insert(edges, 1, parent[k])
+        k = parent[k].from
+      end
+      local legs, cx, cy = {}, sx, sy
+      for _, e in ipairs(edges) do
+        if e.link then
+          local fx, fy = e.from & 0xFF, (e.from >> 8) & 0xFF
+          if not (fx == cx and fy == cy) then legs[#legs + 1] = { walk = { fx, fy } } end
+          legs[#legs + 1] = { link = e.link, from = { fx, fy } }
+          cx, cy = e.link[4], e.link[5]
+        end
+      end
+      if not (cx == x and cy == y) then legs[#legs + 1] = { walk = { x, y } } end
+      return legs
+    end
+    local zn = zAfter(x, y, z)
+    local function visit(nx, ny, link)
+      local k = nkey(nx, ny, zn)
+      if not seen[k] and not (av[(ny << 8) | nx] and not (nx == tx and ny == ty)) then
+        seen[k] = true
+        parent[k] = { from = nkey(x, y, z), link = link }
+        out[(ny << 8) | nx] = true
+        q[#q + 1] = { nx, ny, zn }
+      end
+    end
+    -- standing on a link's tile, its press carries the party (the script
+    -- re-runs under it every few frames and reads the facing)
+    for _, dir in ipairs({ "up", "right", "down", "left" }) do
+      local j = jump[((y << 8) | x) * 8 + MOVEIDX[dir]]
+      if j and (j[6] == nil or j[6]()) then visit(j[4], j[5], j) end
+    end
+    for _, dir in ipairs(MOVES) do
+      if stepAllowed(x, y, dir, z) then
+        local d = DELTA[dir]
+        local nx, ny = (x + d[1]) & 0xFF, (y + d[2]) & 0xFF
+        local j = jump[((ny << 8) | nx) * 8 + MOVEIDX[dir]]
+        local link = nil
+        -- entered moving its way, the link's tile carries the party on
+        if j and (PRESS[dir] == dir) and (j[6] == nil or j[6]()) then
+          link = j
+          nx, ny = j[4], j[5]
+        end
+        visit(nx, ny, link)
+      end
+    end
+  end
+  if tx then return nil end
+  return out
+end
+
+-- Step: walk to (tx, ty) over the map's tile-event links as well as its
+-- floor (M.bfsReach's legs, planned where the party stands when the step
+-- starts): each walk leg is a navTo (opts reach it: fight, playBattles,
+-- avoid...), each link a held press onto its tile until the event has set
+-- the party down on the link's landing with control.
+function M.navLinks(tx, ty, links, opts)
+  opts = opts or {}
+  local what = opts.what or string.format("to (%d,%d) by the links", tx, ty)
+  return M.lazy(function()
+    local legs = nil
+    for _, z in ipairs({ false, 1, 2, 0, 3 }) do
+      legs = M.bfsReach(nil, nil, z or nil, links, tx, ty, opts.avoid)
+      if legs then break end
+    end
+    if not legs then
+      error(string.format("navLinks: no route (%d,%d)->(%d,%d) over the floor and %d link(s)", M.fieldX(),
+        M.fieldY(), tx, ty, #(links or {})), 0)
+    end
+    -- a walk leg's own plan must not step onto a link's tile (it would
+    -- take the link where the plan meant to walk)
+    local wopts = {}
+    for k, v in pairs(opts) do wopts[k] = v end
+    wopts.avoid = {}
+    for _, t in ipairs(opts.avoid or {}) do wopts.avoid[#wopts.avoid + 1] = t end
+    for _, L in ipairs(links or {}) do
+      if L[6] == nil or L[6]() then wopts.avoid[#wopts.avoid + 1] = { L[1], L[2] } end
+    end
+    local desc, steps = {}, {}
+    for _, l in ipairs(legs) do
+      if l.walk then
+        desc[#desc + 1] = string.format("walk (%d,%d)", l.walk[1], l.walk[2])
+        steps[#steps + 1] = M.navTo(l.walk[1], l.walk[2], wopts)
+      else
+        local L, F = l.link, l.from
+        desc[#desc + 1] = string.format("%s from (%d,%d) by (%d,%d) -> (%d,%d)", L[3], F[1], F[2], L[1], L[2],
+          L[4], L[5])
+        -- to the tile the press is made from: the link's own tile (stood
+        -- on, the press turns the party and the script reads the facing)
+        -- or the one before it (the step onto it is the press); arriving
+        -- carried already is arriving
+        local fo = {}
+        for k, v in pairs(wopts) do fo[k] = v end
+        fo.arrive = function() return M.fieldX() == L[4] and M.fieldY() == L[5] end
+        steps[#steps + 1] = M.navTo(F[1], F[2], fo)
+        -- landed: on the landing tile at rest for 16 frames with control
+        -- read on two of them (a landing that is itself a link's tile, the
+        -- way back, re-runs its script under the party: control one frame
+        -- in four)
+        local n, ctl, bn = 0, 0, 0
+        local drv = M.fightDriverFor("navLinks", { tactical = true, boost = true, items = true, healPercent = 55 },
+          opts.fight)
+        steps[#steps + 1] = M.withReset(M.driveUntil(function()
+          if M.fieldX() == L[4] and M.fieldY() == L[5] and M.tileAligned() and not M.battleLoadStarted() then
+            n = n + 1
+            if M.hasControl() then ctl = ctl + 1 end
+          else
+            n, ctl = 0, 0
+          end
+          return n >= 16 and ctl >= 2
+        end, 2400, {
+          M.call(function()
+            -- a battle under the jump is fought as the walks fight theirs
+            bn = M.battleLoadStarted() and bn + 1 or 0
+            if bn >= 3 then drv.frame(); return end
+            if bn == 0 then drv.idle() end
+            -- held while the party rests on the press's tile: a link's own
+            -- tile has control one frame in four, and the field reads the
+            -- pad on those
+            local onStart = M.fieldX() == F[1] and M.fieldY() == F[2] and M.tileAligned()
+              and not M.dialogWaiting()
+            M.setPad(onStart and { [L[3]] = true } or {})
+          end),
+        }, string.format("%s: the link %s onto (%d,%d) lands on (%d,%d)", what, L[3], L[1], L[2], L[4], L[5])),
+        function() n, ctl, bn = 0, 0, 0 end)
+      end
+    end
+    M.log(string.format("[links] %s from (%d,%d): %s", what, M.fieldX(), M.fieldY(), table.concat(desc, "; ")))
+    return M.seqStep(steps)
+  end)
+end
+
 -- ------------------------------------------------------- BFS navigation --
 NAV = {}
 function M.navReset()
@@ -2426,10 +2590,17 @@ local function wrapAngle(a) return ((a + 180) % 360) - 180 end
 -- Over the target tile and stopped, B lands; the step ends on foot, the
 -- world settled, on (tx, ty).  The world wraps at 256 tiles, so the
 -- bearing is taken the short way round.  opts.maxFrames (default 6000).
+-- opts.entersMap: the landing tile starts an event that leaves the world
+-- map (LandAirship, world/init.asm: a tile whose property word has bit
+-- $4000 runs VehicleEvent_03, the Phoenix Cave; bit $8000 VehicleEvent_04,
+-- Kefka's Tower); the step ends once a field map holds the screen, with
+-- the event still running, rather than on foot.
 function M.flyTo(tx, ty, opts)
   opts = opts or {}
   local what = opts.what or string.format("fly to (%d,%d) and land", tx, ty)
   local hb, pulse, landed, presses = -600, 0, false, 0
+  local bn, flown, fought = 0, 0, false
+  local drv = M.fightDriverFor("flyTo", { tactical = true, boost = true, items = true, healPercent = 55 }, opts.fight)
   local function heading() return M.readWord(0x73) - 270 end
   local function pressFor()
     local x, y = M.airshipPos()
@@ -2482,16 +2653,48 @@ function M.flyTo(tx, ty, opts)
       M.assertEq(M.airshipCanLandAt(tx, ty), true, string.format("%s: (%d,%d) is a tile the airship can land on "
         .. "(its property word $%04X, bit 1 clear)", what, tx, ty, M.worldTileProp(tx, ty)))
     end),
+    -- A battle in the air (the World of Ruin's Doom Gaze, formation 463,
+    -- met over the sea between Thamasa and the Phoenix Cave:
+    -- build/attempts/wt/v032-splitparty/lab/g1, 'battle key be90-g01CF ...
+    -- map 1') is fought with the walks' driver (opts.fight reaches it), and
+    -- its frames are not the flight's: opts.maxFrames bounds the flying.
     M.driveUntil(function()
-      landed = M.worldMode() and not M.aboardAirship() and M.worldHasControl()
+      if opts.entersMap then
+        landed = not M.worldMode() and (M.readWord(0x1f64) & 0x1FF) ~= 3
+      else
+        landed = M.worldMode() and not M.aboardAirship() and M.worldHasControl()
+      end
       return landed
-    end, opts.maxFrames or 6000, {
+    end, (opts.maxFrames or 6000) + 400000, {
       M.call(function()
+        bn = M.battleLoadStarted() and bn + 1 or 0
+        if bn >= 3 then
+          if bn == 3 then
+            local w = M.formationWords()
+            M.log(string.format("[fly] %s: f%d a battle in the air (%04X %04X %04X %04X)", what, M.frame, w[1], w[2],
+              w[3], w[4]))
+          end
+          fought = true
+          drv.frame()
+          return
+        end
+        if bn > 0 then M.setPad({}); return end
+        if fought then fought = false; drv.idle() end
+        flown = flown + 1
+        if flown > (opts.maxFrames or 6000) then
+          error(string.format("%s: not landed after %d frames in the air (battles excluded)", what, flown), 0)
+        end
         if not M.airshipControl() then M.setPad({}); return end
         M.setPad(pressFor())
       end),
     }, what),
     M.release(),
+    M.cond(function() return opts.entersMap end, {
+      M.call(function()
+        M.log(string.format("[fly] %s: landed on (%d,%d); the landing's event has map %d", what, tx, ty,
+          M.readWord(0x1f64) & 0x1FF))
+      end),
+    }, {
     M.waitWorldSettled(what .. ": on foot", 1200, 30),
     M.call(function()
       M.log(string.format("[fly] %s: on foot at (%d,%d), the airship parked at (%d,%d)", what, M.worldX(),
@@ -2499,7 +2702,8 @@ function M.flyTo(tx, ty, opts)
       M.assertEq(M.worldX() == tx and M.worldY() == ty, true, string.format("%s: landed on (%d,%d) "
         .. "(standing on (%d,%d))", what, tx, ty, M.worldX(), M.worldY()))
     end),
-  }), function() hb, pulse, landed, presses = -600, 0, false, 0 end)
+    }),
+  }), function() hb, pulse, landed, presses, bn, flown, fought = -600, 0, false, 0, 0, 0, false end)
 end
 
 -- Walk to world tile (tx,ty): the field navTo's verified-step loop on
@@ -5062,7 +5266,8 @@ function M.fieldCare(opts)
   -- Tonics to zero (measured: the pre-gate-cave care shipped an empty bag
   -- and a member the party then could not revive).  A caller that truly
   -- means to spend everything before a boss passes reserve = {}.
-  if opts.reserve == nil then opts.reserve = M.CARE_RESERVE end
+  -- (in a split dungeon, plus the other parties' unspent shares)
+  if opts.reserve == nil then opts.reserve = M.splitReserveFor(nil) or M.CARE_RESERVE end
   local K = M.careKernel(opts)
   local phase = 0
   -- A battle can open under the visit: a wandering NPC whose touch is an
@@ -5166,7 +5371,9 @@ M.CARE_RESERVE = { [CARE_TONIC] = 4, [CARE_POTION] = 4, [CARE_TINCTURE] = 1 }
 
 function M.newCareDriver(opts)
   opts = opts or {}
-  if opts.reserve == nil then opts.reserve = M.CARE_RESERVE end
+  -- (in a split dungeon the floor also keeps back the other parties'
+  -- unspent shares of the bag: M.splitReserveFor, "split parties" below)
+  if opts.reserve == nil then opts.reserve = M.splitReserveFor(opts.party) or M.CARE_RESERVE end
   -- Owner guideline: outside-battle care heals with TONICS (items), not by
   -- casting -- Tonics are cheap and everywhere, and casting cures drained
   -- MP over a grind badly enough to wipe (zozo_arrival, MP-starved with a
@@ -8607,6 +8814,380 @@ function M.partySelect(members, opts)
       opts.closeWait or 1200, tag .. ": menu closed", 5)
   end
   return M.seqStep(steps)
+end
+
+-- ------------------------------------------------- split parties --
+-- A split-party dungeon (the Phoenix Cave: `party_menu 2`, Kefka's Tower:
+-- `party_menu 3`) keeps two or three parties on the field at once.  What
+-- the engine keeps (field/obj.asm, menu/save.asm):
+--   $1850+c     verbbppp: the low three bits are the party of character c
+--               (0 none), bits 3-4 its battle order, bit 6 enabled
+--   $1A6D       the party the pad walks (the "active" party)
+--   $1EB9 & $40 party switching allowed (event switch $01CE)
+--   $0867+$29c  character c's field object: bit 6 shown, low 3 bits its
+--               party; $086A/$086D its pixel position, $088D its map
+--   $1F81+2c    the map, $1FD3+2c / $1FD4+2c the tile, of character c's
+--               object as PushPartyMap last pushed them (a menu open, a
+--               party switch, a map change): inside $1600-$1FFF, so a save
+--               keeps where every party stands
+-- CheckChangeParty switches on Y, edge-triggered (Y seen up, then down),
+-- with control, the party object on a tile and no event running;
+-- ChangeParty steps $1A6D to the next party that has a shown member
+-- (1 -> 2 -> 3 -> 1) and reloads the map (the same one, or that party's).
+-- A battle is the active party's: the walking party's four are the ones
+-- seated, the XP goes to them, and the bag (one for all parties) pays for
+-- what any party spends.
+--
+-- M.split is the ledger while a split runs (M.splitBegin .. M.splitEnd):
+-- every battle with the party that fought it, its formation, outcome and
+-- each member's XP; every care item the bag lost, charged to the party
+-- active when it went; and each party's share of the care stock the split
+-- began with (the budget).  The after-battle care of one party keeps back
+-- what the other parties have not yet spent of their shares
+-- (M.splitReserveFor), so the first party to walk cannot drink the
+-- second's Tonics.
+M.split = nil
+-- the care items the ledger counts (Tonic .. Green Cherry, Tent)
+M.SPLIT_ITEMS = { 0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF, 0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF7, 0xF8 }
+-- the items whose stock is shared out between the parties at the split
+M.SPLIT_BUDGET_ITEMS = { 0xE8, 0xE9, 0xEB, 0xF0, 0xF5 }
+M.SPLIT_NAMES = { [0] = "TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN", "CELES", "STRAGO", "RELM",
+  "SETZER", "MOG", "GAU", "GOGO", "UMARO" }
+do
+  local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
+  local function nameOf(c) return M.SPLIT_NAMES[c] or string.format("c%d", c) end
+
+  function M.activeParty() return M.readByte(0x1A6D) & 0x07 end
+  function M.partyOfChar(c) return M.readByte(0x1850 + c) & 0x07 end
+
+  -- party p's members in battle order (the order bits, then the id)
+  function M.partyRoster(p)
+    local out = {}
+    for c = 0, 15 do
+      if (M.readByte(0x1850 + c) & 0x07) == p then out[#out + 1] = c end
+    end
+    table.sort(out, function(a, b)
+      local oa, ob = (M.readByte(0x1850 + a) >> 3) & 3, (M.readByte(0x1850 + b) >> 3) & 3
+      if oa ~= ob then return oa < ob end
+      return a < b
+    end)
+    return out
+  end
+
+  -- the party numbers that have members, ascending
+  function M.partyNumbers()
+    local seen, out = {}, {}
+    for c = 0, 15 do
+      local p = M.readByte(0x1850 + c) & 0x07
+      if p ~= 0 and not seen[p] then seen[p] = true; out[#out + 1] = p end
+    end
+    table.sort(out)
+    return out
+  end
+
+  -- where party p stands: its leader's object (ChangeParty's pick, the
+  -- shown member of party p with the lowest battle order), as map, x, y
+  -- and the leader's id; nil when no member of p is shown
+  function M.partyWhere(p)
+    local best, bestOrd = nil, 99
+    for c = 0, 15 do
+      local b = M.readByte(0x0867 + 0x29 * c)
+      if (b & 0x40) ~= 0 and (b & 0x07) == p and ((b >> 3) & 3) < bestOrd then
+        best, bestOrd = c, (b >> 3) & 3
+      end
+    end
+    if best == nil then return nil end
+    local o = 0x29 * best
+    return M.readWord(0x088D + o) & 0x1FF, M.readWord(0x086A + o) >> 4, M.readWord(0x086D + o) >> 4, best
+  end
+
+  -- one line naming every party: its members (level, HP), where it stands
+  function M.partiesLine()
+    local t = {}
+    for _, p in ipairs(M.partyNumbers()) do
+      local m = {}
+      for _, c in ipairs(M.partyRoster(p)) do
+        m[#m + 1] = string.format("%s L%d %d/%d", nameOf(c), M.readByte(0x1600 + 37 * c + 8), M.charHp(c),
+          M.charMaxHp(c))
+      end
+      local mp, x, y = M.partyWhere(p)
+      t[#t + 1] = string.format("party %d%s at %s: %s", p, p == M.activeParty() and " (walking)" or "",
+        mp and string.format("map %d (%d,%d)", mp, x, y) or "(not shown)", table.concat(m, ", "))
+    end
+    return table.concat(t, "; ")
+  end
+
+  -- Step: make party p the walked party with Y, as a player switches.  Y is
+  -- pressed only while the game takes it (control, on a tile, the screen
+  -- lit), released between presses (the edge CheckChangeParty waits for),
+  -- and after a press the step waits for the switch's reload before it
+  -- judges again: pressing through the reload switched the two parties of
+  -- the Phoenix Cave back and forth for 1,800 frames (build/attempts/wt/
+  -- v032-splitparty/lab/phx1).  Done when $1A6D reads p with the party in
+  -- control for 8 frames.
+  function M.switchParty(p, opts)
+    opts = opts or {}
+    local tag = opts.tag or ("switch to party " .. p)
+    local ph, calm, ctl, hold, presses = 0, 0, 0, 0, 0
+    return M.withReset(M.seqStep({
+      M.call(function()
+        local has = false
+        for _, q in ipairs(M.partyNumbers()) do if q == p then has = true end end
+        M.assertEq(has, true, tag .. ": party " .. p .. " has members")
+        if M.activeParty() ~= p then
+          M.assertEq((M.readByte(0x1EB9) & 0x40) ~= 0, true, tag .. ": party switching is on ($1EB9 bit 6)")
+        end
+      end),
+      -- arrived: party p walked, the map loaded and lit for 16 frames, with
+      -- control read on at least two of them (a party left standing on a
+      -- plate has control one frame in four: the Phoenix Cave's (35,52),
+      -- lab/phx4)
+      M.driveUntil(function()
+        local ok = M.activeParty() == p and bright() >= 15 and M.mapLoaded() and not M.battleLoadStarted()
+        if ok then
+          calm = calm + 1
+          if M.hasControl() and M.tileAligned() then ctl = ctl + 1 end
+        else
+          calm, ctl = 0, 0
+        end
+        return calm >= 16 and ctl >= 2
+      end, opts.maxFrames or 2400, {
+        M.call(function()
+          if M.activeParty() == p or M.battleLoadStarted() then M.setPad({}); return end
+          hold = hold + 1
+          if hold % 300 == 0 then
+            M.log(string.format("[split] %s: %d frames, $1A6D=%d control=%s event=%s ($E5=%02X%04X) $1EB9=%02X "
+              .. "$0762=%02X $055E=%02X $0084=%02X aligned=%s", tag, hold, M.activeParty(), tostring(M.hasControl()),
+              tostring(M.eventRunning()), M.readByte(0xE7), M.readWord(0xE5), M.readByte(0x1EB9),
+              M.readByte(0x0762), M.readByte(0x055E), M.readByte(0x0084), tostring(M.tileAligned())))
+          end
+          -- A party standing on a plate (a trigger whose script re-runs
+          -- every 4 frames, 3 of them with an event running) is in control
+          -- one frame in four, and CheckChangeParty reads Y only on those:
+          -- Y up on one, then Y down on a later one.  So Y is held 8 and
+          -- released 8, which spans two of them either way, rather than
+          -- pressed only on a frame that reads control (the Phoenix Cave's
+          -- (35,52): 2,400 frames without a switch, lab/phx4).
+          if bright() >= 15 and M.readByte(0x0059) == 0 and M.mapLoaded() then
+            ph = ph + 1
+            if ph == 1 then presses = presses + 1 end
+            M.setPad(ph <= 8 and { "y" } or {})
+            if ph >= 16 then ph = 0 end
+            return
+          end
+          ph = 0
+          M.setPad({})
+        end),
+      }, tag),
+      M.call(function()
+        M.log(string.format("[split] %s: walking party %d after %d Y press(es); %s", tag, p, presses,
+          M.partiesLine()))
+      end),
+    }), function() ph, calm, ctl, hold, presses = 0, 0, 0, 0, 0 end)
+  end
+
+  local function bagCounts()
+    local t = {}
+    for _, id in ipairs(M.SPLIT_ITEMS) do t[id] = M.invCountOf(id) end
+    return t
+  end
+  local function xpOf(c)
+    local o = 0x1600 + 37 * c
+    return M.readByte(o + 0x11) + M.readByte(o + 0x12) * 256 + M.readByte(o + 0x13) * 65536
+  end
+
+  -- the per-frame ledger: battles and bag spends, charged to $1A6D
+  local function ledgerFrame()
+    local S = M.split
+    if S == nil or not S.on then return end
+    local inB = M.battleLoadStarted()
+    if inB then
+      S.bn = S.bn + 1
+      if S.bn == 3 and S.cur == nil then
+        local p = M.activeParty()
+        local rec = { n = #S.battles + 1, party = p, roster = M.partyRoster(p), seats = {}, xp0 = {},
+          form = M.readWord(0x11E0), map = M.mapId() & 0x1FF, frame = M.frame, outcomes0 = #M.outcomes }
+        for e = 0, 3 do
+          local a = M.readByte(0x3ED8 + 2 * e)
+          if a ~= 0xFF and (M.readByte(0x3AA0 + 2 * e) & 1) ~= 0 then rec.seats[#rec.seats + 1] = a end
+        end
+        for _, c in ipairs(rec.roster) do rec.xp0[c] = xpOf(c) end
+        -- the battle's seats must be the walking party's members: the
+        -- party the ledger charges is the party the engine seated
+        local want = {}
+        for _, c in ipairs(rec.roster) do want[M.charActor(c)] = true end
+        rec.seatsMatch = #rec.seats > 0
+        for _, a in ipairs(rec.seats) do if not want[a] then rec.seatsMatch = false end end
+        S.cur = rec
+        local nm = {}
+        for _, c in ipairs(rec.roster) do nm[#nm + 1] = nameOf(c) end
+        M.log(string.format("[split] battle %d opens: group %d on map %d, fought by party %d (%s); seats %s%s",
+          rec.n, rec.form, rec.map, p, table.concat(nm, ", "), table.concat(rec.seats, ","),
+          rec.seatsMatch and "" or " -- SEATS ARE NOT THE WALKING PARTY'S"))
+      end
+      return
+    end
+    S.bn = 0
+    -- the bag is read only with the walking party in control and no menu
+    -- up: a battle's items reach it as the battle hands back, and the Save
+    -- menu's frames read as 78 Tinctures and 98 Potions gone
+    -- (build/attempts/wt/v032-splitparty/lab/g1, the report after the save)
+    if not (M.hasControl() or M.worldHasControl()) or M.readByte(0x0059) ~= 0 then return end
+    local rec = nil
+    if S.cur ~= nil then
+      rec = S.cur
+      S.cur = nil
+      rec.xp = {}
+      for _, c in ipairs(rec.roster) do rec.xp[c] = xpOf(c) - rec.xp0[c] end
+      rec.kind = (#M.outcomes > rec.outcomes0 and M.outcomes[#M.outcomes].kind) or "unknown"
+      rec.spent = {}
+      S.battles[#S.battles + 1] = rec
+    end
+    -- a care item the bag lost is charged to the walking party (a battle's
+    -- items reach the field bag as the battle hands back, $1A6D unchanged)
+    local now = bagCounts()
+    local p = M.activeParty()
+    S.spent[p] = S.spent[p] or {}
+    for id, n in pairs(now) do
+      local was = S.last[id] or n
+      if n < was then
+        S.spent[p][id] = (S.spent[p][id] or 0) + (was - n)
+        if rec then rec.spent[id] = (rec.spent[id] or 0) + (was - n) end
+      end
+    end
+    S.last = now
+    if rec then
+      local t, sp = {}, {}
+      for _, c in ipairs(rec.roster) do t[#t + 1] = string.format("%s +%d", nameOf(c), rec.xp[c]) end
+      for id, v in pairs(rec.spent) do sp[#sp + 1] = string.format("$%02X x%d", id, v) end
+      table.sort(sp)
+      M.log(string.format("[split] battle %d (group %d) ends: party %d %s; XP %s; items %s", rec.n, rec.form,
+        rec.party, rec.kind, table.concat(t, ", "), #sp > 0 and table.concat(sp, " ") or "none"))
+    end
+  end
+
+  -- Step: begin the ledger for the parties now on the field.  opts.items:
+  -- the budget items (default M.SPLIT_BUDGET_ITEMS); opts.shares: party ->
+  -- weight (default each party's member count).  Logs each party and its
+  -- budget.  Idempotent per run: a second begin restarts the ledger.
+  function M.splitBegin(opts)
+    opts = opts or {}
+    return M.call(function()
+      local parties = M.partyNumbers()
+      M.assertEq(#parties >= 2, true, "splitBegin: two or more parties on the field")
+      local stock = bagCounts()
+      local w, total = {}, 0
+      for _, p in ipairs(parties) do
+        w[p] = (opts.shares and opts.shares[p]) or #M.partyRoster(p)
+        total = total + w[p]
+      end
+      local budget = {}
+      for _, p in ipairs(parties) do
+        budget[p] = {}
+        for _, id in ipairs(opts.items or M.SPLIT_BUDGET_ITEMS) do
+          budget[p][id] = math.floor(stock[id] * w[p] / total)
+        end
+      end
+      M.split = { on = true, parties = parties, budget = budget, spent = {}, battles = {}, last = stock, bn = 0,
+        stock0 = stock }
+      for _, p in ipairs(parties) do M.split.spent[p] = {} end
+      if not M.splitHooked then
+        M.splitHooked = true
+        emu.addEventCallback(function() ledgerFrame() end, emu.eventType.startFrame)
+      end
+      for _, p in ipairs(parties) do
+        local b = {}
+        for _, id in ipairs(opts.items or M.SPLIT_BUDGET_ITEMS) do
+          b[#b + 1] = string.format("$%02X x%d", id, budget[p][id])
+        end
+        M.log(string.format("[split] begin: party %d's share of the bag: %s", p, table.concat(b, " ")))
+      end
+      M.log("[split] begin: " .. M.partiesLine())
+    end)
+  end
+
+  -- the reserve the care of party p keeps: `base` (default M.CARE_RESERVE)
+  -- plus what every other party has not yet spent of its share; nil while
+  -- no split runs (the caller's own default stands)
+  function M.splitReserveFor(p, base)
+    local S = M.split
+    if S == nil or not S.on then return nil end
+    p = p or M.activeParty()
+    base = base or M.CARE_RESERVE or {}
+    local r = {}
+    for k, v in pairs(base) do r[k] = v end
+    for _, q in ipairs(S.parties) do
+      if q ~= p then
+        for id, share in pairs(S.budget[q] or {}) do
+          local left = share - ((S.spent[q] or {})[id] or 0)
+          if left > 0 then r[id] = (r[id] or 0) + left end
+        end
+      end
+    end
+    return r
+  end
+
+  -- the ledger's summary, one line a party
+  function M.splitReport()
+    local S = M.split
+    if S == nil then return { "[split] no split ran" } end
+    local out = {}
+    for _, p in ipairs(S.parties) do
+      local n, won, lost, xp = 0, 0, 0, {}
+      for _, b in ipairs(S.battles) do
+        if b.party == p then
+          n = n + 1
+          if b.kind == "won" then won = won + 1 elseif b.kind == "lost" then lost = lost + 1 end
+          for c, g in pairs(b.xp) do xp[c] = (xp[c] or 0) + g end
+        end
+      end
+      local xs, sp = {}, {}
+      for _, c in ipairs(M.partyRoster(p)) do xs[#xs + 1] = string.format("%s +%d", nameOf(c), xp[c] or 0) end
+      for _, id in ipairs(M.SPLIT_ITEMS) do
+        local v = (S.spent[p] or {})[id]
+        if v and v > 0 then sp[#sp + 1] = string.format("$%02X x%d", id, v) end
+      end
+      out[#out + 1] = string.format("[split] party %d: %d battle(s), %d won, %d lost; XP %s; spent %s", p, n, won,
+        lost, table.concat(xs, ", "), #sp > 0 and table.concat(sp, " ") or "nothing")
+    end
+    return out
+  end
+
+  -- Step: log the report and close the ledger
+  function M.splitEnd()
+    return M.call(function()
+      for _, l in ipairs(M.splitReport()) do M.log(l) end
+      if M.split then M.split.on = false end
+    end)
+  end
+
+  -- Step: care for each party in turn (opts.parties, default all), each
+  -- with its own field care (the menu serves only the walked party's
+  -- four) and its split reserve, then walk the party opts.back (default
+  -- the one walking now).  Other opts reach M.fieldCare.
+  function M.splitCare(opts)
+    opts = opts or {}
+    local steps, back = {}, nil
+    steps[#steps + 1] = M.call(function() back = opts.back or M.activeParty() end)
+    for _, p in ipairs(opts.parties or { 1, 2, 3 }) do
+      local co = {}
+      for k, v in pairs(opts) do co[k] = v end
+      co.parties, co.back = nil, nil
+      co.tag = (opts.tag or "split care") .. ", party " .. p
+      steps[#steps + 1] = M.cond(function()
+        for _, q in ipairs(M.partyNumbers()) do if q == p then return true end end
+        return false
+      end, {
+        M.switchParty(p, { tag = co.tag .. ": walk it" }),
+        M.lazy(function()
+          co.reserve = opts.reserve and M.splitReserveFor(p, opts.reserve) or M.splitReserveFor(p) or co.reserve
+          return M.fieldCare(co)
+        end),
+      }, {})
+    end
+    steps[#steps + 1] = M.lazy(function() return M.switchParty(back, { tag = (opts.tag or "split care") .. ": back" }) end)
+    return M.seqStep(steps)
+  end
 end
 
 -- ------------------------------------------- South Figaro shared toolkit --

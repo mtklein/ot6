@@ -1996,6 +1996,43 @@ M.contracts["wor-thamasa-v1"] = {
   },
 }
 
+-- wor-phoenix-v1: the Phoenix Cave's save point, map 315 (37,28), with the
+-- party split in two (`party_menu 2`, EnterPhoenixCave): party 1 (TERRA,
+-- STRAGO, SABIN, CYAN) walking on the save point, party 2 (CELES, RELM, MOG,
+-- UMARO) beside the lava switch it pulled (315 (20,11)).  The rocks raised
+-- ($02A8), the passage north cleared ($02AA), the lava drained ($02D0);
+-- the Red Dragon ($069C shown) and LOCKE ($00D7) still ahead.  The retry
+-- point for the dragon and the cave's second half
+-- (docs/design/split-party.md).  No timer.
+M.contracts["wor-phoenix-v1"] = {
+  slot = 3,
+  field = { map = 315, x = 37, y = 28 },   -- the vanilla save point (315 NPC_2)
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x02DB, 1, "MagiMaster beaten (_cc544b)" },
+    { 0x02BF, 1, "inside the Phoenix Cave (EnterPhoenixCave)" },
+    { 0x01CE, 1, "party switching on (_cc2090)" },
+    { 0x02A8, 1, "the rocks raised (313 (40,38), _cc288a)" },
+    { 0x02AA, 0, "the passage north cleared (313 (46,16), _cc2934)" },
+    { 0x02D0, 1, "the lava drained (315 (19,10), _cc2a1f)" },
+    { 0x069C, 1, "the Red Dragon shown, not fought (_cc2048)" },
+    { 0x00D7, 0, "LOCKE not yet found (_cc2b43)" },
+  },
+  party = {
+    size = 8,
+    members = {
+      { 0x00, "TERRA", 1 }, { 0x07, "STRAGO", 1 }, { 0x05, "SABIN", 1 }, { 0x02, "CYAN", 1 },
+      { 0x06, "CELES", 2 }, { 0x08, "RELM", 2 }, { 0x0A, "MOG", 2 }, { 0x0D, "UMARO", 2 },
+    },
+  },
+  parties = { [2] = { map = 315, x = 20, y = 11 } },
+  walking = 1,
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
@@ -2068,11 +2105,25 @@ function M.contractDiffs(c)
       field("party size (COUNTED $1850 assignments, #21)", c.party.size, n)
     end
     if c.party.members then
+      -- m[3]: the member's party number in a split dungeon (default 1)
       for _, m in ipairs(c.party.members) do
-        field(string.format("%s (char %02X) in party", m[2], m[1]),
-          1, partyOf(m[1]))
+        field(string.format("%s (char %02X) in party %d", m[2], m[1], m[3] or 1),
+          m[3] or 1, partyOf(m[1]))
       end
     end
+  end
+  -- A split dungeon's save (the Phoenix Cave, Kefka's Tower): where each
+  -- party that is not walking stands, its leader's object (M.partyWhere),
+  -- which a Continue puts back from the save block's $1F81/$1FD3 copies.
+  -- The walking party is the field block above.
+  if c.parties then
+    for p, w in pairs(c.parties) do
+      local m, x, y = M.partyWhere(p)
+      field(string.format("party %d stands on map", p), w.map, m or -1)
+      field(string.format("party %d stands at x", p), w.x, x or -1)
+      field(string.format("party %d stands at y", p), w.y, y or -1)
+    end
+    field("the walking party ($1A6D)", c.walking or 1, M.readByte(0x1A6D) & 0x07)
   end
   if c.items then
     for _, it in ipairs(c.items) do
