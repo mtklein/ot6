@@ -179,6 +179,56 @@ end
 -- here is latched by the ROM at the frame's inputPolled, so it can land one
 -- frame after the stamp.
 local LIVE_IVL = 128
+-- The heartbeat interval, in frames (first one at frame 20, with the first
+-- live shot).  A headless frame takes well under a second even loaded, so
+-- this is seconds apart; measured in docs/TOOLING.md.
+local HB_IVL = 1024
+
+-- ----------------------------------------------------------- progress --
+-- Script-level forward progress, the only thing run.sh's stall watch
+-- counts (owner, 2026-10-19: frames advancing is not progress; a game
+-- parked in the field menu ticks and animates forever).  M.progress(why)
+-- is the one hook; milestones are:
+--   a top-level step of H.run's list completing (seqStep, root only);
+--   a goal reached: waitUntil / waitUntilSoft / driveUntil satisfied;
+--   the game state moving, sampled every PROG_IVL frames (progressSample):
+--     the map or the party's place on it, gil, the bag, the roster's
+--     stats and gear, and every battler's HP -- so a field walk, a
+--     purchase, an equip, a level, a hit landing, a battle ending all
+--     count, and an open menu with nothing happening does not.
+-- A milestone is a thing that happened; a loop that merely keeps pressing
+-- buttons without any of them is a stall, however many frames it runs.
+M.progressN, M.progressFrame, M.progressWhy = 0, 0, "start"
+function M.progress(why)
+  M.progressN = M.progressN + 1
+  M.progressFrame = M.frame or 0
+  M.progressWhy = tostring(why):gsub("%s+", "_")
+end
+local PROG_IVL = 32
+local progLast = {}
+local function progressSample()
+  local rb, rw = M.readByte, M.readWord
+  local f = {
+    map = rw(0x1F64), x = rb(0x1F60), y = rb(0x1F61),
+    gil = rw(0x1860) + rb(0x1862) * 65536,
+  }
+  local bag, roster, hp = 0, 0, 0
+  -- the bag ($1869: 256 item ids, then 256 counts) and the roster ($1600,
+  -- 16 blocks of 37: level, HP, MP, experience, equipment...), each folded
+  for i = 0, 511 do bag = (bag * 31 + rb(0x1869 + i)) % 4294967291 end
+  for i = 0, 591 do roster = (roster * 31 + rb(0x1600 + i)) % 4294967291 end
+  for i = 0, 19 do hp = (hp * 31 + rb(0x3BF4 + i)) % 4294967291 end
+  f.bag, f.roster, f.hp = bag, roster, hp
+  for k, v in pairs(f) do
+    if progLast[k] ~= nil and progLast[k] ~= v then
+      progLast[k] = v
+      M.progress(k)
+      for k2, v2 in pairs(f) do progLast[k2] = v2 end
+      return
+    end
+  end
+  for k, v in pairs(f) do progLast[k] = v end
+end
 
 -- ------------------------------------------------------ render on demand --
 -- Drawing pixels was ~27% of a headless frame, and the harness looks at few
@@ -4043,6 +4093,7 @@ seqStep = function(steps)
         local r = s:tick()
         if r == "frame" then return "frame" end
         self.i = self.i + 1
+        if self.root then M.progress("step " .. (self.i - 1)) end
       end
       return "done"
     end,
@@ -4270,6 +4321,7 @@ function M.waitUntil(pred, maxFrames, what, pollEvery)
     tick = function()
       if waited % pollEvery == 0 and pred() then
         M.log("waitUntil '" .. what .. "' satisfied after " .. waited .. " frames")
+        M.progress("waitUntil")
         return "done"
       end
       waited = waited + 1
@@ -4292,6 +4344,7 @@ function M.waitUntilSoft(pred, maxFrames, name, pollEvery)
     tick = function()
       if waited % pollEvery == 0 and pred() then
         M.vars[name] = true
+        M.progress("waitUntilSoft")
         return "done"
       end
       waited = waited + 1
@@ -4376,6 +4429,7 @@ function M.driveUntil(pred, maxFrames, steps, what)
       if pred() then
         M.setPad({})
         M.log("driveUntil '" .. what .. "' satisfied after " .. waited .. " frames")
+        M.progress("driveUntil")
         return "done"
       end
       waited = waited + 1
@@ -18806,6 +18860,7 @@ function M.run(opts, steps)
   -- step list.  Install it; the callbacks below stay as they were.
   if RUN.installing then
     RUN.root = seqStep(steps)
+    RUN.root.root = true
     RUN.opts = opts
     RUN.budget = opts.maxFrames or 60000
     return
@@ -18829,6 +18884,7 @@ function M.run(opts, steps)
   RUN.opts = opts
   RUN.budget = opts.maxFrames or 60000
   RUN.root = seqStep(steps)
+  RUN.root.root = true
   RUN.shift = (type(OT6_SEED_SHIFT) == "number" and OT6_SEED_SHIFT or 0)
   RUN.tried[RUN.shift % M.SEED_PERIOD] = true
   -- Probe mode (#208, seed_sweep.py --probe): every sample runs the body
@@ -19305,6 +19361,17 @@ function M.run(opts, steps)
     end
     M.frame = M.frame + 1
     if M.frame == 20 or M.frame % LIVE_IVL == 0 then M.liveShot() end
+    if M.frame % PROG_IVL == 0 then progressSample() end
+    -- The run's heartbeat (docs/TOOLING.md "The run's heartbeat"): the
+    -- frame, the wall-clock second, and the progress counter with the frame
+    -- and name of the newest milestone.  run.sh's stall watch resets on the
+    -- COUNTER changing, never on the frame: a game parked in a menu ticks
+    -- frames forever.  No [ot6] prefix: it is not terminal output.
+    if M.frame == 20 or M.frame % HB_IVL == 0 then
+      local okT, now = pcall(os.time)
+      print(string.format("[ot6hb] %d %s %d %d %s", M.frame, okT and tostring(now) or "-",
+        M.progressN, M.progressFrame, M.progressWhy))
+    end
 
     -- The boot snapshot for the replay: collected here, a couple of
     -- frames after it was asked for (below, after the tick).

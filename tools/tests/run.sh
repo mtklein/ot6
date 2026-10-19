@@ -448,26 +448,39 @@ if [ -n "${OT6_SRAM_CHECKPOINT:-}" ]; then
     { echo "invalid SRAM checkpoint: $OT6_SRAM_CHECKPOINT (refused BEFORE boot)"; exit 2; }
 fi
 # --timeout: Mesen's testrunner has a default 100-second wall-clock cap
-# (exit -1/255 and truncated stdout on expiry) that killed long runs.  Keep a
-# cap as the only defense against a hung emulator, but a roomy one.
-# OT6_TIMEOUT raises it for a run already known to be competing for cores;
-# the cap is wall clock, so `nice` does not protect it (see the timeout
-# diagnosis below).
+# (exit -1/255 and truncated stdout on expiry) that killed long runs.  What
+# bounds a run now is its heartbeat, not a wall clock: lib/ot6.lua's runner
+# prints `[ot6hb] <frame> <time> <progress n> <progress frame> <what>` at
+# frame 20 and every 1024 frames, and this script kills a run whose progress
+# counter has not changed for OT6_HEARTBEAT seconds (default 120): a STALL,
+# reported as one below.  Progress is a script-level milestone (H.progress:
+# a top-level step done, a goal reached, the map, position, gil, bag, roster
+# or any battler's HP changing), NOT frames: a game parked in a menu ticks
+# forever.  A run that keeps reaching milestones is never killed for being
+# slow.  The window is wall clock, so `nice` does not protect it, but it
+# measures the gap between two milestones, not the length of the run.  The Mesen --timeout is only the last-resort
+# backstop for a run that progresses forever, OT6_HARD_CAP seconds (default
+# 21600).  OT6_TIMEOUT, the old per-run cap, is accepted and ignored: its
+# callers (configure.py's TEST_ENV, savestate_ninja.py's edges) predate the
+# heartbeat and their values were guesses at "slow but progressing".
+# The stall watch arms at the first heartbeat, so a script that never runs
+# the lib's runner (no heartbeat) is bounded by the backstop alone.
 # --enableStdout mirrors the emulator message log to stdout.  It does not
 # carry Lua errors or watchdog kills; those go to the script log, which
 # nothing reads headless.  print() is the only channel out of a script, so a
 # script that stops printing reports nothing.  Kept for the ROM-info banner.
 # run_mesen's home variable is the isolation boundary measured above.
-CAP="${OT6_TIMEOUT:-600}"
-# A timeout kill carries no result, so the harness retries it instead of
-# reporting it.  The cap is wall clock and `nice` does not slow the wall, so
-# concurrent jobs starve each other: a savestate generation that takes 400s
-# alone can cross 600s when a dozen share ten cores.  Every invocation gets
+CAP="${OT6_HARD_CAP:-21600}"
+HB_WINDOW="${OT6_HEARTBEAT:-120}"
+HB_POLL=10     # heartbeat check every HB_POLL * 0.5 s
+# A timeout kill (a stall or the backstop) carries no result, so the harness
+# retries it instead of reporting it.  The clocks are wall clock and `nice`
+# does not slow the wall, so concurrent jobs starve each other.  Every invocation gets
 # its own workspace and CFFIXED_USER_HOME, which is what makes a retry safe
 # and deterministic: the same inputs run again with nothing shared disturbed.
 #
 # The retry fires only on the timeout-kill signature: no verdict in the log,
-# and the run lived to the cap.  A real FAIL is never retried, since that
+# and the run was killed for a stall or lived to the backstop.  A real FAIL is never retried, since that
 # would turn a flaky test into a green one with no notice.  A no-verdict run
 # that died well short of the cap is not retried either: that is a Lua load
 # error, which is deterministic and will fail identically.
@@ -510,6 +523,8 @@ while :; do
   mesen_pid=$!
   load_grace="${OT6_LOAD_GRACE:-120}"
   load_dead=0
+  stalled=0
+  hb_last=""; hb_t=$t0; hb_n=0
   # Polled every half second: the loop's sleep is the wall time a run spends
   # after Mesen has exited (it was 5 s, 2.5 s a run on average, #394).
   while kill -0 "$mesen_pid" 2>/dev/null; do
@@ -521,6 +536,32 @@ while :; do
       sleep 2
       kill -9 "$mesen_pid" 2>/dev/null
     fi
+    # The stall watch.  Every HB_POLL polls, read the newest heartbeat from
+    # the log's tail (a savestate payload line can be megabytes, hence the
+    # window); any change is progress.  Armed by the first heartbeat.
+    hb_n=$(( hb_n + 1 ))
+    if [ "$hb_n" -ge "$HB_POLL" ] && [ "$load_dead" -eq 0 ] && [ "$stalled" -eq 0 ]; then
+      hb_n=0
+      hb=$(tail -c 4194304 "$RUN_LOG" 2>/dev/null | grep -a '^\[ot6hb\] ' | tail -n 1)
+      now=$(date +%s)
+      # `[ot6hb] <frame> <time> <progress n> <progress frame> <what>`: the
+      # counter (field 4) is the progress; the frame (field 2) always moves.
+      hbn=$(printf '%s' "$hb" | cut -d' ' -f4)
+      if [ -n "$hbn" ] && [ "$hbn" != "$hb_last" ]; then
+        [ -n "$hb_last" ] || hb_t=$now   # arming: the window starts here
+        hb_last=$hbn; hb_t=$now
+        hb_line=$hb
+      elif [ -n "$hb_last" ] && [ $(( now - hb_t )) -ge "$HB_WINDOW" ]; then
+        stalled=1
+        stall_frame=$(printf '%s' "$hb_line" | cut -d' ' -f5)
+        stall_what=$(printf '%s' "$hb_line" | cut -d' ' -f6)
+        stall_at=$(printf '%s' "$hb" | cut -d' ' -f2)
+        stall_secs=$(( now - hb_t ))
+        kill "$mesen_pid" 2>/dev/null
+        sleep 2
+        kill -9 "$mesen_pid" 2>/dev/null
+      fi
+    fi
   done
   wait "$mesen_pid"
   code=$?
@@ -530,11 +571,16 @@ while :; do
   fi
   elapsed=$(( $(date +%s) - t0 ))
   verdict_spoken "$RUN_LOG" && break
-  [ $(( elapsed + 5 )) -ge "$CAP" ] || break
+  [ "$stalled" -eq 1 ] || [ $(( elapsed + 5 )) -ge "$CAP" ] || break
   [ "$attempt" -le "$RETRIES" ] || break
   retried=$(( retried + 1 ))
-  printf '[ot6] KILLED BY THE TIMEOUT after %ss against a %ss wall-clock cap -- retrying (attempt %s of %s).  Runs are isolated, so this is safe and is not a re-roll of a failure: no verdict was ever reached.\n' \
-    "$elapsed" "$CAP" "$(( attempt + 1 ))" "$(( RETRIES + 1 ))" >&2
+  if [ "$stalled" -eq 1 ]; then
+    printf '[ot6] KILLED BY A STALL after %ss: the last progress was frame %s ("%s"), %ss before the kill (window %ss) -- retrying (attempt %s of %s).  Runs are isolated, so this is safe and is not a re-roll of a failure: no verdict was ever reached.\n' \
+      "$elapsed" "$stall_frame" "$stall_what" "$stall_secs" "$HB_WINDOW" "$(( attempt + 1 ))" "$(( RETRIES + 1 ))" >&2
+  else
+    printf '[ot6] KILLED BY THE TIMEOUT after %ss against a %ss wall-clock backstop -- retrying (attempt %s of %s).  Runs are isolated, so this is safe and is not a re-roll of a failure: no verdict was ever reached.\n' \
+      "$elapsed" "$CAP" "$(( attempt + 1 ))" "$(( RETRIES + 1 ))" >&2
+  fi
   sleep 5
 done
 
@@ -550,8 +596,8 @@ python3 "$ROOT/tools/tests/lib/decode_b64.py" "$RUN_LOG" "$ART"
 if [ "$retried" -gt 0 ] && verdict_spoken "$RUN_LOG"; then
   # Report every retry: a machine killing runs on the timeout is worth seeing
   # even when the retry rescued the result.
-  printf '[ot6] this run was KILLED %s time(s) by the %ss wall-clock cap and retried; the verdict below is from attempt %s.\n' \
-    "$retried" "$CAP" "$attempt" >> "$RUN_LOG"
+  printf '[ot6] this run was KILLED %s time(s) by the stall window (%ss) or the %ss backstop and retried; the verdict below is from attempt %s.\n' \
+    "$retried" "$HB_WINDOW" "$CAP" "$attempt" >> "$RUN_LOG"
 fi
 if grep -qE "$PASS_RE" "$RUN_LOG"; then
   verdict=0
@@ -572,19 +618,27 @@ else
   # the `grep '^\[ot6\]'` at the end of this script for a direct invocation,
   # and the published log for anything reading it after the fact.
   timeout_note() { printf '[ot6] %s\n' "$@" >> "$RUN_LOG"; }
-  if [ $(( elapsed + 5 )) -ge "$CAP" ]; then
-    timeout_note "KILLED BY THE TIMEOUT: no verdict, and the run lasted ${elapsed}s against a ${CAP}s wall-clock cap (--timeout).  Mesen killed it; it did not crash." \
+  if [ "$stalled" -eq 1 ]; then
+    timeout_note "KILLED BY A STALL: no verdict, and the run stopped making progress: the last milestone (${stall_what}) was at frame ${stall_frame}, ${stall_secs}s before the kill; the emulator was at frame ${stall_at} (window ${HB_WINDOW}s, OT6_HEARTBEAT); the run lasted ${elapsed}s.  run.sh killed it; it did not crash." \
+         "  This is the FINAL attempt: the harness already retried it ${retried} time(s)" \
+         "  automatically (OT6_TIMEOUT_RETRIES=${RETRIES})." \
+         "  The script or the emulator is hung or idling (frames may still be advancing), or the machine starved it:" \
+         "  load right now: $(uptime | sed 's/.*load average/load average/')" \
+         "  Next: read this log's last lines for the step it was in (an infinite Lua loop in a" \
+         "  frame callback, a pause); if load is the cause, raise OT6_HEARTBEAT or lower parallelism."
+  elif [ $(( elapsed + 5 )) -ge "$CAP" ]; then
+    timeout_note "KILLED BY THE TIMEOUT: no verdict, and the run lasted ${elapsed}s against a ${CAP}s wall-clock backstop (--timeout, OT6_HARD_CAP).  Mesen killed it; it did not crash." \
          "  This is the FINAL attempt: the harness already retried it ${retried} time(s)" \
          "  automatically (OT6_TIMEOUT_RETRIES=${RETRIES}), so the cap is not merely being" \
          "  grazed -- this run cannot finish inside it on this machine right now." \
          "  Load right now: $(uptime | sed 's/.*load average/load average/')" \
          "  The cap is wall clock, so nice(1) does not protect it -- concurrent" \
          "  jobs are all equally niced and starve each other." \
-         "  Next: raise the cap for this run (OT6_TIMEOUT=1200), allow more" \
+         "  Next: raise the backstop for this run (OT6_HARD_CAP=43200), allow more" \
          "  retries (OT6_TIMEOUT_RETRIES=3), or lower parallelism (NINJAFLAGS=-j2)."
   elif [ "$verdict" -ne 0 ]; then
-    timeout_note "no verdict after ${elapsed}s (cap ${CAP}s): the script died before reaching PASS or FAIL." \
-         "  Well short of the cap, so this is NOT a timeout kill -- read this log for a Lua load error."
+    timeout_note "no verdict after ${elapsed}s (backstop ${CAP}s): the script died before reaching PASS or FAIL." \
+         "  Well short of the backstop, so this is NOT a timeout kill -- read this log for a Lua load error."
   fi
 fi
 if [ "$verdict" -eq 0 ] && [ -n "${OT6_EXPECT_ARTIFACT:-}" ]; then
