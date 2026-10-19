@@ -8246,6 +8246,24 @@ function Driver:magicOnlyLine(actor, boost)
           return { kind = "magic", spell = M.STUDY_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0,
                    aim = boss, vetoOk = true, reason = "reraise_hold" }
         end
+        -- no Scan and nobody under 90%: the least-full member's Potion
+        -- still holds the turn.  Falling through to the attack, TERRA's
+        -- Ice 2 killed him while three lacked Life 3, and his dying Ultima
+        -- took all four (build/attempts/wt/v031-tower-2/lab/re2_k3_s0:
+        -- 'actor=0 magic-only: $01 at slot 0', '[wipe] f+65324')
+        local least, leastFrac = nil, 2
+        for e = 0, 3 do
+          local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+          if hp > 0 and mx > 0 and hp / mx < leastFrac then least, leastFrac = e, hp / mx end
+        end
+        if least ~= nil and spellCell(actor, 0x2D, true) ~= nil then   -- Cure, unboosted
+          return { kind = "magic", spell = 0x2D, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0, ally = true,
+                   target = least, vetoOk = true, reason = "reraise_hold" }
+        end
+        local anyPotion = row and least ~= nil and self:battInvIdx(0xE9)
+        if anyPotion then
+          return { kind = "item", item = 0xE9, target = least, row = row, idx = anyPotion, reason = "reraise_hold" }
+        end
       end
     else
       self.holdSince = nil
