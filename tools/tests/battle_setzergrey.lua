@@ -22,7 +22,10 @@
 --      in the next battle, and the purse falls to 140.
 -- The prices are derived from the battle's own level, so the arithmetic is
 -- asserted rather than assumed; a battle that ends before all five is
--- followed by another (two Defends again first), at most four.
+-- followed by another (two Defends again first), at most four -- including
+-- a battle that ends before SETZER's table opens (the route's levels and
+-- the foe's draw decide how long a fight lasts; v0.32's chain ended the
+-- first one at the second Defend).
 -- Negative controls (build/attempts/wt/kit-setzer/): a grey that ignores
 -- the purse takes step 1; Ot6CoinTotal's four-pass arm priced as two
 -- throws (1,860) takes step 1, its three-pass arm priced as two takes
@@ -88,7 +91,14 @@ H.run({ maxFrames = 200000 }, {
           -- turn reaches it: its refusal is asserted here, by name (and
           -- H.setzerBattle fails at once if a refused entry's confirm goes
           -- through to target select)
-          if k == 1 then
+          -- The refusal can only be asserted once SETZER's table opened this
+          -- battle: a fight that ends under the two Defends (the party can
+          -- clear it first when the route left it strong or the foes weak)
+          -- never reaches step 1, and the next battle takes its place.
+          local opened = #(H.vars.setzerList or {}) > 0
+          H.log(string.format("[grey] battle %d: SETZER's table %s (%d list opening(s))", battles,
+            opened and "opened" or "never opened -- the fight ended under the Defends", #(H.vars.setzerList or {})))
+          if k == 1 and opened then
             H.assertEq(plan[DEFENDS + 1].refusedSeen == true, true, string.format("step 1: Coin Toss at 3 BP (four "
               .. "throws, %d) with %d in the purse is refused at the list", 4 * H.readByte(0x1600 + 37 * 9 + 8) * 30,
               PURSE))
