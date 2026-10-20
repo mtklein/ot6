@@ -36,6 +36,12 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local COIN, HIRE = 0x59, 0x5A
 local PURSE = 2000
 
+-- the party's gil (3 bytes at $1860): the one declared expedient
+local function setPurse(v)
+  H.writeWord(0x1860, v % 0x10000)
+  H.writeByte(0x1862, v // 0x10000)
+end
+
 local function walkToBattle()
   local wp = 1
   local WPS = { { 124, 26 }, { 120, 11 } }
@@ -60,8 +66,7 @@ local plan
 H.run({ maxFrames = 200000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
   H.call(function()
-    H.writeWord(0x1860, PURSE)
-    H.writeByte(0x1862, 0)
+    setPurse(PURSE)
     local lv = H.readByte(0x1600 + 37 * 9 + 8)
     H.log(string.format("[grey] SETZER L%d; the purse set to %d (declared expedient)", lv, PURSE))
     H.assertEq(lv * 30 * 4 > PURSE and lv * 30 * 3 > PURSE and lv * 50 * 2 > PURSE and lv * 30 * 2 <= PURSE
@@ -79,6 +84,18 @@ H.run({ maxFrames = 200000 }, {
         for kk, v in pairs(WANT[i]) do c[kk] = v end
         plan[#plan + 1] = c
       end
+    end),
+    H.call(function()
+      -- A battle that ended before the step it was for still paid out its
+      -- gil, so the purse a later battle opens with is no longer the one
+      -- the steps are priced against.  The same declared expedient puts it
+      -- back: PURSE before step 4 takes it, and what step 4 left (the
+      -- purse step 5's expectation was derived from) after.
+      local want = k <= 4 and PURSE or took[#took].gil1
+      local have = H.readWord(0x1860) + 0x10000 * H.readByte(0x1862)
+      H.log(string.format("[grey] battle %d (step %d next): the purse is %d, put back to %d (declared expedient)",
+        battles, k, have, want))
+      setPurse(want)
     end),
     walkToBattle(),
     (function()
