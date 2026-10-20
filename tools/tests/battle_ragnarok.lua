@@ -18,9 +18,10 @@
 -- and a cast cut off or charged no MP is played again.  In order:
 --   1. TERRA's Fire at 3 BP -- the control: the fold, Ultima ($14) priced
 --      80, and Ot6BoostDmg writes no $11b0 for it;
---   2. RELM's Ultima at 1 BP -- from Ragnarok's list: priced 80 (it holds
---      no tier), cast as Ultima ($14), costs 80, and Ot6BoostDmg writes
---      $11b0 for it (the multiplier).
+--   2. RELM's Ultima at 1 BP -- from Ragnarok's list: it holds no tier, so
+--      the boost buys the multiplier and prices it as any boosted spell
+--      (Ot6BoostPriceFor: 80 x 5 / 2 past the two-digit ceiling, 99); cast
+--      as Ultima ($14), costs 99, and Ot6BoostDmg writes $11b0 for it.
 -- Mutants (build/attempts/wt/v032-narshe-locke/ragnarok/): Ot6BoostLevel
 -- answering 0 for every Ultima turns cast 2 red; Ragnarok's list without
 -- Ultima turns the list red.
@@ -140,9 +141,10 @@ local function checkCast(i, r)
   else
     H.log(string.format("[ragnarok] the list priced RELM's Ultima at %s with 1 BP pending",
       tostring(listCost.ragnarok)))
-    H.assertEq(listCost.ragnarok, 80, "RELM's list holds Ultima from Ragnarok, priced 80 at 1 BP (no tier)")
+    H.assertEq(listCost.ragnarok, 99, "RELM's list holds Ultima from Ragnarok, priced 99 at 1 BP (80 boosted, "
+      .. "at the ceiling)")
     H.assertEq(r.spell == ULTIMA and r.pend == 1, true, "cast 2 was RELM's Ultima at 1 BP")
-    H.assertEq(r.mp0 - r.mp1, 80, "and costs Ultima's 80")
+    H.assertEq(r.mp0 - r.mp1, 99, "and costs the list's 99")
     H.assertEq(r.writes >= 1, true, "Ragnarok's Ultima takes the multiplier (Ot6BoostDmg wrote $11b0)")
   end
 end
@@ -189,7 +191,7 @@ H.run({ maxFrames = 600000 }, {
     }),
   }, "the two casts"),
   H.call(function()
-    H.log("[ragnarok] PASS: TERRA's folded Ultima is unmultiplied and RELM's Ultima from Ragnarok, priced 80, is "
+    H.log("[ragnarok] PASS: TERRA's folded Ultima is unmultiplied and RELM's Ultima from Ragnarok, boosted, is "
       .. "multiplied")
   end),
 })
