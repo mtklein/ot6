@@ -2521,7 +2521,7 @@ Ot6ShieldTbl:
                                 ;   spells)
         ; ---- the world of ruin: the veldt (gau; route-wor-gau.md section
         ; 3) -------------------------------------------------------------
-        ; The Veldt deals every formation the save has fought; these seven
+        ; The Veldt deals every formation the save has fought; these fourteen
         ; World of Balance bodies rode the floor and the play met them there
         ; (the sweeps' [key] lines, met.txt).  Each keeps the floor's
         ; shields and class, so the World of Balance parties that meet them
@@ -2544,6 +2544,25 @@ Ot6ShieldTbl:
         .word   $005d
         .byte   2, OT6_SLASH|OT6_BLUDG ; areneid: a shelled crawler;
                                 ;   ice|poison|water (poison an ot6 add)
+        .word   $0018
+        .byte   3, OT6_SLASH|OT6_PIERCE ; stray cat: claws and teeth;
+                                ;   poison an ot6 add
+        .word   $0029
+        .byte   3, OT6_SLASH|OT6_PIERCE ; beakor: a bird; fire vanilla
+        .word   $002f
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; crasshoppr: an insect's shell;
+                                ;   fire|wind vanilla
+        .word   $004f
+        .byte   3, OT6_SLASH|OT6_BLUDG ; bomb: burst it; ice|water vanilla,
+                                ;   absorbs fire
+        .word   $005a
+        .byte   3, OT6_SLASH|OT6_SPECIAL ; ghost: a spirit; fire|holy
+                                ;   vanilla, absorbs poison
+        .word   $0076
+        .byte   3, OT6_SLASH|OT6_BLUDG ; rhobite: a beetle; water vanilla
+        .word   $00a2
+        .byte   3, OT6_SLASH|OT6_PIERCE ; poplium: a puffball; fire|holy
+                                ;   vanilla, absorbs poison
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian

@@ -1,7 +1,7 @@
 -- @suite
 -- battle_breakwor_gau.lua -- the World of Ruin break rows for the Gau arc
 -- (the Veldt cave: its pool, Allo Ver's monster chest and the SrBehemoth;
--- and the seven World of Balance bodies the play met on the Veldt),
+-- and the fourteen World of Balance bodies the play met on the Veldt),
 -- re-verified from the built ROM (battle_breakwor_locke's shape: pure ROM
 -- bytes, no savestate).  docs/design/route-wor-gau.md section 3 is the
 -- design; WANT and VELDT below are its tables, and the only place the
@@ -17,7 +17,7 @@
 --   3. the lesson: GAU alone holds a key to every body here (his fists and
 --      his beasts' bludgeon, Were-Rat's poison), and the cave drinks
 --      CELES's ice (Toe Cutter, the SrBehemoth);
---   4. the Veldt's seven: each carries its designed row, keeps the floor's
+--   4. the Veldt's fourteen: each carries its designed row, keeps the floor's
 --      shields and class (the World of Balance parties that meet them at
 --      home keep their key) and its vanilla and added elements, and is
 --      keyed for the three who walk the Veldt (TERRA, CELES, RELM).
@@ -43,7 +43,7 @@ local TERRA = { "TERRA", PIERCE, FIRE | HOLY }
 local CELES = { "CELES", SLASH, ICE | BOLT | POISON }
 local RELM = { "RELM", BLUDG, EARTH }
 local GAU = { "GAU", BLUDG, POISON | BOLT }
--- the Veldt's seven: species -> { name, shields, classes, the floor's class
+-- the Veldt's fourteen: species -> { name, shields, classes, the floor's class
 -- (OT6_FLOOR_CLASS), vanilla weak, vanilla absorb, element added }
 local VELDT = {
   [0x013] = { "Were-Rat", 2, SLASH | PIERCE, SLASH, FIRE, POISON, 0 },
@@ -53,6 +53,13 @@ local VELDT = {
   [0x042] = { "M-TekArmor", 3, PIERCE | BLUDG, PIERCE, BOLT, 0, POISON },
   [0x04D] = { "Repo Man", 2, SLASH | PIERCE, SLASH, POISON, 0, 0 },
   [0x05D] = { "Areneid", 2, SLASH | BLUDG, SLASH, ICE | WATER, 0, POISON },
+  [0x018] = { "Stray Cat", 3, SLASH | PIERCE, SLASH, 0, 0, POISON },
+  [0x029] = { "Beakor", 3, SLASH | PIERCE, SLASH, FIRE, 0, 0 },
+  [0x02F] = { "CrassHoppr", 3, PIERCE | BLUDG, PIERCE, FIRE | WIND, 0, 0 },
+  [0x04F] = { "Bomb", 3, SLASH | BLUDG, SLASH, ICE | WATER, FIRE, 0 },
+  [0x05A] = { "Ghost", 3, SLASH | SPECIAL, SLASH, FIRE | HOLY, POISON, 0 },
+  [0x076] = { "Rhobite", 3, SLASH | BLUDG, SLASH, WATER, 0, 0 },
+  [0x0A2] = { "Poplium", 3, SLASH | PIERCE, SLASH, FIRE | HOLY, POISON, 0 },
 }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what }
@@ -201,7 +208,7 @@ H.run({ maxFrames = 600 }, {
     end
     if (weakOf(0x119) & POISON) == 0 then problem("$119: the SrBehemoth lost its vanilla poison (Were-Rat's key)") end
 
-    -- 4. the Veldt's seven
+    -- 4. the Veldt's fourteen
     local vids = {}
     for sp in pairs(VELDT) do vids[#vids + 1] = sp end
     table.sort(vids)
