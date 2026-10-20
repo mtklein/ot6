@@ -43,7 +43,6 @@ local function anyLoot()
   return false
 end
 local function queueN() return H.readByte(0x64DA) end
-local function queueItem(i) return H.readByte(0x602D + (i & 15) * 5) end
 
 local seat, rec, stage, battles, mode = nil, nil, 1, 0, nil
 local plan = {}
@@ -61,7 +60,7 @@ local function arm()
     if seat == nil or rec ~= nil or not lockeX() or H.readByte(0xB6) ~= MARK then return end
     local e = seat * 2
     rec = { pend = H.readByte(0x3E9D + e), bank0 = H.readByte(0x3E9C + e), mp0 = H.readWord(0x3C08 + e),
-      q0 = queueN(), f = H.frame, read = {}, bodies = {} }
+      q0 = queueN(), f = H.frame, read = {}, bodies = {}, queued = {} }
     for s = 0, 5 do
       local r, c = lootOf(s)
       rec.bodies[s] = { live = live(s), rare = r, common = c, scan = (H.readByte(0x3C80 + ent(s)) & 0x10) == 0 }
@@ -73,6 +72,12 @@ local function arm()
     local s = ((o >= 12) and o - 12 or o) // 2
     rec.read[s] = true
   end, emu.callbackType.write, 0x7EED45, 0x7EED5C)
+  -- each item BtlGfx $05 copies into the obtained-items queue during the
+  -- action (the first byte of its 5-byte record), in order
+  emu.addMemoryCallback(function(addr, v)
+    if rec == nil or rec.ended or (addr - 0x7E602D) % 5 ~= 0 then return end
+    rec.queued[#rec.queued + 1] = v
+  end, emu.callbackType.write, 0x7E602D, 0x7E602D + 16 * 5 - 1)
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
     if rec == nil or rec.ended or seat == nil or not lockeX() then return end
@@ -116,9 +121,9 @@ local function judge()
       end
     end
     H.assertEq(r.q1 - r.q0, #want, string.format("the queue gained one item per body with loot (%d)", #want))
+    H.assertEq(#r.queued, #want, "the action queued exactly those items")
     for i, id in ipairs(want) do
-      H.assertEq(queueItem(r.q0 + i - 1), id, string.format("queued item %d is $%02X: the body's rare, else its "
-        .. "common", i, id))
+      H.assertEq(r.queued[i], id, string.format("queued item %d is $%02X: the body's rare, else its common", i, id))
     end
     H.assertEq(r.mp0 - r.mp1, MARK_MP, "Master's Mark cost 99 MP")
     H.assertEq(r.bank1, r.bank0 - 3, "the bank paid the full boost")
@@ -132,6 +137,7 @@ local function judge()
       end
     end
     H.assertEq(r.q1, r.q0, "the queue did not grow")
+    H.assertEq(#r.queued, 0, "nothing was queued")
     H.assertEq(r.mp0 - r.mp1, 0, "a Master's Mark under three points costs nothing")
     H.assertEq(r.bank1, r.bank0 - 2, "the bank paid the two points pending")
   end
