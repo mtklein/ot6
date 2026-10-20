@@ -945,13 +945,16 @@ STATES = [
     S("wor_phoenix", gen="gen_wor_phoenix", prev="wor_tower",
       checkpoint="wor-thamasa-v1", timeout=7200),
 
-    # wor-phoenix-v1 -> LOCKE joined, CELES and LOCKE on the Falcon (map
-    # 189): the bridge, the Red Dragon (event battle 138, a game over when
-    # lost: the runner retries from the save point), the jump plate, the
-    # last bridge, LOCKE (docs/design/split-party.md).  A cut; it saves
-    # nothing yet: the regroup and the save are the next arc's (#268).
+    # wor-phoenix-v1 -> the World of Ruin map outside Kohlingen (40,45):
+    # the bridge, the Red Dragon (event battle 138, a game over when lost:
+    # the runner retries from the save point), the jump plate, the last
+    # bridge, LOCKE and the scene that ends in Kohlingen, the regroup in the
+    # Falcon's cabin, Kohlingen's inn and counters, and Save there: the
+    # `wor-locke-v1` checkpoint, the next arc's boot
+    # (docs/design/route-wor-locke.md).  A cut; saves= until a leg boots
+    # it.  Re-cut by checkpoint_drift.py --recut.
     S("wor_locke", gen="gen_wor_locke", prev="wor_phoenix",
-      checkpoint="wor-phoenix-v1", timeout=7200),
+      checkpoint="wor-phoenix-v1", saves="wor-locke-v1", timeout=7200),
 
 ]
 

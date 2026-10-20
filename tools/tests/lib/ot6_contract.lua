@@ -2033,6 +2033,42 @@ M.contracts["wor-phoenix-v1"] = {
   },
 }
 
+-- wor-locke-v1: the World of Ruin map outside Kohlingen, on foot on the
+-- tile east of its door (40,45), after the Phoenix Cave: the Red Dragon
+-- beaten ($069C cleared, _cc2048), LOCKE joined (_cc2b43, _cc3178) and the
+-- party one again; LOCKE, TERRA, CELES and RELM seated after the Falcon's
+-- cabin, Kohlingen's inn and counters (docs/design/route-wor-locke.md).
+-- No timer.
+M.contracts["wor-locke-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 40, y = 45 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x02DB, 1, "MagiMaster beaten (_cc544b)" },
+    { 0x069C, 0, "the Red Dragon beaten (_cc2048)" },
+    { 0x00D7, 1, "LOCKE found (_cc2b43)" },
+    { 0x02F1, 1, "LOCKE available ($02F0 + 1)" },
+    { 0x01CE, 0, "party switching off: one party again (_cc3178)" },
+  },
+  party = {
+    size = 4,                     -- LOCKE, TERRA, CELES and RELM
+    members = {
+      { 0x01, "LOCKE" },
+      { 0x00, "TERRA" },
+      { 0x06, "CELES" },
+      { 0x08, "RELM" },
+    },
+  },
+  ram = {
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)

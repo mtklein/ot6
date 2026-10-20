@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-locke.sram",
+  "slot": 3,
+  "milestone": "wor-locke",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "map": 1,
+      "x": 40,
+      "y": 45
+    }
+  },
+  "size": 32768,
+  "sha256": "5bb777b6911e9bb5bcca91b0e184a621fa6f61dd171b8d5935e8ad6b08debb0b",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "5bb777b6911e9bb5bcca91b0e184a621fa6f61dd171b8d5935e8ad6b08debb0b",
+    "generator_sig": "6c08ec71c5cf79a54e58e08312306e165e024190aeb9dddeee007150192c97e8 gen_wor_locke build/cap/cp1/wor-phoenix-v1/manifest.json build/cap/cp1/wor-phoenix-v1/wor-phoenix.sram",
+    "ancestors": [
+      {
+        "path": "build/cap/cp1/wor-phoenix-v1/manifest.json",
+        "sha256": "afbbfff225fd648bbbbde98d5de056a98a782004ebba8358b024b6fc4a56b417"
+      }
+    ]
+  }
+}

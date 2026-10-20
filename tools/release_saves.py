@@ -80,6 +80,8 @@ TITLES = {
     "wor-owzer-v1": "Owzer's basement, save point before Chadarnook",
     "wor-tower-v1": "Outside the Fanatics' Tower, after Strago joins",
     "wor-thamasa-v1": "Outside the Fanatics' Tower, after MagiMaster",
+    "wor-phoenix-v1": "Phoenix Cave, save point with the party split",
+    "wor-locke-v1": "Outside Kohlingen, after Locke joins",
 }
 
 README = """\

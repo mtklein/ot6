@@ -13,6 +13,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 local TERRA, CYAN, SABIN, CELES, STRAGO, RELM, MOG, UMARO = 0, 2, 5, 6, 7, 8, 10, 13
 local POTION, FENIX, REMEDY, TENT, TINCTURE = 0xE9, 0xF0, 0xF5, 0xF7, 0xEB
+local WING_EDGE = 0x4C
 local MAP_THAMASA, MAP_THAMASA_ITEMS, MAP_THAMASA_INN = 344, 347, 346
 local THAMASA_DOOR, THAMASA_LANDING = { 251, 230 }, { 250, 229 }
 local THAMASA_AVOID = { { 22, 39 }, { 23, 39 } }
@@ -288,6 +289,20 @@ H.run({ maxFrames = 2400000 }, {
   -- @@stage north
   H.switchParty(1),
   door(29, 38, MAP_DEEP, "party 1: the west side -> 313 (29,34)"),
+  -- the Wing Edge (315 (24,43), treasure bit 172), LOCKE's: its chest
+  -- stands past a pit (315 (24,44), _cc280e: the floor gives way and drops
+  -- the party to 313 (25,44)); the step below, (23,49), lays the bridge
+  -- for good ($02A5, _cc284b).  From 313's west side the walk round by
+  -- 313 (24,50) comes up below it (route_data field-path:
+  -- build/attempts/wt/v032-locke-arc/data/paths.txt)
+  door(24, 50, MAP_CAVE, "party 1: 313 (24,50) -> 315 (24,54), below the Wing Edge"),
+  walk(23, 49, "party 1 onto (23,49): the bridge over the pit"),
+  H.waitUntil(function() return sw(0x02A5) == 1 and settled() end, 1200, "the bridge over the pit ($02A5)", 1),
+  chestIfNear(24, 43, 0x0AC, "Wing Edge (315 (24,43))", WING_EDGE),
+  H.call(function()
+    H.assertEq(H.chestOpen(0x0AC), true, "the Wing Edge's chest is open (bit 172)")
+  end),
+  door(24, 55, MAP_DEEP, "party 1: back down to 313 (24,51)"),
   walk(41, 27, "party 1 onto (41,27): the passage north for the east side ($02AA)"),
   H.waitUntil(function() return sw(0x02AA) == 1 and settled() end, 1200, "$02AA set", 1),
   H.switchParty(2),
