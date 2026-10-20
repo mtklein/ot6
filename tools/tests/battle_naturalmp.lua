@@ -93,11 +93,17 @@ local function installWatches()
   end, emu.callbackType.write, 0x7E3A7D, 0x7E3A7D)
 end
 -- a slot's pool as the battle last held it: the last write before the
--- teardown's $FFFF, or the pool it loaded with when nothing wrote it
+-- teardown's $FFFF, or the pool it loaded with when nothing wrote it.  The
+-- teardown is a fill (X its index, $23F8 measured, never an entity's
+-- offset 0-$13 as every action's charge is), so no write it makes is a
+-- pool the battle held, whatever its bytes read as: the v0.33
+-- qualification's fill wrote slot 0's low byte with no high byte beside
+-- it ("f2884 slot0 30->255 ($b5=00 $b6=F7 $3a7c=FFFF X=23F8)",
+-- build/attempts/wt/v033-wor-gau/q1), which read as the battle's last pool
 local function battleExitPool(s)
   for i = #poolWrites, 1, -1 do
     local w = poolWrites[i]
-    if w.slot == s and w.new < 10000 then return w.new, w end
+    if w.slot == s and w.new < 10000 and w.x < 0x100 then return w.new, w end
   end
   return fieldPre[s], nil
 end
