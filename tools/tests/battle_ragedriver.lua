@@ -16,7 +16,7 @@
 --   2. the price: GAU's MP (his record, $1600 + 37 * 11 + $0D) after the
 --      battle is his MP before it less 8, over the start and at least one
 --      possessed turn: 8 once, nothing a turn;
---   3. the tier: OT6_RAGETIER ($57BB) holds the plan's boost (Cmd_10
+--   3. the tier: OT6_RAGETIER holds the plan's boost (Cmd_10
 --      stores the pending pips, capped 3), so the coin the plan bought is
 --      the coin the trance rolls;
 --   4. the plan's choice: no standing body absorbed or nulled the chosen
@@ -28,7 +28,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local GAU = 0x0B
-local RAGETIER = 0x57BB
+local RAGETIER = nil                  -- OT6_RAGETIER (ot6_memory.inc), read from the symbols
 local BUDGET = 16                     -- battles to see a measured Rage in
 local A, B = { 57, 45 }, { 58, 45 }
 local FIGHT = {}
@@ -50,6 +50,7 @@ local inBattle = false
 H.run({ maxFrames = 900000 }, {
   H.bootCheckpoint("wor-veldt-cave-v1"),
   H.call(function()
+    RAGETIER = H.sym("OT6_RAGETIER") & 0xFFFF
     H.assertEq(H.partyOfChar(GAU), 1, "GAU seated in wor-veldt-cave-v1 (the play's own save)")
     n0 = #H.outcomes
     emu.addMemoryCallback(function()
