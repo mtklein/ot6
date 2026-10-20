@@ -2519,6 +2519,31 @@ Ot6ShieldTbl:
                                 ;   fire|poison vanilla (gau's were-rat);
                                 ;   absorbs ice (celes's runic, not her
                                 ;   spells)
+        ; ---- the world of ruin: the veldt (gau; route-wor-gau.md section
+        ; 3) -------------------------------------------------------------
+        ; The Veldt deals every formation the save has fought; these seven
+        ; World of Balance bodies rode the floor and the play met them there
+        ; (the sweeps' [key] lines, met.txt).  Each keeps the floor's
+        ; shields and class, so the World of Balance parties that meet them
+        ; at home keep their key, and gains one from its body.
+        .word   $0013
+        .byte   2, OT6_SLASH|OT6_PIERCE ; were-rat: a rat; fire vanilla
+        .word   $0017
+        .byte   2, OT6_SLASH|OT6_BLUDG ; leafer: a rabbit; fire|water
+                                ;   vanilla, absorbs ice
+        .word   $001b
+        .byte   2, OT6_SLASH|OT6_BLUDG ; vomammoth: a crushing blow on the
+                                ;   hide; fire vanilla
+        .word   $0028
+        .byte   2, OT6_SLASH|OT6_PIERCE ; dark wind: a bird; fire vanilla
+        .word   $0042
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; m-tekarmor: armour; bolt|poison
+                                ;   (poison an ot6 add)
+        .word   $004d
+        .byte   2, OT6_SLASH|OT6_PIERCE ; repo man: a thief; poison vanilla
+        .word   $005d
+        .byte   2, OT6_SLASH|OT6_BLUDG ; areneid: a shelled crawler;
+                                ;   ice|poison|water (poison an ot6 add)
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian

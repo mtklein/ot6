@@ -1,10 +1,11 @@
 -- @suite
 -- battle_breakwor_gau.lua -- the World of Ruin break rows for the Gau arc
--- (the Veldt cave: its pool, Allo Ver's monster chest and the SrBehemoth),
+-- (the Veldt cave: its pool, Allo Ver's monster chest and the SrBehemoth;
+-- and the seven World of Balance bodies the play met on the Veldt),
 -- re-verified from the built ROM (battle_breakwor_locke's shape: pure ROM
 -- bytes, no savestate).  docs/design/route-wor-gau.md section 3 is the
--- design; WANT below is its table, and the only place the expectations
--- live.
+-- design; WANT and VELDT below are its tables, and the only place the
+-- expectations live.
 --
 --   1. each species carries exactly its designed Ot6ShieldTbl row and keeps
 --      its vanilla weak and absorb bytes, with no Ot6ElemAddTbl row;
@@ -15,7 +16,11 @@
 --      wor-veldt-cave-v1 seats them);
 --   3. the lesson: GAU alone holds a key to every body here (his fists and
 --      his beasts' bludgeon, Were-Rat's poison), and the cave drinks
---      CELES's ice (Toe Cutter, the SrBehemoth).
+--      CELES's ice (Toe Cutter, the SrBehemoth);
+--   4. the Veldt's seven: each carries its designed row, keeps the floor's
+--      shields and class (the World of Balance parties that meet them at
+--      home keep their key) and its vanilla and added elements, and is
+--      keyed for the three who walk the Veldt (TERRA, CELES, RELM).
 -- All mismatches are logged before the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -38,6 +43,17 @@ local TERRA = { "TERRA", PIERCE, FIRE | HOLY }
 local CELES = { "CELES", SLASH, ICE | BOLT | POISON }
 local RELM = { "RELM", BLUDG, EARTH }
 local GAU = { "GAU", BLUDG, POISON | BOLT }
+-- the Veldt's seven: species -> { name, shields, classes, the floor's class
+-- (OT6_FLOOR_CLASS), vanilla weak, vanilla absorb, element added }
+local VELDT = {
+  [0x013] = { "Were-Rat", 2, SLASH | PIERCE, SLASH, FIRE, POISON, 0 },
+  [0x017] = { "Leafer", 2, SLASH | BLUDG, SLASH, FIRE | WATER, ICE, 0 },
+  [0x01B] = { "Vomammoth", 2, SLASH | BLUDG, SLASH, FIRE, 0, 0 },
+  [0x028] = { "Dark Wind", 2, SLASH | PIERCE, SLASH, FIRE, 0, 0 },
+  [0x042] = { "M-TekArmor", 3, PIERCE | BLUDG, PIERCE, BOLT, 0, POISON },
+  [0x04D] = { "Repo Man", 2, SLASH | PIERCE, SLASH, POISON, 0, 0 },
+  [0x05D] = { "Areneid", 2, SLASH | BLUDG, SLASH, ICE | WATER, 0, POISON },
+}
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what }
   for _, m in ipairs(list) do
@@ -47,6 +63,7 @@ local function union(what, list)
   return h
 end
 local FOUR = union("the four (TERRA, CELES, RELM, GAU)", { TERRA, CELES, RELM, GAU })
+local THREE = union("the Veldt's three (TERRA, CELES, RELM)", { TERRA, CELES, RELM })
 local GAU_ALONE = union("GAU alone", { GAU })
 
 local GROUPS = { { "field", 132, FOUR }, { "event", 153, FOUR }, { "event", 82, FOUR } }
@@ -183,7 +200,35 @@ H.run({ maxFrames = 600 }, {
       if (absorb(sp) & ICE) == 0 then problem("$%03X %s no longer drinks CELES's ice", sp, WANT[sp][1]) end
     end
     if (weakOf(0x119) & POISON) == 0 then problem("$119: the SrBehemoth lost its vanilla poison (Were-Rat's key)") end
+
+    -- 4. the Veldt's seven
+    local vids = {}
+    for sp in pairs(VELDT) do vids[#vids + 1] = sp end
+    table.sort(vids)
+    for _, sp in ipairs(vids) do
+      local w = VELDT[sp]
+      local got = shield[sp]
+      local fl = H.readRomByte(floor + sp)
+      if got == nil then
+        problem("$%03X %s has no Ot6ShieldTbl row (want %d, class $%02X)", sp, w[1], w[2], w[3])
+      else
+        if got[1] ~= w[2] then problem("$%03X %s shields %d, want %d", sp, w[1], got[1], w[2]) end
+        if got[2] ~= w[3] then problem("$%03X %s class mask $%02X, want $%02X", sp, w[1], got[2], w[3]) end
+        if (got[2] & fl) ~= fl then problem("$%03X %s lost the floor's class $%02X", sp, w[1], fl) end
+        local lvl = H.readRomByte(prop + sp * 32 + 16)
+        if got[1] ~= 2 + lvl // 8 then
+          problem("$%03X %s shields %d, the floor's (2 + L%d / 8) %d", sp, w[1], got[1], lvl, 2 + lvl // 8)
+        end
+      end
+      if fl ~= w[4] then problem("$%03X %s floor class $%02X, the design read $%02X", sp, w[1], fl, w[4]) end
+      if weak(sp) ~= w[5] then problem("$%03X %s weak byte $%02X, want vanilla $%02X", sp, w[1], weak(sp), w[5]) end
+      if absorb(sp) ~= w[6] then problem("$%03X %s absorb byte $%02X, want vanilla $%02X", sp, w[1], absorb(sp), w[6]) end
+      local add = elemAdd[sp] and elemAdd[sp][1] or 0
+      if add ~= w[7] then problem("$%03X %s adds elements $%02X, want $%02X", sp, w[1], add, w[7]) end
+      if not keys(sp, THREE.cls, THREE.el) then problem("$%03X %s: no key for %s", sp, w[1], THREE.what) end
+    end
+    H.log(string.format("checked the Veldt's %d rows", #vids))
     H.assertEq(#problems, 0, "WoR Gau arc break row mismatches")
-    H.log("WoR Gau arc (the Veldt cave) break rows verified against the built ROM")
+    H.log("WoR Gau arc (the Veldt cave, the Veldt) break rows verified against the built ROM")
   end),
 })
