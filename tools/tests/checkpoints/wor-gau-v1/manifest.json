@@ -11,5 +11,18 @@
       "x": 139,
       "y": 21
     }
+  },
+  "size": 32768,
+  "sha256": "26ab669bf46977a22ece2a0c248dd84c2f124c3114b34204a690b48e5a2c79ed",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "26ab669bf46977a22ece2a0c248dd84c2f124c3114b34204a690b48e5a2c79ed",
+    "generator_sig": "7c1f5b3bac28daf9245af499f41c1c6e3236c41132fd0fcab00dc71a1cbcef74 gen_wor_gau tools/tests/checkpoints/wor-veldt-cave-v1/manifest.json tools/tests/checkpoints/wor-veldt-cave-v1/wor-veldt-cave.sram",
+    "ancestors": [
+      {
+        "path": "tools/tests/checkpoints/wor-veldt-cave-v1/manifest.json",
+        "sha256": "037a9e31bc023d873b499000e154e15bd33e6bf94e051d7165719e58344ae34d"
+      }
+    ]
   }
 }
