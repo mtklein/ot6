@@ -14036,7 +14036,20 @@ function M.setzerBattle(plan, opts)
       -- Preserve the formation while SETZER has a plan.  His lost control
       -- is handled by care above, through actual cures rather than attacks
       -- that could end the encounter before its property is exercised.
-      if p ~= nil and not opts.othersFight then defend(st) else fight(a, st) end
+      -- The plan holds the formation until its last row has RUN, not only
+      -- been confirmed: a row confirmed late (his window spent first on a
+      -- Zombied ally's cure) waits in the queue while the others' Fights
+      -- end the crowd, and the throw never runs (wor-tomb-v1 on
+      -- wt/v032-locke-kit-q's chain: SETZER confirmed at f17408, every body
+      -- down by f17520, build/attempts/wt/v032-locke-kit/qual/).
+      local inFlight = 0
+      for _, q in ipairs(plan) do
+        -- the rows a record closes (a reel spin makes none)
+        if q.confirmedAt ~= nil and q.confirmedAt >= (Z.startF or 0) and (q.cmd == 0x18 or (type(q.row) == "number" and q.row >= 0x59
+            and q.row <= 0x5B)) then inFlight = inFlight + 1 end
+      end
+      inFlight = inFlight - #(M.vars.setzer or {}) - #(M.vars.setzerTaken or {})
+      if (p ~= nil or inFlight > 0) and not opts.othersFight then defend(st) else fight(a, st) end
       return
     end
     Z.entity = a * 2
@@ -14188,7 +14201,7 @@ function M.setzerBattle(plan, opts)
     end
   end
   return M.seqStep({
-    M.call(function() M.logRomIdentity("[setzer]") end),
+    M.call(function() Z.startF = M.frame; M.logRomIdentity("[setzer]") end),
     M.waitUntil(function() return M.battleActive() end, 1200, "the battle is up", 2),
     M.driveUntil(function()
       if opts.untilPlanDone and k > #plan and Z.rec == nil then
