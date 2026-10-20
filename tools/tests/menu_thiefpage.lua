@@ -4,22 +4,25 @@
 -- The skills list has an 8th row, Thief, gated like every other row by the
 -- character's own battle commands, and A on it opens a field info page in
 -- the Blitz page's shape: one column, name + MP price per row, B backs out,
--- A is a no-op.  Three rows, always -- there is no learned set: Steal,
--- Filch and Bestow exist from the moment Locke does.
+-- A is a no-op.  Eight rows, the battle list's order read a column at a
+-- time (ot6_thief.asm Ot6ThiefRowTbl): Steal, Filch and Bestow from the
+-- moment Locke joins; Mug, Trickshot, Dismantle, Appraise and Master's Mark
+-- once their story beat's event switch is set (#382), the Blitz page's
+-- locked marker before that.
 --
--- Names come from the ROM's own AttackName records: the thief row ids
--- $56-$58 are AttackName pad slots (record = id - $51, so 5/6/7).  Prices
--- come from the same two authorities the battle charge reads: Steal from
--- Ot6StealCost's immediate, Filch/Bestow from Ot6ThiefCostTbl's (key, cost)
--- records -- not Ot6AbilityCostTbl, which keys $55-$5c as SwdTech boost
--- rows.  There is no probe-icon column: Ot6SkillClassTbl keys $56-$58 to
--- SwdTech's slash class, so an icon here would teach the wrong thing.
+-- Names come from the ROM's own Ot6ThiefName records (one per row, in
+-- order).  Prices come from the same two authorities the battle charge
+-- reads: Steal from Ot6StealCost's immediate, the rest from
+-- Ot6ThiefCostTbl's (key, cost) records -- not Ot6AbilityCostTbl, which keys
+-- $55-$5c as SwdTech boost rows.  There is no probe-icon column.
 --
--- Geometry is the Blitz page's: rows 1/3/5 (odd rows only, nothing past row
--- 15), name at column 3 flush against the cursor at x=8
+-- Geometry is the Blitz page's: rows 1/3/.../15 (odd rows only, nothing past
+-- row 15), name at column 3 flush against the cursor at x=8
 -- (cursor_x = 8*col - 16), price right-aligned at column 16.
 --
--- Fixture: celes_freed, the real just-freed-Celes save.  LOCKE carries
+-- Fixture: celes_freed, the real just-freed-Celes save, after the Lete
+-- River ($001A: Trickshot learned) and before his escape ($001E: Mug not
+-- yet), so the page shows both kinds of row.  LOCKE carries
 -- Steal (his own record) so his row is white and the page opens; CELES does
 -- not, so her row is gray and A on it refuses.  Both paths run on one save
 -- with zero memory writes.
@@ -48,18 +51,36 @@ local ZERO_CHAR, DIGIT9 = 0xb4, 0xbd
 local PAD = 0xff                        -- fixed_length_en.json: 0xFF = {pad}
 
 -- ---- the ROM tables this page must agree with ----
-local ATKNAME = H.sym("AttackName") & 0x3FFFFF
-local NAME_SIZE = 10                    -- AttackName::ITEM_SIZE
-local ATKNAME_0 = 0x51                  -- AttackName record 0 is attack id $51
-local THIEF_ATK0 = 0x56                 -- Steal; Filch $57, Bestow $58
-local function nameBytes(id)
-  local t, rec = {}, id - ATKNAME_0
-  for i = 0, NAME_SIZE - 1 do t[i + 1] = H.readRomByte(ATKNAME + rec * NAME_SIZE + i) end
+local NAMES = H.sym("Ot6ThiefName") & 0x3FFFFF
+local ROWTBL = H.sym("Ot6ThiefRowTbl") & 0x3FFFFF
+local NAME_SIZE = 10                    -- Ot6ThiefName's record
+local THIEF_ATK0 = 0x56                 -- Steal
+local ROWS = 8
+local function rowId(i) return H.readRomByte(ROWTBL + i * 5) end
+-- learned: the row's switch (record +3 the byte off $1E80, +4 the bit; 0 =
+-- at join), read off the save
+local function learned(i)
+  local bit = H.readRomByte(ROWTBL + i * 5 + 4)
+  return bit == 0 or (H.readByte(0x1E80 + H.readRomByte(ROWTBL + i * 5 + 3)) & bit) ~= 0
+end
+local LOCKED = H.sym("Ot6BlitzLockedTiles") & 0x3FFFFF
+local function lockedBytes()
+  local t = {}
+  for i = 0, 15 do
+    local b = H.readRomByte(LOCKED + i)
+    if b == 0 then break end
+    t[#t + 1] = b
+  end
   return t
 end
-local function nameText(id)             -- for the log only
+local function nameBytes(i)
+  local t = {}
+  for k = 0, NAME_SIZE - 1 do t[k + 1] = H.readRomByte(NAMES + i * NAME_SIZE + k) end
+  return t
+end
+local function nameText(i)              -- for the log only
   local s = ""
-  for _, b in ipairs(nameBytes(id)) do
+  for _, b in ipairs(nameBytes(i)) do
     if b == PAD then s = s .. "."
     elseif b >= 0x80 and b <= 0x99 then s = s .. string.char(65 + b - 0x80)
     elseif b >= 0x9a and b <= 0xb3 then s = s .. string.char(97 + b - 0x9a)
@@ -89,7 +110,7 @@ end
 
 -- ---- page geometry, mirroring skills.asm's Ot6ThiefPageDraw ----
 local NAME_COL, COST_COL = 3, 16
-local function thiefRow(i) return 1 + i * 2 end   -- odd rows 1/3/5 (#43)
+local function thiefRow(i) return 1 + i * 2 end   -- odd rows 1..15 (#43)
 
 local function assertRun(x0, y, bytes, what)
   for i, b in ipairs(bytes) do
@@ -106,26 +127,22 @@ end
 
 -- Even rows are four scanlines in this window and rows past 15 are outside
 -- it, so nothing may land on either.  Column 30 is the window's right
--- border; columns 0-2 the cursor gutter on every row.  This page has only
--- three rows, so rows 7..15 must also stay blank.
+-- border; columns 0-2 the cursor gutter on every row.
 local function assertGeometry(what)
   for y = 0, 27 do
-    if y % 2 == 0 or y > 5 then
+    if y % 2 == 0 or y > 15 then
       assertRowBlank(y, string.format(
         "%s: row %d must be empty (%s)", what, y,
-        (y % 2 == 0) and "even: four scanlines"
-          or (y > 15) and "outside the window"
-          or "past the page's three rows"))
+        (y % 2 == 0) and "even: four scanlines" or "outside the window"))
     end
   end
-  for y = 1, 5, 2 do
+  for y = 1, 15, 2 do
     for _, x in ipairs({ 0, 1, 2, 13, 14, 15, 30, 31 }) do
       H.assertEq(cell(x, y), 0, string.format(
         "%s: {%d,%d} must stay blank -- %s", what, x, y,
         (x <= 2) and "the cursor sprite's gutter"
           or (x >= 30) and "the window's border column"
-          or "the gap between name and price (NO icon column on this page: "
-             .. "Ot6SkillClassTbl keys $56-$58 as SwdTech slash rows)"))
+          or "the gap between name and price (NO icon column on this page)"))
     end
     for x = COST_COL + 5, 29 do
       H.assertEq(cell(x, y), 0, string.format(
@@ -160,9 +177,18 @@ end
 
 -- ---- one row: name + price, and deliberately no icon ----
 local function assertThiefRow(i)
-  local id, y = THIEF_ATK0 + i, thiefRow(i)
-  assertRun(NAME_COL, y, nameBytes(id),
-    string.format("thief row %d name %s", i, nameText(id)))
+  local id, y = rowId(i), thiefRow(i)
+  if not learned(i) then
+    assertRun(NAME_COL, y, lockedBytes(), string.format("thief row %d ($%02X, not learned) draws the locked "
+      .. "marker", i, id))
+    for x = COST_COL, COST_COL + 1 do
+      local c = cell(x, y)
+      H.assertEq(c >= ZERO_CHAR and c <= DIGIT9, false, string.format("thief row %d (locked) draws no price", i))
+    end
+    return
+  end
+  assertRun(NAME_COL, y, nameBytes(i),
+    string.format("thief row %d name %s", i, nameText(i)))
   local cost = costOf(id)
   H.assertEq(cost > 0, true, string.format(
     "thief row %d (%s) is priced -- every ability costs MP (v0.5); a zero "
@@ -209,10 +235,12 @@ H.run({ maxFrames = 30000 }, {
       "LOCKE's own record carries BATTLE_CMD::STEAL -- nothing is installed")
     H.assertEq(hasSteal(CHAR_CELES), false,
       "CELES's record does not carry Steal -- she is the gray-row control")
-    for i = 0, 2 do
-      H.log(string.format("thief row %d %s costs %d MP",
-        i, nameText(THIEF_ATK0 + i), costOf(THIEF_ATK0 + i)))
+    for i = 0, ROWS - 1 do
+      H.log(string.format("thief row %d $%02X %s costs %d MP, %s", i, rowId(i), nameText(i), costOf(rowId(i)),
+        learned(i) and "learned" or "not learned yet"))
     end
+    H.assertEq(learned(4), true, "the Lete River is behind this save: Trickshot is learned ($001A)")
+    H.assertEq(learned(3), false, "his escape is ahead of this save: Mug is not learned ($001E)")
   end),
   H.pressButtons({ "down" }, 2),            -- Items -> Skills
   H.waitFrames(6),
@@ -239,17 +267,17 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(90),                         -- draws + DMA settle
 
   H.call(function()
-    for i = 0, 2 do assertThiefRow(i) end
+    for i = 0, ROWS - 1 do assertThiefRow(i) end
     assertGeometry("thief page")
-    for n = 0, 2 do assertCursorGutter(n, "thief page") end
+    for n = 0, ROWS - 1 do assertCursorGutter(n, "thief page") end
     H.assertEq(H.readByte(0x9ec9), 0xff,
       "description buffer holds the blank marker -- the thief rows have no "
       .. "desc asset and must not show another page's text")
     H.screenshot("thiefpage_rows")
-    H.log("RENDER OK: Skills->Thief for a REAL LOCKE -- three rows, each the "
-      .. "AttackName record's own name and the charge's own price, no icon "
-      .. "column, no fourth row, every cell inside rows 1/3/5 and clear of "
-      .. "the gutter and border")
+    H.log("RENDER OK: Skills->Thief for a REAL LOCKE -- eight rows, each learned "
+      .. "one Ot6ThiefName's own name and the charge's own price, each other one "
+      .. "the locked marker, no icon column, every cell inside rows 1..15 and "
+      .. "clear of the gutter and border")
   end),
 
   H.pressButtons({ "down" }, 2),
@@ -260,7 +288,7 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(st(), ST_THIEF, "still on the thief page")
     H.assertEq(H.readByte(ZCURSOR), 2,
       "one column: two steps down is row 2 (Bestow)")
-    for n = 0, 2 do assertCursorGutter(n, "cursor on row 2") end
+    for n = 0, ROWS - 1 do assertCursorGutter(n, "cursor on row 2") end
   end),
 
   H.pressButtons({ "b" }, 3),

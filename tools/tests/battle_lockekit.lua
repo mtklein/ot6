@@ -69,11 +69,11 @@ local seat, rec, stage, battles, mode = nil, nil, 1, 0, nil
 local plan = {}
 local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
 local function lockeX() return (emu.getState()["cpu.x"] & 0xFF) == seat * 2 end
-local function inProc(name, size)
+local function inAnalyzeOne()
   local st = emu.getState()
   local pc = (st["cpu.k"] << 16) | st["cpu.pc"]
-  local a = H.sym(name)
-  return pc >= a and pc < a + size
+  local a = H.sym("Ot6AnalyzeOne")
+  return pc >= a and pc < a + 76      -- the proc's size (ff6-en.dbg)
 end
 
 -- the return address of the jsl that entered the routine now executing (its
@@ -141,7 +141,7 @@ local function arm()
   end, emu.callbackType.exec, H.sym("Ot6BoostDmg"), H.sym("Ot6BoostDmg"))
   -- the pending reveal Ot6AnalyzeOne writes, per slot (battle_analyze's)
   emu.addMemoryCallback(function(addr, v)
-    if rec == nil or rec.ended or not inProc("Ot6AnalyzeOne", 76) then return end
+    if rec == nil or rec.ended or not inAnalyzeOne() then return end
     local o = addr - 0x7EED45
     local cls = o >= 12
     local s = (cls and o - 12 or o) // 2
