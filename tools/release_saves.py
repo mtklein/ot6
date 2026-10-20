@@ -84,7 +84,7 @@ TITLES = {
     "wor-locke-v1": "Outside Kohlingen, after Locke joins",
     "wor-ragnarok-v1": "Outside Narshe, after Ragnarok",
     "wor-veldt-cave-v1": "Veldt cave, save point, after Gau joins",
-    "wor-gau-v1": "Outside Thamasa, after the Veldt cave",
+    "wor-gau-v1": "By Duncan's house, after the Veldt cave and Gau's father",
 }
 
 README = """\

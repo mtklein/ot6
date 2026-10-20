@@ -2114,21 +2114,17 @@ M.contracts["wor-ragnarok-v1"] = {
 }
 
 -- wor-veldt-cave-v1: the Veldt cave's save point, map 353 (57,44), after
--- Duncan's house (SABIN's Bum Rush, _cc0bd8: $02AF), the Veldt (GAU joined
--- after a battle: MiscAIEffect_03 sets $1EDF bit 3), his father's house
--- (_cb6527 .. : $0245, $0249) and the cave's first half: the dog
--- (_cb799f: $0195), the three chests, the wall (_cb79e6: $016E).  The dog's
--- master and the SrBehemoth (_cb7a18: $0199) are ahead.  TERRA, CELES,
--- RELM and GAU seated (docs/design/route-wor-gau.md).  The retry point for
--- the SrBehemoth.  No timer.
+-- the Veldt (GAU joined after a battle: MiscAIEffect_03 sets $1EDF bit 3)
+-- and the cave's first half: the dog (_cb799f: $0195), the three chests,
+-- the wall (_cb79e6: $016E).  The dog's master and the SrBehemoth
+-- (_cb7a18: $0199), the father's house and Duncan's are ahead.  TERRA,
+-- CELES, RELM and GAU seated (docs/design/route-wor-gau.md).  The retry
+-- point for the SrBehemoth.  No timer.
 M.contracts["wor-veldt-cave-v1"] = {
   slot = 3,
   field = { map = 353, x = 57, y = 44 },   -- the vanilla save point (353 NPC_1)
   switches = {
     { 0x00A4, 1, "the World of Ruin (:12423)" },
-    { 0x02AF, 1, "Duncan's Bum Rush taught (_cc0bd8)" },
-    { 0x0245, 1, "GAU's father found (_cb6527)" },
-    { 0x0249, 1, "the father's scene done, GAU back (_cb6639 ..)" },
     { 0x0195, 1, "the dog met in the cave (_cb799f)" },
     { 0x016E, 1, "the cave's wall open (_cb79e6)" },
     { 0x0199, 0, "the dog's master not yet found (_cb7a18)" },
@@ -2155,36 +2151,39 @@ M.contracts["wor-veldt-cave-v1"] = {
   },
 }
 
--- wor-gau-v1: the World of Ruin map, on foot on the Falcon's tile outside
--- Thamasa (250,231: _cb7a18's airship_pos), after the Veldt cave: the
+-- wor-gau-v1: the World of Ruin map, on foot on the Falcon's tile by
+-- Duncan's house north-east of Narshe (139,21), after the Veldt cave: the
 -- SrBehemoth beaten and SHADOW carried to Strago's house (_cb7a18 ..
--- _cb7ccf: $0199), the Memento Ring, Thamasa's item counter, and SHADOW
--- gone to the Colosseum as the party left the town (_cb7d69: $019F).
--- TERRA, CELES, RELM and GAU seated (docs/design/route-wor-gau.md).  No
+-- _cb7ccf: $0199), the Memento Ring, Thamasa's item counter, SHADOW gone to
+-- the Colosseum as the party left the town (_cb7d69: $019F), the father's
+-- house (_cb6527 ..: $0245, $0249) and Duncan's (_cc0bd8: $02AF, Bum Rush).
+-- SABIN, GAU, TERRA and CELES seated (docs/design/route-wor-gau.md).  No
 -- timer.
 M.contracts["wor-gau-v1"] = {
   slot = 3,
-  world = { map = 1, x = 250, y = 231 },
+  world = { map = 1, x = 139, y = 21 },
   switches = {
     { 0x00A4, 1, "the World of Ruin (:12423)" },
-    { 0x02AF, 1, "Duncan's Bum Rush taught (_cc0bd8)" },
-    { 0x0249, 1, "the father's scene done, GAU back (_cb6639 ..)" },
     { 0x0199, 1, "the dog's master found, the SrBehemoth beaten (_cb7a18)" },
     { 0x019F, 1, "SHADOW left Thamasa for the Colosseum (_cb7d69)" },
+    { 0x0245, 1, "GAU's father found (_cb6527)" },
+    { 0x0249, 1, "the father's scene done, GAU back (_cb6639 ..)" },
+    { 0x02AF, 1, "Duncan's Bum Rush taught (_cc0bd8)" },
   },
   party = {
-    size = 4,                     -- TERRA, CELES, RELM and GAU
+    size = 4,                     -- SABIN, GAU, TERRA and CELES
     members = {
+      { 0x05, "SABIN" },
+      { 0x0B, "GAU" },
       { 0x00, "TERRA" },
       { 0x06, "CELES" },
-      { 0x08, "RELM" },
-      { 0x0B, "GAU" },
     },
   },
   ram = {
-    { 0x1F62, 0xFF, 250, "the Falcon parked at x 250 (save-block cell $1F62)" },
-    { 0x1F63, 0xFF, 231, "the Falcon parked at y 231 (save-block cell $1F63)" },
+    { 0x1F62, 0xFF, 139, "the Falcon parked at x 139 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 21, "the Falcon parked at y 21 (save-block cell $1F63)" },
     { 0x1EDF, 0x08, 0x08, "GAU available ($1EDF bit 3)" },
+    { 0x1D28, 0x80, 0x80, "SABIN knows Bum Rush ($1D28 bit 7, give_blitz)" },
     { 0x1E5C, 0x08, 0x08, "the Memento Ring's chest open (treasure bit $0E3)" },
     { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
     { 0x118A, 0xFF, 0x00, "timer 0 counter high" },

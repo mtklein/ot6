@@ -3,20 +3,29 @@
 -- the Veldt cave's save point), the door to the dog's master (59,18) and
 -- the scene there (_cb7a18): the SrBehemoth (event battle 82, a game over
 -- when lost: the runner retries from the save point), SHADOW carried to
--- Thamasa on the Falcon and his dream (_cb7b..), Strago's house (the
--- Memento Ring), Thamasa's item counter, and off the town's edge, where
--- SHADOW leaves for the Colosseum (_cb7d69: $019F), then the save beside
--- the Falcon: the `wor-gau-v1` battery, the next arc's boot.
+-- Thamasa on the Falcon and his dream, Strago's house (the Memento Ring),
+-- Thamasa's item counter, and off the town's edge, where SHADOW leaves for
+-- the Colosseum (_cb7d69: $019F).  Then the Falcon's cabin (SABIN, GAU,
+-- TERRA and CELES), the father's house (SABIN and GAU: the scene), Duncan's
+-- house north of Narshe (SABIN's Bum Rush), and the save beside the Falcon
+-- there: the `wor-gau-v1` battery, the next arc's boot.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local TERRA, CELES, RELM, GAU = 0, 6, 8, 11
+local TERRA, LOCKE, SABIN, CELES, RELM, GAU = 0, 1, 5, 6, 8, 11
 local POTION, FENIX, REMEDY, TENT, TINCTURE, REVIVIFY = 0xE9, 0xF0, 0xF5, 0xF7, 0xEB, 0xF1
 local MEMENTO = 0xDB
-local MAP_VCAVE, MAP_HOUSE, MAP_THAMASA, MAP_THAMASA_ITEMS = 353, 349, 344, 347
-local SEATED = { TERRA, CELES, RELM, GAU }
-local NAMES = { [TERRA] = "TERRA", [CELES] = "CELES", [RELM] = "RELM", [GAU] = "GAU" }
+local MAP_DECK, MAP_CABIN, MAP_VCAVE, MAP_HOUSE, MAP_THAMASA, MAP_THAMASA_ITEMS = 11, 12, 353, 349, 344, 347
+local MAP_DUNCAN, MAP_FATHER, MAP_FATHER_IN = 127, 131, 116
+local NAMES = { [TERRA] = "TERRA", [LOCKE] = "LOCKE", [SABIN] = "SABIN", [CELES] = "CELES", [RELM] = "RELM",
+  [GAU] = "GAU" }
 local SHOP_ITEMS = 74
+-- world tiles (route_data world-entrances 1; landable: the property word's
+-- bit 1 clear): the father's house (178,45) -> map 131 (7,13), the Falcon
+-- down on (178,46); Duncan's house (140,20) -> map 127 (7,13), down on
+-- (139,21), where the arc saves
+local FATHER_DOOR, FATHER_LANDING = { 178, 45 }, { 178, 46 }
+local DUNCAN_DOOR, DUNCAN_LANDING = { 140, 20 }, { 139, 21 }
 -- the cave's doors (gen_wor_veldt's), the way from the save point to the
 -- dog's master: (52,53) and through the door (51,53) onto (59,18)
 local DOORS353 = { { 41, 55, 13, 32 }, { 12, 32, 40, 55 }, { 14, 18, 7, 48 }, { 7, 47, 14, 17 }, { 8, 55, 17, 25 },
@@ -41,6 +50,7 @@ local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
 local function c(ch, off) return 0x1600 + 37 * ch + off end
 local function lv(ch) return H.readByte(c(ch, 8)) end
+local function partyOf(ch) return H.readByte(0x1850 + ch) & 7 end
 local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15 and not H.dialogWaiting()
 end
@@ -54,14 +64,170 @@ local function say(tag, what)
     or string.format("map %d (%d,%d)", map(), H.fieldX(), H.fieldY())
   H.log(string.format("[%s] f%d %s %s; %s; %s", tag, H.frame, what, pos, H.partiesLine(), supplies()))
 end
-local function kitLine()
+local function kitLine(members)
   local t = {}
-  for _, ch in ipairs(SEATED) do
+  for _, ch in ipairs(members) do
     local g = {}
     for k = 0x1E, 0x24 do g[#g + 1] = string.format("%02X", H.readByte(c(ch, k))) end
     t[#t + 1] = string.format("%s L%d kit %s", NAMES[ch], lv(ch), table.concat(g, " "))
   end
   return table.concat(t, "; ")
+end
+-- the rages GAU knows ($1D2C, one bit a species) and the loadout's eight
+-- bytes ($1E1F, rage id + 1, all zero AUTO: kit-gau.md section 4)
+local function rageLine()
+  local n, ids = 0, {}
+  for i = 0, 255 do
+    if (H.readByte(0x1D2C + (i >> 3)) >> (i & 7)) & 1 == 1 then n = n + 1; ids[#ids + 1] = string.format("$%02X", i) end
+  end
+  local l = {}
+  for i = 0, 7 do l[#l + 1] = string.format("%02X", H.readByte(0x1E1F + i)) end
+  return string.format("GAU knows %d rages (%s); loadout %s", n, table.concat(ids, " "), table.concat(l, " "))
+end
+-- walk onto (x, y) until the map reads dst (gen_wor_relm's)
+local function walkInto(x, y, dst, what, avoid)
+  local function there() return map() == dst and H.hasControl() and H.tileAligned() and bright() >= 15 end
+  return H.seqStep({
+    H.repeatN(3, {
+      H.cond(function() return not there() end, {
+        H.navTo(x, y, { maxFrames = 12000, playBattles = "tactical", fight = FIGHT, avoid = avoid,
+          arrive = function() return map() == dst end }),
+        H.release(),
+        H.waitUntil(function() return map() == dst end, 600, what .. ": onto map " .. dst, 5),
+      }, {}),
+    }),
+    H.waitUntil(there, 1200, what .. ": control on map " .. dst, 1),
+    H.call(function() say("route", what) end),
+  })
+end
+-- off a field map's edge onto the world map (gen_wor_locke's outToWorld)
+local function outToWorld(dir, what)
+  local n = 0
+  return H.seqStep({
+    H.driveUntil(function() return H.worldMode() end, 3000, { H.hold({ dir }) }, what),
+    H.release(),
+    H.withReset(H.waitUntil(function()
+      local ok = H.worldSettled() and H.worldAligned() and H.worldPassable(H.worldX(), H.worldY())
+      n = ok and n + 1 or 0
+      return n >= 30
+    end, 2400, what .. ": back on the World of Ruin map"), function() n = 0 end),
+    H.call(function() say("wor", what) end),
+  })
+end
+-- onto a world door until its field map holds the screen
+local function enterFrom(door, dst, what)
+  return H.seqStep({
+    H.worldNavTo(door[1], door[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
+      arrive = function() return map() == dst and not H.worldMode() end }),
+    H.waitUntil(function() return map() == dst and settled() end, 2400, what .. ": map " .. dst, 1),
+    H.call(function() say("route", what) end),
+  })
+end
+-- boarding: on foot on the parked airship's tile, A boards (gen_wor_locke's)
+local function board()
+  local n, ph = 0, 0
+  local drv = H.fightDriverFor("board", { tactical = true, boost = true, items = true, healPercent = 55 }, FIGHT)
+  local battleFrames = 0
+  local function offTile()
+    return not H.battleLoadStarted() and H.worldSettled() and not H.aboardAirship()
+      and (H.worldX() ~= H.readByte(0x1F62) or H.worldY() ~= H.readByte(0x1F63))
+  end
+  return H.withReset(H.driveUntil(function()
+    n = H.airshipControl() and n + 1 or 0
+    return n >= 30
+  end, 30000, {
+    H.cond(offTile, {
+      H.worldNavTo(function() return H.readByte(0x1F62) end, function() return H.readByte(0x1F63) end,
+        { maxFrames = 6000, playBattles = "tactical", fight = FIGHT }),
+    }, {}),
+    H.call(function()
+      if H.battleLoadStarted() then
+        battleFrames = battleFrames + 1
+        if battleFrames >= 3 then drv.frame() end
+        return
+      end
+      if battleFrames > 0 then drv.idle() end
+      ph = (ph + 1) % 16
+      if H.aboardAirship() then H.setPad({}); return end
+      H.setPad(ph < 4 and { "a" } or {})
+    end),
+  }, "board the Falcon"), function() n, ph, battleFrames = 0, 0, 0 end)
+end
+-- the cabin's waiting members (map 12) each ask "Change party members?"
+-- (_caf59d); NPC_n is object $10 + n - 1, shown by its switch
+-- (gen_wor_locke's regroup)
+local CABIN_NPCS = { { "TERRA", 0x10, 0x0388 }, { "CYAN", 0x12, 0x038B }, { "SABIN", 0x15, 0x038D },
+  { "CELES", 0x16, 0x038E }, { "STRAGO", 0x17, 0x038F }, { "RELM", 0x18, 0x0390 }, { "MOG", 0x1A, 0x0392 },
+  { "UMARO", 0x1D, 0x0395 }, { "EDGAR", 0x14, 0x038C }, { "SETZER", 0x19, 0x0391 } }
+local function regroup(members)
+  local obj = nil
+  local function pickTalker()
+    obj = nil
+    for _, n in ipairs(CABIN_NPCS) do
+      local ox, oy = H.objX(n[2]), H.objY(n[2])
+      local reach = H.bfsPath(ox, oy + 1) or H.bfsPath(ox - 1, oy) or H.bfsPath(ox + 1, oy) or H.bfsPath(ox, oy - 1)
+      if obj == nil and sw(n[3]) == 1 and reach then obj = n end
+    end
+    return obj
+  end
+  return H.seqStep({
+    board(),
+    H.withReset((function()
+      local ph = 0
+      return H.driveUntil(function() return map() == MAP_DECK and settled() end, 2400, {
+        H.call(function()
+          ph = (ph + 1) % 16
+          H.setPad((H.airshipControl() and ph < 4) and { "x" } or {})
+        end),
+      }, "X: to the Falcon's deck (map 11)")
+    end)(), function() end),
+    walkInto(24, 8, MAP_CABIN, "the deck -> the cabin (map 12)"),
+    H.call(function() pickTalker() end),
+    H.cond(function() return obj == nil end, {
+      H.navTo(23, 44, { maxFrames = 3000, arrive = function() return H.fieldY() < 40 end }),
+      H.waitUntil(function() return settled() and H.fieldY() < 40 end, 1200, "up the cabin's stairs", 1),
+      H.call(function() pickTalker() end),
+    }, {}),
+    H.call(function()
+      H.assertEq(obj ~= nil, true, "a member waits in the cabin to talk to")
+      H.log(string.format("[regroup] talking to %s (obj $%02X, show-switch $%04X)", obj[1], obj[2], obj[3]))
+    end),
+    H.lazy(function() return H.talkToObj(obj[2], obj[1] .. " in the cabin") end),
+    H.dialogChoice(1, { inBattle = false, what = "Change party members? Yes", tag = "the cabin" }),
+    H.partySelect(members, { tag = "the Falcon's cabin" }),
+    H.waitUntil(function() return map() == MAP_DECK and settled() end, 2400, "back on the deck after the menu", 5),
+    H.call(function()
+      local n = 0
+      for ch = 0, 13 do if partyOf(ch) == 1 then n = n + 1 end end
+      for _, ch in ipairs(members) do
+        H.assertEq(partyOf(ch), 1, string.format("%s is in party 1 after the regroup", NAMES[ch]))
+      end
+      H.assertEq(n, #members, "party 1 holds exactly the regroup's members")
+      say("regroup", "after the menu")
+    end),
+  })
+end
+-- lift off from the deck's wheel (_caf532: face left, A held on (15,8))
+local function liftOff()
+  return H.seqStep({
+    H.navTo(15, 8, { maxFrames = 3000 }),
+    H.faceAndHoldA("left", function() return H.dialogWaiting() end, 1200, "the Falcon's wheel (11 (15,8)): face left, A"),
+    H.release(),
+    H.dialogChoice(0, { inBattle = false, what = "the wheel: (Lift-off)", tag = "the wheel" }),
+  })
+end
+-- the key of every battle (reads only)
+local watchOn = false
+local function watches()
+  return H.call(function()
+    if watchOn then return end
+    watchOn = true
+    local addr = H.seedStoreAddr()
+    emu.addMemoryCallback(function()
+      H.log(string.format("[key] battle key be%02X-g%04X f%d map %d party %d", emu.getState()["cpu.a"] & 0xff,
+        H.readWord(0x11e0), H.frame, map(), H.activeParty()))
+    end, emu.callbackType.exec, addr, addr)
+  end)
 end
 -- a walk over a map's floor and its doors
 local function walk(x, y, what, avoid, arrive)
@@ -90,27 +256,12 @@ local function chestAt(cx, cy, bit, what, item)
       H.fieldX(), H.fieldY()))
   end)
 end
--- boarding: on foot on the parked airship's tile, A boards (gen_wor_locke's)
-local watchOn = false
-local function watches()
-  return H.call(function()
-    if watchOn then return end
-    watchOn = true
-    local addr = H.seedStoreAddr()
-    emu.addMemoryCallback(function()
-      H.log(string.format("[key] battle key be%02X-g%04X f%d map %d party %d", emu.getState()["cpu.a"] & 0xff,
-        H.readWord(0x11e0), H.frame, map(), H.activeParty()))
-    end, emu.callbackType.exec, addr, addr)
-  end)
-end
-local falcon = nil
-
 H.run({ maxFrames = 2400000 }, {
   H.bootCheckpoint("wor-veldt-cave-v1"),
   watches(),
   H.call(function()
     say("wor", "boot")
-    H.log("[kit] " .. kitLine())
+    H.log("[kit] " .. kitLine({ TERRA, CELES, RELM, GAU }))
   end),
   -- @@setup-end
 
@@ -159,8 +310,8 @@ H.run({ maxFrames = 2400000 }, {
   H.crossDoor(36, 45, MAP_THAMASA, 26, 39, "Thamasa's item shop -> the street", { fight = FIGHT }),
   H.saveState("wor_gau_thamasa.mss"),
 
-  -- ---- 3. off the edge, and the save ----------------------------------------------------
-  -- @@stage save
+  -- ---- 3. off the edge: SHADOW goes ---------------------------------------------------
+  -- @@stage edge
   -- the south edge's triggers (344 (20-25,48), _cb7d69): with SHADOW
   -- resting ($0196) and the dream seen ($019E), he leaves for the
   -- Colosseum ($019F) as the party goes
@@ -169,27 +320,72 @@ H.run({ maxFrames = 2400000 }, {
   H.release(),
   H.waitWorldSettled("out of Thamasa", 1800, 30),
   H.call(function()
-    falcon = { H.readByte(0x1F62), H.readByte(0x1F63) }
-    say("wor", string.format("out of Thamasa; the Falcon at (%d,%d)", falcon[1], falcon[2]))
+    say("wor", string.format("out of Thamasa; the Falcon at (%d,%d)", H.readByte(0x1F62), H.readByte(0x1F63)))
     H.assertEq(sw(0x019F), 1, "SHADOW left for the Colosseum ($019F, _cb7d69)")
   end),
-  H.lazy(function()
-    return H.worldNavTo(falcon[1], falcon[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT })
+
+  -- ---- 4. the cabin, the father's house ----------------------------------------------------
+  -- @@stage father
+  -- SABIN and GAU for the father's house and Duncan's, with TERRA and
+  -- CELES; RELM, LOCKE and the rest wait aboard.  Map 131 (7,6) -> 116,
+  -- the old man (116 NPC_1 (115,9), _cb6828 .. _cb645b: face up, A): the
+  -- reveal ($0245), Jidoor's tailor, the father, and the scene ends on the
+  -- world map beside the Falcon ($0249: char_party GAU, 1)
+  regroup({ SABIN, GAU, TERRA, CELES }),
+  H.gearDress({ tag = "gear for the four" }),
+  H.dressRelics({ { SABIN, "SABIN" }, { GAU, "GAU" }, { TERRA, "TERRA" }, { CELES, "CELES" } },
+    { tag = "relics for the four" }),
+  liftOff(),
+  H.flyTo(FATHER_LANDING[1], FATHER_LANDING[2], { what = "the Falcon down by the father's house", fight = FIGHT }),
+  enterFrom(FATHER_DOOR, MAP_FATHER, "the father's house (131)"),
+  H.navTo(7, 6, { maxFrames = 3000, arrive = function() return map() == MAP_FATHER_IN end }),
+  H.waitUntil(function() return map() == MAP_FATHER_IN and settled() end, 2400, "the back room: map 116", 1),
+  H.navTo(115, 10, { maxFrames = 3000 }),
+  H.faceAndHoldA("up", function() return H.dialogWaiting() or not H.hasControl() end, 600,
+    "the old man (116 NPC_1 (115,9)): face up, A"),
+  H.release(),
+  H.advanceStory(function() return sw(0x0249) == 1 and H.worldMode() and H.worldSettled() end, 60000,
+    { playBattles = "tactical", fight = FIGHT }),
+  H.call(function()
+    say("story", "the father's house ($0245, $0247, $0249)")
+    H.assertEq(sw(0x0245), 1, "the father found ($0245)")
+    H.assertEq(partyOf(GAU), 1, "GAU back in the party (char_party GAU, 1)")
   end),
+  H.saveState("wor_gau_father.mss"),
+
+  -- ---- 5. Duncan -------------------------------------------------------------------------
+  -- @@stage duncan
+  -- the trigger (7,11) (_cc0bd8: SABIN in the party, $02AF clear): the
+  -- scene, and give_blitz (Bum Rush)
+  board(),
+  H.flyTo(DUNCAN_LANDING[1], DUNCAN_LANDING[2], { what = "the Falcon down by Duncan's house", fight = FIGHT }),
+  enterFrom(DUNCAN_DOOR, MAP_DUNCAN, "Duncan's house (127)"),
+  H.navTo(7, 11, { maxFrames = 3000, arrive = function() return not H.hasControl() end }),
+  H.advanceStory(function() return sw(0x02AF) == 1 and settled() end, 60000, { playBattles = "tactical", fight = FIGHT }),
+  H.call(function()
+    say("story", "Duncan ($02AF)")
+    H.assertEq(H.readByte(0x1D28) & 0x80, 0x80, "SABIN knows Bum Rush ($1D28 bit 7, give_blitz)")
+  end),
+  H.navTo(7, 13, { maxFrames = 3000 }),
+  outToWorld("down", "out of Duncan's house"),
+
+  -- ---- 6. the save ------------------------------------------------------------------------
+  -- @@stage save
+  H.worldNavTo(DUNCAN_LANDING[1], DUNCAN_LANDING[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
+    avoid = { DUNCAN_DOOR } }),
   H.waitFrames(90),
-  H.lazy(function()
-    return H.worldNavTo(falcon[1], falcon[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT })
-  end),
+  H.worldNavTo(DUNCAN_LANDING[1], DUNCAN_LANDING[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
+    avoid = { DUNCAN_DOOR } }),
   H.fieldCare({ threshold = 1.0, tag = "on the save tile" }),
   H.waitUntil(function() return H.worldSettled() and H.worldAligned() end, 1200, "settled on the save tile", 5),
   H.call(function()
     say("wor", "on the save tile")
-    H.log("[kit] " .. kitLine())
+    H.log("[kit] " .. kitLine({ SABIN, GAU, TERRA, CELES }))
   end),
   H.saveAtCheckpoint("wor-gau-v1"),
   H.saveState("wor_gau.mss"),
   H.logStep(function()
-    return string.format("wor_gau generated: TERRA L%d, CELES L%d, RELM L%d and GAU L%d beside the Falcon outside "
-      .. "Thamasa, world (%d,%d), saved in slot 3", lv(TERRA), lv(CELES), lv(RELM), lv(GAU), H.worldX(), H.worldY())
+    return string.format("wor_gau generated: SABIN L%d, GAU L%d, TERRA L%d and CELES L%d beside the Falcon by Duncan's "
+      .. "house, world (%d,%d), saved in slot 3", lv(SABIN), lv(GAU), lv(TERRA), lv(CELES), H.worldX(), H.worldY())
   end),
 })

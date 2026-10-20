@@ -968,24 +968,23 @@ STATES = [
       checkpoint="wor-locke-v1", timeout=5400),
 
     # wor-ragnarok-v1 -> the Veldt cave's save point, map 353 (57,44): the
-    # Falcon's cabin (SABIN, TERRA, CELES), Duncan's house north of Narshe
-    # (Bum Rush), the Veldt until GAU joins after a battle, his father's
-    # house, the cabin again (TERRA, CELES, RELM, GAU), the cave's dog, its
-    # three chests and its wall, and Save there: the `wor-veldt-cave-v1`
-    # checkpoint, the retry point for the SrBehemoth
+    # Falcon's cabin (TERRA, CELES, RELM), the Veldt until GAU joins after a
+    # battle, the cave's dog, its three chests and its wall, and Save there:
+    # the `wor-veldt-cave-v1` checkpoint, the retry point for the SrBehemoth
     # (docs/design/route-wor-gau.md).  A cut.  wor_gau below boots its
     # checkpoint.  Re-cut by checkpoint_drift.py --recut.
     S("wor_veldt", gen="gen_wor_veldt", prev="wor_ragnarok",
       checkpoint="wor-ragnarok-v1", timeout=7200),
 
-    # wor-veldt-cave-v1 -> the World of Ruin map on the Falcon's tile
-    # outside Thamasa (250,231): the dog's master and the SrBehemoth (event
+    # wor-veldt-cave-v1 -> the World of Ruin map on the Falcon's tile by
+    # Duncan's house (139,21): the dog's master and the SrBehemoth (event
     # battle 82, a game over when lost: the runner retries from the save
     # point), SHADOW carried to Thamasa, Strago's house (the Memento Ring),
     # the item counter, the town's edge (SHADOW leaves for the Colosseum),
-    # and Save there: the `wor-gau-v1` checkpoint, the next arc's boot
-    # (docs/design/route-wor-gau.md).  A cut; saves= until a leg boots it.
-    # Re-cut by checkpoint_drift.py --recut.
+    # the cabin (SABIN, GAU, TERRA, CELES), the father's house, Duncan's
+    # house (Bum Rush), and Save there: the `wor-gau-v1` checkpoint, the next
+    # arc's boot (docs/design/route-wor-gau.md).  A cut; saves= until a leg
+    # boots it.  Re-cut by checkpoint_drift.py --recut.
     S("wor_gau", gen="gen_wor_gau", prev="wor_veldt",
       checkpoint="wor-veldt-cave-v1", saves="wor-gau-v1", timeout=5400),
 

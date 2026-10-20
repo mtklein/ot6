@@ -1,10 +1,8 @@
 -- gen_wor_veldt.lua -- the Gau arc's first leg (docs/design/route-wor-gau.md):
 -- Continue the `wor-ragnarok-v1` battery (LOCKE, TERRA, CELES and RELM
--- beside the Falcon south of Narshe), the cabin (SABIN, TERRA and CELES:
--- three, so GAU can come), Duncan's house north of Narshe (SABIN's Bum
--- Rush), the Veldt until GAU joins after a battle, his kit, his father's
--- house (SABIN and GAU: the scene), the cabin again (TERRA, CELES, RELM and
--- GAU), and the Veldt cave: the dog, its three chests (the Rage Ring, Allo
+-- beside the Falcon south of Narshe), the cabin (TERRA, CELES and RELM:
+-- three, so GAU can come), the Veldt until GAU joins after a battle, his
+-- kit, and the Veldt cave: the dog, its three chests (the Rage Ring, Allo
 -- Ver's box, the Striker), the wall's switch, and the save point before the
 -- dog's master: the `wor-veldt-cave-v1` battery, the retry point for the
 -- SrBehemoth (gen_wor_gau).
@@ -13,17 +11,13 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 local TERRA, LOCKE, SABIN, CELES, RELM, GAU = 0, 1, 5, 6, 8, 11
 local POTION, FENIX, REMEDY, TENT, TINCTURE, REVIVIFY = 0xE9, 0xF0, 0xF5, 0xF7, 0xEB, 0xF1
-local MAP_DECK, MAP_CABIN, MAP_DUNCAN, MAP_FATHER, MAP_FATHER_IN, MAP_VCAVE = 11, 12, 127, 131, 116, 353
+local MAP_DECK, MAP_CABIN, MAP_VCAVE = 11, 12, 353
 local NAMES = { [TERRA] = "TERRA", [LOCKE] = "LOCKE", [SABIN] = "SABIN", [CELES] = "CELES", [RELM] = "RELM",
   [GAU] = "GAU" }
 -- world tiles (route_data world-entrances 1; landable: the property word's
--- bit 1 clear): Duncan's house (140,20) -> map 127 (7,13), the Falcon down
--- on (139,21); the Veldt (group 255) on (199,85); the father's house
--- (178,45) -> map 131 (7,13), down on (178,46); the cave (207,89) -> map
+-- bit 1 clear): the Veldt (group 255) on (199,85); the cave (207,89) -> map
 -- 353 (33,61), down on (207,90)
-local DUNCAN_DOOR, DUNCAN_LANDING = { 140, 20 }, { 139, 21 }
 local VELDT_LANDING = { 199, 85 }
-local FATHER_DOOR, FATHER_LANDING = { 178, 45 }, { 178, 46 }
 local CAVE_DOOR, CAVE_LANDING = { 207, 89 }, { 207, 90 }
 -- GAU comes to a party of three or fewer after a Veldt battle, 5/8 of the
 -- time (battle_main.asm @4840: `Rand / cmp #$a0`; @2fbb: $fc < 4).  Twelve
@@ -97,20 +91,6 @@ local function walkInto(x, y, dst, what, avoid)
     }),
     H.waitUntil(there, 1200, what .. ": control on map " .. dst, 1),
     H.call(function() say("route", what) end),
-  })
-end
--- off a field map's edge onto the world map (gen_wor_locke's outToWorld)
-local function outToWorld(dir, what)
-  local n = 0
-  return H.seqStep({
-    H.driveUntil(function() return H.worldMode() end, 3000, { H.hold({ dir }) }, what),
-    H.release(),
-    H.withReset(H.waitUntil(function()
-      local ok = H.worldSettled() and H.worldAligned() and H.worldPassable(H.worldX(), H.worldY())
-      n = ok and n + 1 or 0
-      return n >= 30
-    end, 2400, what .. ": back on the World of Ruin map"), function() n = 0 end),
-    H.call(function() say("wor", what) end),
   })
 end
 -- onto a world door until its field map holds the screen
@@ -289,29 +269,15 @@ H.run({ maxFrames = 2400000 }, {
   H.call(function() say("wor", "boot") end),
   -- @@setup-end
 
-  -- ---- 1. the cabin, Duncan ------------------------------------------------------------
-  -- @@stage duncan
-  -- three seated: GAU joins only a party of three or fewer.  SABIN for
-  -- Duncan and the father's house, TERRA and CELES the two highest
-  regroup({ SABIN, TERRA, CELES }),
-  liftOff(),
-  H.flyTo(DUNCAN_LANDING[1], DUNCAN_LANDING[2], { what = "the Falcon down by Duncan's house", fight = FIGHT }),
-  enterFrom(DUNCAN_DOOR, MAP_DUNCAN, "Duncan's house (127)"),
-  -- the trigger (7,11) (_cc0bd8: SABIN in the party, $02AF clear): the
-  -- scene, and give_blitz (Bum Rush)
-  H.navTo(7, 11, { maxFrames = 3000, arrive = function() return not H.hasControl() end }),
-  H.advanceStory(function() return sw(0x02AF) == 1 and settled() end, 60000, { playBattles = "tactical", fight = FIGHT }),
-  H.call(function()
-    say("story", "Duncan ($02AF)")
-    H.log(string.format("[kit] SABIN's blitzes $1D28 = $%02X", H.readByte(0x1D28)))
-  end),
-  H.navTo(7, 13, { maxFrames = 3000 }),
-  outToWorld("down", "out of Duncan's house"),
-  H.saveState("wor_veldt_duncan.mss"),
-
-  -- ---- 2. the Veldt: GAU --------------------------------------------------------------
+  -- ---- 1. the cabin, the Veldt: GAU -------------------------------------------------
   -- @@stage veldt
-  board(),
+  -- three seated: GAU joins only a party of three or fewer.  The three
+  -- highest: the Veldt's first battle from this save is the Holy Dragon
+  -- (formation 481, route-wor-gau.md finding 2), which TERRA, CELES and
+  -- RELM won in 10 of 10 with no one down and SABIN, TERRA and CELES in 8
+  -- of 8 at 2.12 deaths a fight (section 7, the hd lab)
+  regroup({ TERRA, CELES, RELM }),
+  liftOff(),
   H.flyTo(VELDT_LANDING[1], VELDT_LANDING[2], { what = "the Falcon down on the Veldt", fight = FIGHT }),
   H.call(function() H.log("[kit] " .. rageLine()) end),
   veldt(function() return partyOf(GAU) == 1 end, VELDT_BUDGET, "the Veldt until GAU joins"),
@@ -321,48 +287,19 @@ H.run({ maxFrames = 2400000 }, {
   end),
   -- his kit from the bag (he holds no weapon: the Fight row is his fists)
   H.gearDress({ tag = "GAU's gear from the bag" }),
-  H.dressRelics({ { SABIN, "SABIN" }, { TERRA, "TERRA" }, { CELES, "CELES" }, { GAU, "GAU" } },
+  H.dressRelics({ { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" }, { GAU, "GAU" } },
     { tag = "relics with GAU" }),
   H.fieldCare({ tag = "after GAU" }),
   H.call(function()
-    H.log("[kit] " .. kitLine({ SABIN, TERRA, CELES, GAU }))
+    H.log("[kit] " .. kitLine({ TERRA, CELES, RELM, GAU }))
     H.log("[kit] " .. rageLine())
   end),
   H.saveState("wor_veldt_gau.mss"),
 
-  -- ---- 3. the father's house -----------------------------------------------------------
-  -- @@stage father
-  -- map 131 (7,6) -> 116, the old man (116 NPC_1 (115,9), _cb6828 ..
-  -- _cb645b: face up, A; SABIN and GAU in the party): the reveal ($0245),
-  -- Jidoor's tailor, the father, and the scene ends on the world map
-  -- beside the Falcon ($0249: char_party GAU, 1)
-  board(),
-  H.flyTo(FATHER_LANDING[1], FATHER_LANDING[2], { what = "the Falcon down by the father's house", fight = FIGHT }),
-  enterFrom(FATHER_DOOR, MAP_FATHER, "the father's house (131)"),
-  H.navTo(7, 6, { maxFrames = 3000, arrive = function() return map() == MAP_FATHER_IN end }),
-  H.waitUntil(function() return map() == MAP_FATHER_IN and settled() end, 2400, "the back room: map 116", 1),
-  H.navTo(115, 10, { maxFrames = 3000 }),
-  H.faceAndHoldA("up", function() return H.dialogWaiting() or not H.hasControl() end, 600,
-    "the old man (116 NPC_1 (115,9)): face up, A"),
-  H.release(),
-  H.advanceStory(function() return sw(0x0249) == 1 and H.worldMode() and H.worldSettled() end, 60000,
-    { playBattles = "tactical", fight = FIGHT }),
-  H.call(function()
-    say("story", "the father's house ($0245, $0247, $0249)")
-    H.assertEq(sw(0x0245), 1, "the father found ($0245)")
-    H.assertEq(partyOf(GAU), 1, "GAU back in the party (char_party GAU, 1)")
-  end),
-  H.saveState("wor_veldt_father.mss"),
-
-  -- ---- 4. the cabin, the Veldt cave --------------------------------------------------------
+  -- ---- 2. the Veldt cave ---------------------------------------------------------------
   -- @@stage cave
-  -- GAU with the three highest (TERRA, CELES, RELM); SABIN, LOCKE and the
-  -- rest wait aboard
-  regroup({ TERRA, CELES, RELM, GAU }),
-  H.gearDress({ tag = "gear for the four" }),
-  H.dressRelics({ { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" }, { GAU, "GAU" } },
-    { tag = "relics for the four" }),
-  liftOff(),
+  -- GAU with the three who brought him: SABIN, LOCKE and the rest wait aboard
+  board(),
   H.flyTo(CAVE_LANDING[1], CAVE_LANDING[2], { what = "the Falcon down by the Veldt cave", fight = FIGHT }),
   enterFrom(CAVE_DOOR, MAP_VCAVE, "the Veldt cave (353)"),
   -- the dog (35,56) (_cb799f: Interceptor shows, then the way he went)
@@ -382,7 +319,7 @@ H.run({ maxFrames = 2400000 }, {
   H.call(function() say("story", "the wall open ($016E)") end),
   H.saveState("wor_veldt_wall.mss"),
 
-  -- ---- 5. the save point --------------------------------------------------------------------
+  -- ---- 3. the save point --------------------------------------------------------------------
   -- @@stage save
   cwalk(57, 45, "below the save point (353 (57,44))", { MASTER }),
   H.fieldCare({ threshold = 1.0, tag = "at the cave's save point" }),
