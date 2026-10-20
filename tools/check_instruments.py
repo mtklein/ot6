@@ -47,6 +47,7 @@ import compose  # noqa: E402 -- declared_states: the graph's state names
 OUT = os.path.join(ROOT, "build", "checks", "instruments")
 MANUAL = re.compile(r"^-- @manual(.*)$", re.M)
 SPLICE = re.compile(r"^\s*splice:\s*(\S+)(?:\s+with\s+(.*?))?\s*$")
+BOOT_CHECKPOINT = re.compile(r'H\.bootCheckpoint\("([^"]+)"')
 HOST_LIB = re.compile(r'^local H = dofile\("[^"]*lib/ot6\.lua"\)\n', re.M)
 
 
@@ -115,15 +116,26 @@ def emulated(rel: str, text: str, states: set[str]) -> tuple[bool, str]:
                        + ", which no generator in savestate_graph.py makes")
     composed = os.path.join(OUT, name + ".lua")
     log = os.path.join(OUT, name + ".log")
+    env = dict(os.environ, OT6_HARD_CAP=TIMEOUT, OT6_TIMEOUT_RETRIES="0",
+               OT6_WORKER="instrument_" + name)
+    # an instrument that Continues a checkpoint gets the capture the graph's
+    # own run saved, as its suite counterparts do (configure.py TEST_ENV);
+    # compose.py writes it into the preamble, so it is set before composing
+    keys = sorted(set(BOOT_CHECKPOINT.findall(text)))
+    if len(keys) > 1:
+        return False, "Continues more than one checkpoint: " + ", ".join(keys)
+    if keys:
+        ck = os.path.join("build", "checkpoints", keys[0])
+        if not os.path.exists(os.path.join(ROOT, ck, "manifest.json")):
+            return False, f"Continues {keys[0]}, but {ck} holds no capture"
+        env["OT6_SRAM_CHECKPOINT"] = ck
     res = subprocess.run([sys.executable, os.path.join("tools", "tests", "lib", "compose.py"),
-                          rel, composed], cwd=ROOT, capture_output=True, text=True)
+                          rel, composed], cwd=ROOT, env=env, capture_output=True, text=True)
     if res.returncode != 0:
         tail = (res.stdout + res.stderr).strip().splitlines()[-1:] or [""]
         return False, f"compose.py exit {res.returncode}: {tail[0][:160]}"
     with open(composed, "a") as f:
         f.write(TRAILER)
-    env = dict(os.environ, OT6_HARD_CAP=TIMEOUT, OT6_TIMEOUT_RETRIES="0",
-               OT6_WORKER="instrument_" + name)
     subprocess.run(["sh", os.path.join("tools", "tests", "run.sh"), composed, log],
                    cwd=ROOT, env=env, stdout=subprocess.DEVNULL,
                    stderr=subprocess.DEVNULL)

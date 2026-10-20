@@ -856,6 +856,21 @@ check("callback_negative", "nice sh tools/tests/lib/callback_negative.sh",
       + [copy_if_changed_from(h) for h in LIBS])
 # #309: every instrument left in tools/tests (`-- @manual`) composes and
 # starts (docs/TESTING.md "Scripts that stay in the tree").
+BOOT_CHECKPOINT = re.compile(r'H\.bootCheckpoint\("([^"]+)"')
+
+
+# an instrument that Continues a checkpoint (H.bootCheckpoint) runs on the
+# capture the graph's own run saved, as a suite does (check_instruments.py
+# hands it OT6_SRAM_CHECKPOINT)
+def checkpoint_deps(lua_path):
+    deps = []
+    for key in sorted(set(BOOT_CHECKPOINT.findall((ROOT / lua_path).read_text(errors="replace")))):
+        if key not in captures:
+            sys.exit(f"configure.py: {lua_path} Continues {key}, which no run on the savestate graph saves")
+        deps += sn.capture_inputs(ROOT, key)
+    return deps
+
+
 def splice_hosts(lua_path):
     m = re.search(r"^-- @manual\s+splice:\s*(\S+)", (ROOT / lua_path).read_text(errors="replace"), re.M)
     return [m.group(1)] if m else []
@@ -868,7 +883,7 @@ check("instruments", "nice python3 tools/check_instruments.py",
        copy_if_changed_from(sn.EMULATOR)]
       + [copy_if_changed_from(f) for f in instruments] + HARNESS
       + [copy_if_changed_from(h) for h in LIBS]
-      + [d for f in instruments for d in fixture_deps(f)]
+      + [d for f in instruments for d in fixture_deps(f) + checkpoint_deps(f)]
       # a spliced instrument (`-- @manual splice: <host>`) runs inside its host
       + [x for f in instruments for h in splice_hosts(f)
          for x in [copy_if_changed_from(h)] + fixture_deps(h)])
