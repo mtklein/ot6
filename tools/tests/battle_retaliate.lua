@@ -429,6 +429,22 @@ H.run({ maxFrames = 150000 }, {
       H.setPad(st == ST_CMD and { x = true } or { b = true })
     end),
   }, "the engine-chosen Fight that dumps the bank"),
+  -- The charge is recorded at Ot6ActionEnd's entry, and its write to the
+  -- bank can land a frame later: on the v032-locke-arc chain the predicate
+  -- above came true at f6082 with the charge entered at f6081 and the bank
+  -- still 5, and read 2 at f6083 (build/attempts/wt/v032-locke-arc/lab/
+  -- race_q2).  So the verdict waits, a few frames at most, for the bank to
+  -- move off the value the charge entered with; a bank that never moves
+  -- still fails the verdict below.
+  (function()
+    local n = 0
+    return H.withReset(H.driveUntil(function()
+      n = n + 1
+      local c = L.charges[1]
+      return c == nil or bp(SUBJ) ~= c.bank or n >= 30
+    end, 60, { H.call(function() H.setPad({}) end) }, "the charge's write to the bank lands"),
+      function() n = 0 end)
+  end)(),
 
   -- ================================================================== --
   -- the verdict
