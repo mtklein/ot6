@@ -103,6 +103,10 @@ local function worldBattle(tag)
   local A, B
   return H.seqStep({
     H.waitUntil(function() return H.worldSettled() end, 3000, tag .. ": the world map, settled", 5),
+    -- a fight can leave the caster down (a K-battle history met one that
+    -- struck first: build/attempts/wt/v032-narshe-locke-3/lab/rk_k4_s7);
+    -- a person revives before the next try, and fieldCare does
+    H.fieldCare({ tag = tag .. ": care before the pace", threshold = 0.95 }),
     H.call(function()
       local x, y = H.worldX(), H.worldY()
       local doors = entranceSet(H.worldId())
