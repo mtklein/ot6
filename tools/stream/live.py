@@ -185,7 +185,7 @@ GRID_PAGE = """<!doctype html><meta charset="utf-8"><meta name="viewport" conten
 <body style="margin:0;background:#111;color:#cdc;font:13px ui-monospace,monospace">
 <div style="display:flex;justify-content:space-between;gap:10px;padding:10px 14px">
 <span id=quota style="color:#8a8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
-<a href="progress.html" style="color:#8ac;white-space:nowrap;flex-shrink:0">route map &rarr;</a></div>
+<a href="progress.html" style="color:#8ac;white-space:nowrap;flex-shrink:0">route &rarr;</a></div>
 <div id=active style="padding:0 14px 8px;line-height:1.5"></div>
 <div id=machines style="padding:0 14px 10px;line-height:1.6"></div>
 <div id=grid style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;padding:0 14px 18px"></div>
@@ -391,30 +391,23 @@ function nf(n){ return n==null ? '\\u2014' : Number(n).toLocaleString(); }
 tick(); setInterval(tick, 400);
 </script>"""
 
-# __COORDS__ is replaced at page-write time with {name: [x,y]} world-tile
-# coordinates (route_coords.py, offsets pre-applied) -- the fallback for a
-# progress.json written by an older live.py that carries no x/y per edge.
+# The route: every graph edge in order, eight to a row, snaking.
 PROGRESS_PAGE = """<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OT6 route</title>
 <body style="margin:0;background:#111;color:#cdc;font:13px ui-monospace,monospace">
 <div style="max-width:1000px;margin:0 auto;padding:16px">
 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
 <b style="font-size:17px">the route</b>
-<a id=tog href="#" style="color:#8ac">grid view</a></div>
-<svg id=map viewBox="0 0 256 256" width="100%" style="display:block;margin:auto;max-height:88vh"></svg>
+<span id=hdr style="color:#8a8"></span></div>
+<svg id=map viewBox="0 0 1000 100" width="100%" style="display:block;margin:auto"></svg>
 <div id=cur style="color:#9ac;padding-top:4px"></div>
 <div id=pick style="color:#aca;min-height:1.2em"></div>
 <div id=legend style="color:#687;font-size:11px"></div>
 <div style="color:#575;padding-top:6px"><a href="index.html" style="color:#8ac">&larr; live view</a></div>
 </div>
 <script>
-const C = __COORDS__;   // fallback world coords, keyed by segment name
 const COLS = 8, DX = 120, DY = 74, R0 = 6;
-let view = 'wob', last = null;
+let last = null;
 const svg = document.getElementById('map');
-document.getElementById('tog').onclick = (ev)=>{ ev.preventDefault();
-  view = view==='wob' ? 'grid' : 'wob';
-  document.getElementById('tog').textContent = view==='wob' ? 'grid view' : 'map view';
-  if(last) render(last); };
 svg.addEventListener('click', ev=>{
   const n = ev.target.getAttribute && ev.target.getAttribute('data-name');
   const e = n && last ? last.edges.find(x=>x.name===n) : null;
@@ -425,7 +418,7 @@ function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
 function tip(e){ return e.name + (e.on && e.on.length
   ? ' \u2014 ' + e.status + ' on ' + e.on.join(', ') : ''); }
 function render(j){
-  if(view==='wob') renderWob(j); else renderGrid(j);
+  renderGrid(j);
   document.getElementById('hdr').textContent =
     `${j.done}/${j.total} segments · ${j.elapsed_min} min elapsed · ~${j.eta_min} min left`;
   document.getElementById('cur').textContent =
@@ -434,47 +427,6 @@ function render(j){
     `<span style="color:#3f9d63">\u25cf</span> done \u00b7 `
     + `<span style="color:#e0a93e">\u25cf</span> running (machine named above;`
     + ` click a node for where it ran)`;
-}
-function renderWob(j){
-  svg.setAttribute('viewBox','0 0 256 256');
-  // node placement: server-supplied e.x/e.y (world tiles), else the
-  // page-baked table; +.5 centers on the tile
-  const P = j.edges.map(e=>{
-    const c = (e.x!==undefined) ? [e.x,e.y] : (C[e.name]||[10,10]);
-    return [c[0]+.5, c[1]+.5]; });
-  let out = `<image href="wob_map.png" x="0" y="0" width="256" height="256"
-    style="filter:saturate(.7) brightness(.75)"/>`;
-  out += `<polyline fill="none" stroke="#fff" stroke-opacity=".28"
-    stroke-width=".6" stroke-linejoin="round"
-    points="${P.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')}"/>`;
-  const lastDone = j.edges.reduce((a,e,i)=>e.status==='done'?i:a, -1);
-  let labels = '';
-  j.edges.forEach((e,i)=>{
-    const [x,y] = P[i];
-    const rad = 1.5 + Math.min(2.2, Math.sqrt(e.dur||30)/8);
-    const col = e.status==='done' ? '#3f9d63' : e.status==='running' ? '#e0a93e' : '#39413b';
-    const pulse = e.status==='running' ? `<animate attributeName="r" values="${rad};${rad+1.4};${rad}" dur="1.2s" repeatCount="indefinite"/>` : '';
-    // checkpoint-booted segments wear the dotted yellow ring, as in the
-    // grid; the rest get a hairline dark rim so they read against the map
-    const ring = e.ckpt ? ` stroke="#e8c94a" stroke-width=".55" stroke-dasharray="1 .8"`
-                        : ` stroke="#0c100d" stroke-width=".35"`;
-    out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad.toFixed(1)}"
-      fill="${col}" fill-opacity="${e.status==='pending'?.75:1}"${ring}
-      data-name="${esc(e.name)}" style="cursor:pointer">
-      <title>${esc(tip(e))}</title>${pulse}</circle>`;
-    // labels stay sparse at 76 nodes: running, most recent done
-    if(e.status==='running' || i===lastDone){
-      const txt = e.name;
-      const lw = 2.8*txt.length;   // ~half the label's width in units
-      const lx = Math.min(Math.max(x, lw/2+2), 254-lw/2);
-      const ly = y-rad-1.5 < 6 ? y+rad+5.5 : y-rad-1.5;
-      labels += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}"
-        fill="${e.status==='running'?'#f4d27a':'#bfe3c8'}" font-size="5"
-        text-anchor="middle" paint-order="stroke" stroke="#111"
-        stroke-width=".9" style="pointer-events:none">${esc(txt)}</text>`;
-    }
-  });
-  svg.innerHTML = out + labels;
 }
 function renderGrid(j){
   const rows = Math.ceil(j.edges.length / COLS);
@@ -496,7 +448,7 @@ function renderGrid(j){
     // segments that boot from an SRAM save checkpoint rather than the
     // played chain wear a dotted yellow ring
     const ring = e.ckpt ? ` stroke="#e8c94a" stroke-width="2" stroke-dasharray="4 3"` : '';
-    out += `<circle cx="${x}" cy="${y}" r="${rad}" fill="${col}"${ring}><title>${esc(tip(e))}</title>${pulse}</circle>`
+    out += `<circle cx="${x}" cy="${y}" r="${rad}" fill="${col}"${ring} data-name="${esc(e.name)}" style="cursor:pointer"><title>${esc(tip(e))}</title>${pulse}</circle>`
         + `<text x="${x}" y="${y+rad+12}" fill="${e.status==='pending'?'#565':'#aca'}" font-size="9" text-anchor="middle">${esc(e.name)}</text>`;
   });
   svg.innerHTML = out;
@@ -516,16 +468,6 @@ def _load_stream_module(name):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
-
-
-def _route_coords(names):
-    """{name: (x, y)} WoB world tiles for the map view (route_coords.py,
-    stack-spiral offsets applied); {} when the table cannot load, so the
-    viewer degrades to its page-baked fallback."""
-    try:
-        return _load_stream_module("route_coords").coords(names)
-    except Exception:
-        return {}
 
 
 # Keep the screen on while a page is shown (the Screen Wake Lock API), e.g.
@@ -584,29 +526,8 @@ def write_pages(webroot):
         f.write(GRID_PAGE + WAKE_JS + HEALTH_JS)
     with open(os.path.join(webroot, "live1.html"), "w") as f:
         f.write(DETAIL_PAGE + WAKE_JS + HEALTH_JS)
-    try:
-        states = runpy.run_path(
-            os.path.join(ROOT, "tools/tests/savestate_graph.py"))["STATES"]
-        coords = _route_coords([e["state"] for e in states])
-    except Exception:
-        coords = {}
-    baked = {n: [round(x, 1), round(y, 1)] for n, (x, y) in coords.items()}
     with open(os.path.join(webroot, "progress.html"), "w") as f:
-        f.write(PROGRESS_PAGE.replace("__COORDS__", json.dumps(baked))
-                + WAKE_JS + HEALTH_JS)
-
-
-def ensure_map(webroot):
-    """Regenerate the World of Balance background (render_worldmap.py, from
-    the repo's own game data) if build/live lacks it."""
-    out = os.path.join(webroot, "wob_map.png")
-    if os.path.exists(out):
-        return
-    try:
-        _load_stream_module("render_worldmap").render(out)
-    except Exception as e:
-        print(f"wob_map.png not rendered ({e}); map view will show no "
-              "background", file=sys.stderr)
+        f.write(PROGRESS_PAGE + WAKE_JS + HEALTH_JS)
 
 
 # ---- the worker grid: one tile per active run worker ----------------------
@@ -833,7 +754,6 @@ class Scanner:
             if self.prog is None:
                 states = runpy.run_path(os.path.join(
                     ROOT, "tools/tests/savestate_graph.py"))["STATES"]
-                xy = _route_coords([e["state"] for e in states])
                 # freshness check: compose.py's own stamp verification
                 # (signature over generator+libs+extras, artifact hash,
                 # ancestor chain).  A fresh stamp is what ninja will not
@@ -844,7 +764,7 @@ class Scanner:
                 compose = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(compose)
                 from pathlib import Path
-                self.prog = (states, xy, compose, Path(ROOT))
+                self.prog = (states, compose, Path(ROOT))
                 try:   # which machine's route is newest, for merge_progress
                     self.route_ts = int(subprocess.run(
                         ["git", "-C", ROOT, "log", "-1", "--format=%ct"],
@@ -1430,10 +1350,10 @@ def route_inputs():
     return h.hexdigest()
 
 
-def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
+def build_progress(states, compose, rootp, t0, live_test, memo=None):
     """One progress.json payload: every graph edge's status (done when its
     stamp passes compose's freshness check, running when a live workspace
-    bears its name, pending otherwise), WoB coords for the map, a
+    bears its name, pending otherwise), a
     whole-build time-left ETA (the savestate critical path plus the parallel
     suite phase) from the ninja log's durations, and which single
     edge is on the live view.
@@ -1517,8 +1437,6 @@ def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
               "deps": [d for d in (None if e.get("checkpoint") else e.get("prev"),
                                    e.get("seed"), e.get("after"))
                        if d]}
-        if n in xy:   # WoB world-tile coords for the map view
-            ed["x"], ed["y"] = round(xy[n][0], 1), round(xy[n][1], 1)
         if live_test and live_test in names:
             ed["live"] = True   # the one node on index.html's live view
         edges.append(ed)
@@ -1866,7 +1784,6 @@ def main():
     webroot = os.path.join(ROOT, "build", "live")
     os.makedirs(webroot, exist_ok=True)
     write_pages(webroot)
-    ensure_map(webroot)
 
     stop = threading.Event()
     # shared so the progress scan can flag the one edge follow() is tailing

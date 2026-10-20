@@ -32,7 +32,7 @@ python3 tools/stream/live.py --peer air.local      # repeatable; host:path if no
 The same pages then show every machine: a line per machine at the top
 (active, frozen, load average, and which branch/worktree each worker
 belongs to), tiles labelled with their machine, remote detail pages, and
-the route map with segments running or done elsewhere (teal: done only on
+the route grid with segments running or done elsewhere (teal: done only on
 another machine).  An unreachable peer reads `air: unreachable since
 HH:MM (<ssh's reason>)` and never holds up this machine's tiles.
 
