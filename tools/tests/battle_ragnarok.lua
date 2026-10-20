@@ -51,6 +51,13 @@ end
 local BD = H.sym("Ot6BoostDmg")
 local inBD = 0
 local function arm()
+  -- the key of every battle (reads only): $be at the open plus the formation,
+  -- so a sweep's distinct draws can be counted (TESTING.md, "Tests that survive any draw")
+  local seedAt = H.seedStoreAddr()
+  emu.addMemoryCallback(function()
+    H.log(string.format("[key] battle key be%02X-g%04X f%d map %d", emu.getState()["cpu.a"] & 0xff,
+      H.readWord(0x11e0), H.frame, H.worldId()))
+  end, emu.callbackType.exec, seedAt, seedAt)
   emu.addMemoryCallback(function(_, v)
     if seat == nil or rec ~= nil then return end
     if H.readByte(0x3A7C) ~= CMD_MAGIC or H.readByte(0x3A7D) ~= v then return end
