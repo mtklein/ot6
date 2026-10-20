@@ -13,8 +13,8 @@ Toe Cutters and the SrBehemoth still absorb ice.
 
 **A second weak point for fourteen early monsters.** Were-Rats, Leafers,
 Vomammoths, Dark Winds, M-TekArmors, Repo Men, Areneids, Stray Cats, Beakors,
-CrassHopprs, Bombs, Ghosts, Rhobites and Popliums each gain a second weapon
-weakness, which also applies when they come on the Veldt. Their shields are
+CrassHopprs, Bombs, Ghosts, Rhobites and Popliums each gain a second weak
+point, which also applies when they come on the Veldt. Their shields are
 unchanged.
 
 **New saves at the Veldt cave and after Gau's father.** The `saves` folder
