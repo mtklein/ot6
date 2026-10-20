@@ -58,7 +58,6 @@ tools/tests/battle_counterboost.lua	.writeByte(	5
 tools/tests/battle_counterboost.lua	.writeWord(	2
 tools/tests/battle_counterfold.lua	.writeByte(	5
 tools/tests/battle_dancemp.lua	.writeWord(	3
-tools/tests/battle_dancestumble.lua	.writeByte(	1	quarantine: #313 synthetic setup -- one off-terrain dance added to MOG's known-dance mask ($1D4C) between the defense's waves, because moogle_defense is the route's only MOG-with-Dance window and holds one terrain, so the vanilla stumble roll never runs by play; the property is that a stumbled boosted start charges no MP and spends no pips
 tools/tests/battle_dlgmenu.lua	.writeByte(	2	quarantine: #292 review, synthetic step -- one monster slot's shield-count upload planted pending mid-dialogue (OT6_SHWANT/OT6_SHPEND), because a count change landing while a battle dialogue is up is not a thing a fixture produces on cue; the property is that the nmi holds the upload until the dialogue and its re-lay are done
 tools/tests/battle_divines.lua	.writeByte(	2
 tools/tests/battle_divines.lua	.writeWord(	5
@@ -86,6 +85,7 @@ tools/tests/battle_magicite.lua	.writeWord(	2	quarantine: lab conditions the fig
 tools/tests/battle_mpcost.lua	.writeWord(	4
 tools/tests/battle_rage.lua	.writeByte(	16
 tools/tests/battle_rage.lua	.writeWord(	5
+tools/tests/battle_ragefizzle.lua	.writeWord(	1	quarantine: #330 synthetic fault -- GAU's pool set one MP under the flat Rage price the frame a boosted Rage commit is queued, what an MP drain (Rasp, Osmose) landing in the advance wait leaves; the Rage window refuses an unpayable pick, so no fixture reaches an unpayable start by play, and the property is that a start that cannot pay at resolve spends no pips
 tools/tests/battle_ragerefuse.lua	.writeWord(	2	quarantine: Rage is a chance verb and stays flat at 8 MP at every boost level (#219), so no boost can price it out and the only unaffordable Rage is a drained pool; draining GAU's real 95 by play is eleven trances.  The pin puts GAU one MP under the flat price with his own command window already up, and restores his real pool immediately after the refusal; the window, the grey, the confirm, the queue counter and the buzz under test are the ROM's, and the restored pool then pays a real start
 tools/tests/battle_retaliate.lua	.writeByte(	1	quarantine: #236 needs ONE character the player is not driving, and the class is unreachable on cue in the World of Balance -- Umaro and the Colosseum are World of Ruin, Muddle and Charm are a monster's roll, and the only WoB Berserk the route can draw (CrassHoppr's SPECIAL, battle_statuses.lua) needs up to eleven paced world-map legs to land.  The file writes the one STATUS2 bit (Berserk) onto its subject at one chosen moment and nothing else: the banking before it is the player's own real Fights, the actions after it are the engine's, and the swing count, the landed hits, the charge and both latches under test are all the ROM's and are read, never written
 tools/tests/battle_reveal.lua	emu.write	4	quarantine: seed-entry mask only reachable via a Cmd_20 reload; phase 2 converted

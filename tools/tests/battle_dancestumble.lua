@@ -1,4 +1,4 @@
--- @suite savestate=moogle_cleared slow
+-- @suite savestate=wor_tritoch slow
 -- battle_dancestumble.lua -- a boosted Dance start that stumbles costs
 -- nothing: no MP, no pips (#313).
 --
@@ -13,21 +13,19 @@
 -- pip banked.  The dance that does start still pays the boosted price and
 -- the pip, and is the control that the boost is not simply switched off.
 --
--- The run is the real MOG in the moogle defense (battle_danceboost's
--- fixture and march).  He learns the terrain's dance by winning P2's first
--- wave.  SYNTHETIC SETUP (waivered): that fixture is the route's only
--- MOG-with-Dance window and holds one terrain, so no dance he can know
--- there is ever off its terrain and the stumble roll never runs.  Between
--- the waves the known-dance mask ($1D4C) gains one more dance, the lowest
--- id whose terrain is not this one -- what learning it elsewhere would have
--- written.  Everything after that is real menus: in the second wave he
--- takes the pip every character opens with, presses R once, and starts
--- that dance.  His squad Defends.  The first command window is snapshotted
--- and branched (each branch idles 7 frames longer there and Defends (k-1) % 4
--- turns first, its own draw of the 50% roll) at least MIN_BRANCHES times and until both outcomes, a stumble
--- and a started dance, have been seen, at most MAX_BRANCHES.  Observed,
--- never written: the stumble arm's execution (Cmd_13's `lda #$06 / sta
--- $3401`, "Stumbled!!", found by its bytes so the same test runs on any
+-- The run is the real MOG on the World of Ruin map (wor_tritoch: he is in
+-- the party and knows five dances, carried from the World of Balance and the
+-- Water Rondo detour).  A world-map encounter is walked into, and the dance
+-- chosen is the lowest-numbered known dance that is not the encounter
+-- background's own, so the stumble roll is live with nothing written: no
+-- state is touched anywhere in this file.  MOG takes the pip every
+-- character opens with, presses R once and starts that dance.  His party
+-- Defends.  The first command window is snapshotted and branched (each branch
+-- idles 7 frames longer there and Defends (k-1) % 4 turns first, its own draw
+-- of the 50% roll) at least MIN_BRANCHES times and until both outcomes, a
+-- stumble and a started dance, have been seen, at most MAX_BRANCHES.
+-- Observed, never written: the stumble arm's execution (Cmd_13's `lda #$06 /
+-- sta $3401`, "Stumbled!!", found by its bytes so the same test runs on any
 -- build), MOG's pending boost, bank, MP and DANCE status at the start
 -- turn's Ot6ActionEnd, and his bank 20 frames after it.
 -- Asserted, per branch whose start turn resolved:
@@ -39,7 +37,7 @@
 -- and across branches: at least one stumble and one started dance.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/moogle_defense.mss.lua"
+local STATE = "build/states/wor_tritoch.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_DANCE = 0x05, 0x21
@@ -48,7 +46,6 @@ local CMD_DANCE = 0x13
 local CMDTBL = 0x202E
 local MOG = 0x0A
 local DANCES = 0x1D4C                   -- known-dance mask
-local FIGHTPARTY = 0x1A6D               -- which party a defense battle engaged
 local BOOST = 1                         -- the pip every character opens with
 local MIN_BRANCHES, MAX_BRANCHES = 8, 16
 
@@ -57,44 +54,8 @@ local function pend(s) return H.readByte(0x3E9D + s * 2) end
 local function mpOf(s) return H.readWord(0x3C08 + s * 2) end
 local function dancing(s) return (H.readByte(0x3EF8 + s * 2) & 0x01) ~= 0 end
 
--- squads (gen_moogle's tables): P2 = MOG + three moogles, leader obj $019A
-local LEADER_OFF = { [1] = 0x0029, [2] = 0x019A, [3] = 0x0148 }
-local function ySwitchTo(p)
-  return H.driveUntil(function()
-    return H.readWord(0x0803) == LEADER_OFF[p]
-  end, 1800, {
-    H.pressButtons({ "y" }, 6),
-    H.waitFrames(40),
-  }, "Y-switch to party " .. p)
-end
-
 local mogSlot, danceId, offId = nil, nil, nil
 local ph, hb = 0, -600
-
--- fight every non-P2 battle with plain tap-A; stop when a battle engages P2
-local function untilP2Battle(what)
-  local battN = 0
-  return H.driveUntil(function()
-    battN = H.battleLoadStarted() and battN + 1 or 0
-    return battN >= 30 and H.readByte(FIGHTPARTY) == 2
-  end, 60000, {
-    H.call(function()
-      ph = ph + 1
-      if H.frame - hb >= 600 then
-        hb = H.frame
-        H.log(string.format("[hb f%d] batt=%s party=%d menu=%02x",
-          H.frame, tostring(H.battleLoadStarted()), H.readByte(FIGHTPARTY),
-          H.readByte(MENU)))
-      end
-      if H.battleLoadStarted() and H.readByte(FIGHTPARTY) == 2 then
-        H.setPad({})
-      else
-        H.setPad(ph % 8 < 4 and { a = true } or {})
-      end
-    end),
-    H.waitFrames(1),
-  }, what)
-end
 
 -- the bystanders' hands: Defend from the command window, page dialogs
 local function bystander()
@@ -105,16 +66,6 @@ local function bystander()
   elseif step < 4 then H.setPad({ right = true })      -- Fight -> Def
   elseif step >= 20 and step < 24 then H.setPad({ a = true })
   else H.setPad({}) end
-end
-
-local function winByTapA(what)
-  return H.driveUntil(function() return not H.battleLoadStarted() end, 30000, {
-    H.call(function()
-      ph = ph + 1
-      H.setPad(ph % 8 < 4 and { a = true } or {})
-    end),
-    H.waitFrames(1),
-  }, what)
 end
 
 local function findMog()
@@ -353,51 +304,44 @@ local body = {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(30),
-  H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 3000,
-    "control on the defense map"),
-  H.call(function()
-    H.assertEq(H.mapId(), 51, "moogle_defense on map 51")
-    installObservers()
-  end),
-  -- deployment, gen_moogle's exact march order
-  H.navTo(15, 15, { maxFrames = 2500, playBattles = true }),
-  ySwitchTo(3),
-  H.navTo(20, 20, { maxFrames = 4000, playBattles = true }),
-  ySwitchTo(2),
-  H.navTo(10, 21, { maxFrames = 4000, playBattles = true }),
-  ySwitchTo(1),
-  H.navTo(14, 14, { maxFrames = 2500, playBattles = true }),
-  -- P2's first wave teaches the terrain's dance
-  untilP2Battle("the west arm's first wave engages MOG's squad"),
+  H.waitUntil(function()
+    return H.worldMode() and H.worldHasControl() and H.worldAligned()
+  end, 6000, "world control on the World of Ruin map"),
+  H.call(function() installObservers() end),
+  -- battle_gaufight's walk: alternate left/right at tile boundaries until
+  -- the world's own encounter roll wins
+  H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
+    H.call(function()
+      if H.battleLoadStarted() or not H.worldHasControl() then H.setPad({}) return end
+      if not H.worldAligned() then return end
+      ph = ph + 1
+      H.setPad({ [(ph % 2 == 0) and "left" or "right"] = true })
+    end),
+    H.waitFrames(1),
+  }, "a world-map encounter fires"),
+  H.release(),
+  H.waitUntil(function() return H.battleActive() end, 1200, "battle armed", 5),
   H.waitFrames(240),
   H.call(function()
     findMog()
-    danceId = H.readRomByte((H.sym("BattleBGDance") & 0x3FFFFF) + H.readByte(0x11E2))
-    H.assertEq(danceId < 8, true, "this background HAS a dance to teach")
-  end),
-  winByTapA("P2's first wave won with plain Fights"),
-  H.waitFrames(60),
-  H.call(function()
     local mask = H.readByte(DANCES)
-    H.assertEq(mask & (1 << danceId) ~= 0, true,
-      "the victory taught the background's dance")
+    danceId = H.readRomByte((H.sym("BattleBGDance") & 0x3FFFFF) + H.readByte(0x11E2))
+    offId = nil
     for d = 0, 7 do
-      if d ~= danceId then offId = d; break end
+      if mask & (1 << d) ~= 0 and d ~= danceId then offId = d; break end
     end
-    -- SYNTHETIC SETUP (see header): one dance from another terrain
-    H.writeByte(DANCES, mask | (1 << offId))
-    H.log(string.format("[dancestumble] terrain dance %d; known mask %02X -> "
-      .. "%02X (dance %d added, synthetic)", danceId, mask, H.readByte(DANCES), offId))
+    H.assertEq(offId ~= nil, true, string.format(
+      "MOG knows a dance that is not this background's (mask %02X, terrain dance %d)",
+      mask, danceId))
+    H.log(string.format("[dancestumble] known mask %02X, terrain dance %d, "
+      .. "chosen dance %d", mask, danceId, offId))
   end),
 }
-body[#body + 1] = untilP2Battle("the west arm's second wave engages MOG's squad")
-body[#body + 1] = H.waitFrames(240)
 body[#body + 1] = H.call(function()
-  findMog()
   local bgDance = H.readRomByte((H.sym("BattleBGDance") & 0x3FFFFF) + H.readByte(0x11E2))
   H.assertEq(bgDance ~= offId, true,
     "the chosen dance is off this terrain: vanilla's stumble roll is live")
-  H.log(string.format("[dancestumble] second wave: MOG slot %d, %d MP, %d BP, "
+  H.log(string.format("[dancestumble] MOG slot %d, %d MP, %d BP, "
     .. "terrain dance %d, chosen dance %d", mogSlot, mpOf(mogSlot), bp(mogSlot),
     bgDance, offId))
 end)

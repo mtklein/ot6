@@ -2314,7 +2314,8 @@ Ot6ThiefCostTbl:
 ; ($3a4c, staged at action load) exceeds the pool, Cmd_10 skips the status set
 ; and the beast flag entirely and runs the plain exec, whose fizzle shows the
 ; standard refusal surface.  Mid-trance turns queue at 0 (Ot6AbilityCost's
-; cmd-$10 arm), so this gate never fires on a possessed turn.
+; cmd-$10 arm), so this gate never fires on a possessed turn.  A refusal also
+; drops the pending boost (#330): see the arm below.
 ; entry: jsl from Cmd_10, a8/i8 (command context), y = attacker entity, db=$7e.
 ; clobbers a.  out: carry set = cannot pay.
 .proc Ot6RageStartGate
@@ -2326,6 +2327,17 @@ Ot6ThiefCostTbl:
         sep     #$20
         .a8
         bcs     @ok
+        ; cannot pay (the pool moved between the commit and the resolve): no
+        ; trance begins, and the boost raised for the possession's coin
+        ; bought nothing, so it is dropped while it is still only pending,
+        ; as Ot6DanceStumble drops a stumbled dance's (#330).  Without this
+        ; Ot6ActionEnd spent the pips on the fizzle.  The turn then ends as
+        ; an unboosted one: regen pip included.
+        lda     #$00
+        sta     OT6_BOOST_REVEALED,y    ; the pending pips: nothing to spend
+        lda     $3204,y
+        ora     #$80            ; vanilla's "recheck enabled magic" request,
+        sta     $3204,y         ;   so the folded prices fall back
         sec                     ; cannot pay: the trance must not lock
         rtl
 @ok:    clc
