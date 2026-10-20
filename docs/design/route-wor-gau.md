@@ -189,7 +189,9 @@ refused confirm takes the verb off for the battle.
 Off, which is how this arc plays, GAU Fights: his fists are bludgeon, the
 key every body in the Veldt cave carries (section 3).  The line was on for
 the first sweeps; the paired A/B in section 7 found the possession slower
-on every key, and on the SrBehemoth costlier, than his fists, because the
+than his fists on every SrBehemoth key (and costlier: two deaths) and on the
+cave's randoms by the mean (1559 against 1363 ticks; Rage was the faster on
+5 of the 17 shared keys), because the
 nine World of Balance rages he returns with are weak (specials of power 8 to
 40).  A route that teaches him stronger ones (Leap on the Veldt, kit-gau.md
 6.3) is where to turn it on and measure again.
@@ -280,7 +282,7 @@ at the open with the group word): `tally.py` (`tally_*.txt`) and
     first to sixth Veldt battle (the budget is twelve; "[veldt] the Veldt
     until GAU joins: 5 battle(s)" the most, `sfe_k5_s7`).
   - `gen_wor_gau` (`sff_*`, K battles below the cave's save point first):
-    12 of 12 passed, 32,944 to 54,086 frames; 48 battles, 13 distinct
+    12 of 12 passed, 32,944 to 54,086 frames; 48 battles, 17 distinct
     keys, no member down (`tally_sff.txt`, `fight_report_sff.txt`).  The
     saves held 96-99 Potions, 40 Tinctures, 28 Fenix Downs and 18-19
     Remedies, GAU at L32-33.

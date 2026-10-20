@@ -8355,7 +8355,8 @@ end
 -- Opt-in: opts.rage = true turns it on (RAGE_OFF, a global, off again, the
 -- control arm).  Off, GAU Fights: his fists are bludgeon, a key the Veldt
 -- cave's rows hold on every body, and on the arc that brings him back the
--- possession lost to them on every key both played (route-wor-gau.md
+-- possession was slower than them on the boss's every key and on the
+-- cave's mean (route-wor-gau.md
 -- section 7, build/attempts/wt/v033-wor-gau/lab/pairs_boss.txt and
 -- pairs_cave.txt): the SrBehemoth 10363 ticks and 2 deaths over 4 keys
 -- against 6739 and none, the cave's randoms 1559 ticks against 1363 over 17.
