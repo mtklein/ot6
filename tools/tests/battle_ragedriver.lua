@@ -19,9 +19,11 @@
 --   3. the tier: OT6_RAGETIER holds the plan's boost (Cmd_10
 --      stores the pending pips, capped 3), so the coin the plan bought is
 --      the coin the trance rolls;
---   4. the plan's choice: no standing body absorbed or nulled the chosen
---      special's element (MagicProp +1) when it was planned (the plan's
---      record, M.rages).
+-- The plan's absorb veto is logged at the plan (the "[rage] plan read"
+-- line), not asserted: the cave's randoms absorb ice, and no rage GAU
+-- carries is ice, so no draw here could make it fail.  The play shows it
+-- (route-wor-gau.md section 5: Were-Rat's Poison scored -1 against the
+-- monster chest's Allo Ver, which drinks poison).
 -- Then the control: RAGE_OFF set, the next battle is fought with no Cmd_10
 -- for GAU at all.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
@@ -79,8 +81,9 @@ H.run({ maxFrames = 900000 }, {
         cur.beast and string.format("$%02X", cur.beast) or "-", cur.mp0, cur.mp1))
       if cur.rage and cur.cmd10 >= 2 and done == nil then done = cur end
     end
-    -- 4, read the moment the plan is made: the chosen beast's special
-    -- (MonsterRage +1) and its element, against every standing body
+    -- read the moment the plan is made (a log, not an assert): the chosen
+    -- beast's special (MonsterRage +1) and its element, against every
+    -- standing body
     if inBattle and cur.vetoFree == nil and #H.rages > nr0 then
       local r = H.rages[nr0 + 1]
       local atk = H.readRomByte((H.sym("MonsterRage") & 0x3FFFFF) + r.rage * 2 + 1)
@@ -114,7 +117,6 @@ H.run({ maxFrames = 900000 }, {
     H.assertEq(done.beast, r.rage, "1. GAU's seat possessed by the planned beast ($33A8)")
     H.assertEq(done.mp1, done.mp0 - 8, "2. 8 MP for the start and none for the possessed turns after it")
     H.assertEq(done.tier, math.min(r.boost, 3), "3. OT6_RAGETIER holds the plan's boost")
-    H.assertEq(done.vetoFree, true, "4. no standing body absorbed or nulled the chosen special")
   end),
   -- the control: the same driver with the line off
   H.call(function()
