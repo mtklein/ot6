@@ -2155,6 +2155,46 @@ M.contracts["wor-veldt-cave-v1"] = {
   },
 }
 
+-- wor-gau-v1: the World of Ruin map, on foot on the Falcon's tile outside
+-- Thamasa (250,231: _cb7a18's airship_pos), after the Veldt cave: the
+-- SrBehemoth beaten and SHADOW carried to Strago's house (_cb7a18 ..
+-- _cb7ccf: $0199), the Memento Ring, Thamasa's item counter, and SHADOW
+-- gone to the Colosseum as the party left the town (_cb7d69: $019F).
+-- TERRA, CELES, RELM and GAU seated (docs/design/route-wor-gau.md).  No
+-- timer.
+M.contracts["wor-gau-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 250, y = 231 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x02AF, 1, "Duncan's Bum Rush taught (_cc0bd8)" },
+    { 0x0249, 1, "the father's scene done, GAU back (_cb6639 ..)" },
+    { 0x0199, 1, "the dog's master found, the SrBehemoth beaten (_cb7a18)" },
+    { 0x019F, 1, "SHADOW left Thamasa for the Colosseum (_cb7d69)" },
+  },
+  party = {
+    size = 4,                     -- TERRA, CELES, RELM and GAU
+    members = {
+      { 0x00, "TERRA" },
+      { 0x06, "CELES" },
+      { 0x08, "RELM" },
+      { 0x0B, "GAU" },
+    },
+  },
+  ram = {
+    { 0x1F62, 0xFF, 250, "the Falcon parked at x 250 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 231, "the Falcon parked at y 231 (save-block cell $1F63)" },
+    { 0x1EDF, 0x08, 0x08, "GAU available ($1EDF bit 3)" },
+    { 0x1E5C, 0x08, 0x08, "the Memento Ring's chest open (treasure bit $0E3)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)

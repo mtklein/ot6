@@ -11,5 +11,18 @@
       "x": 57,
       "y": 44
     }
+  },
+  "size": 32768,
+  "sha256": "6201a16b17775698a4175557f7882a70ba14718caeed7006f352966653a1780f",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "6201a16b17775698a4175557f7882a70ba14718caeed7006f352966653a1780f",
+    "generator_sig": "2a36bf8e0cbffb33d192e3ac2d06e584a1cfc793d4b041e24862f60223492fa8 gen_wor_veldt tools/tests/checkpoints/wor-ragnarok-v1/manifest.json tools/tests/checkpoints/wor-ragnarok-v1/wor-ragnarok.sram",
+    "ancestors": [
+      {
+        "path": "tools/tests/checkpoints/wor-ragnarok-v1/manifest.json",
+        "sha256": "aa5fa0388a63eef082b202a0d2633cc191eeb294a9c02fa9de4fd86fe952cd14"
+      }
+    ]
   }
 }

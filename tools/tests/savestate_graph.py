@@ -973,10 +973,21 @@ STATES = [
     # house, the cabin again (TERRA, CELES, RELM, GAU), the cave's dog, its
     # three chests and its wall, and Save there: the `wor-veldt-cave-v1`
     # checkpoint, the retry point for the SrBehemoth
-    # (docs/design/route-wor-gau.md).  A cut.  Re-cut by checkpoint_drift.py
-    # --recut.
+    # (docs/design/route-wor-gau.md).  A cut.  wor_gau below boots its
+    # checkpoint.  Re-cut by checkpoint_drift.py --recut.
     S("wor_veldt", gen="gen_wor_veldt", prev="wor_ragnarok",
-      checkpoint="wor-ragnarok-v1", saves="wor-veldt-cave-v1", timeout=7200),
+      checkpoint="wor-ragnarok-v1", timeout=7200),
+
+    # wor-veldt-cave-v1 -> the World of Ruin map on the Falcon's tile
+    # outside Thamasa (250,231): the dog's master and the SrBehemoth (event
+    # battle 82, a game over when lost: the runner retries from the save
+    # point), SHADOW carried to Thamasa, Strago's house (the Memento Ring),
+    # the item counter, the town's edge (SHADOW leaves for the Colosseum),
+    # and Save there: the `wor-gau-v1` checkpoint, the next arc's boot
+    # (docs/design/route-wor-gau.md).  A cut; saves= until a leg boots it.
+    # Re-cut by checkpoint_drift.py --recut.
+    S("wor_gau", gen="gen_wor_gau", prev="wor_veldt",
+      checkpoint="wor-veldt-cave-v1", saves="wor-gau-v1", timeout=5400),
 
 ]
 
