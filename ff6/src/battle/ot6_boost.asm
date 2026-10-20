@@ -2211,6 +2211,43 @@ Ot6ThiefCostTbl:
         rtl
 .endproc
 
+; [ a costed action the pool cannot pay keeps its boost (#450) ]
+;
+; CalcAttackEffect's universal MP check refuses the cast (a spell, Blitz,
+; SwdTech, a Tool, a Dance start whose pool moved after the commit) and
+; charges no MP.  The pips raised for it are still only pending, and
+; Ot6ActionEnd would spend them on a cast that never happened.  Dropping
+; them here, while they are only pending, ends the turn as an unboosted
+; one: the bank untouched, the regen pip earned, the folded prices falling
+; back (the same request Ot6DanceStumble and Ot6RageStartGate make).  One
+; place serves every verb; the Rage and Dance start gates drop earlier for
+; their own trance, and this finds nothing pending after them.
+;
+; Not on the second half of an X-Magic: it resumes through $3406 with bit 6
+; clear (see Ot6NoActionMark), and the first spell was paid for and bought
+; with this same pending boost, which must still be spent.
+;
+; entry: jsl from CalcAttackEffect's fizzle arm, a16/i8, x = attacker entity,
+; db=$7e.  Preserves a, x, y and flags.
+.proc Ot6FizzleDropBoost
+        php
+        sep     #$20
+        .a8
+        pha
+        cpx     #$08
+        bcs     @out            ; monsters hold no boost
+        bit     $3406           ; bit 6 set = the first spell of a turn
+        bvc     @out
+        lda     #$00
+        sta     OT6_BOOST_REVEALED,x
+        lda     $3204,x
+        ora     #$80            ; the "recheck enabled magic" request
+        sta     $3204,x
+@out:   pla
+        plp
+        rtl
+.endproc
+
 ; ------------------------------------------------------------------------------
 
 ; [ the boost level this action's damage multiplier buys ]

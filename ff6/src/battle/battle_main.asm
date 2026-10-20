@@ -8522,7 +8522,9 @@ CalcAttackEffect:
         bcc     @32ca
         ldy     #$12
         sty     $b5
-@32ca:  jsr     _c235ad
+@32ca:  jsl     Ot6FizzleDropBoost  ; ot6: a character's refused cast keeps
+                                ;   its pending boost (#450); x = attacker
+        jsr     _c235ad
         stz     $a2
         stz     $a4
         lda     #$0002
