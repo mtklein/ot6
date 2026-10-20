@@ -792,7 +792,7 @@ done:   plp
 ; [ add one item to what the party obtained this battle ]
 ; LoadItemProp (battle_main.asm) into $2e72-$2e76, quantity 1, then battle
 ; graphics $05, the pair _c262c7 runs for a stolen item.  a8/i16, A = item id
-; (not $ff), db=$7e.  preserves X and Y.
+; (not $ff), db=$7e.  preserves X and Y.  jsr (rts).
 .proc Ot6GrantItem
         .a8
         .i16
@@ -864,7 +864,7 @@ done:   plp
         jsl     ExecBtlGfx_ext
         ply
         plx
-        rtl
+        rts
 .endproc
 
 ; ------------------------------------------------------------------------------
