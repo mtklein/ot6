@@ -539,6 +539,10 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-terra-v1",
     "battle_breakblade": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-terra-v1",
+    # #447: RELM's Ultima from Ragnarok against TERRA's folded one, from the
+    # save the play makes outside Narshe with the stone on
+    "battle_ragnarok": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-ragnarok-v1",
     # #424: a 3-BP Break on Esper Mountain's four- and five-shield bodies,
     # and RunicBlade sending a Wizard's spell back on the Narshe cliffs
     "battle_breakfour": "OT6_TIMEOUT=1800 "
