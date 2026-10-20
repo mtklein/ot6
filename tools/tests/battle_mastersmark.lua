@@ -15,7 +15,8 @@
 -- the continent into random battles (H.fcAlcoveToBattle / H.fcPace); LOCKE
 -- plays the list through H.kitBattle, everyone else Defends.  Nothing is
 -- written.  Stages, each in a battle where a standing body carries loot:
---   1. the row at 2 BP: drawn at 99 MP in cell 7, refused at the list (it
+--   1. (two or more bodies carrying loot) the row at 2 BP: drawn at 99 MP
+--      in cell 7, refused at the list (it
 --      buzzes, the list stays up); then at 3 BP, confirmed: every body
 --      standing at the action lost its loot, the queue gained exactly the
 --      rare-else-common of each body that had any, in slot order;
@@ -35,12 +36,13 @@ local MARK_MP = 99
 local function ent(s) return 8 + s * 2 end
 local function live(s) return (H.readByte(0x3AA8 + s * 2) & 1) == 1 and H.readWord(0x3BFC + s * 2) > 0 end
 local function lootOf(s) return H.readByte(0x3308 + ent(s)), H.readByte(0x3309 + ent(s)) end
-local function anyLoot()
+local function lootCount()
+  local n = 0
   for s = 0, 5 do
     local r, c = lootOf(s)
-    if live(s) and (r ~= 0xFF or c ~= 0xFF) then return true end
+    if live(s) and (r ~= 0xFF or c ~= 0xFF) then n = n + 1 end
   end
-  return false
+  return n
 end
 local function queueN() return H.readByte(0x64DA) end
 
@@ -78,6 +80,12 @@ local function arm()
     if rec == nil or rec.ended or (addr - 0x7E602D) % 5 ~= 0 or v == 0xFF then return end
     rec.queued[#rec.queued + 1] = v
   end, emu.callbackType.write, 0x7E602D, 0x7E602D + 16 * 5 - 1)
+  emu.addEventCallback(function()
+    if rec ~= nil and not rec.shot and H.frame >= rec.f + 20 then
+      rec.shot = true
+      H.screenshot("mastersmark_banner_" .. stage)
+    end
+  end, emu.eventType.endFrame)
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
     if rec == nil or rec.ended or seat == nil or not lockeX() then return end
@@ -153,11 +161,12 @@ local function decide()
   local e = seat * 2
   local can = H.readWord(0x3BF4 + e) > 0 and (H.readByte(0x3EE4 + e) & 0xE2) == 0
     and H.readWord(0x3C08 + e) >= MARK_MP
-  H.log(string.format("[mark] battle %d, stage %d: LOCKE seat %d MP %d bank %d; loot on the field %s", battles,
-    stage, seat, H.readWord(0x3C08 + e), H.readByte(0x3E9C + e), tostring(anyLoot())))
-  if not can or not anyLoot() then
+  H.log(string.format("[mark] battle %d, stage %d: LOCKE seat %d MP %d bank %d; bodies with loot %d", battles,
+    stage, seat, H.readWord(0x3C08 + e), H.readByte(0x3E9C + e), lootCount()))
+  if not can or lootCount() < (stage == 1 and 2 or 1) then
     mode = "fightout"
-    H.log("[mark] LOCKE cannot act, lacks 99 MP, or no body carries loot: fought out, the next battle taken")
+    H.log("[mark] LOCKE cannot act or lacks 99 MP, or too few bodies carry loot (the robbery wants two): fought "
+      .. "out, the next battle taken")
     return
   end
   if stage == 1 then
