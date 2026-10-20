@@ -32,6 +32,11 @@
 --     and before the battle ended: the cure is the one spent;
 --   * the battle was won and paid the once-zombied member its share, unless
 --     it went down again after the cure (a second landing or a fall: said).
+-- The cure's carrier can itself be Zombied before its item runs (the chain's
+-- tomb_zombie: SETZER carries the Revivify, a monster Zombies him, the item
+-- resolves on no target): the driver drops a cure whose carrier is down and
+-- the next living member plans it again (watchPendingCare); the property
+-- here is unchanged.
 -- ZOMBIE_CURE is the lever (opts.zombieCure); a copy with it false is the
 -- negative control and goes red at the first of those it breaks (the
 -- mutants that prove each assertion can fail are in
