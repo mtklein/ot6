@@ -16,3 +16,13 @@ and outside Kohlingen after the cave, with Locke in the party.
 **A golden aura for Boost.** A character with a boost raised glows, more
 strongly at each BP, until the boost is spent. When several boost at once,
 the one choosing a command wears the full aura and the others glow.
+
+**Locke's full kit.** His Steal list grows as the story goes. Mug (after
+South Figaro) is a Fight that steals on each hit. Trickshot (after the Lete
+River) throws a coin that pierces and ignores defense. Dismantle (after the
+Sealed Gate) lowers an enemy's defense for the battle, then stabs. Appraise
+(after Thamasa) reveals an enemy's weaknesses, or every enemy's when boosted.
+Master's Mark, his divine (3 BP, 99 MP, after the Air Force), steals the best
+item from every enemy and reveals their weaknesses. Filch and Bestow are there
+from the start. A boosted Capture or Mug buys extra swings only; its steals use
+the normal odds.

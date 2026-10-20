@@ -16,8 +16,9 @@
 --      left column, Trickshot $E1, Dismantle $E2 and Appraise $E3 down the
 --      right, Master's Mark's cell empty; prices 4 / 4 / 8 / 3 MP;
 --   2. Mug at 1 BP on a body that carries loot: it runs as Capture --
---      Ot6FightBoost buys its two extra swings (three passes of
---      _magicpunch, or fewer only when no body is left standing), each
+--      Ot6FightBoost buys its two extra swings (four passes of _magicpunch,
+--      a Fight's two, one a hand, and two for the point, or fewer only when
+--      no body is left standing), each
 --      landing hit runs Steal's effect, and the steal rolls vanilla's odds
 --      (Ot6StealBoostLevel hands back the raw level with a point pending:
 --      the boost bought the swings and pays once); 4 MP, the bank pays the
@@ -243,8 +244,8 @@ local function judge()
     H.assertEq(r.row, MUG, "the counted action is the Mug")
     H.assertEq(r.pend, 1, "Mug ran at the 1 BP planned")
     H.assertEq(r.fightBoost, 1, "Mug ran as Capture: Ot6FightBoost saw its point (the boost buys swings)")
-    if not (r.swings == 3 or (r.swings >= 1 and not anyLive())) then
-      H.assertEq(r.swings, 3, "a 1-BP Mug swings three times (1 + 2 per point)")
+    if not (r.swings == 4 or (r.swings >= 1 and not anyLive())) then
+      H.assertEq(r.swings, 4, "a 1-BP Mug makes four passes: a Fight's two (one a hand) and two a point")
     end
     if r.steals == 0 or #r.levels == 0 then
       H.log("[lockekit] no hit reached the steal roll (missed, or the loot was gone): not counted")

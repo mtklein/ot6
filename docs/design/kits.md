@@ -96,7 +96,7 @@ it (a Jackpot), and is free where it does not (a Cleave).
 | Setzer | Jackpot | a throw of two triple rolls, 99 MP | yes (`ot6_setzer.asm`) |
 | Shadow | Assassinate | his 3-BP action: a hit of it that breaks a non-boss, or lands on a Broken one, kills it (the effect, not a gate) | yes (`ot6_divine.asm`) |
 | Sabin | Bum Rush | (built today as a 99-MP Blitz row at any boost; as a divine it will take the full boost) | no |
-| Locke | Master's Mark | steal from all enemies and reveal everything, at 3 BP | no |
+| Locke | Master's Mark | every enemy robbed (its rare item, else its common, no roll) and read, 99 MP | yes (`ot6_thief.asm`) |
 | Mog | Water Rondo | the dance at 3 BP: every step x8 for the battle, 99 MP, and it never stumbles, wherever the party fights | yes (`ot6_waterrondo.asm`) |
 | Umaro | Storm | a dump of all three points: Storm, ice on every enemy at x8, with or without the Blizzard Orb | yes (`ot6_umaro.asm`) |
 | Strago | Study | his Scan at 3 BP: reads every enemy and learns every lore any monster present could cast, 99 MP | yes (`ot6_analyze.asm`) |
@@ -107,7 +107,7 @@ Terra's Ultima is a fold, not a divine, but it too is what a full boost buys
 the once-a-battle flag (`OT6_DIVINE_USED`), is retired.
 Suites: `battle_divines` and `battle_cleave` (Cleave), `battle_jackpot`,
 `battle_assassinate`, `battle_trance` and `battle_morphrandom`, `battle_runicblade`,
-`battle_overclock`, `battle_waterrondo`, `battle_umaro`, each with its gate
+`battle_overclock`, `battle_waterrondo`, `battle_umaro`, `battle_mastersmark`, each with its gate
 (under 3 BP no divine), and an old-ROM red; the menu divines also with a
 second use in one battle.
 
@@ -535,22 +535,27 @@ probes, redistributes and corrodes, with some merchant work as well
 
 | # | Skill | Effect | Source |
 |---|---|---|---|
-| 1 | Steal ✦ (4 MP) | vanilla steal | join |
-| 2 | Mug | steal + piercing damage | South Figaro escape |
-| 3 | Trickshot | piercing chip at range (thrown coin) | Lete River |
-| 4 | Filch ✦ (6 MP) | take one shield, class-blind, and bank it as 1 BP | Opera house |
-| 5 | Bestow ✦ (5 MP) | give an ally 1 BP | Vector (merchant beat) |
-| 6 | Dismantle | armor corrode: −defense, piercing chip | Sealed Gate |
-| 7 | Appraise | reveal one enemy's full weakness row | Thamasa |
-| 8 | **Master's Mark** (divine, at 3 BP; not built) | steal from all enemies + reveal everything | Floating Continent |
+| 1 | Steal ✦ (4 MP) | vanilla steal; boost buys certainty | join |
+| 2 | Mug (4 MP) | Capture: a swing that steals on each hit; boost buys swings | South Figaro escape (`$001E`) |
+| 3 | Trickshot (4 MP, escalates) | a thrown coin: piercing, past defense; boost multiplies | Lete River (`$001A`) |
+| 4 | Filch ✦ (6 MP) | take one shield, class-blind, and bank it as 1 BP | join (was: Opera house) |
+| 5 | Bestow ✦ (5 MP) | give an ally 1 BP | join (was: Vector) |
+| 6 | Dismantle (8 MP) | defense corrode, then a piercing stab; boost buys steps | Sealed Gate (`$0079`) |
+| 7 | Appraise (3 MP) | Scan's read of one enemy; boost reads them all | Thamasa, Strago met (`$008D`) |
+| 8 | **Master's Mark** (divine, 3 BP, 99 MP) | every enemy robbed and read | Floating Continent, the Air Force (`$00A0`) |
 
 - Filch and Bestow move BP around: take from enemies, give to
   allies. Tactically he supplies tempo as well as loot.
 
 **The thief submenu.** Steal is tier one of this list rather than
 a verb of its own, so the list sits behind the Steal row:
-`OpenCmdMenuTbl[$05]` opens the Tools-window shell with Steal / Filch / Bestow
-in it (`Ot6ThiefListOpen`), priced, with unaffordable rows greyed. This
+`OpenCmdMenuTbl[$05]` opens the Tools-window shell with the kit in it
+(`Ot6ThiefListOpen`), two columns of four: Steal, Filch, Bestow and Mug down
+the left, Trickshot, Dismantle, Appraise and Master's Mark down the right
+(`Ot6ThiefRowTbl`), a row blank until it is learned, priced, with
+unaffordable rows greyed. The field Skills page lists the same eight in the
+same order, read a column at a time, with the Blitz page's locked marker on a
+row not learned yet. This
 arrangement is forced, because **Locke has no spare command slot.**
 `char_prop.asm:160`
 records FIGHT, STEAL, MAGIC, ITEM; the apparently blank third row is MAGIC
@@ -591,19 +596,77 @@ the same `Ot6BushidoRowGrey` that coloured it), so the turn and the 5 MP stay
 with the player; a self-target and an ally already at the 5 cap are still
 refused at execution. `battle_bestowrefuse` is the suite.
 
-**Break class: none of the three takes one.** Steal and Bestow deal no damage,
+**Break class: none of the first three takes one** (Mug's is his weapon's;
+Trickshot and Dismantle pierce). Steal and Bestow deal no damage,
 and Filch deals none either. A class glyph on Filch's row would be wrong about
 the property that matters: it chips whatever the row says.
 
-**Story gating: grant at join, i.e. no gate.** The rows are Steal's rows and
-Steal is granted at join, so they arrive with him. Reasons, in order of weight:
-(1) Locke has no learned-set byte, where Blitz has `$1d28` and SwdTech `$1cf7`,
-and inventing a per-ability set for him is a change that should ride the change
-that needs *eight* tiers rather than the one that ships two; (2) it
-is the only option that structurally cannot leave a past-the-beat save without
-the skill. When tiers 2/3/6/7 arrive and a learned set becomes
-unavoidable, the gate can be added then and grant-at-join becomes its
-already-satisfied floor for these two.
+**Story gating: Filch and Bestow at join; the other five by story.** Filch
+and Bestow are Steal's rows and Steal is granted at join, so they arrive with
+him (the later ruling; the table's Opera house and Vector beats are retired).
+The five that came after (#382) are each taught by the beat in the table, and
+the gate needed no learned-set byte after all: each beat already sets an
+event switch once and nothing clears it, so `Ot6ThiefRowTbl` keys each row on
+its switch (`$1E80 + n/8`, bit `n & 7`), and a save past the beat has the row
+whatever it did on the way. The Floating Continent's landing sets no switch
+of its own; the Air Force gauntlet's `$00A0` (set as its first wave falls,
+and never without the landing following, since a loss there is a Game Over)
+stands in. Thamasa's first arrival sets none either; Strago's `$008D` does,
+on the route's first visit. In story order: Trickshot (the Lete River ride,
+while Locke is in South Figaro, so he has it when the player next takes him),
+Mug, Dismantle, Appraise, Master's Mark.
+
+**The later rows (#382).** The names are not in AttackName (no pad slot is
+left there): the ids are `$E0`-`$E4`, free under command `$05`, and the list
+draws them from `Ot6ThiefName` (`Ot6KitListName`, which also took over the
+SwdTech names' C1 arm), the banner from `Ot6ThiefBanner` through attack name
+type 3, unused in vanilla. The list's ten letters print the divine as
+"Mstr. Mark"; the banner prints "Master's Mark".
+
+- **Mug** is vanilla's Capture as a row (FF3-US prints the Thief Glove's
+  verb as Capture): `Ot6MugCheck` sends the action to `Cmd_06`, so it is a
+  Fight swing with his weapon's class (the dagger pierces) whose landing hits
+  each run Steal's effect, and the boost buys swings, two a point, as a
+  Fight's does. The boost pays once: the steal on a Capture's or Mug's hit
+  rolls vanilla's odds whatever is pending (`Ot6StealBoostLevel`,
+  `Ot6StealSlot`; a boosted Thief Glove Capture used to buy both). 4 MP,
+  Steal's price: the swing is the Fight he would take anyway.
+- **Trickshot** is one thrown coin by Fight's own formula at battle power
+  40, whatever he holds, physical, ignoring defense (and with it the
+  target's row and Defend), class pierce. It runs under GP Rain's animation
+  command `$18`, which `Ot6BoostDmg` does not gate, so the boost multiplies
+  it x2/x4/x8 and its 4 MP escalates with it (`Ot6ThiefCharge`,
+  `Ot6ThiefRowCost`): the one test, a price escalates exactly when the boost
+  multiplies. It is the pierce key a sword-holding Locke still has, and a
+  hit that defense does not blunt.
+- **Dismantle** corrodes first, then stabs: each step takes a quarter of the
+  target's defense (`$3BB8`, at least one point), for the rest of the
+  battle, and the boost buys steps (one at 0 BP, four at 3 BP, about a third
+  of the defense left). The stab (power 20, class pierce) stays under Steal's
+  gated command, so the boost buys no multiplier and 8 MP is flat. The
+  corrode is for the party's physical hits that follow.
+- **Appraise** is Strago's Scan read (`Ot6AnalyzeOne`): the target's weak
+  elements and classes onto the HUD and into the codex, nothing chipped; a
+  point or more reads every enemy. 3 MP, Analyze's price, flat (no
+  multiplier under command `$05`).
+- **Master's Mark**, the divine, at three points pending: every standing
+  body read as Appraise reads it and robbed as a 3-BP Steal robs (its rare
+  item, else its common, no roll; nothing from a body already robbed), each
+  item straight into the battle's obtained-items queue (BtlGfx `$05`), since
+  the attacker's one `$32F4` slot holds a single item. 99 MP, the divines'
+  ceiling. Greyed and refused under three; picked at three and taken back,
+  it does nothing and costs nothing (`Ot6ThiefCharge` prices it at 0).
+
+Suites: `battle_lockekit` (fire-out-v1: the list, Mug, Trickshot at 0 and 1
+BP, Dismantle at 2 BP, Appraise at 0 and 1 BP), `battle_mastersmark`
+(fc-alcove-v1: the refusal at 2 BP, the robbery at 3, the take-back),
+`menu_thiefpage` (the field page's eight rows). The play driver uses them
+(`Driver:lockeLine`, `Driver:lockeMug`): Mug in place of his Fight on a body
+that still carries loot; Appraise on a body the HUD cannot key yet, in an
+event battle or with 1,500 HP or more; Dismantle once a body in an event
+battle with 3,000 HP and 64 defense or more; Trickshot on a pierce-weak body
+his Fight keys nothing on; Master's Mark in an event battle with loot on the
+field, or a random one with three bodies carrying it.
 
 **Prices** are on mp-economy.md's baseline (8-20% of the real pool at the
 level the ability arrives) against Locke's 31 MP at LV6: Steal 4 (12.9%),
