@@ -1,0 +1,15 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-veldt-cave.sram",
+  "slot": 3,
+  "milestone": "wor-veldt-cave",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 353,
+      "x": 57,
+      "y": 44
+    }
+  }
+}

@@ -298,7 +298,9 @@ class Data:
         """EventBattleGroup[g]: the first formation 3/4 of the time, the
         second 1/4 (field/event.asm EventBattle, `cmp #$c0`)."""
         a = self.at("EventBattleGroup", g * 4)
-        return [self.w(a) & 0x1FF, self.w(a + 2) & 0x1FF]
+        # a formation index is ten bits (0-575): the Veldt cave's monster
+        # chest (group 153) reads $0203, formation 515 (Allo Ver)
+        return [self.w(a) & 0x3FF, self.w(a + 2) & 0x3FF]
 
     def arrangements(self, f):
         v = (self.w(self.at("BattleProp", f * 4)) ^ 0x00F0) & 0xF0

@@ -961,11 +961,22 @@ STATES = [
     # elder's treasure room, the weapon shop's back room (Ragnarok, taken
     # as the stone), the relic shop, the Cursed Shld, the item counter, the
     # gear counters and the inn, and Save there: the `wor-ragnarok-v1`
-    # checkpoint, the next arc's boot (docs/design/route-wor-narshe.md
-    # section 12).  A cut; saves= until a leg boots it.  Re-cut by
-    # checkpoint_drift.py --recut.
+    # checkpoint (docs/design/route-wor-narshe.md section 12).  A cut.
+    # wor_veldt below boots its checkpoint.  Re-cut by checkpoint_drift.py
+    # --recut.
     S("wor_ragnarok", gen="gen_wor_ragnarok", prev="wor_locke",
-      checkpoint="wor-locke-v1", saves="wor-ragnarok-v1", timeout=5400),
+      checkpoint="wor-locke-v1", timeout=5400),
+
+    # wor-ragnarok-v1 -> the Veldt cave's save point, map 353 (57,44): the
+    # Falcon's cabin (SABIN, TERRA, CELES), Duncan's house north of Narshe
+    # (Bum Rush), the Veldt until GAU joins after a battle, his father's
+    # house, the cabin again (TERRA, CELES, RELM, GAU), the cave's dog, its
+    # three chests and its wall, and Save there: the `wor-veldt-cave-v1`
+    # checkpoint, the retry point for the SrBehemoth
+    # (docs/design/route-wor-gau.md).  A cut.  Re-cut by checkpoint_drift.py
+    # --recut.
+    S("wor_veldt", gen="gen_wor_veldt", prev="wor_ragnarok",
+      checkpoint="wor-ragnarok-v1", saves="wor-veldt-cave-v1", timeout=7200),
 
 ]
 

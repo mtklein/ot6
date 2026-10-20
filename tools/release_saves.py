@@ -83,6 +83,7 @@ TITLES = {
     "wor-phoenix-v1": "Phoenix Cave, save point with the party split",
     "wor-locke-v1": "Outside Kohlingen, after Locke joins",
     "wor-ragnarok-v1": "Outside Narshe, after Ragnarok",
+    "wor-veldt-cave-v1": "Veldt cave, save point, after Gau joins",
 }
 
 README = """\

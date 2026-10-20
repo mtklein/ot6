@@ -2113,6 +2113,48 @@ M.contracts["wor-ragnarok-v1"] = {
   },
 }
 
+-- wor-veldt-cave-v1: the Veldt cave's save point, map 353 (57,44), after
+-- Duncan's house (SABIN's Bum Rush, _cc0bd8: $02AF), the Veldt (GAU joined
+-- after a battle: MiscAIEffect_03 sets $1EDF bit 3), his father's house
+-- (_cb6527 .. : $0245, $0249) and the cave's first half: the dog
+-- (_cb799f: $0195), the three chests, the wall (_cb79e6: $016E).  The dog's
+-- master and the SrBehemoth (_cb7a18: $0199) are ahead.  TERRA, CELES,
+-- RELM and GAU seated (docs/design/route-wor-gau.md).  The retry point for
+-- the SrBehemoth.  No timer.
+M.contracts["wor-veldt-cave-v1"] = {
+  slot = 3,
+  field = { map = 353, x = 57, y = 44 },   -- the vanilla save point (353 NPC_1)
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x02AF, 1, "Duncan's Bum Rush taught (_cc0bd8)" },
+    { 0x0245, 1, "GAU's father found (_cb6527)" },
+    { 0x0249, 1, "the father's scene done, GAU back (_cb6639 ..)" },
+    { 0x0195, 1, "the dog met in the cave (_cb799f)" },
+    { 0x016E, 1, "the cave's wall open (_cb79e6)" },
+    { 0x0199, 0, "the dog's master not yet found (_cb7a18)" },
+  },
+  party = {
+    size = 4,                     -- TERRA, CELES, RELM and GAU
+    members = {
+      { 0x00, "TERRA" },
+      { 0x06, "CELES" },
+      { 0x08, "RELM" },
+      { 0x0B, "GAU" },
+    },
+  },
+  ram = {
+    { 0x1EDF, 0x08, 0x08, "GAU available ($1EDF bit 3, MiscAIEffect_03)" },
+    { 0x1E57, 0x80, 0x80, "the Rage Ring's chest open (treasure bit $0BF)" },
+    { 0x1E58, 0x03, 0x03, "the monster chest and the Striker's open (treasure bits $0C0, $0C1)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
