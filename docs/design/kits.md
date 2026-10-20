@@ -664,7 +664,9 @@ BP, Dismantle at 2 BP, Appraise at 0 and 1 BP), `battle_mastersmark`
 (fc-alcove-v1: the refusal at 2 BP, the robbery at 3, the take-back),
 `menu_thiefpage` (the field page's eight rows). The play driver uses them
 (`Driver:lockeLine`, `Driver:lockeMug`): Mug in place of his Fight on a body
-that still carries loot; Appraise on a body the HUD cannot key yet, in an
+that still carries loot, in event battles only (each landing hit shows its
+steal message, so a Mug in every battle cost the legs 5-7% more frames for
+loot that random battles do not need); Appraise on a body the HUD cannot key yet, in an
 event battle or with 1,500 HP or more; Dismantle once a body in an event
 battle with 3,000 HP and 64 defense or more; Trickshot on a pierce-weak body
 his Fight keys nothing on; Master's Mark in an event battle with loot on the

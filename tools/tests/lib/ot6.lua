@@ -8232,7 +8232,14 @@ end
 -- Mug in place of LOCKE's Fight (#382): the same swings at the same boost
 -- (Mug runs as Capture, so its boost buys swings as a Fight's does), and each
 -- landing hit also tries a Steal, for Mug's 4 MP.  Only on an aimed body that
--- still carries something, and only while the pool stays at o.mpFloor or more.
+-- still carries something, only while the pool stays at o.mpFloor or more,
+-- and only in an event battle (o.mugInRandoms = true lifts that): every
+-- landing hit of a Mug shows its steal message, so it is slower than the
+-- Fight it replaces, and a random battle's loot is not worth the time.
+-- Measured, Mug in every battle against Mug off (LOCKE_MUG_OFF), 3 seed
+-- shifts each (build/attempts/wt/v032-locke-kit/lab/mugab/): gen_fc_alcove
+-- 40,720 frames mean against 38,687, gen_zozo2_arrival 190,441 against
+-- 178,638, the same legs passing.
 function Driver:lockeMug(actor, plan)
   if plan == nil or plan.kind ~= "fight" or plan.ally then return plan end
   local o = self.opts.locke
@@ -8255,6 +8262,7 @@ function Driver:lockeMug(actor, plan)
     end
   end
   if row == nil or aim == nil or not monAlive(aim) or not M.monLoot(aim) then return plan end
+  if M.readByte(M.RANDBTL) ~= 0 and not o.mugInRandoms then return plan end
   if M.readWord(BATTLE.CURMP + actor * 2) - L.PRICE[L.MUG] < (o.mpFloor or 8) then return plan end
   M.log(string.format("[%s] actor=%d LOCKE Mug at %d BP on slot %d: his Fight, and slot %d still carries loot",
     self.tag or "fight", actor, plan.boostLeft or 0, aim, aim))
