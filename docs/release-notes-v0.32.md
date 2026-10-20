@@ -19,8 +19,9 @@ can steal while he fights, throw coins that ignore armor, strip an enemy's
 defense, and read its weak points. Late in the game a 3 BP skill robs every
 enemy at once.
 
-**Boost glows.** A character holding Boost Points glows gold, brighter the
-more points they hold.
+**Boost glows.** A character glows gold while a boost is raised, brighter
+with each press of R and dimmer with each L. The glow fades when the boosted
+action lands.
 
 **Weak points in the Phoenix Cave.** The cave's monsters have their own weak
 points and are easier to break.
