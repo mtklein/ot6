@@ -543,6 +543,10 @@ TEST_ENV = {
     # save the play makes outside Narshe with the stone on
     "battle_ragnarok": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-ragnarok-v1",
+    # #269: the driver's Rage line for GAU, from the save the play makes on
+    # the Veldt cave's save point with him seated
+    "battle_ragedriver": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-veldt-cave-v1",
     # #424: a 3-BP Break on Esper Mountain's four- and five-shield bodies,
     # and RunicBlade sending a Wizard's spell back on the Narshe cliffs
     "battle_breakfour": "OT6_TIMEOUT=1800 "

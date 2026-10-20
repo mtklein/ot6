@@ -112,10 +112,22 @@ H.run({ maxFrames = 200000 }, {
           -- battle: a fight that ends under the two Defends (the party can
           -- clear it first when the route left it strong or the foes weak)
           -- never reaches step 1, and the next battle takes its place.
+          -- So can one that ends while the refusal is being pressed: the
+          -- entry needs four A presses with the list still up to settle (a
+          -- confirm that went through would have reached target select,
+          -- which H.setzerBattle refuses at once), and the v0.33
+          -- qualification's wor-tomb-v1 draw ended battle 1 after two
+          -- (the others killed the crowd while SETZER sat in the list:
+          -- "[refused] f7934 ... the confirm buzzed", then "no monster stands"
+          -- at f7980; build/attempts/wt/v033-wor-gau/q1).
           local opened = #(H.vars.setzerList or {}) > 0
-          H.log(string.format("[grey] battle %d: SETZER's table %s (%d list opening(s))", battles,
-            opened and "opened" or "never opened -- the fight ended under the Defends", #(H.vars.setzerList or {})))
-          if k == 1 and opened then
+          local p1 = plan[DEFENDS + 1]
+          local unsettled = k == 1 and opened and not p1.refusedSeen and (p1.presses or 0) <= 3
+          H.log(string.format("[grey] battle %d: SETZER's table %s (%d list opening(s))%s", battles,
+            opened and "opened" or "never opened -- the fight ended under the Defends", #(H.vars.setzerList or {}),
+            unsettled and string.format("; the fight ended %d A press(es) into step 1's refusal, before it settled",
+              p1.presses or 0) or ""))
+          if k == 1 and opened and not unsettled then
             H.assertEq(plan[DEFENDS + 1].refusedSeen == true, true, string.format("step 1: Coin Toss at 3 BP (four "
               .. "throws, %d) with %d in the purse is refused at the list", 4 * H.readByte(0x1600 + 37 * 9 + 8) * 30,
               PURSE))

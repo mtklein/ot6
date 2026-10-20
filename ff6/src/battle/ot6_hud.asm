@@ -2495,6 +2495,74 @@ Ot6ShieldTbl:
                                 ;   met on the falcon's deck on the way and
                                 ;   fled (v0.34 fights it).  fire|holy
                                 ;   vanilla; absorbs ice|poison
+        ; ---- the world of ruin: the veldt cave (gau; the srbehemoth;
+        ; docs/design/route-wor-gau.md section 3) --------------------------
+        ; The four who walk it (terra, celes, relm, gau) hold slash
+        ; (celes), pierce (terra's dagger), bludgeon (relm's rod, gau's
+        ; fists) and fire; every body here but rhyos drinks or nulls one of
+        ; celes's spells (ice, poison).  The rows key bludgeon, so gau's
+        ; fists and his beasts' physical turns break what celes's ice heals.
+        .word   $008f
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; toe cutter: a scythed shell; crack
+                                ;   or puncture it.  fire|wind vanilla;
+                                ;   absorbs ice
+        .word   $007e
+        .byte   4, OT6_BLUDG    ; rhyos: an armoured horn (def 150), the
+                                ;   cave's rare body; no element
+        .word   $00bb
+        .byte   3, OT6_SLASH|OT6_BLUDG ; allo ver: bones in the monster
+                                ;   chest; doom and condemned.  fire|holy
+                                ;   vanilla; absorbs poison
+        .word   $0119
+        .byte   6, OT6_PIERCE|OT6_BLUDG ; srbehemoth: the dead beast at
+                                ;   the dog's master; horn and bone.
+                                ;   fire|poison vanilla (gau's were-rat);
+                                ;   absorbs ice (celes's runic, not her
+                                ;   spells)
+        ; ---- the world of ruin: the veldt (gau; route-wor-gau.md section
+        ; 3) -------------------------------------------------------------
+        ; The Veldt deals every formation the save has fought; these fourteen
+        ; World of Balance bodies rode the floor and the play met them there
+        ; (the sweeps' [key] lines, met.txt).  Each keeps the floor's
+        ; shields and class, so the World of Balance parties that meet them
+        ; at home keep their key, and gains one from its body.
+        .word   $0013
+        .byte   2, OT6_SLASH|OT6_PIERCE ; were-rat: a rat; fire vanilla
+        .word   $0017
+        .byte   2, OT6_SLASH|OT6_BLUDG ; leafer: a rabbit; fire|water
+                                ;   vanilla, absorbs ice
+        .word   $001b
+        .byte   2, OT6_SLASH|OT6_BLUDG ; vomammoth: a crushing blow on the
+                                ;   hide; fire vanilla
+        .word   $0028
+        .byte   2, OT6_SLASH|OT6_PIERCE ; dark wind: a bird; fire vanilla
+        .word   $0042
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; m-tekarmor: armour; bolt|poison
+                                ;   (poison an ot6 add)
+        .word   $004d
+        .byte   2, OT6_SLASH|OT6_PIERCE ; repo man: a thief; poison vanilla
+        .word   $005d
+        .byte   2, OT6_SLASH|OT6_BLUDG ; areneid: a shelled crawler;
+                                ;   ice|poison|water (poison an ot6 add)
+        .word   $0018
+        .byte   3, OT6_SLASH|OT6_PIERCE ; stray cat: claws and teeth;
+                                ;   poison an ot6 add
+        .word   $0029
+        .byte   3, OT6_SLASH|OT6_PIERCE ; beakor: a bird; fire vanilla
+        .word   $002f
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; crasshoppr: an insect's shell;
+                                ;   fire|wind vanilla
+        .word   $004f
+        .byte   3, OT6_SLASH|OT6_BLUDG ; bomb: burst it; ice|water vanilla,
+                                ;   absorbs fire
+        .word   $005a
+        .byte   3, OT6_SLASH|OT6_SPECIAL ; ghost: a spirit; fire|holy
+                                ;   vanilla, absorbs poison
+        .word   $0076
+        .byte   3, OT6_SLASH|OT6_BLUDG ; rhobite: a beetle; water vanilla
+        .word   $00a2
+        .byte   3, OT6_SLASH|OT6_PIERCE ; poplium: a puffball; fire|holy
+                                ;   vanilla, absorbs poison
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian

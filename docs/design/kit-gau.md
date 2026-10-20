@@ -266,7 +266,7 @@ battle. This is the same problem Slot solves over a shorter span: Slot stores
 the spin's tier at the first A press (`Ot6SlotRig` → `OT6_SLOTTIER` at `$57ba`,
 `ot6_kits.asm:1490-1530`, `ot6_memory.inc:59-64`) so the charge and the reels
 can never disagree. Rage copies `OT6_BOOST_REVEALED,x` (capped 3) into
-**`OT6_RAGETIER`**, the `$57bb` spare of the same init-exempt strip.
+**`OT6_RAGETIER`** (`$ed73` in the measured-free shadow past InitBP's clear, `ot6_memory.inc`; first planned as the `$57bb` spare of the same init-exempt strip).
 Staleness is harmless for the same reason it is in Slot: the cell is read only
 while a RAGE status is set, and the only writer of that status (`Cmd_10`)
 always rewrites the flag first. One byte suffices while Gau is the only Rage
@@ -493,7 +493,7 @@ drawn at col 2 under a cursor at `x = 8` puts the sprite on the leading glyph.
 
 1. **`ot6_memory.inc`**: `OT6_RAGELOAD := $7e1e1f` (8 bytes) + asserts
    `>= $1600` and `+7 <= $1ffd` (the `OT6_LOADOUT` assert pair,
-   `ot6_memory.inc:38-40`, widened). `OT6_RAGETIER := $57bb` beside
+   `ot6_memory.inc:38-40`, widened). `OT6_RAGETIER` (now `$ed73`, `ot6_memory.inc`) beside
    `OT6_SLOTTIER` with the same strip comment discipline.
 2. **F0, `ot6_kits.asm` (new strip beside the Bushido loadout)**:
    - `Ot6RageLearned` — bit test of rage id A against `$1d2c` (the

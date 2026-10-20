@@ -137,3 +137,7 @@
 172	map 315 the Phoenix Cave, Wing Edge (24,43), past the pit (gen_wor_phoenix)
 177	map 315 the Phoenix Cave, Dragon Horn (20,40) (gen_wor_locke)
 171	map 313 the Phoenix Cave, Ribbon (13,20) (gen_wor_locke)
+191	map 353 the Veldt cave, Rage Ring (18,20) (gen_wor_veldt)
+192	map 353 the Veldt cave, the monster chest (6,8): Allo Ver (gen_wor_veldt)
+193	map 353 the Veldt cave, Striker (42,26) (gen_wor_veldt)
+227	map 349 Strago's house, Memento Ring (56,16) -- after the Veldt cave (gen_wor_gau)

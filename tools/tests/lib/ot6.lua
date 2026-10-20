@@ -6603,6 +6603,15 @@ local BATTLE = {
   -- seat's $2EAE byte is 0, else DefaultMagitekAttackTbl (0, 1, 2, 4)
   CMD_MAGITEK = 0x1D, ST_MTEK_OPEN = 0x28, ST_MTEK_CLOSE = 0x29, ST_MTEK = 0x2A,
   MTEK_COL = 0x893F, MTEK_ROW = 0x8943, MTEK_BASE = 0x83,
+  -- GAU's Rage (#269, kit-gau.md): command $10 opens the rage window
+  -- through $1C to $1E (the list: two columns, entry = (scroll + row) * 2
+  -- + column, the cells $892B/$892F/$8933 per actor, _c18438), $1D closes
+  -- it, and A on an entry hands on to a target confirm ($38,
+  -- battle_gaufight).  The list is InitSkills' flat one at $257E, $3A9A
+  -- entries, the loadout's eight (or AUTO's); MonsterRage (cf/4600) holds
+  -- each beast's two attacks, entry 0 Battle, entry 1 the special
+  CMD_RAGE = 0x10, ST_RAGE_OPEN = 0x1C, ST_RAGE_CLOSE = 0x1D, ST_RAGE = 0x1E,
+  RAGE_SCROLL = 0x892B, RAGE_COL = 0x892F, RAGE_ROW = 0x8933, RAGE_LIST = 0x257E, RAGE_COUNT = 0x3A9A,
 }
 BATTLE.KNOWN_ST = { [BATTLE.ST_CMD] = true, [BATTLE.ST_TGT] = true, [BATTLE.ST_ITEM] = true,
                     [BATTLE.ST_MAGIC] = true, [BATTLE.ST_ESPER] = true, [BATTLE.ST_TOOLS] = true,
@@ -6619,14 +6628,17 @@ BATTLE.KNOWN_ST = { [BATTLE.ST_CMD] = true, [BATTLE.ST_TGT] = true, [BATTLE.ST_I
                     [BATTLE.ST_SLOT] = true,
                     -- the MagiTek list (#373): open, close, attack select
                     [BATTLE.ST_MTEK_OPEN] = true, [BATTLE.ST_MTEK_CLOSE] = true,
-                    [BATTLE.ST_MTEK] = true }
+                    [BATTLE.ST_MTEK] = true,
+                    -- the rage window (#269): open, close, the list
+                    [BATTLE.ST_RAGE_OPEN] = true, [BATTLE.ST_RAGE_CLOSE] = true,
+                    [BATTLE.ST_RAGE] = true }
 -- The selection windows a plan-less driver backs out of (see the
 -- plan-nil head of button()): every list that waits on A or B.  The
 -- transitional states ($19 lore fill, $2B/$2C throw open/close) are
 -- left out; they pass on their own.
 BATTLE.IDLE_ST = { [BATTLE.ST_ITEM] = true, [BATTLE.ST_TOOLS] = true, [BATTLE.ST_MAGIC] = true,
                    [BATTLE.ST_ESPER] = true, [BATTLE.ST_LORE] = true, [BATTLE.ST_THROW] = true,
-                   [BATTLE.ST_MTEK] = true }
+                   [BATTLE.ST_MTEK] = true, [BATTLE.ST_RAGE] = true }
 for _, s in ipairs(BATTLE.ST_TRANSITIONAL) do BATTLE.KNOWN_ST[s] = true end
 
 -- A command row the cursor can actually land on.  Each $202E row is
@@ -8324,6 +8336,101 @@ function Driver:magitekLine(actor)
   end
   return { kind = "magitek", row = cmdRow(actor, BATTLE.CMD_MAGITEK), entry = best,
            skill = bestAtk, aim = slot, boostLeft = 0 }
+end
+
+-- GAU's Rage (#269; kit-gau.md): the beast whose special does the most to
+-- the formation, from the battle list the loadout built ($257E, the
+-- eight Gau carries), as a plan, or nil.  The possession is the whole
+-- battle's: one choice at Gau's first window, paid once (8 MP), every
+-- possessed turn after it a coin between Battle and the special that boost
+-- tilts toward the special (1 BP 3/4, 2 BP 15/16, 3 BP every turn).  Read
+-- with full power (TESTING.md): each special's MagicProp element, power and
+-- targeting, and every standing body's weak, half, absorb and null bytes;
+-- a special something here absorbs or nulls is out, a weakness doubles it,
+-- a revealed key it chips counts as the magitek line counts one.  The
+-- physical specials (Battle $EE, Special $EF, both FightAttack's: Gau's
+-- fists, bludgeon) are scored at a nominal power.  Boost: an event battle
+-- buys the special every turn at 3 BP when the bank holds them (one choice
+-- for the whole fight); a random battle 1 BP.
+-- Opt-in: opts.rage = true turns it on (RAGE_OFF, a global, off again, the
+-- control arm).  Off, GAU Fights: his fists are bludgeon, a key the Veldt
+-- cave's rows hold on every body, and on the arc that brings him back the
+-- possession was slower than them on the boss's every key and on the
+-- cave's mean (route-wor-gau.md
+-- section 7, build/attempts/wt/v033-wor-gau/lab/pairs_boss.txt and
+-- pairs_cave.txt): the SrBehemoth 10363 ticks and 2 deaths over 4 keys
+-- against 6739 and none, the cave's randoms 1559 ticks against 1363 over 17.
+-- The nine World of Balance rages he returns with are the reason (powers
+-- 8-40); a route that teaches stronger ones (Leap on the Veldt) is where to
+-- turn it on and measure again.
+BATTLE.RAGE_PHYS_POWER = 40
+M.rages = {}             -- every Rage plan this run, oldest first (battle_ragedriver reads them)
+BATTLE.RAGE_MP = 8
+function Driver:rageLine(actor, have)
+  if self.opts.rage ~= true or RAGE_OFF then return nil end
+  if M.readByte(BATTLE.BCHID + actor * 2) ~= 0x0B then return nil end
+  local row = cmdRow(actor, BATTLE.CMD_RAGE)
+  if row == nil or self.skillDead[BATTLE.CMD_RAGE] then return nil end
+  if (M.readByte(BATTLE.ST4 + actor * 2) & 0x01) ~= 0 then return nil end
+  local mp = M.readWord(BATTLE.CURMP + actor * 2)
+  if mp < BATTLE.RAGE_MP then return nil end
+  local n = math.min(M.readByte(BATTLE.RAGE_COUNT), 8)
+  local MR = M.sym("MonsterRage") & 0x3FFFFF
+  local MP = M.sym("MagicProp") & 0x3FFFFF
+  local best, bestScore, said = nil, nil, {}
+  for i = 0, n - 1 do
+    local r = M.readByte(BATTLE.RAGE_LIST + i)
+    if r ~= 0xFF then
+      local atk = M.readRomByte(MR + r * 2 + 1)
+      local phys = atk == 0xEE or atk == 0xEF
+      local elem = phys and 0 or M.readRomByte(MP + atk * 14 + 1)
+      local power = phys and BATTLE.RAGE_PHYS_POWER or M.readRomByte(MP + atk * 14 + 6)
+      local heal = not phys and (M.readRomByte(MP + atk * 14 + 4) & 0x01) ~= 0
+      local all = not phys and (M.readRomByte(MP + atk * 14) & 0x20) ~= 0
+      local score, top = 0, 0
+      if heal or power == 0 then
+        score = 0
+      else
+        for s = 0, 5 do
+          if monAlive(s) then
+            local x = 8 + s * 2
+            local weak, half = M.readByte(0x3BE0 + x), M.readByte(0x3BE1 + x)
+            local absorb, null = M.readByte(0x3BCC + x), M.readByte(0x3BCD + x)
+            local v
+            if elem ~= 0 and ((absorb & elem) ~= 0 or (null & elem) == elem) then
+              score = -1; break
+            end
+            v = power
+            if elem ~= 0 and (weak & elem) ~= 0 then v = v * 2
+            elseif elem ~= 0 and (half & elem) ~= 0 then v = v // 2 end
+            v = v + 1000 * hitChips(s, phys and 0x04 or 0, elem)
+            if all then score = score + v elseif v > top then top = v end
+          end
+        end
+        if score >= 0 and not all then score = top end
+      end
+      said[#said + 1] = string.format("%d:$%02X $%02X%s elem $%02X pow %d -> %d", i, r, atk,
+        phys and " phys" or (all and " all" or ""), elem, power, score)
+      if score > 0 and (bestScore == nil or score > bestScore) then best, bestScore = i, score end
+    end
+  end
+  if best == nil then
+    if not self.statusSaid["rage:none"] then
+      self.statusSaid["rage:none"] = true
+      M.log(string.format("[%s] actor=%d GAU: no rage here pays (%s) -- he Fights", self.tag or "fight",
+        actor, table.concat(said, "; ")))
+    end
+    return nil
+  end
+  local event = M.readByte(M.RANDBTL) == 0
+  local b = event and math.min(have, 3) or math.min(have, 1)
+  local r = M.readByte(BATTLE.RAGE_LIST + best)
+  M.log(string.format("[%s] actor=%d GAU Rage entry %d ($%02X) at %d BP (%s battle), %d MP of %d: %s",
+    self.tag or "fight", actor, best, r, b, event and "an event" or "a random", BATTLE.RAGE_MP, mp,
+    table.concat(said, "; ")))
+  M.rages[#M.rages + 1] = { frame = M.frame, actor = actor, entry = best, rage = r, boost = b, score = bestScore,
+    mp = mp }
+  return { kind = "rage", row = row, entry = best, rage = r, boostLeft = b, reason = "rage" }
 end
 
 -- The magic-only command table (the Fanatics' Tower: battle switch $38,
@@ -10369,7 +10476,7 @@ if type(OT6_POLICY_FORMS) == "string" and OT6_POLICY_FORMS ~= "" then
   for h in OT6_POLICY_FORMS:gmatch("[0-9A-Fa-f]+") do M.POLICY_FORMS[tonumber(h, 16)] = true end
 end
 Driver.POLICY_SKILL = { skill = true, magic = true, runic = true, lore = true, slot = true,
-  summon = true, throw = true, morph = true, magitek = true }
+  summon = true, throw = true, morph = true, magitek = true, rage = true }
 function Driver:policyPlan(actor, plan)
   local pol = M.POLICY
   if pol == nil or plan == nil or plan.kind == "defer" or plan.kind == "switch" then return plan end
@@ -12196,6 +12303,11 @@ function Driver:makePlanRules(actor)
     local line = self:lockeLine(actor, have)
     if line then return line end
   end
+  -- GAU's Rage, at his first window of a battle (#269; Driver:rageLine)
+  if id == 0x0B then
+    local line = self:rageLine(actor, have)
+    if line then return line end
+  end
   if self.opts.bushido and id == 2 and not self.skillDead[BATTLE.CMD_SWDTECH]
      and cmdRow(actor, BATTLE.CMD_SWDTECH) and have >= 1
      and not (self.opts.bank and have < self.opts.bank) then
@@ -13059,6 +13171,34 @@ function Driver:button(actor)
     if cc ~= wc then return { wc > cc and "right" or "left" } end
     return { wr > cr and "down" or "up" }
   end
+  if (st == BATTLE.ST_RAGE_OPEN or st == BATTLE.ST_RAGE_CLOSE) and self.plan.kind == "rage" then
+    return nil                       -- the rage window is building / closing; wait
+  end
+  if st == BATTLE.ST_RAGE and self.plan.kind == "rage" then
+    -- the planned beast's entry, re-read from the live list; a beast no
+    -- longer there drops the plan rather than rage whatever holds the cell
+    local want
+    for i = 0, math.min(M.readByte(BATTLE.RAGE_COUNT), 8) - 1 do
+      if M.readByte(BATTLE.RAGE_LIST + i) == self.plan.rage then want = i; break end
+    end
+    if want == nil then self:dropPlan("rage_unavailable"); return { "b" } end
+    if self.plan.committed and M.frame - self.plan.committed > 40 then
+      -- the A went in and the list is still up: refused (MP under the
+      -- price).  Not this battle again.
+      M.log(string.format("[%s] actor=%d Rage entry %d refused in the list -- backing out; not offered "
+        .. "again this battle", self.tag or "fight", actor, want))
+      self.skillDead[BATTLE.CMD_RAGE] = true
+      self:dropPlan("rage_refused")
+      return { "b" }
+    end
+    local wc, wr = want % 2, want // 2
+    local cc = M.readByte(BATTLE.RAGE_COL + actor)
+    local cr = M.readByte(BATTLE.RAGE_SCROLL + actor) + M.readByte(BATTLE.RAGE_ROW + actor)
+    if cc ~= wc then return { wc > cc and "right" or "left" } end
+    if cr ~= wr then return { wr > cr and "down" or "up" } end
+    self.plan.committed = self.plan.committed or M.frame
+    return { "a" }
+  end
   if (st == BATTLE.ST_MTEK_OPEN or st == BATTLE.ST_MTEK_CLOSE) and self.plan.kind == "magitek" then
     return nil                       -- the list is building / closing; wait
   end
@@ -13174,12 +13314,12 @@ function Driver:button(actor)
     end
     return { "a" }
   end
-  if st == BATTLE.ST_TGT and (self.plan.kind == "runic" or self.plan.kind == "morph") then
+  if st == BATTLE.ST_TGT and (self.plan.kind == "runic" or self.plan.kind == "morph" or self.plan.kind == "rage") then
     -- the engine latched the target on the caster (chars = 1<<actor,
     -- probe_runic.lua, deleted in bd50a973); there is nothing to steer.
     -- Morph's target select is the same shape (battle_trance's `self`).
     M.log(string.format("[%s] actor=%d %s confirmed (target chars=%02X, pending %d BP)",
-      self.tag or "fight", actor, self.plan.kind == "morph" and "Morph" or "Runic", M.readByte(BATTLE.TGTCHARS),
+      self.tag or "fight", actor, ({ morph = "Morph", rage = "Rage" })[self.plan.kind] or "Runic", M.readByte(BATTLE.TGTCHARS),
       M.readByte(BATTLE.PEND_BP + actor * 2)))
     if self.recovery then self.recovery.confirm(actor, M.frame,
       M.readByte(BATTLE.TGTCHARS), M.readByte(BATTLE.TGTMONS)) end

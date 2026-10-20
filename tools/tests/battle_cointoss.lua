@@ -84,22 +84,66 @@ local function checkThrow(r, i)
 end
 
 local WANT = { { row = COIN, boost = 1 }, { row = COIN, boost = 0 } }
-local walk, S = H.setzerCrowdBattles({
-  tag = "cointoss", want = WANT, wps = { { 124, 26 }, { 120, 11 } },
-  setzerOpts = { onList = checkList, shot = "cointoss_table" },
-  check = function(rec, i)
-    H.assertEq(rec.row, COIN, string.format("record %d is a Coin Toss", i))
-    H.assertEq(rec.boost, WANT[i].boost, string.format("record %d ran at its planned boost", i))
-    return checkThrow(rec, i)
-  end,
-})
+local function crowdWalk(tag, want)
+  return H.setzerCrowdBattles({
+    tag = tag, want = want, wps = { { 124, 26 }, { 120, 11 } },
+    setzerOpts = { onList = checkList, shot = "cointoss_table" },
+    check = function(rec, i)
+      H.assertEq(rec.row, COIN, string.format("record %d is a Coin Toss", i))
+      H.assertEq(rec.boost, want[i].boost, string.format("record %d ran at its planned boost", i))
+      return checkThrow(rec, i)
+    end,
+  })
+end
+local walk, S = crowdWalk("cointoss", WANT)
+-- A crowd is chosen as it opens (two or more bodies, one special-weak and
+-- shielded), and the special-weak body can be dead before SETZER's first
+-- toss: the v0.33 qualification's wor-tomb-v1 draw Zombied him three times
+-- in crowd battle 1 while the others fought, and both his tosses found it
+-- at 0 HP ("slot 0: HP 0 -> 0, shields 3 -> 3"; build/attempts/wt/
+-- v033-wor-gau/q1).  Such a draw gives no chip to count, so up to two more
+-- crowds are taken, one Coin Toss each, until a toss chips one; the
+-- coverage below then holds over every toss played.
+local EXTRA = 2
+local extras = {}
+for e = 1, EXTRA do
+  local w, s2 = crowdWalk("cointoss extra " .. e, { { row = COIN, boost = 0 } })
+  extras[e] = { walk = w, S = s2 }
+end
+local function chips(alls)
+  local n = 0
+  for _, all in ipairs(alls) do
+    for _, ps in ipairs(all) do
+      for _, p in ipairs(ps) do for _, h in ipairs(p.hits) do if h.chip then n = n + 1 end end end
+    end
+  end
+  return n
+end
+local function played()
+  local alls = { S.all }
+  for _, x in ipairs(extras) do if #x.S.done > 0 then alls[#alls + 1] = x.S.all end end
+  return alls
+end
+local extraSteps = {}
+for e = 1, EXTRA do
+  extraSteps[#extraSteps + 1] = H.cond(function() return chips(played()) == 0 end, {
+    H.call(function()
+      H.log(string.format("[cointoss] no toss so far chipped a special-weak body (the crowd's died before SETZER's "
+        .. "tosses reached it): crowd %d more, one Coin Toss", e))
+    end),
+    extras[e].walk,
+  }, {})
+end
 
 H.run({ maxFrames = 1200000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
   walk,
+  H.cond(function() return true end, extraSteps),
   H.call(function()
     H.assertEq(#S.done, #WANT, "two Coin Tosses resolved")
-    coverage(S.all, "cointoss")
+    local all = {}
+    for _, a in ipairs(played()) do for _, r in ipairs(a) do all[#all + 1] = r end end
+    coverage(all, "cointoss")
     H.log(string.format("[cointoss] PASSED: %d throws over %d battle(s), %d of them crowds", #S.done, S.battles,
       S.crowds))
   end),

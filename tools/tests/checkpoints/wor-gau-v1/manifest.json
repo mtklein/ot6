@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-gau.sram",
+  "slot": 3,
+  "milestone": "wor-gau",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "map": 1,
+      "x": 139,
+      "y": 21
+    }
+  },
+  "size": 32768,
+  "sha256": "1d7a0032b7fbace2fc380281c52621f23539c73893d282b6e231a4ea12d6dbaa",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "1d7a0032b7fbace2fc380281c52621f23539c73893d282b6e231a4ea12d6dbaa",
+    "generator_sig": "00f48f0190d5104ed8cfdf636ab7f8f545a8bcf6a46fb4247143763612ef9739 gen_wor_gau build/checkpoints/wor-veldt-cave-v1/manifest.json build/checkpoints/wor-veldt-cave-v1/wor-veldt-cave.sram",
+    "ancestors": [
+      {
+        "path": "build/checkpoints/wor-veldt-cave-v1/manifest.json",
+        "sha256": "e28b17edf7700d76f8708d5c4e46d09c1b81eff4b437404e4c678d39bf635390"
+      }
+    ]
+  }
+}
