@@ -80,8 +80,8 @@ UMARO: two of the arc's four casters (L46-49) beside two of the bench
 7. Party 1 off its plate, round by 313 (13,9) (the Ribbon, 313 (13,20)) and
    315 (6,12), across the jumps (4,23) -> (10,23), onto the step (10,32).
 8. Party 2 onto the step (12,32): the last bridge; down to 313 (18,52),
-   LOCKE (6,53). The scene ends with CELES and LOCKE alone on the Falcon
-   (map 189): the regroup and the save are #268's.
+   LOCKE (6,53). The scene ends with CELES and LOCKE alone in Kohlingen
+   (map 189): the regroup and the save are route-wor-locke.md's (#268).
 
 ## 4. The library
 
@@ -130,7 +130,8 @@ lava done, the Red Dragon and LOCKE ahead. Its contract checks the eight
 members' parties, where party 2 stands and which party walks
 (`M.contracts["wor-phoenix-v1"]`). The legs: `gen_wor_phoenix`
 (wor-thamasa-v1 -> wor-phoenix-v1) and `gen_wor_locke` (wor-phoenix-v1 ->
-LOCKE joined), both on the graph.
+LOCKE joined, then on to `wor-locke-v1`: route-wor-locke.md), both on the
+graph.
 
 Rules that fell out:
 
