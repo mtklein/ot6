@@ -23,12 +23,12 @@
 --      the boost buys the multiplier and prices it as any boosted spell
 --      (Ot6BoostPriceFor: 80 x 5 / 2 past the two-digit ceiling, 99); cast
 --      as Ultima ($14), costs 99, and Ot6BoostDmg writes $11b0 for it.
--- Mutants (build/attempts/wt/v032-narshe-locke-3/lab/mut{A,B,C}_*, patched
+-- Mutants (build/attempts/wt/v032-narshe-locke-3/lab/rk2_mut{A,B,C}, patched
 -- by mkmut.py beside them; the first round is build/attempts/wt/
 -- v032-narshe-locke/lab/rm_mut{A,B}, ROMs patched by hand): Ot6BoostLevel
 -- answering 0 for every Ultima (A) turns cast 2 red; Ragnarok's list
 -- without Ultima (B) turns the list red; every Ultima multiplied (C) turns
--- the control, cast 1, red.  Draws: lab/rk_k*_s* (K world-map battles
+-- the control, cast 1, red.  Draws: lab/rk2_k*_s* (K world-map battles
 -- fought first, seed shifts 0 and 7).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")

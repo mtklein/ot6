@@ -627,11 +627,19 @@ the save on (115,38). LOCKE, TERRA, CELES and RELM throughout.
   Ultima costs 80 at 3 BP and takes no multiplier. `battle_ragnarok`
   checks both from `wor-ragnarok-v1` (`r2`: `cast 1: spell $14 at 3 BP
   ... MP 566 -> 486, Ot6BoostDmg $11b0 writes 0`; `cast 2: spell $14 at 1
-  BP ... MP 544 -> 445, Ot6BoostDmg $11b0 writes 2`). Red on a ROM whose
-  `Ot6BoostLevel` answers 0 for every Ultima (`rm_mutA`: `Ragnarok's
-  Ultima takes the multiplier (Ot6BoostDmg wrote $11b0): got false`) and
-  on one whose Ragnarok list lacks Ultima (`rm_mutB`: `char $08's magic
-  list holds spell $14: got false`). The route's fights here are randoms
+  BP ... MP 544 -> 445, Ot6BoostDmg $11b0 writes 2`). The test finds
+  Ragnarok's wearer in the save (`Ragnarok's wearer: character $08`, RELM
+  in this save). It passes after K = 0-5 world-map battles first, at seed
+  shifts 0 and 7 (12 of 12, `build/attempts/wt/v032-narshe-locke-3/
+  verdicts.txt`, `rk2_*`; the first sweep's `rk_k4_s7` failed with the
+  wearer down for all twelve tries, which the care before each pace now
+  fixes). Red on three mutants, patched by `mkmut.py` from the built ROM:
+  `Ot6BoostLevel` answers 0 for every Ultima (`rk2_mutA`: `Ragnarok's
+  Ultima takes the multiplier (Ot6BoostDmg wrote $11b0): got false`); the
+  Ragnarok list lacks Ultima (`rk2_mutB`: `char $08's magic list holds
+  spell $14: got false`); every Ultima is multiplied (`rk2_mutC`: `the
+  folded Ultima takes no multiplier (the control: Ot6BoostDmg wrote no
+  $11b0): got 2 ($2), want 0 ($0)`). The route's fights here are randoms
   the party wins without it, so the driver does not cast it yet.
 - **The treasure room** (map 30, bits `$004`-`$009`): Hyper Wrist, Sneak
   Ring, Wall Ring, ThiefKnife, Earrings and 5,000 GP. The relic care puts
