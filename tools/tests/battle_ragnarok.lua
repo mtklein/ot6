@@ -28,8 +28,12 @@
 -- v032-narshe-locke/lab/rm_mut{A,B}, ROMs patched by hand): Ot6BoostLevel
 -- answering 0 for every Ultima (A) turns cast 2 red; Ragnarok's list
 -- without Ultima (B) turns the list red; every Ultima multiplied (C) turns
--- the control, cast 1, red.  Draws: lab/rk2_k*_s* (K world-map battles
--- fought first, seed shifts 0 and 7).
+-- the control, cast 1, red.  Draws: lab/rk2_k*_s* (K = 0-5 world-map
+-- battles fought first, seed shifts 0 and 7: 12 runs; the first sweep,
+-- lab/rk_k*_s*, was K = 0-4: 10 runs, one red, rk_k4_s7).  The same 12 with
+-- the [key] line: round2/lab/r3_*, 11 distinct battle keys (round2/keys.txt).
+-- The red one, restored where RELM lay dead on the world map (round2/snap/):
+-- the care revives her ($F0) and both casts resolve.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 

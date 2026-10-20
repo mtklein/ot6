@@ -631,9 +631,17 @@ the save on (115,38). LOCKE, TERRA, CELES and RELM throughout.
   Ragnarok's wearer in the save (`Ragnarok's wearer: character $08`, RELM
   in this save). It passes after K = 0-5 world-map battles first, at seed
   shifts 0 and 7 (12 of 12, `build/attempts/wt/v032-narshe-locke-3/
-  verdicts.txt`, `rk2_*`; the first sweep's `rk_k4_s7` failed with the
-  wearer down for all twelve tries, which the care before each pace now
-  fixes). Red on three mutants, patched by `mkmut.py` from the built ROM:
+  verdicts.txt`, `rk2_*`; the same 12 again with the `[key]` line, 11
+  distinct battle keys, `round2/keys.txt`, `round2/lab/r3_*`). The first
+  sweep (`rk_*`, K = 0-4 at the same two shifts: 10 draws) passed 9 and
+  failed `rk_k4_s7`: RELM was down on the world map after the previous
+  battle and stayed down for all twelve tries. The care before each pace
+  now revives her: restored at that moment (`round2/snap/`, frame 30427,
+  `character $08 is down on the world map (hp 0, status1 80`), the test
+  logs `plan: revive char 8 with $F0` and `used $F0 on char 8: 0 -> 541 hp,
+  ... status1 80 -> 00`, then both casts resolve (`PASS`); the test as it
+  stood before the care, restored at the same moment, wipes with her down
+  (`round2/snap/r2_snapB_old`). Red on three mutants, patched by `mkmut.py` from the built ROM:
   `Ot6BoostLevel` answers 0 for every Ultima (`rk2_mutA`: `Ragnarok's
   Ultima takes the multiplier (Ot6BoostDmg wrote $11b0): got false`); the
   Ragnarok list lacks Ultima (`rk2_mutB`: `char $08's magic list holds
