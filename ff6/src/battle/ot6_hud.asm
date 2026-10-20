@@ -2495,6 +2495,30 @@ Ot6ShieldTbl:
                                 ;   met on the falcon's deck on the way and
                                 ;   fled (v0.34 fights it).  fire|holy
                                 ;   vanilla; absorbs ice|poison
+        ; ---- the world of ruin: the veldt cave (gau; the srbehemoth;
+        ; docs/design/route-wor-gau.md section 3) --------------------------
+        ; The four who walk it (terra, celes, relm, gau) hold slash
+        ; (celes), pierce (terra's dagger), bludgeon (relm's rod, gau's
+        ; fists) and fire; every body here but rhyos drinks or nulls one of
+        ; celes's spells (ice, poison).  The rows key bludgeon, so gau's
+        ; fists and his beasts' physical turns break what celes's ice heals.
+        .word   $008f
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; toe cutter: a scythed shell; crack
+                                ;   or puncture it.  fire|wind vanilla;
+                                ;   absorbs ice
+        .word   $007e
+        .byte   4, OT6_BLUDG    ; rhyos: an armoured horn (def 150), the
+                                ;   cave's rare body; no element
+        .word   $00bb
+        .byte   3, OT6_SLASH|OT6_BLUDG ; allo ver: bones in the monster
+                                ;   chest; doom and condemned.  fire|holy
+                                ;   vanilla; absorbs poison
+        .word   $0119
+        .byte   6, OT6_PIERCE|OT6_BLUDG ; srbehemoth: the dead beast at
+                                ;   the dog's master; horn and bone.
+                                ;   fire|poison vanilla (gau's were-rat);
+                                ;   absorbs ice (celes's runic, not her
+                                ;   spells)
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian

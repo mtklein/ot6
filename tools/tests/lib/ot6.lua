@@ -8354,6 +8354,7 @@ end
 -- for the whole fight); a random battle 1 BP.  opts.rage = false (or the
 -- RAGE_OFF global) turns it off, the control arm: Gau Fights.
 BATTLE.RAGE_PHYS_POWER = 40
+M.rages = {}             -- every Rage plan this run, oldest first (battle_ragedriver reads them)
 BATTLE.RAGE_MP = 8
 function Driver:rageLine(actor, have)
   if self.opts.rage == false or RAGE_OFF then return nil end
@@ -8417,6 +8418,8 @@ function Driver:rageLine(actor, have)
   M.log(string.format("[%s] actor=%d GAU Rage entry %d ($%02X) at %d BP (%s battle), %d MP of %d: %s",
     self.tag or "fight", actor, best, r, b, event and "an event" or "a random", BATTLE.RAGE_MP, mp,
     table.concat(said, "; ")))
+  M.rages[#M.rages + 1] = { frame = M.frame, actor = actor, entry = best, rage = r, boost = b, score = bestScore,
+    mp = mp }
   return { kind = "rage", row = row, entry = best, rage = r, boostLeft = b, reason = "rage" }
 end
 
