@@ -8,9 +8,17 @@
 --     outline colour (colour 1) replaced from Ot6AuraOutline's row for the
 --     level, stepping through the row (the pulse);
 --   * the halo: copies of the character's two body sprites (tiles slot*4 +
---     0/2, palette 4 + slot): 4/6/9 at 1/2/3 BP for one booster on its own
---     (Ot6HaloTopN + Ot6HaloBotN; the scanline budget, battle_auraband,
---     trims them only where other sprites crowd the lines).
+--     0/2, palette 4 + slot): at most 4/6/9 at 1/2/3 BP (Ot6HaloTopN +
+--     Ot6HaloBotN), fewer where the battle's other sprites crowd the
+--     booster's scanlines.  How many is not a constant: Ot6AuraHalo grants
+--     copies against a per-16-line-band sliver budget (fullest band + 2n <=
+--     34; lines from $97 down are left alone), so what a frame owes depends
+--     on the draw (which monsters, where they stand, who is in the party).
+--     This suite computes the owed count from that frame's own OAM by the
+--     rule (expectedCopies), asserts the frame has exactly that many, and
+--     that the copies never take a line above $97 past 34 slivers;
+--     battle_auraband is the mechanism test that crowds the lines on
+--     purpose.
 -- With no boost pending both are absent: two body sprites, and colour 1 is
 -- the character's unaltered colour (w7e81ad, the copy UpdateCharPal restores
 -- from).
@@ -23,8 +31,10 @@ local STATE = "build/states/kolts_cave.mss.lua"
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local OAM, CG = emu.memType.snesSpriteRam, emu.memType.snesCgRam
 local PRISTINE = 0x7E81AD                  -- w7e81ad: unaltered char palettes
-local COPIES = { 4, 6, 9 }                 -- Ot6HaloTopN + Ot6HaloBotN (top + bottom half)
+local FLOOR = 0x97                      -- the budget stops here (FF6 overflows lines below it on purpose)
+local TOPN, BOTN = { 2, 3, 6 }, { 2, 3, 3 } -- Ot6HaloTopN, Ot6HaloBotN: copies a half wants at 1/2/3 BP
 local actor
+local copiesSeen = 0                       -- halo copies seen over the run: the halo must show somewhere
 local function pend(s) return H.readByte(0x3e9d + s * 2) end
 local function bp(s) return H.readByte(0x3e9c + s * 2) end
 local function map() return H.mapId() & 0x1ff end
@@ -51,13 +61,123 @@ local function outlineRow(level)
   return row
 end
 
+-- ---- the budget rule, read off the frame's own OAM ----------------------
+-- (ot6_aura.asm, Ot6AuraHalo / Ot6HaloHalf.)  The halo's character is the
+-- only one boosting here.  Its bodies are the first OAM entry of tile
+-- slot*4 and of slot*4+2 in the slot's palette; later entries of the same
+-- tile and palette are its copies.  Every other entry that touches the
+-- halo's rows (it starts above the window's end and its last row reaches the
+-- window's start) puts its slivers (16x16: 2, 32x32: 4) into the 16-line
+-- bands it touches (a small one a second band only when its y is off a band
+-- edge, a large one a third); a half gets n copies while its fullest band +
+-- 2n <= 34, and its copies' slivers join the bands before the next half.
+local function oam()
+  local e = {}
+  for i = 0, 127 do
+    e[i] = { x = emu.read(i * 4, OAM), y = emu.read(i * 4 + 1, OAM),
+             t = emu.read(i * 4 + 2, OAM), a = emu.read(i * 4 + 3, OAM),
+             hb = (emu.read(512 + (i >> 2), OAM) >> ((i & 3) * 2)) & 3 }
+  end
+  return e
+end
+local function split(e, slot)
+  local top, bot, copy = nil, nil, {}
+  for i = 0, 127 do
+    local o = e[i]
+    if (o.t & 0xf1) == 0 and (o.t >> 2) == slot and (o.a & 0x0f) == 8 + slot * 2 and o.y < 0xe0 then
+      if (o.t & 2) == 0 and not top then top = i
+      elseif (o.t & 2) ~= 0 and not bot then bot = i
+      else copy[i] = true end
+    end
+  end
+  return top, bot, copy
+end
+-- the copies a half owes (top, bottom) for `slot` at boost `level`, or nil
+-- when the two bodies are not both in OAM
+local function expectedCopies(e, slot, level)
+  local top, bot, copy = split(e, slot)
+  if not top or not bot then return nil end
+  if level == 0 then return 0, 0 end
+  local wlo = math.max(e[top].y - 2, 0)
+  local whi = math.min(e[bot].y + 0x11, FLOOR)
+  local hist = {}
+  for b = 0, 15 do hist[b] = 0 end
+  for i = 0, 127 do
+    local o = e[i]
+    if not copy[i] and o.y < whi then
+      local large = (o.hb & 2) ~= 0
+      if o.y + (large and 31 or 15) >= wlo then
+        local b, sl = o.y >> 4, large and 4 or 2
+        hist[b] = hist[b] + sl
+        if large or (o.y & 15) ~= 0 then hist[b + 1] = hist[b + 1] + sl end
+        if large and (o.y & 15) ~= 0 then hist[b + 2] = hist[b + 2] + sl end
+      end
+    end
+  end
+  local function half(lo, hi, nmax)
+    if hi >= FLOOR then hi = FLOOR - 1 end
+    local b0, b1 = lo >> 4, math.min(hi >> 4, 11)
+    local full = 0
+    for b = b0, b1 do full = math.max(full, hist[b]) end
+    local n = math.min(nmax, math.max(34 - full, 0) // 2)
+    for b = b0, b1 do hist[b] = hist[b] + 2 * n end
+    return n
+  end
+  local nt = half(wlo, wlo + 0x11, TOPN[level])
+  local nb = half(e[bot].y, e[bot].y + 0x10, BOTN[level])
+  return nt, nb
+end
+-- slivers on each line above the floor (16x16 / 32x32, x clipped to the
+-- screen: the PPU's own count), all entries and without `slot`'s copies
+local function lineSlivers(e, copy)
+  local all, own = {}, {}
+  for l = 0, FLOOR - 1 do all[l], own[l] = 0, 0 end
+  for i = 0, 127 do
+    local o = e[i]
+    local x = o.x - ((o.hb & 1) ~= 0 and 256 or 0)
+    local w = (o.hb & 2) ~= 0 and 32 or 16
+    if x > -w and x < 256 then
+      local sl = (math.min(x + w, 256) - math.max(x, 0) + 7) // 8
+      for dy = 0, w - 1 do
+        local l = (o.y + dy) & 0xff
+        if l < FLOOR then
+          all[l] = all[l] + sl
+          if not copy[i] then own[l] = own[l] + sl end
+        end
+      end
+    end
+  end
+  return all, own
+end
+-- one frame: the actor's body+copy count, what the rule owes, and whether
+-- the copies kept every line above the floor inside the PPU's 34 slivers
+-- (a line the other sprites alone overfill is theirs, not the halo's)
+local function snap()
+  local e = oam()
+  local level = pend(actor)
+  local nt, nb = expectedCopies(e, actor, level)
+  local top, bot, copy = split(e, actor)
+  local n = (top and 1 or 0) + (bot and 1 or 0)
+  local ncopy = 0
+  for _ in pairs(copy) do ncopy = ncopy + 1 end
+  local all, own = lineSlivers(e, copy)
+  local worst, wl = 0, -1
+  for l = 0, FLOOR - 1 do
+    local over = all[l] - math.max(34, own[l])
+    if over > worst then worst, wl = over, l end
+  end
+  return { n = n + ncopy, want = nt and (2 + nt + nb) or nil, level = level,
+           over = worst, overLine = wl }
+end
+
 -- sample `n` frames; returns per-frame body counts and colour-1 values
 local samples
 local function sample(n)
   return H.repeatN(n, {
     H.call(function()
-      local c = bodies(actor)
-      samples[#samples + 1] = { n = c, c1 = colour1(actor), pend = pend(actor), bp = bp(actor) }
+      local f = snap()
+      samples[#samples + 1] = { n = f.n, want = f.want, over = f.over, overLine = f.overLine,
+        c1 = colour1(actor), pend = pend(actor), bp = bp(actor) }
     end),
     H.waitFrames(1),
   })
@@ -86,12 +206,18 @@ end
 
 local function checkLevel(level, what)
   return H.call(function()
-    local want = 2 + COPIES[level]
     local row, seen, distinct = nil, {}, 0
+    local lo, hi, short = 99, 0, 0
     for k, s in ipairs(samples) do
       H.assertEq(s.pend, level, what .. ": pending boost held (frame " .. k .. ")")
-      H.assertEq(s.n, want, string.format("%s: body sprites + halo copies at %d BP (frame %d)",
-        what, level, k))
+      H.assertEq(s.want ~= nil, true, string.format("%s: both body sprites are in OAM (frame %d)", what, k))
+      H.assertEq(s.n, s.want, string.format("%s: body sprites + halo copies at %d BP, as the scanline "
+        .. "budget grants them from this frame's OAM (frame %d)", what, level, k))
+      H.assertEq(s.over, 0, string.format("%s: the copies keep every line above $%02X inside 34 slivers "
+        .. "(frame %d, line %d)", what, FLOOR, k, s.overLine))
+      copiesSeen = copiesSeen + (s.n - 2)
+      lo, hi = math.min(lo, s.n), math.max(hi, s.n)
+      if s.want < 2 + TOPN[level] + BOTN[level] then short = short + 1 end
       row = row or outlineRow(level)
       if not row[s.c1] then
         error(string.format("%s: colour 1 $%04x is not on Ot6AuraOutline's %d BP row (frame %d)",
@@ -103,8 +229,9 @@ local function checkLevel(level, what)
       error(string.format("%s: the glow does not pulse at %d BP (one colour over %d frames)",
         what, level, #samples), 0)
     end
-    H.log(string.format("[aura] %s: %d BP, %d sprites every frame of %d, %d outline colours",
-      what, level, want, #samples, distinct))
+    H.log(string.format("[aura] %s: %d BP, %d..%d sprites (the budget granted exactly that every frame; "
+      .. "%d of %d frames trimmed from the uncrowded %d), %d outline colours",
+      what, level, lo, hi, short, #samples, 2 + TOPN[level] + BOTN[level], distinct))
   end)
 end
 
@@ -208,22 +335,32 @@ H.run({ maxFrames = 40000 }, {
   startSample(),
   H.driveUntil(function() return bp(actor) == 0 end, 1200, {
     H.call(function()
-      local c = bodies(actor)
-      samples[#samples + 1] = { n = c, c1 = colour1(actor), pend = pend(actor) }
+      local f = snap()
+      samples[#samples + 1] = { n = f.n, want = f.want, over = f.over, overLine = f.overLine,
+        c1 = colour1(actor), pend = pend(actor) }
     end),
   }, "the boosted Fight charges its 3 BP"),
   H.call(function()
-    local full, held = 0, 0
-    for _, s in ipairs(samples) do
+    local held, exact, bad = 0, 0, nil
+    for k, s in ipairs(samples) do
       if s.pend == 3 then
         held = held + 1
-        if s.n == 2 + COPIES[3] then full = full + 1 end
+        if s.want ~= nil and s.n == s.want and s.over == 0 then exact = exact + 1
+        else bad = bad or string.format("frame %d: %d sprites, the budget grants %s, %d slivers over on line %d",
+          k, s.n, tostring(s.want), s.over or -1, s.overLine or -1) end
       end
     end
-    H.log(string.format("[aura] boosted Fight: %d frames with 3 BP pending, %d of them with the full halo",
-      held, full))
-    if held < 30 or full < held // 2 then
-      error(string.format("the halo did not hold through the boosted action (%d of %d frames)", full, held), 0)
+    H.log(string.format("[aura] boosted Fight: %d frames with 3 BP pending, %d of them with exactly the "
+      .. "copies the budget grants", held, exact))
+    if held < 30 then error(string.format("only %d frames with 3 BP pending in the boosted action", held), 0) end
+    -- (a frame with an actor body out of OAM -- want nil -- is not a halo frame: the pose the
+    -- engine draws in the middle of the swing; those are counted out, not forgiven)
+    local scored = 0
+    for _, s in ipairs(samples) do if s.pend == 3 and s.want ~= nil then scored = scored + 1 end end
+    if scored < held // 2 then error(string.format("the action's frames mostly lack the body sprites (%d of %d)", scored, held), 0) end
+    if exact < scored then
+      error(string.format("the halo did not hold the budget through the boosted action (%d of %d frames; %s)",
+        exact, scored, bad), 0)
     end
   end),
   H.waitFrames(8),
@@ -235,5 +372,11 @@ H.run({ maxFrames = 40000 }, {
       H.assertEq(s.c1, pristine1(actor), "after the charge: colour 1 restored (frame " .. k .. ")")
     end
     H.log("[aura] after the charge: 2 sprites, colour 1 restored")
+  end),
+  H.call(function()
+    -- some frame of the run wore a halo: a build with no halo owes the same 2 sprites only
+    -- where every line is crowded, and no draw crowds every level's lines for the whole run
+    H.assertEq(copiesSeen > 0, true, "the halo shows: copies were drawn in some frame of the run")
+    H.log(string.format("[aura] %d halo copies seen over the run's level frames", copiesSeen))
   end),
 })

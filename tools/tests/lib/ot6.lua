@@ -16373,7 +16373,21 @@ function Driver:watchPendingCare()
     -- off, opts.zombieCure = false, any 0 HP is a fall, as before #263)
     local fell = M.readWord(0x3BF4 + e * 2) == 0
       and (self.opts.zombieCure == false or (s1 & M.ST1_ZOMBIE) == 0)
-    if not still or fell
+    -- A cure whose carrier went down (or Zombied: a zombie's turns are the
+    -- engine's, and its item resolves on no target) before the item ran is
+    -- lost, with the item (v032-suite-draws: tomb_zombie, SETZER's Revivify
+    -- confirmed on SABIN, SETZER Zombied 36 frames later, the action ran at
+    -- "targets":0, and nobody planned another on SABIN for the 840 ticks
+    -- the entry lived: the battle ended with SABIN still Zombied).  The
+    -- entry goes, and the next living actor plans the cure again.
+    local by = q.by
+    local lost = by ~= nil and by ~= e and (M.readWord(0x3BF4 + by * 2) == 0
+      or (M.readByte(BATTLE.ST1 + by * 2) & (M.ST1_ZOMBIE | 0x80)) ~= 0)
+    if lost then
+      M.log(string.format("[%s] actor %d went down before its $%02X on entity %d ran -- the cure is "
+        .. "lost; the next living actor plans it again", self.tag or "fight", by, q.item, e))
+    end
+    if not still or fell or lost
        or self.battleTick - q.tick > BATTLE.RAISE_WAIT + 600 then
       self.cureQueued[e] = nil
     end
