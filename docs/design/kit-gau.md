@@ -231,7 +231,15 @@ same two numbers (`$3c08,y` against `$3a4c`), and the trance is set before the
 charge. The one path that took pips for nothing was the unpayable start;
 `Ot6RageStartGate` now zeroes the pending boost on its refusal, as
 `Ot6DanceStumble` does for a stumbled dance. Dance's `Ot6DanceStartGate`
-refusal has the same shape and is not changed by #330.
+refusal had the same shape, and so did every other costed verb (spells,
+Blitz, SwdTech, Tools): #450 settles them once, where the refusal is made.
+`CalcAttackEffect`'s MP fizzle (`@32ca`) calls `Ot6FizzleDropBoost`, which
+drops a character's pending boost while it is still only pending, so the
+turn ends as an unboosted one. The one exception is the second spell of an
+X-Magic (resumed through `$3406` with bit 6 clear): the first spell was paid
+for with that same pending boost, which must still be spent. Nothing
+legitimately spends pips on a refusal. `battle_mpfizzle` plays a boosted
+Magic cast and a boosted Dance start that cannot pay at resolve.
 
 ---
 
