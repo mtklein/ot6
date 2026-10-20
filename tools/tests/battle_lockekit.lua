@@ -11,7 +11,7 @@
 --
 -- Played: Continue fire-out-v1 (TERRA, LOCKE, STRAGO) and walk the plain east
 -- of Thamasa (battle_study's lap), one counted LOCKE action a battle through
--- H.kitBattle; the others Fight.  Nothing is written.  Stages:
+-- H.kitBattle; the others Fight.  Stages (one write, before stage 8):
 --   1. the list (peek): Steal $56, Filch $57, Bestow $58 and Mug $E0 down the
 --      left column, Trickshot $E1, Dismantle $E2 and Appraise $E3 down the
 --      right, Master's Mark's cell empty; prices 4 / 4 / 8 / 3 MP;
@@ -26,13 +26,20 @@
 --   3. Trickshot at 0 BP, then 4. at 1 BP: at the damage calc the props are
 --      the coin's (power 40, physical, ignore defense, class pierce) under
 --      command $18, which Ot6BoostDmg multiplies; the body loses HP; 4 MP,
---      then 10 at 1 BP (x2.5, the price escalates with the multiplier);
+--      then 10 at 1 BP (x2.5, the price escalates with the multiplier), and
+--      the multiplier made the base damage x1, then x2 ($11B0 at
+--      Ot6BoostDmg's return);
 --   5. Dismantle at 2 BP: the body's defense ($3BB8) drops by three quarter
 --      steps (each a quarter, at least one point), the stab goes in under
 --      Steal's command $05 (not multiplied), class pierce; 8 MP flat;
 --   6. Appraise at 0 BP: Ot6AnalyzeOne read the target alone, its weak
 --      elements and classes; 7. at 1 BP with two or more bodies standing:
---      it read every one; 3 MP flat at either boost.
+--      it read every one; 3 MP flat at either boost;
+--   8. Capture at 1 BP, the Thief Glove's verb: the same swings, and the
+--      steal on each hit at vanilla's odds (the boost pays once), free.
+--      No fixture holds a Thief Glove, so one declared write turns LOCKE's
+--      Steal command into Capture in his record before these battles
+--      (state_write_waivers.txt), the rewrite the glove makes at battle init.
 -- A battle where the stage cannot be played (no loot for Mug, one body for
 -- stage 7, LOCKE out or short of MP) is fought out and the next taken; a
 -- stage whose counted effect did not happen (every Mug swing missed, the
@@ -44,6 +51,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local LOCKE, CMD = 0x01, 0x05
 local STEAL, FILCH, BESTOW, MUG, TRICK, DIS, APP, MARK = 0x56, 0x57, 0x58, 0xE0, 0xE1, 0xE2, 0xE3, 0xE4
 local PIERCE = 0x02
+local CAPTURE = 0x06
 
 local function ent(s) return 8 + s * 2 end
 local function present(s) return (H.readByte(0x3AA8 + s * 2) & 1) == 1 end
@@ -67,6 +75,7 @@ local function corrode(def, steps)
 end
 
 local seat, rec, stage, battles, mode = nil, nil, 1, 0, nil
+local captureStaged = false
 local plan = {}
 local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
 local function lockeX() return (emu.getState()["cpu.x"] & 0xFF) == seat * 2 end
@@ -106,6 +115,12 @@ local function arm()
     if seat == nil or (emu.getState()["cpu.y"] & 0xFF) ~= seat * 2 then return end
     if H.readByte(0xB6) == MUG then open(MUG, slotOfMask(H.readByte(0xB9))) end
   end, emu.callbackType.exec, H.sym("Ot6MugCheck"), H.sym("Ot6MugCheck"))
+  -- a Capture (stage 8): Cmd_06, which a Fight runs through too, so the
+  -- command it was queued as ($b5) tells them apart
+  emu.addMemoryCallback(function()
+    if seat == nil or stage ~= 8 or (emu.getState()["cpu.y"] & 0xFF) ~= seat * 2 then return end
+    if H.readByte(0xB5) == CAPTURE then open(CAPTURE, slotOfMask(H.readByte(0xB9))) end
+  end, emu.callbackType.exec, H.sym("Cmd_06"), H.sym("Cmd_06"))
   emu.addMemoryCallback(function()
     if rec == nil or rec.ended or not lockeX() then return end
     rec.fightBoost = H.readByte(0x3E9D + seat * 2)
@@ -135,10 +150,22 @@ local function arm()
       end, emu.callbackType.exec, ret, ret)
     end
   end, emu.callbackType.exec, H.sym("Ot6StealBoostLevel"), H.sym("Ot6StealBoostLevel"))
+  -- each damage calc of his: the props and base damage at Ot6BoostDmg's
+  -- entry, and $11B0 again at its return (what the multiplier made of it)
+  local dmgArmed = {}
   emu.addMemoryCallback(function()
     if rec == nil or rec.ended or not lockeX() then return end
     rec.calc[#rec.calc + 1] = { b5 = H.readByte(0xB5), power = H.readByte(0x11A6), flags = H.readByte(0x11A2),
       cls = H.readByte(0x57B8), pend = H.readByte(0x3E9D + seat * 2), dmg = H.readWord(0x11B0) }
+    local ret = jslReturn()
+    if not dmgArmed[ret] then
+      dmgArmed[ret] = true
+      emu.addMemoryCallback(function()
+        if rec == nil or rec.ended then return end
+        local c = rec.calc[#rec.calc]
+        if c ~= nil and c.out == nil then c.out = H.readWord(0x11B0) end
+      end, emu.callbackType.exec, ret, ret)
+    end
   end, emu.callbackType.exec, H.sym("Ot6BoostDmg"), H.sym("Ot6BoostDmg"))
   -- the pending reveal Ot6AnalyzeOne writes, per slot (battle_analyze's)
   emu.addMemoryCallback(function(addr, v)
@@ -203,6 +230,12 @@ local function entryFor()
     if liveCount() < 2 then return nil, "one body: the breadth needs two" end
     return { who = LOCKE, cmd = CMD, row = APP, boost = 1, slot = first }
   end
+  if stage == 8 then
+    for s = 0, 5 do
+      if live(s) and loot(s) then return { who = LOCKE, cmd = CAPTURE, boost = 1, slot = s } end
+    end
+    return nil, "no standing body carries loot"
+  end
 end
 
 local function onList(p, a)
@@ -227,37 +260,39 @@ end
 
 local function judge()
   local r = rec
-  local what = ({ [MUG] = "Mug", [TRICK] = "Trickshot", [DIS] = "Dismantle", [APP] = "Appraise" })[r.row]
+  local what = ({ [MUG] = "Mug", [TRICK] = "Trickshot", [DIS] = "Dismantle", [APP] = "Appraise",
+    [CAPTURE] = "Capture" })[r.row]
   H.log(string.format("[lockekit] stage %d: %s at %d BP (f%d) on slot %s: MP %d -> %d, bank %d -> %d; HP %s -> %s, "
     .. "def %s -> %s; swings %d, steal effects %d, fight boost %s", stage, what, r.pend, r.f, tostring(r.target),
     r.mp0, r.mp1, r.bank0, r.bank1, tostring(r.hp0), tostring(r.hp1), tostring(r.def0), tostring(r.def1), r.swings,
     r.steals, tostring(r.fightBoost)))
   for i, c in ipairs(r.calc) do
-    H.log(string.format("[lockekit]   damage calc %d: $b5 $%02X power %d flags $%02X class $%02X pend %d base %d",
-      i, c.b5, c.power, c.flags, c.cls, c.pend, c.dmg))
+    H.log(string.format("[lockekit]   damage calc %d: $b5 $%02X power %d flags $%02X class $%02X pend %d base %d "
+      .. "-> %s", i, c.b5, c.power, c.flags, c.cls, c.pend, c.dmg, tostring(c.out)))
   end
   for i, l in ipairs(r.levels) do
     H.log(string.format("[lockekit]   steal roll %d: level handed %d (raw %d) at %d BP pending, $b5 $%02X", i, l.a,
       l.level, l.pend, l.b5))
   end
-  if stage == 2 then
-    H.assertEq(r.row, MUG, "the counted action is the Mug")
-    H.assertEq(r.pend, 1, "Mug ran at the 1 BP planned")
-    H.assertEq(r.fightBoost, 1, "Mug ran as Capture: Ot6FightBoost saw its point (the boost buys swings)")
+  if stage == 2 or stage == 8 then
+    local name = stage == 2 and "Mug" or "Capture"
+    H.assertEq(r.row, stage == 2 and MUG or CAPTURE, "the counted action is the " .. name)
+    H.assertEq(r.pend, 1, name .. " ran at the 1 BP planned")
+    H.assertEq(r.fightBoost, 1, name .. " ran as Capture: Ot6FightBoost saw its point (the boost buys swings)")
     if not (r.swings == 4 or (r.swings >= 1 and not anyLive())) then
-      H.assertEq(r.swings, 4, "a 1-BP Mug makes four passes: a Fight's two (one a hand) and two a point")
+      H.assertEq(r.swings, 4, "a 1-BP " .. name .. " makes four passes: a Fight's two (one a hand) and two a point")
     end
     if r.steals == 0 or #r.levels == 0 then
       H.log("[lockekit] no hit reached the steal roll (missed, or the loot was gone): not counted")
       return false
     end
     for _, l in ipairs(r.levels) do
-      H.assertEq(l.b5, 0x06, "the steal on Mug's hit runs under Capture ($b5 = $06)")
-      H.assertEq(l.a, l.level, "the steal on Mug's hit rolls vanilla's odds: the raw level, not the boosted one "
-        .. "(the boost bought the swings; it pays once)")
+      H.assertEq(l.b5, 0x06, "the steal on the " .. name .. "'s hit runs under Capture ($b5 = $06)")
+      H.assertEq(l.a, l.level, "the steal on the " .. name .. "'s hit rolls vanilla's odds: the raw level, not the "
+        .. "boosted one (the boost bought the swings; it pays once)")
     end
-    H.assertEq(r.mp0 - r.mp1, 4, "Mug cost 4 MP")
-    bankPaid(r, 1, "Mug")
+    H.assertEq(r.mp0 - r.mp1, stage == 2 and 4 or 0, name .. (stage == 2 and " cost 4 MP" or " is free"))
+    bankPaid(r, 1, name)
   elseif stage == 3 or stage == 4 then
     local b = stage == 3 and 0 or 1
     H.assertEq(r.row, TRICK, "the counted action is the Trickshot")
@@ -268,6 +303,8 @@ local function judge()
     H.assertEq(c.power, 40, "the coin's battle power is 40")
     H.assertEq(c.flags & 0x21, 0x21, "the coin is physical and ignores defense")
     H.assertEq(c.cls, PIERCE, "the coin pierces")
+    H.assertEq(c.out, math.min(c.dmg * (1 << b), 0xFFFF), string.format("the boost multiplied the coin x%d "
+      .. "(%d -> %s)", 1 << b, c.dmg, tostring(c.out)))
     H.assertEq(r.hp1 < r.hp0, true, "the body lost HP to the coin")
     H.assertEq(r.mp0 - r.mp1, price(4, b), string.format("Trickshot cost %d MP at %d BP", price(4, b), b))
     bankPaid(r, b, "Trickshot")
@@ -312,7 +349,7 @@ end
 
 local function decide()
   battles = battles + 1
-  H.assertEq(battles <= 30, true, "the seven stages within 30 battles")
+  H.assertEq(battles <= 34, true, "the eight stages within 34 battles")
   seat, plan, mode, rec = nil, {}, "play", nil
   for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == LOCKE then seat = s end end
   H.assertEq(seat ~= nil, true, "LOCKE is seated")
@@ -389,7 +426,7 @@ H.run({ maxFrames = 1500000 }, {
     home, away = { 250, 126 }, { 251, 127 }
     H.assertEq(H.worldBfs(home[1], home[2]) ~= nil, true, "the lap's tiles are reachable")
   end),
-  H.driveUntil(function() return stage > 7 end, 1450000, {
+  H.driveUntil(function() return stage > 8 end, 1450000, {
     H.cond(function() return not H.battleLoadStarted() end,
       { H.fieldCare({ tag = "lockekit" }), lap(), H.release() }, {}),
     H.waitUntil(function() return H.battleActive() end, 900, "battle up", 5),
@@ -416,10 +453,25 @@ H.run({ maxFrames = 1500000 }, {
     }),
     H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000,
       "back on the world map", 5),
-  }, "the seven stages"),
+    H.call(function()
+      if stage ~= 8 or captureStaged then return end
+      -- the one declared write (state_write_waivers.txt): no fixture of
+      -- this branch holds a Thief Glove, so LOCKE's Steal command becomes
+      -- Capture ($06) in his character record, the rewrite the glove makes
+      -- at battle init (RelicCmdTbl), before the stage-8 battles
+      local rec = 0x1600 + 37 * LOCKE + 0x16
+      local slot
+      for i = 0, 3 do if H.readByte(rec + i) == CMD then slot = i end end
+      H.assertEq(slot ~= nil, true, "LOCKE's record carries Steal")
+      H.writeByte(rec + slot, CAPTURE)
+      captureStaged = true
+      H.log(string.format("[lockekit] staged: LOCKE's command %d is Capture ($06), the Thief Glove's rewrite", slot))
+    end),
+  }, "the eight stages"),
   H.call(function()
     H.log("[lockekit] PASS: the list holds the four learned rows at their prices; Mug swings as Capture and steals "
       .. "at vanilla odds; Trickshot's coin pierces past defense and its boost multiplies at an escalating price; "
-      .. "Dismantle corrodes a step a point; Appraise reads its target, every body with a point")
+      .. "Dismantle corrodes a step a point; Appraise reads its target, every body with a point; a boosted Capture "
+      .. "buys swings and steals at vanilla odds")
   end),
 })
