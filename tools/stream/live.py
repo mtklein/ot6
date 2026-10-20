@@ -57,6 +57,7 @@ import importlib.util
 import runpy
 import threading
 import time
+import zlib
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
@@ -406,6 +407,7 @@ PROGRESS_PAGE = """<!doctype html><meta charset="utf-8"><meta name="viewport" co
 </div>
 <script>
 const COLS = 8, DX = 120, DY = 74, R0 = 6;
+const SAVE_POINT = '__SAVE_POINT__';   // the game's save point sprite
 let last = null;
 const svg = document.getElementById('map');
 svg.addEventListener('click', ev=>{
@@ -427,8 +429,7 @@ function render(j){
     `<span style="color:#3f9d63">\u25cf</span> done \u00b7 `
     + `<span style="color:#e0a93e">\u25cf</span> running (machine named above;`
     + ` click a node for where it ran) · `
-    + `<svg width="11" height="11" style="vertical-align:-1px"><circle cx="5.5" cy="5.5" r="4"`
-    + ` fill="#3a423c" stroke="#e8c94a" stroke-width="1.2" stroke-dasharray="2 1.5"/></svg>`
+    + `<img src="${SAVE_POINT}" width="14" height="14" style="image-rendering:pixelated;vertical-align:-3px">`
     + ` starts by Continuing the in-game save the segment before it made`
     + ` (a checkpoint), not from its emulator snapshot`;
 }
@@ -449,10 +450,11 @@ function renderGrid(j){
     const rad = R0 + Math.min(14, Math.sqrt(e.dur||30));
     const col = e.status==='done' ? '#3f9d63' : e.status==='running' ? '#e0a93e' : '#3a423c';
     const pulse = e.status==='running' ? `<animate attributeName="r" values="${rad};${rad+4};${rad}" dur="1.2s" repeatCount="indefinite"/>` : '';
-    // segments that boot from an SRAM save checkpoint rather than the
-    // played chain wear a dotted yellow ring
-    const ring = e.ckpt ? ` stroke="#e8c94a" stroke-width="2" stroke-dasharray="4 3"` : '';
-    out += `<circle cx="${x}" cy="${y}" r="${rad}" fill="${col}"${ring} data-name="${esc(e.name)}" style="cursor:pointer"><title>${esc(tip(e))}</title>${pulse}</circle>`
+    // segments that Continue a checkpoint save rather than boot the
+    // played chain's savestate wear a save point at the shoulder
+    const sp = e.ckpt ? `<image href="${SAVE_POINT}" x="${x+rad*.7-9}" y="${y-rad*.7-9}"
+      width="18" height="18" style="image-rendering:pixelated;pointer-events:none"/>` : '';
+    out += `<circle cx="${x}" cy="${y}" r="${rad}" fill="${col}" data-name="${esc(e.name)}" style="cursor:pointer"><title>${esc(tip(e))}</title>${pulse}</circle>` + sp
         + `<text x="${x}" y="${y+rad+12}" fill="${e.status==='pending'?'#565':'#aca'}" font-size="9" text-anchor="middle">${esc(e.name)}</text>`;
   });
   svg.innerHTML = out;
@@ -531,7 +533,41 @@ def write_pages(webroot):
     with open(os.path.join(webroot, "live1.html"), "w") as f:
         f.write(DETAIL_PAGE + WAKE_JS + HEALTH_JS)
     with open(os.path.join(webroot, "progress.html"), "w") as f:
-        f.write(PROGRESS_PAGE + WAKE_JS + HEALTH_JS)
+        f.write(PROGRESS_PAGE.replace("__SAVE_POINT__", save_point_png())
+                + WAKE_JS + HEALTH_JS)
+
+
+def save_point_png():
+    """The field's save point (its third animation frame, the bright star),
+    decoded from the game's own sprite and palette as a data: URI; "" when
+    the files cannot be read, so the page shows no marker."""
+    try:
+        gfx = open(os.path.join(ROOT, "ff6/src/gfx/map_sprite_gfx/save_point.4bpp"), "rb").read()
+        pal = open(os.path.join(ROOT, "ff6/src/gfx/map_sprite_pal/rainbow.pal"), "rb").read()
+    except OSError:
+        return ""
+    rgb = []
+    for i in range(16):
+        v = pal[2 * i] | pal[2 * i + 1] << 8
+        rgb.append(bytes((c & 31) * 255 // 31 for c in (v, v >> 5, v >> 10)))
+    rows = [bytearray() for _ in range(16)]
+    for k in range(4):   # tiles 9-12: frame 3, top-left, top-right, bottom-left, bottom-right
+        t = gfx[32 * (9 + k):32 * (10 + k)]
+        for y in range(8):
+            row = rows[8 * (k // 2) + y]
+            for x in range(8):
+                b = 7 - x
+                c = sum(((t[o] >> b) & 1) << n for n, o in
+                        enumerate((2 * y, 2 * y + 1, 16 + 2 * y, 17 + 2 * y)))
+                row += rgb[c] + (b"\xff" if c else b"\x00")
+    raw = b"".join(b"\0" + bytes(r) for r in rows)
+    def chunk(tag, data):
+        return (len(data).to_bytes(4, "big") + tag + data
+                + (zlib.crc32(tag + data) & 0xffffffff).to_bytes(4, "big"))
+    png = (b"\x89PNG\r\n\x1a\n"
+           + chunk(b"IHDR", (16).to_bytes(4, "big") * 2 + bytes((8, 6, 0, 0, 0)))
+           + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
+    return "data:image/png;base64," + base64.b64encode(png).decode()
 
 
 # ---- the worker grid: one tile per active run worker ----------------------
