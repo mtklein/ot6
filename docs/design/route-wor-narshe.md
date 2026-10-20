@@ -4,7 +4,8 @@ The plan for milestone v0.29, #266: from the save beside the Falcon outside
 Jidoor (`wor-cyan-v1`, where the v0.28 route ends) to MOG and UMARO joined,
 Terrato and Tritoch owned, the Ice Dragon beaten, and a save beside the
 Falcon outside Narshe. Sections 0-10 are the plan as written before play;
-section 11 is what the route built and measured.
+section 11 is what the route built and measured; section 12 is Narshe with
+LOCKE (v0.32, #447).
 
 Line numbers are into `ff6/src/event/event_main.asm` unless a file is named.
 Evidence is under `build/attempts/wt/v029-plan/`, read from `build/ot6.sfc`
@@ -45,6 +46,9 @@ marked.
    (shop 69, which stocks nothing), two elder's-house rooms with an Elixir
    each, the mines, the moogle cave, Mog, the cliffs, Tritoch, the Ice
    Dragon and Umaro's cave. v0.29 therefore buys nothing in Narshe.
+   (Played in v0.32: no keeper stands at any of these counters or the inn
+   in the World of Ruin, so LOCKE's locks open rooms and nothing is sold:
+   section 12.2.)
 3. **There is no Lone Wolf choice in the World of Ruin.** The Lone Wolf
    chase and the Mog-or-Gold-Hairpin choice are World of Balance events:
    `_ccd3ce` (:110050) returns at once once `$00A4` (the World of Ruin) is
@@ -411,6 +415,7 @@ them. His showcase is the regroup and the Narshe plain beside the Falcon
 2. **Ragnarok.** LOCKE's lock decides when the stone arrives; the plan moves
    it to v0.32 (Locke). The stone-or-sword choice stays a player's choice
    there.
+   (v0.32 takes the stone and puts it on RELM: section 12.2.)
 
 ## 11. Played (v0.29)
 
@@ -578,4 +583,98 @@ wipe in twelve, `varA/`).
 - **Dance.** The driver has no Dance verb; MOG Fights.
 - **The relic swap** (11.2): the relic rule needs an unequip to make a swap
   between two members.
-- **Ragnarok** is v0.32 (finding 1).
+- **Ragnarok** is v0.32 (finding 1): section 12.
+
+## 12. Played (v0.32): Narshe with LOCKE
+
+#447: one leg from the save outside Kohlingen where the Locke arc ends
+([route-wor-locke.md](route-wor-locke.md)). Evidence is under
+`build/attempts/wt/v032-narshe-locke/lab/` (the run logs, and the scripts
+beside them: `mkvar.py`, `tally.py`, `who_acts.py`).
+
+### 12.1 The leg
+
+`gen_wor_ragnarok` (`wor-locke-v1` -> `wor-ragnarok-v1`): aboard the
+Falcon at Kohlingen and down on the plain south of Narshe (115,38); in the
+town LOCKE picks each of the six locks (map 32 NPC_2-NPC_7, `$06C0`-`$06C5`
+cleared): the treasure room (52,37) and its six chests, the weapon shop
+(32,30) and its back room, where the old man's Ragnarok is taken as the
+stone, the relic shop (29,25), the Cursed Shld's room (32,16), the item
+shop (41,22) and the inn (41,36); Ragnarok onto RELM; out of the gate and
+the save on (115,38). LOCKE, TERRA, CELES and RELM throughout.
+
+### 12.2 What play found
+
+- **No keeper stands in World of Ruin Narshe.** Every keeper of maps 24-28
+  (the weapon, armor, item and relic counters and the inn) is NPC_1 shown
+  by switch `$0600` (`npc_prop.asm:1512-1575`), which reads 0 there
+  (`d5/run.log.gz`: `[shop] Narshe's item shop: the keeper's switch $0600
+  = 0`). The locks open rooms, not counters: nothing is sold and there is
+  no inn. Finding 2's item counter is the ROM's shop 71, which no keeper
+  opens. The leg checks the switch at each counter and talks to a keeper
+  only if one stands there; the bag from Kohlingen carries on (84-94
+  Potions at the save in the sweep).
+- **Ragnarok, the stone** (choice 0, `$00B6`): magicite.md's Last Word.
+  It goes to the seated member other than TERRA (whose Fire already folds
+  into Ultima) with the highest magic, which Ultima's damage reads: RELM
+  (magic 44; TERRA 39, CELES 36, LOCKE 28 in `wor-locke-v1`), whose Ifrit
+  goes back to the bag. A worn stone grants its list (`Ot6EsperSpellKnown`),
+  so RELM casts Ultima and Warp from then.
+- **Ultima from the stone is a multiplier spell.** Unboosted it costs 80;
+  boosted it buys the damage multiplier and is priced as any boosted spell
+  (`Ot6BoostPriceFor`: 99 at 1 BP, the two-digit ceiling). TERRA's folded
+  Ultima costs 80 at 3 BP and takes no multiplier. `battle_ragnarok`
+  checks both from `wor-ragnarok-v1` (`r2`: `cast 1: spell $14 at 3 BP
+  ... MP 566 -> 486, Ot6BoostDmg $11b0 writes 0`; `cast 2: spell $14 at 1
+  BP ... MP 544 -> 445, Ot6BoostDmg $11b0 writes 2`). Red on a ROM whose
+  `Ot6BoostLevel` answers 0 for every Ultima (`rm_mutA`: `Ragnarok's
+  Ultima takes the multiplier (Ot6BoostDmg wrote $11b0): got false`) and
+  on one whose Ragnarok list lacks Ultima (`rm_mutB`: `char $08's magic
+  list holds spell $14: got false`). The route's fights here are randoms
+  the party wins without it, so the driver does not cast it yet.
+- **The treasure room** (map 30, bits `$004`-`$009`): Hyper Wrist, Sneak
+  Ring, Wall Ring, ThiefKnife, Earrings and 5,000 GP. The relic care puts
+  the Hyper Wrist on LOCKE in place of his Peace Ring; the others stay in
+  the bag, and so does the ThiefKnife (pierce, attack 88, under the Wing
+  Edge's 198). (77,9) is empty in the ROM (bit `$003`) and stays shut.
+- **The Cursed Shld's old man lies in bed** at 30 (87,45), facing right; A
+  from the bed's foot (87,46) did nothing in 600 frames (`d3`, `d4`:
+  `activation round 1' satisfied after 600 frames`), so the leg talks to
+  him from (86,45). The shield stays in the bag: its curse is a later
+  arc's choice.
+- **The Ragnarok old man's "Right."** follows the choice and waits for A
+  (`d1`, the no-progress shot); the leg rides the scene to `$00B6`.
+
+### 12.3 Species and rows
+
+The leg meets Narshe's town pool (group 189: Red Wolf, Nastidon, Test
+Rider; rows from v0.29, section 11.3) and the plain at the gate (world
+group 51; rows from v0.28); the K battles of the sweep add the plain beside
+Kohlingen (Harpiai, Bogy, Deep Eye, Muus). `tools/audit_break_coverage.py`
+lists none of them unauthored, so no row changes. The Test Rider's one key
+is pierce, which this party holds only in LOCKE's Trickshot: the driver
+throws it at pierce-weak bodies his Fight does not key (`[navTo] actor=0
+LOCKE Trickshot at 0 BP on slot 1: pierce-weak, and his Fight keys nothing
+there`), 56 times over the sweep (`who_acts_sw.txt`).
+
+### 12.4 The sweep
+
+Twelve runs from the commit `ae27a4ce`'s tree (`sw_*/commit.txt`), the
+leg's variant with K random battles fought beside Kohlingen first
+(`mkvar.py`), K 0-5 at seed shifts 0 and 7; retries off.
+
+- 12 of 12 pass, 26,646 to 43,632 frames (`tally_sw.txt`).
+- 94 battles, 75 distinct keys (`$be` at the open with the group); no
+  member down, the party's low point 79% at worst, 94-100% median by
+  formation (`fight_report_sw.txt`). These are passages for a party ten
+  levels over the town's L32 bodies; Narshe has no fight that tests it.
+- `wor-ragnarok-v1` holds LOCKE L41, TERRA L49-50, CELES L50, RELM L47
+  and 84-94 Potions, 40 Tinctures, 30 Fenix Downs (`who_acts_sw.txt`).
+
+### 12.5 Open
+
+1. **LOCKE is L41** against the others' 47-50, and Narshe's randoms pay
+   too little to close it. The next arc's fights decide whether he needs
+   levels.
+2. **Ultima in the driver.** RELM holds it; no policy casts it yet. A
+   boss where "end the fight" pays is where to measure it.
