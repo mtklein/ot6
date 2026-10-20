@@ -155,7 +155,15 @@ local function watched(inner)
     -- on the Morph (a Floating Continent single took four from full HP to
     -- 392/267/329/52 before her 3-BP pick, and the party wiped:
     -- build/attempts/wt/v029-release-qualification/attempt2-abf9a89b/)
-    if cur ~= nil and cur.m0 == nil and #(H.vars.kit or {}) == 0 and H.battleActive() and danger() then
+    -- Step 4 plays two entries, and between its Morph and its Revert the
+    -- others Defend too: the step is let go there as well, before the Revert
+    -- is picked (revertDone's own test is read only once both are played; a
+    -- lone Floating Continent body cut the party from 627/892/598/464 to
+    -- 386/201/6/0 while TERRA waited for her Revert window, and the fight-out
+    -- from there wiped: build/attempts/wt/v032-locke-kit/qual/)
+    local kit = #(H.vars.kit or {})
+    if cur ~= nil and H.battleActive() and danger()
+        and ((cur.m0 == nil and kit == 0) or (cur.rmark ~= nil and kit < 2)) then
       cur.abandoned = true
       H.setPad({})
       return "done"
