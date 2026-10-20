@@ -8,10 +8,14 @@ next arc's boot.
 
 Line numbers are into `ff6/src/event/event_main.asm` unless a file is named.
 Evidence is under `build/attempts/wt/v033-wor-gau/lab/` (the run logs, and
-the scripts beside them: the labs `explore*.lua` and `probe*.lua`, the
-variant and mutant builders `mkvar.py`, `mkhd.py` and `mkmut.py`, the
-launchers `lab.sh`, `sweep.sh`, `hd.sh` and `mutants.sh`, and the readers
-`veldt_set.py`, `kit.py`, `where.py`, `sw.py` and `tally.py`).
+the scripts beside them: the labs `explore*.lua` and `probe*.lua`; the
+variant builders `mkvar.py` (the sweeps), `mkhd.py` (the Holy Dragon lab),
+`mkboss.py` and `mkcave.py` (the Rage A/B) and `mkrd.py` (battle_ragedriver
+from other draws); the mutant builders `mkmut.py` and `rowmuts.sh`; the
+launchers `lab.sh`, `sweep.sh`, `sweep1.sh`, `hd.sh`, `boss.sh`, `cave.sh`,
+`rdvar.sh`, `mutants.sh` and `qual.sh`; and the readers `veldt_set.py`,
+`met.py`, `tally.py`, `pairs.py`, `gau_acts.py`, `lines.py`, `kit.py`,
+`where.py` and `sw.py`).
 
 ---
 
@@ -21,9 +25,8 @@ launchers `lab.sh`, `sweep.sh`, `hd.sh` and `mutants.sh`, and the readers
    won with two or more standing, he appears 5/8 of the time
    (`battle_main.asm` @4840: `Rand / cmp #$a0`), and only when the party
    holds fewer than four (@2fbb: `$fc < 4`); the battle's AI then adds him
-   (`MiscAIEffect_03`: `$1EDF` bit 3).  He joins at the level he had at the
-   World of Ruin's start (`norm_lvl GAU`, :11277): L32, against TERRA and
-   CELES's L49-50.
+   (`MiscAIEffect_03`: `$1EDF` bit 3).  He joins at his record's level:
+   L32 in `wor-ragnarok-v1`, against TERRA and CELES's L49-50.
 2. **The Veldt deals what the save has fought.**  `$1DDD-$1E1C` holds a bit
    for every formation fought whose monsters are all under 256 and whose
    battle data does not bar it (`battle_main.asm` @49e9); each Veldt battle
@@ -261,8 +264,13 @@ at the open with the group word): `tally.py` (`tally_*.txt`) and
   played: "cave_rage ... deaths 0, mean ticks 1559", "cave_norage ...
   deaths 0, mean ticks 1363" (`pairs_cave.txt`; Rhyos 3517 against 1750
   ticks median).  The line went opt-in (section 5).
-- **The final sweeps**, at 33240ddc (the line off), from the tracked
-  checkpoints:
+- **The restructured route with the line on** (TERRA, CELES and RELM on
+  the Veldt; K Veldt battles with the four first): `swb_*` at d54cfc43 and
+  `swc_*` at 5ceb3e7d, and `sfc_*` and `sfd_*` at d7432de9 after the
+  Veldt's rows, 12 of 12 each.
+- **The final sweeps**, the line off, from the tracked checkpoints
+  (`sfe_*` at 33240ddc, `sff_*` at 3a0cf4e8, each booting the capture before
+  it):
   - `gen_wor_veldt` (`sfe_*`, K Veldt battles with the four seated first,
     which GAU will not join, each moving `$1FA5`): 12 of 12 passed, 36,432 to 58,686 frames; 147 battles, 102
     distinct keys, no member down (`tally_sfe.txt`, `fight_report_sfe.txt`).
@@ -300,11 +308,11 @@ at the open with the group word): `tally.py` (`tally_*.txt`) and
 
 ## 8. Open
 
-1. **GAU is L32**, his level from the World of Ruin's start, against TERRA
-   and CELES's L50: the Veldt's battles pay him nothing he keeps a level on
-   here, and he is the member most often down (the one death of the final
-   sweeps' cave fights, when there was one, was his).  A grind, or the next
-   arc's fights, decide it.
+1. **GAU is L32-33** at the arc's end, against TERRA and CELES's L50-51,
+   and the frailest member (1,697-1,799 HP): the one death in the sweeps
+   with the line on was his (`sfc_k5_s7`, to Rhyos), as were both in the
+   Rage A/B.  The final sweeps had none.  A grind, or the next arc's
+   fights, decide it.
 2. **Rage** waits for stronger rages: Leap on the Veldt (each return
    teaches the formation he left from) and a curated loadout (Skills ->
    Rage; AUTO leaves out M-TekArmor) are what a player would do next; the
