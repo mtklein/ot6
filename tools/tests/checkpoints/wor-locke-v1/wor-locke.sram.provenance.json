@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "249ce332a6ca4f1f7b4e57ea4a506ab4e10e2fa2fd9147589eb66d2e0dbfa0cf",
+  "generator_sig": "543e3923ff875e92621f0238cd41744384e40d48acd5481d065898b36cc690b3 gen_wor_locke build/checkpoints/wor-phoenix-v1/manifest.json build/checkpoints/wor-phoenix-v1/wor-phoenix.sram",
+  "ancestors": [
+    {
+      "path": "build/checkpoints/wor-phoenix-v1/manifest.json",
+      "sha256": "6de902e754e9b6e26ccc5b3543ae1f7ebaa0c59b2f6717f97dc447533f650e15"
+    }
+  ]
+}

@@ -165,6 +165,30 @@ group): `tally.py` (`tally_sw.txt`) and `tools/fight_report.py`
   | Red Dragon ($174) | 11 / 12 | 0.00 / 0.00 | 84% / 72% |
 
   Fenix Downs spent over the 24 runs: 37 before, 18 after.
+- **Qualification.** A bare `ninja -j 10 -k 0` on px13 from a fresh
+  worktree at cb96cf45 played the line from power-on on this ROM
+  (`build/attempts/wt/v032-locke-arc/ninja/q2/`): `wor_phoenix` "PASS
+  (frame 82847) attempts=1/3", `field_splitparty` "PASS (frame 7247)",
+  `wor_locke` "PASS (frame 54514) attempts=1/3" (the Red Dragon "battle
+  $174 WON after 6591 ticks"). Three suites failed, none of them this arc's
+  (`battle_boostaura`, `battle_retaliate`, `battle_zombiecure`; the report
+  of the branch has the causes; battle_retaliate's is fixed here). The
+  same tree moved to feadc849 (LOCKE's row; the retaliate fix) re-ran what
+  those touched: `wor_locke` "PASS (frame 54694) attempts=1/3", LOCKE "->
+  back row", `battle_retaliate` "PASS (frame 6083)". `wor-phoenix-v1` and
+  `wor-locke-v1` are re-cut from that play (`checkpoint_drift.py
+  --recut`).
+- **Audits** over that chain (`ninja/q2/`): `audit_equipment`,
+  `audit_party_hp` and `audit_chests` OK (the chain opens the 108 chests
+  `tools/chests_opened.txt` lists, the Wing Edge among them);
+  `audit_readiness` flags nothing at `wor_phoenix` or `wor_locke`.
+  `audit_supplies` warns that `wor_phoenix` (the cave's save point, 47
+  Potions in the play; 26-89 in the sweep) is under the Potion band and the
+  field-care band at L49: two parties share one 99-stack and the cave has
+  no counter. The Red Dragon after it is won with no one down, and
+  Kohlingen restores the bands (`wor_locke` is not flagged). `audit_fenix`
+  lists three Fenix Downs in `wor_phoenix`'s random battles ("RANDOM 3/3");
+  the sweep's deaths are in the next item.
 - **The Necromancers' formation ($152)** still kills: two of its seven
   keys took five deaths each, both party 1's (`swp_k0_s7`, `swp_k4_s7`).
   The cause is Zombie: ZombiStick turns SABIN (L38, the bench), and the
