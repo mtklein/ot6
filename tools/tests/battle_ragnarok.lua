@@ -8,27 +8,32 @@
 -- (OT6_ULTIMAFOLD, set by Ot6QueueFold), so "an Ultima cast from a
 -- Ragnarok's list keeps it".  The route reaches the stone for the first
 -- time in #447 (gen_wor_ragnarok: the weapon shop's back room, taken as the
--- stone, onto RELM).
+-- stone, onto the seated member other than TERRA with the most magic; the
+-- test finds that wearer in the save's own party record).
 --
 -- Played: Continue the wor-ragnarok-v1 battery (the play's save outside
--- Narshe, RELM wearing Ragnarok: nothing here writes it), pace two World of
+-- Narshe, one member wearing Ragnarok: nothing here writes it), pace two World of
 -- Ruin tiles into a random battle, and cast through the real menu
 -- (H.kitBattle); everyone else Defends.  Each cast in whatever battle is
 -- up: one where its caster cannot cast is fought out and the next taken,
 -- and a cast cut off or charged no MP is played again.  In order:
 --   1. TERRA's Fire at 3 BP -- the control: the fold, Ultima ($14) priced
 --      80, and Ot6BoostDmg writes no $11b0 for it;
---   2. RELM's Ultima at 1 BP -- from Ragnarok's list: it holds no tier, so
+--   2. the wearer's Ultima at 1 BP -- from Ragnarok's list: it holds no tier, so
 --      the boost buys the multiplier and prices it as any boosted spell
 --      (Ot6BoostPriceFor: 80 x 5 / 2 past the two-digit ceiling, 99); cast
 --      as Ultima ($14), costs 99, and Ot6BoostDmg writes $11b0 for it.
--- Mutants (build/attempts/wt/v032-narshe-locke/ragnarok/): Ot6BoostLevel
--- answering 0 for every Ultima turns cast 2 red; Ragnarok's list without
--- Ultima turns the list red.
+-- Mutants (build/attempts/wt/v032-narshe-locke-3/lab/mut{A,B,C}_*, patched
+-- by mkmut.py beside them; the first round is build/attempts/wt/
+-- v032-narshe-locke/lab/rm_mut{A,B}, ROMs patched by hand): Ot6BoostLevel
+-- answering 0 for every Ultima (A) turns cast 2 red; Ragnarok's list
+-- without Ultima (B) turns the list red; every Ultima multiplied (C) turns
+-- the control, cast 1, red.  Draws: lab/rk_k*_s* (K world-map battles
+-- fought first, seed shifts 0 and 7).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local TERRA, RELM, CMD_MAGIC = 0x00, 0x08, 0x02
+local TERRA, CMD_MAGIC = 0x00, 0x02
 local FIRE, ULTIMA = 0x00, 0x14
 local RAGNAROK = 16
 local SPELL_PTR = { [0] = 0x0000, [1] = 0x013C, [2] = 0x0278, [3] = 0x03B4 }
@@ -122,7 +127,7 @@ end
 local listCost = {}
 local CASTS = {
   { who = TERRA, spell = FIRE, boost = 3, tag = "fold" },
-  { who = RELM, spell = ULTIMA, boost = 1, tag = "ragnarok" },
+  { who = nil, spell = ULTIMA, boost = 1, tag = "ragnarok" }, -- who: Ragnarok's wearer, found at boot
 }
 local nDone, turns, mode, nrec = 0, 0, nil, 0
 local plan = {}
@@ -139,11 +144,11 @@ local function checkCast(i, r)
     H.assertEq(r.spell, ULTIMA, "TERRA's 3-BP Fire casts Ultima ($14)")
     H.assertEq(r.writes, 0, "the folded Ultima takes no multiplier (the control: Ot6BoostDmg wrote no $11b0)")
   else
-    H.log(string.format("[ragnarok] the list priced RELM's Ultima at %s with 1 BP pending",
+    H.log(string.format("[ragnarok] the list priced $%02X's Ultima at %s with 1 BP pending", who,
       tostring(listCost.ragnarok)))
-    H.assertEq(listCost.ragnarok, 99, "RELM's list holds Ultima from Ragnarok, priced 99 at 1 BP (80 boosted, "
-      .. "at the ceiling)")
-    H.assertEq(r.spell == ULTIMA and r.pend == 1, true, "cast 2 was RELM's Ultima at 1 BP")
+    H.assertEq(listCost.ragnarok, 99, "the wearer's list holds Ultima from Ragnarok, priced 99 at 1 BP (80 "
+      .. "boosted, at the ceiling)")
+    H.assertEq(r.spell == ULTIMA and r.pend == 1, true, "cast 2 was the wearer's Ultima at 1 BP")
     H.assertEq(r.mp0 - r.mp1, 99, "and costs the list's 99")
     H.assertEq(r.writes >= 1, true, "Ragnarok's Ultima takes the multiplier (Ot6BoostDmg wrote $11b0)")
   end
@@ -153,7 +158,14 @@ H.run({ maxFrames = 600000 }, {
   H.bootCheckpoint("wor-ragnarok-v1"),
   H.call(function()
     arm()
-    H.assertEq(H.readByte(0x1600 + 37 * RELM + 0x1E), RAGNAROK, "RELM wears Ragnarok: the play put it on")
+    local wearers = {}
+    for ch = 0, 15 do
+      if H.readByte(0x1600 + 37 * ch + 0x1E) == RAGNAROK then wearers[#wearers + 1] = ch end
+    end
+    H.assertEq(#wearers, 1, "exactly one character wears Ragnarok: the play put it on one")
+    H.assertEq(wearers[1] ~= TERRA, true, "Ragnarok's wearer is not TERRA (her Ultima is the fold's)")
+    CASTS[2].who = wearers[1]
+    H.log(string.format("[ragnarok] Ragnarok's wearer: character $%02X", wearers[1]))
     H.assertEq(H.readByte(0x1E80 + (0xBF >> 3)) & (1 << (0xBF & 7)) ~= 0, true,
       "switch $00BF is set: TERRA's fold is unlocked (the control)")
   end),
@@ -191,7 +203,7 @@ H.run({ maxFrames = 600000 }, {
     }),
   }, "the two casts"),
   H.call(function()
-    H.log("[ragnarok] PASS: TERRA's folded Ultima is unmultiplied and RELM's Ultima from Ragnarok, boosted, is "
+    H.log("[ragnarok] PASS: TERRA's folded Ultima is unmultiplied and the wearer's Ultima from Ragnarok, boosted, is "
       .. "multiplied")
   end),
 })

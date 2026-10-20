@@ -16,7 +16,7 @@ and outside Kohlingen after the cave, with Locke in the party.
 **A new save outside Narshe, with Ragnarok.** The `saves` folder has a save
 outside Narshe after Locke opens the town's locked doors: the elder's treasure
 room emptied, Ragnarok taken as magicite and equipped on Relm, and the Cursed
-Shld in the bag. Narshe's shops and inn stay closed in the World of Ruin.
+Shld in the bag.
 
 **A golden aura for Boost.** A character with a boost raised glows, more
 strongly at each BP, until the boost is spent. When several boost at once,

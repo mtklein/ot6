@@ -590,7 +590,8 @@ wipe in twelve, `varA/`).
 #447: one leg from the save outside Kohlingen where the Locke arc ends
 ([route-wor-locke.md](route-wor-locke.md)). Evidence is under
 `build/attempts/wt/v032-narshe-locke/lab/` (the run logs, and the scripts
-beside them: `mkvar.py`, `tally.py`, `who_acts.py`).
+beside them: `mkvar.py`, `tally.py`, `who_acts.py`, and the launchers
+`lab.sh`, `sweep.sh`, `mutants.sh`, copied from px13 after the runs).
 
 ### 12.1 The leg
 
@@ -635,8 +636,7 @@ the save on (115,38). LOCKE, TERRA, CELES and RELM throughout.
 - **The treasure room** (map 30, bits `$004`-`$009`): Hyper Wrist, Sneak
   Ring, Wall Ring, ThiefKnife, Earrings and 5,000 GP. The relic care puts
   the Hyper Wrist on LOCKE in place of his Peace Ring; the others stay in
-  the bag, and so does the ThiefKnife (pierce, attack 88, under the Wing
-  Edge's 198). (77,9) is empty in the ROM (bit `$003`) and stays shut.
+  the bag, and so does the ThiefKnife. (77,9) is empty in the ROM (bit `$003`) and stays shut.
 - **The Cursed Shld's old man lies in bed** at 30 (87,45), facing right; A
   from the bed's foot (87,46) did nothing in 600 frames (`d3`, `d4`:
   `activation round 1' satisfied after 600 frames`), so the leg talks to
@@ -664,7 +664,7 @@ leg's variant with K random battles fought beside Kohlingen first
 (`mkvar.py`), K 0-5 at seed shifts 0 and 7; retries off.
 
 - 12 of 12 pass, 26,646 to 43,632 frames (`tally_sw.txt`).
-- 94 battles, 75 distinct keys (`$be` at the open with the group); no
+- 104 battles (the rows of `tally_sw.txt` sum 6+6+6+6+8+8+10+10+10+10+12+12), 75 distinct keys (`$be` at the open with the group); no
   member down, the party's low point 79% at worst, 94-100% median by
   formation (`fight_report_sw.txt`). These are passages for a party ten
   levels over the town's L32 bodies; Narshe has no fight that tests it.
