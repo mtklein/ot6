@@ -426,7 +426,11 @@ function render(j){
   document.getElementById('legend').innerHTML =
     `<span style="color:#3f9d63">\u25cf</span> done \u00b7 `
     + `<span style="color:#e0a93e">\u25cf</span> running (machine named above;`
-    + ` click a node for where it ran)`;
+    + ` click a node for where it ran) · `
+    + `<svg width="11" height="11" style="vertical-align:-1px"><circle cx="5.5" cy="5.5" r="4"`
+    + ` fill="#3a423c" stroke="#e8c94a" stroke-width="1.2" stroke-dasharray="2 1.5"/></svg>`
+    + ` starts by Continuing the in-game save the segment before it made`
+    + ` (a checkpoint), not from its emulator snapshot`;
 }
 function renderGrid(j){
   const rows = Math.ceil(j.edges.length / COLS);
