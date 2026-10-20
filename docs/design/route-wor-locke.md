@@ -104,8 +104,10 @@ pierce each turn it red where they should (`rows/`).
   CYAN, STRAGO, MOG and UMARO wait aboard (EDGAR and SETZER already did).
 - **LOCKE's kit.** The gear care dresses him from the bag on arrival: the
   Wing Edge, the scene's Flame Shld, a Circlet and a Crystal Mail;
-  the relics give him a Ribbon; he takes the first owned stone no one wears
-  (Shiva in the seed run). His commands are #382's (Mug, Trickshot,
+  the relic care fills his two slots from the bag (a Peace Ring and the
+  Safety Bit in the qualified play); he takes the first owned stone no one
+  wears (Shiva in the seed run), and goes to the back row, since the Wing
+  Edge has no row penalty. His commands are #382's (Mug, Trickshot,
   Dismantle, Appraise, Master's Mark), built on another branch; this route
   uses no command of his yet.
 - **Kohlingen** (shops 65-67, the inn): the bag to the bands at the four's
