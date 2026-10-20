@@ -219,7 +219,7 @@ pips only at `Ot6ActionEnd`'s spend arm. The paths between, from `ExecAction`
 
 | path | MP | pips | trance | where it is settled |
 |---|---|---|---|---|
-| paid start (the normal case) | 8 | spent | set in `Cmd_10` before the first possessed action runs (`:3395-3402`), so the trance exists whatever that action then does (hits, misses, finds no target) | `battle_rage`, `battle_procboost`, `battle_ragefizzle` control branches |
+| paid start (the normal case) | 8 | spent | set in `Cmd_10` before the first possessed action runs (`:3411-3413`), so the trance exists whatever that action then does (hits, misses, finds no target) | `battle_rage`, `battle_procboost`, `battle_ragefizzle` control branches |
 | pool below 8 at resolve (an enemy's Rasp or Osmose in the advance wait; the window refuses an unpayable pick, #225) | none: `Ot6RageStartGate` sends `Cmd_10` to `Cmd_02`, whose fizzle refuses the cast | **were spent on the fizzle**; now dropped in the gate (#330) | none | `battle_ragefizzle` drained branches |
 | Gau felled, slept or petrified after the commit, before it resolves | none: `ExecAction` runs the `$12` placeholder with `$3a4c` cleared (`:231`), `Cmd_10` never runs | dropped by `Ot6ActionEnd`'s `OT6_NOACTION` arm (#346) | none | `battle_slotcancel` plays that arm on Slot; Rage has no code of its own on it, and was not played separately |
 | battle ends in the wait | none | none (no turn ends) | none | no code runs |

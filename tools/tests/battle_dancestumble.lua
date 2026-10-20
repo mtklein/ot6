@@ -73,7 +73,7 @@ local function findMog()
   for s = 0, 3 do
     if H.readByte(0x3ED8 + s * 2) == MOG then mogSlot = s end
   end
-  assert(mogSlot, "MOG is in P2's battle party")
+  assert(mogSlot, "MOG is in the battle party")
 end
 
 local function mogMenu(what)

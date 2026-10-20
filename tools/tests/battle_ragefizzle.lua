@@ -185,6 +185,9 @@ local function branch(k)
     end, 3000),
     H.call(function()
       rec.pend0 = rec.queued.pend
+      -- the property needs a raised boost to drop: assert it was raised
+      H.assertEq(rec.pend0, BOOST, string.format(
+        "branch %d: the commit queued with the boost raised", k))
       if drain then
         H.writeWord(0x3C08 + gau * 2, RAGE_COST - 1)
         H.log(string.format("[ragefizzle] branch %d: queued f%d pending %d "
