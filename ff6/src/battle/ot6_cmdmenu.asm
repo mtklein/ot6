@@ -388,11 +388,12 @@
 ;     x2/x4/x8, so x2.5 per pending level (#219).
 ;   * SwdTech (cmd $07): gated -- the boost was already spent on picking the
 ;     row, so the row is priced at its own table price and nothing escalates.
-;   * Thief (cmd $05): gated, so EVERY row of it is flat, Steal included.
-;     Steal's boost buys the rare/guarantee ladder and Filch's and Bestow's
-;     buys nothing at all; either way the command multiplies nothing, the BP
-;     is what pays for the certainty, and one arm serves all three rows
-;     (owner, 2026-09-17).
+;   * Thief (cmd $05): gated, so its rows are flat, Steal included (owner,
+;     2026-09-17): Steal's boost buys the rare/guarantee ladder, Mug's
+;     swings, Dismantle's corrode steps, Appraise's breadth, and Filch's and
+;     Bestow's nothing at all.  The one exception is Trickshot, which runs
+;     under command $18 so its boost multiplies, and so it escalates
+;     (Ot6ThiefRowCost; Ot6ThiefCharge at the queue).
 ;
 ; in: A = the row's id ($ff = an empty cell).  out: A = the price.
 ; a8/i16, db=$7e; preserves X and Y.  rtl.
@@ -554,8 +555,9 @@
 ; the player learns it before spending the turn rather than after.  This proc
 ; keeps its Bushido name because the shape is Bushido's ("a second grey reason,
 ; on top of the MP one, for a row the bank cannot reach"); the two arms share the
-; caster-lookup and the stack protocol and nothing else.  Steal and Filch have no
-; BP precondition and are never greyed by this arm.
+; caster-lookup and the stack protocol and nothing else.  Master's Mark, the
+; divine, greys under three points pending (its one gate, as Jackpot's).  The
+; other rows have no BP precondition and are never greyed by this arm.
 ;
 ; Two callers, one answer: Ot6BlitzRowDecorate colours the row by it, and
 ; Ot6KitConfirmMP refuses the confirm by it (#232), so a row this greys is a

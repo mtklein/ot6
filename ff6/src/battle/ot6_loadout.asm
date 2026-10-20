@@ -418,7 +418,7 @@ Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
 .proc Ot6ThiefCost
         .a8
         .i16
-        jsl     Ot6ThiefIsNew       ; carry set = filch/bestow (A preserved)
+        jsl     Ot6ThiefIsNew       ; carry set = a row past Steal (A preserved)
         bcc     @steal
         jmp     Ot6ThiefCostFor     ; tail-call: same bank, its rtl returns for us
 @steal: jmp     Ot6StealCost        ; the Steal row's one authority

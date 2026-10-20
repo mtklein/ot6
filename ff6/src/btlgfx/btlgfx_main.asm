@@ -18231,7 +18231,7 @@ _c1_bushido_open:
 
 ; ot6 (locke's kit): Steal is the first row of a thief submenu, not a bare
 ; command.  OpenCmdMenuTbl[5] hits this stub instead of the target-select state
-; it used to; bank $f0 fills wItemList with Steal/Filch/Bestow (+ costs and each
+; it used to; bank $f0 fills wItemList with the learned rows (+ costs and each
 ; row's own targeting byte) and raises thief mode w7e6168=3, then the Tools
 ; window shell picks one and its non-blitz confirm arm carries the picked row
 ; through target select the same way a real tool does.

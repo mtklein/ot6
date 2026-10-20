@@ -27,7 +27,7 @@ CODE_EXT_INC = 1
 .global Ot6SlotMiss, Ot6SlotCommit         ;   rig/drift/miss tiers + the
                                            ;   stored-tier charge at commit
 .global Ot6ThiefListOpen         ; #55 locke's kit: steal -> tools-shell submenu
-.global Ot6ThiefExec             ;   Cmd_05's execute-side dispatch (filch/bestow)
+.global Ot6ThiefExec             ;   Cmd_05's execute-side dispatch (the kit's rows)
 .global Ot6MugCheck              ;   Cmd_05's head: the Mug row runs as Capture
 .global Ot6KitListName           ;   ListTextCmd_0f: SwdTech and thief-row names
 .global Ot6ThiefBannerName       ;   attack name type 3: a thief row's banner

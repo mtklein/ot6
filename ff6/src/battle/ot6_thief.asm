@@ -11,7 +11,7 @@
 inc_lang "text/bushido_name_%s.inc"     ; Ot6KitListName's SwdTech names
 
 ; ------------------------------------------------------------------------------
-; Locke's kit, first slice: the thief submenu and the merchant pair
+; Locke's kit: the thief submenu and the merchant pair
 ; ------------------------------------------------------------------------------
 ;
 ; The command slot, and why this is a submenu behind Steal.
