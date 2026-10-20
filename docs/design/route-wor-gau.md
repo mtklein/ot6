@@ -304,7 +304,27 @@ at the open with the group word): `tally.py` (`tally_*.txt`) and
   at 33240ddc, "PASS (frame 40042) attempts=1/3"; `cg4`: gen_wor_gau from
   cv3's capture at 3a0cf4e8, "PASS (frame 33288) attempts=1/3".  Their
   captures seed `wor-veldt-cave-v1` and `wor-gau-v1`
-- **Qualification**: QUAL.
+- **Qualification.**  A bare `ninja -k 0` on px13 from a fresh clone at
+  ae2358c1 (`build/attempts/wt/v033-wor-gau/q1/`) played the line from
+  power-on on this ROM in 9,458 s: `wor_veldt` "PASS (frame 36329)
+  attempts=1/3", `wor_gau` "PASS (frame 37196) attempts=1/3",
+  `battle_ragedriver` "PASS (frame 21996)", `battle_breakwor_gau` "PASS
+  (frame 31)".  It exited 1: three suites the moved draws broke
+  (`battle_naturalmp`, `battle_cointoss`, `battle_setzergrey`), fixed at
+  55da844e.  The same tree pulled to 55da844e (`q2/`): `ninja -k 0` exit 0,
+  no FAILED line, then "ninja: no work to do"; "fixtures: 126/126 fresh";
+  "play-current: all 126 states were played under this tree's ROM, pin,
+  generators and library".  `wor-veldt-cave-v1` and `wor-gau-v1` are re-cut
+  from that play (`checkpoint_drift.py --recut`: "none -- the tracked save
+  is the one the graph's play makes today").
+- **Audits** over that chain (`q1/ninja.log`): `audit_equipment`,
+  `audit_party_hp` and `audit_chests` OK ("the chain opens exactly the 118
+  chest(s) tools/chests_opened.txt records"); `audit_supplies` flags
+  `wor_veldt` under the field-care band ("FIELD CARE SHORT wor_veldt tonic=
+  0 potion= 89 field-care 3500 HP < band 4950 HP (L50)"): no counter lies
+  between Narshe and Thamasa, and Thamasa's counter tops up before the save
+  (`wor_gau` is not flagged); `audit_fenix` lists no death in either leg;
+  `audit_readiness` flags nothing at `wor_veldt` or `wor_gau`.
 
 ## 8. Open
 
