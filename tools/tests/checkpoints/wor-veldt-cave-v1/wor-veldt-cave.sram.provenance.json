@@ -1,7 +1,7 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "6201a16b17775698a4175557f7882a70ba14718caeed7006f352966653a1780f",
-  "generator_sig": "2a36bf8e0cbffb33d192e3ac2d06e584a1cfc793d4b041e24862f60223492fa8 gen_wor_veldt tools/tests/checkpoints/wor-ragnarok-v1/manifest.json tools/tests/checkpoints/wor-ragnarok-v1/wor-ragnarok.sram",
+  "payload_sha256": "9eb7941fc817a12ca5da1b78a55f2b3e29dba74eb20875c51e6a51e09ff8f2d9",
+  "generator_sig": "93cb610c7d3614aef4fc35656201156567b44b1ea90091c5dc9bf2c293fb948e gen_wor_veldt tools/tests/checkpoints/wor-ragnarok-v1/manifest.json tools/tests/checkpoints/wor-ragnarok-v1/wor-ragnarok.sram",
   "ancestors": [
     {
       "path": "tools/tests/checkpoints/wor-ragnarok-v1/manifest.json",
