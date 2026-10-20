@@ -8351,13 +8351,22 @@ end
 -- physical specials (Battle $EE, Special $EF, both FightAttack's: Gau's
 -- fists, bludgeon) are scored at a nominal power.  Boost: an event battle
 -- buys the special every turn at 3 BP when the bank holds them (one choice
--- for the whole fight); a random battle 1 BP.  opts.rage = false (or the
--- RAGE_OFF global) turns it off, the control arm: Gau Fights.
+-- for the whole fight); a random battle 1 BP.
+-- Opt-in: opts.rage = true turns it on (RAGE_OFF, a global, off again, the
+-- control arm).  Off, GAU Fights: his fists are bludgeon, a key the Veldt
+-- cave's rows hold on every body, and on the arc that brings him back the
+-- possession lost to them on every key both played (route-wor-gau.md
+-- section 7, build/attempts/wt/v033-wor-gau/lab/pairs_boss.txt and
+-- pairs_cave.txt): the SrBehemoth 10363 ticks and 2 deaths over 4 keys
+-- against 6739 and none, the cave's randoms 1559 ticks against 1363 over 17.
+-- The nine World of Balance rages he returns with are the reason (powers
+-- 8-40); a route that teaches stronger ones (Leap on the Veldt) is where to
+-- turn it on and measure again.
 BATTLE.RAGE_PHYS_POWER = 40
 M.rages = {}             -- every Rage plan this run, oldest first (battle_ragedriver reads them)
 BATTLE.RAGE_MP = 8
 function Driver:rageLine(actor, have)
-  if self.opts.rage == false or RAGE_OFF then return nil end
+  if self.opts.rage ~= true or RAGE_OFF then return nil end
   if M.readByte(BATTLE.BCHID + actor * 2) ~= 0x0B then return nil end
   local row = cmdRow(actor, BATTLE.CMD_RAGE)
   if row == nil or self.skillDead[BATTLE.CMD_RAGE] then return nil end

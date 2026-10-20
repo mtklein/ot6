@@ -33,7 +33,7 @@ local GAU = 0x0B
 local RAGETIER = nil                  -- OT6_RAGETIER (ot6_memory.inc), read from the symbols
 local BUDGET = 16                     -- battles to see a measured Rage in
 local A, B = { 57, 45 }, { 58, 45 }
-local FIGHT = {}
+local FIGHT = { rage = true }      -- the line is opt-in (Driver:rageLine)
 
 local function gauSlot()
   for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == GAU then return s end end
