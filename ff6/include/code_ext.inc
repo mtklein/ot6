@@ -28,6 +28,11 @@ CODE_EXT_INC = 1
                                            ;   stored-tier charge at commit
 .global Ot6ThiefListOpen         ; #55 locke's kit: steal -> tools-shell submenu
 .global Ot6ThiefExec             ;   Cmd_05's execute-side dispatch (filch/bestow)
+.global Ot6MugCheck              ;   Cmd_05's head: the Mug row runs as Capture
+.global Ot6KitListName           ;   ListTextCmd_0f: SwdTech and thief-row names
+.global Ot6ThiefBannerName       ;   attack name type 3: a thief row's banner
+.global Ot6ThiefPageRow          ;   the field Thief page's rows: id, name, gate
+.global Ot6ThiefName             ;   the later thief rows' 10-letter list names
 .global Ot6SetzerListOpen        ; setzer's kit: slot -> tools-shell table
 .global Ot6SetzerConfirm         ;   the Slot row chains to the reels
 .global Ot6SetzerExec            ;   Cmd_0f's dispatch (coin toss/hired help/jackpot)

@@ -447,6 +447,14 @@ TEST_ENV = {
     # the Continue, a walk and up to sixteen battles
     "battle_study": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # #382: LOCKE's Mug, Trickshot, Dismantle and Appraise, on the same plain
+    # (four of his five later rows are learned there); the Continue, a walk
+    # and seven or more battles of one scripted turn each
+    "battle_lockekit": "OT6_TIMEOUT=5400 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # #382: his divine, Master's Mark, once the Air Force is behind him
+    "battle_mastersmark": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
     # #319: SETZER's kit, played in Darill's Tomb's east room from the
     # battery cut on its save point (SETZER back in the World of Ruin, so
     # Jackpot is learned).  A run is the Continue, a walk and one to four

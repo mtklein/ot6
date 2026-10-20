@@ -51,6 +51,9 @@
         lda     $b1             ; countered: never boost, it can't be charged
         lsr
         bcs     @vanilla
+        lda     $b5             ; a Capture's (and Mug's) hit: the boost
+        cmp     #$06            ;   bought its swings, so the steal on it
+        beq     @vanilla        ;   rolls vanilla's odds (it pays once)
         lda     OT6_BOOST_REVEALED,x         ; pending boost (0-3)
         beq     @vanilla        ; unspent: byte-for-byte vanilla
         cmp     #$03
@@ -111,6 +114,9 @@
         lda     $b1             ; countered? vanilla roll (convention, as above)
         lsr
         bcs     @vanilla
+        lda     $b5             ; a Capture's or Mug's hit: vanilla (above)
+        cmp     #$06
+        beq     @vanilla
         lda     OT6_BOOST_REVEALED,x         ; pending boost
         beq     @vanilla        ; 0 bp: the exact vanilla roll
         lda     $3308,y         ; slot 0 = rare

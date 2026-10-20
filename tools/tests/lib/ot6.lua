@@ -8117,6 +8117,147 @@ function Driver:setzerLine(actor, have)
   return nil
 end
 
+-- LOCKE's kit past Steal (#382, kits.md "Locke"): the rows behind his Steal
+-- command, their ids (ot6_thief.asm) and the event switch each story beat
+-- sets (a zero switch: at join).  The battle list shows a row once its
+-- switch is set (Ot6ThiefRowKnown), and so does M.lockeKnows.
+BATTLE.LOCKE = { STEAL = 0x56, FILCH = 0x57, BESTOW = 0x58, MUG = 0xE0, TRICK = 0xE1, DISMANTLE = 0xE2,
+  APPRAISE = 0xE3, MARK = 0xE4, CMD = 0x05,
+  SW = { [0xE0] = 0x001E, [0xE1] = 0x001A, [0xE2] = 0x0079, [0xE3] = 0x008D, [0xE4] = 0x00A0 },
+  PRICE = { [0xE0] = 4, [0xE1] = 4, [0xE2] = 8, [0xE3] = 3, [0xE4] = 99 } }
+function M.lockeKnows(id)
+  local sw = BATTLE.LOCKE.SW[id]
+  if sw == nil then return true end
+  return (M.readByte(0x1E80 + (sw >> 3)) >> (sw & 7)) & 1 == 1
+end
+-- what monster slot s still carries to steal ($3308 rare, $3309 common)
+function M.monLoot(s)
+  local r, c = M.readByte(0x3308 + 8 + s * 2), M.readByte(0x3309 + 8 + s * 2)
+  return r ~= 0xFF or c ~= 0xFF, r ~= 0xFF
+end
+-- a body whose weaknesses the HUD has not all read yet, and that vanilla
+-- lets a Scan read ($3C80 bit 4 clear)
+function M.monUnread(s)
+  local e = 8 + s * 2
+  if (M.readByte(0x3C80 + e) & 0x10) ~= 0 then return false end
+  local weak = M.readByte(0x3BE0 + e) & ~M.readByte(0xEDD8 + e - 8) & 0xFF
+  return (weak & ~M.readByte(0x3E89 + e)) ~= 0 or (M.readByte(0x3E9C + e) & ~M.readByte(0x3E9D + e)) ~= 0
+end
+
+-- LOCKE's rows, each where it pays (o = opts.locke; false, or the
+-- LOCKE_POLICY_OFF global, turns them all off, the control arm):
+--   Master's Mark (3 BP, 99 MP): every body's best item and every body read
+--     in one turn.  In an event battle when a body carries anything; in a
+--     random battle when three or more do.
+--   Appraise (3 MP): a standing body the HUD cannot key yet, worth reading
+--     -- an event battle's, or one with o.appraiseHp (1500) HP or more.
+--     The chip model keys only revealed cells (hitChips), so the read is
+--     what lets the keyed lines aim; at 1 BP, when two or more such bodies
+--     stand, it reads them all.  The codex keeps a read species read, so
+--     this is a first-meeting turn.
+--   Dismantle (8 MP): once a battle per body, on the press target of an
+--     event battle with o.dismantleHp (3000) HP or more and defense of
+--     o.dismantleDef (64) or more, at 1 BP when two are banked (two steps
+--     of the corrode), for the party's swings that follow.
+--   Trickshot (4 MP): a pierce-weak shielded body his Fight keys nothing on
+--     (his hands hold no piercing weapon): the coin pierces whatever he
+--     holds.  Unboosted: the boost would buy x2 damage at x2.5 the price,
+--     and a chip is what the turn is for.
+-- MP: none of them takes the pool under o.mpFloor (8), so a Mug stays paid.
+function Driver:lockeLine(actor, have)
+  local o = self.opts.locke
+  if o == false or LOCKE_POLICY_OFF or M.readByte(BATTLE.BCHID + actor * 2) ~= 1 then return nil end
+  o = type(o) == "table" and o or {}
+  local L = BATTLE.LOCKE
+  local row = cmdRow(actor, L.CMD)
+  if row == nil or self.skillDead[L.CMD] then return nil end
+  local mp = M.readWord(BATTLE.CURMP + actor * 2)
+  local floor = o.mpFloor or 8
+  local tag = self.tag or "fight"
+  local event = M.readByte(M.RANDBTL) == 0
+  local function plan(skill, b, aim, why)
+    M.log(string.format("[%s] actor=%d LOCKE %s at %d BP%s: %s (%d MP of %d)", tag, actor,
+      ({ [L.MARK] = "Master's Mark", [L.APPRAISE] = "Appraise", [L.DISMANTLE] = "Dismantle",
+         [L.TRICK] = "Trickshot" })[skill], b, aim and (" on slot " .. aim) or "", why, L.PRICE[skill], mp))
+    return { kind = "skill", cmd = L.CMD, skill = skill, row = row, boostLeft = b, aim = aim,
+             reason = "locke" }
+  end
+  if o.mark ~= false and M.lockeKnows(L.MARK) and have >= 3 and mp >= L.PRICE[L.MARK] then
+    local n, rare = 0, 0
+    for s = 0, 5 do
+      if monAlive(s) then
+        local any, r = M.monLoot(s)
+        if any then n = n + 1 end
+        if r then rare = rare + 1 end
+      end
+    end
+    if (event and n >= 1) or n >= 3 then
+      return plan(L.MARK, 3, nil, string.format("%d bodies carry loot (%d rare)%s", n, rare,
+        event and ", an event battle" or ""))
+    end
+  end
+  if o.appraise ~= false and M.lockeKnows(L.APPRAISE) and mp - L.PRICE[L.APPRAISE] >= floor then
+    local first, n = nil, 0
+    for s = 0, 5 do
+      if monAlive(s) and M.monUnread(s) and (event or M.readWord(BATTLE.MON_HP + s * 2) >= (o.appraiseHp or 1500))
+         and M.readByte(BATTLE.SH_CUR + s * 2) > 0 then
+        n = n + 1
+        first = first or s
+      end
+    end
+    if first ~= nil then
+      local b = (n >= 2 and have >= 1) and 1 or 0
+      return plan(L.APPRAISE, b, first, string.format("%d body(ies) the HUD cannot key yet", n))
+    end
+  end
+  local slot = self:pressTarget()
+  if slot == nil then for s = 0, 5 do if monAlive(s) then slot = s; break end end end
+  if slot == nil then return nil end
+  self.lockeDismantled = self.lockeDismantled or {}
+  if o.dismantle ~= false and event and M.lockeKnows(L.DISMANTLE) and mp - L.PRICE[L.DISMANTLE] >= floor
+     and not self.lockeDismantled[slot] and M.readWord(BATTLE.MON_HP + slot * 2) >= (o.dismantleHp or 3000)
+     and M.readByte(0x3BB8 + 8 + slot * 2) >= (o.dismantleDef or 64) then
+    self.lockeDismantled[slot] = true
+    return plan(L.DISMANTLE, have >= 2 and 1 or 0, slot, string.format("defense %d",
+      M.readByte(0x3BB8 + 8 + slot * 2)))
+  end
+  if o.trickshot ~= false and M.lockeKnows(L.TRICK) and mp - L.PRICE[L.TRICK] >= floor
+     and M.readByte(BATTLE.SH_CUR + slot * 2) > 0 and M.readByte(BATTLE.BRK_TICKS + slot * 2) == 0
+     and hitChips(slot, 0x02, 0) > 0 and fightChips(actor, slot, 0) == 0 then
+    return plan(L.TRICK, 0, slot, "pierce-weak, and his Fight keys nothing there")
+  end
+  return nil
+end
+
+-- Mug in place of LOCKE's Fight (#382): the same swings at the same boost
+-- (Mug runs as Capture, so its boost buys swings as a Fight's does), and each
+-- landing hit also tries a Steal, for Mug's 4 MP.  Only on an aimed body that
+-- still carries something, and only while the pool stays at o.mpFloor or more.
+function Driver:lockeMug(actor, plan)
+  if plan == nil or plan.kind ~= "fight" or plan.ally then return plan end
+  local o = self.opts.locke
+  if o == false or LOCKE_POLICY_OFF or M.readByte(BATTLE.BCHID + actor * 2) ~= 1 then return plan end
+  o = type(o) == "table" and o or {}
+  local L = BATTLE.LOCKE
+  if o.mug == false or not M.lockeKnows(L.MUG) or self.skillDead[L.CMD] then return plan end
+  local row = cmdRow(actor, L.CMD)
+  local aim = plan.aim
+  if aim == nil then
+    for s = 0, 5 do
+      if monAlive(s) then
+        if aim ~= nil then aim = nil; break end
+        aim = s
+      end
+    end
+  end
+  if row == nil or aim == nil or not monAlive(aim) or not M.monLoot(aim) then return plan end
+  if M.readWord(BATTLE.CURMP + actor * 2) - L.PRICE[L.MUG] < (o.mpFloor or 8) then return plan end
+  M.log(string.format("[%s] actor=%d LOCKE Mug at %d BP on slot %d: his Fight, and slot %d still carries loot",
+    self.tag or "fight", actor, plan.boostLeft or 0, aim, aim))
+  return { kind = "skill", cmd = L.CMD, skill = L.MUG, row = row, boostLeft = plan.boostLeft or 0, aim = aim,
+           reason = "mug", finish = plan.reason == "finish" or nil }
+end
+
 -- The MagiTek attack this actor's list offers that does the most to the
 -- target (#373), as a plan, or nil.  Entries 0-2 are the beams (fire, ice,
 -- lightning: MagicProp's own element bytes), 3 Bio Blast, 4 Heal Force (a
@@ -10185,6 +10326,7 @@ function Driver:makePlan(actor)
     self._racePred = nil
   end
   self._race = nil
+  plan = self:lockeMug(actor, plan)
   plan = self:policyPlan(actor, plan)
   if plan then plan.raceBoost = plan.boostLeft or 0 end
   self:sayTurn(actor, plan)
@@ -12034,6 +12176,12 @@ function Driver:makePlanRules(actor)
   -- SETZER's table, when a row of it pays (#353; Driver:setzerLine)
   if id == 9 then
     local line = self:setzerLine(actor, have)
+    if line then return line end
+  end
+  -- LOCKE's later rows, when one pays (#382; Driver:lockeLine).  Mug is not
+  -- here: it replaces his Fight in makePlan (Driver:lockeMug)
+  if id == 1 then
+    local line = self:lockeLine(actor, have)
     if line then return line end
   end
   if self.opts.bushido and id == 2 and not self.skillDead[BATTLE.CMD_SWDTECH]

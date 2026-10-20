@@ -1,10 +1,14 @@
 ; ------------------------------------------------------------------------------
-; Locke's kit: the Steal submenu and the merchant pair
+; Locke's kit: the Steal submenu and its eight rows
 ;
-; Ot6ThiefListOpen/IsNew/Exec plus Filch and Bestow. The boost tilts on the
-; plain Steal roll that this submenu's first row fires are in ot6_steal.asm;
-; the row price comes from Ot6ThiefCost in ot6_loadout.asm.
+; Ot6ThiefListOpen/IsNew/Exec, Filch and Bestow, and the five rows the story
+; teaches (#382): Mug, Trickshot, Dismantle, Appraise and the divine Master's
+; Mark.  The boost tilts on the plain Steal roll that this submenu's first row
+; fires are in ot6_steal.asm; the row price comes from Ot6ThiefCost in
+; ot6_loadout.asm.  Design and rulings: docs/design/kits.md, "Locke".
 ; ------------------------------------------------------------------------------
+
+inc_lang "text/bushido_name_%s.inc"     ; Ot6KitListName's SwdTech names
 
 ; ------------------------------------------------------------------------------
 ; Locke's kit, first slice: the thief submenu and the merchant pair
@@ -64,22 +68,148 @@ OT6_THIEF_STEAL  = $56
 OT6_THIEF_FILCH  = $57
 OT6_THIEF_BESTOW = $58
 
+; The later rows (#382).  AttackName has no free slot left ($56-$5c went to
+; this list and Setzer's), so these ids name nothing there: the list draws
+; them from Ot6ThiefName (Ot6KitListName, thief mode) and the banner from
+; Ot6ThiefBannerName (attack name type 3).  Under command $05 the queued attack
+; byte is this menu's own (see above), so any id outside the three rows above
+; and the $ff of a Steal nobody chose is free; $e0-$e4 are clear of both.
+OT6_THIEF_MUG       = $e0       ; Capture, as a row: a swing that steals
+OT6_THIEF_TRICK     = $e1       ; a thrown coin: piercing, past defense
+OT6_THIEF_DISMANTLE = $e2       ; a stab that corrodes defense
+OT6_THIEF_APPRAISE  = $e3       ; Scan's read, Locke's way
+OT6_THIEF_MARK      = $e4       ; the divine: steal from all, read all
+
+OT6_TRICK_POWER     = 40        ; the coin's battle power (Fight's formula)
+OT6_DISMANTLE_POWER = 20        ; the stab's battle power
+OT6_MARK_BOOST      = 3         ; the divine's one gate: a full boost
+
+; ------------------------------------------------------------------------------
+
+; [ the eight rows: id, window cell, targeting, the story beat that teaches ]
+;
+; In page order, which is the window read a column at a time: Steal, Filch,
+; Bestow, Mug down the left, Trickshot, Dismantle, Appraise and Master's Mark
+; down the right.  The cell is the wItemList offset (row*6, +3 for the right
+; column).  Steal, Filch and Bestow come at join (kits.md: the grant-at-join
+; ruling); the other five come by story, each an event switch its beat sets
+; once and nothing clears (event_main.asm):
+;   Trickshot   $001A  the Lete River ride is run (:39327)
+;   Mug         $001E  Locke's South Figaro escape is done (:21017)
+;   Dismantle   $0079  the Sealed Gate opens (:46318)
+;   Appraise    $008D  Strago is met in Thamasa (:69857)
+;   Master's    $00A0  the Air Force gauntlet, on the way to the Floating
+;     Mark             Continent (:13445; the landing itself sets nothing)
+; Switch n is bit (n & 7) of $1e80 + (n >> 3); the record holds the byte's
+; offset from $1e80 and the bit, and a zero bit means "at join".
+.define OT6_SW(n) <((n) >> 3), <(1 << ((n) & 7))
+OT6_THIEF_REC  = 5
+OT6_THIEF_ROWS = 8
+Ot6ThiefRowTbl:
+        .byte   OT6_THIEF_STEAL,     0, $43, 0, 0
+        .byte   OT6_THIEF_FILCH,     6, $43, 0, 0
+        .byte   OT6_THIEF_BESTOW,   12, $03, 0, 0
+        .byte   OT6_THIEF_MUG,      18, $43, OT6_SW($001e)
+        .byte   OT6_THIEF_TRICK,     3, $43, OT6_SW($001a)
+        .byte   OT6_THIEF_DISMANTLE, 9, $43, OT6_SW($0079)
+        .byte   OT6_THIEF_APPRAISE, 15, $43, OT6_SW($008d)
+        .byte   OT6_THIEF_MARK,     21, $6a, OT6_SW($00a0)
+        ; Master's Mark takes Coin Toss's targeting ($6a: the cursor opens
+        ; on the whole enemy side); it reads and robs every body whatever
+        ; the cursor names
+
+; the list's names, one 10-letter record per row in the table's order, in
+; AttackName's encoding (the field page draws them through LoadArrayItem)
+Ot6ThiefName:
+        .byte   $92, $ad, $9e, $9a, $a5, $ff, $ff, $ff, $ff, $ff ; Steal
+        .byte   $85, $a2, $a5, $9c, $a1, $ff, $ff, $ff, $ff, $ff ; Filch
+        .byte   $81, $9e, $ac, $ad, $a8, $b0, $ff, $ff, $ff, $ff ; Bestow
+        .byte   $8c, $ae, $a0, $ff, $ff, $ff, $ff, $ff, $ff, $ff ; Mug
+        .byte   $93, $ab, $a2, $9c, $a4, $ac, $a1, $a8, $ad, $ff ; Trickshot
+        .byte   $83, $a2, $ac, $a6, $9a, $a7, $ad, $a5, $9e, $ff ; Dismantle
+        .byte   $80, $a9, $a9, $ab, $9a, $a2, $ac, $9e, $ff, $ff ; Appraise
+        .byte   $8c, $ac, $ad, $ab, $c5, $fe, $8c, $9a, $ab, $a4 ; Mstr. Mark
+
+; the battle banner's names for the five later rows ($e0-$e4), 13 letters:
+; the message window takes the divine's whole name
+OT6_BANNER_LEN = 13
+Ot6ThiefBanner:
+        .byte   $8c, $ae, $a0, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff ; Mug
+        .byte   $93, $ab, $a2, $9c, $a4, $ac, $a1, $a8, $ad, $ff, $ff, $ff, $ff ; Trickshot
+        .byte   $83, $a2, $ac, $a6, $9a, $a7, $ad, $a5, $9e, $ff, $ff, $ff, $ff ; Dismantle
+        .byte   $80, $a9, $a9, $ab, $9a, $a2, $ac, $9e, $ff, $ff, $ff, $ff, $ff ; Appraise
+        .byte   $8c, $9a, $ac, $ad, $9e, $ab, $c3, $ac, $fe, $8c, $9a, $ab, $a4 ; Master's Mark
+
+; ------------------------------------------------------------------------------
+
+; [ has Locke learned this row? ]
+; in: X = the row's record offset in Ot6ThiefRowTbl.  out: carry set = known.
+; a8/i16, db=$7e.  preserves X and Y; clobbers A.
+.proc Ot6ThiefRowKnown
+        .a8
+        .i16
+        lda     f:Ot6ThiefRowTbl+4,x
+        beq     @yes            ; at join
+        phx
+        pha                     ; [1,s] the switch's bit
+        lda     f:Ot6ThiefRowTbl+3,x
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     $1e80,x         ; the switch's byte
+        and     $01,s
+        sta     $01,s
+        pla                     ; the switch's bit, or 0 (Z from the pull)
+        beq     @no
+        plx
+@yes:   sec
+        rtl
+@no:    plx
+        clc
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ which row of the table is this id? ]
+; in: A = a row id.  out: carry set and X = its record offset, or carry clear.
+; a8/i16.  preserves A and Y.
+.proc Ot6ThiefRowOf
+        .a8
+        .i16
+        ldx     #$0000
+@scan:  cmp     f:Ot6ThiefRowTbl,x
+        beq     @hit
+        inx
+        inx
+        inx
+        inx
+        inx
+        cpx     #OT6_THIEF_REC*OT6_THIEF_ROWS
+        bcc     @scan
+        clc
+        rtl
+@hit:   sec
+        rtl
+.endproc
+
 ; ------------------------------------------------------------------------------
 
 ; [ open Steal as a submenu, the twin of Ot6BlitzListOpen ]
-; Three rows in the left column only (cells 0/6/12, the Ot6BushidoWindow shape),
-; right column and rows past the third $ff so the window renders one clean
-; column.  Per row: Index = the id above, Qty = the MP cost as of this open,
-; Flags = the row's own targeting byte, which the Tools confirm copies into
-; w7e7a84 in place of the command's.  That last one is why Bestow can point at
-; the party while Steal and Filch point at the enemy from the same command:
-; Steal/Filch take $43 (MANUAL|ONE_SIDE|ENEMY, byte-identical to
-; BattleCmdProp[$05]'s own target byte, battle_cmd_prop.asm:53) and Bestow takes
-; $03 (MANUAL|ONE_SIDE, no ENEMY, the Banon's-Health side of the field,
-; battle_cmd_prop.asm:117).  BattleCmdProp[$05] is not changed to
-; MENU: an AI-issued or Confused Steal still needs the engine's own target
-; flags, and the player path never re-derives them (the menu's chosen mask
-; reaches $b8 and CalcCmdDelay skips ChooseTarget while $b8 is nonzero).
+; Every learned row of the table goes in its own cell, the rest stay $ff
+; (blank and unselectable), so the window is two columns of up to four.  Per
+; row: Index = the id, Qty = the MP cost as of this open, Flags = the row's
+; own targeting byte, which the Tools confirm copies into w7e7a84 in place
+; of the command's.  That is why Bestow can point at the party while the
+; rest point at the enemy from the same command: Steal's $43
+; (MANUAL|ONE_SIDE|ENEMY, byte-identical to BattleCmdProp[$05]'s own target
+; byte, battle_cmd_prop.asm:53), Bestow's $03 (MANUAL|ONE_SIDE, no ENEMY, the
+; Banon's-Health side of the field, battle_cmd_prop.asm:117).
+; BattleCmdProp[$05] is not changed to MENU: an AI-issued or Confused Steal
+; still needs the engine's own target flags, and the player path never
+; re-derives them (the menu's chosen mask reaches $b8 and CalcCmdDelay skips
+; ChooseTarget while $b8 is nonzero).
 ;
 ; entry: jsl from the C1 stub, db=$7e, a8/i16.  clobbers a/x/y (the caller's
 ; next act is jmp OpenToolsWindow, which reloads what it needs).
@@ -96,34 +226,29 @@ OT6_THIEF_BESTOW = $58
         inx
         cpx     #$0018          ; 8 cells * 3 bytes
         bcc     @pad
-        ; --- row 0: Steal (offset 0) ---
-        lda     #OT6_THIEF_STEAL
-        sta     $4005
-        jsl     Ot6ThiefCost    ; flat at every boost level, like the two rows
-                                ;   below it: Ot6BoostDmg gates cmd $05, so
-                                ;   nothing under this command is multiplied
-                                ;   and nothing under it escalates.  Steal's
-                                ;   boost buys the rare/guarantee ladder,
-                                ;   which the BP pays for.  Ot6KitRowCost
-                                ;   draws the same flat number and
-                                ;   Ot6AbilityCost charges it
-        sta     $4006
-        lda     #$43            ; MANUAL|ONE_SIDE|ENEMY
-        sta     $4007
-        ; --- row 1: Filch (offset 6) ---
-        lda     #OT6_THIEF_FILCH
-        sta     $400b
-        jsl     Ot6ThiefCost
-        sta     $400c
-        lda     #$43
-        sta     $400d
-        ; --- row 2: Bestow (offset 12) ---
-        lda     #OT6_THIEF_BESTOW
-        sta     $4011
-        jsl     Ot6ThiefCost
-        sta     $4012
-        lda     #$03            ; MANUAL|ONE_SIDE: the party side
-        sta     $4013
+        ; --- every learned row into its cell ---
+        ldx     #$0000
+@row:   jsl     Ot6ThiefRowKnown
+        bcc     @next
+        lda     f:Ot6ThiefRowTbl+1,x
+        longa
+        and     #$00ff
+        tay                     ; Y = the cell
+        shorta0
+        lda     f:Ot6ThiefRowTbl,x
+        sta     $4005,y
+        jsl     Ot6ThiefCost    ; flat here; Ot6KitRowCost redraws the live
+                                ;   price per draw (Trickshot's boost)
+        sta     $4006,y
+        lda     f:Ot6ThiefRowTbl+2,x
+        sta     $4007,y
+@next:  inx
+        inx
+        inx
+        inx
+        inx
+        cpx     #OT6_THIEF_REC*OT6_THIEF_ROWS
+        bcc     @row
         ; --- honor Config>Cursor the same way Blitz/Bushido/Tools do: leave the
         ; shared cursor triple alone, and force a fresh window re-init. ---
         stz     $7ba5           ; force MakeToolsList_04 to re-init the window
@@ -136,23 +261,65 @@ OT6_THIEF_BESTOW = $58
 
 ; ------------------------------------------------------------------------------
 
-; [ is this pending Steal-command action Filch, or Bestow, or plain Steal? ]
+; [ is this pending Steal-command action one of the kit's rows past Steal? ]
 ;
 ; One discriminator for the charge, the menu and the execute dispatch, so they
 ; cannot disagree about which row fired.  in: A = the queued attack byte
 ; ($3a7b at charge time, $b6 at execute time).  out: carry set and A preserved
-; when it is one of the two new rows; carry clear for anything else: $ff (the
-; byte init_buf_input leaves, i.e. every Steal the submenu did not issue), $00,
-; the Steal row itself, or garbage.  Preserves X and Y, and reads no state.
+; when it is a row with its own price and effect (Filch, Bestow and the five
+; later rows); carry clear for anything else: $ff (the byte init_buf_input
+; leaves, i.e. every Steal the submenu did not issue), $00, the Steal row
+; itself, or garbage.  Preserves X and Y, and reads no state.
 .proc Ot6ThiefIsNew
         .a8
         cmp     #OT6_THIEF_FILCH
         beq     @yes
         cmp     #OT6_THIEF_BESTOW
         beq     @yes
-        clc
+        cmp     #OT6_THIEF_MUG
+        bcc     @no
+        cmp     #OT6_THIEF_MARK+1
+        bcc     @yes
+@no:    clc
         rtl
 @yes:   sec
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ Cmd_05's head: is this action the Mug row? ]
+;
+; Mug is Capture as a row of the kit (vanilla's Thief Glove verb, which FF3-US
+; prints as Capture): a Fight swing whose every landing hit also tries a
+; Steal.  So it runs as Capture runs, through Cmd_06: the weapon's swing and
+; its class (Locke's dagger pierces), the steal on the hit (ExecAttack's
+; `$b5 = $06` arm sets special effect $52), and the boost buying swings
+; (Ot6FightBoost), which is what a boosted Fight or Capture buys.  The boost
+; pays once (guidelines.md): the steal on a Mug's hit rolls vanilla's odds at
+; every boost (Ot6StealBoostLevel's and Ot6StealSlot's capture test).  The
+; price was charged at the queue as this row's (Ot6AbilityCost's @steal arm
+; keys on the queued byte), so running as Capture changes no number.
+; entry: jsl from Cmd_05 after its `tyx`, any widths, db=$7e, y = attacker.
+; out: carry set = Mug ($b5 = $06, the caller jumps to Cmd_06); clear = any
+; other Steal action.  preserves X and Y.
+.proc Ot6MugCheck
+        php
+        sep     #$20
+        .a8
+        tya                     ; width-neutral: a character's action only
+        cmp     #$08
+        bcs     @no
+        lda     $b6
+        cmp     #OT6_THIEF_MUG
+        bne     @no
+        lda     #$06
+        sta     $b5             ; Capture: the animation and the steal-on-hit
+        plp
+        sec
+        rtl
+@no:    plp
+        clc
         rtl
 .endproc
 
@@ -164,13 +331,14 @@ OT6_THIEF_BESTOW = $58
 ; and every decision stays in bank F0, keeping the row-id constants out of
 ; the C2 source.
 ;
-; Set $3412 = 0 (attack name type "normal") for the two new rows.  ExecAction
-; $ff-fills $3410-$341f before dispatching CmdTbl (battle_main.asm:3132), so
-; $3412 is $ff at entry and ShowAttackName's `bmi` shows nothing, which is why
-; a vanilla Steal has never printed a banner.  Type 0 is ShowAttackName_00, `lda
-; $b6`, and $b6 is the row id, so Filch and Bestow print their names out of the
-; AttackName pad slots this menu already named.  Steal is left alone: no banner,
-; byte-for-byte as it ships.
+; The banner.  ExecAction $ff-fills $3410-$341f before dispatching CmdTbl
+; (battle_main.asm:3132), so $3412 is $ff at entry and ShowAttackName's `bmi`
+; shows nothing, which is why a vanilla Steal has never printed a banner.
+; Filch and Bestow set type 0 (ShowAttackName_00, `lda $b6`), which prints
+; AttackName[$b6-$51], the pad slots this menu named.  The later rows set type
+; 3, unused in vanilla and pointed at the same `lda $b6`, whose message arm
+; (_c2bb11's third, Ot6ThiefBannerName) names them from Ot6ThiefBanner.  Steal
+; is left alone: no banner, byte-for-byte as it ships.
 ;
 ; The widths are pinned here rather than assumed from the command context, per
 ; this file's standing discipline: a 16-bit A would make `lda $b6` a two-byte
@@ -190,11 +358,35 @@ OT6_THIEF_BESTOW = $58
         .a8
         .i8
         lda     $b6
-        jsl     Ot6ThiefIsNew           ; carry set = one of the two new rows
+        jsl     Ot6ThiefIsNew           ; carry set = one of the kit's rows
         bcc     @plain
         cmp     #OT6_THIEF_BESTOW
         beq     @bestow
-        jsl     Ot6Filch
+        cmp     #OT6_THIEF_FILCH
+        beq     @filch
+        cmp     #OT6_THIEF_TRICK
+        beq     @trick
+        cmp     #OT6_THIEF_DISMANTLE
+        beq     @dismantle
+        cmp     #OT6_THIEF_APPRAISE
+        beq     @appraise
+        cmp     #OT6_THIEF_MARK
+        bne     @plain                  ; (Mug left at Cmd_05's head)
+        jsl     Ot6MastersMark
+        bra     @later
+@appraise:
+        jsl     Ot6Appraise
+        bra     @later
+@dismantle:
+        jsl     Ot6Dismantle
+        bra     @later
+@trick: jsl     Ot6Trickshot
+@later: lda     #$03                    ; attack name type 3 -> Ot6ThiefBanner
+        sta     $3412
+        plp
+        sec
+        rtl
+@filch: jsl     Ot6Filch
         bra     @named
 @bestow:
         jsl     Ot6Bestow
@@ -377,4 +569,525 @@ done:   plp
 @out:   ply
 done:   plp
         rtl
+.endproc
+
+
+; ------------------------------------------------------------------------------
+
+; [ Trickshot: a thrown coin, piercing, past defense ]
+;
+; One hit on one enemy by Fight's own physical formula (CalcDmg: Locke's
+; level and vigor) at a fixed battle power, OT6_TRICK_POWER, whatever he
+; holds: the coin is the weapon, so the hit pierces (OT6_PIERCE, one chip on a
+; pierce-weak body) with a sword in his hand as with a dagger.  It ignores
+; defense ($11a2 bit 5), which in the damage modification also skips the
+; target's row and its Defend, and it cannot be dodged (_c2298d's $11a4).
+; The animation is GP Rain's coin ($b5 = $18), and $b5 is also the command
+; Ot6BoostDmg reads: $18 is not in its gate, so the boost multiplies the hit
+; x2/x4/x8, and the price escalates with it (Ot6AbilityCost's @steal arm and
+; Ot6ThiefRowCost), the one test kits.md states.
+; entry: jsl from Ot6ThiefExec, a8/i8, x = attacker.  clobbers a.
+.proc Ot6Trickshot
+        .a8
+        .i8
+        lda     #OT6_TRICK_POWER
+        sta     $11a6
+        lda     #$21            ; physical, ignore defense
+        sta     $11a2
+        bra     Ot6ThiefHit
+.endproc
+
+; [ Dismantle: a stab that corrodes the target's defense ]
+;
+; The corrode lands first, then a weak piercing stab at the lowered defense.
+; Each step takes a quarter of the target's defense (at least one point), and
+; the boost buys steps: one at 0 BP, four at 3 BP (x3/4 each, so about a third
+; of it left).  It lasts the battle.  The boost buys the corrode, so the stab
+; is not multiplied: $b5 stays Steal's $05, which Ot6BoostDmg gates, and the
+; price is flat.
+; entry: jsl from Ot6ThiefExec, a8/i8, x = attacker, $b9 = the monster mask.
+; clobbers a; preserves x and y.
+.proc Ot6Dismantle
+        .a8
+        .i8
+        phy
+        jsr     Ot6ThiefTarget  ; y = the primary monster target
+        bcc     @hit            ; none: the stab alone
+        lda     OT6_BOOST_REVEALED,x
+        and     #$03
+        inc     a
+        pha                     ; [1,s] the steps
+@step:  lda     $3bb8,y         ; the body's defense
+        beq     @done
+        lsr
+        lsr                     ; a quarter of it...
+        bne     :+
+        lda     #$01            ; ...or at least one point
+:       eor     #$ff
+        sec
+        adc     $3bb8,y         ; defense - the cut
+        sta     $3bb8,y
+        pla
+        dec     a
+        pha
+        bne     @step
+@done:  pla
+@hit:   ply
+        lda     #OT6_DISMANTLE_POWER
+        sta     $11a6
+        lda     #$01            ; physical, defense applies (what is left)
+        sta     $11a2
+        ; fall through
+.endproc
+
+; [ the rest of a thief hit's props: Fight's formula, piercing ]
+; a8/i8, x = attacker.  $11a6 and $11a2 are the caller's.
+.proc Ot6ThiefHit
+        .a8
+        .i8
+        stz     $11a1           ; no element
+        lda     $3b2c,x         ; vigor * 2, as _magicpunch loads it
+        sta     $11ae
+        lda     $3b18,x         ; level, as InitAttackerLevel loads it
+        sta     $11af
+        lda     #OT6_PIERCE
+        sta     f:$7e0000+OT6_ATKCLASS
+        lda     $b6
+        cmp     #OT6_THIEF_TRICK
+        bne     :+
+        lda     #$18            ; the coin: GP Rain's animation, and a
+        sta     $b5             ;   command the multiplier serves
+:       rtl
+.endproc
+
+; [ the primary monster target -> its entity offset ]
+; a8/i8.  in: $b9.  out: carry set and y = the body, or carry clear.
+.proc Ot6ThiefTarget
+        .a8
+        .i8
+        ldy     #$08
+        lda     $b9             ; monster mask (slots 0-5)
+@mon:   lsr
+        bcs     @have
+        iny
+        iny
+        cpy     #$14
+        bcc     @mon
+        clc
+        rts
+@have:  sec
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ Appraise: read one enemy's weaknesses, or every enemy's with a boost ]
+;
+; Strago's Scan read (Ot6AnalyzeOne): every weak element and class of the
+; body goes onto the HUD and into the codex for its species, nothing chipped,
+; and a body vanilla will not scan stays unread.  The boost buys breadth, as
+; on Scan: a point or more reads every enemy on the field.  No damage, so the
+; price is flat (the boost buys no multiplier); the reveal commits with the
+; action's end (Ot6ActionEnd's Ot6RevealCommit, an action with no numeral).
+; entry: jsl from Ot6ThiefExec, a8/i8, x = attacker.  preserves x and y.
+.proc Ot6Appraise
+        .a8
+        .i8
+        phy
+        lda     OT6_BOOST_REVEALED,x
+        bne     @all
+        jsr     Ot6ThiefTarget
+        bcc     @out
+        php
+        rep     #$10
+        .i16
+        jsr     Ot6AnalyzeOne
+        plp
+        .i8
+        bra     @out
+@all:   php
+        rep     #$10
+        .i16
+        ldy     #$0008
+@slot:  jsr     Ot6ThiefBody
+        bcc     :+
+        jsr     Ot6AnalyzeOne
+:       iny
+        iny
+        cpy     #$0014
+        bcc     @slot
+        plp
+        .i8
+@out:   ply
+        rtl
+.endproc
+
+; [ is monster slot y a body on the field? ] a8/i16.  out: carry.
+.proc Ot6ThiefBody
+        .a8
+        .i16
+        lda     $3aa0,y         ; present
+        lsr
+        bcc     @no
+        lda     $3bf4,y         ; and standing (HP, either byte)
+        ora     $3bf5,y
+        beq     @no
+        sec
+        rts
+@no:    clc
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ Master's Mark: steal from every enemy and read every enemy ]
+;
+; Locke's divine, at the full boost (kits.md "Divines": the one gate is three
+; points).  Every body on the field is read as Appraise reads it and robbed
+; as a 3-BP Steal robs: its rare item if it has one, else its common, taken
+; outright, no roll (Ot6StealSlot's cap rule), and a body with nothing, or
+; already robbed, gives nothing.  No damage.  Picked at three and taken back
+; to fewer (L in target select), it does nothing, and the queue priced it at
+; 0 (Ot6AbilityCost); the bank pays what was pending, as for any action.
+; Each item goes straight to the battle's obtained-items queue (BtlGfx $05,
+; the one vanilla's end-of-action grant uses), since the attacker's one
+; $32f4 slot holds a single item per action.
+; entry: jsl from Ot6ThiefExec, a8/i8, x = attacker.  preserves x and y.
+.proc Ot6MastersMark
+        .a8
+        .i8
+        lda     OT6_BOOST_REVEALED,x
+        cmp     #OT6_MARK_BOOST
+        bcc     @out            ; under the full boost: nothing
+        phy
+        php
+        rep     #$10
+        .i16
+        ldy     #$0008
+@slot:  jsr     Ot6ThiefBody
+        bcc     @next
+        jsr     Ot6AnalyzeOne
+        lda     $3308,y         ; the rare
+        cmp     #$ff
+        bne     @take
+        lda     $3309,y         ; else the common
+        cmp     #$ff
+        beq     @next           ; nothing to take
+@take:  pha
+        lda     #$ff
+        sta     $3308,y         ; robbed, as a steal leaves it
+        sta     $3309,y
+        pla
+        jsr     Ot6GrantItem
+@next:  iny
+        iny
+        cpy     #$0014
+        bcc     @slot
+        plp
+        .i8
+        ply
+@out:   rtl
+.endproc
+
+; [ add one item to what the party obtained this battle ]
+; LoadItemProp (battle_main.asm) into $2e72-$2e76, quantity 1, then battle
+; graphics $05, the pair _c262c7 runs for a stolen item.  a8/i16, A = item id
+; (not $ff), db=$7e.  preserves X and Y.
+.proc Ot6GrantItem
+        .a8
+        .i16
+        phx
+        phy
+        pha
+        lda     #$80            ; make item unusable
+        sta     $2e73
+        lda     #$ff
+        sta     $2e76           ; clear all equippability flags
+        pla
+        sta     $2e72           ; item number
+        longa
+        and     #$00ff
+        asl                     ; id * 2
+        pha
+        asl
+        asl
+        asl
+        asl                     ; id * 32
+        sec
+        sbc     $01,s           ; id * 30, ItemProp's record
+        tax
+        pla
+        shorta0
+        lda     f:ItemProp+14,x ; targetting
+        sta     $2e74
+        lda     f:ItemProp,x
+        pha
+        pha
+        asl
+        asl
+        and     #$80            ; item useable in battle
+        trb     $2e73
+        pla
+        asl
+        and     #$20            ; item can be thrown
+        tsb     $2e73
+        pla
+        and     #$07            ; item type
+        phx
+        longa
+        and     #$0007
+        tax
+        shorta0
+        lda     f:ItemTypeMaskTbl,x
+        plx
+        asl
+        tsb     $2e73
+        bcs     @grant
+        longa
+        clc
+        stz     $ee
+        lda     f:ItemProp+1,x  ; equippable characters
+        ldx     #$0006
+@chr:   bit     $3a20,x         ; actor mask
+        bne     :+
+        sec
+:       rol     $ee
+        dex
+        dex
+        bpl     @chr
+        shorta0
+        lda     $ee
+        sta     $2e76           ; set item equippability
+@grant: lda     #$01
+        sta     $2e75           ; quantity 1
+        lda     #$05            ; battle graphics $05: add an obtained item
+        jsl     ExecBtlGfx_ext
+        ply
+        plx
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ a kit list's name from a table that is not AttackName ]
+;
+; ListTextCmd_0f (btlgfx) jsl's here for every id at or past $51, in place of
+; its own SwdTech arm:
+;   bushido mode (w7e6168 = 2): ids $55-$5c are SwdTechs, named in
+;     BushidoName by tech index (AttackName's $55-$5c are other rows' names);
+;   thief mode (3): every row of Ot6ThiefRowTbl, named in Ot6ThiefName.
+; Each letter is DrawListLetter's EN body (the tile, attribute in B, to
+; ($53),y and $55 to ($51),y, Y += 2), with B reloaded from $56, the
+; attribute the caller staged.
+; in: A = id, Y = the line buffer offset, a8, db=$7e.  out: carry set = drawn
+; (Y past the name), carry clear = an AttackName row (A = id, Y unchanged).
+OT6_THIEF_NAMELEN = 10
+.proc Ot6KitListName
+        .a8
+        php
+        rep     #$10
+        .i16
+        pha                     ; [1,s] the id
+        lda     $6168
+        cmp     #$02
+        beq     @bushido
+        cmp     #$03
+        bne     @no
+        lda     $01,s
+        jsl     Ot6ThiefRowOf   ; X = the record offset (row * 5)
+        bcc     @no
+        longa
+        txa
+        asl                     ; row * 10: the name's offset
+        tax
+        shorta0
+        lda     #OT6_THIEF_NAMELEN
+        pha                     ; [1,s] letters left
+@thief: lda     $56
+        xba
+        lda     f:Ot6ThiefName,x
+        jsr     Ot6ListLetter
+        inx
+        lda     $01,s
+        dec     a
+        sta     $01,s
+        bne     @thief
+        bra     @drawn
+@bushido:
+        lda     $01,s
+        sec
+        sbc     #$55            ; tech index 0-7
+        longa
+        and     #$00ff
+        pha                     ; [1,s] the index
+        asl
+        clc
+        adc     $01,s           ; x3
+        asl
+        asl                     ; x12, BushidoName's record
+        tax
+        pla
+        shorta0
+        lda     #BushidoName::ITEM_SIZE
+        pha                     ; [1,s] letters left
+@bush:  lda     $56
+        xba
+        lda     f:BushidoName,x
+        jsr     Ot6ListLetter
+        inx
+        lda     $01,s
+        dec     a
+        sta     $01,s
+        bne     @bush
+@drawn: pla
+        pla
+        plp
+        sec
+        rtl
+@no:    pla
+        plp
+        clc
+        rtl
+.endproc
+
+; DrawListLetter's EN body.  in: B:A = attribute:tile, Y = buffer offset.
+.proc Ot6ListLetter
+        .a8
+        .i16
+        longa
+        sta     ($53),y         ; tile id
+        lda     $55
+        sta     ($51),y
+        shorta
+        iny
+        iny
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ attack name type 3: a later thief row's banner ]
+; _c2bb11's third arm (btlgfx_code_far) jml's here: the message string at
+; w7e57d5 becomes the row's name from Ot6ThiefBanner, $00-terminated, the way
+; _c2bb1c copies a SwdTech's.  The row id is the script's third byte (attack
+; name type 3 is ShowAttackName_00's `lda $b6`).  a8, db=$7e.  rtl.
+.proc Ot6ThiefBannerName
+        .a8
+        php
+        rep     #$10
+        .i16
+        ldy     #$0002
+        lda     ($76),y         ; the row id
+        sec
+        sbc     #OT6_THIEF_MUG
+        ldy     #$0000
+        cmp     #OT6_THIEF_MARK - OT6_THIEF_MUG + 1
+        bcs     @end            ; not a later row: an empty string
+        longa
+        and     #$00ff
+        tay                     ; Y = the row
+        lda     #$0000
+@mul:   cpy     #$0000
+        beq     @have
+        clc
+        adc     #OT6_BANNER_LEN
+        dey
+        bra     @mul
+@have:  tax
+        shorta0
+@cp:    lda     f:Ot6ThiefBanner,x
+        cmp     #$ff
+        beq     @end
+        sta     $57d5,y
+        inx
+        iny
+        cpy     #OT6_BANNER_LEN
+        bne     @cp
+@end:   lda     #$00
+        sta     $57d5,y
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ the field Thief page: row n's id, or $ff when it is not learned yet ]
+; in: A = the page row 0-7.  out: A = the row's id or $ff.  any widths, any
+; db.  preserves X and Y.  rtl.
+.proc Ot6ThiefPageRow
+        php
+        sep     #$20
+        .a8
+        rep     #$10
+        .i16
+        phx
+        phb
+        pha
+        lda     #$7e
+        pha
+        plb                     ; db = $7e for Ot6ThiefRowKnown's switch read
+        pla
+        longa
+        and     #$00ff
+        pha
+        asl
+        asl
+        clc
+        adc     $01,s           ; row * 5
+        tax
+        pla
+        shorta0
+        jsl     Ot6ThiefRowKnown
+        bcc     @no
+        lda     f:Ot6ThiefRowTbl,x
+        bra     @out
+@no:    lda     #$ff
+@out:   plb
+        plx
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ a later row's charge, at the queue: Ot6AbilityCost's @steal arm ]
+;
+; Every row under command $05 is flat (Ot6BoostDmg gates the command, so the
+; boost multiplies nothing), with two exceptions, both from kits.md's one
+; test, a price escalates exactly when the boost multiplies the action:
+;   Trickshot's hit is multiplied ($b5 = $18 at execution), so its base
+;     takes x2.5 per pending point (Ot6BoostPriceFor);
+;   Master's Mark queued under three points does nothing at execution, and
+;     a divine charges nothing it did not deliver (kits.md "Divines").
+; in: A = the row id, X = the attacker.  out: A = the price.  a8/i16.
+; preserves X and Y.  rtl.
+.proc Ot6ThiefCharge
+        .a8
+        .i16
+        cmp     #OT6_THIEF_TRICK
+        bne     @mark
+        jsl     Ot6ThiefCostFor
+        jml     Ot6BoostPriceFor
+@mark:  cmp     #OT6_THIEF_MARK
+        bne     @flat
+        lda     OT6_BOOST_REVEALED,x
+        cmp     #OT6_MARK_BOOST
+        lda     #OT6_THIEF_MARK
+        bcs     @flat
+        lda     #$00
+        rtl
+@flat:  jml     Ot6ThiefCostFor
+.endproc
+
+; [ a row's price as the window draws it: the charge's rule for the caster
+;   whose window is open (Ot6KitRowCost's thief arm, and the confirm) ]
+; in: A = the row id.  out: A = the price.  a8/i16.  preserves X and Y.
+.proc Ot6ThiefRowCost
+        .a8
+        .i16
+        cmp     #OT6_THIEF_TRICK
+        bne     @flat
+        jsl     Ot6ThiefCost
+        jml     Ot6PendPrice
+@flat:  jml     Ot6ThiefCost
 .endproc

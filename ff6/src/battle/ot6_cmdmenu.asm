@@ -152,6 +152,13 @@
         jsl     Ot6KitRowCost
         pha                     ; park column-2 cost
         jsl     Ot6AbilityGrey  ;   grey column 2's font the same way;
+        iny                     ;   the BP reason too, at the right cell
+        iny                     ;   (Y + 3: the thief list's right column
+        iny                     ;   holds Master's Mark)
+        jsl     Ot6BushidoRowGrey
+        dey
+        dey
+        dey
         ora     #$21            ; +10  +9/+10 colors column-2's name AND cost
         sta     $575f
         lda     #$0f
@@ -416,8 +423,8 @@
 @bushido:
         pla
         jml     Ot6CostFor      ; the tech's own row price, unescalated
-@thief: pla                     ; Steal, Filch and Bestow alike: Ot6BoostDmg
-        jml     Ot6ThiefCost    ;   gates cmd $05, so no thief row escalates
+@thief: pla                     ; flat but for Trickshot, the one row whose
+        jml     Ot6ThiefRowCost ;   boost multiplies (Ot6ThiefCharge's rule)
 @empty: lda     #$00            ; an empty cell draws two blanks and stays white
         rtl
 .endproc
@@ -603,8 +610,10 @@
         bra     @pass
 ; In thief mode only Bestow has a BP precondition, and it is "hold one".
 @thief: lda     $4005,y         ; this row's id (column 1; Qty at +1, Flags +2)
+        cmp     #OT6_THIEF_MARK
+        beq     @mark           ; the divine: a full boost pending
         cmp     #OT6_THIEF_BESTOW
-        bne     @pass           ; steal / filch / an empty cell: MP grey only
+        bne     @pass           ; the other rows, an empty cell: MP grey only
         phx                     ; [S+2] save caller X (Ot6BlitzRowDecorate's)
         lda     $62ca           ; entity offset for the bp bank
         and     #$03
@@ -627,6 +636,24 @@
 @setzer:
         pla                     ; the MP grey
         jml     Ot6SetzerRowGrey
+; Master's Mark: fewer than three points pending, the divine's one gate
+; (kits.md "Divines"); a boost pressed or taken back with the window up
+; re-stages the row, so the grey follows R and L, as Jackpot's does
+@mark:  phx
+        lda     $62ca
+        and     #$03
+        asl
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     OT6_BOOST_REVEALED,x
+        plx
+        cmp     #OT6_MARK_BOOST
+        bcs     @pass
+        pla
+        ora     #$04
+        rtl
 .endproc
 
 ; ------------------------------------------------------------------------------

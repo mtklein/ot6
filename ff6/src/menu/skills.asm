@@ -2123,12 +2123,12 @@ Ot6BlitzCursorPos:
         .endrep
 
 ; ==============================================================================
-; The field Thief page: the Skills row for Steal / Filch / Bestow
+; The field Thief page: the Skills row for Locke's eight
 ;
-; This is the Blitz page's shape with the staging removed.  There is no
-; learned set (the three rows exist from the moment Locke does, granted at
-; join with Steal), so there is no GetBlitzList twin, no locked marker, and no
-; $1d28-style mask; every row draws white with its name and its price.
+; This is the Blitz page's shape with the staging removed.  Steal, Filch and
+; Bestow come at join; the other five are taught by story beats, each an event
+; switch (Ot6ThiefRowTbl, bank F0), so a row not learned yet draws the Blitz
+; page's locked marker, and a learned one its name and price.
 ;
 ; The geometry is the Blitz page's own: rows 1/3/5 of this window's eight
 ; usable odd rows, name at column 3 flush against the cursor at x=8
@@ -2178,43 +2178,75 @@ DrawThiefMenu:
         jsr     CreateSubPortraitTask
         jmp     InitDMA1BG3ScreenB
 
-; ---- draw the three rows ----
+; ---- draw the eight rows ----
+; In the battle window's order read a column at a time (Ot6ThiefRowTbl, bank
+; F0): Steal, Filch, Bestow, Mug, Trickshot, Dismantle, Appraise, Master's
+; Mark.  A row the story has not taught yet draws the Blitz page's locked
+; marker (#382: Ot6ThiefPageRow reads the same switch the battle list does).
 Ot6ThiefPageDraw:
         ldx     #$0000
-@lp:    stx     $e2                     ; row index 0..2 (word: $e2/$e3)
+@lp:    stx     $e2                     ; row index 0..7 (word: $e2/$e3)
         lda     #$ff
         sta     f:$7e9d89,x             ; no description asset: LoadBigText's
                                         ;   $ff arm renders the empty string
         lda     $e2
         asl
         inc
-        sta     $e6                     ; row = 1 + i*2: odd rows 1/3/5
+        sta     $e6                     ; row = 1 + i*2: odd rows 1..15
+        lda     $e2
+        jsl     Ot6ThiefPageRow         ; F0: the row's id, $ff if not learned
+        cmp     #$ff
+        beq     @locked
+        pha
         lda     #BG1_TEXT_COLOR::DEFAULT
         sta     zTextColor
         lda     $e2
-        clc
-        adc     #OT6_THIEF_ATK0 - OT6_ATTACKNAME_0
-        sta     $e5                     ; AttackName record index (5/6/7)
+        sta     $e5                     ; Ot6ThiefName record index
         ldx     #OT6_BLITZ_NAME_COL
-        jsr     Ot6BlitzDrawName
-        lda     $e2
-        clc
-        adc     #OT6_THIEF_ATK0         ; row id
+        jsr     Ot6ThiefDrawName
+        pla                             ; row id
         jsl     Ot6ThiefCost            ; F0: A = MP cost; the
                                         ;   thief-keyed shim, NOT Ot6LoadoutCost
                                         ;   (see the header: $56-$58 collide
                                         ;   with SwdTech's cost keys)
         ldx     #OT6_BLITZ_COST_COL
         jsr     Ot6LoadoutDrawCost      ; the one field-menu price drawer
-        ldx     $e2
+        bra     @next
+@locked:
+        lda     #BG1_TEXT_COLOR::BLUE   ; chrome, as on the Blitz page
+        sta     zTextColor
+        ldx     #OT6_BLITZ_NAME_COL
+        jsr     Ot6BlitzDrawLocked
+        lda     #$00
+        ldx     #OT6_BLITZ_COST_COL
+        jsr     Ot6LoadoutDrawCost      ; cost 0 -> blanks
+@next:  ldx     $e2
         inx
-        cpx     #$0003
+        cpx     #$0008
         bcc     @lp
         rts
 
-; ---- the page's own cursor: one column, three rows ----
-; The Blitz table's rule (y = 116 + n*12, x = 8 under text at column 3),
-; truncated to the three rows this page has.  Wrap stays on, as it is there.
+; ---- one thief row's name.  in: $e5 = Ot6ThiefName index, $e6 = row, X = col
+Ot6ThiefDrawName:
+        lda     $e6
+        jsr     GetBG1TilemapPtr        ; A = row, X = col -> X = tilemap dest
+        longa
+        txa
+        sta     $7e9e89                 ; DrawPosTextBuf position header
+        shorta
+        ldy     #10                     ; Ot6ThiefName's record
+        sty     $eb
+        ldy     #near Ot6ThiefName
+        sty     $ef
+        lda     #^Ot6ThiefName
+        sta     $f1
+        lda     $e5
+        jsr     LoadArrayItem           ; write the 10-tile name into $7e9e8b
+        jmp     DrawPosTextBuf
+
+; ---- the page's own cursor: one column, eight rows ----
+; The Blitz table's rule (y = 116 + n*12, x = 8 under text at column 3).
+; Wrap stays on, as it is there.
 LoadThiefCursor:
         ldy     #near Ot6ThiefCursorProp
         jmp     LoadCursor
@@ -2227,9 +2259,9 @@ InitThiefCursor:
         jmp     UpdateCursorPos
 
 Ot6ThiefCursorProp:
-        cursor_prop {0, 0}, {1, 3}
+        cursor_prop {0, 0}, {1, 8}
 Ot6ThiefCursorPos:
-        .repeat 3, yy
+        .repeat 8, yy
         cursor_pos {8, 116 + yy * 12}
         .endrep
 

@@ -15317,30 +15317,12 @@ ListTextCmd_0f:
 .if LANG_EN
         cmp     #$51
         bcc     @65cc
-        tax                     ; ot6: park the id (X free here, reloaded at
-                                ;   @65bf), test bushido mode without touching A/Y
-        lda     w7e6168
-        cmp     #$02            ; bushido submenu? SwdTech names ($55-$5c) live in
-        bne     @atkname        ;   BushidoName, NOT AttackName (whose $55-$5c slots
-                                ;   are the empty pad after Joker Doom) -- draw them
-                                ;   by tech index there instead.
-        txa                     ; A = id
-        sec
-        sbc     #$55            ; -> tech index 0-7
-        sta     $2c
-        lda     #BushidoName::ITEM_SIZE
-        sta     $2e
-        sta     $40
-        jsr     Mult8NoHW
-        ldx     $30
-@65bn:  lda     f:BushidoName,x
-        jsr     DrawListLetter
-        inx
-        dec     $40
-        bne     @65bn
-        rts
+        jsl     Ot6KitListName  ; ot6: a kit list whose names are not in
+        bcc     @atkname        ;   AttackName draws them in bank F0: SwdTech's
+        rts                     ;   from BushidoName (bushido mode), Locke's
+                                ;   later rows from Ot6ThiefName (thief mode).
+                                ;   carry clear = an AttackName row, A = id
 @atkname:
-        txa                     ; A = id (restored)
         sec
         sbc     #$51
         sta     $2c             ; ot6: index -> Mult8NoHW multiplicand.  the
@@ -22871,7 +22853,9 @@ GfxCmd_11:
 ; ------------------------------------------------------------------------------
 
 _c197a1:
-@97a1:  .byte   $0f,$0e,$80,$00,$81,$0c
+@97a1:  .byte   $0f,$0e,$80,$82,$81,$0c ; ot6: type 3 (unused in vanilla, was
+                                        ;   $00, an empty string) is Locke's
+                                        ;   kit rows: _c2bb11's third arm
 
 ; ------------------------------------------------------------------------------
 
@@ -41007,7 +40991,11 @@ set_s_mess_poi:
         jmp     (.loword(_c2bb18),x)
 
 _c2bb18:
-@bb18:  .addr   _c2bb46,_c2bb1c
+@bb18:  .addr   _c2bb46,_c2bb1c,_c2bb_thief
+
+; ot6: [ load the name of one of Locke's later kit rows ] (attack name type 3)
+_c2bb_thief:
+        jml     Ot6ThiefBannerName
 
 ; ------------------------------------------------------------------------------
 

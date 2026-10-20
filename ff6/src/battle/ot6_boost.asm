@@ -1924,9 +1924,11 @@ OT6_LIFE3_ID = $35
         ; Ot6StealCost, the single authority for Steal's price.
         pla                     ; drop the parked cost (0 for steal)
         lda     $3a7b           ; the row the submenu queued
-        jsl     Ot6ThiefIsNew   ; carry set = filch/bestow (A preserved)
+        jsl     Ot6ThiefIsNew   ; carry set = a kit row past Steal (A kept)
         bcc     @plainsteal
-        jsl     Ot6ThiefCostFor
+        jsl     Ot6ThiefCharge  ; its price: flat, but Trickshot's escalates
+                                ;   (its boost multiplies) and a Master's Mark
+                                ;   queued under three points costs nothing
         plp
         rtl
 @plainsteal:
@@ -2093,6 +2095,11 @@ OT6_LIFE3_ID = $35
 Ot6ThiefCostTbl:
         .byte   OT6_THIEF_FILCH,  6     ; Filch: shield -> boost point
         .byte   OT6_THIEF_BESTOW, 5     ; Bestow: hand a boost point to an ally
+        .byte   OT6_THIEF_MUG,    4     ; Mug: a swing that steals (Steal's 4)
+        .byte   OT6_THIEF_TRICK,  4     ; Trickshot: escalates (Ot6ThiefCharge)
+        .byte   OT6_THIEF_DISMANTLE, 8  ; Dismantle: the corrode
+        .byte   OT6_THIEF_APPRAISE, 3   ; Appraise: Scan's 3 (Strago's Analyze)
+        .byte   OT6_THIEF_MARK,   99    ; Master's Mark: the divines' ceiling
         .byte   $ff
         ; no Steal row: Ot6StealCost is its authority and the @steal arm
         ; routes the Steal row, and every Steal this menu did not issue, to

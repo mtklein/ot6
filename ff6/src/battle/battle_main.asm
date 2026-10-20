@@ -3422,7 +3422,10 @@ Cmd_10:
 
 Cmd_05:
 @1591:  tyx
-        jsr     _c2298a
+        jsl     Ot6MugCheck  ; ot6: the Mug row is a Capture (a swing that
+        bcc     :+           ;   steals on the hit); carry set = it was Mug,
+        jmp     Cmd_06       ;   $b5 already reads $06
+:       jsr     _c2298a
         jsl     Ot6ThiefExec ; ot6: steal is the first ROW of Locke's thief
                              ;   submenu now, and the row the player picked rode
                              ;   into $b6 as this action's attack byte.  carry
@@ -9137,7 +9140,9 @@ ShowAttackNameTbl:
 @36c4:  .addr   ShowAttackName_00
         .addr   ShowAttackName_01
         .addr   ShowAttackName_02
-        .addr   ShowAttackName_03
+        .addr   ShowAttackName_00       ; ot6: type 3, unused in vanilla, is
+                                        ;   Locke's later kit rows: the row id
+                                        ;   in $b6, named by Ot6ThiefBannerName
         .addr   ShowAttackName_04
         .addr   ShowAttackName_05
         .addr   ShowAttackName_06
