@@ -13,7 +13,7 @@ mechanics while keeping the FF6 story, world, and characters.
 - Characters gain and spend Boost Points. Boost can add hits, raise spell
   tiers, improve odds, or extend effects.
 
-  ![Boost arrows beside a character](docs/img/boost.png)
+  ![A character's boost aura](docs/img/boost.png)
 
 - Equipped Magicite grant spells and stats. They do not teach spells
   permanently.
@@ -22,7 +22,7 @@ mechanics while keeping the FF6 story, world, and characters.
 
 - Characters have distinct skill sets.
 
-  ![A character's skill list](docs/img/skills.png)
+  ![Locke's skill list](docs/img/skills.png)
 
 
 See [the design](docs/DESIGN.md) for details.
