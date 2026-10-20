@@ -207,6 +207,32 @@ a price on a row that is free everywhere else in the game. `Ot6AbilityCost`
 has no `cmd $11` arm; the verb falls out of the chain with vanilla's own 0.
 Steal's flat 4 stands.
 
+### 5.1 From a queued price to a trance: every way it can end (#330)
+
+The question (the Dance stumble's shape, #313): can a Rage's price or boost
+be taken and no trance start? The price is queued at action load
+(`InitPlayerAction`, `battle_main.asm:~443`, `$3620` to `$3a4c`) and the
+pips sit in `OT6_BOOST_REVEALED`; the MP is taken only at
+`CalcAttackEffect`'s `$3a4c` subtract (`battle_main.asm:8514-8519`), and the
+pips only at `Ot6ActionEnd`'s spend arm. The paths between, from `ExecAction`
+(`:194`):
+
+| path | MP | pips | trance | where it is settled |
+|---|---|---|---|---|
+| paid start (the normal case) | 8 | spent | set in `Cmd_10` before the first possessed action runs (`:3395-3402`), so the trance exists whatever that action then does (hits, misses, finds no target) | `battle_rage`, `battle_procboost`, `battle_ragefizzle` control branches |
+| pool below 8 at resolve (an enemy's Rasp or Osmose in the advance wait; the window refuses an unpayable pick, #225) | none: `Ot6RageStartGate` sends `Cmd_10` to `Cmd_02`, whose fizzle refuses the cast | **were spent on the fizzle**; now dropped in the gate (#330) | none | `battle_ragefizzle` drained branches |
+| Gau felled, slept or petrified after the commit, before it resolves | none: `ExecAction` runs the `$12` placeholder with `$3a4c` cleared (`:231`), `Cmd_10` never runs | dropped by `Ot6ActionEnd`'s `OT6_NOACTION` arm (#346) | none | `battle_slotcancel` plays that arm on Slot; Rage has no code of its own on it, and was not played separately |
+| battle ends in the wait | none | none (no turn ends) | none | no code runs |
+| Imp or an engine-driven pick | `InitPlayerAction` turns a non-imp command into Fight with cost 0 (`:466-478`); `RandCharAction` picks pay as any start | the Fight spends them on its swings | none | not a Rage start |
+| every enemy dead when the start resolves | none (`CalcAttackEffect` is not reached, per `battle_ragerefuse`'s note on the arm) | as on any action, at `Ot6ActionEnd` | set | free, but the fight is over; not played here |
+
+No path takes MP and then starts no trance: the gate and the charge test the
+same two numbers (`$3c08,y` against `$3a4c`), and the trance is set before the
+charge. The one path that took pips for nothing was the unpayable start;
+`Ot6RageStartGate` now zeroes the pending boost on its refusal, as
+`Ot6DanceStumble` does for a stumbled dance. Dance's `Ot6DanceStartGate`
+refusal has the same shape and is not changed by #330.
+
 ---
 
 ## 6. Boost — the chance-verb canon, Dance-shaped
