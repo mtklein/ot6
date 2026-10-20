@@ -211,7 +211,7 @@ local function branch(k)
       rec.bank0, rec.mp0 = bp(who), mp(who)
       want = "press"
     end),
-    step(V.name .. " commits, boosted", function() return rec.queued ~= nil end, 3000),
+    step("the caster commits, boosted", function() return rec.queued ~= nil end, 3000),
     H.call(function()
       rec.pend0 = rec.queued.pend
       if drain then
@@ -244,7 +244,7 @@ local function branch(k)
         end
       end),
       H.waitFrames(1),
-    }, V.name .. " start turn resolves"),
+    }, "the start turn resolves"),
     H.call(function()
       local d, a = rec.done, rec.after
       if not (d and a) then
@@ -341,6 +341,11 @@ local function slotOfChar(c)
   end
 end
 local function magicCaster()
+  -- a mage of the party first (TERRA, CELES), else whoever has the row
+  for _, c in ipairs({ 0x00, 0x06 }) do
+    local s = slotOfChar(c)
+    if s and cmdCellOf(s, CMD_MAGIC) then return s end
+  end
   for s = 0, 3 do
     if cmdCellOf(s, CMD_MAGIC) then return s end
   end
