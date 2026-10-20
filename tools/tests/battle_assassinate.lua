@@ -223,7 +223,11 @@ emu.addMemoryCallback(function(addr, v)
     local m = ((addr - 0x7E0000 - 0x3E88) - 8) // 2
     if brokeAt[m] ~= nil then return end
     local pc, atk = cpu()
-    brokeAt[m] = { f = H.frame, seq = stamp(), atk = atk, pc = pc, pend = shadowPend() }
+    -- ctl: a status that has SHADOW's turns in the engine's hands (Berserk,
+    -- Muddle...) as the break lands; such a hit is the engine's, not the
+    -- arm's boosted action
+    local c = shadowSlot and H.controlTaken(shadowSlot) or nil
+    brokeAt[m] = { f = H.frame, seq = stamp(), atk = atk, pc = pc, pend = shadowPend(), ctl = c and c.name }
     local site = (pc >= CLASSCHIP and pc < CLASSCHIP + 0x80) and "Ot6ClassChip"
       or ((pc >= ELEMCHIP and pc < ELEMCHIP + 0x80) and "Ot6Chip" or "?")
     H.log(string.format("[break] f%d seq%d body %d broke: %s store, "
@@ -803,7 +807,16 @@ add({
       H.call(function()
         local m = H.vars.bossBody
         local b = brokeAt[m]
-        if b ~= nil then
+        if b ~= nil and b.ctl ~= nil then
+          -- SHADOW's control was taken (the v032-locke-kit-2 chain's
+          -- camp_escaped draw: Berserk, $3EE5 bit 4, and the engine's 0-BP
+          -- Fights broke the bitted body, build/attempts/wt/v032-locke-kit/
+          -- qual2/assassinate/): the break is not the arm's 3-BP action, so
+          -- this fight is fought out and another drawn, as one whose body
+          -- went unbroken
+          H.log(string.format("[isolation arm] body %d broke at f%d by SHADOW under %s (the engine's turn, at %d BP): "
+            .. "not the arm's action -- another fight", m, b.f, b.ctl, b.pend))
+        elseif b ~= nil then
           broke = true
           H.log(string.format("[isolation arm] body %d broke at f%d seq%d by "
             .. "x=$%02x%s at %d BP pending: divineKills=%d hp=%d alive=%s", m, b.f,
