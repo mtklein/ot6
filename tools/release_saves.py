@@ -82,6 +82,7 @@ TITLES = {
     "wor-thamasa-v1": "Outside the Fanatics' Tower, after MagiMaster",
     "wor-phoenix-v1": "Phoenix Cave, save point with the party split",
     "wor-locke-v1": "Outside Kohlingen, after Locke joins",
+    "wor-ragnarok-v1": "Outside Narshe, after Ragnarok",
 }
 
 README = """\
