@@ -80,7 +80,8 @@ LAB_WIPE = re.compile(r"PARTY WIPED|\[m269lab\] WIPED|canary: BATTLE WIPE|outcom
 FIZZLE = re.compile(
     r"\[fizzle\] f(?P<f>\d+) slot(?P<slot>\d) char(?P<c>\d+) "
     r"(?P<verb>\S+)\(\$(?P<cmd>[0-9A-F]{2})\) atk=\$(?P<atk>[0-9A-F]{2}) "
-    r"boost=(?P<bp>\d+) cost=(?P<cost>\d+) pool=(?P<pool>\d+)")
+    r"boost=(?P<bp>\d+) cost=(?P<cost>\d+) pool=(?P<pool>\d+)"
+    r"(?: asked=(?P<asked>\d+))?")
 
 
 def worker_of(path):
@@ -159,7 +160,8 @@ def scan(path):
                                  slot=int(m["slot"]), char=int(m["c"]),
                                  verb=m["verb"], cmd=int(m["cmd"], 16),
                                  atk=int(m["atk"], 16), bp=int(m["bp"]),
-                                 cost=int(m["cost"]), pool=int(m["pool"]))
+                                 cost=int(m["cost"]), pool=int(m["pool"]),
+                                 asked=int(m["asked"]) if m["asked"] else None)
             continue
         m = LAB_DEATH.search(line)
         if m and "[death] f+" not in line:
@@ -181,8 +183,11 @@ def scan(path):
 
 def fizzle_report(fizzles, nlogs):
     """The most literal boost left on the table (#230): a costed action the
-    pool could not pay for, which burned the turn and the pips banked into
-    it and bought nothing."""
+    pool could not pay for, which burned the turn and, on a ROM before #450,
+    the pips banked into it.  A line's boost= is what was spent on it (the
+    pending boost left when the refused action's body was over); asked= is
+    what the player raised.  Since #450 a refusal keeps the pips, so boost=0
+    and the burned total counts only what was really spent."""
     if not fizzles:
         print(f"Fizzle audit: no costed action was refused for MP in the "
               f"scanned logs ({nlogs} logs).")
@@ -266,6 +271,8 @@ def selftest():
         # control run: EDGAR's boosted crossbow against a 25 MP pool
         "[ot6] [fizzle] f36110 slot1 char4 Tools($09) atk=$AA boost=2 cost=25 pool=21 -- the pool could not pay it: CalcAttackEffect refused the action, the turn and 2 boost point(s) are gone and the pool is still 21.  Pressing R is a claim the caster can pay (M.boostPlan, #230).",
         "[ot6note] f36110 [fizzle] f36110 slot1 char4 Tools($09) atk=$AA boost=2 cost=25 pool=21 -- the pool could not pay it: CalcAttackEffect refused the action, the turn and 2 boost point(s) are gone and the pool is still 21.  Pressing R is a claim the caster can pay (M.boostPlan, #230).",
+        # #450: a refusal that kept its pips (boost= is what was spent)
+        "[ot6] [fizzle] f40000 slot2 char0 Magic($02) atk=$2C boost=0 cost=10 pool=1 asked=1 -- the pool could not pay it",
     ])
     # a lab whose fighter is not the driver (the Rizopas control): the lab's
     # own battle-up, death and wipe lines are all there is
@@ -286,7 +293,9 @@ def selftest():
     wipes = [r for k, r in ev if k == "wipe"]
     fizzles = [r for k, r in ev if k == "fizzle"]
     # the [ot6note] mirror is not a second fizzle
-    assert len(fizzles) == 1, fizzles
+    assert len(fizzles) == 2, fizzles
+    assert fizzles[1]["bp"] == 0 and fizzles[1]["asked"] == 1, fizzles[1]
+    assert fizzles[0]["asked"] is None
     assert fizzles[0]["verb"] == "Tools" and fizzles[0]["cmd"] == 0x09
     assert fizzles[0]["atk"] == 0xAA and fizzles[0]["bp"] == 2
     assert fizzles[0]["cost"] == 25 and fizzles[0]["pool"] == 21
