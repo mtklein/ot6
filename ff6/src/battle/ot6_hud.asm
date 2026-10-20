@@ -2450,6 +2450,51 @@ Ot6ShieldTbl:
         .word   $0166
         .byte   8, OT6_SPECIAL  ; magimaster: his wall's one weakness
                                 ;   (wallchange), or ot6's break
+        ; ---- the world of ruin: the phoenix cave (locke; the red dragon;
+        ; doom gaze in the sky on the way; docs/design/route-wor-locke.md
+        ; section 3) ------------------------------------------------------
+        ; The cave splits the party: party 1 (terra, strago, sabin, cyan)
+        ; holds slash, pierce, bludgeon, fire, holy, wind and water but no
+        ; ice; party 2 (celes, relm, mog, umaro) holds the cave's vanilla
+        ; key, ice, with slash, pierce and bludgeon.  Nearly every species
+        ; here is weak to ice and drinks fire, so each row gives party 1 a
+        ; key of its own: holy on the casters and the phantom, a class on
+        ; the beasts.  Vanilla elements stay.
+        .word   $00bc
+        .byte   2, OT6_SPECIAL  ; phase: a phantom; +holy (Ot6ElemAddTbl)
+                                ;   beside its ice: the key for the half
+                                ;   with no ice.  absorbs fire
+        .word   $00bf
+        .byte   2, OT6_SLASH|OT6_PIERCE ; parasoul: cut or puncture the
+                                ;   canopy.  ice vanilla; absorbs fire
+        .word   $00f1
+        .byte   2, OT6_SLASH|OT6_SPECIAL ; necromancr: a robed caster;
+                                ;   celes's runic eats its doom and flare.
+                                ;   fire|holy vanilla
+        .word   $00f7
+        .byte   2, OT6_PIERCE|OT6_SPECIAL ; trixter: a fire imp; mog's spear
+                                ;   for the half with no holy.  holy vanilla
+        .word   $00ec
+        .byte   3, OT6_SLASH|OT6_PIERCE ; aquila: a bird, the cave's rare
+                                ;   killer (flap).  ice vanilla
+        .word   $00e2
+        .byte   4, OT6_PIERCE|OT6_BLUDG ; chaos drgn: a dragon with no
+                                ;   armour (def 5).  ice vanilla
+        .word   $00e9
+        .byte   2, OT6_SLASH    ; sea flower: a plant, in fives.  ice|bolt
+                                ;   vanilla; absorbs fire|water
+        .word   $0093
+        .byte   1, OT6_BLUDG    ; uroburos: 50 hp behind defence 252; one
+                                ;   crushing blow breaks it.  ice vanilla
+        .word   $0153
+        .byte   6, OT6_PIERCE   ; red dragon: 30000 hp; mog's spear between
+                                ;   the scales, celes's ice; ice|water
+                                ;   vanilla, absorbs fire
+        .word   $011d
+        .byte   8, OT6_PIERCE|OT6_SPECIAL ; doom gaze: the eye in the sky,
+                                ;   met on the falcon's deck on the way and
+                                ;   fled (v0.34 fights it).  fire|holy
+                                ;   vanilla; absorbs ice|poison
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian

@@ -209,6 +209,10 @@ Ot6ElemAddTbl:
                                 ;   it; route-wor-thamasa 4.2)
         .word   $0143
         .byte   $40, $00        ; l.70 magic: + earth (the same)
+        .word   $00bc
+        .byte   $20, $00        ; phase: + holy (keeps ice; the phoenix
+                                ;   cave's party 1 holds no ice:
+                                ;   route-wor-locke 3)
         .word   $0134
         .byte   $01, $00        ; whelk head: + fire
         .word   $0103
