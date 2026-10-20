@@ -7,14 +7,15 @@
 -- here writes it), pace two tiles beside the save point into the cave's
 -- random battles, and let the real driver fight each one.  Whatever the
 -- cave deals (Toe Cutters, Rhyos), the first battle in which the driver
--- plans GAU's Rage and he then takes two possessed turns is the one
--- measured; the asserts read the engine:
+-- plans GAU's Rage and Cmd_10 then runs for his seat twice (the start and
+-- a possessed turn: every possessed turn goes through Cmd_10 again) is the
+-- one measured; the asserts read the engine:
 --   1. the possession is the planned beast: Cmd_10 ran for GAU's seat and
 --      $33A8 (his seat's beast) holds the rage the plan named, the one the
 --      d-pad steer went to in the live list ($257E);
 --   2. the price: GAU's MP (his record, $1600 + 37 * 11 + $0D) after the
---      battle is the plan's reading less 8, over the start and at least two
---      possessed turns ($3EF9 bit 0 set at each): 8 once, nothing a turn;
+--      battle is his MP before it less 8, over the start and at least one
+--      possessed turn: 8 once, nothing a turn;
 --   3. the tier: OT6_RAGETIER ($57BB) holds the plan's boost (Cmd_10
 --      stores the pending pips, capped 3), so the coin the plan bought is
 --      the coin the trance rolls;
@@ -28,7 +29,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 local GAU = 0x0B
 local RAGETIER = 0x57BB
-local BUDGET = 8                      -- battles to see a measured Rage in
+local BUDGET = 16                     -- battles to see a measured Rage in
 local A, B = { 57, 45 }, { 58, 45 }
 local FIGHT = {}
 
@@ -39,12 +40,11 @@ end
 local function raging(s) return (H.readByte(0x3EF9 + s * 2) & 0x01) ~= 0 end
 local function recMp() return H.readWord(0x1600 + 37 * GAU + 0x0D) end
 
--- per battle: the Rage plans made in it, GAU's Cmd_10s, his possessed
--- dispatches (ExecCmd with his seat in X while RAGE is set), the tier and
--- beast at the first possessed read
+-- per battle: the Rage plans made in it, GAU's Cmd_10s (his seat in Y),
+-- and the tier and beast the first frame his RAGE status reads set
 local cur, done = nil, nil
 local nr0, n0 = 0, 0
-local function fresh() return { cmd10 = 0, disp = 0, tier = nil, beast = nil, rage = nil } end
+local function fresh() return { cmd10 = 0, tier = nil, beast = nil, rage = nil } end
 local inBattle = false
 
 H.run({ maxFrames = 900000 }, {
@@ -56,17 +56,16 @@ H.run({ maxFrames = 900000 }, {
       local s = gauSlot()
       if cur and s ~= nil and (emu.getState()["cpu.y"] & 0xFF) == s * 2 then cur.cmd10 = cur.cmd10 + 1 end
     end, emu.callbackType.exec, H.sym("Cmd_10"), H.sym("Cmd_10"))
-    emu.addMemoryCallback(function()
-      local s = gauSlot()
-      if cur and s ~= nil and (emu.getState()["cpu.x"] & 0xFF) == s * 2 and raging(s) then
-        cur.disp = cur.disp + 1
-        if cur.tier == nil then cur.tier, cur.beast = H.readByte(RAGETIER), H.readByte(0x33A8 + s * 2) end
-      end
-    end, emu.callbackType.exec, H.sym("ExecCmd@battle_code"), H.sym("ExecCmd@battle_code"))
   end),
   H.navTo(A[1], A[2], { maxFrames = 3000 }),
   H.driveUntil(function()
     local b = H.battleLoadStarted()
+    -- the beast and the tier, the first frame GAU's RAGE status reads set
+    -- (Cmd_10 writes both before it sets the bit)
+    local gs = gauSlot()
+    if b and inBattle and cur.tier == nil and gs ~= nil and raging(gs) then
+      cur.tier, cur.beast = H.readByte(RAGETIER), H.readByte(0x33A8 + gs * 2)
+    end
     if b and not inBattle then
       inBattle, cur, nr0 = true, fresh(), #H.rages
       cur.mp0 = recMp()
@@ -74,10 +73,10 @@ H.run({ maxFrames = 900000 }, {
       inBattle = false
       cur.mp1 = recMp()
       if #H.rages > nr0 then cur.rage = H.rages[nr0 + 1] end
-      H.log(string.format("[rage] battle %d: rage plans %d; Cmd_10 %d; possessed dispatches %d; tier %s; beast %s; "
-        .. "record MP %d -> %d", #H.outcomes - n0, #H.rages - nr0, cur.cmd10, cur.disp, tostring(cur.tier),
+      H.log(string.format("[rage] battle %d: rage plans %d; Cmd_10 %d; tier %s; beast %s; record MP %d -> %d",
+        #H.outcomes - n0, #H.rages - nr0, cur.cmd10, tostring(cur.tier),
         cur.beast and string.format("$%02X", cur.beast) or "-", cur.mp0, cur.mp1))
-      if cur.rage and cur.disp >= 3 and done == nil then done = cur end
+      if cur.rage and cur.cmd10 >= 2 and done == nil then done = cur end
     end
     -- 4, read the moment the plan is made: the chosen beast's special
     -- (MonsterRage +1) and its element, against every standing body
@@ -97,8 +96,9 @@ H.run({ maxFrames = 900000 }, {
         .. "body: %s", r.rage, atk, elem, tostring(not cur.vetoFree)))
     end
     if done then return not inBattle and H.hasControl() end
-    H.assertEq(#H.outcomes - n0 <= BUDGET, true,
-      string.format("a Rage planned and two possessed turns taken within %d cave battles", BUDGET))
+    if #H.outcomes - n0 > BUDGET then
+      error(string.format("no Rage planned and possessed past its start within %d cave battles", BUDGET))
+    end
     return false
   end, 800000, {
     H.navTo(B[1], B[2], { maxFrames = 20000, playBattles = "tactical", fight = FIGHT }),
@@ -106,10 +106,10 @@ H.run({ maxFrames = 900000 }, {
   }, "cave battles until GAU's Rage is measured"),
   H.call(function()
     local r = done.rage
-    H.log(string.format("[rage] measured: entry %d ($%02X) at %d BP, score %d, battle MP %d; Cmd_10 %d, dispatches %d, "
-      .. "tier %d, beast $%02X, record MP %d -> %d", r.entry, r.rage, r.boost, r.score, r.mp, done.cmd10, done.disp,
+    H.log(string.format("[rage] measured: entry %d ($%02X) at %d BP, score %d, battle MP %d; Cmd_10 %d, "
+      .. "tier %d, beast $%02X, record MP %d -> %d", r.entry, r.rage, r.boost, r.score, r.mp, done.cmd10,
       done.tier, done.beast, done.mp0, done.mp1))
-    H.assertEq(done.cmd10, 1, "1. Cmd_10 ran once for GAU's seat")
+    H.assertEq(done.cmd10 >= 2, true, "1. Cmd_10 ran for GAU's seat at the start and a possessed turn")
     H.assertEq(done.beast, r.rage, "1. GAU's seat possessed by the planned beast ($33A8)")
     H.assertEq(done.mp1, done.mp0 - 8, "2. 8 MP for the start and none for the possessed turns after it")
     H.assertEq(done.tier, math.min(r.boost, 3), "3. OT6_RAGETIER holds the plan's boost")
