@@ -24,6 +24,12 @@
 # five bits are shared by two or three records, because duplicate map copies
 # have to close the same chest, so one line here can cover more than one map.
 2	map 30 Elder's House, Elixir (55,30) -- the #84 wave
+4	map 30 Elder's House treasure room, Hyper Wrist (78,8) -- behind LOCKE's lock (#447)
+5	map 30 Elder's House treasure room, Sneak Ring (79,8) -- behind LOCKE's lock (#447)
+6	map 30 Elder's House treasure room, Wall Ring (80,8) -- behind LOCKE's lock (#447)
+7	map 30 Elder's House treasure room, ThiefKnife (78,10) -- behind LOCKE's lock (#447)
+8	map 30 Elder's House treasure room, Earrings (79,10) -- behind LOCKE's lock (#447)
+9	map 30 Elder's House treasure room, 5000 GP (80,12) -- behind LOCKE's lock (#447)
 11	map 50 mines chase, Fenix Down (65,28)
 12	map 50 mines chase, Sleeping Bag (52,33)
 14	map 59 Figaro shop alcove, Tonic (43,12)

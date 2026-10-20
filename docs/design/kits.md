@@ -1164,8 +1164,8 @@ The World of Ruin adds no new lists to these kits; its twelve Espers are
 the breadth layer.  Their spell lists, stat packages and the milestone
 that grants each are in [magicite.md](magicite.md) ("World of Ruin
 Espers", "When each stone arrives"): Palidor and Fenrir at v0.27, Terrato,
-Tritoch and (probably) Ragnarok at v0.29, Starlet with Golem and ZoneSeek
-at v0.30, Phoenix at v0.32, Bahamut at v0.34, Odin/Raiden and Alexandr at
+Tritoch at v0.29, Starlet with Golem and ZoneSeek
+at v0.30, Phoenix and Ragnarok at v0.32, Bahamut at v0.34, Odin/Raiden and Alexandr at
 v0.35, Crusader at v0.38.
 
 One stop bears on every kit: the Fanatics' Tower (v0.30) is magic-only.

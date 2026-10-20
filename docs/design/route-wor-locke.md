@@ -205,8 +205,8 @@ group): `tally.py` (`tally_sw.txt`) and `tools/fight_report.py`
 1. **Narshe and Ragnarok.** LOCKE opens Narshe's locks (route-wor-narshe.md
    findings 1-2): the town's only stocked item counter, the weapon shop's
    Ragnarok (stone or sword, a player's choice), the relic shop and the
-   elder's treasure room. route-wor-narshe.md planned Ragnarok for v0.32;
-   this arc's route does not go there.
+   elder's treasure room. Routed from this arc's save in #447
+   (`gen_wor_ragnarok`, route-wor-narshe.md section 12).
 2. **The Necromancers' Zombie** (section 7): a Ribbon or another Zombie
    guard on the bench in the cave's first half, or levels for the bench.
    The Ribbon is in this cave (313 (13,20)) and goes on in its second half.

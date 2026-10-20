@@ -2069,6 +2069,50 @@ M.contracts["wor-locke-v1"] = {
   },
 }
 
+-- wor-ragnarok-v1: the World of Ruin map, on foot beside the Falcon parked
+-- on the plain south of Narshe's gate (115,38), after LOCKE's locks in
+-- Narshe (map 32, $06C0-$06C5 cleared, _cc0a9e-_cc0aee): the treasure room,
+-- the weapon shop's back room (Ragnarok taken as the stone, _cc0b1e:
+-- $00B6), the relic shop, the Cursed Shld (_cc0b70: $00B8), the item
+-- counter and the inn; LOCKE, TERRA, CELES and RELM seated
+-- (docs/design/route-wor-narshe.md section 12).  No timer.
+M.contracts["wor-ragnarok-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 115, y = 38 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00D7, 1, "LOCKE found (_cc2b43)" },
+    { 0x00B6, 1, "Ragnarok taken (_cc0b1e)" },
+    { 0x00B8, 1, "the Cursed Shld given (_cc0b70)" },
+    { 0x06C0, 0, "the inn's lock picked (_cc0a9e)" },
+    { 0x06C1, 0, "the weapon shop's lock picked (_cc0aae)" },
+    { 0x06C2, 0, "the relic shop's lock picked (_cc0abe)" },
+    { 0x06C3, 0, "the treasure room's lock picked (_cc0ace)" },
+    { 0x06C4, 0, "the Cursed Shld door's lock picked (_cc0ade)" },
+    { 0x06C5, 0, "the item shop's lock picked (_cc0aee)" },
+  },
+  party = {
+    size = 4,                     -- LOCKE, TERRA, CELES and RELM
+    members = {
+      { 0x01, "LOCKE" },
+      { 0x00, "TERRA" },
+      { 0x06, "CELES" },
+      { 0x08, "RELM" },
+    },
+  },
+  ram = {
+    { 0x1F62, 0xFF, 115, "the Falcon parked at x 115 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 38, "the Falcon parked at y 38 (save-block cell $1F63)" },
+    { 0x1A6B, 0x01, 0x01, "Ragnarok owned (esper bit 16, $1A69 + 2)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
