@@ -411,6 +411,20 @@ H.run({ maxFrames = 2400000 }, {
   H.call(function() say("shop", "Kohlingen") end),
   walkInto(12, 40, MAP_KOHLINGEN, "the store -> Kohlingen"),
   H.gearStop({ tag = "gear Kohlingen (LOCKE)", fight = FIGHT }),     -- #434: buy power with gil
+  -- LOCKE's row (gen_wor_kohlingen's rule for SETZER): a weapon without
+  -- the row penalty (ItemProp +19 bit 5; the Wing Edge has it) loses
+  -- nothing in the back row, where physical hits taken are halved, so he
+  -- goes back when his weapon says so (the qualification's first play
+  -- left him in front with the Wing Edge: audit_readiness, wor_locke.mss)
+  H.cond(function()
+    local w = H.readByte(0x1600 + 37 * LOCKE + 0x1F)
+    local free = w ~= 0xFF and (H.readRomByte((H.sym("ItemProp") & 0x3FFFFF) + w * 30 + 19) & 0x20) ~= 0
+    H.log(string.format("[kit] LOCKE's weapon $%02X %s the row penalty; party byte $%02X", w,
+      free and "ignores" or "carries", H.readByte(0x1850 + LOCKE)))
+    return free
+  end, {
+    H.setRows({ [LOCKE] = true }, { tag = "LOCKE to the back row" }),
+  }, {}),
   H.saveState("wor_locke_kohlingen.mss"),
 
   -- ---- 7. out to the world map, and the save ----------------------------------------------
