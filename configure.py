@@ -485,7 +485,7 @@ TEST_ENV = {
     # grinds honest world-map fights until the 1/16 Shadow-leave roll passes:
     # an 80-win cap at ~4000 frames a win is ~320k frames, ~1600 s at the
     # ~200 frames/s a loaded machine emulates; the 600 s default cap is far short
-    "battle_shadowstays": "OT6_TIMEOUT=3600",
+    "battle_shadowstays": "OT6_TIMEOUT=7200",
     # each budgets its encounters for EVERY encounter-counter state the
     # game can deal, not the fixture's (lib/ot6_field.lua's
     # worstCaseEncounters), so its worst case is well past the default cap

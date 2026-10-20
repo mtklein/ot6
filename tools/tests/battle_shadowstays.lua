@@ -39,13 +39,19 @@
 -- never sees the roll pass fails with the counts.  The emulation is
 -- bit-reproducible, so the number of wins this takes is a property of the
 -- fixture plus SETTLE (the idle frames before the first step), not a coin
--- flip: see the [shadowstays] lines in the log.  A world-map fight here
--- costs ~3000-4500 frames, so 80 wins is ~320k frames; the suite edge
--- carries a raised OT6_TIMEOUT for that (see configure.py TEST_ENV).
+-- flip: see the [shadowstays] lines in the log.  But which fixture the
+-- chain hands this suite moves with every ROM change, so the bound is sized
+-- from the odds, not from one chain: with p = 1/16 a roll, N rolls all miss
+-- with probability (15/16)^N -- 0.6% at 80, 0.003% at 160.  The v0.32 aura
+-- chain's camp_escaped met that 0.6%: 80 rolls, none under $10, the
+-- smallest exactly $10 (build/attempts/wt/v032-boost-aura-2/shadowstays/).
+-- A world-map fight here costs ~3000-4500 frames, so 160 wins is up to
+-- ~720k frames; the suite edge carries a raised OT6_TIMEOUT for that (see
+-- configure.py TEST_ENV).
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/camp_escaped.mss.lua"
-local MAX_WINS = 80
+local MAX_WINS = 160
 local SETTLE = 30                       -- idle frames after the load, before
                                         -- the first step: the RNG lever
 local SHADOW = 3                        -- character id
@@ -287,7 +293,7 @@ end
 
 local before = {}
 
-H.run({ maxFrames = 600000 }, {
+H.run({ maxFrames = 900000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(SETTLE),
