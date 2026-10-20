@@ -156,8 +156,9 @@ The other thirty the Veldt can deal from this save stay on the floor: no
 run met them (section 8).  `battle_breakwor_gau` checks the fourteen
 (section 4 of the suite): the row, the floor's shields and class kept, the
 vanilla and added elements, and a key for TERRA, CELES and RELM.  Red on the
-ROM without this arc's rows (`bwbase`: "$07E Rhyos has no Ot6ShieldTbl row
-(want 4, class $04)", and the rest) and on two ROM mutants (`rowmuts.sh`):
+ROM without this arc's rows (`bwbase`, on the final suite at cc895b8c:
+"$07E Rhyos has no Ot6ShieldTbl row (want 4, class $04)", 18 rows missing,
+"mismatches: got 26") and on two ROM mutants (`rowmuts.sh`):
 Toe Cutter without bludgeon (`bwmut1`: "$08F Toe Cutter: GAU alone holds no
 key"), Leafer without the floor's slash (`bwmut2`: "$017 Leafer lost the
 floor's class $01").
@@ -200,11 +201,12 @@ nine World of Balance rages he returns with are weak (specials of power 8 to
 `wor-veldt-cave-v1`: the possessing beast is the planned one (`$33A8`), the
 price is 8 once and nothing for a possessed turn, and `OT6_RAGETIER` holds
 the planned boost; with the line off GAU never Rages.  Three mutants, one an
-assertion (`mkmut.py`): the steer one entry off (`mutA`: "possessed by the
-planned beast ($33A8): got 14 ($E), want 11 ($B)"), every possessed turn
-charged (`mutB`, the ROM: "got 293 ($125), want 301 ($12D)"), the boost
-recorded and not pressed (`mutC`: "OT6_RAGETIER holds the plan's boost: got
-0 ($0), want 1 ($1)").  It passes from five draws: `rd3` and, with K cave
+assertion (`mkmut.py`, `mutants.sh`, run on the final suite at cc895b8c):
+the steer one entry off (`mutA`: "possessed by the planned beast ($33A8):
+got 46 ($2E), want 36 ($24)"), every possessed turn charged (`mutB`, the
+ROM: "got 293 ($125), want 301 ($12D)"), the boost recorded and not pressed
+(`mutC`: "OT6_RAGETIER holds the plan's boost: got 0 ($0), want 1 ($1)").
+The first round, on the suite before it went opt-in, is `mut*_r1`.  It passes from five draws: `rd3` and, with K cave
 battles fought first (the line off for them, `mkrd.py`), `rdv_k0_s3`,
 `rdv_k2_s0`, `rdv_k2_s7` and `rdv_k4_s0`, which measured Brawler ($0B) or
 Leafer ($17) possessing ("GAU's seat possessed by the planned beast
