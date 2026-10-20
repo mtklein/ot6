@@ -75,7 +75,7 @@ local function arm()
   -- each item BtlGfx $05 copies into the obtained-items queue during the
   -- action (the first byte of its 5-byte record), in order
   emu.addMemoryCallback(function(addr, v)
-    if rec == nil or rec.ended or (addr - 0x7E602D) % 5 ~= 0 then return end
+    if rec == nil or rec.ended or (addr - 0x7E602D) % 5 ~= 0 or v == 0xFF then return end
     rec.queued[#rec.queued + 1] = v
   end, emu.callbackType.write, 0x7E602D, 0x7E602D + 16 * 5 - 1)
   local ae = H.sym("Ot6ActionEnd")
