@@ -512,10 +512,22 @@ function M.navLinks(tx, ty, links, opts)
       if L[6] == nil or L[6]() then wopts.avoid[#wopts.avoid + 1] = { L[1], L[2] } end
     end
     local desc, steps = {}, {}
-    for _, l in ipairs(legs) do
+    for i, l in ipairs(legs) do
       if l.walk then
         desc[#desc + 1] = string.format("walk (%d,%d)", l.walk[1], l.walk[2])
-        steps[#steps + 1] = M.navTo(l.walk[1], l.walk[2], wopts)
+        -- a walk that ends on the next link's own tile (a door the party
+        -- can only reach by a diagonal step, so no press is made onto it:
+        -- Strago's house's (60,21)) is carried as it arrives; landing is
+        -- arriving
+        local nx = legs[i + 1] and legs[i + 1].link
+        if nx and nx[1] == l.walk[1] and nx[2] == l.walk[2] then
+          local fo = {}
+          for k, v in pairs(wopts) do fo[k] = v end
+          fo.arrive = function() return M.fieldX() == nx[4] and M.fieldY() == nx[5] end
+          steps[#steps + 1] = M.navTo(l.walk[1], l.walk[2], fo)
+        else
+          steps[#steps + 1] = M.navTo(l.walk[1], l.walk[2], wopts)
+        end
       else
         local L, F = l.link, l.from
         desc[#desc + 1] = string.format("%s from (%d,%d) by (%d,%d) -> (%d,%d)", L[3], F[1], F[2], L[1], L[2],
