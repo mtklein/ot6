@@ -15,9 +15,23 @@
 -- fights honest random battles on the World of Balance from camp_escaped
 -- (SABIN, CYAN, guest SHADOW at world (179,71)) -- the shared navigator's
 -- tactical fight driver through the real battle menus, Tonic care through
--- the field menu after every fight, no fleeing, no state writes -- until the
--- roll passes, and asserts on that battle.  Every assertion is backed by an
--- observation: an exec callback on a symbol-resolved address, or a RAM read.
+-- the field menu after every fight, no fleeing -- and makes the roll pass
+-- in the first eligible won battle, then asserts on that battle.
+--
+-- A mechanism test, not play: the roll is forced.  It is not an independent
+-- 1/16 per win.  Rand returns RNGTbl[++$be], so the roll is a fixed function
+-- of $be at the roll site, and the battles a chain deals can keep landing on
+-- the same few indexes: the v0.32 aura chain's camp_escaped took 80 rolls
+-- over 61 distinct $be values (be=$0A gave $B2 twice, $CD gave $A6 three
+-- times, $E8 gave $C6 four times) and none came under $10, then 146 straight
+-- misses at a doubled bound (build/attempts/wt/v032-boost-aura-2/
+-- shadowstays/).  So at every roll ($3003 holds Shadow's slot, the jsr Rand)
+-- until one passes, $be is set to the index before the first RNGTbl entry
+-- under $10 (a declared waiver, tools/state_write_waivers.txt), and the
+-- roll's own checks -- front attack, two or more up, Shadow's status,
+-- $1ede -- decide whether that win reaches ShadowLeaves, as in play.  Every
+-- assertion below is backed by an observation: an exec callback on a
+-- symbol-resolved address, or a RAM read.
 --   (a) it terminates normally: exec callbacks see ShadowLeaves >
 --       Ot6ShadowLeaves > WinBattle > _488f > UpdateSRAM > TerminateBattle in
 --       that order and nothing else from that set in between; the world
@@ -33,25 +47,16 @@
 --       still enrolled in the party ($1850) on the field afterward;
 --   (d) the win path still ran: WinBattle executed once more for that fight.
 --
--- The bound.  The roll is 1/16 per ELIGIBLE win (front attack, $201f = 0;
--- two or more characters up; Shadow not dead/petrified/zombied; $3ebd.3
--- clear; $1ede.3 set), so the wins are capped at MAX_WINS and a run that
--- never sees the roll pass fails with the counts.  The emulation is
--- bit-reproducible, so the number of wins this takes is a property of the
--- fixture plus SETTLE (the idle frames before the first step), not a coin
--- flip: see the [shadowstays] lines in the log.  But which fixture the
--- chain hands this suite moves with every ROM change, so the bound is sized
--- from the odds, not from one chain: with p = 1/16 a roll, N rolls all miss
--- with probability (15/16)^N -- 0.6% at 80, 0.003% at 160.  The v0.32 aura
--- chain's camp_escaped met that 0.6%: 80 rolls, none under $10, the
--- smallest exactly $10 (build/attempts/wt/v032-boost-aura-2/shadowstays/).
--- A world-map fight here costs ~3000-4500 frames, so 160 wins is up to
--- ~720k frames; the suite edge carries a raised OT6_TIMEOUT for that (see
--- configure.py TEST_ENV).
+-- The bound.  A win reaches ShadowLeaves only when it is ELIGIBLE (front
+-- attack, $201f = 0; two or more characters up; Shadow not dead/petrified/
+-- zombied; $3ebd.3 clear; $1ede.3 set), so the wins are capped at MAX_WINS
+-- and a run that meets no eligible win fails with the counts.  A world-map
+-- fight here costs ~3000-4500 frames; the suite edge carries a raised
+-- OT6_TIMEOUT (see configure.py TEST_ENV).
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/camp_escaped.mss.lua"
-local MAX_WINS = 160
+local MAX_WINS = 80
 local SETTLE = 30                       -- idle frames after the load, before
                                         -- the first step: the RNG lever
 local SHADOW = 3                        -- character id
@@ -183,8 +188,22 @@ hook("TerminateBattle", SYM.TerminateBattle, function()
       H.frame, H.frame - fired, table.concat(seq, " > "), landHits))
   end
 end)
-emu.addMemoryCallback(function() rolls = rolls + 1 end,
-  emu.callbackType.exec, ROLL_RAND, ROLL_RAND)
+-- The forced roll (see the header): at the jsr Rand, until a roll has
+-- passed, $be goes to the index before the first RNGTbl entry under $10,
+-- so Rand's `inc $be` / `lda RNGTbl,x` returns it and the cmp #$10 passes.
+local RNGTBL = H.sym("RNGTbl")
+local PASS_IDX = nil
+for i = 0, 255 do
+  if PASS_IDX == nil and H.readRomByte((RNGTBL & 0x3FFFFF) + i) < 0x10 then PASS_IDX = i end
+end
+assert(PASS_IDX ~= nil, "RNGTbl holds an entry under $10")
+local forced = 0
+emu.addMemoryCallback(function()
+  rolls = rolls + 1
+  if fired then return end
+  H.writeByte(0xBE, (PASS_IDX - 1) & 0xFF)
+  forced = forced + 1
+end, emu.callbackType.exec, ROLL_RAND, ROLL_RAND)
 emu.addMemoryCallback(function() passes = passes + 1 end,
   emu.callbackType.exec, ROLL_PASSED, ROLL_PASSED)
 
@@ -293,7 +312,7 @@ end
 
 local before = {}
 
-H.run({ maxFrames = 900000 }, {
+H.run({ maxFrames = 600000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(SETTLE),
@@ -321,11 +340,13 @@ H.run({ maxFrames = 900000 }, {
       .. "Ot6ShadowLeaves x%d WinBattle x%d TerminateBattle x%d", H.frame,
       #wins, eligible, rolls, passes, N.ShadowLeaves, N.Ot6ShadowLeaves,
       N.WinBattle, N.TerminateBattle))
+    H.log(string.format("[shadowstays] forced roll(s): %d ($be -> $%02X, RNGTbl[$%02X] = $%02X)",
+      forced, (PASS_IDX - 1) & 0xFF, PASS_IDX, H.readRomByte((RNGTBL & 0x3FFFFF) + PASS_IDX)))
+    H.assertEq(passes >= 1, true, "a forced roll passed the cmp #$10")
     if not fired then
-      error(string.format("the 1/16 Shadow-leave roll never passed in %d "
-        .. "won battles (%d eligible front attacks, %d rolls taken, %d "
-        .. "passed the cmp #$10) -- raise MAX_WINS, vary SETTLE, or pick a "
-        .. "fixture with more eligible wins", #wins, eligible, rolls, passes), 0)
+      error(string.format("no eligible won battle reached ShadowLeaves in %d "
+        .. "won battles (%d front attacks, %d rolls forced, %d passed the "
+        .. "cmp #$10)", #wins, eligible, forced, passes), 0)
     end
   end),
 
