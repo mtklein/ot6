@@ -8236,7 +8236,11 @@ end
 function Driver:lockeMug(actor, plan)
   if plan == nil or plan.kind ~= "fight" or plan.ally then return plan end
   local o = self.opts.locke
-  if o == false or LOCKE_POLICY_OFF or M.readByte(BATTLE.BCHID + actor * 2) ~= 1 then return plan end
+  -- LOCKE_MUG_OFF (a global a lab sets ahead of the lib's run): Mug alone
+  -- off, the control arm of its measurement
+  if o == false or LOCKE_POLICY_OFF or LOCKE_MUG_OFF or M.readByte(BATTLE.BCHID + actor * 2) ~= 1 then
+    return plan
+  end
   o = type(o) == "table" and o or {}
   local L = BATTLE.LOCKE
   if o.mug == false or not M.lockeKnows(L.MUG) or self.skillDead[L.CMD] then return plan end
@@ -13840,6 +13844,7 @@ function M.setzerBattle(plan, opts)
           -- monster's HP moved), so it is not the plan's throw and is not
           -- checked as one
           M.vars.setzerTaken[#M.vars.setzerTaken + 1] = r
+          Z.inFlight = math.max(0, (Z.inFlight or 0) - 1)
           -- and the plan entry it confirmed is played again (his next
           -- window comes after this row ran, so nothing was confirmed since)
           local back = Z.confirmedK
@@ -13855,6 +13860,7 @@ function M.setzerBattle(plan, opts)
           return
         end
         M.vars.setzer[#M.vars.setzer + 1] = r
+        Z.inFlight = math.max(0, (Z.inFlight or 0) - 1)
         M.log(string.format("[setzer] f%d row $%02X at %d BP (L%d): gil %d -> %d (TakeGil %s), MP %d -> %d, "
           .. "bank %d -> %d, divine %02X -> %02X, targets %02X, %d chip call(s)%s", M.frame, r.row, r.boost,
           r.level, r.gil0, r.gil1, tostring(r.cost), r.mp0, r.mp1, r.bank0, r.bank1, r.divine0, r.divine1,
@@ -14042,13 +14048,16 @@ function M.setzerBattle(plan, opts)
       -- end the crowd, and the throw never runs (wor-tomb-v1 on
       -- wt/v032-locke-kit-q's chain: SETZER confirmed at f17408, every body
       -- down by f17520, build/attempts/wt/v032-locke-kit/qual/).
-      local inFlight = 0
-      for _, q in ipairs(plan) do
-        -- the rows a record closes (a reel spin makes none)
-        if q.confirmedAt ~= nil and q.confirmedAt >= (Z.startF or 0) and (q.cmd == 0x18 or (type(q.row) == "number" and q.row >= 0x59
-            and q.row <= 0x5B)) then inFlight = inFlight + 1 end
+      -- Z.inFlight: rows confirmed whose record has not closed (a row set
+      -- aside and played again counts again), while SETZER can still run
+      -- them: Wounded or Petrified he runs none, and Zombied his row is the
+      -- engine's (set aside), so the others fight rather than Defend the
+      -- battle out
+      local sz = seat()
+      local inFlight = Z.inFlight or 0
+      if sz == nil or M.readWord(0x3BF4 + sz * 2) == 0 or (M.readByte(0x3EE4 + sz * 2) & 0xC2) ~= 0 then
+        inFlight = 0
       end
-      inFlight = inFlight - #(M.vars.setzer or {}) - #(M.vars.setzerTaken or {})
       if (p ~= nil or inFlight > 0) and not opts.othersFight then defend(st) else fight(a, st) end
       return
     end
@@ -14190,6 +14199,9 @@ function M.setzerBattle(plan, opts)
       end
       Z.confirmedK, p.confirmedAt = k, M.frame   -- confirmedAt: for a caller telling his row's
       k = k + 1                                   --   execution from one queued before it
+      if p.cmd == 0x18 or (type(p.row) == "number" and p.row >= 0x59 and p.row <= 0x5B) then
+        Z.inFlight = (Z.inFlight or 0) + 1        -- a row whose record has not closed yet
+      end
       pulse("a")
     elseif st == 0x08 then
       if cool == 0 and M.readByte(0x7B92) == 0 then Z.confirmedK, p.confirmedAt = k, M.frame; k = k + 1 end
@@ -14201,7 +14213,7 @@ function M.setzerBattle(plan, opts)
     end
   end
   return M.seqStep({
-    M.call(function() Z.startF = M.frame; M.logRomIdentity("[setzer]") end),
+    M.call(function() Z.inFlight = 0; M.logRomIdentity("[setzer]") end),
     M.waitUntil(function() return M.battleActive() end, 1200, "the battle is up", 2),
     M.driveUntil(function()
       if opts.untilPlanDone and k > #plan and Z.rec == nil then

@@ -128,7 +128,8 @@ Ot6ThiefName:
         .byte   $93, $ab, $a2, $9c, $a4, $ac, $a1, $a8, $ad, $ff ; Trickshot
         .byte   $83, $a2, $ac, $a6, $9a, $a7, $ad, $a5, $9e, $ff ; Dismantle
         .byte   $80, $a9, $a9, $ab, $9a, $a2, $ac, $9e, $ff, $ff ; Appraise
-        .byte   $8c, $ac, $ad, $ab, $c5, $fe, $8c, $9a, $ab, $a4 ; Mstr. Mark
+        .byte   $8c, $ac, $ad, $ab, $c5, $8c, $9a, $ab, $a4, $ff ; Mstr.Mark (nine:
+                                ;   the price needs a gap)
 
 ; the battle banner's names for the five later rows ($e0-$e4), 13 letters:
 ; the message window takes the divine's whole name
@@ -747,8 +748,10 @@ done:   plp
 ; as a 3-BP Steal robs: its rare item if it has one, else its common, taken
 ; outright, no roll (Ot6StealSlot's cap rule), and a body with nothing, or
 ; already robbed, gives nothing.  No damage.  Picked at three and taken back
-; to fewer (L in target select), it does nothing, and the queue priced it at
-; 0 (Ot6AbilityCost); the bank pays what was pending, as for any action.
+; to fewer (L in target select), it does nothing and charges nothing: the
+; queue priced it at 0 (Ot6ThiefCharge), and the pending boost is cleared
+; here, so Ot6ActionEnd reads an unboosted turn and pays its pip (Jackpot's
+; rule, Ot6JackpotDice: nothing bought is nothing charged).
 ; Each item goes straight to the battle's obtained-items queue (BtlGfx $05,
 ; the one vanilla's end-of-action grant uses), since the attacker's one
 ; $32f4 slot holds a single item per action.
@@ -758,8 +761,10 @@ done:   plp
         .i8
         lda     OT6_BOOST_REVEALED,x
         cmp     #OT6_MARK_BOOST
-        bcc     @out            ; under the full boost: nothing
-        phy
+        bcs     @full
+        stz     OT6_BOOST_REVEALED,x    ; under the full boost: nothing done,
+        rtl                             ;   nothing charged
+@full:  phy
         php
         rep     #$10
         .i16

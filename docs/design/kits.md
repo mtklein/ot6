@@ -620,8 +620,8 @@ Mug, Dismantle, Appraise, Master's Mark.
 left there): the ids are `$E0`-`$E4`, free under command `$05`, and the list
 draws them from `Ot6ThiefName` (`Ot6KitListName`, which also took over the
 SwdTech names' C1 arm), the banner from `Ot6ThiefBanner` through attack name
-type 3, unused in vanilla. The list's ten letters print the divine as
-"Mstr. Mark"; the banner prints "Master's Mark".
+type 3, unused in vanilla. The list prints the divine as "Mstr.Mark" (nine
+letters, so its price keeps a gap); the banner prints "Master's Mark".
 
 - **Mug** is vanilla's Capture as a row (FF3-US prints the Thief Glove's
   verb as Capture): `Ot6MugCheck` sends the action to `Cmd_06`, so it is a
@@ -655,7 +655,9 @@ type 3, unused in vanilla. The list's ten letters print the divine as
   item straight into the battle's obtained-items queue (BtlGfx `$05`), since
   the attacker's one `$32F4` slot holds a single item. 99 MP, the divines'
   ceiling. Greyed and refused under three; picked at three and taken back,
-  it does nothing and costs nothing (`Ot6ThiefCharge` prices it at 0).
+  it does nothing and costs nothing: no MP (`Ot6ThiefCharge` prices it at 0)
+  and no points (`Ot6MastersMark` clears the pending boost, as
+  `Ot6JackpotDice` does, so the turn banks an unboosted turn's pip).
 
 Suites: `battle_lockekit` (fire-out-v1: the list, Mug, Trickshot at 0 and 1
 BP, Dismantle at 2 BP, Appraise at 0 and 1 BP), `battle_mastersmark`

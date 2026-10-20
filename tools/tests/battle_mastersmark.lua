@@ -23,7 +23,8 @@
 --      Ot6AnalyzeOne read every standing scannable body; 99 MP, the bank
 --      paid three;
 --   2. picked at 3 BP, taken back to 2 at target select: no body's loot
---      moved, the queue did not grow, no MP was charged, the bank paid two.
+--      moved, the queue did not grow, no MP and no points were charged:
+--      the turn ends as an unboosted one and banks its pip (Jackpot's rule).
 -- A battle with no loot on the field, or where LOCKE cannot act or lacks
 -- 99 MP, is fought out and the next taken.
 -- Old-ROM red and mutants: build/attempts/wt/v032-locke-kit/.
@@ -147,7 +148,8 @@ local function judge()
     H.assertEq(r.q1, r.q0, "the queue did not grow")
     H.assertEq(#r.queued, 0, "nothing was queued")
     H.assertEq(r.mp0 - r.mp1, 0, "a Master's Mark under three points costs nothing")
-    H.assertEq(r.bank1, r.bank0 - 2, "the bank paid the two points pending")
+    H.assertEq(r.bank1, math.min(r.bank0 + 1, 5), "no points were charged: the pending boost is cleared and the "
+      .. "turn banks an unboosted turn's pip")
   end
   return true
 end
