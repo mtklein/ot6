@@ -255,7 +255,45 @@ Zinger plan: got 11").
 
 ## 6. Supplies and kits
 
-PENDING
+**Supplies.**  The Opera House's fights left the bag below the band
+(`wor-opera-v1`: "potion=44 tincture=40 fenix=22 remedy=19 revivify=34
+tent=4 gil=560717", the lab captures' boot line) against about level x 1.5
+Potions before a boss gauntlet (guidelines), so the arc's first stop is
+Kohlingen's general store, the only counter on the arc (`kohlingenStop`:
+Potions to `careStockPotions` with the field care's own, Remedies to 20 for
+the dream's Petrify and Sap, Fenix Downs to the level capped at 20, the combat
+items to the top of the bag), and again at the Ancient Castle's start, where
+it tops up what the dream spent.  The bag at the saves (the lab captures):
+
+| save | Potions | Fenix Downs | Remedies | Tinctures | Tents | gil | the capture |
+|---|---|---|---|---|---|---|---|
+| `wor-dream-v1` | 96 | 22 | 20 | 40 | 4 | 560,301 | `gd3_s0` |
+| `wor-doma-v1` | 95 | 21 | 20 | 40 | 4 | 564,015 | `gdo2_s0` |
+| `wor-ancient-v1` | 93 | 21 | 19 | 40 | 3 | 599,393 | `ga1_s0` |
+
+The Kohlingen gear stops bought nothing (`ga1_s0`: "stop done: spent 0 GP"):
+its counters sell nothing better than the party wears.
+
+**Kits.**  The cabin's gear and relic care before Doma (`H.gearDress`,
+`H.dressRelics`) hands TERRA the Blizzard and RELM the Earrings; the stooges'
+arms (`H.absorbSafeArms`) take TERRA's ice blade off before Larry (absorbs
+ice) and Wrexsoul's RELM's Pearl Rod (Wrexsoul and the Soul Savers absorb
+holy).  The dream's train gives the Flame Shld and a second Genji Glove, which
+the relic care after the wake puts on CYAN (the main boost-Fighter without
+one: "Genji Glove $D1 goes to CYAN's slot 4 ... a spare two-weapon relic to
+the main boost-Fighter without one (vigor 40)", `gdo1_s0`); he wields Strato
+and the dream's Aura.  Alexandr goes on CYAN (`H.equipEsper`: "verified:
+char 2 (pos 2) wears $0E").  Raiden replaces Odin in the bag and is worn by
+nobody: the four's stones (TERRA's Maduin, CELES's Tritoch, RELM's Ragnarok,
+CYAN's Alexandr) grant their lists while worn (`Ot6EsperSpellKnown`), and a
+swap would take a list away mid-arc.  For the Blue Dragon the Wall Rings
+(CELES, RELM and TERRA wear them from the tower) give way to the bag's
+Czarina Ring, Barrier Ring and Earrings (`wallRingsOff`; route-wor-gogo.md
+section 4: Reflect turns the party's own Cure and Shell away), and go back
+on after it.  The Ancient Castle's chests taken: the Gold Hairpin and the
+Blizzard Orb (406), the X-Ether (408); the cave's (401) and the two monster
+chests (Master Pug, KatanaSoul) are left (section 8).  CYAN's SwdTechs:
+kits.md "On the route".
 
 ## 7. Played
 
