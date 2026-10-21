@@ -1247,7 +1247,7 @@ in each arm):
 
 The k3_s7 run fails in both fix arms on the render-on-demand check
 after all 13 battles were won and the save was written (`savestate at
-frame 18030 scanline 41`). That is a harness check, not play. The care
+frame 18030 scanline 41`). That is a harness check, not play: Mesen's periodic auto-save, turned off since (#458). The care
 spends Tonics instead: 8-16 left at the save from 29, against 15-29 on
 the base, with Potions untouched.
 
