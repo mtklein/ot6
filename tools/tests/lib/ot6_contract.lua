@@ -2267,14 +2267,14 @@ M.contracts["wor-gogo-v1"] = {
 }
 
 -- wor-ebot-v1: the World of Ruin map, on foot on the Falcon's tile by
--- Thamasa (250,229), after Ebot's Rock: the coral, the hungry chest fed
+-- Thamasa (250,231, where Hidon's scene parks it), after Ebot's Rock: the coral, the hungry chest fed
 -- ($01F9 is a map switch; the chest's door stays open: $055D clear), Hidon
 -- beaten (_cb71d2: $019C), the scene in Strago's house, and Thamasa's item
 -- counter.  The Opera House and Doom Gaze are ahead
 -- (docs/design/route-wor-gogo.md).  No timer.
 M.contracts["wor-ebot-v1"] = {
   slot = 3,
-  world = { map = 1, x = 250, y = 229 },
+  world = { map = 1, x = 250, y = 231 },
   switches = {
     { 0x00A4, 1, "the World of Ruin (:12423)" },
     { 0x00D4, 1, "GOGO met (_cb81c6)" },
@@ -2292,7 +2292,7 @@ M.contracts["wor-ebot-v1"] = {
   },
   ram = {
     { 0x1F62, 0xFF, 250, "the Falcon parked at x 250 (save-block cell $1F62)" },
-    { 0x1F63, 0xFF, 229, "the Falcon parked at y 229 (save-block cell $1F63)" },
+    { 0x1F63, 0xFF, 231, "the Falcon parked at y 231 (save-block cell $1F63; Hidon's scene, :54632)" },
     { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
     { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
   },

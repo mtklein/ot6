@@ -391,7 +391,10 @@ local function coralHunt(need, what, budget)
 end
 -- Ebot's Rock: the mouth (249,223), the Falcon down on (250,224); Thamasa (gen_wor_phoenix's)
 local EBOT_DOOR, EBOT_LANDING = { 249, 223 }, { 250, 224 }
-local THAMASA_DOOR, THAMASA_LANDING = { 251, 230 }, { 250, 229 }
+local THAMASA_DOOR = { 251, 230 }
+-- Hidon's scene parks the Falcon by Thamasa (event_main.asm :54632, airship_pos {250, 231}); the leg saves on
+-- its tile
+local FALCON_AFTER = { 250, 231 }
 -- Hidon's formation (464: route_data species): Hidon and its four Hidonites, one of which drinks every
 -- element ($160)
 local HIDON_SPECIES = { 0x123, 0x126, 0x160, 0x161, 0x162 }
@@ -471,10 +474,10 @@ H.run({ maxFrames = 2400000 }, {
   H.driveUntil(function() return H.worldMode() end, 6000, { H.hold({ "down" }), H.waitFrames(4) }, "off Thamasa's edge"),
   H.release(),
   H.waitWorldSettled("out of Thamasa", 1800, 30),
-  H.worldNavTo(THAMASA_LANDING[1], THAMASA_LANDING[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
+  H.worldNavTo(FALCON_AFTER[1], FALCON_AFTER[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
     avoid = { THAMASA_DOOR } }),
   H.waitFrames(90),
-  H.worldNavTo(THAMASA_LANDING[1], THAMASA_LANDING[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
+  H.worldNavTo(FALCON_AFTER[1], FALCON_AFTER[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
     avoid = { THAMASA_DOOR } }),
   H.fieldCare({ threshold = 1.0, tag = "on the save tile" }),
   H.waitUntil(function() return H.worldSettled() and H.worldAligned() end, 1200, "settled on the save tile", 5),
