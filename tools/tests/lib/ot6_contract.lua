@@ -2302,6 +2302,42 @@ M.contracts["wor-ebot-v1"] = {
   },
 }
 
+-- wor-opera-v1: the World of Ruin map, on foot on the Falcon's tile by the
+-- Opera House (30,182), after the Dirt Dragon (event battle 134: $0387
+-- clear) and Doom Gaze (DoomGazeDefeated: $1DD2 bit 0, Bahamut).  CELES,
+-- RELM, GOGO and STRAGO seated (docs/design/route-wor-gogo.md).  The Gogo
+-- arc's end and the next arc's boot.  No timer.
+M.contracts["wor-opera-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 30, y = 182 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00D4, 1, "GOGO met (_cb81c6)" },
+    { 0x019C, 1, "Hidon beaten (_cb71d2)" },
+    { 0x0387, 0, "the Dirt Dragon gone from the stage (_cab6d6)" },
+  },
+  party = {
+    size = 4,                     -- CELES, RELM, GOGO and STRAGO
+    members = {
+      { 0x06, "CELES" },
+      { 0x08, "RELM" },
+      { 0x0C, "GOGO" },
+      { 0x07, "STRAGO" },
+    },
+  },
+  ram = {
+    { 0x1F62, 0xFF, 30, "the Falcon parked at x 30 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 182, "the Falcon parked at y 182 (save-block cell $1F63)" },
+    { 0x1DD2, 0x01, 0x01, "Doom Gaze beaten ($1DD2 bit 0: world/ctrl.asm @6ee8 no longer draws it)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
