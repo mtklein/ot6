@@ -74,11 +74,30 @@ local MOG = 0x0A
 local DANCES = 0x1D4C
 local BOOST = 1
 local BRANCHES, MIN_EACH = 8, 3
+-- The encounter is whatever the world deals (#454).  One where the caster
+-- falls before a branch's turn resolves (the Mantodea, formation group
+-- $0143, killed MOG inside every Dance branch on v0.34's first chain) or
+-- that ends before it yields no outcome for that branch; a verb still
+-- short of its counts after an encounter's branches goes on to the next
+-- encounter: the world map before this one is restored, this one is fought
+-- out by the walker, the party is cared for, and the next one is walked
+-- into.  At most MAX_ENCOUNTERS.
+local MAX_ENCOUNTERS = 4
 
 local function bp(s) return H.readByte(0x3E9C + s * 2) end
 local function pend(s) return H.readByte(0x3E9D + s * 2) end
 local function mp(s) return H.readWord(0x3C08 + s * 2) end
 local function dancing(s) return (H.readByte(0x3EF8 + s * 2) & 0x01) ~= 0 end
+-- why slot s's turn can no longer come in this battle, or nil: the battle
+-- ended, or s is down (no HP, or Wound / Petrify / Zombie in STATUS1)
+local function lostWhy(s)
+  if not H.battleLoadStarted() then return "the battle ended" end
+  local hp, st1 = H.readWord(0x3BF4 + s * 2), H.readByte(0x3EE4 + s * 2)
+  if hp == 0 or (st1 & 0xC2) ~= 0 then
+    return string.format("slot %d is down (HP %d, STATUS1 $%02X)", s, hp, st1)
+  end
+  return nil
+end
 -- the file's one pool write (see the header): what a drain leaves
 local function drainTo(s, v) H.writeWord(0x3C08 + s * 2, v) end
 
@@ -92,6 +111,7 @@ end
 local ph = 0
 local xChar = nil                   -- the X-Magic caster's character id
 local snap0, snap = nil, nil
+local enc, encs, phaseLost = 0, {}, nil   -- the encounter in use, each one's snapshots
 local V = nil                       -- the verb under test
 local who = nil                     -- its caster's slot
 local rec, recs = nil, {}
@@ -289,7 +309,7 @@ local function branch(k, verb)
   local drain = (k % 2 == 1)
   local kind = (verb.cmd == CMD_XMAGIC) and XKINDS[(k - 1) % #XKINDS + 1] or nil
   if kind then drain = (kind ~= "control") end
-  return H.cond(function() return true end, {
+  return H.cond(function() return not phaseLost end, {
     H.call(function()
       H.setPad({})
       rec = nil
@@ -311,8 +331,13 @@ local function branch(k, verb)
       rec.bank0, rec.mp0 = bp(who), mp(who)
       want = "press"
     end),
-    step("the caster commits, boosted", function() return rec.queued ~= nil end, 3000),
+    step("the caster commits, boosted", function()
+      if rec.queued ~= nil then return true end
+      rec.lost = lostWhy(who)
+      return rec.lost ~= nil
+    end, 3000),
     H.call(function()
+      if rec.lost then return end
       rec.pend0 = rec.queued.pend
       -- the property needs a raised boost to keep or drop: assert it was raised
       H.assertEq(rec.pend0, BOOST, string.format(
@@ -338,12 +363,15 @@ local function branch(k, verb)
       want = "defer"
     end),
     H.driveUntil(function()
+      if rec.lost then return true end
       if not H.battleLoadStarted() then return true end
       if rec.done and H.frame >= rec.done.f + 20 then
         rec.after = { bank = bp(who), mp = mp(who), dancing = dancing(who) }
         return true
       end
-      return false
+      -- the caster down before its turn resolved: that turn never comes
+      if not rec.done then rec.lost = lostWhy(who) end
+      return rec.lost ~= nil
     end, 6000, {
       H.call(function()
         ph = ph + 1
@@ -367,6 +395,11 @@ local function branch(k, verb)
     }, "the start turn resolves"),
     H.call(function()
       local d, a = rec.done, rec.after
+      if rec.lost then
+        H.log(string.format("[mpfizzle] %s branch %d (encounter %d): %s before "
+          .. "the turn resolved (no outcome)", V.name, k, enc, rec.lost))
+        return
+      end
       if not (d and a) then
         H.log(string.format("[mpfizzle] %s branch %d: the fight ended before "
           .. "the turn resolved (no outcome)", V.name, k))
@@ -421,14 +454,26 @@ local function phase(verb, pick)
       H.log(string.format("[mpfizzle] %s: caster slot %d, %d MP, %d BP",
         verb.name, who, mp(who), bp(who)))
     end),
-    window(verb.name .. " caster's command window"),
-    H.call(function()
-      H.setPad({})
-      H.assertEq(bp(who) >= BOOST, true, "the caster holds the opening pip")
-      snap = H.requestSaveState()
+    step(verb.name .. " caster's command window", function()
+      if H.battleLoadStarted() and H.readByte(MENU) ~= 0
+         and H.readByte(ACTOR) == who and H.readByte(MSTATE) == ST_CMD then return true end
+      phaseLost = lostWhy(who)
+      return phaseLost ~= nil
     end),
-    H.waitFrames(2),
-    H.call(function() H.checkReq(snap, "snapshot at the caster's window") end),
+    H.cond(function() return phaseLost == nil end, {
+      H.call(function()
+        H.setPad({})
+        H.assertEq(bp(who) >= BOOST, true, "the caster holds the opening pip")
+        snap = H.requestSaveState()
+      end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(snap, "snapshot at the caster's window") end),
+    }, {
+      H.call(function()
+        H.log(string.format("[mpfizzle] %s (encounter %d): %s before the caster's "
+          .. "first window: no branch here", verb.name, enc, phaseLost))
+      end),
+    }),
   }
   for k = 1, BRANCHES do out[#out + 1] = branch(k, verb) end
   return H.seqStep(out)
@@ -461,26 +506,135 @@ local body = {
     end
     assert(xChar, "TERRA or CELES is in the party with a third command")
   end),
-  H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
-    H.call(function()
-      if H.battleLoadStarted() or not H.worldHasControl() then H.setPad({}) return end
-      if not H.worldAligned() then return end
-      ph = ph + 1
-      H.setPad({ [(ph % 2 == 0) and "left" or "right"] = true })
-    end),
-    H.waitFrames(1),
-  }, "a world-map encounter fires"),
-  H.release(),
-  H.waitUntil(function() return H.battleActive() end, 1200, "battle armed", 5),
-  H.waitFrames(240),
-  H.call(function()
-    installObservers()
-    H.setPad({})
-    snap0 = H.requestSaveState()
-  end),
-  H.waitFrames(2),
-  H.call(function() H.checkReq(snap0, "battle-start snapshot") end),
 }
+
+-- the walk into an encounter: battle_gaufight's, alternating left/right at
+-- tile boundaries until the world's own encounter roll wins
+local function walkIn()
+  return H.seqStep({
+    H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
+      H.call(function()
+        if H.battleLoadStarted() or not H.worldHasControl() then H.setPad({}) return end
+        if not H.worldAligned() then return end
+        ph = ph + 1
+        H.setPad({ [(ph % 2 == 0) and "left" or "right"] = true })
+      end),
+      H.waitFrames(1),
+    }, "a world-map encounter fires"),
+    H.release(),
+    H.waitUntil(function() return H.battleActive() end, 1200, "battle armed", 5),
+    H.waitFrames(240),
+  })
+end
+
+local function worldControl(what)
+  return H.waitUntil(function()
+    return H.worldMode() and H.worldHasControl() and H.worldAligned()
+  end, 6000, what)
+end
+
+-- the walker fights the encounter the world map holds next, from here
+local function fightThrough(what)
+  local o0, wp, W = nil, 1, nil
+  return H.withReset(H.driveUntil(function()
+    return o0 ~= nil and #H.outcomes > o0
+  end, 200000, {
+    H.call(function()
+      if o0 ~= nil then return end
+      o0 = #H.outcomes
+      local x, y = H.worldX(), H.worldY()
+      for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+        if W == nil and H.worldPassable(x + d[1], y + d[2]) then W = { { x + d[1], y + d[2] }, { x, y } } end
+      end
+      assert(W, "a walkable tile beside the party")
+    end),
+    H.worldNavTo(function() return W[wp][1] end, function() return W[wp][2] end,
+      { maxFrames = 20000, playBattles = "tactical" }),
+    H.call(function() wp = wp % #W + 1 end),
+  }, what), function() o0, wp, W = nil, 1, nil end)
+end
+
+-- encounter e, made once: from encounter e-1's world map (restored, and
+-- that encounter fought out by the walker), the party cared for, the world
+-- map snapshotted, the walk in, the battle's first frame snapshotted
+local observersOn = false
+local function meet(e)
+  local req
+  return H.seqStep({
+    H.cond(function() return encs[e] == nil end, {
+      H.cond(function() return e > 1 end, {
+        H.call(function()
+          H.setPad({}); rec = nil; V = nil
+          req = H.requestLoadState(encs[e - 1].world.blob)
+        end),
+        H.waitFrames(2),
+        H.call(function()
+          H.checkReq(req, "world-map snapshot load (encounter " .. (e - 1) .. ")")
+          H.rearmInputInjection()
+        end),
+        worldControl("world control before encounter " .. (e - 1)),
+        fightThrough("the walker fights encounter " .. (e - 1) .. " out"),
+      }, {}),
+      worldControl("world control before encounter " .. e),
+      H.fieldCare({ tag = "care before encounter " .. e, threshold = H.CARE_BEFORE_FIGHTS }),
+      worldControl("world control after the care (encounter " .. e .. ")"),
+      H.call(function()
+        for _, c in ipairs({ MOG, xChar }) do
+          H.assertEq(H.charHp(c) > 0 and (H.charStatus1(c) & 0xC2) == 0, true, string.format(
+            "encounter %d: char %d stands before the walk in (HP %d, STATUS1 $%02X)", e, c,
+            H.charHp(c), H.charStatus1(c)))
+        end
+        encs[e] = { world = H.requestSaveState() }
+      end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(encs[e].world, "world-map snapshot (encounter " .. e .. ")") end),
+      walkIn(),
+      H.call(function()
+        if not observersOn then installObservers(); observersOn = true end
+        H.setPad({})
+        encs[e].start = H.requestSaveState()
+      end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(encs[e].start, "battle-start snapshot (encounter " .. e .. ")")
+        H.log(string.format("[mpfizzle] encounter %d: formation group $%04X", e, H.readWord(0x11E0)))
+      end),
+    }, {}),
+    H.call(function() enc, snap0, phaseLost = e, encs[e].start, nil end),
+  })
+end
+
+-- what a verb's resolved branches count so far, and whether it needs more
+local function counts(name)
+  local c = { c = 0, d = 0, control = 0, first = 0, second = 0, both = 0 }
+  for _, r in ipairs(recs) do
+    if r.verb == name and r.done and r.after then
+      if r.kind then
+        if #(r.spells or {}) == 2 then c[r.kind] = c[r.kind] + 1 end
+      elseif r.drain then c.d = c.d + 1
+      elseif not (name == "Dance" and not r.done.dancing) then c.c = c.c + 1 end
+    end
+  end
+  return c
+end
+local function needs(name)
+  local c = counts(name)
+  if name == "XMagic" then
+    for _, k in ipairs(XKINDS) do if c[k] < 1 then return true end end
+    return false
+  end
+  return c.d < MIN_EACH or c.c < 1
+end
+local function verbPhases(verb, pick)
+  local out = {}
+  for e = 1, MAX_ENCOUNTERS do
+    out[#out + 1] = H.cond(function() return needs(verb.name) end, {
+      meet(e),
+      phase(verb, pick),
+    }, {})
+  end
+  return H.seqStep(out)
+end
 
 local function slotOfChar(c)
   for s = 0, 3 do
@@ -497,17 +651,17 @@ local function magicCaster()
     if cmdCellOf(s, CMD_MAGIC) then return s end
   end
 end
-body[#body + 1] = phase({ name = "Magic", cmd = CMD_MAGIC }, function()
+body[#body + 1] = verbPhases({ name = "Magic", cmd = CMD_MAGIC }, function()
   local s = magicCaster()
   assert(s, "a party member with a Magic row")
   return s
 end)
-body[#body + 1] = phase({ name = "XMagic", cmd = CMD_XMAGIC }, function()
+body[#body + 1] = verbPhases({ name = "XMagic", cmd = CMD_XMAGIC }, function()
   local s = slotOfChar(xChar)
   assert(s and cmdCellOf(s, CMD_XMAGIC), "the X-Magic caster's battle list has X-Magic")
   return s
 end)
-body[#body + 1] = phase({ name = "Dance", cmd = CMD_DANCE }, function()
+body[#body + 1] = verbPhases({ name = "Dance", cmd = CMD_DANCE }, function()
   local s = slotOfChar(MOG)
   assert(s, "MOG is in the party")
   assert(cmdCellOf(s, CMD_DANCE), "MOG's command list carries Dance")
