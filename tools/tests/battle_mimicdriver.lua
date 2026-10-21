@@ -13,18 +13,24 @@
 -- his seat) is measured, and the asserts read the engine:
 --   1. the plans are carried out: mimicreplace runs for his seat at least
 --      once and never more often than the driver confirmed a Mimic (one
---      whose turn never runs, GOGO felled first, makes none), each copying a
---      command the line copies (M.MIMIC_COPY).  The copy is the party's last action when
---      his turn runs, which can be later than the one the plan read (another
---      member acting between: lab md1, a Tools plan copied a Fight); both
---      are logged;
+--      whose turn never runs, GOGO felled first, makes none), each copy's
+--      plan having read a command the line copies (M.MIMIC_COPY).  The copy
+--      itself is the party's last action when his turn runs, which can be
+--      later than the one the plan read (another member acting between: lab
+--      md1, a Tools plan copied a Fight; lab x29, a plan copied an Item), so
+--      the engine's command is logged beside the plan's, not asserted;
 --   2. the price: his MP ($3C08 + his seat) when each copy ends
 --      (Ot6ActionEnd for his seat) is his MP at the copy: Mimic is free;
 --   3. the boost: the pips pending at each copy ($3E9D + his seat) are the
 --      plan's (its boost, capped by the bank it read and 3), and at least
 --      one copy is boosted, so the check is not of zeros alone.
 -- Then the control: the same snapshot and idle frames as the first fight
--- that copied, MIMIC_OFF set: no mimicreplace for his seat.
+-- that copied, MIMIC_OFF set: GOGO has a command window (the control is
+-- not vacuous) and no mimicreplace runs for his seat.
+-- The fight budget: lab x29 (build/lab/gogo/mkx29.py), sixteen fights from
+-- the snapshot, measured a boosted copy in 5 of 16 ("[x29] fight N ...:
+-- ... 1 boosted"), so thirteen fights miss one with odds (11/16)^13 < 1%;
+-- the fights stop at the first boosted copy.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -40,8 +46,8 @@ local snap = nil
 local cur = nil
 local function fresh() return { copies = {}, plans0 = #H.mimics, confirms = 0, windows = 0, inWindow = false } end
 -- the fights with the line: idle frames at the switch before each (lab md3: one fight's draw felled GOGO
--- after two turns, neither a Mimic)
-local TRIES, tries, before, copiedTry = { 0, 37, 73, 111 }, 0, 0, nil
+-- after two turns, neither a Mimic); thirteen of them (the budget above)
+local TRIES, tries, before, copiedTry = { 0, 37, 73, 111, 13, 29, 41, 57, 89, 97, 131, 151, 167 }, 0, 0, nil
 local function boostedSeen()
   for _, c in ipairs(cur and cur.copies or {}) do if c.pend > 0 and c.mpEnd then return true end end
   return false
@@ -140,8 +146,9 @@ H.run({ maxFrames = 900000 }, {
       H.log(string.format("[mimic]   copy %d: engine cmd $%02X atk $%02X, MP %d -> %s, pending %d; plan %s", i, c.cmd,
         c.atk, c.mp, tostring(c.mpEnd), c.pend, p and string.format("read cmd $%02X atk $%02X at %d BP (bank %d)",
           p.cmd, p.atk, p.boost, p.bp) or "-"))
-      H.assertEq(H.MIMIC_COPY[c.cmd] ~= nil, true, string.format("1. copy %d's command $%02X is one the line copies",
-        i, c.cmd))
+      H.assertEq(p ~= nil and H.MIMIC_COPY[p.cmd] ~= nil, true, string.format(
+        "1. copy %d's plan read a command the line copies (plan's $%02X; the engine copied $%02X)", i,
+        p and p.cmd or 0xFF, c.cmd))
       H.assertEq(c.mpEnd, c.mp, string.format("2. copy %d is free (GOGO's MP at its end)", i))
       if p then
         H.assertEq(c.pend, math.min(p.boost, p.bp, 3), string.format("3. copy %d's pending pips are its plan's", i))
