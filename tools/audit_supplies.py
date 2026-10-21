@@ -513,18 +513,18 @@ def selftest(repo: str = ".") -> int:
         ok = False
         print("  SELFTEST FAIL mrf-save-room-v1 not among tracked checkpoints")
     else:
-        # 19 pins the v0.32 re-cut (the drift report read "item $F0: fresh
-        # 19, tracked 21"); v0.31's (be7123af) held 21, v0.30's (7eb86a40)
+        # 20 pins the v0.33 re-cut (the drift report read "item $F0: fresh
+        # 20, tracked 19"); v0.32's held 19, v0.31's (be7123af) 21, v0.30's (7eb86a40)
         # 17, the #198 re-cut
         # (832740ee, from the regenerated ifrit_entry) carried 20, re-cut
         # B (2026-09-01) 13 and the fled run's payload 2.  The pin is the checkpoint reader's
         # regression canary, so it tracks whatever the sealed payload
         # truly holds.
         n, err = revives_of_sram(cps["mrf-save-room-v1"])
-        if err or n != 19:
+        if err or n != 20:
             ok = False
             print(f"  SELFTEST FAIL revives_of_sram(mrf-save-room-v1) "
-                  f"should read 19 Fenix Downs, got {err or n}")
+                  f"should read 20 Fenix Downs, got {err or n}")
 
     # Sanity-check: the graph loads with edges.
     states, _ = load_graph(repo)
