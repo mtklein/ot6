@@ -5,8 +5,6 @@ and its effect. Cite evidence in the commit message.
 
 ## What's changed
 
-**Weak points on the Veldt.** The Veldt cave's monsters, and the monsters that roam the Veldt, have their own weak points and are easier to break.
+**New weak points.** Monsters in the Veldt cave, and many early monsters met on the Veldt, have new weak points.
 
-**Two new saves.** At the Veldt cave's save point, and outside Duncan's house once Gau is back and Sabin has learned Bum Rush.
-
-**Running out of MP.** An action that fails for lack of MP does nothing and keeps its boost.
+**Two new saves.** At the Veldt cave and at Duncan's house.
