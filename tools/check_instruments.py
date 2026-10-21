@@ -47,7 +47,9 @@ import compose  # noqa: E402 -- declared_states: the graph's state names
 OUT = os.path.join(ROOT, "build", "checks", "instruments")
 MANUAL = re.compile(r"^-- @manual(.*)$", re.M)
 SPLICE = re.compile(r"^\s*splice:\s*(\S+)(?:\s+with\s+(.*?))?\s*$")
-BOOT_CHECKPOINT = re.compile(r'H\.bootCheckpoint\("([^"]+)"')
+# an instrument Continues a checkpoint by H.bootCheckpoint, or by its own
+# boot declared with a `-- @checkpoint <key>` line
+BOOT_CHECKPOINT = re.compile(r'H\.bootCheckpoint\("([^"]+)"|^-- @checkpoint\s+(\S+)', re.M)
 HOST_LIB = re.compile(r'^local H = dofile\("[^"]*lib/ot6\.lua"\)\n', re.M)
 
 
@@ -121,7 +123,7 @@ def emulated(rel: str, text: str, states: set[str]) -> tuple[bool, str]:
     # an instrument that Continues a checkpoint gets the capture the graph's
     # own run saved, as its suite counterparts do (configure.py TEST_ENV);
     # compose.py writes it into the preamble, so it is set before composing
-    keys = sorted(set(BOOT_CHECKPOINT.findall(text)))
+    keys = sorted(set([a or b for a, b in BOOT_CHECKPOINT.findall(text)]))
     if len(keys) > 1:
         return False, "Continues more than one checkpoint: " + ", ".join(keys)
     if keys:

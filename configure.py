@@ -874,7 +874,9 @@ check("callback_negative", "nice sh tools/tests/lib/callback_negative.sh",
       + [copy_if_changed_from(h) for h in LIBS])
 # #309: every instrument left in tools/tests (`-- @manual`) composes and
 # starts (docs/TESTING.md "Scripts that stay in the tree").
-BOOT_CHECKPOINT = re.compile(r'H\.bootCheckpoint\("([^"]+)"')
+# an instrument Continues a checkpoint by H.bootCheckpoint, or by its own
+# boot declared with a `-- @checkpoint <key>` line
+BOOT_CHECKPOINT = re.compile(r'H\.bootCheckpoint\("([^"]+)"|^-- @checkpoint\s+(\S+)', re.M)
 
 
 # an instrument that Continues a checkpoint (H.bootCheckpoint) runs on the
@@ -882,7 +884,7 @@ BOOT_CHECKPOINT = re.compile(r'H\.bootCheckpoint\("([^"]+)"')
 # hands it OT6_SRAM_CHECKPOINT)
 def checkpoint_deps(lua_path):
     deps = []
-    for key in sorted(set(BOOT_CHECKPOINT.findall((ROOT / lua_path).read_text(errors="replace")))):
+    for key in sorted(set([a or b for a, b in BOOT_CHECKPOINT.findall((ROOT / lua_path).read_text(errors="replace"))])):
         if key not in captures:
             sys.exit(f"configure.py: {lua_path} Continues {key}, which no run on the savestate graph saves")
         deps += sn.capture_inputs(ROOT, key)

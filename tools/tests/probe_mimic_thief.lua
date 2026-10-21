@@ -1,5 +1,6 @@
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 -- @manual a measurement probe for #261 (what a mimicked Steal, Filch and Bestow cost); no design verdict
+-- @checkpoint fire-out-v1
 -- probe_mimic_thief.lua -- what a MIMICKED Steal, Filch and Bestow cost, and do  (#261)
 --
 -- A measurement probe (no verdict asserts on the design question; it asserts
@@ -287,7 +288,21 @@ end
 -- ---- the run -----------------------------------------------------------------
 local snapL, snapRef = nil, {}
 local steps = {
-  H.bootCheckpoint("fire-out-v1"),   -- the cold Continue, its entry contract asserted
+  H.waitFrames(350),
+  H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
+  H.waitFrames(120),
+  (function()
+    local ph = 0
+    return H.driveUntil(function() return H.worldMode() and bright() >= 15 and H.worldHasControl() end,
+      6000, {
+      H.call(function()
+        ph = (ph + 1) % 48
+        if bright() < 15 then H.setPad({}); return end
+        H.setPad(ph < 8 and { "a" } or {})
+      end),
+    }, "cold Continue -> world map control")
+  end)(),
+  H.release(),
   H.waitFrames(60),
   H.call(function()
     H.assertEntryContract("fire-out-v1")
