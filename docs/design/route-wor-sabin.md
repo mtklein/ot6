@@ -1224,6 +1224,33 @@ driver's idle (`var-final/summary.txt`): 14 of 14 `PASS attempts=1/1`,
 last per-frame reading) and `var-prefinal/` (a release-per-step walker
 since dropped) ended at the same frames with the same verdicts.
 
+**v0.34 (#454): the care threshold and the Sneeze carry.** After the
+v0.33 ROM changes, v0.33's qualification lost attempt 1 in Osprey +
+Chitonid + Gigan Toad (key `beDC-g00CC-eF8A7A3A3`). The after-battle
+care had passed at 0.65 (`nothing to do: c6 760/1043 hp`), and she was
+Slowed at 334 and died at 82 with a Cure queued. The care now tops her
+up at `H.CARE_BEFORE_FIGHTS` (0.9) on every walk. The same formation
+also sneezed her out when a 2-BP Fight on a Chitonid at 106 or 127 HP
+carried its spare swings onto the other two and killed them, leaving
+the Chitonid's counter with nobody else standing. The driver now gives
+a Sneeze body that a smaller Fight already kills the smallest boost
+that kills it (`[last stand] slot 1 at 127 HP ... Fight at 0 BP, 2 BP
+kept (#454)`). K 0-5 x shifts 0/7, retries off, from the tracked
+`wor-start-v1` (`build/attempts/wt/v034-tzen-wipe/lab/`, `summary.txt`
+in each arm):
+
+| arm | PASS | distinct battle keys | not won |
+|---|---|---|---|
+| `base/` (v0.34's generator and lib) | 11 / 12 | 116 | 2, both $0CC: `beDC` LOST (k0_s0, the qualification's death), `be10` PARTY LEFT (k0_s7) |
+| `fix1-all/` (the care only) | 11 / 12 | 134 | 1: `beC8-g00CC-eF8A7A3A3` PARTY LEFT (k2_s7) |
+| `fix2/` (the care and the boost trim) | 11 / 12 | 132 | 0; `beC8-g00CC-eF8A7A3A3` WON (k2_s7) |
+
+The k3_s7 run fails in both fix arms on the render-on-demand check
+after all 13 battles were won and the save was written (`savestate at
+frame 18030 scanline 41`). That is a harness check, not play. The care
+spends Tonics instead: 8-16 left at the save from 29, against 15-29 on
+the base, with Potions untouched.
+
 ### 10.6 For the house segment
 
 `wor-tzen-door-v1` boots CELES alone at world (131,179): L27 (xp 55,924),

@@ -48,6 +48,20 @@ local MOG = 0x0A
 local DANCES = 0x1D4C                   -- known-dance mask
 local BOOST = 1                         -- the pip every character opens with
 local MIN_BRANCHES, MAX_BRANCHES = 8, 16
+-- The encounter is whatever the world deals (#454).  One that ends, or where
+-- MOG falls, before a branch's start turn resolves gives that branch no
+-- outcome (on v0.34's first chain the Mantodea, formation group $0143,
+-- killed MOG, and UMARO's berserk swings ended another, before the turn
+-- came); once LOST_RUN branches of an encounter in a row give none, or its
+-- MAX_BRANCHES are used, the next encounter is taken: the world map before
+-- this one is restored, this one is fought out by the walker, the party is
+-- cared for, and the next one is walked into.  At most MAX_ENCOUNTERS.
+-- Measured over K 0-5 encounters used up first (build/attempts/wt/
+-- v034-tzen-wipe/suitelab/sfix/): 6 of 6 pass; K1 ($0143) and K4 ($0145)
+-- lost MOG in 3 branches and took encounter 2.  The same draws failed the
+-- suite before (sbase/: K1, K2 and K4 timed out; K2 walked in with MOG
+-- dead, which the care before the walk now lifts).
+local LOST_RUN, MAX_ENCOUNTERS = 3, 4
 
 local function bp(s) return H.readByte(0x3E9C + s * 2) end
 local function pend(s) return H.readByte(0x3E9D + s * 2) end
@@ -55,6 +69,19 @@ local function mpOf(s) return H.readWord(0x3C08 + s * 2) end
 local function dancing(s) return (H.readByte(0x3EF8 + s * 2) & 0x01) ~= 0 end
 
 local mogSlot, danceId, offId = nil, nil, nil
+local enc, encs, encLost, lostRun = 0, {}, nil, 0
+
+-- why MOG's turn can no longer come in this battle, or nil: the battle
+-- ended, or he is down (no HP, or Wound / Petrify / Zombie in STATUS1)
+local function lostWhy()
+  if not H.battleLoadStarted() then return "the battle ended" end
+  local s = mogSlot
+  local hp, st1 = H.readWord(0x3BF4 + s * 2), H.readByte(0x3EE4 + s * 2)
+  if hp == 0 or (st1 & 0xC2) ~= 0 then
+    return string.format("MOG (slot %d) is down (HP %d, STATUS1 $%02X)", s, hp, st1)
+  end
+  return nil
+end
 local ph, hb = 0, -600
 
 -- the bystanders' hands: Defend from the command window, page dialogs
@@ -76,10 +103,19 @@ local function findMog()
   assert(mogSlot, "MOG is in the battle party")
 end
 
+local rec = nil           -- the live branch's record
+local function lostNow()
+  if rec == nil then encLost = encLost or lostWhy(); return encLost ~= nil end
+  rec.lost = rec.lost or lostWhy()
+  return rec.lost ~= nil
+end
+
 local function mogMenu(what)
   return H.driveUntil(function()
-    return H.battleLoadStarted() and H.readByte(MENU) ~= 0
-       and H.readByte(ACTOR) == mogSlot and H.readByte(MSTATE) == ST_CMD
+    if rec and rec.lost then return true end
+    if H.battleLoadStarted() and H.readByte(MENU) ~= 0
+       and H.readByte(ACTOR) == mogSlot and H.readByte(MSTATE) == ST_CMD then return true end
+    return lostNow()
   end, 30000, {
     H.call(function()
       ph = ph + 1
@@ -96,6 +132,7 @@ end
 -- R until MOG's pending boost reads BOOST (edge presses, read back)
 local function raiseBoost(what)
   return H.driveUntil(function()
+    if rec.lost or lostNow() then return true end
     return H.readByte(ACTOR) == mogSlot and H.readByte(MSTATE) == ST_CMD
        and pend(mogSlot) == BOOST
   end, 900, {
@@ -114,8 +151,10 @@ local function raiseBoost(what)
 end
 
 local function openDance(what)
-  return H.driveUntil(function() return H.readByte(MSTATE) == ST_DANCE end,
-    1200, {
+  return H.driveUntil(function()
+      if rec.lost or lostNow() then return true end
+      return H.readByte(MSTATE) == ST_DANCE
+    end, 1200, {
       H.call(function()
         ph = ph + 1
         local edge = ph % 10 < 5
@@ -137,6 +176,7 @@ end
 
 local function danceCursorTo(what)   -- onto offId, read when it runs
   return H.driveUntil(function()
+    if rec.lost or lostNow() then return true end
     local id = offId
     local a = H.readByte(ACTOR)
     return H.readByte(MSTATE) == ST_DANCE
@@ -161,7 +201,6 @@ end
 
 -- ---- observers --------------------------------------------------------------
 local recs = {}           -- one per branch
-local rec = nil           -- the live branch's record
 
 -- the stumble arm, by its bytes: `lda #$06 / sta $3401` ("Stumbled!!")
 -- inside Cmd_13, so the observer needs no symbol a given build may lack
@@ -198,30 +237,36 @@ local function installObservers()
 end
 
 local function tally()
-  local st, dn = 0, 0
+  local st, dn, res = 0, 0, 0
   for _, r in ipairs(recs) do
     if r.after then
+      res = res + 1
       if r.stumbled then st = st + 1 elseif r.done.dancing then dn = dn + 1 end
     end
   end
-  return st, dn
+  return st, dn, res
+end
+-- more branches wanted: fewer than MIN_BRANCHES resolved, or either outcome unseen
+local function needMore()
+  local st, dn, res = tally()
+  return res < MIN_BRANCHES or st == 0 or dn == 0
 end
 
 local snap = nil
 local function branch(k, wait)
   local req
   return H.cond(function()
-    local st, dn = tally()
-    return #recs < MIN_BRANCHES or st == 0 or dn == 0
+    return needMore() and encLost == nil and lostRun < LOST_RUN
   end, {
     H.call(function() H.setPad({}); rec = nil; req = H.requestLoadState(snap.blob) end),
     H.waitFrames(2),
     H.call(function()
       H.checkReq(req, "snapshot load (branch " .. k .. ")")
       H.rearmInputInjection()
-      rec = { k = k, wait = wait }
+      rec = { k = k, wait = wait, enc = enc }
       recs[#recs + 1] = rec
-      H.log(string.format("[dancestumble] branch %d: %d idle frames at MOG's window", k, wait))
+      H.log(string.format("[dancestumble] branch %d (encounter %d): %d idle frames at MOG's window",
+        k, enc, wait))
     end),
     H.waitFrames(wait + 1),
     -- the draw: MOG Defends (k-1) % 4 turns first, so monster turns and
@@ -231,6 +276,7 @@ local function branch(k, wait)
     -- $be $73-$AF, build/attempts/wt/v028-kits/px13-lab2/stumble/lab.out)
     H.repeatN((k - 1) % 4, {
       H.driveUntil(function()
+        if rec.lost or lostNow() then return true end
         return H.readByte(MENU) == 0 or H.readByte(ACTOR) ~= mogSlot
       end, 1800, {
         H.call(function()
@@ -250,11 +296,13 @@ local function branch(k, wait)
     H.waitFrames(20),
     danceCursorTo("cursor onto the off-terrain dance's cell"),
     H.call(function()
+      if rec.lost then return end
       rec.pend0, rec.bank0, rec.mp0 = pend(mogSlot), bp(mogSlot), mpOf(mogSlot)
       H.log(string.format("[dancestumble] confirm: pending %d, bank %d, %d MP",
         rec.pend0, rec.bank0, rec.mp0))
     end),
     H.driveUntil(function()
+      if rec.lost or lostNow() then return true end
       return H.readByte(0x32CC + mogSlot * 2) ~= 0xFF or dancing(mogSlot)
     end, 1800, {
       H.call(function()
@@ -265,14 +313,17 @@ local function branch(k, wait)
       end),
       H.waitFrames(1),
     }, "the dance commits"),
-    H.call(function() rec.committed = true end),
+    H.call(function() if not rec.lost then rec.committed = true end end),
     -- run until 20 frames past the start turn's end (or the wave's end)
     H.driveUntil(function()
+      if rec.lost then return true end
       if not H.battleLoadStarted() then return true end
       if rec.done and H.frame >= rec.done.f + 20 then
         rec.after = { bank = bp(mogSlot), mp = mpOf(mogSlot) }
         return true
       end
+      -- MOG down before the start turn resolved: that turn never comes
+      if not rec.done then return lostNow() end
       return false
     end, 20000, {
       H.call(function()
@@ -287,10 +338,13 @@ local function branch(k, wait)
     H.call(function()
       local d, a = rec.done, rec.after
       if not (d and a) then
-        H.log(string.format("[dancestumble] branch %d: the wave ended before "
-          .. "the start turn resolved (no outcome)", k))
+        lostRun = lostRun + 1
+        H.log(string.format("[dancestumble] branch %d (encounter %d): %s before "
+          .. "the start turn resolved (no outcome; %d in a row here)", k, enc,
+          rec.lost or "the wave ended", lostRun))
         return
       end
+      lostRun = 0
       H.log(string.format("[dancestumble] branch %d %s: confirm pending %d "
         .. "bank %d MP %d | turn end f%d pending %d bank %d MP %d dancing=%s "
         .. "| +20f bank %d MP %d", k, rec.stumbled and "STUMBLED" or
@@ -308,62 +362,136 @@ local body = {
     return H.worldMode() and H.worldHasControl() and H.worldAligned()
   end, 6000, "world control on the World of Ruin map"),
   H.call(function() installObservers() end),
-  -- battle_gaufight's walk: alternate left/right at tile boundaries until
-  -- the world's own encounter roll wins
-  H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
-    H.call(function()
-      if H.battleLoadStarted() or not H.worldHasControl() then H.setPad({}) return end
-      if not H.worldAligned() then return end
-      ph = ph + 1
-      H.setPad({ [(ph % 2 == 0) and "left" or "right"] = true })
-    end),
-    H.waitFrames(1),
-  }, "a world-map encounter fires"),
-  H.release(),
-  H.waitUntil(function() return H.battleActive() end, 1200, "battle armed", 5),
-  H.waitFrames(240),
-  H.call(function()
-    findMog()
-    local mask = H.readByte(DANCES)
-    danceId = H.readRomByte((H.sym("BattleBGDance") & 0x3FFFFF) + H.readByte(0x11E2))
-    offId = nil
-    for d = 0, 7 do
-      if mask & (1 << d) ~= 0 and d ~= danceId then offId = d; break end
-    end
-    H.assertEq(offId ~= nil, true, string.format(
-      "MOG knows a dance that is not this background's (mask %02X, terrain dance %d)",
-      mask, danceId))
-    H.log(string.format("[dancestumble] known mask %02X, terrain dance %d, "
-      .. "chosen dance %d", mask, danceId, offId))
-  end),
 }
-body[#body + 1] = H.call(function()
-  local bgDance = H.readRomByte((H.sym("BattleBGDance") & 0x3FFFFF) + H.readByte(0x11E2))
-  H.assertEq(bgDance ~= offId, true,
-    "the chosen dance is off this terrain: vanilla's stumble roll is live")
-  H.log(string.format("[dancestumble] MOG slot %d, %d MP, %d BP, "
-    .. "terrain dance %d, chosen dance %d", mogSlot, mpOf(mogSlot), bp(mogSlot),
-    bgDance, offId))
-end)
-body[#body + 1] = mogMenu("MOG's command window")
-body[#body + 1] = H.call(function()
-  H.assertEq(bp(mogSlot) >= BOOST, true,
-    "MOG holds the pip every character opens with")
-  H.assertEq(mpOf(mogSlot) >= H.boostPrice(8, BOOST), true, string.format(
-    "MOG's real pool (%d) pays a boost-%d dance start (%d)",
-    mpOf(mogSlot), BOOST, H.boostPrice(8, BOOST)))
-  H.setPad({})
-  snap = H.requestSaveState()
-end)
-body[#body + 1] = H.waitFrames(2)
-body[#body + 1] = H.call(function() H.checkReq(snap, "snapshot at MOG's window") end)
-for k = 1, MAX_BRANCHES do body[#body + 1] = branch(k, (k - 1) * 7) end
+
+local function worldControl(what)
+  return H.waitUntil(function()
+    return H.worldMode() and H.worldHasControl() and H.worldAligned()
+  end, 6000, what)
+end
+
+-- battle_gaufight's walk: alternate left/right at tile boundaries until the
+-- world's own encounter roll wins
+local function walkIn()
+  return H.seqStep({
+    H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
+      H.call(function()
+        if H.battleLoadStarted() or not H.worldHasControl() then H.setPad({}) return end
+        if not H.worldAligned() then return end
+        ph = ph + 1
+        H.setPad({ [(ph % 2 == 0) and "left" or "right"] = true })
+      end),
+      H.waitFrames(1),
+    }, "a world-map encounter fires"),
+    H.release(),
+    H.waitUntil(function() return H.battleActive() end, 1200, "battle armed", 5),
+    H.waitFrames(240),
+  })
+end
+
+-- the walker fights the encounter the world map holds next, from here
+local function fightThrough(what)
+  local o0, wp, W = nil, 1, nil
+  return H.withReset(H.driveUntil(function()
+    return o0 ~= nil and #H.outcomes > o0
+  end, 200000, {
+    H.call(function()
+      if o0 ~= nil then return end
+      o0 = #H.outcomes
+      local x, y = H.worldX(), H.worldY()
+      for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+        if W == nil and H.worldPassable(x + d[1], y + d[2]) then W = { { x + d[1], y + d[2] }, { x, y } } end
+      end
+      assert(W, "a walkable tile beside the party")
+    end),
+    H.worldNavTo(function() return W[wp][1] end, function() return W[wp][2] end,
+      { maxFrames = 20000, playBattles = "tactical" }),
+    H.call(function() wp = wp % #W + 1 end),
+  }, what), function() o0, wp, W = nil, 1, nil end)
+end
+
+-- encounter e: from encounter e-1's world map (restored, and that encounter
+-- fought out by the walker), the party cared for, the world map
+-- snapshotted, the walk in, MOG's first window snapshotted, the branches
+local function encounter(e)
+  local req
+  local out = {
+    H.cond(function() return e > 1 end, {
+      H.call(function()
+        H.setPad({}); rec = nil
+        req = H.requestLoadState(encs[e - 1].blob)
+      end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(req, "world-map snapshot load (encounter " .. (e - 1) .. ")")
+        H.rearmInputInjection()
+      end),
+      worldControl("world control before encounter " .. (e - 1)),
+      fightThrough("the walker fights encounter " .. (e - 1) .. " out"),
+    }, {}),
+    worldControl("world control before encounter " .. e),
+    H.fieldCare({ tag = "care before encounter " .. e, threshold = H.CARE_BEFORE_FIGHTS }),
+    worldControl("world control after the care (encounter " .. e .. ")"),
+    H.call(function()
+      H.assertEq(H.charHp(MOG) > 0 and (H.charStatus1(MOG) & 0xC2) == 0, true, string.format(
+        "encounter %d: MOG stands before the walk in (HP %d, STATUS1 $%02X)", e,
+        H.charHp(MOG), H.charStatus1(MOG)))
+      rec, enc, encLost, lostRun = nil, e, nil, 0
+      encs[e] = H.requestSaveState()
+    end),
+    H.waitFrames(2),
+    H.call(function() H.checkReq(encs[e], "world-map snapshot (encounter " .. e .. ")") end),
+    walkIn(),
+    H.call(function()
+      findMog()
+      local mask = H.readByte(DANCES)
+      danceId = H.readRomByte((H.sym("BattleBGDance") & 0x3FFFFF) + H.readByte(0x11E2))
+      offId = nil
+      for d = 0, 7 do
+        if mask & (1 << d) ~= 0 and d ~= danceId then offId = d; break end
+      end
+      H.assertEq(offId ~= nil, true, string.format(
+        "MOG knows a dance that is not this background's (mask %02X, terrain dance %d)",
+        mask, danceId))
+      H.log(string.format("[dancestumble] encounter %d: formation group $%04X; known mask %02X, "
+        .. "terrain dance %d, chosen dance %d", e, H.readWord(0x11E0), mask, danceId, offId))
+      local bgDance = H.readRomByte((H.sym("BattleBGDance") & 0x3FFFFF) + H.readByte(0x11E2))
+      H.assertEq(bgDance ~= offId, true,
+        "the chosen dance is off this terrain: vanilla's stumble roll is live")
+      H.log(string.format("[dancestumble] MOG slot %d, %d MP, %d BP, "
+        .. "terrain dance %d, chosen dance %d", mogSlot, mpOf(mogSlot), bp(mogSlot),
+        bgDance, offId))
+    end),
+    mogMenu("MOG's command window"),
+    H.cond(function() return encLost == nil end, {
+      H.call(function()
+        H.assertEq(bp(mogSlot) >= BOOST, true,
+          "MOG holds the pip every character opens with")
+        H.assertEq(mpOf(mogSlot) >= H.boostPrice(8, BOOST), true, string.format(
+          "MOG's real pool (%d) pays a boost-%d dance start (%d)",
+          mpOf(mogSlot), BOOST, H.boostPrice(8, BOOST)))
+        H.setPad({})
+        snap = H.requestSaveState()
+      end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(snap, "snapshot at MOG's window") end),
+    }, {
+      H.call(function()
+        H.log(string.format("[dancestumble] encounter %d: %s before MOG's first window: "
+          .. "no branch here", e, encLost))
+      end),
+    }),
+  }
+  for k = 1, MAX_BRANCHES do out[#out + 1] = branch(k, (k - 1) * 7) end
+  return H.seqStep(out)
+end
+for e = 1, MAX_ENCOUNTERS do
+  body[#body + 1] = H.cond(function() return needMore() end, { encounter(e) }, {})
+end
 body[#body + 1] = H.call(function()
   H.setPad({})
   local price = H.boostPrice(8, BOOST)
-  local st, dn = tally()
-  local resolved = 0
-  for _, r in ipairs(recs) do if r.after then resolved = resolved + 1 end end
+  local st, dn, resolved = tally()
   H.log(string.format("[dancestumble] SUMMARY branches=%d resolved=%d "
     .. "stumbled=%d danced=%d (boost %d, boosted price %d)",
     #recs, resolved, st, dn, BOOST, price))
