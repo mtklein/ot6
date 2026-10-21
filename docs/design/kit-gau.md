@@ -245,6 +245,20 @@ Nothing legitimately spends pips on a refusal. `battle_mpfizzle` plays a
 boosted Magic cast, a boosted Dance start and a boosted X-Magic whose
 spells cannot pay at resolve.
 
+The refusal also ends the action's passes (#451). The price is checked on
+the first pass only (`$3a4c` is cleared as it is read), and a command
+handler that counts extra passes before that pass (Pummel, Bum Rush and
+Drill through `Ot6HitCount`, an Overclock through `Ot6OverclockPasses`,
+Jackpot's rolls through `Ot6SetzerEffect`) left `$3a70` standing, so
+ExecAttack's tail ran the rest unpaid: on main, a refused Pummel's second
+strike took 614 HP and a refused Overclock's second firing targeted
+(`build/attempts/wt/v033-multipass-fizzle/main_a0cfdfba/`). The fizzle arm
+now zeroes `$3a70`. Quadra Slam, Quadra Slice and Empowerer were never
+affected: their passes come from the attacker effect (`AttackerEffect_32`,
+`_36`), which runs after the MP check, so a refused one has `$3a70` at 0
+(a refused Empowerer: one pass, none after). `battle_multipassfizzle` plays
+a refused Pummel and a refused Overclock.
+
 ---
 
 ## 6. Boost — the chance-verb canon, Dance-shaped

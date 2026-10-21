@@ -28,8 +28,11 @@
 --   SABIN  Blitz, Pummel at 1 BP (two strikes, Ot6HitCount);
 --   EDGAR  Tools at 3 BP, Overclocked (twice the firings,
 --          Ot6OverclockPasses): Drill when the bag has one (its own x2 as
---          well), else the first other Tool in the list that is not Chain
---          Saw.
+--          well), else a Tool that deals damage (AutoCrossbow, Bio Blaster,
+--          Air Anchor), else Flash, NoiseBlaster or Debilitator.
+-- MPASS_SKIP (a global a lab sets; default 0) battles are fought out
+-- first, to vary the encounter history the uses meet; MPASS_CHECKPOINT
+-- names another battery for a lab (its OT6_SRAM_CHECKPOINT to match).
 -- The verbs are the seated party's: a CYAN seated (a lab on wor-cyan-v1)
 -- plays his SwdTech window's first multi-pass row.
 -- Watched, never written: Ot6FizzleDropBoost (the refusal) with x = the
@@ -50,9 +53,14 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 local CYAN, EDGAR, SABIN = 0x02, 0x04, 0x05
 local CMD_SWDTECH, CMD_TOOLS, CMD_BLITZ = 0x07, 0x09, 0x0A
-local PUMMEL, DRILL, CHAINSAW = 0x5D, 0xA8, 0xA6
+local PUMMEL = 0x5D
+-- Drill (its own x2 as well), then the Tools that deal damage, then the
+-- rest; never Chain Saw (its instant kill ends small battles)
+local TOOL_PREF = { 0xA8, 0xAA, 0xA4, 0xA9, 0xA5, 0xA3, 0xA7 }
 local MULTI_SWDTECH = { [0x58] = "Quadra Slam", [0x59] = "Empowerer", [0x5B] = "Quadra Slice" }
 local BATTLES = 4
+MPASS_SKIP = MPASS_SKIP or 0
+MPASS_CHECKPOINT = MPASS_CHECKPOINT or "wor-tomb-v1"   -- a lab's other battery
 
 local function seatOf(c)
   for s = 0, 3 do
@@ -106,7 +114,7 @@ local function arm()
     if active.refused == nil then
       active.refused = { f = H.frame, passes = H.readByte(0x3A70), pend = pend(active.seat), hp = t, hps = s,
         before = active.passes or 0 }
-      H.log(string.format("[mpass] %s refused f%d: $3a70=%d (passes still counted), pending %d, pass %d of "
+      H.log(string.format("[mpass] %s refused f%d: $3a70=%d at the refusal, pending %d, pass %d of "
         .. "the action, monsters' HP %s", active.verb.name, H.frame, active.refused.passes, active.refused.pend,
         active.refused.before, s))
     end
@@ -204,9 +212,8 @@ local function useStep(v)
           local seen = {}
           for i = 0, 7 do seen[#seen + 1] = string.format("%02X", rows[i]) end
           if v.peek == "tools" then
-            for i = 0, 7 do if rows[i] == DRILL then v.row = DRILL end end
-            for i = 0, 7 do
-              if v.row == nil and rows[i] >= 0xA3 and rows[i] <= 0xAA and rows[i] ~= CHAINSAW then v.row = rows[i] end
+            for _, id in ipairs(TOOL_PREF) do
+              for i = 0, 7 do if v.row == nil and rows[i] == id then v.row = id end end
             end
           else
             for i = 0, 7 do
@@ -245,7 +252,7 @@ local function pending()
 end
 
 local body = {
-  H.bootCheckpoint("wor-tomb-v1"),
+  H.bootCheckpoint(MPASS_CHECKPOINT),
   H.call(function()
     arm()
     local party = H.readByte(0x1A6D) & 7
@@ -259,6 +266,13 @@ local body = {
   end),
 }
 
+body[#body + 1] = H.repeatN(MPASS_SKIP, {
+  H.waitUntil(function() return H.hasControl() or H.worldHasControl() end, 3000, "control", 5),
+  H.fieldCare({ tag = "mpass: care before a skipped battle", threshold = 0.95, mpBand = 0.9 }),
+  walkToBattle(),
+  H.kitBattle({}, { maxFrames = 60000 }),
+  H.call(function() H.log("[mpass] a skipped battle fought out (MPASS_SKIP)") end),
+})
 body[#body + 1] = H.driveUntil(function() return pending() == 0 and not H.battleLoadStarted() end, 400000, {
   H.call(function()
     battles = battles + 1
