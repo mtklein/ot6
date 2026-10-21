@@ -8,8 +8,9 @@
 -- so its 3-BP cast only ever showed a Break; here the body holds five, so
 -- four taken is told from three and from five.
 --
--- Played: Continue esper-mtn-save-v1 (TERRA L24 knows Break, her level-24
--- spell), pace beside the save point into a random battle, and TERRA casts
+-- Played: Continue esper-mtn-save-v1 (Break is TERRA's level-24 spell; the
+-- battles before she knows it are fought out for the experience), pace
+-- beside the save point into a random battle, and TERRA casts
 -- Break at 3 BP through the real menu (H.kitBattle; Defends bank the
 -- points) at an unbroken body holding five; everyone else Defends.  This map's
 -- pool (route_data.py pool field 375, group 90) fields an Adamanchyt
@@ -103,6 +104,11 @@ end
 -- such battles in a row is 0.3125^10 = 8.7e-6; a try is also lost to a
 -- TERRA who cannot cast or a battle that ends before the cast.  TRIES = 12.
 local TRIES = 12
+-- LEARN: Break is TERRA's level-24 spell, and the play that makes esper-mtn-save-v1 can leave her at L23
+-- (the v0.34 qualification: 37,963 of the 39,056 experience L24 takes); battles fought before she knows it
+-- are fought out for the experience, as a player would at the save point, and are not counted in TRIES
+local LEARN = 8
+local learning = 0
 local done, turns, mode, nrec, target, held = false, 0, nil, 0, nil, 0
 local plan = {}
 local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
@@ -112,6 +118,14 @@ local function terraCasts()
     and (H.readByte(0x3EE5 + e) & 0xB8) == 0
 end
 local function decide()
+  if not H.knowsSpell(TERRA, BREAK) then
+    learning = learning + 1
+    H.assertEq(learning <= LEARN, true, string.format("TERRA learns Break within %d battles", LEARN))
+    plan, mode, nrec = {}, "fightout", #recs
+    H.log(string.format("[break4] TERRA (L%d) does not know Break yet: battle %d fought out for the experience",
+      H.readByte(0x1608), learning))
+    return
+  end
   turns = turns + 1
   H.assertEq(turns <= TRIES, true, string.format("the counted cast within %d tries", TRIES))
   seat = nil
