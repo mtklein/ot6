@@ -425,7 +425,10 @@ H.run({ maxFrames = 2400000 }, {
   H.advanceStory(function() return sw(0x01F0) == 1 and settled() end, 3000, { playBattles = "tactical", fight = FIGHT }),
   H.navTo(118, 27, { maxFrames = 3000 }),
   H.saveState("wor_opera_switch.mss"),
-  H.faceAndHoldA("up", function() return not H.hasControl() end, 600, "the catwalk's switch (232 (118,27)): face up, A"),
+  -- (the switch's own tile re-runs its script under the party, control one frame in four: done is the
+  -- drop's map load, _cab497's load_map 231, not a frame without control)
+  H.faceAndHoldA("up", function() return map() ~= 232 or H.battleLoadStarted() end, 900,
+    "the catwalk's switch (232 (118,27)): face up, A"),
   H.release(),
   H.advanceStory(function() return sw(0x0387) == 0 and map() == 237 and settled() end, 300000,
     { playBattles = "tactical", fight = FIGHT }),
