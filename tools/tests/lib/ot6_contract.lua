@@ -2738,7 +2738,11 @@ local function atBoundary(c)
     return M.worldMode() and (M.mapId() & 0x1ff) == (c.world.map or 0)
        and M.worldX() == c.world.x and M.worldY() == c.world.y
   end
-  return not M.worldMode() and (M.mapId() & 0x1ff) == c.field.map
+  -- (the load screen's "This data?" preview holds the slot's map and tile in
+  -- the cells read here while the menu module runs: measured on the
+  -- wor-dream-v1 Continue, where the A presses stopped on the preview and
+  -- the confirm sat unanswered, build/attempts/wt/v035-wor-dreams/lab/gdo1_s0)
+  return not M.worldMode() and not M.menuRunning() and (M.mapId() & 0x1ff) == c.field.map
      and M.fieldX() == c.field.x and M.fieldY() == c.field.y
 end
 

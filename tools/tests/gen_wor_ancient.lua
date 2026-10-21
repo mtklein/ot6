@@ -587,6 +587,10 @@ H.run({ maxFrames = 2400000 }, {
   H.waitUntil(function() return map() == MAP_ASAVE and settled() end, 3000, "402", 1),
   door(22, 42, MAP_ACAVE, "402 (22,42) -> the cave (401)"),
   door(42, 4, MAP_FB1, "the cave (42,4) -> basement 1"),
+  -- the cave's mouth opens on basement 1's east side; the engineer stands in its west room, which the lower hall
+  -- joins: 61 (27,31) -> 59 (14,48), 59 (9,49) -> 61 (10,33)
+  door(27, 31, MAP_FHALL, "basement 1's east side -> the lower hall"),
+  door(9, 49, MAP_FB1, "the lower hall -> basement 1's west room"),
   -- under the stratum the engineer asks at once; the ride on goes to South Figaro (_ca6969 -> _ca69ad), and
   -- the next ride, to Kohlingen, stops under it again and goes on to the Kohlingen side (_ca6931), where the
   -- Falcon waits
