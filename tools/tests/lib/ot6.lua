@@ -10522,6 +10522,7 @@ function Driver:makePlan(actor)
   self._race = nil
   plan = self:lockeMug(actor, plan)
   plan = self:dodgePlan(actor, plan)
+  plan = self:floatPlan(actor, plan)
   plan = self:policyPlan(actor, plan)
   if plan then plan.raceBoost = plan.boostLeft or 0 end
   self:sayTurn(actor, plan)
@@ -10564,6 +10565,46 @@ function Driver:dodgePlan(actor, plan)
     end
   end
   return plan
+end
+
+-- Float against an earth caster (#270): opts.floatVs = { [species] = true }.
+-- While one of these stands and a living member is not floating (ST4 bit 7),
+-- an actor with Float ($22) in its Magic list casts it on the whole party
+-- (the all-allies latch, as the party cure takes) in place of an attack:
+-- earth misses a floating body (the Opera House's Dirt Dragon casts Quake,
+-- Magnitude8 and Slide, and Quake felled the q2 qualification's first
+-- attempt: build/attempts/wt/v034-wor-gogo/q2).  A heal, an item, a raise or
+-- a defer the rules chose stands; a cast already in flight (confirmed in the
+-- last 600 frames) is not doubled.  Shaped like magicOnlyLine's shellVs.
+-- FLOAT_OFF (a global) turns it off, the control arm.
+M.FLOAT_SPELL = 0x22
+Driver.FLOAT_OVER = { fight = true, skill = true, magic = true, lore = true, tools = true, mimic = true,
+  summon = true, throw = true, runic = true, slot = true, morph = true, magitek = true, rage = true }
+function Driver:floatPlan(actor, plan)
+  local fv = self.opts.floatVs
+  if fv == nil or FLOAT_OFF or plan == nil or not Driver.FLOAT_OVER[plan.kind] then return plan end
+  if plan.kind == "magic" and plan.spell == M.FLOAT_SPELL then return plan end
+  local danger = false
+  for s = 0, 5 do if monAlive(s) and fv[M.readWord(0x57C0 + s * 2)] then danger = true end end
+  if not danger then return plan end
+  local row = cmdRow(actor, BATTLE.CMD_MAGIC)
+  if row == nil or spellCell(actor, M.FLOAT_SPELL, true) == nil then return plan end
+  if M.frame - (self.floatAt or -100000) <= 600 then return plan end
+  local bare = nil
+  for e = 0, 3 do
+    local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+    if bare == nil and mx > 0 and mx ~= 0xFFFF and hp > 0 and (M.readByte(BATTLE.ST4 + e * 2) & 0x80) == 0 then
+      bare = e
+    end
+  end
+  if bare == nil then return plan end
+  self.floatAt = M.frame
+  M.floats = M.floats or {}
+  M.floats[#M.floats + 1] = { actor = actor, frame = M.frame, bare = bare, over = plan.kind }
+  M.log(string.format("[%s] actor=%d Float on the party (entity %d is not floating, an earth caster stands): in "
+    .. "place of its %s", self.tag or "fight", actor, bare, plan.kind))
+  return { kind = "magic", spell = M.FLOAT_SPELL, row = row, boostLeft = 0, ally = true, all = true,
+           target = bare, buff = true, vetoOk = true, reason = "float" }
 end
 
 -- The measuring policies (#422, tools/fight_report.py): the real driver
