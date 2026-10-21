@@ -10,3 +10,4 @@
 2026-10-13 v0.29 qualification: the line replayed from power-on under the release library (the MOG/Water Rondo route, elemental shield grants and the lib changes since v0.28)
 2026-10-14 v0.30 qualification: the line replayed from power-on under the release library (the Jidoor/Owzer/Chadarnook route, Strago's kit and the ot6, ot6_contract and ot6_field lib changes since v0.29)
 2026-10-20 v0.32 qualification: the line replayed from power-on under the release library (Locke's kit, the boost aura, the Narshe/Ragnarok route and the ot6, ot6_contract and ot6_field lib changes since v0.31)
+2026-10-21 v0.33 qualification: the line replayed from power-on under the release library (the Veldt/Gau/Duncan route, the Rage, MP-fizzle and multi-pass fixes, and the lib changes since v0.32)
