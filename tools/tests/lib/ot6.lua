@@ -10524,6 +10524,7 @@ function Driver:makePlan(actor)
   plan = self:dodgePlan(actor, plan)
   plan = self:floatPlan(actor, plan)
   plan = self:buffPlan(actor, plan)
+  plan = self:zingerPlan(actor, plan)
   plan = self:policyPlan(actor, plan)
   if plan then plan.raceBoost = plan.boostLeft or 0 end
   self:sayTurn(actor, plan)
@@ -10659,6 +10660,39 @@ function Driver:buffPlan(actor, plan)
     end
   end
   return plan
+end
+
+-- Wrexsoul's Zinger (#271): its first turn (AIScript _290) hides it inside a
+-- party member: TargetEffect_3a keeps the attacker in $33F8 and the member
+-- in $33F9 (entity x 2) and makes it untargetable ($2F4D), and only that
+-- member's fall brings it back (_c207c8: hide, then revive at its current
+-- HP); its Soul Savers restore themselves when they fall, so a fight that
+-- waits for the member to fall to them is a war of attrition (the dream's
+-- first Wrexsoul labs, route-wor-dreams.md).  A person who saw where the
+-- Zinger went fells that member: while one hides, an actor other than the
+-- host turns an attack plan, or a heal aimed at the host, into a Fight on
+-- the host (the ally-Fight the Muddle rule presses), at the plan's boost
+-- when it was a Fight.  Care for the other members stands.  ZINGER_OFF (a
+-- global) turns it off, the control arm.
+M.zingers = {}           -- every Zinger plan this run, oldest first (battle_zinger reads them)
+function Driver:zingerPlan(actor, plan)
+  if ZINGER_OFF or plan == nil then return plan end
+  local za, zt = M.readByte(0x33F8), M.readByte(0x33F9)
+  if za == 0xFF or za < 8 or zt >= 8 or zt % 2 ~= 0 then return plan end
+  local host = zt // 2
+  if actor == host or M.readWord(0x3BF4 + host * 2) == 0 then return plan end
+  local care = plan.kind == "item" or plan.kind == "defer" or plan.kind == "switch"
+    or (plan.ally and plan.reason ~= "zinger")
+  if care and plan.target ~= host then return plan end
+  local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
+  if fight == nil then return plan end
+  local boost = plan.kind == "fight" and not plan.ally and (plan.boostLeft or 0) or 0
+  M.zingers[#M.zingers + 1] = { actor = actor, host = host, slot = (za - 8) // 2, frame = M.frame,
+    over = plan.kind, boost = boost }
+  M.log(string.format("[%s] actor=%d zinger: slot %d hides in entity %d (%d/%d HP): a Fight on the host at %d BP "
+    .. "in place of its %s", self.tag or "fight", actor, (za - 8) // 2, host, M.readWord(0x3BF4 + host * 2),
+    M.readWord(0x3C1C + host * 2), boost, plan.kind))
+  return { kind = "fight", row = fight, boostLeft = boost, target = host, ally = true, reason = "zinger" }
 end
 
 -- The measuring policies (#422, tools/fight_report.py): the real driver
@@ -13880,7 +13914,7 @@ function Driver:button(actor)
     -- The raise-then-top-up pair (#168): a confirmed Fenix Down is
     -- pending until the target's HP moves (watchPendingCare); a confirmed heal
     -- on a raised member pays the top-up owed.
-    if self.plan.ally and not self.plan.bounce and not self.plan.buff then
+    if self.plan.ally and not self.plan.bounce and not self.plan.buff and self.plan.reason ~= "zinger" then
       self.unmuddlePending = { e = self.plan.target, by = actor, tick = self.battleTick }
       -- the hit itself, until the hitter's command runs (#320): it lands
       -- even when something else cleared the Muddle first
