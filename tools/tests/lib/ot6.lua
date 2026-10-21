@@ -10523,6 +10523,7 @@ function Driver:makePlan(actor)
   plan = self:lockeMug(actor, plan)
   plan = self:dodgePlan(actor, plan)
   plan = self:floatPlan(actor, plan)
+  plan = self:buffPlan(actor, plan)
   plan = self:policyPlan(actor, plan)
   if plan then plan.raceBoost = plan.boostLeft or 0 end
   self:sayTurn(actor, plan)
@@ -10606,6 +10607,51 @@ function Driver:floatPlan(actor, plan)
     .. "caster stands): in place of its %s", self.tag or "fight", actor, bare, mask, plan.kind))
   return { kind = "magic", spell = M.FLOAT_SPELL, row = row, boostLeft = 0, ally = true, all = true,
            target = bare, buff = true, vetoOk = true, reason = "float" }
+end
+
+-- Wards against a hard caster (#270): opts.buffVs = { [species] = { spell, ... } }.
+-- While one of these stands, an actor whose Magic list holds one of the
+-- spells (Shell $25 halves magic, Safe $1C physical, Haste $1F) puts it on
+-- the first living member without that status, a member at a time, in place
+-- of an attack (a heal, an item, a raise or a defer the rules chose stands),
+-- the spells in the order given.  A member under Reflect takes no ward (it
+-- would rebound); a cast in flight on a member (confirmed in the last 900
+-- frames) is not doubled.  BUFF_OFF (a global) turns it off.  The Dirt
+-- Dragon's earth spells strip no ward but Float (its 50 Gs removes Float
+-- alone: build/lab/gogo/magic.py C3), so Shell holds where Float does not.
+Driver.BUFF_STATUS = { [0x25] = { 0x3EF8, 0x20 }, [0x1C] = { 0x3EF8, 0x40 }, [0x1F] = { 0x3EF8, 0x08 } }
+function Driver:buffPlan(actor, plan)
+  local bv = self.opts.buffVs
+  if bv == nil or BUFF_OFF or plan == nil or not Driver.FLOAT_OVER[plan.kind] or plan.buff then return plan end
+  local spells = nil
+  for s = 0, 5 do
+    local sp = monAlive(s) and bv[M.readWord(0x57C0 + s * 2)]
+    if sp and spells == nil then spells = sp end
+  end
+  if spells == nil then return plan end
+  local row = cmdRow(actor, BATTLE.CMD_MAGIC)
+  if row == nil then return plan end
+  self.buffAt = self.buffAt or {}
+  for _, spell in ipairs(spells) do
+    local st = Driver.BUFF_STATUS[spell]
+    if st and spellCell(actor, spell, true) ~= nil then
+      for e = 0, 3 do
+        local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+        local key = spell * 4 + e
+        if mx > 0 and mx ~= 0xFFFF and hp > 0 and (M.readByte(st[1] + e * 2) & st[2]) == 0
+           and (M.readByte(0x3EF8 + e * 2) & 0x80) == 0 and M.frame - (self.buffAt[key] or -100000) > 900 then
+          self.buffAt[key] = M.frame
+          M.buffs = M.buffs or {}
+          M.buffs[#M.buffs + 1] = { actor = actor, spell = spell, target = e, frame = M.frame }
+          M.log(string.format("[%s] actor=%d ward $%02X on entity %d (a listed caster stands): in place of its %s",
+            self.tag or "fight", actor, spell, e, plan.kind))
+          return { kind = "magic", spell = spell, row = row, boostLeft = 0, ally = true, target = e, buff = true,
+                   vetoOk = true, reason = "ward" }
+        end
+      end
+    end
+  end
+  return plan
 end
 
 -- The measuring policies (#422, tools/fight_report.py): the real driver
