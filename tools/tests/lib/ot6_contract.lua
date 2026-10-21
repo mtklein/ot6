@@ -2266,6 +2266,42 @@ M.contracts["wor-gogo-v1"] = {
   },
 }
 
+-- wor-ebot-v1: the World of Ruin map, on foot on the Falcon's tile by
+-- Thamasa (250,229), after Ebot's Rock: the coral, the hungry chest fed
+-- ($01F9 is a map switch; the chest's door stays open: $055D clear), Hidon
+-- beaten (_cb71d2: $019C), the scene in Strago's house, and Thamasa's item
+-- counter.  The Opera House and Doom Gaze are ahead
+-- (docs/design/route-wor-gogo.md).  No timer.
+M.contracts["wor-ebot-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 250, y = 229 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00D4, 1, "GOGO met (_cb81c6)" },
+    { 0x019C, 1, "Hidon beaten (_cb71d2)" },
+    { 0x0387, 1, "the Dirt Dragon still on the Opera House's stage" },
+  },
+  party = {
+    size = 4,                     -- STRAGO, RELM, GOGO and TERRA
+    members = {
+      { 0x07, "STRAGO" },
+      { 0x08, "RELM" },
+      { 0x0C, "GOGO" },
+      { 0x00, "TERRA" },
+    },
+  },
+  ram = {
+    { 0x1F62, 0xFF, 250, "the Falcon parked at x 250 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 229, "the Falcon parked at y 229 (save-block cell $1F63)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
