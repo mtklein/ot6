@@ -415,6 +415,10 @@ H.run({ maxFrames = 2400000 }, {
   H.dressRelics({ { CELES, "CELES" }, { RELM, "RELM" }, { GOGO, "GOGO" }, { STRAGO, "STRAGO" } },
     { tag = "relics for the dragon and the hunt" }),
   H.fieldCare({ threshold = 1.0, tag = "before the Opera House" }),
+  -- the battle heals on top of the bag: the Elixir sat at row 106, and the walk to it held RELM's turn in
+  -- the Item list for 1,100 frames of the dragon's opening Quakes (sweep so3_k3_s7: "item steer: row 0 ->
+  -- 106")
+  H.bagArrange({ POTION, FENIX, 0xEE, 0xEC, REMEDY, TINCTURE }, { tag = "bag: the battle heals on top" }),
   H.call(function() H.log("[kit] " .. kitLine(HUNT)) end),
   liftOff(),
   H.call(function() H.log("[doom] aloft: " .. doomLine()) end),
