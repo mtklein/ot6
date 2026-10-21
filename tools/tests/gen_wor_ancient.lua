@@ -515,6 +515,45 @@ local function dragonObj()
   end
   return nil
 end
+-- walk to the wandering dragon and touch it (A, facing it, from a neighbouring tile) until its battle opens: each
+-- aligned frame the way to a tile beside it is planned again from its live tile; when no tile beside it can be
+-- reached (it stands in a nook), the party waits on the reachable tile nearest it until it steps out
+local function touchDragon(o, maxFrames, what)
+  local ph, said = 0, -1000
+  return H.withReset(H.driveUntil(function() return H.battleLoadStarted() end, maxFrames, {
+    H.call(function()
+      ph = (ph + 1) % 8
+      if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
+      if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
+      local ox, oy, px, py = H.objX(o), H.objY(o), H.fieldX(), H.fieldY()
+      local dx, dy = ox - px, oy - py
+      if H.frame - said >= 240 then
+        said = H.frame
+        H.log(string.format("[dragon] %s: f%d the dragon at (%d,%d), the party at (%d,%d)", what, H.frame, ox, oy, px, py))
+      end
+      if math.abs(dx) + math.abs(dy) == 1 then
+        local dir = dx == 1 and "right" or dx == -1 and "left" or dy == 1 and "down" or "up"
+        H.setPad(ph < 4 and { "a", dir } or { dir })
+        return
+      end
+      local best
+      for _, n in ipairs({ { ox, oy + 1 }, { ox - 1, oy }, { ox + 1, oy }, { ox, oy - 1 } }) do
+        local p = H.bfsPath(n[1], n[2])
+        if p and (best == nil or #p < #best) then best = p end
+      end
+      if best == nil then
+        local reach, bt, bd = H.bfsReach(nil, nil, nil, {}), nil, 1e9
+        for k in pairs(reach) do
+          local x, y = k & 0xFF, k >> 8
+          local d = math.abs(x - ox) + math.abs(y - oy)
+          if d < bd then bt, bd = { x, y }, d end
+        end
+        if bt and not (bt[1] == px and bt[2] == py) then best = H.bfsPath(bt[1], bt[2]) end
+      end
+      if best and #best > 0 then H.setPad({ [H.movePress(best[1])] = true }) else H.setPad({}) end
+    end),
+  }, what), function() ph, said = 0, -1000 end)
+end
 H.run({ maxFrames = 2400000 }, {
   H.bootCheckpoint("wor-doma-v1"),
   watches(),
@@ -587,6 +626,14 @@ H.run({ maxFrames = 2400000 }, {
     if o == nil then return H.call(function() end) end
     return talkNpc(o, function() return sw(0x06A0) == 0 end, "the queen's book (408 (28,43))")
   end),
+  -- the dragon wanders the east room the queen stands in and fights when it touches the party (sweep sa: in 3 of
+  -- 12 runs it met the party on the way to the queen), so the care for it comes before the east room
+  wallRingsOff("for the Blue Dragon"),
+  H.absorbSafeArms(nil, { 0x152 }, { tag = "arms for the Blue Dragon" }),
+  H.bagArrange({ POTION, FENIX, 0xEA, 0xEE, 0xEC, REMEDY, TINCTURE }, { tag = "bag: the battle heals on top" }),
+  H.fieldCare({ threshold = 1.0, tag = "before the Blue Dragon" }),
+  H.call(function() H.log("[kit] " .. kitLine(FOUR)) end),
+  H.saveState("wor_ancient_dragon.mss"),
   H.lazy(function()
     local o = objOn(52, 41)
     H.assertEq(o ~= nil, true, "the queen's statue stands at 408 (52,41)")
@@ -596,17 +643,15 @@ H.run({ maxFrames = 2400000 }, {
     H.assertEq(owns(RAIDEN), true, "Raiden is the party's")
     H.assertEq(owns(ODIN), false, "Odin was traded in (take_genju ODIN)")
   end),
-  wallRingsOff("for the Blue Dragon"),
-  H.absorbSafeArms(nil, { 0x152 }, { tag = "arms for the Blue Dragon" }),
-  H.bagArrange({ POTION, FENIX, 0xEA, 0xEE, 0xEC, REMEDY, TINCTURE }, { tag = "bag: the battle heals on top" }),
-  H.fieldCare({ threshold = 1.0, tag = "before the Blue Dragon" }),
-  H.call(function() H.log("[kit] " .. kitLine(FOUR)) end),
-  H.saveState("wor_ancient_dragon.mss"),
-  H.lazy(function()
-    local o = dragonObj()
-    H.assertEq(o ~= nil, true, "the Blue Dragon wanders the queen's floor")
-    return H.chaseTalk(o, 6000, "the Blue Dragon", { done = function() return H.battleLoadStarted() end })
-  end),
+  H.cond(function() return sw(0x06A1) == 1 end, {
+    H.lazy(function()
+      local o = dragonObj()
+      H.assertEq(o ~= nil, true, "the Blue Dragon wanders the queen's floor")
+      return touchDragon(o, 12000, "the Blue Dragon")
+    end),
+  }, {
+    H.call(function() H.log("[dragon] the Blue Dragon met the party on the way to the queen ($06A1 clear)") end),
+  }),
   H.advanceStory(function() return settled() and sw(0x06A1) == 0 end, 300000, { playBattles = "tactical", fight = FIGHT }),
   H.call(function() say("story", "the Blue Dragon beaten ($06A1 clear)") end),
   wallRingsBack("after the Blue Dragon"),
