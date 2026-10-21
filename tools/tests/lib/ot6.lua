@@ -11282,6 +11282,43 @@ function Driver:makePlanRules(actor)
     if self.opts.bank and have < self.opts.bank then boost = 0
     else boost = math.min(have, 3) end
   end
+  -- The last-stand body inside a smaller Fight (#454): a removal counter
+  -- (the Sneeze) that the focus takes first, already within reach of a
+  -- Fight at a lower boost, gets the smallest boost that kills it.  The
+  -- swings past its death carry onto the plain bodies, and a carry that
+  -- leaves N or fewer standing fires the counter on its killing blow:
+  -- measured on the WoR plains ($0CC), a 2-BP Fight on a Chitonid at
+  -- 106 and 127 HP took 1414 and 1435 off the monsters, killed all three
+  -- and CELES was sneezed out at 484 and 612 HP ("PARTY LEFT",
+  -- build/attempts/wt/v034-tzen-wipe/lab/).  The pips stay banked for the
+  -- next turn.  M.STAND_TRIM = false is the driver before it.
+  if boost > 0 and self.lastStand and M.STAND_TRIM ~= false then
+    local focus = self:lastStandFocus()
+    local slot = focus and focus[1] and focus[1].slot
+    local en = slot ~= nil and self.lastStand.entries[slot] or nil
+    local dh = self.dmgHit[actor]
+    if en and en.class == "removal" and dh ~= nil and dh.kind == "fight" and dh.per > 0 then
+      local hp = M.readWord(BATTLE.MON_HP + slot * 2)
+      local sh = M.readByte(BATTLE.SH_CUR + slot * 2)
+      local broken = M.readByte(BATTLE.BRK_TICKS + slot * 2) ~= 0
+      local _, l = handsOf(actor)
+      for b = 0, boost - 1 do
+        local mh, oh = M.fightHits(l ~= nil and 2 or 1, b)
+        local hits = mh + oh
+        local est = broken and dh.per * 4 * hits
+          or M.killEstimate({ per = dh.per, hits = hits, chips = fightChips(actor, slot, b), need = sh })
+          or dh.per * hits
+        if est >= hp then
+          M.log(string.format("[%s] actor=%d [last stand] slot %d at %d HP (%d shield(s)%s) dies to a Fight at "
+            .. "%d BP (%d: %d hit(s) at %d); boosting to %d would carry swings onto the plain bodies -- "
+            .. "Fight at %d BP, %d BP kept (#454)", self.tag or "fight", actor, slot, hp, sh,
+            broken and ", BROKEN" or "", b, est, hits, dh.per, boost, b, have - b))
+          boost = b
+          break
+        end
+      end
+    end
+  end
   -- The Doom's last turn (#190, M.doomRule): a condemned actor whose
   -- count runs out before its next turn takes no care -- a heal on it
   -- restores HP the Doom takes anyway -- and spends every pip on the
