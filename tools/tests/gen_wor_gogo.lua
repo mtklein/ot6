@@ -283,7 +283,7 @@ local function objLine(o0, o1)
   for o = o0 or 0x10, o1 or 0x14 do t[#t + 1] = string.format("$%02X(%d,%d)", o, H.objX(o), H.objY(o)) end
   return table.concat(t, " ")
 end
--- navJ (build/lab/gogo/mknavj.py): H.navLinks with a link's 7th field pressing A beside its direction
+-- navJ (build/attempts/wt/v034-wor-gogo/lab/mknavj.py): H.navLinks with a link's 7th field pressing A beside its direction
 local function navJ(tx, ty, links, opts)
   opts = opts or {}
   local what = opts.what or string.format("to (%d,%d) by the links", tx, ty)
@@ -393,7 +393,7 @@ end
 -- Entering 280 starts the ceiling (_cb80b8 -> _cb812c: timer 0, 256 frames); at zero it drops (_cb8149) and
 -- the party survives standing on a safe tile ($01B5: _cb81a2's tiles; $01BF: _cb81ab's; the engine clears
 -- both as the party steps off) or outside the room (the corridors below row 48/49: _cb81b4/_cb81bd), else
--- GameOver; then the timer runs again (x6, x7: build/lab/gogo).  A person watches the clock and walks from
+-- GameOver; then the timer runs again (x6, x7: build/attempts/wt/v034-wor-gogo/lab).  A person watches the clock and walks from
 -- one safe tile to the next that the time left reaches.
 local CRUSH_SAFE = { { 30, 42 }, { 35, 46 }, { 41, 44 }, { 46, 48 }, { 46, 49 }, { 47, 48 }, { 47, 49 }, { 50, 43 },
   { 49, 43 }, { 54, 45 }, { 54, 46 }, { 35, 47 }, { 30, 43 }, { 50, 44 },

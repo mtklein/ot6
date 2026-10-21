@@ -27,7 +27,7 @@
 -- Then the control: the same snapshot and idle frames as the first fight
 -- that copied, MIMIC_OFF set: GOGO has a command window (the control is
 -- not vacuous) and no mimicreplace runs for his seat.
--- The fight budget: lab x29 (build/lab/gogo/mkx29.py), sixteen fights from
+-- The fight budget: lab x29 (build/attempts/wt/v034-wor-gogo/lab/mkx29.py), sixteen fights from
 -- the snapshot, measured a boosted copy in 5 of 16 ("[x29] fight N ...:
 -- ... 1 boosted"), so thirteen fights miss one with odds (11/16)^13 < 1%;
 -- the fights stop at the first boosted copy.

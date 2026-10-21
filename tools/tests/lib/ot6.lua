@@ -10618,7 +10618,7 @@ end
 -- would rebound); a cast in flight on a member (confirmed in the last 900
 -- frames) is not doubled.  BUFF_OFF (a global) turns it off.  The Dirt
 -- Dragon's earth spells strip no ward but Float (its 50 Gs removes Float
--- alone: build/lab/gogo/magic.py C3), so Shell holds where Float does not.
+-- alone: build/attempts/wt/v034-wor-gogo/lab/magic.py C3), so Shell holds where Float does not.
 Driver.BUFF_STATUS = { [0x25] = { 0x3EF8, 0x20 }, [0x1C] = { 0x3EF8, 0x40 }, [0x1F] = { 0x3EF8, 0x08 } }
 function Driver:buffPlan(actor, plan)
   local bv = self.opts.buffVs
