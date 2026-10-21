@@ -82,6 +82,11 @@ local BRANCHES, MIN_EACH = 8, 3
 -- encounter: the world map before this one is restored, this one is fought
 -- out by the walker, the party is cared for, and the next one is walked
 -- into.  At most MAX_ENCOUNTERS.
+-- Measured over K 0-5 encounters used up first (build/attempts/wt/
+-- v034-tzen-wipe/suitelab/sfix/): 6 of 6 pass; K1 ($0143) and K4 ($0145)
+-- lost MOG and took encounter 2 for the Dance.  The same draws failed the
+-- suite before (sbase/: K1, K2 and K4 timed out; K2 walked in with MOG
+-- dead, which the care before the walk now lifts).
 local MAX_ENCOUNTERS = 4
 
 local function bp(s) return H.readByte(0x3E9C + s * 2) end
