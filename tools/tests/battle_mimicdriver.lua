@@ -48,13 +48,29 @@ local function boostedSeen()
 end
 -- the switch (232 (118,27), _cab497: facing up, A) and the fight to the dragon's end (map 237, $0387 clear)
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
+-- The dragon is no sure thing for these four (route-wor-gogo.md section 7: the Dirt Dragon lab), so a fight
+-- ends on the win or on a wipe read the moment all four stand at 0 HP for 30 frames, before the game over
+-- (the runner counts a game over as the run's end); the next fight restores the snapshot either way
 local function theFight(what)
+  local drv, bn, wiped, ph = nil, 0, 0, 0
   return H.seqStep({
     H.faceAndHoldA("up", function() return map() ~= 232 or H.battleLoadStarted() end, 900,
       what .. ": the catwalk's switch (232 (118,27)): face up, A"),
     H.release(),
-    H.advanceStory(function() return sw(0x0387) == 0 and map() == 237 and H.hasControl() end, 300000,
-      { playBattles = "tactical", fight = FIGHT }),
+    H.withReset(H.driveUntil(function()
+      wiped = H.partyWiped() and wiped + 1 or 0
+      if wiped >= 30 then H.log("[mimic] " .. what .. ": the party fell"); return true end
+      return sw(0x0387) == 0 and map() == 237 and H.hasControl()
+    end, 300000, {
+      H.call(function()
+        drv = drv or H.fightDriverFor("dragon", { tactical = true, boost = true, items = true, healPercent = 55 }, FIGHT)
+        ph = (ph + 1) % 8
+        bn = H.battleLoadStarted() and bn + 1 or 0
+        if bn >= 3 then drv.frame(); return end
+        if bn == 0 then drv.idle() end
+        H.setPad((H.dialogWaiting() and ph < 4) and { "a" } or {})
+      end),
+    }, what .. ": the Dirt Dragon"), function() drv, bn, wiped, ph = nil, 0, 0, 0 end),
   })
 end
 
