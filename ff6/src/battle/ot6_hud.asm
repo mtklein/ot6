@@ -2596,29 +2596,29 @@ Ot6ShieldTbl:
                                 ;   mistake, so no gauge
         ; ---- the world of ruin: ebot's rock (strago's hidon, gogo's first
         ; area; route-wor-gogo.md section 3) ------------------------------
-        ; Strago, gogo, terra and celes: bludgeon (strago's rod), pierce
-        ; (terra's dagger; gogo's), slash (celes), fire and holy, ice; and
-        ; gogo's mimic copies whichever key was just struck.  Vanilla
-        ; elements stay.
+        ; Strago, relm, gogo and terra walk it: bludgeon (the rods), pierce
+        ; (terra's dagger), fire and holy.  It is strago's quest, so every
+        ; body takes his rod (bludgeon) beside a key of its own; gogo's
+        ; mimic copies whichever key was just struck.  Vanilla elements stay.
         .word   $0069
-        .byte   2, OT6_SLASH|OT6_SPECIAL ; warlock: a robed caster (mdef
+        .byte   2, OT6_BLUDG|OT6_SPECIAL ; warlock: a robed caster (mdef
                                 ;   225).  bolt|poison vanilla
         .word   $0074
         .byte   2, OT6_PIERCE|OT6_BLUDG ; slatter: a shelled crawler; holy
                                 ;   vanilla
         .word   $009a
-        .byte   2, OT6_SLASH|OT6_PIERCE ; cluck: a bird.  ice vanilla;
+        .byte   2, OT6_SLASH|OT6_BLUDG ; cluck: a bird.  ice vanilla;
                                 ;   absorbs poison
         .word   $00a5
-        .byte   2, OT6_SLASH|OT6_PIERCE ; eland: an antelope.  bolt vanilla
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; eland: an antelope.  bolt vanilla
         .word   $00b5
         .byte   2, OT6_PIERCE|OT6_BLUDG ; hipocampus: a sea horse.
                                 ;   fire|holy vanilla; absorbs poison
         .word   $0070
-        .byte   3, OT6_PIERCE|OT6_SPECIAL ; displayer: an eye.  fire|holy
+        .byte   3, OT6_BLUDG|OT6_SPECIAL ; displayer: an eye.  fire|holy
                                 ;   vanilla; absorbs poison
         .word   $00c8
-        .byte   3, OT6_SLASH|OT6_PIERCE ; opinicus: a griffin.  fire|holy
+        .byte   3, OT6_SLASH|OT6_BLUDG ; opinicus: a griffin.  fire|holy
                                 ;   vanilla; absorbs poison
         .word   $0123
         .byte   6, OT6_PIERCE|OT6_BLUDG ; hidon: strago's old foe;
@@ -2627,8 +2627,8 @@ Ot6ShieldTbl:
         .byte   2, OT6_SLASH|OT6_BLUDG ; hidonite (poison claw): earth
                                 ;   vanilla; absorbs poison
         .word   $0160
-        .byte   2, OT6_SLASH|OT6_PIERCE ; hidonite (confuclaw): reflect,
-                                ;   and drinks every element: blades only
+        .byte   2, OT6_SLASH|OT6_BLUDG ; hidonite (confuclaw): reflect,
+                                ;   and drinks every element: a weapon only
         .word   $0161
         .byte   2, OT6_PIERCE|OT6_BLUDG ; hidonite (zombi claw): fire|holy
                                 ;   vanilla; absorbs poison
