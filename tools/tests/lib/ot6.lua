@@ -10687,12 +10687,13 @@ function Driver:zingerPlan(actor, plan)
   local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
   if fight == nil then return plan end
   local boost = plan.kind == "fight" and not plan.ally and (plan.boostLeft or 0) or 0
-  M.zingers[#M.zingers + 1] = { actor = actor, host = host, slot = (za - 8) // 2, frame = M.frame,
-    over = plan.kind, boost = boost }
+  local target = host
+  M.zingers[#M.zingers + 1] = { actor = actor, host = host, target = target, slot = (za - 8) // 2,
+    frame = M.frame, over = plan.kind, boost = boost }
   M.log(string.format("[%s] actor=%d zinger: slot %d hides in entity %d (%d/%d HP): a Fight on the host at %d BP "
     .. "in place of its %s", self.tag or "fight", actor, (za - 8) // 2, host, M.readWord(0x3BF4 + host * 2),
     M.readWord(0x3C1C + host * 2), boost, plan.kind))
-  return { kind = "fight", row = fight, boostLeft = boost, target = host, ally = true, reason = "zinger" }
+  return { kind = "fight", row = fight, boostLeft = boost, target = target, ally = true, reason = "zinger" }
 end
 
 -- The measuring policies (#422, tools/fight_report.py): the real driver

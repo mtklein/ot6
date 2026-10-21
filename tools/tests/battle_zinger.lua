@@ -80,8 +80,8 @@ H.run({ maxFrames = 400000 }, {
     end
     if planAt == nil and #H.zingers > z0 then
       planAt, plan = H.frame, H.zingers[z0 + 1]
-      H.log(string.format("[zinger] the plan: actor %d on entity %d at fight frame %d, in place of its %s",
-        plan.actor, plan.host, plan.frame - (f0 or plan.frame), plan.over))
+      H.log(string.format("[zinger] the plan: actor %d on entity %d (the host read %d) at fight frame %d, in place "
+        .. "of its %s", plan.actor, plan.target, plan.host, plan.frame - (f0 or plan.frame), plan.over))
     end
     if planAt and host and fellAt == nil and H.readWord(0x3BF4 + host * 2) == 0 then
       fellAt = H.frame
@@ -95,7 +95,7 @@ H.run({ maxFrames = 400000 }, {
   end),
   H.call(function()
     H.assertEq(planAt ~= nil, true, "1. a Zinger plan once Wrexsoul hides")
-    H.assertEq(plan.host, host, "1. the plan's target is the member $33F9 names")
+    H.assertEq(plan.target, host, "1. the plan's target is the member $33F9 names")
     H.assertEq(plan.actor ~= host, true, "1. the plan is another member's")
     H.assertEq(fellAt ~= nil and fellAt - planAt <= 6000, true, "2. the host falls within 6000 frames of the plan")
     H.assertEq(backAt ~= nil and backAt - fellAt <= 600, true, "3. Wrexsoul is back within 600 frames of the fall")
