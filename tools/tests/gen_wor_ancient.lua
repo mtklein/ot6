@@ -307,6 +307,39 @@ local function objOn(x, y)
   return nil
 end
 
+-- ---- Kohlingen: the arc's counter ----
+-- No town on the arc sells anything but Kohlingen, beside Figaro Castle's Kohlingen side: its general store
+-- (189 (11,11) -> 194 (12,39); the item counter's keeper (19,35), shop 67) tops the bag up to the band (guidelines
+-- "Supply band": Potions about level x 1.5 before a boss gauntlet and the field care's own, careStockPotions;
+-- Fenix Downs about the level, capped at 20; Remedies for the dream's Petrify and Sap), and its weapon and armor
+-- counters are the gear stop (H.gearStop, #434).  The town's south edge returns the party to the world.
+local MAP_KOHLINGEN, MAP_KSTORE, KOHLINGEN_DOOR, SHOP_KITEMS = 189, 194, { 38, 45 }, 67
+local function kohlingenStop(what)
+  return H.seqStep({
+    H.waitUntil(function() return H.airshipControl() end, 3000, what .. ": the pilot's controls", 5),
+    landNear(KOHLINGEN_DOOR[1], KOHLINGEN_DOOR[2], what .. ": the Falcon down by Kohlingen"),
+    H.worldNavTo(KOHLINGEN_DOOR[1], KOHLINGEN_DOOR[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
+      arrive = function() return not H.worldMode() end }),
+    H.waitUntil(function() return map() == MAP_KOHLINGEN and settled() end, 2400, what .. ": Kohlingen, map 189", 1),
+    H.gearStop({ tag = what .. ": gear Kohlingen", fight = FIGHT }),
+    H.crossDoor(11, 11, MAP_KSTORE, 12, 39, what .. ": Kohlingen's store 189 (11,11) -> 194", { fight = FIGHT }),
+    H.shopTalk(19, 35, what .. ": Kohlingen's item counter", { fight = FIGHT }),
+    H.call(function() H.assertEq(H.shopId(), SHOP_KITEMS, "the counter opened shop 67 ($0201)") end),
+    H.buyItem(POTION, function() return math.max(0, H.careStockPotions(H.activeTopLevel(), { spend = 30 })
+      - H.invCountOf(POTION)) end, "POTION to the band"),
+    H.buyItem(REMEDY, function() return math.max(0, 20 - H.invCountOf(REMEDY)) end, "REMEDY to 20"),
+    H.buyItem(FENIX, function() return math.max(0, math.min(20, H.activeTopLevel()) - H.invCountOf(FENIX)) end,
+      "FENIX DOWN to the level, capped at 20"),
+    H.shopClose(what .. ": Kohlingen's item counter"),
+    H.bagArrange({ POTION, FENIX, REMEDY, TINCTURE }, { tag = what .. ": bag: combat items on top" }),
+    H.call(function() say("shop", what .. ": Kohlingen") end),
+    walkInto(12, 40, MAP_KOHLINGEN, what .. ": the store -> Kohlingen"),
+    H.navTo(23, 29, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT }),
+    outToWorld("down", what .. ": out of Kohlingen by the south edge"),
+    board(),
+  })
+end
+
 -- ---- Doma and the dream's maps ----
 local DOMA_DOOR = { 171, 75 }
 local MAP_COURT, MAP_KING, MAP_SCAPE, MAP_TRAIN = 285, 123, 317, 143
@@ -499,6 +532,8 @@ H.run({ maxFrames = 2400000 }, {
     H.assertEq(sw(0x00CD), 1, "the stratum stops the ride ($00CD, set at the Falcon's return)")
   end),
   board(),
+  -- Kohlingen beside the castle: the bag topped up for the Ancient Castle and its dragon
+  kohlingenStop("the top-up before the Ancient Castle"),
   landNear(CASTLE_K[1], CASTLE_K[2], "the Falcon down by Figaro Castle"),
   H.worldNavTo(CASTLE_K[1], CASTLE_K[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
     arrive = function() return not H.worldMode() end }),
