@@ -2194,6 +2194,39 @@ M.contracts["wor-gau-v1"] = {
   },
 }
 
+-- wor-belly-v1: the Zone Eater's belly's save point, map 279 (24,4), after
+-- Triangle Island (the Zone Eater's Engulf: battle_main.asm @4807,
+-- VehicleEvent_05) and the bridge (276: the conductors, the jumps, the door
+-- (21,33)).  The crushing room and GOGO (_cb81c6: $00D4) are ahead.  TERRA,
+-- CELES, RELM and STRAGO seated (docs/design/route-wor-gogo.md).  The retry
+-- point for the crushing room.  No timer: the room's starts as the party
+-- enters it.
+M.contracts["wor-belly-v1"] = {
+  slot = 3,
+  field = { map = 279, x = 24, y = 4 },   -- the vanilla save point (279 NPC_1)
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00D4, 0, "GOGO not yet met (_cb81c6)" },
+  },
+  party = {
+    size = 4,                     -- TERRA, CELES, RELM and STRAGO
+    members = {
+      { 0x00, "TERRA" },
+      { 0x06, "CELES" },
+      { 0x08, "RELM" },
+      { 0x07, "STRAGO" },
+    },
+  },
+  ram = {
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
