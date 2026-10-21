@@ -39,6 +39,13 @@ local function map() return H.mapId() & 0x1ff end
 local snap = nil
 local cur = nil
 local function fresh() return { copies = {}, plans0 = #H.mimics, confirms = 0 } end
+-- the fights with the line: idle frames at the switch before each (lab md3: one fight's draw felled GOGO
+-- after two turns, neither a Mimic)
+local TRIES, tries = { 0, 37, 73, 111 }, 0
+local function boostedSeen()
+  for _, c in ipairs(cur and cur.copies or {}) do if c.pend > 0 and c.mpEnd then return true end end
+  return false
+end
 -- the switch (232 (118,27), _cab497: facing up, A) and the fight to the dragon's end (map 237, $0387 clear)
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
 local function theFight(what)
@@ -78,12 +85,30 @@ H.run({ maxFrames = 900000 }, {
   H.call(function() snap = H.requestSaveState() end),
   H.waitFrames(2),
   H.call(function() H.checkReq(snap, "the switch's snapshot"); cur = fresh() end),
-  theFight("with the line"),
+  -- the fight, again from the snapshot after a few more idle frames each time (another clock, another
+  -- in-battle draw: TESTING.md), until a boosted copy is measured or TRIES fights are spent; copies
+  -- accumulate across the fights
+  H.repeatN(#TRIES, {
+    H.cond(function() return not boostedSeen() end, {
+      H.call(function()
+        tries = tries + 1
+        if tries > 1 then snap.load = H.requestLoadState(snap.blob) end
+      end),
+      H.waitFrames(2),
+      H.call(function()
+        if tries > 1 then H.checkReq(snap.load, "the switch's snapshot again") end
+        H.log(string.format("[mimic] fight %d with the line, %d idle frames first", tries, TRIES[tries]))
+      end),
+      H.lazy(function() return H.waitFrames(TRIES[tries]) end),
+      H.waitUntil(function() return H.hasControl() end, 600, "control at the switch", 1),
+      H.lazy(function() return theFight("with the line, fight " .. tries) end),
+    }, {}),
+  }),
   H.call(function()
     local n = #cur.copies
     local planned, confirmed = #H.mimics - cur.plans0, 0
     for i = cur.plans0 + 1, #H.mimics do if H.mimics[i].confirmed then confirmed = confirmed + 1 end end
-    H.log(string.format("[mimic] the fight with the line: %d Mimic plan(s), %d confirmed, %d copy(ies) for GOGO's seat",
+    H.log(string.format("[mimic] %d fight(s) with the line: %d Mimic plan(s), %d confirmed, %d copy(ies) for GOGO's seat", tries,
       planned, confirmed, n))
     local boosted = 0
     for i, c in ipairs(cur.copies) do
