@@ -178,12 +178,52 @@ Eater with a gauge (`bwmut2`: "$171 the Zone Eater draws a gauge").
   25 and 22 left of 28 (the `[doom] ... after meeting N: hp 0 ... beaten
   true` lines; the bag's first and last `fenix=` in each log).
   The leg seats CELES.
-- **The Dirt Dragon** (battle 134; a game over when lost).  Lab `dd2` from
-  `wor_opera_switch`, 20 fights an arm, idle frames apart: "arm plain: 15 of
-  20 won" (the walks' driver), "arm lore: 16 of 20 won" (Aqua Rake and Aero
-  first, `nukeLore`), "arm back: 18 of 20 won" (the lores, and STRAGO, RELM
-  and GOGO in the back row).  The leg plays the third (`gen_wor_opera`,
-  `H.setRows` before the switch).
+- **The Dirt Dragon** (battle 134; a game over when lost).  Its script casts
+  earth on the whole field (Quake, Magnitude8, Slide), strikes with Honed
+  Tusk, and answers Float with 50 Gs, which removes Float and nothing else
+  (MagicProp $C3, `magic.py C3`).  The labs fight it from
+  `wor_opera_switch`, twenty trials an arm (thirty in `dx*`), idle frames
+  apart; `dtally.py` pairs each trial with its battle key:
+
+  | lab | seated | the fight | won | keys won every time |
+  |---|---|---|---|---|
+  | `dd2_plain` | TERRA | the walks' driver | 15 of 20 | |
+  | `dd2_lore` | TERRA | Aqua Rake and Aero first (`nukeLore`) | 16 of 20 | |
+  | `dd2_back` | TERRA | the lores, STRAGO, RELM and GOGO in the back row | 18 of 20 | |
+  | `fl1_lore` | TERRA | the lores, the back row | 18 of 20 | |
+  | `fl1` | TERRA | and the Float line | 5 of 12 (stopped) | |
+  | `dc_lore` | CELES | the lores, the back row | 18 of 20 | 11 of 13 |
+  | `dc_float` | CELES | and the Float line | 17 of 20 | 10 of 13 |
+  | `dw_ward` | CELES | the lores and Shell, Safe (`buffVs`) | 18 of 20 | 11 of 13 |
+  | `du_ultima` | CELES | the lores and RELM's Ultima | 18 of 20 | 11 of 13 |
+  | `du_ultimaward` | CELES | Ultima and Shell | 19 of 20 | 12 of 13 |
+  | `du_ultimafloat` | CELES | Ultima and Float | 13 of 20 | 8 of 13 |
+  | `dx2_ward` | CELES | Ultima and Shell | 25 of 30 | 14 of 17 |
+  | `dx2_dis` | CELES | and STRAGO's Dischord | 22 of 30 | 11 of 17 |
+
+  (The labs before `dx2` built one driver for all their trials, so its
+  per-battle memory carried from trial to trial; `dx2` builds one a trial.)
+  Float loses every way it was tried: 50 Gs takes it off within 400-1300
+  frames of each cast (lab `x26`, the floating mask), and the casts cost
+  STRAGO his lores.  Two things the sweeps found mattered more than any
+  line: the battle heals sat at bag rows 106-107 (`so3_k3_s7`: "item steer:
+  row 0 -> 106", RELM's turn held in the Item list for 1,100 frames of
+  Quakes), and CELES, STRAGO and RELM wore Wall Rings from the tower, so the
+  party's Cure and Shell turned away from them.  The leg seats CELES (the
+  cabin before the Opera House), puts the heals on top of the bag
+  (`bagArrange`), trades the Wall Rings for the Earrings, the Czarina Ring
+  and the Barrier Ring for this fight (back on for Doom Gaze), and fights
+  with the lores, RELM's Ultima, Shell on the party and Dischord.  The opera
+  sweeps, K 0-5 at shifts 0 and 7, the Dirt Dragon's line in
+  `fight_report_*`:
+
+  | sweep (commit) | the fight | runs | Dirt Drgn keys won | deaths a fight |
+  |---|---|---|---|---|
+  | `so` (8a75e830) | TERRA seated, the lores, the back row | 10 of 12 | 9 of 11 | 1.18 |
+  | `so2` (690e4c04) | CELES, Ultima, Shell | 11 of 12 | 11 of 12 | 1.67 |
+  | `so3` (801b332b) | and Dischord | 11 of 12 | 11 of 12 | 1.67 |
+  | `so4` (4b618091) | and the heals on top | 11 of 12 | 10 of 11 | 2.09 |
+  | `so5` (946c08b1) | and the Wall Rings off | 12 of 12 | 10 of 10 | 1.00 |
 
 ## 5. GOGO's kit and the Mimic line
 
@@ -199,25 +239,55 @@ Otherwise his Lore and Tools rows decide, and then the bag.  `MIMIC_OFF` turns t
 off.  His kit row in `kits.md` ("Gogo -- Mime") has the rest.
 
 `battle_mimicdriver` plays the Dirt Dragon from `wor_opera_switch` (up to
-four fights, idle frames apart, until a boosted copy is measured) and reads
-the engine: each copy is a command the line copies, free (his MP at
+thirteen fights, idle frames apart, until a boosted copy is measured) and
+reads the engine: each copy's plan read a command the line copies (the
+engine's copy is the party's last action when his turn runs, logged beside
+it: lab `x29` saw a plan's copy land on an Item), free (his MP at
 `Ot6ActionEnd` equals his MP at `mimicreplace`), its pending pips its
 plan's, at least one copy, no more copies than confirmed Mimics, at least
 one boosted; then a control from the same snapshot and the idle frames of
-the first fight that copied, with `MIMIC_OFF`, makes no copy.  Passing at
-09227f50 (`md5`): "4 fight(s) with the line: 2 Mimic plan(s), 2 confirmed,
-2 copy(ies)", "the control fight: 0 copy(ies)".  Four mutants (`mkmut.py`,
-`mutants.sh`), each red on its assertion: no Mimic plan (`mutA`, 09227f50:
-"1. at least one copy for GOGO's seat: got false"), the copy charged 5 MP
-in the ROM (`mutB`, c34651d5: "2. copy 1 is free ... got 343, want 348"),
-no boost pressed (`mutC`, c34651d5: "3. copy 2's pending pips are its
-plan's: got 0, want 1"), the line ignoring `MIMIC_OFF` (`mutD`, 09227f50:
-"control: with the line off GOGO never Mimics: got 2").
+the first fight that copied, with `MIMIC_OFF`: GOGO has a command window
+(his command menu open on his seat) and makes no copy.  The budget is
+measured: lab `x29` (`mkx29.py`, sixteen fights, no early stop) saw a
+boosted copy in 5 of 16 fights, so thirteen miss one with odds
+(11/16)^13 < 1%.  Passing at 0e49d158 (`md6`): "3 fight(s) with the line:
+2 Mimic plan(s), 2 confirmed, 2 copy(ies) for GOGO's seat in 12 command
+window(s) of his", "the control fight: 0 copy(ies) for GOGO's seat in 8
+command window(s) of his".  Four mutants (`mkmut.py`, `mutants.sh`), each
+red on its assertion: no Mimic plan (`mutA`, 0e49d158: "1. at least one
+copy for GOGO's seat: got false"), the copy charged 5 MP in the ROM
+(`mutB`, c34651d5: "2. copy 1 is free ... got 343, want 348"), no boost
+pressed (`mutC`, 0e49d158: "3. copy 1's pending pips are its plan's: got
+0, want 1"), the line ignoring `MIMIC_OFF` (`mutD`, 0e49d158: "control:
+with the line off GOGO never Mimics: got 2").
 
 `battle_vanish` gained a part for `Driver:dodgePlan` (finding 9): a Fight
 at a Vanished body re-aims, one at a body that can be hit is left alone,
 `DODGE_OFF` (the control) leaves the plan as made, and with every body
-faded the Fight becomes a cast where the actor has one.
+faded each actor's Fight becomes its cast where it has a Magic row and a
+line, else stays a Fight, and some actor casts.  Passing at ff7cda4d
+(`r2_battle_vanish`: "actor 2's Fight becomes magic (Magic row true, a line
+magic)"); the mutant that never casts (`mkmut2.py V`, `muts2.sh`) is red:
+"3. every body faded: actor 2's Fight becomes its cast where it has one,
+else stays a Fight: got fight, want magic".
+
+Two lines came with the Dirt Dragon (section 4).  `Driver:floatPlan`
+(`opts.floatVs`, `FLOAT_OFF` the control): while a listed earth caster
+stands and a living member is not floating, an actor with Float casts it on
+the whole party in place of an attack.  `battle_floatline` checks it on the
+dragon from `wor_opera_switch`: a Float plan, then every living member
+floating within 2400 frames, then the control with no plan and nobody
+floating.  Passing at 7bb0b225 (`r3_battle_floatline`: "every living member
+floats (mask $F) 1068 frames after the plan", "the control: 0 Float
+plan(s), floating mask ever $0"); red on the plan aimed at one member
+(`mkmut2.py FA`: "1. every living member floats within 2400 frames of the
+plan (the whole party): got false") and on the line ignoring `FLOAT_OFF`
+(`FB`: "control: with FLOAT_OFF no Float plan: got 1").  `Driver:buffPlan`
+(`opts.buffVs`, `BUFF_OFF`): Shell, Safe or Haste on each living member
+without it, the frailest first, a member at a time, none on a reflecting
+member.  The leg uses the second and not the first: the dragon's 50 Gs
+removes Float and nothing else (MagicProp $C3, `magic.py`), and in lab
+`x26` the party's Float lasted 400-1300 frames a cast.
 
 ## 6. Supplies
 
@@ -226,9 +296,11 @@ Potions, 30 Fenix Downs, 40 Tinctures, 5 Tents (`gg1`: "[wor] ... on the save
 tile world (250,229) ... potion=99 tincture=40 fenix=30 ..."); at
 `wor-ebot-v1`'s, 97 Potions and 30 Fenix Downs (`ge4`: "on the save tile
 world (250,231) ... potion=97 tincture=40 fenix=30"); at
-`wor-opera-v1`'s, after the Doom Gaze hunt: 44 Potions, 22 Fenix Downs, 40
-Tinctures, 4 Tents and 560,717 gil (`go3`).  The hunt is where they go;
-the next arc starts with gil to restock.  GOGO's kit at join holds no weapon
+`wor-opera-v1`'s, after the Dirt Dragon and the Doom Gaze hunt: 41
+Potions, 19 Fenix Downs, 40 Tinctures, 1 Tent and 633,026 gil (`so5_k0_s0`:
+"on the save tile world (30,182) ... potion=41 tincture=40 fenix=19 ...
+tent=1 gil=633026"; the play's `wor-ebot-v1` carried 20 Fenix Downs).  The
+two fights are where they go; the next arc starts with gil to restock.  GOGO's kit at join holds no weapon
 (FF): he has no Fight row to use one.
 
 ## 7. Played
@@ -247,11 +319,9 @@ the distinct `[key]` lines by group; `fight_report_<p>.txt` is
 | belly | `sb2` (4639ae4b) | 12 of 12 PASS | g014F 2, g015D 13, g015E 14, g0161 7 | Karkass 13 won of 13, 0.00 deaths a fight; Covert+Tap Dancer 14 of 14, 0.00; Ogor+Wart Puck 7 of 7, 0.29 |
 | gogo | `sg` (76b9cc54) | 12 of 12 PASS | g014E 2, g015D 3, g015E 4, g0161 2 | all won, 0.00 deaths |
 | ebot | `se2` (3ada72cd) | 12 of 12 PASS | g0123 19, g0124 11, g0125 40, g0128 4, g0129 4, g012A 8, g01D0 11 | all won; Hidon+Hidonite 11 of 11, 0.45 deaths a fight, two down at most |
-| opera | `so` (8a75e830) | 10 of 12 PASS | g014D 6, g014E 4, g0170 11, g01CF 32 | Doom Gaze 32 meetings, 1.41 deaths a meeting; Dirt Drgn 9 of 11 won, 1.18 deaths a fight, three down at most |
+| opera | `so5` (946c08b1) | 12 of 12 PASS | g014D 5, g014E 4, g0170 10, g01CF 29 | Dirt Drgn 10 of 10 won, 1.00 deaths a fight, two down at most; Doom Gaze 29 meetings, 0.24 deaths a meeting |
 
-The two opera failures (`so_k0_s7`, `so_k1_s0`) are the Dirt Dragon:
-"FAIL: GAME OVER fired", the last `[key]` line `g0170` on map 231.  The
-graph's leg has three attempts.
+The opera sweeps before `so5` are in section 4.
 
 Before them: `sb` (the first belly sweep, before `dodgePlan`) 11 of 12, the
 wipe to Covert's Vanish (finding 9); `se` (before the Mimic target select
@@ -274,10 +344,12 @@ the graph's play (`checkpoint_drift.py --recut`, at the release).
    arcs' regroups still use `talkToObj`.
 4. **The checkpoints** were sealed from lab captures (section 7); the
    release's re-cut makes them the graph's play.
-5. **The Dirt Dragon** is the arc's hard fight: 18 of 20 in the lab with the
-   back row and the lores, 9 of 11 in the final sweep.  Every attack it
-   casts is earth (Quake, Magnitude8, Slide) and it starts with Float; Float
-   on the party is the answer a player would reach for.  The driver casts
-   no Float (its Shell line, `shellVs`, is the shape such a line would take).
-6. **Doom Gaze** fells one or two a meeting (1.41 deaths a meeting over 32);
-   the hunt wins every run, at the bag's cost (section 6).
+5. **The Dirt Dragon** is the arc's hard fight (section 4): one death a fight
+   in `so5`.  The Float line is built and tested (`battle_floatline`) and
+   left out of this fight.  The Wall Rings the tower put on CELES, STRAGO
+   and RELM stay on for every other fight of the arc; nothing measured
+   them elsewhere.
+6. **Doom Gaze** fells one in four meetings (0.24 deaths a meeting over 29
+   in `so5`); the hunt wins every run, at the bag's cost (section 6).
+7. **The labs before `dx2`** shared one driver across their trials
+   (section 4); their numbers are comparisons on that footing.
