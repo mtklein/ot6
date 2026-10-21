@@ -224,6 +224,11 @@ Eater with a gauge (`bwmut2`: "$171 the Zone Eater draws a gauge").
   | `so3` (801b332b) | and Dischord | 11 of 12 | 11 of 12 | 1.67 |
   | `so4` (4b618091) | and the heals on top | 11 of 12 | 10 of 11 | 2.09 |
   | `so5` (946c08b1) | and the Wall Rings off | 12 of 12 | 10 of 10 | 1.00 |
+  | `so6` (06573b92, shifts 3 and 11) | the same | 12 of 12 | 11 of 11 | 1.55 |
+
+  Over `so5` and `so6` the dragon drew 20 distinct keys and lost none; its
+  worst moment in `so6` left the party at 2% of its HP (`low_worst`), so it
+  stays a fight.
 
 ## 5. GOGO's kit and the Mimic line
 
@@ -253,7 +258,10 @@ boosted copy in 5 of 16 fights, so thirteen miss one with odds
 (11/16)^13 < 1%.  Passing at 0e49d158 (`md6`): "3 fight(s) with the line:
 2 Mimic plan(s), 2 confirmed, 2 copy(ies) for GOGO's seat in 12 command
 window(s) of his", "the control fight: 0 copy(ies) for GOGO's seat in 8
-command window(s) of his".  Four mutants (`mkmut.py`, `mutants.sh`), each
+command window(s) of his"; again at 06573b92 on the leg's new fixture
+(`md7`: "1 fight(s) with the line: 2 Mimic plan(s), 2 confirmed, 1
+copy(ies) ... in 8 command window(s)", "the control fight: 0 copy(ies) ...
+in 7 command window(s)").  Four mutants (`mkmut.py`, `mutants.sh`), each
 red on its assertion: no Mimic plan (`mutA`, 0e49d158: "1. at least one
 copy for GOGO's seat: got false"), the copy charged 5 MP in the ROM
 (`mutB`, c34651d5: "2. copy 1 is free ... got 343, want 348"), no boost
@@ -277,15 +285,22 @@ stands and a living member is not floating, an actor with Float casts it on
 the whole party in place of an attack.  `battle_floatline` checks it on the
 dragon from `wor_opera_switch`: a Float plan, then every living member
 floating within 2400 frames, then the control with no plan and nobody
-floating.  Passing at 7bb0b225 (`r3_battle_floatline`: "every living member
-floats (mask $F) 1068 frames after the plan", "the control: 0 Float
-plan(s), floating mask ever $0"); red on the plan aimed at one member
-(`mkmut2.py FA`: "1. every living member floats within 2400 frames of the
-plan (the whole party): got false") and on the line ignoring `FLOAT_OFF`
-(`FB`: "control: with FLOAT_OFF no Float plan: got 1").  `Driver:buffPlan`
-(`opts.buffVs`, `BUFF_OFF`): Shell, Safe or Haste on each living member
-without it, the frailest first, a member at a time, none on a reflecting
-member.  The leg uses the second and not the first: the dragon's 50 Gs
+floating.  `Driver:buffPlan` (`opts.buffVs`, `BUFF_OFF`): Shell, Safe or
+Haste on each living member without it, the frailest first, a member at a
+time, none on a reflecting member; the same suite checks it: a ward plan,
+its target under Shell within 2400 frames, then the control with no plan
+and that member never shelled.  Passing at 06573b92 on the leg's own
+fixture (`r4_battle_floatline`: "every living member floats (mask $F) 1196
+frames after the plan", "the control: 0 Float plan(s), floating mask ever
+$0", "entity 2 under Shell 1039 frames after the plan", "the control: 0
+ward plan(s); entity 2 under Shell: false").  Four mutants (`mkmut2.py`,
+`muts2.sh`), each red: the Float plan aimed at one member (`FA`: "1. every
+living member floats within 2400 frames of the plan (the whole party): got
+false"), the Float line ignoring `FLOAT_OFF` (`FB`: "control: with
+FLOAT_OFF no Float plan: got 1"), the ward cast on the next member (`WA`:
+"2. its target under Shell within 2400 frames of the plan: got false"),
+the ward line ignoring `BUFF_OFF` (`WB`: "control: with BUFF_OFF no ward
+plan: got 1").  The leg uses the ward line and not the Float line: the dragon's 50 Gs
 removes Float and nothing else (MagicProp $C3, `magic.py`), and in lab
 `x26` the party's Float lasted 400-1300 frames a cast.
 
@@ -320,6 +335,7 @@ the distinct `[key]` lines by group; `fight_report_<p>.txt` is
 | gogo | `sg` (76b9cc54) | 12 of 12 PASS | g014E 2, g015D 3, g015E 4, g0161 2 | all won, 0.00 deaths |
 | ebot | `se2` (3ada72cd) | 12 of 12 PASS | g0123 19, g0124 11, g0125 40, g0128 4, g0129 4, g012A 8, g01D0 11 | all won; Hidon+Hidonite 11 of 11, 0.45 deaths a fight, two down at most |
 | opera | `so5` (946c08b1) | 12 of 12 PASS | g014D 5, g014E 4, g0170 10, g01CF 29 | Dirt Drgn 10 of 10 won, 1.00 deaths a fight, two down at most; Doom Gaze 29 meetings, 0.24 deaths a meeting |
+| opera | `so6` (06573b92, shifts 3, 11) | 12 of 12 PASS | g014D 6, g014E 4, g0170 11, g01CF 26 | Dirt Drgn 11 of 11 won, 1.55 deaths a fight, three down at most; Doom Gaze 26 meetings, 0.46 deaths a meeting |
 
 The opera sweeps before `so5` are in section 4.
 
@@ -344,8 +360,8 @@ the graph's play (`checkpoint_drift.py --recut`, at the release).
    arcs' regroups still use `talkToObj`.
 4. **The checkpoints** were sealed from lab captures (section 7); the
    release's re-cut makes them the graph's play.
-5. **The Dirt Dragon** is the arc's hard fight (section 4): one death a fight
-   in `so5`.  The Float line is built and tested (`battle_floatline`) and
+5. **The Dirt Dragon** is the arc's hard fight (section 4): 1.00 and 1.55
+   deaths a fight in `so5` and `so6`, 20 keys won of 20.  The Float line is built and tested (`battle_floatline`) and
    left out of this fight.  The Wall Rings the tower put on CELES, STRAGO
    and RELM stay on for every other fight of the arc; nothing measured
    them elsewhere.
