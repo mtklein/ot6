@@ -46,6 +46,7 @@
         sta     f:$7e0000+OT6_WEAPSPELL ; nor a weapon-spell flag from the
                                 ;   last battle's final pass
         sta     f:$7e0000+OT6_ULTIMAFOLD ; nor a folded-Ultima mark
+        sta     f:$7e0000+OT6_FIZZLED ; nor an X-Magic refusal mark
         sta     f:$7e0000+OT6_RUNICBLADE ; nor a RunicBlade nobody raised
         sta     f:$7e0000+OT6_BLADEPEND  ; nor a bounce from the last battle
         sta     f:$7e0000+OT6_UNCTL     ; nor a stale "the engine is driving
@@ -201,6 +202,10 @@
         eor     #$ff            ;   the action that cast it
         and     f:$7e0000+OT6_ULTIMAFOLD
         sta     f:$7e0000+OT6_ULTIMAFOLD
+        lda     $3018,x         ; and an X-Magic's first-spell refusal
+        eor     #$ff            ;   (Ot6FizzleDropBoost) ends with its turn
+        and     f:$7e0000+OT6_FIZZLED
+        sta     f:$7e0000+OT6_FIZZLED
         ; #346: an action that never ran buys nothing, so it costs nothing.
         ; ExecAction runs a fresh turn whose command list is empty -- the
         ; action was removed after its entry reached the action queue: a
@@ -2208,6 +2213,66 @@ Ot6ThiefCostTbl:
         lda     $3204,y
         ora     #$80            ; vanilla's "recheck enabled magic" request
         sta     $3204,y
+        rtl
+.endproc
+
+; [ a costed action the pool cannot pay keeps its boost (#450) ]
+;
+; CalcAttackEffect's universal MP check refuses the cast (a spell, Blitz,
+; SwdTech, a Tool, a Dance start whose pool moved after the commit) and
+; charges no MP.  The pips raised for it are still only pending, and
+; Ot6ActionEnd would spend them on a cast that never happened.  Dropping
+; them here, while they are only pending, ends the turn as an unboosted
+; one: the bank untouched, the regen pip earned, the folded prices falling
+; back (the same request Ot6DanceStumble and Ot6RageStartGate make).  One
+; place serves every verb; the Rage and Dance start gates drop earlier for
+; their own trance, and this finds nothing pending after them.
+;
+; X-Magic queues two spells on one pending boost, and Ot6QueueFold folded
+; both to the boosted tier at the commit.  The turn's last spell is the one
+; that decides: Ot6ActionEnd runs once, after it.
+;   - The first spell refused with the second still to come (the command
+;     list's next entry, $32cc,x, is not $ff; ExecAction moved it there
+;     before ExecCmd): the boost is kept for the second spell, which casts
+;     at its folded tier and spends it.  The refusal is marked in
+;     OT6_FIZZLED.
+;   - The second spell refused (resumed through $3406, bit 6 clear; see
+;     Ot6NoActionMark): the boost is dropped only if the first was refused
+;     too.  If the first cast, it bought that tier and is spent.
+;   - A fresh turn's one action refused (bit 6 set, nothing to follow):
+;     dropped.
+;
+; entry: jsl from CalcAttackEffect's fizzle arm, a16/i8, x = attacker entity,
+; db=$7e.  Preserves a, x, y and flags.
+.proc Ot6FizzleDropBoost
+        .i8                     ; CalcAttackEffect's width, not the file's:
+                                ;   `cpx #$08` assembled for i16 left a $00
+                                ;   (BRK) after it, so every fizzle crashed
+        php
+        sep     #$20
+        .a8
+        pha
+        cpx     #$08
+        bcs     @out            ; monsters hold no boost
+        lda     $32cc,x         ; the command list's next entry
+        inc                     ;   ($ff: nothing follows this spell)
+        bne     @defer
+        bit     $3406           ; bit 6 set = a fresh turn
+        bvs     @drop
+        lda     $3018,x         ; the second spell: was the first refused?
+        and     f:$7e0000+OT6_FIZZLED
+        beq     @out            ; no: the first cast and bought the tier
+@drop:  lda     #$00
+        sta     OT6_BOOST_REVEALED,x
+        lda     $3204,x
+        ora     #$80            ; the "recheck enabled magic" request
+        sta     $3204,x
+        bra     @out
+@defer: lda     $3018,x         ; the second spell spends it; mark the
+        ora     f:$7e0000+OT6_FIZZLED  ;   refusal for it
+        sta     f:$7e0000+OT6_FIZZLED
+@out:   pla
+        plp
         rtl
 .endproc
 

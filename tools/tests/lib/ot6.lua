@@ -6280,22 +6280,29 @@ local EXEC_CMD_NAME = {
 -- tools/audit_boost.py off the `[fizzle]` lines, and by a lab off either.
 M.fizzles = { n = 0, bp = 0, rows = {}, by = {}, order = {} }
 local execCost = {}                   -- $3A4C and the pool, parked at ExecCmd
-local function fizzleNote(x, p, mp)
+-- p.rev is the boost pending when ExecCmd began (what the player asked for);
+-- spent is what is still pending when the action's body is over, at
+-- SaveForMimic, which is what Ot6ActionEnd goes on to charge.  A refusal
+-- drops the pending boost (Ot6FizzleDropBoost, Ot6RageStartGate, #450), so on
+-- a ROM that keeps a refused action's boost spent is 0 and nothing was
+-- burned; the line says both so a reader sees which ROM it ran on.
+local function fizzleNote(x, p, mp, spent)
   local slot = x // 2
   local char = M.readByte(0x3ED8 + x)
   local key = string.format("char%d %s", char, EXEC_CMD_NAME[p.cmd] or "?")
   local F = M.fizzles
   if F.by[key] == nil then F.order[#F.order + 1] = key end
   F.by[key] = (F.by[key] or 0) + 1
-  F.n, F.bp = F.n + 1, F.bp + p.rev
+  F.n, F.bp = F.n + 1, F.bp + spent
   local row = string.format("f%d slot%d char%d %s($%02X) atk=$%02X boost=%d "
-    .. "cost=%d pool=%d", p.frame, slot, char, EXEC_CMD_NAME[p.cmd] or "?",
-    p.cmd, p.atk, p.rev, p.cost, p.mp)
+    .. "cost=%d pool=%d asked=%d", p.frame, slot, char,
+    EXEC_CMD_NAME[p.cmd] or "?", p.cmd, p.atk, spent, p.cost, p.mp, p.rev)
   if #F.rows < 200 then F.rows[#F.rows + 1] = row end
   M.log(string.format("[fizzle] %s -- the pool could not pay it: "
-    .. "CalcAttackEffect refused the action, the turn and %d boost point(s) "
-    .. "are gone and the pool is still %d.  Pressing R is a claim the caster "
-    .. "can pay (M.boostPlan, #230).", row, p.rev, mp))
+    .. "CalcAttackEffect refused the action and the turn is gone; %d of the "
+    .. "%d boost point(s) asked for are still pending to be spent on it; the "
+    .. "pool is still %d.  Pressing R is a claim the caster can pay "
+    .. "(M.boostPlan, #230).", row, spent, p.rev, mp))
 end
 
 function M.fizzleReport()
@@ -6405,7 +6412,11 @@ local function execActivate()
       if p ~= nil then
         local mp = M.readWord(0x3C08 + x)
         if p.cost > 0 and p.cost > p.mp and mp == p.mp then
-          fizzleNote(x, p, mp)
+          -- an X-Magic's first spell with its second still to come keeps
+          -- the pending boost for the second (Ot6FizzleDropBoost): none of
+          -- it is burned on this refusal
+          fizzleNote(x, p, mp, M.readByte(0x32CC + x) ~= 0xFF and 0
+            or M.readByte(0x3E9D + x))
         end
       end
       if execActor == x // 2 then
