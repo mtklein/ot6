@@ -169,7 +169,8 @@ local function regroup(members)
       H.assertEq(obj ~= nil, true, "a member waits in the cabin to talk to")
       H.log(string.format("[regroup] talking to %s (obj $%02X, show-switch $%04X)", obj[1], obj[2], obj[3]))
     end),
-    H.lazy(function() return H.talkToObj(obj[2], obj[1] .. " in the cabin") end),
+    -- the waiting members wander: chaseTalk re-plans its approach every step and stops on the prompt
+    H.lazy(function() return H.chaseTalk(obj[2], 6000, obj[1] .. " in the cabin") end),
     H.dialogChoice(1, { inBattle = false, what = "Change party members? Yes", tag = "the cabin" }),
     H.partySelect(members, { tag = "the Falcon's cabin" }),
     H.waitUntil(function() return map() == MAP_DECK and settled() end, 2400, "back on the deck after the menu", 5),

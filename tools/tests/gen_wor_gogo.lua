@@ -170,7 +170,8 @@ local function regroup(members)
       H.assertEq(obj ~= nil, true, "a member waits in the cabin to talk to")
       H.log(string.format("[regroup] talking to %s (obj $%02X, show-switch $%04X)", obj[1], obj[2], obj[3]))
     end),
-    H.lazy(function() return H.talkToObj(obj[2], obj[1] .. " in the cabin") end),
+    -- the waiting members wander: chaseTalk re-plans its approach every step and stops on the prompt
+    H.lazy(function() return H.chaseTalk(obj[2], 6000, obj[1] .. " in the cabin") end),
     H.dialogChoice(1, { inBattle = false, what = "Change party members? Yes", tag = "the cabin" }),
     H.partySelect(members, { tag = "the Falcon's cabin" }),
     H.waitUntil(function() return map() == MAP_DECK and settled() end, 2400, "back on the deck after the menu", 5),
@@ -535,7 +536,7 @@ end
 local GOGO_CHAR = 12
 local function gogoCmdByte(row) return H.readByte(0x1600 + 37 * GOGO_CHAR + 0x16 + row) end
 local function gogoCommands(want, what)
-  local ph, idx, listLogged, lastS = 0, 1, false, nil
+  local ph, idx, listLogged = 0, 1, false
   local function st() return H.menuRunning() and H.readByte(0x26) or -1 end
   local function steer(cur, row)
     if cur == row then return { "a" } end
@@ -560,10 +561,6 @@ local function gogoCommands(want, what)
         ph = (ph + 1) % 12
         local s = st()
         local held = {}
-        if s ~= lastS then
-          H.log(string.format("[gogo] %s: f%d menu state $%02X cursor %d", what, H.frame, s & 0xFF, H.readByte(0x4B)))
-          lastS = s
-        end
         while idx <= #want and gogoCmdByte(want[idx][1]) == want[idx][2] do idx = idx + 1 end
         if allSet() then
           if s ~= -1 then held = { "b" } end
