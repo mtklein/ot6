@@ -211,11 +211,12 @@ two ROM mutants (section 7).
 - **The Dream Stooges** (event battle 90, formation `$1CC`: Curley, Larry,
   Moe; a game over when lost).  Curley casts Life 2 and the three Delta
   Hit (Petrify) and Rflect; the walks' driver wins it with the Soft and the
-  Remedy for the Petrify.  Sweep `sd2` (the leg as shipped, K 0-5 at shifts
-  0 and 7): 11 keys, 11 won, the party's low point 94% at worst, no deaths,
-  a median of 14,470 ticks (`fight_report_sd2.txt`: "$1CC Curley+Larry+Moe
-  ... 11 11 0 97% 94% 0 0.00 22 14470"); sweep `sd` (before Kohlingen's
-  counter) 12 of 12 more.  Not a coin flip; no lab.
+  Remedy for the Petrify.  Sweep `sd3` (the leg as shipped, K 0-5 at shifts
+  0 and 7): 10 keys, 10 won, the party's low point 97% at worst, no deaths,
+  a median of 13,634 ticks (`fight_report_sd3.txt`: "$1CC Curley+Larry+Moe
+  ... 10 10 0 98% 97% 0 0.00 20.5 13634"); `sd2` (before the TumbleWeed's
+  row) 11 of 11 and `sd` (before Kohlingen's counter) 12 of 12 more.  Not a
+  coin flip; no lab.
 - **Wrexsoul** (event battle 92, formation `$1CE`; a game over when lost):
   a war of attrition until the driver fells the member it hides in (section
   5).  Sweep `sdo` (K 0-5 at shifts 0 and 7, from `wor-dream-v1`): 11 keys,
@@ -335,7 +336,7 @@ run and the distinct `[key]` lines by group; `fight_report_<p>.txt` is
 
 | leg | sweep (commit) | runs | distinct keys of the boss | fights (fight_report) |
 |---|---|---|---|---|
-| dream | `sd3` (SD3COMMIT) | SD3RUNS | SD3KEYS | SD3FIGHTS |
+| dream | `sd3` (b03a1051) | 12 of 12 PASS | g01CC 10 | every fight won; the stooges 10 of 10, no deaths, 97% at worst; Rain Man+Samurai 19 of 19, 0.05 deaths a fight; the TumbleWeed 4 of 4 |
 | dream | `sd2` (560c2cc2, before the TumbleWeed's row) | 12 of 12 PASS | g01CC 11 | every fight won; the stooges 11 of 11, no deaths; Barb-e+Samurai+Suriander 25 of 25, 0.04 deaths a fight |
 | doma | `sdo` (19963ed9) | 12 of 12 PASS | g01CE 11 | Wrexsoul 11 of 11, 1.45 deaths a fight (the host's one included), one down at most |
 | ancient | `sa2` (b03a1051) | 12 of 12 PASS | g0173 11 | every fight won; the Blue Dragon 11 of 11, no deaths; Enuo+Figaliz+Goblin 26 of 26, 0.04 |
