@@ -208,7 +208,33 @@ two ROM mutants (section 7).
 
 ## 4. The bosses
 
-PENDING
+- **The Dream Stooges** (event battle 90, formation `$1CC`: Curley, Larry,
+  Moe; a game over when lost).  Curley casts Life 2 and the three Delta
+  Hit (Petrify) and Rflect; the walks' driver wins it with the Soft and the
+  Remedy for the Petrify.  Sweep `sd2` (the leg as shipped, K 0-5 at shifts
+  0 and 7): 11 keys, 11 won, the party's low point 94% at worst, no deaths,
+  a median of 14,470 ticks (`fight_report_sd2.txt`: "$1CC Curley+Larry+Moe
+  ... 11 11 0 97% 94% 0 0.00 22 14470"); sweep `sd` (before Kohlingen's
+  counter) 12 of 12 more.  Not a coin flip; no lab.
+- **Wrexsoul** (event battle 92, formation `$1CE`; a game over when lost):
+  a war of attrition until the driver fells the member it hides in (section
+  5).  Sweep `sdo` (K 0-5 at shifts 0 and 7, from `wor-dream-v1`): 11 keys,
+  11 won, a median of 11,154 ticks, the party's low point 43% at worst, one
+  member down at most (`fight_report_sdo.txt`: "$1CE SoulSaver+Wrexsoul ...
+  11 11 0 61% 43% 1 1.45 23 11154"); one death a fight is the host's, felled
+  by the party and raised after.
+- **The Blue Dragon** (event battle 137, formation `$173`; a game over when
+  lost).  It wanders the queen's east room and fights when it touches the
+  party, so in 8 of the 12 runs of sweep `sa2` it met the party on the way to
+  the queen ("[dragon] the Blue Dragon met the party on the way to the
+  queen"); the care for it (the Wall Rings off, the arms, the heals on top of
+  the bag) comes before that room.  Sweep `sa2` (K 0-5 at shifts 0 and 7,
+  from `wor-doma-v1`): 11 keys, 11 won, the party's low point 82% at worst,
+  no deaths, a median of 3,839 ticks (`fight_report_sa2.txt`: "$173 Blue
+  Drgn ... 11 11 0 86% 82% 0 0.00 7 3839").  Not a coin flip; no lab.  (The
+  first sweep, `sa`, won the dragon on all 10 of its keys and failed three
+  runs after it: the dragon had met the party unprepared on the way to the
+  queen, and the touch step then waited on its gone object.)
 
 ## 5. The Zinger line
 
@@ -297,11 +323,57 @@ kits.md "On the route".
 
 ## 7. Played
 
-PENDING
+Evidence under `build/attempts/wt/v035-wor-dreams/lab/`.  Each sweep run is
+one attempt (retries off) from a committed tree (`commit.txt`; `diff.sha256`
+of the empty diff), the leg's variant with K battles used up first
+(`mkvar.py`: the dream leg on the plain west of Doma Castle's door, world
+group 52, between the landing and the door; Wrexsoul's leg in the dream's
+Doma, 126 (8,11) <-> (8,12); the Ancient Castle's leg in its cave, 401
+(42,6) <-> (42,7)), K 0-5 at seed shifts 0 and 7.  `tally_<p>.txt` lists each
+run and the distinct `[key]` lines by group; `fight_report_<p>.txt` is
+`tools/fight_report.py` over the runs.
+
+| leg | sweep (commit) | runs | distinct keys of the boss | fights (fight_report) |
+|---|---|---|---|---|
+| dream | `sd3` (SD3COMMIT) | SD3RUNS | SD3KEYS | SD3FIGHTS |
+| dream | `sd2` (560c2cc2, before the TumbleWeed's row) | 12 of 12 PASS | g01CC 11 | every fight won; the stooges 11 of 11, no deaths; Barb-e+Samurai+Suriander 25 of 25, 0.04 deaths a fight |
+| doma | `sdo` (19963ed9) | 12 of 12 PASS | g01CE 11 | Wrexsoul 11 of 11, 1.45 deaths a fight (the host's one included), one down at most |
+| ancient | `sa2` (b03a1051) | 12 of 12 PASS | g0173 11 | every fight won; the Blue Dragon 11 of 11, no deaths; Enuo+Figaliz+Goblin 26 of 26, 0.04 |
+
+Before them: `sd` (the dream leg before Kohlingen's counter, 8c750826: 12 of
+12 PASS, the stooges 12 of 12); `sa` (before the dragon's care moved, 7ee5ffb0:
+9 of 12, the three failures in section 4).
+
+The captures the tracked checkpoints were sealed from: `gd3_s0` ("PASS
+(frame 67946) attempts=1/3", `wor-dream-v1`), `gdo2_s0` ("PASS (frame
+28447) attempts=1/3", `wor-doma-v1`), `ga1_s0` ("PASS (frame 63840)
+attempts=1/3", `wor-ancient-v1`), each booting the tracked checkpoint before
+it.  They were sealed from those captures, not yet re-cut from the graph's
+play (`checkpoint_drift.py --recut`, at the release); `ga1_s0` ran the
+Ancient Castle's leg before the dragon's care moved.
 
 ## 8. Open
 
-PENDING
+1. **CYAN's level.**  He sits out his own dream and comes back L40-41
+   against the others' L50-52.  The Ancient Castle's Goblins cast L.5 Doom
+   and L.4 Flare, and L40 is a multiple of both; the sweeps' castle fights
+   lost no one to it (`sa2`: 0.04 deaths a fight at most), and the arc does
+   not grind him.
+2. **Raiden** is the party's and worn by nobody (section 6).
+3. **Chests left:** the Ancient Castle's cave (401: Ether, Wing Edge, Doom
+   Darts, Magicite, X-Potion) and its two monster chests (Master Pug, event
+   group 113; KatanaSoul, event group 95); the dream's first car (321: Ice
+   Shld, X-Potion) and the dream's Doma.
+4. **The Cursed Shield** is not worn (section 9).
+5. **Wrexsoul with a TERRA host** is the slow case: the others' Fights on her
+   land 300-600, and her fall took 10,682 frames (`zon_s13`) and 13,921 on the
+   leg's snapshot (`mutZB`'s first arm); spending every pip did not move it
+   (`zon2`).
+6. **The checkpoints** were sealed from lab captures (section 7); the
+   release's re-cut makes them the graph's play.
+7. **The dream leg's K battles** are fought on the plain west of Doma's door
+   (world group 52), where the leg itself fights none; they move the draw of
+   the dream's fights, and met the TumbleWeed, which now has a row.
 
 ## 9. The Cursed Shield
 
