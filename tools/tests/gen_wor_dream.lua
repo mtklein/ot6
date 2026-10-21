@@ -501,7 +501,11 @@ H.run({ maxFrames = 2400000 }, {
   H.waitFrames(20),
   H.faceAndHoldA("up", function() return sw(0x01FB) == 1 end, 200, "the button (27,5), again"),
   H.release(),
-  H.waitUntil(function() return settled() end, 600, "control after the doors", 20),
+  -- (the car is dimmed while the doors stand open: control, not the screen's brightness, says the press is done)
+  H.waitUntil(function() return H.hasControl() and H.tileAligned() and not H.dialogWaiting() end, 600,
+    "control after the doors", 20),
+  H.call(function() H.log(string.format("[doors] $01F9=%d $01FA=%d $01FB=%d $01FE=%d, brightness %d", sw(0x01F9),
+    sw(0x01FA), sw(0x01FB), sw(0x01FE), bright())) end),
   chestAt(25, 5, 0x0BC, "the Genji Glove (25,5)", 0xD1),
   walkInto(1, 7, MAP_TRAIN, "144 (1,7) -> 143"),
   walkInto(65, 8, MAP_CAR1, "143 (65,8) -> 321"),
