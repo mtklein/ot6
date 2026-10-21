@@ -23,8 +23,8 @@
 --   3. the boost: the pips pending at each copy ($3E9D + his seat) are the
 --      plan's (its boost, capped by the bank it read and 3), and at least
 --      one copy is boosted, so the check is not of zeros alone.
--- Then the control: the same snapshot again, MIMIC_OFF set, the same fight:
--- no mimicreplace for his seat.
+-- Then the control: the same snapshot and idle frames as the first fight
+-- that copied, MIMIC_OFF set: no mimicreplace for his seat.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -41,7 +41,7 @@ local cur = nil
 local function fresh() return { copies = {}, plans0 = #H.mimics, confirms = 0 } end
 -- the fights with the line: idle frames at the switch before each (lab md3: one fight's draw felled GOGO
 -- after two turns, neither a Mimic)
-local TRIES, tries = { 0, 37, 73, 111 }, 0
+local TRIES, tries, before, copiedTry = { 0, 37, 73, 111 }, 0, 0, nil
 local function boostedSeen()
   for _, c in ipairs(cur and cur.copies or {}) do if c.pend > 0 and c.mpEnd then return true end end
   return false
@@ -117,7 +117,9 @@ H.run({ maxFrames = 900000 }, {
       end),
       H.lazy(function() return H.waitFrames(TRIES[tries]) end),
       H.waitUntil(function() return H.hasControl() end, 600, "control at the switch", 1),
+      H.call(function() before = #cur.copies end),
       H.lazy(function() return theFight("with the line, fight " .. tries) end),
+      H.call(function() if #cur.copies > before and copiedTry == nil then copiedTry = tries end end),
     }, {}),
   }),
   H.call(function()
@@ -146,13 +148,19 @@ H.run({ maxFrames = 900000 }, {
     H.assertEq(n <= confirmed, true, string.format("1. no more copies (%d) than confirmed Mimics (%d)", n, confirmed))
     H.assertEq(boosted >= 1, true, "3. at least one copy boosted")
   end),
-  -- the control: the same snapshot, the line off
+  -- the control: the snapshot and the idle frames of the first fight that copied, the line off (the same
+  -- draw, so a copy here would be the line's)
   H.call(function()
     MIMIC_OFF = true
     snap.load = H.requestLoadState(snap.blob)
   end),
   H.waitFrames(2),
-  H.call(function() H.checkReq(snap.load, "the switch's snapshot again"); cur = fresh() end),
+  H.call(function()
+    H.checkReq(snap.load, "the switch's snapshot again"); cur = fresh()
+    copiedTry = copiedTry or 1
+    H.log(string.format("[mimic] the control replays fight %d (%d idle frames)", copiedTry, TRIES[copiedTry]))
+  end),
+  H.lazy(function() return H.waitFrames(TRIES[copiedTry]) end),
   H.waitUntil(function() return H.hasControl() end, 600, "control at the switch again", 1),
   theFight("with MIMIC_OFF"),
   H.call(function()
