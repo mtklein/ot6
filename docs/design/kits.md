@@ -1106,14 +1106,14 @@ what a full boost buys.
 `battle_umaro` (a synthetic mechanism test: one seat of battle 67 staged as
 him, as `battle_retaliate_umaro` does) checks the divine and the class.
 
-## Gogo — Mime (piercing: dagger; bludgeoning: rod) (#270)
+## Gogo — Mime (no weapon of his own: Mimic's keys are the party's) (#270)
 
 Gogo joins in the Zone Eater's belly (World of Ruin, v0.34) with Mimic and
 three empty rows; the Status menu fills them from the commands the party
 has met (measured, `wor-gogo-v1`'s play: Fight, Magic, Item, Steal,
 SwdTech, Throw, Tools, Blitz, Runic, Lore, Sketch, Slot, Dance, Rage).  He
 joins at the party's level less a few (L42 against TERRA and CELES's L49-50,
-route-wor-gogo.md section 1).  OT6 adds nothing to his kit's rules; what it
+route-wor-gogo.md section 0, finding 4).  OT6 adds nothing to his kit's rules; what it
 settles is which three rows a player would give him, and how the driver
 plays Mimic.
 
@@ -1129,17 +1129,21 @@ plays Mimic.
   medic between his copies.  Fight is left off: his weapons (daggers and
   rods) and his vigor make a weak swing that the Mimic of a strong one
   outdoes.
-- **His keys** are his weapon's (dagger: pierce; rod: bludgeon) and,
-  through Mimic, every key the party holds.
+- **His keys** are the party's, through Mimic: the arc gives him no weapon
+  (he has no Fight row to swing one), so his own turn keys nothing a copy
+  does not.
 
 The driver (`Driver:mimicLine`, `lib/ot6.lua`): at his window Gogo mimics
 when the party's last action (SaveForMimic's `$3F20`-`$3F23`) is a command
 Mimic copies (`M.MIMIC_COPY`: Fight, Magic, SwdTech, Throw, Tools, Blitz,
 Lore, X-Magic), aimed at a monster still standing, not a heal, and not an
 element a standing target drinks or nulls; else his Tools take Edgar's line,
-else the bag.  `battle_mimicdriver` checks it against the engine from
-`wor-gogo-v1` (mimicreplace runs for his seat, the copy is free, the pips
-pending are the plan's) with `MIMIC_OFF` as the control.
+else the bag.  Mimic opens no list; the target select that follows its
+confirm is latched on his own seat and is confirmed as it stands.
+`battle_mimicdriver` checks it against the engine from the `wor_opera`
+leg's snapshot at the Opera House's catwalk switch (`wor_opera_switch`:
+the Dirt Dragon's fight; mimicreplace runs for his seat, the copy is free,
+the pips pending are the plan's) with `MIMIC_OFF` as the control.
 
 ## Curated kits (the Ochette/Hikari pair)
 

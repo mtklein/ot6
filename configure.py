@@ -554,6 +554,9 @@ TEST_ENV = {
     # #270: the driver's Mimic line for GOGO, on the Dirt Dragon from the
     # wor_opera leg's snapshot at the Opera House's catwalk switch
     "battle_mimicdriver": "OT6_TIMEOUT=3600",
+    # #270: the driver's Float line against the Dirt Dragon's earth, from the
+    # same snapshot
+    "battle_floatline": "OT6_TIMEOUT=1800",
     # #424: a 3-BP Break on Esper Mountain's four- and five-shield bodies,
     # and RunicBlade sending a Wizard's spell back on the Narshe cliffs
     "battle_breakfour": "OT6_TIMEOUT=1800 "

@@ -50,13 +50,14 @@ local WANT = {
 }
 
 -- the hands, as the arc seats them (route-wor-gogo.md section 2): TERRA (a dagger; Fire, Pearl), CELES (a
--- blade; Ice), RELM (a rod; Chocobo Brush in the bag: special), STRAGO (a rod; Pearl Rod holy), GOGO (a rod
--- or a dagger; his Mimic copies the others)
+-- blade; Ice), RELM (a rod; Chocobo Brush in the bag: special), STRAGO (a rod; Pearl Rod holy), GOGO (no
+-- weapon and no Fight row: no key of his own; his Mimic copies the others' keys, which the union already
+-- holds)
 local TERRA = { "TERRA", PIERCE, FIRE | HOLY }
 local CELES = { "CELES", SLASH, ICE }
 local RELM = { "RELM", BLUDG | SPECIAL, 0 }
 local STRAGO = { "STRAGO", BLUDG, HOLY }
-local GOGO = { "GOGO", BLUDG | PIERCE, 0 }
+local GOGO = { "GOGO", 0, 0 }
 local function union(what, list)
   local h = { cls = 0, el = 0, what = what, members = list }
   for _, m in ipairs(list) do

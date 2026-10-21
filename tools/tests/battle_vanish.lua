@@ -196,10 +196,18 @@ H.run({ maxFrames = 90000 }, {
     for _, s in ipairs(standing) do setBit(ST1 + (4 + s) * 2, 0x10, true) end
     local castBy = nil
     for actor = 0, 3 do
+      -- the cast this actor has: a Magic row ($202E, command $02) and a line magicOnlyLine would play
+      local hasMagic = false
+      for row = 0, 3 do if H.readByte(0x202E + actor * 12 + row * 3) == 0x02 then hasMagic = true end end
+      local line = hasMagic and D:magicOnlyLine(actor, 0) or nil
       local p = D:dodgePlan(actor, { kind = "fight", row = 0, boostLeft = 0, aim = standing[1] })
-      H.log(string.format("[test] every body Vanished: actor %d's Fight becomes %s", actor, p.kind))
+      H.log(string.format("[test] every body Vanished: actor %d's Fight becomes %s (Magic row %s, a line %s)", actor,
+        p.kind, tostring(hasMagic), line and line.kind or "none"))
+      H.assertEq(p.kind, line and line.kind or "fight", string.format(
+        "3. every body faded: actor %d's Fight becomes its cast where it has one, else stays a Fight", actor))
       if p.kind ~= "fight" then castBy = actor end
     end
+    H.assertEq(castBy ~= nil, true, "3. every body faded: some actor's Fight became a cast (the case is not vacuous)")
     for _, s in ipairs(standing) do setBit(ST1 + (4 + s) * 2, 0x10, false) end
     H.log(string.format("[test] dodgePlan: re-aim checked on %d standing body(ies); a cast for actor %s when every body "
       .. "faded", #standing, tostring(castBy)))

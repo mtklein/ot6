@@ -38,7 +38,7 @@ end
 local function map() return H.mapId() & 0x1ff end
 local snap = nil
 local cur = nil
-local function fresh() return { copies = {}, plans0 = #H.mimics, confirms = 0 } end
+local function fresh() return { copies = {}, plans0 = #H.mimics, confirms = 0, windows = 0, inWindow = false } end
 -- the fights with the line: idle frames at the switch before each (lab md3: one fight's draw felled GOGO
 -- after two turns, neither a Mimic)
 local TRIES, tries, before, copiedTry = { 0, 37, 73, 111 }, 0, 0, nil
@@ -64,6 +64,11 @@ local function theFight(what)
     end, 300000, {
       H.call(function()
         drv = drv or H.fightDriverFor("dragon", { tactical = true, boost = true, items = true, healPercent = 55 }, FIGHT)
+        -- GOGO's command windows: the command menu ($7BC2 state $05) open on his seat ($62CA)
+        local s = gogoSlot()
+        local open = s ~= nil and H.readByte(0x7BC2) == 0x05 and H.readByte(0x62CA) == s
+        if open and not cur.inWindow then cur.windows = cur.windows + 1 end
+        cur.inWindow = open
         ph = (ph + 1) % 8
         bn = H.battleLoadStarted() and bn + 1 or 0
         if bn >= 3 then drv.frame(); return end
@@ -126,8 +131,8 @@ H.run({ maxFrames = 900000 }, {
     local n = #cur.copies
     local planned, confirmed = #H.mimics - cur.plans0, 0
     for i = cur.plans0 + 1, #H.mimics do if H.mimics[i].confirmed then confirmed = confirmed + 1 end end
-    H.log(string.format("[mimic] %d fight(s) with the line: %d Mimic plan(s), %d confirmed, %d copy(ies) for GOGO's seat", tries,
-      planned, confirmed, n))
+    H.log(string.format("[mimic] %d fight(s) with the line: %d Mimic plan(s), %d confirmed, %d copy(ies) for GOGO's seat"
+      .. " in %d command window(s) of his", tries, planned, confirmed, n, cur.windows))
     local boosted = 0
     for i, c in ipairs(cur.copies) do
       -- the plan behind a copy: GOGO's latest, made before it (he gets no window between his plan and his turn)
@@ -164,7 +169,9 @@ H.run({ maxFrames = 900000 }, {
   H.waitUntil(function() return H.hasControl() end, 600, "control at the switch again", 1),
   theFight("with MIMIC_OFF"),
   H.call(function()
-    H.log(string.format("[mimic] the control fight: %d copy(ies) for GOGO's seat", #cur.copies))
+    H.log(string.format("[mimic] the control fight: %d copy(ies) for GOGO's seat in %d command window(s) of his",
+      #cur.copies, cur.windows))
+    H.assertEq(cur.windows >= 1, true, "control: GOGO had a command window (the control is not vacuous)")
     H.assertEq(#cur.copies, 0, "control: with the line off GOGO never Mimics")
   end),
 })
