@@ -481,6 +481,10 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     "battle_passside": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
+    # #451: SABIN's Pummel and EDGAR's Overclock refused for MP at resolve;
+    # the Continue, a walk and one to four battles
+    "battle_multipassfizzle": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
     # wt/hire-sprite: the 3 and 2 BP hires' figures (Defends bank the points)
     "battle_hirecrew": "OT6_TIMEOUT=2400 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-tomb-v1",
