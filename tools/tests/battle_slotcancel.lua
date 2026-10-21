@@ -24,10 +24,13 @@
 -- -- members felling Setzer with a blow timed into his wait -- failed 2 to
 -- 3 of 12 draws each, the queued blow landing before his ~100-frame commit
 -- and every fall between branch points spending a Fenix Down
--- (build/attempts/wt/v026-rom2/slotcancel/).  Nothing in these fights puts
--- him to sleep or stone by play: the party knows no Sleep and carries no
--- item that inflicts it, and every monster action measured on him was a
--- plain Fight ($b5 = $00, 12 traced runs).
+-- (build/attempts/wt/v026-rom2/slotcancel/).  The party knows no Sleep and
+-- carries no item that inflicts it, and every monster action measured on
+-- him at v0.26 was a plain Fight ($b5 = $00, 12 traced runs); a monster's
+-- Sleep by play is still possible on some draws (8c90abf1's chain: his
+-- uninjected attempt 1 came up marked, asleep,
+-- build/attempts/wt/v033-fizzle-boost-2/full_8c90abf1/), and is booked
+-- like an injected one.
 --
 -- So: Sleep, injected in the shape its own handler leaves -- the four
 -- bytes SetStatus_0f and UpdateStatus write when a Sleep lands: STATUS2
@@ -77,13 +80,14 @@
 --   2. a boosted spin whose turn came up marked: pending -> 0, nothing
 --      charged, and the bank up one (capped at 5) when he is in the fight at
 --      the turn's end -- asleep, as injected -- or UNCHANGED if out of it;
---   3. a marked turn with him in the fight came after the injected Sleep
---      was applied (the bit seen set; a blow may wake him again before the
---      stale entry comes up), and the Sleep was allowed by his $331c;
+--   3. a marked turn with him in the fight came after a Sleep, injected or
+--      by play, was applied after his commit (the bit seen set; a blow may
+--      wake him again before the stale entry comes up), and an injected
+--      Sleep was allowed by his $331c;
 -- and the control, and at least one of 2 below bank 5 that the injection
--- made (in the fight, Sleep applied).  A spin a monster's blow cancels by
--- felling him (out of the fight) is booked by 2 like any other, but does
--- not count toward the precondition.
+-- made (in the fight, Sleep applied).  A spin a monster cancels by play
+-- (a blow felling him, a Sleep) is booked by 2 and 3 like any other, but
+-- does not count toward the precondition.
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -498,7 +502,7 @@ local function cancelledBelowCap()
     -- that cancels a spin is booked the same way but is play's, not the
     -- precondition)
     if a.done and a.done.kind == "cancelled" and a.commit.p > 0 and a.commit.b < 5
-       and not a.done.ko and a.sleptF ~= nil and a.sleptF <= a.done.f then n = n + 1 end
+       and not a.done.ko and a.injected ~= nil and a.sleptF ~= nil and a.sleptF <= a.done.f then n = n + 1 end
   end
   return n
 end
@@ -542,7 +546,7 @@ local function approachFrame()
         A.injected.ahead, tostring(executing)))
     end
   end
-  if A and A.injected and not A.sleptF and asleep() then A.sleptF = H.frame end
+  if A and A.commit and not A.done and not A.sleptF and asleep() then A.sleptF = H.frame end
   if endHit then
     local e = endHit
     endHit = nil
