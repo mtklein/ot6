@@ -8444,6 +8444,69 @@ function Driver:rageLine(actor, have)
   return { kind = "rage", row = row, entry = best, rage = r, boostLeft = b, reason = "rage" }
 end
 
+-- GOGO's Mimic (#270; kits.md "Gogo"): the party's last action again, free
+-- (mp-economy.md: a mimic copies the action, not its price) and bought up by
+-- GOGO's own boost the way the copied action's boost is (Ot6MimicFold).  The
+-- engine keeps the last action a party member made that Mimic may copy
+-- (SaveForMimic, battle_main.asm: $3F20 command, $3F21 attack, $3F22/$3F23
+-- the character and monster targets; mimicreplace copies them over GOGO's
+-- queued Mimic), so the line reads them with full power and mimics when the
+-- copy strikes: a command in M.MIMIC_COPY, aimed at a monster still standing,
+-- and (a spell or a lore) neither a heal nor an element a standing target
+-- absorbs or nulls.  Otherwise GOGO's own lines decide (Tools, the bag).
+-- The boost is the bank's planned one for the turn.  Opt-out: opts.mimic =
+-- false, or the MIMIC_OFF global (the control arm).
+BATTLE.CMD_MIMIC = 0x12
+M.MIMIC_COPY = { [0x00] = "Fight", [0x02] = "Magic", [0x07] = "SwdTech", [0x08] = "Throw", [0x09] = "Tools",
+  [0x0A] = "Blitz", [0x0C] = "Lore", [0x17] = "X-Magic" }
+M.mimics = {}            -- every Mimic plan this run, oldest first (battle_mimicdriver reads them)
+function Driver:mimicLine(actor, boost)
+  if self.opts.mimic == false or MIMIC_OFF then return nil end
+  local row = cmdRow(actor, BATTLE.CMD_MIMIC)
+  if row == nil or self.skillDead[BATTLE.CMD_MIMIC] then return nil end
+  local cmd, atk = M.readByte(0x3F20), M.readByte(0x3F21)
+  local tmons = M.readByte(0x3F23)
+  local what = M.MIMIC_COPY[cmd]
+  local why = nil
+  if what == nil then
+    why = string.format("the last action (cmd $%02X) is not one this line copies", cmd)
+  elseif tmons == 0 then
+    why = string.format("the last %s struck no monster", what)
+  else
+    local live, absorbed = false, false
+    local MP = M.sym("MagicProp") & 0x3FFFFF
+    local spell = cmd == 0x02 or cmd == 0x0C or cmd == 0x17
+    local elem = spell and M.readRomByte(MP + atk * 14 + 1) or 0
+    local heal = spell and (M.readRomByte(MP + atk * 14 + 4) & 0x01) ~= 0
+    for s = 0, 5 do
+      if (tmons >> s) & 1 == 1 and monAlive(s) then
+        live = true
+        local x = 8 + s * 2
+        if elem ~= 0 and ((M.readByte(0x3BCC + x) & elem) ~= 0 or (M.readByte(0x3BCD + x) & elem) == elem) then
+          absorbed = true
+        end
+      end
+    end
+    if not live then why = string.format("the last %s's targets have fallen", what)
+    elseif heal then why = string.format("the last %s ($%02X) heals", what, atk)
+    elseif absorbed then why = string.format("a target of the last %s ($%02X) drinks or nulls its element", what, atk)
+    end
+  end
+  if why then
+    local key = "mimic:" .. why
+    if not self.statusSaid[key] then
+      self.statusSaid[key] = true
+      M.log(string.format("[%s] actor=%d GOGO no Mimic: %s", self.tag or "fight", actor, why))
+    end
+    return nil
+  end
+  M.log(string.format("[%s] actor=%d GOGO Mimic of %s ($%02X $%02X, monsters %02X) at %d BP, %d MP of %d",
+    self.tag or "fight", actor, what, cmd, atk, tmons, boost or 0, 0, M.readWord(BATTLE.CURMP + actor * 2)))
+  M.mimics[#M.mimics + 1] = { frame = M.frame, actor = actor, cmd = cmd, atk = atk, mons = tmons, boost = boost or 0,
+    mp = M.readWord(BATTLE.CURMP + actor * 2), bp = M.readByte(BATTLE.BP + actor * 2) }
+  return { kind = "mimic", row = row, boostLeft = boost, copy = { cmd = cmd, atk = atk, mons = tmons } }
+end
+
 -- The magic-only command table (the Fanatics' Tower: battle switch $38,
 -- InitCmdList turns Fight into Magic and drops every row but Magic, Item and
 -- Mimic; route-wor-thamasa.md finding 3): no Fight row, so the attack turn
@@ -12319,6 +12382,11 @@ function Driver:makePlanRules(actor)
     local line = self:rageLine(actor, have)
     if line then return line end
   end
+  -- GOGO's Mimic, when the party's last action is worth his turn (#270; Driver:mimicLine)
+  if id == 0x0C then
+    local line = self:mimicLine(actor, boost)
+    if line then return line end
+  end
   if self.opts.bushido and id == 2 and not self.skillDead[BATTLE.CMD_SWDTECH]
      and cmdRow(actor, BATTLE.CMD_SWDTECH) and have >= 1
      and not (self.opts.bank and have < self.opts.bank) then
@@ -12378,7 +12446,8 @@ function Driver:makePlanRules(actor)
   -- tool the pool cannot pay at all, in which case EDGAR falls through
   -- to the free boosted Fight below.
   local toolBp, toolMp, toolWhy = nil, nil, nil
-  if self.opts.tactical and self.opts.tools ~= false and id == 4
+  -- (EDGAR's, and GOGO's when his kit holds Tools: #270)
+  if self.opts.tactical and self.opts.tools ~= false and (id == 4 or id == 0x0C)
      and cmdRow(actor, BATTLE.CMD_TOOLS)
      and self:battInvIdx(self.opts.tool or BATTLE.AUTOCROSSBOW) then
     toolBp, toolMp, toolWhy = M.kitBoost(actor, self.opts.tool or BATTLE.AUTOCROSSBOW, boost)
@@ -13075,7 +13144,15 @@ function Driver:button(actor)
       return nil
     end
     local cur = M.readByte(BATTLE.CMDROW + actor) & 3
-    if cur == self.plan.row then return { "a" } end
+    if cur == self.plan.row then
+      -- Mimic commits on its row: no list, no target select (#270)
+      if self.plan.kind == "mimic" then
+        self.plan.committed = M.frame
+        M.log(string.format("[%s] actor=%d Mimic confirmed (pending %d BP)", self.tag or "fight", actor,
+          M.readByte(BATTLE.PEND_BP + actor * 2)))
+      end
+      return { "a" }
+    end
     return { cur < self.plan.row and "down" or "up" }
   end
   if st == BATTLE.ST_ITEM and self.plan.kind == "item" then
