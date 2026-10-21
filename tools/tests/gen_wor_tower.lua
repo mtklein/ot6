@@ -943,7 +943,10 @@ H.run({ maxFrames = 1500000 }, {
   -- back up (build/attempts/wt/v031-tower/lab/dn3_*_s0: 'no path (8,1)->(8,14)')
   via({ { 5, 3 }, { 5, 2 }, { 7, 3 } }, "the tower's foot: round the stair's head", { { 8, 1 } }),
   toFalconBy(8, 14, "down", "the tower's foot", { { TOWER_DOOR[1], TOWER_DOOR[2] } }),
-  H.fieldCare({ threshold = 1.0, tag = "beside the Falcon" }),
+  -- the save is next, so the casters spend their MP to the last point (mpFloor 0): a draw that leaves the bag
+  -- without Potions or Tents here shipped CELES at 449/3595 under the default floor (the v0.34 qualification
+  -- q1, audit_party_hp; build/attempts/wt/v034-wor-gogo/lab/x23: the same care from that save, all four full)
+  H.fieldCare({ threshold = 1.0, mpFloor = 0, tag = "beside the Falcon" }),
   H.call(function()
     say("wor", "beside the Falcon after the tower")
     H.log("[wor] " .. kitLine())
