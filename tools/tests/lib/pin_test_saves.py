@@ -33,6 +33,12 @@ prefs["SaveDataFolder"] = saves          # dedicated, isolated from the user's
 # tools/mesen/experiments/render-cost/summary.txt, "norewind").
 # OT6_REWIND=1 keeps it, to measure what it costs.
 prefs["EnableRewind"] = os.environ.get("OT6_REWIND") == "1"
+# No periodic auto-save state either.  Mesen's Emulator::ProcessAutoSaveState
+# takes one every AutoSaveStateDelay (5) minutes of emulated time, after a
+# frame is run, which under render on demand can land inside the visible
+# lines (`savestate at frame 18030 scanline 41`) and fail a run that played
+# correctly (#458, #394).  Nothing reads slot 11 in a headless run.
+prefs["EnableAutoSaveState"] = False
 
 # Mesen's per-Lua-slice watchdog defaults to 1 second; a slow frame callback
 # (e.g. a BFS over the collision grid) can be killed at that setting with no
