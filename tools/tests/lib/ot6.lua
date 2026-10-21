@@ -10635,7 +10635,14 @@ function Driver:buffPlan(actor, plan)
   for _, spell in ipairs(spells) do
     local st = Driver.BUFF_STATUS[spell]
     if st and spellCell(actor, spell, true) ~= nil then
-      for e = 0, 3 do
+      -- the frailest first (the smallest max HP: the member a round fells soonest)
+      local order = { 0, 1, 2, 3 }
+      table.sort(order, function(a, b)
+        local ma, mb = M.readWord(0x3C1C + a * 2), M.readWord(0x3C1C + b * 2)
+        if ma ~= mb then return ma < mb end
+        return a < b
+      end)
+      for _, e in ipairs(order) do
         local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
         local key = spell * 4 + e
         if mx > 0 and mx ~= 0xFFFF and hp > 0 and (M.readByte(st[1] + e * 2) & st[2]) == 0
