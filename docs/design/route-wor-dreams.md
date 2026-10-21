@@ -203,8 +203,16 @@ of 3"), CYAN alone every body of the Ancient Castle ("CYAN alone (the
 Ancient Castle) keys 12 of 12", the species once a pool), the three stooges
 three different pairs, the Soul Savers the brush alone among classes, and
 the Blue Dragon keeps its bolt weakness and its water absorb (lab
-`s_breakwor`: "PASS (frame 31)").  Red on the ROM without this arc's rows and on
-two ROM mutants (section 7).
+`f_breakwor` at 568bea1a: "checked 23 designed rows", "checked 28
+formations, 57 formation-species-hands triples", "PASS (frame 31)"; the
+TumbleWeed and world groups 52 and 53 joined after the first count above).
+Red at 568bea1a on the ROM without this arc's rows (`mutbase`, origin/main's
+`ot6_hud.asm`: "WoR Dreams arc break row mismatches: got 76") and on two ROM
+mutants (`mkmut.py`): the Soul Savers with slash (`mutRA`: "$167 SoulSaver
+class mask $09, want $08", "$167 SoulSaver: class $09, want the brush alone
+($08)"), the Lethal Wpn without slash (`mutRB`: "$045 Lethal Wpn class mask
+$06, want $05", "$045 Lethal Wpn: CYAN alone (the Ancient Castle) holds no
+key").
 
 ## 4. The bosses
 
@@ -271,14 +279,15 @@ once Wrexsoul is out.
 `$33F9` names, by another member; the host's fall within 20,000 frames of
 the plan; Wrexsoul back within 600 frames of the fall; then the control,
 `ZINGER_OFF`, from the same snapshot for as long as the line took and 900
-frames more: no Zinger plan, and Wrexsoul still hidden.  Passing (`s_zinger`,
-on the lab's throne snapshot: "entity 0 fell 6869 frames after the plan",
-"Wrexsoul back 1 frames after the fall", "the control: 0 Zinger plan(s);
-Wrexsoul still hidden 8316 frames in: true").  Two mutants (`mkmut.py`,
-`mutants.sh`), each red on its assertion: the Fight aimed at another living
-member (`mutZA`: "1. the plan's target is the member $33F9 names: got 1, want
-3"), the line ignoring `ZINGER_OFF` (`mutZB`: "control: with ZINGER_OFF no
-Zinger plan: got 11").
+frames more: no Zinger plan, and Wrexsoul still hidden.  Passing at 568bea1a
+(`f_zinger`, on a snapshot below the throne from the doma sweep's play:
+"entity 0 fell 6610 frames after the plan", "Wrexsoul back 1 frames after
+the fall", "the control: 0 Zinger plan(s); Wrexsoul still hidden 8236 frames
+in: true").  Two mutants at 568bea1a (`mkmut.py`, `mutants.sh`, the same
+snapshot), each red on its assertion: the Fight aimed at another living
+member (`mutZA`: "1. the plan's target is the member $33F9 names: got 1,
+want 0"), the line ignoring `ZINGER_OFF` (`mutZB`: "control: with
+ZINGER_OFF no Zinger plan: got 12").
 
 ## 6. Supplies and kits
 
@@ -368,7 +377,7 @@ Ancient Castle's leg before the dragon's care moved.
 4. **The Cursed Shield** is not worn (section 9).
 5. **Wrexsoul with a TERRA host** is the slow case: the others' Fights on her
    land 300-600, and her fall took 10,682 frames (`zon_s13`) and 13,921 on the
-   leg's snapshot (`mutZB`'s first arm); spending every pip did not move it
+   leg's snapshot (`mutZB`'s first arm, at b2253f4b); spending every pip did not move it
    (`zon2`).
 6. **The checkpoints** were sealed from lab captures (section 7); the
    release's re-cut makes them the graph's play.
