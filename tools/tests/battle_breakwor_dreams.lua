@@ -9,7 +9,9 @@
 --
 --   1. each species carries exactly its designed Ot6ShieldTbl row and keeps
 --      its vanilla weak and absorb bytes, with no Ot6ElemAddTbl row;
---   2. every species of every formation the arc can deal -- the dreamscape
+--   2. every species of every formation the arc can deal -- the plains by
+--      Doma Castle's door (world groups 52 and 53: the bodies other than the
+--      TumbleWeed are the Cyan arc's rows, keyed here and checked there), the dreamscape
 --      (field group 183, map 317), the dream's train and its Doma (181, maps
 --      321, 144, 322, 126), the cave (182, maps 319 and 320), the stooges
 --      (event group 90), Wrexsoul (92), the Ancient Castle's cave, halls and
@@ -31,6 +33,7 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
+  [0x034] = { "TumbleWeed", 3, SLASH | BLUDG, FIRE, WATER },
   [0x0BE] = { "Barb-e", 3, SLASH | SPECIAL, POISON, 0 },
   [0x0AB] = { "Critic", 2, SLASH | BLUDG, 0, 0 },
   [0x085] = { "Allosaurus", 3, PIERCE | BLUDG, FIRE | HOLY, 0 },
@@ -77,9 +80,14 @@ local DREAM = union("the dream's three (TERRA, CELES, RELM)", { TERRA, CELES, RE
 local CAVE = union("the three in Magitek armor", { MAGITEK })
 local BOLT_BEAM = union("the bolt beam alone", { { "the bolt beam", 0, BOLT } })
 local ANCIENT = union("the castle's four (CYAN, CELES, RELM, TERRA)", { CYAN, CELES, RELM, TERRA })
+local DOMA = union("the cabin's four by Doma (CYAN, CELES, RELM, TERRA)", { CYAN, CELES, RELM, TERRA })
+-- the plains by Doma Castle's door (world groups 52 and 53) deal bodies whose rows the Cyan arc owns
+-- (route-wor-cyan.md, battle_breakwor_cyan): met here, keyed here, their rows checked there
+local OWNED = { [0x087] = "Sprinter", [0x0B0] = "Spek Tor", [0x0D2] = "Mantodea", [0x05B] = "Crawler" }
 local CYAN_ALONE = union("CYAN alone", { CYAN })
 
-local GROUPS = { { "field", 183, TERRA_ALONE }, { "field", 183, DREAM }, { "field", 181, DREAM },
+local GROUPS = { { "world", 52, DOMA }, { "world", 53, DOMA }, { "field", 183, TERRA_ALONE }, { "field", 183, DREAM },
+  { "field", 181, DREAM },
   { "field", 182, CAVE }, { "event", 90, DREAM }, { "event", 92, DREAM }, { "field", 143, ANCIENT },
   { "field", 144, ANCIENT }, { "field", 145, ANCIENT }, { "event", 137, ANCIENT } }
 local POOLS = { [317] = 183, [321] = 181, [144] = 181, [322] = 181, [126] = 181, [319] = 182, [320] = 182,
@@ -188,7 +196,7 @@ H.run({ maxFrames = 600 }, {
     for _ in pairs(nform) do nf = nf + 1 end
     H.log(string.format("checked %d formations, %d formation-species-hands triples", nf, triples))
     for sp in pairs(met) do
-      if WANT[sp] == nil then problem("species $%03X is met on this arc and has no line in WANT", sp) end
+      if WANT[sp] == nil and OWNED[sp] == nil then problem("species $%03X is met on this arc and has no line in WANT", sp) end
     end
     for _, sp in ipairs(ids) do
       if not met[sp] then problem("$%03X %s is in WANT but no group of the arc deals it", sp, WANT[sp][1]) end

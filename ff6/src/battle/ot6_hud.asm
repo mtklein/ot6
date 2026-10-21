@@ -2641,6 +2641,12 @@ Ot6ShieldTbl:
         .byte   6, OT6_PIERCE|OT6_BLUDG ; dirt drgn: an earth dragon; the
                                 ;   floor's pierce and a crushing blow.
                                 ;   wind|water vanilla (strago's aqua rake)
+        ; ---- the world of ruin: the plain west of doma castle (world group
+        ; 52; route-wor-dreams.md section 3): its other bodies' rows are the
+        ; cyan arc's ----------------------------------------------------------
+        .word   $0034
+        .byte   3, OT6_SLASH|OT6_BLUDG ; tumbleweed: a dry bush; cut it or
+                                ;   crush it.  fire vanilla; absorbs water
         ; ---- the world of ruin: cyan's dream (route-wor-dreams.md section
         ; 3) -------------------------------------------------------------------
         ; Terra, celes and relm walk it (cyan is the dream's): slash (the two
