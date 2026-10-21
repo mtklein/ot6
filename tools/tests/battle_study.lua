@@ -30,6 +30,11 @@
 -- lost the fight-out (build/attempts/wt/v030-route/study/).  A battle
 -- without a Chimera, where STRAGO cannot cast, or whose Chimera falls
 -- before the cast is fought out and the next taken.
+-- Every fight-out (after the cast, or of a battle that counts nothing) is
+-- the route's Fight driver (H.fightBattleByMenu), which heals in battle as
+-- a player does: a Fight-only fight-out wiped to a lone Chimera on v0.35's
+-- draw, the party at 54/57/58 HP after the 2 BP cast and nobody healing
+-- (build/attempts/wt/v035-wor-dreams/study/).
 -- Old-ROM red and mutants: build/attempts/wt/v030-plan-kits/study/; stage
 -- 1's: build/attempts/wt/v030-route/scanally/.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
@@ -188,7 +193,7 @@ H.run({ maxFrames = 900000 }, {
       { H.fieldCare({ tag = "study" }), lap(), H.release() }, {}),
     H.waitUntil(function() return H.battleActive() end, 900, "battle up", 5),
     H.call(decide),
-    H.cond(function() return mode == "fightout" end, { H.kitBattle({}, {}) }, {
+    H.cond(function() return mode == "fightout" end, { H.fightBattleByMenu(40000) }, {
       H.kitBattle(proxy, { untilPlanDone = true, others = "fight", idle = "defend", maxFrames = 60000,
         planDone = closed }),
       H.call(function()
@@ -227,7 +232,7 @@ H.run({ maxFrames = 900000 }, {
           H.assertEq(rec.mp0 - rec.mp1, STUDY_MP, "the study cost the shared ceiling, 99 MP")
         end
       end),
-      H.cond(function() return H.battleLoadStarted() end, { H.kitBattle({}, {}) }, {}),
+      H.cond(function() return H.battleLoadStarted() end, { H.fightBattleByMenu(40000) }, {}),
       H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000,
         "back on the world map", 5),
       H.call(function()
