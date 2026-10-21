@@ -866,6 +866,7 @@ M.contracts["thamasa-night-v1"] = {
 -- value of $008E no longer describes what the player sees.
 M.contracts["fire-out-v1"] = {
   slot = 3,
+  world = { x = 249, y = 128 },   -- outside Thamasa (the ram cells below)
   ram = {
     { 0x1f60, 0xFF, 249, "world x (save-block cell $1f60): outside Thamasa" },
     { 0x1f61, 0xFF, 128, "world y (save-block cell $1f61)" },
