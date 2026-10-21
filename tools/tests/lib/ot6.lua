@@ -10590,19 +10590,20 @@ function Driver:floatPlan(actor, plan)
   local row = cmdRow(actor, BATTLE.CMD_MAGIC)
   if row == nil or spellCell(actor, M.FLOAT_SPELL, true) == nil then return plan end
   if M.frame - (self.floatAt or -100000) <= 600 then return plan end
-  local bare = nil
+  local bare, mask = nil, 0
   for e = 0, 3 do
     local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
-    if bare == nil and mx > 0 and mx ~= 0xFFFF and hp > 0 and (M.readByte(BATTLE.ST4 + e * 2) & 0x80) == 0 then
-      bare = e
-    end
+    local up = (M.readByte(BATTLE.ST4 + e * 2) & 0x80) ~= 0
+    if up then mask = mask | (1 << e) end
+    if bare == nil and mx > 0 and mx ~= 0xFFFF and hp > 0 and not up then bare = e end
   end
+  self.floatMask = mask
   if bare == nil then return plan end
   self.floatAt = M.frame
   M.floats = M.floats or {}
   M.floats[#M.floats + 1] = { actor = actor, frame = M.frame, bare = bare, over = plan.kind }
-  M.log(string.format("[%s] actor=%d Float on the party (entity %d is not floating, an earth caster stands): in "
-    .. "place of its %s", self.tag or "fight", actor, bare, plan.kind))
+  M.log(string.format("[%s] actor=%d Float on the party (entity %d is not floating, floating mask $%X; an earth "
+    .. "caster stands): in place of its %s", self.tag or "fight", actor, bare, mask, plan.kind))
   return { kind = "magic", spell = M.FLOAT_SPELL, row = row, boostLeft = 0, ally = true, all = true,
            target = bare, buff = true, vetoOk = true, reason = "float" }
 end
@@ -13226,7 +13227,8 @@ function Driver:button(actor)
     end
     local cur = M.readByte(BATTLE.CMDROW + actor) & 3
     if cur == self.plan.row then
-      -- Mimic commits on its row: no list, no target select (#270)
+      -- Mimic opens no list: A on its row confirms it, and the target select that follows (latched on
+      -- GOGO's own seat; the ST_TGT head) is confirmed as it stands (#270)
       if self.plan.kind == "mimic" then
         self.plan.committed = M.frame
         if self.plan.rec then self.plan.rec.confirmed = M.frame end
