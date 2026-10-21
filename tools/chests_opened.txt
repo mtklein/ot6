@@ -141,3 +141,8 @@
 192	map 353 the Veldt cave, the monster chest (6,8): Allo Ver (gen_wor_veldt)
 193	map 353 the Veldt cave, Striker (42,26) (gen_wor_veldt)
 227	map 349 Strago's house, Memento Ring (56,16) -- after the Veldt cave (gen_wor_gau)
+188	map 144 the dream's second car, Genji Glove (25,5) (gen_wor_dream)
+189	map 144 the dream's second car, Flame Shld (14,5) (gen_wor_dream)
+202	map 406 the Ancient Castle, Blizzard Orb (53,23) (gen_wor_ancient)
+203	map 406 the Ancient Castle, Gold Hairpin (55,23) (gen_wor_ancient)
+204	map 408 the Ancient Castle, X-Ether (34,43) (gen_wor_ancient)
