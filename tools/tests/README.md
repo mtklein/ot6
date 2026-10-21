@@ -390,7 +390,10 @@ byte-identical artifacts, serial or parallel. The pinned settings:
 
 - `pin_test_saves.py`: `Snes.RamPowerOnState = "AllZeros"` (FF6 reads
   uninitialized RAM), `Snes.DisableFrameSkipping = true`,
-  `Snes.Port1.Type = SnesController`, `Debug.ScriptWindow.ScriptTimeout = 30`.
+  `Snes.Port1.Type = SnesController`, `Debug.ScriptWindow.ScriptTimeout = 30`,
+  `Preferences.EnableRewind = false`, and `Preferences.EnableAutoSaveState =
+  false` (Mesen's 5-minute auto-save could land mid-frame and fail a run
+  under render on demand, #458).
 - `run.sh` wipes `<saves>/*.srm` before every launch; tests that need a
   save inject it (SRM sidecars).
 
