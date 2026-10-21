@@ -425,6 +425,12 @@ H.run({ maxFrames = 2400000 }, {
   H.release(),
   H.advanceStory(function() return sw(0x01F0) == 1 and settled() end, 3000, { playBattles = "tactical", fight = FIGHT }),
   H.navTo(118, 27, { maxFrames = 3000 }),
+  -- the dragon hits hard with its tusks and keeps its vanilla wind and water: STRAGO, RELM and GOGO step to
+  -- the back row (blows taken halved) and STRAGO's lores Aqua Rake and Aero are his first reach (and GOGO's,
+  -- through his Lore row).  The Dirt Dragon lab, route-wor-gogo.md: 15 of 20 won as the walks fight it,
+  -- 16 of 20 with the lores, 18 of 20 with the lores and the back row (labs dd2_plain, dd2_lore, dd2_back)
+  H.setRows({ [STRAGO] = true, [RELM] = true, [GOGO] = true }),
+  H.waitUntil(function() return H.hasControl() end, 600, "control after the rows", 1),
   H.saveState("wor_opera_switch.mss"),
   -- (the switch's own tile re-runs its script under the party, control one frame in four: done is the
   -- drop's map load, _cab497's load_map 231, not a frame without control)
@@ -432,7 +438,7 @@ H.run({ maxFrames = 2400000 }, {
     "the catwalk's switch (232 (118,27)): face up, A"),
   H.release(),
   H.advanceStory(function() return sw(0x0387) == 0 and map() == 237 and settled() end, 300000,
-    { playBattles = "tactical", fight = FIGHT }),
+    { playBattles = "tactical", fight = { nukeLore = { 0x03, 0x04 } } }),
   H.call(function() say("story", "the Dirt Dragon beaten ($0387 clear)") end),
   H.fieldCare({ tag = "after the Dirt Dragon" }),
   H.saveState("wor_opera_dragon.mss"),
