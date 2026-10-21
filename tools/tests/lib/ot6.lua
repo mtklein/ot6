@@ -6412,7 +6412,11 @@ local function execActivate()
       if p ~= nil then
         local mp = M.readWord(0x3C08 + x)
         if p.cost > 0 and p.cost > p.mp and mp == p.mp then
-          fizzleNote(x, p, mp, M.readByte(0x3E9D + x))
+          -- an X-Magic's first spell with its second still to come keeps
+          -- the pending boost for the second (Ot6FizzleDropBoost): none of
+          -- it is burned on this refusal
+          fizzleNote(x, p, mp, M.readByte(0x32CC + x) ~= 0xFF and 0
+            or M.readByte(0x3E9D + x))
         end
       end
       if execActor == x // 2 then

@@ -490,8 +490,17 @@ OT6_MORPHBOOST       := $ede4
 ; The boost aura's halo (ot6_aura.asm, Ot6AuraHalo): per-frame scratch, the
 ; body entries found and the scanline budget being granted.  Written before
 ; it is read on every frame anyone has a boost pending, so it needs no init.
-OT6_AURAWORK         := $ede5   ; 58 bytes
+OT6_AURAWORK         := $ede5   ; 59 bytes (AW_HIST+0..+14: Ot6AuraHalo clears OT6_AURABANDS+3)
 .assert OT6_AURAWORK = OT6_MORPHBOOST + 1, error, "the aura's scratch must follow the Morph's boost"
-.assert OT6_AURAWORK + 58 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+.assert OT6_AURAWORK + 59 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
+; X-Magic's first spell refused for MP with its second still to come
+; (ot6_boost.asm, Ot6FizzleDropBoost): a per-character bitmask (----1234,
+; the OT6_COVERPAID shape).  Read when the second spell is refused too, so
+; the boost neither spell bought is dropped.  Cleared for the actor by
+; Ot6ActionEnd and wholesale by InitBP.
+OT6_FIZZLED          := $ee20
+.assert OT6_FIZZLED = OT6_AURAWORK + 59, error, "the X-Magic refusal mark must follow the aura's scratch"
+.assert OT6_FIZZLED <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
 .endif

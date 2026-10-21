@@ -38,6 +38,25 @@
 --            dance that stumbled off its terrain is neither (#313,
 --            battle_dancestumble) and is not counted;
 -- and across branches: at least MIN_EACH of each kind resolved, per verb.
+--
+-- X-Magic queues two spells on one pending boost, both folded to the boosted
+-- tier at the commit, and its turn ends once, after the second.  So the boost
+-- goes with the turn's last spell: a first spell refused with a second still
+-- to cast keeps it for the second.  No fixture holds a Gem Box this early, so
+-- a second declared write (the battle_mimic expedient) turns the Magic
+-- caster's third command (Morph or Runic) into X-Magic in the field record
+-- before the encounter; battle init builds the battle's menus from it.  The
+-- X-Magic caster commits two different lit rows, the dearer first (A, then
+-- B), that the pool pays together, and its branches take four kinds in turn:
+--   control  both spells charged their queued prices; the pip spent;
+--   first    the pool set to B's price at the commit: A refused, B cast at
+--            the id and price it was queued at; the pip pending at the
+--            turn's end and spent;
+--   second   the pool set under B's price once A has cast: A charged, B
+--            refused; the pip spent (it bought A);
+--   both     the pool set under B's price at the commit: both refused,
+--            nothing pending at the turn's end, the bank one pip up.
+-- At least one of each kind resolved.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/wor_tritoch.mss.lua"
 
@@ -45,7 +64,10 @@ local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
 local ST_TRANS, ST_CMD, ST_MAGIC, ST_DANCE, ST_TGT = 0x01, 0x05, 0x0E, 0x21, 0x38
 local ST_DEF = 0x27
 local CMDTBL = 0x202E
-local CMD_MAGIC, CMD_DANCE = 0x02, 0x13
+local CMD_MAGIC, CMD_DANCE, CMD_XMAGIC = 0x02, 0x13, 0x17
+local XKINDS = { "control", "first", "second", "both" }
+-- the spell list and its two scroll states (ScrollMagicListDown/Up)
+local XLIST = { [0x0E] = true, [0x17] = true, [0x18] = true }
 local MLISTPTR = 0x302C
 local QCMD = 0x3A7A
 local MOG = 0x0A
@@ -57,6 +79,8 @@ local function bp(s) return H.readByte(0x3E9C + s * 2) end
 local function pend(s) return H.readByte(0x3E9D + s * 2) end
 local function mp(s) return H.readWord(0x3C08 + s * 2) end
 local function dancing(s) return (H.readByte(0x3EF8 + s * 2) & 0x01) ~= 0 end
+-- the file's one pool write (see the header): what a drain leaves
+local function drainTo(s, v) H.writeWord(0x3C08 + s * 2, v) end
 
 local function cmdCellOf(slot, cmd)
   for i = 0, 3 do
@@ -66,6 +90,7 @@ local function cmdCellOf(slot, cmd)
 end
 
 local ph = 0
+local xChar = nil                   -- the X-Magic caster's character id
 local snap0, snap = nil, nil
 local V = nil                       -- the verb under test
 local who = nil                     -- its caster's slot
@@ -102,6 +127,35 @@ local function magicCell(a)
   return nil
 end
 
+-- X-Magic's two picks: B the cheapest lit row, A the dearest lit row dearer
+-- than B that the pool pays together with B
+local function xPicks(a)
+  local rows = {}
+  for cell = 0, 53 do
+    local id, flags, cost = listEntry(a, cell)
+    if id == nil then break end
+    if id ~= 0xFF and (flags & 0x80) == 0 and cost > 0 then
+      rows[#rows + 1] = { cell = cell, id = id, cost = cost }
+    end
+  end
+  local A, B = nil, nil
+  for _, r in ipairs(rows) do if B == nil or r.cost < B.cost then B = r end end
+  for _, r in ipairs(rows) do
+    if B and r.cost > B.cost and r.cost + B.cost <= mp(a)
+       and (A == nil or r.cost > A.cost) then A = r end
+  end
+  return A, B
+end
+
+local function steerTo(a, cell)
+  local wantRow, wantCol = cell // 2, cell % 2
+  local absRow = H.readByte(0x8913 + a) + H.readByte(0x891B + a)
+  local col = H.readByte(0x8917 + a)
+  if absRow ~= wantRow then return (absRow < wantRow) and "down" or "up" end
+  if col ~= wantCol then return (col < wantCol) and "right" or "left" end
+  return "a"
+end
+
 local danceId = nil
 local function danceCost() return H.boostPrice(8, BOOST) end
 
@@ -131,14 +185,23 @@ local function pulse()
   elseif st == ST_MAGIC and V.cmd == CMD_MAGIC then
     local cell, id, cost = magicCell(a)
     assert(cell, "the caster has a lit Magic row the pool pays at the boost")
-    local wantRow, wantCol = cell // 2, cell % 2
-    local absRow = H.readByte(0x8913 + a) + H.readByte(0x891B + a)
-    local col = H.readByte(0x8917 + a)
-    if absRow ~= wantRow then btn = (absRow < wantRow) and "down" or "up"
-    elseif col ~= wantCol then btn = (col < wantCol) and "right" or "left"
-    else
-      rec.spell, rec.price = id, cost
-      btn = "a"
+    btn = steerTo(a, cell)
+    if btn == "a" then rec.spell, rec.price = id, cost end
+  elseif XLIST[st] and V.cmd == CMD_XMAGIC then
+    if rec.picks == nil then
+      local A, B = xPicks(a)
+      assert(A and B, "the X-Magic caster has two lit rows, one dearer, that "
+        .. "the pool pays together")
+      rec.picks, rec.pi = { A, B }, 1
+      H.log(string.format("[mpfizzle] X-Magic picks: A $%02X (%d MP), B $%02X "
+        .. "(%d MP), pool %d", A.id, A.cost, B.id, B.cost, mp(a)))
+    end
+    -- back in the list after a pick was taken: the next pick
+    if not XLIST[rec.lastSt or 0] and rec.pressed == rec.pi then rec.pi = rec.pi + 1 end
+    local p = rec.picks[rec.pi]
+    if p then
+      btn = steerTo(a, p.cell)
+      if btn == "a" then rec.pressed = rec.pi end
     end
   elseif st == ST_DANCE and V.cmd == CMD_DANCE then
     local row, col = danceId // 2, danceId % 2
@@ -148,9 +211,15 @@ local function pulse()
     else rec.price = danceCost(); btn = "a" end
   elseif st == ST_TGT then
     btn = "a"
+  elseif V.cmd == CMD_XMAGIC and rec.pressed then
+    -- between X-Magic's picks the menu passes through its own states: wait
+    if st ~= rec.lastSt then
+      H.log(string.format("[mpfizzle] X-Magic menu state $%02X after pick %d", st, rec.pressed))
+    end
   else
     btn = "b"
   end
+  rec.lastSt = st
   H.setPad((edge and btn) and { [btn] = true } or {})
 end
 
@@ -168,27 +237,58 @@ end
 
 -- ------------------------------------------------------------ observers --
 local function installObservers()
-  emu.addMemoryCallback(function()
-    if not (rec and V) or rec.queued then return end
-    if H.readByte(QCMD) ~= V.cmd then return end
+  emu.addMemoryCallback(function(addr, v)
+    if not (rec and V) or rec.spells then return end
+    local q = H.readByte(QCMD)
+    -- an X-Magic queues its first spell as Magic ($02), its second as $17
+    local xfirst = V.cmd == CMD_XMAGIC and q == CMD_MAGIC
+      and (emu.getState()["cpu.x"] & 0xFF) == who * 2
+    if q ~= V.cmd and not xfirst then return end
+    -- the queued price and attack id, per queue slot (the fold's write last)
+    rec.qw = rec.qw or {}
+    rec.qw[#rec.qw + 1] = { addr = addr & 0xFFFF, v = v, id = H.readByte(0x3A7B),
+                            cmd = q }
+    if rec.queued or xfirst then return end
     rec.queued = { f = H.frame, mp = mp(who), pend = pend(who),
                    fz = H.fizzles.n }
   end, emu.callbackType.write, 0x7E3620, 0x7E3620 + 0xFE)
+  -- each spell of an X-Magic as its body ends: what ran, and the pool
+  local sfm = H.sym("SaveForMimic")
+  emu.addMemoryCallback(function()
+    if not (rec and rec.queued and V and V.cmd == CMD_XMAGIC) or rec.done then return end
+    if (emu.getState()["cpu.x"] & 0xFF) ~= who * 2 then return end
+    rec.spells = rec.spells or {}
+    rec.spells[#rec.spells + 1] = { f = H.frame, cmd = H.readByte(0x3A7C),
+      atk = H.readByte(0x3A7D), mp = mp(who), pend = pend(who) }
+  end, emu.callbackType.exec, sfm, sfm)
+  -- what the refusal sees: the next list entry, $3406, the refusal mark
+  local fd = H.sym("Ot6FizzleDropBoost")
+  emu.addMemoryCallback(function()
+    if not (rec and rec.queued) or rec.done then return end
+    if (emu.getState()["cpu.x"] & 0xFF) ~= who * 2 then return end
+    H.log(string.format("[mpfizzle] refusal f%d: next entry $32cc=$%02X $3406=$%02X "
+      .. "mark=$%02X pending %d", H.frame, H.readByte(0x32CC + who * 2),
+      H.readByte(0x3406), H.readByte(0xEE20), pend(who)))
+  end, emu.callbackType.exec, fd, fd)
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
     if not (rec and rec.queued) or rec.done then return end
     if (emu.getState()["cpu.x"] & 0xFF) ~= who * 2 then return end
-    if H.readByte(0x3A7C) ~= V.cmd then return end
+    local c = H.readByte(0x3A7C)
+    if c ~= V.cmd and not (V.cmd == CMD_XMAGIC and c == CMD_MAGIC) then return end
     local note = H.fizzles.rows[#H.fizzles.rows]
     rec.done = { f = H.frame, pend = pend(who), bank = bp(who), mp = mp(who),
                  dancing = dancing(who), fizzled = H.fizzles.n > rec.queued.fz,
+                 nfz = H.fizzles.n - rec.queued.fz,
                  note = (H.fizzles.n > rec.queued.fz) and note or nil }
   end, emu.callbackType.exec, ae, ae)
 end
 
-local function branch(k)
+local function branch(k, verb)
   local req
   local drain = (k % 2 == 1)
+  local kind = (verb.cmd == CMD_XMAGIC) and XKINDS[(k - 1) % #XKINDS + 1] or nil
+  if kind then drain = (kind ~= "control") end
   return H.cond(function() return true end, {
     H.call(function()
       H.setPad({})
@@ -199,11 +299,11 @@ local function branch(k)
     H.call(function()
       H.checkReq(req, "snapshot load (branch " .. k .. ")")
       H.rearmInputInjection()
-      rec = { k = k, drain = drain, verb = V.name }
+      rec = { k = k, drain = drain, verb = V.name, kind = kind }
       recs[#recs + 1] = rec
       want = "idle"
       H.log(string.format("[mpfizzle] %s branch %d (%s): %d idle frames at "
-        .. "the caster's window", V.name, k, drain and "drained" or "control",
+        .. "the caster's window", V.name, k, kind or (drain and "drained" or "control"),
         (k - 1) * 9))
     end),
     H.waitFrames((k - 1) * 9 + 1),
@@ -214,8 +314,19 @@ local function branch(k)
     step("the caster commits, boosted", function() return rec.queued ~= nil end, 3000),
     H.call(function()
       rec.pend0 = rec.queued.pend
-      if drain then
-        H.writeWord(0x3C08 + who * 2, 1)
+      -- the property needs a raised boost to keep or drop: assert it was raised
+      H.assertEq(rec.pend0, BOOST, string.format(
+        "%s branch %d: the commit queued with the boost raised", V.name, k))
+      if kind then
+        local cb = rec.picks[2].cost
+        if kind == "first" then drainTo(who, cb)
+        elseif kind == "both" then drainTo(who, cb - 1) end
+        H.log(string.format("[mpfizzle] %s branch %d (%s): queued f%d pending "
+          .. "%d bank %d, pool %d -> %d%s", V.name, k, kind, rec.queued.f,
+          rec.pend0, rec.bank0, rec.mp0, mp(who),
+          (kind == "first" or kind == "both") and " (synthetic drain)" or ""))
+      elseif drain then
+        drainTo(who, 1)
         H.log(string.format("[mpfizzle] %s branch %d: queued f%d pending %d "
           .. "bank %d, pool %d -> %d (synthetic drain)", V.name, k,
           rec.queued.f, rec.pend0, rec.bank0, rec.mp0, mp(who)))
@@ -237,6 +348,15 @@ local function branch(k)
       H.call(function()
         ph = ph + 1
         if not H.battleLoadStarted() then H.setPad({}) return end
+        -- the second kind's drain: once A's body has ended, before B's
+        if rec.kind == "second" and rec.spells and #rec.spells == 1
+           and not rec.drained2 then
+          rec.drained2 = { f = H.frame, from = mp(who) }
+          drainTo(who, rec.picks[2].cost - 1)
+          H.log(string.format("[mpfizzle] %s branch %d (second): A's body ended "
+            .. "f%d, pool %d -> %d (synthetic drain)", V.name, k,
+            rec.spells[1].f, rec.drained2.from, mp(who)))
+        end
         if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == who then
           H.setPad({})
         else
@@ -252,12 +372,19 @@ local function branch(k)
           .. "the turn resolved (no outcome)", V.name, k))
         return
       end
+      local sp = {}
+      for i, e in ipairs(rec.spells or {}) do
+        sp[#sp + 1] = string.format("spell%d f%d cmd $%02X atk $%02X pool %d "
+          .. "pending %d", i, e.f, e.cmd, e.atk, e.mp, e.pend)
+      end
       H.log(string.format("[mpfizzle] %s branch %d %s: commit pending %d bank "
         .. "%d pool %d | turn end f%d pending %d bank %d pool %d fizzled=%s "
-        .. "dancing=%s | +20f bank %d pool %d%s", V.name, k,
-        drain and "DRAINED" or "CONTROL", rec.pend0, rec.bank0, rec.mp0, d.f,
-        d.pend, d.bank, d.mp, tostring(d.fizzled), tostring(d.dancing), a.bank,
-        a.mp, d.note and ("\n[mpfizzle] note: " .. d.note) or ""))
+        .. "(%d) dancing=%s | +20f bank %d pool %d%s%s", V.name, k,
+        kind and kind:upper() or (drain and "DRAINED" or "CONTROL"), rec.pend0,
+        rec.bank0, rec.mp0, d.f, d.pend, d.bank, d.mp, tostring(d.fizzled),
+        d.nfz, tostring(d.dancing), a.bank, a.mp,
+        #sp > 0 and (" | " .. table.concat(sp, "; ")) or "",
+        d.note and ("\n[mpfizzle] note: " .. d.note) or ""))
     end),
   })
 end
@@ -303,7 +430,7 @@ local function phase(verb, pick)
     H.waitFrames(2),
     H.call(function() H.checkReq(snap, "snapshot at the caster's window") end),
   }
-  for k = 1, BRANCHES do out[#out + 1] = branch(k) end
+  for k = 1, BRANCHES do out[#out + 1] = branch(k, verb) end
   return H.seqStep(out)
 end
 
@@ -314,6 +441,26 @@ local body = {
   H.waitUntil(function()
     return H.worldMode() and H.worldHasControl() and H.worldAligned()
   end, 6000, "world control on the World of Ruin map"),
+  H.call(function()
+    -- the declared expedient (see the header): the Magic caster's third
+    -- command becomes X-Magic in the field record, before battle init reads it
+    local party = H.readByte(0x1A6D) & 7
+    for _, c in ipairs({ 0x00, 0x06 }) do
+      if (H.readByte(0x1850 + c) & 7) == party and xChar == nil then
+        for r = 1, 3 do
+          local at = 0x1600 + 37 * c + 0x16 + r
+          local v = H.readByte(at)
+          if xChar == nil and v ~= 0x00 and v ~= 0x01 and v ~= CMD_MAGIC then
+            xChar = c
+            H.writeByte(at, CMD_XMAGIC)
+            H.log(string.format("[mpfizzle] EXPEDIENT: char %d command row %d "
+              .. "$%02X -> $17 (X-Magic)", c, r, v))
+          end
+        end
+      end
+    end
+    assert(xChar, "TERRA or CELES is in the party with a third command")
+  end),
   H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
     H.call(function()
       if H.battleLoadStarted() or not H.worldHasControl() then H.setPad({}) return end
@@ -355,6 +502,11 @@ body[#body + 1] = phase({ name = "Magic", cmd = CMD_MAGIC }, function()
   assert(s, "a party member with a Magic row")
   return s
 end)
+body[#body + 1] = phase({ name = "XMagic", cmd = CMD_XMAGIC }, function()
+  local s = slotOfChar(xChar)
+  assert(s and cmdCellOf(s, CMD_XMAGIC), "the X-Magic caster's battle list has X-Magic")
+  return s
+end)
 body[#body + 1] = phase({ name = "Dance", cmd = CMD_DANCE }, function()
   local s = slotOfChar(MOG)
   assert(s, "MOG is in the party")
@@ -364,11 +516,63 @@ end)
 body[#body + 1] = H.call(function()
   H.setPad({})
   local n = { Magic = { c = 0, d = 0 }, Dance = { c = 0, d = 0 } }
+  local nx = { control = 0, first = 0, second = 0, both = 0 }
   local fails = {}
   local function check(ok, msg) if not ok then fails[#fails + 1] = msg end end
   for _, r in ipairs(recs) do
     local d, a = r.done, r.after
-    if d and a then
+    local sp = r.spells or {}
+    if d and a and r.kind and #sp ~= 2 then
+      H.log(string.format("[mpfizzle] %s branch %d (%s): %d spell bodies ended "
+        .. "before the turn's end (no outcome)", r.verb, r.k, r.kind, #sp))
+    elseif d and a and r.kind then
+      local tag = string.format("%s branch %d (%s)", r.verb, r.k, r.kind)
+      nx[r.kind] = nx[r.kind] + 1
+      -- the two queue slots in the order they were queued, each's last write
+      local order, last = {}, {}
+      for _, w in ipairs(r.qw or {}) do
+        if last[w.addr] == nil then order[#order + 1] = w.addr end
+        last[w.addr] = w
+      end
+      check(#order == 2, string.format("%s: %d queue slots written (want 2)", tag, #order))
+      local qa, qb = last[order[1]] or {}, last[order[2]] or {}
+      local mp0 = r.queued.mp
+      if r.kind == "control" then
+        check(d.nfz == 0, tag .. ": a payable spell fizzled")
+        check(mp0 - sp[1].mp == qa.v and sp[1].mp - sp[2].mp == qb.v,
+          string.format("%s: charged %d and %d (want the queued %s and %s)", tag,
+          mp0 - sp[1].mp, sp[1].mp - sp[2].mp, tostring(qa.v), tostring(qb.v)))
+      elseif r.kind == "first" then
+        check(d.nfz == 1, string.format("%s: %d fizzles (want A's one)", tag, d.nfz))
+        check(sp[1].mp == r.picks[2].cost, tag .. ": MP charged for the refused A")
+        check(sp[1].mp - sp[2].mp == qb.v, string.format("%s: B charged %d "
+          .. "(want its queued %s)", tag, sp[1].mp - sp[2].mp, tostring(qb.v)))
+        check(sp[2].atk == qb.id, string.format("%s: B cast $%02X (want the "
+          .. "queued, boosted $%s)", tag, sp[2].atk, string.format("%02X", qb.id or 0)))
+      elseif r.kind == "second" then
+        check(d.nfz == 1, string.format("%s: %d fizzles (want B's one)", tag, d.nfz))
+        check(r.drained2 ~= nil, tag .. ": the drain after A never ran")
+        check(mp0 - sp[1].mp == qa.v, string.format("%s: A charged %d (want its "
+          .. "queued %s)", tag, mp0 - sp[1].mp, tostring(qa.v)))
+        check(sp[2].mp == r.picks[2].cost - 1, tag .. ": MP charged for the refused B")
+      else
+        check(d.nfz == 2, string.format("%s: %d fizzles (want both)", tag, d.nfz))
+        check(sp[1].mp == r.picks[2].cost - 1 and sp[2].mp == sp[1].mp,
+          tag .. ": MP charged for a refused spell")
+      end
+      if r.kind == "both" then
+        check(d.pend == 0, string.format("%s: the pending boost was kept for "
+          .. "spending (it read %d at the turn's end)", tag, d.pend))
+        check(a.bank == math.min(5, r.bank0 + 1), string.format("%s: bank %d -> "
+          .. "%d (want %d: no spend, the unboosted turn's regen)", tag, r.bank0,
+          a.bank, math.min(5, r.bank0 + 1)))
+      else
+        check(d.pend == r.pend0, string.format("%s: the pip not pending at the "
+          .. "turn's end (it read %d)", tag, d.pend))
+        check(a.bank == r.bank0 - r.pend0, string.format("%s: bank %d -> %d "
+          .. "(want the pip spent)", tag, r.bank0, a.bank))
+      end
+    elseif d and a then
       local tag = string.format("%s branch %d", r.verb, r.k)
       if r.drain then
         n[r.verb].d = n[r.verb].d + 1
@@ -398,12 +602,16 @@ body[#body + 1] = H.call(function()
   end
   for _, m in ipairs(fails) do H.log("[mpfizzle] FAIL " .. m) end
   H.log(string.format("[mpfizzle] SUMMARY Magic control=%d drained=%d, Dance "
-    .. "control=%d drained=%d (boost %d)", n.Magic.c, n.Magic.d, n.Dance.c,
-    n.Dance.d, BOOST))
+    .. "control=%d drained=%d, XMagic control=%d first=%d second=%d both=%d "
+    .. "(boost %d)", n.Magic.c, n.Magic.d, n.Dance.c, n.Dance.d, nx.control,
+    nx.first, nx.second, nx.both, BOOST))
   H.assertEq(#fails, 0, "every resolved branch: a refused boosted action kept its pips")
   for _, v in ipairs({ "Magic", "Dance" }) do
     H.assertEq(n[v].d >= MIN_EACH, true, v .. ": enough drained branches resolved")
     H.assertEq(n[v].c >= 1, true, v .. ": a paid control branch resolved")
+  end
+  for _, k in ipairs(XKINDS) do
+    H.assertEq(nx[k] >= 1, true, "XMagic: a " .. k .. " branch resolved")
   end
 end)
 H.run({ maxFrames = 400000 }, body)

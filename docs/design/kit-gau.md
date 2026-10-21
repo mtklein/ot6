@@ -235,11 +235,15 @@ refusal had the same shape, and so did every other costed verb (spells,
 Blitz, SwdTech, Tools): #450 settles them once, where the refusal is made.
 `CalcAttackEffect`'s MP fizzle (`@32ca`) calls `Ot6FizzleDropBoost`, which
 drops a character's pending boost while it is still only pending, so the
-turn ends as an unboosted one. The one exception is the second spell of an
-X-Magic (resumed through `$3406` with bit 6 clear): the first spell was paid
-for with that same pending boost, which must still be spent. Nothing
-legitimately spends pips on a refusal. `battle_mpfizzle` plays a boosted
-Magic cast and a boosted Dance start that cannot pay at resolve.
+turn ends as an unboosted one. X-Magic queues two spells on one pending
+boost, both folded at the commit, and the turn's last spell decides: a
+first spell refused with the second still to come (`$32cc,x` not `$ff`)
+keeps the boost for the second, which spends it; a second spell refused
+(resumed through `$3406`, bit 6 clear) drops it only when the first was
+refused too (`OT6_FIZZLED`), since a first spell that cast bought its tier.
+Nothing legitimately spends pips on a refusal. `battle_mpfizzle` plays a
+boosted Magic cast, a boosted Dance start and a boosted X-Magic whose
+spells cannot pay at resolve.
 
 ---
 
