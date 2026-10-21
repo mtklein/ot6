@@ -75,7 +75,7 @@ end
 local function mons()
   local t = {}
   for m = 0, 5 do
-    if H.readWord(0x3BFC + (4 + m) * 2) > 0 then
+    if H.readWord(0x3BFC + m * 2) > 0 then
       local r, c = loot(m)
       t[#t + 1] = string.format("m%d sh%d loot%02X/%02X", m, shield(m), r, c)
     end
@@ -341,7 +341,7 @@ local steps = {
           local best
           for m = 0, 5 do
             local r, cm = loot(m)
-            if H.readWord(0x3BFC + (4 + m) * 2) > 0 and shield(m) > 0 and (r ~= 0xFF or cm ~= 0xFF) then
+            if H.readWord(0x3BFC + m * 2) > 0 and shield(m) > 0 and (r ~= 0xFF or cm ~= 0xFF) then
               if best == nil or H.readWord(0x3BF4 + (4 + m) * 2) > H.readWord(0x3BF4 + (4 + best) * 2) then best = m end
             end
           end
