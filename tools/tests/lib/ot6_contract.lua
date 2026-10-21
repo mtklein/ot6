@@ -2227,6 +2227,45 @@ M.contracts["wor-belly-v1"] = {
   },
 }
 
+-- wor-gogo-v1: the World of Ruin map, on foot on the Falcon's tile by
+-- Thamasa (250,229), after the crushing room, GOGO (_cb81c6: $00D4), the
+-- Warp Stone out, the cabin (STRAGO, RELM, GOGO, TERRA), GOGO's commands,
+-- Thamasa's item counter and Gungho's door (_cb75bf/_cb75d5: $019A, Ebot's
+-- Rock's mouth open).  Ebot's Rock and Hidon are ahead
+-- (docs/design/route-wor-gogo.md).  No timer.
+M.contracts["wor-gogo-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 250, y = 229 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00D4, 1, "GOGO met (_cb81c6)" },
+    { 0x019A, 1, "Gungho's door: Ebot's Rock open (_cb75d5)" },
+    { 0x019C, 0, "Hidon not yet beaten (_cb71d2)" },
+  },
+  party = {
+    size = 4,                     -- STRAGO, RELM, GOGO and TERRA
+    members = {
+      { 0x07, "STRAGO" },
+      { 0x08, "RELM" },
+      { 0x0C, "GOGO" },
+      { 0x00, "TERRA" },
+    },
+  },
+  ram = {
+    { 0x1F62, 0xFF, 250, "the Falcon parked at x 250 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 229, "the Falcon parked at y 229 (save-block cell $1F63)" },
+    { 0x1617 + 37 * 12, 0xFF, 0x0C, "GOGO's second command Lore" },
+    { 0x1618 + 37 * 12, 0xFF, 0x09, "GOGO's third command Tools" },
+    { 0x1619 + 37 * 12, 0xFF, 0x01, "GOGO's fourth command Item" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
