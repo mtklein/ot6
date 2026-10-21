@@ -352,7 +352,7 @@ local function leversToCheck()
             walk(l[1], l[2], "the first car's lever (" .. l[1] .. "," .. l[2] .. ")"),
             H.faceAndHoldA("up", function() return sw(l[3]) ~= v0 end, 900, "the lever (" .. l[1] .. "," .. l[2] .. ")"),
             H.release(),
-            H.waitUntil(function() return settled() end, 600, "control after the lever", 20),
+            H.waitUntil(function() return settled() end, 600, "control after the lever", 1),
             H.call(function() H.log(string.format("[lever] pressed (%d,%d): levers now %s", l[1], l[2], cfg())) end),
           })
         end
@@ -578,6 +578,9 @@ H.run({ maxFrames = 2400000 }, {
   -- ---- 5. back to Figaro Castle, two rides, and the save ---------------------------------------------------------
   -- @@stage back
   door(25, 41, MAP_AHALL, "408 (25,41) -> the castle (406)"),
+  -- the halls' floor reaches the courtyard's stair from here; their one-way warps stay off the plan (a walk past
+  -- (33,31) is carried to (10,32))
+  H.call(function() LINKS[MAP_AHALL] = nil end),
   walk(9, 47, "406 (9,47) -> the courtyard", nil, function() return map() == MAP_AYARD end),
   H.waitUntil(function() return map() == MAP_AYARD and settled() end, 3000, "the courtyard: map 407", 1),
   walk(15, 47, "407's south edge -> 402", nil, function() return map() == MAP_ASAVE end),

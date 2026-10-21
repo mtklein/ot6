@@ -351,7 +351,7 @@ local function leversToCheck()
             walk(l[1], l[2], "the first car's lever (" .. l[1] .. "," .. l[2] .. ")"),
             H.faceAndHoldA("up", function() return sw(l[3]) ~= v0 end, 900, "the lever (" .. l[1] .. "," .. l[2] .. ")"),
             H.release(),
-            H.waitUntil(function() return settled() end, 600, "control after the lever", 20),
+            H.waitUntil(function() return settled() end, 600, "control after the lever", 1),
             H.call(function() H.log(string.format("[lever] pressed (%d,%d): levers now %s", l[1], l[2], cfg())) end),
           })
         end

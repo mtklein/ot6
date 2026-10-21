@@ -353,7 +353,7 @@ local function leversToCheck()
             walk(l[1], l[2], "the first car's lever (" .. l[1] .. "," .. l[2] .. ")"),
             H.faceAndHoldA("up", function() return sw(l[3]) ~= v0 end, 900, "the lever (" .. l[1] .. "," .. l[2] .. ")"),
             H.release(),
-            H.waitUntil(function() return settled() end, 600, "control after the lever", 20),
+            H.waitUntil(function() return settled() end, 600, "control after the lever", 1),
             H.call(function() H.log(string.format("[lever] pressed (%d,%d): levers now %s", l[1], l[2], cfg())) end),
           })
         end
@@ -503,7 +503,7 @@ H.run({ maxFrames = 2400000 }, {
   H.release(),
   -- (the car is dimmed while the doors stand open: control, not the screen's brightness, says the press is done)
   H.waitUntil(function() return H.hasControl() and H.tileAligned() and not H.dialogWaiting() end, 600,
-    "control after the doors", 20),
+    "control after the doors", 1),
   H.call(function() H.log(string.format("[doors] $01F9=%d $01FA=%d $01FB=%d $01FE=%d, brightness %d", sw(0x01F9),
     sw(0x01FA), sw(0x01FB), sw(0x01FE), bright())) end),
   chestAt(25, 5, 0x0BC, "the Genji Glove (25,5)", 0xD1),
