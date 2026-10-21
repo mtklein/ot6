@@ -308,6 +308,21 @@ does not show it: a drain takes no more than its caster is missing (a
 stand-in at 1147/1215 HP drew 68 at boost 0, 1 and 3 from a 750-HP
 target), so the suite reads the damage the calc hands the drain.
 
+The thief rows follow the same rule. A Mimic of Steal, Filch or Bestow
+never reaches `Ot6AbilityCost`'s `@steal` arm: mimicreplace writes the
+source's command/attack word (`$5605`, `$5705`, `$5805`) over Mimic's own
+queue row without `CreateAction`, so the copier is charged 0 MP where Locke
+paid 4, 6 and 5, at stand-in boost 0 and 1 alike. The copy does Locke's row
+with the copier's own pips: a copied Filch chips the same target's shield
+and banks a pip for the copier (bank 1 to 3 across the turn, regen
+included, for 0 MP), a copied Bestow hands one of the copier's pips to the
+ally (bank 1 to 0, ally 3 to 4), a copied Steal runs Steal's roll on the
+same body (nothing left on it in the measured runs, where Locke's own Steal
+had taken it). A boost on the copier buys nothing (the cmd `$05` gate) and
+its pip is spent anyway: a boost-1 copied Filch ended at bank 1 where the
+unboosted one ended at 3. Measured by `tools/tests/probe_mimic_thief.lua`
+(`build/attempts/wt/v034-mimic-thief/`).
+
 Dance is the control that makes this a rule rather than a habit.
 `Ot6RageCost` tail-calls `Ot6DanceCost`, so Rage and Dance share one
 base price of 8, and they are still charged differently — Dance 8 / 20 /
