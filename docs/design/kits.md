@@ -1106,6 +1106,41 @@ what a full boost buys.
 `battle_umaro` (a synthetic mechanism test: one seat of battle 67 staged as
 him, as `battle_retaliate_umaro` does) checks the divine and the class.
 
+## Gogo — Mime (piercing: dagger; bludgeoning: rod) (#270)
+
+Gogo joins in the Zone Eater's belly (World of Ruin, v0.34) with Mimic and
+three empty rows; the Status menu fills them from the commands the party
+has met (measured, `wor-gogo-v1`'s play: Fight, Magic, Item, Steal,
+SwdTech, Throw, Tools, Blitz, Runic, Lore, Sketch, Slot, Dance, Rage).  He
+joins at the party's level less a few (L42 against TERRA and CELES's L49-50,
+route-wor-gogo.md section 1).  OT6 adds nothing to his kit's rules; what it
+settles is which three rows a player would give him, and how the driver
+plays Mimic.
+
+- **Mimic is free** (mp-economy.md; the guidelines): the copy keeps the
+  copied action's price at 0 and its boost buys what the copied action's
+  boost buys (`Ot6MimicFold`, `battle_mimic`).  So Gogo's best turn is the
+  party's best turn again, at no MP: a keyed boosted strike that broke a
+  shield, a lore, a tier spell.
+- **The arc's three rows: Lore, Tools, Item.**  Gogo's own stats are a
+  caster's (vigor 20, magic power 33 at L42), so the rows are the commands
+  that do not scale with his arm: Tools (Edgar's devices, by the bag's
+  tools), Lore (Strago's, at Gogo's magic), and Item, which makes him a
+  medic between his copies.  Fight is left off: his weapons (daggers and
+  rods) and his vigor make a weak swing that the Mimic of a strong one
+  outdoes.
+- **His keys** are his weapon's (dagger: pierce; rod: bludgeon) and,
+  through Mimic, every key the party holds.
+
+The driver (`Driver:mimicLine`, `lib/ot6.lua`): at his window Gogo mimics
+when the party's last action (SaveForMimic's `$3F20`-`$3F23`) is a command
+Mimic copies (`M.MIMIC_COPY`: Fight, Magic, SwdTech, Throw, Tools, Blitz,
+Lore, X-Magic), aimed at a monster still standing, not a heal, and not an
+element a standing target drinks or nulls; else his Tools take Edgar's line,
+else the bag.  `battle_mimicdriver` checks it against the engine from
+`wor-gogo-v1` (mimicreplace runs for his seat, the copy is free, the pips
+pending are the plan's) with `MIMIC_OFF` as the control.
+
 ## Curated kits (the Ochette/Hikari pair)
 
 Both learn an open-ended collection and equip a curated subset, so the

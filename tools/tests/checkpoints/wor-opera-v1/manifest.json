@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-opera.sram",
+  "slot": 3,
+  "milestone": "wor-opera",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "map": 1,
+      "x": 30,
+      "y": 182
+    }
+  },
+  "size": 32768,
+  "sha256": "979957501ffae0e51739f2329112c655470bae882738edf23d80ee845fc21333",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "979957501ffae0e51739f2329112c655470bae882738edf23d80ee845fc21333",
+    "generator_sig": "ffe9554c6679c36e0b420ea00ab0f72ea82d2453b4f6017fc1bbd642ccbb239f gen_wor_opera tools/tests/checkpoints/wor-ebot-v1/manifest.json tools/tests/checkpoints/wor-ebot-v1/wor-ebot.sram",
+    "ancestors": [
+      {
+        "path": "tools/tests/checkpoints/wor-ebot-v1/manifest.json",
+        "sha256": "206c5dae14d0330601c341942550803dc5be759e939037cb84bfd0a9a0160d66"
+      }
+    ]
+  }
+}

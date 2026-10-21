@@ -982,11 +982,51 @@ STATES = [
     # point), SHADOW carried to Thamasa, Strago's house (the Memento Ring),
     # the item counter, the town's edge (SHADOW leaves for the Colosseum),
     # the cabin (SABIN, GAU, TERRA, CELES), the father's house, Duncan's
-    # house (Bum Rush), and Save there: the `wor-gau-v1` checkpoint, the next
-    # arc's boot (docs/design/route-wor-gau.md).  A cut; saves= until a leg
-    # boots it.  Re-cut by checkpoint_drift.py --recut.
+    # house (Bum Rush), and Save there: the `wor-gau-v1` checkpoint
+    # (docs/design/route-wor-gau.md).  A cut.  wor_belly below boots its
+    # checkpoint.  Re-cut by checkpoint_drift.py --recut.
     S("wor_gau", gen="gen_wor_gau", prev="wor_veldt",
-      checkpoint="wor-veldt-cave-v1", saves="wor-gau-v1", timeout=5400),
+      checkpoint="wor-veldt-cave-v1", timeout=5400),
+
+    # wor-gau-v1 -> the Zone Eater's belly's save point, map 279 (24,4): the
+    # Falcon's cabin (TERRA, CELES, RELM, STRAGO), Triangle Island, where the
+    # Zone Eater engulfs a party that lets it, the belly's bridge (its
+    # conductors watched, its jumps pressed) and Save there: the
+    # `wor-belly-v1` checkpoint, the retry point for the crushing room
+    # (docs/design/route-wor-gogo.md).  A cut.  wor_gogo below boots its
+    # checkpoint.  Re-cut by checkpoint_drift.py --recut.
+    S("wor_belly", gen="gen_wor_belly", prev="wor_gau",
+      checkpoint="wor-gau-v1", timeout=7200),
+
+    # wor-belly-v1 -> the World of Ruin map on the Falcon's tile by Thamasa
+    # (250,229): the crushing room on its clock, GOGO, a Warp Stone out, the
+    # cabin (STRAGO, RELM, GOGO, TERRA), GOGO's commands, Thamasa's item
+    # counter and Gungho's door (Ebot's Rock open), and Save there: the
+    # `wor-gogo-v1` checkpoint (docs/design/route-wor-gogo.md).  A cut.
+    # wor_ebot below boots its checkpoint.  Re-cut by checkpoint_drift.py
+    # --recut.
+    S("wor_gogo", gen="gen_wor_gogo", prev="wor_belly",
+      checkpoint="wor-belly-v1", timeout=7200),
+
+    # wor-gogo-v1 -> the World of Ruin map on the Falcon's tile by Thamasa
+    # (250,231, where Hidon's scene parks it): Ebot's Rock, its holes and
+    # coral, the hungry chest, Hidon (event battle 94, a game over when lost:
+    # the runner retries from the leg's boot), Strago's house, Thamasa's item
+    # counter, and Save there: the `wor-ebot-v1` checkpoint
+    # (docs/design/route-wor-gogo.md).  A cut.  wor_opera below boots its
+    # checkpoint.  Re-cut by checkpoint_drift.py --recut.
+    S("wor_ebot", gen="gen_wor_ebot", prev="wor_gogo",
+      checkpoint="wor-gogo-v1", timeout=7200),
+
+    # wor-ebot-v1 -> the World of Ruin map on the Falcon's tile by the Opera
+    # House (30,182): the catwalk, the stage master, the switch and the Dirt
+    # Dragon (event battle 134), the cabin (CELES, RELM, GOGO, STRAGO), the
+    # hunt for Doom Gaze until it falls (Bahamut), and Save there: the
+    # `wor-opera-v1` checkpoint, the next arc's boot
+    # (docs/design/route-wor-gogo.md).  A cut; saves= until a leg boots it.
+    # Re-cut by checkpoint_drift.py --recut.
+    S("wor_opera", gen="gen_wor_opera", prev="wor_ebot",
+      checkpoint="wor-ebot-v1", saves="wor-opera-v1", timeout=7200),
 
 ]
 
