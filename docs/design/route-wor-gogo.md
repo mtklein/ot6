@@ -84,24 +84,26 @@ mutant builders `mkmut.py` and `rowmuts.sh`; the launchers `lab.sh`,
 | `gen_wor_belly` | `wor-gau-v1` | `wor-belly-v1` | the cabin (TERRA, CELES, RELM, STRAGO), Triangle Island until the Engulf, the bridge, the plate, the save point in the belly (279 (24,4)) |
 | `gen_wor_gogo` | `wor-belly-v1` | `wor-gogo-v1` | the crushing room, 277, the west half, GOGO (name menu, his kit), the Warp Stone out, the Falcon to Thamasa, the scene that opens Ebot's Rock, the save by the Falcon (250,229) |
 | `gen_wor_ebot` | `wor-gogo-v1` | `wor-ebot-v1` | Ebot's Rock: the holes, the coral, the hungry chest, Hidon, the scene at Strago's house, the save on the Falcon's tile (250,231) |
-| `gen_wor_opera` | `wor-ebot-v1` | `wor-opera-v1` | the cabin (CELES, RELM, GOGO, STRAGO), the Doom Gaze hunt, the Opera House, the Dirt Dragon, the save by the Falcon there (30,182); also `wor_opera_switch` (the catwalk's switch, `battle_mimicdriver`'s fixture) |
+| `gen_wor_opera` | `wor-ebot-v1` | `wor-opera-v1` | the cabin (CELES, RELM, GOGO, STRAGO), the Opera House, the Dirt Dragon, the Doom Gaze hunt, the save by the Falcon there (30,182); also `wor_opera_switch` (the catwalk's switch: `battle_mimicdriver`'s and `battle_floatline`'s fixture) |
 
 ## 2. The order
 
 Duncan's house -> Triangle Island (down on (237,52); the Zone Eater) -> the
 belly: the bridge, the plate, the save point -> the crushing room -> 277 ->
 the west half -> GOGO -> the Warp Stone -> Thamasa (STRAGO and RELM seated:
-the scene at (22-23,39)) -> Ebot's Rock -> Hidon -> the Falcon -> Doom Gaze
-in the air -> the Opera House -> the Dirt Dragon -> the save beside the
-Falcon.
+the scene at (22-23,39)) -> Ebot's Rock -> Hidon -> the Falcon's cabin -> the
+Opera House -> the Dirt Dragon -> Doom Gaze in the air -> the save beside the
+Falcon by the Opera House.
 
 The belly is walked by TERRA, CELES, RELM and STRAGO: the highest four, and
 STRAGO and RELM are wanted at Thamasa next.  Ebot's Rock is STRAGO's: STRAGO,
-RELM, GOGO and TERRA.  For Doom Gaze, CELES takes TERRA's seat: the hunt with
-TERRA met it 8, 14 and 13 times (lab `dg`, `dg_terra_*`), with CELES 3, 4 and
-5 (`dg_celes_*`: "after meeting 3 ... beaten true"), because the gear care
-that seats CELES hands RELM the brush, Doom Gaze's key.  The Dirt Dragon is
-fought by the same four.
+RELM, GOGO and TERRA.  At the Falcon after Hidon the cabin seats CELES for
+TERRA, and those four (CELES, RELM, GOGO, STRAGO) fight the Dirt Dragon and
+then Doom Gaze.  The hunt with TERRA met Doom Gaze 8, 14 and 13 times (lab
+`dg`, `dg_terra_*`), with CELES 3, 4 and 5 (`dg_celes_*`: "after meeting 3
+... beaten true"), because the gear care that seats CELES hands RELM the
+brush, Doom Gaze's key.  For the dragon the two seats are alike (18 of 20
+trials each with the lores: section 4), so one cabin stop serves both.
 
 ## 3. Species and break rows
 
@@ -219,9 +221,11 @@ faded the Fight becomes a cast where the actor has one.
 
 ## 6. Supplies
 
-No counter on the way but Thamasa's.  The bag at `wor-gogo-v1`'s save: 97
-Potions, 30 Fenix Downs, 40 Tinctures, 5 Tents (`ge4`: "[wor] ... on the
-save tile world (250,231) ... potion=97 tincture=40 fenix=30 ..."); at
+No counter on the way but Thamasa's.  The bag at `wor-gogo-v1`'s save: 99
+Potions, 30 Fenix Downs, 40 Tinctures, 5 Tents (`gg1`: "[wor] ... on the save
+tile world (250,229) ... potion=99 tincture=40 fenix=30 ..."); at
+`wor-ebot-v1`'s, 97 Potions and 30 Fenix Downs (`ge4`: "on the save tile
+world (250,231) ... potion=97 tincture=40 fenix=30"); at
 `wor-opera-v1`'s, after the Doom Gaze hunt: 44 Potions, 22 Fenix Downs, 40
 Tinctures, 4 Tents and 560,717 gil (`go3`).  The hunt is where they go;
 the next arc starts with gil to restock.  GOGO's kit at join holds no weapon

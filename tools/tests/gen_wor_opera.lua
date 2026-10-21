@@ -392,9 +392,10 @@ local OPERA_DOOR, OPERA_LANDING = { 31, 183 }, { 30, 182 }
 -- the hunt's four (route-wor-gogo.md section 7, the Doom Gaze lab): CELES for TERRA, and the cabin's gear
 -- care, which hands RELM the brush (special: Doom Gaze's key)
 local HUNT = { CELES, RELM, GOGO, STRAGO }
--- the Dirt Dragon's fight: STRAGO's lores, RELM's Ultima, Shell on the party (labs du_*: section 4)
+-- the Dirt Dragon's fight: STRAGO's lores and his Dischord (halves its level, which scales its Quake and its
+-- blows), RELM's Ultima, Shell on the party (labs du_*, dx_*, sweeps so2, so3: section 4)
 local DRAGON_FIGHT = { nukeLore = { 0x03, 0x04 }, magic = { [RELM] = { spell = 0x14 } },
-  buffVs = { [0x14C] = { 0x25 } } }
+  buffVs = { [0x14C] = { 0x25 } }, strago = { dischord = { [0x14C] = true } } }
 H.run({ maxFrames = 2400000 }, {
   H.bootCheckpoint("wor-ebot-v1"),
   watches(),
@@ -407,8 +408,8 @@ H.run({ maxFrames = 2400000 }, {
   -- ---- 1. the Opera House: the catwalk ------------------------------------------------------------------
   -- @@stage opera
   -- the cabin first: CELES takes TERRA's seat for the Dirt Dragon and for Doom Gaze both (the Dirt Dragon
-  -- labs, route-wor-gogo.md section 4: the lores alone won 14 of 16 trials with TERRA seated, fl1_lore, and
-  -- 18 of 20 with CELES, dc_lore)
+  -- labs, route-wor-gogo.md section 4: the lores alone won 18 of 20 trials with TERRA seated, fl1_lore, and
+  -- 18 of 20 with CELES, dc_lore; one cabin stop serves both fights)
   regroup(HUNT),
   H.gearDress({ tag = "gear for the dragon and the hunt" }),
   H.dressRelics({ { CELES, "CELES" }, { RELM, "RELM" }, { GOGO, "GOGO" }, { STRAGO, "STRAGO" } },
