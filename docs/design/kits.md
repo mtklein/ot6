@@ -426,6 +426,16 @@ which also moves its damage as any wind attack's (double on a wind-weak body,
 nothing on an immune one).  No monster casts Quadra Slice, so no monster's
 behaviour moves.  `battle_swdtechclass` reads both from the built ROM.
 
+**On the route** (v0.35, route-wor-dreams.md): CYAN sits out his own dream
+(the party of four is three in it) and wakes in Doma's King's room with
+every tech (`give_bushido`: `$1CF7` = `$FF`, asserted by `gen_wor_doma`) at
+L40, the katana Aura beside his Strato, the dream train's Genji Glove (the
+relic rule hands the spare two-weapon relic to the main boost-Fighter
+without one) and the stone Alexandr (its stat package is a front-liner's,
+magicite.md).  The Ancient Castle's bodies wear Reflect behind mdef 250, and
+his slash keys every one of them (`battle_breakwor_dreams`: "CYAN alone (the
+Ancient Castle) keys 12 of 12").
+
 Test: `tools/tests/battle_bushido.lua`.
 
 ---

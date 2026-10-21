@@ -89,6 +89,9 @@ TITLES = {
     "wor-gogo-v1": "Outside Thamasa, after Gogo joins",
     "wor-ebot-v1": "Outside Thamasa, after Hidon",
     "wor-opera-v1": "By the Opera House, after the Dirt Dragon and Doom Gaze",
+    "wor-dream-v1": "Cyan's dream, the save point in the dream's Doma",
+    "wor-doma-v1": "By Doma Castle, after Cyan's dream",
+    "wor-ancient-v1": "By Figaro Castle, after the Ancient Castle",
 }
 
 README = """\
