@@ -1019,8 +1019,8 @@ STATES = [
       checkpoint="wor-gogo-v1", timeout=7200),
 
     # wor-ebot-v1 -> the World of Ruin map on the Falcon's tile by the Opera
-    # House (30,182): the catwalk, the stage master, the switch and the Dirt
-    # Dragon (event battle 134), the cabin (CELES, RELM, GOGO, STRAGO), the
+    # House (30,182): the cabin (CELES, RELM, GOGO, STRAGO), the catwalk, the
+    # stage master, the switch and the Dirt Dragon (event battle 134), the
     # hunt for Doom Gaze until it falls (Bahamut), and Save there: the
     # `wor-opera-v1` checkpoint, the next arc's boot
     # (docs/design/route-wor-gogo.md).  A cut; saves= until a leg boots it.

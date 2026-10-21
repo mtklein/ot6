@@ -1,14 +1,14 @@
 -- gen_wor_opera.lua -- the Gogo arc's fourth leg (docs/design/route-wor-gogo.md):
 -- Continue the `wor-ebot-v1` battery (STRAGO, RELM, GOGO and TERRA beside
--- the Falcon by Thamasa), the Falcon to the Opera House (world (31,183) ->
--- map 237), the stage-left room's way up (237 (48,30) -> 231 -> 232: the
--- catwalk), the stage master, the switch that drops the party onto the
--- stage where the Dirt Dragon sits ($0387: event battle 134; a game over
--- when lost: the runner retries from the leg's boot), then the cabin for
--- the hunt, Doom Gaze flown down in the sky until it falls (its HP carries
--- from meeting to meeting; DoomGazeDefeated: Bahamut), and the save beside
--- the Falcon by the Opera House: the `wor-opera-v1` battery, the next arc's
--- boot.
+-- the Falcon by Thamasa), the cabin (CELES, RELM, GOGO, STRAGO: the four for
+-- the Dirt Dragon and Doom Gaze both), the Falcon to the Opera House (world
+-- (31,183) -> map 237), the stage-left room's way up (237 (48,30) -> 231 ->
+-- 232: the catwalk), the stage master, the switch that drops the party onto
+-- the stage where the Dirt Dragon sits ($0387: event battle 134; a game over
+-- when lost: the runner retries from the leg's boot), back aboard, Doom Gaze
+-- flown down in the sky until it falls (its HP carries from meeting to
+-- meeting; DoomGazeDefeated: Bahamut), and the save beside the Falcon by the
+-- Opera House: the `wor-opera-v1` battery, the next arc's boot.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -392,6 +392,9 @@ local OPERA_DOOR, OPERA_LANDING = { 31, 183 }, { 30, 182 }
 -- the hunt's four (route-wor-gogo.md section 7, the Doom Gaze lab): CELES for TERRA, and the cabin's gear
 -- care, which hands RELM the brush (special: Doom Gaze's key)
 local HUNT = { CELES, RELM, GOGO, STRAGO }
+-- the Dirt Dragon's fight: STRAGO's lores, RELM's Ultima, Shell on the party (labs du_*: section 4)
+local DRAGON_FIGHT = { nukeLore = { 0x03, 0x04 }, magic = { [RELM] = { spell = 0x14 } },
+  buffVs = { [0x14C] = { 0x25 } } }
 H.run({ maxFrames = 2400000 }, {
   H.bootCheckpoint("wor-ebot-v1"),
   watches(),
@@ -403,7 +406,16 @@ H.run({ maxFrames = 2400000 }, {
 
   -- ---- 1. the Opera House: the catwalk ------------------------------------------------------------------
   -- @@stage opera
-  board(),
+  -- the cabin first: CELES takes TERRA's seat for the Dirt Dragon and for Doom Gaze both (the Dirt Dragon
+  -- labs, route-wor-gogo.md section 4: the lores alone won 14 of 16 trials with TERRA seated, fl1_lore, and
+  -- 18 of 20 with CELES, dc_lore)
+  regroup(HUNT),
+  H.gearDress({ tag = "gear for the dragon and the hunt" }),
+  H.dressRelics({ { CELES, "CELES" }, { RELM, "RELM" }, { GOGO, "GOGO" }, { STRAGO, "STRAGO" } },
+    { tag = "relics for the dragon and the hunt" }),
+  H.fieldCare({ threshold = 1.0, tag = "before the Opera House" }),
+  H.call(function() H.log("[kit] " .. kitLine(HUNT)) end),
+  liftOff(),
   H.call(function() H.log("[doom] aloft: " .. doomLine()) end),
   H.flyTo(OPERA_LANDING[1], OPERA_LANDING[2], { what = "the Falcon down by the Opera House", fight = FIGHT }),
   H.worldNavTo(OPERA_DOOR[1], OPERA_DOOR[2], { maxFrames = 3000, playBattles = "tactical", fight = FIGHT,
@@ -425,10 +437,11 @@ H.run({ maxFrames = 2400000 }, {
   H.release(),
   H.advanceStory(function() return sw(0x01F0) == 1 and settled() end, 3000, { playBattles = "tactical", fight = FIGHT }),
   H.navTo(118, 27, { maxFrames = 3000 }),
-  -- the dragon hits hard with its tusks and keeps its vanilla wind and water: STRAGO, RELM and GOGO step to
-  -- the back row (blows taken halved) and STRAGO's lores Aqua Rake and Aero are his first reach (and GOGO's,
-  -- through his Lore row).  The Dirt Dragon lab, route-wor-gogo.md: 15 of 20 won as the walks fight it,
-  -- 16 of 20 with the lores, 18 of 20 with the lores and the back row (labs dd2_plain, dd2_lore, dd2_back)
+  -- the dragon hits hard with its tusks, casts earth (Quake, Magnitude8, Slide) and keeps its vanilla wind
+  -- and water: STRAGO, RELM and GOGO step to the back row (blows taken halved); STRAGO's lores Aqua Rake and
+  -- Aero are his first reach (and GOGO's, through his Lore row), RELM casts her Ultima, and Shell goes on
+  -- each member (DRAGON_FIGHT).  Its 50 Gs strips Float, so the Float line is left out of this fight
+  -- (route-wor-gogo.md section 4)
   H.setRows({ [STRAGO] = true, [RELM] = true, [GOGO] = true }),
   H.waitUntil(function() return H.hasControl() end, 600, "control after the rows", 1),
   H.saveState("wor_opera_switch.mss"),
@@ -438,7 +451,7 @@ H.run({ maxFrames = 2400000 }, {
     "the catwalk's switch (232 (118,27)): face up, A"),
   H.release(),
   H.advanceStory(function() return sw(0x0387) == 0 and map() == 237 and settled() end, 300000,
-    { playBattles = "tactical", fight = { nukeLore = { 0x03, 0x04 } } }),
+    { playBattles = "tactical", fight = DRAGON_FIGHT }),
   H.call(function() say("story", "the Dirt Dragon beaten ($0387 clear)") end),
   H.fieldCare({ tag = "after the Dirt Dragon" }),
   H.saveState("wor_opera_dragon.mss"),
@@ -452,13 +465,9 @@ H.run({ maxFrames = 2400000 }, {
   H.call(function() say("wor", "out of the Opera House") end),
   H.worldNavTo(OPERA_LANDING[1], OPERA_LANDING[2], { maxFrames = 3000, playBattles = "tactical", fight = FIGHT,
     avoid = { OPERA_DOOR } }),
-  regroup(HUNT),
-  H.gearDress({ tag = "gear for the hunt" }),
-  H.dressRelics({ { CELES, "CELES" }, { RELM, "RELM" }, { GOGO, "GOGO" }, { STRAGO, "STRAGO" } },
-    { tag = "relics for the hunt" }),
   H.fieldCare({ threshold = 1.0, tag = "before the hunt" }),
   H.call(function() H.log("[kit] " .. kitLine(HUNT)) end),
-  liftOff(),
+  board(),
   doomHunt(20, "Doom Gaze"),
   H.call(function()
     H.log("[doom] " .. doomLine())
