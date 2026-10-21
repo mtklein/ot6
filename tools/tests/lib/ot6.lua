@@ -10686,7 +10686,8 @@ function Driver:zingerPlan(actor, plan)
   if care and plan.target ~= host then return plan end
   local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
   if fight == nil then return plan end
-  local boost = plan.kind == "fight" and not plan.ally and (plan.boostLeft or 0) or 0
+  -- every pip the actor holds: a boosted Fight is more swings, and the host's fall is the fight's turn
+  local boost = math.min(3, M.readByte(BATTLE.BP + actor * 2))
   local target = host
   M.zingers[#M.zingers + 1] = { actor = actor, host = host, target = target, slot = (za - 8) // 2,
     frame = M.frame, over = plan.kind, boost = boost }
