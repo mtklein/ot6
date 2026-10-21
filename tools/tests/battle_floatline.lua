@@ -8,7 +8,8 @@
 -- battle 134), whose spells are all earth, and the real driver fights it
 -- with floatVs naming the dragon.  Asserted, reading the engine:
 --   1. a Float plan is made (the line fires on the dragon's stage), its
---      caster has Float in its list, and within 900 frames of the plan every
+--      caster has Float in its list, and within 2400 frames of the plan
+--      (the cast waits its turn in the queue: lab r2, 900 was short) every
 --      living member floats (ST4 $3EF9 bit 7): the cast reached the whole
 --      party (the all-allies latch), not one member;
 -- then the control: the same snapshot, FLOAT_OFF set, the fight driven as
@@ -88,13 +89,13 @@ H.run({ maxFrames = 200000 }, {
         landed = H.frame
         H.log(string.format("[float] every living member floats (mask $%X) %d frames after the plan", m, H.frame - planAt))
       end
-      return landed ~= nil or H.frame - planAt > 900
+      return landed ~= nil or H.frame - planAt > 2400
     end
     return false
   end),
   H.call(function()
     H.assertEq(planAt ~= nil, true, "1. a Float plan on the dragon's stage")
-    H.assertEq(landed ~= nil, true, "1. every living member floats within 900 frames of the plan (the whole party)")
+    H.assertEq(landed ~= nil, true, "1. every living member floats within 2400 frames of the plan (the whole party)")
     landedIn = landed - fightAt
   end),
   -- 2. the control
