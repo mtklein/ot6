@@ -297,17 +297,20 @@ local function ebotWhere(tag)
     .. "%d%d%d%d%d", tag, map(), H.fieldX(), H.fieldY(), coral(), sw(0x1F1), sw(0x1F2), sw(0x1F3), sw(0x1F4),
     sw(0x1F5), sw(0x1F6), sw(0x1F7), sw(0x1F8), sw(0x1FA), sw(0x1FB), sw(0x1FC), sw(0x1FD), sw(0x1FE)))
 end
--- step onto a hole and ride the warp until the party stands with control somewhere else
+-- step onto a hole and ride the warp until the party stands with control somewhere else: the warp fades
+-- the screen out (_cb6ef9), so a hole is taken once the party has been beside it and the screen has gone
+-- dark; a battle on the way (the walk's) leaves it lit
 local function hole(x, y, what)
-  local m0, near = nil, false
+  local m0, near, dark = nil, false, false
   local function gone()
     if m0 == nil then return false end
     local d = math.abs(H.fieldX() - x) + math.abs(H.fieldY() - y)
     if map() == m0 and d <= 1 then near = true end
-    return near and (map() ~= m0 or d > 1)
+    if near and bright() == 0 and not H.battleLoadStarted() then dark = true end
+    return dark and (map() ~= m0 or d > 1)
   end
   return H.seqStep({
-    H.call(function() m0, near = map(), false end),
+    H.call(function() m0, near, dark = map(), false, false end),
     H.navTo(x, y, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, arrive = gone }),
     H.advanceStory(function() return gone() and settled() end, 6000, { playBattles = "tactical", fight = FIGHT }),
     H.call(function() ebotWhere(what) end),
@@ -317,7 +320,8 @@ local function reach(x, y) return H.bfsReach(nil, nil, nil, {}, x, y) ~= nil end
 -- the side of an object the party can stand on to talk to it
 local function talkSide(ox, oy)
   for _, o in ipairs({ { 0, 1 }, { -1, 0 }, { 1, 0 }, { 0, -1 } }) do
-    if reach(ox + o[1], oy + o[2]) then return true end
+    -- talkToObj's own approach test (bfsPath), so a side counted here is one it will walk to
+    if H.bfsPath(ox + o[1], oy + o[2]) then return true end
   end
   return false
 end
