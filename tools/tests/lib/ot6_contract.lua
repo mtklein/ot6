@@ -2338,6 +2338,42 @@ M.contracts["wor-opera-v1"] = {
   },
 }
 
+-- wor-dream-v1: the save point in the dream's Doma (map 126 (8,8), shown on
+-- the arrival: $0548), inside CYAN's dream (Doma Castle's bed, _cb82b1):
+-- after the dreamscape and the three Dream Stooges (event battle 90:
+-- _cb8bd1, $0179), the dream's train (the scene at (88,8): _cb9335, $0197;
+-- the first car's check: _cb8ec1, $017A) and the cave below its engine
+-- (Magitek armor, off on the drop: _cb94e7).  CELES, RELM and TERRA walk it;
+-- CYAN is the dream's.  Wrexsoul is ahead (docs/design/route-wor-dreams.md).
+-- No timer.
+M.contracts["wor-dream-v1"] = {
+  slot = 3,
+  field = { map = 126, x = 8, y = 8 },   -- the dream's save point (126 NPC_4)
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x0179, 1, "the Dream Stooges beaten (_cb8bd1)" },
+    { 0x0197, 1, "the dream's train: the scene at (88,8) seen (_cb9335)" },
+    { 0x017A, 1, "the dream's train: the first car's check passed (_cb8ec1)" },
+    { 0x00DA, 0, "CYAN's dream not yet ended (_cb97d6)" },
+  },
+  party = {
+    size = 3,                     -- CELES, RELM and TERRA (CYAN is the dream's)
+    members = {
+      { 0x06, "CELES" },
+      { 0x08, "RELM" },
+      { 0x00, "TERRA" },
+    },
+  },
+  ram = {
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
