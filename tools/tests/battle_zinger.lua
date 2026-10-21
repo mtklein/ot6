@@ -12,7 +12,9 @@
 -- real driver fights it.  Asserted, reading the engine:
 --   1. once Wrexsoul hides, a Zinger plan is made, aimed at the member
 --      $33F9 names, by another member;
---   2. that member falls within 6000 frames of the first Zinger plan;
+--   2. that member falls within 15000 frames of the first Zinger plan (the
+--      lab, eight battle keys with the line: 3,500 to 10,700 frames from the
+--      hide to the fall; without it the earliest fall came at 24,800);
 --   3. Wrexsoul is back ($33F8 cleared, its slot standing) within 600 frames
 --      of the fall;
 -- then the control: the same snapshot, ZINGER_OFF set, the fight driven as
@@ -91,13 +93,13 @@ H.run({ maxFrames = 400000 }, {
       backAt = H.frame
       H.log(string.format("[zinger] Wrexsoul back %d frames after the fall", H.frame - fellAt))
     end
-    return backAt ~= nil or (planAt ~= nil and H.frame - planAt > 6600) or (f0 ~= nil and H.frame - f0 > 30000)
+    return backAt ~= nil or (planAt ~= nil and H.frame - planAt > 15600) or (f0 ~= nil and H.frame - f0 > 40000)
   end),
   H.call(function()
     H.assertEq(planAt ~= nil, true, "1. a Zinger plan once Wrexsoul hides")
     H.assertEq(plan.target, host, "1. the plan's target is the member $33F9 names")
     H.assertEq(plan.actor ~= host, true, "1. the plan is another member's")
-    H.assertEq(fellAt ~= nil and fellAt - planAt <= 6000, true, "2. the host falls within 6000 frames of the plan")
+    H.assertEq(fellAt ~= nil and fellAt - planAt <= 15000, true, "2. the host falls within 15000 frames of the plan")
     H.assertEq(backAt ~= nil and backAt - fellAt <= 600, true, "3. Wrexsoul is back within 600 frames of the fall")
     backIn = backAt - fightAt
   end),

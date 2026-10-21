@@ -393,12 +393,13 @@ local WALL_RING = 0xBB
 local function owns(esper) return (H.readByte(0x1A69 + (esper >> 3)) >> (esper & 7)) & 1 == 1 end
 local FOUR = { CELES, RELM, CYAN, TERRA }
 -- 401's same-map doors (route_data.py map 401: its shorts and its two one-tile longs); 406's; 408's
--- (a long entrance covers its tile and `len` more, and lands as far along its destination: CheckLongEntrance)
+-- (a long entrance covers its tile and `len` more, and every one of them lands on its one destination:
+-- CheckLongEntrance, DoEntrance)
 LINKS[MAP_ACAVE] = links({ { 43, 26, 43, 41 }, { 43, 39, 43, 25 }, { 50, 26, 50, 38 }, { 50, 36, 50, 25 },
-  { 58, 26, 58, 38 }, { 58, 36, 58, 25 }, { 33, 41, 27, 6 }, { 33, 42, 27, 7 }, { 28, 6, 34, 41 }, { 28, 7, 34, 42 } })
+  { 58, 26, 58, 38 }, { 58, 36, 58, 25 }, { 33, 41, 27, 6 }, { 33, 42, 27, 6 }, { 28, 6, 34, 41 }, { 28, 7, 34, 41 } })
 LINKS[MAP_AHALL] = links({ { 15, 14, 24, 13 }, { 54, 28, 38, 9 }, { 45, 56, 35, 51 }, { 38, 7, 54, 27 },
-  { 24, 12, 15, 13 }, { 9, 31, 33, 30 }, { 10, 31, 34, 30 }, { 11, 31, 35, 30 }, { 33, 31, 10, 32 },
-  { 34, 31, 11, 32 } })
+  { 24, 12, 15, 13 }, { 9, 31, 33, 30 }, { 10, 31, 33, 30 }, { 11, 31, 33, 30 }, { 33, 31, 10, 32 },
+  { 34, 31, 10, 32 } })
 LINKS[MAP_AQUEEN] = links({ { 36, 52, 46, 57 }, { 45, 56, 35, 51 } })
 -- a door onto another map, the walk playing its battles; arrives when the map reads dst
 local function door(x, y, dst, what)
