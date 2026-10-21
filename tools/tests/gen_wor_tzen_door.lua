@@ -59,6 +59,15 @@
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
+-- A party of one walks into every plains fight at the after-battle care's
+-- threshold, and the default 0.65 sent her into the stretch's hardest
+-- formation short: v0.33's qualification (#454) opened Osprey + Chitonid +
+-- Gigan Toad ($0CC) at 760/1043 ("[care after battle (worldNavTo)] nothing
+-- to do: c6 760/1043 hp"), took 123 before her first turn, was Slowed at
+-- 334 and died at 82 with a Cure queued.  Every walk here is a known danger
+-- zone for a lone member, so the care tops her up at the pre-danger figure.
+H.careThreshold = H.CARE_BEFORE_FIGHTS
+
 -- Sabin joins at max(26, CELES's level) (norm_lvl, field/event.asm:857),
 -- and the house's Scorpions, HermitCrabs and Pm Stalkers are L26: one
 -- level over them, healthy rather than minimal (guidelines: "Fight, don't
