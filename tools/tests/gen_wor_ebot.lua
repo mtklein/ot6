@@ -291,6 +291,9 @@ end
 local EBOT_HOLES = { [404] = { { 3, 6 }, { 15, 4 }, { 25, 5 }, { 3, 16 }, { 18, 16 }, { 26, 17 }, { 4, 27 }, { 14, 28 },
   { 28, 27 } }, [405] = { { 8, 9 }, { 7, 15 }, { 23, 22 } } }
 local CORAL_NEED = 22
+-- every hole on the live map: a walk steps around them (one underfoot warps the party and redraws the
+-- rooms); the walk's own target is exempt (navTo's avoid)
+local function holesHere() return EBOT_HOLES[map()] or {} end
 local function coral() return H.readWord(0x1FD0) end
 local function ebotWhere(tag)
   H.log(string.format("[ebot] %s: map %d (%d,%d); coral %d; rooms $01F1-$01F8 %d%d%d%d%d%d%d%d; chests $01FA-$01FE "
@@ -311,19 +314,20 @@ local function hole(x, y, what)
   end
   return H.seqStep({
     H.call(function() m0, near, dark = map(), false, false end),
-    H.navTo(x, y, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, arrive = gone }),
+    H.navTo(x, y, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, arrive = gone, avoid = holesHere() }),
     H.advanceStory(function() return gone() and settled() end, 6000, { playBattles = "tactical", fight = FIGHT }),
     H.call(function() ebotWhere(what) end),
   })
 end
 local function reach(x, y) return H.bfsReach(nil, nil, nil, {}, x, y) ~= nil end
 -- the side of an object the party can stand on to talk to it
+-- the side of a coral chest (an invisible NPC on a chest tile) the party can reach without crossing a hole,
+-- and the way it faces from there
 local function talkSide(ox, oy)
-  for _, o in ipairs({ { 0, 1 }, { -1, 0 }, { 1, 0 }, { 0, -1 } }) do
-    -- talkToObj's own approach test (bfsPath), so a side counted here is one it will walk to
-    if H.bfsPath(ox + o[1], oy + o[2]) then return true end
+  for _, o in ipairs({ { 0, 1, "up" }, { -1, 0, "right" }, { 1, 0, "left" }, { 0, -1, "down" } }) do
+    if H.bfsReach(nil, nil, nil, {}, ox + o[1], oy + o[2], holesHere()) then return { ox + o[1], oy + o[2], o[3] } end
   end
-  return false
+  return nil
 end
 -- one move of the coral hunt: a coral chest within reach, else a hole within reach (the nearest)
 local function coralMove(what)
@@ -331,10 +335,14 @@ local function coralMove(what)
     for i = 0, 4 do
       local o = 0x10 + i
       local ox, oy = H.objX(o), H.objY(o)
-      if sw(0x1FA + i) == 0 and not (ox == 0 and oy == 0) and talkSide(ox, oy) then
+      local side = (sw(0x1FA + i) == 0 and not (ox == 0 and oy == 0)) and talkSide(ox, oy) or nil
+      if side then
         local c0 = coral()
         return H.seqStep({
-          H.talkToObj(o, string.format("coral chest $%02X (404 (%d,%d))", o, ox, oy)),
+          H.navTo(side[1], side[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, avoid = holesHere() }),
+          H.faceAndHoldA(side[3], function() return H.dialogWaiting() or not H.hasControl() end, 600,
+            string.format("coral chest $%02X (404 (%d,%d)): face %s, A", o, ox, oy, side[3])),
+          H.release(),
           H.advanceStory(function() return settled() end, 3000, { playBattles = "tactical", fight = FIGHT }),
           H.call(function()
             H.log(string.format("[ebot] %s: coral chest $%02X at (%d,%d): %d -> %d coral", what, o, ox, oy, c0, coral()))
@@ -346,7 +354,7 @@ local function coralMove(what)
   local best, bestD = nil, 1e9
   for _, h in ipairs(EBOT_HOLES[map()] or {}) do
     local p = H.bfsPath(h[1], h[2])
-    if p and #p < bestD then best, bestD = h, #p end
+    if p and #p < bestD and H.bfsReach(nil, nil, nil, {}, h[1], h[2], holesHere()) then best, bestD = h, #p end
   end
   H.assertEq(best ~= nil, true, string.format("%s: a hole within reach of map %d (%d,%d)", what, map(), H.fieldX(),
     H.fieldY()))
@@ -366,7 +374,7 @@ local function coralHunt(need, what, budget)
             local best, bestD = nil, 1e9
             for _, h in ipairs(EBOT_HOLES[405]) do
               local p = H.bfsPath(h[1], h[2])
-              if p and #p < bestD then best, bestD = h, #p end
+              if p and #p < bestD and H.bfsReach(nil, nil, nil, {}, h[1], h[2], holesHere()) then best, bestD = h, #p end
             end
             return hole(best[1], best[2], what .. ": toward the chest")
           end
@@ -412,7 +420,7 @@ H.run({ maxFrames = 2400000 }, {
   -- ---- 2. the hungry chest --------------------------------------------------------------------------------
   -- @@stage chest
   -- the trigger (23,19) (_cb70c7) turns the party to the chest and asks; fed, it hops away ($01F9)
-  H.navTo(23, 20, { maxFrames = 3000, playBattles = "tactical", fight = FIGHT }),
+  H.navTo(23, 20, { maxFrames = 3000, playBattles = "tactical", fight = FIGHT, avoid = holesHere() }),
   H.navTo(23, 19, { maxFrames = 600, arrive = function() return H.dialogWaiting() or not H.hasControl() end }),
   H.dialogChoice(0, { inBattle = false, what = "Hand over some Coral? Sure.", tag = "the hungry chest" }),
   H.advanceStory(function() return sw(0x01F9) == 1 and settled() end, 6000, { playBattles = "tactical", fight = FIGHT }),
