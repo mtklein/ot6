@@ -1,3 +1,4 @@
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 -- probe_mimic_thief.lua -- what a MIMICKED Steal, Filch and Bestow cost, and do  (#261)
 --
 -- A measurement probe (no verdict asserts on the design question; it asserts
