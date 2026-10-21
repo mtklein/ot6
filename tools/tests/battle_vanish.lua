@@ -24,7 +24,13 @@
 --      a dead slot wearing the bit is skipped;
 --   2. with Vanish on the one slot the party's next Fight lands on, the
 --      driver's damage watch settles that Fight at 0 -- the miss the
---      generator measured, on this ROM, on cue.
+--      generator measured, on this ROM, on cue (DODGE_OFF: the driver's own
+--      answer to a faded body is part 3's);
+--   3. the driver's answer (#270, Driver:dodgePlan): a Fight aimed at a
+--      Vanished body re-aims at a standing one that can be hit, a Fight
+--      aimed at a body that can be hit is left alone, and DODGE_OFF leaves
+--      the plan as made (the control); with every body faded, each actor's
+--      Fight becomes its cast where it has one (logged).
 -- Negative control: stub H.dodges to nil and 1 goes red.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_cave.mss.lua"
@@ -128,6 +134,8 @@ H.run({ maxFrames = 90000 }, {
     -- Vanish/Image writes nothing else the driver reads)
     for _, s3 in ipairs(slots) do setBit(ST1 + (4 + s3) * 2, 0x10, true) end
     vanished, pokeLine = slots, #lines
+    -- part 2 measures the engine's miss, so the driver's own answer to a faded body (part 3) is held off
+    DODGE_OFF = true
     F = H.newFightDriver("vanish", { tactical = true, boost = true, bank = 2,
                                      items = true, healPercent = 50 })
   end),
@@ -156,5 +164,52 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(took, 0, "...and it took 0 off the monsters: the miss the generator measured")
     for _, s3 in ipairs(vanished) do setBit(ST1 + (4 + s3) * 2, 0x10, false) end
     H.log("[test] a Fight on a Vanished monster took " .. took .. "; Vanish cleared")
+  end),
+
+  -- 3. the driver's answer (#270, Driver:dodgePlan): a Fight aimed at a Vanished body is re-aimed at a
+  -- standing one that can be hit; with every standing body faded it becomes the actor's cast when the
+  -- actor has one, else stays a Fight; DODGE_OFF leaves it as planned.  Read on the live stage, through
+  -- the same driver (F.driver), with the bit poked as above.
+  H.call(function()
+    DODGE_OFF = nil
+    local D = F.driver
+    local standing = {}
+    for s = 0, 5 do if monAlive(s) then standing[#standing + 1] = s end end
+    if #standing >= 2 then
+      local a, b = standing[1], standing[2]
+      setBit(ST1 + (4 + a) * 2, 0x10, true)
+      local p = D:dodgePlan(0, { kind = "fight", row = 0, boostLeft = 0, aim = a })
+      H.assertEq(p.kind, "fight", "3. one body of two Vanished: still a Fight")
+      H.assertEq(p.aim ~= a and monAlive(p.aim) and p.aim ~= nil, true,
+        string.format("3. re-aimed off Vanished slot %d (now %s)", a, tostring(p.aim)))
+      DODGE_OFF = true
+      local q = D:dodgePlan(0, { kind = "fight", row = 0, boostLeft = 0, aim = a })
+      H.assertEq(q.aim, a, "3. DODGE_OFF: the plan stands as made (the control)")
+      DODGE_OFF = nil
+      local un = D:dodgePlan(0, { kind = "fight", row = 0, boostLeft = 0, aim = b })
+      H.assertEq(un.aim, b, "3. a Fight aimed at a body that can be hit is left alone")
+      setBit(ST1 + (4 + a) * 2, 0x10, false)
+    else
+      H.log("[test] one monster stands: the re-aim case is not staged here")
+    end
+    -- every standing body faded: a cast for an actor with a Magic row and a line, else the Fight
+    for _, s in ipairs(standing) do setBit(ST1 + (4 + s) * 2, 0x10, true) end
+    local castBy = nil
+    for actor = 0, 3 do
+      -- the cast this actor has: a Magic row ($202E, command $02) and a line magicOnlyLine would play
+      local hasMagic = false
+      for row = 0, 3 do if H.readByte(0x202E + actor * 12 + row * 3) == 0x02 then hasMagic = true end end
+      local line = hasMagic and D:magicOnlyLine(actor, 0) or nil
+      local p = D:dodgePlan(actor, { kind = "fight", row = 0, boostLeft = 0, aim = standing[1] })
+      H.log(string.format("[test] every body Vanished: actor %d's Fight becomes %s (Magic row %s, a line %s)", actor,
+        p.kind, tostring(hasMagic), line and line.kind or "none"))
+      H.assertEq(p.kind, line and line.kind or "fight", string.format(
+        "3. every body faded: actor %d's Fight becomes its cast where it has one, else stays a Fight", actor))
+      if p.kind ~= "fight" then castBy = actor end
+    end
+    H.assertEq(castBy ~= nil, true, "3. every body faded: some actor's Fight became a cast (the case is not vacuous)")
+    for _, s in ipairs(standing) do setBit(ST1 + (4 + s) * 2, 0x10, false) end
+    H.log(string.format("[test] dodgePlan: re-aim checked on %d standing body(ies); a cast for actor %s when every body "
+      .. "faded", #standing, tostring(castBy)))
   end),
 })

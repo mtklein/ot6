@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-gogo.sram",
+  "slot": 3,
+  "milestone": "wor-gogo",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "map": 1,
+      "x": 250,
+      "y": 229
+    }
+  },
+  "size": 32768,
+  "sha256": "7623652c3c5b3d013d67229437bbf71e6d4800d4d35df0c68b03bbbd33d497c7",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "7623652c3c5b3d013d67229437bbf71e6d4800d4d35df0c68b03bbbd33d497c7",
+    "generator_sig": "5320399d5c7aa375898d81227befcedaf30c265535d95b8884d468822b5610d8 gen_wor_gogo tools/tests/checkpoints/wor-belly-v1/manifest.json tools/tests/checkpoints/wor-belly-v1/wor-belly.sram",
+    "ancestors": [
+      {
+        "path": "tools/tests/checkpoints/wor-belly-v1/manifest.json",
+        "sha256": "a8fa9adbfb3ed7bcef9b9db58b3d7511e3cd5c6ae7072872c31e6becc751eb35"
+      }
+    ]
+  }
+}

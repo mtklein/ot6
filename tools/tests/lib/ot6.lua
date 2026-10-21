@@ -8444,6 +8444,70 @@ function Driver:rageLine(actor, have)
   return { kind = "rage", row = row, entry = best, rage = r, boostLeft = b, reason = "rage" }
 end
 
+-- GOGO's Mimic (#270; kits.md "Gogo"): the party's last action again, free
+-- (mp-economy.md: a mimic copies the action, not its price) and bought up by
+-- GOGO's own boost the way the copied action's boost is (Ot6MimicFold).  The
+-- engine keeps the last action a party member made that Mimic may copy
+-- (SaveForMimic, battle_main.asm: $3F20 command, $3F21 attack, $3F22/$3F23
+-- the character and monster targets; mimicreplace copies them over GOGO's
+-- queued Mimic), so the line reads them with full power and mimics when the
+-- copy strikes: a command in M.MIMIC_COPY, aimed at a monster still standing,
+-- and (a spell or a lore) neither a heal nor an element a standing target
+-- absorbs or nulls.  Otherwise GOGO's own lines decide (Tools, the bag).
+-- The boost is the bank's planned one for the turn.  Opt-out: opts.mimic =
+-- false, or the MIMIC_OFF global (the control arm).
+BATTLE.CMD_MIMIC = 0x12
+M.MIMIC_COPY = { [0x00] = "Fight", [0x02] = "Magic", [0x07] = "SwdTech", [0x08] = "Throw", [0x09] = "Tools",
+  [0x0A] = "Blitz", [0x0C] = "Lore", [0x17] = "X-Magic" }
+M.mimics = {}            -- every Mimic plan this run, oldest first (battle_mimicdriver reads them)
+function Driver:mimicLine(actor, boost)
+  if self.opts.mimic == false or MIMIC_OFF then return nil end
+  local row = cmdRow(actor, BATTLE.CMD_MIMIC)
+  if row == nil or self.skillDead[BATTLE.CMD_MIMIC] then return nil end
+  local cmd, atk = M.readByte(0x3F20), M.readByte(0x3F21)
+  local tmons = M.readByte(0x3F23)
+  local what = M.MIMIC_COPY[cmd]
+  local why = nil
+  if what == nil then
+    why = string.format("the last action (cmd $%02X) is not one this line copies", cmd)
+  elseif tmons == 0 then
+    why = string.format("the last %s struck no monster", what)
+  else
+    local live, absorbed = false, false
+    local MP = M.sym("MagicProp") & 0x3FFFFF
+    local spell = cmd == 0x02 or cmd == 0x0C or cmd == 0x17
+    local elem = spell and M.readRomByte(MP + atk * 14 + 1) or 0
+    local heal = spell and (M.readRomByte(MP + atk * 14 + 4) & 0x01) ~= 0
+    for s = 0, 5 do
+      if (tmons >> s) & 1 == 1 and monAlive(s) then
+        live = true
+        local x = 8 + s * 2
+        if elem ~= 0 and ((M.readByte(0x3BCC + x) & elem) ~= 0 or (M.readByte(0x3BCD + x) & elem) == elem) then
+          absorbed = true
+        end
+      end
+    end
+    if not live then why = string.format("the last %s's targets have fallen", what)
+    elseif heal then why = string.format("the last %s ($%02X) heals", what, atk)
+    elseif absorbed then why = string.format("a target of the last %s ($%02X) drinks or nulls its element", what, atk)
+    end
+  end
+  if why then
+    local key = "mimic:" .. why
+    if not self.statusSaid[key] then
+      self.statusSaid[key] = true
+      M.log(string.format("[%s] actor=%d GOGO no Mimic: %s", self.tag or "fight", actor, why))
+    end
+    return nil
+  end
+  M.log(string.format("[%s] actor=%d GOGO Mimic of %s ($%02X $%02X, monsters %02X) at %d BP, %d MP of %d",
+    self.tag or "fight", actor, what, cmd, atk, tmons, boost or 0, 0, M.readWord(BATTLE.CURMP + actor * 2)))
+  local rec = { frame = M.frame, actor = actor, cmd = cmd, atk = atk, mons = tmons, boost = boost or 0,
+    mp = M.readWord(BATTLE.CURMP + actor * 2), bp = M.readByte(BATTLE.BP + actor * 2) }
+  M.mimics[#M.mimics + 1] = rec
+  return { kind = "mimic", row = row, boostLeft = boost, copy = { cmd = cmd, atk = atk, mons = tmons }, rec = rec }
+end
+
 -- The magic-only command table (the Fanatics' Tower: battle switch $38,
 -- InitCmdList turns Fight into Magic and drops every row but Magic, Item and
 -- Mimic; route-wor-thamasa.md finding 3): no Fight row, so the attack turn
@@ -10457,9 +10521,143 @@ function Driver:makePlan(actor)
   end
   self._race = nil
   plan = self:lockeMug(actor, plan)
+  plan = self:dodgePlan(actor, plan)
+  plan = self:floatPlan(actor, plan)
+  plan = self:buffPlan(actor, plan)
   plan = self:policyPlan(actor, plan)
   if plan then plan.raceBoost = plan.boostLeft or 0 end
   self:sayTurn(actor, plan)
+  return plan
+end
+
+-- A Fight aimed at a monster its swing cannot touch (#270): Vanish or Image
+-- (M.dodges; a Covert's counter, Disappear, Vanishes it) makes every physical
+-- hit miss, and the belly's Covert pairs were fought that way, 55 swings that
+-- "took 0 off" against 34 that landed in the run that wiped
+-- (build/attempts/wt/v034-wor-gogo/lab/sb_k3_s7).  A person sees the body fade
+-- and swings at another, or, when every standing body has faded, casts (a
+-- spell lands on a Vanished body and ends it): the Fight re-aims at a standing
+-- monster that can be hit, else becomes the actor's magic line
+-- (Driver:magicOnlyLine) when there is one.  Other plans are left alone.
+-- DODGE_OFF (a global) turns it off, the control arm.
+function Driver:dodgePlan(actor, plan)
+  if plan == nil or plan.kind ~= "fight" or DODGE_OFF then return plan end
+  local function dodger(s)
+    return M.dodges({ s1 = M.readByte(0x3EE4 + (4 + s) * 2), s2 = M.readByte(0x3EE5 + (4 + s) * 2) })
+  end
+  local aim = plan.aim
+  if aim == nil then for s = 0, 5 do if aim == nil and monAlive(s) then aim = s end end end
+  if aim == nil or not monAlive(aim) or dodger(aim) == nil then return plan end
+  local why = dodger(aim)
+  for s = 0, 5 do
+    if monAlive(s) and dodger(s) == nil then
+      M.log(string.format("[%s] actor=%d Fight re-aimed: slot %d is under %s (every swing misses it); slot %d instead",
+        self.tag or "fight", actor, aim, why, s))
+      plan.aim = s
+      return plan
+    end
+  end
+  if cmdRow(actor, BATTLE.CMD_MAGIC) then
+    local line = self:magicOnlyLine(actor, plan.boostLeft or 0)
+    if line then
+      M.log(string.format("[%s] actor=%d every standing monster is under Vanish or Image: a cast (%s) for the "
+        .. "Fight that would miss", self.tag or "fight", actor, line.kind))
+      return line
+    end
+  end
+  return plan
+end
+
+-- Float against an earth caster (#270): opts.floatVs = { [species] = true }.
+-- While one of these stands and a living member is not floating (ST4 bit 7),
+-- an actor with Float ($22) in its Magic list casts it on the whole party
+-- (the all-allies latch, as the party cure takes) in place of an attack:
+-- earth misses a floating body (the Opera House's Dirt Dragon casts Quake,
+-- Magnitude8 and Slide, and Quake felled the q2 qualification's first
+-- attempt: build/attempts/wt/v034-wor-gogo/q2).  A heal, an item, a raise or
+-- a defer the rules chose stands; a cast already in flight (confirmed in the
+-- last 600 frames) is not doubled.  Shaped like magicOnlyLine's shellVs.
+-- FLOAT_OFF (a global) turns it off, the control arm.
+M.FLOAT_SPELL = 0x22
+Driver.FLOAT_OVER = { fight = true, skill = true, magic = true, lore = true, tools = true, mimic = true,
+  summon = true, throw = true, runic = true, slot = true, morph = true, magitek = true, rage = true }
+function Driver:floatPlan(actor, plan)
+  local fv = self.opts.floatVs
+  if fv == nil or FLOAT_OFF or plan == nil or not Driver.FLOAT_OVER[plan.kind] then return plan end
+  if plan.kind == "magic" and plan.spell == M.FLOAT_SPELL then return plan end
+  local danger = false
+  for s = 0, 5 do if monAlive(s) and fv[M.readWord(0x57C0 + s * 2)] then danger = true end end
+  if not danger then return plan end
+  local row = cmdRow(actor, BATTLE.CMD_MAGIC)
+  if row == nil or spellCell(actor, M.FLOAT_SPELL, true) == nil then return plan end
+  if M.frame - (self.floatAt or -100000) <= 600 then return plan end
+  local bare, mask = nil, 0
+  for e = 0, 3 do
+    local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+    local up = (M.readByte(BATTLE.ST4 + e * 2) & 0x80) ~= 0
+    if up then mask = mask | (1 << e) end
+    if bare == nil and mx > 0 and mx ~= 0xFFFF and hp > 0 and not up then bare = e end
+  end
+  self.floatMask = mask
+  if bare == nil then return plan end
+  self.floatAt = M.frame
+  M.floats = M.floats or {}
+  M.floats[#M.floats + 1] = { actor = actor, frame = M.frame, bare = bare, over = plan.kind }
+  M.log(string.format("[%s] actor=%d Float on the party (entity %d is not floating, floating mask $%X; an earth "
+    .. "caster stands): in place of its %s", self.tag or "fight", actor, bare, mask, plan.kind))
+  return { kind = "magic", spell = M.FLOAT_SPELL, row = row, boostLeft = 0, ally = true, all = true,
+           target = bare, buff = true, vetoOk = true, reason = "float" }
+end
+
+-- Wards against a hard caster (#270): opts.buffVs = { [species] = { spell, ... } }.
+-- While one of these stands, an actor whose Magic list holds one of the
+-- spells (Shell $25 halves magic, Safe $1C physical, Haste $1F) puts it on
+-- the first living member without that status, a member at a time, in place
+-- of an attack (a heal, an item, a raise or a defer the rules chose stands),
+-- the spells in the order given.  A member under Reflect takes no ward (it
+-- would rebound); a cast in flight on a member (confirmed in the last 900
+-- frames) is not doubled.  BUFF_OFF (a global) turns it off.  The Dirt
+-- Dragon's earth spells strip no ward but Float (its 50 Gs removes Float
+-- alone: build/lab/gogo/magic.py C3), so Shell holds where Float does not.
+Driver.BUFF_STATUS = { [0x25] = { 0x3EF8, 0x20 }, [0x1C] = { 0x3EF8, 0x40 }, [0x1F] = { 0x3EF8, 0x08 } }
+function Driver:buffPlan(actor, plan)
+  local bv = self.opts.buffVs
+  if bv == nil or BUFF_OFF or plan == nil or not Driver.FLOAT_OVER[plan.kind] or plan.buff then return plan end
+  local spells = nil
+  for s = 0, 5 do
+    local sp = monAlive(s) and bv[M.readWord(0x57C0 + s * 2)]
+    if sp and spells == nil then spells = sp end
+  end
+  if spells == nil then return plan end
+  local row = cmdRow(actor, BATTLE.CMD_MAGIC)
+  if row == nil then return plan end
+  self.buffAt = self.buffAt or {}
+  for _, spell in ipairs(spells) do
+    local st = Driver.BUFF_STATUS[spell]
+    if st and spellCell(actor, spell, true) ~= nil then
+      -- the frailest first (the smallest max HP: the member a round fells soonest)
+      local order = { 0, 1, 2, 3 }
+      table.sort(order, function(a, b)
+        local ma, mb = M.readWord(0x3C1C + a * 2), M.readWord(0x3C1C + b * 2)
+        if ma ~= mb then return ma < mb end
+        return a < b
+      end)
+      for _, e in ipairs(order) do
+        local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+        local key = spell * 4 + e
+        if mx > 0 and mx ~= 0xFFFF and hp > 0 and (M.readByte(st[1] + e * 2) & st[2]) == 0
+           and (M.readByte(0x3EF8 + e * 2) & 0x80) == 0 and M.frame - (self.buffAt[key] or -100000) > 900 then
+          self.buffAt[key] = M.frame
+          M.buffs = M.buffs or {}
+          M.buffs[#M.buffs + 1] = { actor = actor, spell = spell, target = e, frame = M.frame }
+          M.log(string.format("[%s] actor=%d ward $%02X on entity %d (a listed caster stands): in place of its %s",
+            self.tag or "fight", actor, spell, e, plan.kind))
+          return { kind = "magic", spell = spell, row = row, boostLeft = 0, ally = true, target = e, buff = true,
+                   vetoOk = true, reason = "ward" }
+        end
+      end
+    end
+  end
   return plan
 end
 
@@ -12319,6 +12517,11 @@ function Driver:makePlanRules(actor)
     local line = self:rageLine(actor, have)
     if line then return line end
   end
+  -- GOGO's Mimic, when the party's last action is worth his turn (#270; Driver:mimicLine)
+  if id == 0x0C then
+    local line = self:mimicLine(actor, boost)
+    if line then return line end
+  end
   if self.opts.bushido and id == 2 and not self.skillDead[BATTLE.CMD_SWDTECH]
      and cmdRow(actor, BATTLE.CMD_SWDTECH) and have >= 1
      and not (self.opts.bank and have < self.opts.bank) then
@@ -12378,7 +12581,8 @@ function Driver:makePlanRules(actor)
   -- tool the pool cannot pay at all, in which case EDGAR falls through
   -- to the free boosted Fight below.
   local toolBp, toolMp, toolWhy = nil, nil, nil
-  if self.opts.tactical and self.opts.tools ~= false and id == 4
+  -- (EDGAR's, and GOGO's when his kit holds Tools: #270)
+  if self.opts.tactical and self.opts.tools ~= false and (id == 4 or id == 0x0C)
      and cmdRow(actor, BATTLE.CMD_TOOLS)
      and self:battInvIdx(self.opts.tool or BATTLE.AUTOCROSSBOW) then
     toolBp, toolMp, toolWhy = M.kitBoost(actor, self.opts.tool or BATTLE.AUTOCROSSBOW, boost)
@@ -13075,7 +13279,17 @@ function Driver:button(actor)
       return nil
     end
     local cur = M.readByte(BATTLE.CMDROW + actor) & 3
-    if cur == self.plan.row then return { "a" } end
+    if cur == self.plan.row then
+      -- Mimic opens no list: A on its row confirms it, and the target select that follows (latched on
+      -- GOGO's own seat; the ST_TGT head) is confirmed as it stands (#270)
+      if self.plan.kind == "mimic" then
+        self.plan.committed = M.frame
+        if self.plan.rec then self.plan.rec.confirmed = M.frame end
+        M.log(string.format("[%s] actor=%d Mimic confirmed (pending %d BP)", self.tag or "fight", actor,
+          M.readByte(BATTLE.PEND_BP + actor * 2)))
+      end
+      return { "a" }
+    end
     return { cur < self.plan.row and "down" or "up" }
   end
   if st == BATTLE.ST_ITEM and self.plan.kind == "item" then
@@ -13325,12 +13539,16 @@ function Driver:button(actor)
     end
     return { "a" }
   end
-  if st == BATTLE.ST_TGT and (self.plan.kind == "runic" or self.plan.kind == "morph" or self.plan.kind == "rage") then
+  -- (Mimic too: the confirm on its row opens a target select latched on GOGO's own seat, chars = 1<<actor,
+  -- which A takes as it stands: build/attempts/wt/v034-wor-gogo/lab/se_k0_s0, "[tgt-graph] chars=04
+  -- --left--> chars=04", the stuck crossing to the monsters)
+  if st == BATTLE.ST_TGT and (self.plan.kind == "runic" or self.plan.kind == "morph" or self.plan.kind == "rage"
+      or self.plan.kind == "mimic") then
     -- the engine latched the target on the caster (chars = 1<<actor,
     -- probe_runic.lua, deleted in bd50a973); there is nothing to steer.
     -- Morph's target select is the same shape (battle_trance's `self`).
     M.log(string.format("[%s] actor=%d %s confirmed (target chars=%02X, pending %d BP)",
-      self.tag or "fight", actor, ({ morph = "Morph", rage = "Rage" })[self.plan.kind] or "Runic", M.readByte(BATTLE.TGTCHARS),
+      self.tag or "fight", actor, ({ morph = "Morph", rage = "Rage", mimic = "Mimic" })[self.plan.kind] or "Runic", M.readByte(BATTLE.TGTCHARS),
       M.readByte(BATTLE.PEND_BP + actor * 2)))
     if self.recovery then self.recovery.confirm(actor, M.frame,
       M.readByte(BATTLE.TGTCHARS), M.readByte(BATTLE.TGTMONS)) end

@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "0c75a12fa49d931c1d02470b181f27218f1400dba95b167cef77c104b90c4d37",
+  "generator_sig": "b8170305739eb6f4a8f4c733e5d95efde39333dde001102c8849e9a6a89dff3e gen_wor_ebot tools/tests/checkpoints/wor-gogo-v1/manifest.json tools/tests/checkpoints/wor-gogo-v1/wor-gogo.sram",
+  "ancestors": [
+    {
+      "path": "tools/tests/checkpoints/wor-gogo-v1/manifest.json",
+      "sha256": "8e772f5d0cc8b13ce53bfca2f4bc8d772ccf95b94725c68d027f987167010803"
+    }
+  ]
+}

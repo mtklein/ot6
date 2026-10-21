@@ -2563,6 +2563,84 @@ Ot6ShieldTbl:
         .word   $00a2
         .byte   3, OT6_SLASH|OT6_PIERCE ; poplium: a puffball; fire|holy
                                 ;   vanilla, absorbs poison
+        ; ---- the world of ruin: the zone eater's belly (gogo; route-wor-
+        ; gogo.md section 3) -----------------------------------------------
+        ; The four who walk it (terra, celes, relm, strago) hold pierce
+        ; (terra's dagger), slash (celes), bludgeon (the two rods), fire and
+        ; holy (terra) and ice (celes), and no bolt or poison: the bodies
+        ; weak only to those (ogor, tap dancer) take a class, and each row
+        ; keys two of the four.  Vanilla elements stay.
+        .word   $00dc
+        .byte   3, OT6_SLASH|OT6_BLUDG ; karkass: a carcass; break the
+                                ;   bones.  fire|holy vanilla; absorbs poison
+        .word   $007d
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; wart puck: a warty imp.  fire
+                                ;   vanilla
+        .word   $0068
+        .byte   3, OT6_SLASH|OT6_PIERCE ; ogor: an ogre's hide.  bolt|poison
+                                ;   vanilla, which the four lack
+        .word   $00f0
+        .byte   2, OT6_SLASH|OT6_BLUDG ; tap dancer: a dancer; muddles.
+                                ;   poison vanilla, which the four lack
+        .word   $0067
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; covert: a ninja (evade 50);
+                                ;   pinned or crushed.  holy vanilla (pearl)
+        .word   $00fa
+        .byte   3, OT6_SLASH    ; woolly: shear the wool.  fire vanilla;
+                                ;   absorbs ice, bolt, poison, wind, earth,
+                                ;   water
+        .word   $0171
+        .byte   0, $00          ; zone eater: the island's only body, and
+                                ;   the fight is to be eaten (engulf takes
+                                ;   the party to gogo); striking it is the
+                                ;   mistake, so no gauge
+        ; ---- the world of ruin: ebot's rock (strago's hidon, gogo's first
+        ; area; route-wor-gogo.md section 3) ------------------------------
+        ; Strago, relm, gogo and terra walk it: bludgeon (the rods), pierce
+        ; (terra's dagger), fire and holy.  It is strago's quest, so every
+        ; body takes his rod (bludgeon) beside a key of its own; gogo's
+        ; mimic copies whichever key was just struck.  Vanilla elements stay.
+        .word   $0069
+        .byte   2, OT6_BLUDG|OT6_SPECIAL ; warlock: a robed caster (mdef
+                                ;   225).  bolt|poison vanilla
+        .word   $0074
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; slatter: a shelled crawler; holy
+                                ;   vanilla
+        .word   $009a
+        .byte   2, OT6_SLASH|OT6_BLUDG ; cluck: a bird.  ice vanilla;
+                                ;   absorbs poison
+        .word   $00a5
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; eland: an antelope.  bolt vanilla
+        .word   $00b5
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; hipocampus: a sea horse.
+                                ;   fire|holy vanilla; absorbs poison
+        .word   $0070
+        .byte   3, OT6_BLUDG|OT6_SPECIAL ; displayer: an eye.  fire|holy
+                                ;   vanilla; absorbs poison
+        .word   $00c8
+        .byte   3, OT6_SLASH|OT6_BLUDG ; opinicus: a griffin.  fire|holy
+                                ;   vanilla; absorbs poison
+        .word   $0123
+        .byte   6, OT6_PIERCE|OT6_BLUDG ; hidon: strago's old foe;
+                                ;   fire|holy|earth vanilla, absorbs poison
+        .word   $0126
+        .byte   2, OT6_SLASH|OT6_BLUDG ; hidonite (poison claw): earth
+                                ;   vanilla; absorbs poison
+        .word   $0160
+        .byte   2, OT6_SLASH|OT6_BLUDG ; hidonite (confuclaw): reflect,
+                                ;   and drinks every element: a weapon only
+        .word   $0161
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; hidonite (zombi claw): fire|holy
+                                ;   vanilla; absorbs poison
+        .word   $0162
+        .byte   2, OT6_BLUDG    ; hidonite (mega claw): safe, and weak to
+                                ;   every element
+        ; ---- the world of ruin: the opera house (the dirt dragon;
+        ; route-wor-gogo.md section 3) --------------------------------------
+        .word   $014c
+        .byte   6, OT6_PIERCE|OT6_BLUDG ; dirt drgn: an earth dragon; the
+                                ;   floor's pierce and a crushing blow.
+                                ;   wind|water vanilla (strago's aqua rake)
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian

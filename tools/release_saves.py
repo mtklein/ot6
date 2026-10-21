@@ -85,6 +85,10 @@ TITLES = {
     "wor-ragnarok-v1": "Outside Narshe, after Ragnarok",
     "wor-veldt-cave-v1": "Veldt cave, save point, after Gau joins",
     "wor-gau-v1": "By Duncan's house, after the Veldt cave and Gau's father",
+    "wor-belly-v1": "Zone Eater's belly, save point",
+    "wor-gogo-v1": "Outside Thamasa, after Gogo joins",
+    "wor-ebot-v1": "Outside Thamasa, after Hidon",
+    "wor-opera-v1": "By the Opera House, after the Dirt Dragon and Doom Gaze",
 }
 
 README = """\
