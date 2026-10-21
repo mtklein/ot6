@@ -92,8 +92,7 @@ local function installObservers()
   installed = true
   local function cx() return emu.getState()["cpu.x"] & 0xFFFF end
   local function cy() return emu.getState()["cpu.y"] & 0xFFFF end
-  local function onExec(name, fn)
-    local a = H.sym(name)
+  local function onExec(a, fn)
     emu.addMemoryCallback(function() if armed and not armed.endF then fn(armed) end end,
       emu.callbackType.exec, a, a)
   end
@@ -104,15 +103,15 @@ local function installObservers()
     if cx() == standS * 2 then armed.standStores[#armed.standStores + 1] = v end
     if cx() == lockeS * 2 then armed.lockeStores[#armed.lockeStores + 1] = v end
   end, emu.callbackType.write, 0x7E3620, 0x7E371F)
-  onExec("Ot6AbilityCost", function(c)
+  onExec(H.sym("Ot6AbilityCost"), function(c)
     ev(c, string.format("Ot6AbilityCost x=%02X 3a7a=$%02X 3a7b=$%02X vanillaCost=%d", cx(),
       H.readByte(0x3A7A), H.readByte(0x3A7B), emu.getState()["cpu.a"] & 0xFF))
   end)
-  onExec("SaveForMimic", function(c)
+  onExec(H.sym("SaveForMimic"), function(c)
     ev(c, string.format("SaveForMimic x=%02X 3a7c=$%04X 3a30=$%04X", cx(), rd16(0x3A7C), rd16(0x3A30)))
     if cx() == lockeS * 2 then c.srcSaved = c.srcSaved + 1; c.saved = rd16(0x3A7C) end
   end)
-  onExec("mimicreplace", function(c)
+  onExec(H.sym("mimicreplace"), function(c)
     ev(c, string.format("mimicreplace x=%02X: 3f20=$%04X 3f22=$%04X 3f24=$%04X 3f26=$%04X 3f28=$%02X %s",
       cx(), rd16(0x3F20), rd16(0x3F22), rd16(0x3F24), rd16(0x3F26), H.readByte(0x3F28), chars()))
     if cx() == standS * 2 then c.inStand = true end
@@ -123,14 +122,14 @@ local function installObservers()
       H.readByte(0x3A7A), H.readByte(0x3A7B)))
     armed.staged[#armed.staged + 1] = v
   end, emu.callbackType.write, 0x7E3A4C, 0x7E3A4C)
-  onExec("Ot6ThiefExec", function(c)
+  onExec(H.sym("Ot6ThiefExec"), function(c)
     ev(c, string.format("Ot6ThiefExec x=%02X b6=$%02X b8=$%02X b9=$%02X", cx(), H.readByte(0xB6),
       H.readByte(0xB8), H.readByte(0xB9)))
   end)
-  onExec("Ot6Filch", function(c)
+  onExec(H.sym("Ot6Filch"), function(c)
     ev(c, string.format("Ot6Filch x=%02X b9=$%02X %s | %s", cx(), H.readByte(0xB9), chars(), mons()))
   end)
-  onExec("Ot6Bestow", function(c)
+  onExec(H.sym("Ot6Bestow"), function(c)
     ev(c, string.format("Ot6Bestow x=%02X b8=$%02X %s", cx(), H.readByte(0xB8), chars()))
   end)
   emu.addMemoryCallback(function(_, v)
@@ -141,7 +140,7 @@ local function installObservers()
     if armed == nil or armed.endF or v == 0xFF then return end
     ev(armed, string.format("grant $32F4+<-$%02X (x=%02X)", v, cx()))
   end, emu.callbackType.write, 0x7E32F4, 0x7E3306)
-  onExec("Ot6ActionEnd", function(c)
+  onExec(H.sym("Ot6ActionEnd"), function(c)
     local x = cx()
     if x == lockeS * 2 and c.srcEnd == nil then
       c.srcEnd = true
