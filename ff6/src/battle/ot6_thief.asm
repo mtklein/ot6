@@ -54,8 +54,16 @@ inc_lang "text/bushido_name_%s.inc"     ; Ot6KitListName's SwdTech names
 ; So the rows get per-ability ids at no cost. cmd $05 gets its own table,
 ; Ot6ThiefCostTbl, reached only from Ot6AbilityCost's @steal arm. Steal's own
 ; row still prices through Ot6StealCost, and any $3a7b this menu did not
-; write ($ff from a Confused or AI-issued Steal, a Gogo mimic, or a relic
-; Capture) falls through to plain Steal.
+; write ($ff from a Confused or AI-issued Steal, or a relic Capture) falls
+; through to plain Steal.  A Gogo's Mimic of Steal, Filch or Bestow never
+; reaches this arm: mimicreplace puts the source's command/attack word
+; ($3f20 = $56xx..$58xx) into Mimic's own queue row without CreateAction, so
+; the copy keeps Mimic's 0 and the row runs free (measured #261,
+; tools/tests/probe_mimic_thief.lua: the copier paid 0 MP where Locke paid
+; 4 / 6 / 5).  Free is the ruling (mp-economy.md, "Mimic copies the action,
+; not the price"); the copy's effect is Locke's row, with the copier's
+; own pips (Filch banks one for the copier, Bestow gives one of the
+; copier's).
 ;
 ; The row ids are AttackName pad slots. ListTextCmd_0f renders any id >= $51
 ; from AttackName[id-$51] (btlgfx_main.asm:15308-15330), and indices $05-$0b

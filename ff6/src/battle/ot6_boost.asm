@@ -1925,8 +1925,12 @@ OT6_LIFE3_ID = $35
         ; Ot6ThiefListOpen's header for why that byte is free under this
         ; command).  Filch and Bestow price from Ot6ThiefCostTbl, keyed on
         ; that byte; everything else (the Steal row itself, the $ff a
-        ; Confused or AI-issued Steal queues, a Gogo mimic) falls through to
-        ; Ot6StealCost, the single authority for Steal's price.
+        ; Confused or AI-issued Steal queues) falls through to
+        ; Ot6StealCost, the single authority for Steal's price.  A Gogo's
+        ; Mimic of any of these rows does not come through here at all:
+        ; mimicreplace copies the row's command/attack word without
+        ; CreateAction, so the copy is free (4 / 6 / 5 MP for Locke, 0 for the
+        ; copier; #261, tools/tests/probe_mimic_thief.lua).
         pla                     ; drop the parked cost (0 for steal)
         lda     $3a7b           ; the row the submenu queued
         jsl     Ot6ThiefIsNew   ; carry set = a kit row past Steal (A kept)
