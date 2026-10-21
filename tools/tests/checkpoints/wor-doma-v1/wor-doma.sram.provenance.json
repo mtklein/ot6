@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "ca0a475a0322b57907ec1ef2a9607484d814516f8cb2e01d7dbf75ddf5f8af59",
+  "generator_sig": "534c2984f648237ecfa409aaa937fa0137218abbf6bb71b7fba49f0cae8a7681 gen_wor_doma tools/tests/checkpoints/wor-dream-v1/manifest.json tools/tests/checkpoints/wor-dream-v1/wor-dream.sram",
+  "ancestors": [
+    {
+      "path": "tools/tests/checkpoints/wor-dream-v1/manifest.json",
+      "sha256": "333149d7ab5373ee3bbfbaf47379eb905bb13a1f0dc048220b658cf03f633279"
+    }
+  ]
+}
