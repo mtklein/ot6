@@ -13443,12 +13443,16 @@ function Driver:button(actor)
     end
     return { "a" }
   end
-  if st == BATTLE.ST_TGT and (self.plan.kind == "runic" or self.plan.kind == "morph" or self.plan.kind == "rage") then
+  -- (Mimic too: the confirm on its row opens a target select latched on GOGO's own seat, chars = 1<<actor,
+  -- which A takes as it stands: build/attempts/wt/v034-wor-gogo/lab/se_k0_s0, "[tgt-graph] chars=04
+  -- --left--> chars=04", the stuck crossing to the monsters)
+  if st == BATTLE.ST_TGT and (self.plan.kind == "runic" or self.plan.kind == "morph" or self.plan.kind == "rage"
+      or self.plan.kind == "mimic") then
     -- the engine latched the target on the caster (chars = 1<<actor,
     -- probe_runic.lua, deleted in bd50a973); there is nothing to steer.
     -- Morph's target select is the same shape (battle_trance's `self`).
     M.log(string.format("[%s] actor=%d %s confirmed (target chars=%02X, pending %d BP)",
-      self.tag or "fight", actor, ({ morph = "Morph", rage = "Rage" })[self.plan.kind] or "Runic", M.readByte(BATTLE.TGTCHARS),
+      self.tag or "fight", actor, ({ morph = "Morph", rage = "Rage", mimic = "Mimic" })[self.plan.kind] or "Runic", M.readByte(BATTLE.TGTCHARS),
       M.readByte(BATTLE.PEND_BP + actor * 2)))
     if self.recovery then self.recovery.confirm(actor, M.frame,
       M.readByte(BATTLE.TGTCHARS), M.readByte(BATTLE.TGTMONS)) end
