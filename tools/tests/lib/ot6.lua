@@ -10521,9 +10521,48 @@ function Driver:makePlan(actor)
   end
   self._race = nil
   plan = self:lockeMug(actor, plan)
+  plan = self:dodgePlan(actor, plan)
   plan = self:policyPlan(actor, plan)
   if plan then plan.raceBoost = plan.boostLeft or 0 end
   self:sayTurn(actor, plan)
+  return plan
+end
+
+-- A Fight aimed at a monster its swing cannot touch (#270): Vanish or Image
+-- (M.dodges; a Covert's counter, Disappear, Vanishes it) makes every physical
+-- hit miss, and the belly's Covert pairs were fought that way, 55 swings that
+-- "took 0 off" against 34 that landed in the run that wiped
+-- (build/attempts/wt/v034-wor-gogo/lab/sb_k3_s7).  A person sees the body fade
+-- and swings at another, or, when every standing body has faded, casts (a
+-- spell lands on a Vanished body and ends it): the Fight re-aims at a standing
+-- monster that can be hit, else becomes the actor's magic line
+-- (Driver:magicOnlyLine) when there is one.  Other plans are left alone.
+-- DODGE_OFF (a global) turns it off, the control arm.
+function Driver:dodgePlan(actor, plan)
+  if plan == nil or plan.kind ~= "fight" or DODGE_OFF then return plan end
+  local function dodger(s)
+    return M.dodges({ s1 = M.readByte(0x3EE4 + (4 + s) * 2), s2 = M.readByte(0x3EE5 + (4 + s) * 2) })
+  end
+  local aim = plan.aim
+  if aim == nil then for s = 0, 5 do if aim == nil and monAlive(s) then aim = s end end end
+  if aim == nil or not monAlive(aim) or dodger(aim) == nil then return plan end
+  local why = dodger(aim)
+  for s = 0, 5 do
+    if monAlive(s) and dodger(s) == nil then
+      M.log(string.format("[%s] actor=%d Fight re-aimed: slot %d is under %s (every swing misses it); slot %d instead",
+        self.tag or "fight", actor, aim, why, s))
+      plan.aim = s
+      return plan
+    end
+  end
+  if cmdRow(actor, BATTLE.CMD_MAGIC) then
+    local line = self:magicOnlyLine(actor, plan.boostLeft or 0)
+    if line then
+      M.log(string.format("[%s] actor=%d every standing monster is under Vanish or Image: a cast (%s) for the "
+        .. "Fight that would miss", self.tag or "fight", actor, line.kind))
+      return line
+    end
+  end
   return plan
 end
 
