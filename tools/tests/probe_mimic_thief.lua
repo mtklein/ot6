@@ -244,7 +244,7 @@ local function runCase(snapRef, c)
       tick, held = 0, nil
       mf, tapNo = 0, -1
       c.log, c.standStores, c.lockeStores, c.staged = {}, {}, {}, {}
-      c.srcSaved, c.srcDone, c.mimicSent = 0, false, false
+      c.srcSaved, c.srcDone, c.mimicSent, c.after = 0, false, false, false
       c.endF, c.inStand, c.srcEnd = nil, false, nil
       armed = c
       ev(c, "START " .. chars() .. " | " .. mons())
@@ -252,6 +252,10 @@ local function runCase(snapRef, c)
     H.driveUntil(function() return c.endF ~= nil and H.frame >= c.endF + 120 end, 14000, {
       H.call(function()
         Tm.observe(); Tc.observe()
+        if c.endF and not c.after and H.frame >= c.endF + 6 then
+          c.after = true
+          ev(c, "six frames after the stand-in's Ot6ActionEnd: " .. chars() .. " | " .. mons())
+        end
         local ac = lockeAim(c)
         if ac then held = nil; H.setPad(ac) return end
         tick = tick + 1
