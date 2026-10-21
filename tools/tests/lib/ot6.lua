@@ -8502,9 +8502,10 @@ function Driver:mimicLine(actor, boost)
   end
   M.log(string.format("[%s] actor=%d GOGO Mimic of %s ($%02X $%02X, monsters %02X) at %d BP, %d MP of %d",
     self.tag or "fight", actor, what, cmd, atk, tmons, boost or 0, 0, M.readWord(BATTLE.CURMP + actor * 2)))
-  M.mimics[#M.mimics + 1] = { frame = M.frame, actor = actor, cmd = cmd, atk = atk, mons = tmons, boost = boost or 0,
+  local rec = { frame = M.frame, actor = actor, cmd = cmd, atk = atk, mons = tmons, boost = boost or 0,
     mp = M.readWord(BATTLE.CURMP + actor * 2), bp = M.readByte(BATTLE.BP + actor * 2) }
-  return { kind = "mimic", row = row, boostLeft = boost, copy = { cmd = cmd, atk = atk, mons = tmons } }
+  M.mimics[#M.mimics + 1] = rec
+  return { kind = "mimic", row = row, boostLeft = boost, copy = { cmd = cmd, atk = atk, mons = tmons }, rec = rec }
 end
 
 -- The magic-only command table (the Fanatics' Tower: battle switch $38,
@@ -13148,6 +13149,7 @@ function Driver:button(actor)
       -- Mimic commits on its row: no list, no target select (#270)
       if self.plan.kind == "mimic" then
         self.plan.committed = M.frame
+        if self.plan.rec then self.plan.rec.confirmed = M.frame end
         M.log(string.format("[%s] actor=%d Mimic confirmed (pending %d BP)", self.tag or "fight", actor,
           M.readByte(BATTLE.PEND_BP + actor * 2)))
       end

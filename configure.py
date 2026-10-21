@@ -551,10 +551,9 @@ TEST_ENV = {
     # the Veldt cave's save point with him seated
     "battle_ragedriver": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-veldt-cave-v1",
-    # #270: the driver's Mimic line for GOGO, from the save the play makes
-    # beside the Falcon by Thamasa with him seated
-    "battle_mimicdriver": "OT6_TIMEOUT=3600 "
-        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-gogo-v1",
+    # #270: the driver's Mimic line for GOGO, on the Dirt Dragon from the
+    # wor_opera leg's snapshot at the Opera House's catwalk switch
+    "battle_mimicdriver": "OT6_TIMEOUT=3600",
     # #424: a 3-BP Break on Esper Mountain's four- and five-shield bodies,
     # and RunicBlade sending a Wizard's spell back on the Narshe cliffs
     "battle_breakfour": "OT6_TIMEOUT=1800 "

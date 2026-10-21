@@ -1025,8 +1025,10 @@ STATES = [
     # `wor-opera-v1` checkpoint, the next arc's boot
     # (docs/design/route-wor-gogo.md).  A cut; saves= until a leg boots it.
     # Re-cut by checkpoint_drift.py --recut.
+    # also: wor_opera_switch, the party at the catwalk's switch before the
+    # Dirt Dragon (battle_mimicdriver's fixture).
     S("wor_opera", gen="gen_wor_opera", prev="wor_ebot",
-      checkpoint="wor-ebot-v1", saves="wor-opera-v1", timeout=7200),
+      checkpoint="wor-ebot-v1", saves="wor-opera-v1", timeout=7200, also=["wor_opera_switch"]),
 
 ]
 
