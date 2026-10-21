@@ -8524,6 +8524,10 @@ CalcAttackEffect:
         sty     $b5
 @32ca:  jsl     Ot6FizzleDropBoost  ; ot6: a character's refused cast keeps
                                 ;   its pending boost (#450); x = attacker
+        shorta                  ; ot6 #451: and runs no more passes.  The
+        stz     $3a70           ;   count a command handler set (Pummel,
+        longa                   ;   Drill, an Overclock) would run them
+                                ;   with $3a4c already cleared: unpaid
         jsr     _c235ad
         stz     $a2
         stz     $a4

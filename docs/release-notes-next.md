@@ -10,3 +10,5 @@ and its effect. Cite evidence in the commit message.
 **Two new saves.** At the Veldt cave's save point, and outside Duncan's house once Gau is back and Sabin has learned Bum Rush.
 
 **A boosted action that fails for lack of MP keeps its boost.**
+
+**A multi-strike action that fails for lack of MP does nothing.**
