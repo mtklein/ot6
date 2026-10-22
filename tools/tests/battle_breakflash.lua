@@ -220,8 +220,28 @@ H.run({ maxFrames = 60000 }, {
                         cmd = H.readByte(0xE9E8), pan = H.readByte(0xE9EA) }
     end, emu.callbackType.write, 0x7EE9EC, 0x7EE9EC)
     emu.addEventCallback(function() sample() end, emu.eventType.startFrame)
-    watch = true
     H.log("lab: guards fire-weak, hp pinned, vanilla turn-flash latched off")
+  end),
+  -- The latch stops new vanilla attacker flashes, not one already in
+  -- flight: a guard whose turn began before the lab latched can still be
+  -- toggling its sprite onto palette 3 (#468, shift 24: guard 1 put on
+  -- palette 3 at f549 by the attacker-flash code, C1/9B25's sequence, and
+  -- counted as foreign).  The watch arms once both guards have sat on
+  -- their own palettes for 30 straight frames.
+  (function()
+    local calm = 0
+    return H.waitUntil(function()
+      pinLab()
+      if palBits(1) ~= 0x06 and palBits(2) ~= 0x06 then calm = calm + 1 else calm = 0 end
+      return calm >= 30
+    end, 900, "no vanilla turn flash in flight when the watch arms", 1)
+  end)(),
+  H.call(function()
+    for g = 1, 2 do
+      H.assertEq(palBits(g) ~= 0x06, true, string.format("guard %d is on its own palette "
+        .. "when the watch arms", g))
+    end
+    watch = true
   end),
 
   -- ---------------- phase 1: one natural break, on the damage frame -------
@@ -405,9 +425,19 @@ H.run({ maxFrames = 60000 }, {
       "atb keeps running across a live break flash -- #33's signature (every "
       .. "gauge frozen, menus stalled shut) does not reproduce")
   end),
-  H.driveUntil(function() return H.readByte(0x7bca) ~= 0 end, 6000, {
+  -- ...and phase 4 restages only once both flashes have run out and handed
+  -- their sprites back.  Phase 3 stops after twelve of a flash's 24 frames,
+  -- and regauge zeroes the tick byte: cut there, the sprite stays pointed at
+  -- palette 3, and Ot6BreakStart refuses every later flash on it (#468,
+  -- shift 7: the menu was already open when phase 3 ended, phase 4's break
+  -- banked $FF at f2428 and was consumed unarmed, then 14000 frames of
+  -- beams on a broken guard).
+  H.driveUntil(function()
+    return H.readByte(0x7bca) ~= 0 and not live(1) and not live(2)
+      and palBits(1) ~= 0x06 and palBits(2) ~= 0x06
+  end, 6000, {
     H.call(function() pinLab() end), H.waitFrames(4),
-  }, "a battle menu still opens after the flash window"),
+  }, "a battle menu still opens after the flash window, both sprites handed back"),
 
   H.call(function()
     resetWatch()
@@ -422,6 +452,10 @@ H.run({ maxFrames = 60000 }, {
     H.log(string.format("phase 4: revealed going in E/C = %02X/%02X and "
       .. "%02X/%02X; target is guard %d",
       H.vars.rev0[1].e, H.vars.rev0[1].c, H.vars.rev0[2].e, H.vars.rev0[2].c, b))
+    for g = 1, 2 do
+      H.assertEq(palBits(g) ~= 0x06, true, string.format("guard %d is on its own palette "
+        .. "going in (no flash left holding palette 3, which would refuse this break's)", g))
+    end
     H.assertEq(H.vars.rev0[b].e & 0x01, 0x01,
       "the target guard's FIRE weakness is already revealed before this break "
       .. "-- so the breaking chip reveals nothing new")

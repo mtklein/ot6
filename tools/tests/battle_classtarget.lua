@@ -169,10 +169,23 @@ do
       if alive(s) and speciesAt(s) == CIRPIUS and (classRev(s) & PIERCE) ~= 0 then keyed = true end
     end
     local at = slot and speciesAt(slot) or nil
-    branchRecord.fights[#branchRecord.fights + 1] = string.format("%s%s",
+    -- the monster the driver's plan aimed this Fight at (plan.aim, read each
+    -- frame by measure below).  When that monster fell while the cursor was
+    -- still walking to it (a party-mate's queued blow killed it), the engine
+    -- drops the cursor on another monster and the input confirms there: the
+    -- aim chose a Cirpius, the engine's fallback did not (#468, shift 13:
+    -- FINISH aimed slot 2, LOCKE's queued Fight killed it 17 frames before
+    -- TERRA's confirm landed on the Tusker).  Counted apart, and logged.
+    local aimed = branchRecord.terraAim
+    local fell = aimed ~= nil and slot ~= aimed and not alive(aimed)
+    branchRecord.fights[#branchRecord.fights + 1] = string.format("%s%s%s",
       slot and string.format("s%d=%03X", slot, at) or string.format("mask%02X", mons),
-      keyed and "" or "(no keyed Cirpius)")
-    if keyed and at ~= CIRPIUS then branchRecord.offKey = branchRecord.offKey + 1 end
+      keyed and "" or "(no keyed Cirpius)",
+      fell and string.format("(aimed s%d fell during the cursor walk)", aimed) or "")
+    if keyed and at ~= CIRPIUS then
+      if fell then branchRecord.fellOff = branchRecord.fellOff + 1
+      else branchRecord.offKey = branchRecord.offKey + 1 end
+    end
   end, emu.callbackType.exec, gpt, gpt)
 end
 
@@ -221,12 +234,16 @@ local function measure(name, aim)
   return H.seqStep({
     H.call(function()
       out.broke, out.chips, out.on, out.fights, out.offKey = {}, 0, {}, {}, 0
+      out.fellOff, out.terraAim = 0, nil
       TERRA_ENT = S.terra * 2
       branchRecord = out
     end),
     H.driveUntil(function() return not H.battleLoadStarted() end, 40000, {
       H.call(function()
         F.frame()
+        -- TERRA's current plan's aim (nil when the plan names none)
+        local d = F.driver
+        if d.plan ~= nil and d.planActor == S.terra then out.terraAim = d.plan.aim end
         for s = 0, 5 do
           if alive(s) and speciesAt(s) == CIRPIUS and broken(s) then out.broke[s] = true end
         end
@@ -243,10 +260,11 @@ local function measure(name, aim)
       end
       H.log(string.format("[classtarget] %s: pierce chips on a Cirpius=%d (%s), cirpius "
         .. "broken=%d, fight took %d frames from the restored snapshot (f%d..f%d); TERRA's "
-        .. "Fights aimed at: %s -- %d off the key while a keyed Cirpius stood", name,
+        .. "Fights aimed at: %s -- %d off the key while a keyed Cirpius stood, %d more where "
+        .. "the aimed monster fell during the cursor walk", name,
         out.chips, #per > 0 and table.concat(per, " ") or "none", out.nbroke, out.frames,
         out.restored, H.frame, #out.fights > 0 and table.concat(out.fights, " ") or "none",
-        out.offKey))
+        out.offKey, out.fellOff))
     end),
   })
 end

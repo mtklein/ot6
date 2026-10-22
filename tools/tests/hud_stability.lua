@@ -4,8 +4,13 @@
 -- so this test watches the cell words frame by frame.
 --   1. both guards' lines present after settle
 --   2. 600 idle frames: the visible cell set never changes
---   3. an attack may contest BG3, but within 120 frames of the action
---      landing the HUD is back and stays put for 300 more frames
+--   3. a magitek action's animation may contest BG3, but within 120 frames
+--      of the action landing the HUD is back and stays put for 300 more
+--      frames.  The action is Heal Force: it animates over the field and
+--      leaves both guards standing, so both lines must come back.  (#468:
+--      shift 0 passed by firing Heal Force, the list cell two
+--      downs from the top; on shift 13 the walk overshot to an empty cell,
+--      and an Ice Beam instead kills a guard, whose line then rightly goes.)
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 local GLYPH = {[0x65]=1,[0x66]=1,[0x67]=1,[0x69]=1,[0x6a]=1,[0x6b]=1,[0x71]=1,
@@ -35,6 +40,25 @@ local function lineCount(set)
 end
 local baseline, changes = nil, 0
 local actorSlot, bpBefore
+-- the magitek list cell (column, row) holding Heal Force for actor `act`:
+-- the seat's $2EAE byte picks TerraMagitekAttackTbl (0) or
+-- DefaultMagitekAttackTbl (UpdateMenuState_2a), two columns, $FF an empty
+-- cell the confirm refuses; Heal Force is the entry whose MagicProp record
+-- (attack $83 + entry value, 14 bytes) carries the heal flag (+4 bit 0),
+-- the same reading the driver's magitekLine makes
+local listSaid = false
+local function healForceCell(act)
+  local tbl = (H.readByte(0x2EAE + act * 32) == 0 and H.sym("TerraMagitekAttackTbl")
+    or H.sym("DefaultMagitekAttackTbl")) & 0x3FFFFF
+  local MP = H.sym("MagicProp") & 0x3FFFFF
+  for idx = 0, 7 do
+    local v = H.readRomByte(tbl + idx)
+    if v < 0x80 and (H.readRomByte(MP + (0x83 + v) * 14 + 4) & 0x01) ~= 0 then
+      return idx % 2, idx // 2
+    end
+  end
+  error(string.format("hud_stability: actor %d's magitek list offers no Heal Force", act))
+end
 local function stableWatch(tag, nframes)
   local count = 0
   return H.waitUntil(function()
@@ -69,18 +93,18 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(changes, 0, "idle hud perfectly stable for 600 frames")
   end),
   (function()
-    local mf, downs = 0, 0
+    local mf = 0
     return H.driveUntil(function()
       return actorSlot ~= nil
         and H.readByte(0x3e9c + actorSlot*2) ~= bpBefore
     end, 12000, {
       H.call(function()
-        if H.readByte(0x7bca) == 0 then mf, downs = 0, 0; H.setPad({}); return end
+        if H.readByte(0x7bca) == 0 then mf = 0; H.setPad({}); return end
         local act = H.readByte(0x62ca)
         if actorSlot == nil then
           actorSlot = act
           bpBefore = H.readByte(0x3e9c + act*2)
-          H.log("firing one real beam from the first active slot: " .. act)
+          H.log("firing one real Heal Force from the first active slot: " .. act)
         end
         if H.readByte(0x3e9c + actorSlot*2) ~= bpBefore then
           H.setPad({}); return
@@ -93,16 +117,26 @@ H.run({ maxFrames = 30000 }, {
           btn = st == 0x05 and "x" or "b"   -- defer focus; back out first
         elseif st == 0x05 then btn = "a"    -- open the magitek list
         elseif st == 0x2a then
-          if downs < 2 then
-            if (mf - 1) % 8 == 0 then downs = downs + 1 end
-            btn = "down"
-          else btn = "a" end                -- the row-2 beam
+          -- walk the list cursor to Heal Force's cell, read from the seat's
+          -- table in the ROM, by the cursor's own column/row ($893F/$8943),
+          -- rather than counting held downs (#468, shift 13: the cursor ran
+          -- to row 3, an empty $FF cell, and every A buzzed for 12000 frames)
+          local wc, wr = healForceCell(act)
+          local cc, cr = H.readByte(0x893F + act), H.readByte(0x8943 + act)
+          if not listSaid then
+            listSaid = true
+            H.log(string.format("magitek list open for slot %d: cursor at col %d row %d; "
+              .. "Heal Force at col %d row %d", act, cc, cr, wc, wr))
+          end
+          if cc ~= wc then btn = wc > cc and "right" or "left"
+          elseif cr ~= wr then btn = wr > cr and "down" or "up"
+          else btn = "a" end
         elseif st == 0x38 then btn = "a"    -- confirm the default target
         elseif st == 0x01 then H.setPad({}); return
         else btn = "b" end
         H.setPad({ [btn] = true })
       end),
-    }, "one real beam lands")
+    }, "one real Heal Force lands")
   end)(),
   H.waitFrames(120),   -- recovery window
   -- an instantaneous check raced the queue: submitting cancels no
