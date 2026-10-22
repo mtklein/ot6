@@ -3678,6 +3678,13 @@ end
 --                 point of MP for the fight it is walking toward, and the
 --                 target goes unhealed once the bag is empty.
 --                 Revival is always a Fenix Down.
+-- opts.castFirst  cast a cure before reaching for the bag (default false;
+--                 M.careCastFirst for a whole run): where the party's MP is
+--                 bought back with Tinctures and a cure heals more per gil
+--                 than the bag (the Fanatics' Tower, gen_wor_tower: no Tent
+--                 or inn inside, a Potion 300 GP for 250 HP, Cure 5 MP at
+--                 30 GP an MP for some 700 HP).  The bag still serves a
+--                 target no cure can reach (the casters at their floor).
 -- opts.mpFloor    MP a caster keeps back: a fraction of their maximum below
 --                 1, an absolute number at or above it (default 0.25).  A
 --                 caster drained to zero in a corridor walks into the next
@@ -4492,6 +4499,8 @@ local function careKernel(opts)
   local budget = opts.maxFrames or 24000
 
   local useMagic = opts.magic ~= false
+  local castFirst = opts.castFirst
+  if castFirst == nil then castFirst = M.careCastFirst end
   local mpFloor = opts.mpFloor or 0.25
   local maxTries = opts.maxTries or 48
   -- The MP band (#231): a living member whose MP is under this fraction of
@@ -4778,7 +4787,9 @@ local function careKernel(opts)
       -- this target -- and the caller has not switched casting off.
       -- Measured before this order: gen_esper_tubes' "care before battle
       -- 72" cast $2D three times with 84 Tonics in the bag.
-      local w = pickItem(h.c)
+      local w = nil
+      if castFirst and useMagic then w = pickCast(h.c) end
+      if w == nil then w = pickItem(h.c) end
       if w == nil and useMagic then w = pickCast(h.c) end
       if w ~= nil then return w end
     end
@@ -5311,6 +5322,10 @@ M.careFloat = nil
 M.careMagic = nil
 -- The after-battle care's HP threshold for a whole run (0.65 when nil)
 M.careThreshold = nil
+-- The care casts a cure before it reaches for the bag (careKernel's
+-- opts.castFirst) for a whole run: a leg whose MP is bought back with
+-- Tinctures, where a cure is the cheaper heal (gen_wor_tower)
+M.careCastFirst = nil
 
 -- M.fieldCare: the step form -- behaviorally what it has always been
 -- (open the menu, serve the plans, close, settle), built on careKernel.
