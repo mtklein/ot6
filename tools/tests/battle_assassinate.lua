@@ -855,6 +855,13 @@ add({
           -- went unbroken
           H.log(string.format("[isolation arm] body %d broke at f%d by SHADOW under %s (the engine's turn, at %d BP): "
             .. "not the arm's action -- another fight", m, b.f, b.ctl, b.pend))
+        elseif b ~= nil and b.atk ~= shadowSlot * 2 then
+          -- another member's hit broke it (ee275f7e's qualification: x=$04,
+          -- at 0 BP, build/attempts/wt/v036-boost/round3/): not SHADOW's
+          -- 3-BP action either, so the same: fought out, another drawn
+          H.log(string.format("[isolation arm] body %d broke at f%d by x=$%02x, not SHADOW (at %d BP; status "
+            .. "$%02X $%02X): not the arm's action -- another fight", m, b.f, b.atk, b.pend,
+            H.readByte(0x3EE4 + b.atk), H.readByte(0x3EE5 + b.atk)))
         elseif b ~= nil then
           broke = true
           H.log(string.format("[isolation arm] body %d broke at f%d seq%d by "

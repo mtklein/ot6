@@ -36,6 +36,33 @@ local TOPN, BOTN = { 2, 3, 6 }, { 2, 3, 3 } -- Ot6HaloTopN, Ot6HaloBotN: copies 
 local actor
 local copiesSeen = 0                       -- halo copies seen over the run: the halo must show somewhere
 local function pend(s) return H.readByte(0x3e9d + s * 2) end
+-- the actor's Fight row, and a menu step that presses `btn()` (tapped: 4
+-- frames down, 12 up) until `done()` holds, reading the menu each time
+local function fightRow()
+  for r = 0, 3 do if H.readByte(0x202E + actor * 12 + r * 3) == 0x00 then return r end end
+  error("precondition: the actor's command list has Fight", 0)
+end
+-- the first of the actor's commands that opens a list window (Item, Magic,
+-- Steal, SwdTech, Throw, Tools, Blitz, Lore): not Morph or Defend, which
+-- would commit the boosted action from the command window
+local LISTCMD = { [0x01] = true, [0x02] = true, [0x05] = true, [0x07] = true, [0x08] = true, [0x09] = true,
+  [0x0A] = true, [0x0C] = true }
+local function listRow()
+  for r = 0, 3 do
+    local c = H.readByte(0x202E + actor * 12 + r * 3)
+    if LISTCMD[c] and (H.readByte(0x202E + actor * 12 + r * 3 + 1) & 0x80) == 0 then return r end
+  end
+  error("precondition: the actor has a command that opens a list", 0)
+end
+local function menuTo(done, btn, what)
+  local ph = 0
+  return H.driveUntil(done, 600, {
+    H.call(function()
+      ph = ph + 1
+      H.setPad(ph % 16 < 4 and { [btn()] = true } or {})
+    end),
+  }, what)
+end
 local function bp(s) return H.readByte(0x3e9c + s * 2) end
 local function map() return H.mapId() & 0x1ff end
 
@@ -292,6 +319,13 @@ H.run({ maxFrames = 40000 }, {
   end)(),
   H.release(),
   H.waitFrames(30),
+  -- the loop's last A can land as the window comes up and open Fight's
+  -- target select (kolts_cave at shift 57: state $38 here); back out to the
+  -- command window
+  menuTo(function()
+    return H.readByte(MENU) ~= 0 and (H.readByte(ACTOR) & 3) == actor and H.readByte(MSTATE) == 0x05
+  end, function() return "b" end, "the actor's command window up"),
+  H.waitFrames(8),
 
   -- no boost: two body sprites, the unaltered outline colour
   startSample(), sample(32),
@@ -316,8 +350,25 @@ H.run({ maxFrames = 40000 }, {
   raiseTo(2), H.waitFrames(12), startSample(), sample(32), checkLevel(2, "command window"),
   raiseTo(3), H.waitFrames(12), startSample(), sample(32), checkLevel(3, "command window"),
 
-  -- a list open: the second command's window (Magic, Steal, Tools...)
-  H.pressButtons({ down = true }, 4), H.waitFrames(8),
+  -- a list open: the first list command's window (Item, Magic, Tools...).
+  -- Every step reads the menu it acts on (the cursor row $890F, the window
+  -- state $7BC2) rather than pressing blind: on ee275f7e's kolts_cave a
+  -- blind B / up / A / A sequence committed something other than the Fight,
+  -- and the boost was charged 13 frames into the sample ("only 13 frames
+  -- with 3 BP pending"), and at another draw the Fight never went in
+  -- (build/attempts/wt/v036-boost/round3/)
+  H.call(function()
+    local t = {}
+    for r = 0, 3 do
+      t[#t + 1] = string.format("%02X/%02X", H.readByte(0x202E + actor * 12 + r * 3),
+        H.readByte(0x202E + actor * 12 + r * 3 + 1))
+    end
+    H.log(string.format("[aura] slot %d commands %s, cursor row %d, menu state $%02X, list row %d", actor,
+      table.concat(t, " "), H.readByte(0x890F + actor) & 3, H.readByte(MSTATE), listRow()))
+  end),
+  menuTo(function() return (H.readByte(0x890F + actor) & 3) == listRow() end,
+    function() return (H.readByte(0x890F + actor) & 3) > listRow() and "up" or "down" end,
+    "the cursor on a command that opens a list"),
   H.pressButtons({ a = true }, 4), H.waitFrames(30),
   H.call(function()
     local st = H.readByte(MSTATE)
@@ -325,13 +376,21 @@ H.run({ maxFrames = 40000 }, {
     if st == 0x05 then error("precondition: a list window opened over the command window", 0) end
   end),
   startSample(), sample(32), checkLevel(3, "list open"),
-  H.pressButtons({ b = true }, 4), H.waitFrames(30),
-  H.pressButtons({ up = true }, 4), H.waitFrames(8),
+  menuTo(function() return H.readByte(MSTATE) == 0x05 end, function() return "b" end,
+    "the list closed, the command window back"),
+  menuTo(function()
+    return H.readByte(MSTATE) == 0x05 and (H.readByte(0x890F + actor) & 3) == fightRow()
+  end, function() return (H.readByte(0x890F + actor) & 3) > fightRow() and "up" or "down" end,
+    "the cursor on Fight"),
+  H.call(function() H.assertEq(pend(actor), 3, "the boost still raised on the command window") end),
 
   -- Fight with the 3-BP boost: the aura holds through the action until the
   -- charge (bp drops by 3), then goes
-  H.pressButtons({ a = true }, 4), H.waitFrames(20),
-  H.pressButtons({ a = true }, 4),
+  menuTo(function() return H.readByte(MSTATE) == 0x38 end, function() return "a" end,
+    "Fight picked: the target window up"),
+  menuTo(function() return H.readByte(MENU) == 0 or (H.readByte(ACTOR) & 3) ~= actor
+      or H.readByte(MSTATE) ~= 0x38 end,
+    function() return "a" end, "the target confirmed"),
   startSample(),
   H.driveUntil(function() return bp(actor) == 0 end, 1200, {
     H.call(function()

@@ -390,8 +390,17 @@ local steps = {
           local ids = H.monsterIds()
           local names = {}
           for m = 0, 5 do names[#names + 1] = string.format("%d:%04X", m, ids[m + 1]) end
+          -- and a second body beside it: a lone body can fall to the
+          -- source's own action, which ends the battle before the copier's
+          -- turn (the plain's single $1D at K=2, shift 7: the battle ended
+          -- in case slot-b0, then 13,000 quiet frames, "timeout after 14000
+          -- frames driving toward case slot-b0 resolves",
+          -- build/attempts/wt/v036-fragile/K2/)
+          local standing = 0
+          for m = 0, 5 do if H.readWord(0x3BFC + m * 2) > 0 then standing = standing + 1 end end
+          if standing < 2 then best = nil end
           H.log(string.format("[mimicboost] draw %d: monsters %s | %s -> target %s", try,
-            table.concat(names, " "), mons(), best and ("m" .. best) or "none (run)"))
+            table.concat(names, " "), mons(), best and ("m" .. best) or "none, or no body beside it (run)"))
           if best then tgtMon = best; measured = true end
         end),
         H.cond(function() return measured end, {}, {
@@ -402,7 +411,9 @@ local steps = {
         }),
       })
     end
-    steps[#steps + 1] = H.call(function() assert(measured, "a draw with a body that carries loot and a shield") end)
+    steps[#steps + 1] = H.call(function()
+      assert(measured, "a draw with a body that carries loot and a shield, and another beside it")
+    end)
     return H.repeatN(1, steps)
   end)(),
   H.call(function()
