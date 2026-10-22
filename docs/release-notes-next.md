@@ -8,3 +8,5 @@ and its effect. Cite evidence in the commit message.
 **New weak points.** Monsters in Cyan's dream and in the Ancient Castle have their own weak points.
 
 **Three new saves.** In Cyan's dream, at Doma Castle after the dream, and at Figaro Castle after the Ancient Castle.
+
+**Mimic is always free.** Gogo's copy never costs MP, and a boost the copy can't use stays in the bank.
