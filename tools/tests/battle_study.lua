@@ -17,8 +17,10 @@
 -- in a battle that fields a Chimera, through the real menu (H.kitBattle):
 --   1. STRAGO's Scan picked at 3 BP and aimed at a party member: it reads
 --      nothing at any boost, so the boost buys nothing and is dropped
---      (Ot6QueueFold): plain Scan's price, not 99 MP; no study; the turn
---      ends unboosted (pending 0 at Ot6ActionEnd, the bank regens a pip);
+--      before any charge (Ot6QueueFold prices it as plain Scan and marks
+--      the turn, #463; Ot6ActionEnd drops it): plain Scan's price, not 99
+--      MP; no study; the turn ends unboosted (the bank regens a pip
+--      rather than paying three);
 --   2. STRAGO's Scan at 2 BP: Ot6StudyOne writes nothing; the battle is
 --      fought out;
 --   3. STRAGO's Scan at 3 BP: Ot6StudyOne's writes to $3A84 add exactly the
@@ -217,7 +219,6 @@ H.run({ maxFrames = 900000 }, {
           H.assertEq(rec.studied, 0, "Scan on a party member studied nothing")
           H.assertEq(rec.mp0 - rec.mp1, H.battleSpellPrice(seat, SCAN, 0),
             "Scan on a party member at 3 BP pays plain Scan's price (its boost buys nothing)")
-          H.assertEq(rec.pendEnd, 0, "its boost is dropped before Ot6ActionEnd (pending 0)")
           H.assertEq(rec.bank1, math.min(rec.bank0 + 1, 5),
             string.format("the turn ends unboosted and regens a pip (bank %d -> %s)", rec.bank0, tostring(rec.bank1)))
         elseif stage == 2 then

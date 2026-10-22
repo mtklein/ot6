@@ -512,4 +512,14 @@ OT6_MIMICCOPY        := $ee21
 .assert OT6_MIMICCOPY = OT6_FIZZLED + 1, error, "the Mimic copy mark must follow the X-Magic refusal mark"
 .assert OT6_MIMICCOPY <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
+; This turn's spells buy nothing with a boost (ot6_boost.asm, #463): a
+; per-character bitmask (----1234, the OT6_FIZZLED shape).  Ot6QueueFold
+; sets it when a Magic or Lore (or an X-Magic's first spell) is one the boost
+; buys nothing on (Ot6SpellNoBoost, or Scan aimed at the party) and clears it
+; when the spell, or an X-Magic's second, buys; Ot6ActionEnd drops the
+; pending boost while it is set, then clears it.  Cleared wholesale by InitBP.
+OT6_SPELLNONE        := $ee22
+.assert OT6_SPELLNONE = OT6_MIMICCOPY + 1, error, "the no-reward spell mark must follow the Mimic copy mark"
+.assert OT6_SPELLNONE <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
 .endif

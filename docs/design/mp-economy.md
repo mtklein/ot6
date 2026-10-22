@@ -366,9 +366,18 @@ and buzzes R there, as at the cap. The rows:
 A boost raised on the command window, before the row was picked, is
 dropped before anything charges it (`Ot6KeepBoost`, the drop
 `Ot6FizzleDropBoost` makes): in `Ot6Filch`/`Ot6Bestow`, in `Ot6ActionEnd`
-for an Item, and in `Ot6QueueFold` for a spell, lore or summon (not for
-X-Magic, whose pending the other spell may use). Lores and summons get the
-price and the drop but not yet the R refusal: their windows are not read.
+for an Item, in `Ot6QueueFold` for a summon, and in `Ot6ActionEnd` for a
+Magic, Lore or X-Magic turn on `Ot6QueueFold`'s verdict (`OT6_SPELLNONE`).
+That verdict waits for the turn's end because X-Magic's two spells share
+one pending boost and its first is queued as plain Magic: the boost is
+dropped only when neither spell buys anything with it. Scan aimed at the
+party is such a spell (it reads nothing). Revert (`Ot6RevertTake`) and the
+commands with neither a list nor a number to move, Row, Def., Leap, Control
+and Possess (`Ot6CmdNoBoost`, at each command's head), drop it too: a
+boosted Def. ended its turn a pip down (bank 3) where the plain one gained a
+pip (bank 5; `battle_boostkeep`'s `defend-b1`, before `Ot6CmdNoBoost`).
+Lores and summons get the price and the drop but not yet the R refusal:
+their windows are not read.
 Measured on main from fire-out-v1 snapshots (LOCKE at bank 4, TERRA at 4):
 `filch-r: R on the row left the pending at 1`, `cure-b1: the bank ended at
 3, cure-b0's at 5`, `quiet-b1: charged 38 MP, quiet-b0 15` (Shell), and
@@ -376,7 +385,7 @@ eight more; the fix passes each (`battle_boostkeep`,
 `build/attempts/wt/v036-boost/`).
 
 Where only the resolve can tell that a boost found nothing (a Steal on a
-body already robbed, Appraise with one body standing), the boost is spent:
+body already robbed, Appraise or Scan with one body standing), the boost is spent:
 the menu could not know (the owner, #463). `battle_boostkeep` asserts both
 spend. The exceptions are the two the owner keeps: an action refused for
 lack of MP never happened (#450), and a Mimic's copy is free in all

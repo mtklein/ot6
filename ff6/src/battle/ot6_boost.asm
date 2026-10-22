@@ -48,6 +48,7 @@
         sta     f:$7e0000+OT6_ULTIMAFOLD ; nor a folded-Ultima mark
         sta     f:$7e0000+OT6_FIZZLED ; nor an X-Magic refusal mark
         sta     f:$7e0000+OT6_MIMICCOPY ; nor a Mimic copy mark
+        sta     f:$7e0000+OT6_SPELLNONE ; nor a no-reward spell turn's mark
         sta     f:$7e0000+OT6_RUNICBLADE ; nor a RunicBlade nobody raised
         sta     f:$7e0000+OT6_BLADEPEND  ; nor a bounce from the last battle
         sta     f:$7e0000+OT6_UNCTL     ; nor a stale "the engine is driving
@@ -226,6 +227,22 @@
         bcc     @bought
         jsl     Ot6KeepBoost
 @bought:
+        ; #463: a Magic, Lore or X-Magic turn none of whose spells buys
+        ; anything with the boost (Ot6QueueFold's verdict: Ot6SpellNoBoost,
+        ; or Scan aimed at the party) is allowed no boost: a pending raised
+        ; before the spell was picked is dropped here, before the charge
+        ; below.  The verdict ends with the turn.
+        lda     $3018,x
+        and     f:$7e0000+OT6_SPELLNONE
+        beq     @spdone
+        lda     OT6_BOOST_REVEALED,x
+        beq     :+
+        jsl     Ot6KeepBoost
+:       lda     $3018,x
+        eor     #$ff
+        and     f:$7e0000+OT6_SPELLNONE
+        sta     f:$7e0000+OT6_SPELLNONE
+@spdone:
         lda     $3018,x         ; and a Mimic's copy mark (Ot6MimicKeep)
         eor     #$ff
         and     f:$7e0000+OT6_MIMICCOPY
@@ -994,10 +1011,40 @@ done:   pla
         cmp     #$17
         beq     @cmdok          ; $17 x-magic
         cmp     #$0c
-        bne     @keep           ; $0c lore (not $19 summon: see the header)
+        jne     @keep           ; $0c lore (not $19 summon: see the header)
 @cmdok: txa                     ; width-neutral character test
         cmp     #$08
-        bcs     @keep           ; monsters never boost
+        jcs     @keep           ; monsters never boost
+        ; #463: does this turn's boost buy anything?  A spell buys nothing
+        ; when Ot6SpellNoBoost says so, or when it is Scan aimed at no
+        ; monster (@scan).  The turn's verdict is OT6_SPELLNONE, which
+        ; Ot6ActionEnd reads once, after the turn's last spell, and drops the
+        ; pending boost on before any charge.  An X-Magic's two spells share
+        ; one pending boost, its first queued as Magic ($02) and its second
+        ; as $17: the first (or a Magic or Lore, the turn's one spell) sets
+        ; the verdict, and the second clears it if it buys, so the boost is
+        ; dropped only when neither spell buys.
+        lda     $3a7b
+        cmp     #OT6_ANALYZE_SPELL
+        bne     :+
+        lda     $b9             ; Scan: aimed at a monster, it reads
+        beq     @spnone         ;   (Ot6Analyze); at the party, nothing
+        bra     @spbuy
+:       jsl     Ot6SpellNoBoost
+        bcs     @spnone
+@spbuy: lda     $3018,x
+        eor     #$ff
+        and     f:$7e0000+OT6_SPELLNONE
+        sta     f:$7e0000+OT6_SPELLNONE
+        bra     @spmark
+@spnone:
+        lda     $3a7a
+        cmp     #$17            ; X-Magic's second: the first's verdict
+        beq     @spmark         ;   stands
+        lda     $3018,x
+        ora     f:$7e0000+OT6_SPELLNONE
+        sta     f:$7e0000+OT6_SPELLNONE
+@spmark:
         lda     $3a7b
         cmp     #OT6_ANALYZE_SPELL
         bne     @fold
@@ -1040,18 +1087,10 @@ done:   pla
         bra     @keep           ;   overwrites the base cost :13249 just banked
 @escalate:
         ; #463: a spell or lore the boost buys nothing on (Ot6SpellNoBoost)
-        ; is allowed no boost: a pending raised on the command window before
-        ; the list opened is dropped here, before any charge, and the cast is
-        ; priced as itself (Ot6MagicPrice, below, now that the pending is 0).
-        ; Not on X-Magic ($17): the pending is the turn's, and the other
-        ; spell may buy with it.
-        lda     $3a7b
-        jsl     Ot6SpellNoBoost
-        bcc     @mult
-        lda     $3a7a
-        cmp     #$17
-        beq     @mult
-        jsl     Ot6KeepBoost
+        ; is allowed no boost, so its price does not escalate: Ot6MagicPrice,
+        ; below, prices it as itself.  A pending raised on the command window
+        ; before the list opened is dropped at the turn's end (OT6_SPELLNONE,
+        ; marked at @cmdok).
 @mult:
         ; not a tier family: boost buys this cast Ot6BoostDmg's x2/x4/x8, so
         ; the price escalates with it (#219).  Re-derived here, on the same A
@@ -1071,19 +1110,13 @@ done:   pla
         plp
         rtl
 @scan:  ; Scan aimed at no monster reads nothing (Ot6Analyze), at any boost,
-        ; so its boost buys nothing (guidelines "boost pays once"): the
-        ; pending boost is dropped, as Ot6RevertTake drops Revert's, so the
-        ; turn ends unboosted, regen pip included; and the cast is priced as
-        ; plain Scan, not the boosted price (or the study's 99) the list's
-        ; cost byte held at the confirm.  Refunding is simpler than refusing
-        ; the party side at target select.
+        ; so its boost buys nothing (guidelines "boost pays once"): @cmdok
+        ; marked the turn (OT6_SPELLNONE), so Ot6ActionEnd drops the pending
+        ; boost before any charge unless an X-Magic's other spell buys with
+        ; it; and the cast is priced as plain Scan, not the boosted price (or
+        ; the study's 99) the list's cost byte held at the confirm.
         lda     OT6_BOOST_REVEALED,x
         beq     @keep           ; unboosted: plain Scan already
-        lda     #$00
-        sta     OT6_BOOST_REVEALED,x
-        lda     $3204,x
-        ora     #$80            ; vanilla's "recheck enabled magic" request
-        sta     $3204,x
         lda     $02,s           ; a mimic's copy keeps GetMPCost's 0 (#260)
         and     #$40
         bne     @keep
@@ -1159,11 +1192,19 @@ done:   pla
 ;     the command window before the row was picked (#463; Ot6Boost refuses R
 ;     on such a row, Ot6RowNoBoost): Ot6Filch, Ot6Bestow (whose transfer
 ;     charges its one pip), an Item that moves no number (Ot6ActionEnd,
-;     Ot6ItemNoBoost), a spell, lore or summon that moves none (Ot6QueueFold,
-;     Ot6SpellNoBoost).
+;     Ot6ItemNoBoost), a Magic, Lore or X-Magic turn none of whose spells
+;     moves one, Scan aimed at the party included (Ot6ActionEnd, on
+;     Ot6QueueFold's OT6_SPELLNONE verdict), a summon that moves none
+;     (Ot6QueueFold; both Ot6SpellNoBoost), Revert (Ot6RevertTake), and
+;     Row, Def., Leap, Control and Possess (Ot6CmdNoBoost);
+;   * an action that never ran (#346, Ot6ActionEnd's NOACTION arm) or never
+;     began: a stumbled dance (Ot6DanceStumble), a Rage start the pool cannot
+;     pay (Ot6RageStartGate), a Jackpot or Master's Mark whose boost was taken
+;     back under three after the pick (Ot6JackpotDice, Ot6MastersMark), an
+;     engine-picked Morph (Ot6MorphTake).  Those write the byte themselves.
 ; An action whose boost turns out useless only when it resolves (a Steal on a
-; body already robbed, Appraise with one body standing) spends it: the menu
-; could not know (the owner, #463).
+; body already robbed, Appraise or Scan with one body standing) spends it:
+; the menu could not know (the owner, #463).
 ;
 ; a8, either index width; x = the character's entity offset; db=$7e.
 ; Preserves x and y; clobbers a.
@@ -1175,6 +1216,32 @@ done:   pla
         ora     #$80            ; the "recheck enabled magic" request
         sta     $3204,x
         rtl
+.endproc
+
+; [ a command with no boost reward: the boost raised for it is dropped ]
+;
+; #463.  jsl from the heads of Cmd_0e (Control), Cmd_11 (Leap), Cmd_14 (Row),
+; Cmd_15 (Def.) and Cmd_1c (Possess).  None of them moves a number or reads a
+; boost (none is in Ot6BoostDmg's reach: no damage), so a boost raised on the
+; command window before one was picked buys nothing and is dropped before
+; Ot6ActionEnd charges it (Ot6KeepBoost), as Ot6RevertTake drops Revert's.
+; The command window cannot refuse R for them: R there raises a boost for
+; whatever is picked next.
+;
+; a8, either index width (the command handlers run i8); y = the actor's
+; entity offset, db=$7e.  Preserves x and y; clobbers a.
+.proc Ot6CmdNoBoost
+        .a8
+        tya                     ; width-neutral character test
+        cmp     #$08
+        bcs     @out            ; a monster has no bank
+        lda     OT6_BOOST_REVEALED,y
+        beq     @out            ; nothing raised: nothing to drop
+        phx
+        tyx
+        jsl     Ot6KeepBoost
+        plx
+@out:   rtl
 .endproc
 
 ; [ can a boost buy anything on this spell?  (#463) ]
@@ -1393,7 +1460,9 @@ done:   pla
 ;     $0f is in the gate.  Setzer's kit rows (Coin Toss, Hired Help,
 ;     Jackpot) read the copier's boost when they run, and keep it.
 ;   * Magic, Lore and Summon ($02, $0c, $19) of a spell with no boost
-;     reward (Ot6SpellNoBoost, #463).
+;     reward (Ot6SpellNoBoost, #463); a copied X-Magic (its first spell
+;     here as Magic, its second in $3f24 as $17, queued next) only when
+;     neither of its spells has one.
 ; A copied Filch or Bestow keeps it in Ot6Filch / Ot6Bestow, a copied Item
 ; that moves no number in Ot6ActionEnd: the places a direct one does.
 ; A copied Steal buys the roll's ladder (Ot6StealBoostLevel) when the body
@@ -1437,7 +1506,16 @@ done:   pla
         bra     @drop           ;   above Jackpot: a reel result
 @spell: lda     $3421,y         ; the copied spell, lore or esper record
         jsl     Ot6SpellNoBoost
-        bcc     @out
+        bcc     @out            ; it buys
+        lda     $3420,y
+        cmp     #$02
+        bne     @drop
+        lda     $3f24           ; a copied X-Magic: its second spell, which
+        cmp     #$17            ;   mimicreplace queues next, shares the
+        bne     @drop           ;   boost
+        lda     $3f25
+        jsl     Ot6SpellNoBoost
+        bcc     @out            ; the second buys with it
 @drop:  jsl     Ot6KeepBoost
 @out:   plp
         rtl

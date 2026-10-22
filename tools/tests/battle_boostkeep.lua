@@ -14,7 +14,8 @@
 -- before anything charges it (Ot6KeepBoost).  The rows: Filch and Bestow
 -- (Bestow's transfer is its one pip at every boost), an item that moves no
 -- number (a status cure, a Fenix Down: Ot6ItemNoBoost), a spell that moves
--- none (TERRA's, chosen off the ROM: Ot6SpellNoBoost).  So:
+-- none (TERRA's, chosen off the ROM: Ot6SpellNoBoost); and Def., a command
+-- with no list (Ot6CmdNoBoost: Row, Def., Leap, Control, Possess).  So:
 --   * <row>-r: R pressed with the cursor on the row leaves the pending at 0
 --     (refused) on those rows, at 1 on the controls (Tonic, a multiplied
 --     spell);
@@ -196,6 +197,22 @@ local function onRow(c, s)
 end
 local function actorPress(c, st)
   local s = actS
+  if c.cmd == "defend" then
+    -- Def. is the cell right of the command window; it has no list and no
+    -- target, so its confirm is the commit
+    if st == ST_CMD then
+      if pend(s) < c.boost then return "r" end
+      if pend(s) > c.boost then return "l" end
+      c.mp0, c.bank0, c.pendAtCmd = mp(s), bank(s), pend(s)
+      return "right"
+    end
+    if st == ST_DEF then
+      c.sent, c.pendAtConfirm = true, pend(s)
+      ev(c, "the measured actor's Def. confirmed: " .. chars() .. " | " .. mons())
+      return "a"
+    end
+    return "b"
+  end
   if st == ST_CMD then
     if pend(s) < c.boost then return "r" end
     if pend(s) > c.boost then return "l" end
@@ -564,6 +581,8 @@ local CASES = {
     moreMp = "loud-b0" },
   { name = "loud-r",       snap = "T", who = "T", cmd = CMD_MAGIC, spell = "loud", boost = 0, rowR = 1,
     spend = true },
+  { name = "defend-b0",    snap = "L", cmd = "defend", boost = 0 },
+  { name = "defend-b1",    snap = "L", cmd = "defend", boost = 1, keep = "defend-b0" },
   { name = "steal-b0",     snap = "R", cmd = CMD_STEAL, rowName = "steal",    boost = 0 },
   { name = "steal-b1",     snap = "R", cmd = CMD_STEAL, rowName = "steal",    boost = 1, spend = true },
   { name = "appraise1-b0", snap = "A", cmd = CMD_STEAL, rowName = "appraise", boost = 0 },
@@ -632,7 +651,8 @@ steps[#steps + 1] = H.call(function()
   end
   assert(#bad == 0, #bad .. " boost-keep assertion(s) failed: " .. table.concat(bad, "; "))
   H.log("[boostkeep] VERDICT: R refused on every row the boost buys nothing on, and a boost raised before such "
-    .. "a row never charged; Tonic's, the multiplied spell's, Appraise's and a Steal's on a robbed body spent")
+    .. "a row (or Def.) never charged; Tonic's, the multiplied spell's, Appraise's and a Steal's on a robbed body "
+    .. "spent")
 end)
 
 H.run({ maxFrames = 600000 }, steps)
