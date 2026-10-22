@@ -896,8 +896,12 @@ an action already queued names its targets (`M.queuedOn`: the entity's
 pending action at `$32CC`/`$32CD`, its targets at `$3520`), and any other
 takes the enemy's measured share of its landed actions on that member
 (`M.aimShare`, one in the living before three have landed). The round
-itself stays priced as before. When the expected take reaches the target's
-HP, the heal is not taken: the care lines go to the next heal or patient,
+itself stays priced as before. When the expected take reaches a quarter
+over the target's HP (`M.HEAL_ARRIVAL_MARGIN`; at the HP itself it is a coin
+toss the heal wins half the time, and on Wrexsoul a Cure refused on "take
+213 typical" against TERRA's 213 cost her life to the party's own swing at
+the soul in her: `build/attempts/wt/v036-driver/lab/sdo_new_k4_s7` against
+`sdo_old_k4_s7`), the heal is not taken: the care lines go to the next heal or patient,
 the spend rule stops counting it as saving, and a heal that lands first and
 lifts the member clear of its round goes instead, one the turn-for-turn rule
 refused included (`M.inTimeLift`). Tzen's own Cure still goes (s2's typical
@@ -912,13 +916,22 @@ main cures STRAGO at 1321/3219 under the dragon's queued 1898 and "the
 target fell first"; the branch says "the enemy actions due inside its 240
 ticks (s0 eta 0 2x1898 (queued on it)) take 2373 typical ... -- the target
 falls first (#459)" and casts instead
-(`build/attempts/wt/v036-driver/lab/tw_old_k0_s0`, `tw_new_k0_s0`, both
-PASS). A restore of the fight's state at that HP
+(`build/attempts/wt/v036-driver/lab/tw_old_k0_s0`, `tw2f_new_k0_s0` at
+f7dc2aae, both PASS: the leg in 385,359 frames with 7 deaths on main and
+424,350 with 6 on the branch, the dragon won after 16,276 ticks and 18,932). A restore of the fight's state at that HP
 (`snaphp_old_tw2`, `fst_old`, `fst_new`) does not show it: the restored
 driver has no hit ledger yet, so neither arm prices the arrival ("a round
 costs 0") and both cure. `heal_arrival_selftest` puts #436's v0.30
 X-Potion (from row 32, "walking fast") through `makePlanRules`: main drinks
 it, the branch casts the Cure that lands first.
+
+Sweeps (K 0-5 at shifts 0 and 7, main against the branch, from the
+tracked boots; `build/attempts/wt/v036-driver/`): Tzen's door leg 12 of 12
+on each, the same 126 distinct battle keys won and the same frames (the
+rule never fired there: `tzen_old/`, `tzen_new/` at 32d84233); Doma's leg
+with its rings 12 of 12 on each, Wrexsoul's 12 keys won on each, 16
+deaths on main and 15 at f7dc2aae, "the target fell first" 4 times on
+each (`sdo_old_*`, `sdo2_new_*`).
 
 Before an enemy action is attributed in the battle nothing is priced (the
 round then reads the measured loss), and a queued action whose target the
