@@ -107,8 +107,15 @@ do
   local a = H.healArrival({ hp = 82, arrive = 240, enemies = tzen })
   check(a.n == 1 and a.cost == 64 and a.worst == 123 and not a.beaten,
     "Tzen: one action ahead of the Cure, 64 typical under 82 HP, not beaten; got " .. a.why)
-  check(H.healArrival({ hp = 64, arrive = 240, enemies = tzen }).beaten, "at 64 HP the typical hit ahead takes it all")
-  check(not H.healArrival({ hp = 65, arrive = 240, enemies = tzen }).beaten, "at 65 HP it does not")
+  -- beaten from a quarter over the HP (M.HEAL_ARRIVAL_MARGIN): 64 >= 51 x 1.25
+  check(H.healArrival({ hp = 51, arrive = 240, enemies = tzen }).beaten, "at 51 HP the typical 64 ahead is beaten")
+  check(not H.healArrival({ hp = 52, arrive = 240, enemies = tzen }).beaten, "at 52 HP (65 needed) it is not")
+  check(not H.healArrival({ hp = 64, arrive = 240, enemies = tzen }).beaten, "at 64 HP, a coin toss: the heal goes")
+  -- Wrexsoul (sdo_new_k4_s7): 101 queued-or-due plus a third of 337 is 213 on TERRA's 213
+  local wrex = H.healArrival({ hp = 213, arrive = 200, enemies = {
+    { slot = 3, eta = 0, period = 389, worst = 101, typical = 101 },
+    { slot = 4, eta = 0, period = 389, worst = 337, typical = 337, share = 1 / 3 } } })
+  check(wrex.cost == 213 and not wrex.beaten, "Wrexsoul's 213 on 213: not beaten; got " .. wrex.why)
   check(H.healArrival({ hp = 82, arrive = 117, enemies = tzen }).n == 0, "an action due after the heal is not ahead")
   check(H.healArrival({ hp = 82, arrive = 118, enemies = tzen }).n == 1, "one due on the heal's tick is")
   check(H.healArrival({ hp = 82, arrive = 400, enemies = tzen }).n == 3, "s2 twice inside 400 ticks (118, 390), s0 once")
@@ -136,17 +143,17 @@ do
     { slot = 1, eta = 33, period = 182, worst = 214, typical = 214, share = 0.25 },
     { slot = 3, eta = 0, period = 182, worst = 414, typical = 414, share = 0.25, queuedOn = false } } })
   check(not yard.beaten and yard.cost == 344, "the courtyard's member is not beaten; got " .. yard.why)
-  check(H.healArrival({ hp = 2258, arrive = 240, enemies = {
+  check(H.healArrival({ hp = 1856, arrive = 240, enemies = {
     { slot = 0, eta = 0, period = 182, worst = 532, typical = 532 },
     { slot = 1, eta = 33, period = 182, worst = 214, typical = 214 },
     { slot = 3, eta = 0, period = 182, worst = 414, typical = 414 } } }).beaten,
-    "with every action on her (the share unset), she would be")
+    "every action on her (the share unset) at 1856 HP: 2320 is a quarter over, beaten")
   -- Wrexsoul (build/attempts/wt/v036-route/lab/sdo8_k1_s7): entity 3 at 200,
   -- both gauges full (207 and 194)
   check(H.healArrival({ hp = 200, arrive = 240, enemies = { { slot = 3, eta = 0, period = 389, worst = 207 },
     { slot = 4, eta = 0, period = 389, worst = 194 } } }).beaten, "Wrexsoul's two queued hits beat the self-cure")
   -- an unmeasured enemy at its ROM price, else the battle's worst
-  check(H.healArrival({ hp = 300, arrive = 100, enemies = { { slot = 0, eta = 0, rom = 300 } } }).beaten,
+  check(H.healArrival({ hp = 240, arrive = 100, enemies = { { slot = 0, eta = 0, rom = 300 } } }).beaten,
     "a ROM-priced action ahead counts")
   check(H.healArrival({ hp = 300, arrive = 100, enemies = { { slot = 0, eta = 0 } }, fallback = 299 }).cost == 299,
     "nothing priced: the battle's worst")

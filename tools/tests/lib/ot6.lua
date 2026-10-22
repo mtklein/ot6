@@ -1603,10 +1603,16 @@ M.HEAL_ARRIVAL_OFF = false
 --            queuedOn; fallback likewise
 -- Returns { n, cost, worst, beaten, why }: n the actions due (expected on
 -- this target), cost their typical take, worst their worst take; beaten
--- when the expected take is the target's HP or more.  The typical price,
--- not the worst: a heal that lands unless the hit ahead is the enemy's
--- worst is still the best turn (the Tzen cure itself: s2's typical 64
--- under 82 HP; its worst 123 killed her).
+-- when the expected take is M.HEAL_ARRIVAL_MARGIN times the target's HP or
+-- more.  The typical price, not the worst: a heal that lands unless the hit
+-- ahead is the enemy's worst is still the best turn (the Tzen cure itself:
+-- s2's typical 64 under 82 HP; its worst 123 killed her).  The margin, for
+-- an expectation that only meets the HP is a coin toss the heal wins half
+-- the time: on Wrexsoul (build/attempts/wt/v036-driver/lab/sdo_new_k4_s7,
+-- key beA4-g01CE) TERRA at 213 was refused a Cure on "take 213 typical",
+-- spent instead, and fell to the party's own swing at the soul hiding in
+-- her, where main's Cure had kept her up (sdo_old_k4_s7).
+M.HEAL_ARRIVAL_MARGIN = 1.25
 function M.healArrival(o)
   local hp, arrive = o.hp or 0, o.arrive or 0
   local n, cost, worst, parts = 0, 0, 0, {}
@@ -1632,7 +1638,7 @@ function M.healArrival(o)
     end
   end
   cost, worst = math.floor(cost + 0.5), math.floor(worst + 0.5)
-  local beaten = n > 0 and hp <= cost
+  local beaten = n > 0 and cost >= hp * M.HEAL_ARRIVAL_MARGIN
   return { n = n, cost = cost, worst = worst, beaten = beaten,
     why = string.format("the enemy actions due inside its %d ticks (%s) take %d typical, %d at worst, "
       .. "against %d HP", arrive, #parts > 0 and table.concat(parts, ", ") or "none", cost, worst, hp) }
