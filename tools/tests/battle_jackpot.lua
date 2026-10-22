@@ -205,8 +205,8 @@ end
 -- party lives through to the plan's end.  The grave moves with the route's
 -- play, and a key whose Dullahan wipes the party before the plan is done
 -- has nothing to hold: at 96e745f0's grave (SABIN a level lower than
--- main's) pass 1's own key, beE8-g01C7, wiped the four before the first
--- Jackpot ('party 06:0/1798 ... Death', the canary's game over at f9551:
+-- main's) pass 1's own key, beE8-g01C7, wiped the four between its two
+-- Jackpots ('party 06:0/1798 ... Death', the canary's game over at f9551:
 -- build/attempts/wt/v036-driver/qual-96e745f0.log, and the same on main's
 -- lib from that grave, lab/jp_old_branchgrave).  The lib's wipe predicate
 -- held 90 frames (the search's, below) ends a try short of the canary's
@@ -214,10 +214,17 @@ end
 -- first (its $be steps $10 every four frames), up to 16 keys, each lost one
 -- said.  build(wait) returns the try's step; wait nil is the grave's own
 -- frame, as before.
--- A try is lost only while no Jackpot has executed in it (Ot6SetzerExec
--- with Jackpot's row in $b6, the search's lost-candidate rule below): a
--- wipe after one executed is the property's to answer, not a key to skip,
--- and fails the pass by name.  The held line says how many tries were lost.
+-- A try is lost when no Jackpot has executed in it (Ot6SetzerExec with
+-- Jackpot's row in $b6, the search's lost-candidate rule below), or when
+-- every Jackpot that executed resolved (its record is in H.vars.setzer)
+-- and the party stood KEYED_STOOD frames past the last one: Dullahan's
+-- wipe, not the throw's.  At the branch's grave pass 1's first key threw
+-- at f2361 and Dullahan wiped the four at f9342, during the three Defends
+-- before the second throw (lab/jp3_branchgrave).  Any other wipe after a
+-- throw fails the pass by name: the control that writes the party's HP to
+-- 0 at Jackpot's exec wipes at f2451 (lab/jp3_mut_branchgrave).  The held
+-- line says how many tries were lost.
+local KEYED_STOOD = 600
 local keyedExec = { hooked = false, f = nil }
 local function keyed(n, build)
   local i, cur, wipedN, lost = 0, nil, 0, 0
@@ -227,29 +234,40 @@ local function keyed(n, build)
         keyedExec.hooked = true
         local a = H.sym("Ot6SetzerExec")
         emu.addMemoryCallback(function()
-          if H.readByte(0xB6) == JACKPOT then keyedExec.f = keyedExec.f or H.frame end
+          if H.readByte(0xB6) == JACKPOT then
+            keyedExec.f, keyedExec.last, keyedExec.n = keyedExec.f or H.frame, H.frame, (keyedExec.n or 0) + 1
+          end
         end, emu.callbackType.exec, a, a)
       end
       if cur == nil then
         i = i + 1
         H.assertEq(i <= 16, true, string.format("pass %d: a battle key the party lives through, within 16 (%d "
           .. "lost to a wipe)", n, lost))
-        cur, wipedN, keyedExec.f = build(i > 1 and 4 * (i - 1) or nil), 0, nil
+        cur, wipedN = build(i > 1 and 4 * (i - 1) or nil), 0
+        keyedExec.f, keyedExec.last, keyedExec.n, keyedExec.wipeF = nil, nil, 0, nil
       end
       wipedN = H.battleLoadStarted() and H.partyWipedInBattle() and wipedN + 1 or 0
+      if wipedN == 1 then keyedExec.wipeF = H.frame end
       if wipedN >= 90 then
-        H.assertEq(keyedExec.f == nil, true, string.format("pass %d: try %d's party wiped (f%d) after a Jackpot "
-          .. "executed (f%s): not a lost key", n, i, H.frame, tostring(keyedExec.f)))
+        local why = "before any Jackpot executed"
+        if keyedExec.f ~= nil then
+          local resolved = #(H.vars.setzer or {})
+          H.assertEq(resolved >= keyedExec.n and keyedExec.wipeF - keyedExec.last >= KEYED_STOOD, true,
+            string.format("pass %d: try %d's party wiped (f%d) after a Jackpot executed (f%d, %d executed, %d "
+              .. "resolved): not a lost key", n, i, keyedExec.wipeF, keyedExec.last, keyedExec.n, resolved))
+          why = string.format("%d frames after its last Jackpot (f%d) resolved", keyedExec.wipeF - keyedExec.last,
+            keyedExec.last)
+        end
         lost = lost + 1
-        H.log(string.format("[jackpot] pass %d: try %d (the grave's frame + %d) lost: the party wiped before any "
-          .. "Jackpot executed (the lib's wipe predicate, 90 frames, at f%d); the next key", n, i, 4 * (i - 1), H.frame))
+        H.log(string.format("[jackpot] pass %d: try %d (the grave's frame + %d) lost: the party wiped %s (the "
+          .. "lib's wipe predicate, 90 frames, from f%d); the next key", n, i, 4 * (i - 1), why, keyedExec.wipeF))
         H.setPad({})
         cur = nil
         return "frame"
       end
       local r = cur:tick()
       if r ~= "frame" then
-        H.log(string.format("[jackpot] pass %d held at try %d: %d tr%s lost to a wipe before any Jackpot executed",
+        H.log(string.format("[jackpot] pass %d held at try %d: %d tr%s lost to a wipe (Dullahan's, not a throw's)",
           n, i, lost, lost == 1 and "y" or "ies"))
       end
       return r
