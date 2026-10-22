@@ -401,6 +401,12 @@ H.run({ maxFrames = 60000 }, {
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() and H.tileAligned() end,
     900, "a genuinely controllable frame to generate on"),
+  -- the care before the fixture (audit_party_hp: "DEAD camp_cleared: SABIN
+  -- L14 0/363 hp" on the boost branch's chain, the scene having cut the
+  -- party down to him): revive and top him up before he walks on alone
+  H.fieldCare({ tag = "care at Doma's gate", threshold = H.CARE_BEFORE_FIGHTS }),
+  H.waitUntil(function() return H.hasControl() and H.tileAligned() end,
+    900, "a controllable frame after the care"),
   H.call(function()
     H.assertEq(map(), 119, "map 119 -- DOMA CASTLE, the gate")
     H.assertEq(H.hasControl(), true, "controllable")

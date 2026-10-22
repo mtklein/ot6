@@ -494,6 +494,11 @@ H.run({ maxFrames = 90000 }, {
   worldLeg(179, 71, 117, "to the Imperial Camp gate", 30000),
   rideUntil(landedField(117, 10), "inside the Imperial Camp (map 117)", 20000),
   H.waitFrames(30),
+  -- the care before the fixture (audit_party_hp): the walk here can arrive
+  -- with SABIN poisoned (the boost branch's chain at 17941799: "POISONED
+  -- sabin_camp: SABIN L14 264/363 hp ... status1 04"), and poison drains
+  -- every step the next leg walks
+  H.fieldCare({ tag = "care at the camp gate", threshold = H.CARE_BEFORE_FIGHTS }),
   H.call(function()
     H.assertEq(map(), 117, "map 117 -- the IMPERIAL CAMP")
     H.assertEq(H.hasControl(), true, "controllable")
