@@ -142,10 +142,11 @@ local function installObservers()
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
     if not fx or fx.endF then return end
-    if cx() == terraS * 2 and fx.sent[terraS] and not fx.terraEndF then
+    local life, item = fx.steps[1], fx.steps[2]
+    if cx() == life.a * 2 and life.sent and not fx.terraEndF then
       fx.terraEndF = H.frame
-      fx.stragoStatus = H.readByte(STATUS4 + stragoS * 2)
-    elseif cx() == stragoS * 2 and fx.sent[stragoS] then
+      fx.userStatus = H.readByte(STATUS4 + fx.user * 2)
+    elseif cx() == item.a * 2 and item.sent then
       fx.endF = H.frame
       fx.hpEnd, fx.hpMax = H.readWord(0x3BF4 + lockeS * 2), H.readWord(0x3C1C + lockeS * 2)
       fx.koEnd = (H.readByte(STATUS1 + lockeS * 2) & KO) ~= 0
@@ -273,6 +274,25 @@ end
 -- passes (X).  Every press goes through the real menus and target cursor.
 local STRAGO, FIRE, CMD_FIGHT = 7, 0x00, 0x00
 local function ko(s) return (H.readByte(STATUS1 + s * 2) & KO) ~= 0 end
+-- why seat s cannot be the Life 3 target and then take a command, or nil:
+-- removed from the battle (status4 $20, $3A39), down (no HP, Death /
+-- Petrify / Zombie), not taking commands (Berserk, Muddle, Sleep, Stop,
+-- Frozen), or Reflect (the Life would bounce off)
+local function commandable(s)
+  local st1, st2 = H.readByte(STATUS1 + s * 2), H.readByte(STATUS1 + 1 + s * 2)
+  local st3, st4 = H.readByte(0x3EF8 + s * 2), H.readByte(STATUS4 + s * 2)
+  if (st4 & 0x20) ~= 0 or (H.readByte(0x3A39) & (1 << s)) ~= 0 then
+    return string.format("removed from the battle (status4 $%02X, $3A39 $%02X)", st4, H.readByte(0x3A39))
+  end
+  if H.readWord(0x3BF4 + s * 2) == 0 or (st1 & 0xC2) ~= 0 then
+    return string.format("down (HP %d, status1 $%02X)", H.readWord(0x3BF4 + s * 2), st1)
+  end
+  if (st2 & 0xB0) ~= 0 or (st3 & 0x10) ~= 0 or (st4 & 0x02) ~= 0 then
+    return string.format("not taking commands (status $%02X $%02X $%02X)", st2, st3, st4)
+  end
+  if (st3 & 0x80) ~= 0 then return "Reflect" end
+  return nil
+end
 local function lockeFull()
   return H.readWord(0x3BF4 + lockeS * 2) >= H.readWord(0x3C1C + lockeS * 2)
 end
@@ -471,6 +491,15 @@ local function knockout()
             .. "status1 $%02X status4 $%02X", H.frame, bank(terraS), mp(terraS),
             H.readWord(0x3BF4 + lockeS * 2), H.readWord(0x3C1C + lockeS * 2),
             H.readByte(STATUS1 + lockeS * 2), H.readByte(STATUS4 + lockeS * 2)))
+          local seats = {}
+          for q = 0, 3 do
+            seats[#seats + 1] = string.format("s%d id%02X hp%d st %02X %02X %02X %02X", q,
+              H.readByte(0x3ED8 + q * 2), H.readWord(0x3BF4 + q * 2), H.readByte(0x3EE4 + q * 2),
+              H.readByte(0x3EE5 + q * 2), H.readByte(0x3EF8 + q * 2), H.readByte(0x3EF9 + q * 2))
+          end
+          H.log(string.format("[lifefold] K seats: %s; $3A74=%02X $3A39=%02X $3A40=%02X $3A8A=%02X $3A76=%d",
+            table.concat(seats, " | "), H.readByte(0x3A74), H.readByte(0x3A39), H.readByte(0x3A40),
+            H.readByte(0x3A8A), H.readByte(0x3A76)))
           return
         end
         pulse(nil)
@@ -532,7 +561,14 @@ for _, c in ipairs(CASES) do
 end
 
 -- ko-fenix: from K, TERRA casts Life at two points (Life 3) on STRAGO,
--- standing, and then STRAGO uses a Fenix Down on the KO'd LOCKE.  The
+-- standing, and then STRAGO uses a Fenix Down on the KO'd LOCKE.  When
+-- STRAGO cannot take that part at K -- the draw's monsters removed him
+-- (v036-fragile K2 fireoutfar s7 k1: STRAGO's status4 $20 and $3A39 bit
+-- 2 at K, a Snort-style removal, so the target cursor never lit him), or
+-- he is down or not taking commands -- TERRA takes both: Life 3 on
+-- herself, then the Fenix Down on her next window.  The property is the
+-- same either way: an item action right after a Life 3, by a body that
+-- carries Life 3, revives as a Fenix Down does.  The
 -- Fenix Down must revive him as a Fenix Down does (a fraction of his HP, no
 -- Life 3 status): the Life 3 hooks key on the executing action -- a
 -- character, command Magic or X-Magic, attack Life 3 -- and an item action
@@ -553,10 +589,14 @@ local function fenixPulse(f)
   if st ~= ST_TGT then tapNo = -1 end
   if st ~= ST_MAGIC then inMagic = 0 end
   if st ~= ST_ITEM then inItem = 0 end
-  local p = f.plans[a]
+  -- this actor's part: the first of the case's steps it has not confirmed
+  local p = nil
+  for _, q in ipairs(f.steps) do
+    if p == nil and q.a == a and not q.sent then p = q end
+  end
   local btn
   if st == ST_TRANS then btn = nil
-  elseif p == nil or f.sent[a] then btn = defend(st, edge)
+  elseif p == nil then btn = defend(st, edge)
   elseif st == ST_CMD then
     local boost = p.boost or 0
     if pend(a) < boost then btn = "r" elseif pend(a) > boost then btn = "l"
@@ -590,7 +630,7 @@ local function fenixPulse(f)
     btn = tc.steer(p.target, mf)
     if btn == "a" then
       if edge then
-        f.sent[a] = true
+        p.sent = true
         H.log(string.format("[lifefold] ko-fenix f%d: slot %d confirms command $%02X on slot %d",
           H.frame, a, p.cmd, p.target))
       else btn = nil end
@@ -610,13 +650,24 @@ do
     H.checkReq(req, "snapshot load")
     H.rearmInputInjection()
     mf, tapNo, tapAt, inMagic, inItem = 0, -1, 0, 0, 0
-    f.casts, f.sent, f.plans = {}, {}, {}
-    f.plans[terraS] = { cmd = CMD_MAGIC, boost = 2, target = stragoS }
-    f.plans[stragoS] = { cmd = CMD_ITEM, target = lockeS }
+    f.casts = {}
+    local why = commandable(stragoS)
+    if rawget(_G, "LIFEFOLD_SELF") then why = why or "a lab's LIFEFOLD_SELF" end
+    f.user = why and terraS or stragoS
+    f.userName = why and "TERRA" or "STRAGO"
+    H.log(string.format("[lifefold] ko-fenix: Life 3 and the Fenix Down by %s%s", f.userName,
+      why and (" (STRAGO cannot: " .. why .. ")") or ""))
+    f.steps = {
+      { a = terraS, cmd = CMD_MAGIC, boost = 2, target = f.user },
+      { a = f.user, cmd = CMD_ITEM, target = lockeS },
+    }
+    H.assertEq(commandable(f.user) == nil, true, string.format(
+      "%s can take the Life 3 and the Fenix Down (%s)", f.userName, tostring(commandable(f.user))))
+    H.assertEq(cmdRow(f.user, CMD_ITEM) ~= nil, true, f.userName .. "'s command list has Item")
     H.assertEq(ko(lockeS), true, "LOCKE is KO'd")
     H.assertEq(fenixIdx() ~= nil, true, "the bag holds a Fenix Down")
-    H.assertEq((H.readByte(STATUS4 + stragoS * 2) & LIFE3_STATUS) == 0, true,
-      "STRAGO does not already carry Life 3")
+    H.assertEq((H.readByte(STATUS4 + f.user * 2) & LIFE3_STATUS) == 0, true,
+      f.userName .. " does not already carry Life 3")
     fx = f
   end)
   steps[#steps + 1] = H.driveUntil(function() return f.endF ~= nil and H.frame >= f.endF + 60 end,
@@ -626,9 +677,9 @@ do
     H.setPad({})
     local cs = {}
     for _, v in ipairs(f.casts) do cs[#cs + 1] = string.format("$%02X", v) end
-    H.log(string.format("[lifefold] ko-fenix: TERRA's action ended f%s (STRAGO status4 $%02X), "
-      .. "STRAGO's f%d; $3410 writes %s; LOCKE at STRAGO's action end: HP %d/%d, %s, status4 "
-      .. "$%02X", tostring(f.terraEndF), f.stragoStatus or 0, f.endF, table.concat(cs, " "),
+    H.log(string.format("[lifefold] ko-fenix: TERRA's Life action ended f%s (%s status4 $%02X), "
+      .. "the Fenix Down's f%d; $3410 writes %s; LOCKE at its end: HP %d/%d, %s, status4 "
+      .. "$%02X", tostring(f.terraEndF), f.userName, f.userStatus or 0, f.endF, table.concat(cs, " "),
       f.hpEnd, f.hpMax, f.koEnd and "KO'd" or "standing", f.statusEnd))
     H.screenshot("lifefold_ko-fenix_after")
     CASES.fenix = f
@@ -643,8 +694,8 @@ steps[#steps + 1] = H.call(function()
   local l3 = false
   for _, v in ipairs(f.casts) do if v == LIFE3 then l3 = true end end
   check(l3 and f.terraEndF ~= nil and f.terraEndF < f.endF and
-    ((f.stragoStatus or 0) & LIFE3_STATUS) ~= 0, "ko-fenix: TERRA's Life 3 landed on STRAGO "
-    .. "before STRAGO's Fenix Down (the precondition)")
+    ((f.userStatus or 0) & LIFE3_STATUS) ~= 0, "ko-fenix: TERRA's Life 3 landed on " .. f.userName
+    .. " before " .. f.userName .. "'s Fenix Down (the precondition)")
   check(not f.koEnd and f.hpEnd < f.hpMax and (f.statusEnd & LIFE3_STATUS) == 0, string.format(
     "ko-fenix: the Fenix Down revived LOCKE as a Fenix Down does (%d/%d, %s, status4 $%02X), "
     .. "not as Life 3", f.hpEnd, f.hpMax, f.koEnd and "KO'd" or "standing", f.statusEnd))

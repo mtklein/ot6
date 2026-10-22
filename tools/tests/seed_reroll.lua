@@ -24,6 +24,13 @@
 -- reproducing attempt 1's battle (a changed fixture or walk), the
 -- rerollCount assert says so rather than passing vacuously: re-measure
 -- with the probe line above and pick a shift from its duplicates.
+--
+-- Shift 0 only, by design: the ladder above is the runner's own (attempt 2
+-- at shift 26), so a run started at another OT6_SEED_SHIFT rebases it and
+-- the duplicate is not there to re-roll.  A draw sweep (OT6_SEED_SHIFT or K
+-- encounters used up) skips this suite; v036-fragile's shifts 7 and 13
+-- failed on that rebased ladder, not on a ROM draw
+-- (build/attempts/wt/v036-fragile/results.md).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local STATE = "build/states/battle_entry.mss.lua"

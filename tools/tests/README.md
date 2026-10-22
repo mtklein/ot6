@@ -534,6 +534,17 @@ runs every script through the **segment runner** at the bottom of
   and the table lists each shift's key, `$021e`, seed and frame with
   duplicates marked, plus `[seedprobe] trace` lines in the log (clock,
   control and idle transitions after the boot point).
+- **Encounters used up (`PACE_BURN`).** A lab varies a kit suite's
+  encounter history by setting the global `PACE_BURN = K` ahead of the
+  lib: `H.paceToEncounter` then flees K encounters (fighting out one it
+  cannot run) before the suite's own battle. Its limit: the burn waits
+  3000 frames for field control after each burned battle, and a battle
+  that ends into an event stalls it. battle_runicmonster's first burned
+  battle is formation $16E (no running; won, `event reward due`), and
+  "control after the burn" timed out at every K and shift
+  (`build/attempts/wt/v036-fragile/results.md`). Such a suite is varied
+  by a burn block after its boot step instead. `seed_reroll` is skipped
+  by draw sweeps: it is shift-0-only by design (its header).
 
 `tools/tests/segment_retry.lua` (suite) proves the replay: a `nopath`
 raised on attempt 1 passes on attempt 2 with rebuilt locals and steps;
