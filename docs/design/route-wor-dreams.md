@@ -338,9 +338,11 @@ the party stalled on a lone Barb-e (formation $13D: its Imp landed, and
 every Fight "took 0 off the monsters" until the leg's time ran out) in 3 of
 12 runs of the dream leg and 4 of 12 of Doma's (sweeps `sd7`, `sdo7` at
 ef239262, all at shift 7: three distinct draws of the dream, one of
-Doma's K battles); with the rings on, the same four draws passed
-(`rd_k1_s7`, `rd_k2_s7`, `rd_k5_s7`, `rdo_k1_s7`;
-`build/attempts/wt/v036-route/lab/`).  Sweeps at de405a9b
+Doma's K battles; the stalled keys be20, be1C and beE8 of $13D); with
+the rings on, the same variants passed (`rd_k1_s7`, `rd_k2_s7`, `rd_k5_s7`,
+`rdo_k1_s7`, which met other keys; `build/attempts/wt/v036-route/lab/`),
+and the sweep after won Doma's beE8 in 5 of 5 (`sdo8`).  The leg asserts
+the three rings are on.  Sweeps at de405a9b
 (K 0-5 at shifts 0 and 7, from the chain's own boots at that commit):
 `sd8` 12 of 12 PASS, the stooges 12 keys won of 12, no deaths, Barb-e,
 Samurai and Suriander 21 of 21; `sdo8` 12 of 12, Wrexsoul 11 of 11, 1.27

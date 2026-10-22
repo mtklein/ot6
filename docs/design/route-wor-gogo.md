@@ -244,8 +244,47 @@ Eater with a gauge (`bwmut2`: "$171 the Zone Eater draws a gauge").
   ("be70:WWWW", "be70:xxxx"); beA0 was lost in all four arms.  The leg
   drops Dischord.  The tower no longer leaves Wall Rings on
   (route-wor-thamasa.md 12.2), so the Earrings, the Czarina Ring and the
-  Barrier Ring take each member's second relic for the dragon and that
-  relic goes back for Doom Gaze.  Sweep `so7` (ef239262, from the chain's
+  Barrier Ring took each member's second relic for the dragon (`so7`
+  below) -- but the Barrier Ring sat on TERRA, benched, and STRAGO fought
+  without it.
+
+  **The kit (v0.36 review, the owner's levers).**  Keys the dragon won
+  or lost depend on the fixture's clock: the leg's own snapshot at
+  70142bd6 lost be94 in all 4 of its trials and be78 in its one
+  (`de_ward`, `de_ward2`: 55 of 60), where main's had lost beA0 and beB4.
+  A Cherub Down's Float is the relic's, and the dragon's 50 Gs ($C3)
+  does not strip it: from one snapshot at the switch (the play's, with four
+  Cherub Downs bought at Jidoor's relic counter, shop 79, 6,300 GP each:
+  lab `opj`), sixty trials an arm (`kit_*`; `dact.py` reads each dragon
+  action's party HP and float mask then and 90 frames on):
+
+  | arm | won | distinct keys | deaths a fight | low_worst |
+  |---|---|---|---|---|
+  | the ward relics (`kit_base_*`) | 60 of 60 | 16 | 1.62 | 5% |
+  | a Cherub Down on each (`kit_cherub_*`) | 60 of 60 | 16 | 0.19 | 69% |
+  | the bag's one Gaia Gear on STRAGO (`kit_gaia_*`) | 60 of 60 | 15 | 1.07 | 24% |
+  | both (`kit_both_*`) | 60 of 60 | 21 | 0.05 | 59% |
+
+  With the Cherub Downs the dragon spent 136 actions on 50 Gs ("atk $C3:
+  69 action(s); 69 with a floater, float kept in 69; hp lost 0") and its
+  37 Quakes took nothing ("atk $15: 19 action(s) ... hp lost 0"), against
+  336,405 HP of Quake on the ward-relic arm.  The Gaia Gear's wearer
+  takes no earth: a Quake left STRAGO at 3339/3339 while the others lost
+  about 1,800 each (`kit_gaia_1`: "atk $15: party hp 3853/4328/2754/3339
+  float $0 -> hp 1984/3482/1068/3339"); he was at full HP each time, so a
+  heal did not show.  The bag held one Gaia Gear (Nikeah's and South
+  Figaro's armor counters sell more; not bought).  The leg now buys four
+  Cherub Downs at Jidoor on the way, and at the catwalk puts one in each
+  member's second relic slot and the Gaia Gear on STRAGO, asserting each
+  piece on; all go back for Doom Gaze.  From the leg's own
+  snapshot at 0a6b5bea (the kit on), sixty trials (`legkit_1`, `legkit_2`):
+  60 of 60, 20 distinct keys won every time, beA0 among them ("beA0:WWW",
+  "beA0:WW"; beB4 was not drawn), 0.05 deaths a fight, every 50 Gs
+  leaving the Float ("atk $C3: 62 action(s); 62 with a floater, float kept
+  in 62; hp lost 0"); sweep `so9` (0a6b5bea, K 0-5 at shifts 0 and 7): 12
+  of 12 PASS, the Dirt Dragon 9 keys won of 9, 0.11 deaths a fight; Doom
+  Gaze 27 meetings, 0.56 deaths a meeting, every hunt won
+  (`fight_report_so9.txt`).  Sweep `so7` (ef239262, from the chain's
   own `wor-ebot-v1` at that commit, K 0-5 at shifts 0 and 7): 12 of 12
   PASS, the Dirt Dragon 11 keys won of 11, 1.73 deaths a fight, three down
   at most, the party's worst moment 6%; Doom Gaze 26 meetings, 0.50 deaths
@@ -387,7 +426,8 @@ the graph's play (`checkpoint_drift.py --recut`, at the release).
    release's re-cut makes them the graph's play.
 5. **The Dirt Dragon** is the arc's hard fight (section 4): 1.00 and 1.55
    deaths a fight in `so5` and `so6`, 20 keys won of 20; 1.73 in `so7`
-   (v0.36, without Dischord and without the tower's Wall Rings), 11 of 11.
+   (v0.36, without Dischord and without the tower's Wall Rings), 11 of 11;
+   0.11 in `so9` with the Cherub Downs and the Gaia Gear, 9 of 9.
 6. **Doom Gaze** fells one in four meetings (0.24 deaths a meeting over 29
    in `so5`); the hunt wins every run, at the bag's cost (section 6).
 7. **The labs before `dx2`** shared one driver across their trials
