@@ -9815,3 +9815,405 @@ for _, name in ipairs({ "fieldCare", "careStop", "bagArrange", "setRows", "equip
     return M.menuStep(build(...), name)
   end
 end
+
+-- ------------------------------------------------ the World of Ruin legs' kit --
+-- The Gau, Gogo and Dreams arcs' generators (gen_wor_gau, gen_wor_belly,
+-- gen_wor_gogo, gen_wor_ebot, gen_wor_opera, gen_wor_dream, gen_wor_doma,
+-- gen_wor_ancient) walk the same way: the Falcon's cabin and its wheel, the
+-- world's doors and edges, chests, talks and step-on switches, the battle
+-- key line and the supplies line.  Those helpers lived in each generator,
+-- stamped from gen_wor_gau's by the arcs' leg builders (#456); this is
+-- their one home.  A generator keeps its own route and constants and takes
+-- the helpers from here:
+--
+--   local K = H.worLegKit({ fight = FIGHT, links = LINKS, names = NAMES })
+--   local map, say, walk, regroup = K.map, K.say, K.walk, K.regroup
+--
+-- env.fight   the walks' fight table (the generator's FIGHT; read live, so
+--             a later write to it reaches every walk)
+-- env.links   { [map] = links } for the walks' planner (H.navLinks,
+--             H.bfsReach); the generator's own table, so a map it adds
+--             later is seen
+-- env.names   { [char] = "NAME" } for the log lines and the regroup's
+--             asserts
+-- env.talkToObj  true: the cabin's regroup approaches the member it talks
+--             to with H.talkToObj (gen_wor_gau's); else H.chaseTalk, which
+--             re-plans every step, since the waiting members wander (lab go2
+--             of the Gogo arc: talkToObj's approach timed out on SABIN)
+
+-- (x, y, dx, dy) doors as the links of a walk's planner: each door taken by
+-- a press in any direction
+function M.doorLinks(doors)
+  local out = {}
+  for _, d in ipairs(doors) do
+    for _, dir in ipairs({ "up", "down", "left", "right" }) do out[#out + 1] = { d[1], d[2], dir, d[3], d[4] } end
+  end
+  return out
+end
+
+function M.worLegKit(env)
+  local FIGHT, LINKS, NAMES = env.fight, env.links or {}, env.names or {}
+  local POTION, FENIX, REMEDY, TENT, TINCTURE, REVIVIFY = 0xE9, 0xF0, 0xF5, 0xF7, 0xEB, 0xF1
+  local MAP_DECK, MAP_CABIN = 11, 12   -- the Falcon's deck and cabin
+  local function map() return M.mapId() & 0x1ff end
+  local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
+  local function sw(id) return (M.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
+  local function c(ch, off) return 0x1600 + 37 * ch + off end
+  local function lv(ch) return M.readByte(c(ch, 8)) end
+  local function partyOf(ch) return M.readByte(0x1850 + ch) & 7 end
+  local function settled()
+    return M.hasControl() and M.tileAligned() and bright() >= 15 and not M.dialogWaiting()
+  end
+  local function supplies()
+    return string.format("potion=%d tincture=%d fenix=%d remedy=%d revivify=%d tent=%d gil=%d", M.invCountOf(POTION),
+      M.invCountOf(TINCTURE), M.invCountOf(FENIX), M.invCountOf(REMEDY), M.invCountOf(REVIVIFY), M.invCountOf(TENT),
+      M.gil())
+  end
+  local function say(tag, what)
+    local pos = M.worldMode() and string.format("world (%d,%d)", M.worldX(), M.worldY())
+      or string.format("map %d (%d,%d)", map(), M.fieldX(), M.fieldY())
+    M.log(string.format("[%s] f%d %s %s; %s; %s", tag, M.frame, what, pos, M.partiesLine(), supplies()))
+  end
+  local function kitLine(members)
+    local t = {}
+    for _, ch in ipairs(members) do
+      local g = {}
+      for k = 0x1E, 0x24 do g[#g + 1] = string.format("%02X", M.readByte(c(ch, k))) end
+      t[#t + 1] = string.format("%s L%d kit %s", NAMES[ch], lv(ch), table.concat(g, " "))
+    end
+    return table.concat(t, "; ")
+  end
+  -- walk onto (x, y) until the map reads dst (gen_wor_relm's)
+  local function walkInto(x, y, dst, what, avoid)
+    local function there() return map() == dst and M.hasControl() and M.tileAligned() and bright() >= 15 end
+    return M.seqStep({
+      M.repeatN(3, {
+        M.cond(function() return not there() end, {
+          M.navTo(x, y, { maxFrames = 12000, playBattles = "tactical", fight = FIGHT, avoid = avoid,
+            arrive = function() return map() == dst end }),
+          M.release(),
+          M.waitUntil(function() return map() == dst end, 600, what .. ": onto map " .. dst, 5),
+        }, {}),
+      }),
+      M.waitUntil(there, 1200, what .. ": control on map " .. dst, 1),
+      M.call(function() say("route", what) end),
+    })
+  end
+  -- off a field map's edge onto the world map (gen_wor_locke's outToWorld)
+  local function outToWorld(dir, what)
+    local n = 0
+    return M.seqStep({
+      M.driveUntil(function() return M.worldMode() end, 3000, { M.hold({ dir }) }, what),
+      M.release(),
+      M.withReset(M.waitUntil(function()
+        local ok = M.worldSettled() and M.worldAligned() and M.worldPassable(M.worldX(), M.worldY())
+        n = ok and n + 1 or 0
+        return n >= 30
+      end, 2400, what .. ": back on the World of Ruin map"), function() n = 0 end),
+      M.call(function() say("wor", what) end),
+    })
+  end
+  -- onto a world door until its field map holds the screen
+  local function enterFrom(door, dst, what)
+    return M.seqStep({
+      M.worldNavTo(door[1], door[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
+        arrive = function() return map() == dst and not M.worldMode() end }),
+      M.waitUntil(function() return map() == dst and settled() end, 2400, what .. ": map " .. dst, 1),
+      M.call(function() say("route", what) end),
+    })
+  end
+  -- boarding: on foot on the parked airship's tile, A boards (gen_wor_locke's)
+  local function board()
+    local n, ph = 0, 0
+    local drv = M.fightDriverFor("board", { tactical = true, boost = true, items = true, healPercent = 55 }, FIGHT)
+    local battleFrames = 0
+    local function offTile()
+      return not M.battleLoadStarted() and M.worldSettled() and not M.aboardAirship()
+        and (M.worldX() ~= M.readByte(0x1F62) or M.worldY() ~= M.readByte(0x1F63))
+    end
+    return M.withReset(M.driveUntil(function()
+      n = M.airshipControl() and n + 1 or 0
+      return n >= 30
+    end, 30000, {
+      M.cond(offTile, {
+        M.worldNavTo(function() return M.readByte(0x1F62) end, function() return M.readByte(0x1F63) end,
+          { maxFrames = 6000, playBattles = "tactical", fight = FIGHT }),
+      }, {}),
+      M.call(function()
+        if M.battleLoadStarted() then
+          battleFrames = battleFrames + 1
+          if battleFrames >= 3 then drv.frame() end
+          return
+        end
+        if battleFrames > 0 then drv.idle() end
+        ph = (ph + 1) % 16
+        if M.aboardAirship() then M.setPad({}); return end
+        M.setPad(ph < 4 and { "a" } or {})
+      end),
+    }, "board the Falcon"), function() n, ph, battleFrames = 0, 0, 0 end)
+  end
+  -- the cabin's waiting members (map 12) each ask "Change party members?"
+  -- (_caf59d); NPC_n is object $10 + n - 1, shown by its switch
+  -- (gen_wor_locke's regroup)
+  local CABIN_NPCS = { { "TERRA", 0x10, 0x0388 }, { "CYAN", 0x12, 0x038B }, { "SABIN", 0x15, 0x038D },
+    { "CELES", 0x16, 0x038E }, { "STRAGO", 0x17, 0x038F }, { "RELM", 0x18, 0x0390 }, { "MOG", 0x1A, 0x0392 },
+    { "UMARO", 0x1D, 0x0395 }, { "EDGAR", 0x14, 0x038C }, { "SETZER", 0x19, 0x0391 } }
+  local function regroup(members)
+    local obj = nil
+    local function pickTalker()
+      obj = nil
+      for _, n in ipairs(CABIN_NPCS) do
+        local ox, oy = M.objX(n[2]), M.objY(n[2])
+        local reach = M.bfsPath(ox, oy + 1) or M.bfsPath(ox - 1, oy) or M.bfsPath(ox + 1, oy) or M.bfsPath(ox, oy - 1)
+        if obj == nil and sw(n[3]) == 1 and reach then obj = n end
+      end
+      return obj
+    end
+    return M.seqStep({
+      board(),
+      M.withReset((function()
+        local ph = 0
+        return M.driveUntil(function() return map() == MAP_DECK and settled() end, 2400, {
+          M.call(function()
+            ph = (ph + 1) % 16
+            M.setPad((M.airshipControl() and ph < 4) and { "x" } or {})
+          end),
+        }, "X: to the Falcon's deck (map 11)")
+      end)(), function() end),
+      walkInto(24, 8, MAP_CABIN, "the deck -> the cabin (map 12)"),
+      M.call(function() pickTalker() end),
+      M.cond(function() return obj == nil end, {
+        M.navTo(23, 44, { maxFrames = 3000, arrive = function() return M.fieldY() < 40 end }),
+        M.waitUntil(function() return settled() and M.fieldY() < 40 end, 1200, "up the cabin's stairs", 1),
+        M.call(function() pickTalker() end),
+      }, {}),
+      M.call(function()
+        M.assertEq(obj ~= nil, true, "a member waits in the cabin to talk to")
+        M.log(string.format("[regroup] talking to %s (obj $%02X, show-switch $%04X)", obj[1], obj[2], obj[3]))
+      end),
+      -- the waiting members wander: chaseTalk re-plans its approach every step and stops on the prompt
+      -- (env.talkToObj: the fixed approach, gen_wor_gau's)
+      M.lazy(function()
+        if env.talkToObj then return M.talkToObj(obj[2], obj[1] .. " in the cabin") end
+        return M.chaseTalk(obj[2], 6000, obj[1] .. " in the cabin")
+      end),
+      M.dialogChoice(1, { inBattle = false, what = "Change party members? Yes", tag = "the cabin" }),
+      M.partySelect(members, { tag = "the Falcon's cabin" }),
+      M.waitUntil(function() return map() == MAP_DECK and settled() end, 2400, "back on the deck after the menu", 5),
+      M.call(function()
+        local n = 0
+        for ch = 0, 13 do if partyOf(ch) == 1 then n = n + 1 end end
+        for _, ch in ipairs(members) do
+          M.assertEq(partyOf(ch), 1, string.format("%s is in party 1 after the regroup", NAMES[ch]))
+        end
+        M.assertEq(n, #members, "party 1 holds exactly the regroup's members")
+        say("regroup", "after the menu")
+      end),
+    })
+  end
+  -- lift off from the deck's wheel (_caf532: face left, A held on (15,8))
+  local function liftOff()
+    return M.seqStep({
+      M.navTo(15, 8, { maxFrames = 3000 }),
+      M.faceAndHoldA("left", function() return M.dialogWaiting() end, 1200, "the Falcon's wheel (11 (15,8)): face left, A"),
+      M.release(),
+      M.dialogChoice(0, { inBattle = false, what = "the wheel: (Lift-off)", tag = "the wheel" }),
+    })
+  end
+  -- the key of every battle (reads only)
+  local watchOn = false
+  local function watches()
+    return M.call(function()
+      if watchOn then return end
+      watchOn = true
+      local addr = M.seedStoreAddr()
+      emu.addMemoryCallback(function()
+        M.log(string.format("[key] battle key be%02X-g%04X f%d map %d party %d", emu.getState()["cpu.a"] & 0xff,
+          M.readWord(0x11e0), M.frame, map(), M.activeParty()))
+      end, emu.callbackType.exec, addr, addr)
+    end)
+  end
+  -- a walk over a map's floor and its doors
+  local function walk(x, y, what, avoid, arrive)
+    return M.seqStep({
+      M.lazy(function()
+        return M.navLinks(x, y, LINKS[map()] or {}, { what = what, maxFrames = 12000, playBattles = "tactical",
+          fight = FIGHT, avoid = avoid, arrive = arrive })
+      end),
+      M.call(function() say("route", what) end),
+    })
+  end
+  -- a chest from whichever side of it the party can reach (gen_wor_ragnarok's)
+  local function chestAt(cx, cy, bit, what, item)
+    return M.lazy(function()
+      for _, o in ipairs({ { 0, 1, "up" }, { -1, 0, "right" }, { 1, 0, "left" }, { 0, -1, "down" } }) do
+        local legs = M.bfsReach(nil, nil, nil, LINKS[map()] or {}, cx + o[1], cy + o[2])
+        if legs then
+          return M.seqStep({
+            walk(cx + o[1], cy + o[2], what .. ": beside it"),
+            M.openChest({ stand = { cx + o[1], cy + o[2] }, face = o[3], bit = bit, what = what, item = item,
+              nav = { fight = FIGHT } }),
+          })
+        end
+      end
+      error(string.format("[chest] %s (%d,%d): no side of it is reachable from (%d,%d)", what, cx, cy,
+        M.fieldX(), M.fieldY()))
+    end)
+  end
+  -- Doom Gaze's two cells ($0B00..$0B07: x, y in four-tile cells, world/init.asm @86a6; ctrl.asm @6f1d
+  -- checks the first two while A is held in the air) and whether it is beaten ($1DD2 bit 0) and its HP
+  -- ($1DD3, the battle's $3EBE saved)
+  local function doomLine()
+    return string.format("Doom Gaze cells (%d,%d) (%d,%d) [tiles (%d,%d) (%d,%d)]; beaten $1DD2.0=%d; hp $1DD3=%d",
+      M.readByte(0x0B00), M.readByte(0x0B02), M.readByte(0x0B04), M.readByte(0x0B06),
+      M.readByte(0x0B00) * 4, M.readByte(0x0B02) * 4, M.readByte(0x0B04) * 4, M.readByte(0x0B06) * 4,
+      M.readByte(0x1DD2) & 1, M.readWord(0x1DD3))
+  end
+  -- pace between the tile the party stands on and a passable neighbour until done(), the world walker
+  -- playing the battles; spare: species words the walker leaves to the engine (no input)
+  local function pace(done, budget, what, spare)
+    local A, B, n0 = nil, nil, nil
+    return M.seqStep({
+      M.call(function()
+        local x, y = M.worldX(), M.worldY()
+        A, B, n0 = { x, y }, nil, #M.outcomes
+        for _, d in ipairs({ { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } }) do
+          local bx, by = x + d[1], y + d[2]
+          if B == nil and M.worldPassable(bx, by) then B = { bx, by } end
+        end
+        M.assertEq(B ~= nil, true, what .. ": a passable tile beside (" .. x .. "," .. y .. ")")
+        M.log(string.format("[pace] %s: pacing (%d,%d) <-> (%d,%d)", what, A[1], A[2], B[1], B[2]))
+      end),
+      M.driveUntil(function()
+        if done() then return true end
+        if M.battleLoadStarted() or not M.worldMode() or not M.worldSettled() then return false end
+        M.assertEq(#M.outcomes - n0 < budget, true, string.format("%s: done within %d battles", what, budget))
+        return false
+      end, 900000, {
+        M.cond(function() return M.worldMode() and not done() end, {
+          M.worldNavTo(function() return B[1] end, function() return B[2] end,
+            { maxFrames = 20000, playBattles = "tactical", fight = FIGHT, spare = spare,
+              arrive = function() return done() end }),
+          M.call(function()
+            A, B = B, A
+            M.log(string.format("[pace] %s: %d battle(s)", what, #M.outcomes - n0))
+          end),
+        }, { M.call(function() M.setPad({}) end) }),
+      }, what),
+    })
+  end
+  local function objLine(o0, o1)
+    local t = {}
+    for o = o0 or 0x10, o1 or 0x14 do t[#t + 1] = string.format("$%02X(%d,%d)", o, M.objX(o), M.objY(o)) end
+    return table.concat(t, " ")
+  end
+  local function inParty(ch) return partyOf(ch) == 1 end
+  local function partyCount()
+    local n = 0
+    for ch = 0, 13 do if partyOf(ch) == 1 then n = n + 1 end end
+    return n
+  end
+  -- land the Falcon on the landable tile nearest (tx, ty) that a walk reaches it from (the world's own tile
+  -- properties: M.airshipCanLandAt, M.worldPassable, M.worldBfs), read once the pilot has the controls
+  local function landNear(tx, ty, what)
+    return M.seqStep({
+      M.waitUntil(function() return M.airshipControl() end, 3000, what .. ": the pilot's controls", 5),
+      M.lazy(function()
+        local best, bd = nil, 1e9
+        for dy = -6, 6 do
+          for dx = -6, 6 do
+            local x, y = tx + dx, ty + dy
+            if not (dx == 0 and dy == 0) and M.airshipCanLandAt(x, y) and M.worldPassable(x, y) then
+              local d = dx * dx + dy * dy
+              if d < bd and M.worldBfs(tx, ty, nil, x, y) then best, bd = { x, y }, d end
+            end
+          end
+        end
+        M.assertEq(best ~= nil, true, string.format("%s: a landable tile near (%d,%d) with a walk to it", what, tx, ty))
+        M.log(string.format("[land] %s: landing on (%d,%d) for (%d,%d)", what, best[1], best[2], tx, ty))
+        return M.flyTo(best[1], best[2], { what = what, fight = FIGHT })
+      end),
+    })
+  end
+  -- talk to object o from whichever side of it the party can reach, the walk playing its battles; done() ends it
+  local function talkNpc(o, done, what)
+    return M.seqStep({
+      M.lazy(function()
+        local ox, oy = M.objX(o), M.objY(o)
+        for _, s in ipairs({ { 0, 1, "up" }, { -1, 0, "right" }, { 1, 0, "left" }, { 0, -1, "down" } }) do
+          if M.bfsReach(nil, nil, nil, LINKS[map()] or {}, ox + s[1], oy + s[2]) then
+            return M.seqStep({
+              walk(ox + s[1], oy + s[2], what .. ": beside it"),
+              M.faceAndHoldA(s[3], function() return done() or M.dialogWaiting() end, 900, what),
+              M.release(),
+            })
+          end
+        end
+        error(string.format("[talk] %s: no side of obj $%02X (%d,%d) is reachable", what, o, ox, oy))
+      end),
+      M.advanceStory(function() return done() and settled() end, 6000, { playBattles = "tactical", fight = FIGHT }),
+      M.call(function() say("story", what) end),
+    })
+  end
+  -- stand on (x, y) and face up with A until done() (a step-on switch that reads the facing and the A button,
+  -- $01B0 and $01B4)
+  local function pressUp(x, y, done, what)
+    return M.seqStep({
+      M.cond(function() return not done() end, {
+        walk(x, y, what .. ": onto (" .. x .. "," .. y .. ")"),
+        M.faceAndHoldA("up", function() return done() end, 900, what),
+        M.release(),
+        M.advanceStory(function() return settled() end, 3000, { playBattles = "tactical", fight = FIGHT }),
+      }, {}),
+      M.call(function() say("story", what) end),
+    })
+  end
+  -- the object standing on (x, y), or nil (an unshown object reads (0,0))
+  local function objOn(x, y)
+    for o = 0x10, 0x3F do
+      if M.objX(o) == x and M.objY(o) == y then return o end
+    end
+    return nil
+  end
+
+  -- ---- Kohlingen: the Dreams arc's counter (gen_wor_dream, gen_wor_ancient) ----
+  -- No town on the arc sells anything but Kohlingen, beside Figaro Castle's Kohlingen side: its general store
+  -- (189 (11,11) -> 194 (12,39); the item counter's keeper (19,35), shop 67) tops the bag up to the band (guidelines
+  -- "Supply band": Potions about level x 1.5 before a boss gauntlet and the field care's own, careStockPotions;
+  -- Fenix Downs about the level, capped at 20; Remedies for the dream's Petrify and Sap), and its weapon and armor
+  -- counters are the gear stop (M.gearStop, #434).  The town's south edge returns the party to the world.
+  local MAP_KOHLINGEN, MAP_KSTORE, KOHLINGEN_DOOR, SHOP_KITEMS = 189, 194, { 38, 45 }, 67
+  local function kohlingenStop(what)
+    return M.seqStep({
+      M.waitUntil(function() return M.airshipControl() end, 3000, what .. ": the pilot's controls", 5),
+      landNear(KOHLINGEN_DOOR[1], KOHLINGEN_DOOR[2], what .. ": the Falcon down by Kohlingen"),
+      M.worldNavTo(KOHLINGEN_DOOR[1], KOHLINGEN_DOOR[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
+        arrive = function() return not M.worldMode() end }),
+      M.waitUntil(function() return map() == MAP_KOHLINGEN and settled() end, 2400, what .. ": Kohlingen, map 189", 1),
+      M.gearStop({ tag = what .. ": gear Kohlingen", fight = FIGHT }),
+      M.crossDoor(11, 11, MAP_KSTORE, 12, 39, what .. ": Kohlingen's store 189 (11,11) -> 194", { fight = FIGHT }),
+      M.shopTalk(19, 35, what .. ": Kohlingen's item counter", { fight = FIGHT }),
+      M.call(function() M.assertEq(M.shopId(), SHOP_KITEMS, "the counter opened shop 67 ($0201)") end),
+      M.buyItem(POTION, function() return math.max(0, M.careStockPotions(M.activeTopLevel(), { spend = 30 })
+        - M.invCountOf(POTION)) end, "POTION to the band"),
+      M.buyItem(REMEDY, function() return math.max(0, 20 - M.invCountOf(REMEDY)) end, "REMEDY to 20"),
+      M.buyItem(FENIX, function() return math.max(0, math.min(20, M.activeTopLevel()) - M.invCountOf(FENIX)) end,
+        "FENIX DOWN to the level, capped at 20"),
+      M.shopClose(what .. ": Kohlingen's item counter"),
+      M.bagArrange({ POTION, FENIX, REMEDY, TINCTURE }, { tag = what .. ": bag: combat items on top" }),
+      M.call(function() say("shop", what .. ": Kohlingen") end),
+      walkInto(12, 40, MAP_KOHLINGEN, what .. ": the store -> Kohlingen"),
+      M.navTo(23, 29, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT }),
+      outToWorld("down", what .. ": out of Kohlingen by the south edge"),
+      board(),
+    })
+  end
+  return {
+    map = map, bright = bright, sw = sw, c = c, lv = lv, partyOf = partyOf, settled = settled,
+    supplies = supplies, say = say, kitLine = kitLine, walkInto = walkInto, outToWorld = outToWorld,
+    enterFrom = enterFrom, board = board, regroup = regroup, liftOff = liftOff, watches = watches,
+    walk = walk, chestAt = chestAt, doomLine = doomLine, pace = pace, objLine = objLine,
+    inParty = inParty, partyCount = partyCount, landNear = landNear, talkNpc = talkNpc,
+    pressUp = pressUp, objOn = objOn, kohlingenStop = kohlingenStop,
+  }
+end
