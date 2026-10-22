@@ -505,26 +505,65 @@ def selftest(repo: str = ".") -> int:
     check("65 Tonics at L13 holds (3250 >= 3250)", field_short(65, 3, 13), False)
     check("64 Tonics at L13 is short (3200 < 3250)", field_short(64, 3, 13), True)
 
-    # Checked against mrf-save-room-v1, which carries two Fenix Downs.
-    # The tracked copy: the reader's canary needs bytes that hold still
-    # between re-cuts, and the capture moves with every replay.
+    # The checkpoint reader's regression canary (#455).  It reads a small
+    # synthetic SRAM built here, so the expected count is a literal that no
+    # release re-cut can move: a character table of eleven records (actor id
+    # = record index, the shape find_char_block locates), and a bag with
+    # Fenix Downs split across two slots beside other items.  A tracked
+    # checkpoint's own count changes with every re-cut, so the real payload
+    # is only required to read.
+    import tempfile
+    from savestate_party import REC, FALLBACK_CB, PARTY, CHAR_BLOCK
+    synth = bytearray(0x1000)
+    cb0 = 0x200
+    for c in range(11):
+        synth[cb0 + REC * c] = c
+    for slot, (item, qty) in enumerate([(FENIX_DOWN, 7), (POTION, 40), (TONIC, 99),
+                                        (FENIX_DOWN, 5), (REVIVIFY, 3)]):
+        synth[cb0 + INV_IDS + slot] = item
+        synth[cb0 + INV_QTY + slot] = qty
+    with tempfile.TemporaryDirectory() as td:
+        sp = os.path.join(td, "synthetic.sram")
+        with open(sp, "wb") as f:
+            f.write(bytes(synth))
+        n, err = revives_of_sram(sp)
+        if err or n != 12:
+            ok = False
+            print(f"  SELFTEST FAIL revives_of_sram(synthetic SRAM) "
+                  f"should read 12 Fenix Downs (7 + 5), got {err or n}")
+        # nothing but the table: no bag, so zero (not an error)
+        for slot in range(5):
+            synth[cb0 + INV_IDS + slot] = 0
+        sp0 = os.path.join(td, "empty-bag.sram")
+        with open(sp0, "wb") as f:
+            f.write(bytes(synth))
+        n, err = revives_of_sram(sp0)
+        if err or n != 0:
+            ok = False
+            print(f"  SELFTEST FAIL revives_of_sram(synthetic empty bag) "
+                  f"should read 0, got {err or n}")
+        sp1 = os.path.join(td, "no-table.sram")
+        # a blob the fixed-offset fallback would accept (record 0 is actor 0
+        # and somebody is seated): a checkpoint must not be read that way
+        blind = bytearray(0x4000)
+        blind[FALLBACK_CB + (PARTY - CHAR_BLOCK)] = 1
+        with open(sp1, "wb") as f:
+            f.write(bytes(blind))
+        n, err = revives_of_sram(sp1)
+        if n is not None or not err:
+            ok = False
+            print(f"  SELFTEST FAIL revives_of_sram(no table) should report "
+                  f"the table not located, got {n!r}")
     cps = dict(tracked_payloads(repo))
     if "mrf-save-room-v1" not in cps:
         ok = False
         print("  SELFTEST FAIL mrf-save-room-v1 not among tracked checkpoints")
     else:
-        # 19 pins the v0.35 re-cut (the drift report read "item $F0: fresh
-        # 19, tracked 20"); v0.33's held 20, v0.32's 19, v0.31's (be7123af) 21, v0.30's (7eb86a40)
-        # 17, the #198 re-cut
-        # (832740ee, from the regenerated ifrit_entry) carried 20, re-cut
-        # B (2026-09-01) 13 and the fled run's payload 2.  The pin is the checkpoint reader's
-        # regression canary, so it tracks whatever the sealed payload
-        # truly holds.
         n, err = revives_of_sram(cps["mrf-save-room-v1"])
-        if err or n != 19:
+        if err or not (0 <= n <= 99):
             ok = False
             print(f"  SELFTEST FAIL revives_of_sram(mrf-save-room-v1) "
-                  f"should read 19 Fenix Downs, got {err or n}")
+                  f"should read a count, got {err or n}")
 
     # Sanity-check: the graph loads with edges.
     states, _ = load_graph(repo)

@@ -595,7 +595,7 @@ def fmt_species(d, sid, indent="    "):
 def fmt_pool(d, words, indent="  ", species_seen=None, odds=SLOT_ODDS):
     out = []
     for i, word in enumerate(words):
-        base = word & 0x1FF
+        base = word & 0x3FF
         forms = [base + k for k in range(4)] if word & 0x8000 else [base]
         tag = " (+rand 0..3: each 1/4)" if word & 0x8000 else ""
         out.append(f"{indent}slot {i}: {odds[i]}/256 word ${word:04X}{tag}")

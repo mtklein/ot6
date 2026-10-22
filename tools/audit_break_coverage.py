@@ -106,7 +106,7 @@ floor = {}
 with open(os.path.join(ROOT, 'ff6/src/battle/ot6_break_floor.inc')) as f:
     i = 0
     for line in f:
-        line = line.strip()
+        line = line.split(';', 1)[0].strip()      # the generator's `; 0 Guard -> PIERCE` comments
         if line.startswith('.byte'):
             for tok in line[5:].split(','):
                 tok = tok.strip()
@@ -115,6 +115,8 @@ with open(os.path.join(ROOT, 'ff6/src/battle/ot6_break_floor.inc')) as f:
                     try: val = int(tok.replace('$','0x'), 16) if '$' in tok else int(tok)
                     except ValueError: continue
                 floor[i] = val; i += 1
+if len(floor) != 384:
+    sys.exit(f'ot6_break_floor.inc parsed to {len(floor)} species, not 384: the floor-class parse is broken')
 
 # ---- THE TUNING CLAIM, from the route's own battles (#287) --------------
 SEED_BATTLE = re.compile(r'^\[ot6\] \[seed\] (?:first )?battle: .*?key be[0-9A-F]{2}-g([0-9A-F]{4})')
