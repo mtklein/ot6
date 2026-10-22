@@ -84,7 +84,7 @@ mutant builders `mkmut.py` and `rowmuts.sh`; the launchers `lab.sh`,
 | `gen_wor_belly` | `wor-gau-v1` | `wor-belly-v1` | the cabin (TERRA, CELES, RELM, STRAGO), Triangle Island until the Engulf, the bridge, the plate, the save point in the belly (279 (24,4)) |
 | `gen_wor_gogo` | `wor-belly-v1` | `wor-gogo-v1` | the crushing room, 277, the west half, GOGO (name menu, his kit), the Warp Stone out, the Falcon to Thamasa, the scene that opens Ebot's Rock, the save by the Falcon (250,229) |
 | `gen_wor_ebot` | `wor-gogo-v1` | `wor-ebot-v1` | Ebot's Rock: the holes, the coral, the hungry chest, Hidon, the scene at Strago's house, the save on the Falcon's tile (250,231) |
-| `gen_wor_opera` | `wor-ebot-v1` | `wor-opera-v1` | the cabin (CELES, RELM, GOGO, STRAGO), the Opera House, the Dirt Dragon, the Doom Gaze hunt, the save by the Falcon there (30,182); also `wor_opera_switch` (the catwalk's switch: `battle_mimicdriver`'s and `battle_floatline`'s fixture) |
+| `gen_wor_opera` | `wor-ebot-v1` | `wor-opera-v1` | the cabin (CELES, RELM, GOGO, STRAGO), the Opera House, the Dirt Dragon, the Doom Gaze hunt, the save by the Falcon there (30,182); also `wor_opera_switch` (the catwalk's switch: `battle_mimicdriver`'s and `battle_wardline`'s fixture) |
 
 ## 2. The order
 
@@ -230,6 +230,22 @@ Eater with a gauge (`bwmut2`: "$171 the Zone Eater draws a gauge").
   worst moment in `so6` left the party at 2% of its HP (`low_worst`), so it
   stays a fight.
 
+  **v0.36 (#460).**  Dischord retested from main's `wor_opera_switch`
+  (the leg's fixture at cfae9e47), thirty trials an arm twice, idle frames
+  apart, a fresh driver a trial (`build/attempts/wt/v036-route/lab/dd_*`,
+  `dtally.py`): without it 27 of 30 and 28 of 30 (`dd_ward`, `dd_ward2`),
+  with it 24 of 30 and 25 of 30 (`dd_dis`, `dd_dis2`); the key be70 was
+  won in all 7 of its trials without Dischord and lost in all 7 with it
+  ("be70:WWWW", "be70:xxxx"); beA0 was lost in all four arms.  The leg
+  drops Dischord.  The tower no longer leaves Wall Rings on
+  (route-wor-thamasa.md 12.2), so the Earrings, the Czarina Ring and the
+  Barrier Ring take each member's second relic for the dragon and that
+  relic goes back for Doom Gaze.  Sweep `so7` (ef239262, from the chain's
+  own `wor-ebot-v1` at that commit, K 0-5 at shifts 0 and 7): 12 of 12
+  PASS, the Dirt Dragon 11 keys won of 11, 1.73 deaths a fight, three down
+  at most, the party's worst moment 6%; Doom Gaze 26 meetings, 0.50 deaths
+  a meeting, every hunt won (`fight_report_so7.txt`).
+
 ## 5. GOGO's kit and the Mimic line
 
 GOGO has no Fight row, so the driver's fallbacks had nothing to press for
@@ -279,30 +295,24 @@ magic)"); the mutant that never casts (`mkmut2.py V`, `muts2.sh`) is red:
 "3. every body faded: actor 2's Fight becomes its cast where it has one,
 else stays a Fight: got fight, want magic".
 
-Two lines came with the Dirt Dragon (section 4).  `Driver:floatPlan`
-(`opts.floatVs`, `FLOAT_OFF` the control): while a listed earth caster
-stands and a living member is not floating, an actor with Float casts it on
-the whole party in place of an attack.  `battle_floatline` checks it on the
-dragon from `wor_opera_switch`: a Float plan, then every living member
-floating within 2400 frames, then the control with no plan and nobody
-floating.  `Driver:buffPlan` (`opts.buffVs`, `BUFF_OFF`): Shell, Safe or
-Haste on each living member without it, the frailest first, a member at a
-time, none on a reflecting member; the same suite checks it: a ward plan,
-its target under Shell within 2400 frames, then the control with no plan
-and that member never shelled.  Passing at 06573b92 on the leg's own
-fixture (`r4_battle_floatline`: "every living member floats (mask $F) 1196
-frames after the plan", "the control: 0 Float plan(s), floating mask ever
-$0", "entity 2 under Shell 1039 frames after the plan", "the control: 0
-ward plan(s); entity 2 under Shell: false").  Four mutants (`mkmut2.py`,
-`muts2.sh`), each red: the Float plan aimed at one member (`FA`: "1. every
-living member floats within 2400 frames of the plan (the whole party): got
-false"), the Float line ignoring `FLOAT_OFF` (`FB`: "control: with
-FLOAT_OFF no Float plan: got 1"), the ward cast on the next member (`WA`:
-"2. its target under Shell within 2400 frames of the plan: got false"),
-the ward line ignoring `BUFF_OFF` (`WB`: "control: with BUFF_OFF no ward
-plan: got 1").  The leg uses the ward line and not the Float line: the dragon's 50 Gs
-removes Float and nothing else (MagicProp $C3, `magic.py`), and in lab
-`x26` the party's Float lasted 400-1300 frames a cast.
+The ward line came with the Dirt Dragon (section 4): `Driver:buffPlan`
+(`opts.buffVs`, `BUFF_OFF` the control): Shell, Safe or Haste on each living
+member without it, the frailest first, a member at a time, none on a
+reflecting member.  `battle_wardline` checks it on the dragon from
+`wor_opera_switch`: a ward plan, its target under Shell within 2400 frames,
+then the control with no plan and that member never shelled.  Passing at
+06573b92 (then `battle_floatline`, `r4_battle_floatline`: "entity 2 under
+Shell 1039 frames after the plan", "the control: 0 ward plan(s); entity 2
+under Shell: false"); its mutants `WA` (the ward cast on the next member:
+"2. its target under Shell within 2400 frames of the plan: got false") and
+`WB` (the line ignoring `BUFF_OFF`: "control: with BUFF_OFF no ward plan:
+got 1") were red.  WARDLINE_V036
+
+A Float line (`Driver:floatPlan`, `opts.floatVs`) was built beside it and
+no leg used it: the dragon's 50 Gs removes Float and nothing else
+(MagicProp $C3, `magic.py`), and in lab `x26` the party's Float lasted
+400-1300 frames a cast.  It was pruned in v0.36 (#460), with its half of
+the suite (then `battle_floatline`).
 
 ## 6. Supplies
 
@@ -361,10 +371,8 @@ the graph's play (`checkpoint_drift.py --recut`, at the release).
 4. **The checkpoints** were sealed from lab captures (section 7); the
    release's re-cut makes them the graph's play.
 5. **The Dirt Dragon** is the arc's hard fight (section 4): 1.00 and 1.55
-   deaths a fight in `so5` and `so6`, 20 keys won of 20.  The Float line is built and tested (`battle_floatline`) and
-   left out of this fight.  The Wall Rings the tower put on CELES, STRAGO
-   and RELM stay on for every other fight of the arc; nothing measured
-   them elsewhere.
+   deaths a fight in `so5` and `so6`, 20 keys won of 20; 1.73 in `so7`
+   (v0.36, without Dischord and without the tower's Wall Rings), 11 of 11.
 6. **Doom Gaze** fells one in four meetings (0.24 deaths a meeting over 29
    in `so5`); the hunt wins every run, at the bag's cost (section 6).
 7. **The labs before `dx2`** shared one driver across their trials
