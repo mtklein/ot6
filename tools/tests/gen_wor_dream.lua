@@ -18,13 +18,7 @@ local NAMES = { [TERRA] = "TERRA", [LOCKE] = "LOCKE", [CYAN] = "CYAN", [EDGAR] =
   [CELES] = "CELES", [STRAGO] = "STRAGO", [RELM] = "RELM", [SETZER] = "SETZER", [MOG] = "MOG", [GAU] = "GAU",
   [GOGO] = "GOGO", [UMARO] = "UMARO" }
 local SHOP_ITEMS = 74
-local function links(doors)
-  local out = {}
-  for _, d in ipairs(doors) do
-    for _, dir in ipairs({ "up", "down", "left", "right" }) do out[#out + 1] = { d[1], d[2], dir, d[3], d[4] } end
-  end
-  return out
-end
+local links = H.doorLinks
 -- Strago's house (map 349): the bedroom where Hidon's scene leaves the party and the hall, joined by two
 -- doors (gen_wor_gau's)
 local DOORS349 = { { 39, 10, 61, 20 }, { 60, 21, 38, 11 } }
@@ -32,314 +26,12 @@ local LINKS = { [MAP_HOUSE] = links(DOORS349) }
 local FIGHT = {}
 H.NAV_REFIRE_HOLD = true
 
-local function map() return H.mapId() & 0x1ff end
-local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
-local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
-local function c(ch, off) return 0x1600 + 37 * ch + off end
-local function lv(ch) return H.readByte(c(ch, 8)) end
-local function partyOf(ch) return H.readByte(0x1850 + ch) & 7 end
-local function settled()
-  return H.hasControl() and H.tileAligned() and bright() >= 15 and not H.dialogWaiting()
-end
-local function supplies()
-  return string.format("potion=%d tincture=%d fenix=%d remedy=%d revivify=%d tent=%d gil=%d", H.invCountOf(POTION),
-    H.invCountOf(TINCTURE), H.invCountOf(FENIX), H.invCountOf(REMEDY), H.invCountOf(REVIVIFY), H.invCountOf(TENT),
-    H.gil())
-end
-local function say(tag, what)
-  local pos = H.worldMode() and string.format("world (%d,%d)", H.worldX(), H.worldY())
-    or string.format("map %d (%d,%d)", map(), H.fieldX(), H.fieldY())
-  H.log(string.format("[%s] f%d %s %s; %s; %s", tag, H.frame, what, pos, H.partiesLine(), supplies()))
-end
-local function kitLine(members)
-  local t = {}
-  for _, ch in ipairs(members) do
-    local g = {}
-    for k = 0x1E, 0x24 do g[#g + 1] = string.format("%02X", H.readByte(c(ch, k))) end
-    t[#t + 1] = string.format("%s L%d kit %s", NAMES[ch], lv(ch), table.concat(g, " "))
-  end
-  return table.concat(t, "; ")
-end
--- walk onto (x, y) until the map reads dst (gen_wor_relm's)
-local function walkInto(x, y, dst, what, avoid)
-  local function there() return map() == dst and H.hasControl() and H.tileAligned() and bright() >= 15 end
-  return H.seqStep({
-    H.repeatN(3, {
-      H.cond(function() return not there() end, {
-        H.navTo(x, y, { maxFrames = 12000, playBattles = "tactical", fight = FIGHT, avoid = avoid,
-          arrive = function() return map() == dst end }),
-        H.release(),
-        H.waitUntil(function() return map() == dst end, 600, what .. ": onto map " .. dst, 5),
-      }, {}),
-    }),
-    H.waitUntil(there, 1200, what .. ": control on map " .. dst, 1),
-    H.call(function() say("route", what) end),
-  })
-end
--- off a field map's edge onto the world map (gen_wor_locke's outToWorld)
-local function outToWorld(dir, what)
-  local n = 0
-  return H.seqStep({
-    H.driveUntil(function() return H.worldMode() end, 3000, { H.hold({ dir }) }, what),
-    H.release(),
-    H.withReset(H.waitUntil(function()
-      local ok = H.worldSettled() and H.worldAligned() and H.worldPassable(H.worldX(), H.worldY())
-      n = ok and n + 1 or 0
-      return n >= 30
-    end, 2400, what .. ": back on the World of Ruin map"), function() n = 0 end),
-    H.call(function() say("wor", what) end),
-  })
-end
--- onto a world door until its field map holds the screen
-local function enterFrom(door, dst, what)
-  return H.seqStep({
-    H.worldNavTo(door[1], door[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
-      arrive = function() return map() == dst and not H.worldMode() end }),
-    H.waitUntil(function() return map() == dst and settled() end, 2400, what .. ": map " .. dst, 1),
-    H.call(function() say("route", what) end),
-  })
-end
--- boarding: on foot on the parked airship's tile, A boards (gen_wor_locke's)
-local function board()
-  local n, ph = 0, 0
-  local drv = H.fightDriverFor("board", { tactical = true, boost = true, items = true, healPercent = 55 }, FIGHT)
-  local battleFrames = 0
-  local function offTile()
-    return not H.battleLoadStarted() and H.worldSettled() and not H.aboardAirship()
-      and (H.worldX() ~= H.readByte(0x1F62) or H.worldY() ~= H.readByte(0x1F63))
-  end
-  return H.withReset(H.driveUntil(function()
-    n = H.airshipControl() and n + 1 or 0
-    return n >= 30
-  end, 30000, {
-    H.cond(offTile, {
-      H.worldNavTo(function() return H.readByte(0x1F62) end, function() return H.readByte(0x1F63) end,
-        { maxFrames = 6000, playBattles = "tactical", fight = FIGHT }),
-    }, {}),
-    H.call(function()
-      if H.battleLoadStarted() then
-        battleFrames = battleFrames + 1
-        if battleFrames >= 3 then drv.frame() end
-        return
-      end
-      if battleFrames > 0 then drv.idle() end
-      ph = (ph + 1) % 16
-      if H.aboardAirship() then H.setPad({}); return end
-      H.setPad(ph < 4 and { "a" } or {})
-    end),
-  }, "board the Falcon"), function() n, ph, battleFrames = 0, 0, 0 end)
-end
--- the cabin's waiting members (map 12) each ask "Change party members?"
--- (_caf59d); NPC_n is object $10 + n - 1, shown by its switch
--- (gen_wor_locke's regroup)
-local CABIN_NPCS = { { "TERRA", 0x10, 0x0388 }, { "CYAN", 0x12, 0x038B }, { "SABIN", 0x15, 0x038D },
-  { "CELES", 0x16, 0x038E }, { "STRAGO", 0x17, 0x038F }, { "RELM", 0x18, 0x0390 }, { "MOG", 0x1A, 0x0392 },
-  { "UMARO", 0x1D, 0x0395 }, { "EDGAR", 0x14, 0x038C }, { "SETZER", 0x19, 0x0391 } }
-local function regroup(members)
-  local obj = nil
-  local function pickTalker()
-    obj = nil
-    for _, n in ipairs(CABIN_NPCS) do
-      local ox, oy = H.objX(n[2]), H.objY(n[2])
-      local reach = H.bfsPath(ox, oy + 1) or H.bfsPath(ox - 1, oy) or H.bfsPath(ox + 1, oy) or H.bfsPath(ox, oy - 1)
-      if obj == nil and sw(n[3]) == 1 and reach then obj = n end
-    end
-    return obj
-  end
-  return H.seqStep({
-    board(),
-    H.withReset((function()
-      local ph = 0
-      return H.driveUntil(function() return map() == MAP_DECK and settled() end, 2400, {
-        H.call(function()
-          ph = (ph + 1) % 16
-          H.setPad((H.airshipControl() and ph < 4) and { "x" } or {})
-        end),
-      }, "X: to the Falcon's deck (map 11)")
-    end)(), function() end),
-    walkInto(24, 8, MAP_CABIN, "the deck -> the cabin (map 12)"),
-    H.call(function() pickTalker() end),
-    H.cond(function() return obj == nil end, {
-      H.navTo(23, 44, { maxFrames = 3000, arrive = function() return H.fieldY() < 40 end }),
-      H.waitUntil(function() return settled() and H.fieldY() < 40 end, 1200, "up the cabin's stairs", 1),
-      H.call(function() pickTalker() end),
-    }, {}),
-    H.call(function()
-      H.assertEq(obj ~= nil, true, "a member waits in the cabin to talk to")
-      H.log(string.format("[regroup] talking to %s (obj $%02X, show-switch $%04X)", obj[1], obj[2], obj[3]))
-    end),
-    -- the waiting members wander: chaseTalk re-plans its approach every step and stops on the prompt
-    H.lazy(function() return H.chaseTalk(obj[2], 6000, obj[1] .. " in the cabin") end),
-    H.dialogChoice(1, { inBattle = false, what = "Change party members? Yes", tag = "the cabin" }),
-    H.partySelect(members, { tag = "the Falcon's cabin" }),
-    H.waitUntil(function() return map() == MAP_DECK and settled() end, 2400, "back on the deck after the menu", 5),
-    H.call(function()
-      local n = 0
-      for ch = 0, 13 do if partyOf(ch) == 1 then n = n + 1 end end
-      for _, ch in ipairs(members) do
-        H.assertEq(partyOf(ch), 1, string.format("%s is in party 1 after the regroup", NAMES[ch]))
-      end
-      H.assertEq(n, #members, "party 1 holds exactly the regroup's members")
-      say("regroup", "after the menu")
-    end),
-  })
-end
--- lift off from the deck's wheel (_caf532: face left, A held on (15,8))
-local function liftOff()
-  return H.seqStep({
-    H.navTo(15, 8, { maxFrames = 3000 }),
-    H.faceAndHoldA("left", function() return H.dialogWaiting() end, 1200, "the Falcon's wheel (11 (15,8)): face left, A"),
-    H.release(),
-    H.dialogChoice(0, { inBattle = false, what = "the wheel: (Lift-off)", tag = "the wheel" }),
-  })
-end
--- the key of every battle (reads only)
-local watchOn = false
-local function watches()
-  return H.call(function()
-    if watchOn then return end
-    watchOn = true
-    local addr = H.seedStoreAddr()
-    emu.addMemoryCallback(function()
-      H.log(string.format("[key] battle key be%02X-g%04X f%d map %d party %d", emu.getState()["cpu.a"] & 0xff,
-        H.readWord(0x11e0), H.frame, map(), H.activeParty()))
-    end, emu.callbackType.exec, addr, addr)
-  end)
-end
--- a walk over a map's floor and its doors
-local function walk(x, y, what, avoid, arrive)
-  return H.seqStep({
-    H.lazy(function()
-      return H.navLinks(x, y, LINKS[map()] or {}, { what = what, maxFrames = 12000, playBattles = "tactical",
-        fight = FIGHT, avoid = avoid, arrive = arrive })
-    end),
-    H.call(function() say("route", what) end),
-  })
-end
--- a chest from whichever side of it the party can reach (gen_wor_ragnarok's)
-local function chestAt(cx, cy, bit, what, item)
-  return H.lazy(function()
-    for _, o in ipairs({ { 0, 1, "up" }, { -1, 0, "right" }, { 1, 0, "left" }, { 0, -1, "down" } }) do
-      local legs = H.bfsReach(nil, nil, nil, LINKS[map()] or {}, cx + o[1], cy + o[2])
-      if legs then
-        return H.seqStep({
-          walk(cx + o[1], cy + o[2], what .. ": beside it"),
-          H.openChest({ stand = { cx + o[1], cy + o[2] }, face = o[3], bit = bit, what = what, item = item,
-            nav = { fight = FIGHT } }),
-        })
-      end
-    end
-    error(string.format("[chest] %s (%d,%d): no side of it is reachable from (%d,%d)", what, cx, cy,
-      H.fieldX(), H.fieldY()))
-  end)
-end
-local function objLine(o0, o1)
-  local t = {}
-  for o = o0 or 0x10, o1 or 0x14 do t[#t + 1] = string.format("$%02X(%d,%d)", o, H.objX(o), H.objY(o)) end
-  return table.concat(t, " ")
-end
--- ---- the Dreams arc's helpers ----
-local function inParty(ch) return partyOf(ch) == 1 end
-local function partyCount()
-  local n = 0
-  for ch = 0, 13 do if partyOf(ch) == 1 then n = n + 1 end end
-  return n
-end
--- land the Falcon on the landable tile nearest (tx, ty) that a walk reaches it from (the world's own tile
--- properties: H.airshipCanLandAt, H.worldPassable, H.worldBfs), read once the pilot has the controls
-local function landNear(tx, ty, what)
-  return H.seqStep({
-    H.waitUntil(function() return H.airshipControl() end, 3000, what .. ": the pilot's controls", 5),
-    H.lazy(function()
-      local best, bd = nil, 1e9
-      for dy = -6, 6 do
-        for dx = -6, 6 do
-          local x, y = tx + dx, ty + dy
-          if not (dx == 0 and dy == 0) and H.airshipCanLandAt(x, y) and H.worldPassable(x, y) then
-            local d = dx * dx + dy * dy
-            if d < bd and H.worldBfs(tx, ty, nil, x, y) then best, bd = { x, y }, d end
-          end
-        end
-      end
-      H.assertEq(best ~= nil, true, string.format("%s: a landable tile near (%d,%d) with a walk to it", what, tx, ty))
-      H.log(string.format("[land] %s: landing on (%d,%d) for (%d,%d)", what, best[1], best[2], tx, ty))
-      return H.flyTo(best[1], best[2], { what = what, fight = FIGHT })
-    end),
-  })
-end
--- talk to object o from whichever side of it the party can reach, the walk playing its battles; done() ends it
-local function talkNpc(o, done, what)
-  return H.seqStep({
-    H.lazy(function()
-      local ox, oy = H.objX(o), H.objY(o)
-      for _, s in ipairs({ { 0, 1, "up" }, { -1, 0, "right" }, { 1, 0, "left" }, { 0, -1, "down" } }) do
-        if H.bfsReach(nil, nil, nil, LINKS[map()] or {}, ox + s[1], oy + s[2]) then
-          return H.seqStep({
-            walk(ox + s[1], oy + s[2], what .. ": beside it"),
-            H.faceAndHoldA(s[3], function() return done() or H.dialogWaiting() end, 900, what),
-            H.release(),
-          })
-        end
-      end
-      error(string.format("[talk] %s: no side of obj $%02X (%d,%d) is reachable", what, o, ox, oy))
-    end),
-    H.advanceStory(function() return done() and settled() end, 6000, { playBattles = "tactical", fight = FIGHT }),
-    H.call(function() say("story", what) end),
-  })
-end
--- stand on (x, y) and face up with A until done() (a step-on switch that reads the facing and the A button,
--- $01B0 and $01B4)
-local function pressUp(x, y, done, what)
-  return H.seqStep({
-    H.cond(function() return not done() end, {
-      walk(x, y, what .. ": onto (" .. x .. "," .. y .. ")"),
-      H.faceAndHoldA("up", function() return done() end, 900, what),
-      H.release(),
-      H.advanceStory(function() return settled() end, 3000, { playBattles = "tactical", fight = FIGHT }),
-    }, {}),
-    H.call(function() say("story", what) end),
-  })
-end
--- the object standing on (x, y), or nil (an unshown object reads (0,0))
-local function objOn(x, y)
-  for o = 0x10, 0x3F do
-    if H.objX(o) == x and H.objY(o) == y then return o end
-  end
-  return nil
-end
-
--- ---- Kohlingen: the arc's counter ----
--- No town on the arc sells anything but Kohlingen, beside Figaro Castle's Kohlingen side: its general store
--- (189 (11,11) -> 194 (12,39); the item counter's keeper (19,35), shop 67) tops the bag up to the band (guidelines
--- "Supply band": Potions about level x 1.5 before a boss gauntlet and the field care's own, careStockPotions;
--- Fenix Downs about the level, capped at 20; Remedies for the dream's Petrify and Sap), and its weapon and armor
--- counters are the gear stop (H.gearStop, #434).  The town's south edge returns the party to the world.
-local MAP_KOHLINGEN, MAP_KSTORE, KOHLINGEN_DOOR, SHOP_KITEMS = 189, 194, { 38, 45 }, 67
-local function kohlingenStop(what)
-  return H.seqStep({
-    H.waitUntil(function() return H.airshipControl() end, 3000, what .. ": the pilot's controls", 5),
-    landNear(KOHLINGEN_DOOR[1], KOHLINGEN_DOOR[2], what .. ": the Falcon down by Kohlingen"),
-    H.worldNavTo(KOHLINGEN_DOOR[1], KOHLINGEN_DOOR[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
-      arrive = function() return not H.worldMode() end }),
-    H.waitUntil(function() return map() == MAP_KOHLINGEN and settled() end, 2400, what .. ": Kohlingen, map 189", 1),
-    H.gearStop({ tag = what .. ": gear Kohlingen", fight = FIGHT }),
-    H.crossDoor(11, 11, MAP_KSTORE, 12, 39, what .. ": Kohlingen's store 189 (11,11) -> 194", { fight = FIGHT }),
-    H.shopTalk(19, 35, what .. ": Kohlingen's item counter", { fight = FIGHT }),
-    H.call(function() H.assertEq(H.shopId(), SHOP_KITEMS, "the counter opened shop 67 ($0201)") end),
-    H.buyItem(POTION, function() return math.max(0, H.careStockPotions(H.activeTopLevel(), { spend = 30 })
-      - H.invCountOf(POTION)) end, "POTION to the band"),
-    H.buyItem(REMEDY, function() return math.max(0, 20 - H.invCountOf(REMEDY)) end, "REMEDY to 20"),
-    H.buyItem(FENIX, function() return math.max(0, math.min(20, H.activeTopLevel()) - H.invCountOf(FENIX)) end,
-      "FENIX DOWN to the level, capped at 20"),
-    H.shopClose(what .. ": Kohlingen's item counter"),
-    H.bagArrange({ POTION, FENIX, REMEDY, TINCTURE }, { tag = what .. ": bag: combat items on top" }),
-    H.call(function() say("shop", what .. ": Kohlingen") end),
-    walkInto(12, 40, MAP_KOHLINGEN, what .. ": the store -> Kohlingen"),
-    H.navTo(23, 29, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT }),
-    outToWorld("down", what .. ": out of Kohlingen by the south edge"),
-    board(),
-  })
-end
+-- the World of Ruin legs' helpers (lib/ot6_field.lua, H.worLegKit)
+local K = H.worLegKit({ fight = FIGHT, links = LINKS, names = NAMES })
+local map, bright, sw, lv, settled = K.map, K.bright, K.sw, K.lv, K.settled
+local say, kitLine, walkInto, regroup, liftOff = K.say, K.kitLine, K.walkInto, K.regroup, K.liftOff
+local watches, walk, chestAt, inParty, partyCount = K.watches, K.walk, K.chestAt, K.inParty, K.partyCount
+local landNear, talkNpc, pressUp, objOn, kohlingenStop = K.landNear, K.talkNpc, K.pressUp, K.objOn, K.kohlingenStop
 
 -- ---- Doma and the dream's maps ----
 local DOMA_DOOR = { 171, 75 }
@@ -361,6 +53,7 @@ LINKS[MAP_SCAPE] = links({ { 11, 38, 24, 43 }, { 9, 44, 9, 50 }, { 3, 47, 5, 44 
 -- cabin leaves is CYAN, CELES, RELM, TERRA, so TERRA walks (L50, her Ultima at 3 BP and her Morph) and CELES
 -- and RELM wait
 local DREAM = { CYAN, CELES, RELM, TERRA }
+local WALL_RING = 0xBB
 -- the first car's levers (321: _cb8dc3, _cb8e1d, _cb8e7d toggle $0184-$0186, which move its walls) and its
 -- panel: six switches (map switches $01F1-$01F6, cleared at every map load) that the check (9,5) wants at
 -- 0 0 1 1 1 0 (_cb8ec1), the pattern the second car's lever shows (_cb911a, "Memorize the positions.")
@@ -442,6 +135,29 @@ H.run({ maxFrames = 2400000 }, {
   H.gearDress({ tag = "gear for Doma" }),
   H.dressRelics({ { CYAN, "CYAN" }, { CELES, "CELES" }, { RELM, "RELM" }, { TERRA, "TERRA" } },
     { tag = "relics for Doma" }),
+  -- Wall Rings for the dream and Doma (CELES, RELM and TERRA, the second relic slot): the Barb-e groups' Imp
+  -- and their other spells rebound.  Without them (the tower took its rings off, #460) the party stalled on
+  -- a lone Barb-e (formation $13D) in 7 of 24 runs of this leg and the next (build/attempts/wt/v036-route/lab/
+  -- sd7_*, sdo7_*: 'timeout after 92000 frames', '[status] ... entity 1 char 8 is an IMP', every Fight
+  -- 'took 0 off the monsters', keys be20, be1C and beE8 of $13D), and with them the same variants passed
+  -- (rd_k1_s7, rd_k2_s7, rd_k5_s7, rdo_k1_s7, which met other keys); the sweep after won beE8 in 5 of 5
+  -- (sdo8).  The Ancient Castle's leg takes them off for the Blue Dragon (gen_wor_ancient)
+  H.lazy(function()
+    local steps = {}
+    for _, ch in ipairs({ CELES, RELM, TERRA }) do
+      if H.readByte(0x1600 + 37 * ch + 0x23) ~= WALL_RING and H.readByte(0x1600 + 37 * ch + 0x24) ~= WALL_RING
+         and H.invCountOf(WALL_RING) > 0 then
+        steps[#steps + 1] = H.equipKit(ch, { { 5, WALL_RING } }, { tag = NAMES[ch] .. ": a Wall Ring for the dream" })
+      end
+    end
+    steps[#steps + 1] = H.call(function()
+      for _, ch in ipairs({ CELES, RELM, TERRA }) do
+        H.assertEq(H.readByte(0x1600 + 37 * ch + 0x23) == WALL_RING or H.readByte(0x1600 + 37 * ch + 0x24) == WALL_RING,
+          true, NAMES[ch] .. " wears a Wall Ring for the dream (the Barb-e groups)")
+      end
+    end)
+    return H.seqStep(steps)
+  end),
   H.call(function() H.log("[kit] " .. kitLine(DREAM)) end),
   H.fieldCare({ threshold = 1.0, tag = "before Doma" }),
   liftOff(),

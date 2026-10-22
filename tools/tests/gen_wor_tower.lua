@@ -675,14 +675,19 @@ local function stonesFor(set, tag)
   return H.seqStep(steps)
 end
 -- the Wall Rings on and off: each member's second relic (slot 5) gives way
--- to a Wall Ring and comes back before a boss
+-- to a Wall Ring and comes back before the Holy Dragon and out of the
+-- tower.  The relic it gave way to is recorded only while no Wall Ring is
+-- in the slot: an "on" over a ring already worn recorded the ring itself,
+-- and every "off" after it then had nothing to put back (#460: the rings
+-- stayed on from the fourth floor for the rest of the World of Ruin)
 local heldRelic = {}
 local function wallRingsOn()
   local steps = {}
   for _, m in ipairs(PARTY) do
     steps[#steps + 1] = lazy(function()
-      heldRelic[m[1]] = H.readByte(c(m[1], 0x24))
-      if heldRelic[m[1]] == WALL_RING or H.readByte(c(m[1], 0x23)) == WALL_RING then return H.call(function() end) end
+      local cur = H.readByte(c(m[1], 0x24))
+      if cur ~= WALL_RING then heldRelic[m[1]] = cur end
+      if cur == WALL_RING or H.readByte(c(m[1], 0x23)) == WALL_RING then return H.call(function() end) end
       return H.equipKit(m[1], { { 5, WALL_RING } }, { tag = m[2] .. ": a Wall Ring" })
     end)
   end
@@ -758,7 +763,14 @@ H.run({ maxFrames = 1500000 }, {
   -- with 'casting off' (build/attempts/wt/v030-route/lab/tower/c12); and
   -- the four walk into each fight near whole (c15 met the fourth floor's
   -- L.90 Magic with TERRA at 2,478 of 3,591 and CELES at 2,642 of 3,595)
-  H.call(function() H.careMpBand = 0.6; H.careFloat = true; H.careMagic = true; H.careThreshold = 0.95 end),
+  -- The care casts its cures before it reaches for the bag (H.careCastFirst): inside there is no Tent or
+  -- inn, so MP is bought back with Tinctures (1500 GP for 50 MP), and a Cure (5 MP, 150 GP of it) heals
+  -- about 700 of a member's 3,500 where a Potion (300 GP) heals 250.  Bag first, the first floor's randoms
+  -- drank 87 Potions and the party left the tower with 2 (main's wor_tower play: 'on the second floor:
+  -- ... potion=12', 'beside the Falcon after the tower ... tonic=0 potion=2 ... tincture=1 ... tent=0')
+  H.call(function()
+    H.careMpBand = 0.6; H.careFloat = true; H.careMagic = true; H.careThreshold = 0.95; H.careCastFirst = true
+  end),
   H.call(function()
     say("wor", "boot")
     H.log("[wor] " .. kitLine())
@@ -880,7 +892,11 @@ H.run({ maxFrames = 1500000 }, {
   -- in it passed every turn of MagiMaster's fight ('cmds=17,FF,FF,01',
   -- 'actor=0 char=0 plan=switch': build/attempts/wt/v030-route/lab/tower/
   -- cap2)
-  wallRingsOff("MagiMaster"),
+  -- MagiMaster is fought in the Wall Rings: every sweep that measured his
+  -- fight had them on (build/attempts/wt/v031-tower-2/lab/sw13_k0_s5:
+  -- 'dressed for MagiMaster: kit TERRA 02 06 64 7F 94 CA BB'), the "off"
+  -- that stood here restoring nothing (the fourth floor's "on" had
+  -- recorded the rings, #460)
   -- TERRA onto Shiva (Shell for his Ultima; her own Life, Drain, Break and
   -- Pearl stay), STRAGO onto Sraphim (Cure and a second Life: one Life 3
   -- caster lost him the fight he had already won, his Ultima falling on
@@ -928,7 +944,9 @@ H.run({ maxFrames = 1500000 }, {
   -- the climb's kit back on for the walk down: the floors' randoms are the
   -- climb's, and in MagiMaster's kit (no Wall Rings, no Float caster) the
   -- fourth floor's L.60 and L.90 Magic wiped the four with Quake and
-  -- Merton (build/attempts/wt/v031-tower/lab/dn2_*: 'atk $15', 'atk $17')
+  -- Merton (build/attempts/wt/v031-tower/lab/dn2_*: 'atk $15', 'atk $17').  The care keeps casting first on
+  -- the way down: bag first there, the walk spent the Potions the climb had kept, to 4 in three of eighteen
+  -- runs, and saved no MP (build/attempts/wt/v036-route/lab/tw2_*, against tw1_*)
   H.call(function() FIGHT.cure = false end),
   stonesFor({ { TERRA, MADUIN }, { RELM, IFRIT }, { STRAGO, PALIDOR }, { CELES, TRITOCH } }, "stones for the walk down"),
   wallRingsOn(),
@@ -943,10 +961,16 @@ H.run({ maxFrames = 1500000 }, {
   -- back up (build/attempts/wt/v031-tower/lab/dn3_*_s0: 'no path (8,1)->(8,14)')
   via({ { 5, 3 }, { 5, 2 }, { 7, 3 } }, "the tower's foot: round the stair's head", { { 8, 1 } }),
   toFalconBy(8, 14, "down", "the tower's foot", { { TOWER_DOOR[1], TOWER_DOOR[2] } }),
-  -- the save is next, so the casters spend their MP to the last point (mpFloor 0): a draw that leaves the bag
-  -- without Potions or Tents here shipped CELES at 449/3595 under the default floor (the v0.34 qualification
-  -- q1, audit_party_hp; build/attempts/wt/v034-wor-gogo/lab/x23: the same care from that save, all four full)
-  H.fieldCare({ threshold = 1.0, mpFloor = 0, tag = "beside the Falcon" }),
+  -- out of the tower the Wall Rings come off: Reflect turns the party's own Cure and Shell away from its
+  -- wearers, and nothing past the tower is fought magic-only (#460; route-wor-gogo.md section 4: the Dirt
+  -- Dragon's sweeps won 20 keys of 20 with them off)
+  wallRingsOff("the World of Ruin"),
+  H.call(function()
+    for _, m in ipairs(PARTY) do
+      H.assertEq(H.readByte(c(m[1], 0x24)) ~= WALL_RING, true, m[2] .. " wears no Wall Ring out of the tower")
+    end
+  end),
+  H.fieldCare({ threshold = 1.0, tag = "beside the Falcon" }),
   H.call(function()
     say("wor", "beside the Falcon after the tower")
     H.log("[wor] " .. kitLine())

@@ -110,6 +110,11 @@ launchers `lab.sh`, `go.sh`, `run.sh`, `multi.sh`, `rawlab.sh`, `genlab.sh`,
 | `gen_wor_doma` | `wor-dream-v1` | `wor-doma-v1` | Wrexsoul (the Zinger line), the wake, Alexandr (on CYAN), the care, out of Doma, the save on the Falcon's tile (170,75); also `wor_doma_throne` (`battle_zinger`'s fixture) |
 | `gen_wor_ancient` | `wor-doma-v1` | `wor-ancient-v1` | Kohlingen's counter, Figaro Castle stopped under the stratum, the Ancient Castle (the flashback, Odin, the queen's passage, the book, Raiden, the Blue Dragon), the two rides back, the save on the Falcon's tile (49,58); also `wor_ancient_dragon` |
 
+The walks' helpers the arc's leg builder stamped into each generator (the
+cabin and its wheel, the doors and edges, chests, talks, the battle key and
+supplies lines) live in `lib/ot6_field.lua` since v0.36 (`H.worLegKit`,
+#456); each generator keeps its own route.
+
 ## 2. The order and the party
 
 The Opera House -> the Falcon's cabin (CYAN, CELES, RELM, TERRA, in that
@@ -323,10 +328,27 @@ char 2 (pos 2) wears $0E").  Raiden replaces Odin in the bag and is worn by
 nobody: the four's stones (TERRA's Maduin, CELES's Tritoch, RELM's Ragnarok,
 CYAN's Alexandr) grant their lists while worn (`Ot6EsperSpellKnown`), and a
 swap would take a list away mid-arc.  For the Blue Dragon the Wall Rings
-(CELES, RELM and TERRA wear them from the tower) give way to the bag's
-Czarina Ring, Barrier Ring and Earrings (`wallRingsOff`; route-wor-gogo.md
-section 4: Reflect turns the party's own Cure and Shell away), and go back
-on after it.  The Ancient Castle's chests taken: the Gold Hairpin and the
+(CELES, RELM and TERRA wear them) give way to the bag's Czarina Ring,
+Barrier Ring and Earrings (`wallRingsOff`; route-wor-gogo.md section 4:
+Reflect turns the party's own Cure and Shell away), and go back on after
+it.  Until v0.36 the rings were the tower's, left on by mistake
+(route-wor-thamasa.md 12.2); the tower now takes them off, and the dream
+leg puts them on CELES, RELM and TERRA at the cabin (#460).  Without them
+the party stalled on a lone Barb-e (formation $13D: its Imp landed, and
+every Fight "took 0 off the monsters" until the leg's time ran out) in 3 of
+12 runs of the dream leg and 4 of 12 of Doma's (sweeps `sd7`, `sdo7` at
+ef239262, all at shift 7: three distinct draws of the dream, one of
+Doma's K battles; the stalled keys be20, be1C and beE8 of $13D); with
+the rings on, the same variants passed (`rd_k1_s7`, `rd_k2_s7`, `rd_k5_s7`,
+`rdo_k1_s7`, which met other keys; `build/attempts/wt/v036-route/lab/`),
+and the sweep after won Doma's beE8 in 5 of 5 (`sdo8`).  The leg asserts
+the three rings are on.  Sweeps at de405a9b
+(K 0-5 at shifts 0 and 7, from the chain's own boots at that commit):
+`sd8` 12 of 12 PASS, the stooges 12 keys won of 12, no deaths, Barb-e,
+Samurai and Suriander 21 of 21; `sdo8` 12 of 12, Wrexsoul 11 of 11, 1.27
+deaths a fight, one down at most; `sa4` 12 of 12, the Blue Dragon 10 of 10,
+no deaths (`build/attempts/wt/v036-route/fight_report_sd8.txt`,
+`fight_report_sdo8.txt`, `fight_report_sa4.txt`).  The Ancient Castle's chests taken: the Gold Hairpin and the
 Blizzard Orb (406), the X-Ether (408); the cave's (401) and the two monster
 chests (Master Pug, KatanaSoul) are left (section 8).  CYAN's SwdTechs:
 kits.md "On the route".

@@ -10522,7 +10522,6 @@ function Driver:makePlan(actor)
   self._race = nil
   plan = self:lockeMug(actor, plan)
   plan = self:dodgePlan(actor, plan)
-  plan = self:floatPlan(actor, plan)
   plan = self:buffPlan(actor, plan)
   plan = self:zingerPlan(actor, plan)
   plan = self:policyPlan(actor, plan)
@@ -10569,47 +10568,6 @@ function Driver:dodgePlan(actor, plan)
   return plan
 end
 
--- Float against an earth caster (#270): opts.floatVs = { [species] = true }.
--- While one of these stands and a living member is not floating (ST4 bit 7),
--- an actor with Float ($22) in its Magic list casts it on the whole party
--- (the all-allies latch, as the party cure takes) in place of an attack:
--- earth misses a floating body (the Opera House's Dirt Dragon casts Quake,
--- Magnitude8 and Slide, and Quake felled the q2 qualification's first
--- attempt: build/attempts/wt/v034-wor-gogo/q2).  A heal, an item, a raise or
--- a defer the rules chose stands; a cast already in flight (confirmed in the
--- last 600 frames) is not doubled.  Shaped like magicOnlyLine's shellVs.
--- FLOAT_OFF (a global) turns it off, the control arm.
-M.FLOAT_SPELL = 0x22
-Driver.FLOAT_OVER = { fight = true, skill = true, magic = true, lore = true, tools = true, mimic = true,
-  summon = true, throw = true, runic = true, slot = true, morph = true, magitek = true, rage = true }
-function Driver:floatPlan(actor, plan)
-  local fv = self.opts.floatVs
-  if fv == nil or FLOAT_OFF or plan == nil or not Driver.FLOAT_OVER[plan.kind] then return plan end
-  if plan.kind == "magic" and plan.spell == M.FLOAT_SPELL then return plan end
-  local danger = false
-  for s = 0, 5 do if monAlive(s) and fv[M.readWord(0x57C0 + s * 2)] then danger = true end end
-  if not danger then return plan end
-  local row = cmdRow(actor, BATTLE.CMD_MAGIC)
-  if row == nil or spellCell(actor, M.FLOAT_SPELL, true) == nil then return plan end
-  if M.frame - (self.floatAt or -100000) <= 600 then return plan end
-  local bare, mask = nil, 0
-  for e = 0, 3 do
-    local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
-    local up = (M.readByte(BATTLE.ST4 + e * 2) & 0x80) ~= 0
-    if up then mask = mask | (1 << e) end
-    if bare == nil and mx > 0 and mx ~= 0xFFFF and hp > 0 and not up then bare = e end
-  end
-  self.floatMask = mask
-  if bare == nil then return plan end
-  self.floatAt = M.frame
-  M.floats = M.floats or {}
-  M.floats[#M.floats + 1] = { actor = actor, frame = M.frame, bare = bare, over = plan.kind }
-  M.log(string.format("[%s] actor=%d Float on the party (entity %d is not floating, floating mask $%X; an earth "
-    .. "caster stands): in place of its %s", self.tag or "fight", actor, bare, mask, plan.kind))
-  return { kind = "magic", spell = M.FLOAT_SPELL, row = row, boostLeft = 0, ally = true, all = true,
-           target = bare, buff = true, vetoOk = true, reason = "float" }
-end
-
 -- Wards against a hard caster (#270): opts.buffVs = { [species] = { spell, ... } }.
 -- While one of these stands, an actor whose Magic list holds one of the
 -- spells (Shell $25 halves magic, Safe $1C physical, Haste $1F) puts it on
@@ -10620,10 +10578,14 @@ end
 -- frames) is not doubled.  BUFF_OFF (a global) turns it off.  The Dirt
 -- Dragon's earth spells strip no ward but Float (its 50 Gs removes Float
 -- alone: build/attempts/wt/v034-wor-gogo/lab/magic.py C3), so Shell holds where Float does not.
+-- the plans a ward may take the place of: an attack of any verb (a heal, an item, a raise or a defer the
+-- rules chose stands)
+Driver.BUFF_OVER = { fight = true, skill = true, magic = true, lore = true, tools = true, mimic = true,
+  summon = true, throw = true, runic = true, slot = true, morph = true, magitek = true, rage = true }
 Driver.BUFF_STATUS = { [0x25] = { 0x3EF8, 0x20 }, [0x1C] = { 0x3EF8, 0x40 }, [0x1F] = { 0x3EF8, 0x08 } }
 function Driver:buffPlan(actor, plan)
   local bv = self.opts.buffVs
-  if bv == nil or BUFF_OFF or plan == nil or not Driver.FLOAT_OVER[plan.kind] or plan.buff then return plan end
+  if bv == nil or BUFF_OFF or plan == nil or not Driver.BUFF_OVER[plan.kind] or plan.buff then return plan end
   local spells = nil
   for s = 0, 5 do
     local sp = monAlive(s) and bv[M.readWord(0x57C0 + s * 2)]

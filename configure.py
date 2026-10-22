@@ -557,9 +557,9 @@ TEST_ENV = {
     # #270: the driver's Mimic line for GOGO, on the Dirt Dragon from the
     # wor_opera leg's snapshot at the Opera House's catwalk switch
     "battle_mimicdriver": "OT6_TIMEOUT=3600",
-    # #270: the driver's Float line against the Dirt Dragon's earth, from the
+    # #270: the driver's ward line (Shell) against the Dirt Dragon, from the
     # same snapshot
-    "battle_floatline": "OT6_TIMEOUT=1800",
+    "battle_wardline": "OT6_TIMEOUT=1800",
     # #271: the driver's Zinger line against Wrexsoul, from the wor_doma leg's
     # snapshot below the dream's throne
     "battle_zinger": "OT6_TIMEOUT=3600",
