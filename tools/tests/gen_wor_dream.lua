@@ -53,6 +53,7 @@ LINKS[MAP_SCAPE] = links({ { 11, 38, 24, 43 }, { 9, 44, 9, 50 }, { 3, 47, 5, 44 
 -- cabin leaves is CYAN, CELES, RELM, TERRA, so TERRA walks (L50, her Ultima at 3 BP and her Morph) and CELES
 -- and RELM wait
 local DREAM = { CYAN, CELES, RELM, TERRA }
+local WALL_RING = 0xBB
 -- the first car's levers (321: _cb8dc3, _cb8e1d, _cb8e7d toggle $0184-$0186, which move its walls) and its
 -- panel: six switches (map switches $01F1-$01F6, cleared at every map load) that the check (9,5) wants at
 -- 0 0 1 1 1 0 (_cb8ec1), the pattern the second car's lever shows (_cb911a, "Memorize the positions.")
@@ -134,6 +135,23 @@ H.run({ maxFrames = 2400000 }, {
   H.gearDress({ tag = "gear for Doma" }),
   H.dressRelics({ { CYAN, "CYAN" }, { CELES, "CELES" }, { RELM, "RELM" }, { TERRA, "TERRA" } },
     { tag = "relics for Doma" }),
+  -- Wall Rings for the dream and Doma (CELES, RELM and TERRA, the second relic slot): the Barb-e groups' Imp
+  -- and their other spells rebound.  Without them (the tower took its rings off, #460) the party stalled on
+  -- a lone Barb-e (formation $13D) in 7 of 24 runs of this leg and the next (build/attempts/wt/v036-route/lab/
+  -- sd7_*, sdo7_*: 'timeout after 92000 frames', '[status] ... entity 1 char 8 is an IMP', every Fight
+  -- 'took 0 off the monsters'), and with them the same four draws passed (rd_k1_s7, rd_k2_s7, rd_k5_s7,
+  -- rdo_k1_s7).  The Ancient Castle's leg takes them off for the Blue Dragon (gen_wor_ancient)
+  H.lazy(function()
+    local steps = {}
+    for _, ch in ipairs({ CELES, RELM, TERRA }) do
+      if H.readByte(0x1600 + 37 * ch + 0x23) ~= WALL_RING and H.readByte(0x1600 + 37 * ch + 0x24) ~= WALL_RING
+         and H.invCountOf(WALL_RING) > 0 then
+        steps[#steps + 1] = H.equipKit(ch, { { 5, WALL_RING } }, { tag = NAMES[ch] .. ": a Wall Ring for the dream" })
+      end
+    end
+    steps[#steps + 1] = H.call(function() end)
+    return H.seqStep(steps)
+  end),
   H.call(function() H.log("[kit] " .. kitLine(DREAM)) end),
   H.fieldCare({ threshold = 1.0, tag = "before Doma" }),
   liftOff(),

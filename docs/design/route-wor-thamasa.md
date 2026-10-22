@@ -748,3 +748,40 @@ and L.80 Magic in 31 of 42, the L.90 and L.60 Magic in 18 of 24; his fight
 ran 53,495 to 198,092 ticks. The draws of sw4_k5_s3 and sw2_k3_s0 passed
 (`re5_*`), and with the dead-open tail rule switched off (`mut6_k5_s3`)
 the k5 s3 draw failed `MagiMaster: its formation was fought once: got 2`.
+
+### 12.2 The bag and the rings out of the tower (v0.36, #457, #460)
+
+Evidence under `build/attempts/wt/v036-route/lab/`.
+
+- **The bag.** The care healed from the bag first, and a Potion gives 250
+  of a member's 3,500 HP, so the first floor's randoms drank 87 Potions
+  and the party left the tower with 2 (main's play at cfae9e47, and lab
+  `tw0_k0_s0`, the old generator from the tracked `wor-tower-v1`:
+  "beside the Falcon after the tower ... tonic=0 potion=2 ... tincture=1
+  ... tent=0"). Inside there is no Tent or inn, so MP is bought back with
+  Tinctures (1,500 GP for 50 MP), and a Cure costs 5 MP (150 GP of
+  Tinctures) for about 700 HP (`tw1_k1_s7`: "cast $2D on char 7: 402 ->
+  1087 hp, caster 256 -> 251 mp"). The tower's care now casts first
+  (`H.careCastFirst`, the field care's `opts.castFirst`) and reaches for
+  the bag when no cure can be cast. The last care's spend-MP-to-zero
+  stopgap is gone. Over the sweep `tw1` (K 0-5 at shifts 0, 7 and 13: 18
+  of 18 PASS at one attempt) the save held 66 to 95 Potions and 4 Tonics,
+  every member at full HP. Tinctures still run down to 1-26 (the climb's
+  attacks are its MP), and in 3 of 18 runs a member reached the save under
+  a fifth of his MP (`tw1_k1_s7`: TERRA 9/559; the next leg's first stop is
+  Thamasa's inn). A walk down that healed from the bag again (`tw2`) left
+  4 Potions in three runs and saved no MP, so it was dropped.
+- **The rings.** The Wall Rings came off before the Holy Dragon and went
+  back on after him, but the fourth floor's second "on" recorded the
+  rings themselves as the relic to restore, so every later "off" restored
+  nothing: MagiMaster has always been fought in them (`v031-tower-2/lab/
+  sw13_k0_s5`: "dressed for MagiMaster: kit TERRA 02 06 64 7F 94 CA BB"),
+  and CELES, STRAGO, RELM and TERRA left the tower wearing them. The
+  record now skips a ring already worn; MagiMaster's fight is left as
+  measured, in the rings; and out of the tower, beside the Falcon, the
+  rings come off and each member's relic from before the climb goes back
+  on (every run of `tw1`: slot 5 TERRA $C3, CELES $B1, STRAGO $B5, RELM
+  $B1).
+- **The sweep.** `tw1` at e4491312: 18 of 18 PASS at one attempt; the Holy
+  Dragon in 16 distinct keys over 19 meetings (with `tw0`), MagiMaster in
+  14 over 19, every one won (`tally_tw.txt`).
