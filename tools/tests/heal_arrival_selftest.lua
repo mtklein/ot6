@@ -321,9 +321,9 @@ local function barbe(o)
     w8(0x3EE5, 0x08)                      -- entity 0's STATUS2: Mute
     w8(CMDTBL + 0 * 12 + 1 * 3 + 1, 0x80) -- and the engine's greyed Magic row
   end
-  local D = driver()
+  local D = driver(o.opts)
   D.magicOnlyLine = function() return { kind = "magic", spell = 0x00 } end
-  return D, D:coverPlan(0, { kind = "fight", row = 0, boostLeft = 0 })
+  return D, D:coverPlan(0, { kind = "fight", row = 0, boostLeft = 0, aim = o.aim })
 end
 do
   local _, p = barbe({ guard = 0xFF })
@@ -333,6 +333,17 @@ do
   check(said("every standing monster is under Love Token (slot 0's Fight lands on entity 1)") ~= nil, "and why")
   _, p = barbe({ second = true })
   check(p.kind == "fight" and p.aim == 1, "another body without the token: the Fight goes there")
+  check(p.aimHard == 1, "and pinned there (aimHard), over any kill order the executor would steer by")
+  -- a kill order (opts.focus) wins over plan.aim in the executor, so the
+  -- body it names is the one the cover is read on
+  _, p = barbe({ second = true, aim = 1, opts = { items = true, boost = true, focus = { { slot = 0 } } } })
+  check(p.kind == "fight" and p.aimHard == 1 and said("Fight re-aimed: slot 0 is under Love Token") ~= nil,
+    "the focus names the guarded slot 0 over the plan's aim 1: re-aimed and pinned to 1")
+  _, p = barbe({ aim = 0, opts = { items = true, boost = true, focus = { { slot = 0 } } } })
+  check(p.kind == "magic", "the focus names the lone guarded body: a cast, got " .. tostring(p.kind))
+  _, p = barbe({ second = true, aim = 0, opts = { items = true, boost = true, focus = { { slot = 1 } } } })
+  check(p.kind == "fight" and p.aimHard == nil and said("re-aimed") == nil,
+    "the focus names the unguarded slot 1 over the plan's guarded aim 0: left alone")
   _, p = barbe({ cmds = { 0x00, 0x0B, 0x01, 0xFF } })
   check(p.kind == "fight" and said("no other body to swing at and no Magic row -- the Fight stands (#466)") ~= nil, "no Magic row and no other body: the Fight stands")
   local D = barbe()

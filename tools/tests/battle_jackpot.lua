@@ -214,26 +214,45 @@ end
 -- first (its $be steps $10 every four frames), up to 16 keys, each lost one
 -- said.  build(wait) returns the try's step; wait nil is the grave's own
 -- frame, as before.
+-- A try is lost only while no Jackpot has executed in it (Ot6SetzerExec
+-- with Jackpot's row in $b6, the search's lost-candidate rule below): a
+-- wipe after one executed is the property's to answer, not a key to skip,
+-- and fails the pass by name.  The held line says how many tries were lost.
+local keyedExec = { hooked = false, f = nil }
 local function keyed(n, build)
   local i, cur, wipedN, lost = 0, nil, 0, 0
   return {
     tick = function(self)
+      if not keyedExec.hooked then
+        keyedExec.hooked = true
+        local a = H.sym("Ot6SetzerExec")
+        emu.addMemoryCallback(function()
+          if H.readByte(0xB6) == JACKPOT then keyedExec.f = keyedExec.f or H.frame end
+        end, emu.callbackType.exec, a, a)
+      end
       if cur == nil then
         i = i + 1
         H.assertEq(i <= 16, true, string.format("pass %d: a battle key the party lives through, within 16 (%d "
           .. "lost to a wipe)", n, lost))
-        cur, wipedN = build(i > 1 and 4 * (i - 1) or nil), 0
+        cur, wipedN, keyedExec.f = build(i > 1 and 4 * (i - 1) or nil), 0, nil
       end
       wipedN = H.battleLoadStarted() and H.partyWipedInBattle() and wipedN + 1 or 0
       if wipedN >= 90 then
+        H.assertEq(keyedExec.f == nil, true, string.format("pass %d: try %d's party wiped (f%d) after a Jackpot "
+          .. "executed (f%s): not a lost key", n, i, H.frame, tostring(keyedExec.f)))
         lost = lost + 1
-        H.log(string.format("[jackpot] pass %d: try %d (the grave's frame + %d) lost: the party wiped before the "
-          .. "plan was done (the lib's wipe predicate, 90 frames, at f%d); the next key", n, i, 4 * (i - 1), H.frame))
+        H.log(string.format("[jackpot] pass %d: try %d (the grave's frame + %d) lost: the party wiped before any "
+          .. "Jackpot executed (the lib's wipe predicate, 90 frames, at f%d); the next key", n, i, 4 * (i - 1), H.frame))
         H.setPad({})
         cur = nil
         return "frame"
       end
-      return cur:tick()
+      local r = cur:tick()
+      if r ~= "frame" then
+        H.log(string.format("[jackpot] pass %d held at try %d: %d tr%s lost to a wipe before any Jackpot executed",
+          n, i, lost, lost == 1 and "y" or "ies"))
+      end
+      return r
     end,
     reset = function(self) i, cur, wipedN, lost = 0, nil, 0, 0 end,
   }

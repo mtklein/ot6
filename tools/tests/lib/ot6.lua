@@ -10760,7 +10760,20 @@ end
 function Driver:coverPlan(actor, plan)
   if plan == nil or (plan.kind ~= "fight" and plan.kind ~= "capture") or COVER_OFF then return plan end
   if plan.ally then return plan end      -- a cure-hit on a muddled member aims at the party
-  local aim = plan.aim
+  -- the body the executor will steer this Fight to (Driver:planButton's
+  -- focus): the plan's own aimHard, else the first standing entry of an
+  -- authored, multi-part or last-stand kill order (focusList: it wins over
+  -- plan.aim there), else plan.aim, else the first standing slot
+  local aim = plan.aimHard
+  if aim == nil then
+    local focus = self:focusList()
+    if focus ~= nil then
+      for _, e in ipairs(M.focusSlots(focus)) do
+        if aim == nil and monAlive(e.slot) then aim = e.slot end
+      end
+    end
+  end
+  if aim == nil then aim = plan.aim end
   if aim == nil then for s = 0, 5 do if aim == nil and monAlive(s) then aim = s end end end
   if aim == nil or not monAlive(aim) then return plan end
   local guard = M.loveGuardOf(aim)
@@ -10769,7 +10782,8 @@ function Driver:coverPlan(actor, plan)
     if monAlive(s) and M.loveGuardOf(s) == nil then
       M.log(string.format("[%s] actor=%d Fight re-aimed: slot %d is under Love Token (entity %d takes "
         .. "every Fight on it); slot %d instead (#466)", self.tag or "fight", actor, aim, guard, s))
-      plan.aim = s
+      -- aimHard: the executor steers to it over any kill order
+      plan.aim, plan.aimHard = s, s
       return plan
     end
   end
