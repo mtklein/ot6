@@ -362,6 +362,33 @@ it.  They were sealed from those captures, not yet re-cut from the graph's
 play (`checkpoint_drift.py --recut`, at the release); `ga1_s0` ran the
 Ancient Castle's leg before the dragon's care moved.
 
+### What the arc's ROM change exposed upstream
+
+The break rows change the ROM, so the whole play replays from power-on
+on new draws.  The qualification at 946a52e9 (`build/attempts/wt/v035-wor-dreams/qual/q3/`)
+found two problems that main's qualification does not:
+
+- **water_rondo saved with EDGAR down.**  The Serpent Trench's last battle
+  ($043, "1 fell", EDGAR "+0 (due 0)") felled him.  The leg then walked out
+  of Nikeah and saved, and audit_party_hp read "DEAD water_rondo: EDGAR L22
+  0/821 hp".  gen_water_rondo now cares for the party before the save, and
+  asserts that every party member is standing there.  On the re-played
+  chain (`water_rondo/c1/`, 600ac953) the same draw felled him again, and
+  the care revived and healed him: "used $F0 on char 4: 0 -> 102 hp", then
+  a Tent, then "c1 820/820 ... c4 821/821 ... c5 902/902 ... c10
+  1038/1038".
+- **battle_study wiped to a lone Chimera.**  After the 2 BP cast the party
+  stood at 54/57/58 HP ("party 00:54/0002 ... 07:58/0002" at f11172).  The
+  fight-out was Fight-only, so nobody healed, and the canary read "BATTLE
+  WIPE" at f11917 (`study/q3_red_battle_study.log`).  Every fight-out is now
+  the route's Fight driver (`H.fightBattleByMenu`), which heals.  The
+  assertions and the timeouts are unchanged.  In `study/st1/` (600ac953),
+  seed shifts 0, 3, 7, 11, 13, 17 and 19 on the fresh `fire-out-v1`, plus
+  shift 0 on the tracked one, all PASS on attempt 1.  That is 35 battles
+  across distinct keys, and the driver healed in three of the runs.  The
+  mutants `study_anyboost` ("at 2 BP the study wrote nothing ...: got 8") and
+  `study_off` ("at 3 BP the study added exactly ...: got 0") are still red.
+
 ## 8. Open
 
 1. **CYAN's level.**  He sits out his own dream and comes back L40-41
