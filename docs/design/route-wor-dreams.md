@@ -323,10 +323,16 @@ char 2 (pos 2) wears $0E").  Raiden replaces Odin in the bag and is worn by
 nobody: the four's stones (TERRA's Maduin, CELES's Tritoch, RELM's Ragnarok,
 CYAN's Alexandr) grant their lists while worn (`Ot6EsperSpellKnown`), and a
 swap would take a list away mid-arc.  For the Blue Dragon the Wall Rings
-(CELES, RELM and TERRA wear them from the tower) give way to the bag's
+(CELES, RELM and TERRA wore them from the tower) gave way to the bag's
 Czarina Ring, Barrier Ring and Earrings (`wallRingsOff`; route-wor-gogo.md
-section 4: Reflect turns the party's own Cure and Shell away), and go back
-on after it.  The Ancient Castle's chests taken: the Gold Hairpin and the
+section 4: Reflect turns the party's own Cure and Shell away), and went
+back on after it.  Since v0.36 the tower takes its rings off as the party
+leaves it (#460, route-wor-thamasa.md 12.2): `wallRingsOff` serves only a
+save that still wears one, and no ring goes back on.  Sweep `sa3`
+(ef239262, from the chain's own `wor-doma-v1`, K 0-5 at shifts 0 and 7, K5
+at shift 0 only): 11 of 11 PASS, the Blue Dragon 11 keys won of 11, no
+deaths, the party's low point 80% at worst
+(`build/attempts/wt/v036-route/fight_report_sa3.txt`).  The Ancient Castle's chests taken: the Gold Hairpin and the
 Blizzard Orb (406), the X-Ether (408); the cave's (401) and the two monster
 chests (Master Pug, KatanaSoul) are left (section 8).  CYAN's SwdTechs:
 kits.md "On the route".
