@@ -9721,8 +9721,8 @@ TargetEffect_52:
         inc     $3401
         rts
 @ot6none:
-        jsl     Ot6MimicStealNone       ; ot6 #461: nothing to take, no roll:
-                                        ;   a copy keeps the boost
+        jsl     Ot6StealNone            ; ot6 #461, #463: nothing to take, no
+                                        ;   roll: the boost is kept
 @3a01:  shorta
         lda     #$00
         sta     $3d48,y

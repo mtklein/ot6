@@ -10,19 +10,25 @@
 -- Mimic is a free copy in all circumstances (the owner, #461): its boost
 -- buys what a boost buys on the copied action, and where the copy cannot use
 -- it the pending boost is kept, the bank untouched and the turn's regen pip
--- earned (Ot6MimicKeep, Ot6MimicStealNone; ot6_boost.asm).  So a boosted
+-- earned (Ot6KeepBoost and its callers; ot6_boost.asm).  So a boosted
 -- copy of these ends with the copier's bank where the unboosted copy of the
 -- same action from the same snapshot ends:
 --   * Filch and Bestow (cmd $05): neither reads a boost.  Bestow hands one
---     pip over and charges exactly that one, so the boosted case is at 2;
+--     pip over and charges exactly that one, and a refused one charges
+--     nothing, so the boosted case is at 2.  Here the copy meets TERRA at
+--     the 5 cap (LOCKE's own Bestow and her regen put her there), so it is
+--     the refusal that is measured (battle_boostkeep plays the transfer);
 --   * Steal on a body with nothing left to take: no roll, so no ladder;
 --   * SwdTech: the source's boost bought the tech at its own menu;
---   * Slot, a reel result: the source's boost bought the rig at its spin.
--- The control: a copied Trickshot (cmd $05 too) takes the multiplier, so its
--- boost is spent: the bank ends one below where it stood, no regen.  And
--- every copy is free of MP.  Main at 7b4f90ec fails every keep assertion but
--- Bestow's at 1 (Bestow already charged its one pip there):
--- build/attempts/wt/v035-boost-scope/.
+--   * Slot, a reel result: the source's boost bought the rig at its spin;
+--   * an Item that moves no number, a status cure (#465): its boost buys
+--     the multiplier and nothing else (Ot6ActionEnd's Item arm).
+-- The controls: a copied Trickshot (cmd $05 too) and a copied Tonic take
+-- the multiplier, so their boost is spent: the bank ends one below where it
+-- stood, no regen.  And every copy is free of MP.  Main at 7b4f90ec fails
+-- every keep assertion but Bestow's at 1 (Bestow already charged its one pip
+-- there): build/attempts/wt/v035-boost-scope/; the Item cases' red is
+-- build/attempts/wt/v036-boost/.
 --
 -- DECLARED EXPEDIENT (tools/state_write_waivers.txt), the battle_mimic one:
 -- no fixture has a Mimic beside LOCKE, nor anyone beside a Mimic with SwdTech
@@ -40,8 +46,9 @@
 -- encounter on the plain whose bodies carry loot and a shield, Defend until
 -- LOCKE's window opens with LOCKE and STRAGO holding two pips (snapshot L),
 -- then on to TERRA's (snapshot T).  Per case restore the source's snapshot:
--- the source plays the row (LOCKE boosts his Steal by 2, which makes the
--- take near-certain, so the copy meets a body with nothing left) and
+-- the source plays the row (LOCKE boosts his Steal by 3, which makes the
+-- take certain at any level, Ot6StealBoostLevel, so the copy meets a body
+-- with nothing left; snapshot L waits for his third pip) and
 -- everyone else Defends; once the source's SaveForMimic has run, STRAGO
 -- presses R to the case's boost, picks Mimic, and confirms its target.
 -- Observed, never written: the copy (mimicreplace), the copier's MP and
@@ -54,7 +61,9 @@ local CMDTBL, CMDROW = 0x202E, 0x890F
 local ST_CMD, ST_DEF, ST_TGT, ST_LIST, ST_SWD, ST_REELS = 0x05, 0x27, 0x38, 0x30, 0x37, 0x08
 local KCOL, KROW = 0x8963, 0x8967
 local BANK, PEND, CURMP = 0x3E9C, 0x3E9D, 0x3C08
-local CMD_STEAL, CMD_SWDTECH, CMD_SLOT, CMD_MIMIC = 0x05, 0x07, 0x0F, 0x12
+local CMD_ITEM, CMD_STEAL, CMD_SWDTECH, CMD_SLOT, CMD_MIMIC = 0x01, 0x05, 0x07, 0x0F, 0x12
+local ST_ITEM, BATTINV = 0x0A, 0x2686
+local TONIC, ANTIDOTE = 0xE8, 0xF2
 local TERRA, LOCKE, STRAGO = 0, 1, 7
 -- the thief window's cells: { column, row } (Ot6ThiefRowTbl)
 local CELL = { steal = { 0, 0 }, filch = { 0, 1 }, bestow = { 0, 2 }, trick = { 1, 0 } }
@@ -70,6 +79,11 @@ local function loot(m) return H.readByte(0x3308 + 8 + m * 2), H.readByte(0x3309 
 local function cmdRow(s, cmd)
   for r = 0, 3 do
     if H.readByte(CMDTBL + s * 12 + r * 3) == cmd then return r end
+  end
+end
+local function bagIdx(id)
+  for i = 0, 251 do
+    if H.readByte(BATTINV + i * 5) == id and H.readByte(BATTINV + i * 5 + 3) > 0 then return i end
   end
 end
 local function members()
@@ -137,7 +151,7 @@ local function installObservers()
     if c.inStand and cx() == standS * 2 then
       c.endF = H.frame
       c.mpEnd = mp(standS)
-      ev(c, string.format("Ot6ActionEnd (copier) entry: %s | %s", chars(), mons()))
+      ev(c, string.format("Ot6ActionEnd (copier) entry: 3a7c=$%02X %s | %s", H.readByte(0x3A7C), chars(), mons()))
     end
   end)
 end
@@ -186,6 +200,13 @@ local function sourcePress(c, st)
     return "a"
   end
   if c.cmd == CMD_SWDTECH and (st == ST_LIST or st == ST_SWD) then return "a" end
+  if c.cmd == CMD_ITEM and st == ST_ITEM then
+    local want = bagIdx(c.item)
+    if want == nil then return "b" end
+    local cur = H.readByte(0x8947 + s) + H.readByte(0x894F + s)
+    if cur ~= want then return cur < want and "down" or "up" end
+    return "a"
+  end
   if c.cmd == CMD_SLOT and st == ST_REELS then return "a" end
   if c.cmd ~= CMD_STEAL and st == ST_TGT then return "a" end
   return nil
@@ -363,11 +384,13 @@ local steps = {
     assert(cmdRow(standS, CMD_MIMIC), "the copier's battle list has Mimic")
     assert(cmdRow(lockeS, CMD_STEAL), "LOCKE's battle list has Steal")
     assert(cmdRow(terraS, CMD_SWDTECH) and cmdRow(terraS, CMD_SLOT), "TERRA's battle list has SwdTech and Slot")
+    assert(cmdRow(terraS, CMD_ITEM), "TERRA's battle list has Item")
+    assert(bagIdx(TONIC) and bagIdx(ANTIDOTE), "the bag holds a Tonic and an Antidote")
   end),
 }
 -- the two snapshots: LOCKE's window, then TERRA's, each with the source's
--- pending at 0 and the copier (and LOCKE, who boosts his Steal by 2) holding
--- two pips; everyone else Defends meanwhile
+-- pending at 0 and the copier holding two pips (and LOCKE, who boosts his
+-- Steal by 3, three); everyone else Defends meanwhile
 local function snapAt(key, who)
   return H.driveUntil(function() return snaps[key] ~= nil end, 20000, {
     H.call(function()
@@ -376,7 +399,7 @@ local function snapAt(key, who)
       if tick % 12 == 6 then H.setPad({}) return end
       local s = who()
       if H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_CMD and (H.readByte(ACTOR) & 3) == s
-         and pend(s) == 0 and bank(standS) >= 2 and bank(lockeS) >= 2 then
+         and pend(s) == 0 and bank(standS) >= 2 and bank(lockeS) >= 3 then
         H.setPad({}); snaps[key] = H.requestSaveState()
         H.log(string.format("[mimicboost] snapshot %s f%d: %s | %s", key, H.frame, chars(), mons()))
         return
@@ -398,8 +421,8 @@ steps[#steps + 1] = H.call(function() H.checkReq(snaps.T, "snapshot T") end)
 -- keep: the boosted copy's bank ends where the unboosted copy's does.
 -- spend: the boosted copy's bank ends `boost` below where it stood (no regen)
 local CASES = {
-  { name = "steal-b0",   snap = "L", cmd = CMD_STEAL, row = "steal",  srcBoost = 2, boost = 0 },
-  { name = "steal-b1",   snap = "L", cmd = CMD_STEAL, row = "steal",  srcBoost = 2, boost = 1, keep = "steal-b0" },
+  { name = "steal-b0",   snap = "L", cmd = CMD_STEAL, row = "steal",  srcBoost = 3, boost = 0 },
+  { name = "steal-b1",   snap = "L", cmd = CMD_STEAL, row = "steal",  srcBoost = 3, boost = 1, keep = "steal-b0" },
   { name = "filch-b0",   snap = "L", cmd = CMD_STEAL, row = "filch",  srcBoost = 0, boost = 0 },
   { name = "filch-b1",   snap = "L", cmd = CMD_STEAL, row = "filch",  srcBoost = 0, boost = 1, keep = "filch-b0" },
   { name = "bestow-b0",  snap = "L", cmd = CMD_STEAL, row = "bestow", srcBoost = 0, boost = 0 },
@@ -410,6 +433,10 @@ local CASES = {
   { name = "swdtech-b1", snap = "T", cmd = CMD_SWDTECH, srcBoost = 0, boost = 1, keep = "swdtech-b0" },
   { name = "slot-b0",    snap = "T", cmd = CMD_SLOT, srcBoost = 0, boost = 0 },
   { name = "slot-b1",    snap = "T", cmd = CMD_SLOT, srcBoost = 0, boost = 1, keep = "slot-b0" },
+  { name = "tonic-b0",   snap = "T", cmd = CMD_ITEM, item = TONIC, srcBoost = 0, boost = 0 },
+  { name = "tonic-b1",   snap = "T", cmd = CMD_ITEM, item = TONIC, srcBoost = 0, boost = 1, spend = true },
+  { name = "cure-b0",    snap = "T", cmd = CMD_ITEM, item = ANTIDOTE, srcBoost = 0, boost = 0 },
+  { name = "cure-b1",    snap = "T", cmd = CMD_ITEM, item = ANTIDOTE, srcBoost = 0, boost = 1, keep = "cure-b0" },
 }
 local byName = {}
 for _, c in ipairs(CASES) do
@@ -446,7 +473,8 @@ steps[#steps + 1] = H.call(function()
     end
   end
   assert(#bad == 0, #bad .. " mimic-boost assertion(s) failed: " .. table.concat(bad, "; "))
-  H.log("[mimicboost] VERDICT: every copy free of MP; every boost a copy cannot use kept; the copied Trickshot's spent")
+  H.log("[mimicboost] VERDICT: every copy free of MP; every boost a copy cannot use kept; the copied Trickshot's "
+    .. "and Tonic's spent")
 end)
 
 H.run({ maxFrames = 400000 }, steps)

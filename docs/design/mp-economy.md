@@ -327,16 +327,47 @@ nothing: a boost-1 copied Filch ended at bank 1 where the unboosted one
 ended at 3. `Ot6MimicKeep` drops the pending boost when mimicreplace
 writes a copy whose boost buys nothing, as `Ot6FizzleDropBoost` drops a
 refused action's (the bank untouched, the turn's regen pip earned): a
-SwdTech (the source's boost bought the tech at its menu), a Filch or a
-Bestow (neither reads a boost; Bestow still charges the one pip it hands
-over), and a Slot reel result (the source's boost bought the rig at its
-spin). A copied Steal buys the roll's ladder when the body has something
-to take; when it has nothing there is no roll, and `Ot6MimicStealNone`
-drops the boost there. Every other copy reads the copier's boost as it
+SwdTech (the source's boost bought the tech at its menu) and a Slot reel
+result (the source's boost bought the rig at its spin). The rest of the
+class is decided where the action runs, for a copy and a player's own
+action alike (below). Every other copy reads the copier's boost as it
 runs. `battle_mimicboost` plays each of these at boost 0 and boosted from
 one snapshot and asserts the boosted copy's bank ends where the unboosted
-one's does, and that a copied Trickshot, which takes the multiplier, still
-spends its pip (`build/attempts/wt/v035-boost-scope/`).
+one's does, and that a copied Trickshot and a copied Tonic, which take the
+multiplier, still spend their pip (`build/attempts/wt/v035-boost-scope/`,
+`build/attempts/wt/v036-boost/`).
+
+**A boost that buys nothing stays in the bank** (#463, the owner's rule
+from #450 and #461, outside Mimic too). Every case drops the pending boost
+through one proc, `Ot6KeepBoost`, so the turn ends as the unboosted one
+does: the bank untouched, the regen pip earned. Measured on main at
+cfae9e47 from one fire-out-v1 snapshot (LOCKE at bank 4), each boosted
+action ended a pip or more below its unboosted twin, and now ends level
+with it (`battle_boostkeep`, `build/attempts/wt/v036-boost/`):
+- **Steal on a body with nothing left to take**: the boost buys the
+  roll's ladder and there is no roll (`Ot6StealNone`, which was the
+  Mimic-only `Ot6MimicStealNone`).
+- **Filch**: it reads no boost (`Ot6Filch`).
+- **Bestow at two or three points**: the pip handed over is the whole
+  charge at every boost (`Ot6Bestow` sets the pending to that one pip
+  rather than letting an L/R raise stand); a refused Bestow charges
+  nothing.
+- **Appraise with one body standing**: the boost reads every body, and the
+  target is the only one (`Ot6Appraise`). Two or more standing, it reads
+  them all and the pip is spent.
+- **An item that moves no number**: an Item's boost buys the damage
+  multiplier and nothing else, so `Ot6BoostDmg` marks the action bought
+  (`OT6_BOOSTBUY`) only when the multiplier meets a nonzero base that is
+  not a fraction of max HP/MP, and `Ot6ActionEnd` keeps an Item's boost
+  that was never marked. A status cure's base is 0; a Fenix Down's is its
+  power, 2, which `CalcTargetDmg` replaces with `CalcDmgRatio`'s raise
+  (max HP x 2 / 16) per target, so the multiplier never reaches it. A
+  boosted Tonic's heal doubles (base 50) and its pip is spent. A Mimic's
+  copy of an Item is queued as the Item, so it is served the same way.
+The other choice was to refuse the raise for these actions. The boost is
+raised on the command window, before the action is picked, and whether a
+Steal finds anything or a second body is standing is only known when the
+action runs, so the boost is kept rather than refused.
 
 Dance is the control that makes this a rule rather than a habit.
 `Ot6RageCost` tail-calls `Ot6DanceCost`, so Rage and Dance share one

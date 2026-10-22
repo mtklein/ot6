@@ -596,16 +596,21 @@ remover. It reveals nothing (it takes the shield without teaching the row, so it
 complements Debilitator rather than replacing it) and deals no damage. A landed
 Filch gives Locke **+2 BP on the turn**, the filched pip plus his own unboosted
 regen, which nothing else in the game does. Against an already-Broken or
-shieldless target it is a no-op.
+shieldless target it is a no-op. Filch reads no boost, so a boost raised for
+it is kept (#463, `battle_boostkeep`).
 
 Bestow is the sketch verbatim. Its debit rides `OT6_BOOST_REVEALED` so that
 `Ot6ActionEnd` does the subtraction, which is the only BP charge path in the game
 and is what stops Bestow being free: if it were charged inline, Ot6ActionEnd would
-still pay Locke his regen and Bestow would yield a pip a turn for 5 MP. At 0 BP
+still pay Locke his regen and Bestow would yield a pip a turn for 5 MP. The
+pip handed over is the whole charge at every boost: a boost raised for Bestow
+buys nothing, so a Bestow at two or three points costs the one pip it gives
+(#463). At 0 BP
 the row greys and, since #232, the confirm refuses it (`Ot6KitConfirmMP` reads
 the same `Ot6BushidoRowGrey` that coloured it), so the turn and the 5 MP stay
 with the player; a self-target and an ally already at the 5 cap are still
-refused at execution. `battle_bestowrefuse` is the suite.
+refused at execution, charging no pip. `battle_bestowrefuse` is the suite;
+`battle_boostkeep` holds the boosted cases.
 
 **Break class: none of the first three takes one** (Mug's is his weapon's;
 Trickshot and Dismantle pierce). Steal and Bestow deal no damage,
@@ -659,7 +664,8 @@ letters, so its price keeps a gap); the banner prints "Master's Mark".
 - **Appraise** is Strago's Scan read (`Ot6AnalyzeOne`): the target's weak
   elements and classes onto the HUD and into the codex, nothing chipped; a
   point or more reads every enemy. 3 MP, Analyze's price, flat (no
-  multiplier under command `$05`).
+  multiplier under command `$05`). With the target the only body standing
+  the point reads nothing more, and it is kept (#463).
 - **Master's Mark**, the divine, at three points pending: every standing
   body read as Appraise reads it and robbed as a 3-BP Steal robs (its rare
   item, else its common, no roll; nothing from a body already robbed), each
@@ -1132,7 +1138,8 @@ plays Mimic.
   copied action's price at 0 and its boost buys what the copied action's
   boost buys (`Ot6MimicFold`, `battle_mimic`); a boost the copy cannot
   use (a SwdTech, Filch, Bestow, a reel result, a Steal with nothing to
-  take) is kept, not spent (`Ot6MimicKeep`, `battle_mimicboost`, #461).
+  take, an Item that moves no number) is kept, not spent (`Ot6KeepBoost`,
+  `battle_mimicboost`, #461, #463).
   So Gogo's best turn is the
   party's best turn again, at no MP: a keyed boosted strike that broke a
   shield, a lore, a tier spell.

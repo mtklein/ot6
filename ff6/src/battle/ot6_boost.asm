@@ -47,7 +47,7 @@
                                 ;   last battle's final pass
         sta     f:$7e0000+OT6_ULTIMAFOLD ; nor a folded-Ultima mark
         sta     f:$7e0000+OT6_FIZZLED ; nor an X-Magic refusal mark
-        sta     f:$7e0000+OT6_MIMICCOPY ; nor a Mimic copy mark
+        sta     f:$7e0000+OT6_BOOSTBUY  ; nor a boost-bought mark
         sta     f:$7e0000+OT6_RUNICBLADE ; nor a RunicBlade nobody raised
         sta     f:$7e0000+OT6_BLADEPEND  ; nor a bounce from the last battle
         sta     f:$7e0000+OT6_UNCTL     ; nor a stale "the engine is driving
@@ -207,10 +207,31 @@
         eor     #$ff            ;   (Ot6FizzleDropBoost) ends with its turn
         and     f:$7e0000+OT6_FIZZLED
         sta     f:$7e0000+OT6_FIZZLED
-        lda     $3018,x         ; and a Mimic's copy mark (Ot6MimicKeep)
+        ; #463: an Item's boost buys the damage multiplier and nothing else
+        ; (cmd $01 is outside Ot6BoostDmg's gate, and no item folds a tier),
+        ; so an Item whose multiplier met no number -- a status cure, a Fenix
+        ; Down's raise (a fraction of max HP, CalcDmgRatio, which never
+        ; reaches the multiplier) -- bought nothing, and the boost is kept
+        ; (Ot6KeepBoost): the turn ends as the unboosted one does.  The
+        ; queued command, as Ot6BoostDmg's own tier test reads it: a rod or
+        ; shield used from Item runs as $b5 = $02, still queued as Item, and
+        ; its spell's number marks it bought.  A Mimic's copy of an Item is
+        ; queued as the Item (mimicreplace writes the copied pair), so the
+        ; copy is served the same way.
+        lda     OT6_BOOST_REVEALED,x
+        beq     @bought
+        lda     $3a7c           ; the queued command
+        cmp     #$01            ; Item
+        bne     @bought
+        lda     $3018,x
+        and     f:$7e0000+OT6_BOOSTBUY
+        bne     @bought         ; the multiplier moved a number
+        jsl     Ot6KeepBoost
+@bought:
+        lda     $3018,x         ; the mark ends with its action
         eor     #$ff
-        and     f:$7e0000+OT6_MIMICCOPY
-        sta     f:$7e0000+OT6_MIMICCOPY
+        and     f:$7e0000+OT6_BOOSTBUY
+        sta     f:$7e0000+OT6_BOOSTBUY
         ; #346: an action that never ran buys nothing, so it costs nothing.
         ; ExecAction runs a fresh turn whose command list is empty -- the
         ; action was removed after its entry reached the action queue: a
@@ -1100,28 +1121,52 @@ done:   pla
 
 ; ------------------------------------------------------------------------------
 
+; [ a boost that buys nothing stays in the bank ]
+
+; #450, #461, #463: the one drop.  An action whose boost buys nothing leaves
+; the pending boost at 0 while it is still only pending, so Ot6ActionEnd ends
+; the turn as an unboosted one: the bank untouched, the turn's regen pip
+; earned, and the caster's folded prices falling back (vanilla's "recheck
+; enabled magic" request, which Ot6ActionEnd's spend arm also makes).  Its
+; callers, each where it is known that the boost bought nothing:
+;   * Ot6FizzleDropBoost: a costed action the pool cannot pay;
+;   * Ot6MimicKeep: a Mimic's copy of a SwdTech or a reel result;
+;   * Ot6StealNone: a Steal on a body with nothing left to take;
+;   * Ot6Filch (it reads no boost), Ot6Bestow (a refused transfer),
+;     Ot6Appraise (the target stands alone);
+;   * Ot6ActionEnd: an Item whose multiplier met no number (OT6_BOOSTBUY).
+;
+; a8, either index width; x = the character's entity offset; db=$7e.
+; Preserves x and y; clobbers a.
+.proc Ot6KeepBoost
+        .a8
+        lda     #$00
+        sta     OT6_BOOST_REVEALED,x
+        lda     $3204,x
+        ora     #$80            ; the "recheck enabled magic" request
+        sta     $3204,x
+        rtl
+.endproc
+
 ; [ a mimic's copy keeps a boost it cannot spend ]
 
 ; #461.  jsl from mimicreplace (battle_main.asm), right after Ot6MimicFold.
 ; Mimic is a free copy: its boost buys what a boost buys on the copied
-; action, and where the copy cannot use it the pending boost is dropped
-; rather than spent, as Ot6FizzleDropBoost drops a refused action's: the bank
-; untouched, the turn's regen pip earned, the folded prices falling back.
-; The copied rows whose boost buys nothing, from what reads the copier's
-; pending byte while the copy runs:
+; action, and where the copy cannot use it the pending boost is kept
+; (Ot6KeepBoost).  The copied rows whose boost buys nothing that this has
+; to decide at the copy, from what reads the copier's pending byte while the
+; copy runs:
 ;   * SwdTech ($07): the source's boost bought the tech at its menu
 ;     (Ot6BushidoTier), the copy runs the tech it picked, and cmd $07 is in
 ;     Ot6BoostDmg's gate.  Cleave's copy is free (kits.md "Divines").
-;   * Filch and Bestow ($05, $57/$58): neither reads a boost, and cmd $05 is
-;     in the gate.  Bestow then arms the one pip it hands over itself
-;     (Ot6Bestow), so a copy pays exactly the transfer at every boost.
 ;   * Slot ($0f) when the copy is a reel result: the source's boost bought
 ;     the rig at its own spin (Ot6SlotRig), the copy spins nothing, and cmd
 ;     $0f is in the gate.  Setzer's kit rows (Coin Toss, Hired Help,
 ;     Jackpot) read the copier's boost when they run, and keep it.
-; A copied Steal buys the roll's ladder (Ot6StealBoostLevel) when the body
-; has something to take, which is decided when it runs: this marks the copy
-; (OT6_MIMICCOPY) for Ot6MimicStealNone.
+; The rest is decided where the copy runs, the same place a direct action's
+; is (#463): a copied Filch or Bestow (Ot6Filch, Ot6Bestow), a copied Steal
+; with nothing to take (Ot6StealNone), a copied Appraise with one body
+; standing (Ot6Appraise), a copied Item that moves no number (Ot6ActionEnd).
 ; Everything else that Mimic copies reads the copier's boost as it runs
 ; (Fight and Capture's swings, Throw's throws, a tier or the multiplier,
 ; Runic's turns, Rage's coin, Dance's tier, Locke's later rows).
@@ -1136,16 +1181,11 @@ done:   pla
         txa
         cmp     #$08
         bcs     @out            ; monsters never mimic, or boost
-        lda     $3018,x
-        ora     f:$7e0000+OT6_MIMICCOPY
-        sta     f:$7e0000+OT6_MIMICCOPY ; this turn is a copy
         lda     OT6_BOOST_REVEALED,x
         beq     @out            ; nothing pending: nothing to keep
         lda     $3420,y         ; the copied command
         cmp     #$07
         beq     @drop           ; SwdTech
-        cmp     #$05
-        beq     @thief
         cmp     #$0f
         bne     @out
         lda     $3421,y         ; Slot: a kit row reads the boost
@@ -1153,46 +1193,30 @@ done:   pla
         bcc     @drop           ;   below Coin Toss: a reel result
         cmp     #OT6_SETZER_JACKPOT+1
         bcc     @out            ;   Coin Toss, Hired Help, Jackpot
-        bra     @drop           ;   above Jackpot: a reel result
-@thief: lda     $3421,y         ; the thief row
-        cmp     #OT6_THIEF_FILCH
-        beq     @drop
-        cmp     #OT6_THIEF_BESTOW
-        bne     @out
-@drop:  lda     #$00
-        sta     OT6_BOOST_REVEALED,x    ; kept: nothing bought, nothing spent
-        lda     $3204,x
-        ora     #$80            ; the "recheck enabled magic" request
-        sta     $3204,x
+@drop:  jsl     Ot6KeepBoost    ;   above Jackpot: a reel result
 @out:   plp
         rtl
 .endproc
 
-; [ a copied Steal that finds nothing keeps its boost ]
+; [ a Steal that finds nothing keeps its boost ]
 
-; #461.  jsl from TargetEffect_52 (battle_main.asm) on the arm where the
-; body has nothing to take, before any roll: the boost buys the roll's
-; ladder and there is no roll.  Only a Mimic's copy (OT6_MIMICCOPY) of a
-; Steal ($b5 = $05; a Capture's or Mug's hit is $06 and its boost bought the
-; swings) keeps it, dropped as Ot6MimicKeep drops it.
+; #461, #463.  jsl from TargetEffect_52 (battle_main.asm) on the arm where
+; the body has nothing to take, before any roll: a Steal's boost buys the
+; roll's ladder (Ot6StealBoostLevel, Ot6StealSlot) and there is no roll, so
+; the boost is kept (Ot6KeepBoost), a player's Steal and a Mimic's copy
+; alike.  Only a Steal ($b5 = $05): a Capture's or Mug's hit is $06, and its
+; boost bought the swings.
 ;
 ; a8/i8 (DoTargetEffect's shortai); x = the attacker, a character (the
 ; caller's `cpx #$08` sent monsters elsewhere).  Preserves x and y;
 ; clobbers a.
-.proc Ot6MimicStealNone
+.proc Ot6StealNone
         .a8
         .i8
         lda     $b5
         cmp     #$05
         bne     @out            ; not a Steal
-        lda     $3018,x
-        and     f:$7e0000+OT6_MIMICCOPY
-        beq     @out            ; not a copy
-        lda     #$00
-        sta     OT6_BOOST_REVEALED,x
-        lda     $3204,x
-        ora     #$80            ; the "recheck enabled magic" request
-        sta     $3204,x
+        jsl     Ot6KeepBoost
 @out:   rtl
 .endproc
 
@@ -2369,11 +2393,7 @@ Ot6ThiefCostTbl:
         lda     $3018,x         ; the second spell: was the first refused?
         and     f:$7e0000+OT6_FIZZLED
         beq     @out            ; no: the first cast and bought the tier
-@drop:  lda     #$00
-        sta     OT6_BOOST_REVEALED,x
-        lda     $3204,x
-        ora     #$80            ; the "recheck enabled magic" request
-        sta     $3204,x
+@drop:  jsl     Ot6KeepBoost
         bra     @out
 @defer: lda     $3018,x         ; the second spell spends it; mark the
         ora     f:$7e0000+OT6_FIZZLED  ;   refusal for it

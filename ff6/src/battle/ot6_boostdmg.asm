@@ -61,22 +61,22 @@
         .i16
         txa                     ; width-neutral character test
         cmp     #$08
-        bcs     done            ; monsters never boost
+        bcs     @done           ; monsters never boost
         lda     $b1             ; counterattacks never boost (the $b1.0
         lsr                     ;   flag ExecRetal raises): interceptor's
-        bcs     done            ;   dog rides command $02 attack $fc/$fd
+        bcs     @done           ;   dog rides command $02 attack $fc/$fd
                                 ;   (battle_main.asm:12606); the counter
                                 ;   path never reaches Ot6ActionEnd to
                                 ;   charge what it delivered
         lda     $b5             ; current command
-        beq     done            ; $00 fight: boost = extra swings
+        beq     @done           ; $00 fight: boost = extra swings
         cmp     #$06
-        beq     done            ; $06 capture: same fight path
+        beq     @done           ; $06 capture: same fight path
         cmp     #$07
-        beq     done            ; $07 bushido: boost bought the tech tier,
+        beq     @done           ; $07 bushido: boost bought the tech tier,
                                 ;   so it must not also buy a multiplier
         cmp     #$10
-        beq     done            ; $10 rage: boost bought the coin's
+        beq     @done           ; $10 rage: boost bought the coin's
                                 ;   certainty (Ot6RageCoin), never a damage
                                 ;   multiplier.  Rage's attacks never reach
                                 ;   here as $10 ($b5 is the beast attack's own
@@ -85,20 +85,20 @@
                                 ;   is the one the price gate reads
                                 ;   (battle_boostprice, battle_costtable)
         cmp     #$0f
-        beq     done            ; $0f slot: boost bought the reel's
+        beq     @done           ; $0f slot: boost bought the reel's
                                 ;   certainty (Ot6SlotRig), never a damage
                                 ;   multiplier
         cmp     #$05
-        beq     done            ; $05 steal: boost buys the rare/guarantee
+        beq     @done           ; $05 steal: boost buys the rare/guarantee
                                 ;   downstream (Ot6StealBoostLevel /
                                 ;   Ot6StealSlot), never a damage multiplier
         lda     $3a7c           ; a Rage start turn: Cmd_10 hands the beast's
         cmp     #$10            ;   attack to _c21554, which rewrites $b5 to
-        beq     done            ;   that attack's own command before any
+        beq     @done           ;   that attack's own command before any
                                 ;   damage, while the boost is still pending
         lda     f:$7e0000+OT6_WEAPSPELL
         bit     #$40            ; a weapon's own on-hit spell: the boost
-        bne     done            ;   bought that weapon's swings, not this
+        bne     @done           ;   bought that weapon's swings, not this
         phx
         ldx     #$0003          ; only a spell command can have bought a
 @cmd:   lda     $3a7c           ;   tier: Ot6QueueFold's own four, mirrored
@@ -118,15 +118,26 @@
         plx
 @plain: jsl     Ot6BoostLevel   ; the boost level: the pending boost, or a
         bne     @mul0           ;   dance step's recorded tier (#294).  Asked
-        bra     done            ;   once, here, after the exemptions: the
+                                ;   once, here, after the exemptions: the
                                 ;   dance tier made the old early `beq` on
                                 ;   the pending byte a wrong answer, and its
                                 ;   jsl put the gate's branches out of range
+@done:  plp                     ; (the exit sits mid-proc so the gate's
+        rtl                     ;   early branches reach it)
 @tier:  plx
-        bra     done
+        bra     @done
 @mul0:
         sta     OT6_SCR_BIT
-        longa
+        lda     $11b0           ; #463: a base of 0 (a status cure's) is
+        ora     $11b1           ;   0 at any multiplier: the boost moved no
+        beq     @done           ;   number, and OT6_BOOSTBUY stays clear
+        lda     $11a4           ; nor does a fraction of max HP/MP (a Fenix
+        bmi     @mul1           ;   Down's raise): CalcTargetDmg replaces
+                                ;   this base with CalcDmgRatio's per target
+        lda     $3018,x         ; it moves one: this action's boost bought
+        ora     f:$7e0000+OT6_BOOSTBUY  ;   something (Ot6ActionEnd's Item
+        sta     f:$7e0000+OT6_BOOSTBUY  ;   arm reads it)
+@mul1:  longa
         lda     $11b0
 @mul:   asl                     ; not a true xN, but x2/x4/x8 reads better
         bcs     @cap            ; on 16-bit overflow, saturate at $ffff
@@ -142,7 +153,7 @@
 @cap:   lda     #$ffff
 @store: sta     $11b0
         shorta0
-done:   plp
+        plp
         rtl
 .endproc
 
