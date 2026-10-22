@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "3b28f2fe9b743bf627d33651102acbbcbc3875dfcf74012ada17533b8346ec3b",
+  "sha256": "dd852c67fe6400e8b3652112f0aaca5d8112e299ee48ac39a548825a77b1a171",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "3b28f2fe9b743bf627d33651102acbbcbc3875dfcf74012ada17533b8346ec3b",
-    "generator_sig": "e62cff06dcd7d97527753046e0c9d29b72202247264e4f9e59ba1444640246a5 gen_ultros build/checkpoints/esper-mtn-save-v1/manifest.json build/checkpoints/esper-mtn-save-v1/esper-mtn-save.sram",
+    "payload_sha256": "dd852c67fe6400e8b3652112f0aaca5d8112e299ee48ac39a548825a77b1a171",
+    "generator_sig": "c0bd8b701d76223924e6f0d00f78059eb74317e9ad33f1cdf14a4aa704e50d5a gen_ultros build/checkpoints/esper-mtn-save-v1/manifest.json build/checkpoints/esper-mtn-save-v1/esper-mtn-save.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/esper-mtn-save-v1/manifest.json",
-        "sha256": "9b3e215442d16facae7d45fc3ad3daf516ebab71d803c12930ad9abe252897ab"
+        "sha256": "1eb299f20e4319cc5dd997785483e51bc3f5395d652b58637146a27848635e74"
       }
     ]
   }

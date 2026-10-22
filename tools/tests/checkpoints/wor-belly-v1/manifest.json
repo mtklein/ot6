@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "3e2e8da962b574bb37d000f5d175ac63cdd67133f30fd874cf9f509b3973c6c9",
+  "sha256": "a4d6e41256336c6305e7ed4e60bc45bd2a0d61387576f37fa570725fe89688fa",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "3e2e8da962b574bb37d000f5d175ac63cdd67133f30fd874cf9f509b3973c6c9",
-    "generator_sig": "136f6c26995678c660e919c2c10564ae914aef8fec2fa44423102ef382969c2b gen_wor_belly tools/tests/checkpoints/wor-gau-v1/manifest.json tools/tests/checkpoints/wor-gau-v1/wor-gau.sram",
+    "payload_sha256": "a4d6e41256336c6305e7ed4e60bc45bd2a0d61387576f37fa570725fe89688fa",
+    "generator_sig": "26df75db58614fe8a93094b464a6c7f56307ae7789ed2fc4d69a92d301fa7133 gen_wor_belly build/checkpoints/wor-gau-v1/manifest.json build/checkpoints/wor-gau-v1/wor-gau.sram",
     "ancestors": [
       {
-        "path": "tools/tests/checkpoints/wor-gau-v1/manifest.json",
-        "sha256": "793ded63204625593667336cdfde1d22ec413e9a00ec0426fa5a3ccc755e1457"
+        "path": "build/checkpoints/wor-gau-v1/manifest.json",
+        "sha256": "3cb5a80d0419cfbe9400920606417bc783e4797148ac473bfda6a23cc4ad4dc2"
       }
     ]
   }

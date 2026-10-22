@@ -16,11 +16,11 @@
   "provenance": {
     "format": "ot6-provenance/v2",
     "payload_sha256": "383e51a1da026b16ed394601c909e580017f783d292f4fb4b185b065abfbde96",
-    "generator_sig": "1a1998cb0232e421bece2712c99aa67fb40446992f4f95a0b05e9cb2663fb0eb gen_worldmap",
+    "generator_sig": "4219d817f8dc6831fe295db0148e27a1e6489ea72c51f467662b5df41506b6f4 gen_worldmap",
     "ancestors": [
       {
         "path": "build/states/moogle_cleared.stamp",
-        "sha256": "9ce3f984f9e804cca670ffc86d2f2fab5674f4126338f763acbb42558629d035"
+        "sha256": "d7984b569a3fd9fdd81928b2911f29060e8adf03c2229797bf293bf8bebc3d0f"
       }
     ]
   }
