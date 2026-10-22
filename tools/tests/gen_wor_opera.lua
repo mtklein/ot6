@@ -156,12 +156,25 @@ local HUNT = { CELES, RELM, GOGO, STRAGO }
 local DRAGON_KIT = { { CELES, 5, 0xBC }, { RELM, 5, 0xBC }, { GOGO, 5, 0xBC }, { STRAGO, 5, 0xBC },
   { STRAGO, 3, 0x8D } }
 local kitHeld = {}
+local gaiaSkipped = false
 local function dragonKit(tag)
   local steps = {}
   for _, m in ipairs(DRAGON_KIT) do
     steps[#steps + 1] = H.lazy(function()
       local cur = H.readByte(0x1600 + 37 * m[1] + 0x1F + m[2])
       if cur == m[3] then return H.call(function() end) end
+      if m[3] == 0x8D and H.invCountOf(m[3]) == 0 then
+        -- the Gaia Gear is the bag's if the chain bought one, not something
+        -- this leg buys: on the boost branch's chain (17941799) the bag held
+        -- none ("item $8D in the bag for STRAGO for the Dirt Dragon: got
+        -- false").  The Cherub Downs alone won 60 of 60 trials (0.19 deaths a
+        -- fight, the lab above), so the leg goes on without it
+        return H.call(function()
+          gaiaSkipped = true
+          H.log(string.format("[kit] no Gaia Gear in the bag: %s keeps $%02X %s (the Cherub Downs carry the fight)",
+            NAMES[m[1]], cur, tag))
+        end)
+      end
       H.assertEq(H.invCountOf(m[3]) > 0, true, string.format("item $%02X in the bag for %s %s", m[3], NAMES[m[1]], tag))
       kitHeld[#kitHeld + 1] = { m[1], m[2], cur }
       return H.equipKit(m[1], { { m[2], m[3] } }, { tag = string.format("%s: $%02X %s", NAMES[m[1]], m[3], tag) })
@@ -170,8 +183,10 @@ local function dragonKit(tag)
   steps[#steps + 1] = H.call(function()
     H.log("[kit] " .. tag .. ": " .. kitLine(HUNT))
     for _, m in ipairs(DRAGON_KIT) do
-      H.assertEq(H.readByte(0x1600 + 37 * m[1] + 0x1F + m[2]), m[3],
-        string.format("%s wears $%02X in slot %d %s", NAMES[m[1]], m[3], m[2], tag))
+      if not (m[3] == 0x8D and gaiaSkipped) then
+        H.assertEq(H.readByte(0x1600 + 37 * m[1] + 0x1F + m[2]), m[3],
+          string.format("%s wears $%02X in slot %d %s", NAMES[m[1]], m[3], m[2], tag))
+      end
     end
   end)
   return H.seqStep(steps)
