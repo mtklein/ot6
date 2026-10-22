@@ -47,6 +47,7 @@
                                 ;   last battle's final pass
         sta     f:$7e0000+OT6_ULTIMAFOLD ; nor a folded-Ultima mark
         sta     f:$7e0000+OT6_FIZZLED ; nor an X-Magic refusal mark
+        sta     f:$7e0000+OT6_MIMICCOPY ; nor a Mimic copy mark
         sta     f:$7e0000+OT6_RUNICBLADE ; nor a RunicBlade nobody raised
         sta     f:$7e0000+OT6_BLADEPEND  ; nor a bounce from the last battle
         sta     f:$7e0000+OT6_UNCTL     ; nor a stale "the engine is driving
@@ -206,6 +207,10 @@
         eor     #$ff            ;   (Ot6FizzleDropBoost) ends with its turn
         and     f:$7e0000+OT6_FIZZLED
         sta     f:$7e0000+OT6_FIZZLED
+        lda     $3018,x         ; and a Mimic's copy mark (Ot6MimicKeep)
+        eor     #$ff
+        and     f:$7e0000+OT6_MIMICCOPY
+        sta     f:$7e0000+OT6_MIMICCOPY
         ; #346: an action that never ran buys nothing, so it costs nothing.
         ; ExecAction runs a fresh turn whose command list is empty -- the
         ; action was removed after its entry reached the action queue: a
@@ -1095,6 +1100,104 @@ done:   pla
 
 ; ------------------------------------------------------------------------------
 
+; [ a mimic's copy keeps a boost it cannot spend ]
+
+; #461.  jsl from mimicreplace (battle_main.asm), right after Ot6MimicFold.
+; Mimic is a free copy: its boost buys what a boost buys on the copied
+; action, and where the copy cannot use it the pending boost is dropped
+; rather than spent, as Ot6FizzleDropBoost drops a refused action's: the bank
+; untouched, the turn's regen pip earned, the folded prices falling back.
+; The copied rows whose boost buys nothing, from what reads the copier's
+; pending byte while the copy runs:
+;   * SwdTech ($07): the source's boost bought the tech at its menu
+;     (Ot6BushidoTier), the copy runs the tech it picked, and cmd $07 is in
+;     Ot6BoostDmg's gate.  Cleave's copy is free (kits.md "Divines").
+;   * Filch and Bestow ($05, $57/$58): neither reads a boost, and cmd $05 is
+;     in the gate.  Bestow then arms the one pip it hands over itself
+;     (Ot6Bestow), so a copy pays exactly the transfer at every boost.
+;   * Slot ($0f) when the copy is a reel result: the source's boost bought
+;     the rig at its own spin (Ot6SlotRig), the copy spins nothing, and cmd
+;     $0f is in the gate.  Setzer's kit rows (Coin Toss, Hired Help,
+;     Jackpot) read the copier's boost when they run, and keep it.
+; A copied Steal buys the roll's ladder (Ot6StealBoostLevel) when the body
+; has something to take, which is decided when it runs: this marks the copy
+; (OT6_MIMICCOPY) for Ot6MimicStealNone.
+; Everything else that Mimic copies reads the copier's boost as it runs
+; (Fight and Capture's swings, Throw's throws, a tier or the multiplier,
+; Runic's turns, Rage's coin, Dance's tier, Locke's later rows).
+;
+; a8, either index width; x = the actor's entity offset, y = the queue slot
+; (mimicreplace's own).  Preserves x and y; clobbers a.
+.proc Ot6MimicKeep
+        .a8
+        php
+        longi
+        .i16
+        txa
+        cmp     #$08
+        bcs     @out            ; monsters never mimic, or boost
+        lda     $3018,x
+        ora     f:$7e0000+OT6_MIMICCOPY
+        sta     f:$7e0000+OT6_MIMICCOPY ; this turn is a copy
+        lda     OT6_BOOST_REVEALED,x
+        beq     @out            ; nothing pending: nothing to keep
+        lda     $3420,y         ; the copied command
+        cmp     #$07
+        beq     @drop           ; SwdTech
+        cmp     #$05
+        beq     @thief
+        cmp     #$0f
+        bne     @out
+        lda     $3421,y         ; Slot: a kit row reads the boost
+        cmp     #OT6_SETZER_COIN
+        bcc     @drop           ;   below Coin Toss: a reel result
+        cmp     #OT6_SETZER_JACKPOT+1
+        bcc     @out            ;   Coin Toss, Hired Help, Jackpot
+        bra     @drop           ;   above Jackpot: a reel result
+@thief: lda     $3421,y         ; the thief row
+        cmp     #OT6_THIEF_FILCH
+        beq     @drop
+        cmp     #OT6_THIEF_BESTOW
+        bne     @out
+@drop:  lda     #$00
+        sta     OT6_BOOST_REVEALED,x    ; kept: nothing bought, nothing spent
+        lda     $3204,x
+        ora     #$80            ; the "recheck enabled magic" request
+        sta     $3204,x
+@out:   plp
+        rtl
+.endproc
+
+; [ a copied Steal that finds nothing keeps its boost ]
+
+; #461.  jsl from TargetEffect_52 (battle_main.asm) on the arm where the
+; body has nothing to take, before any roll: the boost buys the roll's
+; ladder and there is no roll.  Only a Mimic's copy (OT6_MIMICCOPY) of a
+; Steal ($b5 = $05; a Capture's or Mug's hit is $06 and its boost bought the
+; swings) keeps it, dropped as Ot6MimicKeep drops it.
+;
+; a8/i8 (DoTargetEffect's shortai); x = the attacker, a character (the
+; caller's `cpx #$08` sent monsters elsewhere).  Preserves x and y;
+; clobbers a.
+.proc Ot6MimicStealNone
+        .a8
+        .i8
+        lda     $b5
+        cmp     #$05
+        bne     @out            ; not a Steal
+        lda     $3018,x
+        and     f:$7e0000+OT6_MIMICCOPY
+        beq     @out            ; not a copy
+        lda     #$00
+        sta     OT6_BOOST_REVEALED,x
+        lda     $3204,x
+        ora     #$80            ; the "recheck enabled magic" request
+        sta     $3204,x
+@out:   rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ how many tiers does this character's pending boost buy? ]
 ;
 ; the 0/1/2 clamp, shared by the three sites that need it: queue-time fold,
@@ -1930,7 +2033,7 @@ OT6_LIFE3_ID = $35
         ; Mimic of any of these rows does not come through here at all:
         ; mimicreplace copies the row's command/attack word without
         ; CreateAction, so the copy is free (4 / 6 / 5 MP for Locke, 0 for the
-        ; copier; #261, tools/tests/probe_mimic_thief.lua).
+        ; copier; #261, tools/tests/battle_mimicboost.lua).
         pla                     ; drop the parked cost (0 for steal)
         lda     $3a7b           ; the row the submenu queued
         jsl     Ot6ThiefIsNew   ; carry set = a kit row past Steal (A kept)

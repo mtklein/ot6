@@ -318,10 +318,25 @@ and banks a pip for the copier (bank 1 to 3 across the turn, regen
 included, for 0 MP), a copied Bestow hands one of the copier's pips to the
 ally (bank 1 to 0, ally 3 to 4), a copied Steal runs Steal's roll on the
 same body (nothing left on it in the measured runs, where Locke's own Steal
-had taken it). A boost on the copier buys nothing (the cmd `$05` gate) and
-its pip is spent anyway: a boost-1 copied Filch ended at bank 1 where the
-unboosted one ended at 3. Measured by `tools/tests/probe_mimic_thief.lua`
+had taken it). Measured by the probe that became `battle_mimicboost.lua`
 (`build/attempts/wt/v034-mimic-thief/`).
+
+A boost on a copy that cannot use it is kept (#461; the owner: Mimic is a
+free copy in all circumstances). Before, the copier's pip was spent for
+nothing: a boost-1 copied Filch ended at bank 1 where the unboosted one
+ended at 3. `Ot6MimicKeep` drops the pending boost when mimicreplace
+writes a copy whose boost buys nothing, as `Ot6FizzleDropBoost` drops a
+refused action's (the bank untouched, the turn's regen pip earned): a
+SwdTech (the source's boost bought the tech at its menu), a Filch or a
+Bestow (neither reads a boost; Bestow still charges the one pip it hands
+over), and a Slot reel result (the source's boost bought the rig at its
+spin). A copied Steal buys the roll's ladder when the body has something
+to take; when it has nothing there is no roll, and `Ot6MimicStealNone`
+drops the boost there. Every other copy reads the copier's boost as it
+runs. `battle_mimicboost` plays each of these at boost 0 and boosted from
+one snapshot and asserts the boosted copy's bank ends where the unboosted
+one's does, and that a copied Trickshot, which takes the multiplier, still
+spends its pip (`build/attempts/wt/v035-boost-scope/`).
 
 Dance is the control that makes this a rule rather than a habit.
 `Ot6RageCost` tail-calls `Ot6DanceCost`, so Rage and Dance share one

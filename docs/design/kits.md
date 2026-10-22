@@ -85,7 +85,8 @@ nothing it did not deliver.  Each divine is tuned to be worth a full boost
 and to be used more than once a fight; each entry below gives its reason.
 Mimic copies a divine's action, not its price, but the gate is the boost:
 a Gogo's copy takes the full boost from Gogo's own bank where the copy reads
-it (a Jackpot), and is free where it does not (a Cleave).
+it (a Jackpot), and is free where it does not (a Cleave: the boost is kept,
+#461).
 
 | Character | Divine | What three points buy | Built |
 |---|---|---|---|
@@ -1129,7 +1130,10 @@ plays Mimic.
 
 - **Mimic is free** (mp-economy.md; the guidelines): the copy keeps the
   copied action's price at 0 and its boost buys what the copied action's
-  boost buys (`Ot6MimicFold`, `battle_mimic`).  So Gogo's best turn is the
+  boost buys (`Ot6MimicFold`, `battle_mimic`); a boost the copy cannot
+  use (a SwdTech, Filch, Bestow, a reel result, a Steal with nothing to
+  take) is kept, not spent (`Ot6MimicKeep`, `battle_mimicboost`, #461).
+  So Gogo's best turn is the
   party's best turn again, at no MP: a keyed boosted strike that broke a
   shield, a lore, a tier spell.
 - **The arc's three rows: Lore, Tools, Item.**  Gogo's own stats are a

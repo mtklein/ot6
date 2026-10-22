@@ -429,6 +429,9 @@ TEST_ENV = {
     # and declares a two-byte command expedient (state_write_waivers.txt)
     "battle_mimic":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # #461: the same expedient, three bytes (Mimic, SwdTech, Slot)
+    "battle_mimicboost":
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
     # #292: NUMBER 024 (7 shields) is two steps from this save point
     "battle_hudcount":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/n024-entry-save-v1",

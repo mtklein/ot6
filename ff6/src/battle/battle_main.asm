@@ -354,6 +354,7 @@ mimicreplace:
         sta     $3520,y
         shorta
         jsl     Ot6MimicFold            ; ot6 #260: the boost buys the copy's tier
+        jsl     Ot6MimicKeep            ; ot6 #461: a boost the copy can't use is kept
         lda     $3f24
         cmp     #$12
         beq     _01d8                   ; return (can't mimic mimic)
@@ -9686,7 +9687,7 @@ TargetEffect_52:
         lda     $3308,y
         inc
         shorta_sec
-        beq     @3a01
+        beq     @ot6none       ; ot6 #461: was @3a01
         inc     $3401
         jsl     Ot6StealBoostLevel      ; ot6: boost tilts the success chance
         adc     #$32                    ;   (a=level+tier, carry set; 3 bp
@@ -9719,6 +9720,9 @@ TargetEffect_52:
         sta     $3309,y
         inc     $3401
         rts
+@ot6none:
+        jsl     Ot6MimicStealNone       ; ot6 #461: nothing to take, no roll:
+                                        ;   a copy keeps the boost
 @3a01:  shorta
         lda     #$00
         sta     $3d48,y

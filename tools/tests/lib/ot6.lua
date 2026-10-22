@@ -11326,13 +11326,18 @@ function Driver:makePlanRules(actor)
   -- 106 and 127 HP took 1414 and 1435 off the monsters, killed all three
   -- and CELES was sneezed out at 484 and 612 HP ("PARTY LEFT",
   -- build/attempts/wt/v034-tzen-wipe/lab/).  The pips stay banked for the
-  -- next turn.  M.STAND_TRIM = false is the driver before it.
+  -- next turn.  M.STAND_TRIM = false is the driver before it.  The trim is
+  -- the plain Fight line's alone (#462): it is read at that line's return
+  -- (standBoost), so every other line below keeps the bank's boost; and a
+  -- counter gated never on its own killing blow (gate.guarded) needs none.
+  local standBoost, standSay = nil, nil
   if boost > 0 and self.lastStand and M.STAND_TRIM ~= false then
     local focus = self:lastStandFocus()
     local slot = focus and focus[1] and focus[1].slot
     local en = slot ~= nil and self.lastStand.entries[slot] or nil
     local dh = self.dmgHit[actor]
-    if en and en.class == "removal" and dh ~= nil and dh.kind == "fight" and dh.per > 0 then
+    if en and en.class == "removal" and not (en.gate and en.gate.guarded)
+       and dh ~= nil and dh.kind == "fight" and dh.per > 0 then
       local hp = M.readWord(BATTLE.MON_HP + slot * 2)
       local sh = M.readByte(BATTLE.SH_CUR + slot * 2)
       local broken = M.readByte(BATTLE.BRK_TICKS + slot * 2) ~= 0
@@ -11344,11 +11349,11 @@ function Driver:makePlanRules(actor)
           or M.killEstimate({ per = dh.per, hits = hits, chips = fightChips(actor, slot, b), need = sh })
           or dh.per * hits
         if est >= hp then
-          M.log(string.format("[%s] actor=%d [last stand] slot %d at %d HP (%d shield(s)%s) dies to a Fight at "
+          standSay = string.format("[%s] actor=%d [last stand] slot %d at %d HP (%d shield(s)%s) dies to a Fight at "
             .. "%d BP (%d: %d hit(s) at %d); boosting to %d would carry swings onto the plain bodies -- "
             .. "Fight at %d BP, %d BP kept (#454)", self.tag or "fight", actor, slot, hp, sh,
-            broken and ", BROKEN" or "", b, est, hits, dh.per, boost, b, have - b))
-          boost = b
+            broken and ", BROKEN" or "", b, est, hits, dh.per, boost, b, have - b)
+          standBoost = b
           break
         end
       end
@@ -12817,7 +12822,9 @@ function Driver:makePlanRules(actor)
   -- pierce hand takes the pierce-keyed monster and a slash hand the
   -- slash-keyed one, the way a person reads the HUD class cell.  chipAim is
   -- nil where there is no such choice, and the cursor keeps its default.
-  return { kind = "fight", row = fight, boostLeft = boost, aim = self:chipAim(actor, boost) }
+  local fb = boost
+  if standBoost ~= nil then fb = standBoost; M.log(standSay) end   -- the last-stand trim (#454, #462)
+  return { kind = "fight", row = fight, boostLeft = fb, aim = self:chipAim(actor, fb) }
 end
 
 function Driver:layoutOf()
