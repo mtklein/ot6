@@ -781,7 +781,9 @@ Evidence under `build/attempts/wt/v036-route/lab/`.
   measured, in the rings; and out of the tower, beside the Falcon, the
   rings come off and each member's relic from before the climb goes back
   on (every run of `tw1`: slot 5 TERRA $C3, CELES $B1, STRAGO $B5, RELM
-  $B1).
+  $B1). The legs to the Opera House play without them (sweeps `sg7`,
+  `se7`, `so7`: route-wor-gogo.md section 4); the dream leg puts them back
+  on for the Barb-e groups (route-wor-dreams.md section 6).
 - **The sweep.** `tw1` at e4491312: 18 of 18 PASS at one attempt; the Holy
   Dragon in 16 distinct keys over 19 meetings (with `tw0`), MagiMaster in
   14 over 19, every one won (`tally_tw.txt`).
