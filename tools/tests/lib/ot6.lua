@@ -10724,7 +10724,7 @@ Driver.POLICY_SKILL = { skill = true, magic = true, runic = true, lore = true, s
 function Driver:policyPlan(actor, plan)
   local pol = M.POLICY
   if pol == nil or plan == nil or plan.kind == "defer" or plan.kind == "switch" then return plan end
-  local form = M.readWord(0x11E0) & 0x1FF
+  local form = M.readWord(0x11E0) & 0x3FF
   if M.POLICY_FORMS and not M.POLICY_FORMS[form] then return plan end
   local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
   if fight == nil then return plan end
@@ -10773,7 +10773,7 @@ function Driver:sayTurn(actor, plan)
   end
   M.log(string.format("[%s] [board] n=%d tick=%d form=$%03X who=%d char=%d did=%s bp=%d "
     .. "party=%s mons=%s", self.tag or "fight", self.turnN, self.battleTick,
-    M.readWord(0x11E0) & 0x1FF, actor, M.readByte(BATTLE.BCHID + actor * 2),
+    M.readWord(0x11E0) & 0x3FF, actor, M.readByte(BATTLE.BCHID + actor * 2),
     plan and plan.kind or "-", plan and plan.boostLeft or 0,
     table.concat(party, ","), table.concat(mons, ",")))
 end
@@ -16445,7 +16445,7 @@ function Driver:watchTimer()
     self.runDecided = true
     local t = self:clock()
     if not t or self.opts.timedRun == false or not M.TIMED_RUN then return end
-    local form = M.readWord(0x11E0) & 0x1FF
+    local form = M.readWord(0x11E0) & 0x3FF
     local random = M.readByte(M.RANDBTL) ~= 0
     if not random then
       M.log(string.format("[%s] [timer] f+%d battle $%03X is an event battle: fought, never "
@@ -16587,7 +16587,7 @@ function Driver:sayOutcome()
   M.outcomes[#M.outcomes + 1] = rec
   M.log(string.format("[%s] [outcome] battle $%03X %s after %d ticks%s: killed %s; escaped %s; "
     .. "%d of %d seated fled (Run, Warp); %s reward due %d a member (%s): %s%s", self.tag or "fight",
-    r.form & 0x1FF, o.kind:upper(), self.battleTick, atEnd and "" or " (no end reading: the last frame's)",
+    r.form & 0x3FF, o.kind:upper(), self.battleTick, atEnd and "" or " (no end reading: the last frame's)",
     slots(o.kills), slots(o.escaped), o.leftN,
     o.seatedN, r.random and "random" or "event", o.due, table.concat(paid, ", "),
     o.contradiction and ("CONTRADICTION -- " .. o.contradiction)
@@ -16599,7 +16599,7 @@ function Driver:sayOutcome()
     rec.timerCost = self.timedOpen.frames - (t and t.frames or 0)
     if o.kind == "won" then M.timedCosts[#M.timedCosts + 1] = rec.timerCost end
     M.log(string.format("[%s] [timer] battle $%03X over at f+%d: %s; the battle took %d frames "
-      .. "of it (%s at the opening)", self.tag or "fight", r.form & 0x1FF, self.battleTick,
+      .. "of it (%s at the opening)", self.tag or "fight", r.form & 0x3FF, self.battleTick,
       t and M.sceneTimerStr(t) or "the timer is spent", self.timedOpen.frames - (t and t.frames or 0),
       M.clockStr(self.timedOpen.frames)))
   end

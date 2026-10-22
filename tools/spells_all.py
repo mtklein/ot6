@@ -25,7 +25,11 @@ when any checkpoint is BAD.
   spells_all.py --control   the same checkpoints, each with one spell that is
                             no tier and that no source the save has produces
                             set learned for LOCKE in memory: every checkpoint
-                            must read BAD (exit 0 if so)
+                            must read BAD (exit 0 if so).  The spell is the
+                            first that qualifies, so it changes as a save
+                            holds more Espers (FIRE, POISON, MERTON, FLARE,
+                            METEOR along the route): each line
+                            says "control" and names it ([injected: X])
 """
 import sys
 
@@ -97,7 +101,13 @@ for name, path in sp.checkpoint_payloads(root):
     bad, line = check(name, raw)
     n += 1
     nbad += bool(bad)
-    print(("BAD " if bad else "ok  ") + name.ljust(28), line)
+    if control:
+        # the unsourced spell on this line is the one --control injected
+        # (#453), not a finding about the checkpoint
+        print(("control BAD " if bad else "control ok  ") + name.ljust(28), line,
+              f"[injected: {picked.get(name, 'none')}]")
+    else:
+        print(("BAD " if bad else "ok  ") + name.ljust(28), line)
 print(f"tier ids from Ot6FoldTbl: {sorted(inp.name(s) for s in tiers)}")
 print(f"spells no current source produces: {[inp.name(s) for s in never]}")
 if control:

@@ -99,7 +99,10 @@ def random_forms():
     d = rom()
     if d is None:
         sys.exit("--events needs build/ot6.sfc (ninja build/ot6.sfc)")
-    return {w & 0x1FF for g in range(256) for w in d.group_words(g)}
+    # a formation is ten bits (0-575); bit 15 marks a pack of four
+    # consecutive formations, each 1/4 (LoadBattleProp's `+ Rand & 3`)
+    return {(w & 0x3FF) + k for g in range(256) for w in d.group_words(g)
+            for k in range(4 if w & 0x8000 else 1)}
 
 
 def opener(path):
