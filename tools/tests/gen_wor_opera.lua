@@ -143,35 +143,43 @@ local OPERA_DOOR, OPERA_LANDING = { 31, 183 }, { 30, 182 }
 -- the hunt's four (route-wor-gogo.md section 7, the Doom Gaze lab): CELES for TERRA, and the cabin's gear
 -- care, which hands RELM the brush (special: Doom Gaze's key)
 local HUNT = { CELES, RELM, GOGO, STRAGO }
--- a relic for a Wall Ring in each member's second relic slot ($1624 + 37 * char), and back: { {char, relic} }
-local WALL_RING = 0xBB
-local wallOff = {}
+-- the dragon's relics: each member's second relic slot ($1624 + 37 * char) takes the listed relic for the
+-- fight, and what it held goes back after: { {char, relic} }.  A member already wearing it, or a relic not
+-- in the bag, is left as it is
+local wardHeld = {}
 local function wardRelics(list, tag)
   local steps = {}
   for _, m in ipairs(list) do
     steps[#steps + 1] = H.lazy(function()
-      if H.readByte(0x1600 + 37 * m[1] + 0x24) ~= WALL_RING then return H.call(function() end) end
-      wallOff[#wallOff + 1] = m[1]
-      return H.equipKit(m[1], { { 5, m[2] } }, { tag = NAMES[m[1]] .. ": the Wall Ring off " .. tag })
+      local base = 0x1600 + 37 * m[1]
+      if H.readByte(base + 0x23) == m[2] or H.readByte(base + 0x24) == m[2] or H.invCountOf(m[2]) < 1 then
+        return H.call(function() end)
+      end
+      wardHeld[#wardHeld + 1] = { m[1], H.readByte(base + 0x24) }
+      return H.equipKit(m[1], { { 5, m[2] } }, { tag = NAMES[m[1]] .. ": a ward relic " .. tag })
     end)
   end
   steps[#steps + 1] = H.call(function() H.log("[kit] relics " .. tag .. ": " .. kitLine(HUNT)) end)
   return H.seqStep(steps)
 end
-local function wallRingsBack(tag)
+local function wardRelicsBack(tag)
   return H.lazy(function()
     local steps = {}
-    for _, ch in ipairs(wallOff) do
-      steps[#steps + 1] = H.equipKit(ch, { { 5, WALL_RING } }, { tag = NAMES[ch] .. ": the Wall Ring back " .. tag })
+    for _, h in ipairs(wardHeld) do
+      if h[2] ~= 0xFF then
+        steps[#steps + 1] = H.equipKit(h[1], { { 5, h[2] } }, { tag = NAMES[h[1]] .. ": the relic back " .. tag })
+      end
     end
     steps[#steps + 1] = H.call(function() H.log("[kit] relics " .. tag .. ": " .. kitLine(HUNT)) end)
     return H.seqStep(steps)
   end)
 end
--- the Dirt Dragon's fight: STRAGO's lores and his Dischord (halves its level, which scales its Quake and its
--- blows), RELM's Ultima, Shell on the party (labs du_*, dx_*, sweeps so2, so3: section 4)
+-- the Dirt Dragon's fight: STRAGO's lores, RELM's Ultima, Shell on the party (labs du_*, dx_*, sweep so2:
+-- section 4).  No Dischord: from the same snapshot the fight with it won 49 of 60 trials and without it 55
+-- of 60, and it lost every trial of one key the plain fight won (#460; build/attempts/wt/v036-route/lab/
+-- dd_dis*, dd_ward*: 'be70:xxxx', 'be70:WWWW')
 local DRAGON_FIGHT = { nukeLore = { 0x03, 0x04 }, magic = { [RELM] = { spell = 0x14 } },
-  buffVs = { [0x14C] = { 0x25 } }, strago = { dischord = { [0x14C] = true } } }
+  buffVs = { [0x14C] = { 0x25 } } }
 H.run({ maxFrames = 2400000 }, {
   H.bootCheckpoint("wor-ebot-v1"),
   watches(),
@@ -195,10 +203,10 @@ H.run({ maxFrames = 2400000 }, {
   -- the Item list for 1,100 frames of the dragon's opening Quakes (sweep so3_k3_s7: "item steer: row 0 ->
   -- 106")
   H.bagArrange({ POTION, FENIX, 0xEA, 0xEE, 0xEC, REMEDY, TINCTURE }, { tag = "bag: the battle heals on top" }),
-  -- the Wall Rings off for the dragon (CELES, STRAGO and RELM wear them from the tower): its spells are earth
-  -- on the whole field, which Reflect does not turn, and Reflect turns the party's own Cure and Shell away
-  -- from them (Driver:buffPlan skips a reflecting member); RELM takes the Earrings (her Ultima), CELES the
-  -- Czarina Ring and STRAGO the Barrier Ring (each a ward cast near death)
+  -- the dragon's relics (the kit sweeps so5 and so6 won it with): RELM the Earrings (her Ultima), CELES the
+  -- Czarina Ring and STRAGO the Barrier Ring (each a ward cast near death).  (They took the place of the
+  -- Wall Rings the tower left on until #460; its spells are earth on the whole field, which Reflect does
+  -- not turn, and Reflect turned the party's own Cure and Shell away)
   wardRelics({ { CELES, 0xC1 }, { STRAGO, 0xB7 }, { RELM, 0xC3 } }, "for the Dirt Dragon"),
   H.call(function() H.log("[kit] " .. kitLine(HUNT)) end),
   liftOff(),
@@ -251,8 +259,8 @@ H.run({ maxFrames = 2400000 }, {
   H.call(function() say("wor", "out of the Opera House") end),
   H.worldNavTo(OPERA_LANDING[1], OPERA_LANDING[2], { maxFrames = 3000, playBattles = "tactical", fight = FIGHT,
     avoid = { OPERA_DOOR } }),
-  -- the Wall Rings back for Doom Gaze (the hunt's lab, dg, was played with them)
-  wallRingsBack("for the hunt"),
+  -- the second relics back for Doom Gaze
+  wardRelicsBack("for the hunt"),
   H.fieldCare({ threshold = 1.0, tag = "before the hunt" }),
   H.call(function() H.log("[kit] " .. kitLine(HUNT)) end),
   board(),

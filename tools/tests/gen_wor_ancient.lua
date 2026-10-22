@@ -92,9 +92,10 @@ local function ride(first, stratum, what)
     end),
   })
 end
--- the Wall Rings off for the Blue Dragon (the tower put them on CELES, RELM and TERRA: they turn the party's
--- own Cure and Shell away, route-wor-gogo.md section 4), each for the bag relic the relic rule ranks next
-local wallOff = {}
+-- a Wall Ring off for the Blue Dragon, for the bag relic the relic rule ranks next: Reflect turns the party's
+-- own Cure and Shell away (route-wor-gogo.md section 4).  The tower takes its rings off as the party leaves it
+-- (#460), so the play reaches here without one; a save that still wears one (an older wor-doma-v1) is
+-- served, and the ring is not put back
 local function wallRingsOff(tag)
   local steps = {}
   for _, ch in ipairs(FOUR) do
@@ -105,22 +106,11 @@ local function wallRingsOff(tag)
         if pick == nil and H.invCountOf(id) > 0 and id ~= H.readByte(c(ch, 0x23)) then pick = id end
       end
       if pick == nil then return H.call(function() end) end
-      wallOff[#wallOff + 1] = ch
       return H.equipKit(ch, { { 5, pick } }, { tag = NAMES[ch] .. ": the Wall Ring off " .. tag })
     end)
   end
   steps[#steps + 1] = H.call(function() H.log("[kit] relics " .. tag .. ": " .. kitLine(FOUR)) end)
   return H.seqStep(steps)
-end
-local function wallRingsBack(tag)
-  return H.lazy(function()
-    local steps = {}
-    for _, ch in ipairs(wallOff) do
-      steps[#steps + 1] = H.equipKit(ch, { { 5, WALL_RING } }, { tag = NAMES[ch] .. ": the Wall Ring back " .. tag })
-    end
-    steps[#steps + 1] = H.call(function() H.log("[kit] relics " .. tag .. ": " .. kitLine(FOUR)) end)
-    return H.seqStep(steps)
-  end)
 end
 -- the Blue Dragon (408 NPC_4, shown by $06A1, wandering: _cc205b on touch, event battle 137)
 local function dragonObj()
@@ -268,7 +258,6 @@ H.run({ maxFrames = 2400000 }, {
   }),
   H.advanceStory(function() return settled() and sw(0x06A1) == 0 end, 300000, { playBattles = "tactical", fight = FIGHT }),
   H.call(function() say("story", "the Blue Dragon beaten ($06A1 clear)") end),
-  wallRingsBack("after the Blue Dragon"),
   H.fieldCare({ tag = "after the Blue Dragon" }),
   chestAt(34, 43, 0x0CC, "the X-Ether (408 (34,43))", nil),
 
