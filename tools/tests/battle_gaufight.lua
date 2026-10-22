@@ -189,6 +189,71 @@ local function deferBench()
   return false
 end
 
+-- The ride's bench, which cares rather than idles (#465 follow-up): at each
+-- bench window, a Potion (else a Tonic) on the most hurt member under 60% of
+-- max HP, Gau included, else a Defend.  An idle bench let the monsters take
+-- the party: on the regenerated gau_joined's five-body group $0045 the ride
+-- ended "still possessed ... got false" with party HP 0,0,0,0 (shift 0;
+-- build/attempts/wt/v036-boost/gaufight/).  The menu gate is still tested
+-- the same way: any window the four-row menu opened for a possessed Gau
+-- would be counted (gauMenus), whatever the bench does with its own.
+local POTION, TONIC = 0xE9, 0xE8
+local function bagIdx(id)
+  for i = 0, 251 do
+    if H.readByte(0x2686 + i * 5) == id and H.readByte(0x2686 + i * 5 + 3) > 0 then return i end
+  end
+end
+local benchPlan = {}
+local function careBench()
+  if H.readByte(MENU) == 0 or (H.readByte(ACTOR) & 3) == gauSlot then return false end
+  local a, st = H.readByte(ACTOR) & 3, H.readByte(MSTATE)
+  local p = benchPlan[a]
+  if st == ST_CMD then
+    local worst, wpct
+    for slot = 0, 3 do
+      local hp, mx = H.readWord(0x3BF4 + slot * 2), H.readWord(0x3C1C + slot * 2)
+      if mx > 0 and mx < 0xFFFF and hp > 0 and hp * 100 < mx * 60 then
+        local pct = hp * 100 // mx
+        if wpct == nil or pct < wpct then worst, wpct = slot, pct end
+      end
+    end
+    local item = (bagIdx(POTION) and POTION) or (bagIdx(TONIC) and TONIC)
+    local row
+    for r = 0, 3 do if H.readByte(CMDROW(a, r)) == CMD_ITEM then row = r end end
+    if worst and item and row then
+      p = { item = item, target = worst }
+      if not (benchPlan[a] and benchPlan[a].target == worst) then
+        H.log(string.format("[ride] f%d bench slot %d: item $%02X on slot %d at %d%%", H.frame, a, item, worst, wpct))
+      end
+    else
+      p = { defend = true }
+    end
+    benchPlan[a] = p
+    if p.defend then H.setPad({ right = true }) return true end
+    local cur = H.readByte(0x890F + a) & 3
+    H.setPad(cur == row and { a = true } or (cur < row and { down = true } or { up = true }))
+    return true
+  end
+  if st == 0x27 then H.setPad({ a = true }) return true end          -- the Def. window
+  if st == 0x0A then                                                    -- the Item list
+    local want = p and p.item and bagIdx(p.item)
+    if not want then H.setPad({ b = true }) return true end
+    local cur = H.readByte(0x8947 + a) + H.readByte(0x894F + a)
+    H.setPad(cur == want and { a = true } or (cur < want and { down = true } or { up = true }))
+    return true
+  end
+  if st == ST_TGT then
+    if not (p and p.target) then H.setPad({ b = true }) return true end
+    local lit = H.readByte(0x7B7D)
+    if lit == (1 << p.target) then H.setPad({ a = true })
+    elseif lit == 0 then H.setPad({ right = true })                    -- back to the party side
+    else H.setPad({ down = true }) end
+    return true
+  end
+  H.setPad({ b = true })
+  return true
+end
+
 -- wait for Gau's own menu, X-cycling the bench out of the way.
 local function menuForGau(what)
   local ph = 0
@@ -241,13 +306,19 @@ add({
 -- first six draws are now 54, 184, 142, 410, 420 and 107 HP.  The seventh
 -- reaches group 6, whose only formation is CrassHopper x3 (729 HP).
 local VELDT_LIST, MAX_DRAWS = 0x1DDD, 128   -- two passes over all 64 bytes
+-- Lever, for evidence only (the suite runs 0; a lab sets the global
+-- GAUFIGHT_SKIP ahead of the file): resolve that many suitable draws first,
+-- so the trance is ridden against a later formation (TESTING.md: vary the
+-- encounters, not seeds)
+local SKIP = type(GAUFIGHT_SKIP) == "number" and GAUFIGHT_SKIP or 0
+local skipped = 0
 add({ H.call(function()
   H.vars.suitable = false
   local groups = 0
   for i = 0, 63 do
     if H.readByte(VELDT_LIST + i) ~= 0 then groups = groups + 1 end
   end
-  H.vars.drawCap = math.min(2 * groups, MAX_DRAWS)
+  H.vars.drawCap = math.min(2 * groups + SKIP, MAX_DRAWS)
   H.log(string.format("battle A: the Veldt list holds %d formation groups; "
     .. "draw budget %d (two passes)", groups, H.vars.drawCap))
 end) })
@@ -258,6 +329,7 @@ for n = 1, MAX_DRAWS do
     surveyBattle()
     local total = monsterHpTotal()
     H.vars.suitable = (#msPresent >= 2 and total >= 500)
+    if H.vars.suitable and skipped < SKIP then skipped, H.vars.suitable = skipped + 1, false end
     H.log(string.format("battle A draw %d: %d bodies, %d total HP -> %s",
       n, #msPresent, total, H.vars.suitable and "FIGHT" or "resolve"))
   end)
@@ -407,15 +479,14 @@ add({
   }, "the RAGE status is set (Cmd_10 ran)"),
   H.call(function() gauMenus, gauDispatches, rideN = 0, 0, 0 end),
                                       -- count openings/actions from the trance on
-  -- ride the trance: the bench is X-cycled, so if the four-row
-  -- menu ever offered a possessed Gau a window, the cycling would land
-  -- focus on him and the counter below would catch it.  The ride lasts
+  -- ride the trance: the bench cares or Defends (careBench), and if the
+  -- four-row menu ever offered a possessed Gau a window, the counter below
+  -- would catch it.  The ride lasts
   -- RIDE_TURNS of Gau's own possessed turns (each one a turn the gate had
   -- to refuse a menu on), capped at 700 iterations, about 6300 frames.
-  -- It does not sit out the whole cap: the X-deferred bench never acts, so
-  -- every frame past the turns it needs is the monsters' free damage, and
-  -- the #214 gau_joined drew a pair that wiped the idle party 4450 frames
-  -- in (f15743).
+  -- It does not sit out the whole cap: every frame past the turns it needs
+  -- is the monsters' damage, and the #214 gau_joined drew a pair that wiped
+  -- the then-idle party 4450 frames in (f15743).
   H.driveUntil(function()
     return gauDispatches >= RIDE_TURNS or rideN >= 700
   end, 8000, {
@@ -424,7 +495,7 @@ add({
       if H.readByte(MENU) ~= 0 and (H.readByte(ACTOR) & 3) == gauSlot then
         gauMenus = gauMenus + 1
       end
-      if not deferBench() then H.setPad({}) end
+      if not careBench() then H.setPad({}) end
     end),
     H.waitFrames(3),
     H.call(function() H.setPad({}) end),

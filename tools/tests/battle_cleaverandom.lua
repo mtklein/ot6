@@ -24,9 +24,9 @@
 -- the learned set and $2020 as above, MP := 999, both soldiers' HP :=
 -- 30,000 (so his own techs do not end the battle before the picks are
 -- counted), Muddle ($3EE5 bit 5) set on him again whenever a hit clears
--- it, and his HP put back to his max after every hit (Muddled,
--- his techs land on himself too: the first run, at 14f02de1, lost him after
--- three picks).  Nothing else is touched: the command, the pick and the
+-- it, his max HP := 9999 and his HP put back to it after every hit
+-- (Muddled, his techs land on himself too: the first run, at 14f02de1, lost
+-- him after three picks, and his own Stunner does 1448 in one action).  Nothing else is touched: the command, the pick and the
 -- attack are the engine's.
 --
 -- Watched: each RandBushido entry, and the bound RandA takes right after
@@ -100,10 +100,16 @@ for ai, A in ipairs(ARMS) do
       H.writeWord(KNOWN, A.known)
       H.writeByte(0x1CF7, A.learned)
       H.writeWord(0x3C08 + cyanSlot * 2, 999)
+      -- his max HP raised to the cap: Muddled, his own Stunner lands on him
+      -- for more than his 358 in one action (base 1448 at shifts 4 and 12 on
+      -- main's cyan_defence, the HP falling 358 -> 0 inside the action, before
+      -- any per-frame restore could act: build/attempts/wt/v036-boost/
+      -- cleaverandom/), so the restore below puts him back to 9999
+      H.writeWord(0x3C1C + cyanSlot * 2, 9999)
       for m = 0, 5 do
         if (H.readByte(0x3AA8 + m * 2) & 1) == 1 then H.writeWord(0x3BFC + m * 2, 30000) end
       end
-      H.log(string.format("[crand] arm %s staged: $2020 := %d, $1CF7 := %02X, MP := 999, "
+      H.log(string.format("[crand] arm %s staged: $2020 := %d, $1CF7 := %02X, MP := 999, max HP := 9999, "
         .. "soldiers' HP := 30000 (declared expedients)", A.name, A.known, A.learned))
       armed = true
     end),
@@ -113,9 +119,10 @@ for ai, A in ipairs(ARMS) do
           H.writeByte(0x3EE5 + cyanSlot * 2, H.readByte(0x3EE5 + cyanSlot * 2) | 0x20)
         end
         -- Muddled, his techs land on himself too: his HP is put back to his
-        -- max after every hit, so he meets each one full.  (Under half was
-        -- not enough: on 8c90abf1's chain one tech took him from 189/358
-        -- to 0, build/attempts/wt/v033-fizzle-boost-2/full_8c90abf1/.)
+        -- max (9999, staged above) after every hit, so he meets each one
+        -- full.  (Under half was not enough: on 8c90abf1's chain one tech
+        -- took him from 189/358 to 0, build/attempts/wt/v033-fizzle-boost-2/
+        -- full_8c90abf1/; nor was his own 358, against Stunner's 1448.)
         local hp, mx = H.readWord(0x3BF4 + cyanSlot * 2), H.readWord(0x3C1C + cyanSlot * 2)
         if H.battleActive() and hp > 0 and hp < mx then H.writeWord(0x3BF4 + cyanSlot * 2, mx) end
         H.setPad(H.frame % 8 < 4 and { a = true } or {})   -- the menus Muddle leaves him: none; dialogs: A
