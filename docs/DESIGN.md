@@ -140,8 +140,10 @@ Cannon is holy, Drill is spear-class, Fire Dance is fire, ...).
 - Every boost buys something (owner, 2026-10-22). An action with no reward
   for boosting doesn't take a boost: R can't raise one on it, and its price
   doesn't escalate. Where the reward is only known when the action runs (a
-  Steal on a body with nothing left, Scan with one body standing), the
-  boost that bought nothing stays in the bank. Each such action is a design
+  Steal on a body with nothing left, Scan with one body standing), the boost
+  is spent, fruitlessly: the player chose it. (An action refused for lack
+  of MP never happened and keeps its boost; a Mimic copy is free in every
+  case.) Each such action is a design
   opportunity: what would a boost naturally buy, and which boost family
   does it join (#469).
 
