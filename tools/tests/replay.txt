@@ -13,3 +13,4 @@
 2026-10-21 v0.33 qualification: the line replayed from power-on under the release library (the Veldt/Gau/Duncan route, the Rage, MP-fizzle and multi-pass fixes, and the lib changes since v0.32)
 2026-10-21 v0.34 qualification: the line replayed from power-on under the release library (the Gogo route, the Tzen care and trim, Mimic and fizzle suite changes, and the lib changes since v0.33)
 2026-10-21 v0.34 qualification, again: the whole line under the final library (the first replay ran with fire-out-v1's contract edit that a81a9695 reverted)
+2026-10-22 v0.35 qualification: the line replayed from power-on under the release library (the Dreams route, Mimic boost keeping, the trim's scope, and the lib changes since v0.34)
