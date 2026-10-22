@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "ca0a475a0322b57907ec1ef2a9607484d814516f8cb2e01d7dbf75ddf5f8af59",
+  "sha256": "80b90387d988b94216878e5ca52d87232ef85b5f8f13d5174f231755b40ca5f0",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "ca0a475a0322b57907ec1ef2a9607484d814516f8cb2e01d7dbf75ddf5f8af59",
-    "generator_sig": "534c2984f648237ecfa409aaa937fa0137218abbf6bb71b7fba49f0cae8a7681 gen_wor_doma tools/tests/checkpoints/wor-dream-v1/manifest.json tools/tests/checkpoints/wor-dream-v1/wor-dream.sram",
+    "payload_sha256": "80b90387d988b94216878e5ca52d87232ef85b5f8f13d5174f231755b40ca5f0",
+    "generator_sig": "2a5ad13d070caf130cec7a654c0493f3b3932065149552622023c38fbcd0174a gen_wor_doma build/checkpoints/wor-dream-v1/manifest.json build/checkpoints/wor-dream-v1/wor-dream.sram",
     "ancestors": [
       {
-        "path": "tools/tests/checkpoints/wor-dream-v1/manifest.json",
-        "sha256": "333149d7ab5373ee3bbfbaf47379eb905bb13a1f0dc048220b658cf03f633279"
+        "path": "build/checkpoints/wor-dream-v1/manifest.json",
+        "sha256": "a21920ae0ae0b7a9e68717ee83425f6384efc7e11c2130e49557fce3b8ab50a6"
       }
     ]
   }

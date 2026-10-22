@@ -12,15 +12,15 @@
     }
   },
   "size": 32768,
-  "sha256": "31ed6549a75082f0691068c70513aabcb55475abc5ba90133d4abe804415ee2e",
+  "sha256": "f7c08ace51e8ba139080ead641e37152e6d5df710998e781ba81511b9aded2c3",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "31ed6549a75082f0691068c70513aabcb55475abc5ba90133d4abe804415ee2e",
-    "generator_sig": "2e2979ce31921202aa7a0ce99093d18a7bc9f8b65486cccebe8963901910872c gen_sabin_magitek",
+    "payload_sha256": "f7c08ace51e8ba139080ead641e37152e6d5df710998e781ba81511b9aded2c3",
+    "generator_sig": "99e0d8f969e51e9ab0bd250187a12d1c06877215cfc9696f8d7bed02f1c559b9 gen_sabin_magitek",
     "ancestors": [
       {
         "path": "build/states/doma_defended.stamp",
-        "sha256": "512697a9a395379a9994d4ce970f2586638635ede6df164c43f16f597512ea5e"
+        "sha256": "3e0bc18dacac8c5de3d2ae68083a8355412930446b78aadefa4dab0529462d2d"
       }
     ]
   }
