@@ -41,6 +41,18 @@
 -- (build/attempts/wt/v027-kits/final-matrix/<rom>__battle_breakmonster.out; the
 -- branch's ROM before the gate: build/attempts/wt/v027-kits/mx8/
 -- mut2_real__battle_breakmonster.out).
+--
+-- The battles are whatever the continent deals (#468).  A battle the
+-- staging does not need is fought out by the route's fight driver
+-- (tactical, boost, items, its heals), not by a bare Fight: v0.36's sweep
+-- (shift 13 after one and three encounters used up) lost the whole party
+-- to the Ninja pincer (formation monsters $0003 $0003) in such a battle,
+-- every seat at 4-5 BP unspent (build/attempts/wt/v036-fragile/K/logs/
+-- battle_breakmonster__s13__k1.log.gz).  And the party Defends through a
+-- staging only while it holds: once a seated member falls under a third of their
+-- max HP (or down, a stone the staging made aside), that battle is handed
+-- to the fight driver and the arm goes on in the next one, its Breaks
+-- counted across battles against the same CASTS.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -53,6 +65,49 @@ local staged, casts, stoned, target, armed = nil, 0, false, nil, false
 -- step after it (#424: the break_cmd mutant's twenty shield-taking Breaks
 -- went past a callback's assertion)
 local bad = {}
+
+-- why the party can no longer Defend through a staging, or nil: a seated
+-- member down (Wound, Zombie or 0 HP; the stone a staged Break makes is the
+-- property, not a danger) or under DANGER of max HP
+local DANGER = 1 / 3
+local function danger()
+  if not H.battleLoadStarted() then return nil end
+  for s = 0, 3 do
+    if H.readByte(0x3ED8 + s * 2) ~= 0xFF then
+      local hp, mx, st1 = H.readWord(0x3BF4 + s * 2), H.readWord(0x3C1C + s * 2), H.readByte(0x3EE4 + s * 2)
+      if (st1 & 0x40) == 0 and (hp == 0 or (st1 & 0x82) ~= 0 or (mx > 0 and hp < mx * DANGER)) then
+        return string.format("seat %d at %d/%d HP, status1 $%02X", s, hp, mx, st1)
+      end
+    end
+  end
+  return nil
+end
+local handed = nil
+-- step, run until it ends or danger() hands the battle over (handed)
+local function guarded(step, what)
+  local ended = false
+  return H.withReset(H.driveUntil(function()
+    if ended then return true end
+    if handed == nil then
+      handed = danger()
+      if handed then H.log(string.format("[mbreak] f%d %s: handed to the fight driver (%s)", H.frame, what, handed)) end
+    end
+    return handed ~= nil
+  end, 70000, { step, H.call(function() ended = true end) }, what), function() ended = false end)
+end
+-- the route's fight driver fights the battle out from wherever it stands
+local function fightOut(tag)
+  local F = nil
+  return H.withReset(H.driveUntil(function() return not H.battleLoadStarted() end, 60000, {
+    H.call(function()
+      if F == nil then
+        F = H.newFightDriver(tag, { tactical = true, boost = true, items = true, bank = 0, healPercent = 55,
+          setzer = false })
+      end
+      F.frame()
+    end),
+  }, tag .. ": the battle fought out"), function() if F then F.idle() end; F = nil end)
+end
 
 local function pickTarget()
   for s = 0, 3 do
@@ -150,6 +205,7 @@ local function ctxArm(c, name)
     H.driveUntil(function() return cstone end, 300000, {
       H.cond(function() return not H.battleLoadStarted() end, { H.fcPace("mbreak") }, {}),
       H.call(function()
+        handed, crec = nil, nil
         H.assertEq(bad[1], nil, "every staged Break was vanilla's (no shield, no HP)")
         H.assertEq(ccasts < CASTS, true, string.format("a %s-context Break petrified within %d casts", name, CASTS))
         tseat = nil
@@ -164,12 +220,13 @@ local function ctxArm(c, name)
         end
         plan = { { who = TERRA, cmd = CMD_MAGIC, spell = BREAK, boost = 0, slot = t } }
       end),
-      H.cond(function() return #plan == 0 end, { H.kitBattle({}, {}) }, {
-        H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000,
+      H.cond(function() return #plan == 0 end, { fightOut("mbreak: " .. name .. " arm, no cast here") }, {
+        guarded(H.kitBattle(proxy, { untilPlanDone = true, idle = "defend", maxFrames = 60000,
           planDone = function()
             local k = H.vars.kit[#H.vars.kit]
             return k ~= nil and ctxEnd > k.frame
-          end }),
+          end }), "the " .. name .. "-context Break"),
+        H.cond(function() return handed ~= nil end, { fightOut("mbreak: " .. name .. " arm, handed over") }, {}),
       }),
     }, "a " .. name .. "-context Break that petrifies"),
     H.call(function()
@@ -180,16 +237,26 @@ local function ctxArm(c, name)
   })
 end
 
+local function monsterArmDone() return stoned or (casts >= CASTS and staged == nil) end
 H.run({ maxFrames = 900000 }, {
   H.bootCheckpoint("fc-alcove-v1"),
   H.call(arm),
   H.fcAlcoveToBattle("mbreak"),
-  H.call(function()
-    H.assertEq(pickTarget() ~= nil, true, "a party member Petrify can reach (no Ribbon or stone ward)")
-    armed = true
-  end),
-  H.kitBattle({}, { untilPlanDone = true, idle = "defend", maxFrames = 60000,
-    planDone = function() return stoned or (casts >= CASTS and staged == nil) end }),
+  H.driveUntil(monsterArmDone, 400000, {
+    H.cond(function() return not H.battleLoadStarted() end, { H.fcPace("mbreak") }, {}),
+    H.call(function()
+      -- a Break staged in a battle that ended unresolved never resolves
+      staged, handed = nil, nil
+      H.assertEq(pickTarget() ~= nil, true, "a party member Petrify can reach (no Ribbon or stone ward)")
+      armed = true
+    end),
+    guarded(H.kitBattle({}, { untilPlanDone = true, idle = "defend", maxFrames = 60000,
+      planDone = monsterArmDone }), "a monster's staged Break"),
+    H.cond(function() return handed ~= nil end, {
+      H.call(function() armed, staged = false, nil end),
+      fightOut("mbreak: monster arm, handed over"),
+    }, {}),
+  }, "a monster's Break that petrifies"),
   H.call(function()
     H.log(string.format("[mbreak] %d Break(s) cast by monsters; seat %s turned to stone", casts, tostring(target)))
     H.assertEq(bad[1], nil, "every staged Break was vanilla's (no HP)")
@@ -198,9 +265,9 @@ H.run({ maxFrames = 900000 }, {
     armed = false
     armCtx()
   end),
-  H.cond(function() return H.battleLoadStarted() end, { H.kitBattle({}, {}) }, {}),
+  H.cond(function() return H.battleLoadStarted() end, { fightOut("mbreak: after the monster arm") }, {}),
   ctxArm(RAGE, "Rage"),
-  H.cond(function() return H.battleLoadStarted() end, { H.kitBattle({}, {}) }, {}),
+  H.cond(function() return H.battleLoadStarted() end, { fightOut("mbreak: after the Rage arm") }, {}),
   ctxArm(SKETCH, "Sketch"),
   H.call(function()
     H.log("[mbreak] PASS: a monster's Break, and a Break cast in Rage's or Sketch's context, keep vanilla's petrify")
