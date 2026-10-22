@@ -139,11 +139,31 @@ local function arm()
     active.done = { f = H.frame, pend = pend(active.seat), bank = bank(active.seat), mp = mp(active.seat),
       hp = t, hps = s }
   end, emu.callbackType.exec, ae, ae)
+  -- a status that takes the caster's turn (Sleep, Muddle, Stop, a fall...)
+  -- empties its queue through RemoveAllActions before the action runs: the
+  -- use never resolves, and nothing of it is evidence (#468: EDGAR's queued
+  -- Overclock slept away under Sleep/Muddle/Imp, status 25 A8, and the
+  -- others Defended 40,000 frames waiting for its turn's end)
+  local ra = H.sym("RemoveAllActions")
+  emu.addMemoryCallback(function()
+    if active == nil or not active.queued or active.done or active.refused or active.cancelled then return end
+    if (emu.getState()["cpu.x"] & 0xFF) ~= active.seat * 2 then return end
+    active.cancelled = { f = H.frame, s1 = H.readByte(0x3EE4 + active.seat * 2),
+      s2 = H.readByte(0x3EE5 + active.seat * 2), s3 = H.readByte(0x3EF8 + active.seat * 2) }
+  end, emu.callbackType.exec, ra, ra)
 end
 
--- the use is over 20 frames after its turn's end
+-- the use is over 20 frames after its turn's end, or its queue was emptied
+-- before it ran (not counted: the verb stays pending for the next battle)
 local function closed()
   local r = active
+  if r ~= nil and r.cancelled and not r.done and not r.refused then
+    H.log(string.format("[mpass] %s: the caster's queue was emptied at f%d before the action ran (status %02X %02X "
+      .. "%02X): not counted, the battle is fought out and the next taken", r.verb.name, r.cancelled.f,
+      r.cancelled.s1, r.cancelled.s2, r.cancelled.s3))
+    active = nil
+    return true
+  end
   if r == nil or not r.done or H.frame < r.done.f + 20 then return false end
   local t, s = monsterHp()
   r.later = { bank = bank(r.seat), hp = t, hps = s }

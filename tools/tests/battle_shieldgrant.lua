@@ -196,6 +196,16 @@ H.run({ maxFrames = 400000 }, {
     H.log("[shield] the wearer's learned bytes for the family: " .. family)
     H.assertEq(learned() ~= 0xFF, true, "before: the wearer has not learned " .. sname)
   end),
+  -- care first, as a player would before opening the wearer's menus and
+  -- walking into the world map's fights: a wearer felled by an earlier
+  -- battle has no Skills submenu to open (#468: a burned encounter left
+  -- char 2 at 0/2012, and A timed out on "skills submenu")
+  H.waitUntil(function() return H.worldHasControl() end, 3000, "world control before the care", 5),
+  H.fieldCare({ tag = "shield: care before A", threshold = 0.95 }),
+  H.call(function()
+    H.assertEq(H.charHp(who) > 0, true, string.format("the wearer (char %d) stands after the care (HP %d/%d)",
+      who, H.charHp(who), H.charMaxHp(who)))
+  end),
   -- A. without the shield
   openMagic("A"),
   H.call(function()
@@ -224,6 +234,9 @@ H.run({ maxFrames = 400000 }, {
   H.driveUntil(function() return ownCast() ~= nil and not H.battleLoadStarted() end, 300000, {
     H.cond(function() return not H.battleLoadStarted() end, {
       H.waitUntil(function() return H.worldHasControl() end, 3000, "C: world control", 5),
+      -- a wearer felled in the last battle is revived before the next
+      H.fieldCare({ tag = "shield: care before a battle", threshold = 0.95 }),
+      H.waitUntil(function() return H.worldHasControl() end, 3000, "C: world control after the care", 5),
       toBattle(),
       H.waitUntil(function() return H.battleActive() end, 1200, "C: the battle is up", 2),
       H.waitFrames(30),
@@ -236,6 +249,8 @@ H.run({ maxFrames = 400000 }, {
         if H.readByte(0x3ED8 + s * 2) == H.charActor(who) then slot = s end
       end
       H.assertEq(slot ~= nil, true, "C: the wearer is seated")
+      H.assertEq(H.readWord(0x3BF4 + slot * 2) > 0, true, "C: the wearer stands at the battle's open (the care "
+        .. "before the walk saw to it)")
       local base, cell = H.readWord(0x302C + slot * 2), nil
       for k = 0, 53 do
         if H.readByte(base + (k + 1) * 4) == spell then cell = k end

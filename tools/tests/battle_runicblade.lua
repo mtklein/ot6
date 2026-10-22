@@ -137,9 +137,29 @@ end
 -- a step whose Bolt is never cast (EDGAR made an Imp or muted before his
 -- turn came) ends 1500 frames after its last pick; the battle is fought out
 -- and the next starts the steps over
+--
+-- Each step's plan is played again in every battle the steps start over in,
+-- so its entries are cleared back to what the step asked for first: kitBattle
+-- keeps what it learns about an entry in the entry (p.greyed when EDGAR was
+-- muted, p.goneLogged), and a flag left from one battle made every later
+-- battle's EDGAR Fight instead of cast and the others fight the battle out
+-- (#468: "char $04's command $02 is greyed" in battle 3 of 24, then no step
+-- 3 in battles 4-24, build/attempts/wt/v036-fragile/A/logs/
+-- battle_runicblade__s13__k0.log.gz)
 local function step(n, plan, doneFn)
+  local asked = {}
+  for i, p in ipairs(plan) do
+    asked[i] = {}
+    for key, v in pairs(p) do asked[i][key] = v end
+  end
   return {
-    H.call(function() mark[n] = { casts = #casts, absorbs = absorbs } end),
+    H.call(function()
+      mark[n] = { casts = #casts, absorbs = absorbs }
+      for i, p in ipairs(plan) do
+        for key in pairs(p) do p[key] = nil end
+        for key, v in pairs(asked[i]) do p[key] = v end
+      end
+    end),
     H.kitBattle(plan, { untilPlanDone = true, idle = "defend", maxFrames = 60000, planDone = function()
       if doneFn() then return true end
       local last = H.vars.kit[#H.vars.kit]
