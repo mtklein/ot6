@@ -137,6 +137,8 @@ Cannon is holy, Drill is spear-class, Fire Dance is fire, ...).
   what pays for that. MP scales with magnitude; BP alone pays for certainty.
   mp-economy.md's "Boosting costs MP" has the rule, the table and the
   rulings.
+- Never a refund (owner, 2026-10-22): a boosted action either charges
+  nothing, isn't allowed a boost, or keeps what was spent.
 - Every boost buys something (owner, 2026-10-22). An action with no reward
   for boosting doesn't take a boost: R can't raise one on it, and its price
   doesn't escalate. Where the reward is only known when the action runs (a
