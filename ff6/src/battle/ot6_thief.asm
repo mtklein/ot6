@@ -59,7 +59,7 @@ inc_lang "text/bushido_name_%s.inc"     ; Ot6KitListName's SwdTech names
 ; reaches this arm: mimicreplace puts the source's command/attack word
 ; ($3f20 = $56xx..$58xx) into Mimic's own queue row without CreateAction, so
 ; the copy keeps Mimic's 0 and the row runs free (measured #261,
-; tools/tests/probe_mimic_thief.lua: the copier paid 0 MP where Locke paid
+; tools/tests/battle_mimicboost.lua: the copier paid 0 MP where Locke paid
 ; 4 / 6 / 5).  Free is the ruling (mp-economy.md, "Mimic copies the action,
 ; not the price"); the copy's effect is Locke's row, with the copier's
 ; own pips (Filch banks one for the copier, Bestow gives one of the
