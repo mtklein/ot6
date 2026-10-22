@@ -1022,13 +1022,49 @@ STATES = [
     # House (30,182): the cabin (CELES, RELM, GOGO, STRAGO), the catwalk, the
     # stage master, the switch and the Dirt Dragon (event battle 134), the
     # hunt for Doom Gaze until it falls (Bahamut), and Save there: the
-    # `wor-opera-v1` checkpoint, the next arc's boot
-    # (docs/design/route-wor-gogo.md).  A cut; saves= until a leg boots it.
-    # Re-cut by checkpoint_drift.py --recut.
+    # `wor-opera-v1` checkpoint (docs/design/route-wor-gogo.md).  A cut.
+    # wor_dream below boots its checkpoint.  Re-cut by checkpoint_drift.py
+    # --recut.
     # also: wor_opera_switch, the party at the catwalk's switch before the
     # Dirt Dragon (battle_mimicdriver's fixture).
     S("wor_opera", gen="gen_wor_opera", prev="wor_ebot",
-      checkpoint="wor-ebot-v1", saves="wor-opera-v1", timeout=7200, also=["wor_opera_switch"]),
+      checkpoint="wor-ebot-v1", timeout=7200, also=["wor_opera_switch"]),
+
+    # wor-opera-v1 -> the save point in CYAN's dream, the dream's Doma (map
+    # 126 (8,8)): the cabin (CYAN, CELES, RELM, TERRA), Doma Castle's bed, the
+    # dreamscape (TERRA alone until the stooges run), the three Dream Stooges
+    # (event battle 90), the dream's train (its cars' lump, doors, levers and
+    # panel), the cave below its engine in Magitek armor, and Save there: the
+    # `wor-dream-v1` checkpoint, the boot for Wrexsoul
+    # (docs/design/route-wor-dreams.md).  A cut.  wor_doma below boots its
+    # checkpoint.  Re-cut by checkpoint_drift.py --recut.
+    S("wor_dream", gen="gen_wor_dream", prev="wor_opera",
+      checkpoint="wor-opera-v1", timeout=7200),
+
+    # wor-dream-v1 -> the World of Ruin map on the Falcon's tile by Doma
+    # (170,75): the dream's throne and Wrexsoul (event battle 92, a game over
+    # when lost: the runner retries from the leg's boot), the wake in the
+    # King's room (CYAN back, every SwdTech), the Magicite Alexandr and its
+    # stone on CYAN, and Save there: the `wor-doma-v1` checkpoint
+    # (docs/design/route-wor-dreams.md).  A cut.  wor_ancient below boots its
+    # checkpoint.  Re-cut by checkpoint_drift.py --recut.
+    # also: wor_doma_throne, the party below the dream's throne before
+    # Wrexsoul (battle_zinger's fixture).
+    S("wor_doma", gen="gen_wor_doma", prev="wor_dream",
+      checkpoint="wor-dream-v1", timeout=7200, also=["wor_doma_throne"]),
+
+    # wor-doma-v1 -> the World of Ruin map on the Falcon's tile by Figaro
+    # Castle on the Kohlingen side (49,58): the engineer's ride stopped under
+    # the stratum, the cave to the Ancient Castle, its flashback, Odin, the
+    # queen's statue (Raiden), the Blue Dragon (event battle 137, a game over
+    # when lost), the castle's two rides back, and Save there: the
+    # `wor-ancient-v1` checkpoint, the next arc's boot
+    # (docs/design/route-wor-dreams.md).  A cut; saves= until a leg boots it.
+    # Re-cut by checkpoint_drift.py --recut.
+    # also: wor_ancient_dragon, the party on the queen's floor before the
+    # Blue Dragon (the dragon's labs).
+    S("wor_ancient", gen="gen_wor_ancient", prev="wor_doma",
+      checkpoint="wor-doma-v1", saves="wor-ancient-v1", timeout=7200, also=["wor_ancient_dragon"]),
 
 ]
 

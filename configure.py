@@ -557,6 +557,9 @@ TEST_ENV = {
     # #270: the driver's Float line against the Dirt Dragon's earth, from the
     # same snapshot
     "battle_floatline": "OT6_TIMEOUT=1800",
+    # #271: the driver's Zinger line against Wrexsoul, from the wor_doma leg's
+    # snapshot below the dream's throne
+    "battle_zinger": "OT6_TIMEOUT=3600",
     # #424: a 3-BP Break on Esper Mountain's four- and five-shield bodies,
     # and RunicBlade sending a Wizard's spell back on the Narshe cliffs
     "battle_breakfour": "OT6_TIMEOUT=1800 "

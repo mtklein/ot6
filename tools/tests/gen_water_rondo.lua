@@ -682,6 +682,19 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
       H.worldX(), H.worldY(), H.readByte(0x1F62), H.readByte(0x1F63), partyLine(), dances()))
     H.screenshot("wr_beside_the_blackjack")
   end),
+  -- care before the save, as a player does at a save: the trench's last
+  -- battle can fell a member (v0.35's chain: EDGAR saved at 0/821 HP,
+  -- audit_party_hp), and the Continue would start with him down
+  H.fieldCare({ tag = "before the water-rondo-v1 save" }),
+  H.call(function()
+    for s = 0, 15 do
+      if (H.readByte(0x1850 + s) & 7) == 1 then
+        local o = 0x1600 + s * 37
+        H.assertEq(H.readWord(o + 0x09) > 0 and (H.readByte(o + 0x14) & 0xC2) == 0, true,
+          string.format("char %d stands at the save (HP %d/%d)", H.readByte(o), H.readWord(o + 0x09), H.readWord(o + 0x0B)))
+      end
+    end
+  end),
   H.saveState("water_rondo.mss"),
   H.saveAtCheckpoint("water-rondo-v1"),
 })

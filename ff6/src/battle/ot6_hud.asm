@@ -2641,6 +2641,91 @@ Ot6ShieldTbl:
         .byte   6, OT6_PIERCE|OT6_BLUDG ; dirt drgn: an earth dragon; the
                                 ;   floor's pierce and a crushing blow.
                                 ;   wind|water vanilla (strago's aqua rake)
+        ; ---- the world of ruin: the plain west of doma castle (world group
+        ; 52; route-wor-dreams.md section 3): its other bodies' rows are the
+        ; cyan arc's ----------------------------------------------------------
+        .word   $0034
+        .byte   3, OT6_SLASH|OT6_BLUDG ; tumbleweed: a dry bush; cut it or
+                                ;   crush it.  fire vanilla; absorbs water
+        ; ---- the world of ruin: cyan's dream (route-wor-dreams.md section
+        ; 3) -------------------------------------------------------------------
+        ; Terra, celes and relm walk it (cyan is the dream's): slash (the two
+        ; blades), bludgeon (relm's rod), fire, ice, bolt and holy.  Terra
+        ; walks the dreamscape alone until the stooges run, so every body
+        ; there takes her blade or her fire.  Vanilla elements stay.
+        .word   $00be
+        .byte   3, OT6_SLASH|OT6_SPECIAL ; barb-e: a dream's siren; steel
+                                ;   or a brush.  poison vanilla
+        .word   $00ab
+        .byte   2, OT6_SLASH|OT6_BLUDG ; critic: a shrieking bird
+        .word   $0085
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; allosaurus: a dinosaur's hide.
+                                ;   fire|holy vanilla (terra's fire)
+        .word   $00b1
+        .byte   2, OT6_SLASH    ; parasite: a soft crawler.  fire vanilla
+        .word   $00ac
+        .byte   3, OT6_BLUDG|OT6_SPECIAL ; pan dora: a jar; break it.
+                                ;   fire|holy vanilla; absorbs poison
+        .word   $000a
+        .byte   2, OT6_BLUDG|OT6_SPECIAL ; rain man: a storm spirit.
+                                ;   ice|holy|water vanilla (celes's ice)
+        .word   $0004
+        .byte   3, OT6_SLASH|OT6_PIERCE ; samurai: a swordsman of the
+                                ;   dream's war; steel answers steel.
+                                ;   poison vanilla
+        .word   $001e
+        .byte   3, OT6_SLASH|OT6_BLUDG ; suriander: a ghostly beast.  holy
+                                ;   vanilla
+        ; the cave below the dream's train: the three ride magitek armor
+        ; there (_cb93bf), whose rows are the beams (fire, bolt, ice) and
+        ; terra's tek missile (pierce); every body is weak to bolt vanilla,
+        ; so the bolt beam breaks them all
+        .word   $009d
+        .byte   3, OT6_PIERCE   ; plutoarmor: an armored rider; the
+                                ;   missile pierces.  bolt|water vanilla
+        .word   $0095
+        .byte   2, OT6_PIERCE|OT6_SPECIAL ; sky cap: a flying cap.
+                                ;   bolt|wind|water vanilla
+        .word   $00fe
+        .byte   4, OT6_PIERCE|OT6_BLUDG ; io: a war machine.  bolt|holy|
+                                ;   water vanilla; nulls poison|wind|earth
+        ; the dream stooges (event battle 90): each takes another pair, and
+        ; the three together hold a key for every hand
+        .word   $011f
+        .byte   4, OT6_SLASH|OT6_SPECIAL ; curley: ice|water vanilla;
+                                ;   absorbs fire
+        .word   $0120
+        .byte   4, OT6_PIERCE|OT6_BLUDG ; larry: fire vanilla; absorbs
+                                ;   ice|wind
+        .word   $0121
+        .byte   4, OT6_SLASH|OT6_BLUDG ; moe: no weakness; absorbs bolt
+        ; wrexsoul (event battle 92): a composite of the war's spirits
+        .word   $0122
+        .byte   6, OT6_SLASH|OT6_SPECIAL ; wrexsoul: steel or a brush.
+                                ;   ice vanilla; absorbs fire|holy
+        .word   $0167
+        .byte   2, OT6_SPECIAL  ; soulsaver: a soul; the brush, or celes's
+                                ;   ice (vanilla); absorbs fire|holy
+        ; ---- the world of ruin: the ancient castle (route-wor-dreams.md
+        ; section 3) ---------------------------------------------------------
+        ; Every body wears reflect and most have mdef 250: spells bounce
+        ; and steel decides.  Cyan comes back from his dream with every
+        ; swdtech, and his katana (slash) keys every body here.
+        .word   $00a6
+        .byte   2, OT6_SLASH|OT6_BLUDG ; enuo: a slime.  holy vanilla
+        .word   $006d
+        .byte   3, OT6_SLASH|OT6_PIERCE ; goblin: holy vanilla
+        .word   $0057
+        .byte   3, OT6_SLASH|OT6_BLUDG ; figaliz: a lizard.  ice vanilla
+        .word   $0045
+        .byte   4, OT6_SLASH|OT6_BLUDG ; lethal wpn: a machine; cut its
+                                ;   cables or crush it.  bolt|water vanilla
+        .word   $0051
+        .byte   3, OT6_SLASH|OT6_BLUDG ; boxed set: an empty armor.  holy
+                                ;   vanilla
+        .word   $0152
+        .byte   6, OT6_SLASH|OT6_PIERCE ; blue drgn: a water dragon's
+                                ;   scales.  bolt vanilla; absorbs water
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian

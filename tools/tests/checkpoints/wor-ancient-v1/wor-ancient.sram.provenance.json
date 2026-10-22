@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "45c2aa3b80a23463d8bdd1fc814b2b03f977cb844c2c3073121088e2c501822e",
+  "generator_sig": "64e44070265af65db3912952b3177aee6aa72f8a4f1702c04d5c743c809d0ccc gen_wor_ancient tools/tests/checkpoints/wor-doma-v1/manifest.json tools/tests/checkpoints/wor-doma-v1/wor-doma.sram",
+  "ancestors": [
+    {
+      "path": "tools/tests/checkpoints/wor-doma-v1/manifest.json",
+      "sha256": "e8a028379dc7b2e4ff906133729c13a0940d7ed0140a7a7842adc708db4c2e5a"
+    }
+  ]
+}

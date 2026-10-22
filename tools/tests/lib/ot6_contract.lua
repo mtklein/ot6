@@ -2338,6 +2338,119 @@ M.contracts["wor-opera-v1"] = {
   },
 }
 
+-- wor-dream-v1: the save point in the dream's Doma (map 126 (8,8), shown on
+-- the arrival: $0548), inside CYAN's dream (Doma Castle's bed, _cb82b1):
+-- after the dreamscape and the three Dream Stooges (event battle 90:
+-- _cb8bd1, $0179), the dream's train (the scene at (88,8): _cb9335, $0197;
+-- the first car's check: _cb8ec1, $017A) and the cave below its engine
+-- (Magitek armor, off on the drop: _cb94e7).  CELES, RELM and TERRA walk it;
+-- CYAN is the dream's.  Wrexsoul is ahead (docs/design/route-wor-dreams.md).
+-- No timer.
+M.contracts["wor-dream-v1"] = {
+  slot = 3,
+  field = { map = 126, x = 8, y = 8 },   -- the dream's save point (126 NPC_4)
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x0179, 1, "the Dream Stooges beaten (_cb8bd1)" },
+    { 0x0197, 1, "the dream's train: the scene at (88,8) seen (_cb9335)" },
+    { 0x017A, 1, "the dream's train: the first car's check passed (_cb8ec1)" },
+    { 0x00DA, 0, "CYAN's dream not yet ended (_cb97d6)" },
+  },
+  party = {
+    size = 3,                     -- CELES, RELM and TERRA (CYAN is the dream's)
+    members = {
+      { 0x06, "CELES" },
+      { 0x08, "RELM" },
+      { 0x00, "TERRA" },
+    },
+  },
+  ram = {
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
+-- wor-doma-v1: the World of Ruin map, on foot on the Falcon's tile by Doma
+-- Castle (170,75), after CYAN's dream: Wrexsoul (event battle 92), the wake
+-- in the King's room ($00DA, every SwdTech: give_bushido) and the Magicite
+-- Alexandr (_cb9a7a).  CELES, RELM, CYAN and TERRA seated.  The Ancient
+-- Castle is ahead (docs/design/route-wor-dreams.md).  No timer.
+M.contracts["wor-doma-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 170, y = 75 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00DA, 1, "CYAN's dream ended (_cb97d6)" },
+    { 0x0549, 0, "Alexandr taken from the King's room (_cb9a7a)" },
+    { 0x02DF, 0, "the Ancient Castle not yet entered (_cc1a60)" },
+  },
+  party = {
+    size = 4,                     -- CELES, RELM, CYAN and TERRA
+    members = {
+      { 0x06, "CELES" },
+      { 0x08, "RELM" },
+      { 0x02, "CYAN" },
+      { 0x00, "TERRA" },
+    },
+  },
+  ram = {
+    { 0x1F62, 0xFF, 170, "the Falcon parked at x 170 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 75, "the Falcon parked at y 75 (save-block cell $1F63)" },
+    { 0x1CF7, 0xFF, 0xFF, "CYAN knows every SwdTech ($1CF7: give_bushido)" },
+    { 0x1A6A, 0x40, 0x40, "Alexandr owned (esper 14: $1A69 + 1, bit 6)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
+-- wor-ancient-v1: the World of Ruin map, on foot on the Falcon's tile by
+-- Figaro Castle on the Kohlingen side (49,58), after the Ancient Castle: the
+-- flashback ($02DF), Odin, the queen's statue (Raiden: $02DD), the Blue
+-- Dragon (event battle 137: $06A1 clear), and the castle's two rides back
+-- to the Kohlingen side ($00DC).  CELES, RELM, CYAN and TERRA seated.  The
+-- Dreams arc's end and the next arc's boot (docs/design/route-wor-dreams.md).
+-- No timer.
+M.contracts["wor-ancient-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 49, y = 58 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00DA, 1, "CYAN's dream ended (_cb97d6)" },
+    { 0x02DF, 1, "the Ancient Castle's flashback seen (_cc1a60)" },
+    { 0x02DD, 1, "the queen's statue: Odin became Raiden (_cc1f49)" },
+    { 0x06A1, 0, "the Blue Dragon gone from the queen's floor (_cc205b)" },
+    { 0x00DC, 1, "Figaro Castle on the Kohlingen side (_ca6931)" },
+  },
+  party = {
+    size = 4,                     -- CELES, RELM, CYAN and TERRA
+    members = {
+      { 0x06, "CELES" },
+      { 0x08, "RELM" },
+      { 0x02, "CYAN" },
+      { 0x00, "TERRA" },
+    },
+  },
+  ram = {
+    { 0x1F62, 0xFF, 49, "the Falcon parked at x 49 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 58, "the Falcon parked at y 58 (save-block cell $1F63)" },
+    { 0x1A6A, 0x50, 0x50, "Raiden and Alexandr owned (espers 12 and 14: $1A69 + 1, bits 4 and 6)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
@@ -2625,7 +2738,11 @@ local function atBoundary(c)
     return M.worldMode() and (M.mapId() & 0x1ff) == (c.world.map or 0)
        and M.worldX() == c.world.x and M.worldY() == c.world.y
   end
-  return not M.worldMode() and (M.mapId() & 0x1ff) == c.field.map
+  -- (the load screen's "This data?" preview holds the slot's map and tile in
+  -- the cells read here while the menu module runs: measured on the
+  -- wor-dream-v1 Continue, where the A presses stopped on the preview and
+  -- the confirm sat unanswered, build/attempts/wt/v035-wor-dreams/lab/gdo1_s0)
+  return not M.worldMode() and not M.menuRunning() and (M.mapId() & 0x1ff) == c.field.map
      and M.fieldX() == c.field.x and M.fieldY() == c.field.y
 end
 
