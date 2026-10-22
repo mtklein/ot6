@@ -277,7 +277,8 @@ do
   _, p = barbe({ cmds = { 0x00, 0x0B, 0x01, 0xFF } })
   check(p.kind == "fight" and said("the Fight stands (#466)") ~= nil, "no Magic row and no other body: the Fight stands")
   local D = barbe()
-  check(D:coverPlan(0, { kind = "magic", spell = 0 }).kind == "magic", "a cast is not a Fight")
+  local cast = { kind = "magic", spell = 0x14 }
+  check(D:coverPlan(0, cast) == cast, "a cast is not a Fight: left alone")
   check(D:coverPlan(0, { kind = "fight", ally = true, target = 1 }).ally, "an unmuddle hit on an ally is not re-aimed")
   COVER_OFF = true
   _, p = barbe()
