@@ -86,6 +86,11 @@ mutant builders `mkmut.py` and `rowmuts.sh`; the launchers `lab.sh`,
 | `gen_wor_ebot` | `wor-gogo-v1` | `wor-ebot-v1` | Ebot's Rock: the holes, the coral, the hungry chest, Hidon, the scene at Strago's house, the save on the Falcon's tile (250,231) |
 | `gen_wor_opera` | `wor-ebot-v1` | `wor-opera-v1` | the cabin (CELES, RELM, GOGO, STRAGO), the Opera House, the Dirt Dragon, the Doom Gaze hunt, the save by the Falcon there (30,182); also `wor_opera_switch` (the catwalk's switch: `battle_mimicdriver`'s and `battle_wardline`'s fixture) |
 
+The walks' helpers the arc's leg builder stamped into each generator (the
+cabin and its wheel, the doors and edges, chests, talks, the battle key and
+supplies lines) live in `lib/ot6_field.lua` since v0.36 (`H.worLegKit`,
+#456); each generator keeps its own route.
+
 ## 2. The order
 
 Duncan's house -> Triangle Island (down on (237,52); the Zone Eater) -> the
@@ -244,7 +249,11 @@ Eater with a gauge (`bwmut2`: "$171 the Zone Eater draws a gauge").
   own `wor-ebot-v1` at that commit, K 0-5 at shifts 0 and 7): 12 of 12
   PASS, the Dirt Dragon 11 keys won of 11, 1.73 deaths a fight, three down
   at most, the party's worst moment 6%; Doom Gaze 26 meetings, 0.50 deaths
-  a meeting, every hunt won (`fight_report_so7.txt`).
+  a meeting, every hunt won (`fight_report_so7.txt`).  The same chain's
+  Ebot's Rock without the rings (`se7`, K 0-5 at shifts 0 and 7, K5 at 0
+  only): 11 of 11 PASS, Hidon 10 keys won of 10, 0.20 deaths a fight; and
+  the Gau arc's leg before it (`sg7`, 12 of 12 PASS): the SrBehemoth 8
+  keys won of 8 (`fight_report_se7.txt`, `fight_report_sg7.txt`).
 
 ## 5. GOGO's kit and the Mimic line
 
@@ -306,7 +315,13 @@ Shell 1039 frames after the plan", "the control: 0 ward plan(s); entity 2
 under Shell: false"); its mutants `WA` (the ward cast on the next member:
 "2. its target under Shell within 2400 frames of the plan: got false") and
 `WB` (the line ignoring `BUFF_OFF`: "control: with BUFF_OFF no ward plan:
-got 1") were red.  WARDLINE_V036
+got 1") were red.  In v0.36 the suite
+became `battle_wardline` (the ward half alone); passing at ef239262 on the
+chain's `wor_opera_switch` (`build/attempts/wt/v036-route/lab/wardline`:
+"entity 2 under Shell 1185 frames after the plan", "the control: 0 ward
+plan(s); entity 2 under Shell: false"), and red with the ward cast on the
+next member (`wardline_mutWA`: "1. its target under Shell within 2400
+frames of the plan: got false, want true").
 
 A Float line (`Driver:floatPlan`, `opts.floatVs`) was built beside it and
 no leg used it: the dragon's 50 Gs removes Float and nothing else
