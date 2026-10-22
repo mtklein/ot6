@@ -84,10 +84,12 @@ local function danger()
 end
 local handed = nil
 -- Lab lever (#468 review): MBREAK_FORCE_HANDOVER = "monster", "Rage" or
--- "Sketch" hands that arm's first guarded battle over once, 600 frames in,
+-- "Sketch" hands that arm's first guarded battle over once, MBREAK_FORCE_AT
+-- frames in (default 600),
 -- as if danger() had fired, so the hand-over path and the arm's resumption
 -- in the next battle can be shown on a draw that never endangers the party.
 local FORCE = rawget(_G, "MBREAK_FORCE_HANDOVER")
+local FORCE_AT = rawget(_G, "MBREAK_FORCE_AT") or 600
 local forced = false
 -- step, run until it ends or danger() hands the battle over (handed)
 local function guarded(step, what, arm)
@@ -97,7 +99,7 @@ local function guarded(step, what, arm)
     if handed == nil then
       if H.battleLoadStarted() then inBattle = inBattle + 1 end
       handed = danger()
-      if handed == nil and FORCE ~= nil and FORCE == arm and not forced and inBattle >= 600 then
+      if handed == nil and FORCE ~= nil and FORCE == arm and not forced and inBattle >= FORCE_AT then
         forced, handed = true, "forced by MBREAK_FORCE_HANDOVER (lab)"
       end
       if handed then H.log(string.format("[mbreak] f%d %s: handed to the fight driver (%s)", H.frame, what, handed)) end
