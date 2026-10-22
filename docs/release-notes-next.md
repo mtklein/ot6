@@ -9,4 +9,4 @@ and its effect. Cite evidence in the commit message.
 
 **Three new saves.** In Cyan's dream, at Doma Castle after the dream, and at Figaro Castle after the Ancient Castle.
 
-**Mimic is always free.** Gogo's copy never costs MP, and a boost the copy can't use stays in the bank.
+**Mimic is always free.** Gogo's copies never cost anything.
