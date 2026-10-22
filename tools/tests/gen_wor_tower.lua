@@ -944,8 +944,11 @@ H.run({ maxFrames = 1500000 }, {
   -- the climb's kit back on for the walk down: the floors' randoms are the
   -- climb's, and in MagiMaster's kit (no Wall Rings, no Float caster) the
   -- fourth floor's L.60 and L.90 Magic wiped the four with Quake and
-  -- Merton (build/attempts/wt/v031-tower/lab/dn2_*: 'atk $15', 'atk $17')
-  H.call(function() FIGHT.cure = false end),
+  -- Merton (build/attempts/wt/v031-tower/lab/dn2_*: 'atk $15', 'atk $17').  Down, the care reaches for the
+  -- bag first again: the climb kept the Potions (88-95 at MagiMaster), and casting on the walk down spent the
+  -- Tinctures to the last and left TERRA at 9 MP at the save (build/attempts/wt/v036-route/lab/tw1_k1_s7:
+  -- 'beside the Falcon ... MP 9/559 ... potion=92 ... tincture=1')
+  H.call(function() FIGHT.cure = false; H.careCastFirst = false end),
   stonesFor({ { TERRA, MADUIN }, { RELM, IFRIT }, { STRAGO, PALIDOR }, { CELES, TRITOCH } }, "stones for the walk down"),
   wallRingsOn(),
   H.fieldCare({ tag = "Float on the four, down" }),
