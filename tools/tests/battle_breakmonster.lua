@@ -83,17 +83,27 @@ local function danger()
   return nil
 end
 local handed = nil
+-- Lab lever (#468 review): MBREAK_FORCE_HANDOVER = "monster", "Rage" or
+-- "Sketch" hands that arm's first guarded battle over once, 600 frames in,
+-- as if danger() had fired, so the hand-over path and the arm's resumption
+-- in the next battle can be shown on a draw that never endangers the party.
+local FORCE = rawget(_G, "MBREAK_FORCE_HANDOVER")
+local forced = false
 -- step, run until it ends or danger() hands the battle over (handed)
-local function guarded(step, what)
-  local ended = false
+local function guarded(step, what, arm)
+  local ended, inBattle = false, 0
   return H.withReset(H.driveUntil(function()
     if ended then return true end
     if handed == nil then
+      if H.battleLoadStarted() then inBattle = inBattle + 1 end
       handed = danger()
+      if handed == nil and FORCE ~= nil and FORCE == arm and not forced and inBattle >= 600 then
+        forced, handed = true, "forced by MBREAK_FORCE_HANDOVER (lab)"
+      end
       if handed then H.log(string.format("[mbreak] f%d %s: handed to the fight driver (%s)", H.frame, what, handed)) end
     end
     return handed ~= nil
-  end, 70000, { step, H.call(function() ended = true end) }, what), function() ended = false end)
+  end, 70000, { step, H.call(function() ended = true end) }, what), function() ended, inBattle = false, 0 end)
 end
 -- the route's fight driver fights the battle out from wherever it stands
 local function fightOut(tag)
@@ -225,7 +235,7 @@ local function ctxArm(c, name)
           planDone = function()
             local k = H.vars.kit[#H.vars.kit]
             return k ~= nil and ctxEnd > k.frame
-          end }), "the " .. name .. "-context Break"),
+          end }), "the " .. name .. "-context Break", name),
         H.cond(function() return handed ~= nil end, { fightOut("mbreak: " .. name .. " arm, handed over") }, {}),
       }),
     }, "a " .. name .. "-context Break that petrifies"),
@@ -251,7 +261,7 @@ H.run({ maxFrames = 900000 }, {
       armed = true
     end),
     guarded(H.kitBattle({}, { untilPlanDone = true, idle = "defend", maxFrames = 60000,
-      planDone = monsterArmDone }), "a monster's staged Break"),
+      planDone = monsterArmDone }), "a monster's staged Break", "monster"),
     H.cond(function() return handed ~= nil end, {
       H.call(function() armed, staged = false, nil end),
       fightOut("mbreak: monster arm, handed over"),

@@ -38,11 +38,14 @@
 -- recorded are set aside (both must come from one battle), the party is
 -- cared for at the save-point band again, and the next encounter is walked
 -- into.  At most MAX_ENCOUNTERS; a battle with both uses is asserted as
--- before.  The budget: in the sweep of this fix (shifts 0/7/13, 0-3
--- encounters used up first), 7 of 19 battles were handed over (Ninjas,
--- Dragon, Behemoth, Brainpans; one run needed its 4th encounter), so
--- eight leave about 0.37^8, under one run in 2000, to luck
--- (build/attempts/wt/v036-fragile-fix/g1/full2/).
+-- before.  The budget is measured, not decoded from the pool odds: in the
+-- sweep of this fix at its final form (shifts 0/7/13, 0-3 encounters used
+-- up first; build/attempts/wt/v036-fragile-fix/g1/oc3/), the hand-over rate
+-- was not uniform across shifts -- shift 0 handed over 0 of 4 battles,
+-- shift 7 4 of 8, shift 13 3 of 7 (Ninjas, Dragon, Behemoth, Brainpans; one
+-- run needed its 4th encounter).  At the worst shift's rate, 1/2 a battle,
+-- eight encounters all handed over is 0.5^8, about one run in 256, if the
+-- battles were independent; that is the luck this suite still carries.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
