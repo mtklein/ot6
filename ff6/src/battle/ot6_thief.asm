@@ -704,37 +704,13 @@ done:   plp
 ; on Scan: a point or more reads every enemy on the field.  No damage, so the
 ; price is flat (the boost buys no multiplier); the reveal commits with the
 ; action's end (Ot6ActionEnd's Ot6RevealCommit, an action with no numeral).
-; With one body standing, the target, the breadth reads nothing the plain
-; read does not, so the boost is kept (#463, Ot6KeepBoost) and the target is
-; read alone.
 ; entry: jsl from Ot6ThiefExec, a8/i8, x = attacker.  preserves x and y.
 .proc Ot6Appraise
         .a8
         .i8
         phy
-        php
-        rep     #$10
-        .i16
         lda     OT6_BOOST_REVEALED,x
-        beq     @one
-        lda     #$00
-        pha                     ; [1,s] the bodies standing
-        ldy     #$0008
-@count: jsr     Ot6ThiefBody
-        bcc     :+
-        lda     1,s
-        inc     a
-        sta     1,s
-:       iny
-        iny
-        cpy     #$0014
-        bcc     @count
-        pla
-        cmp     #$02
-        bcs     @all            ; two or more: the boost reads them all
-        jsl     Ot6KeepBoost    ; the target stands alone
-@one:   plp
-        .i8
+        bne     @all
         jsr     Ot6ThiefTarget
         bcc     @out
         php
@@ -744,8 +720,10 @@ done:   plp
         plp
         .i8
         bra     @out
+@all:   php
+        rep     #$10
         .i16
-@all:   ldy     #$0008
+        ldy     #$0008
 @slot:  jsr     Ot6ThiefBody
         bcc     :+
         jsr     Ot6AnalyzeOne

@@ -259,8 +259,10 @@ Magicite's. `battle_procboost` asserts the table: a tier cast skipped, a
 weapon's spell unmultiplied, a Throw and an Ice Rod multiplied.
 
 **Escalate — the boost multiplies them:** Blitz, Tools, Lore, non-tier
-magic (Drain, Scan, Break, Doom, Pearl, Flare, Quake, Ultima, Osmose,
-Rflect, Vanish, Dispel, …), summons, and **Dance**. None of their
+magic with a number (Drain, Pearl, Flare, Quake, Ultima, Osmose, …),
+summons, and **Dance**. A spell, lore or summon with no number (Rflect,
+Vanish, Dispel, Doom, a fraction like Demi) takes no boost and no
+escalation (#463, below); Scan's boost buys breadth and Break's chips. None of their
 commands is in the gate, so the boost buys them x2/x4/x8 and nothing
 else, and the price follows at 2.5x per level.
 
@@ -337,37 +339,49 @@ one's does, and that a copied Trickshot and a copied Tonic, which take the
 multiplier, still spend their pip (`build/attempts/wt/v035-boost-scope/`,
 `build/attempts/wt/v036-boost/`).
 
-**A boost that buys nothing stays in the bank** (#463, the owner's rule
-from #450 and #461, outside Mimic too). Every case drops the pending boost
-through one proc, `Ot6KeepBoost`, so the turn ends as the unboosted one
-does: the bank untouched, the regen pip earned. Measured on main at
-cfae9e47 from one fire-out-v1 snapshot (LOCKE at bank 4), each boosted
-action ended a pip or more below its unboosted twin, and now ends level
-with it (`battle_boostkeep`, `build/attempts/wt/v036-boost/`):
-- **Steal on a body with nothing left to take**: the boost buys the
-  roll's ladder and there is no roll (`Ot6StealNone`, which was the
-  Mimic-only `Ot6MimicStealNone`).
-- **Filch**: it reads no boost (`Ot6Filch`).
-- **Bestow at two or three points**: the pip handed over is the whole
-  charge at every boost (`Ot6Bestow` sets the pending to that one pip
-  rather than letting an L/R raise stand); a refused Bestow charges
-  nothing.
-- **Appraise with one body standing**: the boost reads every body, and the
-  target is the only one (`Ot6Appraise`). Two or more standing, it reads
-  them all and the pip is spent.
-- **An item that moves no number**: an Item's boost buys the damage
-  multiplier and nothing else, so `Ot6BoostDmg` marks the action bought
-  (`OT6_BOOSTBUY`) only when the multiplier meets a nonzero base that is
-  not a fraction of max HP/MP, and `Ot6ActionEnd` keeps an Item's boost
-  that was never marked. A status cure's base is 0; a Fenix Down's is its
-  power, 2, which `CalcTargetDmg` replaces with `CalcDmgRatio`'s raise
-  (max HP x 2 / 16) per target, so the multiplier never reaches it. A
-  boosted Tonic's heal doubles (base 50) and its pip is spent. A Mimic's
-  copy of an Item is queued as the Item, so it is served the same way.
-The other choice was to refuse the raise for these actions. The boost is
-raised on the command window, before the action is picked, and whether a
-Steal finds anything or a second body is standing is only known when the
-action runs, so the boost is kept rather than refused.
+**No boost where the boost can buy nothing** (#463; the owner's BP rule in
+DESIGN.md: a boosted action charges nothing, is not allowed a boost, or
+keeps what was spent, and never a refund). Where the menu can name the row,
+R does not raise a boost on it and its price does not escalate:
+`Ot6Boost` asks `Ot6RowNoBoost` of the row under an open list's cursor
+and buzzes R there, as at the cap. The rows:
+- **Filch and Bestow** in the thief list. Neither reads a boost; Bestow's
+  transfer is its one pip at every boost (`Ot6Bestow` sets the pending to
+  it), and a refused Bestow charges nothing.
+- **An item that moves no number** in the Item list (`Ot6ItemNoBoost`): a
+  consumable of power 0 (Antidote, Eyedrop, Soft, Remedy, Green Cherry,
+  Echo Screen, Smoke Bomb, Warp Stone) or a fraction of max HP/MP (ItemProp
+  +19 bit 7: Fenix Down, Holy Water, X-Potion, X-Ether, Elixir, Megalixir,
+  Sleeping Bag, Tent). Measured at `Ot6BoostDmg`'s entry: a Fenix Down's
+  base is its power, 2, which `CalcTargetDmg` replaces with `CalcDmgRatio`'s
+  raise per target. Magicite buys a redraw (`Ot6MagiciteKeep`), and
+  equipment used from Item casts its spell, so neither is on the list.
+- **A spell that moves no number** in the Magic list (`Ot6SpellNoBoost`):
+  outside the tier families (and Break's chips) and Scan's breadth, a power
+  of 0 (Rflect, Shell, Safe, Vanish, Dispel, Stop, Mute, Sleep, Quick,
+  X-Zone, Doom...) or a fraction of HP/MP (MagicProp +$04 bit 7: Demi,
+  Quarter, a revival). `Ot6MagicPrice`, the one price authority, prices it
+  as itself at every boost, so the list, the grey, the confirm and the
+  charge all show its own MP.
+A boost raised on the command window, before the row was picked, is
+dropped before anything charges it (`Ot6KeepBoost`, the drop
+`Ot6FizzleDropBoost` makes): in `Ot6Filch`/`Ot6Bestow`, in `Ot6ActionEnd`
+for an Item, and in `Ot6QueueFold` for a spell, lore or summon (not for
+X-Magic, whose pending the other spell may use). Lores and summons get the
+price and the drop but not yet the R refusal: their windows are not read.
+Measured on main from fire-out-v1 snapshots (LOCKE at bank 4, TERRA at 4):
+`filch-r: R on the row left the pending at 1`, `cure-b1: the bank ended at
+3, cure-b0's at 5`, `quiet-b1: charged 38 MP, quiet-b0 15` (Shell), and
+eight more; the fix passes each (`battle_boostkeep`,
+`build/attempts/wt/v036-boost/`).
+
+Where only the resolve can tell that a boost found nothing (a Steal on a
+body already robbed, Appraise with one body standing), the boost is spent:
+the menu could not know (the owner, #463). `battle_boostkeep` asserts both
+spend. The exceptions are the two the owner keeps: an action refused for
+lack of MP never happened (#450), and a Mimic's copy is free in all
+circumstances (#461), so a copied Steal on a robbed body keeps its pip
+(`Ot6MimicStealNone`).
 
 Dance is the control that makes this a rule rather than a habit.
 `Ot6RageCost` tail-calls `Ot6DanceCost`, so Rage and Dance share one

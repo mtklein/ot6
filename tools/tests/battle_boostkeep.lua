@@ -1,51 +1,53 @@
 -- @suite
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
--- battle_boostkeep.lua -- a boost that buys nothing stays in the bank (#463)
+-- battle_boostkeep.lua -- no boost where the boost can buy nothing (#463)
 --
 -- Boots fire-out-v1 by cold Continue (configure.py TEST_ENV).  By hand:
 --   OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1 \
 --     tools/tests/run.sh tools/tests/battle_boostkeep.lua <log>
 --
--- The rule (the owner, #450, #461): a boost that buys nothing is not spent.
--- A boosted action that buys nothing ends its turn as the unboosted one
--- does: the bank untouched and the turn's regen pip earned.  So each keep
--- case below ends with LOCKE's bank where the unboosted case of the same
--- action, played from the same snapshot, ends:
---   * Steal on a body with nothing left to take: no roll, so no ladder
---     (Ot6StealNone);
---   * Filch: it reads no boost (Ot6Filch keeps it);
---   * Bestow: it hands one pip over and charges exactly that one at every
---     boost (Ot6Bestow);
---   * Appraise with one body standing: the boost reads every body, and the
---     target is the only one (Ot6Appraise);
---   * an item whose use moves no number by the boost's multiplier: a status
---     cure, and a Fenix Down (its raise is a fraction of max HP, which the
---     multiplier never reaches) (Ot6ActionEnd's Item arm, OT6_BOOSTBUY).
--- The controls spend: a boosted Tonic (the multiplier doubles its heal) and
--- a boosted Appraise with two or more bodies standing (it reads them all)
--- end with the bank `boost` below where it stood, no regen.
+-- The rule (the owner; DESIGN.md's BP economy): a boosted action charges
+-- nothing, is not allowed a boost, or keeps what was spent; never a refund.
+-- Where the menu can name a row the boost buys nothing on, R does not raise
+-- one there (Ot6Boost, Ot6RowNoBoost) and its price does not escalate; a
+-- boost raised on the command window before such a row was picked is dropped
+-- before anything charges it (Ot6KeepBoost).  The rows: Filch and Bestow
+-- (Bestow's transfer is its one pip at every boost), an item that moves no
+-- number (a status cure, a Fenix Down: Ot6ItemNoBoost), a spell that moves
+-- none (TERRA's, chosen off the ROM: Ot6SpellNoBoost).  So:
+--   * <row>-r: R pressed with the cursor on the row leaves the pending at 0
+--     (refused) on those rows, at 1 on the controls (Tonic, a multiplied
+--     spell);
+--   * <row>-b1/b2: raised on the command window, then the row: the bank ends
+--     where the unboosted case's does, and the spell's price (drawn and
+--     charged) is its own.
+-- Where only the resolve can tell the boost found nothing (a Steal on a body
+-- already robbed, Appraise with one body standing) it is spent: the bank
+-- ends `boost` below where it stood, as the controls' (a Tonic, the
+-- multiplied spell, Appraise with two bodies standing) do.
 --
 -- The run: Continue fire-out-v1 (TERRA LOCKE STRAGO by Thamasa), pace to an
 -- encounter on the plain with two or more bodies, one of which carries loot
 -- and a shield (the target).  Everyone Defends until LOCKE's window opens
--- with four pips banked and none pending (snapshot L).  From L each case is
--- LOCKE's one action, everyone else Defending.  Then from L LOCKE Steals
--- from the target at 3 BP (certain, Ot6StealBoostLevel), and at his next
--- window with a pip banked comes snapshot R: the body robbed.  From R, TERRA
--- and STRAGO Fight every body but the target while LOCKE Defends, and at
--- his window with the target alone standing comes snapshot A.
--- Nothing is written; everything is observed: LOCKE's bank and pending
--- around his action (the bank six frames after his Ot6ActionEnd), whether a
--- Steal rolled (Ot6StealBoostLevel), the bodies Ot6AnalyzeOne read, and the
--- base each Ot6BoostDmg call met.
+-- with four pips banked and none pending (snapshot L), then on to TERRA's
+-- with two (snapshot T).  Each case is one action of LOCKE's (from L) or
+-- TERRA's (from T), everyone else Defending.  Then from L LOCKE Steals from
+-- the target at 3 BP (certain, Ot6StealBoostLevel), and at his next window
+-- with a pip banked comes snapshot R: the body robbed.  From R, TERRA and
+-- STRAGO Fight every body but the target while LOCKE Defends, and at his
+-- window with the target alone standing comes snapshot A.
+-- Nothing is written; everything is observed: the actor's bank, pending and
+-- MP around the action (the bank six frames after its Ot6ActionEnd), the
+-- spell row's drawn price, whether a Steal rolled (Ot6StealBoostLevel), the
+-- bodies Ot6AnalyzeOne read, and the base each Ot6BoostDmg call met.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local CMDTBL, CMDROW = 0x202E, 0x890F
-local ST_CMD, ST_DEF, ST_TGT, ST_LIST, ST_ITEM = 0x05, 0x27, 0x38, 0x30, 0x0A
+local ST_CMD, ST_DEF, ST_TGT, ST_LIST, ST_ITEM, ST_MAGIC = 0x05, 0x27, 0x38, 0x30, 0x0A, 0x0E
 local KCOL, KROW = 0x8963, 0x8967
 local BANK, PEND, CURMP, BATTINV = 0x3E9C, 0x3E9D, 0x3C08, 0x2686
-local CMD_FIGHT, CMD_ITEM, CMD_STEAL = 0x00, 0x01, 0x05
+local CMD_FIGHT, CMD_ITEM, CMD_MAGIC, CMD_STEAL = 0x00, 0x01, 0x02, 0x05
 local TERRA, LOCKE, STRAGO = 0, 1, 7
 -- the thief window's cells: { column, row } (Ot6ThiefRowTbl)
 local CELL = { steal = { 0, 0 }, filch = { 0, 1 }, bestow = { 0, 2 }, appraise = { 1, 2 } }
@@ -86,6 +88,7 @@ local function members()
   return t
 end
 local lockeS, terraS, stragoS
+local actS            -- the slot whose action the case measures
 local function chars()
   return string.format("MP L%d bank L%d T%d S%d pend L%d T%d S%d hp T%d", mp(lockeS), bank(lockeS), bank(terraS),
     bank(stragoS), pend(lockeS), pend(terraS), pend(stragoS), hp(terraS))
@@ -113,13 +116,13 @@ local function installObservers()
       emu.callbackType.exec, a, a)
   end
   onExec(H.sym("Ot6StealBoostLevel"), function(c)
-    if cx() == lockeS * 2 then
+    if cx() == actS * 2 then
       c.rolled = true
-      ev(c, "Ot6StealBoostLevel: the Steal rolls, pend " .. pend(lockeS))
+      ev(c, "Ot6StealBoostLevel: the Steal rolls, pend " .. pend(actS))
     end
   end)
   onExec(H.sym("Ot6ThiefExec"), function(c)
-    if cx() == lockeS * 2 then
+    if cx() == actS * 2 then
       c.row = H.readByte(0xB6)
       ev(c, string.format("Ot6ThiefExec b6=$%02X %s | %s", H.readByte(0xB6), chars(), mons()))
     end
@@ -129,15 +132,15 @@ local function installObservers()
     ev(c, string.format("Ot6AnalyzeOne reads body %d", ((emu.getState()["cpu.y"] & 0xFF) - 8) // 2))
   end)
   onExec(H.sym("Ot6BoostDmg"), function(c)
-    if cx() == lockeS * 2 then
+    if cx() == actS * 2 then
       ev(c, string.format("Ot6BoostDmg entry: b5=$%02X 3a7c=$%02X base $11B0=%d $11A4=$%02X pend %d",
-        H.readByte(0xB5), H.readByte(0x3A7C), H.readWord(0x11B0), H.readByte(0x11A4), pend(lockeS)))
+        H.readByte(0xB5), H.readByte(0x3A7C), H.readWord(0x11B0), H.readByte(0x11A4), pend(actS)))
     end
   end)
   onExec(H.sym("Ot6ActionEnd"), function(c)
-    if cx() == lockeS * 2 then
+    if cx() == actS * 2 then
       c.endF = H.frame
-      c.mpEnd = mp(lockeS)
+      c.mpEnd = mp(actS)
       ev(c, string.format("Ot6ActionEnd entry: 3a7c=$%02X %s | %s", H.readByte(0x3A7C), chars(), mons()))
     end
   end)
@@ -170,10 +173,29 @@ end
 
 local tgtMon          -- the body LOCKE's rows aim at: loot and a shield
 local cureItem        -- the status cure the bag holds
--- LOCKE's own turn: the case's action at its boost.  c.cmd is Steal (a
--- thief row, c.row) or Item (c.item); c.ally aims at TERRA.
-local function lockePress(c, st)
-  local s = lockeS
+-- The measured actor's own turn: the case's action at its boost.  c.cmd is
+-- Steal (a thief row, c.rowName), Item (c.item) or Magic (c.spell); c.ally
+-- aims at the other of LOCKE and TERRA.  c.boost is raised on the command
+-- window, before the row is picked; c.rowR presses R once with the cursor on
+-- the row (Ot6Boost refuses it on a row the boost buys nothing on, #463).
+local function spellIdx(s, id)
+  for i = 0, 53 do
+    if H.readByte(0x2092 + s * 0x13C + i * 4) == id then return i end
+  end
+end
+local function onRow(c, s)
+  if c.rowR and not c.triedR then
+    c.triedR, c.pendBeforeR = true, pend(s)
+    return "r"
+  end
+  if c.rowR and c.pendAfterR == nil then
+    c.pendAfterR = pend(s)
+    ev(c, string.format("R on the row: pending %d -> %d", c.pendBeforeR, c.pendAfterR))
+  end
+  return "a"
+end
+local function actorPress(c, st)
+  local s = actS
   if st == ST_CMD then
     if pend(s) < c.boost then return "r" end
     if pend(s) > c.boost then return "l" end
@@ -188,28 +210,39 @@ local function lockePress(c, st)
     local cc, cr = H.readByte(KCOL + s), H.readByte(KROW + s)
     if cc ~= col then return cc < col and "right" or "left" end
     if cr ~= row then return cr < row and "down" or "up" end
-    return "a"
+    return onRow(c, s)
   end
   if c.cmd == CMD_ITEM and st == ST_ITEM then
     local want = bagIdx(c.item)
     if want == nil then return "b" end
     local cur = H.readByte(0x8947 + s) + H.readByte(0x894F + s)
     if cur ~= want then return cur < want and "down" or "up" end
-    return "a"
+    return onRow(c, s)
+  end
+  if c.cmd == CMD_MAGIC and st == ST_MAGIC then
+    local i = spellIdx(s, c.spell)
+    if i == nil then return "b" end
+    local wr, wc = i // 2, i % 2
+    local ar = H.readByte(0x8913 + s) + H.readByte(0x891B + s)
+    local col = H.readByte(0x8917 + s)
+    if ar ~= wr then return ar < wr and "down" or "up" end
+    if col ~= wc then return col < wc and "right" or "left" end
+    c.listPrice = H.readByte(0x2092 + s * 0x13C + i * 4 + 3)   -- the row's drawn price
+    return onRow(c, s)
   end
   return nil
 end
 local function lockeAim(c)
-  if H.readByte(MENU) == 0 or H.readByte(MSTATE) ~= ST_TGT or (H.readByte(ACTOR) & 3) ~= lockeS
+  if H.readByte(MENU) == 0 or H.readByte(MSTATE) ~= ST_TGT or (H.readByte(ACTOR) & 3) ~= actS
      or c.sent then
     mf, tapNo = 0, -1
     return false
   end
-  local btn = c.ally and aim(Tc, terraS) or aim(Tm, tgtMon)
+  local btn = c.ally and aim(Tc, actS == terraS and lockeS or terraS) or aim(Tm, tgtMon)
   if next(btn) == "a" then
     c.sent = true
-    c.pendAtConfirm = pend(lockeS)
-    ev(c, "LOCKE's target confirmed: " .. chars() .. " | " .. mons())
+    c.pendAtConfirm = pend(actS)
+    ev(c, "the measured actor's target confirmed: " .. chars() .. " | " .. mons())
   end
   return btn
 end
@@ -218,7 +251,7 @@ end
 local function othersPress(a, st, fightOthers)
   local other = false
   for m = 0, 5 do if m ~= tgtMon and live(m) then other = true end end
-  if not fightOthers or not other or a == lockeS then return defendPress(st) end
+  if not fightOthers or not other or a == actS then return defendPress(st) end
   if st == ST_CMD then
     local want = cmdRow(a, CMD_FIGHT)
     if want == nil then return "right" end
@@ -231,7 +264,7 @@ local function othersPress(a, st, fightOthers)
   return nil
 end
 local function fightAim()
-  if H.readByte(MENU) == 0 or H.readByte(MSTATE) ~= ST_TGT or (H.readByte(ACTOR) & 3) == lockeS then
+  if H.readByte(MENU) == 0 or H.readByte(MSTATE) ~= ST_TGT or (H.readByte(ACTOR) & 3) == actS then
     mf, tapNo = 0, -1
     return false
   end
@@ -253,7 +286,9 @@ local function runCase(c)
       tick, held = 0, nil
       mf, tapNo = 0, -1
       c.log = {}
+      actS = c.who == "T" and terraS or lockeS
       c.sent, c.after, c.endF, c.rolled, c.read, c.row = false, false, nil, false, 0, nil
+      c.triedR, c.pendAfterR = false, nil
       c.hp0 = hp(terraS)
       armed = c
       ev(c, "START " .. chars() .. " | " .. mons())
@@ -263,9 +298,9 @@ local function runCase(c)
         Tm.observe(); Tc.observe()
         if c.endF and not c.after and H.frame >= c.endF + 6 then
           c.after = true
-          c.bankEnd = bank(lockeS)
+          c.bankEnd = bank(actS)
           c.hpEnd = hp(terraS)
-          ev(c, "six frames after LOCKE's Ot6ActionEnd: " .. chars() .. " | " .. mons())
+          ev(c, "six frames after the actor's Ot6ActionEnd: " .. chars() .. " | " .. mons())
         end
         local ac = lockeAim(c)
         if ac then held = nil; H.setPad(ac) return end
@@ -275,7 +310,7 @@ local function runCase(c)
           held = nil
           if H.readByte(MENU) ~= 0 then
             local st, a = H.readByte(MSTATE), H.readByte(ACTOR) & 3
-            if a == lockeS and not c.sent then held = lockePress(c, st) else held = defendPress(st) end
+            if a == actS and not c.sent then held = actorPress(c, st) else held = defendPress(st) end
           end
         end
         H.setPad((held and ph < 6) and { [held] = true } or {})
@@ -286,10 +321,11 @@ local function runCase(c)
       H.setPad({})
       for _, l in ipairs(c.log) do H.log(string.format("[boostkeep] %s: %s", c.name, l)) end
       c.charged = (c.mp0 or 0) - (c.mpEnd or c.mp0 or 0)
-      H.log(string.format("[boostkeep] %s RESULT: boost %d (pending at confirm %s); LOCKE bank %s at the "
-        .. "command -> %s after his turn; MP charged %d; Steal rolled: %s; bodies read %d; TERRA HP %d -> %s",
-        c.name, c.boost, tostring(c.pendAtConfirm), tostring(c.bank0), tostring(c.bankEnd), c.charged,
-        tostring(c.rolled), c.read, c.hp0, tostring(c.hpEnd)))
+      H.log(string.format("[boostkeep] %s RESULT: boost %d (R on the row: %s; pending at confirm %s); %s bank "
+        .. "%s at the command -> %s after the turn; MP charged %d; Steal rolled: %s; bodies read %d; "
+        .. "TERRA HP %d -> %s", c.name, c.boost, c.rowR and tostring(c.pendAfterR) or "-",
+        tostring(c.pendAtConfirm), c.who == "T" and "TERRA" or "LOCKE", tostring(c.bank0), tostring(c.bankEnd),
+        c.charged, tostring(c.rolled), c.read, c.hp0, tostring(c.hpEnd)))
     end),
   }
 end
@@ -298,9 +334,10 @@ end
 -- pending and `cond()`; snapshot it as `key`.  `fightOthers`: TERRA and
 -- STRAGO Fight every body but the target meanwhile.  `first`: LOCKE's
 -- first window takes this action (a case table) before anything else.
-local function snapAt(key, cond, fightOthers, first)
+local function snapAt(key, cond, fightOthers, first, who)
   return {
     H.call(function()
+      actS = who and who() or lockeS
       tick, held, mf, tapNo = 0, nil, 0, -1
       if first then first.log, first.sent = {}, false; armed = first end
     end),
@@ -321,12 +358,12 @@ local function snapAt(key, cond, fightOthers, first)
         if tick % 12 ~= 0 then return end
         if H.readByte(MENU) == 0 then return end
         local st, a = H.readByte(MSTATE), H.readByte(ACTOR) & 3
-        if a == lockeS and first and not first.sent then
-          local b = lockePress(first, st)
+        if a == actS and first and not first.sent then
+          local b = actorPress(first, st)
           H.setPad(b and { [b] = true } or {})
           return
         end
-        if a == lockeS and st == ST_CMD and pend(lockeS) == 0 and cond() then
+        if a == actS and st == ST_CMD and pend(actS) == 0 and cond() then
           H.setPad({}); snaps[key] = H.requestSaveState()
           H.log(string.format("[boostkeep] snapshot %s f%d: %s | %s", key, H.frame, chars(), mons()))
           return
@@ -447,8 +484,36 @@ local steps = {
 }
 local function add(t) for _, s in ipairs(t) do steps[#steps + 1] = s end end
 
+-- TERRA's two spells, read off the ROM as Ot6SpellNoBoost reads it: one the
+-- boost buys nothing on (not a tier family, not Scan, power 0 or a fraction
+-- of HP/MP), one it multiplies (power, no fraction, not a tier family)
+local quiet, loud
+steps[#steps + 1] = H.call(function()
+  local mpb, fold = H.sym("MagicProp") & 0x3FFFFF, H.sym("Ot6FoldTbl") & 0x3FFFFF
+  local inFold = {}
+  for i = 0, 0x17 do inFold[H.readRomByte(fold + i)] = true end
+  inFold[0x0C] = true                     -- Break (Ot6InFoldTbl's own arm)
+  local names = {}
+  for i = 0, 53 do
+    local id = H.readByte(0x2092 + terraS * 0x13C + i * 4)
+    if id ~= 0xFF and not inFold[id] and id ~= 0x18 then
+      local flags, power = H.readRomByte(mpb + id * 14 + 4), H.readRomByte(mpb + id * 14 + 6)
+      local none = (flags & 0x80) ~= 0 or power == 0
+      if none and quiet == nil then quiet = id end
+      if not none and loud == nil then loud = id end
+      names[#names + 1] = string.format("$%02X%s", id, none and "-" or "+")
+    end
+  end
+  H.log(string.format("[boostkeep] TERRA's spells (- buys nothing, + the multiplier): %s; quiet $%s, loud $%s",
+    table.concat(names, " "), quiet and string.format("%02X", quiet) or "none",
+    loud and string.format("%02X", loud) or "none"))
+  assert(quiet and loud, "TERRA knows a spell the boost buys nothing on and one it multiplies")
+end)
+
 -- snapshot L: LOCKE's window, four pips banked
 add(snapAt("L", function() return bank(lockeS) >= 4 end))
+-- snapshot T: on from L, TERRA's window with two pips banked
+add(snapAt("T", function() return bank(terraS) >= 2 end, false, nil, function() return terraS end))
 -- snapshot R: from L, LOCKE robs the target at 3 BP (certain); his next
 -- window with a pip banked and the target standing
 local rob = { name = "rob-b3", cmd = CMD_STEAL, rowName = "steal", boost = 3 }
@@ -471,25 +536,46 @@ add(snapAt("A", function() return bank(lockeS) >= 1 and live(tgtMon) and liveCou
 local CASES = {
   { name = "filch-b0",     snap = "L", cmd = CMD_STEAL, rowName = "filch",    boost = 0 },
   { name = "filch-b1",     snap = "L", cmd = CMD_STEAL, rowName = "filch",    boost = 1, keep = "filch-b0" },
+  { name = "filch-r",      snap = "L", cmd = CMD_STEAL, rowName = "filch",    boost = 0, rowR = 0 },
   { name = "bestow-b0",    snap = "L", cmd = CMD_STEAL, rowName = "bestow",   boost = 0, ally = true },
-  { name = "bestow-b1",    snap = "L", cmd = CMD_STEAL, rowName = "bestow",   boost = 1, ally = true, keep = "bestow-b0" },
-  { name = "bestow-b2",    snap = "L", cmd = CMD_STEAL, rowName = "bestow",   boost = 2, ally = true, keep = "bestow-b0" },
+  { name = "bestow-b1",    snap = "L", cmd = CMD_STEAL, rowName = "bestow",   boost = 1, ally = true,
+    keep = "bestow-b0" },
+  { name = "bestow-b2",    snap = "L", cmd = CMD_STEAL, rowName = "bestow",   boost = 2, ally = true,
+    keep = "bestow-b0" },
+  { name = "bestow-r",     snap = "L", cmd = CMD_STEAL, rowName = "bestow",   boost = 0, ally = true, rowR = 0 },
   { name = "appraise2-b1", snap = "L", cmd = CMD_STEAL, rowName = "appraise", boost = 1, spend = true },
   { name = "tonic-b0",     snap = "L", cmd = CMD_ITEM, item = TONIC, boost = 0, ally = true },
   { name = "tonic-b1",     snap = "L", cmd = CMD_ITEM, item = TONIC, boost = 1, ally = true, spend = true },
+  { name = "tonic-r",      snap = "L", cmd = CMD_ITEM, item = TONIC, boost = 0, ally = true, rowR = 1,
+    spend = true },
   { name = "cure-b0",      snap = "L", cmd = CMD_ITEM, item = "cure", boost = 0, ally = true },
   { name = "cure-b1",      snap = "L", cmd = CMD_ITEM, item = "cure", boost = 1, ally = true, keep = "cure-b0" },
+  { name = "cure-r",       snap = "L", cmd = CMD_ITEM, item = "cure", boost = 0, ally = true, rowR = 0 },
   { name = "fenix-b0",     snap = "L", cmd = CMD_ITEM, item = FENIX, boost = 0, ally = true },
   { name = "fenix-b1",     snap = "L", cmd = CMD_ITEM, item = FENIX, boost = 1, ally = true, keep = "fenix-b0" },
+  { name = "fenix-r",      snap = "L", cmd = CMD_ITEM, item = FENIX, boost = 0, ally = true, rowR = 0 },
+  { name = "quiet-b0",     snap = "T", who = "T", cmd = CMD_MAGIC, spell = "quiet", boost = 0, ally = true },
+  { name = "quiet-b1",     snap = "T", who = "T", cmd = CMD_MAGIC, spell = "quiet", boost = 1, ally = true,
+    keep = "quiet-b0", sameMp = "quiet-b0" },
+  { name = "quiet-r",      snap = "T", who = "T", cmd = CMD_MAGIC, spell = "quiet", boost = 0, ally = true,
+    rowR = 0 },
+  { name = "loud-b0",      snap = "T", who = "T", cmd = CMD_MAGIC, spell = "loud", boost = 0 },
+  { name = "loud-b1",      snap = "T", who = "T", cmd = CMD_MAGIC, spell = "loud", boost = 1, spend = true,
+    moreMp = "loud-b0" },
+  { name = "loud-r",       snap = "T", who = "T", cmd = CMD_MAGIC, spell = "loud", boost = 0, rowR = 1,
+    spend = true },
   { name = "steal-b0",     snap = "R", cmd = CMD_STEAL, rowName = "steal",    boost = 0 },
-  { name = "steal-b1",     snap = "R", cmd = CMD_STEAL, rowName = "steal",    boost = 1, keep = "steal-b0" },
+  { name = "steal-b1",     snap = "R", cmd = CMD_STEAL, rowName = "steal",    boost = 1, spend = true },
   { name = "appraise1-b0", snap = "A", cmd = CMD_STEAL, rowName = "appraise", boost = 0 },
-  { name = "appraise1-b1", snap = "A", cmd = CMD_STEAL, rowName = "appraise", boost = 1, keep = "appraise1-b0" },
+  { name = "appraise1-b1", snap = "A", cmd = CMD_STEAL, rowName = "appraise", boost = 1, spend = true },
 }
 local byName = {}
 for _, c in ipairs(CASES) do
   byName[c.name] = c
-  steps[#steps + 1] = H.call(function() if c.item == "cure" then c.item = cureItem end end)
+  steps[#steps + 1] = H.call(function()
+    if c.item == "cure" then c.item = cureItem end
+    if c.spell == "quiet" then c.spell = quiet elseif c.spell == "loud" then c.spell = loud end
+  end)
   add(runCase(c))
 end
 
@@ -500,11 +586,31 @@ steps[#steps + 1] = H.call(function()
     if not ok then bad[#bad + 1] = msg end
   end
   for _, c in ipairs(CASES) do
-    -- what the case played: LOCKE's action, at the case's boost
-    H.assertEq(c.pendAtConfirm, c.boost, c.name .. ": LOCKE's pending at his confirm")
+    -- what the case played: the actor's action, at the case's boost; R on
+    -- the row raised it (rowR = 1) or was refused (rowR = 0)
+    if c.rowR then
+      H.assertEq(c.pendBeforeR, 0, c.name .. ": nothing pending when R was pressed on the row")
+      check(c.pendAfterR == c.rowR, string.format("%s: R on the row left the pending at %s (%s)", c.name,
+        tostring(c.pendAfterR), c.rowR == 0 and "refused: the boost buys nothing here" or "raised: it buys"))
+      c.boost = c.pendAfterR or c.boost
+    end
+    H.assertEq(c.pendAtConfirm, c.boost, c.name .. ": the pending at the confirm")
     if c.rowName then H.assertEq(c.row, ROWID[c.rowName], c.name .. ": LOCKE ran the row") end
     if c.rowName == "steal" then
       H.assertEq(c.rolled, false, c.name .. ": the Steal met a body with nothing left (the 3-BP Steal took it)")
+    end
+    if c.sameMp then
+      check(c.listPrice == byName[c.sameMp].listPrice, string.format("%s: the list drew %s MP with the boost "
+        .. "pending, %s %s (no escalated price)", c.name, tostring(c.listPrice), c.sameMp,
+        tostring(byName[c.sameMp].listPrice)))
+      check(c.charged == byName[c.sameMp].charged, string.format("%s: charged %d MP, %s %d (no escalated price)",
+        c.name, c.charged, c.sameMp, byName[c.sameMp].charged))
+    end
+    if c.moreMp then
+      check((c.listPrice or 0) > (byName[c.moreMp].listPrice or 0), string.format("%s: the list drew %s MP with "
+        .. "the boost pending, %s %s", c.name, tostring(c.listPrice), c.moreMp, tostring(byName[c.moreMp].listPrice)))
+      check(c.charged > byName[c.moreMp].charged, string.format("%s: charged %d MP, %s %d (the price escalates)",
+        c.name, c.charged, c.moreMp, byName[c.moreMp].charged))
     end
     if c.rowName == "appraise" then
       if c.snap == "A" then
@@ -516,16 +622,17 @@ steps[#steps + 1] = H.call(function()
     end
     if c.keep then
       local base = byName[c.keep]
-      H.assertEq(c.bank0, base.bank0, c.name .. ": LOCKE's bank at the command, as in " .. c.keep)
-      check(c.bankEnd == base.bankEnd, string.format("%s: LOCKE's bank ended at %d, %s's at %d "
-        .. "(a boost that buys nothing is kept)", c.name, c.bankEnd, c.keep, base.bankEnd))
+      H.assertEq(c.bank0, base.bank0, c.name .. ": the bank at the command, as in " .. c.keep)
+      check(c.bankEnd == base.bankEnd, string.format("%s: the bank ended at %d, %s's at %d "
+        .. "(a boost that buys nothing is never charged)", c.name, c.bankEnd, c.keep, base.bankEnd))
     elseif c.spend then
-      check(c.bankEnd == c.bank0 - c.boost, string.format("%s: LOCKE's bank went %d -> %d, "
-        .. "%d spent and no regen (a boost that buys something is spent)", c.name, c.bank0, c.bankEnd, c.boost))
+      check(c.bankEnd == c.bank0 - c.boost, string.format("%s: the bank went %d -> %d, "
+        .. "%d spent and no regen (a boost spent, whatever it found)", c.name, c.bank0, c.bankEnd, c.boost))
     end
   end
   assert(#bad == 0, #bad .. " boost-keep assertion(s) failed: " .. table.concat(bad, "; "))
-  H.log("[boostkeep] VERDICT: every boost that bought nothing kept; the boosted Tonic's and the wide Appraise's spent")
+  H.log("[boostkeep] VERDICT: R refused on every row the boost buys nothing on, and a boost raised before such "
+    .. "a row never charged; Tonic's, the multiplied spell's, Appraise's and a Steal's on a robbed body spent")
 end)
 
 H.run({ maxFrames = 600000 }, steps)

@@ -21,8 +21,9 @@
 --   * Steal on a body with nothing left to take: no roll, so no ladder;
 --   * SwdTech: the source's boost bought the tech at its own menu;
 --   * Slot, a reel result: the source's boost bought the rig at its spin;
---   * an Item that moves no number, a status cure (#465): its boost buys
---     the multiplier and nothing else (Ot6ActionEnd's Item arm).
+--   * an Item that moves no number, a status cure (#465), and a spell that
+--     moves none (TERRA's, chosen off the ROM): the boost buys nothing on
+--     them (Ot6ItemNoBoost in Ot6ActionEnd, Ot6SpellNoBoost in Ot6MimicKeep).
 -- The controls: a copied Trickshot (cmd $05 too) and a copied Tonic take
 -- the multiplier, so their boost is spent: the bank ends one below where it
 -- stood, no regen.  And every copy is free of MP.  Main at 7b4f90ec fails
@@ -35,11 +36,12 @@
 -- and Slot (GOGO joins in the World of Ruin).  So after the cold Continue and
 -- before the first step this writes three command bytes in the field
 -- character records ($1600 + 37*id + $16..$19): STRAGO's second command
--- becomes Mimic ($12), TERRA's second (Morph) SwdTech ($07) and her third
--- (Magic) Slot ($0f).  Battle init builds the command lists from them;
+-- becomes Mimic ($12), TERRA's second (Morph) SwdTech ($07) and her first
+-- (Fight) Slot ($0f), so she keeps Magic (#463's copied spell).  Battle init
+-- builds the command lists from them;
 -- everything after is the engine's own: the menus, the queue, the copy, the
 -- charge.  LOCKE is the thief rows' source (his real list), TERRA the
--- SwdTech and Slot source, STRAGO the copier.  A mechanism test, not play,
+-- SwdTech, Slot, Item and Magic source, STRAGO the copier.  A mechanism test, not play,
 -- and not a claim about GOGO's balance.
 --
 -- The run: Continue fire-out-v1 (TERRA LOCKE STRAGO by Thamasa), pace to an
@@ -61,8 +63,24 @@ local CMDTBL, CMDROW = 0x202E, 0x890F
 local ST_CMD, ST_DEF, ST_TGT, ST_LIST, ST_SWD, ST_REELS = 0x05, 0x27, 0x38, 0x30, 0x37, 0x08
 local KCOL, KROW = 0x8963, 0x8967
 local BANK, PEND, CURMP = 0x3E9C, 0x3E9D, 0x3C08
-local CMD_ITEM, CMD_STEAL, CMD_SWDTECH, CMD_SLOT, CMD_MIMIC = 0x01, 0x05, 0x07, 0x0F, 0x12
-local ST_ITEM, BATTINV = 0x0A, 0x2686
+local CMD_ITEM, CMD_MAGIC, CMD_STEAL, CMD_SWDTECH, CMD_SLOT, CMD_MIMIC = 0x01, 0x02, 0x05, 0x07, 0x0F, 0x12
+local ST_ITEM, ST_MAGIC, BATTINV = 0x0A, 0x0E, 0x2686
+-- TERRA's spell the boost buys nothing on (#463), read off the ROM as
+-- Ot6SpellNoBoost reads it: not a tier family, not Break or Scan, power 0
+-- or a fraction of HP/MP
+local quiet
+local function quietSpell(s)
+  local mpb, fold = H.sym("MagicProp") & 0x3FFFFF, H.sym("Ot6FoldTbl") & 0x3FFFFF
+  local inFold = { [0x0C] = true, [0x18] = true }
+  for i = 0, 0x17 do inFold[H.readRomByte(fold + i)] = true end
+  for i = 0, 53 do
+    local id = H.readByte(0x2092 + s * 0x13C + i * 4)
+    if id ~= 0xFF and not inFold[id] then
+      local flags, power = H.readRomByte(mpb + id * 14 + 4), H.readRomByte(mpb + id * 14 + 6)
+      if (flags & 0x80) ~= 0 or power == 0 then return id, i end
+    end
+  end
+end
 local TONIC, ANTIDOTE = 0xE8, 0xF2
 local TERRA, LOCKE, STRAGO = 0, 1, 7
 -- the thief window's cells: { column, row } (Ot6ThiefRowTbl)
@@ -200,6 +218,15 @@ local function sourcePress(c, st)
     return "a"
   end
   if c.cmd == CMD_SWDTECH and (st == ST_LIST or st == ST_SWD) then return "a" end
+  if c.cmd == CMD_MAGIC and st == ST_MAGIC then
+    local _, i = quietSpell(s)
+    if i == nil then return "b" end
+    local ar = H.readByte(0x8913 + s) + H.readByte(0x891B + s)
+    local col = H.readByte(0x8917 + s)
+    if ar ~= i // 2 then return ar < i // 2 and "down" or "up" end
+    if col ~= i % 2 then return col < i % 2 and "right" or "left" end
+    return "a"
+  end
   if c.cmd == CMD_ITEM and st == ST_ITEM then
     local want = bagIdx(c.item)
     if want == nil then return "b" end
@@ -316,12 +343,12 @@ local steps = {
     local have = {}
     for _, c in ipairs(members()) do have[c] = true end
     assert(have[TERRA] and have[LOCKE] and have[STRAGO], "TERRA, LOCKE and STRAGO are in the party")
-    local o1, o2, o3 = H.readByte(recCmd(STRAGO, 1)), H.readByte(recCmd(TERRA, 1)), H.readByte(recCmd(TERRA, 2))
+    local o1, o2, o3 = H.readByte(recCmd(STRAGO, 1)), H.readByte(recCmd(TERRA, 1)), H.readByte(recCmd(TERRA, 0))
     H.writeByte(recCmd(STRAGO, 1), CMD_MIMIC)
     H.writeByte(recCmd(TERRA, 1), CMD_SWDTECH)
-    H.writeByte(recCmd(TERRA, 2), CMD_SLOT)
+    H.writeByte(recCmd(TERRA, 0), CMD_SLOT)
     H.log(string.format("[mimicboost] EXPEDIENT: STRAGO command row 1 $%02X -> $12 (Mimic); TERRA row 1 "
-      .. "$%02X -> $07 (SwdTech), row 2 $%02X -> $0F (Slot)", o1, o2, o3))
+      .. "$%02X -> $07 (SwdTech), row 0 $%02X -> $0F (Slot)", o1, o2, o3))
     installObservers()
   end),
   (function()
@@ -385,6 +412,10 @@ local steps = {
     assert(cmdRow(lockeS, CMD_STEAL), "LOCKE's battle list has Steal")
     assert(cmdRow(terraS, CMD_SWDTECH) and cmdRow(terraS, CMD_SLOT), "TERRA's battle list has SwdTech and Slot")
     assert(cmdRow(terraS, CMD_ITEM), "TERRA's battle list has Item")
+    quiet = quietSpell(terraS)
+    H.log(string.format("[mimicboost] TERRA's spell the boost buys nothing on: %s",
+      quiet and string.format("$%02X", quiet) or "none"))
+    assert(quiet, "TERRA knows a spell the boost buys nothing on")
     assert(bagIdx(TONIC) and bagIdx(ANTIDOTE), "the bag holds a Tonic and an Antidote")
   end),
 }
@@ -437,6 +468,8 @@ local CASES = {
   { name = "tonic-b1",   snap = "T", cmd = CMD_ITEM, item = TONIC, srcBoost = 0, boost = 1, spend = true },
   { name = "cure-b0",    snap = "T", cmd = CMD_ITEM, item = ANTIDOTE, srcBoost = 0, boost = 0 },
   { name = "cure-b1",    snap = "T", cmd = CMD_ITEM, item = ANTIDOTE, srcBoost = 0, boost = 1, keep = "cure-b0" },
+  { name = "quiet-b0",   snap = "T", cmd = CMD_MAGIC, srcBoost = 0, boost = 0 },
+  { name = "quiet-b1",   snap = "T", cmd = CMD_MAGIC, srcBoost = 0, boost = 1, keep = "quiet-b0" },
 }
 local byName = {}
 for _, c in ipairs(CASES) do

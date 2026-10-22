@@ -5,4 +5,4 @@ and its effect. Cite evidence in the commit message.
 
 ## What's changed
 
-A boost that would do nothing is no longer spent.
+You can no longer boost an action that a boost would do nothing for.

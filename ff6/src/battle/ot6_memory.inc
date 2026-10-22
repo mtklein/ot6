@@ -503,14 +503,13 @@ OT6_FIZZLED          := $ee20
 .assert OT6_FIZZLED = OT6_AURAWORK + 59, error, "the X-Magic refusal mark must follow the aura's scratch"
 .assert OT6_FIZZLED <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
-; This action's boost moved a number (ot6_boostdmg.asm, Ot6BoostDmg, #463):
-; a per-character bitmask (----1234, the OT6_FIZZLED shape), set when the
-; damage multiplier meets a nonzero base, and read by Ot6ActionEnd for an
-; Item, whose boost buys the multiplier and nothing else: a status cure or a
-; Fenix Down's raise moves no number by it.  Cleared for the actor by
-; Ot6ActionEnd and wholesale by InitBP.
-OT6_BOOSTBUY         := $ee21
-.assert OT6_BOOSTBUY = OT6_FIZZLED + 1, error, "the boost-bought mark must follow the X-Magic refusal mark"
-.assert OT6_BOOSTBUY <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+; This turn is a Mimic's copy (ot6_boost.asm, Ot6MimicKeep, #461): a
+; per-character bitmask (----1234, the OT6_FIZZLED shape), set when
+; mimicreplace writes the copy and read by Ot6MimicStealNone when a copied
+; Steal finds nothing to take.  Cleared for the actor by Ot6ActionEnd and
+; wholesale by InitBP.
+OT6_MIMICCOPY        := $ee21
+.assert OT6_MIMICCOPY = OT6_FIZZLED + 1, error, "the Mimic copy mark must follow the X-Magic refusal mark"
+.assert OT6_MIMICCOPY <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
 .endif
