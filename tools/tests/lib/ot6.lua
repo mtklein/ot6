@@ -1032,6 +1032,8 @@ M.REVIVIFY = 0xF1
 -- bit 6) drain on the dot trigger, Slow (STATUS3 bit 2) halves the ATB
 -- constant.  None denies a turn; the [status] line says each.
 M.ST1_BLIND, M.ST1_POISON, M.ST2_SAP, M.ST3_SLOW = 0x01, 0x04, 0x40, 0x04
+-- Mute (STATUS2 bit 3) greys the Magic row (UpdateCmd_05); Driver:coverPlan cures it (#466)
+M.ST2_MUTE = 0x08
 -- With no `items`, the candidates are every consumable usable in battle
 -- whose record carries the bit with the remove flag, cheapest first in
 -- gil (M.cureItems, #370): Green Cherry 150 before Remedy 1000 for Imp,
@@ -10778,6 +10780,22 @@ function Driver:coverPlan(actor, plan)
   local listed = false
   for r = 0, 3 do
     if M.readByte(BATTLE.CMDTBL + actor * 12 + r * 3) == BATTLE.CMD_MAGIC then listed = true end
+  end
+  -- the Magic row greyed by Mute (UpdateCmd_05: $3EE5 bit 3): Barb-e's counter
+  -- to a hit ('if_hit: attack SPECIAL, SPECIAL, NOTHING') mutes the caster, and
+  -- a lone bodyguard then swung into herself to the leg's end (build/attempts/
+  -- wt/v036-driver/lab/dbg_new_k4_s7: 'the Magic row greyed -- the Fight
+  -- stands'); the bag's Mute cure (Echo Screen, Remedy: M.statusCure on the
+  -- ROM's records) gives the cast back
+  local irow = cmdRow(actor, BATTLE.CMD_ITEM)
+  if mrow == nil and listed and irow ~= nil and (M.readByte(BATTLE.ST2 + actor * 2) & M.ST2_MUTE) ~= 0 then
+    local item = M.statusCure({ byte = 2, bit = M.ST2_MUTE, has = function(it) return self:battInvIdx(it) ~= nil end })
+    if item ~= nil then
+      M.log(string.format("[%s] actor=%d is MUTED and slot %d's Fight lands on entity %d (Love Token): $%02X on "
+        .. "itself for the cast (#466)", self.tag or "fight", actor, aim, guard, item))
+      return { kind = "item", item = item, target = actor, row = irow, idx = self:battInvIdx(item),
+               reason = "cure Mute" }
+    end
   end
   local why = mrow == nil and (listed and "the Magic row greyed" or "no Magic row")
     or string.format("no spell to cast (%d MP)", M.readWord(BATTLE.CURMP + actor * 2))

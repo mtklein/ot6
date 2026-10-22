@@ -309,6 +309,11 @@ local function barbe(o)
   w8(0x336C + 8, o.guard or 0x02)
   w8(0x336C + 10, 0xFF)
   w8(0x3AA0 + 2, 1); w8(0x32B9 + 2, 0x80); w8(0x3359 + 2, 0x80)
+  bag(o.bag or {})
+  if o.mute then
+    w8(0x3EE5, 0x08)                      -- entity 0's STATUS2: Mute
+    w8(CMDTBL + 0 * 12 + 1 * 3 + 1, 0x80) -- and the engine's greyed Magic row
+  end
   local D = driver()
   D.magicOnlyLine = function() return { kind = "magic", spell = 0x00 } end
   return D, D:coverPlan(0, { kind = "fight", row = 0, boostLeft = 0 })
@@ -327,6 +332,12 @@ do
   local cast = { kind = "magic", spell = 0x14 }
   check(D:coverPlan(0, cast) == cast, "a cast is not a Fight: left alone")
   check(D:coverPlan(0, { kind = "fight", ally = true, target = 1 }).ally, "an unmuddle hit on an ally is not re-aimed")
+  -- muted by Barb-e's counter (build/attempts/wt/v036-driver/lab/dbg_new_k4_s7):
+  -- the bag's Mute cure on itself, else the Fight stands
+  _, p = barbe({ mute = true, bag = { [4] = { 0xF5, 20 } } })
+  check(p.kind == "item" and p.item == 0xF5 and p.target == 0, "muted: a Remedy on itself, got " .. tostring(p.kind))
+  _, p = barbe({ mute = true })
+  check(p.kind == "fight" and said("the Magic row greyed -- the Fight stands") ~= nil, "muted, no cure: the Fight stands")
   COVER_OFF = true
   _, p = barbe()
   check(p.kind == "fight", "COVER_OFF: the driver before #466 swings into the bodyguard")
