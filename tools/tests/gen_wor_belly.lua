@@ -42,6 +42,9 @@ local watches, objLine, doomLine, pace = K.watches, K.objLine, K.doomLine, K.pac
 -- stretch's first move is made; otherwise other routes are tried (the riskiest tile closed, up to five
 -- times), then the party stands (on a rest, or where standing is safe enough), or steps or jumps away.
 local CARD = { up = { 0, -1 }, down = { 0, 1 }, left = { -1, 0 }, right = { 1, 0 } }
+-- the directions in a fixed order: pairs() over string keys follows the hash seed, which Lua 5.4 draws
+-- per run, so the walk's equal-length routes differed between identical runs (#467)
+local CARD_DIRS = { "down", "left", "right", "up" }
 CAREFUL_PACE, CAREFUL_TRIALS, CAREFUL_RISK, CAREFUL_IMPATIENCE = 18, 120, 0.08, 0.002
 local STEP_F, JUMP_F, DOOR_F = 16, 72, 40
 local CONDSEG = { [276] = { [30] = { { 32, 40 }, { 45, 48 } }, [32] = { { 31, 34 } } } }
@@ -102,7 +105,7 @@ local function planRoute(tx, ty, lk, closed)
       end
     end
     for _, L in ipairs(byTile[k] or {}) do visit((L[5] << 8) | L[4], { kind = "jump", link = L, dir = L[3] }) end
-    for dir, d in pairs(CARD) do
+    for _, dir in ipairs(CARD_DIRS) do local d = CARD[dir]
       if H.canStep(x, y, dir) then visit(((y + d[2]) << 8) | (x + d[1]), { kind = "step", dir = dir }) end
     end
   end
@@ -273,7 +276,7 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
       if rs > CAREFUL_RISK then
         -- a conductor closing in: the move whose stretch to a rest runs the least risk, if less than standing
         local cand = {}
-        for dir, d in pairs(CARD) do
+        for _, dir in ipairs(CARD_DIRS) do local d = CARD[dir]
           if H.canStep(H.fieldX(), H.fieldY(), dir) then
             cand[#cand + 1] = { kind = "step", dir = dir, from = here,
               to = ((H.fieldY() + d[2]) << 8) | (H.fieldX() + d[1]) }

@@ -139,8 +139,9 @@ H.run({ maxFrames = 2400000 }, {
   -- and their other spells rebound.  Without them (the tower took its rings off, #460) the party stalled on
   -- a lone Barb-e (formation $13D) in 7 of 24 runs of this leg and the next (build/attempts/wt/v036-route/lab/
   -- sd7_*, sdo7_*: 'timeout after 92000 frames', '[status] ... entity 1 char 8 is an IMP', every Fight
-  -- 'took 0 off the monsters'), and with them the same four draws passed (rd_k1_s7, rd_k2_s7, rd_k5_s7,
-  -- rdo_k1_s7).  The Ancient Castle's leg takes them off for the Blue Dragon (gen_wor_ancient)
+  -- 'took 0 off the monsters', keys be20, be1C and beE8 of $13D), and with them the same variants passed
+  -- (rd_k1_s7, rd_k2_s7, rd_k5_s7, rdo_k1_s7, which met other keys); the sweep after won beE8 in 5 of 5
+  -- (sdo8).  The Ancient Castle's leg takes them off for the Blue Dragon (gen_wor_ancient)
   H.lazy(function()
     local steps = {}
     for _, ch in ipairs({ CELES, RELM, TERRA }) do
@@ -149,7 +150,12 @@ H.run({ maxFrames = 2400000 }, {
         steps[#steps + 1] = H.equipKit(ch, { { 5, WALL_RING } }, { tag = NAMES[ch] .. ": a Wall Ring for the dream" })
       end
     end
-    steps[#steps + 1] = H.call(function() end)
+    steps[#steps + 1] = H.call(function()
+      for _, ch in ipairs({ CELES, RELM, TERRA }) do
+        H.assertEq(H.readByte(0x1600 + 37 * ch + 0x23) == WALL_RING or H.readByte(0x1600 + 37 * ch + 0x24) == WALL_RING,
+          true, NAMES[ch] .. " wears a Wall Ring for the dream (the Barb-e groups)")
+      end
+    end)
     return H.seqStep(steps)
   end),
   H.call(function() H.log("[kit] " .. kitLine(DREAM)) end),

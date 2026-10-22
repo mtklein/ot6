@@ -144,8 +144,10 @@ local OPERA_DOOR, OPERA_LANDING = { 31, 183 }, { 30, 182 }
 -- care, which hands RELM the brush (special: Doom Gaze's key)
 local HUNT = { CELES, RELM, GOGO, STRAGO }
 -- the dragon's relics: each member's second relic slot ($1624 + 37 * char) takes the listed relic for the
--- fight, and what it held goes back after: { {char, relic} }.  A member already wearing it, or a relic not
--- in the bag, is left as it is
+-- fight, and what it held goes back after: { {char, relic} }.  A member already wearing it is left as it is;
+-- each relic must be on its member after (a relic missing from the bag is a precondition gone wrong: the
+-- Barrier Ring sat on TERRA, benched, and STRAGO fought without it, #460 review)
+local WARD_RELICS = { { CELES, 0xC1 }, { STRAGO, 0xB7 }, { RELM, 0xC3 } }
 local wardHeld = {}
 local function wardRelics(list, tag)
   local steps = {}
@@ -159,8 +161,30 @@ local function wardRelics(list, tag)
       return H.equipKit(m[1], { { 5, m[2] } }, { tag = NAMES[m[1]] .. ": a ward relic " .. tag })
     end)
   end
-  steps[#steps + 1] = H.call(function() H.log("[kit] relics " .. tag .. ": " .. kitLine(HUNT)) end)
+  steps[#steps + 1] = H.call(function()
+    H.log("[kit] relics " .. tag .. ": " .. kitLine(HUNT))
+    for _, m in ipairs(list) do
+      local base = 0x1600 + 37 * m[1]
+      H.assertEq(H.readByte(base + 0x23) == m[2] or H.readByte(base + 0x24) == m[2], true,
+        string.format("%s wears relic $%02X %s", NAMES[m[1]], m[2], tag))
+    end
+  end)
   return H.seqStep(steps)
+end
+-- the ward relics off a member who leaves the party at the cabin (the Relic menu reaches only the seated):
+-- the Ebot's Rock leg's relic care put the Barrier Ring on TERRA (wor_opera at ef239262: 'relics for the
+-- Dirt Dragon: ... STRAGO L47 kit 09 39 62 7A A1 D2 B5')
+local function freeWardRelics(ch)
+  return H.lazy(function()
+    local base, slots = 0x1600 + 37 * ch, {}
+    for _, m in ipairs(WARD_RELICS) do
+      for slot = 4, 5 do
+        if H.readByte(base + 0x1F + slot) == m[2] then slots[#slots + 1] = slot end
+      end
+    end
+    if #slots == 0 then return H.call(function() end) end
+    return H.unequipRelics(ch, slots, { tag = NAMES[ch] .. ": the ward relics off before the cabin" })
+  end)
 end
 local function wardRelicsBack(tag)
   return H.lazy(function()
@@ -194,6 +218,7 @@ H.run({ maxFrames = 2400000 }, {
   -- the cabin first: CELES takes TERRA's seat for the Dirt Dragon and for Doom Gaze both (the Dirt Dragon
   -- labs, route-wor-gogo.md section 4: the lores alone won 18 of 20 trials with TERRA seated, fl1_lore, and
   -- 18 of 20 with CELES, dc_lore; one cabin stop serves both fights)
+  freeWardRelics(TERRA),
   regroup(HUNT),
   H.gearDress({ tag = "gear for the dragon and the hunt" }),
   H.dressRelics({ { CELES, "CELES" }, { RELM, "RELM" }, { GOGO, "GOGO" }, { STRAGO, "STRAGO" } },
@@ -207,7 +232,7 @@ H.run({ maxFrames = 2400000 }, {
   -- Czarina Ring and STRAGO the Barrier Ring (each a ward cast near death).  (They took the place of the
   -- Wall Rings the tower left on until #460; its spells are earth on the whole field, which Reflect does
   -- not turn, and Reflect turned the party's own Cure and Shell away)
-  wardRelics({ { CELES, 0xC1 }, { STRAGO, 0xB7 }, { RELM, 0xC3 } }, "for the Dirt Dragon"),
+  wardRelics(WARD_RELICS, "for the Dirt Dragon"),
   H.call(function() H.log("[kit] " .. kitLine(HUNT)) end),
   liftOff(),
   H.call(function() H.log("[doom] aloft: " .. doomLine()) end),
