@@ -193,10 +193,10 @@ dream with every SwdTech, and his katana keys every body here.
 The courtyard's pool (145) also deals the train's Barb-e, Samurai and
 Suriander, each of them keyed by slash.
 
-`battle_breakwor_dreams` checks the 22 rows in the built ROM, every
+`battle_breakwor_dreams` checks the 23 rows in the built ROM, every
 formation of the pools (field groups 183, 181, 182, 143, 144 and 145, events
-90, 92 and 137: "checked 22 formations, 48 formation-species-hands
-triples") against the hands that meet them, and the lessons: TERRA alone
+90, 92 and 137; the final run: "checked 28 formations, 57
+formation-species-hands triples") against the hands that meet them, and the lessons: TERRA alone
 keys every body of the dreamscape ("TERRA alone (the dreamscape) keys 5 of
 5"), the bolt beam every body of the cave ("the bolt beam (the cave) keys 3
 of 3"), CYAN alone every body of the Ancient Castle ("CYAN alone (the
@@ -384,8 +384,8 @@ found two problems that main's qualification does not:
   the route's Fight driver (`H.fightBattleByMenu`), which heals.  The
   assertions and the timeouts are unchanged.  In `study/st1/` (600ac953),
   seed shifts 0, 3, 7, 11, 13, 17 and 19 on the fresh `fire-out-v1`, plus
-  shift 0 on the tracked one, all PASS on attempt 1.  That is 35 battles
-  across distinct keys, and the driver healed in three of the runs.  The
+  shift 0 on the tracked one, all PASS on attempt 1.  That is 35 battles,
+  30 distinct keys, and the driver healed in three of the runs.  The
   mutants `study_anyboost` ("at 2 BP the study wrote nothing ...: got 8") and
   `study_off` ("at 3 BP the study added exactly ...: got 0") are still red.
 
