@@ -1582,17 +1582,29 @@ end
 M.HEAL_ARRIVAL = { heal = 240, item = 287 }
 M.HEAL_ARRIVAL_WALK = 15
 M.HEAL_ARRIVAL_OFF = false
--- The enemy actions due at or before a heal's arrival, priced at what each
--- enemy typically does (M.typicalOf; an enemy with nothing measured at its
--- worst, the ROM's price or the battle's worst, as M.roundCost does).
+-- The enemy actions due at or before a heal's arrival, each priced at what
+-- the enemy typically does (M.typicalOf; an enemy with nothing measured at
+-- its worst, the ROM's price or the battle's worst, as M.roundCost does)
+-- times the chance it lands on this target: an action already queued
+-- names its targets (en.queuedOn: true/false for the queued action, nil
+-- when none is queued), and any other takes the enemy's measured share of
+-- its landed actions on this member (en.share, M.aimShare; nil = 1).
+-- M.roundCost prices a round as if every action came at the one member, a
+-- worst case kept for the round; the heal's question is whether the
+-- member is expected to fall first.  Measured on the dream leg's courtyard
+-- (build/attempts/wt/v036-driver/lab/nd_new_k4_s7): before the share, a
+-- member at 2258/2547 among four was refused a Cure as "6 enemy action(s)
+-- ... take 2320", three monsters' two actions each all on her.
 --   hp       the target's HP now
 --   arrive   ATB ticks until the heal lands
---   enemies  M.roundCost's enemy table for this target; fallback likewise
--- Returns { n, cost, worst, beaten, why }: beaten when the actions ahead,
--- at their typical price, take the target's HP before the heal lands.  The
--- typical price, not the worst: a heal that lands unless the hit ahead is
--- the enemy's worst is still the best turn (the Tzen cure itself: s2's
--- typical 64 under 82 HP; its worst 123 killed her).
+--   enemies  M.roundCost's enemy table for this target, with share and
+--            queuedOn; fallback likewise
+-- Returns { n, cost, worst, beaten, why }: n the actions due (expected on
+-- this target), cost their typical take, worst their worst take; beaten
+-- when the expected take is the target's HP or more.  The typical price,
+-- not the worst: a heal that lands unless the hit ahead is the enemy's
+-- worst is still the best turn (the Tzen cure itself: s2's typical 64
+-- under 82 HP; its worst 123 killed her).
 function M.healArrival(o)
   local hp, arrive = o.hp or 0, o.arrive or 0
   local n, cost, worst, parts = 0, 0, 0, {}
@@ -1607,14 +1619,48 @@ function M.healArrival(o)
       local each = en.typical
       if each == nil or en.worst == nil then each = top end
       if each > top then each = top end
-      n, cost, worst = n + k, cost + k * each, worst + k * top
-      parts[#parts + 1] = string.format("s%d eta %d %dx%d", en.slot or -1, en.eta, k, each)
+      local share = en.share or 1
+      -- the first action of a full gauge is the queued one, its targets known
+      local w = share * k
+      if en.eta == 0 and en.queuedOn ~= nil then w = (en.queuedOn and 1 or 0) + share * (k - 1) end
+      n, cost, worst = n + w, cost + w * each, worst + w * top
+      parts[#parts + 1] = string.format("s%d eta %d %dx%d%s", en.slot or -1, en.eta, k, each,
+        en.eta == 0 and en.queuedOn ~= nil and (en.queuedOn and " (queued on it)" or " (queued elsewhere)")
+        or share < 1 and string.format(" at %d%%", math.floor(share * 100 + 0.5)) or "")
     end
   end
+  cost, worst = math.floor(cost + 0.5), math.floor(worst + 0.5)
   local beaten = n > 0 and hp <= cost
   return { n = n, cost = cost, worst = worst, beaten = beaten,
-    why = string.format("%d enemy action(s) due inside its %d ticks (%s) take %d typical, %d at worst, "
-      .. "against %d HP", n, arrive, #parts > 0 and table.concat(parts, ", ") or "none", cost, worst, hp) }
+    why = string.format("the enemy actions due inside its %d ticks (%s) take %d typical, %d at worst, "
+      .. "against %d HP", arrive, #parts > 0 and table.concat(parts, ", ") or "none", cost, worst, hp) }
+end
+-- The share of an enemy's landed actions that hit member e (#459): its
+-- ledger's landed count on e over its landed actions (an action on the
+-- whole party counts on each), once M.TYPICAL_MIN have landed; before
+-- that, one in `living` (a single target drawn among the living).
+function M.aimShare(L, e, living)
+  if L ~= nil and (L.landN or 0) >= M.TYPICAL_MIN then
+    return #((L.landOn or {})[e] or {}) / L.landN
+  end
+  return 1 / math.max(1, living or 1)
+end
+-- Whether monster slot s's queued action is aimed at party member e (#459):
+-- the engine keeps each entity's pending action at $32CC,x (normal) and
+-- $32CD,x (a counter; $FF none), its targets in the targets queue $3520
+-- (CreateAction: `lda $b8 / sta $3520,y`, the low byte the party's bits).
+-- nil when nothing is queued for the slot.
+function M.queuedOn(s, e)
+  local x = 8 + s * 2
+  local on = nil
+  for _, head in ipairs({ 0x32CC + x, 0x32CD + x }) do
+    local p = M.readByte(head)
+    if p < 0x80 then
+      on = on or false
+      if (M.readByte(0x3520 + p * 2) >> e) & 1 == 1 then on = true end
+    end
+  end
+  return on
 end
 -- The heal to take when the one the care lines chose lands too late
 -- (#459): of the heals that land in time (h.late false), the earliest that
@@ -10980,6 +11026,8 @@ function Driver:makePlanRules(actor)
   local price, priceWhy, priceRate, priceN = {}, {}, {}, nil
   -- each member's enemy table and fallback, kept for the heal's arrival (#459)
   local priceFoes = {}
+  local livingParty = 0
+  for e = 0, 3 do if hpNow[e] > 0 and hpNow[e] ~= 0xFFFF and maxOf(e) > 0 then livingParty = livingParty + 1 end end
   do
     local fallback, any = nil, false
     for s2 = 0, 5 do
@@ -11035,7 +11083,9 @@ function Driver:makePlanRules(actor)
               if worst == nil then rom, romAtk = self:scriptWorst(s2, e) end
               enemies[#enemies + 1] = { slot = s2, eta = etaOf(8 + s2 * 2),
                 period = mconst > 0 and math.ceil(0xFF00 / mconst) or nil, worst = worst,
-                typical = M.typicalOf(L), rom = rom, romAtk = romAtk }
+                typical = M.typicalOf(L), rom = rom, romAtk = romAtk,
+                -- for the heal's arrival (#459; M.roundCost reads neither)
+                share = M.aimShare(L, e, livingParty), queuedOn = M.queuedOn(s2, e) }
             end
           end
           if window == nil then

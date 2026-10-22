@@ -59,7 +59,12 @@ local HP, MAXHP, ATB, ATBC, CURMP, MAXMP = 0x3BF4, 0x3C1C, 0x3218, 0x3AC8, 0x3C0
 local CMDTBL, MLISTPTR, BCHID, BATTINV, ITEMSCR, ITEMROW = 0x202E, 0x302C, 0x3ED8, 0x2686, 0x8947, 0x894F
 local MON_HP, MON_PRESENT = 0x3BFC, 0x3AA8
 local CURE, POTION, XPOTION = 0x2D, 0xE9, 0xEA
-local function reset() mem, logs = {}, {}; w8(0x3403, 0xFF) end
+-- InitBattle's $FF fill: nobody seized, no pending action ($32CC/$32CD per entity)
+local function reset()
+  mem, logs = {}, {}
+  w8(0x3403, 0xFF)
+  for x = 0, 18, 2 do w8(0x32CC + x, 0xFF); w8(0x32CD + x, 0xFF) end
+end
 -- a seated member: full gauge (deciding) unless eta; Fight, Magic, Item; Cure at 5 MP
 local function member(e, hp, maxhp, period, o)
   o = o or {}
@@ -112,7 +117,30 @@ do
   -- entity 3 at 1321, s0's gauge full (its action queued), one action seen
   -- (1898): no typical yet, so its worst, twice inside 240 ticks
   local wd = H.healArrival({ hp = 1321, arrive = 240, enemies = { { slot = 0, eta = 0, period = 182, worst = 1898 } } })
-  check(wd.beaten and wd.n == 2 and wd.cost == 3796, "the White Dragon's queued 1898 beats the Cure; got " .. wd.why)
+  check(wd.beaten and wd.n == 2 and wd.cost == 3796, "the White Dragon's 1898 twice beats the Cure; got " .. wd.why)
+  -- with the aim: the queued action names entity 3, the one after it is one
+  -- in four (1898 + 1898 / 4 = 2372.5); queued on another, one in four alone
+  local function dragon(on)
+    return H.healArrival({ hp = 1321, arrive = 240,
+      enemies = { { slot = 0, eta = 0, period = 182, worst = 1898, share = 0.25, queuedOn = on } } })
+  end
+  check(dragon(true).beaten and dragon(true).cost == 2373, "queued on entity 3: beaten; got " .. dragon(true).why)
+  check(not dragon(false).beaten and dragon(false).cost == 475, "queued on another: not; got " .. dragon(false).why)
+  check(dragon(nil).cost == 949, "nothing queued: both actions at the share")
+  -- the dream's courtyard (build/attempts/wt/v036-driver/lab/nd_new_k4_s7): a
+  -- member at 2258/2547 among four, three monsters due twice each inside
+  -- the Cure; at one in four, and two of the queued ones aimed elsewhere,
+  -- far from her HP
+  local yard = H.healArrival({ hp = 2258, arrive = 240, enemies = {
+    { slot = 0, eta = 0, period = 182, worst = 532, typical = 532, share = 0.25, queuedOn = false },
+    { slot = 1, eta = 33, period = 182, worst = 214, typical = 214, share = 0.25 },
+    { slot = 3, eta = 0, period = 182, worst = 414, typical = 414, share = 0.25, queuedOn = false } } })
+  check(not yard.beaten and yard.cost == 344, "the courtyard's member is not beaten; got " .. yard.why)
+  check(H.healArrival({ hp = 2258, arrive = 240, enemies = {
+    { slot = 0, eta = 0, period = 182, worst = 532, typical = 532 },
+    { slot = 1, eta = 33, period = 182, worst = 214, typical = 214 },
+    { slot = 3, eta = 0, period = 182, worst = 414, typical = 414 } } }).beaten,
+    "with every action on her (the share unset), she would be")
   -- Wrexsoul (build/attempts/wt/v036-route/lab/sdo8_k1_s7): entity 3 at 200,
   -- both gauges full (207 and 194)
   check(H.healArrival({ hp = 200, arrive = 240, enemies = { { slot = 3, eta = 0, period = 389, worst = 207 },
@@ -124,6 +152,20 @@ do
     "nothing priced: the battle's worst")
   check(H.healArrival({ hp = 300, arrive = 100, enemies = { { slot = 0, eta = 0, worst = 50, typical = 80 } } }).cost == 50,
     "a typical never above the worst")
+end
+
+-- M.aimShare and M.queuedOn
+do
+  check(H.aimShare({ landN = 4, landOn = { [2] = { 1, 2 } } }, 2, 3) == 0.5, "two of four landed actions on her: half")
+  check(H.aimShare({ landN = 4, landOn = {} }, 1, 3) == 0, "none of four on him: none")
+  check(H.aimShare({ landN = 2, landOn = { [2] = { 1, 2 } } }, 2, 4) == 0.25, "two landed: too few, one in four")
+  check(H.aimShare(nil, 0, 1) == 1, "nothing seen, alone: every action")
+  reset()
+  check(H.queuedOn(1, 2) == nil, "no pending action: nil")
+  w8(0x32CC + 10, 7); w16(0x3520 + 14, 0x0004)
+  check(H.queuedOn(1, 2) == true and H.queuedOn(1, 0) == false, "slot 1's queued action names entity 2 only")
+  w8(0x32CC + 10, 0xFF); w8(0x32CD + 10, 3); w16(0x3520 + 6, 0x0001)
+  check(H.queuedOn(1, 0) == true and H.queuedOn(1, 2) == false, "a queued counter names entity 0")
 end
 
 -- 2. M.inTimeLift -----------------------------------------------------------
@@ -186,14 +228,16 @@ do
   check(said("the faster heal for the one that lands too late (#459)") ~= nil, "and why")
 end
 -- the White Dragon (tw2_k0_s0): actor 1 deciding, entity 3 at 1321/3219 with
--- s0's gauge full and its 1898 seen; Cure measured at 705
-local function wd()
+-- s0's gauge full, its action queued (queue slot 5) on `aimed`, its 1898
+-- seen; Cure measured at 705
+local function wd(aimed)
   reset()
   member(0, 3000, 3000, 202, { eta = 120 })
   member(1, 3595, 3595, 218)
   member(2, 3000, 3000, 202, { eta = 150 })
   member(3, 1321, 3219, 202, { eta = 65 })
   monster(0, 20000, 0, 182)
+  w8(0x32CC + 8, 5); w16(0x3520 + 10, 1 << aimed)
   bag({})
   local D = driver()
   D.hitLedger[0] = { max = 1898, maxOn = { [3] = 1898 }, actN = 1, actSum = 1898 }
@@ -202,12 +246,15 @@ local function wd()
 end
 do
   H.HEAL_ARRIVAL_OFF = true
-  local p = wd()
+  local p = wd(3)
   check(p.kind == "heal" and p.target == 3, "the old rules cure entity 3 under the queued 1898")
   H.HEAL_ARRIVAL_OFF = false
-  p = wd()
+  p = wd(3)
   check(not (p.kind == "heal" and p.target == 3), "the cure the queued hit beats is not cast, got " .. tostring(p.kind))
   check(said("no cure on entity 3 (1321/3219): $2D lands in about 240 ticks") ~= nil, "and it is said why")
+  check(said("(queued on it)") ~= nil, "the queued action read as aimed at it")
+  p = wd(0)
+  check(p.kind == "heal" and p.target == 3, "queued on entity 0, the dragon's next is one in four: the cure goes")
 end
 -- the spend rule: CELES at 82 with both gauges full ahead of her Cure (64
 -- and 68 typical) holds 2 BP -- a self-heal that lands after she falls saves
