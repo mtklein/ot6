@@ -31,6 +31,7 @@ H.NAV_REFIRE_HOLD = true
 -- the World of Ruin legs' helpers (lib/ot6_field.lua, H.worLegKit)
 local K = H.worLegKit({ fight = FIGHT, links = LINKS, names = NAMES })
 local map, sw, lv, settled, say = K.map, K.sw, K.lv, K.settled, K.say
+local outToWorld = K.outToWorld
 local kitLine, walkInto, board, regroup, liftOff = K.kitLine, K.walkInto, K.board, K.regroup, K.liftOff
 local watches, doomLine = K.watches, K.doomLine
 
@@ -143,60 +144,71 @@ local OPERA_DOOR, OPERA_LANDING = { 31, 183 }, { 30, 182 }
 -- the hunt's four (route-wor-gogo.md section 7, the Doom Gaze lab): CELES for TERRA, and the cabin's gear
 -- care, which hands RELM the brush (special: Doom Gaze's key)
 local HUNT = { CELES, RELM, GOGO, STRAGO }
--- the dragon's relics: each member's second relic slot ($1624 + 37 * char) takes the listed relic for the
--- fight, and what it held goes back after: { {char, relic} }.  A member already wearing it is left as it is;
--- each relic must be on its member after (a relic missing from the bag is a precondition gone wrong: the
--- Barrier Ring sat on TERRA, benched, and STRAGO fought without it, #460 review)
-local WARD_RELICS = { { CELES, 0xC1 }, { STRAGO, 0xB7 }, { RELM, 0xC3 } }
-local wardHeld = {}
-local function wardRelics(list, tag)
+-- the Dirt Dragon's kit, swapped on at the catwalk and off for Doom Gaze: { {char, slot, item} } (slot 3
+-- armor, 5 the second relic).  A Cherub Down on each of the four: its Float is the relic's, so the dragon's
+-- 50 Gs, which strips a cast Float, leaves it, and its earth (Quake $15, Magnitude8, Slide) misses; and the
+-- bag's Gaia Gear (absorbs earth) on STRAGO.  From one snapshot at the switch, sixty trials an arm, a fresh
+-- driver a trial (build/attempts/wt/v036-route/lab/kit_*; dtally.py, dact.py, fight_report.py): the leg's
+-- ward relics 60 of 60, 1.62 deaths a fight; the Cherub Downs 60 of 60, 0.19, the party's Float kept after
+-- all 136 of the dragon's 50 Gs and its Quakes taking 0 HP (37 of them); the Gaia Gear 60 of 60, 1.07; both
+-- 60 of 60, 0.05, 21 distinct keys.  The four Cherub Downs come from Jidoor's relic counter on the way
+-- (jidoorStop); each piece must be on its member after the swap
+local DRAGON_KIT = { { CELES, 5, 0xBC }, { RELM, 5, 0xBC }, { GOGO, 5, 0xBC }, { STRAGO, 5, 0xBC },
+  { STRAGO, 3, 0x8D } }
+local kitHeld = {}
+local function dragonKit(tag)
   local steps = {}
-  for _, m in ipairs(list) do
+  for _, m in ipairs(DRAGON_KIT) do
     steps[#steps + 1] = H.lazy(function()
-      local base = 0x1600 + 37 * m[1]
-      if H.readByte(base + 0x23) == m[2] or H.readByte(base + 0x24) == m[2] or H.invCountOf(m[2]) < 1 then
-        return H.call(function() end)
-      end
-      wardHeld[#wardHeld + 1] = { m[1], H.readByte(base + 0x24) }
-      return H.equipKit(m[1], { { 5, m[2] } }, { tag = NAMES[m[1]] .. ": a ward relic " .. tag })
+      local cur = H.readByte(0x1600 + 37 * m[1] + 0x1F + m[2])
+      if cur == m[3] then return H.call(function() end) end
+      H.assertEq(H.invCountOf(m[3]) > 0, true, string.format("item $%02X in the bag for %s %s", m[3], NAMES[m[1]], tag))
+      kitHeld[#kitHeld + 1] = { m[1], m[2], cur }
+      return H.equipKit(m[1], { { m[2], m[3] } }, { tag = string.format("%s: $%02X %s", NAMES[m[1]], m[3], tag) })
     end)
   end
   steps[#steps + 1] = H.call(function()
-    H.log("[kit] relics " .. tag .. ": " .. kitLine(HUNT))
-    for _, m in ipairs(list) do
-      local base = 0x1600 + 37 * m[1]
-      H.assertEq(H.readByte(base + 0x23) == m[2] or H.readByte(base + 0x24) == m[2], true,
-        string.format("%s wears relic $%02X %s", NAMES[m[1]], m[2], tag))
+    H.log("[kit] " .. tag .. ": " .. kitLine(HUNT))
+    for _, m in ipairs(DRAGON_KIT) do
+      H.assertEq(H.readByte(0x1600 + 37 * m[1] + 0x1F + m[2]), m[3],
+        string.format("%s wears $%02X in slot %d %s", NAMES[m[1]], m[3], m[2], tag))
     end
   end)
   return H.seqStep(steps)
 end
--- the ward relics off a member who leaves the party at the cabin (the Relic menu reaches only the seated):
--- the Ebot's Rock leg's relic care put the Barrier Ring on TERRA (wor_opera at ef239262: 'relics for the
--- Dirt Dragon: ... STRAGO L47 kit 09 39 62 7A A1 D2 B5')
-local function freeWardRelics(ch)
-  return H.lazy(function()
-    local base, slots = 0x1600 + 37 * ch, {}
-    for _, m in ipairs(WARD_RELICS) do
-      for slot = 4, 5 do
-        if H.readByte(base + 0x1F + slot) == m[2] then slots[#slots + 1] = slot end
-      end
-    end
-    if #slots == 0 then return H.call(function() end) end
-    return H.unequipRelics(ch, slots, { tag = NAMES[ch] .. ": the ward relics off before the cabin" })
-  end)
-end
-local function wardRelicsBack(tag)
+local function dragonKitBack(tag)
   return H.lazy(function()
     local steps = {}
-    for _, h in ipairs(wardHeld) do
-      if h[2] ~= 0xFF then
-        steps[#steps + 1] = H.equipKit(h[1], { { 5, h[2] } }, { tag = NAMES[h[1]] .. ": the relic back " .. tag })
+    for _, h in ipairs(kitHeld) do
+      if h[3] ~= 0xFF then
+        steps[#steps + 1] = H.equipKit(h[1], { { h[2], h[3] } }, { tag = NAMES[h[1]] .. ": back " .. tag })
       end
     end
-    steps[#steps + 1] = H.call(function() H.log("[kit] relics " .. tag .. ": " .. kitLine(HUNT)) end)
+    steps[#steps + 1] = H.call(function() H.log("[kit] " .. tag .. ": " .. kitLine(HUNT)) end)
     return H.seqStep(steps)
   end)
+end
+-- Jidoor's relic counter (198 (5,25) -> 202, the keeper (54,16), shop 79): a Cherub Down for each of the
+-- four, then out by the town's south edge and aboard
+local JIDOOR_DOOR, JIDOOR_LANDING = { 35, 156 }, { 36, 156 }
+local function jidoorStop()
+  return H.seqStep({
+    H.flyTo(JIDOOR_LANDING[1], JIDOOR_LANDING[2], { what = "the Falcon down by Jidoor", fight = FIGHT }),
+    H.worldNavTo(JIDOOR_DOOR[1], JIDOOR_DOOR[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
+      arrive = function() return map() == 198 and not H.worldMode() end }),
+    H.waitUntil(function() return map() == 198 and settled() end, 2400, "Jidoor: map 198", 1),
+    H.crossDoor(5, 25, 202, 54, 22, "Jidoor -> its relic shop (202)", { fight = FIGHT }),
+    H.shopTalk(54, 16, "Jidoor's relic counter", { fight = FIGHT }),
+    H.call(function() H.assertEq(H.shopId(), 79, "Jidoor's relic counter is shop 79") end),
+    H.buyItem(0xBC, function() return math.max(0, 4 - H.invCountOf(0xBC)) end, "CHERUB DOWN for each of the four"),
+    H.shopClose("Jidoor's relic counter"),
+    H.call(function() H.assertEq(H.invCountOf(0xBC) >= 4, true, "four Cherub Downs in the bag") end),
+    H.crossDoor(54, 23, 198, 5, 27, "the relic shop -> Jidoor", { fight = FIGHT }),
+    H.navTo(16, 62, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT }),
+    outToWorld("down", "out of Jidoor"),
+    board(),
+    H.call(function() say("shop", "Jidoor's Cherub Downs") end),
+  })
 end
 -- the Dirt Dragon's fight: STRAGO's lores, RELM's Ultima, Shell on the party (labs du_*, dx_*, sweep so2:
 -- section 4).  No Dischord: from the same snapshot the fight with it won 49 of 60 trials and without it 55
@@ -218,7 +230,6 @@ H.run({ maxFrames = 2400000 }, {
   -- the cabin first: CELES takes TERRA's seat for the Dirt Dragon and for Doom Gaze both (the Dirt Dragon
   -- labs, route-wor-gogo.md section 4: the lores alone won 18 of 20 trials with TERRA seated, fl1_lore, and
   -- 18 of 20 with CELES, dc_lore; one cabin stop serves both fights)
-  freeWardRelics(TERRA),
   regroup(HUNT),
   H.gearDress({ tag = "gear for the dragon and the hunt" }),
   H.dressRelics({ { CELES, "CELES" }, { RELM, "RELM" }, { GOGO, "GOGO" }, { STRAGO, "STRAGO" } },
@@ -228,13 +239,9 @@ H.run({ maxFrames = 2400000 }, {
   -- the Item list for 1,100 frames of the dragon's opening Quakes (sweep so3_k3_s7: "item steer: row 0 ->
   -- 106")
   H.bagArrange({ POTION, FENIX, 0xEA, 0xEE, 0xEC, REMEDY, TINCTURE }, { tag = "bag: the battle heals on top" }),
-  -- the dragon's relics (the kit sweeps so5 and so6 won it with): RELM the Earrings (her Ultima), CELES the
-  -- Czarina Ring and STRAGO the Barrier Ring (each a ward cast near death).  (They took the place of the
-  -- Wall Rings the tower left on until #460; its spells are earth on the whole field, which Reflect does
-  -- not turn, and Reflect turned the party's own Cure and Shell away)
-  wardRelics(WARD_RELICS, "for the Dirt Dragon"),
   H.call(function() H.log("[kit] " .. kitLine(HUNT)) end),
   liftOff(),
+  jidoorStop(),
   H.call(function() H.log("[doom] aloft: " .. doomLine()) end),
   H.flyTo(OPERA_LANDING[1], OPERA_LANDING[2], { what = "the Falcon down by the Opera House", fight = FIGHT }),
   H.worldNavTo(OPERA_DOOR[1], OPERA_DOOR[2], { maxFrames = 3000, playBattles = "tactical", fight = FIGHT,
@@ -244,6 +251,7 @@ H.run({ maxFrames = 2400000 }, {
   -- the stage-left room's stair (237 (48,30): $0110 -> 231), and 231's east stair up to the catwalk (232)
   walkInto(48, 30, 231, "237 (48,30) -> 231"),
   walkInto(28, 24, 232, "231 (28,24) -> 232: the catwalk"),
+  dragonKit("for the Dirt Dragon"),
   H.fieldCare({ threshold = 1.0, tag = "before the Dirt Dragon" }),
 
   -- ---- 2. the Dirt Dragon --------------------------------------------------------------------------------
@@ -285,7 +293,7 @@ H.run({ maxFrames = 2400000 }, {
   H.worldNavTo(OPERA_LANDING[1], OPERA_LANDING[2], { maxFrames = 3000, playBattles = "tactical", fight = FIGHT,
     avoid = { OPERA_DOOR } }),
   -- the second relics back for Doom Gaze
-  wardRelicsBack("for the hunt"),
+  dragonKitBack("for the hunt"),
   H.fieldCare({ threshold = 1.0, tag = "before the hunt" }),
   H.call(function() H.log("[kit] " .. kitLine(HUNT)) end),
   board(),
