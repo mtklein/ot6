@@ -322,7 +322,7 @@ do
   _, p = barbe({ second = true })
   check(p.kind == "fight" and p.aim == 1, "another body without the token: the Fight goes there")
   _, p = barbe({ cmds = { 0x00, 0x0B, 0x01, 0xFF } })
-  check(p.kind == "fight" and said("the Fight stands (#466)") ~= nil, "no Magic row and no other body: the Fight stands")
+  check(p.kind == "fight" and said("no other body to swing at and no Magic row -- the Fight stands (#466)") ~= nil, "no Magic row and no other body: the Fight stands")
   local D = barbe()
   local cast = { kind = "magic", spell = 0x14 }
   check(D:coverPlan(0, cast) == cast, "a cast is not a Fight: left alone")

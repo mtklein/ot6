@@ -10765,7 +10765,8 @@ function Driver:coverPlan(actor, plan)
       return plan
     end
   end
-  if cmdRow(actor, BATTLE.CMD_MAGIC) then
+  local mrow = cmdRow(actor, BATTLE.CMD_MAGIC)
+  if mrow then
     local line = self:magicOnlyLine(actor, plan.boostLeft or 0)
     if line then
       M.log(string.format("[%s] actor=%d every standing monster is under Love Token (slot %d's Fight "
@@ -10774,12 +10775,18 @@ function Driver:coverPlan(actor, plan)
       return line
     end
   end
-  local key = "cover:" .. actor
+  local listed = false
+  for r = 0, 3 do
+    if M.readByte(BATTLE.CMDTBL + actor * 12 + r * 3) == BATTLE.CMD_MAGIC then listed = true end
+  end
+  local why = mrow == nil and (listed and "the Magic row greyed" or "no Magic row")
+    or string.format("no spell to cast (%d MP)", M.readWord(BATTLE.CURMP + actor * 2))
+  local key = "cover:" .. actor .. ":" .. why
   if not self.statusSaid[key] then
     self.statusSaid[key] = true
     M.log(string.format("[%s] actor=%d: slot %d is under Love Token and its Fight lands on entity %d; "
-      .. "no other body to swing at and no spell to cast -- the Fight stands (#466)", self.tag or "fight",
-      actor, aim, guard))
+      .. "no other body to swing at and %s -- the Fight stands (#466)", self.tag or "fight",
+      actor, aim, guard, why))
   end
   return plan
 end
