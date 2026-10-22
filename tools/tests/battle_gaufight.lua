@@ -312,216 +312,262 @@ local VELDT_LIST, MAX_DRAWS = 0x1DDD, 128   -- two passes over all 64 bytes
 -- encounters, not seeds)
 local SKIP = type(GAUFIGHT_SKIP) == "number" and GAUFIGHT_SKIP or 0
 local skipped = 0
-add({ H.call(function()
-  H.vars.suitable = false
-  local groups = 0
-  for i = 0, 63 do
-    if H.readByte(VELDT_LIST + i) ~= 0 then groups = groups + 1 end
-  end
-  H.vars.drawCap = math.min(2 * groups + SKIP, MAX_DRAWS)
-  H.log(string.format("battle A: the Veldt list holds %d formation groups; "
-    .. "draw budget %d (two passes)", groups, H.vars.drawCap))
-end) })
-for n = 1, MAX_DRAWS do
-  local w = {}
-  for _, s in ipairs(walkIntoEncounter("battle A draw " .. n)) do w[#w + 1] = s end
-  w[#w + 1] = H.call(function()
-    surveyBattle()
-    local total = monsterHpTotal()
-    H.vars.suitable = (#msPresent >= 2 and total >= 500)
-    if H.vars.suitable and skipped < SKIP then skipped, H.vars.suitable = skipped + 1, false end
-    H.log(string.format("battle A draw %d: %d bodies, %d total HP -> %s",
-      n, #msPresent, total, H.vars.suitable and "FIGHT" or "resolve"))
-  end)
-  w[#w + 1] = H.cond(function() return not H.vars.suitable end,
-    { resolveBattle("battle A draw " .. n),
-      -- recover OUTSIDE combat before the next draw, gen_sabin_gau's own
-      -- between-battles doctrine: top off and Fenix Down through the world
-      -- menu so the next fight starts whole instead of bleeding turns into
-      -- the bag mid-battle
-      H.cond(function() return H.worldMode() end, {
-        H.fieldCare({ tag = "between draws " .. n, threshold = 0.9,
-                      maxFrames = 12000 }),
-      }, {}) }, {})
-  if n == 1 then add(w)
-  else
-    add({ H.cond(function()
-      return not H.vars.suitable and n <= H.vars.drawCap
-    end, w, {}) })
-  end
-end
-add({
-  H.call(function()
-    H.assertEq(H.vars.suitable, true,
-      "the Veldt dealt a trance-sized formation within two passes of its list")
-  end),
-})
-
--- -------- 1a/1b/1c. the save record, the Veldt list, and the Gau gate -----
-add({
-  H.call(function()
-    local onVeldt = (H.readByte(VELDT) & 0x02) ~= 0
-    local rows = rowsOf(gauSlot)
-    saveRecA = saveRecord(gauSlot)
-    H.log(string.format("[battle A / gau slot %d] save record = %02X %02X %02X "
-      .. "%02X", gauSlot, saveRecA[0], saveRecA[1], saveRecA[2], saveRecA[3]))
-    H.log(string.format("[battle A / gau slot %d] rows = %02X %02X %02X %02X  "
-      .. "MP=%d  $11e4=%02X (veldt=%s)", gauSlot, rows[0], rows[1], rows[2],
-      rows[3], H.readWord(CURMP(gauSlot)), H.readByte(VELDT), tostring(onVeldt)))
-
-    -- 1a. the per-save data itself, unpoked
-    H.assertEq(saveRecA[0], CMD_FIGHT,
-      "save record slot 0 is FIGHT -- the free action Gau never had (#47), "
-      .. "copied into the character record by his own join event; pre-#47 this "
-      .. "byte was $10 RAGE and the record held no $00 anywhere")
-    H.assertEq(saveRecA[1], CMD_RAGE, "save record slot 1 is RAGE")
-    H.assertEq(saveRecA[2], CMD_MAGIC,
-      "save record slot 2 is MAGIC -- and it STAYS magic in the record; the "
-      .. "sharing is a runtime verdict on the FIGHT row, not a rewrite of the "
-      .. "save")
-    H.assertEq(saveRecA[3], CMD_ITEM, "save record slot 3 is ITEM")
-
-    -- 1b. the built list, on the Veldt.  The rule, not a constant.
-    H.assertEq(onVeldt, true,
-      "positive control: the fixture really is standing on a Veldt sector, so "
-      .. "the substitution below is exercised rather than merely not-fired "
-      .. "($11e4 |= $02, field/battle.asm:141)")
-    H.assertEq(rows[0], onVeldt and CMD_LEAP or CMD_FIGHT, string.format(
-      "row 0 is the SHARED row and follows the rule, not a constant: the Veldt "
-      .. "flag $11e4 reads $%02X, so this row belongs to %s",
-      H.readByte(VELDT), onVeldt and "LEAP" or "FIGHT"))
-    H.assertEq(rows[1], CMD_RAGE, "row 1 is RAGE -- the kit verb keeps a row")
-    H.assertEq(rows[2], CMD_NONE,
-      "row 2 is MAGIC's own untouched vanilla verdict -- removed ($ff), "
-      .. "because this Gau knows no spells and InitCmd_03 is back to exact "
-      .. "vanilla")
-    H.assertEq(rows[3], CMD_ITEM, "row 3 is ITEM -- the free floor is intact")
-
-    -- 1c. the negative control: the substitution is gated on CHAR::GAU.
-    for s = 0, 3 do
-      local id = H.readByte(0x3ED8 + s * 2)
-      if id ~= 0xFF and s ~= gauSlot then
-        local other = rowsOf(s)
-        H.log(string.format("[slot %d] actor $%02X rows = %02X %02X %02X %02X",
-          s, id, other[0], other[1], other[2], other[3]))
-        H.assertEq(other[0], CMD_FIGHT, string.format(
-          "actor $%02X still leads with FIGHT -- his row 0 was NOT substituted "
-          .. "even though we are standing on the Veldt", id))
-        local anyLeap = false
-        for i = 0, 3 do if other[i] == CMD_LEAP then anyLeap = true end end
-        H.assertEq(anyLeap, false, string.format(
-          "actor $%02X got Gau's Veldt Leap on NO row", id))
-      end
+-- Battle A's attempts (draw, checks, ride): a draw whose fight fells Gau
+-- before the ride's possessed turns cannot answer and is resolved, and the
+-- next attempt draws again (the lone failure: gau_joined of the 5642a784
+-- chain at GAUFIGHT_SKIP 5, shift 4, group $0045's five bodies, "still
+-- possessed after riding the trance: got false" with Gau at 0 HP,
+-- build/attempts/wt/v036-boost/round4/e/).
+local A_TRIES = 3
+local rideWatched = false
+local function battleA(attempt)
+  local seq = {}
+  local function addA(t) for _, st in ipairs(t) do seq[#seq + 1] = st end end
+  addA({ H.call(function()
+    H.vars.suitable = false
+    local groups = 0
+    for i = 0, 63 do
+      if H.readByte(VELDT_LIST + i) ~= 0 then groups = groups + 1 end
     end
-  end),
-})
+    H.vars.drawCap = math.min(2 * groups + SKIP, MAX_DRAWS)
+    H.log(string.format("battle A: the Veldt list holds %d formation groups; "
+      .. "draw budget %d (two passes)", groups, H.vars.drawCap))
+  end) })
+  for n = 1, MAX_DRAWS do
+    local w = {}
+    for _, s in ipairs(walkIntoEncounter("battle A draw " .. n)) do w[#w + 1] = s end
+    w[#w + 1] = H.call(function()
+      surveyBattle()
+      local total = monsterHpTotal()
+      H.vars.suitable = (#msPresent >= 2 and total >= 500)
+      if H.vars.suitable and skipped < SKIP then skipped, H.vars.suitable = skipped + 1, false end
+      H.log(string.format("battle A draw %d: %d bodies, %d total HP -> %s",
+        n, #msPresent, total, H.vars.suitable and "FIGHT" or "resolve"))
+    end)
+    w[#w + 1] = H.cond(function() return not H.vars.suitable end,
+      { resolveBattle("battle A draw " .. n),
+        -- recover OUTSIDE combat before the next draw, gen_sabin_gau's own
+        -- between-battles doctrine: top off and Fenix Down through the world
+        -- menu so the next fight starts whole instead of bleeding turns into
+        -- the bag mid-battle
+        H.cond(function() return H.worldMode() end, {
+          H.fieldCare({ tag = "between draws " .. n, threshold = 0.9,
+                        maxFrames = 12000 }),
+        }, {}) }, {})
+    if n == 1 then addA(w)
+    else
+      addA({ H.cond(function()
+        return not H.vars.suitable and n <= H.vars.drawCap
+      end, w, {}) })
+    end
+  end
+  addA({
+    H.call(function()
+      H.assertEq(H.vars.suitable, true,
+        "the Veldt dealt a trance-sized formation within two passes of its list")
+    end),
+  })
 
--- ----------------------------------- 4. rage possession is unaffected --
-add({
-  H.waitFrames(60),
-  menuForGau("gau_menu_for_rage"),
-  H.waitFrames(30),
-  H.call(function()
-    H.assertEq(H.readWord(CURMP(gauSlot)) >= 8, true, string.format(
-      "positive control: Gau's own save MP can afford the flat-8 trance "
-      .. "(got %d)", H.readWord(CURMP(gauSlot))))
-    H.assertEq(H.readByte(0x3A9A) > 0, true,
-      "positive control: the fixture's Gau has learned at least one rage")
-    emu.addMemoryCallback(function() cmd10Hits = cmd10Hits + 1 end,
-      emu.callbackType.exec, H.sym("Cmd_10"), H.sym("Cmd_10"))
-    emu.addMemoryCallback(function()
-      local x = emu.getState()["cpu.x"] & 0xFF
-      if x == gauSlot * 2 and (H.readByte(ST4(gauSlot * 2)) & 0x01) ~= 0 then
-        gauDispatches = gauDispatches + 1
+  -- -------- 1a/1b/1c. the save record, the Veldt list, and the Gau gate -----
+  addA({
+    H.call(function()
+      local onVeldt = (H.readByte(VELDT) & 0x02) ~= 0
+      local rows = rowsOf(gauSlot)
+      saveRecA = saveRecord(gauSlot)
+      H.log(string.format("[battle A / gau slot %d] save record = %02X %02X %02X "
+        .. "%02X", gauSlot, saveRecA[0], saveRecA[1], saveRecA[2], saveRecA[3]))
+      H.log(string.format("[battle A / gau slot %d] rows = %02X %02X %02X %02X  "
+        .. "MP=%d  $11e4=%02X (veldt=%s)", gauSlot, rows[0], rows[1], rows[2],
+        rows[3], H.readWord(CURMP(gauSlot)), H.readByte(VELDT), tostring(onVeldt)))
+
+      -- 1a. the per-save data itself, unpoked
+      H.assertEq(saveRecA[0], CMD_FIGHT,
+        "save record slot 0 is FIGHT -- the free action Gau never had (#47), "
+        .. "copied into the character record by his own join event; pre-#47 this "
+        .. "byte was $10 RAGE and the record held no $00 anywhere")
+      H.assertEq(saveRecA[1], CMD_RAGE, "save record slot 1 is RAGE")
+      H.assertEq(saveRecA[2], CMD_MAGIC,
+        "save record slot 2 is MAGIC -- and it STAYS magic in the record; the "
+        .. "sharing is a runtime verdict on the FIGHT row, not a rewrite of the "
+        .. "save")
+      H.assertEq(saveRecA[3], CMD_ITEM, "save record slot 3 is ITEM")
+
+      -- 1b. the built list, on the Veldt.  The rule, not a constant.
+      H.assertEq(onVeldt, true,
+        "positive control: the fixture really is standing on a Veldt sector, so "
+        .. "the substitution below is exercised rather than merely not-fired "
+        .. "($11e4 |= $02, field/battle.asm:141)")
+      H.assertEq(rows[0], onVeldt and CMD_LEAP or CMD_FIGHT, string.format(
+        "row 0 is the SHARED row and follows the rule, not a constant: the Veldt "
+        .. "flag $11e4 reads $%02X, so this row belongs to %s",
+        H.readByte(VELDT), onVeldt and "LEAP" or "FIGHT"))
+      H.assertEq(rows[1], CMD_RAGE, "row 1 is RAGE -- the kit verb keeps a row")
+      H.assertEq(rows[2], CMD_NONE,
+        "row 2 is MAGIC's own untouched vanilla verdict -- removed ($ff), "
+        .. "because this Gau knows no spells and InitCmd_03 is back to exact "
+        .. "vanilla")
+      H.assertEq(rows[3], CMD_ITEM, "row 3 is ITEM -- the free floor is intact")
+
+      -- 1c. the negative control: the substitution is gated on CHAR::GAU.
+      for s = 0, 3 do
+        local id = H.readByte(0x3ED8 + s * 2)
+        if id ~= 0xFF and s ~= gauSlot then
+          local other = rowsOf(s)
+          H.log(string.format("[slot %d] actor $%02X rows = %02X %02X %02X %02X",
+            s, id, other[0], other[1], other[2], other[3]))
+          H.assertEq(other[0], CMD_FIGHT, string.format(
+            "actor $%02X still leads with FIGHT -- his row 0 was NOT substituted "
+            .. "even though we are standing on the Veldt", id))
+          local anyLeap = false
+          for i = 0, 3 do if other[i] == CMD_LEAP then anyLeap = true end end
+          H.assertEq(anyLeap, false, string.format(
+            "actor $%02X got Gau's Veldt Leap on NO row", id))
+        end
       end
-    end, emu.callbackType.exec, H.sym("ExecCmd@battle_code"),
-      H.sym("ExecCmd@battle_code"))
-  end),
-  tap("down", 24),                  -- row 0 (the shared row) -> row 1 Rage
-  H.driveUntil(function() return H.readByte(MSTATE) == ST_RAGE end, 1500, {
-    H.call(function() H.setPad({ a = true }) end),
-    H.waitFrames(2),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(14),
-  }, "the rage window opens from row 1"),
-  -- Steer the rage window's cursor to entry 0 with the d-pad against the
-  -- live cursor cells (scroll $892b, col $892f, row $8933, indexed by the
-  -- actor slot; _c18438).
-  H.driveUntil(function()
-    return H.readByte(MSTATE) == ST_RAGE
-       and H.readByte(0x892B + gauSlot) + H.readByte(0x8933 + gauSlot) == 0
-       and H.readByte(0x892F + gauSlot) == 0
-  end, 1500, {
-    H.call(function()
-      if H.readByte(MSTATE) ~= ST_RAGE then H.setPad({}); return end
-      if H.readByte(0x892F + gauSlot) > 0 then H.setPad({ left = true })
-      elseif H.readByte(0x892B + gauSlot) + H.readByte(0x8933 + gauSlot) > 0
-        then H.setPad({ up = true })
-      else H.setPad({}) end
     end),
-    H.waitFrames(2),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(8),
-  }, "rage cursor steered to entry 0 (d-pad, no pokes)"),
-  H.call(function() cmd10Hits, gauMenus = 0, 0 end),
-  H.driveUntil(function()
-    return (H.readByte(ST4(gauSlot * 2)) & 0x01) ~= 0
-  end, 4000, {
+  })
+
+  -- ----------------------------------- 4. rage possession is unaffected --
+  addA({
+    H.waitFrames(60),
+    menuForGau("gau_menu_for_rage"),
+    H.waitFrames(30),
     H.call(function()
-      -- press A on any window Gau still has open: the rage list ($1e) hands
-      -- off to a follow-up state ($38) that also waits on a confirm.
-      H.setPad((H.readByte(MENU) ~= 0 and (H.readByte(ACTOR) & 3) == gauSlot)
-               and { a = true } or {})
-    end),
-    H.waitFrames(3),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(16),
-  }, "the RAGE status is set (Cmd_10 ran)"),
-  H.call(function() gauMenus, gauDispatches, rideN = 0, 0, 0 end),
-                                      -- count openings/actions from the trance on
-  -- ride the trance: the bench cares or Defends (careBench), and if the
-  -- four-row menu ever offered a possessed Gau a window, the counter below
-  -- would catch it.  The ride lasts
-  -- RIDE_TURNS of Gau's own possessed turns (each one a turn the gate had
-  -- to refuse a menu on), capped at 700 iterations, about 6300 frames.
-  -- It does not sit out the whole cap: every frame past the turns it needs
-  -- is the monsters' damage, and the #214 gau_joined drew a pair that wiped
-  -- the then-idle party 4450 frames in (f15743).
-  H.driveUntil(function()
-    return gauDispatches >= RIDE_TURNS or rideN >= 700
-  end, 8000, {
-    H.call(function()
-      rideN = rideN + 1
-      if H.readByte(MENU) ~= 0 and (H.readByte(ACTOR) & 3) == gauSlot then
-        gauMenus = gauMenus + 1
+      H.assertEq(H.readWord(CURMP(gauSlot)) >= 8, true, string.format(
+        "positive control: Gau's own save MP can afford the flat-8 trance "
+        .. "(got %d)", H.readWord(CURMP(gauSlot))))
+      H.assertEq(H.readByte(0x3A9A) > 0, true,
+        "positive control: the fixture's Gau has learned at least one rage")
+      if not rideWatched then            -- once, whatever the attempt
+        rideWatched = true
+        emu.addMemoryCallback(function() cmd10Hits = cmd10Hits + 1 end,
+          emu.callbackType.exec, H.sym("Cmd_10"), H.sym("Cmd_10"))
+        emu.addMemoryCallback(function()
+          local x = emu.getState()["cpu.x"] & 0xFF
+          if x == gauSlot * 2 and (H.readByte(ST4(gauSlot * 2)) & 0x01) ~= 0 then
+            gauDispatches = gauDispatches + 1
+          end
+        end, emu.callbackType.exec, H.sym("ExecCmd@battle_code"),
+          H.sym("ExecCmd@battle_code"))
       end
-      if not careBench() then H.setPad({}) end
     end),
-    H.waitFrames(3),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(6),
-  }, "the trance ridden for " .. RIDE_TURNS .. " possessed Gau turns"),
-  H.call(function()
-    H.log(string.format("[trance] cmd10=%d gau dispatches=%d menu openings=%d "
-      .. "raging=%s monstersLeft=%d ride=%d iterations partyhp=%d,%d,%d,%d",
-      cmd10Hits, gauDispatches, gauMenus,
-      tostring((H.readByte(ST4(gauSlot * 2)) & 0x01) ~= 0),
-      H.monstersPresent(), rideN, H.readWord(0x3BF4), H.readWord(0x3BF6),
-      H.readWord(0x3BF8), H.readWord(0x3BFA)))
-    H.assertEq((H.readByte(ST4(gauSlot * 2)) & 0x01) ~= 0, true,
-      "still possessed after riding the trance")
-    H.assertEq(gauDispatches >= 1, true, string.format(
-      "the trance really dispatched a Gau action on its own "
-      .. "(ExecCmd saw %d) -- Cmd_10 is only the possession setup and "
-      .. "therefore is not a per-turn counter", gauDispatches))
-    H.assertEq(gauMenus, 0,
-      "the four-row menu did not give a possessed Gau a menu: "
-      .. "CheckPlayerAction's STATUS34 {DANCE,HIDE,RAGE} gate still refuses to "
-      .. "open one, so his command list -- the shared row included -- is "
-      .. "IRRELEVANT mid-trance, which is what 'unaffected' has to mean")
-    H.screenshot("gau_veldt_row")
-  end),
-})
+    tap("down", 24),                  -- row 0 (the shared row) -> row 1 Rage
+    H.driveUntil(function() return H.readByte(MSTATE) == ST_RAGE end, 1500, {
+      H.call(function() H.setPad({ a = true }) end),
+      H.waitFrames(2),
+      H.call(function() H.setPad({}) end),
+      H.waitFrames(14),
+    }, "the rage window opens from row 1"),
+    -- Steer the rage window's cursor to entry 0 with the d-pad against the
+    -- live cursor cells (scroll $892b, col $892f, row $8933, indexed by the
+    -- actor slot; _c18438).
+    H.driveUntil(function()
+      return H.readByte(MSTATE) == ST_RAGE
+         and H.readByte(0x892B + gauSlot) + H.readByte(0x8933 + gauSlot) == 0
+         and H.readByte(0x892F + gauSlot) == 0
+    end, 1500, {
+      H.call(function()
+        if H.readByte(MSTATE) ~= ST_RAGE then H.setPad({}); return end
+        if H.readByte(0x892F + gauSlot) > 0 then H.setPad({ left = true })
+        elseif H.readByte(0x892B + gauSlot) + H.readByte(0x8933 + gauSlot) > 0
+          then H.setPad({ up = true })
+        else H.setPad({}) end
+      end),
+      H.waitFrames(2),
+      H.call(function() H.setPad({}) end),
+      H.waitFrames(8),
+    }, "rage cursor steered to entry 0 (d-pad, no pokes)"),
+    H.call(function() cmd10Hits, gauMenus = 0, 0 end),
+    H.driveUntil(function()
+      return (H.readByte(ST4(gauSlot * 2)) & 0x01) ~= 0
+    end, 4000, {
+      H.call(function()
+        -- press A on any window Gau still has open: the rage list ($1e) hands
+        -- off to a follow-up state ($38) that also waits on a confirm.
+        H.setPad((H.readByte(MENU) ~= 0 and (H.readByte(ACTOR) & 3) == gauSlot)
+                 and { a = true } or {})
+      end),
+      H.waitFrames(3),
+      H.call(function() H.setPad({}) end),
+      H.waitFrames(16),
+    }, "the RAGE status is set (Cmd_10 ran)"),
+    H.call(function() gauMenus, gauDispatches, rideN = 0, 0, 0 end),
+                                        -- count openings/actions from the trance on
+    -- ride the trance: the bench cares or Defends (careBench), and if the
+    -- four-row menu ever offered a possessed Gau a window, the counter below
+    -- would catch it.  The ride lasts
+    -- RIDE_TURNS of Gau's own possessed turns (each one a turn the gate had
+    -- to refuse a menu on), capped at 700 iterations, about 6300 frames.
+    -- It does not sit out the whole cap: every frame past the turns it needs
+    -- is the monsters' damage, and the #214 gau_joined drew a pair that wiped
+    -- the then-idle party 4450 frames in (f15743).
+    H.driveUntil(function()
+      return gauDispatches >= RIDE_TURNS or rideN >= 700
+    end, 8000, {
+      H.call(function()
+        rideN = rideN + 1
+        if H.readByte(MENU) ~= 0 and (H.readByte(ACTOR) & 3) == gauSlot then
+          gauMenus = gauMenus + 1
+        end
+        if not careBench() then H.setPad({}) end
+      end),
+      H.waitFrames(3),
+      H.call(function() H.setPad({}) end),
+      H.waitFrames(6),
+    }, "the trance ridden for " .. RIDE_TURNS .. " possessed Gau turns"),
+    H.call(function()
+      H.log(string.format("[trance] cmd10=%d gau dispatches=%d menu openings=%d "
+        .. "raging=%s monstersLeft=%d ride=%d iterations partyhp=%d,%d,%d,%d",
+        cmd10Hits, gauDispatches, gauMenus,
+        tostring((H.readByte(ST4(gauSlot * 2)) & 0x01) ~= 0),
+        H.monstersPresent(), rideN, H.readWord(0x3BF4), H.readWord(0x3BF6),
+        H.readWord(0x3BF8), H.readWord(0x3BFA)))
+      H.assertEq(gauMenus, 0,
+        "the four-row menu did not give a possessed Gau a menu, over the "
+        .. "possessed turns this ride saw")
+      -- the precondition the draw could not promise: the fight keeps Gau
+      -- standing for RIDE_TURNS possessed turns.  A draw that fells him first
+      -- ends the possession by the fight, not by the code under test: it is
+      -- resolved, and the next suitable draw taken (at most A_TRIES).
+      local gauHp = H.readWord(0x3BF4 + gauSlot * 2)
+      local gauSt = H.readByte(0x3EE4 + gauSlot * 2)
+      if gauDispatches < RIDE_TURNS and (gauHp == 0 or (gauSt & 0xC2) ~= 0) then
+        H.log(string.format("[trance] attempt %d: the fight felled Gau (HP %d, STATUS1 $%02X) after %d "
+          .. "of %d possessed turns: this draw cannot answer; resolving it and drawing again",
+          attempt, gauHp, gauSt, gauDispatches, RIDE_TURNS))
+        return
+      end
+      H.assertEq((H.readByte(ST4(gauSlot * 2)) & 0x01) ~= 0, true,
+        "still possessed after riding the trance")
+      H.assertEq(gauDispatches >= 1, true, string.format(
+        "the trance really dispatched a Gau action on its own "
+        .. "(ExecCmd saw %d) -- Cmd_10 is only the possession setup and "
+        .. "therefore is not a per-turn counter", gauDispatches))
+      H.assertEq(gauMenus, 0,
+        "the four-row menu did not give a possessed Gau a menu: "
+        .. "CheckPlayerAction's STATUS34 {DANCE,HIDE,RAGE} gate still refuses to "
+        .. "open one, so his command list -- the shared row included -- is "
+        .. "IRRELEVANT mid-trance, which is what 'unaffected' has to mean")
+      H.screenshot("gau_veldt_row")
+      H.vars.rideAnswered = true
+    end),
+    H.cond(function() return not H.vars.rideAnswered end, {
+      resolveBattle("battle A attempt " .. attempt .. " after Gau fell"),
+      H.cond(function() return H.worldMode() end, {
+        H.fieldCare({ tag = "after attempt " .. attempt, threshold = 0.9, maxFrames = 12000 }),
+      }, {}),
+    }, {}),
+  })
+  return seq
+end
+add({ H.call(function() H.vars.rideAnswered = false end) })
+for attempt = 1, A_TRIES do
+  add({ H.cond(function() return not H.vars.rideAnswered end, battleA(attempt), {}) })
+end
+add({ H.call(function()
+  H.assertEq(H.vars.rideAnswered, true, string.format("battle A: a draw kept Gau standing for the "
+    .. "ride's %d possessed turns within %d attempts", RIDE_TURNS, A_TRIES))
+end) })
 
 -- ============================================================== battle B ==
 -- The labeled isolation arm; see the header.  Fresh load, with one bit
