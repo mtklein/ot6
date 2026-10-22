@@ -1047,8 +1047,13 @@ route-wor-falcon.md 13.10).
   and exit tricks; divine **Assassinate** (built).  Its one gate is the
   rule's: an action of his boosted with all three points (no once-a-battle
   limit; a counterattack, Interceptor's, is no action of his and carries no
-  divine).  Its effect: a hit of that action that breaks an enemy kills it
-  outright on that hit -- break it and it dies -- and so does such a hit on
+  divine).  The three points need not be the player's: a berserked or
+  muddled Shadow who has been hit dumps his bank on his next Fight
+  (`Ot6Retaliate`, #236), and a dump of three opens the divine (measured in
+  `battle_assassinate`'s own play: SHADOW berserked in the fight, "written 3
+  by Ot6Retaliate", two kills, #464).  Its effect: a hit of that action
+  that breaks an enemy kills it outright on that hit -- break it and it
+  dies -- and so does such a hit on
   an enemy someone else already Broke; a hit that breaks nothing is a hit.
   The break is what the divine does, not a condition on using it.  A boss
   is only Broken (owner ruling, #239).
