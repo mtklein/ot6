@@ -305,11 +305,19 @@ local function branch(k, wait)
       if rec.lost or lostNow() then return true end
       return H.readByte(0x32CC + mogSlot * 2) ~= 0xFF or dancing(mogSlot)
     end, 1800, {
+      -- the wave can end under the confirm (the battle goes on while MOG's
+      -- list is open): the victory pages wait for A, as in the
+      -- resolve step below, so A is pressed with no menu up and the end
+      -- reads as lostNow's "the battle ended".  v036-fragile's K2 woc s7 k1
+      -- sat on "Got 4808 Exp. point(s)" with nothing pressed until this
+      -- step timed out (build/attempts/wt/v036-fragile-fix/g4/).
       H.call(function()
         ph = ph + 1
-        if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == mogSlot then
+        if not H.battleLoadStarted() or H.readByte(MENU) == 0 then
+          H.setPad(ph % 8 < 4 and { a = true } or {})
+        elseif H.readByte(ACTOR) == mogSlot then
           H.setPad(ph % 10 < 5 and { a = true } or {})
-        else H.setPad({}) end
+        else bystander() end
       end),
       H.waitFrames(1),
     }, "the dance commits"),

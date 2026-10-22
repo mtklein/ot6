@@ -28,6 +28,7 @@ local STATE = "build/states/battle_entry.mss.lua"
 local A, B = 0x0c, 0x0e            -- guards in monster slots 2/3
 local POISON = 0x04                -- $3ee4,y bit 2 (battle_main.asm:15292)
 local SEIZE  = 0x40                -- $3ee5,y bit 6 (battle_main.asm:15374)
+local PENDING = 0x10               -- $3aa1,y bit 4: a DOT action is queued (SetFlag1)
 
 local function shieldA() return H.readByte(0x3E38 + A) end
 local function shieldB() return H.readByte(0x3E38 + B) end
@@ -259,11 +260,29 @@ H.run({ maxFrames = 60000 }, {
       "is an unmatched weakness, not a missing hit)")
   end),
 
-  -- sap/seize: damage with no element must chip nothing
+  -- sap/seize: damage with no element must chip nothing.  A DOT action
+  -- carries the branch it was queued with ($b6 set by rigenetimer when the
+  -- counter fired), so a poison tick queued before the switch still runs as
+  -- a poison tick after it (#468: shifts 7 and 13 had B's tick pending,
+  -- `sap dot 1 f2664 y=0E $b6=04`).  Poison comes off first, and the sap
+  -- phase starts only once neither guard has a DOT action pending
+  -- ($3AA1 bit 4, set by SetFlag1 and cleared as Cmd_22 runs).
   H.call(function()
-    dots, chips, classChips, shieldWrites = {}, {}, {}, {}
     for _, e in ipairs({ A, B }) do
       H.writeByte(0x3EE4 + e, H.readByte(0x3EE4 + e) & (~POISON & 0xFF))
+    end
+  end),
+  H.driveUntil(function()
+    return (H.readByte(0x3AA1 + A) | H.readByte(0x3AA1 + B)) & PENDING == 0
+  end, 6000, { H.call(keepAlive), H.waitFrames(1) },
+    "no DOT action left pending on either guard"),
+  H.call(function()
+    local pend = (H.readByte(0x3AA1 + A) | H.readByte(0x3AA1 + B)) & PENDING
+    H.log(string.format("sap phase begins f%d: pending DOT bits A/B = %02X/%02X",
+      H.frame, H.readByte(0x3AA1 + A) & PENDING, H.readByte(0x3AA1 + B) & PENDING))
+    H.assertEq(pend, 0, "no poison tick is still queued when the sap phase begins")
+    dots, chips, classChips, shieldWrites = {}, {}, {}, {}
+    for _, e in ipairs({ A, B }) do
       H.writeByte(0x3EE5 + e, H.readByte(0x3EE5 + e) | SEIZE)
     end
     H.writeByte(0x3E38 + A, 2); H.writeByte(0x3E88 + A, 0)

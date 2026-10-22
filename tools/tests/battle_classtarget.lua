@@ -41,7 +41,12 @@
 --      never aims TERRA's Fight at the unkeyed Tusker while a pierce-keyed
 --      Cirpius stands, and aim-off, the old shape, does -- each Fight's
 --      target read at the engine's hand-off of the confirmed input
---      (GetPlayerTargets).  The pierce chips landed on a Cirpius (counted
+--      (GetPlayerTargets).  Narrowed (#468): a Fight whose aimed monster was
+--      alive when the plan aimed it and fell before the confirm (a
+--      party-mate's queued blow) lands where the engine's fallback cursor
+--      puts it; the suite does not claim where that Fight lands.  It is
+--      counted apart, and aim-on must still have at least one keyed Fight
+--      that is not set apart.  The pierce chips landed on a Cirpius (counted
 --      at Ot6ClassChip's store), the Cirpius broken and the frames each
 --      branch's fight took from its own restore are logged beside it, not
 --      asserted; why is at the A/B below.
@@ -154,6 +159,13 @@ end, emu.callbackType.write, 0x7E0000 + SH_CUR, 0x7E0000 + SH_CUR + 11)
 -- a pierce-keyed Cirpius stood at that moment -- the input the aim
 -- changes, read at the engine's own hand-off.
 local TERRA_ENT = nil       -- TERRA's entity offset, set when the fight is found
+-- Is a confirmed Fight set apart as "the aimed monster fell during the
+-- cursor walk"?  Only when the plan aimed a monster that was alive at the
+-- moment of aiming, the confirm landed elsewhere, and that monster is now
+-- dead.  An aim at a monster already dead when aimed is not set apart.
+local function fellDuringWalk(aimed, aliveWhenAimed, slot, aliveNow)
+  return aimed ~= nil and aliveWhenAimed == true and slot ~= aimed and not aliveNow
+end
 do
   local gpt = H.sym("GetPlayerTargets")
   emu.addMemoryCallback(function()
@@ -169,10 +181,24 @@ do
       if alive(s) and speciesAt(s) == CIRPIUS and (classRev(s) & PIERCE) ~= 0 then keyed = true end
     end
     local at = slot and speciesAt(slot) or nil
-    branchRecord.fights[#branchRecord.fights + 1] = string.format("%s%s",
+    -- the monster the driver's plan aimed this Fight at (plan.aim, read each
+    -- frame by measure below).  When that monster fell while the cursor was
+    -- still walking to it (a party-mate's queued blow killed it), the engine
+    -- drops the cursor on another monster and the input confirms there: the
+    -- aim chose a Cirpius, the engine's fallback did not (#468, shift 13:
+    -- FINISH aimed slot 2, LOCKE's queued Fight killed it 17 frames before
+    -- TERRA's confirm landed on the Tusker).  Counted apart, and logged.
+    local aimed = branchRecord.terraAim
+    local fell = fellDuringWalk(aimed, branchRecord.terraAimAlive, slot, aimed ~= nil and alive(aimed))
+    branchRecord.fights[#branchRecord.fights + 1] = string.format("%s%s%s",
       slot and string.format("s%d=%03X", slot, at) or string.format("mask%02X", mons),
-      keyed and "" or "(no keyed Cirpius)")
-    if keyed and at ~= CIRPIUS then branchRecord.offKey = branchRecord.offKey + 1 end
+      keyed and "" or "(no keyed Cirpius)",
+      fell and string.format("(aimed s%d fell during the cursor walk)", aimed) or "")
+    if keyed and fell then branchRecord.fellOff = branchRecord.fellOff + 1
+    elseif keyed then
+      branchRecord.counted = branchRecord.counted + 1
+      if at ~= CIRPIUS then branchRecord.offKey = branchRecord.offKey + 1 end
+    end
   end, emu.callbackType.exec, gpt, gpt)
 end
 
@@ -221,12 +247,21 @@ local function measure(name, aim)
   return H.seqStep({
     H.call(function()
       out.broke, out.chips, out.on, out.fights, out.offKey = {}, 0, {}, {}, 0
+      out.fellOff, out.terraAim, out.terraAimAlive, out.counted, out.terraPlan = 0, nil, nil, 0, nil
       TERRA_ENT = S.terra * 2
       branchRecord = out
     end),
     H.driveUntil(function() return not H.battleLoadStarted() end, 40000, {
       H.call(function()
         F.frame()
+        -- TERRA's current plan's aim (nil when the plan names none)
+        local d = F.driver
+        if d.plan ~= nil and d.planActor == S.terra
+            and (d.plan ~= out.terraPlan or d.plan.aim ~= out.terraAim) then
+          -- a new plan or aim: note whether its monster stood when it was aimed
+          out.terraPlan, out.terraAim = d.plan, d.plan.aim
+          out.terraAimAlive = out.terraAim ~= nil and alive(out.terraAim)
+        end
         for s = 0, 5 do
           if alive(s) and speciesAt(s) == CIRPIUS and broken(s) then out.broke[s] = true end
         end
@@ -243,10 +278,11 @@ local function measure(name, aim)
       end
       H.log(string.format("[classtarget] %s: pierce chips on a Cirpius=%d (%s), cirpius "
         .. "broken=%d, fight took %d frames from the restored snapshot (f%d..f%d); TERRA's "
-        .. "Fights aimed at: %s -- %d off the key while a keyed Cirpius stood", name,
+        .. "Fights aimed at: %s -- %d off the key while a keyed Cirpius stood, %d more where "
+        .. "the aimed monster fell during the cursor walk", name,
         out.chips, #per > 0 and table.concat(per, " ") or "none", out.nbroke, out.frames,
         out.restored, H.frame, #out.fights > 0 and table.concat(out.fights, " ") or "none",
-        out.offKey))
+        out.offKey, out.fellOff))
     end),
   })
 end
@@ -376,6 +412,18 @@ steps[#steps + 1] = H.call(function()
       "the pierce hand is aimed at a pierce-keyed Cirpius")
   end
   aimsAtCirpius(pickOn)
+
+  -- control for the A/B's set-apart rule (#468 review): it can set apart only
+  -- an aim whose monster stood when aimed; an aim at a monster already dead
+  -- is still counted (and, landing on the Tusker, counted off the key).
+  H.assertEq(fellDuringWalk(2, false, 3, false), false,
+    "an aim at a monster already dead when aimed is not set apart")
+  H.assertEq(fellDuringWalk(2, true, 3, false), true,
+    "an aim at a standing monster that fell before the confirm is set apart")
+  H.assertEq(fellDuringWalk(2, true, 2, false), false,
+    "a Fight confirmed on its aimed monster is not set apart")
+  H.assertEq(fellDuringWalk(2, true, 3, true), false,
+    "a Fight confirmed elsewhere while its aimed monster stands is not set apart")
   H.assertEq(pickOn ~= S.tusk, true, "and NOT at the unkeyed Tusker")
 
   -- a slash hand has no key in this formation, so it keeps the default cursor
@@ -446,14 +494,18 @@ steps[#steps + 1] = (function()
     H.call(function()
       local a, b = S.ab["aim-on"], S.ab["aim-off"]
       H.log(string.format("[classtarget] A/B: TERRA Fights aimed off the key while a keyed "
-        .. "Cirpius stood %d of %d vs %d of %d; pierce chips on a Cirpius %d vs %d; cirpius "
-        .. "broken %d vs %d; frames from the restore %d vs %d (on/off %.3f)", a.offKey,
-        #a.fights, b.offKey, #b.fights, a.chips, b.chips, a.nbroke, b.nbroke, a.frames,
-        b.frames, a.frames / b.frames))
-      H.assertEq(#a.fights > 0, true, "TERRA Fought in the aim-on branch (the count below is "
-        .. "not vacuous)")
+        .. "Cirpius stood %d of %d counted (%d more set apart: the aimed monster fell during "
+        .. "the cursor walk; %d Fights in all) vs %d of %d counted (%d set apart; %d in all); "
+        .. "pierce chips on a Cirpius %d vs %d; cirpius broken %d vs %d; frames from the "
+        .. "restore %d vs %d (on/off %.3f)", a.offKey, a.counted, a.fellOff, #a.fights,
+        b.offKey, b.counted, b.fellOff, #b.fights, a.chips, b.chips, a.nbroke, b.nbroke,
+        a.frames, b.frames, a.frames / b.frames))
+      H.assertEq(a.counted > 0, true, "aim-on had at least one Fight confirmed while a keyed "
+        .. "Cirpius stood and not set apart as fallen during the cursor walk (the count below "
+        .. "is not vacuous)")
       H.assertEq(a.offKey, 0, string.format("aim-on never aims TERRA's Fight at the unkeyed "
-        .. "Tusker while a pierce-keyed Cirpius stands (%d Fights)", #a.fights))
+        .. "Tusker while a pierce-keyed Cirpius stands, outside Fights whose aimed monster "
+        .. "fell during the cursor walk (%d counted, %d set apart)", a.counted, a.fellOff))
       H.assertEq(#b.fights > 0, true, "the same hook saw the aim-off branch's Fights "
         .. "(the count above is a reading, not a default)")
       H.log(string.format("[classtarget] the old shape aimed off the key %d of %d (%s)",

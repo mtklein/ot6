@@ -142,12 +142,18 @@ local landHits, landFirst = 0, {}        -- $C2:FE00-FFFF exec inside the window
 local stpHits = 0                        -- $C2:FEF9 exec, ever
 local wins = {}                          -- per WinBattle: { frame, $201f }
 local rolls, passes = 0, 0
+-- The hooks below count and force nothing until the search begins (armed in
+-- the first step after the fixture's load): encounters used up before that
+-- (a lab's burn varying the history, TESTING.md) are not the search's wins,
+-- and their own 1/16 rolls are vanilla's.  The STP watch is always on.
+local armed = false
 
 -- fnFirst: run fn before the seq append (ShadowLeaves opens the window
 -- with its own hit); otherwise after (TerminateBattle closes it with its own).
 local function hook(name, addr, fn, fnFirst)
   N[name] = 0
   emu.addMemoryCallback(function()
+    if not armed then return end
     N[name] = N[name] + 1
     AT[name] = H.frame
     if fnFirst and fn then fn() end
@@ -199,12 +205,13 @@ end
 assert(PASS_IDX ~= nil, "RNGTbl holds an entry under $10")
 local forced = 0
 emu.addMemoryCallback(function()
+  if not armed then return end
   rolls = rolls + 1
   if fired then return end
   H.writeByte(0xBE, (PASS_IDX - 1) & 0xFF)
   forced = forced + 1
 end, emu.callbackType.exec, ROLL_RAND, ROLL_RAND)
-emu.addMemoryCallback(function() passes = passes + 1 end,
+emu.addMemoryCallback(function() if armed then passes = passes + 1 end end,
   emu.callbackType.exec, ROLL_PASSED, ROLL_PASSED)
 
 -- (b): where the mis-banked jmp used to land, and the STP it ran into.
@@ -323,6 +330,7 @@ H.run({ maxFrames = 600000 }, {
     H.assertEq(shadowAvail(), true, "$1ede has Shadow's bit (he is a guest the roll can see)")
     before.members = #H.partyMembers()
     before.hp = H.charHp(SHADOW)
+    armed = true
     H.log(string.format("[shadowstays] start f%d settle=%d world (%d,%d) party=%d "
       .. "shadow %d/%d hp tonic=%d potion=%d fenix=%d", H.frame, SETTLE,
       H.worldX(), H.worldY(), before.members, before.hp, H.charMaxHp(SHADOW),
