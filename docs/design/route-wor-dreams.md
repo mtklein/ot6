@@ -359,8 +359,8 @@ frames", `ft_old_beBC`) and the driver won ("battle $13D WON after 4292
 ticks", `ft4_new_beBC`).  So the dream leg no longer needs the rings for
 Barb-e.  Doma's leg still does: without them Wrexsoul ran 150,000 to
 345,000 ticks and the leg ran out of time in 1 of 12 runs on main and 4 of
-12 on the driver at 32d84233 (`ndo_*`), where with them it is won in
-10,000 to 61,000 (`sdo_*`, `sdo2_*`: 12 of 12 on each).  Sweeps at de405a9b
+12 on the driver at 32d84233 (`ndo_*`; the same, frame for frame, at
+6c7b2b93: `ndo2_new_*`), where with them it is won in 10,000 to 61,000 (`sdo_*`, `sdo2_*`: 12 of 12 on each).  Sweeps at de405a9b
 (K 0-5 at shifts 0 and 7, from the chain's own boots at that commit):
 `sd8` 12 of 12 PASS, the stooges 12 keys won of 12, no deaths, Barb-e,
 Samurai and Suriander 21 of 21; `sdo8` 12 of 12, Wrexsoul 11 of 11, 1.27
