@@ -313,8 +313,10 @@ local function barbe(o)
   member(1, 4138, 4328, 185, { eta = 100 })
   monster(0, 2535, 100, 272)
   if o.second then monster(1, 1000, 150, 300) end
+  if o.third then monster(2, 1000, 150, 300) end
   w8(0x336C + 8, o.guard or 0x02)
-  w8(0x336C + 10, 0xFF)
+  w8(0x336C + 10, o.guard1 or 0xFF)
+  w8(0x336C + 12, 0xFF)
   w8(0x3AA0 + 2, 1); w8(0x32B9 + 2, 0x80); w8(0x3359 + 2, 0x80)
   bag(o.bag or {})
   if o.mute then
@@ -323,7 +325,15 @@ local function barbe(o)
   end
   local D = driver(o.opts)
   D.magicOnlyLine = function() return { kind = "magic", spell = 0x00 } end
-  return D, D:coverPlan(0, { kind = "fight", row = 0, boostLeft = 0, aim = o.aim })
+  -- a slot the target cursor could not reach (Driver:focusReachable), as
+  -- the executor marks it, with the standing set it was marked under
+  for _, s in ipairs(o.unreach or {}) do
+    local live = 0
+    for m = 0, 5 do if H.readWord(MON_HP + m * 2) > 0 then live = live | (1 << m) end end
+    D.tgtUnreach[s] = { live = live, tick = D.battleTick }
+  end
+  local tc = o.contract and { chars = 0, monsters = o.contract, all = false } or nil
+  return D, D:coverPlan(0, { kind = "fight", row = 0, boostLeft = 0, aim = o.aim, targetContract = tc })
 end
 do
   local _, p = barbe({ guard = 0xFF })
@@ -344,6 +354,17 @@ do
   _, p = barbe({ second = true, aim = 0, opts = { items = true, boost = true, focus = { { slot = 1 } } } })
   check(p.kind == "fight" and p.aimHard == nil and said("re-aimed") == nil,
     "the focus names the unguarded slot 1 over the plan's guarded aim 0: left alone")
+  -- the care race's Fight: its contract names the body (it replaces the
+  -- kill order in the executor), and a re-aim moves the contract with it
+  _, p = barbe({ second = true, aim = 1, contract = 1 << 0, opts = { items = true, boost = true, focus = { { slot = 1 } } } })
+  check(p.kind == "fight" and p.aimHard == 1 and p.targetContract.monsters == 1 << 1,
+    "the race's contract names the guarded slot 0 over the focus's and the plan's slot 1: re-aimed, the contract on 1")
+  -- a focus entry the cursor could not reach is skipped, by the executor
+  -- and so here; nor is a re-aim sent to one
+  _, p = barbe({ second = true, third = true, guard = 0xFF, guard1 = 0x02, unreach = { 0 },
+    opts = { items = true, boost = true, focus = { { slot = 0 }, { slot = 1 } } } })
+  check(p.kind == "fight" and p.aimHard == 2 and said("Fight re-aimed: slot 1 is under Love Token") ~= nil,
+    "the focus's slot 0 unreachable, its slot 1 guarded: re-aimed past 0 to slot 2, got " .. tostring(p.aimHard))
   _, p = barbe({ cmds = { 0x00, 0x0B, 0x01, 0xFF } })
   check(p.kind == "fight" and said("no other body to swing at and no Magic row -- the Fight stands (#466)") ~= nil, "no Magic row and no other body: the Fight stands")
   local D = barbe()
