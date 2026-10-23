@@ -3959,6 +3959,9 @@ InitUmaroAttack:
 ; [ command $1c: possess ]
 
 Cmd_1c:
+        jsl     Ot6CmdNoBoost   ; ot6 #463: no boost reward on this command;
+                                ;   a boost raised for it is dropped, not
+                                ;   charged (ot6_boost.asm)
 @17e5:  tyx
         jsr     InitCmdTarget
         lda     #$20
@@ -4186,6 +4189,9 @@ _1937:  php
 ; [ command $14: row ]
 
 Cmd_14:
+        jsl     Ot6CmdNoBoost   ; ot6 #463: no boost reward on this command;
+                                ;   a boost raised for it is dropped, not
+                                ;   charged (ot6_boost.asm)
 @194c:  tyx
         lda     $3aa1,x     ; toggle battle row
         eor     #$20
@@ -4212,6 +4218,9 @@ Cmd_0b:
 ; [ command $15: def. ]
 
 Cmd_15:
+        jsl     Ot6CmdNoBoost   ; ot6 #463: no boost reward on this command;
+                                ;   a boost raised for it is dropped, not
+                                ;   charged (ot6_boost.asm)
 @196a:  tyx
         lda     #$02
         jsr     SetFlag1       ; set $3aa1.1
@@ -4223,6 +4232,9 @@ Cmd_15:
 ; [ command $0e: control ]
 
 Cmd_0e:
+        jsl     Ot6CmdNoBoost   ; ot6 #463: no boost reward on this command;
+                                ;   a boost raised for it is dropped, not
+                                ;   charged (ot6_boost.asm)
 @1976:  lda     $3ef9,y
         bit     #$10
         beq     @1987
@@ -4245,6 +4257,9 @@ Cmd_0e:
 ; [ command $11: leap ]
 
 Cmd_11:
+        jsl     Ot6CmdNoBoost   ; ot6 #463: no boost reward on this command;
+                                ;   a boost raised for it is dropped, not
+                                ;   charged (ot6_boost.asm)
 @199d:  tyx
         jsr     _c2298a
         lda     #$a8        ; special effect $54 (leap)

@@ -488,8 +488,9 @@ nowhere else. The World of Ruin adds Phoenix's Life (magicite.md, #327).
   is read at Cmd_03's head (`Ot6MorphTake`, `OT6_MORPHBOOST`), so a pick
   taken back at target select gets the span of what it pays.  Revert stays
   free, so she can morph again in the same battle; it buys nothing, so a
-  boost raised on it is refunded at Cmd_04's head (`Ot6RevertTake`, #430)
-  and the turn regens a point like any unboosted one.
+  boost raised on it is dropped at Cmd_04's head, before anything charges
+  it (`Ot6RevertTake`, #430), and the turn regens a point like any
+  unboosted one.
   Vanilla's cross-battle gauge is gone: `$1CF6` (filled by magicite
   points after battles, drained by each morph, saved) no longer sets the
   duration, greys the command (`UpdateCmd_00`) or gates a random pick
@@ -519,7 +520,7 @@ nowhere else. The World of Ruin adds Phoenix's Life (magicite.md, #327).
   3,900 and 4,812 (this ROM) against 6,438 and 4,956 (main) and 2,020 and
   3,290 unmorphed, over one to three of her attacking turns.
   `battle_trance` (each span, permanence at 3, the take-back, and a 2-BP
-  Revert after a 3-BP Morph: it reverts and is refunded),
+  Revert after a 3-BP Morph: it reverts and charges nothing),
   `battle_morphrandom` (the engine's pick).
 - **Break (level 24, and Shoat's) takes shields** (#398): no damage and no
   status; one shield off its one target, ignoring class and element, plus
@@ -596,16 +597,23 @@ remover. It reveals nothing (it takes the shield without teaching the row, so it
 complements Debilitator rather than replacing it) and deals no damage. A landed
 Filch gives Locke **+2 BP on the turn**, the filched pip plus his own unboosted
 regen, which nothing else in the game does. Against an already-Broken or
-shieldless target it is a no-op.
+shieldless target it is a no-op. Filch reads no boost, so R does not raise
+one on its row, and one raised before the row is picked is never charged
+(#463, `battle_boostkeep`).
 
 Bestow is the sketch verbatim. Its debit rides `OT6_BOOST_REVEALED` so that
 `Ot6ActionEnd` does the subtraction, which is the only BP charge path in the game
 and is what stops Bestow being free: if it were charged inline, Ot6ActionEnd would
-still pay Locke his regen and Bestow would yield a pip a turn for 5 MP. At 0 BP
+still pay Locke his regen and Bestow would yield a pip a turn for 5 MP. The
+pip handed over is the whole charge at every boost: a boost raised for Bestow
+buys nothing, so R does not raise one on its row and a Bestow raised to two
+or three points before the row was picked costs the one pip it gives
+(#463). At 0 BP
 the row greys and, since #232, the confirm refuses it (`Ot6KitConfirmMP` reads
 the same `Ot6BushidoRowGrey` that coloured it), so the turn and the 5 MP stay
 with the player; a self-target and an ally already at the 5 cap are still
-refused at execution. `battle_bestowrefuse` is the suite.
+refused at execution, charging no pip. `battle_bestowrefuse` is the suite;
+`battle_boostkeep` holds the boosted cases.
 
 **Break class: none of the first three takes one** (Mug's is his weapon's;
 Trickshot and Dismantle pierce). Steal and Bestow deal no damage,
@@ -659,7 +667,9 @@ letters, so its price keeps a gap); the banner prints "Master's Mark".
 - **Appraise** is Strago's Scan read (`Ot6AnalyzeOne`): the target's weak
   elements and classes onto the HUD and into the codex, nothing chipped; a
   point or more reads every enemy. 3 MP, Analyze's price, flat (no
-  multiplier under command `$05`).
+  multiplier under command `$05`). With the target the only body standing
+  the point reads nothing more and is spent: only the resolve could tell
+  (#463).
 - **Master's Mark**, the divine, at three points pending: every standing
   body read as Appraise reads it and robbed as a 3-BP Steal robs (its rare
   item, else its common, no roll; nothing from a body already robbed), each
@@ -1041,8 +1051,13 @@ route-wor-falcon.md 13.10).
   and exit tricks; divine **Assassinate** (built).  Its one gate is the
   rule's: an action of his boosted with all three points (no once-a-battle
   limit; a counterattack, Interceptor's, is no action of his and carries no
-  divine).  Its effect: a hit of that action that breaks an enemy kills it
-  outright on that hit -- break it and it dies -- and so does such a hit on
+  divine).  The three points need not be the player's: a berserked or
+  muddled Shadow who has been hit dumps his bank on his next Fight
+  (`Ot6Retaliate`, #236), and a dump of three opens the divine (measured in
+  `battle_assassinate`'s own play: SHADOW berserked in the fight, "written 3
+  by Ot6Retaliate", two kills, #464).  Its effect: a hit of that action
+  that breaks an enemy kills it outright on that hit -- break it and it
+  dies -- and so does such a hit on
   an enemy someone else already Broke; a hit that breaks nothing is a hit.
   The break is what the divine does, not a condition on using it.  A boss
   is only Broken (owner ruling, #239).
@@ -1132,7 +1147,8 @@ plays Mimic.
   copied action's price at 0 and its boost buys what the copied action's
   boost buys (`Ot6MimicFold`, `battle_mimic`); a boost the copy cannot
   use (a SwdTech, Filch, Bestow, a reel result, a Steal with nothing to
-  take) is kept, not spent (`Ot6MimicKeep`, `battle_mimicboost`, #461).
+  take, an Item or spell that moves no number) is kept, not spent
+  (`Ot6KeepBoost`, `battle_mimicboost`, #461, #463).
   So Gogo's best turn is the
   party's best turn again, at no MP: a keyed boosted strike that broke a
   shield, a lore, a tier spell.

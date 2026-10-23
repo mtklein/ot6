@@ -40,6 +40,11 @@
 --      No fixture holds a Thief Glove, so one declared write turns LOCKE's
 --      Steal command into Capture in his record before these battles
 --      (state_write_waivers.txt), the rewrite the glove makes at battle init.
+-- Every fight-out (after the counted action, or of a battle that counts
+-- nothing) is the route's Fight driver (H.fightBattleByMenu), which heals in
+-- battle as a player does, as battle_study's are: a Fight-only fight-out
+-- wiped to formation $001F + $0096 x2 after stage 5 (party at 59, 307 and
+-- 292 HP) in f874ce92's qualification (build/attempts/wt/v036-boost/round4/).
 -- A battle where the stage cannot be played (no loot for Mug, one body for
 -- stage 7, LOCKE out or short of MP) is fought out and the next taken; a
 -- stage whose counted effect did not happen (every Mug swing missed, the
@@ -431,7 +436,7 @@ H.run({ maxFrames = 1500000 }, {
       { H.fieldCare({ tag = "lockekit" }), lap(), H.release() }, {}),
     H.waitUntil(function() return H.battleActive() end, 900, "battle up", 5),
     H.call(decide),
-    H.cond(function() return mode == "fightout" end, { H.kitBattle({}, {}) }, {
+    H.cond(function() return mode == "fightout" end, { H.fightBattleByMenu(40000) }, {
       H.kitBattle(proxy, { untilPlanDone = true, others = "fight", idle = "defend", maxFrames = 60000,
         onList = onList, planDone = function() return stage == 1 or closed() end }),
       H.call(function()
@@ -449,7 +454,7 @@ H.run({ maxFrames = 1500000 }, {
           stage = stage + 1
         end
       end),
-      H.cond(function() return H.battleLoadStarted() end, { H.kitBattle({}, {}) }, {}),
+      H.cond(function() return H.battleLoadStarted() end, { H.fightBattleByMenu(40000) }, {}),
     }),
     H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000,
       "back on the world map", 5),

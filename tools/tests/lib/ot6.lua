@@ -11602,11 +11602,14 @@ function Driver:makePlanRules(actor)
   -- The Doom's last turn (#190, M.doomRule): a condemned actor whose
   -- count runs out before its next turn takes no care -- a heal on it
   -- restores HP the Doom takes anyway -- and spends every pip on the
-  -- attack lines below rather than die holding them (#175).
+  -- attack lines below rather than die holding them (#175).  That includes
+  -- the plain Fight line: the last-stand trim's pips kept for the next turn
+  -- (standBoost) are pips this actor will not live to use (#465).
   do
     local last, count = doomLast(actor, actor)
     if last == "last" then
       row, cureRow = nil, nil
+      standBoost, standSay = nil, nil
       if self.opts.boost then boost = math.min(have, 3) end
       if self.statusSaid["doom:" .. actor] ~= count then
         self.statusSaid["doom:" .. actor] = count

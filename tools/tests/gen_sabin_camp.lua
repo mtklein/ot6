@@ -721,6 +721,9 @@ H.run({ maxFrames = 150000, allowGameOver = true }, {  -- the #84 chest pickup r
   rideUntil(landedField(117, 10), "back at (36,5) with the chest opened",
     6000),
   H.waitFrames(30),
+  -- the care before the fixture (audit_party_hp: "POISONED camp_intro:
+  -- SABIN L14 165/363 hp ... status1 04" on the boost branch's chain)
+  H.fieldCare({ tag = "care before camp_intro", threshold = H.CARE_BEFORE_FIGHTS }),
 
   H.call(function()
     H.assertEq(map(), 117, "map 117 -- back in the Imperial Camp")

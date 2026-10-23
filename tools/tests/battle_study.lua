@@ -17,15 +17,20 @@
 -- in a battle that fields a Chimera, through the real menu (H.kitBattle):
 --   1. STRAGO's Scan picked at 3 BP and aimed at a party member: it reads
 --      nothing at any boost, so the boost buys nothing and is dropped
---      (Ot6QueueFold): plain Scan's price, not 99 MP; no study; the turn
---      ends unboosted (pending 0 at Ot6ActionEnd, the bank regens a pip);
+--      before any charge (Ot6QueueFold prices it as plain Scan and marks
+--      the turn, #463; Ot6ActionEnd drops it): plain Scan's price, not 99
+--      MP; no study; the turn ends unboosted (the bank regens a pip
+--      rather than paying three);
 --   2. STRAGO's Scan at 2 BP: Ot6StudyOne writes nothing; the battle is
 --      fought out;
 --   3. STRAGO's Scan at 3 BP: Ot6StudyOne's writes to $3A84 add exactly the
 --      present species' lores he lacks (Aqua Rake), the cast costs 99 MP,
 --      and after the victory $1D29 holds Aqua Rake again.
 -- Everyone else Fights while STRAGO banks his points and Defends from the
--- cast until it resolves: Defending through the bank let the Chimera kill
+-- cast until it resolves (a lone Chimera often falls first and the battle
+-- counts nothing; H.kitBattle's "thin", Defending while it stood alone, wiped
+-- the party after the stage-3 cast on d4736400's chain): Defending through
+-- the bank let the Chimera kill
 -- TERRA and LOCKE before the cast on a later ROM's draw, and STRAGO alone
 -- lost the fight-out (build/attempts/wt/v030-route/study/).  A battle
 -- without a Chimera, where STRAGO cannot cast, or whose Chimera falls
@@ -217,7 +222,6 @@ H.run({ maxFrames = 900000 }, {
           H.assertEq(rec.studied, 0, "Scan on a party member studied nothing")
           H.assertEq(rec.mp0 - rec.mp1, H.battleSpellPrice(seat, SCAN, 0),
             "Scan on a party member at 3 BP pays plain Scan's price (its boost buys nothing)")
-          H.assertEq(rec.pendEnd, 0, "its boost is dropped before Ot6ActionEnd (pending 0)")
           H.assertEq(rec.bank1, math.min(rec.bank0 + 1, 5),
             string.format("the turn ends unboosted and regens a pip (bank %d -> %s)", rec.bank0, tostring(rec.bank1)))
         elseif stage == 2 then
@@ -233,23 +237,29 @@ H.run({ maxFrames = 900000 }, {
         end
       end),
       H.cond(function() return H.battleLoadStarted() end, { H.fightBattleByMenu(40000) }, {}),
-      H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000,
-        "back on the world map", 5),
-      H.call(function()
-        if mode ~= "cast" or rec == nil or not rec.ended then return end
-        local k = lores()
-        H.log(string.format("[study] after the battle: lores $%06X", k))
-        if stage < 3 then
-          if k & 0x08 ~= 0 then
-            H.log("[study] the Chimera taught Aqua Rake the vanilla way: cleared again for the study")
-            H.writeByte(0x1D29, H.readByte(0x1D29) & 0xF7)
-          end
-        else
-          H.assertEq(k & rec.want, rec.want, "the victory taught the studied lores ($1D29)")
-        end
-        stage = stage + 1
-      end),
     }),
+    H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000,
+      "back on the world map", 5),
+    -- after every battle, counted or not: a Chimera that cast Aqua Rake in a
+    -- battle that counted nothing teaches it the vanilla way too (on
+    -- d4736400's chain battle 5's did, and stage 3 then had nothing left to
+    -- learn: "no present species could teach a lore at the cast"), so the
+    -- study's lore is cleared again unless this was the counted stage-3 cast
+    H.call(function()
+      local counted = mode == "cast" and rec ~= nil and rec.ended ~= nil
+      local k = lores()
+      if counted then H.log(string.format("[study] after the battle: lores $%06X", k)) end
+      if counted and stage == 3 then
+        H.assertEq(k & rec.want, rec.want, "the victory taught the studied lores ($1D29)")
+        stage = stage + 1
+        return
+      end
+      if k & 0x08 ~= 0 then
+        H.log("[study] the Chimera taught Aqua Rake the vanilla way: cleared again for the study")
+        H.writeByte(0x1D29, H.readByte(0x1D29) & 0xF7)
+      end
+      if counted then stage = stage + 1 end
+    end),
   }, "the three counted casts"),
   H.call(function()
     H.log("[study] PASS: at 3 BP on a party member Scan is plain Scan, boost kept; at 2 BP it studies nothing; "

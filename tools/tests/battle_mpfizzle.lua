@@ -56,6 +56,17 @@
 --            refused; the pip spent (it bought A);
 --   both     the pool set under B's price at the commit: both refused,
 --            nothing pending at the turn's end, the bank one pip up.
+-- Three more kinds hold #463's X-Magic rule: a spell the boost buys nothing
+-- on (Ot6SpellNoBoost: not a tier family, Break or Scan, and a power of 0 or
+-- a fraction of HP/MP, read off the ROM) shares the turn's one pending boost
+-- with the other spell, so the boost is dropped only when neither spell buys
+-- with it.  No drain; the pool pays both:
+--   qa       A buys nothing, B buys: both charged their queued prices, B's
+--            the list's boosted price; the pip pending at the turn's end and
+--            spent (the boost is the turn's, and B bought with it);
+--   lq       A buys, B buys nothing: the pip spent;
+--   qq       neither buys: both charged their own prices, the pip dropped
+--            inside Ot6ActionEnd before its charge: the bank one pip up.
 -- At least one of each kind resolved.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/wor_tritoch.mss.lua"
@@ -65,7 +76,8 @@ local ST_TRANS, ST_CMD, ST_MAGIC, ST_DANCE, ST_TGT = 0x01, 0x05, 0x0E, 0x21, 0x3
 local ST_DEF = 0x27
 local CMDTBL = 0x202E
 local CMD_MAGIC, CMD_DANCE, CMD_XMAGIC = 0x02, 0x13, 0x17
-local XKINDS = { "control", "first", "second", "both" }
+local XKINDS = { "control", "first", "second", "both", "qa", "lq", "qq" }
+local QKIND = { qa = true, lq = true, qq = true }
 -- the spell list and its two scroll states (ScrollMagicListDown/Up)
 local XLIST = { [0x0E] = true, [0x17] = true, [0x18] = true }
 local MLISTPTR = 0x302C
@@ -152,9 +164,48 @@ local function magicCell(a)
   return nil
 end
 
+-- a spell the boost buys nothing on, as Ot6SpellNoBoost reads the ROM: not
+-- a tier family (Ot6FoldTbl, and Break's chips), not Scan; a fraction of
+-- HP/MP (MagicProp +$04 bit 7) or a power of 0
+local inFold = nil
+local function buysNothing(id)
+  if inFold == nil then
+    inFold = { [0x0C] = true }
+    local fold = H.sym("Ot6FoldTbl") & 0x3FFFFF
+    for i = 0, 0x17 do inFold[H.readRomByte(fold + i)] = true end
+  end
+  if inFold[id] or id == 0x18 then return false end
+  local mpb = H.sym("MagicProp") & 0x3FFFFF
+  return (H.readRomByte(mpb + id * 14 + 4) & 0x80) ~= 0 or H.readRomByte(mpb + id * 14 + 6) == 0
+end
+
+-- the #463 kinds' picks: A and B by what the boost buys on each (qa: A
+-- nothing, B something; lq: the reverse; qq: neither, the same row twice
+-- when only one is lit), the pool paying both at the listed prices
+local function qPicks(a, kind)
+  local quiet, loud = {}, {}
+  for cell = 0, 53 do
+    local id, flags, cost = listEntry(a, cell)
+    if id == nil then break end
+    if id ~= 0xFF and (flags & 0x80) == 0 and cost > 0 then
+      local r = { cell = cell, id = id, cost = cost }
+      if buysNothing(id) then quiet[#quiet + 1] = r else loud[#loud + 1] = r end
+    end
+  end
+  local As = (kind == "lq") and loud or quiet
+  local Bs = (kind == "qa") and loud or quiet
+  for _, A in ipairs(As) do
+    for _, B in ipairs(Bs) do
+      if (B ~= A or #Bs == 1) and A.cost + B.cost <= mp(a) then return A, B end
+    end
+  end
+  return nil, nil
+end
+
 -- X-Magic's two picks: B the cheapest lit row, A the dearest lit row dearer
 -- than B that the pool pays together with B
-local function xPicks(a)
+local function xPicks(a, kind)
+  if QKIND[kind] then return qPicks(a, kind) end
   local rows = {}
   for cell = 0, 53 do
     local id, flags, cost = listEntry(a, cell)
@@ -214,12 +265,13 @@ local function pulse()
     if btn == "a" then rec.spell, rec.price = id, cost end
   elseif XLIST[st] and V.cmd == CMD_XMAGIC then
     if rec.picks == nil then
-      local A, B = xPicks(a)
-      assert(A and B, "the X-Magic caster has two lit rows, one dearer, that "
-        .. "the pool pays together")
+      local A, B = xPicks(a, rec.kind)
+      assert(A and B, string.format("the X-Magic caster has the two lit rows "
+        .. "the %s kind needs, that the pool pays together", rec.kind))
       rec.picks, rec.pi = { A, B }, 1
-      H.log(string.format("[mpfizzle] X-Magic picks: A $%02X (%d MP), B $%02X "
-        .. "(%d MP), pool %d", A.id, A.cost, B.id, B.cost, mp(a)))
+      H.log(string.format("[mpfizzle] X-Magic picks (%s): A $%02X (%d MP%s), B $%02X "
+        .. "(%d MP%s), pool %d", rec.kind, A.id, A.cost, buysNothing(A.id) and ", buys nothing" or "",
+        B.id, B.cost, buysNothing(B.id) and ", buys nothing" or "", mp(a)))
     end
     -- back in the list after a pick was taken: the next pick
     if not XLIST[rec.lastSt or 0] and rec.pressed == rec.pi then rec.pi = rec.pi + 1 end
@@ -313,7 +365,7 @@ local function branch(k, verb)
   local req
   local drain = (k % 2 == 1)
   local kind = (verb.cmd == CMD_XMAGIC) and XKINDS[(k - 1) % #XKINDS + 1] or nil
-  if kind then drain = (kind ~= "control") end
+  if kind then drain = (kind ~= "control" and not QKIND[kind]) end
   return H.cond(function() return not phaseLost end, {
     H.call(function()
       H.setPad({})
@@ -480,7 +532,9 @@ local function phase(verb, pick)
       end),
     }),
   }
-  for k = 1, BRANCHES do out[#out + 1] = branch(k, verb) end
+  -- X-Magic: each kind twice
+  local nb = (verb.cmd == CMD_XMAGIC) and 2 * #XKINDS or BRANCHES
+  for k = 1, nb do out[#out + 1] = branch(k, verb) end
   return H.seqStep(out)
 end
 
@@ -611,7 +665,7 @@ end
 
 -- what a verb's resolved branches count so far, and whether it needs more
 local function counts(name)
-  local c = { c = 0, d = 0, control = 0, first = 0, second = 0, both = 0 }
+  local c = { c = 0, d = 0, control = 0, first = 0, second = 0, both = 0, qa = 0, lq = 0, qq = 0 }
   for _, r in ipairs(recs) do
     if r.verb == name and r.done and r.after then
       if r.kind then
@@ -675,7 +729,7 @@ end)
 body[#body + 1] = H.call(function()
   H.setPad({})
   local n = { Magic = { c = 0, d = 0 }, Dance = { c = 0, d = 0 } }
-  local nx = { control = 0, first = 0, second = 0, both = 0 }
+  local nx = { control = 0, first = 0, second = 0, both = 0, qa = 0, lq = 0, qq = 0 }
   local fails = {}
   local function check(ok, msg) if not ok then fails[#fails + 1] = msg end end
   for _, r in ipairs(recs) do
@@ -696,11 +750,19 @@ body[#body + 1] = H.call(function()
       check(#order == 2, string.format("%s: %d queue slots written (want 2)", tag, #order))
       local qa, qb = last[order[1]] or {}, last[order[2]] or {}
       local mp0 = r.queued.mp
-      if r.kind == "control" then
+      if r.kind == "control" or QKIND[r.kind] then
         check(d.nfz == 0, tag .. ": a payable spell fizzled")
         check(mp0 - sp[1].mp == qa.v and sp[1].mp - sp[2].mp == qb.v,
           string.format("%s: charged %d and %d (want the queued %s and %s)", tag,
           mp0 - sp[1].mp, sp[1].mp - sp[2].mp, tostring(qa.v), tostring(qb.v)))
+        if QKIND[r.kind] then
+          -- each queued at the price the list showed at the boost: the one
+          -- that buys at its boosted price (a buying B queued after a
+          -- no-reward A still had the boost to buy with)
+          check(qa.v == r.picks[1].cost and qb.v == r.picks[2].cost,
+            string.format("%s: queued %s and %s (want the listed %d and %d)", tag,
+            tostring(qa.v), tostring(qb.v), r.picks[1].cost, r.picks[2].cost))
+        end
       elseif r.kind == "first" then
         check(d.nfz == 1, string.format("%s: %d fizzles (want A's one)", tag, d.nfz))
         check(sp[1].mp == r.picks[2].cost, tag .. ": MP charged for the refused A")
@@ -719,7 +781,11 @@ body[#body + 1] = H.call(function()
         check(sp[1].mp == r.picks[2].cost - 1 and sp[2].mp == sp[1].mp,
           tag .. ": MP charged for a refused spell")
       end
-      if r.kind == "both" then
+      if r.kind == "qq" then
+        check(a.bank == math.min(5, r.bank0 + 1), string.format("%s: bank %d -> "
+          .. "%d (want %d: no spend, the unboosted turn's regen)", tag, r.bank0,
+          a.bank, math.min(5, r.bank0 + 1)))
+      elseif r.kind == "both" then
         check(d.pend == 0, string.format("%s: the pending boost was kept for "
           .. "spending (it read %d at the turn's end)", tag, d.pend))
         check(a.bank == math.min(5, r.bank0 + 1), string.format("%s: bank %d -> "
@@ -762,9 +828,10 @@ body[#body + 1] = H.call(function()
   for _, m in ipairs(fails) do H.log("[mpfizzle] FAIL " .. m) end
   H.log(string.format("[mpfizzle] SUMMARY Magic control=%d drained=%d, Dance "
     .. "control=%d drained=%d, XMagic control=%d first=%d second=%d both=%d "
-    .. "(boost %d)", n.Magic.c, n.Magic.d, n.Dance.c, n.Dance.d, nx.control,
-    nx.first, nx.second, nx.both, BOOST))
-  H.assertEq(#fails, 0, "every resolved branch: a refused boosted action kept its pips")
+    .. "qa=%d lq=%d qq=%d (boost %d)", n.Magic.c, n.Magic.d, n.Dance.c, n.Dance.d, nx.control,
+    nx.first, nx.second, nx.both, nx.qa, nx.lq, nx.qq, BOOST))
+  H.assertEq(#fails, 0, "every resolved branch: a refused boosted action kept its pips, "
+    .. "and an X-Magic's boost went with the spell that buys")
   for _, v in ipairs({ "Magic", "Dance" }) do
     H.assertEq(n[v].d >= MIN_EACH, true, v .. ": enough drained branches resolved")
     H.assertEq(n[v].c >= 1, true, v .. ": a paid control branch resolved")

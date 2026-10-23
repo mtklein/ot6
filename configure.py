@@ -432,6 +432,10 @@ TEST_ENV = {
     # #461: the same expedient, three bytes (Mimic, SwdTech, Slot)
     "battle_mimicboost":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # #463: LOCKE's thief rows and items, boosted and not, from one battle's
+    # snapshots; no write
+    "battle_boostkeep": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
     # #292: NUMBER 024 (7 shields) is two steps from this save point
     "battle_hudcount":
         "OT6_SRAM_CHECKPOINT=build/checkpoints/n024-entry-save-v1",

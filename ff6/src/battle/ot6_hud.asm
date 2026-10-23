@@ -1046,6 +1046,8 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 :       pla
         bit     #$10            ; R: boost up
         beq     @tryl
+        jsl     Ot6RowNoBoost   ; #463: not on a row the boost buys nothing
+        bcs     @deny           ;   on (Filch, Bestow, a status cure...)
         lda     OT6_BOOST_REVEALED,y
         inc     a
         cmp     #$04            ; spend at most 3

@@ -454,6 +454,10 @@ Ot6ThiefBanner:
 ; backstop is the frame that shows it, the same path a 0-damage chip already
 ; relies on.
 ;
+; Filch reads no boost (#463): a boost raised for it buys nothing and is
+; kept (Ot6KeepBoost), so a boosted Filch ends the turn as the unboosted one
+; does, the filched pip and the regen pip both.  A Mimic's copy is the same.
+;
 ; entry: jsl from Cmd_05's dispatch, db=$7e, a8/i8 (command context).  x =
 ; attacker entity offset, $b9 = the monster half of the target mask.  clobbers
 ; a; preserves x and y.
@@ -465,6 +469,7 @@ Ot6ThiefBanner:
         .i8
         cpx     #$08
         bcs     done            ; monster attacker: never
+        jsl     Ot6KeepBoost    ; the boost buys nothing here
         phy                     ; the caller still needs y (i8: one byte)
         ; --- primary monster target -> entity offset (Ot6Assassinate's scan) ---
         ldy     #$08
@@ -519,15 +524,16 @@ done:   plp
 ;     pip per turn for 5 MP (Ot6ThiefCostTbl; kits.md, mp-economy.md).
 ;   * there is exactly one BP charge path in the game and this uses it, so no
 ;     second clamp, no second cap, no way for the two to drift.
-; If the player has already armed a pending boost with L/R before opening the
-; menu, that spend stands and this adds nothing to it (the `bne` below): Locke
-; pays at least one either way and cannot be double-charged.  Boosting into
-; Bestow buys nothing, because it is not a damage verb and Ot6BoostDmg's cmd-$05
-; gate already refuses to multiply anything under this command, so that is
-; wasted BP in the same way boosting into Runic is.
+; The pip handed over is the whole charge, at every boost (#463): boosting
+; into Bestow buys nothing (it is not a damage verb, and Ot6BoostDmg's cmd-$05
+; gate refuses to multiply anything under this command), so a pending boost
+; the player raised with L/R is set to the one pip, not added to: a Bestow at
+; two or three points costs the one it gives.  A Mimic's copy is the same.
 ;
 ; Three refusals, all no-ops rather than errors, because by the time this
-; runs the turn is committed and there is no menu left to signal in:
+; runs the turn is committed and there is no menu left to signal in.  Each
+; keeps the boost (Ot6KeepBoost): nothing was handed over, so nothing is
+; charged and the turn earns its regen pip, boosted or not:
 ;   * Locke holds no BP (nothing to give);
 ;   * the chosen ally is Locke himself (a transfer to himself would change
 ;     nothing and spend the turn);
@@ -547,12 +553,12 @@ done:   plp
         .i8
         cpx     #$08
         bcs     done            ; monster attacker: never
+        phy                     ; the caller still needs y (i8: one byte)
         lda     OT6_BP_CLASS,x
-        beq     done            ; nothing to give
+        beq     @keep           ; nothing to give
         lda     $3018,x         ; a transfer to himself changes nothing: the
         and     $b8             ;   attacker's own character bit inside the
-        bne     done            ;   chosen mask means he pointed at himself
-        phy                     ; the caller still needs y (i8: one byte)
+        bne     @keep           ;   chosen mask means he pointed at himself
         ; --- primary character target -> entity offset (bit c -> offset c*2) ---
         ldy     #$00
         lda     $b8             ; character mask (slots 0-3)
@@ -562,19 +568,19 @@ done:   plp
         iny
         cpy     #$08
         bcc     @chr
-        bra     @out            ; no character target: nothing to hand it to
+        bra     @keep           ; no character target: nothing to hand it to
 @have:  lda     OT6_BP_CLASS,y
         cmp     #$05
-        bcs     @out            ; the ally is capped: the point would be lost
+        bcs     @keep           ; the ally is capped: the point would be lost
         inc     a
         sta     OT6_BP_CLASS,y  ; the ally banks it
         jsr     Ot6BankMoved    ; the ALLY's bank moved, and the ally
                                 ;   is the one who may have a kit window open,
                                 ;   since Locke is mid-action
-        lda     OT6_BOOST_REVEALED,x       ; Locke's half: let Ot6ActionEnd charge it
-        bne     @out            ;   a spend already armed by L/R stands as is
-        lda     #$01
-        sta     OT6_BOOST_REVEALED,x
+        lda     #$01            ; Locke's half: Ot6ActionEnd charges the one
+        sta     OT6_BOOST_REVEALED,x    ;   pip, whatever L/R raised
+        bra     @out
+@keep:  jsl     Ot6KeepBoost    ; refused: nothing given, nothing charged
 @out:   ply
 done:   plp
         rtl

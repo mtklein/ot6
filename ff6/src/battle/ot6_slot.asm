@@ -160,9 +160,12 @@
 ; store first (y = the queue row _c16d56 just computed), then the charge fix:
 ; OT6_BOOST_REVEALED = the store, so Ot6ActionEnd charges the tier the reels
 ; were spun with. An L edge mid-spin can no longer buy a chosen
-; triple at a discount, and an R edge mid-spin (banked but never read by the
-; already-stored spin) is handed back rather than charged for nothing.
-; Delivered equals charged in both directions (battle_lateboost's rule).
+; triple at a discount, and an R edge mid-spin cannot raise a pending the
+; already-stored spin never reads.  Ot6Boost now ignores L/R from the first
+; reel press, so the two are already equal here and the store is the
+; backstop; nothing has been charged when it runs (Ot6ActionEnd charges),
+; so it is never a refund.  Delivered equals charged in both directions
+; (battle_lateboost's rule).
 ; a8, db=$7e; y preserved (the sta uses it before any width games).
 .proc Ot6SlotCommit
         .a8

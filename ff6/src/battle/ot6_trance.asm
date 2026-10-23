@@ -113,8 +113,10 @@ OT6_MORPH_SPEED:
 ; is dropped before Ot6ActionEnd can charge it: the turn ends as an
 ; unboosted one, regen pip included, and the magic rows fall back off any
 ; folded prices the raise put on them (the same request Ot6ActionEnd's spend
-; arm makes).  Refunding is simpler than greying the boost at the command
-; window, which would need the R press to know the cursor's command.
+; arm makes).  Never a refund: nothing has been charged yet.  R on the
+; command window raises a boost for whatever is picked next, so the boost
+; is refused here, when the pick is Revert, rather than at the R press
+; (Ot6KeepBoost's other no-reward rows, #463).
 ; jsl from Cmd_04, a8/i8, db = $7e, y = the actor (Cmd_03's context).
 ; clobbers A; preserves X and Y.
 .proc Ot6RevertTake
@@ -123,7 +125,7 @@ OT6_MORPH_SPEED:
         cmp     #$08
         bcs     @out            ; (a monster has no bank)
         lda     OT6_BOOST_REVEALED,y
-        beq     @out            ; nothing raised: nothing to refund
+        beq     @out            ; nothing raised: nothing to drop
         lda     #$00
         sta     OT6_BOOST_REVEALED,y
         lda     $3204,y

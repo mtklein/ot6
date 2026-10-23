@@ -63,7 +63,9 @@
 --      most once inside the action.  SHADOW's pending boost is read at every
 --      break and mark.
 --   2. battle 2, the gate: unboosted, his breaking hit and his hits on the
---      body it broke draw no mark.
+--      body it broke draw no mark; every mark in it is attributed to the
+--      pending its action held, and none is under three points (a 3-BP
+--      action the engine raised, Ot6Retaliate's dump, may still mark: #464).
 --   3. the boss check: no boss shares a battle with Shadow anywhere in the
 --      generated tree, so the negative is an isolation arm, played at 3 BP
 --      (so the gate the boss check guards is open).  A fresh battle, a
@@ -142,6 +144,8 @@ local function shadowPend() return shadowSlot and H.readByte(0x3E9D + shadowSlot
 -- One sequence counter across every callback below, so two writes in the
 -- same frame still say which came first.
 local GATE, SITE = H.sym("Ot6AssassinateGate"), H.sym("Ot6Assassinate")
+local RETAL = H.sym("Ot6Retaliate")
+local pendBy
 local CLASSCHIP, ELEMCHIP = H.sym("Ot6ClassChip"), H.sym("Ot6Chip")
 local seq = 0
 local function stamp() seq = seq + 1; return seq end
@@ -208,15 +212,32 @@ emu.addMemoryCallback(function(addr, v)
     local pc = cpu()
     if pc >= GATE and pc < SITE then
       local m = ((addr - 0x7E0000 - 0x3DD4) - 8) // 2
-      local k = { m = m, f = H.frame, seq = stamp(), pc = pc, via = gateVia, pend = shadowPend() }
+      local k = { m = m, f = H.frame, seq = stamp(), pc = pc, via = gateVia, pend = shadowPend(),
+        pendBy = pendBy }
       divineKills[#divineKills + 1] = k
       killPending[m] = true
+      local e = shadowSlot and shadowSlot * 2 or 0
       H.log(string.format("[divine] f%d seq%d body %d: Death marked in "
-        .. "Ot6AssassinateGate (pc=$%06x) via %s", k.f, k.seq, m, pc,
-        tostring(gateVia)))
+        .. "Ot6AssassinateGate (pc=$%06x) via %s; SHADOW pending %d (written %s), bank %d, "
+        .. "queued cmd $%02X, $b1=$%02X, engine-driven %s, status $%02X $%02X", k.f, k.seq, m, pc,
+        tostring(gateVia), k.pend, pendBy or "?", H.readByte(0x3E9C + e), H.readByte(0x3A7C),
+        H.readByte(0xB1), (H.readByte(0xED97) & H.readByte(0x3018 + e)) ~= 0 and "yes" or "no",
+        H.readByte(0x3EE4 + e), H.readByte(0x3EE5 + e)))
     end
   end)
 end, emu.callbackType.write, 0x7E3DD4 + 8, 0x7E3DD4 + 0x13)
+-- Who wrote SHADOW's pending boost (OT6_BOOST_REVEALED, $3e9d): the pc of
+-- the write that raised it, cleared when it drops to 0, so a mark names what
+-- raised the gate it passed (a press in his menu, or the engine's bank dump,
+-- Ot6Retaliate, #464).
+pendBy = nil
+emu.addMemoryCallback(function(addr, v)
+  if shadowSlot == nil or addr ~= 0x7E3E9D + shadowSlot * 2 then return end
+  if v == 0 then pendBy = nil; return end
+  local pc = cpu()
+  local by = (pc >= RETAL and pc < RETAL + 0x40) and "by Ot6Retaliate" or string.format("at pc=$%06x", pc)
+  pendBy = string.format("%d f%d %s", v, H.frame, by)
+end, emu.callbackType.write, 0x7E3E9D, 0x7E3E9D + 6)
 emu.addMemoryCallback(function(addr, v)
   if not watching or v ~= BREAK_TICKS then return end
   pcall(function()
@@ -685,6 +706,18 @@ add({
 -- break store comes (x = SHADOW, his pending boost 0) and no in-proc Death
 -- mark; then he Fights on, unboosted, until another hit of his lands on the
 -- Broken body (the hook point puts it to the gate): no mark either.
+-- The claim is the gate's: no mark on an action with under three points
+-- pending.  "SHADOW's actions here are unboosted" is not a precondition this
+-- arm can hold (#464): the engine raises his pending itself -- a hurt,
+-- engine-driven SHADOW dumps his bank on his next Fight (Ot6Retaliate, #236),
+-- three points from a bank of three -- and battle 1's last 3-BP Fight can
+-- still be swinging when this ledger opens.  A mark on such an action is the
+-- divine working as ruled, so each mark is attributed to the pending its
+-- action held (read as the mark is written, with what wrote it), and only a
+-- mark under three points fails.  The whole count failed once, "got 2"
+-- with SHADOW at bank 3 (0e003449, build/attempts/wt/v035-boost-scope/qual/
+-- ninja-0e003449.log); the gate mutant that opens under three points fails
+-- this assertion (build/attempts/wt/v036-boost/).
 local control, controlFights = nil, 0
 add({
   H.call(function()
@@ -735,8 +768,14 @@ add({
         H.log(string.format("[battle 2] body %d broke at f%d seq%d by SHADOW at %d BP pending; hook point %s; marks %d",
           control.m, control.b.f, control.b.seq, control.b.pend, hooked and string.format("read it at f%d (pending %d)",
           hooked.f, hooked.pend) or "not reached", #divineKills))
-        H.assertEq(#divineKills, 0, "under three points SHADOW's breaking hit, and his hits on the Broken body, "
-          .. "drew no in-proc Death mark")
+        local under = 0
+        for _, k in ipairs(divineKills) do
+          if k.pend < 3 then under = under + 1 end
+          H.log(string.format("[battle 2] mark on body %d at f%d seq%d: SHADOW's pending %d (written %s)%s", k.m, k.f,
+            k.seq, k.pend, k.pendBy or "?", k.pend >= 3 and " -- a 3-BP action, the divine as ruled" or ""))
+        end
+        H.assertEq(under, 0, "under three points SHADOW's breaking hit, and his hits on the Broken body, "
+          .. "drew no in-proc Death mark (marks on an action with under three points pending)")
         watching = false
       end),
     })
@@ -816,6 +855,13 @@ add({
           -- went unbroken
           H.log(string.format("[isolation arm] body %d broke at f%d by SHADOW under %s (the engine's turn, at %d BP): "
             .. "not the arm's action -- another fight", m, b.f, b.ctl, b.pend))
+        elseif b ~= nil and b.atk ~= shadowSlot * 2 then
+          -- another member's hit broke it (ee275f7e's qualification: x=$04,
+          -- at 0 BP, build/attempts/wt/v036-boost/round3/): not SHADOW's
+          -- 3-BP action either, so the same: fought out, another drawn
+          H.log(string.format("[isolation arm] body %d broke at f%d by x=$%02x, not SHADOW (at %d BP; status "
+            .. "$%02X $%02X): not the arm's action -- another fight", m, b.f, b.atk, b.pend,
+            H.readByte(0x3EE4 + b.atk), H.readByte(0x3EE5 + b.atk)))
         elseif b ~= nil then
           broke = true
           H.log(string.format("[isolation arm] body %d broke at f%d seq%d by "

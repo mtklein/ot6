@@ -173,7 +173,16 @@ end
 -- re-arms against it (#404: H.absorbSafeArms, the strongest bag weapon by
 -- the ROM's power byte none of the pool absorbs); CELES's kit under the
 -- clock is absorb-aware the same way.
-local function escPool() return H.poolSpecies(H.fieldEncounterGroup(393)) end
+-- Nerapa ($0118, the escape's event boss, absorbs fire) is no member of the
+-- pool, so it is added: f874ce92's chain re-armed LOCKE with a fire blade
+-- ($0D) here and the absorb guard stopped the Nerapa fight ("char 1's L-hand
+-- item $0D (fire) is ABSORBED by slot 0 species $0118").
+local NERAPA = 0x118
+local function escPool()
+  local p = H.poolSpecies(H.fieldEncounterGroup(393))
+  p[#p + 1] = { slot = #p, species = NERAPA }
+  return p
+end
 
 local function absorb(pred, cap, tag, row, driver)
   local t = 0
