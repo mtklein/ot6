@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "ba8244567ba3c8a2ed5adaff34243c615acebcd7cd88eb03148b8eb00d32bd72",
+  "sha256": "086133765d89595d312600e5b1d992686463316bf631b3c1316ee509ff5584bf",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "ba8244567ba3c8a2ed5adaff34243c615acebcd7cd88eb03148b8eb00d32bd72",
-    "generator_sig": "0d4f83cbaf7dd2b184e3756ec8627511e5ee9e661780f986c862c3b5dc994387 gen_kolts build/checkpoints/world-figaro-v1/manifest.json build/checkpoints/world-figaro-v1/world-figaro.sram",
+    "payload_sha256": "086133765d89595d312600e5b1d992686463316bf631b3c1316ee509ff5584bf",
+    "generator_sig": "625446ee69bd9e2140b4bf83e6126e0d5dc50bcd9dd8bf8b58e84b8c74fb146c gen_kolts build/checkpoints/world-figaro-v1/manifest.json build/checkpoints/world-figaro-v1/world-figaro.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/world-figaro-v1/manifest.json",
-        "sha256": "3a2a5b9590cc179ee9509dd549961a0d866b99e88c3ebd37b679abb089272aa2"
+        "sha256": "2bedc7922d0a6a78c7302a94e19e3a8905289d8fa4eaea19d322dc2416707b9a"
       }
     ]
   }
