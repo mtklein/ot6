@@ -201,13 +201,91 @@ local function checkJackpot(r, i)
   return { empty = empty, redraws = redraws }
 end
 
+-- A fixed pass (1-3) from the grave at the first battle key whose fight the
+-- party lives through to the plan's end.  The grave moves with the route's
+-- play, and a key whose Dullahan wipes the party before the plan is done
+-- has nothing to hold: at 96e745f0's grave (SABIN a level lower than
+-- main's) pass 1's own key, beE8-g01C7, wiped the four between its two
+-- Jackpots ('party 06:0/1798 ... Death', the canary's game over at f9551:
+-- build/attempts/wt/v036-driver/qual-96e745f0.log, and the same on main's
+-- lib from that grave, lab/jp_old_branchgrave).  The lib's wipe predicate
+-- held 90 frames (the search's, below) ends a try short of the canary's
+-- 300; the next try reloads the grave and stands 4 frames longer on it
+-- first (its $be steps $10 every four frames), up to 16 keys, each lost one
+-- said.  build(wait) returns the try's step; wait nil is the grave's own
+-- frame, as before.
+-- A try is lost when no Jackpot has executed in it (Ot6SetzerExec with
+-- Jackpot's row in $b6, the search's lost-candidate rule below), or when
+-- every Jackpot that executed resolved (its record is in H.vars.setzer)
+-- and the party stood KEYED_STOOD frames past the last one: Dullahan's
+-- wipe, not the throw's.  At the branch's grave pass 1's first key threw
+-- at f2361 and Dullahan wiped the four at f9342, during the three Defends
+-- before the second throw (lab/jp3_branchgrave).  Any other wipe after a
+-- throw fails the pass by name: the control that writes the party's HP to
+-- 0 at Jackpot's exec wipes at f2451 (lab/jp3_mut_branchgrave).  The held
+-- line says how many tries were lost.
+local KEYED_STOOD = 600
+local keyedExec = { hooked = false, f = nil }
+local function keyed(n, build)
+  local i, cur, wipedN, lost = 0, nil, 0, 0
+  return {
+    tick = function(self)
+      if not keyedExec.hooked then
+        keyedExec.hooked = true
+        local a = H.sym("Ot6SetzerExec")
+        emu.addMemoryCallback(function()
+          if H.readByte(0xB6) == JACKPOT then
+            keyedExec.f, keyedExec.last, keyedExec.n = keyedExec.f or H.frame, H.frame, (keyedExec.n or 0) + 1
+          end
+        end, emu.callbackType.exec, a, a)
+      end
+      if cur == nil then
+        i = i + 1
+        H.assertEq(i <= 16, true, string.format("pass %d: a battle key the party lives through, within 16 (%d "
+          .. "lost to a wipe)", n, lost))
+        cur, wipedN = build(i > 1 and 4 * (i - 1) or nil), 0
+        keyedExec.f, keyedExec.last, keyedExec.n, keyedExec.wipeF = nil, nil, 0, nil
+      end
+      wipedN = H.battleLoadStarted() and H.partyWipedInBattle() and wipedN + 1 or 0
+      if wipedN == 1 then keyedExec.wipeF = H.frame end
+      if wipedN >= 90 then
+        local why = "before any Jackpot executed"
+        if keyedExec.f ~= nil then
+          local resolved = #(H.vars.setzer or {})
+          H.assertEq(resolved >= keyedExec.n and keyedExec.wipeF - keyedExec.last >= KEYED_STOOD, true,
+            string.format("pass %d: try %d's party wiped (f%d) after a Jackpot executed (f%d, %d executed, %d "
+              .. "resolved): not a lost key", n, i, keyedExec.wipeF, keyedExec.last, keyedExec.n, resolved))
+          why = string.format("%d frames after its last Jackpot (f%d) resolved", keyedExec.wipeF - keyedExec.last,
+            keyedExec.last)
+        end
+        lost = lost + 1
+        H.log(string.format("[jackpot] pass %d: try %d (the grave's frame + %d) lost: the party wiped %s (the "
+          .. "lib's wipe predicate, 90 frames, from f%d); the next key", n, i, 4 * (i - 1), why, keyedExec.wipeF))
+        H.setPad({})
+        cur = nil
+        return "frame"
+      end
+      local r = cur:tick()
+      if r ~= "frame" then
+        H.log(string.format("[jackpot] pass %d held at try %d: %d tr%s lost to a wipe (Dullahan's, not a throw's)",
+          n, i, lost, lost == 1 and "y" or "ies"))
+      end
+      return r
+    end,
+    reset = function(self) i, cur, wipedN, lost = 0, nil, 0, 0 end,
+  }
+end
+
 local function pass(n, plan, wantN, o)
+  return keyed(n, function(wait)
+  -- a try plays the plan afresh (setzerBattle keeps its per-entry progress on the entries)
+  for _, p in ipairs(plan) do p.aim, p.presses, p.lPresses, p.tookBack, p.refusedSeen = nil, nil, nil, nil, nil end
   o = o or {}
   local recs
-  -- o.wait: frames stood on the grave before the press (the battle key);
-  -- o.stand: frames the party stands in the battle before acting (a player
-  -- slow to the menu; Dullahan's turns go on).  Both are inputs, and pick
-  -- the draw a pass needs; passes 1-3 take neither.
+  -- wait: frames stood on the grave before the press (the battle key: keyed,
+  -- above); o.stand: frames the party stands in the battle before acting (a
+  -- player slow to the menu; Dullahan's turns go on).  Both are inputs, and
+  -- pick the draw a pass needs; passes 1-3 take no stand.
   local steps = {
     H.loadState(STATE),
     H.call(function()
@@ -215,7 +293,7 @@ local function pass(n, plan, wantN, o)
       H.assertEq(H.readByte(0x1E99) & 0x04, 0x04, "SETZER has rejoined in the World of Ruin (switch $00CA)")
     end),
   }
-  if o.wait then steps[#steps + 1] = H.waitFrames(o.wait) end
+  if wait then steps[#steps + 1] = H.waitFrames(wait) end
   steps[#steps + 1] = H.faceAndHoldA("up", function() return H.battleLoadStarted() end, 3000,
     "the grave (100,14): face up, A")
   steps[#steps + 1] = H.release()
@@ -242,6 +320,7 @@ local function pass(n, plan, wantN, o)
       H.log(string.format("[jackpot] pass %d held: %d Jackpot(s), faces %s", n, #recs, table.concat(faces, ",")))
     end)
   return H.seqStep(steps)
+  end)
 end
 
 -- ---- the search for the two draws ------------------------------------
@@ -371,8 +450,9 @@ end
 -- pass 3: Jackpot picked at 3 BP and taken back to 2 at target select (L):
 -- it executes at 2, so Ot6JackpotDice zeroes the pending and rolls
 -- nothing, Ot6AbilityCost priced it at 2 (no MP), and the bank pays nothing
-local takeBack = H.seqStep({
+local takeBack = keyed(3, function(wait) return H.seqStep({
   H.loadState(STATE),
+  wait and H.waitFrames(wait) or H.call(function() end),
   H.faceAndHoldA("up", function() return H.battleLoadStarted() end, 3000, "the grave (100,14): face up, A"),
   H.release(),
   H.setzerBattle({ { row = "defend" }, { row = "defend" }, { row = JACKPOT, boost = 3, takeBack = 2 } },
@@ -392,7 +472,7 @@ local takeBack = H.seqStep({
       H.assertEq(r.mon1[b].hp, m.hp, string.format("pass 3: slot %d's HP did not move", b))
     end
   end),
-})
+}) end)
 
 -- ---- the redraw, staged ------------------------------------------------
 -- The draw rule's second branch (a roll that meets a byte past 251 draws

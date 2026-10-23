@@ -1032,6 +1032,8 @@ M.REVIVIFY = 0xF1
 -- bit 6) drain on the dot trigger, Slow (STATUS3 bit 2) halves the ATB
 -- constant.  None denies a turn; the [status] line says each.
 M.ST1_BLIND, M.ST1_POISON, M.ST2_SAP, M.ST3_SLOW = 0x01, 0x04, 0x40, 0x04
+-- Mute (STATUS2 bit 3) greys the Magic row (UpdateCmd_05); Driver:coverPlan cures it (#466)
+M.ST2_MUTE = 0x08
 -- With no `items`, the candidates are every consumable usable in battle
 -- whose record carries the bit with the remove flag, cheapest first in
 -- gil (M.cureItems, #370): Green Cherry 150 before Remedy 1000 for Imp,
@@ -1562,6 +1564,125 @@ function M.roundCost(o)
   local why = string.format("%d enemy action(s) inside %d ticks%s [%s]", actions, window,
     #parts > 0 and (": " .. table.concat(parts, " + ")) or "", table.concat(gauges, ", "))
   return cost, actions, why, rate, acts
+end
+
+-- When a heal lands (#459).  A heal decided now takes effect some ticks
+-- later -- the menu walk, the actions queued ahead of it, the animation --
+-- and every enemy action due before then (a full gauge, eta 0, is queued
+-- already) lands on the HP the member has now, not on the healed HP.
+-- Tzen (#454, build/attempts/qual-v033.ninja.log): CELES at 82/1043 cast
+-- Cure ("82 + 377 = 459 survives the 291 round") with s2's gauge 118 ticks
+-- from full, and "[heal-watch] cure $2D on entity 0: the target fell
+-- first".  M.HEAL_ARRIVAL is when a heal typically lands, in ATB ticks
+-- from the plan to its first HP effect: the median of the [ot6action]
+-- ledger's elapsed_atb_ticks over build/attempts/wt/v03[3-6]*/lab/ (Cure
+-- $2D 240 of 2489 casts, p10 127; Potion $E9 287 of 1336, p10 131; the
+-- X-Potion, deeper in the bag, 618 of 522, p10 282 -- hence
+-- M.HEAL_ARRIVAL_WALK, a pulse of three rows past the first three, the
+-- steer's "walking fast"), the arrival the typical price below goes with.
+-- M.HEAL_ARRIVAL_OFF = true is the driver before it.
+M.HEAL_ARRIVAL = { heal = 240, item = 287 }
+M.HEAL_ARRIVAL_WALK = 15
+M.HEAL_ARRIVAL_OFF = false
+-- The enemy actions due at or before a heal's arrival, each priced at what
+-- the enemy typically does (M.typicalOf; an enemy with nothing measured at
+-- its worst, the ROM's price or the battle's worst, as M.roundCost does)
+-- times the chance it lands on this target: an action already queued
+-- names its targets (en.queuedOn: true/false for the queued action, nil
+-- when none is queued), and any other takes the enemy's measured share of
+-- its landed actions on this member (en.share, M.aimShare; nil = 1).
+-- M.roundCost prices a round as if every action came at the one member, a
+-- worst case kept for the round; the heal's question is whether the
+-- member is expected to fall first.  Measured on the dream leg's courtyard
+-- (build/attempts/wt/v036-driver/lab/nd_new_k4_s7): before the share, a
+-- member at 2258/2547 among four was refused a Cure as "6 enemy action(s)
+-- ... take 2320", three monsters' two actions each all on her.
+--   hp       the target's HP now
+--   arrive   ATB ticks until the heal lands
+--   enemies  M.roundCost's enemy table for this target, with share and
+--            queuedOn; fallback likewise
+-- Returns { n, cost, worst, beaten, why }: n the actions due (expected on
+-- this target), cost their typical take, worst their worst take; beaten
+-- when the expected take is M.HEAL_ARRIVAL_MARGIN times the target's HP or
+-- more.  The typical price, not the worst: a heal that lands unless the hit
+-- ahead is the enemy's worst is still the best turn (the Tzen cure itself:
+-- s2's typical 64 under 82 HP; its worst 123 killed her).  The margin, for
+-- an expectation that only meets the HP is a coin toss the heal wins half
+-- the time: on Wrexsoul (build/attempts/wt/v036-driver/lab/sdo_new_k4_s7,
+-- key beA4-g01CE) TERRA at 213 was refused a Cure on "take 213 typical",
+-- spent instead, and fell to the party's own swing at the soul hiding in
+-- her, where main's Cure had kept her up (sdo_old_k4_s7).
+M.HEAL_ARRIVAL_MARGIN = 1.25
+function M.healArrival(o)
+  local hp, arrive = o.hp or 0, o.arrive or 0
+  local n, cost, worst, parts = 0, 0, 0, {}
+  for _, en in ipairs(o.enemies or {}) do
+    local k = 0
+    if en.eta ~= nil and en.eta <= arrive then
+      k = 1
+      if en.period ~= nil and en.period > 0 then k = k + (arrive - en.eta) // en.period end
+    end
+    if k > 0 then
+      local top = en.worst or en.rom or o.fallback or 0
+      local each = en.typical
+      if each == nil or en.worst == nil then each = top end
+      if each > top then each = top end
+      local share = en.share or 1
+      -- the first action of a full gauge is the queued one, its targets known
+      local w = share * k
+      if en.eta == 0 and en.queuedOn ~= nil then w = (en.queuedOn and 1 or 0) + share * (k - 1) end
+      n, cost, worst = n + w, cost + w * each, worst + w * top
+      parts[#parts + 1] = string.format("s%d eta %d %dx%d%s", en.slot or -1, en.eta, k, each,
+        en.eta == 0 and en.queuedOn ~= nil and (en.queuedOn and " (queued on it)" or " (queued elsewhere)")
+        or share < 1 and string.format(" at %d%%", math.floor(share * 100 + 0.5)) or "")
+    end
+  end
+  cost, worst = math.floor(cost + 0.5), math.floor(worst + 0.5)
+  local beaten = n > 0 and cost >= hp * M.HEAL_ARRIVAL_MARGIN
+  return { n = n, cost = cost, worst = worst, beaten = beaten,
+    why = string.format("the enemy actions due inside its %d ticks (%s) take %d typical, %d at worst, "
+      .. "against %d HP", arrive, #parts > 0 and table.concat(parts, ", ") or "none", cost, worst, hp) }
+end
+-- The share of an enemy's landed actions that hit member e (#459): its
+-- ledger's landed count on e over its landed actions (an action on the
+-- whole party counts on each), once M.TYPICAL_MIN have landed; before
+-- that, one in `living` (a single target drawn among the living).
+function M.aimShare(L, e, living)
+  if L ~= nil and (L.landN or 0) >= M.TYPICAL_MIN then
+    return #((L.landOn or {})[e] or {}) / L.landN
+  end
+  return 1 / math.max(1, living or 1)
+end
+-- Whether monster slot s's queued action is aimed at party member e (#459):
+-- the engine keeps each entity's pending action at $32CC,x (normal) and
+-- $32CD,x (a counter; $FF none), its targets in the targets queue $3520
+-- (CreateAction: `lda $b8 / sta $3520,y`, the low byte the party's bits).
+-- nil when nothing is queued for the slot.
+function M.queuedOn(s, e)
+  local x = 8 + s * 2
+  local on = nil
+  for _, head in ipairs({ 0x32CC + x, 0x32CD + x }) do
+    local p = M.readByte(head)
+    if p < 0x80 then
+      on = on or false
+      if (M.readByte(0x3520 + p * 2) >> e) & 1 == 1 then on = true end
+    end
+  end
+  return on
+end
+-- The heal to take when the one the care lines chose lands too late
+-- (#459): of the heals that land in time (h.late false), the earliest that
+-- lifts the target clear of its round (hp + restore > cost), in list order
+-- on a tie; nil when none does.  heals: { what, restore, arrive, late }.
+function M.inTimeLift(hp, cost, heals)
+  local best = nil
+  for _, h in ipairs(heals or {}) do
+    if not h.late and h.restore ~= nil and hp + h.restore > cost
+       and (best == nil or h.arrive < best.arrive) then
+      best = h
+    end
+  end
+  return best
 end
 
 -- ---- the care race (#415, docs/design/care-race.md) ----------------------
@@ -9953,6 +10074,31 @@ function Driver:raceDelay(actor, plan)
     n = #samples, source = "attributed HP effects in ATB-update ticks; 15-tick pulse slack" }
 end
 
+-- When a heal this actor plans now lands (#459, M.HEAL_ARRIVAL), in ATB
+-- ticks: the median first HP effect this battle measured for the same
+-- actor, verb and id (the race's observer, raceEffectLatency), else the
+-- route's measured median; an item adds the walk from the list's cursor to
+-- its row, a pulse of three rows past the first three.
+-- kind "heal" (a cure, id the spell) or "item" (id the item).
+function Driver:healArrivalTicks(actor, kind, id)
+  local samples = (self.raceEffectLatency or {})[raceDelayKey(actor, kind, id, 0)]
+  if samples ~= nil and #samples > 0 then
+    local firsts = {}
+    for _, q in ipairs(samples) do firsts[#firsts + 1] = q.first end
+    return M.median(firsts), "measured this battle"
+  end
+  local t = M.HEAL_ARRIVAL[kind] or M.HEAL_ARRIVAL.item
+  if kind == "item" then
+    local idx = self:battInvIdx(id)
+    if idx ~= nil then
+      local cursor = M.readByte(BATTLE.ITEMSCR + actor) + M.readByte(BATTLE.ITEMROW + actor)
+      local rows = math.abs(idx - cursor)
+      if rows > 3 then t = t + ((rows - 1) // 3) * M.HEAL_ARRIVAL_WALK end
+    end
+  end
+  return t, "the route's median"
+end
+
 function Driver:raceCandidates(actor, st)
   local c = {}
   local seen = {}
@@ -10522,6 +10668,7 @@ function Driver:makePlan(actor)
   self._race = nil
   plan = self:lockeMug(actor, plan)
   plan = self:dodgePlan(actor, plan)
+  plan = self:coverPlan(actor, plan)
   plan = self:buffPlan(actor, plan)
   plan = self:zingerPlan(actor, plan)
   plan = self:policyPlan(actor, plan)
@@ -10564,6 +10711,130 @@ function Driver:dodgePlan(actor, plan)
         .. "Fight that would miss", self.tag or "fight", actor, line.kind))
       return line
     end
+  end
+  return plan
+end
+
+-- Love Token (#466): Barb-e's spell (ai_script.asm, AIScript::_190: `attack
+-- DRAIN, LOVE_TOKEN, NOTHING` after its Imp) makes a party member its
+-- bodyguard: TargetEffect_2d stores the member in the caster's $336c, and
+-- CoverEffect's first arm then turns every attack on the caster that can
+-- critical ($b2 bit 1 clear: Fight, Capture and Umaro's, battle_main.asm
+-- FightAttack/UmaroAttack) onto that member, whenever CheckCoverTarget
+-- passes it: present ($3AA0 bit 0), not controlling ($32B8's top bit set),
+-- not seized ($3358's top bit set), none of $3EE4 & $A0D2 (Wound, Petrify,
+-- Clear, Zombie, Sleep...) or $3EF8 & $3210 (Stop...).  A spell, a Tool, a
+-- SwdTech goes to the caster.  Without the Wall Rings that reflect it, the
+-- dream legs stalled on a lone Barb-e ($13D) for the whole leg: every Fight
+-- "took 0 off the monsters" and landed on the bodyguard (RELM "Miss", then
+-- 211 and 201 off her; CELES killed by TERRA's Fight, "[death] ... by
+-- entity 3 char 0 cmd $00 atk $FF (an ally's action)") --
+-- build/attempts/wt/v036-route/lab/sd7_k1_s7 (key be20-g013D).  The Imp it
+-- casts first was cured each time (Green Cherry); the token stays until the
+-- caster or its bodyguard dies (_c207c8's RemoveLoveToken).
+-- The party entity guarding a body under this cover, or nil:
+--   guard    the body's $336c byte (an entity offset; $FF none)
+--   present, controlling, seized, st (the $3EE4 word), st34 (the $3EF8
+--            word): the guard's own cells, as CheckCoverTarget reads them
+function M.loveGuard(o)
+  local g = o.guard or 0xFF
+  if g >= 0x08 then return nil end      -- none ($FF), or a monster guarding a monster
+  if not o.present or o.controlling or o.seized then return nil end
+  if ((o.st or 0) & 0xA0D2) ~= 0 or ((o.st34 or 0) & 0x3210) ~= 0 then return nil end
+  return g // 2
+end
+-- the guard of monster slot s, read live (M.loveGuard), or nil
+function M.loveGuardOf(s)
+  local g = M.readByte(0x336C + 8 + s * 2)
+  if g >= 0x08 then return nil end
+  return M.loveGuard({ guard = g, present = (M.readByte(0x3AA0 + g) & 1) ~= 0,
+    controlling = (M.readByte(0x32B9 + g) & 0x80) == 0, seized = (M.readByte(0x3359 + g) & 0x80) == 0,
+    st = M.readWord(0x3EE4 + g), st34 = M.readWord(0x3EF8 + g) })
+end
+-- A Fight aimed at a body under Love Token lands on the bodyguard (#466): a
+-- person sees the member step in and swings at another body, or, when
+-- every standing body is so guarded, casts (Driver:magicOnlyLine).  With
+-- neither, the Fight stands (it is what the turn has; the token ends when
+-- the bodyguard falls), said once a battle.  Fight and Capture plans only.
+-- COVER_OFF (a global) turns it off, the control arm.
+function Driver:coverPlan(actor, plan)
+  if plan == nil or (plan.kind ~= "fight" and plan.kind ~= "capture") or COVER_OFF then return plan end
+  if plan.ally then return plan end      -- a cure-hit on a muddled member aims at the party
+  -- the body the executor will steer this Fight to (Driver:planButton's
+  -- focus, in its order): the plan's own aimHard, else the one monster a
+  -- scored command's contract names (the care race's Fight: its contract
+  -- replaces the kill order there), else the first standing, reachable
+  -- entry of an authored, multi-part or last-stand kill order (focusList:
+  -- it wins over plan.aim there; focusReachable, as the executor skips a
+  -- slot its cursor could not reach), else plan.aim, else the first
+  -- standing slot
+  local aim = plan.aimHard
+  local tc = plan.targetContract
+  if aim == nil and tc ~= nil then
+    for s = 0, 5 do if not tc.all and tc.monsters == 1 << s then aim = s end end
+  end
+  if aim == nil and tc == nil then
+    local focus = self:focusList()
+    if focus ~= nil then
+      for _, e in ipairs(M.focusSlots(focus)) do
+        if aim == nil and monAlive(e.slot) and self:focusReachable(e.slot) then aim = e.slot end
+      end
+    end
+  end
+  if aim == nil then aim = plan.aim end
+  if aim == nil then for s = 0, 5 do if aim == nil and monAlive(s) then aim = s end end end
+  if aim == nil or not monAlive(aim) then return plan end
+  local guard = M.loveGuardOf(aim)
+  if guard == nil then return plan end
+  for s = 0, 5 do
+    if monAlive(s) and M.loveGuardOf(s) == nil and self:focusReachable(s) then
+      M.log(string.format("[%s] actor=%d Fight re-aimed: slot %d is under Love Token (entity %d takes "
+        .. "every Fight on it); slot %d instead (#466)", self.tag or "fight", actor, aim, guard, s))
+      -- aimHard: the executor steers to it over any kill order; a scored
+      -- command's contract names the new body, so its trace expects it
+      plan.aim, plan.aimHard = s, s
+      if tc ~= nil and not tc.all then plan.targetContract = { chars = 0, monsters = 1 << s, all = false } end
+      return plan
+    end
+  end
+  local mrow = cmdRow(actor, BATTLE.CMD_MAGIC)
+  if mrow then
+    local line = self:magicOnlyLine(actor, plan.boostLeft or 0)
+    if line then
+      M.log(string.format("[%s] actor=%d every standing monster is under Love Token (slot %d's Fight "
+        .. "lands on entity %d): a cast (%s) for the Fight (#466)", self.tag or "fight", actor, aim, guard,
+        line.kind))
+      return line
+    end
+  end
+  local listed = false
+  for r = 0, 3 do
+    if M.readByte(BATTLE.CMDTBL + actor * 12 + r * 3) == BATTLE.CMD_MAGIC then listed = true end
+  end
+  -- the Magic row greyed by Mute (UpdateCmd_05: $3EE5 bit 3): Barb-e's counter
+  -- to a hit ('if_hit: attack SPECIAL, SPECIAL, NOTHING') mutes the caster, and
+  -- a lone bodyguard then swung into herself to the leg's end (build/attempts/
+  -- wt/v036-driver/lab/dbg_new_k4_s7: 'the Magic row greyed -- the Fight
+  -- stands'); the bag's Mute cure (Echo Screen, Remedy: M.statusCure on the
+  -- ROM's records) gives the cast back
+  local irow = cmdRow(actor, BATTLE.CMD_ITEM)
+  if mrow == nil and listed and irow ~= nil and (M.readByte(BATTLE.ST2 + actor * 2) & M.ST2_MUTE) ~= 0 then
+    local item = M.statusCure({ byte = 2, bit = M.ST2_MUTE, has = function(it) return self:battInvIdx(it) ~= nil end })
+    if item ~= nil then
+      M.log(string.format("[%s] actor=%d is MUTED and slot %d's Fight lands on entity %d (Love Token): $%02X on "
+        .. "itself for the cast (#466)", self.tag or "fight", actor, aim, guard, item))
+      return { kind = "item", item = item, target = actor, row = irow, idx = self:battInvIdx(item),
+               reason = "cure Mute" }
+    end
+  end
+  local why = mrow == nil and (listed and "the Magic row greyed" or "no Magic row")
+    or string.format("no spell to cast (%d MP)", M.readWord(BATTLE.CURMP + actor * 2))
+  local key = "cover:" .. actor .. ":" .. why
+  if not self.statusSaid[key] then
+    self.statusSaid[key] = true
+    M.log(string.format("[%s] actor=%d: slot %d is under Love Token and its Fight lands on entity %d; "
+      .. "no other body to swing at and %s -- the Fight stands (#466)", self.tag or "fight",
+      actor, aim, guard, why))
   end
   return plan
 end
@@ -10808,6 +11079,10 @@ function Driver:makePlanRules(actor)
   -- stays the price only while the ledger has nothing attributed yet
   -- (the opening move, damage no monster action owns).
   local price, priceWhy, priceRate, priceN = {}, {}, {}, nil
+  -- each member's enemy table and fallback, kept for the heal's arrival (#459)
+  local priceFoes = {}
+  local livingParty = 0
+  for e = 0, 3 do if hpNow[e] > 0 and hpNow[e] ~= 0xFFFF and maxOf(e) > 0 then livingParty = livingParty + 1 end end
   do
     local fallback, any = nil, false
     for s2 = 0, 5 do
@@ -10863,7 +11138,9 @@ function Driver:makePlanRules(actor)
               if worst == nil then rom, romAtk = self:scriptWorst(s2, e) end
               enemies[#enemies + 1] = { slot = s2, eta = etaOf(8 + s2 * 2),
                 period = mconst > 0 and math.ceil(0xFF00 / mconst) or nil, worst = worst,
-                typical = M.typicalOf(L), rom = rom, romAtk = romAtk }
+                typical = M.typicalOf(L), rom = rom, romAtk = romAtk,
+                -- for the heal's arrival (#459; M.roundCost reads neither)
+                share = M.aimShare(L, e, livingParty), queuedOn = M.queuedOn(s2, e) }
             end
           end
           if window == nil then
@@ -10873,6 +11150,7 @@ function Driver:makePlanRules(actor)
             local c, n, why, rate = M.roundCost({ window = window, enemies = enemies,
               fallback = fallback })
             price[e], priceWhy[e], priceRate[e] = c, why, rate
+            priceFoes[e] = { enemies = enemies, fallback = fallback }
             if e == actor then priceN = n end
           end
         end
@@ -11433,6 +11711,18 @@ function Driver:makePlanRules(actor)
   -- survives the 262 round" was the same Potion the heal policy
   -- refused as "buys back less than it spends", so LOCKE did neither
   -- and died holding 3 BP.
+  -- A heal on entity e that the enemy actions due before it lands beat to
+  -- e's HP (#459, M.healArrival): the arrival record, else nil; the second
+  -- value is the arrival in ticks either way (nil when it is not priced).
+  local function lateHeal(e, kind, id)
+    if M.HEAL_ARRIVAL_OFF or priceFoes[e] == nil then return nil end
+    local arrive, src = self:healArrivalTicks(actor, kind, id)
+    local a = M.healArrival({ hp = hpNow[e], arrive = arrive, enemies = priceFoes[e].enemies,
+      fallback = priceFoes[e].fallback })
+    if not a.beaten then return nil, arrive end
+    a.arrive, a.src = arrive, src
+    return a, arrive
+  end
   local function actorHeals()
     local hp, maxhp = hpNow[actor], maxOf(actor)
     local cost = price[actor] or 0
@@ -11453,7 +11743,12 @@ function Driver:makePlanRules(actor)
         for _, spell in ipairs(type(self.opts.cure) == "table" and self.opts.cure or BATTLE.CURES) do
           local r = self:castRestoreOf(spell, actor, actor)
           if spellCell(actor, spell, true) then
-            if taken(r, true) then
+            local late = lateHeal(actor, "heal", spell)
+            if late then
+              -- it lands after the actions that take this actor's HP: it saves nothing (#459)
+              refused[#refused + 1] = { what = string.format("cure $%02X", spell), restore = r,
+                note = "it lands after " .. late.why }
+            elseif taken(r, true) then
               heals[#heals + 1] = { what = string.format("cure $%02X", spell), restore = r }
             else
               refused[#refused + 1] = { what = string.format("cure $%02X", spell), restore = r }
@@ -11466,7 +11761,11 @@ function Driver:makePlanRules(actor)
         -- would spend on this actor, else each it refused
         local it, _, no = M.itemChoice({ hp = hp, maxhp = maxhp, roundCost = cost, allies = allies,
           threshold = self:healPct(), cap = M.deathGil(maxhp), items = self:bagHeals(actor, hp) })
-        if it then
+        local late = it and lateHeal(actor, "item", it.id)
+        if late then
+          refused[#refused + 1] = { what = string.format("item $%02X", it.id), restore = it.restore,
+            note = "it lands after " .. late.why }
+        elseif it then
           heals[#heals + 1] = { what = string.format("item $%02X", it.id), restore = it.restore }
         end
         for _, r in ipairs(no or {}) do
@@ -12171,6 +12470,9 @@ function Driver:makePlanRules(actor)
     end
     for _, c in ipairs(cands) do
       local cost = price[c.e] or 0
+      -- the heals priced for when they land (#459): each one offered on c,
+      -- with its arrival and whether the actions due before it take c first
+      local arrivals, anyLate = {}, false
       -- The cast, offered first.  A cure's magic_prop power scales with
       -- the caster's magic power and level, so unlike an item's +$14
       -- power byte there is no honest prior for what it restores.  The
@@ -12213,7 +12515,19 @@ function Driver:makePlanRules(actor)
                    roundCost = cost, allies = allies, threshold = threshold,
                    mp = true, owed = self.topUpOwed[c.e] ~= nil })
             if why and src ~= "measured" and gain ~= nil then why = why .. "; " .. src end
-            if why then
+            local late, at = lateHeal(c.e, "heal", spell)
+            if at ~= nil then
+              arrivals[#arrivals + 1] = { what = string.format("cure $%02X", spell), restore = gain,
+                arrive = at, late = late ~= nil,
+                plan = { kind = "heal", spell = spell, target = c.e, restore = gain, row = cureRow } }
+            end
+            if why and late then
+              anyLate = true
+              local said = string.format("[%s] actor=%d no cure on entity %d (%d/%d): $%02X lands "
+                .. "in about %d ticks (%s) and %s -- the target falls first (#459)", self.tag or "fight",
+                actor, c.e, c.hp, c.maxhp, spell, late.arrive, late.src, late.why)
+              if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+            elseif why then
               self.healSaid = nil
               M.log(string.format("[%s] actor=%d cure entity %d (%d/%d) with "
                 .. "$%02X, cell %d, %d MP of %d -- restores %s, a round "
@@ -12222,12 +12536,13 @@ function Driver:makePlanRules(actor)
                 gain and tostring(gain) or "?", cost, why))
               return orSpend({ kind = "heal", spell = spell, target = c.e, restore = gain,
                        row = cureRow, reason = why }, string.format("a cure on entity %d", c.e))
+            else
+              local said = string.format("[%s] actor=%d not curing entity %d "
+                .. "(%d/%d): $%02X restores %d and a round costs %d, so the "
+                .. "turn buys back less than it spends -- acting instead",
+                self.tag or "fight", actor, c.e, c.hp, c.maxhp, spell, gain, cost)
+              if said ~= self.healSaid then self.healSaid = said; M.log(said) end
             end
-            local said = string.format("[%s] actor=%d not curing entity %d "
-              .. "(%d/%d): $%02X restores %d and a round costs %d, so the "
-              .. "turn buys back less than it spends -- acting instead",
-              self.tag or "fight", actor, c.e, c.hp, c.maxhp, spell, gain, cost)
-            if said ~= self.healSaid then self.healSaid = said; M.log(said) end
           end
         end
       end
@@ -12240,6 +12555,34 @@ function Driver:makePlanRules(actor)
         -- the budget reopened for a lift (#402): only a heal that outpaces
         -- the round is worth the extra care turn
         heals = M.liftFilterHeals(heals, c.hp, c.maxhp, cost)
+      end
+      -- an item the actions due before it beat to c's HP is no heal (#459):
+      -- the bag's choice is made among the ones that land in time
+      if #heals > 0 then
+        local keep, lates = {}, {}
+        for _, it in ipairs(heals) do
+          local late, at = lateHeal(c.e, "item", it.id)
+          if at ~= nil then
+            arrivals[#arrivals + 1] = { what = string.format("item $%02X", it.id), restore = it.restore,
+              arrive = at, late = late ~= nil,
+              plan = { kind = "item", item = it.id, target = c.e, row = row, restore = it.restore,
+                       idx = it.idx, flat = it.flat } }
+          end
+          if late then
+            lates[#lates + 1] = string.format("$%02X in about %d ticks (%s): %s", it.id, late.arrive,
+              late.src, late.why)
+          else
+            keep[#keep + 1] = it
+          end
+        end
+        if #lates > 0 then
+          anyLate = true
+          local said = string.format("[%s] actor=%d no item on entity %d (%d/%d) that lands after "
+            .. "the target falls (#459): %s", self.tag or "fight", actor, c.e, c.hp, c.maxhp,
+            table.concat(lates, "; "))
+          if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+        end
+        heals = keep
       end
       if #heals > 0 then
         local cap = M.deathGil(c.maxhp)
@@ -12268,6 +12611,28 @@ function Driver:makePlanRules(actor)
           "(%d/%d): a round costs %d (a death costs %d gil); %s -- acting instead",
           self.tag or "fight", actor, c.e, c.hp, c.maxhp, cost, cap, table.concat(t, "; "))
         if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+      end
+      -- The faster heal (#459): the heal the care lines would take on a
+      -- member inside its round lands after the actions that take it, so a
+      -- heal that lands first and lifts it clear of the round goes instead,
+      -- one the turn-for-turn rule refused included (a heal that lands is
+      -- the only one that buys anything).  #436 at v0.30: CELES at 172/1043
+      -- drank an X-Potion from row 32 of the bag ("walking fast") and fell
+      -- at 51 HP to the third action before it landed, the Cure that lands
+      -- before two refused as "buys back less than it spends".
+      if anyLate and cost > 0 and c.hp <= cost then
+        local h = M.inTimeLift(c.hp, cost, arrivals)
+        if h then
+          self.healSaid = nil
+          M.log(string.format("[%s] actor=%d %s on entity %d (%d/%d) lands in about %d ticks, before "
+            .. "the actions that take it, and lifts it clear of its %d round (%d + %d) -- the faster "
+            .. "heal for the one that lands too late (#459)", self.tag or "fight", actor, h.what, c.e,
+            c.hp, c.maxhp, h.arrive, cost, c.hp, h.restore))
+          local p = {}
+          for k, v in pairs(h.plan) do p[k] = v end
+          p.reason = "lands in time (#459)"
+          return orSpend(p, string.format("a heal on entity %d", c.e))
+        end
       end
     end
   end

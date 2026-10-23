@@ -342,7 +342,25 @@ Doma's K battles; the stalled keys be20, be1C and beE8 of $13D); with
 the rings on, the same variants passed (`rd_k1_s7`, `rd_k2_s7`, `rd_k5_s7`,
 `rdo_k1_s7`, which met other keys; `build/attempts/wt/v036-route/lab/`),
 and the sweep after won Doma's beE8 in 5 of 5 (`sdo8`).  The leg asserts
-the three rings are on.  Sweeps at de405a9b
+the three rings are on.  The stall was Barb-e's Love Token, not the Imp
+(#466; the Imp was cured each time with a Green Cherry): the spell makes
+a party member its bodyguard, and every Fight on Barb-e lands on that
+member (`sd7_k1_s7`: RELM "Miss", then 211 and 201 off her; alone, CELES
+swung into herself).  The driver now swings at a body without the token,
+else casts, and cures the Mute Barb-e's counter puts on the caster
+(lib/ot6.lua `Driver:coverPlan`, mechanics-coverage.md).  Without the
+rings, the dream leg from the tracked `wor-opera-v1` (K 0-5 at shifts 0
+and 7, `build/attempts/wt/v036-driver/lab/nd_*`): main 11 of 12
+(`nd_old_k4_s7`: "FAIL: timeout after 92000 frames driving toward navTo"
+on key beBC), the driver at f7dc2aae 12 of 12 (`nd4_new_*`), 24 distinct
+$13D keys won; restored where the token had stood on a lone CELES for 300
+frames (`snapt_old_k4_s7`), main timed out ("timeout after 110000
+frames", `ft_old_beBC`) and the driver won ("battle $13D WON after 4292
+ticks", `ft4_new_beBC`).  So the dream leg no longer needs the rings for
+Barb-e.  Doma's leg still does: without them Wrexsoul ran 150,000 to
+345,000 ticks and the leg ran out of time in 1 of 12 runs on main and 4 of
+12 on the driver at 32d84233 (`ndo_*`; the same, frame for frame, at
+6c7b2b93: `ndo2_new_*`), where with them it is won in 10,000 to 61,000 (`sdo_*`, `sdo2_*`: 12 of 12 on each).  Sweeps at de405a9b
 (K 0-5 at shifts 0 and 7, from the chain's own boots at that commit):
 `sd8` 12 of 12 PASS, the stooges 12 keys won of 12, no deaths, Barb-e,
 Samurai and Suriander 21 of 21; `sdo8` 12 of 12, Wrexsoul 11 of 11, 1.27
