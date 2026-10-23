@@ -995,6 +995,27 @@ done:   pla
         cmp     $32cd,x         ; the actor's pending counterattack pointer
         jeq     @keep           ;   the same: this action IS the counter
 @cmd:   lda     $3a7a           ; command
+        ; #463: OT6_SPELLNONE belongs to a Magic, Lore or X-Magic turn, set
+        ; at its queue and cleared at its Ot6ActionEnd.  An entry lost before
+        ; it reached $3820 (a fall, a petrify, a sleep: no turn end ran)
+        ; would leave it set into the caster's next turn, whose boost the
+        ; turn end would then drop after it bought (a free boosted Fight).
+        ; Any other command a character queues starts a turn the bit must
+        ; not speak for: clear it here.
+        cmp     #$02
+        beq     @spcmd
+        cmp     #$0c
+        beq     @spcmd
+        cmp     #$17
+        beq     @spcmd
+        txa                     ; width-neutral character test
+        cmp     #$08
+        bcs     @spcmd          ; monsters hold no mark
+        lda     $3018,x
+        eor     #$ff
+        and     f:$7e0000+OT6_SPELLNONE
+        sta     f:$7e0000+OT6_SPELLNONE
+@spcmd: lda     $3a7a
         cmp     #$19            ; #463: a summon that moves no number buys
         bne     :+              ;   nothing with a boost (its price is the
         txa                     ;   list's, Ot6MagicPrice's base for it)
