@@ -1000,8 +1000,14 @@ done:   pla
         ; it reached $3820 (a fall, a petrify, a sleep: no turn end ran)
         ; would leave it set into the caster's next turn, whose boost the
         ; turn end would then drop after it bought (a free boosted Fight).
-        ; Any other command a character queues starts a turn the bit must
-        ; not speak for: clear it here.
+        ; Any other battle-menu command a character queues ($00-$1D) starts
+        ; a turn the bit must not speak for: clear it here.  Not the
+        ; engine's own follow-ups ($1E and up), which a turn queues while it
+        ; runs: Scan's text is Cmd_27, queued for the caster before its turn
+        ; ends (clearing on it spent the 3-BP boost of a Scan aimed at the
+        ; party, battle_study stage 1 at shift 8 on d4736400's chain).
+        cmp     #$1e
+        bcs     @spcmd
         cmp     #$02
         beq     @spcmd
         cmp     #$0c

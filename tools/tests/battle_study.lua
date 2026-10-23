@@ -27,7 +27,10 @@
 --      present species' lores he lacks (Aqua Rake), the cast costs 99 MP,
 --      and after the victory $1D29 holds Aqua Rake again.
 -- Everyone else Fights while STRAGO banks his points and Defends from the
--- cast until it resolves: Defending through the bank let the Chimera kill
+-- cast until it resolves (a lone Chimera often falls first and the battle
+-- counts nothing; H.kitBattle's "thin", Defending while it stood alone, wiped
+-- the party after the stage-3 cast on d4736400's chain): Defending through
+-- the bank let the Chimera kill
 -- TERRA and LOCKE before the cast on a later ROM's draw, and STRAGO alone
 -- lost the fight-out (build/attempts/wt/v030-route/study/).  A battle
 -- without a Chimera, where STRAGO cannot cast, or whose Chimera falls
@@ -234,23 +237,29 @@ H.run({ maxFrames = 900000 }, {
         end
       end),
       H.cond(function() return H.battleLoadStarted() end, { H.fightBattleByMenu(40000) }, {}),
-      H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000,
-        "back on the world map", 5),
-      H.call(function()
-        if mode ~= "cast" or rec == nil or not rec.ended then return end
-        local k = lores()
-        H.log(string.format("[study] after the battle: lores $%06X", k))
-        if stage < 3 then
-          if k & 0x08 ~= 0 then
-            H.log("[study] the Chimera taught Aqua Rake the vanilla way: cleared again for the study")
-            H.writeByte(0x1D29, H.readByte(0x1D29) & 0xF7)
-          end
-        else
-          H.assertEq(k & rec.want, rec.want, "the victory taught the studied lores ($1D29)")
-        end
-        stage = stage + 1
-      end),
     }),
+    H.waitUntil(function() return not H.battleLoadStarted() and H.worldHasControl() end, 6000,
+      "back on the world map", 5),
+    -- after every battle, counted or not: a Chimera that cast Aqua Rake in a
+    -- battle that counted nothing teaches it the vanilla way too (on
+    -- d4736400's chain battle 5's did, and stage 3 then had nothing left to
+    -- learn: "no present species could teach a lore at the cast"), so the
+    -- study's lore is cleared again unless this was the counted stage-3 cast
+    H.call(function()
+      local counted = mode == "cast" and rec ~= nil and rec.ended ~= nil
+      local k = lores()
+      if counted then H.log(string.format("[study] after the battle: lores $%06X", k)) end
+      if counted and stage == 3 then
+        H.assertEq(k & rec.want, rec.want, "the victory taught the studied lores ($1D29)")
+        stage = stage + 1
+        return
+      end
+      if k & 0x08 ~= 0 then
+        H.log("[study] the Chimera taught Aqua Rake the vanilla way: cleared again for the study")
+        H.writeByte(0x1D29, H.readByte(0x1D29) & 0xF7)
+      end
+      if counted then stage = stage + 1 end
+    end),
   }, "the three counted casts"),
   H.call(function()
     H.log("[study] PASS: at 3 BP on a party member Scan is plain Scan, boost kept; at 2 BP it studies nothing; "
