@@ -23,9 +23,10 @@
 -- character opens with, presses R once and starts that dance.  His party
 -- Defends.  The first command window is snapshotted and branched (each branch
 -- idles 7 frames longer there and Defends (k-1) % 4 + (k-1)//4 % 3 turns
--- first, its own draw of the roll) at least MIN_BRANCHES times and until both outcomes, a
--- stumble and a started dance, have been seen, at most MAX_BRANCHES.  At one
--- point a start stumbles a quarter of the time (Ot6DanceStumbleOdds).
+-- first, its own draw of the roll) at least MIN_BRANCHES times and until
+-- both outcomes, a stumble and a started dance, have been seen, at most
+-- MAX_BRANCHES.  At one point a start stumbles a quarter of the time
+-- (Ot6DanceStumbleOdds).
 -- Observed, never written: the stumble arm's execution (Cmd_13's `lda #$06 /
 -- sta $3401`, "Stumbled!!", found by its bytes so the same test runs on any
 -- build), MOG's pending boost, bank, MP and DANCE status at the start
@@ -272,10 +273,10 @@ local function branch(k, wait)
     end),
     H.waitFrames(wait + 1),
     -- the draw: MOG Defends (k-1) % 4 + (k-1)//4 % 3 turns first, so
-    -- monster turns and ATB time move the battle RNG ($be) between branches; idling at his
-    -- window alone left it within a few entries of one place, and on the
-    -- fixture this ROM's play made every one of them stumbled (16 of 16,
-    -- $be $73-$AF, build/attempts/wt/v028-kits/px13-lab2/stumble/lab.out)
+    -- monster turns and ATB time move the battle RNG ($be) between
+    -- branches; idling at his window alone left it within a few entries of
+    -- one place, and on the fixture this ROM's play made every one of
+    -- them stumbled (16 of 16, $be $73-$AF, build/attempts/wt/v028-kits/px13-lab2/stumble/lab.out)
     H.repeatN((k - 1) % 4 + ((k - 1) // 4) % 3, {
       H.driveUntil(function()
         if rec.lost or lostNow() then return true end

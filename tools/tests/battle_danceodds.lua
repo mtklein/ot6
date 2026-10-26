@@ -35,10 +35,11 @@
 -- both outcomes.  A level-2 stumble is a 1-in-16 draw and one seat gives
 -- only a few distinct draws, so when a seat's MAX_BRANCHES are used (or
 -- LOST_RUN in a row give no outcome) the same encounter is walked into
--- again from its world-map snapshot a few frames later: a seat.  The battle
--- RNG starts from the game clock's frame, so each seat is a fresh draw of
--- the same formation.  At most SEATS seats per encounter and
--- MAX_ENCOUNTERS encounters.
+-- again from its world-map snapshot one frame later each time: a seat.  The
+-- battle RNG starts from the game clock's frame (4 to $be per frame), so each
+-- seat is a fresh draw of the same formation.  Stops at the first witness;
+-- else an encounter gets DISTINCT_BE distinct $be (a repeat is skipped) and
+-- there are MAX_ENCOUNTERS encounters.
 -- Observed, never written: $be, the background and the pending boost as
 -- Cmd_13 begins; the stumble arm's execution ("Stumbled!!", found by its
 -- bytes); MOG's pending boost, bank, MP, DANCE status and the background at
@@ -65,7 +66,11 @@ local MOG = 0x0A
 local DANCES = 0x1D4C                   -- known-dance mask
 local MIN_PER, MAX_BRANCHES = 3, 16      -- branches per seat
 local MAX_EXTRA = 6                       -- extra Defends cycle 0..5
-local SEATS = 10                          -- walk-ins per encounter
+-- Walk-ins per encounter.  The battle seed ($be, InitBattle) is the clock's
+-- frame times 4 mod 256, so 64 walk-ins stepped one frame apart are 64
+-- distinct seeds; an encounter is given DISTINCT_BE of them (55) before the
+-- next encounter is taken, SEATS (64) walk-ins at most.
+local SEATS, DISTINCT_BE = 64, 55
 local THRESH = { [1] = 0x40, [2] = 0x10, [3] = 0x00 }   -- the design (kits.md)
 local WANT_OF_256 = { [1] = 64, [2] = 16, [3] = 0 }     -- its odds over RNGTbl
 -- The encounter is whatever the world deals; battle_dancestumble's handling
@@ -94,6 +99,7 @@ end
 
 local mogSlot, danceId, offId = nil, nil, nil
 local enc, encs, encLost, lostRun, seat = 0, {}, nil, 0, 0
+local seenBe, nBe = {}, 0      -- this encounter's distinct $be, and their count
 
 -- why MOG's turn can no longer come in this battle, or nil
 local function lostWhy()
@@ -103,6 +109,16 @@ local function lostWhy()
   if hp == 0 or (st1 & 0xC2) ~= 0 then
     return string.format("MOG (slot %d) is down (HP %d, STATUS1 $%02X)", s, hp, st1)
   end
+  -- the wave won under the branch (the bystanders' Defends spend turns the
+  -- monsters die in): victory pages follow, and the dance window never comes
+  local present, standing = 0, 0
+  for e = 4, 9 do
+    if H.readWord(0x3C1C + e * 2) > 0 then
+      present = present + 1
+      if H.readWord(0x3BF4 + e * 2) > 0 then standing = standing + 1 end
+    end
+  end
+  if present > 0 and standing == 0 then return "the wave was won (no enemy standing)" end
   return nil
 end
 local ph = 0
@@ -308,19 +324,21 @@ local function pickLevel(k)
 end
 
 local snap = nil
+local dupSeat = false   -- this seat's $be was met already: same draws, skipped
 local seatUses = {}       -- branches each level has taken in this seat
-local function branch(k, wait)
+local function branch(bi, wait)
+  local k                      -- the record's number (#recs + 1), set below
   local req
   local level, defends = nil, nil
   return H.cond(function()
-    return needMore() and encLost == nil and lostRun < LOST_RUN
+    return needMore() and encLost == nil and lostRun < LOST_RUN and not dupSeat
   end, {
     H.call(function() H.setPad({}); rec = nil; req = H.requestLoadState(snap.blob) end),
     H.waitFrames(2),
     H.call(function()
-      H.checkReq(req, "snapshot load (branch " .. k .. ")")
+      H.checkReq(req, "snapshot load (encounter " .. enc .. " seat " .. seat .. " branch " .. bi .. ")")
       H.rearmInputInjection()
-      level = pickLevel(k)
+      level = pickLevel(bi)
       -- the draw: Defends before the start move the battle RNG; a level
       -- this seat has used n times Defends n % MAX_EXTRA more turns
       local n = seatUses[level] or 0
@@ -511,19 +529,22 @@ local function encounter(e)
         "encounter %d: MOG stands before the walk in (HP %d, STATUS1 $%02X)", e,
         H.charHp(MOG), H.charStatus1(MOG)))
       rec, enc = nil, e
+      seenBe, nBe = {}, 0
       encs[e] = H.requestSaveState()
     end),
     H.waitFrames(2),
     H.call(function() H.checkReq(encs[e], "world-map snapshot (encounter " .. e .. ")") end),
   }
-  for s = 1, SEATS do out[#out + 1] = H.cond(function() return needMore() end, { seatOf(e, s) }, {}) end
+  for s = 1, SEATS do out[#out + 1] = H.cond(function() return needMore() and nBe < DISTINCT_BE end, { seatOf(e, s) }, {}) end
   return H.seqStep(out)
 end
 
 -- seat s of encounter e: the same encounter walked into again from its
--- world-map snapshot, 5(s-1) frames later.  The battle RNG starts from the
--- game clock's frame (InitBattle), so each seat is another draw of the same
--- formation; the encounter counters, and so the formation, do not move.
+-- world-map snapshot, s frames later.  The battle RNG starts from the
+-- game clock's frame (InitBattle: $be, 4 per frame mod 256), so each seat is
+-- another draw of the same formation; the encounter counters, and so the
+-- formation, do not move.  A seat whose $be was met already would repeat that
+-- seat's draws and is skipped; it does not count toward DISTINCT_BE.
 seatOf = function(e, s)
   local req
   local out = {
@@ -539,11 +560,17 @@ seatOf = function(e, s)
       end),
       worldControl("world control (encounter " .. e .. " seat " .. s .. ")"),
     }, {}),
-    H.call(function() rec, encLost, lostRun, seat, seatUses = nil, nil, 0, s, {} end),
-    H.waitFrames(1 + 5 * (s - 1)),
+    H.call(function() rec, encLost, lostRun, seat, seatUses, dupSeat = nil, nil, 0, s, {}, false end),
+    H.waitFrames(s),
     walkIn(),
     H.call(function()
       findMog()
+      local be = H.readByte(0xBE)
+      dupSeat = seenBe[be] ~= nil
+      if not dupSeat then seenBe[be] = s; nBe = nBe + 1 end
+      H.log(string.format("[danceodds] encounter %d seat %d (%d idle frames): $be $%02X, %s "
+        .. "(%d distinct $be of %d this encounter)", e, s, s,
+        be, dupSeat and ("a repeat of seat " .. seenBe[be] .. ", skipped") or "new", nBe, DISTINCT_BE))
       local mask = H.readByte(DANCES)
       danceId = bgDance(H.readByte(0x11E2))
       offId = nil
@@ -557,8 +584,8 @@ seatOf = function(e, s)
         .. "known mask %02X, terrain dance %d, chosen dance %d; MOG slot %d, %d MP, %d BP", e, s,
         H.readWord(0x11E0), H.readByte(0xBE), mask, danceId, offId, mogSlot, mpOf(mogSlot), bp(mogSlot)))
     end),
-    mogMenu("MOG's command window"),
-    H.cond(function() return encLost == nil end, {
+    H.cond(function() return not dupSeat end, { mogMenu("MOG's command window") }, {}),
+    H.cond(function() return encLost == nil and not dupSeat end, {
       H.call(function()
         H.assertEq(mpOf(mogSlot) >= H.boostPrice(8, 3), true, string.format(
           "MOG's real pool (%d) pays a boost-3 dance start (%d)",
@@ -570,12 +597,13 @@ seatOf = function(e, s)
       H.call(function() H.checkReq(snap, "snapshot at MOG's window") end),
     }, {
       H.call(function()
+        if dupSeat then return end
         H.log(string.format("[danceodds] encounter %d: %s before MOG's first window: "
           .. "no branch here", e, encLost))
       end),
     }),
   }
-  for k = 1, MAX_BRANCHES do out[#out + 1] = branch(k, (k - 1) * 7) end
+  for bi = 1, MAX_BRANCHES do out[#out + 1] = branch(bi, (bi - 1) * 7) end
   return H.seqStep(out)
 end
 for e = 1, MAX_ENCOUNTERS do
@@ -665,4 +693,10 @@ body[#body + 1] = H.call(function()
   H.assertEq(#romFails, 0, "the ROM's thresholds are 1/4, 1/16 and never (#473)")
 end)
 
-H.run({ maxFrames = 2000000 }, body)
+-- Worst case, no witness anywhere: a seat of 16 branches costs ~38k frames
+-- (build/attempts/wt/v037-danceodds-seats/exhaust3.out: 30 seats, 31 walk-ins,
+-- PASS at frame 1171225 with level 2 never satisfied), and an encounter is at
+-- most SEATS = 64 walk-ins (a repeated $be is skipped, nearly free), so two
+-- encounters are 2 * 64 * 40k = 5.1M frames, plus ~0.2M to reach the first and
+-- fight it out: under 6M.  The normal run stops at the first witness.
+H.run({ maxFrames = 6000000 }, body)
