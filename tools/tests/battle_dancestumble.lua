@@ -1,17 +1,18 @@
 -- @suite savestate=wor_tritoch slow
--- battle_dancestumble.lua -- a boosted Dance start that stumbles costs
--- nothing: no MP, no pips (#313).
+-- battle_dancestumble.lua -- a boosted Dance start that stumbles charges no
+-- MP and spends its boost (#313, #473).
 --
--- Off its terrain a Dance start stumbles half the time (vanilla's roll in
--- Cmd_13, kept): the DANCE status is cleared, MOG spends the turn on
--- "Stumbled!!" and no dance begins, so neither the boost's multiplier nor
--- the whole-battle state was bought.  Before #313 the stumble still paid the
--- boosted price (CalcAttackEffect charged the queued $3a4c on the stumble's
--- self-action) and spent the pips (Ot6ActionEnd found the pending boost).
--- Ot6DanceStumble now drops both before either is charged, so the turn ends
--- as an unboosted stumble would: MP untouched, nothing pending, the regen
--- pip banked.  The dance that does start still pays the boosted price and
--- the pip, and is the control that the boost is not simply switched off.
+-- Off its terrain a Dance start can stumble (Cmd_13's roll; the start's
+-- boost tilts it, battle_danceodds): the DANCE status is cleared, MOG spends
+-- the turn on "Stumbled!!" and no dance begins, so the MP price, which buys
+-- the dance's whole-battle state at its multiplier, is not charged
+-- (Ot6DanceStumble clears the queued $3a4c before CalcAttackEffect charges
+-- it, #313).  The boost bought the odds of the roll that was taken, so it is
+-- spent (owner, #473): Ot6ActionEnd finds it pending and charges the bank,
+-- with no regen pip.  Before #473 Ot6DanceStumble dropped the pending boost
+-- too, and the turn ended as an unboosted stumble (bank one pip up).  The
+-- dance that does start pays the boosted price and the pip, the control that
+-- the MP rule is not simply switched off.
 --
 -- The run is the real MOG on the World of Ruin map (wor_tritoch: he is in
 -- the party and knows five dances, carried from the World of Balance and the
@@ -21,17 +22,18 @@
 -- state is touched anywhere in this file.  MOG takes the pip every
 -- character opens with, presses R once and starts that dance.  His party
 -- Defends.  The first command window is snapshotted and branched (each branch
--- idles 7 frames longer there and Defends (k-1) % 4 turns first, its own draw
--- of the 50% roll) at least MIN_BRANCHES times and until both outcomes, a
--- stumble and a started dance, have been seen, at most MAX_BRANCHES.
+-- idles 7 frames longer there and Defends (k-1) % 4 + (k-1)//4 % 3 turns
+-- first, its own draw of the roll) at least MIN_BRANCHES times and until both outcomes, a
+-- stumble and a started dance, have been seen, at most MAX_BRANCHES.  At one
+-- point a start stumbles a quarter of the time (Ot6DanceStumbleOdds).
 -- Observed, never written: the stumble arm's execution (Cmd_13's `lda #$06 /
 -- sta $3401`, "Stumbled!!", found by its bytes so the same test runs on any
 -- build), MOG's pending boost, bank, MP and DANCE status at the start
 -- turn's Ot6ActionEnd, and his bank 20 frames after it.
 -- Asserted, per branch whose start turn resolved:
 --   1. it stumbled exactly when the dance did not lock in;
---   2. a stumble: MP unchanged, nothing pending at the turn's end, and the
---      bank one pip up (capped at 5) -- the unboosted turn's regen, no spend;
+--   2. a stumble: MP unchanged, the pip still pending at the turn's end, and
+--      the bank one pip down -- the boost spent, no regen;
 --   3. a started dance: the boosted price (H.boostPrice(8, 1)) charged, the
 --      pip pending at the turn's end, and the bank one pip down;
 -- and across branches: at least one stumble and one started dance.
@@ -47,7 +49,7 @@ local CMDTBL = 0x202E
 local MOG = 0x0A
 local DANCES = 0x1D4C                   -- known-dance mask
 local BOOST = 1                         -- the pip every character opens with
-local MIN_BRANCHES, MAX_BRANCHES = 8, 16
+local MIN_BRANCHES, MAX_BRANCHES = 8, 24
 -- The encounter is whatever the world deals (#454).  One that ends, or where
 -- MOG falls, before a branch's start turn resolves gives that branch no
 -- outcome (on v0.34's first chain the Mantodea, formation group $0143,
@@ -269,12 +271,12 @@ local function branch(k, wait)
         k, enc, wait))
     end),
     H.waitFrames(wait + 1),
-    -- the draw: MOG Defends (k-1) % 4 turns first, so monster turns and
-    -- ATB time move the battle RNG ($be) between branches; idling at his
+    -- the draw: MOG Defends (k-1) % 4 + (k-1)//4 % 3 turns first, so
+    -- monster turns and ATB time move the battle RNG ($be) between branches; idling at his
     -- window alone left it within a few entries of one place, and on the
     -- fixture this ROM's play made every one of them stumbled (16 of 16,
     -- $be $73-$AF, build/attempts/wt/v028-kits/px13-lab2/stumble/lab.out)
-    H.repeatN((k - 1) % 4, {
+    H.repeatN((k - 1) % 4 + ((k - 1) // 4) % 3, {
       H.driveUntil(function()
         if rec.lost or lostNow() then return true end
         return H.readByte(MENU) == 0 or H.readByte(ACTOR) ~= mogSlot
@@ -515,12 +517,12 @@ body[#body + 1] = H.call(function()
       if r.stumbled then
         check(d.mp == r.mp0, string.format(
           "branch %d: a stumbled start charged %d MP (want 0)", r.k, r.mp0 - d.mp))
-        check(d.pend == 0, string.format(
-          "branch %d: a stumbled start ended its turn with %d pip(s) pending to spend (want 0)",
-          r.k, d.pend))
-        check(a.bank == math.min(5, r.bank0 + 1), string.format(
-          "branch %d: bank %d -> %d after a stumble (want %d: no spend, the unboosted regen)",
-          r.k, r.bank0, a.bank, math.min(5, r.bank0 + 1)))
+        check(d.pend == BOOST, string.format(
+          "branch %d: a stumbled start ended its turn with %d pip(s) pending to spend (want %d)",
+          r.k, d.pend, BOOST))
+        check(a.bank == r.bank0 - BOOST, string.format(
+          "branch %d: bank %d -> %d after a stumble (want %d: the boost spent, no regen)",
+          r.k, r.bank0, a.bank, r.bank0 - BOOST))
       elseif d.dancing then
         check(r.mp0 - d.mp == price, string.format(
           "branch %d: a started dance charged %d MP (want the boosted %d)", r.k, r.mp0 - d.mp, price))
@@ -535,7 +537,7 @@ body[#body + 1] = H.call(function()
   for _, m in ipairs(fails) do H.log("[dancestumble] FAIL " .. m) end
   H.assertEq(st >= 1, true, "at least one branch stumbled (else the stumble was not measured)")
   H.assertEq(dn >= 1, true, "at least one branch started the dance (the control)")
-  H.assertEq(#fails, 0, "every resolved branch: a stumble cost nothing, a started dance paid (#313)")
+  H.assertEq(#fails, 0, "every resolved branch: a stumble charged no MP and spent its boost, a started dance paid both (#313, #473)")
 end)
 
 H.run({ maxFrames = 400000 }, body)

@@ -258,11 +258,11 @@
         ; there mid-turn).  The pending boost is dropped rather than spent.
         ; The turn's regen pip then follows the TLM's ruling (#346): a
         ; character still in the fight (put to sleep, stopped) earns it as on
-        ; any unboosted turn, the settlement Ot6DanceStumble gives a stumbled
-        ; start; one out of the fight at the turn's end -- KO'd or petrified,
-        ; $3ee4 & $c0, FF6's own "died or escaped" grouping at :1144 less its
-        ; zombie bit, and neither takes turns -- earns nothing, as when the
-        ; fall came before the entry reached the queue and no turn end ran.
+        ; any unboosted turn; one out of the fight at the turn's end --
+        ; KO'd or petrified, $3ee4 & $c0, FF6's own "died or escaped"
+        ; grouping at :1144 less its zombie bit, and neither takes turns --
+        ; earns nothing, as when the fall came before the entry reached the
+        ; queue and no turn end ran.
         ; Measured before this, in play: a fallen Setzer's queued spin came up
         ; as $12 and took the pips it was boosted with (battle_slotcancel;
         ; build/attempts/wt/slots-followups/).
@@ -1225,7 +1225,8 @@ done:   pla
 ;     (Ot6QueueFold; both Ot6SpellNoBoost), Revert (Ot6RevertTake), and
 ;     Row, Def., Leap, Control and Possess (Ot6CmdNoBoost);
 ;   * an action that never ran (#346, Ot6ActionEnd's NOACTION arm) or never
-;     began: a stumbled dance (Ot6DanceStumble), a Rage start the pool cannot
+;     began: Water Rondo under three points (Ot6DanceTerrain; a dance that
+;     stumbles off its roll spends, #473), a Rage start the pool cannot
 ;     pay (Ot6RageStartGate), a Jackpot or Master's Mark whose boost was taken
 ;     back under three after the pick (Ot6JackpotDice, Ot6MastersMark), an
 ;     engine-picked Morph (Ot6MorphTake).  Those write the byte themselves.
@@ -2437,10 +2438,11 @@ OT6_LIFE3_ID = $35
         ; turns queue through the same CreateAction (RandDanceAction,
         ; battle_main.asm:617), but by then Cmd_13 has set the actor's DANCE
         ; status ($3ef8 bit 0).  one payment starts the whole-battle state,
-        ; and every locked-in step is free.  a stumbled start (Cmd_13's 50%
-        ; @17af arm) starts nothing and pays nothing: Ot6DanceStumble drops
-        ; the price this arm queued before the charge reads it (#313).  the
-        ; next commit is a fresh start and is priced here again.
+        ; and every locked-in step is free.  a stumbled start (Cmd_13's
+        ; @17af arm) starts nothing and pays no MP: Ot6DanceStumble drops
+        ; the price this arm queued before the charge reads it (#313); its
+        ; boost bought the roll's odds and is spent (#473).  the next
+        ; commit is a fresh start and is priced here again.
         ; X = attacker entity at this hook (the site contract above).
         pla                     ; drop the parked cost (0 for dance)
         lda     $3ef8,x         ; status 3
@@ -2669,23 +2671,25 @@ Ot6ThiefCostTbl:
         rtl
 .endproc
 
-; [ a stumbled Dance start costs nothing ]
+; [ a stumbled Dance start: no MP, and the boost spent ]
 ;
-; Off its terrain a Dance start stumbles half the time (vanilla's roll in
-; Cmd_13, kept as it is): the DANCE status is cleared again, the dancer
-; spends the turn on the "Stumbled!!" self-action, and no dance begins, so
-; neither its multiplier nor its whole-battle state was bought (#313; the
-; boost pays once, or costs nothing).  Both prices are still only queued
-; here: the MP in $3a4c, charged by CalcAttackEffect when the stumble's
-; self-action executes, and the pips in the pending boost, spent by
-; Ot6ActionEnd at the end of this turn.  Dropping them now means neither is
-; charged, rather than charged and handed back, and the turn ends exactly
-; as an unboosted stumble would, regen pip included.  A locked-in step
-; that stumbles (a second dancer moved the background) already queued 0
-; and holds no pending boost, so this is a no-op there.
-;
-; The pending boost is gone, so this caster's magic rows fall back off
-; their folded prices, the same request Ot6ActionEnd's spend arm makes.
+; Off its terrain a Dance start can stumble (Cmd_13's roll, tilted by the
+; start's boost: Ot6DanceTerrain, #473): the DANCE status is cleared again,
+; the dancer spends the turn on the "Stumbled!!" self-action, and no dance
+; begins.  The MP price buys the dance's magnitude, its whole-battle state at
+; the bought multiplier, and none of it began, so it is not charged (#313):
+; the price is still only queued in $3a4c, charged by CalcAttackEffect when
+; the stumble's self-action executes, and is cleared here before that.  The
+; boost bought something that did happen: the odds of the roll that was
+; taken (1/2, 1/4, 1/16 or never, by the tier).  So the pending pips stay
+; pending and Ot6ActionEnd spends them at the end of this turn, as it spends
+; a Steal's that came up empty or a Rage coin's that showed Fight: no regen
+; pip, and the folded prices fall back on its spend arm (owner, #473; before
+; it the stumble dropped them, #313).  A locked-in step that stumbles (a
+; second dancer moved the background) already queued 0 and holds no pending
+; boost, so this changes nothing there.  The divine's gate stumble (Water
+; Rondo under three points), whose boost could buy nothing, has already
+; dropped the pending boost (Ot6DanceTerrain).
 ;
 ; entry: jsl from Cmd_13's stumble arm, a8/i8, y = attacker entity (a
 ; character: only a character dances), db=$7e.  clobbers a; preserves x/y.
@@ -2694,12 +2698,6 @@ Ot6ThiefCostTbl:
         stz     $3a4c           ; the queued MP: CalcAttackEffect charges 0
                                 ;   (8-bit, vanilla's own imp clear at
                                 ;   InitPlayerAction; $3a4d is never set)
-        lda     #$00
-        sta     OT6_BOOST_REVEALED,y    ; the queued pips: Ot6ActionEnd
-                                        ;   finds nothing pending
-        lda     $3204,y
-        ora     #$80            ; vanilla's "recheck enabled magic" request
-        sta     $3204,y
         rtl
 .endproc
 
@@ -2711,7 +2709,7 @@ Ot6ThiefCostTbl:
 ; Ot6ActionEnd would spend them on a cast that never happened.  Dropping
 ; them here, while they are only pending, ends the turn as an unboosted
 ; one: the bank untouched, the regen pip earned, the folded prices falling
-; back (the same request Ot6DanceStumble and Ot6RageStartGate make).  One
+; back (the same request Ot6KeepBoost and Ot6RageStartGate make).  One
 ; place serves every verb; the Rage and Dance start gates drop earlier for
 ; their own trance, and this finds nothing pending after them.
 ;
@@ -2877,8 +2875,9 @@ Ot6ThiefCostTbl:
         bcs     @ok
         ; cannot pay (the pool moved between the commit and the resolve): no
         ; trance begins, and the boost raised for the possession's coin
-        ; bought nothing, so it is dropped while it is still only pending,
-        ; as Ot6DanceStumble drops a stumbled dance's (#330).  Without this
+        ; bought nothing, so it is dropped while it is still only pending
+        ; (#330; a Dance that stumbles off its roll spends instead, #473:
+        ; that boost bought the roll).  Without this
         ; Ot6ActionEnd spent the pips on the fizzle.  The turn then ends as
         ; an unboosted one: regen pip included.
         lda     #$00

@@ -3822,12 +3822,15 @@ Cmd_13:
         bpl     @1794       ; branch if valid
         lda     $3a6f       ; default dance battle background
         sta     $32e1,y
-@1794:  jsl     Ot6DanceTerrain ; ot6 #380: vanilla's `ldx $11e2 / cmp
-                                ;   f:BattleBGDance,x`, and Water Rondo's
-                                ;   rule: at a full boost it never stumbles
-                                ;   (Z set), under one it stumbles (V set)
+@1794:  jsl     Ot6DanceTerrain ; ot6: vanilla's `ldx $11e2 / cmp
+                                ;   f:BattleBGDance,x`, and the boost's
+                                ;   ladder (#473): at tier 0 vanilla's roll
+                                ;   below decides; at 1-3 the tier rolled
+                                ;   its own odds, landing (Z set) or
+                                ;   stumbling (V set); Water Rondo under
+                                ;   three points stumbles (V set, #380)
         beq     Cmd_02      ; branch if dance matches
-        bvs     @17af       ; ot6: the divine danced without its boost
+        bvs     @17af       ; ot6: the tier's roll stumbled
         nop                 ; ot6: keeps the roll below at its offset
         jsr     RandCarry
         bcc     @17af       ; 50% chance to branch
@@ -3839,8 +3842,8 @@ Cmd_13:
 @17af:  lda     $3ef8,y     ; clear dance status
         clrflg  STATUS3, DANCE
         sta     $3ef8,y
-        jsl     Ot6DanceStumble ; ot6: the stumble bought nothing, so it
-                                ;   charges nothing: no MP, no pips (#313)
+        jsl     Ot6DanceStumble ; ot6: no MP (#313); the boost, which
+                                ;   bought the odds, is spent (#473)
         tyx
         lda     #$06        ; battle message $06 (stumbled!!)
         sta     $3401
