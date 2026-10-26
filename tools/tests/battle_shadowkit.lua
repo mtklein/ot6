@@ -184,7 +184,8 @@ H.run({ maxFrames = 600000 }, {
           if (t.st[e] & 0x10) ~= 0 and p[3] ~= "Vanish" then
             -- the thrower under Vanish (the mask always holds him, as vanilla's does): a thrown item is a
             -- physical hit, and it misses a vanished body
-            H.log(string.format("[kit] %d. entity %d, the thrower, is under Vanish: the throw cannot land on him", i + 1, e))
+            H.assertEq(held[e] == nil, true, string.format("%d. entity %d, the thrower under Vanish, gains no %s "
+              .. "(the throw cannot land on him)", i + 1, e, p[3]))
           else
             H.assertEq(held[e] or had, true, string.format("%d. entity %d holds %s after the throw", i + 1, e, p[3]))
           end

@@ -18,7 +18,8 @@
 --      0 and the shield the Paladin Shield;
 --   C. declared: staged at 255, and the battle read as an event battle (Ot6RandBtl's flag, $57BD, cleared at
 --      Ot6CurseCount's entry, the only reader there): 255 + 1 lifts it, the count 0;
---   D. declared: staged at 100, read as an event battle: the count 101, the shield still cursed.
+--   D. declared: staged at 100, read as an event battle: the count 101, the shield still cursed;
+--   E. declared: staged at 255: 255 + 2 lifts it with one left over, the count 1.
 -- The event battle is staged because the route's play has no event battle with the shield worn (no wearer on
 -- the route: route-wor-colosseum.md section 5), and the wrap because 128 battles is not a suite.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -89,5 +90,6 @@ H.run({ maxFrames = 600000 }, {
   arm("B (254, a random battle)", 254, false, 0, PALADIN),
   arm("C (255, an event battle)", 255, true, 0, PALADIN),
   arm("D (100, an event battle)", 100, true, 101, CURSED),
+  arm("E (255, a random battle)", 255, false, 1, PALADIN),
   H.call(function() H.log("[curse] PASS: two a random battle, one an event, and the wrap lifts the curse") end),
 })
