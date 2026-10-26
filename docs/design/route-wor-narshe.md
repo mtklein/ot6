@@ -79,11 +79,12 @@ marked.
    $01AA=0, _ccd88e` ("Ooh…", :110891): `$01AA` is MOG (character 10). He
    then waits on the Falcon ("me wait for you in big airship", `$007E`). MOG
    has to be seated before the cliffs.
-7. **Mog's divine is out of reach here.** `wor-cyan-v1` knows one dance:
-   `$1D4C = $40`, Dusk Requiem (bit 6; Water Rondo is bit 5,
-   `ot6_waterrondo.asm:34`; `wor-cyan-v1_roster.txt`). kits.md keeps Water
-   Rondo WoB-missable, learned on the Lete River, and this route's MOG
-   never learned it. See section 10.
+7. **Water Rondo is not known here.** `wor-cyan-v1` knows one dance:
+   `$1D4C = $40`, Dusk Requiem (bit 6; Water Rondo is bit 5;
+   `wor-cyan-v1_roster.txt`). Water Rondo is WoB-missable, learned only in
+   the Serpent Trench, and this route's MOG never learned it. See section
+   10. (It was Mog's divine then; since #478 it is an ordinary dance and
+   Mog has no divine.)
 8. **Narshe's arc is ice.** Every boss absorbs ice and is weak to fire
    (Umaro, Tritoch, the Ice Dragon, `species.txt`), the three party fire
    sources are TERRA's natural Fire and the Ifrit and Maduin stones
@@ -408,10 +409,9 @@ them. His showcase is the regroup and the Narshe plain beside the Falcon
 
 ## 10. Open questions (vision-level)
 
-1. **Mog's Water Rondo.** It is WoB-missable by design (kits.md), and the
-   route's MOG never learned it, so the arc where he joins has
-   no divine for him. Keep it missable, or give the World of Ruin a way to
-   learn it?
+1. **Mog's Water Rondo.** It is WoB-missable, and the route's MOG never
+   learned it. Keep it missable, or give the World of Ruin a way to learn
+   it? (Answered by #428, 11.7: the World of Balance route learns it.)
 2. **Ragnarok.** LOCKE's lock decides when the stone arrives; the plan moves
    it to v0.32 (Locke). The stone-or-sword choice stays a player's choice
    there.

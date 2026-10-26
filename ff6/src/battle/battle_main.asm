@@ -977,9 +977,8 @@ RandDance:
         lda     $32e1,y
         cmp     #$ff
         bne     @05b2
-        jsl     Ot6DanceKnownRand   ; ot6 #380: `clr_a / lda $1d4c`, less
-                                ;   Water Rondo, the divine (a random pick
-                                ;   spends no boost)
+        clr_a
+        lda     $1d4c       ; known dances
         jsr     RandBit
         jsr     GetBitID
         txa
@@ -3827,8 +3826,7 @@ Cmd_13:
                                 ;   ladder (#473): at tier 0 vanilla's roll
                                 ;   below decides; at 1-3 the tier rolled
                                 ;   its own odds, landing (Z set) or
-                                ;   stumbling (V set); Water Rondo under
-                                ;   three points stumbles (V set, #380)
+                                ;   stumbling (V set)
         beq     Cmd_02      ; branch if dance matches
         bvs     @17af       ; ot6: the tier's roll stumbled
         nop                 ; ot6: keeps the roll below at its offset

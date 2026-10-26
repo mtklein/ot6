@@ -1225,11 +1225,11 @@ done:   pla
 ;     (Ot6QueueFold; both Ot6SpellNoBoost), Revert (Ot6RevertTake), and
 ;     Row, Def., Leap, Control and Possess (Ot6CmdNoBoost);
 ;   * an action that never ran (#346, Ot6ActionEnd's NOACTION arm) or never
-;     began: Water Rondo under three points (Ot6DanceTerrain; a dance that
-;     stumbles off its roll spends, #473), a Rage start the pool cannot
-;     pay (Ot6RageStartGate), a Jackpot or Master's Mark whose boost was taken
-;     back under three after the pick (Ot6JackpotDice, Ot6MastersMark), an
-;     engine-picked Morph (Ot6MorphTake).  Those write the byte themselves.
+;     began: a Rage start the pool cannot pay (Ot6RageStartGate), a Jackpot
+;     or Master's Mark whose boost was taken back under three after the pick
+;     (Ot6JackpotDice, Ot6MastersMark), an engine-picked Morph
+;     (Ot6MorphTake).  Those write the byte themselves.  (A Dance start that
+;     stumbles off its roll spends its boost, #473: Ot6DanceStumble.)
 ; An action whose boost turns out useless only when it resolves (a Steal on a
 ; body already robbed, Appraise or Scan with one body standing) spends it:
 ; the menu could not know (the owner, #463).
@@ -2687,9 +2687,7 @@ Ot6ThiefCostTbl:
 ; pip, and the folded prices fall back on its spend arm (owner, #473; before
 ; it the stumble dropped them, #313).  A locked-in step that stumbles (a
 ; second dancer moved the background) already queued 0 and holds no pending
-; boost, so this changes nothing there.  The divine's gate stumble (Water
-; Rondo under three points), whose boost could buy nothing, has already
-; dropped the pending boost (Ot6DanceTerrain).
+; boost, so this changes nothing there.
 ;
 ; entry: jsl from Cmd_13's stumble arm, a8/i8, y = attacker entity (a
 ; character: only a character dances), db=$7e.  clobbers a; preserves x/y.

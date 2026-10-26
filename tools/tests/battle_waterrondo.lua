@@ -1,53 +1,44 @@
--- @suite savestate=moogle_cleared slow
--- battle_waterrondo.lua -- Water Rondo is Mog's divine: only a full 3-BP
--- boost dances it, and danced with one it never stumbles (#380).
+-- @suite slow
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+-- battle_waterrondo.lua -- Water Rondo is an ordinary dance (#478).
 --
--- kits.md "Divines": a divine's one gate is a full 3-BP boost.  Mog's is
--- Water Rondo (dance 5).  Ot6DanceRowColor greys its row and the confirm
--- buzzes with fewer than three points pending; a start with three records
--- tier 3 (Ot6DanceStartGate), and Ot6DanceTerrain lets a tier-3 Water Rondo
--- start wherever the party stands -- vanilla's off-terrain start stumbles
--- half the time (Cmd_13's RandCarry) -- turning the background to the
--- river.  The paths the engine picks a dance by spend no boost and are
--- closed: a random Dance draws from the known dances less Water Rondo
--- (Ot6DanceKnownRand), and a Water Rondo start under three points that
--- still arrives (a dance id left from an earlier start) stumbles, charging
--- nothing.
+-- Water Rondo (dance 5) was Mog's divine (#380): greyed and buzzing under
+-- three pending points, a start under three stumbling whatever the roll and
+-- dropping its boost, and left out of a random Dance's draw.  The owner
+-- (2026-10-26) made it one of his eight dances like the others, so it is
+-- offered, priced, boosted and rolled as they are (#473's ladder), and a
+-- random Dance can draw it.  This suite checks it where it used to differ.
 --
--- The run is the real MOG in the moogle defense (battle_dancestumble's
--- fixture and march): he learns the terrain's dance by winning P2's first
--- wave.  SYNTHETIC SETUP (waivered), because moogle_defense is the route's
--- only MOG-with-Dance window and Water Rondo is learned on the Lete River,
--- which no route state reaches with MOG: between the waves the known-dance
--- mask ($1D4C) gains Water Rondo; in the second wave MOG's pool := 999 so
--- the price is never the reason a row greys or a start fails (three points
--- price the start at 99, past his real pool).  His squad Defends.  Three
--- arms, each from a snapshot of the second wave:
---   A. the gate (real menus): at his first window, pending 1, Water Rondo's
---      row is grey ($25) while the terrain dance's is white, and A on it
---      buzzes, commits nothing and leaves the list open.
---   B. the divine (real menus): MOG Defends two turns to bank three points
---      (every character opens with one), then R to pending 3 and Water
---      Rondo, from one snapshot BRANCHES times (each idling 7 frames longer,
---      its own draw of the terrain roll).  Every start must lock in (no
---      stumble arm executed, DANCE set), with tier 3 recorded, the boosted
---      price (H.boostPrice(8, 3) = 99) charged, and the background turned to
---      the river's (DanceBG's Water Rondo entry).  Vanilla stumbles each
---      such start with probability 1/2 (RandCarry), so a ROM without the
---      rule passes all BRANCHES with probability 2^-BRANCHES.
---   C. the engine's pick (synthetic): MOG Muddled (STATUS2 bit 5, put back
---      if a hit clears it, and his HP topped up under half) with Water
---      Rondo left as his dance id ($32E1), from the snapshot MUDDLES times.
---      His first random Dance must stumble (the stumble arm executes, no MP
---      charged, nothing pending at the turn's end) and clear the id; every
---      draw RandDance makes from the known dances ($ff path: the mask
---      RandBit is handed) must leave Water Rondo out.  Without the rule a
---      Water Rondo start stumbles only off its roll, 1/2.
--- Old-ROM red: build/attempts/wt/v028-kits/px13-lab/old/battle_waterrondo.out.
--- Mutants (the gate at one point, the terrain rule off, the random mask
--- whole): build/attempts/wt/v028-kits/px13-lab/mut/{grey,terrain,mask}/.
+-- Played from water-rondo-v1 (cold Continue on the Blackjack's tile outside
+-- Nikeah: LOCKE, EDGAR, SABIN and MOG, who learned Water Rondo in the
+-- Serpent Trench): the party walks into a world-map encounter, whose
+-- background is not the river's, so a Water Rondo start's roll is live.
+-- MOG's first command window is snapshotted; LOCKE, EDGAR and SABIN Defend
+-- throughout.  Three arms:
+--   A. the menu (real menus, nothing written): at pending 1, Water Rondo's
+--      row is white, as another known dance's is, and A on it plays the
+--      confirm, not the buzz, and closes the list.
+--   B. the roll (real menus, nothing written): MOG Defends one turn to bank
+--      two points; from that snapshot BRANCHES times (each idling 7 frames
+--      longer, its own draw) he raises 1 or 2 points (alternately) and
+--      starts Water Rondo.  Each start is predicted from the draw its roll
+--      reads (RNGTbl[$be + 1], $be as Cmd_13 begins; battle_danceodds): at
+--      1 point a draw below $40 stumbles, at 2 below $10.  Asserted per
+--      resolved start: the row was white and the confirm took; it stumbled
+--      exactly when the ladder says, and exactly when the dance did not lock
+--      in; the boost is spent either way (the pips still pending at the
+--      turn's Ot6ActionEnd, the bank down by them 20 frames on); a stumble
+--      charges no MP and keeps the dance id; a landed start records its
+--      tier, charges H.boostPrice(8, p) and turns the background to the
+--      river's.  At least one start lands.
+--   C. the engine's pick (SYNTHETIC, waivered: no battle Muddles MOG on
+--      cue): from the first snapshot MOG is Muddled (STATUS2 bit 5, put back
+--      if a hit clears it, his HP topped up under half) until RandDance
+--      draws from the known dances (no dance chosen yet: $32E1 = $FF), at
+--      most MUDDLES branches.  The mask RandBit is handed must be every
+--      known dance, Water Rondo among them.
+-- Red on the ROM before #478 (Water Rondo the divine) in all three arms.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/moogle_defense.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_DANCE, ST_DEF = 0x05, 0x21, 0x27
@@ -55,11 +46,11 @@ local CMD_DANCE = 0x13
 local CMDTBL = 0x202E
 local MOG = 0x0A
 local DANCES = 0x1D4C                   -- known-dance mask
-local FIGHTPARTY = 0x1A6D               -- which party a defense battle engaged
 local RONDO = 5
 local DANCETIER = 0x7EEDA1              -- OT6_DANCETIER (ot6_memory.inc), stride 2
-local WHITE, GREY = 0x21, 0x25
+local WHITE = 0x21
 local BRANCHES, MUDDLES = 8, 6
+local THRESH = { [1] = 0x40, [2] = 0x10 }   -- the ladder (kits.md, Mog)
 
 local function bp(s) return H.readByte(0x3E9C + s * 2) end
 local function pend(s) return H.readByte(0x3E9D + s * 2) end
@@ -89,43 +80,8 @@ local function findInMap(seq)
 end
 local function mapWord(w) return emu.readWord(w * 2, emu.memType.snesVideoRam) end
 
--- squads (gen_moogle's tables): P2 = MOG + three moogles, leader obj $019A
-local LEADER_OFF = { [1] = 0x0029, [2] = 0x019A, [3] = 0x0148 }
-local function ySwitchTo(p)
-  return H.driveUntil(function()
-    return H.readWord(0x0803) == LEADER_OFF[p]
-  end, 1800, {
-    H.pressButtons({ "y" }, 6),
-    H.waitFrames(40),
-  }, "Y-switch to party " .. p)
-end
-
-local mogSlot, danceId = nil, nil
-local ph, hb = 0, -600
-
-local function untilP2Battle(what)
-  local battN = 0
-  return H.driveUntil(function()
-    battN = H.battleLoadStarted() and battN + 1 or 0
-    return battN >= 30 and H.readByte(FIGHTPARTY) == 2
-  end, 60000, {
-    H.call(function()
-      ph = ph + 1
-      if H.frame - hb >= 600 then
-        hb = H.frame
-        H.log(string.format("[hb f%d] batt=%s party=%d menu=%02x",
-          H.frame, tostring(H.battleLoadStarted()), H.readByte(FIGHTPARTY),
-          H.readByte(MENU)))
-      end
-      if H.battleLoadStarted() and H.readByte(FIGHTPARTY) == 2 then
-        H.setPad({})
-      else
-        H.setPad(ph % 8 < 4 and { a = true } or {})
-      end
-    end),
-    H.waitFrames(1),
-  }, what)
-end
+local mogSlot, ctlId = nil, nil
+local ph = 0
 
 -- a window's hands for Defend: Right to the Def. window, A there
 local function defendHands()
@@ -138,22 +94,12 @@ local function defendHands()
   else H.setPad({}) end
 end
 
-local function winByTapA(what)
-  return H.driveUntil(function() return not H.battleLoadStarted() end, 30000, {
-    H.call(function()
-      ph = ph + 1
-      H.setPad(ph % 8 < 4 and { a = true } or {})
-    end),
-    H.waitFrames(1),
-  }, what)
-end
-
 local function findMog()
   mogSlot = nil
   for s = 0, 3 do
     if H.readByte(0x3ED8 + s * 2) == MOG then mogSlot = s end
   end
-  assert(mogSlot, "MOG is in P2's battle party")
+  assert(mogSlot, "MOG is in the battle party")
 end
 
 local function mogMenu(what)
@@ -250,21 +196,50 @@ local function danceCursorTo(id, what)
   }, what)
 end
 
-local function backToCmd(what)
-  return H.driveUntil(function() return H.readByte(MSTATE) == ST_CMD end, 900, {
+-- ---- the world: walk two tiles until an encounter fires
+local W = nil
+local function walkIn()
+  local wp = 1
+  return H.seqStep({
     H.call(function()
-      ph = ph + 1
-      H.setPad(ph % 10 < 5 and { b = true } or {})
+      -- two tiles in a line away from the save tile, Nikeah's gate (east of
+      -- it) left out: the walk stays on open ground
+      local x, y = H.worldX(), H.worldY()
+      for _, d in ipairs({ { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+        if W == nil and H.worldPassable(x + d[1], y + d[2]) and H.worldPassable(x + 2 * d[1], y + 2 * d[2]) then
+          W = { { x + 2 * d[1], y + 2 * d[2] }, { x + d[1], y + d[2] } }
+        end
+      end
+      assert(W, "two walkable tiles in a line beside the save tile, away from Nikeah")
+      H.log(string.format("[rondo] walking (%d,%d) <-> (%d,%d)", W[1][1], W[1][2], W[2][1], W[2][2]))
     end),
-    H.waitFrames(1),
-  }, what)
+    H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
+      H.call(function()
+        if H.battleLoadStarted() or not H.worldHasControl() or not H.worldAligned() then
+          if not H.worldHasControl() then H.setPad({}) end
+          return
+        end
+        local x, y = H.worldX(), H.worldY()
+        if x == W[wp][1] and y == W[wp][2] then wp = wp % 2 + 1 end
+        local tx, ty = W[wp][1], W[wp][2]
+        local dir = tx > x and "right" or tx < x and "left" or ty > y and "down" or "up"
+        H.setPad({ [dir] = true })
+      end),
+      H.waitFrames(1),
+    }, "a world-map encounter fires"),
+    H.release(),
+    H.waitUntil(function() return H.battleActive() end, 1200, "battle armed", 5),
+  })
 end
 
 -- ---- observers --------------------------------------------------------------
 local buzzes, confirms = 0, 0
-local rec = nil                         -- the live branch's record (arms B, C)
-local masks = {}                        -- RandBit's mask on RandDance's draw
+local rec = nil                         -- the live branch's record
+local draws = {}                        -- RandDance's draws from the known dances
 local inRandDance = false
+
+local function rng(i) return H.readRomByte((H.sym("RNGTbl") & 0x3FFFFF) + (i & 0xFF)) end
+local function predicts(tier, d) return d < THRESH[tier] end
 
 local function findStumbleArm()
   local base = H.sym("Cmd_13") & 0x3FFFFF
@@ -286,17 +261,23 @@ local function installObservers()
     emu.addMemoryCallback(function() confirms = confirms + 1 end,
       emu.callbackType.write, base + 0x96, base + 0x96)
   end
+  local function mine(reg) return mogSlot and (emu.getState()["cpu." .. reg] & 0xFF) == mogSlot * 2 end
+  -- the start's roll: Cmd_13 begins for MOG, not yet dancing; the draw a
+  -- tier-1/2 roll reads is RNGTbl[$be + 1] (battle_danceodds)
+  local c13 = H.sym("Cmd_13")
+  emu.addMemoryCallback(function()
+    if not (rec and rec.committed) or rec.roll or not mine("y") or dancing(mogSlot) then return end
+    local be = H.readByte(0xBE)
+    rec.roll = { f = H.frame, be = be, d = rng(be + 1), bg = H.readByte(0x11E2) }
+  end, emu.callbackType.exec, c13, c13)
   local arm = findStumbleArm()
   emu.addMemoryCallback(function()
-    if not (rec and mogSlot) then return end
-    if (emu.getState()["cpu.y"] & 0xFF) ~= mogSlot * 2 then return end
+    if not rec or not mine("y") then return end
     rec.stumbles = (rec.stumbles or 0) + 1
-    rec.stumbleF = rec.stumbleF or H.frame
   end, emu.callbackType.exec, arm, arm)
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
-    if not (rec and rec.committed and mogSlot) or rec.done then return end
-    if (emu.getState()["cpu.x"] & 0xFF) ~= mogSlot * 2 then return end
+    if not (rec and rec.committed) or rec.done or not mine("x") then return end
     if H.readByte(0x3A7C) ~= CMD_DANCE then return end
     rec.done = { f = H.frame, pend = pend(mogSlot), bank = bp(mogSlot), mp = mpOf(mogSlot),
                  dancing = dancing(mogSlot), tier = tierOf(mogSlot), bg = H.readByte(0x11E2),
@@ -306,98 +287,29 @@ local function installObservers()
   -- RandDance entry whose dance id is $ff (the only path that calls RandBit)
   local rd, rb = H.sym("RandDance"), H.sym("RandBit")
   emu.addMemoryCallback(function()
-    if not mogSlot then return end
-    if (emu.getState()["cpu.y"] & 0xFF) ~= mogSlot * 2 then return end
+    if not mine("y") then return end
     inRandDance = H.readByte(0x32E1 + mogSlot * 2) == 0xFF
   end, emu.callbackType.exec, rd, rd)
   emu.addMemoryCallback(function()
     if not inRandDance then return end
     inRandDance = false
-    masks[#masks + 1] = emu.getState()["cpu.a"] & 0xFFFF
-    H.log(string.format("[rondo] f%d RandDance draws from mask %04X", H.frame, masks[#masks]))
+    draws[#draws + 1] = { mask = emu.getState()["cpu.a"] & 0xFFFF, known = H.readByte(DANCES) }
+    H.log(string.format("[rondo] f%d RandDance draws from mask %04X (known dances %02X)", H.frame,
+      draws[#draws].mask, draws[#draws].known))
   end, emu.callbackType.exec, rb, rb)
-  H.log(string.format("[rondo] stumble arm $%06X, Ot6ActionEnd $%06X, RandDance $%06X, RandBit $%06X",
-    arm, ae, rd, rb))
+  H.log(string.format("[rondo] Cmd_13 $%06X, stumble arm $%06X, Ot6ActionEnd $%06X, RandDance $%06X, "
+    .. "RandBit $%06X", c13, arm, ae, rd, rb))
 end
 
 local riverBg = nil
+local fails = {}
+local function check(ok, msg) if not ok then fails[#fails + 1] = msg end end
 
--- ---- the run ----------------------------------------------------------------
-local snap0, snap3 = nil, nil
-local recsB, recsC = {}, {}
-
-local body = {
-  H.waitFrames(20),
-  H.loadState(STATE),
-  H.waitFrames(30),
-  H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 3000,
-    "control on the defense map"),
-  H.call(function()
-    H.assertEq(H.mapId(), 51, "moogle_defense on map 51")
-    installObservers()
-    riverBg = H.readRomByte((H.sym("DanceBG") & 0x3FFFFF) + RONDO)
-  end),
-  H.navTo(15, 15, { maxFrames = 2500, playBattles = true }),
-  ySwitchTo(3),
-  H.navTo(20, 20, { maxFrames = 4000, playBattles = true }),
-  ySwitchTo(2),
-  H.navTo(10, 21, { maxFrames = 4000, playBattles = true }),
-  ySwitchTo(1),
-  H.navTo(14, 14, { maxFrames = 2500, playBattles = true }),
-  untilP2Battle("the west arm's first wave engages MOG's squad"),
-  H.waitFrames(240),
-  H.call(function()
-    findMog()
-    danceId = H.readRomByte((H.sym("BattleBGDance") & 0x3FFFFF) + H.readByte(0x11E2))
-    H.assertEq(danceId < 8 and danceId ~= RONDO, true,
-      "this background teaches a dance, and it is not Water Rondo")
-  end),
-  winByTapA("P2's first wave won with plain Fights"),
-  H.waitFrames(60),
-  H.call(function()
-    local mask = H.readByte(DANCES)
-    H.assertEq(mask & (1 << danceId) ~= 0, true, "the victory taught the background's dance")
-    H.writeByte(DANCES, mask | (1 << RONDO))
-    H.log(string.format("[rondo] terrain dance %d; known mask %02X -> %02X (Water Rondo added, synthetic)",
-      danceId, mask, H.readByte(DANCES)))
-  end),
-  untilP2Battle("the west arm's second wave engages MOG's squad"),
-  H.waitFrames(240),
-  H.call(function()
-    findMog()
-    local bgDance = H.readRomByte((H.sym("BattleBGDance") & 0x3FFFFF) + H.readByte(0x11E2))
-    H.assertEq(bgDance ~= RONDO and H.readByte(0x11E2) ~= riverBg, true,
-      "the battle is off Water Rondo's terrain: vanilla's stumble roll is live")
-    H.log(string.format("[rondo] second wave: MOG slot %d, %d MP, %d BP; terrain dance %d, river bg %02X",
-      mogSlot, mpOf(mogSlot), bp(mogSlot), bgDance, riverBg))
-  end),
-  mogMenu("MOG's first window"),
-  H.call(function()
-    H.writeWord(0x3C08 + mogSlot * 2, 999)
-    H.log("[rondo] MOG's pool := 999 (synthetic: the price is not the reason)")
-    H.setPad({})
-    snap0 = H.requestSaveState()
-  end),
-  H.waitFrames(2),
-  H.call(function() H.checkReq(snap0, "snapshot at MOG's first window") end),
-
-  -- ---- A. the gate ------------------------------------------------------------
-  raiseBoost(1, "A: R to pending 1"),
-  openDance("A: the dance list opens"),
-  H.waitFrames(20),
-  H.call(function()
-    local wr, td = findInMap(danceNameSeq(RONDO)), findInMap(danceNameSeq(danceId))
-    H.assertEq(wr ~= nil and td ~= nil, true, "both dances are drawn in the list")
-    H.log(string.format("[rondo] A: pending %d: Water Rondo font %02X, terrain dance font %02X",
-      pend(mogSlot), mapWord(wr) >> 8, mapWord(td) >> 8))
-    H.assertEq(mapWord(td) >> 8, WHITE, "A: the terrain dance's row is white (the control)")
-    H.assertEq(mapWord(wr) >> 8, GREY, "A: Water Rondo's row is grey with one point pending")
-  end),
-  danceCursorTo(RONDO, "A: cursor onto Water Rondo"),
-  H.call(function()
-    rec = { arm = "A", buzzes = buzzes, confirms = confirms, queue = H.readByte(0x32CC + mogSlot * 2) }
-  end),
-  H.driveUntil(function() return buzzes > rec.buzzes end, 1800, {
+-- A on the highlighted cell until the confirm sounds or buzzes
+local function confirmCell(what)
+  return H.driveUntil(function()
+    return confirms > rec.confirms0 or buzzes > rec.buzzes0
+  end, 1800, {
     H.call(function()
       ph = ph + 1
       if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == mogSlot then
@@ -405,48 +317,111 @@ local body = {
       else H.setPad({}) end
     end),
     H.waitFrames(1),
-  }, "A: Water Rondo is confirmed and buzzes"),
+  }, what)
+end
+
+-- ---- the run ----------------------------------------------------------------
+local snap0, snapB, reqB = nil, nil, nil
+local recsB, recsC = {}, {}
+
+local body = {
+  H.bootCheckpoint("water-rondo-v1"),
+  H.waitUntil(function() return H.worldMode() and H.worldHasControl() and H.worldAligned() end, 6000,
+    "world control at Nikeah"),
+  H.call(function()
+    local mask = H.readByte(DANCES)
+    H.assertEq(mask & (1 << RONDO) ~= 0, true, string.format("MOG knows Water Rondo (known dances %02X)", mask))
+    for d = 0, 7 do
+      if ctlId == nil and d ~= RONDO and (mask & (1 << d)) ~= 0 then ctlId = d end
+    end
+    H.assertEq(ctlId ~= nil, true, "MOG knows a dance besides Water Rondo (the menu's control)")
+    installObservers()
+    riverBg = H.readRomByte((H.sym("DanceBG") & 0x3FFFFF) + RONDO)
+  end),
+  walkIn(),
+  H.call(function()
+    findMog()
+    local bgDance = H.readRomByte((H.sym("BattleBGDance") & 0x3FFFFF) + H.readByte(0x11E2))
+    H.assertEq(bgDance ~= RONDO and H.readByte(0x11E2) ~= riverBg, true,
+      "the battle is off Water Rondo's terrain: the start's roll is live")
+    H.log(string.format("[rondo] formation group $%04X, $be $%02X: MOG slot %d, %d MP, %d BP; bg %02X (its dance %d), "
+      .. "river bg %02X; known dances %02X, control dance %d", H.readWord(0x11E0), H.readByte(0xBE), mogSlot,
+      mpOf(mogSlot), bp(mogSlot), H.readByte(0x11E2), bgDance, riverBg, H.readByte(DANCES), ctlId))
+  end),
+  mogMenu("MOG's first window"),
+  H.call(function()
+    H.assertEq(mpOf(mogSlot) >= H.boostPrice(8, 2), true, string.format(
+      "MOG's pool (%d) pays a two-point Dance start (%d): the price is not the reason", mpOf(mogSlot),
+      H.boostPrice(8, 2)))
+    H.assertEq(H.readByte(0x32E1 + mogSlot * 2), 0xFF, "MOG has chosen no dance yet ($32E1)")
+    H.setPad({})
+    snap0 = H.requestSaveState()
+  end),
+  H.waitFrames(2),
+  H.call(function() H.checkReq(snap0, "snapshot at MOG's first window") end),
+
+  -- ---- A. the menu: offered at one point, like any dance ----------------------
+  raiseBoost(1, "A: R to pending 1"),
+  openDance("A: the dance list opens"),
+  H.waitFrames(20),
+  H.call(function()
+    local wr, td = findInMap(danceNameSeq(RONDO)), findInMap(danceNameSeq(ctlId))
+    H.assertEq(wr ~= nil and td ~= nil, true, "both dances are drawn in the list")
+    rec = { arm = "A", fontWR = mapWord(wr) >> 8, fontTD = mapWord(td) >> 8 }
+    H.log(string.format("[rondo] A: pending %d: Water Rondo font %02X, control dance font %02X",
+      pend(mogSlot), rec.fontWR, rec.fontTD))
+  end),
+  danceCursorTo(RONDO, "A: cursor onto Water Rondo"),
+  H.call(function() rec.buzzes0, rec.confirms0 = buzzes, confirms end),
+  confirmCell("A: Water Rondo is confirmed (or buzzes)"),
   H.waitFrames(60),
   H.call(function()
     H.setPad({})
-    H.assertEq(confirms, rec.confirms, "A: the confirm sound did not play")
-    H.assertEq(H.readByte(MSTATE), ST_DANCE, "A: the dance list is still open")
-    H.assertEq(H.readByte(0x32CC + mogSlot * 2), rec.queue, "A: nothing was queued for MOG")
-    H.assertEq(dancing(mogSlot), false, "A: no dance started")
-    H.log("[rondo] A PASS: under three points Water Rondo greys and buzzes")
+    local a = rec
+    a.buzzed, a.confirmed = buzzes > a.buzzes0, confirms > a.confirms0
+    a.queue = H.readByte(0x32CC + mogSlot * 2)
+    H.log(string.format("[rondo] A: confirm sounded %s, buzzed %s, MOG's queue $%02X, list open %s",
+      tostring(a.confirmed), tostring(a.buzzed), a.queue, tostring(H.readByte(MSTATE) == ST_DANCE)))
+    check(a.fontTD == WHITE, string.format("A: the control dance's row is white (font %02X)", a.fontTD))
+    check(a.fontWR == WHITE, string.format("A: Water Rondo's row is white at one point (font %02X)", a.fontWR))
+    check(a.confirmed and not a.buzzed, "A: A on Water Rondo at one point plays the confirm, not the buzz")
+    check(H.readByte(MSTATE) ~= ST_DANCE, "A: the dance list closed on the confirm")
     rec = nil
   end),
-  backToCmd("A: back out of the list"),
-  raiseBoost(0, "A: L back to pending 0, so the Defends bank"),
 
-  -- ---- B. three points: the divine never stumbles --------------------------
+  -- ---- B's snapshot: two points banked ---------------------------------------
+  H.call(function() H.setPad({}); rec = nil; reqB = H.requestLoadState(snap0.blob) end),
+  H.waitFrames(2),
+  H.call(function()
+    H.checkReq(reqB, "snapshot load (to bank B's points)")
+    H.rearmInputInjection()
+  end),
   mogDefends("B: MOG Defends (a point banked)"),
   mogMenu("B: MOG's second window"),
-  mogDefends("B: MOG Defends again"),
-  mogMenu("B: MOG's third window"),
   H.call(function()
-    H.assertEq(bp(mogSlot) >= 3, true, string.format("B: MOG banked three points (%d)", bp(mogSlot)))
-    H.writeWord(0x3C08 + mogSlot * 2, 999)
+    H.assertEq(bp(mogSlot) >= 2, true, string.format("B: MOG banked two points (%d)", bp(mogSlot)))
     H.setPad({})
-    snap3 = H.requestSaveState()
+    snapB = H.requestSaveState()
   end),
   H.waitFrames(2),
-  H.call(function() H.checkReq(snap3, "snapshot at MOG's three-point window") end),
+  H.call(function() H.checkReq(snapB, "snapshot at MOG's two-point window") end),
 }
 
+-- ---- B. one or two points: the start rolls on the ladder ---------------------
 local function branchB(k)
   local req
+  local p = (k - 1) % 2 + 1
   return {
-    H.call(function() H.setPad({}); rec = nil; req = H.requestLoadState(snap3.blob) end),
+    H.call(function() H.setPad({}); rec = nil; req = H.requestLoadState(snapB.blob) end),
     H.waitFrames(2),
     H.call(function()
       H.checkReq(req, "snapshot load (B branch " .. k .. ")")
       H.rearmInputInjection()
-      rec = { arm = "B", k = k }
+      rec = { arm = "B", k = k, p = p }
       recsB[#recsB + 1] = rec
     end),
     H.waitFrames((k - 1) * 7 + 1),
-    raiseBoost(3, "B: R to pending 3"),
+    raiseBoost(p, "B: R to pending " .. p),
     openDance("B: the dance list opens"),
     H.waitFrames(20),
     H.call(function()
@@ -455,10 +430,12 @@ local function branchB(k)
     end),
     danceCursorTo(RONDO, "B: cursor onto Water Rondo"),
     H.call(function()
-      rec.pend0, rec.bank0, rec.mp0, rec.bg0 = pend(mogSlot), bp(mogSlot), mpOf(mogSlot), H.readByte(0x11E2)
+      rec.pend0, rec.bank0, rec.mp0 = pend(mogSlot), bp(mogSlot), mpOf(mogSlot)
+      rec.buzzes0, rec.confirms0 = buzzes, confirms
+      rec.committed = true
     end),
     H.driveUntil(function()
-      return H.readByte(0x32CC + mogSlot * 2) ~= 0xFF or dancing(mogSlot)
+      return H.readByte(0x32CC + mogSlot * 2) ~= 0xFF or dancing(mogSlot) or buzzes > rec.buzzes0
     end, 1800, {
       H.call(function()
         ph = ph + 1
@@ -467,10 +444,10 @@ local function branchB(k)
         else H.setPad({}) end
       end),
       H.waitFrames(1),
-    }, "B: Water Rondo commits"),
-    H.call(function() rec.committed = true end),
+    }, "B: Water Rondo commits (or buzzes)"),
+    H.call(function() rec.buzzed = buzzes > rec.buzzes0 end),
     H.driveUntil(function()
-      if not H.battleLoadStarted() then return true end
+      if rec.buzzed or not H.battleLoadStarted() then return true end
       return rec.done ~= nil and H.frame >= rec.done.f + 20
     end, 20000, {
       H.call(function()
@@ -484,43 +461,47 @@ local function branchB(k)
     }, "B: the start turn resolves"),
     H.call(function()
       local d = rec.done
-      if not d then
-        H.log(string.format("[rondo] B branch %d: the wave ended before the start resolved (no outcome)", k))
+      if rec.buzzed then
+        H.log(string.format("[rondo] B branch %d (p=%d): the confirm buzzed (font %02X)", k, p, rec.font))
         return
       end
-      H.log(string.format("[rondo] B branch %d: font %02X, confirm pending %d bank %d MP %d bg %02X | "
-        .. "turn end pending %d MP %d dancing=%s tier %d bg %02X id %d stumbles %d",
-        k, rec.font, rec.pend0, rec.bank0, rec.mp0, rec.bg0, d.pend, d.mp, tostring(d.dancing), d.tier, d.bg,
-        d.id, rec.stumbles or 0))
+      if not d then
+        H.log(string.format("[rondo] B branch %d (p=%d): the battle ended before the start resolved (no outcome)",
+          k, p))
+        return
+      end
+      rec.bankAfter = H.battleLoadStarted() and bp(mogSlot) or nil
+      local r = rec.roll
+      H.log(string.format("[rondo] B branch %d (p=%d): font %02X, confirm pending %d bank %d MP %d | roll %s | "
+        .. "turn end pending %d MP %d dancing=%s tier %d bg %02X id %d stumbles %d | +20f bank %s",
+        k, p, rec.font, rec.pend0, rec.bank0, rec.mp0,
+        r and string.format("f%d $be $%02X draw $%02X bg $%02X, the ladder says %s", r.f, r.be, r.d, r.bg,
+          predicts(p, r.d) and "stumble" or "lands") or "-",
+        d.pend, d.mp, tostring(d.dancing), d.tier, d.bg, d.id, rec.stumbles or 0, tostring(rec.bankAfter)))
     end),
   }
 end
 
 for k = 1, BRANCHES do for _, st in ipairs(branchB(k)) do body[#body + 1] = st end end
 
--- ---- C. the engine's pick ------------------------------------------------------
+-- ---- C. the engine's pick: a random Dance draws from every known dance -------
 local function branchC(k)
   local req
-  return {
+  return H.cond(function() return #draws == 0 end, {
     H.call(function() H.setPad({}); rec = nil; req = H.requestLoadState(snap0.blob) end),
     H.waitFrames(2),
     H.call(function()
       H.checkReq(req, "snapshot load (C branch " .. k .. ")")
       H.rearmInputInjection()
-      rec = { arm = "C", k = k, mp0 = mpOf(mogSlot), masks0 = #masks }
+      rec = { arm = "C", k = k }
       recsC[#recsC + 1] = rec
-      H.writeByte(0x32E1 + mogSlot * 2, RONDO)
       H.writeByte(0x3EE5 + mogSlot * 2, H.readByte(0x3EE5 + mogSlot * 2) | 0x20)
-      rec.committed = true
-      H.log(string.format("[rondo] C branch %d: MOG Muddled, dance id := Water Rondo (synthetic), %d MP",
-        k, rec.mp0))
+      H.log(string.format("[rondo] C branch %d: MOG Muddled (synthetic); dance id $%02X", k,
+        H.readByte(0x32E1 + mogSlot * 2)))
     end),
     H.waitFrames((k - 1) * 7 + 1),
-    -- until his first random Dance resolves, then until a draw from the known
-    -- dances (or the wave ends)
     H.driveUntil(function()
-      if not H.battleLoadStarted() then return true end
-      return rec.done ~= nil and #masks > rec.masks0 and H.frame >= rec.done.f + 20
+      return not H.battleLoadStarted() or #draws > 0
     end, 40000, {
       H.call(function()
         ph = ph + 1
@@ -538,63 +519,69 @@ local function branchC(k)
         else defendHands() end
       end),
       H.waitFrames(1),
-    }, "C: MOG's random Dances"),
+    }, "C: MOG's random Dance"),
     H.call(function()
-      local d = rec.done
-      if not d then
-        H.log(string.format("[rondo] C branch %d: no random Dance resolved before the wave ended", k))
-        return
-      end
-      H.log(string.format("[rondo] C branch %d: first random Dance: stumbles %d, turn end pending %d MP %d "
-        .. "(was %d) dancing=%s id %02X; draws after it: %d", k, rec.stumbles or 0, d.pend, d.mp, rec.mp0,
-        tostring(d.dancing), d.id, #masks - rec.masks0))
+      H.log(string.format("[rondo] C branch %d: %d draw(s) from the known dances", k, #draws))
+      rec = nil
     end),
-  }
+  }, {})
 end
 
-for k = 1, MUDDLES do for _, st in ipairs(branchC(k)) do body[#body + 1] = st end end
+for k = 1, MUDDLES do body[#body + 1] = branchC(k) end
 
 body[#body + 1] = H.call(function()
   H.setPad({})
-  local fails = {}
-  local function check(ok, msg) if not ok then fails[#fails + 1] = msg end end
-  local price = H.boostPrice(8, 3)
-  local resolvedB, resolvedC = 0, 0
+  local resolvedB, landed, stumbled = 0, 0, 0
   for _, r in ipairs(recsB) do
     local d = r.done
-    if d then
+    if r.buzzed then
       resolvedB = resolvedB + 1
-      check(r.font == WHITE, string.format("B %d: Water Rondo's row is white at three points (font %02X)", r.k, r.font))
-      check(r.pend0 == 3, string.format("B %d: confirmed with pending %d (want 3)", r.k, r.pend0))
-      check((r.stumbles or 0) == 0, string.format("B %d: the start stumbled", r.k))
-      check(d.dancing, string.format("B %d: the dance did not lock in", r.k))
-      check(d.tier == 3, string.format("B %d: the start recorded tier %d (want 3)", r.k, d.tier))
-      check(r.mp0 - d.mp == price, string.format("B %d: charged %d MP (want %d)", r.k, r.mp0 - d.mp, price))
-      check(d.bg == riverBg, string.format("B %d: background %02X after the start (want the river's %02X)",
-        r.k, d.bg, riverBg))
+      check(false, string.format("B %d: the confirm buzzed on Water Rondo at %d point(s) (font %02X)", r.k, r.p, r.font))
+    elseif d then
+      resolvedB = resolvedB + 1
+      local st = (r.stumbles or 0) > 0
+      if st then stumbled = stumbled + 1 else landed = landed + 1 end
+      check(r.font == WHITE, string.format("B %d: Water Rondo's row is white at %d point(s) (font %02X)", r.k, r.p, r.font))
+      check(r.pend0 == r.p, string.format("B %d: confirmed with pending %d (want %d)", r.k, r.pend0, r.p))
+      check(r.roll ~= nil, string.format("B %d: MOG's start reached Cmd_13", r.k))
+      if r.roll then
+        local want = predicts(r.p, r.roll.d)
+        check(st == want, string.format("B %d: at %d point(s), draw $%02X: stumbled=%s, the ladder says %s",
+          r.k, r.p, r.roll.d, tostring(st), tostring(want)))
+      end
+      check(st == not d.dancing, string.format("B %d: stumbled=%s but dancing=%s", r.k, tostring(st),
+        tostring(d.dancing)))
+      check(d.pend == r.p, string.format("B %d: %d pip(s) pending at the turn's end (want %d: the boost is spent, "
+        .. "not dropped)", r.k, d.pend, r.p))
+      if r.bankAfter then
+        check(r.bankAfter == r.bank0 - r.p, string.format("B %d: bank %d -> %d (want %d: %d spent, no regen)",
+          r.k, r.bank0, r.bankAfter, r.bank0 - r.p, r.p))
+      end
+      if st then
+        check(d.mp == r.mp0, string.format("B %d: the stumble charged %d MP (want 0)", r.k, r.mp0 - d.mp))
+        check(d.id == RONDO, string.format("B %d: the dance id is %02X after the stumble (want Water Rondo's, %d)",
+          r.k, d.id, RONDO))
+      else
+        check(d.tier == r.p, string.format("B %d: the start recorded tier %d (want %d)", r.k, d.tier, r.p))
+        local price = H.boostPrice(8, r.p)
+        check(r.mp0 - d.mp == price, string.format("B %d: charged %d MP (want %d)", r.k, r.mp0 - d.mp, price))
+        check(d.bg == riverBg, string.format("B %d: background %02X after the start (want the river's %02X)",
+          r.k, d.bg, riverBg))
+      end
     end
   end
-  for _, r in ipairs(recsC) do
-    local d = r.done
-    if d then
-      resolvedC = resolvedC + 1
-      check((r.stumbles or 0) >= 1 and r.stumbleF <= d.f, string.format(
-        "C %d: the Water Rondo start under three points did not stumble", r.k))
-      check(d.mp == r.mp0, string.format("C %d: the stumble charged %d MP", r.k, r.mp0 - d.mp))
-      check(d.pend == 0, string.format("C %d: %d pip(s) pending at the stumble's end", r.k, d.pend))
-      check(not d.dancing, string.format("C %d: a dance locked in from the Water Rondo start", r.k))
-      check(d.id == 0xFF, string.format("C %d: the dance id was left at %02X (want $FF)", r.k, d.id))
-    end
+  for i, m in ipairs(draws) do
+    check(m.mask == m.known and (m.mask & (1 << RONDO)) ~= 0, string.format(
+      "draw %d: RandDance drew from mask %04X (want every known dance, %02X, Water Rondo among them)", i, m.mask,
+      m.known))
   end
-  for i, m in ipairs(masks) do
-    check(m & (1 << RONDO) == 0, string.format("draw %d: RandDance drew from mask %04X, Water Rondo in it", i, m))
-  end
-  H.log(string.format("[rondo] SUMMARY B resolved %d of %d, C resolved %d of %d, random draws %d",
-    resolvedB, #recsB, resolvedC, #recsC, #masks))
+  H.log(string.format("[rondo] SUMMARY B resolved %d of %d (%d landed, %d stumbled); C %d branch(es), "
+    .. "random draws %d; %d failure(s)", resolvedB, #recsB, landed, stumbled, #recsC, #draws, #fails))
   for _, m in ipairs(fails) do H.log("[rondo] FAIL " .. m) end
   H.assertEq(resolvedB >= BRANCHES - 2, true, "B: at least BRANCHES-2 starts resolved")
-  H.assertEq(resolvedC >= 1 and #masks >= 1, true, "C: a Water Rondo start and a random draw were observed")
-  H.assertEq(#fails, 0, "every arm: the full boost is Water Rondo's one gate, and it never stumbles")
+  H.assertEq(#draws >= 1, true, "C: a random Dance drew from the known dances")
+  H.assertEq(#fails, 0, "Water Rondo is offered, rolled, settled and drawn like any dance")
+  H.assertEq(landed >= 1, true, "B: a Water Rondo start under three points landed")
   H.log("[rondo] PASS")
 end)
 

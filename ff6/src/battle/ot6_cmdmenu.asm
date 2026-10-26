@@ -277,27 +277,28 @@
         .a8
         .i16
         lda     $575a           ; +5 = column-1 dance id (caller wrote it)
-        jsl     Ot6DanceRowColor ;  id -> $04 grey / $00 white (the MP, and
-                                ;   Water Rondo's full boost, #380)
+        jsl     Ot6DanceRowCost ;   id -> cost (0 for an $ff empty cell)
+        pha                     ; park column-1 cost
+        jsl     Ot6AbilityGrey  ;   cost -> $04 grey / $00 white
         ora     #$21
         sta     $5756           ; +1: font palette (colors cost + name)
         lda     #$04
         sta     $5755           ; +0: font command
         lda     #$02
         sta     $5757           ; +2: number command
-        lda     $575a
-        jsl     Ot6DanceRowCost ;   id -> cost (0 for an $ff empty cell)
+        pla
         sta     $5758           ; +3: column-1 cost value
         lda     $5760           ; +11 = column-2 dance id
-        jsl     Ot6DanceRowColor
+        jsl     Ot6DanceRowCost
+        pha                     ; park column-2 cost
+        jsl     Ot6AbilityGrey
         ora     #$21
         sta     $575c           ; +7: font palette
         lda     #$04
         sta     $575b           ; +6: font command
         lda     #$02
         sta     $575d           ; +8: number command
-        lda     $5760
-        jsl     Ot6DanceRowCost
+        pla
         sta     $575e           ; +9: column-2 cost value
         plp
         rtl
@@ -499,7 +500,8 @@
         php
         rep     #$10
         .i16
-        jsl     Ot6DanceRowColor ; the MP, and Water Rondo's full boost (#380)
+        jsl     Ot6DanceRowCost
+        jsl     Ot6AbilityGrey
         plp
         bra     Ot6ConfirmVerdict
 .endproc

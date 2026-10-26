@@ -1,51 +1,28 @@
 -- @suite slow
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
--- battle_rondogate.lua -- GOGO's Mimic of Water Rondo under three points
--- drops its boost, and a locked-in step that meets another dancer's
--- background rolls on its start's ladder (#476).
+-- battle_dancestep.lua -- a locked-in Dance step that meets another
+-- dancer's background rolls on its start's ladder (#473, #476).
 --
--- Two rules in Ot6DanceTerrain (ot6_waterrondo.asm) that no other suite
--- reaches (battle_waterrondo's engine pick comes to the gate with nothing
--- pending; battle_danceodds and battle_dancestumble roll only starts):
---   A. the divine's gate.  A Water Rondo start under three points stumbles
---      whatever the roll, and its pending boost is DROPPED (Ot6KeepBoost),
---      not spent: no boost under three could buy that start (kits.md,
---      Mog).  The real case is a GOGO who Mimics MOG's Water Rondo with one
---      or two points pending: Mimic reads GOGO's own pending boost
---      (Ot6MimicKeep leaves a copied Dance's boost pending, for Dance's
---      tier), so the copy reaches the gate with it.  The copy is MOG's
---      queued pair, Dance and the step's spell ($13/$70 here); GOGO's own
---      dance id is $FF, so Cmd_13 takes $3A6F, the dance last picked in a
---      menu: MOG's Water Rondo.  Dropped, the turn ends
---      as an unboosted one: nothing pending at GOGO's Ot6ActionEnd, his bank
---      up by the regen pip (capped at 5), no MP (Mimic is free and a stumble
---      charges none), the dance id cleared.  Spent (the jsl gone), the bank
---      would end the boost down with no regen.
---   B. the ladder on a locked-in step.  The tier a Dance start bought
---      (OT6_DANCETIER) is read by every step (kits.md, Mog: "a locked-in
---      step that meets another dancer's background rolls on the same
---      odds").  Another dancer's landed start turns the background to his
---      dance's, so MOG's next step is off its terrain and rolls: at tier 1 a
---      draw below $40 stumbles, at tier 2 below $10, where vanilla's coin
---      stumbles on any even draw.  Both take the next RNGTbl entry, so the
---      draw a step's roll reads is RNGTbl[$be + 1], $be read as Cmd_13
---      begins (battle_danceodds' prediction), and each such step is
---      predicted from the tier MOG's START recorded, not from the byte the
---      step reads, so a step that read some other tier is caught.
+-- The tier a Dance start bought (OT6_DANCETIER) is read by every step of
+-- that dance (kits.md, Mog: "a locked-in step that meets another dancer's
+-- background rolls on the same odds"), a rule in Ot6DanceTerrain
+-- (ot6_dance.asm) that battle_danceodds and battle_dancestumble, which roll
+-- only starts, do not reach.  Another dancer's landed start turns the
+-- background to his dance's, so MOG's next step is off its terrain and
+-- rolls: at tier 1 a draw below $40 stumbles, at tier 2 below $10, where
+-- vanilla's coin stumbles on any even draw.  Both take the next RNGTbl
+-- entry, so the draw a step's roll reads is RNGTbl[$be + 1], $be read as
+-- Cmd_13 begins (battle_danceodds' prediction), and each such step is
+-- predicted from the tier MOG's START recorded, not from the byte the step
+-- reads, so a step that read some other tier is caught.
 --
 -- Played, nothing written: Continue wor-gogo-v1 (beside the Falcon by
 -- Thamasa), board, and in the Falcon's cabin seat MOG, GOGO, TERRA and
 -- CELES (route-wor-gogo.md's regroup; no route state seats MOG beside
 -- GOGO); in the field menu give GOGO Dance in his second row (his kit
 -- keeps Mimic in the first); lift off, land by Ebot's Rock and walk into a
--- world-map encounter.  MOG knows Water Rondo and four other dances by
--- then ($1D4C).  The battle's first command window is snapshotted and
--- branched; TERRA and CELES Defend throughout.
---   A(p), p = 1 or 2: MOG Defends to three banked pips, presses R to 3 and
---      starts Water Rondo (every step x8: the start can end the wave, which
---      gives the branch no outcome); GOGO Defends until MOG's dance has
---      resolved (SaveForMimic for MOG's seat with the Dance command), then
---      raises his pending to p and picks Mimic.
+-- world-map encounter.  The battle's first command window is snapshotted
+-- and branched; TERRA and CELES Defend throughout.
 --   B(t), t = 1 or 2: MOG starts the background's own dance if he knows it
 --      (no roll), else the first known dance, at pending t; once he is
 --      dancing GOGO starts, unboosted, a known dance whose background is
@@ -56,19 +33,15 @@
 -- frames more and Defends MOG (k-1) % 3 more turns first.  An encounter
 -- that keeps ending before an outcome (LOST_RUN) is fought out by the
 -- walker and the next is taken, at most MAX_ENCOUNTERS.
--- A confirm counts once the seat's command list holds it (a Dance or Mimic
--- pick opens a target window first).
--- Asserted, per resolved A(p): the copy is Dance, its start Water Rondo at
--- pending p; the gate's stumble ran; at GOGO's Ot6ActionEnd nothing pending, not
--- dancing, $32E1 cleared, no MP charged; 20 frames on, the bank is the
--- regen's (min(5, bank + 1)).  Per B observation: MOG's start tier was t;
--- the step stumbled exactly when the tier's rule says from its draw.
--- Coverage: A(1) and A(2) each MIN_A times; B at each tier MIN_B
--- observations, one with a draw on which the tier's rule and vanilla's
--- coin disagree (TELL).
+-- A confirm counts once the seat's command list holds it (a Dance pick
+-- opens a target window first).
+-- Asserted, per observation: MOG's start tier was t; the step stumbled
+-- exactly when the tier's rule says from its draw.  Coverage: each tier
+-- MIN_B observations, one with a draw on which the tier's rule and
+-- vanilla's coin disagree (TELL).
 --
 -- Lever, for evidence only (the suite runs BURN 0; a lab sets the global
--- RONDOGATE_BURN ahead of the file): the walker fights that many encounters
+-- DANCESTEP_BURN ahead of the file): the walker fights that many encounters
 -- on the landing's tiles first, to vary the encounter history (TESTING.md).
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -76,14 +49,13 @@ local TERRA, CELES, MOG, GOGO = 0x00, 0x06, 0x0A, 0x0C
 local NAMES = { [TERRA] = "TERRA", [CELES] = "CELES", [MOG] = "MOG", [GOGO] = "GOGO" }
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_DANCE, ST_DEF, ST_TGT = 0x05, 0x21, 0x27, 0x38
-local CMD_DANCE, CMD_MIMIC = 0x13, 0x12
+local CMD_DANCE = 0x13
 local CMDTBL, CMDROW = 0x202E, 0x890F
 local DANCES = 0x1D4C
-local RONDO = 5
 local DANCETIER = 0x7EEDA1              -- OT6_DANCETIER (ot6_memory.inc), stride 2
 local LANDING = { 250, 224 }            -- gen_wor_ebot's landing by Ebot's Rock
-local BURN = type(RONDOGATE_BURN) == "number" and RONDOGATE_BURN or 0
-local MIN_A, MIN_B = 2, 3
+local BURN = type(DANCESTEP_BURN) == "number" and DANCESTEP_BURN or 0
+local MIN_B = 3
 local SEATS, MAX_BRANCHES, LOST_RUN, MAX_ENCOUNTERS = 8, 12, 4, 3
 local BRANCH_FRAMES = 30000             -- a branch's budget once it starts
 local THRESH = { [1] = 0x40, [2] = 0x10 }
@@ -154,7 +126,7 @@ local function gogoCommands(want, what)
           if not listLogged then
             local t = {}
             for r = 0, n - 1 do t[#t + 1] = string.format("%02X", H.readByte(0x7E9D8A + r)) end
-            H.log(string.format("[rondogate] %s: GOGO's command list (%d): %s", what, n, table.concat(t, " ")))
+            H.log(string.format("[dancestep] %s: GOGO's command list (%d): %s", what, n, table.concat(t, " ")))
             listLogged = true
           end
           local row = nil
@@ -166,7 +138,7 @@ local function gogoCommands(want, what)
       end),
     }, what),
     H.call(function()
-      H.log(string.format("[rondogate] %s: GOGO's commands %02X %02X %02X %02X", what, gogoCmdByte(0),
+      H.log(string.format("[dancestep] %s: GOGO's commands %02X %02X %02X %02X", what, gogoCmdByte(0),
         gogoCmdByte(1), gogoCmdByte(2), gogoCmdByte(3)))
     end),
   }), function() ph, idx, listLogged = 0, 1, false end)
@@ -261,25 +233,8 @@ local function installObservers()
     local ev = c.cur[cy() // 2]
     if ev then ev.stumbled = true end
   end)
-  on(H.sym("SaveForMimic"), function(c)
-    if cx() == mogS * 2 and #c.saves < 8 then
-      c.saves[#c.saves + 1] = string.format("f%d $3A7C=$%04X", H.frame, H.readWord(0x3A7C))
-    end
-    if cx() == mogS * 2 and H.readByte(0x3A7C) == CMD_DANCE then
-      c.mogSaved = c.mogSaved or { f = H.frame, cmd = H.readWord(0x3A7C) }
-    end
-  end)
-  on(H.sym("mimicreplace"), function(c)
-    if cx() ~= gogoS * 2 or c.copy then return end
-    c.copy = { f = H.frame, cmd = H.readByte(0x3F20), atk = H.readByte(0x3F21),
-      pend = pend(gogoS), bank = bank(gogoS), mp = mpOf(gogoS) }
-  end)
   on(H.sym("Ot6ActionEnd"), function(c)
     local x = cx()
-    if x == gogoS * 2 and c.copy and not c.endA then
-      c.endA = { f = H.frame, pend = pend(gogoS), bank = bank(gogoS), mp = mpOf(gogoS),
-        dancing = dancing(gogoS), id = H.readByte(0x32E1 + gogoS * 2), cmd = H.readByte(0x3A7C) }
-    end
     for _, s in ipairs({ mogS, gogoS }) do
       if x == s * 2 and c.cur[s] and not c.cur[s].done then
         local ev = c.cur[s]
@@ -287,7 +242,7 @@ local function installObservers()
       end
     end
   end)
-  H.log(string.format("[rondogate] observers: Cmd_13 $%06X, stumble arm $%06X, Ot6DanceTerrain $%06X, "
+  H.log(string.format("[dancestep] observers: Cmd_13 $%06X, stumble arm $%06X, Ot6DanceTerrain $%06X, "
     .. "Ot6ActionEnd $%06X", H.sym("Cmd_13"), arm, H.sym("Ot6DanceTerrain"), H.sym("Ot6ActionEnd")))
 end
 
@@ -332,7 +287,7 @@ local function danceStart(c, s, p, id, mark)
       c[mark] = { f = H.frame, pend = pend(s), bank = bank(s), mp = mpOf(s) }
       c.presses = (c.presses or 0) + 1
       if c.presses <= 4 or c.presses % 50 == 0 then
-        H.log(string.format("[rondogate] f%d seat %d confirms dance %d (press %d): cursor row %d col %d, "
+        H.log(string.format("[dancestep] f%d seat %d confirms dance %d (press %d): cursor row %d col %d, "
           .. "pending %d, bank %d, MP %d", H.frame, s, id, c.presses, H.readByte(0x893B + s),
           H.readByte(0x8937 + s), pend(s), bank(s), mpOf(s)))
       end
@@ -352,39 +307,15 @@ local function decide(c)
       if st == ST_CMD and pend(mogS) > 0 then return "l" end
       return defend(st)
     end
-    local need = c.kind == "A" and 3 or c.t
+    local need = c.t
     if bank(mogS) < need or c.mogDefs < c.extra then
       if st == ST_CMD and pend(mogS) > 0 then return "l" end
       if st == ST_DEF then c.mogDefPending = true end
       return defend(st)
     end
-    local b = danceStart(c, mogS, need, c.kind == "A" and RONDO or c.x, "mogPress")
-    return b
+    return danceStart(c, mogS, need, c.x, "mogPress")
   end
   if a == gogoS then
-    if c.kind == "A" then
-      if c.mimicSent then
-        if st == ST_TGT then return "a" end
-        if st == ST_CMD and pend(gogoS) > 0 then return "l" end
-        return defend(st)
-      end
-      if not c.mogGo or bank(gogoS) < c.p then
-        if st == ST_CMD and pend(gogoS) > 0 then return "l" end
-        return defend(st)
-      end
-      if not c.mogSaved then return nil end          -- hold the window: MOG's dance is still to resolve
-      if st == ST_CMD then
-        local b = toPend(gogoS, c.p)
-        if b then return b end
-        return toRow(gogoS, CMD_MIMIC)
-      end
-      if st == ST_TGT then
-        c.mimicPress = { f = H.frame, pend = pend(gogoS), bank = bank(gogoS), mp = mpOf(gogoS) }
-        return "a"
-      end
-      if c.mimicPress then return nil end
-      return "b"
-    end
     -- B: GOGO dances once MOG is dancing
     if not (c.mogGo and dancing(mogS)) or dancing(gogoS) then
       if st == ST_CMD and pend(gogoS) > 0 then return "l" end
@@ -403,11 +334,7 @@ local function queued(s) return H.readByte(0x32CC + s * 2) ~= 0xFF end
 local function drive(c)
   if c.mogPress and not c.mogGo and (queued(mogS) or c.cur[mogS]) then
     c.mogGo = c.mogPress
-    H.log(string.format("[rondogate] f%d MOG's dance is queued (confirmed f%d)", H.frame, c.mogPress.f))
-  end
-  if c.mimicPress and not c.mimicSent and (queued(gogoS) or c.copy) then
-    c.mimicSent = c.mimicPress
-    H.log(string.format("[rondogate] f%d GOGO's Mimic is queued (confirmed f%d)", H.frame, c.mimicPress.f))
+    H.log(string.format("[dancestep] f%d MOG's dance is queued (confirmed f%d)", H.frame, c.mogPress.f))
   end
   ph = ph + 1
   if ph % 8 == 0 then
@@ -422,7 +349,6 @@ local function obsOf(r)
   -- MOG's locked-in steps that came in off his dance's terrain, after a
   -- start of his that recorded the branch's tier
   local out = {}
-  if r.kind ~= "B" then return out end
   local start = nil
   for _, ev in ipairs(r.ev) do
     if ev.who == r.mogS then
@@ -436,23 +362,19 @@ local function obsOf(r)
 end
 
 local function tally()
-  local t = { A = { [1] = 0, [2] = 0 }, B = { [1] = { n = 0, tell = 0 }, [2] = { n = 0, tell = 0 } } }
+  local t = { [1] = { n = 0, tell = 0 }, [2] = { n = 0, tell = 0 } }
   for _, r in ipairs(recs) do
-    if r.kind == "A" and r.resolved then t.A[r.p] = t.A[r.p] + 1 end
-    if r.kind == "B" then
-      for _, o in ipairs(obsOf(r)) do
-        local x = t.B[r.t]
-        x.n = x.n + 1
-        if telling(r.t, o.ev.d) then x.tell = x.tell + 1 end
-      end
+    for _, o in ipairs(obsOf(r)) do
+      local x = t[r.t]
+      x.n = x.n + 1
+      if telling(r.t, o.ev.d) then x.tell = x.tell + 1 end
     end
   end
   return t
 end
 local function shortOf(t)
   local s = {}
-  for p = 1, 2 do if t.A[p] < MIN_A then s[#s + 1] = "A" .. p end end
-  for k = 1, 2 do if t.B[k].n < MIN_B or t.B[k].tell < 1 then s[#s + 1] = "B" .. k end end
+  for k = 1, 2 do if t[k].n < MIN_B or t[k].tell < 1 then s[#s + 1] = "B" .. k end end
   return s
 end
 local function needMore() return #shortOf(tally()) > 0 end
@@ -469,31 +391,27 @@ local function branch(bi)
       H.rearmInputInjection()
       local short = shortOf(tally())
       local pick = short[(bi - 1) % #short + 1]
-      c = { k = #recs + 1, kind = pick:sub(1, 1), enc = enc, seat = seat, bi = bi, ev = {}, cur = {}, saves = {},
-        mogDefs = 0, extra = (bi - 1) % 3, mogS = mogS, gogoS = gogoS }
-      if c.kind == "A" then c.p = tonumber(pick:sub(2)) else c.t = tonumber(pick:sub(2)) end
+      c = { k = #recs + 1, enc = enc, seat = seat, bi = bi, ev = {}, cur = {},
+        mogDefs = 0, extra = (bi - 1) % 3, mogS = mogS, gogoS = gogoS, t = tonumber(pick:sub(2)) }
       local mask = H.readByte(DANCES)
       local bgd = bgDance(H.readByte(0x11E2))
-      if c.kind == "B" then
-        if bgd ~= RONDO and (mask & (1 << bgd)) ~= 0 then c.x = bgd end
-        for d = 0, 7 do
-          if c.x == nil and d ~= RONDO and (mask & (1 << d)) ~= 0 then c.x = d end
-        end
-        for d = 0, 7 do
-          if c.y == nil and d ~= RONDO and d ~= c.x and (mask & (1 << d)) ~= 0
-             and danceBg(d) ~= danceBg(c.x) then c.y = d end
-        end
-        H.assertEq(c.x ~= nil and c.y ~= nil, true, string.format(
-          "MOG knows two dances with different backgrounds besides Water Rondo (mask %02X)", mask))
+      if bgd < 8 and (mask & (1 << bgd)) ~= 0 then c.x = bgd end
+      for d = 0, 7 do
+        if c.x == nil and (mask & (1 << d)) ~= 0 then c.x = d end
       end
+      for d = 0, 7 do
+        if c.y == nil and c.x ~= nil and d ~= c.x and (mask & (1 << d)) ~= 0
+           and danceBg(d) ~= danceBg(c.x) then c.y = d end
+      end
+      H.assertEq(c.x ~= nil and c.y ~= nil, true, string.format(
+        "MOG knows two dances with different backgrounds (mask %02X)", mask))
       c.wait = (bi - 1) * 7
       recs[#recs + 1] = c
       rec = c
       ph = 0
-      H.log(string.format("[rondogate] branch %d (encounter %d seat %d #%d): %s%s, %d idle frames, %d extra "
-        .. "Defends; bg $%02X (its dance %d)%s; MOG bank %d MP %d, GOGO bank %d MP %d", c.k, enc, seat, bi,
-        c.kind, c.kind == "A" and ("(p=" .. c.p .. ")") or ("(t=" .. c.t .. ")"), c.wait, c.extra,
-        H.readByte(0x11E2), bgd, c.kind == "B" and string.format("; MOG dance %d, GOGO dance %d", c.x, c.y) or "",
+      H.log(string.format("[dancestep] branch %d (encounter %d seat %d #%d): B(t=%d), %d idle frames, %d extra "
+        .. "Defends; bg $%02X (its dance %d); MOG dance %d, GOGO dance %d; MOG bank %d MP %d, GOGO bank %d MP %d",
+        c.k, enc, seat, bi, c.t, c.wait, c.extra, H.readByte(0x11E2), bgd, c.x, c.y,
         bank(mogS), mpOf(mogS), bank(gogoS), mpOf(gogoS)))
     end),
     H.lazy(function() return H.waitFrames(c.wait + 1) end),
@@ -503,16 +421,7 @@ local function branch(bi)
       if not c.lost and H.frame - c.f0 > BRANCH_FRAMES then
         c.lost = string.format("the branch's %d frames ran out", BRANCH_FRAMES)
       end
-      if c.kind == "A" then
-        if c.endA and H.frame >= c.endA.f + 20 then
-          c.after = { bank = bank(gogoS) }
-          c.resolved = true
-          return true
-        end
-        if c.endA then return false end
-        return c.lost ~= nil
-      end
-      -- B: until MOG's dance ends, or the battle does
+      -- until MOG's dance ends, or the battle does
       if c.lost then return true end
       if c.mogGo and c.mogStartDone == nil then
         for _, ev in ipairs(c.ev) do
@@ -539,43 +448,22 @@ local function branch(bi)
       c.over = true
       H.setPad({})
       for _, ev in ipairs(c.ev) do
-        H.log(string.format("[rondogate] branch %d %s %s f%d: $be $%02X draw $%02X bg $%02X (dance %d) "
+        H.log(string.format("[dancestep] branch %d %s %s f%d: $be $%02X draw $%02X bg $%02X (dance %d) "
           .. "id %s pend %d tier@cmd %d tier@roll %s MP %d stumbled=%s%s", c.k, ev.who == mogS and "MOG" or "GOGO",
           ev.locked and "step" or "start", ev.f, ev.be, ev.d, ev.bg, bgDance(ev.bg), tostring(ev.id), ev.pend, ev.tier,
           tostring(ev.tierT), ev.mp, tostring(ev.stumbled or false),
           ev.done and string.format(" -> dancing=%s bg $%02X", tostring(ev.done.dancing), ev.done.bg) or ""))
       end
-      H.log(string.format("[rondogate] branch %d MOG's SaveForMimic: %s", c.k, table.concat(c.saves, ", ")))
-      local outcome
-      if c.kind == "A" then
-        outcome = c.resolved and "resolved" or ("no outcome: " .. tostring(c.lost))
-        if c.resolved then lostRun = 0 else lostRun = lostRun + 1 end
-        local cp, e = c.copy or {}, c.endA or {}
-        local g = nil
-        for _, ev in ipairs(c.ev) do if ev.who == gogoS and ev.f >= (cp.f or math.huge) then g = g or ev end end
-        c.gev = g
-        H.log(string.format("[rondogate] branch %d A(p=%d) %s | MOG start %s; MOG saved %s | copy %s | GOGO roll %s "
-          .. "| GOGO end %s | +20f bank %s", c.k, c.p, outcome,
-          c.mogGo and string.format("f%d pend %d bank %d MP %d", c.mogGo.f, c.mogGo.pend, c.mogGo.bank, c.mogGo.mp) or "-",
-          c.mogSaved and string.format("f%d $3A7C=$%04X", c.mogSaved.f, c.mogSaved.cmd) or "-",
-          c.copy and string.format("f%d $%02X/$%02X pend %d bank %d MP %d", cp.f, cp.cmd, cp.atk, cp.pend, cp.bank, cp.mp) or "-",
-          g and string.format("f%d id %s tier %s pend %d locked=%s stumbled=%s", g.f, tostring(g.id), tostring(g.tierT),
-            g.pend, tostring(g.locked), tostring(g.stumbled or false)) or "-",
-          c.endA and string.format("f%d pend %d bank %d MP %d dancing=%s $32E1=$%02X cmd $%02X", e.f, e.pend, e.bank, e.mp,
-            tostring(e.dancing), e.id, e.cmd) or "-",
-          c.after and tostring(c.after.bank) or "-"))
-      else
-        local obs = obsOf(c)
-        if #obs > 0 then lostRun = 0 else lostRun = lostRun + 1 end
-        for _, o in ipairs(obs) do
-          H.log(string.format("[rondogate] branch %d B(t=%d) OBS MOG step f%d off terrain (bg $%02X): start tier %d, "
-            .. "draw $%02X, the rule says %s%s; stumbled=%s", c.k, c.t, o.ev.f, o.ev.bg, o.t0, o.ev.d,
-            predicts(o.t0, o.ev.d) and "stumble" or "lands", telling(o.t0, o.ev.d) and " (tells from vanilla)" or "",
-            tostring(o.ev.stumbled or false)))
-        end
-        outcome = string.format("%d observation(s)%s", #obs, c.lost and (", then " .. c.lost) or "")
-        H.log(string.format("[rondogate] branch %d B(t=%d): %s", c.k, c.t, outcome))
+      local obs = obsOf(c)
+      if #obs > 0 then lostRun = 0 else lostRun = lostRun + 1 end
+      for _, o in ipairs(obs) do
+        H.log(string.format("[dancestep] branch %d B(t=%d) OBS MOG step f%d off terrain (bg $%02X): start tier %d, "
+          .. "draw $%02X, the rule says %s%s; stumbled=%s", c.k, c.t, o.ev.f, o.ev.bg, o.t0, o.ev.d,
+          predicts(o.t0, o.ev.d) and "stumble" or "lands", telling(o.t0, o.ev.d) and " (tells from vanilla)" or "",
+          tostring(o.ev.stumbled or false)))
       end
+      H.log(string.format("[dancestep] branch %d B(t=%d): %d observation(s)%s", c.k, c.t, #obs,
+        c.lost and (", then " .. c.lost) or ""))
       rec = nil
     end),
   }, {})
@@ -598,7 +486,7 @@ local function walkIn()
         if W == nil and H.worldPassable(x + d[1], y + d[2]) then W = { { x + d[1], y + d[2] }, { x, y } } end
       end
       assert(W, "a walkable tile beside the landing")
-      H.log(string.format("[rondogate] walking (%d,%d) <-> (%d,%d)", W[1][1], W[1][2], W[2][1], W[2][2]))
+      H.log(string.format("[dancestep] walking (%d,%d) <-> (%d,%d)", W[1][1], W[1][2], W[2][1], W[2][2]))
     end),
     H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
       H.call(function()
@@ -646,7 +534,7 @@ local function seatOf(e, s)
     walkIn(),
     H.call(function()
       findSeats()
-      H.log(string.format("[rondogate] encounter %d seat %d: formation group $%04X, $be $%02X, bg $%02X; "
+      H.log(string.format("[dancestep] encounter %d seat %d: formation group $%04X, $be $%02X, bg $%02X; "
         .. "MOG slot %d (L%d, %d MP), GOGO slot %d (L%d, %d MP); known dances $%02X", e, s, H.readWord(0x11E0),
         H.readByte(0xBE), H.readByte(0x11E2), mogS, K.lv(MOG), mpOf(mogS), gogoS, K.lv(GOGO), mpOf(gogoS),
         H.readByte(DANCES)))
@@ -661,8 +549,8 @@ local function seatOf(e, s)
     }, "the first command window"),
     H.cond(function() return encLost == nil end, {
       H.call(function()
-        H.assertEq(mpOf(mogS) >= H.boostPrice(8, 3), true, string.format(
-          "MOG's pool (%d) pays a three-point Dance start (%d)", mpOf(mogS), H.boostPrice(8, 3)))
+        H.assertEq(mpOf(mogS) >= H.boostPrice(8, 2), true, string.format(
+          "MOG's pool (%d) pays a two-point Dance start (%d)", mpOf(mogS), H.boostPrice(8, 2)))
         H.setPad({})
         snap = H.requestSaveState()
       end),
@@ -713,8 +601,6 @@ local body = {
   worldControl("world control on the landing"),
   H.call(function()
     say("wor", "landed")
-    H.assertEq((H.readByte(DANCES) & (1 << RONDO)) ~= 0, true, string.format(
-      "MOG knows Water Rondo (known dances $%02X)", H.readByte(DANCES)))
     installObservers()
   end),
 }
@@ -730,7 +616,7 @@ for i = 1, BURN do
     fightThrough("BURN: the walker fights encounter " .. i),
     worldControl("world control after BURN " .. i),
     H.call(function()
-      H.log(string.format("[rondogate] BURN %d: encounters used up; $1FA1-5 = %02X %02X %02X %02X %02X", i,
+      H.log(string.format("[dancestep] BURN %d: encounters used up; $1FA1-5 = %02X %02X %02X %02X %02X", i,
         H.readByte(0x1FA1), H.readByte(0x1FA2), H.readByte(0x1FA3), H.readByte(0x1FA4), H.readByte(0x1FA5)))
     end),
   })
@@ -743,50 +629,25 @@ body[#body + 1] = H.call(function()
   local fails = {}
   local function check(ok, msg) if not ok then fails[#fails + 1] = msg end end
   for _, r in ipairs(recs) do
-    if r.kind == "A" and r.resolved then
-      local cp, e, g = r.copy, r.endA, r.gev
-      -- the copy is MOG's queued pair, Dance and the step's spell; the dance id the
-      -- copier's Cmd_13 reads is the last one picked in a menu ($3A6F: MOG's)
-      check(cp.cmd == CMD_DANCE, string.format(
-        "branch %d: GOGO's copy is command $%02X (want Dance $13)", r.k, cp.cmd))
-      check(cp.pend == r.p, string.format("branch %d: %d pending at the copy (want %d)", r.k, cp.pend, r.p))
-      check(g ~= nil and g.id == RONDO and g.pend == r.p and not g.locked, string.format(
-        "branch %d: GOGO's Water Rondo start reached the terrain roll at pending %d (id %s, pending %s)", r.k, r.p,
-        g and tostring(g.id) or "-", g and tostring(g.pend) or "-"))
-      check(g ~= nil and g.stumbled == true, string.format(
-        "branch %d: the gate stumbled GOGO's Water Rondo at %d point(s)", r.k, r.p))
-      check(e.pend == 0, string.format(
-        "branch %d: %d pip(s) still pending at GOGO's Ot6ActionEnd (want 0: the gate drops the boost)", r.k, e.pend))
-      check(not e.dancing, string.format("branch %d: GOGO is dancing after the gate", r.k))
-      check(e.id == 0xFF, string.format("branch %d: GOGO's dance id $%02X after the gate (want $FF)", r.k, e.id))
-      check(e.mp == cp.mp, string.format("branch %d: the copy charged %d MP (want 0)", r.k, cp.mp - e.mp))
-      local want = math.min(5, cp.bank + 1)
-      check(r.after.bank == want, string.format(
-        "branch %d: GOGO's bank %d -> %d (want %d: nothing spent, the regen pip)", r.k, cp.bank, r.after.bank, want))
-    end
-    if r.kind == "B" then
-      for _, o in ipairs(obsOf(r)) do
-        check(o.t0 == r.t, string.format("branch %d: MOG's start recorded tier %d (want %d)", r.k, o.t0, r.t))
-        local want = predicts(r.t, o.ev.d)
-        check((o.ev.stumbled or false) == want, string.format(
-          "branch %d: MOG's step f%d at tier %d, draw $%02X: stumbled=%s, the start's ladder says %s", r.k, o.ev.f,
-          r.t, o.ev.d, tostring(o.ev.stumbled or false), tostring(want)))
-        check((o.ev.stumbled or false) == (not o.ev.done.dancing), string.format(
-          "branch %d: MOG's step f%d stumbled=%s but dancing=%s after it", r.k, o.ev.f,
-          tostring(o.ev.stumbled or false), tostring(o.ev.done.dancing)))
-      end
+    for _, o in ipairs(obsOf(r)) do
+      check(o.t0 == r.t, string.format("branch %d: MOG's start recorded tier %d (want %d)", r.k, o.t0, r.t))
+      local want = predicts(r.t, o.ev.d)
+      check((o.ev.stumbled or false) == want, string.format(
+        "branch %d: MOG's step f%d at tier %d, draw $%02X: stumbled=%s, the start's ladder says %s", r.k, o.ev.f,
+        r.t, o.ev.d, tostring(o.ev.stumbled or false), tostring(want)))
+      check((o.ev.stumbled or false) == (not o.ev.done.dancing), string.format(
+        "branch %d: MOG's step f%d stumbled=%s but dancing=%s after it", r.k, o.ev.f,
+        tostring(o.ev.stumbled or false), tostring(o.ev.done.dancing)))
     end
   end
   local t = tally()
-  H.log(string.format("[rondogate] SUMMARY A(1) %d resolved, A(2) %d resolved; B(1) %d observations (%d telling), "
-    .. "B(2) %d observations (%d telling); %d branches", t.A[1], t.A[2], t.B[1].n, t.B[1].tell, t.B[2].n,
-    t.B[2].tell, #recs))
-  for _, m in ipairs(fails) do H.log("[rondogate] FAIL " .. m) end
-  H.assertEq(#fails, 0, "every Water Rondo copy under three points dropped its boost, and every locked-in step "
-    .. "rolled on its start's ladder")
+  H.log(string.format("[dancestep] SUMMARY B(1) %d observations (%d telling), B(2) %d observations (%d telling); "
+    .. "%d branches", t[1].n, t[1].tell, t[2].n, t[2].tell, #recs))
+  for _, m in ipairs(fails) do H.log("[dancestep] FAIL " .. m) end
+  H.assertEq(#fails, 0, "every locked-in step rolled on its start's ladder")
   local short = shortOf(t)
   H.assertEq(#short, 0, "coverage: " .. (#short > 0 and ("short of " .. table.concat(short, ", ")) or "met"))
-  H.log("[rondogate] PASS")
+  H.log("[dancestep] PASS")
 end)
 
 H.run({ maxFrames = 6000000 }, body)

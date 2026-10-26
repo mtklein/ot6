@@ -40,7 +40,7 @@ touches vanilla behavior where a pillar requires it.
 | Strago | Scholar | Rod | Fire/Ice/Lightning | Lores (five equipped), Aqua Rake as the free row; **Analyze** (Scan: reveals every weakness of a species), always his, 3 MP (kits.md) |
 | Relm | Painter | Brush | — | Sketch stays as signature |
 | Shadow | Assassin | Dagger (thrown) | Dark | Throw (signature) over the eight throwing items, learned by acquisition as Edgar's Tools are: three stars, three skeans (pierce and an element), the smoke (Image) and the exit (Vanish), whose boost buys reach (kits.md "Shadow"); divine: Assassinate, at a full 3-BP boost (kits.md "Divines"): the hit of his that breaks an enemy kills it outright, as does a hit on one already Broken; a boss is only Broken |
-| Mog | Dancer | Spear | varies by dance | the 8 Dances, verbatim |
+| Mog | Dancer | Spear | varies by dance | the 8 Dances, verbatim; no divine for now (kits.md "Divines") |
 | Umaro / Gogo | Berserker / Mime | — | — | bonus characters; Gogo has access to every job and masters none |
 
 **Break classes (4):** Slash (swords, katanas, claws), Pierce (spears,

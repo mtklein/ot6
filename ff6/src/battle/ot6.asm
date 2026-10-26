@@ -85,9 +85,9 @@
 ; Debilitator reveals the weakness it adds (#378), appended for the same reason.
         .include "ot6_debilitator.asm"
 
-; Mog's Water Rondo, the divine of his Dance (#380), appended for the same
+; Dance's terrain roll on the boost's ladder (#473), appended for the same
 ; reason.
-        .include "ot6_waterrondo.asm"
+        .include "ot6_dance.asm"
 
 ; Umaro's kit (#380), appended for the same reason.
         .include "ot6_umaro.asm"

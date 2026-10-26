@@ -98,7 +98,7 @@ it (a Jackpot), and is free where it does not (a Cleave: the boost is kept,
 | Shadow | Assassinate | his 3-BP action: a hit of it that breaks a non-boss, or lands on a Broken one, kills it (the effect, not a gate) | yes (`ot6_divine.asm`) |
 | Sabin | Bum Rush | (built today as a 99-MP Blitz row at any boost; as a divine it will take the full boost) | no |
 | Locke | Master's Mark | every enemy robbed (its rare item, else its common, no roll) and read, 99 MP | yes (`ot6_thief.asm`) |
-| Mog | Water Rondo | the dance at 3 BP: every step x8 for the battle, 99 MP, and, like any 3-BP dance, it never stumbles, wherever the party fights | yes (`ot6_waterrondo.asm`) |
+| Mog | (open: none of his dances stands above the others, owner 2026-10-26, #478) | — | no |
 | Umaro | Storm | a dump of all three points: Storm, ice on every enemy at x8, with or without the Blizzard Orb | yes (`ot6_umaro.asm`) |
 | Strago | Study | his Scan at 3 BP: reads every enemy and learns every lore any monster present could cast, 99 MP | yes (`ot6_analyze.asm`) |
 | Gau | (open, kit-gau.md) | at 3 BP | no |
@@ -108,16 +108,14 @@ Terra's Ultima is a fold, not a divine, but it too is what a full boost buys
 the once-a-battle flag (`OT6_DIVINE_USED`), is retired.
 Suites: `battle_divines` and `battle_cleave` (Cleave), `battle_jackpot`,
 `battle_assassinate`, `battle_trance` and `battle_morphrandom`, `battle_runicblade`,
-`battle_overclock`, `battle_waterrondo`, `battle_umaro`, `battle_mastersmark`, each with its gate
+`battle_overclock`, `battle_umaro`, `battle_mastersmark`, each with its gate
 (under 3 BP no divine), and an old-ROM red; the menu divines also with a
 second use in one battle.
 
 The engine picks a command for a character the player is not driving
 (Muddle, Charm, the Colosseum, Berserk) and spends no boost doing it, so
 every divine closes that path: a random SwdTech's range stops short of
-Cleave (`Ot6RandBushidoTop`), a random Dance draws from the known dances
-less Water Rondo and a Water Rondo start under three points stumbles
-(`Ot6DanceKnownRand`, `Ot6DanceTerrain`), a Morph the engine chose takes
+Cleave (`Ot6RandBushidoTop`), a Morph the engine chose takes
 the 0-BP span, whatever is pending (`Ot6MorphTake`), and Umaro's Storm is his only on a dump of all
 three points, which only being hurt makes (`Ot6UmaroArm`).
 
@@ -1133,25 +1131,16 @@ there).
   passive.
 - **Setzer — Gambler/Merchant**: built; see "Setzer" above (#319).
 - **Mog — Dancer (piercing: spear)**: the 8 Dances verbatim ✦,
-  learned by dancing on each terrain ✦; divine **Water Rondo** (built,
-  #380, `ot6_waterrondo.asm`), kept WoB-missable, vanilla-style: learned on
-  the Lete River.  Its one gate is the full boost: under three points its row
-  greys and the confirm buzzes (`Ot6DanceRowColor`, the draw's and the
-  confirm's one verdict).  Three points buy what three points buy any dance
-  (every step x8 for the battle, the start at 99 MP, and no stumble, below),
-  and the party almost never fights on a river again: a three-point Water
-  Rondo starts wherever it stands and turns the background to the river, so
-  every later step matches (`Ot6DanceTerrain`).
-  *Reason it is worth three points: El Nino and Plasma at x8 every turn for
-  the rest of the battle, anywhere.*  The engine's picks spend no boost: a
-  random Dance (Muddle, Charm, the Colosseum) draws from the known dances
-  less Water Rondo (`Ot6DanceKnownRand`), and a Water Rondo start that still
-  arrives under three points (a dance id left by an earlier start, a Gogo's
-  Mimic he did not boost) stumbles, charging nothing, neither MP nor pips (no
-  boost under three could buy it), and clears the id.  A Gogo's Mimic reads
-  Gogo's own pending boost, the Jackpot precedent.  `battle_waterrondo`;
-  `battle_rondogate` plays the Mimic (GOGO beside MOG, one or two points
-  pending: the boost dropped, the regen pip earned).
+  learned by fighting on each dance's terrain ✦, vanilla's rule.  No divine
+  for now (owner, 2026-10-26, #478): none of his dances stands above the
+  others, so Water Rondo is an ordinary dance, learned (the Serpent
+  Trench's battles, [route-water-rondo.md](route-water-rondo.md)), priced,
+  boosted and rolled like the other seven, and a random Dance (Muddle,
+  Charm, the Colosseum) can draw it.  From #380 to #478 it was his divine,
+  gated on a full boost.  `battle_waterrondo` checks it at the points where
+  it used to differ: its row white and its confirm taken under three
+  points, a one- or two-point start rolled on the ladder below and settled
+  like any dance's, and a random Dance drawn from every known dance.
 
   **The stumble ladder (#473).** Off its own terrain a Dance start stumbles
   on vanilla's coin: Cmd_13 rolls `RandCarry`, and an even draw (carry
@@ -1179,7 +1168,7 @@ there).
   still one payoff: the boost buys the dance at that tier, and starting is
   part of it.  `battle_danceodds` checks the rule on every draw it meets at
   each level and the thresholds as odds over RNGTbl; `battle_dancestumble`
-  the settlement; `battle_rondogate` MOG's locked-in steps on GOGO's
+  the settlement; `battle_dancestep` MOG's locked-in steps on GOGO's
   background, each predicted from the tier MOG's start bought.
 - **Umaro — Berserker (bludgeoning: club, fists)**: see "Umaro" below
   (#380).

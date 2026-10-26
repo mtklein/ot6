@@ -561,10 +561,14 @@ TEST_ENV = {
     # #270: the driver's Mimic line for GOGO, on the Dirt Dragon from the
     # wor_opera leg's snapshot at the Opera House's catwalk switch
     "battle_mimicdriver": "OT6_TIMEOUT=3600",
-    # #476: GOGO's Mimic of Water Rondo under three points, and a locked-in
-    # step on another dancer's background; the cabin seats MOG beside GOGO
-    "battle_rondogate": "OT6_TIMEOUT=7200 "
+    # #476: a locked-in Dance step on another dancer's background rolls on
+    # its start's ladder; the cabin seats MOG beside GOGO
+    "battle_dancestep": "OT6_TIMEOUT=7200 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-gogo-v1",
+    # #478: Water Rondo offered, rolled and drawn like any dance, from the
+    # save outside Nikeah after MOG learns it
+    "battle_waterrondo": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/water-rondo-v1",
     # #270: the driver's ward line (Shell) against the Dirt Dragon, from the
     # same snapshot
     "battle_wardline": "OT6_TIMEOUT=1800",
