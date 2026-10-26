@@ -230,7 +230,8 @@ No path takes MP and then starts no trance: the gate and the charge test the
 same two numbers (`$3c08,y` against `$3a4c`), and the trance is set before the
 charge. The one path that took pips for nothing was the unpayable start;
 `Ot6RageStartGate` now zeroes the pending boost on its refusal, as
-`Ot6DanceStumble` does for a stumbled dance. Dance's `Ot6DanceStartGate`
+`Ot6DanceStumble` then did for a stumbled dance (since #473 a stumble spends
+the boost, which bought its odds, kits.md's Mog). Dance's `Ot6DanceStartGate`
 refusal had the same shape, and so did every other costed verb (spells,
 Blitz, SwdTech, Tools): #450 settles them once, where the refusal is made.
 `CalcAttackEffect`'s MP fizzle (`@32ca`) calls `Ot6FizzleDropBoost`, which

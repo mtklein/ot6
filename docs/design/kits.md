@@ -98,7 +98,7 @@ it (a Jackpot), and is free where it does not (a Cleave: the boost is kept,
 | Shadow | Assassinate | his 3-BP action: a hit of it that breaks a non-boss, or lands on a Broken one, kills it (the effect, not a gate) | yes (`ot6_divine.asm`) |
 | Sabin | Bum Rush | (built today as a 99-MP Blitz row at any boost; as a divine it will take the full boost) | no |
 | Locke | Master's Mark | every enemy robbed (its rare item, else its common, no roll) and read, 99 MP | yes (`ot6_thief.asm`) |
-| Mog | Water Rondo | the dance at 3 BP: every step x8 for the battle, 99 MP, and it never stumbles, wherever the party fights | yes (`ot6_waterrondo.asm`) |
+| Mog | Water Rondo | the dance at 3 BP: every step x8 for the battle, 99 MP, and, like any 3-BP dance, it never stumbles, wherever the party fights | yes (`ot6_waterrondo.asm`) |
 | Umaro | Storm | a dump of all three points: Storm, ice on every enemy at x8, with or without the Blizzard Orb | yes (`ot6_umaro.asm`) |
 | Strago | Study | his Scan at 3 BP: reads every enemy and learns every lore any monster present could cast, 99 MP | yes (`ot6_analyze.asm`) |
 | Gau | (open, kit-gau.md) | at 3 BP | no |
@@ -1071,19 +1071,46 @@ route-wor-falcon.md 13.10).
   the Lete River.  Its one gate is the full boost: under three points its row
   greys and the confirm buzzes (`Ot6DanceRowColor`, the draw's and the
   confirm's one verdict).  Three points buy what three points buy any dance
-  (every step x8 for the battle, the start at 99 MP), and one thing more: it
-  never stumbles.  Off its own terrain a dance start stumbles half the time
-  (vanilla's roll in Cmd_13), and the party almost never fights on a river
-  again; a three-point Water Rondo starts wherever it stands and turns the
-  background to the river, so every later step matches (`Ot6DanceTerrain`).
+  (every step x8 for the battle, the start at 99 MP, and no stumble, below),
+  and the party almost never fights on a river again: a three-point Water
+  Rondo starts wherever it stands and turns the background to the river, so
+  every later step matches (`Ot6DanceTerrain`).
   *Reason it is worth three points: El Nino and Plasma at x8 every turn for
-  the rest of the battle, and the only dance a player can count on starting
-  anywhere.*  The engine's picks spend no boost: a random Dance (Muddle,
-  Charm, the Colosseum) draws from the known dances less Water Rondo
-  (`Ot6DanceKnownRand`), and a Water Rondo start that still arrives under
-  three points (a dance id left by an earlier start, a Gogo's Mimic he did
-  not boost) stumbles, charging nothing, and clears the id.  A Gogo's Mimic
-  reads Gogo's own pending boost, the Jackpot precedent.  `battle_waterrondo`.
+  the rest of the battle, anywhere.*  The engine's picks spend no boost: a
+  random Dance (Muddle, Charm, the Colosseum) draws from the known dances
+  less Water Rondo (`Ot6DanceKnownRand`), and a Water Rondo start that still
+  arrives under three points (a dance id left by an earlier start, a Gogo's
+  Mimic he did not boost) stumbles, charging nothing, neither MP nor pips (no
+  boost under three could buy it), and clears the id.  A Gogo's Mimic reads
+  Gogo's own pending boost, the Jackpot precedent.  `battle_waterrondo`.
+
+  **The stumble ladder (#473).** Off its own terrain a Dance start stumbles
+  on vanilla's coin: Cmd_13 rolls `RandCarry`, and an even draw (carry
+  clear) stumbles.  RNGTbl is a permutation of 0-255, so the coin is
+  exactly 1/2 (128 of its 256 entries are even); on its own terrain there
+  is no roll.  That is the same 1/2 coin Rage's special rides
+  ([kit-gau.md](kit-gau.md) §6), so the chance-verb family's ladder carries
+  over unchanged, each point roughly quartering the stumble odds and the
+  third removing them:
+
+  | BP | the roll (`Ot6DanceTerrain`) | stumble | starts |
+  |---|---|---|---|
+  | 0 | vanilla's `RandCarry`, untouched (no extra draw) | 1/2 | 1/2 |
+  | 1 | a fresh draw below $40 stumbles | 1/4 | 3/4 |
+  | 2 | a fresh draw below $10 stumbles | 1/16 | 15/16 |
+  | 3 | never | 0 | 1 |
+
+  The thresholds are `Ot6DanceStumbleOdds`.  The tier is the start's
+  (`OT6_DANCETIER`), so a locked-in step that meets another dancer's
+  background rolls on the same odds.  A dance that starts off its terrain
+  turns the background to its own, as vanilla's does.  A stumble spends the
+  boost (Ot6ActionEnd finds it pending: no regen pip) and charges no MP
+  (`Ot6DanceStumble`, #313): the boost bought the odds and the roll was
+  taken; the MP buys the dance's magnitude, which never began.  This is
+  still one payoff: the boost buys the dance at that tier, and starting is
+  part of it.  `battle_danceodds` checks the rule on every draw it meets at
+  each level and the thresholds as odds over RNGTbl; `battle_dancestumble`
+  the settlement.
 - **Umaro — Berserker (bludgeoning: club, fists)**: see "Umaro" below
   (#380).
 

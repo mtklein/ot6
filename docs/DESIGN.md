@@ -169,6 +169,19 @@ answers to guarantee rather than potency, and keeping the two axes disjoint is
 what keeps the rule easy to follow. Steal's tier table and the full ruling
 live in design/kits.md.
 
+**Dance carries both halves (#473).** A Dance's boost multiplies every step
+of the dance it starts, and since #473 it also loads the one die a Dance
+rolls: off its own terrain, vanilla's start stumbles on a coin (an even
+draw from the battle RNG table, exactly 1/2). That coin is the same one
+Rage's special rides, so Dance takes Rage's ladder unchanged: a stumble
+1/2 at 0 BP (vanilla's roll, untouched), 1/4 at 1, 1/16 at 2, never at 3.
+It is still one payoff: the boost buys the dance at that tier, and starting
+is part of the dance. A stumble spends the boost, because the odds were
+bought and the roll was taken, and charges no MP, because the MP pays for
+the dance's magnitude, which never began. MP scales with magnitude; BP
+pays for certainty. The ladder and its derivation are in design/kits.md
+(Mog).
+
 **The third category: on reactive verbs, boost buys duration.** A verb that
 does not act but *waits* — Runic, and every reactive verb after it — has
 neither a potency to tier nor a die to load. What it has is a window, so BP
