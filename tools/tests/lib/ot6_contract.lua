@@ -2451,6 +2451,41 @@ M.contracts["wor-ancient-v1"] = {
   },
 }
 
+-- wor-colosseum-v1: the World of Ruin map, on foot on the Falcon's tile by
+-- Maranda, after the Colosseum: the Striker wagered against SHADOW himself,
+-- who joined ($02F3: _cb78d9), and the wagers after it; the cabin seated
+-- SHADOW, CELES, CYAN and TERRA, and Maranda's weapon counter sold SHADOW his
+-- skeans and edges.  The Colosseum & Shadow arc's end and the next arc's boot
+-- (docs/design/route-wor-colosseum.md).  No timer.
+M.contracts["wor-colosseum-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 69, y = 183 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x02F3, 1, "SHADOW recruited at the Colosseum (_cb78d9)" },
+    { 0x01EF, 0, "SHADOW no longer waits at the Colosseum (_cb78d9)" },
+  },
+  party = {
+    size = 4,                     -- SHADOW, CELES, CYAN and TERRA
+    members = {
+      { 0x03, "SHADOW" },
+      { 0x06, "CELES" },
+      { 0x02, "CYAN" },
+      { 0x00, "TERRA" },
+    },
+  },
+  ram = {
+    { 0x1F62, 0xFF, 69, "the Falcon parked at x 69 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 183, "the Falcon parked at y 183 (save-block cell $1F63)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)

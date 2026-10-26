@@ -50,6 +50,7 @@ tools/tests/battle_careguards.lua	.writeWord(	2	quarantine: one member put hurt 
 tools/tests/battle_class.lua	.writeByte(	40
 tools/tests/battle_class.lua	.writeWord(	10
 tools/tests/battle_clockwork.lua	.writeByte(	22
+tools/tests/battle_cursecount.lua	.writeByte(	2	quarantine: the count staged near its wrap (254, 255, 100) and a random battle read as an event's ($57BD at Ot6CurseCount's entry): 128 battles and an event battle with the shield worn are not on cue
 tools/tests/battle_clockwork.lua	.writeWord(	5
 tools/tests/battle_codex.lua	.writeByte(	5	quarantine: legacy O7-era save layout no build can produce by play (owner-named)
 tools/tests/battle_codex.lua	.writeWord(	4	quarantine: legacy O7-era save layout no build can produce by play (owner-named)

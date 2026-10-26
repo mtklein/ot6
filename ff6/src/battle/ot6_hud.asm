@@ -2728,6 +2728,23 @@ Ot6ShieldTbl:
         .word   $0152
         .byte   6, OT6_SLASH|OT6_PIERCE ; blue drgn: a water dragon's
                                 ;   scales.  bolt vanilla; absorbs water
+        ; ---- the world of ruin: the colosseum's own bodies (route-wor-
+        ; colosseum.md section 3) ----------------------------------------------
+        ; One fighter, sent by the player, auto-battles each; these three are
+        ; met nowhere else.  The fighter's weapon is the key a player chooses
+        ; by choosing who fights.  Vanilla elements stay.
+        .word   $0037
+        .byte   6, OT6_SLASH|OT6_PIERCE ; siegfried (the impostor): a
+                                ;   swordsman; steel answers steel.  weak to
+                                ;   every element vanilla
+        .word   $0040
+        .byte   0, $00          ; chupon (the colosseum's): the wager the
+                                ;   colosseum will not take; it sneezes the
+                                ;   fighter out, so no gauge
+        .word   $007f
+        .byte   6, OT6_PIERCE|OT6_BLUDG ; srbehemoth (the colosseum's): the
+                                ;   dead beast, as the veldt cave's: horn and
+                                ;   bone.  fire|holy vanilla; absorbs poison
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian

@@ -1043,12 +1043,79 @@ cost some 30,000 gil a run against the control and bought no fewer deaths
 old behaviour (the control arm of the Falcon arc's labs,
 route-wor-falcon.md 13.10).
 
+### Shadow — Assassin (piercing: thrown edges, daggers, ninja blades) (#383)
+
+Learned by acquisition, as Edgar's Tools are: his eight skills are the
+eight throwing items, all behind Throw, his signature, and the divine is
+Assassinate on a full boost (below, "Sketches").  Throw also takes any
+weapon in the bag, as in vanilla.
+
+| # | Skill | Effect | Break key | Source |
+|---|---|---|---|---|
+| ✦ | Throw | the signature verb: throws the item picked, which is spent; boost multiplies a damaging throw x2/x4/x8 | the item's | join |
+| 1 | Shuriken | a thrown star | pierce | the World of Ruin's Thamasa arsenal (shop 72); ten in the bag at `wor-ancient-v1` |
+| 2 | Ninja Star | a thrown star | pierce | the World of Ruin's Thamasa arsenal (shop 72) |
+| 3 | Tack Star | a thrown star | pierce | the Colosseum (the Ninja Star's prize, against the Chaos Drgn) |
+| 4 | Fire Skean | fire on every enemy | pierce and fire | the World of Ruin's Maranda weapon counter (shop 80) |
+| 5 | Water Edge | water on every enemy | pierce and water | the same |
+| 6 | Bolt Edge | bolt on every enemy | pierce and bolt | the same |
+| 7 | Shadow Edge, the smoke | Image (a double that turns physical hits aside) on the thrower; boost reaches allies | none | the same |
+| 8 | Inviz Edge, the exit | Vanish (physical hits miss) on the thrower; boost reaches allies | none | the same |
+| divine | **Assassinate** (3 BP) | a hit of his that breaks a non-boss, or lands on a Broken one, kills it | — | join |
+
+Interceptor is his passive (vanilla's: a physical attack on him is blocked
+and countered half the time).
+
+**The skeans pierce (#383).**  A Fire Skean, Water Edge or Bolt Edge
+resolves as its spell (`$51`-`$53`: `ThrowToolsOffsetTbl` maps the items
+`$AB`-`$AD` there), and `Ot6SkillClassTbl` gives those spells the pierce
+class, so a thrown skean chips a pierce-weak body by its class (Ot6ClassChip)
+and an element-weak one by its element (Ot6Chip): both on a body weak to
+both, as a Flame Knife chips both.  *Reason: a thrown edge is a thrown
+edge (weapon-classes.md: "thrown edges" pierce), and before this the skeans
+were the one damaging throw that taught no class.*  The stars were already
+pierce through `Ot6WeapClassTbl` (a thrown weapon takes its item's class,
+`Ot6ItemClass`).
+
+**The smoke and exit tricks: boost buys reach.**  The Shadow Edge (Image)
+and the Inviz Edge (Vanish) deal no damage, so the multiplier bought
+nothing on them.  Now each boost point covers one more ally, taken in
+battle order after the thrower and wrapping (`Ot6TrickReach`,
+`ot6_shadow.asm`, between the item path's target mask and ExecAttack): 0 BP
+is vanilla, the thrower alone; three points cover a party of four.  An ally
+the throw cannot land on is passed over for the next: one under Vanish (a
+thrown item is a physical hit, and a physical hit misses a vanished body)
+and, for the smoke, one already doubled.  A point beyond the allies left
+finds nobody and is spent, as a Scan's boost is with one body standing.
+A boosted trick takes the targeting `$0A`, since `ChooseTarget` answers
+vanilla's `$02` by putting the thrower alone back in the mask.  Anyone who
+Throws a trick gets the reach (Gogo's Mimic copies the action and reads the
+copier's own pending, as the copied Jackpot does).  *Reason: a smoke screen
+that hides the whole party is the assassin's way of covering a retreat, and
+targets are what a boost on a status item can buy.*
+
+`battle_shadowkit` (the leg's end state, `wor_colosseum`): a thrown Fire
+Skean's class chip on a pierce-keyed body; the smoke at 0 BP covers SHADOW
+alone; the exit at 1 BP SHADOW and the next ally, each vanished; the smoke
+at 2 BP SHADOW and the next two allies it can land on (the vanished ally
+passed over), each doubled.  Red on main and on three mutants (no reach;
+no skean rows; vanilla targeting): route-wor-colosseum.md section 5.
+
+**The driver.**  SHADOW's Fight (his blade pierces) and the elemental
+skean line (a skean whose element a revealed weakness takes) stand.  A
+sweep line (a skean when two or more standing bodies show pierce) was
+measured and kept out: on the plain by Maranda the Crawler trio took a
+median 3101 ticks with it and 2856 without (15 and 14 keys; route-wor-
+colosseum.md section 5).  The tricks have no driver line yet (section 8
+there).
+
 ---
 
 ## Sketches (join order, WoB)
 
-- **Shadow — Assassin (piercing, thrown)**: Throw ✦ signature; smoke
-  and exit tricks; divine **Assassinate** (built).  Its one gate is the
+- **Shadow — Assassin (piercing, thrown)**: built (#383); see "Shadow"
+  below for the throwing kit and the smoke and exit tricks.  Throw ✦
+  signature; divine **Assassinate** (built).  Its one gate is the
   rule's: an action of his boosted with all three points (no once-a-battle
   limit; a counterattack, Interceptor's, is no action of his and carries no
   divine).  The three points need not be the player's: a berserked or

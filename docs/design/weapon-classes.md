@@ -111,6 +111,9 @@ byte-identical), and leaves the default cursor where class is irrelevant
 The chip check reads the *action's* class byte, never the wielder's:
 Trickshot is piercing on a dagger thief, AutoCrossbow is piercing
 from a spear machinist, Suplex is bludgeoning regardless of claws.
+Shadow's skeans (Fire Skean, Water Edge, Bolt Edge) resolve as their
+spells and pierce through them (#383, kits.md "Shadow"), so a thrown
+edge chips its class and its element.
 (The per-skill class/element byte provides this for free.)
 
 ## Multiple weapon classes per character

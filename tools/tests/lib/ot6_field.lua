@@ -9831,6 +9831,122 @@ for _, name in ipairs({ "fieldCare", "careStop", "bagArrange", "setRows", "equip
   end
 end
 
+-- ---------------------------------------------------------- the Colosseum --
+-- The World of Ruin Colosseum (map 413; docs/design/route-wor-colosseum.md).
+-- Its guard (NPC_10, object $19, at (23,4): _cb78c3) asks "Care to fight in
+-- the colosseum?"; row 0 opens the wager list (menu state $72: the bag's rows,
+-- cursor $4B, the row's item into $0205 on A), which LoadColosseumProp turns
+-- into the opponent ($0206), the prize ($0207) and the prize's hiding
+-- ($0209), then the fighter (state $76: cursor $4B over the party's four
+-- seats, zCharID $69-$6C, the pick into $0208).  The fight is the engine's
+-- (formation $23F, or $23E for SHADOW's own: InitParty puts the fighter in
+-- seat 0 and sets $3A97, and RandCharAction picks every command): nothing
+-- is pressed in it.  A win adds the prize (WinBattle's colosseum branch); a
+-- loss takes the wager and leaves the fighter down.  Colosseum battles pay
+-- no experience (M.rewardDue).
+--
+-- M.colosseumFighter(): the seated member a player sends, read with full
+-- power: the standing member of the highest level, then the most HP (the measured win rates are
+-- in route-wor-colosseum.md).
+local COL_MAP, COL_GUARD = 413, 0x19
+M.colosseumLog = {}
+function M.colosseumFighter()
+  local act, best, bl, bh = M.readByte(0x1A6D) & 0x07, nil, -1, -1
+  for c = 0, 13 do
+    -- standing: a member down (no HP, or the Wound bit) is not sent
+    local up = M.readWord(0x1600 + 37 * c + 9) > 0 and (M.readByte(0x1600 + 37 * c + 0x14) & 0x80) == 0
+    if (M.readByte(0x1850 + c) & 0x07) == act and up then
+      local l, h = M.readByte(0x1600 + 37 * c + 8), M.readWord(0x1600 + 37 * c + 11) & 0x3FFF
+      if l > bl or (l == bl and h > bh) then best, bl, bh = c, l, h end
+    end
+  end
+  return best
+end
+-- M.colosseumBet(item, opts): standing in the Colosseum with control, talk to
+-- the guard, wager `item` and send opts.fighter (default
+-- M.colosseumFighter()), let the fight run and the scene after it, and say
+-- `[colosseum] wager $ii vs $ooo: <fighter> WON|LOST; prize $pp ...`.
+-- opts.want = "won" raises on a loss (a wager whose loss the route cannot
+-- take, the Striker); opts.wonIf() decides the win where the prize does not
+-- (the Striker's fight is SHADOW's, and its win is his joining).  Each bet is appended to M.colosseumLog
+-- { item, prize, opponent, fighter, won, frame }.
+function M.colosseumBet(item, opts)
+  opts = opts or {}
+  local what = opts.what or string.format("the Colosseum: wager $%02X", item)
+  local fighter, have, prize, prizeHad, opp = nil, 0, 0, 0, 0
+  local mode, n, ph = "item", 0, 0
+  local function settled()
+    return (M.mapId() & 0x1FF) == COL_MAP and M.hasControl() and M.tileAligned() and not M.dialogWaiting()
+      and (emu.getState()["ppu.screenBrightness"] or 0) >= 15
+  end
+  local menus = M.withReset(M.driveUntil(function() return mode == "done" end, 6000, {
+    M.call(function()
+      ph = (ph + 1) % 12
+      n = n + 1
+      local st = M.readByte(0x26)
+      if mode == "item" then
+        if st == 0x76 or st == 0x75 then mode, n = "char", 0; M.setPad({}); return end
+        if st ~= 0x72 then M.setPad({}); return end
+        local slot = M.invSlotOf(item)
+        M.assertEq(slot ~= nil, true, string.format("%s: $%02X is in the bag", what, item))
+        local cur = M.readByte(0x4B)
+        if cur == slot then M.setPad(ph < 4 and { "a" } or {})
+        else M.setPad({ [cur < slot and "down" or "up"] = true }) end
+        return
+      end
+      if mode == "char" then
+        if st ~= 0x76 then
+          if n > 600 and st ~= 0x75 then mode = "done" end
+          M.setPad({}); return
+        end
+        local want = nil
+        for k = 0, 3 do if M.readByte(0x69 + k) == fighter then want = k end end
+        M.assertEq(want ~= nil, true, string.format("%s: char %d is among the four seats", what, fighter))
+        local cur = M.readByte(0x4B)
+        if cur == want then M.setPad(ph < 4 and { "a" } or {})
+        else M.setPad({ [cur < want and "right" or "left"] = true }) end
+        return
+      end
+    end),
+  }, what .. ": the wager and the fighter"), function() mode, n, ph = "item", 0, 0 end)
+  return M.seqStep({
+    M.call(function()
+      M.assertEq(M.mapId() & 0x1FF, COL_MAP, what .. ": in the Colosseum (map 413)")
+      fighter = opts.fighter or M.colosseumFighter()
+      have = M.invCountOf(item)
+      M.assertEq(have > 0, true, string.format("%s: $%02X is in the bag", what, item))
+      M.assertEq(M.objX(COL_GUARD) == 23 and M.objY(COL_GUARD) == 4, true, what .. ": the guard stands at (23,4)")
+    end),
+    M.lazy(function() return M.talkToObj(COL_GUARD, what .. ": the guard (413 (23,4))") end),
+    M.dialogChoice(0, { inBattle = false, what = what .. ": Care to fight in the colosseum? (With pleasure.)",
+      maxFrames = 3000 }),
+    menus,
+    M.call(function()
+      M.assertEq(M.readByte(0x0205), item, what .. ": the wager taken ($0205)")
+      M.assertEq(M.readByte(0x0208), fighter, what .. ": the fighter sent ($0208)")
+      prize, opp = M.readByte(0x0207), M.readByte(0x0206)
+      prizeHad = M.invCountOf(prize)
+      M.log(string.format("[colosseum] %s: wager $%02X (bag %d) vs opponent byte $%02X%s, prize $%02X%s; fighter char %d L%d",
+        what, item, have, opp, M.readByte(0x0201) ~= 0 and " (SHADOW himself)" or "", prize,
+        M.readByte(0x0209) ~= 0 and " (hidden)" or "", fighter, M.readByte(0x1600 + 37 * fighter + 8)))
+    end),
+    M.advanceStory(settled, opts.maxFrames or 200000, { playBattles = "tactical", fight = opts.fight }),
+    M.call(function()
+      local won
+      if opts.wonIf then won = opts.wonIf()
+      elseif prize == item then won = M.invCountOf(item) >= have
+      else won = M.invCountOf(prize) > prizeHad end
+      M.colosseumLog[#M.colosseumLog + 1] = { item = item, prize = prize, opponent = opp, fighter = fighter,
+        won = won, frame = M.frame }
+      M.log(string.format("[colosseum] %s: char %d %s; prize $%02X %d -> %d; wager $%02X %d -> %d", what, fighter,
+        won and "WON" or "LOST", prize, prizeHad, M.invCountOf(prize), item, have, M.invCountOf(item)))
+      if opts.want == "won" then
+        M.assertEq(won, true, what .. ": the fight is won (a loss here costs what the route cannot do without)")
+      end
+    end),
+  })
+end
+
 -- ------------------------------------------------ the World of Ruin legs' kit --
 -- The Gau, Gogo and Dreams arcs' generators (gen_wor_gau, gen_wor_belly,
 -- gen_wor_gogo, gen_wor_ebot, gen_wor_opera, gen_wor_dream, gen_wor_doma,

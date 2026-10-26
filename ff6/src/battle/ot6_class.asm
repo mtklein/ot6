@@ -154,7 +154,9 @@ Ot6WeapClassTbl:
         .byte   OT6_PIERCE      ; $a8 drill
         .byte   OT6_PIERCE      ; $a9 air anchor (harpoon)
         .byte   OT6_PIERCE      ; $aa autocrossbow
-        ; skeans/edges $ab-$af resolve as their spells: no class here
+        ; skeans/edges $ab-$ad resolve as their spells $51-$53, whose class
+        ; is Ot6SkillClassTbl's (pierce, #383); the Inviz and Shadow Edges
+        ; deal no damage (ot6_shadow.asm): no class here
         .res    $b0 - $ab, $00
         ; relics $b0-$e6, consumables $e7-$fe: no class
         .res    $ff - $b0, $00
@@ -193,4 +195,7 @@ Ot6SkillClassTbl:
         .byte   $5f, OT6_BLUDG  ; suplex (the train is bludgeon-weak)
         .byte   $64, OT6_BLUDG  ; bum rush
         .byte   $8a, OT6_PIERCE ; tekmissile
+        .byte   $51, OT6_PIERCE ; fire skean  (thrown edges pierce, #383:
+        .byte   $52, OT6_PIERCE ; water edge   each chips pierce and its
+        .byte   $53, OT6_PIERCE ; bolt edge    element)
         .byte   $ff

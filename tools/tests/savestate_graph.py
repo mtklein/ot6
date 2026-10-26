@@ -1059,12 +1059,26 @@ STATES = [
     # queen's statue (Raiden), the Blue Dragon (event battle 137, a game over
     # when lost), the castle's two rides back, and Save there: the
     # `wor-ancient-v1` checkpoint, the next arc's boot
-    # (docs/design/route-wor-dreams.md).  A cut; saves= until a leg boots it.
-    # Re-cut by checkpoint_drift.py --recut.
+    # (docs/design/route-wor-dreams.md).  A cut.  wor_colosseum below boots
+    # its checkpoint.  Re-cut by checkpoint_drift.py --recut.
     # also: wor_ancient_dragon, the party on the queen's floor before the
     # Blue Dragon (the dragon's labs).
     S("wor_ancient", gen="gen_wor_ancient", prev="wor_doma",
-      checkpoint="wor-doma-v1", saves="wor-ancient-v1", timeout=7200, also=["wor_ancient_dragon"]),
+      checkpoint="wor-doma-v1", timeout=7200, also=["wor_ancient_dragon"]),
+
+    # wor-ancient-v1 -> the World of Ruin map on the Falcon's tile by Maranda
+    # (69,183): Kohlingen's counter, the Colosseum (map 413): the Striker
+    # wagered against SHADOW himself, who joins ($02F3), and the wagers that
+    # trade the bag's gear up; the cabin (SHADOW, CELES, CYAN, TERRA), the gear
+    # and relic care, Maranda's weapon counter (SHADOW's skeans and edges) and
+    # gear stop, and Save there: the `wor-colosseum-v1` checkpoint, the next
+    # arc's boot (docs/design/route-wor-colosseum.md).  A cut; saves= until a
+    # leg boots it.  Re-cut by checkpoint_drift.py --recut.
+    # also: wor_colosseum_in, the party inside the Colosseum before the
+    # guard (the wagers' labs and battle_colosseum's fixture).
+    S("wor_colosseum", gen="gen_wor_colosseum", prev="wor_ancient",
+      checkpoint="wor-ancient-v1", saves="wor-colosseum-v1", timeout=7200,
+      also=["wor_colosseum_in"]),
 
 ]
 

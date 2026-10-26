@@ -97,3 +97,9 @@
 
 ; the boost aura (#445), appended for the same reason.
         .include "ot6_aura.asm"
+
+; Shadow's tricks (#383), appended for the same reason.
+        .include "ot6_shadow.asm"
+
+; the Cursed Shield's count (#387), appended for the same reason.
+        .include "ot6_gear.asm"

@@ -92,6 +92,7 @@ TITLES = {
     "wor-dream-v1": "Cyan's dream, the save point in the dream's Doma",
     "wor-doma-v1": "By Doma Castle, after Cyan's dream",
     "wor-ancient-v1": "By Figaro Castle, after the Ancient Castle",
+    "wor-colosseum-v1": "By Maranda, after the Colosseum (Shadow joins)",
 }
 
 README = """\

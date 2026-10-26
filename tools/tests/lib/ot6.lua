@@ -3608,6 +3608,7 @@ end
 --   random    OT6_RANDBTL set;  mul16  Ot6RewardMulW (16ths)
 --   alive     $3A76;  veldt  $11E4 bit 1
 function M.rewardDue(o)
+  if o.colosseum then return 0 end
   local sum = 0
   for s = 0, 5 do
     if o.st1[s] and (o.st1[s] & 0xC2) ~= 0 and not o.veldt then sum = sum + (o.xp[s] or 0) end
@@ -3734,7 +3735,7 @@ function M.battleOutcome(o)
   -- kind says.  Said as a contradiction, so the kind cannot drift from
   -- the engine's own count unnoticed.
   local killedXp = 0
-  for _, s in ipairs(kills) do killedXp = killedXp + (o.veldt and 0 or (o.xp[s] or 0)) end
+  for _, s in ipairs(kills) do killedXp = killedXp + ((o.veldt or o.colosseum) and 0 or (o.xp[s] or 0)) end
   local contradiction = nil
   if kind == "won" and killedXp > 0 and (o.alive or 0) == 0 then
     contradiction = "a WIN over bodies worth experience with no ally alive to take it ($3A76 = 0)"
@@ -15027,7 +15028,8 @@ end
 -- M.setzerBattle has for SETZER's table, for any character and command:
 --   { who = character id, cmd = command id, boost = 0..3,
 --     spell = id       the Magic list's cell holding this spell id (state $0E)
---     row = id         a Tools-shell list's cell holding this id (state $30)
+--     row = id         a Tools-shell list's cell holding this id (state $30),
+--                      or the Throw list's (state $2D, the same shell)
 --     direct = true    the list's A commits the action itself, with no target
 --                      select (SwdTech, Blitz)
 --     slot = s         aim at monster slot s (else any live monster)
@@ -15273,7 +15275,7 @@ function M.kitBattle(plan, opts)
       end
       if cool == 0 then p.opened, p.seat = true, a end
       pulse("a")
-    elseif (st == 0x0E or st == 0x30) and not p.opened then
+    elseif (st == 0x0E or st == 0x30 or st == 0x2D) and not p.opened then
       pulse("b")   -- a window this entry did not open (an earlier entry's, closing)
     elseif st == 0x0E and p.spell ~= nil then
       local i = spellIdx(a, p.spell)
@@ -15298,13 +15300,25 @@ function M.kitBattle(plan, opts)
         done(p, a, true)
       end
       pulse("b")
-    elseif st == 0x30 and p.row ~= nil then
+    elseif (st == 0x30 or st == 0x2D) and p.row ~= nil then
+      -- the Tools shell, or the Throw list in the same shell (#383: SHADOW's
+      -- throwing kit; wItemList $4005, three-byte rows, $FF ends the list)
       local want
-      for i = 0, 7 do if M.readByte(0x4005 + i * 3) == p.row then want = i end end
+      for i = 0, (st == 0x2D and 63 or 7) do
+        local rid = M.readByte(0x4005 + i * 3)
+        if rid == 0xFF and st == 0x2D then break end
+        if want == nil and rid == p.row then want = i end
+      end
       if want == nil then M.assertEq(false, true, string.format("the list holds row $%02X", p.row)) end
-      local cc, cr = M.readByte(0x8963 + a), M.readByte(0x8967 + a)
-      if cc ~= want % 2 then pulse(want % 2 > cc and "right" or "left"); return end
-      if cr ~= want // 2 then pulse(want // 2 > cr and "down" or "up"); return end
+      if st == 0x2D then
+        -- the Throw list is one column: its scroll plus its row (battle_procboost's steer)
+        local cur = M.readByte(0x8953 + a) + M.readByte(0x895B + a)
+        if cur ~= want then pulse(cur < want and "down" or "up"); return end
+      else
+        local cc, cr = M.readByte(0x8963 + a), M.readByte(0x8967 + a)
+        if cc ~= want % 2 then pulse(want % 2 > cc and "right" or "left"); return end
+        if cr ~= want // 2 then pulse(want // 2 > cr and "down" or "up"); return end
+      end
       if p.refused == "list" then
         p.presses = (p.presses or 0) + (cool == 0 and 1 or 0)
         if p.presses > 3 then done(p, a, true); pulse("b"); return end
@@ -16558,6 +16572,9 @@ local function readReward(eligibility)
   r.lost = M.partyWipedInBattle ~= nil and M.partyWipedInBattle() or false
   r.form = M.readWord(0x11E0)
   r.veldt = (M.readByte(0x11E4) & 0x02) ~= 0
+  -- a Colosseum battle ($3A97 set by InitParty for formations $23E/$23F) pays
+  -- the wager's prize and no experience (WinBattle: `lda $3a97 / beq`)
+  r.colosseum = M.readByte(0x3A97) ~= 0
   return r
 end
 local function endActivate()
@@ -16888,7 +16905,7 @@ function Driver:sayOutcome()
   for e = 0, 3 do seated[e] = self.seatXp[e] ~= nil end
   local o = M.battleOutcome({ xp = r.xp, st1 = r.st1, hp = r.hp, egg = r.egg,
     random = r.random, mul16 = r.mul16, alive = r.alive, aliveMask = r.aliveMask, veldt = r.veldt,
-    left = r.left, gone = r.gone, lost = r.lost, seated = seated, filled = self.filled })
+    colosseum = r.colosseum, left = r.left, gone = r.gone, lost = r.lost, seated = seated, filled = self.filled })
   local ok, paid, got = o.contradiction == nil, {}, {}
   for e = 0, 3 do
     if self.seatXp[e] then

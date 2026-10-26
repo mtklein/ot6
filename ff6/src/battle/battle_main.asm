@@ -4107,8 +4107,9 @@ _189e:  tyx
         and     $b8
         sta     $b8
         shorta
-        lda     #$04
-        trb     $b3
+        jsl     Ot6TrickReach   ; ot6 #383: a thrown Inviz/Shadow Edge reaches
+                                ;   one more ally per boost point; then the
+                                ;   displaced `lda #$04 / trb $b3`
 @18e0:  jmp     ExecAttack
 
 ; items that use a spell (bio blaster/flash, rods, shields, water/fire/bolt edge)
@@ -16227,10 +16228,13 @@ LearnItemMagic:
 @5ff3:  lda     $161f,x
         cmp     #$ff
         beq     @6024       ; skip if no item equipped
-        cmp     #$66
-        bne     @600c       ; branch if not cursed shield
-        inc     $3ec0       ; increment cursed shield battle counter
+        jsl     Ot6CurseCount   ; ot6 #387: the cursed shield's count, two
+                                ;   for a won random battle, one for an
+                                ;   event (Z set when it wraps: the curse
+                                ;   lifts); A kept for any other item
         bne     @600c
+        nop2                    ; (vanilla's cmp/bne/inc/bne took 9 bytes;
+        nop                     ;   the bank keeps its layout)
         lda     #$01
         tsb     $f0         ; cursed shield dispelled
         lda     #$67
