@@ -19,9 +19,11 @@
 --      row is white, as another known dance's is, and A on it plays the
 --      confirm, not the buzz, and closes the list.
 --   B. the roll (real menus, nothing written): MOG Defends one turn to bank
---      two points; from that snapshot BRANCHES times (each idling 7 frames
---      longer, its own draw) he raises 1 or 2 points (alternately) and
---      starts Water Rondo.  Each start is predicted from the draw its roll
+--      two points; from that snapshot, branch k idles 7(k-1) frames (its own
+--      draw), raises 1 or 2 points (alternately for the first BRANCHES, then
+--      1) and starts Water Rondo, until a one-point start has both landed
+--      and stumbled (at most MAX_B branches: a one-point start stumbles 1 in
+--      4, so the stumble settlement is always exercised).  Each start is predicted from the draw its roll
 --      reads (RNGTbl[$be + 1], $be as Cmd_13 begins; battle_danceodds): at
 --      1 point a draw below $40 stumbles, at 2 below $10.  Asserted per
 --      resolved start: the row was white and the confirm took; it stumbled
@@ -30,7 +32,7 @@
 --      turn's Ot6ActionEnd, the bank down by them 20 frames on); a stumble
 --      charges no MP and keeps the dance id; a landed start records its
 --      tier, charges H.boostPrice(8, p) and turns the background to the
---      river's.  At least one start lands.
+--      river's.  At one point, at least one start lands and one stumbles.
 --   C. the engine's pick (SYNTHETIC, waivered: no battle Muddles MOG on
 --      cue): from the first snapshot MOG is Muddled (STATUS2 bit 5, put back
 --      if a hit clears it, his HP topped up under half) until RandDance
@@ -38,6 +40,11 @@
 --      most MUDDLES branches.  The mask RandBit is handed must be every
 --      known dance, Water Rondo among them.
 -- Red on the ROM before #478 (Water Rondo the divine) in all three arms.
+--
+-- Lever, for evidence only (the suite runs BURN 0; a lab sets the global
+-- WATERRONDO_BURN ahead of the file): the walker first fights that many
+-- encounters on the walk's tiles, to vary the encounter history
+-- (TESTING.md), with field care after them.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -49,7 +56,9 @@ local DANCES = 0x1D4C                   -- known-dance mask
 local RONDO = 5
 local DANCETIER = 0x7EEDA1              -- OT6_DANCETIER (ot6_memory.inc), stride 2
 local WHITE = 0x21
-local BRANCHES, MUDDLES = 8, 6
+local BRANCHES, MAX_B, MUDDLES = 8, 32, 6
+local BURN = type(WATERRONDO_BURN) == "number" and WATERRONDO_BURN or 0
+local FIGHT = {}
 local THRESH = { [1] = 0x40, [2] = 0x10 }   -- the ladder (kits.md, Mog)
 
 local function bp(s) return H.readByte(0x3E9C + s * 2) end
@@ -198,10 +207,9 @@ end
 
 -- ---- the world: walk two tiles until an encounter fires
 local W = nil
-local function walkIn()
-  local wp = 1
-  return H.seqStep({
-    H.call(function()
+local function pickWalk()
+  return H.call(function()
+      if W then return end
       -- two tiles in a line away from the save tile, Nikeah's gate (east of
       -- it) left out: the walk stays on open ground
       local x, y = H.worldX(), H.worldY()
@@ -212,7 +220,12 @@ local function walkIn()
       end
       assert(W, "two walkable tiles in a line beside the save tile, away from Nikeah")
       H.log(string.format("[rondo] walking (%d,%d) <-> (%d,%d)", W[1][1], W[1][2], W[2][1], W[2][2]))
-    end),
+    end)
+end
+local function walkIn()
+  local wp = 1
+  return H.seqStep({
+    pickWalk(),
     H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
       H.call(function()
         if H.battleLoadStarted() or not H.worldHasControl() or not H.worldAligned() then
@@ -230,6 +243,20 @@ local function walkIn()
     H.release(),
     H.waitUntil(function() return H.battleActive() end, 1200, "battle armed", 5),
   })
+end
+-- BURN: the walker fights one encounter out on the walk's tiles
+-- (battle_dancestep's)
+local function fightThrough(what)
+  local o0, wp = nil, 1
+  return H.withReset(H.driveUntil(function() return o0 ~= nil and #H.outcomes > o0 end, 200000, {
+    H.call(function() if o0 == nil then o0 = #H.outcomes end end),
+    H.worldNavTo(function() return W[wp][1] end, function() return W[wp][2] end,
+      { maxFrames = 20000, playBattles = "tactical", fight = FIGHT }),
+    H.call(function() wp = wp % 2 + 1 end),
+  }, what), function() o0, wp = nil, 1 end)
+end
+local function worldControl(what)
+  return H.waitUntil(function() return H.worldMode() and H.worldHasControl() and H.worldAligned() end, 6000, what)
 end
 
 -- ---- observers --------------------------------------------------------------
@@ -335,9 +362,26 @@ local body = {
       if ctlId == nil and d ~= RONDO and (mask & (1 << d)) ~= 0 then ctlId = d end
     end
     H.assertEq(ctlId ~= nil, true, "MOG knows a dance besides Water Rondo (the menu's control)")
-    installObservers()
     riverBg = H.readRomByte((H.sym("DanceBG") & 0x3FFFFF) + RONDO)
   end),
+  pickWalk(),
+}
+for i = 1, BURN do
+  body[#body + 1] = H.seqStep({
+    fightThrough("BURN: the walker fights encounter " .. i),
+    worldControl("world control after BURN " .. i),
+    H.call(function()
+      H.log(string.format("[rondo] BURN %d: encounters used up; $1FA1-5 = %02X %02X %02X %02X %02X", i,
+        H.readByte(0x1FA1), H.readByte(0x1FA2), H.readByte(0x1FA3), H.readByte(0x1FA4), H.readByte(0x1FA5)))
+    end),
+  })
+end
+if BURN > 0 then
+  body[#body + 1] = H.fieldCare({ tag = "care after the BURN", threshold = H.CARE_BEFORE_FIGHTS })
+  body[#body + 1] = worldControl("world control after the care")
+end
+for _, st in ipairs({
+  H.call(function() installObservers() end),
   walkIn(),
   H.call(function()
     findMog()
@@ -405,13 +449,20 @@ local body = {
   end),
   H.waitFrames(2),
   H.call(function() H.checkReq(snapB, "snapshot at MOG's two-point window") end),
-}
+}) do body[#body + 1] = st end
 
 -- ---- B. one or two points: the start rolls on the ladder ---------------------
+-- a one-point start has landed and has stumbled
+local function seenAtOne(stumble)
+  for _, r in ipairs(recsB) do
+    if r.p == 1 and r.done and not r.buzzed and ((r.stumbles or 0) > 0) == stumble then return true end
+  end
+  return false
+end
 local function branchB(k)
   local req
-  local p = (k - 1) % 2 + 1
-  return {
+  local p = k <= BRANCHES and (k - 1) % 2 + 1 or 1
+  return H.cond(function() return k <= BRANCHES or not (seenAtOne(true) and seenAtOne(false)) end, {
     H.call(function() H.setPad({}); rec = nil; req = H.requestLoadState(snapB.blob) end),
     H.waitFrames(2),
     H.call(function()
@@ -479,10 +530,10 @@ local function branchB(k)
           predicts(p, r.d) and "stumble" or "lands") or "-",
         d.pend, d.mp, tostring(d.dancing), d.tier, d.bg, d.id, rec.stumbles or 0, tostring(rec.bankAfter)))
     end),
-  }
+  }, {})
 end
 
-for k = 1, BRANCHES do for _, st in ipairs(branchB(k)) do body[#body + 1] = st end end
+for k = 1, MAX_B do body[#body + 1] = branchB(k) end
 
 -- ---- C. the engine's pick: a random Dance draws from every known dance -------
 local function branchC(k)
@@ -579,9 +630,12 @@ body[#body + 1] = H.call(function()
     .. "random draws %d; %d failure(s)", resolvedB, #recsB, landed, stumbled, #recsC, #draws, #fails))
   for _, m in ipairs(fails) do H.log("[rondo] FAIL " .. m) end
   H.assertEq(resolvedB >= BRANCHES - 2, true, "B: at least BRANCHES-2 starts resolved")
+  H.log(string.format("[rondo] B at one point: landed %s, stumbled %s", tostring(seenAtOne(false)),
+    tostring(seenAtOne(true))))
   H.assertEq(#draws >= 1, true, "C: a random Dance drew from the known dances")
   H.assertEq(#fails, 0, "Water Rondo is offered, rolled, settled and drawn like any dance")
-  H.assertEq(landed >= 1, true, "B: a Water Rondo start under three points landed")
+  H.assertEq(seenAtOne(false) and seenAtOne(true), true,
+    "B: a one-point Water Rondo start both landed and stumbled (the stumble settlement was exercised)")
   H.log("[rondo] PASS")
 end)
 
