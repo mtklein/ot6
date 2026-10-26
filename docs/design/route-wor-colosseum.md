@@ -40,8 +40,10 @@ the scripts beside them; the scripts that built them are the lab's own, in
    Colosseum battle nothing (`M.rewardDue`).
 4. **The player's lever is the fighter.**  The fight runs itself, so the
    choice is who fights (and what they wear).  `H.colosseumFighter` sends the
-   seated member of the highest level, then the most HP: CELES, L52, in this
-   arc.
+   seated, standing member of the highest level, then the most HP.  From the
+   graph's `wor-ancient-v1` (CELES and TERRA L52, CELES with 4 more HP) that
+   is CELES; when the battles before the Colosseum raise TERRA a level, it is
+   TERRA (sweep `s3`, section 4).
 5. **The Colosseum has an inn** (413 NPC_3 (52,16), 400 GP) and no save
    point; its long exit (22,16) lands on the world's (50,18).
 6. **The Ragnarok sword is not in this save.**  The route took the Magicite at
@@ -152,18 +154,29 @@ class $06)").
 ## 4. The fights
 
 No boss on the leg; the Colosseum's fights are the coin flips, if any, and
-the measured rates say they are not:
+the measured rates say they are not.  Sweep `s3` played the route that ships:
+the qualified commit 1b22315d, from the graph's own `wor-ancient-v1` capture
+(`OT6_SRAM_CHECKPOINT=build/checkpoints/wor-ancient-v1`), K 0-5 battles used
+up first at seed shifts 0 and 7.  The fighter is the rule's: CELES in the
+ten runs with K 0-4, TERRA in the two with K 5 (her K battles took her to
+L53):
 
-| fight | fighter | sweep `s1` (K 0-5 at shifts 0 and 7) |
-|---|---|---|
-| SHADOW, for the Striker | CELES | 12 of 12, 11 distinct keys |
-| the Test Rider, for the SwordBreaker | CELES | 12 of 12, 12 keys |
-| the Test Rider, for the Strato | CELES | 12 of 12, 12 keys |
-| the Opinicus, for the Genji Helmet | CELES | 12 of 12, 11 keys |
-| the Opinicus, for the Falchion | CELES | 12 of 12, 11 keys |
+| fight | sweep `s3`: won (distinct keys); CELES 10 runs, TERRA 2 |
+|---|---|
+| SHADOW, for the Striker | 12 of 12 (11) |
+| the Test Rider, for the SwordBreaker | 12 of 12 (10) |
+| the Test Rider, for the Strato | 12 of 12 (11) |
+| the Opinicus, for the Genji Helmet | 12 of 12 (9) |
+| the Opinicus, for the Falchion | 12 of 12 (12) |
 
-(`tally_s1.txt`: "the Striker against SHADOW won 12 of 12, 11 distinct keys"
-and the four lines after it.)  A loss of the Striker would take SHADOW with
+(`tally_s3.txt`: "the Striker against SHADOW won 12 of 12, 11 distinct keys"
+and the four lines after it; CELES fought 50 of the 60, TERRA 10, all won.)
+The earlier sweeps (`s1`, `s2`, from the tracked `wor-ancient-v1`, where
+TERRA and CELES are both L52 and the battles before the Colosseum often take
+TERRA to L53) sent TERRA in 8 runs of 12 and CELES in 4 each: 40 fights
+TERRA, 20 CELES, all won (`run.out`'s "char 0 WON" and "char 6 WON" lines).
+So TERRA has 90 won fights in all (80 from the tracked entry, 10 here) and
+CELES 90 (40 there, 50 here).  A loss of the Striker would take SHADOW with
 it, so the leg fails on one (`want = "won"` raises an assertion, which the
 runner does not retry; a person reloads); a loss of any other wager is
 taken as a loss, logged, and the route goes on.
@@ -231,50 +244,59 @@ keys with it, 2856 over 14 without (`fight_report_abon.txt`,
 
 ## 6. Supplies and kits
 
-**Supplies.**  `wor-ancient-v1` left 43 Potions and 19 Fenix Downs against
-the band (about level x 1.5 Potions, about the level in Fenix Downs);
-Kohlingen's counter (`kohlingenStop`) tops them up first ("potion=99 ...
-fenix=20 remedy=20" leaving Kohlingen, lab `g3`).  The Colosseum's fights
+**Supplies.**  The graph's `wor-ancient-v1` left 67 Potions and 21 Fenix
+Downs (the qualified play's boot line, `qual/px13/wor_colosseum.log`:
+"potion=67 tincture=40 fenix=21 remedy=20 revivify=28 tent=0 gil=729878")
+against the band (about level x 1.5 Potions, about the level in Fenix
+Downs); Kohlingen's counter (`kohlingenStop`) tops the Potions up first.  The Colosseum's fights
 spend nothing from the bag on a win; a loss leaves the fighter down for a
 Fenix Down (the Steroidite's seven losses cost seven).  The bag at the save
-(sweep `s1`, `s1_k0_s0`): "potion=76 tincture=40 fenix=20 remedy=20
-revivify=30 tent=0 gil=665742".
+(the qualified play): "potion=76 tincture=40 fenix=21 remedy=20 revivify=28
+tent=0 gil=714410".
 
 **Kits.**  SHADOW joins with nothing worn; the cabin's gear care dresses him
 from the bag (the Striker back from his fight, the Genji Shield, the
 Colosseum's Genji Helmet, a Power Sash) and Maranda's armor counter sells him
-a Dark Gear; the relic care gives him the Memento Ring and a Peace Ring.
+a Dark Gear; the relic care gives him his relics from the bag (below).
 Maranda's weapon counter sells his throwing kit: Fire Skeans, Water Edges and
 Bolt Edges to nine each, Shadow Edges and Inviz Edges to four (the bag's ten
 Shuriken were already there).  CYAN's second Strato goes in his second hand;
-TERRA's Falchion replaces the Enhancer (the gear policy).  The kit at the
-save (`s1_k0_s0`): "SHADOW L41 kit FF 29 64 81 96 DB B2; CELES L53 kit 0A 19
-15 7A 98 D1 BB; CYAN L42 kit 0E 31 31 7A 98 D1 CA; TERRA L53 kit 06 15 5E 7A
-94 CA BB".
+TERRA's Falchion replaces the Enhancer (the gear policy).  In the qualified
+play the relic care gave SHADOW a Ribbon and the Memento Ring, CYAN keeping
+his Genji Glove and Ribbon.  The kit at the save: "SHADOW L41 kit FF 29 64 81
+96 CA DB; CELES L53 kit 0A 19 15 7A 98 D1 BB; CYAN L42 kit 0E 31 31 7A 98 CA
+D1; TERRA L53 kit 06 15 5E 7A 94 CA BB".
 
 ## 7. Played
 
 Each sweep run is one attempt (retries off) from a committed tree
 (`commit.txt`, `diff.sha256`), the leg's variant with K battles used up first
 on the plain by Figaro Castle where the boot stands (world group 47:
-`mkvar.py`), K 0-5 at seed shifts 0 and 7, from the tracked
-`wor-ancient-v1`.  `tally_<p>.txt` lists each run and the wagers by key;
+`mkvar.py`), K 0-5 at seed shifts 0 and 7: `s3` from the graph's own
+`wor-ancient-v1` capture at the qualified commit, `s1` and `s2` (before the
+rebase onto the Tritoch leg and the Dance ladder) from the tracked one.  `tally_<p>.txt` lists each run and the wagers by key;
 `fight_report_<p>.txt` is `tools/fight_report.py` over the runs (its "Pugs"
 label on formation `$23F` is the formation's placeholder slot: the opponent
 there is the wager's).
 
 | sweep (commit) | runs | fights (fight_report) |
 |---|---|---|
+| `s3` (1b22315d, qualified; px13) | 12 of 12 PASS, attempts=1/1 each | every fight won: SHADOW's `$23E` 11 keys; the wagers' `$23F` 35 keys of 48 fights; the Crawler 24 keys, Mantodea+Spek Tor+Sprinter 6, Bogy 8, Maliga 2; no deaths but SHADOW's own in his fight |
 | `s2` (cb122cdb, the arc's ROM: the rows, the reach, the curse count; CYAN's pair) | 12 of 12 PASS, attempts=1/1 each (the Air) | every fight won: SHADOW's `$23E` 11 keys; the wagers' `$23F` 33 keys of 48 fights (`tally_s2.txt`: the Striker 11 keys, the SwordBreaker 12, the Strato 11, the Genji Helmet 10, the Falchion 12, each 12 of 12); the Crawler 26 keys, Mantodea+Spek Tor+Sprinter 5, Bogy 7, Maliga 2; no deaths but SHADOW's own in his fight |
 | `s1` (155c284f) | 12 of 12 PASS, attempts=1/1 each | every fight won: SHADOW's `$23E` 11 keys; the wagers' `$23F` 35 keys of 48 fights; the Crawler 26 keys, Mantodea+Spek Tor+Sprinter 6, the K battles' Bogy 7 and Maliga 2; no deaths but SHADOW's own in his fight |
 
-The tracked checkpoint was first sealed from a lab capture (`g4`, "PASS
-(frame 42059) attempts=1/3") and then re-cut from the graph's own play at
-869cf79d (`checkpoint_drift.py --recut`: "none -- the tracked save is the
-one the graph's play makes today"; the leg's log in
-`build/attempts/wt/v037-colosseum/qual/logs/wor_colosseum.log`: "PASS
-(frame 47443) attempts=1/3", won on its first attempt; "the wagers done: 5
-of 5 won").
+The tracked checkpoint is re-cut from the qualified play: bare `ninja` from
+power-on at 1b22315d on px13 (wt/v037-colosseum-3: the ROM, route and suites
+this branch's arc commit carries), a clean tree (`qual/px13/q4.log`: "gate:
+GREEN -- ninja -k 0 -j 12 exited 0", "sha=1b22315d... dirty=0"), then
+`checkpoint_drift.py --recut wor-colosseum-v1` ("none -- the tracked save is
+the one the graph's play makes today").  A second replay from power-on of the
+same ROM and route (`qual/px13/q6.log`, GREEN, with the suites' later arms)
+made the same save: `checkpoint_drift.py --strict wor-colosseum-v1` against
+its capture reads "none -- the tracked save is the one the graph's play makes
+today", rc=0 (`qual/px13/drift_wor-colosseum-v1.txt`).  The leg's log
+(`qual/px13/wor_colosseum.log`): "PASS (frame 37918) attempts=1/3", won on
+its first attempt; "the wagers done: 5 of 5 won", CELES sent every time.
 
 ## 8. Open
 
