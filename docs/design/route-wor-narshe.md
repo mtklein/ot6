@@ -751,8 +751,8 @@ hand's, and keeping Runic and SwdTech; each hand gets its old weapon back
 after Umaro, so the next legs keep their kit.
 
 - K = 0, shifts 0-63 (`fixD/`): `runs 64, PASS 64`; the dragon `34
-  distinct keys, won every time 34`; deaths in 5 of the 64 fights (one
-  draw, `be38`, five times), median 5,284 ticks, worst low point 48%.
+  distinct keys, won every time 34`; deaths in 5 of the 64 fights (three keys
+  sharing `be38`: s6-s8, s16, s44), median 5,284 ticks, worst low point 48%.
 - K = 1-3 (`fixK2D/`, 48 runs): `runs 48, PASS 48`; the dragon `37
   distinct keys, won every time 37`; deaths in 1 fight, median 4,495
   ticks.
