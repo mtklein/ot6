@@ -97,6 +97,12 @@ H.run({ maxFrames = 200000 }, {
         battles, k, have, want))
       setPurse(want)
     end),
+    -- field care to full before each battle: the party Defends while
+    -- SETZER plays, so a battle the table does not end wears it down, and
+    -- a person heals before walking into the next (the economizer branch's
+    -- qualification: the second battle opened with e0 down and e1-e3 at
+    -- 54, 112 and 65 HP, and wiped)
+    H.fieldCare({ threshold = 1.0, tag = "before the battle" }),
     walkToBattle(),
     (function()
       local step
