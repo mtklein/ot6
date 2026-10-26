@@ -496,6 +496,7 @@ local CMD_OF = { fight = CMD_FIGHT, throw = CMD_THROW, item = CMD_ITEM, magic = 
                  rage = CMD_RAGE }
 local LIST_OF = { throw = ST_THROW, item = ST_ITEM, magic = ST_MAGIC, rage = ST_RAGE }
 local phase, held = "idle", nil
+local shut, SENT_CALLS = 0, 3
 -- Why a case's actor cannot play its verb now, or nil: down, a status that
 -- takes the turn or the choice of command away (H.turnDenied, Muddle,
 -- Zombie), or the verb's command row greyed -- Mute or Imp greys Magic,
@@ -553,7 +554,18 @@ local function decide(c)
     return b
   end
   if phase == "target" then
-    if H.readByte(MENU) == 0 or a ~= c.slot then phase = "sent" return nil end
+    -- sent once the actor's window has stayed shut for SENT_CALLS decisions (12 frames apart): the
+    -- menu byte also reads 0 for a frame or two while a list closes, and a
+    -- press that fell there left LOCKE's Magicite unqueued with his command
+    -- window open again, the resolve waiting for an action that never came
+    -- (v0.37 replay, fc_alcove at shift 0: "timeout after 6000 frames
+    -- driving toward magicite resolves, try 1")
+    if H.readByte(MENU) == 0 or a ~= c.slot then
+      shut = shut + 1
+      if shut >= SENT_CALLS then phase = "sent" end
+      return nil
+    end
+    shut = 0
     if st == ST_CMD or st == LIST_OF[c.verb] then return "a" end   -- not taken
     if st ~= ST_TGT then return nil end
     markConfirm(c)
@@ -596,7 +608,7 @@ local function tryCase(c, n)
       c.esper, c.cutF, c.cutSeats, c.drawn = nil, nil, nil, nil
       c.pendAtConfirm, c.bankAtConfirm, c.mpAtConfirm = nil, nil, nil
       c.spend = n - 1
-      tick, phase, held, spent, deferring = 0, "reach", nil, 0, nil
+      tick, phase, held, spent, deferring, shut = 0, "reach", nil, 0, nil, 0
     end),
     H.driveUntil(function() return skip or phase == "sent" end, 6000 + (n - 1) * ROUND_FRAMES, {
       H.call(function()
@@ -646,7 +658,7 @@ local function tryCase(c, n)
         tick = tick + 1
         local ph = tick % 12
         if ph == 0 then held = decide(c) end
-        if phase == "confirmed" and ph == 11 then phase = "sent" end
+        if phase == "confirmed" and ph == 11 then phase = "target" end   -- sent once the window stays shut
         H.setPad((held and ph < 6) and { [held] = true } or {})
       end),
     }, string.format("%s, try %d", c.name, n)),
