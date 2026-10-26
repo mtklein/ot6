@@ -7624,7 +7624,8 @@ end
 --      status, then an acting relic by rank), never when arming for a
 --      boss (threats.boss); opts.egg = false leaves it to step 4.
 --   4. A slot nothing above took keeps what it holds, else the leftover
---      the member can wear.
+--      the member can wear, else it comes empty when what it held went to
+--      another member above (the Relic menu's Remove).
 -- Arm per fight (#351): a generator calls this before a fight with that
 -- fight's threats (M.FIGHT_THREATS) and again after with the arc's.
 -- The threatened statuses are opts.threats ({ s1 =, s2 = } STATUS1/2
@@ -8083,6 +8084,18 @@ function M.relicPlan(members, opts)
           -- (keyed by slot, review of bcf5240f: a relic id can sit in both)
           m.filler = m.filler or {}
           m.filler[take(m, id, "a slot nothing above took: kept filled")] = true
+        elseif m.cur[s] ~= 0xFF then
+          -- what it held went to another member above and nothing is left
+          -- that it can wear: the slot comes empty.  Leaving it as it is
+          -- planned one relic on two members (wor_gogo on #475's chain:
+          -- STRAGO kept the Star Pendant under his Ribbon while it also
+          -- went to GOGO's empty slot, and the Relic menu, which equips
+          -- only from the bag, had nothing to give him: "GOGO wants Star
+          -- Pendant $B1 in slot 4 (not in the bag; held by (empty) $FF)",
+          -- build/attempts/wt/v037-menu-race-3/wor_gogo.log)
+          m.want[s] = 0xFF
+          lines[#lines + 1] = string.format("%s's slot %d comes empty: %s went to another member above and nothing "
+            .. "left in the pool is one %s can wear", m.name, s, relicName(m.cur[s]), m.name)
         end
       end
     end
@@ -8104,6 +8117,27 @@ function M.relicPlan(members, opts)
           m.name, relicName(m.cur[o]), o)
       end
     end
+  end
+  -- The plan wears no relic the party does not own: each relic is planned
+  -- on no more slots than the bag holds plus the slots wearing it now (a
+  -- relic the plan moves reaches the bag when its wearer's slot changes).
+  local supply, demand = {}, {}
+  for s = 0, 255 do
+    local id, q = M.readByte(0x1869 + s), M.readByte(0x1969 + s)
+    if id ~= 0xFF and q > 0 then supply[id] = (supply[id] or 0) + q end
+  end
+  for _, m in ipairs(ms) do
+    for s = 4, 5 do
+      if m.real[s] ~= 0xFF then supply[m.real[s]] = (supply[m.real[s]] or 0) + 1 end
+      local w = m.want[s] or m.cur[s]
+      if w ~= 0xFF then demand[w] = (demand[w] or 0) + 1 end
+    end
+  end
+  for _, l in ipairs(lines) do M.log(string.format("[%s] %s", tag, l)) end
+  lines = {}
+  for id, n in pairs(demand) do
+    M.assertEq(n <= (supply[id] or 0), true, string.format("%s: the plan puts %s on %d slot(s) and the party owns %d "
+      .. "(the bag and the slots wearing it)", tag, relicName(id), n, supply[id] or 0))
   end
   local plan = {}
   for _, m in ipairs(ms) do
@@ -8319,10 +8353,13 @@ function M.dressRelics(members, opts)
             end
             return "done"
           end
+          -- a change to $FF (a slot the plan empties) needs nothing from
+          -- the bag: the Relic menu's Remove
+          local function lacks(c) return c[2] ~= 0xFF and M.invCountOf(c[2]) < 1 end
           local pick = nil
           for i, p in ipairs(queue) do
             local ok = true
-            for _, c in ipairs(p.changes) do if M.invCountOf(c[2]) < 1 then ok = false end end
+            for _, c in ipairs(p.changes) do if lacks(c) then ok = false end end
             if ok then pick = i; break end
           end
           if pick == nil then
@@ -8337,11 +8374,11 @@ function M.dressRelics(members, opts)
             local ip = M.sym("ItemProp") & 0x3FFFFF
             for _, q in ipairs(queue) do
               for _, c in ipairs(q.changes) do
-                if pick == nil and M.invCountOf(c[2]) < 1 then
+                if pick == nil and lacks(c) then
                   local held = charByte(q.ch, 0x1F + c[1])
                   local wanted = false
                   for _, o in ipairs(queue) do
-                    for _, oc in ipairs(o.changes) do if o ~= q and oc[2] == held then wanted = true end end
+                    for _, oc in ipairs(o.changes) do if o ~= q and held ~= 0xFF and oc[2] == held then wanted = true end end
                   end
                   if wanted then
                     local mask = 1 << M.charActor(q.ch)
@@ -8389,7 +8426,7 @@ function M.dressRelics(members, opts)
               if pick == nil then
                 local rm = {}
                 for _, c in ipairs(q.changes) do
-                  if M.invCountOf(c[2]) < 1 then
+                  if lacks(c) then
                     local held = charByte(q.ch, 0x1F + c[1])
                     for _, o in ipairs(queue) do
                       for _, oc in ipairs(o.changes) do
@@ -8424,7 +8461,7 @@ function M.dressRelics(members, opts)
             local lacking = {}
             for _, q in ipairs(queue) do
               for _, c in ipairs(q.changes) do
-                if M.invCountOf(c[2]) < 1 then
+                if lacks(c) then
                   lacking[#lacking + 1] = string.format("%s wants %s in slot %d (not in the bag; held by %s)", q.name,
                     relicName(c[2]), c[1], relicName(charByte(q.ch, 0x1F + c[1])))
                 end
@@ -8434,7 +8471,21 @@ function M.dressRelics(members, opts)
               tag, table.concat(lacking, "; ")))
           end
           local p = table.remove(queue, pick)
-          cur = relicStep(p, p.changes, string.format("%s: %s", tag, p.name))
+          local put, empty = {}, {}
+          for _, c in ipairs(p.changes) do
+            if c[2] == 0xFF then empty[#empty + 1] = c[1] else put[#put + 1] = c end
+          end
+          if #empty == 0 then
+            cur = relicStep(p, put, string.format("%s: %s", tag, p.name))
+          else
+            -- the slots the plan empties first (Remove), then the rest
+            local steps = { relicStep(p, {}, string.format("%s: %s (emptied)", tag, p.name), empty) }
+            if #put > 0 then
+              steps[#steps + 1] = M.waitFrames(40)
+              steps[#steps + 1] = relicStep(p, put, string.format("%s: %s", tag, p.name))
+            end
+            cur = M.seqStep(steps)
+          end
         end
         ::ticked::
         local r = cur:tick()
