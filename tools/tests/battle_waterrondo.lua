@@ -23,7 +23,7 @@
 --      draw), raises 1 or 2 points (alternately for the first BRANCHES, then
 --      1) and starts Water Rondo, until a one-point start has both landed
 --      and stumbled (at most MAX_B branches: a one-point start stumbles 1 in
---      4, so the stumble settlement is always exercised).  Each start is predicted from the draw its roll
+--      4, so 56 one-point tries miss a stumble about once in 10^7).  Each start is predicted from the draw its roll
 --      reads (RNGTbl[$be + 1], $be as Cmd_13 begins; battle_danceodds): at
 --      1 point a draw below $40 stumbles, at 2 below $10.  Asserted per
 --      resolved start: the row was white and the confirm took; it stumbled
@@ -56,7 +56,7 @@ local DANCES = 0x1D4C                   -- known-dance mask
 local RONDO = 5
 local DANCETIER = 0x7EEDA1              -- OT6_DANCETIER (ot6_memory.inc), stride 2
 local WHITE = 0x21
-local BRANCHES, MAX_B, MUDDLES = 8, 32, 6
+local BRANCHES, MAX_B, MUDDLES = 8, 64, 6
 local BURN = type(WATERRONDO_BURN) == "number" and WATERRONDO_BURN or 0
 local FIGHT = {}
 local THRESH = { [1] = 0x40, [2] = 0x10 }   -- the ladder (kits.md, Mog)
