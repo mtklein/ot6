@@ -694,3 +694,135 @@ leg's variant with K random battles fought beside Kohlingen first
    levels.
 2. **Ultima in the driver.** RELM holds it; no policy casts it yet. A
    boss where "end the fight" pays is where to measure it.
+
+## 13. The Ice Dragon on its first draw (v0.37, #474)
+
+v0.36's qualification lost `gen_wor_tritoch`'s first attempt to the Ice
+Dragon (`qual-v036.ninja.log`: `attempt 1/3 FAILED class=wipe
+frame=14163`; the fight `battle $16E LOST after 10722 ticks`) and passed
+the second. Since v0.32 the party meets it at L35-39 (CYAN 36, TERRA 38,
+CELES 39, MOG 35 on `wor-narshe-cliffs-v1`), four or five levels under
+the v0.29 sets of section 11.4. Evidence is under
+`build/attempts/wt/v037-tritoch/lab/`: `varlab.py` (the leg from the
+tracked `wor-narshe-cliffs-v1` at seed shift s, retries off, and for K > 0
+K random battles fought beside the save point first, kept off the
+dragon's live tile), `varlab_met.py` (the same with the first K walk,
+which meets the wandering dragon on the way), `dragon.py` and `stats.py`
+(per run, the dragon fight's key, outcome, ticks, deaths, actions and low
+point), each set's `summary.txt` and `dragon.txt`, the gzipped logs, and
+each generator copy a set ran (`gen_main.lua` is the main tree's,
+`gen_fixD.lua` the change's).
+
+### 13.1 Why it lost
+
+The dragon's damage is Absolute 0 (every member; two of the three picks
+on one step of its rotation and one on the next), N. Cross (Frozen) and
+the Battle it counters every action with. Only MOG (Ice Shld, absorbs)
+and TERRA (Thunder Shld, halves) answer ice, and no shop sells another
+ice shield. Healing cannot keep up (a Potion heals 250, a Cure about 600,
+against 900-1,216 a member per Absolute 0), so the fight is a race to the
+break, and until the break the party's fire landed 500-800 a cast against
+24,400 HP. In the lost draws Absolute 0 came twice before the third
+shield fell: on the qualification's key `be34-g016E-e6C5A5959` CYAN and
+CELES died to one (`[death] f+2514 entity 0 char 2 from 611/2116 by slot
+4 cmd $0C atk $BB`, the same for `entity 2 char 6 from 1212/2428`) and
+the rest followed (`class=died with 3 BP banked`).
+
+The main tree's generator, 64 runs at shifts 0-63 (`base/`): `runs 64,
+PASS 60`; the dragon `32 distinct keys, won every time 30`, lost on
+`be34-g016E-e6C5A5959` (s0, the qualification's draw) and
+`beB4-g016E-e6A5A5959` (s62, s63); a member died in 22 of the 64 fights,
+the median fight took 7,455 ticks, the worst low point 12%. With K = 1-3
+(`baseK2/`, 48 runs): `runs 48, PASS 44`; the dragon `38 distinct keys,
+won every time 38`, deaths in 13 fights; the four failures are UMARO's
+talk (13.3).
+
+### 13.2 The fix: fire blades for the Fighter
+
+The bag holds two Flame Sabres. A fire blade lands the weakness on each
+swing (double damage) and the fire key on each, so CELES, with her Genji
+Glove, now wears both for the arc's three bosses and Fights the Ice
+Dragon instead of casting (`armForFire`, `DRAGON_FIGHT`); TERRA and CYAN
+cast fire as before, and Tritoch (defence 254) and Umaro keep the old
+plan. The blades are dressed after the relics, and go to whoever swings
+most (a two-weapon relic's wearer first, then by vigor), only into a hand
+already holding a weapon, only where the blade's power doubled beats the
+hand's, and keeping Runic and SwdTech; each hand gets its old weapon back
+after Umaro, so the next legs keep their kit.
+
+- K = 0, shifts 0-63 (`fixD/`): `runs 64, PASS 64`; the dragon `34
+  distinct keys, won every time 34`; deaths in 5 of the 64 fights (one
+  draw, `be38`, five times), median 5,284 ticks, worst low point 48%.
+- K = 1-3 (`fixK2D/`, 48 runs): `runs 48, PASS 48`; the dragon `37
+  distinct keys, won every time 37`; deaths in 1 fight, median 4,495
+  ticks.
+- Together, 112 of 112 legs and 71 distinct dragon keys won, against 104
+  of 112 and 70 keys with 2 lost on the main tree's generator.
+- The blades, not the Fight alone (`nofireD/`, the change without
+  `armForFire`: CELES Fights with her Falchion and Enhancer, 8 shifts):
+  every fight won, but deaths in 2 of 8 and a median of 7,412 ticks, the
+  main tree's pace.
+
+### 13.3 Random battles at the dragon's touch and UMARO's talk
+
+The K sets found two more losses, both a random battle coming up during
+a scripted approach that did not fight it.
+
+- **The dragon's touch.** The presses toward the wandering dragon idled
+  through a random battle until their 1,200-frame budget ran out
+  (`fixK2C/k1_s9`: `[seed] battle ... g0114` at f13681, then `FAIL:
+  timeout after 1200 frames driving toward the Ice Dragon (34 NPC_2):
+  touch it`; five runs of `fixK2C/`, the change before this fix). The
+  battle is now fought and the budget counts the presses only: the same
+  five draws pass (`fixK2D/k1_s9`: `[touchNpc] [outcome] battle $114
+  WON`, `PASS`). The main tree's generator has the same presses; its
+  draws in `baseK2/` happened not to meet a battle there.
+- **UMARO's talk.** When a random battle comes up as the party steps up
+  to talk, the talk counts the battle as the event starting, and the
+  naming ride pressed START into the battle until the no-effect watchdog
+  ended the run (`baseK/k1_s33`: `UMARO (283 NPC_2): activation round 1'
+  satisfied after 16 frames`, then `[seed] battle ... g0102`, `FAIL:
+  no-effect: start for 304 frames`; `baseK/` k1_s33, 36, 39, 42 and 45;
+  `baseK2/` k3_s21 and k3_s24 the same with `624 frames`, k3_s27 and
+  k3_s30 with `304 frames`). The ride now fights the battle, and after
+  one talks again when the party stands in control with no event
+  running; a talk that sets nothing off still fails at the ride's budget.
+  Only the met walk exercises it after the change: `metD/` k1_s33, 36,
+  39, 42 and 45, the draws `baseK/` lost, pass (`metD/k1_s33`: `UMARO
+  joins: a random battle came up instead of the event, and the party
+  stands in control with the event not run; talking again`, `PASS`);
+  `fixK2D/` never took that path.
+- **The met walk's two saves.** When the dragon was already met on the
+  walk up, the leg saves `wor_tritoch_ready.mss` and
+  `wor_tritoch_dragon.mss` two frames apart, and the second carried the
+  PPU's palette address unknown (render on demand, #394): `fixBK/`
+  (`varlab_met.py`, the change before this fix) `runs 48, PASS 44`, the
+  four `FAIL: render on demand: fixture(s) wor_tritoch_dragon.mss saved
+  with the PPU's palette address unknown`. A drawn frame now comes
+  between them: `metD/` `runs 48, PASS 48`, every run on that branch
+  (`the Ice Dragon was met on the walk up` in all 48). The main tree's
+  `baseK/` on the same walk passed it by its timing. `baseK/`, `fixBK/`
+  and `metD/` fight the dragon on the K walk with the plain driver, so
+  they count only for this section.
+
+### 13.4 Short of "What makes a fight good"
+
+With the blades the dragon is less of a contest: median low point 72% at
+K = 0 and 94% at K = 1-3, deaths in 6 of 112 fights against 35 of 112.
+The win comes from a choice a player makes (the weakness read off the
+bestiary and the bag), and the levels the arc arrives with are its other
+lever.
+
+### 13.5 Found on the way
+
+`base/k0_s57` lost the leg in a random battle after the dragon (six
+Psychots): CELES's command window opened with an empty menu-state queue
+and nothing could act for 35,000 frames (`[unknown-menu] state $00 first
+seen this battle at f14411`, `class=worn down`). A write trace of the
+replayed run (`trace/k0_s57.log.gz`) shows the cause: the NMI's
+`UpdateMenuState` ran between `window_open`'s `sta w7e7bc3` (#$04) and
+its `sta w7e7bc2` (#$01) (`f14377 w $7BC3=04 pc=C144C8`, then `f14378 w
+$7BC2=04 pc=C15A7D` and `w $7BC2=01 pc=C144CD`), consumed the queued
+open, and left state $00, which reads no input. The two stores are
+vanilla's; it is a game bug no input can leave, seen once in the lab
+runs here, and not fixed in this change.

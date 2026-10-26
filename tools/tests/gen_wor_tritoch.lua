@@ -42,6 +42,12 @@ local FIRE = 0x00
 -- as a player spends her divine on a boss.
 local BOSS_FIGHT = { runic = true, bushido = true, magic = { [0] = { spell = FIRE } }, nuke = { FIRE },
   trance = true }
+-- The Ice Dragon (defence 74, not Tritoch's 254): CELES swings the fire
+-- blades armForFire put in her hands rather than casting, so her Fight
+-- lands the weakness on every swing and the fire key on each; TERRA and
+-- CYAN cast fire as before.
+local DRAGON_FIGHT = { bushido = true, magic = { [TERRA] = { spell = FIRE }, [CYAN] = { spell = FIRE } },
+  trance = true }
 -- their threats for the relic rule (an informed reading of their scripts:
 -- ice spells and Frozen, which no relic in the bag guards; the damage is
 -- mostly magic)
@@ -228,21 +234,38 @@ local function via(points, what, avoid)
 end
 -- a story stretch that may open a naming menu (MOG's, `name_menu`): the
 -- ride taps A through the dialogs, and while a field menu is up ($0059)
--- presses START, which commits the default name (gen_moogle's LOCKE)
+-- presses START, which commits the default name (gen_moogle's LOCKE).
+-- A random battle that comes up instead (the talk's approach stepped onto
+-- an encounter: build/attempts/wt/v037-tritoch/lab/baseK/k1_s33.log.gz,
+-- UMARO's talk at f44155, then "[seed] battle ... g0102" and START pressed
+-- into the battle until the no-effect watchdog) is fought with the
+-- tactical driver; when, after such a battle, the party stands in control
+-- with no event running for 120 frames, the talk did not take: the ride
+-- ends with `pred` still false and the caller talks again (the repeatN
+-- around UMARO's talk).  Without a battle the ride waits for `pred` to
+-- its budget and fails there, as before.
 local function rideNaming(pred, maxF, what)
-  local ph = 0
+  local ph, idle, inBattle, battled = 0, 0, false, false
+  local drv = H.fightDriverFor("rideNaming", { tactical = true, boost = true, items = true, healPercent = 55 }, FIGHT)
   return H.withReset(H.seqStep({
-    H.driveUntil(function() return pred() and settled() end, maxF, {
+    H.driveUntil(function() return (pred() and settled()) or (battled and idle >= 120) end, maxF, {
       H.call(function()
+        if H.battleLoadStarted() then inBattle, battled, idle = true, true, 0; drv.frame(); return end
+        if inBattle then drv.idle(); inBattle = false end
         ph = (ph + 1) % 16
+        idle = (settled() and not H.eventRunning() and not pred()) and idle + 1 or 0
         if H.readByte(0x0059) ~= 0 then H.setPad(ph < 6 and { "start" } or {}); return end
         if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
         H.setPad({})
       end),
     }, what),
     H.release(),
-    H.call(function() say("story", what) end),
-  }), function() ph = 0 end)
+    H.call(function()
+      if not pred() then H.log(string.format("[story] f%d %s: a random battle came up instead of the event, and "
+        .. "the party stands in control with the event not run; talking again", H.frame, what)) end
+      say("story", what)
+    end),
+  }), function() ph, idle, inBattle, battled = 0, 0, false, false end)
 end
 -- a chest from whichever side of it the party can reach
 local function chestAt(cx, cy, bit, what, item, avoid)
@@ -309,6 +332,18 @@ local function toFalconBy(x, y, dir, what, worldDoors)
     H.waitWorldSettled("out of " .. what, 1800, 30),
     H.worldNavTo(function() return H.readByte(0x1F62) end, function() return H.readByte(0x1F63) end,
       { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, avoid = worldDoors }),
+  })
+end
+
+-- a drawn frame (render on demand, #394), asked for until one comes
+local function drawnFrame()
+  return H.seqStep({
+    H.call(function() H.requestRender() end),
+    H.waitUntil(function()
+      if H.frameDrawn() then return true end
+      H.requestRender()
+      return false
+    end, 30, "a drawn frame", 1),
   })
 end
 
@@ -564,7 +599,8 @@ end
 -- the Ice Dragon's object stands away from its posted tile (build/lab/
 -- narshe/t1: $11 at (20,16), posted (22,20)) and may walk
 local function touchNpc(find, begun, what)
-  local ph = 0
+  local ph, pressed, inBattle = 0, 0, false
+  local drv = H.fightDriverFor("touchNpc", { tactical = true, boost = true, items = true, healPercent = 55 }, FIGHT)
   return H.seqStep({
     H.cond(function() return not begun() end, {
       lazy(function()
@@ -581,15 +617,30 @@ local function touchNpc(find, begun, what)
             { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, arrive = function()
               return begun() or math.abs(H.objX(o) - H.fieldX()) + math.abs(H.objY(o) - H.fieldY()) == 1
             end }),
-          H.withReset(H.driveUntil(begun, 1200, {
+          -- a random battle that comes up during the presses is fought
+          -- (build/attempts/wt/v037-tritoch/lab/fixK2C/k1_s9.log.gz: "[seed]
+          -- battle ... g0114" at f13681, then "timeout after 1200 frames
+          -- driving toward the Ice Dragon (34 NPC_2): touch it"); the 1200
+          -- frames bound the presses, not the battle
+          H.withReset(H.driveUntil(begun, 40000, {
             H.call(function()
               ph = (ph + 1) % 8
-              if H.battleLoadStarted() or not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
+              if H.battleLoadStarted() then
+                -- the touched body's own battle is begun(), the caller's to play
+                if H.formationHas({ [ICEDRAGON] = true }) then H.setPad({}); return end
+                inBattle = true; drv.frame(); return
+              end
+              if inBattle then drv.idle(); inBattle = false end
+              pressed = pressed + 1
+              if pressed > 1200 then
+                error(string.format("timeout after 1200 frames of presses toward %s: touch it", what))
+              end
+              if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
               local dx, dy = H.objX(o) - H.fieldX(), H.objY(o) - H.fieldY()
               local dir = dx > 0 and "right" or dx < 0 and "left" or dy > 0 and "down" or "up"
               H.setPad(ph < 4 and { [dir] = true, a = true } or { [dir] = true })
             end),
-          }, what .. ": touch it"), function() ph = 0 end),
+          }, what .. ": touch it"), function() ph, pressed, inBattle = 0, 0, false end),
           H.release(),
         })
       end),
@@ -668,6 +719,106 @@ local function armForIce(party)
   return H.seqStep(steps)
 end
 
+-- ---- armed with fire -------------------------------------------------------
+-- The three bosses are weak to fire, and the bag holds fire blades (two
+-- Flame Sabres on wor-narshe-cliffs-v1).  A fire blade's Fight lands the
+-- weakness on every swing: double damage, and the fire key chips a shield
+-- (break-coverage-vector.md: "its vanilla fire weakness (Ifrit's
+-- magicite, or the Flame Sabre)").  So the bag's fire blades go into the
+-- hands of whoever swings most -- a two-weapon relic's wearer first (both
+-- hands), then by vigor -- where the blade's power doubled beats what the
+-- hand holds and it keeps the hand's Runic and SwdTech (ItemProp +$13 bits
+-- 7 and 1).  An ice blade counts for nothing here: every boss absorbs ice.
+-- What each hand held goes back on after Umaro, so the legs after this
+-- one keep their kit.  Reads only; the dressing is the Equip menu's presses.
+local FIRE_EL = 0x01
+local FIRE_WORN = {}
+local function fireBlade(id)
+  return id ~= 0xFF and (ip(id, 0) & 7) == 1 and (H.weaponElement(id) & FIRE_EL) ~= 0
+end
+local function twoHands(ch)
+  for _, off in ipairs({ 0x23, 0x24 }) do
+    local r = H.readByte(c(ch, off))
+    if r ~= 0xFF and (ip(r, 0) & 7) == 5 and (ip(r, 12) & 0x38) ~= 0 then return true end
+  end
+  return false
+end
+local function bladeScore(id)
+  if id == 0xFF or (ip(id, 0) & 7) ~= 1 then return 0 end
+  local el = H.weaponElement(id)
+  if (el & ICE) ~= 0 then return 0 end
+  return ip(id, 0x14) * (((el & FIRE_EL) ~= 0) and 2 or 1)
+end
+local function armForFire(party)
+  local plan = {}
+  local steps = { H.call(function()
+    plan, FIRE_WORN = {}, {}
+    local bag = {}
+    for s = 0, 255 do
+      local id, n = H.readByte(0x1869 + s), H.readByte(0x1969 + s)
+      if n > 0 and fireBlade(id) then bag[id] = (bag[id] or 0) + n end
+    end
+    local order = {}
+    for i, m in ipairs(party) do order[#order + 1] = { m = m, i = i, two = twoHands(m[1]), vig = H.readByte(c(m[1], 0x1A)) } end
+    table.sort(order, function(a, b)
+      if a.two ~= b.two then return a.two end
+      if a.vig ~= b.vig then return a.vig > b.vig end
+      return a.i < b.i
+    end)
+    for _, o in ipairs(order) do
+      local ch, name = o.m[1], o.m[2]
+      local items = {}
+      local hands = { 0 }
+      local left = H.readByte(c(ch, 0x20))
+      if o.two and left ~= 0xFF and (ip(left, 0) & 7) == 1 then hands[2] = 1 end
+      for _, sl in ipairs(hands) do
+        local cur = H.readByte(c(ch, 0x1F + sl))
+        local need = (cur ~= 0xFF and (ip(cur, 0) & 7) == 1) and (ip(cur, 0x13) & 0x82) or 0
+        local best, bs = nil, bladeScore(cur)
+        -- an empty hand stays empty: the Equip menu has no unequip to put
+        -- it back after Umaro, so only a hand holding a weapon is swapped
+        if cur == 0xFF then bs = math.huge end
+        for id, n in pairs(bag) do
+          if n > 0 and wearable(ch, id) and (ip(id, 0x13) & need) == need and bladeScore(id) > bs then
+            best, bs = id, bladeScore(id)
+          end
+        end
+        H.log(string.format("[kit] %s hand %d: $%02X (score %d), the bag's best fire blade %s", name, sl, cur,
+          bladeScore(cur), best and string.format("$%02X (score %d)", best, bs) or "none better"))
+        if best then
+          bag[best] = bag[best] - 1
+          items[#items + 1] = { sl, best }
+          FIRE_WORN[#FIRE_WORN + 1] = { ch = ch, name = name, slot = sl, old = cur }
+        end
+      end
+      if #items > 0 then plan[#plan + 1] = { ch = ch, name = name, items = items } end
+    end
+  end) }
+  for i = 1, 4 do
+    steps[#steps + 1] = H.cond(function() return plan[i] ~= nil end, {
+      lazy(function() return H.equipKit(plan[i].ch, plan[i].items, { tag = plan[i].name .. " with fire" }) end),
+    }, {})
+  end
+  steps[#steps + 1] = H.call(function() say("kit", "armed with fire: " .. kitLine()) end)
+  return H.seqStep(steps)
+end
+-- each hand armForFire changed back to what it held
+local function unarmFire()
+  local steps = {}
+  for _, ch in ipairs({ CYAN, TERRA, CELES, MOG }) do
+    steps[#steps + 1] = lazy(function()
+      local items = {}
+      for _, w in ipairs(FIRE_WORN) do
+        if w.ch == ch then items[#items + 1] = { w.slot, w.old } end
+      end
+      if #items == 0 then return H.call(function() end) end
+      return H.equipKit(ch, items, { tag = "char " .. ch .. " back from fire" })
+    end)
+  end
+  steps[#steps + 1] = H.call(function() say("kit", "the fire blades back in the bag: " .. kitLine()) end)
+  return H.seqStep(steps)
+end
+
 local PARTY = { { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" }, { MOG, "MOG" } }
 local REGROUP = { UMARO, MOG, TERRA, CELES }
 local REGROUP_MEMBERS = { { UMARO, "UMARO" }, { MOG, "MOG" }, { TERRA, "TERRA" }, { CELES, "CELES" } }
@@ -698,6 +849,8 @@ H.run({ maxFrames = 500000 }, {
   -- @@stage dragon
   armForIce(PARTY),
   ready("the Ice Dragon", true),
+  -- after the relics, so the two-weapon relic it reads is the one worn
+  armForFire(PARTY),
   H.saveState("wor_tritoch_ready.mss"),
   -- map 34 NPC_2 (posted (22,20)), _cc36df: touched, event battle 132, a
   -- game over when lost (_ca5ea9)
@@ -710,10 +863,16 @@ H.run({ maxFrames = 500000 }, {
     end, "the Ice Dragon (34 NPC_2)"),
     H.advanceStory(function()
       return sw(0x0695) == 0 and not H.battleLoadStarted() and map() == MAP_CLIFF_SAVE and settled()
-    end, 120000, { playBattles = "tactical", fight = BOSS_FIGHT }),
+    end, 120000, { playBattles = "tactical", fight = DRAGON_FIGHT }),
     fought(ICEDRAGON_FORMATION, "the Ice Dragon"),
   }, {
     H.call(function() H.log("[boss] the Ice Dragon was met on the walk up (gen_wor_narshe): $0695 already clear") end),
+    -- no battle between the two saves on this branch: a drawn frame between
+    -- them, or the second carries the PPU's palette address unknown
+    -- (render on demand, #394; build/attempts/wt/v037-tritoch/lab/fixBK/
+    -- k2_s42.log.gz: "fixture wor_tritoch_dragon.mss: its savestate
+    -- carries the PPU's palette address UNKNOWN")
+    drawnFrame(),
   }),
   H.saveState("wor_tritoch_dragon.mss"),
 
@@ -781,11 +940,17 @@ H.run({ maxFrames = 500000 }, {
     H.assertEq((H.readByte(0x1A69 + (TERRATO >> 3)) >> (TERRATO & 7)) & 1, 1, "Terrato owned (give_genju)")
   end),
   H.saveState("wor_tritoch_umaro.mss"),
+  unarmFire(),
   -- UMARO (283 NPC_2 (59,13), _ccd793, MOG in the party): his naming menu,
   -- and "me wait for you in big airship" ($02FD, $007E)
   H.fieldCare({ tag = "after Umaro" }),
-  talkTo(59, 13, "UMARO (283 NPC_2)"),
-  rideNaming(function() return sw(0x02FD) == 1 and sw(0x007E) == 1 and map() == MAP_LAIR end, 20000, "UMARO joins"),
+  H.repeatN(3, {
+    H.cond(function() return not (sw(0x02FD) == 1 and sw(0x007E) == 1) end, {
+      H.fieldCare({ tag = "before UMARO's talk" }),
+      talkTo(59, 13, "UMARO (283 NPC_2)"),
+      rideNaming(function() return sw(0x02FD) == 1 and sw(0x007E) == 1 and map() == MAP_LAIR end, 20000, "UMARO joins"),
+    }, {}),
+  }),
   H.call(function()
     H.assertEq(sw(0x02FD), 1, "UMARO is available ($02FD, _ccd793)")
     say("wor", "UMARO joined")
