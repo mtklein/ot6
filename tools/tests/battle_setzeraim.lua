@@ -22,6 +22,33 @@
 -- and the purse fell by that one fee.  On the lib before aimStep a and b
 -- were confirmed where the cursor stood: build/attempts/wt/pass-retarget/aim/.
 -- The fight driver then ends the battle.
+--
+-- A crowd can stop being one the plan can be played through before it is
+-- done, and the battle is then lost to the test: the plan is dropped,
+-- the route's fight driver fights it out, and the next crowd (at most W
+-- encounters on, the decoded worst case) plays the plan from its start --
+-- at most MAX_LOST such battles in the run.  The points:
+--   * care.lostPoint's (the rule battle_slots and battle_slotsboot play
+--     by) without "SETZER fell" (lo.fell = false: a Zombie reads 0 HP,
+--     and H.setzerBattle's care cures or raises him): two or more members
+--     out of control (H.controlTaken: Death, Zombie, Sleep, Muddle ...),
+--     nobody but SETZER in control, or a conditional control attack live.
+--     The tomb's crowds all hold Exorays, whose Special Zombies on any
+--     turn (PowerDemon's skill too), and the plan holds the formation with
+--     Defends: on #475's chain SETZER was Zombied between his hire's
+--     confirm and its exec, the engine aimed it at CELES (#433), EDGAR and
+--     SABIN were Zombied, and the party wiped with the plan still owed
+--     (build/attempts/wt/v037-menu-race-3/suite_battle_setzeraim.log).
+--   * c's target select opening with fewer than two live monsters (c
+--     needs one off the cursor).  Read only there: the tomb's formations
+--     hide and show bodies (Cmd_24), so $3A75 passes through 0 between
+--     waves and the plan goes on once they are back.
+--   * c's slot fallen between its confirm and its exec (the engine
+--     retargets it), or the battle over with c not run.
+-- c's slot is latched when its target select opens, once per aim: when
+-- the engine aims c (SETZER Zombied after his confirm) H.setzerBattle
+-- plays the entry again with a new aim, and the slot is latched again
+-- (the first may have fallen meanwhile).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -33,6 +60,10 @@ local function count(m) local n = 0 while m ~= 0 do n = n + (m & 1); m = m >> 1 
 local function gil() return H.readWord(0x1860) + H.readByte(0x1862) * 65536 end
 
 local W, since, wp = nil, 0, 1
+local lost, MAX_LOST = 0, 3
+local function seat() for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == 9 then return s end end end
+-- read only: the lost point and the party line
+local care = H.newSpinnerCare({ spinner = seat })
 local WPS = { { 124, 26 }, { 120, 11 } }
 local done = false
 local far, absent = nil, nil
@@ -58,23 +89,65 @@ local function play()
           for s = 0, 5 do if (lm >> s) & 1 == 1 and (1 << s) ~= cur then return s end end
           return absent
         end })
-        -- latched when its target select opens: the live monster with the
-        -- highest slot the cursor is not resting on, so the aim must walk
+        -- latched when its target select opens (H.setzerBattle builds the
+        -- entry's aim there, then reads its slot): the live monster with the
+        -- highest slot the cursor is not resting on, so the aim must walk.
+        -- Once per aim: a replay (the engine aimed the row he confirmed)
+        -- comes with a new aim and latches again.  With fewer than two live
+        -- monsters there is no such slot, and the battle is lost to the
+        -- test (an absent slot meanwhile, so nothing is confirmed)
         S.pos = setmetatable({ row = HIRE, boost = 0 }, { __index = function(t, k)
           if k ~= "slot" then return nil end
-          if rawget(t, "latched") == nil then
+          local aim = rawget(t, "aim")
+          if aim ~= nil and rawget(t, "latchedFor") ~= aim then
             local cur, lm = H.readByte(0x7B7E), alive()
+            local was = rawget(t, "latched")
+            rawset(t, "latched", nil)
             for s = 0, 5 do if (lm >> s) & 1 == 1 and (1 << s) ~= cur then rawset(t, "latched", s) end end
+            rawset(t, "latchedFor", aim)
+            S.latches = (S.latches or 0) + 1
             far = rawget(t, "latched")
+            H.log(string.format("[%s] f%d c latched (aim %d): slot %s (cursor mons=%02X, $3A75 = $%02X)%s", TAG,
+              H.frame, S.latches, tostring(far), cur, lm, was ~= nil and string.format(", was slot %d", was) or ""))
+            if far == nil then
+              S.lostWhy = string.format("c's target select opened with %d live monster(s) ($3A75 = $%02X), and c "
+                .. "needs one off the cursor", count(lm), lm)
+            end
           end
-          return rawget(t, "latched")
+          return rawget(t, "latched") or absent
         end })
         S.step = H.setzerBattle({ S.negA, S.negB, S.pos }, { untilPlanDone = true, aimRefusedOk = true })
       end
     end
+    local function forfeit(why)
+      if S.phase ~= "plan" then return end
+      lost = lost + 1
+      H.log(string.format("[%s] f%d encounter %d: %s -- this battle is lost to the test (#%d of at most %d); the "
+        .. "plan is dropped, the fight driver fights it out, and the next crowd plays it | party %s", TAG, H.frame,
+        since, why, lost, MAX_LOST, care.partyLine()))
+      H.assertEq(lost <= MAX_LOST, true, string.format("%d battles lost to the test (the bound is %d)", lost, MAX_LOST))
+      -- the budget counts from this crowd, as from the last
+      since = 0
+      S.phase = "fight"
+    end
+    if S.phase == "plan" and H.battleActive() then
+      local why = S.lostWhy or care.lostPoint({ fell = false })
+      if why then forfeit(why) end
+    end
     if S.phase == "plan" then
       local r = S.step:tick()
       if r ~= "done" then return r end
+      local recs = H.vars.setzer
+      if #recs == 1 and far ~= nil and recs[1].mon0[far] and not recs[1].mon0[far].alive then
+        -- its slot fell between the confirm and the exec, and the engine
+        -- aimed it elsewhere (vanilla's retarget): not the aim's doing
+        forfeit(string.format("the aimed hire's slot %d fell before it ran (exec f%d, targets $%02X)", far,
+          recs[1].f, recs[1].targets))
+      elseif #recs == 0 and not H.battleLoadStarted() and rawget(S.pos, "aimRefused") == nil then
+        forfeit("the battle ended before c ran")
+      end
+    end
+    if S.phase == "plan" then
       local recs = H.vars.setzer
       H.log(string.format("[%s] a (slot %d, no monster): %s", TAG, absent, tostring(rawget(S.negA, "aimRefused"))))
       H.log(string.format("[%s] b (off the cursor, walking off): %s", TAG, tostring(rawget(S.negB, "aimRefused"))))

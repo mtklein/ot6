@@ -1887,9 +1887,12 @@ function M.newSpinnerCare(o)
   --   * no member but the spinner has control left.
   -- The caller marks the battle lost to the test and ends it with Fights
   -- (C.fightOut) rather than spin into it.
-  function C.lostPoint()
+  -- lo.fell = false leaves the first rule out: a caller whose spinner is
+  -- cured or raised by care in the battle (battle_setzeraim; a Zombie
+  -- reads 0 HP) does not lose it to his fall.
+  function C.lostPoint(lo)
     local spinner = o.spinner()
-    if spinner ~= nil and seated(spinner) and php(spinner) == 0 then
+    if not (lo and lo.fell == false) and spinner ~= nil and seated(spinner) and php(spinner) == 0 then
       return NAME .. " fell"
     end
     local standing, species = 0, {}
