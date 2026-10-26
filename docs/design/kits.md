@@ -1149,7 +1149,9 @@ there).
   arrives under three points (a dance id left by an earlier start, a Gogo's
   Mimic he did not boost) stumbles, charging nothing, neither MP nor pips (no
   boost under three could buy it), and clears the id.  A Gogo's Mimic reads
-  Gogo's own pending boost, the Jackpot precedent.  `battle_waterrondo`.
+  Gogo's own pending boost, the Jackpot precedent.  `battle_waterrondo`;
+  `battle_rondogate` plays the Mimic (GOGO beside MOG, one or two points
+  pending: the boost dropped, the regen pip earned).
 
   **The stumble ladder (#473).** Off its own terrain a Dance start stumbles
   on vanilla's coin: Cmd_13 rolls `RandCarry`, and an even draw (carry
@@ -1177,7 +1179,8 @@ there).
   still one payoff: the boost buys the dance at that tier, and starting is
   part of it.  `battle_danceodds` checks the rule on every draw it meets at
   each level and the thresholds as odds over RNGTbl; `battle_dancestumble`
-  the settlement.
+  the settlement; `battle_rondogate` MOG's locked-in steps on GOGO's
+  background, each predicted from the tier MOG's start bought.
 - **Umaro — Berserker (bludgeoning: club, fists)**: see "Umaro" below
   (#380).
 
