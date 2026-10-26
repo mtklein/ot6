@@ -36,11 +36,13 @@ TOKENS = [
     "emu.write16",
     "emu.write32",
     "emu.setState",
+    "emu.setCpuState",
     "emu.addCheat",
     "emu.clearCheats",
     "emu.rewind",
     "emu.reset",
     "emu.loadSavestate",
+    "emu.loadSavestateAsync",
     ".writeByte(",
     ".writeWord(",
     "H.write",
@@ -361,6 +363,8 @@ M.write(0x16)
 emu.reset()
 local s = "benign" ; H.write(0x18)
 local sneak = __OT6_EMU_RAW.write(0x1a, 4)
+emu.setCpuState({pc = 0})
+emu.loadSavestateAsync(blob)
 """
     got = scan_text("n.lua", noisy)
     want = [
@@ -371,6 +375,8 @@ local sneak = __OT6_EMU_RAW.write(0x1a, 4)
         ("n.lua", 7, "emu.reset"),
         ("n.lua", 8, "H.write"),
         ("n.lua", 9, "__OT6_EMU_RAW"),
+        ("n.lua", 10, "emu.setCpuState"),
+        ("n.lua", 11, "emu.loadSavestateAsync"),
     ]
     expect(got == want, "detection drift: want %r got %r" % (want, got))
 

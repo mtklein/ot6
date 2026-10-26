@@ -62,6 +62,36 @@ def main():
             assert placement.claim(path, placed, 4, 'b') == ['mbp']*4
         with patch.object(placement.time, 'time', return_value=now+21):
             assert placement.claim(path, placed, 4, 'stale') == []
+    # A repeat --claim by the same claimant replaces its hold; claims lapse
+    # after placement.CLAIM_SEC (#477).
+    def view(t, path):
+        two = [dict(machine('px13', active=2), power={'source': 'ac', 'ts': t}),
+               dict(machine('mbp'), power={'source': 'ac', 'ts': t})]
+        return placement.placement(two, placement.read_claims(path, t), t)
+    def total(path, t, who):
+        return sum(c['n'] for c in placement.read_claims(path, t) if c['by'] == who)
+    with tempfile.TemporaryDirectory() as directory:
+        path = str(Path(directory) / 'claims')
+        t0 = time.time()
+        with patch.object(placement.time, 'time', return_value=t0):
+            first = placement.claim(path, view(t0 - 1, path), 4, 'a')
+        assert first == ['px13'] * 4, first
+        with patch.object(placement.time, 'time', return_value=t0 + 1):
+            again = placement.claim(path, view(t0 + 0.5, path), 4, 'a')
+        assert again == ['px13'] * 4, again
+        assert total(path, t0 + 1, 'a') == 4, total(path, t0 + 1, 'a')
+        with patch.object(placement.time, 'time', return_value=t0 + 2):
+            other = placement.claim(path, view(t0 + 1.5, path), 4, 'b')
+        assert other == ['px13'] * 2 + ['mbp'] * 2, other
+        with patch.object(placement.time, 'time', return_value=t0 + 3):
+            assert placement.claim(path, view(t0 + 2.5, path), 6, 'a') == ['px13'] * 4 + ['mbp'] * 2
+        assert total(path, t0 + 3, 'a') == 6 and total(path, t0 + 3, 'b') == 4
+        assert total(path, t0 + 3 + placement.CLAIM_SEC - 1, 'a') == 6
+        assert total(path, t0 + 3 + placement.CLAIM_SEC + 1, 'a') == 0
+        late = t0 + 3 + placement.CLAIM_SEC + 1
+        with patch.object(placement.time, 'time', return_value=late):
+            assert placement.claim(path, view(late - 0.5, path), 8, 'c') == ['px13'] * 6 + ['mbp'] * 2
+    print('PASS: a repeat claim replaces the claimant\'s hold; claims expire after CLAIM_SEC')
     machines[1]['power']['source'] = 'ac'
     assert placement.placement(machines, [], now)['order'].count('air') == 7
     print('PASS: placement excludes battery/unknown/stale, preserves running count and claims, resumes on AC')

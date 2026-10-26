@@ -224,6 +224,20 @@ for other control loss, and debounces those states over 3 consecutive frames. `o
 extra terminator predicate; `opts.maxFrames` (default 20000) errors on
 timeout.
 
+## Exec callbacks cannot inject faults
+
+An `emu.addMemoryCallback` on `emu.callbackType.exec` runs before the
+instruction, but its return value is ignored: Mesen hands the callback a copy
+of the opcode, so returning a different byte changes nothing in the emulated
+CPU. A fault (a skipped store, a forced branch, an interrupt between two
+instructions) cannot be injected that way. The only levers are the write-side
+`emu` calls (`emu.setState`, `emu.setCpuState`, `emu.write`, ...), and those
+are gated: the checked-in surface is `tools/check_state_writes.py` (waived per
+file in `tools/state_write_waivers.txt`) and the runtime gate in
+`tools/tests/lib/compose.py` (`WRITE_GATE_SURFACE`), which refuses them in any
+script whose file carries no waiver. A script that uses one declares it, with
+the reason, in the waiver file (a quarantine line).
+
 ## Runtime limits
 
 Two wall-clock limits apply to every headless run:

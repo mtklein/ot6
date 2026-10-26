@@ -99,8 +99,8 @@ def load_write_waivers(path):
 # lib entry points, which are removed with the lib's own waiver registry instead).
 WRITE_GATE_SURFACE = [
     "write", "writeWord", "write16", "write32",
-    "setState", "addCheat", "clearCheats",
-    "rewind", "reset", "loadSavestate",
+    "setState", "setCpuState", "addCheat", "clearCheats",
+    "rewind", "reset", "loadSavestate", "loadSavestateAsync",
 ]
 
 

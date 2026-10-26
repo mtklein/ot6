@@ -1798,7 +1798,8 @@ def main():
                     "emulators should go, and exit")
     ap.add_argument("--claim", metavar="WHO",
                     help="with --place: hold those emulators for WHO for a "
-                    "couple of minutes, so parallel callers do not double-book")
+                    "couple of minutes, so parallel callers do not double-book; "
+                    "a repeat --claim by the same WHO replaces its hold")
     ap.add_argument("--active", type=int, nargs="+", metavar="ISSUE",
                     help=f"label these issues '{ACTIVE_LABEL}' (an agent is on "
                     "them; the grid page lists them) and exit")

@@ -35,7 +35,8 @@ PREFER = ("px13", "mini", "air", "mbp")
 
 def held(claims, machine, active, now):
     """Emulators live claims still hold on a machine: what was claimed,
-    less what has started there since the oldest live claim."""
+    less what has started there since the oldest live claim.  A claimant holds
+    one claim: placement.claim() replaces its earlier one."""
     live = [c for c in claims
             if c["machine"] == machine and now - c["ts"] < CLAIM_SEC]
     if not live:
@@ -114,11 +115,20 @@ def claim(path, p, n, who):
     return the machines taken.  Parallel callers queue on the lock."""
     with locked(path):
         now = time.time()
-        live = read_claims(path, now)
+        every = read_claims(path, now)
+        # A repeat claim by WHO replaces its earlier hold (#477): drop it,
+        # and give its room back where p (which may have seen it) took it.
+        live = [c for c in every if c.get("by") != who]
+        replaced = len(live) != len(every)
         unseen = [c for c in live if c["ts"] > p["ts"]]
         ms = [dict(m) for m in p["machines"]]
         for m in ms:
-            if "room" in m:
+            if "room" not in m:
+                continue
+            if replaced and not (m.get("blocked") or m.get("settling")):
+                m["room"] = max(0, m["slots"] - m["active"] - held(
+                    live, m["name"], m["active"], now))
+            else:
                 m["room"] = max(0, m["room"] - held(
                     unseen, m["name"], m["active"], now))
         take = fill(ms, now)["order"][:n]
