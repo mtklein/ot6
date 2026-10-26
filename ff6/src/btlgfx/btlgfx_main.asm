@@ -9304,10 +9304,8 @@ window_mess_open:
         bne     @434a
         jsr     _c1434b
         inc     w7e64d5
-        lda     #$3b
-        sta     w7e7bc3
-        lda     #$01
-        sta     w7e7bc2
+        ldx     #$3b01        ; ot6: state $01, then $3b, in one store (#475):
+        stx     w7e7bc2       ; see window_open
 @433a:  lda     w7e7bf0
         ora     w7e7bc2
         beq     @4347
@@ -9405,10 +9403,8 @@ _c143cc:
 @43cc:  lda     w7e64d5
         beq     @43e1
         jsr     _c143b9
-        lda     #$3c
-        sta     w7e7bc3
-        lda     #$02
-        sta     w7e7bc2
+        ldx     #$3c02        ; ot6: state $02, then $3c, in one store (#475):
+        stx     w7e7bc2       ; see window_open
         stz     w7e64d5
 @43e1:  rts
 
@@ -9528,10 +9524,17 @@ window_open:
         sta     w7e7b98
         jsr     _c14445       ; update inventory with obtained items
         jsr     _c14759
-        lda     #$04
-        sta     w7e7bc3
-        lda     #$01
-        sta     w7e7bc2
+        ldx     #$0401        ; ot6: menu state $01 (wait for the window
+        stx     w7e7bc2       ; animation), then $04, in ONE 16-bit store
+                              ; (#475).  vanilla stored $7bc3 then $7bc2: a
+                              ; frame interrupt between them ran the OLD
+                              ; state $01, which shifted the new $04 in, and
+                              ; the $01 written next shifted in the empty
+                              ; slot behind it: state $00, which reads no
+                              ; input, with the window open.  an interrupt
+                              ; is taken only between instructions, so one
+                              ; store leaves it nothing in between.  x is
+                              ; dead here (auto_window_open returns)
         inc     w7e7bbb       ; enable menu window update
         inc     w7e7bca       ;
         rts
@@ -22715,10 +22718,8 @@ good_anim_window_put_big_open:
 BattleEventCmd_10:
 good_anim_window_put_big_close:
 @96ad:  jsr     _c143b9
-        lda     #$3c
-        sta     w7e7bc3
-        lda     #$02
-        sta     w7e7bc2
+        ldx     #$3c02        ; ot6: state $02, then $3c, in one store (#475):
+        stx     w7e7bc2       ; see window_open (WaitFrame keeps x)
         jsr     WaitFrame
         stz     w7e64d5
         rts

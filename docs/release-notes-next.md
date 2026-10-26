@@ -19,3 +19,5 @@ A stumble still costs no MP, but the boost points are spent.
 **The Cursed Shield.** A won random battle now counts twice toward lifting the curse, so the Paladin Shield takes about half as many battles as before. Random battles come half as often in OT6, so the walking it takes is about what it was in the original game.
 
 **A new save.** By Maranda, after Shadow joins at the Colosseum.
+
+**A rare battle freeze.** Very occasionally, when one character finished choosing a command and the menu passed straight to the next, the menu could come up empty and stop answering the controller, so nobody could act for the rest of the fight. This came from the original game's code and is fixed.

@@ -83,6 +83,7 @@ tools/tests/battle_left.lua	.writeWord(	1	quarantine: #255 mechanism staging -- 
 tools/tests/battle_loadgate.lua	.writeWord(	1	quarantine: unit test of the harness's own load-gate predicate, not of play
 tools/tests/battle_lore.lua	.writeByte(	6
 tools/tests/battle_magicite.lua	.writeWord(	2	quarantine: lab conditions the fighting run's fixture cannot supply on cue -- (1) the casters' FIELD MP pinned before each boot (boot A: Celes 126 and Locke his maximum, for the divine/flag windows; boot B: Celes 31 = 1 mod 5 for the boundary walk); the fighting run's fixture ships them drained (Celes 1 of 126, Locke 13) after the honest Ifrit/Shiva nuking one door earlier, and the experiments cannot rest on that; (2) NUMBER 024's random WallChange pinned at zero (a once-per-battle divine cannot retry a wall that eats its element); neither touches the prices, flags, debit deltas or the $331c immunity under test
+tools/tests/battle_menurace.lua	emu.setState	1	quarantine: #475 fault injection -- the program counter held on the menu state pair's first write until the frame interrupt has run (an interrupt between two stores, which no input places); no RAM is written
 tools/tests/battle_mpcost.lua	.writeWord(	4
 tools/tests/battle_rage.lua	.writeByte(	16
 tools/tests/battle_rage.lua	.writeWord(	5
