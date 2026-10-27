@@ -9344,21 +9344,24 @@ function M.monBerserk(slot)
 end
 
 -- opts.berserkVs = { [species] = true } (magicOnlyLine): Bserk ($21) at one
--- of these while it stands, not Berserk and not Broken.  A Berserk monster
--- runs no script but its Fight, and its counters only to their first end_if
+-- of these while it stands and is not Berserk.  A Berserk monster runs no
+-- script but its Fight, and its counters only to their first end_if
 -- (ExecAIRetal): MagiMaster's tier spells stop, and so does his if_hit
 -- WallChange, while his if_self_dead Ultima, the first block, still runs as
--- he dies (the Life 3 hold stays).  So it goes on while his wall is one a
--- living member can hit (an element of a castable spell of the magic-only
--- list), and that wall then stands to the end; at a WallChange body
--- (opts.wallChangeVs) it waits, as an element cast does (wallWaitPlan), for
--- the spells in the air to land first, since the wall read now may not be
--- the one Bserk meets.  (Asked to find no action queued at all, it never
--- went: lab z1, 'no Bserk ... an action or his counter pending' at every
--- wall.)  One cast in the air at a time (900 frames); one that misses is
--- cast again.  The plan
--- is monsterOnly: Bserk's cursor opens on the party, and the confirm backs
--- out rather than land it on a member.
+-- he dies (the Life 3 hold stays).  So his wall stands from then to the end,
+-- and it must be one a living member can hit (an element of a castable spell
+-- of the magic-only list).  At a WallChange body (opts.wallChangeVs) Bserk
+-- goes only while it is Broken: then it draws no counter and its wall stands
+-- still, so the wall read at the plan is the one Bserk freezes, and opts.
+-- breakVs breaks it only on a wall the party holds.  Cast outside a window,
+-- even after waiting for the spells in the air (wallWaitPlan), it froze him
+-- on a wall nobody held in four of eight fights (cast on $20, landed on $08,
+-- $40, $40, $80), and his Fight, 700 to 900 a hit, wore the party down to a
+-- game over (lab z3_k1_s7, z3_k2_*, z3_k3_s7: '[bz] ... BERSERK (HP 46614,
+-- wall weak $08)', '[death] ... by slot 0 cmd $00 atk $EE').  One cast in the
+-- air at a time (900 frames); one that misses is cast again.  The plan is
+-- monsterOnly: Bserk's cursor opens on the party, and the confirm backs out
+-- rather than land it on a member.
 M.BSERK_SPELL = 0x21
 function Driver:berserkPlan(actor)
   local zv = self.opts.berserkVs
@@ -9366,8 +9369,9 @@ function Driver:berserkPlan(actor)
   if self.bserkAt and M.frame - self.bserkAt < 900 then return nil end
   local MP = M.sym("MagicProp") & 0x3FFFFF
   for s = 0, 5 do
+    local wc = self.opts.wallChangeVs and self.opts.wallChangeVs[M.readWord(0x57C0 + s * 2)]
     if monAlive(s) and zv[M.readWord(0x57C0 + s * 2)] and not M.monBerserk(s)
-       and M.readByte(BATTLE.BRK_TICKS + s * 2) == 0 then
+       and (not wc or M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0) then
       local weak, can = M.readByte(0x3BE0 + 8 + s * 2), 0
       for e = 0, 3 do
         if M.readWord(0x3BF4 + e * 2) > 0 then
@@ -9384,11 +9388,6 @@ function Driver:berserkPlan(actor)
             self.tag or "fight", actor, s, weak, can))
         end
       elseif not self:castVetoed(M.BSERK_SPELL, "Bserk") then
-        -- the wall read now may not be the one Bserk meets: the turn waits
-        -- for the spell in the air to land, as an element cast's does
-        local wc = self.opts.wallChangeVs
-        local wait = wc and wc[M.readWord(0x57C0 + s * 2)] and self:wallWaitPlan(actor, s, "Bserk") or nil
-        if wait then return wait end
         self.bserkAt = M.frame
         M.log(string.format("[%s] actor=%d Bserk at slot %d (species $%03X, HP %d): wall weak $%02X, the party "
           .. "casts $%02X", self.tag or "fight", actor, s, M.readWord(0x57C0 + s * 2), M.readWord(0x3BF4 + 8 + s * 2),

@@ -88,8 +88,10 @@ BOSS_FIGHT.breakHold = true
 -- he is open to Berserk (magicite.md "Berserk"), and Berserk he casts
 -- nothing and his WallChange stops (his counter runs only to its first
 -- end_if), but his dying Ultima still comes, so the Life 3 hold stays: a
--- member who holds Bserk casts it at him while he is not Berserk, on a wall
--- the party can hit (Driver opts.berserkVs)
+-- member who holds Bserk (STRAGO, who sees the L.50 Magic's counter on the
+-- climb) casts it at him in a break window, while his wall stands on one
+-- the party can hit, and it stands there to the end (Driver opts.berserkVs;
+-- route-wor-thamasa.md 12.4)
 BOSS_FIGHT.berserkVs = { [0x166] = true }
 BOSS_FIGHT.magicOnly = {}
 for _, id in ipairs(H.MAGIC_ONLY_SPELLS) do
