@@ -9217,9 +9217,13 @@ function Driver:magicOnlyLine(actor, boost)
     -- v038-magimaster/lab/m1_b0_k0_s0_s9: 'broken (0 of 8 shields) at HP
     -- 18353', 'slot 0 weak $80', 'window over ... HP 18353')
     local weak = M.readByte(0x3BE0 + 8 + bestSlot * 2)
+    -- (held by a member other than the Break's caster, whose turn the
+    -- Break spends: on holy, which only TERRA holds, two windows took
+    -- nothing, m6_b0_k1_s7_s0: '2 shields, bank 2, wall weak $20 (the party
+    -- holds it): 1 BP', 'broken ... at HP 38622', 'window over ... HP 38622')
     local covered = false
     for e = 0, 3 do
-      if M.readWord(0x3BF4 + e * 2) > 0 then
+      if e ~= actor and M.readWord(0x3BF4 + e * 2) > 0 then
         for _, id in ipairs(self.opts.magicOnly or M.MAGIC_ONLY_SPELLS) do
           local el = M.readRomByte(MP + id * 14 + 1)
           if el ~= 0 and (el & weak) ~= 0 and spellCell(e, id, true) ~= nil then covered = true end
