@@ -29,14 +29,30 @@ FIGHT.nuke = function()
   return nil
 end
 -- without a Water Edge in the bag or SHADOW standing to throw it, nothing the party holds can touch the Cactrot,
--- and a player runs from it (it pays no experience): read as each battle opens
+-- and a player runs from it (it pays no experience).  Read as each battle opens and every 30 frames while it is
+-- fought (worldNavTo's fleeSpecies function), so a SHADOW who falls mid-battle turns the fight into a run: in
+-- battle his HP is his seat's ($3ED8 names the character, $3BF4 the HP), on the field his record's
 local WATER_EDGE = 0xAC
+local runs, runSaid, battleNo = 0, nil, 0
+local function shadowUp()
+  if H.battleLoadStarted() then
+    for e = 0, 3 do
+      if H.readByte(0x3ED8 + e * 2) == SHADOW then return H.readWord(0x3BF4 + e * 2) > 0 end
+    end
+    return false
+  end
+  return (H.readByte(0x1850 + SHADOW) & 7) == 1 and H.readWord(0x1600 + 37 * SHADOW + 0x09) > 0
+end
 local function cactrotRun()
-  local up = (H.readByte(0x1850 + SHADOW) & 7) == 1 and H.readWord(0x1600 + 37 * SHADOW + 0x09) > 0
+  if not H.formationHas({ [CACTROT] = true }) then return {} end
+  local up = shadowUp()
   if up and H.invCountOf(WATER_EDGE) > 0 then return {} end
-  if not H.formationHas({ [CACTROT] = true }) then return { CACTROT } end
-  H.log(string.format("[desert] no throw for the Cactrot (SHADOW %s, %d Water Edge): running from it",
-    up and "standing" or "down", H.invCountOf(WATER_EDGE)))
+  -- said and counted once a battle (battleNo: the battle seed's store, one a battle; the rereads share it)
+  if runSaid ~= battleNo then
+    runSaid, runs = battleNo, runs + 1
+    H.log(string.format("[desert] no throw for the Cactrot (SHADOW %s, %d Water Edge): running from it (run %d)",
+      up and "standing" or "down", H.invCountOf(WATER_EDGE), runs))
+  end
   return { CACTROT }
 end
 
@@ -53,7 +69,7 @@ local DESERT_NEAR = { 70, 187 }                      -- one step south of the la
 local MARANDA_TILE = { 69, 183 }                     -- the Falcon's tile by Maranda (wor-colosseum-v1's)
 local MARANDA_WORLD = { { 69, 184 }, { 70, 184 } }   -- Maranda's door: the walks step round it
 -- a while in the desert, as a player at the pinata spends it: eight battles (route-wor-side-trips.md section 3)
-local DESERT_FIGHTS, n0 = 8, 0
+local DESERT_FIGHTS, n0, runs0 = 8, 0, 0
 
 -- the world tile nearest (nx, ny) whose own zone deals `group` on its own background, with a passable
 -- neighbour that does too (the zone is the saved position, which every battle sets to its own tile:
@@ -93,6 +109,10 @@ local GIL_FLOOR = 60000
 H.run({ maxFrames = 1600000 }, {
   H.bootCheckpoint("wor-dino-v1"),
   watches(),
+  H.call(function()
+    local addr = H.seedStoreAddr()
+    emu.addMemoryCallback(function() battleNo = battleNo + 1 end, emu.callbackType.exec, addr, addr)
+  end),
   -- ---- 0. what the plan depends on (#480) -------------------------------------------------------------------
   -- The entry contract (lib/ot6_contract.lua) already holds the story: SHADOW recruited ($02F3, gen_wor_colosseum;
   -- his Throw is the one hit that lands on the Cactrot) and the Falcon parked beside the party.  Hard, and asserted
@@ -125,23 +145,24 @@ H.run({ maxFrames = 1600000 }, {
   H.lazy(function()
     DT = groupTile(DESERT, DESERT_NEAR[1], DESERT_NEAR[2], "the Cactrot desert")
     return H.worldNavTo(DT[1], DT[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
-      avoid = MARANDA_WORLD })
+      avoid = MARANDA_WORLD, fleeSpecies = cactrotRun })
   end),
-  H.call(function() n0 = #H.outcomes; say("wor", "on the desert") end),
+  H.call(function() n0, runs0 = #H.outcomes, runs; say("wor", "on the desert") end),
   K.pace(function() return #H.outcomes - n0 >= DESERT_FIGHTS end, DESERT_FIGHTS + 1, "the Cactrot desert", nil,
     { pick = inGroup(DESERT), flee = cactrotRun }),
   H.call(function()
     local t = {}
     for i = n0 + 1, #H.outcomes do t[H.outcomes[i].kind] = (t[H.outcomes[i].kind] or 0) + 1 end
-    say("wor", string.format("after the desert: %d battles, %d won, %d run from, %d lost", #H.outcomes - n0,
-      t["won"] or 0, t["party left"] or 0, t["lost"] or 0))
+    -- a run prints no [outcome]: the runs are cactrotRun's own count
+    say("wor", string.format("after the desert: %d battles, %d won, %d run from, %d lost",
+      #H.outcomes - n0 + runs - runs0, t["won"] or 0, runs - runs0, t["lost"] or 0))
     H.log("[kit] " .. kitLine(FOUR))
   end),
 
   -- ---- 2. back to the Falcon, and the save --------------------------------------------------------------
   -- @@stage save
   H.worldNavTo(function() return H.readByte(0x1F62) end, function() return H.readByte(0x1F63) end,
-    { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, avoid = MARANDA_WORLD }),
+    { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, avoid = MARANDA_WORLD, fleeSpecies = cactrotRun }),
   -- the Hoovers' Sand Storms empty the bag (the line's play: 97 Potions in, 4 out), and the save is Kefka's
   -- Tower's boot: a player restocks before it, at Kohlingen's counter, and comes back to the Falcon's tile
   H.cond(potionsShort, {

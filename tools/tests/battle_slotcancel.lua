@@ -378,8 +378,6 @@ local function otherWaiting()
   end
   return false
 end
--- another entity has an action committed and not yet started ($32cc, its
--- command list, set as the action is queued and cleared as it starts)
 -- whether an A pressed now on reel 1 stops it on a 7 (icon 0) or the esper
 -- (icon 2), read with the press any of the next four frames (the reel moves
 -- 4 a frame; the tables are the ROM's, H.slotLoadTables)
@@ -392,6 +390,8 @@ local function reel1Risky()
   end
   return false
 end
+-- another entity has an action committed and not yet started ($32cc, its
+-- command list, set as the action is queued and cleared as it starts)
 local function setzerSpin()
   SS.n = SS.n + 1
   local ph = SS.n % 6                -- quick hands: the blow is already queued

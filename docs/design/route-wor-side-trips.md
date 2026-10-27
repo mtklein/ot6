@@ -93,9 +93,9 @@ Fire, Ice and Bolt. Vanilla elements stay.
 
 | species | L / HP | vanilla | shields | classes | why |
 |---|---|---|---|---|---|
-| Hoover `$03E` | 49 / 12,018 | weak ice, water; counters every hit with Sand Storm (wind) | 4 | slash, bludgeon | a soft sand-eater: cut it or crush it. The desert keys the blades; its counter answers every hit, so a break by element (Ice, the Water Edge) saves hits |
+| Hoover `$03E` | 49 / 12,018 | weak ice, water; counters every hit with Sand Storm (wind) | 2 | slash, bludgeon | a soft sand-eater: cut it or crush it. The desert keys the blades; its counter answers every hit, so a break by element (Ice, the Water Edge) saves hits |
 | Cactrot `$04C` | 27 / 3 | weak ice, water; evade 250, MBlock 250, defence 255 | 1 | pierce | three HP behind an evade almost nothing beats: a hit that lands does 1, and 0 while it shields, so the break is the kill. SHADOW's thrown point (pierce, and it cannot be dodged), or ice and water |
-| Tyranosaur `$027` | 57 / 12,770 | weak ice; Meteor | 4 | pierce, bludgeon | a dinosaur's hide, as the Allosaurus's (Cyan's dream): a point or a blow, not an edge. The forest's lesson is the reverse of the desert's: the blades skid, SHADOW's point and the mages' Ice find it |
+| Tyranosaur `$027` | 57 / 12,770 | weak ice; Meteor | 3 | pierce, bludgeon | a dinosaur's hide, as the Allosaurus's (Cyan's dream): a point or a blow, not an edge. The forest's lesson is the reverse of the desert's: the blades skid, SHADOW's point and the mages' Ice find it |
 | Brachosaur `$026` | 77 / 46,050 | weak ice; Disaster, Meteor, Sneeze, Ultima | 6 | pierce, bludgeon | the same hide on a body four times the size; six, so a break holds its turns, Ultima among them |
 
 `battle_breakwor_sidetrips` checks the four rows in the built ROM, their
@@ -148,6 +148,18 @@ Without a Water Edge (`gs_noedge`, a lab battery with the nine removed) the
 leg runs from the Cactrot: "[desert] no throw for the Cactrot (SHADOW standing, 0 Water Edge): running
 from it", both Cactrots run from, the eight Hoovers won, PASS.
 
+The run is read at each battle's open and every 30 frames while the battle is
+fought, on every walk of the leg (onto the desert, the pacing, back to the
+Falcon). With no Water Edge, the leg's own walks between the Falcon and the
+desert met a Cactrot and ran (`walks_noedge_s0`, `s20`: "[desert] no throw for
+the Cactrot (SHADOW standing, 0 Water Edge): running from it (run 1)"). With
+SHADOW not throwing (a lab that switches the throw off), the Blow Fish felled
+him mid-battle and the fight turned into a run ("[death] f+9296 entity 0 char 3
+... atk $90", then "(SHADOW down, 9 Water Edge): running from it (run 1)",
+`midfall_s0`; `midfall_s20` the same). The summary counts runs from the
+leg's own count, once a battle: "after the desert: 10 battles, 8 won, 2 run
+from, 0 lost" (`de_nedge_full`).
+
 The save the tower boots: SHADOW L53-54, CYAN L52-53, CELES L61-62, TERRA
 L62, 930,000-970,000 GP, the bag at its band.
 
@@ -196,13 +208,14 @@ levels the fight may turn; that is for whoever grinds past L60.
 (#483, `c1d9745d`: the party arrives at SHADOW L43, CYAN L44, CELES and TERRA
 L54), the line replayed from `wor_ragnarok` and its `wor_colosseum` capture
 booted six sweep runs of `gen_wor_dino` (`lab/air/gd_*`: seed shifts 0, 10,
-20, 30; K = 3 and 6 encounters used up first), and the line itself played the
-leg once (`qual/wor_dino.log`):
+20, 30; K = 3 and 6 encounters used up first). The line's own play of the leg
+(`qual/wor_dino.log`) booted the same capture at shift 0, so it is `gd_s0`'s
+draw, counted once (the same battles to the frame: "the forest: 28 battles
+... f140895" in both):
 
-| | runs | PASS | plain | forest | two Tyranosaurs | one | Brachosaur | deaths | frames |
+| | runs | PASS | plain | forest | two Tyranosaurs | one | Brachosaur | deaths | the forest done |
 |---|---|---|---|---|---|---|---|---|---|
-| `gd_*` | 6 | 6 | 1-7 battles | 25-28 battles | won 37 (28 keys) | won 117 (50 keys) | run from 6 of 6 (6 keys) | 14 (13 in the pair) | 127,840-141,258 |
-| the line | 1 | 1 | 7 | 28 | won 7 | won 21 | run from 1 | 3 | 140,911 |
+| `gd_*` | 6 | 6 | 1-7 battles | 25-28 battles | won 37 (28 keys) | won 117 (50 keys) | run from 6 of 6 (6 keys) | 14 (13 in the pair) | f126,886-f140,895 |
 
 The four leave the forest at SHADOW L52-53, CYAN L52, CELES L59-61 and TERRA
 L60-61, with about 55,000 GP more than they came with and the bag still
@@ -247,6 +260,13 @@ asserts ("[deps] Ice: CELES, TERRA").
   or the bag ended inside a battle's hand-back and the walk after it stalled
   (`dnrun_s0`, `dnrun_s10`: "no-progress ... W:0.216.128.0.1"); the forest's
   stops are read only on the world, settled.
+- **`battle_slotcancel`** (not this branch's suite) went red on this ROM: its
+  blind reel taps landed 2-2-2 and the drawn Crusader took the party before
+  the property was measured. Reel 1 is now not timed on a 7 or the esper. It
+  passes at seed shifts 0, 10, 20 and with its first K = 1, 2, 3 draws run
+  from (six distinct battle keys, `slotcancel/final_s*.log`, `k*.log`); the
+  suite before the fix also passes at those K, so only the shift-0 draw met
+  the esper.
 - **Fled battles print no `[outcome]`.** The sweeps count a run from the
   battle keys (`scripts/sweep.py`: a key with no outcome before the next).
 
@@ -285,9 +305,15 @@ Brachosaur run from once, 3 deaths) and `qual/wor_desert.log` (PASS: Cactrot
 potion=99 ... fenix=20 ... gil=928573").
 
 **The re-cut.** The rows change the ROM, and the play from power-on moved
-with it: 60 of the 62 tracked checkpoints differed from the graph's capture
+with it. The first save to move is in the World of Balance, `kolts-summit-v1`
+(the two before it, `world-narshe-v1` and `world-figaro-v1`, are unchanged);
+from there 60 of the 62 tracked checkpoints differed from the graph's capture
 (`qual/drift_before_recut.txt`), all re-cut from the play at `e0280579`
-(`qual/recut.txt`). gen_wor_ragnarok, main's own change before this branch,
+(`qual/recut.txt`).
+
+**A retry in the qualified play.** `wor_phoenix` (not this branch's leg) wiped
+on its first attempt and passed on its second: "[retry] attempt 1/3 FAILED
+class=wipe frame=66449" (`qual/wor_phoenix.log`). gen_wor_ragnarok, main's own change before this branch,
 reproduces main's tracked save byte for byte on main's ROM with main's lib
 and with this branch's lib (`lab/air/probe_main`, `probe_mylib`), so the
 drift is the ROM's, not the lib's.

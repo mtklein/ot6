@@ -2801,10 +2801,11 @@ function M.worldNavTo(txIn, tyIn, opts)
   -- own convention) to FLEE specifically while otherwise fighting
   -- tactically.  Reuses newFlee's own cap + can't-run/pincer-refusal
   -- fallback, built below whenever `tactical` is.
-  -- A function is read at each battle's open (battN == 3) and returns the
-  -- list for that battle: a run the policy decides from the live party
-  -- (gen_wor_desert's Cactrot, run from when SHADOW cannot throw).
-  local fleeSet = {}
+  -- A function is read at each battle's open (battN == 3), and every 30
+  -- frames after while the battle is fought, and returns the list for that
+  -- battle: a run the policy decides from the live party (gen_wor_desert's
+  -- Cactrot, run from when SHADOW cannot throw, or once he falls).
+  local fleeSet, fleeFrom = {}, nil
   local fleeFn = type(opts.fleeSpecies) == "function" and opts.fleeSpecies or nil
   for _, w in ipairs(fleeFn and {} or opts.fleeSpecies or {}) do fleeSet[w] = true end
   local blocked, nblocked = {}, 0
@@ -2882,9 +2883,14 @@ function M.worldNavTo(txIn, tyIn, opts)
       if battN >= 3 then
         sawBattle = true
         plan, pend = nil, nil
-        if fleeFn and battN == 3 then
+        -- the function is read again every 30 frames while the battle is
+        -- fought (a thrower who falls mid-battle: the run starts then, its
+        -- frames counted from there), and once it says run, the run holds
+        if fleeFn and battN == 3 then fleeFrom = nil end
+        if fleeFn and fleeFrom == nil and (battN - 3) % 30 == 0 then
           fleeSet = {}
           for _, w in ipairs(fleeFn() or {}) do fleeSet[w] = true end
+          if next(fleeSet) and M.formationHas(fleeSet) then fleeFrom = battN end
         end
         if next(spareSet) and M.formationHas(spareSet) then
           M.setPad({})
@@ -2892,7 +2898,7 @@ function M.worldNavTo(txIn, tyIn, opts)
         end
         if wantsFlee(opts.playBattles)
            or (flee and next(fleeSet) and M.formationHas(fleeSet)) then
-          flee(battN)
+          flee(fleeFrom and (battN - fleeFrom + 3) or battN)
           return
         end
         if tactical then tactical.frame(); return end
