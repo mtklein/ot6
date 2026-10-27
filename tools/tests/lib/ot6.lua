@@ -8789,7 +8789,8 @@ function Driver:magicOnlyLine(actor, boost)
         -- to 0 with one Life 3 queued, and his dying Ultima wiped the four
         -- (build/attempts/wt/v038-magimaster/lab/f5_k4_s7: 'broken (0 of 8
         -- shields) at HP 27244', '[wipe] ... atk $14')
-        local rf = self.opts.reraiseVs and self.opts.reraiseVs[M.readWord(0x57C0 + s * 2)]
+        -- (opts.breakHold = true asks for it; gen_wor_tower's BOSS_FIGHT)
+        local rf = self.opts.breakHold and self.opts.reraiseVs and self.opts.reraiseVs[M.readWord(0x57C0 + s * 2)]
         if rf and M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0 then frac = math.max(frac, rf) end
         if mx > 0 and hp <= mx * frac then hold, boss = true, s end
       end
@@ -9246,7 +9247,7 @@ function Driver:magicOnlyLine(actor, boost)
     -- and not while his HP is at or under the reraise mark with a living
     -- member still lacking Life 3 (the window would take him past the hold
     -- before it is on: f5_k4_s7, above)
-    local rvf = self.opts.reraiseVs and self.opts.reraiseVs[M.readWord(0x57C0 + bestSlot * 2)]
+    local rvf = self.opts.breakHold and self.opts.reraiseVs and self.opts.reraiseVs[M.readWord(0x57C0 + bestSlot * 2)]
     if rvf then
       local hp, mx = M.readWord(0x3BF4 + 8 + bestSlot * 2), M.readWord(0x3C1C + 8 + bestSlot * 2)
       if mx > 0 and hp <= mx * rvf then

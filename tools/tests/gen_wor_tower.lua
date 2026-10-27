@@ -55,7 +55,7 @@ local FIGHT = { cure = false, shellVs = { [0x164] = true }, magicFirst = { [0x16
 -- While he is Broken the hold starts at the Life 3 mark, 60%, and no Break
 -- breaks him under it while a member lacks Life 3: one window's casts took
 -- him from 54% to 0 and his Ultima wiped the four (build/attempts/wt/
--- v038-magimaster/lab/f5_k4_s7; Driver opts.breakVs)
+-- v038-magimaster/lab/f5_k4_s7; Driver opts.breakVs, opts.breakHold)
 local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.6 }, reraiseHold = { [0x166] = 0.4 } }
 -- no Drain on the bosses: it heals MagiMaster (his HP rose 38,578 -> 41,594
 -- on RELM's Drain, f11a4a92), and with the default list back RELM cast it 64
@@ -83,6 +83,8 @@ BOSS_FIGHT.wallChangeVs = { [0x166] = true }
 -- reads the wall, and a seat with no line leaves the window to those who
 -- hold its weakness (route-wor-thamasa.md 12.3)
 BOSS_FIGHT.breakVs = { [0x166] = true }
+-- (the Life 3 hold for his windows, above BOSS_FIGHT: Driver opts.breakHold)
+BOSS_FIGHT.breakHold = true
 BOSS_FIGHT.magicOnly = {}
 for _, id in ipairs(H.MAGIC_ONLY_SPELLS) do
   if id ~= 0x04 then BOSS_FIGHT.magicOnly[#BOSS_FIGHT.magicOnly + 1] = id end
