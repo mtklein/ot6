@@ -231,7 +231,7 @@ SABIN ("2227 -> 0 ... atk $EF", keys beA4 and beC4), two are STRAGO's
 falls to the Necromancers' and the Phase's magic (keys be34 and beC4). No
 zombie's turn felled a member. The five-death draws of section 7 were
 v0.32's driver; the K sweep from `wor-thamasa-v1` (`lab/phoenix/pa_*`, K
-0-5 at shifts 0 and 7) met $152 only at K = 0 and passed 12 of 12.
+0-5 at shifts 0 and 7) met $152 only at K = 0 and K = 4 and passed 12 of 12.
 
 The play did show a defect. When the Zombie lands with SABIN's command
 window open, the driver planned SABIN's own Revivify in that window

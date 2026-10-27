@@ -913,16 +913,21 @@ with the route's driver and field care, seed shifts 0-23 an arm. Formation
 | the Back Guard on LOCKE (`nb_*`) | 24 of 24 | 47 | 47 | 0.09 | 0 / 0 (be24 a side attack, no one down) |
 | that, and RELM in the back row (`nc_*`) | 24 of 24 | 49 | 49 | 0.02 | 0 / 0 |
 
-Of the 24 deaths to formation 325 in the first two arms, 20 were RELM's
-and 19 of those were one blow from 80% or more: she had stood in the front
-row since she joined. In the third arm the fights run a little longer
+The deaths/fight column counts by distinct key. By fight the Back Guard
+alone did not cut deaths (11 in the first arm's 120 fights, 13 in the
+second's); what it did was remove the pincer and back attacks. The gain in
+deaths came from RELM's row: of the 24 deaths to formation 325 in the first
+two arms, 20 were hers and 18 of those were one blow from 80% or more (19
+one-blow deaths in all, the other CELES's): she had stood in the front row
+since she joined. In the third arm the fights run a little longer
 (median 2,272 ticks against 1,916), since her Fight from the back row is
 halved.
 
 **The leg** (`gen_wor_ragnarok`): at its start it asserts that the party
 owns a Back Guard (the bag's, carried since the World of Balance; no
-counter on this leg sells one), puts it on LOCKE over the Star Pendant his
-Ribbon already covers, and moves RELM to the back row; before the walk
+counter on this leg sells one), puts it on LOCKE over his Star Pendant (he
+has no Poison guard until the treasure room's relic plan hands him a
+Ribbon), and moves RELM to the back row; before the walk
 back to the Falcon it checks the Back Guard is still on and puts it back if
 not. The town's relic rule leaves it where it is (an unranked worn relic
 stays, `M.relicPlan` step 1). The assert's negative: the leg with the item
