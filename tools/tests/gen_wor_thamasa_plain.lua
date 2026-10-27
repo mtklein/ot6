@@ -145,7 +145,7 @@ local function plain()
   return H.seqStep(steps)
 end
 
-H.run({ maxFrames = 600000 }, {
+H.run({ maxFrames = 400000 }, {
   H.bootCheckpoint("wor-gogo-v1"),
   watches(),
   H.call(function()

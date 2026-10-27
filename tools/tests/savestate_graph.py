@@ -1024,7 +1024,7 @@ STATES = [
     # on foot until each of its four formations (world groups 55 and 56) is
     # won (docs/design/route-wor-gogo.md section 10).  Nothing boots it.
     S("wor_thamasa_plain", gen="gen_wor_thamasa_plain", prev="wor_gogo",
-      checkpoint="wor-gogo-v1", timeout=3600),
+      checkpoint="wor-gogo-v1"),
 
     # wor-ebot-v1 -> the World of Ruin map on the Falcon's tile by the Opera
     # House (30,182): the cabin (CELES, RELM, GOGO, STRAGO), the catwalk, the
