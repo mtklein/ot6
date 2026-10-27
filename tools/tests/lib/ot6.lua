@@ -9347,10 +9347,13 @@ end
 -- WallChange, while his if_self_dead Ultima, the first block, still runs as
 -- he dies (the Life 3 hold stays).  So it goes on while his wall is one a
 -- living member can hit (an element of a castable spell of the magic-only
--- list), and that wall then stands to the end; while another member's
--- action is queued or his counter is pending, the wall read now may not be
--- the one Bserk meets, and the turn goes to the lines below.  One cast in
--- the air at a time (900 frames); one that misses is cast again.  The plan
+-- list), and that wall then stands to the end; at a WallChange body
+-- (opts.wallChangeVs) it waits, as an element cast does (wallWaitPlan), for
+-- the spells in the air to land first, since the wall read now may not be
+-- the one Bserk meets.  (Asked to find no action queued at all, it never
+-- went: lab z1, 'no Bserk ... an action or his counter pending' at every
+-- wall.)  One cast in the air at a time (900 frames); one that misses is
+-- cast again.  The plan
 -- is monsterOnly: Bserk's cursor opens on the party, and the confirm backs
 -- out rather than land it on a member.
 M.BSERK_SPELL = 0x21
@@ -9370,18 +9373,19 @@ function Driver:berserkPlan(actor)
           end
         end
       end
-      local busy = M.readByte(0x32CD + 8 + s * 2) < 0x80
-      for e = 0, 3 do
-        if e ~= actor and M.readWord(0x3BF4 + e * 2) > 0 and M.readByte(0x32CC + e * 2) < 0x80 then busy = true end
-      end
-      if (weak & can) == 0 or busy then
-        local key = string.format("bserkwait:%d:%02X:%s", s, weak, tostring(busy))
+      if (weak & can) == 0 then
+        local key = string.format("bserkwait:%d:%02X", s, weak)
         if not self.statusSaid[key] then
           self.statusSaid[key] = true
-          M.log(string.format("[%s] actor=%d no Bserk at slot %d yet: wall weak $%02X, the party casts $%02X%s",
-            self.tag or "fight", actor, s, weak, can, busy and ", an action or his counter pending" or ""))
+          M.log(string.format("[%s] actor=%d no Bserk at slot %d yet: wall weak $%02X, the party casts $%02X",
+            self.tag or "fight", actor, s, weak, can))
         end
       elseif not self:castVetoed(M.BSERK_SPELL, "Bserk") then
+        -- the wall read now may not be the one Bserk meets: the turn waits
+        -- for the spell in the air to land, as an element cast's does
+        local wc = self.opts.wallChangeVs
+        local wait = wc and wc[M.readWord(0x57C0 + s * 2)] and self:wallWaitPlan(actor, s, "Bserk") or nil
+        if wait then return wait end
         self.bserkAt = M.frame
         M.log(string.format("[%s] actor=%d Bserk at slot %d (species $%03X, HP %d): wall weak $%02X, the party "
           .. "casts $%02X", self.tag or "fight", actor, s, M.readWord(0x57C0 + s * 2), M.readWord(0x3BF4 + 8 + s * 2),
