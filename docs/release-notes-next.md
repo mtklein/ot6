@@ -10,6 +10,6 @@ and its effect. Cite evidence in the commit message.
 **Two new saves.** One by the dinosaur forest, after levelling the party there, and one by Maranda, after the Cactrot desert, the last stop before Kefka's Tower.
 
 A battle could freeze for good, with an animation stuck on screen, when a
-character opened Magic or another ability list while a long animation was
+character had Magic or another ability list open while a long animation was
 playing, such as a spell bouncing off several reflecting party members.
 This no longer happens.

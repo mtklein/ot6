@@ -11,9 +11,14 @@
 --   asserts: across every NMI of a battle in which TERRA opens her magic
 --   list, raises and lowers a boost (each re-folds the list inside the NMI)
 --   and scrolls it, the eight bytes read at the NMI's exit equal the ones
---   read at its entry; and (the precondition) NMIs really did run with the
---   magic list open, and the list's own fold really did write the scratch
---   inside them.
+--   read at its entry; and (the preconditions) NMIs really did run with the
+--   magic list open, the list's own fold ran inside them, and at least one
+--   NMI's work really changed the scratch before the bracket's restore: at
+--   Ot6NmiScratchRestore_ext's entry the scratch differs from the save in
+--   OT6_NMISCR.  On a ROM without the bracket (the unfixed build) the same
+--   count is taken at IncGameTime_ext's entry inside the NMI, the call the
+--   restore replaces, against the NMI's entry bytes, so the red half reads
+--   a real change there too.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/worldmap_narshe.mss.lua"
 
@@ -21,6 +26,7 @@ local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
 local ST_CMD, ST_MAGIC, ST_TRANS = 0x05, 0x0E, 0x01
 local CMD_MAGIC = 0x02
 local SCR, SCR_N = 0x7E3ECC, 8
+local NMISCR = 0x7EEE23                         -- OT6_NMISCR (ot6_memory.inc)
 
 local function pend(slot) return H.readByte(0x3e9d + slot * 2) end
 local function cmdRowOf(slot, cmd)
@@ -48,7 +54,7 @@ end
 -- the watch: NMI entry (BattleNMI) pushes the scratch, NMI exit (the rti it
 -- falls through to, BattleIRQ) pops and compares.  A stack, so a nested
 -- NMI (BattleNMI's own $46 guard path) pairs with its own entry.
-local W = { nmis = 0, listNmis = 0, changed = 0, foldWrites = 0, stack = {}, refs = {} }
+local W = { nmis = 0, listNmis = 0, changed = 0, foldWrites = 0, undone = 0, stack = {}, refs = {} }
 local function watchOn()
   local entry, exit = H.sym("BattleNMI"), H.sym("BattleIRQ")
   local fold = H.sym("Ot6FoldSteps")
@@ -75,6 +81,31 @@ local function watchOn()
   W.refs[#W.refs + 1] = { emu.addMemoryCallback(function()
     if (W.inNmi or 0) > 0 then W.foldWrites = W.foldWrites + 1 end
   end, emu.callbackType.exec, fold, fold), fold }
+  -- the third: a real change for the bracket to undo.  At the restore's
+  -- entry the scratch is compared with the save it is about to put back;
+  -- on a ROM without the restore, at IncGameTime_ext inside the NMI, with
+  -- the NMI's entry bytes
+  local okR, restore = pcall(H.sym, "Ot6NmiScratchRestore_ext")
+  W.restoreHook = okR and "Ot6NmiScratchRestore_ext" or "IncGameTime_ext"
+  local at = okR and restore or H.sym("IncGameTime_ext")
+  W.refs[#W.refs + 1] = { emu.addMemoryCallback(function()
+    if (W.inNmi or 0) == 0 then return end
+    local saved
+    if okR then
+      saved = {}
+      for i = 0, SCR_N - 1 do saved[i + 1] = H.readByte(NMISCR + i) end
+    else
+      local top = W.stack[#W.stack]
+      saved = top and top[1]
+    end
+    if saved and hex(saved) ~= hex(scratch()) then
+      W.undone = W.undone + 1
+      if W.undone <= 4 then
+        H.log(string.format("[nmiscratch] f%d at %s: saved %s now %s", H.frame, W.restoreHook, hex(saved),
+          hex(scratch())))
+      end
+    end
+  end, emu.callbackType.exec, at, at), at }
 end
 local function watchOff()
   for _, r in ipairs(W.refs) do emu.removeMemoryCallback(r[1], emu.callbackType.exec, r[2], r[2]) end
@@ -167,9 +198,12 @@ H.run({ maxFrames = 40000 }, {
   H.call(function()
     watchOff()
     H.log(string.format("[nmiscratch] %d NMIs watched, %d with TERRA's magic list open, %d fold calls inside "
-      .. "an NMI, %d NMIs changed the scratch", W.nmis, W.listNmis, W.foldWrites, W.changed))
+      .. "an NMI, %d NMIs whose work changed the scratch before %s, %d NMIs changed the scratch", W.nmis,
+      W.listNmis, W.foldWrites, W.undone, W.restoreHook, W.changed))
     H.assertEq(W.listNmis >= 300, true, "the NMI ran with the magic list open (the precondition)")
     H.assertEq(W.foldWrites >= 1, true, "the list's fold (Ot6FoldSteps) ran inside the NMI (the precondition)")
+    H.assertEq(W.undone >= 1, true, "an NMI's work really changed the scratch before " .. W.restoreHook
+      .. " (the precondition: the bracket had a change to undo)")
     H.assertEq(W.changed, 0, "no NMI changed the main thread's battle scratch ($3ecc-$3ed3)")
   end),
 })

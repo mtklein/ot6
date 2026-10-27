@@ -41,10 +41,13 @@
 ;
 ; Cost, in CPU cycles of the NMI (measured, build/attempts/wt/v032-boost-aura/
 ; and v032-boost-aura-2/): with no boost pending anywhere, four loads and a
-; branch (the hook's whole run is at most 22 cycles); with any, ~420 for the
-; glow per boosting character (averaged over its one frame in four) and
-; ~4,500 for the halo, against an NMI of ~21,000-24,500 in a ~45,200-cycle
-; frame.
+; branch (the aura's part of the hook is at most 22 cycles); with any, ~420
+; for the glow per boosting character (averaged over its one frame in four)
+; and ~4,500 for the halo, against an NMI of ~21,000-24,500 in a ~45,200-cycle
+; frame.  The scratch bracket below adds about 150 more on every unpaused
+; NMI, boost or not: 79 for Ot6NmiScratchSave with its jsr and 71 for
+; Ot6NmiScratchRestore_ext before its jml (counted from the opcode cycle
+; table, not measured).
 ; ------------------------------------------------------------------------------
 
 ; Ot6RestageGate_ext's caller in C1 now lands here first.
