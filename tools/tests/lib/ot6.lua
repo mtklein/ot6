@@ -9228,6 +9228,42 @@ function Driver:magicOnlyLine(actor, boost)
     end
   end
   if best == nil then return self:wallTurnOrNil(actor, castable) end
+  -- An element cast at a WallChange body (opts.wallChangeVs) is read
+  -- against the wall it will land on: every hit draws the counter that
+  -- turns it, so while another member's action is queued or running, or the
+  -- body's counter is pending, the wall read now is not the one the cast
+  -- meets, and the window is handed on (X) the way a person waits for the
+  -- spell in the air to land before choosing the next.  Not while it is
+  -- Broken (no counters: the wall stands), and at most 900 frames an actor.
+  local wcv = self.opts.wallChangeVs
+  if wcv and best.elem ~= 0 and bestSlot ~= nil and wcv[M.readWord(0x57C0 + bestSlot * 2)]
+     and not brokenNow(bestSlot) then
+    local busy = nil
+    local R = self.recovery
+    for e = 0, 3 do
+      if e ~= actor and M.readWord(0x3BF4 + e * 2) > 0 then
+        if M.readByte(0x32CC + e * 2) < 0x80 then busy = busy or string.format("entity %d's action queued", e) end
+        if R and ((R.queued[e] and #R.queued[e] > 0) or R.running[e]) then
+          busy = busy or string.format("entity %d's action in flight", e)
+        end
+      end
+    end
+    if M.readByte(0x32CD + 8 + bestSlot * 2) < 0x80 then busy = busy or "his counter pending" end
+    self.wallWait = self.wallWait or {}
+    if busy then
+      self.wallWait[actor] = self.wallWait[actor] or M.frame
+      if M.frame - self.wallWait[actor] < 900 then
+        local key = "wallwait:" .. actor .. ":" .. busy
+        if not self.statusSaid[key] then
+          self.statusSaid[key] = true
+          M.log(string.format("[%s] actor=%d waits to read the wall (%s) before $%02X", self.tag or "fight", actor,
+            busy, best.id))
+        end
+        return { kind = "defer", reason = "wall_wait", at = M.frame }
+      end
+    end
+    self.wallWait[actor] = nil
+  end
   local b = castBoost(actor, best.id, best.cost, want, self:nukeFloor(actor))
   if b == nil then b = 0 end
   local key = string.format("monly:%d:%d:%d", actor, bestSlot, best.id)
@@ -13825,6 +13861,13 @@ function Driver:button(actor)
   if st == BATTLE.ST_CMD then
     -- "switch" (no Fight row) and "defer" (a muddled actor, #170) both
     -- hand the window on with X; the plan stays until the actor changes
+    -- a wait for the wall (magicOnlyLine's wall_wait) is re-read every 30
+    -- frames: X hands the window on only while another member's is open,
+    -- and the wait ends when the spell in the air lands
+    if self.plan.kind == "defer" and self.plan.reason == "wall_wait" and M.frame - (self.plan.at or 0) > 30 then
+      self:dropPlan("wall_wait")
+      return nil
+    end
     if self.plan.kind == "switch" or self.plan.kind == "defer" then return { "x" } end
     -- the boost (#408): R until the pending boost the engine shows reads
     -- what the plan wants (M.boostStep), not a count of R pulses sent
