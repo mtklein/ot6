@@ -278,6 +278,20 @@ lab/air/cact_trace2: actor=0's throw took 3 off the monsters (0 shielded-equival
 lab/air/neg_dino_noice: [deps] Ice: nobody / assertEq failed: one of the four knows Ice (TERRA's natural magic, or a stone the line gave)
 ```
 
+The line's own play of the legs at the final commit: `qual/wor_dino.log`
+(PASS, first attempt: plain 7, forest 28, two Tyranosaurs won 7, the
+Brachosaur run from once, 3 deaths) and `qual/wor_desert.log` (PASS: Cactrot
+2 of 2, Hoover 6 of 6, 4 deaths; "on the save tile world (69,183) ...
+potion=99 ... fenix=20 ... gil=928573").
+
+**The re-cut.** The rows change the ROM, and the play from power-on moved
+with it: 60 of the 62 tracked checkpoints differed from the graph's capture
+(`qual/drift_before_recut.txt`), all re-cut from the play at `e0280579`
+(`qual/recut.txt`). gen_wor_ragnarok, main's own change before this branch,
+reproduces main's tracked save byte for byte on main's ROM with main's lib
+and with this branch's lib (`lab/air/probe_main`, `probe_mylib`), so the
+drift is the ROM's, not the lib's.
+
 The tables' "lab boots" rows booted the tracked `wor-colosseum-v1` of v0.37
 (made on main's ROM, a Continue across builds: a lab, not a measurement of the
 graph); the `gd_`/`gs_` rows and `qual/` are the graph's own captures.
