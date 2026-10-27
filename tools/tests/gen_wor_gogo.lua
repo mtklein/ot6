@@ -2,7 +2,9 @@
 -- Continue the `wor-belly-v1` battery (TERRA, CELES, RELM and STRAGO on the
 -- Zone Eater's belly's save point), the crushing room (280: its ceiling
 -- drops on a clock, and the party crosses it from one safe tile to the
--- next), the passage (277) to the room's west half and its jumps, GOGO
+-- next, taking its three chests), the passage (277) to the room's west half,
+-- its plate and jumps and its chest, the hunt in GOGO's room until each
+-- formation of its pool is won (#486), GOGO
 -- (278 (8,5), _cb81c6: his name, $00D4; he waits in the cabin for a party
 -- of four), a Warp Stone out to Triangle Island, the cabin (STRAGO, RELM,
 -- GOGO and TERRA), GOGO's commands (Mimic, Lore, Tools, Item), Thamasa:

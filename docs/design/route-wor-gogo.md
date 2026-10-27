@@ -81,8 +81,8 @@ mutant builders `mkmut.py` and `rowmuts.sh`; the launchers `lab.sh`,
 
 | leg | boots | saves | what |
 |---|---|---|---|
-| `gen_wor_belly` | `wor-gau-v1` | `wor-belly-v1` | the cabin (TERRA, CELES, RELM, STRAGO), Triangle Island until the Engulf, the bridge, the plate, the save point in the belly (279 (24,4)) |
-| `gen_wor_gogo` | `wor-belly-v1` | `wor-gogo-v1` | the crushing room, 277, the west half, GOGO (name menu, his kit), the Warp Stone out, the Falcon to Thamasa, the scene that opens Ebot's Rock, the save by the Falcon (250,229) |
+| `gen_wor_belly` | `wor-gau-v1` | `wor-belly-v1` | the cabin (TERRA, CELES, RELM, STRAGO), Triangle Island until the Engulf, the hunt on the landing, the bridge and its five chests, the plate, the save point in the belly (279 (24,4)) (section 9) |
+| `gen_wor_gogo` | `wor-belly-v1` | `wor-gogo-v1` | the crushing room and its three chests, 277, the west half, its plate and chest, the hunt in GOGO's room (section 9), GOGO (name menu, his kit), the Warp Stone out, the Falcon to Thamasa, the scene that opens Ebot's Rock, the save by the Falcon (250,229) |
 | `gen_wor_ebot` | `wor-gogo-v1` | `wor-ebot-v1` | Ebot's Rock: the holes, the coral, the hungry chest, Hidon, the scene at Strago's house, the save on the Falcon's tile (250,231) |
 | `gen_wor_thamasa_plain` | `wor-gogo-v1` | (a branch: no save) | Thamasa's item counter when the bag is under its band, the plain around Thamasa on foot until its four formations are won (section 9), back to the Falcon's tile |
 | `gen_wor_opera` | `wor-ebot-v1` | `wor-opera-v1` | the cabin (CELES, RELM, GOGO, STRAGO), the Opera House, the Dirt Dragon, the Doom Gaze hunt, the save by the Falcon there (30,182); also `wor_opera_switch` (the catwalk's switch: `battle_mimicdriver`'s and `battle_wardline`'s fixture) |
@@ -417,8 +417,7 @@ the graph's play (`checkpoint_drift.py --recut`, at the release).
 
 ## 8. Open
 
-1. **The belly's chests** (the Genji Armor, the Hero Ring and the rest) are
-   not opened; the walks keep to the way on.
+1. **The belly's chests** are opened since v0.38 (section 9).
 2. **GOGO is L42** against TERRA and CELES's L50.
 3. **The cabin regroup** talks to members who wander; `talkToObj`'s fixed
    approach timed out on them, and the legs now chase (`chaseTalk`).  Other
@@ -532,3 +531,111 @@ some of GOGO's XP, not a fight; the driver's last-stand rule
 (`opts.lastStand`, Sneeze by default) does not plan around it, and the leg
 leaves it so. At these levels the plain is a short grind (997-1,695 XP a
 member a fight, 2,192 when one ends stone), not a fight to tune.
+
+## 9. The belly in full (v0.38, #486)
+
+Evidence under `build/attempts/wt/v038-zone-eater/lab/` (`scripts/`, `out/`).
+The coverage audit (wor-coverage.md 4.1, 4.3, 5.1) found seven of the
+belly's formations no leg had fought and its nine chests unopened. A player
+walks the belly once and opens every chest on or beside the way, so the legs
+now do: the gear is on the main line and feeds the legs after it.
+
+**The formations.** Field group 170 (maps 276 and 277) deals Karkass x2
+(349), Wart Puck and Ogor (353), Tap Dancer and Covert x2 (350) at 80/256
+each and Woolly x2 with Karkass x2 (352) at 16/256; group 171 (map 278,
+GOGO's room, and no other map) deals Ogor x2 (346), Covert and Ogor (347),
+Wart Puck x2 (348) at 80/256 and Tap Dancer with Woolly (351) at 16/256.
+`gen_wor_belly` walks the landing (10,12) <-> (10,13) after the Engulf and
+`gen_wor_gogo` GOGO's room (8,12) <-> (8,11) before GOGO, each until every
+formation of its pool not yet fought is won (`K.hunt`, lib/ot6_field.lua:
+the grind plains' rule as a helper). The pick is `UpdateBattleGrpRng`'s
+byte, `RNGTbl[$1FA2] + $1FA3` (field/battle.asm), so the longest a lap can
+wait for a slot is the table's own worst run: over every offset and start,
+21 picks for a slot of 80/256 and 110 for 16/256 (`scripts/gaps.py`: "slot
+3 ($F0-$FF, 16/256): worst picks to the first draw 110 (offset $0D, index
+97)"). Each hunt's budget is that bound, asserted as each battle ends: a
+hunt that reaches it has met a draw the ROM cannot deal, or lost a fight.
+The care between the hunt's battles casts its cures before it reaches for
+the bag (the tower's knobs, for the hunt only): bag first, the landing's
+twelve battles took the Potions from 98 to 23 (`out/gb1`); cures first, to
+94 (`out/h1`).
+
+**The chests**, all nine opened, each asserted by its treasure bit:
+
+| chest | where | how |
+|---|---|---|
+| Genji Armor, Magical Brsh | 276 (43,32), (42,32), between row 32's jumps | from (44,32) facing left and (41,32) facing right, the careful walk there |
+| Ether, Red Jacket | 276 (35,16), (40,13), the shaft | a conductor's touch on purpose (`_cb8251` drops the party to (37,17)): onto row 30 at (36,30), then a step at a time toward the conductor; the plate (46,17) opens the way back as before |
+| FakeMustache | 276 (25,31), the bridge's west end | from (25,32) facing up |
+| Zephyr Cape, Hero Ring | 280 (46,47), (41,43), on the ceiling's clock | from the safe tiles below them, (46,48) and (41,44) |
+| Tack Star | 280 (27,44) | from (28,44), three steps off the safe tile (30,43) and back |
+| Thunder Shld | 280 (1,45), the west half | behind the plate (12,51) (`_cb807e`: $018C; `_cb7e36` opens the ledge (6,54) the jump west starts from), then the jumps (6,54) and (1,52) |
+
+The crushing room's walk takes a chest when the time left covers the walk to
+its stand, the opening and the walk back to safety (`CRUSH_OPEN`, 80 frames;
+`out/gg4`: "the Hero Ring opened at f2828 t=189 (67 frames ...)", "the Tack
+Star opened ... (111 frames, the clock 255 -> 145)", its three steps
+included). `H.openChest` lingers 90 frames after the window, which the Tack
+Star cannot spare (`out/gg1`: the walk waited for a clock that never came),
+so the room opens its chests with a shorter press of its own (`quickChest`:
+the window seen and closed). Before the plate (12,51) no route reaches the
+Thunder Shld from anywhere in 280 (`out/x4`, `out/x6`).
+
+**The gear downstream.** The gear and relic care picks the new pieces up on
+its own: the Genji Armor goes on TERRA at the belly's save point and stays
+on her through the Colosseum; RELM takes the Magical Brsh; the Hero Ring
+goes to CELES in GOGO's room and later to STRAGO; GOGO takes the Thunder
+Shld (`wor-colosseum-v1` from the graph's play at b54ea61c: "TERRA L57 ...
+Genji Armor | Ribbon | Economizer"). The hunts' XP leaves the four two or
+three levels higher at each save after the belly (the Colosseum's TERRA L57
+and CELES L56, against L54 and L54). Every leg from the belly to the
+Colosseum passed on its first attempt (`ninja_l3.log`; "wor_colosseum:
+PASS (frame 95919) attempts=1/3"), and the eight saves after `wor-gau-v1`
+were re-cut from that play.
+
+**The asserts and their negatives.** Each is red on a one-line mutant
+(`scripts/mkmut.py`, `scripts/nfinal.sh`), as class=assert, which the
+runner does not retry ("attempts=1/3 stopped; failed attempts: 1:assert"):
+
+- The budget (`out/n_budget`, the hunt's budget 1): "assertEq failed: the
+  belly's landing (group 170): every formation it is walked for won within
+  1 battles (...)"; walked for a formation no pool deals, 999
+  (`out/n_unmet`): the same assert after 111 battles, "won within 111
+  battles (349 Karkass x2 won; 350 Tap Dancer, Covert x2 won; 352 Woolly
+  x2, Karkass x2 won; 999 no such formation -)".
+- Every formation won, after the hunt (`out/n_final`, its end test true at
+  once): "assertEq failed: the belly's landing (group 170): formation 349
+  (Karkass x2) won: got false, want true".
+- The belly's chests (`out/n_belly_chest`, no drop down the shaft):
+  "assertEq failed: 276: the Ether's chest (bit 194) is open: got false,
+  want true"; the crushing room's (`out/n_gogo_chest`, the Thunder Shld not
+  opened): "assertEq failed: 280: the Thunder Shld's chest (bit 228) is
+  open: got false, want true".
+
+**Measured** from the graph's own captures at b54ea61c, `wor_belly_in` and
+`wor_gogo_278` (`scripts/lab_hunt.lua`: K battles used up on the hunt's own
+lap, counted by battles opened, then the leg's hunt), K 0-11 at seed shifts
+0 and 7, one attempt each: 48 of 48 PASS (`out/sb_*`, `out/sg_*`;
+`out/tally_sb.txt`, `out/tally_sg.txt`). The pick sequence is the
+fixture's, so K moves where the hunt starts in it and the clock moves the
+keys:
+
+| formation | fights | keys | won | keys with a fall |
+|---|---|---|---|---|
+| 349 Karkass x2 | 64 | 28 | 64 | 0 |
+| 350 Tap Dancer, Covert x2 | 146 | 50 | 146 | 5 |
+| 352 Woolly x2, Karkass x2 | 24 | 18 | 24 | 0 |
+| 346 Ogor x2 | 144 | 53 | 144 | 31 |
+| 347 Covert, Ogor | 192 | 54 | 192 | 13 |
+| 348 Wart Puck x2 | 240 | 58 | 234 | 0 |
+| 351 Tap Dancer, Woolly | 24 | 20 | 24 | 0 |
+
+Six Wart Puck fights ended with the party Sneezed out (`PARTY LEFT`: no
+reward and no loss); the hunt walks on until one is won. The falls in GOGO's
+room are Ogor's Zombite: of its 179 falls, all but one are its special `$EF`
+("is a status landing, not damage"), cured in the fight with Revivify; no
+run there spent a Fenix Down ("fenix=27" at every run's end). The landing's
+falls are CELES to Covert's skeans (`$51`) from low HP ("CELES 373/3853",
+"CELES 61/3853"): 12 of the 24 runs spent no Fenix Down, 10 one, two runs
+two or three. The kit is left as it is: Ribbons on TERRA and STRAGO, and the
+bag's Revivify answers the Zombite.

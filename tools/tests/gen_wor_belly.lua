@@ -2,9 +2,11 @@
 -- Continue the `wor-gau-v1` battery (SABIN, GAU, TERRA and CELES beside the
 -- Falcon by Duncan's house), the Falcon's cabin (TERRA, CELES, RELM and
 -- STRAGO), Triangle Island, where the Zone Eater (world group 32) engulfs a
--- party that lets it (the walker leaves its battle to the engine), the
--- belly's bridge (276: its conductors watched, its jumps pressed) to the
--- door (21,33), and the save point beyond it (279 (24,4)): the
+-- party that lets it (the walker leaves its battle to the engine), the hunt
+-- on the landing until each formation of the belly's pool is won (#486),
+-- the belly's bridge (276: its conductors watched, its jumps pressed) and
+-- its five chests (a conductor's touch on purpose for the shaft's two) to
+-- the door (21,33), and the save point beyond it (279 (24,4)): the
 -- `wor-belly-v1` battery, the retry point for the crushing room and GOGO
 -- (gen_wor_gogo).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
