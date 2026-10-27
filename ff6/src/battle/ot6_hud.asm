@@ -2745,6 +2745,32 @@ Ot6ShieldTbl:
         .byte   6, OT6_PIERCE|OT6_BLUDG ; srbehemoth (the colosseum's): the
                                 ;   dead beast, as the veldt cave's: horn and
                                 ;   bone.  fire|holy vanilla; absorbs poison
+        ; ---- the world of ruin: the side trips by the falcon (route-wor-side-
+        ; trips.md section 2) --------------------------------------------------
+        ; The Cactrot desert beside Maranda (world group 111) and the dinosaur
+        ; forest north of Gau's father's house (world group 54).  The cabin
+        ; seats three blades (slash) and SHADOW's point (pierce, his skeans
+        ; fire, water and bolt); vanilla elements stay.  The desert keys the
+        ; blades; the forest's hide turns them, so it wants the point, a blow
+        ; or the mages' ice.
+        .word   $003e
+        .byte   4, OT6_SLASH|OT6_BLUDG ; hoover: a soft sand-eater; cut it
+                                ;   or crush it.  ice|water vanilla (shadow's
+                                ;   water edge); it answers every hit with
+                                ;   sand storm, so few hits that chip win
+        .word   $004c
+        .byte   1, OT6_PIERCE   ; cactrot: 3 hp under evade 250: a hit that
+                                ;   lands does 1, and 0 while it shields, so
+                                ;   the break is the kill.  shadow's throw
+                                ;   (pierce) or ice|water (vanilla)
+        .word   $0027
+        .byte   4, OT6_PIERCE|OT6_BLUDG ; tyranosaur: a dinosaur's hide, as
+                                ;   the allosaurus's; a point or a blow, not
+                                ;   an edge.  ice vanilla
+        .word   $0026
+        .byte   6, OT6_PIERCE|OT6_BLUDG ; brachosaur: the same hide on a
+                                ;   46050-hp body; a break holds its turns,
+                                ;   ultima among them.  ice vanilla
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian
