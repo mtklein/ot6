@@ -52,6 +52,10 @@ local FIGHT = { cure = false, shellVs = { [0x164] = true }, magicFirst = { [0x16
 -- him into a wipe (build/attempts/wt/v031-tower-2/lab/re3_k3_s0:
 -- 'monhp=s0:22555', 'monhp=s0:2557', '[wipe] f+65388').  40% of 50,000
 -- leaves two such hits between the hold and his end
+-- While he is Broken the hold starts at the Life 3 mark, 60%, and no Break
+-- breaks him under it while a member lacks Life 3: one window's casts took
+-- him from 54% to 0 and his Ultima wiped the four (build/attempts/wt/
+-- v038-magimaster/lab/f5_k4_s7; Driver opts.breakVs)
 local BOSS_FIGHT = { shellVs = { [0x166] = true }, reraiseVs = { [0x166] = 0.6 }, reraiseHold = { [0x166] = 0.4 } }
 -- no Drain on the bosses: it heals MagiMaster (his HP rose 38,578 -> 41,594
 -- on RELM's Drain, f11a4a92), and with the default list back RELM cast it 64

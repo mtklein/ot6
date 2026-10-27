@@ -864,13 +864,21 @@ $162 won after N ticks`:
 |---|---|---|---|---|---|---|---|
 | `b0` (main's generator at 36907d28, K 0-5) | 18 of 18 PASS | 18 | 16 | 64,826 | 91,512 | 183,639 | 193,514 |
 | `f2` K 0-6 at 56ac38d3, `f3` K 7-9 at 14c413ed | 29 of 30 PASS | 30 | 24 | 40,419 | 69,492 | 95,767 | 127,221 |
+| `f6` K 0-8 at 38b483f8 (the window's Life 3 hold) | 18 of 18 PASS | 18 | 17 | 45,591 | 74,271 | 113,459 | 124,444 |
 
 (`mmtally.py lab b0`, `mmtally.py lab "f[23]"`; `f2`'s three K7 runs, on
 the generator before the Holy Dragon's fix, are left out, and `b0_k7_*`
 failed the same way.) The graph's own play won his fight in 71,570 ticks
 at its first attempt (`gate-ea263d6a.log`, `wor_tower-ea263d6a.log.gz`:
 `MagiMaster: battle $162 won after 71570 ticks`, `PASS (frame 399535)
-attempts=1/3`). At 60 frames a second that is about 11 to 35 minutes,
+attempts=1/3`). Between those two sweeps the 900-frame wait came to be
+re-armed each turn; at that commit (b0f98276) `f5` lost one of ten,
+`f5_k4_s7`: broken at 54% of his HP with one Life 3 on, the window's
+casts already queued killed him, and his dying Ultima took all four
+(`broken (0 of 8 shields) at HP 27244`, `[wipe] ... atk $14`). While he
+is Broken the hold now starts at the Life 3 mark (60%), and no Break
+breaks him under it while a member lacks Life 3; the same draw won
+(`f6_k4_s7`, 105,437 ticks). At 60 frames a second that is about 11 to 35 minutes,
 against 18 to 54. His dying Ultima still takes three or four of the party
 in nearly every win (the mmtally lines' "4 deaths"; over f2 and f3, 93 of
 the fights' 112 deaths are `by slot 0 cmd $02 atk $14`), and Life 3 raises
