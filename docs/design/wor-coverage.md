@@ -448,6 +448,9 @@ boot checkpoint the branch Continues and the leg it rejoins.
 | 9 | WoB: stop spending WoR bits | WoB chain (the #350 item 8 pass) | 8 prizes (section 5.2) | S, regenerates the WoB chain | yes |
 | 10 | The early-continent draw gaps | `wor-start-v1` to `wor-figaro-sweep-v1` | 19 formations of L5-29, 2-1,155 per member | S | seldom |
 
+Units 1 and 2 are played since v0.38 by `gen_wor_dino` and `gen_wor_desert`,
+on the line after the Colosseum (`route-wor-side-trips.md`).
+
 Unit 5 splits by arc: the Ancient Castle (`gen_wor_ancient`, 8 chests,
 items Wing Edge, Doom Darts, Magicite, Ether, X-Potion, Punisher, two
 boxes), Doma and the dream (`gen_wor_doma`/`gen_wor_dream`: Elixir,

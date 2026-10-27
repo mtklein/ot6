@@ -40,7 +40,7 @@ running instances resume at shifted offsets and fail.
 
 A `.mss` belongs to one ROM, so after a ROM change every generated state
 regenerates, each from the one before it. The graph plays the game once,
-from power-on to the frontier (`wor_colosseum`, which saves `wor-colosseum-v1`),
+from power-on to the frontier (`wor_desert`, which saves `wor-desert-v1`),
 with no second copy of any state (#363). Where the play saves -- at a save point, or on the world map,
 where the game lets you save anywhere -- the graph has a cut: an entry in
 `tools/tests/savestate_graph.py` with both `prev=` and `checkpoint=`, `prev=`
@@ -62,7 +62,7 @@ own run: `cutter=` names it (`gen_post_opera_checkpoint` from blackjack,
 n128_won); its capture edge publishes no state and writes
 `build/checkpoints/<key>.record` (the ROM, its own sig, the payload, the
 stamp of what it booted). And `saves=` marks a run that ends by saving a
-checkpoint no cut boots yet: the frontier (`wor-colosseum-v1`) and
+checkpoint no cut boots yet: the frontier (`wor-desert-v1`) and
 `crescent-landing-v1` (thamasa_night boots the savestate).
 
 So the play is one serial line of runs, and it is the build's critical

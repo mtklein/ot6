@@ -267,7 +267,9 @@ Notes and cautions:
 - **Intangir is NOT an XP grind here** — `monster_prop` gives it **0 XP**
   (species `$0a3`). The Triangle Island trick is a magic/gil story, not levels.
 - The huge-XP formations (Tyranosaur 8800, Doom Drgn 8500, Brachosaur 14396)
-  are all **WoR-gated** (L44–77) and unreachable pre-FC.
+  are all **WoR-gated** (L44–77) and unreachable pre-FC. The route grinds
+  the Tyranosaurs before Kefka's Tower (`route-wor-side-trips.md`) and runs
+  from the Brachosaur.
 - **The Veldt pays no XP** (`$11E4` bit 1; HANDOFF), so Gau's stretch is not a
   grind — `WorldBattleGroup` marks veldt sectors with `$FF`
   (`field/battle.asm:138-142`).
