@@ -626,7 +626,8 @@ local function touchNpc(find, begun, what)
   -- frames (build/attempts/wt/v038-magimaster/lab/f2_k7_s0, s7, s13:
   -- 'timeout after 1200 frames driving toward the Holy Dragon (368 NPC_1):
   -- touch it', the frame a battle's).  The budget is the presses' own: the
-  -- frames a battle takes are not counted
+  -- frames a battle takes are not counted against the 1,200, and the
+  -- driveUntil's 200,000 is only a ceiling on the frames such battles take
   local drv = H.fightDriverFor("touch", { tactical = true, boost = true, items = true, healPercent = 55 }, FIGHT)
   local fought, budget = false, 0
   return H.seqStep({
@@ -813,27 +814,32 @@ local function ringsOwned()
   end
   return n
 end
+-- Each floor and target is read when it is asked for: the party's level is
+-- the booted save's, and read while the script loads (before the boot) it
+-- was 0, so the trip bought "FENIX DOWN to 0" and "POTION to 66" (build/
+-- attempts/wt/v038-magimaster/lab/n1_short)
 local function supplyNeeds()
-  local lv = H.activeTopLevel()
+  local lv = function() return H.activeTopLevel() end
   return {
-    { TINCTURE, "Tincture", 99, function() return 99 end },
-    { POTION, "Potion", math.ceil(lv * 1.5), function() return H.careStockPotions(lv, { spend = 40 }) end },
-    { FENIX, "Fenix Down", math.min(20, lv), function() return math.min(20, lv) end },
-    { REMEDY, "Remedy", 10, function() return 10 end },
-    { WALL_RING, "Wall Ring", 4, function() return 4 end, ringsOwned },
+    { TINCTURE, "Tincture", function() return 99 end, function() return 99 end },
+    { POTION, "Potion", function() return math.ceil(lv() * 1.5) end,
+      function() return H.careStockPotions(lv(), { spend = 40 }) end },
+    { FENIX, "Fenix Down", function() return math.min(20, lv()) end, function() return math.min(20, lv()) end },
+    { REMEDY, "Remedy", function() return 10 end, function() return 10 end },
+    { WALL_RING, "Wall Ring", function() return 4 end, function() return 4 end, ringsOwned },
   }
 end
 local function shortOf()
   local out = {}
   for _, s in ipairs(supplyNeeds()) do
     local have = s[5] and s[5]() or H.invCountOf(s[1])
-    if have < s[3] then out[#out + 1] = { s = s, have = have } end
+    if have < s[3]() then out[#out + 1] = { s = s, have = have } end
   end
   return out
 end
 local function shortLine(list)
   local t = {}
-  for _, x in ipairs(list) do t[#t + 1] = string.format("%s %d < %d", x.s[2], x.have, x.s[3]) end
+  for _, x in ipairs(list) do t[#t + 1] = string.format("%s %d < %d", x.s[2], x.have, x.s[3]()) end
   return #t > 0 and table.concat(t, ", ") or "nothing"
 end
 local function topUpCost()
@@ -846,11 +852,14 @@ local function topUpCost()
 end
 local function readiness()
   local trip = false
+  -- (built when the counter is reached, so its label names the live target)
   local function buy(s)
-    return H.buyItem(s[1], function()
-      local have = s[5] and s[5]() or H.invCountOf(s[1])
-      return math.max(0, s[4]() - have)
-    end, string.format("%s to %d for the tower", s[2]:upper(), s[4]()))
+    return lazy(function()
+      return H.buyItem(s[1], function()
+        local have = s[5] and s[5]() or H.invCountOf(s[1])
+        return math.max(0, s[4]() - have)
+      end, string.format("%s to %d for the tower", s[2]:upper(), s[4]()))
+    end)
   end
   local itemBuys = {}
   for _, s in ipairs(supplyNeeds()) do

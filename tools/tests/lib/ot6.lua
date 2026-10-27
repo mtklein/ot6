@@ -9070,6 +9070,9 @@ function Driver:magicOnlyLine(actor, boost)
             end
             return { kind = "defer", reason = "wall_wait", at = M.frame }
           end
+          M.log(string.format("[%s] actor=%d waited %d frames in the window with nothing for its wall: the 900-frame "
+            .. "cap gives way, planning on", self.tag or "fight", actor, M.frame - self.wallWait[actor]))
+          self.wallWait[actor] = nil
         else
           local w = self:wallWaitPlan(actor, s, "a turn with no line")
           if w then return w end
@@ -9347,6 +9350,8 @@ function Driver:wallWaitPlan(actor, slot, what)
       end
       return { kind = "defer", reason = "wall_wait", at = M.frame }
     end
+    M.log(string.format("[%s] actor=%d waited %d frames to read the wall (%s) before %s: the 900-frame cap gives "
+      .. "way, planning on", self.tag or "fight", actor, M.frame - self.wallWait[actor], busy, what))
   end
   self.wallWait[actor] = nil
   return nil

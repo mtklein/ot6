@@ -14,11 +14,12 @@
 --      Potion with one left, the floor ignored) passed 18 of 18 tower runs
 --      (build/attempts/wt/v031-relics-grey/lab/rg3mut_*); here it fails
 --      case 1b.
---   2. Driver:cureFor on Mute: a Muted seat with a Magic row and no Fight
---      row (the Fanatics' Tower) is cured with the cheapest Mute cure in
---      gil above its floor (an Echo Screen before a Remedy); a Muted seat
---      that can still Fight or Rage, and an unmuted seat, are not; with the Echo
---      Screens at their floor the Remedy is the cure.
+--   2. Driver:cureFor on Mute: a Muted seat whose only verbs are Magic and
+--      Item (the Fanatics' Tower, whose Fight row is Magic) is cured with the
+--      cheapest Mute cure in gil above its floor (an Echo Screen before a
+--      Remedy); a Muted seat with any other verb (Fight, Rage, ...) and an
+--      unmuted seat are not; with the Echo Screens at their floor the Remedy
+--      is the cure.
 -- Negative controls (build/attempts/wt/v038-magimaster/mut/): the floor
 -- ignored in noLineItemPick fails 1b; cureFor's Mute branch removed fails
 -- 2a; the branch keyed on the Fight row alone (its first cut) fails 2e.
