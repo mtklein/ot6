@@ -182,7 +182,8 @@ XP), Reach Frog x4 (324), Mantodea x2 (325, 9,224 XP), TumbleWeed x4 (327,
 10,216 XP, 31% of group 52), Crawler (103) and Crawler x4 (114). Group 50
 (61 forest tiles beside Maranda and the Opera House, x27-67 y147-187:
 Reach Frog x4, Mantodea x2) has no formation fought. A player grinding
-there meets all of them.
+there meets all of them. Since #483 `gen_wor_colosseum` fights all six
+before its save (route-wor-colosseum.md section 9).
 
 **The early continents (groups 0, 29, 33, 35, 37, 39, 42, 44, 45, 46, 47).**
 L23-29 monsters worth 94-2,310 XP a random (the 19 formations are in

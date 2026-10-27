@@ -455,8 +455,9 @@ build/attempts/wt/v037-colosseum/qual/px13/ (`q4.log`, `q6.log`).
 3. **The Colosseum's late opponents** (section 3) are designed by the arcs
    whose pools deal them.
 4. **SHADOW's level**: L41 against CELES and TERRA's L53, as CYAN came back
-   from his dream (route-wor-dreams.md section 8).  The plain by Maranda's
-   fights lost no one; the arc does not grind him.
+   from his dream (route-wor-dreams.md section 8).  The grind plains (section
+   9) take SHADOW and CYAN to L43-44; the Mantodea pair still fells CYAN in
+   one blow in about one key in three.
 5. **A Colosseum fighter who kills herself ends the run.**  When TERRA's own
    Drain or Merton took her last HP, the battle table read wiped for 369
    frames and the harness's wipe canary counted a game over ("canary:
@@ -464,3 +465,72 @@ build/attempts/wt/v037-colosseum/qual/px13/ (`q4.log`, `q6.log`).
    lost wager; a loss to the opponent hands back at once.  The route does not
    meet it (CELES fights the Gem Box), but `H.colosseumBet` should take it as
    a loss.
+
+## 9. The grind plains (v0.38, #483)
+
+`level-curve.md` names the plains around Narshe, Zozo and Doma (world groups
+48-53) the World of Ruin's grind, and the coverage audit (wor-coverage.md
+3.2) found six of their formations no leg had fought: Mantodea, Sprinter and
+two Spek Tors (323), four Reach Frogs (324), two Mantodeas (325), four
+TumbleWeeds (327), one Crawler (103) and four (114). A player who grinds
+there meets them all, so the leg now does, after SHADOW's first fights and
+before the save, while SHADOW and CYAN stand ten levels under CELES and
+TERRA (open item 4).
+
+**Where.** Two Falcon stops deal all six. A world tile's group comes from
+its sector and its tile kind (`WorldBattleGroup`), so each lap is a straight
+run of tiles of one group, found from the ROM
+(build/attempts/wt/v038-grind-plains/lab/scripts/laps.py, `laps.txt`):
+
+| stop | lap | group | there for |
+|---|---|---|---|
+| Doma's plain, down on (172,76) | (172,77) <-> (176,77) | 52 | 327 (31.25%) |
+| the same, west of the castle's doors | (165,76) <-> (169,76) | 53 | 103 (31.25%), 114 (37.5%) |
+| the forest north of the Opera House, down on (27,148) | (27,149) <-> (33,149) | 50 | 324 (62.5%), 325 (37.5%) |
+| the plain south of it | (25,158) <-> (31,158) | 49 | 323 (37.5%) |
+
+Each lap is walked, with the field care after every battle, until each
+formation it is there for has been won, bounded at 20-25 battles (a miss at
+those odds is about one draw in a thousand or fewer). Then Kohlingen's
+counter tops the bag up again and the Falcon goes back down by Maranda for
+the save. The leg asserts the Falcon at its start; with the switch id
+mutated it fails at boot, "assertEq failed: the Falcon has risen ($00CC:
+gen_wor_falcon) for the hops to the grind plains: got 0 ($0), want 1 ($1)"
+(`lab/out/mut_falcon`).
+
+**The leg** (`leg1/`, the graph's play at 4c81486a; the same play, "PASS
+(frame 101212) attempts=1/3", at 4dc81e6e): twelve plain battles, all won,
+"Doma's plain (group 52): done after 3 battles", "(group 53): done after 5
+battles", "the forest north of the Opera House (group 50): done after 2
+battles", "the plain south of the forest (group 49): done after 2 battles".
+The four came out at "SHADOW L43 ... CELES L54 ... CYAN L44 ... TERRA L54"
+(L41, L53, L42 and L53 before), with "potion=88 ... gil=718313" on the save
+tile.
+
+**Measured** from the graph's own `wor_colosseum_plains` at 4dc81e6e
+(`lab/out/p2_*`, `lab_plains.lua`: K battles used up on the plain by
+Maranda, then the leg's grind, copied), K 0-5 at seed shifts 0, 1, 7 and 13,
+one attempt each: 24 of 24 PASS, every battle won. By distinct key
+(`tally_p2.txt`, `deaths_p2.txt`):
+
+| formation | fights | keys | won | keys with a death |
+|---|---|---|---|---|
+| 103 Crawler | 60 | 17 | 60 | 0 |
+| 114 Crawler x4 | 36 | 9 | 36 | 0 |
+| 323 Mantodea, Sprinter, Spek Tor x2 | 36 | 8 | 36 | 0 |
+| 324 Reach Frog x4 | 24 | 6 | 24 | 0 |
+| 325 Mantodea x2 | 36 | 9 | 36 | 3 |
+| 327 TumbleWeed x4 | 24 | 6 | 24 | 0 |
+
+The three deaths are CYAN's, each one Mantodea blow in a normal battle from
+near full ("CYAN 2072/2885", "CYAN 2892/3001", "CYAN 3118/3118"). The
+Mantodea's record is vanilla's (route-wor-narshe.md section 14) and CYAN is
+L42-44 against its L54: the level gap a grind closes, so the leg leaves it.
+An arm with CYAN in the back row for the plains (`lab/out/r1_*`,
+`lab_plains_row.lua`, K 0-7 at shifts 0 and 13) did not help: 325 felled him
+in 2 of 10 keys, now from part HP ("CYAN 1181/2885"; "CYAN 571/2885; CYAN
+1180/2885"), CELES fell once in a 323 back attack, and its two K=0 runs
+failed in the row menu ("timeout after 1800 frames driving toward CYAN to
+the back row"), a lab fault. The back and pincer attacks #452 answered with
+the Back Guard decided nothing here: 325 rolled one back attack in 9 keys
+(be78, no one down). The Back Guard stays on LOCKE, who is not seated.
