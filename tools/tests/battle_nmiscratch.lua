@@ -85,7 +85,9 @@ local function watchOn()
   -- entry the scratch is compared with the save it is about to put back;
   -- on a ROM without the restore, at IncGameTime_ext inside the NMI, with
   -- the NMI's entry bytes
-  local okR, restore = pcall(H.sym, "Ot6NmiScratchRestore_ext")
+  -- (the call spelled out: compose.py injects only the symbols a literal
+  -- H.sym("...") names)
+  local okR, restore = pcall(function() return H.sym("Ot6NmiScratchRestore_ext") end)
   W.restoreHook = okR and "Ot6NmiScratchRestore_ext" or "IncGameTime_ext"
   local at = okR and restore or H.sym("IncGameTime_ext")
   W.refs[#W.refs + 1] = { emu.addMemoryCallback(function()
