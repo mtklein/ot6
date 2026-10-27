@@ -9315,6 +9315,17 @@ function Driver:wallWaitPlan(actor, slot, what)
     end
   end
   if M.readByte(0x32CD + 8 + slot * 2) < 0x80 then busy = busy or "his counter pending" end
+  -- and for 120 frames after the last such reading: a member's action reads
+  -- resolved a beat before the counter it drew is queued, and a cast planned
+  -- in that beat met the turned wall (build/attempts/wt/v038-magimaster/lab/
+  -- m8_b0_k2_s7_s0: 'actor=1 waits to read the wall (entity 0's action in
+  -- flight) before $01', its plan, then 'monact f39307 ... atk $C1' and
+  -- 'actor=1's magic took 0')
+  if busy then
+    self.wallBusyAt = M.frame
+  elseif self.wallBusyAt and M.frame - self.wallBusyAt < 120 then
+    busy = "the last action's counter may follow"
+  end
   self.wallWait = self.wallWait or {}
   if busy then
     self.wallWait[actor] = self.wallWait[actor] or M.frame
