@@ -21,6 +21,8 @@ H.NAV_REFIRE_HOLD = true
 -- miss never makes); the Hoover is weak to ice too, and whoever holds Ice casts it while one stands
 -- (route-wor-side-trips.md section 3: Fight alone, the Cactrot wiped the party, and Ice missed it)
 local CACTROT, HOOVER = 0x04C, 0x03E
+-- the care between battles casts first, as the forest's does (TERRA's Cure is 1 MP under the Economizer)
+H.careMagic, H.careCastFirst = true, true
 FIGHT.throwRead = function() return H.formationHas({ [CACTROT] = true }) end
 FIGHT.nuke = function()
   if H.formationHas({ [HOOVER] = true }) then return { 0x01 } end
@@ -32,6 +34,7 @@ local WATER_EDGE = 0xAC
 local function cactrotRun()
   local up = (H.readByte(0x1850 + SHADOW) & 7) == 1 and H.readWord(0x1600 + 37 * SHADOW + 0x09) > 0
   if up and H.invCountOf(WATER_EDGE) > 0 then return {} end
+  if not H.formationHas({ [CACTROT] = true }) then return { CACTROT } end
   H.log(string.format("[desert] no throw for the Cactrot (SHADOW %s, %d Water Edge): running from it",
     up and "standing" or "down", H.invCountOf(WATER_EDGE)))
   return { CACTROT }
@@ -139,6 +142,15 @@ H.run({ maxFrames = 1600000 }, {
   -- @@stage save
   H.worldNavTo(function() return H.readByte(0x1F62) end, function() return H.readByte(0x1F63) end,
     { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, avoid = MARANDA_WORLD }),
+  -- the Hoovers' Sand Storms empty the bag (the line's play: 97 Potions in, 4 out), and the save is Kefka's
+  -- Tower's boot: a player restocks before it, at Kohlingen's counter, and comes back to the Falcon's tile
+  H.cond(potionsShort, {
+    board(),
+    kohlingenStop("the restock after the desert"),
+    H.waitUntil(function() return H.airshipControl() end, 3000, "the pilot's controls", 5),
+    H.lazy(function() return H.flyTo(MARANDA_TILE[1], MARANDA_TILE[2], { what = "the Falcon back by Maranda",
+      fight = FIGHT }) end),
+  }, {}),
   H.fieldCare({ threshold = 1.0, tag = "on the Falcon's tile" }),
   H.waitUntil(function() return H.worldSettled() and H.worldAligned() end, 1200, "settled on the save tile", 5),
   H.call(function()

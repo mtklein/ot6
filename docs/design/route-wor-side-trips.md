@@ -73,9 +73,9 @@ their own.
 
 **What they do downstream.** Kefka's Tower boots `wor-desert-v1` instead of
 `wor-colosseum-v1`. They raise the four Kefka's Tower would seat first:
-SHADOW and CYAN from L41 to L52-53, CELES from L52 to L59-61 and TERRA from
-L53 to L60-63, and they add about 160,000 GP (the plain's Crawlers; the
-Cactrots' 20,000 each go on top), against Kefka's Tower's target of L52 for
+SHADOW from L43 and CYAN from L44 to L52-54, CELES and TERRA from L54 to
+L61-62, and they add about 210,000 GP (55,000 on the plain and in the forest,
+the rest the desert's Hoovers and Cactrots), against Kefka's Tower's target of L52 for
 each of three parties (`level-curve.md`). The bench gains nothing: the other
 eight stay where the Colosseum left them (RELM L50, STRAGO L47, GOGO L42,
 LOCKE L41, SABIN L39, MOG and UMARO L38, EDGAR L34, GAU L33, SETZER L31), so
@@ -134,7 +134,22 @@ Before the forest, at L41-53, the desert was worse: the Hoover lost 6 of 18
 with 30 deaths (`de_s*`), which is why the desert comes after the forest.
 
 The leg's six runs (two boots from the forest's lab captures, seed shifts and
-K = 2, 5 encounters used up first) all passed (`de5*`): @DESERT_SWEEP@
+K = 2, 5 encounters used up first) all passed (`de5*`): on the lab boots, Cactrot 12 of 12 and Hoover 35 of 36 with 22 deaths.
+
+**From the graph's own capture** (`lab/air/gs_*`, booted from the line's
+`wor-dino-v1`: seed shifts 0-30 and K = 2, 5), with the care casting first and
+a restock at Kohlingen when the bag comes out short: 6 of 6 PASS; the Cactrot
+12 of 12 (9 keys, 1 death), the Hoover 35 of 36 (26 keys, 13 deaths). The
+restock: the line's first play of the leg came back with 4 Potions of 97
+("on the save tile ... potion=4"), so the leg now tops up and flies back
+before saving ("the restock after the desert ... potion=99"; "on the save
+tile world (69,183) ... potion=99 ... fenix=20 ... gil=928573").
+Without a Water Edge (`gs_noedge`, a lab battery with the nine removed) the
+leg runs from the Cactrot: "[desert] no throw for the Cactrot (SHADOW standing, 0 Water Edge): running
+from it", both Cactrots run from, the eight Hoovers won, PASS.
+
+The save the tower boots: SHADOW L53-54, CYAN L52-53, CELES L61-62, TERRA
+L62, 930,000-970,000 GP, the bag at its band.
 
 ## 4. The forest and the Brachosaur
 
@@ -177,7 +192,25 @@ Brachosaur's XP (7,198 a member) is not worth a coin flip, so the leg runs
 (`FLEE = { BRACHOSAUR }`), and the run has never failed. With twelve more
 levels the fight may turn; that is for whoever grinds past L60.
 
-@FOREST_SWEEP@
+**From the graph's own capture.** After the rebase onto the grind plains
+(#483, `c1d9745d`: the party arrives at SHADOW L43, CYAN L44, CELES and TERRA
+L54), the line replayed from `wor_ragnarok` and its `wor_colosseum` capture
+booted six sweep runs of `gen_wor_dino` (`lab/air/gd_*`: seed shifts 0, 10,
+20, 30; K = 3 and 6 encounters used up first), and the line itself played the
+leg once (`qual/wor_dino.log`):
+
+| | runs | PASS | plain | forest | two Tyranosaurs | one | Brachosaur | deaths | frames |
+|---|---|---|---|---|---|---|---|---|---|
+| `gd_*` | 6 | 6 | 1-7 battles | 25-28 battles | won 37 (28 keys) | won 117 (50 keys) | run from 6 of 6 (6 keys) | 14 (13 in the pair) | 127,840-141,258 |
+| the line | 1 | 1 | 7 | 28 | won 7 | won 21 | run from 1 | 3 | 140,911 |
+
+The four leave the forest at SHADOW L52-53, CYAN L52, CELES L59-61 and TERRA
+L60-61, with about 55,000 GP more than they came with and the bag still
+nearly full (Potions 94-97 of 99, Fenix Downs 18-21; no trip back to
+Kohlingen was needed). The grind is about 35 battles and 130,000-140,000
+frames, some 36-39 minutes of play: "the forest: 28 battles (won 140 x7, won
+141 x21) ... SHADOW L53 4124/4124, CELES L61 5241/5241, CYAN L52 3993/3993,
+TERRA L61 5237/5237" (`qual/wor_dino.log`).
 
 ## 5. What the legs depend on (#480)
 
@@ -227,4 +260,24 @@ arms, `br/mkty.py` the Tyranosaur arms, `br/mkcact.py` the Cactrot answers,
 `br/mkk.py` the K variants, `br/mkarm.py`; `sweep.py` the tally;
 `make_negative.py`), and `qual/` (the graph's line and the gate).
 
-@EVIDENCE_LINES@
+Quoted lines behind the tables (each from the file named):
+
+```
+lab/air/gd_s0/run.log.gz: [ot6] [wor] f29762 the plain by Maranda: 7 battles (won 13F x5, won 143 x2) ... SHADOW L45 3116/3116, CELES L55 3943/4387, CYAN L45 2897/3118, TERRA L55 4383/4383; potion=98 ... fenix=22
+lab/air/gd_s0/run.log.gz: [ot6] [wor] f140895 the forest: 28 battles (won 140 x7, won 141 x21) ... SHADOW L53 4124/4124, CELES L61 5241/5241, CYAN L52 3993/3993, TERRA L61 5237/5237; potion=97 ... fenix=19
+sweep.py gd_*: form 320 ($140): won 37; deaths 13; distinct keys 28 / form 321 ($141): won 117; deaths 1; distinct keys 50 / form 322 ($142): run from 6; deaths 0; distinct keys 6
+sweep.py gs_*: form 221 ($0DD): won 12; deaths 1; distinct keys 9 / form 237 ($0ED): lost 1, won 35; deaths 13; distinct keys 26
+sweep.py dn4_*: form 320 ($140): lost 1, won 40; deaths 24; distinct keys 30
+sweep.py dn2_*: form 320 ($140): lost 4, won 8 (four shields, the care at 65%)
+sweep.py brice0_s40 dnfight_s0 b52f_*: form 322 ($142): lost 5, won 3; deaths 29; distinct keys 10 (and b52f_b0's wipe in it)
+sweep.py ty_ice dnrun_s0 dnrun_s10 b52r_*: form 322 ($142): run from 15; deaths 0; distinct keys 12
+sweep.py de4*: form 237 ($0ED): lost 4, won 32; deaths 42 (four shields) / de5*: lost 1, won 35; deaths 22 (two)
+lab/px13/brrun0: flee: this formation refuses the run ($b1=22 $2f4b=00 held 60 frames ...)
+lab/px13/cact_ice: [outcome] battle $0DD LOST after 16385 ticks: killed none
+lab/air/cact_trace2: actor=0's throw took 3 off the monsters (0 shielded-equivalent over 1 hit(s), 0 a hit ...) [exec cmd $08 atk $AC]
+lab/air/neg_dino_noice: [deps] Ice: nobody / assertEq failed: one of the four knows Ice (TERRA's natural magic, or a stone the line gave)
+```
+
+The tables' "lab boots" rows booted the tracked `wor-colosseum-v1` of v0.37
+(made on main's ROM, a Continue across builds: a lab, not a measurement of the
+graph); the `gd_`/`gs_` rows and `qual/` are the graph's own captures.
