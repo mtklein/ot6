@@ -65,7 +65,7 @@ local function joined() return sw(0x02F3) == 1 end
 -- group 53: Crawler 103, Crawler x4 114), and the forest north of the Opera House with the plain south of it
 -- (group 50: Reach Frog x4 324, Mantodea x2 325; group 49: Mantodea, Sprinter and Spek Tor x2 323).  Each lap is a
 -- straight run of tiles of the one group (WorldBattleGroup by sector and tile kind, read from the ROM:
--- build/attempts/wt/v038-grind-plains/lab/laps.txt), so its pool is the group's alone.  A lap is walked until
+-- build/attempts/wt/v038-grind-plains/lab/scripts/laps.txt), so its pool is the group's alone.  A lap is walked until
 -- every formation it is there for has been won (the pool's odds: 31.25-62.5% a battle), bounded by `budget`,
 -- which a miss at those odds reaches about one draw in a thousand or fewer.
 local PLAINS = {
@@ -154,7 +154,7 @@ local function via(points, what, avoid)
   return H.seqStep(steps)
 end
 
-H.run({ maxFrames = 2400000 }, {
+H.run({ maxFrames = 1600000 }, {
   H.bootCheckpoint("wor-ancient-v1"),
   watches(),
   H.call(function()
