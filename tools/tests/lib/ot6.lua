@@ -9173,8 +9173,61 @@ function Driver:magicOnlyLine(actor, boost)
   local want = wantFor(bestSlot)
   if best.id == M.BREAK_SPELL and breakBody(bestSlot) and not brokenNow(bestSlot) then
     local bank, sh = M.readByte(BATTLE.BP + actor * 2), M.readByte(BATTLE.SH_CUR + bestSlot * 2)
-    want = (bank >= sh - 1) and math.min(3, math.max(0, sh - 1)) or (bank >= 3 and 3 or 0)
+    -- the window is worth what the party can cast into it: his wall stands
+    -- through it and nulls all but its weakness, so he is broken on a wall
+    -- whose weak element a living member can cast now.  On another wall the
+    -- Break takes shields short of the last one, and with one left the turn
+    -- goes to a cast that turns the wall (the wallChangeVs line).  Breaking
+    -- whatever the wall, nine windows of a fight took nothing on the six
+    -- that fell on a weakness nobody holds (build/attempts/wt/
+    -- v038-magimaster/lab/m1_b0_k0_s0_s9: 'broken (0 of 8 shields) at HP
+    -- 18353', 'slot 0 weak $80', 'window over ... HP 18353')
+    local weak = M.readByte(0x3BE0 + 8 + bestSlot * 2)
+    local covered = false
+    for e = 0, 3 do
+      if M.readWord(0x3BF4 + e * 2) > 0 then
+        for _, id in ipairs(self.opts.magicOnly or M.MAGIC_ONLY_SPELLS) do
+          local el = M.readRomByte(MP + id * 14 + 1)
+          if el ~= 0 and (el & weak) ~= 0 and spellCell(e, id, true) ~= nil then covered = true end
+        end
+      end
+    end
+    local breakNow = (bank >= sh - 1) and math.min(3, math.max(0, sh - 1)) or nil
+    if covered then
+      want = breakNow or (bank >= 3 and 3 or 0)
+    elseif sh <= 1 then
+      want = nil
+    else
+      want = math.min(math.min(3, bank), sh - 2)
+      if want < 2 then want = 0 end
+    end
+    local key = string.format("breakwant:%d:%d:%d:%s", actor, sh, bank, tostring(want))
+    if not self.statusSaid[key] then
+      self.statusSaid[key] = true
+      M.log(string.format("[%s] actor=%d Break on slot %d: %d shields, bank %d, wall weak $%02X %s: %s",
+        self.tag or "fight", actor, bestSlot, sh, bank, weak, covered and "(the party holds it)" or "(no one holds it)",
+        want == nil and "held for a wall the party can hit" or string.format("%d BP", want)))
+    end
+    if want == nil then
+      -- the next best cast, Break left out; else nothing here (the
+      -- fallbacks below turn the wall)
+      local nb, ns, nsl = nil, nil, nil
+      for slot = 0, 5 do
+        if monAlive(slot) then
+          local x = 8 + slot * 2
+          local absorb, null = M.readByte(0x3BCC + x), M.readByte(0x3BCD + x)
+          for _, sp in ipairs(spells) do
+            if sp.id ~= M.BREAK_SPELL and sp.power > 0
+               and not (sp.elem ~= 0 and ((absorb & sp.elem) ~= 0 or (null & sp.elem) == sp.elem)) then
+              if ns == nil or sp.power > ns then nb, ns, nsl = sp, sp.power, slot end
+            end
+          end
+        end
+      end
+      if nb ~= nil then best, bestSlot, want = nb, nsl, 0 else best = nil end
+    end
   end
+  if best == nil then return self:wallTurnOrNil(actor, castable) end
   local b = castBoost(actor, best.id, best.cost, want, self:nukeFloor(actor))
   if b == nil then b = 0 end
   local key = string.format("monly:%d:%d:%d", actor, bestSlot, best.id)
@@ -9185,6 +9238,35 @@ function Driver:magicOnlyLine(actor, boost)
   end
   return { kind = "magic", spell = best.id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = b, aim = bestSlot,
            reason = "magic_only" }
+end
+
+-- A turn that turns a WallChange body's wall (opts.wallChangeVs): the
+-- cheapest attack in `castable` no standing monster absorbs, unboosted, at
+-- the first such body -- a hit draws the counter that changes the wall.
+-- nil when there is none.
+function Driver:wallTurnOrNil(actor, castable)
+  local wc = self.opts.wallChangeVs
+  if not wc then return nil end
+  local pick = nil
+  for _, sp in ipairs(castable) do
+    if sp.power > 0 and sp.id ~= M.BREAK_SPELL and (pick == nil or sp.cost < pick.cost) then
+      local absorbed = false
+      for s = 0, 5 do
+        if monAlive(s) and sp.elem ~= 0 and (M.readByte(0x3BCC + 8 + s * 2) & sp.elem) ~= 0 then absorbed = true end
+      end
+      if not absorbed then pick = sp end
+    end
+  end
+  if pick == nil or M.readWord(BATTLE.CURMP + actor * 2) < pick.cost then return nil end
+  for s = 0, 5 do
+    if monAlive(s) and wc[M.readWord(0x57C0 + s * 2)] then
+      M.log(string.format("[%s] actor=%d magic-only: $%02X on slot %d to turn the wall before the break",
+        self.tag or "fight", actor, pick.id, s))
+      return { kind = "magic", spell = pick.id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0,
+               aim = s, vetoOk = true, reason = "magic_only_wallchange" }
+    end
+  end
+  return nil
 end
 
 function Driver:dmgWatchOf(e)
