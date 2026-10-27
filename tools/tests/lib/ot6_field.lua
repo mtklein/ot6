@@ -10306,6 +10306,81 @@ function M.worLegKit(env)
       }, what),
     })
   end
+  -- hunt(spec): walk a lap of two tiles, the walker playing the battles and the field care after each, until
+  -- every formation in spec.forms ({ [id] = name }) has been won (#486, the model #483's grind plains): spec.what,
+  -- spec.lap = { { x, y }, { x, y } } on the field (or the world map with spec.world), spec.budget the most
+  -- battles the lap may take (asserted, loud), spec.won a table shared across hunts (formation -> true)
+  local function huntLine(forms, won)
+    local t = {}
+    for f, name in pairs(forms) do t[#t + 1] = string.format("%d %s %s", f, name, won[f] and "won" or "-") end
+    table.sort(t)
+    return table.concat(t, "; ")
+  end
+  -- spec.castFirst: the care between the hunt's battles casts its cures before it reaches for the bag
+  -- (M.careMagic and M.careCastFirst while the hunt runs, as gen_wor_tower's): a hunt far from a counter keeps
+  -- its Potions for the fights
+  local function hunt(spec)
+    local won, wp, n0, seen = spec.won or {}, 1, nil, nil
+    local saved = nil
+    local function knobs(on)
+      if not spec.castFirst then return end
+      if on then
+        saved = saved or { M.careMagic, M.careCastFirst }
+        M.careMagic, M.careCastFirst = true, true
+      elseif saved then
+        M.careMagic, M.careCastFirst = saved[1], saved[2]
+        saved = nil
+      end
+    end
+    local function done()
+      for f in pairs(spec.forms) do if not won[f] then return false end end
+      return true
+    end
+    local function still()
+      if M.battleLoadStarted() then return false end
+      if spec.world then return M.worldMode() and M.worldSettled() end
+      return M.hasControl() and M.tileAligned()
+    end
+    local nav = spec.world and M.worldNavTo or M.navTo
+    return M.withReset(M.seqStep({
+      M.call(function()
+        n0, seen, wp = #M.outcomes, #M.outcomes, 1
+        knobs(true)
+        say("hunt", string.format("%s: lap (%d,%d) <-> (%d,%d); %s", spec.what, spec.lap[1][1], spec.lap[1][2],
+          spec.lap[2][1], spec.lap[2][2], huntLine(spec.forms, won)))
+      end),
+      M.driveUntil(function()
+        while seen < #M.outcomes do
+          seen = seen + 1
+          local o = M.outcomes[seen]
+          local f = o.form & 0x1FF
+          if o.kind == "won" then won[f] = true end
+          M.log(string.format("[hunt] %s: battle %d formation %d %s after %d ticks", spec.what, seen - n0, f, o.kind,
+            o.tick or -1))
+          -- the budget, asserted as each battle ends (the count moves only then)
+          if not done() then
+            M.assertEq(seen - n0 < spec.budget, true, string.format("%s: every formation it is walked for won "
+              .. "within %d battles (%s)", spec.what, spec.budget, huntLine(spec.forms, won)))
+          end
+        end
+        if done() then return still() end
+        return false
+      end, spec.maxFrames or 3000000, {
+        nav(function() return spec.lap[wp][1] end, function() return spec.lap[wp][2] end,
+          { maxFrames = 20000, playBattles = "tactical", fight = FIGHT, avoid = spec.avoid }),
+        M.call(function() wp = wp % 2 + 1 end),
+        M.cond(function() return not M.battleLoadStarted() end, { M.fieldCare({ tag = "care on the hunt" }) }, {}),
+      }, spec.what),
+      M.call(function()
+        knobs(false)
+        say("hunt", string.format("%s: done after %d battles; %s", spec.what, #M.outcomes - n0,
+          huntLine(spec.forms, won)))
+        for f, name in pairs(spec.forms) do
+          M.assertEq(won[f] == true, true, string.format("%s: formation %d (%s) won", spec.what, f, name))
+        end
+      end),
+    }), function() n0, seen, wp = nil, nil, 1; knobs(false) end)
+  end
   local function objLine(o0, o1)
     local t = {}
     for o = o0 or 0x10, o1 or 0x14 do t[#t + 1] = string.format("$%02X(%d,%d)", o, M.objX(o), M.objY(o)) end
@@ -10416,7 +10491,8 @@ function M.worLegKit(env)
     map = map, bright = bright, sw = sw, c = c, lv = lv, partyOf = partyOf, settled = settled,
     supplies = supplies, say = say, kitLine = kitLine, walkInto = walkInto, outToWorld = outToWorld,
     enterFrom = enterFrom, board = board, regroup = regroup, liftOff = liftOff, watches = watches,
-    walk = walk, chestAt = chestAt, doomLine = doomLine, pace = pace, objLine = objLine,
+    walk = walk, chestAt = chestAt, doomLine = doomLine, pace = pace, hunt = hunt, huntLine = huntLine,
+    objLine = objLine,
     inParty = inParty, partyCount = partyCount, landNear = landNear, talkNpc = talkNpc,
     pressUp = pressUp, objOn = objOn, kohlingenStop = kohlingenStop,
   }

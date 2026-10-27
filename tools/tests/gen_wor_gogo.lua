@@ -155,8 +155,57 @@ local function crushOutside(x, y)
   return (x >= 25 and x <= 27 and y >= 50) or (x >= 53 and x <= 55 and y >= 49) or y >= 54 or x < 24
 end
 local function crushTimer() return H.readByte(0x1189) | (H.readByte(0x118A) << 8) end
-local function crushWalk(tx, ty, what)
+-- the room's chests (#486), each opened from `stand` facing it; `back` is the steps from the stand to the nearest
+-- safe tile (0 where the stand is one: the Zephyr Cape's and the Hero Ring's).  A chest is taken when the time
+-- left covers the walk to its stand, the opening (CRUSH_OPEN frames) and the walk back to safety
+local CRUSH_CHESTS = {
+  { stand = { 46, 48 }, face = "up", bit = 232, what = "Zephyr Cape", item = 0xC0, back = 0 },
+  { stand = { 41, 44 }, face = "up", bit = 233, what = "Hero Ring", item = 0xC9, back = 0 },
+  { stand = { 28, 44 }, face = "left", bit = 234, what = "Tack Star", item = 0x43, back = 3 },
+}
+local CRUSH_OPEN = 80
+-- a chest on the clock: face it, A until its bit is set, and A again on the "Received!" window until it has
+-- shown and closed (or 120 frames pass with none): H.openChest lingers 90 frames after the window, which the
+-- clock cannot spare beside the Tack Star (lab gg1, "the Hero Ring opened ... (132 frames ...)"); the room's
+-- clock event holds control most frames, so control is not waited for (gg2); the window can open 30 frames or
+-- more after the bit (gg3)
+local FACE_VAL = { up = 0, right = 1, down = 2, left = 3 }
+local function quickChest(o)
+  local ph, calm, before, seen = 0, 0, nil, false
+  return H.withReset(H.seqStep({
+    H.call(function() before = H.invCountOf(o.item) end),
+    H.driveUntil(function() return H.readByte(0x087f + H.readWord(0x0803)) == FACE_VAL[o.face] end, 300,
+      { H.call(function() H.setPad({ [o.face] = true }) end) }, o.what .. ": faced " .. o.face),
+    H.release(),
+    H.driveUntil(function()
+      if H.dialogWaiting() then seen = true end
+      if H.chestOpen(o.bit) and not H.dialogWaiting() then calm = calm + 1 else calm = 0 end
+      return (seen and calm >= 8) or calm >= 120
+    end, 900, {
+      H.call(function()
+        ph = (ph + 1) % 8
+        H.setPad((ph < 4 and (not H.chestOpen(o.bit) or H.dialogWaiting())) and { a = true } or {})
+      end),
+    }, o.what .. ": the chest opened and its window closed"),
+    H.release(),
+    H.call(function()
+      H.assertEq(H.chestOpen(o.bit), true, o.what .. ": treasure bit " .. o.bit .. " set")
+      H.assertEq(H.invCountOf(o.item), before + 1, string.format("%s: bag %d -> %d of item $%02X", o.what, before,
+        H.invCountOf(o.item), o.item))
+      H.log(string.format("[chest] chest bit %d (%s): OPENED", o.bit, o.what))
+    end),
+  }), function() ph, calm, before, seen = 0, 0, nil, false end)
+end
+local THUNDER_SHLD = { stand = { 1, 46 }, face = "up", bit = 228, what = "Thunder Shld", item = 0x62 }
+-- GOGO's room's pool (field group 171, map 278): Ogor x2 (346), Covert and Ogor (347), Wart Puck x2 (348) at
+-- 80/256 each and Tap Dancer with Woolly (351) at 16/256; no other map deals it.  The party walks a lap by the
+-- door until each is won, within the pick's worst run (110 for 16/256: gen_wor_belly's hunt, gaps.py)
+local BELLY171 = { [346] = "Ogor x2", [347] = "Covert, Ogor", [348] = "Wart Puck x2", [351] = "Tap Dancer, Woolly" }
+local HUNT_BUDGET = 111
+local HUNT278_LAP = { { 8, 12 }, { 8, 11 } }
+local function crushWalk(tx, ty, what, chests)
   local hops = 0
+  chests = chests or {}
   local function there() return H.fieldX() == tx and H.fieldY() == ty and H.tileAligned() end
   local function oneHop()
     local t = crushTimer()
@@ -166,16 +215,45 @@ local function crushWalk(tx, ty, what)
       local p = H.bfsPath(gx, gy)
       return p and #p or nil
     end
+    -- the next chest the walk has not opened: taken when the time left covers it, else the hops aim at it
+    local goal = nil
+    for _, ch in ipairs(chests) do
+      if not H.chestOpen(ch.bit) then goal = ch; break end
+    end
+    if goal then
+      local d1 = steps(goal.stand[1], goal.stand[2])
+      local cost = d1 and (CRUSH_STEP * (d1 + goal.back) + CRUSH_OPEN)
+      if cost and t - CRUSH_MARGIN >= cost then
+        hops = hops + 1
+        local t0, f0 = t, H.frame
+        H.log(string.format("[crush] %s: f%d t=%d to the %s's stand (%d,%d), %d steps, %d back (cost %d)", what,
+          H.frame, t, goal.what, goal.stand[1], goal.stand[2], d1, goal.back, cost))
+        return H.seqStep({
+          H.navTo(goal.stand[1], goal.stand[2], { maxFrames = 1200 }),
+          quickChest(goal),
+          H.call(function()
+            H.log(string.format("[crush] %s: the %s opened at f%d t=%d (%d frames, the clock %d -> %d)", what,
+              goal.what, H.frame, crushTimer(), H.frame - f0, t0, crushTimer()))
+          end),
+        })
+      end
+    end
+    -- the hops aim at the chest's stand while one is left (a chest's stand is gone to only by the test above)
+    local ax, ay = tx, ty
+    if goal then ax, ay = goal.stand[1], goal.stand[2] end
     local budget = math.floor((t - CRUSH_MARGIN) / CRUSH_STEP)
     -- the target itself, if it is outside the room or the time left reaches it
     local dt = steps(tx, ty)
-    if dt and (dt <= budget or crushOutside(tx, ty) and dt <= budget) then
+    if not goal and dt and (dt <= budget or crushOutside(tx, ty) and dt <= budget) then
       hops = hops + 1
       H.log(string.format("[crush] %s: f%d t=%d to the target (%d,%d), %d steps", what, H.frame, t, tx, ty, dt))
       return H.navTo(tx, ty, { maxFrames = 1200 })
     end
-    -- else the safe tile nearest the target that the time left reaches
-    local best, bestD = nil, steps(tx, ty) or 999
+    -- else the safe tile nearest the target (or the chest's stand) that the time left reaches
+    -- (any safe tile in reach is a candidate: off a safe tile, as after the Tack Star, the nearest to the target
+    -- may lie farther from it than the party stands; lab gg5, "no safe tile in reach (budget 5 steps; ... (30,43)
+    -- 3 ...)")
+    local best, bestD = nil, 999
     local hereSafe = false
     for _, s in ipairs(CRUSH_SAFE) do if s[1] == x and s[2] == y then hereSafe = true end end
     if crushOutside(x, y) then hereSafe = true end
@@ -183,18 +261,25 @@ local function crushWalk(tx, ty, what)
       local ds = steps(s[1], s[2])
       if ds and ds <= budget and ds > 0 then
         -- how far the safe tile leaves the party from the target
-        local rest = math.abs(s[1] - tx) + math.abs(s[2] - ty)
+        local rest = math.abs(s[1] - ax) + math.abs(s[2] - ay)
         if rest < bestD then best, bestD = s, rest end
       end
     end
-    local hereRest = math.abs(x - tx) + math.abs(y - ty)
+    local hereRest = math.abs(x - ax) + math.abs(y - ay)
     if best and (bestD < hereRest or not hereSafe) then
       hops = hops + 1
       H.log(string.format("[crush] %s: f%d t=%d hop to (%d,%d)", what, H.frame, t, best[1], best[2]))
       return H.navTo(best[1], best[2], { maxFrames = 1200 })
     end
     if not hereSafe then
-      error(string.format("[crush] %s: f%d t=%d at (%d,%d) with no safe tile in reach", what, H.frame, t, x, y), 0)
+      local near = {}
+      for _, s in ipairs(CRUSH_SAFE) do
+        if math.abs(s[1] - x) + math.abs(s[2] - y) <= 8 then
+          near[#near + 1] = string.format("(%d,%d) %s", s[1], s[2], tostring(steps(s[1], s[2])))
+        end
+      end
+      error(string.format("[crush] %s: f%d t=%d at (%d,%d) z=%d with no safe tile in reach (budget %d steps; %s)",
+        what, H.frame, t, x, y, H.readByte(0x00b2) & 3, budget, table.concat(near, ", ")), 0)
     end
     return H.waitFrames(8)
   end
@@ -365,13 +450,41 @@ H.run({ maxFrames = 2400000 }, {
   -- the door (22,3) lands on 280 (54,52), whose trigger starts the ceiling's clock (_cb80b8); the way on is
   -- the room's south-west corridor (26,54) -> 277, then 277 (4,35) -> the room's west half (15,48)
   walkInto(22, 3, 280, "279 (22,3) -> 280: the crushing room"),
-  crushWalk(26, 53, "280: across the crushing room to (26,53)"),
+  crushWalk(26, 53, "280: across the crushing room to (26,53)", CRUSH_CHESTS),
   walkInto(26, 54, 277, "280 (26,54) -> 277"),
   walkInto(4, 35, 280, "277 (4,35) -> 280's west half"),
+  -- the west half's chest (no clock there): the Thunder Shld (1,45), from below it.  Its corner (x 0-2) is shut
+  -- until the plate (12,51) (_cb807e: $018C, _cb7e36) opens the ledge (6,54) the jump west is taken from (labs
+  -- x4, x6: no route to it before)
+  H.cond(function() return sw(0x018C) == 0 end, {
+    H.lazy(function() return navJ(12, 51, LINKS280W, { what = "280 west: onto the plate (12,51)", maxFrames = 12000,
+      playBattles = "tactical", fight = FIGHT }) end),
+    H.waitUntil(function() return sw(0x018C) == 1 and settled() end, 1800, "280 west: the plate (12,51) ($018C)", 5),
+    H.call(function() say("route", "280 west: the plate (12,51)") end),
+  }, {}),
+  H.lazy(function() return navJ(THUNDER_SHLD.stand[1], THUNDER_SHLD.stand[2], LINKS280W,
+    { what = "280 west: below the Thunder Shld", maxFrames = 12000, playBattles = "tactical", fight = FIGHT }) end),
+  H.openChest({ stand = THUNDER_SHLD.stand, face = THUNDER_SHLD.face, bit = THUNDER_SHLD.bit, what = THUNDER_SHLD.what,
+    item = THUNDER_SHLD.item, nav = { maxFrames = 3000, playBattles = "tactical", fight = FIGHT } }),
   H.lazy(function() return navJ(5, 44, LINKS280W, { what = "280 west: below the door (5,43)", maxFrames = 12000,
     playBattles = "tactical", fight = FIGHT }) end),
+  H.call(function()
+    for _, o in ipairs({ CRUSH_CHESTS[1], CRUSH_CHESTS[2], CRUSH_CHESTS[3], THUNDER_SHLD }) do
+      H.assertEq(H.chestOpen(o.bit), true, string.format("280: the %s's chest (bit %d) is open", o.what, o.bit))
+    end
+  end),
   walkInto(5, 43, 278, "280 (5,43) -> 278"),
   H.saveState("wor_gogo_278.mss"),
+
+  -- ---- 1b. the hunt in GOGO's room ---------------------------------------------------------------------
+  -- @@stage hunt
+  K.hunt({ what = "GOGO's room (group 171)", lap = HUNT278_LAP, forms = BELLY171, budget = HUNT_BUDGET,
+    castFirst = true }),
+  H.fieldCare({ threshold = 1.0, tag = "after the hunt" }),
+  H.gearDress({ tag = "gear from the crushing room's chests" }),
+  H.dressRelics({ { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" }, { STRAGO, "STRAGO" } },
+    { tag = "relics from the crushing room's chests" }),
+  H.call(function() H.log("[kit] " .. kitLine({ TERRA, CELES, RELM, STRAGO })) end),
 
   -- ---- 2. GOGO ------------------------------------------------------------------------------------------
   -- @@stage gogo

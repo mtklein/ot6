@@ -990,23 +990,31 @@ STATES = [
 
     # wor-gau-v1 -> the Zone Eater's belly's save point, map 279 (24,4): the
     # Falcon's cabin (TERRA, CELES, RELM, STRAGO), Triangle Island, where the
-    # Zone Eater engulfs a party that lets it, the belly's bridge (its
-    # conductors watched, its jumps pressed) and Save there: the
-    # `wor-belly-v1` checkpoint, the retry point for the crushing room
-    # (docs/design/route-wor-gogo.md).  A cut.  wor_gogo below boots its
+    # Zone Eater engulfs a party that lets it, the hunt on its landing until
+    # the belly's pool has dealt and the party won each formation (#486), the
+    # belly's bridge (its conductors watched, its jumps pressed) and its five
+    # chests (a conductor's touch on purpose for the shaft's two) and Save
+    # there: the `wor-belly-v1` checkpoint, the retry point for the crushing
+    # room (docs/design/route-wor-gogo.md).  A cut.  wor_gogo below boots its
     # checkpoint.  Re-cut by checkpoint_drift.py --recut.
+    # also: wor_belly_in, the party on the landing just engulfed, before the
+    # hunt (#486: the hunt's sweeps).
     S("wor_belly", gen="gen_wor_belly", prev="wor_gau",
-      checkpoint="wor-gau-v1", timeout=7200),
+      checkpoint="wor-gau-v1", timeout=7200, also=["wor_belly_in"]),
 
     # wor-belly-v1 -> the World of Ruin map on the Falcon's tile by Thamasa
-    # (250,229): the crushing room on its clock, GOGO, a Warp Stone out, the
-    # cabin (STRAGO, RELM, GOGO, TERRA), GOGO's commands, Thamasa's item
+    # (250,229): the crushing room on its clock and its three chests, the
+    # west half's plate and chest, the hunt in GOGO's room until its pool has
+    # dealt and the party won each formation (#486), GOGO, a Warp Stone out,
+    # the cabin (STRAGO, RELM, GOGO, TERRA), GOGO's commands, Thamasa's item
     # counter and Gungho's door (Ebot's Rock open), and Save there: the
     # `wor-gogo-v1` checkpoint (docs/design/route-wor-gogo.md).  A cut.
     # wor_ebot below boots its checkpoint.  Re-cut by checkpoint_drift.py
     # --recut.
+    # also: wor_gogo_278, the party in GOGO's room before the hunt (#486: the
+    # hunt's sweeps).
     S("wor_gogo", gen="gen_wor_gogo", prev="wor_belly",
-      checkpoint="wor-belly-v1", timeout=7200),
+      checkpoint="wor-belly-v1", timeout=7200, also=["wor_gogo_278"]),
 
     # wor-gogo-v1 -> the World of Ruin map on the Falcon's tile by Thamasa
     # (250,231, where Hidon's scene parks it): Ebot's Rock, its holes and

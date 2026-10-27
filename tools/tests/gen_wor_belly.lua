@@ -417,6 +417,76 @@ local function jwalk(x, y, lk, what, tries, done)
     end),
   })
 end
+-- ---- the belly in full (#486): its formations and its chests ----
+-- The belly's pool (field group 170, maps 276 and 277: SubBattleGroup) deals Karkass x2 (349), Wart Puck and
+-- Ogor (353), Tap Dancer and Covert x2 (350) at 80/256 each and Woolly x2 with Karkass x2 (352) at 16/256.  The
+-- party walks the landing until each it had not won is won.  The pick is UpdateBattleGrpRng's byte (RNGTbl at
+-- $1FA2 plus $1FA3, battle.asm @489), so its worst run is the table's: 21 picks for a slot of 80/256, 110 for
+-- 16/256, over every offset and start (build/attempts/wt/v038-zone-eater/lab/scripts/gaps.py).  The budget is
+-- that bound: a lap that reaches it has met a draw the ROM cannot deal, or lost one.
+local BELLY170 = { [349] = "Karkass x2", [350] = "Tap Dancer, Covert x2", [352] = "Woolly x2, Karkass x2" }
+local HUNT_BUDGET = 111
+-- the chests (treasure bits; TreasureProp 276) and the tile each is opened from, facing it: the bridge's two
+-- beside the jumps of row 32, the shaft's two (the foot of the conductors' drop), and the one at the bridge's
+-- west end
+local GENJI_ARMOR = { stand = { 44, 32 }, face = "left", bit = 237, what = "Genji Armor", item = 0x9A }
+local MAGICAL_BRSH = { stand = { 41, 32 }, face = "right", bit = 236, what = "Magical Brsh", item = 0x3F }
+local ETHER = { stand = { 35, 17 }, face = "up", bit = 194, what = "Ether", item = 0xEC }
+local RED_JACKET = { stand = { 40, 14 }, face = "up", bit = 209, what = "Red Jacket", item = 0x93 }
+local FAKEMUSTACHE = { stand = { 25, 32 }, face = "up", bit = 208, what = "FakeMustache", item = 0xD7 }
+local function chest(o)
+  return H.openChest({ stand = o.stand, face = o.face, bit = o.bit, what = o.what, item = o.item,
+    nav = { maxFrames = 6000, playBattles = "tactical", fight = FIGHT } })
+end
+-- the bridge's chests from the tile beside each (the careful walk there; a drop on the way is walked back)
+local function bridgeChest(o)
+  return H.cond(function() return not H.chestOpen(o.bit) end, {
+    jwalk(o.stand[1], o.stand[2], LINKS276, string.format("276: the bridge to the %s (%d,%d)", o.what, o.stand[1],
+      o.stand[2]), 30),
+    chest(o),
+  }, {})
+end
+-- the shaft's chests: a person who wants them lets a conductor touch the party (_cb8251 drops it to (37,17)):
+-- onto the conductors' row 30 west of the gap, then a step at a time toward the conductor there
+local function towardConductor()
+  local best, bd = nil, 99
+  for o = 0x10, 0x12 do
+    local ox, oy = H.objX(o), H.objY(o)
+    if oy == H.fieldY() and ox >= 31 and ox <= 41 and math.abs(ox - H.fieldX()) < bd then
+      best, bd = ox, math.abs(ox - H.fieldX())
+    end
+  end
+  return best
+end
+local function dropDown()
+  local f0, ph = nil, 0
+  local function dropped() return fallCount() > f0 end
+  return H.cond(function() return not (H.chestOpen(ETHER.bit) and H.chestOpen(RED_JACKET.bit)) end, {
+    H.call(function() f0 = fallCount() end),
+    H.lazy(function()
+      return jwalk(36, 30, LINKS276, "276: onto the conductors' row (36,30)", 30, dropped)
+    end),
+    H.withReset(H.driveUntil(function()
+      return dropped() and map() == 276 and H.hasControl() and H.tileAligned() and H.fieldY() == 17
+    end, 6000, {
+      H.call(function()
+        ph = (ph + 1) % 8
+        local cx = towardConductor()
+        local pad = {}
+        if not dropped() and cx and H.hasControl() and H.tileAligned() and ph < 4 then
+          pad[cx < H.fieldX() and "left" or "right"] = true
+        end
+        H.setPad(pad)
+      end),
+    }, "276: a conductor's touch drops the party down the shaft"), function() ph = 0 end),
+    H.release(),
+    H.call(function() say("route", string.format("276: down the shaft, at (%d,%d)", H.fieldX(), H.fieldY())) end),
+    chest(ETHER),
+    chest(RED_JACKET),
+  }, {})
+end
+local huntWon = {}
+
 -- Triangle Island: the Falcon down on (237,52), a landable tile of world group 32 (the Zone Eater, every
 -- slot: route_data pool group 32)
 local ISLAND = { 237, 52 }
@@ -451,15 +521,35 @@ H.run({ maxFrames = 2400000 }, {
   H.call(function() say("story", "engulfed: the belly (276)") end),
   H.saveState("wor_belly_in.mss"),
 
-  -- ---- 2. the bridge -----------------------------------------------------------------------------------
+  -- ---- 2. the hunt on the landing ----------------------------------------------------------------------
+  -- @@stage hunt
+  K.hunt({ what = "the belly's landing (group 170)", lap = { { 10, 12 }, { 10, 13 } }, forms = BELLY170,
+    budget = HUNT_BUDGET, won = huntWon, castFirst = true }),
+  H.fieldCare({ threshold = 1.0, tag = "after the hunt" }),
+  H.call(function() H.log("[kit] " .. kitLine({ TERRA, CELES, RELM, STRAGO })) end),
+
+  -- ---- 3. the bridge and its chests --------------------------------------------------------------------
   -- @@stage bridge
   -- the landing (10,12), the door (6,20) to the bridge's east end (60,26), the bridge's rows and their
-  -- jumps, the conductors watched (careful walk), and the door (21,33) to the save point's room (279);
-  -- a conductor's touch drops the party to the shaft's foot, and the plate (46,17) opens the way back
+  -- jumps, the conductors watched (careful walk): the Genji Armor and the Magical Brsh beside row 32's jumps,
+  -- a conductor's touch on purpose down the shaft for the Ether and the Red Jacket, the plate (46,17) that
+  -- opens the way back, the FakeMustache at the west end, and the door (21,33) to the save point's room (279)
+  bridgeChest(GENJI_ARMOR),
+  bridgeChest(MAGICAL_BRSH),
+  dropDown(),
+  bridgeChest(FAKEMUSTACHE),
   jwalk(21, 32, LINKS276, "276: across the bridge to the door (21,33)", 30),
+  H.call(function()
+    for _, o in ipairs({ GENJI_ARMOR, MAGICAL_BRSH, ETHER, RED_JACKET, FAKEMUSTACHE }) do
+      H.assertEq(H.chestOpen(o.bit), true, string.format("276: the %s's chest (bit %d) is open", o.what, o.bit))
+    end
+  end),
   walkInto(21, 33, 279, "276 (21,33) -> 279"),
+  H.gearDress({ tag = "gear from the belly's chests" }),
+  H.dressRelics({ { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" }, { STRAGO, "STRAGO" } },
+    { tag = "relics from the belly's chests" }),
 
-  -- ---- 3. the save point -------------------------------------------------------------------------------
+  -- ---- 4. the save point -------------------------------------------------------------------------------
   -- @@stage save
   H.fieldCare({ threshold = 1.0, tag = "at the belly's save point" }),
   H.call(function()
