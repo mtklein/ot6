@@ -311,6 +311,20 @@ from there 60 of the 62 tracked checkpoints differed from the graph's capture
 (`qual/drift_before_recut.txt`), all re-cut from the play at `e0280579`
 (`qual/recut.txt`).
 
+**After MagiMaster (`d300045e`).** Rebased onto it, the line replayed from
+`wor_tower` on, and 16 saves drifted from it: the 14 main had just re-cut
+(`wor-thamasa-v1` to `wor-colosseum-v1`, played on main's ROM) and this
+branch's two. All 16 were re-cut from the play at `994c8a46` (`qual/recut2.txt`:
+"checkpoint drift wor-dino-v1: 107 byte(s) differ ... TERRA exp: fresh 642951,
+tracked 628913"; "checkpoint drift wor-desert-v1: 106 byte(s) differ"). The
+line's play of the legs there: the forest 29 battles (two Tyranosaurs won 7,
+the Brachosaur run from once), the four at SHADOW L53, CELES L60, CYAN L52,
+TERRA L61; the desert 8 battles (Cactrot 2 of 2, Hoover 5 of 6, the loss with a
+sneezed member standing), the save at potion 99, gil 878,073
+(`qual/gate5.out`). The re-cut wor_colosseum also needed its grind plains'
+fixture cared for before it is saved (CELES poisoned on this ROM,
+`audit_party_hp` in `qual/gate4.out`).
+
 **A retry in the qualified play.** `wor_phoenix` (not this branch's leg) wiped
 on its first attempt and passed on its second: "[retry] attempt 1/3 FAILED
 class=wipe frame=66449" (`qual/wor_phoenix.log`). gen_wor_ragnarok, main's own change before this branch,
