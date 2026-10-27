@@ -30,11 +30,12 @@ local BOSS_SPECIES = { [WHITE_DRGN] = true, [MAGIMASTER] = true }
 -- revives as everywhere
 -- the randoms are fought in Wall Rings (Reflect: the monsters' tier spells
 -- bounce), so the care block heals with items, not cures (a cure on a
--- reflecting member lands on the monsters); the bosses are fought without
--- them (the Holy Dragon absorbs the holy its Pearl would bounce back,
--- MagiMaster absorbs one element and nulls the rest), cures allowed
+-- reflecting member lands on the monsters); the Holy Dragon is fought
+-- without them (it absorbs the holy its Pearl would bounce back), cures
+-- allowed, and MagiMaster in them (section 4: out of them his tier spells
+-- wiped the four)
 -- Shell goes up while an L.90 Magic stands (its Bolt 3, Merton, Meteor and
--- Flare), and on all four against MagiMaster (route-wor-thamasa.md 5.3)
+-- Flare) on a member out of Reflect (route-wor-thamasa.md 5.3)
 local FIGHT = { cure = false, shellVs = { [0x164] = true }, magicFirst = { [0x164] = true } }
 -- MagiMaster: Shell on all four, Life 3 from 40% of his HP, and below 15%
 -- no attack while a living member lacks Life 3 (his Ultima as he dies
@@ -70,9 +71,13 @@ BOSS_FIGHT.wallChangeVs = { [0x166] = true }
 -- to take four"): Broken he takes no turns and no counters, so his wall
 -- stands still for the window, he casts nothing that could rebound and heal
 -- him, and every hit is doubled.  So the bank is kept for the window
--- (Driver opts.breakVs): TERRA's Break spends what breaks him now, the
+-- (Driver opts.breakVs): a Break (TERRA's, CELES's on Shoat) spends what
+-- breaks him now, on a wall a member other than its caster can hit, the
 -- others' shielded casts go unboosted, and in the window every cast spends
--- the bank
+-- the bank.  With wallChangeVs, each element cast and each Break waits for
+-- the spell in the air to land and its counter to turn the wall before it
+-- reads the wall, and a seat with no line leaves the window to those who
+-- hold its weakness (route-wor-thamasa.md 12.3)
 BOSS_FIGHT.breakVs = { [0x166] = true }
 BOSS_FIGHT.magicOnly = {}
 for _, id in ipairs(H.MAGIC_ONLY_SPELLS) do
@@ -615,6 +620,15 @@ end
 -- narshe/t1: $11 at (20,16), posted (22,20)) and may walk
 local function touchNpc(find, begun, what)
   local ph = 0
+  -- a random battle that comes up in the presses is fought there: one did
+  -- in the Holy Dragon's room (a Magic Urn pair, seven world battles used
+  -- up first), and the presses, idle through it, ran out of their 1,200
+  -- frames (build/attempts/wt/v038-magimaster/lab/f2_k7_s0, s7, s13:
+  -- 'timeout after 1200 frames driving toward the Holy Dragon (368 NPC_1):
+  -- touch it', the frame a battle's).  The budget is the presses' own: the
+  -- frames a battle takes are not counted
+  local drv = H.fightDriverFor("touch", { tactical = true, boost = true, items = true, healPercent = 55 }, FIGHT)
+  local fought, budget = false, 0
   return H.seqStep({
     H.cond(function() return not begun() end, {
       lazy(function()
@@ -631,16 +645,22 @@ local function touchNpc(find, begun, what)
             { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, arrive = function()
               return begun() or math.abs(H.objX(o) - H.fieldX()) + math.abs(H.objY(o) - H.fieldY()) == 1
             end }),
-          H.withReset(H.driveUntil(begun, 1200, {
+          H.withReset(H.driveUntil(function() return begun() or budget > 1200 end, 200000, {
             H.call(function()
               ph = (ph + 1) % 8
-              if H.battleLoadStarted() or not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
+              if H.battleLoadStarted() then fought = true; drv.frame(); return end
+              if fought then drv.idle(); fought = false end
+              budget = budget + 1
+              if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
               local dx, dy = H.objX(o) - H.fieldX(), H.objY(o) - H.fieldY()
               local dir = dx > 0 and "right" or dx < 0 and "left" or dy > 0 and "down" or "up"
               H.setPad(ph < 4 and { [dir] = true, a = true } or { [dir] = true })
             end),
-          }, what .. ": touch it"), function() ph = 0 end),
+          }, what .. ": touch it"), function() ph, budget, fought = 0, 0, false end),
           H.release(),
+          H.call(function()
+            H.assertEq(begun(), true, string.format("%s: touched within 1,200 frames of presses", what))
+          end),
         })
       end),
     }, {}),
