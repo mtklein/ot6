@@ -498,17 +498,28 @@ counted by battles opened, then the leg byte for byte), K 0-11 at seed
 shifts 0, 7 and 13, one attempt each: 36 of 36 PASS, 36 distinct plays by
 their sequence of battle keys. By distinct key (`tally_p3.txt`):
 
-| formation | fights in the leg | keys | won | deaths |
-|---|---|---|---|---|
-| 331 Harpy | 108 | 52 | 108 | 0 |
-| 332 Harpy, Prussian | 36 | 29 | 36 | 0 |
-| 333 Prussian, GloomShell | 36 | 28 | 36 | 0 |
-| 334 GloomShell x3 | 144 | 56 | 144 | 0 |
+| formation | fights in the leg | keys | won | deaths | Petrify landed (keys) |
+|---|---|---|---|---|---|
+| 331 Harpy | 108 | 52 | 108 | 0 | 0 |
+| 332 Harpy, Prussian | 36 | 29 | 36 | 0 | 0 |
+| 333 Prussian, GloomShell | 36 | 28 | 36 | 0 | 0 |
+| 334 GloomShell x3 | 144 | 56 | 144 | 0 | 37 (18) |
 
 The K battles are all group 56 (the Falcon's tile and its neighbour are
-shore) and add 51 fights of 333 (6 keys) and 147 of 334 (21 keys), all won.
-The longest lap was 10 battles (the shore at K 5, the plain at K 2-3), half
-the cap. No member fell in any of the 522 fights, and the GloomShell's Rock
-(its Petrify counter while it stands alone, last-stand.md) took no one. At
-these levels the plain is a short grind (997-1,695 XP a member a fight), not
-a fight to tune; the leg ends with STRAGO L48-49 and TERRA L51-52.
+shore) and add 51 fights of 333 (6 keys) and 147 of 334 (21 keys), all won,
+with 21 more Petrify landings in 3 of the 334 keys. The longest lap was 10
+battles (the shore at K 5, the plain at K 2-3), half the cap. No member fell
+in any of the 522 fights.
+
+**The GloomShell's Rock.** With one GloomShell left, a hit that does not kill
+it draws its 1/3 Rock (last-stand.md, row 8). The three-shell formation
+landed it in 18 of its 56 keys; the pair in 333 never did. In every landing it
+petrified GOGO ("slot 2 species $08A (cmd $00 atk $EF) landed Petrify on
+entity 2"), and the party cured him with a Soft on its next turn ("cure
+entity 2's Petrify with $F4"); a fight that ends with him still stone pays
+him nothing ("char 12 +0 (due 0)"). That is the vanilla counter, cured the
+way a player would, and it costs a Soft and some of GOGO's XP, not a fight;
+the driver's last-stand rule (`opts.lastStand`, Sneeze by default) does not
+plan around it, and the leg leaves it so. At these levels the plain is a
+short grind (997-1,695 XP a member a fight), not a fight to tune; the leg
+ends with STRAGO L48-49 and TERRA L51-52.
