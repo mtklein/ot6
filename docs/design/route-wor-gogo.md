@@ -585,13 +585,15 @@ Thunder Shld from anywhere in 280 (`out/x4`, `out/x6`).
 its own: the Genji Armor goes on TERRA at the belly's save point and stays
 on her through the Colosseum; RELM takes the Magical Brsh; the Hero Ring
 goes to CELES in GOGO's room and later to STRAGO; GOGO takes the Thunder
-Shld (`wor-colosseum-v1` from the graph's play at b54ea61c: "TERRA L57 ...
-Genji Armor | Ribbon | Economizer"). The hunts' XP leaves the four two or
-three levels higher at each save after the belly (the Colosseum's TERRA L57
-and CELES L56, against L54 and L54). Every leg from the belly to the
-Colosseum passed on its first attempt (`ninja_l3.log`; "wor_colosseum:
-PASS (frame 95919) attempts=1/3"), and the eight saves after `wor-gau-v1`
-were re-cut from that play.
+Shld (`wor-colosseum-v1` from the graph's play at 2db501e2: "TERRA L57
+... Genji Armor | Ribbon | Economizer"). The hunts' XP leaves the four two
+or three levels higher at each save after the belly (the Colosseum's TERRA
+L57 and CELES L57, against L54 and L54 at d300045e). Every leg from the
+tower to the Colosseum passed on its first attempt (`ninja_l4.log`, the
+states' logs under `l4_states/`: "PASS (frame 149204) attempts=1/3" for the
+belly, "PASS (frame 91423) attempts=1/3" for the Colosseum), and the eight
+saves after `wor-gau-v1` were re-cut from that play; the saves from
+`wor-thamasa-v1` to `wor-gau-v1` do not drift.
 
 **The asserts and their negatives.** Each is red on a one-line mutant
 (`scripts/mkmut.py`, `scripts/nfinal.sh`), as class=assert, which the
@@ -612,30 +614,32 @@ runner does not retry ("attempts=1/3 stopped; failed attempts: 1:assert"):
   opened): "assertEq failed: 280: the Thunder Shld's chest (bit 228) is
   open: got false, want true".
 
-**Measured** from the graph's own captures at b54ea61c, `wor_belly_in` and
-`wor_gogo_278` (`scripts/lab_hunt.lua`: K battles used up on the hunt's own
-lap, counted by battles opened, then the leg's hunt), K 0-11 at seed shifts
-0 and 7, one attempt each: 48 of 48 PASS (`out/sb_*`, `out/sg_*`;
-`out/tally_sb.txt`, `out/tally_sg.txt`). The pick sequence is the
-fixture's, so K moves where the hunt starts in it and the clock moves the
-keys:
+**Measured** from the graph's own captures at 2db501e2 on d300045e,
+`wor_belly_in` and `wor_gogo_278` (`scripts/lab_hunt.lua`: K battles used
+up on the hunt's own lap, counted by battles opened, then the leg's hunt),
+K 0-11 at seed shifts 0 and 7, one attempt each: 48 of 48 PASS
+(`out/sb2_*`, `out/sg2_*`; `out/tally_sb2.txt`, `out/tally_sg2.txt`). The
+pick sequence is the fixture's, so K moves where the hunt starts in it and
+the clock moves the keys:
 
 | formation | fights | keys | won | keys with a fall |
 |---|---|---|---|---|
 | 349 Karkass x2 | 64 | 28 | 64 | 0 |
-| 350 Tap Dancer, Covert x2 | 146 | 50 | 146 | 5 |
-| 352 Woolly x2, Karkass x2 | 24 | 18 | 24 | 0 |
-| 346 Ogor x2 | 144 | 53 | 144 | 31 |
-| 347 Covert, Ogor | 192 | 54 | 192 | 13 |
-| 348 Wart Puck x2 | 240 | 58 | 234 | 0 |
+| 350 Tap Dancer, Covert x2 | 146 | 48 | 146 | 5 |
+| 352 Woolly x2, Karkass x2 | 24 | 22 | 24 | 0 |
+| 346 Ogor x2 | 144 | 52 | 144 | 34 |
+| 347 Covert, Ogor | 192 | 56 | 192 | 14 |
+| 348 Wart Puck x2 | 240 | 54 | 229 | 0 |
 | 351 Tap Dancer, Woolly | 24 | 20 | 24 | 0 |
 
-Six Wart Puck fights ended with the party Sneezed out (`PARTY LEFT`: no
+Eleven Wart Puck fights ended with the party Sneezed out (`PARTY LEFT`: no
 reward and no loss); the hunt walks on until one is won. The falls in GOGO's
-room are Ogor's Zombite: of its 179 falls, all but one are its special `$EF`
-("is a status landing, not damage"), cured in the fight with Revivify; no
-run there spent a Fenix Down ("fenix=27" at every run's end). The landing's
-falls are CELES to Covert's skeans (`$51`) from low HP ("CELES 373/3853",
-"CELES 61/3853"): 12 of the 24 runs spent no Fenix Down, 10 one, two runs
-two or three. The kit is left as it is: Ribbons on TERRA and STRAGO, and the
+room are Ogor's Zombite: of its 176 falls, 175 are its special `$EF` ("is a
+status landing, not damage"), cured in the fight with Revivify; the one
+other is CELES to a Covert's skean (`$52`, "from 514/4117"), the only Fenix
+Down spent there (`sg2_k7_s0`). The landing's falls are CELES to Covert's
+skeans from low HP ("CELES 21/3853", "CELES 664/3853"): 12 of the 24 runs
+spent no Fenix Down, 7 one, 5 two or three. The same sweeps before the
+rebase (`out/sb_*`, `out/sg_*` at b54ea61c on c1d9745d) read alike: 48 of 48
+PASS, every fight won but six Sneezed out. The kit is left as it is: Ribbons on TERRA and STRAGO, and the
 bag's Revivify answers the Zombite.
