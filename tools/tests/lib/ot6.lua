@@ -9171,6 +9171,7 @@ function Driver:magicOnlyLine(actor, boost)
     return nil
   end
   local want = wantFor(bestSlot)
+  local breaking = false
   if best.id == M.BREAK_SPELL and breakBody(bestSlot) and not brokenNow(bestSlot) then
     local bank, sh = M.readByte(BATTLE.BP + actor * 2), M.readByte(BATTLE.SH_CUR + bestSlot * 2)
     -- the window is worth what the party can cast into it: his wall stands
@@ -9195,6 +9196,7 @@ function Driver:magicOnlyLine(actor, boost)
     local breakNow = (bank >= sh - 1) and math.min(3, math.max(0, sh - 1)) or nil
     if covered then
       want = breakNow or (bank >= 3 and 3 or 0)
+      breaking = want >= sh - 1
     elseif sh <= 1 then
       want = nil
     else
@@ -9236,7 +9238,12 @@ function Driver:magicOnlyLine(actor, boost)
   -- spell in the air to land before choosing the next.  Not while it is
   -- Broken (no counters: the wall stands), and at most 900 frames an actor.
   local wcv = self.opts.wallChangeVs
-  if wcv and best.elem ~= 0 and bestSlot ~= nil and wcv[M.readWord(0x57C0 + bestSlot * 2)]
+  -- The Break that breaks him waits the same way: the window takes the wall
+  -- that stands when it lands, and a Break planned on a wall the party held
+  -- broke him on water (build/attempts/wt/v038-magimaster/lab/
+  -- m3_b0_k5_s0_s0: 'wall weak $04 (the party holds it)', then 'broken (0
+  -- of 8 shields) at HP 34138', 'weak $80', 'window over ... HP 34138')
+  if wcv and (best.elem ~= 0 or breaking) and bestSlot ~= nil and wcv[M.readWord(0x57C0 + bestSlot * 2)]
      and not brokenNow(bestSlot) then
     local busy = nil
     local R = self.recovery
