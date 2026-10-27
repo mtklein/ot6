@@ -13,6 +13,16 @@
     }
   },
   "size": 32768,
-  "sha256": "0f222fbbacdd411f9b72391efdae05799b54fa0fcf7d85b7658f78adb53b7ad8",
-  "provenance": "LAB SEED, to be re-cut from the graph capture: gen_wor_desert run de5a_s0 (air, build/attempts/wt/v038-dino-desert/lab/de5a_s0) booted from the lab capture dn4_s0 of wor-dino-v1; its battery, not a graph capture"
+  "sha256": "a249b3f29ada3d7f5967fafc6b8478efdb34e89a91c84e4b460ce18fcfb6fdcf",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "a249b3f29ada3d7f5967fafc6b8478efdb34e89a91c84e4b460ce18fcfb6fdcf",
+    "generator_sig": "1902839574f9595f0bb1af0b509d0edb89d7e6f1b7ae3e7f3404908eb2c2a5b9 gen_wor_desert build/checkpoints/wor-dino-v1/manifest.json build/checkpoints/wor-dino-v1/wor-dino.sram",
+    "ancestors": [
+      {
+        "path": "build/checkpoints/wor-dino-v1/manifest.json",
+        "sha256": "ea10502f6f73a0d8ae75a118a19a14f6c397fc907215e507be33ee1811846073"
+      }
+    ]
+  }
 }

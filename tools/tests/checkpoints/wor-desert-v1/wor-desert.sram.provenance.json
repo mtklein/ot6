@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "a249b3f29ada3d7f5967fafc6b8478efdb34e89a91c84e4b460ce18fcfb6fdcf",
+  "generator_sig": "1902839574f9595f0bb1af0b509d0edb89d7e6f1b7ae3e7f3404908eb2c2a5b9 gen_wor_desert build/checkpoints/wor-dino-v1/manifest.json build/checkpoints/wor-dino-v1/wor-dino.sram",
+  "ancestors": [
+    {
+      "path": "build/checkpoints/wor-dino-v1/manifest.json",
+      "sha256": "ea10502f6f73a0d8ae75a118a19a14f6c397fc907215e507be33ee1811846073"
+    }
+  ]
+}
