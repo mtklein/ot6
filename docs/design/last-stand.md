@@ -178,7 +178,7 @@ From `tools/tests/savestate_graph.py` plus the logs (`met*.txt`).
 | $0F1 Muus | `wor_figaro_sweep` / `wor_kohlingen` / `wor_tomb` (Kohlingen-continent legs, `docs/design/route-wor-falcon.md` §3.2) | gen_wor_kohlingen / gen_wor_tomb / gen_wor_falcon (which crosses group-47 tiles: **not determined**) | never |
 | $118 / $119 Mag Roader | **none**: no generator walks map 36 | — | never |
 | $11C / $11D Crusher | **none**: no generator enters Owzer's house (map 207) | — | never |
-| $14D GloomShell | the `wor-gogo-v1` cut (`wor_gogo`) | gen_wor_thamasa_plain (#484) | $14E x3: Rock landed Petrify in 18 of 56 keys, cured by a Soft; $14D: none (route-wor-gogo.md section 9) |
+| $14D GloomShell | the `wor-gogo-v1` cut (`wor_gogo`) | gen_wor_thamasa_plain (#484) | $14E x3: Rock landed Petrify in 17 of 59 keys, cured by a Soft; $14D: none (route-wor-gogo.md section 9) |
 | $147 TumbleWeed | **none**: no generator reaches those WoR sectors | — | never |
 | $1CC Larry | **none** (Cyan's dream is not on the route) | — | never |
 | $1D7 Long Arm / Face | **none** (final battle) | — | never |

@@ -445,7 +445,7 @@ forest inside (group 55) a Harpy (331, 62.5%) and a Harpy with a Prussian
 bludgeon, Prussian slash and bludgeon). A player meets them walking between
 the Falcon and Thamasa's door, so `gen_wor_thamasa_plain` plays them from
 `gen_wor_ebot`'s own boot, `wor-gogo-v1`, with the party that holds it
-(STRAGO L47, RELM L48, GOGO L42, TERRA L50). It is a branch: nothing boots
+(STRAGO L47, RELM L47, GOGO L42, TERRA L50). It is a branch: nothing boots
 its state, and no tracked checkpoint changes.
 
 **Where.** The whole plain is sector (7,7), so a tile's group is its tile
@@ -488,38 +488,44 @@ The counter stop, forced by a band one Remedy over the bag (`n_mut_shop`),
 plays through: "REMEDY to 10: bought 1 x $F5 from shop 74 (Item) row 4",
 "PASS (frame 22736)".
 
-**The leg** (the graph's play at 682797eb, `leg1/`): "PASS (frame 19288)",
-five battles, all won: the shore "done after 2 battles", the plain "done
-after 3 battles".
+**The leg** (the graph's play at dbf3d245, on main's d300045e, whose replay
+from the tower made `wor-gogo-v1` again with "checkpoint drift wor-gogo-v1:
+none"; `leg2/`): "PASS (frame 21938)", five battles, all won: the shore
+"done after 2 battles", the plain "done after 3 battles". The first play, at
+682797eb on the line before the tower's re-cut, is `leg1/` ("PASS (frame
+19288)").
 
 **Measured** from the graph's own capture `build/checkpoints/wor-gogo-v1`
-at a4ff2e6f (`lab/out/p3_*`: K battles used up first beside the Falcon,
+at dbf3d245 (`lab/out/p4_*`: K battles used up first beside the Falcon,
 counted by battles opened, then the leg byte for byte), K 0-11 at seed
 shifts 0, 7 and 13, one attempt each: 36 of 36 PASS, 36 distinct plays by
-their sequence of battle keys. By distinct key (`tally_p3.txt`):
+their sequence of battle keys. By distinct key (`tally_p4.txt`):
 
 | formation | fights in the leg | keys | won | deaths | Petrify landed (keys) |
 |---|---|---|---|---|---|
-| 331 Harpy | 108 | 52 | 108 | 0 | 0 |
-| 332 Harpy, Prussian | 36 | 29 | 36 | 0 | 0 |
-| 333 Prussian, GloomShell | 36 | 28 | 36 | 0 | 0 |
-| 334 GloomShell x3 | 144 | 56 | 144 | 0 | 37 (18) |
+| 331 Harpy | 108 | 47 | 108 | 0 | 0 |
+| 332 Harpy, Prussian | 51 | 35 | 51 | 0 | 0 |
+| 333 Prussian, GloomShell | 36 | 30 | 36 | 0 | 0 |
+| 334 GloomShell x3 | 183 | 59 | 183 | 0 | 37 (17) |
 
 The K battles are all group 56 (the Falcon's tile and its neighbour are
-shore) and add 51 fights of 333 (6 keys) and 147 of 334 (21 keys), all won,
-with 21 more Petrify landings in 3 of the 334 keys. The longest lap was 10
+shore) and add 51 fights of 333 (5 keys) and 147 of 334 (22 keys), all won,
+with 26 more Petrify landings in 5 of the 334 keys. The longest lap was 10
 battles (the shore at K 5, the plain at K 2-3), half the cap. No member fell
-in any of the 522 fights.
+in any of the 576 fights. The same sweep on the line before the tower's
+re-cut (`p3_*` at a4ff2e6f, `tally_p3.txt`) was 36 of 36 too, every fight
+won, no death. `p1` and `p2` are failed launches (the lab composed without
+the capture to Continue) and are kept.
 
 **The GloomShell's Rock.** With one GloomShell left, a hit that does not kill
 it draws its 1/3 Rock (last-stand.md, row 8). The three-shell formation
-landed it in 18 of its 56 keys; the pair in 333 never did. In every landing it
-petrified GOGO ("slot 2 species $08A (cmd $00 atk $EF) landed Petrify on
-entity 2"), and the party cured him with a Soft on its next turn ("cure
-entity 2's Petrify with $F4"); a fight that ends with him still stone pays
-him nothing ("char 12 +0 (due 0)"). That is the vanilla counter, cured the
-way a player would, and it costs a Soft and some of GOGO's XP, not a fight;
-the driver's last-stand rule (`opts.lastStand`, Sneeze by default) does not
-plan around it, and the leg leaves it so. At these levels the plain is a
-short grind (997-1,695 XP a member a fight), not a fight to tune; the leg
-ends with STRAGO L48-49 and TERRA L51-52.
+landed it in 17 of its 59 keys; the pair in 333 never did. It petrified GOGO
+in 59 of the 63 landings and RELM in 4 ("slot 2 species $08A (cmd $00 atk
+$EF) landed Petrify on entity 2"), and the party cured the member with a
+Soft on its next turn ("cure entity 2's Petrify with $F4"); a fight that
+ends with him still stone pays him nothing ("char 12 +0 (due 0)"). That is
+the vanilla counter, cured the way a player would, and it costs a Soft and
+some of GOGO's XP, not a fight; the driver's last-stand rule
+(`opts.lastStand`, Sneeze by default) does not plan around it, and the leg
+leaves it so. At these levels the plain is a short grind (997-1,695 XP a
+member a fight), not a fight to tune.
