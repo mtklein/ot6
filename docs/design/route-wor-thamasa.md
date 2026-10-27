@@ -878,7 +878,13 @@ casts already queued killed him, and his dying Ultima took all four
 (`broken (0 of 8 shields) at HP 27244`, `[wipe] ... atk $14`). While he
 is Broken the hold now starts at the Life 3 mark (60%), and no Break
 breaks him under it while a member lacks Life 3; the same draw won
-(`f6_k4_s7`, 105,437 ticks). At 60 frames a second that is about 11 to 35 minutes,
+(`f6_k4_s7`, 105,437 ticks). The graph's own play with it, at 7ef5e752
+(`opts.breakHold`, the hold asked for by the tower's fight), won his fight
+in 72,034 ticks at its first attempt (`gate-7ef5e752.log`,
+`wor_tower-7ef5e752.log.gz`: `MagiMaster: battle $162 won after 72034
+ticks`, `PASS (frame 387792) attempts=1/3`), the same fight as `f6_k0_s0`;
+the 14 checkpoints after the tower were re-cut from that play
+(`recut/drift-before-7ef5e752.txt`, `drift-after-7ef5e752.txt`). At 60 frames a second that is about 11 to 35 minutes,
 against 18 to 54. His dying Ultima still takes three or four of the party
 in nearly every win (the mmtally lines' "4 deaths"; over f2 and f3, 93 of
 the fights' 112 deaths are `by slot 0 cmd $02 atk $14`), and Life 3 raises
