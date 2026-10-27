@@ -96,9 +96,10 @@ case("skill_row_missing", ST_TOOLS, { kind = "skill", cmd = 0x09, skill = 0xA8, 
 case("item_unavailable", ST_ITEM, { kind = "item", item = 0xF0, target = 1, row = 3, reason = "revive" }, press)
 case("spell_unavailable", ST_MAGIC, { kind = "heal", spell = 0x2D, target = 1, row = 2 }, press)
 -- the throw steer's give-up: the row is there but the cursor never
--- reaches it inside the 40-pulse budget
+-- reaches it inside the 40-pulse budget (the English window is one column:
+-- scroll $8953 + row $895B, UpdateMenuState_2d; the wanted item is row 0)
 case("throw_steer", ST_THROW, { kind = "throw", item = 0x22, row = 1 }, function(D)
-  mem[0x8963], mem[0x8967] = 1, 1    -- cursor parked on column 1, row 1
+  mem[0x8953], mem[0x895B] = 0, 1    -- cursor parked on row 1
   local held
   for i = 1, 40 do
     mem[0x7B7D] = i                  -- a moving target cell, so the parked-window

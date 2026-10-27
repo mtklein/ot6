@@ -380,6 +380,18 @@ local function otherWaiting()
 end
 -- another entity has an action committed and not yet started ($32cc, its
 -- command list, set as the action is queued and cleared as it starts)
+-- whether an A pressed now on reel 1 stops it on a 7 (icon 0) or the esper
+-- (icon 2), read with the press any of the next four frames (the reel moves
+-- 4 a frame; the tables are the ROM's, H.slotLoadTables)
+local function reel1Risky()
+  if H.SLOT_REELS == nil then H.slotLoadTables() end
+  local pos = H.readByte(0x7B8C)
+  for k = 0, 4 do
+    local icon = H.slotIcon(1, H.slotStopPos((pos - 4 * k) & 0xFF))
+    if icon == 0 or icon == 2 then return true end
+  end
+  return false
+end
 local function setzerSpin()
   SS.n = SS.n + 1
   local ph = SS.n % 6                -- quick hands: the blow is already queued
@@ -410,6 +422,17 @@ local function setzerSpin()
       -- the injection attempt's commit waits until another entity's action
       -- stands in the advance-wait queue, so his entry follows it into the
       -- action queue and waits there behind it
+      H.setPad({})
+    elseif H.readByte(PRESS[1]) == 0 and reel1Risky() then
+      -- reel 1 would stop on a 7 or the esper icon: wait for the next icon.
+      -- At one pip the rigged miss is gone and the reels drift toward the
+      -- triple of reel 1's icon; a 7 pair can end 7-7-Bar (Joker Doom on the
+      -- party, H.slotResult's result 0), and the esper triple summons a
+      -- drawn esper (RandGenju).  The blind taps landed 2-2-2 on a v0.38
+      -- draw and the drawn Crusader (attack $45) took the whole party
+      -- ("[labhp] f3377 hp 0,0,0,0 atk3410=$45 b5=$0F",
+      -- build/attempts/wt/v038-dino-desert/slotcancel/trace2_s0.log); a
+      -- Setzer who reads the reels times neither (H.slotAim leaves both out)
       H.setPad({})
     else
       tap("a")                     -- reels 1-3, then the commit
