@@ -29,8 +29,9 @@
 ;     Magic menus show it as they show TERRA's and CELES's natural spells,
 ;     and it rides the Magic row: it is his in the Fanatics' Tower, where
 ;     the Lore row is gone.
-; LearnLore (battle_main.asm) runs Strago's eligibility before its lore test
-; so that the watch below sees a non-lore attack with the same eyes.
+; Ot6BlueWatch runs at LearnLore's head (battle_main.asm), before its lore
+; test, and makes LearnLore's own status test itself (CheckStatus's masks,
+; below), so vanilla's path, its registers included, is as it was.
 ; ------------------------------------------------------------------------------
 
 .segment "ot6_code"
@@ -38,14 +39,26 @@
 OT6_BLUE_SPELL   = $21          ; ATTACK::BSERK
 OT6_BLUE_CELL    = $1a6e + $07 * $36 + OT6_BLUE_SPELL   ; STRAGO's Bserk learn byte
 
-; jsl from LearnLore once Strago is known present and able.  x = attacker
-; (entity offset), $b6 = the attack, db = $7e, a8; any index width.
-; Preserves A, X, Y and P (LearnLore's lore test reads the carry it left).
+; LearnLore's status test (peaflg STATUS12 / STATUS34 into CheckStatus):
+; Strago sees nothing while dead, petrified, blind or a zombie, asleep,
+; muddled or berserk, stopped, frozen, raging or hidden
+OT6_BLUE_ST1 = $c3              ; DEAD PETRIFY ZOMBIE BLIND
+OT6_BLUE_ST2 = $b0              ; SLEEP CONFUSE BERSERK
+OT6_BLUE_ST3 = $10              ; STOP
+OT6_BLUE_ST4 = $23              ; HIDE FROZEN RAGE
+
+; jsl from LearnLore's head, after every attack.  x = attacker (entity
+; offset), $b6 = the attack, db = $7e, any widths.  Preserves A, X, Y and P.
 .proc Ot6BlueWatch
         php
+        rep     #$30
+        .a16
+        .i16
+        pha
+        phx
+        phy
         sep     #$20
         .a8
-        pha
         txa
         cmp     #$08
         bcc     @done           ; a character's action teaches nothing
@@ -63,9 +76,33 @@ OT6_BLUE_CELL    = $1a6e + $07 * $36 + OT6_BLUE_SPELL   ; STRAGO's Bserk learn b
         lda     f:$7e0000+OT6_BLUE_CELL
         cmp     #$ff
         beq     @done           ; known already
+        lda     $3007           ; Strago's slot ($ff: not in the battle)
+        bmi     @done
+        rep     #$20
+        .a16
+        and     #$00ff
+        tay
+        sep     #$20
+        .a8
+        lda     $3ee4,y
+        and     #OT6_BLUE_ST1
+        bne     @done
+        lda     $3ee5,y
+        and     #OT6_BLUE_ST2
+        bne     @done
+        lda     $3ef8,y
+        and     #OT6_BLUE_ST3
+        bne     @done
+        lda     $3ef9,y
+        and     #OT6_BLUE_ST4
+        bne     @done
         lda     #$01
         sta     f:$7e0000+OT6_BLUESEEN
-@done:  pla
+@done:  rep     #$30
+        .a16
+        ply
+        plx
+        pla
         plp
         rtl
 .endproc
