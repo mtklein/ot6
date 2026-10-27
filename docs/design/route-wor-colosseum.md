@@ -15,7 +15,8 @@ the scripts beside them; the scripts that built them are the lab's own, in
 `build/lab/col/` of the worktree, retained under the same evidence path).
 The Gem Box's wager (owner, 2026-10-26) has its own, under
 `build/attempts/wt/v037-economizer/` (`lab/`, with `lab/scripts/`, and
-`qual/px13/`).
+`qual/px13/`), and the line with CELES's Flame Sabres under
+`build/attempts/wt/v037-economizer-5/` (`lab/`, `scripts/`, `qual/px13/`).
 
 ---
 
@@ -117,12 +118,13 @@ when it can: her Genji Glove's two hands take the bag's Flame Sabres (fire,
 the SrBehemoth's weakness; `battle_breakwor_colosseum` checks the weak
 byte), and her own blades go back after the fight (`WAGERS`' `fighter` and
 `arm`).  The Gem Box is the last wager, so no other fight sees the Sabres.
-The tracked save holds two Sabres; the play from power-on held none on this
-ROM ("item $0D: fresh 0, tracked 1" in the drift of every save from
-minecart-platform-v1 on, a loss between n024-entry-save-v1 and there that
-another branch is restoring), so on the line the route ships CELES fights in
-her own blades ("no $0D in the bag to arm CELES"), and the rates there are
-section 4's.  The bag holds one Gem Box and a loss takes it, so a lost wager
+On the line from power-on the bag holds two (Tzen's weapon counter tops
+CELES's Flame Sabres up to a pair, `gen_wor_sabin`), so CELES fights the
+Gem Box in both ("[kit] CELES L52 kit 0A 0D 0D 7A 98 D1 BB" in the
+qualified play and in every run of section 4's `a5` and `a6`).  For a
+while the play from power-on held none (a loss upstream, since fixed), and
+the sweep `s4` measured CELES in her own blades on that line (section 4).
+The bag holds one Gem Box and a loss takes it, so a lost wager
 is a lost attempt (`reload`: the leg raises "LOST: ...", and the runner
 retries from the boot, counted, as a person reloads).  TERRA's
 self-inflicted losses also end the harness's run, not just the wager: the
@@ -219,7 +221,32 @@ TERRA, 20 CELES, all won (`run.out`'s "char 0 WON" and "char 6 WON" lines).
 So TERRA has 90 won fights in all (80 from the tracked entry, 10 here) and
 CELES 90 (40 there, 50 here).
 
-**With the Gem Box** (the wager added: section 2), sweep `s4` played the same
+**With the Gem Box and the Flame Sabres** (the line as it ships), sweeps
+`a5` (seed shifts 0 and 7) and `a6` (13 and 22) played the same way at
+a0645150 (02409c87's tree), the Economizer's price rule in, from the graph's own
+`wor-ancient-v1` capture of that commit's play from power-on
+(build/attempts/wt/v037-economizer-5/lab/, px13).  CELES fought every wager
+with K 0-1 and TERRA the five before the Gem Box with K 2-5; CELES fought
+the Gem Box in all 24, in two Flame Sabres every time
+(`fighters_a5.txt`, `fighters_a6.txt`: "a5_k2_s0 0 WON, 0 WON, 0 WON, 0 WON,
+0 WON, 6 WON"):
+
+| fight | `a5` and `a6`: won (distinct keys) |
+|---|---|
+| SHADOW, for the Striker | 24 of 24 (18) |
+| the Test Rider, for the SwordBreaker | 24 of 24 (18) |
+| the Test Rider, for the Strato | 24 of 24 (17) |
+| the Opinicus, for the Genji Helmet | 24 of 24 (21) |
+| the Opinicus, for the Falchion | 24 of 24 (19) |
+| the SrBehemoth, for the Economizer | 24 of 24 (17) |
+
+(`tally_a56.txt`: "the Gem Box for the Economizer, TERRA's (vs SrBehemoth)
+won 24 of 24, 17 distinct keys"; `a5` alone 12 of 12, 10 keys, `a6` 12 of
+12, 11.)  Every run passed on its one attempt ("PASS ... attempts=1/1");
+the only deaths were SHADOW's own in his fight and CYAN's twice on the
+plain by Maranda (`deaths_a56.txt`).
+
+Before the Sabres were back on the line, sweep `s4` played the same
 way at 6a7a8130 from the graph's own `wor-ancient-v1` capture on the ROM of
 9d654d6f (before the Economizer's price rule; build/attempts/wt/v037-economizer/lab/,
 px13), and `t1` (0d2d347a) and `t2` (6888e25e, CELES's blades back after the
@@ -238,13 +265,13 @@ fight) from the tracked one:
 won 12 of 12, 11 distinct keys".)  In `s4` the rule sent CELES for every
 wager with K 0-4 and TERRA for the five before the Gem Box with K 5; CELES
 fought the Gem Box in all twelve (`fighters_s4.txt`: "s4_k5_s0 0 WON, 0 WON,
-0 WON, 0 WON, 0 WON, 6 WON").  The line held no Flame Sabres (section 2), so
-`s4`'s twelve are CELES in her own blades ("no $0D in the bag to arm CELES"
-in every run); `t1` and `t2`, from the tracked save, armed her.  CELES in her
-own blades against the SrBehemoth: 12 of 12 on the line (`s4`, 11 keys), 9 of
-14 from the tracked save's capture (`fc_celes`, 7 of 9 keys): 18 of 20
-distinct keys.  In two Flame Sabres: 38 of 38 (`fl_celes` 14, 13 keys; `t1`
-and `t2` 24, 12 keys each).  A loss of the Gem Box is a lost attempt, retried
+0 WON, 0 WON, 0 WON, 6 WON").  That line held no Flame Sabres, so `s4`'s twelve
+are CELES in her own blades ("no $0D in the bag to arm CELES" in every run);
+`t1` and `t2`, from the tracked save, armed her.  CELES in her own blades
+against the SrBehemoth: 12 of 12 on that line (`s4`, 11 keys), 9 of 14 from
+the tracked save's capture (`fc_celes`, 7 of 9 keys).  In two Flame Sabres:
+62 of 62 (`a5` and `a6` 24, 17 keys, on the line that ships; `fl_celes` 14,
+13 keys; `t1` and `t2` 24, 12 keys each).  A loss of the Gem Box is a lost attempt, retried
 from the boot (section 2).  A loss of the Striker would take SHADOW with
 it, so the leg fails on one (`want = "won"` raises an assertion, which the
 runner does not retry; a person reloads); a loss of any other wager is
@@ -338,18 +365,17 @@ keys with it, 2856 over 14 without (`fight_report_abon.txt`,
 
 ## 6. Supplies and kits
 
-**Supplies.**  The graph's `wor-ancient-v1` left 67 Potions and 21 Fenix
-Downs (the qualified play's boot line, build/attempts/wt/v037-economizer/
-qual/px13/wor_colosseum.log: "potion=67 tincture=40 fenix=21 remedy=20
-revivify=28 tent=0 gil=729878")
+**Supplies.**  The graph's `wor-ancient-v1` left 80 Potions and 25 Fenix
+Downs (the qualified play's boot line, build/attempts/wt/v037-economizer-5/
+qual/px13/wor_colosseum.log: "potion=80 tincture=40 fenix=25 remedy=20
+revivify=30 tent=0 gil=654711")
 against the band (about level x 1.5 Potions, about the level in Fenix
 Downs); Kohlingen's counter (`kohlingenStop`) tops the Potions up first.  The Colosseum's fights
 spend nothing from the bag on a win; a loss leaves the fighter down for a
 Fenix Down (the Steroidite's seven losses cost seven).  A won fight can
 still leave the fighter hurt, and the field care after it pays in Potions:
-the bag at the save of 90d6b83f's play (before the price rule), "potion=71
-tincture=40 fenix=21 remedy=19 revivify=28 tent=0 gil=714410", against the
-tracked save's 76 Potions and 20 Remedies from before the wager was added.
+the bag at the save of the qualified play, "potion=64 tincture=40 fenix=25
+remedy=18 revivify=30 tent=0 gil=646143".
 
 **Kits.**  SHADOW joins with nothing worn; the cabin's gear care dresses him
 from the bag (the Striker back from his fight, the Genji Shield, the
@@ -359,30 +385,35 @@ Maranda's weapon counter sells his throwing kit: Fire Skeans, Water Edges and
 Bolt Edges to nine each, Shadow Edges and Inviz Edges to four (the bag's ten
 Shuriken were already there).  CYAN's second Strato goes in his second hand;
 TERRA's Falchion replaces the Enhancer (the gear policy).  CELES fights the
-Gem Box in the bag's Flame Sabres when it holds them (the line from power-on
-did not: section 2) and takes her Scimitar and Falchion back after it;
+Gem Box in the bag's two Flame Sabres (section 2) and takes her Scimitar and
+Falchion back after it;
 TERRA's Economizer takes her Wall Ring's slot (section 5).  In
-the qualified play the relic care gave SHADOW a Ribbon and the Memento Ring,
-CYAN keeping his Genji Glove and Ribbon.  The kit at the save: "SHADOW L41
-kit FF 29 64 81 96 CA DB; CELES L53 kit 0A 19 15 7A 98 D1 BB; CYAN L42 kit
-0E 31 31 7A 98 CA D1; TERRA L53 kit 06 15 5E 7A 94 CA CE".
+the qualified play the relic care gave SHADOW the Memento Ring and a Peace
+Ring, CYAN keeping his Genji Glove and Ribbon.  The kit at the save: "SHADOW
+L41 kit FF 29 64 81 96 DB B2; CELES L52 kit 0A 19 15 7A 98 D1 BB; CYAN L41
+kit 0E 31 31 7A 98 D1 CA; TERRA L53 kit 06 15 5E 7A 94 CA CE".
 
 ## 7. Played
 
 Each sweep run is one attempt (retries off) from a committed tree
 (`commit.txt`, `diff.sha256`), the leg's variant with K battles used up first
 on the plain by Figaro Castle where the boot stands (world group 47:
-`mkvar.py`), K 0-5 at seed shifts 0 and 7: `s3` from the graph's own
+`mkvar.py`), K 0-5 at seed shifts 0 and 7 (`a6`: 13 and 22): `s3` from the graph's own
 `wor-ancient-v1` capture at the qualified commit, `s1` and `s2` (before the
 rebase onto the Tritoch leg and the Dance ladder) from the tracked one; with
 the Gem Box (build/attempts/wt/v037-economizer/lab/), `s4` from the graph's
-own capture on this ROM, `t1` and `t2` from the tracked one.  `tally_<p>.txt` lists each run and the wagers by key;
+own capture on the ROM before the price rule, `t1` and `t2` from the tracked
+one; with the Flame Sabres back on the line
+(build/attempts/wt/v037-economizer-5/lab/), `a5` and `a6` from the graph's
+own capture on this ROM.  `tally_<p>.txt` lists each run and the wagers by key;
 `fight_report_<p>.txt` is `tools/fight_report.py` over the runs (its "Pugs"
 label on formation `$23F` is the formation's placeholder slot: the opponent
 there is the wager's).
 
 | sweep (commit) | runs | fights (fight_report) |
 |---|---|---|
+| `a5` (a0645150; px13) | 12 of 12 PASS, attempts=1/1 each | every fight won; the Gem Box 12 of 12, 10 keys, CELES in two Flame Sabres |
+| `a6` (a0645150, shifts 13 and 22; px13) | 12 of 12 PASS, attempts=1/1 each | every fight won; the Gem Box 12 of 12, 11 keys, CELES in two Flame Sabres |
 | `s4` (6a7a8130; px13) | 12 of 12 PASS, attempts=1/1 each | every fight won: SHADOW's `$23E` 11 keys; the wagers' `$23F` 39 keys of 60 fights; the Crawler 28 keys, Mantodea+Spek Tor+Sprinter 6 (one death: CYAN, `s4_k3_s0`, "[death] f+665 entity 2 char 2 ... by slot 0"), Bogy 8, Maliga 2 |
 | `t2` (6888e25e; px13) | 12 of 12 PASS, attempts=1/1 each | every fight won: SHADOW's `$23E` 11 keys; the wagers' `$23F` 35 keys of 60 fights; the Crawler 25 keys, Mantodea+Spek Tor+Sprinter 5 (one death), Bogy 7, Maliga 2 |
 | `t1` (0d2d347a: CELES kept the Flame Sabres; px13) | 12 of 12 PASS, attempts=1/1 each | every fight won: as `t2` |
@@ -391,18 +422,26 @@ there is the wager's).
 | `s1` (155c284f) | 12 of 12 PASS, attempts=1/1 each | every fight won: SHADOW's `$23E` 11 keys; the wagers' `$23F` 35 keys of 48 fights; the Crawler 26 keys, Mantodea+Spek Tor+Sprinter 6, the K battles' Bogy 7 and Maliga 2; no deaths but SHADOW's own in his fight |
 
 The tracked checkpoint is re-cut from the qualified play
-(build/attempts/wt/v037-economizer/qual/px13/): the line from power-on on
-this ROM (`chain0.log`, `ninja chain` at 9d654d6f: "gate: GREEN"), then bare
-`ninja` at 90d6b83f, the Gem Box's route and suites, on a clean tree, which
-replays this leg and runs every suite (`q1.log`: "gate: GREEN -- ninja -k 0
--j 14 exited 0", "sha=90d6b83f... dirty=0").  Its capture drifted from the
-tracked save by the wager alone (`drift_wor-colosseum-v1.txt`: "TERRA gear:
-fresh 15 5E 7A 94 CA CE, tracked 15 5E 7A 94 CA BB", "item $D8: fresh 0,
-tracked 1", "item $E9: fresh 71, tracked 76"), and `checkpoint_drift.py
+(build/attempts/wt/v037-economizer-5/qual/px13/): bare `ninja -k 0` at
+a0645150 on a clean tree, the line from power-on with the Gem Box's route
+and the Flame Sabres (`q1.log`: "sha=a064515036ea... dirty=0"; a0645150 is
+02409c87's tree, the branch's commit before its first commit message was
+reworded).  It played
+every leg and suite green but one selftest, which still priced the
+Economizer's boosted spells the old way ("FAIL tools/tests/spell_price_selftest.lua
+... relic$40 boost1 price got1 want3"); its expectation was corrected with the
+rule, and the branch's own bare `ninja` re-ran it (`q2.log`).  The capture
+drifted from the tracked save by the line's own history and the wager
+(`drift_wor-colosseum-v1.txt`: "TERRA gear: fresh 15 5E 7A 94 CA CE, tracked
+15 5E 7A 94 CA BB", "item $0D: fresh 2, tracked 0", "item $D8: fresh 0,
+tracked 1", "gil: fresh 646143, tracked 714410"), and `checkpoint_drift.py
 --recut wor-colosseum-v1` made the tracked save the capture ("none -- the
-tracked save is the one the graph's play makes today", `recut_wor-colosseum-v1.txt`).
-The leg's log (`wor_colosseum.log`): "PASS (frame 43191) attempts=1/3", won
-on its first attempt; "the wagers done: 6 of 6 won", CELES sent every time.
+tracked save is the one the graph's play makes today",
+`recut_wor-colosseum-v1.txt`).  The leg's log (`wor_colosseum.log`): "PASS
+(frame 55093) attempts=1/3", won on its first attempt; "the wagers done: 6
+of 6 won", CELES sent every time and armed for the Gem Box ("[kit] CELES L52
+kit 0A 0D 0D 7A 98 D1 BB").  The earlier qualification of the wager, before
+the Sabres were back, is under build/attempts/wt/v037-economizer/qual/px13/.
 The arc's earlier qualification (1b22315d, before the Gem Box) is under
 build/attempts/wt/v037-colosseum/qual/px13/ (`q4.log`, `q6.log`).
 
