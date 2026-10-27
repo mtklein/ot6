@@ -1022,7 +1022,7 @@ STATES = [
     # (250,229) again: a branch beside wor_ebot (#484).  Thamasa's item
     # counter when the bag is under its band, then the plain around Thamasa
     # on foot until each of its four formations (world groups 55 and 56) is
-    # won (docs/design/route-wor-gogo.md section 10).  Nothing boots it.
+    # won (docs/design/route-wor-gogo.md section 9).  Nothing boots it.
     S("wor_thamasa_plain", gen="gen_wor_thamasa_plain", prev="wor_gogo",
       checkpoint="wor-gogo-v1"),
 

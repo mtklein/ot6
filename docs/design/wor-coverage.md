@@ -172,7 +172,9 @@ is seven steps south. Both rows are the floor.
 GloomShell), 5,035 XP a random in `level-curve.md`'s table, which names it
 a grind with Ebot's door. 95 and 146 battle tiles around Thamasa (bounding
 boxes in the table); the route stood on 2 and 7 of them and rolled no
-fight there. All four formations have authored rows.
+fight there. All four formations have authored rows. Since #484
+`gen_wor_thamasa_plain`, a branch from `wor-gogo-v1`, fights all four
+(route-wor-gogo.md section 9).
 
 **The plains the design sends players to grind (groups 48-53).**
 `level-curve.md` names 49, 51 and 52 "the World of Ruin's grind". Of the nine

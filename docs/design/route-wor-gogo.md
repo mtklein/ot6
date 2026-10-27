@@ -84,6 +84,7 @@ mutant builders `mkmut.py` and `rowmuts.sh`; the launchers `lab.sh`,
 | `gen_wor_belly` | `wor-gau-v1` | `wor-belly-v1` | the cabin (TERRA, CELES, RELM, STRAGO), Triangle Island until the Engulf, the bridge, the plate, the save point in the belly (279 (24,4)) |
 | `gen_wor_gogo` | `wor-belly-v1` | `wor-gogo-v1` | the crushing room, 277, the west half, GOGO (name menu, his kit), the Warp Stone out, the Falcon to Thamasa, the scene that opens Ebot's Rock, the save by the Falcon (250,229) |
 | `gen_wor_ebot` | `wor-gogo-v1` | `wor-ebot-v1` | Ebot's Rock: the holes, the coral, the hungry chest, Hidon, the scene at Strago's house, the save on the Falcon's tile (250,231) |
+| `gen_wor_thamasa_plain` | `wor-gogo-v1` | (a branch: no save) | Thamasa's item counter when the bag is under its band, the plain around Thamasa on foot until its four formations are won (section 9), back to the Falcon's tile |
 | `gen_wor_opera` | `wor-ebot-v1` | `wor-opera-v1` | the cabin (CELES, RELM, GOGO, STRAGO), the Opera House, the Dirt Dragon, the Doom Gaze hunt, the save by the Falcon there (30,182); also `wor_opera_switch` (the catwalk's switch: `battle_mimicdriver`'s and `battle_wardline`'s fixture) |
 
 The walks' helpers the arc's leg builder stamped into each generator (the
@@ -432,3 +433,82 @@ the graph's play (`checkpoint_drift.py --recut`, at the release).
    in `so5`); the hunt wins every run, at the bag's cost (section 6).
 7. **The labs before `dx2`** shared one driver across their trials
    (section 4); their numbers are comparisons on that footing.
+
+## 9. Thamasa's plain (v0.38, #484)
+
+The plain around Thamasa holds four formations no leg had fought
+(wor-coverage.md 3.2): on its shore tiles (world group 56) three GloomShells
+(334, 62.5%) and a Prussian with a GloomShell (333, 37.5%); on the grass and
+forest inside (group 55) a Harpy (331, 62.5%) and a Harpy with a Prussian
+(332, 37.5%). All three species are L41-42 with authored rows
+(route-wor-thamasa.md 4.3: Harpy pierce and ¤, GloomShell pierce and
+bludgeon, Prussian slash and bludgeon). A player meets them walking between
+the Falcon and Thamasa's door, so `gen_wor_thamasa_plain` plays them from
+`gen_wor_ebot`'s own boot, `wor-gogo-v1`, with the party that holds it
+(STRAGO L47, RELM L48, GOGO L42, TERRA L50). It is a branch: nothing boots
+its state, and no tracked checkpoint changes.
+
+**Where.** The whole plain is sector (7,7), so a tile's group is its tile
+kind's (`WorldBattleGroup`; the map and the straight runs are read from the
+ROM: build/attempts/wt/v038-thamasa-plain/lab/plainmap.txt, `laps.txt`).
+Two laps of seven tiles, on foot:
+
+| lap | group | there for |
+|---|---|---|
+| (250,229) <-> (250,235), south from the Falcon's tile | 56 | 333, 334 |
+| (237,232) <-> (243,232), the plain west of Thamasa | 55 | 331, 332 |
+
+The shore lap keeps off Thamasa's door (251,230). Each lap is walked, with
+the field care after every battle, until each formation it is there for has
+been won, bounded at 20 battles (a 37.5% formation missed 20 times running
+is about one draw in 12,000); a win on the way between the laps counts too.
+Then the party walks back to the Falcon's tile. Before the laps the leg
+tops up at Thamasa's item counter, to `gen_wor_gogo`'s targets, when the bag
+is under them; at today's save it is not ("the bag at its band: no stop at
+Thamasa").
+
+**The asserts and their negatives** (one-line mutants of the leg,
+`lab/scripts/mklab.py`; each red as class=assert, "attempts=1/3 stopped;
+failed attempts: 1:assert"):
+
+- Each lap tile on foot from the boot tile, naming `gen_wor_gogo`'s save (a
+  lap tile moved to Doma's plain, `lab/out/n_mut_reach`): "assertEq failed:
+  the shore by Thamasa (group 56): (172,77) on foot from the boot tile
+  (250,229), gen_wor_gogo's save by the Falcon: got false, want true".
+- A lap's cap: the shore allowed one battle (`n_mut_budget`): "the shore by
+  Thamasa (group 56): every formation it is walked for won within 1
+  battles (...): got false, want true"; walked for a formation no pool
+  deals (`n_mut_unmet`): the same assert on the inner lap, "won within 20
+  battles (... 999 no such formation -)".
+- Every formation won, after the laps: the laps' end test true at once
+  (`n_mut_final`): "Thamasa's plain: formation 333 (Prussian, GloomShell)
+  won: got false, want true".
+
+The counter stop, forced by a band one Remedy over the bag (`n_mut_shop`),
+plays through: "REMEDY to 10: bought 1 x $F5 from shop 74 (Item) row 4",
+"PASS (frame 22736)".
+
+**The leg** (the graph's play at 682797eb, `leg1/`): "PASS (frame 19288)",
+five battles, all won: the shore "done after 2 battles", the plain "done
+after 3 battles".
+
+**Measured** from the graph's own capture `build/checkpoints/wor-gogo-v1`
+at a4ff2e6f (`lab/out/p3_*`: K battles used up first beside the Falcon,
+counted by battles opened, then the leg byte for byte), K 0-11 at seed
+shifts 0, 7 and 13, one attempt each: 36 of 36 PASS, 36 distinct plays by
+their sequence of battle keys. By distinct key (`tally_p3.txt`):
+
+| formation | fights in the leg | keys | won | deaths |
+|---|---|---|---|---|
+| 331 Harpy | 108 | 52 | 108 | 0 |
+| 332 Harpy, Prussian | 36 | 29 | 36 | 0 |
+| 333 Prussian, GloomShell | 36 | 28 | 36 | 0 |
+| 334 GloomShell x3 | 144 | 56 | 144 | 0 |
+
+The K battles are all group 56 (the Falcon's tile and its neighbour are
+shore) and add 51 fights of 333 (6 keys) and 147 of 334 (21 keys), all won.
+The longest lap was 10 battles (the shore at K 5, the plain at K 2-3), half
+the cap. No member fell in any of the 522 fights, and the GloomShell's Rock
+(its Petrify counter while it stands alone, last-stand.md) took no one. At
+these levels the plain is a short grind (997-1,695 XP a member a fight), not
+a fight to tune; the leg ends with STRAGO L48-49 and TERRA L51-52.

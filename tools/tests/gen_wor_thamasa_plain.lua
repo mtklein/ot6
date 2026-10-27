@@ -1,5 +1,5 @@
 -- gen_wor_thamasa_plain.lua -- a branch beside the Gogo arc's third leg (docs/design/route-wor-gogo.md section
--- 10, #484): Continue the `wor-gogo-v1` battery (STRAGO, RELM, GOGO and TERRA on foot on the Falcon's tile by
+-- 9, #484): Continue the `wor-gogo-v1` battery (STRAGO, RELM, GOGO and TERRA on foot on the Falcon's tile by
 -- Thamasa, before Ebot's Rock), Thamasa's item counter when the bag is under its band, then the plain around
 -- Thamasa on foot until each of its four formations has been won: the shore (world group 56: GloomShell x3 334,
 -- Prussian and GloomShell 333) and the plain inside it (group 55: Harpy 331, Harpy and Prussian 332), and back
@@ -67,7 +67,7 @@ end
 -- ---- the plain ----------------------------------------------------------------------------------------------
 -- A world tile's group comes from its sector and its tile kind (WorldBattleGroup); the plain around Thamasa is
 -- all sector (7,7), its shore tiles group 56 and the grass and forest inside group 55 (route-wor-gogo.md section
--- 10: the map, from the ROM).  Each lap is a straight run of seven tiles of one group, so its pool is the group's
+-- 9: the map, from the ROM).  Each lap is a straight run of seven tiles of one group, so its pool is the group's
 -- alone, walked until each formation it is there for has been won (the pool's odds: 37.5% or 62.5% a battle),
 -- bounded by `budget`: a miss of a 37.5% formation in 20 battles is one draw in 12,000.
 local LAPS = {
