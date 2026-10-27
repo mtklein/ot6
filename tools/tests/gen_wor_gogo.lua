@@ -201,9 +201,8 @@ end
 local THUNDER_SHLD = { stand = { 1, 46 }, face = "up", bit = 228, what = "Thunder Shld", item = 0x62 }
 -- GOGO's room's pool (field group 171, map 278): Ogor x2 (346), Covert and Ogor (347), Wart Puck x2 (348) at
 -- 80/256 each and Tap Dancer with Woolly (351) at 16/256; no other map deals it.  The party walks a lap by the
--- door until each is won, within the pick's worst run (110 for 16/256: gen_wor_belly's hunt, gaps.py)
+-- door until each is won (K.hunt: the list asserted to be the map's pool, the hunt bounded by the worst draws)
 local BELLY171 = { [346] = "Ogor x2", [347] = "Covert, Ogor", [348] = "Wart Puck x2", [351] = "Tap Dancer, Woolly" }
-local HUNT_BUDGET = 111
 local HUNT278_LAP = { { 8, 12 }, { 8, 11 } }
 local function crushWalk(tx, ty, what, chests)
   local hops = 0
@@ -480,7 +479,7 @@ H.run({ maxFrames = 2400000 }, {
 
   -- ---- 1b. the hunt in GOGO's room ---------------------------------------------------------------------
   -- @@stage hunt
-  K.hunt({ what = "GOGO's room (group 171)", lap = HUNT278_LAP, forms = BELLY171, budget = HUNT_BUDGET,
+  K.hunt({ what = "GOGO's room (group 171)", lap = HUNT278_LAP, forms = BELLY171,
     castFirst = true }),
   H.fieldCare({ threshold = 1.0, tag = "after the hunt" }),
   H.gearDress({ tag = "gear from the crushing room's chests" }),

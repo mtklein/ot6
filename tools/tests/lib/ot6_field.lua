@@ -7693,6 +7693,7 @@ local RELIC_NAMES = {
 local function relicName(id)
   return string.format("%s $%02X", RELIC_NAMES[id] or "relic", id)
 end
+local RIBBON_ID = 0xCA
 local function itemProp(id, off)
   return M.readRomByte((M.sym("ItemProp") & 0x3FFFFF) + id * 30 + off)
 end
@@ -7922,6 +7923,25 @@ function M.relicPlan(members, opts)
             .. "learned (%s) who can wear it with a free slot", wcover, m.name, table.concat(others, ", ")))
         end
         break
+      end
+    end
+  end
+  -- 2b. every other Ribbon the party owns goes on too (guidelines: a Ribbon goes on the moment it's in the
+  -- bag): to the members planned without one, by spells learned as in step 2, before the ranked relics take the
+  -- free slots (#486 review: after the dream a Genji Glove took CYAN's Ribbon's slot and the Hyper Wrist his
+  -- other, and the Ribbon sat in the bag through Doma: "Genji Glove $D1 goes to CYAN's slot 4 (over Ribbon
+  -- $CA)", "Hyper Wrist $D2 goes to CYAN's slot 5")
+  if (count[RIBBON_ID] or 0) > 0 then
+    local byspells = {}
+    for _, m in ipairs(ms) do byspells[#byspells + 1] = m end
+    table.sort(byspells, function(a, b)
+      if a.spells ~= b.spells then return a.spells > b.spells end
+      return a.order < b.order
+    end)
+    for _, m in ipairs(byspells) do
+      if count[RIBBON_ID] > 0 and m.want[4] ~= RIBBON_ID and m.want[5] ~= RIBBON_ID and hasFree(m)
+          and wearsItem(m.ch, RIBBON_ID) then
+        take(m, RIBBON_ID, "a Ribbon the party owns goes on a member planned without one (step 2b)")
       end
     end
   end
@@ -10307,25 +10327,72 @@ function M.worLegKit(env)
     })
   end
   -- hunt(spec): walk a lap of two tiles, the walker playing the battles and the field care after each, until
-  -- every formation in spec.forms ({ [id] = name }) has been won (#486, the model #483's grind plains): spec.what,
-  -- spec.lap = { { x, y }, { x, y } } on the field (or the world map with spec.world), spec.budget the most
-  -- battles the lap may take (asserted, loud), spec.won a table shared across hunts (formation -> true)
+  -- every formation of the map's pool has been won (#486, the model #483's grind plains): spec.what, spec.lap =
+  -- { { x, y }, { x, y } } on a field map, spec.forms ({ [id] = name }) the pool's formations, asserted at the
+  -- start equal to the pool the ROM gives the map (SubBattleGroup, RandBattleGroup: one formation a slot),
+  -- spec.won a table shared across hunts (formation -> true).  Two bounds, read from the ROM at the start and
+  -- asserted loud:
+  --   battles: the most picks, over every ($1FA2, $1FA3) the encounter counters can hold, until every slot of
+  --     the pool has been drawn (M.worstCaseEncounters); the hunt fails at that many battles without every
+  --     formation won.  A pick that is not a win (a fight lost, or left: Wart Puck's Sneeze takes the party out)
+  --     uses the bound without a win, so the bound holds for a party that wins what it meets;
+  --   steps: the most lap steps, over every ($1FA1, $1FA4), until a random battle opens, at the map's rate with
+  --     and without a Charm Bangle (worstSteps); a hunt that steps that far with no battle has a pool the walk
+  --     never meets.
+  -- spec.budget and spec.steps override the two (a mutant's lever).
   local function huntLine(forms, won)
     local t = {}
     for f, name in pairs(forms) do t[#t + 1] = string.format("%d %s %s", f, name, won[f] and "won" or "-") end
     table.sort(t)
     return table.concat(t, "; ")
   end
+  -- the most steps to a random battle on field map `mp`, over every ($1FA1, $1FA4): each step adds the rate
+  -- table's increment for the map's code times Ot6DangerMulW (16ths) to the danger counter ($1F6E, capped at
+  -- $FF00), and a battle opens when RNGTbl[++$1FA1] + $1FA4 is under its high byte (field/battle.asm
+  -- CheckBattleSub, UpdateBattleRng: $1FA4 gains 17 when $1FA1 wraps); the rows without a relic and with a
+  -- Charm Bangle, the larger.  nil when the map rolls no battles
+  local function worstSteps(mp)
+    local code = (M.readRomByte((M.sym("SubBattleRate") & 0x3FFFFF) + (mp >> 2)) >> ((mp & 3) * 2)) & 3
+    local mul = M.readRomWord(M.sym("Ot6DangerMulW") & 0x3FFFFF) & 0xFF
+    local base = M.sym("RNGTbl") & 0x3FFFFF
+    local t = {}
+    for i = 0, 255 do t[i] = M.readRomByte(base + i) end
+    local worst = nil
+    for row = 0, 1 do
+      local inc = M.readRomWord((M.sym("SubBattleRateTbl") & 0x3FFFFF) + row * 8 + code * 2) * mul // 16
+      if inc > 0 then
+        for b0 = 0, 255 do
+          for a0 = 0, 255 do
+            local a, b, n, acc = a0, b0, 0, 0
+            repeat
+              n = n + 1
+              acc = math.min(acc + inc, 0xFF00)
+              a = (a + 1) & 0xFF
+              if a == 0 then b = (b + 17) & 0xFF end
+            until ((t[a] + b) & 0xFF) < (acc >> 8) or n >= 4096
+            if worst == nil or n > worst then worst = n end
+          end
+        end
+      end
+    end
+    return worst
+  end
   -- spec.castFirst: the care between the hunt's battles casts its cures before it reaches for the bag
   -- (M.careMagic and M.careCastFirst while the hunt runs, as gen_wor_tower's): a hunt far from a counter keeps
-  -- its Potions for the fights
+  -- its Potions for the fights.  The leg's own values come back when the hunt ends, and at a retry's reload
+  -- (M.onReplay), so an attempt that died in the hunt does not carry cures-first into the next
   local function hunt(spec)
     local won, wp, n0, seen = spec.won or {}, 1, nil, nil
-    local saved, quietSaid = nil, false
+    local saved, quietSaid, budget, stepCap, steps = nil, false, nil, nil, 0
     local function knobs(on)
       if not spec.castFirst then return end
       if on then
-        saved = saved or { M.careMagic, M.careCastFirst }
+        if not saved then
+          saved = { M.careMagic, M.careCastFirst }
+          M.onReplay(function()
+            if saved then M.careMagic, M.careCastFirst = saved[1], saved[2]; saved = nil end
+          end)
+        end
         M.careMagic, M.careCastFirst = true, true
       elseif saved then
         M.careMagic, M.careCastFirst = saved[1], saved[2]
@@ -10338,43 +10405,80 @@ function M.worLegKit(env)
     end
     local function still()
       if M.battleLoadStarted() then return false end
-      if spec.world then return M.worldMode() and M.worldSettled() end
       return M.hasControl() and M.tileAligned()
     end
-    local nav = spec.world and M.worldNavTo or M.navTo
+    -- the pool the ROM gives the map, against spec.forms, and the two bounds
+    local function bounds()
+      local mp = map()
+      local g = M.fieldEncounterGroup(mp)
+      local pool = M.encounterPool(g)
+      local slotOf, t = {}, {}
+      for slot = 1, 4 do
+        local fs = pool[slot].formations
+        M.assertEq(#fs, 1, string.format("%s: map %d's pool (group %d) slot %d is one formation", spec.what, mp, g, slot))
+        slotOf[fs[1].id] = slot
+        t[#t + 1] = string.format("slot %d formation %d (%d/256)", slot, fs[1].id, pool[slot].odds)
+      end
+      for f in pairs(spec.forms) do
+        M.assertEq(slotOf[f] ~= nil, true, string.format("%s: formation %d is in map %d's pool (group %d: %s)",
+          spec.what, f, mp, g, table.concat(t, ", ")))
+      end
+      for f in pairs(slotOf) do
+        M.assertEq(spec.forms[f] ~= nil, true, string.format("%s: map %d's pool formation %d is one it is walked for",
+          spec.what, mp, f))
+      end
+      local want = {}
+      for f in pairs(spec.forms) do want[slotOf[f]] = true end
+      budget = spec.budget or M.worstCaseEncounters(function()
+        local got = {}
+        return function(slot)
+          got[slot] = true
+          for sl in pairs(want) do if not got[sl] then return false end end
+          return true
+        end
+      end)
+      stepCap = spec.steps or worstSteps(mp)
+      M.assertEq(stepCap ~= nil, true, string.format("%s: map %d rolls random battles", spec.what, mp))
+      M.log(string.format("[hunt] %s: map %d, group %d: %s; every slot drawn within %d battles, a battle within %d "
+        .. "steps (the worst cases over the encounter counters)", spec.what, mp, g, table.concat(t, ", "), budget,
+        stepCap))
+    end
     return M.withReset(M.seqStep({
       M.call(function()
-        n0, seen, wp = #M.outcomes, #M.outcomes, 1
+        n0, seen, wp, steps = #M.outcomes, #M.outcomes, 1, 0
         knobs(true)
+        bounds()
         say("hunt", string.format("%s: lap (%d,%d) <-> (%d,%d); %s", spec.what, spec.lap[1][1], spec.lap[1][2],
           spec.lap[2][1], spec.lap[2][2], huntLine(spec.forms, won)))
       end),
       M.driveUntil(function()
         while seen < #M.outcomes do
           seen = seen + 1
+          steps = 0
           local o = M.outcomes[seen]
           local f = o.form & 0x1FF
           if o.kind == "won" then won[f] = true end
           M.log(string.format("[hunt] %s: battle %d formation %d %s after %d ticks", spec.what, seen - n0, f, o.kind,
             o.tick or -1))
-          -- the budget, asserted as each battle ends (the count moves only then)
-          if not done() then
-            M.assertEq(seen - n0 < spec.budget, true, string.format("%s: every formation it is walked for won "
-              .. "within %d battles (%s)", spec.what, spec.budget, huntLine(spec.forms, won)))
-          end
+          -- the budget, asserted as each battle ends (the count moves only then): every formation won by the
+          -- bound's battle at the latest
+          M.assertEq((seen - n0 < budget) or done(), true, string.format("%s: every formation it is walked for won "
+            .. "within %d battles (%s)", spec.what, budget, huntLine(spec.forms, won)))
         end
         if done() then return still() end
         return false
       end, spec.maxFrames or 3000000, {
         -- a lap of two tiles with no encounter repeats the last lap's frames, and the no-progress watchdog reads
-        -- novelty (gen_n024_entry's grind laps): declared per step, so a lap that really stalls still trips
+        -- novelty (gen_n024_entry's grind laps): declared per step, the steps themselves bounded here
         M.call(function()
+          M.assertEq(steps < stepCap, true, string.format("%s: a random battle within %d steps of the lap (%d "
+            .. "since the last)", spec.what, stepCap, steps))
           M.watchQuiet(600, not quietSaid and "the hunt walks the same two tiles" or nil)
           quietSaid = true
         end),
-        nav(function() return spec.lap[wp][1] end, function() return spec.lap[wp][2] end,
+        M.navTo(function() return spec.lap[wp][1] end, function() return spec.lap[wp][2] end,
           { maxFrames = 20000, playBattles = "tactical", fight = FIGHT, avoid = spec.avoid }),
-        M.call(function() wp = wp % 2 + 1 end),
+        M.call(function() wp = wp % 2 + 1; steps = steps + 1 end),
         M.cond(function() return not M.battleLoadStarted() end, { M.fieldCare({ tag = "care on the hunt" }) }, {}),
       }, spec.what),
       M.call(function()
@@ -10385,7 +10489,7 @@ function M.worLegKit(env)
           M.assertEq(won[f] == true, true, string.format("%s: formation %d (%s) won", spec.what, f, name))
         end
       end),
-    }), function() n0, seen, wp = nil, nil, 1; knobs(false) end)
+    }), function() n0, seen, wp, steps = nil, nil, 1, 0; knobs(false) end)
   end
   local function objLine(o0, o1)
     local t = {}

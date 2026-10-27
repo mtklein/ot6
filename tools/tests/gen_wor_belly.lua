@@ -48,6 +48,9 @@ local CARD = { up = { 0, -1 }, down = { 0, 1 }, left = { -1, 0 }, right = { 1, 0
 -- per run, so the walk's equal-length routes differed between identical runs (#467)
 local CARD_DIRS = { "down", "left", "right", "up" }
 CAREFUL_PACE, CAREFUL_TRIALS, CAREFUL_RISK, CAREFUL_IMPATIENCE = 18, 120, 0.08, 0.002
+-- the longest one stand for the conductors is let sit quiet (the no-progress watchdog stands down for it): the
+-- longest measured stand, 2304 frames (#486 review of the play at 2db501e2), rounded up
+CAREFUL_QUIET = 2400
 local STEP_F, JUMP_F, DOOR_F = 16, 72, 40
 local CONDSEG = { [276] = { [30] = { { 32, 40 }, { 45, 48 } }, [32] = { { 31, 34 } } } }
 local function condList(objs)
@@ -240,7 +243,7 @@ local function doMove(mv, what, abort)
     end })
 end
 local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
-  local moves, waits, lastWhy, stood = 0, 0, nil, 0
+  local moves, waits, lastWhy, stood, waitStart, lastFrom = 0, 0, nil, 0, nil, nil
   local function there() return H.fieldX() == tx and H.fieldY() == ty and H.tileAligned() end
   local function oneMove()
     local conds = condList(objs)
@@ -260,6 +263,23 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
       closed[wk] = true
     end
     local mv = nil
+    -- no route around the conductors: walk on toward the crossing, as a person would, by the route that ignores
+    -- them, a move at a time while it lands on a rest no conductor's tile closes, and wait at the last such rest
+    -- (#486 review: the shaft's way back stood at (49,18), far from the bridge, "no route")
+    if best == nil then
+      local open = planRoute(tx, ty, lk, {})
+      local m1 = open and open[1]
+      -- (never back onto the tile the last move left: the plan around the conductors and this one can each
+      -- undo the other, lab r2_belly: "standing at (49,32)", "standing at (48,32)", ... past frame 313000)
+      if m1 and not closed[m1.to] and isRest(m1.to, conds) and m1.to ~= here and m1.to ~= lastFrom then
+        local sp, te = spansOf({ m1 })
+        if simRisk(sp, te, conds) <= CAREFUL_RISK then
+          moves, stood, waitStart, lastWhy = moves + 1, 0, nil, nil
+          lastFrom = here
+          return doMove(m1, what, abort)
+        end
+      end
+    end
     -- patience runs out: the risk a person takes grows with the frames stood on a rest (four a wait)
     local thr = CAREFUL_RISK + stood * CAREFUL_IMPATIENCE
     -- off a rest, the stretch already begun is finished: standing on a conductor's row is the risk
@@ -316,20 +336,26 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
     if mv == nil then
       waits = waits + 1
       stood = stood + 1
-      -- a person waiting for the conductors to clear stands still on purpose: from the shaft's way back up the
-      -- only crossing of the bridge's middle is the conductor's own row, and a wait there outlasted the
-      -- no-progress watchdog (#486, the graph's play at ec0ff9aa: "waiting at (49,18): no route" for 1808
-      -- frames).  The walk's own budget (CAREFUL moves and waits, jwalk's tries) still bounds it
-      H.watchQuiet(120)
+      -- a person waiting for the conductors to clear stands still on purpose: the bridge's middle is crossed on
+      -- the conductor's own row, and a wait for it outlasted the no-progress watchdog (#486, the graph's play
+      -- at ec0ff9aa: "waiting at (49,18): no route" for 1808 frames).  Declared for CAREFUL_QUIET frames of one
+      -- stand at most, so a stand past that trips
+      if waitStart == nil then
+        waitStart = H.frame
+        H.log(string.format("[careful] %s: f%d standing at (%d,%d) for the conductors, quiet declared for up to %d "
+          .. "frames", what, H.frame, H.fieldX(), H.fieldY(), CAREFUL_QUIET))
+      end
+      if H.frame - waitStart < CAREFUL_QUIET then H.watchQuiet(120) end
       return H.waitFrames(4)
     end
-    moves = moves + 1
+    moves, waitStart = moves + 1, nil
     if mv.kind == "jump" then stood = 0 end
     lastWhy = nil
     if mv.kind == "jump" then
       H.log(string.format("[careful] f%d jump %s from (%d,%d) (risk %.2f); %s", H.frame, mv.link[3], H.fieldX(),
         H.fieldY(), bestR, objLine()))
     end
+    lastFrom = here
     return doMove(mv, what, abort)
   end
   local nOut = #H.outcomes
@@ -348,6 +374,12 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
     H.call(function()
       H.log(string.format("[careful] %s: %s after %d moves and %d waits", what, there() and "there" or "stopped",
         moves, waits))
+      -- the walk's step budget spent short of the target and with no drop to end it: said loud (jwalk tries
+      -- again from where the party stands, and asserts after its last try)
+      if not there() and not abort() then
+        H.log(string.format("[careful] %s: BUDGET SPENT -- %d steps (%d moves, %d waits) at (%d,%d), short of "
+          .. "(%d,%d)", what, budget or 3000, moves, waits, H.fieldX(), H.fieldY(), tx, ty))
+      end
     end),
   })
 end
@@ -427,12 +459,11 @@ end
 -- ---- the belly in full (#486): its formations and its chests ----
 -- The belly's pool (field group 170, maps 276 and 277: SubBattleGroup) deals Karkass x2 (349), Wart Puck and
 -- Ogor (353), Tap Dancer and Covert x2 (350) at 80/256 each and Woolly x2 with Karkass x2 (352) at 16/256.  The
--- party walks the landing until each it had not won is won.  The pick is UpdateBattleGrpRng's byte (RNGTbl at
--- $1FA2 plus $1FA3, battle.asm @489), so its worst run is the table's: 21 picks for a slot of 80/256, 110 for
--- 16/256, over every offset and start (build/attempts/wt/v038-zone-eater/lab/scripts/gaps.py).  The budget is
--- that bound: a lap that reaches it has met a draw the ROM cannot deal, or lost one.
-local BELLY170 = { [349] = "Karkass x2", [350] = "Tap Dancer, Covert x2", [352] = "Woolly x2, Karkass x2" }
-local HUNT_BUDGET = 111
+-- party walks the landing until each is won (K.hunt, which asserts this list is the pool the ROM gives the map
+-- and bounds the hunt by the worst draws the encounter counters can hold: every slot within 110 picks, a battle
+-- within 162 steps; build/attempts/wt/v038-zone-eater/lab/scripts/bounds.py).
+local BELLY170 = { [349] = "Karkass x2", [353] = "Wart Puck, Ogor", [350] = "Tap Dancer, Covert x2",
+  [352] = "Woolly x2, Karkass x2" }
 -- the chests (treasure bits; TreasureProp 276) and the tile each is opened from, facing it: the bridge's two
 -- beside the jumps of row 32, the shaft's two (the foot of the conductors' drop), and the one at the bridge's
 -- west end
@@ -531,7 +562,7 @@ H.run({ maxFrames = 2400000 }, {
   -- ---- 2. the hunt on the landing ----------------------------------------------------------------------
   -- @@stage hunt
   K.hunt({ what = "the belly's landing (group 170)", lap = { { 10, 12 }, { 10, 13 } }, forms = BELLY170,
-    budget = HUNT_BUDGET, won = huntWon, castFirst = true }),
+    won = huntWon, castFirst = true }),
   H.fieldCare({ threshold = 1.0, tag = "after the hunt" }),
   H.call(function() H.log("[kit] " .. kitLine({ TERRA, CELES, RELM, STRAGO })) end),
 

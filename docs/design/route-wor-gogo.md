@@ -81,8 +81,8 @@ mutant builders `mkmut.py` and `rowmuts.sh`; the launchers `lab.sh`,
 
 | leg | boots | saves | what |
 |---|---|---|---|
-| `gen_wor_belly` | `wor-gau-v1` | `wor-belly-v1` | the cabin (TERRA, CELES, RELM, STRAGO), Triangle Island until the Engulf, the hunt on the landing, the bridge and its five chests, the plate, the save point in the belly (279 (24,4)) (section 9) |
-| `gen_wor_gogo` | `wor-belly-v1` | `wor-gogo-v1` | the crushing room and its three chests, 277, the west half, its plate and chest, the hunt in GOGO's room (section 9), GOGO (name menu, his kit), the Warp Stone out, the Falcon to Thamasa, the scene that opens Ebot's Rock, the save by the Falcon (250,229) |
+| `gen_wor_belly` | `wor-gau-v1` | `wor-belly-v1` | the cabin (TERRA, CELES, RELM, STRAGO), Triangle Island until the Engulf, the hunt on the landing, the bridge and its five chests, the plate, the save point in the belly (279 (24,4)) (section 10) |
+| `gen_wor_gogo` | `wor-belly-v1` | `wor-gogo-v1` | the crushing room and its three chests, 277, the west half, its plate and chest, the hunt in GOGO's room (section 10), GOGO (name menu, his kit), the Warp Stone out, the Falcon to Thamasa, the scene that opens Ebot's Rock, the save by the Falcon (250,229) |
 | `gen_wor_ebot` | `wor-gogo-v1` | `wor-ebot-v1` | Ebot's Rock: the holes, the coral, the hungry chest, Hidon, the scene at Strago's house, the save on the Falcon's tile (250,231) |
 | `gen_wor_thamasa_plain` | `wor-gogo-v1` | (a branch: no save) | Thamasa's item counter when the bag is under its band, the plain around Thamasa on foot until its four formations are won (section 9), back to the Falcon's tile |
 | `gen_wor_opera` | `wor-ebot-v1` | `wor-opera-v1` | the cabin (CELES, RELM, GOGO, STRAGO), the Opera House, the Dirt Dragon, the Doom Gaze hunt, the save by the Falcon there (30,182); also `wor_opera_switch` (the catwalk's switch: `battle_mimicdriver`'s and `battle_wardline`'s fixture) |
@@ -417,7 +417,7 @@ the graph's play (`checkpoint_drift.py --recut`, at the release).
 
 ## 8. Open
 
-1. **The belly's chests** are opened since v0.38 (section 9).
+1. **The belly's chests** are opened since v0.38 (section 10).
 2. **GOGO is L42** against TERRA and CELES's L50.
 3. **The cabin regroup** talks to members who wander; `talkToObj`'s fixed
    approach timed out on them, and the legs now chase (`chaseTalk`).  Other
@@ -532,7 +532,7 @@ some of GOGO's XP, not a fight; the driver's last-stand rule
 leaves it so. At these levels the plain is a short grind (997-1,695 XP a
 member a fight, 2,192 when one ends stone), not a fight to tune.
 
-## 9. The belly in full (v0.38, #486)
+## 10. The belly in full (v0.38, #486)
 
 Evidence under `build/attempts/wt/v038-zone-eater/lab/` (`scripts/`, `out/`).
 The coverage audit (wor-coverage.md 4.1, 4.3, 5.1) found seven of the
@@ -547,18 +547,34 @@ GOGO's room, and no other map) deals Ogor x2 (346), Covert and Ogor (347),
 Wart Puck x2 (348) at 80/256 and Tap Dancer with Woolly (351) at 16/256.
 `gen_wor_belly` walks the landing (10,12) <-> (10,13) after the Engulf and
 `gen_wor_gogo` GOGO's room (8,12) <-> (8,11) before GOGO, each until every
-formation of its pool not yet fought is won (`K.hunt`, lib/ot6_field.lua:
-the grind plains' rule as a helper). The pick is `UpdateBattleGrpRng`'s
-byte, `RNGTbl[$1FA2] + $1FA3` (field/battle.asm), so the longest a lap can
-wait for a slot is the table's own worst run: over every offset and start,
-21 picks for a slot of 80/256 and 110 for 16/256 (`scripts/gaps.py`: "slot
-3 ($F0-$FF, 16/256): worst picks to the first draw 110 (offset $0D, index
-97)"). Each hunt's budget is that bound, asserted as each battle ends: a
-hunt that reaches it has met a draw the ROM cannot deal, or lost a fight.
+formation of its pool is won (`K.hunt`, lib/ot6_field.lua: the grind plains'
+rule as a helper). The hunt asserts at its start that the formations it is
+walked for are the pool the ROM gives the map (`SubBattleGroup`,
+`RandBattleGroup`), and reads its two bounds from the ROM there:
+
+- **Battles.** The pick is `UpdateBattleGrpRng`'s byte, `RNGTbl[$1FA2] +
+  $1FA3` (field/battle.asm), so the longest a hunt can wait for every slot
+  is the table's own worst run over every value the two counters can hold
+  (`M.worstCaseEncounters`): 110 picks for both pools ("every slot drawn
+  within 110 battles"; `scripts/bounds.py`, `scripts/gaps.py`: "slot 3
+  ($F0-$FF, 16/256): worst picks to the first draw 110"). The hunt fails at
+  the bound's battle without every formation won. A pick whose fight is not
+  a win (lost, or left: Wart Puck's Sneeze takes the party out) uses the
+  bound without a win, so the bound holds for a party that wins what it
+  meets; Sneeze is in 348's fights only, whose slot comes again within 21
+  picks.
+- **Steps.** A step adds the map's rate (code 0, $0070, times
+  `Ot6DangerMulW` 8/16) to the danger counter, and a battle opens when
+  `RNGTbl[$1FA1] + $1FA4` is under its high byte (`CheckBattleSub`): over
+  every value of the two counters, a battle within 132 steps, 162 with a
+  Charm Bangle (`worstSteps`; "a battle within 162 steps"). A hunt that
+  walks 162 steps of its lap with no battle fails.
+
 The care between the hunt's battles casts its cures before it reaches for
-the bag (the tower's knobs, for the hunt only): bag first, the landing's
-twelve battles took the Potions from 98 to 23 (`out/gb1`); cures first, to
-94 (`out/h1`).
+the bag (the tower's knobs, for the hunt only, put back at a retry's reload):
+over the landing's twelve battles, bag first took the Potions from 98 to 38
+(`out/gb1`, "done after 12 battles ... potion=38"), cures first to 94
+(`out/h1`, the same twelve).
 
 **The chests**, all nine opened, each asserted by its treasure bit:
 
@@ -581,6 +597,17 @@ so the room opens its chests with a shorter press of its own (`quickChest`:
 the window seen and closed). Before the plate (12,51) no route reaches the
 Thunder Shld from anywhere in 280 (`out/x4`, `out/x6`).
 
+The bridge's careful walk (finding 2) now walks the extra stretches the
+chests ask for. Where no route clears the conductors it walks on toward the
+crossing by the route that ignores them, a rest at a time, and stands at the
+last rest there; it never steps back onto the tile its last move left (the
+two plans undid each other in lab `r2_belly`: "standing at (49,32)",
+"standing at (48,32)", past frame 313000). A stand declares its quiet to the
+no-progress watchdog for 2400 frames at most (`CAREFUL_QUIET`; the longest
+stand in `out/r3_belly` was 1836 frames at (49,32), `scripts/stands.py`),
+and a walk that spends its step budget short of the target logs `BUDGET
+SPENT` before jwalk tries again.
+
 **The gear downstream.** The gear and relic care picks the new pieces up on
 its own: the Genji Armor goes on TERRA at the belly's save point and stays
 on her through the Colosseum; RELM takes the Magical Brsh; the Hero Ring
@@ -596,23 +623,35 @@ saves after `wor-gau-v1` were re-cut from that play; the saves from
 `wor-thamasa-v1` to `wor-gau-v1` do not drift.
 
 **The asserts and their negatives.** Each is red on a one-line mutant
-(`scripts/mkmut.py`, `scripts/nfinal.sh`), as class=assert, which the
-runner does not retry ("attempts=1/3 stopped; failed attempts: 1:assert"):
+(`scripts/mkmut.py`; the lib's two through `scripts/nlib.sh`), as
+class=assert, which the runner does not retry ("attempts=1/3 stopped;
+failed attempts: 1:assert"):
 
-- The budget (`out/n_budget`, the hunt's budget 1): "assertEq failed: the
-  belly's landing (group 170): every formation it is walked for won within
-  1 battles (...)"; walked for a formation no pool deals, 999
-  (`out/n_unmet`): the same assert after 111 battles, "won within 111
-  battles (349 Karkass x2 won; 350 Tap Dancer, Covert x2 won; 352 Woolly
-  x2, Karkass x2 won; 999 no such formation -)".
-- Every formation won, after the hunt (`out/n_final`, its end test true at
-  once): "assertEq failed: the belly's landing (group 170): formation 349
-  (Karkass x2) won: got false, want true".
-- The belly's chests (`out/n_belly_chest`, no drop down the shaft):
-  "assertEq failed: 276: the Ether's chest (bit 194) is open: got false,
-  want true"; the crushing room's (`out/n_gogo_chest`, the Thunder Shld not
-  opened): "assertEq failed: 280: the Thunder Shld's chest (bit 228) is
-  open: got false, want true".
+- The pool (`out/r1_n_unmet`, walked for a formation no pool deals, 999):
+  "formation 999 is in map 276's pool (group 170: slot 1 formation 349
+  (80/256), slot 2 formation 353 (80/256), slot 3 formation 350 (80/256),
+  slot 4 formation 352 (16/256)): got false"; and the other way
+  (`out/r1_n_pool`, 353 left out): "map 276's pool formation 353 is one it
+  is walked for: got false".
+- The battle bound (`out/r1_n_budget`, 1): "every formation it is walked
+  for won within 1 battles (...): got false"; the step bound
+  (`out/r1_n_steps`, 1): "a random battle within 1 steps of the lap (1
+  since the last): got false".
+- Every formation won, after the hunt (`out/r3_n_final`, its end test true
+  at once): "formation 352 (Woolly x2, Karkass x2) won: got false".
+- The belly's chests (`out/r3_n_belly_chest`, no drop down the shaft): "276:
+  the Ether's chest (bit 194) is open: got false"; the west half's
+  (`out/r2_n_gogo_chest`, the Thunder Shld not opened): "280: the Thunder
+  Shld's chest (bit 228) is open: got false"; the crushing room's
+  (`out/r2_n_gogo_crush`, the walk handed two of its three chests): "280:
+  the Tack Star's chest (bit 234) is open: got false"; `quickChest`'s
+  bag+1 (`out/r2_n_gogo_bag`, the Zephyr Cape's record naming the Hero
+  Ring's item): "Zephyr Cape: bag 0 -> 0 of item $C9: got 0 ($0), want 1
+  ($1)".
+- Every Ribbon worn (`field_relicribbon`, `out/rb_mut`, the relic plan's
+  step 2b off): "the plan puts on 2 Ribbon(s): every Ribbon the seated
+  party holds, while a seated member who can wear one goes without: got 1
+  ($1), want 2 ($2)".
 
 **Measured** from the graph's own captures at 2db501e2 on d300045e,
 `wor_belly_in` and `wor_gogo_278` (`scripts/lab_hunt.lua`: K battles used
