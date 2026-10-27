@@ -100,9 +100,9 @@ local function arm()
 end
 -- a write's pc inside a routine: from its label to the next 96 bytes
 -- (compose.py embeds the symbols a script names literally)
-local PROC = { learn = H.sym("Ot6BlueLearn"), msg = H.sym("ShowLearnedMagicMsg") }
+-- (looked up when first asked, so an old ROM without them fails on the play)
 local function inProc(pc, which)
-  local a = PROC[which]
+  local a = which == "learn" and H.sym("Ot6BlueLearn") or H.sym("ShowLearnedMagicMsg")
   return pc >= a and pc < a + 96
 end
 local function closed() return rec ~= nil and rec.ended ~= nil and H.frame > rec.ended + 30 end
