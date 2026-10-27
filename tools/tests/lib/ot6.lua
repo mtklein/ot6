@@ -9042,6 +9042,39 @@ function Driver:magicOnlyLine(actor, boost)
     return { kind = "magic", spell = bounce.sp.id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = b,
              ally = true, target = bounce.to, all = bounce.all or nil, bounce = true, reason = "magic_only_bounce" }
   end
+  if best == nil and self.opts.wallChangeVs then
+    -- No line at a WallChange body: the turn's only use is to draw the
+    -- counter that turns the wall, which another member's action in flight
+    -- does anyway, so it waits for that to land (wallWaitPlan); and while
+    -- the body is Broken there is no counter to draw, so it waits for the
+    -- members who hold the weakness, rather than queue a Scan ahead of
+    -- them: a window took nothing while two Scans and a nulled Fire ran
+    -- before CELES's Poison, which landed after it closed (build/attempts/
+    -- wt/v038-magimaster/lab/m5_b0_k4_s7_s0: 'broken (0 of 8 shields) at HP
+    -- 46035', 'weak $08', 'actor=1 magic-only: $03 at slot 0, 3 BP',
+    -- 'window over after 2249 frames ... HP 46035')
+    for s = 0, 5 do
+      if monAlive(s) and self.opts.wallChangeVs[M.readWord(0x57C0 + s * 2)] then
+        if brokenNow(s) then
+          self.wallWait = self.wallWait or {}
+          self.wallWait[actor] = self.wallWait[actor] or M.frame
+          if M.frame - self.wallWait[actor] < 900 then
+            local key = "brokenwait:" .. actor
+            if not self.statusSaid[key] then
+              self.statusSaid[key] = true
+              M.log(string.format("[%s] actor=%d holds nothing for the broken body's wall (weak $%02X): the window "
+                .. "is left to those who do", self.tag or "fight", actor, M.readByte(0x3BE0 + 8 + s * 2)))
+            end
+            return { kind = "defer", reason = "wall_wait", at = M.frame }
+          end
+        else
+          local w = self:wallWaitPlan(actor, s, "a turn with no line")
+          if w then return w end
+        end
+        break
+      end
+    end
+  end
   if best == nil then
     -- what the list holds, once per distinct reading: each candidate's cell,
     -- its greyed bit, its price against the live MP, and whether the cast
@@ -9245,31 +9278,8 @@ function Driver:magicOnlyLine(actor, boost)
   -- of 8 shields) at HP 34138', 'weak $80', 'window over ... HP 34138')
   if wcv and (best.elem ~= 0 or breaking) and bestSlot ~= nil and wcv[M.readWord(0x57C0 + bestSlot * 2)]
      and not brokenNow(bestSlot) then
-    local busy = nil
-    local R = self.recovery
-    for e = 0, 3 do
-      if e ~= actor and M.readWord(0x3BF4 + e * 2) > 0 then
-        if M.readByte(0x32CC + e * 2) < 0x80 then busy = busy or string.format("entity %d's action queued", e) end
-        if R and ((R.queued[e] and #R.queued[e] > 0) or R.running[e]) then
-          busy = busy or string.format("entity %d's action in flight", e)
-        end
-      end
-    end
-    if M.readByte(0x32CD + 8 + bestSlot * 2) < 0x80 then busy = busy or "his counter pending" end
-    self.wallWait = self.wallWait or {}
-    if busy then
-      self.wallWait[actor] = self.wallWait[actor] or M.frame
-      if M.frame - self.wallWait[actor] < 900 then
-        local key = "wallwait:" .. actor .. ":" .. busy
-        if not self.statusSaid[key] then
-          self.statusSaid[key] = true
-          M.log(string.format("[%s] actor=%d waits to read the wall (%s) before $%02X", self.tag or "fight", actor,
-            busy, best.id))
-        end
-        return { kind = "defer", reason = "wall_wait", at = M.frame }
-      end
-    end
-    self.wallWait[actor] = nil
+    local w = self:wallWaitPlan(actor, bestSlot, string.format("$%02X", best.id))
+    if w then return w end
   end
   local b = castBoost(actor, best.id, best.cost, want, self:nukeFloor(actor))
   if b == nil then b = 0 end
@@ -9281,6 +9291,41 @@ function Driver:magicOnlyLine(actor, boost)
   end
   return { kind = "magic", spell = best.id, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = b, aim = bestSlot,
            reason = "magic_only" }
+end
+
+-- The wait for a WallChange body's wall to stand still (magicOnlyLine,
+-- opts.wallChangeVs): while another living member's action is queued
+-- ($32CC) or in flight (the recovery trace's queued/running), or the body's
+-- counter is pending ($32CD), a defer plan (X hands the window on, re-read
+-- every 30 frames); nil once the wall stands, or after 900 frames of
+-- waiting by this actor.
+function Driver:wallWaitPlan(actor, slot, what)
+  local busy = nil
+  local R = self.recovery
+  for e = 0, 3 do
+    if e ~= actor and M.readWord(0x3BF4 + e * 2) > 0 then
+      if M.readByte(0x32CC + e * 2) < 0x80 then busy = busy or string.format("entity %d's action queued", e) end
+      if R and ((R.queued[e] and #R.queued[e] > 0) or R.running[e]) then
+        busy = busy or string.format("entity %d's action in flight", e)
+      end
+    end
+  end
+  if M.readByte(0x32CD + 8 + slot * 2) < 0x80 then busy = busy or "his counter pending" end
+  self.wallWait = self.wallWait or {}
+  if busy then
+    self.wallWait[actor] = self.wallWait[actor] or M.frame
+    if M.frame - self.wallWait[actor] < 900 then
+      local key = "wallwait:" .. actor .. ":" .. busy .. ":" .. what
+      if not self.statusSaid[key] then
+        self.statusSaid[key] = true
+        M.log(string.format("[%s] actor=%d waits to read the wall (%s) before %s", self.tag or "fight", actor,
+          busy, what))
+      end
+      return { kind = "defer", reason = "wall_wait", at = M.frame }
+    end
+  end
+  self.wallWait[actor] = nil
+  return nil
 end
 
 -- A turn that turns a WallChange body's wall (opts.wallChangeVs): the
