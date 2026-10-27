@@ -720,11 +720,12 @@ local function armForIce(party)
 end
 
 -- ---- armed with fire -------------------------------------------------------
--- The three bosses are weak to fire, and the bag holds fire blades (two
--- Flame Sabres on wor-narshe-cliffs-v1).  A fire blade's Fight lands the
--- weakness on every swing: double damage, and the fire key chips a shield
--- (break-coverage-vector.md: "its vanilla fire weakness (Ifrit's
--- magicite, or the Flame Sabre)").  So the bag's fire blades go into the
+-- The three bosses are weak to fire, and CELES has fire blades: the pair
+-- of Flame Sabres gen_wor_sabin tops up at Tzen's counter, in her hands or
+-- the bag (she swings them through the Falcon legs).  A fire blade's Fight
+-- lands the weakness on every swing: double damage, and the fire key
+-- chips a shield (break-coverage-vector.md: "its vanilla fire weakness
+-- (Ifrit's magicite, or the Flame Sabre)").  So the bag's fire blades go into the
 -- hands of whoever swings most -- a two-weapon relic's wearer first (both
 -- hands), then by vigor -- where the blade's power doubled beats what the
 -- hand holds and it keeps the hand's Runic and SwdTech (ItemProp +$13 bits
@@ -732,6 +733,7 @@ end
 -- What each hand held goes back on after Umaro, so the legs after this
 -- one keep their kit.  Reads only; the dressing is the Equip menu's presses.
 local FIRE_EL = 0x01
+local FIRE_BLADES = 2       -- CELES's two hands, with her Genji Glove
 local FIRE_WORN = {}
 local function fireBlade(id)
   return id ~= 0xFF and (ip(id, 0) & 7) == 1 and (H.weaponElement(id) & FIRE_EL) ~= 0
@@ -793,6 +795,27 @@ local function armForFire(party)
       end
       if #items > 0 then plan[#plan + 1] = { ch = ch, name = name, items = items } end
     end
+    -- DRAGON_FIGHT gives up CELES's Runic and magic for a Fight with a
+    -- fire blade in each hand (13.2), so both her hands must end up holding
+    -- one: a blade she holds now, or one the plan above puts there.  The
+    -- supply is Tzen's counter (gen_wor_sabin tops the pair up); short of
+    -- it here, the route lost them on the way.
+    local celes = 0
+    for sl = 0, 1 do
+      local planned = false
+      for _, w in ipairs(FIRE_WORN) do
+        if w.ch == CELES and w.slot == sl then planned = true end
+      end
+      if planned or fireBlade(H.readByte(c(CELES, 0x1F + sl))) then celes = celes + 1 end
+    end
+    local spare = 0
+    for id, n in pairs(bag) do
+      if wearable(CELES, id) then spare = spare + n end
+    end
+    H.log(string.format("[kit] fire blades for the Ice Dragon: CELES's hands %d of %d, %d more in the bag "
+      .. "she can wield", celes, FIRE_BLADES, spare))
+    H.assertEq(celes, FIRE_BLADES, "CELES holds a fire blade in each hand for the Ice Dragon (DRAGON_FIGHT, "
+      .. "route-wor-narshe.md 13.2; gen_wor_sabin buys the Flame Sabres at Tzen)")
   end) }
   for i = 1, 4 do
     steps[#steps + 1] = H.cond(function() return plan[i] ~= nil end, {

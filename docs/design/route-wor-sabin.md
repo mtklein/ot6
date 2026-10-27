@@ -718,6 +718,11 @@ blitzes with their own classes and elements: Pummel and Suplex bludg
 Power Sash 5,000), along with the house's Hyper Wrist. A second Genji
 Glove is in the bag.
 
+Tzen's weapon counter also tops CELES's Flame Sabres (the bag and her hands) up to a pair (7,000
+each) for the Narshe arc's fire-weak bosses: it is the one counter on the
+route that sells a fire blade, and the World of Balance supplies one only
+under some draws (route-wor-narshe.md 13.6).
+
 ---
 
 ## 7. Save points and checkpoint cuts

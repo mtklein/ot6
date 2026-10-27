@@ -739,7 +739,9 @@ talk (13.3).
 
 ### 13.2 The fix: fire blades for the Fighter
 
-The bag holds two Flame Sabres. A fire blade lands the weakness on each
+CELES owns two Flame Sabres (since v0.37 topped up at Tzen when the World
+of Balance did not supply them, 13.6); she swings them through the Falcon
+legs, and they are back in the bag on `wor-narshe-cliffs-v1`. A fire blade lands the weakness on each
 swing (double damage) and the fire key on each, so CELES, with her Genji
 Glove, now wears both for the arc's three bosses and Fights the Ice
 Dragon instead of casting (`armForFire`, `DRAGON_FIGHT`); TERRA and CYAN
@@ -826,3 +828,53 @@ $7BC2=04 pc=C15A7D` and `w $7BC2=01 pc=C144CD`), consumed the queued
 open, and left state $00, which reads no input. The two stores are
 vanilla's; it is a game bug no input can leave, seen once in the lab
 runs here, and not fixed in this change.
+
+### 13.6 Where the blades come from (v0.37)
+
+The two Flame Sabres of 13.2 were luck. The World of Balance has two
+sources: Number 024's rare drop (`MonsterItems` $10A: Flame Sabre rare,
+Blizzard common; the 1-in-8 roll at `battle_main.asm` @5f17) and
+FlameEater's steal ($116: Flame Sabre). The tracked checkpoints, cut before
+#473, carry one from each; the play after #473 drew Number 024's Blizzard
+and LOCKE cast at FlameEater instead of stealing, so the bag held none from
+`minecart-platform-v1` on (094d012d's line from power-on,
+`build/attempts/wt/v037-flame-sabres/red/chain-094d012d.log.gz`: `item $0D:
+fresh 0, tracked 1` at minecart-platform-v1, `fresh 0, tracked 2` from
+fire-out-v1), and `armForFire` found nothing (`[kit] CELES hand 0: $15
+(score 176), the bag's best fire blade none better`; the dragon still fell,
+`battle $16E WON after 13141 ticks`). Number 024 after 24 different waits on that
+line's own `n024-entry-save-v1` (`build/attempts/wt/v037-flame-sabres/lab/n024drop/`, 15 distinct keys) dropped
+the Blizzard every time (`[lab] sabres bag=0 worn=0 blizzard=2`).
+
+Only three counters sell a fire blade (`ShopProp` 49 Albrook, 52 Tzen, 56
+Nikeah: the Flame Sabre, 7,000 GP), and Tzen's is the one the route stands
+at. So `gen_wor_sabin` tops CELES's Sabres up to a pair there, counting the
+bag and her own hands (a Sabre on another character, as the World of
+Balance's Optimum once handed LOCKE, is not hers to swing), and asserts the
+pair once the shop has closed; and `armForFire` asserts that both of CELES's
+hands hold a fire blade before the dragon, since `DRAGON_FIGHT` gives up her
+Runic and magic for a Fight with two.
+
+Evidence under `build/attempts/wt/v037-flame-sabres/lab/`:
+
+- `sabin2/`: from 75623b91's own `wor-tzen-door-v1` (no Sabre), shifts 0-3:
+  4 of 4 `bought 2 x $0D from shop 52`, `[tzen] Flame Sabres for CELES: 2
+  (the bag 2, her hands 0)`, PASS; from the tracked `wor-tzen-door-v1` (two
+  in the bag): nothing bought, PASS; the buy switched off: `FAIL: ... a pair
+  of Flame Sabres for CELES (the bag and her hands) leaving Tzen's weapon
+  counter`. (`sabin/` has the first version's 12 shifts, all bought.) A
+  Sabre on another character cannot be set up at Tzen by play: CELES and
+  SABIN are the whole party there, SABIN cannot wield one, and no character
+  who can holds one on the batteries the route makes.
+- `tritoch2/`: the changed `gen_wor_tritoch` from 75623b91's
+  `wor-narshe-cliffs-v1` (no Sabre): `CELES's hands 0 of 2`, FAIL at boot;
+  from the changed line's capture with one Sabre put in TERRA's hand through
+  the Equip menu first: `CELES's hands 1 of 2`, FAIL, where the first
+  version's any-hand guard passed (`2 hand(s) to swing them`); unchanged:
+  `CELES's hands 2 of 2, 0 more in the bag she can wield`, `battle $16E WON
+  after 9214 ticks`, PASS.
+- The line with the change (`round2/chain-3ee38d05.log.gz`) carries the pair
+  through the Falcon legs (CELES swings them there, as on the tracked line)
+  to the cliffs. It has 14,000 GP less than the line without them at
+  `wor-sabin-v1`, 9,634 less at `wor-falcon-v1` and 10,358 less at
+  `wor-narshe-cliffs-v1`.

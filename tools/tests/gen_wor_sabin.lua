@@ -43,8 +43,9 @@
 --      collapse, and SABIN into the party at max(26, CELES's level)
 --      (norm_lvl), with nothing equipped.
 --   6. The town again, now without a clock: the inn (350 GP) when anyone
---      is short, the item shop at the band, CELES's Genji Glove and blades
---      back on, and SABIN dressed from the
+--      is short, the item shop at the band, a pair of Flame Sabres for the
+--      Narshe arc, CELES's Genji Glove and blades back on, and SABIN
+--      dressed from the
 --      weapon and armor shops and the bag: two Fire Knuckles on the bag's
 --      second Genji Glove, the Tiger Mask, the Power Sash, the Black Belt,
 --      and IFRIT.
@@ -61,6 +62,17 @@ local IFRIT, SRAPHIM = 1, 21                        -- esper indices ($1A69 bits
 local FIRE_KNUCKLE, TIGER_MASK, POWER_SASH = 0x57, 0x77, 0x90
 local GENJI, BLACK_BELT, BACK_GUARD, JEWEL_RING = 0xD1, 0xD5, 0xE1, 0xB5
 local BLIZZARD, THUNDERBLADE = 0x0E, 0x0F
+-- The Narshe arc's three bosses (the Ice Dragon, Tritoch, Umaro) are weak
+-- to fire, and gen_wor_tritoch's armForFire puts fire blades in its
+-- Fighter's hands: CELES with her Genji Glove swings two
+-- (route-wor-narshe.md 13.2).  Only three counters in the game sell a fire
+-- blade (ShopProp: Albrook's 49, Tzen's 52 and Nikeah's 56, the Flame
+-- Sabre), and Tzen's is the one the route passes; the World of Balance's
+-- are a 1-in-8 drop (Number 024's rare drop, battle_main.asm @5f17) and a
+-- steal (FlameEater's), so the play owns them under one draw and not
+-- under another (v0.37's line: none from Vector onward).  Tzen's counter
+-- tops the pair up.
+local FLAME_SABRE, FIRE_BLADES = 0x0D, 2
 -- The house's relic (a lever; route-wor-sabin.md 11 has the A/B): the
 -- Back Guard takes the Genji Glove's slot from before the clock until
 -- Sabin has joined.  A solo CELES cannot flee a pincer, and in one her
@@ -123,6 +135,16 @@ local function kit(ch)
   return table.concat(t, " ")
 end
 local function inParty(ch) return (H.readByte(0x1850 + ch) & 7) ~= 0 end
+-- the Flame Sabres CELES can swing: the bag's and her own two hands'.  A
+-- blade another character holds (the World of Balance's Optimum handed
+-- LOCKE one, gen_fc_landing) is not hers to swing, so it does not count.
+local function celesSabres()
+  local n = H.invCountOf(FLAME_SABRE)
+  for _, off in ipairs({ 0x1F, 0x20 }) do
+    if H.readByte(c(CELES, off)) == FLAME_SABRE then n = n + 1 end
+  end
+  return n
+end
 local function timer0() return H.readWord(0x1189) end
 local function clock()
   return H.sceneTimerStr() or string.format("no scene timer (timer 0 counter %d)", timer0())
@@ -510,7 +532,17 @@ H.run({ maxFrames = 200000 }, {
   H.call(function() H.assertEq(H.shopId(), SHOP_WEAPON, "the counter opened shop 52 ($0201)") end),
   H.buyItem(FIRE_KNUCKLE, function() return math.max(0, 2 - H.invCountOf(FIRE_KNUCKLE)) end,
     "FIRE KNUCKLE x2 (a pair on the Genji Glove)"),
+  H.buyItem(FLAME_SABRE, function() return math.max(0, FIRE_BLADES - celesSabres()) end,
+    "FLAME SABRE to a pair for CELES (the Narshe arc's fire-weak bosses)"),
   H.shopClose("Tzen weapon shop"),
+  -- read after the shop hands the bag back (H.buyItem: purchases are
+  -- verified after the shop closes)
+  H.call(function()
+    H.log(string.format("[tzen] Flame Sabres for CELES: %d (the bag %d, her hands %d)", celesSabres(),
+      H.invCountOf(FLAME_SABRE), celesSabres() - H.invCountOf(FLAME_SABRE)))
+    H.assertEq(celesSabres() >= FIRE_BLADES, true,
+      "a pair of Flame Sabres for CELES (the bag and her hands) leaving Tzen's weapon counter")
+  end),
   H.navTo(39, 50, { maxFrames = 6000, playBattles = "tactical" }),
   holdOut("down", MAP_TZEN, "the weapon shop's (39,51) trigger -> Tzen 305"),
   H.crossDoor(8, 17, MAP_ARMOR, 56, 51, "Tzen armor shop door 305(8,17)->310(56,51)"),
