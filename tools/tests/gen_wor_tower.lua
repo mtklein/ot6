@@ -662,6 +662,7 @@ local function examineUp(x, y, begun, what, avoid)
   })
 end
 local PARTY = { { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" }, { STRAGO, "STRAGO" } }
+local MAGIMASTER_STONES = { { TERRA, SHIVA }, { RELM, MADUIN }, { STRAGO, SRAPHIM }, { CELES, TRITOCH } }
 -- the stones by member, in order: each is equipped only where it is not
 -- worn already (H.equipEsper frees a stone from its seated owner first)
 local function stonesFor(set, tag)
@@ -713,6 +714,21 @@ local function wallRingsOff(tag, keep)
   end
   steps[#steps + 1] = H.call(function() say("wor", "Wall Rings off for " .. tag .. ": " .. kitLine()) end)
   return H.seqStep(steps)
+end
+-- the rings off for a fight that must not be fought in them, and checked:
+-- a ring whose relic this run never recorded (a boot past the climb's
+-- first "on") stays on, and the fight would be the old one
+local function ringsOffFor(tag)
+  return H.seqStep({
+    wallRingsOff(tag),
+    H.call(function()
+      for _, m in ipairs(PARTY) do
+        H.assertEq(H.readByte(c(m[1], 0x23)) ~= WALL_RING and H.readByte(c(m[1], 0x24)) ~= WALL_RING, true,
+          string.format("%s wears no Wall Ring for %s (the relic it gave way to was recorded: %s)", m[2], tag,
+            heldRelic[m[1]] and string.format("$%02X", heldRelic[m[1]]) or "none"))
+      end
+    end),
+  })
 end
 -- the climb's spend (route-wor-thamasa.md 10.1: the randoms are fought, the
 -- MP drain answered with supplies), logged floor by floor
@@ -892,17 +908,28 @@ H.run({ maxFrames = 1500000 }, {
   -- in it passed every turn of MagiMaster's fight ('cmds=17,FF,FF,01',
   -- 'actor=0 char=0 plan=switch': build/attempts/wt/v030-route/lab/tower/
   -- cap2)
-  -- MagiMaster is fought in the Wall Rings: every sweep that measured his
-  -- fight had them on (build/attempts/wt/v031-tower-2/lab/sw13_k0_s5:
-  -- 'dressed for MagiMaster: kit TERRA 02 06 64 7F 94 CA BB'), the "off"
-  -- that stood here restoring nothing (the fourth floor's "on" had
-  -- recorded the rings, #460)
   -- TERRA onto Shiva (Shell for his Ultima; her own Life, Drain, Break and
   -- Pearl stay), STRAGO onto Sraphim (Cure and a second Life: one Life 3
   -- caster lost him the fight he had already won, his Ultima falling on
   -- STRAGO alone: build/attempts/wt/v031-tower/lab/
-  -- f4b_p3t_p3r_k0_wor_relm_s9_wor_tower_f4_s0)
-  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM }, { CELES, TRITOCH } }, "stones for MagiMaster"),
+  -- f4b_p3t_p3r_k0_wor_relm_s9_wor_tower_f4_s0), RELM onto Maduin (Fire,
+  -- Ice and Bolt: three of his eight walls where Ifrit's Fire answered one,
+  -- and his wall absorbs one element in eight, so on Ifrit she drank a
+  -- Tonic every turn the absorbed element was fire: 142 of 180 no-line
+  -- fallbacks, build/attempts/wt/v031-relics-grey/lab/rg1_*, rg2_*, rg4_*,
+  -- 'magic-only $00 refused: fire is ABSORBED by slot 0 species $0166', #444)
+  stonesFor(MAGIMASTER_STONES, "stones for MagiMaster"),
+  -- MagiMaster is fought without the Wall Rings (#442).  In them each
+  -- Fire 2/3, Ice 2/3 and Bolt 2/3 he aimed at a member rebounded onto
+  -- him, and his wall drinks one element in eight: the party's HP never
+  -- moved while his climbed back (3,350 to 58,212 HP regained a fight over
+  -- 36 wins, 'slot 0 $166 cmd $02 atk $09' then 'monhp=s0:47337' ->
+  -- '50000' with the party's HP unchanged: build/attempts/wt/
+  -- v031-tower-2/lab/sw5_*, sw6_*), Reflect turned the party's own Shell
+  -- away, and the fight ran 39,982 to 203,654 ticks.  Off, his spells land
+  -- on the party, Shell goes up (the driver's shellVs skips a reflecting
+  -- member), and the care can cast its cures in the fight
+  ringsOffFor("MagiMaster"),
   -- (unless the dress after its room already put it on someone)
   lazy(function()
     if H.invCountOf(FORCE_ARMOR) < 1 then
@@ -918,7 +945,8 @@ H.run({ maxFrames = 1500000 }, {
   -- ---- 5. MagiMaster ---------------------------------------------------------------
   -- @@stage magimaster
   H.call(function() BOSS_FIGHT.reserve = walkDownReserve() end),
-  stonesFor({ { TERRA, SHIVA }, { RELM, IFRIT }, { STRAGO, SRAPHIM }, { CELES, TRITOCH } }, "stones for MagiMaster"),
+  stonesFor(MAGIMASTER_STONES, "stones for MagiMaster"),
+  ringsOffFor("MagiMaster"),
   H.call(function() H.assertEq(sw(0x02DA), 1, "the Gem Box's tile armed MagiMaster ($02DA, _cc5440)") end),
   stepOn(8, 8, function() return H.battleLoadStarted() or sw(0x02DB) == 1 end),
   -- 400,000 frames: his 50,000 HP fall only to the casts his wall leaves

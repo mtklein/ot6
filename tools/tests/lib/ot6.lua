@@ -7246,6 +7246,30 @@ function Driver:battInvIdx(id, reserve)
   return nil
 end
 
+-- The item a seat with no Fight row and no Magic line spends its turn on
+-- (Driver:makePlanRules' no-line fallback, #443): a Tonic, else a Potion,
+-- from above the bag's care floor (`reserve`, battInvIdx); only when
+-- neither is left above it, the last of either, below.  Returns { it, idx,
+-- have, floor } or nil.  tools/tests/noline_floor_selftest.lua holds it to
+-- the floor.
+function Driver:noLineItemPick(reserve)
+  for _, it in ipairs({ 0xE8, 0xE9 }) do   -- Tonic, Potion
+    local idx = self:battInvIdx(it, reserve)
+    if idx ~= nil then
+      return { it = it, idx = idx, floor = "within the care floor", have = M.readByte(BATTLE.BATTINV + idx * 5 + 3) }
+    end
+  end
+  for _, it in ipairs({ 0xE8, 0xE9 }) do
+    for slot = 0, 251 do
+      if M.readByte(BATTLE.BATTINV + slot * 5) == it and M.readByte(BATTLE.BATTINV + slot * 5 + 3) > 0 then
+        return { it = it, idx = slot, floor = "BELOW the care floor: nothing else left",
+                 have = M.readByte(BATTLE.BATTINV + slot * 5 + 3) }
+      end
+    end
+  end
+  return nil
+end
+
 -- What one use of an item gives back.  The prior is M.itemPower, the
 -- +$14 power byte; it is a prior and not the answer, because power is an
 -- input to the engine's heal routine rather than its output.  The first
@@ -9169,6 +9193,27 @@ function Driver:cureFor(e)
   if (M.readByte(BATTLE.ST2 + e * 2) & M.ST2_BERSERK) ~= 0 then
     return M.statusCure({ byte = 2, bit = M.ST2_BERSERK,
       has = function(item) return self:battInvIdx(item) ~= nil end }), "Berserk"
+  end
+  -- Mute (#444) where Magic is the member's attack: a seat with a Magic row
+  -- and no Fight row (the Fanatics' Tower, whose Fight row is Magic) has no
+  -- turn while the row is greyed (UpdateCmd_05 greys it on $3EE5 bit 3), so
+  -- an Echo Screen or a Remedy (M.statusCure, cheapest in gil) is worth the
+  -- turn.  A member who can still Fight keeps its turn for that.  Measured
+  -- in the tower before this branch: 23 of 203 no-line fallbacks were a
+  -- Muted seat drinking a Tonic with Remedies in the bag (build/attempts/wt/
+  -- v031-relics-grey/lab/rg1_k5_s11: 'Magic row greyed, status $00 $08 MUTE')
+  -- (the rows read as listed, greyed or not: cmdRow reports the greyed
+  -- Magic row as absent)
+  local function listed(cmd)
+    for row = 0, 3 do
+      if M.readByte(BATTLE.CMDTBL + e * 12 + row * 3) == cmd then return true end
+    end
+    return false
+  end
+  if (M.readByte(BATTLE.ST2 + e * 2) & M.ST2_MUTE) ~= 0 and listed(BATTLE.CMD_MAGIC)
+     and not listed(BATTLE.CMD_FIGHT) then
+    return M.statusCure({ byte = 2, bit = M.ST2_MUTE,
+      has = function(item) return self:battInvIdx(item) ~= nil end }), "Mute"
   end
   return nil, nil
 end
@@ -13150,23 +13195,7 @@ function Driver:makePlanRules(actor)
     if irow ~= nil and least ~= nil then
       -- a driver given no floor of its own (a walk's fights) keeps the field care's (M.CARE_RESERVE)
       local reserve = self.opts.reserve or M.CARE_RESERVE or {}
-      local pick = nil
-      for _, it in ipairs({ 0xE8, 0xE9 }) do   -- Tonic, Potion
-        local idx = self:battInvIdx(it, reserve)
-        if pick == nil and idx ~= nil then pick = { it = it, idx = idx, floor = "within the care floor",
-                                  have = M.readByte(BATTLE.BATTINV + idx * 5 + 3) } end
-      end
-      if pick == nil then
-        for _, it in ipairs({ 0xE8, 0xE9 }) do
-          for slot = 0, 251 do
-            if pick == nil and M.readByte(BATTLE.BATTINV + slot * 5) == it
-               and M.readByte(BATTLE.BATTINV + slot * 5 + 3) > 0 then
-              pick = { it = it, idx = slot, floor = "BELOW the care floor: nothing else left",
-                         have = M.readByte(BATTLE.BATTINV + slot * 5 + 3) }
-            end
-          end
-        end
-      end
+      local pick = self:noLineItemPick(reserve)
       if pick ~= nil then
         -- why there is no line: the Magic row greyed (flags bit 7) or absent, or present and
         -- empty-handed; Mute is status byte 2 bit 3
