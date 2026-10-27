@@ -243,9 +243,20 @@ async function tick(){ try{
   const Q = j.quota||{};
   if(Q.percent!=null){
     const p=Math.max(0,Math.min(100,Q.percent)), n=8, f=Math.round(p*n/100);
-    const col = p>=90?'#e06060':p>=75?'#e0a93e':'#8c8';
     // to the minute: the endpoint says 22:59:59.5 as often as 23:00:00
     const r = new Date(Math.round(Date.parse(Q.resets_at)/60000)*60000);
+    // Colored by pace, not by level: at this week's rate so far, when would
+    // the quota run out, against the reset?  Blue: it won't (under 90% used
+    // at the reset); green: about on pace (out within half a day of it);
+    // yellow: out a day or two early; red: faster than that.
+    const day=864e5, left=r-Date.now(), gone=7*day-left;
+    const ahead = p>0 && gone>0 ? (left - gone*(100-p)/p)/day : -Infinity;
+    const atReset = gone>0 ? p*7*day/gone : 0;
+    const col = atReset<90 ? '#6aa8e0' : ahead<=0.5 ? '#8c8'
+              : ahead<=2 ? '#e0c040' : '#e06060';
+    $('quota').title = isFinite(ahead) ? (atReset<100
+      ? 'on this pace, '+Math.round(atReset)+'% used by the reset'
+      : 'on this pace, out '+ahead.toFixed(1)+' day(s) before the reset') : '';
     $('quota').innerHTML = 'week <span style="color:'+col+'">'
       + '\u2588'.repeat(f)+'</span><span style="color:#354">'
       + '\u2588'.repeat(n-f)+'</span> <span style="color:'+col+'">'+p+'%</span>'
