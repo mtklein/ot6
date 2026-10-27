@@ -40,7 +40,7 @@
 -- through the menu as a player would):
 --   BASE  no esper equipped; leader's four stats and union recorded, union empty.
 --   RAMUH esper 0  stamina +4, mag.pwr +2; grants Bolt/Rasp.
---   SIREN esper 3  speed +4, mag.pwr +2; grants Mute/Sleep (magicite.md's
+--   SIREN esper 3  speed +4, mag.pwr +2; grants Mute/Sleep/Bserk (magicite.md's
 --                  planned list), and not Slow or Fire.
 --   KIRIN esper 17 mag.pwr +4, stamina +2; grants Cure(base)/Regen (the
 --                  plan), and NOT Cure2 (a tier), Antdot or Scan.
@@ -57,6 +57,7 @@ local STATE = "build/states/minecart_entry.mss.lua"
 local BOLT, RASP           = 0x02, 0x1a
 local SLEEP, MUTE, SLOW    = 0x1d, 0x1b, 0x19
 local MUDDLE, IMP, FLOAT   = 0x1e, 0x23, 0x22
+local BSERK                = 0x21
 local CURE, CURE2, REGEN, ANTDOT, SCAN = 0x2d, 0x2e, 0x34, 0x32, 0x18
 local FIRE, FIRE2, DRAIN   = 0x00, 0x05, 0x04
 local ICE, ICE2, OSMOSE, SHELL = 0x01, 0x06, 0x29, 0x25
@@ -298,7 +299,7 @@ local function checkBase()
       { SLOW, "Slow" }, { CURE, "Cure" }, { REGEN, "Regen" }, { ANTDOT, "Antidote" },
       { MUDDLE, "Muddle" }, { IMP, "Imp" }, { FLOAT, "Float" }, { CURE2, "Cure2" },
       { FIRE, "Fire" }, { DRAIN, "Drain" }, { ICE, "Ice" }, { OSMOSE, "Osmose" },
-      { SHELL, "Shell" }, { FIRE2, "Fire2" }, { ICE2, "Ice2" },
+      { SHELL, "Shell" }, { FIRE2, "Fire2" }, { ICE2, "Ice2" }, { BSERK, "Bserk" },
     }) do
       H.assertEq(has(b.union, s[1]), false,
         "[base] " .. s[2] .. " innately absent (clean control)")
@@ -346,7 +347,7 @@ add({ checkEsper("ramuh", RAMUH, { stam = 4, mag = 2 },
   { { BOLT, "Bolt" }, { RASP, "Rasp" } }) })
 add(driveSteps("siren", SIREN))
 add({ checkEsper("siren", SIREN, { spd = 4, mag = 2 },
-  { { SLEEP, "Sleep" }, { MUTE, "Mute" } },
+  { { SLEEP, "Sleep" }, { MUTE, "Mute" }, { BSERK, "Bserk" } },
   { { SLOW, "Slow (not in the plan)" }, { FIRE, "Fire (not in the plan)" } }) })
 add(driveSteps("kirin", KIRIN))
 add({ checkEsper("kirin", KIRIN, { mag = 4, stam = 2 },
@@ -357,7 +358,7 @@ add({ checkEsper("kirin", KIRIN, { mag = 4, stam = 2 },
 add(driveSteps("stray", STRAY))
 add({ checkEsper("stray", STRAY, { mag = 4, spd = 2 },
   { { MUDDLE, "Muddle" }, { IMP, "Imp" } },
-  { { FLOAT, "Float (not in the plan)" } }) })
+  { { FLOAT, "Float (not in the plan)" }, { BSERK, "Bserk (Siren's, not Stray's)" } }) })
 add(driveSteps("ifrit", IFRIT))
 add({ checkEsper("ifrit", IFRIT, { vig = 12, stam = 4, mag = -3 },
   { { FIRE, "Fire (base tier -- PROOF here)" }, { DRAIN, "Drain" } },

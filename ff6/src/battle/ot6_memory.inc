@@ -533,4 +533,11 @@ OT6_NMISCR           := $ee23   ; 8 bytes
 .assert OT6_NMISCR + 8 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 .assert OT6_SCR_COLS + 2 - OT6_SCR_SLOT2 = 8, error, "the NMI's scratch save covers $3ecc-$3ed3 in four words"
 
+; Strago saw a monster inflict Berserk this battle (ot6_blue.asm, Strago's
+; blue Bserk): set by Ot6BlueWatch from LearnLore while he is present and
+; able, read by Ot6BlueLearn at the victory.  Cleared wholesale by InitBP.
+OT6_BLUESEEN         := $ee2b
+.assert OT6_BLUESEEN = OT6_NMISCR + 8, error, "the blue-magic mark must follow the NMI's scratch save"
+.assert OT6_BLUESEEN <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
 .endif

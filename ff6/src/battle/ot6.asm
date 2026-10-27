@@ -103,3 +103,6 @@
 
 ; the Cursed Shield's count (#387), appended for the same reason.
         .include "ot6_gear.asm"
+
+; Strago's blue Bserk, appended for the same reason.
+        .include "ot6_blue.asm"

@@ -10,9 +10,11 @@ table, 54 bytes a character; savestate_party.find_char_block locates $1600):
               (check_spell_grants.tiers_of): no source in this ROM grants one.
   UNSOURCED = learned spells no current grant source produces for that save:
               not TERRA's or CELES's NaturalMagic at or below the saved level,
+              not STRAGO's Bserk (learned by watching, battle/ot6_blue.asm),
               and not in the GenjuProp list of an Esper the save holds
               ($1A69..$1A6C bits).  check_spell_grants.py's header: nothing
-              else writes the learned table.
+              else writes the learned table.  The --control spell is
+              LOCKE's, so STRAGO's Bserk never stands in for it.
 For TERRA (0) and CELES (6):
   missing   = natural spells at or below the saved level not learned.
 One line per checkpoint; 'BAD' marks any tier or unsourced spell.  Exit 1
@@ -42,6 +44,9 @@ tiers = g.tiers_of(bytes(inp.rom[inp.fold:inp.fold + 3 * inp.nfold]))
 NAMES = ["TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN", "CELES", "STRAGO",
          "RELM", "SETZER", "MOG", "GAU"]
 nat = {0: g.natural_pairs(inp, 0), 6: g.natural_pairs(inp, 1)}
+# STRAGO learns Bserk by watching a monster inflict Berserk (battle/ot6_blue.asm,
+# OT6_BLUE_SPELL): his learned table may hold it, and only it, with no Esper
+STRAGO, BLUE_SPELL = 7, 0x21
 grants = {e: {s for s in g.esper_spells(inp, e) if s != 0xFF}
           for e in range(inp.genju_rows)}
 every = set().union(*grants.values()) | {s for c in nat for s, _ in nat[c] if s != 0xFF}
@@ -66,6 +71,8 @@ def check(name, raw):
         learned = {s for s in range(54) if raw[base + s] == 0xFF}
         t = sorted(inp.name(s) for s in learned if s in tiers)
         ok = set(from_espers)
+        if c == STRAGO:
+            ok.add(BLUE_SPELL)
         if c in nat:
             ok |= {s for s, l in nat[c] if s != 0xFF and l <= lvl}
         extra = sorted(inp.name(s) for s in learned - ok)

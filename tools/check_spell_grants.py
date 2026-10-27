@@ -51,9 +51,11 @@ And equipment grants while worn, as an Esper does (#431): Ot6ItemGrantTbl
 wearer its spell, never learned.  Items may grant a family's base -- the head
 of an Ot6FoldTbl row, which boost folds up its tiers -- and never a tier or a
 spell no row heads; and the table equals docs/design/magicite.md's "Items
-that grant" table, in order.  Nothing else writes the learned-spell table: the new-game
-init clears it, and vanilla's teach-spell event routine (GiveMagic) is in no
-event command slot.
+that grant" table, in order.  Nothing else writes the learned-spell table but
+STRAGO's blue Bserk (battle/ot6_blue.asm: he learns Bserk, and only Bserk, by
+seeing a monster inflict Berserk; tools/spells_all.py counts it as his
+source): the new-game init clears it, and vanilla's teach-spell event routine
+(GiveMagic) is in no event command slot.
 
 Usage:  python3 tools/check_spell_grants.py [--repo ROOT] [--rom PATH]
             [--dbg PATH] [--selftest]

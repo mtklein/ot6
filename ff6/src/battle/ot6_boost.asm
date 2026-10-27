@@ -49,6 +49,7 @@
         sta     f:$7e0000+OT6_FIZZLED ; nor an X-Magic refusal mark
         sta     f:$7e0000+OT6_MIMICCOPY ; nor a Mimic copy mark
         sta     f:$7e0000+OT6_SPELLNONE ; nor a no-reward spell turn's mark
+        sta     f:$7e0000+OT6_BLUESEEN  ; nor a Berserk Strago saw last battle
         sta     f:$7e0000+OT6_RUNICBLADE ; nor a RunicBlade nobody raised
         sta     f:$7e0000+OT6_BLADEPEND  ; nor a bounce from the last battle
         sta     f:$7e0000+OT6_UNCTL     ; nor a stale "the engine is driving

@@ -9182,15 +9182,18 @@ LearnLore:
         phx
         php
         shorta
-        lda     $11a3
-        bit     #$04
-        beq     @3708
+        ; ot6: Strago's eligibility first, then the lore test, so that a
+        ;   monster's Berserk is watched with a lore's eyes (ot6_blue.asm)
         ldy     $3007
         bmi     @3708
         peaflg  STATUS12, {DEAD, PETRIFY, BLIND, ZOMBIE, SLEEP, CONFUSE, BERSERK}
         peaflg  STATUS34, {STOP, FROZEN, RAGE, HIDE}
         jsr     CheckStatus
         bcc     @3708
+        jsl     Ot6BlueWatch    ; ot6: a monster's Berserk teaches him Bserk
+        lda     $11a3           ;   (P kept: the carry CheckStatus set)
+        bit     #$04
+        beq     @3708
         lda     $b6
         sbc     #$8b
         clc
@@ -15961,6 +15964,7 @@ WinBattle:
         lda     #$0027      ; battle message $27 "got <v0> exp. point(s)"
         jsr     ShowMsg
 @5e0e:  shorta
+        jsl     Ot6BlueLearn    ; ot6: Strago's Bserk, seen this battle
         ldy     #$0006
 @5e13:  lda     $3018,y     ; character mask
         bit     $3a74

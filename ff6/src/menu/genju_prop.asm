@@ -99,9 +99,10 @@ make_genju_prop {FIRE, 0}, {DRAIN, 0}, {}, {}, {}
 ;   nothing to multiply.
 make_genju_prop {ICE, 0}, {OSMOSE, 0}, {SHELL, 0}, {}, {}
 
-; 3: siren.  Mute, Sleep: the planned list (docs/design/magicite.md's WoB roster table, "the
-;   controller job").  Vanilla's Slow and the leftover Fire are not in it.
-make_genju_prop {MUTE, 0}, {SLEEP, 0}, {}, {}, {}
+; 3: siren.  Mute, Sleep, Bserk: the planned list (docs/design/magicite.md's WoB roster table, "the
+;   controller job": three ways to take an enemy's turn from it, the last for a caster that shrugs
+;   off the first two).  Vanilla's Slow and the leftover Fire are not in it.
+make_genju_prop {MUTE, 0}, {SLEEP, 0}, {BSERK, 0}, {}, {}
 
 ; 4: terrato, "the Landslide" (magicite.md's World of Ruin table).  Quake hits
 ;   every body on the field that does not float; Quartr is the enemy-only

@@ -67,7 +67,7 @@ Permit columns describe the *proposed* system, not the shipped one.
 | Ramuh | Zozo | Bolt, Rasp | 0 / 0 / +4 / +2 | *Conductor*: bolt spells chip +1 | piercing | the storm-lancer job |
 | Kirin | Zozo | Cure, Regen | 0 / 0 / +2 / +4 | *Mender*: heals never miss the row | — | the medic job |
 | Stray | Zozo | Muddle, Imp | 0 / +2 / 0 / +4 | *Alley Cat*: +5 evade | slashing (claws) | the trickster job |
-| Siren | Zozo | Mute, Sleep | 0 / +4 / 0 / +2 | *Lullaby*: sleepers take +50% chip | — | the controller job |
+| Siren | Zozo | Mute, Sleep, Bserk | 0 / +4 / 0 / +2 | *Lullaby*: sleepers take +50% chip | — | the controller job: silence a caster, sleep it, or madden it into a brawler ("Berserk", below) |
 | Ifrit | Magitek factory | Fire, Drain | +6 / 0 / +4 / −3 | none, deliberately | none, deliberately | **"the Furnace": weight** |
 | Shiva | Magitek factory | Ice, Osmose, **Shell** | −3 / +4 / 0 / +6 | none, deliberately | none, deliberately | **"the Rime": economy** |
 | Unicorn | tube room | Pearl, Remedy | 0 / 0 / +5 / +2 | *Purity*: status durations halved | — | the paladin-adjacent |
