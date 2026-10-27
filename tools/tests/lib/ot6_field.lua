@@ -10321,7 +10321,7 @@ function M.worLegKit(env)
   -- its Potions for the fights
   local function hunt(spec)
     local won, wp, n0, seen = spec.won or {}, 1, nil, nil
-    local saved = nil
+    local saved, quietSaid = nil, false
     local function knobs(on)
       if not spec.castFirst then return end
       if on then
@@ -10366,6 +10366,12 @@ function M.worLegKit(env)
         if done() then return still() end
         return false
       end, spec.maxFrames or 3000000, {
+        -- a lap of two tiles with no encounter repeats the last lap's frames, and the no-progress watchdog reads
+        -- novelty (gen_n024_entry's grind laps): declared per step, so a lap that really stalls still trips
+        M.call(function()
+          M.watchQuiet(600, not quietSaid and "the hunt walks the same two tiles" or nil)
+          quietSaid = true
+        end),
         nav(function() return spec.lap[wp][1] end, function() return spec.lap[wp][2] end,
           { maxFrames = 20000, playBattles = "tactical", fight = FIGHT, avoid = spec.avoid }),
         M.call(function() wp = wp % 2 + 1 end),
