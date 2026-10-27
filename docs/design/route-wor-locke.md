@@ -217,3 +217,31 @@ group): `tally.py` (`tally_sw.txt`) and `tools/fight_report.py`
    nine levels under them.
 4. **Doom Gaze's row** (8, pierce and special) is a first design from the
    meeting on the way; v0.34 fights it.
+
+## 9. The Necromancers again (v0.38, #448)
+
+Measured on v0.37's line from the cave's own snapshot: `wor_phoenix_split`
+(both groups dressed at the entry) from a replay of the chain's play
+(`build/attempts/wt/v038-wor-fights/lab/phoenix/pa_k0_s0`, the same keys as
+the qualified `wor_phoenix`), then the gates stage at 40 seed shifts
+(`lab/gates/`, `mkgates.py`; `tally.py`, `deaths.py`). Party 1's first
+random there is formation $152 on every shift: 11 distinct keys, 11 won,
+four `[death]` lines (`ga_deaths.txt`). Two are the ZombiStick landing on
+SABIN ("2227 -> 0 ... atk $EF", keys beA4 and beC4), two are STRAGO's
+falls to the Necromancers' and the Phase's magic (keys be34 and beC4). No
+zombie's turn felled a member. The five-death draws of section 7 were
+v0.32's driver; the K sweep from `wor-thamasa-v1` (`lab/phoenix/pa_*`, K
+0-5 at shifts 0 and 7) met $152 only at K = 0 and passed 12 of 12.
+
+The play did show a defect. When the Zombie lands with SABIN's command
+window open, the driver planned SABIN's own Revivify in that window
+("actor=2 cure entity 2's Zombie with $F1", `ga_s0`). A zombie's turns
+are the engine's, so the plan could not run, and it took the round's care
+turn while the next member's cure waited for it. `M.zombieDefers` now
+defers a Zombied actor's window (X), as for Muddle: "actor=2 is a ZOMBIE
+(STATUS1 $02) -- not planning" (`gb_s0`). On these draws the next member's
+window came no sooner either way, so the gates sweep with the rule
+(`gb_*`) reads the same: 11 keys, 11 won, the same four `[death]` lines.
+The Revivify still lands about 2,000 frames after it is planned (the
+queue behind the monsters' actions), and the Zombie guards of section 8.2
+stay the way to keep SABIN from turning.

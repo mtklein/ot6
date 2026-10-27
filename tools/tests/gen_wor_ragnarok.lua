@@ -13,6 +13,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local TERRA, LOCKE, CELES, RELM = 0, 1, 6, 8
 local POTION, FENIX, REMEDY, TENT, TINCTURE, REVIVIFY = 0xE9, 0xF0, 0xF5, 0xF7, 0xEB, 0xF1
 local HYPER_WRIST, SNEAK_RING, WALL_RING, THIEFKNIFE, EARRINGS, CURSED_SHLD = 0xD2, 0xC7, 0xBB, 0x04, 0xC3, 0x66
+local BACK_GUARD = 0xE1                     -- no back or pincer attacks (ChooseBattleType @2e3a)
 local MAP_NARSHE, MAP_ELDER, MAP_WEAPON, MAP_ITEMS, MAP_RELICS, MAP_INN = 32, 30, 24, 26, 27, 28
 local SEATED = { LOCKE, TERRA, CELES, RELM }
 local NAMES = { [TERRA] = "TERRA", [LOCKE] = "LOCKE", [CELES] = "CELES", [RELM] = "RELM" }
@@ -56,6 +57,31 @@ local function say(tag, what)
   local pos = H.worldMode() and string.format("world (%d,%d)", H.worldX(), H.worldY())
     or string.format("map %d (%d,%d)", map(), H.fieldX(), H.fieldY())
   H.log(string.format("[%s] f%d %s %s; %s; %s", tag, H.frame, what, pos, H.partiesLine(), supplies()))
+end
+-- The Back Guard on the plain (#452).  The plain south of Narshe (world
+-- group 51) deals the Mantodea pair (formation 325, 80/256) and permits a
+-- pincer, which forces every member to the front row and lands the blows
+-- from behind (InitBattleType_02, UpdateFacingDirection: +50%): vanilla's
+-- arithmetic on a vanilla monster (L54, attack 180), one blow a member from
+-- full in the Gau arc's sweep (build/attempts/wt/v033-wor-gau/lab/swa_k3_s7,
+-- key be24-g0145).  The bag's Back Guard drops the pincer and the back attack
+-- from the roll; it goes on LOCKE over the Star Pendant his Ribbon already
+-- covers, and RELM goes to the back row.  Measured from this leg's capture (build/attempts/wt/
+-- v038-wor-fights/lab/narshe/): without it formation 325 rolled a pincer or
+-- a back attack in 3 of 50 keys, be24 a pincer; with it none in 47, be24 a
+-- side attack, won with no one down.
+local function wearsBackGuard(ch)
+  return H.readByte(c(ch, 0x23)) == BACK_GUARD or H.readByte(c(ch, 0x24)) == BACK_GUARD
+end
+local function backGuard(what)
+  return H.seqStep({
+    H.cond(function() return not wearsBackGuard(LOCKE) end, {
+      H.equipKit(LOCKE, { { 5, BACK_GUARD } }, { tag = "LOCKE: the Back Guard (" .. what .. ")" }),
+    }, {}),
+    H.call(function()
+      H.assertEq(wearsBackGuard(LOCKE), true, "LOCKE wears the Back Guard (" .. what .. ")")
+    end),
+  })
 end
 local function kitLine()
   local t = {}
@@ -244,8 +270,26 @@ H.run({ maxFrames = 2400000 }, {
   H.call(function()
     say("wor", "boot")
     H.log("[kit] " .. kitLine())
+    -- what the plan depends on (#480): the Back Guard is the party's own,
+    -- carried since the World of Balance and last worn in the Figaro cave
+    -- (gen_wor_edgar puts it back in the bag); no counter on this leg sells one
+    local n = H.invCountOf(BACK_GUARD)
+    for _, ch in ipairs(SEATED) do if wearsBackGuard(ch) then n = n + 1 end end
+    H.assertEq(n >= 1, true, "the party owns a Back Guard ($E1) for the plain's pincers (carried since the World "
+      .. "of Balance; gen_wor_edgar puts it back in the bag after the Figaro cave)")
   end),
   -- @@setup-end
+  backGuard("the plain south of Narshe"),
+  -- RELM to the back row (#452): she stood in the front row since she
+  -- joined, where a Mantodea's Battle took her from full in one blow (20 of
+  -- the two arms' 24 deaths to formation 325 were hers, 19 "ONE ACTION from
+  -- >= 80%"); the back row halves the blows a painter takes (lab/narshe/
+  -- nc_*: 0.02 deaths a fight over 49 keys, against 0.09 over 47 with the
+  -- Back Guard alone and 0.12 over 50 with neither)
+  H.setRows({ [RELM] = true }, { tag = "RELM to the back row" }),
+  H.call(function()
+    H.assertEq(H.readByte(0x1850 + RELM) & 0x20, 0x20, "RELM stands in the back row ($1850 bit 5)")
+  end),
 
   -- ---- 1. the Falcon to Narshe ------------------------------------------------------
   -- @@stage flight
@@ -396,6 +440,7 @@ H.run({ maxFrames = 2400000 }, {
 
   -- ---- 6. out of the gate, and the save -------------------------------------------------------
   -- @@stage save
+  backGuard("the walk back to the Falcon"),
   via({ { 38, 40 }, { 38, 50 } }, "Narshe's street to the gate", NARSHE_DOORS),
   H.navTo(38, 61, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, avoid = NARSHE_DOORS,
     arrive = function() return H.worldMode() end }),

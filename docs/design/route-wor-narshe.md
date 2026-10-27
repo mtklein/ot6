@@ -878,3 +878,54 @@ Evidence under `build/attempts/wt/v037-flame-sabres/lab/`:
   to the cliffs. It has 14,000 GP less than the line without them at
   `wor-sabin-v1`, 9,634 less at `wor-falcon-v1` and 10,358 less at
   `wor-narshe-cliffs-v1`.
+
+## 14. The plain's pincer (v0.38, #452)
+
+The Gau arc's first sweep lost one battle on the plain south of Narshe
+(world group 51): the Mantodea pair, formation 325, in a pincer, key
+be24-g0145, felled LOCKE, CELES, TERRA and RELM over five of the
+Mantodeas' actions to the party's four ("[wipe] ... class=one-shot early",
+`build/attempts/wt/v033-wor-gau/lab/swa_k3_s7`). CELES (3,381 of 3,723)
+and RELM (4,176, full) each fell to one blow; TERRA lost 3,126 to one.
+
+**Vanilla's arithmetic.** The Mantodea's record (L54, attack 180, 4,500
+HP) is the retail ROM's byte for byte, and OT6's damage hooks change no
+monster's blow on a character: `Ot6ShieldedDmg` and `Ot6BrokenDmg` return
+at once for a target under entity 8 (`ot6_break.asm`, `cmp #$08 / bcc
+done`). The pincer is vanilla's too: `InitBattleType_02` puts every member
+in the front row, and `UpdateFacingDirection` marks a monster's blow on a
+member as from behind, half again as much (`inc $bc`). OT6 does lengthen
+the fight: a Mantodea takes half from a hit that keys none of its three
+shields (slash, bludgeon, special), and TERRA's spear and LOCKE's Wing
+Edge key none. But the lost key was decided by the opening blows, not the
+length. So this is vanilla difficulty, and the answer is how the route
+plays.
+
+**Measured** from this leg's own capture, `wor-ragnarok-v1` at 36907d28
+(`build/attempts/wt/v038-wor-fights/lab/narshe/`, `lab_narshe_plain*.lua`
+in `lab/scripts/`): the four walk (115,38) <-> (115,35) for ten battles
+with the route's driver and field care, seed shifts 0-23 an arm. Formation
+325 by distinct key (`fight_report_narshe.txt`, `tally_n*.txt`):
+
+| arm | runs | keys | won | deaths/fight | pincer / back keys |
+|---|---|---|---|---|---|
+| as v0.37 (`na_*`) | 24 of 24 | 50 | 50 | 0.12 | 1 / 2 (be24 a pincer, won with LOCKE down twice) |
+| the Back Guard on LOCKE (`nb_*`) | 24 of 24 | 47 | 47 | 0.09 | 0 / 0 (be24 a side attack, no one down) |
+| that, and RELM in the back row (`nc_*`) | 24 of 24 | 49 | 49 | 0.02 | 0 / 0 |
+
+Of the 24 deaths to formation 325 in the first two arms, 20 were RELM's
+and 19 of those were one blow from 80% or more: she had stood in the front
+row since she joined. In the third arm the fights run a little longer
+(median 2,272 ticks against 1,916), since her Fight from the back row is
+halved.
+
+**The leg** (`gen_wor_ragnarok`): at its start it asserts that the party
+owns a Back Guard (the bag's, carried since the World of Balance; no
+counter on this leg sells one), puts it on LOCKE over the Star Pendant his
+Ribbon already covers, and moves RELM to the back row; before the walk
+back to the Falcon it checks the Back Guard is still on and puts it back if
+not. The town's relic rule leaves it where it is (an unranked worn relic
+stays, `M.relicPlan` step 1). The assert's negative: the leg with the item
+id changed fails at boot, "assertEq failed: the party owns a Back Guard
+($E1) for the plain's pincers" (`lab/ragnarok/ragmut`); the leg passes,
+"PASS (frame 31145)" (`lab/ragnarok/rag2`).

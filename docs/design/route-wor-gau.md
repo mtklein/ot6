@@ -347,7 +347,9 @@ at the open with the group word): `tally.py` (`tally_*.txt`) and
 4. **The Mantodea pair** on the plain south of Narshe (world group 51,
    formation 325, 80/256) wiped the four the Narshe arc leaves there in one
    of the three keys the first sweep met; the arc's own leg takes no steps
-   on that plain.  A lab for the Narshe arc's save, or levels for LOCKE (L41).
+   on that plain.  Answered in the Narshe arc's leg (#452,
+   route-wor-narshe.md section 14): the Back Guard on LOCKE and RELM in
+   the back row.
 5. **SHADOW** waits at the Colosseum ($019F; the milestone that recruits
    him is v0.37's, "The Colosseum & Shadow").
 6. **The logs number formations in nine bits**: the driver's `[outcome]` and
