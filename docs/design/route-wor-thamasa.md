@@ -845,7 +845,12 @@ sweeps (`msweep.sh`) boot `b0`'s own states before MagiMaster.
   (supplied by gen_wor_sabin ...)`; 40 Tinctures and no rings fly to
   Thamasa, buy 59 Tinctures and 4 rings, and pass; the same with 1,000 GP
   fails `gil for Thamasa's top-up ...: 112500 GP, the bag holds 1000`
-  (`lab/n1_*`).
+  (`lab/n1_*`). The floors and targets read the party's level when they
+  are asked for: read while the script loaded they used level 0, and the
+  trip bought "FENIX DOWN to 0" (`n1_short`). With 40 Potions and 5 Fenix
+  Downs, `n2_potfenix` reads `short of Potion 40 < 74, Fenix Down 5 < 20`,
+  buys `59 x $E9` and `15 x $F0` (Potions to 99, Fenix Downs to 20), and
+  passes.
 - **The Holy Dragon's presses** fight a random battle that comes up in
   them: with seven world battles used up, a Magic Urn pair came up there
   and the presses timed out in all three shifts, on the old generator too
@@ -857,16 +862,19 @@ $162 won after N ticks`:
 
 | sweep | runs | MagiMaster won | distinct keys | min | median | p90 | max |
 |---|---|---|---|---|---|---|---|
-| `b0` (main's generator, K 0-5) | 18 of 18 PASS | 18 | 16 | 64,826 | 91,512 | 183,639 | 193,514 |
-| `f2` K 0-6 and `f3` K 7-9 (this) | 29 of 30 PASS | 30 | 24 | 40,419 | 69,492 | 95,767 | 127,221 |
+| `b0` (main's generator at 36907d28, K 0-5) | 18 of 18 PASS | 18 | 16 | 64,826 | 91,512 | 183,639 | 193,514 |
+| `f2` K 0-6 at 56ac38d3, `f3` K 7-9 at 14c413ed | 29 of 30 PASS | 30 | 24 | 40,419 | 69,492 | 95,767 | 127,221 |
 
 (`mmtally.py lab b0`, `mmtally.py lab "f[23]"`; `f2`'s three K7 runs, on
 the generator before the Holy Dragon's fix, are left out, and `b0_k7_*`
-failed the same way.) The graph's own play of this branch won his fight
-in 71,570 ticks at its first attempt (`gate.log`, `wor_tower.log`:
+failed the same way.) The graph's own play won his fight in 71,570 ticks
+at its first attempt (`gate-ea263d6a.log`, `wor_tower-ea263d6a.log.gz`:
 `MagiMaster: battle $162 won after 71570 ticks`, `PASS (frame 399535)
 attempts=1/3`). At 60 frames a second that is about 11 to 35 minutes,
-against 18 to 54.
+against 18 to 54. His dying Ultima still takes three or four of the party
+in nearly every win (the mmtally lines' "4 deaths"; over f2 and f3, 93 of
+the fights' 112 deaths are `by slot 0 cmd $02 atk $14`), and Life 3 raises
+them: the reraise rule (5.3) is what carries the end.
 
 The one failure, `f3_k8_s13`, came after his fight: on the walk down a
 random battle (L.70 Magic, L.50 Magic and a third, `be54-g016D`) froze
