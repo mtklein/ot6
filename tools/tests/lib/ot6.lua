@@ -9363,6 +9363,12 @@ end
 -- monsterOnly: Bserk's cursor opens on the party, and the confirm backs out
 -- rather than land it on a member.
 M.BSERK_SPELL = 0x21
+-- the window must have at least this many of its 16 break ticks
+-- (OT6_BREAK_TICKS, about 140 frames each) left, so that Bserk lands inside
+-- it: one cast late in a window landed after it and met a wall the next
+-- hit had turned ('Bserk at slot 0 ... wall weak $02', '[bz] ... BERSERK
+-- (HP 19489, wall weak $01)', lab z5)
+M.BSERK_WINDOW_TICKS = 8
 function Driver:berserkPlan(actor)
   local zv = self.opts.berserkVs
   if not zv or spellCell(actor, M.BSERK_SPELL, true) == nil then return nil end
@@ -9371,7 +9377,7 @@ function Driver:berserkPlan(actor)
   for s = 0, 5 do
     local wc = self.opts.wallChangeVs and self.opts.wallChangeVs[M.readWord(0x57C0 + s * 2)]
     if monAlive(s) and zv[M.readWord(0x57C0 + s * 2)] and not M.monBerserk(s)
-       and (not wc or M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0) then
+       and (not wc or M.readByte(BATTLE.BRK_TICKS + s * 2) >= M.BSERK_WINDOW_TICKS) then
       local weak, can = M.readByte(0x3BE0 + 8 + s * 2), 0
       for e = 0, 3 do
         if M.readWord(0x3BF4 + e * 2) > 0 then
@@ -9390,8 +9396,8 @@ function Driver:berserkPlan(actor)
       elseif not self:castVetoed(M.BSERK_SPELL, "Bserk") then
         self.bserkAt = M.frame
         M.log(string.format("[%s] actor=%d Bserk at slot %d (species $%03X, HP %d): wall weak $%02X, the party "
-          .. "casts $%02X", self.tag or "fight", actor, s, M.readWord(0x57C0 + s * 2), M.readWord(0x3BF4 + 8 + s * 2),
-          weak, can))
+          .. "casts $%02X, break ticks %d", self.tag or "fight", actor, s, M.readWord(0x57C0 + s * 2),
+          M.readWord(0x3BF4 + 8 + s * 2), weak, can, M.readByte(BATTLE.BRK_TICKS + s * 2)))
         return { kind = "magic", spell = M.BSERK_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0,
                  aim = s, aimHard = s, monsterOnly = true, reason = "bserk" }
       end
