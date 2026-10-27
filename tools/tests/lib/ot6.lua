@@ -9283,7 +9283,13 @@ function Driver:magicOnlyLine(actor, boost)
   -- broke him on water (build/attempts/wt/v038-magimaster/lab/
   -- m3_b0_k5_s0_s0: 'wall weak $04 (the party holds it)', then 'broken (0
   -- of 8 shields) at HP 34138', 'weak $80', 'window over ... HP 34138')
-  if wcv and (best.elem ~= 0 or breaking) and bestSlot ~= nil and wcv[M.readWord(0x57C0 + bestSlot * 2)]
+  -- Every Break at a break body waits so: two Breaks in the air add up, and
+  -- one planned short of the break broke him behind the other on holy, the
+  -- one weakness its holder had spent her turn on a Break of her own (lab/
+  -- m13_b0_k2_s7_s9: 'broken (0 of 8 shields) ... the last party action
+  -- entity 1 cmd $02 atk $0C', 'weak $20', 'window over ... HP 49911')
+  if wcv and (best.elem ~= 0 or breaking or (best.id == M.BREAK_SPELL and breakBody(bestSlot))) and bestSlot ~= nil
+     and wcv[M.readWord(0x57C0 + bestSlot * 2)]
      and not brokenNow(bestSlot) then
     local w = self:wallWaitPlan(actor, bestSlot, string.format("$%02X", best.id))
     if w then return w end

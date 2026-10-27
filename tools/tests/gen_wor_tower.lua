@@ -670,7 +670,7 @@ local function examineUp(x, y, begun, what, avoid)
   })
 end
 local PARTY = { { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" }, { STRAGO, "STRAGO" } }
-local MAGIMASTER_STONES = { { TERRA, SHIVA }, { RELM, MADUIN }, { STRAGO, SRAPHIM }, { CELES, TRITOCH } }
+local MAGIMASTER_STONES = { { TERRA, SHIVA }, { RELM, MADUIN }, { STRAGO, SRAPHIM }, { CELES, SHOAT } }
 -- the stones by member, in order: each is equipped only where it is not
 -- worn already (H.equipEsper frees a stone from its seated owner first)
 local function stonesFor(set, tag)
@@ -768,6 +768,7 @@ local STONES_NEEDED = {
   { IFRIT, "Ifrit", "gen_ifrit_magicite (the Magitek factory)" },
   { SHIVA, "Shiva", "gen_ifrit_magicite (the Magitek factory)" },
   { MADUIN, "Maduin", "gen_esper_tubes (the tube room)" },
+  { SHOAT, "Shoat", "gen_esper_tubes (the tube room)" },
   { PALIDOR, "Palidor", "gen_wor_terra (Solitary Island's beach)" },
   { TRITOCH, "Tritoch", "gen_wor_tritoch (the Narshe cliffs)" },
   { SRAPHIM, "Sraphim", "gen_wor_sabin (Tzen's esper seller)" },
@@ -1043,7 +1044,14 @@ H.run({ maxFrames = 1500000 }, {
   -- and his wall absorbs one element in eight, so on Ifrit she drank a
   -- Tonic every turn the absorbed element was fire: 142 of 180 no-line
   -- fallbacks, build/attempts/wt/v031-relics-grey/lab/rg1_*, rg2_*, rg4_*,
-  -- 'magic-only $00 refused: fire is ABSORBED by slot 0 species $0166', #444)
+  -- 'magic-only $00 refused: fire is ABSORBED by slot 0 species $0166', #444),
+  -- CELES onto Shoat (Break, the stone the route plan names for his shields:
+  -- route-wor-thamasa.md 5.3, 6.1).  His break is the fight (BOSS_FIGHT.
+  -- breakVs), and a second Break caster halves the climb to it: from the
+  -- same twelve states, on Tritoch his fight ran 40,814 to 156,318 ticks
+  -- (median 74,150), on Shoat 45,215 to 82,824 (median 60,251)
+  -- (build/attempts/wt/v038-magimaster/lab/m9_*, m13_*).  Her Ice stays;
+  -- Tritoch's Poison is the one wall in eight given up
   stonesFor(MAGIMASTER_STONES, "stones for MagiMaster"),
   -- MagiMaster is fought in the Wall Rings.  In them each Fire 2/3, Ice 2/3
   -- and Bolt 2/3 he aims at a member rebounds onto him, and his wall drinks
