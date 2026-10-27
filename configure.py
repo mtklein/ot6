@@ -540,6 +540,10 @@ TEST_ENV = {
     # v0.27 kits (#398, #378): TERRA, EDGAR and SHADOW on the Floating
     # Continent, from the alcove's save; a run is the Continue, a walk and
     # one battle of scripted turns (3-11k frames on the branch's runs)
+    # the Economizer at every boost (owner, 2026-10-26), from the save the
+    # play makes by Maranda with TERRA wearing it
+    "battle_economizer": "OT6_TIMEOUT=1800 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/wor-colosseum-v1",
     "battle_breakspell": "OT6_TIMEOUT=1800 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fc-alcove-v1",
     "battle_breakmonster": "OT6_TIMEOUT=1800 "

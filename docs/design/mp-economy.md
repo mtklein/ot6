@@ -610,6 +610,18 @@ it, and `tools/tests/battle_magicite.lua` pins both the price and
 the 7-MP boundary that only 8 can produce. No other magic
 price is touched.
 
+The MP relics: the Gold Hairpin halves a spell's cost (rounding up),
+as vanilla's does, and a boosted multiplied cast scales from the halved
+price.  The Economizer makes every spell its wearer casts cost 1 MP at
+any boost, a fold, a multiplied cast, a summon, a lore, the study
+(`Ot6MagicPrice` answers it before both rules above; owner, 2026-10-26:
+"economizer should make spells cost 1 MP"), and wins when both are worn.
+Osmose's reasoning would argue for pricing it, and the owner chose
+otherwise: it is one relic, won late in the World of Ruin (the
+Colosseum's Gem Box wager), on one caster, so the choice between
+spending in random fights and saving for the boss stays with the rest
+of the party (route-wor-colosseum.md section 5, `battle_economizer`).
+
 Strago's kit is Lores, so it
 is already priced. His "free signature" Aqua Rake (kits.md)
 is free at join, and costs MP like any lore. Divines cost

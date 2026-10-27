@@ -1932,12 +1932,26 @@ OT6_ULTIMA_ID   = $14
 ;   * everything else -- Drain, Quake, Ultima, every Lore, an equipped esper's
 ;     summon -- is a multiplier verb under Ot6BoostDmg, so it takes the 2.5x.
 ;
+;   * ahead of both, the Economizer: its wearer's every spell costs 1 MP at
+;     any boost -- a family's tier, a fold, a multiplied cast, a summon, a
+;     lore, Strago's study (owner, 2026-10-26: "economizer should make
+;     spells cost 1 MP").  Ot6SpellMP already flattens a tier's own price;
+;     this is what keeps Ot6BoostPriceFor's x2.5 off the rest.
+;
 ; in: A = the spell id (an esper is its MagicProp record, index + $36),
 ; X = the caster's entity offset, OT6_SCR_BIT = the tier steps his boost buys
 ; (Ot6FoldSteps').  out: A = the price.  a8/i16, db=$7e; preserves X and Y.
 .proc Ot6MagicPrice
         .a8
         .i16
+        pha
+        lda     $3c45,x         ; relic effects 2, CalcMPCost's own input
+        and     #$40            ; the Economizer's bit
+        beq     :+
+        pla                     ; economizer: 1, whatever the boost
+        lda     #$01
+        rtl
+:       pla
         cmp     #OT6_ANALYZE_SPELL      ; Strago's Scan at the full boost is
         bne     @plain                  ;   his study (#432, ot6_analyze.asm),
         pha                             ;   priced at the shared ceiling

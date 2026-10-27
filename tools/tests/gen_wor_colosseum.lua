@@ -34,11 +34,17 @@ local BEFORE = { CELES, RELM, CYAN, TERRA }
 -- the wagers after the Striker (route-wor-colosseum.md section 2): what the bag holds that the Colosseum trades up
 -- into gear the party wears, each against an opponent the fighter beats (the labs' measured rates there)
 local STRIKER, STRATO = 0x29, 0x31
+local ECONOMIZER, RIBBON = 0xCE, 0xCA
 local WAGERS = {
   { 0x05, "the Assassin for a SwordBreaker, LOCKE's blade (vs Test Rider)" },
   { 0x2A, "the Stunner for CYAN's second Strato (vs Test Rider)" },
   { 0x7B, "the Regal Crown for a Genji Helmet (vs Opinicus)" },
   { 0x16, "the Soul Sabre for a Falchion (vs Opinicus)" },
+  -- last, since its fighter may go in armed for it: CELES (TERRA's random Magic casts Drain and Merton on
+  -- herself), with the bag's Flame Sabres in her Genji Glove's hands against the SrBehemoth's fire weakness when
+  -- the bag holds them (section 2).  The bag holds one Gem Box and the Colosseum takes it on a loss, so a loss
+  -- is a lost attempt, which a person reloads (`reload`: "LOST: ...", the runner's retry from the boot)
+  { 0xD8, "the Gem Box for the Economizer, TERRA's (vs SrBehemoth)", fighter = CELES, arm = 0x0D, reload = true },
 }
 -- SHADOW's throwing kit (kits.md "Shadow"): the skeans and edges his Throw lists, from Maranda's weapon counter
 local THROWN = {
@@ -99,8 +105,44 @@ H.run({ maxFrames = 1600000 }, {
   H.lazy(function()
     local steps = {}
     for _, w in ipairs(WAGERS) do
+      local arm, held = {}, {}
+      if w.arm then
+        -- the fighter's hands take the wager's weapon, as many as the bag holds (two at most), and get their own
+        -- blades back after the fight (the gear policy leaves a Genji Glove's two hands to the kit, #434)
+        arm[1] = H.lazy(function()
+          held = { H.readByte(c(w.fighter, 0x1F)), H.readByte(c(w.fighter, 0x20)) }
+          local hands = {}
+          for h = 0, math.min(1, H.invCountOf(w.arm) - 1) do hands[#hands + 1] = { h, w.arm } end
+          if #hands == 0 then
+            return H.call(function() H.log(string.format("[colosseum] %s: no $%02X in the bag to arm %s", w[2],
+              w.arm, NAMES[w.fighter])) end)
+          end
+          return H.equipKit(w.fighter, hands, { tag = string.format("%s armed for the wager", NAMES[w.fighter]) })
+        end)
+        arm[2] = H.call(function() H.log("[kit] " .. kitLine({ w.fighter })) end)
+        arm[3] = H.lazy(function()
+          local back = {}
+          for h = 0, 1 do
+            if held[h + 1] ~= 0xFF and H.readByte(c(w.fighter, 0x1F + h)) ~= held[h + 1] then
+              back[#back + 1] = { h, held[h + 1] }
+            end
+          end
+          if #back == 0 then return H.call(function() end) end
+          return H.equipKit(w.fighter, back, { tag = string.format("%s's own blades back", NAMES[w.fighter]) })
+        end)
+      end
       steps[#steps + 1] = H.cond(function() return H.invCountOf(w[1]) > 0 end, {
-        H.colosseumBet(w[1], { what = "the Colosseum: " .. w[2], fight = FIGHT }),
+        arm[1] or H.call(function() end),
+        arm[2] or H.call(function() end),
+        H.colosseumBet(w[1], { what = "the Colosseum: " .. w[2], fight = FIGHT, fighter = w.fighter }),
+        H.call(function()
+          local b = H.colosseumLog[#H.colosseumLog]
+          if w.reload and not b.won then
+            error(string.format("LOST: %s -- %s lost the wager at f%d, and the bag held one", w[2],
+              NAMES[w.fighter], b.frame), 0)
+          end
+        end),
+        arm[3] or H.call(function() end),
         H.fieldCare({ threshold = 1.0, tag = "after the wager" }),
       }, { H.call(function() H.log(string.format("[colosseum] %s: $%02X is not in the bag", w[2], w[1])) end) })
     end
@@ -128,6 +170,17 @@ H.run({ maxFrames = 1600000 }, {
       return H.equipKit(CYAN, { { 1, STRATO } }, { tag = "CYAN: the Colosseum's Strato in his second hand" })
     end
     return H.call(function() H.log("[kit] CYAN's second Strato: not in the bag, or worn") end)
+  end),
+  -- the Colosseum's Economizer (every spell 1 MP, boosts included: Ot6SpellMP) goes on TERRA, the party's caster:
+  -- her Magic carries the Cure and Life the party leans on and the Fire ladder to Ultima, where CELES's Runic
+  -- refills her own MP (route-wor-colosseum.md section 5, kits.md "Terra").  It takes the slot that does not hold
+  -- her Ribbon; the relic rule leaves a worn relic it does not rank where it is (H.relicPlan step 1)
+  H.lazy(function()
+    if H.invCountOf(ECONOMIZER) < 1 then
+      return H.call(function() H.log("[kit] TERRA's Economizer: not in the bag, or worn") end)
+    end
+    local slot = H.readByte(c(TERRA, 0x23)) == RIBBON and 5 or 4
+    return H.equipKit(TERRA, { { slot, ECONOMIZER } }, { tag = "TERRA: the Colosseum's Economizer" })
   end),
   H.call(function() H.log("[kit] " .. kitLine(FOUR)) end),
   liftOff(),
@@ -190,6 +243,8 @@ H.run({ maxFrames = 1600000 }, {
       H.assertEq(partyOf(ch), 1, NAMES[ch] .. " is seated")
     end
     H.assertEq(H.readByte(c(SHADOW, 0x1F)) ~= 0xFF, true, "SHADOW holds a weapon")
+    H.assertEq(H.readByte(c(TERRA, 0x23)) == ECONOMIZER or H.readByte(c(TERRA, 0x24)) == ECONOMIZER, true,
+      "TERRA wears the Colosseum's Economizer")
     say("wor", "on the save tile")
     H.log("[kit] " .. kitLine(FOUR))
   end),

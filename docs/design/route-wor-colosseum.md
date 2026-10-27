@@ -13,6 +13,9 @@ Line numbers are into `ff6/src/event/event_main.asm` unless a file is named.
 Evidence is under `build/attempts/wt/v037-colosseum/lab/` (the run logs and
 the scripts beside them; the scripts that built them are the lab's own, in
 `build/lab/col/` of the worktree, retained under the same evidence path).
+The Gem Box's wager (owner, 2026-10-26) has its own, under
+`build/attempts/wt/v037-economizer/` (`lab/`, with `lab/scripts/`, and
+`qual/px13/`).
 
 ---
 
@@ -46,7 +49,7 @@ the scripts beside them; the scripts that built them are the lab's own, in
    TERRA (sweep `s3`, section 4).
 5. **The Colosseum has an inn** (413 NPC_3 (52,16), 400 GP) and no save
    point; its long exit (22,16) lands on the world's (50,18).
-6. **The Ragnarok sword is not in this save.**  The route took the Magicite at
+5. **The Ragnarok sword is not in this save.**  The route took the Magicite at
    Narshe (v0.32), so vanilla's only Illumina, the sword's wager, is out of
    reach (section 5).
 
@@ -54,7 +57,7 @@ the scripts beside them; the scripts that built them are the lab's own, in
 
 | leg | boots | saves | what |
 |---|---|---|---|
-| `gen_wor_colosseum` | `wor-ancient-v1` | `wor-colosseum-v1` | Kohlingen's counter, the Colosseum: the Striker (SHADOW joins), four wagers; the cabin (SHADOW, CELES, CYAN, TERRA), the gear and relic care, CYAN's Strato pair, Maranda's weapon counter (SHADOW's skeans and edges) and gear stop, three fights on the plain by Maranda, the save on the Falcon's tile (69,183); also `wor_colosseum_in` (inside the Colosseum before the guard: `battle_colosseum`'s fixture) |
+| `gen_wor_colosseum` | `wor-ancient-v1` | `wor-colosseum-v1` | Kohlingen's counter, the Colosseum: the Striker (SHADOW joins), five wagers (the last, the Gem Box, for TERRA's Economizer); the cabin (SHADOW, CELES, CYAN, TERRA), the gear and relic care, CYAN's Strato pair, Maranda's weapon counter (SHADOW's skeans and edges) and gear stop, three fights on the plain by Maranda, the save on the Falcon's tile (69,183); also `wor_colosseum_in` (inside the Colosseum before the guard: `battle_colosseum`'s fixture) |
 
 ## 2. The order, the party and the wagers
 
@@ -82,11 +85,52 @@ fighter beats:
 | Stunner | Test Rider | Strato | CYAN's second Strato (his pair: 199 and 199 for 199 and 162) |
 | Regal Crown | Opinicus (3, slash/bludgeon: Ebot's Rock's) | Genji Helmet | SHADOW's helmet |
 | Soul Sabre | Opinicus | Falchion | TERRA's blade (over the Enhancer) |
+| Gem Box | SrBehemoth (the Colosseum's: 6, pierce/bludgeon; weak fire, holy) | Economizer | TERRA's relic (section 5) |
 
 Measured with CELES before the leg (labs `sw_stun_celes_s*`,
 `sw_crown_celes_s*`: from one capture inside the Colosseum, seed shifts 0-29):
-the Test Rider 8 of 8, the Opinicus 8 of 8 over 8 distinct keys.  Left out,
-each by its own reason:
+the Test Rider 8 of 8, the Opinicus 8 of 8 over 8 distinct keys.
+
+**The Gem Box's fight** (owner, 2026-10-26: "economizer should make spells
+cost 1 MP", so the route takes it).  The SrBehemoth is the one opponent here
+the fighter rule's pick does not beat every time, and the player's lever,
+who fights and what they wear, is what moves it.  Labs from one capture
+inside the Colosseum (`col_in`, made from the tracked `wor-ancient-v1`), one
+bet each, field care to full before it, under
+build/attempts/wt/v037-economizer/lab/:
+
+| fighter, kit | runs | won (distinct keys) | how the losses went |
+|---|---|---|---|
+| CELES, her Scimitar and Falchion (`fc_celes_s*`) | 14 | 9 (7 of 9 keys) | worn down, on be18 (shifts 0-2) and be28 (3, 5): "[death] f+6823 entity 0 char 6 from 88/3984 by slot 0 cmd $00 atk $EE" |
+| TERRA, her blades (`fc_terra_s*`) | 5 | 1 (1 of 5 keys) | her random Magic turns on her: "by entity 0 char 0 cmd $02 atk $04 (its own action)" (Drain, which the undead body reverses: be84, be94) and "atk $17" (Merton: beA0) |
+| CYAN, his Stratos (`fc_cyan_s*`) | 5 | 0 (0 of 5 keys) | worn down, and once his own Bushido |
+| CELES, Dragoon Boots for the Wall Ring (`db_celes_s*`; the Relic menu's re-equip also changed her helmet) | 14 | 10 (7 of 9 keys) | worn down (be60, be90) |
+| CELES, the bag's two Flame Sabres (`fl_celes_s*`) | 14 | 14 (13 of 13 keys) | none |
+
+(The first pass, `gem_celes_s*` and `gem_terra_s*`, bet without the field
+care first and drew the same keys: CELES 5 of 7 runs, TERRA 2 of 7 runs, 2
+of 6 keys; superseded by the `fc_` labs.)
+
+So the leg sends CELES for the Gem Box, not the rule's pick (which is TERRA
+once the battles before the Colosseum raise her a level), and arms her first
+when it can: her Genji Glove's two hands take the bag's Flame Sabres (fire,
+the SrBehemoth's weakness; `battle_breakwor_colosseum` checks the weak
+byte), and her own blades go back after the fight (`WAGERS`' `fighter` and
+`arm`).  The Gem Box is the last wager, so no other fight sees the Sabres.
+The tracked save holds two Sabres; the play from power-on held none on this
+ROM ("item $0D: fresh 0, tracked 1" in the drift of every save from
+minecart-platform-v1 on, a loss between n024-entry-save-v1 and there that
+another branch is restoring), so on the line the route ships CELES fights in
+her own blades ("no $0D in the bag to arm CELES"), and the rates there are
+section 4's.  The bag holds one Gem Box and a loss takes it, so a lost wager
+is a lost attempt (`reload`: the leg raises "LOST: ...", and the runner
+retries from the boot, counted, as a person reloads).  TERRA's
+self-inflicted losses also end the harness's run, not just the wager: the
+battle table read wiped for 369 frames and the wipe canary counted a game
+over ("canary: BATTLE WIPE ... Counted as a game over", `fc_terra_s3`),
+where CELES's losses to the opponent hand back as lost wagers (section 8).
+
+Left out, each by its own reason:
 
 - **Tortoise Shield for a Titanium helmet** (the bag holds seven; Titanium is
   42/42 and absorbs water, over the party's Circlets): the opponent, the
@@ -94,12 +138,6 @@ each by its own reason:
   `b_tort_celes`: "[colbet] bet 1 ... LOST" through "bet 7 ... LOST", keys
   be54, be5C, beA8, be38, be44, beDC, beB8), and each loss left her down for
   a Fenix Down.
-- **The Gem Box for the Economizer**: every spell at 1 MP for its wearer,
-  boosts included (`Ot6SpellMP` takes the Economizer before the boost
-  price), so a caster wearing it never chooses between MP for random fights
-  and MP for the boss, the tension the economy is built on (guidelines "MP
-  tension is the target"; the same reason Osmose costs 8, mp-economy.md).
-  The Gem Box stays in the bag.
 - **The Cursed Shield** for a Cursed Ring: it is the Paladin Shield to be
   (section 5).
 - The rest of the bag's table trades sideways (a Rage Ring for a Blizzard
@@ -139,7 +177,7 @@ Ruin's late pools (random groups 197-227: Kefka's Tower and the dragons'
 hunts), whose arcs design them for the parties that meet them there.
 
 `battle_breakwor_colosseum` checks the three rows in the built ROM and that
-no group deals them; the route's five wagers' `ColosseumProp` records
+no group deals them; the route's six wagers' `ColosseumProp` records
 (opponent and prize) and that each opponent has an authored row; every
 formation of world group 49 against the four the cabin seats, and the
 Crawler lesson; and #383's skean rows.  Lab `bw1`: "checked 3 designed rows
@@ -149,7 +187,10 @@ without the rows (`mutmain`, origin/main's battle sources: 7 mismatches,
 "$037 Siegfried (the Colosseum's) has no Ot6ShieldTbl row") and on two
 mutants: Siegfried without pierce (`mutRA`: "class mask $01, want $03"), the
 SrBehemoth's row moved off it (`mutRB`: "has no Ot6ShieldTbl row (want 6,
-class $06)").
+class $06)").  With the Gem Box's record added (it names the SrBehemoth and
+the Economizer): lab `bw_gem`, "checked 6 wagers' records", PASS; red with
+the prize wanted one off (`mutGB_bw`: "MISMATCH: the Gem Box's prize $CE, the
+route plays for $CD"), both under build/attempts/wt/v037-economizer/lab/.
 
 ## 4. The fights
 
@@ -176,7 +217,35 @@ TERRA and CELES are both L52 and the battles before the Colosseum often take
 TERRA to L53) sent TERRA in 8 runs of 12 and CELES in 4 each: 40 fights
 TERRA, 20 CELES, all won (`run.out`'s "char 0 WON" and "char 6 WON" lines).
 So TERRA has 90 won fights in all (80 from the tracked entry, 10 here) and
-CELES 90 (40 there, 50 here).  A loss of the Striker would take SHADOW with
+CELES 90 (40 there, 50 here).
+
+**With the Gem Box** (the wager added: section 2), sweep `s4` played the same
+way at 6a7a8130 from the graph's own `wor-ancient-v1` capture on the ROM of
+9d654d6f (before the Economizer's price rule; build/attempts/wt/v037-economizer/lab/,
+px13), and `t1` (0d2d347a) and `t2` (6888e25e, CELES's blades back after the
+fight) from the tracked one:
+
+| fight | `s4`: won (distinct keys) | `t1` | `t2` |
+|---|---|---|---|
+| SHADOW, for the Striker | 12 of 12 (11) | 12 of 12 (11) | 12 of 12 (11) |
+| the Test Rider, for the SwordBreaker | 12 of 12 (10) | 12 of 12 (12) | 12 of 12 (12) |
+| the Test Rider, for the Strato | 12 of 12 (11) | 12 of 12 (11) | 12 of 12 (11) |
+| the Opinicus, for the Genji Helmet | 12 of 12 (9) | 12 of 12 (10) | 12 of 12 (10) |
+| the Opinicus, for the Falchion | 12 of 12 (12) | 12 of 12 (12) | 12 of 12 (12) |
+| the SrBehemoth, for the Economizer | 12 of 12 (11) | 12 of 12 (12) | 12 of 12 (12) |
+
+(`tally_s4.txt`: "the Gem Box for the Economizer, TERRA's (vs SrBehemoth)
+won 12 of 12, 11 distinct keys".)  In `s4` the rule sent CELES for every
+wager with K 0-4 and TERRA for the five before the Gem Box with K 5; CELES
+fought the Gem Box in all twelve (`fighters_s4.txt`: "s4_k5_s0 0 WON, 0 WON,
+0 WON, 0 WON, 0 WON, 6 WON").  The line held no Flame Sabres (section 2), so
+`s4`'s twelve are CELES in her own blades ("no $0D in the bag to arm CELES"
+in every run); `t1` and `t2`, from the tracked save, armed her.  CELES in her
+own blades against the SrBehemoth: 12 of 12 on the line (`s4`, 11 keys), 9 of
+14 from the tracked save's capture (`fc_celes`, 7 of 9 keys): 18 of 20
+distinct keys.  In two Flame Sabres: 38 of 38 (`fl_celes` 14, 13 keys; `t1`
+and `t2` 24, 12 keys each).  A loss of the Gem Box is a lost attempt, retried
+from the boot (section 2).  A loss of the Striker would take SHADOW with
 it, so the leg fails on one (`want = "won"` raises an assertion, which the
 runner does not retry; a person reloads); a loss of any other wager is
 taken as a loss, logged, and the route goes on.
@@ -217,7 +286,7 @@ keys with it, 2856 over 14 without (`fight_report_abon.txt`,
 - *The Colosseum's rewards* go into the kits as section 2 lists: CYAN's
   Strato pair (the gear policy leaves a Genji Glove's two hands to the kit,
   so the leg puts the second Strato in his second hand itself), SHADOW's
-  Genji Helmet, TERRA's Falchion, LOCKE's SwordBreaker.
+  Genji Helmet, TERRA's Falchion, LOCKE's SwordBreaker, TERRA's Economizer.
 - *The Paladin Shield.*  The Cursed Shield lifts its curse after 256 battles
   won with it worn (`LearnItemMagic`: `$3EC0`, kept as `$1DD5`).  OT6 halves
   random encounters a step and doubles their experience and gil
@@ -238,21 +307,49 @@ keys with it, 2856 over 14 without (`fight_report_abon.txt`,
   Magicite (a magicite is a second job, a pillar), so this route has no
   Illumina, and a player who takes the sword keeps vanilla's way to it.  Left
   as it is.
-- *The Economizer* is left in the Colosseum and not taken (section 2): a
-  wearer's spells at 1 MP end the MP choice.  Whether it should change
-  (a fraction of the cost rather than 1) is open (section 8).
+- *The Economizer* (the Gem Box's prize, section 2): every spell its
+  wearer casts costs 1 MP at any boost (owner, 2026-10-26: "economizer
+  should make spells cost 1 MP", taken literally).  Vanilla's relic
+  arithmetic already gave a tier its 1 (`Ot6SpellMP`), but a spell outside
+  the fold families (Drain, Quake, a summon, a lore) then took
+  `Ot6BoostPriceFor`'s x2.5 per point on top, 3, 6 and 16 MP at 1-3 BP; now
+  `Ot6MagicPrice` answers 1 for an Economizer wearer before either rule,
+  Strago's study included.  `battle_economizer` (Continue wor-colosseum-v1,
+  TERRA's Drain at 1 and 3 BP, her Fire folded at 2 BP and her Drain at
+  0 BP, each through the real menu, the pool's own movement attributed to
+  the cast): PASS on this ROM (lab `econ_economizer`: "cast 2 (f5063):
+  spell $04 at 3 BP: MP 637 -> 636"); red on origin/main's
+  `ot6_boost.asm` (`main_economizer`: "Drain at 1 BP costs the Economizer's
+  1 MP: got 3 ($3), want 1 ($1)") and on the mutant reading the Gold
+  Hairpin's bit (`mutHP_economizer`, the same line).  The harness's price
+  model (`H.spellPrice`, `H.battleSpellPrice`) answers 1 the same way.
+  It goes to TERRA, the party's caster: of the four the cabin seats she has
+  learned the most spells ("spells learned: TERRA 7, CELES 6, SHADOW 0,
+  CYAN 0", the relic care's own line in the leg's log), her Magic carries
+  the party's Cure and Life, and her Fire's boost ladder (Fire 2, Fire 3,
+  Ultima at 80 MP once the fold opens, kits.md "Terra") is the most
+  expensive casting any of the four does.  CELES's Runic refills her own
+  MP.  The leg puts it on TERRA's slot that does not hold her Ribbon (the
+  Wall Ring from the tower's MagiMaster kit comes off); the relic rule
+  leaves a worn relic it does not rank where it is (`H.relicPlan` step 1),
+  so the dressings after it keep it on, and the leg's exit asserts TERRA
+  wears it (red with the equip step taken out: lab `mutEQ2`).  The MP
+  choice stays with the other three.
 
 ## 6. Supplies and kits
 
 **Supplies.**  The graph's `wor-ancient-v1` left 67 Potions and 21 Fenix
-Downs (the qualified play's boot line, `qual/px13/wor_colosseum.log`:
-"potion=67 tincture=40 fenix=21 remedy=20 revivify=28 tent=0 gil=729878")
+Downs (the qualified play's boot line, build/attempts/wt/v037-economizer/
+qual/px13/wor_colosseum.log: "potion=67 tincture=40 fenix=21 remedy=20
+revivify=28 tent=0 gil=729878")
 against the band (about level x 1.5 Potions, about the level in Fenix
 Downs); Kohlingen's counter (`kohlingenStop`) tops the Potions up first.  The Colosseum's fights
 spend nothing from the bag on a win; a loss leaves the fighter down for a
-Fenix Down (the Steroidite's seven losses cost seven).  The bag at the save
-(the qualified play): "potion=76 tincture=40 fenix=21 remedy=20 revivify=28
-tent=0 gil=714410".
+Fenix Down (the Steroidite's seven losses cost seven).  A won fight can
+still leave the fighter hurt, and the field care after it pays in Potions:
+the bag at the save of 90d6b83f's play (before the price rule), "potion=71
+tincture=40 fenix=21 remedy=19 revivify=28 tent=0 gil=714410", against the
+tracked save's 76 Potions and 20 Remedies from before the wager was added.
 
 **Kits.**  SHADOW joins with nothing worn; the cabin's gear care dresses him
 from the bag (the Striker back from his fight, the Genji Shield, the
@@ -261,11 +358,14 @@ a Dark Gear; the relic care gives him his relics from the bag (below).
 Maranda's weapon counter sells his throwing kit: Fire Skeans, Water Edges and
 Bolt Edges to nine each, Shadow Edges and Inviz Edges to four (the bag's ten
 Shuriken were already there).  CYAN's second Strato goes in his second hand;
-TERRA's Falchion replaces the Enhancer (the gear policy).  In the qualified
-play the relic care gave SHADOW a Ribbon and the Memento Ring, CYAN keeping
-his Genji Glove and Ribbon.  The kit at the save: "SHADOW L41 kit FF 29 64 81
-96 CA DB; CELES L53 kit 0A 19 15 7A 98 D1 BB; CYAN L42 kit 0E 31 31 7A 98 CA
-D1; TERRA L53 kit 06 15 5E 7A 94 CA BB".
+TERRA's Falchion replaces the Enhancer (the gear policy).  CELES fights the
+Gem Box in the bag's Flame Sabres when it holds them (the line from power-on
+did not: section 2) and takes her Scimitar and Falchion back after it;
+TERRA's Economizer takes her Wall Ring's slot (section 5).  In
+the qualified play the relic care gave SHADOW a Ribbon and the Memento Ring,
+CYAN keeping his Genji Glove and Ribbon.  The kit at the save: "SHADOW L41
+kit FF 29 64 81 96 CA DB; CELES L53 kit 0A 19 15 7A 98 D1 BB; CYAN L42 kit
+0E 31 31 7A 98 CA D1; TERRA L53 kit 06 15 5E 7A 94 CA CE".
 
 ## 7. Played
 
@@ -274,41 +374,54 @@ Each sweep run is one attempt (retries off) from a committed tree
 on the plain by Figaro Castle where the boot stands (world group 47:
 `mkvar.py`), K 0-5 at seed shifts 0 and 7: `s3` from the graph's own
 `wor-ancient-v1` capture at the qualified commit, `s1` and `s2` (before the
-rebase onto the Tritoch leg and the Dance ladder) from the tracked one.  `tally_<p>.txt` lists each run and the wagers by key;
+rebase onto the Tritoch leg and the Dance ladder) from the tracked one; with
+the Gem Box (build/attempts/wt/v037-economizer/lab/), `s4` from the graph's
+own capture on this ROM, `t1` and `t2` from the tracked one.  `tally_<p>.txt` lists each run and the wagers by key;
 `fight_report_<p>.txt` is `tools/fight_report.py` over the runs (its "Pugs"
 label on formation `$23F` is the formation's placeholder slot: the opponent
 there is the wager's).
 
 | sweep (commit) | runs | fights (fight_report) |
 |---|---|---|
+| `s4` (6a7a8130; px13) | 12 of 12 PASS, attempts=1/1 each | every fight won: SHADOW's `$23E` 11 keys; the wagers' `$23F` 39 keys of 60 fights; the Crawler 28 keys, Mantodea+Spek Tor+Sprinter 6 (one death: CYAN, `s4_k3_s0`, "[death] f+665 entity 2 char 2 ... by slot 0"), Bogy 8, Maliga 2 |
+| `t2` (6888e25e; px13) | 12 of 12 PASS, attempts=1/1 each | every fight won: SHADOW's `$23E` 11 keys; the wagers' `$23F` 35 keys of 60 fights; the Crawler 25 keys, Mantodea+Spek Tor+Sprinter 5 (one death), Bogy 7, Maliga 2 |
+| `t1` (0d2d347a: CELES kept the Flame Sabres; px13) | 12 of 12 PASS, attempts=1/1 each | every fight won: as `t2` |
 | `s3` (1b22315d, qualified; px13) | 12 of 12 PASS, attempts=1/1 each | every fight won: SHADOW's `$23E` 11 keys; the wagers' `$23F` 35 keys of 48 fights; the Crawler 24 keys, Mantodea+Spek Tor+Sprinter 6, Bogy 8, Maliga 2; no deaths but SHADOW's own in his fight |
 | `s2` (cb122cdb, the arc's ROM: the rows, the reach, the curse count; CYAN's pair) | 12 of 12 PASS, attempts=1/1 each (the Air) | every fight won: SHADOW's `$23E` 11 keys; the wagers' `$23F` 33 keys of 48 fights (`tally_s2.txt`: the Striker 11 keys, the SwordBreaker 12, the Strato 11, the Genji Helmet 10, the Falchion 12, each 12 of 12); the Crawler 26 keys, Mantodea+Spek Tor+Sprinter 5, Bogy 7, Maliga 2; no deaths but SHADOW's own in his fight |
 | `s1` (155c284f) | 12 of 12 PASS, attempts=1/1 each | every fight won: SHADOW's `$23E` 11 keys; the wagers' `$23F` 35 keys of 48 fights; the Crawler 26 keys, Mantodea+Spek Tor+Sprinter 6, the K battles' Bogy 7 and Maliga 2; no deaths but SHADOW's own in his fight |
 
-The tracked checkpoint is re-cut from the qualified play: bare `ninja` from
-power-on at 1b22315d on px13 (wt/v037-colosseum-3: the ROM, route and suites
-this branch's arc commit carries), a clean tree (`qual/px13/q4.log`: "gate:
-GREEN -- ninja -k 0 -j 12 exited 0", "sha=1b22315d... dirty=0"), then
-`checkpoint_drift.py --recut wor-colosseum-v1` ("none -- the tracked save is
-the one the graph's play makes today").  A second replay from power-on of the
-same ROM and route (`qual/px13/q6.log`, GREEN, with the suites' later arms)
-made the same save: `checkpoint_drift.py --strict wor-colosseum-v1` against
-its capture reads "none -- the tracked save is the one the graph's play makes
-today", rc=0 (`qual/px13/drift_wor-colosseum-v1.txt`).  The leg's log
-(`qual/px13/wor_colosseum.log`): "PASS (frame 37918) attempts=1/3", won on
-its first attempt; "the wagers done: 5 of 5 won", CELES sent every time.
+The tracked checkpoint is re-cut from the qualified play
+(build/attempts/wt/v037-economizer/qual/px13/): the line from power-on on
+this ROM (`chain0.log`, `ninja chain` at 9d654d6f: "gate: GREEN"), then bare
+`ninja` at 90d6b83f, the Gem Box's route and suites, on a clean tree, which
+replays this leg and runs every suite (`q1.log`: "gate: GREEN -- ninja -k 0
+-j 14 exited 0", "sha=90d6b83f... dirty=0").  Its capture drifted from the
+tracked save by the wager alone (`drift_wor-colosseum-v1.txt`: "TERRA gear:
+fresh 15 5E 7A 94 CA CE, tracked 15 5E 7A 94 CA BB", "item $D8: fresh 0,
+tracked 1", "item $E9: fresh 71, tracked 76"), and `checkpoint_drift.py
+--recut wor-colosseum-v1` made the tracked save the capture ("none -- the
+tracked save is the one the graph's play makes today", `recut_wor-colosseum-v1.txt`).
+The leg's log (`wor_colosseum.log`): "PASS (frame 43191) attempts=1/3", won
+on its first attempt; "the wagers done: 6 of 6 won", CELES sent every time.
+The arc's earlier qualification (1b22315d, before the Gem Box) is under
+build/attempts/wt/v037-colosseum/qual/px13/ (`q4.log`, `q6.log`).
 
 ## 8. Open
 
 1. **The tricks have no driver line.**  A player throws the smoke before a
    physical boss; the arc has no boss after SHADOW joins, so the line waits
    for an arc with one to measure it on.
-2. **The Economizer** (section 5): kept from the route; a rule that keeps the
-   MP choice (a fraction of the cost) would let the Gem Box's wager in.
-3. **The Paladin Shield**: the count is halved for random battles; the route
+2. **The Paladin Shield**: the count is halved for random battles; the route
    has not yet chosen who wears the shield, or where.
-4. **The Colosseum's late opponents** (section 3) are designed by the arcs
+3. **The Colosseum's late opponents** (section 3) are designed by the arcs
    whose pools deal them.
-5. **SHADOW's level**: L41 against CELES and TERRA's L53, as CYAN came back
+4. **SHADOW's level**: L41 against CELES and TERRA's L53, as CYAN came back
    from his dream (route-wor-dreams.md section 8).  The plain by Maranda's
    fights lost no one; the arc does not grind him.
+5. **A Colosseum fighter who kills herself ends the run.**  When TERRA's own
+   Drain or Merton took her last HP, the battle table read wiped for 369
+   frames and the harness's wipe canary counted a game over ("canary:
+   BATTLE WIPE ... Counted as a game over", lab `fc_terra_s3`) instead of a
+   lost wager; a loss to the opponent hands back at once.  The route does not
+   meet it (CELES fights the Gem Box), but `H.colosseumBet` should take it as
+   a loss.

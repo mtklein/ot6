@@ -8,7 +8,7 @@
 --      designed Ot6ShieldTbl rows and keep their vanilla weak and absorb bytes, with no Ot6ElemAddTbl row;
 --   2. the route's wagers: each one's ColosseumProp record names the opponent and the prize the route plays
 --      for, and each opponent has an authored row (Test Rider's is the Narshe arc's, the Opinicus's Ebot's
---      Rock's, checked there);
+--      Rock's, checked there; the SrBehemoth's, the Gem Box's, is part 1's);
 --   3. every species of every formation of the plain by Maranda's Falcon (world group 49, where SHADOW's first
 --      fights are; the Cyan arc's rows, checked there) has an authored row and a key for the four the cabin
 --      seats (SHADOW, CELES, CYAN, TERRA); and the lesson: among the four's blades, SHADOW's alone keys the
@@ -35,6 +35,7 @@ local WAGERS = {
   { 0x2A, "Stunner", 0x09C, 0x31 },
   { 0x7B, "Regal Crown", 0x0C8, 0x81 },
   { 0x16, "Soul Sabre", 0x0C8, 0x15 },
+  { 0xD8, "Gem Box", 0x07F, 0xCE },
 }
 -- the hands the cabin seats after the Colosseum (route-wor-colosseum.md section 3): SHADOW (the Striker:
 -- pierce; his skeans fire, water, bolt), CELES (a blade; Ice), CYAN (katanas; Quadra Slice wind), TERRA (a

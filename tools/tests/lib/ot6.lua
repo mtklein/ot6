@@ -3157,18 +3157,26 @@ function M.studySlot()
   end
   return nil, 0
 end
+-- Ot6MagicPrice's first rule: a seated caster wearing the Economizer
+-- (relic effects 2 $3C45 bit $40) pays 1 MP for every spell at any boost
+function M.wearsEconomizer(actor)
+  return actor ~= nil and (M.readByte(0x3C45 + actor * 2) & 0x40) ~= 0
+end
 function M.spellPrice(id, base, boost, actor)
   base, boost = base or 0, boost or 0
   if boost <= 0 then return base, id end
-  if M.isStudy(id, boost, actor) then return M.STUDY_MP, id end
+  local econ = M.wearsEconomizer(actor)
+  if M.isStudy(id, boost, actor) then return econ and 1 or M.STUDY_MP, id end
   if M.inFoldTbl(id) then
     local to = M.foldTier(id, M.foldSteps(actor, boost))
+    if econ then return 1, to end
     if to == id then return base, id end
     -- MagicProp+5, the number Ot6SpellMP re-derives a folded tier's price
     -- from; M.spellMpCost (the nav half) already reads that byte, so the
     -- fold's price and the field menu's read the same cell
     return M.spellMpCost(to), to
   end
+  if econ then return 1, id end
   return M.boostPrice(base, boost), id
 end
 
@@ -3192,9 +3200,10 @@ function M.battleSpellPrice(actor, id, boost)
     "battle spell price requires an ability record")
   assert(type(boost) == "number" and boost % 1 == 0 and boost >= 0 and boost <= 3,
     "battle spell price requires total boost 0..3")
-  if M.isStudy(id, boost, actor) then return M.STUDY_MP, id end
   local family = M.inFoldTbl(id)
   local resolved = family and M.foldTier(id, M.foldSteps(actor, boost)) or id
+  if M.wearsEconomizer(actor) then return 1, resolved end
+  if M.isStudy(id, boost, actor) then return M.STUDY_MP, id end
   local raw = M.spellMpCost(resolved)
   local base = M.casterSpellMp(raw, M.readByte(0x3C45 + actor * 2))
   return family and base or M.boostPrice(base, boost), resolved

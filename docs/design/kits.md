@@ -536,6 +536,14 @@ nowhere else. The World of Ruin adds Phoenix's Life (magicite.md, #327).
   (four at 3 BP, on a five-shield body), `battle_breakblade` (the Break
   Blade's one, with 3 BP pending), `battle_breakmonster` (a monster's, and a
   Break in Rage's or Sketch's context, staged).
+- **The Economizer is hers** (World of Ruin, from the Colosseum's Gem Box
+  wager; #272, owner 2026-10-26).  Every spell its wearer casts costs 1 MP
+  at any boost, a fold, a multiplied cast or a summon alike
+  (`Ot6MagicPrice`).  Of the party that wins it (SHADOW, CELES, CYAN,
+  TERRA) she has learned the most spells (7 to CELES's 6; SHADOW and CYAN
+  none), and hers is the Fire ladder, whose top fold is Ultima at 80 MP;
+  CELES refills her own pool with Runic.  The relic rule does not rank it,
+  so it stays where the route puts it (route-wor-colosseum.md section 5).
 
 ### Locke — Thief (piercing: dagger)
 
