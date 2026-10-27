@@ -2801,8 +2801,12 @@ function M.worldNavTo(txIn, tyIn, opts)
   -- own convention) to FLEE specifically while otherwise fighting
   -- tactically.  Reuses newFlee's own cap + can't-run/pincer-refusal
   -- fallback, built below whenever `tactical` is.
+  -- A function is read at each battle's open (battN == 3) and returns the
+  -- list for that battle: a run the policy decides from the live party
+  -- (gen_wor_desert's Cactrot, run from when SHADOW cannot throw).
   local fleeSet = {}
-  for _, w in ipairs(opts.fleeSpecies or {}) do fleeSet[w] = true end
+  local fleeFn = type(opts.fleeSpecies) == "function" and opts.fleeSpecies or nil
+  for _, w in ipairs(fleeFn and {} or opts.fleeSpecies or {}) do fleeSet[w] = true end
   local blocked, nblocked = {}, 0
   local plan, idx = nil, 1
   local pend = nil
@@ -2878,6 +2882,10 @@ function M.worldNavTo(txIn, tyIn, opts)
       if battN >= 3 then
         sawBattle = true
         plan, pend = nil, nil
+        if fleeFn and battN == 3 then
+          fleeSet = {}
+          for _, w in ipairs(fleeFn() or {}) do fleeSet[w] = true end
+        end
         if next(spareSet) and M.formationHas(spareSet) then
           M.setPad({})
           return
@@ -10255,8 +10263,11 @@ function M.worLegKit(env)
       M.readByte(0x1DD2) & 1, M.readWord(0x1DD3))
   end
   -- pace between the tile the party stands on and a passable neighbour until done(), the world walker
-  -- playing the battles; spare: species words the walker leaves to the engine (no input)
-  local function pace(done, budget, what, spare)
+  -- playing the battles; spare: species words the walker leaves to the engine (no input).  opts.flee:
+  -- species words the walker runs from (worldNavTo's fleeSpecies: L+R, fought out when the formation
+  -- refuses the run); opts.pick(x, y): true for a neighbour the pacing may take (default any passable one)
+  local function pace(done, budget, what, spare, opts)
+    opts = opts or {}
     local A, B, n0 = nil, nil, nil
     return M.seqStep({
       M.call(function()
@@ -10264,7 +10275,9 @@ function M.worLegKit(env)
         A, B, n0 = { x, y }, nil, #M.outcomes
         for _, d in ipairs({ { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } }) do
           local bx, by = x + d[1], y + d[2]
-          if B == nil and M.worldPassable(bx, by) then B = { bx, by } end
+          if B == nil and M.worldPassable(bx, by) and (opts.pick == nil or opts.pick(bx, by)) then
+            B = { bx, by }
+          end
         end
         M.assertEq(B ~= nil, true, what .. ": a passable tile beside (" .. x .. "," .. y .. ")")
         M.log(string.format("[pace] %s: pacing (%d,%d) <-> (%d,%d)", what, A[1], A[2], B[1], B[2]))
@@ -10277,7 +10290,7 @@ function M.worLegKit(env)
       end, 900000, {
         M.cond(function() return M.worldMode() and not done() end, {
           M.worldNavTo(function() return B[1] end, function() return B[2] end,
-            { maxFrames = 20000, playBattles = "tactical", fight = FIGHT, spare = spare,
+            { maxFrames = 20000, playBattles = "tactical", fight = FIGHT, spare = spare, fleeSpecies = opts.flee,
               arrive = function() return done() end }),
           M.call(function()
             A, B = B, A

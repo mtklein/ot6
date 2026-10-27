@@ -2764,9 +2764,11 @@ Ot6ShieldTbl:
                                 ;   the break is the kill.  shadow's throw
                                 ;   (pierce) or ice|water (vanilla)
         .word   $0027
-        .byte   4, OT6_PIERCE|OT6_BLUDG ; tyranosaur: a dinosaur's hide, as
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; tyranosaur: a dinosaur's hide, as
                                 ;   the allosaurus's; a point or a blow, not
-                                ;   an edge.  ice vanilla
+                                ;   an edge.  three, so the pair's break
+                                ;   lands before its second meteor (four
+                                ;   lost the pair 1 in 3).  ice vanilla
         .word   $0026
         .byte   6, OT6_PIERCE|OT6_BLUDG ; brachosaur: the same hide on a
                                 ;   46050-hp body; a break holds its turns,

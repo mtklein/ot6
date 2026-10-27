@@ -13387,15 +13387,24 @@ function Driver:makePlanRules(actor)
   -- wItemList -> $2D selects -> ST_TGT.  The boost stays free: cmd $08
   -- falls out of Ot6AbilityCost's chain with vanilla's own cost, 0, so
   -- there is no price here to escalate (#219).
+  -- opts.throwRead: the policy reads the weakness itself (docs/TESTING.md
+  -- "Reading is full power": what an experienced player knows of a body,
+  -- here its battle weak byte $3BE0+entity) rather than waiting for the
+  -- fight to reveal it.  A skean cannot be dodged (MagicProp $51-$53 +4
+  -- bit $20), which is the vanilla answer to the Cactrot's evade 250
+  -- (route-wor-side-trips.md section 3).  Off by default.
   if self.opts.tactical and self.opts.throw ~= false and id == 3
      and cmdRow(actor, BATTLE.CMD_THROW) then
     for item, elem in pairs(BATTLE.SKEAN_ELEM) do
       if self:battInvIdx(item) then
         for s = 0, 5 do
+          local known = M.readByte(0x3E91 + s * 2)
+          if self.opts.throwRead then known = known | M.readByte(0x3BE0 + 8 + s * 2) end
           if monAlive(s)
-             and (M.readByte(0x3E91 + s * 2) & elem) ~= 0 then
+             and (known & elem) ~= 0 then
             M.log(string.format("[%s] SHADOW throws $%02X at slot %d "
-              .. "(revealed elem mask %02X)", self.tag or "fight", item, s, elem))
+              .. "(%s elem mask %02X)", self.tag or "fight", item, s,
+              self.opts.throwRead and "known" or "revealed", elem))
             return { kind = "throw", item = item,
                      row = cmdRow(actor, BATTLE.CMD_THROW), boostLeft = boost }
           end
@@ -13622,7 +13631,10 @@ function Driver:button(actor)
     self.planPulses = self.planPulses + 1
     -- (the fast steer walks ~3 rows a pulse, so even the last bag row
     -- needs well under the ceiling; the ceiling keeps a runaway bounded)
-    local budget = math.min(140, 40 + (self.plan.kind == "item" and self.plan.idx or 0))
+    -- (a throw walks a one-column list a press a row, its row unknown at
+    -- plan time: the ceiling)
+    local budget = self.plan.kind == "throw" and 140
+      or math.min(140, 40 + (self.plan.kind == "item" and self.plan.idx or 0))
     if self.planPulses > budget then
       self.parkDropN = self.parkDropN + 1
       M.log(string.format("[%s] plan %s (item=%s idx=%s) consumed %d pulses "
@@ -13646,8 +13658,10 @@ function Driver:button(actor)
     -- 13 pulses no matter how the cursor moved, so the steers' own
     -- give-ups (24 and 40 pulses, which confirm on whoever is lit)
     -- could never fire first (the Zozo Bio Blaster wipe, 2026-09-04).
-    local sig = string.format("%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",
-      st, actor,
+    -- (and the Throw window's own pair, its scroll $8953 and row $895B:
+    -- a Water Edge deep in a bag of weapons, route-wor-side-trips.md 3)
+    local sig = string.format("%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",
+      st, actor, M.readByte(0x8953 + actor), M.readByte(0x895B + actor),
       M.readByte(BATTLE.CMDROW + actor), M.readByte(BATTLE.ITEMSCR + actor),
       M.readByte(BATTLE.ITEMROW + actor), M.readByte(BATTLE.MSCROLL + actor),
       M.readByte(BATTLE.MROW + actor), M.readByte(BATTLE.MCOL + actor),
@@ -14107,27 +14121,31 @@ function Driver:button(actor)
     -- toward the wanted row; if it cannot be reached, drop the plan
     -- and back out rather than throw whatever sits under the cursor
     -- (a wrong confirm here throws a WEAPON).
+    -- The English window is ONE column (UpdateMenuState_2d, LANG_EN: $39
+    -- = 0), the list as long as the bag's throwables (every weapon among
+    -- them, so a skean can sit far down), its scroll $8953+actor (max
+    -- $FB) and the in-window row $895B+actor: the absolute row is their
+    -- sum.  (Before the side trips the steer read the two-column tools
+    -- cells and the first 16 rows: a Water Edge past them was "not in the
+    -- list" and SHADOW re-planned the throw every turn, never throwing.)
     local want
-    for i = 0, 15 do
+    for i = 0, 255 do
       local rid = M.readByte(BATTLE.ITEMLIST + i * 3)
       if rid == self.plan.item then want = i; break end
       if rid == 0xFF then break end
     end
     if want == nil then self:dropPlan("throw_unavailable"); return { "b" } end
-    local wc, wr = want % 2, want // 2
-    local cc, cr = M.readByte(BATTLE.BLCOL + actor), M.readByte(BATTLE.BLROW + actor)
-    if cc == wc and cr == wr then return { "a" } end
+    local cur = M.readByte(0x8953 + actor) + M.readByte(0x895B + actor)
+    if cur == want then self.tgtSpin = 0; return { "a" } end
     self.tgtSpin = self.tgtSpin + 1
-    if self.tgtSpin >= 40 then
-      M.log(string.format("[%s] throw steer gave up (row %d,%d vs want "
-        .. "%d,%d) -- backing out, not throwing blind", self.tag or "fight",
-        cr, cc, wr, wc))
+    if self.tgtSpin >= 40 + 4 * want then
+      M.log(string.format("[%s] throw steer gave up (row %d vs want %d) -- "
+        .. "backing out, not throwing blind", self.tag or "fight", cur, want))
       self:dropPlan("throw_steer")
       self.tgtSpin = 0
       return { "b" }
     end
-    if cc ~= wc then return { wc > cc and "right" or "left" } end
-    return { wr > cr and "down" or "up" }
+    return { want > cur and "down" or "up" }
   end
   if (st == BATTLE.ST_RAGE_OPEN or st == BATTLE.ST_RAGE_CLOSE) and self.plan.kind == "rage" then
     return nil                       -- the rage window is building / closing; wait

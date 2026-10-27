@@ -22,7 +22,7 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 local WANT = {
   [0x03E] = { "Hoover", 4, SLASH | BLUDG, ICE | WATER, 0 },
   [0x04C] = { "Cactrot", 1, PIERCE, ICE | WATER, 0 },
-  [0x027] = { "Tyranosaur", 4, PIERCE | BLUDG, ICE, 0 },
+  [0x027] = { "Tyranosaur", 3, PIERCE | BLUDG, ICE, 0 },
   [0x026] = { "Brachosaur", 6, PIERCE | BLUDG, ICE, 0 },
 }
 local HOOVER, CACTROT, TYRANOSAUR, BRACHOSAUR = 0x03E, 0x04C, 0x027, 0x026
