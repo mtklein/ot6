@@ -2754,10 +2754,13 @@ Ot6ShieldTbl:
         ; blades; the forest's hide turns them, so it wants the point, a blow
         ; or the mages' ice.
         .word   $003e
-        .byte   4, OT6_SLASH|OT6_BLUDG ; hoover: a soft sand-eater; cut it
+        .byte   2, OT6_SLASH|OT6_BLUDG ; hoover: a soft sand-eater; cut it
                                 ;   or crush it.  ice|water vanilla (shadow's
                                 ;   water edge); it answers every hit with
-                                ;   sand storm, so few hits that chip win
+                                ;   sand storm, so few hits that chip win:
+                                ;   two, so the break comes before the
+                                ;   counters pile up (four: 42 deaths in
+                                ;   36 fights; two: 22)
         .word   $004c
         .byte   1, OT6_PIERCE   ; cactrot: 3 hp under evade 250: a hit that
                                 ;   lands does 1, and 0 while it shields, so

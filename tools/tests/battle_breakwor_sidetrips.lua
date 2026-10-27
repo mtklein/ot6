@@ -20,7 +20,7 @@ local FIRE, ICE, BOLT, POISON, WIND, HOLY, EARTH, WATER = 0x01, 0x02, 0x04, 0x08
 
 -- species -> { name, shields, class mask, vanilla weak byte, vanilla absorb byte }
 local WANT = {
-  [0x03E] = { "Hoover", 4, SLASH | BLUDG, ICE | WATER, 0 },
+  [0x03E] = { "Hoover", 2, SLASH | BLUDG, ICE | WATER, 0 },
   [0x04C] = { "Cactrot", 1, PIERCE, ICE | WATER, 0 },
   [0x027] = { "Tyranosaur", 3, PIERCE | BLUDG, ICE, 0 },
   [0x026] = { "Brachosaur", 6, PIERCE | BLUDG, ICE, 0 },

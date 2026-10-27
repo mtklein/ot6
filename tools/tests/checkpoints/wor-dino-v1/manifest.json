@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-dino.sram",
+  "slot": 3,
+  "milestone": "wor-dino",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "map": 1,
+      "x": 195,
+      "y": 46
+    }
+  },
+  "size": 32768,
+  "sha256": "6e321c550057804847c3b875a133f099d937ea1f0bca25cca46f8a7858e1cc81",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "6e321c550057804847c3b875a133f099d937ea1f0bca25cca46f8a7858e1cc81",
+    "generator_sig": "8a4bbe0fd546c2ccd9ed97678d190cd0f1f7bb0a7781cdac8858c57fb110b6c1 gen_wor_dino tools/tests/checkpoints/wor-colosseum-v1/manifest.json tools/tests/checkpoints/wor-colosseum-v1/wor-colosseum.sram",
+    "ancestors": [
+      {
+        "path": "tools/tests/checkpoints/wor-colosseum-v1/manifest.json",
+        "sha256": "e130ec21520ef62cd4548dc44c180c02d5a6a8b83d61c1785537aa40fe0ed1f8"
+      }
+    ]
+  }
+}

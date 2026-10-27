@@ -93,6 +93,8 @@ TITLES = {
     "wor-doma-v1": "By Doma Castle, after Cyan's dream",
     "wor-ancient-v1": "By Figaro Castle, after the Ancient Castle",
     "wor-colosseum-v1": "By Maranda, after the Colosseum (Shadow joins)",
+    "wor-dino-v1": "By the dinosaur forest, after the grind there",
+    "wor-desert-v1": "By Maranda, after the Cactrot desert (before Kefka's Tower)",
 }
 
 README = """\

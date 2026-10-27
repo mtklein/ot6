@@ -2486,6 +2486,74 @@ M.contracts["wor-colosseum-v1"] = {
   },
 }
 
+-- wor-desert-v1: the World of Ruin map, on foot on the Falcon's tile by
+-- Maranda again (69,183), where the line left it, after the dinosaur
+-- forest's grind and the Cactrot desert (world group 111) south of the
+-- town: SHADOW, CELES, CYAN and TERRA seated.  The second grind before
+-- Kefka's Tower, and its boot (docs/design/route-wor-side-trips.md).  No
+-- timer.
+M.contracts["wor-desert-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 69, y = 183 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x02F3, 1, "SHADOW recruited at the Colosseum (_cb78d9)" },
+  },
+  party = {
+    size = 4,                     -- SHADOW, CELES, CYAN and TERRA
+    members = {
+      { 0x03, "SHADOW" },
+      { 0x06, "CELES" },
+      { 0x02, "CYAN" },
+      { 0x00, "TERRA" },
+    },
+  },
+  ram = {
+    { 0x1F62, 0xFF, 69, "the Falcon parked at x 69 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 183, "the Falcon parked at y 183 (save-block cell $1F63)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
+-- wor-dino-v1: the World of Ruin map, on foot on the Falcon's tile by the
+-- dinosaur forest north of Gau's father's house (195,46), after the grind
+-- there (world group 54) until the four stood at Kefka's Tower's target
+-- level: SHADOW, CELES, CYAN and TERRA seated.  The first grind before
+-- Kefka's Tower, and the desert's boot (docs/design/route-wor-side-trips.md).
+-- No timer.
+M.contracts["wor-dino-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 195, y = 46 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x02F3, 1, "SHADOW recruited at the Colosseum (_cb78d9)" },
+  },
+  party = {
+    size = 4,                     -- SHADOW, CELES, CYAN and TERRA
+    members = {
+      { 0x03, "SHADOW" },
+      { 0x06, "CELES" },
+      { 0x02, "CYAN" },
+      { 0x00, "TERRA" },
+    },
+  },
+  ram = {
+    { 0x1F62, 0xFF, 195, "the Falcon parked at x 195 (save-block cell $1F62)" },
+    { 0x1F63, 0xFF, 46, "the Falcon parked at y 46 (save-block cell $1F63)" },
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
