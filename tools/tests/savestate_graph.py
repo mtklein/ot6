@@ -1018,6 +1018,14 @@ STATES = [
     S("wor_ebot", gen="gen_wor_ebot", prev="wor_gogo",
       checkpoint="wor-gogo-v1", timeout=7200),
 
+    # wor-gogo-v1 -> the World of Ruin map on the Falcon's tile by Thamasa
+    # (250,229) again: a branch beside wor_ebot (#484).  Thamasa's item
+    # counter when the bag is under its band, then the plain around Thamasa
+    # on foot until each of its four formations (world groups 55 and 56) is
+    # won (docs/design/route-wor-gogo.md section 10).  Nothing boots it.
+    S("wor_thamasa_plain", gen="gen_wor_thamasa_plain", prev="wor_gogo",
+      checkpoint="wor-gogo-v1", timeout=3600),
+
     # wor-ebot-v1 -> the World of Ruin map on the Falcon's tile by the Opera
     # House (30,182): the cabin (CELES, RELM, GOGO, STRAGO), the catwalk, the
     # stage master, the switch and the Dirt Dragon (event battle 134), the
