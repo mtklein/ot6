@@ -17,11 +17,11 @@
 --   2. Driver:cureFor on Mute: a Muted seat with a Magic row and no Fight
 --      row (the Fanatics' Tower) is cured with the cheapest Mute cure in
 --      gil above its floor (an Echo Screen before a Remedy); a Muted seat
---      that can still Fight, and an unmuted seat, are not; with the Echo
+--      that can still Fight or Rage, and an unmuted seat, are not; with the Echo
 --      Screens at their floor the Remedy is the cure.
 -- Negative controls (build/attempts/wt/v038-magimaster/mut/): the floor
 -- ignored in noLineItemPick fails 1b; cureFor's Mute branch removed fails
--- 2a.
+-- 2a; the branch keyed on the Fight row alone (its first cut) fails 2e.
 emu = { eventType = { inputPolled = 1 }, addEventCallback = function() return 1 end }
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -121,6 +121,9 @@ bag({ { REMEDY, 10 }, { ECHO, 4 } })
 seat(OUTSIDE, true)
 item, what = driver(cureFloor):cureFor(0)
 check(what == nil, "2c: a Muted seat that can still Fight: no cure (got " .. tostring(what) .. ")")
+seat({ 0x10, CMD_MAGIC, 0xFF, CMD_ITEM }, true)   -- a Rage row beside Magic (GAU's)
+item, what = driver(cureFloor):cureFor(0)
+check(what == nil, "2e: a Muted seat with another verb (Rage): no cure (got " .. tostring(what) .. ")")
 seat(TOWER, false)
 item, what = driver(cureFloor):cureFor(0)
 check(what == nil, "2d: an unmuted seat: no cure (got " .. tostring(what) .. ")")

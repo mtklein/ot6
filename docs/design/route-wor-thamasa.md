@@ -355,7 +355,10 @@ draws WallChange (finding 5). On death, Ultima (power 150) on the party.
   (the driver reads his HP), with Fenix Downs as the backstop.
 - **Reflect.** Wall Ring or Rflect (Carbunkl) on the party would bounce his
   single-target spells onto him, where seven elements in eight are null;
-  but it bounces the party's own Cure too. A lab branch, not the plan.
+  but it bounces the party's own Cure too. A lab branch at first; since
+  v0.31 the plan (12.3: out of the rings his tier spells wipe the four). His
+  wall absorbs one element in eight, so about one bounced spell in eight
+  heals him.
 - **Expectation.** The arc's contest: the target level comes from it.
 
 ### 5.4 The Holy Dragon (event 139; `AIScript::_36`, `ai_script.asm:3253`)
@@ -396,6 +399,9 @@ Haste); STRAGO Sraphim (Cure, Life) or Shoat (Break, Doom). Life is then
 on two casters (TERRA, Sraphim's wearer), Break on two (TERRA, Shoat's),
 Shell on one. level-curve.md and magicite.md listed Carbunkl among the
 Shell stones; it grants Rflect and Safe (`espers.txt`), corrected there.
+As played (12.3): for MagiMaster, TERRA Shiva, CELES Shoat, RELM Maduin,
+STRAGO Sraphim; for the climb, TERRA Maduin, CELES Tritoch, RELM Ifrit,
+STRAGO Palidor.
 
 ### 6.2 RELM on arrival
 
@@ -787,3 +793,76 @@ Evidence under `build/attempts/wt/v036-route/lab/`.
 - **The sweep.** `tw1` at e4491312: 18 of 18 PASS at one attempt; the Holy
   Dragon in 16 distinct keys over 19 meetings (with `tw0`), MagiMaster in
   14 over 19, every one won (`tally_tw.txt`).
+
+### 12.3 MagiMaster's fight, and the tower's checks (v0.38, #442, #444, #480)
+
+Evidence under `build/attempts/wt/v038-magimaster/`. Every sweep boots the
+graph's own capture of `wor-tower-v1` (`build/checkpoints/`, the line from
+power-on at bdcc1e61, which this branch's ROM and upstream legs share), K
+world battles used up beside the tower first (`tsweep.sh`); the stage
+sweeps (`msweep.sh`) boot `b0`'s own states before MagiMaster.
+
+- **His heals were the rings.** In the Wall Rings each Fire, Ice and Bolt
+  he aims at a member rebounds onto him, and his wall absorbs one element
+  in eight: the party's HP never moved while his climbed back (`b0`: a
+  median 22,802 HP regained a fight). Out of the rings (`f1`) his spells
+  land for 1,300 to 2,600 under Shell, and every run that reached him
+  wiped (`f1_k1_s0`: `[death] ... by slot 0 cmd $02 atk $09`, `battle wipe
+  x1`). The rings stay; the fight is shortened on the party's side.
+- **His break is the fight.** Broken he takes no turns and draws no
+  counters, so his wall stands still for the window, he casts nothing that
+  could heal him, and every hit doubles. The driver's `opts.breakVs` keeps
+  the bank for the window, breaks him only on a wall a member other than
+  the Break's caster can hit, and spends the whole bank in it; CELES wears
+  Shoat for a second Break (the stone 5.3 and 6.1 name for his shields).
+  Breaking on any wall, six windows of nine took nothing (`m1_b0_k0_s0_s9`,
+  `weak $80`, `window over ... HP 18353`).
+- **Read the wall it lands on.** Every hit draws WallChange, so a cast
+  planned while another member's action is in the air meets a new wall.
+  With `opts.wallChangeVs`, an element cast and a Break wait for the
+  spell in the air and its counter before reading the wall (X hands the
+  window on, as a person waits for a spell to land before choosing the
+  next), and a seat with no line leaves a break window to those who hold
+  its weakness. From the same twelve states the fight went from a median
+  of 104,663 ticks with the break line alone (`m2`) to 82,271 (`m6`), and
+  with Shoat to 60,251 (`m13`, 45,215 to 82,824).
+- **RELM on Maduin** (Fire, Ice and Bolt, three walls in eight where
+  Ifrit's Fire answered one): the no-line item fallback in his fight fell
+  from 49 in 18 runs (`b0`) to 2 in 24 (`f2`; `noline.py`).
+- **Mute.** A Muted seat whose only attack is Magic is cured with the
+  cheapest Mute cure (`Driver:cureFor`): `f2`, four Echo Screens on the
+  climb's randoms, none needed against MagiMaster (he is immune to Mute,
+  and his own Mute rebounds onto him in the rings).
+- **The floor test.** `noline_floor_selftest.lua` holds the no-line
+  fallback to the care floor (#443) and the Mute cure; each case fails by
+  its own mutant (`mut/floor.out`, `mut/mute.out`).
+- **The checks at the leg's start (#480).** The stones every kit names are
+  asserted, each naming the leg that gives it; Tinctures, Potions, Fenix
+  Downs, Remedies and the four Wall Rings below their floors send the
+  party back to Thamasa's counters, and gil short of the top-up is
+  asserted. From lab-only edits of the capture (`make_negative.py`):
+  Sraphim's bit cleared fails `Sraphim owned for the tower's kits
+  (supplied by gen_wor_sabin ...)`; 40 Tinctures and no rings fly to
+  Thamasa, buy 59 Tinctures and 4 rings, and pass; the same with 1,000 GP
+  fails `gil for Thamasa's top-up ...: 112500 GP, the bag holds 1000`
+  (`lab/n1_*`).
+- **The Holy Dragon's presses** fight a random battle that comes up in
+  them: with seven world battles used up, a Magic Urn pair came up there
+  and the presses timed out in all three shifts, on the old generator too
+  (`b0_k7_*`, `f2_k7_*`: `timeout after 1200 frames driving toward the
+  Holy Dragon`).
+
+The sweep, before and after, his fight from `[boss] MagiMaster: battle
+$162 won after N ticks`:
+
+| sweep | runs | MagiMaster won | distinct keys | min | median | p90 | max |
+|---|---|---|---|---|---|---|---|
+| `b0` (main's generator, K 0-5) | 18 of 18 PASS | 18 | 16 | 64,826 | 91,512 | 183,639 | 193,514 |
+| `f2` (this, K 0-6) | 21 of 21 PASS | 21 | 19 | 40,419 | 71,570 | 96,062 | 127,221 |
+
+At 60 frames a second that is about 11 to 35 minutes, against 18 to 54.
+It is still a long fight: the windows last 2,200 frames, about two
+actions, and between them the party climbs eight shields one Break and
+one weakness at a time. The same stage sweeps on a lab ROM with four
+shields in place of eight ran a median of 45,563 with Shoat (`m14`,
+`mm4-setup.sh`); that row is the owner's call (the report of #442).

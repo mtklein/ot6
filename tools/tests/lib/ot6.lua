@@ -9418,24 +9418,24 @@ function Driver:cureFor(e)
     return M.statusCure({ byte = 2, bit = M.ST2_BERSERK,
       has = function(item) return self:battInvIdx(item) ~= nil end }), "Berserk"
   end
-  -- Mute (#444) where Magic is the member's attack: a seat with a Magic row
-  -- and no Fight row (the Fanatics' Tower, whose Fight row is Magic) has no
-  -- turn while the row is greyed (UpdateCmd_05 greys it on $3EE5 bit 3), so
-  -- an Echo Screen or a Remedy (M.statusCure, cheapest in gil) is worth the
-  -- turn.  A member who can still Fight keeps its turn for that.  Measured
+  -- Mute (#444) where Magic is the member's only verb: a seat whose rows are
+  -- Magic and Item alone (the Fanatics' Tower, whose Fight row is Magic) has
+  -- no turn while the row is greyed (UpdateCmd_05 greys it on $3EE5 bit 3),
+  -- so an Echo Screen or a Remedy (M.statusCure, cheapest in gil) is worth
+  -- the turn.  A member with another verb (Fight, Rage, a Dance...) keeps
+  -- its turn for that.  Measured
   -- in the tower before this branch: 23 of 203 no-line fallbacks were a
   -- Muted seat drinking a Tonic with Remedies in the bag (build/attempts/wt/
   -- v031-relics-grey/lab/rg1_k5_s11: 'Magic row greyed, status $00 $08 MUTE')
   -- (the rows read as listed, greyed or not: cmdRow reports the greyed
   -- Magic row as absent)
-  local function listed(cmd)
-    for row = 0, 3 do
-      if M.readByte(BATTLE.CMDTBL + e * 12 + row * 3) == cmd then return true end
-    end
-    return false
+  local magic, other = false, false
+  for row = 0, 3 do
+    local cmd = M.readByte(BATTLE.CMDTBL + e * 12 + row * 3)
+    if cmd == BATTLE.CMD_MAGIC then magic = true
+    elseif cmd ~= BATTLE.CMD_ITEM and cmd ~= 0xFF then other = true end
   end
-  if (M.readByte(BATTLE.ST2 + e * 2) & M.ST2_MUTE) ~= 0 and listed(BATTLE.CMD_MAGIC)
-     and not listed(BATTLE.CMD_FIGHT) then
+  if (M.readByte(BATTLE.ST2 + e * 2) & M.ST2_MUTE) ~= 0 and magic and not other then
     return M.statusCure({ byte = 2, bit = M.ST2_MUTE,
       has = function(item) return self:battInvIdx(item) ~= nil end }), "Mute"
   end
