@@ -858,9 +858,22 @@ $162 won after N ticks`:
 | sweep | runs | MagiMaster won | distinct keys | min | median | p90 | max |
 |---|---|---|---|---|---|---|---|
 | `b0` (main's generator, K 0-5) | 18 of 18 PASS | 18 | 16 | 64,826 | 91,512 | 183,639 | 193,514 |
-| `f2` (this, K 0-6) | 21 of 21 PASS | 21 | 19 | 40,419 | 71,570 | 96,062 | 127,221 |
+| `f2` K 0-6 and `f3` K 7-9 (this) | 29 of 30 PASS | 30 | 24 | 40,419 | 69,492 | 95,767 | 127,221 |
 
-At 60 frames a second that is about 11 to 35 minutes, against 18 to 54.
+(`mmtally.py lab b0`, `mmtally.py lab "f[23]"`; `f2`'s three K7 runs, on
+the generator before the Holy Dragon's fix, are left out, and `b0_k7_*`
+failed the same way.) The graph's own play of this branch won his fight
+in 71,570 ticks at its first attempt (`gate.log`, `wor_tower.log`:
+`MagiMaster: battle $162 won after 71570 ticks`, `PASS (frame 399535)
+attempts=1/3`). At 60 frames a second that is about 11 to 35 minutes,
+against 18 to 54.
+
+The one failure, `f3_k8_s13`, came after his fight: on the walk down a
+random battle (L.70 Magic, L.50 Magic and a third, `be54-g016D`) froze
+mid-animation, a Bolt rebounding off the four mirrors on the screen and
+the battle menu in state `$01`, until the stall watch killed the run; the
+same draw froze the same way again (`f4_k8_s13`,
+`f4_k8_s13_stall_f315008.png`). It is open.
 It is still a long fight: the windows last 2,200 frames, about two
 actions, and between them the party climbs eight shields one Break and
 one weakness at a time. The same stage sweeps on a lab ROM with four
