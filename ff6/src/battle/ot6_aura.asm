@@ -51,6 +51,7 @@
 .proc Ot6FramePost_ext
         .a8
         .i16
+        jsr     Ot6NmiScratchSave
         lda     $3e9d                   ; any character's pending boost?
         ora     $3e9f
         ora     $3ea1
@@ -59,6 +60,71 @@
         jsr     Ot6Aura
         jsr     Ot6AuraHalo
 :       jmp     Ot6RestageGate_ext      ; rtl's back to the C1 frame loop
+.endproc
+
+; ------------------------------------------------------------------------------
+; [ the battle NMI leaves the main thread's scratch as it found it ]
+;
+; OT6's battle scratch ($3ecc-$3ed3: OT6_SCR_SLOT2, OT6_SCR_BIT, OT6_SCR_IDX,
+; OT6_SCR_COLS and the glyph byte after them) is written by code on both
+; sides of the battle NMI.  On the main thread: the HUD's per-monster walkers
+; (Ot6BgHudLine, from WaitFrame), the pip and wallet stages, and the battle
+; program's break, boost and damage math.  Inside the NMI: the menu-text and
+; menu-state work that draws the battle lists (_c15a5c, UpdateMenuState ->
+; ListTextCmd_0f -> Ot6PreviewList_ext -> Ot6FoldSteps, the list icons) and
+; the boost re-fold (Ot6RestageGate_ext).  An NMI that lands inside a main-
+; thread walker therefore changed its counter under it.  The HUD's class
+; walk (Ot6BgHudLine @cbit) shifts OT6_SCR_BIT left until it reaches $10;
+; when the NMI's Ot6FoldSteps stored a 0 there mid-walk, the walk never
+; ended, the main thread spun in it for good and the battle froze with the
+; animation on screen (build/attempts/wt/v038-mirror-freeze/: the Cultists'
+; Tower freeze, a magic list opened while a four-mirror Bolt bounce had
+; the frame's work running late into the vblank).
+;
+; The NMI's OT6 work is bracketed instead of each writer: Ot6FramePost_ext,
+; the first OT6 call on the NMI's unpaused path, saves the eight bytes, and
+; the jsl to IncGameTime_ext at the end of that path (repointed here, same
+; size) puts them back.  Every NMI list draw sits between the two, on one
+; straight-line path (BattleNMI @0cdd-@0cfd); the paused path skips both.
+; ------------------------------------------------------------------------------
+
+; jsr from Ot6FramePost_ext.  Preserves every register and flag.
+.proc Ot6NmiScratchSave
+        php
+        rep     #$20
+        .a16
+        pha
+        lda     f:$7e0000+OT6_SCR_SLOT2
+        sta     f:$7e0000+OT6_NMISCR
+        lda     f:$7e0000+OT6_SCR_BIT
+        sta     f:$7e0000+OT6_NMISCR+2
+        lda     f:$7e0000+OT6_SCR_IDX
+        sta     f:$7e0000+OT6_NMISCR+4
+        lda     f:$7e0000+OT6_SCR_COLS
+        sta     f:$7e0000+OT6_NMISCR+6
+        pla
+        plp
+        rts
+.endproc
+
+; jsl from BattleNMI in place of `jsl IncGameTime_ext`.  Preserves every
+; register and flag, then runs the call it replaced.
+.proc Ot6NmiScratchRestore_ext
+        php
+        rep     #$20
+        .a16
+        pha
+        lda     f:$7e0000+OT6_NMISCR
+        sta     f:$7e0000+OT6_SCR_SLOT2
+        lda     f:$7e0000+OT6_NMISCR+2
+        sta     f:$7e0000+OT6_SCR_BIT
+        lda     f:$7e0000+OT6_NMISCR+4
+        sta     f:$7e0000+OT6_SCR_IDX
+        lda     f:$7e0000+OT6_NMISCR+6
+        sta     f:$7e0000+OT6_SCR_COLS
+        pla
+        plp
+        jml     IncGameTime_ext
 .endproc
 
 .proc Ot6Aura

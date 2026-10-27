@@ -524,4 +524,13 @@ OT6_SPELLNONE        := $ee22
 .assert OT6_SPELLNONE = OT6_MIMICCOPY + 1, error, "the no-reward spell mark must follow the Mimic copy mark"
 .assert OT6_SPELLNONE <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
+; The battle scratch ($3ecc-$3ed3, above) as the main thread left it when the
+; NMI's OT6 work began (ot6_aura.asm, Ot6NmiScratchSave), put back before the
+; NMI returns (Ot6NmiScratchRestore_ext).  Written before it is read on every
+; NMI that reads it, so it needs no init.
+OT6_NMISCR           := $ee23   ; 8 bytes
+.assert OT6_NMISCR = OT6_SPELLNONE + 1, error, "the NMI's scratch save must follow the no-reward spell mark"
+.assert OT6_NMISCR + 8 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+.assert OT6_SCR_COLS + 2 - OT6_SCR_SLOT2 = 8, error, "the NMI's scratch save covers $3ecc-$3ed3 in four words"
+
 .endif

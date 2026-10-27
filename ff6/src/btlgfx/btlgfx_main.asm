@@ -1767,8 +1767,9 @@ BattleNMI:
         jsr     UpdateSfx
         jsr     _c10b73       ; update running/fade in/timers
         phb
-        jsl     IncGameTime_ext
-        plb
+        jsl     Ot6NmiScratchRestore_ext ; ot6: same-size repoint: puts back
+        plb                     ;   the main thread's scratch, then runs
+                                ;   IncGameTime_ext (ot6_aura.asm)
 @0d03:  clr_a
         longa
         lda     a:$000e       ; frame counter
