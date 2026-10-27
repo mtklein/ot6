@@ -454,6 +454,11 @@ TEST_ENV = {
     # the Continue, a walk and up to sixteen battles
     "battle_study": "OT6_TIMEOUT=3600 "
         "OT6_SRAM_CHECKPOINT=build/checkpoints/fire-out-v1",
+    # v0.38: Siren's Bserk and STRAGO's, learned by watching, from Esper
+    # Mountain's save point (Siren held, Insecares in the cave above); the
+    # Continue, a walk and five to a dozen battles (about 40k frames)
+    "battle_bserk": "OT6_TIMEOUT=3600 "
+        "OT6_SRAM_CHECKPOINT=build/checkpoints/ultros-won-v1",
     # #382: LOCKE's Mug, Trickshot, Dismantle and Appraise, on the same plain
     # (four of his five later rows are learned there); the Continue, a walk
     # and seven or more battles of one scripted turn each
