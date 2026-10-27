@@ -66,6 +66,14 @@ BOSS_FIGHT.progressVs = { [0x166] = 120000 }
 -- nothing that lands casts something he nulls to turn the wall (Driver
 -- opts.wallChangeVs)
 BOSS_FIGHT.wallChangeVs = { [0x166] = true }
+-- his break is the fight (#442; route-wor-thamasa.md 5.3, "Break, boosted
+-- to take four"): Broken he takes no turns and no counters, so his wall
+-- stands still for the window, he casts nothing that could rebound and heal
+-- him, and every hit is doubled.  So the bank is kept for the window
+-- (Driver opts.breakVs): TERRA's Break spends what breaks him now, the
+-- others' shielded casts go unboosted, and in the window every cast spends
+-- the bank
+BOSS_FIGHT.breakVs = { [0x166] = true }
 BOSS_FIGHT.magicOnly = {}
 for _, id in ipairs(H.MAGIC_ONLY_SPELLS) do
   if id ~= 0x04 then BOSS_FIGHT.magicOnly[#BOSS_FIGHT.magicOnly + 1] = id end
@@ -715,21 +723,6 @@ local function wallRingsOff(tag, keep)
   steps[#steps + 1] = H.call(function() say("wor", "Wall Rings off for " .. tag .. ": " .. kitLine()) end)
   return H.seqStep(steps)
 end
--- the rings off for a fight that must not be fought in them, and checked:
--- a ring whose relic this run never recorded (a boot past the climb's
--- first "on") stays on, and the fight would be the old one
-local function ringsOffFor(tag)
-  return H.seqStep({
-    wallRingsOff(tag),
-    H.call(function()
-      for _, m in ipairs(PARTY) do
-        H.assertEq(H.readByte(c(m[1], 0x23)) ~= WALL_RING and H.readByte(c(m[1], 0x24)) ~= WALL_RING, true,
-          string.format("%s wears no Wall Ring for %s (the relic it gave way to was recorded: %s)", m[2], tag,
-            heldRelic[m[1]] and string.format("$%02X", heldRelic[m[1]]) or "none"))
-      end
-    end),
-  })
-end
 -- the climb's spend (route-wor-thamasa.md 10.1: the randoms are fought, the
 -- MP drain answered with supplies), logged floor by floor
 local function spend(what)
@@ -767,6 +760,135 @@ local function sideRoom(floorMap, roomMap, bit, item, what, extra)
   return H.seqStep(steps)
 end
 
+-- ---- what the plan depends on, checked as the leg starts (#480) ------------
+-- Hard: what only an earlier leg supplies.  The party is wor-tower-v1's entry
+-- contract (lib/ot6_contract.lua); the stones every fight's kit names are
+-- asserted here, each naming the leg that gives it.
+local STONES_NEEDED = {
+  { IFRIT, "Ifrit", "gen_ifrit_magicite (the Magitek factory)" },
+  { SHIVA, "Shiva", "gen_ifrit_magicite (the Magitek factory)" },
+  { MADUIN, "Maduin", "gen_esper_tubes (the tube room)" },
+  { PALIDOR, "Palidor", "gen_wor_terra (Solitary Island's beach)" },
+  { TRITOCH, "Tritoch", "gen_wor_tritoch (the Narshe cliffs)" },
+  { SRAPHIM, "Sraphim", "gen_wor_sabin (Tzen's esper seller)" },
+}
+-- Soft: what the leg buys back itself, the way a player flies back to
+-- Thamasa (shop 74, items; shop 75, relics) when the bag is short for a
+-- tower with no counter inside: each item's floor (below it, the trip), and
+-- what the trip buys to (gen_wor_relm's Thamasa targets).  Tinctures to the
+-- stack (the climb's MP: 99 in, 1 to 26 left at the save, route-wor-
+-- thamasa.md 12.2); Potions to the band (level x 1.5 before a boss
+-- gauntlet, guidelines), bought to careStockPotions; Fenix Downs to the
+-- level, capped at 20; Remedies to 10 (the plain's poison, MagiMaster's
+-- Mute); a Wall Ring for each of the four (worn or in the bag).
+local MAP_THAMASA, MAP_THAMASA_ITEMS, MAP_THAMASA_RELICS = 344, 347, 350
+local THAMASA_DOOR, THAMASA_LANDING = { 251, 230 }, { 250, 229 }
+local THAMASA_AVOID = { { 22, 39 }, { 23, 39 } }
+local function ringsOwned()
+  local n = H.invCountOf(WALL_RING)
+  for _, m in ipairs(PARTY) do
+    if H.readByte(c(m[1], 0x23)) == WALL_RING then n = n + 1 end
+    if H.readByte(c(m[1], 0x24)) == WALL_RING then n = n + 1 end
+  end
+  return n
+end
+local function supplyNeeds()
+  local lv = H.activeTopLevel()
+  return {
+    { TINCTURE, "Tincture", 99, function() return 99 end },
+    { POTION, "Potion", math.ceil(lv * 1.5), function() return H.careStockPotions(lv, { spend = 40 }) end },
+    { FENIX, "Fenix Down", math.min(20, lv), function() return math.min(20, lv) end },
+    { REMEDY, "Remedy", 10, function() return 10 end },
+    { WALL_RING, "Wall Ring", 4, function() return 4 end, ringsOwned },
+  }
+end
+local function shortOf()
+  local out = {}
+  for _, s in ipairs(supplyNeeds()) do
+    local have = s[5] and s[5]() or H.invCountOf(s[1])
+    if have < s[3] then out[#out + 1] = { s = s, have = have } end
+  end
+  return out
+end
+local function shortLine(list)
+  local t = {}
+  for _, x in ipairs(list) do t[#t + 1] = string.format("%s %d < %d", x.s[2], x.have, x.s[3]) end
+  return #t > 0 and table.concat(t, ", ") or "nothing"
+end
+local function topUpCost()
+  local gil = 0
+  for _, s in ipairs(supplyNeeds()) do
+    local have = s[5] and s[5]() or H.invCountOf(s[1])
+    gil = gil + math.max(0, s[4]() - have) * H.itemPrice(s[1])
+  end
+  return gil
+end
+local function readiness()
+  local trip = false
+  local function buy(s)
+    return H.buyItem(s[1], function()
+      local have = s[5] and s[5]() or H.invCountOf(s[1])
+      return math.max(0, s[4]() - have)
+    end, string.format("%s to %d for the tower", s[2]:upper(), s[4]()))
+  end
+  local itemBuys = {}
+  for _, s in ipairs(supplyNeeds()) do
+    if s[1] ~= WALL_RING then itemBuys[#itemBuys + 1] = buy(s) end
+  end
+  return H.seqStep({
+    H.call(function()
+      for _, st in ipairs(STONES_NEEDED) do
+        H.assertEq(owns(st[1]), true, string.format("%s owned for the tower's kits (supplied by %s)", st[2], st[3]))
+      end
+      local short = shortOf()
+      trip = #short > 0
+      say("ready", "the tower's supplies: short of " .. shortLine(short))
+      if trip then
+        local cost = topUpCost()
+        H.assertEq(H.gil() >= cost, true, string.format("gil for Thamasa's top-up (%s): %d GP, the bag holds %d "
+          .. "(gil is the World of Ruin legs' before the tower, through gen_wor_relm)", shortLine(short), cost, H.gil()))
+      end
+    end),
+    H.cond(function() return trip end, {
+      board(),
+      H.flyTo(THAMASA_LANDING[1], THAMASA_LANDING[2], { what = "the Falcon to Thamasa for the tower's supplies" }),
+      H.worldNavTo(THAMASA_DOOR[1], THAMASA_DOOR[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
+        arrive = function() return map() == MAP_THAMASA and not H.worldMode() end }),
+      H.waitUntil(function() return map() == MAP_THAMASA and settled() end, 2400, "Thamasa: map 344", 1),
+      H.crossDoor(26, 37, MAP_THAMASA_ITEMS, 36, 44, "Thamasa's item shop door 344 (26,37) -> 347",
+        { fight = FIGHT, avoid = THAMASA_AVOID }),
+      H.shopTalk(36, 39, "Thamasa's item shop", { fight = FIGHT }),
+      H.call(function() H.assertEq(H.shopId(), 74, "the counter opened shop 74 ($0201)") end),
+      H.seqStep(itemBuys),
+      H.shopClose("Thamasa's item shop"),
+      H.crossDoor(36, 45, MAP_THAMASA, 26, 39, "Thamasa's item shop -> the street", { fight = FIGHT }),
+      H.cond(function() return ringsOwned() < 4 end, {
+        H.crossDoor(40, 30, MAP_THAMASA_RELICS, 44, 13, "Thamasa's relic shop door 344 (40,30) -> 350",
+          { fight = FIGHT, avoid = THAMASA_AVOID }),
+        H.shopTalk(43, 8, "Thamasa's relic shop", { fight = FIGHT }),
+        H.call(function() H.assertEq(H.shopId(), 75, "the counter opened shop 75 ($0201)") end),
+        buy(supplyNeeds()[5]),
+        H.shopClose("Thamasa's relic shop"),
+        H.crossDoor(44, 14, MAP_THAMASA, 40, 32, "Thamasa's relic shop -> the street", { fight = FIGHT }),
+      }, {}),
+      H.bagArrange({ POTION, FENIX, TONIC, REMEDY }, { tag = "bag: combat items on top (Thamasa)" }),
+      H.navTo(22, 47, { maxFrames = 12000, playBattles = "tactical", fight = FIGHT, avoid = THAMASA_AVOID }),
+      H.driveUntil(function() return H.worldMode() end, 6000, { H.hold({ "down" }), H.waitFrames(4) },
+        "off Thamasa's edge"),
+      H.release(),
+      H.waitWorldSettled("out of Thamasa", 1800, 30),
+      board(),
+      H.flyTo(TOWER_LANDING[1], TOWER_LANDING[2], { what = "the Falcon back to the tower" }),
+      H.fieldCare({ threshold = 1.0, tag = "beside the tower, after Thamasa" }),
+    }, {}),
+    H.call(function()
+      local short = shortOf()
+      say("ready", "the tower's supplies after the check: short of " .. shortLine(short))
+      H.assertEq(#short, 0, "the tower's supplies at their floors after the check (" .. shortLine(short) .. ")")
+    end),
+  })
+end
+
 H.run({ maxFrames = 1500000 }, {
   H.bootCheckpoint("wor-tower-v1"),
   watches(),
@@ -792,6 +914,10 @@ H.run({ maxFrames = 1500000 }, {
     H.log("[wor] " .. kitLine())
   end),
   -- @@setup-end
+
+  -- ---- 0. what the plan depends on (#480) ---------------------------------------
+  -- @@stage ready
+  readiness(),
 
   -- ---- 1. the stones for the climb, and in -------------------------------------
   -- @@stage stones
@@ -919,17 +1045,17 @@ H.run({ maxFrames = 1500000 }, {
   -- fallbacks, build/attempts/wt/v031-relics-grey/lab/rg1_*, rg2_*, rg4_*,
   -- 'magic-only $00 refused: fire is ABSORBED by slot 0 species $0166', #444)
   stonesFor(MAGIMASTER_STONES, "stones for MagiMaster"),
-  -- MagiMaster is fought without the Wall Rings (#442).  In them each
-  -- Fire 2/3, Ice 2/3 and Bolt 2/3 he aimed at a member rebounded onto
-  -- him, and his wall drinks one element in eight: the party's HP never
-  -- moved while his climbed back (3,350 to 58,212 HP regained a fight over
-  -- 36 wins, 'slot 0 $166 cmd $02 atk $09' then 'monhp=s0:47337' ->
-  -- '50000' with the party's HP unchanged: build/attempts/wt/
-  -- v031-tower-2/lab/sw5_*, sw6_*), Reflect turned the party's own Shell
-  -- away, and the fight ran 39,982 to 203,654 ticks.  Off, his spells land
-  -- on the party, Shell goes up (the driver's shellVs skips a reflecting
-  -- member), and the care can cast its cures in the fight
-  ringsOffFor("MagiMaster"),
+  -- MagiMaster is fought in the Wall Rings.  In them each Fire 2/3, Ice 2/3
+  -- and Bolt 2/3 he aims at a member rebounds onto him, and his wall drinks
+  -- one element in eight, so about one cast in eight heals him (3,350 to
+  -- 58,212 HP regained a fight over 36 wins: 'slot 0 $166 cmd $02 atk $09'
+  -- then 'monhp=s0:47337' -> '50000' with the party's HP unchanged,
+  -- build/attempts/wt/v031-tower-2/lab/sw5_*, sw6_*).  Out of them (#442's
+  -- first try) his spells landed: Shell on, cures cast, and still 1,300 to
+  -- 2,600 a hit, and both runs that reached him wiped, his HP at 42,872 and
+  -- 48,816 (build/attempts/wt/v038-magimaster/lab/f1_k1_s0, f1_k5_s0:
+  -- '[death] ... by slot 0 cmd $02 atk $09', 'battle wipe x1').  The rings
+  -- are the defence; the fight is shortened on the party's side
   -- (unless the dress after its room already put it on someone)
   lazy(function()
     if H.invCountOf(FORCE_ARMOR) < 1 then
@@ -946,7 +1072,6 @@ H.run({ maxFrames = 1500000 }, {
   -- @@stage magimaster
   H.call(function() BOSS_FIGHT.reserve = walkDownReserve() end),
   stonesFor(MAGIMASTER_STONES, "stones for MagiMaster"),
-  ringsOffFor("MagiMaster"),
   H.call(function() H.assertEq(sw(0x02DA), 1, "the Gem Box's tile armed MagiMaster ($02DA, _cc5440)") end),
   stepOn(8, 8, function() return H.battleLoadStarted() or sw(0x02DB) == 1 end),
   -- 400,000 frames: his 50,000 HP fall only to the casts his wall leaves

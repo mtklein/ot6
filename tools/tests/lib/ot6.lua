@@ -8959,8 +8959,25 @@ function Driver:magicOnlyLine(actor, boost)
   -- build/attempts/wt/v031-tower-2/lab/cap3b).  A caster whose Fire folds
   -- into Ultima at three points keeps her bank for it while a 5,000-HP body
   -- stands (her two-point rebounds had kept it below three)
+  -- opts.breakVs = { [species] = true }: a body whose break is the fight
+  -- (MagiMaster, #442).  While it holds shields, the bank is kept for the
+  -- window: a cast at it goes unboosted, but Break, which takes one shield
+  -- and one more a point (ot6_breakspell.asm), spends what breaks it now
+  -- (shields less one, at most 3), else 3 once banked, else nothing.  Broken,
+  -- it takes no turns and no counters (its WallChange waits: Ot6Gate,
+  -- Ot6BrokenTurn), its wall stands, and every hit is doubled: each cast at
+  -- it spends the whole bank, up to 3
+  local bv = self.opts.breakVs
+  local function breakBody(slot)
+    return bv and slot ~= nil and monAlive(slot) and bv[M.readWord(0x57C0 + slot * 2)]
+  end
+  local function brokenNow(slot) return M.readByte(BATTLE.BRK_TICKS + slot * 2) ~= 0 end
   local function wantFor(slot)
     local bank = M.readByte(BATTLE.BP + actor * 2)
+    if breakBody(slot) then
+      if brokenNow(slot) then return math.min(3, bank) end
+      return 0
+    end
     if spellCell(actor, 0x00, true) ~= nil and M.foldSteps(actor, 3) == 3 and bank < 3 then
       for s = 0, 5 do
         if monAlive(s) and M.readWord(0x3BF4 + 8 + s * 2) >= 5000 then return 0 end
@@ -8987,6 +9004,14 @@ function Driver:magicOnlyLine(actor, boost)
       if monAlive(s) and M.readWord(0x3BF4 + 8 + s * 2) >= 5000 then big = true end
     end
     local _, cost = spellCell(actor, 0x00, true)
+    -- a break body with shields left is Break's first (opts.breakVs above):
+    -- four shields for the three points, where Ultima on the shielded body is
+    -- half its 9,999
+    if bv and spellCell(actor, M.BREAK_SPELL, true) ~= nil then
+      for s = 0, 5 do
+        if breakBody(s) and not brokenNow(s) and M.readByte(BATTLE.SH_CUR + s * 2) > 0 then big = false end
+      end
+    end
     -- the bank must hold the three points now: planned on the price alone,
     -- the cast went at 0 or 1 BP ('wanted 3, the bank holds 0: going at
     -- 0'), a plain Fire MagiMaster's wall nulls
@@ -9145,7 +9170,12 @@ function Driver:magicOnlyLine(actor, boost)
     end
     return nil
   end
-  local b = castBoost(actor, best.id, best.cost, wantFor(bestSlot), self:nukeFloor(actor))
+  local want = wantFor(bestSlot)
+  if best.id == M.BREAK_SPELL and breakBody(bestSlot) and not brokenNow(bestSlot) then
+    local bank, sh = M.readByte(BATTLE.BP + actor * 2), M.readByte(BATTLE.SH_CUR + bestSlot * 2)
+    want = (bank >= sh - 1) and math.min(3, math.max(0, sh - 1)) or (bank >= 3 and 3 or 0)
+  end
+  local b = castBoost(actor, best.id, best.cost, want, self:nukeFloor(actor))
   if b == nil then b = 0 end
   local key = string.format("monly:%d:%d:%d", actor, bestSlot, best.id)
   if not self.statusSaid[key] then
