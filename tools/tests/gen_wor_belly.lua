@@ -314,6 +314,11 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
     if mv == nil then
       waits = waits + 1
       stood = stood + 1
+      -- a person waiting for the conductors to clear stands still on purpose: from the shaft's way back up the
+      -- only crossing of the bridge's middle is the conductor's own row, and a wait there outlasted the
+      -- no-progress watchdog (#486, the graph's play at ec0ff9aa: "waiting at (49,18): no route" for 1808
+      -- frames).  The walk's own budget (CAREFUL moves and waits, jwalk's tries) still bounds it
+      H.watchQuiet(120)
       return H.waitFrames(4)
     end
     moves = moves + 1
