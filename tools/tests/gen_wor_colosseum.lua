@@ -327,6 +327,9 @@ H.run({ maxFrames = 1600000 }, {
   K.pace(function() return #H.outcomes - firstFights >= FIRST_FIGHTS end, FIRST_FIGHTS + 1,
     "SHADOW's first fights on the plain by Maranda"),
   H.call(function() say("wor", string.format("after SHADOW's first %d fights", #H.outcomes - firstFights)) end),
+  -- the plains' fixture is a boot, so it is cared for first: on the v0.38 rows' ROM the last of these fights left
+  -- CELES poisoned (audit_party_hp: "POISONED wor_colosseum_plains: CELES L52 3205/3984 hp ... status1 04")
+  H.fieldCare({ threshold = 1.0, tag = "before the grind plains" }),
   H.saveState("wor_colosseum_plains.mss"),
 
   -- ---- 6. the grind plains, Kohlingen's counter, and the save ------------------------------------------
