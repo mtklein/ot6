@@ -493,6 +493,13 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(H.itemStatus2(0xF5), 0x48, "Remedy $F5 status-2 cure mask is $48 = SILENCE|SAP (ItemProp +22)")
     H.assertEq(H.itemStatus2(0xF5) & H.ST2_MUDDLE, 0, "...so a Remedy never cured Muddle: vanilla, not authored")
     H.assertEq(H.itemStatus1(0xF0), 0x80, "Fenix Down $F0 status-1 cure mask is DEAD (the same record shape)")
+    -- Zombie (#448): a Zombied actor's turns are the engine's, so it plans
+    -- nothing at a window it still shows (the Phoenix Cave's SABIN planned
+    -- his own Revivify there and held the round's care turn with it)
+    H.assertEq(H.zombieDefers({ s1 = 0x02 }), true, "a Zombied actor defers its window: its turns are the engine's")
+    H.assertEq(H.zombieDefers({ s1 = 0x03 }), true, "...Blind beside the Zombie changes nothing")
+    H.assertEq(H.zombieDefers({ s1 = 0x82 }), false, "a Wounded member is the raise lines', not a zombie's")
+    H.assertEq(H.zombieDefers({ s1 = 0x00 }), false, "a member without the bit plans as usual")
     local full = { [0] = 1, [1] = 1, [2] = 1, [3] = 1 }
     H.assertEq(H.muddleRule({ actor = 0, status2 = { [0] = 0, [1] = 0x20, [2] = 0, [3] = 0 },
                               hp = full, maxhp = full }), 1,

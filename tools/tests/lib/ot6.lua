@@ -920,6 +920,17 @@ function M.muddleFloors(o)
   return fl
 end
 
+-- The Zombie rule (#448): a Zombied actor (STATUS1 $02, not Wounded: a
+-- zombie reads 0 HP without the Wound bit) never plans -- its turns are
+-- the engine's -- and defers the window it still shows, as a muddled one
+-- does.  o.s1 is the actor's STATUS1 byte.  M.ZOMBIE_DEFER = false turns
+-- the rule off (the lab's control arm).
+function M.zombieDefers(o)
+  if M.ZOMBIE_DEFER == false then return false end
+  local s1 = o.s1 or 0
+  return (s1 & M.ST1_ZOMBIE) ~= 0 and (s1 & 0x80) == 0
+end
+
 function M.muddleRule(o)
   local st, hp, maxhp, floor = o.status2 or {}, o.hp or {}, o.maxhp or {}, o.floor or {}
   local inFlight = o.inFlight or {}
@@ -11254,6 +11265,24 @@ function Driver:makePlanRules(actor)
         M.log(string.format("[%s] [round] actor=%d deciding: %s", self.tag or "fight", actor, said))
       end
     end
+  end
+  -- A Zombied actor plans nothing (#448): its turns are the engine's (the
+  -- ATB-full check @0941 carries ZOMBIE), so a command entered at a window
+  -- it still shows is never its own.  The Phoenix Cave's Necromancers
+  -- Zombied SABIN with his window open, and the driver planned his own
+  -- Revivify there ("actor=2 cure entity 2's Zombie with $F1"): a plan that
+  -- could not run took the round's care turn, so the next member's cure
+  -- waited on it ("entity 2's Zombie cure ($F1) waits for the round's care
+  -- turn"), and the cure landed 3,800 frames after the Zombie
+  -- (build/attempts/wt/v038-wor-fights/lab/ga_s0).  A person passes the
+  -- window (X), as for Muddle, and the next member cures.  M.ZOMBIE_DEFER =
+  -- false is the lab's control arm.
+  if M.zombieDefers({ s1 = M.readByte(BATTLE.ST1 + actor * 2) }) then
+    local said = string.format("[%s] actor=%d is a ZOMBIE (STATUS1 $%02X) -- not planning: its turns "
+      .. "are the engine's; deferring the window (X)", self.tag or "fight", actor,
+      M.readByte(BATTLE.ST1 + actor * 2))
+    if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+    return { kind = "defer" }
   end
   -- The Muddle rule (#170, M.muddleRule), before every other line: a
   -- muddled actor defers (X) rather than confirm a command the engine
