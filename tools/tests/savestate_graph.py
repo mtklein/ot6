@@ -1071,14 +1071,19 @@ STATES = [
     # wagered against SHADOW himself, who joins ($02F3), and the wagers that
     # trade the bag's gear up; the cabin (SHADOW, CELES, CYAN, TERRA), the gear
     # and relic care, Maranda's weapon counter (SHADOW's skeans and edges) and
-    # gear stop, and Save there: the `wor-colosseum-v1` checkpoint, the next
-    # arc's boot (docs/design/route-wor-colosseum.md).  A cut; saves= until a
+    # gear stop, the grind plains (Doma's plain and the forest by the Opera
+    # House, until their six formations no leg had fought are won: #483),
+    # Kohlingen's counter again, and Save there: the `wor-colosseum-v1`
+    # checkpoint, the next arc's boot
+    # (docs/design/route-wor-colosseum.md).  A cut; saves= until a
     # leg boots it.  Re-cut by checkpoint_drift.py --recut.
     # also: wor_colosseum_in, the party inside the Colosseum before the
-    # guard (the wagers' labs and battle_colosseum's fixture).
+    # guard (the wagers' labs and battle_colosseum's fixture);
+    # wor_colosseum_plains, the party on the plain by Maranda before the grind
+    # plains (#483: the plains' labs and sweeps).
     S("wor_colosseum", gen="gen_wor_colosseum", prev="wor_ancient",
       checkpoint="wor-ancient-v1", saves="wor-colosseum-v1", timeout=7200,
-      also=["wor_colosseum_in"]),
+      also=["wor_colosseum_in", "wor_colosseum_plains"]),
 
 ]
 

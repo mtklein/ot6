@@ -28,6 +28,7 @@ local MAP_COL, COL_DOOR = 413, { 50, 17 }            -- the Colosseum's world do
 local MAP_MARANDA, MAP_MARANDA_WEAPON = 284, 289
 local MARANDA_DOOR = { 69, 184 }
 local MARANDA_WORLD = { { 69, 184 }, { 70, 184 } }
+local DOMA_WORLD = { { 171, 75 }, { 172, 75 } }       -- Doma Castle's two world doors, kept off on its plain
 local SHOP_MARANDA_WEAPON = 80                       -- the World of Ruin's (_cc656f: $00A4 -> shop 80)
 local FOUR = { SHADOW, CELES, CYAN, TERRA }
 local BEFORE = { CELES, RELM, CYAN, TERRA }
@@ -54,6 +55,94 @@ local THROWN = {
 
 local FIRST_FIGHTS, firstFights = 3, 0
 local function joined() return sw(0x02F3) == 1 end
+
+-- ---- the grind plains (#483) ------------------------------------------------------------------------------
+-- level-curve.md sends the World of Ruin's grind to the plains around Narshe, Zozo and Doma (world groups 48-53,
+-- L51-55, 6,200-10,216 XP a random before the x2).  Six of their formations no leg had fought (wor-coverage.md
+-- 3.2).  Two Falcon stops deal all six: Doma's plain, beside the castle's door (group 52: TumbleWeed x4 327;
+-- group 53: Crawler 103, Crawler x4 114), and the forest north of the Opera House with the plain south of it
+-- (group 50: Reach Frog x4 324, Mantodea x2 325; group 49: Mantodea, Sprinter and Spek Tor x2 323).  Each lap is a
+-- straight run of tiles of the one group (WorldBattleGroup by sector and tile kind, read from the ROM:
+-- build/attempts/wt/v038-grind-plains/lab/laps.txt), so its pool is the group's alone.  A lap is walked until
+-- every formation it is there for has been won (the pool's odds: 31.25-62.5% a battle), bounded by `budget`,
+-- which a miss at those odds reaches about one draw in a thousand or fewer.
+local PLAINS = {
+  { what = "Doma's plain (group 52)", land = { 172, 77 }, lap = { { 172, 77 }, { 176, 77 } },
+    forms = { [327] = "TumbleWeed x4" }, budget = 25 },
+  { what = "Doma's plain (group 53)", lap = { { 165, 76 }, { 169, 76 } },
+    forms = { [103] = "Crawler", [114] = "Crawler x4" }, budget = 25 },
+  { what = "the forest north of the Opera House (group 50)", land = { 27, 149 }, lap = { { 27, 149 }, { 33, 149 } },
+    forms = { [324] = "Reach Frog x4", [325] = "Mantodea x2" }, budget = 20 },
+  { what = "the plain south of the forest (group 49)", lap = { { 25, 158 }, { 31, 158 } },
+    forms = { [323] = "Mantodea, Sprinter, Spek Tor x2" }, budget = 20 },
+}
+local plainsWon = {}
+local function plainsLine()
+  local t = {}
+  for _, p in ipairs(PLAINS) do
+    for f, name in pairs(p.forms) do t[#t + 1] = string.format("%d %s %s", f, name, plainsWon[f] and "won" or "-") end
+  end
+  table.sort(t)
+  return table.concat(t, "; ")
+end
+local function lowest()
+  local m = 99
+  for _, ch in ipairs(FOUR) do m = math.min(m, lv(ch)) end
+  return m
+end
+local function plainsLap(p)
+  local wp, n0, seen = 1, nil, nil
+  local function done()
+    for f in pairs(p.forms) do if not plainsWon[f] then return false end end
+    return true
+  end
+  return H.withReset(H.seqStep({
+    H.call(function()
+      n0, seen, wp = #H.outcomes, #H.outcomes, 1
+      say("plains", string.format("%s: lap (%d,%d) <-> (%d,%d); lowest L%d; %s", p.what, p.lap[1][1], p.lap[1][2],
+        p.lap[2][1], p.lap[2][2], lowest(), plainsLine()))
+    end),
+    H.driveUntil(function()
+      while seen < #H.outcomes do
+        seen = seen + 1
+        local o = H.outcomes[seen]
+        local f = o.form & 0x1FF
+        if o.kind == "won" then plainsWon[f] = true end
+        H.log(string.format("[plains] %s: battle %d formation %d %s after %d ticks; lowest L%d", p.what, seen - n0, f,
+          o.kind, o.tick or -1, lowest()))
+      end
+      if done() then return not H.battleLoadStarted() and H.worldSettled() end
+      H.assertEq(#H.outcomes - n0 < p.budget, true, string.format("%s: every formation it is walked for won within %d "
+        .. "battles (%s)", p.what, p.budget, plainsLine()))
+      return false
+    end, 1500000, {
+      H.worldNavTo(function() return p.lap[wp][1] end, function() return p.lap[wp][2] end,
+        { maxFrames = 20000, playBattles = "tactical", fight = FIGHT, avoid = DOMA_WORLD }),
+      H.call(function() wp = wp % 2 + 1 end),
+      H.cond(function() return not H.battleLoadStarted() end, { H.fieldCare({ tag = "care on the plains" }) }, {}),
+    }, p.what),
+    H.call(function() say("plains", string.format("%s: done after %d battles; %s", p.what, #H.outcomes - n0,
+      plainsLine())) end),
+  }), function() n0, seen, wp = nil, nil, 1 end)
+end
+local function plains()
+  local steps = { H.call(function() say("plains", "the grind plains: " .. plainsLine()) end) }
+  for _, p in ipairs(PLAINS) do
+    if p.land then
+      steps[#steps + 1] = board()
+      steps[#steps + 1] = landNear(p.land[1], p.land[2], "the Falcon down for " .. p.what)
+    end
+    steps[#steps + 1] = plainsLap(p)
+  end
+  steps[#steps + 1] = H.call(function()
+    for _, p in ipairs(PLAINS) do
+      for f, name in pairs(p.forms) do
+        H.assertEq(plainsWon[f] == true, true, string.format("the grind plains: formation %d (%s) won", f, name))
+      end
+    end
+  end)
+  return H.seqStep(steps)
+end
 local function via(points, what, avoid)
   local steps = {}
   for _, p in ipairs(points) do
@@ -63,7 +152,7 @@ local function via(points, what, avoid)
   return H.seqStep(steps)
 end
 
-H.run({ maxFrames = 1600000 }, {
+H.run({ maxFrames = 2400000 }, {
   H.bootCheckpoint("wor-ancient-v1"),
   watches(),
   H.call(function()
@@ -234,6 +323,14 @@ H.run({ maxFrames = 1600000 }, {
   K.pace(function() return #H.outcomes - firstFights >= FIRST_FIGHTS end, FIRST_FIGHTS + 1,
     "SHADOW's first fights on the plain by Maranda"),
   H.call(function() say("wor", string.format("after SHADOW's first %d fights", #H.outcomes - firstFights)) end),
+  H.saveState("wor_colosseum_plains.mss"),
+
+  -- ---- 6. the grind plains, Kohlingen's counter, and the save ------------------------------------------
+  -- @@stage plains
+  plains(),
+  board(),
+  kohlingenStop("the top-up after the plains"),
+  landNear(MARANDA_DOOR[1], MARANDA_DOOR[2], "the Falcon down by Maranda again"),
   H.worldNavTo(function() return H.readByte(0x1F62) end, function() return H.readByte(0x1F63) end,
     { maxFrames = 3000, playBattles = "tactical", fight = FIGHT, avoid = MARANDA_WORLD }),
   H.fieldCare({ threshold = 1.0, tag = "on the Falcon's tile" }),
