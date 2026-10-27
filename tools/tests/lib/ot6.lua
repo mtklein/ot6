@@ -8976,6 +8976,9 @@ function Driver:magicOnlyLine(actor, boost)
     local bank = M.readByte(BATTLE.BP + actor * 2)
     if breakBody(slot) then
       if brokenNow(slot) then return math.min(3, bank) end
+      -- (opts.breakBank = false: a shielded cast takes the turn's own boost,
+      -- the bank not kept for the window; a lab lever)
+      if self.opts.breakBank == false then return boost or 0 end
       return 0
     end
     if spellCell(actor, 0x00, true) ~= nil and M.foldSteps(actor, 3) == 3 and bank < 3 then
