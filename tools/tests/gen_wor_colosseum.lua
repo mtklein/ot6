@@ -3,7 +3,9 @@
 -- the Falcon down by the Colosseum (world (50,17) -> map 413), the wagers: the Striker against SHADOW himself, who
 -- joins (_cb78d9: $02F3), then the bag's gear the Colosseum trades up (section 2); out, the cabin (SHADOW, CELES,
 -- CYAN, TERRA), the gear and relic care, Maranda's weapon counter for SHADOW's throwing kit and the gear stop,
--- and the save on the Falcon's tile by Maranda: the `wor-colosseum-v1` battery, the next arc's boot.
+-- SHADOW's first fights, the grind plains (Doma's plain, the forest by the Opera House and the plain south of
+-- it, until each formation there no other leg fights is won: #483), Kohlingen's counter again, and the save on
+-- the Falcon's tile by Maranda: the `wor-colosseum-v1` battery, the next arc's boot.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -162,6 +164,8 @@ H.run({ maxFrames = 2400000 }, {
     H.assertEq(sw(0x01EF), 1, "SHADOW waits at the Colosseum ($01EF: CheckColosseumShadow)")
     H.assertEq(joined(), false, "SHADOW not yet recruited ($02F3 clear)")
     H.assertEq(H.invCountOf(STRIKER) > 0, true, "the Striker is in the bag (the Veldt cave's chest)")
+    -- the grind plains are Falcon hops (Doma's plain, the forest by the Opera House)
+    H.assertEq(sw(0x00CC), 1, "the Falcon has risen ($00CC: gen_wor_falcon) for the hops to the grind plains")
   end),
   -- @@setup-end
 
