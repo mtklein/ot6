@@ -8565,6 +8565,9 @@ function Driver:rageLine(actor, have)
       local heal = not phys and (M.readRomByte(MP + atk * 14 + 4) & 0x01) ~= 0
       local all = not phys and (M.readRomByte(MP + atk * 14) & 0x20) ~= 0
       local score, top = 0, 0
+      -- (a no-damage rage scores 0 and is never chosen: CrassHoppr's and
+      -- WeedFeeder's Bserk, which a possessed Gau casts on his own party,
+      -- magicite.md "Berserk", among them)
       if heal or power == 0 then
         score = 0
       else
