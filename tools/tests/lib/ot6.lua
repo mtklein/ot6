@@ -8874,6 +8874,10 @@ function Driver:magicOnlyLine(actor, boost)
     -- going at 1', 'Need MP')
     if cell ~= nil and not self:castVetoed(id, "magic-only") then spells[#spells + 1] = castable[#castable] end
   end
+  if self.opts.berserkVs then
+    local z = self:berserkPlan(actor)
+    if z then return z end
+  end
   -- The bounce: while a monster stands under Reflect and a party member
   -- wears it (the tower's Wall Rings), a reflectable spell cast on that
   -- member rebounds onto the monsters, and a rebound is not reflected again
@@ -9066,15 +9070,17 @@ function Driver:magicOnlyLine(actor, boost)
     -- 'window over after 2249 frames ... HP 46035')
     for s = 0, 5 do
       if monAlive(s) and self.opts.wallChangeVs[M.readWord(0x57C0 + s * 2)] then
-        if brokenNow(s) then
+        -- (Berserk stills it the same way: wallWaitPlan)
+        if brokenNow(s) or M.monBerserk(s) then
           self.wallWait = self.wallWait or {}
           self.wallWait[actor] = self.wallWait[actor] or M.frame
           if M.frame - self.wallWait[actor] < 900 then
             local key = "brokenwait:" .. actor
             if not self.statusSaid[key] then
               self.statusSaid[key] = true
-              M.log(string.format("[%s] actor=%d holds nothing for the broken body's wall (weak $%02X): the window "
-                .. "is left to those who do", self.tag or "fight", actor, M.readByte(0x3BE0 + 8 + s * 2)))
+              M.log(string.format("[%s] actor=%d holds nothing for the %s body's wall (weak $%02X): the window "
+                .. "is left to those who do", self.tag or "fight", actor, brokenNow(s) and "broken" or "berserk",
+                M.readByte(0x3BE0 + 8 + s * 2)))
             end
             return { kind = "defer", reason = "wall_wait", at = M.frame }
           end
@@ -9329,6 +9335,65 @@ function Driver:magicOnlyLine(actor, boost)
            reason = "magic_only" }
 end
 
+-- Monster slot `slot` is Berserk (status 2 bit 4, $3EE5 + 8 + slot * 2)
+function M.monBerserk(slot)
+  return (M.readByte(BATTLE.ST2 + 8 + slot * 2) & M.ST2_BERSERK) ~= 0
+end
+
+-- opts.berserkVs = { [species] = true } (magicOnlyLine): Bserk ($21) at one
+-- of these while it stands, not Berserk and not Broken.  A Berserk monster
+-- runs no script but its Fight, and its counters only to their first end_if
+-- (ExecAIRetal): MagiMaster's tier spells stop, and so does his if_hit
+-- WallChange, while his if_self_dead Ultima, the first block, still runs as
+-- he dies (the Life 3 hold stays).  So it goes on while his wall is one a
+-- living member can hit (an element of a castable spell of the magic-only
+-- list), and that wall then stands to the end; while another member's
+-- action is queued or his counter is pending, the wall read now may not be
+-- the one Bserk meets, and the turn goes to the lines below.  One cast in
+-- the air at a time (900 frames); one that misses is cast again.  The plan
+-- is monsterOnly: Bserk's cursor opens on the party, and the confirm backs
+-- out rather than land it on a member.
+M.BSERK_SPELL = 0x21
+function Driver:berserkPlan(actor)
+  local zv = self.opts.berserkVs
+  if not zv or spellCell(actor, M.BSERK_SPELL, true) == nil then return nil end
+  if self.bserkAt and M.frame - self.bserkAt < 900 then return nil end
+  local MP = M.sym("MagicProp") & 0x3FFFFF
+  for s = 0, 5 do
+    if monAlive(s) and zv[M.readWord(0x57C0 + s * 2)] and not M.monBerserk(s)
+       and M.readByte(BATTLE.BRK_TICKS + s * 2) == 0 then
+      local weak, can = M.readByte(0x3BE0 + 8 + s * 2), 0
+      for e = 0, 3 do
+        if M.readWord(0x3BF4 + e * 2) > 0 then
+          for _, id in ipairs(self.opts.magicOnly or M.MAGIC_ONLY_SPELLS) do
+            if spellCell(e, id, true) ~= nil then can = can | M.readRomByte(MP + id * 14 + 1) end
+          end
+        end
+      end
+      local busy = M.readByte(0x32CD + 8 + s * 2) < 0x80
+      for e = 0, 3 do
+        if e ~= actor and M.readWord(0x3BF4 + e * 2) > 0 and M.readByte(0x32CC + e * 2) < 0x80 then busy = true end
+      end
+      if (weak & can) == 0 or busy then
+        local key = string.format("bserkwait:%d:%02X:%s", s, weak, tostring(busy))
+        if not self.statusSaid[key] then
+          self.statusSaid[key] = true
+          M.log(string.format("[%s] actor=%d no Bserk at slot %d yet: wall weak $%02X, the party casts $%02X%s",
+            self.tag or "fight", actor, s, weak, can, busy and ", an action or his counter pending" or ""))
+        end
+      elseif not self:castVetoed(M.BSERK_SPELL, "Bserk") then
+        self.bserkAt = M.frame
+        M.log(string.format("[%s] actor=%d Bserk at slot %d (species $%03X, HP %d): wall weak $%02X, the party "
+          .. "casts $%02X", self.tag or "fight", actor, s, M.readWord(0x57C0 + s * 2), M.readWord(0x3BF4 + 8 + s * 2),
+          weak, can))
+        return { kind = "magic", spell = M.BSERK_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC), boostLeft = 0,
+                 aim = s, aimHard = s, monsterOnly = true, reason = "bserk" }
+      end
+    end
+  end
+  return nil
+end
+
 -- The wait for a WallChange body's wall to stand still (magicOnlyLine,
 -- opts.wallChangeVs): while another living member's action is queued
 -- ($32CC) or in flight (the recovery trace's queued/running), or the body's
@@ -9336,6 +9401,9 @@ end
 -- every 30 frames); nil once the wall stands, or after 900 frames of
 -- waiting by this actor.
 function Driver:wallWaitPlan(actor, slot, what)
+  -- a Berserk body's counters run only to their first end_if (ExecAIRetal),
+  -- so MagiMaster's WallChange, his if_hit block, never runs: the wall stands
+  if M.monBerserk(slot) then return nil end
   local busy = nil
   local R = self.recovery
   for e = 0, 3 do
@@ -14513,6 +14581,16 @@ function Driver:button(actor)
     -- (a bounce, magicOnlyLine's, is aimed at a reflecting member on purpose;
     -- its idle Scan may bounce off a reflecting body and harm nobody: c14
     -- held its target select 30,000 frames on that refusal)
+    -- a plan meant for a monster only (Bserk, berserkPlan: its cursor opens
+    -- on the party) is backed out of if a steer that gave up left the
+    -- cursor on a member, and re-planned
+    if self.plan.monsterOnly and (M.readByte(BATTLE.TGTCHARS) ~= 0 or M.readByte(BATTLE.TGTMONS) == 0) then
+      M.log(string.format("[%s] actor=%d: the %s cast is for a monster and the cursor is on the party "
+        .. "(chars=%02X mons=%02X): backing out", self.tag or "fight", actor, tostring(self.plan.reason),
+        M.readByte(BATTLE.TGTCHARS), M.readByte(BATTLE.TGTMONS)))
+      self:dropPlan("monster_only_on_party")
+      return { "b" }
+    end
     if ((self.plan.kind == "magic" and self.plan.spell ~= nil) or self.plan.kind == "lore") and not self.plan.bounce
        and not self.plan.vetoOk then
       local id = self.plan.kind == "magic" and (self.plan.executionSpell or self.plan.spell) or (0x8B + self.plan.lore)

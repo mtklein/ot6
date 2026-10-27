@@ -85,6 +85,12 @@ BOSS_FIGHT.wallChangeVs = { [0x166] = true }
 BOSS_FIGHT.breakVs = { [0x166] = true }
 -- (the Life 3 hold for his windows, above BOSS_FIGHT: Driver opts.breakHold)
 BOSS_FIGHT.breakHold = true
+-- he is open to Berserk (magicite.md "Berserk"), and Berserk he casts
+-- nothing and his WallChange stops (his counter runs only to its first
+-- end_if), but his dying Ultima still comes, so the Life 3 hold stays: a
+-- member who holds Bserk casts it at him while he is not Berserk, on a wall
+-- the party can hit (Driver opts.berserkVs)
+BOSS_FIGHT.berserkVs = { [0x166] = true }
 BOSS_FIGHT.magicOnly = {}
 for _, id in ipairs(H.MAGIC_ONLY_SPELLS) do
   if id ~= 0x04 then BOSS_FIGHT.magicOnly[#BOSS_FIGHT.magicOnly + 1] = id end
@@ -136,6 +142,16 @@ local function kitLine()
   local t = {}
   for _, p in ipairs(MEMBERS) do t[#t + 1] = p[2] .. " " .. kit(p[1]) end
   return "kit " .. table.concat(t, ", ")
+end
+-- who of the four holds Bserk ($21), and how: learned (STRAGO's, by
+-- watching) or granted by the stone worn (Siren)
+local function bserkLine()
+  local t = {}
+  for _, p in ipairs({ { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" }, { STRAGO, "STRAGO" } }) do
+    if H.readByte(0x1A6E + 54 * p[1] + 0x21) == 0xFF then t[#t + 1] = p[2] .. " (learned)"
+    elseif H.knowsSpell(p[1], 0x21) then t[#t + 1] = p[2] .. " (stone)" end
+  end
+  return #t > 0 and table.concat(t, ", ") or "nobody"
 end
 local function say(tag, what)
   local pos = H.worldMode() and string.format("world (%d,%d)", H.worldX(), H.worldY())
@@ -1116,6 +1132,7 @@ H.run({ maxFrames = 1500000 }, {
   H.call(function() BOSS_FIGHT.reserve = walkDownReserve() end),
   stonesFor(MAGIMASTER_STONES, "stones for MagiMaster"),
   H.call(function() H.assertEq(sw(0x02DA), 1, "the Gem Box's tile armed MagiMaster ($02DA, _cc5440)") end),
+  H.call(function() say("boss", "Bserk for MagiMaster: " .. bserkLine()) end),
   stepOn(8, 8, function() return H.battleLoadStarted() or sw(0x02DB) == 1 end),
   -- 400,000 frames: his 50,000 HP fall only to the casts his wall leaves
   -- open (three of the eight elements are no member's), and a cast that
