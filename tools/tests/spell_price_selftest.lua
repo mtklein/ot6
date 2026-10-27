@@ -23,11 +23,12 @@ local costs = {[0]=4,[5]=20,[9]=51,[16]=8,[0x36]=110}
 for id=0,255 do rom[0x2000+14*id+5] = costs[id] or 60 end
 -- The expected prices below are independent ROM examples, not computed
 -- by the library under test. Odd costs distinguish rounding direction.
+-- The Economizer ($40) prices every spell at 1 at any boost (Ot6MagicPrice).
 local expected = {
   [0] = {[0]={4,20,51,51}, [0x20]={2,10,26,26}, [0x40]={1,1,1,1}, [0x60]={1,1,1,1}},
   [9] = {[0]={51,51,51,51}, [0x20]={26,26,26,26}, [0x40]={1,1,1,1}, [0x60]={1,1,1,1}},
-  [16] = {[0]={8,20,50,99}, [0x20]={4,10,25,63}, [0x40]={1,3,6,16}, [0x60]={1,3,6,16}},
-  [0x36] = {[0]={110,110,110,110}, [0x20]={55,99,99,99}, [0x40]={1,3,6,16}, [0x60]={1,3,6,16}},
+  [16] = {[0]={8,20,50,99}, [0x20]={4,10,25,63}, [0x40]={1,1,1,1}, [0x60]={1,1,1,1}},
+  [0x36] = {[0]={110,110,110,110}, [0x20]={55,99,99,99}, [0x40]={1,1,1,1}, [0x60]={1,1,1,1}},
 }
 for actor=0,3 do
   for id, byRelic in pairs(expected) do
