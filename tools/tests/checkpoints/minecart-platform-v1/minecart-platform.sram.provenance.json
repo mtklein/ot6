@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "b66e0382892f9443f6c8a369a326174357b042d9845cd9ce63852388a7efa449",
-  "generator_sig": "0f38b8554a95da86ae76536b0f4540f3c92f84126ec3be8abd5ca27a30323cda gen_minecart_platform_checkpoint",
+  "payload_sha256": "eb372096a8575963e4df2b38fcae7d6038656a8c6870c57c5d6ecb4da3e1c8e2",
+  "generator_sig": "11235c31b2001306c4f9eccb6b14823a5a1133545fc486a6893659cd251dc814 gen_minecart_platform_checkpoint",
   "ancestors": [
     {
       "path": "build/states/minecart_entry.stamp",
-      "sha256": "0e4227497238674ade9f721a0554e9809e9e11c2255dc451093dc4c36aaf8a4b"
+      "sha256": "01f7c6baeaba015bac1ef5f3da34c7e8254a3778d6582889f1ebfd71b5241375"
     }
   ]
 }
