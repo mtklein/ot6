@@ -461,7 +461,9 @@ Two laps of seven tiles, on foot:
 The shore lap keeps off Thamasa's door (251,230). Each lap is walked, with
 the field care after every battle, until each formation it is there for has
 been won, bounded at 20 battles (a 37.5% formation missed 20 times running
-is about one draw in 12,000); a win on the way between the laps counts too.
+is about one draw in 12,000, less with the shore battles the walk to the
+inner lap can add to its count: nearer one in 3,000-5,000); a win on the
+way between the laps counts too.
 Then the party walks back to the Falcon's tile. Before the laps the leg
 tops up at Thamasa's item counter, to `gen_wor_gogo`'s targets, when the bag
 is under them; at today's save it is not ("the bag at its band: no stop at
@@ -521,11 +523,12 @@ the capture to Continue) and are kept.
 it draws its 1/3 Rock (last-stand.md, row 8). The three-shell formation
 landed it in 17 of its 59 keys; the pair in 333 never did. It petrified GOGO
 in 59 of the 63 landings and RELM in 4 ("slot 2 species $08A (cmd $00 atk
-$EF) landed Petrify on entity 2"), and the party cured the member with a
-Soft on its next turn ("cure entity 2's Petrify with $F4"); a fight that
-ends with him still stone pays him nothing ("char 12 +0 (due 0)"). That is
+$EF) landed Petrify on entity 2"), and in 59 of the 63 the fight ended with
+the member still stone and the field care spent the Soft after it; a
+fight that ends with him still stone pays him nothing ("char 12 +0 (due
+0)"), and the other three split his share (2,192 XP a member). That is
 the vanilla counter, cured the way a player would, and it costs a Soft and
 some of GOGO's XP, not a fight; the driver's last-stand rule
 (`opts.lastStand`, Sneeze by default) does not plan around it, and the leg
 leaves it so. At these levels the plain is a short grind (997-1,695 XP a
-member a fight), not a fight to tune.
+member a fight, 2,192 when one ends stone), not a fight to tune.
