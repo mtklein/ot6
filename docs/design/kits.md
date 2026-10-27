@@ -1316,6 +1316,20 @@ player prunes the kit all game. Same model, different collection verbs:
     lore.  *Placement: the Lore window's 24 records are one per lore id, so
     it takes no extra row; Analyze is his row and Study its top rung, the
     shape Cleave has on the SwdTech window.*  `battle_study`.
+  - **Bserk, by watching** (`ot6_blue.asm`, owner 2026-10-27: Berserk
+    "available in a few ways", blue magic and a caster whose spell list
+    was thin among them).  The first battle in which a monster inflicts
+    Berserk while he is present and able (vanilla's lore test) teaches him
+    Bserk at the victory, if he is standing then, and he keeps it: a
+    Magic-row spell in his own learned-spell table, beside Scan.  An ally's
+    Bserk, a Rage and a lore (Rippler, Pep Up) teach nothing.  The World of
+    Balance's Insecares on Esper Mountain teach it, and so does the L.50
+    Magic's counter in the Fanatics' Tower, where his Lore row is gone and
+    his Magic row is not.  It is a spell rather than a lore because the
+    lore id space is full (24 records and 24 learned bits), and it sits
+    outside the five, as Analyze does.  Study does not teach it (Study
+    learns lores).  The sources and the reasons: magicite.md "Berserk".
+    `battle_bserk`.
 
 - **Relm — Painter (special ¤: brush)**: Sketch ✦ signature (bug
   preserved ✦: it corrupts a save now and then, and that is canon —

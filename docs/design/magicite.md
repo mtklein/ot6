@@ -319,7 +319,9 @@ What the arcs need from them (`level-curve.md`, "The World of Ruin"):
   with LOCKE at v0.32.
 - **MagiMaster's death counter is Ultima**, and the answer is Life
   boosted to Life 3 (Terra's natural Life, Sraphim's), pre-cast, with
-  Shell (Shiva, ZoneSeek; Alexandr's at v0.35) besides.
+  Shell (Shiva, ZoneSeek; Alexandr's at v0.35) besides.  He is open to
+  Berserk (Siren's, or STRAGO's once he has watched it): it stops his
+  WallChange and his casting, though not the Ultima ("Berserk", above).
 - **Stones outnumber the members who can wear them** from v0.27 on: fifteen
   stones for five members at v0.27, eighteen to twenty-one for ten at
   v0.30.  Umaro and Gogo take none.  The one-copy rule binds on the four
@@ -388,8 +390,10 @@ visit, beside a visit to the real row.
   stretch that fits a warlord: Odin's berserkers. Cast on an enemy, it turns
   a spellcaster into a brawler that can only Fight; cast on an ally, it takes
   that ally out of the player's hands (Phantom's recorded reason for dropping
-  it), so it is an enemy verb in practice. Quick (99 MP) is the game's dearest
-  spell and the only extra-turn verb.
+  it), so it is an enemy verb in practice. Siren and STRAGO carry it before
+  this stone ("Berserk", above); Odin is its World of Ruin copy, for a
+  fighter's slot. Quick (99 MP) is the game's dearest spell and the only
+  extra-turn verb.
 - **Bahamut, the Dragon King.** Vanilla's Flare holds no tier. Flare (45 MP,
   single, untyped) is never absorbed, so it is the answer for a body that
   absorbs or nulls every element the other stones carry. W Wind is the

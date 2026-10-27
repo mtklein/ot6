@@ -334,6 +334,7 @@ Against Zombone's 1991 HP it is the stretch's best single action if the
 death-class miss check (+0x04 `$10` rides Demi too) passes the same
 undead-flag question as Doom. Bserk is dropped from the vanilla row for the
 recorded Ifrit reason: it removes player control (`genju_prop.asm:97-98`).
+It is Siren's now, as an enemy verb (magicite.md "Berserk", v0.38).
 
 **The Vanish+Doom interaction.** Phantom grants Vanish and Shoat grants
 Doom. Vanilla's Clear status forces magic to bypass its hit roll, which in

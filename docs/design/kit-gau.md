@@ -395,6 +395,21 @@ no-regen rule applying on the next turn), the 8 MP trance price, and the loss
 of control. A muddled unset-rager rolls a random rage *from the loadout*
 (§2.2), so preparation also constrains Gau's failure modes.
 
+**The Berserk rages** (magicite.md "Berserk"; vanilla, kept). Insecare's
+rage puts Wing Whisp (no damage, Berserk) on one enemy on the special side of
+the coin, and Insecare is huntable once Esper Mountain's cave has been fought.
+CrassHoppr's and WeedFeeder's rages cast the Bserk spell itself, whose cursor
+opens on the party (MagicProp targeting `$01`), so `Retarget` sends a raged
+Gau's Bserk to a random member of his own party, Gau included. On Gau it
+changes what he does not at all: a possessed turn is chosen by the Rage
+branch before the Berserk table is read (`battle_main.asm` @037b), and only
+his Fights grow by Berserk's half again. On another member it is the
+fighter's gamble vanilla offers (Fight only, half again as hard, no cure in
+the bag). The driver's `rageLine` never picks those two (Bserk's power 0
+scores 0); it scores Insecare's no-damage special as a physical hit
+(`BATTLE.RAGE_PHYS_POWER`), a gap in its scoring that the Berserk work
+leaves as it found it.
+
 ---
 
 ## 8. Where the machinery lives

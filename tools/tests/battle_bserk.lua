@@ -99,8 +99,10 @@ local function arm()
   end, emu.callbackType.write, 0x7E0000 + CELL, 0x7E0000 + CELL)
 end
 -- a write's pc inside a routine: from its label to the next 96 bytes
-local function inProc(pc, name)
-  local a = H.sym(name)
+-- (compose.py embeds the symbols a script names literally)
+local PROC = { learn = H.sym("Ot6BlueLearn"), msg = H.sym("ShowLearnedMagicMsg") }
+local function inProc(pc, which)
+  local a = PROC[which]
   return pc >= a and pc < a + 96
 end
 local function closed() return rec ~= nil and rec.ended ~= nil and H.frame > rec.ended + 30 end
@@ -242,9 +244,9 @@ H.run({ maxFrames = 1500000 }, {
           -- ($80), and the battle-end loop's ShowLearnedMagicMsg, which prints
           -- "<name> learned <spell>", makes it $FF
           local w = cellWrites
-          H.assertEq(#w >= 2 and w[#w - 1].v == 0x80 and inProc(w[#w - 1].pc, "Ot6BlueLearn"), true,
+          H.assertEq(#w >= 2 and w[#w - 1].v == 0x80 and inProc(w[#w - 1].pc, "learn"), true,
             "the victory's Ot6BlueLearn marked Bserk newly learned ($80)")
-          H.assertEq(w[#w].v == 0xFF and inProc(w[#w].pc, "ShowLearnedMagicMsg"), true,
+          H.assertEq(w[#w].v == 0xFF and inProc(w[#w].pc, "msg"), true,
             "ShowLearnedMagicMsg made it learned ($FF), the step that prints the message")
           stage = 3
         elseif #seen > 0 then
