@@ -456,8 +456,8 @@ build/attempts/wt/v037-colosseum/qual/px13/ (`q4.log`, `q6.log`).
    whose pools deal them.
 4. **SHADOW's level**: L41 against CELES and TERRA's L53, as CYAN came back
    from his dream (route-wor-dreams.md section 8).  The grind plains (section
-   9) take SHADOW and CYAN to L43-44; the Mantodea pair still fells CYAN in
-   one blow in about one key in three.
+   9) take SHADOW and CYAN to L43-44; the Mantodea pair still fells a
+   member, mostly CYAN in one blow, in half its keys.
 5. **A Colosseum fighter who kills herself ends the run.**  When TERRA's own
    Drain or Merton took her last HP, the battle table read wiped for 369
    frames and the harness's wipe canary counted a game over ("canary:
@@ -493,44 +493,82 @@ Each lap is walked, with the field care after every battle, until each
 formation it is there for has been won, bounded at 20-25 battles (a miss at
 those odds is about one draw in a thousand or fewer). Then Kohlingen's
 counter tops the bag up again and the Falcon goes back down by Maranda for
-the save. The leg asserts the Falcon at its start; with the switch id
-mutated it fails at boot, "assertEq failed: the Falcon has risen ($00CC:
-gen_wor_falcon) for the hops to the grind plains: got 0 ($0), want 1 ($1)"
-(`lab/out/mut_falcon`).
+the save.
+
+**The asserts and their negatives.** Each is red on a mutant, at boot or in
+the grind, as class=assert, which the runner does not retry (each mutant
+run with three attempts allowed: "attempts=1/3 stopped; failed attempts:
+1:assert" and "class=assert is NOT seed-dependent, so this failed on
+attempt 1 of 3 without a retry"):
+
+- The Falcon, at the leg's start (switch id mutated, `lab/out/mut_falcon`):
+  "assertEq failed: the Falcon has risen ($00CC: gen_wor_falcon) for the
+  hops to the grind plains: got 0 ($0), want 1 ($1)".
+- A lap's cap: Doma's group-52 lap allowed one battle (`lab/out/n_mut_budget`):
+  "assertEq failed: Doma's plain (group 52): every formation it is walked
+  for won within 1 battles (...): got false, want true"; walked for a
+  formation no pool deals, `[999]` (`n_mut_unmet`): the same assert after
+  25 battles, "won within 25 battles (... 999 no such formation -)".
+- Every formation won, after the laps: every lap's end test true at once,
+  so the laps end with nothing won (`n_mut_final`): "assertEq failed: the
+  grind plains: formation 327 (TumbleWeed x4) won: got false, want true".
+
+The mutants are one-line edits of `lab_plains.lua`, whose grind is the
+generator's byte for byte (`lab/scripts/mkmut.py`).
 
 **The leg** (`leg1/`, the graph's play at 4c81486a; the same play, "PASS
-(frame 101212) attempts=1/3", at 4dc81e6e): twelve plain battles, all won,
-"Doma's plain (group 52): done after 3 battles", "(group 53): done after 5
-battles", "the forest north of the Opera House (group 50): done after 2
-battles", "the plain south of the forest (group 49): done after 2 battles".
-The four came out at "SHADOW L43 ... CELES L54 ... CYAN L44 ... TERRA L54"
-(L41, L53, L42 and L53 before), with "potion=88 ... gil=718313" on the save
-tile.
+(frame 101212) attempts=1/3", at 4dc81e6e and at 755f817f, `gate2/`):
+twelve plain battles, all won, "Doma's plain (group 52): done after 3
+battles", "(group 53): done after 5 battles", "the forest north of the Opera
+House (group 50): done after 2 battles", "the plain south of the forest
+(group 49): done after 2 battles". The four came out at "SHADOW L43 ...
+CELES L54 ... CYAN L44 ... TERRA L54" (L41, L53, L42 and L53 before), with
+"potion=88 ... gil=718313" on the save tile. The save is `wor-colosseum-v1`:
+`battle_economizer` Continues it, `battle_shadowkit` and `battle_cursecount`
+boot the leg's `wor_colosseum.mss`, `battle_colosseum` boots
+`wor_colosseum_in` (before the grind), and `release_saves.py` ships it.
 
-**Measured** from the graph's own `wor_colosseum_plains` at 4dc81e6e
-(`lab/out/p2_*`, `lab_plains.lua`: K battles used up on the plain by
-Maranda, then the leg's grind, copied), K 0-5 at seed shifts 0, 1, 7 and 13,
-one attempt each: 24 of 24 PASS, every battle won. By distinct key
-(`tally_p2.txt`, `deaths_p2.txt`):
+**Measured** from the graph's own `wor_colosseum_plains` at 755f817f
+(`lab/out/p3_*`, `lab_plains.lua`: K battles used up on the plain by
+Maranda, then the leg's grind, copied), K 0-11 at seed shifts 0 and 7, one
+attempt each: 24 of 24 PASS, every battle won. The shifts seldom move the
+fights (the two shifts played alike at every K but 0), so the 24 runs are
+13 distinct plays (`tally_p3.txt`: "runs 24, distinct plays ... 13"); K is
+what varies the draw. By distinct key (`tally_p3.txt`, `deaths_p3.txt`):
 
 | formation | fights | keys | won | keys with a death |
 |---|---|---|---|---|
-| 103 Crawler | 60 | 17 | 60 | 0 |
-| 114 Crawler x4 | 36 | 9 | 36 | 0 |
-| 323 Mantodea, Sprinter, Spek Tor x2 | 36 | 8 | 36 | 0 |
-| 324 Reach Frog x4 | 24 | 6 | 24 | 0 |
-| 325 Mantodea x2 | 36 | 9 | 36 | 3 |
-| 327 TumbleWeed x4 | 24 | 6 | 24 | 0 |
+| 103 Crawler | 42 | 21 | 42 | 0 |
+| 114 Crawler x4 | 54 | 26 | 54 | 0 |
+| 323 Mantodea, Sprinter, Spek Tor x2 | 54 | 13 | 54 | 1 |
+| 324 Reach Frog x4 | 28 | 11 | 28 | 0 |
+| 325 Mantodea x2 | 38 | 18 | 38 | 9 |
+| 327 TumbleWeed x4 | 24 | 12 | 24 | 0 |
 
-The three deaths are CYAN's, each one Mantodea blow in a normal battle from
-near full ("CYAN 2072/2885", "CYAN 2892/3001", "CYAN 3118/3118"). The
-Mantodea's record is vanilla's (route-wor-narshe.md section 14) and CYAN is
-L42-44 against its L54: the level gap a grind closes, so the leg leaves it.
-An arm with CYAN in the back row for the plains (`lab/out/r1_*`,
-`lab_plains_row.lua`, K 0-7 at shifts 0 and 13) did not help: 325 felled him
-in 2 of 10 keys, now from part HP ("CYAN 1181/2885"; "CYAN 571/2885; CYAN
-1180/2885"), CELES fell once in a 323 back attack, and its two K=0 runs
-failed in the row menu ("timeout after 1800 frames driving toward CYAN to
-the back row"), a lab fault. The back and pincer attacks #452 answered with
-the Back Guard decided nothing here: 325 rolled one back attack in 9 keys
-(be78, no one down). The Back Guard stays on LOCKE, who is not seated.
+Beside the six, the plains' other formations lost one member in one key:
+CYAN in a 328 pincer (be20-g0148, two fights, "CYAN 1227/2885"). Every death took a Fenix Down from
+the field care after the battle ("used $F0 on char 2: 0 -> 375 hp"); the
+runs ended with 17-20 Fenix Downs of 20 (11 of 24 spent none), and
+Kohlingen's counter tops them back up before the save.
+
+**The Mantodea pair is the hard one.** Of 325's 18 keys, 9 lost a member:
+CYAN in 7 (one blow, from 65-100% of his HP: be5C "CYAN 3001/3001", beD8
+"CYAN 3118/3118", be34 "CYAN 2353/3237", beA8 "CYAN 2072/2885", beE4 "CYAN
+1954/3001", and two keys met at two entry states, be58 "CYAN 3001/3001" and
+"CYAN 2125/3001", beC8 "CYAN 2892/3001" and "CYAN 2125/3001"), CELES in 2 from part HP ("CELES 658/4387" in a pincer,
+"CELES 1134/4251"); 323's one was CYAN from "921/3001". CYAN is L42-44 and
+the Mantodea L54, with its record vanilla's (route-wor-narshe.md section
+14): the level gap a grind closes, and the grind is the route's answer, so
+the leg leaves the kit as it is. An arm with CYAN in the back row for the
+plains (`lab/out/r1_*`, `lab_plains_row.lua`, K 0-7 at shifts 0 and 13, at
+4dc81e6e) did not help: 325 felled him in 2 of 10 keys, now from part HP
+("CYAN 1181/2885"; "CYAN 571/2885; CYAN 1180/2885"), CELES fell once in a
+323 back attack, and its two K=0 runs failed in the row menu ("timeout
+after 1800 frames driving toward CYAN to the back row"), a lab fault. The
+Back Guard stays on LOCKE, who is not seated: of the deaths above, two came
+in pincers (325 be24, 328 be20), which it would have removed.
+
+The earlier sweep `p2` (K 0-5 at shifts 0, 1, 7 and 13, at 4dc81e6e: 24 of
+24 PASS, 7 distinct plays) is under `lab/out/p2_*`; `p1` counted the
+savestate's stale first outcome as a K battle and is kept as a failed
+attempt.
