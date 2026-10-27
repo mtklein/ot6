@@ -71,7 +71,7 @@ end
 
 -- the records: a cast of Bserk (its $3410 write) closed by the caster's
 -- Ot6ActionEnd, and every write of OT6_BLUESEEN with who made it
-local caster, rec, seen = nil, nil, {}
+local caster, rec, seen, cellWrites = nil, nil, {}, {}
 local function arm()
   emu.addMemoryCallback(function(_, v)
     if v ~= BSERK or caster == nil or rec ~= nil then return end
@@ -92,8 +92,16 @@ local function arm()
       v, H.frame, st["cpu.x"] & 0xff, H.readByte(0xB6), H.readByte(0x11AB)))
   end, emu.callbackType.write, 0x7E0000 + SEEN, 0x7E0000 + SEEN)
   emu.addMemoryCallback(function(_, v)
-    H.log(string.format("[bserk] STRAGO's Bserk byte <- $%02X at f%d", v, H.frame))
+    local st = emu.getState()
+    local pc = (st["cpu.k"] << 16) | st["cpu.pc"]
+    cellWrites[#cellWrites + 1] = { v = v, pc = pc, f = H.frame }
+    H.log(string.format("[bserk] STRAGO's Bserk byte <- $%02X at f%d (pc $%06X)", v, H.frame, pc))
   end, emu.callbackType.write, 0x7E0000 + CELL, 0x7E0000 + CELL)
+end
+-- a write's pc inside a routine: from its label to the next 96 bytes
+local function inProc(pc, name)
+  local a = H.sym(name)
+  return pc >= a and pc < a + 96
 end
 local function closed() return rec ~= nil and rec.ended ~= nil and H.frame > rec.ended + 30 end
 
@@ -230,6 +238,14 @@ H.run({ maxFrames = 1500000 }, {
           local s = seen[1]
           H.assertEq(s.x >= 8, true, string.format("the attack that taught it was a monster's (entity $%02X)", s.x))
           H.assertEq(s.st2 & 0x10, 0x10, "the attack that taught it carried Berserk")
+          -- vanilla's "learned" step: Ot6BlueLearn marks it newly learned
+          -- ($80), and the battle-end loop's ShowLearnedMagicMsg, which prints
+          -- "<name> learned <spell>", makes it $FF
+          local w = cellWrites
+          H.assertEq(#w >= 2 and w[#w - 1].v == 0x80 and inProc(w[#w - 1].pc, "Ot6BlueLearn"), true,
+            "the victory's Ot6BlueLearn marked Bserk newly learned ($80)")
+          H.assertEq(w[#w].v == 0xFF and inProc(w[#w].pc, "ShowLearnedMagicMsg"), true,
+            "ShowLearnedMagicMsg made it learned ($FF), the step that prints the message")
           stage = 3
         elseif #seen > 0 then
           -- seen, and not learned: he was not standing at the victory

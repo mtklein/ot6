@@ -115,6 +115,74 @@ Passives, including the stat bump: learned by battles-carried
 vanilla's stat-bonus grind with collecting passives. Character
 passives (kits.md) and esper passives share the same slots.
 
+## Berserk
+
+Bserk (16 MP, one target, hit rate 150) is the verb against an enemy caster.
+A berserked monster only Fights, and its counter section runs only to its
+first `end_if` (`ExecAIRetal`), so a counter behind an `if_hit` stops. Cast
+on an ally it takes that ally out of the player's hands, which is why the
+tube room left it off Phantom (`magicite-tube-six.md` §8); the player aims it
+at enemies. Its cursor opens on the party (MagicProp targeting `$01`), so a
+cast at an enemy crosses over first.
+
+The owner asked for it "available in a few ways" (2026-10-27). It is offered
+in four, so a party can have it in the World of Balance and before the
+Fanatics' Tower, whose MagiMaster is open to it:
+
+| when | source | how | notes |
+|---|---|---|---|
+| World of Balance, Gau's arc on | Gau's rages (vanilla, unchanged) | Insecare's rage: Wing Whisp (no damage, Berserk) on one enemy, on the special side of each possessed turn's coin. CrassHoppr's and WeedFeeder's rages cast the Bserk spell itself, whose cursor opens on the party, so a raged Gau's cast lands on a random member of his own party, Gau included (`Retarget`: no "starts on the enemy" bit) | the Rage row is gone in the tower (`kits.md`, #420) |
+| World of Balance, Zozo on | the stone Siren | Mute, Sleep and Bserk while worn | the controller job |
+| World of Balance, Esper Mountain on | STRAGO, by watching (`ot6_blue.asm`) | the first battle in which a monster inflicts Berserk while he is present and able teaches it at the victory | a Magic-row spell of his own, so his in the tower |
+| World of Ruin, the Ancient Castle | Odin, then Raiden | unchanged | after the tower |
+
+**Siren, the controller.** Mute and Sleep each take a caster's turn from it;
+Bserk is the third way, and the one a body immune to the other two can still
+take: MagiMaster's immunity bytes (`$FF $EF $14`) refuse every status-1
+effect, Mute and Sleep, and leave Berserk open. The sirens of the myth drive
+sailors mad, so the stretch is a small one. Stray (Muddle, Imp) was the other
+candidate; Muddle already sets an enemy on its own side, while the controller
+job is about the enemy's own action. Zozo is the source every save holds from
+the World of Balance on, so it is the one a party can count on at the tower.
+Nothing leaves the stone: it carries three spells, as Shiva and Maduin do.
+
+**STRAGO, by watching.** His verb is observation (`kits.md`), and his Magic
+row held only Scan, so he is also the caster whose spell list was thinnest.
+Bserk is a spell, not a lore: the Lore window holds one record per lore id
+and the learned-lore field is 24 bits, so a twenty-fifth lore would move the
+save layout and the Lore page, and turning an existing lore into Berserk
+would change the monsters that cast it. So he learns it into his own
+learned-spell table, where TERRA and CELES keep their natural magic, and the
+Magic menus show it the same way. What teaches it: any monster's attack whose
+status set carries Berserk and that removes nothing, lores excepted (Rippler
+and Pep Up name Berserk among the statuses they swap or clear). Where:
+Insecare in Esper Mountain's cave (map 372, which the route climbs through
+with him), CrassHoppr, WeedFeeder and Grenade on the World of Balance map,
+Telstar's Megazerk, Evil Toot (Pan Dora, the Phantom Train), AtmaWeapon's Mind
+Blast, Cactrot and Woolly in the World of Ruin, and the L.50 Magic's counter
+in the Fanatics' Tower, which casts Bserk itself. The rule is the lore rule
+(vanilla's `LearnLore` status test), plus one: he learns it at the victory
+only if he is standing then, because vanilla's "learned" step visits the
+living only. `battle_bserk` plays both: RELM's Siren cast lands and teaches
+him nothing, and an Insecare's Wing Whisp teaches him, after which he casts
+it.
+
+**Natural magic** stays as it is. TERRA and CELES are the only natural
+casters; each list is eight rows (DESIGN.md) and every row is one a player
+relies on. CELES's Imp is the thinnest, and Stray grants it too, but Imp is
+not Berserk's job, and STRAGO answers "a caster whose spell progression isn't
+feeling great" better.
+
+**Items, relics and tools** stay as they are: none casts or inflicts Berserk
+(no weapon's spell is Bserk), and the Peace Ring and Ribbon guard against it.
+
+**What a player feels.** The Siren wearer, and STRAGO once he has seen it,
+carry Bserk in their Magic list. A Muddled or Charmed caster may pick it at
+random (`RandMagic` draws from the list, as vanilla's Muddle does with every
+spell); Muddle turns its cursor toward the enemies. STRAGO's Study does not
+teach it: Study learns lores, and Bserk is not one. Nothing a player already
+had is taken away.
+
 ## Items that grant
 
 Some equipment grants a spell the way a stone does (#431): while worn, never
