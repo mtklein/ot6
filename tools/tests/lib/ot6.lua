@@ -495,6 +495,10 @@ function M.requestLoadState(blob)
   -- not handled (#205): a stall after this reload is the reload's own
   M.thawPad()
   if RUN ~= nil then RUN.goUnhandled = nil end
+  -- the battle-end reading the lib holds is the old timeline's (#491)
+  if M.traceOnLoad then M.traceOnLoad(M.loadedFrame == nil) end
+  M.loadedFrame = M.frame
+  if M.forgetBattleEnd then M.forgetBattleEnd() end
   local req = {}
   local ref
   M.pendingStateReqs = M.pendingStateReqs + 1
@@ -16980,6 +16984,20 @@ local endHooked, endSnap = false, nil
 -- the driver watching the battle now (watchLeavers), and the frame it last
 -- watched: the end hook has it say the [outcome]
 local endWatcher = nil
+-- A restored snapshot starts a new timeline: the end hook's reading and the
+-- watcher belong to the one before it.  A state captured just after a battle
+-- (a walker returns on the [outcome] and the build captures then) still
+-- reads as that battle for ~35 frames, and the first driver after the load
+-- said it again as a "WON ... no end reading ... CONTRADICTION" that a lab
+-- counting H.outcomes took for a real battle (#491; every run in
+-- build/attempts/wt/v038-grind-plains/lab/out/p1_*).  So the load drops the
+-- stale reading, and an [outcome] with no end reading from a battle first
+-- watched within the tail's 90 frames of the load is the capture's own
+-- battle end, said as a [tail] and not recorded (sayOutcome).  A battle that
+-- really ends after a load fires the end hook and has its reading.
+-- M.LOAD_TAIL = false is the mutant the test proves it against.
+M.LOAD_TAIL = true
+function M.forgetBattleEnd() endSnap, endWatcher = nil, nil end
 local function xpAt(off)
   return M.readByte(0x1611 + off) + M.readByte(0x1612 + off) * 256
        + M.readByte(0x1613 + off) * 65536
@@ -17096,6 +17114,11 @@ function Driver:watchLeavers()
       if g.realMin == nil or gap < g.realMin then g.realMin = gap end
     end
     self.seatXp, self.seatChar, self.filled = {}, {}, {}
+    -- the formation as the battle opens (#489): $11E0 is the battle index
+    -- and a battle-change command (Cmd_20) rewrites it mid-fight, so the
+    -- end hook's reading can name a later scene (SrBehemoth printed $1A8
+    -- for the formation 452 it dealt, build/attempts/wt/v038-wor-coverage)
+    self.openForm = M.readWord(0x11E0)
     for e = 0, 3 do
       local a, off = M.readByte(0x3ED8 + e * 2), M.readWord(0x3010 + e * 2)
       if a < 16 and (M.readByte(0x3AA0 + e * 2) & 1) == 1 and off < 37 * 16 then
@@ -17330,10 +17353,25 @@ end
 -- seated member's experience then and now.  A share the engine did not
 -- pay is said as a MISMATCH (the model of WinBattle is wrong, or a kill
 -- was assumed) and recorded in M.lastOutcome.ok for a caller to assert.
+-- The formation an [outcome] names (#489): the one the battle opened with,
+-- when known; the end hook's $11E0 is the last scene's after a battle change.
+function M.outcomeForm(openForm, endForm)
+  return openForm or endForm
+end
+
 function Driver:sayOutcome()
   local atEnd = endSnap ~= nil and endSnap.frame >= (self.startFrame or 0)
   local r = atEnd and endSnap.reward or self.reward
   self.outcomeSaid = true
+  local shownForm = M.outcomeForm(self.openForm, r.form)
+  if not atEnd and M.LOAD_TAIL ~= false and M.loadedFrame ~= nil
+     and (self.startFrame or 0) - M.loadedFrame < 90 then
+    M.log(string.format("[%s] [tail] battle $%03X read %d ticks after a state load, first watched %d frames "
+      .. "after it and with no end reading: the capture's own battle end, not a battle -- no [outcome], "
+      .. "not counted (#491)", self.tag or "fight", r.form & 0x3FF, self.battleTick,
+      (self.startFrame or 0) - M.loadedFrame))
+    return
+  end
   local seated = {}
   for e = 0, 3 do seated[e] = self.seatXp[e] ~= nil end
   local o = M.battleOutcome({ xp = r.xp, st1 = r.st1, hp = r.hp, egg = r.egg,
@@ -17354,7 +17392,7 @@ function Driver:sayOutcome()
     for _, s in ipairs(list) do t[#t + 1] = string.format("s%d:$%03X", s, r.species[s]) end
     return #t > 0 and table.concat(t, " ") or "none"
   end
-  local rec = { kind = o.kind, form = r.form, kills = o.kills, escaped = o.escaped,
+  local rec = { kind = o.kind, form = shownForm, formEnd = r.form, kills = o.kills, escaped = o.escaped,
                 due = o.due, share = o.share, got = got, ok = ok, leftN = o.leftN,
                 seatedN = o.seatedN, random = r.random, tick = self.battleTick, atEnd = atEnd }
   if self.raceEligibility then
@@ -17367,7 +17405,7 @@ function Driver:sayOutcome()
   M.outcomes[#M.outcomes + 1] = rec
   M.log(string.format("[%s] [outcome] battle $%03X %s after %d ticks%s: killed %s; escaped %s; "
     .. "%d of %d seated fled (Run, Warp); %s reward due %d a member (%s): %s%s", self.tag or "fight",
-    r.form & 0x3FF, o.kind:upper(), self.battleTick, atEnd and "" or " (no end reading: the last frame's)",
+    shownForm & 0x3FF, o.kind:upper(), self.battleTick, atEnd and "" or " (no end reading: the last frame's)",
     slots(o.kills), slots(o.escaped), o.leftN,
     o.seatedN, r.random and "random" or "event", o.due, table.concat(paid, ", "),
     o.contradiction and ("CONTRADICTION -- " .. o.contradiction)
@@ -17392,8 +17430,20 @@ end
 -- every second Stop from the same Brainpan trio: fc-alcove control
 -- seed 35 fight 1 shows SHADOW's window open with no plan from f+4500
 -- to f+6300 and no [status] line for it, #224.)
+-- Is the battle the driver is watching still live?  False past its end
+-- hook, or in a hand-back tail (watchLeavers): the RAM is being handed
+-- back and every status reads as garbage (#494: `[status] ... entity 2
+-- char 0 is under PETRIFY ... cure: none in the bag` right after
+-- `[outcome] battle $14D WON`; tools/audit_zombie_touches.py parses these
+-- lines).  Pure, so battle_healpolicy asserts it; snapFrame is the last
+-- end hook's frame (nil: none yet).
+function M.battleLiveAt(snapFrame, startFrame)
+  return snapFrame == nil or (snapFrame < (startFrame or 0)
+    and (startFrame or 0) - snapFrame >= 90)
+end
+
 function Driver:watchStatuses()
-  if self.battleTick > 4 then
+  if self.battleTick > 4 and M.battleLiveAt(endSnap and endSnap.frame, self.startFrame) then
     for e = 0, 3 do
       if M.readWord(0x3C1C + e * 2) > 0 then
         local s1, s2, s3, s4 = statusOf(e)
@@ -17530,8 +17580,7 @@ function Driver:watchStatuses()
         -- battle is live: past its end hook, or in a hand-back tail
         -- (watchLeavers), $3403 reads all held (431 SEIZED/RELEASED lines
         -- after an [outcome] in #425's qualification)
-        local live = endSnap == nil or (endSnap.frame < (self.startFrame or 0)
-          and (self.startFrame or 0) - endSnap.frame >= 90)
+        local live = true   -- the whole watcher is gated above (#494)
         local held = live and M.seized(e)
         local hkey = e .. ":Seized"
         if live and held ~= (self.statusSaid[hkey] == "on") then
@@ -19236,8 +19285,12 @@ end
 -- the record; battle and menu frames re-record the frozen field tile,
 -- which the dedupe absorbs.
 local traceMap, traceSet, traceCount = nil, {}, 0
+M.traceFlushes = {}       -- { map, n, frame } of each [tiles] flush (a test reads it)
+M.traceHoldUntil = -1
+M.TRACE_HOLD = true       -- false: the mutant battle_tracehold proves the hold against
 local function traceFlush()
   if traceMap == nil or traceCount == 0 then return end
+  if #M.traceFlushes < 200 then M.traceFlushes[#M.traceFlushes + 1] = { traceMap, traceCount, M.frame } end
   local keys = {}
   for k in pairs(traceSet) do keys[#keys + 1] = k end
   table.sort(keys)
@@ -19329,12 +19382,46 @@ local function coverageFlush()
   M.emitBlob("coverage.cdl", table.concat(chars))
 end
 
+-- Does a trace sample cohere?  The world map keeps its party tile in $e0/$e2
+-- and a field map in the field object, and which one is live is read from
+-- $1F64 twice: worldMode (& $3FF below 3) and the map id logged (& $1FF).
+-- They disagree while a transition is in flight (the id still a world map's
+-- with a flag bit up, the field object already a field map's), and a
+-- field-mode tile logged under map=1 was a coordinate the world never had
+-- (`[tiles] map=1 ... xy=0:28`, #489: "stood on" counts were upper bounds).
+-- Such a sample is skipped.  Pure; battle_healpolicy asserts it.
+function M.traceCoheres(world, mapId)
+  return ((mapId & 0x1ff) < 3) == (world and true or false)
+end
+
+-- A state load is not play: the frames before the run's first load are the
+-- boot's (power-on RAM read as a map: `[tiles] map=0 n=1 xy=0:0`, map=3 the
+-- frame after, and the `map=1 ... xy=0:28` at the head of the WoR legs that
+-- #489 found), and the frames the restore takes read half-written RAM.
+-- The load drops what the first one finds and holds the trace off for its
+-- frames; a later load keeps what was stood on (flushed) and holds the same.
+function M.traceOnLoad(first)
+  if M.TRACE_HOLD == false then return end
+  if first then traceSet, traceCount, traceMap = {}, 0, nil else traceFlush() end
+  M.traceHoldUntil = M.frame + 3
+end
+
+-- the samples held now, for a test
+function M.traceSnapshot()
+  local keys = {}
+  for k in pairs(traceSet) do keys[#keys + 1] = k end
+  table.sort(keys)
+  return traceMap, keys
+end
+
 local function traceTick()
   -- the world map keeps its party tile in $e0/$e2, not the field object (#288)
   local world = M.worldMode ~= nil and M.worldMode()
   if world then
     if not M.worldAligned() then return end
   elseif not M.tileAligned() then return end
+  if not M.traceCoheres(world, M.mapId()) then return end
+  if M.TRACE_HOLD ~= false and M.frame <= M.traceHoldUntil then return end
   local m = M.mapId() & 0x1ff
   if m ~= traceMap then
     traceFlush()
@@ -20236,6 +20323,7 @@ local function resetLibState()
   -- as a battle (wor_tzen_door's retry counted two battles at f1254 and
   -- f4121, 'formation 0000': build/attempts/wt/v030-route/lab/tzen/t2)
   M.blsSeen = nil
+  M.loadedFrame = nil
   M.gameOverFired = 0
   M.thawPad()
   M.setPad(nil)
@@ -20245,6 +20333,7 @@ local function resetLibState()
   M.absorbGuardBattles, M.absorbGuardClashes, M.absorbGuardEntries = 0, 0, 0
   guardArmed, guardSettle, guardSeen, guardRandom = true, 0, {}, false
   traceMap, traceSet, traceCount = nil, {}, 0
+  M.traceHoldUntil, M.traceFlushes = -1, {}
   recoveryObserver, recoveryHooks, recoveryEvents = nil, false, {}
   execActor, execActorCmd, execDone, execMon, execMonDone = nil, nil, {}, nil, nil
   execParty, execSkipped = nil, {}
