@@ -85,6 +85,31 @@ local steps = {
 }
 for _, s in ipairs(reloadAndStep("mutant", true, mutant)) do steps[#steps + 1] = s end
 for _, s in ipairs(reloadAndStep("fixed", false, fixed)) do steps[#steps + 1] = s end
+-- the positive control: a battle watched BEFORE a load and idled after it,
+-- with no end reading, is a real battle the reload cut off and still counts
+-- (build/attempts/wt/v034-wor-gogo/lab/dd_plain: 'battle $170 LOST after 7811
+-- ticks (no end reading...)' after a reload, 55 such LOST lines in the
+-- attempts).  The old test, gap < 90, took any negative gap for the tail.
+local F3, frames3, before3, req3
+steps[#steps + 1] = H.call(function() H.LOAD_TAIL = true end)
+steps[#steps + 1] = H.loadState("build/states/first_battle.mss.lua")
+steps[#steps + 1] = H.call(function() F3 = H.newFightDriver("loadtail_before"); frames3 = 0 end)
+steps[#steps + 1] = H.driveUntil(function() return frames3 >= 60 end, 200,
+  { H.call(function() frames3 = frames3 + 1; F3.frame() end) }, "60 frames of a driver watching a live battle")
+steps[#steps + 1] = H.call(function()
+  before3 = #H.outcomes
+  req3 = H.requestLoadState(blob)
+end)
+steps[#steps + 1] = H.waitFrames(2)
+steps[#steps + 1] = H.call(function()
+  H.checkReq(req3, "reload after a watched battle")
+  F3.idle()
+  local o = H.outcomes[#H.outcomes]
+  H.log(string.format("battle_loadtail: watched before the load, idled after it: %d outcome(s) added%s",
+    #H.outcomes - before3, o and string.format(" (%s $%03X, atEnd=%s)", o.kind, o.form & 0x3FF, tostring(o.atEnd)) or ""))
+  H.assertEq(#H.outcomes - before3, 1, "positive control: a battle that opened before the load is still counted "
+    .. "when it is idled after the reload with no end reading")
+end)
 steps[#steps + 1] = H.call(function()
   H.LOAD_TAIL = true
   H.assertEq(mutant.added >= 1, true,

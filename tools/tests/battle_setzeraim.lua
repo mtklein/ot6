@@ -49,11 +49,13 @@
 --     the confirm (~44 frames: hidden by Cmd_24, or felled by a Zombied
 --     member's attack; #479).  aimStep says 'not a live monster' and sets
 --     aimRefused, which is the property under test, so the refusal is judged
---     at the frame it appears: the slot gone from $3A75 loses the battle to
+--     once, the first frame it appears: the slot gone from $3A75 loses the battle to
 --     the test (cGoneWhy, the confirm-to-exec check's mirror); the slot still
 --     live is c refused for nothing, and stays the failure.
---   * the battle over with c not run loses it only when a and b were
---     refused (abRefused): a hire that was confirmed is the defect itself.
+--   * the battle over with c not run loses it unless a or b was confirmed
+--     (abForfeitOk; hireState tells refused, confirmed and never attempted
+--     apart): a hire that went through is the defect itself, one that never
+--     got to target select is the battle ending first.
 -- c's slot is latched when its target select opens, once per aim: when
 -- the engine aims c (SETZER Zombied after his confirm) H.setzerBattle
 -- plays the entry again with a new aim, and the slot is latched again
@@ -65,18 +67,31 @@ local HIRE = 0x5A
 local TAG = "setzeraim"
 
 local function alive() return H.readByte(0x3A75) end
--- #479: c was refused (aimRefused set) and its latched slot is no longer in
--- $3A75 (lm): the slot left between the latch and the confirm, so the
--- refusal is the engine's board changing, not aimStep's fault.  Returns why.
-local function cGoneWhy(refused, slot, lm)
+-- #479.  A hire's state at target select: "refused" (aimRefused set),
+-- "confirmed" (it reached target select, p.aim set, and was not refused), or
+-- "never" (it has not got that far: the battle ended first).
+local function hireState(p)
+  if rawget(p, "aimRefused") ~= nil then return "refused" end
+  if rawget(p, "aim") ~= nil then return "confirmed" end
+  return "never"
+end
+-- c was refused and its latched slot is no longer in $3A75 (lm): the slot left
+-- between the latch and the confirm, so the refusal is the board changing,
+-- not aimStep's fault.  Judged ONCE, the first frame the refusal appears
+-- (the caller latches), so a later change of the board cannot turn a real
+-- refusal into a forfeit.  Says whose refusal it was: a's and b's are the
+-- test's own and never forfeit.
+local function cGoneWhy(refused, slot, lm, a, b)
   if not refused or slot == nil then return nil end
   if (lm >> slot) & 1 == 1 then return nil end
-  return string.format("c was refused: its latched slot %d left $3A75 ($%02X) between the latch and the confirm",
-    slot, lm)
+  return string.format("c (not a or b: a %s, b %s) was refused: its latched slot %d left $3A75 ($%02X) between "
+    .. "the latch and the confirm", a or "?", b or "?", slot, lm)
 end
--- a and b were both refused, as the test needs before a battle that ended
--- early may be written off
-local function abRefused(a, b) return a ~= nil and b ~= nil end
+-- a battle that ended before c ran is written off unless a or b was
+-- CONFIRMED (a hire that went through is the defect itself); a or b that
+-- never got to target select is the battle ending first, still a forfeit
+local function abForfeitOk(a, b) return a ~= "confirmed" and b ~= "confirmed" end
+
 local function count(m) local n = 0 while m ~= 0 do n = n + (m & 1); m = m >> 1 end return n end
 local function gil() return H.readWord(0x1860) + H.readByte(0x1862) * 65536 end
 
@@ -158,8 +173,11 @@ local function play()
     if S.phase == "plan" then
       local r = S.step:tick()
       -- judged the frame the refusal appears, while $3A75 is the board it saw
-      local gone = cGoneWhy(rawget(S.pos, "aimRefused") ~= nil, far, alive())
-      if gone then forfeit(gone) end
+      if S.cJudged == nil and rawget(S.pos, "aimRefused") ~= nil then
+        S.cJudged = true
+        local gone = cGoneWhy(true, far, alive(), hireState(S.negA), hireState(S.negB))
+        if gone then forfeit(gone) end
+      end
       if S.phase == "plan" and r ~= "done" then return r end
       local recs = H.vars.setzer
       if S.phase ~= "plan" then
@@ -170,8 +188,8 @@ local function play()
         forfeit(string.format("the aimed hire's slot %d fell before it ran (exec f%d, targets $%02X)", far,
           recs[1].f, recs[1].targets))
       elseif #recs == 0 and not H.battleLoadStarted() and rawget(S.pos, "aimRefused") == nil
-             and abRefused(rawget(S.negA, "aimRefused"), rawget(S.negB, "aimRefused")) then
-        forfeit("the battle ended before c ran (a and b were refused)")
+             and abForfeitOk(hireState(S.negA), hireState(S.negB)) then
+        forfeit(string.format("the battle ended before c ran (a %s, b %s)", hireState(S.negA), hireState(S.negB)))
       end
     end
     if S.phase == "plan" then
@@ -215,13 +233,19 @@ H.run({ maxFrames = 600000 }, {
   -- the two forfeit rules, as plain arithmetic (the draw itself is not seen
   -- in 38 runs, #479): red with either rule dropped
   H.call(function()
-    H.assertEq(cGoneWhy(true, 3, 0x07) ~= nil, true, "c refused with its slot (3) gone from $3A75: lost to the test")
+    H.assertEq(cGoneWhy(true, 3, 0x07, "refused", "refused") ~= nil, true, "c refused with its slot (3) gone from $3A75: lost to the test")
+    H.assertEq(cGoneWhy(true, 3, 0x07, "refused", "refused"):find("c %(not a or b: a refused, b refused%)") ~= nil, true,
+      "...and the reason tells c's refusal from a's and b's")
     H.assertEq(cGoneWhy(true, 2, 0x07), nil, "c refused with its slot (2) still live: stays the failure")
     H.assertEq(cGoneWhy(false, 3, 0x07), nil, "c not refused: nothing to judge")
     H.assertEq(cGoneWhy(true, nil, 0x07), nil, "c with no latched slot: the 'fewer than two' rule's")
-    H.assertEq(abRefused("x", "y"), true, "a and b refused: a battle that ended early may be written off")
-    H.assertEq(abRefused("x", nil), false, "b not refused: it may not")
-    H.assertEq(abRefused(nil, "y"), false, "a not refused: it may not")
+    H.assertEq(hireState({ aimRefused = "x" }), "refused", "a hire with aimRefused set is refused")
+    H.assertEq(hireState({ aim = {} }), "confirmed", "...one that reached target select unrefused is confirmed")
+    H.assertEq(hireState({}), "never", "...one that did not get there is never")
+    H.assertEq(abForfeitOk("refused", "never"), true, "a refused, b never attempted: the early end is a forfeit")
+    H.assertEq(abForfeitOk("never", "never"), true, "before a and b: still a forfeit")
+    H.assertEq(abForfeitOk("confirmed", "refused"), false, "a confirmed: the defect, not a forfeit")
+    H.assertEq(abForfeitOk("refused", "confirmed"), false, "b confirmed: the defect, not a forfeit")
   end),
   H.bootCheckpoint("wor-tomb-v1"),
   H.call(function() W = H.setzerCrowdBudget(H.fieldEncounterGroup(H.mapId() & 0x1ff), TAG) end),

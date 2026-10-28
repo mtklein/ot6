@@ -8,8 +8,9 @@
 -- `map=3 n=1 xy=0:0` at frame 22 on any fixture run, and on the WoR legs the
 -- `map=1 ... xy=0:28`, `0:6`, `128:2` field coordinates under a world map
 -- that the coverage audit (e348f864) found, so "stood on" counts were upper
--- bounds.  The load drops the boot's samples and holds the trace off for the
--- frames the restore takes (M.traceOnLoad).
+-- bounds.  The load drops the boot samples still pending and holds the trace
+-- off for the frames the restore takes (M.traceOnLoad).  The boot's own
+-- `map=0 n=1 xy=0:0` flush at f21, before the request, stays in the log.
 --
 -- After a 20-frame boot and the load, no [tiles] flush happened from the
 -- load request on (the flushes are M.traceFlushes; the boot's own, before
@@ -32,5 +33,9 @@ H.run({ maxFrames = 600 }, {
     H.log("battle_tracehold: flushes after the load request (f" .. H.loadedFrame .. "): "
       .. (#seen > 0 and table.concat(seen, "; ") or "none"))
     H.assertEq(#seen, 0, "no [tiles] flush from the frames the load takes")
+    -- and the trace resumes once the hold is over
+    H.log(string.format("battle_tracehold: hold until f%d, last sample f%s", H.traceHoldUntil, tostring(H.traceLastSample)))
+    H.assertEq(H.traceLastSample ~= nil and H.traceLastSample > H.traceHoldUntil, true,
+      "the trace records again after the hold")
   end),
 })
