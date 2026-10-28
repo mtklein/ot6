@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "4b269dca2e593d5136af255a559d7db161e9a5a5a211a4c1583b3c8fb8cef1b3",
-  "generator_sig": "3e07e5757e0556d56e4acb60d9005f205bf32d6a56040f68470c49227c9a9fe2 gen_esper_mtn build/checkpoints/fire-out-v1/manifest.json build/checkpoints/fire-out-v1/fire-out.sram",
+  "payload_sha256": "e5476c52531f4c05fcba2136ba0c12f4357f18bf448a2e59907decd710e71233",
+  "generator_sig": "cee124b1c3b930ddbf90084ac98177aaf94c0a28b26a07611d0014c33062e10b gen_esper_mtn build/checkpoints/fire-out-v1/manifest.json build/checkpoints/fire-out-v1/fire-out.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/fire-out-v1/manifest.json",
-      "sha256": "b699de0c414a18b31a5049e82424a3468d4208de7f3b0c17001de004f1f98841"
+      "sha256": "e45af3650b7de80c28e7a1e548148d474c7b589a87f4b439dbf626f08259187c"
     }
   ]
 }
