@@ -6950,6 +6950,11 @@ local function nib(v) if (v & 8) ~= 0 then return -(v & 7) end return v & 7 end
 function M.gearValue(c, id)
   if id == nil or id == 0xFF then return 0 end
   local t = gearType(id)
+  -- a weapon whose blow heals what it hits (ItemProp +27 high nibble $0C, battle_main.asm AttackerEffect_0c: the
+  -- Heal Rod) is no weapon to fight with: the game's own Optimum skips it (equip.asm ImpItem), and RELM wearing it
+  -- healed the White Drgn by every Fight (#485: the Tzen house's Heal Rod; build/attempts/wt/v038-wor-sweeps-a/
+  -- chain/chain5.log.gz, wor_veldt's three wipes, the dragon's HP back at 18500)
+  if t == 1 and (gearByte(id, 27) >> 4) == 0x0C then return -1000 end
   local v = 0
   local stats = gearByte(id, 16) | (gearByte(id, 17) << 8)
   for k = 0, 3 do v = v + 3 * nib((stats >> (4 * k)) & 0x0F) end

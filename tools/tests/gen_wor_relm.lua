@@ -422,7 +422,11 @@ local function bestInBag(ch, kind)
   local best, bs = nil, -1
   for s = 0, 255 do
     local id, n = H.readByte(0x1869 + s), H.readByte(0x1969 + s)
-    if id ~= 0xFF and n > 0 and (ip(id, 0) & 7) == kind and wearable(ch, id) then
+    -- (never a weapon whose blow heals what it hits: ItemProp +27 high nibble $0C, the Heal Rod, which the Tzen
+    -- house now hands the bag; RELM in it healed the White Drgn by every Fight, #485: build/attempts/wt/
+    -- v038-wor-sweeps-a/chain/chain5.log.gz)
+    if id ~= 0xFF and n > 0 and (ip(id, 0) & 7) == kind and wearable(ch, id)
+      and not (kind == 1 and (ip(id, 27) >> 4) == 0x0C) then
       local sc = kind == 1 and ip(id, 0x14) or guard(id)
       if sc > bs then best, bs = id, sc end
     end
