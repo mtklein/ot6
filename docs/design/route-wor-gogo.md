@@ -722,3 +722,62 @@ read alike: 48 of 48 PASS each time, every fight won but the Sneezed-out.
 crossing walk: sha256 fdc0825d, and is kept as a failed attempt.)
 The kit is left as it is: Ribbons on TERRA and STRAGO, and the bag's
 Revivify answers the Zombite.
+
+## 11. Ebot's Rock's pools (v0.38, #488)
+
+Evidence under `build/attempts/wt/v038-wor-sweeps-b/lab/` (`scripts/`,
+`out/`). The coverage audit (wor-coverage.md 4.3) found four of the rock's
+eight formations unfought. `gen_wor_ebot` now walks a lap of each of its
+two pools until each formation is won (`K.hunt`, section 10's helper): the
+hub (405, group 194: Slatter, Warlock and Eland 296, Slatter x2 297,
+Warlock, Cluck x2 and Eland x2 298 at 80/256, Hipocampus and Cluck x3 295
+at 16/256) at its mouth, (7,23) <-> (7,22), before the first hole; and the
+random rooms (404, group 193: Opinicus x2 291, Displayer 292, Opinicus,
+Hipocampus and Eland 293 at 80/256, Hipocampus x3 294 at 16/256) on the
+first landing in them during the coral hunt. The rooms' walls are drawn at
+random on each landing, so that lap is the tile landed on and a neighbour
+one step away, neither a hole nor another step-on tile (`lapHere`). The
+hub's step bound is lower than the other hunts' (its rate code: "a battle
+within 101 steps"). The rock has no chest a player keeps: its coral chests
+are the coral hunt's.
+
+The graph's play at 8fdc6159 on fa5425f1 (`ninja_c1.log`): "Ebot's hub
+(group 194): done after 15 battles", "Ebot's rooms (group 193): done after
+27 battles", the leg "PASS (frame 216959) attempts=1/3".
+
+**Measured** from the graph's captures before each hunt (`wor_ebot_hub`,
+`wor_ebot_rooms`; `scripts/lab_hunt.lua`, the rooms' lap chosen there by
+the leg's rule), K 0-11 at seed shifts 0 and 7, one attempt each: 48 of 48
+PASS (`out/eh_*`, `out/er_*`; `out/tally_eh.txt`, `out/tally_er.txt`). The
+pick sequence is the fixture's, so K moves where the hunt starts in it: the
+rooms' hunt took 27 - K battles in every run (its Hipocampus x3 is the
+27th pick), the hub's 6 to 15.
+
+| formation | fights | keys | won | keys with a fall |
+|---|---|---|---|---|
+| 295 Hipocampus, Cluck x3 | 24 | 20 | 24 | 0 |
+| 296 Slatter, Warlock, Eland | 110 | 49 | 110 | 0 |
+| 297 Slatter x2 | 62 | 22 | 62 | 0 |
+| 298 Warlock, Cluck x2, Eland x2 | 192 | 51 | 192 | 1 |
+| 291 Opinicus x2 | 144 | 48 | 144 | 0 |
+| 292 Displayer | 240 | 56 | 240 | 0 |
+| 293 Opinicus, Hipocampus, Eland | 240 | 59 | 240 | 0 |
+| 294 Hipocampus x3 | 24 | 19 | 24 | 0 |
+
+The one fall is GOGO's in a 298 ("GOGO 590/3101", a plain blow from a
+fifth of his HP: `out/falls_eh.txt`, "cmd $00 atk $FF x1").
+
+The asserts' negatives (`scripts/mkmut.py`, one line each, class=assert;
+run at 7ce9a6f5, before the rebase onto fa5425f1, from the tracked
+checkpoints of the time): the rooms' hunt switched off, "the coral hunt: the rooms (404) were hunted
+on the first landing in them: got false" (`out/n_ebot_rooms`); the mouth's
+tile counted a step-on tile, "the hub's lap starts off its step-on tiles:
+got true" (`out/n_ebot_lap`).
+
+**The hunt's step count (#495).** A battle opens inside a lap step, and the
+hunt added that step to its count after the battle had set it to 0, so the
+count ran one ahead and the worst case with a Charm Bangle would have failed
+a step early. A battle now sets it to -1, and the step after leaves it at 0.
+The step bound still goes red when it binds: with the bound 1
+(`out/n_hunt_steps`, the pocket's hunt of section 15 of route-wor-narshe.md),
+"a random battle within 1 steps of the lap (1 since the last): got false".
