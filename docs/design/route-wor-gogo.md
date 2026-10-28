@@ -611,17 +611,49 @@ down the shaft", against "there after 2 tries" before it).
 
 **The gear downstream.** The gear and relic care picks the new pieces up on
 its own: the Genji Armor goes on TERRA at the belly's save point and stays
-on her through the Colosseum; RELM takes the Magical Brsh; the Hero Ring
-goes to CELES in GOGO's room and later to STRAGO; GOGO takes the Thunder
-Shld (`wor-colosseum-v1` from the graph's play at 2db501e2: "TERRA L57
-... Genji Armor | Ribbon | Economizer"). The hunts' XP leaves the four two
-or three levels higher at each save after the belly (the Colosseum's TERRA
-L57 and CELES L57, against L54 and L54 at d300045e). Every leg from the
-tower to the Colosseum passed on its first attempt (`ninja_l4.log`, the
-states' logs under `l4_states/`: "PASS (frame 149204) attempts=1/3" for the
-belly, "PASS (frame 91423) attempts=1/3" for the Colosseum), and the eight
-saves after `wor-gau-v1` were re-cut from that play; the saves from
-`wor-thamasa-v1` to `wor-gau-v1` do not drift.
+on her through the Colosseum; RELM takes the Magical Brsh until the Magus
+Rod; the Hero Ring goes to CELES in GOGO's room and later to STRAGO; GOGO
+takes the Thunder Shld (`wor-colosseum-v1` from the graph's play at
+cec9c74c: "TERRA L57 ... Genji Armor | Ribbon | Economizer"). The hunts'
+XP leaves the four two or three levels higher at each save after the belly
+(the Colosseum's TERRA L57 and CELES L56, against L54 and L54 at 533203f8).
+
+The relic plan keeps every Ribbon on (guidelines: a Ribbon goes on the
+moment it's in the bag). At 2db501e2 a Genji Glove and a Hyper Wrist took
+CYAN's two slots after the dream and his Ribbon sat in the bag through Doma.
+`M.relicPlan` now ends with step 4b: a Ribbon the plan would leave in the
+bag goes on a member planned without one, over the lowest-ranked relic in a
+slot the plan does not keep, never a two-weapon relic or a ward; and step 4
+no longer fills a member's second slot with a second Ribbon. Both act only
+after a first Ribbon is planned, and not when arming for a boss (the boss
+kits trade a Ribbon for their wards: gen_wor_tritoch's Ice Dragon gives
+TERRA's slot to the Czarina Ring). A first cut that placed every Ribbon
+before the ranked relics changed plans that already wore them all (the
+replay's `wor-narshe-v1` drifted: "CYAN gear: fresh 2E 5E 7A 98 B2 C3,
+tracked 2E 5E 7A 98 CA B1") and took the Shell ward's slot for Dullahan
+(`field_relicplan`: "a Shell ward is planned on CELES, the caster: got
+false"); the final rule leaves every plan before the belly as main's (every
+key through `wor-gau-v1` reads "none" on the replay). After the dream the
+Ribbons go to TERRA, CYAN and RELM ("Ribbon $CA goes to RELM's slot 4 (over
+Earrings $C3, planned Earrings $C3): a Ribbon the plan left in the bag goes
+on a member planned without one (step 4b)"); the dream leg's own Wall Ring
+kit, put on after the plan for the dream's Imp, takes RELM's for the dream,
+and the doma leg's plan puts it back. `field_relicribbon` checks the rule
+on `wor_doma`.
+
+**The replay and the re-cut.** On main's 533203f8 (the freeze fix's ROM)
+the whole line replayed from power-on on px13 and every leg passed on its
+first attempt (the belly "PASS (frame 108564) attempts=1/3", the gogo leg
+"PASS (frame 136159) attempts=1/3", the Colosseum "PASS (frame 91041)
+attempts=1/3"; `ninja_l9.log`, `ninja_l10.log`). Ten tracked saves after
+the belly drifted and were re-cut (`drift_before.txt`, `drift_before2.txt`:
+"wor-belly-v1: 72 byte(s) differ" ... "wor-desert-v1: 63 byte(s) differ");
+after it every key reads "none -- the tracked save is the one the graph's
+play makes today" but the two negative-control fixtures, which have no
+capture (`drift_after2.txt`). `gen_wor_thamasa_plain` (section 9), which
+boots `wor-gogo-v1`, was measured again from the new save, K 0-5 at shift 0
+(`out/tp/tpz_*`, `out/tp/tally_tpz.txt`, #484's own lab): 6 of 6 PASS, every
+fight won, no death, the longest lap 10 battles of its 20.
 
 **The asserts and their negatives.** Each is red on a one-line mutant
 (`scripts/mkmut.py`; the lib's two through `scripts/nlib.sh`), as
@@ -654,32 +686,39 @@ failed attempts: 1:assert"):
   party holds, while a seated member who can wear one goes without: got 1
   ($1), want 2 ($2)".
 
-**Measured** from the graph's own captures at 2db501e2 on d300045e,
-`wor_belly_in` and `wor_gogo_278` (`scripts/lab_hunt.lua`: K battles used
+**Measured** from the graph's own captures at 684ab9e8 on 533203f8,
+`wor_belly_in` and `wor_gogo_278` (`wor_belly_in` byte for byte the one the
+sweep booted, made at 4d27975b: sha256 560ac66f; `scripts/lab_hunt.lua`: K battles used
 up on the hunt's own lap, counted by battles opened, then the leg's hunt),
 K 0-11 at seed shifts 0 and 7, one attempt each: 48 of 48 PASS
-(`out/sb2_*`, `out/sg2_*`; `out/tally_sb2.txt`, `out/tally_sg2.txt`). The
-pick sequence is the fixture's, so K moves where the hunt starts in it and
-the clock moves the keys:
+(`out/sb3_*`, `out/sg4_*`; `out/tally_sb3.txt`, `out/tally_sg4.txt`;
+`scripts/falls.py` reads the falls by formation and action). The pick
+sequence is the fixture's, so K moves where the hunt starts in it and the
+clock moves the keys:
 
 | formation | fights | keys | won | keys with a fall |
 |---|---|---|---|---|
-| 349 Karkass x2 | 64 | 28 | 64 | 0 |
-| 350 Tap Dancer, Covert x2 | 146 | 48 | 146 | 5 |
-| 352 Woolly x2, Karkass x2 | 24 | 22 | 24 | 0 |
-| 346 Ogor x2 | 144 | 52 | 144 | 34 |
-| 347 Covert, Ogor | 192 | 56 | 192 | 14 |
-| 348 Wart Puck x2 | 240 | 54 | 229 | 0 |
-| 351 Tap Dancer, Woolly | 24 | 20 | 24 | 0 |
+| 349 Karkass x2 | 64 | 29 | 64 | 0 |
+| 353 Wart Puck, Ogor | 130 | 42 | 130 | 13 |
+| 350 Tap Dancer, Covert x2 | 146 | 46 | 146 | 6 |
+| 352 Woolly x2, Karkass x2 | 24 | 20 | 24 | 0 |
+| 346 Ogor x2 | 144 | 50 | 144 | 29 |
+| 347 Covert, Ogor | 192 | 53 | 192 | 12 |
+| 348 Wart Puck x2 | 240 | 56 | 237 | 0 |
+| 351 Tap Dancer, Woolly | 24 | 19 | 24 | 0 |
 
-Eleven Wart Puck fights ended with the party Sneezed out (`PARTY LEFT`: no
-reward and no loss); the hunt walks on until one is won. The falls in GOGO's
-room are Ogor's Zombite: of its 176 falls, 175 are its special `$EF` ("is a
-status landing, not damage"), cured in the fight with Revivify; the one
-other is CELES to a Covert's skean (`$52`, "from 514/4117"), the only Fenix
-Down spent there (`sg2_k7_s0`). The landing's falls are CELES to Covert's
-skeans from low HP ("CELES 21/3853", "CELES 664/3853"): 12 of the 24 runs
-spent no Fenix Down, 7 one, 5 two or three. The same sweeps before the
-rebase (`out/sb_*`, `out/sg_*` at b54ea61c on c1d9745d) read alike: 48 of 48
-PASS, every fight won but six Sneezed out. The kit is left as it is: Ribbons on TERRA and STRAGO, and the
-bag's Revivify answers the Zombite.
+Three Wart Puck fights ended with the party Sneezed out (`PARTY LEFT`: no
+reward and no loss); the hunt walks on until one is won. Most falls are
+Ogor's Zombite, its special `$EF` ("is a status landing, not damage"),
+cured in the fight with Revivify: 136 of 137 in 346, 60 of 61 in 347, and
+all 56 in 353 on the landing. The rest are Covert's in 350: its skeans ($51-$53,
+8) and Wind Slash ($65, 2), with one more ($EE, 1), most from low HP; and
+one plain blow each in 346 and 347. Fenix Downs: the landing's runs started with 24 and
+18 of 24 ended with 24, 3 with 23, 2 with 22, 1 with 20; GOGO's room's
+ended with 24 in 23 of 24 runs. The sweeps before (`out/sb2_*`, `out/sg2_*`
+at 2db501e2 on d300045e; `out/sb_*`, `out/sg_*` at b54ea61c on c1d9745d)
+read alike: 48 of 48 PASS each time, every fight won but the Sneezed-out.
+(`out/sg3_*` booted the room's capture from a replay since dropped, with the
+crossing walk: sha256 fdc0825d, and is kept as a failed attempt.)
+The kit is left as it is: Ribbons on TERRA and STRAGO, and the bag's
+Revivify answers the Zombite.
