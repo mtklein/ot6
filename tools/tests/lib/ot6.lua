@@ -9102,8 +9102,8 @@ function Driver:magicOnlyLine(actor, boost)
             end
             return { kind = "defer", reason = "wall_wait", at = M.frame }
           end
-          M.log(string.format("[%s] actor=%d waited %d frames in the window with nothing for its wall: the 900-frame "
-            .. "cap gives way, planning on", self.tag or "fight", actor, M.frame - self.wallWait[actor]))
+          M.log(string.format("[%s] actor=%d waited %d frames in the window with nothing for its wall: the wait cap "
+            .. "gives way, planning on", self.tag or "fight", actor, M.frame - self.wallWait[actor]))
           self.wallWait[actor] = nil
         else
           local w = self:wallWaitPlan(actor, s, "a turn with no line")
@@ -9331,7 +9331,7 @@ function Driver:magicOnlyLine(actor, boost)
   -- body's counter is pending, the wall read now is not the one the cast
   -- meets, and the window is handed on (X) the way a person waits for the
   -- spell in the air to land before choosing the next.  Not while it is
-  -- Broken (no counters: the wall stands), and at most 900 frames an actor.
+  -- Broken (no counters: the wall stands), and not past M.wallWaitOver's cap (none by default).
   local wcv = self.opts.wallChangeVs
   -- The Break that breaks him waits the same way: the window takes the wall
   -- that stands when it lands, and a Break planned on a wall the party held
@@ -9431,12 +9431,19 @@ function Driver:berserkPlan(actor)
   return nil
 end
 
--- The cap on one actor's wait for a WallChange body's wall (#493): 900
--- frames by default, M.WALL_WAIT_CAP = 0 for none (the lab's arm).  `since`
--- is the frame the wait began.
+-- The cap on one actor's wait for a WallChange body's wall (#493): none by
+-- default; M.WALL_WAIT_CAP = 900 is the old cap (the lab's other arm).
+-- `since` is the frame the wait began.  The lab (build/attempts/wt/
+-- v038-harness-fixes/lab/cap_tally.txt): from wor-tower-v1 with K = 0..5
+-- battles used up and seed shifts 0, 7, 13, 21, MagiMaster fought with each
+-- cap -- 24 runs an arm, 20 distinct battle keys ($be + formation), all 48
+-- won; per key the uncapped wait won faster on 15 and the capped on 5 (mean
+-- 43,232 ticks against 53,776, deaths 3.77 against 3.75 a fight), and the
+-- 900 arm hit its cap 913 times (38 a fight) where waiting longer lets the
+-- wall's counter land before the cast reads it.  Nothing stalled uncapped:
+-- the driver's progress window (opts.progressVs) still bounds the fight.
 function M.wallWaitOver(since, now)
-  local cap = M.WALL_WAIT_CAP
-  if cap == nil then cap = 900 end
+  local cap = M.WALL_WAIT_CAP or 0
   return cap ~= 0 and now - since >= cap
 end
 -- The wait's clock belongs to one stretch of waiting: a member's plan that
@@ -9454,8 +9461,8 @@ end
 -- opts.wallChangeVs): while another living member's action is queued
 -- ($32CC) or in flight (the recovery trace's queued/running), or the body's
 -- counter is pending ($32CD), a defer plan (X hands the window on, re-read
--- every 30 frames); nil once the wall stands, or after 900 frames of
--- waiting by this actor.
+-- every 30 frames); nil once the wall stands, or when M.wallWaitOver's cap
+-- (none by default) is spent by this actor.
 function Driver:wallWaitPlan(actor, slot, what)
   -- a Berserk body's counters run only to their first end_if (ExecAIRetal),
   -- so MagiMaster's WallChange, his if_hit block, never runs: the wall stands
@@ -9494,7 +9501,7 @@ function Driver:wallWaitPlan(actor, slot, what)
       end
       return { kind = "defer", reason = "wall_wait", at = M.frame }
     end
-    M.log(string.format("[%s] actor=%d waited %d frames to read the wall (%s) before %s: the 900-frame cap gives "
+    M.log(string.format("[%s] actor=%d waited %d frames to read the wall (%s) before %s: the wait cap gives "
       .. "way, planning on", self.tag or "fight", actor, M.frame - self.wallWait[actor], busy, what))
   end
   self.wallWait[actor] = nil
@@ -19438,11 +19445,12 @@ end
 -- Does a trace sample cohere?  The world map keeps its party tile in $e0/$e2
 -- and a field map in the field object, and which one is live is read from
 -- $1F64 twice: worldMode (& $3FF below 3) and the map id logged (& $1FF).
--- They disagree while a transition is in flight (the id still a world map's
--- with a flag bit up, the field object already a field map's), and a
--- field-mode tile logged under map=1 was a coordinate the world never had
--- (`[tiles] map=1 ... xy=0:28`, #489: "stood on" counts were upper bounds).
--- Such a sample is skipped.  Pure; battle_healpolicy asserts it.
+-- They can disagree while a transition is in flight, and a field-mode tile
+-- logged under map=1 was a coordinate the world never had (`[tiles] map=1
+-- ... xy=0:28`, #489: "stood on" counts were upper bounds).  Such a sample
+-- is skipped.  (Whether this or the load's frames, traceOnLoad below, made
+-- the audit's lines was not separated: only the load's was reproduced,
+-- battle_tracehold.)  Pure; battle_healpolicy asserts it.
 function M.traceCoheres(world, mapId)
   return ((mapId & 0x1ff) < 3) == (world and true or false)
 end

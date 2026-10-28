@@ -1509,10 +1509,10 @@ H.run({ maxFrames = 3000 }, {
   -- the MagiMaster wall-wait clock (#493)
   H.call(function()
     H.WALL_WAIT_CAP = nil
-    H.assertEq(H.wallWaitOver(1000, 1899), false, "the default cap is 900 frames: 899 waited, still waiting")
+    H.assertEq(H.wallWaitOver(1000, 1000 + 21000), false, "no cap by default (the lab's pick, cap_tally.txt)")
+    H.WALL_WAIT_CAP = 900
+    H.assertEq(H.wallWaitOver(1000, 1899), false, "the old cap is 900 frames: 899 waited, still waiting")
     H.assertEq(H.wallWaitOver(1000, 1900), true, "...900 waited: the cap gives way")
-    H.WALL_WAIT_CAP = 0
-    H.assertEq(H.wallWaitOver(1000, 1000 + 21000), false, "cap 0: no cap, whatever has been waited")
     H.WALL_WAIT_CAP = nil
     local waits = { [1] = 500, [2] = 700 }
     H.assertEq(H.wallWaitSettle(waits, 1, "wall_wait"), false, "a wait's own plan keeps its clock")
