@@ -9438,7 +9438,7 @@ end
 -- battles used up and seed shifts 0, 7, 13, 21, MagiMaster fought with each
 -- cap -- 24 runs an arm, 20 distinct battle keys ($be + formation), all 48
 -- won; per key the uncapped wait won faster on 15 and the capped on 5 (mean
--- 43,232 ticks against 53,776, deaths 3.77 against 3.75 a fight), and the
+-- 43,232 ticks against 53,776; deaths 3.75 a fight in both arms, 90 over 24), and the
 -- 900 arm hit its cap 913 times (38 a fight) where waiting longer lets the
 -- wall's counter land before the cast reads it.  Nothing stalled uncapped:
 -- the driver's progress window (opts.progressVs) still bounds the fight.
@@ -17174,11 +17174,6 @@ function Driver:watchLeavers()
       if g.realMin == nil or gap < g.realMin then g.realMin = gap end
     end
     self.seatXp, self.seatChar, self.filled = {}, {}, {}
-    -- the formation as the battle opens (#489): $11E0 is the battle index
-    -- and a battle-change command (Cmd_20) rewrites it mid-fight, so the
-    -- end hook's reading can name a later scene (SrBehemoth printed $1A8
-    -- for the formation 452 it dealt, build/attempts/wt/v038-wor-coverage)
-    self.openForm = M.readWord(0x11E0)
     for e = 0, 3 do
       local a, off = M.readByte(0x3ED8 + e * 2), M.readWord(0x3010 + e * 2)
       if a < 16 and (M.readByte(0x3AA0 + e * 2) & 1) == 1 and off < 37 * 16 then
@@ -17413,19 +17408,30 @@ end
 -- seated member's experience then and now.  A share the engine did not
 -- pay is said as a MISMATCH (the model of WinBattle is wrong, or a kill
 -- was assumed) and recorded in M.lastOutcome.ok for a caller to assert.
--- The formation an [outcome] names (#489): the one the battle opened with,
--- when known; the end hook's $11E0 is the last scene's after a battle change.
-function M.outcomeForm(openForm, endForm)
-  return openForm or endForm
+-- The formation an [outcome] names is $11E0 as the battle ran: vanilla's
+-- conditional battles (LoadBattleProp, battle_main.asm @30e8, cond_battle.dat)
+-- swap the index before the battle opens, so SrBehemoth's event group 452
+-- is dealt as $1A8 and the id printed is the one fought (#489; the coverage
+-- audit read it as stale).  Audits that map an event group to its formation
+-- apply that table.
+-- Is an [outcome] with these readings the capture's own battle end (#491)?
+-- Only a battle first watched AFTER the load, within the tail's 90 frames of
+-- it, with no end reading: one that opened before the load is a real battle
+-- the reload cut off (a negative gap passes `< 90`: 55 real LOST lines in
+-- build/attempts, e.g. v034-wor-gogo/lab/dd_plain 'battle $170 LOST after
+-- 7811 ticks').  The window is the hand-back tail's own (watchLeavers); the
+-- gap measured for the capture case is 2 frames (battle_loadtail).
+function M.loadTailStale(atEnd, startFrame, loadedFrame)
+  if M.LOAD_TAIL == false or atEnd or loadedFrame == nil or startFrame == nil then return false end
+  local gap = startFrame - loadedFrame
+  return gap >= 0 and gap < 90
 end
 
 function Driver:sayOutcome()
   local atEnd = endSnap ~= nil and endSnap.frame >= (self.startFrame or 0)
   local r = atEnd and endSnap.reward or self.reward
   self.outcomeSaid = true
-  local shownForm = M.outcomeForm(self.openForm, r.form)
-  if not atEnd and M.LOAD_TAIL ~= false and M.loadedFrame ~= nil
-     and (self.startFrame or 0) - M.loadedFrame < 90 then
+  if M.loadTailStale(atEnd, self.startFrame, M.loadedFrame) then
     M.log(string.format("[%s] [tail] battle $%03X read %d ticks after a state load, first watched %d frames "
       .. "after it and with no end reading: the capture's own battle end, not a battle -- no [outcome], "
       .. "not counted (#491)", self.tag or "fight", r.form & 0x3FF, self.battleTick,
@@ -17452,7 +17458,7 @@ function Driver:sayOutcome()
     for _, s in ipairs(list) do t[#t + 1] = string.format("s%d:$%03X", s, r.species[s]) end
     return #t > 0 and table.concat(t, " ") or "none"
   end
-  local rec = { kind = o.kind, form = shownForm, formEnd = r.form, kills = o.kills, escaped = o.escaped,
+  local rec = { kind = o.kind, form = r.form, kills = o.kills, escaped = o.escaped,
                 due = o.due, share = o.share, got = got, ok = ok, leftN = o.leftN,
                 seatedN = o.seatedN, random = r.random, tick = self.battleTick, atEnd = atEnd }
   if self.raceEligibility then
@@ -17465,7 +17471,7 @@ function Driver:sayOutcome()
   M.outcomes[#M.outcomes + 1] = rec
   M.log(string.format("[%s] [outcome] battle $%03X %s after %d ticks%s: killed %s; escaped %s; "
     .. "%d of %d seated fled (Run, Warp); %s reward due %d a member (%s): %s%s", self.tag or "fight",
-    shownForm & 0x3FF, o.kind:upper(), self.battleTick, atEnd and "" or " (no end reading: the last frame's)",
+    r.form & 0x3FF, o.kind:upper(), self.battleTick, atEnd and "" or " (no end reading: the last frame's)",
     slots(o.kills), slots(o.escaped), o.leftN,
     o.seatedN, r.random and "random" or "event", o.due, table.concat(paid, ", "),
     o.contradiction and ("CONTRADICTION -- " .. o.contradiction)
@@ -18990,8 +18996,27 @@ function Driver:flushLedger()
   for ts, _ in pairs(self.monTurn or {}) do self:closeMonTurn(ts) end
 end
 
+-- The uncapped wall wait (#493) is bounded by the progress window: every
+-- species in opts.wallChangeVs needs an opts.progressVs entry, or a wait that
+-- never ends has nothing to stop it.  Returns the species missing one.
+function M.wallChangeUnbounded(opts)
+  local missing = {}
+  for sp in pairs(opts.wallChangeVs or {}) do
+    if not (opts.progressVs and opts.progressVs[sp]) then missing[#missing + 1] = sp end
+  end
+  table.sort(missing)
+  return missing
+end
+
 function M.newFightDriver(tag, opts)
   opts = opts or {}
+  do
+    local miss = M.wallChangeUnbounded(opts)
+    if #miss > 0 then
+      error(string.format("newFightDriver: wallChangeVs names species $%03X with no progressVs window: the wall "
+        .. "wait has no cap (#493), and the progress window is what bounds it", miss[1]), 0)
+    end
+  end
   local D
   D = setmetatable({
     tag = tag, opts = opts,
@@ -19442,37 +19467,18 @@ local function coverageFlush()
   M.emitBlob("coverage.cdl", table.concat(chars))
 end
 
--- Does a trace sample cohere?  The world map keeps its party tile in $e0/$e2
--- and a field map in the field object, and which one is live is read from
--- $1F64 twice: worldMode (& $3FF below 3) and the map id logged (& $1FF).
--- They can disagree while a transition is in flight, and a field-mode tile
--- logged under map=1 was a coordinate the world never had (`[tiles] map=1
--- ... xy=0:28`, #489: "stood on" counts were upper bounds).  Such a sample
--- is skipped.  (Whether this or the load's frames, traceOnLoad below, made
--- the audit's lines was not separated: only the load's was reproduced,
--- battle_tracehold.)  Pure; battle_healpolicy asserts it.
-function M.traceCoheres(world, mapId)
-  return ((mapId & 0x1ff) < 3) == (world and true or false)
-end
-
--- A state load is not play: the frames before the run's first load are the
--- boot's (power-on RAM read as a map: `[tiles] map=0 n=1 xy=0:0`, map=3 the
--- frame after, and the `map=1 ... xy=0:28` at the head of the WoR legs that
--- #489 found), and the frames the restore takes read half-written RAM.
--- The load drops what the first one finds and holds the trace off for its
--- frames; a later load keeps what was stood on (flushed) and holds the same.
+-- A state load is not play: the frames the restore takes read half-written
+-- RAM (`[tiles] map=3 n=1 xy=0:0` the frame after the request, #489), and
+-- before the run's first load the boot's RAM reads as a map.  The first load
+-- drops the boot samples still pending and every load holds the trace off for
+-- 3 frames; a later load keeps what was stood on (flushed).  What the boot
+-- already flushed before the request (`map=0 n=1 xy=0:0` at f21) stays in
+-- the log: only the load's frames are fixed, and the `map=1 ... xy=0:28`
+-- lines of the audit were not reproduced.
 function M.traceOnLoad(first)
   if M.TRACE_HOLD == false then return end
   if first then traceSet, traceCount, traceMap = {}, 0, nil else traceFlush() end
   M.traceHoldUntil = M.frame + 3
-end
-
--- the samples held now, for a test
-function M.traceSnapshot()
-  local keys = {}
-  for k in pairs(traceSet) do keys[#keys + 1] = k end
-  table.sort(keys)
-  return traceMap, keys
 end
 
 local function traceTick()
@@ -19481,8 +19487,8 @@ local function traceTick()
   if world then
     if not M.worldAligned() then return end
   elseif not M.tileAligned() then return end
-  if not M.traceCoheres(world, M.mapId()) then return end
   if M.TRACE_HOLD ~= false and M.frame <= M.traceHoldUntil then return end
+  M.traceLastSample = M.frame
   local m = M.mapId() & 0x1ff
   if m ~= traceMap then
     traceFlush()

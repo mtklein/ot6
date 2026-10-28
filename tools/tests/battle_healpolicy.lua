@@ -1508,12 +1508,18 @@ H.run({ maxFrames = 3000 }, {
 
   -- the MagiMaster wall-wait clock (#493)
   H.call(function()
-    H.WALL_WAIT_CAP = nil
+    -- the shipped default, before anything here sets the lever
+    H.assertEq(H.WALL_WAIT_CAP, nil, "the lever ships unset")
     H.assertEq(H.wallWaitOver(1000, 1000 + 21000), false, "no cap by default (the lab's pick, cap_tally.txt)")
     H.WALL_WAIT_CAP = 900
     H.assertEq(H.wallWaitOver(1000, 1899), false, "the old cap is 900 frames: 899 waited, still waiting")
     H.assertEq(H.wallWaitOver(1000, 1900), true, "...900 waited: the cap gives way")
     H.WALL_WAIT_CAP = nil
+    H.assertEq(#H.wallChangeUnbounded({ wallChangeVs = { [0x166] = true }, progressVs = { [0x166] = 120000 } }), 0,
+      "a wall-change body with a progress window is bounded")
+    H.assertEq(H.wallChangeUnbounded({ wallChangeVs = { [0x166] = true } })[1], 0x166,
+      "...and one without is named: the uncapped wait would have nothing to stop it")
+    H.assertEq(#H.wallChangeUnbounded({}), 0, "no wall-change body: nothing to bound")
     local waits = { [1] = 500, [2] = 700 }
     H.assertEq(H.wallWaitSettle(waits, 1, "wall_wait"), false, "a wait's own plan keeps its clock")
     H.assertEq(waits[1], 500, "...the clock reads as it did")
@@ -1525,16 +1531,17 @@ H.run({ maxFrames = 3000 }, {
     H.log("battle_healpolicy: the wall-wait clock and cap (#493) checked")
   end),
 
-  -- harness traces (#489)
+  -- a reload does not cancel a real battle's outcome (#491)
   H.call(function()
-    H.assertEq(H.outcomeForm(0x1C4, 0x1A8), 0x1C4, "an [outcome] names the formation the battle opened with")
-    H.assertEq(H.outcomeForm(nil, 0x1A8), 0x1A8, "...and the end hook's when no opening was read")
-    H.assertEq(H.traceCoheres(true, 1), true, "world mode on map 1: a world tile")
-    H.assertEq(H.traceCoheres(false, 98), true, "field mode on map 98: a field tile")
-    H.assertEq(H.traceCoheres(false, 0x201), false, "field mode while the id still reads WoR (flag bit up): skipped")
-    H.assertEq(H.traceCoheres(false, 1), false, "field mode on map 1: skipped")
-    H.assertEq(H.traceCoheres(true, 98), false, "world mode on a field map id: skipped")
-    H.log("battle_healpolicy: the trace's coherence check and the [outcome] formation (#489) checked")
+    H.assertEq(H.loadTailStale(false, 1002, 1000), true, "first watched 2 frames after the load, no end reading: the capture's tail")
+    H.assertEq(H.loadTailStale(false, 1089, 1000), true, "...89 frames after: still inside the tail")
+    H.assertEq(H.loadTailStale(false, 1090, 1000), false, "...90 frames after: a new battle")
+    H.assertEq(H.loadTailStale(false, 200, 1000), false, "a battle that opened BEFORE the load is real, whatever the gap")
+    H.assertEq(H.loadTailStale(false, 1000, 1000), true, "first watched on the load's own frame: the tail")
+    H.assertEq(H.loadTailStale(true, 1002, 1000), false, "with its end reading it is a battle")
+    H.assertEq(H.loadTailStale(false, nil, 1000), false, "no start frame: not judged a tail")
+    H.assertEq(H.loadTailStale(false, 1002, nil), false, "no load this run: not a tail")
+    H.log("battle_healpolicy: the load-tail rule (#491) checked")
   end),
 
   -- 8. the table was not skipped
