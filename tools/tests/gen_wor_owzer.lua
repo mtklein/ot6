@@ -719,24 +719,12 @@ end
 local DOOR_TILES = { { 88, 50 }, { 90, 50 }, { 92, 50 }, { 85, 50 } }
 local MOOGLE_SUIT_CHEST = { 92, 58, 0x0D5, "Moogle Suit (207 (92,58))", MOOGLE_SUIT }
 local RELIC_RING_CHEST = { 90, 47, 0x102, "Relic Ring (207 (90,47))", RELIC_RING }
--- The basement's pool (field group 157, map 207: SubBattleGroup) deals Vindr x2 (286), SoulDancer x2 with Crusher
--- x2 (284, slots 2 and 4), and Vindr x2, Wild Cat, Crusher x2 (285).  The party walks a lap by the save point
--- until each is won (K.hunt: the list asserted to be the map's pool, the hunt bounded by the worst draws the
--- encounter counters can hold), as a player who pauses in the basement meets them.
-local OWZER157 = { [286] = "Vindr x2", [284] = "SoulDancer x2, Crusher x2", [285] = "Vindr x2, Wild Cat, Crusher x2" }
-local HUNT207_LAP = { { 85, 46 }, { 85, 47 } }
--- the hunt's fights: the SoulDancers first (gen_wor_relm's kill order, measured there: SoulDancer x2 with Crusher x2,
--- 284, lost 1 of 31 meetings in the default order and none of 36 with the SoulDancers first; build/attempts/wt/
--- v031-tower/lab/base16_s*, b16fsd_s*), and the heal at 75% (their thrown knives, AIScript _173: Dirk to
--- Assassin, take 500-1,000 a throw from the three).  This hunt's sweep, K 0-11 at shifts 0 and 7 from the graph's
--- capture: in the default order 284 lost 2 of 23 fights, deaths in 7 of its 15 keys (sweeps/tally_ow.txt);
--- SoulDancers first, 1 of 85, deaths in 3 of 30 (tally_ow2.txt, the loss at key be3C, K3 s7); with the 75% heal
--- too, see OWZER_HEAL (build/attempts/wt/v038-wor-sweeps-a/sweeps/)
-local OWZER_FOCUS = { { species = 0x0AD } }
-local OWZER_HEAL = 75
-local NAMES = {}
-for _, p in ipairs(MEMBERS) do NAMES[p[1]] = p[2] end
-local K = H.worLegKit({ fight = FIGHT, links = {}, names = NAMES })
+-- The basement's pool (field group 157, map 207) is not hunted (#488): the three before Chadarnook (L38-40 on
+-- the line at fa5425f1) lose SoulDancer x2 with Crusher x2 (284) too often to walk a lap for it.  From the graph's
+-- capture wor-narshe-v1, the leg with a hunt by the save point (the SoulDancers first, gen_wor_relm's order, and
+-- the heal at 75%) lost 3 of 6 seed shifts, and the heal at 90%, the relic plan against a physical threat or Bio
+-- changed none of it for the better (build/attempts/wt/v038-wor-sweeps-a/sweeps/tally_owv*.txt); the SoulDancers'
+-- thrown knives (AIScript _173) take 500-1,000 a throw.  wor-coverage.md section 11.2.
 
 local PARTY = { { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" } }
 
@@ -848,11 +836,6 @@ H.run({ maxFrames = 500000 }, {
   warpTo(76, 51, 85, 46, "the opened painting (76,51) -> (85,46)"),
   -- (neither chest holds gear for the three: the Moogle Suit is STRAGO's and RELM's, which gen_wor_relm's dress
   -- picks up, and the relic plan ranks no Relic Ring)
-  H.saveState("wor_owzer_hunt.mss"),
-  -- the hunt by the save point (#488), the SoulDancers killed first and the heal at 75% (OWZER_FOCUS, OWZER_HEAL)
-  H.call(function() FIGHT.focus, FIGHT.healPercent = OWZER_FOCUS, OWZER_HEAL end),
-  K.hunt({ what = "Owzer's basement (group 157)", lap = HUNT207_LAP, forms = OWZER157, avoid = DOOR_TILES }),
-  H.call(function() FIGHT.focus, FIGHT.healPercent = nil, nil end),
   H.fieldCare({ tag = "at the basement's save point", threshold = H.CARE_BEFORE_FIGHTS }),
   H.call(function()
     say("wor", "at the basement's save point")

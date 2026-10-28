@@ -914,11 +914,9 @@ STATES = [
     # (the switch, the two paintings), the basement's turning doors, the
     # painting warp, Still Life: the `wor-owzer-v1` checkpoint, the retry
     # point for Chadarnook (docs/design/route-wor-thamasa.md).  A cut.
-    # Re-cut by checkpoint_drift.py --recut.  also: wor_owzer_hunt, the
-    # party by the basement's save point before the hunt there (#488: the
-    # sweep's boot).
+    # Re-cut by checkpoint_drift.py --recut.
     S("wor_owzer", gen="gen_wor_owzer", prev="wor_tritoch",
-      checkpoint="wor-narshe-v1", timeout=5400, also=["wor_owzer_hunt"]),
+      checkpoint="wor-narshe-v1", timeout=5400),
 
     # wor-owzer-v1 -> the World of Ruin map beside the Falcon at the
     # Fanatics' Tower (160,127): Chadarnook (event battle 86, a game over when
