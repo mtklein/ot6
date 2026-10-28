@@ -420,6 +420,7 @@ H.run({ maxFrames = 600000 }, {
   -- TARGET_LEVEL -- the Tentacles at the end of the cave are an event battle
   -- whose loss is a game over (section 6).
   H.cond(function() return GRIND_ON end, {
+    H.saveState("wor_edgar_shore.mss"),
     KIT.worldHunt({ what = "the shore by the cave (group 42)", lap = GRIND_LAP42, forms = SHORE42, avoid = grindAvoid }),
     checkOutcomes("the shore's hunt"),
     H.call(function() grindDone = level(CELES) >= TARGET_LEVEL and level(SABIN) >= TARGET_LEVEL end),

@@ -732,8 +732,10 @@ STATES = [
     # Continues wor_start's save.  Every random is fought; a wipe retries from
     # the Continue (the runner's default 3 attempts).
     # Re-cut by checkpoint_drift.py --recut.
+    # also: wor_tzen_door_laps, CELES on the world map out of Albrook's first
+    # stop, before the grind's laps (#488: the sweeps' boot).
     S("wor_tzen_door", gen="gen_wor_tzen_door", prev="wor_start",
-      checkpoint="wor-start-v1", timeout=3600),
+      checkpoint="wor-start-v1", timeout=3600, also=["wor_tzen_door_laps"]),
 
     # wor-tzen-door-v1 -> the first save after Sabin joins: cold-Continue
     # the save outside Tzen's door (CELES alone at world (131,179)), walk
@@ -797,8 +799,10 @@ STATES = [
     # the review's merged run emulated on the Air; three attempts are
     # ~520k frames, ~6500 s at a loaded machine's ~80 frames/s.
     # Re-cut by checkpoint_drift.py --recut.
+    # also: wor_edgar_shore, the two on the continent before the grind's
+    # shore lap (#488: the sweeps' boot).
     S("wor_edgar", gen="gen_wor_edgar", prev="wor_south_figaro",
-      checkpoint="wor-south-figaro-v1", timeout=7200),
+      checkpoint="wor-south-figaro-v1", timeout=7200, also=["wor_edgar_shore"]),
 
     # wor-edgar-v1 -> wor-figaro-sweep-v1, the Falcon arc's leg 1, on the
     # chain since 2026-10-01 (guidelines "Ribbons are worth going out of your

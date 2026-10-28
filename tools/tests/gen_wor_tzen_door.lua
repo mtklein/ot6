@@ -717,6 +717,7 @@ H.run({ maxFrames = 600000 }, {
   end),
 
   -- ---- 4. the grind -------------------------------------------------------------
+  H.saveState("wor_tzen_door_laps.mss"),
   grindLaps(),
   H.call(function()
     H.log(string.format("[wor] the grind's laps done f%d: %s; %s", H.frame, whereLine(), supplies()))
