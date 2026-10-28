@@ -10530,6 +10530,93 @@ function M.worLegKit(env)
       end),
     }), function() n0, seen, wp, steps = nil, nil, 1, 0; knobs(false) end)
   end
+  -- worldHunt(spec): hunt's World of Ruin map counterpart (#488, the early continent's draw gaps): walk a lap of
+  -- two world tiles of one encounter group until every formation of the group's pool has been won.  spec.what,
+  -- spec.lap = { { x, y }, { x, y } }, spec.forms ({ [id] = name }, asserted at the start to be the pool the ROM
+  -- gives the lap's group, WorldBattleGroup -> RandBattleGroup; a formation in two slots is met by either),
+  -- spec.won (a table shared across hunts), spec.avoid (worldNavTo's).  Both lap tiles are asserted to roll the
+  -- group, so every battle of the lap is the pool's.  The battle bound is the pool's worst case over the
+  -- encounter counters (M.worstCaseEncounters, as hunt's), asserted as each battle ends; spec.budget overrides
+  -- it (a mutant's lever).  The walker plays the battles (FIGHT) and the field care runs after each lap.
+  local function worldHunt(spec)
+    local won, wp, n0, seen, budget = spec.won or {}, 1, nil, nil, nil
+    local function done()
+      for f in pairs(spec.forms) do if not won[f] then return false end end
+      return true
+    end
+    local function bounds()
+      local a, b = spec.lap[1], spec.lap[2]
+      local g = M.worldEncounterGroup(a[1], a[2], a[1], a[2])
+      M.assertEq(g ~= nil and M.worldEncounterGroup(b[1], b[2], b[1], b[2]) == g, true, string.format(
+        "%s: both lap tiles (%d,%d) and (%d,%d) roll one group (%s)", spec.what, a[1], a[2], b[1], b[2], tostring(g)))
+      local pool = M.encounterPool(g)
+      local slotsOf, t = {}, {}
+      for slot = 1, 4 do
+        local fs = pool[slot].formations
+        M.assertEq(#fs, 1, string.format("%s: world group %d's slot %d is one formation", spec.what, g, slot))
+        slotsOf[fs[1].id] = slotsOf[fs[1].id] or {}
+        table.insert(slotsOf[fs[1].id], slot)
+        t[#t + 1] = string.format("slot %d formation %d (%d/256)", slot, fs[1].id, pool[slot].odds)
+      end
+      for f in pairs(spec.forms) do
+        M.assertEq(slotsOf[f] ~= nil, true, string.format("%s: formation %d is in world group %d's pool (%s)",
+          spec.what, f, g, table.concat(t, ", ")))
+      end
+      for f in pairs(slotsOf) do
+        M.assertEq(spec.forms[f] ~= nil, true, string.format("%s: world group %d's pool formation %d is one it is "
+          .. "walked for", spec.what, g, f))
+      end
+      budget = spec.budget or M.worstCaseEncounters(function()
+        local got = {}
+        return function(slot)
+          got[slot] = true
+          for f in pairs(spec.forms) do
+            local met = false
+            for _, sl in ipairs(slotsOf[f]) do if got[sl] then met = true end end
+            if not met then return false end
+          end
+          return true
+        end
+      end)
+      M.log(string.format("[hunt] %s: world group %d: %s; every slot drawn within %d battles (the worst case over "
+        .. "the encounter counters)", spec.what, g, table.concat(t, ", "), budget))
+    end
+    return M.withReset(M.seqStep({
+      M.call(function()
+        n0, seen, wp = #M.outcomes, #M.outcomes, 1
+        bounds()
+        say("hunt", string.format("%s: lap (%d,%d) <-> (%d,%d); %s", spec.what, spec.lap[1][1], spec.lap[1][2],
+          spec.lap[2][1], spec.lap[2][2], huntLine(spec.forms, won)))
+      end),
+      M.driveUntil(function()
+        while seen < #M.outcomes do
+          seen = seen + 1
+          local o = M.outcomes[seen]
+          local f = o.form & 0x1FF
+          if o.kind == "won" then won[f] = true end
+          M.log(string.format("[hunt] %s: battle %d formation %d %s after %d ticks", spec.what, seen - n0, f, o.kind,
+            o.tick or -1))
+          M.assertEq((seen - n0 < budget) or done(), true, string.format("%s: every formation it is walked for won "
+            .. "within %d battles (%s)", spec.what, budget, huntLine(spec.forms, won)))
+        end
+        if done() then return not M.battleLoadStarted() and M.worldMode() and M.worldSettled() end
+        return false
+      end, spec.maxFrames or 3000000, {
+        M.worldNavTo(function() return spec.lap[wp][1] end, function() return spec.lap[wp][2] end,
+          { maxFrames = 20000, playBattles = "tactical", fight = FIGHT, avoid = spec.avoid }),
+        M.call(function() wp = wp % 2 + 1 end),
+        M.cond(function() return not M.battleLoadStarted() and M.worldMode() end,
+          { M.fieldCare({ tag = "care on the hunt" }) }, {}),
+      }, spec.what),
+      M.call(function()
+        say("hunt", string.format("%s: done after %d battles; %s", spec.what, #M.outcomes - n0,
+          huntLine(spec.forms, won)))
+        for f, name in pairs(spec.forms) do
+          M.assertEq(won[f] == true, true, string.format("%s: formation %d (%s) won", spec.what, f, name))
+        end
+      end),
+    }), function() n0, seen, wp = nil, nil, 1 end)
+  end
   local function objLine(o0, o1)
     local t = {}
     for o = o0 or 0x10, o1 or 0x14 do t[#t + 1] = string.format("$%02X(%d,%d)", o, M.objX(o), M.objY(o)) end
@@ -10640,7 +10727,7 @@ function M.worLegKit(env)
     map = map, bright = bright, sw = sw, c = c, lv = lv, partyOf = partyOf, settled = settled,
     supplies = supplies, say = say, kitLine = kitLine, walkInto = walkInto, outToWorld = outToWorld,
     enterFrom = enterFrom, board = board, regroup = regroup, liftOff = liftOff, watches = watches,
-    walk = walk, chestAt = chestAt, doomLine = doomLine, pace = pace, hunt = hunt, huntLine = huntLine,
+    walk = walk, chestAt = chestAt, doomLine = doomLine, pace = pace, hunt = hunt, huntLine = huntLine, worldHunt = worldHunt,
     objLine = objLine,
     inParty = inParty, partyCount = partyCount, landNear = landNear, talkNpc = talkNpc,
     pressUp = pressUp, objOn = objOn, kohlingenStop = kohlingenStop,

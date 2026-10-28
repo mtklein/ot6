@@ -384,6 +384,15 @@ local function grindAvoid()
   return GRIND_AVOID
 end
 local gwp, grindLegs, grindDone = 1, 0, false
+-- the grind's draw gap (#488, the early continent's): the shore by the cave's mouth (world group 42: Latimeria
+-- 224, Latimeria with Nohrabbit x3 225, the second never fought; wor-coverage.md 3.1), two steps off the loop's
+-- first waypoint.  A lap of two of its tiles (K.worldHunt: the list asserted to be the group's pool, the battle
+-- bound the pool's worst case), walked first; the grind then goes on only as far as TARGET_LEVEL, so its XP is
+-- part of the grind's.  The desert's two (223, 138) stay off: its Sand Horse pair is the one the loop keeps off
+-- (above).
+local GRIND_LAP42 = { { 108, 100 }, { 109, 100 } }
+local SHORE42 = { [224] = "Latimeria", [225] = "Latimeria, Nohrabbit x3" }
+local KIT = H.worLegKit({ fight = {}, links = {}, names = { [CELES] = "CELES", [SABIN] = "SABIN" } })
 
 H.run({ maxFrames = 600000 }, {
   -- ---- 0. cold Continue of wor-south-figaro-v1 ------------------------------------------
@@ -411,6 +420,9 @@ H.run({ maxFrames = 600000 }, {
   -- TARGET_LEVEL -- the Tentacles at the end of the cave are an event battle
   -- whose loss is a game over (section 6).
   H.cond(function() return GRIND_ON end, {
+    KIT.worldHunt({ what = "the shore by the cave (group 42)", lap = GRIND_LAP42, forms = SHORE42, avoid = grindAvoid }),
+    checkOutcomes("the shore's hunt"),
+    H.call(function() grindDone = level(CELES) >= TARGET_LEVEL and level(SABIN) >= TARGET_LEVEL end),
     H.withReset(H.driveUntil(function() return grindDone end, 600000, {
       H.worldNavTo(function() return GRIND[gwp][1] end, function() return GRIND[gwp][2] end,
         { maxFrames = 20000, playBattles = "tactical", avoid = grindAvoid }),

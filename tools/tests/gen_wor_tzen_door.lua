@@ -354,6 +354,47 @@ end
 -- TARGET_LEVEL.  The level is read only between legs, never mid-walk, so
 -- the battle that crosses it still gets its field care.
 local wpi, grindDone, legs = 1, false, 0
+-- ---- the grind's draw gaps (#488, the early continent's) -------------------------
+-- A person grinding north of Albrook walks the ground next to it too: the
+-- forest west of the bend (world group 33: Lunaris x2 203, Chitonid with
+-- Gigan Toad x2 201), the strip south-west (group 35: Mesosaur x4 198,
+-- Gilomantis x2 with a Mesosaur 200) and the patch east of the landing
+-- (group 0: Leafer 6, Leafer x2 with a Dark Wind 7), none of which the route
+-- had fought (wor-coverage.md 3.1).  Each is a lap of two of its tiles
+-- (K.worldHunt: the list asserted to be the group's pool, the battle bound
+-- the pool's worst case), walked first; the grind then goes on only as far
+-- as TARGET_LEVEL, so the laps' XP is part of the grind's, not on top of it.
+-- Groups 33 and 35 deal only the plains six; group 0 deals two species of
+-- the World of Balance's opening (authored rows), allowed on its lap alone.
+local GRIND_LAPS = {
+  { what = "the forest west of the bend (group 33)", lap = { { 125, 200 }, { 125, 201 } },
+    forms = { [203] = "Lunaris x2", [201] = "Chitonid, Gigan Toad x2" } },
+  { what = "the strip south-west (group 35)", lap = { { 127, 210 }, { 127, 211 } },
+    forms = { [198] = "Mesosaur x4", [200] = "Gilomantis x2, Mesosaur" } },
+  { what = "the patch east of the landing (group 0)", lap = { { 160, 194 }, { 160, 193 } },
+    forms = { [6] = "Leafer", [7] = "Leafer x2, Dark Wind" },
+    allowed = { [0x017] = "Leafer", [0x028] = "Dark Wind" } },
+}
+local KIT = H.worLegKit({ fight = {}, links = {}, names = { [CELES] = "CELES" } })
+local grindWon = {}
+local function grindLaps()
+  local steps = {}
+  for _, l in ipairs(GRIND_LAPS) do
+    local allowed = nil
+    if l.allowed then
+      allowed = {}
+      for sp, n in pairs(SOLO_OK) do allowed[sp] = n end
+      for sp, n in pairs(l.allowed) do allowed[sp] = n end
+    end
+    steps[#steps + 1] = H.call(function()
+      assertLegPools("to " .. l.what, { { H.worldX(), H.worldY() }, l.lap[1], l.lap[2] }, nil, allowed)
+    end)
+    steps[#steps + 1] = KIT.worldHunt({ what = l.what, lap = l.lap, forms = l.forms, won = grindWon,
+      avoid = avoid })
+    steps[#steps + 1] = checkOutcomes(l.what)
+  end
+  return H.seqStep(steps)
+end
 local function grind()
   return H.withReset(H.driveUntil(function() return grindDone end, 500000, {
     H.worldNavTo(function() return GRIND[wpi][1] end, function() return GRIND[wpi][2] end,
@@ -676,6 +717,10 @@ H.run({ maxFrames = 600000 }, {
   end),
 
   -- ---- 4. the grind -------------------------------------------------------------
+  grindLaps(),
+  H.call(function()
+    H.log(string.format("[wor] the grind's laps done f%d: %s; %s", H.frame, whereLine(), supplies()))
+  end),
   H.cond(function() return level() < TARGET_LEVEL end, { grind() }, {
     H.logStep(function() return string.format("[wor] CELES is already L%d: no grind", level()) end),
   }),

@@ -714,6 +714,13 @@ STATES = [
     S("wor_start", gen="gen_wor_start", prev="wor_island",
       checkpoint="wor-island-v1", timeout=7200),
 
+    # wor-island-v1 -> the Solitary Island's World of Ruin tile: a branch
+    # beside wor_start (#488, the early continent's draw gaps).  The
+    # island's ground (world group 29) walked until both its formations are
+    # won.  Nothing boots it.
+    S("wor_island_plain", gen="gen_wor_island_plain", prev="wor_island",
+      checkpoint="wor-island-v1", timeout=1800),
+
     # wor-start-v1 -> the last save before Tzen's timed house: cold-Continue
     # the landing save (CELES alone at world (146,212)), dress her for the
     # solo stretch on the world map's menu, stop in Albrook, fight the
@@ -768,6 +775,13 @@ STATES = [
     # frames, ~1650 s at ~80 frames/s.
     # Re-cut by checkpoint_drift.py --recut.
     S("wor_south_figaro", gen="gen_wor_south_figaro", prev="wor_nikeah",
+      checkpoint="wor-nikeah-v1", timeout=3600),
+
+    # wor-nikeah-v1 -> its tile again: a branch beside wor_south_figaro
+    # (#488).  The grass by Nikeah (world group 37) and the plain north of
+    # it (group 39), each walked until every formation is won.  Nothing
+    # boots it.
+    S("wor_nikeah_plain", gen="gen_wor_nikeah_plain", prev="wor_nikeah",
       checkpoint="wor-nikeah-v1", timeout=3600),
 
     # wor-south-figaro-v1 -> the World of Ruin map outside the surfaced
@@ -832,6 +846,12 @@ STATES = [
     # (docs/design/route-wor-falcon.md section 12).
     # Re-cut by checkpoint_drift.py --recut.
     S("wor_tomb", gen="gen_wor_tomb", prev="wor_kohlingen",
+      checkpoint="wor-kohlingen-v1", timeout=3600),
+
+    # wor-kohlingen-v1 -> its tile again: a branch beside wor_tomb (#488).
+    # The ground round Kohlingen (world groups 45, 46 and 47), each walked
+    # until every formation is won.  Nothing boots it.
+    S("wor_kohlingen_plain", gen="gen_wor_kohlingen_plain", prev="wor_kohlingen",
       checkpoint="wor-kohlingen-v1", timeout=3600),
 
     # wor_tomb -> the frame a Zombie lands on a member in a battle in the
