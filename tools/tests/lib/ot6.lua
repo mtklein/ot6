@@ -13665,6 +13665,18 @@ function Driver:cross(toward)
   for _, d in ipairs(dirs) do
     if (self.steerDead[d] or 0) < 2 then return self:steer(d, "cross") end
   end
+  -- a side the window will not cross to (wor_colosseum on the replay after #485: a pincer, the heal's window
+  -- 01:00:00:01, left and right both dead): the plan goes and the menu backs out, as a person cancels a target
+  -- they cannot reach and does something else; the third such drop in a battle is still a driver defect
+  self.crossDropN = (self.crossDropN or 0) + 1
+  if self.crossDropN <= 2 and self.plan ~= nil then
+    M.log(string.format("[%s] crossing to the %s in a %s: %s did nothing twice each in target select (state "
+      .. "$%02X, window %s) -- dropping the plan and backing out (drop #%d this battle)", self.tag or "fight",
+      toward, L.name, table.concat(dirs, " and "), M.readByte(BATTLE.MSTATE), tgtSig(), self.crossDropN))
+    self.steerDead, self.steerLast = {}, nil
+    self:dropPlan("cross_dead")
+    return { "b" }
+  end
   self:failFast(string.format("crossing to the %s in a %s: %s did nothing twice "
     .. "each in target select (state $%02X, window %s)", toward, L.name,
     table.concat(dirs, " and "), M.readByte(BATTLE.MSTATE), tgtSig()))
@@ -14807,6 +14819,7 @@ function Driver:idle()
   self.menuStreak, self.tick, self.battleTick = 0, 0, 0
   self.plan, self.planActor, self.held, self.confirmed = nil, nil, {}, nil
   self.parkDropN = 0
+  self.crossDropN = 0
   self.turnN = 0                        -- the [board] lines' count (#422)
   self.raceActDeclined = nil
   self.layout, self.layoutUnreadSaid, self.steerLast, self.steerDead = nil, false, nil, {}
