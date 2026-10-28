@@ -37,7 +37,7 @@ touches vanilla behavior where a pillar requires it.
 | Celes | Rune Knight | Sword | Ice/Holy | Runic from the start (signature) + spells (see below) |
 | Gau | Beast Tamer | Fangs (innate) | Earth | Rage learned without limit on the Veldt, 8 equipped (see below) |
 | Setzer | Gambler/Merchant | Cards & dice | — | Slot from the start (signature), with Coin Toss and Hired Help (paid in gil) behind it; divine: Jackpot, a Fixed-Dice triple, never Slot itself (kits.md) |
-| Strago | Scholar | Rod | Fire/Ice/Lightning | Lores (five equipped), Aqua Rake as the free row; **Analyze** (Scan: reveals every weakness of a species), always his, 3 MP (kits.md) |
+| Strago | Scholar | Rod | Fire/Ice/Lightning | Lores (five equipped), Aqua Rake as the free row; **Analyze** (Scan: reveals every weakness of a species), always his, 3 MP; Bserk, learned by watching a monster inflict Berserk (kits.md) |
 | Relm | Painter | Brush | — | Sketch stays as signature |
 | Shadow | Assassin | Dagger (thrown) | Dark | Throw (signature) over the eight throwing items, learned by acquisition as Edgar's Tools are: three stars, three skeans (pierce and an element), the smoke (Image) and the exit (Vanish), whose boost buys reach (kits.md "Shadow"); divine: Assassinate, at a full 3-BP boost (kits.md "Divines"): the hit of his that breaks an enemy kills it outright, as does a hit on one already Broken; a boss is only Broken |
 | Mog | Dancer | Spear | varies by dance | the 8 Dances, verbatim; no divine for now (kits.md "Divines") |

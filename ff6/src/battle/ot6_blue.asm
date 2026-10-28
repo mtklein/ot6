@@ -8,7 +8,9 @@
 ;
 ;   * What counts: a monster's attack (the attacker is a monster, so Gau's
 ;     rage, a Muddled ally and a Siren wearer teach nothing) whose status set
-;     carries Berserk ($11ab bit 4), and which neither removes nor toggles
+;     carries Berserk ($11ab bit 4; a monster RELM Controls is still the
+;     attacker, so its Bserk teaches, as Control teaches lores in vanilla),
+;     and which neither removes nor toggles
 ;     status ($11a4 bits 2-3: Dispel takes Berserk off).  Lores are left to
 ;     vanilla's own path (Rippler and Pep Up name Berserk among the statuses
 ;     they swap or clear).  So: L.50 Magic's counter (Bserk itself, in the

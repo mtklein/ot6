@@ -1321,8 +1321,11 @@ player prunes the kit all game. Same model, different collection verbs:
     was thin among them).  The first battle in which a monster inflicts
     Berserk while he is present and able (vanilla's lore test) teaches him
     Bserk at the victory, if he is standing then, and he keeps it: a
-    Magic-row spell in his own learned-spell table, beside Scan.  An ally's
-    Bserk, a Rage and a lore (Rippler, Pep Up) teach nothing.  The World of
+    Magic-row spell in his own learned-spell table, the first in it (before
+    it his Magic row held only his stone's spells).  An ally's Bserk, a Rage
+    and a lore (Rippler, Pep Up) teach nothing.  A monster RELM Controls is
+    still the attacker, so its Bserk teaches him, as Control teaches lores
+    in vanilla (read from `Ot6BlueWatch`'s attacker test, not played).  The World of
     Balance's Insecares on Esper Mountain teach it, and so does the L.50
     Magic's counter in the Fanatics' Tower, where his Lore row is gone and
     his Magic row is not.  It is a spell rather than a lore because the

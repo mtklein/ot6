@@ -429,7 +429,8 @@ the chip passive, goes into §12; the water identity stays on the divine.
 (§1). Fire/Ice/Bolt are removed as Maduin's job.
 
 **The Slow collision.** Siren used to grant Slow too; since #305 she
-grants magicite.md's planned Mute and Sleep only. Shiva's Diamond Dust
+grants magicite.md's planned Mute and Sleep, and since v0.38 Bserk
+(magicite.md "Berserk"), and no Slow. Shiva's Diamond Dust
 still carries a Slow rider, and Bismark's Slow differs from it: it folds to
 all-enemies at 1 BP and pairs with Haste.
 

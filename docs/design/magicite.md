@@ -146,8 +146,9 @@ job is about the enemy's own action. Zozo is the source every save holds from
 the World of Balance on, so it is the one a party can count on at the tower.
 Nothing leaves the stone: it carries three spells, as Shiva and Maduin do.
 
-**STRAGO, by watching.** His verb is observation (`kits.md`), and his Magic
-row held only Scan, so he is also the caster whose spell list was thinnest.
+**STRAGO, by watching.** His verb is observation (`kits.md`), and his own
+learned-spell table was empty (his Magic row held only his stone's spells),
+so he is also the caster whose spell list was thinnest.
 Bserk is a spell, not a lore: the Lore window holds one record per lore id
 and the learned-lore field is 24 bits, so a twenty-fifth lore would move the
 save layout and the Lore page, and turning an existing lore into Berserk
