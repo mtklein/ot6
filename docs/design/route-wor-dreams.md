@@ -492,23 +492,27 @@ Evidence under `build/attempts/wt/v038-wor-sweeps-b/lab/` (`scripts/`,
 `out/`). The coverage audit (wor-coverage.md 4.3, 5.1) found nine of the
 arc's formations unfought and fourteen item chests unopened. A player who
 pauses in the dream and the castle meets the formations, and opens the
-chests on or beside the way, so the legs now do both.
+chests on or beside the way. The legs open the chests on the main line;
+the hunts are branch legs, each booted from the graph's capture (or save)
+where its hunt begins, and nothing boots what they leave
+(route-wor-narshe.md section 15 says why; no grind the route already does
+walks these maps).
 
 **The hunts.** Each walks a lap until every formation of its pool is won
 (`K.hunt`, lib/ot6_field.lua; route-wor-gogo.md section 10), the ROM's pool
 asserted at its start and its bounds read from the ROM ("every slot drawn
 within 110 battles, a battle within 162 steps"):
 
-| leg | where | pool | lap |
+| branch leg (boots) | where | pool | lap |
 |---|---|---|---|
-| `gen_wor_dream` | the dreamscape (317), after both members rejoin, before the stooges | group 183: Barb-e and Critic 312, Allosaurus and Parasite x3 314, Critic and Pan Dora x3 315 (80/256), Allosaurus 316 (16/256) | (26,52) <-> (26,53) |
-| `gen_wor_dream` | the cave below the engine (319), in Magitek armor, before the drop | group 182: PlutoArmor x2 311, PlutoArmor and Sky Cap 313, Io 137 (two slots) | (16,25) <-> (17,25) |
-| `gen_wor_doma` | the dream's Doma (126), beside its save point, the leg's boot | group 181 (also the train's cars 144 and 321): Rain Man x2 309, Samurai and Rain Man x2 310, Barb-e, Samurai and Suriander 317 (80/256), Suriander, Pan Dora and Parasite x2 318 (16/256) | (8,9) <-> (8,10) |
-| `gen_wor_ancient` | the courtyard (407), after the flashback | group 145: Goblin x2 301, Barb-e, Samurai and Suriander 317, Goblin and Figaliz x2 302 (two slots) | (16,13) <-> (16,14) |
-| `gen_wor_ancient` | the castle (406), after Odin | group 144: Lethal Wpn 305, Boxed Set 304, Boxed Set x2 and Figaliz x2 303 (80/256), Boxed Set x4 308 (16/256) | (32,12) <-> (33,12) |
+| `gen_wor_dream_hunt` (`wor_dream_scape`, `gen_wor_dream`'s) | the dreamscape (317), after both members rejoin, before the stooges | group 183: Barb-e and Critic 312, Allosaurus and Parasite x3 314, Critic and Pan Dora x3 315 (80/256), Allosaurus 316 (16/256) | (26,52) <-> (26,53) |
+| `gen_wor_dream_cave_hunt` (`wor_dream_cave`) | the cave below the engine (319), in Magitek armor, before the drop | group 182: PlutoArmor x2 311, PlutoArmor and Sky Cap 313, Io 137 (two slots) | (16,25) <-> (17,25) |
+| `gen_wor_doma_hunt` (`wor-dream-v1`) | the dream's Doma (126), beside its save point | group 181 (also the train's cars 144 and 321): Rain Man x2 309, Samurai and Rain Man x2 310, Barb-e, Samurai and Suriander 317 (80/256), Suriander, Pan Dora and Parasite x2 318 (16/256) | (8,9) <-> (8,10) |
+| `gen_wor_ancient_hunt` (`wor_ancient_yard`, `gen_wor_ancient`'s) | the courtyard (407), after the flashback | group 145: Goblin x2 301, Barb-e, Samurai and Suriander 317, Goblin and Figaliz x2 302 (two slots) | (16,13) <-> (16,14) |
+| the same leg, on | the castle (406), below Odin's statue | group 144: Lethal Wpn 305, Boxed Set 304, Boxed Set x2 and Figaliz x2 303 (80/256), Boxed Set x4 308 (16/256) | (32,12) <-> (33,12) |
 
-The doma leg asserts at its start that it stands in the dream's Doma,
-naming `wor_dream`'s save. The cave's pool (group 143) was fought in full
+Each branch asserts at its start the map its boot stands on, naming the leg
+that made it; the doma leg asserts it too, for its chests. The cave's pool (group 143) was fought in full
 already.
 
 **The chests**, each asserted by its treasure bit (and the bag's count of
@@ -526,21 +530,9 @@ The two monster boxes (401 (58,43) Master Pug, 406 (10,17) KatanaSoul) are
 #487's. The Wing Edge, Doom Darts and Punisher are LOCKE's, SETZER's and
 STRAGO's, RELM's or GOGO's to wear; this arc's party carries them.
 
-The graph's play at 8fdc6159 on fa5425f1 (`ninja_c1.log`): "the
-dreamscape (group 183): done after 35 battles", "the dream's cave (group
-182): done after 5 battles", the dream leg "PASS (frame 245462)
-attempts=1/3"; "the dream's Doma (group 181): done after 9 battles", "PASS
-(frame 73343) attempts=1/3"; "the courtyard (group 145): done after 14
-battles", "the castle (group 144): done after 24 battles", "PASS (frame
-216229) attempts=1/3".
+DREAM_PLAY
 
-**The levels.** The hunts here and upstream (Umaro's cave, Ebot's Rock)
-leave the party well above the curve the arc was played at: wor-ancient-v1
-reads "TERRA level: fresh 64, tracked 55", CYAN 49 against 41, CELES 63
-against 55, RELM 61 against 53 (`drift_before.txt`); the Colosseum's TERRA
-65 against 57.
-
-**Measured** from the graph's captures before each hunt (`wor_dream_scape`,
+**Measured**, first with the hunts on the main line (at 8fdc6159), from the graph's captures before each hunt (`wor_dream_scape`,
 `wor_dream_cave`, `wor_ancient_yard`, `wor_ancient_hall`) and, for the
 dream's Doma, the graph's `wor-dream-v1` itself (`scripts/lab_hunt.lua`: K
 battles used up on the hunt's own lap, counted by battles opened, then the
@@ -595,3 +587,5 @@ Beads left, "123: the Beads's chest (bit 54) is open: got false"
 the dream's Doma (126): wor_dream's save: got 126 ($7E), want 125 ($7D)"
 (`out/n_doma_boot`). The hunt's own asserts (the pool, the two bounds,
 every formation won) are route-wor-gogo.md section 10's.
+
+DREAM_SWEEP
