@@ -846,7 +846,9 @@ local PARTY = { { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" }, { MOG,
 local REGROUP = { UMARO, MOG, TERRA, CELES }
 local REGROUP_MEMBERS = { { UMARO, "UMARO" }, { MOG, "MOG" }, { TERRA, "TERRA" }, { CELES, "CELES" } }
 -- relics are dressed for the arc's bosses once, before the Ice Dragon (the
--- three share their threats); dressing them again before Umaro, after the
+-- three share their threats; since #495 the relic plan's step 4b arms for a
+-- boss too, so the Ribbon TERRA's Czarina Ring leaves in the bag goes on
+-- another member over a lower-ranked relic); dressing them again before Umaro, after the
 -- Gauntlet came into the bag, planned a swap between two members that the
 -- relic rule cannot make from the bag (build/lab/narshe/t4: 'a member's new
 -- relics are all in the bag (no swap deadlock)')
