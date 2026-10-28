@@ -725,6 +725,11 @@ local RELIC_RING_CHEST = { 90, 47, 0x102, "Relic Ring (207 (90,47))", RELIC_RING
 -- encounter counters can hold), as a player who pauses in the basement meets them.
 local OWZER157 = { [286] = "Vindr x2", [284] = "SoulDancer x2, Crusher x2", [285] = "Vindr x2, Wild Cat, Crusher x2" }
 local HUNT207_LAP = { { 85, 46 }, { 85, 47 } }
+-- the hunt's kill order: the SoulDancers first (gen_wor_relm's, measured there: SoulDancer x2 with Crusher x2, 284,
+-- lost 1 of 31 meetings in the default order and none of 36 with the SoulDancers first; build/attempts/wt/
+-- v031-tower/lab/base16_s*, b16fsd_s*).  In the default order this hunt's sweep lost 2 of 23 of 284's fights, with
+-- deaths in 7 of its 15 keys (build/attempts/wt/v038-wor-sweeps-a/sweeps/ow_*, tally_ow.txt)
+local OWZER_FOCUS = { { species = 0x0AD } }
 local NAMES = {}
 for _, p in ipairs(MEMBERS) do NAMES[p[1]] = p[2] end
 local K = H.worLegKit({ fight = FIGHT, links = {}, names = NAMES })
@@ -840,8 +845,10 @@ H.run({ maxFrames = 500000 }, {
   -- (neither chest holds gear for the three: the Moogle Suit is STRAGO's and RELM's, which gen_wor_relm's dress
   -- picks up, and the relic plan ranks no Relic Ring)
   H.saveState("wor_owzer_hunt.mss"),
-  -- the hunt by the save point (#488)
+  -- the hunt by the save point (#488), the SoulDancers killed first (OWZER_FOCUS)
+  H.call(function() FIGHT.focus = OWZER_FOCUS end),
   K.hunt({ what = "Owzer's basement (group 157)", lap = HUNT207_LAP, forms = OWZER157, avoid = DOOR_TILES }),
+  H.call(function() FIGHT.focus = nil end),
   H.fieldCare({ tag = "at the basement's save point", threshold = H.CARE_BEFORE_FIGHTS }),
   H.call(function()
     say("wor", "at the basement's save point")
