@@ -500,6 +500,19 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(H.zombieDefers({ s1 = 0x03 }), true, "...Blind beside the Zombie changes nothing")
     H.assertEq(H.zombieDefers({ s1 = 0x82 }), false, "a Wounded member is the raise lines', not a zombie's")
     H.assertEq(H.zombieDefers({ s1 = 0x00 }), false, "a member without the bit plans as usual")
+    -- ...and a plan made a beat BEFORE the Zombie landed is dropped like
+    -- Muddle's (#490, #348): never a committed one, a switch or a defer
+    H.assertEq(H.planBackOut({ kind = "fight", st1 = 0x02, st2 = 0 }), "zombied",
+      "a plan held through a Zombie is backed out of")
+    H.assertEq(H.planBackOut({ kind = "heal", st1 = 0x03, st2 = 0 }), "zombied", "...a heal plan as well")
+    H.assertEq(H.planBackOut({ kind = "fight", st1 = 0x00, st2 = 0x20 }), "muddled", "Muddle's back-out is as it was")
+    H.assertEq(H.planBackOut({ kind = "fight", st1 = 0x02, st2 = 0x20 }), "muddled", "...and wins when both landed")
+    H.assertEq(H.planBackOut({ kind = "fight", st1 = 0x82, st2 = 0 }), nil, "a Wounded member is not a zombie")
+    H.assertEq(H.planBackOut({ kind = "fight", st1 = 0x00, st2 = 0 }), nil, "no status: the plan stands")
+    H.assertEq(H.planBackOut({ kind = "fight", committed = true, st1 = 0x02, st2 = 0 }), nil,
+      "a committed plan is the engine's now")
+    H.assertEq(H.planBackOut({ kind = "defer", st1 = 0x02, st2 = 0 }), nil, "a defer has nothing to lose")
+    H.assertEq(H.planBackOut({ kind = "switch", st1 = 0x02, st2 = 0 }), nil, "a switch has nothing to lose")
     local full = { [0] = 1, [1] = 1, [2] = 1, [3] = 1 }
     H.assertEq(H.muddleRule({ actor = 0, status2 = { [0] = 0, [1] = 0x20, [2] = 0, [3] = 0 },
                               hp = full, maxhp = full }), 1,
@@ -1491,6 +1504,25 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(H.battleLiveAt(411, 500), false, "89 frames after the last end: still its tail")
     H.assertEq(H.battleLiveAt(410, 500), true, "90 frames after the last end: a new battle")
     H.log("battle_healpolicy: the status watcher's liveness gate (#494) checked")
+  end),
+
+  -- the MagiMaster wall-wait clock (#493)
+  H.call(function()
+    H.WALL_WAIT_CAP = nil
+    H.assertEq(H.wallWaitOver(1000, 1899), false, "the default cap is 900 frames: 899 waited, still waiting")
+    H.assertEq(H.wallWaitOver(1000, 1900), true, "...900 waited: the cap gives way")
+    H.WALL_WAIT_CAP = 0
+    H.assertEq(H.wallWaitOver(1000, 1000 + 21000), false, "cap 0: no cap, whatever has been waited")
+    H.WALL_WAIT_CAP = nil
+    local waits = { [1] = 500, [2] = 700 }
+    H.assertEq(H.wallWaitSettle(waits, 1, "wall_wait"), false, "a wait's own plan keeps its clock")
+    H.assertEq(waits[1], 500, "...the clock reads as it did")
+    H.assertEq(H.wallWaitSettle(waits, 1, "magic_only_wallchange"), true, "another plan ends the stretch of waiting")
+    H.assertEq(waits[1], nil, "...and the stale stamp is gone, so the next wait starts at its own frame")
+    H.assertEq(waits[2], 700, "...only that member's")
+    H.assertEq(H.wallWaitSettle(waits, 3, nil), false, "a member that never waited has nothing to clear")
+    H.assertEq(H.wallWaitSettle(nil, 1, nil), false, "no table yet: nothing to clear")
+    H.log("battle_healpolicy: the wall-wait clock and cap (#493) checked")
   end),
 
   -- harness traces (#489)
