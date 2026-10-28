@@ -356,23 +356,21 @@ end
 local wpi, grindDone, legs = 1, false, 0
 -- ---- the grind's draw gaps (#488, the early continent's) -------------------------
 -- A person grinding north of Albrook walks the ground next to it too: the
--- forest west of the bend (world group 33: Lunaris x2 203, Chitonid with
--- Gigan Toad x2 201), the strip south-west (group 35: Mesosaur x4 198,
--- Gilomantis x2 with a Mesosaur 200) and the patch east of the landing
--- (group 0: Leafer 6, Leafer x2 with a Dark Wind 7), none of which the route
--- had fought (wor-coverage.md 3.1).  Each is a lap of two of its tiles
+-- strip south-west (group 35: Mesosaur x4 198, Gilomantis x2 with a Mesosaur
+-- 200) and the patch east of the landing (group 0: Leafer 6, Leafer x2 with
+-- a Dark Wind 7), none of which the route had fought (wor-coverage.md 3.1).
+-- The forest west of the bend (group 33) is hunted on a branch with SABIN
+-- (gen_wor_tzen_plain): alone, CELES lost fights of its Chitonid with Gigan
+-- Toad x2 (201) at the grind's start and at L27 (sweeps/tally_wt_g33.txt,
+-- tally_wt2_g33.txt, tally_wt3_g33t.txt); with SABIN, none
+-- (tally_wt4_g33s.txt).  Each is a lap of two of its tiles
 -- (K.worldHunt: the list asserted to be the group's pool, the battle bound
 -- the pool's worst case), walked first; the grind then goes on only as far
 -- as TARGET_LEVEL, so the laps' XP is part of the grind's, not on top of it.
--- Groups 33 and 35 deal only the plains six; group 0 deals two species of
+-- Group 35 deals only the plains six; group 0 deals two species of
 -- the World of Balance's opening (authored rows), allowed on its lap alone.
--- CELES is alone: between the laps' battles she tops up to full (the sweep
--- with the walks' default care lost one fight of Chitonid with Gigan Toad x2,
--- 201, in 82, she having opened it at 858/1125 and died from 52:
--- build/attempts/wt/v038-wor-sweeps-a/sweeps/tally_wt_g33.txt).
+-- CELES is alone: between the laps' battles she tops up to full.
 local GRIND_LAPS = {
-  { what = "the forest west of the bend (group 33)", lap = { { 125, 200 }, { 125, 201 } },
-    forms = { [203] = "Lunaris x2", [201] = "Chitonid, Gigan Toad x2" } },
   { what = "the strip south-west (group 35)", lap = { { 127, 210 }, { 127, 211 } },
     forms = { [198] = "Mesosaur x4", [200] = "Gilomantis x2, Mesosaur" } },
   { what = "the patch east of the landing (group 0)", lap = { { 160, 194 }, { 160, 193 } },

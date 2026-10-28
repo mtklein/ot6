@@ -779,6 +779,12 @@ STATES = [
     S("wor_south_figaro", gen="gen_wor_south_figaro", prev="wor_nikeah",
       checkpoint="wor-nikeah-v1", timeout=3600),
 
+    # wor-sabin-v1 -> its tile again: a branch beside wor_nikeah (#488).
+    # The forest west of Tzen (world group 33) walked until both its
+    # formations are won, CELES with SABIN.  Nothing boots it.
+    S("wor_tzen_plain", gen="gen_wor_tzen_plain", prev="wor_sabin",
+      checkpoint="wor-sabin-v1", timeout=3600),
+
     # wor-nikeah-v1 -> its tile again: a branch beside wor_south_figaro
     # (#488).  The grass by Nikeah (world group 37) and the plain north of
     # it (group 39), each walked until every formation is won.  Nothing

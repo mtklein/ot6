@@ -16,6 +16,21 @@ local say = K.say
 -- the save's tile, and the doors the laps keep off
 local HOME = { 40, 45 }
 local DOORS = { { 38, 45 }, { 39, 45 } }
+local OFF = nil
+local AV = nil
+local function avoid()
+  if AV == nil then
+    local list = {}
+    for _, d in ipairs(DOORS) do list[#list + 1] = d end
+    if OFF then
+      for y = OFF.box[2], OFF.box[4] do for x = OFF.box[1], OFF.box[3] do
+        if H.worldEncounterGroup(x, y, x, y) == OFF.group then list[#list + 1] = { x, y } end
+      end end
+    end
+    AV = H.worldAvoidSet(list)
+  end
+  return AV
+end
 local LAPS = {
   { what = "the plain south of Kohlingen (group 45)", lap = { { 40, 47 }, { 40, 48 } },
     forms = { [236] = "Harpiai", [243] = "Muus" } },
@@ -39,10 +54,10 @@ local steps = {
 }
 for _, l in ipairs(LAPS) do
   steps[#steps + 1] = K.worldHunt({ what = l.what, lap = l.lap, forms = l.forms, won = won,
-    avoid = H.worldAvoidSet(DOORS) })
+    avoid = avoid })
 end
 steps[#steps + 1] = H.worldNavTo(HOME[1], HOME[2], { maxFrames = 12000, playBattles = "tactical", fight = FIGHT,
-  avoid = H.worldAvoidSet(DOORS) })
+  avoid = avoid })
 steps[#steps + 1] = H.fieldCare({ threshold = 1.0, tag = "back at the save's tile" })
 steps[#steps + 1] = H.call(function() say("wor", "the laps done") end)
 steps[#steps + 1] = H.saveState("wor_kohlingen_plain.mss")
