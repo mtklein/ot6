@@ -243,7 +243,7 @@ local function doMove(mv, what, abort)
     end })
 end
 local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
-  local moves, waits, lastWhy, stood, waitStart, lastFrom = 0, 0, nil, 0, nil, nil
+  local moves, waits, lastWhy, stood, waitStart = 0, 0, nil, 0, nil
   local function there() return H.fieldX() == tx and H.fieldY() == ty and H.tileAligned() end
   local function oneMove()
     local conds = condList(objs)
@@ -263,23 +263,6 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
       closed[wk] = true
     end
     local mv = nil
-    -- no route around the conductors: walk on toward the crossing, as a person would, by the route that ignores
-    -- them, a move at a time while it lands on a rest no conductor's tile closes, and wait at the last such rest
-    -- (#486 review: the shaft's way back stood at (49,18), far from the bridge, "no route")
-    if best == nil then
-      local open = planRoute(tx, ty, lk, {})
-      local m1 = open and open[1]
-      -- (never back onto the tile the last move left: the plan around the conductors and this one can each
-      -- undo the other, lab r2_belly: "standing at (49,32)", "standing at (48,32)", ... past frame 313000)
-      if m1 and not closed[m1.to] and isRest(m1.to, conds) and m1.to ~= here and m1.to ~= lastFrom then
-        local sp, te = spansOf({ m1 })
-        if simRisk(sp, te, conds) <= CAREFUL_RISK then
-          moves, stood, waitStart, lastWhy = moves + 1, 0, nil, nil
-          lastFrom = here
-          return doMove(m1, what, abort)
-        end
-      end
-    end
     -- patience runs out: the risk a person takes grows with the frames stood on a rest (four a wait)
     local thr = CAREFUL_RISK + stood * CAREFUL_IMPATIENCE
     -- off a rest, the stretch already begun is finished: standing on a conductor's row is the risk
@@ -355,7 +338,6 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
       H.log(string.format("[careful] f%d jump %s from (%d,%d) (risk %.2f); %s", H.frame, mv.link[3], H.fieldX(),
         H.fieldY(), bestR, objLine()))
     end
-    lastFrom = here
     return doMove(mv, what, abort)
   end
   local nOut = #H.outcomes

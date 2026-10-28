@@ -597,16 +597,17 @@ so the room opens its chests with a shorter press of its own (`quickChest`:
 the window seen and closed). Before the plate (12,51) no route reaches the
 Thunder Shld from anywhere in 280 (`out/x4`, `out/x6`).
 
-The bridge's careful walk (finding 2) now walks the extra stretches the
-chests ask for. Where no route clears the conductors it walks on toward the
-crossing by the route that ignores them, a rest at a time, and stands at the
-last rest there; it never steps back onto the tile its last move left (the
-two plans undid each other in lab `r2_belly`: "standing at (49,32)",
-"standing at (48,32)", past frame 313000). A stand declares its quiet to the
-no-progress watchdog for 2400 frames at most (`CAREFUL_QUIET`; the longest
-stand in `out/r3_belly` was 1836 frames at (49,32), `scripts/stands.py`),
-and a walk that spends its step budget short of the target logs `BUDGET
-SPENT` before jwalk tries again.
+The bridge's careful walk (finding 2) walks the extra stretches the chests
+ask for. A stand for the conductors declares its quiet to the no-progress
+watchdog for 2400 frames at most (`CAREFUL_QUIET`, the longest stand the
+review measured, 2304 frames, rounded up; `scripts/stands.py` reads them
+from a log), with a line naming the tile, and a walk that spends its step
+budget short of the target logs `BUDGET SPENT` before jwalk tries again. A
+walk that, with no route around the conductors, walked on toward the
+crossing and stood at the last rest there was tried and dropped: the
+conductors touched the party there again and again (the replay at 4d27975b:
+"the bridge to the FakeMustache (25,32): there after 15 tries, 17 drop(s)
+down the shaft", against "there after 2 tries" before it).
 
 **The gear downstream.** The gear and relic care picks the new pieces up on
 its own: the Genji Armor goes on TERRA at the belly's save point and stays
