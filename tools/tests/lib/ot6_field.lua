@@ -8125,12 +8125,15 @@ function M.relicPlan(members, opts)
   -- lowest-ranked relic planned in a slot the plan does not keep, never a two-weapon relic or a ward; among
   -- equals the member with the most spells learned (step 2's order).  Only the Ribbons after the first: the
   -- first is step 2's to place or leave (a fight whose threats no guard covers leaves its slot to the ward the
-  -- fight calls for: field_relicplan's Dullahan case).  A plan that already wears them all is unchanged.
+  -- fight calls for: field_relicplan's Dullahan case).  Not when arming for a boss (threats.boss): the boss kit
+  -- trades a Ribbon for the wards its fight calls for (gen_wor_tritoch's Ice Dragon: TERRA's Ribbon for the Czarina
+  -- Ring, the Ribbon to the bag until the fight is over).  A plan that already wears them all is unchanged.
   local ribbonsOn = 0
   for _, m in ipairs(ms) do
     for s = 4, 5 do if m.want[s] == RIBBON_ID then ribbonsOn = ribbonsOn + 1 end end
   end
-  while ribbonsOn > 0 and (count[RIBBON_ID] or 0) > 0 do
+  local boss = opts.threats and opts.threats.boss
+  while not boss and ribbonsOn > 0 and (count[RIBBON_ID] or 0) > 0 do
     local best = nil
     for _, m in ipairs(ms) do
       if m.want[4] ~= RIBBON_ID and m.want[5] ~= RIBBON_ID and wearsItem(m.ch, RIBBON_ID) then
