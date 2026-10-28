@@ -10483,7 +10483,9 @@ function M.worLegKit(env)
       M.driveUntil(function()
         while seen < #M.outcomes do
           seen = seen + 1
-          steps = 0
+          -- the battle opened inside a lap step whose count the body adds after the nav returns (#495): -1
+          -- here leaves the count at 0 steps since the battle
+          steps = -1
           local o = M.outcomes[seen]
           local f = o.form & 0x1FF
           if o.kind == "won" then won[f] = true end

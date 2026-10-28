@@ -39,6 +39,19 @@ local ODIN, RAIDEN = 11, 12                 -- the stones' indices (GenjuProp or
 local WALL_RING = 0xBB
 local function owns(esper) return (H.readByte(0x1A69 + (esper >> 3)) >> (esper & 7)) & 1 == 1 end
 local FOUR = { CELES, RELM, CYAN, TERRA }
+-- the castle's two pools (#488, wor-coverage.md 4.3): the courtyard (407, group 145) deals Goblin x2 (301),
+-- Barb-e, Samurai and Suriander (317), Goblin and Figaliz x2 (302, two slots); the castle (406, group 144) Lethal
+-- Wpn (305), Boxed Set (304), Boxed Set x2 and Figaliz x2 (303), Boxed Set x4 (308).  The party walks a lap of
+-- each until each is won (K.hunt, which asserts these lists are the pools the ROM gives the maps and bounds the
+-- hunts by the worst draws the encounter counters can hold), as a player pausing in the castle meets them
+local YARD145 = { [301] = "Goblin x2", [317] = "Barb-e, Samurai, Suriander", [302] = "Goblin, Figaliz x2" }
+local HALL144 = { [305] = "Lethal Wpn", [304] = "Boxed Set", [303] = "Boxed Set x2, Figaliz x2", [308] = "Boxed Set x4" }
+local YARD_LAP, HALL_LAP = { { 16, 13 }, { 16, 14 } }, { { 32, 12 }, { 33, 12 } }
+local huntWon = {}
+-- the cave's and the castle's chests a player opens on the way (#485, wor-coverage.md 5.1): the cave (401) holds
+-- an Ether, the Wing Edge, the Doom Darts, a Magicite and an X-Potion; the castle (406, reached from the
+-- courtyard's east door (19,11)) the Punisher.  The two monster boxes (401 (58,43), 406 (10,17)) are #487's
+local ETHER, XPOTION, MAGICITE, WING_EDGE, DOOM_DARTS, PUNISHER = 0xEC, 0xEA, 0xF9, 0x4C, 0x4F, 0x3B
 -- 401's same-map doors (route_data.py map 401: its shorts and its two one-tile longs); 406's; 408's
 -- (a long entrance covers its tile and `len` more, and every one of them lands on its one destination:
 -- CheckLongEntrance, DoEntrance)
@@ -207,6 +220,16 @@ H.run({ maxFrames = 2400000 }, {
 
   -- ---- 2. the cave and the castle's courtyard ----------------------------------------------------------------
   -- @@stage cave
+  chestAt(55, 21, 0x0C4, "the Ether (401 (55,21))", ETHER),
+  chestAt(45, 21, 0x0C5, "the Wing Edge (401 (45,21))", WING_EDGE),
+  chestAt(49, 46, 0x0C7, "the Doom Darts (401 (49,46))", DOOM_DARTS),
+  chestAt(18, 28, 0x0C8, "the Magicite (401 (18,28))", MAGICITE),
+  chestAt(8, 20, 0x0C9, "the X-Potion (401 (8,20))", XPOTION),
+  H.call(function()
+    for _, b in ipairs({ 0x0C4, 0x0C5, 0x0C7, 0x0C8, 0x0C9 }) do
+      H.assertEq(H.chestOpen(b), true, string.format("401: the chest of bit %d is open", b))
+    end
+  end),
   door(19, 16, MAP_ASAVE, "the cave (19,16) -> 402"),
   H.fieldCare({ tag = "at the Ancient Castle's save point" }),
   door(15, 41, MAP_AYARD, "402 (15,41) -> the courtyard (407)"),
@@ -216,6 +239,17 @@ H.run({ maxFrames = 2400000 }, {
   H.release(),
   H.advanceStory(function() return settled() and sw(0x02DF) == 1 end, 30000, { playBattles = "tactical", fight = FIGHT }),
   H.call(function() say("story", "the flashback ($02DF)") end),
+  -- @@stage yard_hunt
+  H.fieldCare({ threshold = 1.0, tag = "before the courtyard's hunt" }),
+  H.saveState("wor_ancient_yard.mss"),
+  K.hunt({ what = "the courtyard (group 145)", lap = YARD_LAP, forms = YARD145, won = huntWon, castFirst = true }),
+  H.fieldCare({ threshold = 1.0, tag = "after the courtyard's hunt" }),
+  -- the courtyard's east door (19,11) -> 406 (55,11), the Punisher's corner (no other way reaches it: route_data
+  -- field-path 406 (33,12) -> (58,6) finds none), and back by (55,12) -> 407 (19,13)
+  door(19, 11, MAP_AHALL, "407 (19,11) -> the castle's east corner (406)"),
+  chestAt(59, 6, 0x0CE, "the Punisher (406 (59,6))", PUNISHER),
+  H.call(function() H.assertEq(H.chestOpen(0x0CE), true, "406: the Punisher's chest (bit 206) is open") end),
+  door(55, 12, MAP_AYARD, "406 (55,12) -> the courtyard (407)"),
   door(15, 10, MAP_AHALL, "407 (15,10) -> the castle (406)"),
 
   -- ---- 3. the castle: Odin, the queen's passage, the chests ---------------------------------------------------
@@ -226,6 +260,12 @@ H.run({ maxFrames = 2400000 }, {
   H.release(),
   H.advanceStory(function() return settled() and owns(ODIN) end, 6000, { playBattles = "tactical", fight = FIGHT }),
   H.call(function() say("story", "Odin") end),
+  -- @@stage hall_hunt
+  H.fieldCare({ threshold = 1.0, tag = "before the castle's hunt" }),
+  H.saveState("wor_ancient_hall.mss"),
+  K.hunt({ what = "the castle (group 144)", lap = HALL_LAP, forms = HALL144, won = huntWon, castFirst = true,
+    avoid = { { 34, 14 } } }),
+  H.fieldCare({ threshold = 1.0, tag = "after the castle's hunt" }),
   chestAt(55, 23, 0x0CB, "the Gold Hairpin (406 (55,23))", 0xCD),
   chestAt(53, 23, 0x0CA, "the Blizzard Orb (406 (53,23))", nil),
   -- "...when the queen stands and takes 5 steps": (34,14) faced up with A opens the queen's floor's east

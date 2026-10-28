@@ -53,6 +53,40 @@ LINKS[MAP_SCAPE] = links({ { 11, 38, 24, 43 }, { 9, 44, 9, 50 }, { 3, 47, 5, 44 
 -- cabin leaves is CYAN, CELES, RELM, TERRA, so TERRA walks (L50, her Ultima at 3 BP and her Morph) and CELES
 -- and RELM wait
 local DREAM = { CYAN, CELES, RELM, TERRA }
+-- the dream's two pools the route walked short of (#488, wor-coverage.md 4.3): the dreamscape (317, group 183)
+-- deals Barb-e and Critic (312), Allosaurus and Parasite x3 (314), Critic and Pan Dora x3 (315) at 80/256 and a
+-- lone Allosaurus (316) at 16/256; the cave below the engine (319 and 320, group 182, the party in Magitek armor)
+-- PlutoArmor x2 (311), PlutoArmor and Sky Cap (313) and Io (137, two slots).  The party walks a lap of each until
+-- each is won (K.hunt, which asserts these lists are the pools the ROM gives the maps and bounds the hunts by the
+-- worst draws the encounter counters can hold), as a player pausing in the dream meets them.  The train's pool
+-- (group 181) is gen_wor_doma's hunt, beside the dream's save point
+local SCAPE183 = { [312] = "Barb-e, Critic", [314] = "Allosaurus, Parasite x3", [315] = "Critic, Pan Dora x3",
+  [316] = "Allosaurus" }
+local CAVE182 = { [311] = "PlutoArmor x2", [313] = "PlutoArmor, Sky Cap", [137] = "Io" }
+local SCAPE_LAP, CAVE_LAP = { { 26, 52 }, { 26, 53 } }, { { 16, 25 }, { 17, 25 } }
+-- the first car's chests (#485, wor-coverage.md 5.1): an X-Potion (321 (24,9)) and the Ice Shld (321 (16,8))
+local XPOTION, ICE_SHLD = 0xEA, 0x61
+local CAR1_CHESTS = { { 24, 9, 0x0BA, "the X-Potion", XPOTION }, { 16, 8, 0x0BB, "the Ice Shld", ICE_SHLD } }
+-- each first-car chest a side of which the party can reach now (the levers move the car's walls)
+local function car1Chests(tag)
+  return H.lazy(function()
+    local steps = {}
+    for _, ch in ipairs(CAR1_CHESTS) do
+      if not H.chestOpen(ch[3]) then
+        local side = false
+        for _, o in ipairs({ { 0, 1 }, { -1, 0 }, { 1, 0 }, { 0, -1 } }) do
+          if H.bfsReach(nil, nil, nil, {}, ch[1] + o[1], ch[2] + o[2]) then side = true end
+        end
+        H.log(string.format("[chest] %s (321 (%d,%d)) %s: a side %s reachable (levers %d%d%d)", ch[4], ch[1], ch[2],
+          tag, side and "is" or "is not", sw(0x0184), sw(0x0185), sw(0x0186)))
+        if side then
+          steps[#steps + 1] = chestAt(ch[1], ch[2], ch[3], string.format("%s (321 (%d,%d))", ch[4], ch[1], ch[2]), ch[5])
+        end
+      end
+    end
+    return H.seqStep(steps)
+  end)
+end
 local WALL_RING = 0xBB
 -- the first car's levers (321: _cb8dc3, _cb8e1d, _cb8e7d toggle $0184-$0186, which move its walls) and its
 -- panel: six switches (map switches $01F1-$01F6, cleared at every map load) that the check (9,5) wants at
@@ -208,6 +242,11 @@ H.run({ maxFrames = 2400000 }, {
       H.assertEq(inParty(ch), true, NAMES[ch] .. " walks the dreamscape")
     end
   end),
+  -- @@stage scape_hunt
+  H.fieldCare({ threshold = 1.0, tag = "before the dreamscape's hunt" }),
+  H.saveState("wor_dream_scape.mss"),
+  K.hunt({ what = "the dreamscape (group 183)", lap = SCAPE_LAP, forms = SCAPE183, castFirst = true }),
+  H.fieldCare({ threshold = 1.0, tag = "after the dreamscape's hunt" }),
   -- the three at (46,55) (_cb8bd1: event battle 90, the Dream Stooges); a second step on the tile with
   -- $0179 set goes on into the dream's train (_cb8c59: 143 (107,8))
   walk(46, 56, "below the third stooge (46,56)"),
@@ -260,9 +299,17 @@ H.run({ maxFrames = 2400000 }, {
   chestAt(25, 5, 0x0BC, "the Genji Glove (25,5)", 0xD1),
   walkInto(1, 7, MAP_TRAIN, "144 (1,7) -> 143"),
   walkInto(65, 8, MAP_CAR1, "143 (65,8) -> 321"),
+  car1Chests("on the way in"),
   leversToCheck(),
+  car1Chests("with the check in reach"),
   setPanel(),
   pressUp(9, 5, function() return sw(0x017A) == 1 end, "the first car's check (9,5)"),
+  car1Chests("after the check"),
+  H.call(function()
+    for _, ch in ipairs(CAR1_CHESTS) do
+      H.assertEq(H.chestOpen(ch[3]), true, string.format("321: %s's chest (bit %d) is open", ch[4], ch[3]))
+    end
+  end),
   walkInto(1, 7, MAP_TRAIN, "321 (1,7) -> 143"),
   -- (38,8) loads the engine (146 (8,12)); (8,13) below it is, in the World of Ruin, the cave (_cba808 ->
   -- _cb93bf: 320 (6,10), the party in Magitek armor)
@@ -283,6 +330,9 @@ H.run({ maxFrames = 2400000 }, {
   H.advanceStory(function() return settled() end, 3000, { playBattles = "tactical", fight = FIGHT }),
   walkInto(22, 25, MAP_CAVE_B, "320 (22,25) -> 319"),
   H.advanceStory(function() return settled() and sw(0x0184) == 1 end, 6000, { playBattles = "tactical", fight = FIGHT }),
+  -- @@stage cave_hunt
+  H.saveState("wor_dream_cave.mss"),
+  K.hunt({ what = "the dream's cave (group 182)", lap = CAVE_LAP, forms = CAVE182, castFirst = true }),
   walk(15, 25, "beside the drop (15,25)"),
   H.driveUntil(function() return not H.hasControl() or map() ~= MAP_CAVE_B end, 600, { H.hold({ "left" }) },
     "left onto (14,25)"),

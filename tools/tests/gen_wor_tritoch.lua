@@ -65,6 +65,17 @@ local CLIFF_SAVE_AVOID = { { 16, 41 }, { 17, 41 }, { 18, 41 }, { 19, 41 }, { 20,
 -- that does not mean to take them
 local DROPS_281 = { { 10, 54 }, { 11, 53 } }
 local DROPS_282 = { { 14, 30 }, { 33, 26 } }
+-- the cave's two pools (#488, wor-coverage.md 4.3): the landing's floor (281, group 166) deals Poppers x4 (254),
+-- Kiwok and Ceritops (255), Kiwok and Poppers x3 (256) at 80/256 and a lone Pug (253) at 16/256; the X-Ether's
+-- pocket (282, group 167; the lair 283's group 168 deals the same four) Anemone x4 (259), Anemone x2 and Tomb
+-- Thumb (258), Ceritops and Tomb Thumb x2 (260) at 80/256 and Ceritops x3 (257) at 16/256.  The party walks a
+-- lap of each until each is won (K.hunt, lib/ot6_field.lua: it asserts these lists are the pools the ROM gives
+-- the maps and bounds the hunts by the worst draws the encounter counters can hold), as a player pausing in the
+-- cave meets them
+local CAVE166 = { [254] = "Poppers x4", [255] = "Kiwok, Ceritops", [256] = "Kiwok, Poppers x3", [253] = "Pug" }
+local CAVE167 = { [259] = "Anemone x4", [258] = "Anemone x2, Tomb Thumb", [260] = "Ceritops, Tomb Thumb x2",
+  [257] = "Ceritops x3" }
+local LAP_281, LAP_282 = { { 14, 55 }, { 15, 55 } }, { { 21, 31 }, { 20, 31 } }
 local CAVE_DOORS = { { 9, 52 }, { 15, 51 }, { 24, 51 }, { 52, 47 }, { 53, 36 }, { 27, 14 } }
 
 local function map() return H.mapId() & 0x1ff end
@@ -108,6 +119,8 @@ local function say(tag, what)
 end
 
 local FIGHT = {}
+-- the World of Ruin legs' helpers, for their hunt (lib/ot6_field.lua, H.worLegKit)
+local KIT = H.worLegKit({ fight = FIGHT })
 local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15 and not H.dialogWaiting()
 end
@@ -926,9 +939,18 @@ H.run({ maxFrames = 500000 }, {
   H.dialogChoice(0, { inBattle = false, what = "Hop into it? Yes", tag = "the cave's mouth" }),
   H.waitUntil(function() return map() == MAP_CAVE and settled() end, 6000, "Umaro's cave: map 281", 1),
   H.call(function() say("route", "in Umaro's cave") end),
+  -- @@stage cave_hunt
+  H.saveState("wor_tritoch_cave.mss"),
+  KIT.hunt({ what = "Umaro's cave, the landing (group 166)", lap = LAP_281, forms = CAVE166, castFirst = true,
+    avoid = DROPS_281 }),
+  H.fieldCare({ threshold = 1.0, tag = "after the landing's hunt" }),
   -- the landing's pocket: (15,51) -> 282 (22,31), the X-Ether (282
   -- (14,25)), then the floor drop (14,30) -> 281 (42,53), the main pocket
   walkInto(15, 51, MAP_CAVE_B, "the landing -> 282 (22,31)", DROPS_281),
+  H.saveState("wor_tritoch_pocket.mss"),
+  KIT.hunt({ what = "Umaro's cave, the X-Ether's pocket (group 167)", lap = LAP_282, forms = CAVE167,
+    castFirst = true, avoid = { { 14, 30 }, { 33, 26 }, { 23, 31 } } }),
+  H.fieldCare({ threshold = 1.0, tag = "after the pocket's hunt" }),
   via({ { 20, 27 } }, "282 to the X-Ether", DROPS_282),
   chestAt(14, 25, 0x0A8, "X-Ether (282 (14,25))", X_ETHER, DROPS_282),
   stepOn(14, 30, function() return map() == MAP_CAVE end),
