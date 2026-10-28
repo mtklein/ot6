@@ -102,6 +102,8 @@ end
 -- (compose.py embeds the symbols a script names literally)
 -- (looked up when first asked, so an old ROM without them fails on the play)
 local function inProc(pc, which)
+  -- Ot6BlueWatch runs up to Ot6BlueLearn, which follows it in ot6_blue.asm
+  if which == "watch" then return pc >= H.sym("Ot6BlueWatch") and pc < H.sym("Ot6BlueLearn") end
   local a = which == "learn" and H.sym("Ot6BlueLearn") or H.sym("ShowLearnedMagicMsg")
   return pc >= a and pc < a + 96
 end
@@ -238,6 +240,11 @@ H.run({ maxFrames = 1500000 }, {
         if b == 0xFF then
           H.assertEq(#seen >= 1, true, "the watch fired before STRAGO learned Bserk")
           local s = seen[1]
+          -- the write is Ot6BlueWatch's own: a SEEN address gone stale (the
+          -- cell moved in ot6_memory.inc) would leave stage 1's "still 0"
+          -- true of a cell nothing writes
+          H.assertEq(inProc(s.pc, "watch"), true, string.format("OT6_BLUESEEN was written by Ot6BlueWatch (pc $%06X)",
+            s.pc))
           H.assertEq(s.x >= 8, true, string.format("the attack that taught it was a monster's (entity $%02X)", s.x))
           H.assertEq(s.st2 & 0x10, 0x10, "the attack that taught it carried Berserk")
           -- vanilla's "learned" step: Ot6BlueLearn marks it newly learned
