@@ -42,6 +42,39 @@ local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
 local function c(ch, off) return 0x1600 + 37 * ch + off end
+-- The Veldt's first battle is the Holy Dragon, which absorbs holy (route_data species $024: "absorb holy"): a
+-- holy weapon heals it by every Fight.  Since the Tzen house's chests (#485) RELM holds their Pearl Rod (holy),
+-- and on the replay the three lost all three attempts to it (build/attempts/wt/v038-wor-sweeps-a/chain/
+-- chain6.log.gz: "attempt 3/3 FAILED class=wipe ... formation 0024").  A player who knows the dragon's element
+-- (read with full power) swaps it before the Veldt: the weapon of hers that hits hardest, holy or healing ones
+-- left out, from what she holds and the bag.
+local HOLY = 0x20
+local function ip(id, off) return H.readRomByte((H.sym("ItemProp") & 0x3FFFFF) + id * 30 + off) end
+local function fightsHoly(id)
+  return id ~= 0xFF and ((ip(id, 15) & HOLY) ~= 0 or (ip(id, 27) >> 4) == 0x0C)
+end
+local function notHolyWeapon(ch)
+  return H.lazy(function()
+    local cur = H.readByte(c(ch, 0x1F))
+    if not fightsHoly(cur) then
+      H.log(string.format("[kit] char %d's weapon $%02X is not holy; kept for the Holy Dragon", ch, cur))
+      return H.call(function() end)
+    end
+    local best, bp = nil, -1
+    for s = 0, 255 do
+      local id, n = H.readByte(0x1869 + s), H.readByte(0x1969 + s)
+      local mask = ip(id, 1) | (ip(id, 2) << 8)
+      if id ~= 0xFF and n > 0 and (ip(id, 0) & 7) == 1 and ((mask >> ch) & 1) == 1 and not fightsHoly(id)
+        and ip(id, 20) > bp then
+        best, bp = id, ip(id, 20)
+      end
+    end
+    H.log(string.format("[kit] char %d's weapon $%02X is holy (the Holy Dragon absorbs it): %s", ch, cur,
+      best and string.format("$%02X (power %d) from the bag", best, bp) or "the bag holds no other; kept"))
+    if not best then return H.call(function() end) end
+    return H.equipKit(ch, { { 0, best } }, { tag = "a weapon the Holy Dragon does not absorb" })
+  end)
+end
 local function lv(ch) return H.readByte(c(ch, 8)) end
 local function partyOf(ch) return H.readByte(0x1850 + ch) & 7 end
 local function settled()
@@ -277,6 +310,9 @@ H.run({ maxFrames = 2400000 }, {
   -- RELM won in 10 of 10 with no one down and SABIN, TERRA and CELES in 8
   -- of 8 at 2.12 deaths a fight (section 7, the hd lab)
   regroup({ TERRA, CELES, RELM }),
+  notHolyWeapon(TERRA),
+  notHolyWeapon(CELES),
+  notHolyWeapon(RELM),
   liftOff(),
   H.flyTo(VELDT_LANDING[1], VELDT_LANDING[2], { what = "the Falcon down on the Veldt", fight = FIGHT }),
   H.call(function() H.log("[kit] " .. rageLine()) end),
