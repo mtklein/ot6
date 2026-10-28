@@ -649,7 +649,7 @@ failed attempts: 1:assert"):
   Ring's item): "Zephyr Cape: bag 0 -> 0 of item $C9: got 0 ($0), want 1
   ($1)".
 - Every Ribbon worn (`field_relicribbon`, `out/rb_mut`, the relic plan's
-  step 2b off): "the plan puts on 2 Ribbon(s): every Ribbon the seated
+  step 4b off): "the plan puts on 2 Ribbon(s): every Ribbon the seated
   party holds, while a seated member who can wear one goes without: got 1
   ($1), want 2 ($2)".
 

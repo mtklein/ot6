@@ -7926,32 +7926,6 @@ function M.relicPlan(members, opts)
       end
     end
   end
-  -- 2b. every other Ribbon the party owns goes on too (guidelines: a Ribbon goes on the moment it's in the
-  -- bag): to the members planned without one, by spells learned as in step 2, before the ranked relics take the
-  -- free slots (#486 review: after the dream a Genji Glove took CYAN's Ribbon's slot and the Hyper Wrist his
-  -- other, and the Ribbon sat in the bag through Doma: "Genji Glove $D1 goes to CYAN's slot 4 (over Ribbon
-  -- $CA)", "Hyper Wrist $D2 goes to CYAN's slot 5")
-  -- Only the Ribbons after the first: the first is step 2's to place or leave (a fight whose threats a guard
-  -- does not cover leaves its slot to the ward the fight calls for: field_relicplan's Dullahan case, "a Shell
-  -- ward is planned on CELES, the caster")
-  local ribbonsOn = 0
-  for _, m in ipairs(ms) do
-    for s = 4, 5 do if m.want[s] == RIBBON_ID then ribbonsOn = ribbonsOn + 1 end end
-  end
-  if ribbonsOn > 0 and (count[RIBBON_ID] or 0) > 0 then
-    local byspells = {}
-    for _, m in ipairs(ms) do byspells[#byspells + 1] = m end
-    table.sort(byspells, function(a, b)
-      if a.spells ~= b.spells then return a.spells > b.spells end
-      return a.order < b.order
-    end)
-    for _, m in ipairs(byspells) do
-      if count[RIBBON_ID] > 0 and m.want[4] ~= RIBBON_ID and m.want[5] ~= RIBBON_ID and hasFree(m)
-          and wearsItem(m.ch, RIBBON_ID) then
-        take(m, RIBBON_ID, "a Ribbon the party owns goes on a member planned without one (step 2b)")
-      end
-    end
-  end
   -- 3. the rest, by rank
   local order = {}
   for _, id in ipairs(ids) do order[#order + 1] = id end
@@ -8143,6 +8117,46 @@ function M.relicPlan(members, opts)
         end
       end
     end
+  end
+  -- 4b. a Ribbon the plan leaves in the bag goes on after all (guidelines: a Ribbon goes on the moment it's in
+  -- the bag; #486 review: after the dream a Genji Glove took CYAN's Ribbon's slot and the Hyper Wrist his other,
+  -- and the Ribbon sat in the bag through Doma: "Genji Glove $D1 goes to CYAN's slot 4 (over Ribbon $CA)",
+  -- "Hyper Wrist $D2 goes to CYAN's slot 5"): on a member planned without one who can wear it, in place of the
+  -- lowest-ranked relic planned in a slot the plan does not keep, never a two-weapon relic or a ward; among
+  -- equals the member with the most spells learned (step 2's order).  Only the Ribbons after the first: the
+  -- first is step 2's to place or leave (a fight whose threats no guard covers leaves its slot to the ward the
+  -- fight calls for: field_relicplan's Dullahan case).  A plan that already wears them all is unchanged.
+  local ribbonsOn = 0
+  for _, m in ipairs(ms) do
+    for s = 4, 5 do if m.want[s] == RIBBON_ID then ribbonsOn = ribbonsOn + 1 end end
+  end
+  while ribbonsOn > 0 and (count[RIBBON_ID] or 0) > 0 do
+    local best = nil
+    for _, m in ipairs(ms) do
+      if m.want[4] ~= RIBBON_ID and m.want[5] ~= RIBBON_ID and wearsItem(m.ch, RIBBON_ID) then
+        for _, s in ipairs(m.free) do
+          local w, key = m.want[s], nil
+          if w == nil or w == 0xFF then key = -1
+          else
+            local cl = M.relicClass(w, opts.threats)
+            if cl and not cl.hands and cl.aff ~= "ward" then key = cl.rank end
+          end
+          if key ~= nil and (best == nil or key < best.key or (key == best.key and m.spells > best.m.spells)) then
+            best = { m = m, s = s, key = key }
+          end
+        end
+      end
+    end
+    if best == nil then break end
+    local m, w = best.m, best.m.want[best.s]
+    m.want[best.s] = RIBBON_ID
+    count[RIBBON_ID] = count[RIBBON_ID] - 1
+    if w ~= nil and w ~= 0xFF then count[w] = (count[w] or 0) + 1 end
+    if m.filler then m.filler[best.s] = nil end
+    ribbonsOn = ribbonsOn + 1
+    lines[#lines + 1] = string.format("%s goes to %s's slot %d (over %s, planned %s): a Ribbon the plan left in the "
+      .. "bag goes on a member planned without one (step 4b)", relicName(RIBBON_ID), m.name, best.s,
+      relicName(m.cur[best.s]), w and relicName(w) or "nothing")
   end
   -- The two relic slots are alike, so a relic the plan keeps on its wearer
   -- stays in the slot it sits in: a plan that moved the Egg from SETZER's
