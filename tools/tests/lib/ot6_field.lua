@@ -7931,7 +7931,14 @@ function M.relicPlan(members, opts)
   -- free slots (#486 review: after the dream a Genji Glove took CYAN's Ribbon's slot and the Hyper Wrist his
   -- other, and the Ribbon sat in the bag through Doma: "Genji Glove $D1 goes to CYAN's slot 4 (over Ribbon
   -- $CA)", "Hyper Wrist $D2 goes to CYAN's slot 5")
-  if (count[RIBBON_ID] or 0) > 0 then
+  -- Only the Ribbons after the first: the first is step 2's to place or leave (a fight whose threats a guard
+  -- does not cover leaves its slot to the ward the fight calls for: field_relicplan's Dullahan case, "a Shell
+  -- ward is planned on CELES, the caster")
+  local ribbonsOn = 0
+  for _, m in ipairs(ms) do
+    for s = 4, 5 do if m.want[s] == RIBBON_ID then ribbonsOn = ribbonsOn + 1 end end
+  end
+  if ribbonsOn > 0 and (count[RIBBON_ID] or 0) > 0 then
     local byspells = {}
     for _, m in ipairs(ms) do byspells[#byspells + 1] = m end
     table.sort(byspells, function(a, b)
