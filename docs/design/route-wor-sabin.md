@@ -466,6 +466,10 @@ that the clock runs through. It is not a random battle, so it earns no ×2
 reward (`Ot6MarkRandom` marks only the random paths). Skip both boxes under
 the timer. The Magicite, Drainer and Hyper Wrist are worth their few steps.
 
+Since v0.38 (#485) the house's walk takes all six item chests on the clock
+(the tour is 196 steps against the bare walk's 140); the boxes stay shut.
+The margins it leaves are in wor-coverage.md section 11.
+
 ---
 
 ## 4. Encounter pools

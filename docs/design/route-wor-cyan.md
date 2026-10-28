@@ -347,9 +347,11 @@ in 30 fights (sections 5.3, 8.2).
 
 ## 9. What was left
 
-- **Zozo's clock and the Chain Saw.** Off the way; a later arc (EDGAR's
-  tools) can take it: the trigger (225 (98,59)) answers A held facing up,
-  and 6:10:50 opens the room (`zozo/clk1.log`).
+- **Zozo's clock and the Chain Saw.** Taken since v0.38 (#485), with
+  Maranda's two chests, Zozo's Tonic and Tincture and the hunts of Zozo's
+  two pools: wor-coverage.md section 11. The north rooms and the rooftop
+  (the Thief Glove, the Fire Knuckle, the RunningShoes, an X-Potion) stay
+  behind the stair room's liars and the building jumps.
 - **The planner's 4096-node cap** (section 3) is the library's; raising it
   could change which side an approach picks in the chain's other
   generators, so the waypoints stay generator-local.

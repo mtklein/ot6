@@ -170,9 +170,10 @@ From the tracked SRAM (`wor-cyan-v1_dump.txt`, `wor-cyan-v1_roster.txt`):
 Not on the way: the Pugs' chest (282 (13,34), event group 152: three
 Pugs, L99, 14,001 HP each, evade 150, counter Pearl, XP 0; `pools.txt`).
 A chest that is only a fight with nothing in it; the plan leaves it shut.
-The two open elder's-house Elixirs (map 30 (105,14) from map 32's (18,22);
+The two elder's-house Elixirs (map 30 (105,14) from map 32's (18,22);
 (55,30) from (49,12) or (53,9); `chests_reach.txt`) are a few steps off the
-town's main street and the route takes them.
+town's main street. The second was opened in the World of Balance; the
+route takes the first since v0.38 (#485, wor-coverage.md section 11).
 
 ## 3. Maps, switches and battles
 

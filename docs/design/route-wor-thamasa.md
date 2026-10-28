@@ -555,7 +555,11 @@ The route plays the arc in three legs. Evidence is under
 - **The old woman at (107,56)** stands on the only way west (row 56), so
   her fight (event 151) is part of the walk.
 - **The Moogle Suit and the Relic Ring** are not reached from the save
-  point's pocket; the route leaves them.
+  point's pocket. Since v0.38 (#485) the walk takes them on the way: the
+  Moogle Suit through the inner door (104,46) -> (92,61) and back by
+  (92,62), the Relic Ring from (95,61) before the lamp turns the doors;
+  and it walks a lap by the save point until each formation of the
+  basement's pool is won (wor-coverage.md section 11).
 - **The auction's World of Ruin chain** (`_cb55b0`) is the Hero Ring, then
   an item, then Golem, then ZoneSeek, each behind a coin flip: Golem one
   visit in eight, ZoneSeek one in sixteen before Golem is owned. The run
