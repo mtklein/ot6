@@ -65,8 +65,9 @@ end
 -- arithmetic on a vanilla monster (L54, attack 180), one blow a member from
 -- full in the Gau arc's sweep (build/attempts/wt/v033-wor-gau/lab/swa_k3_s7,
 -- key be24-g0145).  The bag's Back Guard drops the pincer and the back attack
--- from the roll; it goes on LOCKE over the Star Pendant his Ribbon already
--- covers, and RELM goes to the back row.  Measured from this leg's capture (build/attempts/wt/
+-- from the roll; it goes on LOCKE over his Star Pendant (he has no Ribbon
+-- until the treasure room's relic plan hands him one, #490), and RELM goes to
+-- the back row.  Measured from this leg's capture (build/attempts/wt/
 -- v038-wor-fights/lab/narshe/): without it formation 325 rolled a pincer or
 -- a back attack in 3 of 50 keys, be24 a pincer; with it none in 47, be24 a
 -- side attack, won with no one down.
@@ -273,19 +274,23 @@ H.run({ maxFrames = 2400000 }, {
     -- what the plan depends on (#480): the Back Guard is the party's own,
     -- carried since the World of Balance and last worn in the Figaro cave
     -- (gen_wor_edgar puts it back in the bag); no counter on this leg sells one
-    local n = H.invCountOf(BACK_GUARD)
-    for _, ch in ipairs(SEATED) do if wearsBackGuard(ch) then n = n + 1 end end
-    H.assertEq(n >= 1, true, "the party owns a Back Guard ($E1) for the plain's pincers (carried since the World "
-      .. "of Balance; gen_wor_edgar puts it back in the bag after the Figaro cave)")
+    -- (backGuard() equips from the bag only, or leaves LOCKE's own: a Back
+    -- Guard on another member is not one it can use, #490)
+    local n = H.invCountOf(BACK_GUARD) + (wearsBackGuard(LOCKE) and 1 or 0)
+    H.assertEq(n >= 1, true, "LOCKE wears a Back Guard ($E1) or the bag holds one for the plain's pincers (carried "
+      .. "since the World of Balance; gen_wor_edgar puts it back in the bag after the Figaro cave)")
   end),
   -- @@setup-end
   backGuard("the plain south of Narshe"),
   -- RELM to the back row (#452): she stood in the front row since she
   -- joined, where a Mantodea's Battle took her from full in one blow (20 of
-  -- the two arms' 24 deaths to formation 325 were hers, 19 "ONE ACTION from
-  -- >= 80%"); the back row halves the blows a painter takes (lab/narshe/
-  -- nc_*: 0.02 deaths a fight over 49 keys, against 0.09 over 47 with the
-  -- Back Guard alone and 0.12 over 50 with neither)
+  -- the two arms' 24 deaths to formation 325 were hers, 18 of them "ONE
+  -- ACTION from >= 80%"); the back row halves the blows a painter takes
+  -- (lab/narshe/nc_*: 0.02 deaths a fight over 49 keys, against 0.09 over 47
+  -- with the Back Guard alone and 0.12 over 50 with neither -- counted by
+  -- distinct key; by fight the Back Guard alone cut no deaths, 11 in the
+  -- first arm's 120 fights against 13 in the second's: it removed the
+  -- pincer and back attacks, and the gain came from RELM's row; #490)
   H.setRows({ [RELM] = true }, { tag = "RELM to the back row" }),
   H.call(function()
     H.assertEq(H.readByte(0x1850 + RELM) & 0x20, 0x20, "RELM stands in the back row ($1850 bit 5)")

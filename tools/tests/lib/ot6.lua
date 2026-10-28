@@ -935,6 +935,17 @@ function M.zombieDefers(o)
   return (s1 & M.ST1_ZOMBIE) ~= 0 and (s1 & 0x80) == 0
 end
 
+-- Does a plan made a beat ago have to be dropped because a status landed on
+-- its actor since (#348 Muddle, #490 Zombie)?  A committed plan is the
+-- engine's now, and "switch" and "defer" plans press nothing to lose.
+-- o = { committed, kind, st2 (STATUS2 byte), st1 (STATUS1 byte) }.
+function M.planBackOut(o)
+  if o.committed or o.kind == "switch" or o.kind == "defer" then return nil end
+  if ((o.st2 or 0) & M.ST2_MUDDLE) ~= 0 then return "muddled" end
+  if M.zombieDefers({ s1 = o.st1 }) then return "zombied" end
+  return nil
+end
+
 function M.muddleRule(o)
   local st, hp, maxhp, floor = o.status2 or {}, o.hp or {}, o.maxhp or {}, o.floor or {}
   local inFlight = o.inFlight or {}
@@ -9081,7 +9092,7 @@ function Driver:magicOnlyLine(actor, boost)
         if brokenNow(s) or M.monBerserk(s) then
           self.wallWait = self.wallWait or {}
           self.wallWait[actor] = self.wallWait[actor] or M.frame
-          if M.frame - self.wallWait[actor] < 900 then
+          if not M.wallWaitOver(self.wallWait[actor], M.frame) then
             local key = "brokenwait:" .. actor
             if not self.statusSaid[key] then
               self.statusSaid[key] = true
@@ -9260,6 +9271,14 @@ function Driver:magicOnlyLine(actor, boost)
     -- and not while his HP is at or under the reraise mark with a living
     -- member still lacking Life 3 (the window would take him past the hold
     -- before it is on: f5_k4_s7, above)
+    -- (No give-way here for the case where no one can put Life 3 on the
+    -- rest, #493: the Break is only withheld, never waited for.  `want`
+    -- falls to nil below and the next best cast goes instead, so no window
+    -- stalls on it; and the hold above gives way by itself after 3,600
+    -- frames once no living member could cast Life at two points, so the
+    -- attacks the hold kept back go on.  What stays forgone is the doubled
+    -- window, and that is the point of withholding it: past the mark with a
+    -- bare member, one window took him from 54% to 0 with one Life 3 queued.)
     local rvf = self.opts.breakHold and self.opts.reraiseVs and self.opts.reraiseVs[M.readWord(0x57C0 + bestSlot * 2)]
     if rvf then
       local hp, mx = M.readWord(0x3BF4 + 8 + bestSlot * 2), M.readWord(0x3C1C + 8 + bestSlot * 2)
@@ -9412,6 +9431,25 @@ function Driver:berserkPlan(actor)
   return nil
 end
 
+-- The cap on one actor's wait for a WallChange body's wall (#493): 900
+-- frames by default, M.WALL_WAIT_CAP = 0 for none (the lab's arm).  `since`
+-- is the frame the wait began.
+function M.wallWaitOver(since, now)
+  local cap = M.WALL_WAIT_CAP
+  if cap == nil then cap = 900 end
+  return cap ~= 0 and now - since >= cap
+end
+-- The wait's clock belongs to one stretch of waiting: a member's plan that
+-- is not the wait itself (reason "wall_wait") ends it, so a later wait starts
+-- its own clock (#493: f6_k6_s0 'waited 21000 frames ... the 900-frame cap
+-- gives way', a stamp left by an earlier window, never cleared).  Returns
+-- whether it cleared one.
+function M.wallWaitSettle(waits, actor, reason)
+  if reason == "wall_wait" or waits == nil or waits[actor] == nil then return false end
+  waits[actor] = nil
+  return true
+end
+
 -- The wait for a WallChange body's wall to stand still (magicOnlyLine,
 -- opts.wallChangeVs): while another living member's action is queued
 -- ($32CC) or in flight (the recovery trace's queued/running), or the body's
@@ -9447,7 +9485,7 @@ function Driver:wallWaitPlan(actor, slot, what)
   self.wallWait = self.wallWait or {}
   if busy then
     self.wallWait[actor] = self.wallWait[actor] or M.frame
-    if M.frame - self.wallWait[actor] < 900 then
+    if not M.wallWaitOver(self.wallWait[actor], M.frame) then
       local key = "wallwait:" .. actor .. ":" .. busy .. ":" .. what
       if not self.statusSaid[key] then
         self.statusSaid[key] = true
@@ -14026,6 +14064,7 @@ function Driver:button(actor)
       return nil
     end
     self.plan, self.planActor, self.tgtSpin = self:makePlan(actor), actor, 0
+    M.wallWaitSettle(self.wallWait, actor, self.plan.reason)
     if self.recovery then self.recovery.plan(actor, self.plan, M.frame) end
     if self.raceTimeActive then self:raceTimeBind(actor,self.plan) end
     self.planPulses, self.steerTrail = 0, {}
@@ -14043,12 +14082,25 @@ function Driver:button(actor)
   -- char 5 cmd $0A atk $5D (a MUDDLED member's action)`), the wipe's
   -- first death.  A person sees the status land and backs out; so does
   -- this, and the next plan is the rule's defer.
-  if not self.plan.committed and self.plan.kind ~= "switch" and self.plan.kind ~= "defer"
-     and (M.readByte(BATTLE.ST2 + actor * 2) & M.ST2_MUDDLE) ~= 0 then
+  -- A Zombie landing after the plan is the same defect (#490, as #448 was
+  -- reached at plan time): a Zombied actor's turns are the engine's, so a
+  -- command entered at the window it still shows is never its own, and a
+  -- plan held through the status took the round's care turn.  Backed out
+  -- of the same way; the next plan is the zombie rule's defer.
+  local backOut = M.planBackOut({ committed = self.plan.committed, kind = self.plan.kind,
+    st2 = M.readByte(BATTLE.ST2 + actor * 2), st1 = M.readByte(BATTLE.ST1 + actor * 2) })
+  if backOut == "muddled" then
     M.log(string.format("[%s] actor=%d was MUDDLED after its %s was planned (state $%02X) -- "
       .. "backing out rather than confirm a command the engine would re-aim (#348)",
       self.tag or "fight", actor, self.plan.kind, st))
     self:dropPlan("muddled")
+    if st == BATTLE.ST_CMD then return nil end
+    return { "b" }
+  elseif backOut == "zombied" then
+    M.log(string.format("[%s] actor=%d was ZOMBIED after its %s was planned (state $%02X, STATUS1 $%02X) -- "
+      .. "backing out: its turns are the engine's (#490)", self.tag or "fight", actor, self.plan.kind, st,
+      M.readByte(BATTLE.ST1 + actor * 2)))
+    self:dropPlan("zombied")
     if st == BATTLE.ST_CMD then return nil end
     return { "b" }
   end
@@ -14841,6 +14893,7 @@ function Driver:idle()
   self.raisePending, self.topUpOwed, self.unmuddlePending = nil, {}, nil
   self.raiseQueued, self.cureQueued, self.healQueued = {}, {}, {}
   self.statusSaid, self.cureSaid, self.freeRoundSaid = {}, nil, false
+  self.wallWait, self.wallBusyAt = nil, nil     -- a wait's clock is one battle's (#493)
   execActor, execActorCmd, execDone = nil, nil, {}
   execParty, execSkipped = nil, {}
   execMon, execMonDone = nil, nil
