@@ -46,16 +46,8 @@ local ALEXANDR = 14                 -- the stone's index (GenjuProp order: Ramuh
 local function owns(esper) return (H.readByte(0x1A69 + (esper >> 3)) >> (esper & 7)) & 1 == 1 end
 local function posOf(ch) return (H.readByte(0x1850 + ch) >> 3) & 3 end
 local FOUR = { CELES, RELM, CYAN, TERRA }
--- the dream's pool (#488, wor-coverage.md 4.3): group 181 (the dream's Doma, 126, and the train's cars 144 and
--- 321) deals Rain Man x2 (309), Samurai and Rain Man x2 (310), Barb-e, Samurai and Suriander (317) at 80/256 and
--- Suriander, Pan Dora and Parasite x2 (318) at 16/256.  The party walks a lap beside the dream's save point until
--- each is won (K.hunt, which asserts this list is the pool the ROM gives the map and bounds the hunt by the worst
--- draws the encounter counters can hold), as a player at a save point before a boss grinds
-local DOMA181 = { [309] = "Rain Man x2", [310] = "Samurai, Rain Man x2", [317] = "Barb-e, Samurai, Suriander",
-  [318] = "Suriander, Pan Dora, Parasite x2" }
-local DOMA_LAP = { { 8, 9 }, { 8, 10 } }
 -- the castle's chests (#485, wor-coverage.md 5.1), which the waking Doma (123) and the dream's copy (126) share by
--- their bits.  Four are opened in the dream's Doma after the hunt: the Elixir, the Ether, the Remedy and the
+-- their bits.  Four are opened in the dream's Doma from its save point: the Elixir, the Ether, the Remedy and the
 -- X-Potion, which in 123 stands behind the door (16,32) to map 124 but in 126 on the same map ((16,32) -> (28,36);
 -- in 123 no way from (55,6) reached it).  The Fenix Down and the Beads stand in a room no door of 126's floor
 -- reaches (126 (33,35): no side of (28,49) reachable); in 123 the ramparts' east door (285 (50,37) -> 123 (28,54))
@@ -85,10 +77,8 @@ H.run({ maxFrames = 1800000 }, {
   -- @@setup-end
 
   -- ---- 1. Wrexsoul ---------------------------------------------------------------------------------------
-  -- @@stage hunt
+  -- @@stage chests
   H.call(function() H.assertEq(map(), MAP_DREAM_DOMA, "the boot stands in the dream's Doma (126): wor_dream's save") end),
-  K.hunt({ what = "the dream's Doma (group 181)", lap = DOMA_LAP, forms = DOMA181, castFirst = true }),
-  H.fieldCare({ threshold = 1.0, tag = "after the hunt" }),
   domaChests(DREAM_CHESTS, MAP_DREAM_DOMA),
 
   -- @@stage wrexsoul

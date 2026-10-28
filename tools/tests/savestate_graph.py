@@ -900,12 +900,20 @@ STATES = [
     # (docs/design/route-wor-narshe.md).  Each fight is a game over when
     # lost: the runner retries from the save point.  A cut.  wor_owzer
     # below boots its checkpoint.  Re-cut by checkpoint_drift.py --recut.
-    # also: wor_tritoch_cave and wor_tritoch_pocket, the party on the cave's
-    # landing (281) and in the X-Ether's pocket (282) before their hunts
-    # (#488: the hunts' sweeps).
+    # also: wor_tritoch_cave, the party on the cave's landing (281), where
+    # the branch wor_umaro_hunt below begins (#488).
     S("wor_tritoch", gen="gen_wor_tritoch", prev="wor_narshe",
       checkpoint="wor-narshe-cliffs-v1", timeout=5400,
-      also=["wor_tritoch_cave", "wor_tritoch_pocket"]),
+      also=["wor_tritoch_cave"]),
+
+    # wor_tritoch_cave -> a branch (#488): Umaro's cave's two pools hunted
+    # until each formation is won, the landing's (281) and the X-Ether's
+    # pocket's (282) (docs/design/route-wor-narshe.md section 15).  Nothing
+    # boots it: the main line walks through the cave without the hunts'
+    # experience.  also: wor_umaro_hunt_pocket, the party in the pocket
+    # before its hunt (the sweeps').
+    S("wor_umaro_hunt", gen="gen_wor_umaro_hunt", prev="wor_tritoch_cave",
+      timeout=5400, also=["wor_umaro_hunt_pocket"]),
 
     # wor-narshe-v1 -> Owzer's basement, map 207's save point (87,41): the
     # cabin (CYAN, TERRA and CELES), the Falcon to Jidoor, the item counter,
@@ -1028,11 +1036,19 @@ STATES = [
     # (docs/design/route-wor-gogo.md).  A cut.  wor_opera below boots its
     # checkpoint.  Re-cut by checkpoint_drift.py --recut.
     # also: wor_ebot_hub and wor_ebot_rooms, the party at the rock's mouth
-    # (405) and on its first landing in the rooms (404) before their hunts
-    # (#488: the hunts' sweeps).
+    # (405) and on its first landing in the rooms (404), where the branches
+    # wor_ebot_hunt and wor_ebot_rooms_hunt below begin (#488).
     S("wor_ebot", gen="gen_wor_ebot", prev="wor_gogo",
       checkpoint="wor-gogo-v1", timeout=7200,
       also=["wor_ebot_hub", "wor_ebot_rooms"]),
+
+    # wor_ebot_hub, wor_ebot_rooms -> branches (#488): Ebot's Rock's two
+    # pools hunted until each formation is won (docs/design/route-wor-gogo.md
+    # section 11).  Nothing boots them.
+    S("wor_ebot_hunt", gen="gen_wor_ebot_hunt", prev="wor_ebot_hub",
+      timeout=7200),
+    S("wor_ebot_rooms_hunt", gen="gen_wor_ebot_rooms_hunt",
+      prev="wor_ebot_rooms", timeout=7200),
 
     # wor-gogo-v1 -> the World of Ruin map on the Falcon's tile by Thamasa
     # (250,229) again: a branch beside wor_ebot (#484).  Thamasa's item
@@ -1063,11 +1079,23 @@ STATES = [
     # (docs/design/route-wor-dreams.md).  A cut.  wor_doma below boots its
     # checkpoint.  Re-cut by checkpoint_drift.py --recut.
     # also: wor_dream_scape and wor_dream_cave, the party in the dreamscape
-    # (317) and in the cave below the engine (319) before their hunts (#488:
-    # the hunts' sweeps).
+    # (317) and in the cave below the engine (319), where the branches
+    # wor_dream_hunt and wor_dream_cave_hunt below begin (#488).
     S("wor_dream", gen="gen_wor_dream", prev="wor_opera",
       checkpoint="wor-opera-v1", timeout=7200,
       also=["wor_dream_scape", "wor_dream_cave"]),
+
+    # wor_dream_scape, wor_dream_cave, wor-dream-v1 -> branches (#488): the
+    # dream's three pools hunted until each formation is won, the
+    # dreamscape's, the cave's (in Magitek armor) and the dream's Doma's
+    # beside its save point (docs/design/route-wor-dreams.md section 10).
+    # Nothing boots them.
+    S("wor_dream_hunt", gen="gen_wor_dream_hunt", prev="wor_dream_scape",
+      timeout=7200),
+    S("wor_dream_cave_hunt", gen="gen_wor_dream_cave_hunt",
+      prev="wor_dream_cave", timeout=7200),
+    S("wor_doma_hunt", gen="gen_wor_doma_hunt", prev="wor_dream",
+      checkpoint="wor-dream-v1", timeout=7200),
 
     # wor-dream-v1 -> the World of Ruin map on the Falcon's tile by Doma
     # (170,75): the dream's throne and Wrexsoul (event battle 92, a game over
@@ -1091,11 +1119,19 @@ STATES = [
     # its checkpoint.  Re-cut by checkpoint_drift.py --recut.
     # also: wor_ancient_dragon, the party on the queen's floor before the
     # Blue Dragon (the dragon's labs).
-    # also: wor_ancient_yard and wor_ancient_hall, the party in the courtyard
-    # (407) and the castle (406) before their hunts (#488: the hunts' sweeps).
+    # also: wor_ancient_yard, the party in the courtyard (407) after the
+    # flashback, where the branch wor_ancient_hunt below begins (#488).
     S("wor_ancient", gen="gen_wor_ancient", prev="wor_doma",
       checkpoint="wor-doma-v1", timeout=7200,
-      also=["wor_ancient_dragon", "wor_ancient_yard", "wor_ancient_hall"]),
+      also=["wor_ancient_dragon", "wor_ancient_yard"]),
+
+    # wor_ancient_yard -> a branch (#488): the Ancient Castle's two pools
+    # hunted until each formation is won, the courtyard's (407) and the
+    # castle's (406) (docs/design/route-wor-dreams.md section 10).  Nothing
+    # boots it.  also: wor_ancient_hunt_hall, the party below Odin's statue
+    # before the castle's hunt (the sweeps').
+    S("wor_ancient_hunt", gen="gen_wor_ancient_hunt", prev="wor_ancient_yard",
+      timeout=7200, also=["wor_ancient_hunt_hall"]),
 
     # wor-ancient-v1 -> the World of Ruin map on the Falcon's tile by Maranda
     # (69,183): Kohlingen's counter, the Colosseum (map 413): the Striker

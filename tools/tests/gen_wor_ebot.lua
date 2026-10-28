@@ -72,54 +72,9 @@ local function hole(x, y, what)
   })
 end
 local function reach(x, y) return H.bfsReach(nil, nil, nil, {}, x, y) ~= nil end
--- Ebot's two pools (#488, wor-coverage.md 4.3): the hub (405, group 194) deals Slatter, Warlock and Eland (296),
--- Slatter x2 (297), Warlock, Cluck x2 and Eland x2 (298) at 80/256 and Hipocampus and Cluck x3 (295) at 16/256;
--- the random rooms (404, group 193) Opinicus x2 (291), Displayer (292), Opinicus, Hipocampus and Eland (293) at
--- 80/256 and Hipocampus x3 (294) at 16/256.  The party walks a lap of each until each is won (K.hunt, which
--- asserts these lists are the pools the ROM gives the maps and bounds the hunts by the worst draws the encounter
--- counters can hold), as a player pausing in the rock meets them: the hub's at its mouth, the rooms' on the
--- first landing in them (their walls are drawn at random, so the lap is the tile landed on and a neighbour)
-local HUB194 = { [296] = "Slatter, Warlock, Eland", [297] = "Slatter x2", [298] = "Warlock, Cluck x2, Eland x2",
-  [295] = "Hipocampus, Cluck x3" }
-local ROOMS193 = { [291] = "Opinicus x2", [292] = "Displayer", [293] = "Opinicus, Hipocampus, Eland",
-  [294] = "Hipocampus x3" }
--- the map's step-on tiles (its holes and its other triggers: route_data map 404/405), kept off a lap
-local EBOT_TRIGGERS = { [404] = {}, [405] = { { 23, 19 }, { 7, 5 }, { 23, 7 }, { 7, 24 } } }
-local function offLap(x, y)
-  for _, t in ipairs(holesHere()) do if t[1] == x and t[2] == y then return true end end
-  for _, t in ipairs(EBOT_TRIGGERS[map()] or {}) do if t[1] == x and t[2] == y then return true end end
-  return false
-end
--- a lap of the tile the party stands on and a neighbour one step away, neither a step-on tile
-local function lapHere(what)
-  local x, y = H.fieldX(), H.fieldY()
-  for _, d in ipairs({ { 0, -1 }, { 0, 1 }, { -1, 0 }, { 1, 0 } }) do
-    local nx, ny = x + d[1], y + d[2]
-    local p = not offLap(nx, ny) and H.bfsPath(nx, ny) or nil
-    if p and #p == 1 then return { { x, y }, { nx, ny } } end
-  end
-  error(string.format("[hunt] %s: no lap beside map %d (%d,%d)", what, map(), x, y))
-end
-local ebotWon, rooms404Hunted = {}, false
-local function hunt405()
-  return H.lazy(function()
-    H.assertEq(offLap(H.fieldX(), H.fieldY()), false, "the hub's lap starts off its step-on tiles")
-    return K.hunt({ what = "Ebot's hub (group 194)", lap = lapHere("Ebot's hub"), forms = HUB194, won = ebotWon,
-      castFirst = true, avoid = holesHere() })
-  end)
-end
-local function hunt404()
-  return H.lazy(function()
-    rooms404Hunted = true
-    return H.seqStep({
-      H.fieldCare({ threshold = 1.0, tag = "before the rooms' hunt" }),
-      H.saveState("wor_ebot_rooms.mss"),
-      K.hunt({ what = "Ebot's rooms (group 193)", lap = lapHere("Ebot's rooms"), forms = ROOMS193, won = ebotWon,
-        castFirst = true, avoid = holesHere() }),
-      H.fieldCare({ threshold = 1.0, tag = "after the rooms' hunt" }),
-    })
-  end)
-end
+-- the captures gen_wor_ebot_hunt and gen_wor_ebot_rooms_hunt boot (branches: nothing boots them; #488): the hub at the rock's mouth, and the
+-- rooms on the first landing in them (their walls are drawn at random on each landing)
+local roomsCaptured = false
 -- the side of an object the party can stand on to talk to it
 -- the side of a coral chest (an invisible NPC on a chest tile) the party can reach without crossing a hole,
 -- and the way it faces from there
@@ -168,7 +123,10 @@ local function coralHunt(need, what, budget)
     H.repeatN(budget or 80, {
       H.cond(function() return not done() end, {
         H.call(function() moves = moves + 1 end),
-        H.cond(function() return map() == 404 and not rooms404Hunted end, { hunt404() }, {}),
+        H.cond(function() return map() == 404 and not roomsCaptured end, {
+          H.call(function() roomsCaptured = true end),
+          H.saveState("wor_ebot_rooms.mss"),
+        }, {}),
         H.lazy(function()
           if coral() >= need and map() == 405 and not reach(23, 19) then
             -- enough coral: holes until the chest's room
@@ -187,7 +145,7 @@ local function coralHunt(need, what, budget)
       ebotWhere(what .. string.format(" after %d moves", moves))
       H.assertEq(done(), true, string.format("%s: %d coral and the chest in reach within %d moves", what, need,
         budget or 80))
-      H.assertEq(rooms404Hunted, true, what .. ": the rooms (404) were hunted on the first landing in them")
+      H.assertEq(roomsCaptured, true, what .. ": the rooms (404) were captured on the first landing in them")
     end),
   })
 end
@@ -218,11 +176,7 @@ H.run({ maxFrames = 2400000 }, {
     arrive = function() return map() == 405 and not H.worldMode() end }),
   H.waitUntil(function() return map() == 405 and settled() end, 2400, "Ebot's Rock: map 405", 1),
   H.call(function() say("route", "Ebot's Rock (405)") end),
-  -- @@stage hub_hunt
-  H.fieldCare({ threshold = 1.0, tag = "before the hub's hunt" }),
   H.saveState("wor_ebot_hub.mss"),
-  hunt405(),
-  H.fieldCare({ threshold = 1.0, tag = "after the hub's hunt" }),
   -- the first hole (7,15) sets the party by the hungry chest (_cb6ec6, $0181); every hole after it is random
   hole(7, 15, "405 (7,15): the first hole"),
   coralHunt(CORAL_NEED, "the coral hunt", 80),
