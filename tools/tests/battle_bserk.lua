@@ -110,6 +110,17 @@ end
 local function closed() return rec ~= nil and rec.ended ~= nil and H.frame > rec.ended + 30 end
 
 local stage, battles, mode, plan, watch0 = 1, 0, nil, {}, nil
+-- The battle budget, from the pool odds (route_data SLOT_ODDS, 80/80/80/16
+-- of 256, over each map's group): beside the save point (map 375, group 90)
+-- and in cave 372 (group 89) the formations with a body open to Berserk are
+-- slots 0, 1 and 3, 176/256; an Insecare stands only in group 89's slot 1,
+-- 80/256.  Its Wing Whisp came inside the watch in each of 8 Insecare
+-- battles over K 0-7 (build/attempts/wt/v038-berserk-2/lab-air/bk_k*); 0.7
+-- is taken for it.  Each stage gets the battles that leave it a 1-in-1000
+-- chance of running out: 6, 28 and 6, so 40
+local function within(p) return math.ceil(math.log(1e-3) / math.log(1 - p)) end
+local P_OPEN, P_INSECARE, Q_WATCH = 176 / 256, 80 / 256, 0.7
+local BUDGET = within(P_OPEN) + within(P_INSECARE * Q_WATCH) + within(P_OPEN)
 -- how long the party Defends for an Insecare's Wing Whisp before it fights
 -- the battle out (about five of the Insecare's turns)
 local WATCH_FRAMES = 4000
@@ -131,7 +142,7 @@ end
 -- one battle's choice, made when it is up
 local function decide()
   battles = battles + 1
-  H.assertEq(battles <= 40, true, "the three stages within 40 battles")
+  H.assertEq(battles <= BUDGET, true, string.format("the three stages within %d battles (the pool odds)", BUDGET))
   plan, mode, rec, caster, seen = {}, "fightout", nil, nil, {}
   local ids, insecare = {}, false
   for s = 0, 5 do
