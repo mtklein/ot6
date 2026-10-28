@@ -449,9 +449,9 @@ boot checkpoint the branch Continues and the leg it rejoins.
 | 10 | The early-continent draw gaps | `wor-start-v1` to `wor-figaro-sweep-v1` | 19 formations of L5-29, 2-1,155 per member | S | seldom |
 
 Units 1 and 2 are played since v0.38 by `gen_wor_dino` and `gen_wor_desert`,
-on the line after the Colosseum (`route-wor-side-trips.md`). Units 5 and 7
-for Zozo, Owzer's house, the Tzen house and the small towns (with South
-Figaro's passage) are played since v0.38 by those places' legs (section 11).
+on the line after the Colosseum (`route-wor-side-trips.md`). Unit 5 for Zozo, Owzer's house, the Tzen house and the small towns, and
+unit 7 for Zozo and South Figaro's passage, are played since v0.38 by
+those places' legs (section 11; Owzer's basement's pool is left).
 
 Unit 5 splits by arc: the Ancient Castle (`gen_wor_ancient`, 8 chests,
 items Wing Edge, Doom Darts, Magicite, Ether, X-Potion, Punisher, two
@@ -777,7 +777,7 @@ distinct bits opened by WoR legs 62; already opened in the WoB 30
 From the worktree root, in order: `ninja build/ot6.sfc`; in the evidence directory `map_graph.py` (DEPTH=0,1,2 into `graph_d*.json`), `visited.py`, `maptable.py`, `veldt_bits.py`, `world1.py`, `evbat.py`, `wor_gap.py`, `groups.py`, `isles.py`, `trip.py`, `units.py`, `chest_report.py`, `shared_bits.py`, `proof.py`, `summary.py`; `python3 tools/audit_chests.py` (`audit_chests.txt`); `python3 tools/route_data.py world-path 1 178 46 195 50`, `world-path 1 69 185 66 189`, `species`, `pool group`. No emulator was started: every number is read from the ROM, the tracked SRAM, a seeded savestate or an existing play log.
 
 
-## 11. Played since (v0.38): the small towns, Zozo, Owzer's basement and the Tzen house (#485, #488)
+## 11. Played since (v0.38): the small towns, Zozo, Owzer's house and the Tzen house (#485, #488)
 
 Units 5 and 7 for these places. Evidence under
 `build/attempts/wt/v038-wor-sweeps-a/`: `dev/` (the development runs and
@@ -823,70 +823,83 @@ Left, with the reason:
 
 Each walks a two-tile lap until every formation of its map's pool is won
 (`K.hunt`: the list asserted to be the pool the ROM gives the map, the
-bounds read from the ROM). A formation that fills two slots (284 in group
-157, 125 in group 65) is met when either slot is drawn (`K.hunt` since
-2acb09cc); the bound for the one-slot pools is unchanged.
+bounds read from the ROM). A formation that fills two slots (125 in group
+65) is met when either slot is drawn (`K.hunt` since 2acb09cc); the bound
+for the one-slot pools is unchanged.
 
 | pool | leg | lap | battles bound | longest hunt |
 |---|---|---|---|---|
 | Zozo's street, group 78 (map 221): 104, 109, 102, 110 | `gen_wor_cyan`, after the Rust-Rid | (42,30) <-> (43,30) | 110 | 14 |
 | Zozo's buildings, group 77 (map 225): 105, 107, 108, 106 | `gen_wor_cyan`, in the clock's room | (98,61) <-> (99,61) | 110 | 13 |
 | South Figaro's passage, group 65 (map 87): 374, 373, 125 | `gen_wor_figaro_sweep`, after the cellar | (36,49) <-> (37,49) | 21 | 15 |
-| Owzer's basement, group 157 (map 207): 286, 284, 285 | `gen_wor_owzer`, by the save point | (85,46) <-> (85,47) | 21 | 10 |
 
 ("every slot drawn within 110 battles", "within 21 battles"; "a battle
-within 162 steps" for all four.)
+within 162 steps" for all three.)
 
-The basement's hunt fights SoulDancer x2 with Crusher x2 (284) with the
-SoulDancers killed first (`gen_wor_relm`'s order for the same pool) and the
-heal at 75%: the SoulDancers throw knives (AIScript `_173`, Dirk to
-Assassin) for 500-1,000 a throw on the three. Its sweep in the default
-order lost 2 of 23 fights of 284 with deaths in 7 of 15 keys
-(`sweeps/tally_ow.txt`, stopped at 17 runs), the SoulDancers first lost 1
-of 85 with deaths in 3 of 30 keys (`tally_ow2.txt`), and with the 75% heal
-too none of 86 (`tally_owA2.txt`). Runic instead of the heal lost one of
-the three draws that had died (`tally_owB.txt`).
+**Owzer's basement is not hunted.** Its pool (group 157: Vindr x2 286,
+SoulDancer x2 with Crusher x2 284, 285) is too much for the three before
+Chadarnook at this line's levels (L38-40). The SoulDancers throw knives
+(AIScript `_173`, Dirk to Assassin) for 500-1,000 a throw. A hunt by the
+save point was played and measured before it was dropped
+(`sweeps_53f07b59/`, the line before Berserk landed, the party L40-41; and
+`sweeps/`, this line):
+
+- before Berserk, from the hunt's capture, K 0-11 at shifts 0 and 7: the
+  default order lost 2 of 23 fights of 284 (`tally_ow.txt`), the
+  SoulDancers first (`gen_wor_relm`'s order) 1 of 85 (`tally_ow2.txt`),
+  with the heal at 75% too none of 86 (`tally_owA2.txt`);
+- on this line the same hunt's sweep won all 86 fights of 284 from its
+  capture (`tally_ow.txt`), but the graph's own play lost its first
+  attempt there (`chain/chain4.log.gz`: "battle 5 formation 284 lost", key be7C-g011C;
+  "PASS (frame 116525) attempts=2/3"), and the leg from `wor-narshe-v1`
+  lost at 3 of 6 seed shifts; the heal at 90%, the relic plan against a
+  physical threat and Bio did no better (`tally_owv.txt`: "formation 284:
+  18 fights ... won 15, lost 3"; `tally_owvb.txt`: "22 fights ... won 15,
+  lost 7").
+
+So 284 and 286 stay unfought; the route's own walk still meets the pool,
+as before (route-wor-thamasa.md 11). A fourth member there, or more levels
+before the basement, is the lever for a later unit.
 
 ### 11.3 The sweeps
 
 From the graph's own captures before each hunt (`wor_cyan_rustrid`,
-`wor_cyan_zozo225`, `wor_figaro_sweep_passage` from the play at 2acb09cc;
-`wor_owzer_hunt`, sha256 8b55d577, the same play: the leg's later changes
-come after it), K 0-11 battles used up first on the hunt's own lap,
-counted by battles opened (#491), at seed shifts 0 and 7, one attempt each
-(`scripts/lab_hunt.lua`, `scripts/tally.py`): 96 of 96 PASS. The pick
-sequence is the fixture's, so K moves where the hunt starts in it.
+`wor_cyan_zozo225`, `wor_figaro_sweep_passage`, sha256 a1402b80, 9c1910f6,
+56583d64, from the play at 923895c6 on fa5425f1; the commits after it
+change only the Owzer leg, later on the line), K 0-11 battles used up
+first on the hunt's own lap, counted by battles opened (#491), at seed
+shifts 0 and 7, one attempt each (`scripts/lab_hunt.lua`,
+`scripts/tally.py`): 72 of 72 PASS. The pick sequence is the fixture's, so
+K moves where the hunt starts in it.
 
 | formation | fights | distinct keys | won | keys with a death |
 |---|---|---|---|---|
-| 104 Gabbldegak x4 | 150 | 21 | 150 | 0 |
-| 109 Harvester, Gabbldegak x2 | 36 | 8 | 36 | 0 |
-| 102 HadesGigas | 102 | 15 | 102 | 0 |
-| 110 HadesGigas, Harvester | 60 | 7 | 60 | 0 |
-| 105 SlamDancer | 226 | 47 | 226 | 0 |
-| 107 Harvester | 34 | 13 | 34 | 0 |
-| 108 SlamDancer, Harvester x2 | 58 | 19 | 58 | 0 |
+| 104 Gabbldegak x4 | 150 | 20 | 150 | 0 |
+| 109 Harvester, Gabbldegak x2 | 36 | 6 | 36 | 0 |
+| 102 HadesGigas | 102 | 11 | 102 | 0 |
+| 110 HadesGigas, Harvester | 60 | 11 | 60 | 0 |
+| 105 SlamDancer | 226 | 40 | 226 | 0 |
+| 107 Harvester | 34 | 17 | 34 | 0 |
+| 108 SlamDancer, Harvester x2 | 58 | 16 | 58 | 0 |
 | 106 SlamDancer, Gabbldegak x3 | 24 | 14 | 24 | 0 |
-| 374 Vector Pup x2 | 82 | 36 | 82 | 0 |
-| 373 Vector Pup x2, Commander | 90 | 25 | 90 | 0 |
-| 125 Commander x3 | 130 | 41 | 130 | 0 |
-| 286 Vindr x2 | 102 | 35 | 102 | 0 |
-| 284 SoulDancer x2, Crusher x2 | 86 | 25 | 86 | 0 |
-| 285 Vindr x2, Wild Cat, Crusher x2 | 90 | 16 | 90 | 0 |
+| 374 Vector Pup x2 | 82 | 31 | 82 | 0 |
+| 373 Vector Pup x2, Commander | 90 | 24 | 90 | 0 |
+| 125 Commander x3 | 130 | 42 | 130 | 0 |
 
-Zozo's street repeats its draws most: 9 distinct plays in 24 runs
-(`tally_z1.txt`); its 110 was met in 7 keys.
+Zozo's street repeats its draws most: 11 distinct plays in 24 runs
+(`tally_z1.txt`); its 109 was met in 6 keys. The sweeps before Berserk
+landed (`sweeps_53f07b59/`) read alike: every fight won.
 
 ### 11.4 The Tzen house on its clock
 
-From the graph's capture `wor-tzen-door-v1` (the play at 2acb09cc), K 0-11
-battles used up beside Tzen's door first, at seed shifts 0 and 7
-(`scripts/mk_tzenlab.py`: the leg as it stands with the battles put
-before it): 24 of 24 PASS, all six chests every time, no run from a
+From the graph's capture `wor-tzen-door-v1` (sha256 23462913, the play at
+923895c6), K 0-11 battles used up beside Tzen's door first, at seed shifts
+0 and 7 (`scripts/mk_tzenlab.py`: the leg as it stands with the battles
+put before it): 24 of 24 PASS, all six chests every time, no run from a
 fight; the house's fights 207 (HermitCrab x2, Pm Stalker) 46 in 31 keys
-and 209 (Scorpion x3) 40 in 31 keys, all won. The time left at the exit:
-"min 2864, median 8328, max 9436" frames of 21,600 (`tally_tz.txt`); the
-lowest, K6 s7, met five fights in the house ("exit 0:47 (2864)"). The
+and 209 (Scorpion x3) 40 in 28 keys, all won. The time left at the exit:
+"min 2571, median 8310, max 9371" frames of 21,600 (`tally_tz.txt`); the
+lowest, K6 s0, met five fights in the house ("exit 0:42 (2571)"). The
 leg's run rule counts the chests still to open in the walk ahead.
 
 ### 11.5 Figaro Castle's SABIN
@@ -899,7 +912,8 @@ leaves to wander (`_ca89fd`, $0049) and rejoins at the court's landing
 ### 11.6 The asserts and their negatives
 
 Each is red on a one-line mutant, as class=assert (`scripts/mkmut.py`,
-`scripts/mkmut_hunt.py`; `dev/mut_*`):
+`scripts/mkmut_hunt.py`; `dev/mut_*`, run at 2acb09cc from the tracked
+checkpoints of the line before Berserk landed):
 
 - the chests: "Albrook: the Elixir (330 (35,7))'s chest (bit 103) is open:
   got false", "311: the Pearl Rod's chest (bit 145) is open: got false",
@@ -914,7 +928,8 @@ Each is red on a one-line mutant, as class=assert (`scripts/mkmut.py`,
   near his post (43,29): got false";
 - SABIN's return: "SABIN is back from his wander about the castle ($0049,
   _ca7171): got 1";
-- the hunt helper: the bound at 1, "every formation it is walked for won
-  within 1 battles (...): got false"; the two-slot 125 left out, "map 87's
+- the hunt helper (from development captures): the bound at 1, "every
+  formation it is walked for won within 1 battles (...): got false"; the
+  two-slot 125 left out, "map 87's
   pool formation 125 is one it is walked for: got false"; a formation no
   pool deals, "formation 999 is in map 221's pool (...): got false".
