@@ -10537,7 +10537,8 @@ function M.worLegKit(env)
   -- spec.won (a table shared across hunts), spec.avoid (worldNavTo's).  Both lap tiles are asserted to roll the
   -- group, so every battle of the lap is the pool's.  The battle bound is the pool's worst case over the
   -- encounter counters (M.worstCaseEncounters, as hunt's), asserted as each battle ends; spec.budget overrides
-  -- it (a mutant's lever).  The walker plays the battles (FIGHT) and the field care runs after each lap.
+  -- it (a mutant's lever).  The walker plays the battles (FIGHT) and the field care runs after each lap, at
+  -- spec.careThreshold when given (a solo member tops up to full).
   local function worldHunt(spec)
     local won, wp, n0, seen, budget = spec.won or {}, 1, nil, nil, nil
     local function done()
@@ -10606,7 +10607,7 @@ function M.worLegKit(env)
           { maxFrames = 20000, playBattles = "tactical", fight = FIGHT, avoid = spec.avoid }),
         M.call(function() wp = wp % 2 + 1 end),
         M.cond(function() return not M.battleLoadStarted() and M.worldMode() end,
-          { M.fieldCare({ tag = "care on the hunt" }) }, {}),
+          { M.fieldCare({ tag = "care on the hunt", threshold = spec.careThreshold }) }, {}),
       }, spec.what),
       M.call(function()
         say("hunt", string.format("%s: done after %d battles; %s", spec.what, #M.outcomes - n0,

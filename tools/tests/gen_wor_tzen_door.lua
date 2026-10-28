@@ -366,6 +366,10 @@ local wpi, grindDone, legs = 1, false, 0
 -- as TARGET_LEVEL, so the laps' XP is part of the grind's, not on top of it.
 -- Groups 33 and 35 deal only the plains six; group 0 deals two species of
 -- the World of Balance's opening (authored rows), allowed on its lap alone.
+-- CELES is alone: between the laps' battles she tops up to full (the sweep
+-- with the walks' default care lost one fight of Chitonid with Gigan Toad x2,
+-- 201, in 82, she having opened it at 858/1125 and died from 52:
+-- build/attempts/wt/v038-wor-sweeps-a/sweeps/tally_wt_g33.txt).
 local GRIND_LAPS = {
   { what = "the forest west of the bend (group 33)", lap = { { 125, 200 }, { 125, 201 } },
     forms = { [203] = "Lunaris x2", [201] = "Chitonid, Gigan Toad x2" } },
@@ -390,7 +394,7 @@ local function grindLaps()
       assertLegPools("to " .. l.what, { { H.worldX(), H.worldY() }, l.lap[1], l.lap[2] }, nil, allowed)
     end)
     steps[#steps + 1] = KIT.worldHunt({ what = l.what, lap = l.lap, forms = l.forms, won = grindWon,
-      avoid = avoid })
+      avoid = avoid, careThreshold = 1.0 })
     steps[#steps + 1] = checkOutcomes(l.what)
   end
   return H.seqStep(steps)
