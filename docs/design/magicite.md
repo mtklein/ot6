@@ -322,6 +322,9 @@ What the arcs need from them (`level-curve.md`, "The World of Ruin"):
   Shell (Shiva, ZoneSeek; Alexandr's at v0.35) besides.  He is open to
   Berserk (Siren's, or STRAGO's once he has watched it): it stops his
   WallChange and his casting, though not the Ultima ("Berserk", above).
+  Berserk, he Fights for 700 to 900 a hit, so it pays only on a wall the
+  party can hit; the route casts it in a break window
+  (route-wor-thamasa.md 12.4).
 - **Stones outnumber the members who can wear them** from v0.27 on: fifteen
   stones for five members at v0.27, eighteen to twenty-one for ten at
   v0.30.  Umaro and Gogo take none.  The one-copy rule binds on the four

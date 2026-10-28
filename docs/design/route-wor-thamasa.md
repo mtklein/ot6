@@ -901,3 +901,49 @@ actions, and between them the party climbs eight shields one Break and
 one weakness at a time. The same stage sweeps on a lab ROM with four
 shields in place of eight ran a median of 45,563 with Shoat (`m14`,
 `mm4-setup.sh`); that row is the owner's call (the report of #442).
+
+### 12.4 Berserk at MagiMaster (v0.38)
+
+Evidence under `build/attempts/wt/v038-berserk-2/`. Every sweep boots the
+graph's own capture of `wor-tower-v1` at 6b0f5ab5 (this branch's ROM),
+with K world battles opened beside the tower first, counted by battles
+opened rather than by `H.outcomes` (#491; `scripts/mkkv.py`), K 0-8 at seed
+shifts 0 and 7 (`scripts/mkjobs.sh`); `scripts/bztally.py` counts each
+MagiMaster battle key once.
+
+- **STRAGO learns it on the climb.** The capture's STRAGO does not know
+  Bserk (`lab/peek`: `STRAGO's Bserk byte $00`); the L.50 Magic's counter
+  on the floors teaches him (`[lander] ... species $133 (cmd $02 atk $21)
+  landed Berserk on entity 1`), and he held it at MagiMaster's door in 17
+  of 18 runs (`Bserk for MagiMaster: STRAGO (learned)`). The one that did
+  not, `z6_k5_s7`, fought the fight without it and won (38,820 ticks), so
+  the kit stays as it is: no Siren wearer.
+- **Berserk freezes his wall.** Berserk, his counter runs only to its first
+  `end_if`, so `if_hit WallChange` stops and `if_self_dead Ultima` still
+  fires (the Life 3 hold stays). He also Fights, for 700 to 900 a hit
+  through the rings. Frozen on a wall nobody holds, the fight is lost: cast
+  whenever the wall read hittable, Bserk landed after the wall had turned
+  and froze it on poison, earth, earth and water, and four of eight runs
+  ended in a game over (`z3_k1_s7`, `z3_k2_*`, `z3_k3_s7`: `[bz] ...
+  BERSERK (HP 46614, wall weak $08)`, `[death] ... by slot 0 cmd $00 atk
+  $EE`); the four on a held wall won in 26,120 to 37,425 ticks. Asked to
+  wait until no action was queued at all, it never went (`z1`).
+- **So it goes in a break window** (`Driver:berserkPlan`, `opts.berserkVs`):
+  Broken he draws no counter, his wall stands, and `breakVs` broke him only
+  on a wall the party holds; STRAGO, who holds nothing for most walls, is
+  free in the window. It also wants 8 of the window's 16 break ticks left:
+  one cast late in a window landed after it on a turned wall (`z5_k1_s7`:
+  `window over after 2356 frames`, then `atk $C1`, then `BERSERK (HP 19489,
+  wall weak $01)`).
+
+| sweep | runs | distinct keys won | min | median | p90 | max |
+|---|---|---|---|---|---|---|
+| `f6` main at 38b483f8 (12.3) | 18 of 18 PASS | 17 of 17 | 45,591 | 76,508 | 114,929 | 124,444 |
+| `z4` this ROM, no Bserk | 18 of 18 PASS | 15 of 15 | 39,132 | 67,400 | 90,756 | 117,232 |
+| `z6` this ROM, Bserk in a window | 18 of 18 PASS | 15 of 15 | 23,214 | 48,000 | 88,060 | 90,174 |
+
+(Ticks by distinct key, `bztally.py lab z6 z4`, `tally-f6.txt`; over all
+18 runs `z6` reads median 47,094 and p90 87,230, `f6` 74,271 and 113,459.)
+Berserk landed in 12 of the 18 `z6` fights; in the others he died in the
+window before it landed, STRAGO had no turn in a window (his Life 3 casts
+come first), or nobody held it.
