@@ -905,11 +905,14 @@ shields in place of eight ran a median of 45,563 with Shoat (`m14`,
 ### 12.4 Berserk at MagiMaster (v0.38)
 
 Evidence under `build/attempts/wt/v038-berserk-2/`. Every sweep boots the
-graph's own capture of `wor-tower-v1` at 6b0f5ab5 (this branch's ROM),
-with K world battles opened beside the tower first, counted by battles
-opened rather than by `H.outcomes` (#491; `scripts/mkkv.py`), K 0-8 at seed
-shifts 0 and 7 (`scripts/mkjobs.sh`); `scripts/bztally.py` counts each
-MagiMaster battle key once.
+graph's own capture of `wor-tower-v1` at 6b0f5ab5, with K world battles
+opened beside the tower first, counted by battles opened rather than by
+`H.outcomes` (#491; `scripts/mkkv.py`), K 0-8 at seed shifts 0 and 7
+(`scripts/mkjobs.sh`); `scripts/bztally.py` counts each MagiMaster battle
+key once. Two ROMs ran them, differing only in where `OT6_BLUESEEN` sits in
+RAM: 2c9379bf (6b0f5ab5's, the cell at `$ee23`: `z1` to `z3`, and 16 of
+`z4`'s 18 runs) and 5de66a7d (the cell at `$ee2b`: `z4`'s last two, `z5` to
+`z7`); each run's `rom.txt` names its own.
 
 - **STRAGO learns it on the climb.** The capture's STRAGO does not know
   Bserk (`lab/peek`: `STRAGO's Bserk byte $00`); the L.50 Magic's counter
@@ -921,29 +924,60 @@ MagiMaster battle key once.
 - **Berserk freezes his wall.** Berserk, his counter runs only to its first
   `end_if`, so `if_hit WallChange` stops and `if_self_dead Ultima` still
   fires (the Life 3 hold stays). He also Fights, for 700 to 900 a hit
-  through the rings. Frozen on a wall nobody holds, the fight is lost: cast
-  whenever the wall read hittable, Bserk landed after the wall had turned
-  and froze it on poison, earth, earth and water, and four of eight runs
+  through the rings. Frozen on a wall nobody holds, the fight is lost.
+  Asked to wait until no action was queued at all, Bserk never went (`z1`,
+  two runs to the fight, then stopped). Cast whenever the wall read
+  hittable (`z3`), it landed after the wall had turned and froze it on
+  poison, earth, earth and water: of the eight runs that finished, four
   ended in a game over (`z3_k1_s7`, `z3_k2_*`, `z3_k3_s7`: `[bz] ...
   BERSERK (HP 46614, wall weak $08)`, `[death] ... by slot 0 cmd $00 atk
-  $EE`); the four on a held wall won in 26,120 to 37,425 ticks. Asked to
-  wait until no action was queued at all, it never went (`z1`).
+  $EE`) and four won in 26,120 to 37,425 ticks; its other eight runs were
+  stopped when the rule changed. (`z2`, the first try of the K lap, reached
+  the fight in its two K-0 runs only: in the other 16 the lap's world walk
+  timed out aboard the Falcon after the leg's readiness trip, `worldNavTo:
+  timeout after 20000 walk frames`; the lap now runs before that check.)
 - **So it goes in a break window** (`Driver:berserkPlan`, `opts.berserkVs`):
   Broken he draws no counter, his wall stands, and `breakVs` broke him only
   on a wall the party holds; STRAGO, who holds nothing for most walls, is
-  free in the window. It also wants 8 of the window's 16 break ticks left:
-  one cast late in a window landed after it on a turned wall (`z5_k1_s7`:
-  `window over after 2356 frames`, then `atk $C1`, then `BERSERK (HP 19489,
-  wall weak $01)`).
+  free in the window. It also wants 8 of the window's 16 break ticks left.
+  With any tick allowed (`z7`, the rule before that one, re-run with the
+  ticks logged; `z5`, its first run, was stopped before any fight ended and
+  its logs are lost), every cast with 5 ticks or fewer left landed after
+  its window (3 ticks: 1,527 frames after; 4: 120 and 209; 5: 250, 955, 963,
+  980 and 980), and four of those met a wall the next hit had turned: three
+  onto a held wall and won (`z7_k1_s7`: `break ticks 5`, `window over after
+  2356 frames`, `BERSERK (HP 19489, wall weak $01)`), one onto wind, a game
+  over (`z7_k4_s0`: `break ticks 5`, `BERSERK (HP 19594, wall weak $10)`).
+  The casts with 6 and 7 ticks left landed 157 to 212 frames inside their
+  windows (`z7_k8_s7`, `z7_k3_s0`, `z7_k5_s0`), and every one with 10 or
+  more well inside; 8 keeps two ticks in hand.
 
 | sweep | runs | distinct keys won | min | median | p90 | max |
 |---|---|---|---|---|---|---|
 | `f6` main at 38b483f8 (12.3) | 18 of 18 PASS | 17 of 17 | 45,591 | 76,508 | 114,929 | 124,444 |
 | `z4` this ROM, no Bserk | 18 of 18 PASS | 15 of 15 | 39,132 | 67,400 | 90,756 | 117,232 |
-| `z6` this ROM, Bserk in a window | 18 of 18 PASS | 15 of 15 | 23,214 | 48,000 | 88,060 | 90,174 |
+| `z6` Bserk in a window, 8 ticks left | 18 of 18 PASS | 15 of 15 | 23,214 | 48,000 | 88,060 | 90,174 |
+| `z7` Bserk in a window, any tick | 17 of 18 PASS | 14 of 15 | 23,214 | 33,636 | 55,028 | 64,544 |
 
-(Ticks by distinct key, `bztally.py lab z6 z4`, `tally-f6.txt`; over all
-18 runs `z6` reads median 47,094 and p90 87,230, `f6` 74,271 and 113,459.)
-Berserk landed in 12 of the 18 `z6` fights; in the others he died in the
-window before it landed, STRAGO had no turn in a window (his Life 3 casts
-come first), or nobody held it.
+(Ticks by distinct key, `tally-z6-z4-z3-z5.txt`, `tally-m4-m6-z7.txt`,
+`tally-f6.txt`; over all 18 runs `z6` reads median 47,094 and p90 87,230,
+`f6` 74,271 and 113,459.) Berserk landed in 12 of the 18 `z6` fights and 16
+of `z7`'s; in the others he died in the window before it landed, STRAGO
+had no turn early enough in a window (his Life 3 casts come first), or
+nobody held it.
+
+**His shield count** (the break row, the owner's call). Lab ROMs with his
+row cut from 8 shields to 4 (`m4`, ROM ceabd956) and to 6 (`m6`, 5ff7130e),
+everything else as `z6` (`scripts/setup-mm.sh`):
+
+| sweep | runs | distinct keys won | min | median | p90 | max | Berserk landed |
+|---|---|---|---|---|---|---|---|
+| `m4` 4 shields | 17 of 18 PASS | 15 of 15 | 16,844 | 48,576 | 61,125 | 90,064 | 7 of 18 |
+| `m6` 6 shields | 18 of 18 PASS | 15 of 15 | 20,798 | 44,157 | 65,518 | 68,136 | 13 of 18 |
+
+Neither reaches a median of 25,000 to 35,000: fewer shields bring the
+windows sooner, but STRAGO's turn comes late in them, and with 4 he cast in
+few. The row stays at 8. `m4`'s one failure came after his fight
+(`m4_k4_s7`, won in 48,576 ticks): a battle on the walk down froze with
+the menu in state `$01` until the stall watch killed the run, the open
+freeze of 12.3.

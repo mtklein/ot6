@@ -9365,9 +9365,11 @@ end
 M.BSERK_SPELL = 0x21
 -- the window must have at least this many of its 16 break ticks
 -- (OT6_BREAK_TICKS, about 140 frames each) left, so that Bserk lands inside
--- it: one cast late in a window landed after it and met a wall the next
--- hit had turned ('Bserk at slot 0 ... wall weak $02', '[bz] ... BERSERK
--- (HP 19489, wall weak $01)', lab z5)
+-- it: cast with 5 or fewer left, every one landed after the window, and
+-- one met a wall the next hit had turned to one nobody held, a game over
+-- (build/attempts/wt/v038-berserk-2/lab/z7_k4_s0: 'break ticks 5', '[bz]
+-- ... BERSERK (HP 19594, wall weak $10)'); with 6 and 7 left they landed
+-- 157 to 212 frames inside (z7_k8_s7, z7_k3_s0, z7_k5_s0)
 M.BSERK_WINDOW_TICKS = 8
 function Driver:berserkPlan(actor)
   local zv = self.opts.berserkVs
