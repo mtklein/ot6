@@ -361,7 +361,8 @@ local wpi, grindDone, legs = 1, false, 0
 -- a Dark Wind 7), none of which the route had fought (wor-coverage.md 3.1).
 -- The forest west of the bend (group 33) is hunted on a branch with SABIN
 -- (gen_wor_tzen_plain): alone, CELES lost fights of its Chitonid with Gigan
--- Toad x2 (201) at the grind's start and at L27 (sweeps/tally_wt_g33.txt,
+-- Toad x2 (201) at the grind's start and at L27 (build/attempts/wt/v038-wor-
+-- sweeps-a/sweeps_r3/tally_wt_g33.txt,
 -- tally_wt2_g33.txt, tally_wt3_g33t.txt); with SABIN, none
 -- (tally_wt4_g33s.txt).  Each is a lap of two of its tiles
 -- (K.worldHunt: the list asserted to be the group's pool, the battle bound

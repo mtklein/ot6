@@ -723,7 +723,7 @@ local RELIC_RING_CHEST = { 90, 47, 0x102, "Relic Ring (207 (90,47))", RELIC_RING
 -- the line at fa5425f1) lose SoulDancer x2 with Crusher x2 (284) too often to walk a lap for it.  From the graph's
 -- capture wor-narshe-v1, the leg with a hunt by the save point (the SoulDancers first, gen_wor_relm's order, and
 -- the heal at 75%) lost 3 of 6 seed shifts, and the heal at 90%, the relic plan against a physical threat or Bio
--- changed none of it for the better (build/attempts/wt/v038-wor-sweeps-a/sweeps/tally_owv*.txt); the SoulDancers'
+-- changed none of it for the better (build/attempts/wt/v038-wor-sweeps-a/sweeps_r2/tally_owv*.txt); the SoulDancers'
 -- thrown knives (AIScript _173) take 500-1,000 a throw.  wor-coverage.md section 11.2.
 
 local PARTY = { { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" } }
