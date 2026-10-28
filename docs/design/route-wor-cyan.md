@@ -348,8 +348,8 @@ in 30 fights (sections 5.3, 8.2).
 ## 9. What was left
 
 - **Zozo's clock and the Chain Saw.** Taken since v0.38 (#485), with
-  Maranda's two chests, Zozo's Tonic and Tincture and the hunts of Zozo's
-  two pools: wor-coverage.md section 11. The north rooms and the rooftop
+  Maranda's two chests and Zozo's Tonic and Tincture; Zozo's two pools are
+  hunted on a branch, gen_wor_zozo_hunt (wor-coverage.md section 11). The north rooms and the rooftop
   (the Thief Glove, the Fire Knuckle, the RunningShoes, an X-Potion) stay
   behind the stair room's liars and the building jumps.
 - **The planner's 4096-node cap** (section 3) is the library's; raising it

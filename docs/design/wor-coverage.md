@@ -449,9 +449,12 @@ boot checkpoint the branch Continues and the leg it rejoins.
 | 10 | The early-continent draw gaps | `wor-start-v1` to `wor-figaro-sweep-v1` | 19 formations of L5-29, 2-1,155 per member | S | seldom |
 
 Units 1 and 2 are played since v0.38 by `gen_wor_dino` and `gen_wor_desert`,
-on the line after the Colosseum (`route-wor-side-trips.md`). Unit 5 for Zozo, Owzer's house, the Tzen house and the small towns, and
-unit 7 for Zozo and South Figaro's passage, are played since v0.38 by
-those places' legs (section 11; Owzer's basement's pool is left).
+on the line after the Colosseum (`route-wor-side-trips.md`). Unit 5 for
+Zozo, Owzer's house, the Tzen house and the small towns, and unit 7 for
+Zozo, South Figaro's passage and the early continent (unit 10), are played
+since v0.38 (section 11: the chests on the main line, the hunts in the
+grinds beside them or on branch legs; Owzer's basement's pool and the
+Figaro desert's two are left).
 
 Unit 5 splits by arc: the Ancient Castle (`gen_wor_ancient`, 8 chests,
 items Wing Edge, Doom Darts, Magicite, Ether, X-Potion, Punisher, two
@@ -777,12 +780,16 @@ distinct bits opened by WoR legs 62; already opened in the WoB 30
 From the worktree root, in order: `ninja build/ot6.sfc`; in the evidence directory `map_graph.py` (DEPTH=0,1,2 into `graph_d*.json`), `visited.py`, `maptable.py`, `veldt_bits.py`, `world1.py`, `evbat.py`, `wor_gap.py`, `groups.py`, `isles.py`, `trip.py`, `units.py`, `chest_report.py`, `shared_bits.py`, `proof.py`, `summary.py`; `python3 tools/audit_chests.py` (`audit_chests.txt`); `python3 tools/route_data.py world-path 1 178 46 195 50`, `world-path 1 69 185 66 189`, `species`, `pool group`. No emulator was started: every number is read from the ROM, the tracked SRAM, a seeded savestate or an existing play log.
 
 
-## 11. Played since (v0.38): the small towns, Zozo, Owzer's house and the Tzen house (#485, #488)
+## 11. Played since (v0.38): the small towns, Zozo, Owzer's house, the Tzen house and the early continent (#485, #488)
 
-Units 5 and 7 for these places. Evidence under
-`build/attempts/wt/v038-wor-sweeps-a/`: `dev/` (the development runs and
-the mutants), `sweeps/` (the sweeps and their tallies), `zozo/`, `tzen/`,
-`figaro/` (the static door graphs and the house's tour), `scripts/`.
+Unit 5 for these places, and unit 7 for them and for the early continent
+(#488's world groups 0, 29, 33, 35, 37, 39 and 42-47). Evidence under
+`build/attempts/wt/v038-wor-sweeps-a/`: `dev/`, `dev2/`, `dev3/` (the
+development runs and the mutants), `sweeps/` (the sweeps on the final line
+and their tallies; `sweeps_53f07b59/`, `sweeps_r2/`, `sweeps_r3/` the
+earlier rounds), `chain/` (the line's plays and the drift), `zozo/`,
+`tzen/`, `figaro/` (the static door graphs and the house's tour),
+`scripts/`.
 Every number below is quoted from a log or a tally there.
 
 ### 11.1 The chests
@@ -819,43 +826,66 @@ Left, with the reason:
   seated.
 - **The Tzen house's monster boxes** (bits 144, 148): unit 8.
 
-### 11.2 The hunts
+### 11.2 The draw gaps: grinds and branches
 
-Each walks a two-tile lap until every formation of its map's pool is won
-(`K.hunt`: the list asserted to be the pool the ROM gives the map, the
-bounds read from the ROM). A formation that fills two slots (125 in group
-65) is met when either slot is drawn (`K.hunt` since 2acb09cc); the bound
-for the one-slot pools is unchanged.
+The round's rule (owner, through the coordinator): a chest a player takes
+stays on the main line; a draw-gap hunt goes on a branch leg that boots the
+graph's capture and feeds nothing downstream (`gen_wor_thamasa_plain`'s
+shape), unless a grind the route already does walks beside the pool, in
+which case the hunt goes into that grind and the grind still stops at its
+level target. Each hunt walks a two-tile lap until every formation of its
+pool is won: `K.hunt` on a field map, `K.worldHunt` (new, the same asserts)
+on the World of Ruin map. A formation that fills two slots is met when
+either is drawn.
 
-| pool | leg | lap | battles bound | longest hunt |
+| pool | where it is hunted | lap | bound | longest |
 |---|---|---|---|---|
-| Zozo's street, group 78 (map 221): 104, 109, 102, 110 | `gen_wor_cyan`, after the Rust-Rid | (42,30) <-> (43,30) | 110 | 14 |
-| Zozo's buildings, group 77 (map 225): 105, 107, 108, 106 | `gen_wor_cyan`, in the clock's room | (98,61) <-> (99,61) | 110 | 13 |
-| South Figaro's passage, group 65 (map 87): 374, 373, 125 | `gen_wor_figaro_sweep`, after the cellar | (36,49) <-> (37,49) | 21 | 15 |
+| Zozo's street, field group 78: 104, 109, 102, 110 | branch `gen_wor_zozo_hunt` (from `wor_cyan_rustrid`) | 221 (42,30) <-> (43,30) | 110 | 14 |
+| Zozo's buildings, group 77: 105, 107, 108, 106 | the same branch, the Tonic's room | 225 (83,61) <-> (83,60) | 110 | 13 |
+| South Figaro's passage, group 65: 374, 373, 125 | branch `gen_wor_passage_hunt` (from `wor_figaro_sweep_passage`) | 87 (36,49) <-> (37,49) | 21 | 15 |
+| world group 35: 198, 200 | Sabin's grind (`gen_wor_tzen_door`) | (127,210) <-> (127,211) | 21 | 5 |
+| world group 0: 6, 7 | Sabin's grind | (160,194) <-> (160,193) | 21 | 5 |
+| world group 42: 224, 225 | Edgar's grind (`gen_wor_edgar`) | (108,100) <-> (109,100) | 21 | 7 |
+| world group 33: 203, 201 | branch `gen_wor_tzen_plain` (from `wor-sabin-v1`) | (127,182) <-> (127,183) | 21 | 4 |
+| world group 29: 192, 193 | branch `gen_wor_island_plain` (from `wor-island-v1`) | (75,236) <-> (75,235) | 21 | 4 |
+| world groups 37, 39: 216, 213, 215; 219, 218, 217 | branch `gen_wor_nikeah_plain` (from `wor-nikeah-v1`) | (148,76) <-> (148,75); (147,75) <-> (146,75) | 21 | 8 |
+| world groups 45, 46, 47: 236, 243; 238, 240, 242; 239, 241 | branch `gen_wor_kohlingen_plain` (from `wor-kohlingen-v1`) | (40,47) <-> (40,48); (36,56) <-> (36,57); (40,45) <-> (40,44) | 21 | 7 |
 
-("every slot drawn within 110 battles", "within 21 battles"; "a battle
-within 162 steps" for all three.)
+The grinds: Sabin's walks its laps first and then grinds on to L27 only as
+far as the laps left it short ("the grind's laps done ... CELES L26",
+"grind done ... CELES L27" on the line's run); Edgar's likewise to L30
+(the shore's hunt "done after 7 battles", "grind done ... CELES L30 ...
+SABIN L30"). Group 33 went to a branch with SABIN because CELES alone lost
+fights of its Chitonid with Gigan Toad x2 (201): from the grind's capture
+1 of 82, and with full care 12 of 68; from `wor-tzen-door-v1` at L27, 1 of
+68; with SABIN, from `wor-sabin-v1`, none of 48 (`sweeps_r3/`:
+`tally_wt_g33.txt`, `tally_wt2_g33.txt`, `tally_wt3_g33t.txt`,
+`tally_wt4_g33s.txt`). Between the grind's laps CELES tops up to full.
+
+Left: the Figaro desert's two (group 44: 223, 138), whose pool deals the
+Sand Horse pair that `gen_wor_edgar`'s grind keeps off; and Owzer's
+basement (below).
 
 **Owzer's basement is not hunted.** Its pool (group 157: Vindr x2 286,
 SoulDancer x2 with Crusher x2 284, 285) is too much for the three before
 Chadarnook at this line's levels (L38-40). The SoulDancers throw knives
 (AIScript `_173`, Dirk to Assassin) for 500-1,000 a throw. A hunt by the
 save point was played and measured before it was dropped
-(`sweeps_53f07b59/`, the line before Berserk landed, the party L40-41; and
-`sweeps/`, this line):
+(`sweeps_53f07b59/`, the line before Berserk landed, the party L40-41;
+`sweeps_r2/`, the line on fa5425f1):
 
 - before Berserk, from the hunt's capture, K 0-11 at shifts 0 and 7: the
   default order lost 2 of 23 fights of 284 (`tally_ow.txt`), the
   SoulDancers first (`gen_wor_relm`'s order) 1 of 85 (`tally_ow2.txt`),
   with the heal at 75% too none of 86 (`tally_owA2.txt`);
-- on this line the same hunt's sweep won all 86 fights of 284 from its
-  capture (`tally_ow.txt`), but the graph's own play lost its first
-  attempt there (`chain/chain4.log.gz`: "battle 5 formation 284 lost", key be7C-g011C;
-  "PASS (frame 116525) attempts=2/3"), and the leg from `wor-narshe-v1`
-  lost at 3 of 6 seed shifts; the heal at 90%, the relic plan against a
-  physical threat and Bio did no better (`tally_owv.txt`: "formation 284:
-  18 fights ... won 15, lost 3"; `tally_owvb.txt`: "22 fights ... won 15,
-  lost 7").
+- on fa5425f1 the same hunt's sweep won all 86 fights of 284 from its
+  capture (`sweeps_r2/tally_ow.txt`), but the graph's own play lost its
+  first attempt there (`chain/chain4.log.gz`: "battle 5 formation 284
+  lost", key be7C-g011C; "PASS (frame 116525) attempts=2/3"), and the leg
+  from `wor-narshe-v1` lost at 3 of 6 seed shifts; the heal at 90%, the
+  relic plan against a physical threat and Bio did no better
+  (`sweeps_r2/tally_owv.txt`: "formation 284: 18 fights ... won 15, lost
+  3"; `tally_owvb.txt`: "22 fights ... won 15, lost 7").
 
 So 284 and 286 stay unfought; the route's own walk still meets the pool,
 as before (route-wor-thamasa.md 11). A fourth member there, or more levels
@@ -863,53 +893,108 @@ before the basement, is the lever for a later unit.
 
 ### 11.3 The sweeps
 
-From the graph's own captures before each hunt (`wor_cyan_rustrid`,
-`wor_cyan_zozo225`, `wor_figaro_sweep_passage`, sha256 a1402b80, 9c1910f6,
-56583d64, from the play at 923895c6 on fa5425f1; the commits after it
-change only the Owzer leg, later on the line), K 0-11 battles used up
-first on the hunt's own lap, counted by battles opened (#491), at seed
+From the graph's own captures at ba16da57's play (the line at 85bb3ba7
+and the driver fix after it, which changed no state): K 0-11 battles used
+up first on the hunt's own lap, counted by battles opened (#491), at seed
 shifts 0 and 7, one attempt each (`scripts/lab_hunt.lua`,
-`scripts/tally.py`): 72 of 72 PASS. The pick sequence is the fixture's, so
-K moves where the hunt starts in it.
+`scripts/lab_whunt.lua`, `scripts/tally.py`; boots: `wor_cyan_rustrid`
+sha256 f9a15872, `wor_zozo_hunt_225` 8348cee7, `wor_figaro_sweep_passage`
+61d2535b, `wor_tzen_door_laps` 481bd12f, `wor_edgar_shore` 50902b90, the
+batteries `wor-sabin-v1` e2da7639, `wor-island-v1` b44c2369,
+`wor-nikeah-v1` 38ab917a, `wor-kohlingen-v1` 3029a5a4): 312 of 312 PASS
+(`sweeps/tally_*.txt`). The pick sequence is the fixture's, so K moves
+where the hunt starts in it.
 
 | formation | fights | distinct keys | won | keys with a death |
 |---|---|---|---|---|
 | 104 Gabbldegak x4 | 150 | 20 | 150 | 0 |
-| 109 Harvester, Gabbldegak x2 | 36 | 6 | 36 | 0 |
-| 102 HadesGigas | 102 | 11 | 102 | 0 |
-| 110 HadesGigas, Harvester | 60 | 11 | 60 | 0 |
-| 105 SlamDancer | 226 | 40 | 226 | 0 |
-| 107 Harvester | 34 | 17 | 34 | 0 |
-| 108 SlamDancer, Harvester x2 | 58 | 16 | 58 | 0 |
-| 106 SlamDancer, Gabbldegak x3 | 24 | 14 | 24 | 0 |
-| 374 Vector Pup x2 | 82 | 31 | 82 | 0 |
-| 373 Vector Pup x2, Commander | 90 | 24 | 90 | 0 |
-| 125 Commander x3 | 130 | 42 | 130 | 0 |
+| 109 Harvester, Gabbldegak x2 | 36 | 5 | 36 | 0 |
+| 102 HadesGigas | 102 | 13 | 102 | 0 |
+| 110 HadesGigas, Harvester | 60 | 10 | 60 | 0 |
+| 105 SlamDancer | 204 | 45 | 204 | 0 |
+| 107 Harvester | 36 | 14 | 36 | 0 |
+| 108 SlamDancer, Harvester x2 | 60 | 23 | 60 | 0 |
+| 106 SlamDancer, Gabbldegak x3 | 24 | 17 | 24 | 0 |
+| 374 Vector Pup x2 | 82 | 33 | 82 | 0 |
+| 373 Vector Pup x2, Commander | 90 | 22 | 90 | 0 |
+| 125 Commander x3 | 130 | 41 | 130 | 0 |
+| 198 Mesosaur x4 | 98 | 22 | 98 | 0 |
+| 200 Gilomantis x2, Mesosaur | 74 | 15 | 74 | 0 |
+| 6 Leafer | 114 | 28 | 114 | 0 |
+| 7 Leafer x2, Dark Wind | 82 | 21 | 82 | 0 |
+| 224 Latimeria | 156 | 30 | 156 | 0 |
+| 225 Latimeria, Nohrabbit x3 | 84 | 34 | 84 | 0 |
+| 203 Lunaris x2 | 126 | 29 | 126 | 0 |
+| 201 Chitonid, Gigan Toad x2 | 48 | 20 | 48 | 0 |
+| 192 Peepers x2 | 128 | 24 | 128 | 0 |
+| 193 Peepers x3 | 68 | 19 | 68 | 0 |
+| 216 Bloompire x2 | 84 | 26 | 84 | 1 |
+| 213 Buffalax | 60 | 17 | 60 | 0 |
+| 215 Bloompire x2, Lizard | 94 | 13 | 94 | 1 |
+| 219 Buffalax, Lizard | 84 | 32 | 84 | 0 |
+| 218 Bloompire x2, Delta Bug | 60 | 22 | 60 | 2 |
+| 217 Delta Bug x4 | 94 | 20 | 94 | 0 |
+| 236 Harpiai | 108 | 19 | 108 | 0 |
+| 243 Muus | 92 | 24 | 92 | 0 |
+| 238 Harpiai, Deep Eye x2 | 58 | 19 | 58 | 0 |
+| 240 Deep Eye x6 | 98 | 31 | 98 | 0 |
+| 242 Muus x3 | 88 | 21 | 88 | 0 |
+| 239 Bogy x2 | 108 | 21 | 108 | 0 |
+| 241 Deep Eye x2, Muus x2 | 92 | 26 | 92 | 0 |
 
-Zozo's street repeats its draws most: 11 distinct plays in 24 runs
-(`tally_z1.txt`); its 109 was met in 6 keys. The sweeps before Berserk
-landed (`sweeps_53f07b59/`) read alike: every fight won.
+Zozo's street repeats its draws most: 8 distinct plays in 24 runs
+(`tally_z1.txt`). The falls by Nikeah are SABIN's, each in one key
+(`tally_wn_g37.txt`, `tally_wn_g39.txt`), every fight won.
 
 ### 11.4 The Tzen house on its clock
 
-From the graph's capture `wor-tzen-door-v1` (sha256 23462913, the play at
-923895c6), K 0-11 battles used up beside Tzen's door first, at seed shifts
-0 and 7 (`scripts/mk_tzenlab.py`: the leg as it stands with the battles
-put before it): 24 of 24 PASS, all six chests every time, no run from a
+From the graph's capture `wor-tzen-door-v1` (sha256 710bbf7f, the same
+play), K 0-11 battles used up beside Tzen's door first, at seed shifts 0
+and 7 (`scripts/mk_tzenlab.py`: the leg as it stands with the battles put
+before it): 24 of 24 PASS, all six chests every time, no run from a
 fight; the house's fights 207 (HermitCrab x2, Pm Stalker) 46 in 31 keys
-and 209 (Scorpion x3) 40 in 28 keys, all won. The time left at the exit:
-"min 2571, median 8310, max 9371" frames of 21,600 (`tally_tz.txt`); the
-lowest, K6 s0, met five fights in the house ("exit 0:42 (2571)"). The
+and 209 (Scorpion x3) 40 in 26 keys, all won. The time left at the exit:
+"min 2467, median 7497, max 9194" frames of 21,600 (`sweeps/tally_tz.txt`);
+the lowest, K6 s0, met five fights in the house ("exit 0:41 (2467)"). The
 leg's run rule counts the chests still to open in the walk ahead.
 
-### 11.5 Figaro Castle's SABIN
+### 11.5 What the chests reached downstream
+
+- **The Heal Rod** (the Tzen house) heals what it hits. `gen_wor_relm`'s
+  dress ranked it RELM's best weapon by battle power, and `wor_veldt` lost
+  all three attempts to the Holy Dragon, whose HP her every Fight put back
+  (`chain/chain5.log.gz`). The lib's gear value and `gen_wor_relm`'s dress
+  now pass over such a weapon, as the game's own Optimum does.
+- **The Pearl Rod** (holy) then became her best, and the Holy Dragon
+  absorbs holy: `wor_veldt` lost all three again (`chain/chain6.log.gz`).
+  Before the Veldt each of the three swaps a holy or healing weapon for the
+  bag's hardest-hitting other one (`dev2/vd_s*`: "char 8's weapon $39 is
+  holy ...: $46 (power 109) from the bag", PASS at the runner's three
+  shifts).
+- **The fight driver** met a heal whose target window would not cross in a
+  pincer (`wor_colosseum`, `chain/chain10.log.gz`: "FIGHT DRIVER STUCK:
+  crossing to the monsters in a pincer"); it now drops such a plan and
+  backs out, as its parked-window watchdog does, and fails fast only on
+  the third in a battle.
+
+### 11.6 Levels at the saves
+
+The re-cut's drift against main's saves (`chain/drift_before.txt`): every
+save before `wor-tzen-door-v1` reads "none"; from it on the seated party's
+levels are within one of main's (`wor-terra-v1` CELES 32 against 33,
+`wor-figaro-sweep-v1` SABIN 31 against 32, `wor-owzer-v1` TERRA 40 against
+39, `wor-colosseum-v1` CELES 56 against 57, `wor-desert-v1` CELES 62
+against 63 and SHADOW 54 against 53). After the re-cut every tracked key
+reads "none" but the two negative-control fixtures (`drift_after.txt`).
+
+### 11.7 Figaro Castle's SABIN
 
 The inner court's landing (55 (28,31)) plays the castle's own scene: SABIN
 leaves to wander (`_ca89fd`, $0049) and rejoins at the court's landing
 (28,40) with full HP and MP (`_ca7171`, "Hey! Wait. I'm going too!").
 `gen_wor_edgar` pages through it and asserts all three seated as it leaves.
 
-### 11.6 The asserts and their negatives
+### 11.8 The asserts and their negatives
 
 Each is red on a one-line mutant, as class=assert (`scripts/mkmut.py`,
 `scripts/mkmut_hunt.py`; `dev/mut_*`, run at 2acb09cc from the tracked
@@ -933,3 +1018,13 @@ checkpoints of the line before Berserk landed):
   two-slot 125 left out, "map 87's
   pool formation 125 is one it is walked for: got false"; a formation no
   pool deals, "formation 999 is in map 221's pool (...): got false".
+- `K.worldHunt` and the grind's pool (`scripts/mk_wmut.py`; `dev3/mut_nw_*`,
+  from the line's captures): the bound at 1, "the Solitary Island (group
+  29): every formation it is walked for won within 1 battles (...): got
+  false"; a formation no pool deals, "formation 999 is in world group 29's
+  pool (...): got false"; one left out, "world group 45's pool formation
+  243 is one it is walked for: got false"; a lap across two groups, "both
+  lap tiles (148,76) and (146,75) roll one group (37): got false"; group
+  0's lap without its allowance, "to the patch east of the landing (group
+  0): group 0 deals only the plains six (not $017, formation 6): got
+  false".
