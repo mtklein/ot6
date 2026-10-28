@@ -8089,11 +8089,16 @@ function M.relicPlan(members, opts)
         local function egg(x) return x ~= 0xFF and M.relicClass(x, opts.threats) ~= nil
           and M.relicClass(x, opts.threats).aff == "behind" end
         local id = m.cur[s]
-        if id == 0xFF or (count[id] or 0) < 1 or (boss and egg(id)) then
-          local held = id ~= 0xFF and (count[id] or 0) >= 1 and id or nil
+        -- a second Ribbon on a member already planned with one guards nothing more: it is left for step 4b to
+        -- give a member without one (#486 review: the dream leg's "relics for Doma" put TERRA in two)
+        local function second(x) return x == RIBBON_ID and m.want[s == 4 and 5 or 4] == RIBBON_ID end
+        if id == 0xFF or (count[id] or 0) < 1 or (boss and egg(id)) or second(id) then
+          local held = id ~= 0xFF and (count[id] or 0) >= 1 and not second(id) and id or nil
           id = nil
           for _, x in ipairs(order) do
-            if id == nil and count[x] > 0 and wearsItem(m.ch, x) and not (boss and egg(x)) then id = x end
+            if id == nil and count[x] > 0 and wearsItem(m.ch, x) and not (boss and egg(x)) and not second(x) then
+              id = x
+            end
           end
           id = id or held
         end
