@@ -39,6 +39,10 @@ local ODIN, RAIDEN = 11, 12                 -- the stones' indices (GenjuProp or
 local WALL_RING = 0xBB
 local function owns(esper) return (H.readByte(0x1A69 + (esper >> 3)) >> (esper & 7)) & 1 == 1 end
 local FOUR = { CELES, RELM, CYAN, TERRA }
+-- the cave's and the castle's chests a player opens on the way (#485, wor-coverage.md 5.1): the cave (401) holds
+-- an Ether, the Wing Edge, the Doom Darts, a Magicite and an X-Potion; the castle (406, reached from the
+-- courtyard's east door (19,11)) the Punisher.  The two monster boxes (401 (58,43), 406 (10,17)) are #487's
+local ETHER, XPOTION, MAGICITE, WING_EDGE, DOOM_DARTS, PUNISHER = 0xEC, 0xEA, 0xF9, 0x4C, 0x4F, 0x3B
 -- 401's same-map doors (route_data.py map 401: its shorts and its two one-tile longs); 406's; 408's
 -- (a long entrance covers its tile and `len` more, and every one of them lands on its one destination:
 -- CheckLongEntrance, DoEntrance)
@@ -207,6 +211,16 @@ H.run({ maxFrames = 2400000 }, {
 
   -- ---- 2. the cave and the castle's courtyard ----------------------------------------------------------------
   -- @@stage cave
+  chestAt(55, 21, 0x0C4, "the Ether (401 (55,21))", ETHER),
+  chestAt(45, 21, 0x0C5, "the Wing Edge (401 (45,21))", WING_EDGE),
+  chestAt(49, 46, 0x0C7, "the Doom Darts (401 (49,46))", DOOM_DARTS),
+  chestAt(18, 28, 0x0C8, "the Magicite (401 (18,28))", MAGICITE),
+  chestAt(8, 20, 0x0C9, "the X-Potion (401 (8,20))", XPOTION),
+  H.call(function()
+    for _, b in ipairs({ 0x0C4, 0x0C5, 0x0C7, 0x0C8, 0x0C9 }) do
+      H.assertEq(H.chestOpen(b), true, string.format("401: the chest of bit %d is open", b))
+    end
+  end),
   door(19, 16, MAP_ASAVE, "the cave (19,16) -> 402"),
   H.fieldCare({ tag = "at the Ancient Castle's save point" }),
   door(15, 41, MAP_AYARD, "402 (15,41) -> the courtyard (407)"),
@@ -216,6 +230,14 @@ H.run({ maxFrames = 2400000 }, {
   H.release(),
   H.advanceStory(function() return settled() and sw(0x02DF) == 1 end, 30000, { playBattles = "tactical", fight = FIGHT }),
   H.call(function() say("story", "the flashback ($02DF)") end),
+  -- the courtyard, where gen_wor_ancient_hunt (a branch: nothing boots it) hunts the castle's two pools (#488)
+  H.saveState("wor_ancient_yard.mss"),
+  -- the courtyard's east door (19,11) -> 406 (55,11), the Punisher's corner (no other way reaches it: route_data
+  -- field-path 406 (33,12) -> (58,6) finds none), and back by (55,12) -> 407 (19,13)
+  door(19, 11, MAP_AHALL, "407 (19,11) -> the castle's east corner (406)"),
+  chestAt(59, 6, 0x0CE, "the Punisher (406 (59,6))", PUNISHER),
+  H.call(function() H.assertEq(H.chestOpen(0x0CE), true, "406: the Punisher's chest (bit 206) is open") end),
+  door(55, 12, MAP_AYARD, "406 (55,12) -> the courtyard (407)"),
   door(15, 10, MAP_AHALL, "407 (15,10) -> the castle (406)"),
 
   -- ---- 3. the castle: Odin, the queen's passage, the chests ---------------------------------------------------

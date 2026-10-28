@@ -72,6 +72,9 @@ local function hole(x, y, what)
   })
 end
 local function reach(x, y) return H.bfsReach(nil, nil, nil, {}, x, y) ~= nil end
+-- the captures gen_wor_ebot_hunt and gen_wor_ebot_rooms_hunt boot (branches: nothing boots them; #488): the hub at the rock's mouth, and the
+-- rooms on the first landing in them (their walls are drawn at random on each landing)
+local roomsCaptured = false
 -- the side of an object the party can stand on to talk to it
 -- the side of a coral chest (an invisible NPC on a chest tile) the party can reach without crossing a hole,
 -- and the way it faces from there
@@ -120,6 +123,10 @@ local function coralHunt(need, what, budget)
     H.repeatN(budget or 80, {
       H.cond(function() return not done() end, {
         H.call(function() moves = moves + 1 end),
+        H.cond(function() return map() == 404 and not roomsCaptured end, {
+          H.call(function() roomsCaptured = true end),
+          H.saveState("wor_ebot_rooms.mss"),
+        }, {}),
         H.lazy(function()
           if coral() >= need and map() == 405 and not reach(23, 19) then
             -- enough coral: holes until the chest's room
@@ -138,6 +145,7 @@ local function coralHunt(need, what, budget)
       ebotWhere(what .. string.format(" after %d moves", moves))
       H.assertEq(done(), true, string.format("%s: %d coral and the chest in reach within %d moves", what, need,
         budget or 80))
+      H.assertEq(roomsCaptured, true, what .. ": the rooms (404) were captured on the first landing in them")
     end),
   })
 end
@@ -168,6 +176,7 @@ H.run({ maxFrames = 2400000 }, {
     arrive = function() return map() == 405 and not H.worldMode() end }),
   H.waitUntil(function() return map() == 405 and settled() end, 2400, "Ebot's Rock: map 405", 1),
   H.call(function() say("route", "Ebot's Rock (405)") end),
+  H.saveState("wor_ebot_hub.mss"),
   -- the first hole (7,15) sets the party by the hungry chest (_cb6ec6, $0181); every hole after it is random
   hole(7, 15, "405 (7,15): the first hole"),
   coralHunt(CORAL_NEED, "the coral hunt", 80),

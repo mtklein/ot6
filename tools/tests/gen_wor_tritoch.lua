@@ -846,7 +846,9 @@ local PARTY = { { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" }, { MOG,
 local REGROUP = { UMARO, MOG, TERRA, CELES }
 local REGROUP_MEMBERS = { { UMARO, "UMARO" }, { MOG, "MOG" }, { TERRA, "TERRA" }, { CELES, "CELES" } }
 -- relics are dressed for the arc's bosses once, before the Ice Dragon (the
--- three share their threats); dressing them again before Umaro, after the
+-- three share their threats; since #495 the relic plan's step 4b arms for a
+-- boss too, so the Ribbon TERRA's Czarina Ring leaves in the bag goes on
+-- another member over a lower-ranked relic); dressing them again before Umaro, after the
 -- Gauntlet came into the bag, planned a swap between two members that the
 -- relic rule cannot make from the bag (build/lab/narshe/t4: 'a member's new
 -- relics are all in the bag (no swap deadlock)')
@@ -926,6 +928,8 @@ H.run({ maxFrames = 500000 }, {
   H.dialogChoice(0, { inBattle = false, what = "Hop into it? Yes", tag = "the cave's mouth" }),
   H.waitUntil(function() return map() == MAP_CAVE and settled() end, 6000, "Umaro's cave: map 281", 1),
   H.call(function() say("route", "in Umaro's cave") end),
+  -- the landing, where gen_wor_umaro_hunt (a branch: nothing boots it) hunts the cave's two pools (#488)
+  H.saveState("wor_tritoch_cave.mss"),
   -- the landing's pocket: (15,51) -> 282 (22,31), the X-Ether (282
   -- (14,25)), then the floor drop (14,30) -> 281 (42,53), the main pocket
   walkInto(15, 51, MAP_CAVE_B, "the landing -> 282 (22,31)", DROPS_281),

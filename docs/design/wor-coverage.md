@@ -278,6 +278,11 @@ and the shops the route did visit). None of these maps rolls a battle.
 These are the #286 kind: the route walks the map and the draw never
 dealt the formation. A player who pauses in the dungeon meets them.
 
+Since the audit (v0.38, #488): the pools of Umaro's cave, Ebot's Rock,
+Cyan's dream, the dream's Doma and the Ancient Castle below are hunted by
+their legs until each formation is won (route-wor-narshe.md section 15,
+route-wor-gogo.md section 11, route-wor-dreams.md section 10).
+
 | area | map | pool | unfought formations |
 |---|---|---|---|
 | Darill's Tomb | 298 | g149 | 244 Orog+Orog; 245 Orog+PowerDemon+PowerDemon |
@@ -326,6 +331,10 @@ dealt the formation. A player who pauses in the dungeon meets them.
 ## 5. Chests
 
 ### 5.1 Unopened chests with a prize
+
+Since the audit (v0.38, #485): the item chests of Doma, Cyan's dream and
+the Ancient Castle below are opened (route-wor-dreams.md section 10); their
+monster boxes are #487's.
 
 | area | n | chests |
 |---|---|---|

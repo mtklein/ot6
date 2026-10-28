@@ -437,10 +437,9 @@ found two problems that main's qualification does not:
    lost no one to it (`sa2`: 0.04 deaths a fight at most), and the arc does
    not grind him.
 2. **Raiden** is the party's and worn by nobody (section 6).
-3. **Chests left:** the Ancient Castle's cave (401: Ether, Wing Edge, Doom
-   Darts, Magicite, X-Potion) and its two monster chests (Master Pug, event
-   group 113; KatanaSoul, event group 95); the dream's first car (321: Ice
-   Shld, X-Potion) and the dream's Doma.
+3. **Chests left:** the Ancient Castle's two monster chests (Master Pug,
+   event group 113; KatanaSoul, event group 95), #487's. The item chests
+   are opened since v0.38 (section 10).
 4. **The Cursed Shield** is not worn (section 9).
 5. **Wrexsoul with a TERRA host** is the slow case: the others' Fights on her
    land 300-600, and her fall took 10,682 frames (`zon_s13`) and 13,921 on the
@@ -486,3 +485,107 @@ So the uncursing belongs to a stretch of the route with many random
 battles and no boss on a clock: a grind on a strong pool, or the long
 World of Ruin dungeons ahead, worn by a Ribboned member the party can
 spare.  It is left for a later arc; nothing here wears the shield.
+
+## 10. The arc's pools and chests (v0.38, #485, #488)
+
+Evidence under `build/attempts/wt/v038-wor-sweeps-b/lab/` (`scripts/`,
+`out/`). The coverage audit (wor-coverage.md 4.3, 5.1) found nine of the
+arc's formations unfought and fourteen item chests unopened. A player who
+pauses in the dream and the castle meets the formations, and opens the
+chests on or beside the way. The legs open the chests on the main line;
+the hunts are branch legs, each booted from the graph's capture (or save)
+where its hunt begins, and nothing boots what they leave
+(route-wor-narshe.md section 15 says why; no grind the route already does
+walks these maps).
+
+**The hunts.** Each walks a lap until every formation of its pool is won
+(`K.hunt`, lib/ot6_field.lua; route-wor-gogo.md section 10), the ROM's pool
+asserted at its start and its bounds read from the ROM ("every slot drawn
+within 110 battles, a battle within 162 steps"):
+
+| branch leg (boots) | where | pool | lap |
+|---|---|---|---|
+| `gen_wor_dream_hunt` (`wor_dream_scape`, `gen_wor_dream`'s) | the dreamscape (317), after both members rejoin, before the stooges | group 183: Barb-e and Critic 312, Allosaurus and Parasite x3 314, Critic and Pan Dora x3 315 (80/256), Allosaurus 316 (16/256) | (26,52) <-> (26,53) |
+| `gen_wor_dream_cave_hunt` (`wor_dream_cave`) | the cave below the engine (319), in Magitek armor, before the drop | group 182: PlutoArmor x2 311, PlutoArmor and Sky Cap 313, Io 137 (two slots) | (16,25) <-> (17,25) |
+| `gen_wor_doma_hunt` (`wor-dream-v1`) | the dream's Doma (126), beside its save point | group 181 (also the train's cars 144 and 321): Rain Man x2 309, Samurai and Rain Man x2 310, Barb-e, Samurai and Suriander 317 (80/256), Suriander, Pan Dora and Parasite x2 318 (16/256) | (8,9) <-> (8,10) |
+| `gen_wor_ancient_hunt` (`wor_ancient_yard`, `gen_wor_ancient`'s) | the courtyard (407), after the flashback | group 145: Goblin x2 301, Barb-e, Samurai and Suriander 317, Goblin and Figaliz x2 302 (two slots) | (16,13) <-> (16,14) |
+| the same leg, on | the castle (406), below Odin's statue | group 144: Lethal Wpn 305, Boxed Set 304, Boxed Set x2 and Figaliz x2 303 (80/256), Boxed Set x4 308 (16/256) | (32,12) <-> (33,12) |
+
+Each branch asserts at its start the map its boot stands on, naming the leg
+that made it; the doma leg asserts it too, for its chests. The cave's pool (group 143) was fought in full
+already.
+
+**The chests**, each asserted by its treasure bit (and the bag's count of
+its item) and listed in `tools/chests_opened.txt`:
+
+| chest | where | how |
+|---|---|---|
+| Ether, Wing Edge, Doom Darts, Magicite, X-Potion | the Ancient Castle's cave (401 (55,21), (45,21), (49,46), (18,28), (8,20)) | on the way from basement 1 to the save room |
+| Punisher | 406 (59,6), the castle's east corner | only the courtyard's door (407 (19,11) -> 406 (55,11)) reaches it (route_data field-path from (33,12): no path); back by (55,12) |
+| X-Potion, Ice Shld | the dream's first car (321 (24,9), (16,8)) | on the way in, the levers as the car loads (both reachable then) |
+| Elixir, Ether, Remedy, X-Potion | the dream's Doma (126 (52,47), (56,47), (55,5), (33,34)), after the hunt | the waking Doma (123) shares the bits, but there the X-Potion stands behind the door (16,32) to map 124 (dev run `d1_doma`: "no side of it is reachable from (55,6)"); 126 joins it on the same map |
+| Fenix Down, Beads | the waking Doma, 123 (28,49), (31,50) | no door of 126's floor reaches their room (`d2_doma`: "no side of it is reachable from (33,35)"); in 123 the ramparts' east door does (123 (17,39) -> 285 (37,13), 285 (50,37) -> 123 (28,54)), on the way out |
+
+The two monster boxes (401 (58,43) Master Pug, 406 (10,17) KatanaSoul) are
+#487's. The Wing Edge, Doom Darts and Punisher are LOCKE's, SETZER's and
+STRAGO's, RELM's or GOGO's to wear; this arc's party carries them.
+
+DREAM_PLAY
+
+**Measured**, first with the hunts on the main line (at 8fdc6159), from the graph's captures before each hunt (`wor_dream_scape`,
+`wor_dream_cave`, `wor_ancient_yard`, `wor_ancient_hall`) and, for the
+dream's Doma, the graph's `wor-dream-v1` itself (`scripts/lab_hunt.lua`: K
+battles used up on the hunt's own lap, counted by battles opened, then the
+leg's hunt), K 0-11 at seed shifts 0 and 7, one attempt each: 120 of 120
+PASS, 24 a hunt, the longest 35 battles of its 110 (`out/ds_*`, `out/dc_*`, `out/dd_*`, `out/ay_*`, `out/ah_*`;
+`out/tally_*.txt`, `out/falls_*.txt`).
+
+| formation | fights | keys | won | keys with a fall |
+|---|---|---|---|---|
+| 312 Barb-e, Critic | 192 | 56 | 192 | 7 |
+| 314 Allosaurus, Parasite x3 | 264 | 57 | 264 | 0 |
+| 315 Critic, Pan Dora x3 | 360 | 60 | 360 | 12 |
+| 316 Allosaurus | 24 | 21 | 24 | 0 |
+| 311 PlutoArmor x2 | 78 | 31 | 78 | 0 |
+| 313 PlutoArmor, Sky Cap | 40 | 17 | 40 | 0 |
+| 137 Io | 128 | 35 | 128 | 0 |
+| 309 Rain Man x2 | 104 | 32 | 104 | 0 |
+| 310 Samurai, Rain Man x2 | 144 | 56 | 144 | 5 |
+| 317 Barb-e, Samurai, Suriander | 144 | 50 | 144 | 0 |
+| 318 Suriander, Pan Dora, Parasite x2 | 44 | 19 | 44 | 0 |
+| 301 Goblin x2 | 122 | 43 | 122 | 5 |
+| 302 Goblin, Figaliz x2 | 192 | 49 | 192 | 2 |
+| 317 (the courtyard's) | 24 | 16 | 24 | 0 |
+| 305 Lethal Wpn | 144 | 39 | 144 | 1 |
+| 304 Boxed Set | 120 | 47 | 120 | 0 |
+| 303 Boxed Set x2, Figaliz x2 | 288 | 60 | 288 | 0 |
+| 308 Boxed Set x4 | 24 | 20 | 24 | 0 |
+
+The falls: the dreamscape's are the most, 27 in 312's fights (7 of its 56
+keys, the same keys again across runs: be64 felled TERRA from full HP in 11
+runs) and 22 in 315's (12 keys), most of them from full HP; of those with
+an action read, plain blows (`atk $FF`, 20), Imp (`cmd $02 atk $23`, 7), `$EF`
+(5) and `$BB` (3) (`out/falls_ds.txt`). Every one of those fights was won;
+a fall here is a member Imped or struck while the others finish the fight.
+In the dream's Doma, 7 in 310, all to `$EF` and most from full
+HP ("TERRA 5179/5237"); in the courtyard, 9 to the Goblins' `cmd $0C atk
+$94`, CELES's (10 of the castle's 11 falls are hers): she reaches L60 in the
+hunt, a multiple of the L.5 Doom the Goblins cast (section 8, item 1); in
+the castle, 2 to Lethal Wpn's `$B6` in one fight ("CELES 413/5241; CYAN
+102/3237"). Every fight was won.
+
+The asserts' negatives (`scripts/mkmut.py`, one line each, class=assert;
+run at 7ce9a6f5, before the rebase onto fa5425f1, from the tracked
+checkpoints of the time): the cave's Ether not opened, "401: the chest of bit 196 is open: got false"
+(`out/n_ancient_cave`); the Punisher not opened, "406: the Punisher's chest
+(bit 206) is open: got false" (`out/n_ancient_punisher`); the first car's
+chests left, "321: the X-Potion's chest (bit 186) is open: got false"
+(`out/n_dream_car1`); the dream's Doma's X-Potion left, "126: the
+X-Potion's chest (bit 96) is open: got false" (`out/n_doma_dream`); the
+Beads left, "123: the Beads's chest (bit 54) is open: got false"
+(`out/n_doma_wake`); the boot's map read as another, "the boot stands in
+the dream's Doma (126): wor_dream's save: got 126 ($7E), want 125 ($7D)"
+(`out/n_doma_boot`). The hunt's own asserts (the pool, the two bounds,
+every formation won) are route-wor-gogo.md section 10's.
+
+DREAM_SWEEP

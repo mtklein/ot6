@@ -935,3 +935,55 @@ stays, `M.relicPlan` step 1). The assert's negative: the leg with the item
 id changed fails at boot, "assertEq failed: the party owns a Back Guard
 ($E1) for the plain's pincers" (`lab/ragnarok/ragmut`); the leg passes,
 "PASS (frame 31145)" (`lab/ragnarok/rag2`).
+
+## 15. Umaro's cave's pools (v0.38, #488)
+
+Evidence under `build/attempts/wt/v038-wor-sweeps-b/lab/` (`scripts/`,
+`out/`). The coverage audit (wor-coverage.md 4.3) found six of the cave's
+eight formations unfought: the walk through it is short. A branch leg,
+`gen_wor_umaro_hunt`, boots the graph's capture `wor_tritoch_cave` (the
+party just dropped onto the landing, made by `gen_wor_tritoch`) and walks a
+lap of each pool the cave walk crosses until each formation is won
+(`K.hunt`, lib/ot6_field.lua, the model of route-wor-gogo.md section 10).
+Nothing boots what it leaves: a player who pauses in the cave meets these,
+but one who walks through does not, and hunting every pool on the main line
+left the party 8-9 levels over the curve the later arcs were tuned at (the
+first cut, at 8fdc6159: wor-ancient-v1 "TERRA level: fresh 64, tracked
+55"). No grind the route already does walks this cave, so no hunt here
+stays on the main line. The pools: the landing (281, group 166: Poppers x4 254, Kiwok and Ceritops 255,
+Kiwok and Poppers x3 256 at 80/256, a lone Pug 253 at 16/256) on (14,55)
+<-> (15,55), and the X-Ether's pocket (282, group 167: Anemone x4 259,
+Anemone x2 and Tomb Thumb 258, Ceritops and Tomb Thumb x2 260 at 80/256,
+Ceritops x3 257 at 16/256) on (21,31) <-> (20,31). The lair (283, group
+168) deals the same four as 282, so one hunt covers both. The hunt reads
+its bounds from the ROM: "every slot drawn within 110 battles, a battle
+within 162 steps". The cave's monster box (282 (13,34), Pugs x3) is #487's.
+
+UMARO_PLAY
+
+**Measured**, first with the hunts on the main line (at 8fdc6159, from the
+graph's captures `wor_tritoch_cave` and `wor_tritoch_pocket`, the pocket's
+the same party after the landing's hunt; `scripts/lab_hunt.lua`: K battles used up on the
+hunt's own lap, counted by battles opened, then the leg's hunt), K 0-11 at
+seed shifts 0 and 7, one attempt each: 48 of 48 PASS (`out/uc_*`,
+`out/up_*`; `out/tally_uc.txt`, `out/tally_up.txt`), the longest hunt 18
+battles of its 110.
+
+| formation | fights | keys | won | keys with a fall |
+|---|---|---|---|---|
+| 253 Pug | 34 | 21 | 34 | 8 |
+| 254 Poppers x4 | 106 | 28 | 106 | 0 |
+| 255 Kiwok, Ceritops | 162 | 54 | 162 | 0 |
+| 256 Kiwok, Poppers x3 | 112 | 47 | 112 | 0 |
+| 257 Ceritops x3 | 24 | 18 | 24 | 0 |
+| 258 Anemone x2, Tomb Thumb | 122 | 35 | 122 | 0 |
+| 259 Anemone x4 | 28 | 18 | 28 | 0 |
+| 260 Ceritops, Tomb Thumb x2 | 192 | 48 | 192 | 0 |
+
+Every fall is in the Pug's fights, 10 in its 34 (`tally_uc.txt`); of those
+with an action read, 8 are its `cmd $0C atk $99` and 1 its `$EF`
+(`out/falls_uc.txt`), most of them MOG (L35-37, about 2,200 HP) from a third
+of his HP or more ("MOG 783/2208"). The party wins the Pug every time, with
+a fall in a third of its keys; the hunt meets it once.
+
+UMARO_SWEEP

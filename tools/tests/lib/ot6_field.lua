@@ -8132,18 +8132,19 @@ function M.relicPlan(members, opts)
   -- the bag; #486 review: after the dream a Genji Glove took CYAN's Ribbon's slot and the Hyper Wrist his other,
   -- and the Ribbon sat in the bag through Doma: "Genji Glove $D1 goes to CYAN's slot 4 (over Ribbon $CA)",
   -- "Hyper Wrist $D2 goes to CYAN's slot 5"): on a member planned without one who can wear it, in place of the
-  -- lowest-ranked relic planned in a slot the plan does not keep, never a two-weapon relic or a ward; among
+  -- lowest-ranked relic planned in a slot the plan does not keep, never a two-weapon relic, a ward or the Exp.
+  -- Egg (aff "behind", as M.eggMayDisplace: step 3b placed it on the member furthest behind; #495); among
   -- equals the member with the most spells learned (step 2's order).  Only the Ribbons after the first: the
   -- first is step 2's to place or leave (a fight whose threats no guard covers leaves its slot to the ward the
-  -- fight calls for: field_relicplan's Dullahan case).  Not when arming for a boss (threats.boss): the boss kit
-  -- trades a Ribbon for the wards its fight calls for (gen_wor_tritoch's Ice Dragon: TERRA's Ribbon for the Czarina
-  -- Ring, the Ribbon to the bag until the fight is over).  A plan that already wears them all is unchanged.
+  -- fight calls for: field_relicplan's Dullahan case).  Arming for a boss too (#495: the exclusion had no play
+  -- reason): the wards the boss kit puts on stay, as everywhere, and a Ribbon left in the bag goes over a
+  -- lower-ranked relic (gen_wor_tritoch's Ice Dragon: TERRA's Ribbon gives way to the Czarina Ring and goes on
+  -- MOG).  A plan that already wears them all is unchanged.
   local ribbonsOn = 0
   for _, m in ipairs(ms) do
     for s = 4, 5 do if m.want[s] == RIBBON_ID then ribbonsOn = ribbonsOn + 1 end end
   end
-  local boss = opts.threats and opts.threats.boss
-  while not boss and ribbonsOn > 0 and (count[RIBBON_ID] or 0) > 0 do
+  while ribbonsOn > 0 and (count[RIBBON_ID] or 0) > 0 do
     local best = nil
     for _, m in ipairs(ms) do
       if m.want[4] ~= RIBBON_ID and m.want[5] ~= RIBBON_ID and wearsItem(m.ch, RIBBON_ID) then
@@ -8152,7 +8153,7 @@ function M.relicPlan(members, opts)
           if w == nil or w == 0xFF then key = -1
           else
             local cl = M.relicClass(w, opts.threats)
-            if cl and not cl.hands and cl.aff ~= "ward" then key = cl.rank end
+            if cl and not cl.hands and cl.aff ~= "ward" and cl.aff ~= "behind" then key = cl.rank end
           end
           if key ~= nil and (best == nil or key < best.key or (key == best.key and m.spells > best.m.spells)) then
             best = { m = m, s = s, key = key }
@@ -10493,7 +10494,9 @@ function M.worLegKit(env)
       M.driveUntil(function()
         while seen < #M.outcomes do
           seen = seen + 1
-          steps = 0
+          -- the battle opened inside a lap step whose count the body adds after the nav returns (#495): -1
+          -- here leaves the count at 0 steps since the battle
+          steps = -1
           local o = M.outcomes[seen]
           local f = o.form & 0x1FF
           if o.kind == "won" then won[f] = true end
