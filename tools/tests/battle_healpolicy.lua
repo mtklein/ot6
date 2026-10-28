@@ -1481,6 +1481,30 @@ H.run({ maxFrames = 3000 }, {
     H.log("battle_healpolicy: the bag's prices and the item a care turn spends (#370) checked")
   end),
 
+  -- the status watcher reads only a live battle (#494): past the end
+  -- hook, or inside the 90-frame hand-back tail, it says nothing
+  H.call(function()
+    H.assertEq(H.battleLiveAt(nil, 500), true, "no end hook yet: live")
+    H.assertEq(H.battleLiveAt(100, 500), true, "a battle opened 400 frames after the last end: live")
+    H.assertEq(H.battleLiveAt(500, 500), false, "the end hook fired on the watch's first frame: the hand-back")
+    H.assertEq(H.battleLiveAt(600, 500), false, "the end hook fired after this watch began: its battle is over")
+    H.assertEq(H.battleLiveAt(411, 500), false, "89 frames after the last end: still its tail")
+    H.assertEq(H.battleLiveAt(410, 500), true, "90 frames after the last end: a new battle")
+    H.log("battle_healpolicy: the status watcher's liveness gate (#494) checked")
+  end),
+
+  -- harness traces (#489)
+  H.call(function()
+    H.assertEq(H.outcomeForm(0x1C4, 0x1A8), 0x1C4, "an [outcome] names the formation the battle opened with")
+    H.assertEq(H.outcomeForm(nil, 0x1A8), 0x1A8, "...and the end hook's when no opening was read")
+    H.assertEq(H.traceCoheres(true, 1), true, "world mode on map 1: a world tile")
+    H.assertEq(H.traceCoheres(false, 98), true, "field mode on map 98: a field tile")
+    H.assertEq(H.traceCoheres(false, 0x201), false, "field mode while the id still reads WoR (flag bit up): skipped")
+    H.assertEq(H.traceCoheres(false, 1), false, "field mode on map 1: skipped")
+    H.assertEq(H.traceCoheres(true, 98), false, "world mode on a field map id: skipped")
+    H.log("battle_healpolicy: the trace's coherence check and the [outcome] formation (#489) checked")
+  end),
+
   -- 8. the table was not skipped
   H.call(function()
     H.assertEq(ran, #CASES, string.format(
