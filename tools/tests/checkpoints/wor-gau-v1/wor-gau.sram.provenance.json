@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "45c1ab1f731138a11564550ae135b23004d90182098d24f195788f58d3c529c7",
-  "generator_sig": "89f10e27bdfe44335d2e48555c17adf1e7b5e4f0e2a9ce5a44374bde89aae34b gen_wor_gau build/checkpoints/wor-veldt-cave-v1/manifest.json build/checkpoints/wor-veldt-cave-v1/wor-veldt-cave.sram",
+  "payload_sha256": "0e75567322d7865d83f4a34a145ede7c7c7b8bee8e7e9e6a3a22d2bdef3ef712",
+  "generator_sig": "1b61d34693b4f04d0ab4ae3798eec5265135a7ffdb7335c7648dcd83312ddd65 gen_wor_gau build/checkpoints/wor-veldt-cave-v1/manifest.json build/checkpoints/wor-veldt-cave-v1/wor-veldt-cave.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/wor-veldt-cave-v1/manifest.json",
-      "sha256": "b47dcc48791e3bc5399399ece2b3a8c76b16cac3727f3a57d34967f33c40e26e"
+      "sha256": "ef7fa9c672ee8b72b9e4199ab7e8254028d31515151271f0a9dba110a79dc851"
     }
   ]
 }

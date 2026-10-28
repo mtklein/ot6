@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "e3b23487e2d8a480cd4edc89159202afd609864dc7dc709dc51a9c15f771aac6",
-  "generator_sig": "3234278b8747a4ed46f64f0e58cf45bb93b9a35d4dce819a9db621118e495500 gen_kolts build/checkpoints/world-figaro-v1/manifest.json build/checkpoints/world-figaro-v1/world-figaro.sram",
+  "payload_sha256": "4926e10301e0941618a12f6b228cf9b4ba014df254a2582cd89cfde7b57b8ba9",
+  "generator_sig": "5ce7b5e25cb8264ae66d856a7c40fd12dc594c5dae13bedf3ae3c3b091014c06 gen_kolts build/checkpoints/world-figaro-v1/manifest.json build/checkpoints/world-figaro-v1/world-figaro.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/world-figaro-v1/manifest.json",
-      "sha256": "30bb9c6a5668ae45ff5b38ed7ae90fbfa187c35652141137250fec4c3f36cdcc"
+      "sha256": "d6e93b70065e8a6d8ea7575c978af31607cd569c83aae784f4ab96a1d9ca04ad"
     }
   ]
 }

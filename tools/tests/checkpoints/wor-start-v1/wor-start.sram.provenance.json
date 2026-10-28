@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "8cff525685ff53766183851a8477500838d055570e5a43a0432a19fec5200185",
-  "generator_sig": "4117b73bdc4da1081e7c2ef8213ff88b71ac0a17cf71c6058dfb6e03ca867c89 gen_wor_start build/checkpoints/wor-island-v1/manifest.json build/checkpoints/wor-island-v1/wor-island.sram",
+  "payload_sha256": "597fcf41ef190f924b4d08b9c202d2a4500a436fb332156100fc3ee6b1b0bc90",
+  "generator_sig": "0b89fdcbc26f2b007e48573d22fa5c94de926ccee9870c62bee3fa5765e7f1a8 gen_wor_start build/checkpoints/wor-island-v1/manifest.json build/checkpoints/wor-island-v1/wor-island.sram",
   "ancestors": [
     {
       "path": "build/checkpoints/wor-island-v1/manifest.json",
-      "sha256": "5db4f11765573cd1c08c052c751634732caf950c996d1b2392b67095f33b68f4"
+      "sha256": "d7183ee25d035df88fec10a54e2eb0dacb3a1faf41491accfd09c0e35be9315e"
     }
   ]
 }
