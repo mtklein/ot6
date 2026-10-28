@@ -798,9 +798,17 @@ STATES = [
     # timeout=3600: the capture ended at frame 40859 from the Continue (10
     # battles); three such attempts are ~123k frames, ~1500 s at ~80 frames/s.
     # Re-cut by checkpoint_drift.py --recut.  also: wor_figaro_sweep_passage,
-    # the party in the passage before the hunt there (#488: the sweep's boot).
+    # the party in the passage back from the cellar, gen_wor_passage_hunt's
+    # boot (#488).
     S("wor_figaro_sweep", gen="gen_wor_figaro_sweep", prev="wor_edgar",
       checkpoint="wor-edgar-v1", timeout=3600, also=["wor_figaro_sweep_passage"]),
+
+    # wor_figaro_sweep_passage -> the passage: a branch beside
+    # wor_figaro_sweep (#488).  The passage's pool (field group 65) walked
+    # until every formation is won (wor-coverage.md section 11).  Nothing
+    # boots it.
+    S("wor_passage_hunt", gen="gen_wor_passage_hunt", prev="wor_figaro_sweep_passage",
+      timeout=3600),
 
     # wor-figaro-sweep-v1 -> the World of Ruin map outside Kohlingen: the Regal
     # Crown off the castle's basement 2 (#322), the engineer's ride to
@@ -869,13 +877,17 @@ STATES = [
     # armor counter and Lola again with CYAN, and back up to the save point:
     # the `wor-mtzozo-v1` checkpoint, the Storm Dragon's retry point
     # (docs/design/route-wor-cyan.md).  A cut.  Re-cut by
-    # checkpoint_drift.py --recut.  also (#488: the sweeps' boots):
-    # wor_cyan_rustrid, the party by Zozo's merchant before the street's
-    # hunt, and wor_cyan_zozo225, the party in the clock's room before the
-    # buildings' hunt.
+    # checkpoint_drift.py --recut.  also: wor_cyan_rustrid, the party by
+    # Zozo's merchant after the Rust-Rid, gen_wor_zozo_hunt's boot (#488).
     S("wor_cyan", gen="gen_wor_cyan", prev="wor_terra",
-      checkpoint="wor-terra-v1", timeout=5400,
-      also=["wor_cyan_rustrid", "wor_cyan_zozo225"]),
+      checkpoint="wor-terra-v1", timeout=5400, also=["wor_cyan_rustrid"]),
+
+    # wor_cyan_rustrid -> Zozo's Tonic room: a branch beside wor_cyan
+    # (#488).  The street's pool (field group 78) and the buildings' (group
+    # 77), each walked until every formation is won (wor-coverage.md
+    # section 11).  Nothing boots it.
+    S("wor_zozo_hunt", gen="gen_wor_zozo_hunt", prev="wor_cyan_rustrid",
+      timeout=3600, also=["wor_zozo_hunt_225"]),
 
     # wor-mtzozo-v1 -> the World of Ruin map beside the Falcon parked
     # outside Zozo (45,130): the Storm Dragon (event battle 133, a game over

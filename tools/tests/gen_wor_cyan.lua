@@ -478,18 +478,6 @@ local function zozoClock()
     end),
   }, {})
 end
--- the two pools: the street (field group 78, map 221) and the buildings (group 77, map 225), each walked on a
--- lap until every formation is won (K.hunt: the list asserted to be the map's pool, the hunt bounded by the
--- worst draws the encounter counters can hold), as a player who pauses in Zozo meets them
-local ZOZO78 = { [104] = "Gabbldegak x4", [109] = "Harvester, Gabbldegak x2", [102] = "HadesGigas",
-  [110] = "HadesGigas, Harvester" }
-local ZOZO77 = { [105] = "SlamDancer", [107] = "Harvester", [108] = "SlamDancer, Harvester x2",
-  [106] = "SlamDancer, Gabbldegak x3" }
-local HUNT221_LAP, HUNT225_LAP = { { 42, 30 }, { 43, 30 } }, { { 98, 61 }, { 99, 61 } }
-local NAMES = {}
-for _, p in ipairs(MEMBERS) do NAMES[p[1]] = p[2] end
-local K = H.worLegKit({ fight = FIGHT, links = {}, names = NAMES })
-local zozoWon = {}
 -- Maranda's two chests (TreasureProp 284): the Remedy by the pigeon's yard and the Revivify by the gate, walked to
 -- off the town's two exits to the world, the east one (32,16) and the gate's row (4-13,31) (the first try walked
 -- onto (32,16) on the way to the Remedy: build/attempts/wt/v038-wor-sweeps-a/dev/cy1)
@@ -776,16 +764,11 @@ H.run({ maxFrames = 400000 }, {
   H.dialogChoice(0, { inBattle = false, what = "the Rust-Rid for 1000 GP? Yes", tag = "Zozo" }),
   ride(function() return sw(0x01DB) == 1 end, 3000, "the Rust-Rid"),
   H.saveState("wor_cyan_rustrid.mss"),
-  -- ---- 2a. Zozo (#485, #488): the street's hunt, the clock, the buildings' hunt in its room and the Chain Saw,
-  -- the Tonic's room, and on to the café; the Tincture's room off the landing below
-  K.hunt({ what = "Zozo's street (group 78)", lap = HUNT221_LAP, forms = ZOZO78, won = zozoWon, avoid = zozoAvoid() }),
-  H.fieldCare({ tag = "after the street's hunt" }),
+  -- ---- 2a. Zozo's chests (#485): the clock and the Chain Saw, the Tonic's room, and on to the café; the
+  -- Tincture's room off the landing below.  (Zozo's two pools are hunted on a branch from the capture above,
+  -- gen_wor_zozo_hunt, #488.)
   walkInto(42, 28, MAP_ZOZO_IN, "Zozo -> the clock's room (225 (98,61))", zozoAvoid(42, 28)),
   zozoClock(),
-  H.saveState("wor_cyan_zozo225.mss"),
-  K.hunt({ what = "Zozo's buildings (group 77)", lap = HUNT225_LAP, forms = ZOZO77, won = zozoWon,
-    avoid = ZOZO_IN_DOORS }),
-  H.fieldCare({ tag = "after the buildings' hunt" }),
   -- the way the clock opened (_ca9725's tiles, x 101-102 from row 45 down) runs past the clock's tile and onto
   -- the stair's own trigger (103,55), then up the stair to (109,49) (v028's probe: "xy=...,101:55,102:55,103:55,
   -- 104:54,...,109:49,110:49,..."); with $01F0 set both triggers return at once, so the walk crosses them, and
