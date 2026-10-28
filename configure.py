@@ -858,6 +858,11 @@ check("checkpoint_drift_selftest",
       "python3 tools/tests/lib/checkpoint_drift.py --selftest",
       ["tools/tests/lib/checkpoint_drift.py", "tools/tests/lib/sram_checkpoint.py",
        "tools/tests/lib/savestate_ninja.py", sn.GRAPH])
+# #480: the tool that states a landing's replay scope, pinned on known answers
+check("downstream_selftest",
+      "python3 tools/tests/lib/downstream.py --selftest",
+      ["tools/tests/lib/downstream.py", "tools/tests/lib/savestate_ninja.py",
+       sn.GRAPH, "configure.py"] + glob("tools/tests/*.lua"))
 # #354: every tracked checkpoint is captured by a run on the graph, so
 # `ninja release`'s drift gate compares it, and every save a suite Continues
 # is one; the rest are the graph's NOT_GATED, each with its reason.

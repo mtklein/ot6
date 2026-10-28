@@ -127,6 +127,37 @@ gate and the release edges (on the Air, 486 s with the drift gate's old
 cost, build/attempts/wt/v026-graph/romchange/after-2.ninja_log). The contracts stay light: a suite that needs a
 level or an item asserts its own precondition.
 
+### Landing a play-changing branch
+
+A change to a generator, the ROM or anything else the play reaches lands
+with a scoped replay and a re-cut of exactly the tracked checkpoints that
+moved (#480), not at the next release. Find the scope from the earliest
+leg the change can reach:
+
+    python3 tools/tests/lib/downstream.py <leg>        # wor_tower or gen_wor_tower
+
+`downstream.py` reads the graph (`savestate_graph.py`) and `configure.py`'s
+suites and prints the states downstream of the leg along the `prev=` chain
+(through `checkpoint=` boots), the tracked keys those runs cut, the suites
+and instruments that boot any of them, and a ready-to-paste `--recut`
+line. A branch leg nothing boots (`wor_thamasa_plain`) prints no keys:
+there is nothing to re-cut. Then:
+
+1. `ninja`, which replays what the change reaches (the line, from the
+   earliest changed leg);
+2. `checkpoint_drift.py` on the listed keys, and quote its lines in the
+   landing's evidence before the re-cut ("N byte(s) differ" with the
+   explanation);
+3. `checkpoint_drift.py --recut` the keys that drifted, and quote the
+   lines again after ("none");
+4. commit the re-cut with the change, or right after it, and push.
+
+Re-cut only the drifted keys; a key whose drift line says "none" is
+already today's play. Labs and sweeps run in the meantime boot the graph's
+captures in `build/checkpoints/`, not the tracked saves (docs/TESTING.md).
+Push your own branch; never force-push. A rebase of a published branch
+goes up under a new branch name.
+
 The release zip ships the tracked checkpoints as player saves: `saves/NN -
 Title.srm`, one per non-negative checkpoint, numbered in the graph's story
 order and named by `TITLES` in `tools/release_saves.py`, plus
@@ -464,6 +495,12 @@ those.
   `pin_test_saves.py` copies, as the Mac's `~/Library/Application
   Support/Mesen2/settings.json` is (which is also `{}`); run.sh refuses to run
   without it.
+- **Detached launches**: a job that must outlive the ssh session starts
+  detached with its input closed: `setsid nohup <cmd> > log 2>&1 < /dev/null
+  &` on Linux. macOS has no `setsid`; there use `nohup <cmd> > log 2>&1 <
+  /dev/null &`. Then head the log (`head log`) to confirm the job really
+  started; a launch that failed silently looks the same as one still
+  working.
 - **Seeding**: clone to `~/ot6`, scp `Final Fantasy III (USA).sfc` into it
   from a Mac, `python3 configure.py`, `ninja build/ot6.sfc`. Savestates come
   from running `ninja` there. A worktree seeds from `~/ot6` with

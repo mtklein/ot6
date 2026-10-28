@@ -128,7 +128,20 @@ captured, never an older tracked copy.
   quick failure is worth reading; a quick pass is not qualification.
 - A suite run by hand, a lab or a sweep is evidence for the question it
   was run to answer (see "Match the evidence to the question"), with the
-  boot it names.
+  boot it names. A lab or sweep boots the graph's own captures: the
+  `build/states/` state, or the `build/checkpoints/<key>` capture the run
+  before it made, never a tracked save, which is a copy an older build's
+  play made and may have drifted (#480). The `-- @checkpoint` and
+  `OT6_SRAM_CHECKPOINT` lines name the capture for the same reason.
+
+A branch that changes play lands with its replay scoped and its tracked
+saves re-cut: replay from the earliest section the change can reach, then
+`checkpoint_drift.py --recut` exactly the keys that moved, quoting the
+`checkpoint drift` lines before the re-cut and after it ("none") in the
+landing's evidence. `python3 tools/tests/lib/downstream.py <leg>` states
+the scope: the states downstream of the leg, the tracked keys they cut, the
+suites that boot them, and the `--recut` line (docs/TOOLING.md "Landing a
+play-changing branch").
 
 Evidence must outlive the tree it was produced in. Write evidence you will
 cite under `build/attempts/<branch>/` and cite it by that path. In an agent
@@ -175,6 +188,25 @@ formations. To vary the draw, use up
 encounters before the body (fight or run them), not idle frames or seeds.
 Budgets for "within N encounters" come from the map's decoded pool odds, not
 from one run.
+
+A leg's dependencies come in two kinds, sorted by who can satisfy them.
+A **hard** dependency only an earlier leg can supply: a character who
+joined, a unique item, a story flag, enough gil. The leg asserts it at its
+start, with a message that names the upstream leg that should have
+supplied it (`gen_wor_tritoch`'s armForFire guard), so a lost dependency
+fails where it is needed, not three legs later. A **soft** dependency the
+leg can fix the way a player would: fewer Potions than expected, a buyable
+weapon, low HP or MP. The leg tops those up itself in its own segment (a
+shop, field care; the Tzen Sabre buy) and asserts only what it cannot fix.
+Each new assert ships with a negative: a boot without the dependency goes
+red.
+
+The canon playthrough, the line from power-on, is the middle path: what a
+competent player does on the way, not the most thorough one. A hunt for
+coverage (every formation, every drop, a level more than the route needs)
+goes on a branch leg that nothing boots, or rides a grind the route already
+does and stops at that grind's own level target, so the line's play, and
+every save downstream of it, does not move for the hunt.
 
 A new or changed test is ready to merge when its evidence shows:
 1. the old version failing where the draw or history moves (when fixing
