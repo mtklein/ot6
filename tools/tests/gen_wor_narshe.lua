@@ -505,7 +505,15 @@ H.run({ maxFrames = 400000 }, {
   -- (30 (55,30), bit $002) and the cave's Pod Bracelet and Elixir (38, bits
   -- $00B, $00C) were opened in the World of Balance: build/lab/narshe/d3,
   -- 'already open'
-  via({ { 38, 48 }, { 40, 38 }, { 46, 32 }, { 47, 23 }, { 50, 18 } }, "Narshe's street to the elder's door", NARSHE_DOORS),
+  -- the elder's west room and its Elixir (#485: TreasureProp 30 (105,14), bit $00A), 65 steps off the street
+  -- (route_data.py field-path 32 38 48 18 23): in by the west door (18,22) -> 30 (110,25), out by its trigger
+  -- (110,26), which in the World of Ruin loads 32 (18,24) (_cc390c)
+  via({ { 38, 48 } }, "Narshe's street past the gate", NARSHE_DOORS),
+  door(18, 22, MAP_ELDER, "Narshe -> the elder's west room (30 (110,25))", exceptOf(NARSHE_DOORS, 18, 22)),
+  chestAt(105, 14, 0x00A, "Elixir (30 (105,14))", ELIXIR, ELDER_DOORS),
+  door(110, 26, MAP_NARSHE, "the elder's west room -> Narshe (32 (18,24))", exceptOf(ELDER_DOORS, 110, 26)),
+  H.call(function() H.assertEq(H.chestOpen(0x00A), true, "30: the Elixir's chest (bit 10) is open") end),
+  via({ { 40, 38 }, { 46, 32 }, { 47, 23 }, { 50, 18 } }, "Narshe's street to the elder's door", NARSHE_DOORS),
   door(49, 12, MAP_ELDER, "Narshe -> the elder's house (30)", exceptOf(NARSHE_DOORS, 49, 12)),
   door(67, 26, MAP_NARSHE, "the elder's house -> Narshe's north ledge (32 (53,8))", exceptOf(ELDER_DOORS, 67, 26)),
   via({ { 41, 8 }, { 29, 8 } }, "the north ledge to the moogle cave's door", NARSHE_DOORS),

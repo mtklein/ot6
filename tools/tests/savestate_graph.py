@@ -797,9 +797,10 @@ STATES = [
     # 10).  wor_kohlingen below boots its checkpoint.
     # timeout=3600: the capture ended at frame 40859 from the Continue (10
     # battles); three such attempts are ~123k frames, ~1500 s at ~80 frames/s.
-    # Re-cut by checkpoint_drift.py --recut.
+    # Re-cut by checkpoint_drift.py --recut.  also: wor_figaro_sweep_passage,
+    # the party in the passage before the hunt there (#488: the sweep's boot).
     S("wor_figaro_sweep", gen="gen_wor_figaro_sweep", prev="wor_edgar",
-      checkpoint="wor-edgar-v1", timeout=3600),
+      checkpoint="wor-edgar-v1", timeout=3600, also=["wor_figaro_sweep_passage"]),
 
     # wor-figaro-sweep-v1 -> the World of Ruin map outside Kohlingen: the Regal
     # Crown off the castle's basement 2 (#322), the engineer's ride to
@@ -868,9 +869,13 @@ STATES = [
     # armor counter and Lola again with CYAN, and back up to the save point:
     # the `wor-mtzozo-v1` checkpoint, the Storm Dragon's retry point
     # (docs/design/route-wor-cyan.md).  A cut.  Re-cut by
-    # checkpoint_drift.py --recut.
+    # checkpoint_drift.py --recut.  also (#488: the sweeps' boots):
+    # wor_cyan_rustrid, the party by Zozo's merchant before the street's
+    # hunt, and wor_cyan_zozo225, the party in the clock's room before the
+    # buildings' hunt.
     S("wor_cyan", gen="gen_wor_cyan", prev="wor_terra",
-      checkpoint="wor-terra-v1", timeout=5400),
+      checkpoint="wor-terra-v1", timeout=5400,
+      also=["wor_cyan_rustrid", "wor_cyan_zozo225"]),
 
     # wor-mtzozo-v1 -> the World of Ruin map beside the Falcon parked
     # outside Zozo (45,130): the Storm Dragon (event battle 133, a game over
@@ -909,9 +914,11 @@ STATES = [
     # (the switch, the two paintings), the basement's turning doors, the
     # painting warp, Still Life: the `wor-owzer-v1` checkpoint, the retry
     # point for Chadarnook (docs/design/route-wor-thamasa.md).  A cut.
-    # Re-cut by checkpoint_drift.py --recut.
+    # Re-cut by checkpoint_drift.py --recut.  also: wor_owzer_hunt, the
+    # party by the basement's save point before the hunt there (#488: the
+    # sweep's boot).
     S("wor_owzer", gen="gen_wor_owzer", prev="wor_tritoch",
-      checkpoint="wor-narshe-v1", timeout=5400),
+      checkpoint="wor-narshe-v1", timeout=5400, also=["wor_owzer_hunt"]),
 
     # wor-owzer-v1 -> the World of Ruin map beside the Falcon at the
     # Fanatics' Tower (160,127): Chadarnook (event battle 86, a game over when

@@ -247,17 +247,22 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(sw(0x0376), 0, "Gerad has left the street ($0376)")
   end),
 
-  -- ---- 5. the inn, when anyone is short (150 GP) ----------------------------------------
+  -- ---- 5. the inn: its Elixir (#485), and a night when anyone is short (150 GP) ----------
+  -- the chest (TreasureProp 171: (57,37), bit 62) is in the inn's back room, 27 steps from the door
+  -- (route_data.py field-path 171 44 52 57 38); Nikeah rolls no battles
+  H.crossDoor(19, 31, MAP_NK_INN, 44, 52, "Nikeah inn door 169(19,31)->171(44,52)"),
+  H.openChest({ stand = { 57, 38 }, face = "up", bit = 62, what = "Elixir (171 (57,37))", item = 0xEE,
+    nav = { maxFrames = 9000 } }),
+  H.call(function() H.assertEq(H.chestOpen(62), true, "171: the Elixir's chest (bit 62) is open") end),
   H.cond(function()
     local s = not whole(CELES) or not whole(SABIN)
-    if not s then H.log("[nikeah] the party is whole; no inn") end
+    if not s then H.log("[nikeah] the party is whole; no night at the inn") end
     return s
   end, {
-    H.crossDoor(19, 31, MAP_NK_INN, 44, 52, "Nikeah inn door 169(19,31)->171(44,52)"),
     H.innRest({ spot = { 46, 50 }, face = "up", price = 150, tag = "Nikeah inn" }),
-    H.navTo(44, 52, { maxFrames = 6000, playBattles = "tactical" }),
-    holdOut("down", MAP_NIKEAH, "the inn's (44,53) exit -> Nikeah 169"),
   }, {}),
+  H.navTo(44, 52, { maxFrames = 6000, playBattles = "tactical" }),
+  holdOut("down", MAP_NIKEAH, "the inn's (44,53) exit -> Nikeah 169"),
 
   -- ---- 6. the ship ------------------------------------------------------------------
   H.navTo(13, 62, { maxFrames = 9000, playBattles = "tactical" }),

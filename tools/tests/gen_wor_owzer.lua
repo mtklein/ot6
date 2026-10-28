@@ -710,16 +710,24 @@ local function warpTo(x, y, dx, dy, what, avoid)
     H.call(function() H.log(string.format("[route] %s: on map %d at (%d,%d)", what, map(), H.fieldX(), H.fieldY())) end),
   })
 end
-local function chestIfReachable(cx, cy, bit, what, item)
-  return lazy(function()
-    for _, o in ipairs({ { 0, 1 }, { -1, 0 }, { 1, 0 }, { 0, -1 } }) do
-      if H.bfsPath(cx + o[1], cy + o[2]) then return chestAt(cx, cy, bit, what, item) end
-    end
-    H.log(string.format("[chest] %s (%d,%d): no side reachable from (%d,%d); left", what, cx, cy, H.fieldX(),
-      H.fieldY()))
-    return H.call(function() end)
-  end)
-end
+-- ---- the basement in full (#485, #488): its two chests and its pool ----
+-- The Moogle Suit (92,58) sits in the pocket the inner door (104,46) leads to, (92,61), and back out by (92,62)
+-- -> (104,48); the Relic Ring (90,47) above the turning doors, walked to from (95,61) before the lamp (the doors'
+-- tiles (88/90/92,50) and the painting (85,50) kept off: two drop the party into the cell).  Before #485 the route
+-- looked for both from the save point's side, where neither is reachable (the play at cec9c74c: "no side
+-- reachable from (85,46); left").
+local DOOR_TILES = { { 88, 50 }, { 90, 50 }, { 92, 50 }, { 85, 50 } }
+local MOOGLE_SUIT_CHEST = { 92, 58, 0x0D5, "Moogle Suit (207 (92,58))", MOOGLE_SUIT }
+local RELIC_RING_CHEST = { 90, 47, 0x102, "Relic Ring (207 (90,47))", RELIC_RING }
+-- The basement's pool (field group 157, map 207: SubBattleGroup) deals Vindr x2 (286), SoulDancer x2 with Crusher
+-- x2 (284, slots 2 and 4), and Vindr x2, Wild Cat, Crusher x2 (285).  The party walks a lap by the save point
+-- until each is won (K.hunt: the list asserted to be the map's pool, the hunt bounded by the worst draws the
+-- encounter counters can hold), as a player who pauses in the basement meets them.
+local OWZER157 = { [286] = "Vindr x2", [284] = "SoulDancer x2, Crusher x2", [285] = "Vindr x2, Wild Cat, Crusher x2" }
+local HUNT207_LAP = { { 85, 46 }, { 85, 47 } }
+local NAMES = {}
+for _, p in ipairs(MEMBERS) do NAMES[p[1]] = p[2] end
+local K = H.worLegKit({ fight = FIGHT, links = {}, names = NAMES })
 
 local PARTY = { { CYAN, "CYAN" }, { TERRA, "TERRA" }, { CELES, "CELES" } }
 
@@ -796,7 +804,19 @@ H.run({ maxFrames = 500000 }, {
   -- ---- 4. the basement: the lamp, the turning doors, the painting warp ---------
   -- @@stage basement
   warpTo(124, 52, 112, 47, "the basement (124,52) -> (112,47)"),
+  -- the Moogle Suit's pocket: in by (104,46), out by (92,62)
+  warpTo(104, 46, 92, 61, "the basement (104,46) -> (92,61)"),
+  chestAt(table.unpack(MOOGLE_SUIT_CHEST)),
+  warpTo(92, 62, 104, 48, "the basement (92,62) -> (104,48)"),
   warpTo(106, 46, 95, 61, "the basement (106,46) -> (95,61)"),
+  -- the Relic Ring, above the turning doors, before the lamp turns them
+  chestAt(RELIC_RING_CHEST[1], RELIC_RING_CHEST[2], RELIC_RING_CHEST[3], RELIC_RING_CHEST[4], RELIC_RING_CHEST[5],
+    DOOR_TILES),
+  H.call(function()
+    for _, o in ipairs({ MOOGLE_SUIT_CHEST, RELIC_RING_CHEST }) do
+      H.assertEq(H.chestOpen(o[3]), true, string.format("207: the %s's chest (bit %d) is open", o[4], o[3]))
+    end
+  end),
   -- the lamp (95,60), _cb4962: the doors start turning
   stepOn(95, 60, function() return sw(0x01B5) == 1 end),
   H.call(function() H.log(string.format("[doors] the lamp: $01B5 %d", sw(0x01B5))) end),
@@ -817,8 +837,11 @@ H.run({ maxFrames = 500000 }, {
   H.call(function() say("route", "Still Life fought") end),
   -- (76,51), _cb4c94: through the opened painting to (85,46)
   warpTo(76, 51, 85, 46, "the opened painting (76,51) -> (85,46)"),
-  chestIfReachable(92, 58, 0x0D5, "Moogle Suit (207 (92,58))", MOOGLE_SUIT),
-  chestIfReachable(90, 47, 0x102, "Relic Ring (207 (90,47))", RELIC_RING),
+  -- (neither chest holds gear for the three: the Moogle Suit is STRAGO's and RELM's, which gen_wor_relm's dress
+  -- picks up, and the relic plan ranks no Relic Ring)
+  H.saveState("wor_owzer_hunt.mss"),
+  -- the hunt by the save point (#488)
+  K.hunt({ what = "Owzer's basement (group 157)", lap = HUNT207_LAP, forms = OWZER157, avoid = DOOR_TILES }),
   H.fieldCare({ tag = "at the basement's save point", threshold = H.CARE_BEFORE_FIGHTS }),
   H.call(function()
     say("wor", "at the basement's save point")

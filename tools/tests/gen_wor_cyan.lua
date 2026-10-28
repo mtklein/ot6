@@ -394,6 +394,115 @@ local function stepOn(x, y, done)
   }), function() n = 0; nb = nil; fought = false end)
 end
 
+-- ---- Zozo in full (#485, #488): its chests, its clock and its two pools ----
+-- The building jumps (221 (19-28,33/39), _ca95c6 and its kin: a step onto one facing across it jumps the gap)
+-- and the crane (35,41) are kept off every walk on the street, and 225's clock and its staircase trigger off
+-- every walk inside (their tiles are in ZOZO_IN_DOORS).
+local ZOZO_JUMPS = { { 28, 39 }, { 25, 39 }, { 21, 39 }, { 19, 39 }, { 28, 33 }, { 25, 33 }, { 21, 33 }, { 19, 33 },
+  { 35, 41 } }
+local function zozoAvoid(x, y)
+  local out = exceptOf(ZOZO_DOORS, x or -1, y or -1)
+  for _, t in ipairs(ZOZO_JUMPS) do out[#out + 1] = t end
+  return out
+end
+-- the chests the route takes (TreasureProp 225): three rooms off the street and the landing (route_data.py map
+-- 221/225, the door graph walked from the street: build/attempts/wt/v038-wor-sweeps-a/zozo/).  The other four,
+-- the Thief Glove (225 (11,59)), the Fire Knuckle (225 (35,11)) and the rooftop's RunningShoes and X-Potion (226
+-- (72,26), (92,27)), lie past the stair room's bandit conveyor (225 (53,14-30): seven of the clock's liars stand
+-- on its one-wide stair; the live planner reads no way through, dev/cy9: "no path (59,34)->(46,9)") and the
+-- building jumps, the World of Balance's climb to Dadaluma, which gen_zozo4_dadaluma drives with its own
+-- conveyor, jump and switchback drives.  For this party they are a long climb for little: SABIN wears two Fire
+-- Knuckles already, EDGAR the cellar's RunningShoes, and the Thief Glove is LOCKE's and GOGO's, neither in the
+-- party; the route leaves them.
+local CHAIN_SAW = 0xA6
+local ZOZO_CHESTS = {
+  tonic = { 83, 53, 0x048, "Tonic (225 (83,53))", TONIC },
+  chainsaw = { 111, 52, 0x049, "Chain Saw (225 (111,52))", CHAIN_SAW },
+  tincture = { 66, 50, 0x04A, "Tincture (225 (66,50))", TINCTURE },
+}
+local ZOZO_CHEST_ORDER = { "chainsaw", "tonic", "tincture" }
+local function zozoChest(key, avoid)
+  local o = ZOZO_CHESTS[key]
+  return chestAt(o[1], o[2], o[3], o[4], o[5], avoid)
+end
+-- Zozo's clock (225 (98,59), _ca96bd): stood on, facing up with A held, it asks the hour, the minute and the
+-- second; 6:00 (row 2) sets $01F1, 0:10 (row 0) $01F2, and 0:00:50 (row 4) with both set opens the Chain Saw's
+-- room ($01F0, _ca9725's tiles).  The World of Balance's play set it once (gen_zozo3_clock, whose picks these
+-- are); the World of Ruin's Zozo reads $01F0 clear again (build/attempts/wt/v028-cyan-route/zozo/clk1.log:
+-- "$01F0=0" at (98,61)).
+local function clockPick(idx, doneId, what)
+  return H.dialogChoice(idx, {
+    ready = "count", on = 3, maxFrames = 3000, what = what, tag = what,
+    done = function() return sw(doneId) == 1 end,
+    idle = function(ph)
+      H.setPad(H.readByte(0x00d3) == 1 and ph < 3 and { "a" } or {})
+    end,
+  })
+end
+local function zozoClock()
+  return H.cond(function() return sw(0x01F0) == 0 end, {
+    H.navTo(98, 60, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, avoid = ZOZO_IN_DOORS }),
+    H.driveUntil(function() return H.dialogWaiting() end, 900, {
+      H.hold({ "up" }), H.waitFrames(6),
+      H.hold({ "a", "up" }), H.waitFrames(6),
+    }, "the clock (225 (98,59)): onto it, facing up, A"),
+    clockPick(2, 0x01F1, "the clock's hour: 6:00"),
+    clockPick(0, 0x01F2, "the clock's minute: 0:10"),
+    clockPick(4, 0x01F0, "the clock's second: 0:00:50"),
+    H.waitUntil(function() return sw(0x01F0) == 1 and not H.dialogWaiting() end, 900, "the clock set ($01F0)", 5),
+    -- off the clock's tile (its trigger re-enters every frame the party stands there, so control flickers):
+    -- down pressed only while the party stands aligned on it, released the moment the step is under way (a press
+    -- held through the flicker walked on out of the room's door, (98,62): build/attempts/wt/v038-wor-sweeps-a/
+    -- dev/cy4, "[stair] down done at (98,62)"); a battle on the step is fought
+    (function()
+      local drv = H.fightDriverFor("off the clock", { tactical = true, boost = true, items = true, healPercent = 55 },
+        FIGHT)
+      local fought, ph = false, 0
+      return H.withReset(H.driveUntil(function()
+        return not H.battleLoadStarted() and map() == MAP_ZOZO_IN and H.fieldY() >= 60 and H.hasControl()
+          and H.tileAligned()
+      end, 6000, {
+        H.call(function()
+          ph = (ph + 1) % 8
+          if H.battleLoadStarted() then fought = true; drv.frame(); return end
+          if fought then fought = false; drv.idle() end
+          if H.dialogWaiting() then H.setPad(ph < 4 and { a = true } or {}); return end
+          H.setPad((H.tileAligned() and H.fieldY() <= 59) and { down = true } or {})
+        end),
+      }, "off the clock's tile (98,59)"), function() fought, ph = false, 0 end)
+    end)(),
+    H.release(),
+    H.call(function()
+      H.assertEq(sw(0x01F0), 1, "Zozo's clock set to 6:10:50 ($01F0, _ca9725)")
+      say("route", "Zozo's clock set")
+    end),
+  }, {})
+end
+-- the two pools: the street (field group 78, map 221) and the buildings (group 77, map 225), each walked on a
+-- lap until every formation is won (K.hunt: the list asserted to be the map's pool, the hunt bounded by the
+-- worst draws the encounter counters can hold), as a player who pauses in Zozo meets them
+local ZOZO78 = { [104] = "Gabbldegak x4", [109] = "Harvester, Gabbldegak x2", [102] = "HadesGigas",
+  [110] = "HadesGigas, Harvester" }
+local ZOZO77 = { [105] = "SlamDancer", [107] = "Harvester", [108] = "SlamDancer, Harvester x2",
+  [106] = "SlamDancer, Gabbldegak x3" }
+local HUNT221_LAP, HUNT225_LAP = { { 42, 30 }, { 43, 30 } }, { { 98, 61 }, { 99, 61 } }
+local NAMES = {}
+for _, p in ipairs(MEMBERS) do NAMES[p[1]] = p[2] end
+local K = H.worLegKit({ fight = FIGHT, links = {}, names = NAMES })
+local zozoWon = {}
+-- Maranda's two chests (TreasureProp 284): the Remedy by the pigeon's yard and the Revivify by the gate, walked to
+-- off the town's two exits to the world, the east one (32,16) and the gate's row (4-13,31) (the first try walked
+-- onto (32,16) on the way to the Remedy: build/attempts/wt/v038-wor-sweeps-a/dev/cy1)
+local MARANDA_EXITS = { { 32, 16 }, { 32, 17 } }
+for x = 4, 14 do MARANDA_EXITS[#MARANDA_EXITS + 1] = { x, 31 } end
+local MARANDA_CHESTS = {
+  { stand = { 27, 20 }, face = "right", bit = 0x0F4, what = "Remedy (284 (28,20))", item = REMEDY },
+  { stand = { 2, 27 }, face = "up", bit = 0x0F5, what = "Revivify (284 (2,26))", item = REVIVIFY } }
+local function marandaChest(o)
+  return H.openChest({ stand = o.stand, face = o.face, bit = o.bit, what = o.what, item = o.item,
+    nav = { fight = FIGHT, avoid = MARANDA_EXITS } })
+end
+
 -- ---- the Falcon's cabin: CYAN into the party -------------------------------
 -- The party CYAN joins is full, so he waits aboard; the cabin's members
 -- (map 12) each ask "Change party members?" (_caf59d), and the party menu
@@ -637,24 +746,78 @@ H.run({ maxFrames = 400000 }, {
   talkTo(23, 9, "the carrier pigeon (284 NPC_18)"),
   ride(function() return sw(0x0298) == 1 and map() == MAP_MARANDA end, 12000, "the pigeon flies"),
   H.saveState("wor_cyan_maranda.mss"),
+  -- Maranda's chests (#485): the Remedy by the yard, the Revivify by the gate
+  marandaChest(MARANDA_CHESTS[1]),
+  via({ { 20, 17 }, { 9, 25 }, { 13, 23 }, { 14, 27 }, { 11, 29 } }, "Maranda's street to the gate", MARANDA_EXITS),
+  marandaChest(MARANDA_CHESTS[2]),
+  H.call(function()
+    for _, o in ipairs(MARANDA_CHESTS) do
+      H.assertEq(H.chestOpen(o.bit), true, string.format("284: the %s's chest (bit %d) is open", o.what, o.bit))
+    end
+  end),
 
   -- ---- 2. Zozo: the Rust-Rid and the rusted door -----------------------------
-  via({ { 20, 17 }, { 9, 25 }, { 13, 23 }, { 14, 27 }, { 11, 29 } }, "Maranda's street to the gate"),
+  walkTo(11, 29, "Maranda's gate", {}),
   toFalcon(11, 31, "Maranda", MARANDA_WORLD),
   flyIn(ZOZO_LANDING[1], ZOZO_LANDING[2], ZOZO_DOOR[1], ZOZO_DOOR[2], MAP_ZOZO, "Zozo"),
   -- the merchant (221 NPC_3 at (43,29), _ca9513): with $0298 he tells of the
   -- path to Mt. Zozo and sells the Rust-Rid, 1000 GP ($01DB)
   walkTo(42, 30, "near the merchant", ZOZO_DOORS),
-  talkTo(43, 29, "the merchant (221 NPC_3)"),
+  -- he wanders: by his object ($19, Zozo's street's NPC_3: its twelve NPCs are objects $17-$22), not the one
+  -- nearest his posted tile (Maranda's chests brought the party here later, and he had walked to (41,33), six
+  -- tiles off: build/attempts/wt/v038-wor-sweeps-a/dev/cy3, "the objects: ... $19(41,33)")
+  H.call(function()
+    local o = 0x17 + 2
+    H.log(string.format("[npc] the merchant (221 NPC_3): object $%02X at (%d,%d)", o, H.objX(o), H.objY(o)))
+    H.assertEq(math.abs(H.objX(o) - 43) + math.abs(H.objY(o) - 29) <= 12, true,
+      "the merchant (221 NPC_3, object $19) is near his post (43,29)")
+  end),
+  H.talkToObj(0x19, "the merchant (221 NPC_3)"),
   H.dialogChoice(0, { inBattle = false, what = "the Rust-Rid for 1000 GP? Yes", tag = "Zozo" }),
   ride(function() return sw(0x01DB) == 1 end, 3000, "the Rust-Rid"),
   H.saveState("wor_cyan_rustrid.mss"),
+  -- ---- 2a. Zozo (#485, #488): the street's hunt, the clock, the buildings' hunt in its room and the Chain Saw,
+  -- the Tonic's room, and on to the café; the Tincture's room off the landing below
+  K.hunt({ what = "Zozo's street (group 78)", lap = HUNT221_LAP, forms = ZOZO78, won = zozoWon, avoid = zozoAvoid() }),
+  H.fieldCare({ tag = "after the street's hunt" }),
+  walkInto(42, 28, MAP_ZOZO_IN, "Zozo -> the clock's room (225 (98,61))", zozoAvoid(42, 28)),
+  zozoClock(),
+  H.saveState("wor_cyan_zozo225.mss"),
+  K.hunt({ what = "Zozo's buildings (group 77)", lap = HUNT225_LAP, forms = ZOZO77, won = zozoWon,
+    avoid = ZOZO_IN_DOORS }),
+  H.fieldCare({ tag = "after the buildings' hunt" }),
+  -- the way the clock opened (_ca9725's tiles, x 101-102 from row 45 down) runs past the clock's tile and onto
+  -- the stair's own trigger (103,55), then up the stair to (109,49) (v028's probe: "xy=...,101:55,102:55,103:55,
+  -- 104:54,...,109:49,110:49,..."); with $01F0 set both triggers return at once, so the walk crosses them, and
+  -- its press is held through the control the trigger takes on (103,55) each frame (navTo's refireHold: the walk
+  -- read the stair blocked there and stood: build/attempts/wt/v038-wor-sweeps-a/dev/cy5, cy6, cy7)
+  H.openChest({ stand = { 110, 52 }, face = "right", bit = ZOZO_CHESTS.chainsaw[3], what = ZOZO_CHESTS.chainsaw[4],
+    item = CHAIN_SAW, nav = { fight = FIGHT, avoid = exceptOf(exceptOf(ZOZO_IN_DOORS, 98, 59), 103, 55),
+    refireHold = true } }),
+  -- and back down the stair past the two triggers to the room's door
+  H.navTo(98, 61, { maxFrames = 12000, playBattles = "tactical", fight = FIGHT, refireHold = true,
+    avoid = exceptOf(exceptOf(ZOZO_IN_DOORS, 98, 59), 103, 55) }),
+  walkInto(98, 62, MAP_ZOZO, "the clock's room -> Zozo (221 (42,29))", exceptOf(ZOZO_IN_DOORS, 98, 62)),
+  walkInto(23, 17, MAP_ZOZO_IN, "Zozo -> the Tonic's room (225 (83,61))", zozoAvoid(23, 17)),
+  zozoChest("tonic", ZOZO_IN_DOORS),
+  walkInto(83, 62, MAP_ZOZO, "the Tonic's room -> Zozo (221 (23,18))", exceptOf(ZOZO_IN_DOORS, 83, 62)),
   -- to the rusted door: the café building (44,48) -> 225, its stair to (21,15)
   -- -> the balcony 221 (49,39), the stair to the landing, the door (49,35)
-  walkInto(44, 48, MAP_ZOZO_IN, "Zozo -> the café (225)", exceptOf(ZOZO_DOORS, 44, 48)),
+  walkInto(44, 48, MAP_ZOZO_IN, "Zozo -> the café (225)", zozoAvoid(44, 48)),
   walkInto(21, 15, MAP_ZOZO, "the café -> the balcony (221 (49,39))", exceptOf(ZOZO_IN_DOORS, 21, 15)),
   climbStair(),
-  walkTo(49, 36, "below the rusted door", ZOZO_DOORS),
+  -- the Tincture's room, off the landing (54,35)
+  walkInto(54, 35, MAP_ZOZO_IN, "the landing -> the Tincture's room (225 (66,56))", zozoAvoid(54, 35)),
+  zozoChest("tincture", ZOZO_IN_DOORS),
+  walkInto(66, 57, MAP_ZOZO, "the Tincture's room -> the landing (221 (54,36))", exceptOf(ZOZO_IN_DOORS, 66, 57)),
+  H.call(function()
+    for _, k in ipairs(ZOZO_CHEST_ORDER) do
+      local o = ZOZO_CHESTS[k]
+      H.assertEq(H.chestOpen(o[3]), true, string.format("Zozo: the %s's chest (bit %d) is open", o[4], o[3]))
+    end
+  end),
+  H.fieldCare({ tag = "after Zozo's rooms" }),
+  walkTo(49, 36, "below the rusted door", zozoAvoid()),
   talkTo(49, 35, "the rusted door (221 NPC_8)"),
   ride(function() return sw(0x0356) == 0 end, 3000, "Rust dissolved"),
   walkInto(49, 31, MAP_MTZOZO, "Zozo -> Mt. Zozo (179)", exceptOf(ZOZO_DOORS, 49, 31)),

@@ -713,6 +713,47 @@ H.run({ maxFrames = 600000 }, {
   walkInto(11, 32, 59, "basement 1 -> the lower hall"),
   walkInto(12, 50, MAP_CASTLE, "the lower hall -> the castle"),
   H.call(function() say("castle", "in the castle") end),
+  -- the castle's two chests (#485: TreasureProp 59, the Soft (11,12) and the Fenix Down (120,11)), up through the
+  -- surfaced castle, which rolls no battles: the court's gate (28,38) -> the lower hall, (12,41) -> the inner court
+  -- 55 (28,31), its north door (28,13) -> the upper hall 59 (27,28), the west stair (22,21) -> (10,18) and back,
+  -- the north stair (23,9) -> (120,14) and back, then down the same way (the door graph: build/attempts/wt/
+  -- v038-wor-sweeps-a/figaro/doorgraph.txt)
+  H.crossDoor(28, 38, 59, 12, 49, "the court -> the lower hall 55(28,38)->59(12,49)", { fight = CAVE_FIGHT }),
+  H.crossDoor(12, 41, MAP_CASTLE, 28, 31, "the lower hall -> the inner court 59(12,41)->55(28,31)", { fight = CAVE_FIGHT }),
+  H.crossDoor(28, 13, 59, 27, 28, "the inner court -> the upper hall 55(28,13)->59(27,28)", { fight = CAVE_FIGHT }),
+  H.crossDoor(22, 21, 59, 10, 18, "the upper hall's west stair 59(22,21)->59(10,18)", { fight = CAVE_FIGHT }),
+  H.openChest({ stand = { 11, 13 }, face = "up", bit = 0x010, what = "Soft (59 (11,12))", item = 0xF4,
+    nav = { fight = CAVE_FIGHT } }),
+  H.crossDoor(10, 19, 59, 22, 23, "the west stair back 59(10,19)->59(22,23)", { fight = CAVE_FIGHT }),
+  H.crossDoor(23, 9, 59, 120, 14, "the upper hall's north stair 59(23,9)->59(120,14)", { fight = CAVE_FIGHT }),
+  H.openChest({ stand = { 120, 12 }, face = "up", bit = 0x011, what = "Fenix Down (59 (120,11))", item = 0xF0,
+    nav = { fight = CAVE_FIGHT } }),
+  H.crossDoor(120, 15, 59, 23, 10, "the north stair back 59(120,15)->59(23,10)", { fight = CAVE_FIGHT }),
+  H.crossDoor(27, 29, MAP_CASTLE, 28, 15, "the upper hall -> the inner court 59(27,29)->55(28,15)", { fight = CAVE_FIGHT }),
+  H.crossDoor(28, 32, 59, 12, 43, "the inner court -> the lower hall 55(28,32)->59(12,43)", { fight = CAVE_FIGHT }),
+  -- back into the court.  The inner court's landing (28,31) plays the castle's own scene for SABIN (_ca89ed ->
+  -- _ca89fd: "This's like old times! I have to wander around for a while!", and he leaves the party, $0049);
+  -- the court's landing (28,40) brings him back (_ca7171: "Hey! Wait. I'm going too!", his HP and MP full), a
+  -- dialog the walk pages through (build/attempts/wt/v038-wor-sweeps-a/dev/d1_edgar, ed2: the walk waited for
+  -- control under it)
+  H.navTo(12, 50, { maxFrames = 6000, playBattles = "tactical", fight = CAVE_FIGHT,
+    arrive = function() return map() == MAP_CASTLE end }),
+  H.advanceStory(function()
+    return map() == MAP_CASTLE and H.hasControl() and H.tileAligned() and not H.dialogWaiting() and bright() >= 15
+      and sw(0x0049) == 0
+  end, 6000, { playBattles = "tactical", fight = CAVE_FIGHT }),
+  H.call(function()
+    H.assertEq(sw(0x0049), 0, "SABIN is back from his wander about the castle ($0049, _ca7171)")
+    for _, m in ipairs(MEMBERS) do
+      H.assertEq((H.readByte(0x1850 + m[1]) & 7) ~= 0, true, m[2] .. " is in the party leaving the castle")
+    end
+  end),
+  H.call(function()
+    for _, o in ipairs({ { 0x010, "Soft" }, { 0x011, "Fenix Down" } }) do
+      H.assertEq(H.chestOpen(o[1]), true, string.format("59: the %s's chest (bit %d) is open", o[2], o[1]))
+    end
+    say("castle", "the castle's chests taken")
+  end),
   H.navTo(28, 42, { maxFrames = 6000, playBattles = "tactical", fight = CAVE_FIGHT }),
   H.driveUntil(function() return H.worldMode() end, 3000, { H.hold({ "down" }) }, "out of Figaro Castle to the world"),
   H.release(),

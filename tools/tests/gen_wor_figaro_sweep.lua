@@ -82,6 +82,13 @@ local function kit(ch)
   return table.concat(t, " ")
 end
 local MEMBERS = { { CELES, "CELES" }, { SABIN, "SABIN" }, { EDGAR, "EDGAR" } }
+-- the passage's pool (#488: field group 65, map 87, the World of Balance's): Vector Pup x2 (374), Vector Pup x2
+-- with a Commander (373) and Commander x3 (125, slots 3 and 4).  The party walks a lap by the cellar's door until
+-- each is won (K.hunt: the list asserted to be the map's pool, the hunt bounded by the worst draws the encounter
+-- counters can hold), as a player who pauses in the passage meets them
+local PASSAGE65 = { [374] = "Vector Pup x2", [373] = "Vector Pup x2, Commander", [125] = "Commander x3" }
+local HUNT87_LAP, PASSAGE_DOORS = { { 36, 49 }, { 37, 49 } }, { { 33, 51 }, { 57, 48 }, { 20, 34 } }
+local K = H.worLegKit({ fight = {}, links = {}, names = { [CELES] = "CELES", [SABIN] = "SABIN", [EDGAR] = "EDGAR" } })
 -- the statuses the arc's coming fights inflict, for the relic rule's
 -- guards (lib/ot6_field.lua M.ARC_THREATS, shared by the arc's generators)
 local ARC_THREATS = H.ARC_THREATS["wor-falcon"]
@@ -314,6 +321,9 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(H.chestOpen(0x020) and H.chestOpen(0x021), true,
       "the passage's Iron Armor and Earrings are open (bits $020, $021)")
   end),
+  H.saveState("wor_figaro_sweep_passage.mss"),
+  K.hunt({ what = "the passage (group 65)", lap = HUNT87_LAP, forms = PASSAGE65, avoid = PASSAGE_DOORS }),
+  H.fieldCare({ tag = "after the passage's hunt" }),
   H.crossDoor(57, 48, MAP_DUNCAN, 49, 31, "the passage -> Duncan's house 87(57,48)->86(49,31)"),
   H.crossDoor(52, 27, MAP_SF, 48, 36, "Duncan's house -> South Figaro 86(52,27)->74(48,36)"),
   checkOutcomes("the passage by Duncan's house"),

@@ -34,11 +34,13 @@
 --      a lost attempt (LOST:), retried from the checkpoint by the runner.
 --      Before the clock CELES trades the Genji Glove for the Back Guard
 --      (HOUSE_BACK_GUARD): no pincer, no back attack in the house.
---   4. The house, map 311: in at (123,60), up by the same-map link
---      (102,53) -> (125,23), to the child's tile (117,12), "face up and
---      hold A" (H.faceAndHoldA: _cc5958 reads facing up and A held), down
---      by (126,22) -> (103,52), and out by (123,61).  No chest: the timer
---      is the house's budget (section 11 has the margin measured).
+--   4. The house, map 311: in at (123,60), the Heal Rod and the Tincture,
+--      up by the same-map link (102,53) -> (125,23), the Drainer, the
+--      child's tile (117,12), "face up and hold A" (H.faceAndHoldA:
+--      _cc5958 reads facing up and A held), the Magicite, down by (126,22)
+--      -> (103,52), the Hyper Wrist and the Pearl Rod, and out by (123,61)
+--      (#485: the six chests a player takes on the way, each opened with
+--      the short press the clock allows; the two monster boxes stay shut).
 --   5. Sabin's scene (_cc5980): stop_timer 0, "SABIN: Wait!", the
 --      collapse, and SABIN into the party at max(26, CELES's level)
 --      (norm_lvl), with nothing equipped.
@@ -114,14 +116,66 @@ local HOUSE_FRAMES = 21600                          -- start_timer 0, 21600 (:90
 -- 2197-4151 frames, mean 3526 (build/attempts/wt/wor-sabin/lab/var-final/,
 -- "the battle took N frames of it").
 local HOUSE_FIGHT_COST = 4151
--- The house's legs in order, with the steps each walks when taken whole
--- (the navigator's own plans: `nav: planned 44 steps from (123,60)`, 26
--- from (125,23), 27 from (117,12), 43 from (103,52); build/attempts/wt/
--- wor-sabin/lab/ws/lab3b.log), then the one step out.  A step costs about
--- 17 frames (44 steps in 731, var-final/k2_s0.log), the child's scene about
--- 150, and each same-map link about 40.
-local HOUSE_LEGS = { { 102, 53, 44 }, { 117, 12, 26 }, { 126, 22, 27 }, { 123, 60, 43 } }
-local STEP_FRAMES, CHILD_FRAMES, LINK_FRAMES = 17, 150, 40
+-- The house's stops in order (#485), with the steps each walks from the one
+-- before (the static planner's shortest tour of the six chests, 196 steps
+-- against the bare walk's 140: route_data.py field-path, build/attempts/
+-- wt/v038-wor-sweeps-a/tzen/tour.txt), then the one step out: a chest's
+-- stand and the way it faces, a link, the child.  A step costs about 17
+-- frames (44 steps in 731, build/attempts/wt/wor-sabin/lab/var-final/
+-- k2_s0.log), the child's scene about 150, each same-map link about 40,
+-- and a chest's short press about 80 (gen_wor_gogo's CRUSH_OPEN).
+-- The chests (TreasureProp 311; route-wor-sabin.md 3.4): the Heal Rod
+-- and the Pearl Rod (STRAGO's and RELM's), the Tincture, the Hyper Wrist,
+-- the Magicite and the Drainer (CELES's).  The two monster boxes (102,49)
+-- and (111,12) (four Pm Stalkers each) are the monster boxes' unit
+-- (wor-coverage.md unit 8), left shut.
+local HOUSE_CHESTS = {
+  healrod = { stand = { 123, 44 }, face = "up", bit = 142, what = "Heal Rod", item = 0x33 },
+  tincture = { stand = { 104, 44 }, face = "up", bit = 143, what = "Tincture", item = 0xEB },
+  drainer = { stand = { 117, 26 }, face = "right", bit = 149, what = "Drainer", item = 0x12 },
+  magicite = { stand = { 125, 13 }, face = "up", bit = 147, what = "Magicite", item = 0xF9 },
+  hyperwrist = { stand = { 104, 58 }, face = "left", bit = 146, what = "Hyper Wrist", item = 0xD2 },
+  pearlrod = { stand = { 112, 50 }, face = "up", bit = 145, what = "Pearl Rod", item = 0x39 },
+}
+local HOUSE_LEGS = {
+  { 123, 44, 20, chest = "healrod" }, { 104, 44, 19, chest = "tincture" }, { 102, 53, 13, link = true },
+  { 117, 26, 24, chest = "drainer" }, { 117, 12, 26, child = true }, { 125, 13, 9, chest = "magicite" },
+  { 126, 22, 18, link = true },
+  { 104, 58, 12, chest = "hyperwrist" }, { 112, 50, 22, chest = "pearlrod" }, { 123, 60, 33 },
+}
+local STEP_FRAMES, CHILD_FRAMES, LINK_FRAMES, CHEST_FRAMES = 17, 150, 40, 80
+-- a chest on the clock (gen_wor_gogo's quickChest): face it, A until its
+-- bit is set, and A again on the "Received!" window until it has shown and
+-- closed (or 120 frames pass with none); H.openChest's 90-frame linger is
+-- time the clock is spending
+local FACE_VAL = { up = 0, right = 1, down = 2, left = 3 }
+local function quickChest(o, guard)
+  local ph, calm, before, seen = 0, 0, nil, false
+  return H.withReset(H.seqStep({
+    H.call(function() before = H.invCountOf(o.item) end),
+    H.driveUntil(function() guard(); return H.readByte(0x087f + H.readWord(0x0803)) == FACE_VAL[o.face] end, 300,
+      { H.call(function() H.setPad({ [o.face] = true }) end) }, o.what .. ": faced " .. o.face),
+    H.release(),
+    H.driveUntil(function()
+      guard()
+      if H.dialogWaiting() then seen = true end
+      if H.chestOpen(o.bit) and not H.dialogWaiting() then calm = calm + 1 else calm = 0 end
+      return (seen and calm >= 8) or calm >= 120
+    end, 900, {
+      H.call(function()
+        ph = (ph + 1) % 8
+        H.setPad((ph < 4 and (not H.chestOpen(o.bit) or H.dialogWaiting())) and { a = true } or {})
+      end),
+    }, o.what .. ": the chest opened and its window closed"),
+    H.release(),
+    H.call(function()
+      H.assertEq(H.chestOpen(o.bit), true, o.what .. ": treasure bit " .. o.bit .. " set")
+      H.assertEq(H.invCountOf(o.item), before + 1, string.format("%s: bag %d -> %d of item $%02X", o.what, before,
+        H.invCountOf(o.item), o.item))
+      H.log(string.format("[chest] chest bit %d (%s): OPENED", o.bit, o.what))
+    end),
+  }), function() ph, calm, before, seen = 0, 0, nil, false end)
+end
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -334,9 +388,14 @@ local function aheadFrames()
       local leg = HOUSE_LEGS[legNo]
       local p = leg and H.bfsPath(leg[1], leg[2]) or nil
       local steps = p and #p or (leg and leg[3] or 0)
-      for i = legNo + 1, #HOUSE_LEGS do steps = steps + HOUSE_LEGS[i][3] end
-      local links = legNo <= 1 and 2 or (legNo <= 3 and 1 or 0)
-      ahead = (steps + 1) * STEP_FRAMES + links * LINK_FRAMES
+      local links, chests = 0, 0
+      for i = legNo, #HOUSE_LEGS do
+        local l = HOUSE_LEGS[i]
+        if i > legNo then steps = steps + l[3] end
+        if l.link then links = links + 1 end
+        if l.chest and not H.chestOpen(HOUSE_CHESTS[l.chest].bit) then chests = chests + 1 end
+      end
+      ahead = (steps + 1) * STEP_FRAMES + links * LINK_FRAMES + chests * CHEST_FRAMES
         + (sw(0x028B) == 0 and CHILD_FRAMES or 0)
     end
   end
@@ -349,6 +408,7 @@ end
 -- leg's end
 local function houseLeg(n, what, arrive)
   local x, y = HOUSE_LEGS[n][1], HOUSE_LEGS[n][2]
+  local chest = HOUSE_LEGS[n].chest and HOUSE_CHESTS[HOUSE_LEGS[n].chest]
   return H.seqStep({
     H.call(function() legNo, aheadAt = n, nil end),
     H.navTo(x, y, { maxFrames = 12000, playBattles = "tactical",
@@ -358,6 +418,7 @@ local function houseLeg(n, what, arrive)
     H.waitUntil(function() guard(); return H.hasControl() and H.tileAligned() end, 900,
       what .. ": control", 2),
     checkOutcomes(what),
+    chest and quickChest(chest, guard) or H.call(function() end),
     H.call(function() say("house", what) end),
   })
 end
@@ -468,13 +529,16 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- ---- 4. the house ---------------------------------------------------------------
-  houseLeg(1, "up by the link (102,53) -> (125,23)",
+  houseLeg(1, "the Heal Rod (123,43) from (123,44)"),
+  houseLeg(2, "the Tincture (104,43) from (104,44)"),
+  houseLeg(3, "up by the link (102,53) -> (125,23)",
     function() return H.fieldY() < 40 end),
   H.call(function()
     H.assertEq(H.fieldX() == LINK_UP_TO[1] and H.fieldY() == LINK_UP_TO[2], true,
       "upstairs at (125,23)")
   end),
-  houseLeg(2, "at the child's tile (117,12)"),
+  houseLeg(4, "the Drainer (118,26) from (117,26)"),
+  houseLeg(5, "at the child's tile (117,12)"),
   H.faceAndHoldA("up", function() guard(); return sw(0x028B) == 1 end, 3000,
     "face up and hold A on (117,12) -- _cc5958"),
   H.release(),
@@ -487,13 +551,22 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(sw(0x066D), 0, "the child is hidden ($066D)")
     say("house", "the child is with her")
   end),
-  houseLeg(3, "down by the link (126,22) -> (103,52)",
+  houseLeg(6, "the Magicite (125,12) from (125,13)"),
+  houseLeg(7, "down by the link (126,22) -> (103,52)",
     function() return H.fieldY() > 40 end),
   H.call(function()
     H.assertEq(H.fieldX() == LINK_DOWN_TO[1] and H.fieldY() == LINK_DOWN_TO[2], true,
       "downstairs at (103,52)")
   end),
-  houseLeg(4, "back at the door (123,60)"),
+  houseLeg(8, "the Hyper Wrist (103,58) from (104,58)"),
+  houseLeg(9, "the Pearl Rod (112,49) from (112,50)"),
+  houseLeg(10, "back at the door (123,60)"),
+  H.call(function()
+    for _, k in ipairs({ "healrod", "tincture", "drainer", "magicite", "hyperwrist", "pearlrod" }) do
+      local o = HOUSE_CHESTS[k]
+      H.assertEq(H.chestOpen(o.bit), true, string.format("311: the %s's chest (bit %d) is open", o.what, o.bit))
+    end
+  end),
   H.driveUntil(function() guard(); return map() ~= MAP_HOUSE end, 900,
     { H.hold({ "down" }) }, "out by the exit (123,61)"),
   H.release(),

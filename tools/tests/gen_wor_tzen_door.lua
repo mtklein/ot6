@@ -468,6 +468,45 @@ local function worldReady(what)
   end, 2400, what), function() n = 0 end)
 end
 
+-- ---- Albrook's chests (#485) ------------------------------------------------
+-- TreasureProp 324, 326 and 330: the Potion by the inn (324 (56,13)), the
+-- Tincture in the weapon shop (326 (11,49), door (23,19) -> (4,55), out by
+-- its (4,56) trigger) and the Elixir in the house east of the inn (330
+-- (35,7), door (44,12) -> (37,30), out by its (37,31) trigger).  Albrook
+-- rolls no battles.  The first stop takes them; the second finds them open.
+local MAP_ALBROOK_WEAPON, MAP_ALBROOK_HOUSE = 326, 330
+local ALBROOK_CHESTS = {
+  { stand = { 56, 14 }, face = "up", bit = 98, what = "Potion (324 (56,13))", item = POTION, map = MAP_ALBROOK },
+  { stand = { 11, 50 }, face = "up", bit = 100, what = "Tincture (326 (11,49))", item = 0xEB, map = MAP_ALBROOK_WEAPON },
+  { stand = { 35, 8 }, face = "up", bit = 103, what = "Elixir (330 (35,7))", item = 0xEE, map = MAP_ALBROOK_HOUSE },
+}
+local function albrookChest(o)
+  return H.openChest({ stand = o.stand, face = o.face, bit = o.bit, what = o.what, item = o.item,
+    nav = { maxFrames = 12000 } })
+end
+local function albrookChests(what)
+  return H.cond(function()
+    for _, o in ipairs(ALBROOK_CHESTS) do if not H.chestOpen(o.bit) then return true end end
+    return false
+  end, {
+    albrookChest(ALBROOK_CHESTS[1]),
+    H.crossDoor(23, 19, MAP_ALBROOK_WEAPON, 4, 55, "Albrook weapon shop door 324(23,19)->326(4,55)"),
+    albrookChest(ALBROOK_CHESTS[2]),
+    H.navTo(4, 55, { maxFrames = 6000, playBattles = "tactical" }),
+    holdOut("down", MAP_ALBROOK, "the weapon shop's (4,56) trigger -> Albrook 324"),
+    H.crossDoor(44, 12, MAP_ALBROOK_HOUSE, 37, 30, "Albrook house door 324(44,12)->330(37,30)"),
+    albrookChest(ALBROOK_CHESTS[3]),
+    H.navTo(37, 30, { maxFrames = 6000, playBattles = "tactical" }),
+    holdOut("down", MAP_ALBROOK, "the house's (37,31) trigger -> Albrook 324"),
+    H.call(function()
+      for _, o in ipairs(ALBROOK_CHESTS) do
+        H.assertEq(H.chestOpen(o.bit), true, string.format("Albrook: the %s's chest (bit %d) is open", o.what, o.bit))
+      end
+      H.log(string.format("[albrook] %s: the town's chests open; %s", what, supplies()))
+    end),
+  }, {})
+end
+
 -- ---- Albrook ---------------------------------------------------------------
 -- A stop in town from wherever the party stands on the world map: in by
 -- the door (141,209), the item shop topped up to the band at the level she
@@ -523,6 +562,7 @@ local function albrookStop(what, after)
     H.bagArrange({ POTION, X_POTION, FENIX, REMEDY, SOFT, TONIC }, { tag = "bag: combat items on top (Albrook)" }),
     H.navTo(37, 54, { maxFrames = 6000, playBattles = "tactical" }),
     holdOut("down", MAP_ALBROOK, "the item shop's (37,55) trigger -> Albrook 324"),
+    albrookChests(what),
     H.gearStop({ tag = "gear Albrook (" .. what .. ")" }),     -- #434: buy power with gil
     -- the inn, 300 GP: door (54,12) -> 325 (58,56), keeper (56,51) behind the
     -- counter, talk spot (56,53) facing up; out by the (58,57) trigger.  A

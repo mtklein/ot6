@@ -10441,28 +10441,33 @@ function M.worLegKit(env)
       local mp = map()
       local g = M.fieldEncounterGroup(mp)
       local pool = M.encounterPool(g)
-      local slotOf, t = {}, {}
+      -- a formation can fill two slots (Owzer's basement, group 157: 284 in slots 2 and 4): it is met when
+      -- either is drawn
+      local slotsOf, t = {}, {}
       for slot = 1, 4 do
         local fs = pool[slot].formations
         M.assertEq(#fs, 1, string.format("%s: map %d's pool (group %d) slot %d is one formation", spec.what, mp, g, slot))
-        slotOf[fs[1].id] = slot
+        slotsOf[fs[1].id] = slotsOf[fs[1].id] or {}
+        table.insert(slotsOf[fs[1].id], slot)
         t[#t + 1] = string.format("slot %d formation %d (%d/256)", slot, fs[1].id, pool[slot].odds)
       end
       for f in pairs(spec.forms) do
-        M.assertEq(slotOf[f] ~= nil, true, string.format("%s: formation %d is in map %d's pool (group %d: %s)",
+        M.assertEq(slotsOf[f] ~= nil, true, string.format("%s: formation %d is in map %d's pool (group %d: %s)",
           spec.what, f, mp, g, table.concat(t, ", ")))
       end
-      for f in pairs(slotOf) do
+      for f in pairs(slotsOf) do
         M.assertEq(spec.forms[f] ~= nil, true, string.format("%s: map %d's pool formation %d is one it is walked for",
           spec.what, mp, f))
       end
-      local want = {}
-      for f in pairs(spec.forms) do want[slotOf[f]] = true end
       budget = spec.budget or M.worstCaseEncounters(function()
         local got = {}
         return function(slot)
           got[slot] = true
-          for sl in pairs(want) do if not got[sl] then return false end end
+          for f in pairs(spec.forms) do
+            local met = false
+            for _, sl in ipairs(slotsOf[f]) do if got[sl] then met = true end end
+            if not met then return false end
+          end
           return true
         end
       end)
