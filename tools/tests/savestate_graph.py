@@ -969,6 +969,12 @@ STATES = [
     S("wor_umaro_hunt", gen="gen_wor_umaro_hunt", prev="wor_tritoch_cave",
       timeout=5400, also=["wor_umaro_hunt_pocket"]),
 
+    # wor_tritoch_cave -> a branch (#487): the Pugs' monster box (282
+    # (13,34): three Pugs, L99), in the pocket below the drop the line's
+    # walk does not enter.  Nothing boots it.
+    S("wor_umaro_box", gen="gen_wor_umaro_box", prev="wor_tritoch_cave",
+      timeout=5400),
+
     # wor-narshe-v1 -> Owzer's basement, map 207's save point (87,41): the
     # cabin (CYAN, TERRA and CELES), the Falcon to Jidoor, the item counter,
     # the auction (up to 16 visits for Golem and ZoneSeek), Owzer's hall

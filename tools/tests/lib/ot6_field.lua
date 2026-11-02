@@ -10739,11 +10739,71 @@ function M.worLegKit(env)
       board(),
     })
   end
+  -- A monster box (TreasureMonster: "Monster-in-a-box!", EventCmd_8e; a game over when lost, _ca5ea9), from
+  -- whichever side of it the party can reach (#487): o = { x, y, bit, form, species, what, avoid = tiles,
+  -- heals = the bag's battle heals on top }.  The walk, the arms against the body's absorbs (M.absorbSafeArms),
+  -- the heals on top of the bag and care to full, then A on it and its battle played out by the tactical
+  -- driver; after it its bit, its battle (the formation, won, said on its own end reading and paid as due) and,
+  -- when both of the body's drop slots name one item (MonsterItems +2, +3), that item in the bag are asserted.
+  -- o.done(line) gets "<form> won[, item $XX dropped]".
+  local function monsterBox(o)
+    local n0, drop, had
+    local function sureDrop(sp)
+      local a = (M.sym("MonsterItems") & 0x3FFFFF) + sp * 4
+      local rare, common = M.readRomByte(a + 2), M.readRomByte(a + 3)
+      return (rare == common and rare ~= 0xFF) and rare or nil
+    end
+    return M.lazy(function()
+      for _, sd in ipairs({ { 0, 1, "up" }, { -1, 0, "right" }, { 1, 0, "left" }, { 0, -1, "down" } }) do
+        if M.bfsReach(nil, nil, nil, LINKS[map()] or {}, o.x + sd[1], o.y + sd[2]) then
+          return M.seqStep({
+            walk(o.x + sd[1], o.y + sd[2], o.what .. ": beside it", o.avoid),
+            M.absorbSafeArms(nil, { o.species }, { tag = "arms for " .. o.what }),
+            M.bagArrange(o.heals or { POTION, FENIX, 0xEA, 0xEE, 0xEC, REMEDY, TINCTURE },
+              { tag = "bag: the battle heals on top (" .. o.what .. ")" }),
+            M.fieldCare({ threshold = 1.0, tag = "before " .. o.what }),
+            M.call(function()
+              M.assertEq(M.chestOpen(o.bit), false, o.what .. ": its bit " .. o.bit .. " is clear")
+              n0 = #M.outcomes
+              drop = sureDrop(o.species)
+              had = drop and M.invCountOf(drop) or 0
+              say("box", o.what .. ": opening")
+            end),
+            M.faceAndHoldA(sd[3], function() return M.battleLoadStarted() end, 3000,
+              o.what .. ": face " .. sd[3] .. ", A (Monster-in-a-box!, EventCmd_8e)"),
+            M.release(),
+            M.advanceStory(function()
+              return M.chestOpen(o.bit) and not M.battleLoadStarted() and settled()
+            end, 600000, { playBattles = "tactical", fight = FIGHT }),
+            M.call(function()
+              M.assertEq(M.chestOpen(o.bit), true, string.format("%d: %s (bit %d) is open", map(), o.what, o.bit))
+              local last = M.outcomes[#M.outcomes]
+              M.assertEq(#M.outcomes > n0 and (last.form & 0x3FF) == o.form and last.kind == "won", true,
+                string.format("%s: its battle (formation %d) was won", o.what, o.form))
+              M.assertEq(last.atEnd and last.ok, true, string.format("%s: its battle was judged on its own end "
+                .. "reading and paid as due", o.what))
+              if drop then
+                M.assertEq(M.invCountOf(drop), had + 1, string.format("%s: the bag holds its sure drop, item $%02X "
+                  .. "(%d -> %d)", o.what, drop, had, M.invCountOf(drop)))
+              end
+              local line = string.format("%d won%s", o.form, drop and string.format(", item $%02X dropped", drop) or "")
+              if o.done then o.done(line) end
+              M.log(string.format("[chest] chest bit %d (%s): OPENED, formation %d won", o.bit, o.what, o.form))
+              say("box", o.what .. ": won")
+            end),
+            M.fieldCare({ threshold = 1.0, tag = "after " .. o.what }),
+          })
+        end
+      end
+      error(string.format("[box] %s (%d,%d): no side of it is reachable from (%d,%d)", o.what, o.x, o.y,
+        M.fieldX(), M.fieldY()))
+    end)
+  end
   return {
     map = map, bright = bright, sw = sw, c = c, lv = lv, partyOf = partyOf, settled = settled,
     supplies = supplies, say = say, kitLine = kitLine, walkInto = walkInto, outToWorld = outToWorld,
     enterFrom = enterFrom, board = board, regroup = regroup, liftOff = liftOff, watches = watches,
-    walk = walk, chestAt = chestAt, doomLine = doomLine, pace = pace, hunt = hunt, huntLine = huntLine, worldHunt = worldHunt,
+    walk = walk, chestAt = chestAt, monsterBox = monsterBox, doomLine = doomLine, pace = pace, hunt = hunt, huntLine = huntLine, worldHunt = worldHunt,
     objLine = objLine,
     inParty = inParty, partyCount = partyCount, landNear = landNear, talkNpc = talkNpc,
     pressUp = pressUp, objOn = objOn, kohlingenStop = kohlingenStop,
