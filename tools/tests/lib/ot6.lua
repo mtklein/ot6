@@ -3157,9 +3157,13 @@ function M.studyRow(sp)
   return M.studyRows[sp] or 0
 end
 -- The first standing monster whose species can teach a lore STRAGO lacks
--- ($1D29-$1D2B), and those lores; nil when none
+-- ($1D29-$1D2B), and those lores; nil when none.  A lore already pending
+-- for this battle's victory ($3A84-$3A86: studied, or seen cast) counts as
+-- known: a second Study of the same body bought nothing and cost 99 MP
+-- (lab eb3_s1: three Studies of Hidon, 606 -> 507 -> 408 MP, #388).
 function M.studySlot()
   local known = M.readByte(0x1D29) | (M.readByte(0x1D2A) << 8) | (M.readByte(0x1D2B) << 16)
+    | M.readByte(0x3A84) | (M.readByte(0x3A85) << 8) | (M.readByte(0x3A86) << 16)
   for s = 0, 5 do
     if M.monStanding(s) then
       local want = M.studyRow(M.readWord(0x57C0 + s * 2)) & ~known & 0xFFFFFF
