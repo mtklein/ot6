@@ -495,6 +495,10 @@ function M.requestLoadState(blob)
   -- not handled (#205): a stall after this reload is the reload's own
   M.thawPad()
   if RUN ~= nil then RUN.goUnhandled = nil end
+  -- the battle-end reading the lib holds is the old timeline's (#491)
+  if M.traceOnLoad then M.traceOnLoad(M.loadedFrame == nil) end
+  M.loadedFrame = M.frame
+  if M.forgetBattleEnd then M.forgetBattleEnd() end
   local req = {}
   local ref
   M.pendingStateReqs = M.pendingStateReqs + 1
@@ -929,6 +933,17 @@ function M.zombieDefers(o)
   if M.ZOMBIE_DEFER == false then return false end
   local s1 = o.s1 or 0
   return (s1 & M.ST1_ZOMBIE) ~= 0 and (s1 & 0x80) == 0
+end
+
+-- Does a plan made a beat ago have to be dropped because a status landed on
+-- its actor since (#348 Muddle, #490 Zombie)?  A committed plan is the
+-- engine's now, and "switch" and "defer" plans press nothing to lose.
+-- o = { committed, kind, st2 (STATUS2 byte), st1 (STATUS1 byte) }.
+function M.planBackOut(o)
+  if o.committed or o.kind == "switch" or o.kind == "defer" then return nil end
+  if ((o.st2 or 0) & M.ST2_MUDDLE) ~= 0 then return "muddled" end
+  if M.zombieDefers({ s1 = o.st1 }) then return "zombied" end
+  return nil
 end
 
 function M.muddleRule(o)
@@ -9077,7 +9092,7 @@ function Driver:magicOnlyLine(actor, boost)
         if brokenNow(s) or M.monBerserk(s) then
           self.wallWait = self.wallWait or {}
           self.wallWait[actor] = self.wallWait[actor] or M.frame
-          if M.frame - self.wallWait[actor] < 900 then
+          if not M.wallWaitOver(self.wallWait[actor], M.frame) then
             local key = "brokenwait:" .. actor
             if not self.statusSaid[key] then
               self.statusSaid[key] = true
@@ -9087,8 +9102,8 @@ function Driver:magicOnlyLine(actor, boost)
             end
             return { kind = "defer", reason = "wall_wait", at = M.frame }
           end
-          M.log(string.format("[%s] actor=%d waited %d frames in the window with nothing for its wall: the 900-frame "
-            .. "cap gives way, planning on", self.tag or "fight", actor, M.frame - self.wallWait[actor]))
+          M.log(string.format("[%s] actor=%d waited %d frames in the window with nothing for its wall: the wait cap "
+            .. "gives way, planning on", self.tag or "fight", actor, M.frame - self.wallWait[actor]))
           self.wallWait[actor] = nil
         else
           local w = self:wallWaitPlan(actor, s, "a turn with no line")
@@ -9256,6 +9271,14 @@ function Driver:magicOnlyLine(actor, boost)
     -- and not while his HP is at or under the reraise mark with a living
     -- member still lacking Life 3 (the window would take him past the hold
     -- before it is on: f5_k4_s7, above)
+    -- (No give-way here for the case where no one can put Life 3 on the
+    -- rest, #493: the Break is only withheld, never waited for.  `want`
+    -- falls to nil below and the next best cast goes instead, so no window
+    -- stalls on it; and the hold above gives way by itself after 3,600
+    -- frames once no living member could cast Life at two points, so the
+    -- attacks the hold kept back go on.  What stays forgone is the doubled
+    -- window, and that is the point of withholding it: past the mark with a
+    -- bare member, one window took him from 54% to 0 with one Life 3 queued.)
     local rvf = self.opts.breakHold and self.opts.reraiseVs and self.opts.reraiseVs[M.readWord(0x57C0 + bestSlot * 2)]
     if rvf then
       local hp, mx = M.readWord(0x3BF4 + 8 + bestSlot * 2), M.readWord(0x3C1C + 8 + bestSlot * 2)
@@ -9308,7 +9331,7 @@ function Driver:magicOnlyLine(actor, boost)
   -- body's counter is pending, the wall read now is not the one the cast
   -- meets, and the window is handed on (X) the way a person waits for the
   -- spell in the air to land before choosing the next.  Not while it is
-  -- Broken (no counters: the wall stands), and at most 900 frames an actor.
+  -- Broken (no counters: the wall stands), and not past M.wallWaitOver's cap (none by default).
   local wcv = self.opts.wallChangeVs
   -- The Break that breaks him waits the same way: the window takes the wall
   -- that stands when it lands, and a Break planned on a wall the party held
@@ -9408,12 +9431,38 @@ function Driver:berserkPlan(actor)
   return nil
 end
 
+-- The cap on one actor's wait for a WallChange body's wall (#493): none by
+-- default; M.WALL_WAIT_CAP = 900 is the old cap (the lab's other arm).
+-- `since` is the frame the wait began.  The lab (build/attempts/wt/
+-- v038-harness-fixes/lab/cap_tally.txt): from wor-tower-v1 with K = 0..5
+-- battles used up and seed shifts 0, 7, 13, 21, MagiMaster fought with each
+-- cap -- 24 runs an arm, 20 distinct battle keys ($be + formation), all 48
+-- won; per key the uncapped wait won faster on 15 and the capped on 5 (mean
+-- 43,232 ticks against 53,776; deaths 3.75 a fight in both arms, 90 over 24), and the
+-- 900 arm hit its cap 913 times (38 a fight) where waiting longer lets the
+-- wall's counter land before the cast reads it.  Nothing stalled uncapped:
+-- the driver's progress window (opts.progressVs) still bounds the fight.
+function M.wallWaitOver(since, now)
+  local cap = M.WALL_WAIT_CAP or 0
+  return cap ~= 0 and now - since >= cap
+end
+-- The wait's clock belongs to one stretch of waiting: a member's plan that
+-- is not the wait itself (reason "wall_wait") ends it, so a later wait starts
+-- its own clock (#493: f6_k6_s0 'waited 21000 frames ... the 900-frame cap
+-- gives way', a stamp left by an earlier window, never cleared).  Returns
+-- whether it cleared one.
+function M.wallWaitSettle(waits, actor, reason)
+  if reason == "wall_wait" or waits == nil or waits[actor] == nil then return false end
+  waits[actor] = nil
+  return true
+end
+
 -- The wait for a WallChange body's wall to stand still (magicOnlyLine,
 -- opts.wallChangeVs): while another living member's action is queued
 -- ($32CC) or in flight (the recovery trace's queued/running), or the body's
 -- counter is pending ($32CD), a defer plan (X hands the window on, re-read
--- every 30 frames); nil once the wall stands, or after 900 frames of
--- waiting by this actor.
+-- every 30 frames); nil once the wall stands, or when M.wallWaitOver's cap
+-- (none by default) is spent by this actor.
 function Driver:wallWaitPlan(actor, slot, what)
   -- a Berserk body's counters run only to their first end_if (ExecAIRetal),
   -- so MagiMaster's WallChange, his if_hit block, never runs: the wall stands
@@ -9443,7 +9492,7 @@ function Driver:wallWaitPlan(actor, slot, what)
   self.wallWait = self.wallWait or {}
   if busy then
     self.wallWait[actor] = self.wallWait[actor] or M.frame
-    if M.frame - self.wallWait[actor] < 900 then
+    if not M.wallWaitOver(self.wallWait[actor], M.frame) then
       local key = "wallwait:" .. actor .. ":" .. busy .. ":" .. what
       if not self.statusSaid[key] then
         self.statusSaid[key] = true
@@ -9452,7 +9501,7 @@ function Driver:wallWaitPlan(actor, slot, what)
       end
       return { kind = "defer", reason = "wall_wait", at = M.frame }
     end
-    M.log(string.format("[%s] actor=%d waited %d frames to read the wall (%s) before %s: the 900-frame cap gives "
+    M.log(string.format("[%s] actor=%d waited %d frames to read the wall (%s) before %s: the wait cap gives "
       .. "way, planning on", self.tag or "fight", actor, M.frame - self.wallWait[actor], busy, what))
   end
   self.wallWait[actor] = nil
@@ -14034,6 +14083,7 @@ function Driver:button(actor)
       return nil
     end
     self.plan, self.planActor, self.tgtSpin = self:makePlan(actor), actor, 0
+    M.wallWaitSettle(self.wallWait, actor, self.plan.reason)
     if self.recovery then self.recovery.plan(actor, self.plan, M.frame) end
     if self.raceTimeActive then self:raceTimeBind(actor,self.plan) end
     self.planPulses, self.steerTrail = 0, {}
@@ -14051,12 +14101,25 @@ function Driver:button(actor)
   -- char 5 cmd $0A atk $5D (a MUDDLED member's action)`), the wipe's
   -- first death.  A person sees the status land and backs out; so does
   -- this, and the next plan is the rule's defer.
-  if not self.plan.committed and self.plan.kind ~= "switch" and self.plan.kind ~= "defer"
-     and (M.readByte(BATTLE.ST2 + actor * 2) & M.ST2_MUDDLE) ~= 0 then
+  -- A Zombie landing after the plan is the same defect (#490, as #448 was
+  -- reached at plan time): a Zombied actor's turns are the engine's, so a
+  -- command entered at the window it still shows is never its own, and a
+  -- plan held through the status took the round's care turn.  Backed out
+  -- of the same way; the next plan is the zombie rule's defer.
+  local backOut = M.planBackOut({ committed = self.plan.committed, kind = self.plan.kind,
+    st2 = M.readByte(BATTLE.ST2 + actor * 2), st1 = M.readByte(BATTLE.ST1 + actor * 2) })
+  if backOut == "muddled" then
     M.log(string.format("[%s] actor=%d was MUDDLED after its %s was planned (state $%02X) -- "
       .. "backing out rather than confirm a command the engine would re-aim (#348)",
       self.tag or "fight", actor, self.plan.kind, st))
     self:dropPlan("muddled")
+    if st == BATTLE.ST_CMD then return nil end
+    return { "b" }
+  elseif backOut == "zombied" then
+    M.log(string.format("[%s] actor=%d was ZOMBIED after its %s was planned (state $%02X, STATUS1 $%02X) -- "
+      .. "backing out: its turns are the engine's (#490)", self.tag or "fight", actor, self.plan.kind, st,
+      M.readByte(BATTLE.ST1 + actor * 2)))
+    self:dropPlan("zombied")
     if st == BATTLE.ST_CMD then return nil end
     return { "b" }
   end
@@ -14850,6 +14913,7 @@ function Driver:idle()
   self.raisePending, self.topUpOwed, self.unmuddlePending = nil, {}, nil
   self.raiseQueued, self.cureQueued, self.healQueued = {}, {}, {}
   self.statusSaid, self.cureSaid, self.freeRoundSaid = {}, nil, false
+  self.wallWait, self.wallBusyAt = nil, nil     -- a wait's clock is one battle's (#493)
   execActor, execActorCmd, execDone = nil, nil, {}
   execParty, execSkipped = nil, {}
   execMon, execMonDone = nil, nil
@@ -16993,6 +17057,20 @@ local endHooked, endSnap = false, nil
 -- the driver watching the battle now (watchLeavers), and the frame it last
 -- watched: the end hook has it say the [outcome]
 local endWatcher = nil
+-- A restored snapshot starts a new timeline: the end hook's reading and the
+-- watcher belong to the one before it.  A state captured just after a battle
+-- (a walker returns on the [outcome] and the build captures then) still
+-- reads as that battle for ~35 frames, and the first driver after the load
+-- said it again as a "WON ... no end reading ... CONTRADICTION" that a lab
+-- counting H.outcomes took for a real battle (#491; every run in
+-- build/attempts/wt/v038-grind-plains/lab/out/p1_*).  So the load drops the
+-- stale reading, and an [outcome] with no end reading from a battle first
+-- watched within the tail's 90 frames of the load is the capture's own
+-- battle end, said as a [tail] and not recorded (sayOutcome).  A battle that
+-- really ends after a load fires the end hook and has its reading.
+-- M.LOAD_TAIL = false is the mutant the test proves it against.
+M.LOAD_TAIL = true
+function M.forgetBattleEnd() endSnap, endWatcher = nil, nil end
 local function xpAt(off)
   return M.readByte(0x1611 + off) + M.readByte(0x1612 + off) * 256
        + M.readByte(0x1613 + off) * 65536
@@ -17343,10 +17421,36 @@ end
 -- seated member's experience then and now.  A share the engine did not
 -- pay is said as a MISMATCH (the model of WinBattle is wrong, or a kill
 -- was assumed) and recorded in M.lastOutcome.ok for a caller to assert.
+-- The formation an [outcome] names is $11E0 as the battle ran: vanilla's
+-- conditional battles (LoadBattleProp, battle_main.asm @30e8, cond_battle.dat)
+-- swap the index before the battle opens, so SrBehemoth's event group 452
+-- is dealt as $1A8 and the id printed is the one fought (#489; the coverage
+-- audit read it as stale).  Audits that map an event group to its formation
+-- apply that table.
+-- Is an [outcome] with these readings the capture's own battle end (#491)?
+-- Only a battle first watched AFTER the load, within the tail's 90 frames of
+-- it, with no end reading: one that opened before the load is a real battle
+-- the reload cut off (a negative gap passes `< 90`: 55 real LOST lines in
+-- build/attempts, e.g. v034-wor-gogo/lab/dd_plain 'battle $170 LOST after
+-- 7811 ticks').  The window is the hand-back tail's own (watchLeavers); the
+-- gap measured for the capture case is 2 frames (battle_loadtail).
+function M.loadTailStale(atEnd, startFrame, loadedFrame)
+  if M.LOAD_TAIL == false or atEnd or loadedFrame == nil or startFrame == nil then return false end
+  local gap = startFrame - loadedFrame
+  return gap >= 0 and gap < 90
+end
+
 function Driver:sayOutcome()
   local atEnd = endSnap ~= nil and endSnap.frame >= (self.startFrame or 0)
   local r = atEnd and endSnap.reward or self.reward
   self.outcomeSaid = true
+  if M.loadTailStale(atEnd, self.startFrame, M.loadedFrame) then
+    M.log(string.format("[%s] [tail] battle $%03X read %d ticks after a state load, first watched %d frames "
+      .. "after it and with no end reading: the capture's own battle end, not a battle -- no [outcome], "
+      .. "not counted (#491)", self.tag or "fight", r.form & 0x3FF, self.battleTick,
+      (self.startFrame or 0) - M.loadedFrame))
+    return
+  end
   local seated = {}
   for e = 0, 3 do seated[e] = self.seatXp[e] ~= nil end
   local o = M.battleOutcome({ xp = r.xp, st1 = r.st1, hp = r.hp, egg = r.egg,
@@ -17405,8 +17509,20 @@ end
 -- every second Stop from the same Brainpan trio: fc-alcove control
 -- seed 35 fight 1 shows SHADOW's window open with no plan from f+4500
 -- to f+6300 and no [status] line for it, #224.)
+-- Is the battle the driver is watching still live?  False past its end
+-- hook, or in a hand-back tail (watchLeavers): the RAM is being handed
+-- back and every status reads as garbage (#494: `[status] ... entity 2
+-- char 0 is under PETRIFY ... cure: none in the bag` right after
+-- `[outcome] battle $14D WON`; tools/audit_zombie_touches.py parses these
+-- lines).  Pure, so battle_healpolicy asserts it; snapFrame is the last
+-- end hook's frame (nil: none yet).
+function M.battleLiveAt(snapFrame, startFrame)
+  return snapFrame == nil or (snapFrame < (startFrame or 0)
+    and (startFrame or 0) - snapFrame >= 90)
+end
+
 function Driver:watchStatuses()
-  if self.battleTick > 4 then
+  if self.battleTick > 4 and M.battleLiveAt(endSnap and endSnap.frame, self.startFrame) then
     for e = 0, 3 do
       if M.readWord(0x3C1C + e * 2) > 0 then
         local s1, s2, s3, s4 = statusOf(e)
@@ -17543,8 +17659,7 @@ function Driver:watchStatuses()
         -- battle is live: past its end hook, or in a hand-back tail
         -- (watchLeavers), $3403 reads all held (431 SEIZED/RELEASED lines
         -- after an [outcome] in #425's qualification)
-        local live = endSnap == nil or (endSnap.frame < (self.startFrame or 0)
-          and (self.startFrame or 0) - endSnap.frame >= 90)
+        local live = true   -- the whole watcher is gated above (#494)
         local held = live and M.seized(e)
         local hkey = e .. ":Seized"
         if live and held ~= (self.statusSaid[hkey] == "on") then
@@ -18894,8 +19009,27 @@ function Driver:flushLedger()
   for ts, _ in pairs(self.monTurn or {}) do self:closeMonTurn(ts) end
 end
 
+-- The uncapped wall wait (#493) is bounded by the progress window: every
+-- species in opts.wallChangeVs needs an opts.progressVs entry, or a wait that
+-- never ends has nothing to stop it.  Returns the species missing one.
+function M.wallChangeUnbounded(opts)
+  local missing = {}
+  for sp in pairs(opts.wallChangeVs or {}) do
+    if not (opts.progressVs and opts.progressVs[sp]) then missing[#missing + 1] = sp end
+  end
+  table.sort(missing)
+  return missing
+end
+
 function M.newFightDriver(tag, opts)
   opts = opts or {}
+  do
+    local miss = M.wallChangeUnbounded(opts)
+    if #miss > 0 then
+      error(string.format("newFightDriver: wallChangeVs names species $%03X with no progressVs window: the wall "
+        .. "wait has no cap (#493), and the progress window is what bounds it", miss[1]), 0)
+    end
+  end
   local D
   D = setmetatable({
     tag = tag, opts = opts,
@@ -19249,8 +19383,12 @@ end
 -- the record; battle and menu frames re-record the frozen field tile,
 -- which the dedupe absorbs.
 local traceMap, traceSet, traceCount = nil, {}, 0
+M.traceFlushes = {}       -- { map, n, frame } of each [tiles] flush (a test reads it)
+M.traceHoldUntil = -1
+M.TRACE_HOLD = true       -- false: the mutant battle_tracehold proves the hold against
 local function traceFlush()
   if traceMap == nil or traceCount == 0 then return end
+  if #M.traceFlushes < 200 then M.traceFlushes[#M.traceFlushes + 1] = { traceMap, traceCount, M.frame } end
   local keys = {}
   for k in pairs(traceSet) do keys[#keys + 1] = k end
   table.sort(keys)
@@ -19342,12 +19480,28 @@ local function coverageFlush()
   M.emitBlob("coverage.cdl", table.concat(chars))
 end
 
+-- A state load is not play: the frames the restore takes read half-written
+-- RAM (`[tiles] map=3 n=1 xy=0:0` the frame after the request, #489), and
+-- before the run's first load the boot's RAM reads as a map.  The first load
+-- drops the boot samples still pending and every load holds the trace off for
+-- 3 frames; a later load keeps what was stood on (flushed).  What the boot
+-- already flushed before the request (`map=0 n=1 xy=0:0` at f21) stays in
+-- the log: only the load's frames are fixed, and the `map=1 ... xy=0:28`
+-- lines of the audit were not reproduced.
+function M.traceOnLoad(first)
+  if M.TRACE_HOLD == false then return end
+  if first then traceSet, traceCount, traceMap = {}, 0, nil else traceFlush() end
+  M.traceHoldUntil = M.frame + 3
+end
+
 local function traceTick()
   -- the world map keeps its party tile in $e0/$e2, not the field object (#288)
   local world = M.worldMode ~= nil and M.worldMode()
   if world then
     if not M.worldAligned() then return end
   elseif not M.tileAligned() then return end
+  if M.TRACE_HOLD ~= false and M.frame <= M.traceHoldUntil then return end
+  M.traceLastSample = M.frame
   local m = M.mapId() & 0x1ff
   if m ~= traceMap then
     traceFlush()
@@ -20249,6 +20403,7 @@ local function resetLibState()
   -- as a battle (wor_tzen_door's retry counted two battles at f1254 and
   -- f4121, 'formation 0000': build/attempts/wt/v030-route/lab/tzen/t2)
   M.blsSeen = nil
+  M.loadedFrame = nil
   M.gameOverFired = 0
   M.thawPad()
   M.setPad(nil)
@@ -20258,6 +20413,7 @@ local function resetLibState()
   M.absorbGuardBattles, M.absorbGuardClashes, M.absorbGuardEntries = 0, 0, 0
   guardArmed, guardSettle, guardSeen, guardRandom = true, 0, {}, false
   traceMap, traceSet, traceCount = nil, {}, 0
+  M.traceHoldUntil, M.traceFlushes = -1, {}
   recoveryObserver, recoveryHooks, recoveryEvents = nil, false, {}
   execActor, execActorCmd, execDone, execMon, execMonDone = nil, nil, {}, nil, nil
   execParty, execSkipped = nil, {}
