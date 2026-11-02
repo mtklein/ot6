@@ -2728,6 +2728,18 @@ Ot6ShieldTbl:
         .word   $0152
         .byte   6, OT6_SLASH|OT6_PIERCE ; blue drgn: a water dragon's
                                 ;   scales.  bolt vanilla; absorbs water
+        ; the two monster boxes (#487; met nowhere else: event groups 113
+        ; and 95)
+        .word   $0138
+        .byte   6, OT6_SLASH|OT6_SPECIAL ; master pug (the cave's box, 401
+                                ;   (58,43)): the pugs' row.  no weakness
+                                ;   vanilla, and wallchange moves the one
+                                ;   it takes; absorbs water
+        .word   $0124
+        .byte   6, OT6_SLASH|OT6_PIERCE ; katanasoul (the castle's box, 406
+                                ;   (10,17)): a swordsman's ghost; steel
+                                ;   answers steel (the samurai's pair).
+                                ;   poison vanilla
         ; ---- the world of ruin: the colosseum's own bodies (route-wor-
         ; colosseum.md section 3) ----------------------------------------------
         ; One fighter, sent by the player, auto-battles each; these three are

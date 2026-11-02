@@ -1187,6 +1187,12 @@ STATES = [
     S("wor_ancient_hunt", gen="gen_wor_ancient_hunt", prev="wor_ancient_yard",
       timeout=7200, also=["wor_ancient_hunt_hall"]),
 
+    # wor_ancient_yard -> a branch (#487): the Ancient Castle's two monster
+    # boxes, the castle's KatanaSoul (406 (10,17)) and the cave's Master Pug
+    # (401 (58,43)), each after care to full.  Nothing boots it.
+    S("wor_ancient_boxes", gen="gen_wor_ancient_boxes", prev="wor_ancient_yard",
+      timeout=7200),
+
     # wor-ancient-v1 -> the World of Ruin map on the Falcon's tile by Maranda
     # (69,183): Kohlingen's counter, the Colosseum (map 413): the Striker
     # wagered against SHADOW himself, who joins ($02F3), and the wagers that
