@@ -834,7 +834,7 @@ Left, with the reason:
   drives with its own conveyor, jump and switchback drives. For this party
   they are a long climb for little: SABIN wears two Fire Knuckles, EDGAR the
   cellar's RunningShoes, and the Thief Glove is LOCKE's and GOGO's, neither
-  seated.
+  seated. The port they need is planned in section 11.9.
 - **The Tzen house's monster boxes** (bits 144, 148): unit 8, a branch
   leg (section 12).
 
@@ -1057,6 +1057,50 @@ checkpoints of the line before Berserk landed):
   0's lap without its allowance, "to the patch east of the landing (group
   0): group 0 deals only the plains six (not $017, formation 6): got
   false".
+
+### 11.9 Follow-ups (v0.38, #498)
+
+#### Zozo's north rooms: the port they need
+
+Not done in this round; the plan, from the ROM and `gen_zozo4_dadaluma`:
+
+- **Every one of the four lies past the stair room.** The door graph
+  (`build/attempts/wt/v038-wor-sweeps-a/zozo/doorgraph.txt`) routes each
+  through 225 (59,34) up the one-wide stair to (46,9), out onto 221's U1
+  roof (30,43). From there the Thief Glove is the short one: 221 (35,33)
+  into 225 (11,61), the chest at (11,59). The Fire Knuckle and the
+  rooftop's pair go on over the jumps and the bridge room to the top roof
+  (30,22), then 221 (35,15) into 225 (35,13) (the Fire Knuckle, (35,11)) or
+  221 (33,9) into 226 (82,37) (the RunningShoes (72,26), the X-Potion
+  (92,27)).
+- **The stair's walkers.** NPCs 2-8 of map 225 (`npc_prop.asm` 9476-9524)
+  stand on the stair with no movement of their own, show-switch $0300 in
+  both worlds. Measure first whether the World of Ruin moves them the way
+  the World of Balance's climb meets them ("seven walkers climb ... forever"):
+  sample their positions for a few hundred frames from the stair's foot.
+  If they move, `stairFollow` (dadaluma 953-1103: `stairDir`, `stairJitter`,
+  `stairLeg`, `stairAttempt`) carries over; if they stand, the stair is shut
+  in this world and the four are out of reach on foot.
+- **What moves into the lib.** The door-walled step model (dadaluma
+  382-555: `prop1/prop2`, `stepAllowed`, `zAfter`, `firstStep`,
+  `followPath`), `stairFollow`, `u1Cross` (906-952) and `jumpRow`
+  (1178-1211) as `ot6_field.lua` drives taking their tile tables as
+  arguments; `bridgeCross`, `bridgeClimb` and `corridorFollow` only for the
+  Fire Knuckle and the rooftop. Two changes on the way in: `stairAttempt`
+  reloads its own pre-stair savestate on a failed attempt, which a leg on
+  the line may not do (a retry is the runner's, from the boot), so the
+  port waits out the queue and fails with the frame instead; and `u1Cross`
+  steps onto the crane (221 (35,41), `_ca963d`), which `gen_wor_cyan`'s
+  walks keep off: its prompt ("Use the crane to go down?") is answered No.
+- **Where it goes.** The Thief Glove alone is a branch's worth for this
+  party (none of LOCKE or GOGO seated); all four together are a branch leg
+  from `wor_cyan_rustrid` beside `gen_wor_zozo_hunt`, feeding nothing.
+
+#### Owzer's basement
+
+Formation 284 (SoulDancer x2, Crusher x2) and 286 stay unfought; they
+belong to the leveling plan (#497), which decides the party's levels or a
+fourth seat before Chadarnook (section 11.2).
 
 ## 12. The monster boxes (v0.38, #487)
 
