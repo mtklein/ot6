@@ -1316,6 +1316,11 @@ player prunes the kit all game. Same model, different collection verbs:
     lore.  *Placement: the Lore window's 24 records are one per lore id, so
     it takes no extra row; Analyze is his row and Study its top rung, the
     shape Cleave has on the SwdTech window.*  `battle_study`.
+    The driver (#388): `opts.strago.study` plans it at three banked points
+    on a body that can teach a lore he lacks, aimed past any body in
+    Reflect; `studyHold` keeps his points unspent while that body stands,
+    for a teacher the party would otherwise kill first (Hidon, GrandTrain's
+    only one: wor-coverage.md section 13).
   - **Bserk, by watching** (`ot6_blue.asm`, owner 2026-10-27: Berserk
     "available in a few ways", blue magic and a caster whose spell list
     was thin among them).  The first battle in which a monster inflicts
