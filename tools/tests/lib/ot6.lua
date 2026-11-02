@@ -13740,6 +13740,15 @@ function Driver:tgtGraph()
   return g, k
 end
 
+-- What the game's own crossing reads (btlgfx_main.asm _c174bf/_c17439, pincer, from the party side: the side's
+-- members $7B79 (left) or $7B7B (right) and the targetable monsters $92, which cur_poi_set rebuilds every frame
+-- as $201E & $61AB & $2F46 | $6195; the command's ONE_SIDE bit in $7A84), said where a cross does nothing
+local function crossReads()
+  return string.format("$92=%02X $201E=%02X $61AB=%02X $2F46=%02X $6195=%02X $2F2F=%02X sides L=%02X R=%02X "
+    .. "$7A84=%02X live=%02X", M.readByte(0x0092), M.readByte(0x201E), M.readByte(0x61AB), M.readByte(0x2F46),
+    M.readByte(0x6195), M.readByte(0x2F2F), M.readByte(0x7B79), M.readByte(0x7B7B), M.readByte(0x7A84), liveMonMask())
+end
+
 function Driver:steerWatch()
   if self.steerLast == nil then return end
   local sig = tgtSig()
@@ -13766,8 +13775,8 @@ function Driver:steerWatch()
   -- a row walk reaching the end of the row is ordinary and only skips
   if n == 2 and self.steerLast.kind == "cross" then
     M.log(string.format("[%s] %s pressed twice in target select with no "
-      .. "effect (window %s, layout %s): that direction does nothing here",
-      self.tag or "fight", self.steerLast.dir, sig, self.layout and self.layout.name or "unread"))
+      .. "effect (window %s, layout %s; %s): that direction does nothing here",
+      self.tag or "fight", self.steerLast.dir, sig, self.layout and self.layout.name or "unread", crossReads()))
   end
   self.steerLast = nil
 end
@@ -13795,15 +13804,15 @@ function Driver:cross(toward)
   self.crossDropN = (self.crossDropN or 0) + 1
   if self.crossDropN <= 2 and self.plan ~= nil then
     M.log(string.format("[%s] crossing to the %s in a %s: %s did nothing twice each in target select (state "
-      .. "$%02X, window %s) -- dropping the plan and backing out (drop #%d this battle)", self.tag or "fight",
-      toward, L.name, table.concat(dirs, " and "), M.readByte(BATTLE.MSTATE), tgtSig(), self.crossDropN))
+      .. "$%02X, window %s; %s) -- dropping the plan and backing out (drop #%d this battle)", self.tag or "fight",
+      toward, L.name, table.concat(dirs, " and "), M.readByte(BATTLE.MSTATE), tgtSig(), crossReads(), self.crossDropN))
     self.steerDead, self.steerLast = {}, nil
     self:dropPlan("cross_dead")
     return { "b" }
   end
   self:failFast(string.format("crossing to the %s in a %s: %s did nothing twice "
-    .. "each in target select (state $%02X, window %s)", toward, L.name,
-    table.concat(dirs, " and "), M.readByte(BATTLE.MSTATE), tgtSig()))
+    .. "each in target select (state $%02X, window %s; %s)", toward, L.name,
+    table.concat(dirs, " and "), M.readByte(BATTLE.MSTATE), tgtSig(), crossReads()))
 end
 
 function Driver:button(actor)
