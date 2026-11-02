@@ -24,10 +24,12 @@ local links = H.doorLinks
 -- doors (gen_wor_gau's)
 local DOORS349 = { { 39, 10, 61, 20 }, { 60, 21, 38, 11 } }
 local LINKS = { [MAP_HOUSE] = links(DOORS349) }
--- STRAGO (#388): his damage lores weighed on each fight's bodies (M.bestLore), and Hidon studied: its
--- script casts GrandTrain, the one teacher of it in the game (Ot6StudyTbl), and the party beats it before
--- it casts it, so he keeps his points while it stands and Studies it on his third turn
-local FIGHT = { nukeLore = "best", strago = { study = true, studyHold = true } }
+-- STRAGO studies Hidon (#388): its script casts GrandTrain, the lore's one teacher in the game
+-- (Ot6StudyTbl), and the party beats it before it casts it, so he keeps his points while it stands and
+-- Studies it at three (lab eb2: learned in 12 of 12, 10 keys).  His randoms stay the boosted Fight: with
+-- his lores weighed (nukeLore "best") Ebot's randoms ran longer (lab eb2 against the main tree's
+-- sweep: $125 4442 ticks against 2874 at the median)
+local FIGHT = { strago = { study = true, studyHold = true } }
 H.NAV_REFIRE_HOLD = true
 
 -- the World of Ruin legs' helpers (lib/ot6_field.lua, H.worLegKit)
