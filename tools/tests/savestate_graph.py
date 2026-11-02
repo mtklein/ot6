@@ -785,6 +785,13 @@ STATES = [
     S("wor_tzen_plain", gen="gen_wor_tzen_plain", prev="wor_sabin",
       checkpoint="wor-sabin-v1", timeout=3600),
 
+    # wor-tzen-door-v1 -> Sabin joined: a branch beside wor_sabin (#487).
+    # The collapsing house under its clock by its two monster boxes (four
+    # Pm Stalkers each) and the child, instead of the line's six chests;
+    # each box opened when the clock covers its fight.  Nothing boots it.
+    S("wor_tzen_boxes", gen="gen_wor_tzen_boxes", prev="wor_tzen_door",
+      checkpoint="wor-tzen-door-v1", timeout=3600),
+
     # wor-nikeah-v1 -> its tile again: a branch beside wor_south_figaro
     # (#488).  The grass by Nikeah (world group 37) and the plain north of
     # it (group 39), each walked until every formation is won.  Nothing
