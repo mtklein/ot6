@@ -26,9 +26,8 @@ local DOORS349 = { { 39, 10, 61, 20 }, { 60, 21, 38, 11 } }
 local LINKS = { [MAP_HOUSE] = links(DOORS349) }
 -- STRAGO studies Hidon (#388): its script casts GrandTrain, the lore's one teacher in the game
 -- (Ot6StudyTbl), and the party beats it before it casts it, so he keeps his points while it stands and
--- Studies it at three (lab eb2: learned in 12 of 12, 10 keys).  His randoms stay the boosted Fight: with
--- his lores weighed (nukeLore "best") Ebot's randoms ran longer (lab eb2 against the main tree's
--- sweep: $125 4442 ticks against 2874 at the median)
+-- Studies it at three (wor-coverage.md section 13.4: labs eb4 and eb5, learned in 12 of 12).  His randoms
+-- stay the boosted Fight.
 local FIGHT = { strago = { study = true, studyHold = true } }
 H.NAV_REFIRE_HOLD = true
 
@@ -204,8 +203,9 @@ H.run({ maxFrames = 2400000 }, {
   H.call(function() ebotWhere("Hidon in sight ($01FC)") end),
   -- a Hidonite drinks every element: weapons none of the five absorbs (the absorb guard's own reads)
   H.absorbSafeArms({ STRAGO, RELM, GOGO, TERRA }, HIDON_SPECIES, { tag = "arms for Hidon" }),
-  -- MP to half of each pool (the bag's Tinctures and Ethers): STRAGO's study costs 99 and must leave the
-  -- nuke floor, a quarter of his pool, standing; Ebot's randoms nuked him to 215 MP (lab eb_s0, #388)
+  -- MP to half of each pool (the bag's Tinctures and Ethers), insurance for the study: it costs 99 and must
+  -- leave the nuke floor, a quarter of his pool, standing (99 + 151 of 606 at L51).  The 174 MP that
+  -- stopped it in lab eb came from an abandoned arm that nuked the randoms with lores (#388)
   H.fieldCare({ threshold = 1.0, mpBand = 0.5, tag = "before Hidon" }),
   H.saveState("wor_ebot_hidon.mss"),
   H.navTo(23, 6, { maxFrames = 1200 }),

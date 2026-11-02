@@ -3172,60 +3172,6 @@ function M.studySlot()
   end
   return nil, 0
 end
--- The lores the nuke picker weighs (#388, opts.nukeLore = "best"): the five
--- that damage every enemy with no condition on the target's level or the
--- gil (L.4 Flare, L? Pearl and the rest are left out): CleanSweep (water,
--- not split), Aqua Rake (water and wind), Aero (wind), Quasar and
--- GrandTrain (no element; magic defense ignored).  Lore ids, $1D29's order.
-M.NUKE_LORES = { 0x02, 0x03, 0x04, 0x15, 0x16 }
--- One lore's damage on one target, the middle of CalcMagicDmg's variance
--- (M.magicHitRange on MagicProp's own power, element and flags byte 2:
--- $20 ignores magic defense), halved when it lands on more than one body
--- unless the record says not to split ($40), and capped at the target's
--- HP.  An element the target absorbs scores what it would heal, negated.
--- caster = { level, magpow }; t = { hp, mdef, shell, weak, half, null,
--- absorb }; split = it lands on more than one body.
-function M.loreHit(lore, caster, t, split)
-  local r = (M.sym("MagicProp") & 0x3FFFFF) + (0x8B + lore) * 14
-  local f2, elem = M.readRomByte(r + 2), M.readRomByte(r + 1)
-  local lo, hi = M.magicHitRange({ power = M.readRomByte(r + 6), flags2 = f2, level = caster.level,
-    magpow = caster.magpow, mdef = t.mdef, shell = t.shell, elem = elem,
-    weak = t.weak, half = t.half, null = t.null })
-  if lo == nil then return 0 end
-  local d = (lo + hi) // 2
-  if split and (f2 & 0x40) == 0 then d = d // 2 end
-  d = math.min(d, t.hp or d)
-  if elem ~= 0 and ((t.absorb or 0) & elem) ~= 0 then return -d end
-  return d
-end
--- The lore a player picks from those in hand: the most damage summed over
--- the targets (M.loreHit), and of the lores within LORE_PICK_NEAR of that
--- the cheapest, so a 64-MP GrandTrain is cast only where it does clearly
--- more than a 22-MP Aqua Rake.  cands = { { lore =, cost = }, ... } (the
--- lores the caster can cast now, at the live list's price); mpFree, the MP
--- the caster may spend.  Returns the lore, its score and the best score;
--- nil when none can be paid for or none does damage.
-M.LORE_PICK_NEAR = 0.85
-function M.bestLore(cands, caster, targets, mpFree)
-  local scored, best = {}, 0
-  for _, c in ipairs(cands) do
-    if c.cost <= mpFree then
-      local s = 0
-      for _, t in ipairs(targets) do s = s + M.loreHit(c.lore, caster, t, #targets > 1) end
-      scored[#scored + 1] = { lore = c.lore, cost = c.cost, score = s }
-      if s > best then best = s end
-    end
-  end
-  if best <= 0 then return nil, 0, 0 end
-  local pick = nil
-  for _, c in ipairs(scored) do
-    if c.score >= best * M.LORE_PICK_NEAR and (pick == nil or c.cost < pick.cost
-        or (c.cost == pick.cost and c.score > pick.score)) then
-      pick = c
-    end
-  end
-  return pick.lore, pick.score, best
-end
 -- Ot6MagicPrice's first rule: a seated caster wearing the Economizer
 -- (relic effects 2 $3C45 bit $40) pays 1 MP for every spell at any boost
 function M.wearsEconomizer(actor)
@@ -7448,7 +7394,19 @@ function Driver:runicSlot(id)
   local MP = M.sym("MagicProp") & 0x3FFFFF
   return M.runicTakes(M.readRomByte(MP + id * 14 + 3), self:runicSpecial())
 end
-function Driver:castVetoed(abilityId, what)
+-- The one exemption from the Reflect half of the cast guard (#388): a
+-- single-target cast whose cursor holds exactly one monster (`tgtmons`,
+-- $7B7E, bit n = slot n), standing (in `slots`, M.activeSlots) and out of
+-- Reflect at that moment, cannot bounce off another body's Reflect.  An
+-- empty cursor, two bodies, a fallen or absent body, or one in Reflect
+-- keeps the guard.  Only a plan that asks (plan.reflectSingle) reads it.
+function M.reflectWaived(tgtmons, slots)
+  for _, s in ipairs(slots) do
+    if (1 << s.slot) == tgtmons then return not s.reflect end
+  end
+  return false
+end
+function Driver:castVetoed(abilityId, what, singleTarget)
   -- An enemy Runic (#413): a monster carrying $3E4C bit 1 (the Speck's
   -- MonsterProp+30, "A Speck absorbs magic!" on its launch) takes every
   -- runic-able spell (MagicProp+3 bit 3, RunicEffect) cast while it
@@ -7466,7 +7424,12 @@ function Driver:castVetoed(abilityId, what)
     end
   end
   local elem = M.spellElement(abilityId)
-  local s, why = M.castVeto(elem, M.spellReflectable(abilityId), activeSlots())
+  local slots = activeSlots()
+  local reflectable = M.spellReflectable(abilityId)
+  if reflectable and singleTarget and M.reflectWaived(M.readByte(BATTLE.TGTMONS), slots) then
+    reflectable = false
+  end
+  local s, why = M.castVeto(elem, reflectable, slots)
   if not s then return false end
   if why == "absorb" then
     M.log(string.format(
@@ -11391,12 +11354,19 @@ end
 -- Study it.  While a body whose species can teach a lore he lacks stands
 -- (M.studySlot), his bank is under the study's three points, his Scan is
 -- in his list and the 99 MP leaves the nuke floor, any plan of his that
--- would spend points goes at none.  A plan with no points, care, and the
--- study itself pass.
+-- would spend points on an attack goes at none.  Passed untouched: a plan
+-- with no points, the study itself, care (a heal, an item, a raise, a
+-- boosted party cure, anything aimed at the party), and a plan whose boost
+-- is pressed to an exact count (exactBoost/boostWant: the race's and the
+-- card plans', which boostLeft does not drive).
+Driver.STUDY_HOLD_KINDS = { fight = true, magic = true, lore = true, skill = true }
 function Driver:studyHoldPlan(actor, plan)
   local so = self.opts.strago
   if not (so and so.study and so.studyHold) or plan == nil or (plan.boostLeft or 0) == 0
-     or plan.reason == "study" or M.readByte(BATTLE.BCHID + actor * 2) ~= M.STRAGO_ID then
+     or plan.reason == "study" or M.readByte(BATTLE.BCHID + actor * 2) ~= M.STRAGO_ID
+     or not Driver.STUDY_HOLD_KINDS[plan.kind] or plan.ally or plan.all
+     or plan.exactBoost or plan.boostWant ~= nil
+     or (type(plan.reason) == "string" and (plan.reason:sub(1, 10) == "party_hurt" or plan.reason:sub(1, 4) == "cure")) then
     return plan
   end
   local have = M.readByte(BATTLE.BP + actor * 2)
@@ -13244,11 +13214,14 @@ function Driver:makePlanRules(actor)
       local mp = M.readWord(BATTLE.CURMP + actor * 2)
       -- The Scan is aimed at one body and the study reads every body on the
       -- field (Ot6Analyze's boosted loop), so it is aimed at a body out of
-      -- Reflect: the teacher, else any other.  Where a body stands in
-      -- Reflect the confirm's cast guard, which refuses a reflectable cast
-      -- while any body reflects, is waived for this single-target cast
-      -- (vetoOk): Hidon's Hidonite $160 wears Reflect, and the guard backed
+      -- Reflect: the teacher, else any other.  The confirm's cast guard
+      -- refuses a reflectable cast while any body reflects; for this
+      -- single-target cast its Reflect half is waived when the cursor holds
+      -- one standing body out of Reflect at the confirm (reflectSingle,
+      -- M.reflectWaived), and the rest of it (absorb, null, an enemy Runic)
+      -- stands.  Hidon's Hidonite $160 wears Reflect, and the guard backed
       -- the study out at every confirm while it stood (lab eb_s1, #388).
+      -- A cursor left on a member backs out too (monsterOnly).
       local aim, reflects = nil, false
       for _, s in ipairs(activeSlots()) do
         if s.reflect then reflects = true
@@ -13259,7 +13232,7 @@ function Driver:makePlanRules(actor)
           .. "(slot %d's), %d MP of %d", self.tag or "fight", actor, M.STUDY_BOOST, aim,
           M.readWord(0x57C0 + aim * 2), want, slot, M.STUDY_MP, mp))
         return { kind = "magic", spell = M.STUDY_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC),
-                 boostLeft = M.STUDY_BOOST, aimHard = aim, reason = "study", vetoOk = reflects or nil,
+                 boostLeft = M.STUDY_BOOST, aimHard = aim, reason = "study", reflectSingle = reflects or nil,
                  monsterOnly = reflects or nil }
       end
     end
@@ -13331,43 +13304,9 @@ function Driver:makePlanRules(actor)
   -- point.  Boost rides the same bank machinery as Fight (opts.boost /
   -- opts.bank); a lore is never boosted, matching the ambush driver's
   -- measured play (Aqua Rake multi-targets unboosted).
-  -- opts.nukeLore = "best" (#388): every damage lore in hand
-  -- (M.NUKE_LORES) is weighed on the standing bodies' own bytes, and
-  -- M.bestLore picks: the element a body is weak to, absorbs or nulls,
-  -- its magic defense, and the price, rather than a fixed order.
-  local pickLores = self.opts.nukeLore == "best"
   if self.opts.nukeLore and not self.loreDead and cmdRow(actor, BATTLE.CMD_LORE) then
     if self.loreSpinN > BATTLE.LORE_STALL then
-      self:loreDiagnose(actor, loreCell(actor, pickLores and M.NUKE_LORES[2] or self.opts.nukeLore[1], false))
-    elseif pickLores then
-      local mp = M.readWord(BATTLE.CURMP + actor * 2)
-      local cands = {}
-      for _, lid in ipairs(M.NUKE_LORES) do
-        if loreOffered(lid) then
-          local cell, cost = loreCell(actor, lid, true)
-          if cell ~= nil and not self:castVetoed(0x8B + lid, "lore") then
-            cands[#cands + 1] = { lore = lid, cost = cost, cell = cell }
-          end
-        end
-      end
-      local x = actor * 2
-      local caster = { level = M.readByte(0x3B18 + x), magpow = M.readByte(0x3B41 + x) }
-      local targets = {}
-      for _, s in ipairs(standingSlots()) do
-        local y = 8 + s * 2
-        targets[#targets + 1] = { hp = M.readWord(BATTLE.MON_HP + s * 2), mdef = M.readByte(0x3BB9 + y),
-          shell = (M.readByte(BATTLE.ST3 + y) & 0x20) ~= 0, weak = M.readByte(0x3BE0 + y),
-          half = M.readByte(0x3BE1 + y), null = M.readByte(0x3BCD + y), absorb = M.readByte(0x3BCC + y) }
-      end
-      local lid, score, best = M.bestLore(cands, caster, targets, mp - self:nukeFloor(actor))
-      if lid ~= nil then
-        local cost = 0
-        for _, c in ipairs(cands) do if c.lore == lid then cost = c.cost end end
-        M.log(string.format(
-          "[%s] actor=%d nuke lore $%02X (best of %d in hand: %d on %d bodies, the best %d), %d MP of %d",
-          self.tag or "fight", actor, lid, #cands, score, #targets, best, cost, mp))
-        return { kind = "lore", lore = lid, row = cmdRow(actor, BATTLE.CMD_LORE) }
-      end
+      self:loreDiagnose(actor, loreCell(actor, self.opts.nukeLore[1], false))
     else
       for _, lid in ipairs(self.opts.nukeLore) do
         if loreOffered(lid) then
@@ -14757,7 +14696,7 @@ function Driver:button(actor)
        and not self.plan.vetoOk then
       local id = self.plan.kind == "magic" and (self.plan.executionSpell or self.plan.spell) or (0x8B + self.plan.lore)
       if self:castVetoed(id, self.plan.kind == "magic" and "cast (at the confirm)"
-                        or "lore (at the confirm)") then
+                        or "lore (at the confirm)", self.plan.reflectSingle) then
         self:dropPlan("stage_changed")
         return { "b" }
       end
