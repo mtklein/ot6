@@ -8150,7 +8150,7 @@ function M.relicPlan(members, opts)
   -- first is step 2's to place or leave (a fight whose threats no guard covers leaves its slot to the ward the
   -- fight calls for: field_relicplan's Dullahan case).  Arming for a boss too (#495: the exclusion had no play
   -- reason): the wards the boss kit puts on stay, as everywhere, and a Ribbon left in the bag goes over a
-  -- lower-ranked relic (gen_wor_tritoch's Ice Dragon: TERRA's Ribbon gives way to the Czarina Ring and goes on
+  -- lower-ranked relic (gen_wor_tritoch's Ice Dragon: TERRA's Ribbon gives way to the Barrier Ring and goes on
   -- MOG).  A plan that already wears them all is unchanged.
   local ribbonsOn = 0
   for _, m in ipairs(ms) do
