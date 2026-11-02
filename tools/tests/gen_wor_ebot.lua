@@ -24,7 +24,10 @@ local links = H.doorLinks
 -- doors (gen_wor_gau's)
 local DOORS349 = { { 39, 10, 61, 20 }, { 60, 21, 38, 11 } }
 local LINKS = { [MAP_HOUSE] = links(DOORS349) }
-local FIGHT = {}
+-- STRAGO (#388): his damage lores weighed on each fight's bodies (M.bestLore), and Hidon studied: its
+-- script casts GrandTrain, the one teacher of it in the game (Ot6StudyTbl), and the party beats it before
+-- it casts it, so he keeps his points while it stands and Studies it on his third turn
+local FIGHT = { nukeLore = "best", strago = { study = true, studyHold = true } }
 H.NAV_REFIRE_HOLD = true
 
 -- the World of Ruin legs' helpers (lib/ot6_field.lua, H.worLegKit)
@@ -208,6 +211,8 @@ H.run({ maxFrames = 2400000 }, {
   H.advanceStory(function() return map() == MAP_HOUSE and settled() end, 300000, { playBattles = "tactical", fight = FIGHT }),
   H.call(function()
     say("story", "Hidon beaten: Strago's house")
+    H.log(string.format("[lore] after Hidon: STRAGO's lores $%06X, GrandTrain %s", H.readByte(0x1D29)
+      | H.readByte(0x1D2A) << 8 | H.readByte(0x1D2B) << 16, (H.readByte(0x1D2B) & 0x40) ~= 0 and "learned" or "NOT learned"))
     H.assertEq(sw(0x019C), 1, "Hidon beaten ($019C)")
   end),
   H.saveState("wor_ebot_after.mss"),

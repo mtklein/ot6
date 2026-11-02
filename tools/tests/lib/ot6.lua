@@ -3168,6 +3168,60 @@ function M.studySlot()
   end
   return nil, 0
 end
+-- The lores the nuke picker weighs (#388, opts.nukeLore = "best"): the five
+-- that damage every enemy with no condition on the target's level or the
+-- gil (L.4 Flare, L? Pearl and the rest are left out): CleanSweep (water,
+-- not split), Aqua Rake (water and wind), Aero (wind), Quasar and
+-- GrandTrain (no element; magic defense ignored).  Lore ids, $1D29's order.
+M.NUKE_LORES = { 0x02, 0x03, 0x04, 0x15, 0x16 }
+-- One lore's damage on one target, the middle of CalcMagicDmg's variance
+-- (M.magicHitRange on MagicProp's own power, element and flags byte 2:
+-- $20 ignores magic defense), halved when it lands on more than one body
+-- unless the record says not to split ($40), and capped at the target's
+-- HP.  An element the target absorbs scores what it would heal, negated.
+-- caster = { level, magpow }; t = { hp, mdef, shell, weak, half, null,
+-- absorb }; split = it lands on more than one body.
+function M.loreHit(lore, caster, t, split)
+  local r = (M.sym("MagicProp") & 0x3FFFFF) + (0x8B + lore) * 14
+  local f2, elem = M.readRomByte(r + 2), M.readRomByte(r + 1)
+  local lo, hi = M.magicHitRange({ power = M.readRomByte(r + 6), flags2 = f2, level = caster.level,
+    magpow = caster.magpow, mdef = t.mdef, shell = t.shell, elem = elem,
+    weak = t.weak, half = t.half, null = t.null })
+  if lo == nil then return 0 end
+  local d = (lo + hi) // 2
+  if split and (f2 & 0x40) == 0 then d = d // 2 end
+  d = math.min(d, t.hp or d)
+  if elem ~= 0 and ((t.absorb or 0) & elem) ~= 0 then return -d end
+  return d
+end
+-- The lore a player picks from those in hand: the most damage summed over
+-- the targets (M.loreHit), and of the lores within LORE_PICK_NEAR of that
+-- the cheapest, so a 64-MP GrandTrain is cast only where it does clearly
+-- more than a 22-MP Aqua Rake.  cands = { { lore =, cost = }, ... } (the
+-- lores the caster can cast now, at the live list's price); mpFree, the MP
+-- the caster may spend.  Returns the lore, its score and the best score;
+-- nil when none can be paid for or none does damage.
+M.LORE_PICK_NEAR = 0.85
+function M.bestLore(cands, caster, targets, mpFree)
+  local scored, best = {}, 0
+  for _, c in ipairs(cands) do
+    if c.cost <= mpFree then
+      local s = 0
+      for _, t in ipairs(targets) do s = s + M.loreHit(c.lore, caster, t, #targets > 1) end
+      scored[#scored + 1] = { lore = c.lore, cost = c.cost, score = s }
+      if s > best then best = s end
+    end
+  end
+  if best <= 0 then return nil, 0, 0 end
+  local pick = nil
+  for _, c in ipairs(scored) do
+    if c.score >= best * M.LORE_PICK_NEAR and (pick == nil or c.cost < pick.cost
+        or (c.cost == pick.cost and c.score > pick.score)) then
+      pick = c
+    end
+  end
+  return pick.lore, pick.score, best
+end
 -- Ot6MagicPrice's first rule: a seated caster wearing the Economizer
 -- (relic effects 2 $3C45 bit $40) pays 1 MP for every spell at any boost
 function M.wearsEconomizer(actor)
@@ -11068,6 +11122,7 @@ function Driver:makePlan(actor)
   plan = self:coverPlan(actor, plan)
   plan = self:buffPlan(actor, plan)
   plan = self:zingerPlan(actor, plan)
+  plan = self:studyHoldPlan(actor, plan)
   plan = self:policyPlan(actor, plan)
   if plan then plan.raceBoost = plan.boostLeft or 0 end
   self:sayTurn(actor, plan)
@@ -11324,6 +11379,35 @@ function Driver:zingerPlan(actor, plan)
     .. "in place of its %s", self.tag or "fight", actor, (za - 8) // 2, host, M.readWord(0x3BF4 + host * 2),
     M.readWord(0x3C1C + host * 2), boost, plan.kind))
   return { kind = "fight", row = fight, boostLeft = boost, target = target, ally = true, reason = "zinger" }
+end
+
+-- STRAGO holds his bank for a study (#388, opts.strago.studyHold): a person
+-- who wants a lore only one fight teaches (Hidon's GrandTrain) does not
+-- spend Strago's points while that body stands, so his third turn can
+-- Study it.  While a body whose species can teach a lore he lacks stands
+-- (M.studySlot), his bank is under the study's three points, his Scan is
+-- in his list and the 99 MP leaves the nuke floor, any plan of his that
+-- would spend points goes at none.  A plan with no points, care, and the
+-- study itself pass.
+function Driver:studyHoldPlan(actor, plan)
+  local so = self.opts.strago
+  if not (so and so.study and so.studyHold) or plan == nil or (plan.boostLeft or 0) == 0
+     or plan.reason == "study" or M.readByte(BATTLE.BCHID + actor * 2) ~= M.STRAGO_ID then
+    return plan
+  end
+  local have = M.readByte(BATTLE.BP + actor * 2)
+  if have >= M.STUDY_BOOST then return plan end
+  local slot, want = M.studySlot()
+  if slot == nil or spellCell(actor, M.STUDY_SPELL, false) == nil
+     or M.readWord(BATTLE.CURMP + actor * 2) - M.STUDY_MP < self:nukeFloor(actor) then
+    return plan
+  end
+  M.log(string.format("[%s] actor=%d study hold: slot %d ($%03X) can teach lores $%06X he lacks; his %s goes "
+    .. "at 0 BP of %d, the bank kept for the study at %d", self.tag or "fight", actor, slot,
+    M.readWord(0x57C0 + slot * 2), want, plan.kind, plan.boostLeft, M.STUDY_BOOST))
+  plan.boostLeft = 0
+  if plan.kind == "fight" then plan.aim = self:chipAim(actor, 0) end
+  return plan
 end
 
 -- The measuring policies (#422, tools/fight_report.py): the real driver
@@ -13229,9 +13313,43 @@ function Driver:makePlanRules(actor)
   -- point.  Boost rides the same bank machinery as Fight (opts.boost /
   -- opts.bank); a lore is never boosted, matching the ambush driver's
   -- measured play (Aqua Rake multi-targets unboosted).
+  -- opts.nukeLore = "best" (#388): every damage lore in hand
+  -- (M.NUKE_LORES) is weighed on the standing bodies' own bytes, and
+  -- M.bestLore picks: the element a body is weak to, absorbs or nulls,
+  -- its magic defense, and the price, rather than a fixed order.
+  local pickLores = self.opts.nukeLore == "best"
   if self.opts.nukeLore and not self.loreDead and cmdRow(actor, BATTLE.CMD_LORE) then
     if self.loreSpinN > BATTLE.LORE_STALL then
-      self:loreDiagnose(actor, loreCell(actor, self.opts.nukeLore[1], false))
+      self:loreDiagnose(actor, loreCell(actor, pickLores and M.NUKE_LORES[2] or self.opts.nukeLore[1], false))
+    elseif pickLores then
+      local mp = M.readWord(BATTLE.CURMP + actor * 2)
+      local cands = {}
+      for _, lid in ipairs(M.NUKE_LORES) do
+        if loreOffered(lid) then
+          local cell, cost = loreCell(actor, lid, true)
+          if cell ~= nil and not self:castVetoed(0x8B + lid, "lore") then
+            cands[#cands + 1] = { lore = lid, cost = cost, cell = cell }
+          end
+        end
+      end
+      local x = actor * 2
+      local caster = { level = M.readByte(0x3B18 + x), magpow = M.readByte(0x3B41 + x) }
+      local targets = {}
+      for _, s in ipairs(standingSlots()) do
+        local y = 8 + s * 2
+        targets[#targets + 1] = { hp = M.readWord(BATTLE.MON_HP + s * 2), mdef = M.readByte(0x3BB9 + y),
+          shell = (M.readByte(BATTLE.ST3 + y) & 0x20) ~= 0, weak = M.readByte(0x3BE0 + y),
+          half = M.readByte(0x3BE1 + y), null = M.readByte(0x3BCD + y), absorb = M.readByte(0x3BCC + y) }
+      end
+      local lid, score, best = M.bestLore(cands, caster, targets, mp - self:nukeFloor(actor))
+      if lid ~= nil then
+        local cost = 0
+        for _, c in ipairs(cands) do if c.lore == lid then cost = c.cost end end
+        M.log(string.format(
+          "[%s] actor=%d nuke lore $%02X (best of %d in hand: %d on %d bodies, the best %d), %d MP of %d",
+          self.tag or "fight", actor, lid, #cands, score, #targets, best, cost, mp))
+        return { kind = "lore", lore = lid, row = cmdRow(actor, BATTLE.CMD_LORE) }
+      end
     else
       for _, lid in ipairs(self.opts.nukeLore) do
         if loreOffered(lid) then

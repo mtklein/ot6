@@ -25,7 +25,9 @@ local links = H.doorLinks
 -- doors (gen_wor_gau's)
 local DOORS349 = { { 39, 10, 61, 20 }, { 60, 21, 38, 11 } }
 local LINKS = { [MAP_HOUSE] = links(DOORS349) }
-local FIGHT = {}
+-- STRAGO's damage lores weighed on each fight's bodies (#388, M.bestLore): GrandTrain from Hidon beside
+-- Aqua Rake and Aero
+local FIGHT = { nukeLore = "best" }
 H.NAV_REFIRE_HOLD = true
 
 -- the World of Ruin legs' helpers (lib/ot6_field.lua, H.worLegKit)
