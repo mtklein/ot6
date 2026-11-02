@@ -6954,7 +6954,7 @@ function M.gearValue(c, id)
   -- Heal Rod) is no weapon to fight with: the game's own Optimum skips it (equip.asm ImpItem), and RELM wearing it
   -- healed the White Drgn by every Fight (#485: the Tzen house's Heal Rod; build/attempts/wt/v038-wor-sweeps-a/
   -- chain/chain5.log.gz, wor_veldt's three wipes, the dragon's HP back at 18500)
-  if t == 1 and (gearByte(id, 27) >> 4) == 0x0C then return -1000 end
+  if t == 1 and M.weaponHeals(id) then return -1000 end
   local v = 0
   local stats = gearByte(id, 16) | (gearByte(id, 17) << 8)
   for k = 0, 3 do v = v + 3 * nib((stats >> (4 * k)) & 0x0F) end
@@ -7474,11 +7474,23 @@ function M.careStockPotions(level, opts)
   return want
 end
 
+-- M.weaponHeals(id): the weapon's blow heals what it hits (ItemProp +27
+-- high nibble $0C, battle_main.asm AttackerEffect_0c: the Heal Rod).  No
+-- weapon to fight with; the game's own Optimum skips it (equip.asm ImpItem).
+function M.weaponHeals(id)
+  if id == nil or id == 0xFF then return false end
+  return (M.readRomByte((M.sym("ItemProp") & 0x3FFFFF) + id * 30 + 27) >> 4) == 0x0C
+end
+
 -- M.bagWeapons(c): the weapons in the bag ($1869 ids with a count), each
 -- once, strongest first by the ROM's power byte (ItemProp +$14; the
 -- record's type +$00 low bits = 1 is a weapon); with a character id, only
 -- those its actor can equip (ItemProp +$01, a 16-bit mask by actor --
--- the list the Equip menu itself filters by).
+-- the list the Equip menu itself filters by).  A weapon whose blow heals
+-- (M.weaponHeals: the Heal Rod, power 200, so first by power) is left out:
+-- STRAGO re-armed with it for Hidon, and his Fight and GOGO's Mimic of it
+-- healed Hidon 22424 -> 24440 until the 300000-frame cap (#485: the Tzen
+-- house's Heal Rod; build/attempts/wt/v038-wor-sweeps-b4/hidon/).
 function M.bagWeapons(c)
   local seen, out = {}, {}
   local ip = M.sym("ItemProp") & 0x3FFFFF
@@ -7490,7 +7502,7 @@ function M.bagWeapons(c)
         if not wears then
           wears = (M.readRomWord(ip + id * 30 + 1) >> M.charActor(c)) & 1 == 1
         end
-      if (t & 0x80) == 0 and (t & 0x07) == 1 and wears then
+      if (t & 0x80) == 0 and (t & 0x07) == 1 and wears and not M.weaponHeals(id) then
         seen[id] = true
         out[#out + 1] = id
       end
