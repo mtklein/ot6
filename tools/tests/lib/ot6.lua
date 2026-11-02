@@ -13238,11 +13238,25 @@ function Driver:makePlanRules(actor)
       local slot, want = M.studySlot()
       local cell = spellCell(actor, M.STUDY_SPELL, true)
       local mp = M.readWord(BATTLE.CURMP + actor * 2)
-      if slot ~= nil and cell ~= nil and mp - M.STUDY_MP >= self:nukeFloor(actor) then
-        M.log(string.format("[%s] actor=%d study: Scan at %d BP on slot %d ($%03X), lores $%06X he lacks, %d MP of %d",
-          self.tag or "fight", actor, M.STUDY_BOOST, slot, M.readWord(0x57C0 + slot * 2), want, M.STUDY_MP, mp))
+      -- The Scan is aimed at one body and the study reads every body on the
+      -- field (Ot6Analyze's boosted loop), so it is aimed at a body out of
+      -- Reflect: the teacher, else any other.  Where a body stands in
+      -- Reflect the confirm's cast guard, which refuses a reflectable cast
+      -- while any body reflects, is waived for this single-target cast
+      -- (vetoOk): Hidon's Hidonite $160 wears Reflect, and the guard backed
+      -- the study out at every confirm while it stood (lab eb_s1, #388).
+      local aim, reflects = nil, false
+      for _, s in ipairs(activeSlots()) do
+        if s.reflect then reflects = true
+        elseif aim == nil or s.slot == slot then aim = (aim == slot) and aim or s.slot end
+      end
+      if slot ~= nil and aim ~= nil and cell ~= nil and mp - M.STUDY_MP >= self:nukeFloor(actor) then
+        M.log(string.format("[%s] actor=%d study: Scan at %d BP on slot %d ($%03X), lores $%06X he lacks "
+          .. "(slot %d's), %d MP of %d", self.tag or "fight", actor, M.STUDY_BOOST, aim,
+          M.readWord(0x57C0 + aim * 2), want, slot, M.STUDY_MP, mp))
         return { kind = "magic", spell = M.STUDY_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC),
-                 boostLeft = M.STUDY_BOOST, aimHard = slot, reason = "study" }
+                 boostLeft = M.STUDY_BOOST, aimHard = aim, reason = "study", vetoOk = reflects or nil,
+                 monsterOnly = reflects or nil }
       end
     end
     if so.dischord and cmdRow(actor, BATTLE.CMD_LORE) and loreOffered(M.LORE_DISCHORD) then

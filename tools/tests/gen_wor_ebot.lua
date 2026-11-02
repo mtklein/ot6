@@ -202,7 +202,9 @@ H.run({ maxFrames = 2400000 }, {
   H.call(function() ebotWhere("Hidon in sight ($01FC)") end),
   -- a Hidonite drinks every element: weapons none of the five absorbs (the absorb guard's own reads)
   H.absorbSafeArms({ STRAGO, RELM, GOGO, TERRA }, HIDON_SPECIES, { tag = "arms for Hidon" }),
-  H.fieldCare({ threshold = 1.0, tag = "before Hidon" }),
+  -- MP to half of each pool (the bag's Tinctures and Ethers): STRAGO's study costs 99 and must leave the
+  -- nuke floor, a quarter of his pool, standing; Ebot's randoms nuked him to 215 MP (lab eb_s0, #388)
+  H.fieldCare({ threshold = 1.0, mpBand = 0.5, tag = "before Hidon" }),
   H.saveState("wor_ebot_hidon.mss"),
   H.navTo(23, 6, { maxFrames = 1200 }),
   H.faceAndHoldA("up", function() return H.battleLoadStarted() or H.dialogWaiting() or not H.hasControl() end, 600,
