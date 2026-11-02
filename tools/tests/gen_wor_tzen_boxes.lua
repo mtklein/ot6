@@ -28,10 +28,11 @@ local HOUSE_FRAMES = 21600
 -- the house's random fights, for the driver's run rule (gen_wor_sabin's measure)
 local HOUSE_FIGHT_COST = 4151
 -- What a box's fight costs of the clock, from the frames left when the party weighs it to the frames left when
--- its fight is won (the box's window, the battle, its close): the worst of 48 box fights, 3614-5563 frames,
--- median 4259 (build/attempts/wt/v038-monster-boxes/tzen/: boxcost_tz.txt, 46 at a cost of 6000 here; tz2, two
--- at 5211, one of them 5563).  And the walk after it can meet a random battle the clock no longer covers, which
--- the run rule runs from: the longest run of the house's was 873 ticks (the same sweeps' "PARTY LEFT" lines),
+-- its fight is won (the box's window, the battle, its close): the worst of 49 box fights, 3614-5563 frames
+-- (build/attempts/wt/v038-monster-boxes/tzen/: boxcost_tz.txt, 46 with the cost at 6000, "min 3614, median 4259,
+-- max 5211"; tz2_k6_*, three with it at 5211, one of them 5563).  And the walk after it can meet a random
+-- battle the clock no longer covers, which the run rule runs from: the longest run of the house's was 873 ticks
+-- (the same sweeps' "PARTY LEFT" lines),
 -- 1200 frames with the battle's open and close; one is expected every 45 steps (the house's rate: $0070 a step
 -- halved, a battle every 44.8 steps on average, route_data.py map 311).  At the cost alone (5211 and no run) the
 -- box upstairs was opened with 6938 frames left and the clock ran out at the door after a run (tz2_k6_s0: "LOST:
