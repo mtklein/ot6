@@ -41,9 +41,9 @@ lines behind each number. Line numbers are into
    Eater), which the route plays. The isles are reachable and empty.
 6. **Seven chests hold a monster.** Two are opened (Darill's Tomb, the
    Veldt cave). Five are not: two in the Tzen house (four Pm Stalkers
-   each), Umaro's cave (three Pugs, L99, 42,003 HP), the Ancient Castle
-   (Master Pug L73, 22,000 HP) and its basement (KatanaSoul L61, 37,620
-   HP). Since v0.38 (#487) all five are opened and won on branch legs
+   each), Umaro's cave (three Pugs, L99, 42,003 HP), the cave below the
+   Ancient Castle (map 401: Master Pug L73, 22,000 HP) and the castle itself
+   (map 406: KatanaSoul L61, 37,620 HP). Since v0.38 (#487) all five are opened and won on branch legs
    (section 12).
 7. **53 chests with a prize are unopened outside Kefka's Tower**
    (16 more inside it), against 62 the WoR legs open. Ten more
@@ -454,7 +454,7 @@ boot checkpoint the branch Continues and the leg it rejoins.
 | 5 | Chests of the dungeons the route walks | the arc's own leg | 39 prizes: Ancient Castle 6, Doma and the dream 8, Zozo 7, Owzer 2, Tzen house 6, Albrook/Nikeah/Figaro/Maranda/Narshe 10 | S to M each, see below | yes |
 | 6 | The Zone Eater's belly | `gen_wor_belly` boot `wor-gau-v1` | forms 346-352 (7, authored, L43-44, 1,399-2,784 per member), 9 chests (Genji Armor, Zephyr Cape, Hero Ring, Thunder Shld, Magical Brsh, Tack Star...) | M | yes |
 | 7 | Draw gaps in played dungeons | each dungeon's leg | 42 formations (section 4.3; Umaro's cave 6 of its 8, the Fanatics' Tower's four pay no XP) | M | meets them if it pauses |
-| 8 | Monster boxes | the arc's leg | five boxes: Pm Stalker x4 (two, Tzen), Pugs x3 L99 (Umaro's cave), Master Pug L73 (Ancient Castle), KatanaSoul L61 (its basement); floor rows on the last two | L | only a strong party; a balance signal (played since v0.38 on three branch legs: section 12) |
+| 8 | Monster boxes | the arc's leg | five boxes: Pm Stalker x4 (two, Tzen), Pugs x3 L99 (Umaro's cave), Master Pug L73 (the Ancient Castle's cave, 401), KatanaSoul L61 (the castle, 406); floor rows on the last two | L | only a strong party; a balance signal (played since v0.38 on three branch legs: section 12) |
 | 9 | WoB: stop spending WoR bits | WoB chain (the #350 item 8 pass) | 8 prizes (section 5.2) | S, regenerates the WoB chain | yes |
 | 10 | The early-continent draw gaps | `wor-start-v1` to `wor-figaro-sweep-v1` | 19 formations of L5-29, 2-1,155 per member | S | seldom |
 

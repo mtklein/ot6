@@ -4,9 +4,11 @@
 -- (16,9), and the house (map 311) by its two monster boxes: the one downstairs (102,49), up by the link, the child
 -- (117,12), the one upstairs (111,12), down by the link and out; then Sabin's joining.  Each box is four Pm
 -- Stalkers (event group 150, formation 211, L26), an event battle the clock runs through and a game over when
--- lost (TreasureMonster: _ca5ea9).  A box is opened when the time left covers its fight (BOX_FIGHT_COST), the
--- walk still ahead and a run from the random battles that walk can expect (BOX_RUN_COST each, one per BOX_STEPS
--- steps), as a player watching the clock would; otherwise it is said and left.  The line's six item
+-- lost (TreasureMonster: _ca5ea9).  The clock is kept for the boxes: while a box is still ahead, its fight
+-- (BOX_FIGHT_COST) counts in the walk the driver's run rule weighs, so the house's random battles are run from
+-- whenever fighting one would spend a box's time; a box is opened when the time left covers its fight, the walk
+-- after it, the boxes still ahead and a run from each random battle that walk can expect (BOX_RUN_COST each, one
+-- per BOX_STEPS steps, rounded up), and the leg asserts at the end that both were opened and won.  The line's six item
 -- chests are the line's (gen_wor_sabin); this walk takes the boxes instead.  No leg boots what it leaves (the
 -- state `wor_tzen_boxes`): the boxes pay 1,032 XP a box and no item, which the main line does not need, and the
 -- house collapses behind Sabin's joining ($028A: _cc56da no longer draws it), so there is no later visit.
@@ -28,16 +30,18 @@ local HOUSE_FRAMES = 21600
 -- the house's random fights, for the driver's run rule (gen_wor_sabin's measure)
 local HOUSE_FIGHT_COST = 4151
 -- What a box's fight costs of the clock, from the frames left when the party weighs it to the frames left when
--- its fight is won (the box's window, the battle, its close): the worst of 49 box fights, 3614-5563 frames
--- (build/attempts/wt/v038-monster-boxes/tzen/: boxcost_tz.txt, 46 with the cost at 6000, "min 3614, median 4259,
--- max 5211"; tz2_k6_*, three with it at 5211, one of them 5563).  And the walk after it can meet a random
--- battle the clock no longer covers, which the run rule runs from: the longest run of the house's was 873 ticks
--- (the same sweeps' "PARTY LEFT" lines),
--- 1200 frames with the battle's open and close; one is expected every 45 steps (the house's rate: $0070 a step
--- halved, a battle every 44.8 steps on average, route_data.py map 311).  At the cost alone (5211 and no run) the
--- box upstairs was opened with 6938 frames left and the clock ran out at the door after a run (tz2_k6_s0: "LOST:
--- the house's timer ran out at f42939 on map 305 (15,9) -- child rescued").
-local BOX_FIGHT_COST, BOX_RUN_COST, BOX_STEPS = 5563, 1200, 45
+-- its fight is won (the box's window, the battle, its close): in the sweep tz3 (build/attempts/wt/
+-- v038-monster-boxes/tzen/boxcost_tz3.txt) 46 fights in 32 distinct keys, "min 3614, median 4259, max 5211"; in
+-- tz2 (the two K6 runs again, a cost of 5211 and no run) a 5563 on a draw tz3 had left shut.  The rule takes the
+-- worst seen with a tenth more, 6100.  The walk after a box can meet a random battle the clock no longer covers,
+-- which the run rule runs from: the longest run of the house's was 873 ticks (the same sweeps' "PARTY LEFT"
+-- lines), 1200 frames with the battle's open and close; one comes every 44.8 steps on average (the house's rate:
+-- $0070 a step halved, route_data.py map 311), so a walk of N steps keeps ceil(N / 45) runs.  At the cost alone
+-- (5211 and no run) the box upstairs was opened with 6938 frames left and the clock ran out at the door after a
+-- run (tz2_k6_s0: "LOST: the house's timer ran out at f42939 on map 305 (15,9) -- child rescued"); with the box's
+-- fight left out of the run rule's walk, a random fight on the way to the child spent the upstairs box's time
+-- (tz3_k6_s0: the box "LEFT SHUT at 6938 frames left").
+local BOX_FIGHT_COST, BOX_RUN_COST, BOX_STEPS = 6100, 1200, 45
 local BOX_FORM = 211
 -- the boxes (TreasureProp 311; route-wor-sabin.md 3.4): the stand below each, faced up
 local BOXES = {
@@ -164,8 +168,8 @@ local function inn(what)
   }, {})
 end
 
--- the walk still ahead to the exit, in frames, from where the party stands (gen_wor_sabin's aheadFrames,
--- without the boxes' fights: a box is weighed when the party stands below it)
+-- the walk still ahead to the exit, in frames, from where the party stands (gen_wor_sabin's aheadFrames; the
+-- boxes' fights and the runs are keepFrames', below)
 local legNo, ahead, aheadAt = 1, 0, nil
 local function stepsAhead(from)
   local steps, links = 0, 0
@@ -179,6 +183,17 @@ end
 local function walkAhead(from)
   local steps, links = stepsAhead(from)
   return steps * STEP_FRAMES + links * LINK_FRAMES + (sw(0x028B) == 0 and CHILD_FRAMES or 0)
+end
+local boxes, weighed = {}, {}                       -- what each box came to; the boxes weighed, by bit
+local function runsFor(steps) return (steps + BOX_STEPS - 1) // BOX_STEPS end
+-- the boxes at legs from..end not weighed yet, as clock frames
+local function boxesAhead(from)
+  local n = 0
+  for i = from, #HOUSE_LEGS do
+    local b = HOUSE_LEGS[i].box
+    if b and not weighed[BOXES[b].bit] then n = n + 1 end
+  end
+  return n * BOX_FIGHT_COST
 end
 local function aheadFrames()
   if map() == MAP_HOUSE and not H.battleLoadStarted() and H.hasControl() and H.tileAligned() then
@@ -194,18 +209,26 @@ local function aheadFrames()
   return ahead
 end
 
-local boxes = {}                                    -- what each box came to: "opened" or "left"
+-- what the run rule weighs a random battle against: the walk ahead (aheadFrames), the boxes not weighed yet,
+-- and a run from each battle the walk can expect, so that a fight is run from when it would spend a box's time
+local function keepFrames()
+  local walk = aheadFrames()
+  local steps = stepsAhead(legNo)
+  return walk + boxesAhead(legNo) + runsFor(steps) * BOX_RUN_COST
+end
 -- a box, from the tile below it: opened when the clock covers its fight and the walk after it, its battle
 -- played out by the tactical driver (an event battle: fought, never run from), then the bit and the win asserted
 local function box(o, after)
   local n0
   return H.cond(function()
-    local runs = stepsAhead(after) // BOX_STEPS
-    local left, need = timer0(), BOX_FIGHT_COST + walkAhead(after) + runs * BOX_RUN_COST
+    weighed[o.bit] = true
+    local runs = runsFor((stepsAhead(after)))
+    local left = timer0()
+    local need = BOX_FIGHT_COST + walkAhead(after) + boxesAhead(after) + runs * BOX_RUN_COST
     local go = left >= need
-    H.log(string.format("[box] %s: %d frames left, its fight ~%d + %d of walk ahead + %d run(s) of %d = %d: %s",
-      o.what, left, BOX_FIGHT_COST, walkAhead(after), runs, BOX_RUN_COST, need,
-      go and "opened" or "LEFT SHUT (the clock cannot cover it)"))
+    H.log(string.format("[box] %s: %d frames left, its fight ~%d + %d of walk ahead + %d of boxes ahead + %d "
+      .. "run(s) of %d = %d: %s", o.what, left, BOX_FIGHT_COST, walkAhead(after), boxesAhead(after), runs,
+      BOX_RUN_COST, need, go and "opened" or "LEFT SHUT (the clock cannot cover it)"))
     if not go then boxes[#boxes + 1] = o.what .. " left" end
     return go
   end, {
@@ -221,7 +244,7 @@ local function box(o, after)
       return H.chestOpen(o.bit) and not H.battleLoadStarted() and map() == MAP_HOUSE and H.hasControl()
         and H.tileAligned() and not H.dialogWaiting()
     end, 60000, { playBattles = "tactical",
-      fight = { timedFightCost = HOUSE_FIGHT_COST, timedWalk = function() return aheadFrames() end } }),
+      fight = { timedFightCost = HOUSE_FIGHT_COST, timedWalk = function() return keepFrames() end } }),
     checkOutcomes(o.what),
     H.call(function()
       H.assertEq(H.chestOpen(o.bit), true, string.format("311: %s (bit %d) is open", o.what, o.bit))
@@ -241,7 +264,7 @@ local function houseLeg(n, what, arrive)
   return H.seqStep({
     H.call(function() legNo, aheadAt = n, nil end),
     H.navTo(x, y, { maxFrames = 12000, playBattles = "tactical",
-      fight = { timedFightCost = HOUSE_FIGHT_COST, timedWalk = function() return aheadFrames() end },
+      fight = { timedFightCost = HOUSE_FIGHT_COST, timedWalk = function() return keepFrames() end },
       arrive = function() guard(); aheadFrames(); return arrive ~= nil and arrive() or false end }),
     H.release(),
     H.waitUntil(function() guard(); return H.hasControl() and H.tileAligned() end, 900, what .. ": control", 2),
@@ -256,7 +279,7 @@ H.run({ maxFrames = 200000 }, {
   H.bootCheckpoint("wor-tzen-door-v1"),
   H.call(function()
     tallyReset()
-    clockOn, houseIn, houseOut, boxes = false, nil, nil, {}
+    clockOn, houseIn, houseOut, boxes, weighed = false, nil, nil, {}, {}
     legNo, ahead, aheadAt = 1, 0, nil
     say("wor", "boot")
     H.assertEq(inParty(CELES) and not inParty(SABIN), true,
@@ -355,8 +378,13 @@ H.run({ maxFrames = 200000 }, {
     say("tzen", "SABIN joined")
     H.assertEq(sw(0x028A), 1, "Sabin joined ($028A, :90262)")
     H.assertEq(inParty(SABIN) and inParty(CELES), true, "SABIN and CELES in the party")
-    H.assertEq(#boxes, 2, "both boxes weighed")
+    for _, o in pairs(BOXES) do
+      H.assertEq(H.chestOpen(o.bit), true, string.format("%s (bit %d) opened and won (audit_chests reads it)",
+        o.what, o.bit))
+    end
+    H.assertEq(table.concat(boxes, ", "):find("left") == nil, true, "no box left shut: " .. table.concat(boxes, ", "))
   end),
+  H.fieldCare({ threshold = 1.0, tag = "after the house, Sabin joined" }),
   H.saveState("wor_tzen_boxes.mss"),
   H.logStep(function()
     return string.format("wor_tzen_boxes generated: CELES L%d and SABIN L%d in Tzen; boxes: %s", level(CELES),
