@@ -1097,25 +1097,40 @@ its 6:00 clock, and it collapses when Sabin joins (`$028A`: `_cc56da` no
 longer draws it), so the boxes have no later visit. The branch walks the
 house by the two boxes and the child (downstairs box, up, the child, the
 upstairs box, down and out) instead of the line's six item chests, and
-opens a box when the time left covers the box's worst measured fight
-(5,563 frames), the walk after it and one run from a random battle for
-every 45 steps of that walk (1,200 frames each: the longest run in the
-house was 873 ticks; a battle comes every 44.8 steps). At the fight's cost
-alone, 5,211, the box upstairs was opened with 6,938 frames left and the
-clock ran out at the door after a run (`tzen/tz2_k6_s0`: "LOST: the house's
-timer ran out at f42939 on map 305 (15,9) -- child rescued").
+keeps the clock for the boxes: while a box is ahead, its fight counts in
+the walk the run rule weighs, so a random battle is run from whenever
+fighting it would spend a box's time. A box's fight is priced at 6,100
+frames, the worst seen (5,563) and a tenth; each walk keeps one run of
+1,200 frames (the longest run in the house was 873 ticks) for every 45
+steps, rounded up (a battle comes every 44.8 steps). The leg asserts at
+its end that both boxes were opened and won, and cares for the party
+before it saves.
+
+Two earlier rules failed on the same draws (`tzen/tz2_*`, `tzen/tz3_*`):
+with the box's fight left out of the run rule's walk, a random fight on the
+way to the child spent the upstairs box's time, and the box was left shut
+in both K6 runs ("LEFT SHUT at 6938 frames left", at 6128 the other); with
+it priced at the fight alone, 5,211, the box was opened with 6,938 frames
+left and the clock ran out at the door after a run (`tzen/tz2_k6_s0`:
+"LOST: the house's timer ran out at f42939 on map 305 (15,9) -- child
+rescued").
 
 Measured from the graph's capture `wor-tzen-door-v1` (sha256 710bbf7f, the
-line at ba16da57's play), K 0-11 battles used up beside Tzen's door first,
-at seed shifts 0 and 7 (`scripts/mk_boxlab.py`): 24 of 24 PASS; 46 box
-fights in 32 distinct keys, all won, "clock cost min 3614, median 4259, max
-5211"; the box upstairs left shut in the two K6 runs, at 6,938 and 6,128
-frames left; "exit margins (frames left of 21600): min 1237, median 3245,
-max 4770 over 24 exits" (`tzen/tally_tz3.txt`, `tzen/boxcost_tz3.txt`). The
-fight report: "$0D3 Pm Stalker ... 32 32 0 65% 21% 0 0.00" (keys, won,
-unfinished, the party's low point median and worst, members down, deaths a
-fight; `tzen/fight_report_tz3.txt`). CELES alone wins every box; at 21% of
-her HP at worst it is a real fight, not a close one.
+line at ba16da57's play, the same in main's 9aa26b7b), K 0-11 battles used
+up beside Tzen's door first, at seed shifts 0 and 7 (`scripts/mk_boxlab.py`,
+at a4516870 on the Air; cdfdc347 after it changes only what the box's
+wait reads, the battle said rather than the bit, which the box sets as it
+opens): "verdicts: PASS 24"; "box fights: 48, clock cost
+min 3747, median 4228, max 4984; boxes left shut 0"; "house formation 211:
+48 fights, 29 distinct keys, won 48"; "exit margins (frames left of 21600):
+min 1845, median 4482, max 9297 over 24 exits" (`tzen/tally_tz4.txt`,
+`tzen/boxcost_tz4.txt`). Of the house's random fights the party ran from
+12 of 24 of formation 207 and 17 of 42 of 209, as the rule keeps the boxes'
+time; it won every one it fought. The fight report: "$0D3 Pm Stalker ...
+29 29 0 60% 34% 0 0.00" (keys, won, unfinished, the party's low point
+median and worst, members down, deaths a fight; `tzen/fight_report_tz4.txt`).
+CELES alone wins every box; at 34% of her HP at worst it is a real fight,
+not a close one.
 
 **Umaro's cave.** The box stands in the pocket below the floor's drop
 (14,30), which the line's walk does not enter: 281 (9,52) -> 282 (16,32).
@@ -1168,7 +1183,14 @@ drop, item $08 (0 -> 0): got 0"; `gen_wor_umaro_box` booting the courtyard,
 `gen_wor_ancient_boxes` booting the cave, "the boot stands in the Ancient
 Castle's courtyard (407) ...: got 281"; `gen_wor_tzen_boxes` Continuing
 `wor-sabin-v1`, "contract wor-tzen-door-v1 (entry) VIOLATED"
-(`ancient/mt_*`, `umaro/mt_yard`, `tzen/mt_sabin`).
+(`ancient/mt_*`, `umaro/mt_yard`, `tzen/mt_sabin`); and in the Tzen leg
+itself (`scripts/mkmut_tz.py`): a box's fight priced at 30,000, both left
+shut and "the box downstairs (102,49) (bit 144) opened and won (audit_chests
+reads it): got false"; the box downstairs named by bit 149, "311: the box
+downstairs (102,49) (bit 149) is open: got false"; its formation as 999,
+"its battle (formation 999, Pm Stalker x4) was won: got false"
+(`tzen/mt_tz*`; `tzen/mt_tzbit_old`, before the wait was changed to read
+the battle and not the bit, ran the clock out instead).
 
 The first sweeps of the two field branches failed at their start
 (`*/first_try_K_bug/`: "bad argument #2 to 'format'"): the lab's K was

@@ -474,8 +474,9 @@ The boxes are a branch since #487 (`gen_wor_tzen_boxes`, from
 `wor-tzen-door-v1`; nothing boots it): the house by the box downstairs,
 the child, the box upstairs and out, instead of the six chests. The house
 collapses behind Sabin's joining (`$028A`: `_cc56da` no longer draws it),
-so there is no second visit; a box is opened when the time left covers its
-fight and the walk after it. The measure is in wor-coverage.md section 12.
+so there is no second visit. While a box is ahead its fight counts in the
+walk the run rule weighs, so the house's random battles are run from when
+one would spend a box's time, and the leg asserts both boxes opened. The measure is in wor-coverage.md section 12.
 
 ---
 
