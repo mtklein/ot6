@@ -1054,3 +1054,141 @@ checkpoints of the line before Berserk landed):
   0's lap without its allowance, "to the patch east of the landing (group
   0): group 0 deals only the plains six (not $017, formation 6): got
   false".
+
+## 12. Abilities the World of Ruin teaches (#388)
+
+What each kit learns in the World of Ruin, where the game teaches it,
+what the route's party knows at each tracked save, and whether the battle
+driver uses it. The saves are the tracked checkpoints as re-cut at
+`a2ca9210` (the play at `a18e540d`), read with
+`audit/abil.py` (`checkpoints.txt`); the driver's uses are counted in the
+WoR legs' logs of the main tree's `build/states` (a play of 2026-10-23,
+older than the re-cut: `driver_uses_1023.txt`, `lores_fought_1023.txt`).
+Evidence under `build/attempts/wt/v038-ability-learning/`.
+
+### 12.1 Where each is taught
+
+| kit | how | OT6's change | in the World of Ruin |
+|---|---|---|---|
+| SABIN's Blitzes | by level, `BlitzLevelTbl` 1/6/10/15/23/30/42; Bum Rush from Duncan | none (kits.md "Sabin") | Air Blade at L30 (by `wor-edgar-v1`, L31); Bum Rush at Duncan's house (`wor-gau-v1`); Spiraler at L42 never: SABIN ends the line at L39 |
+| CYAN's SwdTechs | by level, `BushidoLevelTbl` 1/6/12/15/24/34/44; his dream teaches all | Cleave by story at the Phantom Train farewell (#379) | Stunner at L34 (by `wor-mtzozo-v1`, L35); Quadra Slice from the dream (`give_bushido`, `wor-doma-v1`); all eight from there |
+| STRAGO's lores | seen cast with him present and able | Study, his 3-BP Scan, learns every lore any body present could cast (#432); Bserk by watching (a Magic-row spell) | 4 at the end of the World of Balance (Aqua Rake, Revenge, Stone, Exploder); Dischord at the grind by Jidoor (`wor-tower-v1`); Aero and L.5 Doom at Phoenix Cave (a Study of Doom Gaze, `wor-phoenix-v1`); 7 of 24 from there to the end |
+| GAU's Rages | a Leap on the Veldt, then the formation's monsters | kit-gau.md | 9 at the end of the World of Balance, 10 from `wor-veldt-cave-v1` |
+| MOG's Dances | a battle on the terrain | none | 5 of 8 at `wor-narshe-v1` (Love Sonata and Snowman Jazz in the WoR); MOG is not seated after it |
+
+The species whose scripts cast each lore are `Ot6StudyTbl`
+(`tools/check_study_table.py --emit`). Of the 17 STRAGO lacks, the WoR
+legs that seat him fought these teachers (`lores_fought_1023.txt`):
+Reach Frog (Rippler) at the grind by Jidoor, 54 battles with him; Phase
+(Blow Fish) in Phoenix Cave, 5; Hidon (GrandTrain, its only teacher) at
+Ebot's Rock. Pearl Wind's Sprinter is on world groups 49, 51 and 52, which
+the grind on group 48 does not roll (route-wor-thamasa.md 6.4). The rest
+(Condemned, Roulette, CleanSweep, Big Guard, L.4 Flare, L.3 Muddle,
+Reflect???, L? Pearl, Step Mine, Force Field, Sour Mouth, Pep Up, Quasar)
+are cast by species the route meets without him seated or not before
+Kefka's Tower.
+
+### 12.2 What the party knows at the saves
+
+From `checkpoints.txt` (level, `-` for not seated):
+
+| save | SABIN | Blitzes | CYAN | SwdTechs | STRAGO | lores | rages |
+|---|---|---|---|---|---|---|---|
+| `wor-island-v1` | 26- | 5 (to Mantra) | 24- | 6 (to Empowerer, and Cleave) | 25- | 4 | 9 |
+| `wor-edgar-v1` | 31 | 6 (Air Blade) | 24- | 6 | 25- | 4 | 9 |
+| `wor-mtzozo-v1` | 37 | 6 | 35 | 7 (Stunner) | 25- | 4 | 9 |
+| `wor-tower-v1` | 37- | 6 | 38- | 7 | 46 | 5 (Dischord) | 9 |
+| `wor-phoenix-v1` | 39 | 6 | 40 | 7 | 47 | 7 (Aero, L.5 Doom) | 9 |
+| `wor-veldt-cave-v1` | 39- | 6 | 40- | 7 | 47- | 7 | 10 |
+| `wor-gau-v1` | 39 | 7 (Bum Rush) | 40- | 7 | 47- | 7 | 10 |
+| `wor-doma-v1` | 39- | 7 | 40 | 8 (Quadra Slice) | 51- | 7 | 10 |
+| `wor-desert-v1` | 39- | 7 | 53- | 8 | 51- | 7 | 10 |
+
+### 12.3 What the driver uses
+
+Counted over the WoR legs' logs (`driver_uses_1023.txt`): Aqua Rake 150
+casts (the only lore cast; "nuke lore $03"), Pummel 72 and Air Blade 3
+("Blitz $5D", "Blitz $62"), the SwdTech list 4 times (Empowerer 3,
+Stunner 1; Cleave never), one Study, and no Rage, Dance, Fire Dance,
+Mantra, Bum Rush, Quadra Slice or Cleave. The driver has the lines:
+`opts.blitz` names one Blitz a fight's leg sets (Air Blade at Edgar's
+tentacles), `opts.bushido` the deepest SwdTech row (the storm and Tritoch
+legs), `opts.rage` (kit-gau.md) no WoR leg sets, and STRAGO's lines are
+`opts.nukeLore` (a fixed order), `opts.strago.study` (the grind by Jidoor,
+Phoenix Cave, Locke's), Pearl Wind (never learned) and Dischord.
+
+### 12.4 Routed on this branch: GrandTrain from Hidon, and the lores weighed
+
+GrandTrain is in Hidon's script and no other species' (`Ot6StudyTbl`), and
+the line's party beat Hidon before it cast it, so a player who wants it
+studies Hidon, the canon fight at Ebot's Rock; it costs nothing off the
+main line. `gen_wor_ebot` sets `opts.strago = { study = true, studyHold =
+true }` and its care before Hidon tops MP up to half of each pool.
+`Driver:studyHoldPlan` keeps STRAGO's points unspent while a body that can
+teach a lore he lacks stands, his Scan is in his list and the 99 MP leaves
+the nuke floor; the study is aimed at a body out of Reflect and waives the
+confirm's cast guard, which refuses a reflectable cast while any body
+reflects; a lore pending for the victory (`$3A84-$3A86`) counts as known.
+
+The leg from `wor-gogo-v1` (the tracked copy, byte-identical to the
+graph's capture at `a18e540d`), seed shifts 0-11, one attempt each, in
+`lab/out/`:
+
+| run | commit | PASS | GrandTrain learned | what stopped it |
+|---|---|---|---|---|
+| `eb` | `1374d395` | 12 of 12 | 1 of 12 | STRAGO at 174/606 MP before Hidon (the study needs 99 above a quarter of his pool); where it fired, "cast (at the confirm) $18 refused: slot 3 species $0160 is under REFLECT" |
+| `eb2` | `eaf2d95e` | 12 of 12 | 12 of 12 (10 keys) | |
+| `eb3` | `f993efeb` | 12 of 12 | 12 of 12 (12 keys) | studied again whenever his bank refilled ("99 MP of 606", "of 507", "of 408") |
+| `eb4` | `7b5d7bcd` | 12 of 12, attempts=1/1 | 12 of 12 (12 keys), one Study each | |
+
+`eb4`'s twelve Hidon keys are the twelve of the main tree's own sweep
+(`build/attempts/wt/v038-wor-sweeps-b4/hidon/out`, `a18e540d`), so
+`fight_report_eb4.txt` pairs them: Hidon+Hidonite 12 won of 12 in both,
+0.33 deaths a fight against 0.42, at most one down in both, the lowest HP
+at the median 76% in both and at worst 45% against 60%, and 13,373 ticks
+at the median against 7,942: the study's two held turns and its cast make
+the fight longer, not harder. The randoms are the main tree's to the tick
+($125 2,874, $124 1,296.5).
+
+**The lores weighed.** `opts.nukeLore = "best"` puts every damage lore in
+hand (CleanSweep, Aqua Rake, Aero, Quasar, GrandTrain) through
+`M.bestLore`: CalcMagicDmg on each standing body's magic defense and
+elements, the split across bodies, the HP cap, and the cheapest lore within
+85% of the best (`lore_pick_selftest`, 10 assertions each failed by its own
+mutant). It is in the library and no leg uses it, for what the labs found:
+
+- Ebot's randoms (`eb2`, the leg with the picker on, against the main
+  tree's sweep): STRAGO's lores in place of his boosted Fight made them
+  longer ($125 4,442 ticks at the median against 2,874, $123 2,928 against
+  2,052). An unbroken body takes half damage and the lores chip no shield
+  of these species, where his rod chips bludgeoning.
+- The Dirt Dragon (`opc`, the fixed order Aqua Rake then Aero, against
+  `opb`, the picker, a copy of the generator with that one line changed;
+  both at `f993efeb`, from `eb2_s0`'s save with GrandTrain, seed
+  shifts 0-10, the same 7 keys): 7 won of 7 in both; the picker cast Aero
+  (wind, which the dragon is weak to; 70 casts by STRAGO, 66 by GOGO's Lore
+  row) where the fixed order cast Aqua Rake; 13 turns at the median
+  against 15, 8,229 ticks against 8,724, but 0.29 deaths a fight against
+  0.14 and the lowest HP at worst 49% against 67% (`fight_report_opera.txt`).
+  Seven keys do not settle it; the fight stays as labbed
+  (route-wor-gogo.md section 4).
+
+### 12.5 Left
+
+- **Lores off the line.** Pearl Wind (Sprinter, groups 49, 51, 52 by
+  Jidoor, while STRAGO grinds on 48), Rippler (Reach Frog on that grind,
+  54 battles with him; its `opts.strago.study`, without the hold, fired in
+  none of them in the 10-23 play) and
+  Blow Fish (Phase, Phoenix Cave) are reachable with STRAGO seated; a
+  study on the grind or a branch leg would teach them. Pearl Wind is the
+  one the driver already has a line for (the party heal).
+- **SABIN's Spiraler** comes at L42; he ends the line at L39. Bum Rush (99
+  MP) and Fire Dance are never cast; `opts.blitz` is one Blitz per leg.
+- **CYAN's Cleave** (3 BP, 99 MP) and Quadra Slice are never cast in the
+  World of Ruin: `opts.bushido` is set on three legs, none after the dream.
+- **GAU's Rages**: 10 of 256, and no WoR leg sets `opts.rage`.
+- **MOG's Dances**: 5 of 8; Forest Suite, Desert Aria and Earth Blues
+  need battles on those terrains with him seated.
+- **The picker** waits for a fight where lores beat the boosted Fight;
+  the Dirt Dragon wants more keys (encounters used up before it) than the
+  seven a seed shift reaches.
