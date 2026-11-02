@@ -177,6 +177,16 @@ Eater with a gauge (`bwmut2`: "$171 the Zone Eater draws a gauge").
   PASS, `fight_report_se2.txt`: "$1D0 Hidon+Hidonite ... 11 keys 11 won ...
   89% 38% 2 0.45" (low HP median 89%, worst 38%, at most two down, 0.45
   deaths a fight).  Not a coin flip; no lab.
+  v0.38 (#485): the Tzen house's Heal Rod now rides in the bag, and the
+  absorb guard's re-arm took it for STRAGO first by power (200), so his
+  Fight and GOGO's Mimic of it healed Hidon ("mons=s0:22424/25000" to
+  "s0:24440/25000" across one Mimic) and the leg lost all three attempts
+  at 737c2a19 ("battle $1D0 LOST after 284669 ticks").  The guard's list
+  (`M.bagWeapons`) now leaves out a weapon whose blow heals, as `gearValue`
+  and the relm and veldt pickers already did; STRAGO takes the Gravity
+  Rod.  The leg from the graph's `wor-gogo-v1`, seed shifts 0-11, one
+  attempt each: 12 of 12 PASS, 12 distinct Hidon keys, all won, 6,903 to
+  13,705 ticks (`build/attempts/wt/v038-wor-sweeps-b4/hidon/sweep_hd.txt`).
 - **Doom Gaze**: an attrition fight across meetings (its HP carries).  Lab
   `dg` (six runs from `wor-ebot-v1`, three seed shifts per arm): with TERRA
   seated it took 8, 14 and 13 meetings and left 14, 3 and 7 of 27-28 Fenix
@@ -599,15 +609,29 @@ Thunder Shld from anywhere in 280 (`out/x4`, `out/x6`).
 
 The bridge's careful walk (finding 2) walks the extra stretches the chests
 ask for. A stand for the conductors declares its quiet to the no-progress
-watchdog for 2400 frames at most (`CAREFUL_QUIET`, the longest stand the
-review measured, 2304 frames, rounded up; `scripts/stands.py` reads them
-from a log), with a line naming the tile, and a walk that spends its step
+watchdog for 3240 frames at most (`CAREFUL_QUIET`, since #495 from the
+conductors' cycle: twice the L*L steps a random walk takes to cover the
+longest stretch, L = 9, at the slowest pace of 20 frames; the longest stand
+measured before, 2304 frames; `scripts/stands.py` reads them from a log; a
+battle ends a stand), with a line naming the tile, and a walk that spends its step
 budget short of the target logs `BUDGET SPENT` before jwalk tries again. A
 walk that, with no route around the conductors, walked on toward the
 crossing and stood at the last rest there was tried and dropped: the
 conductors touched the party there again and again (the replay at 4d27975b:
 "the bridge to the FakeMustache (25,32): there after 15 tries, 17 drop(s)
-down the shaft", against "there after 2 tries" before it).
+down the shaft", against "there after 2 tries" before it). Since #495, when
+the routes planned around each conductor and the tiles beside it are all
+closed, the walk plans around the conductors' own tiles and weighs the
+stretch as before, so its patience can take a stretch instead of standing
+on "no route" (the main line's walk to the FakeMustache had spent its 3000
+steps standing: "BUDGET SPENT -- 3000 steps (31 moves, 2969 waits)"). From
+the tracked `wor-gau-v1` at seed shifts 0-3 (`build/attempts/wt/v038-wor-sweeps-b/lab/out/bo_s*`
+before, `bn_s*` after; `scripts/abtally.py`): 3 of 4 PASS before ("timeout
+after 6000 frames driving toward 276" at shift 3), 4 "BUDGET SPENT", the
+longest stand 5759 frames; 4 of 4 after, none spent, the longest stand 1852.
+The FakeMustache's walk drops down the shaft more on the way (11, 7, 9 and 7 times after the last target, against 5, 2, 9 and
+3 before, the last at the failure, e.g. `bo_s2` "21,33:8/9"). A cap of 0.3 on the risk patience takes was
+tried and dropped (`bc_s*`: 28-33 "BUDGET SPENT" a run).
 
 **The gear downstream.** The gear and relic care picks the new pieces up on
 its own: the Genji Armor goes on TERRA at the belly's save point and stays
@@ -625,9 +649,12 @@ CYAN's two slots after the dream and his Ribbon sat in the bag through Doma.
 bag goes on a member planned without one, over the lowest-ranked relic in a
 slot the plan does not keep, never a two-weapon relic or a ward; and step 4
 no longer fills a member's second slot with a second Ribbon. Both act only
-after a first Ribbon is planned, and not when arming for a boss (the boss
-kits trade a Ribbon for their wards: gen_wor_tritoch's Ice Dragon gives
-TERRA's slot to the Czarina Ring). A first cut that placed every Ribbon
+after a first Ribbon is planned. Step 4b never takes the Exp. Egg's slot
+(aff "behind", as `M.eggMayDisplace`), and since #495 it arms for bosses
+too: it was first kept off them to avoid drift, but it never displaces a
+ward, so a boss kit keeps its wards (gen_wor_tritoch's Ice Dragon puts the Barrier Ring in TERRA's slot 4 over
+her Ribbon and the Czarina Ring in slot 5 over her Earrings) and wears the spare Ribbon over a
+lower-ranked relic: "Ribbon $CA goes to MOG's slot 4 (over Peace Ring $B2, planned Peace Ring $B2): a Ribbon the plan left in the bag goes on a member planned without one (step 4b)", and "the Ice Dragon: battle $16E won after 7784 ticks, 4 seated" (`build/attempts/wt/v038-wor-sweeps-b4/chain/wor_tritoch.log.gz`, the play at 737c2a19). A first cut that placed every Ribbon
 before the ranked relics changed plans that already wore them all (the
 replay's `wor-narshe-v1` drifted: "CYAN gear: fresh 2E 5E 7A 98 B2 C3,
 tracked 2E 5E 7A 98 CA B1") and took the Shell ward's slot for Dullahan
@@ -722,3 +749,83 @@ read alike: 48 of 48 PASS each time, every fight won but the Sneezed-out.
 crossing walk: sha256 fdc0825d, and is kept as a failed attempt.)
 The kit is left as it is: Ribbons on TERRA and STRAGO, and the bag's
 Revivify answers the Zombite.
+
+## 11. Ebot's Rock's pools (v0.38, #488)
+
+Evidence under `build/attempts/wt/v038-wor-sweeps-b/lab/` (`scripts/`,
+`out/`). The coverage audit (wor-coverage.md 4.3) found four of the rock's
+eight formations unfought. Two branch legs walk a lap of each of its two
+pools until each formation is won (`K.hunt`, section 10's helper), each
+booted from the graph's capture `gen_wor_ebot` makes where its hunt begins,
+and nothing boots what they leave (`gen_wor_ebot_hunt` from `wor_ebot_hub`,
+`gen_wor_ebot_rooms_hunt` from `wor_ebot_rooms`; route-wor-narshe.md section
+15 says why the hunts are off the main line, and no grind the route already
+does walks the rock): the hub (405, group 194: Slatter, Warlock and Eland 296, Slatter x2 297,
+Warlock, Cluck x2 and Eland x2 298 at 80/256, Hipocampus and Cluck x3 295
+at 16/256) at its mouth, (7,23) <-> (7,22), before the first hole; and the
+random rooms (404, group 193: Opinicus x2 291, Displayer 292, Opinicus,
+Hipocampus and Eland 293 at 80/256, Hipocampus x3 294 at 16/256) on the
+first landing in them during the coral hunt. The rooms' walls are drawn at
+random on each landing, so that lap is the tile landed on and a neighbour
+one step away, neither a hole nor another step-on tile (`lapHere`). The
+hub's step bound is lower than the other hunts' (its rate code: "a battle
+within 101 steps"). The rock has no chest a player keeps: its coral chests
+are the coral hunt's.
+
+**The line's play.** The line was played across four runs, not in one: f1 at 09f9e3b8 (the World of Balance through wor_sabin, interrupted), g1 at 737c2a19 (wor_island_plain through wor_tritoch), g2 at 737c2a19 (failed at wor_ebot) and g3 at a18e540d (rc=0). The only reach of a18e540d's library change is the Hidon re-arm, which g3 replayed. In g2 wor_relm wiped once and passed on attempt 2 ("attempt 1/3 FAILED class=wipe frame=28415", "PASS (frame 393088) attempts=2/3"). G3 played both branch legs:
+"wor_ebot_hunt generated: map 405 (7,23); formations won: 295 296 297 298"
+and "wor_ebot_rooms_hunt generated: map 404 (5,18); formations won: 291 292
+293 294" (`build/attempts/wt/v038-wor-sweeps-b4/chain/ninja_g3.log`).
+
+**Measured**, first with the hunts on the main line (at 8fdc6159), from the graph's captures before each hunt (`wor_ebot_hub`,
+`wor_ebot_rooms`; `scripts/lab_hunt.lua`, the rooms' lap chosen there by
+the leg's rule), K 0-11 at seed shifts 0 and 7, one attempt each: 48 of 48
+PASS (`out/eh_*`, `out/er_*`; `out/tally_eh.txt`, `out/tally_er.txt`). The
+pick sequence is the fixture's, so K moves where the hunt starts in it: the
+rooms' hunt took 27 - K battles in every run (its Hipocampus x3 is the
+27th pick), the hub's 6 to 15.
+
+| formation | fights | keys | won | keys with a fall |
+|---|---|---|---|---|
+| 295 Hipocampus, Cluck x3 | 24 | 20 | 24 | 0 |
+| 296 Slatter, Warlock, Eland | 110 | 49 | 110 | 0 |
+| 297 Slatter x2 | 62 | 22 | 62 | 0 |
+| 298 Warlock, Cluck x2, Eland x2 | 192 | 51 | 192 | 1 |
+| 291 Opinicus x2 | 144 | 48 | 144 | 0 |
+| 292 Displayer | 240 | 56 | 240 | 0 |
+| 293 Opinicus, Hipocampus, Eland | 240 | 59 | 240 | 0 |
+| 294 Hipocampus x3 | 24 | 19 | 24 | 0 |
+
+The one fall is GOGO's in a 298 ("GOGO 590/3101", a plain blow from a
+fifth of his HP: `out/falls_eh.txt`, "cmd $00 atk $FF x1").
+
+The asserts' negatives (`scripts/mkmut.py`, one line each, class=assert;
+run at 53f07b59 with a dirty tree (the edits that became 7ce9a6f5: each
+`n_*/commit.txt` reads 53f07b59 and `status.txt` lists the changed
+`gen_wor_*.lua`), before the rebase onto fa5425f1, from the tracked
+checkpoints of the time): the rooms' hunt switched off, "assertEq failed: the coral hunt: the rooms (404) were captured on the
+first landing in them: got false, want true" (`out/n3_ebot_rooms`, at
+8fdc6159 with the shipped assert's edits dirty); the mouth's
+tile counted a step-on tile, "the hub's lap starts off its step-on tiles:
+got true" (`out/n_ebot_lap`).
+
+**On the branch legs** (the line's four runs, `build/attempts/wt/v038-wor-sweeps-b4/chain/`; the sweep ran with OT6_TIMEOUT=9000 against the graph's 7200), from the graph's captures at that play, K 0-5 at seed shift 0, one attempt each (`build/attempts/wt/v038-wor-sweeps-b4/sweeps/`: `lab_hunt.lua`, `sweep.sh`, `tally.py`; `b4*_k*_s0/`, `tally_b4*.txt`): 12 of 12 PASS, each hunt 11 to 15 battles.
+
+| formation | fights | keys | won | keys with a fall |
+|---|---|---|---|---|
+| 295 Hipocampus, Cluck x3 | 6 | 6 | 6 | 0 |
+| 296 Slatter, Warlock, Eland | 25 | 15 | 25 | 0 |
+| 297 Slatter x2 | 13 | 9 | 13 | 0 |
+| 298 Warlock, Cluck x2, Eland x2 | 48 | 31 | 48 | 0 |
+| 291 Opinicus x2 | 25 | 17 | 25 | 0 |
+| 292 Displayer | 13 | 8 | 13 | 0 |
+| 293 Opinicus, Hipocampus, Eland | 48 | 33 | 48 | 0 |
+| 294 Hipocampus x3 | 6 | 6 | 6 | 0 |
+
+**The hunt's step count (#495).** A battle opens inside a lap step, and the
+hunt added that step to its count after the battle had set it to 0, so the
+count ran one ahead and the worst case with a Charm Bangle would have failed
+a step early. A battle now sets it to -1, and the step after leaves it at 0.
+The step bound still goes red when it binds: with the bound 1
+(`out/n_hunt_steps`, the pocket's hunt of section 15 of route-wor-narshe.md),
+"a random battle within 1 steps of the lap (1 since the last): got false".

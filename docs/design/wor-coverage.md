@@ -278,6 +278,11 @@ and the shops the route did visit). None of these maps rolls a battle.
 These are the #286 kind: the route walks the map and the draw never
 dealt the formation. A player who pauses in the dungeon meets them.
 
+Since the audit (v0.38, #488): the pools of Umaro's cave, Ebot's Rock,
+Cyan's dream, the dream's Doma and the Ancient Castle below are hunted on
+branch legs until each formation is won (route-wor-narshe.md section 15,
+route-wor-gogo.md section 11, route-wor-dreams.md section 10).
+
 | area | map | pool | unfought formations |
 |---|---|---|---|
 | Darill's Tomb | 298 | g149 | 244 Orog+Orog; 245 Orog+PowerDemon+PowerDemon |
@@ -326,6 +331,10 @@ dealt the formation. A player who pauses in the dungeon meets them.
 ## 5. Chests
 
 ### 5.1 Unopened chests with a prize
+
+Since the audit (v0.38, #485): the item chests of Doma, Cyan's dream and
+the Ancient Castle below are opened (route-wor-dreams.md section 10); their
+monster boxes are #487's.
 
 | area | n | chests |
 |---|---|---|
@@ -976,6 +985,11 @@ leg's run rule counts the chests still to open in the walk ahead.
   crossing to the monsters in a pincer"); it now drops such a plan and
   backs out, as its parked-window watchdog does, and fails fast only on
   the third in a battle.
+- **The Heal Rod at Hidon** (v0.38, #485's later chests): the absorb
+  guard's re-arm before Hidon took the Heal Rod for STRAGO by battle power,
+  and his and GOGO's Fights healed Hidon until the leg lost all three
+  attempts (route-wor-gogo.md section 4). The guard's bag list now passes
+  over it too.
 
 ### 11.6 Levels at the saves
 
@@ -986,6 +1000,18 @@ levels are within one of main's (`wor-terra-v1` CELES 32 against 33,
 39, `wor-colosseum-v1` CELES 56 against 57, `wor-desert-v1` CELES 62
 against 63 and SHADOW 54 against 53). After the re-cut every tracked key
 reads "none" but the two negative-control fixtures (`drift_after.txt`).
+
+The second round (the later chests on the line, the hunts on branch legs
+and the relic plan's step 4b; route-wor-dreams.md section 10,
+route-wor-gogo.md section 10) moved the 19 keys from `wor-narshe-v1` on
+and nothing before it
+(`build/attempts/wt/v038-wor-sweeps-b4/chain/drift_before.txt`). The
+party comes out a level or two over main's: `wor-ancient-v1` TERRA 57
+against 55, CYAN 42 against 41, CELES 56 against 55, RELM 54 against 53;
+`wor-colosseum-v1` TERRA 58 against 57, SHADOW 45 against 44, CELES 57
+against 56, RELM 54 against 53; `wor-desert-v1` TERRA 65 against 63,
+CELES 63 against 62, RELM 54 against 53, SHADOW 53 against 54. After the
+re-cut every key reads "none" but the two negative-control fixtures.
 
 ### 11.7 Figaro Castle's SABIN
 

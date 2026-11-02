@@ -6954,7 +6954,7 @@ function M.gearValue(c, id)
   -- Heal Rod) is no weapon to fight with: the game's own Optimum skips it (equip.asm ImpItem), and RELM wearing it
   -- healed the White Drgn by every Fight (#485: the Tzen house's Heal Rod; build/attempts/wt/v038-wor-sweeps-a/
   -- chain/chain5.log.gz, wor_veldt's three wipes, the dragon's HP back at 18500)
-  if t == 1 and (gearByte(id, 27) >> 4) == 0x0C then return -1000 end
+  if t == 1 and M.weaponHeals(id) then return -1000 end
   local v = 0
   local stats = gearByte(id, 16) | (gearByte(id, 17) << 8)
   for k = 0, 3 do v = v + 3 * nib((stats >> (4 * k)) & 0x0F) end
@@ -7474,11 +7474,23 @@ function M.careStockPotions(level, opts)
   return want
 end
 
+-- M.weaponHeals(id): the weapon's blow heals what it hits (ItemProp +27
+-- high nibble $0C, battle_main.asm AttackerEffect_0c: the Heal Rod).  No
+-- weapon to fight with; the game's own Optimum skips it (equip.asm ImpItem).
+function M.weaponHeals(id)
+  if id == nil or id == 0xFF then return false end
+  return (M.readRomByte((M.sym("ItemProp") & 0x3FFFFF) + id * 30 + 27) >> 4) == 0x0C
+end
+
 -- M.bagWeapons(c): the weapons in the bag ($1869 ids with a count), each
 -- once, strongest first by the ROM's power byte (ItemProp +$14; the
 -- record's type +$00 low bits = 1 is a weapon); with a character id, only
 -- those its actor can equip (ItemProp +$01, a 16-bit mask by actor --
--- the list the Equip menu itself filters by).
+-- the list the Equip menu itself filters by).  A weapon whose blow heals
+-- (M.weaponHeals: the Heal Rod, power 200, so first by power) is left out:
+-- STRAGO re-armed with it for Hidon, and his Fight and GOGO's Mimic of it
+-- healed Hidon 22424 -> 24440 until the 300000-frame cap (#485: the Tzen
+-- house's Heal Rod; build/attempts/wt/v038-wor-sweeps-b4/hidon/).
 function M.bagWeapons(c)
   local seen, out = {}, {}
   local ip = M.sym("ItemProp") & 0x3FFFFF
@@ -7490,7 +7502,7 @@ function M.bagWeapons(c)
         if not wears then
           wears = (M.readRomWord(ip + id * 30 + 1) >> M.charActor(c)) & 1 == 1
         end
-      if (t & 0x80) == 0 and (t & 0x07) == 1 and wears then
+      if (t & 0x80) == 0 and (t & 0x07) == 1 and wears and not M.weaponHeals(id) then
         seen[id] = true
         out[#out + 1] = id
       end
@@ -8132,18 +8144,19 @@ function M.relicPlan(members, opts)
   -- the bag; #486 review: after the dream a Genji Glove took CYAN's Ribbon's slot and the Hyper Wrist his other,
   -- and the Ribbon sat in the bag through Doma: "Genji Glove $D1 goes to CYAN's slot 4 (over Ribbon $CA)",
   -- "Hyper Wrist $D2 goes to CYAN's slot 5"): on a member planned without one who can wear it, in place of the
-  -- lowest-ranked relic planned in a slot the plan does not keep, never a two-weapon relic or a ward; among
+  -- lowest-ranked relic planned in a slot the plan does not keep, never a two-weapon relic, a ward or the Exp.
+  -- Egg (aff "behind", as M.eggMayDisplace: step 3b placed it on the member furthest behind; #495); among
   -- equals the member with the most spells learned (step 2's order).  Only the Ribbons after the first: the
   -- first is step 2's to place or leave (a fight whose threats no guard covers leaves its slot to the ward the
-  -- fight calls for: field_relicplan's Dullahan case).  Not when arming for a boss (threats.boss): the boss kit
-  -- trades a Ribbon for the wards its fight calls for (gen_wor_tritoch's Ice Dragon: TERRA's Ribbon for the Czarina
-  -- Ring, the Ribbon to the bag until the fight is over).  A plan that already wears them all is unchanged.
+  -- fight calls for: field_relicplan's Dullahan case).  Arming for a boss too (#495: the exclusion had no play
+  -- reason): the wards the boss kit puts on stay, as everywhere, and a Ribbon left in the bag goes over a
+  -- lower-ranked relic (gen_wor_tritoch's Ice Dragon: TERRA's Ribbon gives way to the Czarina Ring and goes on
+  -- MOG).  A plan that already wears them all is unchanged.
   local ribbonsOn = 0
   for _, m in ipairs(ms) do
     for s = 4, 5 do if m.want[s] == RIBBON_ID then ribbonsOn = ribbonsOn + 1 end end
   end
-  local boss = opts.threats and opts.threats.boss
-  while not boss and ribbonsOn > 0 and (count[RIBBON_ID] or 0) > 0 do
+  while ribbonsOn > 0 and (count[RIBBON_ID] or 0) > 0 do
     local best = nil
     for _, m in ipairs(ms) do
       if m.want[4] ~= RIBBON_ID and m.want[5] ~= RIBBON_ID and wearsItem(m.ch, RIBBON_ID) then
@@ -8152,7 +8165,7 @@ function M.relicPlan(members, opts)
           if w == nil or w == 0xFF then key = -1
           else
             local cl = M.relicClass(w, opts.threats)
-            if cl and not cl.hands and cl.aff ~= "ward" then key = cl.rank end
+            if cl and not cl.hands and cl.aff ~= "ward" and cl.aff ~= "behind" then key = cl.rank end
           end
           if key ~= nil and (best == nil or key < best.key or (key == best.key and m.spells > best.m.spells)) then
             best = { m = m, s = s, key = key }
@@ -10493,7 +10506,9 @@ function M.worLegKit(env)
       M.driveUntil(function()
         while seen < #M.outcomes do
           seen = seen + 1
-          steps = 0
+          -- the battle opened inside a lap step whose count the body adds after the nav returns (#495): -1
+          -- here leaves the count at 0 steps since the battle
+          steps = -1
           local o = M.outcomes[seen]
           local f = o.form & 0x1FF
           if o.kind == "won" then won[f] = true end

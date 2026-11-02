@@ -46,6 +46,27 @@ local ALEXANDR = 14                 -- the stone's index (GenjuProp order: Ramuh
 local function owns(esper) return (H.readByte(0x1A69 + (esper >> 3)) >> (esper & 7)) & 1 == 1 end
 local function posOf(ch) return (H.readByte(0x1850 + ch) >> 3) & 3 end
 local FOUR = { CELES, RELM, CYAN, TERRA }
+-- the castle's chests (#485, wor-coverage.md 5.1), which the waking Doma (123) and the dream's copy (126) share by
+-- their bits.  Four are opened in the dream's Doma from its save point: the Elixir, the Ether, the Remedy and the
+-- X-Potion, which in 123 stands behind the door (16,32) to map 124 but in 126 on the same map ((16,32) -> (28,36);
+-- in 123 no way from (55,6) reached it).  The Fenix Down and the Beads stand in a room no door of 126's floor
+-- reaches (126 (33,35): no side of (28,49) reachable); in 123 the ramparts' east door (285 (50,37) -> 123 (28,54))
+-- opens on it, so they are opened on the way out (route_data field-path 123 (28,54) -> (28,50), (30,50))
+local DREAM_CHESTS = { { 52, 47, 0x033, "the Elixir", 0xEE }, { 56, 47, 0x0B3, "the Ether", 0xEC },
+  { 55, 5, 0x034, "the Remedy", REMEDY }, { 33, 34, 0x060, "the X-Potion", 0xEA } }
+local WAKE_CHESTS = { { 28, 49, 0x035, "the Fenix Down", FENIX }, { 31, 50, 0x036, "the Beads", 0xD4 } }
+local function domaChests(list, mp)
+  local steps = {}
+  for _, ch in ipairs(list) do
+    steps[#steps + 1] = K.chestAt(ch[1], ch[2], ch[3], string.format("%s (%d (%d,%d))", ch[4], mp, ch[1], ch[2]), ch[5])
+  end
+  steps[#steps + 1] = H.call(function()
+    for _, ch in ipairs(list) do
+      H.assertEq(H.chestOpen(ch[3]), true, string.format("%d: %s's chest (bit %d) is open", mp, ch[4], ch[3]))
+    end
+  end)
+  return H.seqStep(steps)
+end
 H.run({ maxFrames = 1800000 }, {
   H.bootCheckpoint("wor-dream-v1"),
   watches(),
@@ -56,6 +77,10 @@ H.run({ maxFrames = 1800000 }, {
   -- @@setup-end
 
   -- ---- 1. Wrexsoul ---------------------------------------------------------------------------------------
+  -- @@stage chests
+  H.call(function() H.assertEq(map(), MAP_DREAM_DOMA, "the boot stands in the dream's Doma (126): wor_dream's save") end),
+  domaChests(DREAM_CHESTS, MAP_DREAM_DOMA),
+
   -- @@stage wrexsoul
   -- the throne (25,11) is entered from below (25,12) (_cb97d6); Wrexsoul and its two Soul Savers absorb fire
   -- and holy (RELM's Pearl Rod is holy), so the arms go first
@@ -96,6 +121,18 @@ H.run({ maxFrames = 1800000 }, {
 
   -- ---- 3. out of Doma, and the save ---------------------------------------------------------------------
   -- @@stage save
+  -- the room of the Fenix Down and the Beads: 123 (17,39) -> the ramparts (285 (37,13): _cba0d2), their east
+  -- door (50,37) -> 123 (28,54), and back by (28,55) -> 285 (50,39) and (37,11) -> 123 (17,38) (route_data
+  -- field-path 285 (37,13) -> (50,37), (50,39) -> (37,12); the ramparts do not reach the gate)
+  walk(17, 39, "123 (17,39) -> the ramparts", nil, function() return map() == MAP_COURT end),
+  H.waitUntil(function() return map() == MAP_COURT and settled() end, 3000, "the ramparts: map 285", 1),
+  walk(50, 37, "285 (50,37) -> 123's south-east room", nil, function() return map() == MAP_KING end),
+  H.waitUntil(function() return map() == MAP_KING and settled() end, 3000, "123's south-east room", 1),
+  domaChests(WAKE_CHESTS, MAP_KING),
+  walk(28, 55, "123 (28,55) -> the ramparts", nil, function() return map() == MAP_COURT end),
+  H.waitUntil(function() return map() == MAP_COURT and settled() end, 3000, "the ramparts again: map 285", 1),
+  walk(37, 11, "285 (37,11) -> 123 (17,38)", nil, function() return map() == MAP_KING end),
+  H.waitUntil(function() return map() == MAP_KING and settled() end, 3000, "123 again", 1),
   -- the way in, backwards: 123 (10,50) -> the courtyard (285 (28,33)), its gate (33,62) and the south edge
   walk(10, 50, "123 (10,50) -> the courtyard", nil, function() return map() == MAP_COURT end),
   H.waitUntil(function() return map() == MAP_COURT and settled() end, 3000, "the courtyard: map 285", 1),

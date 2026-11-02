@@ -48,11 +48,20 @@ local CARD = { up = { 0, -1 }, down = { 0, 1 }, left = { -1, 0 }, right = { 1, 0
 -- per run, so the walk's equal-length routes differed between identical runs (#467)
 local CARD_DIRS = { "down", "left", "right", "up" }
 CAREFUL_PACE, CAREFUL_TRIALS, CAREFUL_RISK, CAREFUL_IMPATIENCE = 18, 120, 0.08, 0.002
--- the longest one stand for the conductors is let sit quiet (the no-progress watchdog stands down for it): the
--- longest measured stand, 2304 frames (#486 review of the play at 2db501e2), rounded up
-CAREFUL_QUIET = 2400
 local STEP_F, JUMP_F, DOOR_F = 16, 72, 40
 local CONDSEG = { [276] = { [30] = { { 32, 40 }, { 45, 48 } }, [32] = { { 31, 34 } } } }
+-- the longest one stand for the conductors is let sit quiet (the no-progress watchdog stands down for it), from
+-- the conductors' cycle (#495): a conductor steps a tile every 16-20 frames either way at even odds, and a
+-- random walk on a stretch of L tiles takes about L*L steps to cover it; a stand is let last twice that on the
+-- longest stretch at the slowest pace (L = 9, row 30's 32-40: 2 * 81 * 20 = 3240 frames), over the longest
+-- stand measured before the walk's tuning, 2304 frames (#486 review of the play at 2db501e2)
+CAREFUL_QUIET = (function()
+  local L = 0
+  for _, rows in pairs(CONDSEG) do
+    for _, segs in pairs(rows) do for _, sg in ipairs(segs) do L = math.max(L, sg[2] - sg[1] + 1) end end
+  end
+  return 2 * L * L * 20
+end)()
 local function condList(objs)
   local out = {}
   for _, o in ipairs(objs) do
@@ -248,11 +257,24 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
   local function oneMove()
     local conds = condList(objs)
     local here = (H.fieldY() << 8) | H.fieldX()
-    local closed = {}
-    for _, c in ipairs(conds) do for dx = -1, 1 do closed[(c[2] << 8) | (c[1] + dx)] = true end end
+    -- routes are planned around each conductor's tile and the tiles beside it on its row; when that closes every
+    -- way (a conductor's stretch is the only way past it), around its own tile alone, the stretch's risk weighed
+    -- the same way, so the walk's patience (CAREFUL_IMPATIENCE) can take a stretch rather than stand on "no
+    -- route" (#495: on the main line the walk to the FakeMustache spent its whole step budget standing there,
+    -- "BUDGET SPENT -- 3000 steps (31 moves, 2969 waits)", every play)
+    local closed, tight = {}, {}
+    for _, c in ipairs(conds) do
+      tight[(c[2] << 8) | c[1]] = true
+      for dx = -1, 1 do closed[(c[2] << 8) | (c[1] + dx)] = true end
+    end
     local best, bestR, tried = nil, 2, 0
+    local plan = closed
     for _ = 1, 6 do
-      local route = planRoute(tx, ty, lk, closed)
+      local route = planRoute(tx, ty, lk, plan)
+      if (not route or #route == 0) and plan == closed and tried == 0 then
+        plan = tight
+        route = planRoute(tx, ty, lk, plan)
+      end
       if not route or #route == 0 then break end
       tried = tried + 1
       local pre = toRest(route, conds)
@@ -260,7 +282,7 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
       local r, wk = simRisk(sp, te, conds)
       if r < bestR then best, bestR = pre, r end
       if r <= CAREFUL_RISK or wk == nil or wk == here then break end
-      closed[wk] = true
+      plan[wk] = true
     end
     local mv = nil
     -- patience runs out: the risk a person takes grows with the frames stood on a rest (four a wait)
@@ -347,7 +369,8 @@ local function carefulWalk(tx, ty, lk, objs, what, budget, abort)
         waitControl(what),
         -- a battle fought on the way: the field care a walk gives after one (the menu stops the field)
         H.cond(function() return #H.outcomes ~= nOut end, {
-          H.call(function() nOut = #H.outcomes end),
+          -- a battle ends a stand: the next stand's quiet counts from after it (#495)
+          H.call(function() nOut, waitStart = #H.outcomes, nil end),
           H.fieldCare({ tag = "care after battle (careful)" }),
         }, {}),
         H.cond(function() return not abort() end, { H.lazy(oneMove) }, {}),
