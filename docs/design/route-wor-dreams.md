@@ -530,7 +530,12 @@ The two monster boxes (401 (58,43) Master Pug, 406 (10,17) KatanaSoul) are
 #487's. The Wing Edge, Doom Darts and Punisher are LOCKE's, SETZER's and
 STRAGO's, RELM's or GOGO's to wear; this arc's party carries them.
 
-DREAM_PLAY
+**The line's play.** The replay at a18e540d played the four branch legs:
+"wor_dream_hunt generated: map 317 (26,52); formations won: 312 314 315
+316", "wor_dream_cave_hunt generated: map 319 (17,25); formations won: 137
+311 313", "wor_doma_hunt generated: map 126 (8,10); formations won: 309 310
+317 318" and "wor_ancient_hunt generated: map 406 (32,12); formations won:
+301 302 303 304 305 308 317" (`build/attempts/wt/v038-wor-sweeps-b4/chain/ninja_g3.log`).
 
 **Measured**, first with the hunts on the main line (at 8fdc6159), from the graph's captures before each hunt (`wor_dream_scape`,
 `wor_dream_cave`, `wor_ancient_yard`, `wor_ancient_hall`) and, for the
@@ -588,4 +593,32 @@ the dream's Doma (126): wor_dream's save: got 126 ($7E), want 125 ($7D)"
 (`out/n_doma_boot`). The hunt's own asserts (the pool, the two bounds,
 every formation won) are route-wor-gogo.md section 10's.
 
-DREAM_SWEEP
+**On the branch legs** (the replay at a18e540d, `build/attempts/wt/v038-wor-sweeps-b4/chain/`), from the graph's captures at that play, K 0-5 at seed shift 0, one attempt each (`build/attempts/wt/v038-wor-sweeps-b4/sweeps/`: `lab_hunt.lua`, `sweep.sh`, `tally.py`; `b4*_k*_s0/`, `tally_b4*.txt`) (the dream's Doma from the graph's `wor-dream-v1`): 30
+of 30 PASS, the longest hunt 35 battles of its 110 (the dreamscape's).
+
+| formation | fights | keys | won | keys with a fall |
+|---|---|---|---|---|
+| 312 Barb-e, Critic | 48 | 33 | 48 | 5 |
+| 314 Allosaurus, Parasite x3 | 66 | 36 | 66 | 0 |
+| 315 Critic, Pan Dora x3 | 90 | 46 | 90 | 3 |
+| 316 Allosaurus | 6 | 5 | 6 | 0 |
+| 137 Io | 43 | 28 | 43 | 0 |
+| 311 PlutoArmor x2 | 31 | 22 | 31 | 0 |
+| 313 PlutoArmor, Sky Cap | 11 | 6 | 11 | 0 |
+| 309 Rain Man x2 | 24 | 19 | 24 | 0 |
+| 310 Samurai, Rain Man x2 | 30 | 27 | 30 | 3 |
+| 317 Barb-e, Samurai, Suriander | 26 | 12 | 26 | 0 |
+| 318 Suriander, Pan Dora, Parasite x2 | 10 | 5 | 10 | 0 |
+| 301 Goblin x2 | 30 | 21 | 30 | 0 |
+| 302 Goblin, Figaliz x2 | 48 | 27 | 48 | 0 |
+| 317 (the courtyard's) | 6 | 5 | 6 | 0 |
+| 305 Lethal Wpn | 42 | 23 | 42 | 0 |
+| 304 Boxed Set | 30 | 23 | 30 | 0 |
+| 303 Boxed Set x2, Figaliz x2 | 72 | 42 | 72 | 0 |
+| 308 Boxed Set x4 | 6 | 6 | 6 | 0 |
+
+The falls are the dreamscape's and the dream's Doma's again, every fight
+won: 11 in 312's fights, RELM's from full HP in most ("312 beB4-g0138
+b4scape_k0_s0: RELM 4971/4971"), 5 in 315's, and 3 in 310's in the
+dream's Doma ("310 be78-g0136 b4doma_k3_s0: CELES 4524/4524"). The
+courtyard and the castle saw none this time.

@@ -177,6 +177,16 @@ Eater with a gauge (`bwmut2`: "$171 the Zone Eater draws a gauge").
   PASS, `fight_report_se2.txt`: "$1D0 Hidon+Hidonite ... 11 keys 11 won ...
   89% 38% 2 0.45" (low HP median 89%, worst 38%, at most two down, 0.45
   deaths a fight).  Not a coin flip; no lab.
+  v0.38 (#485): the Tzen house's Heal Rod now rides in the bag, and the
+  absorb guard's re-arm took it for STRAGO first by power (200), so his
+  Fight and GOGO's Mimic of it healed Hidon ("mons=s0:22424/25000" to
+  "s0:24440/25000" across one Mimic) and the leg lost all three attempts
+  at 737c2a19 ("battle $1D0 LOST after 284669 ticks").  The guard's list
+  (`M.bagWeapons`) now leaves out a weapon whose blow heals, as `gearValue`
+  and the relm and veldt pickers already did; STRAGO takes the Gravity
+  Rod.  The leg from the graph's `wor-gogo-v1`, seed shifts 0-11, one
+  attempt each: 12 of 12 PASS, 12 distinct Hidon keys, all won, 6,903 to
+  13,705 ticks (`build/attempts/wt/v038-wor-sweeps-b4/hidon/sweep_hd.txt`).
 - **Doom Gaze**: an attrition fight across meetings (its HP carries).  Lab
   `dg` (six runs from `wor-ebot-v1`, three seed shifts per arm): with TERRA
   seated it took 8, 14 and 13 meetings and left 14, 3 and 7 of 27-28 Fenix
@@ -644,7 +654,7 @@ after a first Ribbon is planned. Step 4b never takes the Exp. Egg's slot
 too: it was first kept off them to avoid drift, but it never displaces a
 ward, so a boss kit keeps its wards (gen_wor_tritoch's Ice Dragon gives
 TERRA's slot to the Czarina Ring) and wears the spare Ribbon over a
-lower-ranked relic (ICE_DRAGON_LINE). A first cut that placed every Ribbon
+lower-ranked relic: "Ribbon $CA goes to MOG's slot 4 (over Peace Ring $B2, planned Peace Ring $B2): a Ribbon the plan left in the bag goes on a member planned without one (step 4b)", and "the Ice Dragon: battle $16E won after 7784 ticks, 4 seated" (`build/attempts/wt/v038-wor-sweeps-b4/chain/wor_tritoch.log.gz`, the play at 737c2a19). A first cut that placed every Ribbon
 before the ranked relics changed plans that already wore them all (the
 replay's `wor-narshe-v1` drifted: "CYAN gear: fresh 2E 5E 7A 98 B2 C3,
 tracked 2E 5E 7A 98 CA B1") and took the Shell ward's slot for Dullahan
@@ -762,7 +772,10 @@ hub's step bound is lower than the other hunts' (its rate code: "a battle
 within 101 steps"). The rock has no chest a player keeps: its coral chests
 are the coral hunt's.
 
-EBOT_PLAY
+**The line's play.** The replay at a18e540d played both branch legs:
+"wor_ebot_hunt generated: map 405 (7,23); formations won: 295 296 297 298"
+and "wor_ebot_rooms_hunt generated: map 404 (5,18); formations won: 291 292
+293 294" (`build/attempts/wt/v038-wor-sweeps-b4/chain/ninja_g3.log`).
 
 **Measured**, first with the hunts on the main line (at 8fdc6159), from the graph's captures before each hunt (`wor_ebot_hub`,
 `wor_ebot_rooms`; `scripts/lab_hunt.lua`, the rooms' lap chosen there by
@@ -793,7 +806,18 @@ on the first landing in them: got false" (`out/n_ebot_rooms`); the mouth's
 tile counted a step-on tile, "the hub's lap starts off its step-on tiles:
 got true" (`out/n_ebot_lap`).
 
-EBOT_SWEEP
+**On the branch legs** (the replay at a18e540d, `build/attempts/wt/v038-wor-sweeps-b4/chain/`), from the graph's captures at that play, K 0-5 at seed shift 0, one attempt each (`build/attempts/wt/v038-wor-sweeps-b4/sweeps/`: `lab_hunt.lua`, `sweep.sh`, `tally.py`; `b4*_k*_s0/`, `tally_b4*.txt`): 12 of 12 PASS, each hunt 11 to 15 battles.
+
+| formation | fights | keys | won | keys with a fall |
+|---|---|---|---|---|
+| 295 Hipocampus, Cluck x3 | 6 | 6 | 6 | 0 |
+| 296 Slatter, Warlock, Eland | 25 | 15 | 25 | 0 |
+| 297 Slatter x2 | 13 | 9 | 13 | 0 |
+| 298 Warlock, Cluck x2, Eland x2 | 48 | 31 | 48 | 0 |
+| 291 Opinicus x2 | 25 | 17 | 25 | 0 |
+| 292 Displayer | 13 | 8 | 13 | 0 |
+| 293 Opinicus, Hipocampus, Eland | 48 | 33 | 48 | 0 |
+| 294 Hipocampus x3 | 6 | 6 | 6 | 0 |
 
 **The hunt's step count (#495).** A battle opens inside a lap step, and the
 hunt added that step to its count after the battle had set it to 0, so the

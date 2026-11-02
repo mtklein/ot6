@@ -959,7 +959,9 @@ Ceritops x3 257 at 16/256) on (21,31) <-> (20,31). The lair (283, group
 its bounds from the ROM: "every slot drawn within 110 battles, a battle
 within 162 steps". The cave's monster box (282 (13,34), Pugs x3) is #487's.
 
-UMARO_PLAY
+**The line's play.** The replay at 737c2a19 played the branch leg from
+`wor_tritoch_cave`: "wor_umaro_hunt generated: map 282 (21,31); formations
+won: 253 254 255 256 257 258 259 260" (`build/attempts/wt/v038-wor-sweeps-b4/chain/ninja_g2.log`).
 
 **Measured**, first with the hunts on the main line (at 8fdc6159, from the
 graph's captures `wor_tritoch_cave` and `wor_tritoch_pocket`, the pocket's
@@ -986,4 +988,19 @@ with an action read, 8 are its `cmd $0C atk $99` and 1 its `$EF`
 of his HP or more ("MOG 783/2208"). The party wins the Pug every time, with
 a fall in a third of its keys; the hunt meets it once.
 
-UMARO_SWEEP
+**On the branch legs** (the replay at a18e540d, `build/attempts/wt/v038-wor-sweeps-b4/chain/`), from the graph's captures at that play, K 0-5 at seed shift 0, one attempt each (`build/attempts/wt/v038-wor-sweeps-b4/sweeps/`: `lab_hunt.lua`, `sweep.sh`, `tally.py`; `b4*_k*_s0/`, `tally_b4*.txt`): 12 of 12 PASS, the landing's hunt 8 to 10
+battles, the pocket's 10 to 15.
+
+| formation | fights | keys | won | keys with a fall |
+|---|---|---|---|---|
+| 253 Pug | 6 | 5 | 6 | 1 |
+| 254 Poppers x4 | 24 | 13 | 24 | 0 |
+| 255 Kiwok, Ceritops | 30 | 23 | 30 | 0 |
+| 256 Kiwok, Poppers x3 | 9 | 7 | 9 | 0 |
+| 257 Ceritops x3 | 6 | 5 | 6 | 0 |
+| 258 Anemone x2, Tomb Thumb | 30 | 14 | 30 | 0 |
+| 259 Anemone x4 | 6 | 5 | 6 | 0 |
+| 260 Ceritops, Tomb Thumb x2 | 48 | 35 | 48 | 0 |
+
+The one fall is the Pug's again ("253 beD4-g00FD b4cave_k3_s0: TERRA
+382/2424").
