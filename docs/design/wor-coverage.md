@@ -1064,7 +1064,8 @@ Unit 8. Evidence under `build/attempts/wt/v038-monster-boxes/`: `tzen/`,
 `ancient/`, `umaro/` (each run's `run.log.gz`, its commit, ROM and boot
 hashes, the tallies and fight reports), `scripts/`. Every number below is
 quoted from a log or a tally there. The sweeps ran at 252d1487 on its ROM
-(sha256 8b7e29ae, the two new rows).
+(sha256 8b7e29ae, the two new rows); the re-sweeps `ab3_*` and `ub3_*` at
+c87416c4, the branch rebased onto main 9aa26b7b (the same ROM).
 
 A monster box is a chest whose opening starts an event battle
 (`TreasureMonster`: "Monster-in-a-box!", `EventCmd_8e`) and a game over when
@@ -1121,10 +1122,12 @@ her HP at worst it is a real fight, not a close one.
 The plan had left it shut as a fight with nothing in it (route-wor-narshe.md
 section 2); the Pugs are L99, but at the line's levels (CYAN L37, TERRA L38,
 CELES L39, MOG L35) the four win them. From the graph's capture
-`wor_tritoch_cave` (b4's play, sha256 1c9d0422), K 0-5
+`wor_tritoch_cave` (sha256 1c9d0422, the same in main's 9aa26b7b play), K 0-5
 battles used up on the landing's lap first (`scripts/mk_klab.py`), shifts 0
 and 7: 12 of 12 PASS, with two development runs 14 keys, 14 won, "$0EB Pugs
-... 14 14 0 71% 54% 1 0.14" (`umaro/fight_report_ub.txt`): one member down
+... 14 14 0 71% 54% 1 0.14" (`umaro/fight_report_ub.txt`; re-run on main
+9aa26b7b with this branch rebased, `umaro/ub3_*`, the same 12 of 12, "$0EB Pugs
+... 12 12 0 70% 54% 1 0.08"): one member down
 in two fights. Minervas: none in seven of the twelve, one in three, two in
 one and three in one (`umaro/minervas.txt`). The Pugs' row is the Pug's,
 authored since v0.29 (4 · slash, special; `battle_breakwor_narshe` checks
@@ -1143,17 +1146,19 @@ The branch boots the courtyard after the flashback, takes the KatanaSoul by
 the courtyard's door (407 (11,10) -> 406 (10,21)) and the Master Pug by way
 of the save point's room and the cave.
 
-b4's play had not reached `wor_ancient_yard` by the time of these sweeps,
-so the boot is b4's `gen_wor_ancient` played from the tracked `wor-doma-v1`
-(sha256 9e9ea6ae, main's play at ba16da57; the yard 91d79e13): "wor_ancient generated: CELES
-L55, RELM L53, CYAN L42 and TERRA L56", within a level of the tracked
-`wor-ancient-v1` (`ancient/anc_yard`). From it, K 0-5 battles on the
-courtyard's lap first, shifts 0 and 7: 12 of 12 PASS, "$1D1 KatanaSoul ...
-12 12 0 85% 78% 0 0.00", "$1E3 Master Pug ... 11 11 0 97% 84% 0 0.00", every
-run with its Offering and Graedus ("boxes: 465 won, item $D3 dropped; 483
-won, item $08 dropped"; `ancient/ab2_*`, `ancient/fight_report_ab2.txt`).
-The same from an older capture of the yard at higher levels (CELES L59,
-TERRA L61; dc5a2520): 12 of 12 (`ancient/ab_*`). Both are fights players find easy.
+From the graph's capture `wor_ancient_yard` (the line at 343ed5ff, main
+9aa26b7b; sha256 4247217b; CELES L56, RELM L53, CYAN L41, TERRA L56), K 0-5
+battles on the courtyard's lap first, shifts 0 and 7, on main with this
+branch rebased (the arms through the changed `bagWeapons`, which passes over
+a healing weapon): 12 of 12 PASS, "$1D1 KatanaSoul ... 11 11 0 86% 84% 0
+0.00", "$1E3 Master Pug ... 12 12 0 97% 88% 0 0.00", every run with its
+Offering and Graedus ("boxes: 465 won, item $D3 dropped; 483 won, item $08
+dropped"; `ancient/ab3_*`, `ancient/fight_report_ab3.txt`). Before that
+capture existed: from b4's `gen_wor_ancient` played from the tracked
+`wor-doma-v1` (yard 91d79e13, CELES L55, TERRA L56), 12 of 12, "$1D1
+KatanaSoul ... 12 12 0 85% 78% 0 0.00" (`ancient/ab2_*`, `anc_yard`); from an
+older capture at CELES L59, TERRA L61 (dc5a2520), 12 of 12 (`ancient/ab_*`).
+Both are fights players find easy.
 
 **The asserts and their negatives**, each red (`scripts/mkmut.py`):
 the castle's box expecting formation 999, "its battle (formation 999) was
