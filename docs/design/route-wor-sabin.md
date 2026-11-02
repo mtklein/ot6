@@ -470,6 +470,14 @@ Since v0.38 (#485) the house's walk takes all six item chests on the clock
 (the tour is 196 steps against the bare walk's 140); the boxes stay shut.
 The margins it leaves are in wor-coverage.md section 11.
 
+The boxes are a branch since #487 (`gen_wor_tzen_boxes`, from
+`wor-tzen-door-v1`; nothing boots it): the house by the box downstairs,
+the child, the box upstairs and out, instead of the six chests. The house
+collapses behind Sabin's joining (`$028A`: `_cc56da` no longer draws it),
+so there is no second visit. While a box is ahead its fight counts in the
+walk the run rule weighs, so the house's random battles are run from when
+one would spend a box's time, and the leg asserts both boxes opened. The measure is in wor-coverage.md section 12.
+
 ---
 
 ## 4. Encounter pools
@@ -980,7 +988,8 @@ Other unknowns:
   house must cope with both 207 and 209, and with 0-6 battles, not with the
   one sequence the checkpoint happens to hold.
 - **Chests with monsters** start event battles that also run the clock.
-  Leave them for a second visit.
+  There is no second visit: the house collapses when Sabin joins. The
+  boxes are a branch leg (section 3.4).
 
 Out of scope, noted for the coordinator: `tools/audit_break_coverage.py`
 reads raw `RandBattleGroup` words and indexes `battle_monsters.dat` with
