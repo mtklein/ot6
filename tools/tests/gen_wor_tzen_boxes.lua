@@ -26,9 +26,10 @@ local FIELD_CARE_POTIONS = 6
 local HOUSE_FRAMES = 21600
 -- the house's random fights, for the driver's run rule (gen_wor_sabin's measure)
 local HOUSE_FIGHT_COST = 4151
--- What a box's fight costs of the clock: the worst of the sweep's box fights (section 12 of wor-coverage.md,
--- build/attempts/wt/v038-monster-boxes/), with the box's own window and the battle's open and close.
-local BOX_FIGHT_COST = 6000
+-- What a box's fight costs of the clock, from the frames left when the party weighs it to the frames left when
+-- its fight is won (the box's window, the battle, its close): the worst of 46 box fights in 32 distinct keys,
+-- 3614-5211 frames, median 4259 (build/attempts/wt/v038-monster-boxes/tzen/boxcost_tz.txt, at 6000 here).
+local BOX_FIGHT_COST = 5211
 local BOX_FORM = 211
 -- the boxes (TreasureProp 311; route-wor-sabin.md 3.4): the stand below each, faced up
 local BOXES = {
