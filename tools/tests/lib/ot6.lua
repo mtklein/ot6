@@ -3172,9 +3172,13 @@ function M.studyRow(sp)
   return M.studyRows[sp] or 0
 end
 -- The first standing monster whose species can teach a lore STRAGO lacks
--- ($1D29-$1D2B), and those lores; nil when none
+-- ($1D29-$1D2B), and those lores; nil when none.  A lore already pending
+-- for this battle's victory ($3A84-$3A86: studied, or seen cast) counts as
+-- known: a second Study of the same body bought nothing and cost 99 MP
+-- (lab eb3_s1: three Studies of Hidon, 606 -> 507 -> 408 MP, #388).
 function M.studySlot()
   local known = M.readByte(0x1D29) | (M.readByte(0x1D2A) << 8) | (M.readByte(0x1D2B) << 16)
+    | M.readByte(0x3A84) | (M.readByte(0x3A85) << 8) | (M.readByte(0x3A86) << 16)
   for s = 0, 5 do
     if M.monStanding(s) then
       local want = M.studyRow(M.readWord(0x57C0 + s * 2)) & ~known & 0xFFFFFF
@@ -7405,7 +7409,19 @@ function Driver:runicSlot(id)
   local MP = M.sym("MagicProp") & 0x3FFFFF
   return M.runicTakes(M.readRomByte(MP + id * 14 + 3), self:runicSpecial())
 end
-function Driver:castVetoed(abilityId, what)
+-- The one exemption from the Reflect half of the cast guard (#388): a
+-- single-target cast whose cursor holds exactly one monster (`tgtmons`,
+-- $7B7E, bit n = slot n), standing (in `slots`, M.activeSlots) and out of
+-- Reflect at that moment, cannot bounce off another body's Reflect.  An
+-- empty cursor, two bodies, a fallen or absent body, or one in Reflect
+-- keeps the guard.  Only a plan that asks (plan.reflectSingle) reads it.
+function M.reflectWaived(tgtmons, slots)
+  for _, s in ipairs(slots) do
+    if (1 << s.slot) == tgtmons then return not s.reflect end
+  end
+  return false
+end
+function Driver:castVetoed(abilityId, what, singleTarget)
   -- An enemy Runic (#413): a monster carrying $3E4C bit 1 (the Speck's
   -- MonsterProp+30, "A Speck absorbs magic!" on its launch) takes every
   -- runic-able spell (MagicProp+3 bit 3, RunicEffect) cast while it
@@ -7423,7 +7439,12 @@ function Driver:castVetoed(abilityId, what)
     end
   end
   local elem = M.spellElement(abilityId)
-  local s, why = M.castVeto(elem, M.spellReflectable(abilityId), activeSlots())
+  local slots = activeSlots()
+  local reflectable = M.spellReflectable(abilityId)
+  if reflectable and singleTarget and M.reflectWaived(M.readByte(BATTLE.TGTMONS), slots) then
+    reflectable = false
+  end
+  local s, why = M.castVeto(elem, reflectable, slots)
   if not s then return false end
   if why == "absorb" then
     M.log(string.format(
@@ -11117,6 +11138,7 @@ function Driver:makePlan(actor)
   plan = self:coverPlan(actor, plan)
   plan = self:buffPlan(actor, plan)
   plan = self:zingerPlan(actor, plan)
+  plan = self:studyHoldPlan(actor, plan)
   plan = self:policyPlan(actor, plan)
   if plan then plan.raceBoost = plan.boostLeft or 0 end
   self:sayTurn(actor, plan)
@@ -11373,6 +11395,42 @@ function Driver:zingerPlan(actor, plan)
     .. "in place of its %s", self.tag or "fight", actor, (za - 8) // 2, host, M.readWord(0x3BF4 + host * 2),
     M.readWord(0x3C1C + host * 2), boost, plan.kind))
   return { kind = "fight", row = fight, boostLeft = boost, target = target, ally = true, reason = "zinger" }
+end
+
+-- STRAGO holds his bank for a study (#388, opts.strago.studyHold): a person
+-- who wants a lore only one fight teaches (Hidon's GrandTrain) does not
+-- spend Strago's points while that body stands, so his third turn can
+-- Study it.  While a body whose species can teach a lore he lacks stands
+-- (M.studySlot), his bank is under the study's three points, his Scan is
+-- in his list and the 99 MP leaves the nuke floor, any plan of his that
+-- would spend points on an attack goes at none.  Passed untouched: a plan
+-- with no points, the study itself, care (a heal, an item, a raise, a
+-- boosted party cure, anything aimed at the party), and a plan whose boost
+-- is pressed to an exact count (exactBoost/boostWant: the race's and the
+-- card plans', which boostLeft does not drive).
+Driver.STUDY_HOLD_KINDS = { fight = true, magic = true, lore = true, skill = true }
+function Driver:studyHoldPlan(actor, plan)
+  local so = self.opts.strago
+  if not (so and so.study and so.studyHold) or plan == nil or (plan.boostLeft or 0) == 0
+     or plan.reason == "study" or M.readByte(BATTLE.BCHID + actor * 2) ~= M.STRAGO_ID
+     or not Driver.STUDY_HOLD_KINDS[plan.kind] or plan.ally or plan.all
+     or plan.exactBoost or plan.boostWant ~= nil
+     or (type(plan.reason) == "string" and (plan.reason:sub(1, 10) == "party_hurt" or plan.reason:sub(1, 4) == "cure")) then
+    return plan
+  end
+  local have = M.readByte(BATTLE.BP + actor * 2)
+  if have >= M.STUDY_BOOST then return plan end
+  local slot, want = M.studySlot()
+  if slot == nil or spellCell(actor, M.STUDY_SPELL, false) == nil
+     or M.readWord(BATTLE.CURMP + actor * 2) - M.STUDY_MP < self:nukeFloor(actor) then
+    return plan
+  end
+  M.log(string.format("[%s] actor=%d study hold: slot %d ($%03X) can teach lores $%06X he lacks; his %s goes "
+    .. "at 0 BP of %d, the bank kept for the study at %d", self.tag or "fight", actor, slot,
+    M.readWord(0x57C0 + slot * 2), want, plan.kind, plan.boostLeft, M.STUDY_BOOST))
+  plan.boostLeft = 0
+  if plan.kind == "fight" then plan.aim = self:chipAim(actor, 0) end
+  return plan
 end
 
 -- The measuring policies (#422, tools/fight_report.py): the real driver
@@ -13203,11 +13261,28 @@ function Driver:makePlanRules(actor)
       local slot, want = M.studySlot()
       local cell = spellCell(actor, M.STUDY_SPELL, true)
       local mp = M.readWord(BATTLE.CURMP + actor * 2)
-      if slot ~= nil and cell ~= nil and mp - M.STUDY_MP >= self:nukeFloor(actor) then
-        M.log(string.format("[%s] actor=%d study: Scan at %d BP on slot %d ($%03X), lores $%06X he lacks, %d MP of %d",
-          self.tag or "fight", actor, M.STUDY_BOOST, slot, M.readWord(0x57C0 + slot * 2), want, M.STUDY_MP, mp))
+      -- The Scan is aimed at one body and the study reads every body on the
+      -- field (Ot6Analyze's boosted loop), so it is aimed at a body out of
+      -- Reflect: the teacher, else any other.  The confirm's cast guard
+      -- refuses a reflectable cast while any body reflects; for this
+      -- single-target cast its Reflect half is waived when the cursor holds
+      -- one standing body out of Reflect at the confirm (reflectSingle,
+      -- M.reflectWaived), and the rest of it (absorb, null, an enemy Runic)
+      -- stands.  Hidon's Hidonite $160 wears Reflect, and the guard backed
+      -- the study out at every confirm while it stood (lab eb_s1, #388).
+      -- A cursor left on a member backs out too (monsterOnly).
+      local aim, reflects = nil, false
+      for _, s in ipairs(activeSlots()) do
+        if s.reflect then reflects = true
+        elseif aim == nil or s.slot == slot then aim = (aim == slot) and aim or s.slot end
+      end
+      if slot ~= nil and aim ~= nil and cell ~= nil and mp - M.STUDY_MP >= self:nukeFloor(actor) then
+        M.log(string.format("[%s] actor=%d study: Scan at %d BP on slot %d ($%03X), lores $%06X he lacks "
+          .. "(slot %d's), %d MP of %d", self.tag or "fight", actor, M.STUDY_BOOST, aim,
+          M.readWord(0x57C0 + aim * 2), want, slot, M.STUDY_MP, mp))
         return { kind = "magic", spell = M.STUDY_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC),
-                 boostLeft = M.STUDY_BOOST, aimHard = slot, reason = "study" }
+                 boostLeft = M.STUDY_BOOST, aimHard = aim, reason = "study", reflectSingle = reflects or nil,
+                 monsterOnly = reflects or nil }
       end
     end
     if so.dischord and cmdRow(actor, BATTLE.CMD_LORE) and loreOffered(M.LORE_DISCHORD) then
@@ -14684,7 +14759,7 @@ function Driver:button(actor)
        and not self.plan.vetoOk then
       local id = self.plan.kind == "magic" and (self.plan.executionSpell or self.plan.spell) or (0x8B + self.plan.lore)
       if self:castVetoed(id, self.plan.kind == "magic" and "cast (at the confirm)"
-                        or "lore (at the confirm)") then
+                        or "lore (at the confirm)", self.plan.reflectSingle) then
         self:dropPlan("stage_changed")
         return { "b" }
       end

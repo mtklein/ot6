@@ -24,7 +24,11 @@ local links = H.doorLinks
 -- doors (gen_wor_gau's)
 local DOORS349 = { { 39, 10, 61, 20 }, { 60, 21, 38, 11 } }
 local LINKS = { [MAP_HOUSE] = links(DOORS349) }
-local FIGHT = {}
+-- STRAGO studies Hidon (#388): its script casts GrandTrain, the lore's one teacher in the game
+-- (Ot6StudyTbl), and the party beats it before it casts it, so he keeps his points while it stands and
+-- Studies it at three (wor-coverage.md section 13.4: labs eb4 and eb5, learned in 12 of 12).  His randoms
+-- stay the boosted Fight.
+local FIGHT = { strago = { study = true, studyHold = true } }
 H.NAV_REFIRE_HOLD = true
 
 -- the World of Ruin legs' helpers (lib/ot6_field.lua, H.worLegKit)
@@ -199,7 +203,10 @@ H.run({ maxFrames = 2400000 }, {
   H.call(function() ebotWhere("Hidon in sight ($01FC)") end),
   -- a Hidonite drinks every element: weapons none of the five absorbs (the absorb guard's own reads)
   H.absorbSafeArms({ STRAGO, RELM, GOGO, TERRA }, HIDON_SPECIES, { tag = "arms for Hidon" }),
-  H.fieldCare({ threshold = 1.0, tag = "before Hidon" }),
+  -- MP to half of each pool (the bag's Tinctures and Ethers), insurance for the study: it costs 99 and must
+  -- leave the nuke floor, a quarter of his pool, standing (99 + 151 of 606 at L51).  The 174 MP that
+  -- stopped it in lab eb came from an abandoned arm that nuked the randoms with lores (#388)
+  H.fieldCare({ threshold = 1.0, mpBand = 0.5, tag = "before Hidon" }),
   H.saveState("wor_ebot_hidon.mss"),
   H.navTo(23, 6, { maxFrames = 1200 }),
   H.faceAndHoldA("up", function() return H.battleLoadStarted() or H.dialogWaiting() or not H.hasControl() end, 600,
@@ -208,6 +215,8 @@ H.run({ maxFrames = 2400000 }, {
   H.advanceStory(function() return map() == MAP_HOUSE and settled() end, 300000, { playBattles = "tactical", fight = FIGHT }),
   H.call(function()
     say("story", "Hidon beaten: Strago's house")
+    H.log(string.format("[lore] after Hidon: STRAGO's lores $%06X, GrandTrain %s", H.readByte(0x1D29)
+      | H.readByte(0x1D2A) << 8 | H.readByte(0x1D2B) << 16, (H.readByte(0x1D2B) & 0x40) ~= 0 and "learned" or "NOT learned"))
     H.assertEq(sw(0x019C), 1, "Hidon beaten ($019C)")
   end),
   H.saveState("wor_ebot_after.mss"),

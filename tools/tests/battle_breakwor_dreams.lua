@@ -16,7 +16,7 @@
 --      321, 144, 322, 126), the cave (182, maps 319 and 320), the stooges
 --      (event group 90), Wrexsoul (92), the Ancient Castle's cave, halls and
 --      courtyard (143, 144, 145 on maps 401, 406, 407) and the Blue Dragon
---      (137) -- has an authored row, and every gauged one a key for the hands
+--      (137) and the two monster boxes (113, 95) -- has an authored row, and every gauged one a key for the hands
 --      that meet it there;
 --   3. the lessons: TERRA alone keys every body of the dreamscape (she walks
 --      it alone until the stooges run); the bolt beam keys every body of the
@@ -56,6 +56,9 @@ local WANT = {
   [0x045] = { "Lethal Wpn", 4, SLASH | BLUDG, BOLT | WATER, 0 },
   [0x051] = { "Boxed Set", 3, SLASH | BLUDG, HOLY, 0 },
   [0x152] = { "Blue Drgn", 6, SLASH | PIERCE, BOLT, WATER },
+  -- the two monster boxes (#487): the cave's Master Pug (event group 113) and the castle's KatanaSoul (95)
+  [0x138] = { "Master Pug", 6, SLASH | SPECIAL, 0, WATER },
+  [0x124] = { "KatanaSoul", 6, SLASH | PIERCE, POISON, 0 },
 }
 
 -- the hands, as the arc seats them (route-wor-dreams.md section 2): in the dream TERRA (a blade; Fire, Ice,
@@ -89,7 +92,8 @@ local CYAN_ALONE = union("CYAN alone", { CYAN })
 local GROUPS = { { "world", 52, DOMA }, { "world", 53, DOMA }, { "field", 183, TERRA_ALONE }, { "field", 183, DREAM },
   { "field", 181, DREAM },
   { "field", 182, CAVE }, { "event", 90, DREAM }, { "event", 92, DREAM }, { "field", 143, ANCIENT },
-  { "field", 144, ANCIENT }, { "field", 145, ANCIENT }, { "event", 137, ANCIENT } }
+  { "field", 144, ANCIENT }, { "field", 145, ANCIENT }, { "event", 137, ANCIENT },
+  { "event", 113, ANCIENT }, { "event", 95, ANCIENT } }
 local POOLS = { [317] = 183, [321] = 181, [144] = 181, [322] = 181, [126] = 181, [319] = 182, [320] = 182,
   [401] = 143, [406] = 144, [407] = 145 }
 
@@ -227,7 +231,8 @@ H.run({ maxFrames = 600 }, {
     every(speciesOf("field", 183), TERRA_ALONE, "TERRA alone (the dreamscape)")
     every(speciesOf("field", 182), BOLT_BEAM, "the bolt beam (the cave)")
     local castle = {}
-    for _, g in ipairs({ { "field", 143 }, { "field", 144 }, { "field", 145 }, { "event", 137 } }) do
+    for _, g in ipairs({ { "field", 143 }, { "field", 144 }, { "field", 145 }, { "event", 137 }, { "event", 113 },
+      { "event", 95 } }) do
       for _, sp in ipairs(speciesOf(g[1], g[2])) do castle[#castle + 1] = sp end
     end
     every(castle, CYAN_ALONE, "CYAN alone (the Ancient Castle)")

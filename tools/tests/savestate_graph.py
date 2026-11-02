@@ -785,6 +785,13 @@ STATES = [
     S("wor_tzen_plain", gen="gen_wor_tzen_plain", prev="wor_sabin",
       checkpoint="wor-sabin-v1", timeout=3600),
 
+    # wor-tzen-door-v1 -> Sabin joined: a branch beside wor_sabin (#487).
+    # The collapsing house under its clock by its two monster boxes (four
+    # Pm Stalkers each) and the child, instead of the line's six chests;
+    # each box opened when the clock covers its fight.  Nothing boots it.
+    S("wor_tzen_boxes", gen="gen_wor_tzen_boxes", prev="wor_tzen_door",
+      checkpoint="wor-tzen-door-v1", timeout=3600),
+
     # wor-nikeah-v1 -> its tile again: a branch beside wor_south_figaro
     # (#488).  The grass by Nikeah (world group 37) and the plain north of
     # it (group 39), each walked until every formation is won.  Nothing
@@ -961,6 +968,12 @@ STATES = [
     # before its hunt (the sweeps').
     S("wor_umaro_hunt", gen="gen_wor_umaro_hunt", prev="wor_tritoch_cave",
       timeout=5400, also=["wor_umaro_hunt_pocket"]),
+
+    # wor_tritoch_cave -> a branch (#487): the Pugs' monster box (282
+    # (13,34): three Pugs, L99), in the pocket below the drop the line's
+    # walk does not enter.  Nothing boots it.
+    S("wor_umaro_box", gen="gen_wor_umaro_box", prev="wor_tritoch_cave",
+      timeout=5400),
 
     # wor-narshe-v1 -> Owzer's basement, map 207's save point (87,41): the
     # cabin (CYAN, TERRA and CELES), the Falcon to Jidoor, the item counter,
@@ -1179,6 +1192,12 @@ STATES = [
     # before the castle's hunt (the sweeps').
     S("wor_ancient_hunt", gen="gen_wor_ancient_hunt", prev="wor_ancient_yard",
       timeout=7200, also=["wor_ancient_hunt_hall"]),
+
+    # wor_ancient_yard -> a branch (#487): the Ancient Castle's two monster
+    # boxes, the castle's KatanaSoul (406 (10,17)) and the cave's Master Pug
+    # (401 (58,43)), each after care to full.  Nothing boots it.
+    S("wor_ancient_boxes", gen="gen_wor_ancient_boxes", prev="wor_ancient_yard",
+      timeout=7200),
 
     # wor-ancient-v1 -> the World of Ruin map on the Falcon's tile by Maranda
     # (69,183): Kohlingen's counter, the Colosseum (map 413): the Striker

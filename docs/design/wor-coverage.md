@@ -41,9 +41,10 @@ lines behind each number. Line numbers are into
    Eater), which the route plays. The isles are reachable and empty.
 6. **Seven chests hold a monster.** Two are opened (Darill's Tomb, the
    Veldt cave). Five are not: two in the Tzen house (four Pm Stalkers
-   each), Umaro's cave (three Pugs, L99, 42,003 HP), the Ancient Castle
-   (Master Pug L73, 22,000 HP) and its basement (KatanaSoul L61, 37,620
-   HP).
+   each), Umaro's cave (three Pugs, L99, 42,003 HP), the cave below the
+   Ancient Castle (map 401: Master Pug L73, 22,000 HP) and the castle itself
+   (map 406: KatanaSoul L61, 37,620 HP). Since v0.38 (#487) all five are opened and won on branch legs
+   (section 12).
 7. **53 chests with a prize are unopened outside Kefka's Tower**
    (16 more inside it), against 62 the WoR legs open. Ten more
    records are empty in the ROM (prize `$00`).
@@ -333,8 +334,8 @@ route-wor-gogo.md section 11, route-wor-dreams.md section 10).
 ### 5.1 Unopened chests with a prize
 
 Since the audit (v0.38, #485): the item chests of Doma, Cyan's dream and
-the Ancient Castle below are opened (route-wor-dreams.md section 10); their
-monster boxes are #487's.
+the Ancient Castle below are opened (route-wor-dreams.md section 10); the
+five monster boxes are opened on branch legs (#487, section 12).
 
 | area | n | chests |
 |---|---|---|
@@ -359,8 +360,8 @@ Monster boxes (`treasure_battle`, `EventBattleGroup`): opened, Darill's Tomb
 bit 161 (Presenter+Whelk Head) and the Veldt cave bit 192 (Allo Ver);
 unopened, the five above. Pugs x3 (formation 235, L99) and Master Pug
 (483) and KatanaSoul (465) pay no XP. The Tzen boxes are weak (formation 211, L26) but
-sit inside the collapsing house's clock (`route-wor-sabin.md` section 3.4
-leaves them for a second visit).
+sit inside the collapsing house's clock, and the house collapses when Sabin
+joins, so there is no second visit. Section 12 has how each is played.
 
 ### 5.2 Prizes the WoB route takes from the WoR
 
@@ -453,7 +454,7 @@ boot checkpoint the branch Continues and the leg it rejoins.
 | 5 | Chests of the dungeons the route walks | the arc's own leg | 39 prizes: Ancient Castle 6, Doma and the dream 8, Zozo 7, Owzer 2, Tzen house 6, Albrook/Nikeah/Figaro/Maranda/Narshe 10 | S to M each, see below | yes |
 | 6 | The Zone Eater's belly | `gen_wor_belly` boot `wor-gau-v1` | forms 346-352 (7, authored, L43-44, 1,399-2,784 per member), 9 chests (Genji Armor, Zephyr Cape, Hero Ring, Thunder Shld, Magical Brsh, Tack Star...) | M | yes |
 | 7 | Draw gaps in played dungeons | each dungeon's leg | 42 formations (section 4.3; Umaro's cave 6 of its 8, the Fanatics' Tower's four pay no XP) | M | meets them if it pauses |
-| 8 | Monster boxes | the arc's leg | five boxes: Pm Stalker x4 (two, Tzen), Pugs x3 L99 (Umaro's cave), Master Pug L73 (Ancient Castle), KatanaSoul L61 (its basement); floor rows on the last two | L | only a strong party; a balance signal |
+| 8 | Monster boxes | the arc's leg | five boxes: Pm Stalker x4 (two, Tzen), Pugs x3 L99 (Umaro's cave), Master Pug L73 (the Ancient Castle's cave, 401), KatanaSoul L61 (the castle, 406); floor rows on the last two | L | only a strong party; a balance signal (played since v0.38 on three branch legs: section 12) |
 | 9 | WoB: stop spending WoR bits | WoB chain (the #350 item 8 pass) | 8 prizes (section 5.2) | S, regenerates the WoB chain | yes |
 | 10 | The early-continent draw gaps | `wor-start-v1` to `wor-figaro-sweep-v1` | 19 formations of L5-29, 2-1,155 per member | S | seldom |
 
@@ -473,7 +474,8 @@ Zozo's two floors (`gen_wor_cyan`: RunningShoes, Chain Saw, Thief Glove,
 Fire Knuckle...), Owzer's house (`gen_wor_owzer`: Moogle Suit, Relic Ring),
 the Tzen house (`gen_wor_sabin`, timed), and 10 chests in Albrook, Nikeah,
 Figaro, Maranda and Narshe (Sprint Shoes, Elixirs, Remedy, Revivify). The
-boxes of the Tzen house and the Ancient Castle belong to unit 8.
+boxes of the Tzen house and the Ancient Castle belong to unit 8 (section
+12).
 
 ## 9. Limits and what the instruments do
 
@@ -833,7 +835,8 @@ Left, with the reason:
   they are a long climb for little: SABIN wears two Fire Knuckles, EDGAR the
   cellar's RunningShoes, and the Thief Glove is LOCKE's and GOGO's, neither
   seated.
-- **The Tzen house's monster boxes** (bits 144, 148): unit 8.
+- **The Tzen house's monster boxes** (bits 144, 148): unit 8, a branch
+  leg (section 12).
 
 ### 11.2 The draw gaps: grinds and branches
 
@@ -1054,3 +1057,304 @@ checkpoints of the line before Berserk landed):
   0's lap without its allowance, "to the patch east of the landing (group
   0): group 0 deals only the plains six (not $017, formation 6): got
   false".
+
+## 12. The monster boxes (v0.38, #487)
+
+Unit 8. Evidence under `build/attempts/wt/v038-monster-boxes/`: `tzen/`,
+`ancient/`, `umaro/` (each run's `run.log.gz`, its commit, ROM and boot
+hashes, the tallies and fight reports), `scripts/`. Every number below is
+quoted from a log or a tally there. The sweeps ran at 252d1487 on its ROM
+(sha256 8b7e29ae, the two new rows); the re-sweeps `ab3_*` and `ub3_*` at
+c87416c4, the branch rebased onto main 9aa26b7b (the same ROM).
+
+A monster box is a chest whose opening starts an event battle
+(`TreasureMonster`: "Monster-in-a-box!", `EventCmd_8e`) and a game over when
+it is lost (`_ca5ea9`). It holds no item; the battle pays its XP and drops.
+A player opens a chest without knowing what is in it, so a player who walks
+by these boxes opens them; the line's party wins all five at the line's own
+levels. None pays anything the main line needs (1,032 XP a Tzen box; the
+other three pay no XP), so each is a branch leg that boots the graph's
+capture beside it and feeds nothing (`downstream.py`: "this leg feeds no
+key"), the canon playthrough's middle path walking by them as before.
+
+| box | branch leg (boots) | formation | prize |
+|---|---|---|---|
+| Tzen house downstairs, 311 (102,49); upstairs, (111,12) | `gen_wor_tzen_boxes` (`wor-tzen-door-v1`) | 211, Pm Stalker x4, L26 | 1,032 XP each |
+| Umaro's cave, 282 (13,34) | `gen_wor_umaro_box` (`wor_tritoch_cave`) | 235, Pugs x3, L99, 14,001 HP each | a Minerva one time in eight from each Pugs |
+| the Ancient Castle, 406 (10,17) | `gen_wor_ancient_boxes` (`wor_ancient_yard`) | 465, KatanaSoul, L61, 37,620 HP | an Offering, sure; 30,000 GP |
+| the Ancient Castle's cave, 401 (58,43) | the same leg, on | 483, Master Pug, L73, 22,000 HP | a Graedus, sure |
+
+`K.monsterBox` (lib/ot6_field.lua) plays the three branches outside Tzen:
+from whichever side of the box the party reaches, the arms against the
+body's absorbs, the battle heals on top of the bag and care to full, then
+the box; after it, its bit, its win (the formation, said on its own end
+reading and paid as due) and, where both drop slots name one item, that
+item in the bag. Each leg asserts at its start the map its boot stands on,
+naming the leg that made it, and that the box is shut.
+
+**The Tzen house.** The house is the collapsing one of Sabin's scene, under
+its 6:00 clock, and it collapses when Sabin joins (`$028A`: `_cc56da` no
+longer draws it), so the boxes have no later visit. The branch walks the
+house by the two boxes and the child (downstairs box, up, the child, the
+upstairs box, down and out) instead of the line's six item chests, and
+keeps the clock for the boxes: while a box is ahead, its fight counts in
+the walk the run rule weighs, so a random battle is run from whenever
+fighting it would spend a box's time. A box's fight is priced at 6,100
+frames, the worst seen (5,563) and a tenth; each walk keeps one run of
+1,200 frames (the longest run in the house was 873 ticks) for every 45
+steps, rounded up (a battle comes every 44.8 steps). The leg asserts at
+its end that both boxes were opened and won, and cares for the party
+before it saves.
+
+Two earlier rules failed on the same draws (`tzen/tz2_*`, `tzen/tz3_*`):
+with the box's fight left out of the run rule's walk, a random fight on the
+way to the child spent the upstairs box's time, and the box was left shut
+in both K6 runs ("LEFT SHUT at 6938 frames left", at 6128 the other); with
+it priced at the fight alone, 5,211, the box was opened with 6,938 frames
+left and the clock ran out at the door after a run (`tzen/tz2_k6_s0`:
+"LOST: the house's timer ran out at f42939 on map 305 (15,9) -- child
+rescued").
+
+Measured from the graph's capture `wor-tzen-door-v1` (sha256 710bbf7f, the
+line at ba16da57's play, the same in main's 9aa26b7b), K 0-11 battles used
+up beside Tzen's door first, at seed shifts 0 and 7 (`scripts/mk_boxlab.py`,
+at a4516870 on the Air; cdfdc347 after it changes only what the box's
+wait reads, the battle said rather than the bit, which the box sets as it
+opens): "verdicts: PASS 24"; "box fights: 48, clock cost
+min 3747, median 4228, max 4984; boxes left shut 0"; "house formation 211:
+48 fights, 29 distinct keys, won 48"; "exit margins (frames left of 21600):
+min 1845, median 4482, max 9297 over 24 exits" (`tzen/tally_tz4.txt`,
+`tzen/boxcost_tz4.txt`). Of the house's random fights the party ran from
+12 of 24 of formation 207 and 17 of 42 of 209, as the rule keeps the boxes'
+time; it won every one it fought. The fight report: "$0D3 Pm Stalker ...
+29 29 0 60% 34% 0 0.00" (keys, won, unfinished, the party's low point
+median and worst, members down, deaths a fight; `tzen/fight_report_tz4.txt`).
+CELES alone wins every box; at 34% of her HP at worst it is a real fight,
+not a close one.
+
+**Umaro's cave.** The box stands in the pocket below the floor's drop
+(14,30), which the line's walk does not enter: 281 (9,52) -> 282 (16,32).
+The plan had left it shut as a fight with nothing in it (route-wor-narshe.md
+section 2); the Pugs are L99, but at the line's levels (CYAN L37, TERRA L38,
+CELES L39, MOG L35) the four win them. From the graph's capture
+`wor_tritoch_cave` (sha256 1c9d0422, the same in main's 9aa26b7b play), K 0-5
+battles used up on the landing's lap first (`scripts/mk_klab.py`), shifts 0
+and 7: 12 of 12 PASS, with two development runs 14 keys, 14 won, "$0EB Pugs
+... 14 14 0 71% 54% 1 0.14" (`umaro/fight_report_ub.txt`; re-run on main
+9aa26b7b with this branch rebased, `umaro/ub3_*`, the same 12 of 12, "$0EB Pugs
+... 12 12 0 70% 54% 1 0.08"): one member down
+in two fights. Minervas: none in seven of the twelve, one in three, two in
+one and three in one (`umaro/minervas.txt`). The Pugs' row is the Pug's,
+authored since v0.29 (4 · slash, special; `battle_breakwor_narshe` checks
+it with event group 152).
+
+**The Ancient Castle.** The two boxes take new rows (route-wor-dreams.md
+section 3): the Master Pug 6 · slash, special (the Pugs' row; it has no
+weakness of its own and WallChange moves the one it takes), the KatanaSoul
+6 · slash, pierce (a swordsman's ghost, the Samurai's pair). Before, the
+floor gave the Master Pug 6 · bludgeon and the KatanaSoul 6 · slash. Neither
+species is dealt anywhere else (`where`: event groups 113 and 95 only; the
+Colosseum offers neither). `battle_breakwor_dreams` checks both ("checked
+25 designed rows", "CYAN alone (the Ancient Castle) keys 14 of 14"; red on
+the ROM without them, "mismatches: got 5"; `ancient/bd1`, `ancient/bd_neg`).
+The branch boots the courtyard after the flashback, takes the KatanaSoul by
+the courtyard's door (407 (11,10) -> 406 (10,21)) and the Master Pug by way
+of the save point's room and the cave.
+
+From the graph's capture `wor_ancient_yard` (the line at 343ed5ff, main
+9aa26b7b; sha256 4247217b; CELES L56, RELM L53, CYAN L41, TERRA L56), K 0-5
+battles on the courtyard's lap first, shifts 0 and 7, on main with this
+branch rebased (the arms through the changed `bagWeapons`, which passes over
+a healing weapon): 12 of 12 PASS, "$1D1 KatanaSoul ... 11 11 0 86% 84% 0
+0.00", "$1E3 Master Pug ... 12 12 0 97% 88% 0 0.00", every run with its
+Offering and Graedus ("boxes: 465 won, item $D3 dropped; 483 won, item $08
+dropped"; `ancient/ab3_*`, `ancient/fight_report_ab3.txt`). Before that
+capture existed: from b4's `gen_wor_ancient` played from the tracked
+`wor-doma-v1` (yard 91d79e13, CELES L55, TERRA L56), 12 of 12, "$1D1
+KatanaSoul ... 12 12 0 85% 78% 0 0.00" (`ancient/ab2_*`, `anc_yard`); from an
+older capture at CELES L59, TERRA L61 (dc5a2520), 12 of 12 (`ancient/ab_*`).
+Both are fights players find easy.
+
+**The asserts and their negatives**, each red (`scripts/mkmut.py`):
+the castle's box expecting formation 999, "its battle (formation 999) was
+won: got false"; naming the Master Pug's species, "the bag holds its sure
+drop, item $08 (0 -> 0): got 0"; `gen_wor_umaro_box` booting the courtyard,
+"the boot stands on Umaro's cave's landing (281) ...: got 407";
+`gen_wor_ancient_boxes` booting the cave, "the boot stands in the Ancient
+Castle's courtyard (407) ...: got 281"; `gen_wor_tzen_boxes` Continuing
+`wor-sabin-v1`, "contract wor-tzen-door-v1 (entry) VIOLATED"
+(`ancient/mt_*`, `umaro/mt_yard`, `tzen/mt_sabin`); and in the Tzen leg
+itself (`scripts/mkmut_tz.py`): a box's fight priced at 30,000, both left
+shut and "the box downstairs (102,49) (bit 144) opened and won (audit_chests
+reads it): got false"; the box downstairs named by bit 149, "311: the box
+downstairs (102,49) (bit 149) is open: got false"; its formation as 999,
+"its battle (formation 999, Pm Stalker x4) was won: got false"
+(`tzen/mt_tz*`; `tzen/mt_tzbit_old`, before the wait was changed to read
+the battle and not the bit, ran the clock out instead).
+
+The first sweeps of the two field branches failed at their start
+(`*/first_try_K_bug/`: "bad argument #2 to 'format'"): the lab's K was
+shadowed by the leg's own kit, also named K; `mk_klab.py` reads the
+launcher's global.
+
+## 13. Abilities the World of Ruin teaches (#388)
+
+What each kit learns in the World of Ruin, where the game teaches it,
+what the route's party knows at each tracked save, and whether the battle
+driver uses it. The saves are the tracked checkpoints as re-cut at
+`a2ca9210` (the play at `a18e540d`), read with
+`audit/abil.py` (`checkpoints.txt`); the driver's uses are counted in the
+WoR legs' logs of the main tree's `build/states` (a play of 2026-10-23,
+older than the re-cut: `driver_uses_1023.txt`, `lores_fought_1023.txt`).
+Evidence under `build/attempts/wt/v038-ability-learning/`.
+
+### 13.1 Where each is taught
+
+| kit | how | OT6's change | in the World of Ruin |
+|---|---|---|---|
+| SABIN's Blitzes | by level, `BlitzLevelTbl` 1/6/10/15/23/30/42; Bum Rush from Duncan | none (kits.md "Sabin") | Air Blade at L30 (by `wor-edgar-v1`, L31); Bum Rush at Duncan's house (`wor-gau-v1`); Spiraler at L42 never: SABIN ends the line at L39 |
+| CYAN's SwdTechs | by level, `BushidoLevelTbl` 1/6/12/15/24/34/44; his dream teaches all | Cleave by story at the Phantom Train farewell (#379) | Stunner at L34 (by `wor-mtzozo-v1`, L35); Quadra Slice from the dream (`give_bushido`, `wor-doma-v1`); all eight from there |
+| STRAGO's lores | seen cast with him present and able | Study, his 3-BP Scan, learns every lore any body present could cast (#432); Bserk by watching (a Magic-row spell) | 4 at the end of the World of Balance (Aqua Rake, Revenge, Stone, Exploder); Dischord at the grind by Jidoor (`wor-tower-v1`); Aero and L.5 Doom at Phoenix Cave (a Study of Doom Gaze, `wor-phoenix-v1`); 7 of 24 from there to the end in the tracked saves, 8 with GrandTrain from Hidon (13.4) once the line is replayed |
+| GAU's Rages | a Leap on the Veldt, then the formation's monsters | kit-gau.md | 9 at the end of the World of Balance, 10 from `wor-veldt-cave-v1` |
+| MOG's Dances | a battle on the terrain | none | 5 of 8 at `wor-narshe-v1` (Love Sonata and Snowman Jazz in the WoR); MOG is not seated after it |
+
+The species whose scripts cast each lore are `Ot6StudyTbl`
+(`tools/check_study_table.py --emit`). Of the 17 STRAGO lacks, the WoR
+legs that seat him fought these teachers (`lores_fought_1023.txt`):
+Reach Frog (Rippler) at the grind by Jidoor, 54 battles with him; Phase
+(Blow Fish) in Phoenix Cave, 5; Hidon (GrandTrain, its only teacher) at
+Ebot's Rock. Pearl Wind's Sprinter is on world groups 49, 51 and 52, which
+the grind on group 48 does not roll (route-wor-thamasa.md 6.4). The rest
+(Condemned, Roulette, CleanSweep, Big Guard, L.4 Flare, L.3 Muddle,
+Reflect???, L? Pearl, Step Mine, Force Field, Sour Mouth, Pep Up, Quasar)
+are cast by species the route meets without him seated or not before
+Kefka's Tower.
+
+### 13.2 What the party knows at the saves
+
+From `checkpoints.txt` (level, `-` for not seated):
+
+| save | SABIN | Blitzes | CYAN | SwdTechs | STRAGO | lores | rages |
+|---|---|---|---|---|---|---|---|
+| `wor-island-v1` | 26- | 5 (to Mantra) | 24- | 6 (to Empowerer, and Cleave) | 25- | 4 | 9 |
+| `wor-edgar-v1` | 31 | 6 (Air Blade) | 24- | 6 | 25- | 4 | 9 |
+| `wor-mtzozo-v1` | 37 | 6 | 35 | 7 (Stunner) | 25- | 4 | 9 |
+| `wor-tower-v1` | 37- | 6 | 38- | 7 | 46 | 5 (Dischord) | 9 |
+| `wor-phoenix-v1` | 39 | 6 | 40 | 7 | 47 | 7 (Aero, L.5 Doom) | 9 |
+| `wor-veldt-cave-v1` | 39- | 6 | 40- | 7 | 47- | 7 | 10 |
+| `wor-gau-v1` | 39 | 7 (Bum Rush) | 40- | 7 | 47- | 7 | 10 |
+| `wor-doma-v1` | 39- | 7 | 40 | 8 (Quadra Slice) | 51- | 7 | 10 |
+| `wor-desert-v1` | 39- | 7 | 53 | 8 | 51- | 7 | 10 |
+
+### 13.3 What the driver uses
+
+Counted over the WoR legs' logs (`driver_uses_1023.txt`): Aqua Rake 150
+casts (the only lore cast; "nuke lore $03"), Pummel 72 and Air Blade 3
+("Blitz $5D", "Blitz $62"), the SwdTech list 4 times (Empowerer 3,
+Stunner 1; Cleave never), one Study, and no Rage, Dance, Fire Dance,
+Mantra, Bum Rush, Quadra Slice or Cleave. The driver has the lines:
+`opts.blitz` names one Blitz a fight's leg sets (Air Blade at Edgar's
+tentacles), `opts.bushido` the deepest SwdTech row (the storm and Tritoch
+legs), `opts.rage` (kit-gau.md) no WoR leg sets, and STRAGO's lines are
+`opts.nukeLore` (a fixed order), `opts.strago.study` (the grind by Jidoor,
+Phoenix Cave, Locke's), Pearl Wind (never learned) and Dischord.
+
+### 13.4 Routed on this branch: GrandTrain from Hidon
+
+GrandTrain is in Hidon's script and no other species' (`Ot6StudyTbl`), and
+the line's party beat Hidon before it cast it, so a player who wants it
+studies Hidon, the canon fight at Ebot's Rock; it costs nothing off the
+main line. `gen_wor_ebot` sets `opts.strago = { study = true, studyHold =
+true }`, and its care before Hidon tops MP up to half of each pool, as
+insurance: the study costs 99 and must leave the nuke floor (a quarter of
+his pool) standing.
+
+- `Driver:studyHoldPlan` keeps STRAGO's points off his attacks (Fight,
+  Magic, Lore, a kit row) while a body that can teach a lore he lacks
+  stands, his Scan is in his list and the 99 MP leaves the nuke floor.
+  Care (a heal, an item, a raise, a party cure, anything aimed at the
+  party) and a plan pressed to an exact boost (`exactBoost`/`boostWant`)
+  keep theirs.
+- The study is aimed at a body out of Reflect. The confirm's cast guard
+  refuses a reflectable cast while any body reflects; for the study only
+  its Reflect half is waived, and only while the cursor (`$7B7E`) holds
+  exactly one standing monster out of Reflect at the confirm
+  (`M.reflectWaived`, `reflectSingle`). Absorb, null and the enemy Runic
+  (#413) stand. An aimed body fallen before the confirm, a steer that gave
+  up on another body and a target gone into Reflect since the plan keep
+  the guard (`reflect_waiver_selftest`, 6 assertions, each failed by its
+  own mutant).
+- A lore pending for the victory (`$3A84-$3A86`, which InitBattle clears)
+  counts as known, so he studies a body once.
+
+The leg from `wor-gogo-v1` (the tracked copy, byte-identical to the
+graph's capture at `a18e540d`), seed shifts 0-11, one attempt each, in
+`lab/out1/` (`eb`) and `lab/out/`:
+
+| run | commit | PASS | GrandTrain learned | what stopped it |
+|---|---|---|---|---|
+| `eb` | `1374d395` | 12 of 12 | 1 of 12 | STRAGO at 174/606 MP before Hidon (the arm below nuked the randoms with lores); where the study fired, "cast (at the confirm) $18 refused: slot 3 species $0160 is under REFLECT" |
+| `eb2` | `eaf2d95e` | 12 of 12 | 12 of 12 (10 keys) | |
+| `eb3` | `f993efeb` | 12 of 12 | 12 of 12 (12 keys) | studied again whenever his bank refilled ("99 MP of 606", "of 507", "of 408") |
+| `eb4` | `7b5d7bcd` | 12 of 12, attempts=1/1 | 12 of 12 (12 keys), one Study each | |
+| `eb5` | `2a2d83e5` | 12 of 12, attempts=1/1 | 12 of 12 (12 keys), one Study each, no confirm refusal | the narrowed waiver; in 10 of the 12 a Hidonite stood in slot 3 at the study |
+
+`eb5`'s twelve Hidon keys are the twelve of the main tree's own sweep
+(`hd`: `build/attempts/wt/v038-wor-sweeps-b4/hidon/out`, `a18e540d`), so
+`fight_report_eb5.txt` pairs them: Hidon+Hidonite 12 won of 12 in both,
+0.33 deaths a fight against 0.42, at most one down in both, the lowest HP
+at the median 76% in both and at worst 45% against 60%, and 13,373 ticks
+at the median against 7,942 (`eb4`'s figures to the tick): the study's two
+held turns and its cast make the fight longer, not harder. The randoms are
+the main tree's: $125 2,874 and $124 1,296.5 in both; $123 2,163.5 against
+2,052 because its key `beAC-g0123` comes up twice in each sweep (shifts 5
+and 7) and fight_report keeps one occurrence a key, `eb5_s5`'s (2,368
+ticks) on one side and `hd_s7`'s (1,757) on the other; every other $123
+key is the same to the tick (`fights_eb5.tsv`).
+
+**A lore picker, tried and dropped.** An arm (`nukeLore = "best"`, commits
+`1374d395`-`7b5d7bcd`, removed at `2a2d83e5`) weighed STRAGO's damage lores
+on each standing body's magic defense and elements and cast the cheapest
+within 85% of the best. What the labs found:
+
+- Ebot's randoms (`eb2` with the picker on; `fight_report_ebot.txt`, whose
+  labels `first`, `after` and `main_hd` are `eb`, `eb2` and `hd`): his
+  lores in place of his boosted Fight made them longer ($125 4,442 ticks at
+  the median against 2,874, $123 2,928 against 2,052). An unbroken body
+  takes half damage and the lores chip no shield of these species, where
+  his rod chips bludgeoning.
+- The Dirt Dragon (`opc`, the fixed order Aqua Rake then Aero, against
+  `opb`, the picker, a copy of the generator with that one line changed,
+  `opb_generator.diff`; both at `f993efeb`, from `eb2_s0`'s save with
+  GrandTrain, seed shifts 0-10, the same 7 keys; `fight_report_opera.txt`):
+  7 won of 7 in both. The picker planned Aero (wind, which the dragon is
+  weak to) 35 times for STRAGO and 33 for GOGO's Lore row, where the fixed
+  order planned Aqua Rake 42 and 34 times; 13 turns at the median against
+  15, 8,229 ticks against 8,724, but 0.29 deaths a fight against 0.14 and
+  the lowest HP at worst 49% against 67%. Seven keys do not settle it. The
+  Doom Gaze rows in the same report are not paired: its meetings follow
+  the dragon, so the two arms meet it on different keys (13 and 16).
+- Whoever revives it: its arithmetic was not the game's. It nulled before
+  it absorbed (the game absorbs first), let a half and a weakness on one
+  body both apply (they are exclusive), and capped at 9,999 before the
+  split rather than after.
+
+### 13.5 Left
+
+- **Lores off the line.** Pearl Wind (Sprinter, groups 49, 51, 52 by
+  Jidoor, while STRAGO grinds on 48), Rippler (Reach Frog on that grind,
+  54 battles with him; its `opts.strago.study`, without the hold, fired in
+  none of them in the 10-23 play) and
+  Blow Fish (Phase, Phoenix Cave) are reachable with STRAGO seated; a
+  study on the grind or a branch leg would teach them. Pearl Wind is the
+  one the driver already has a line for (the party heal).
+- **SABIN's Spiraler** comes at L42; he ends the line at L39. Bum Rush (99
+  MP) and Fire Dance are never cast; `opts.blitz` is one Blitz per leg.
+- **CYAN's Cleave** (3 BP, 99 MP) and Quadra Slice are never cast in the
+  World of Ruin: `opts.bushido` is set on three legs, none after the dream.
+- **GAU's Rages**: 10 of 256, and no WoR leg sets `opts.rage`.
+- **MOG's Dances**: 5 of 8; Forest Suite, Desert Aria and Earth Blues
+  need battles on those terrains with him seated.
+- **Lores weighed per fight**: a picker wants a fight where lores beat the
+  boosted Fight, and the Dirt Dragon more keys (encounters used up before
+  it) than the seven a seed shift reaches (13.4).

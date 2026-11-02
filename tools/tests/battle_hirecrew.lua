@@ -8,7 +8,11 @@
 -- when he can't be hired.  battle_hiredhelp holds the 1 BP and unboosted
 -- hires (merchant, soldier) and their purse; this holds the 3 and 2 BP ones.
 --
--- Played, not staged: Continue the wor-tomb-v1 battery, walk Darill's
+-- Played, not staged: Continue the wor-tomb-v1 battery, care to full and
+-- put the party's widest guard on SETZER (H.guardOn: the room's bodies
+-- Zombie him, and a Zombied SETZER takes no command while the others
+-- Defend for his plan; v0.38's wor-tomb-v1 wiped here, build/attempts/wt/
+-- v038-tomb-suites/), walk Darill's
 -- Tomb's east room into its randoms, and play SETZER through the real menu
 -- (H.setzerBattle): Defend, Defend, Hired Help at 3 BP; then, in a later
 -- battle, Defend and Hired Help at 2 BP; field care between battles (a
@@ -57,6 +61,11 @@ local stage, battles, recs = 1, 0, {}
 
 H.run({ maxFrames = 300000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
+  -- SETZER has to take every turn the plan needs, and the room's bodies
+  -- Zombie him (route-wor-falcon.md section 1, item 5): the party, cared to
+  -- full, hands him its widest guard before the walk
+  H.fieldCare({ threshold = 1.0, tag = "before the walk" }),
+  H.guardOn(9, "SETZER", 0x02, 0x20, { threats = H.ARC_THREATS["wor-falcon"], tag = "SETZER's guard" }),
   H.call(function() H.hireCrewArm() end),
   H.repeatN(SETZER_SKIP, { walkToBattle(), H.setzerBattle({}) }),
   H.driveUntil(function() return stage > #STAGES end, 280000, {

@@ -187,6 +187,11 @@ Eater with a gauge (`bwmut2`: "$171 the Zone Eater draws a gauge").
   Rod.  The leg from the graph's `wor-gogo-v1`, seed shifts 0-11, one
   attempt each: 12 of 12 PASS, 12 distinct Hidon keys, all won, 6,903 to
   13,705 ticks (`build/attempts/wt/v038-wor-sweeps-b4/hidon/sweep_hd.txt`).
+  Since #388 STRAGO studies Hidon: GrandTrain is in its script and no other
+  species', and the party beat it before it cast it, so he keeps his points
+  while it stands and casts his 3-BP Scan (wor-coverage.md section 13.4).
+  The price is a longer fight, not a harder one: on the same 12 keys, 12 won, 0.33 deaths a
+  fight against 0.42, 13,373 ticks at the median against 7,942 (lab `eb5`).
 - **Doom Gaze**: an attrition fight across meetings (its HP carries).  Lab
   `dg` (six runs from `wor-ebot-v1`, three seed shifts per arm): with TERRA
   seated it took 8, 14 and 13 meetings and left 14, 3 and 7 of 27-28 Fenix

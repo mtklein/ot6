@@ -189,3 +189,8 @@
 200	map 401 the Ancient Castle's cave, Magicite (18,28) (gen_wor_ancient)
 201	map 401 the Ancient Castle's cave, X-Potion (8,20) (gen_wor_ancient)
 206	map 406 the Ancient Castle's east corner, Punisher (59,6) -- by the courtyard's door (19,11) (gen_wor_ancient)
+144	map 311 the Tzen house, the monster box downstairs (102,49): Pm Stalker x4 -- on its clock (gen_wor_tzen_boxes, a branch)
+148	map 311 the Tzen house, the monster box upstairs (111,12): Pm Stalker x4 -- on its clock (gen_wor_tzen_boxes, a branch)
+170	map 282 Umaro's cave, the monster box (13,34): Pugs x3, below the drop (gen_wor_umaro_box, a branch)
+205	map 406 the Ancient Castle, the monster box (10,17): KatanaSoul (gen_wor_ancient_boxes, a branch)
+198	map 401 the Ancient Castle's cave, the monster box (58,43): Master Pug (gen_wor_ancient_boxes, a branch)

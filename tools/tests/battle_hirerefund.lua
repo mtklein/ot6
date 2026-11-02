@@ -9,7 +9,12 @@
 -- (H.setzerBattle): Defend twice (the bank to 3), then Hired Help at 3 BP,
 -- battle after battle until one of them has more hires than bodies to take
 -- them (at most four battles; a lone Mad Oscar of 2,900 HP falls to the
--- second hire at L31).  Every hire is held to the purse: the gil falls by
+-- second hire at L31).  Before the walk the party is cared to full and
+-- SETZER takes its widest guard (H.guardOn): the room's bodies inflict
+-- Zombie, and a Zombied SETZER takes no command while the others Defend
+-- for his plan (v0.38's wor-tomb-v1: PowerDemon and two Exorays Zombied
+-- him four times before the Hire and wiped the party, build/attempts/wt/
+-- v038-tomb-suites/).  Every hire is held to the purse: the gil falls by
 -- one fee (level x 50) for each hire that landed on a body (each landed
 -- hire is a chip call on a monster) and by nothing for one that found none,
 -- and TakeGil is reached once a landed hire.
@@ -50,6 +55,11 @@ end
 
 H.run({ maxFrames = 220000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
+  -- SETZER has to take every turn the plan needs, and the room's bodies
+  -- Zombie him (route-wor-falcon.md section 1, item 5): the party, cared to
+  -- full, hands him its widest guard before the walk
+  H.fieldCare({ threshold = 1.0, tag = "before the walk" }),
+  H.guardOn(9, "SETZER", 0x02, 0x20, { threats = H.ARC_THREATS["wor-falcon"], tag = "SETZER's guard" }),
   H.driveUntil(function() return short >= 1 end, 200000, {
     H.call(function()
       battles = battles + 1
