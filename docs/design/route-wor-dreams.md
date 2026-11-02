@@ -523,14 +523,14 @@ its item) and listed in `tools/chests_opened.txt`:
 | Ether, Wing Edge, Doom Darts, Magicite, X-Potion | the Ancient Castle's cave (401 (55,21), (45,21), (49,46), (18,28), (8,20)) | on the way from basement 1 to the save room |
 | Punisher | 406 (59,6), the castle's east corner | only the courtyard's door (407 (19,11) -> 406 (55,11)) reaches it (route_data field-path from (33,12): no path); back by (55,12) |
 | X-Potion, Ice Shld | the dream's first car (321 (24,9), (16,8)) | on the way in, the levers as the car loads (both reachable then) |
-| Elixir, Ether, Remedy, X-Potion | the dream's Doma (126 (52,47), (56,47), (55,5), (33,34)), after the hunt | the waking Doma (123) shares the bits, but there the X-Potion stands behind the door (16,32) to map 124 (dev run `d1_doma`: "no side of it is reachable from (55,6)"); 126 joins it on the same map |
+| Elixir, Ether, Remedy, X-Potion | the dream's Doma (126 (52,47), (56,47), (55,5), (33,34)), before Wrexsoul on the main line (the hunt is a branch leg) | the waking Doma (123) shares the bits, but there the X-Potion stands behind the door (16,32) to map 124 (dev run `d1_doma`: "no side of it is reachable from (55,6)"); 126 joins it on the same map |
 | Fenix Down, Beads | the waking Doma, 123 (28,49), (31,50) | no door of 126's floor reaches their room (`d2_doma`: "no side of it is reachable from (33,35)"); in 123 the ramparts' east door does (123 (17,39) -> 285 (37,13), 285 (50,37) -> 123 (28,54)), on the way out |
 
 The two monster boxes (401 (58,43) Master Pug, 406 (10,17) KatanaSoul) are
 #487's. The Wing Edge, Doom Darts and Punisher are LOCKE's, SETZER's and
 STRAGO's, RELM's or GOGO's to wear; this arc's party carries them.
 
-**The line's play.** The replay at a18e540d played the four branch legs:
+**The line's play.** The line was played across four runs, not in one: f1 at 09f9e3b8 (the World of Balance through wor_sabin, interrupted), g1 at 737c2a19 (wor_island_plain through wor_tritoch), g2 at 737c2a19 (failed at wor_ebot) and g3 at a18e540d (rc=0). The only reach of a18e540d's library change is the Hidon re-arm, which g3 replayed. In g2 wor_relm wiped once and passed on attempt 2 ("attempt 1/3 FAILED class=wipe frame=28415", "PASS (frame 393088) attempts=2/3"). G3 played the four branch legs:
 "wor_dream_hunt generated: map 317 (26,52); formations won: 312 314 315
 316", "wor_dream_cave_hunt generated: map 319 (17,25); formations won: 137
 311 313", "wor_doma_hunt generated: map 126 (8,10); formations won: 309 310
@@ -580,7 +580,9 @@ the castle, 2 to Lethal Wpn's `$B6` in one fight ("CELES 413/5241; CYAN
 102/3237"). Every fight was won.
 
 The asserts' negatives (`scripts/mkmut.py`, one line each, class=assert;
-run at 7ce9a6f5, before the rebase onto fa5425f1, from the tracked
+run at 53f07b59 with a dirty tree (the edits that became 7ce9a6f5: each
+`n_*/commit.txt` reads 53f07b59 and `status.txt` lists the changed
+`gen_wor_*.lua`), before the rebase onto fa5425f1, from the tracked
 checkpoints of the time): the cave's Ether not opened, "401: the chest of bit 196 is open: got false"
 (`out/n_ancient_cave`); the Punisher not opened, "406: the Punisher's chest
 (bit 206) is open: got false" (`out/n_ancient_punisher`); the first car's
@@ -593,7 +595,7 @@ the dream's Doma (126): wor_dream's save: got 126 ($7E), want 125 ($7D)"
 (`out/n_doma_boot`). The hunt's own asserts (the pool, the two bounds,
 every formation won) are route-wor-gogo.md section 10's.
 
-**On the branch legs** (the replay at a18e540d, `build/attempts/wt/v038-wor-sweeps-b4/chain/`), from the graph's captures at that play, K 0-5 at seed shift 0, one attempt each (`build/attempts/wt/v038-wor-sweeps-b4/sweeps/`: `lab_hunt.lua`, `sweep.sh`, `tally.py`; `b4*_k*_s0/`, `tally_b4*.txt`) (the dream's Doma from the graph's `wor-dream-v1`): 30
+**On the branch legs** (the line's four runs, `build/attempts/wt/v038-wor-sweeps-b4/chain/`; the sweep ran with OT6_TIMEOUT=9000 against the graph's 7200), from the graph's captures at that play, K 0-5 at seed shift 0, one attempt each (`build/attempts/wt/v038-wor-sweeps-b4/sweeps/`: `lab_hunt.lua`, `sweep.sh`, `tally.py`; `b4*_k*_s0/`, `tally_b4*.txt`) (the dream's Doma from the graph's `wor-dream-v1`): 30
 of 30 PASS, the longest hunt 35 battles of its 110 (the dreamscape's).
 
 | formation | fights | keys | won | keys with a fall |

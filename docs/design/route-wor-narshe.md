@@ -988,7 +988,7 @@ with an action read, 8 are its `cmd $0C atk $99` and 1 its `$EF`
 of his HP or more ("MOG 783/2208"). The party wins the Pug every time, with
 a fall in a third of its keys; the hunt meets it once.
 
-**On the branch legs** (the replay at a18e540d, `build/attempts/wt/v038-wor-sweeps-b4/chain/`), from the graph's captures at that play, K 0-5 at seed shift 0, one attempt each (`build/attempts/wt/v038-wor-sweeps-b4/sweeps/`: `lab_hunt.lua`, `sweep.sh`, `tally.py`; `b4*_k*_s0/`, `tally_b4*.txt`): 12 of 12 PASS, the landing's hunt 8 to 10
+**On the branch legs** (the line's four runs, `build/attempts/wt/v038-wor-sweeps-b4/chain/`; the sweep ran with OT6_TIMEOUT=9000 against the graph's 7200), from the graph's captures at that play (the cave and pocket captures are the 737c2a19 play's: wor_tritoch and wor_umaro_hunt were not regenerated in g3), K 0-5 at seed shift 0, one attempt each (`build/attempts/wt/v038-wor-sweeps-b4/sweeps/`: `lab_hunt.lua`, `sweep.sh`, `tally.py`; `b4*_k*_s0/`, `tally_b4*.txt`): 12 of 12 PASS, the landing's hunt 8 to 10
 battles, the pocket's 10 to 15.
 
 | formation | fights | keys | won | keys with a fall |

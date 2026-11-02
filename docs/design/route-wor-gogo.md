@@ -629,8 +629,8 @@ the tracked `wor-gau-v1` at seed shifts 0-3 (`build/attempts/wt/v038-wor-sweeps-
 before, `bn_s*` after; `scripts/abtally.py`): 3 of 4 PASS before ("timeout
 after 6000 frames driving toward 276" at shift 3), 4 "BUDGET SPENT", the
 longest stand 5759 frames; 4 of 4 after, none spent, the longest stand 1852.
-The FakeMustache's walk drops down the shaft more on the way (7-11 times
-against 1-5, of its 30 tries). A cap of 0.3 on the risk patience takes was
+The FakeMustache's walk drops down the shaft more on the way (11, 7, 9 and 7 times after the last target, against 5, 2, 9 and
+3 before, the last at the failure, e.g. `bo_s2` "21,33:8/9"). A cap of 0.3 on the risk patience takes was
 tried and dropped (`bc_s*`: 28-33 "BUDGET SPENT" a run).
 
 **The gear downstream.** The gear and relic care picks the new pieces up on
@@ -652,8 +652,8 @@ no longer fills a member's second slot with a second Ribbon. Both act only
 after a first Ribbon is planned. Step 4b never takes the Exp. Egg's slot
 (aff "behind", as `M.eggMayDisplace`), and since #495 it arms for bosses
 too: it was first kept off them to avoid drift, but it never displaces a
-ward, so a boss kit keeps its wards (gen_wor_tritoch's Ice Dragon gives
-TERRA's slot to the Czarina Ring) and wears the spare Ribbon over a
+ward, so a boss kit keeps its wards (gen_wor_tritoch's Ice Dragon puts the Barrier Ring in TERRA's slot 4 over
+her Ribbon and the Czarina Ring in slot 5 over her Earrings) and wears the spare Ribbon over a
 lower-ranked relic: "Ribbon $CA goes to MOG's slot 4 (over Peace Ring $B2, planned Peace Ring $B2): a Ribbon the plan left in the bag goes on a member planned without one (step 4b)", and "the Ice Dragon: battle $16E won after 7784 ticks, 4 seated" (`build/attempts/wt/v038-wor-sweeps-b4/chain/wor_tritoch.log.gz`, the play at 737c2a19). A first cut that placed every Ribbon
 before the ranked relics changed plans that already wore them all (the
 replay's `wor-narshe-v1` drifted: "CYAN gear: fresh 2E 5E 7A 98 B2 C3,
@@ -772,7 +772,7 @@ hub's step bound is lower than the other hunts' (its rate code: "a battle
 within 101 steps"). The rock has no chest a player keeps: its coral chests
 are the coral hunt's.
 
-**The line's play.** The replay at a18e540d played both branch legs:
+**The line's play.** The line was played across four runs, not in one: f1 at 09f9e3b8 (the World of Balance through wor_sabin, interrupted), g1 at 737c2a19 (wor_island_plain through wor_tritoch), g2 at 737c2a19 (failed at wor_ebot) and g3 at a18e540d (rc=0). The only reach of a18e540d's library change is the Hidon re-arm, which g3 replayed. In g2 wor_relm wiped once and passed on attempt 2 ("attempt 1/3 FAILED class=wipe frame=28415", "PASS (frame 393088) attempts=2/3"). G3 played both branch legs:
 "wor_ebot_hunt generated: map 405 (7,23); formations won: 295 296 297 298"
 and "wor_ebot_rooms_hunt generated: map 404 (5,18); formations won: 291 292
 293 294" (`build/attempts/wt/v038-wor-sweeps-b4/chain/ninja_g3.log`).
@@ -800,13 +800,16 @@ The one fall is GOGO's in a 298 ("GOGO 590/3101", a plain blow from a
 fifth of his HP: `out/falls_eh.txt`, "cmd $00 atk $FF x1").
 
 The asserts' negatives (`scripts/mkmut.py`, one line each, class=assert;
-run at 7ce9a6f5, before the rebase onto fa5425f1, from the tracked
-checkpoints of the time): the rooms' hunt switched off, "the coral hunt: the rooms (404) were hunted
-on the first landing in them: got false" (`out/n_ebot_rooms`); the mouth's
+run at 53f07b59 with a dirty tree (the edits that became 7ce9a6f5: each
+`n_*/commit.txt` reads 53f07b59 and `status.txt` lists the changed
+`gen_wor_*.lua`), before the rebase onto fa5425f1, from the tracked
+checkpoints of the time): the rooms' hunt switched off, "assertEq failed: the coral hunt: the rooms (404) were captured on the
+first landing in them: got false, want true" (`out/n3_ebot_rooms`, at
+8fdc6159 with the shipped assert's edits dirty); the mouth's
 tile counted a step-on tile, "the hub's lap starts off its step-on tiles:
 got true" (`out/n_ebot_lap`).
 
-**On the branch legs** (the replay at a18e540d, `build/attempts/wt/v038-wor-sweeps-b4/chain/`), from the graph's captures at that play, K 0-5 at seed shift 0, one attempt each (`build/attempts/wt/v038-wor-sweeps-b4/sweeps/`: `lab_hunt.lua`, `sweep.sh`, `tally.py`; `b4*_k*_s0/`, `tally_b4*.txt`): 12 of 12 PASS, each hunt 11 to 15 battles.
+**On the branch legs** (the line's four runs, `build/attempts/wt/v038-wor-sweeps-b4/chain/`; the sweep ran with OT6_TIMEOUT=9000 against the graph's 7200), from the graph's captures at that play, K 0-5 at seed shift 0, one attempt each (`build/attempts/wt/v038-wor-sweeps-b4/sweeps/`: `lab_hunt.lua`, `sweep.sh`, `tally.py`; `b4*_k*_s0/`, `tally_b4*.txt`): 12 of 12 PASS, each hunt 11 to 15 battles.
 
 | formation | fights | keys | won | keys with a fall |
 |---|---|---|---|---|
