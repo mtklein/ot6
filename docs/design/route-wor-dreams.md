@@ -194,6 +194,8 @@ dream with every SwdTech, and his katana keys every body here.
 | Lethal Wpn `$045` | 144 | 47 / 9,200 | weak bolt, water | 4 | slash, bludgeon | a machine: cut its cables or crush it |
 | Boxed Set `$051` | 144 | 45 / 4,020 | weak holy | 3 | slash, bludgeon | an empty armor |
 | Blue Drgn `$152` | event 137 | 65 / 26,900 | weak bolt; absorbs water | 6 | slash, pierce | a water dragon's scales |
+| Master Pug `$138` | event 113 (the cave's box) | 73 / 22,000 | none (WallChange moves the one it takes); absorbs water | 6 | slash, special | the Pugs' row |
+| KatanaSoul `$124` | event 95 (the castle's box) | 61 / 37,620 | weak poison | 6 | slash, pierce | a swordsman's ghost: steel answers steel, as the Samurai |
 
 The courtyard's pool (145) also deals the train's Barb-e, Samurai and
 Suriander, each of them keyed by slash.
@@ -217,7 +219,13 @@ mutants (`mkmut.py`): the Soul Savers with slash (`mutRA`: "$167 SoulSaver
 class mask $09, want $08", "$167 SoulSaver: class $09, want the brush alone
 ($08)"), the Lethal Wpn without slash (`mutRB`: "$045 Lethal Wpn class mask
 $06, want $05", "$045 Lethal Wpn: CYAN alone (the Ancient Castle) holds no
-key").
+key").  The two monster boxes' rows joined in v0.38 (#487): 25 rows, with event
+groups 113 and 95 ("checked 25 designed rows", "checked 30 formations, 59
+formation-species-hands triples", "CYAN alone (the Ancient Castle) keys 14
+of 14"; red on the ROM without them, "$124 KatanaSoul has no Ot6ShieldTbl
+row", "$138 Master Pug: CYAN alone (the Ancient Castle) holds no key",
+"mismatches: got 5"; `build/attempts/wt/v038-monster-boxes/ancient/bd1`,
+`bd_neg`).
 
 ## 4. The bosses
 
@@ -527,7 +535,11 @@ its item) and listed in `tools/chests_opened.txt`:
 | Fenix Down, Beads | the waking Doma, 123 (28,49), (31,50) | no door of 126's floor reaches their room (`d2_doma`: "no side of it is reachable from (33,35)"); in 123 the ramparts' east door does (123 (17,39) -> 285 (37,13), 285 (50,37) -> 123 (28,54)), on the way out |
 
 The two monster boxes (401 (58,43) Master Pug, 406 (10,17) KatanaSoul) are
-#487's. The Wing Edge, Doom Darts and Punisher are LOCKE's, SETZER's and
+a branch since #487, `gen_wor_ancient_boxes` (from `wor_ancient_yard`;
+nothing boots it): the KatanaSoul by the courtyard's door (407 (11,10) ->
+406 (10,21)), then the Master Pug by way of 402 and the cave, each after
+care to full. They pay no XP; their sure drops are an Offering and a
+Graedus (wor-coverage.md section 12). The Wing Edge, Doom Darts and Punisher are LOCKE's, SETZER's and
 STRAGO's, RELM's or GOGO's to wear; this arc's party carries them.
 
 **The line's play.** The line was played across four runs, not in one: f1 at 09f9e3b8 (the World of Balance through wor_sabin, interrupted), g1 at 737c2a19 (wor_island_plain through wor_tritoch), g2 at 737c2a19 (failed at wor_ebot) and g3 at a18e540d (rc=0). The only reach of a18e540d's library change is the Hidon re-arm, which g3 replayed. In g2 wor_relm wiped once and passed on attempt 2 ("attempt 1/3 FAILED class=wipe frame=28415", "PASS (frame 393088) attempts=2/3"). G3 played the four branch legs:

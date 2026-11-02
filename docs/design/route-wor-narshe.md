@@ -168,8 +168,12 @@ From the tracked SRAM (`wor-cyan-v1_dump.txt`, `wor-cyan-v1_roster.txt`):
     save beside the Falcon outside Narshe, `wor-narshe-v1`.
 
 Not on the way: the Pugs' chest (282 (13,34), event group 152: three
-Pugs, L99, 14,001 HP each, evade 150, counter Pearl, XP 0; `pools.txt`).
-A chest that is only a fight with nothing in it; the plan leaves it shut.
+Pugs, L99, 14,001 HP each, evade 150, counter Pearl, XP 0; `pools.txt`),
+in the pocket below the drop (14,30), reached by 281 (9,52) -> 282 (16,32).
+The line leaves it shut; the branch `gen_wor_umaro_box` (from
+`wor_tritoch_cave`; nothing boots it) opens it and wins it at the line's
+levels (wor-coverage.md section 12). Its prize is a Minerva one time in
+eight from each Pugs (MonsterItems).
 The two elder's-house Elixirs (map 30 (105,14) from map 32's (18,22);
 (55,30) from (49,12) or (53,9); `chests_reach.txt`) are a few steps off the
 town's main street. The second was opened in the World of Balance; the
@@ -226,7 +230,8 @@ lesson: section 11.3.)
 | Tritoch `$144` | event 119 | 62 / 30,000 | weak fire; absorbs ice; nulls bolt, poison, wind, holy, earth, water; **def 254**; Float | 10 | slash, pierce | blades and the spear chip what they barely hurt (DESIGN.md: any damaging hit on a weakness chips; measure that a 1-damage hit does); fire burns it |
 | Ice Dragon `$149` | event 132 | 74 / 24,400 | weak fire; absorbs ice | 10 | pierce, bludg | MOG's spear is the class key; fire is everyone's |
 
-Not designed: Pugs `$0FF` (the chest the plan leaves shut).
+Pugs `$0FF` (the chest) carries the Pug's row, 4 · slash, special, and
+`battle_breakwor_narshe` checks it with event group 152.
 
 Tritoch `$144`'s row today is `0, $00` under "scripted set-pieces"
 (`ot6_hud.asm:2263`), beside the World of Balance records `$114` and `$115`

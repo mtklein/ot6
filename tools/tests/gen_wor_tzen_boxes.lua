@@ -4,8 +4,9 @@
 -- (16,9), and the house (map 311) by its two monster boxes: the one downstairs (102,49), up by the link, the child
 -- (117,12), the one upstairs (111,12), down by the link and out; then Sabin's joining.  Each box is four Pm
 -- Stalkers (event group 150, formation 211, L26), an event battle the clock runs through and a game over when
--- lost (TreasureMonster: _ca5ea9).  A box is opened when the time left covers its fight (BOX_FIGHT_COST) and the
--- walk still ahead, as a player watching the clock would; otherwise it is said and left.  The line's six item
+-- lost (TreasureMonster: _ca5ea9).  A box is opened when the time left covers its fight (BOX_FIGHT_COST), the
+-- walk still ahead and a run from the random battles that walk can expect (BOX_RUN_COST each, one per BOX_STEPS
+-- steps), as a player watching the clock would; otherwise it is said and left.  The line's six item
 -- chests are the line's (gen_wor_sabin); this walk takes the boxes instead.  No leg boots what it leaves (the
 -- state `wor_tzen_boxes`): the boxes pay 1,032 XP a box and no item, which the main line does not need, and the
 -- house collapses behind Sabin's joining ($028A: _cc56da no longer draws it), so there is no later visit.
@@ -27,9 +28,15 @@ local HOUSE_FRAMES = 21600
 -- the house's random fights, for the driver's run rule (gen_wor_sabin's measure)
 local HOUSE_FIGHT_COST = 4151
 -- What a box's fight costs of the clock, from the frames left when the party weighs it to the frames left when
--- its fight is won (the box's window, the battle, its close): the worst of 46 box fights in 32 distinct keys,
--- 3614-5211 frames, median 4259 (build/attempts/wt/v038-monster-boxes/tzen/boxcost_tz.txt, at 6000 here).
-local BOX_FIGHT_COST = 5211
+-- its fight is won (the box's window, the battle, its close): the worst of 48 box fights, 3614-5563 frames,
+-- median 4259 (build/attempts/wt/v038-monster-boxes/tzen/: boxcost_tz.txt, 46 at a cost of 6000 here; tz2, two
+-- at 5211, one of them 5563).  And the walk after it can meet a random battle the clock no longer covers, which
+-- the run rule runs from: the longest run of the house's was 873 ticks (the same sweeps' "PARTY LEFT" lines),
+-- 1200 frames with the battle's open and close; one is expected every 45 steps (the house's rate: $0070 a step
+-- halved, a battle every 44.8 steps on average, route_data.py map 311).  At the cost alone (5211 and no run) the
+-- box upstairs was opened with 6938 frames left and the clock ran out at the door after a run (tz2_k6_s0: "LOST:
+-- the house's timer ran out at f42939 on map 305 (15,9) -- child rescued").
+local BOX_FIGHT_COST, BOX_RUN_COST, BOX_STEPS = 5563, 1200, 45
 local BOX_FORM = 211
 -- the boxes (TreasureProp 311; route-wor-sabin.md 3.4): the stand below each, faced up
 local BOXES = {
@@ -159,13 +166,17 @@ end
 -- the walk still ahead to the exit, in frames, from where the party stands (gen_wor_sabin's aheadFrames,
 -- without the boxes' fights: a box is weighed when the party stands below it)
 local legNo, ahead, aheadAt = 1, 0, nil
-local function walkAhead(from)
+local function stepsAhead(from)
   local steps, links = 0, 0
   for i = from, #HOUSE_LEGS do
     local l = HOUSE_LEGS[i]
     steps = steps + l[3]
     if l.link then links = links + 1 end
   end
+  return steps, links
+end
+local function walkAhead(from)
+  local steps, links = stepsAhead(from)
   return steps * STEP_FRAMES + links * LINK_FRAMES + (sw(0x028B) == 0 and CHILD_FRAMES or 0)
 end
 local function aheadFrames()
@@ -188,10 +199,12 @@ local boxes = {}                                    -- what each box came to: "o
 local function box(o, after)
   local n0
   return H.cond(function()
-    local left, need = timer0(), BOX_FIGHT_COST + walkAhead(after)
+    local runs = stepsAhead(after) // BOX_STEPS
+    local left, need = timer0(), BOX_FIGHT_COST + walkAhead(after) + runs * BOX_RUN_COST
     local go = left >= need
-    H.log(string.format("[box] %s: %d frames left, its fight ~%d + %d of walk ahead = %d: %s", o.what, left,
-      BOX_FIGHT_COST, need - BOX_FIGHT_COST, need, go and "opened" or "LEFT SHUT (the clock cannot cover it)"))
+    H.log(string.format("[box] %s: %d frames left, its fight ~%d + %d of walk ahead + %d run(s) of %d = %d: %s",
+      o.what, left, BOX_FIGHT_COST, walkAhead(after), runs, BOX_RUN_COST, need,
+      go and "opened" or "LEFT SHUT (the clock cannot cover it)"))
     if not go then boxes[#boxes + 1] = o.what .. " left" end
     return go
   end, {
