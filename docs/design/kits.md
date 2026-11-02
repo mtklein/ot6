@@ -1320,9 +1320,7 @@ player prunes the kit all game. Same model, different collection verbs:
     on a body that can teach a lore he lacks, aimed past any body in
     Reflect; `studyHold` keeps his points unspent while that body stands,
     for a teacher the party would otherwise kill first (Hidon, GrandTrain's
-    only one: wor-coverage.md section 12).  `opts.nukeLore = "best"` weighs
-    his damage lores on the bodies' own bytes (`M.bestLore`,
-    `lore_pick_selftest`); no leg uses it yet (the labs: wor-coverage.md 12.4).
+    only one: wor-coverage.md section 13).
   - **Bserk, by watching** (`ot6_blue.asm`, owner 2026-10-27: Berserk
     "available in a few ways", blue magic and a caster whose spell list
     was thin among them).  The first battle in which a monster inflicts
