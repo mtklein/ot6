@@ -239,9 +239,10 @@ local function box(o, after)
     H.faceAndHoldA(o.face, function() guard(); return H.battleLoadStarted() end, 3000,
       o.what .. ": face " .. o.face .. ", A (Monster-in-a-box!, EventCmd_8e)"),
     H.release(),
+    -- until the box's battle has been said and the party stands in the house again (the bit is asserted after)
     H.advanceStory(function()
       guard()
-      return H.chestOpen(o.bit) and not H.battleLoadStarted() and map() == MAP_HOUSE and H.hasControl()
+      return #H.outcomes > n0 and not H.battleLoadStarted() and map() == MAP_HOUSE and H.hasControl()
         and H.tileAligned() and not H.dialogWaiting()
     end, 60000, { playBattles = "tactical",
       fight = { timedFightCost = HOUSE_FIGHT_COST, timedWalk = function() return keepFrames() end } }),
