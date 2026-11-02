@@ -385,6 +385,15 @@ H.run({ maxFrames = 200000 }, {
     end
     H.assertEq(table.concat(boxes, ", "):find("left") == nil, true, "no box left shut: " .. table.concat(boxes, ", "))
   end),
+  -- SABIN joins with nothing equipped; the town's counters dress him as
+  -- the main line's do (gen_wor_sabin's gearStop), so the branch's save
+  -- hands him something to fight with (audit_equipment)
+  H.gearStop({ tag = "gear Tzen (the boxes' branch)" }),
+  H.call(function()
+    local hands = { H.readByte(0x1600 + 37 * SABIN + 0x1F), H.readByte(0x1600 + 37 * SABIN + 0x20) }
+    H.assertEq(hands[1] ~= 0xFF or hands[2] ~= 0xFF, true,
+      string.format("SABIN holds a weapon after the town's counters (hands %02X %02X)", hands[1], hands[2]))
+  end),
   H.fieldCare({ threshold = 1.0, tag = "after the house, Sabin joined" }),
   H.saveState("wor_tzen_boxes.mss"),
   H.logStep(function()
