@@ -7,6 +7,10 @@
 -- party's gil is written to PURSE before the walk, because the battery
 -- carries a quarter of a million and no route shop empties it on cue.
 -- Everything after is played: Continue the wor-tomb-v1 battery (SETZER L31),
+-- care to full and SETZER in the party's widest guard (H.guardOn: the
+-- room's bodies Zombie him, and a Zombied SETZER takes no command while the
+-- others Defend for his plan; v0.38's wor-tomb-v1 wiped here,
+-- build/attempts/wt/v038-tomb-suites/),
 -- walk Darill's Tomb's east room into a random battle, and play SETZER's
 -- table through the real menu (H.setzerBattle): two Defends first (the
 -- bank to 3), then the steps.  A boost buys one more throw or hire at the
@@ -65,6 +69,11 @@ local plan
 
 H.run({ maxFrames = 200000 }, {
   H.bootCheckpoint("wor-tomb-v1"),
+  -- SETZER has to take every turn the plan needs, and the room's bodies
+  -- Zombie him (route-wor-falcon.md section 1, item 5): the party, cared to
+  -- full, hands him its widest guard before the walk
+  H.fieldCare({ threshold = 1.0, tag = "before the walk" }),
+  H.guardOn(9, "SETZER", 0x02, 0x20, { threats = H.ARC_THREATS["wor-falcon"], tag = "SETZER's guard" }),
   H.call(function()
     setPurse(PURSE)
     local lv = H.readByte(0x1600 + 37 * 9 + 8)

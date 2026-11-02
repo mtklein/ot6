@@ -8582,6 +8582,40 @@ function M.dressRelics(members, opts)
   }
 end
 
+-- M.guardOn(ch, name, s1, s2, opts): a kit suite's setup.  The member whose
+-- turns the suite plays wears the party's widest guard (relicPlan's step 2
+-- with opts.guardTo = ch; the others' relics planned by the same rule
+-- against opts.threats, default the statuses s1/s2), through the Relic menu
+-- (M.dressRelics), and the precondition is asserted after: his two relic
+-- slots block every STATUS1 bit of s1 and STATUS2 bit of s2 (ItemProp +6,
+-- +7).  A person testing one character's commands in a room whose bodies
+-- inflict those statuses gives that character the Ribbon first, so a turn
+-- the status would take stays his.
+local CHAR_NAMES = { "TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN", "CELES", "STRAGO", "RELM", "SETZER",
+  "MOG", "GAU", "GOGO", "UMARO" }
+function M.guardOn(ch, name, s1, s2, opts)
+  opts = opts or {}
+  local tag = opts.tag or ("the guard on " .. name)
+  local members = {}
+  for c = 0, 13 do members[#members + 1] = { c, CHAR_NAMES[c + 1] } end
+  return M.seqStep({
+    M.dressRelics(members, { guardTo = ch, threats = opts.threats or { s1 = s1, s2 = s2 }, tag = tag }),
+    M.call(function()
+      local b1, b2, worn = 0, 0, {}
+      for s = 4, 5 do
+        local id = charByte(ch, 0x1F + s)
+        worn[#worn + 1] = relicName(id)
+        if id ~= 0xFF then b1, b2 = b1 | itemProp(id, 6), b2 | itemProp(id, 7) end
+      end
+      M.log(string.format("[%s] %s wears %s: STATUS1 blocked $%02X, STATUS2 $%02X (wanted $%02X, $%02X)", tag, name,
+        table.concat(worn, ", "), b1, b2, s1, s2))
+      M.assertEq((b1 & s1) == s1 and (b2 & s2) == s2, true, string.format("%s: %s's relics block STATUS1 $%02X and "
+        .. "STATUS2 $%02X (he wears %s; a guard that covers them must be in the party's bag or on a member)", tag,
+        name, s1, s2, table.concat(worn, ", ")))
+    end),
+  })
+end
+
 -- M.relicKit(ch, name, kit, opts): a route's fixed relics through the
 -- relic rule.  kit = { [4] = id, [5] = id } (either may be left out: that
 -- slot is planned from what is worn).  When the step is reached,
