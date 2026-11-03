@@ -350,8 +350,11 @@ in 30 fights (sections 5.3, 8.2).
 - **Zozo's clock and the Chain Saw.** Taken since v0.38 (#485), with
   Maranda's two chests and Zozo's Tonic and Tincture; Zozo's two pools are
   hunted on a branch, gen_wor_zozo_hunt (wor-coverage.md section 11). The north rooms and the rooftop
-  (the Thief Glove, the Fire Knuckle, the RunningShoes, an X-Potion) stay
-  behind the stair room's liars and the building jumps.
+  (the Thief Glove, the Fire Knuckle, the RunningShoes, an X-Potion) are
+  opened on a branch too, gen_wor_zozo_north, which walks the World of
+  Balance's climb past the stair room (wor-coverage.md section 11.9); the
+  line goes on without them. Mt. Zozo's caves' pool is hunted on
+  gen_wor_mtzozo_hunt, from `wor-mtzozo-v1`.
 - **The planner's 4096-node cap** (section 3) is the library's; raising it
   could change which side an approach picks in the chain's other
   generators, so the waypoints stay generator-local.

@@ -282,7 +282,9 @@ end
 
 -- the step check, parameterized on the party z-level so the pathfinder can
 -- track z along a hypothetical path instead of assuming it constant
-local function stepAllowed(x, y, move, z)
+-- bodies: false leaves out the object-map test (M.wallFirstStep's planner,
+-- which waits walkers out rather than routing around them)
+local function stepAllowed(x, y, move, z, bodies)
   local c = M.readByte(0x7E7600 + M.maptile(x, y))     -- p1(cur)
   local press = PRESS[move]
   local diag = diagStep(x, y, c, press, z)
@@ -307,7 +309,7 @@ local function stepAllowed(x, y, move, z)
   elseif (((c & 0x03) ~ 0x03) & (t & 0x03)) ~= 0 then
     return false                          -- z-levels incompatible
   end
-  if (M.readByte(0x7E2000 + (ny & 0xFF) * 256 + (nx & 0xFF)) & 0x80) == 0 then
+  if bodies ~= false and (M.readByte(0x7E2000 + (ny & 0xFF) * 256 + (nx & 0xFF)) & 0x80) == 0 then
     return false                          -- an NPC/object stands there
   end
   return true
@@ -389,6 +391,278 @@ function M.bfsPath(tx, ty, blockedEdges, avoid, zStart)
     end
   end
   return nil
+end
+
+-- ---- Zozo's climb as drives (#502) ------------------------------------
+-- gen_zozo4_dadaluma's door-walled step model, its stair conveyor, its
+-- per-tile walks and its jump rows, taking their tile tables as arguments:
+-- the World of Ruin's north rooms (gen_wor_zozo_north, wor-coverage.md
+-- section 11.9) walk the World of Balance's climb.  The library's planner
+-- misreads these maps (z-loop beams it mispredicts, a one-wide stair whose
+-- seven walkers never stand still), so the walks are tables of moves, each
+-- gated by M.canStep, so a body in the way is waited out.  Changes from the
+-- World of Balance's copy: no in-leg savestate reload (a failed walk fails
+-- with its frame; the retry is the runner's, from the boot), and a field
+-- dialog on a walk that should meet none is a failure, not an A press (the
+-- crane's "Use the crane to go down?" defaults to Yes).
+
+function M.tileKey(x, y) return y * 256 + x end
+
+-- A M.tableWalk moves table from a path of tiles, "x,y x,y ..." as
+-- tools/route_data.py field-path prints it (its BFS carries the z-level
+-- along the path, and on Zozo's roofs it gives gen_zozo4_dadaluma's
+-- measured tables): the move from each tile to the next.  A tile the path
+-- crosses twice (a z-loop's crossing) lists its later move first, so the
+-- live z picks the pass: the later move is not allowed on the earlier pass,
+-- or the path would be shorter.
+function M.movesAlong(path)
+  local NAME = { ["0,-1"] = "up", ["1,0"] = "right", ["0,1"] = "down", ["-1,0"] = "left", ["1,-1"] = "upright",
+    ["1,1"] = "downright", ["-1,1"] = "downleft", ["-1,-1"] = "upleft" }
+  local tiles = {}
+  for x, y in path:gmatch("(%d+),(%d+)") do tiles[#tiles + 1] = { tonumber(x), tonumber(y) } end
+  local t = {}
+  for i = 1, #tiles - 1 do
+    local a, b = tiles[i], tiles[i + 1]
+    local mv = NAME[(b[1] - a[1]) .. "," .. (b[2] - a[2])]
+    assert(mv, string.format("M.movesAlong: (%d,%d) -> (%d,%d) is not one step", a[1], a[2], b[1], b[2]))
+    local k = M.tileKey(a[1], a[2])
+    t[k] = t[k] or {}
+    table.insert(t[k], 1, mv)
+  end
+  return t
+end
+
+-- The first move of the shortest path from (sx, sy) to (tx, ty) over every
+-- z, `walls` (a set of M.tileKey: the map's doors) walls but the target, and
+-- the object map left out (the stair's walkers are waited out, not routed
+-- around).  nil when there is none.
+function M.wallFirstStep(sx, sy, tx, ty, walls)
+  local xm, ym = M.readByte(0x0086), M.readByte(0x0087)
+  local function nkey(x, y, z) return (z << 16) | (y << 8) | x end
+  local seen, q, qi = {}, {}, 1
+  for z = 0, 3 do
+    seen[nkey(sx, sy, z)] = true
+    q[#q + 1] = { sx, sy, z, nil }
+  end
+  while qi <= #q do
+    local x, y, z, f = q[qi][1], q[qi][2], q[qi][3], q[qi][4]
+    qi = qi + 1
+    if x == tx and y == ty then return f end
+    local zn = zAfter(x, y, z)
+    for _, mv in ipairs(MOVES) do
+      local d = DELTA[mv]
+      local nx, ny = x + d[1], y + d[2]
+      if nx >= 0 and ny >= 0 and nx <= xm and ny <= ym
+         and (not walls[M.tileKey(nx, ny)] or (nx == tx and ny == ty)) then
+        local k = nkey(nx, ny, zn)
+        if not seen[k] and stepAllowed(x, y, mv, z, false) then
+          seen[k] = true
+          q[#q + 1] = { nx, ny, zn, f or mv }
+        end
+      end
+    end
+  end
+  return nil
+end
+
+-- the per-frame battle hand of the drives below: true on a frame a random
+-- battle holds (fought by the route's tactical driver, `fight`'s table on
+-- top), false when the drive may walk
+function M.climbFights(tag, fight)
+  local drv = M.fightDriverFor(tag, { tactical = true, boost = true, items = true, healPercent = 55 }, fight)
+  local bn = 0
+  return function()
+    bn = M.battleLoadStarted() and bn + 1 or 0
+    if bn >= 3 then drv.frame(); return true end
+    if bn > 0 then M.setPad({}); return true end
+    drv.idle()
+    return false
+  end
+end
+
+local function climbSettled()
+  return M.hasControl() and M.tileAligned() and (emu.getState()["ppu.screenBrightness"] or 0) >= 15
+    and not M.dialogWaiting() and not M.battleLoadStarted()
+end
+
+-- Step: field care once the party has stood settled for 90 frames, outside
+-- any menu screen; skipped (and logged) when it never settles within 6,000
+-- frames: a care menu opened on a z-loop beam or in a scene hangs
+-- (gen_zozo4_dadaluma's climbCare).
+function M.settledCare(what, threshold)
+  local MENU_SCREENS = { [0x05] = true, [0x06] = true, [0x08] = true, [0x0A] = true, [0x17] = true, [0x18] = true,
+    [0x19] = true, [0x1A] = true, [0x3B] = true, [0x3D] = true, [0x64] = true, [0x70] = true }
+  local function ready() return climbSettled() and not MENU_SCREENS[M.readByte(0x26)] end
+  local calm, waited = 0, 0
+  return M.withReset(M.seqStep({
+    M.driveUntil(function()
+      waited = waited + 1
+      calm = ready() and calm + 1 or 0
+      return calm >= 90 or waited >= 6000
+    end, 8000, { M.call(function() M.setPad({}) end) }, "settled before the care: " .. what),
+    M.cond(ready, { M.fieldCare({ tag = what, threshold = threshold or 0.9 }) }, {
+      M.logStep(function()
+        return string.format("[care %s] skipped: not settled at (%d,%d) on map %d ($26=%02X)", what, M.fieldX(),
+          M.fieldY(), M.mapId() & 0x1FF, M.readByte(0x26))
+      end),
+    }),
+  }), function() calm, waited = 0, 0 end)
+end
+
+-- the shared frame of the walks below: a battle fought, a dialog (tapped,
+-- or with spec.noDialog a failure naming it), no control (released, or with
+-- spec.ride A tapped through the scene: the west room's beam hangs under a
+-- direction press), unaligned (released, or with spec.hold the press kept);
+-- else nil, and the walk presses.  Returns true when the frame is taken.
+local function climbFrame(spec, st)
+  if st.fights() then st.fought = true; return true end
+  if spec.quietShaft and M.battleLoadStarted() then
+    error(string.format("%s: a random battle opened in a shaft that rolls none, at (%d,%d)", spec.what, M.fieldX(),
+      M.fieldY()), 0)
+  end
+  if M.dialogWaiting() then
+    if spec.noDialog then
+      error(string.format("%s: a field dialog opened at (%d,%d) on map %d, on a walk that meets none (the crane's "
+        .. "prompt, 221 (35,41), _ca963d: its default is Yes)", spec.what, M.fieldX(), M.fieldY(), M.mapId() & 0x1FF), 0)
+    end
+    M.setPad(st.hb % 8 < 4 and { "a" } or {})
+    return true
+  end
+  if not M.hasControl() or (spec.ride and M.eventRunning()) then
+    M.setPad(spec.ride and st.hb % 8 < 4 and { "a" } or {})
+    return true
+  end
+  if not M.tileAligned() then
+    if not spec.hold then M.setPad({}) end
+    return true
+  end
+  return false
+end
+
+-- Step: walk a table of moves.  spec: what; moves (M.tileKey -> a move or a
+-- list of moves, the first M.canStep allows taken), or dir (function(x, y)
+-- -> such a list: the stair's route as a function of the tile); done (pred);
+-- maxFrames; fight; afterBattle (end after one battle once settled, for the
+-- caller's care); ride, noDialog, quietShaft, hold (climbFrame's); hang
+-- (frames frozen with no control before failing, a shaft's own watchdog).
+function M.tableWalk(spec)
+  local st = {}
+  local function init()
+    st.hb, st.fought, st.frozen, st.lx, st.ly = 0, false, 0, -1, -1
+    st.fights = M.climbFights(spec.what, spec.fight)
+  end
+  init()
+  return M.withReset(M.seqStep({
+    M.driveUntil(function()
+      if spec.done() then return true end
+      return spec.afterBattle and st.fought and climbSettled()
+    end, spec.maxFrames or 24000, {
+      M.call(function()
+        st.hb = st.hb + 1
+        local x, y = M.fieldX(), M.fieldY()
+        if st.hb % 600 == 0 then
+          M.log(string.format("[climb] %s: f+%d at (%d,%d) z%d map %d ctl=%s", spec.what, st.hb, x, y,
+            M.readByte(0x00b2) & 3, M.mapId() & 0x1FF, tostring(M.hasControl())))
+        end
+        if spec.hang then
+          local frozen = x == st.lx and y == st.ly and not M.hasControl() and not M.dialogWaiting()
+            and not M.battleLoadStarted()
+          st.frozen = frozen and st.frozen + 1 or 0
+          if st.frozen >= spec.hang then
+            error(string.format("%s: frozen %d frames with no control at (%d,%d) z%d", spec.what, spec.hang, x, y,
+              M.readByte(0x00b2) & 3), 0)
+          end
+        end
+        st.lx, st.ly = x, y
+        if climbFrame(spec, st) then return end
+        local e = spec.dir and spec.dir(x, y) or spec.moves[M.tileKey(x, y)]
+        if type(e) == "string" then e = { e } end
+        for _, mv in ipairs(e or {}) do
+          if M.canStep(x, y, mv) then
+            M.setPad({ [PRESS[mv]] = true })
+            return
+          end
+        end
+        M.setPad({})
+      end),
+    }, spec.what),
+    M.call(function() M.setPad({}) end),
+  }), init)
+end
+
+-- Step: a walk in legs with a care stop between them (M.settledCare): each
+-- leg ends at done or after one battle (spec.afterBattle), up to spec.legs
+-- legs (default 6), and the walk fails when done does not hold after them.
+-- spec is M.tableWalk's (or M.followPath's with spec.target).
+function M.walkWithCare(spec)
+  local legs = {}
+  local s = {}
+  for k, v in pairs(spec) do s[k] = v end
+  s.afterBattle = true
+  local n = spec.legs or 6
+  for i = 1, n do
+    legs[#legs + 1] = M.cond(function() return not spec.done() end, {
+      spec.target and M.followPath(spec.target[1], spec.target[2], s) or M.tableWalk(s),
+      M.settledCare(string.format("%s, after leg %d", spec.what, i), spec.careThreshold),
+    }, {})
+  end
+  legs[#legs + 1] = M.call(function()
+    M.assertEq(spec.done() and true or false, true, string.format("%s: done within %d legs (one battle each)",
+      spec.what, n))
+  end)
+  return M.seqStep(legs)
+end
+
+-- Step: walk to (tx, ty), or onto a door until the map reads spec.arriveMap,
+-- re-planning M.wallFirstStep each aligned frame with spec.walls (a list of
+-- { x, y }: the map's doors) as walls; each move is pressed only when
+-- M.canStep allows it at the live z with bodies counted (dadaluma's
+-- followPath pressed outright), so a body on the next tile releases the
+-- press until it moves.  spec: what, walls, arriveMap, done, maxFrames,
+-- fight, afterBattle.
+function M.followPath(tx, ty, spec)
+  local walls = {}
+  for _, w in ipairs(spec.walls or {}) do walls[M.tileKey(w[1], w[2])] = true end
+  local s = {}
+  for k, v in pairs(spec) do s[k] = v end
+  s.what = spec.what or string.format("followPath (%d,%d)", tx, ty)
+  s.done = spec.done or function()
+    if spec.arriveMap then return (M.mapId() & 0x1FF) == spec.arriveMap end
+    return M.fieldX() == tx and M.fieldY() == ty and M.tileAligned()
+  end
+  s.dir = function(x, y)
+    local mv = M.wallFirstStep(x, y, tx, ty, walls)
+    return mv and { mv } or {}
+  end
+  return M.tableWalk(s)
+end
+
+-- Step: hold `spec.dir` across a jump row (221's building jumps, _ca95c6
+-- and its kin: each fires under a held press facing across its gap, and a
+-- held direction chains the row); done when spec.there() holds aligned for
+-- 20 frames.  spec: what, dir, there, maxFrames, fight.
+function M.jumpRow(spec)
+  local st = {}
+  local calm = 0
+  local function init()
+    st.hb, calm = 0, 0
+    st.fights = M.climbFights(spec.what, spec.fight)
+  end
+  init()
+  return M.withReset(M.seqStep({
+    M.driveUntil(function()
+      calm = (spec.there() and M.tileAligned() and not M.battleLoadStarted()) and calm + 1 or 0
+      return calm >= 20
+    end, spec.maxFrames or 9000, {
+      M.call(function()
+        st.hb = st.hb + 1
+        if st.fights() then return end
+        if M.eventRunning() or not M.hasControl() then M.setPad({}); return end
+        M.setPad({ [spec.dir] = true })
+      end),
+    }, spec.what),
+    M.call(function() M.setPad({}) end),
+  }), init)
 end
 
 -- Every tile reachable on the live map from (sx, sy) at z-level sz (default

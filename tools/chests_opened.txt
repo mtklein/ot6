@@ -194,3 +194,7 @@
 170	map 282 Umaro's cave, the monster box (13,34): Pugs x3, below the drop (gen_wor_umaro_box, a branch)
 205	map 406 the Ancient Castle, the monster box (10,17): KatanaSoul (gen_wor_ancient_boxes, a branch)
 198	map 401 the Ancient Castle's cave, the monster box (58,43): Master Pug (gen_wor_ancient_boxes, a branch)
+75	map 225 Zozo, Thief Glove (11,59) -- past the stair room, off the U1 roof (gen_wor_zozo_north, a branch)
+76	map 225 Zozo, Fire Knuckle (35,11) -- off the top roof (gen_wor_zozo_north, a branch)
+70	map 226 Zozo's rooftop room, RunningShoes (72,26) (gen_wor_zozo_north, a branch)
+71	map 226 Zozo's rooftop room, X-Potion (92,27) (gen_wor_zozo_north, a branch)

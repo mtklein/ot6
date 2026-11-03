@@ -878,10 +878,28 @@ STATES = [
     S("wor_kohlingen_plain", gen="gen_wor_kohlingen_plain", prev="wor_kohlingen",
       checkpoint="wor-kohlingen-v1", timeout=3600),
 
+    # wor-kohlingen-v1 -> Darill's Tomb's B1: a branch beside wor_tomb
+    # (#502).  The walk and the door as wor_tomb's, then B1's pool (field
+    # group 149) walked until every formation is won (wor-coverage.md
+    # section 11.9).  Nothing boots it.  also: wor_tomb_b1_hunt_b1, the
+    # party on B1's stairs before the hunt.
+    S("wor_tomb_b1_hunt", gen="gen_wor_tomb_b1_hunt", prev="wor_kohlingen",
+      checkpoint="wor-kohlingen-v1", timeout=7200,
+      also=["wor_tomb_b1_hunt_b1"]),
+
     # wor_tomb -> the frame a Zombie lands on a member in a battle in the
     # tomb's grave room (battle_zombiecure's fixture): paced until it
     # lands, at most 40 battles.
     S("tomb_zombie", gen="gen_tomb_zombie", prev="wor_tomb", timeout=3600),
+
+    # wor-tomb-v1 -> the tomb's grave room: a branch beside wor_falcon
+    # (#502).  B3's pool (group 151) by the save point and B2's (group 150)
+    # below the grave, each walked until every formation is won
+    # (wor-coverage.md section 11.9); the grave and the monster chest are
+    # left to wor_falcon.  Nothing boots it.  also: wor_tomb_hunt_grave, the
+    # party at the grave room's door before its hunt.
+    S("wor_tomb_hunt", gen="gen_wor_tomb_hunt", prev="wor_tomb",
+      checkpoint="wor-tomb-v1", timeout=7200, also=["wor_tomb_hunt_grave"]),
 
     # wor-tomb-v1 -> the World of Ruin map beside the landed Falcon: the
     # monster chest by the tomb's save point (the Presenter and the Whelk
@@ -933,6 +951,16 @@ STATES = [
     S("wor_zozo_hunt", gen="gen_wor_zozo_hunt", prev="wor_cyan_rustrid",
       timeout=3600, also=["wor_zozo_hunt_225"]),
 
+    # wor_cyan_rustrid -> Zozo's rooftop room (226): a branch beside
+    # wor_cyan (#502).  The World of Balance's climb to Dadaluma walked again
+    # (the stair room's conveyor, the roofs' jump rows and z-loop beams) for
+    # the four chests past it: the Thief Glove, the Fire Knuckle, the
+    # RunningShoes and the X-Potion (wor-coverage.md section 11.9).  Nothing
+    # boots it.  also: wor_zozo_north_u1, the party on the U1 roof (221
+    # (30,43)) at the stair's top.
+    S("wor_zozo_north", gen="gen_wor_zozo_north", prev="wor_cyan_rustrid",
+      timeout=3600, also=["wor_zozo_north_u1"]),
+
     # wor-mtzozo-v1 -> the World of Ruin map beside the Falcon parked
     # outside Zozo (45,130): the Storm Dragon (event battle 133, a game over
     # when lost: the runner retries from the save point), the walk down,
@@ -941,6 +969,14 @@ STATES = [
     # checkpoint.  Re-cut by checkpoint_drift.py --recut.
     S("wor_storm", gen="gen_wor_storm", prev="wor_cyan",
       checkpoint="wor-mtzozo-v1", timeout=3600),
+
+    # wor-mtzozo-v1 -> Mt. Zozo's east cave: a branch beside wor_storm
+    # (#502).  The caves' pool (field group 162) walked until every
+    # formation is won (wor-coverage.md section 11.9).  Nothing boots it.
+    # also: wor_mtzozo_hunt_cave, the party at the cave's door before the
+    # hunt.
+    S("wor_mtzozo_hunt", gen="gen_wor_mtzozo_hunt", prev="wor_cyan",
+      checkpoint="wor-mtzozo-v1", timeout=7200, also=["wor_mtzozo_hunt_cave"]),
 
     # wor-cyan-v1 -> the cliffs above Narshe, map 34's save point (25,5):
     # Jidoor's weapon counter (a Partisan for MOG) and item counter, the
