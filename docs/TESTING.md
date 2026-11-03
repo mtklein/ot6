@@ -173,7 +173,12 @@ draw the game can deal at its point in the route, not the one its fixture
 happens to hold. Every ROM change regenerates the fixture chain, and with it
 the RNG, the encounter history, levels, MP and what earlier fights taught or
 inflicted. Derive choices from the fixture's live state and the ROM's data;
-assert the true precondition early, with a message that names it. No
+assert the true precondition early, with a message that names it. A
+precondition the fixture holds only by its play's luck (who wears which
+relic, a level, an MP pool, the first battle's formation) is staged or
+topped up by the suite itself; four suites broke on that in one week
+when upstream play moved (field_relicspare, battle_thief,
+battle_zombiecure and the tomb's Setzer suites, 2026-11-03). No
 hardcoded formation ids, draw indices, "the Nth battle", levels, or
 knowledge an earlier fight happened to produce. Take a baseline at the
 moment the property under test begins, and attribute a change (an MP

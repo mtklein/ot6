@@ -498,6 +498,11 @@ those.
   `pin_test_saves.py` copies, as the Mac's `~/Library/Application
   Support/Mesen2/settings.json` is (which is also `{}`); run.sh refuses to run
   without it.
+- **Matching processes over ssh**: `ssh host 'pgrep -f PATTERN'` or
+  `pkill -f PATTERN` also matches the remote shell running that very
+  command, whose command line contains PATTERN, so a wait loop never ends
+  and a kill takes down its own ssh. Match by `pgrep -x` and the process's
+  cwd (`readlink /proc/PID/cwd`), or by PID.
 - **Detached launches**: a job that must outlive the ssh session starts
   detached with its input closed: `setsid nohup <cmd> > log 2>&1 < /dev/null
   &` on Linux. macOS has no `setsid`; there use `nohup <cmd> > log 2>&1 <
