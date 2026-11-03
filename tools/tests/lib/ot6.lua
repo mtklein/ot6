@@ -903,6 +903,14 @@ M.ST2_MUDDLE = 0x20                   -- STATUS2::CONFUSE, $3ee5 + entity*2
 --   inFlight optional, entity -> true when another member's cure-hit on
 --            it is confirmed and has not run (#348): one hit per muddled
 --            ally in flight, the way a raise is (#341)
+--   fixed    optional, entity -> true when the ally's Muddle is its gear's
+--            (the Cursed Shield's $79): UpdateImmuneStatus clears the
+--            equipment's own STATUS2 bits from the change mask ($331d,
+--            `lda $3c6c,x / and #$ee78 / not / and $ee`), and the removal
+--            CalcMaxDmg queues (@0c45, $3dfd) passes through that mask
+--            (@43c6, `and $331c,y`), so no hit clears it: measured, two
+--            landed hits of 517 and 526 on SHADOW left STATUS2 $79
+--            (build/attempts/wt/v038-cursecount/px13-red/).  Not hit.
 -- The unmuddle floors makePlan hands M.muddleRule (#320, last round of
 -- the care-items review): the hitter's floor on each ally (the most its
 -- Fight can take, Driver:unmuddleFloor) plus the ally's round, since the
@@ -948,11 +956,11 @@ end
 
 function M.muddleRule(o)
   local st, hp, maxhp, floor = o.status2 or {}, o.hp or {}, o.maxhp or {}, o.floor or {}
-  local inFlight = o.inFlight or {}
+  local inFlight, fixed = o.inFlight or {}, o.fixed or {}
   if ((st[o.actor] or 0) & M.ST2_MUDDLE) ~= 0 then return "defer" end
   local held = nil
   for e = 0, 3 do
-    if e ~= o.actor and ((st[e] or 0) & M.ST2_MUDDLE) ~= 0 and not inFlight[e]
+    if e ~= o.actor and ((st[e] or 0) & M.ST2_MUDDLE) ~= 0 and not inFlight[e] and not fixed[e]
        and (hp[e] or 0) > 0 and (maxhp[e] or 1) > 0 then
       if floor[e] ~= nil and hp[e] <= floor[e] then
         held = held or e
@@ -6760,6 +6768,9 @@ local BATTLE = {
   -- the ATB words per entity (X = entity*2): the 16-bit gauge and the
   -- constant added to it each tick (M.atbEta), and STATUS2 ($3ee5)
   ATB = 0x3218, ATB_CONST = 0x3AC8, ST2 = 0x3EE5,
+  -- the STATUS2 bits the engine may change on the entity ($331d, the high
+  -- byte of "blocked status 1 & 2"): a clear bit cannot be set or removed
+  ST2_CHANGE = 0x331D,
   -- and STATUS1 ($3ee4) / STATUS3 ($3ef8) for the turn-denying statuses
   -- and Imp (#187, M.turnDenied / M.statusCure)
   ST1 = 0x3EE4, ST3 = 0x3EF8, ST4 = 0x3EF9,
@@ -12109,8 +12120,23 @@ function Driver:makePlanRules(actor)
         if said ~= self.healSaid then self.healSaid = said; M.log(said) end
       end
     end
+    -- a Muddle the entity's gear holds (the change mask lacks the bit):
+    -- no hit clears it, so no turn goes on one; said once a battle
+    local fixed = {}
+    for e = 0, 3 do
+      if e ~= actor and ((s2[e] or 0) & M.ST2_MUDDLE) ~= 0
+         and (M.readByte(BATTLE.ST2_CHANGE + e * 2) & M.ST2_MUDDLE) == 0 then
+        fixed[e] = true
+        if not self.statusSaid["fixedMuddle:" .. e] then
+          self.statusSaid["fixedMuddle:" .. e] = true
+          M.log(string.format("[%s] actor=%d: entity %d is MUDDLED by its gear (STATUS2 $%02X, change mask "
+            .. "$%02X lacks the bit: the engine removes it from nobody's hit) -- no cure-hit; planning on",
+            self.tag or "fight", actor, e, s2[e], M.readByte(BATTLE.ST2_CHANGE + e * 2)))
+        end
+      end
+    end
     local r, held = M.muddleRule({ actor = actor, status2 = s2, hp = hpNow, maxhp = mx, floor = fl,
-                                   inFlight = inFlight })
+                                   inFlight = inFlight, fixed = fixed })
     if held ~= nil then
       local est = self:allyFightEstimate(actor, held)
       local measured = M.unmuddleHits[M.readByte(BATTLE.BCHID + actor * 2)]
