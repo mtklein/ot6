@@ -1256,60 +1256,43 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
   -- 1, EDGAR 2, SABIN 3.  slot is 0..5 = R-Hand, L-Hand, Helmet, Armor,
   -- Relic 1, Relic 2; 4 and 5 live on a different menu and equipWeapon
   -- knows which walk to take.
-  -- Four of the five are bought or chested and are therefore always here;
-  -- the Black Belt is NOT.  It is monster 334 (leader)'s RARE drop
-  -- (monster_items.asm: `monster_drop FENIX_DOWN, BLACK_BELT`), so whether
-  -- the party owns one is a die roll back in the Narshe defense, and any
-  -- change upstream that moves the RNG can take it away -- which is what
-  -- happened when the #218 basement save shifted the route.  A rare drop
-  -- cannot be a hard precondition for a segment: assert what the route
-  -- guarantees, and wear the drop when the roll gave us one, which is
-  -- also what a player does when they open the menu and fill empty slots
-  -- with whatever the bag actually holds.
+  -- Since #350 the party reaches Zozo dressed by the lib's relic rule
+  -- (H.dressRelics) at each find -- the cellar's Ribbon, Hyper Wrist and
+  -- RunningShoes, the Atlas Armlet, the Hero Ring -- so which relic sits in
+  -- which slot is the rule's, not a fixed kit, and CELES may already wear
+  -- the cellar's Iron Armor.  So the armour fills a slot only when it is
+  -- empty, and the relics are the rule's again with whatever the bag holds
+  -- (a Black Belt, 334's rare drop, when the roll gave one).
   H.call(function()
-    for _, it in ipairs({ { 0x84, "LeatherArmor" }, { 0x5A, "Buckler" },
-                          { 0xB1, "Star Pendant" }, { 0xB2, "Peace Ring" } }) do
-      H.assertEq(H.invCountOf(it[1]) > 0, true,
-        string.format("a %s is in the bag to equip", it[2]))
-    end
-    H.assertEq(H.readByte(0x1600 + 37 * 5 + 0x1F + 4), 0xB1,
-      "SABIN retains the scenario route's Star Pendant")
     blackBeltHeld = H.invCountOf(0xD5) > 0
     H.log(string.format("[zozo kit] Black Belt (334's rare drop) in the bag: "
                         .. "%s", tostring(blackBeltHeld)))
   end),
-  H.equipWeapon(1, 0x84, { slot = 3, tag = "CELES LeatherArmor" }),
-  H.equipWeapon(1, 0xB1, { slot = 4, tag = "CELES Star Pendant" }),
-  H.equipWeapon(1, 0xB2, { slot = 5, tag = "CELES Peace Ring" }),
-  H.equipWeapon(3, 0x5A, { slot = 1, tag = "SABIN Buckler" }),
-  H.cond(function() return blackBeltHeld end, {
-    H.equipWeapon(3, 0xD5, { slot = 5, tag = "SABIN Black Belt" }),
-  }, {
-    H.logStep("no Black Belt this run (334's rare drop did not fall); "
-              .. "SABIN's second relic slot stays empty"),
-  }),
-  -- Read the slots back rather than trusting six menu drives.  A seek that
-  -- timed out would have failed already, but a drive that landed on the
-  -- wrong row would not, and "the menu was opened" and "the item is worn"
-  -- are different claims.  $1600 + 37*c + $1F + slot, with c the character
-  -- index (CELES 6, SABIN 5) rather than the party row.
+  H.cond(function() return H.readByte(0x1600 + 37 * 6 + 0x22) == 0xFF end, {
+    H.equipWeapon(1, 0x84, { slot = 3, tag = "CELES LeatherArmor" }),
+  }, {}),
+  H.cond(function() return H.readByte(0x1600 + 37 * 5 + 0x20) == 0xFF end, {
+    H.equipWeapon(3, 0x5A, { slot = 1, tag = "SABIN Buckler" }),
+  }, {}),
+  H.dressRelics({ { 1, "LOCKE" }, { 6, "CELES" }, { 4, "EDGAR" }, { 5, "SABIN" } },
+    { tag = "relics before the Zozo climb" }),
+  -- Read the slots back rather than trusting the menu drives.
   H.call(function()
     local function worn(c, s)
       return H.readByte(0x1600 + 37 * c + 0x1F + s)
     end
-    local wants = { { 6, 3, 0x84, "CELES wears the LeatherArmor" },
-                    { 6, 4, 0xB1, "CELES wears the Star Pendant" },
-                    { 6, 5, 0xB2, "CELES wears the Peace Ring" },
-                    { 5, 1, 0x5A, "SABIN carries the Buckler" },
-                    { 5, 4, 0xB1, "SABIN wears the Star Pendant" } }
-    if blackBeltHeld then
-      wants[#wants + 1] = { 5, 5, 0xD5, "SABIN wears the Black Belt" }
+    H.assertEq(worn(6, 3) ~= 0xFF, true, "CELES wears body armour")
+    H.assertEq(worn(5, 1) ~= 0xFF, true, "SABIN carries a shield")
+    for _, c in ipairs({ 1, 6, 4, 5 }) do
+      for s = 4, 5 do
+        if worn(c, s) == 0xFF then
+          H.log(string.format("[zozo kit] char %d relic slot %d is empty (the relic rule had nothing for it)", c, s))
+        end
+      end
     end
-    for _, w in ipairs(wants) do
-      H.assertEq(worn(w[1], w[2]), w[3], w[4])
-    end
-    H.log(string.format("[zozo kit] inherited Star Pendant preserved; %d " ..
-      "empty slots filled from the bag", blackBeltHeld and 5 or 4))
+    H.log(string.format("[zozo kit] CELES %02X %02X %02X %02X %02X %02X, SABIN %02X %02X %02X %02X %02X %02X",
+      worn(6, 0), worn(6, 1), worn(6, 2), worn(6, 3), worn(6, 4), worn(6, 5),
+      worn(5, 0), worn(5, 1), worn(5, 2), worn(5, 3), worn(5, 4), worn(5, 5)))
   end),
   -- CELES and SABIN to the back row.  Physical damage taken is halved there
   -- and only a weapon swing pays for it: ExecCmd sets $B3 = $FF at the top
