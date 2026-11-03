@@ -8119,25 +8119,17 @@ function M.relicPlan(members, opts)
     if not count[id] then count[id] = 0; ids[#ids + 1] = id end
     count[id] = count[id] + n
   end
-  -- opts.bag = { [id] = n, ... }: plan against this bag instead of the
-  -- party's, with opts.assume as what the members wear and nothing coming
-  -- off them (a suite's constructed case, field_relicspare's wards: the plan
-  -- read on a fixture whatever the fixture's bag and dressing hold)
-  local function bagRow(id, q)
+  for s = 0, 255 do
+    local id, q = M.readByte(0x1869 + s), M.readByte(0x1969 + s)
     if id ~= 0xFF and q > 0 then
       local cl = M.relicClass(id, opts.threats)
       if cl and not cl.hands then add(id, q) end
       if cl and cl.hands then spareHands[#spareHands + 1] = { id = id, n = q } end
     end
   end
-  if opts.bag then
-    for id, q in pairs(opts.bag) do bagRow(id, q) end
-  else
-    for s = 0, 255 do bagRow(M.readByte(0x1869 + s), M.readByte(0x1969 + s)) end
-  end
   -- an assumed relic is counted in the bag above but is worn in the plan,
   -- and the real one it replaces would come off into the bag
-  for _, m in ipairs(opts.bag and {} or ms) do
+  for _, m in ipairs(ms) do
     for s = 4, 5 do
       if m.cur[s] ~= m.real[s] then
         local cl = M.relicClass(m.cur[s], opts.threats)
@@ -8513,19 +8505,13 @@ function M.relicPlan(members, opts)
   -- on no more slots than the bag holds plus the slots wearing it now (a
   -- relic the plan moves reaches the bag when its wearer's slot changes).
   local supply, demand = {}, {}
-  -- (opts.bag: the constructed bag and what opts.assume puts on, instead)
-  if opts.bag then
-    for id, q in pairs(opts.bag) do supply[id] = (supply[id] or 0) + q end
-  else
-    for s = 0, 255 do
-      local id, q = M.readByte(0x1869 + s), M.readByte(0x1969 + s)
-      if id ~= 0xFF and q > 0 then supply[id] = (supply[id] or 0) + q end
-    end
+  for s = 0, 255 do
+    local id, q = M.readByte(0x1869 + s), M.readByte(0x1969 + s)
+    if id ~= 0xFF and q > 0 then supply[id] = (supply[id] or 0) + q end
   end
   for _, m in ipairs(ms) do
     for s = 4, 5 do
-      local owns = opts.bag and m.cur[s] or m.real[s]
-      if owns ~= 0xFF then supply[owns] = (supply[owns] or 0) + 1 end
+      if m.real[s] ~= 0xFF then supply[m.real[s]] = (supply[m.real[s]] or 0) + 1 end
       local w = m.want[s] or m.cur[s]
       if w ~= 0xFF then demand[w] = (demand[w] or 0) + 1 end
     end
@@ -8647,7 +8633,7 @@ end
 -- a member taking two of one relic (two Hyper Wrists to CYAN, one still on
 -- TERRA) waits until both are there (#350's line, wor_cyan: "CYAN's relic
 -- slot 5 holds Hyper Wrist $D2: got 255").  nil when nobody can go.  A
--- function of its own so field_relicspare can drive it on a stub queue.
+-- function of its own so field_relicqueue can drive it on a stub queue.
 function M.relicDressPick(queue, have)
   for i, p in ipairs(queue) do
     local ok, need = true, {}
