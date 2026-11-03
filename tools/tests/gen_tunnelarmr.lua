@@ -291,6 +291,12 @@ local GENJI_GLOVE, HEAVYSHLD = 0xD1, 0x5B
 local LEATHERHAT, PLUMEDHAT, BANDANA = 0x69, 0x6B, 0x6E
 local LEATHERARMOR, IRONARMOR = 0x84, 0x87
 local EMPTY = 0xFF
+-- the cellar's and the passage's finds (#350): map 89, by the rich man's
+-- door 83 (32,18) and by the passage's 87 (33,51), and map 87's own two
+local RIBBON, HYPER_WRIST, RUNNINGSHOES, EARRINGS = 0xCA, 0xD2, 0xBA, 0xC3
+local X_POTION, ETHER = 0xEA, 0xEC
+local MEMBERS = { { CH_LOCKE, "LOCKE" }, { CH_CELES, "CELES" } }
+local NAV = { playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6 }
 -- Weapon records $00-$09 are the daggers and every one of them is
 -- OT6_PIERCE (ot6_class.asm:47-57).  The assertions below test this rather
 -- than a named item, because what the fight needs is the CLASS in both
@@ -316,6 +322,24 @@ local function posOf(c)
     end
     return 0
   end
+end
+
+-- A chest opened from whichever neighbour the party can reach where it
+-- stands (the ribbon audit's probe_wob_cellar, build/attempts/ribbon-audit/),
+-- and asserted open: H.openChest is idempotent on the treasure bit.
+local function chest(x, y, bit, what, item)
+  local steps = {}
+  for _, d in ipairs({ { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" } }) do
+    local sx, sy = x + d[1], y + d[2]
+    steps[#steps + 1] = H.cond(function()
+      return not H.chestOpen(bit) and H.bfsPath(sx, sy) ~= nil
+    end, { H.openChest({ stand = { sx, sy }, face = d[3], bit = bit, what = what, item = item, nav = NAV }) }, {})
+  end
+  steps[#steps + 1] = H.call(function()
+    H.assertEq(H.chestOpen(bit), true, string.format("%s's chest (%d,%d) is open (treasure bit $%03X), "
+      .. "from a neighbour reachable at (%d,%d) on map %d", what, x, y, bit, H.fieldX(), H.fieldY(), map()))
+  end)
+  return seq(steps)
 end
 
 local function menuEquip(mainRow, pos, slot, slotState, itemState, itemId, tag)
@@ -759,6 +783,18 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
   -- ===================================================================== --
   go(57, 13, 83, 35, 14, "celes room -> corridor"),
 
+  -- The cellar under the rich man's house, by his door off this corridor
+  -- (#350; guidelines "Ribbons are worth going out of your way for", and
+  -- the gear like them): the Hyper Wrist and the RunningShoes, and back.
+  -- The cellar's other room, by the passage, is below.  The relics go on
+  -- the moment they are in the bag, by the lib's relic rule
+  -- (H.dressRelics: LOCKE's Genji Glove stays where it is).
+  H.crossDoor(32, 18, 89, 106, 54, "corridor -> the cellar 83(32,18)->89(106,54)", { healer = 6 }),
+  chest(110, 49, 0x0FC, "Hyper Wrist", HYPER_WRIST),
+  chest(120, 53, 0x100, "RunningShoes", RUNNINGSHOES),
+  H.dressRelics(MEMBERS, { tag = "relics after the Hyper Wrist and the RunningShoes" }),
+  H.crossDoor(105, 53, 83, 31, 17, "the cellar -> the corridor 89(105,53)->83(31,17)", { healer = 6 }),
+
   -- The mansion-basement save point, taken in passing on the corridor the
   -- escape already walks -- what a player does on the way out of an
   -- occupied town with a boss ahead and no shop between here and it.
@@ -778,7 +814,8 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
   -- steps off this corridor: 83 (40,12) -> 88 (11,36), one room, nineteen
   -- tiles, 88 (11,37) -> 83 (40,14) back out, $01BF reads set on the tile
   -- (build/lab/218-m88-save.log, shot m88_on_savepoint.png).
-  go(40, 12, 88, 11, 36, "corridor (40,12) -> basement save room 88 (11,36)"),
+  H.crossDoor(40, 12, 88, 11, 36, "corridor (40,12) -> basement save room 88 (11,36)",
+    { healer = 6, avoid = { { 32, 18 } } }),
   H.navTo(11, 34, { maxFrames = 8000, playBattles = "tactical",
                     fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
   H.release(),
@@ -815,6 +852,30 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
   windClock(),
   go(15, 51, 87, 20, 33, "clock passage (15,51) -> map 87 (20,33)"),
   H.fieldCare({ tag = "care before the basement shelf", threshold = 0.95 }),
+  -- The passage's Iron Armor and Earrings, then its door (33,51) into the
+  -- cellar's other room: the X-Potion, the Ribbon and the Ether (#350).
+  -- The Ribbon goes on at once (guidelines "Ribbons are worth going out of
+  -- your way for"), and CELES takes the Iron Armor over what she wears.
+  chest(32, 42, 0x020, "Iron Armor", IRONARMOR),
+  chest(33, 56, 0x021, "Earrings", EARRINGS),
+  preferItem(CH_CELES, 3, 0x22, { IRONARMOR }, "celes body"),
+  H.crossDoor(33, 51, 89, 96, 42, "the passage -> the cellar 87(33,51)->89(96,42)", { healer = 6 }),
+  chest(101, 39, 0x0FD, "X-Potion", X_POTION),
+  chest(101, 43, 0x0FE, "Ribbon", RIBBON),
+  chest(92, 53, 0x0FF, "Ether", ETHER),
+  H.dressRelics(MEMBERS, { tag = "relics after the Ribbon" }),
+  H.crossDoor(97, 41, 87, 34, 50, "the cellar -> the passage 89(97,41)->87(34,50)", { healer = 6 }),
+  H.call(function()
+    gearLine("after the cellar")
+    H.assertEq(wearsRelic(CH_CELES, RIBBON) or wearsRelic(CH_LOCKE, RIBBON), true,
+      "the Ribbon is worn, not carried (the relic rule gives it to the party's caster)")
+    H.assertEq(wearsRelic(CH_LOCKE, GENJI_GLOVE), true,
+      "LOCKE still wears the Genji Glove after the cellar's relics")
+    H.assertEq(PIERCE[gear(CH_LOCKE, 0x1f)] == true and PIERCE[gear(CH_LOCKE, 0x20)] == true, true,
+      string.format("LOCKE still holds OT6_PIERCE weapons in both hands ($%02X, $%02X) after the relics",
+        gear(CH_LOCKE, 0x1f), gear(CH_LOCKE, 0x20)))
+  end),
+  H.fieldCare({ tag = "care after the cellar", threshold = 0.95 }),
   H.openChest{ stand = { 47, 34 }, face = "up", bit = 34, what = "RegalCutlass",
                nav = { playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
   H.openChest{ stand = { 48, 34 }, face = "up", bit = 35, what = "Heavy Shld",

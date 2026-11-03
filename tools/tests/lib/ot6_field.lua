@@ -7817,7 +7817,6 @@ end
 function M.absorbSafeArms(chars, species, opts)
   opts = opts or {}
   local tag = opts.tag or "absorb-safe arms"
-  local inner
   local function norm()
     local sp = type(species) == "function" and species() or species
     local out = {}
@@ -7838,39 +7837,49 @@ function M.absorbSafeArms(chars, species, opts)
     end
     return out
   end
+  local function armHand(c, sp)
+    local steps = {}
+    local slot = c.hand == "R" and 0 or 1
+    local items = {}
+    local bag = M.bagWeapons(c.char)
+    for _, it in ipairs(bag) do
+      if #M.absorbClashesFor({ { char = c.char, hand = c.hand, item = it } }, sp) == 0 then
+        items[#items + 1] = { slot, it }
+      end
+    end
+    M.log(string.format("[%s] %s -- re-arming from %d bag weapon(s), strongest first", tag,
+      M.clashStr(c), #items))
+    if #items > 0 then
+      steps[#steps + 1] = M.equipKit(c.char, items,
+        { tag = string.format("%s: char %d %s-hand", tag, c.char, c.hand), ladder = true })
+      -- the hand holds the best absorb-safe weapon: the strongest by the
+      -- ROM's power byte among every bag weapon this actor can equip that
+      -- none of the fights ahead absorbs (a ladder that stopped early, or
+      -- a pick by list order, fails here)
+      local best, cc, hand = items[1][2], c.char, slot
+      for _, it in ipairs(items) do
+        if M.itemPower(it[2]) > M.itemPower(best) then best = it[2] end
+      end
+      steps[#steps + 1] = M.call(function()
+        local got = M.readByte(0x1600 + 37 * cc + 0x1F + hand)
+        M.assertEq(M.itemPower(got) >= M.itemPower(best), true, string.format(
+          "%s: char %d's %s-hand took the best absorb-safe weapon ($%02X power %d; "
+          .. "the best was $%02X power %d)", tag, cc, hand == 0 and "R" or "L", got,
+          M.itemPower(got), best, M.itemPower(best)))
+      end)
+    end
+    if #steps == 0 then steps[1] = M.call(function() end) end
+    return steps
+  end
   local function build()
     local sp = norm()
     local steps = {}
+    -- each hand's bag is read when its step starts, not here: a hand re-armed
+    -- before it may have taken the strongest piece out of the bag (#350's
+    -- line, fc_landing: LOCKE's R-hand took the one $0F, and the L-hand's
+    -- list, read before, still named it: "the best was $0F power 108")
     for _, c in ipairs(clashes(sp)) do
-      local slot = c.hand == "R" and 0 or 1
-      local items = {}
-      local bag = M.bagWeapons(c.char)
-      for _, it in ipairs(bag) do
-        if #M.absorbClashesFor({ { char = c.char, hand = c.hand, item = it } }, sp) == 0 then
-          items[#items + 1] = { slot, it }
-        end
-      end
-      M.log(string.format("[%s] %s -- re-arming from %d bag weapon(s), strongest first", tag,
-        M.clashStr(c), #items))
-      if #items > 0 then
-        steps[#steps + 1] = M.equipKit(c.char, items,
-          { tag = string.format("%s: char %d %s-hand", tag, c.char, c.hand), ladder = true })
-        -- the hand holds the best absorb-safe weapon: the strongest by the
-        -- ROM's power byte among every bag weapon this actor can equip that
-        -- none of the fights ahead absorbs (a ladder that stopped early, or
-        -- a pick by list order, fails here)
-        local best, cc, hand = items[1][2], c.char, slot
-        for _, it in ipairs(items) do
-          if M.itemPower(it[2]) > M.itemPower(best) then best = it[2] end
-        end
-        steps[#steps + 1] = M.call(function()
-          local got = M.readByte(0x1600 + 37 * cc + 0x1F + hand)
-          M.assertEq(M.itemPower(got) >= M.itemPower(best), true, string.format(
-            "%s: char %d's %s-hand took the best absorb-safe weapon ($%02X power %d; "
-            .. "the best was $%02X power %d)", tag, cc, hand == 0 and "R" or "L", got,
-            M.itemPower(got), best, M.itemPower(best)))
-        end)
-      end
+      steps[#steps + 1] = M.lazy(function() return M.seqStep(armHand(c, sp)) end)
     end
     steps[#steps + 1] = M.call(function()
       local left, lines = clashes(sp), {}
@@ -7880,13 +7889,7 @@ function M.absorbSafeArms(chars, species, opts)
     end)
     return M.seqStep(steps)
   end
-  return {
-    tick = function(self)
-      if inner == nil then inner = build() end
-      return inner:tick()
-    end,
-    reset = function(self) inner = nil end,
-  }
+  return M.lazy(build)
 end
 
 -- ---- relics: who wears which ---------------------------------------------
@@ -8611,6 +8614,23 @@ end
 -- whose new relics are all in the bag first (a relic moving from one member
 -- to another reaches the bag when its first wearer takes his new one), and
 -- every planned slot asserted after.
+-- The member dressRelics dresses next: the first in `queue` whose new
+-- relics are all in the bag, counted (have(id) -> how many the bag holds) --
+-- a member taking two of one relic (two Hyper Wrists to CYAN, one still on
+-- TERRA) waits until both are there (#350's line, wor_cyan: "CYAN's relic
+-- slot 5 holds Hyper Wrist $D2: got 255").  nil when nobody can go.  A
+-- function of its own so field_relicqueue can drive it on a stub queue.
+function M.relicDressPick(queue, have)
+  for i, p in ipairs(queue) do
+    local ok, need = true, {}
+    for _, c in ipairs(p.changes) do
+      if c[2] ~= 0xFF then need[c[2]] = (need[c[2]] or 0) + 1 end
+    end
+    for id, n in pairs(need) do if have(id) < n then ok = false end end
+    if ok then return i end
+  end
+  return nil
+end
 function M.dressRelics(members, opts)
   opts = opts or {}
   local tag = opts.tag or "relics"
@@ -8722,12 +8742,7 @@ function M.dressRelics(members, opts)
           -- a change to $FF (a slot the plan empties) needs nothing from
           -- the bag: the Relic menu's Remove
           local function lacks(c) return c[2] ~= 0xFF and M.invCountOf(c[2]) < 1 end
-          local pick = nil
-          for i, p in ipairs(queue) do
-            local ok = true
-            for _, c in ipairs(p.changes) do if lacks(c) then ok = false end end
-            if ok then pick = i; break end
-          end
+          local pick = M.relicDressPick(queue, M.invCountOf)
           if pick == nil then
             -- A swap: each member wants a relic the other wears (main's
             -- wor_relm at the gear policy's levels: CYAN's Peace Ring is

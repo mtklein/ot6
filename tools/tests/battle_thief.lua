@@ -31,6 +31,12 @@ local function ENT_M(s) return 8 + s * 2 end
 
 local ID_STEAL, ID_FILCH, ID_BESTOW = 0x56, 0x57, 0x58
 local COST_STEAL, COST_FILCH, COST_BESTOW = 4, 6, 5
+-- the whole plan's MP, every priced row it drives: the Bestow that spends the
+-- bank to 0 (phase 2), the Filch and the Bestow (3, 4), and the capped Filch
+-- and Bestow (5).  Phase 2 spent the bank with a boosted Steal until #350,
+-- which cost 12 (37 -> 25, 31 -> 19 measured) and made the plan 34: LOCKE's
+-- pool at L7, not at the L6 (31 MP) the #350 line's figaro_cleared holds.
+local PLAN_MP = COST_BESTOW + COST_FILCH + COST_BESTOW + COST_FILCH + COST_BESTOW
 
 local function glyphs(s)
   local t = {}
@@ -249,6 +255,9 @@ H.run({ maxFrames = 120000 }, {
       "the species seeded real shields (Ot6SeedShields) -- enough to filch")
     H.log(string.format("locke slot %d (mp %d), ally slot %d, shield sum %d",
       locke, mp(), ally, H.vars.sh0))
+    H.assertEq(mp() >= PLAN_MP, true, string.format("precondition: LOCKE's pool covers the plan's priced rows "
+      .. "(%d MP at L%d, the plan spends %d; Steal, Filch and Bestow have no refund in battle and the bag has no "
+      .. "Ether this early)", mp(), H.readByte(0x1600 + 37 * 1 + 8), PLAN_MP))
   end),
 
   -- 1/2/3: the submenu opens on the real kit; rows, prices, names ----------
@@ -284,12 +293,18 @@ H.run({ maxFrames = 120000 }, {
   end),
 
   -- 4: Bestow greys at 0 BP; the bank is spent there rather than written ---
-  H.call(function()                                      -- R + Steal: 1-1=0
-    affords(COST_STEAL, "phase 2, the boosted steal")
-    modeOf[locke] = "boostkit:0"
+  -- A Bestow at 1 BP hands the pip to the ally and skips Locke's regen:
+  -- 1-1=0, at 5 MP (a boosted Steal did it for 12, more than the L6 pool
+  -- leaves for the rest of the plan).  The ally banks the pip: her ledger
+  -- below starts at 2.
+  H.call(function()
+    affords(COST_BESTOW, "phase 2, the bestow that spends the bank")
+    target = ally
+    modeOf[locke] = "kit:2"
   end),
   driveTo(function() return bp(locke) == 0 end, 20000,
-    "a boosted Steal spends the bank to 0 (regen skipped)"),
+    "a Bestow at 1 BP spends the bank to 0 (regen skipped)"),
+  H.call(function() modeOf[locke] = "defer"; target = nil end),
   parkAtSubmenu(locke, "his next window's submenu, at a 0 bank"),
   H.call(function() H.screenshot("thief_bestow_grey") end),
   H.call(function()
@@ -341,20 +356,20 @@ H.run({ maxFrames = 120000 }, {
   -- 6: Bestow moves a pip from Locke to the never-acted ally ---------------
   H.call(function()
     H.assertEq(bp(locke), 3, "the ledger: Locke holds 3 (1+2)")
-    H.assertEq(bp(ally), 1,
-      "the ledger: the deferred ally still holds her opening 1")
+    H.assertEq(bp(ally), 2,
+      "the ledger: the deferred ally holds her opening 1 and phase 2's pip")
     affords(COST_BESTOW, "phase 4, the bestow")
     target = ally
     modeOf[locke] = "kit:2"
   end),
-  driveTo(function() return bp(ally) >= 2 end, 20000,
+  driveTo(function() return bp(ally) >= 3 end, 20000,
     "the bestow lands: the ally's bank goes up"),
   H.call(function() modeOf[locke] = "defer"; target = nil end),
   H.waitFrames(180),                            -- past Locke's own ActionEnd
   H.call(function()
     local a, t = bp(locke), bp(ally)
-    H.log(string.format("after bestow: locke bp %d (was 3), ally bp %d (was 1)", a, t))
-    H.assertEq(t, 2, "the ally banked exactly one pip")
+    H.log(string.format("after bestow: locke bp %d (was 3), ally bp %d (was 2)", a, t))
+    H.assertEq(t, 3, "the ally banked exactly one pip")
     H.assertEq(a, 2,
       "Locke is down to 2: Ot6ActionEnd charged the pending 1 AND skipped his "
       .. "regen, so the transfer is not free")
@@ -371,7 +386,7 @@ H.run({ maxFrames = 120000 }, {
   -- was then correctly refused at the confirm (v0.19, Ot6KitConfirmMP) --
   -- the window held open and the driver pressed A at the greyed row until
   -- the watchdog fired (4844 buzzed confirms; build/attempts/repro).  On
-  -- item turns the whole test's spend is fixed at 26 of his 37, whatever
+  -- item turns the whole test's spend is fixed at PLAN_MP (27), whatever
   -- the gauges do.
   H.call(function() modeOf[locke] = "item"; modeOf[ally] = "item" end),
   driveTo(function() return bp(locke) == 5 and bp(ally) == 5 end, 60000,

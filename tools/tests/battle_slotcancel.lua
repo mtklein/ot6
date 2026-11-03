@@ -359,7 +359,18 @@ local function setzerDefend()
 end
 local rec = nil              -- the live branch's record
 local recs = {}
-local commitHit, endHit = false, nil
+-- The books are read where the ROM has finished writing them, not at the
+-- frame boundary after a routine's entry: the frame callback that runs the
+-- steps comes at the PPU's frame end, wherever the CPU stands, and a turn's
+-- end can straddle it.  Measured (build/attempts/wt/v038-wob-suites/diag1):
+-- Ot6ActionEnd entered at f5759 scanline 223, the step read "pending 1
+-- bank 1" at that frame's end, and the ROM wrote pending 0 and bank 2 at
+-- f5760 scanline 123 -- a cancelled spin's correct books, booked as a
+-- charge-free turn with no regen.  So a commit is read from the frame after
+-- its hit (Ot6SlotCommit's one store is a few instructions past its entry),
+-- and a turn's books at EndAction, which Ot6ActionEnd's caller jumps to
+-- once it returns (battle_main.asm: jsl Ot6ActionEnd / jmp EndAction).
+local commitHit, endHit = nil, nil
 
 local SS = { n = 0, rTaps = 0 }
 -- A committed action enters the advance-wait queue ($3720, ring
@@ -532,8 +543,8 @@ end
 local function found() return cancelledBelowCap() >= 1 end
 
 local function approachFrame()
-  if commitHit then
-    commitHit = false
+  if commitHit and H.frame > commitHit then
+    commitHit = nil
     if ctl and not ctl.commit and not ctlDone then
       ctl.commit = { f = H.frame, p = pend(actor), b = bp(actor), hp = php(actor) }
     elseif A and not A.commit then
@@ -570,12 +581,12 @@ local function approachFrame()
     end
   end
   if A and A.commit and not A.done and not A.sleptF and asleep() then A.sleptF = H.frame end
-  if endHit then
+  if endHit and endHit.p ~= nil then
     local e = endHit
     endHit = nil
     if ctl and ctl.commit and not ctl.done and not ctlDone then
       if e.cmd == CMD_SLOT and not e.noaction then
-        ctl.done = { f = H.frame, cmd = e.cmd, hp = e.hp, p = pend(actor), b = bp(actor) }
+        ctl.done = { f = H.frame, cmd = e.cmd, hp = e.hp, p = e.p, b = e.b }
         ctlDone = true
         H.log(string.format("[cancel] control f%d: a boosted spin RAN: commit f%d pending %d " ..
           "bank %d | turn end $b5=$0F -> pending %d bank %d", H.frame, ctl.commit.f,
@@ -585,7 +596,7 @@ local function approachFrame()
       end
     elseif A and A.commit and not A.done then
       if e.noaction or e.cmd == CMD_SLOT then
-        A.done = { f = H.frame, cmd = e.cmd, hp = e.hp, p = pend(actor), b = bp(actor),
+        A.done = { f = H.frame, cmd = e.cmd, hp = e.hp, p = e.p, b = e.b,
                    kind = e.noaction and "cancelled" or "ran", ko = e.ko, sleptAtExec = e.slept }
         H.log(string.format("[inject] attempt %d %s: commit f%d pending %d bank %d | turn end " ..
           "f%d no-action mark %s $b5=$%02X%s, asleep at its ExecAction %s -> pending %d bank %d",
@@ -673,7 +684,7 @@ local steps = {
   H.call(function()
     NOACTION = H.sym("OT6_NOACTION")
     local cmt = H.sym("Ot6SlotCommit")
-    emu.addMemoryCallback(function() commitHit = true end, emu.callbackType.exec, cmt, cmt)
+    emu.addMemoryCallback(function() commitHit = H.frame end, emu.callbackType.exec, cmt, cmt)
     local ae = H.sym("Ot6ActionEnd")
     emu.addMemoryCallback(function()
       local x = emu.getState()["cpu.x"] & 0xffff
@@ -691,6 +702,12 @@ local steps = {
                    slept = slept }
       end
     end, emu.callbackType.exec, ae, ae)
+    -- his books as Ot6ActionEnd left them: the first EndAction after his
+    -- Ot6ActionEnd is the jmp that follows its return
+    local endAction = H.sym("EndAction")
+    emu.addMemoryCallback(function()
+      if endHit ~= nil and endHit.p == nil then endHit.p, endHit.b = pend(actor), bp(actor) end
+    end, emu.callbackType.exec, endAction, endAction)
     local ea = H.sym("ExecAction")
     emu.addMemoryCallback(function()
       local x = emu.getState()["cpu.x"] & 0xff

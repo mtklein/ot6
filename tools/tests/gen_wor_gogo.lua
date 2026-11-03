@@ -443,6 +443,10 @@ H.run({ maxFrames = 2400000 }, {
   H.call(function()
     say("wor", "boot")
     H.log("[kit] " .. kitLine({ TERRA, CELES, RELM, STRAGO }))
+    -- a hard input (#480): the belly's Warp Stone is the Phoenix cave's chest (315 (55,53), bit 195, gen_wor_phoenix);
+    -- South Figaro's (bit 231) stays closed in the World of Balance, so the line holds exactly this one
+    H.assertEq(H.chestOpen(0x0C3), true, "the Warp Stone's chest (bit 195) is open at the boot: gen_wor_phoenix opened it")
+    H.assertEq(H.invCountOf(WARP_STONE) >= 1, true, "a Warp Stone in the bag at the boot (gen_wor_phoenix's chest; the belly's exit uses it)")
   end),
   -- @@setup-end
 

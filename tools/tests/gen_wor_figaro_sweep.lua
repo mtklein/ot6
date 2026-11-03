@@ -2,9 +2,9 @@
 -- South Figaro continent's missed items (#322) and its desert (#321):
 -- Continue the `wor-edgar-v1` battery (CELES, SABIN and EDGAR at world
 -- (81,86), outside the surfaced Figaro Castle), walk the desert and the
--- plain to South Figaro, take the basement passage's chests by both of its
--- ways in, take the Hero Ring through the Figaro cave's other door, walk
--- back through the desert, and save on the castle's tile again: the
+-- plain to South Figaro, take the ruined town's chests, take the Hero Ring
+-- through the Figaro cave's other door, walk back through the desert, and
+-- save on the castle's tile again: the
 -- `wor-figaro-sweep-v1` battery, the boot for the Kohlingen leg (the side
 -- trip is on the chain: guidelines "Ribbons are worth going out of your way
 -- for").  Generates wor_figaro_sweep.mss; its capture run (OT6_CAPTURE_SRM)
@@ -15,15 +15,16 @@
 --   1. Field care at the boot (the checkpoint was saved hurt), then the
 --      world walk to South Figaro's door (113,95): the castle's desert
 --      (group 44) first, fought as it comes.
---   2. South Figaro (map 74): the Elixir at (2,43) (its bit, $0E6, the
---      World of Balance's Soft there, never opened); Duncan's house 74 (48,37) -> 86 (52,29), its stairs
---      (48,32) -> the passage 87 (56,49) (its Iron Armor and Earrings),
---      and (33,51) -> 89 (96,42): the X-Potion, the Ribbon and the Ether.
---      Back the same way.  Map 87 rolls the World of Balance's pool 65.
---   3. The rich man's house 74 (15,18) -> 81 (4,16), its warps (3,5) and
---      (13,51) to the stairs (27,10) -> 83 (7,5), the warp (8,12), and
---      (32,18) -> 89 (106,54): the Hyper Wrist and the RunningShoes.
---      Back the same way, and out of town by the west edge.
+--   2. South Figaro (map 74): the Elixir at (2,43) and the six chests whose
+--      World of Balance copies the route leaves closed for these prizes
+--      (#350; tools/chests_opened.txt "keep closed in the WoB"): an
+--      X-Potion, two Tents, a Remedy, a Revivify and a Fenix Down.  The
+--      basement passage and its cellar (the Iron Armor, the Earrings, the
+--      Ribbon, the Hyper Wrist, the RunningShoes, an X-Potion and an Ether)
+--      were taken in the World of Balance, on LOCKE's escape
+--      (gen_tunnelarmr, #350), so this leg asserts them open at the boot
+--      and does not go back down.
+--   3. Out of town by the west edge.
 --   4. The Figaro cave (106,98): map 68's pieces by their links to the
 --      piece of (4,4), its door -> 90 (41,13), the Hero Ring (52,14), and
 --      back out to the world (the cave rolls groups 138 and 140, fought
@@ -31,15 +32,11 @@
 --   5. The walk back to the castle's tile (81,86) through the desert, the
 --      field care to full, and the real Save UI into slot 3 there
 --      (H.saveAtCheckpoint "wor-figaro-sweep-v1").
--- The relics go on the moment they are in the bag (guidelines "Relics
--- matter", "Ribbons are worth going out of your way for"): after the
--- Ribbon's cellar, after the rich man's cellar and after the Hero Ring,
--- the party's relic slots are re-planned by the lib's relic rule
+-- The Hero Ring goes on the moment it is in the bag (guidelines "Relics
+-- matter"): the party's relic slots are re-planned by the lib's relic rule
 -- (H.dressRelics, lib/ot6_field.lua: the Ribbon to the party's caster, then
 -- Haste, damage and vigor over plain guards) and dressed through the Relic
--- menu.  On this chain that is CELES Genji Glove + Ribbon, SABIN Genji
--- Glove + Hero Ring, EDGAR RunningShoes + Hyper Wrist; the contract pins
--- CELES's Ribbon.
+-- menu; the contract pins CELES's Ribbon.
 -- Every battle's [outcome] is asserted said, judged on the battle's own end
 -- reading, and paid as due; every battle's draw is logged as a [key] line
 -- (the seed $be at InitBattle's store and the battle group $11E0) so a set
@@ -49,22 +46,28 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local CELES, SABIN, EDGAR = 6, 5, 4
-local TONIC, POTION, FENIX, REMEDY, SOFT = 0xE8, 0xE9, 0xF0, 0xF5, 0xF4
+local TONIC, POTION, FENIX, REMEDY, SOFT, TENT = 0xE8, 0xE9, 0xF0, 0xF5, 0xF4, 0xF7
 local REVIVIFY, GREEN_CHERRY = 0xF1, 0xF8
 local X_POTION, ETHER, ELIXIR = 0xEA, 0xEC, 0xEE
 local IRON_ARMOR, EARRINGS, RUNNINGSHOES, HERO_RING, RIBBON, HYPER_WRIST = 0x87, 0xC3, 0xBA, 0xC9, 0xCA, 0xD2
-local MAP_SF, MAP_DUNCAN, MAP_PASSAGE, MAP_CELLAR = 74, 86, 87, 89
-local MAP_RICH, MAP_RICH_B1 = 81, 83
+local MAP_SF = 74
 local MAP_CAVE, MAP_CAVE2 = 68, 90
 local SF_DOOR, CAVE_DOOR = { 113, 95 }, { 106, 98 }
 local SAVE_TILE = { 81, 86 }                        -- the castle's exit tile: the wor-figaro-sweep-v1 save
 -- the world's doors kept off every plan but the one walked to
 local DOORS = { { 113, 95 }, { 106, 98 }, { 81, 85 }, { 82, 85 } }
--- the chests this leg is for, by treasure bit (route_data.py map 68/74/87/89/90)
+-- the chests this leg is for, by treasure bit (route_data.py map 74/90)
 local CHESTS = {
-  { 0x013, "Hero Ring" }, { 0x020, "Iron Armor" }, { 0x021, "Earrings" },
+  { 0x013, "Hero Ring" }, { 0x0E6, "Elixir" },
+  { 0x015, "X-Potion" }, { 0x016, "Tent" }, { 0x017, "Remedy" }, { 0x018, "Revivify" }, { 0x019, "Tent" },
+  { 0x0E7, "Fenix Down" },
+}
+-- the chests the World of Balance took on LOCKE's escape (gen_tunnelarmr,
+-- #350): the passage's (map 87) and its cellar's (map 89), a hard input
+local WOB_CHESTS = {
+  { 0x020, "Iron Armor" }, { 0x021, "Earrings" },
   { 0x0FC, "Hyper Wrist" }, { 0x0FD, "X-Potion" }, { 0x0FE, "Ribbon" }, { 0x0FF, "Ether" },
-  { 0x100, "RunningShoes" }, { 0x0E6, "Elixir" },
+  { 0x100, "RunningShoes" },
 }
 -- the cave's fights leave a Muddled ally to the monsters' hits rather than
 -- a Genji pair's cure-hit (gen_wor_edgar CAVE_FIGHT; route-wor-edgar 12.5)
@@ -287,6 +290,14 @@ H.run({ maxFrames = 200000 }, {
     H.log(string.format("[wor] boot f%d: world %d (%d,%d), %s; kit CELES %s, SABIN %s, EDGAR %s; %s", H.frame,
       H.worldId(), H.worldX(), H.worldY(), whereLine(), kit(CELES), kit(SABIN), kit(EDGAR), supplies()))
     H.log("[sweep] at the boot: " .. taken())
+    for _, ch in ipairs(WOB_CHESTS) do
+      H.assertEq(H.chestOpen(ch[1]), true, string.format("the cellar's %s (bit $%03X) was taken in the World of "
+        .. "Balance, on LOCKE's escape (gen_tunnelarmr)", ch[2], ch[1]))
+    end
+    for _, ch in ipairs(CHESTS) do
+      H.assertEq(H.chestOpen(ch[1]), false, string.format("the %s's chest (bit $%03X) is still closed at the boot "
+        .. "(the World of Balance keeps it closed: audit_chests 'keep closed in the WoB')", ch[2], ch[1]))
+    end
   end),
   -- the checkpoint was saved hurt (EDGAR 948/1600 and SABIN 75/291 MP at
   -- the tracked save): the care before the walk
@@ -297,56 +308,22 @@ H.run({ maxFrames = 200000 }, {
   checkOutcomes("the walk to South Figaro"),
   H.fieldCare({ tag = "in South Figaro" }),
 
-  -- ---- 2. South Figaro: the Elixir, and Duncan's way into the passage -------------------------
+  -- ---- 2. South Figaro: the Elixir and the six the World of Balance left ---------------------
+  -- each from a neighbour the map's BFS reaches from the west gate (1,28)
+  -- (route_data.py field-path 74: (5,31)/(6,30), (13,28), (3,43), (14,45),
+  -- (14,47), (32,17), and (11,24) the long way round, 120 steps)
+  mustChest(6, 31, 0x018, "Revivify", REVIVIFY),
+  mustChest(14, 28, 0x019, "Tent", TENT),
   mustChest(2, 43, 0x0E6, "Elixir", ELIXIR),
-  H.crossDoor(48, 37, MAP_DUNCAN, 52, 29, "South Figaro -> Duncan's house 74(48,37)->86(52,29)"),
-  H.crossDoor(48, 32, MAP_PASSAGE, 56, 49, "Duncan's stairs 86(48,32)->87(56,49)"),
-  chest(32, 42, 0x020, "Iron Armor", IRON_ARMOR),
-  chest(33, 56, 0x021, "Earrings", EARRINGS),
-  H.crossDoor(33, 51, MAP_CELLAR, 96, 42, "the passage -> its cellar 87(33,51)->89(96,42)"),
-  mustChest(101, 39, 0x0FD, "X-Potion", X_POTION),
-  mustChest(101, 43, 0x0FE, "Ribbon", RIBBON),
-  mustChest(92, 53, 0x0FF, "Ether", ETHER),
-  H.call(function() say("sweep", "the cellar by Duncan's way: " .. taken()) end),
-  H.dressRelics(MEMBERS, { threats = ARC_THREATS, tag = "relics after the Ribbon" }),
-  H.crossDoor(97, 41, MAP_PASSAGE, 34, 50, "the cellar -> the passage 89(97,41)->87(34,50)"),
-  H.call(function()
-    H.assertEq(H.chestOpen(0x020) and H.chestOpen(0x021), true,
-      "the passage's Iron Armor and Earrings are open (bits $020, $021)")
-  end),
+  mustChest(15, 45, 0x016, "Tent", TENT),
+  mustChest(15, 47, 0x017, "Remedy", REMEDY),
+  mustChest(32, 16, 0x015, "X-Potion", X_POTION),
+  mustChest(11, 23, 0x0E7, "Fenix Down", FENIX),
+  H.call(function() say("sweep", "South Figaro: " .. taken()) end),
   -- (the passage's pool is hunted on a branch from this capture, gen_wor_passage_hunt, #488)
-  H.saveState("wor_figaro_sweep_passage.mss"),
-  H.crossDoor(57, 48, MAP_DUNCAN, 49, 31, "the passage -> Duncan's house 87(57,48)->86(49,31)"),
-  H.crossDoor(52, 27, MAP_SF, 48, 36, "Duncan's house -> South Figaro 86(52,27)->74(48,36)"),
-  checkOutcomes("the passage by Duncan's house"),
-  H.fieldCare({ tag = "after the passage" }),
-
-  -- ---- 3. the rich man's way into the cellar's other room -------------------------------------
-  -- The house is a warp maze (gen_celes, the World of Balance's way through
-  -- it): the stairs (27,10) are reached by (3,5) -> (5,54) and (13,51) ->
-  -- (39,17) (measured: `navTo: no path (4,16)->(27,11)` straight from the
-  -- door, dev1), and the basement's (32,18) by (8,12) -> (18,5).
-  H.crossDoor(15, 18, MAP_RICH, 4, 16, "South Figaro -> the rich man's house 74(15,18)->81(4,16)"),
-  H.crossDoor(3, 5, MAP_RICH, 5, 54, "the rich man's house: the warp 81(3,5)->81(5,54)"),
-  H.crossDoor(13, 51, MAP_RICH, 39, 17, "the rich man's house: the warp 81(13,51)->81(39,17)"),
-  H.crossDoor(27, 10, MAP_RICH_B1, 7, 5, "the rich man's stairs 81(27,10)->83(7,5)"),
-  H.crossDoor(8, 12, MAP_RICH_B1, 18, 5, "the rich man's basement: the warp 83(8,12)->83(18,5)"),
-  H.crossDoor(32, 18, MAP_CELLAR, 106, 54, "the rich man's cellar 83(32,18)->89(106,54)"),
-  mustChest(110, 49, 0x0FC, "Hyper Wrist", HYPER_WRIST),
-  mustChest(120, 53, 0x100, "RunningShoes", RUNNINGSHOES),
-  H.call(function() say("sweep", "the cellar by the rich man's way: " .. taken()) end),
-  H.dressRelics(MEMBERS, { threats = ARC_THREATS, tag = "relics after the Hyper Wrist and the RunningShoes" }),
-  H.crossDoor(105, 53, MAP_RICH_B1, 31, 17, "the cellar -> the rich man's basement 89(105,53)->83(31,17)"),
-  H.crossDoor(17, 4, MAP_RICH_B1, 7, 11, "the rich man's basement: the warp 83(17,4)->83(7,11)",
-    { avoid = { { 32, 18 }, { 35, 12 }, { 40, 12 }, { 45, 12 } } }),
-  H.crossDoor(8, 4, MAP_RICH, 28, 9, "the rich man's basement -> his house 83(8,4)->81(28,9)",
-    { avoid = { { 8, 12 } } }),
-  H.crossDoor(39, 18, MAP_RICH, 13, 53, "the rich man's house: the warp 81(39,18)->81(13,53)",
-    { avoid = { { 27, 10 } } }),
-  H.crossDoor(6, 55, MAP_RICH, 4, 6, "the rich man's house: the warp 81(6,55)->81(4,6)",
-    { avoid = { { 13, 51 }, { 19, 51 } } }),
-  H.crossDoor(4, 17, MAP_SF, 15, 20, "the rich man's house -> South Figaro 81(4,17)->74(15,20)",
-    { avoid = { { 3, 5 }, { 16, 16 } } }),
+  H.saveState("wor_figaro_sweep_town.mss"),
+  checkOutcomes("South Figaro"),
+  H.fieldCare({ tag = "after South Figaro's chests" }),
 
   -- out by the west edge (the long exit (0,0) len 47 -> the world)
   H.navTo(1, 28, { maxFrames = 6000, playBattles = "tactical" }),

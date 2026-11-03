@@ -3,9 +3,8 @@
 -- "She's up there!" guard scene at (38,8) (_cca279: guards surround,
 -- posture, and leave; a cutscene with no input needed), continue to the
 -- mine mouth at (26,8) -> map 50 (mines chase map) at (78,58), and generate
--- mines_chase.mss at the first calm tile inside.  Then open the two map-50
--- chests visible from the walk: the Fenix Down at (65,28) and the
--- Sleeping Bag at (52,33), each from the tile below.  Then north through the
+-- mines_chase.mss at the first calm tile inside.  The map's two chests stay
+-- closed for the World of Ruin's prizes (below).  Then north through the
 -- mines, clearing random encounters and logging their species, to
 -- (55,12), one tile short of the trigger at (55,11) that starts the
 -- bridge-collapse -> Kefka flashback -> Moogle-defense chain. Generate
@@ -93,12 +92,11 @@ H.run({ maxFrames = 50000 }, {
   end),
   H.saveState("mines_chase.mss"),
 
-  H.openChest{ stand = { 65, 29 }, face = "up", bit = 11,
-               what = "Fenix Down", item = 0xF0,
-               nav = { playBattles = true } },
-  H.openChest{ stand = { 52, 34 }, face = "up", bit = 12,
-               what = "Sleeping Bag",
-               nav = { playBattles = true } },
+  -- The map's two chests, the Fenix Down (65,28) and the Sleeping Bag
+  -- (52,33), are left closed: their treasure bits, 11 and 12, are the World
+  -- of Ruin's Moogle cave's too (map 38: the Pod Bracelet and an Elixir), and
+  -- opening them here would spend those (#350; tools/chests_opened.txt
+  -- "keep closed in the WoB", which audit_chests enforces).
 
   -- north to one tile short of the collapse trigger at (55,11).  Guards
   -- chase through this map (vanilla: mobile NPCs whose touch fires a

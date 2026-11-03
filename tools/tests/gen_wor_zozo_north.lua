@@ -1,9 +1,11 @@
 -- gen_wor_zozo_north.lua -- a branch beside the Cyan arc's first leg (#502, wor-coverage.md section 11.9): from
 -- gen_wor_cyan's capture by Zozo's merchant after the Rust-Rid (`wor_cyan_rustrid`: TERRA, CELES, SABIN and
 -- EDGAR on Zozo's street), the World of Balance's climb to Dadaluma (gen_zozo4_dadaluma) walked again for the four
--- chests past the stair room: the Thief Glove (225 (11,59)), the Fire Knuckle (225 (35,11)), and the rooftop's
--- RunningShoes and X-Potion (226 (72,26), (92,27)).  No leg boots what it leaves (`wor_zozo_north`): the chests and
--- the climb's XP stay off the main line, which goes on from the same capture.
+-- chests past the stair room: the Thief Glove (225 (11,59)) and the Fire Knuckle (225 (35,11)).  The rooftop room's
+-- RunningShoes and X-Potion (226 (72,26), (92,27)) are the World of Balance's now, opened by gen_zozo5_ramuh on the
+-- way up to TERRA (#350), so the boot asserts them open and the walk ends in that room as before.  No leg boots what
+-- it leaves (`wor_zozo_north`): the chests and the climb's XP stay off the main line, which goes on from the same
+-- capture.
 --
 -- The stair room's seven walkers (225 NPCs 2-8) climb its one-wide stair in the World of Ruin as in the World of
 -- Balance (build/attempts/wt/v038-zozo-tomb/stair/: from this boot and from zozo-outside-v1, each of objects
@@ -47,8 +49,8 @@ local function onMap(m) return function() return map() == m end end
 local CHESTS = {
   { bit = 0x04B, what = "Thief Glove (225 (11,59))", item = 0xCF },
   { bit = 0x04C, what = "Fire Knuckle (225 (35,11))", item = 0x57 },
-  { bit = 0x046, what = "RunningShoes (226 (72,26))", item = 0xBA },
-  { bit = 0x047, what = "X-Potion (226 (92,27))", item = 0xEA },
+  { bit = 0x046, what = "RunningShoes (226 (72,26))", item = 0xBA, wob = "gen_zozo5_ramuh" },
+  { bit = 0x047, what = "X-Potion (226 (92,27))", item = 0xEA, wob = "gen_zozo5_ramuh" },
 }
 
 -- ---- the walks ----
@@ -121,8 +123,13 @@ H.run({ maxFrames = 600000 }, {
     say("wor", "boot")
     H.log("[kit] " .. kitLine(FOUR))
     for _, c in ipairs(CHESTS) do
-      H.assertEq(H.chestOpen(c.bit), false, string.format("the %s's chest (bit %d) is still closed at the boot",
-        c.what, c.bit))
+      if c.wob then
+        H.assertEq(H.chestOpen(c.bit), true, string.format("the %s's chest (bit %d) is open at the boot: the World "
+          .. "of Balance's %s takes it", c.what, c.bit, c.wob))
+      else
+        H.assertEq(H.chestOpen(c.bit), false, string.format("the %s's chest (bit %d) is still closed at the boot",
+          c.what, c.bit))
+      end
     end
   end),
   -- @@setup-end
@@ -178,21 +185,18 @@ H.run({ maxFrames = 600000 }, {
   landed("the rooftop room settled"),
 
   -- @@stage rooftop
-  H.openChest({ stand = { 72, 27 }, face = "up", bit = CHESTS[3].bit, what = CHESTS[3].what, item = CHESTS[3].item,
-    nav = { fight = FIGHT } }),
-  H.openChest({ stand = { 91, 27 }, face = "right", bit = CHESTS[4].bit, what = CHESTS[4].what, item = CHESTS[4].item,
-    nav = { fight = FIGHT } }),
+  -- (the RunningShoes and the X-Potion chests are open from the boot; nothing to walk to here)
   H.call(function()
     for _, c in ipairs(CHESTS) do
       H.assertEq(H.chestOpen(c.bit), true, string.format("Zozo: the %s's chest (bit %d) is open", c.what, c.bit))
     end
-    say("wor", "the four north chests open")
+    say("wor", "the Thief Glove and the Fire Knuckle opened; the rooftop's two were open at the boot")
     H.log("[kit] " .. kitLine(FOUR))
   end),
   H.saveState("wor_zozo_north.mss"),
   H.logStep(function()
     return string.format("wor_zozo_north generated: TERRA L%d, CELES L%d, SABIN L%d and EDGAR L%d in Zozo's rooftop "
-      .. "room, map %d (%d,%d); the Thief Glove, the Fire Knuckle, the RunningShoes and the X-Potion opened", lv(TERRA),
+      .. "room, map %d (%d,%d); the Thief Glove and the Fire Knuckle opened (the RunningShoes and the X-Potion were open at the boot)", lv(TERRA),
       lv(CELES), lv(SABIN), lv(EDGAR), map(), H.fieldX(), H.fieldY())
   end),
 })
