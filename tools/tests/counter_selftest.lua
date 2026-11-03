@@ -203,5 +203,40 @@ check("the back row halves it (91 -> 45)",
     return hi == 45
   end)
 
+-- ---- the Phoenix Cave's answers (#503) -------------------------------------
+-- Necromancr ($0F1): `if_cmd FIGHT / end_if / if_hit / attack DEMI, QUARTR,
+-- NOTHING`; Phase ($0BC): `if_self_dead / end_if / if_hit / attack
+-- BLOW_FISH` (ai_script.asm _241, _188)
+local LORE, AQUA_RAKE = 0x0C, 0x8E
+check("$0F1 answers a Fight with nothing (its if_cmd FIGHT block is empty)",
+  "retalAnswer", "if c == 0x01 then holds = either(use.cmd, a, b)", "if c == 0x01 then holds = false",
+  function()
+    local a, sure = H.retalAnswer(scriptOf(0x0F1), { cmd = FIGHT })
+    return ids(a) == "" and sure
+  end)
+check("$0F1 answers Aqua Rake with Demi or Quartr ($10, $11)",
+  "retalAnswer", "elseif c == 0x05 then holds = true", "elseif c == 0x05 then holds = false",
+  function()
+    local a, sure = H.retalAnswer(scriptOf(0x0F1), { cmd = LORE, atk = AQUA_RAKE, elem = 0x80 })
+    return ids(a) == "10,11" and sure
+  end)
+local function rec(a) return function(i) return rom:byte(MAGIC + a * 14 + i + 1) end end
+assert(rom:byte(MAGIC + 0x90 * 14 + 10) == 0x1A, "Blow Fish in MagicProp: attacker special effect $1A (+9)")
+assert(rom:byte(MAGIC + 0x11 * 14 + 5) & 0x80 ~= 0 and rom:byte(MAGIC + 0x11 * 14 + 7) == 12,
+  "Quartr in MagicProp: the fraction flag (+4 bit 7), power 12 (+6)")
+check("Blow Fish takes 1000 (AttackerEffect_1a), whatever the HP",
+  "fixedTake", "if byteAt(9) == 0x1A then return 1000 end", "",
+  function() return H.fixedTake(rec(0x90), 557, 2227) == 1000 end)
+-- the wipe's own numbers: SABIN 2227 -> 557, STRAGO 3219 -> 805
+check("Quartr takes 12/16 of the HP standing (2227 -> 1670 off, 3219 -> 2414 off)",
+  "fixedTake", "maxHp or hp) * byteAt(6)) >> 4", "maxHp or hp) * byteAt(6)) >> 3",
+  function() return H.fixedTake(rec(0x11), 2227, 2227) == 1670 and H.fixedTake(rec(0x11), 3219, 3219) == 2414 end)
+check("Demi takes half of the HP standing, not of the max (557 -> 278 off)",
+  "fixedTake", "(byteAt(2) & 0x04) ~= 0 and maxHp or hp", "maxHp",
+  function() return H.fixedTake(rec(0x10), 557, 2227) == 278 end)
+check("Flare is not priced here (monHitOn's magical model is)",
+  "fixedTake", "if (byteAt(4) & 0x80) ~= 0 then", "if true then",
+  function() return H.fixedTake(rec(0x0F), 557, 2227) == nil end)
+
 print(string.format("counter_selftest: PASS -- %d assertions, each failed by its own mutant: %s",
   n, table.concat(checks, "; ")))
