@@ -158,11 +158,12 @@ local function score(id)
   end
   return H.itemPower(id) * (gauged + keys(id)) / gauged
 end
+-- (never a weapon whose blow heals what it hits, H.weaponHeals: the Heal Rod, #485/#499)
 local function bagWeapons()
   local out = {}
   for s = 0, 255 do
     local id, n = H.readByte(0x1869 + s), H.readByte(0x1969 + s)
-    if id ~= 0xFF and n > 0 and isWeapon(id) then out[id] = n end
+    if id ~= 0xFF and n > 0 and isWeapon(id) and not H.weaponHeals(id) then out[id] = n end
   end
   return out
 end

@@ -1585,14 +1585,23 @@ his pool) standing.
   party) and a plan pressed to an exact boost (`exactBoost`/`boostWant`)
   keep theirs.
 - The study is aimed at a body out of Reflect. The confirm's cast guard
-  refuses a reflectable cast while any body reflects; for the study only
-  its Reflect half is waived, and only while the cursor (`$7B7E`) holds
-  exactly one standing monster out of Reflect at the confirm
-  (`M.reflectWaived`, `reflectSingle`). Absorb, null and the enemy Runic
-  (#413) stand. An aimed body fallen before the confirm, a steer that gave
-  up on another body and a target gone into Reflect since the plan keep
-  the guard (`reflect_waiver_selftest`, 6 assertions, each failed by its
-  own mutant).
+  judges Reflect on the bodies the cursor (`$7B7E`) holds at the confirm
+  for a cast that harms nobody when it bounces (`plan.bounceHarmless`, the
+  study's Scan; `M.reflectJudged`, #500). Every other cast is judged on
+  the whole stage, at the plan and at the confirm alike, so a Fire beside
+  a Hidonite never reaches the confirm: a body falling between the confirm
+  and the cast hands a single-target cast to another standing body, which
+  may reflect. Absorb, null and the enemy Runic (#413) are judged on
+  the whole stage. An aimed body fallen before the confirm (the engine
+  retargets the cast) and an empty cursor fall back to the whole stage; a
+  target gone into Reflect since the plan, a steer that gave up on a
+  mirror and a spread over one are refused (`reflect_judged_selftest`, 11
+  assertions, each failed by its own mutant). At Hidon (gen_wor_ebot from
+  the wor-gogo-v1 capture, shifts 0-11, 11 distinct battle keys) the
+  confirm refused no cast and Hidon fell in 7452-15905 ticks (median
+  12460); the old whole-stage rule refused the study's Scan 253 times in
+  11 of the 12 and Hidon took 7452-39515 (median 16855), every run won
+  (build/attempts/wt/v038-driver-followups/hidon/summary.txt).
 - A lore pending for the victory (`$3A84-$3A86`, which InitBattle clears)
   counts as known, so he studies a body once.
 

@@ -7,7 +7,8 @@
 -- the damage).
 --
 -- Played, no writes: Continue the wor-tomb-v1 battery, put the bag's Coin
--- Toss relic on SETZER through the Relic menu (H.equipKit), walk Darill's
+-- Toss relic on SETZER through the Relic menu (H.equipKit), care to full and
+-- hand SETZER the party's widest guard (H.guardOn: the room Zombies), walk Darill's
 -- Tomb's east room into random battles, and throw GP Rain from the command
 -- row (H.setzerBattle's `cmd` entries) at 1 BP and unboosted in the
 -- battles that deal a crowd (two or more monsters, one special-weak), so a
@@ -77,6 +78,14 @@ H.run({ maxFrames = 1200000 }, {
   H.equipKit(SETZER, { { 4, COIN_TOSS_RELIC } }, { tag = "the Coin Toss relic on SETZER" }),
   H.call(function()
     H.assertEq(H.readByte(0x1600 + 37 * SETZER + 0x23), COIN_TOSS_RELIC, "SETZER wears the Coin Toss relic")
+  end),
+  -- SETZER has to take the throws, and the room's bodies Zombie him (route-wor-falcon.md section 1, item 5): the
+  -- party, cared to full, hands him its widest guard beside the Coin Toss (#501: the sweep's K=2 shift-7 draw
+  -- Zombied him and then SABIN, and crowd battle 3 ended with no throw)
+  H.fieldCare({ threshold = 1.0, tag = "before the walk" }),
+  H.guardOn(SETZER, "SETZER", 0x02, 0x20, { threats = H.ARC_THREATS["wor-falcon"], tag = "SETZER's guard" }),
+  H.call(function()
+    H.assertEq(H.readByte(0x1600 + 37 * SETZER + 0x23), COIN_TOSS_RELIC, "SETZER still wears the Coin Toss relic")
   end),
   walk,
   H.call(function()

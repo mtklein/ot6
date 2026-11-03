@@ -3875,14 +3875,21 @@ end
 -- cast at a Reflect bearer lands on the party), or "null" (every element
 -- of the cast is nulled: a wasted turn).  Absorb is judged across the
 -- whole stage first, since it is the costliest.  nil when the cast may go.
-function M.castVeto(elem, reflectable, slots)
+-- reflectSlots, when given, are the bodies the Reflect half is judged on
+-- (the cursor's at the confirm, M.reflectJudged); absorb and null are
+-- judged on the whole stage either way.
+function M.castVeto(elem, reflectable, slots, reflectSlots)
   if elem ~= 0 then
     for _, s in ipairs(slots) do
       if (s.absorb & elem) ~= 0 then return s, "absorb" end
     end
   end
+  if reflectable then
+    for _, s in ipairs(reflectSlots or slots) do
+      if s.reflect then return s, "reflect" end
+    end
+  end
   for _, s in ipairs(slots) do
-    if reflectable and s.reflect then return s, "reflect" end
     if elem ~= 0 and (s.null & elem) == elem then return s, "null" end
   end
   return nil
@@ -7289,6 +7296,37 @@ function Driver:noLineItemPick(reserve)
   return nil
 end
 
+-- The no-line turn (makePlanRules' fallback above, and healWeaponPlan's): a Tonic or Potion
+-- (noLineItemPick) on the least-full member, or nil when there is no Item row, no member to
+-- take it, or nothing in the bag.  `why` heads its log line.
+function Driver:noLineItem(actor, why)
+  local irow = cmdRow(actor, BATTLE.CMD_ITEM)
+  local least, leastFrac = nil, 2
+  for e = 0, 3 do
+    local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+    if hp > 0 and mx > 0 and hp / mx < leastFrac then least, leastFrac = e, hp / mx end
+  end
+  if irow == nil or least == nil then return nil end
+  -- a driver given no floor of its own (a walk's fights) keeps the field care's (M.CARE_RESERVE)
+  local reserve = self.opts.reserve or M.CARE_RESERVE or {}
+  local pick = self:noLineItemPick(reserve)
+  if pick == nil then return nil end
+  -- why there is no line: the Magic row greyed (flags bit 7) or absent, or present and
+  -- empty-handed; Mute is status byte 2 bit 3
+  local magicRow = "absent"
+  for row = 0, 3 do
+    if M.readByte(BATTLE.CMDTBL + actor * 12 + row * 3) == BATTLE.CMD_MAGIC then
+      magicRow = cmdDisabled(actor, row) and "greyed" or "open"
+    end
+  end
+  M.log(string.format("[%s] actor=%d: %s; item $%02X on entity %d "
+    .. "rather than a pass (%s: %d in the bag, Tonic floor %d, Potion floor %d; Magic row %s, status $%02X $%02X%s, MP %d)",
+    self.tag or "fight", actor, why, pick.it, least, pick.floor, pick.have, reserve[0xE8] or 0, reserve[0xE9] or 0,
+    magicRow, M.readByte(0x3EE4 + actor * 2), M.readByte(0x3EE5 + actor * 2),
+    (M.readByte(0x3EE5 + actor * 2) & 0x08) ~= 0 and " MUTE" or "", M.readWord(BATTLE.CURMP + actor * 2)))
+  return { kind = "item", item = pick.it, target = least, row = irow, idx = pick.idx, reason = "no_line_item" }
+end
+
 -- What one use of an item gives back.  The prior is M.itemPower, the
 -- +$14 power byte; it is a prior and not the answer, because power is an
 -- input to the engine's heal routine rather than its output.  The first
@@ -7409,19 +7447,35 @@ function Driver:runicSlot(id)
   local MP = M.sym("MagicProp") & 0x3FFFFF
   return M.runicTakes(M.readRomByte(MP + id * 14 + 3), self:runicSpecial())
 end
--- The one exemption from the Reflect half of the cast guard (#388): a
--- single-target cast whose cursor holds exactly one monster (`tgtmons`,
--- $7B7E, bit n = slot n), standing (in `slots`, M.activeSlots) and out of
--- Reflect at that moment, cannot bounce off another body's Reflect.  An
--- empty cursor, two bodies, a fallen or absent body, or one in Reflect
--- keeps the guard.  Only a plan that asks (plan.reflectSingle) reads it.
-function M.reflectWaived(tgtmons, slots)
+-- The bodies the Reflect half of the cast guard is judged on at the confirm
+-- (#388, #500), for a plan whose cast harms nobody when it bounces
+-- (plan.bounceHarmless: the study's Scan): the monsters the cursor holds
+-- (`tgtmons`, $7B7E, bit n = slot n) when every one of them stands (in
+-- `slots`, M.activeSlots).  Such a cast confirmed on a body out of Reflect
+-- goes in while a Hidonite beside it reflects; a spread over a field with a
+-- mirror in it is judged on the mirror.  An empty cursor (on the party), or
+-- one holding a body that has fallen, is judged on the whole stage.  Every
+-- other cast keeps the whole-stage rule at the confirm, as at the plan
+-- (the cast, nuke, lore and magic-only lines judge the whole stage, so a
+-- Fire beside a Hidonite never reaches the confirm): a body that falls
+-- between the confirm and the cast hands a single-target cast to another
+-- standing body, the engine's retarget, and that body may reflect.
+-- M.REFLECT_PER_TARGET = false is the whole-stage rule everywhere (a lab
+-- lever).
+function M.reflectJudged(tgtmons, slots)
+  if tgtmons == 0 or M.REFLECT_PER_TARGET == false then return slots end
+  local t, seen = {}, 0
   for _, s in ipairs(slots) do
-    if (1 << s.slot) == tgtmons then return not s.reflect end
+    if (tgtmons & (1 << s.slot)) ~= 0 then t[#t + 1] = s; seen = seen | (1 << s.slot) end
   end
-  return false
+  if seen ~= tgtmons then return slots end
+  return t
 end
-function Driver:castVetoed(abilityId, what, singleTarget)
+-- perTarget: the target window is up with the cast's target chosen and the
+-- plan's cast harms nobody when it bounces (plan.bounceHarmless), so the
+-- Reflect half is judged on what the cursor holds (M.reflectJudged); every
+-- other call is judged on the stage
+function Driver:castVetoed(abilityId, what, perTarget)
   -- An enemy Runic (#413): a monster carrying $3E4C bit 1 (the Speck's
   -- MonsterProp+30, "A Speck absorbs magic!" on its launch) takes every
   -- runic-able spell (MagicProp+3 bit 3, RunicEffect) cast while it
@@ -7441,10 +7495,11 @@ function Driver:castVetoed(abilityId, what, singleTarget)
   local elem = M.spellElement(abilityId)
   local slots = activeSlots()
   local reflectable = M.spellReflectable(abilityId)
-  if reflectable and singleTarget and M.reflectWaived(M.readByte(BATTLE.TGTMONS), slots) then
-    reflectable = false
+  local judged = nil
+  if reflectable and perTarget then
+    judged = M.reflectJudged(M.readByte(BATTLE.TGTCHARS) == 0 and M.readByte(BATTLE.TGTMONS) or 0, slots)
   end
-  local s, why = M.castVeto(elem, reflectable, slots)
+  local s, why = M.castVeto(elem, reflectable, slots, judged)
   if not s then return false end
   if why == "absorb" then
     M.log(string.format(
@@ -11135,6 +11190,7 @@ function Driver:makePlan(actor)
   self._race = nil
   plan = self:lockeMug(actor, plan)
   plan = self:dodgePlan(actor, plan)
+  plan = self:healWeaponPlan(actor, plan)
   plan = self:coverPlan(actor, plan)
   plan = self:buffPlan(actor, plan)
   plan = self:zingerPlan(actor, plan)
@@ -11181,6 +11237,39 @@ function Driver:dodgePlan(actor, plan)
     end
   end
   return plan
+end
+
+-- A Fight by a member whose hand holds a weapon whose blow heals what it hits (M.weaponHeals: the Heal Rod,
+-- ItemProp +27 high nibble $0C, battle_main.asm AttackerEffect_0c), or GOGO's Mimic of a Fight while his does
+-- (mimicreplace copies the command and attack, and the copy swings the mimic's own hands), heals the monster
+-- (#485: STRAGO re-armed with the Tzen house's Heal Rod, and Hidon went 22424 -> 24440 under his Fights and GOGO's
+-- Mimics).  The equip lines leave such a weapon out of the bag's picks (M.bagWeapons, Optimum's own skip); this is
+-- the turn's guard for one worn some other way (#499), as a person who sees the rod heal stops swinging it: the
+-- actor's magic line when it has one, else the no-line turn (a Tonic or Potion on the least-full member,
+-- Driver:noLineItem), and only with neither is the window handed on (a switch), so a lone rod holder still takes
+-- turns.  A Fight on an ally (the Muddle rule's) is left alone.  M.HEAL_WEAPON_GUARD = false turns it off, the
+-- control arm.
+function Driver:healWeaponPlan(actor, plan)
+  if plan == nil or plan.ally or M.HEAL_WEAPON_GUARD == false or M.weaponHeals == nil then return plan end
+  if not (plan.kind == "fight" or (plan.kind == "mimic" and plan.copy ~= nil and plan.copy.cmd == BATTLE.CMD_FIGHT)) then
+    return plan
+  end
+  local r, l = handsOf(actor)
+  local rod = (M.weaponHeals(r) and r) or (l ~= nil and M.weaponHeals(l) and l) or nil
+  if rod == nil then return plan end
+  local key = string.format("healweapon:%d:%02X", actor, rod)
+  if not self.statusSaid[key] then
+    self.statusSaid[key] = true
+    M.log(string.format("[%s] actor=%d no %s: the hand holds $%02X, whose blow heals what it hits (ItemProp +27 $%02X)",
+      self.tag or "fight", actor, plan.kind == "mimic" and "Mimic of a Fight" or "Fight", rod,
+      M.readRomByte((M.sym("ItemProp") & 0x3FFFFF) + rod * 30 + 27)))
+  end
+  if cmdRow(actor, BATTLE.CMD_MAGIC) then
+    local line = self:magicOnlyLine(actor, plan.boostLeft or 0)
+    if line then return line end
+  end
+  return self:noLineItem(actor, "the hand's weapon heals and there is no magic line")
+    or { kind = "switch", reason = "heal_weapon" }
 end
 
 -- Love Token (#466): Barb-e's spell (ai_script.asm, AIScript::_190: `attack
@@ -13264,12 +13353,12 @@ function Driver:makePlanRules(actor)
       -- The Scan is aimed at one body and the study reads every body on the
       -- field (Ot6Analyze's boosted loop), so it is aimed at a body out of
       -- Reflect: the teacher, else any other.  The confirm's cast guard
-      -- refuses a reflectable cast while any body reflects; for this
-      -- single-target cast its Reflect half is waived when the cursor holds
-      -- one standing body out of Reflect at the confirm (reflectSingle,
-      -- M.reflectWaived), and the rest of it (absorb, null, an enemy Runic)
-      -- stands.  Hidon's Hidonite $160 wears Reflect, and the guard backed
-      -- the study out at every confirm while it stood (lab eb_s1, #388).
+      -- judges Reflect on the body the cursor holds for a cast that harms nobody
+      -- when it bounces, as a Scan (bounceHarmless, M.reflectJudged, #500),
+      -- and the rest of it (absorb, null, an enemy Runic) on the stage.
+      -- Hidon's Hidonite $160 wears Reflect, and the old guard, judged on
+      -- every standing body, backed the study out at every confirm while it
+      -- stood (lab eb_s1, #388).
       -- A cursor left on a member backs out too (monsterOnly).
       local aim, reflects = nil, false
       for _, s in ipairs(activeSlots()) do
@@ -13281,8 +13370,8 @@ function Driver:makePlanRules(actor)
           .. "(slot %d's), %d MP of %d", self.tag or "fight", actor, M.STUDY_BOOST, aim,
           M.readWord(0x57C0 + aim * 2), want, slot, M.STUDY_MP, mp))
         return { kind = "magic", spell = M.STUDY_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC),
-                 boostLeft = M.STUDY_BOOST, aimHard = aim, reason = "study", reflectSingle = reflects or nil,
-                 monsterOnly = reflects or nil }
+                 boostLeft = M.STUDY_BOOST, aimHard = aim, reason = "study", monsterOnly = reflects or nil,
+                 bounceHarmless = true }
       end
     end
     if so.dischord and cmdRow(actor, BATTLE.CMD_LORE) and loreOffered(M.LORE_DISCHORD) then
@@ -13290,7 +13379,11 @@ function Driver:makePlanRules(actor)
       for s = 0, 5 do
         if monAlive(s) and so.dischord[M.readWord(0x57C0 + s * 2)] and not self.dischorded[s] then
           local cell, cost = loreCell(actor, M.LORE_DISCHORD, true)
-          if cell ~= nil and M.readWord(BATTLE.CURMP + actor * 2) - cost >= self:nukeFloor(actor) then
+          -- the plan-time cast guards the other lines run (#500 review): on this ROM Dischord ($9B) carries
+          -- ignore-reflect (MagicProp +3 = $26, bit 1) and no element or Runic bit, so none refuses it today; the
+          -- guard is here so a change to its record is judged the way every other cast is
+          if cell ~= nil and M.readWord(BATTLE.CURMP + actor * 2) - cost >= self:nukeFloor(actor)
+             and not self:castVetoed(0x8B + M.LORE_DISCHORD, "Dischord") then
             self.dischorded[s] = true
             M.log(string.format("[%s] actor=%d Dischord on slot %d ($%03X), row %d, %d MP", self.tag or "fight",
               actor, s, M.readWord(0x57C0 + s * 2), cell, cost))
@@ -13650,34 +13743,7 @@ function Driver:makePlanRules(actor)
   -- else M.CARE_RESERVE): the item comes from above it, and only when neither
   -- a Tonic nor a Potion is left above it does the turn dip below (#443).
   if fight == nil then
-    local irow = cmdRow(actor, BATTLE.CMD_ITEM)
-    local least, leastFrac = nil, 2
-    for e = 0, 3 do
-      local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
-      if hp > 0 and mx > 0 and hp / mx < leastFrac then least, leastFrac = e, hp / mx end
-    end
-    if irow ~= nil and least ~= nil then
-      -- a driver given no floor of its own (a walk's fights) keeps the field care's (M.CARE_RESERVE)
-      local reserve = self.opts.reserve or M.CARE_RESERVE or {}
-      local pick = self:noLineItemPick(reserve)
-      if pick ~= nil then
-        -- why there is no line: the Magic row greyed (flags bit 7) or absent, or present and
-        -- empty-handed; Mute is status byte 2 bit 3
-        local magicRow = "absent"
-        for row = 0, 3 do
-          if M.readByte(BATTLE.CMDTBL + actor * 12 + row * 3) == BATTLE.CMD_MAGIC then
-            magicRow = cmdDisabled(actor, row) and "greyed" or "open"
-          end
-        end
-        M.log(string.format("[%s] actor=%d: nothing to cast and no Fight row; item $%02X on entity %d "
-          .. "rather than a pass (%s: %d in the bag, Tonic floor %d, Potion floor %d; Magic row %s, status $%02X $%02X%s, MP %d)",
-          self.tag or "fight", actor, pick.it, least, pick.floor, pick.have, reserve[0xE8] or 0, reserve[0xE9] or 0,
-          magicRow, M.readByte(0x3EE4 + actor * 2), M.readByte(0x3EE5 + actor * 2),
-          (M.readByte(0x3EE5 + actor * 2) & 0x08) ~= 0 and " MUTE" or "", M.readWord(BATTLE.CURMP + actor * 2)))
-        return { kind = "item", item = pick.it, target = least, row = irow, idx = pick.idx, reason = "no_line_item" }
-      end
-    end
-    return { kind = "switch" }
+    return self:noLineItem(actor, "nothing to cast and no Fight row") or { kind = "switch" }
   end
   -- The plain boost-Fight through the randoms (#161): with no authored or
   -- multi-part kill order it aims at the slot this hand breaks best, so a
@@ -13861,8 +13927,6 @@ end
 
 function Driver:button(actor)
   local st = M.readByte(BATTLE.MSTATE)
-  -- the empty-field clock (M.EMPTY_FIELD_CAP) runs only while the field stays empty for the cursor
-  if self.emptySince ~= nil and not M.fieldEmptyForCursor() then self.emptySince = nil end
   if st == BATTLE.ST_TGT then self:steerWatch()
   else
     -- a steer press that took the target window away (measured on
@@ -14834,7 +14898,7 @@ function Driver:button(actor)
        and not self.plan.vetoOk then
       local id = self.plan.kind == "magic" and (self.plan.executionSpell or self.plan.spell) or (0x8B + self.plan.lore)
       if self:castVetoed(id, self.plan.kind == "magic" and "cast (at the confirm)"
-                        or "lore (at the confirm)", self.plan.reflectSingle) then
+                        or "lore (at the confirm)", self.plan.bounceHarmless) then
         self:dropPlan("stage_changed")
         return { "b" }
       end
@@ -18818,6 +18882,9 @@ function Driver:frame()
     self.startFrame = nil
   end
   self.battleTick = self.battleTick + 1
+  -- the empty-field clock (M.EMPTY_FIELD_CAP) runs only while the field stays empty for the cursor: read every
+  -- frame, menu or none, so a field that fills while no window is up ends the stretch (review of 97ff8b17)
+  if self.emptySince ~= nil and not M.fieldEmptyForCursor() then self.emptySince = nil end
   -- The party's HP as the battle opened, for the first-turn danger floor
   -- in makePlan.  Taken a beat after the table goes live so every entity
   -- is written (the f+1 log line already reads every entity); no monster
