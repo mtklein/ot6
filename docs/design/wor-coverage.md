@@ -1064,7 +1064,11 @@ Evidence under `build/attempts/wt/v038-sweeps-a-followups/`: `pincer/`
 (the cross drop's cause), `desert/` (the Figaro desert), `veldt/` (the
 holy-weapon swap), `audit/`, `scripts/`. The line was played from
 power-on at 92e50821 on px13 (main's ROM before #487's rows; "rc=0"), and
-every lab below boots its captures.
+every lab below boots its captures. Rebased onto main's #487 rows, the
+line played again from power-on at f804f69b with the branch ("rc=0",
+`chain/chain3.log.gz`): no cross drop, the none-targetable wait met in
+`wor_relm`, `wor_colosseum`, `wor_gau` and `wor_phoenix` and each fight won,
+and `wor_figaro_desert` "done after 3 battles" (`chain/states3/`).
 
 #### The cross drop: the Reach Frogs leave the field
 
