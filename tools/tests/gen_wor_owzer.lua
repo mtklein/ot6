@@ -368,51 +368,6 @@ local function liftOff()
     H.dialogChoice(0, { inBattle = false, what = "the wheel: (Lift-off)", tag = "the wheel" }),
   })
 end
--- ---- gear ------------------------------------------------------------------
--- ItemProp (30-byte records): +0 type (low 3 bits: 1 weapon, 2 armor, 3
--- shield, 4 helmet, 5 relic), +1 the actor mask (a word), +$14 power or
--- defense, +$15 magic defense
-local IP = nil
-local function ip(id, off)
-  IP = IP or (H.sym("ItemProp") & 0x3FFFFF)
-  return H.readRomByte(IP + id * 30 + off)
-end
-local function wearable(ch, id)
-  local mask = ip(id, 1) | (ip(id, 2) << 8)
-  return (mask >> H.charActor(ch)) & 1 == 1
-end
-local function guard(id) return (id == 0xFF) and 0 or (ip(id, 0x14) + ip(id, 0x15)) end
-local function bestInBag(ch, kind)
-  local best, bs = nil, -1
-  for s = 0, 255 do
-    local id, n = H.readByte(0x1869 + s), H.readByte(0x1969 + s)
-    if id ~= 0xFF and n > 0 and (ip(id, 0) & 7) == kind and wearable(ch, id) then
-      local sc = kind == 1 and ip(id, 0x14) or guard(id)
-      if sc > bs then best, bs = id, sc end
-    end
-  end
-  return best, bs
-end
--- dress a character's hand and armor slots from the bag where the bag holds
--- better than what is worn (slots: 0 weapon, 1 shield, 2 helmet, 3 armor)
-local function dressFromBag(ch, name)
-  return lazy(function()
-    local items = {}
-    for _, sl in ipairs({ { 0, 1 }, { 1, 3 }, { 2, 4 }, { 3, 2 } }) do
-      local cur = H.readByte(c(ch, 0x1F + sl[1]))
-      -- a second weapon in the left hand (a Genji Glove's) stays
-      if sl[1] == 1 and cur ~= 0xFF and (ip(cur, 0) & 7) == 1 then goto continue end
-      local id, sc = bestInBag(ch, sl[2])
-      local cs = (cur == 0xFF) and -1 or (sl[2] == 1 and ip(cur, 0x14) or guard(cur))
-      if id and sc > cs then items[#items + 1] = { sl[1], id } end
-      H.log(string.format("[kit] %s slot %d: wears $%02X (%d), the bag's best $%02X (%d)", name, sl[1], cur, cs,
-        id or 0xFF, sc or -1))
-      ::continue::
-    end
-    if #items == 0 then return H.call(function() end) end
-    return H.equipKit(ch, items, { tag = name .. " from the bag" })
-  end)
-end
 local function posOf(ch) return (H.readByte(0x1850 + ch) >> 3) & 3 end
 
 -- walk onto a trigger tile: the walk ends on the tile with its event
