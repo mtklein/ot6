@@ -7240,7 +7240,7 @@ function Driver:dropPlan(reason)
   -- the same comparison again forever. Use ordinary rules for this battle.
   -- Accepted commands and their later queue diagnostics are separate.
   if self.plan and self.plan.targetContract and not self.plan.committed
-    and reason ~= "confirm_attempt" then
+    and reason ~= "confirm_attempt" and reason ~= "none_targetable" then
     self.raceActDeclined = reason or "back_out"
     M.log(string.format("[%s] [race] scored command declined (%s); ordinary rules for this battle",
       self.tag or "fight", self.raceActDeclined))
@@ -13768,9 +13768,11 @@ end
 -- ally, zingerPlan, a bounce or buff) and the window hand-ons.  Such a plan cannot be entered while the field is
 -- empty for the cursor, whatever its verb (Fight, Magic, Lore, a Tool, a Throw...).
 M.MON_AIM_EXEMPT = { item = true, heal = true, raise = true, defer = true, switch = true, mimic = true,
-  runic = true, won = true, lost = true, dog = true }
+  runic = true, won = true, lost = true, dog = true, morph = true, rage = true, slot = true }
 function M.planAimsAtMonsters(plan)
+  -- the party's own care by another command (Pearl Wind's lore) is care too
   return plan ~= nil and not M.MON_AIM_EXEMPT[plan.kind] and not plan.ally and not plan.buff and not plan.bounce
+    and not (plan.reason ~= nil and (plan.reason:sub(1, 10) == "party_hurt" or plan.reason:sub(1, 4) == "cure"))
 end
 -- The empty-field wait's own bound (#498 review): a battle whose field stays empty for the cursor this long,
 -- continuously, while the driver waits on it is a defect, not a wait.  The frog labs' longest stretch was under
