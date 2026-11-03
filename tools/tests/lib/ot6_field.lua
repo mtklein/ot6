@@ -8724,8 +8724,16 @@ function M.dressRelics(members, opts)
           local function lacks(c) return c[2] ~= 0xFF and M.invCountOf(c[2]) < 1 end
           local pick = nil
           for i, p in ipairs(queue) do
-            local ok = true
-            for _, c in ipairs(p.changes) do if lacks(c) then ok = false end end
+            -- by count, not presence: a member taking two of one relic (two
+            -- Hyper Wrists to CYAN, one still on TERRA) waits until both are
+            -- in the bag (#350's line, wor_cyan: "CYAN's relic slot 5 holds
+            -- Hyper Wrist $D2: got 255")
+            local ok, need = true, {}
+            for _, c in ipairs(p.changes) do
+              if lacks(c) then ok = false end
+              if c[2] ~= 0xFF then need[c[2]] = (need[c[2]] or 0) + 1 end
+            end
+            for id, n in pairs(need) do if M.invCountOf(id) < n then ok = false end end
             if ok then pick = i; break end
           end
           if pick == nil then
