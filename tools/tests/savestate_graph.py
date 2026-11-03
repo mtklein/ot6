@@ -933,6 +933,16 @@ STATES = [
     S("wor_zozo_hunt", gen="gen_wor_zozo_hunt", prev="wor_cyan_rustrid",
       timeout=3600, also=["wor_zozo_hunt_225"]),
 
+    # wor_cyan_rustrid -> Zozo's rooftop room (226): a branch beside
+    # wor_cyan (#502).  The World of Balance's climb to Dadaluma walked again
+    # (the stair room's conveyor, the roofs' jump rows and z-loop beams) for
+    # the four chests past it: the Thief Glove, the Fire Knuckle, the
+    # RunningShoes and the X-Potion (wor-coverage.md section 11.9).  Nothing
+    # boots it.  also: wor_zozo_north_u1, the party on the U1 roof (221
+    # (30,43)) at the stair's top.
+    S("wor_zozo_north", gen="gen_wor_zozo_north", prev="wor_cyan_rustrid",
+      timeout=3600, also=["wor_zozo_north_u1"]),
+
     # wor-mtzozo-v1 -> the World of Ruin map beside the Falcon parked
     # outside Zozo (45,130): the Storm Dragon (event battle 133, a game over
     # when lost: the runner retries from the save point), the walk down,
