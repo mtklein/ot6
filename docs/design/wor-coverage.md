@@ -834,7 +834,7 @@ Left, with the reason:
   drives with its own conveyor, jump and switchback drives. For this party
   they are a long climb for little: SABIN wears two Fire Knuckles, EDGAR the
   cellar's RunningShoes, and the Thief Glove is LOCKE's and GOGO's, neither
-  seated. The port they need is planned in section 11.9.
+  seated. Opened since on the branch `gen_wor_zozo_north` (section 11.10).
 - **The Tzen house's monster boxes** (bits 144, 148): unit 8, a branch
   leg (section 12).
 
@@ -1167,7 +1167,8 @@ coverage, not the line.
 
 #### Zozo's north rooms: the port they need
 
-Not done in this round; the plan, from the ROM and `gen_zozo4_dadaluma`:
+Not done in this round; the plan, from the ROM and `gen_zozo4_dadaluma`
+(done since, on a branch: section 11.10):
 
 - **Every one of the four lies past the stair room.** The door graph
   (`build/attempts/wt/v038-wor-sweeps-a/zozo/doorgraph.txt`) routes each
@@ -1209,6 +1210,9 @@ fourth seat before Chadarnook (section 11.2).
 
 #### Mt. Zozo, the Narshe mines and Darill's Tomb (audit only)
 
+The Mt. Zozo and tomb gaps below are hunted since on branch legs (section
+11.10).
+
 From the battles the line played at 92e50821 (px13, power-on to
 `wor_desert`, `build/states/<leg>.log`, every outcome counted by
 formation; `build/attempts/wt/v038-sweeps-a-followups/audit/`):
@@ -1231,6 +1235,135 @@ formation; `build/attempts/wt/v038-sweeps-a-followups/audit/`):
   PowerDemon x2; 16/256) on B1, 247 (PowerDemon) on B2, 251 (Mad Oscar) on
   B3. The tomb's save point (`wor-tomb-v1`, B3's east room) is the boot for
   a branch hunt of the three pools.
+
+### 11.10 Zozo's north rooms, Mt. Zozo's caves and Darill's Tomb (v0.38, #502)
+
+Evidence under `build/attempts/wt/v038-zozo-tomb/`: `stair/` (the stair's
+walkers), `zozo/` (the north rooms' first play and sweep), `dev/` (the
+hunts' first plays and every mutant), `hunts/` (the hunts' sweeps),
+`scripts/`. The boots are the graph's captures at 14e7e0cb's play
+(px13: `wor_cyan_rustrid`, `build/checkpoints/wor-mtzozo-v1`,
+`wor-tomb-v1`, `wor-kohlingen-v1`; the hunts' sweeps ran on the mbp from
+px13's copies of the three batteries, the same ROM, sha256 8b7e29ae, and
+the same play: `mzs_k0_s0` and px13's `mz1` both "PASS (frame 41927)").
+All four legs are branches: `downstream.py` reads "this leg feeds no key"
+for each.
+
+#### The north rooms: the stair's walkers move
+
+Section 11.9's first question, measured (`stair/`, `lab_stair.lua`): from
+`wor_cyan_rustrid` the party walks to the stair room's door (225 (59,34))
+and stands 1,800 frames, the objects' tiles sampled every 30. Objects
+$11-$17 (the room's NPCs 2-8) moved 56, 56, 55, 55, 55, 57 and 56 times in
+the 60 samples ("[stairsum] WORLD=wor ... 11 58,31->53,22 moves=56 ...");
+the same walk from `zozo-outside-v1` in the World of Balance gives the same
+tiles and counts ("[stairsum] WORLD=wob ... 11 58,31->53,22 moves=56").
+So the stair is the World of Balance's conveyor in both worlds, and the four
+chests are reachable on foot.
+
+`gen_wor_zozo_north` (a branch from `wor_cyan_rustrid`) walks
+`gen_zozo4_dadaluma`'s climb with the library's ports of its drives
+(`ot6_field.lua`: `H.wallFirstStep` and `H.followPath`, the door-walled
+planner; `H.tableWalk`, a walk of per-tile moves gated by `H.canStep`, the
+stair's route given as a function of the tile; `H.movesAlong`, a table from
+`route_data.py field-path`'s path; `H.jumpRow`; `H.settledCare` and
+`H.walkWithCare`, a care stop after each battle). The roofs' beams are
+walked from `route_data.py`'s BFS paths (`scripts/paths.sh`), which give
+the World of Balance's measured tables where both cross the same roof; the
+west room and the bridge room's shaft use the World of Balance's own
+tables. The port does not reload a savestate on a failed stair (the retry
+is the runner's), and a field dialog on any of the walks fails it: the
+crane's prompt (221 (35,41), `_ca963d`, asked only facing down) defaults to
+Yes. The order: the stair, the U1 roof's beam to the Thief Glove's door
+(221 (35,33)), back to the J39 row, the west room, the J33 row, the bridge
+room's shaft, the top roof (the Fire Knuckle, 221 (35,15)), the porch and
+the rooftop room (226: the RunningShoes and the X-Potion). Each chest is
+asserted by its treasure bit, closed at the boot and open at the end;
+`tools/chests_opened.txt` lists bits 70, 71, 75 and 76.
+
+The first play: "PASS (frame 18199)", five battles won (`zozo/zn1`). The
+sweep, K 0-11 battles used up on Zozo's street first ((42,30) <-> (43,30))
+at seed shifts 0 and 7 (`lab_zn.lua`, `mklab.py`): 24 of 24 PASS, 24
+distinct plays, every fight won and no death (`zozo/tally_zns.txt`):
+
+| formation | fights | distinct keys | won |
+|---|---|---|---|
+| 102 HadesGigas | 80 | 22 | 80 |
+| 104 Gabbldegak x4 | 66 | 30 | 66 |
+| 105 SlamDancer | 34 | 25 | 34 |
+| 106 SlamDancer, Gabbldegak x3 | 4 | 4 | 4 |
+| 107 Harvester | 6 | 5 | 6 |
+| 108 SlamDancer, Harvester x2 | 10 | 9 | 10 |
+| 109 Harvester, Gabbldegak x2 | 16 | 7 | 16 |
+| 110 HadesGigas, Harvester | 40 | 17 | 40 |
+
+#### The hunts
+
+Three branches, each a `K.hunt` lap (the pool asserted to be the map's, the
+bound the pool's worst case over the encounter counters):
+
+| leg | boot | lap | pool | bound |
+|---|---|---|---|---|
+| `gen_wor_mtzozo_hunt` | `wor-mtzozo-v1` (CYAN, TERRA, CELES, SABIN at L35-38) | the east cave 178 (14,12) <-> (15,12) | group 162: 261, 264, 266 | 21 |
+| `gen_wor_tomb_hunt` | `wor-tomb-v1` (CELES, SABIN, EDGAR, SETZER at L32) | B3's east room 300 (120,16) <-> (120,17); then the grave room 299 (100,25) <-> (100,26) | group 151: 251, 250, 248; group 150: 247, 249, 250 | 21, 21 |
+| `gen_wor_tomb_b1_hunt` | `wor-kohlingen-v1` (the same four at L32) | B1 298 (13,16) <-> (13,17), after the tomb's door | group 149: 244, 245, 246 | 110 |
+
+The grave room's lap keeps off the grave (100,14), and the east room's off
+the monster chest (120,9): both stay `gen_wor_falcon`'s. B1 needs its own
+boot: from the save point the tomb's upper floors are behind the turtles.
+`gen_wor_tomb_b1_hunt` asserts SETZER seated, which the door needs.
+
+The sweeps, K 0-11 battles used up on each leg's first lap at seed shifts 0
+and 7 (`lab_mz.lua`, `lab_tb.lua`, `lab_tb1.lua`; `hunts/tally_*.txt`): 72
+of 72 PASS, every fight won:
+
+| formation | fights | distinct keys | won | keys with a death |
+|---|---|---|---|---|
+| 261 Luridan x3 | 136 | 28 | 136 | 0 |
+| 264 Borras, Ursus, Scrapper | 64 | 22 | 64 | 0 |
+| 266 Luridan x6 | 46 | 21 | 46 | 0 |
+| 251 Mad Oscar | 102 | 32 | 102 | 0 |
+| 250 Mad Oscar, Exoray | 258 | 58 | 258 | 10 |
+| 248 PowerDemon, Exoray x2 | 160 | 40 | 160 | 5 |
+| 247 PowerDemon | 68 | 38 | 68 | 0 |
+| 249 Exoray x3 | 74 | 34 | 74 | 11 |
+| 244 Orog x2 | 126 | 43 | 126 | 26 |
+| 245 Orog, PowerDemon x2 | 32 | 18 | 32 | 6 |
+| 246 Osteosaur | 174 | 47 | 174 | 11 |
+
+The hunts were done after 3-8 battles in the caves, 3-15 in each of the tomb's two
+rooms and 3-16 in B1. The tomb's falls are its Zombie touches (attack $EF:
+287 of B1's 293 falls, 93 of the save point's 95), each cured with a
+Revivify as the line's walk does; B1's hunts ended with 9 to 27 Revivifies, from the
+boot's 25 and what the fights dropped.
+
+#### The asserts and their negatives
+
+Each red on a one-line mutant (`scripts/mkmuts.sh`, `dev/mut_*`), from the
+same boots:
+
+- the chests: the Thief Glove's press left out, "Zozo: the Thief Glove (225
+  (11,59))'s chest (bit 75) is open: got false"; a bit already set at the
+  boot (103), "the Thief Glove (225 (11,59))'s chest (bit 103) is still
+  closed at the boot: got true";
+- the stair's top: "up the stair room's stair onto the U1 roof (221
+  (30,43)): got false" (the tile moved to (30,44));
+- the walks' bound: the stair's conveyor at one leg, "the stair's conveyor
+  -> the U1 roof (221 (30,43)): done within 1 legs (one battle each): got
+  false";
+- the crane: a table that steps down onto it, "the U1 roof -> the Thief
+  Glove's door (221 (35,33)): a field dialog opened at (35,41) on map 221,
+  on a walk that meets none (the crane's prompt ...)", which also shows the
+  prompt fires facing down;
+- the boots: "the boot stands on Mt. Zozo's east face (179) ...: got 179
+  ($B3), want 178", "the boot stands in Darill's Tomb's B3 (300) ...: got
+  300 ($12C), want 299"; SETZER, "SETZER is in the party for the tomb's door
+  ($01A9, _ca3f83): gen_wor_kohlingen's: got false"; the door, "the tomb's
+  door is open ($00CB, _ca3f83): got 0" (read at $00CC).
+
+Left: `gen_zozo4_dadaluma` keeps its own copy of the drives (moving it onto
+the library's would replay the World of Balance from Zozo on); the
+Narshe mines' 277 stays a draw gap only on plays that miss its slot.
 
 ## 12. The monster boxes (v0.38, #487)
 
