@@ -1102,6 +1102,31 @@ Formation 284 (SoulDancer x2, Crusher x2) and 286 stay unfought; they
 belong to the leveling plan (#497), which decides the party's levels or a
 fourth seat before Chadarnook (section 11.2).
 
+#### Mt. Zozo, the Narshe mines and Darill's Tomb (audit only)
+
+From the battles the line played at 92e50821 (px13, power-on to
+`wor_desert`, `build/states/<leg>.log`, every outcome counted by
+formation; `build/attempts/wt/v038-sweeps-a-followups/audit/`):
+
+- **Mt. Zozo.** `gen_wor_cyan` walks the cliff (map 179, group 160) and the
+  two caves (177, 178, group 162) for the Gold Hairpin and CYAN, and
+  `gen_wor_storm` walks them again to the Storm Dragon. Group 160's three
+  are fought (263 x10, 265 x7, 267 x18 on `wor_cyan`); of group 162's three
+  only Luridan x6 (266) is (2 on `wor_cyan`, 1 on `wor_storm`): 261
+  (Luridan x3) and 264 (Borras, Ursus, Scrapper) are draw gaps, 80/256 each,
+  in a walk of about three battles in the caves. Map 214's 6 and 7 are
+  world group 0's formations, won on Sabin's grind (section 11.2). A
+  branch from `wor-cyan-v1` lapping cave 177 would close the pair.
+- **The Narshe mines.** `gen_wor_narshe` and `gen_wor_tritoch` walk group
+  191 (maps 34, 35, 37, 38); this play met all four of its formations, 277
+  (Wizard x2, Psychot x3) once on `wor_narshe`. It is a draw gap only on
+  plays that miss its 80/256 slot.
+- **Darill's Tomb.** `gen_wor_tomb` walks B1-B3 (298-300) with six
+  battles: 246, 248, 249, 250. Unfought: 244 (Orog x2) and 245 (Orog,
+  PowerDemon x2; 16/256) on B1, 247 (PowerDemon) on B2, 251 (Mad Oscar) on
+  B3. The tomb's save point (`wor-tomb-v1`, B3's east room) is the boot for
+  a branch hunt of the three pools.
+
 ## 12. The monster boxes (v0.38, #487)
 
 Unit 8. Evidence under `build/attempts/wt/v038-monster-boxes/`: `tzen/`,
