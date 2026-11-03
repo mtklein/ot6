@@ -1450,9 +1450,13 @@ his pool) standing.
   party) and a plan pressed to an exact boost (`exactBoost`/`boostWant`)
   keep theirs.
 - The study is aimed at a body out of Reflect. The confirm's cast guard
-  judges Reflect on the bodies the cursor (`$7B7E`) holds at the confirm,
-  for every cast (`M.reflectJudged`, #500; it was a waiver for the study
-  alone until then). Absorb, null and the enemy Runic (#413) are judged on
+  judges Reflect on the bodies the cursor (`$7B7E`) holds at the confirm
+  for a cast that harms nobody when it bounces (`plan.bounceHarmless`, the
+  study's Scan; `M.reflectJudged`, #500). Every other cast is judged on
+  the whole stage, at the plan and at the confirm alike, so a Fire beside
+  a Hidonite never reaches the confirm: a body falling between the confirm
+  and the cast hands a single-target cast to another standing body, which
+  may reflect. Absorb, null and the enemy Runic (#413) are judged on
   the whole stage. An aimed body fallen before the confirm (the engine
   retargets the cast) and an empty cursor fall back to the whole stage; a
   target gone into Reflect since the plan, a steer that gave up on a

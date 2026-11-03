@@ -7417,15 +7417,20 @@ function Driver:runicSlot(id)
   return M.runicTakes(M.readRomByte(MP + id * 14 + 3), self:runicSpecial())
 end
 -- The bodies the Reflect half of the cast guard is judged on at the confirm
--- (#388, #500): the monsters the cursor holds (`tgtmons`, $7B7E, bit n =
--- slot n) when every one of them stands (in `slots`, M.activeSlots).  A
--- cast lands on the bodies under the cursor, so only their Reflect can turn
--- it onto the party: a Fire on a body out of Reflect goes in while a
--- Hidonite beside it reflects, and a spread over a field with a mirror in it
--- is judged on the mirror.  An empty cursor (on the party), or one holding a
--- body that has fallen (the engine retargets the cast to another standing
--- body, which may reflect) is judged on the whole stage, the old rule.
--- M.REFLECT_PER_TARGET = false is the old rule everywhere (a lab lever).
+-- (#388, #500), for a plan whose cast harms nobody when it bounces
+-- (plan.bounceHarmless: the study's Scan): the monsters the cursor holds
+-- (`tgtmons`, $7B7E, bit n = slot n) when every one of them stands (in
+-- `slots`, M.activeSlots).  Such a cast confirmed on a body out of Reflect
+-- goes in while a Hidonite beside it reflects; a spread over a field with a
+-- mirror in it is judged on the mirror.  An empty cursor (on the party), or
+-- one holding a body that has fallen, is judged on the whole stage.  Every
+-- other cast keeps the whole-stage rule at the confirm, as at the plan
+-- (the cast, nuke, lore and magic-only lines judge the whole stage, so a
+-- Fire beside a Hidonite never reaches the confirm): a body that falls
+-- between the confirm and the cast hands a single-target cast to another
+-- standing body, the engine's retarget, and that body may reflect.
+-- M.REFLECT_PER_TARGET = false is the whole-stage rule everywhere (a lab
+-- lever).
 function M.reflectJudged(tgtmons, slots)
   if tgtmons == 0 or M.REFLECT_PER_TARGET == false then return slots end
   local t, seen = {}, 0
@@ -7435,10 +7440,11 @@ function M.reflectJudged(tgtmons, slots)
   if seen ~= tgtmons then return slots end
   return t
 end
--- atConfirm: the target window is up with the cast's target chosen, and the
--- Reflect half is judged on what the cursor holds (M.reflectJudged); a plan
--- made before the window opens has no cursor and is judged on the stage
-function Driver:castVetoed(abilityId, what, atConfirm)
+-- perTarget: the target window is up with the cast's target chosen and the
+-- plan's cast harms nobody when it bounces (plan.bounceHarmless), so the
+-- Reflect half is judged on what the cursor holds (M.reflectJudged); every
+-- other call is judged on the stage
+function Driver:castVetoed(abilityId, what, perTarget)
   -- An enemy Runic (#413): a monster carrying $3E4C bit 1 (the Speck's
   -- MonsterProp+30, "A Speck absorbs magic!" on its launch) takes every
   -- runic-able spell (MagicProp+3 bit 3, RunicEffect) cast while it
@@ -7459,7 +7465,7 @@ function Driver:castVetoed(abilityId, what, atConfirm)
   local slots = activeSlots()
   local reflectable = M.spellReflectable(abilityId)
   local judged = nil
-  if reflectable and atConfirm then
+  if reflectable and perTarget then
     judged = M.reflectJudged(M.readByte(BATTLE.TGTCHARS) == 0 and M.readByte(BATTLE.TGTMONS) or 0, slots)
   end
   local s, why = M.castVeto(elem, reflectable, slots, judged)
@@ -13313,7 +13319,8 @@ function Driver:makePlanRules(actor)
       -- The Scan is aimed at one body and the study reads every body on the
       -- field (Ot6Analyze's boosted loop), so it is aimed at a body out of
       -- Reflect: the teacher, else any other.  The confirm's cast guard
-      -- judges Reflect on the body the cursor holds (M.reflectJudged, #500),
+      -- judges Reflect on the body the cursor holds for a cast that harms nobody
+      -- when it bounces, as a Scan (bounceHarmless, M.reflectJudged, #500),
       -- and the rest of it (absorb, null, an enemy Runic) on the stage.
       -- Hidon's Hidonite $160 wears Reflect, and the old guard, judged on
       -- every standing body, backed the study out at every confirm while it
@@ -13329,7 +13336,8 @@ function Driver:makePlanRules(actor)
           .. "(slot %d's), %d MP of %d", self.tag or "fight", actor, M.STUDY_BOOST, aim,
           M.readWord(0x57C0 + aim * 2), want, slot, M.STUDY_MP, mp))
         return { kind = "magic", spell = M.STUDY_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC),
-                 boostLeft = M.STUDY_BOOST, aimHard = aim, reason = "study", monsterOnly = reflects or nil }
+                 boostLeft = M.STUDY_BOOST, aimHard = aim, reason = "study", monsterOnly = reflects or nil,
+                 bounceHarmless = true }
       end
     end
     if so.dischord and cmdRow(actor, BATTLE.CMD_LORE) and loreOffered(M.LORE_DISCHORD) then
@@ -13337,7 +13345,11 @@ function Driver:makePlanRules(actor)
       for s = 0, 5 do
         if monAlive(s) and so.dischord[M.readWord(0x57C0 + s * 2)] and not self.dischorded[s] then
           local cell, cost = loreCell(actor, M.LORE_DISCHORD, true)
-          if cell ~= nil and M.readWord(BATTLE.CURMP + actor * 2) - cost >= self:nukeFloor(actor) then
+          -- the plan-time cast guards the other lines run (#500 review): on this ROM Dischord ($9B) carries
+          -- ignore-reflect (MagicProp +3 = $26, bit 1) and no element or Runic bit, so none refuses it today; the
+          -- guard is here so a change to its record is judged the way every other cast is
+          if cell ~= nil and M.readWord(BATTLE.CURMP + actor * 2) - cost >= self:nukeFloor(actor)
+             and not self:castVetoed(0x8B + M.LORE_DISCHORD, "Dischord") then
             self.dischorded[s] = true
             M.log(string.format("[%s] actor=%d Dischord on slot %d ($%03X), row %d, %d MP", self.tag or "fight",
               actor, s, M.readWord(0x57C0 + s * 2), cell, cost))
@@ -14879,7 +14891,7 @@ function Driver:button(actor)
        and not self.plan.vetoOk then
       local id = self.plan.kind == "magic" and (self.plan.executionSpell or self.plan.spell) or (0x8B + self.plan.lore)
       if self:castVetoed(id, self.plan.kind == "magic" and "cast (at the confirm)"
-                        or "lore (at the confirm)", true) then
+                        or "lore (at the confirm)", self.plan.bounceHarmless) then
         self:dropPlan("stage_changed")
         return { "b" }
       end
