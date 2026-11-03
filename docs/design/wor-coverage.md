@@ -834,7 +834,7 @@ Left, with the reason:
   drives with its own conveyor, jump and switchback drives. For this party
   they are a long climb for little: SABIN wears two Fire Knuckles, EDGAR the
   cellar's RunningShoes, and the Thief Glove is LOCKE's and GOGO's, neither
-  seated.
+  seated. The port they need is planned in section 11.9.
 - **The Tzen house's monster boxes** (bits 144, 148): unit 8, a branch
   leg (section 12).
 
@@ -983,11 +983,12 @@ leg's run rule counts the chests still to open in the walk ahead.
   bag's hardest-hitting other one (`dev2/vd_s*`: "char 8's weapon $39 is
   holy ...: $46 (power 109) from the bag", PASS at the runner's three
   shifts).
-- **The fight driver** met a heal whose target window would not cross in a
+- **The fight driver** met a Fight whose target window would not cross in a
   pincer (`wor_colosseum`, `chain/chain10.log.gz`: "FIGHT DRIVER STUCK:
   crossing to the monsters in a pincer"); it now drops such a plan and
-  backs out, as its parked-window watchdog does, and fails fast only on
-  the third in a battle.
+  backs out, as its parked-window watchdog does. Its cause is inferred,
+  not reproduced, in #498 (section 11.9): the Reach Frogs off the field,
+  met in the same forest with the same window signature.
 - **The Heal Rod at Hidon** (v0.38, #485's later chests): the absorb
   guard's re-arm before Hidon took the Heal Rod for STRAGO by battle power,
   and his and GOGO's Fights healed Hidon until the leg lost all three
@@ -1057,6 +1058,179 @@ checkpoints of the line before Berserk landed):
   0's lap without its allowance, "to the patch east of the landing (group
   0): group 0 deals only the plains six (not $017, formation 6): got
   false".
+
+### 11.9 Follow-ups (v0.38, #498)
+
+Evidence under `build/attempts/wt/v038-sweeps-a-followups/`: `pincer/`
+(the cross drop's cause), `desert/` (the Figaro desert), `veldt/` (the
+holy-weapon swap), `audit/`, `scripts/`. The line was played from
+power-on at 92e50821 on px13 (main's ROM before #487's rows; "rc=0"), and
+every lab below boots its captures. Rebased onto main's #487 rows, the
+line played again from power-on at f804f69b with the branch ("rc=0",
+`chain/chain3.log.gz`): no cross drop, the none-targetable wait met 24
+times in `wor_relm`, 7 in `wor_colosseum`, once each in `wor_gau` and
+`wor_phoenix` (its `[ot6]` lines), and each fight won,
+and `wor_figaro_desert` "done after 3 battles" (`chain/states3/`).
+
+#### The cross drop: the Reach Frogs leave the field
+
+The drop of section 11.5 (`wor_colosseum`, `chain10`/`chain11`: a pincer,
+"left and right did nothing twice each ... window 01:00:00:01") had no
+diagnosed cause. That drop itself was not reproduced (the line's draws
+have moved since); the cause below was reproduced in the same forest (group
+50, the Reach Frog x4) with the same window signature (01:00:00:01, the
+cursor parked on the party with live monsters) and is inferred to be the
+same. The driver now says, with any crossing press that does nothing, the
+masks the game's own crossing reads (btlgfx `_c174bf`, `_c17439`,
+`get_gr0`/`get_gr2`): `$92`, which `cur_poi_set` rebuilds every frame as
+`$201E & $61AB & $2F46 | $6195`, the sides `$7B79`/`$7B7B`, and the
+command's `ONE_SIDE` bit.
+
+Reproduced from the graph's `wor_colosseum_plains` capture (sha256
+fd0dcba1), the leg's own forest lap (group 50) cut to that stage and
+walked until 12 fights of the Reach Frog x4 (324), at seed shifts 0, 7,
+13 and 21 (`scripts/lab_frog.lua`): shift 13 met it, in a normal battle,
+"crossing to the monsters in a normal: left did nothing twice each ...
+$92=00 $201E=38 $61AB=04 ... live=38". A per-frame probe on the same run
+(`lab_frogp.lua`) shows the frogs leaving the field one at a time while they
+stand: `$61AB` drops slot 4 at f23070, slot 5 at f23173 and slot 3 at
+f23712 ("GAP $92=00 live=38 $201E=38 $61AB=04 ... st=38"), and they come
+back from f24256 on; the screen at the gap shows no monster
+(`pincer/gap_target_select.png`), and the party's Fights into the empty
+field land nothing ("actor=1's fight took 0 off the monsters ... 0
+hit(s)"). The cursor cannot reach a monster that is not in `$92`, on
+either side, so a plan aimed at one cannot be entered.
+
+The fix is at the plan: a plan aimed at the monsters (any verb but the
+party's care and the ally lines: `M.planAimsAtMonsters`) with no standing
+monster in `$92` (`M.fieldEmptyForCursor`) goes through `dropPlan`, the
+window is handed on, and the next plan is re-read in 30 frames, as a person
+waits for the field to fill; a cross toward the monsters with none there
+backs out without spending a press, and is counted. The wait has its own
+bound, `M.EMPTY_FIELD_CAP` (3,600 frames of an empty field in a row in one
+battle), past which the driver fails fast with the reads.
+
+At a1d7d6d9, from the same capture (`pincer/out/fixb_*`, `negb_s13`,
+`capb_s13`; the frog lab with the assertion "no cross drop in the frogs'
+fights"): the four shifts PASS (frames 91242, 90419, 85875, 94907) with no
+drop and no dead press; the wait fired 88, 75, 69 and 92 times, all on
+Fights, and the longest empty stretch it waited through was 870-990
+frames. With the wait switched off (`NONE_TARGETABLE_WAIT = false`) shift
+13 is red: "assertEq failed: no cross drop in the frogs' fights: got 1".
+With the cap at 100 frames shift 13 is red at the first empty field:
+"FIGHT DRIVER STUCK: the field has been empty for the cursor for 180 frames
+(since f4026; 3 waits, 0 cross back-outs this battle): $92=00 $201E=20
+$61AB=1C ... live=20".
+
+A plan that is not a Fight waits the same way: the line's `wor_relm` grind
+(TERRA, CELES, RELM, STRAGO; `pincer/out/relm*`, the leg Continued from the
+graph's `wor-owzer-v1` capture and cut after its grind) met a monster off
+the field while STRAGO planned Lore ("a lore aimed at the monsters with none
+of the standing monsters on the screen ... $92=01 $201E=05 $61AB=03 ...
+live=04"): at shifts 0 and 7 PASS, no cross drop, the waits "fight=40
+lore=11" and "fight=43 lore=16"; with the cap at 100 frames, red: "the field
+has been empty for the cursor for 180 frames (since f58188; 3 waits, 0
+cross back-outs this battle)". With the wait off that grind still passed
+with no drop (`relmneg_s0`): no plan there reached a dead cross, so only
+the frogs' negative shows the drop.
+
+The guard stays and is tightened: one drop in a battle is
+allowed, the second fails fast. A pincer's single dead side is ordinary
+and not a drop: the left side all dead, the right still standing, the
+driver tries left, then right (`wor_dream` on the line: "left pressed twice
+... sides L=2A R=15 ... live=15", then "chars=08 --right--> mons=10").
+
+#### The holy-weapon swap, both hands
+
+`gen_wor_veldt`'s swap reads both hands: on the line CELES holds a second
+weapon ($13) in her second hand ("char 6's hand 1 weapon $13 is not holy;
+kept"), and RELM's Pearl Rod goes as before ("char 8's hand 0 weapon $39
+is holy ...: $46 (power 109) from the bag"). A swapped hand is asserted to
+hold no holy weapon. From the graph's `wor-ragnarok-v1` capture: with $13
+read as holy the second hand is swapped ("char 6's hand 1 weapon $13 is
+holy ...: $16 (power 125) from the bag", PASS, `veldt/mut_h1`); with the
+swap keeping the hand's own weapon the assert is red ("char 8's hand 0
+holds no holy weapon for the Holy Dragon ($39): got true", `veldt/mut_red`).
+
+#### The Figaro desert: a branch
+
+`gen_wor_figaro_desert` (a branch from `wor-edgar-v1`, feeding nothing)
+laps (81,88) <-> (81,89) beside the castle until group 44's three are won:
+222 (Sand Horse x2), 223 (Sand Horse, Maliga x2) and 138 (Maliga x3).
+The leg at shifts 0, 7, 13, 21: PASS, 3 battles each (`desert/out/fd_s*`).
+The sweep, K 0-11 battles used up on the lap first at shifts 0 and 7
+(`lab_whunt.lua` lap g44): 24 of 24 PASS; 222 56 fights in 20 distinct
+keys, 223 108 in 29, 138 78 in 24, all won, no death
+(`desert/out/tally_wf_g44.txt`). EDGAR, SABIN and CELES at L31 win them
+easily; a player crossing the desert meets them, so the branch is the
+coverage, not the line.
+
+#### Zozo's north rooms: the port they need
+
+Not done in this round; the plan, from the ROM and `gen_zozo4_dadaluma`:
+
+- **Every one of the four lies past the stair room.** The door graph
+  (`build/attempts/wt/v038-wor-sweeps-a/zozo/doorgraph.txt`) routes each
+  through 225 (59,34) up the one-wide stair to (46,9), out onto 221's U1
+  roof (30,43). From there the Thief Glove is the short one: 221 (35,33)
+  into 225 (11,61), the chest at (11,59). The Fire Knuckle and the
+  rooftop's pair go on over the jumps and the bridge room to the top roof
+  (30,22), then 221 (35,15) into 225 (35,13) (the Fire Knuckle, (35,11)) or
+  221 (33,9) into 226 (82,37) (the RunningShoes (72,26), the X-Potion
+  (92,27)).
+- **The stair's walkers.** NPCs 2-8 of map 225 (`npc_prop.asm` 9476-9524)
+  stand on the stair with no movement of their own, show-switch $0300 in
+  both worlds. Measure first whether the World of Ruin moves them the way
+  the World of Balance's climb meets them ("seven walkers climb ... forever"):
+  sample their positions for a few hundred frames from the stair's foot.
+  If they move, `stairFollow` (dadaluma 953-1103: `stairDir`, `stairJitter`,
+  `stairLeg`, `stairAttempt`) carries over; if they stand, the stair is shut
+  in this world and the four are out of reach on foot.
+- **What moves into the lib.** The door-walled step model (dadaluma
+  382-555: `prop1/prop2`, `stepAllowed`, `zAfter`, `firstStep`,
+  `followPath`), `stairFollow`, `u1Cross` (906-952) and `jumpRow`
+  (1178-1211) as `ot6_field.lua` drives taking their tile tables as
+  arguments; `bridgeCross`, `bridgeClimb` and `corridorFollow` only for the
+  Fire Knuckle and the rooftop. Two changes on the way in: `stairAttempt`
+  reloads its own pre-stair savestate on a failed attempt, which a leg on
+  the line may not do (a retry is the runner's, from the boot), so the
+  port waits out the queue and fails with the frame instead; and `u1Cross`
+  steps onto the crane (221 (35,41), `_ca963d`), which `gen_wor_cyan`'s
+  walks keep off: its prompt ("Use the crane to go down?") is answered No.
+- **Where it goes.** The Thief Glove alone is a branch's worth for this
+  party (none of LOCKE or GOGO seated); all four together are a branch leg
+  from `wor_cyan_rustrid` beside `gen_wor_zozo_hunt`, feeding nothing.
+
+#### Owzer's basement
+
+Formation 284 (SoulDancer x2, Crusher x2) and 286 stay unfought; they
+belong to the leveling plan (#497), which decides the party's levels or a
+fourth seat before Chadarnook (section 11.2).
+
+#### Mt. Zozo, the Narshe mines and Darill's Tomb (audit only)
+
+From the battles the line played at 92e50821 (px13, power-on to
+`wor_desert`, `build/states/<leg>.log`, every outcome counted by
+formation; `build/attempts/wt/v038-sweeps-a-followups/audit/`):
+
+- **Mt. Zozo.** `gen_wor_cyan` walks the cliff (map 179, group 160) and the
+  two caves (177, 178, group 162) for the Gold Hairpin and CYAN, and
+  `gen_wor_storm` walks them again to the Storm Dragon. Group 160's three
+  are fought (263 x10, 265 x7, 267 x18 on `wor_cyan`); of group 162's three
+  only Luridan x6 (266) is (2 on `wor_cyan`, 1 on `wor_storm`): 261
+  (Luridan x3) and 264 (Borras, Ursus, Scrapper) are draw gaps, 80/256 each,
+  in a walk of about three battles in the caves. Map 214's 6 and 7 are
+  world group 0's formations, won on Sabin's grind (section 11.2). A
+  branch from `wor-cyan-v1` lapping cave 177 would close the pair.
+- **The Narshe mines.** `gen_wor_narshe` and `gen_wor_tritoch` walk group
+  191 (maps 34, 35, 37, 38); this play met all four of its formations, 277
+  (Wizard x2, Psychot x3) once on `wor_narshe`. It is a draw gap only on
+  plays that miss its 80/256 slot.
+- **Darill's Tomb.** `gen_wor_tomb` walks B1-B3 (298-300) with six
+  battles: 246, 248, 249, 250. Unfought: 244 (Orog x2) and 245 (Orog,
+  PowerDemon x2; 16/256) on B1, 247 (PowerDemon) on B2, 251 (Mad Oscar) on
+  B3. The tomb's save point (`wor-tomb-v1`, B3's east room) is the boot for
+  a branch hunt of the three pools.
 
 ## 12. The monster boxes (v0.38, #487)
 

@@ -53,26 +53,49 @@ local function ip(id, off) return H.readRomByte((H.sym("ItemProp") & 0x3FFFFF) +
 local function fightsHoly(id)
   return id ~= 0xFF and ((ip(id, 15) & HOLY) ~= 0 or (ip(id, 27) >> 4) == 0x0C)
 end
+-- Both hands: a Genji Glove's second hand (slot 1, $20) swings too, and a holy blade there heals the dragon as
+-- surely as one in the first.  A hand holding a shield or nothing is left alone; each holy weapon takes the
+-- hardest-hitting other one the bag still holds after the hands before it took theirs.
+local function isWeapon(id) return id ~= 0xFF and (ip(id, 0) & 7) == 1 end
 local function notHolyWeapon(ch)
   return H.lazy(function()
-    local cur = H.readByte(c(ch, 0x1F))
-    if not fightsHoly(cur) then
-      H.log(string.format("[kit] char %d's weapon $%02X is not holy; kept for the Holy Dragon", ch, cur))
-      return H.call(function() end)
-    end
-    local best, bp = nil, -1
-    for s = 0, 255 do
-      local id, n = H.readByte(0x1869 + s), H.readByte(0x1969 + s)
-      local mask = ip(id, 1) | (ip(id, 2) << 8)
-      if id ~= 0xFF and n > 0 and (ip(id, 0) & 7) == 1 and ((mask >> ch) & 1) == 1 and not fightsHoly(id)
-        and ip(id, 20) > bp then
-        best, bp = id, ip(id, 20)
+    local taken, swaps = {}, {}
+    for hand = 0, 1 do
+      local cur = H.readByte(c(ch, 0x1F + hand))
+      if not isWeapon(cur) then
+        H.log(string.format("[kit] char %d's hand %d holds $%02X, not a weapon; left alone", ch, hand, cur))
+      elseif not fightsHoly(cur) then
+        H.log(string.format("[kit] char %d's hand %d weapon $%02X is not holy; kept for the Holy Dragon", ch, hand,
+          cur))
+      else
+        local best, bp = nil, -1
+        for s = 0, 255 do
+          local id, n = H.readByte(0x1869 + s), H.readByte(0x1969 + s)
+          local mask = ip(id, 1) | (ip(id, 2) << 8)
+          if isWeapon(id) and n - (taken[id] or 0) > 0 and ((mask >> ch) & 1) == 1 and not fightsHoly(id)
+            and ip(id, 20) > bp then
+            best, bp = id, ip(id, 20)
+          end
+        end
+        H.log(string.format("[kit] char %d's hand %d weapon $%02X is holy (the Holy Dragon absorbs it): %s", ch, hand,
+          cur, best and string.format("$%02X (power %d) from the bag", best, bp) or "the bag holds no other; kept"))
+        if best then
+          taken[best] = (taken[best] or 0) + 1
+          swaps[#swaps + 1] = { hand, best }
+        end
       end
     end
-    H.log(string.format("[kit] char %d's weapon $%02X is holy (the Holy Dragon absorbs it): %s", ch, cur,
-      best and string.format("$%02X (power %d) from the bag", best, bp) or "the bag holds no other; kept"))
-    if not best then return H.call(function() end) end
-    return H.equipKit(ch, { { 0, best } }, { tag = "a weapon the Holy Dragon does not absorb" })
+    if #swaps == 0 then return H.call(function() end) end
+    return H.seqStep({
+      H.equipKit(ch, swaps, { tag = "a weapon the Holy Dragon does not absorb" }),
+      H.call(function()
+        for _, sw in ipairs(swaps) do
+          local now = H.readByte(c(ch, 0x1F + sw[1]))
+          H.assertEq(fightsHoly(now), false, string.format("char %d's hand %d holds no holy weapon for the Holy "
+            .. "Dragon ($%02X)", ch, sw[1], now))
+        end
+      end),
+    })
   end)
 end
 local function lv(ch) return H.readByte(c(ch, 8)) end

@@ -183,6 +183,11 @@ power, write like a human (owner, 2026-09-30).
 - **A regression ships with its test**: red on the regressed build, green
   after. Tooling defects are simplest to fix
   directly, without tests of the test tooling.
+- **The test library's main chunk is full.** `tools/tests/lib/ot6.lua`'s
+  file scope holds 199 of the 200 locals Lua allows one function (2026-11-02,
+  #498: one more broke every leg's load with "too many local variables").
+  New file-scope state and helpers go on `M` or in an existing table, not in
+  a new top-level `local`.
 - **Look at the screen.** Scripts watch what they're doing and fail fast
   with the failure frame; reading the frame and the log beats theorizing.
 - **Few foreseeable surprises.** FF6's mechanics are finite and documented

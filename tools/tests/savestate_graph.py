@@ -841,6 +841,13 @@ STATES = [
     S("wor_passage_hunt", gen="gen_wor_passage_hunt", prev="wor_figaro_sweep_passage",
       timeout=3600),
 
+    # wor-edgar-v1 -> its tile again: a branch beside wor_figaro_sweep
+    # (#498).  The desert around the castle (world group 44: the Sand
+    # Horse pair, the Sand Horse with two Maligas, the Maliga trio) walked
+    # until every formation is won, EDGAR, SABIN and CELES.  Nothing boots it.
+    S("wor_figaro_desert", gen="gen_wor_figaro_desert", prev="wor_edgar",
+      checkpoint="wor-edgar-v1", timeout=3600),
+
     # wor-figaro-sweep-v1 -> the World of Ruin map outside Kohlingen: the Regal
     # Crown off the castle's basement 2 (#322), the engineer's ride to
     # Kohlingen, the walk to town (the castle's desert at its door), the
