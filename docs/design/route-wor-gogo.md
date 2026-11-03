@@ -618,7 +618,11 @@ watchdog for 3240 frames at most (`CAREFUL_QUIET`, since #495 from the
 conductors' cycle: twice the L*L steps a random walk takes to cover the
 longest stretch, L = 9, at the slowest pace of 20 frames; the longest stand
 measured before, 2304 frames; `scripts/stands.py` reads them from a log; a
-battle ends a stand), with a line naming the tile, and a walk that spends its step
+battle ends a stand; #499 measured it with the watchdogs live from the
+wor-gau-v1 capture, shifts 0-7: the longest stand 1196-1872 frames, no
+trip, and 2400 or even 1000 played the same, so the runs cannot tell the
+bounds apart and 3240 keeps the margin over the 2304 stand,
+build/attempts/wt/v038-driver-followups/belly/), with a line naming the tile, and a walk that spends its step
 budget short of the target logs `BUDGET SPENT` before jwalk tries again. A
 walk that, with no route around the conductors, walked on toward the
 crossing and stood at the last rest there was tried and dropped: the

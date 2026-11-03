@@ -50,13 +50,18 @@ local CARD_DIRS = { "down", "left", "right", "up" }
 CAREFUL_PACE, CAREFUL_TRIALS, CAREFUL_RISK, CAREFUL_IMPATIENCE = 18, 120, 0.08, 0.002
 local STEP_F, JUMP_F, DOOR_F = 16, 72, 40
 local CONDSEG = { [276] = { [30] = { { 32, 40 }, { 45, 48 } }, [32] = { { 31, 34 } } } }
--- the longest one stand for the conductors is let sit quiet (the no-progress watchdog stands down for it): 2400
--- frames, over every stand measured.  The longest before the walk's tuning was 2304 (#486 review of the play at
--- 2db501e2); with the watchdogs live, from the graph's wor-gau-v1 capture, shifts 0-7, the longest was 1872 and
--- the eight runs played frame for frame the same under 3240 (#499: build/attempts/wt/v038-driver-followups/belly/,
--- "q3240_s3 PASS (frame 163882) ... longest_stand=1872").  The conductors' cycle model (#495: a random walk on the
--- 9-tile stretch, 2 * 81 * 20 = 3240) bounded it from above and was not needed.
-CAREFUL_QUIET = 2400
+-- the longest one stand for the conductors is let sit quiet (the no-progress watchdog stands down for it), from
+-- the conductors' cycle (#495): a conductor steps a tile every 16-20 frames either way at even odds, and a
+-- random walk on a stretch of L tiles takes about L*L steps to cover it; a stand is let last twice that on the
+-- longest stretch at the slowest pace (L = 9, row 30's 32-40: 2 * 81 * 20 = 3240 frames), over the longest
+-- stand measured before the walk's tuning, 2304 frames (#486 review of the play at 2db501e2)
+CAREFUL_QUIET = (function()
+  local L = 0
+  for _, rows in pairs(CONDSEG) do
+    for _, segs in pairs(rows) do for _, sg in ipairs(segs) do L = math.max(L, sg[2] - sg[1] + 1) end end
+  end
+  return 2 * L * L * 20
+end)()
 local function condList(objs)
   local out = {}
   for _, o in ipairs(objs) do
