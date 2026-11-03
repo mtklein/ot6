@@ -37,6 +37,10 @@
 -- resolves on no target): the driver drops a cure whose carrier is down and
 -- the next living member plans it again (watchPendingCare); the property
 -- here is unchanged.
+-- The fixture's frame is chosen by this suite's own drive (gen_tomb_zombie's proof step reloads the landing and
+-- plays it with advanceStory as below before it emits it): a frame the party's pacing found a turn to spare on
+-- ended 212 frames later under this drive (a Zombied member's queued Fight resolving on the monsters), so the
+-- precondition below fails a fixture that only the generator's own play could use, by name.
 -- ZOMBIE_CURE is the lever (opts.zombieCure); a copy with it false is the
 -- negative control and goes red at the first of those it breaks (the
 -- mutants that prove each assertion can fail are in
