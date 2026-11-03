@@ -259,7 +259,7 @@ him three quarters of his HP (2227 -> 557) and STRAGO's Aqua Rake did
 the same to him (3219 -> 805). Each then hit the Phase and died to Blow
 Fish ("from 557/2227 by slot 0 cmd $0C atk $90", "from 615/3219"). The
 last Necromancer's X-Zone took the two left. The counter rule (#372)
-priced neither attack (its magic model makes Blow Fish 18 and Quartr a
+priced neither attack (its magic model makes Blow Fish a few points and Quartr a
 small spell) and refused only an answer that takes the whole bar. It
 also never checked a nuke lore.
 
