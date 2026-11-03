@@ -13760,6 +13760,23 @@ function M.cursorTargetable()
   return liveMonMask() & M.readByte(0x0092)
 end
 
+-- the field is empty for the cursor: monsters stand, none is in $92
+function M.fieldEmptyForCursor()
+  return liveMonMask() ~= 0 and M.cursorTargetable() == 0
+end
+-- A plan aimed at the monsters: everything but the party's care, the ally lines (the Muddle rule's Fight on an
+-- ally, zingerPlan, a bounce or buff) and the window hand-ons.  Such a plan cannot be entered while the field is
+-- empty for the cursor, whatever its verb (Fight, Magic, Lore, a Tool, a Throw...).
+M.MON_AIM_EXEMPT = { item = true, heal = true, raise = true, defer = true, switch = true, mimic = true,
+  runic = true, won = true, lost = true, dog = true }
+function M.planAimsAtMonsters(plan)
+  return plan ~= nil and not M.MON_AIM_EXEMPT[plan.kind] and not plan.ally and not plan.buff and not plan.bounce
+end
+-- The empty-field wait's own bound (#498 review): a battle whose field stays empty for the cursor this long,
+-- continuously, while the driver waits on it is a defect, not a wait.  The frog labs' longest stretch was under
+-- 1,000 frames (build/attempts/wt/v038-sweeps-a-followups/pincer/).
+M.EMPTY_FIELD_CAP = 3600
+
 function Driver:steerWatch()
   if self.steerLast == nil then return end
   local sig = tgtSig()
@@ -13809,8 +13826,11 @@ function Driver:cross(toward)
   -- no standing monster the cursor can reach (M.cursorTargetable): no press crosses, so none is spent; the plan
   -- goes and the next one waits for them (the command window's none_targetable defer)
   if toward == "monsters" and M.cursorTargetable() == 0 and liveMonMask() ~= 0 and M.NONE_TARGETABLE_WAIT ~= false then
+    self.emptyBackN = (self.emptyBackN or 0) + 1
+    self.emptySince = self.emptySince or M.frame
     M.log(string.format("[%s] crossing to the monsters: none of the standing monsters is on the screen for the "
-      .. "cursor (%s) -- backing out to wait for them", self.tag or "fight", M.crossReads()))
+      .. "cursor (%s) -- backing out to wait for them (back-out #%d this battle)", self.tag or "fight",
+      M.crossReads(), self.emptyBackN))
     self.steerDead, self.steerLast = {}, nil
     self:dropPlan("none_targetable")
     return { "b" }
@@ -13839,6 +13859,8 @@ end
 
 function Driver:button(actor)
   local st = M.readByte(BATTLE.MSTATE)
+  -- the empty-field clock (M.EMPTY_FIELD_CAP) runs only while the field stays empty for the cursor
+  if self.emptySince ~= nil and not M.fieldEmptyForCursor() then self.emptySince = nil end
   if st == BATTLE.ST_TGT then self:steerWatch()
   else
     -- a steer press that took the target window away (measured on
@@ -14247,13 +14269,23 @@ function Driver:button(actor)
       self:dropPlan(self.plan.reason)
       return nil
     end
-    -- a Fight with no standing monster on the screen for the cursor (M.cursorTargetable): the window is handed
-    -- on and the plan re-read every 30 frames, as a person waits for the field to fill again (#498)
-    if self.plan.kind == "fight" and M.cursorTargetable() == 0 and liveMonMask() ~= 0
-       and M.NONE_TARGETABLE_WAIT ~= false then
-      M.log(string.format("[%s] actor=%d: a Fight with none of the standing monsters on the screen for the cursor "
-        .. "(%s) -- waiting for them", self.tag or "fight", actor, M.crossReads()))
-      self.plan = { kind = "defer", reason = "none_targetable", at = M.frame }
+    -- a plan aimed at the monsters (M.planAimsAtMonsters: any verb, not an ally line) with no standing monster on
+    -- the screen for the cursor (M.fieldEmptyForCursor): the plan goes through dropPlan (its race and care
+    -- bookkeeping), the window is handed on, and the next plan is re-read in 30 frames, as a person waits for the
+    -- field to fill again (#498).  The wait has its own bound, M.EMPTY_FIELD_CAP frames of an empty field in a row
+    if M.planAimsAtMonsters(self.plan) and M.fieldEmptyForCursor() and M.NONE_TARGETABLE_WAIT ~= false then
+      self.emptySince = self.emptySince or M.frame
+      self.emptyWaitN = (self.emptyWaitN or 0) + 1
+      if M.frame - self.emptySince > (M.EMPTY_FIELD_CAP or 3600) then
+        self:failFast(string.format("the field has been empty for the cursor for %d frames (since f%d; %d waits, "
+          .. "%d cross back-outs this battle): %s", M.frame - self.emptySince, self.emptySince, self.emptyWaitN,
+          self.emptyBackN or 0, M.crossReads()))
+      end
+      M.log(string.format("[%s] actor=%d: a %s aimed at the monsters with none of the standing monsters on the "
+        .. "screen for the cursor (%s; empty for %d frames, wait #%d) -- waiting for them", self.tag or "fight",
+        actor, self.plan.kind, M.crossReads(), M.frame - self.emptySince, self.emptyWaitN))
+      self:dropPlan("none_targetable")
+      self.plan, self.planActor = { kind = "defer", reason = "none_targetable", at = M.frame }, actor
       return { "x" }
     end
     if self.plan.kind == "switch" or self.plan.kind == "defer" then return { "x" } end
@@ -14999,6 +15031,7 @@ function Driver:idle()
   self.plan, self.planActor, self.held, self.confirmed = nil, nil, {}, nil
   self.parkDropN = 0
   self.crossDropN = 0
+  self.emptySince, self.emptyBackN, self.emptyWaitN = nil, 0, 0
   self.turnN = 0                        -- the [board] lines' count (#422)
   self.raceActDeclined = nil
   self.layout, self.layoutUnreadSaid, self.steerLast, self.steerDead = nil, false, nil, {}
