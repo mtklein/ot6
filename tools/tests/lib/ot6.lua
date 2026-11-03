@@ -7797,9 +7797,15 @@ function Driver:counterAimPlan(actor, plan)
   for s, a in pairs(kills) do ks[#ks + 1] = string.format("slot %d ($%02X)", s, a) end
   table.sort(ks)
   if best == nil then
-    M.log(string.format("[%s] actor=%d Fight at %d HP: %s answer%s a Fight with up to %d or more, and no "
-      .. "standing body's answer is safe -- as planned (#503)", self.tag or "fight", actor, hp,
-      table.concat(ks, ", "), #ks == 1 and "s" or "", hp))
+    -- said once a battle per actor and bodies, not every turn
+    local key = string.format("aim:%d:%s", actor, table.concat(ks, ","))
+    self.counterSaid = self.counterSaid or {}
+    if not self.counterSaid[key] then
+      self.counterSaid[key] = true
+      M.log(string.format("[%s] actor=%d Fight at %d HP: %s answer%s a Fight with %d or more, and no "
+        .. "standing body's answer is safe -- as planned (#503)", self.tag or "fight", actor, hp,
+        table.concat(ks, ", "), #ks == 1 and "s" or "", hp))
+    end
     return plan
   end
   M.log(string.format("[%s] actor=%d Fight re-aimed: %s answer%s a Fight with %d or more against %d HP; slot %d "
