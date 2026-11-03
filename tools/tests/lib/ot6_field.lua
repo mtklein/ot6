@@ -7817,7 +7817,6 @@ end
 function M.absorbSafeArms(chars, species, opts)
   opts = opts or {}
   local tag = opts.tag or "absorb-safe arms"
-  local inner
   local function norm()
     local sp = type(species) == "function" and species() or species
     local out = {}
@@ -7880,14 +7879,7 @@ function M.absorbSafeArms(chars, species, opts)
     -- line, fc_landing: LOCKE's R-hand took the one $0F, and the L-hand's
     -- list, read before, still named it: "the best was $0F power 108")
     for _, c in ipairs(clashes(sp)) do
-      local inner
-      steps[#steps + 1] = {
-        tick = function()
-          if inner == nil then inner = M.seqStep(armHand(c, sp)) end
-          return inner:tick()
-        end,
-        reset = function() inner = nil end,
-      }
+      steps[#steps + 1] = M.lazy(function() return M.seqStep(armHand(c, sp)) end)
     end
     steps[#steps + 1] = M.call(function()
       local left, lines = clashes(sp), {}
@@ -7897,13 +7889,7 @@ function M.absorbSafeArms(chars, species, opts)
     end)
     return M.seqStep(steps)
   end
-  return {
-    tick = function(self)
-      if inner == nil then inner = build() end
-      return inner:tick()
-    end,
-    reset = function(self) inner = nil end,
-  }
+  return M.lazy(build)
 end
 
 -- ---- relics: who wears which ---------------------------------------------

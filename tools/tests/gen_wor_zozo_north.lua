@@ -185,21 +185,18 @@ H.run({ maxFrames = 600000 }, {
   landed("the rooftop room settled"),
 
   -- @@stage rooftop
-  H.openChest({ stand = { 72, 27 }, face = "up", bit = CHESTS[3].bit, what = CHESTS[3].what, item = CHESTS[3].item,
-    nav = { fight = FIGHT } }),
-  H.openChest({ stand = { 91, 27 }, face = "right", bit = CHESTS[4].bit, what = CHESTS[4].what, item = CHESTS[4].item,
-    nav = { fight = FIGHT } }),
+  -- (the RunningShoes and the X-Potion chests are open from the boot; nothing to walk to here)
   H.call(function()
     for _, c in ipairs(CHESTS) do
       H.assertEq(H.chestOpen(c.bit), true, string.format("Zozo: the %s's chest (bit %d) is open", c.what, c.bit))
     end
-    say("wor", "the four north chests open")
+    say("wor", "the Thief Glove and the Fire Knuckle opened; the rooftop's two were open at the boot")
     H.log("[kit] " .. kitLine(FOUR))
   end),
   H.saveState("wor_zozo_north.mss"),
   H.logStep(function()
     return string.format("wor_zozo_north generated: TERRA L%d, CELES L%d, SABIN L%d and EDGAR L%d in Zozo's rooftop "
-      .. "room, map %d (%d,%d); the Thief Glove, the Fire Knuckle, the RunningShoes and the X-Potion opened", lv(TERRA),
+      .. "room, map %d (%d,%d); the Thief Glove and the Fire Knuckle opened (the RunningShoes and the X-Potion were open at the boot)", lv(TERRA),
       lv(CELES), lv(SABIN), lv(EDGAR), map(), H.fieldX(), H.fieldY())
   end),
 })

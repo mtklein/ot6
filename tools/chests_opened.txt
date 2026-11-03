@@ -23,6 +23,30 @@
 # treasure record's switch word (ff6/src/field/player.asm:782-789).  Twenty-
 # five bits are shared by two or three records, because duplicate map copies
 # have to close the same chest, so one line here can cover more than one map.
+
+# Kept closed in the World of Balance (#350): the treasure array is one for
+# both worlds, and where a World of Balance chest and its World of Ruin copy
+# share a bit with different prizes, opening the first spends the second.
+# These bits' World of Ruin prizes are the better ones; the audit fails when
+# any state still in the World of Balance (switch $0A4 clear) has one set.
+[keep closed in the WoB]
+11	map 50 mines chase Fenix Down; map 38 (World of Ruin) Pod Bracelet
+12	map 50 mines chase Sleeping Bag; map 38 (World of Ruin) Elixir
+13	map 52 Rune Edge; map 44 (World of Ruin) Ribbon
+18	map 72 Fenix Down; maps 68/69 (World of Ruin) X-Potions -- the route opens it only in the World of Ruin
+19	maps 70/73 Thunder Rod / Tincture; map 90 (World of Ruin) Hero Ring
+97	maps 69/72 Tincture; map 68 (World of Ruin) Ether
+21	map 75 South Figaro Tonic; map 74 (World of Ruin) X-Potion
+22	map 75 South Figaro Antidote; map 74 (World of Ruin) Tent
+23	map 75 South Figaro Eyedrop; map 74 (World of Ruin) Remedy
+24	map 75 South Figaro Tonic; map 74 (World of Ruin) Revivify
+25	map 75 South Figaro Green Cherry; map 74 (World of Ruin) Tent
+230	map 75 South Figaro Soft; map 74 (World of Ruin) Elixir
+231	map 75 South Figaro Warp Stone; map 74 (World of Ruin) Fenix Down
+
+# Everything below is opened by the route; a chest the chain newly opens is
+# appended at the end of the file, under this header.
+[opened]
 2	map 30 Elder's House, Elixir (55,30) -- the #84 wave
 4	map 30 Elder's House treasure room, Hyper Wrist (78,8) -- behind LOCKE's lock (#447)
 5	map 30 Elder's House treasure room, Sneak Ring (79,8) -- behind LOCKE's lock (#447)
@@ -199,22 +223,3 @@
 76	map 225 Zozo, Fire Knuckle (35,11) -- off the top roof (gen_wor_zozo_north, a branch)
 70	map 226 Zozo's rooftop room, RunningShoes (72,26) -- on the way up to TERRA (gen_zozo5_ramuh, #350)
 71	map 226 Zozo's rooftop room, X-Potion (92,27) -- on the way up to TERRA (gen_zozo5_ramuh, #350)
-
-# Kept closed in the World of Balance (#350): the treasure array is one for
-# both worlds, and where a World of Balance chest and its World of Ruin copy
-# share a bit with different prizes, opening the first spends the second.
-# These bits' World of Ruin prizes are the better ones; the audit fails when
-# any state still in the World of Balance (switch $0A4 clear) has one set.
-[keep closed in the WoB]
-11	map 50 mines chase Fenix Down; map 38 (World of Ruin) Pod Bracelet
-12	map 50 mines chase Sleeping Bag; map 38 (World of Ruin) Elixir
-13	map 52 Rune Edge; map 44 (World of Ruin) Ribbon
-19	maps 70/73 Thunder Rod / Tincture; map 90 (World of Ruin) Hero Ring
-97	maps 69/72 Tincture; map 68 (World of Ruin) Ether
-21	map 75 South Figaro Tonic; map 74 (World of Ruin) X-Potion
-22	map 75 South Figaro Antidote; map 74 (World of Ruin) Tent
-23	map 75 South Figaro Eyedrop; map 74 (World of Ruin) Remedy
-24	map 75 South Figaro Tonic; map 74 (World of Ruin) Revivify
-25	map 75 South Figaro Green Cherry; map 74 (World of Ruin) Tent
-230	map 75 South Figaro Soft; map 74 (World of Ruin) Elixir
-231	map 75 South Figaro Warp Stone; map 74 (World of Ruin) Fenix Down

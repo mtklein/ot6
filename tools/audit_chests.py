@@ -53,6 +53,7 @@ MAP_ID = 0x1F64              # live map index; H.mapId() reads the same word
 MAP_PROP_SIZE = 33           # LoadMapProp copies 33 (field/map.asm:143-156)
 WOR_SWITCH = 0x0A4           # set when the world splits (event_main.asm:12423)
 KEEP_CLOSED = "[keep closed in the WoB]"
+OPENED = "[opened]"
 
 
 def off(addr: int) -> int:
@@ -210,7 +211,7 @@ def load_record(repo: str) -> tuple[dict[int, str], dict[int, str],
 
     Two tab-separated columns, treasure bit / what it is.  `#` comments and
     blank lines ignored.  Lines after the `[keep closed in the WoB]` header
-    are the second map.  Missing file is an empty record, which is the
+    are the second map, until an `[opened]` header returns to the first.  Missing file is an empty record, which is the
     correct reading of "the route opens nothing yet".
     """
     out, keep = {}, {}
@@ -225,6 +226,9 @@ def load_record(repo: str) -> tuple[dict[int, str], dict[int, str],
             continue
         if line.strip() == KEEP_CLOSED:
             into = keep
+            continue
+        if line.strip() == OPENED:
+            into = out
             continue
         parts = [p.strip() for p in line.split("\t") if p.strip()]
         if len(parts) < 2 or not parts[0].isdigit():
@@ -510,7 +514,7 @@ def main() -> int:
     if extra:
         text = {c.bit: c for c in chests}
         print(f"\n{len(extra)} chest(s) the chain opens that {RECORD} does "
-              f"not list.  The list only grows; add:")
+              f"not list.  The list only grows; add at the end of the file, under `[opened]`:")
         for b in extra:
             c = text[b]
             print(f"  {b}\t{c.where()} {c.what}")

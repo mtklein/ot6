@@ -826,8 +826,9 @@ STATES = [
     # (H.dressRelics), the desert again (#321), and Save on the castle's
     # tile (81,86) again (docs/design/route-wor-falcon.md sections 2.2 and
     # 10).  wor_kohlingen below boots its checkpoint.
-    # timeout=3600: the capture ended at frame 40859 from the Continue (10
-    # battles); three such attempts are ~123k frames, ~1500 s at ~80 frames/s.
+    # timeout=3600: the leg is shorter now (the basement and its relics are
+    # the World of Balance's, #350); the bound is the old, longer capture's
+    # (~41k frames, 10 battles) times three attempts, ~1500 s at ~80 frames/s.
     # Re-cut by checkpoint_drift.py --recut.  also: wor_figaro_sweep_town,
     # the party in South Figaro after its chests, gen_wor_passage_hunt's
     # boot (#488; the passage itself is the World of Balance's since #350).

@@ -1103,6 +1103,11 @@ pair), and the lever's effect on other fights.
 
 ### 10.4 The relics worn, and the side trip on the chain (re-cut 2026-10-01)
 
+*Since #350 the cellar's Ribbon, X-Potion and Ether, the rich man's Hyper
+Wrist and RunningShoes, and the Hero Ring are World of Balance finds, already
+in the bag when this leg starts (the leg is shorter, its battles fewer); what
+follows is the 2026-10-01 measurement, when the leg walked to them.*
+
 Owner, 2026-10-01: "you gotta use a ribbon when you have one" (guidelines
 "Ribbons are worth going out of your way for"). The leg now dresses the
 party the moment a find is in the bag (after the Ribbon's cellar, after

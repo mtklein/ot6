@@ -757,6 +757,12 @@ Phoenix Cave landing tiles (prop $4000, landable): 4 e.g. [(117, 156), (118, 156
 # SRAM bits set 120, fc_alcove bits 58, chests_opened.txt 123; in record not SRAM: [37, 38, 39]; in SRAM not record: []
 ```
 
+(A dated measurement, from before #350: South Figaro's bits 21-25 and 231
+and the Narshe mines' 11 and 12 read "WoB OPEN" here, but the World of Balance
+now keeps them closed, tools/chests_opened.txt `[keep closed in the WoB]`;
+bit 12 is the Moogle cave's Elixir, bit 11 its Pod Bracelet, and the World of
+Ruin saves pick both up.)
+
 ```
 # bit: records (map (x,y) prize) | opened by the end of the WoB (fc_alcove) | opened at wor-colosseum-v1
 bit  11: map 38 (65,28) Pod Bracelet; map 50 (65,28) Fenix Down | WoB OPEN | end OPEN
