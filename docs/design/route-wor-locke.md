@@ -268,7 +268,7 @@ power/16 of the HP standing). It refuses a Blitz or a nuke lore whose
 answer can take half the actor's HP when a Fight on the same body draws
 less than half. An all-body verb draws every body's answer in turn. A
 Fight aimed at a body whose answer kills the actor is re-aimed at the
-safest standing body, unless it is the killing blow.
+safest standing body, unless it is the killing blow and the body's dying answer cannot kill (its script read as dead: the Phase opens `if_self_dead`; a death counter still re-aims).
 
 Measured from the tracked `wor-thamasa-v1` (c5746dcc's re-cut of the
 play at 36a4846a; no generator, ROM, emulator pin or replay line has
