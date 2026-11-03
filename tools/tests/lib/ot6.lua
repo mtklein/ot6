@@ -13749,6 +13749,17 @@ function M.crossReads()
     M.readByte(0x6195), M.readByte(0x2F2F), M.readByte(0x7B79), M.readByte(0x7B7B), M.readByte(0x7A84), liveMonMask())
 end
 
+-- The standing monsters the target cursor can reach: $92, the mask every cursor move tests (get_gr0/get_gr2,
+-- _c174bf, _c17439), is rebuilt each frame from the monsters shown ($201E & $61AB, & $2F46).  A monster can stand
+-- (HP, no death status) and still be off the screen: the Reach Frog x4 fight (formation 324) has its frogs leave
+-- the field one by one ($61AB drops their bits for hundreds of frames, the screen shows no monster:
+-- build/attempts/wt/v038-sweeps-a-followups/pincer/), and a Fight aimed at them lands no hit.  A person sees an
+-- empty field and waits for the monsters to come back; a plan aimed at a monster then is not one the cursor can
+-- take (#498: the cross drop of wor_colosseum, chain10/chain11).
+function M.cursorTargetable()
+  return liveMonMask() & M.readByte(0x0092)
+end
+
 function Driver:steerWatch()
   if self.steerLast == nil then return end
   local sig = tgtSig()
@@ -13795,6 +13806,15 @@ end
 function Driver:cross(toward)
   local L = self:layoutOf()
   local dirs = toward == "monsters" and L.toMonsters or L.toChars
+  -- no standing monster the cursor can reach (M.cursorTargetable): no press crosses, so none is spent; the plan
+  -- goes and the next one waits for them (the command window's none_targetable defer)
+  if toward == "monsters" and M.cursorTargetable() == 0 and liveMonMask() ~= 0 and M.NONE_TARGETABLE_WAIT ~= false then
+    M.log(string.format("[%s] crossing to the monsters: none of the standing monsters is on the screen for the "
+      .. "cursor (%s) -- backing out to wait for them", self.tag or "fight", M.crossReads()))
+    self.steerDead, self.steerLast = {}, nil
+    self:dropPlan("none_targetable")
+    return { "b" }
+  end
   for _, d in ipairs(dirs) do
     if (self.steerDead[d] or 0) < 2 then return self:steer(d, "cross") end
   end
@@ -14220,9 +14240,19 @@ function Driver:button(actor)
     -- a wait for the wall (magicOnlyLine's wall_wait) is re-read every 30
     -- frames: X hands the window on only while another member's is open,
     -- and the wait ends when the spell in the air lands
-    if self.plan.kind == "defer" and self.plan.reason == "wall_wait" and M.frame - (self.plan.at or 0) > 30 then
-      self:dropPlan("wall_wait")
+    if self.plan.kind == "defer" and (self.plan.reason == "wall_wait" or self.plan.reason == "none_targetable")
+       and M.frame - (self.plan.at or 0) > 30 then
+      self:dropPlan(self.plan.reason)
       return nil
+    end
+    -- a Fight with no standing monster on the screen for the cursor (M.cursorTargetable): the window is handed
+    -- on and the plan re-read every 30 frames, as a person waits for the field to fill again (#498)
+    if self.plan.kind == "fight" and M.cursorTargetable() == 0 and liveMonMask() ~= 0
+       and M.NONE_TARGETABLE_WAIT ~= false then
+      M.log(string.format("[%s] actor=%d: a Fight with none of the standing monsters on the screen for the cursor "
+        .. "(%s) -- waiting for them", self.tag or "fight", actor, M.crossReads()))
+      self.plan = { kind = "defer", reason = "none_targetable", at = M.frame }
+      return { "x" }
     end
     if self.plan.kind == "switch" or self.plan.kind == "defer" then return { "x" } end
     -- the boost (#408): R until the pending boost the engine shows reads
