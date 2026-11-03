@@ -5574,6 +5574,8 @@ end
 --   FC 03 i1 i2  if_item     the item is i1 or i2
 --   FC 04 mask   if_element  the action's element is in the mask
 --   FC 05        if_hit      any hit (the action is assumed to land)
+--   FC 12 00 00  if_self_dead  the hit kills the body, when use.dies says
+--                (true or false; nil leaves it undecided)
 -- Any other condition (HP, status, variables, monster counts, timers) is
 -- not decided here: the walk takes both ways.  Returns the attack ids that
 -- can answer (each of $F0's three; NOTHING, $FE, left out) and whether the
@@ -5617,6 +5619,7 @@ function M.retalAnswer(byteAt, use)
         elseif c == 0x03 then holds = either(use.item, a, b)
         elseif c == 0x04 then holds = ((use.elem or 0) & a) ~= 0
         elseif c == 0x05 then holds = true
+        elseif c == 0x12 and a == 0 and b == 0 and use.dies ~= nil then holds = use.dies
         end
         if holds == nil then
           certain = false
@@ -7565,6 +7568,67 @@ local function monHitOn(slot, e, a)
   return hi or 0
 end
 
+-- The most a monster's COUNTER, attack `a` of slot `slot`, can take off
+-- party entity `e` standing at `hp` (#503): monHitOn, and the two answers
+-- its damage models miss, which the Phoenix Cave's Phase and Necromancer
+-- throw at whoever hits them.  Blow Fish (attacker special effect $1A,
+-- MagicProp +9; AttackerEffect_1a) sets the damage to 1000 and turns its
+-- modification off, so it takes 1000 whatever the target's defenses.
+-- Demi and Quartr (MagicProp +4 bit 7, the fraction flag; CalcDmgRatio)
+-- take power/16 of the target's HP -- its current HP, or its max where
+-- MagicProp +2 bit 2 says so -- so Quartr's 12 takes three quarters of
+-- what is standing.  Measured on the wipe this was written for
+-- (build/attempts/wt/v038-phoenix-152/lab: bphx_s0, $152 be80): SABIN
+-- 2227 -> 557 and STRAGO 3219 -> 805 to a Necromancer's Quartr, then each
+-- dead to the Phase's Blow Fish from 557 and 615.  Only the counter
+-- reads use it; the unseen-script price (scriptWorst) keeps monHitOn.
+-- M.fixedTake(byteAt, hp, maxHp) is that pricing on one MagicProp record
+-- (byteAt(i), i = 0..13): the take, or nil for an attack it does not
+-- price (counter_selftest checks it on the built ROM's records).
+-- A heal (+4 bit 0: Life, Life 2, Pep Up carry the fraction flag too)
+-- takes nothing.  A fraction that rounds to 0 takes 1 (CalcDmgRatio:
+-- `bne @0dc5 / inc`), so a Demi or Quartr kills a member at 1 HP.
+function M.fixedTake(byteAt, hp, maxHp)
+  if (byteAt(4) & 0x01) ~= 0 then return 0 end
+  if byteAt(9) == 0x1A then return 1000 end
+  if (byteAt(4) & 0x80) ~= 0 then
+    return math.max(1, (((byteAt(2) & 0x04) ~= 0 and maxHp or hp) * byteAt(6)) >> 4)
+  end
+  return nil
+end
+
+-- What a chain of counters takes off a member at `hp` (#503 review): one
+-- action that lands on several bodies draws each one's counter, and the
+-- engine queues them from the highest slot down (CheckRetal: `ldx #$12`,
+-- then `dex2`, entity 9 = monster slot 5 first; CreateRetalAction
+-- appends, the battle loop takes from the front).  So on $152 both
+-- Necromancers' Quartrs (slots 2, 3) land before the Phase's Blow Fish
+-- (slot 0), and a STRAGO at 1800 HP goes 1800 -> 450 -> 113 -> dead,
+-- where the slot order 0 -> 5 would read 1800 -> 800 -> 200 -> 50.
+-- steps = { { slot = s, take = function(left) return n end }, ... };
+-- returns the HP taken (at most hp) and each step's take, by slot.
+function M.counterChain(steps, hp)
+  local order = {}
+  for _, st in ipairs(steps) do order[#order + 1] = st end
+  table.sort(order, function(a, b) return a.slot > b.slot end)
+  local left, each = hp, {}
+  for _, st in ipairs(order) do
+    local t = math.min(st.take(left) or 0, left)
+    each[st.slot] = t
+    left = left - t
+  end
+  return hp - left, each
+end
+
+function Driver:counterHit(slot, e, a, hp)
+  if a ~= 0xEE and a ~= 0xEF then
+    local r = (M.sym("MagicProp") & 0x3FFFFF) + a * 14
+    local t = M.fixedTake(function(i) return M.readRomByte(r + i) end, hp, M.readWord(0x3C1C + e * 2))
+    if t ~= nil then return t end
+  end
+  return monHitOn(slot, e, a)
+end
+
 -- An enemy the fight has not yet measured (#367), priced from what it can
 -- do: the attacks its AI script's main section names ($F0's three and the
 -- single-attack bytes; not the retaliation, which answers the party's
@@ -7631,49 +7695,185 @@ function Driver:scriptWorst(slot, e)
   return price, bestA, mean
 end
 
-function Driver:counterVetoed(actor, use, slots, what)
+-- The worst answer slot `slot`'s retaliation gives party entity `e` at
+-- `hp` for the action `use` (M.retalAnswer, priced by Driver:counterHit):
+-- what it can take, the attack, the answers, and whether one of them is
+-- unpriced (a Special).
+function Driver:counterWorst(slot, e, use, hp)
+  local species = M.readWord(M.FORMATION + slot * 2)
+  if species == 0xFFFF or species >= 0x180 then return 0, nil, {}, false end
   local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
+  local off = M.readRomWord(ptrs + species * 2)
+  local atks = M.retalAnswer(function(i) return M.readRomByte(base + off + i) end, use)
+  local top, which, unknown = 0, nil, false
+  for _, a in ipairs(atks) do
+    local hi = self:counterHit(slot, e, a, hp)
+    if hi == nil then unknown = true
+    elseif hi > top then top, which = hi, a end
+  end
+  return top, which, atks, unknown
+end
+
+-- #503 widens #372's rule two ways.  A verb that lands on every body in
+-- `slots` (aoe: Aqua Rake, a party-wide Blitz) draws every body's answer,
+-- each in turn on what the last left (a Quartr takes its share of the
+-- rest); one that lands on one of them draws the worst one's.  And it is
+-- refused when that can take half the actor's HP while a Fight's answer
+-- cannot, as well as when it can take all of it while a Fight's cannot:
+-- the Necromancers answer anything but a Fight with Demi or Quartr, and
+-- a Pummel that costs SABIN three quarters of his bar is not a trade a
+-- person makes when the Fight beside it draws nothing.  A Fight's answer
+-- is the same body's (the worst of them for an all-body verb), except
+-- that an answer which kills is weighed against the safest standing
+-- body's, since Driver:counterAimPlan steers a Fight off a body whose
+-- answer kills.  An unpriced Fight answer (a Special) refuses nothing.
+function Driver:counterVetoed(actor, use, slots, what, aoe)
   local y = actor * 2
   local hp = M.readWord(0x3BF4 + y)
   if hp == 0 then return false end
-  local function priced(slot, a) return monHitOn(slot, actor, a) end
-  local function worst(slot, u)
-    local species = M.readWord(M.FORMATION + slot * 2)
-    if species == 0xFFFF or species >= 0x180 then return 0, nil, {}, false end
-    local off = M.readRomWord(ptrs + species * 2)
-    local atks = M.retalAnswer(function(i) return M.readRomByte(base + off + i) end, u)
-    local top, which, unknown = 0, nil, false
-    for _, a in ipairs(atks) do
-      local hi = priced(slot, a)
-      if hi == nil then unknown = true
-      elseif hi > top then top, which = hi, a end
+  local function said(key, msg)
+    self.counterSaid = self.counterSaid or {}
+    if not self.counterSaid[key] then
+      self.counterSaid[key] = true
+      M.log(msg)
     end
-    return top, which, atks, unknown
+  end
+  -- each body the verb can land on: its answer to the verb and to a Fight
+  local function fightOn(s)
+    local ftop, _, _, funknown = self:counterWorst(s, actor, { cmd = BATTLE.CMD_FIGHT }, hp)
+    return ftop, funknown
+  end
+  -- the least a Fight draws from any standing body, where Driver:counterAimPlan
+  -- re-aims a Fight whose own body's answer would kill
+  local safest = nil
+  for s = 0, 5 do
+    if monAlive(s) then
+      local ftop, funknown = fightOn(s)
+      if not funknown and (safest == nil or ftop < safest) then safest = ftop end
+    end
+  end
+  local take, parts, fworst, funk = 0, {}, 0, false
+  local refuse = false
+  -- an all-body verb: every body's counter, in the engine's order (M.counterChain)
+  local steps, info = {}, {}
+  if aoe then
+    for _, slot in ipairs(slots) do
+      if monAlive(slot) then
+        steps[#steps + 1] = { slot = slot, take = function(left)
+          local top, which = self:counterWorst(slot, actor, use, left)
+          info[slot] = which
+          return top
+        end }
+      end
+    end
+    local each
+    take, each = M.counterChain(steps, hp)
+    for s = 5, 0, -1 do
+      if info[s] ~= nil then
+        parts[#parts + 1] = string.format("slot %d $%03X $%02X %d", s, M.readWord(M.FORMATION + s * 2),
+          info[s], each[s])
+      end
+    end
   end
   for _, slot in ipairs(slots) do
     if monAlive(slot) then
-      local top, which = worst(slot, use)
-      if top >= hp then
-        local ftop, _, fatks, funknown = worst(slot, { cmd = BATTLE.CMD_FIGHT })
-        if ftop < hp and not funknown then
-          local fsaid = {}
-          for _, a in ipairs(fatks) do fsaid[#fsaid + 1] = string.format("$%02X", a) end
-          local key = string.format("%d:%s:%d:%d", actor, what, slot, which)
-          self.counterSaid = self.counterSaid or {}
-          if not self.counterSaid[key] then
-            self.counterSaid[key] = true
-            M.log(string.format("[%s] actor=%d %s refused: slot %d (species $%03X) answers it "
-              .. "with attack $%02X, up to %d against %d HP; a Fight draws %s, up to %d (#372) "
-              .. "-- falling through", self.tag or "fight", actor, what, slot,
-              M.readWord(M.FORMATION + slot * 2), which, top, hp,
-              #fsaid > 0 and table.concat(fsaid, "/") or "no answer", ftop))
+      local top, which = self:counterWorst(slot, actor, use, hp)
+      local ftop, funknown = fightOn(slot)
+      funk = funk or funknown
+      if ftop > fworst then fworst = ftop end
+      if which ~= nil then
+        if not aoe then
+          parts[#parts + 1] = string.format("slot %d $%03X $%02X %d, a Fight's %d%s", slot,
+            M.readWord(M.FORMATION + slot * 2), which, top, ftop, funknown and "+" or "")
+        end
+        if aoe then
+          -- priced in the chain above
+        else
+          take = math.max(take, top)
+          -- one body: its answer to the verb against its answer to a Fight
+          if not funknown and ((top * 2 >= hp and ftop * 2 < hp)
+              or (top >= hp and (ftop < hp or (safest ~= nil and safest < hp)))) then
+            refuse = true
           end
-          return true
         end
       end
     end
   end
-  return false
+  if aoe and not funk then
+    -- every body's answer, against the worst one a Fight on one of them draws
+    refuse = (take * 2 >= hp and fworst * 2 < hp)
+      or (take >= hp and (fworst < hp or (safest ~= nil and safest < hp)))
+  end
+  if not refuse then return false end
+  said(string.format("%d:%s:%s", actor, what, table.concat(parts, ",")),
+    string.format("[%s] actor=%d %s refused: %s (%s), up to %d of %d HP (#372, #503) -- falling through",
+      self.tag or "fight", actor, what, aoe and "every body it lands on answers it" or "a body answers it",
+      table.concat(parts, "; "), take, hp))
+  return true
+end
+
+-- A Fight aimed at a body whose answer to it kills the actor (#503): the
+-- Phase answers every hit with Blow Fish, 1000 whatever the target's
+-- defenses, so a member under 1000 HP who swings at it dies to its own
+-- swing (bphx_s0: SABIN from 557, STRAGO from 615, the two deaths that
+-- left two members to the last Necromancer's X-Zone).  A person aims
+-- that member at another body: the Fight re-aims at the standing body
+-- whose answer is the least, when that one's cannot kill, and is left as
+-- planned when it is already aimed at a safe body or when every body's
+-- answer kills (or is unpriced).  The engine runs a dying body's counter
+-- too (CheckRetal's $3a56 branch), so a killing blow (plan.reason
+-- "finish") is left as planned only when the body's script, walked with
+-- the hit killing it (retalAnswer's use.dies), answers with nothing that
+-- kills: the Phase's opens `if_self_dead / end_if`, and a death counter
+-- (Coelecite, Scullion, Intangir) still answers.  The finish rule's kill
+-- estimate is taken as given there.  A re-aim never lands on a body under
+-- Vanish or Image (M.dodges: every swing misses it).  aimHard so an
+-- authored or planned kill order does not steer it back.
+function Driver:counterAimPlan(actor, plan)
+  if plan == nil or plan.kind ~= "fight" then return plan end
+  local hp = M.readWord(0x3BF4 + actor * 2)
+  if hp == 0 then return plan end
+  if plan.reason == "finish" and plan.aim ~= nil and monAlive(plan.aim) then
+    local top, _, _, unknown = self:counterWorst(plan.aim, actor, { cmd = BATTLE.CMD_FIGHT, dies = true }, hp)
+    if not unknown and top < hp then return plan end
+  end
+  local kills, best, bestTake, bestHp = {}, nil, nil, nil
+  for s = 0, 5 do
+    if monAlive(s) then
+      local top, which, _, unknown = self:counterWorst(s, actor, { cmd = BATTLE.CMD_FIGHT }, hp)
+      local dodger = M.dodges({ s1 = M.readByte(0x3EE4 + (4 + s) * 2), s2 = M.readByte(0x3EE5 + (4 + s) * 2) })
+      if top >= hp then kills[s] = which
+      elseif not unknown and dodger == nil and self:focusReachable(s) then
+        local mhp = M.readWord(BATTLE.MON_HP + s * 2)
+        if best == nil or top < bestTake or (top == bestTake and mhp < bestHp) then
+          best, bestTake, bestHp = s, top, mhp
+        end
+      end
+    end
+  end
+  if next(kills) == nil then return plan end
+  local aim = plan.aimHard or plan.aim
+  if aim ~= nil and kills[aim] == nil then return plan end
+  local ks = {}
+  for s, a in pairs(kills) do ks[#ks + 1] = string.format("slot %d ($%02X)", s, a) end
+  table.sort(ks)
+  if best == nil then
+    -- said once a battle per actor and bodies, not every turn
+    local key = string.format("aim:%d:%s", actor, table.concat(ks, ","))
+    self.counterSaid = self.counterSaid or {}
+    if not self.counterSaid[key] then
+      self.counterSaid[key] = true
+      M.log(string.format("[%s] actor=%d Fight at %d HP: %s answer%s a Fight with %d or more, and no "
+        .. "standing body's answer is safe -- as planned (#503)", self.tag or "fight", actor, hp,
+        table.concat(ks, ", "), #ks == 1 and "s" or "", hp))
+    end
+    return plan
+  end
+  M.log(string.format("[%s] actor=%d Fight re-aimed: %s answer%s a Fight with %d or more against %d HP; slot %d "
+    .. "instead, whose answer takes up to %d (#503)", self.tag or "fight", actor, table.concat(ks, ", "),
+    #ks == 1 and "s" or "", hp, hp, best, bestTake))
+  plan.aim, plan.aimHard = best, best
+  return plan
 end
 
 -- The monsters standing now, for a verb the engine aims itself.
@@ -11190,6 +11390,7 @@ function Driver:makePlan(actor)
   self._race = nil
   plan = self:lockeMug(actor, plan)
   plan = self:dodgePlan(actor, plan)
+  plan = self:counterAimPlan(actor, plan)
   plan = self:healWeaponPlan(actor, plan)
   plan = self:coverPlan(actor, plan)
   plan = self:buffPlan(actor, plan)
@@ -12281,7 +12482,7 @@ function Driver:makePlanRules(actor)
     if self.parkDropN < 3 and self.opts.tactical and id == 5 and BATTLE.BLITZ_SHAPE[blitz] ~= nil
        and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
        and not self:counterVetoed(actor, { cmd = BATTLE.CMD_BLITZ, atk = blitz },
-         standingSlots(), bname) then
+         standingSlots(), bname, BATTLE.BLITZ_SHAPE[blitz].aoe == true) then
       local bb = M.kitBoost(actor, blitz, bp)
       if bb ~= nil then
         offer({ kind = "skill", cmd = BATTLE.CMD_BLITZ, skill = blitz,
@@ -13456,6 +13657,11 @@ function Driver:makePlanRules(actor)
           local mp = M.readWord(BATTLE.CURMP + actor * 2)
           if self:castVetoed(0x8B + lid, "lore") then
             -- refused and logged; the next lore, then the lines below
+          elseif self:counterVetoed(actor, { cmd = BATTLE.CMD_LORE, atk = 0x8B + lid,
+              elem = M.readRomByte((M.sym("MagicProp") & 0x3FFFFF) + (0x8B + lid) * 14 + 1) },
+              standingSlots(), string.format("lore $%02X", lid),
+              (M.readRomByte((M.sym("MagicProp") & 0x3FFFFF) + (0x8B + lid) * 14) & 0x08) ~= 0) then
+            -- the counters it draws (#503): refused and logged, as above
           elseif cell ~= nil and mp - cost >= self:nukeFloor(actor) then
             M.log(string.format(
               "[%s] actor=%d nuke lore $%02X, row %d, %d MP of %d",
@@ -13660,7 +13866,8 @@ function Driver:makePlanRules(actor)
   if self.opts.tactical and id == 5
      and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
      and not self:counterVetoed(actor, { cmd = BATTLE.CMD_BLITZ, atk = self.opts.blitz or BATTLE.PUMMEL },
-       standingSlots(), string.format("Blitz $%02X", self.opts.blitz or BATTLE.PUMMEL)) then
+       standingSlots(), string.format("Blitz $%02X", self.opts.blitz or BATTLE.PUMMEL),
+       (BATTLE.BLITZ_SHAPE[self.opts.blitz or BATTLE.PUMMEL] or {}).aoe == true) then
     -- Same rule as the Tools line: the blitz's own row price, escalated
     -- (#219).  Suplex at boost 3 is 81 MP against SABIN's 80-MP pool at
     -- the level he joins, so this line steps down far more often than

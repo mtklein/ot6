@@ -245,3 +245,63 @@ window came no sooner either way, so the gates sweep with the rule
 The Revivify still lands about 2,000 frames after it is planned (the
 queue behind the monsters' actions), and the Zombie guards of section 8.2
 stay the way to keep SABIN from turning.
+
+## 10. The Necromancers' counters (v0.38, #503)
+
+A wipe on `$152` at shift 0 (key be80, base at ef1058ae:
+`build/attempts/wt/v038-phoenix-152/lab/logs/base_k0_s0.run.log.gz`) came
+from the bodies' counters, not their turns. The Necromancer answers any
+hit but a Fight with Demi or Quartr, aimed at whoever hit it
+(`if_cmd FIGHT / end_if / if_hit / attack DEMI, QUARTR, NOTHING`). The
+Phase answers every hit with Blow Fish, a flat 1000 (`if_hit / attack
+BLOW_FISH`; attacker effect $1A). SABIN's Pummel on a Necromancer cost
+him three quarters of his HP (2227 -> 557) and STRAGO's Aqua Rake did
+the same to him (3219 -> 805). Each then hit the Phase and died to Blow
+Fish ("from 557/2227 by slot 0 cmd $0C atk $90", "from 615/3219"). The
+last Necromancer's X-Zone took the two left. The counter rule (#372)
+priced neither attack (its magic model makes Blow Fish a few points and Quartr a
+small spell) and refused only an answer that takes the whole bar. It
+also never checked a nuke lore.
+
+The driver now prices those answers (Blow Fish 1000, Demi and Quartr
+power/16 of the HP standing). It refuses a Blitz or a nuke lore whose
+answer can take half the actor's HP when a Fight on the same body draws
+less than half. An all-body verb draws every body's answer in turn. A
+Fight aimed at a body whose answer kills the actor is re-aimed at the
+safest standing body, unless it is the killing blow.
+
+Measured from the tracked `wor-thamasa-v1` (c5746dcc's re-cut of the
+play at 36a4846a; no generator, ROM, emulator pin or replay line has
+changed since), K = 0 and 4 at shifts 0-11 and K = 1, 2, 3 and 5 at
+shifts 0 and 7, 32 runs an arm, both arms booting that one capture.
+The base is the driver at ef1058ae (`base_*`); the fix is aefff9dc
+(`fix2_*`), re-run at b93ccbf0 after review (`fix3_*`: engine-order
+counter chains, heals, Demi at 1 HP, the killing blow read from the
+script, no re-aim onto a dodger), whose 247 fights are the same as
+fix2's (`lab/verdicts.txt`, `lab/verdicts_fix3.txt`,
+`lab/fight_report.txt`, `lab/fight_report_fix3.txt`, `lab/fights.tsv`,
+`lab/deaths_152.txt`):
+
+| formation | keys base / fix | won base / fix | deaths a fight base / fix |
+|---|---|---|---|
+| $152 Necromancr+Parasoul+Phase | 17 / 16 | 16 / 16 | 1.35 / 0.69 |
+| $150 Phase x2 | 26 / 26 | 26 / 26 | 0.15 / 0.08 |
+| $151 Trixter x3 | 40 / 44 | 40 / 44 | 0.00 / 0.02 |
+| $153 Necromancr+Trixter | 32 / 39 | 32 / 39 | 0.16 / 0.21 |
+| $155 Sea Flower+Uroburos | 20 / 21 | 20 / 21 | 0.30 / 0.33 |
+| $156 Chaos Drgn+Sea Flower+Uroburos | 15 / 16 | 15 / 16 | 0.00 / 0.00 |
+| $157 Aquila+Chaos Drgn | 13 / 15 | 13 / 15 | 0.08 / 0.07 |
+| $1CF Doom Gaze | 23 / 23 | 22 / 22 | 0.52 / 0.52 |
+
+On the ten `$152` keys both arms met, the base won 9 with 17 deaths
+and the fix won 10 with 7. The fix's median win (10 wins) took 5,976.5
+ticks against the base's 8,916 (9 wins). Every run's `$152` deaths by attack: the base had Blow Fish 7,
+X-Zone 2, Doom 2 and ZombiStick 15. The fix had no Blow Fish, X-Zone
+or Doom deaths and 8 ZombiStick. Its remaining deaths are ZombiStick's
+Zombie on SABIN (section 8.2) and a SABIN raised at 1/8 HP falling to
+the next hit. On $153 the fix's deaths are ZombiStick (6) and a Trixter's
+Fire 2 on SABIN from 261-420 HP (3); the base's are ZombiStick (6) and
+an X-Zone. On $155 both arms' deaths are Battle on MOG and RELM, plus
+one Bio on UMARO in the fix. The one wipe in each arm is Doom Gaze on the flight at K = 4,
+shift 5 (key be10-g01CF, Doom on three members), the same in both
+arms.
