@@ -1335,7 +1335,9 @@ The hunts were done after 3-8 battles in the caves, 3-15 in each of the tomb's t
 rooms and 3-16 in B1. The tomb's falls are its Zombie touches (attack $EF:
 287 of B1's 293 falls, 93 of the save point's 95), each cured with a
 Revivify as the line's walk does; B1's hunts ended with 9 to 27 Revivifies, from the
-boot's 25 and what the fights dropped.
+boot's 10 and what the fights dropped (the lowest mid-hunt, 6, in tb1s_k1_s7).
+Nothing tops the Revivifies up before the tomb: a soft dependency, and
+Revivify is the only field cure for Zombie (Remedy's mask leaves it).
 
 #### The asserts and their negatives
 

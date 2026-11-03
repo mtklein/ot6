@@ -615,7 +615,9 @@ end
 
 -- Step: walk to (tx, ty), or onto a door until the map reads spec.arriveMap,
 -- re-planning M.wallFirstStep each aligned frame with spec.walls (a list of
--- { x, y }: the map's doors) as walls; a body on the next tile holds the
+-- { x, y }: the map's doors) as walls; each move is pressed only when
+-- M.canStep allows it at the live z with bodies counted (dadaluma's
+-- followPath pressed outright), so a body on the next tile releases the
 -- press until it moves.  spec: what, walls, arriveMap, done, maxFrames,
 -- fight, afterBattle.
 function M.followPath(tx, ty, spec)
