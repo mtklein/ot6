@@ -8704,54 +8704,6 @@ function Driver:rageLine(actor, have)
   return { kind = "rage", row = row, entry = best, rage = r, boostLeft = b, reason = "rage" }
 end
 
--- SABIN's Blitz by the fight (#388), where no leg names one (opts.blitz is
--- the leg's own and stands): against two or more standing bodies, the
--- learned Blitz that lands on every body (Air Blade) and whose element no
--- standing body absorbs or nulls, unless a Pummel chips a standing body's
--- shields; otherwise Pummel, as before.  What he
--- knows is $1D28 (bit n = Blitz $5D+n).  Read with full power: the bodies'
--- battle weak, absorb and null bytes.  The price is the line's own
--- (M.kitBoost, at the caller).  opts.blitzPick = false is the driver before
--- it (the control arm).
-BATTLE.BLITZ_AOE = { 0x62 }   -- Air Blade (Fire Dance, from L15 in the World of Balance, is not measured)
-function Driver:blitzPick(actor)
-  if self.opts.blitz then return self.opts.blitz end
-  if self.opts.blitzPick == false then return BATTLE.PUMMEL end
-  local stand = standingSlots()
-  if #stand < 2 then return BATTLE.PUMMEL end
-  -- a Pummel that chips a standing body's shields keeps the turn: the
-  -- all-body Blitzes chip by element alone, and an unbroken body keeps
-  -- acting (the lab behind this rule: build/attempts/wt/v038-wor-abilities/)
-  for _, sl in ipairs(stand) do
-    if M.readByte(BATTLE.SH_CUR + sl * 2) > 0 and M.readByte(BATTLE.BRK_TICKS + sl * 2) == 0
-       and M.blitzChips(sl, BATTLE.PUMMEL) > 0 then
-      return BATTLE.PUMMEL
-    end
-  end
-  local known = M.readByte(0x1D28)
-  local best, bestWeak = nil, -1
-  for _, b in ipairs(BATTLE.BLITZ_AOE) do
-    local elem = M.spellElement(b)
-    if ((known >> (b - BATTLE.PUMMEL)) & 1) == 1 and elem ~= 0 then
-      local weak, out = 0, false
-      for _, sl in ipairs(stand) do
-        local x = 8 + sl * 2
-        if (M.readByte(0x3BCC + x) & elem) ~= 0 or (M.readByte(0x3BCD + x) & elem) ~= 0 then out = true; break end
-        if (M.readByte(0x3BE0 + x) & elem) ~= 0 then weak = weak + 1 end
-      end
-      if not out and weak > bestWeak then best, bestWeak = b, weak end
-    end
-  end
-  if best == nil then return BATTLE.PUMMEL end
-  local key = string.format("blitzpick:%d:%02X:%d", actor, best, #stand)
-  if not self.statusSaid[key] then
-    self.statusSaid[key] = true
-    M.log(string.format("[%s] actor=%d SABIN Blitz $%02X: %d bodies stand, %d weak to it, none absorbs or nulls it (#388)",
-      self.tag or "fight", actor, best, #stand, bestWeak))
-  end
-  return best
-end
-
 -- GOGO's Mimic (#270; kits.md "Gogo"): the party's last action again, free
 -- (mp-economy.md: a mimic copies the action, not its price) and bought up by
 -- GOGO's own boost the way the copied action's boost is (Ot6MimicFold).  The
@@ -12324,7 +12276,7 @@ function Driver:makePlanRules(actor)
     -- the configured Blitz, whichever it is (#425 review: with Air Blade
     -- set, only a Pummel was ever offered here, so the spend rule took a
     -- 3-BP Fight on one body over a 3-BP Air Blade on four)
-    local blitz = id == 5 and self:blitzPick(actor) or BATTLE.PUMMEL
+    local blitz = self.opts.blitz or BATTLE.PUMMEL
     local bname = blitz == BATTLE.PUMMEL and "Pummel" or string.format("Blitz $%02X", blitz)
     if self.parkDropN < 3 and self.opts.tactical and id == 5 and BATTLE.BLITZ_SHAPE[blitz] ~= nil
        and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
@@ -13705,23 +13657,22 @@ function Driver:makePlanRules(actor)
     return { kind = "skill", cmd = BATTLE.CMD_TOOLS, skill = tool,
              row = cmdRow(actor, BATTLE.CMD_TOOLS), boostLeft = toolBp }
   end
-  local blitz = (self.opts.tactical and id == 5) and self:blitzPick(actor) or BATTLE.PUMMEL
   if self.opts.tactical and id == 5
      and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
-     and not self:counterVetoed(actor, { cmd = BATTLE.CMD_BLITZ, atk = blitz },
-       standingSlots(), string.format("Blitz $%02X", blitz)) then
+     and not self:counterVetoed(actor, { cmd = BATTLE.CMD_BLITZ, atk = self.opts.blitz or BATTLE.PUMMEL },
+       standingSlots(), string.format("Blitz $%02X", self.opts.blitz or BATTLE.PUMMEL)) then
     -- Same rule as the Tools line: the blitz's own row price, escalated
     -- (#219).  Suplex at boost 3 is 81 MP against SABIN's 80-MP pool at
     -- the level he joins, so this line steps down far more often than
     -- it drops; when even the base is out of reach SABIN Fights.
-    local bp, mp, why = M.kitBoost(actor, blitz, boost)
+    local bp, mp, why = M.kitBoost(actor, self.opts.blitz or BATTLE.PUMMEL, boost)
     if bp ~= nil then
       if bp ~= boost then
         M.log(string.format("[%s] actor=%d Blitz $%02X, %d MP of %d -- %s",
-          self.tag or "fight", actor, blitz, mp,
+          self.tag or "fight", actor, self.opts.blitz or BATTLE.PUMMEL, mp,
           M.readWord(BATTLE.CURMP + actor * 2), why))
       end
-      return { kind = "skill", cmd = BATTLE.CMD_BLITZ, skill = blitz,
+      return { kind = "skill", cmd = BATTLE.CMD_BLITZ, skill = self.opts.blitz or BATTLE.PUMMEL,
                row = cmdRow(actor, BATTLE.CMD_BLITZ), boostLeft = bp }
     end
   end
