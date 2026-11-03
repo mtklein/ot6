@@ -986,8 +986,9 @@ leg's run rule counts the chests still to open in the walk ahead.
 - **The fight driver** met a Fight whose target window would not cross in a
   pincer (`wor_colosseum`, `chain/chain10.log.gz`: "FIGHT DRIVER STUCK:
   crossing to the monsters in a pincer"); it now drops such a plan and
-  backs out, as its parked-window watchdog does. The cause was found in
-  #498 (section 11.9): the frogs off the field.
+  backs out, as its parked-window watchdog does. Its cause is inferred,
+  not reproduced, in #498 (section 11.9): the Reach Frogs off the field,
+  met in the same forest with the same window signature.
 - **The Heal Rod at Hidon** (v0.38, #485's later chests): the absorb
   guard's re-arm before Hidon took the Heal Rod for STRAGO by battle power,
   and his and GOGO's Fights healed Hidon until the leg lost all three
@@ -1066,15 +1067,20 @@ holy-weapon swap), `audit/`, `scripts/`. The line was played from
 power-on at 92e50821 on px13 (main's ROM before #487's rows; "rc=0"), and
 every lab below boots its captures. Rebased onto main's #487 rows, the
 line played again from power-on at f804f69b with the branch ("rc=0",
-`chain/chain3.log.gz`): no cross drop, the none-targetable wait met in
-`wor_relm`, `wor_colosseum`, `wor_gau` and `wor_phoenix` and each fight won,
+`chain/chain3.log.gz`): no cross drop, the none-targetable wait met 24
+times in `wor_relm`, 7 in `wor_colosseum`, once each in `wor_gau` and
+`wor_phoenix` (its `[ot6]` lines), and each fight won,
 and `wor_figaro_desert` "done after 3 battles" (`chain/states3/`).
 
 #### The cross drop: the Reach Frogs leave the field
 
 The drop of section 11.5 (`wor_colosseum`, `chain10`/`chain11`: a pincer,
 "left and right did nothing twice each ... window 01:00:00:01") had no
-cause. The driver now says, with any crossing press that does nothing, the
+diagnosed cause. That drop itself was not reproduced (the line's draws
+have moved since); the cause below was reproduced in the same forest (group
+50, the Reach Frog x4) with the same window signature (01:00:00:01, the
+cursor parked on the party with live monsters) and is inferred to be the
+same. The driver now says, with any crossing press that does nothing, the
 masks the game's own crossing reads (btlgfx `_c174bf`, `_c17439`,
 `get_gr0`/`get_gr2`): `$92`, which `cur_poi_set` rebuilds every frame as
 `$201E & $61AB & $2F46 | $6195`, the sides `$7B79`/`$7B7B`, and the
@@ -1095,16 +1101,40 @@ field land nothing ("actor=1's fight took 0 off the monsters ... 0
 hit(s)"). The cursor cannot reach a monster that is not in `$92`, on
 either side, so a plan aimed at one cannot be entered.
 
-The fix is at the plan: a Fight with no standing monster in `$92`
-(`M.cursorTargetable`) hands the window on and is re-read every 30
-frames, as a person waits for the field to fill; a cross toward the
-monsters with none there backs out without spending a press. With it the
-same four runs met no drop and no dead press (`fix_s*`: 48 fights of 324
-in 35 distinct keys, all won; the wait fired 69-92 times a run); with it
-switched off (`NONE_TARGETABLE_WAIT = false`) shift 13 dropped again at
-the same frame (`neg_s13`), and the lab's assertion "no cross drop in the
-frogs' fights" is red there (`nega_s13`) and green with the fix
-(`fixa_s13`). The guard stays and is tightened: one drop in a battle is
+The fix is at the plan: a plan aimed at the monsters (any verb but the
+party's care and the ally lines: `M.planAimsAtMonsters`) with no standing
+monster in `$92` (`M.fieldEmptyForCursor`) goes through `dropPlan`, the
+window is handed on, and the next plan is re-read in 30 frames, as a person
+waits for the field to fill; a cross toward the monsters with none there
+backs out without spending a press, and is counted. The wait has its own
+bound, `M.EMPTY_FIELD_CAP` (3,600 frames of an empty field in a row in one
+battle), past which the driver fails fast with the reads.
+
+At a1d7d6d9, from the same capture (`pincer/out/fixb_*`, `negb_s13`,
+`capb_s13`; the frog lab with the assertion "no cross drop in the frogs'
+fights"): the four shifts PASS (frames 91242, 90419, 85875, 94907) with no
+drop and no dead press; the wait fired 88, 75, 69 and 92 times, all on
+Fights, and the longest empty stretch it waited through was 870-990
+frames. With the wait switched off (`NONE_TARGETABLE_WAIT = false`) shift
+13 is red: "assertEq failed: no cross drop in the frogs' fights: got 1".
+With the cap at 100 frames shift 13 is red at the first empty field:
+"FIGHT DRIVER STUCK: the field has been empty for the cursor for 180 frames
+(since f4026; 3 waits, 0 cross back-outs this battle): $92=00 $201E=20
+$61AB=1C ... live=20".
+
+A plan that is not a Fight waits the same way: the line's `wor_relm` grind
+(TERRA, CELES, RELM, STRAGO; `pincer/out/relm*`, the leg Continued from the
+graph's `wor-owzer-v1` capture and cut after its grind) met a monster off
+the field while STRAGO planned Lore ("a lore aimed at the monsters with none
+of the standing monsters on the screen ... $92=01 $201E=05 $61AB=03 ...
+live=04"): at shifts 0 and 7 PASS, no cross drop, the waits "fight=40
+lore=11" and "fight=43 lore=16"; with the cap at 100 frames, red: "the field
+has been empty for the cursor for 180 frames (since f58188; 3 waits, 0
+cross back-outs this battle)". With the wait off that grind still passed
+with no drop (`relmneg_s0`): no plan there reached a dead cross, so only
+the frogs' negative shows the drop.
+
+The guard stays and is tightened: one drop in a battle is
 allowed, the second fails fast. A pincer's single dead side is ordinary
 and not a drop: the left side all dead, the right still standing, the
 driver tries left, then right (`wor_dream` on the line: "left pressed twice
