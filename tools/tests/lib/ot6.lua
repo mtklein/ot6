@@ -7296,6 +7296,37 @@ function Driver:noLineItemPick(reserve)
   return nil
 end
 
+-- The no-line turn (makePlanRules' fallback above, and healWeaponPlan's): a Tonic or Potion
+-- (noLineItemPick) on the least-full member, or nil when there is no Item row, no member to
+-- take it, or nothing in the bag.  `why` heads its log line.
+function Driver:noLineItem(actor, why)
+  local irow = cmdRow(actor, BATTLE.CMD_ITEM)
+  local least, leastFrac = nil, 2
+  for e = 0, 3 do
+    local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+    if hp > 0 and mx > 0 and hp / mx < leastFrac then least, leastFrac = e, hp / mx end
+  end
+  if irow == nil or least == nil then return nil end
+  -- a driver given no floor of its own (a walk's fights) keeps the field care's (M.CARE_RESERVE)
+  local reserve = self.opts.reserve or M.CARE_RESERVE or {}
+  local pick = self:noLineItemPick(reserve)
+  if pick == nil then return nil end
+  -- why there is no line: the Magic row greyed (flags bit 7) or absent, or present and
+  -- empty-handed; Mute is status byte 2 bit 3
+  local magicRow = "absent"
+  for row = 0, 3 do
+    if M.readByte(BATTLE.CMDTBL + actor * 12 + row * 3) == BATTLE.CMD_MAGIC then
+      magicRow = cmdDisabled(actor, row) and "greyed" or "open"
+    end
+  end
+  M.log(string.format("[%s] actor=%d: %s; item $%02X on entity %d "
+    .. "rather than a pass (%s: %d in the bag, Tonic floor %d, Potion floor %d; Magic row %s, status $%02X $%02X%s, MP %d)",
+    self.tag or "fight", actor, why, pick.it, least, pick.floor, pick.have, reserve[0xE8] or 0, reserve[0xE9] or 0,
+    magicRow, M.readByte(0x3EE4 + actor * 2), M.readByte(0x3EE5 + actor * 2),
+    (M.readByte(0x3EE5 + actor * 2) & 0x08) ~= 0 and " MUTE" or "", M.readWord(BATTLE.CURMP + actor * 2)))
+  return { kind = "item", item = pick.it, target = least, row = irow, idx = pick.idx, reason = "no_line_item" }
+end
+
 -- What one use of an item gives back.  The prior is M.itemPower, the
 -- +$14 power byte; it is a prior and not the answer, because power is an
 -- input to the engine's heal routine rather than its output.  The first
@@ -11213,9 +11244,11 @@ end
 -- (mimicreplace copies the command and attack, and the copy swings the mimic's own hands), heals the monster
 -- (#485: STRAGO re-armed with the Tzen house's Heal Rod, and Hidon went 22424 -> 24440 under his Fights and GOGO's
 -- Mimics).  The equip lines leave such a weapon out of the bag's picks (M.bagWeapons, Optimum's own skip); this is
--- the turn's guard for one worn some other way (#499): the actor's magic line when it has one, else the window is
--- handed on (a switch), as a person who sees the rod heal stops swinging it.  A Fight on an ally (the Muddle rule's)
--- is left alone.  M.HEAL_WEAPON_GUARD = false turns it off, the control arm.
+-- the turn's guard for one worn some other way (#499), as a person who sees the rod heal stops swinging it: the
+-- actor's magic line when it has one, else the no-line turn (a Tonic or Potion on the least-full member,
+-- Driver:noLineItem), and only with neither is the window handed on (a switch), so a lone rod holder still takes
+-- turns.  A Fight on an ally (the Muddle rule's) is left alone.  M.HEAL_WEAPON_GUARD = false turns it off, the
+-- control arm.
 function Driver:healWeaponPlan(actor, plan)
   if plan == nil or plan.ally or M.HEAL_WEAPON_GUARD == false or M.weaponHeals == nil then return plan end
   if not (plan.kind == "fight" or (plan.kind == "mimic" and plan.copy ~= nil and plan.copy.cmd == BATTLE.CMD_FIGHT)) then
@@ -11235,7 +11268,8 @@ function Driver:healWeaponPlan(actor, plan)
     local line = self:magicOnlyLine(actor, plan.boostLeft or 0)
     if line then return line end
   end
-  return { kind = "switch", reason = "heal_weapon" }
+  return self:noLineItem(actor, "the hand's weapon heals and there is no magic line")
+    or { kind = "switch", reason = "heal_weapon" }
 end
 
 -- Love Token (#466): Barb-e's spell (ai_script.asm, AIScript::_190: `attack
@@ -13709,34 +13743,7 @@ function Driver:makePlanRules(actor)
   -- else M.CARE_RESERVE): the item comes from above it, and only when neither
   -- a Tonic nor a Potion is left above it does the turn dip below (#443).
   if fight == nil then
-    local irow = cmdRow(actor, BATTLE.CMD_ITEM)
-    local least, leastFrac = nil, 2
-    for e = 0, 3 do
-      local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
-      if hp > 0 and mx > 0 and hp / mx < leastFrac then least, leastFrac = e, hp / mx end
-    end
-    if irow ~= nil and least ~= nil then
-      -- a driver given no floor of its own (a walk's fights) keeps the field care's (M.CARE_RESERVE)
-      local reserve = self.opts.reserve or M.CARE_RESERVE or {}
-      local pick = self:noLineItemPick(reserve)
-      if pick ~= nil then
-        -- why there is no line: the Magic row greyed (flags bit 7) or absent, or present and
-        -- empty-handed; Mute is status byte 2 bit 3
-        local magicRow = "absent"
-        for row = 0, 3 do
-          if M.readByte(BATTLE.CMDTBL + actor * 12 + row * 3) == BATTLE.CMD_MAGIC then
-            magicRow = cmdDisabled(actor, row) and "greyed" or "open"
-          end
-        end
-        M.log(string.format("[%s] actor=%d: nothing to cast and no Fight row; item $%02X on entity %d "
-          .. "rather than a pass (%s: %d in the bag, Tonic floor %d, Potion floor %d; Magic row %s, status $%02X $%02X%s, MP %d)",
-          self.tag or "fight", actor, pick.it, least, pick.floor, pick.have, reserve[0xE8] or 0, reserve[0xE9] or 0,
-          magicRow, M.readByte(0x3EE4 + actor * 2), M.readByte(0x3EE5 + actor * 2),
-          (M.readByte(0x3EE5 + actor * 2) & 0x08) ~= 0 and " MUTE" or "", M.readWord(BATTLE.CURMP + actor * 2)))
-        return { kind = "item", item = pick.it, target = least, row = irow, idx = pick.idx, reason = "no_line_item" }
-      end
-    end
-    return { kind = "switch" }
+    return self:noLineItem(actor, "nothing to cast and no Fight row") or { kind = "switch" }
   end
   -- The plain boost-Fight through the randoms (#161): with no authored or
   -- multi-part kill order it aims at the slot this hand breaks best, so a

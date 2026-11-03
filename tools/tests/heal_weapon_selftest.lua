@@ -33,16 +33,31 @@ local function plan(kind, extra)
   for k, v in pairs(extra or {}) do p[k] = v end
   return p
 end
+-- the turn the guard falls back to: env.magic (a Magic row whose line casts), env.item (an Item row and a Tonic
+-- above the floor, a member to take it), else neither
+local CMDTBL = 0x202E
+local function rows(magic, item)
+  for r = 0, 3 do ram[CMDTBL + r * 3] = 0x00 end   -- Fight in every row
+  if magic then ram[CMDTBL + 1 * 3] = 0x02 end
+  if item then ram[CMDTBL + 2 * 3] = 0x01 end
+end
+-- entity 1 at 300/1000 HP, the least full (the no-line item's target)
+ram[0x3BF4 + 2], ram[0x3BF4 + 3], ram[0x3C1C + 2], ram[0x3C1C + 3] = 300 & 0xFF, 300 >> 8, 1000 & 0xFF, 1000 >> 8
+local ENV = {}
 local function run(guard, r, l, p)
   H.HEAL_WEAPON_GUARD = guard
   hands(r, l)
+  rows(ENV.magic, ENV.item)
   local d = H.newFightDriver("heal weapon", {}).driver
+  d.magicOnlyLine = function() return ENV.magic and { kind = "magic", spell = 0x00, reason = "magic_only" } or nil end
+  d.noLineItemPick = function() return ENV.item and { it = 0xE8, idx = 0, floor = "within the care floor", have = 9 } or nil end
   local out = d:healWeaponPlan(0, p)
   H.HEAL_WEAPON_GUARD = nil
   return out
 end
 local n, said = 0, {}
-local function case(what, r, l, p, want, guarded)
+local function case(what, r, l, p, want, guarded, env)
+  ENV = env or {}
   n = n + 1
   local out = run(nil, r, l, p)
   assert(out ~= nil and out.kind == want, string.format("FAIL %s: got %s, want %s", what, out and out.kind or "nil",
@@ -60,6 +75,12 @@ case("GOGO's Mimic of a Fight with the Heal Rod in hand: handed on", ROD, SHIELD
   plan("mimic", { copy = { cmd = 0x00, atk = 0xEE, mons = 1 } }), "switch", true)
 case("a Mimic of a spell with the Heal Rod in hand: kept (the copy is a cast)", ROD, SHIELD,
   plan("mimic", { copy = { cmd = 0x02, atk = 0x01, mons = 1 } }), "mimic", false)
+case("a Fight with the Heal Rod and a magic line: the cast", ROD, SHIELD, plan("fight"), "magic", true,
+  { magic = true, item = true })
+case("a Fight with the Heal Rod, no magic line, a Tonic in the bag: the no-line item", ROD, SHIELD, plan("fight"),
+  "item", true, { item = true })
+case("GOGO's Mimic of a Fight with the Heal Rod, no magic line, a Tonic: the no-line item", ROD, SHIELD,
+  plan("mimic", { copy = { cmd = 0x00, atk = 0xEE, mons = 1 } }), "item", true, { item = true })
 case("a Fight with a blade: kept", BLADE, SHIELD, plan("fight"), "fight", false)
 case("a Fight with an empty hand: kept", 0xFF, 0xFF, plan("fight"), "fight", false)
 case("a Fight on an ally (the Muddle rule's) with the Heal Rod: kept", ROD, SHIELD, plan("fight", { ally = true }),
