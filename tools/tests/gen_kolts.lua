@@ -1163,13 +1163,13 @@ H.run({ maxFrames = 700000 }, {
     return string.format("south_figaro generated at frame %d", H.frame)
   end),
 
-  H.openChest{ stand = {5, 31}, face = "right", bit = 24, what = "Tonic",
-               item = 0xE8, nav = { playBattles = "tactical", avoid = M75_AVOID } },
-  H.openChest{ stand = {13, 28}, face = "right", bit = 25,
-               what = "Green Cherry",
-               nav = { playBattles = "tactical", avoid = M75_AVOID } },
-  H.openChest{ stand = {11, 24}, face = "up", bit = 231, what = "Warp Stone",
-               nav = { playBattles = "tactical", avoid = M75_AVOID } },
+  -- The town's chests but the chest yard's Fenix Down stay closed: their
+  -- treasure bits (21-25 and 231, and 230's Soft) are the World of Ruin
+  -- copy's too (map 74: an X-Potion, two Tents, a Remedy, a Revivify, a
+  -- Fenix Down and an Elixir), and opening the Tonics, Antidote, Eyedrop,
+  -- Green Cherry and Warp Stone here would spend those (#350;
+  -- tools/chests_opened.txt "keep closed in the WoB").  The yard's Fenix
+  -- Down (bit 20) is a Fenix Down in both worlds.
 
   enterDoor(15, 20, 81, "chest yard house"),
   H.navTo(16, 15, { maxFrames = 20000, playBattles = "tactical",
@@ -1198,18 +1198,10 @@ H.run({ maxFrames = 700000 }, {
     H.assertEq(map(), 75, "back on the street with the Fenix Down")
   end),
 
-  H.openChest{ stand = {32, 17}, face = "up", bit = 21, what = "Tonic",
-               item = 0xE8, nav = { playBattles = "tactical", avoid = M75_AVOID } },
-
   shopTrip(),
 
   grindTrip(),
   gearTrip(),
-
-  H.openChest{ stand = {15, 46}, face = "up", bit = 22, what = "Antidote",
-               item = 0xF2, nav = { playBattles = "tactical", avoid = M75_AVOID } },
-  H.openChest{ stand = {15, 46}, face = "down", bit = 23, what = "Eyedrop",
-               nav = { playBattles = "tactical", avoid = M75_AVOID } },
 
   relicTrip(),
 

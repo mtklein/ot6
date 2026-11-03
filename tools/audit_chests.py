@@ -10,7 +10,11 @@ own map id and every map a `tools/tests/gen_*.lua` assertion names; this is
 a LOWER BOUND, since a map only crossed (no fixture, no assertion) is
 invisible to it.  `tools/chests_opened.txt` records the chests the route
 does open, one line per treasure bit, and the audit fails unless the
-measured set matches it exactly.
+measured set matches it exactly.  Its `[keep closed in the WoB]` section
+lists the treasure bits whose World of Ruin copy holds the better prize
+(the World of Ruin shares the array, so opening the World of Balance copy
+spends the bit, #350): the audit also fails when any state still in the
+World of Balance (event switch $0A4 clear) has one of them set.
 
 Usage:  python3 tools/audit_chests.py [--dir build/states] [--selftest] [-v]
 Exit 0 clean, 1 if the opened set disagrees with the record or a control
@@ -47,6 +51,8 @@ TREASURE_BITS = 0x1E40       # field-ram.txt:1035, 64 bytes = 512 bits
 EVENT_BITS = 0x1E80          # field-ram.txt:1037, $1E80..$1F5F
 MAP_ID = 0x1F64              # live map index; H.mapId() reads the same word
 MAP_PROP_SIZE = 33           # LoadMapProp copies 33 (field/map.asm:143-156)
+WOR_SWITCH = 0x0A4           # set when the world splits (event_main.asm:12423)
+KEEP_CLOSED = "[keep closed in the WoB]"
 
 
 def off(addr: int) -> int:
@@ -143,7 +149,8 @@ def map_titles(repo: str) -> dict[int, str]:
 # ----------------------------------------------------------- what is opened --
 
 def read_state(raw: bytes | None):
-    """(opened bit set, event bits set, map id) out of one blob, or None.
+    """(opened bit set, event bits set, map id, in the World of Ruin) out of
+    one blob, or None.
 
     `raw` is a decompressed WRAM dump or a raw SRAM slot; both carry the
     $1600 block, so both are read the same way once it is located.
@@ -161,7 +168,8 @@ def read_state(raw: bytes | None):
     live = sum(bin(b).count("1") for b in events)
     map_id = int.from_bytes(raw[cb + off(MAP_ID):cb + off(MAP_ID) + 2],
                             "little") & 0x1FF
-    return opened, live, map_id
+    wor = bool(events[WOR_SWITCH >> 3] >> (WOR_SWITCH & 7) & 1)
+    return opened, live, map_id, wor
 
 
 # ----------------------------------------------------------- route coverage --
@@ -195,28 +203,50 @@ def maps_from_generators(repo: str) -> dict[int, set[str]]:
 
 # --------------------------------------------------------------- the record --
 
-def load_record(repo: str) -> tuple[dict[int, str], str | None]:
-    """bit -> description, from tools/chests_opened.txt.
+def load_record(repo: str) -> tuple[dict[int, str], dict[int, str],
+                                      str | None]:
+    """(bit -> description of the opened, bit -> description of the kept
+    closed in the World of Balance), from tools/chests_opened.txt.
 
     Two tab-separated columns, treasure bit / what it is.  `#` comments and
-    blank lines ignored.  Missing file is an empty record, which is the
+    blank lines ignored.  Lines after the `[keep closed in the WoB]` header
+    are the second map.  Missing file is an empty record, which is the
     correct reading of "the route opens nothing yet".
     """
-    out = {}
+    out, keep = {}, {}
     path = os.path.join(repo, RECORD)
     try:
         lines = open(path).read().splitlines()
     except OSError:
-        return {}, None
+        return {}, {}, None
+    into = out
     for n, line in enumerate(lines, 1):
         if not line.strip() or line.lstrip().startswith("#"):
             continue
+        if line.strip() == KEEP_CLOSED:
+            into = keep
+            continue
         parts = [p.strip() for p in line.split("\t") if p.strip()]
         if len(parts) < 2 or not parts[0].isdigit():
-            return {}, (f"{RECORD}:{n} is not `bit<TAB>description`: "
-                        f"{line!r}")
-        out[int(parts[0])] = parts[1]
-    return out, None
+            return {}, {}, (f"{RECORD}:{n} is not `bit<TAB>description`: "
+                            f"{line!r}")
+        into[int(parts[0])] = parts[1]
+    return out, keep, None
+
+
+def wob_spent(sources: list[tuple[str, tuple]], keep: dict[int, str]
+              ) -> dict[int, list[str]]:
+    """bit -> the World of Balance states that have a keep-closed bit set.
+
+    `sources` is (name, read_state result) pairs; a state counts as the
+    World of Balance's while event switch $0A4 is clear."""
+    out: dict[int, list[str]] = {}
+    for name, (bits, _live, _map, wor) in sources:
+        if wor:
+            continue
+        for b in sorted(bits & set(keep)):
+            out.setdefault(b, []).append(name)
+    return out
 
 
 # ---------------------------------------------------------------- selftest --
@@ -287,7 +317,7 @@ def selftest(repo: str = ".") -> int:
     if got is None:
         bad.append("read_state could not locate $1600 in a synthetic slot")
     else:
-        opened, live, map_id = got
+        opened, live, map_id, _wor = got
         if opened != {want}:
             bad.append(f"a slot with only bit {want} set read back as "
                        f"{opened}")
@@ -299,6 +329,30 @@ def selftest(repo: str = ".") -> int:
     got = read_state(bytes(blob))
     if got is None or got[0]:
         bad.append(f"a slot with no treasure bit set read back as {got}")
+
+    # The keep-closed rule: bit 11 (the mines chase's Fenix Down, whose World
+    # of Ruin copy is the Pod Bracelet) set in a World of Balance slot is
+    # spent; the same bit with $0A4 set ($1E94 bit 4, offset $894) is the
+    # World of Ruin's own opening and is not.
+    keep = {11: "the Pod Bracelet's bit"}
+    blob[0x840 + (11 >> 3)] |= 1 << (11 & 7)
+    wob = read_state(bytes(blob))
+    blob[0x880 + (WOR_SWITCH >> 3)] |= 1 << (WOR_SWITCH & 7)
+    wor = read_state(bytes(blob))
+    if wob is None or wob[3]:
+        bad.append(f"a slot with $0A4 clear read as the World of Ruin: {wob}")
+    if wor is None or not wor[3]:
+        bad.append(f"a slot with $0A4 set (offset $894) read as the World "
+                   f"of Balance: {wor}")
+    if wob is not None and wor is not None:
+        if wob_spent([("wob", wob)], keep) != {11: ["wob"]}:
+            bad.append("bit 11 set in a World of Balance slot was not "
+                       "reported spent")
+        if wob_spent([("wor", wor)], keep) != {}:
+            bad.append("bit 11 set in a World of Ruin slot was reported "
+                       "spent")
+        if wob_spent([("wob", wob)], {12: "x"}) != {}:
+            bad.append("bit 11 was reported against a keep list without it")
 
     for b in bad:
         print(f"  FAIL {b}")
@@ -340,12 +394,14 @@ def main() -> int:
     opened: set[int] = set()
     fixture_maps: dict[int, set[str]] = {}
     unreadable, blind = [], []
+    readings = []
     for name, raw in sources:
         got = read_state(raw)
         if got is None:
             unreadable.append(name)
             continue
-        bits, live, map_id = got
+        readings.append((name, got))
+        bits, live, map_id, _wor = got
         if live == 0:
             blind.append(name)
         opened |= bits
@@ -406,9 +462,14 @@ def main() -> int:
           "chests are the known case, see this file's header)")
 
     # ---- the record -------------------------------------------------------
-    record, rerr = load_record(args.repo)
+    record, keep, rerr = load_record(args.repo)
     if rerr:
         print(f"\n{rerr}")
+        return 1
+    unknown = sorted(set(keep) - known_bits)
+    if unknown:
+        print(f"\n{RECORD}'s {KEEP_CLOSED} names bit(s) no chest uses: "
+              + ", ".join(str(b) for b in unknown))
         return 1
 
     # Group the unopened by map for the report.
@@ -453,7 +514,19 @@ def main() -> int:
         for b in extra:
             c = text[b]
             print(f"  {b}\t{c.where()} {c.what}")
-    if missing or extra:
+    spent = wob_spent(readings, keep)
+    nwob = sum(1 for _n, g in readings if not g[3])
+    if spent:
+        print(f"\n{len(spent)} chest(s) under {KEEP_CLOSED} opened in the "
+              f"World of Balance, which spends the World of Ruin's prize:")
+        for b in sorted(spent):
+            who = spent[b]
+            print(f"  bit {b}: {keep[b]} -- set in {len(who)} World of "
+                  f"Balance state(s), first {who[0]}")
+    else:
+        print(f"  keep closed in the WoB: none of {len(keep)} bit(s) set in "
+              f"the {nwob} World of Balance state(s) read")
+    if missing or extra or spent:
         return 1
 
     if not opened:

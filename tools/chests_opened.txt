@@ -30,18 +30,11 @@
 7	map 30 Elder's House treasure room, ThiefKnife (78,10) -- behind LOCKE's lock (#447)
 8	map 30 Elder's House treasure room, Earrings (79,10) -- behind LOCKE's lock (#447)
 9	map 30 Elder's House treasure room, 5000 GP (80,12) -- behind LOCKE's lock (#447)
-11	map 50 mines chase, Fenix Down (65,28)
-12	map 50 mines chase, Sleeping Bag (52,33)
 14	map 59 Figaro shop alcove, Tonic (43,12)
 15	map 59 Figaro shop alcove, Antidote (44,12)
 18	map 68 Figaro cave (World of Ruin; bits shared with maps 69 and 72), X-Potion (3,18)
 19	map 90 Figaro cave (World of Ruin), Hero Ring (52,14) -- by the cave's other door 68 (4,4)
 20	map 75 South Figaro, Fenix Down (22,18)
-21	map 75 South Figaro, Tonic (32,16)
-22	map 75 South Figaro, Antidote (15,45)
-23	map 75 South Figaro, Eyedrop (15,47)
-24	map 75 South Figaro, Tonic (6,31)
-25	map 75 South Figaro, Green Cherry (14,28)
 26	map 84 Figaro cave, 500 gil (7,52)
 27	map 84 Figaro cave, 1500 gil (21,56)
 28	map 84 Figaro cave, 1000 gil (12,55)
@@ -102,7 +95,6 @@
 160	map 300 Darill's Tomb B3, Man Eater (124,9)
 161	map 300 Darill's Tomb B3, the monster chest (Presenter + Whelk Head, event battle group 116) (120,9)
 230	map 74 South Figaro (World of Ruin; bit shared with map 75's Soft), Elixir (2,43)
-231	map 75 South Figaro, Warp Stone (11,23)
 239	map 225 Zozo clock shelf, Tincture (104,9)
 240	map 225 Zozo clock shelf, Potion (105,9)
 246	map 343 Thamasa town, Echo Screen (13,8)
@@ -198,3 +190,22 @@
 76	map 225 Zozo, Fire Knuckle (35,11) -- off the top roof (gen_wor_zozo_north, a branch)
 70	map 226 Zozo's rooftop room, RunningShoes (72,26) (gen_wor_zozo_north, a branch)
 71	map 226 Zozo's rooftop room, X-Potion (92,27) (gen_wor_zozo_north, a branch)
+
+# Kept closed in the World of Balance (#350): the treasure array is one for
+# both worlds, and where a World of Balance chest and its World of Ruin copy
+# share a bit with different prizes, opening the first spends the second.
+# These bits' World of Ruin prizes are the better ones; the audit fails when
+# any state still in the World of Balance (switch $0A4 clear) has one set.
+[keep closed in the WoB]
+11	map 50 mines chase Fenix Down; map 38 (World of Ruin) Pod Bracelet
+12	map 50 mines chase Sleeping Bag; map 38 (World of Ruin) Elixir
+13	map 52 Rune Edge; map 44 (World of Ruin) Ribbon
+19	maps 70/73 Thunder Rod / Tincture; map 90 (World of Ruin) Hero Ring
+97	maps 69/72 Tincture; map 68 (World of Ruin) Ether
+21	map 75 South Figaro Tonic; map 74 (World of Ruin) X-Potion
+22	map 75 South Figaro Antidote; map 74 (World of Ruin) Tent
+23	map 75 South Figaro Eyedrop; map 74 (World of Ruin) Remedy
+24	map 75 South Figaro Tonic; map 74 (World of Ruin) Revivify
+25	map 75 South Figaro Green Cherry; map 74 (World of Ruin) Tent
+230	map 75 South Figaro Soft; map 74 (World of Ruin) Elixir
+231	map 75 South Figaro Warp Stone; map 74 (World of Ruin) Fenix Down
