@@ -212,9 +212,67 @@ local function walk(x, y, what, opts)
                          healPercent = GRIND.healPercent, healer = CELES,
                          bank = GRIND.bank, careThreshold = GRIND.careThreshold,
                          reserve = { [POTION] = 3 },
-                         arrive = opts.arrive, fight = FIGHT }),
+                         arrive = opts.arrive, fight = FIGHT, avoid = opts.avoid }),
     H.release(),
   })
+end
+
+-- ------------------------------------------------------- the Hero Ring --
+-- The unfinished colosseum's house north of Kohlingen, world (33,9) -> map
+-- 185 (7,13), its door (7,6) -> 186 (119,37), and its chest (115,34): the
+-- Hero Ring (#350 item 4; the ribbon audit's probe_wob_hero_ring, build/
+-- attempts/ribbon-audit/).  +25% to Fight and to magic, the relic rule's
+-- rank 4, worth the walk a player exploring past Kohlingen takes: 56 steps
+-- up from the castle's landing and 67 back down to the crossing's first hop
+-- (route_data.py world-path 0, the waypoints below every 12 steps of those
+-- paths), all world battle groups 9 and 12 (Red Fang, Vulture), no Iron
+-- Fist.  The castle's triggers (30,48)/(31,48), Kohlingen's door and the
+-- chocobo stable stay off the plan.
+local HERO_RING = 0xC9
+local HERO_UP = { { 32, 38 }, { 36, 30 }, { 40, 22 }, { 40, 10 } }
+local HERO_DOWN = { { 40, 15 }, { 40, 27 }, { 40, 39 }, { 40, 51 }, { 35, 58 } }
+local HERO_AVOID = { { 30, 48 }, { 31, 48 }, { 26, 39 }, { 27, 39 }, { 30, 6 } }
+local HERO_MEMBERS = { { 1, "LOCKE" }, { 6, "CELES" }, { 4, "EDGAR" }, { 5, "SABIN" } }
+local function heroRing()
+  local steps = {}
+  for i, w in ipairs(HERO_UP) do
+    steps[#steps + 1] = walk(w[1], w[2], "the Hero Ring, up " .. i, { avoid = HERO_AVOID })
+    steps[#steps + 1] = care("the Hero Ring, up " .. i)
+  end
+  local tail = {
+    walk(33, 9, "into the colosseum house's yard (map 185)",
+      { avoid = HERO_AVOID, arrive = function() return not H.worldMode() end }),
+    H.waitUntil(landed(185, 20), 3000, "the colosseum house's yard (map 185)", 5),
+    H.crossDoor(7, 6, 186, 119, 37, "the yard (7,6) -> the house 186 (119,37)", { fight = FIGHT }),
+    H.openChest{ stand = { 115, 35 }, face = "up", bit = 0x0E5, what = "Hero Ring", item = HERO_RING },
+    H.call(function()
+      H.assertEq(H.chestOpen(0x0E5), true, "the Hero Ring's chest (186 (115,34), treasure bit $0E5) is open")
+    end),
+    H.dressRelics(HERO_MEMBERS, { tag = "relics after the Hero Ring" }),
+    H.call(function()
+      local who = "nobody (the bag)"
+      for _, m in ipairs(HERO_MEMBERS) do
+        local b = 0x1600 + 37 * m[1]
+        if H.readByte(b + 0x23) == HERO_RING or H.readByte(b + 0x24) == HERO_RING then who = m[2] end
+      end
+      H.log("[hero ring] worn by " .. who)
+      H.assertEq(who ~= "nobody (the bag)", true, "the Hero Ring is worn, not carried")
+    end),
+    H.crossDoor(119, 38, 185, 7, 7, "the house (119,38) -> the yard 185 (7,7)", { fight = FIGHT }),
+    H.navTo(7, 14, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT }),
+    H.driveUntil(function() return H.worldMode() end, 900, {
+      H.hold({ "down" }), H.waitFrames(4),
+    }, "out of the yard to the world"),
+    H.waitWorldSettled("world control after the yard", 1500),
+    H.waitFrames(30),
+    H.call(function() where("out of the colosseum house") end),
+  }
+  for _, st in ipairs(tail) do steps[#steps + 1] = st end
+  for i, w in ipairs(HERO_DOWN) do
+    steps[#steps + 1] = walk(w[1], w[2], "the Hero Ring, down " .. i, { avoid = HERO_AVOID })
+    steps[#steps + 1] = care("the Hero Ring, down " .. i)
+  end
+  return seq(steps)
 end
 
 -- ------------------------------------------------------ the crossing hops --
@@ -412,6 +470,9 @@ H.run({ maxFrames = 1200000 }, {
 
   -- 3b. the gentle laps, when the policy asks for them
   gentle(),
+
+  -- 3c. north past Kohlingen to the Hero Ring, and back to the crossing
+  heroRing(),
 
   -- 4. south-west to (34,99), fighting, with a care stop every 12 steps.
   crossing(),

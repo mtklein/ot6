@@ -93,6 +93,9 @@ local function where(tag)
 end
 
 local POTION = 0xE9
+local ATLAS_ARMLET = 0xC4
+-- the climbers, for the relic rule (H.dressRelics)
+local KOLTS_MEMBERS = { { 0, "TERRA" }, { 1, "LOCKE" }, { 4, "EDGAR" } }
 local function care(tag, threshold)
   return H.fieldCare({ tag = "care " .. tag, threshold = threshold or 0.85,
                        reserve = { [POTION] = 5 }, mpFloor = 0.75 })
@@ -149,14 +152,15 @@ end
 -- entrances, unlike Figaro's castle doors, which are walls until
 -- CheckDoor, so BFS can route straight onto them.  The map id is
 -- asserted afterwards, so a missed crossing cannot pass for one.
-local function crossTo(tx, ty, dstMap, what, mode, maxF)
+local function crossTo(tx, ty, dstMap, what, mode, maxF, avoid)
   return seq({
     H.logStep(function()
       return string.format("cross %s: (%d,%d) -> (%d,%d) -> map %d [%s]",
         what, H.fieldX(), H.fieldY(), tx, ty, dstMap, mode or "tactical")
     end),
     H.navTo(tx, ty, { maxFrames = maxF or 40000, arrive = mapChanged(),
-             playBattles = mode or "tactical", reserve = { [POTION] = 5 } }),
+             playBattles = mode or "tactical", reserve = { [POTION] = 5 },
+             avoid = avoid }),
     H.release(),
     settleField(what, dstMap, nil, mode),
     H.call(function()
@@ -1295,7 +1299,43 @@ H.run({ maxFrames = 700000 }, {
   crossTo(11, 26, 100, "K1 entrance -> shelf F", "tactical"),
   crossTo(19, 17, 96, "K2 shelf F -> cave 96 P", "tactical"),
   crossTo(22, 21, 100, "K3 cave 96 P -> shelf D", "tactical"),
-  crossTo(34, 7, 96, "K4 shelf D -> cave 96 R", "tactical"),
+  -- The Atlas Armlet (#350 item 5): shelf D's warp (56,7) to ledge E
+  -- (30,36), its chest (30,33), and the warp back (31,36) -> (57,7), the
+  -- branch gen_kolts_cave's measured way.  A few steps off the climb, and
+  -- +25% to the Fight of whoever wears it (the relic rule's rank 3), so a
+  -- player exploring the mountain takes it; it goes on at once.
+  H.navTo(56, 7, { maxFrames = 25000, playBattles = "tactical",
+    reserve = { [POTION] = 5 }, avoid = { { 34, 7 }, { 50, 33 } },
+    arrive = function() return H.fieldX() <= 32 end }),
+  H.release(),
+  settleField("ledge E", 100),
+  H.call(function()
+    H.assertEq(map(), 100, "the warp (56,7) -> ledge E: still on map 100")
+    H.assertEq(H.fieldX() == 30 and H.fieldY() == 36, true,
+      string.format("the warp (56,7) -> ledge E landed at (30,36), at (%d,%d)",
+        H.fieldX(), H.fieldY()))
+    where("ledge E")
+  end),
+  H.openChest{ stand = { 30, 34 }, face = "up", bit = 39,
+               what = "Atlas Armlet", item = ATLAS_ARMLET,
+               nav = { playBattles = "tactical", avoid = { { 31, 36 } } } },
+  H.call(function()
+    H.assertEq(H.chestOpen(39), true, "the Atlas Armlet's chest is open (treasure bit 39)")
+  end),
+  H.dressRelics(KOLTS_MEMBERS, { tag = "relics after the Atlas Armlet" }),
+  H.navTo(31, 36, { maxFrames = 15000, playBattles = "tactical",
+    reserve = { [POTION] = 5 },
+    arrive = function() return H.fieldX() >= 50 end }),
+  H.release(),
+  settleField("shelf D again", 100),
+  H.call(function()
+    H.assertEq(map() == 100 and H.fieldX() == 57 and H.fieldY() == 7, true,
+      string.format("the warp (31,36) -> shelf D landed at 100 (57,7), at %d (%d,%d)",
+        map(), H.fieldX(), H.fieldY()))
+    where("shelf D again")
+  end),
+  care("shelf D again"),
+  crossTo(34, 7, 96, "K4 shelf D -> cave 96 R", "tactical", nil, { { 56, 7 } }),
   crossTo(12, 8, 102, "K5 cave 96 R -> the bridge (LONG entrance)", "tactical"),
   crossTo(35, 50, 100, "K6 bridge -> shelf B", "tactical"),
   crossTo(58, 45, 97, "K7 shelf B -> cave 97", "tactical"),
