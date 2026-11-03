@@ -13818,11 +13818,13 @@ function Driver:cross(toward)
   for _, d in ipairs(dirs) do
     if (self.steerDead[d] or 0) < 2 then return self:steer(d, "cross") end
   end
-  -- a side the window will not cross to (wor_colosseum on the replay after #485: a pincer, the heal's window
-  -- 01:00:00:01, left and right both dead): the plan goes and the menu backs out, as a person cancels a target
-  -- they cannot reach and does something else; the third such drop in a battle is still a driver defect
+  -- a side the window will not cross to with a monster on the screen for the cursor: the plan goes and the menu
+  -- backs out once in a battle, as a person cancels a target they cannot reach; the second is a driver defect.
+  -- The cause the replay after #485 met (wor_colosseum, chain10/chain11: a pincer, the window 01:00:00:01, left and
+  -- right both dead) was the Reach Frogs off the field, which the none-targetable wait above now meets before any
+  -- press (#498); the allowance went from two drops to one with it
   self.crossDropN = (self.crossDropN or 0) + 1
-  if self.crossDropN <= 2 and self.plan ~= nil then
+  if self.crossDropN <= 1 and self.plan ~= nil then
     M.log(string.format("[%s] crossing to the %s in a %s: %s did nothing twice each in target select (state "
       .. "$%02X, window %s; %s) -- dropping the plan and backing out (drop #%d this battle)", self.tag or "fight",
       toward, L.name, table.concat(dirs, " and "), M.readByte(BATTLE.MSTATE), tgtSig(), M.crossReads(), self.crossDropN))

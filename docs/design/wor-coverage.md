@@ -983,11 +983,11 @@ leg's run rule counts the chests still to open in the walk ahead.
   bag's hardest-hitting other one (`dev2/vd_s*`: "char 8's weapon $39 is
   holy ...: $46 (power 109) from the bag", PASS at the runner's three
   shifts).
-- **The fight driver** met a heal whose target window would not cross in a
+- **The fight driver** met a Fight whose target window would not cross in a
   pincer (`wor_colosseum`, `chain/chain10.log.gz`: "FIGHT DRIVER STUCK:
   crossing to the monsters in a pincer"); it now drops such a plan and
-  backs out, as its parked-window watchdog does, and fails fast only on
-  the third in a battle.
+  backs out, as its parked-window watchdog does. The cause was found in
+  #498 (section 11.9): the frogs off the field.
 - **The Heal Rod at Hidon** (v0.38, #485's later chests): the absorb
   guard's re-arm before Hidon took the Heal Rod for STRAGO by battle power,
   and his and GOGO's Fights healed Hidon until the leg lost all three
@@ -1059,6 +1059,77 @@ checkpoints of the line before Berserk landed):
   false".
 
 ### 11.9 Follow-ups (v0.38, #498)
+
+Evidence under `build/attempts/wt/v038-sweeps-a-followups/`: `pincer/`
+(the cross drop's cause), `desert/` (the Figaro desert), `veldt/` (the
+holy-weapon swap), `audit/`, `scripts/`. The line was played from
+power-on at 92e50821 on px13 (main's ROM before #487's rows; "rc=0"), and
+every lab below boots its captures.
+
+#### The cross drop: the Reach Frogs leave the field
+
+The drop of section 11.5 (`wor_colosseum`, `chain10`/`chain11`: a pincer,
+"left and right did nothing twice each ... window 01:00:00:01") had no
+cause. The driver now says, with any crossing press that does nothing, the
+masks the game's own crossing reads (btlgfx `_c174bf`, `_c17439`,
+`get_gr0`/`get_gr2`): `$92`, which `cur_poi_set` rebuilds every frame as
+`$201E & $61AB & $2F46 | $6195`, the sides `$7B79`/`$7B7B`, and the
+command's `ONE_SIDE` bit.
+
+Reproduced from the graph's `wor_colosseum_plains` capture (sha256
+fd0dcba1), the leg's own forest lap (group 50) cut to that stage and
+walked until 12 fights of the Reach Frog x4 (324), at seed shifts 0, 7,
+13 and 21 (`scripts/lab_frog.lua`): shift 13 met it, in a normal battle,
+"crossing to the monsters in a normal: left did nothing twice each ...
+$92=00 $201E=38 $61AB=04 ... live=38". A per-frame probe on the same run
+(`lab_frogp.lua`) shows the frogs leaving the field one at a time while they
+stand: `$61AB` drops slot 4 at f23070, slot 5 at f23173 and slot 3 at
+f23712 ("GAP $92=00 live=38 $201E=38 $61AB=04 ... st=38"), and they come
+back from f24256 on; the screen at the gap shows no monster
+(`pincer/gap_target_select.png`), and the party's Fights into the empty
+field land nothing ("actor=1's fight took 0 off the monsters ... 0
+hit(s)"). The cursor cannot reach a monster that is not in `$92`, on
+either side, so a plan aimed at one cannot be entered.
+
+The fix is at the plan: a Fight with no standing monster in `$92`
+(`M.cursorTargetable`) hands the window on and is re-read every 30
+frames, as a person waits for the field to fill; a cross toward the
+monsters with none there backs out without spending a press. With it the
+same four runs met no drop and no dead press (`fix_s*`: 48 fights of 324
+in 35 distinct keys, all won; the wait fired 69-92 times a run); with it
+switched off (`NONE_TARGETABLE_WAIT = false`) shift 13 dropped again at
+the same frame (`neg_s13`), and the lab's assertion "no cross drop in the
+frogs' fights" is red there (`nega_s13`) and green with the fix
+(`fixa_s13`). The guard stays and is tightened: one drop in a battle is
+allowed, the second fails fast. A pincer's single dead side is ordinary
+and not a drop: the left side all dead, the right still standing, the
+driver tries left, then right (`wor_dream` on the line: "left pressed twice
+... sides L=2A R=15 ... live=15", then "chars=08 --right--> mons=10").
+
+#### The holy-weapon swap, both hands
+
+`gen_wor_veldt`'s swap reads both hands: on the line CELES holds a second
+weapon ($13) in her second hand ("char 6's hand 1 weapon $13 is not holy;
+kept"), and RELM's Pearl Rod goes as before ("char 8's hand 0 weapon $39
+is holy ...: $46 (power 109) from the bag"). A swapped hand is asserted to
+hold no holy weapon. From the graph's `wor-ragnarok-v1` capture: with $13
+read as holy the second hand is swapped ("char 6's hand 1 weapon $13 is
+holy ...: $16 (power 125) from the bag", PASS, `veldt/mut_h1`); with the
+swap keeping the hand's own weapon the assert is red ("char 8's hand 0
+holds no holy weapon for the Holy Dragon ($39): got true", `veldt/mut_red`).
+
+#### The Figaro desert: a branch
+
+`gen_wor_figaro_desert` (a branch from `wor-edgar-v1`, feeding nothing)
+laps (81,88) <-> (81,89) beside the castle until group 44's three are won:
+222 (Sand Horse x2), 223 (Sand Horse, Maliga x2) and 138 (Maliga x3).
+The leg at shifts 0, 7, 13, 21: PASS, 3 battles each (`desert/out/fd_s*`).
+The sweep, K 0-11 battles used up on the lap first at shifts 0 and 7
+(`lab_whunt.lua` lap g44): 24 of 24 PASS; 222 56 fights in 20 distinct
+keys, 223 108 in 29, 138 78 in 24, all won, no death
+(`desert/out/tally_wf_g44.txt`). EDGAR, SABIN and CELES at L31 win them
+easily; a player crossing the desert meets them, so the branch is the
+coverage, not the line.
 
 #### Zozo's north rooms: the port they need
 
