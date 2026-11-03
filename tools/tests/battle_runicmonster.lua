@@ -127,6 +127,18 @@ local battles, raises, ok, mode, nAbs, nPass, raisedF, fresh = 0, 0, false, nil,
 local plan = {}
 local proxy = setmetatable({}, { __index = function(_, i) return plan[i] end, __len = function() return #plan end })
 
+-- the bounce of absorb a: a counter pass, from the absorb on, of that spell
+-- at its caster alone
+local function bounceOf(a)
+  for j = nPass + 1, #passes do
+    local p = passes[j]
+    if p.counter and p.f >= a.f and p.spell == a.spell and p.b8 == 0
+        and p.b9 == (1 << ((a.caster - 8) // 2)) then
+      return p
+    end
+  end
+end
+
 local function verdict()
   for i = nAbs + 1, #absorbs do
     local a = absorbs[i]
@@ -135,14 +147,7 @@ local function verdict()
         .. "$%02X)", a.pend or 0))
       H.assertEq(a.bcaster, a.caster, "the bounce's caster is the Wizard that cast it (OT6_BLADECASTER)")
       H.assertEq(a.bspell, a.spell, "the bounce is the absorbed spell (OT6_BLADESPELL)")
-      local back = nil
-      for j = nPass + 1, #passes do
-        local p = passes[j]
-        if back == nil and p.counter and p.f >= a.f and p.spell == a.spell and p.b8 == 0
-            and p.b9 == (1 << ((a.caster - 8) // 2)) then
-          back = p
-        end
-      end
+      local back = bounceOf(a)
       H.assertEq(back ~= nil, true, string.format("a counter sent spell $%02X back at the Wizard in slot %d", a.spell,
         (a.caster - 8) // 2))
       H.assertEq(back.cmd, CMD_MAGIC, "the bounce is a Magic cast")
@@ -244,13 +249,16 @@ local steps = {
           if k == nil then return false end
           if raisedF < k.frame then raisedF = k.frame end
           -- a Wizard's spell caught and its bounce come (or 1500 frames for
-          -- it), or the stance ran out, or no Wizard is left
+          -- it), or the stance ran out, or no Wizard is left.  The bounce
+          -- is the verdict's own match, not the first counter pass after
+          -- the absorb: a Wizard's own counter can come between (shift 3:
+          -- "absorbs spell $29 from monster slot 3" at f14006, then "counter
+          -- pass: spell $FF, command $29, targets chars $01" at f14455, and
+          -- the verdict read before the bounce came;
+          -- build/attempts/wt/v038-wob-suites/sw2/)
           for i = nAbs + 1, #absorbs do
             if absorbs[i].species == WIZARD then
-              for j = nPass + 1, #passes do
-                if passes[j].counter and passes[j].f >= absorbs[i].f then return true end
-              end
-              return H.frame > absorbs[i].f + 1500
+              return bounceOf(absorbs[i]) ~= nil or H.frame > absorbs[i].f + 1500
             end
           end
           local stance = (H.readByte(RUNICBLADE) & H.readByte(0x3018 + celes * 2)) ~= 0
