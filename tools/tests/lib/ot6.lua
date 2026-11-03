@@ -8705,76 +8705,6 @@ function Driver:rageLine(actor, have)
   return { kind = "rage", row = row, entry = best, rage = r, boostLeft = b, reason = "rage" }
 end
 
--- CYAN's SwdTech window as the battle will draw it (kits.md "Cyan",
--- Ot6BushidoPick): rows[1..3] = the tech (0-7) the 1-, 2- and 3-BP rows
--- hold, a row nil where it is blank, or nil for a manual loadout ($1E1D
--- nonzero, which the line leaves to the player).  Techs 0-6 come in order,
--- so what he knows of them is a run; Cleave (7) stands apart and, known,
--- takes the 3-BP row.
-function M.swdWindow(known, loadout)
-  known = known or M.readByte(0x1CF7)
-  if (loadout or M.readWord(0x1E1D)) ~= 0 then return nil end
-  local run = 0
-  while run < 7 and ((known >> run) & 1) == 1 do run = run + 1 end
-  if run == 0 then return nil end
-  local ceil = math.min(run - 1, 6)
-  local rows = {}
-  if (known & 0x80) ~= 0 then
-    local base = math.max(0, ceil - 1)
-    rows[1] = base
-    if base + 1 <= ceil then rows[2] = base + 1 end
-    rows[3] = 7
-  else
-    local base = math.max(0, ceil - 2)
-    for b = 1, 3 do rows[b] = math.min(base + b - 1, ceil) end
-  end
-  return rows
-end
-
--- CYAN's SwdTechs by the fight (#388), where no leg names one (opts.bushido
--- is the leg's own line, ahead of this): Cleave when the bank holds its
--- three points and the body it lands on first (the record's primary, the
--- lowest standing slot, Ot6Oblivion) can die, a sure kill; Stunner, the
--- slash on every body, when two or more stand.  Each at the row the window
--- holds it in, paid in BP from the bank (the row is the boost) and in MP
--- inside the kit's random-battle reserve (M.kitBoost at no boost: SwdTech
--- rows do not escalate).  A boss (death-immune, $3AA1 bit 2) is left to
--- the Fight.  opts.swdtech = false turns it off (the control arm).
-BATTLE.SWD_STUNNER, BATTLE.SWD_CLEAVE = 5, 7
-function Driver:cyanLine(actor, have)
-  if self.opts.swdtech == false or self.opts.bushido or not self.opts.tactical then return nil end
-  if M.readByte(BATTLE.BCHID + actor * 2) ~= 2 or self.skillDead[BATTLE.CMD_SWDTECH] then return nil end
-  if self.opts.bank and have < self.opts.bank then return nil end
-  local row = cmdRow(actor, BATTLE.CMD_SWDTECH)
-  local win = row and M.swdWindow()
-  if win == nil then return nil end
-  local stand = standingSlots()
-  if #stand == 0 then return nil end
-  local function rowOf(tech)
-    for b = 1, 3 do if win[b] == tech then return b end end
-  end
-  local function plan(tech, why)
-    local b = rowOf(tech)
-    if b == nil or b > have then return nil end
-    local bp, mp = M.kitBoost(actor, 0x55 + tech, 0)
-    if bp == nil then return nil end
-    M.log(string.format("[%s] actor=%d CYAN SwdTech $%02X at %d BP (bank %d), %d MP of %d: %s (#388)",
-      self.tag or "fight", actor, 0x55 + tech, b, have, mp, M.readWord(BATTLE.CURMP + actor * 2), why))
-    return { kind = "skill", cmd = BATTLE.CMD_SWDTECH, bushido = true, tier = b, skill = 0x55 + tech,
-             row = row, boostLeft = 0, reason = "swdtech" }
-  end
-  local first = stand[1]
-  if (M.readByte(0x3AA1 + 8 + first * 2) & 0x04) == 0 then
-    local p = plan(BATTLE.SWD_CLEAVE, string.format("Cleave: slot %d, its first body, can die", first))
-    if p then return p end
-  end
-  if #stand >= 2 then
-    return plan(BATTLE.SWD_STUNNER, string.format("Stunner: %d bodies stand", #stand))
-  end
-  return nil
-end
-
-
 -- SABIN's Blitz by the fight (#388), where no leg names one (opts.blitz is
 -- the leg's own and stands): against two or more standing bodies, the
 -- learned Blitz that lands on every body (Fire Dance, Air Blade) and whose
@@ -13669,11 +13599,6 @@ function Driver:makePlanRules(actor)
   -- GOGO's Mimic, when the party's last action is worth his turn (#270; Driver:mimicLine)
   if id == 0x0C then
     local line = self:mimicLine(actor, boost)
-    if line then return line end
-  end
-  -- CYAN's SwdTechs by the fight, where the leg names none (#388; Driver:cyanLine)
-  if id == 2 then
-    local line = self:cyanLine(actor, have)
     if line then return line end
   end
   if self.opts.bushido and id == 2 and not self.skillDead[BATTLE.CMD_SWDTECH]
