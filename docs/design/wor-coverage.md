@@ -1657,7 +1657,52 @@ within 85% of the best. What the labs found:
   body both apply (they are exclusive), and capped at 9,999 before the
   split rather than after.
 
-### 13.5 Left
+### 13.5 Tried and dropped: CYAN's SwdTechs and SABIN's Air Blade by the fight
+
+Two driver lines chose a learned ability by the fight where no leg names
+one, and neither was kept: neither was at least as good as the current
+play. The labs boot the tracked saves (byte-identical to the graph's
+captures at `36a4846a`, the re-cut `c5746dcc`), seed shifts 0-11, one
+attempt each, the current play (`c5746dcc`) against the line, on px13;
+evidence under `build/attempts/wt/v038-wor-abilities/lab/` (`verdicts.txt`,
+`uses.txt`, the `fight_report_*.txt` tables and the `fights_*.tsv` rows
+with their raw lines). Fights are compared by formation over distinct
+battle keys; the keys are not paired, since a changed fight moves the
+clock and so the next fight's key.
+
+- **CYAN** (`7180d448`): Cleave at 3 BP on a body that can die (the
+  record's primary, the lowest standing slot, `$3AA1` bit `$04` clear),
+  else Stunner when two or more bodies stand, each at the row the window
+  holds it in. In `wor_dino` and `wor_colosseum` (all 48 runs passed)
+  Stunner was planned 74 and 178 times and Cleave never: his bank does not
+  reach three points in a random. Stunner lost to the keyed Fight on the
+  small formations: three Crawlers (`$13F`) 2,822 ticks at the median
+  against 3,749 in the dino forest and 2,605 against 2,820 on the plains;
+  Mantodea+Spek Tor+Sprinter (`$143`) 0.09 deaths a fight against 0.36;
+  Mantodea alone (`$145`) at worst 48% against 0%, three down at once.
+  It gained on two Tyranosaurs (`$140`, 4,341.5 against 3,933 ticks).
+  Stunner chips one slash a body where the Fight breaks one body at a
+  time, and a broken body loses its turns. A Cleave wants a fight long
+  enough to bank three points: a boss, which takes the heavy cut and which
+  this line left to the Fight.
+- **SABIN** (`27edc69d`, `3cd580f5`): against two or more standing bodies,
+  Air Blade (or Fire Dance where more bodies are weak to fire) in place of
+  Pummel, unless a body absorbs or nulls it. In Phoenix Cave (base 11 of 12
+  passed, the twelfth a wipe on Necromancr+Parasoul+Phase; the line 12 of
+  12) the three-body formations got shorter: `$152` 8,916 ticks against
+  6,864 with 1.50 deaths a fight against 1.12, `$156` 6,503.5 against
+  4,865.5. But the party's low point fell on `$157` (64% at the median
+  against 52%), `$153` (45% against 37%) and `$155` (22% against 12%), and
+  in Figaro's passage sweep (`wor_figaro_sweep`, 24 runs passed) the
+  fights were no shorter and `$0E8` Cruller+Humpty+NeckHunter fell to 56%
+  at worst against 72%. Air Blade chips a shield only by its wind, so it
+  leaves the bodies unbroken and acting. Two variants changed neither
+  finding: three or more bodies (`s3phx`), and Pummel kept whenever it
+  chips a standing body's shields (`kphx`, `kfig`: `$157` 52%, `$153` 35%,
+  `$155` 13% at the median). Fire Dance (learned at L15, in the World of
+  Balance) was committed 4 times in all and is not measured.
+
+### 13.6 Left
 
 - **Lores off the line.** Pearl Wind (Sprinter, groups 49, 51, 52 by
   Jidoor, while STRAGO grinds on 48), Rippler (Reach Frog on that grind,
@@ -1667,10 +1712,20 @@ within 85% of the best. What the labs found:
   study on the grind or a branch leg would teach them. Pearl Wind is the
   one the driver already has a line for (the party heal).
 - **SABIN's Spiraler** comes at L42; he ends the line at L39. Bum Rush (99
-  MP) and Fire Dance are never cast; `opts.blitz` is one Blitz per leg.
+  MP) is learned at Duncan's house, and the line seats him in no battle
+  after it. Fire Dance is never cast; `opts.blitz` is one Blitz per leg. An
+  all-body Blitz by body count was not as good as Pummel (13.5); one that
+  pays would have to break what it hits, or come where the bodies are
+  already broken.
 - **CYAN's Cleave** (3 BP, 99 MP) and Quadra Slice are never cast in the
   World of Ruin: `opts.bushido` is set on three legs, none after the dream.
-- **GAU's Rages**: 10 of 256, and no WoR leg sets `opts.rage`.
+  Stunner by body count lost to the keyed Fight (13.5); Cleave needs a
+  banked bar, so its place is a boss fight, measured against the 3-BP
+  Fight it would replace.
+- **GAU's Rages**: 10 of 256, and no WoR leg sets `opts.rage`. The rages he
+  holds are the World of Balance's weak nine and one more; the measured
+  loss to his fists (route-wor-gau.md section 7) stands until a Leap on
+  the Veldt teaches stronger ones.
 - **MOG's Dances**: 5 of 8; Forest Suite, Desert Aria and Earth Blues
   need battles on those terrains with him seated.
 - **Lores weighed per fight**: a picker wants a fight where lores beat the
