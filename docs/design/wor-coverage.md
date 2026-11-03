@@ -1450,14 +1450,14 @@ his pool) standing.
   party) and a plan pressed to an exact boost (`exactBoost`/`boostWant`)
   keep theirs.
 - The study is aimed at a body out of Reflect. The confirm's cast guard
-  refuses a reflectable cast while any body reflects; for the study only
-  its Reflect half is waived, and only while the cursor (`$7B7E`) holds
-  exactly one standing monster out of Reflect at the confirm
-  (`M.reflectWaived`, `reflectSingle`). Absorb, null and the enemy Runic
-  (#413) stand. An aimed body fallen before the confirm, a steer that gave
-  up on another body and a target gone into Reflect since the plan keep
-  the guard (`reflect_waiver_selftest`, 6 assertions, each failed by its
-  own mutant).
+  judges Reflect on the bodies the cursor (`$7B7E`) holds at the confirm,
+  for every cast (`M.reflectJudged`, #500; it was a waiver for the study
+  alone until then). Absorb, null and the enemy Runic (#413) are judged on
+  the whole stage. An aimed body fallen before the confirm (the engine
+  retargets the cast) and an empty cursor fall back to the whole stage; a
+  target gone into Reflect since the plan, a steer that gave up on a
+  mirror and a spread over one are refused (`reflect_judged_selftest`, 11
+  assertions, each failed by its own mutant).
 - A lore pending for the victory (`$3A84-$3A86`, which InitBattle clears)
   counts as known, so he studies a body once.
 

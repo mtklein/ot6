@@ -3875,14 +3875,21 @@ end
 -- cast at a Reflect bearer lands on the party), or "null" (every element
 -- of the cast is nulled: a wasted turn).  Absorb is judged across the
 -- whole stage first, since it is the costliest.  nil when the cast may go.
-function M.castVeto(elem, reflectable, slots)
+-- reflectSlots, when given, are the bodies the Reflect half is judged on
+-- (the cursor's at the confirm, M.reflectJudged); absorb and null are
+-- judged on the whole stage either way.
+function M.castVeto(elem, reflectable, slots, reflectSlots)
   if elem ~= 0 then
     for _, s in ipairs(slots) do
       if (s.absorb & elem) ~= 0 then return s, "absorb" end
     end
   end
+  if reflectable then
+    for _, s in ipairs(reflectSlots or slots) do
+      if s.reflect then return s, "reflect" end
+    end
+  end
   for _, s in ipairs(slots) do
-    if reflectable and s.reflect then return s, "reflect" end
     if elem ~= 0 and (s.null & elem) == elem then return s, "null" end
   end
   return nil
@@ -7409,19 +7416,29 @@ function Driver:runicSlot(id)
   local MP = M.sym("MagicProp") & 0x3FFFFF
   return M.runicTakes(M.readRomByte(MP + id * 14 + 3), self:runicSpecial())
 end
--- The one exemption from the Reflect half of the cast guard (#388): a
--- single-target cast whose cursor holds exactly one monster (`tgtmons`,
--- $7B7E, bit n = slot n), standing (in `slots`, M.activeSlots) and out of
--- Reflect at that moment, cannot bounce off another body's Reflect.  An
--- empty cursor, two bodies, a fallen or absent body, or one in Reflect
--- keeps the guard.  Only a plan that asks (plan.reflectSingle) reads it.
-function M.reflectWaived(tgtmons, slots)
+-- The bodies the Reflect half of the cast guard is judged on at the confirm
+-- (#388, #500): the monsters the cursor holds (`tgtmons`, $7B7E, bit n =
+-- slot n) when every one of them stands (in `slots`, M.activeSlots).  A
+-- cast lands on the bodies under the cursor, so only their Reflect can turn
+-- it onto the party: a Fire on a body out of Reflect goes in while a
+-- Hidonite beside it reflects, and a spread over a field with a mirror in it
+-- is judged on the mirror.  An empty cursor (on the party), or one holding a
+-- body that has fallen (the engine retargets the cast to another standing
+-- body, which may reflect) is judged on the whole stage, the old rule.
+-- M.REFLECT_PER_TARGET = false is the old rule everywhere (a lab lever).
+function M.reflectJudged(tgtmons, slots)
+  if tgtmons == 0 or M.REFLECT_PER_TARGET == false then return slots end
+  local t, seen = {}, 0
   for _, s in ipairs(slots) do
-    if (1 << s.slot) == tgtmons then return not s.reflect end
+    if (tgtmons & (1 << s.slot)) ~= 0 then t[#t + 1] = s; seen = seen | (1 << s.slot) end
   end
-  return false
+  if seen ~= tgtmons then return slots end
+  return t
 end
-function Driver:castVetoed(abilityId, what, singleTarget)
+-- atConfirm: the target window is up with the cast's target chosen, and the
+-- Reflect half is judged on what the cursor holds (M.reflectJudged); a plan
+-- made before the window opens has no cursor and is judged on the stage
+function Driver:castVetoed(abilityId, what, atConfirm)
   -- An enemy Runic (#413): a monster carrying $3E4C bit 1 (the Speck's
   -- MonsterProp+30, "A Speck absorbs magic!" on its launch) takes every
   -- runic-able spell (MagicProp+3 bit 3, RunicEffect) cast while it
@@ -7441,10 +7458,11 @@ function Driver:castVetoed(abilityId, what, singleTarget)
   local elem = M.spellElement(abilityId)
   local slots = activeSlots()
   local reflectable = M.spellReflectable(abilityId)
-  if reflectable and singleTarget and M.reflectWaived(M.readByte(BATTLE.TGTMONS), slots) then
-    reflectable = false
+  local judged = nil
+  if reflectable and atConfirm then
+    judged = M.reflectJudged(M.readByte(BATTLE.TGTCHARS) == 0 and M.readByte(BATTLE.TGTMONS) or 0, slots)
   end
-  local s, why = M.castVeto(elem, reflectable, slots)
+  local s, why = M.castVeto(elem, reflectable, slots, judged)
   if not s then return false end
   if why == "absorb" then
     M.log(string.format(
@@ -13264,12 +13282,11 @@ function Driver:makePlanRules(actor)
       -- The Scan is aimed at one body and the study reads every body on the
       -- field (Ot6Analyze's boosted loop), so it is aimed at a body out of
       -- Reflect: the teacher, else any other.  The confirm's cast guard
-      -- refuses a reflectable cast while any body reflects; for this
-      -- single-target cast its Reflect half is waived when the cursor holds
-      -- one standing body out of Reflect at the confirm (reflectSingle,
-      -- M.reflectWaived), and the rest of it (absorb, null, an enemy Runic)
-      -- stands.  Hidon's Hidonite $160 wears Reflect, and the guard backed
-      -- the study out at every confirm while it stood (lab eb_s1, #388).
+      -- judges Reflect on the body the cursor holds (M.reflectJudged, #500),
+      -- and the rest of it (absorb, null, an enemy Runic) on the stage.
+      -- Hidon's Hidonite $160 wears Reflect, and the old guard, judged on
+      -- every standing body, backed the study out at every confirm while it
+      -- stood (lab eb_s1, #388).
       -- A cursor left on a member backs out too (monsterOnly).
       local aim, reflects = nil, false
       for _, s in ipairs(activeSlots()) do
@@ -13281,8 +13298,7 @@ function Driver:makePlanRules(actor)
           .. "(slot %d's), %d MP of %d", self.tag or "fight", actor, M.STUDY_BOOST, aim,
           M.readWord(0x57C0 + aim * 2), want, slot, M.STUDY_MP, mp))
         return { kind = "magic", spell = M.STUDY_SPELL, row = cmdRow(actor, BATTLE.CMD_MAGIC),
-                 boostLeft = M.STUDY_BOOST, aimHard = aim, reason = "study", reflectSingle = reflects or nil,
-                 monsterOnly = reflects or nil }
+                 boostLeft = M.STUDY_BOOST, aimHard = aim, reason = "study", monsterOnly = reflects or nil }
       end
     end
     if so.dischord and cmdRow(actor, BATTLE.CMD_LORE) and loreOffered(M.LORE_DISCHORD) then
@@ -14832,7 +14848,7 @@ function Driver:button(actor)
        and not self.plan.vetoOk then
       local id = self.plan.kind == "magic" and (self.plan.executionSpell or self.plan.spell) or (0x8B + self.plan.lore)
       if self:castVetoed(id, self.plan.kind == "magic" and "cast (at the confirm)"
-                        or "lore (at the confirm)", self.plan.reflectSingle) then
+                        or "lore (at the confirm)", true) then
         self:dropPlan("stage_changed")
         return { "b" }
       end
