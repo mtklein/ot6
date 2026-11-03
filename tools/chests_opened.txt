@@ -41,13 +41,13 @@
 29	map 84 Figaro cave, empty chest (22,55) -- a human opens it too
 30	map 86 grandson's house, Tonic (15,10)
 31	map 86 rich man's house, Elixir (7,31)
-32	map 87 Figaro basement (South Figaro's passage), Iron Armor (32,42)
-33	map 87 Figaro basement (South Figaro's passage), Earrings (33,56)
+32	map 87 Figaro basement (South Figaro's passage), Iron Armor (32,42) -- LOCKE's escape (gen_tunnelarmr, #350)
+33	map 87 Figaro basement (South Figaro's passage), Earrings (33,56) -- LOCKE's escape (gen_tunnelarmr, #350)
 34	map 87 Figaro basement, RegalCutlass (47,33)
 35	map 87 Figaro basement, Heavy Shld (48,33)
 37	maps 96/97 Mt. Kolts, Tent (27,14) -- shared bit, two copies
 38	maps 96/97 Mt. Kolts, Guardian (28,27) -- shared bit
-39	map 100 Mt. Kolts, Atlas Armlet (30,33)
+39	map 100 Mt. Kolts, Atlas Armlet (30,33) -- ledge E, off the climb (gen_kolts, #350)
 40	map 100 shelf A, Tent (8,52) -- opened by gen_returner past Vargas
 41	map 109 Returners' Hideout, Green Cherry (26,21)
 42	map 110 hideout west, Fenix Down (28,49)
@@ -94,6 +94,7 @@
 159	map 300 Darill's Tomb B3, Exp. Egg (55,58)
 160	map 300 Darill's Tomb B3, Man Eater (124,9)
 161	map 300 Darill's Tomb B3, the monster chest (Presenter + Whelk Head, event battle group 116) (120,9)
+229	map 186 the unfinished colosseum's house, Hero Ring (115,34) -- north of Kohlingen (gen_zozo2_arrival, #350)
 230	map 74 South Figaro (World of Ruin; bit shared with map 75's Soft), Elixir (2,43)
 239	map 225 Zozo clock shelf, Tincture (104,9)
 240	map 225 Zozo clock shelf, Potion (105,9)
@@ -102,11 +103,11 @@
 248	map 343 Thamasa town, Soft (43,30)
 249	map 343 Thamasa town, Eyedrop (31,37)
 250	map 343 Thamasa town, Fenix Down (14,18)
-252	map 89 South Figaro's cellar, Hyper Wrist (110,49) -- the rich man's way in
-253	map 89 South Figaro's cellar, X-Potion (101,39) -- Duncan's way in
-254	map 89 South Figaro's cellar, Ribbon (101,43) -- Duncan's way in
-255	map 89 South Figaro's cellar, Ether (92,53) -- Duncan's way in
-256	map 89 South Figaro's cellar, RunningShoes (120,53) -- the rich man's way in
+252	map 89 South Figaro's cellar, Hyper Wrist (110,49) -- LOCKE's escape, by the rich man's door (gen_tunnelarmr, #350)
+253	map 89 South Figaro's cellar, X-Potion (101,39) -- LOCKE's escape, by the passage's door (gen_tunnelarmr, #350)
+254	map 89 South Figaro's cellar, Ribbon (101,43) -- LOCKE's escape, by the passage's door (gen_tunnelarmr, #350)
+255	map 89 South Figaro's cellar, Ether (92,53) -- LOCKE's escape, by the passage's door (gen_tunnelarmr, #350)
+256	map 89 South Figaro's cellar, RunningShoes (120,53) -- LOCKE's escape, by the rich man's door (gen_tunnelarmr, #350)
 98	map 324 Albrook, Potion (56,13) -- by the inn (gen_wor_tzen_door)
 100	map 326 Albrook's weapon shop, Tincture (11,49) (gen_wor_tzen_door)
 103	map 330 Albrook, the house east of the inn, Elixir (35,7) (gen_wor_tzen_door)
@@ -188,8 +189,8 @@
 198	map 401 the Ancient Castle's cave, the monster box (58,43): Master Pug (gen_wor_ancient_boxes, a branch)
 75	map 225 Zozo, Thief Glove (11,59) -- past the stair room, off the U1 roof (gen_wor_zozo_north, a branch)
 76	map 225 Zozo, Fire Knuckle (35,11) -- off the top roof (gen_wor_zozo_north, a branch)
-70	map 226 Zozo's rooftop room, RunningShoes (72,26) (gen_wor_zozo_north, a branch)
-71	map 226 Zozo's rooftop room, X-Potion (92,27) (gen_wor_zozo_north, a branch)
+70	map 226 Zozo's rooftop room, RunningShoes (72,26) -- on the way up to TERRA (gen_zozo5_ramuh, #350)
+71	map 226 Zozo's rooftop room, X-Potion (92,27) -- on the way up to TERRA (gen_zozo5_ramuh, #350)
 
 # Kept closed in the World of Balance (#350): the treasure array is one for
 # both worlds, and where a World of Balance chest and its World of Ruin copy

@@ -290,6 +290,22 @@ H.run({ maxFrames = 200000 }, {
   H.waitUntil(landed(226, 10), 1500, "tower up", 1),
   H.waitFrames(150),
 
+  -- 1b. the room's two chests, on the way up to TERRA (#350 item 2): the
+  --     RunningShoes (72,26) and an X-Potion (92,27), opened from the tiles
+  --     the World of Ruin branch gen_wor_zozo_north measured, (72,27) and
+  --     (91,27).  The RunningShoes go on at once (the relic rule's Haste,
+  --     rank 5, to the slowest member with a free slot).
+  H.openChest{ stand = { 72, 27 }, face = "up", bit = 0x046, what = "RunningShoes",
+               item = 0xBA, nav = { playBattles = "tactical" } },
+  H.openChest{ stand = { 91, 27 }, face = "right", bit = 0x047, what = "X-Potion",
+               item = 0xEA, nav = { playBattles = "tactical" } },
+  H.call(function()
+    H.assertEq(H.chestOpen(0x046) and H.chestOpen(0x047), true,
+      "the tower room's RunningShoes and X-Potion chests are open (treasure bits $046, $047)")
+  end),
+  H.dressRelics({ { 1, "LOCKE" }, { 6, "CELES" }, { 4, "EDGAR" }, { 5, "SABIN" } },
+    { tag = "relics after the tower's RunningShoes" }),
+
   talk(80, 17, "right", "TERRA answers"),
   rideScene(function() return sw(0x0053) == 1 end, 40000, "the RAMUH scene"),
   H.waitUntil(landed(226, 20), 3000, "control after the scene", 5),
