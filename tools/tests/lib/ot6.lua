@@ -13861,8 +13861,6 @@ end
 
 function Driver:button(actor)
   local st = M.readByte(BATTLE.MSTATE)
-  -- the empty-field clock (M.EMPTY_FIELD_CAP) runs only while the field stays empty for the cursor
-  if self.emptySince ~= nil and not M.fieldEmptyForCursor() then self.emptySince = nil end
   if st == BATTLE.ST_TGT then self:steerWatch()
   else
     -- a steer press that took the target window away (measured on
@@ -18818,6 +18816,9 @@ function Driver:frame()
     self.startFrame = nil
   end
   self.battleTick = self.battleTick + 1
+  -- the empty-field clock (M.EMPTY_FIELD_CAP) runs only while the field stays empty for the cursor: read every
+  -- frame, menu or none, so a field that fills while no window is up ends the stretch (review of 97ff8b17)
+  if self.emptySince ~= nil and not M.fieldEmptyForCursor() then self.emptySince = nil end
   -- The party's HP as the battle opened, for the first-turn danger floor
   -- in makePlan.  Taken a beat after the table goes live so every entity
   -- is written (the f+1 log line already reads every entity); no monster
