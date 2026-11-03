@@ -144,7 +144,10 @@ line. A branch leg nothing boots (`wor_thamasa_plain`) prints no keys:
 there is nothing to re-cut. Then:
 
 1. `ninja`, which replays what the change reaches (the line, from the
-   earliest changed leg);
+   earliest changed leg). A library edit replays nothing by itself
+   (provenance drift, docs/TESTING.md), so a library change that alters
+   play first adds a dated line to `tools/tests/replay.txt`, and `ninja`
+   replays the whole line under it;
 2. `checkpoint_drift.py` on the listed keys, and quote its lines in the
    landing's evidence before the re-cut ("N byte(s) differ" with the
    explanation);

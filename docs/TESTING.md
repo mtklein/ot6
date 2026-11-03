@@ -135,7 +135,9 @@ captured, never an older tracked copy.
   `OT6_SRAM_CHECKPOINT` lines name the capture for the same reason.
 
 A branch that changes play lands with its replay scoped and its tracked
-saves re-cut: replay from the earliest section the change can reach, then
+saves re-cut (a library change that alters play bumps
+`tools/tests/replay.txt`, since a library edit alone replays nothing):
+replay from the earliest section the change can reach, then
 `checkpoint_drift.py --recut` exactly the keys that moved, quoting the
 `checkpoint drift` lines before the re-cut and after it ("none") in the
 landing's evidence. `python3 tools/tests/lib/downstream.py <leg>` states
