@@ -11,7 +11,11 @@
 -- (the count then reads what is left over).
 --
 -- Boots wor_colosseum (the Falcon's tile by Maranda; the Cursed Shield in the bag since Narshe) for each arm,
--- puts the shield on SHADOW through the real Equip screen, and walks the plain's pool (world group 49) with the
+-- puts a Ribbon on SHADOW first, as a player wearing the shield would (the shield sets Condemned, Mute,
+-- Berserk, Muddle and Sap, ItemProp $66 +25 $79, and holds the four the Ribbon guards past any cure: a
+-- Muddled, Berserk SHADOW kills his own party, the 2026-11-03 play's wipe, where the party's one Ribbon was
+-- TERRA's and the suite had leaned on the earlier play's second one sitting on SHADOW), then the shield through
+-- the real Equip screen, and walks the plain's pool (world group 49) with the
 -- route's fight driver until a random battle is won with SHADOW standing (a battle he falls in counts nothing):
 --   A. played: the count moves by exactly two, the shield still cursed;
 --   B. declared (a waiver): the count staged at 254 before the walk ($1DD5): 254 + 2 lifts the curse, the count
@@ -24,6 +28,8 @@
 -- the route: route-wor-colosseum.md section 5), and the wrap because 128 battles is not a suite.
 local H = dofile("tools/tests/lib/ot6.lua")
 local SHADOW, CURSED, PALADIN = 3, 0x66, 0x67
+-- GUARD (a global a lab sets ahead of the lib; the Ribbon in the suite): the relic that goes on SHADOW first
+local RIBBON = type(GUARD) == "number" and GUARD or 0xCA
 local STATE = "build/states/wor_colosseum.mss.lua"
 local FIGHT = {}
 local K = H.worLegKit({ fight = FIGHT, links = {}, names = { [0] = "TERRA", [2] = "CYAN", [3] = "SHADOW", [6] = "CELES" } })
@@ -41,6 +47,51 @@ emu.addMemoryCallback(function()
 end, emu.callbackType.exec, H.sym("Ot6CurseCount"), H.sym("Ot6CurseCount"))
 
 local function shield() return H.readByte(0x1600 + 37 * SHADOW + 0x20) end
+local function relic(ch, slot) return H.readByte(0x1600 + 37 * ch + 0x1F + slot) end
+
+-- The Ribbon onto SHADOW: from the bag, or off the seated member who wears it (the Relic menu's Remove, then
+-- SHADOW's Equip).  SHADOW's slot is an empty one, else one that holds no two-weapon relic.  The party owning
+-- a Ribbon is the precondition (the WoB's, worn since); without one the suite stops here and says so.
+local function guard(name)
+  local from, fromSlot, slot
+  return H.seqStep({
+    H.call(function()
+      from, fromSlot, slot = nil, nil, nil
+      if relic(SHADOW, 4) == RIBBON or relic(SHADOW, 5) == RIBBON then
+        H.log(string.format("[curse] %s: SHADOW wears the Ribbon $%02X already", name, RIBBON)); return
+      end
+      if H.invCountOf(RIBBON) < 1 then
+        local active = H.readByte(0x1A6D) & 7
+        for ch = 0, 13 do
+          if ch ~= SHADOW and (H.readByte(0x1850 + ch) & 7) == active and from == nil then
+            for s = 4, 5 do if from == nil and relic(ch, s) == RIBBON then from, fromSlot = ch, s end end
+          end
+        end
+      end
+      H.assertEq(H.invCountOf(RIBBON) >= 1 or from ~= nil, true, string.format(
+        "%s: the party owns the guard $%02X (a Ribbon; in the bag or on a seated member) for the shield's wearer", name, RIBBON))
+      for s = 5, 4, -1 do if slot == nil and relic(SHADOW, s) == 0xFF then slot = s end end
+      for s = 5, 4, -1 do
+        local cl = H.relicClass(relic(SHADOW, s))
+        if slot == nil and not (cl and cl.hands) then slot = s end
+      end
+      H.assertEq(slot ~= nil, true, name .. ": SHADOW has a relic slot without a two-weapon relic")
+      H.log(string.format("[curse] %s: the Ribbon $%02X %s, onto SHADOW's slot %d (over $%02X)", name, RIBBON,
+        from and string.format("off char %d's slot %d", from, fromSlot) or "from the bag", slot, relic(SHADOW, slot)))
+    end),
+    H.lazy(function()
+      if from == nil then return H.seqStep({}) end
+      return H.unequipRelics(from, { fromSlot }, { tag = name .. ": the Ribbon off char " .. from })
+    end),
+    H.lazy(function()
+      if slot == nil then return H.seqStep({}) end
+      return H.equipKit(SHADOW, { { slot, RIBBON } }, { tag = name .. ": SHADOW: the Ribbon on" })
+    end),
+    H.call(function()
+      H.assertEq(relic(SHADOW, 4) == RIBBON or relic(SHADOW, 5) == RIBBON, true, name .. ": SHADOW wears the Ribbon")
+    end),
+  })
+end
 local function counted(i)
   local o = H.outcomes[n0 + i]
   return o ~= nil and o.kind == "won" and ends[i] ~= nil and ends[i].shadowHp > 0
@@ -60,6 +111,7 @@ local function arm(name, start, event, wantCount, wantShield)
       H.assertEq(H.readByte(0x1850 + SHADOW) & 7, 1, name .. ": SHADOW is seated")
       H.assertEq(H.invCountOf(CURSED) >= 1, true, name .. ": the bag holds the Cursed Shield")
     end),
+    guard(name),
     H.equipKit(SHADOW, { { 1, CURSED } }, { tag = name .. ": SHADOW: the Cursed Shield on" }),
     H.call(function()
       H.assertEq(shield(), CURSED, name .. ": SHADOW wears the Cursed Shield (slot 1)")

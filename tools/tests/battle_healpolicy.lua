@@ -561,6 +561,16 @@ H.run({ maxFrames = 3000 }, {
       "...and another muddled ally beside it is the one this actor hits")
     H.assertEq(H.muddleRule({ actor = 2, status2 = { [0] = 0x20, [1] = 0, [2] = 0, [3] = 0 },
       hp = q4, maxhp = m4 }), 0, "the same ally with nothing in flight: hit it")
+    -- a Muddle the ally's gear holds (the Cursed Shield's STATUS2 $79): the
+    -- engine's change mask drops the hit's removal, so no hit is planned,
+    -- and the next muddled ally beside it is the one this actor hits
+    r, held = H.muddleRule({ actor = 2, status2 = { [0] = 0x79, [1] = 0, [2] = 0, [3] = 0 },
+      hp = q4, maxhp = m4, fixed = { [0] = true } })
+    H.assertEq(tostring(r) .. "/" .. tostring(held), "nil/nil",
+      "a muddled ally whose gear holds the Muddle: no cure-hit, not held")
+    H.assertEq(H.muddleRule({ actor = 2, status2 = { [0] = 0x79, [1] = 0x20, [2] = 0, [3] = 0 },
+      hp = q4, maxhp = m4, fixed = { [0] = true } }), 1,
+      "...and another muddled ally beside it is the one this actor hits")
     -- the floor's price (#348, H.allyFightMax), the engine's arithmetic
     -- worked by hand: bp 100, L30, vigor x2 80, defense 100 -- attack 180,
     -- 180 x 30 x 30 / 256 = 632, 100 + 1.5 x 632 = 1048, x255/256 + 1 =
