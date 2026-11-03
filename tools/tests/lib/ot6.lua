@@ -7693,10 +7693,10 @@ end
 -- the Necromancers answer anything but a Fight with Demi or Quartr, and
 -- a Pummel that costs SABIN three quarters of his bar is not a trade a
 -- person makes when the Fight beside it draws nothing.  A Fight's answer
--- is the least any standing body's gives (a Fight can be aimed:
--- Driver:counterAimPlan steers it off a body whose answer kills).
--- M.COUNTER_HALF = false is the rule before #503 (all of it only, slot by
--- slot), the lab's control arm.
+-- is the same body's (the worst of them for an all-body verb), except
+-- that an answer which kills is weighed against the safest standing
+-- body's, since Driver:counterAimPlan steers a Fight off a body whose
+-- answer kills.  An unpriced Fight answer (a Special) refuses nothing.
 function Driver:counterVetoed(actor, use, slots, what, aoe)
   local y = actor * 2
   local hp = M.readWord(0x3BF4 + y)
@@ -7708,66 +7708,56 @@ function Driver:counterVetoed(actor, use, slots, what, aoe)
       M.log(msg)
     end
   end
-  if M.COUNTER_HALF == false then
-    for _, slot in ipairs(slots) do
-      if monAlive(slot) then
-        local top, which = self:counterWorst(slot, actor, use, hp)
-        if top >= hp then
-          local ftop, _, fatks, funknown = self:counterWorst(slot, actor, { cmd = BATTLE.CMD_FIGHT }, hp)
-          if ftop < hp and not funknown then
-            local fsaid = {}
-            for _, a in ipairs(fatks) do fsaid[#fsaid + 1] = string.format("$%02X", a) end
-            said(string.format("%d:%s:%d:%d", actor, what, slot, which),
-              string.format("[%s] actor=%d %s refused: slot %d (species $%03X) answers it "
-                .. "with attack $%02X, up to %d against %d HP; a Fight draws %s, up to %d (#372) "
-                .. "-- falling through", self.tag or "fight", actor, what, slot,
-                M.readWord(M.FORMATION + slot * 2), which, top, hp,
-                #fsaid > 0 and table.concat(fsaid, "/") or "no answer", ftop))
-            return true
+  -- each body the verb can land on: its answer to the verb and to a Fight
+  local function fightOn(s)
+    local ftop, _, _, funknown = self:counterWorst(s, actor, { cmd = BATTLE.CMD_FIGHT }, hp)
+    return ftop, funknown
+  end
+  -- the least a Fight draws from any standing body, where Driver:counterAimPlan
+  -- re-aims a Fight whose own body's answer would kill
+  local safest = nil
+  for s = 0, 5 do
+    if monAlive(s) then
+      local ftop, funknown = fightOn(s)
+      if not funknown and (safest == nil or ftop < safest) then safest = ftop end
+    end
+  end
+  local take, left, parts, fworst, funk = 0, hp, {}, 0, false
+  local refuse = false
+  for _, slot in ipairs(slots) do
+    if monAlive(slot) then
+      local top, which = self:counterWorst(slot, actor, use, aoe and left or hp)
+      local ftop, funknown = fightOn(slot)
+      funk = funk or funknown
+      if ftop > fworst then fworst = ftop end
+      if which ~= nil then
+        parts[#parts + 1] = string.format("slot %d $%03X $%02X %d, a Fight's %d%s", slot,
+          M.readWord(M.FORMATION + slot * 2), which, aoe and math.min(top, left) or top, ftop,
+          funknown and "+" or "")
+        if aoe then
+          left = left - math.min(top, left)
+          take = hp - left
+        else
+          take = math.max(take, top)
+          -- one body: its answer to the verb against its answer to a Fight
+          if not funknown and ((top * 2 >= hp and ftop * 2 < hp)
+              or (top >= hp and (ftop < hp or (safest ~= nil and safest < hp)))) then
+            refuse = true
           end
         end
       end
     end
-    return false
   end
-  -- the verb's take
-  local take, left, parts = 0, hp, {}
-  for _, slot in ipairs(slots) do
-    if monAlive(slot) then
-      local top, which = self:counterWorst(slot, actor, use, aoe and left or hp)
-      if which ~= nil then
-        if aoe then
-          top = math.min(top, left)
-          left = left - top
-          take = hp - left
-        elseif top > take then
-          take, parts = top, {}
-        end
-        if aoe or top == take then
-          parts[#parts + 1] = string.format("slot %d $%03X $%02X %d", slot, M.readWord(M.FORMATION + slot * 2),
-            which, top)
-        end
-      end
-    end
+  if aoe and not funk then
+    -- every body's answer, against the worst one a Fight on one of them draws
+    refuse = (take * 2 >= hp and fworst * 2 < hp)
+      or (take >= hp and (fworst < hp or (safest ~= nil and safest < hp)))
   end
-  if take * 2 < hp then return false end
-  -- the Fight's: the safest standing body's answer
-  local ftake, fslot = nil, nil
-  for s = 0, 5 do
-    if monAlive(s) then
-      local ftop, _, _, funknown = self:counterWorst(s, actor, { cmd = BATTLE.CMD_FIGHT }, hp)
-      if not funknown and (ftake == nil or ftop < ftake) then ftake, fslot = ftop, s end
-    end
-  end
-  if ftake == nil then return false end
-  local lethal = take >= hp and ftake < hp
-  local half = ftake * 2 < hp
-  if not (lethal or half) then return false end
+  if not refuse then return false end
   said(string.format("%d:%s:%s", actor, what, table.concat(parts, ",")),
-    string.format("[%s] actor=%d %s refused: %s answer%s it (%s), up to %d of %d HP; a Fight on slot %d "
-      .. "draws up to %d (#372, #503) -- falling through", self.tag or "fight", actor, what,
-      aoe and "every body it lands on" or "a body", aoe and "" or "s", table.concat(parts, "; "), take, hp,
-      fslot, ftake))
+    string.format("[%s] actor=%d %s refused: %s (%s), up to %d of %d HP (#372, #503) -- falling through",
+      self.tag or "fight", actor, what, aoe and "every body it lands on answers it" or "a body answers it",
+      table.concat(parts, "; "), take, hp))
   return true
 end
 
@@ -7783,9 +7773,8 @@ end
 -- (plan.reason "finish": the Phase's retaliation opens with
 -- `if_self_dead / end_if`, a dead body does not answer).  aimHard so an
 -- authored or planned kill order does not steer it back.
--- M.COUNTER_AIM = false turns it off, the lab's control arm.
 function Driver:counterAimPlan(actor, plan)
-  if plan == nil or plan.kind ~= "fight" or plan.reason == "finish" or M.COUNTER_AIM == false then return plan end
+  if plan == nil or plan.kind ~= "fight" or plan.reason == "finish" then return plan end
   local hp = M.readWord(0x3BF4 + actor * 2)
   if hp == 0 then return plan end
   local kills, best, bestTake, bestHp = {}, nil, nil, nil
