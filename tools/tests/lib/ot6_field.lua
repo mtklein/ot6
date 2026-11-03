@@ -8496,13 +8496,19 @@ function M.relicPlan(members, opts)
   -- on no more slots than the bag holds plus the slots wearing it now (a
   -- relic the plan moves reaches the bag when its wearer's slot changes).
   local supply, demand = {}, {}
-  for s = 0, 255 do
-    local id, q = M.readByte(0x1869 + s), M.readByte(0x1969 + s)
-    if id ~= 0xFF and q > 0 then supply[id] = (supply[id] or 0) + q end
+  -- (opts.bag: the constructed bag and what opts.assume puts on, instead)
+  if opts.bag then
+    for id, q in pairs(opts.bag) do supply[id] = (supply[id] or 0) + q end
+  else
+    for s = 0, 255 do
+      local id, q = M.readByte(0x1869 + s), M.readByte(0x1969 + s)
+      if id ~= 0xFF and q > 0 then supply[id] = (supply[id] or 0) + q end
+    end
   end
   for _, m in ipairs(ms) do
     for s = 4, 5 do
-      if m.real[s] ~= 0xFF then supply[m.real[s]] = (supply[m.real[s]] or 0) + 1 end
+      local owns = opts.bag and m.cur[s] or m.real[s]
+      if owns ~= 0xFF then supply[owns] = (supply[owns] or 0) + 1 end
       local w = m.want[s] or m.cur[s]
       if w ~= 0xFF then demand[w] = (demand[w] or 0) + 1 end
     end
