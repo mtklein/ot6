@@ -12386,7 +12386,7 @@ function Driver:makePlanRules(actor)
     -- the configured Blitz, whichever it is (#425 review: with Air Blade
     -- set, only a Pummel was ever offered here, so the spend rule took a
     -- 3-BP Fight on one body over a 3-BP Air Blade on four)
-    local blitz = self:blitzPick(actor)
+    local blitz = id == 5 and self:blitzPick(actor) or BATTLE.PUMMEL
     local bname = blitz == BATTLE.PUMMEL and "Pummel" or string.format("Blitz $%02X", blitz)
     if self.parkDropN < 3 and self.opts.tactical and id == 5 and BATTLE.BLITZ_SHAPE[blitz] ~= nil
        and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ]
