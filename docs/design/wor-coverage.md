@@ -1457,7 +1457,12 @@ his pool) standing.
   retargets the cast) and an empty cursor fall back to the whole stage; a
   target gone into Reflect since the plan, a steer that gave up on a
   mirror and a spread over one are refused (`reflect_judged_selftest`, 11
-  assertions, each failed by its own mutant).
+  assertions, each failed by its own mutant). At Hidon (gen_wor_ebot from
+  the wor-gogo-v1 capture, shifts 0-11, 11 distinct battle keys) the
+  confirm refused no cast and Hidon fell in 7452-15905 ticks (median
+  12460); the old whole-stage rule refused the study's Scan 253 times in
+  11 of the 12 and Hidon took 7452-39515 (median 16855), every run won
+  (build/attempts/wt/v038-driver-followups/hidon/summary.txt).
 - A lore pending for the victory (`$3A84-$3A86`, which InitBattle clears)
   counts as known, so he studies a body once.
 
