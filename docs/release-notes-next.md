@@ -9,6 +9,8 @@ and its effect. Cite evidence in the commit message.
 
 **The Ancient Castle's monster chests.** The Master Pug in the cave's chest and the KatanaSoul in the castle's now have their own weak points: six shields each. Blades break both; Setzer's cards and dice and Relm's brushes also break the Master Pug, and spears and daggers the KatanaSoul.
 
+**More gear in the bundled saves.** The included saves now pick up the World of Balance gear a player finds on the way: the Ribbon, Hyper Wrist and RunningShoes in the cellar under South Figaro on Locke's escape, the Atlas Armlet on Mt. Kolts, the Hero Ring in the house north of Kohlingen, and the RunningShoes in Zozo's tower room. The chests in the Narshe mines and South Figaro's town chests are left closed in the World of Balance, because opening them there empties the better prizes their World of Ruin versions hold; the World of Ruin saves pick up South Figaro's.
+
 **Two new saves.** One by the dinosaur forest, after levelling the party there, and one by Maranda, after the Cactrot desert, the last stop before Kefka's Tower.
 
 A battle could freeze for good, with an animation stuck on screen, when a

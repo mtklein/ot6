@@ -371,19 +371,22 @@ bit (`shared_bits.txt`):
 
 | bit | WoB copy | WoR copy | WoB route |
 |---|---|---|---|
-| 11 | map 50 Fenix Down | map 38 Pod Bracelet | opens it |
-| 12 | map 50 Sleeping Bag | map 38 Elixir | opens it |
-| 21 | map 75 Tonic | map 74 X-Potion | opens it |
-| 22 | map 75 Antidote | map 74 Tent | opens it |
-| 23 | map 75 Eyedrop | map 74 Remedy | opens it |
-| 24 | map 75 Tonic | map 74 Revivify | opens it |
-| 25 | map 75 Green Cherry | map 74 Tent | opens it |
-| 231 | map 75 Warp Stone | map 74 Fenix Down | opens it |
+| 11 | map 50 Fenix Down | map 38 Pod Bracelet | left closed (#350) |
+| 12 | map 50 Sleeping Bag | map 38 Elixir | left closed (#350) |
+| 21 | map 75 Tonic | map 74 X-Potion | left closed (#350) |
+| 22 | map 75 Antidote | map 74 Tent | left closed (#350) |
+| 23 | map 75 Eyedrop | map 74 Remedy | left closed (#350) |
+| 24 | map 75 Tonic | map 74 Revivify | left closed (#350) |
+| 25 | map 75 Green Cherry | map 74 Tent | left closed (#350) |
+| 231 | map 75 Warp Stone | map 74 Fenix Down | left closed (#350) |
 
 Bits 13, 18, 19, 97 and 230 also have two prizes, and the route opens each
 in the world that holds the better one (Ribbon at map 44, the Figaro cave
-and the South Figaro elixir are WoR-opened). #350 item 8 asks the WoB route
-to keep bits 11 and 12 closed; South Figaro's six are the same defect.
+and the South Figaro elixir are WoR-opened). Since #350 the WoB route leaves the
+eight closed: `tools/chests_opened.txt`'s `[keep closed in the WoB]` section
+lists them with 13, 19, 97 and 230, and `audit_chests` fails when a World of
+Balance state has one set. The WoR sweep (`gen_wor_figaro_sweep`) takes
+South Figaro's six; the Moogle cave's pair (map 38) is not on a WoR leg yet.
 
 ## 6. Bosses and events
 
@@ -854,7 +857,7 @@ either is drawn.
 |---|---|---|---|---|
 | Zozo's street, field group 78: 104, 109, 102, 110 | branch `gen_wor_zozo_hunt` (from `wor_cyan_rustrid`) | 221 (42,30) <-> (43,30) | 110 | 14 |
 | Zozo's buildings, group 77: 105, 107, 108, 106 | the same branch, the Tonic's room | 225 (83,61) <-> (83,60) | 110 | 13 |
-| South Figaro's passage, group 65: 374, 373, 125 | branch `gen_wor_passage_hunt` (from `wor_figaro_sweep_passage`) | 87 (36,49) <-> (37,49) | 21 | 15 |
+| South Figaro's passage, group 65: 374, 373, 125 | branch `gen_wor_passage_hunt` (from `wor_figaro_sweep_town`, down Duncan's house) | 87 (36,49) <-> (37,49) | 21 | 15 |
 | world group 35: 198, 200 | Sabin's grind (`gen_wor_tzen_door`) | (127,210) <-> (127,211) | 21 | 5 |
 | world group 0: 6, 7 | Sabin's grind | (160,194) <-> (160,193) | 21 | 5 |
 | world group 42: 224, 225 | Edgar's grind (`gen_wor_edgar`) | (108,100) <-> (109,100) | 21 | 7 |
