@@ -15,6 +15,10 @@
 --      leaves a Ribbon in the bag that member can wear.  The Egg stays (4b's exclusion), the Ribbon goes over the
 --      member's other relic or on another member; and the exclusion is what keeps it: with H.ribbonMayDisplace
 --      switched to allow the Egg, the Ribbon goes over the Egg (the fixture reaches the exclusion).
+--   3. the Ice Dragon's threats again, on two of the seated members only: the one the baseline plans without a
+--      Ribbon in two wards (the caster, whose Ribbon gave way to them) and one planned with a Ribbon.  The spare
+--      Ribbon has nowhere to go but over a ward, so it stays in the bag and the wards stay (4b's ward clause:
+--      field_relicspare's ward_allowed mutant turns this red).
 -- The negative for case 1 (the `not boss` guard 4b had before #495, put back) is recorded in the commit that adds
 -- the file.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -124,10 +128,53 @@ local function spareChecks(plan, base, threats, what)
   return gave
 end
 
+-- the ward clause: a member planned without a Ribbon whose every slot 4b could take holds a ward
+local function wardCase()
+  local base = H.relicPlan(members, { threats = ICE, tag = "relicspare wards, 4b off", spareRibbon = false })
+  local W, R = nil, nil
+  for _, b in ipairs(base) do
+    if hasRibbon(b) then R = R or b
+    elseif W == nil and wears(b.ch, RIBBON) then
+      local wards, open = 0, 0
+      for s = 4, 5 do
+        if not kept(b.cur[s], ICE) then
+          open = open + 1
+          local cl = at(b, s) ~= 0xFF and H.relicClass(at(b, s), ICE) or nil
+          if cl and cl.aff == "ward" then wards = wards + 1 end
+        end
+      end
+      if open > 0 and wards == open then W = b end
+    end
+  end
+  H.assertEq(W ~= nil and R ~= nil, true, "precondition (wards): the baseline plans a seated member without a Ribbon "
+    .. "who can wear one in wards only, and another with a Ribbon")
+  local two = { { W.ch, W.name }, { R.ch, R.name } }
+  local owned2 = H.invCountOf(RIBBON)
+  for _, m in ipairs(two) do for s = 4, 5 do if relicAt(m[1], s) == RIBBON then owned2 = owned2 + 1 end end end
+  local base2 = H.relicPlan(two, { threats = ICE, tag = "relicspare wards (two members), 4b off", spareRibbon = false })
+  local plan2 = H.relicPlan(two, { threats = ICE, tag = "relicspare wards (two members)" })
+  local w0, w1 = byCh(base2, W.ch), byCh(plan2, W.ch)
+  H.log(string.format("[relicspare] wards: %s and %s; the baseline plans %d of %d Ribbon(s); %s planned $%02X/$%02X",
+    W.name, R.name, ribbons(base2), owned2, W.name, at(w0, 4), at(w0, 5)))
+  H.assertEq(owned2 - ribbons(base2) >= 1 and not hasRibbon(w0), true, string.format("precondition (wards): on %s and "
+    .. "%s the baseline leaves a Ribbon in the bag and plans %s without one", W.name, R.name, W.name))
+  for s = 4, 5 do
+    local cl = at(w0, s) ~= 0xFF and H.relicClass(at(w0, s), ICE) or nil
+    H.assertEq(kept(w0.cur[s], ICE) or (cl ~= nil and cl.aff == "ward"), true, string.format("precondition (wards): "
+      .. "%s's slot %d is planned a ward ($%02X)", W.name, s, at(w0, s)))
+    H.assertEq(at(w1, s), at(w0, s), string.format("wards: the spare Ribbon does not go over %s's ward in slot %d "
+      .. "($%02X)", W.name, s, at(w0, s)))
+  end
+  H.assertEq(ribbons(plan2), ribbons(base2), "wards: the spare Ribbon stays in the bag (no slot 4b may take)")
+  H.log(string.format("[relicspare] wards: the spare Ribbon stays in the bag; %s keeps $%02X/$%02X", W.name, at(w1, 4),
+    at(w1, 5)))
+end
+
 H.run({ maxFrames = 3000 }, {
   H.loadState(STATE),
   H.waitFrames(10),
   H.call(read),
+  H.call(wardCase),
   H.call(function()
     -- 1. arming for a boss
     local base = H.relicPlan(members, { threats = ICE, tag = "relicspare ice, 4b off", spareRibbon = false })

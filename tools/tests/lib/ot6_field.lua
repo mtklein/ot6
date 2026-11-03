@@ -7791,7 +7791,7 @@ function M.eggMayDisplace(cl)
 end
 -- Step 4b's class test, the same classes: a Ribbon left in the bag goes over
 -- a guard, a spare ward or an acting relic, never a two-weapon relic, a ward
--- or the Exp. Egg (#495).  A function of its own so field_relicplan's mutants
+-- or the Exp. Egg (#495).  A function of its own so field_relicspare's mutants
 -- can switch it (#499).
 function M.ribbonMayDisplace(cl)
   return cl ~= nil and not cl.hands and cl.aff ~= "ward" and cl.aff ~= "behind"
@@ -8159,7 +8159,7 @@ function M.relicPlan(members, opts)
   -- reason): the wards the boss kit puts on stay, as everywhere, and a Ribbon left in the bag goes over a
   -- lower-ranked relic (gen_wor_tritoch's Ice Dragon: TERRA's Ribbon gives way to the Barrier Ring and goes on
   -- MOG).  A plan that already wears them all is unchanged.  (opts.spareRibbon = false skips the step: the
-  -- baseline field_relicplan reads 4b's promises against, #499)
+  -- baseline field_relicspare reads 4b's promises against, #499)
   local ribbonsOn = 0
   for _, m in ipairs(ms) do
     for s = 4, 5 do if m.want[s] == RIBBON_ID then ribbonsOn = ribbonsOn + 1 end end
