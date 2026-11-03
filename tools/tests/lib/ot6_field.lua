@@ -7789,6 +7789,13 @@ end
 function M.eggMayDisplace(cl)
   return cl ~= nil and not cl.hands and cl.aff ~= "ward" and cl.aff ~= "behind"
 end
+-- Step 4b's class test, the same classes: a Ribbon left in the bag goes over
+-- a guard, a spare ward or an acting relic, never a two-weapon relic, a ward
+-- or the Exp. Egg (#495).  A function of its own so field_relicplan's mutants
+-- can switch it (#499).
+function M.ribbonMayDisplace(cl)
+  return cl ~= nil and not cl.hands and cl.aff ~= "ward" and cl.aff ~= "behind"
+end
 function M.relicPlan(members, opts)
   opts = opts or {}
   local tag = opts.tag or "relics"
@@ -8151,12 +8158,13 @@ function M.relicPlan(members, opts)
   -- fight calls for: field_relicplan's Dullahan case).  Arming for a boss too (#495: the exclusion had no play
   -- reason): the wards the boss kit puts on stay, as everywhere, and a Ribbon left in the bag goes over a
   -- lower-ranked relic (gen_wor_tritoch's Ice Dragon: TERRA's Ribbon gives way to the Barrier Ring and goes on
-  -- MOG).  A plan that already wears them all is unchanged.
+  -- MOG).  A plan that already wears them all is unchanged.  (opts.spareRibbon = false skips the step: the
+  -- baseline field_relicplan reads 4b's promises against, #499)
   local ribbonsOn = 0
   for _, m in ipairs(ms) do
     for s = 4, 5 do if m.want[s] == RIBBON_ID then ribbonsOn = ribbonsOn + 1 end end
   end
-  while ribbonsOn > 0 and (count[RIBBON_ID] or 0) > 0 do
+  while opts.spareRibbon ~= false and ribbonsOn > 0 and (count[RIBBON_ID] or 0) > 0 do
     local best = nil
     for _, m in ipairs(ms) do
       if m.want[4] ~= RIBBON_ID and m.want[5] ~= RIBBON_ID and wearsItem(m.ch, RIBBON_ID) then
@@ -8165,7 +8173,7 @@ function M.relicPlan(members, opts)
           if w == nil or w == 0xFF then key = -1
           else
             local cl = M.relicClass(w, opts.threats)
-            if cl and not cl.hands and cl.aff ~= "ward" and cl.aff ~= "behind" then key = cl.rank end
+            if M.ribbonMayDisplace(cl) then key = cl.rank end
           end
           if key ~= nil and (best == nil or key < best.key or (key == best.key and m.spells > best.m.spells)) then
             best = { m = m, s = s, key = key }
