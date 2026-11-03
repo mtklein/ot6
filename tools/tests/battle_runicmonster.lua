@@ -8,11 +8,12 @@
 -- counterattack queue).  battle_runicblade's caster is always EDGAR; here
 -- the caster is a monster.
 --
--- Played: Continue the wor-narshe-cliffs-v1 battery (CELES L41, the factory
--- long behind her), pace below the save point on the cliffs (map 34) into
+-- Played: Continue the wor-narshe-cliffs-v1 battery (the factory long
+-- behind CELES), walk from the cliffs' save point (map 34) up onto
+-- Tritoch's ledge (map 35, the same pool, group 191) and pace there into
 -- random battles, and in one that fields a Wizard (its script is nothing
 -- but player magic: Mute, Osmose, Rasp, Stop, Muddle, Sleep; formations 276
--- and 277, 160/256 of this map's battles, route_data.py pool field 34)
+-- and 277, 160/256 of the ledge's battles, route_data.py map 35)
 -- CELES raises Runic at 3 BP through the real menu (H.kitBattle; Defends
 -- bank the points); everyone Defends.  A battle with no Wizard, or one that
 -- ends first, is fought out and the next taken; a stance that runs out
@@ -31,13 +32,30 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local CELES, RUNIC, CMD_MAGIC, WIZARD = 0x06, 0x0B, 0x02, 0x0C4
--- the pace: two tiles of the maze's ledge below the save point (25,5),
--- whose own neighbours two and three tiles out are rock (route_data.py
--- field-path 34 25 5 23 8: 5 steps)
-local PACE = { { 23, 6 }, { 23, 8 } }
+-- Not on map 34, where this suite paced below the save point until v0.38:
+-- the Ice Dragon (NPC_2, event battle 132: L74, 24400 HP, no running, a game
+-- over when lost) walks that map at random (npc_prop.asm: set_npc_movement
+-- RANDOM) and came to the pace first on every draw measured -- "[seed]
+-- first battle ... group $016E" at f1413-f1419 on shifts 0, 7 and 13
+-- (build/attempts/wt/v036-fragile/K/res/) -- so the suite's first battle
+-- was the dragon's, fought out with plain Fights: won while the chain's
+-- party could, wiped once wt/v038-wob-gear's play dressed it otherwise
+-- ("GAME OVER fired ... battle wipe x1", formation ... 0149 ...,
+-- build/attempts/wt/v038-wob-suites/repro/).  The dragon is the route's
+-- (gen_wor_tritoch fights it armed for ice), not this suite's; Tritoch's
+-- ledge deals the cliffs' own pool and holds no wanderer.  The walk: the
+-- save point (25,5) to the long exit (20,1) -> map 35 (25,30), 13 steps
+-- (route_data.py field-path 34 25 5 20 1); the pace two tiles up the
+-- ledge's straight run, well clear of its exit row (y 32) and of
+-- Tritoch's triggers (9,14) and (9,12) (route_data.py field-path 35 25 30
+-- 25 25: 5 steps up x = 25).
+local MAP_CLIFFS, MAP_LEDGE, ICEDRAGON = 34, 35, 0x149
+local LEDGE_EXIT = { 20, 1 }
+local PACE = { { 25, 28 }, { 25, 25 } }
 local RUNICBLADE, BLADEPEND, BLADECASTER, BLADESPELL = 0xEDD4, 0xEDD5, 0xEDD6, 0xEDD7
 
 local celes = nil
+local dragonMet = false
 local absorbs, passes = {}, {}
 local function arm()
   local ab = H.sym("Ot6BladeAbsorb")
@@ -73,6 +91,21 @@ local function arm()
         .. "MP %d", p.f, p.spell, p.cmd, p.b8, p.b9, p.celesMp))
     end
   end, emu.callbackType.write, 0x7E3410, 0x7E3410)
+end
+
+local function map() return H.mapId() & 0x1ff end
+-- the Ice Dragon's object (gen_wor_tritoch's dragonObj): map 34's one live
+-- object besides the save point's (25,5)
+local function dragonLine()
+  if map() ~= MAP_CLIFFS then return "not on map 34" end
+  local t = {}
+  for o = 0x10, 0x2F do
+    local ox, oy = H.objX(o), H.objY(o)
+    if not (ox == 0 and oy == 0) and not (ox == 25 and oy == 5) then
+      t[#t + 1] = string.format("$%02X at (%d,%d)", o, ox, oy)
+    end
+  end
+  return #t > 0 and table.concat(t, ", ") or "none"
 end
 
 local function wizardSlots()
@@ -148,6 +181,31 @@ local steps = {
     H.assertEq((H.readByte(0x1E80 + (0x68 >> 3)) >> (0x68 & 7)) & 1, 1,
       "switch $0068 is set: the Magitek factory's way out has opened (RunicBlade learned)")
   end),
+  -- up onto Tritoch's ledge (a battle on the walk is played out by the
+  -- walker; the Ice Dragon's would be the dragon this walk leaves behind,
+  -- and is refused below as the precondition it breaks)
+  H.call(function()
+    H.log(string.format("[rbm] f%d on map %d at (%d,%d); the Ice Dragon: %s", H.frame, map(), H.fieldX(),
+      H.fieldY(), dragonLine()))
+  end),
+  H.fieldCare({ tag = "rbm: care before the walk", threshold = 0.95 }),
+  H.repeatN(3, {
+    H.cond(function() return map() ~= MAP_LEDGE and not dragonMet end, {
+      H.navTo(LEDGE_EXIT[1], LEDGE_EXIT[2], { maxFrames = 12000, playBattles = "tactical",
+        arrive = function()
+          if H.battleLoadStarted() and H.formationHas({ [ICEDRAGON] = true }) then dragonMet = true end
+          return map() == MAP_LEDGE or dragonMet
+        end }),
+      H.release(),
+      H.waitUntil(function() return map() == MAP_LEDGE or dragonMet end, 600, "rbm: onto Tritoch's ledge (map 35)", 5),
+    }, {}),
+  }),
+  H.waitUntil(function() return dragonMet or (map() == MAP_LEDGE and H.hasControl() and H.tileAligned()) end, 1200,
+    "rbm: control on Tritoch's ledge", 1),
+  H.call(function()
+    H.assertEq(dragonMet, false, "precondition: the walk to Tritoch's ledge kept clear of the Ice Dragon")
+    H.log(string.format("[rbm] f%d on Tritoch's ledge (map %d) at (%d,%d)", H.frame, map(), H.fieldX(), H.fieldY()))
+  end),
   H.paceToEncounter("rbm", nil, PACE),
   H.driveUntil(function() return ok end, 800000, {
     H.cond(function() return not H.battleLoadStarted() end,
@@ -158,6 +216,8 @@ local steps = {
         battles = battles + 1
         H.assertEq(battles <= BATTLES, true, string.format("a Wizard's spell sent back within %d battles", BATTLES))
       end
+      H.assertEq(H.formationHas({ [ICEDRAGON] = true }), false,
+        "precondition: the suite's battles are the ledge's pool, not the Ice Dragon's")
       celes = nil
       for s = 0, 3 do if H.readByte(0x3ED8 + s * 2) == CELES then celes = s end end
       H.assertEq(celes ~= nil, true, "CELES is seated")
