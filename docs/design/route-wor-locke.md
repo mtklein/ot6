@@ -273,8 +273,14 @@ safest standing body, unless it is the killing blow.
 Measured from the tracked `wor-thamasa-v1` (c5746dcc's re-cut of the
 play at 36a4846a; no generator, ROM, emulator pin or replay line has
 changed since), K = 0 and 4 at shifts 0-11 and K = 1, 2, 3 and 5 at
-shifts 0 and 7, 32 runs an arm (`lab/verdicts.txt`,
-`lab/fight_report.txt`, `lab/fights.tsv`, `lab/deaths_152.txt`):
+shifts 0 and 7, 32 runs an arm, both arms booting that one capture.
+The base is the driver at ef1058ae (`base_*`); the fix is aefff9dc
+(`fix2_*`), re-run at b93ccbf0 after review (`fix3_*`: engine-order
+counter chains, heals, Demi at 1 HP, the killing blow read from the
+script, no re-aim onto a dodger), whose 247 fights are the same as
+fix2's (`lab/verdicts.txt`, `lab/verdicts_fix3.txt`,
+`lab/fight_report.txt`, `lab/fight_report_fix3.txt`, `lab/fights.tsv`,
+`lab/deaths_152.txt`):
 
 | formation | keys base / fix | won base / fix | deaths a fight base / fix |
 |---|---|---|---|
@@ -288,8 +294,8 @@ shifts 0 and 7, 32 runs an arm (`lab/verdicts.txt`,
 | $1CF Doom Gaze | 23 / 23 | 22 / 22 | 0.52 / 0.52 |
 
 On the ten `$152` keys both arms met, the base won 9 with 17 deaths
-and the fix won 10 with 7. The median win took 5,980 ticks against
-8,916. Every run's `$152` deaths by attack: the base had Blow Fish 7,
+and the fix won 10 with 7. The fix's median win (10 wins) took 5,976.5
+ticks against the base's 8,916 (9 wins). Every run's `$152` deaths by attack: the base had Blow Fish 7,
 X-Zone 2, Doom 2 and ZombiStick 15. The fix had no Blow Fish, X-Zone
 or Doom deaths and 8 ZombiStick. Its remaining deaths are ZombiStick's
 Zombie on SABIN (section 8.2) and a SABIN raised at 1/8 HP falling to
