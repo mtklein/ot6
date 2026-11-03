@@ -6988,7 +6988,6 @@ BATTLE.BLITZ_SHAPE = {
   [0x5D] = { class = 0x04, elem = 0, hits = 2 },   -- Pummel
   [0x5E] = {},                                     -- Aura Bolt
   [0x5F] = { class = 0x04 },                       -- Suplex
-  [0x60] = { aoe = true },                         -- Fire Dance
   [0x62] = { aoe = true },                         -- Air Blade
 }
 function M.blitzChips(slot, id)
@@ -8707,19 +8706,28 @@ end
 
 -- SABIN's Blitz by the fight (#388), where no leg names one (opts.blitz is
 -- the leg's own and stands): against two or more standing bodies, the
--- learned Blitz that lands on every body (Fire Dance, Air Blade) and whose
--- element no standing body absorbs or nulls, the one more bodies are weak
--- to first and Air Blade on a tie; otherwise Pummel, as before.  What he
+-- learned Blitz that lands on every body (Air Blade) and whose element no
+-- standing body absorbs or nulls, unless a Pummel chips a standing body's
+-- shields; otherwise Pummel, as before.  What he
 -- knows is $1D28 (bit n = Blitz $5D+n).  Read with full power: the bodies'
 -- battle weak, absorb and null bytes.  The price is the line's own
 -- (M.kitBoost, at the caller).  opts.blitzPick = false is the driver before
 -- it (the control arm).
-BATTLE.BLITZ_AOE = { 0x62, 0x60 }   -- Air Blade, Fire Dance: the tie order
+BATTLE.BLITZ_AOE = { 0x62 }   -- Air Blade (Fire Dance, from L15 in the World of Balance, is not measured)
 function Driver:blitzPick(actor)
   if self.opts.blitz then return self.opts.blitz end
   if self.opts.blitzPick == false then return BATTLE.PUMMEL end
   local stand = standingSlots()
   if #stand < 2 then return BATTLE.PUMMEL end
+  -- a Pummel that chips a standing body's shields keeps the turn: the
+  -- all-body Blitzes chip by element alone, and an unbroken body keeps
+  -- acting (the lab behind this rule: build/attempts/wt/v038-wor-abilities/)
+  for _, sl in ipairs(stand) do
+    if M.readByte(BATTLE.SH_CUR + sl * 2) > 0 and M.readByte(BATTLE.BRK_TICKS + sl * 2) == 0
+       and M.blitzChips(sl, BATTLE.PUMMEL) > 0 then
+      return BATTLE.PUMMEL
+    end
+  end
   local known = M.readByte(0x1D28)
   local best, bestWeak = nil, -1
   for _, b in ipairs(BATTLE.BLITZ_AOE) do
