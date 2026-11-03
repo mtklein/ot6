@@ -69,7 +69,7 @@ local function guard(name)
         end
       end
       H.assertEq(H.invCountOf(RIBBON) >= 1 or from ~= nil, true, string.format(
-        "%s: the party owns a Ribbon $%02X (in the bag or on a seated member) to guard the shield's wearer", name, RIBBON))
+        "%s: the party owns the guard $%02X (a Ribbon; in the bag or on a seated member) for the shield's wearer", name, RIBBON))
       for s = 5, 4, -1 do if slot == nil and relic(SHADOW, s) == 0xFF then slot = s end end
       for s = 5, 4, -1 do
         local cl = H.relicClass(relic(SHADOW, s))
