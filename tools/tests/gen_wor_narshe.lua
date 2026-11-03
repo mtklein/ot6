@@ -13,6 +13,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local TERRA, CYAN, EDGAR, SABIN, CELES, SETZER, MOG = 0, 2, 4, 5, 6, 9, 10
 local TONIC, POTION, FENIX, REMEDY, SOFT = 0xE8, 0xE9, 0xF0, 0xF5, 0xF4
 local REVIVIFY, TENT, XPOTION, ETHER, ELIXIR, TINCTURE = 0xF1, 0xF7, 0xEA, 0xEC, 0xEE, 0xEB
+local POD_BRACELET = 0xC8
 local PARTISAN, RIBBON, MOOGLE_CHARM = 0x20, 0xCA, 0xDE
 local MAP_JIDOOR, MAP_JIDOOR_SHOP, MAP_JIDOOR_WEAPON = 198, 201, 204
 local MAP_NARSHE, MAP_ELDER, MAP_CLIFF_LO, MAP_CLIFF_SAVE, MAP_MINES = 32, 30, 33, 34, 36
@@ -502,9 +503,10 @@ H.run({ maxFrames = 400000 }, {
   -- through.  The elder's house (map 32 (49,12), a door in a wall, -> 30
   -- (55,34)); its back door (67,26) -> 32 (53,8), the pocket that holds the
   -- moogle cave's upper door (26,8) -> 38 (78,58).  The house's Elixir
-  -- (30 (55,30), bit $002) and the cave's Pod Bracelet and Elixir (38, bits
-  -- $00B, $00C) were opened in the World of Balance: build/lab/narshe/d3,
-  -- 'already open'
+  -- (30 (55,30), bit $002) was opened in the World of Balance (build/lab/
+  -- narshe/d3, 'already open'); the cave's Pod Bracelet and Elixir (38, bits
+  -- $00B, $00C) are this leg's since #350 (the World of Balance leaves their
+  -- bits closed: its copies are the mines chase's Fenix Down and Sleeping Bag)
   -- the elder's west room and its Elixir (#485: TreasureProp 30 (105,14), bit $00A), 65 steps off the street
   -- (route_data.py field-path 32 38 48 18 23): in by the west door (18,22) -> 30 (110,25), out by its trigger
   -- (110,26), which in the World of Ruin loads 32 (18,24) (_cc390c)
@@ -526,8 +528,22 @@ H.run({ maxFrames = 400000 }, {
   -- into from (49,22) (build/lab/narshe/d3: 'no-effect: up for 320
   -- frames'); the way in is the back room: 38 (49,11) -> 37 (20,37), 37
   -- (14,7) -> 44 (121,60)
-  via({ { 71, 53 }, { 65, 47 }, { 62, 38 }, { 57, 31 }, { 56, 26 }, { 59, 17 }, { 54, 10 } },
-    "the moogle cave to its back room's door", MOOGLE_DOORS),
+  -- the cave's two chests stand beside the walk up (#350): the Elixir (52,33)
+  -- and the Pod Bracelet (65,28), each a few steps off (57,31)
+  H.call(function()
+    for _, b in ipairs({ { 0x00B, "Pod Bracelet" }, { 0x00C, "Elixir" } }) do
+      H.assertEq(H.chestOpen(b[1]), false, string.format("38: the %s's chest (bit %d) is closed at the cave's door: "
+        .. "the World of Balance leaves it (audit_chests 'keep closed in the WoB')", b[2], b[1]))
+    end
+  end),
+  via({ { 71, 53 }, { 65, 47 }, { 62, 38 }, { 57, 31 } }, "the moogle cave to its chests", MOOGLE_DOORS),
+  chestAt(52, 33, 0x00C, "Elixir (38 (52,33))", ELIXIR, MOOGLE_DOORS),
+  chestAt(65, 28, 0x00B, "Pod Bracelet (38 (65,28))", POD_BRACELET, MOOGLE_DOORS),
+  H.call(function()
+    H.assertEq(H.chestOpen(0x00B) and H.chestOpen(0x00C), true,
+      "38: the Pod Bracelet's and the Elixir's chests (bits 11, 12) are open")
+  end),
+  via({ { 56, 26 }, { 59, 17 }, { 54, 10 } }, "the moogle cave to its back room's door", MOOGLE_DOORS),
   door(49, 11, MAP_MOOGLE_B, "the moogle cave -> its back room (37)", exceptOf(MOOGLE_DOORS, 49, 11)),
   via({ { 15, 34 }, { 18, 27 }, { 15, 18 } }, "the back room to MOG's door", { { 20, 35 } }),
   door(14, 7, MAP_MOG, "the back room -> MOG's room (44)", { { 20, 35 } }),

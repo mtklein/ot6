@@ -8102,17 +8102,25 @@ function M.relicPlan(members, opts)
     if not count[id] then count[id] = 0; ids[#ids + 1] = id end
     count[id] = count[id] + n
   end
-  for s = 0, 255 do
-    local id, q = M.readByte(0x1869 + s), M.readByte(0x1969 + s)
+  -- opts.bag = { [id] = n, ... }: plan against this bag instead of the
+  -- party's, with opts.assume as what the members wear and nothing coming
+  -- off them (a suite's constructed case, field_relicspare's wards: the plan
+  -- read on a fixture whatever the fixture's bag and dressing hold)
+  local function bagRow(id, q)
     if id ~= 0xFF and q > 0 then
       local cl = M.relicClass(id, opts.threats)
       if cl and not cl.hands then add(id, q) end
       if cl and cl.hands then spareHands[#spareHands + 1] = { id = id, n = q } end
     end
   end
+  if opts.bag then
+    for id, q in pairs(opts.bag) do bagRow(id, q) end
+  else
+    for s = 0, 255 do bagRow(M.readByte(0x1869 + s), M.readByte(0x1969 + s)) end
+  end
   -- an assumed relic is counted in the bag above but is worn in the plan,
   -- and the real one it replaces would come off into the bag
-  for _, m in ipairs(ms) do
+  for _, m in ipairs(opts.bag and {} or ms) do
     for s = 4, 5 do
       if m.cur[s] ~= m.real[s] then
         local cl = M.relicClass(m.cur[s], opts.threats)
@@ -8611,6 +8619,23 @@ end
 -- whose new relics are all in the bag first (a relic moving from one member
 -- to another reaches the bag when its first wearer takes his new one), and
 -- every planned slot asserted after.
+-- The member dressRelics dresses next: the first in `queue` whose new
+-- relics are all in the bag, counted (have(id) -> how many the bag holds) --
+-- a member taking two of one relic (two Hyper Wrists to CYAN, one still on
+-- TERRA) waits until both are there (#350's line, wor_cyan: "CYAN's relic
+-- slot 5 holds Hyper Wrist $D2: got 255").  nil when nobody can go.  A
+-- function of its own so field_relicspare can drive it on a stub queue.
+function M.relicDressPick(queue, have)
+  for i, p in ipairs(queue) do
+    local ok, need = true, {}
+    for _, c in ipairs(p.changes) do
+      if c[2] ~= 0xFF then need[c[2]] = (need[c[2]] or 0) + 1 end
+    end
+    for id, n in pairs(need) do if have(id) < n then ok = false end end
+    if ok then return i end
+  end
+  return nil
+end
 function M.dressRelics(members, opts)
   opts = opts or {}
   local tag = opts.tag or "relics"
@@ -8722,20 +8747,7 @@ function M.dressRelics(members, opts)
           -- a change to $FF (a slot the plan empties) needs nothing from
           -- the bag: the Relic menu's Remove
           local function lacks(c) return c[2] ~= 0xFF and M.invCountOf(c[2]) < 1 end
-          local pick = nil
-          for i, p in ipairs(queue) do
-            -- by count, not presence: a member taking two of one relic (two
-            -- Hyper Wrists to CYAN, one still on TERRA) waits until both are
-            -- in the bag (#350's line, wor_cyan: "CYAN's relic slot 5 holds
-            -- Hyper Wrist $D2: got 255")
-            local ok, need = true, {}
-            for _, c in ipairs(p.changes) do
-              if lacks(c) then ok = false end
-              if c[2] ~= 0xFF then need[c[2]] = (need[c[2]] or 0) + 1 end
-            end
-            for id, n in pairs(need) do if M.invCountOf(id) < n then ok = false end end
-            if ok then pick = i; break end
-          end
+          local pick = M.relicDressPick(queue, M.invCountOf)
           if pick == nil then
             -- A swap: each member wants a relic the other wears (main's
             -- wor_relm at the gear policy's levels: CYAN's Peace Ring is

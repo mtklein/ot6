@@ -142,6 +142,8 @@
 10	map 30 Elder's House, the west room, Elixir (105,14) (gen_wor_narshe)
 207	map 44 Mog's room, Moogle Charm (121,45) -- after MOG joins (gen_wor_narshe)
 13	map 44 Mog's room, Ribbon (98,53) (gen_wor_narshe)
+11	map 38 the Moogle cave (World of Ruin; bit shared with map 50's Fenix Down), Pod Bracelet (65,28) (gen_wor_narshe, #350)
+12	map 38 the Moogle cave (World of Ruin; bit shared with map 50's Sleeping Bag), Elixir (52,33) (gen_wor_narshe, #350)
 168	map 282 Umaro's cave, X-Ether (14,25) (gen_wor_tritoch)
 169	map 281 Umaro's cave, Gauntlet (41,58) (gen_wor_tritoch)
 213	map 207 Owzer's basement, Moogle Suit (92,58) -- the inner door's pocket (gen_wor_owzer)

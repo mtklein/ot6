@@ -386,7 +386,7 @@ and the South Figaro elixir are WoR-opened). Since #350 the WoB route leaves the
 eight closed: `tools/chests_opened.txt`'s `[keep closed in the WoB]` section
 lists them with 13, 19, 97 and 230, and `audit_chests` fails when a World of
 Balance state has one set. The WoR sweep (`gen_wor_figaro_sweep`) takes
-South Figaro's six; the Moogle cave's pair (map 38) is not on a WoR leg yet.
+South Figaro's six, and `gen_wor_narshe` the Moogle cave's pair (map 38) on the walk to MOG.
 
 ## 6. Bosses and events
 
