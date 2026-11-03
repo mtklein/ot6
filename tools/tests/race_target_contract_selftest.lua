@@ -16,6 +16,8 @@ local function driver()
   d.battInvIdx=function() return 0 end;d.steerWatch=function() end
   d.focusList=function() return {{slot=0,mask=1}} end
   d.focusReachable=function() return true end
+  -- the counter rules read the ROM's AI scripts (counter_selftest covers them)
+  d.counterAimPlan=function(_,_,plan) return plan end
   return d
 end
 local function attack(d) return assert(d:racePlan(0,{kind='attack',target=1,boost=0,line={plan={kind='fight',row=0}}})) end
