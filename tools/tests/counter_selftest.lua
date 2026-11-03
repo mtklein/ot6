@@ -238,5 +238,33 @@ check("Flare is not priced here (monHitOn's magical model is)",
   "fixedTake", "if (byteAt(4) & 0x80) ~= 0 then", "if true then",
   function() return H.fixedTake(rec(0x0F), 557, 2227) == nil end)
 
+-- review of 6813106a: heals, a fraction at 1 HP, the engine's counter order, if_self_dead
+assert(rom:byte(MAGIC + 0x30 * 14 + 5) == 0xA5 and rom:byte(MAGIC + 0x31 * 14 + 5) == 0xA5,
+  "Life and Life 2 in MagicProp: the heal flag (+4 bit 0) beside the fraction flag (bit 7)")
+check("a heal is no take, though Life and Life 2 carry the fraction flag",
+  "fixedTake", "if (byteAt(4) & 0x01) ~= 0 then return 0 end", "",
+  function() return H.fixedTake(rec(0x30), 3000, 3000) == 0 and H.fixedTake(rec(0x31), 3000, 3000) == 0 end)
+check("Demi on a member at 1 HP takes 1 (CalcDmgRatio's inc), so it kills",
+  "fixedTake", "return math.max(1, (((byteAt(2)", "return math.max(0, (((byteAt(2)",
+  function() return H.fixedTake(rec(0x10), 1, 2227) == 1 end)
+-- $152 on STRAGO at 1800: Blow Fish in slot 0, Quartr in slots 2 and 3.
+-- The engine's order (slot 5 first) is Quartr, Quartr, Blow Fish:
+-- 1800 -> 450 -> 113 -> dead; slot order would be 1800 -> 800 -> 200 -> 50.
+local function chain152()
+  local function quartr(left) return H.fixedTake(rec(0x11), left, 3219) end
+  local function blow(left) return H.fixedTake(rec(0x90), left, 3219) end
+  return H.counterChain({ { slot = 0, take = blow }, { slot = 2, take = quartr }, { slot = 3, take = quartr } }, 1800)
+end
+check("the counters queue from slot 5 down: Quartr, Quartr, then Blow Fish kills a STRAGO at 1800",
+  "counterChain", "return a.slot > b.slot", "return a.slot < b.slot",
+  function() local t, each = chain152(); return t == 1800 and each[3] == 1350 and each[2] == 337 and each[0] == 113 end)
+check("Phase ($0BC) answers a killing Fight with nothing (if_self_dead / end_if)",
+  "retalAnswer", "use.dies ~= nil then holds = use.dies", "use.dies ~= nil then holds = not use.dies",
+  function()
+    local dead = H.retalAnswer(scriptOf(0x0BC), { cmd = FIGHT, dies = true })
+    local alive = H.retalAnswer(scriptOf(0x0BC), { cmd = FIGHT, dies = false })
+    return ids(dead) == "" and ids(alive) == "90"
+  end)
+
 print(string.format("counter_selftest: PASS -- %d assertions, each failed by its own mutant: %s",
   n, table.concat(checks, "; ")))

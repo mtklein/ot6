@@ -5574,6 +5574,8 @@ end
 --   FC 03 i1 i2  if_item     the item is i1 or i2
 --   FC 04 mask   if_element  the action's element is in the mask
 --   FC 05        if_hit      any hit (the action is assumed to land)
+--   FC 12 00 00  if_self_dead  the hit kills the body, when use.dies says
+--                (true or false; nil leaves it undecided)
 -- Any other condition (HP, status, variables, monster counts, timers) is
 -- not decided here: the walk takes both ways.  Returns the attack ids that
 -- can answer (each of $F0's three; NOTHING, $FE, left out) and whether the
@@ -5617,6 +5619,7 @@ function M.retalAnswer(byteAt, use)
         elseif c == 0x03 then holds = either(use.item, a, b)
         elseif c == 0x04 then holds = ((use.elem or 0) & a) ~= 0
         elseif c == 0x05 then holds = true
+        elseif c == 0x12 and a == 0 and b == 0 and use.dies ~= nil then holds = use.dies
         end
         if holds == nil then
           certain = false
@@ -7582,12 +7585,39 @@ end
 -- M.fixedTake(byteAt, hp, maxHp) is that pricing on one MagicProp record
 -- (byteAt(i), i = 0..13): the take, or nil for an attack it does not
 -- price (counter_selftest checks it on the built ROM's records).
+-- A heal (+4 bit 0: Life, Life 2, Pep Up carry the fraction flag too)
+-- takes nothing.  A fraction that rounds to 0 takes 1 (CalcDmgRatio:
+-- `bne @0dc5 / inc`), so a Demi or Quartr kills a member at 1 HP.
 function M.fixedTake(byteAt, hp, maxHp)
+  if (byteAt(4) & 0x01) ~= 0 then return 0 end
   if byteAt(9) == 0x1A then return 1000 end
   if (byteAt(4) & 0x80) ~= 0 then
-    return (((byteAt(2) & 0x04) ~= 0 and maxHp or hp) * byteAt(6)) >> 4
+    return math.max(1, (((byteAt(2) & 0x04) ~= 0 and maxHp or hp) * byteAt(6)) >> 4)
   end
   return nil
+end
+
+-- What a chain of counters takes off a member at `hp` (#503 review): one
+-- action that lands on several bodies draws each one's counter, and the
+-- engine queues them from the highest slot down (CheckRetal: `ldx #$12`,
+-- then `dex2`, entity 9 = monster slot 5 first; CreateRetalAction
+-- appends, the battle loop takes from the front).  So on $152 both
+-- Necromancers' Quartrs (slots 2, 3) land before the Phase's Blow Fish
+-- (slot 0), and a STRAGO at 1800 HP goes 1800 -> 450 -> 113 -> dead,
+-- where the slot order 0 -> 5 would read 1800 -> 800 -> 200 -> 50.
+-- steps = { { slot = s, take = function(left) return n end }, ... };
+-- returns the HP taken (at most hp) and each step's take, by slot.
+function M.counterChain(steps, hp)
+  local order = {}
+  for _, st in ipairs(steps) do order[#order + 1] = st end
+  table.sort(order, function(a, b) return a.slot > b.slot end)
+  local left, each = hp, {}
+  for _, st in ipairs(order) do
+    local t = math.min(st.take(left) or 0, left)
+    each[st.slot] = t
+    left = left - t
+  end
+  return hp - left, each
 end
 
 function Driver:counterHit(slot, e, a, hp)
@@ -7722,21 +7752,42 @@ function Driver:counterVetoed(actor, use, slots, what, aoe)
       if not funknown and (safest == nil or ftop < safest) then safest = ftop end
     end
   end
-  local take, left, parts, fworst, funk = 0, hp, {}, 0, false
+  local take, parts, fworst, funk = 0, {}, 0, false
   local refuse = false
+  -- an all-body verb: every body's counter, in the engine's order (M.counterChain)
+  local steps, info = {}, {}
+  if aoe then
+    for _, slot in ipairs(slots) do
+      if monAlive(slot) then
+        steps[#steps + 1] = { slot = slot, take = function(left)
+          local top, which = self:counterWorst(slot, actor, use, left)
+          info[slot] = which
+          return top
+        end }
+      end
+    end
+    local each
+    take, each = M.counterChain(steps, hp)
+    for s = 5, 0, -1 do
+      if info[s] ~= nil then
+        parts[#parts + 1] = string.format("slot %d $%03X $%02X %d", s, M.readWord(M.FORMATION + s * 2),
+          info[s], each[s])
+      end
+    end
+  end
   for _, slot in ipairs(slots) do
     if monAlive(slot) then
-      local top, which = self:counterWorst(slot, actor, use, aoe and left or hp)
+      local top, which = self:counterWorst(slot, actor, use, hp)
       local ftop, funknown = fightOn(slot)
       funk = funk or funknown
       if ftop > fworst then fworst = ftop end
       if which ~= nil then
-        parts[#parts + 1] = string.format("slot %d $%03X $%02X %d, a Fight's %d%s", slot,
-          M.readWord(M.FORMATION + slot * 2), which, aoe and math.min(top, left) or top, ftop,
-          funknown and "+" or "")
+        if not aoe then
+          parts[#parts + 1] = string.format("slot %d $%03X $%02X %d, a Fight's %d%s", slot,
+            M.readWord(M.FORMATION + slot * 2), which, top, ftop, funknown and "+" or "")
+        end
         if aoe then
-          left = left - math.min(top, left)
-          take = hp - left
+          -- priced in the chain above
         else
           take = math.max(take, top)
           -- one body: its answer to the verb against its answer to a Fight
@@ -7768,21 +7819,31 @@ end
 -- left two members to the last Necromancer's X-Zone).  A person aims
 -- that member at another body: the Fight re-aims at the standing body
 -- whose answer is the least, when that one's cannot kill, and is left as
--- planned when it is already aimed at a safe body, when every body's
--- answer kills (or is unpriced), or when it is the killing blow
--- (plan.reason "finish": the Phase's retaliation opens with
--- `if_self_dead / end_if`, a dead body does not answer).  aimHard so an
+-- planned when it is already aimed at a safe body or when every body's
+-- answer kills (or is unpriced).  The engine runs a dying body's counter
+-- too (CheckRetal's $3a56 branch), so a killing blow (plan.reason
+-- "finish") is left as planned only when the body's script, walked with
+-- the hit killing it (retalAnswer's use.dies), answers with nothing that
+-- kills: the Phase's opens `if_self_dead / end_if`, and a death counter
+-- (Coelecite, Scullion, Intangir) still answers.  The finish rule's kill
+-- estimate is taken as given there.  A re-aim never lands on a body under
+-- Vanish or Image (M.dodges: every swing misses it).  aimHard so an
 -- authored or planned kill order does not steer it back.
 function Driver:counterAimPlan(actor, plan)
-  if plan == nil or plan.kind ~= "fight" or plan.reason == "finish" then return plan end
+  if plan == nil or plan.kind ~= "fight" then return plan end
   local hp = M.readWord(0x3BF4 + actor * 2)
   if hp == 0 then return plan end
+  if plan.reason == "finish" and plan.aim ~= nil and monAlive(plan.aim) then
+    local top, _, _, unknown = self:counterWorst(plan.aim, actor, { cmd = BATTLE.CMD_FIGHT, dies = true }, hp)
+    if not unknown and top < hp then return plan end
+  end
   local kills, best, bestTake, bestHp = {}, nil, nil, nil
   for s = 0, 5 do
     if monAlive(s) then
       local top, which, _, unknown = self:counterWorst(s, actor, { cmd = BATTLE.CMD_FIGHT }, hp)
+      local dodger = M.dodges({ s1 = M.readByte(0x3EE4 + (4 + s) * 2), s2 = M.readByte(0x3EE5 + (4 + s) * 2) })
       if top >= hp then kills[s] = which
-      elseif not unknown and self:focusReachable(s) then
+      elseif not unknown and dodger == nil and self:focusReachable(s) then
         local mhp = M.readWord(BATTLE.MON_HP + s * 2)
         if best == nil or top < bestTake or (top == bestTake and mhp < bestHp) then
           best, bestTake, bestHp = s, top, mhp
