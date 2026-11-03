@@ -8,7 +8,7 @@ H.readWord=function(a) return (ram[a] or 0)|((ram[a+1] or 0)<<8) end
 H.log=function() end
 H.itemProps=function() return 0 end;H.itemPower=function() return 50 end
 local function driver()
-  ram={};ram[0x7bca]=1;ram[0x3bf4]=100
+  ram={};ram[0x7bca]=1;ram[0x3bf4]=100;ram[0x92]=0xff -- every monster on the screen for the cursor
   ram[0x3bfc],ram[0x3bfe],ram[0x3aa8],ram[0x3aaa]=100,100,1,1
   -- Real command-table stride, Item at row 1; inventory lookup isolated.
   ram[0x202e]=1;ram[0x202f]=0;ram[0x302c]=0;ram[0x302d]=0x21;ram[0x2103]=1
