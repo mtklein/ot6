@@ -8082,6 +8082,18 @@ end
 function M.ribbonMayDisplace(cl)
   return cl ~= nil and not cl.hands and cl.aff ~= "ward" and cl.aff ~= "behind"
 end
+-- Step 4's choice between two leftovers the threats rank alike (the same
+-- rank and threatened cover): x replaces best when it covers more of all the
+-- statuses (#504 review: against Doom Gaze's Wound alone the Ribbon and a
+-- Star Pendant both cover nothing, and the id order put the Star Pendant on
+-- TERRA and left her Ribbon in the bag).  A function of its own so
+-- field_relicspare's mutant can switch it.
+function M.relicFillBetter(x, best, threats)
+  local cx, cb = M.relicClass(x, threats), M.relicClass(best, threats)
+  if cx == nil or cb == nil or cx.rank ~= cb.rank or cx.cover ~= cb.cover then return false end
+  local ax, ab = M.relicClass(x), M.relicClass(best)
+  return (ax and ax.cover or 0) > (ab and ab.cover or 0)
+end
 function M.relicPlan(members, opts)
   opts = opts or {}
   local tag = opts.tag or "relics"
@@ -8406,7 +8418,8 @@ function M.relicPlan(members, opts)
           local held = id ~= 0xFF and (count[id] or 0) >= 1 and not second(id) and id or nil
           id = nil
           for _, x in ipairs(order) do
-            if id == nil and count[x] > 0 and wearsItem(m.ch, x) and not (boss and egg(x)) and not second(x) then
+            if count[x] > 0 and wearsItem(m.ch, x) and not (boss and egg(x)) and not second(x)
+               and (id == nil or M.relicFillBetter(x, id, opts.threats)) then
               id = x
             end
           end

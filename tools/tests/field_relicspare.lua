@@ -22,6 +22,10 @@
 --   3. the Ice Dragon's threats again: the member with more spells in two wards and the other with a Ribbon, a
 --      spare Ribbon in the bag.  It has nowhere to go but over a ward, so it stays in the bag and the wards stay
 --      (4b's ward clause: field_relicspare's ward_allowed mutant turns this red).
+--   4. step 4's tie-break (#504): Doom Gaze's threats (H.FIGHT_THREATS.doomgaze, Wound alone), one member with
+--      empty slots and a Death guard, a Ribbon and a narrower guard in the bag, both covering none of the threats:
+--      the Death guard takes one slot and the other goes to the Ribbon, the wider of the two over all statuses;
+--      with H.relicFillBetter switched off (the id order alone, as before) it goes to the narrower guard.
 -- The negative for case 1 (the `not boss` guard 4b had before #495, put back) is recorded in the commit that adds
 -- the file.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -276,6 +280,44 @@ local function wardCase()
     at(w1, 5)))
 end
 
+-- step 4's tie-break: the Ribbon over a narrower guard the threats rank alike
+local function fillCase()
+  local c = ribbonWearers()
+  H.assertEq(#c >= 1, true, "precondition (the tie-break): a seated member can wear a Ribbon")
+  local A = c[1]
+  local T = H.FIGHT_THREATS.doomgaze
+  H.assertEq(T ~= nil and T.s1 == 0x80, true, "precondition (the tie-break): H.FIGHT_THREATS.doomgaze is Wound alone")
+  local rib = H.relicClass(RIBBON, T)
+  local death = wearable({ A }, T, function(cl) return cl.aff == "guard" and cl.cover >= 1 end)
+  local narrow = wearable({ A }, T, function(cl)
+    return cl.aff == "guard" and cl.rank == rib.rank and cl.cover == rib.cover
+  end)
+  local g = nil
+  for _, id in ipairs(narrow) do
+    if g == nil and id < RIBBON and H.relicClass(id).cover < H.relicClass(RIBBON).cover then g = id end
+  end
+  H.assertEq(#death >= 1 and g ~= nil, true, string.format("precondition (the tie-break): %s can wear a guard covering "
+    .. "Wound and a guard below the Ribbon's id that the threats rank like it (rank %d, cover %d) and that covers "
+    .. "fewer statuses", A[2], rib.rank, rib.cover))
+  local d = death[1]
+  stage({ A }, { { 0xFF, 0xFF } }, { { d, 1 }, { RIBBON, 1 }, { g, 1 } })
+  H.log(string.format("[relicspare] the tie-break: %s empty, the bag $%02X (Wound), Ribbon (%d statuses), $%02X (%d)",
+    A[2], d, H.relicClass(RIBBON).cover, g, H.relicClass(g).cover))
+  local plan = byCh(H.relicPlan({ A }, { threats = T, tag = "relicspare tie-break" }), A[1])
+  local got = { at(plan, 4), at(plan, 5) }
+  H.assertEq((got[1] == d and got[2] == RIBBON) or (got[1] == RIBBON and got[2] == d), true, string.format("the "
+    .. "tie-break: %s wears the Death guard $%02X and the Ribbon (planned $%02X, $%02X)", A[2], d, got[1], got[2]))
+  local real = H.relicFillBetter
+  H.relicFillBetter = function() return false end
+  local ok, mplan = pcall(H.relicPlan, { A }, { threats = T, tag = "relicspare tie-break, id order alone" })
+  H.relicFillBetter = real
+  H.assertEq(ok, true, "the mutant's plan runs: " .. tostring(mplan))
+  local mp = byCh(mplan, A[1])
+  H.assertEq(at(mp, 4) == g or at(mp, 5) == g, true, string.format("the tie-break is reached: by id order alone %s "
+    .. "takes $%02X and leaves the Ribbon in the bag (planned $%02X, $%02X)", A[2], g, at(mp, 4), at(mp, 5)))
+  H.log(string.format("[relicspare] PASSED: the tie-break keeps the Ribbon on %s beside $%02X", A[2], d))
+end
+
 H.run({ maxFrames = 3000 }, {
   H.loadState(STATE),
   H.waitFrames(10),
@@ -283,4 +325,5 @@ H.run({ maxFrames = 3000 }, {
   H.call(bossCase),
   H.call(eggCase),
   H.call(wardCase),
+  H.call(fillCase),
 })

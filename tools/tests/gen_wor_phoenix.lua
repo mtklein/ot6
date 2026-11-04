@@ -207,7 +207,7 @@ end
 -- party is dressed, so the cave's dressing starts from the kit and the bag
 -- it had before the flights.  Every slot that moved comes off first (a
 -- relic may go back to a member in the other party), then each member's
--- own goes back on
+-- own goes back on; a slot that did not move is not touched
 local FLIGHT = { TERRA, CELES, RELM, STRAGO }
 local flightKit = {}
 local function slots(c) return { H.readByte(0x1600 + 37 * c + 0x23), H.readByte(0x1600 + 37 * c + 0x24) } end
@@ -234,13 +234,22 @@ local function restoreKit()
       return H.seqStep(steps)
     end)
   end
+  -- only the slots that moved come off (a two-weapon relic the flights left
+  -- in place stays on, and with it the second hand's weapon)
+  local function differ(c)
+    local s, out = slots(c), {}
+    for i, slot in ipairs({ 4, 5 }) do if s[i] ~= flightKit[c][i] then out[#out + 1] = { slot, i } end end
+    return out
+  end
   local function off(c)
-    return H.unequipRelics(c, { 4, 5 }, { tag = H.SPLIT_NAMES[c] .. ": the flights' relics off" })
+    local which = {}
+    for _, d in ipairs(differ(c)) do which[#which + 1] = d[1] end
+    return H.unequipRelics(c, which, { tag = H.SPLIT_NAMES[c] .. ": the flights' relics off" })
   end
   local function on(c)
     local kit = {}
-    for i, s in ipairs({ 4, 5 }) do
-      if flightKit[c][i] ~= 0xFF then kit[#kit + 1] = { s, flightKit[c][i] } end
+    for _, d in ipairs(differ(c)) do
+      if flightKit[c][d[2]] ~= 0xFF then kit[#kit + 1] = { d[1], flightKit[c][d[2]] } end
     end
     return H.equipKit(c, kit, { tag = H.SPLIT_NAMES[c] .. ": the relics from before the flights back on" })
   end
@@ -271,6 +280,21 @@ H.run({ maxFrames = 2400000 }, {
   recordKit(),
   H.dressRelics({ { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" }, { STRAGO, "STRAGO" } },
     { threats = H.FIGHT_THREATS.doomgaze, tag = "relics for the flights (Doom Gaze)" }),
+  -- who the Death guards went to: the plan gives the first to the member with
+  -- the most spells learned, which on this arc is TERRA, the four's Life
+  -- caster ($30), so Doom cannot take the party's reviver; the Memento Ring
+  -- is RELM's alone
+  H.call(function()
+    for _, c in ipairs(FLIGHT) do
+      local s = slots(c)
+      for _, id in ipairs(s) do
+        if id == 0xDC or id == 0xDB then
+          H.log(string.format("[kit] Death guard $%02X on %s for the flights; %s Life ($30)", id, H.SPLIT_NAMES[c],
+            H.readByte(0x1A6E + 54 * c + 0x30) == 0xFF and "knows" or "does not know"))
+        end
+      end
+    end
+  end),
   -- the bag came down from the tower dry (1 Potion, 2 Tonics, 1 Tincture:
   -- docs/design/split-party.md), and the cave splits it between two parties
   board(),
@@ -373,14 +397,26 @@ H.run({ maxFrames = 2400000 }, {
   walk(46, 16, "party 2 onto (46,16): the passage back to the west side ($02AA clear)"),
   H.waitUntil(function() return sw(0x02AA) == 0 and settled() end, 1200, "$02AA clear", 1),
   door(46, 10, MAP_CAVE, "party 2: -> 315 (46,22)"),
-  -- the walk west crosses the spike field (36-44, 9-11), whose plate (39,15)
-  -- no party holds: about 400 HP a member a tile stepped (split-party.md
-  -- section 1), and party 2 came off it at 1 HP and met the cave's fights
-  -- there (#504: "CELES L49 2460/3595" before, "460/3595" at 313 (29,13),
-  -- then a wipe).  Off the field at (33,12), care first
-  walk(33, 12, "party 2 off the spike field (33,12)"),
-  H.splitCare({ parties = { 2 }, tag = "care after the spike field" }),
+  -- the walk west crosses the spike field (36-44, 9-11), which hurts about
+  -- 400 HP a member a tile stepped while its plate (39,15) is not held
+  -- (split-party.md section 1): walked unheld, party 2 came off it near 1 HP
+  -- and met the cave's fights there (#504: "CELES L49 2460/3595" before,
+  -- "460/3595" at 313 (29,13), then a wipe).  So party 2 waits on 315
+  -- (46,22) while party 1 comes up by the jumps to (42,23) and holds the
+  -- plate (11 steps, no spike: route_data field-path 315 42 23 39 15), then
+  -- crosses with the field down, and party 1 steps off for the save point
+  H.switchParty(1),
+  door(43, 12, MAP_CAVE, "party 1: the jumps -> 315 (42,23)"),
+  hold(39, 15, 0x02D1, "party 1 holds the spike field's plate (39,15)"),
+  H.switchParty(2),
+  H.call(function()
+    H.assertEq(sw(0x02D1), 1, "the spike field (36-44, 9-11) is down ($02D1, party 1 on (39,15)) as party 2 crosses")
+    say("spikes", "party 2 crosses with the field down")
+  end),
   door(29, 18, MAP_DEEP, "party 2: -> 313 (29,13)"),
+  H.call(function()
+    H.assertEq(sw(0x02D1), 1, "the spike field stayed down ($02D1) while party 2 crossed")
+  end),
   door(23, 7, MAP_CAVE, "party 2: -> 315 (23,12)"),
   -- the lava: on (19,10), facing up, A (_cc2a1f)
   walk(19, 10, "party 2 onto the lava switch (19,10)"),
@@ -399,7 +435,7 @@ H.run({ maxFrames = 2400000 }, {
   H.call(function() say("route", "the lava drained ($02D0)") end),
   walk(20, 11, "party 2 off the lava switch"),
   H.switchParty(1),
-  door(43, 12, MAP_CAVE, "party 1: the jumps -> 315 (42,23)"),
+  walk(42, 23, "party 1 off the plate, back to (42,23)"),
   H.saveState("wor_phoenix_north.mss"),
 
   -- ---- 5. the save point ----------------------------------------------------------
