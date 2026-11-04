@@ -338,8 +338,18 @@ TERRA's second slot took the Star Pendant and the Ribbon stayed in the bag.
 Among leftovers the threats rank alike, step 4 now takes the one with the
 wider total cover (`H.relicFillBetter`), so TERRA wears the Ribbon and the
 Safety Bit. `field_relicspare` case 4 checks it, and with the id order put
-back the case goes red. This is a library change that reaches every leg's
-dressing (a `replay.txt` line).
+back the case goes red.
+
+On the tree rebased onto #505, step 4b put the spare Ribbon over RELM's
+Memento Ring, and Doom killed her (`merged_k0_s0`: "Ribbon $CA goes to RELM's
+slot 5 (over relic $DB ...) (step 4b)", "[death] f+2969 entity 2 char 8 ...
+atk $0D"). A relic that guards a threatened status the Ribbon does not now
+counts as threat-critical (`cl.ribbonless`, set only when threats are
+named). `H.ribbonMayDisplace`, and with it 4b and the regroups'
+`H.ribbonMayGoOver`, never puts a Ribbon over one. `field_relicspare` case
+5 checks it, and with the clause switched off the case goes red. Both are
+library changes that reach every leg's dressing. The `replay.txt` line
+records a replay still owed; it has not run.
 
 The four's own relics go back on once the cave splits them (`restoreKit`,
 only the slots that moved, under `H.keepGear`), so the cave's dressing
