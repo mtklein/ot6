@@ -8799,15 +8799,23 @@ function M.dressRelics(members, opts)
             -- member who wears a relic another waiting member wants takes
             -- it off into the bag (the Relic menu's Remove), which frees
             -- that member's change; his relic then reaches the bag when the
-            -- other takes his new one, and the queue moves.  Nothing is
-            -- left on a member the plan did not put there: a plan that
-            -- cannot be met this way (a wanted relic neither in the bag nor
-            -- worn by a waiting member) fails here, loudly.
+            -- other takes his new one, and the queue moves.  Any slot the
+            -- plan changes counts, not only one whose new relic he lacks
+            -- (#505, wor_tritoch at 61e1e189: MOG waited on UMARO's Ribbon
+            -- for slot 4 while his slot 5, planned an Amulet from the bag,
+            -- held the Hyper Wrist UMARO waited on; "UMARO wants Hyper Wrist
+            -- $D2 in slot 5 ...; MOG wants Ribbon $CA in slot 4 ...").
+            -- Nothing is left on a member the plan did not put there: a plan
+            -- that cannot be met this way (a wanted relic neither in the bag
+            -- nor worn by a waiting member) fails here, loudly.
+            -- (the lacking slots first, as before; any changed slot only when
+            -- none of those unwinds)
+            for pass = 1, 2 do
             for _, q in ipairs(queue) do
               if pick == nil then
                 local rm = {}
                 for _, c in ipairs(q.changes) do
-                  if lacks(c) then
+                  if (pass == 1 and lacks(c)) or (pass == 2 and c[2] ~= charByte(q.ch, 0x1F + c[1])) then
                     local held = charByte(q.ch, 0x1F + c[1])
                     for _, o in ipairs(queue) do
                       for _, oc in ipairs(o.changes) do
@@ -8837,6 +8845,7 @@ function M.dressRelics(members, opts)
                   pick = -1
                 end
               end
+            end
             end
             if pick == -1 then goto ticked end
             local lacking = {}
