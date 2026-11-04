@@ -210,6 +210,12 @@ H.run({ maxFrames = 2400000 }, {
 
   -- ---- 1. Thamasa: the inn and the item counter --------------------------------
   -- @@stage thamasa
+  -- the Falcon's flights cross Doom Gaze's cells, and its Doom kills at
+  -- any HP (H.FIGHT_THREATS.doomgaze): the Death guards in the bag go on
+  -- before boarding (#504); the cave's own dressing at the split replaces
+  -- them
+  H.dressRelics({ { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" }, { STRAGO, "STRAGO" } },
+    { threats = H.FIGHT_THREATS.doomgaze, tag = "relics for the flights (Doom Gaze)" }),
   -- the bag came down from the tower dry (1 Potion, 2 Tonics, 1 Tincture:
   -- docs/design/split-party.md), and the cave splits it between two parties
   board(),

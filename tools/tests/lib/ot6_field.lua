@@ -7972,9 +7972,18 @@ M.ARC_THREATS = {
 -- _316-_318): Bio (power 53, Bio-sized hits of 525-535) and Poison are
 -- magic and inflict Poison (STATUS1 $04); their Battle hits run 57-122;
 -- Entwine's and the Special's Slow is STATUS3, which no relic guards.
+-- "doomgaze": formation $1CF in the air, AIScript _285 (ai_script.asm): L5
+-- Doom once, then {Battle, Doom, Ice 3}, {Doom, Aero, Aero}, {nothing,
+-- Escape, Escape} round and round until it escapes.  Doom and L5 Doom
+-- inflict Wound (STATUS1 $80) whatever the HP; the Safety Bit and the
+-- Memento Ring guard it (ItemProp +6 $C2).  #504: Doom felled TERRA,
+-- CELES and STRAGO at full HP on key be10-g01CF while RELM, in the
+-- Memento Ring, fell only to a Battle
+-- (build/attempts/wt/v038-phoenix-152/lab/logs/base_k4_s5.run.log.gz).
 M.FIGHT_THREATS = {
   dullahan = { s1 = 0x00, s2 = 0x00, magic = true, boss = true },
   tentacles = { s1 = 0x04, s2 = 0x00, magic = true, boss = true },
+  doomgaze = { s1 = 0x80, s2 = 0x00 },
 }
 local RELIC_NAMES = {
   [0xB0] = "Goggles", [0xB1] = "Star Pendant", [0xB2] = "Peace Ring", [0xB3] = "Amulet",
