@@ -9391,9 +9391,11 @@ end
 -- members?": every seated member not in `members` who wears a Ribbon takes
 -- it off into the bag (M.unequipRelics, which asserts the slot empty).  A
 -- member who is down keeps his: the Relic menu refuses him.
--- M.ribbonsOnSeated(opts): after the regroup, when the bag holds a Ribbon,
--- M.dressRelics for the seated party (relicPlan's step 4b puts on a Ribbon
--- the plan leaves in the bag), then asserts that a Ribbon still in the bag
+-- M.ribbonsOnSeated(opts): after the regroup, each Ribbon in the bag goes
+-- onto the seated party (M.ribbonSeat's slot), moving no other relic: the
+-- leg's own dress decides the rest, and a whole-party dress here moved CYAN's
+-- Atlas Armlet at Owzer's (the first version's sweep).  Then it asserts that
+-- a Ribbon still in the bag
 -- has no seated member to go on: none who can wear one, lacks one and has a
 -- slot that is empty or that step 4b's class test lets a Ribbon take.
 function M.ribbonsOffLeavers(members, opts)
@@ -9423,6 +9425,31 @@ function M.ribbonsOffLeavers(members, opts)
     return M.seqStep(steps)
   end)
 end
+-- The seated member and slot a bag Ribbon goes to: among the seated members
+-- who can wear one, lack one and are not down, a slot that is empty or holds
+-- a relic step 4b's class test lets a Ribbon take (M.ribbonMayDisplace: no
+-- ward, two-weapon relic or Exp. Egg), the lowest rank first (empty before
+-- anything); ties to the member with more spells, then seat order.  nil when
+-- there is none.  { ch, name, slot, cur, rank }
+function M.ribbonSeat(names)
+  local best
+  for i, ch in ipairs(M.partyRoster(M.readByte(0x1A6D) & 0x07)) do
+    local has = ch <= 13 and (charByte(ch, 0x23) == RIBBON_ID or charByte(ch, 0x24) == RIBBON_ID)
+    if ch <= 13 and not has and wearsItem(ch, RIBBON_ID) and M.charHp(ch) > 0 and (M.charStatus1(ch) & 0xC2) == 0 then
+      local sp = spellsLearned(ch)
+      for s = 4, 5 do
+        local cur = charByte(ch, 0x1F + s)
+        local cl = cur ~= 0xFF and M.relicClass(cur) or nil
+        local rank = cur == 0xFF and -1 or (M.ribbonMayDisplace(cl) and cl.rank or nil)
+        if rank and (best == nil or rank < best.rank or (rank == best.rank and sp > best.spells)) then
+          best = { ch = ch, name = (names and names[ch]) or M.SPLIT_NAMES[ch], slot = s, cur = cur, rank = rank,
+            spells = sp, order = i }
+        end
+      end
+    end
+  end
+  return best
+end
 function M.ribbonsOnSeated(opts)
   opts = opts or {}
   local tag = opts.tag or "relics after the regroup"
@@ -9433,12 +9460,62 @@ function M.ribbonsOnSeated(opts)
     end
     return m
   end
+  -- one bag Ribbon onto M.ribbonSeat's slot through the Relic menu, nobody
+  -- else's relics touched; the Relic menu's Optimum re-equip (a Genji Glove,
+  -- Gauntlet or Merit Award in the old or new pair, M.dressRelics) is put
+  -- back after, and the gear asserted as it was
+  local function placeOne()
+    return M.lazy(function()
+      if M.invCountOf(RIBBON_ID) < 1 then return M.logStep("[ribbons] the bag holds no Ribbon") end
+      local t = M.ribbonSeat()
+      if t == nil then return M.logStep("[ribbons] no seated member can take the bag's Ribbon") end
+      local label = string.format("%s: %s", tag, t.name)
+      M.log(string.format("[ribbons] Ribbon $CA from the bag onto %s's slot %d (over %s, rank %d); no other relic moves",
+        t.name, t.slot, t.cur == 0xFF and "(empty)" or string.format("$%02X", t.cur), t.rank))
+      local before = {}
+      for g = 0, 3 do before[g] = charByte(t.ch, 0x1F + g) end
+      return M.seqStep({
+        M.equipKit(t.ch, { { t.slot, RIBBON_ID } }, { tag = label }),
+        M.lazy(function()
+          local back, swapped = {}, false
+          for g = 0, 3 do
+            if charByte(t.ch, 0x1F + g) ~= before[g] and before[g] ~= 0xFF then
+              M.log(string.format("[ribbons] %s: the Relic menu's re-equip moved slot %d $%02X -> $%02X; putting it back",
+                t.name, g, before[g], charByte(t.ch, 0x1F + g)))
+              back[#back + 1] = { g, before[g] }
+              if M.invCountOf(before[g]) < 1 then swapped = true end
+            end
+          end
+          if #back == 0 then return M.call(function() end) end
+          if swapped then
+            local all = {}
+            for g = 0, 3 do if before[g] ~= 0xFF then all[#all + 1] = { g, before[g] } end end
+            return M.seqStep({
+              M.emptyEquip(t.ch, { tag = label .. " emptied" }),
+              M.equipKit(t.ch, all, { tag = label .. "'s gear back" }),
+            })
+          end
+          return M.equipKit(t.ch, back, { tag = label .. "'s gear back" })
+        end),
+        M.call(function()
+          M.assertEq(charByte(t.ch, 0x1F + t.slot), RIBBON_ID, string.format("%s: relic slot %d holds the Ribbon",
+            label, t.slot))
+          for g = 0, 3 do
+            M.assertEq(charByte(t.ch, 0x1F + g), before[g], string.format("%s: gear slot %d holds $%02X as before",
+              label, g, before[g]))
+          end
+        end),
+      })
+    end)
+  end
   return M.seqStep({
     M.lazy(function()
       local n = M.invCountOf(RIBBON_ID)
       if n < 1 then return M.logStep("[ribbons] no Ribbon in the bag after the regroup") end
-      M.log(string.format("[ribbons] %d Ribbon(s) in the bag after the regroup: dressing the seated party", n))
-      return M.dressRelics(seated(), { tag = tag })
+      M.log(string.format("[ribbons] %d Ribbon(s) in the bag after the regroup: onto the seated party", n))
+      local steps = {}
+      for _ = 1, math.min(n, 4) do steps[#steps + 1] = placeOne() end
+      return M.seqStep(steps)
     end),
     M.call(function()
       local n = M.invCountOf(RIBBON_ID)
