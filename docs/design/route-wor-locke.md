@@ -342,11 +342,30 @@ capture `ninja` made at 532e1a33), K 0-5 x shifts 0, 1, 2, 4, 5, 6, 8, 9,
 
 The base wiped on no Doom Gaze key from this capture, and deaths a meeting
 did not drop (0.40 to 0.44). What changed is that Doom can no longer kill
-TERRA or RELM. The three fix failures, like `fix_k5_s6` in the first sweep,
-are party 2 fights in the cave. Each opened at 1 HP after the walk from 315
-(46,22) to (29,18) ("CELES L49 2460/3595, RELM L46 2117/3221" before, "460/3595,
-117/3221" at 313 (29,13), `fix2_k3_s2`). Both arms open a cave battle with a
-member at 1 HP in most runs (base 59 of 72, fix 56 of 72). The lost keys are
-won elsewhere from normal HP: be70-g0156 in `base_k3_s10` and `fix2_k2_s0`,
-beC4-g0150 in `base_k4_s6` and `fix2_k2_s5`. This is open: care after that
-walk.
+TERRA or RELM. The fix arm's failures (three in `fix2_*`, one in the first sweep) were
+party 2 fights in the cave that opened near 1 HP right after the walk from
+315 (46,22) to (29,18) ("CELES L49 2460/3595, RELM L46 2117/3221" before,
+"460/3595, 117/3221" at 313 (29,13), `fix2_k3_s2`). That walk crosses the
+spike field (36-44, 9-11), and nobody holds its plate (39,15), so it costs
+about 400 HP a member for each tile stepped (section 1 of split-party.md).
+Both arms opened a cave battle with a member at 1 HP in most runs (base 59 of
+72). The lost keys were won from normal HP in other runs: be70-g0156 in
+`base_k3_s10`, beC4-g0150 in `base_k4_s6`. Party 2 now stops off the field
+at (33,12) and uses split care before walking on (2e3ddda2: "care after the
+spike field, party 2 ... c13 1/2123 ... done: ... c13 1251/2123",
+`fix3_k0_s0`).
+
+Re-sweep, same boot, K and shifts; base 532e1a33 (`base3_*`, the same
+results as `base_*` run for run), fix 2e3ddda2 (`fix3_*`):
+
+| | base | fix |
+|---|---|---|
+| runs passed | 72 of 72 | 72 of 72 |
+| cave battles opened with a member at 1 HP (lost) | 59 (0) | 2 (0) |
+| Doom Gaze keys won; deaths, Doom deaths, wipes | 40 of 40; 29, 22, 0 | 39 of 39; 32, 19, 0 |
+| Potions at the save point (K 0, 12 runs) | 31-79 | 26-62 |
+
+The two remaining 1-HP openings came from encounters on the field itself,
+before (33,12) (`fix3_k2_s2`, `fix3_k2_s6`, both won). The care costs about
+18 Potions (74 down to 56 in `fix3_k0_s0`). Each of the leg's other fights
+won every distinct key in both arms (`fight_report_base3_fix3.txt`).
