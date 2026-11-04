@@ -8799,15 +8799,23 @@ function M.dressRelics(members, opts)
             -- member who wears a relic another waiting member wants takes
             -- it off into the bag (the Relic menu's Remove), which frees
             -- that member's change; his relic then reaches the bag when the
-            -- other takes his new one, and the queue moves.  Nothing is
-            -- left on a member the plan did not put there: a plan that
-            -- cannot be met this way (a wanted relic neither in the bag nor
-            -- worn by a waiting member) fails here, loudly.
+            -- other takes his new one, and the queue moves.  Any slot the
+            -- plan changes counts, not only one whose new relic he lacks
+            -- (#505, wor_tritoch at 61e1e189: MOG waited on UMARO's Ribbon
+            -- for slot 4 while his slot 5, planned an Amulet from the bag,
+            -- held the Hyper Wrist UMARO waited on; "UMARO wants Hyper Wrist
+            -- $D2 in slot 5 ...; MOG wants Ribbon $CA in slot 4 ...").
+            -- Nothing is left on a member the plan did not put there: a plan
+            -- that cannot be met this way (a wanted relic neither in the bag
+            -- nor worn by a waiting member) fails here, loudly.
+            -- (the lacking slots first, as before; any changed slot only when
+            -- none of those unwinds)
+            for pass = 1, 2 do
             for _, q in ipairs(queue) do
               if pick == nil then
                 local rm = {}
                 for _, c in ipairs(q.changes) do
-                  if lacks(c) then
+                  if (pass == 1 and lacks(c)) or (pass == 2 and c[2] ~= charByte(q.ch, 0x1F + c[1])) then
                     local held = charByte(q.ch, 0x1F + c[1])
                     for _, o in ipairs(queue) do
                       for _, oc in ipairs(o.changes) do
@@ -8837,6 +8845,7 @@ function M.dressRelics(members, opts)
                   pick = -1
                 end
               end
+            end
             end
             if pick == -1 then goto ticked end
             local lacking = {}
@@ -9376,6 +9385,220 @@ function M.partySelect(members, opts)
       opts.closeWait or 1200, tag .. ": menu closed", 5)
   end
   return M.seqStep(steps)
+end
+
+-- ------------------------------------------- Ribbons across a regroup --
+-- A member the Falcon's cabin leaves behind keeps what he wears, and the
+-- field menu reaches only the seated party, so a Ribbon on him is out of
+-- play until a regroup seats him again (#505: at Maranda the v0.38 line's
+-- three Ribbons were on TERRA, seated, and on LOCKE and RELM, left on the
+-- Falcon at wor_veldt's and wor_colosseum's regroups; which members carried
+-- them into the regroups moved with the draw, so the seated count read 3, 2
+-- or 1 by the play).  A player takes the Ribbon off a member he is about to
+-- leave behind and puts it on one who fights.
+-- M.ribbonsOffLeavers(members): in the cabin, before "Change party
+-- members?": every seated member not in `members` who wears a Ribbon takes
+-- it off into the bag (M.unequipRelics, which asserts the slot empty).  A
+-- leaver who is down is cared for first (M.fieldCare revives), since the
+-- Relic menu refuses him.  It notes the party seated before the regroup
+-- for M.ribbonsOnSeated's check.
+-- M.ribbonsOnSeated(opts): after the regroup, each Ribbon in the bag goes
+-- onto the seated party (M.ribbonSeat's slot), moving no other relic: the
+-- leg's own dress decides the rest, and a whole-party dress here moved CYAN's
+-- Atlas Armlet at Owzer's (the first version's sweep).  A Ribbon with
+-- nowhere to go stays in the bag.  Then it asserts that no member this
+-- regroup left behind wears a Ribbon, and that a Ribbon still in the bag
+-- has no seated member to go on: none who can wear one, lacks one and has a
+-- slot that is empty or holds a relic M.ribbonMayGoOver lets it take.
+-- (The check is on the members this regroup left, not every unseated one:
+-- a split's end can leave a wearer outside the party the cabin sees, as the
+-- Phoenix Cave's leaves STRAGO, and only a later regroup seats him.)
+--
+-- M.keepGear(ch, label, step): run a Relic-menu step for one member and put
+-- back whatever the menu's Optimum re-equip moved (CheckReequipRelics,
+-- menu/equip.asm: it re-equips the whole character when the old or new pair
+-- holds a Genji Glove, Gauntlet or Merit Award; M.dressRelics's relicStep
+-- does the same), then assert gear slots 0-3 as they were.
+function M.keepGear(ch, label, step)
+  local before = {}
+  return M.seqStep({
+    M.call(function() for g = 0, 3 do before[g] = charByte(ch, 0x1F + g) end end),
+    step,
+    M.lazy(function()
+      local back, swapped = {}, false
+      for g = 0, 3 do
+        if charByte(ch, 0x1F + g) ~= before[g] and before[g] ~= 0xFF then
+          M.log(string.format("[ribbons] %s: the Relic menu's re-equip moved slot %d $%02X -> $%02X; putting it back",
+            label, g, before[g], charByte(ch, 0x1F + g)))
+          back[#back + 1] = { g, before[g] }
+          if M.invCountOf(before[g]) < 1 then swapped = true end
+        end
+      end
+      if #back == 0 then return M.call(function() end) end
+      if swapped then
+        local all = {}
+        for g = 0, 3 do if before[g] ~= 0xFF then all[#all + 1] = { g, before[g] } end end
+        return M.seqStep({
+          M.emptyEquip(ch, { tag = label .. " emptied" }),
+          M.equipKit(ch, all, { tag = label .. ": gear back" }),
+        })
+      end
+      return M.equipKit(ch, back, { tag = label .. ": gear back" })
+    end),
+    M.call(function()
+      for g = 0, 3 do
+        M.assertEq(charByte(ch, 0x1F + g), before[g], string.format("%s: gear slot %d holds $%02X as before the relics",
+          label, g, before[g]))
+      end
+    end),
+  })
+end
+-- the note M.ribbonsOffLeavers leaves for M.ribbonsOnSeated: the members
+-- seated before the regroup
+M.ribbonsRegroupNote = nil
+-- a member the Relic menu refuses: KO'd, petrified or zombied (M.dressRelics)
+function M.relicMenuRefuses(ch) return M.charHp(ch) == 0 or (M.charStatus1(ch) & 0xC2) ~= 0 end
+function M.ribbonsOffLeavers(members, opts)
+  opts = opts or {}
+  local tag = opts.tag or "Ribbons off the members the regroup leaves"
+  local keep = {}
+  for _, ch in ipairs(members) do keep[ch] = true end
+  local function leavers()
+    local active = M.readByte(0x1A6D) & 0x07
+    local out = {}
+    for ch = 0, 13 do
+      if not keep[ch] and active ~= 0 and (M.readByte(0x1850 + ch) & 0x07) == active then
+        local slots = {}
+        for s = 4, 5 do if charByte(ch, 0x1F + s) == RIBBON_ID then slots[#slots + 1] = s end end
+        if #slots > 0 then out[#out + 1] = { ch = ch, slots = slots, name = M.SPLIT_NAMES[ch] } end
+      end
+    end
+    return out
+  end
+  return M.seqStep({
+    M.call(function()
+      local prev = {}
+      for _, ch in ipairs(M.partyRoster(M.readByte(0x1A6D) & 0x07)) do prev[#prev + 1] = ch end
+      M.ribbonsRegroupNote = { prev = prev }
+    end),
+    M.lazy(function()
+      for _, l in ipairs(leavers()) do
+        if M.relicMenuRefuses(l.ch) then
+          M.log(string.format("[ribbons] %s leaves wearing a Ribbon and is down (HP %d, status1 $%02X): care first",
+            l.name, M.charHp(l.ch), M.charStatus1(l.ch)))
+          return M.fieldCare({ tag = tag .. ": revive " .. l.name })
+        end
+      end
+      return M.call(function() end)
+    end),
+    M.lazy(function()
+      local steps = {}
+      for _, l in ipairs(leavers()) do
+        M.assertEq(M.relicMenuRefuses(l.ch), false, string.format("%s: %s, who leaves wearing a Ribbon, is up for the Relic menu",
+          tag, l.name))
+        M.log(string.format("[ribbons] %s leaves the party wearing %d Ribbon(s) (slot(s) %s): off into the bag",
+          l.name, #l.slots, table.concat(l.slots, ",")))
+        local label = tag .. ": " .. l.name
+        steps[#steps + 1] = M.keepGear(l.ch, label, M.unequipRelics(l.ch, l.slots, { tag = label }))
+      end
+      if #steps == 0 then return M.logStep("[ribbons] no member the regroup leaves wears a Ribbon") end
+      return M.seqStep(steps)
+    end),
+  })
+end
+-- The relics a bag Ribbon may go over after a regroup: step 4b's class test
+-- (M.ribbonMayDisplace: no ward, two-weapon relic or Exp. Egg; a "ward" is a
+-- Shell/Safe relic the threats call for, so with no threats -- the cabin's
+-- regroups pass none -- a Shell/Safe relic classes as a spare) and nothing
+-- that acts: rank 1 (a guard) or below (a spare ward, rank 0).  A fighter's
+-- or caster's relic (rank 2 and up) stays: at Owzer's the Ribbon over CELES's
+-- Black Belt (61e1e189) lost $11C (SoulDancer x2, Crusher x2) on 6 of 28
+-- distinct keys where main lost 1 of 29 (build/attempts/wt/v039-ribbons/
+-- f11c.txt).  A function of its own so a mutant can switch it.
+function M.ribbonMayGoOver(cl)
+  return M.ribbonMayDisplace(cl) and cl.rank <= 1
+end
+-- The seated member and slot a bag Ribbon goes to: among the seated members
+-- who can wear one, lack one and are not down, a slot that is empty or holds
+-- a relic M.ribbonMayGoOver allows (classed against `threats`, the caller's,
+-- nil for every status), the lowest rank first (empty before anything); ties
+-- to the member with more spells, then seat order.  nil when there is none.
+-- { ch, name, slot, cur, rank }
+function M.ribbonSeat(threats)
+  local best
+  for i, ch in ipairs(M.partyRoster(M.readByte(0x1A6D) & 0x07)) do
+    local has = ch <= 13 and (charByte(ch, 0x23) == RIBBON_ID or charByte(ch, 0x24) == RIBBON_ID)
+    if ch <= 13 and not has and wearsItem(ch, RIBBON_ID) and not M.relicMenuRefuses(ch) then
+      local sp = spellsLearned(ch)
+      for s = 4, 5 do
+        local cur = charByte(ch, 0x1F + s)
+        local cl = cur ~= 0xFF and M.relicClass(cur, threats) or nil
+        local rank = cur == 0xFF and -1 or (M.ribbonMayGoOver(cl) and cl.rank or nil)
+        if rank and (best == nil or rank < best.rank or (rank == best.rank and sp > best.spells)) then
+          best = { ch = ch, name = M.SPLIT_NAMES[ch], slot = s, cur = cur, rank = rank, spells = sp, order = i }
+        end
+      end
+    end
+  end
+  return best
+end
+function M.ribbonsOnSeated(opts)
+  opts = opts or {}
+  local tag = opts.tag or "relics after the regroup"
+  local function placeOne()
+    return M.lazy(function()
+      if M.invCountOf(RIBBON_ID) < 1 then return M.logStep("[ribbons] the bag holds no Ribbon") end
+      local t = M.ribbonSeat(opts.threats)
+      if t == nil then return M.logStep("[ribbons] no seated member can take the bag's Ribbon") end
+      local label = string.format("%s: %s", tag, t.name)
+      M.log(string.format("[ribbons] Ribbon $CA from the bag onto %s's slot %d (over %s, rank %d); no other relic moves",
+        t.name, t.slot, t.cur == 0xFF and "(empty)" or string.format("$%02X", t.cur), t.rank))
+      return M.seqStep({
+        M.keepGear(t.ch, label, M.equipKit(t.ch, { { t.slot, RIBBON_ID } }, { tag = label })),
+        M.call(function()
+          M.assertEq(charByte(t.ch, 0x1F + t.slot), RIBBON_ID, string.format("%s: relic slot %d holds the Ribbon",
+            label, t.slot))
+        end),
+      })
+    end)
+  end
+  return M.seqStep({
+    M.lazy(function()
+      local n = M.invCountOf(RIBBON_ID)
+      if n < 1 then return M.logStep("[ribbons] no Ribbon in the bag after the regroup") end
+      M.log(string.format("[ribbons] %d Ribbon(s) in the bag after the regroup: onto the seated party", n))
+      local steps = {}
+      for _ = 1, math.min(n, 4) do steps[#steps + 1] = placeOne() end
+      return M.seqStep(steps)
+    end),
+    M.call(function()
+      local note = M.ribbonsRegroupNote
+      M.ribbonsRegroupNote = nil
+      M.assertEq(note ~= nil, true, tag .. ": the cabin's Ribbon step (H.ribbonsOffLeavers) ran before this regroup")
+      local active = M.readByte(0x1A6D) & 0x07
+      for _, ch in ipairs(note.prev) do
+        if ch <= 13 and (M.readByte(0x1850 + ch) & 0x07) ~= active then
+          local wearing = charByte(ch, 0x23) == RIBBON_ID or charByte(ch, 0x24) == RIBBON_ID
+          M.assertEq(wearing, false, string.format("%s: %s, whom the regroup left on the Falcon, wears no Ribbon",
+            tag, M.SPLIT_NAMES[ch]))
+        end
+      end
+      local n = M.invCountOf(RIBBON_ID)
+      if n < 1 then return end
+      for _, ch in ipairs(M.partyRoster(active)) do
+        local has = ch <= 13 and (charByte(ch, 0x23) == RIBBON_ID or charByte(ch, 0x24) == RIBBON_ID)
+        if ch <= 13 and not has and wearsItem(ch, RIBBON_ID) and not M.relicMenuRefuses(ch) then
+          for s = 4, 5 do
+            local cur = charByte(ch, 0x1F + s)
+            M.assertEq(cur ~= 0xFF and not M.ribbonMayGoOver(M.relicClass(cur, opts.threats)), true, string.format(
+              "%s: with %d Ribbon(s) in the bag, %s's relic slot %d ($%02X) is one a Ribbon may not take", tag, n,
+              M.SPLIT_NAMES[ch], s, cur))
+          end
+        end
+      end
+      M.log(string.format("[ribbons] %d Ribbon(s) stay in the bag: no seated member can take one", n))
+    end),
+  })
 end
 
 -- ------------------------------------------------- split parties --
@@ -10578,6 +10801,7 @@ function M.worLegKit(env)
         }, "X: to the Falcon's deck (map 11)")
       end)(), function() end),
       walkInto(24, 8, MAP_CABIN, "the deck -> the cabin (map 12)"),
+      M.ribbonsOffLeavers(members),
       M.call(function() pickTalker() end),
       M.cond(function() return obj == nil end, {
         M.navTo(23, 44, { maxFrames = 3000, arrive = function() return M.fieldY() < 40 end }),
@@ -10606,6 +10830,7 @@ function M.worLegKit(env)
         M.assertEq(n, #members, "party 1 holds exactly the regroup's members")
         say("regroup", "after the menu")
       end),
+      M.ribbonsOnSeated(),
     })
   end
   -- lift off from the deck's wheel (_caf532: face left, A held on (15,8))
