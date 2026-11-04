@@ -305,3 +305,48 @@ an X-Zone. On $155 both arms' deaths are Battle on MOG and RELM, plus
 one Bio on UMARO in the fix. The one wipe in each arm is Doom Gaze on the flight at K = 4,
 shift 5 (key be10-g01CF, Doom on three members), the same in both
 arms.
+
+## 11. Doom Gaze's Doom (v0.39, #504)
+
+Section 10's one wipe, key be10-g01CF, is Doom. Doom Gaze's script
+(`AIScript::_285`) opens with L5 Doom, then cycles {Battle, Doom, Ice 3},
+{Doom, Aero, Aero}, {nothing, Escape, Escape} until it escapes. Doom and
+L5 Doom set Wound at any HP. The four flew with one guard against it,
+RELM's Memento Ring, and the bag held the Safety Bit (both ItemProp +6
+$C2). Doom felled TERRA "from 3591/3591", then CELES and STRAGO; RELM fell
+to a Battle at 1599 HP. Today's library on that boot (`lab/old.sh`, K 4,
+shift 5) replays it death for death (`old_base_k4_s5`).
+
+Before boarding, `gen_wor_phoenix` now runs the relic plan against
+`H.FIGHT_THREATS.doomgaze` (STATUS1 $80): the Safety Bit goes on TERRA and
+the Memento Ring stays on RELM. Doom then lands only on CELES and STRAGO,
+so it can no longer down the whole party. The four's own relics go back on
+once the cave splits them, so the cave's dressing starts from the kit it had
+before (first sweep, `fix_*`: party 2 took both Ribbons). An assertion
+checks the swap back; with the swap back cut out it goes red ("TERRA wears
+the relics from before the flights: got $FF $FF, want $CA $C3",
+`mut_k0_s0`).
+
+Sweep from the graph's own `wor-thamasa-v1` (sha256 fc5cbe8d, equal to the
+capture `ninja` made at 532e1a33), K 0-5 x shifts 0, 1, 2, 4, 5, 6, 8, 9,
+10, 12, 13, 14, 72 runs an arm; the base is 532e1a33, the fix 93a738e0
+(`build/attempts/wt/v039-doomgaze/lab/`):
+
+| | base | fix |
+|---|---|---|
+| Doom Gaze keys, won | 40, 40 | 39, 39 |
+| meetings, deaths, wipes | 72, 29, 0 | 72, 32, 0 |
+| Doom deaths (TERRA/CELES/STRAGO/RELM) | 22 (7/5/10/0) | 19 (0/8/11/0) |
+| Battle, Ice 3, Aero deaths | 7 | 13 (RELM's Battle 9) |
+| runs passed | 72 | 69 |
+
+The base wiped on no Doom Gaze key from this capture, and deaths a meeting
+did not drop (0.40 to 0.44). What changed is that Doom can no longer kill
+TERRA or RELM. The three fix failures, like `fix_k5_s6` in the first sweep,
+are party 2 fights in the cave. Each opened at 1 HP after the walk from 315
+(46,22) to (29,18) ("CELES L49 2460/3595, RELM L46 2117/3221" before, "460/3595,
+117/3221" at 313 (29,13), `fix2_k3_s2`). Both arms open a cave battle with a
+member at 1 HP in most runs (base 59 of 72, fix 56 of 72). The lost keys are
+won elsewhere from normal HP: be70-g0156 in `base_k3_s10` and `fix2_k2_s0`,
+beC4-g0150 in `base_k4_s6` and `fix2_k2_s5`. This is open: care after that
+walk.
