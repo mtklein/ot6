@@ -235,7 +235,8 @@ local function restoreKit()
     end)
   end
   -- only the slots that moved come off (a two-weapon relic the flights left
-  -- in place stays on, and with it the second hand's weapon)
+  -- in place stays on), and H.keepGear puts back any weapon or armor the
+  -- Relic menu's Optimum re-equip moves
   local function differ(c)
     local s, out = slots(c), {}
     for i, slot in ipairs({ 4, 5 }) do if s[i] ~= flightKit[c][i] then out[#out + 1] = { slot, i } end end
@@ -244,14 +245,16 @@ local function restoreKit()
   local function off(c)
     local which = {}
     for _, d in ipairs(differ(c)) do which[#which + 1] = d[1] end
-    return H.unequipRelics(c, which, { tag = H.SPLIT_NAMES[c] .. ": the flights' relics off" })
+    local tag = H.SPLIT_NAMES[c] .. ": the flights' relics off"
+    return H.keepGear(c, tag, H.unequipRelics(c, which, { tag = tag }))
   end
   local function on(c)
     local kit = {}
     for _, d in ipairs(differ(c)) do
       if flightKit[c][d[2]] ~= 0xFF then kit[#kit + 1] = { d[1], flightKit[c][d[2]] } end
     end
-    return H.equipKit(c, kit, { tag = H.SPLIT_NAMES[c] .. ": the relics from before the flights back on" })
+    local tag = H.SPLIT_NAMES[c] .. ": the relics from before the flights back on"
+    return H.keepGear(c, tag, H.equipKit(c, kit, { tag = tag }))
   end
   return H.seqStep({
     each(1, off), each(2, off), each(2, on), each(1, on),
