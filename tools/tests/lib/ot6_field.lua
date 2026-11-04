@@ -9404,9 +9404,10 @@ end
 -- onto the seated party (M.ribbonSeat's slot), moving no other relic: the
 -- leg's own dress decides the rest, and a whole-party dress here moved CYAN's
 -- Atlas Armlet at Owzer's (the first version's sweep).  Then it asserts that
--- a Ribbon still in the bag
--- has no seated member to go on: none who can wear one, lacks one and has a
--- slot that is empty or that step 4b's class test lets a Ribbon take.
+-- a Ribbon still in the bag has no seated member to go on: none who can
+-- wear one, lacks one and has a slot that is empty or holds a relic
+-- M.ribbonMayGoOver lets a Ribbon take (a guard or a spare ward; never a
+-- relic that acts).  A Ribbon with nowhere to go stays in the bag.
 function M.ribbonsOffLeavers(members, opts)
   opts = opts or {}
   local tag = opts.tag or "Ribbons off the members the regroup leaves"
@@ -9434,10 +9435,20 @@ function M.ribbonsOffLeavers(members, opts)
     return M.seqStep(steps)
   end)
 end
+-- The relics a bag Ribbon may go over after a regroup: step 4b's class test
+-- (M.ribbonMayDisplace: no ward, two-weapon relic or Exp. Egg) and nothing
+-- that acts, rank 1 (a guard) or below (a spare ward, rank 0).  A fighter's or
+-- caster's relic (rank 2 and up) stays: at Owzer's the Ribbon over CELES's
+-- Black Belt (61e1e189) lost $11C (SoulDancer x2, Crusher x2) on 6 of 28
+-- distinct keys where main lost 1 of 29 (build/attempts/wt/v039-ribbons/
+-- f11c.txt).  A Ribbon with nowhere to go stays in the bag for a later
+-- regroup or dress.  A function of its own so a mutant can switch it.
+function M.ribbonMayGoOver(cl)
+  return M.ribbonMayDisplace(cl) and cl.rank <= 1
+end
 -- The seated member and slot a bag Ribbon goes to: among the seated members
 -- who can wear one, lack one and are not down, a slot that is empty or holds
--- a relic step 4b's class test lets a Ribbon take (M.ribbonMayDisplace: no
--- ward, two-weapon relic or Exp. Egg), the lowest rank first (empty before
+-- a relic M.ribbonMayGoOver allows, the lowest rank first (empty before
 -- anything); ties to the member with more spells, then seat order.  nil when
 -- there is none.  { ch, name, slot, cur, rank }
 function M.ribbonSeat(names)
@@ -9449,7 +9460,7 @@ function M.ribbonSeat(names)
       for s = 4, 5 do
         local cur = charByte(ch, 0x1F + s)
         local cl = cur ~= 0xFF and M.relicClass(cur) or nil
-        local rank = cur == 0xFF and -1 or (M.ribbonMayDisplace(cl) and cl.rank or nil)
+        local rank = cur == 0xFF and -1 or (M.ribbonMayGoOver(cl) and cl.rank or nil)
         if rank and (best == nil or rank < best.rank or (rank == best.rank and sp > best.spells)) then
           best = { ch = ch, name = (names and names[ch]) or M.SPLIT_NAMES[ch], slot = s, cur = cur, rank = rank,
             spells = sp, order = i }
@@ -9535,7 +9546,7 @@ function M.ribbonsOnSeated(opts)
         if not has and wearsItem(ch, RIBBON_ID) and M.charHp(ch) > 0 and (M.charStatus1(ch) & 0xC2) == 0 then
           for s = 4, 5 do
             local cur = charByte(ch, 0x1F + s)
-            M.assertEq(cur ~= 0xFF and not M.ribbonMayDisplace(M.relicClass(cur)), true, string.format(
+            M.assertEq(cur ~= 0xFF and not M.ribbonMayGoOver(M.relicClass(cur)), true, string.format(
               "%s: %d Ribbon(s) left in the bag while %s's relic slot %d ($%02X) could take one", tag, n, p[2], s, cur))
           end
         end
