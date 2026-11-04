@@ -26,6 +26,11 @@
 --      empty slots and a Death guard, a Ribbon and a narrower guard in the bag, both covering none of the threats:
 --      the Death guard takes one slot and the other goes to the Ribbon, the wider of the two over all statuses;
 --      with H.relicFillBetter switched off (the id order alone, as before) it goes to the narrower guard.
+--   5. a Death guard is threat-critical (#504 review): against Doom Gaze's threats a bag Ribbon goes over a narrower
+--      guard, never over a relic guarding Wound, which the Ribbon does not (H.ribbonMayDisplace, which 4b and the
+--      regroups' H.ribbonMayGoOver use).  Every other seated member wears a Ribbon; the last wears the Death guard
+--      and the narrower guard; H.ribbonSeat picks the narrower guard's slot.  With the clause switched off it picks
+--      the Death guard's, and with no threats named the Death guard is a plain guard again.
 -- The negative for case 1 (the `not boss` guard 4b had before #495, put back) is recorded in the commit that adds
 -- the file.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -318,6 +323,49 @@ local function fillCase()
   H.log(string.format("[relicspare] PASSED: the tie-break keeps the Ribbon on %s beside $%02X", A[2], d))
 end
 
+-- a Death guard is threat-critical: the bag Ribbon never goes over it against Doom Gaze's Wound
+local function deathCase()
+  local c = ribbonWearers()
+  H.assertEq(#c >= 1, true, "precondition (Death guards): a seated member can wear a Ribbon")
+  local B = c[#c]
+  local T = H.FIGHT_THREATS.doomgaze
+  local death = wearable({ B }, T, function(cl) return cl.aff == "guard" and (cl.ribbonless or 0) > 0 end)
+  local narrow = wearable({ B }, T, function(cl)
+    return cl.aff == "guard" and cl.rank == 1 and (cl.ribbonless or 0) == 0
+  end)
+  H.assertEq(#death >= 1 and #narrow >= 1, true, string.format("precondition (Death guards): %s can wear a guard "
+    .. "against Wound and a guard the Ribbon covers for", B[2]))
+  local d, g = death[1], narrow[1]
+  for _, m in ipairs(members) do
+    if m[1] == B[1] then
+      put(0x1600 + 37 * m[1] + 0x23, d); put(0x1600 + 37 * m[1] + 0x24, g)
+    else
+      put(0x1600 + 37 * m[1] + 0x23, RIBBON); put(0x1600 + 37 * m[1] + 0x24, 0xFF)
+    end
+  end
+  for s = 0, 255 do put(0x1869 + s, 0xFF); put(0x1969 + s, 0) end
+  put(0x1869, RIBBON); put(0x1969, 1)
+  H.log(string.format("[relicspare] Death guards: %s wears $%02X (Wound) in slot 4 and $%02X in slot 5, the others a "
+    .. "Ribbon, one Ribbon in the bag", B[2], d, g))
+  H.assertEq(H.ribbonMayDisplace(H.relicClass(d, T)), false, string.format("Death guards: $%02X guards Wound against "
+    .. "Doom Gaze's threats; no Ribbon goes over it", d))
+  H.assertEq(H.ribbonMayDisplace(H.relicClass(d)), true, string.format("Death guards: with no threats named $%02X is "
+    .. "a plain guard", d))
+  local t = H.ribbonSeat(T)
+  H.assertEq(t ~= nil and t.ch == B[1] and t.slot == 5, true, string.format("Death guards: the bag Ribbon goes to "
+    .. "%s's slot 5 over $%02X (got %s)", B[2], g, t and string.format("%s slot %d", t.name, t.slot) or "none"))
+  local real = H.ribbonMayDisplace
+  H.ribbonMayDisplace = function(cl) return cl ~= nil and not cl.hands and cl.aff ~= "ward" and cl.aff ~= "behind" end
+  local ok, mt = pcall(H.ribbonSeat, T)
+  H.ribbonMayDisplace = real
+  H.assertEq(ok, true, "the mutant's seat runs: " .. tostring(mt))
+  H.assertEq(mt ~= nil and mt.ch == B[1] and mt.slot == 4, true, string.format("the clause is reached: without it the "
+    .. "bag Ribbon goes over %s's Death guard in slot 4 (got %s)", B[2],
+    mt and string.format("%s slot %d", mt.name, mt.slot) or "none"))
+  H.log(string.format("[relicspare] PASSED: the bag Ribbon goes over $%02X and %s keeps the Death guard $%02X", g,
+    B[2], d))
+end
+
 H.run({ maxFrames = 3000 }, {
   H.loadState(STATE),
   H.waitFrames(10),
@@ -326,4 +374,5 @@ H.run({ maxFrames = 3000 }, {
   H.call(eggCase),
   H.call(wardCase),
   H.call(fillCase),
+  H.call(deathCase),
 })

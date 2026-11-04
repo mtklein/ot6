@@ -8009,7 +8009,7 @@ local RELIC_EFFECT_OFFS = { 5, 8, 9, 10, 11, 12, 13, 16, 17, 25, 26 }
 -- the relic's class under the rule above: rank, affinity, and the statuses
 -- it covers -- of `threats` ({ s1 = STATUS1 mask, s2 = STATUS2 mask }, the
 -- statuses the coming fights inflict) when given, else of all of them
-function M.relicClass(id, threats)
+function M.relicClassRaw(id, threats)
   if id == 0xFF or (itemProp(id, 0) & 7) ~= 5 then return nil end
   local p1, p2 = itemProp(id, 6), itemProp(id, 7)
   local cover = threats and (popcount(p1 & (threats.s1 or 0)) + popcount(p2 & (threats.s2 or 0)))
@@ -8075,12 +8075,32 @@ end
 function M.eggMayDisplace(cl)
   return cl ~= nil and not cl.hands and cl.aff ~= "ward" and cl.aff ~= "behind"
 end
+-- The class, plus `ribbonless`: of the threatened statuses (only when the
+-- caller names threats), how many this relic guards that a Ribbon does not
+-- (#504 review: against Doom Gaze's Wound the Memento Ring and the Safety
+-- Bit guard what the Ribbon cannot).
+function M.relicClass(id, threats)
+  local cl = M.relicClassRaw(id, threats)
+  if cl and threats then
+    local r1, r2 = itemProp(RIBBON_ID, 6), itemProp(RIBBON_ID, 7)
+    cl.ribbonless = popcount(itemProp(id, 6) & (threats.s1 or 0) & ~r1)
+      + popcount(itemProp(id, 7) & (threats.s2 or 0) & ~r2)
+  elseif cl then
+    cl.ribbonless = 0
+  end
+  return cl
+end
 -- Step 4b's class test, the same classes: a Ribbon left in the bag goes over
 -- a guard, a spare ward or an acting relic, never a two-weapon relic, a ward
 -- or the Exp. Egg (#495).  A function of its own so field_relicspare's mutants
 -- can switch it (#499).
+-- A relic guarding a threatened status the Ribbon does not (cl.ribbonless,
+-- set only when the caller names threats) is threat-critical, as step 3b
+-- holds for the Egg: the Ribbon never goes over it (#504 review: 4b put the
+-- spare Ribbon over RELM's Memento Ring armed against Doom Gaze's Wound, and
+-- Doom then killed her).
 function M.ribbonMayDisplace(cl)
-  return cl ~= nil and not cl.hands and cl.aff ~= "ward" and cl.aff ~= "behind"
+  return cl ~= nil and not cl.hands and cl.aff ~= "ward" and cl.aff ~= "behind" and (cl.ribbonless or 0) == 0
 end
 -- Step 4's choice between two leftovers the threats rank alike (the same
 -- rank and threatened cover): x replaces best when it covers more of all the
