@@ -166,6 +166,14 @@ H.run({ maxFrames = 1600000 }, {
     H.assertEq(H.invCountOf(STRIKER) > 0, true, "the Striker is in the bag (the Veldt cave's chest)")
     -- the grind plains are Falcon hops (Doma's plain, the forest by the Opera House)
     H.assertEq(sw(0x00CC), 1, "the Falcon has risen ($00CC: gen_wor_falcon) for the hops to the grind plains")
+    -- the line's three Ribbons, every one a chest no draw moves (#505): the World of Balance cellar's
+    -- (gen_tunnelarmr, treasure bit 254), MOG's room's (gen_wor_narshe, bit 13), the Phoenix Cave's
+    -- (gen_wor_locke, bit 171); the cabin's regroup below keeps them on the members who fight
+    local n = H.invCountOf(RIBBON)
+    for ch = 0, 13 do for s = 0x23, 0x24 do if H.readByte(c(ch, s)) == RIBBON then n = n + 1 end end end
+    H.log(string.format("[ribbons] the party owns %d Ribbon(s), worn or in the bag", n))
+    H.assertEq(n >= 3, true, "the party owns three Ribbons (gen_tunnelarmr's cellar, gen_wor_narshe's MOG's room, "
+      .. "gen_wor_locke's Phoenix Cave)")
   end),
   -- @@setup-end
 

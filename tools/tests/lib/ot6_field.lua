@@ -9378,6 +9378,87 @@ function M.partySelect(members, opts)
   return M.seqStep(steps)
 end
 
+-- ------------------------------------------- Ribbons across a regroup --
+-- A member the Falcon's cabin leaves behind keeps what he wears, and the
+-- field menu reaches only the seated party, so a Ribbon on him is out of
+-- play until a regroup seats him again (#505: at Maranda the v0.38 line's
+-- three Ribbons were on TERRA, seated, and on LOCKE and RELM, left on the
+-- Falcon at wor_veldt's and wor_colosseum's regroups; which members carried
+-- them into the regroups moved with the draw, so the seated count read 3, 2
+-- or 1 by the play).  A player takes the Ribbon off a member he is about to
+-- leave behind and puts it on one who fights.
+-- M.ribbonsOffLeavers(members): in the cabin, before "Change party
+-- members?": every seated member not in `members` who wears a Ribbon takes
+-- it off into the bag (M.unequipRelics, which asserts the slot empty).  A
+-- member who is down keeps his: the Relic menu refuses him.
+-- M.ribbonsOnSeated(opts): after the regroup, when the bag holds a Ribbon,
+-- M.dressRelics for the seated party (relicPlan's step 4b puts on a Ribbon
+-- the plan leaves in the bag), then asserts that a Ribbon still in the bag
+-- has no seated member to go on: none who can wear one, lacks one and has a
+-- slot that is empty or that step 4b's class test lets a Ribbon take.
+function M.ribbonsOffLeavers(members, opts)
+  opts = opts or {}
+  local tag = opts.tag or "Ribbons off the members the regroup leaves"
+  return M.lazy(function()
+    local keep = {}
+    for _, ch in ipairs(members) do keep[ch] = true end
+    local active = M.readByte(0x1A6D) & 0x07
+    local steps = {}
+    for ch = 0, 13 do
+      local name = M.SPLIT_NAMES[ch] or string.format("c%d", ch)
+      if not keep[ch] and active ~= 0 and (M.readByte(0x1850 + ch) & 0x07) == active then
+        local slots = {}
+        for s = 4, 5 do if charByte(ch, 0x1F + s) == RIBBON_ID then slots[#slots + 1] = s end end
+        if #slots > 0 and M.charHp(ch) > 0 and (M.charStatus1(ch) & 0xC2) == 0 then
+          M.log(string.format("[ribbons] %s leaves the party wearing %d Ribbon(s) (slot(s) %s): off into the bag",
+            name, #slots, table.concat(slots, ",")))
+          steps[#steps + 1] = M.unequipRelics(ch, slots, { tag = tag .. ": " .. name })
+        elseif #slots > 0 then
+          M.log(string.format("[ribbons] %s leaves the party wearing a Ribbon but is down (HP %d, status1 $%02X): "
+            .. "the Relic menu will not take him; it stays on him", name, M.charHp(ch), M.charStatus1(ch)))
+        end
+      end
+    end
+    if #steps == 0 then return M.logStep("[ribbons] no member the regroup leaves wears a Ribbon") end
+    return M.seqStep(steps)
+  end)
+end
+function M.ribbonsOnSeated(opts)
+  opts = opts or {}
+  local tag = opts.tag or "relics after the regroup"
+  local function seated()
+    local m = {}
+    for _, ch in ipairs(M.partyRoster(M.readByte(0x1A6D) & 0x07)) do
+      if ch <= 13 then m[#m + 1] = { ch, M.SPLIT_NAMES[ch] } end
+    end
+    return m
+  end
+  return M.seqStep({
+    M.lazy(function()
+      local n = M.invCountOf(RIBBON_ID)
+      if n < 1 then return M.logStep("[ribbons] no Ribbon in the bag after the regroup") end
+      M.log(string.format("[ribbons] %d Ribbon(s) in the bag after the regroup: dressing the seated party", n))
+      return M.dressRelics(seated(), { tag = tag })
+    end),
+    M.call(function()
+      local n = M.invCountOf(RIBBON_ID)
+      if n < 1 then return end
+      for _, p in ipairs(seated()) do
+        local ch = p[1]
+        local has = charByte(ch, 0x23) == RIBBON_ID or charByte(ch, 0x24) == RIBBON_ID
+        if not has and wearsItem(ch, RIBBON_ID) and M.charHp(ch) > 0 and (M.charStatus1(ch) & 0xC2) == 0 then
+          for s = 4, 5 do
+            local cur = charByte(ch, 0x1F + s)
+            M.assertEq(cur ~= 0xFF and not M.ribbonMayDisplace(M.relicClass(cur)), true, string.format(
+              "%s: %d Ribbon(s) left in the bag while %s's relic slot %d ($%02X) could take one", tag, n, p[2], s, cur))
+          end
+        end
+      end
+      M.log(string.format("[ribbons] %d Ribbon(s) stay in the bag: no seated member can take one", n))
+    end),
+  })
+end
+
 -- ------------------------------------------------- split parties --
 -- A split-party dungeon (the Phoenix Cave: `party_menu 2`, Kefka's Tower:
 -- `party_menu 3`) keeps two or three parties on the field at once.  What
@@ -10578,6 +10659,7 @@ function M.worLegKit(env)
         }, "X: to the Falcon's deck (map 11)")
       end)(), function() end),
       walkInto(24, 8, MAP_CABIN, "the deck -> the cabin (map 12)"),
+      M.ribbonsOffLeavers(members),
       M.call(function() pickTalker() end),
       M.cond(function() return obj == nil end, {
         M.navTo(23, 44, { maxFrames = 3000, arrive = function() return M.fieldY() < 40 end }),
@@ -10606,6 +10688,7 @@ function M.worLegKit(env)
         M.assertEq(n, #members, "party 1 holds exactly the regroup's members")
         say("regroup", "after the menu")
       end),
+      M.ribbonsOnSeated(),
     })
   end
   -- lift off from the deck's wheel (_caf532: face left, A held on (15,8))

@@ -463,6 +463,7 @@ H.run({ maxFrames = 300000 }, {
     }, "X: to the Falcon's deck (map 11)")
   end)(), function() end),
   walkInto(24, 8, MAP_CABIN, "the deck -> the cabin (map 12)"),
+  H.ribbonsOffLeavers(REGROUP),
   H.call(function() H.log("[regroup] in the cabin: " .. rosterLine()) end),
   (function()
     local obj = nil
@@ -491,6 +492,7 @@ H.run({ maxFrames = 300000 }, {
       H.assertEq(partyOf(ch) == 1, true, string.format("char %d is in party 1 after the regroup", ch))
     end
   end),
+  H.ribbonsOnSeated(),
   -- dressed for the arc: TERRA's relics and Fenrir
   H.fieldCare({ tag = "after the regroup", threshold = H.CARE_BEFORE_FIGHTS }),
   H.dressRelics(REGROUP_MEMBERS, { threats = H.ARC_THREATS["wor-falcon"], tag = "relics with TERRA" }),

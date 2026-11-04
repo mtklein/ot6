@@ -217,6 +217,7 @@ local function regroup(members)
       }, "X: to the Falcon's deck (map 11)")
     end)(), function() end),
     walkInto(24, 8, MAP_CABIN, "the deck -> the cabin (map 12)"),
+    H.ribbonsOffLeavers(members),
     H.call(function() pickTalker() end),
     H.cond(function() return obj == nil end, {
       H.navTo(23, 44, { maxFrames = 3000, arrive = function() return H.fieldY() < 40 end }),
@@ -240,6 +241,7 @@ local function regroup(members)
       H.assertEq(n, #members, "party 1 holds exactly the regroup's members")
       say("regroup", "after the menu")
     end),
+    H.ribbonsOnSeated(),
   })
 end
 -- lift off from the deck's wheel (_caf532: face left, A held on (15,8))

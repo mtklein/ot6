@@ -396,6 +396,7 @@ local function regroup(members)
       }, "X: to the Falcon's deck (map 11)")
     end)(), function() end),
     walkInto(24, 8, MAP_CABIN, "the deck -> the cabin (map 12)"),
+    H.ribbonsOffLeavers(members),
     H.call(function()
       local t = {}
       for _, p in ipairs(MEMBERS) do t[#t + 1] = string.format("%s $1850=%02X", p[2], H.readByte(0x1850 + p[1])) end
@@ -421,6 +422,7 @@ local function regroup(members)
       end
       H.assertEq(inParty(SABIN), false, "SABIN waits aboard")
     end),
+    H.ribbonsOnSeated(),
   })
 end
 -- lift off from the deck's wheel (_caf532: face left, A held on (15,8))

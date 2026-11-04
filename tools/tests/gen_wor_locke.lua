@@ -205,6 +205,7 @@ local function regroup(members, aboard)
       }, "X: to the Falcon's deck (map 11)")
     end)(), function() end),
     walkInto(24, 8, MAP_CABIN, "the deck -> the cabin (map 12)"),
+    H.ribbonsOffLeavers(members),
     H.call(function() pickTalker() end),
     H.cond(function() return obj == nil end, {
       H.navTo(23, 44, { maxFrames = 3000, arrive = function() return H.fieldY() < 40 end }),
@@ -227,6 +228,7 @@ local function regroup(members, aboard)
         H.assertEq(partyOf(ch), 0, string.format("char %d waits aboard", ch))
       end
     end),
+    H.ribbonsOnSeated(),
   })
 end
 -- a stone for LOCKE, who joins wearing none: the first owned stone no one
