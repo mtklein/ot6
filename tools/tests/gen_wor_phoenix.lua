@@ -373,6 +373,13 @@ H.run({ maxFrames = 2400000 }, {
   walk(46, 16, "party 2 onto (46,16): the passage back to the west side ($02AA clear)"),
   H.waitUntil(function() return sw(0x02AA) == 0 and settled() end, 1200, "$02AA clear", 1),
   door(46, 10, MAP_CAVE, "party 2: -> 315 (46,22)"),
+  -- the walk west crosses the spike field (36-44, 9-11), whose plate (39,15)
+  -- no party holds: about 400 HP a member a tile stepped (split-party.md
+  -- section 1), and party 2 came off it at 1 HP and met the cave's fights
+  -- there (#504: "CELES L49 2460/3595" before, "460/3595" at 313 (29,13),
+  -- then a wipe).  Off the field at (33,12), care first
+  walk(33, 12, "party 2 off the spike field (33,12)"),
+  H.splitCare({ parties = { 2 }, tag = "care after the spike field" }),
   door(29, 18, MAP_DEEP, "party 2: -> 313 (29,13)"),
   door(23, 7, MAP_CAVE, "party 2: -> 315 (23,12)"),
   -- the lava: on (19,10), facing up, A (_cc2a1f)
