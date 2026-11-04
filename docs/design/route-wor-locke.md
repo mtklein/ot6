@@ -308,7 +308,7 @@ arms.
 
 ## 11. Doom Gaze's Doom (v0.39, #504)
 
-Section 10's one wipe, key be10-g01CF, is Doom. Doom Gaze's script
+Section 10's one wipe, key be10-g01CF, came from Doom. Doom Gaze's script
 (`AIScript::_285`) opens with L5 Doom, then cycles {Battle, Doom, Ice 3},
 {Doom, Aero, Aero}, {nothing, Escape, Escape} until it escapes. Doom and
 L5 Doom set Wound at any HP. The four flew with one guard against it,
@@ -317,55 +317,84 @@ $C2). Doom felled TERRA "from 3591/3591", then CELES and STRAGO; RELM fell
 to a Battle at 1599 HP. Today's library on that boot (`lab/old.sh`, K 4,
 shift 5) replays it death for death (`old_base_k4_s5`).
 
-Before boarding, `gen_wor_phoenix` now runs the relic plan against
-`H.FIGHT_THREATS.doomgaze` (STATUS1 $80): the Safety Bit goes on TERRA and
-the Memento Ring stays on RELM. Doom then lands only on CELES and STRAGO,
-so it can no longer down the whole party. The four's own relics go back on
-once the cave splits them, so the cave's dressing starts from the kit it had
-before (first sweep, `fix_*`: party 2 took both Ribbons). An assertion
-checks the swap back; with the swap back cut out it goes red ("TERRA wears
-the relics from before the flights: got $FF $FF, want $CA $C3",
-`mut_k0_s0`).
+**The Death guards.** Before boarding, `gen_wor_phoenix` runs the relic
+plan against `H.FIGHT_THREATS.doomgaze` (STATUS1 $80). The Safety Bit goes
+to TERRA, the member with the most spells learned and the four's Life
+caster, so Doom cannot take the party's reviver ("[kit] Death guard $DC on
+TERRA for the flights; knows Life ($30)"). The Memento Ring stays on RELM,
+the only one of the four who can wear it.
 
-Sweep from the graph's own `wor-thamasa-v1` (sha256 fc5cbe8d, equal to the
-capture `ninja` made at 532e1a33), K 0-5 x shifts 0, 1, 2, 4, 5, 6, 8, 9,
-10, 12, 13, 14, 72 runs an arm; the base is 532e1a33, the fix 93a738e0
-(`build/attempts/wt/v039-doomgaze/lab/`):
+What this guarantees: TERRA and RELM cannot be Doomed, so Doom alone can
+no longer down the whole party. It does not make the fight safe. Doom still
+lands on CELES and STRAGO, and the rest of #504's path is still open:
+Battle or Aero can take RELM, and then TERRA. A wipe now needs damage to
+kill both guarded members.
 
-| | base | fix |
-|---|---|---|
-| Doom Gaze keys, won | 40, 40 | 39, 39 |
-| meetings, deaths, wipes | 72, 29, 0 | 72, 32, 0 |
-| Doom deaths (TERRA/CELES/STRAGO/RELM) | 22 (7/5/10/0) | 19 (0/8/11/0) |
-| Battle, Ice 3, Aero deaths | 7 | 13 (RELM's Battle 9) |
-| runs passed | 72 | 69 |
+Step 4 of the relic plan used to break ties between leftovers by item id.
+Against Wound alone, the Ribbon and a Star Pendant both cover nothing, so
+TERRA's second slot took the Star Pendant and the Ribbon stayed in the bag.
+Among leftovers the threats rank alike, step 4 now takes the one with the
+wider total cover (`H.relicFillBetter`), so TERRA wears the Ribbon and the
+Safety Bit. `field_relicspare` case 4 checks it, and with the id order put
+back the case goes red. This is a library change that reaches every leg's
+dressing (a `replay.txt` line).
 
-The base wiped on no Doom Gaze key from this capture, and deaths a meeting
-did not drop (0.40 to 0.44). What changed is that Doom can no longer kill
-TERRA or RELM. The fix arm's failures (three in `fix2_*`, one in the first sweep) were
-party 2 fights in the cave that opened near 1 HP right after the walk from
-315 (46,22) to (29,18) ("CELES L49 2460/3595, RELM L46 2117/3221" before,
-"460/3595, 117/3221" at 313 (29,13), `fix2_k3_s2`). That walk crosses the
-spike field (36-44, 9-11), and nobody holds its plate (39,15), so it costs
-about 400 HP a member for each tile stepped (section 1 of split-party.md).
-Both arms opened a cave battle with a member at 1 HP in most runs (base 59 of
-72). The lost keys were won from normal HP in other runs: be70-g0156 in
-`base_k3_s10`, beC4-g0150 in `base_k4_s6`. Party 2 now stops off the field
-at (33,12) and uses split care before walking on (2e3ddda2: "care after the
-spike field, party 2 ... c13 1/2123 ... done: ... c13 1251/2123",
-`fix3_k0_s0`).
+The four's own relics go back on once the cave splits them (`restoreKit`,
+only the slots that moved, under `H.keepGear`), so the cave's dressing
+starts from the kit it had before. In the first sweep (`fix_*`) party 2 had
+taken both Ribbons. With the swap back cut out, the assertion goes red
+("TERRA wears the relics from before the flights: got $FF $FF, want $CA
+$C3", `mut_k0_s0`).
 
-Re-sweep, same boot, K and shifts; base 532e1a33 (`base3_*`, the same
-results as `base_*` run for run), fix 2e3ddda2 (`fix3_*`):
+**The spike field.** Party 2's walk from 315 (46,22) to (29,18) crosses
+the spike field (36-44, 9-11). With its plate (39,15) unheld, each tile
+stepped costs about 400 HP a member (split-party.md section 1).
+
+- Before the walk: "CELES L49 2460/3595, RELM L46 2117/3221".
+- At 313 (29,13), after it: "460/3595, 117/3221" (`fix2_k3_s2`).
+- On the base, 59 of 72 runs opened a cave battle with a member at 1 HP.
+- The fix arms lost four such fights, on keys won elsewhere from normal HP
+  (be70-g0156 in `base_k3_s10`; beC4-g0150 in `base_k4_s6`).
+
+The cave is built to be crossed with the plate held, and the leg now does
+that. Party 2 waits on 315 (46,22). Party 1 comes up by the jumps to
+(42,23) and holds (39,15): 11 steps, no spike (`route_data.py field-path
+315 42 23 39 15`). That route does not need the lava drained. Party 2
+crosses with the field down; `$02D1` is asserted set before and after the
+crossing. Party 1 then walks back to (42,23) for the save point. With the
+plate step cut out, the assertion goes red ("the spike field (36-44, 9-11)
+is down ($02D1, party 1 on (39,15)) as party 2 crosses: got 0 ($0), want 1
+($1)", `mutplate`). In `dbg4`, CELES reached 313 (29,13) at 3723/3723.
+
+**The sweep.** All runs booted the graph's own `wor-thamasa-v1` (sha256
+fc5cbe8d, the capture `ninja` made at 532e1a33), at K 0-5 x shifts 0, 1, 2,
+4, 5, 6, 8, 9, 10, 12, 13, 14. The base is 532e1a33 (`base4_*`, the same
+results as `base_*` and `base3_*`); the fix is c5a83012 (`fix4_*`):
 
 | | base | fix |
 |---|---|---|
 | runs passed | 72 of 72 | 72 of 72 |
-| cave battles opened with a member at 1 HP (lost) | 59 (0) | 2 (0) |
-| Doom Gaze keys won; deaths, Doom deaths, wipes | 40 of 40; 29, 22, 0 | 39 of 39; 32, 19, 0 |
-| Potions at the save point (K 0, 12 runs) | 31-79 | 26-62 |
+| cave battles opened with a member at 1 HP | 59 | 0 |
+| Potions at the save point, 72 runs (lowest, median, highest) | 31, 64, 95 | 55, 83, 95 |
+| Doom Gaze keys won | 40 of 40 | 38 of 38 |
+| Doom Gaze meetings, deaths, wipes | 72, 29, 0 | 72, 31, 0 |
+| Doom deaths (TERRA/CELES/STRAGO/RELM) | 22 (7/5/10/0) | 18 (0/11/7/0) |
+| Battle and Aero deaths | 7 | 13 (RELM 9) |
 
-The two remaining 1-HP openings came from encounters on the field itself,
-before (33,12) (`fix3_k2_s2`, `fix3_k2_s6`, both won). The care costs about
-18 Potions (74 down to 56 in `fix3_k0_s0`). Each of the leg's other fights
-won every distinct key in both arms (`fight_report_base3_fix3.txt`).
+Deaths a meeting did not drop: 0.40 base, 0.43 fix. Each of the leg's
+other fights won every distinct key in both arms
+(`fight_report_base4_fix4.txt`). Deaths a fight, base / fix:
+
+| formation | deaths a fight, base / fix |
+|---|---|
+| $152 | 0.47 / 0.56 |
+| $150 | 0.19 / 0.10 |
+| $153 | 0.19 / 0.12 |
+| $155 | 0.38 / 0.00 |
+| $156 | 0.19 / 0.00 |
+| $157 | 0.00 / 0.09 |
+
+After #505 landed, the branch was rebased onto main 7298a849 as
+`wt/v039-doomgaze-2`. One run there, booting main's tracked
+`wor-thamasa-v1` (#505's re-cut, fd14a9de), passed: "PASS (frame
+79979)" (`merged_k0_s0`).
