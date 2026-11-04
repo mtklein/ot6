@@ -324,11 +324,13 @@ caster, so Doom cannot take the party's reviver ("[kit] Death guard $DC on
 TERRA for the flights; knows Life ($30)"). The Memento Ring stays on RELM,
 the only one of the four who can wear it.
 
-What this guarantees: TERRA and RELM cannot be Doomed, so Doom alone can
-no longer down the whole party. It does not make the fight safe. Doom still
-lands on CELES and STRAGO, and the rest of #504's path is still open:
-Battle or Aero can take RELM, and then TERRA. A wipe now needs damage to
-kill both guarded members.
+What this guarantees: TERRA and RELM cannot be Doomed while they wear
+these guards (none of the fix sweep's 72 meetings Doomed either), so Doom
+alone can no longer down the whole party. It does not make the fight safer
+in deaths. Doom Gaze casts its Dooms at the members it can kill, so they
+fall on CELES and STRAGO: Doom deaths rose from 15 to 22 in the sweep below.
+The rest of #504's path is still open: Battle can take RELM, and a wipe
+needs damage to kill TERRA as well.
 
 Step 4 of the relic plan used to break ties between leftovers by item id.
 Against Wound alone, the Ribbon and a Star Pendant both cover nothing, so
@@ -366,35 +368,38 @@ plate step cut out, the assertion goes red ("the spike field (36-44, 9-11)
 is down ($02D1, party 1 on (39,15)) as party 2 crosses: got 0 ($0), want 1
 ($1)", `mutplate`). In `dbg4`, CELES reached 313 (29,13) at 3723/3723.
 
-**The sweep.** All runs booted the graph's own `wor-thamasa-v1` (sha256
-fc5cbe8d, the capture `ninja` made at 532e1a33), at K 0-5 x shifts 0, 1, 2,
-4, 5, 6, 8, 9, 10, 12, 13, 14. The base is 532e1a33 (`base4_*`, the same
-results as `base_*` and `base3_*`); the fix is c5a83012 (`fix4_*`):
+**The sweep.** Both arms booted main's graph capture of `wor-thamasa-v1`.
+`ninja` built it in a clone at main 7298a849 and again at this branch's head
+2451c2cf; both made fd14a9de, the same bytes as the tracked save ("checkpoint
+drift wor-thamasa-v1: none"). The sweep ran K 0-5 x shifts 0, 1, 2, 4, 5, 6,
+8, 9, 10, 12, 13, 14. The base is 7298a849 (`base5_*`) and the fix is
+2451c2cf (`fix5_*`):
 
 | | base | fix |
 |---|---|---|
 | runs passed | 72 of 72 | 72 of 72 |
-| cave battles opened with a member at 1 HP | 59 | 0 |
-| Potions at the save point, 72 runs (lowest, median, highest) | 31, 64, 95 | 55, 83, 95 |
-| Doom Gaze keys won | 40 of 40 | 38 of 38 |
-| Doom Gaze meetings, deaths, wipes | 72, 29, 0 | 72, 31, 0 |
-| Doom deaths (TERRA/CELES/STRAGO/RELM) | 22 (7/5/10/0) | 18 (0/11/7/0) |
-| Battle and Aero deaths | 7 | 13 (RELM 9) |
+| Death guard lines a run | 0 | 2 (TERRA $DC, RELM $DB) in all 72 |
+| cave battles opened with a member at 1 HP | 42 (0 lost) | 0 |
+| Potions at the save point (lowest, median, highest) | 50, 70, 97 | 58, 83, 96 |
+| Doom Gaze keys won; meetings won | 40 of 40; 72 of 72 | 38 of 38; 72 of 72 |
+| Doom Gaze deaths, wipes | 23, 0 | 38, 0 |
+| Doom deaths (TERRA/CELES/STRAGO/RELM) | 15 (1/8/6/0) | 22 (0/7/15/0) |
+| other deaths | 8 (Battle: RELM 7, CELES 1) | 16 (Battle: RELM 10, CELES 2; Aero: CELES 2; Ice 3: STRAGO 2) |
 
-Deaths a meeting did not drop: 0.40 base, 0.43 fix. Each of the leg's
-other fights won every distinct key in both arms
-(`fight_report_base4_fix4.txt`). Deaths a fight, base / fix:
+Deaths a meeting rose from 0.32 to 0.53. Each of the leg's other fights won
+every distinct key in both arms (`fight_report_base5_fix5.txt`). Deaths a
+fight, base / fix:
 
 | formation | deaths a fight, base / fix |
 |---|---|
-| $152 | 0.47 / 0.56 |
-| $150 | 0.19 / 0.10 |
-| $153 | 0.19 / 0.12 |
-| $155 | 0.38 / 0.00 |
-| $156 | 0.19 / 0.00 |
-| $157 | 0.00 / 0.09 |
+| $152 | 0.63 / 0.60 |
+| $150 | 0.05 / 0.06 |
+| $151 | 0.02 / 0.00 |
+| $157 | 0.12 / 0.03 |
+| $153 | 0.19 / 0.25 |
+| $156 | 0.12 / 0.00 |
+| $155 | 0.69 / 0.00 |
 
-After #505 landed, the branch was rebased onto main 7298a849 as
-`wt/v039-doomgaze-2`. One run there, booting main's tracked
-`wor-thamasa-v1` (#505's re-cut, fd14a9de), passed: "PASS (frame
-79979)" (`merged_k0_s0`).
+The earlier sweeps (`base4_*`/`fix4_*` from fc5cbe8d, before #505) read
+the same way: 72 of 72 runs passed in each arm, 59 cave battles opened at
+1 HP on the base against 0 on the fix, and Doom deaths 22 against 18.
