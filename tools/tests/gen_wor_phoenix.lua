@@ -202,6 +202,61 @@ local function dressParty(p)
   return H.seqStep(steps)
 end
 
+-- the Falcon's four and the relics they wore before the flights' Death
+-- guards went on (#504): put back once the cave splits them, before either
+-- party is dressed, so the cave's dressing starts from the kit and the bag
+-- it had before the flights.  Every slot that moved comes off first (a
+-- relic may go back to a member in the other party), then each member's
+-- own goes back on
+local FLIGHT = { TERRA, CELES, RELM, STRAGO }
+local flightKit = {}
+local function slots(c) return { H.readByte(0x1600 + 37 * c + 0x23), H.readByte(0x1600 + 37 * c + 0x24) } end
+local function recordKit()
+  return H.call(function()
+    for _, c in ipairs(FLIGHT) do
+      flightKit[c] = slots(c)
+      H.log(string.format("[kit] %s wears $%02X, $%02X before the flights", H.SPLIT_NAMES[c], flightKit[c][1],
+        flightKit[c][2]))
+    end
+  end)
+end
+local function restoreKit()
+  local function moved(c)
+    local s = slots(c)
+    return s[1] ~= flightKit[c][1] or s[2] ~= flightKit[c][2]
+  end
+  local function each(p, fn)
+    return H.lazy(function()
+      local steps = { H.switchParty(p, { tag = "the flights' relics off, party " .. p }) }
+      for _, c in ipairs(FLIGHT) do
+        if H.partyOfChar(c) == p and moved(c) then steps[#steps + 1] = fn(c) end
+      end
+      return H.seqStep(steps)
+    end)
+  end
+  local function off(c)
+    return H.unequipRelics(c, { 4, 5 }, { tag = H.SPLIT_NAMES[c] .. ": the flights' relics off" })
+  end
+  local function on(c)
+    local kit = {}
+    for i, s in ipairs({ 4, 5 }) do
+      if flightKit[c][i] ~= 0xFF then kit[#kit + 1] = { s, flightKit[c][i] } end
+    end
+    return H.equipKit(c, kit, { tag = H.SPLIT_NAMES[c] .. ": the relics from before the flights back on" })
+  end
+  return H.seqStep({
+    each(1, off), each(2, off), each(2, on), each(1, on),
+    H.call(function()
+      for _, c in ipairs(FLIGHT) do
+        local s = slots(c)
+        H.assertEq(string.format("$%02X $%02X", s[1], s[2]),
+          string.format("$%02X $%02X", flightKit[c][1], flightKit[c][2]),
+          H.SPLIT_NAMES[c] .. " wears the relics from before the flights")
+      end
+    end),
+  })
+end
+
 H.run({ maxFrames = 2400000 }, {
   H.bootCheckpoint("wor-thamasa-v1"),
   watches(),
@@ -212,8 +267,8 @@ H.run({ maxFrames = 2400000 }, {
   -- @@stage thamasa
   -- the Falcon's flights cross Doom Gaze's cells, and its Doom kills at
   -- any HP (H.FIGHT_THREATS.doomgaze): the Death guards in the bag go on
-  -- before boarding (#504); the cave's own dressing at the split replaces
-  -- them
+  -- before boarding (#504), and come off again at the split (restoreKit)
+  recordKit(),
   H.dressRelics({ { TERRA, "TERRA" }, { CELES, "CELES" }, { RELM, "RELM" }, { STRAGO, "STRAGO" } },
     { threats = H.FIGHT_THREATS.doomgaze, tag = "relics for the flights (Doom Gaze)" }),
   -- the bag came down from the tower dry (1 Potion, 2 Tonics, 1 Tincture:
@@ -269,6 +324,7 @@ H.run({ maxFrames = 2400000 }, {
     H.assertEq((H.readByte(0x1EB9) & 0x40) ~= 0, true, "party switching on ($01CE, _cc2090)")
   end),
   H.splitBegin(),
+  restoreKit(),
   dressParty(2),
   dressParty(1),
   H.saveState("wor_phoenix_split.mss"),
