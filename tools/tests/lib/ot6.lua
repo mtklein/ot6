@@ -6861,6 +6861,81 @@ BATTLE.IDLE_ST = { [BATTLE.ST_ITEM] = true, [BATTLE.ST_TOOLS] = true, [BATTLE.ST
                    [BATTLE.ST_MTEK] = true, [BATTLE.ST_RAGE] = true }
 for _, s in ipairs(BATTLE.ST_TRANSITIONAL) do BATTLE.KNOWN_ST[s] = true end
 
+-- What a person does at a fallen member's open command window (#510, #511),
+-- for every driver that steers windows (Driver:button's planning gate,
+-- M.kitBattle, M.setzerBattle): enter nothing for it.  At command select
+-- with another member queued behind ($4001+e not $FF; the front of the
+-- queue, the smallest position, is the window X opens next) hand the
+-- window on with X; with none, wait for the engine to close it (it does
+-- after the next action, AfterAction2).  A list, target select or side
+-- window the member had open as it fell is backed out of with B; a Slot
+-- spin that has started cannot be (B is not read once its first A lands),
+-- so it is finished with A.  The hold is bounded: after M.DOWN_HOLD_CAP
+-- frames on one fallen member's window the member Defends (RIGHT at
+-- command select, A in the Def. window), a command the engine drops for a
+-- fallen actor but which closes the window as any confirm does (the
+-- pre-#510 drivers confirmed fallen members' commands, and their windows
+-- moved on: battle_doom's dead member's Fight at f577).  Pure:
+-- o = { actor, st, queue = { [e] = $4001+e }, held (frames on this
+-- window), spun (a Slot spin's first A landed) }.  Returns the button
+-- (nil: press nothing), why ("hand-on", "hold", "back-out", "spin",
+-- "cap"), and the member X hands the window to.
+M.DOWN_HOLD_CAP = 1800
+function M.downStep(o)
+  local st, q = o.st, o.queue or {}
+  local capped = (o.held or 0) >= M.DOWN_HOLD_CAP
+  if st == BATTLE.ST_CMD then
+    if capped then return "right", "cap" end
+    local behind = nil
+    for e = 0, 3 do
+      if e ~= o.actor and (q[e] or 0xFF) ~= 0xFF and (behind == nil or q[e] < q[behind]) then behind = e end
+    end
+    if behind ~= nil then return "x", "hand-on", behind end
+    return nil, "hold"
+  end
+  if st == BATTLE.ST_DEF and capped then return "a", "cap" end
+  if st == BATTLE.ST_SLOT and o.spun then return "a", "spin" end
+  if BATTLE.IDLE_ST[st] or st == BATTLE.ST_TGT or st == BATTLE.ST_ROW or st == BATTLE.ST_DEF
+     or st == BATTLE.ST_SLOT or st == BATTLE.ST_TOOLS or st == BATTLE.ST_THROW then
+    return "b", "back-out"
+  end
+  return nil, "hold"   -- a transitional state passes on its own
+end
+
+-- M.downStep read off RAM for the window open now: nil when its member
+-- (`actor`, a party slot) stands; else the button to press this pulse, or
+-- false to press nothing.  h is the caller's own table, the hold's state
+-- (which member, since when); a gap of over 120 frames between two looks
+-- starts a new hold.  Logs once a hold, and again at the cap.
+function M.downWindow(h, actor, st, tag)
+  local s1, hp = M.readByte(BATTLE.ST1 + actor * 2), M.readWord(0x3BF4 + actor * 2)
+  if not M.actorDown({ s1 = s1, hp = hp }) then return nil end
+  if h.actor ~= actor or M.frame - (h.last or -1e9) > 120 then
+    h.actor, h.since, h.said, h.capSaid = actor, M.frame, nil, nil
+  end
+  h.last = M.frame
+  local q = {}
+  for e = 0, 3 do q[e] = M.readByte(0x4001 + e) end
+  local btn, why, behind = M.downStep({ actor = actor, st = st, queue = q, held = M.frame - h.since,
+    spun = st == BATTLE.ST_SLOT and M.readByte(BATTLE.SLOT_PRESS1) ~= 0 })
+  if not h.said then
+    h.said = true
+    M.log(string.format("[%s] actor=%d is down (STATUS1 $%02X, HP %d) with its command window open (state $%02X) -- "
+      .. "not planning: %s (#510)", tag or "fight", actor, s1, hp, st,
+      why == "hand-on" and string.format("handing the window on (X) to actor %d's, queued behind it", behind)
+      or why == "back-out" and "backing out of the window it had open (B)"
+      or why == "spin" and "finishing the Slot spin it had started (A)"
+      or "waiting for the engine to close it"))
+  end
+  if why == "cap" and not h.capSaid then
+    h.capSaid = true
+    M.log(string.format("[%s] actor=%d's window has stood %d frames since it fell (f%d) and the engine has not closed "
+      .. "it -- Defending for it so the window closes (M.DOWN_HOLD_CAP, #511)", tag or "fight", actor,
+      M.frame - h.since, h.since))
+  end
+  return btn or false
+end
+
 -- A command row the cursor can actually land on.  Each $202E row is
 -- three bytes -- id, flags, targeting -- and flags bit 7 is the engine's
 -- own "disabled" mark (UpdateCmdList, battle_main.asm: `ror $0001,x`
@@ -14499,6 +14574,12 @@ function Driver:button(actor)
   -- (train_done, v0.17), or a target-select steer whose window closed
   -- under it.  Back out with B now, on every path; the plan (a row to
   -- walk to at $05) is still good once the window is gone.
+  -- (the one exception: the Def. window this driver opened for a fallen
+  -- member whose window outstood M.DOWN_HOLD_CAP, where M.downWindow says A)
+  if st == BATTLE.ST_DEF and self.downHold and self.downHold.capSaid and self.downHold.actor == actor
+     and M.downWindow(self.downHold, actor, st, self.tag) == "a" then
+    return { "a" }
+  end
   if st == BATTLE.ST_ROW or st == BATTLE.ST_DEF then
     self.sideWindowN = self.sideWindowN + 1
     M.log(string.format("[%s] [side-window] %s ($%02X) open at f%d (actor=%d "
@@ -14705,21 +14786,12 @@ function Driver:button(actor)
     do
       local why = M.planGate({ menu = M.readByte(BATTLE.MENU), st = st,
         s1 = M.readByte(BATTLE.ST1 + actor * 2), hp = M.readWord(0x3BF4 + actor * 2) })
+      -- (M.downWindow: X to the queue's front, else the hold, bounded by
+      -- M.DOWN_HOLD_CAP, past which the member Defends so the window closes)
       if why == "down" then
-        local behind = nil
-        for e = 0, 3 do
-          -- (the front of the queue: the smallest position, the window X opens next)
-          if e ~= actor and M.readByte(0x4001 + e) ~= 0xFF
-             and (behind == nil or M.readByte(0x4001 + e) < M.readByte(0x4001 + behind)) then behind = e end
-        end
-        if self.downSaid ~= actor then
-          self.downSaid = actor
-          M.log(string.format("[%s] actor=%d is down (STATUS1 $%02X, HP %d) with its command window open -- "
-            .. "not planning: %s (#510)", self.tag or "fight", actor, M.readByte(BATTLE.ST1 + actor * 2),
-            M.readWord(0x3BF4 + actor * 2), behind ~= nil and string.format("handing the window on (X) to "
-            .. "actor %d's, queued behind it", behind) or "waiting for the engine to close it"))
-        end
-        if behind ~= nil then return { "x" } end
+        self.downHold = self.downHold or {}
+        local btn = M.downWindow(self.downHold, actor, st, self.tag)
+        if btn then return { btn } end
       end
       if why ~= nil then return nil end
     end
@@ -15666,7 +15738,7 @@ function M.setzerBattle(plan, opts)
   -- is the live one, so a suite that plays several battles (one call
   -- each) never has an earlier call's watchers writing into this one's.
   local token = nil
-  local Z = { rec = nil, entity = nil }
+  local Z = { rec = nil, entity = nil, down = {} }
   local function seat()
     for s = 0, 3 do if M.readByte(0x3ED8 + s * 2) == 9 then return s end end
   end
@@ -16015,6 +16087,19 @@ function M.setzerBattle(plan, opts)
     local a = M.readByte(ACTOR) & 3
     local st = M.readByte(MSTATE)
     local p = plan[k]
+    -- A member who fell with its window open (#511, the fight driver's
+    -- #510 gate): nothing is entered for it -- no plan row, no care line, no
+    -- Defend or Fight for the others' script -- and the window is handed on,
+    -- backed out of, or waited out (M.downWindow).  A row SETZER had open as
+    -- he fell is not confirmed, so k stays on it.
+    local dn = M.downWindow(Z.down, a, st, "setzer")
+    if dn ~= nil then
+      if p ~= nil and (p.aim ~= nil or p.presses ~= nil) and M.readByte(0x3ED8 + a * 2) == 9 then
+        p.aim, p.presses, p.lPresses = nil, nil, nil
+      end
+      if dn then pulse(dn) else M.setPad({}) end
+      return
+    end
     -- A status may take control while a command window remains visible.
     -- Give SETZER his turn back through the bag/ally's controller inputs;
     -- never enter a scripted row into a Zombie's stale window.
@@ -16267,7 +16352,7 @@ function M.kitBattle(plan, opts)
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
   local SPELL_PTR = { [0] = 0x0000, [1] = 0x013C, [2] = 0x0278, [3] = 0x03B4 }
   local k, cool = 1, 0
-  local hb = nil
+  local hb, downHold = nil, {}
   local function pulse(btn)
     if cool > 0 then cool = cool - 1; M.setPad({}); return end
     M.setPad({ [btn] = true }); cool = 10
@@ -16386,9 +16471,15 @@ function M.kitBattle(plan, opts)
     local p0 = plan[k]
     if p0 ~= nil and p0.self and p0.opened and p0.seat ~= nil
         and (M.readByte(MENU) == 0 or (M.readByte(ACTOR) & 3) ~= p0.seat) then
-      -- a self-targeted command whose target select confirmed itself (the
-      -- window closed on the command's own A)
-      done(p0, p0.seat)
+      if M.actorDown({ s1 = M.readByte(0x3EE4 + p0.seat * 2), hp = M.readWord(0x3BF4 + p0.seat * 2) }) then
+        -- its member fell with the window open (#511): the window closed
+        -- under it, not on its A, so the entry is not done
+        p0.opened, p0.seat = nil, nil
+      else
+        -- a self-targeted command whose target select confirmed itself (the
+        -- window closed on the command's own A)
+        done(p0, p0.seat)
+      end
     end
     if M.readByte(MENU) == 0 then
       if M.readByte(0x3A77) == 0 then pulse("a") else M.setPad({}) end
@@ -16407,6 +16498,21 @@ function M.kitBattle(plan, opts)
       end
       M.log(string.format("[kit] f%d entry %d/%d (%s) actor %d st %02X; party %s", M.frame, k, #plan,
         p and string.format("char $%02X cmd $%02X", p.who, p.cmd or 0) or "none", a, st, table.concat(t, " ")))
+    end
+    -- A member who fell with its window open (#511, the fight driver's
+    -- #510 gate): nothing is entered for it -- no plan entry (a defend
+    -- entry's A at $27 would record a Defend that never ran and advance k),
+    -- no Defend or Fight for the others' script -- and the window is handed
+    -- on, backed out of, or waited out (M.downWindow).  An entry its member
+    -- had opened is not done: k stays on it, played on the member's next
+    -- window if it is raised, and the others fight it out meanwhile (gone).
+    local dn = M.downWindow(downHold, a, st, "kit")
+    if dn ~= nil then
+      if p ~= nil and p.seat == a then
+        p.opened, p.seat, p.presses, p.lPresses, p.tookBack, aim = nil, nil, nil, nil, nil, nil
+      end
+      if dn then pulse(dn) else M.setPad({}) end
+      return
     end
     if p == nil then
       if opts.idle == "defend" then defend(st) else fight(a, st) end
@@ -19429,7 +19535,7 @@ function Driver:frame()
     -- menu open, so a record that outlives a closed menu is a turn ago's
     -- and must not steer a later window's walk (review of 43462e7d)
     self.plan, self.planActor, self.held, self.confirmed = nil, nil, {}, nil
-    self.downSaid = nil
+    self.downHold = nil
     M.setPad((M.frame % 8 < 4) and { "a" } or {})
     return
   end

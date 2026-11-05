@@ -1,6 +1,8 @@
 -- @manual standalone: lua tools/tests/plan_gate_selftest.lua
--- plan_gate_selftest.lua -- when the fight driver may plan a turn (#510), and
--- the cure line's order among zombies (M.zombieOrder, #508's review).
+-- plan_gate_selftest.lua -- when the fight driver may plan a turn (#510),
+-- what any driver presses at a fallen member's window (M.downStep; the
+-- scripted kit and SETZER drivers, #511), and the cure line's order among
+-- zombies (M.zombieOrder, #508's review).
 -- The engine can open a command window for a member who fell after its turn
 -- was queued: tomb_zombie at c24a73d3, entity 0 Wounded at pf2157, its window
 -- open at pf2180 ($7BCA 01, $62CA 00, state $05) until the engine took it off
@@ -31,6 +33,7 @@ emu = {
   writeWord = function(a, v) mem[a] = v & 0xFF; mem[a + 1] = v >> 8 end,
   setInput = function() end,
   getState = function() return {} end,
+  getMemorySize = function() return 0 end,
 }
 OT6_SYMS = setmetatable({}, { __index = function() return 0 end })
 local rawPrint = print
@@ -182,7 +185,7 @@ local function driverCase(lib0)
   -- entity 2 queued behind the fallen member (battle_doom's case): X hands the window on
   fallenFrame()
   mem[0x4003] = 0x01
-  D.downSaid = nil
+  D.downHold = nil
   local pass = D:button(0)
   noPlan = noPlan and D.plan == nil and pass ~= nil and pass[1] == "x"
     and said("handing the window on (X) to actor 2's")
@@ -203,7 +206,7 @@ do
   for _, m in ipairs({
     { 'if why ~= nil then return nil end', 'if why ~= nil and why ~= "down" then return nil end',
       "no hold for a fallen member" },
-    { 'if behind ~= nil then return { "x" } end', '', "no hand-on to a queued member" },
+    { 'if behind ~= nil then return "x", "hand-on", behind end', '', "no hand-on to a queued member" },
   }) do
     local _, count = lib:gsub(plain(m[1]), "")
     assert(count == 1, "the driver's line '" .. m[1] .. "' occurs " .. count .. " times")
@@ -216,6 +219,159 @@ do
     .. "when another member is queued behind it, and a plan held "
     .. "through the fall backs out with its care turn released (Driver:button, stubbed RAM)"
 end
+
+-- ---- what a fallen member's window gets (M.downStep, #511) -----------------
+-- The lib loaded whole with one edit (M.downStep reads the lib's BATTLE
+-- table, which a lone function's mutant cannot see).
+local function libMutant(from, to)
+  local _, count = lib:gsub(plain(from), "")
+  assert(count == 1, "the lib's line '" .. from .. "' occurs " .. count .. " times")
+  return assert(load((lib:gsub(plain(from), (to:gsub("%%", "%%%%")))), "=mutant ot6.lua"))()
+end
+local function checkLib(what, from, to, f)
+  n = n + 1
+  local ok, r = pcall(f, H)
+  assert(ok and r == true, "FAIL " .. what .. ": " .. tostring(r))
+  local mok, mr = pcall(f, libMutant(from, to))
+  assert(not mok or mr ~= true, string.format("FAIL %s: the mutant ('%s' -> '%s') passed it too", what, from, to))
+  checks[#checks + 1] = what
+end
+local NOQ = { [0] = 0xFF, 0xFF, 0xFF, 0xFF }
+local function step(L, st, queue, held, spun)
+  return L.downStep({ actor = 0, st = st, queue = queue or NOQ, held = held or 0, spun = spun })
+end
+checkLib("a fallen member's window at command select with nobody queued is held (no button)",
+  'if behind ~= nil then return "x", "hand-on", behind end\n    return nil, "hold"',
+  'if behind ~= nil then return "x", "hand-on", behind end\n    return "x", "hold"', function(L)
+    return step(L, CMD) == nil and step(L, 0x01) == nil
+  end)
+checkLib("a transitional state ($01) gets no button",
+  'return nil, "hold"   -- a transitional state passes on its own', 'return "b", "hold"', function(L)
+    return step(L, 0x01) == nil
+  end)
+checkLib("with members queued, X hands the window to the queue's front (the smallest position)",
+  "(behind == nil or q[e] < q[behind])", "(behind == nil or q[e] > q[behind])", function(L)
+    local b, why, to = step(L, CMD, { [0] = 0x00, 0x02, 0x01, 0xFF })
+    return b == "x" and why == "hand-on" and to == 2
+  end)
+checkLib("past M.DOWN_HOLD_CAP frames the member Defends (RIGHT at command select), queue or not",
+  'if capped then return "right", "cap" end', "", function(L)
+    local cap = L.DOWN_HOLD_CAP
+    return step(L, CMD, NOQ, cap - 1) == nil and step(L, CMD, NOQ, cap) == "right"
+      and step(L, CMD, { [0] = 0, 0xFF, 0x01, 0xFF }, cap) == "right"
+  end)
+checkLib("the Def. window the cap opened is confirmed (A); one the member had open as it fell is backed out of",
+  'if st == BATTLE.ST_DEF and capped then return "a", "cap" end', "", function(L)
+    return step(L, 0x27, NOQ, L.DOWN_HOLD_CAP) == "a" and step(L, 0x27, NOQ, 10) == "b"
+  end)
+checkLib("a list, target select or side window open as the member fell is backed out of (B)",
+  'return "b", "back-out"', 'return nil, "back-out"', function(L)
+    for _, st in ipairs({ 0x0A, 0x0E, 0x30, 0x38, 0x24, 0x27, 0x2D }) do
+      if step(L, st) ~= "b" then return "state " .. st end
+    end
+    return true
+  end)
+checkLib("a Slot spin whose first A landed is finished (A); one not started is backed out of",
+  'if st == BATTLE.ST_SLOT and o.spun then return "a", "spin" end', "", function(L)
+    return step(L, 0x08, NOQ, 0, true) == "a" and step(L, 0x08, NOQ, 0, false) == "b"
+  end)
+
+-- ---- the scripted drivers (M.kitBattle, M.setzerBattle; #511) ------------------
+-- Their battle step run on stubbed RAM: LOCKE (seat 0), SETZER (seat 1) and
+-- two more, one monster; the window open is `actor`'s at state `st`, and
+-- `downSeat` is Wounded at 0 HP.
+local LOCKE, SETZER = 0x01, 0x09
+local function scriptedFrame(actor, st, downSeat)
+  for k in pairs(mem) do mem[k] = nil end
+  printed = {}
+  mem[MENU], mem[ACTOR], mem[MSTATE] = 1, actor, st
+  mem[0x3ED8], mem[0x3ED8 + 2], mem[0x3ED8 + 4], mem[0x3ED8 + 6] = LOCKE, SETZER, 0x02, 0x05
+  for e = 0, 3 do word(HP + e * 2, 1500); mem[0x3AA0 + e * 2] = 1; mem[0x4001 + e] = 0xFF end
+  word(HP + downSeat * 2, 0); mem[ST1 + downSeat * 2] = 0x80
+  mem[0x3F45], mem[0x3A77], mem[0x3A75], mem[0xE9F9] = 0x01, 1, 1, 15
+  word(0x3BFC, 900)
+  for a = 0, 3 do mem[0x202E + a * 12] = 0x00; mem[0x202E + a * 12 + 3] = 0x0F end
+end
+-- run the battle step `frames` frames; the buttons it pressed, in order
+local function drive(L, stepObj, frames, onFrame)
+  local pressed, realSet = {}, L.setPad
+  L.setPad = function(b)
+    for k2, v in pairs(b or {}) do
+      local nm = type(k2) == "number" and v or (v and k2)
+      if nm then pressed[#pressed + 1] = nm end
+    end
+    return realSet(b)
+  end
+  local ok, err = pcall(function()
+    for f = 1, frames do
+      L.frame = 1000 + f
+      if onFrame then onFrame(f) end
+      stepObj:tick()
+    end
+  end)
+  L.setPad = realSet
+  assert(ok, err)
+  return pressed
+end
+-- (setzerBattle's care for a Zombied or Muddled SETZER lives in ot6_field.lua,
+-- which compose.py adds to a run: a care that never steps in stands for it)
+local function noCare(L)
+  L.newSpinnerCare = function()
+    local f = function() return false end
+    return { reset = f, watch = f, spinnerTaken = f, allyZombie = f, window = f }
+  end
+  return L
+end
+local function has(t, b) for _, x in ipairs(t) do if x == b then return true end end return false end
+local function only(t, set) for _, x in ipairs(t) do if not set[x] then return false end end return true end
+checkLib("kitBattle: a defend entry's member fell in its Def. window -- no A, the entry not recorded, k stays",
+  'local dn = M.downWindow(downHold, a, st, "kit")', "local dn = nil", function(L)
+    -- #511's case: a p.defend entry recorded 'a Defend' at state $27 for a dead member
+    scriptedFrame(0, 0x27, 0)
+    local pressed = drive(L, L.kitBattle({ { who = LOCKE, defend = true } }, {}), 40)
+    return #L.vars.kit == 0 and has(pressed, "b") and not has(pressed, "a")
+      and said("actor=0 is down") and said("backing out of the window it had open")
+  end)
+checkLib("kitBattle: a fallen member's command window is handed on (X) to the member queued behind it",
+  'local dn = M.downWindow(downHold, a, st, "kit")', "local dn = nil", function(L)
+    scriptedFrame(0, CMD, 0)
+    mem[0x4002] = 0x00
+    local pressed = drive(L, L.kitBattle({ { who = LOCKE, cmd = 0x00 } }, {}), 40)
+    return #L.vars.kit == 0 and has(pressed, "x") and only(pressed, { x = true })
+      and said("handing the window on (X) to actor 1's")
+  end)
+checkLib("kitBattle: a fallen member's window with nobody queued is held, then Defended past the cap (logged)",
+  'if capped then return "right", "cap" end', "", function(L)
+    scriptedFrame(0, CMD, 0)
+    local early = drive(L, L.kitBattle({}, {}), 200)
+    if #early ~= 0 then return "pressed before the cap: " .. table.concat(early, " ") end
+    scriptedFrame(0, CMD, 0)
+    local pressed = drive(L, L.kitBattle({}, {}), L.DOWN_HOLD_CAP + 40, function(f)
+      if f == L.DOWN_HOLD_CAP + 2 then mem[MSTATE] = 0x27 end   -- (RIGHT opened the Def. window)
+    end)
+    return pressed[1] == "right" and pressed[2] == "a" and only(pressed, { right = true, a = true })
+      and not has({ table.unpack(pressed, 2) }, "right") and said("Defending for it so the window closes")
+  end)
+checkLib("setzerBattle: SETZER fell with his window open -- no plan row steered, nothing pressed (held)",
+  'local dn = M.downWindow(Z.down, a, st, "setzer")', "local dn = nil", function(L)
+    scriptedFrame(1, CMD, 1)
+    local pressed = drive(L, noCare(L).setzerBattle({ { row = "defend" } }, {}), 40)
+    return #pressed == 0 and said("actor=1 is down") and said("waiting for the engine to close it")
+  end)
+checkLib("setzerBattle: another member's fallen window is not Defended for the plan; it is handed on (X)",
+  'local dn = M.downWindow(Z.down, a, st, "setzer")', "local dn = nil", function(L)
+    -- LOCKE (not SETZER) fell; SETZER is queued behind him
+    scriptedFrame(0, CMD, 0)
+    mem[0x4002] = 0x00
+    local pressed = drive(L, noCare(L).setzerBattle({ { row = 0x59 } }, {}), 40)
+    return has(pressed, "x") and only(pressed, { x = true })
+  end)
+checkLib("kitBattle: a standing member's window is steered as before, another member down",
+  "if not M.actorDown({ s1 = s1, hp = hp }) then return nil end", "if true then return false end", function(L)
+    scriptedFrame(0, CMD, 3)
+    local pressed = drive(L, L.kitBattle({ { who = LOCKE, defend = true } }, {}), 40)
+    return has(pressed, "right")
+  end)
 
 print = rawPrint
 print(string.format("plan_gate_selftest: PASS -- %d assertions, each failed by its own mutant: %s",
