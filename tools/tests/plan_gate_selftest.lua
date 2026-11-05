@@ -163,6 +163,8 @@ local function fallenFrame()
   mem[ST1] = 0x80
   word(HP + 2, 213); word(HP + 4, 1500)
   mem[ST1 + 6] = 0x02
+  -- the menu queue: only the fallen member's window (the probe's q=00,FF,FF,FF)
+  mem[0x4001], mem[0x4002], mem[0x4003], mem[0x4004] = 0x00, 0xFF, 0xFF, 0xFF
 end
 local function said(pat)
   for _, s in ipairs(printed) do if s:find(pat, 1, true) then return true end end
@@ -176,7 +178,14 @@ local function driverCase(lib0)
   D.menuStreak = 10
   local held = D:button(0)
   local noPlan = D.plan == nil and D.careActor == nil and (held == nil or #held == 0)
-    and said("actor=0 is down")
+    and said("actor=0 is down") and said("waiting for the engine to close it")
+  -- entity 2 queued behind the fallen member (battle_doom's case): X hands the window on
+  fallenFrame()
+  mem[0x4003] = 0x01
+  D.downSaid = nil
+  local pass = D:button(0)
+  noPlan = noPlan and D.plan == nil and pass ~= nil and pass[1] == "x"
+    and said("handing the window on (X) to actor 2's")
   -- a plan held from before the fall: B out of the item list, the care budget released
   fallenFrame()
   mem[MSTATE] = 0x0A
@@ -189,15 +198,22 @@ do
   n = n + 1
   local ok, r = pcall(driverCase, H)
   assert(ok and r == true, "FAIL the driver plans nothing for a fallen member's window: " .. tostring(r))
-  -- the mutant: the gate's hold taken out of Driver:button, the lib loaded whole
-  local from = 'if why ~= nil then return nil end'
-  local _, count = lib:gsub(plain(from), "")
-  assert(count == 1, "the driver's gate line occurs " .. count .. " times")
-  local mlib = lib:gsub(plain(from), 'if why ~= nil and why ~= "down" then return nil end')
-  local Hm = assert(load(mlib, "=mutant ot6.lua"))()
-  local mok, mr = pcall(driverCase, Hm)
-  assert(not mok or mr ~= true, "FAIL the driver's gate: the mutant (no hold for a fallen member) passed it too")
-  checks[#checks + 1] = "the driver plans nothing for a fallen member's open window, and a plan held "
+  -- the mutants, each the lib loaded whole with one edit to Driver:button:
+  -- the gate's hold taken out, and the hand-on to a queued member taken out
+  for _, m in ipairs({
+    { 'if why ~= nil then return nil end', 'if why ~= nil and why ~= "down" then return nil end',
+      "no hold for a fallen member" },
+    { 'if behind ~= nil then return { "x" } end', '', "no hand-on to a queued member" },
+  }) do
+    local _, count = lib:gsub(plain(m[1]), "")
+    assert(count == 1, "the driver's line '" .. m[1] .. "' occurs " .. count .. " times")
+    local mlib = lib:gsub(plain(m[1]), (m[2]:gsub("%%", "%%%%")))
+    local Hm = assert(load(mlib, "=mutant ot6.lua"))()
+    local mok, mr = pcall(driverCase, Hm)
+    assert(not mok or mr ~= true, "FAIL the driver's gate: the mutant (" .. m[3] .. ") passed it too")
+  end
+  checks[#checks + 1] = "the driver plans nothing for a fallen member's open window, hands it on (X) "
+    .. "when another member is queued behind it, and a plan held "
     .. "through the fall backs out with its care turn released (Driver:button, stubbed RAM)"
 end
 

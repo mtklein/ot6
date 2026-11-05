@@ -14694,15 +14694,30 @@ function Driver:button(actor)
     -- gets a window (tomb_zombie: entity 0 Wounded at f+2153, its window open
     -- at f+2180 and planned "cure entity 3's Zombie" over 120 frames of
     -- steering until the engine closed it, the plan never through dropPlan):
-    -- a person waits for the engine to close it, and so does this.
+    -- a person waits for the engine to close it, and so does this.  With
+    -- another member queued behind it ($4001+e not $FF, btlgfx's menu queue)
+    -- a person hands the window on (X, as the zombie and Muddle rules do):
+    -- battle_doom's condemned actor fell in target select, and its window
+    -- held the next member's for ~350 frames (f+139 to its open at f790,
+    -- against f577 when the old driver confirmed the dead member's Fight;
+    -- build/attempts/wt/v039-down-actor/px13b2/b2fix_doom_s0.log), long
+    -- enough for that member's Doom to land before it was weighed.
     do
       local why = M.planGate({ menu = M.readByte(BATTLE.MENU), st = st,
         s1 = M.readByte(BATTLE.ST1 + actor * 2), hp = M.readWord(0x3BF4 + actor * 2) })
-      if why == "down" and self.downSaid ~= actor then
-        self.downSaid = actor
-        M.log(string.format("[%s] actor=%d is down (STATUS1 $%02X, HP %d) with its command window open -- "
-          .. "not planning: waiting for the engine to close it (#510)", self.tag or "fight", actor,
-          M.readByte(BATTLE.ST1 + actor * 2), M.readWord(0x3BF4 + actor * 2)))
+      if why == "down" then
+        local behind = nil
+        for e = 0, 3 do
+          if e ~= actor and M.readByte(0x4001 + e) ~= 0xFF then behind = behind or e end
+        end
+        if self.downSaid ~= actor then
+          self.downSaid = actor
+          M.log(string.format("[%s] actor=%d is down (STATUS1 $%02X, HP %d) with its command window open -- "
+            .. "not planning: %s (#510)", self.tag or "fight", actor, M.readByte(BATTLE.ST1 + actor * 2),
+            M.readWord(0x3BF4 + actor * 2), behind ~= nil and string.format("handing the window on (X) to "
+            .. "actor %d's, queued behind it", behind) or "waiting for the engine to close it"))
+        end
+        if behind ~= nil then return { "x" } end
       end
       if why ~= nil then return nil end
     end
