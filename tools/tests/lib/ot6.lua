@@ -11405,7 +11405,6 @@ function Driver:makePlan(actor)
   plan = self:healWeaponPlan(actor, plan)
   plan = self:coverPlan(actor, plan)
   plan = self:buffPlan(actor, plan)
-  plan = self:sparePlan(actor, plan)
   plan = self:zingerPlan(actor, plan)
   plan = self:studyHoldPlan(actor, plan)
   plan = self:policyPlan(actor, plan)
@@ -11663,33 +11662,6 @@ function Driver:buffPlan(actor, plan)
     end
   end
   return plan
-end
-
--- A body the party leaves alone (#507): opts.spare = { [species] = true }.  While every standing monster is a
--- spared one, a plan aimed at the monsters (M.planAimsAtMonsters: any verb but care, the ally lines and the
--- wards above) waits instead, its window handed on and re-read every 30 frames (the ST_CMD branch), so the
--- turn is ready when the body worth hitting comes back; care, raises and wards go ahead.  Chadarnook's goddess
--- (gen_wor_relm): she has 56,000 HP and comes back from her own death, and every hit on her draws Phantasm;
--- from wor-owzer-v1 the party spent more damage on her than on the demon in half the fights
--- (build/attempts/wt/v039-chadarnook/).  SPARE_OFF (a global) turns it off, the control arm.
-function Driver:sparePlan(actor, plan)
-  local sp = self.opts.spare
-  if sp == nil or SPARE_OFF or plan == nil or not M.planAimsAtMonsters(plan) then return plan end
-  local any = false
-  for s = 0, 5 do
-    if monAlive(s) then
-      if not sp[M.readWord(0x57C0 + s * 2)] then return plan end
-      any = true
-    end
-  end
-  if not any then return plan end
-  self.spareSaid = self.spareSaid or {}
-  if M.frame - (self.spareSaid[actor] or -100000) > 600 then
-    M.log(string.format("[%s] actor=%d spare: only spared bodies stand -- its %s waits for another to come back",
-      self.tag or "fight", actor, plan.kind))
-  end
-  self.spareSaid[actor] = M.frame
-  return { kind = "defer", reason = "spare_wait", at = M.frame }
 end
 
 -- Wrexsoul's Zinger (#271): its first turn (AIScript _290) hides it inside a
@@ -14594,8 +14566,8 @@ function Driver:button(actor)
     -- a wait for the wall (magicOnlyLine's wall_wait) is re-read every 30
     -- frames: X hands the window on only while another member's is open,
     -- and the wait ends when the spell in the air lands
-    if self.plan.kind == "defer" and (self.plan.reason == "wall_wait" or self.plan.reason == "none_targetable"
-         or self.plan.reason == "spare_wait") and M.frame - (self.plan.at or 0) > 30 then
+    if self.plan.kind == "defer" and (self.plan.reason == "wall_wait" or self.plan.reason == "none_targetable")
+       and M.frame - (self.plan.at or 0) > 30 then
       self:dropPlan(self.plan.reason)
       return nil
     end
