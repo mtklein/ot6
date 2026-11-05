@@ -2,7 +2,7 @@
 -- `wor-desert-v1` battery (SHADOW, CELES, CYAN and TERRA beside the Falcon by Maranda), check what the plan
 -- depends on, fly to the tower (world (137,198): LandAirship's VehicleEvent_04 -> EnterKefkasTower), seat the
 -- three groups `party_menu 3` offers (section 4's seating), dress each party, then walk party 3 from its landing
--- (334 (56,22)) down the east ladder, through 339 to the factory (410), over the hop at (8,14) to the factory's
+-- (334 (56,22)) down the east ladder, through 339 (in at its foot, (39,57)) to the factory (410), over the hop at (8,14) to the factory's
 -- save point (37,17), beside Inferno (event battle 114), and Save there with the three parties in the tower: the
 -- `wor-kt-factory-v1` battery, Inferno's retry point.  Parties 1 and 2 stand where the tower set them down.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
@@ -53,11 +53,12 @@ local LINKS = {
   -- the hop at (8,14), entered facing up (_cc1398): a jump through 410 (36,46) to (48,24)
   [MAP_FACTORY] = { { 8, 14, "up", 48, 24 } },
 }
--- the ladders' push-back tiles, and the six tiles that ride the crane out of the tower on A (EnterKefkasTower's
--- crane: _cc0fc3/_cc0fd4/_cc0fe5 and _ca03ba/_ca03c9/_ca03d8, the party back on the Falcon's deck): never stood on
+-- the ladders' push-back tiles.  The six tiles that ride the crane out of the tower (EnterKefkasTower's crane:
+-- _cc0fc3/_cc0fd4/_cc0fe5 and _ca03ba/_ca03c9/_ca03d8, the party back on the Falcon's deck) fire only on A held
+-- there, so they are walked over, not avoided (334 (57,44) is the only way down the east side), and no chest or
+-- talk is made from one
 local AVOID = {
-  [MAP_TOWER] = { { 6, 21 }, { 7, 20 }, { 16, 44 }, { 11, 45 }, { 55, 28 }, { 56, 24 }, { 34, 50 }, { 39, 42 },
-    { 57, 44 }, { 35, 21 }, { 8, 37 }, { 41, 18 }, { 14, 17 } },
+  [MAP_TOWER] = { { 6, 21 }, { 7, 20 }, { 16, 44 }, { 11, 45 }, { 55, 28 }, { 56, 24 }, { 34, 50 }, { 39, 42 } },
   [MAP_FACTORY] = { { 31, 18 } },                    -- Inferno's trigger
 }
 
@@ -73,10 +74,50 @@ local function walk(x, y, what, arrive)
     H.call(function() say("route", what) end),
   })
 end
+-- KT_DEBUG (a lab's global): the walking party's reach on the live map, drawn ('#' reached, '@' the party, 'X' the
+-- target), for planning the tower's walks
+local function reachDump(tx, ty, what)
+  if not KT_DEBUG then return H.call(function() end) end
+  return H.call(function()
+    local set = {}
+    for _, z in ipairs({ false, 0, 1, 2, 3 }) do
+      for k in pairs(H.bfsReach(nil, nil, z or nil, LINKS[map()] or {}, nil, nil, AVOID[map()])) do set[k] = true end
+    end
+    local x0, y0 = H.fieldX(), H.fieldY()
+    H.log(string.format("[reach] %s: map %d from (%d,%d), target (%d,%d) %s", what, map(), x0, y0, tx, ty,
+      set[(ty << 8) | tx] and "REACHED" or "not reached"))
+    for y = 0, 63 do
+      local row = {}
+      for x = 0, 95 do
+        row[#row + 1] = (x == x0 and y == y0) and "@" or (x == tx and y == ty) and "X"
+          or set[(y << 8) | x] and "#" or "."
+      end
+      local s = table.concat(row)
+      if s:find("[#@X]") then H.log(string.format("[reach] %2d %s", y, s)) end
+    end
+  end)
+end
 -- through an exit to another map: onto (x, y) until the map reads dst
+-- An exit tile the floor's BFS does not enter (334 (48,36): the doorway's own tile reads impassable) is taken from
+-- the reached tile beside it, pressing toward it.
 local function door(x, y, dst, what)
+  local function arrived() return map() == dst end
   return H.seqStep({
-    walk(x, y, what, function() return map() == dst end),
+    reachDump(x, y, what),
+    H.lazy(function()
+      if H.bfsReach(nil, nil, nil, LINKS[map()] or {}, x, y, AVOID[map()]) then return walk(x, y, what, arrived) end
+      for _, o in ipairs({ { 0, 1, "up" }, { -1, 0, "right" }, { 1, 0, "left" }, { 0, -1, "down" } }) do
+        if H.bfsReach(nil, nil, nil, LINKS[map()] or {}, x + o[1], y + o[2], AVOID[map()]) then
+          return H.seqStep({
+            walk(x + o[1], y + o[2], what .. ": beside it", arrived),
+            H.driveUntil(arrived, 600, { H.hold({ o[3] }), H.waitFrames(2) }, what .. ": pressing " .. o[3]),
+            H.release(),
+          })
+        end
+      end
+      error(string.format("%s: neither the exit (%d,%d) nor a side of it is reachable from (%d,%d)", what, x, y,
+        H.fieldX(), H.fieldY()), 0)
+    end),
     H.waitUntil(function() return map() == dst and settled() end, 1200, what .. ": on map " .. dst, 1),
     H.call(function() say("route", what) end),
   })
