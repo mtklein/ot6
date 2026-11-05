@@ -126,11 +126,9 @@ while the play from power-on held none (a loss upstream, since fixed), and
 the sweep `s4` measured CELES in her own blades on that line (section 4).
 The bag holds one Gem Box and a loss takes it, so a lost wager
 is a lost attempt (`reload`: the leg raises "LOST: ...", and the runner
-retries from the boot, counted, as a person reloads).  TERRA's
-self-inflicted losses also end the harness's run, not just the wager: the
-battle table read wiped for 369 frames and the wipe canary counted a game
-over ("canary: BATTLE WIPE ... Counted as a game over", `fc_terra_s3`),
-where CELES's losses to the opponent hand back as lost wagers (section 8).
+retries from the boot, counted, as a person reloads).  A Colosseum loss
+is a lost wager, never a game over: the run's wipe watches stand aside while
+`$3A97` is set (section 8, item 5).
 
 Left out, each by its own reason:
 
@@ -458,13 +456,18 @@ build/attempts/wt/v037-colosseum/qual/px13/ (`q4.log`, `q6.log`).
    from his dream (route-wor-dreams.md section 8).  The grind plains (section
    9) take SHADOW and CYAN to L43-44; the Mantodea pair still fells a
    member, mostly CYAN in one blow, in half its keys.
-5. **A Colosseum fighter who kills herself ends the run.**  When TERRA's own
-   Drain or Merton took her last HP, the battle table read wiped for 369
-   frames and the harness's wipe canary counted a game over ("canary:
-   BATTLE WIPE ... Counted as a game over", lab `fc_terra_s3`) instead of a
-   lost wager; a loss to the opponent hands back at once.  The route does not
-   meet it (CELES fights the Gem Box), but `H.colosseumBet` should take it as
-   a loss.
+5. **A Colosseum loss ended the run** (closed, wt/v039-colosseum-suite).
+   The wipe canary counted the fighter's death as a game over, whoever
+   killed her: TERRA's own Drain or Merton (`fc_terra_s3`), and in
+   `battle_colosseum` CELES to the Opinicus on key beC0 ("canary: BATTLE
+   WIPE -- the battle table has read wiped for 464 frames ... Counted as a
+   game over (f6217)").  CheckBattleEnd hands LoseBattle the colosseum mode's
+   `$FF` (no Annihilated message) and the field takes the party back with
+   the fighter down, so the run canary and the rides' wipe canary now stand
+   aside while `$3A97` is set; the GameOver-read and TitleScreen watches
+   still see a real game over.  `battle_colosseum` reads the fighter as the
+   battle hands back, before the ride's care revives her
+   (build/attempts/wt/v039-colosseum-suite/tally.txt).
 
 ## 9. The grind plains (v0.38, #483)
 
