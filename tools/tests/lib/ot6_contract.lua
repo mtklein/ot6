@@ -2520,6 +2520,36 @@ M.contracts["wor-desert-v1"] = {
   },
 }
 
+-- wor-kt-factory-v1: Kefka's Tower, the factory's save point, map 410
+-- (37,17), beside Inferno (event battle 114, not yet fought), with the three
+-- parties in the tower: party 3 walking on the save point, parties 1 and 2
+-- where EnterKefkasTower set them down on map 334 (docs/design/
+-- route-wor-kefka-tower.md section 5).  Inferno's retry point.  No timer.
+M.contracts["wor-kt-factory-v1"] = {
+  slot = 3,
+  field = { map = 410, x = 37, y = 17 },   -- the factory's save point (410 NPC_2)
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x01CE, 1, "party switching on (EnterKefkasTower)" },
+    { 0x02BE, 1, "inside Kefka's Tower (EnterKefkasTower; cleared by _cc0f7d)" },
+    { 0x00BD, 0, "Inferno not yet fought (_cc1872)" },
+  },
+  party = {
+    size = 12,
+    members = {
+      { 0x00, "TERRA", 1 }, { 0x08, "RELM", 1 }, { 0x04, "EDGAR", 1 }, { 0x09, "SETZER", 1 },
+      { 0x06, "CELES", 2 }, { 0x07, "STRAGO", 2 }, { 0x01, "LOCKE", 2 }, { 0x0A, "MOG", 2 },
+      { 0x02, "CYAN", 3 }, { 0x03, "SHADOW", 3 }, { 0x05, "SABIN", 3 }, { 0x0C, "GOGO", 3 },
+    },
+  },
+  parties = { [1] = { map = 334, x = 9, y = 16 }, [2] = { map = 334, x = 43, y = 21 } },
+  walking = 3,
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- wor-dino-v1: the World of Ruin map, on foot on the Falcon's tile by the
 -- dinosaur forest north of Gau's father's house (195,46), after the grind
 -- there (world group 54) until the four stood at Kefka's Tower's target
