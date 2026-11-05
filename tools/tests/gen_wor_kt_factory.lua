@@ -245,8 +245,9 @@ H.run({ maxFrames = 2400000 }, {
   chest(10, 17, 0x0E2, "Hero Ring (410 (10,17))"),
   chest(7, 42, 0x0F1, "Aegis Shld (410 (7,42))"),
   walk(48, 24, "party 3: the hop (8,14) into the factory's hall, 410 (48,24)"),
-  chest(49, 12, 0x0EB, "Gauntlet (410 (49,12))"),
-  chest(38, 12, 0x0E1, "Nutkin Suit (410 (38,12))"),
+  -- the hall's two chests (the Gauntlet (49,12), the Nutkin Suit (38,12)) are reached from 296, the room off 339's
+  -- foot (the same treasure bits; probe f8: "no side of it is reachable from (48,24)"), a dead end the middle path
+  -- leaves (route-wor-kefka-tower.md section 5)
   H.saveState("wor_kt_factory_hall.mss"),
 
   -- ---- 3. the save point -----------------------------------------------------------------------------------

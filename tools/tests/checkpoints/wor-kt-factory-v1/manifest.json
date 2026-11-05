@@ -1,0 +1,15 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-kt-factory.sram",
+  "slot": 3,
+  "milestone": "wor-kt-factory",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 410,
+      "x": 37,
+      "y": 17
+    }
+  }
+}

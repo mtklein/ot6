@@ -1277,10 +1277,21 @@ STATES = [
     # again (69,183), where the line left it: the Cactrot desert seven steps
     # south (world group 111: Hoover, Cactrot), fought a while, and Save
     # there: the `wor-desert-v1` checkpoint, Kefka's Tower's boot
-    # (docs/design/route-wor-side-trips.md).  A cut; saves= until a leg boots
-    # it.  Re-cut by checkpoint_drift.py --recut.
+    # (docs/design/route-wor-side-trips.md).  A cut.  wor_kt_factory below
+    # boots its checkpoint.  Re-cut by checkpoint_drift.py --recut.
     S("wor_desert", gen="gen_wor_desert", prev="wor_dino",
-      checkpoint="wor-dino-v1", saves="wor-desert-v1", timeout=7200),
+      checkpoint="wor-dino-v1", timeout=7200),
+
+    # wor-desert-v1 -> Kefka's Tower, the factory's save point, map 410
+    # (37,17): the Falcon to the tower, the party menu's three groups, each
+    # party dressed, party 3 down the east side, through 339 into the
+    # factory, over the hop into its hall, and Save there beside Inferno
+    # with the three parties in the tower: the `wor-kt-factory-v1`
+    # checkpoint, Inferno's retry point
+    # (docs/design/route-wor-kefka-tower.md).  A cut; saves= until a leg
+    # boots it.  Re-cut by checkpoint_drift.py --recut.
+    S("wor_kt_factory", gen="gen_wor_kt_factory", prev="wor_desert",
+      checkpoint="wor-desert-v1", saves="wor-kt-factory-v1", timeout=7200),
 
 ]
 

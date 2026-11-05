@@ -221,7 +221,7 @@ rows for them affects this area only.
 | Left Blade | `$140` | 22 | 700 | none / — / ice | 3 · slash (`:1553`) |
 | Crane | `$10d` | 23 | 1800 | water / — / bolt | 6 · pierce (`:1555`) |
 | Crane | `$10e` | 24 | 2300 | bolt\|water / — / fire | 6 · pierce (`:1557`) |
-| Guardian | `$111`/`$112` | 71/67 | 50000/60000 | — | 0 · `$00`, gauge-less |
+| Guardian | `$111` (`$112` is Kefka's Tower's: route-wor-kefka-tower.md) | 71 | 50000 | — | 0 · `$00`, gauge-less |
 
 Every boss row in the area is authored and reachable by the party that
 fights it (§6.3). The elements on Number 128 are `Ot6ElemAddTbl` rows rather
