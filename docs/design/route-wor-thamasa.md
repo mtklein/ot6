@@ -985,3 +985,38 @@ few. The row stays at 8. `m4`'s one failure came after his fight
 (`m4_k4_s7`, won in 48,576 ticks): a battle on the walk down froze with
 the menu in state `$01` until the stall watch killed the run, the open
 freeze of 12.3.
+
+### 12.5 Chadarnook's Charm and the Ultima fold (v0.39, #507)
+
+The v0.38 save `wor-owzer-v1` lost Chadarnook at K0 shift 0 every time
+(#505's labs). It replays on v0.39's code from that save
+(`build/attempts/wt/v039-chadarnook/runs/v38base/k0_s0`), and a watch on
+each seat's charm attacker (`$3395 + 2 x seat`, TargetEffect_34) shows
+why (`runs/v38diag/k0_s0`): TERRA cast Fire at 3 BP, which folds into
+Ultima, queued on the demon; the demon left before it ran, the goddess's
+Charm landed on her (`[charm] f21531 entity 1 charm attacker $FF -> $08`),
+and a charmed caster's retarget turns to her own side (`Retarget`,
+battle_main.asm), so the Ultima took all three from full HP (`[death]
+f+17673 entity 0 char 2 from 2437/2437 by entity 1 char 0 cmd $02 atk
+$14`). On the fire-weak demon Ultima is also the weaker cast: it takes no
+boost multiplier and no weakness, 5,262 against Fire 3's 9,364 a cast
+(`runs/base`). So TERRA's Fire at Chadarnook stops at Fire 3
+(`opts.magic[id].maxBoost`), and the v0.38 save's shift 0 is won
+(`runs/v38D/k0_s0`: won after 42,448 ticks).
+
+From the graph's own capture (checkpoint drift none), K 0-5 x 24 seed
+shifts: 91 distinct fights (K and battle key). Before, 88 won and 3 lost;
+with the cap, 89 won and 2 lost (`runs/base`, `runs/base2`, `runs/D`,
+`runs/D2`). Both losses are the goddess's Doom Kiss wearing the three
+down, a member at a time: in one the driver refused the Fenix Down three
+times (`331 HP does not survive the 2158 round`, #508), in the other the
+raised members died again at a few hundred HP. The fight stays attrition
+(11.3): Doom Kiss, Charm and the demon's Bolt 3 over 8,000 to 67,000
+ticks, about two deaths a fight.
+
+Tried and dropped: leaving the goddess alone while she stands alone (her
+hits draw Phantasm, and she comes back from her own death). It halved
+Phantasm (80 to 47 and 160 to 88 counters) and lost as many fights (3 of
+91) (`runs/C`, `runs/C2`). With CELES's Haste and Safe on the party in
+the goddess's turns as well, two of six pilot fights were lost
+(`runs/pB`).
