@@ -226,7 +226,10 @@ def judge_machine(facts):
         bits.append(f"load {facts['load'][0]:g}/{facts.get('ncpu')}")
     pkgs = facts.get("reboot_pkgs")
     if pkgs is not None:
-        out.append((PROBLEM, "reboot pending for " + (", ".join(pkgs[:6]) +
+        # Routine maintenance the coordinator handles at a quiet moment
+        # (owner, 2026-11-05): a note, not a problem, so live.py's banner
+        # stays for things that need attention.
+        out.append((INFO, "reboot pending (coordinator reboots when idle) for " + (", ".join(pkgs[:6]) +
                     (f" (+{len(pkgs) - 6})" if len(pkgs) > 6 else "") if pkgs
                     else "updates")))
     if not out:
