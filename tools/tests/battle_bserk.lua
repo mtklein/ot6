@@ -6,8 +6,14 @@
 -- is present and able teaches it to him at the victory (ot6_blue.asm).
 --
 -- Played: Continue ultros-won-v1 (TERRA, LOCKE, STRAGO and RELM at Esper
--- Mountain's save point, map 375 (8,44), the save holding Siren).  Nothing
--- is written.
+-- Mountain's save point, map 375 (8,44), the save holding Siren).  One byte
+-- is staged: STRAGO's Bserk learn byte, cleared to 0 when the save's play
+-- already taught it him.  The line's own play can (63e0f747's replay
+-- taught it him before fire-out-v1, and this save read $FF: "STRAGO spells
+-- learned: 1 differ, spell 33 fresh 255 tracked 0"), and
+-- not knowing it is this suite's precondition, not the play's; the watch,
+-- the victory's learn and the cast under test are the game's own.  Nothing
+-- else is written.
 --   1. Siren onto RELM through the Skills menu.  In random battles beside
 --      the save point (group 90), RELM casts Bserk through the real menu at a
 --      monster the ROM's records leave open to Berserk (MonsterProp +21 bit
@@ -32,6 +38,9 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local TERRA, LOCKE, STRAGO, RELM = 0, 1, 7, 8
 local SIREN, BSERK, CMD_MAGIC = 3, 0x21, 0x02
 local INSECARE = 0x0D0
+-- the staging lever: false leaves the save's byte as its play left it (the
+-- negative control: a save that taught him goes red at the precondition)
+local STAGE_UNLEARNED = true
 local CELL = 0x1A6E + STRAGO * 0x36 + BSERK    -- STRAGO's Bserk learn byte
 local SEEN = 0xEE2B                            -- OT6_BLUESEEN (ot6_memory.inc)
 local SPELL_PTR = { [0] = 0x0000, [1] = 0x013C, [2] = 0x0278, [3] = 0x03B4 }
@@ -194,6 +203,12 @@ H.run({ maxFrames = 1500000 }, {
       H.assertEq((H.readByte(0x1850 + ch) & 7) ~= 0, true, string.format("char %d is in the party", ch))
     end
     H.assertEq((H.readByte(0x1A69 + (SIREN >> 3)) >> (SIREN & 7)) & 1, 1, "the save holds Siren")
+    -- the precondition, staged (the header): a save whose play taught him
+    -- Bserk has it unlearned here, the state before his first Berserk seen
+    local b0 = H.readByte(CELL)
+    if b0 ~= 0 and STAGE_UNLEARNED then H.writeByte(CELL, 0) end
+    H.log(string.format("[bserk] STRAGO's Bserk byte $%02X in the save%s", b0,
+      (b0 ~= 0 and STAGE_UNLEARNED) and " -> $00 (staged: the save's play taught it)" or ""))
     H.assertEq(H.readByte(CELL) ~= 0xFF, true, "STRAGO does not know Bserk yet (his learn byte is not $FF)")
     arm()
   end),

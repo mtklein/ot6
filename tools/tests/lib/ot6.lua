@@ -9910,6 +9910,21 @@ end
 -- carries the bit (STATUS1 $02), so it is the cure M.statusCure finds;
 -- opts.zombieCure = false leaves the zombie to the field care's Revivify
 -- after the fight, as before.
+-- The cure line's order with its zombies re-sorted (in place): order[1]
+-- (the actor) stays, and the later places that hold a zombie take those
+-- zombies by landing tick, `since(e)` (nil: not a zombie; a zombie standing
+-- before the watcher's first tick reads -1), entity order on a tie.
+function M.zombieOrder(order, since)
+  local at, zs = {}, {}
+  for i = 2, #order do
+    local t = since(order[i])
+    if t ~= nil then at[#at + 1] = i; zs[#zs + 1] = { e = order[i], t = t } end
+  end
+  table.sort(zs, function(a, b) if a.t ~= b.t then return a.t < b.t end return a.e < b.e end)
+  for k, i in ipairs(at) do order[i] = zs[k].e end
+  return order
+end
+
 function Driver:cureFor(e)
   if status1Has(e, M.ST1_PETRIFY) then
     return M.statusCure({ byte = 1, bit = M.ST1_PETRIFY,
@@ -12350,6 +12365,19 @@ function Driver:makePlanRules(actor)
   if self.parkDropN < 3 and not kept and cmdRow(actor, BATTLE.CMD_ITEM) ~= nil and self.opts.items ~= false then
     local order = { actor }
     for e = 0, 3 do if e ~= actor then order[#order + 1] = e end end
+    -- The zombies among the allies take their places in landing order, the
+    -- longest-standing first: in entity order a zombie at entity 3 waited a
+    -- whole battle while two later ones at entities 1 and 2 took both
+    -- Revivifies and it killed CELES meanwhile (tomb_zombie at 63e0f747:
+    -- "actor=0 cure entity 1's Zombie" at f723 over entity 3, Zombied since
+    -- f+5, whose cure had gone down with its carrier; the battle won with
+    -- "char 9 +0 (due 0)").  Everyone else keeps entity order.
+    M.zombieOrder(order, function(e)
+      if not (status1Has(e, M.ST1_ZOMBIE) and not status1Has(e, 0x80) and self.opts.zombieCure ~= false) then
+        return nil
+      end
+      return self.statusSaid[e .. ":Zombie:at"] or -1
+    end)
     for _, e in ipairs(order) do
       -- a zombie reads 0 HP without the Wound bit, and is a patient here
       -- (unless opts.zombieCure = false: then the line is the driver before #263)
@@ -18140,6 +18168,7 @@ function Driver:watchStatuses()
           if self.statusSaid[key] ~= "on" then
             self.statusSaid[key] = "on"
             self.statusSaid[key .. ":n"] = (self.statusSaid[key .. ":n"] or 0) + 1
+            self.statusSaid[key .. ":at"] = self.battleTick   -- this landing's tick (the cure line's zombie order)
             local what
             if name == "Stop" or name == "Frozen" then
               local own = M.readByte(BATTLE.MENU) ~= 0 and (M.readByte(BATTLE.ACTOR) & 3) == e
