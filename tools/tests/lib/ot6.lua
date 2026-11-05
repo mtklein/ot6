@@ -14692,9 +14692,8 @@ function Driver:button(actor)
     -- whose member stands.  A member who fell after its turn was queued still
     -- gets a window (tomb_zombie: entity 0 Wounded at f+2153, its window open
     -- at f+2180 and planned "cure entity 3's Zombie" over 120 frames of
-    -- steering until the engine closed it, the care turn held by the dead
-    -- member the rest of the battle): a person waits for the engine to close
-    -- it, and so does this.
+    -- steering until the engine closed it, the plan never through dropPlan):
+    -- a person waits for the engine to close it, and so does this.
     do
       local why = M.planGate({ menu = M.readByte(BATTLE.MENU), st = st,
         s1 = M.readByte(BATTLE.ST1 + actor * 2), hp = M.readWord(0x3BF4 + actor * 2) })
