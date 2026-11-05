@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "938a4e7f240f03a3d29084c4fae3386b7abe04cb8eb78e5c9142bdc5a2fe1afe",
+  "sha256": "b3ff6dad3e74dcc54a2b76ecd0f53ffa484ada9d7cf7cfe89a778d19f511eead",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "938a4e7f240f03a3d29084c4fae3386b7abe04cb8eb78e5c9142bdc5a2fe1afe",
-    "generator_sig": "44885f69c5587d0850c45e313d274733154e1c6eb83f8175dac13b5d5e070b64 gen_wor_ragnarok build/checkpoints/wor-locke-v1/manifest.json build/checkpoints/wor-locke-v1/wor-locke.sram",
+    "payload_sha256": "b3ff6dad3e74dcc54a2b76ecd0f53ffa484ada9d7cf7cfe89a778d19f511eead",
+    "generator_sig": "f8f84685e6411447ac32b48a66af25d2f94aca06eaa1b376dfd4c443ae67cf14 gen_wor_ragnarok build/checkpoints/wor-locke-v1/manifest.json build/checkpoints/wor-locke-v1/wor-locke.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/wor-locke-v1/manifest.json",
-        "sha256": "e47231cb3199293cf88c6f811b10a528737ad67e3e0930bd6e193ffb1178773e"
+        "sha256": "7d5791add8fd473f676942a094fe155d91b77d3576cfdac00789b997714694cb"
       }
     ]
   }

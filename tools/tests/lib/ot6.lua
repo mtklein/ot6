@@ -951,6 +951,33 @@ function M.planBackOut(o)
   if o.committed or o.kind == "switch" or o.kind == "defer" then return nil end
   if ((o.st2 or 0) & M.ST2_MUDDLE) ~= 0 then return "muddled" end
   if M.zombieDefers({ s1 = o.st1 }) then return "zombied" end
+  if M.actorDown({ s1 = o.st1, hp = o.hp }) then return "down" end
+  return nil
+end
+
+-- Is the member whose window is open down (#510)?  Wound or Petrify, or 0 HP
+-- without the Zombie bit (a zombie reads 0 HP and stands: the zombie rule
+-- defers it).  The engine can open a window for a member who fell after its
+-- turn was queued: tomb_zombie at c24a73d3, entity 0 Wounded at pf2157, its
+-- window opened at pf2180 ($7BCA 01, $62CA 00, state $05) and stood at
+-- command select until the engine took it off the queue at pf2321 ($4001
+-- $FF, $7BCB 01) and closed it at pf2334
+-- (build/attempts/wt/v039-down-actor/probe_c24.log).  o = { s1, hp }; an hp
+-- the caller does not give (nil) says nothing: only the status bits count.
+function M.actorDown(o)
+  local s1 = o.s1 or 0
+  if (s1 & 0xC0) ~= 0 then return true end
+  return o.hp == 0 and (s1 & M.ST1_ZOMBIE) == 0
+end
+
+-- May the driver plan for `actor` now?  nil when it may; otherwise why not:
+-- "closed" (no window, $7BCA 0), "state" (not command select), "down"
+-- (M.actorDown: a person waits for the engine to close a fallen member's
+-- window rather than enter a command for it).  o = { menu, st, s1, hp }.
+function M.planGate(o)
+  if (o.menu or 0) == 0 then return "closed" end
+  if o.st ~= 0x05 then return "state" end
+  if M.actorDown({ s1 = o.s1, hp = o.hp }) then return "down" end
   return nil
 end
 
@@ -14662,7 +14689,40 @@ function Driver:button(actor)
       return nil
     end
     self.idleSt, self.idleN = nil, 0
-    if st ~= BATTLE.ST_CMD then return nil end
+    -- The planning gate (#510, M.planGate): an open window at command select
+    -- whose member stands.  A member who fell after its turn was queued still
+    -- gets a window (tomb_zombie: entity 0 Wounded at f+2153, its window open
+    -- at f+2180 and planned "cure entity 3's Zombie" over 120 frames of
+    -- steering until the engine closed it, the plan never through dropPlan):
+    -- a person waits for the engine to close it, and so does this.  With
+    -- another member queued behind it ($4001+e not $FF, btlgfx's menu queue)
+    -- a person hands the window on (X, as the zombie and Muddle rules do):
+    -- battle_doom's condemned actor fell in target select, and its window
+    -- held the next member's for ~350 frames (f+139 to its open at f790,
+    -- against f577 when the old driver confirmed the dead member's Fight;
+    -- build/attempts/wt/v039-down-actor/px13b2/b2fix_doom_s0.log), long
+    -- enough for that member's Doom to land before it was weighed.
+    do
+      local why = M.planGate({ menu = M.readByte(BATTLE.MENU), st = st,
+        s1 = M.readByte(BATTLE.ST1 + actor * 2), hp = M.readWord(0x3BF4 + actor * 2) })
+      if why == "down" then
+        local behind = nil
+        for e = 0, 3 do
+          -- (the front of the queue: the smallest position, the window X opens next)
+          if e ~= actor and M.readByte(0x4001 + e) ~= 0xFF
+             and (behind == nil or M.readByte(0x4001 + e) < M.readByte(0x4001 + behind)) then behind = e end
+        end
+        if self.downSaid ~= actor then
+          self.downSaid = actor
+          M.log(string.format("[%s] actor=%d is down (STATUS1 $%02X, HP %d) with its command window open -- "
+            .. "not planning: %s (#510)", self.tag or "fight", actor, M.readByte(BATTLE.ST1 + actor * 2),
+            M.readWord(0x3BF4 + actor * 2), behind ~= nil and string.format("handing the window on (X) to "
+            .. "actor %d's, queued behind it", behind) or "waiting for the engine to close it"))
+        end
+        if behind ~= nil then return { "x" } end
+      end
+      if why ~= nil then return nil end
+    end
     -- Another actor's Fenix Down is in the air (#168): hold this window
     -- until it lands, so the plan made here sees the raised member
     -- alive and can top them up -- a Potion's target cursor cannot land
@@ -14707,7 +14767,8 @@ function Driver:button(actor)
   -- plan held through the status took the round's care turn.  Backed out
   -- of the same way; the next plan is the zombie rule's defer.
   local backOut = M.planBackOut({ committed = self.plan.committed, kind = self.plan.kind,
-    st2 = M.readByte(BATTLE.ST2 + actor * 2), st1 = M.readByte(BATTLE.ST1 + actor * 2) })
+    st2 = M.readByte(BATTLE.ST2 + actor * 2), st1 = M.readByte(BATTLE.ST1 + actor * 2),
+    hp = M.readWord(0x3BF4 + actor * 2) })
   if backOut == "muddled" then
     M.log(string.format("[%s] actor=%d was MUDDLED after its %s was planned (state $%02X) -- "
       .. "backing out rather than confirm a command the engine would re-aim (#348)",
@@ -14720,6 +14781,16 @@ function Driver:button(actor)
       .. "backing out: its turns are the engine's (#490)", self.tag or "fight", actor, self.plan.kind, st,
       M.readByte(BATTLE.ST1 + actor * 2)))
     self:dropPlan("zombied")
+    if st == BATTLE.ST_CMD then return nil end
+    return { "b" }
+  elseif backOut == "down" then
+    -- fell with its plan in hand (#510): the engine closes a fallen member's
+    -- window from command select, and a list window stops the battle clock
+    -- in Wait mode, so back out to it and let the planning gate hold
+    M.log(string.format("[%s] actor=%d went down after its %s was planned (state $%02X, STATUS1 $%02X, HP %d) -- "
+      .. "backing out (#510)", self.tag or "fight", actor, self.plan.kind, st,
+      M.readByte(BATTLE.ST1 + actor * 2), M.readWord(0x3BF4 + actor * 2)))
+    self:dropPlan("down")
     if st == BATTLE.ST_CMD then return nil end
     return { "b" }
   end
@@ -19358,6 +19429,7 @@ function Driver:frame()
     -- menu open, so a record that outlives a closed menu is a turn ago's
     -- and must not steer a later window's walk (review of 43462e7d)
     self.plan, self.planActor, self.held, self.confirmed = nil, nil, {}, nil
+    self.downSaid = nil
     M.setPad((M.frame % 8 < 4) and { "a" } or {})
     return
   end
@@ -21560,7 +21632,14 @@ function M.run(opts, steps)
       canaryInGame = true
     end
     if M.battleLoadStarted() and M.frame % 30 == 0 then sampleBattle() end
-    if canaryInGame and M.partyWipedInBattle and M.partyWipedInBattle() then
+    -- A Colosseum battle's loss ($3A97 set: InitParty's `dec $3a97` for
+    -- formations $23E/$23F) is a lost wager, not a game over: CheckBattleEnd
+    -- calls LoseBattle with the colosseum mode's $FF (no "Annihilated"
+    -- message), and the field takes the party back to the Colosseum with the
+    -- fighter down.  So the wipe watch stands aside for it; the GameOver-read
+    -- and TitleScreen watches above still see a real game over.
+    if canaryInGame and M.partyWipedInBattle and M.partyWipedInBattle()
+       and M.readByte(0x3A97) == 0 then
       wipeN = wipeN + 1
       if not wipeLatched and wipeN >= WIPE_FRAMES
          and ((M.readByte(0x3ebc) & 0x01) ~= 0 or wipeN >= WIPE_FRAMES_UNLOST) then

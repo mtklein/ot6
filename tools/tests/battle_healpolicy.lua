@@ -507,7 +507,11 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(H.planBackOut({ kind = "heal", st1 = 0x03, st2 = 0 }), "zombied", "...a heal plan as well")
     H.assertEq(H.planBackOut({ kind = "fight", st1 = 0x00, st2 = 0x20 }), "muddled", "Muddle's back-out is as it was")
     H.assertEq(H.planBackOut({ kind = "fight", st1 = 0x02, st2 = 0x20 }), "muddled", "...and wins when both landed")
-    H.assertEq(H.planBackOut({ kind = "fight", st1 = 0x82, st2 = 0 }), nil, "a Wounded member is not a zombie")
+    -- a Wounded member is not a zombie: the zombie back-out stays off it
+    -- (zombieDefers above), and since #510 its plan backs out as a fallen
+    -- member's, "down" (plan_gate_selftest holds the rest of that rule)
+    H.assertEq(H.planBackOut({ kind = "fight", st1 = 0x82, st2 = 0 }), "down",
+      "a Wounded member is not a zombie: its plan backs out as a fallen member's (#510)")
     H.assertEq(H.planBackOut({ kind = "fight", st1 = 0x00, st2 = 0 }), nil, "no status: the plan stands")
     H.assertEq(H.planBackOut({ kind = "fight", committed = true, st1 = 0x02, st2 = 0 }), nil,
       "a committed plan is the engine's now")

@@ -13,15 +13,15 @@
     }
   },
   "size": 32768,
-  "sha256": "d05924a16416508a69a890b70b8402aa574ccfa3f23ea83cdbce775c990a5a0a",
+  "sha256": "89cd4692f26e09d9721eed700776919f828a42e8764610fdebf8cfd1cc880a1c",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "d05924a16416508a69a890b70b8402aa574ccfa3f23ea83cdbce775c990a5a0a",
-    "generator_sig": "aeb67c858a60114f6bec69df7379efed5931d5cc4c7010b7d6e8442991bbde48 gen_wor_kohlingen build/checkpoints/wor-figaro-sweep-v1/manifest.json build/checkpoints/wor-figaro-sweep-v1/wor-figaro-sweep.sram",
+    "payload_sha256": "89cd4692f26e09d9721eed700776919f828a42e8764610fdebf8cfd1cc880a1c",
+    "generator_sig": "c1d1ea1a3c4fbcfcd1db61518fe692be230e4ca3c2401f0057a261b97374ee53 gen_wor_kohlingen build/checkpoints/wor-figaro-sweep-v1/manifest.json build/checkpoints/wor-figaro-sweep-v1/wor-figaro-sweep.sram",
     "ancestors": [
       {
         "path": "build/checkpoints/wor-figaro-sweep-v1/manifest.json",
-        "sha256": "f9a26ae68c72bc61e3f9604ecfedefb01ea63bdc958f262ccfabd3189c7d41da"
+        "sha256": "711f83f6cb1b61580b1aa9090bbd1b0e9c0f9f9a5e3e793e8fedd0a907067982"
       }
     ]
   }

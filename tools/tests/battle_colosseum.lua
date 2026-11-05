@@ -14,7 +14,9 @@
 --      ($3A97), and nothing pressed;
 --   3. the outcome is read right: a Colosseum battle pays no experience, so the outcome's reward is 0 and the
 --      fighter's experience does not move ("paid as due", M.lastOutcome.ok);
---   4. the wager is spent, and a win adds the prize while a loss adds nothing and leaves the fighter down.
+--   4. the wager is spent, and a win adds the prize while a loss adds nothing and leaves the fighter down (read
+--      as the battle hands back, before the ride's care after battle).  A loss is a lost wager, not a game
+--      over: the run's wipe watches stand aside for a Colosseum battle ($3A97), so either outcome is checked.
 -- Nothing is written.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/wor_colosseum_in.mss.lua"
@@ -27,6 +29,15 @@ emu.addMemoryCallback(function()
   inBattle = { form = H.readWord(0x11E0), mode = H.readByte(0x3A97), seat0 = H.readByte(0x3ED8),
     seat1 = H.readByte(0x3EDA), f = H.frame }
 end, emu.callbackType.exec, H.sym("UpdateSRAM"), H.sym("UpdateSRAM"))
+-- The fighter's record as the battle hands back: the first frame after UpdateSRAM has written it and the
+-- battle table is gone, before the ride's care after battle (advanceStory) can revive or heal the fighter,
+-- as a person who lost would (fix_s0: "used $F0 on char 6: 0 -> 565 hp" before the old read).
+local handBack = nil
+emu.addEventCallback(function()
+  if inBattle == nil or handBack ~= nil or fighter == nil or H.battleLoadStarted() then return end
+  handBack = { hp = H.readWord(0x1600 + 37 * fighter + 9), st1 = H.readByte(0x1600 + 37 * fighter + 0x14),
+    f = H.frame }
+end, emu.eventType.startFrame)
 
 H.run({ maxFrames = 120000 }, {
   H.loadState(STATE),
@@ -77,7 +88,10 @@ H.run({ maxFrames = 120000 }, {
       H.assertEq(H.invCountOf(GENJI_HELMET), prizeHad + 1, "4. a win adds the prize")
     else
       H.assertEq(H.invCountOf(GENJI_HELMET), prizeHad, "4. a loss adds nothing")
-      H.assertEq(H.readWord(0x1600 + 37 * fighter + 9), 0, "4. a loss leaves the fighter down")
+      H.assertEq(handBack ~= nil, true, "4. the fighter's record was read as the battle handed back")
+      H.log(string.format("[colosseum] the fighter as the battle handed back (f%d): HP %d, STATUS1 $%02X",
+        handBack.f, handBack.hp, handBack.st1))
+      H.assertEq(handBack.hp, 0, "4. a loss leaves the fighter down (HP, read as the battle handed back)")
     end
     H.log(string.format("[colosseum] PASS: the wager %s", b.won and "won" or "lost"))
   end),
