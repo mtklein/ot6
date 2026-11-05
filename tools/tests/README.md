@@ -257,6 +257,7 @@ checked spliced into that host. The instruments today:
 | `care_stock_selftest.lua` | `H.careStockPotions` past L43: the reserve stops at the Potion band's cap (79) and the target at the stack's 99, where the old body raised (#419; no emulator) |
 | `noline_floor_selftest.lua` | the no-line fallback spends from above the bag's care floor and dips below only when nothing is left (#443), and a Muted seat whose only attack is Magic is cured with the cheapest Mute cure (#444); each assertion failed by its own mutant (no emulator) |
 | `counter_selftest.lua` | the counter rule's readers (#372): the AI walker over retaliation scripts and the magical/physical damage models, against the built ROM and hand-checked numbers, each assertion failed by its own mutant (no emulator) |
+| `raise_threat_selftest.lua` | what the raise rule's bar is made of (#508): the attack classes from the built ROM's MagicProp (Wound, fraction, heal) and a Special's byte, a Wound attack's landing kept out of the hit ledger whatever command carries it, a fraction kept out of the raise's columns and priced on the raise's own HP, each assertion failed by its own mutant (no emulator) |
 | `rewind_search.lua` (+ `rewind_search.py`) | a lab: at a character's battle decisions, every option the command window offers, each played out from a whole-machine snapshot with the script's Lua heap rolled back alongside, scored across draws (#375); never route or balance evidence |
 
 ### Library reference (abridged)
