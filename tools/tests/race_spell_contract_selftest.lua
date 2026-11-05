@@ -18,6 +18,7 @@ ram[0x302c],ram[0x302d]=0,0x21
 for n=1,54 do ram[0x2100+n*4]=255 end
 ram[0x2104],ram[0x2107],ram[0x2108],ram[0x210b]=0,4,45,5
 ram[0x3c08],ram[0x3e9c]=100,3
+for e=0,3 do ram[0x3bf4+e*2]=100 end -- the members stand (#510: a member at 0 HP is down and gets no plan)
 local function candidate()
   return {kind='magic',spell=0,target=4,boost=2,all=true,
     controller={kind='magic',effectRole='damage',targetContract={chars=0,monsters=3,all=true}}}
