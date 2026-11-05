@@ -14708,7 +14708,9 @@ function Driver:button(actor)
       if why == "down" then
         local behind = nil
         for e = 0, 3 do
-          if e ~= actor and M.readByte(0x4001 + e) ~= 0xFF then behind = behind or e end
+          -- (the front of the queue: the smallest position, the window X opens next)
+          if e ~= actor and M.readByte(0x4001 + e) ~= 0xFF
+             and (behind == nil or M.readByte(0x4001 + e) < M.readByte(0x4001 + behind)) then behind = e end
         end
         if self.downSaid ~= actor then
           self.downSaid = actor
