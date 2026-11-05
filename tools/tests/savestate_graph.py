@@ -1276,21 +1276,11 @@ STATES = [
     # wor-dino-v1 -> the World of Ruin map on the Falcon's tile by Maranda
     # again (69,183), where the line left it: the Cactrot desert seven steps
     # south (world group 111: Hoover, Cactrot), fought a while, and Save
-    # there: the `wor-desert-v1` checkpoint (docs/design/route-wor-side-trips.md).
-    # A cut.  wor_bench below boots its checkpoint.  Re-cut by
-    # checkpoint_drift.py --recut.
-    S("wor_desert", gen="gen_wor_desert", prev="wor_dino",
-      checkpoint="wor-dino-v1", timeout=7200),
-
-    # wor-desert-v1 -> the World of Ruin map on the Falcon's tile by Maranda
-    # (69,183) again: the bench's training on the plain there (world group
-    # 49), two of the bench at a time beside SHADOW and CYAN until each
-    # stands at its goal, the line's four back in the cabin, and Save there:
-    # the `wor-bench-v1` checkpoint, Kefka's Tower's boot
-    # (docs/design/route-wor-tower-prep.md).  A cut; saves= until a leg boots
+    # there: the `wor-desert-v1` checkpoint, Kefka's Tower's boot
+    # (docs/design/route-wor-side-trips.md).  A cut; saves= until a leg boots
     # it.  Re-cut by checkpoint_drift.py --recut.
-    S("wor_bench", gen="gen_wor_bench", prev="wor_desert",
-      checkpoint="wor-desert-v1", saves="wor-bench-v1", timeout=7200),
+    S("wor_desert", gen="gen_wor_desert", prev="wor_dino",
+      checkpoint="wor-dino-v1", saves="wor-desert-v1", timeout=7200),
 
 ]
 

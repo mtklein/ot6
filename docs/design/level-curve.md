@@ -406,11 +406,7 @@ Notes on the targets:
   measurement, and it sets the target.
 - **Kefka's Tower takes three parties**, so the target applies to twelve
   members (or as many as the route seats).  From v0.32 on, rotation is part
-  of the plan, not an afterthought.  Measured since (#496,
-  route-wor-tower-prep.md): not one level for twelve but eight strong
-  members (L48-64), two to a party with a cure among them, carrying the
-  rest at L40; `gen_wor_bench` trains the bench to that on the plain by
-  Maranda before the tower (`wor-bench-v1`: fourteen at mean 49.6, max 64).
+  of the plan, not an afterthought.
 - **The eight dragons** stay at their milestones (Storm v0.28, Ice v0.29,
   Holy v0.30, Red v0.32, Dirt v0.34, Blue v0.35, Gold and Skull v0.38); a
   dragon the projected level cannot take on the first attempt is a lab and

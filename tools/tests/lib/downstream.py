@@ -136,14 +136,14 @@ def selftest():
         print(f"  {'pass' if cond else 'FAIL'} {label}")
         ok = ok and cond
     states = sn.load(ROOT)
-    three = ["wor-colosseum-v1", "wor-dino-v1", "wor-desert-v1", "wor-bench-v1"]
+    three = ["wor-colosseum-v1", "wor-dino-v1", "wor-desert-v1"]
     for leg in ("wor_colosseum", "gen_wor_colosseum", "wor_colosseum_in"):
         h, keys = downstream(states, leg)
         check(f"{leg}: exactly {', '.join(three)}", keys == three)
-    check("...through the prev= chain: wor_dino, wor_desert and wor_bench replay",
-          {"wor_colosseum", "wor_dino", "wor_desert", "wor_bench"} <= set(h))
-    _, keys = downstream(states, "wor_bench")
-    check("the last leg feeds only its own saves= key", keys == ["wor-bench-v1"])
+    check("...through the prev= chain: wor_dino and wor_desert replay",
+          {"wor_colosseum", "wor_dino", "wor_desert"} <= set(h))
+    _, keys = downstream(states, "wor_desert")
+    check("the last leg feeds only its own saves= key", keys == ["wor-desert-v1"])
     h, keys = downstream(states, "wor_thamasa_plain")
     check("a branch leg that nothing boots feeds no tracked key", keys == [])
     _, keys = downstream(states, "wor_gogo")
@@ -170,8 +170,8 @@ def selftest():
     check("an unknown leg is refused, not answered with an empty set", raised)
     # negative control: a deliberately wrong expectation must go red
     _, keys = downstream(states, "wor_colosseum")
-    check("negative control: an expectation without wor-bench-v1 does not "
-          "match", keys != three[:3])
+    check("negative control: an expectation without wor-desert-v1 does not "
+          "match", keys != three[:2])
     check("negative control: an expectation with a branch leg's key does not "
           "match", keys != three + ["wor-thamasa-v1"])
     print("downstream selftest:", "ok" if ok else "FAILED")
