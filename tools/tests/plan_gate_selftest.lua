@@ -83,8 +83,13 @@ check("a statue's window is not planned (Petrify, STATUS1 $40)",
     return H.planGate({ menu = 1, st = CMD, s1 = 0x40, hp = 900 }) == "down"
   end)
 check("a member at 0 HP without Wound or Zombie is down",
-  "actorDown", "return (o.hp or 0) == 0 and", "return false and", function()
+  "actorDown", "return o.hp == 0 and", "return false and", function()
     return H.planGate({ menu = 1, st = CMD, s1 = 0x00, hp = 0 }) == "down"
+  end)
+check("an hp the caller does not give says nothing (battle_healpolicy's status-only planBackOut calls)",
+  "actorDown", "return o.hp == 0 and", "return (o.hp or 0) == 0 and", function()
+    return H.actorDown({ s1 = 0x00 }) == false and H.planBackOut({ kind = "fight", st1 = 0x00, st2 = 0 }) == nil
+      and H.actorDown({ s1 = 0x80 }) == true
   end)
 check("a zombie (0 HP, STATUS1 $02, no Wound) passes the gate: the zombie rule defers it",
   "actorDown", "and (s1 & M.ST1_ZOMBIE) == 0", "", function()

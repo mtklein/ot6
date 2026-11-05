@@ -962,11 +962,12 @@ end
 -- window opened at pf2180 ($7BCA 01, $62CA 00, state $05) and stood at
 -- command select until the engine took it off the queue at pf2321 ($4001
 -- $FF, $7BCB 01) and closed it at pf2334
--- (build/attempts/wt/v039-down-actor/probe_c24.log).  o = { s1, hp }.
+-- (build/attempts/wt/v039-down-actor/probe_c24.log).  o = { s1, hp }; an hp
+-- the caller does not give (nil) says nothing: only the status bits count.
 function M.actorDown(o)
   local s1 = o.s1 or 0
   if (s1 & 0xC0) ~= 0 then return true end
-  return (o.hp or 0) == 0 and (s1 & M.ST1_ZOMBIE) == 0
+  return o.hp == 0 and (s1 & M.ST1_ZOMBIE) == 0
 end
 
 -- May the driver plan for `actor` now?  nil when it may; otherwise why not:
