@@ -397,8 +397,15 @@ H.run({ maxFrames = 150000 }, {
   equipRamuhOnCeles("B"),
   enterBoss("B"),
   H.call(function()
-    emu.addMemoryCallback(function(_, v) spells[#spells + 1] = v end,
-      emu.callbackType.write, 0x7e3410, 0x7e3410)
+    -- (the first $0b is the fold entering the queue: the pool and the
+    -- write count are read on that write, R.q, since the charge can follow
+    -- it within the frame the drive's check sees it -- see [C] below)
+    emu.addMemoryCallback(function(_, v)
+      spells[#spells + 1] = v
+      if v == BOLT3 and R.q == nil and celesMode == "cast" then
+        R.q = { frame = H.frame, mp = mp(celes), writes = #mpWrites }
+      end
+    end, emu.callbackType.write, 0x7e3410, 0x7e3410)
     -- Every write to her pool, with the pool as it stood (the callback runs
     -- before the store: measured, each write's "old" is the previous one's
     -- result) and the command/spell whose props are loaded ($b5/$b6).  Her
@@ -466,9 +473,17 @@ H.run({ maxFrames = 150000 }, {
   -- +3 ($18) -- so the fold queued at 162, the item-turn baseline of 180
   -- read as "her pool already moved", and the debit to 180-53 was never
   -- there to see.
+  -- The baseline is the queue write's own frame (R.q), not the frame this
+  -- step runs on: on 63e0f747's n024_entry nothing stood ahead of the cast,
+  -- the charge followed the queue write before the drive's check, and a
+  -- baseline read here took it as "moved in between" ("her pool 180 at the
+  -- item turn, 127 as the fold queued; moved in between by 1 write(s):
+  -- f3218 180->127 ($b5=02 $b6=0B ...)") and waited 3000 frames for a
+  -- charge already past.
   H.call(function()
     celesMode = "defer"; wantPend = 0
-    R.queuedAt, R.mpQ, R.writesQ = H.frame, mp(celes), #mpWrites
+    H.assertEq(R.q ~= nil, true, "[C] the fold's queue write was seen while she cast")
+    R.queuedAt, R.mpQ, R.writesQ = R.q.frame, R.q.mp, R.q.writes
     local moves = {}
     for i = R.writes0 + 1, R.writesQ do
       local w = mpWrites[i]

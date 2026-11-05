@@ -7608,6 +7608,72 @@ function M.fixedTake(byteAt, hp, maxHp)
   return nil
 end
 
+-- What an enemy attack is to the raise rule (#508), from its MagicProp
+-- record (byteAt(i), i = 0..13), the way the engine reads it: "wound" when
+-- it sets Wound (+$0a, status 1 bit 7) and is no heal and no status lift
+-- (+4 bits 0 and 2: Life, Life 2 and Revive name Wound in the same byte as
+-- the status they take away), so it kills at any HP when it lands (Doom
+-- $0D, X-Zone $12 and the enemy skills like them); "fraction" when it
+-- takes power/16 of the target's HP (+4 bit 7, CalcDmgRatio: Demi $10,
+-- Quartr $11, priced by M.fixedTake); "heal" for a heal; nil for ordinary
+-- damage, which is what a raise's HP has to clear (Blow Fish's fixed 1000
+-- included: it kills a raised member as any 1000 hit would).
+function M.attackClass(byteAt)
+  local f4 = byteAt(4)
+  if (f4 & 0x01) ~= 0 then return "heal" end
+  if (f4 & 0x04) == 0 and (byteAt(10) & 0x80) ~= 0 then return "wound" end
+  if (f4 & 0x80) ~= 0 then return "fraction" end
+  return nil
+end
+-- A monster's Special ($EF) is its own record, the byte at $322d,x
+-- (CalcAttackEffect @32ec): bits 0-5 below $20 name the status it sets,
+-- by bit across $11aa-$11ad, so 7 is Wound (status 1 bit 7).
+function M.specialClass(b)
+  return ((b or 0) & 0x3F) == 0x07 and "wound" or nil
+end
+-- The class of monster action (cmd, atk) from slot `slot` (M.attackClass on
+-- the ROM's record, the Special's byte read live), nil for a Fight, an item
+-- or anything unpriced.
+function M.actClass(cmd, atk, slot)
+  if atk == nil or cmd == 0x01 or cmd == 0x08 then return nil end
+  if atk == 0xEF then
+    return slot ~= nil and M.specialClass(M.readByte(0x322D + 8 + slot * 2)) or nil
+  end
+  if atk >= 0xEE then return nil end
+  local r = (M.sym("MagicProp") & 0x3FFFFF) + atk * 14
+  return M.attackClass(function(i) return M.readRomByte(r + i) end)
+end
+
+-- The most one slot's measured actions can take off a member Fenix Down
+-- raises to `raiseHp` (#508): its ordinary damage as measured (L.ordMaxOn
+-- on e, else on anybody), and each fraction it has landed (L.fracAtks)
+-- priced on the raise's own HP by `takeOf(atk, hp)` (M.fixedTake on the
+-- record).  A fraction measured on a member at full HP is no price for a
+-- raise: Phoenix Cave's Demi took 1167 off STRAGO's 2334 and it takes 145
+-- off a 291 raise.  An HP-blind kill (Doom) is a status landing and never
+-- in the ledger.  nil when the slot has landed nothing that prices.
+function M.raiseWorst(L, e, raiseHp, takeOf)
+  if L == nil then return nil end
+  local w = L.ordMaxOn and L.ordMaxOn[e] or L.ordMax
+  for atk in pairs(L.fracAtks or {}) do
+    local t = takeOf(atk, raiseHp)
+    if t ~= nil and (w == nil or t > w) then w = t end
+  end
+  return w
+end
+
+-- Whether a slot is lethal to a raise to `raiseHp` (#508 review): its worst
+-- on the raised member as M.raiseWorst prices it (the ordinary worst there,
+-- else on anybody, killing blows included, and each fraction on the raise's
+-- HP), not its smallest hit.  raiseOk races the gauges of the lethal slots
+-- against the top-up; reading the smallest hit, a slot that had killed
+-- entity 3 from 844 read "smallest hit 114 ... no lethal slot is due to act"
+-- (fix_k0_s5).  Returns the worst and whether it reaches raiseHp.
+function M.raiseLethal(L, e, raiseHp, takeOf)
+  local w = M.raiseWorst(L, e, raiseHp, takeOf)
+  return w, w ~= nil and w >= raiseHp
+end
+
 -- What a chain of counters takes off a member at `hp` (#503 review): one
 -- action that lands on several bodies draws each one's counter, and the
 -- engine queues them from the highest slot down (CheckRetal: `ldx #$12`,
@@ -9844,6 +9910,21 @@ end
 -- carries the bit (STATUS1 $02), so it is the cure M.statusCure finds;
 -- opts.zombieCure = false leaves the zombie to the field care's Revivify
 -- after the fight, as before.
+-- The cure line's order with its zombies re-sorted (in place): order[1]
+-- (the actor) stays, and the later places that hold a zombie take those
+-- zombies by landing tick, `since(e)` (nil: not a zombie; a zombie standing
+-- before the watcher's first tick reads -1), entity order on a tie.
+function M.zombieOrder(order, since)
+  local at, zs = {}, {}
+  for i = 2, #order do
+    local t = since(order[i])
+    if t ~= nil then at[#at + 1] = i; zs[#zs + 1] = { e = order[i], t = t } end
+  end
+  table.sort(zs, function(a, b) if a.t ~= b.t then return a.t < b.t end return a.e < b.e end)
+  for k, i in ipairs(at) do order[i] = zs[k].e end
+  return order
+end
+
 function Driver:cureFor(e)
   if status1Has(e, M.ST1_PETRIFY) then
     return M.statusCure({ byte = 1, bit = M.ST1_PETRIFY,
@@ -9942,10 +10023,17 @@ end
 -- "[death] f+235 entity 1 char 1 from 172/249 by slot 4 cmd $00 atk $EE"
 -- as a 172 hit and priced "s3 2x172 ... s4 1x172 (worst)", so a member at
 -- 241/241 SPENT "inside one round of death (541)".
-function M.statusDrop(was, now, cmd, atk, was2, now2)
+-- slot: the acting monster's slot.  Any attack that sets Wound and leaves
+-- the victim newly Wounded is the same landing, whatever command carries it
+-- and whatever its power (M.actClass, #508): the power-0 test below sees a
+-- Doom only through the Magic command.
+function M.statusDrop(was, now, cmd, atk, was2, now2, slot)
   if ((now or 0) & ~(was or 0) & (M.ST1_ZOMBIE | M.ST1_PETRIFY)) ~= 0 then return true end
   if ((was2 or 0) & 0x01) ~= 0 and ((now2 or 0) & 0x01) == 0
      and ((now or 0) & ~(was or 0) & 0x80) ~= 0 then
+    return true
+  end
+  if ((now or 0) & ~(was or 0) & 0x80) ~= 0 and M.actClass(cmd, atk, slot) == "wound" then
     return true
   end
   if cmd == 0x02 and atk ~= nil and atk < 0x100
@@ -9956,7 +10044,7 @@ function M.statusDrop(was, now, cmd, atk, was2, now2)
 end
 local function statusDrop(act, d)
   return M.statusDrop(act.st1 and act.st1[d.e] or 0, M.readByte(BATTLE.ST1 + d.e * 2), act.cmd, act.atk,
-    act.st2 and act.st2[d.e] or 0, M.readByte(BATTLE.ST2 + d.e * 2))
+    act.st2 and act.st2[d.e] or 0, M.readByte(BATTLE.ST2 + d.e * 2), act.slot)
 end
 M.TYPICAL_MIN = 3   -- actions a slot must have taken before its mean prices anything
 -- a ledger's typical action: the mean, once M.TYPICAL_MIN actions are in
@@ -10063,9 +10151,31 @@ function M.ledgerCommit(L, act, drops)
     if L.maxOn[e] == nil or v > L.maxOn[e] then L.maxOn[e] = v end
     if L.max == nil or v > L.max then L.max = v end
   end
+  -- (#508) a fraction (d.frac = the attack, M.attackClass "fraction") took
+  -- a share of the HP its victim stood at: no hit a raise's HP must clear.
+  -- It stays out of the raise's columns -- the smallest hit (on/min), the
+  -- killing-blow floor (lb) and the ordinary worst (ordMaxOn/ordMax) -- and
+  -- its attack is kept for M.raiseWorst to price on the raise's HP; maxOn,
+  -- max and the typical action, the living's prices, keep it.
+  L.ordMaxOn = L.ordMaxOn or {}
+  local ord = {}
+  for _, d in ipairs(hits) do
+    if d.frac ~= nil then
+      L.fracAtks = L.fracAtks or {}
+      L.fracAtks[d.frac] = true
+    else
+      ord[d.e] = (ord[d.e] or 0) + d.drop
+    end
+  end
+  for e, v in pairs(ord) do
+    if L.ordMaxOn[e] == nil or v > L.ordMaxOn[e] then L.ordMaxOn[e] = v end
+    if L.ordMax == nil or v > L.ordMax then L.ordMax = v end
+  end
   L.lbOn = L.lbOn or {}
   for _, d in ipairs(hits) do
-    if d.hp == 0 then
+    if d.frac ~= nil then
+      -- (the raise's columns leave it out, above)
+    elseif d.hp == 0 then
       if L.lbOn[d.e] == nil or d.drop > L.lbOn[d.e] then L.lbOn[d.e] = d.drop end
       if L.lb == nil or d.drop > L.lb then L.lb, L.lbE = d.drop, d.e end
     else
@@ -10109,8 +10219,11 @@ function Driver:commitMonAct(act)
   -- entity 2 (75 -> 0)" let a 77-HP raise "survive the smallest hit, 75"
   -- under a 544 Bolt 2.
   local all = {}
+  -- (a fraction's drops carry its attack, for the raise's pricing: M.ledgerCommit, #508)
+  local frac = M.actClass(act.cmd, act.atk, act.slot) == "fraction" and act.atk or nil
   for _, d in ipairs(act.drops) do
-    all[#all + 1] = { e = d.e, drop = d.drop, last = d.last, hp = d.hp, status = statusDrop(act, d) }
+    all[#all + 1] = { e = d.e, drop = d.drop, last = d.last, hp = d.hp, status = statusDrop(act, d),
+                      frac = frac }
   end
   -- A monster's turn is every non-counter action it ExecCmds while its
   -- gauge stays full: the engine resets the gauge only once the actor has
@@ -10169,17 +10282,21 @@ function Driver:closeMonTurn(slot)
   self:commitUnit(slot, { cmd = t.cmd, counter = false, party = t.party, mon = t.mon }, t.drops, t.n)
 end
 -- the drops a slot's still-open turn and action hold, hits only (no status
--- landings), for the raise gate and the round price to read provisionally
-function Driver:openDrops()
+-- landings), for the raise gate and the round price to read provisionally;
+-- `raise` leaves out a fraction's too (M.ledgerCommit's raise columns, #508)
+function Driver:openDrops(raise)
   local by = {}
   for slot, t in pairs(self.monTurn) do
     for _, d in ipairs(t.drops) do
-      if not d.status then by[slot] = by[slot] or {}; by[slot][#by[slot] + 1] = d end
+      if not d.status and not (raise and d.frac ~= nil) then
+        by[slot] = by[slot] or {}; by[slot][#by[slot] + 1] = d
+      end
     end
   end
   if self.monAct ~= nil then
+    local fracAct = raise and M.actClass(self.monAct.cmd, self.monAct.atk, self.monAct.slot) == "fraction"
     for _, d in ipairs(self.monAct.drops) do
-      if not statusDrop(self.monAct, d) then
+      if not fracAct and not statusDrop(self.monAct, d) then
         local slot = self.monAct.slot
         by[slot] = by[slot] or {}
         by[slot][#by[slot] + 1] = d
@@ -10202,13 +10319,26 @@ function Driver:raiseOk(e, actor)
   -- the pair from 405/424 at f+9681, two raises were planned at f+9993
   -- against an empty ledger, and the floor was only committed after.
   -- (and a monster's turn still open: its earlier actions' drops)
+  local function raiseTake(atk, hp)
+    local r = (M.sym("MagicProp") & 0x3FFFFF) + atk * 14
+    return M.fixedTake(function(i) return M.readRomByte(r + i) end, hp, maxhp)
+  end
   local openLs = {}
-  for oslot, ods in pairs(self:openDrops()) do
+  for oslot, ods in pairs(self:openDrops(true)) do
     local base = self.hitLedger[oslot] or { on = {} }
     local openL = { on = {}, min = base.min, minE = base.minE }
     for k, v in pairs(base.on) do openL.on[k] = v end
     openL.lbOn, openL.lb, openL.lbE = {}, base.lb, base.lbE
     for k, v in pairs(base.lbOn or {}) do openL.lbOn[k] = v end
+    -- (the raise's worst, M.raiseLethal: the ordinary worst with the open drops in it)
+    openL.ordMaxOn, openL.ordMax, openL.fracAtks = {}, base.ordMax, base.fracAtks
+    for k, v in pairs(base.ordMaxOn or {}) do openL.ordMaxOn[k] = v end
+    local openOn = {}
+    for _, d in ipairs(ods) do openOn[d.e] = (openOn[d.e] or 0) + d.drop end
+    for k, v in pairs(openOn) do
+      if openL.ordMaxOn[k] == nil or v > openL.ordMaxOn[k] then openL.ordMaxOn[k] = v end
+      if openL.ordMax == nil or v > openL.ordMax then openL.ordMax = v end
+    end
     for _, d in ipairs(ods) do
       if d.hp == 0 then
         if openL.lbOn[d.e] == nil or d.drop > openL.lbOn[d.e] then openL.lbOn[d.e] = d.drop end
@@ -10229,24 +10359,40 @@ function Driver:raiseOk(e, actor)
       -- only killing blows from this slot: the largest is a floor on its hit
       if v == nil and L.lbOn ~= nil then v, on = L.lbOn[e], e end
       if v == nil then v, on = L.lb, L.lbE end
-      if v ~= nil then
-        if hit == nil or v < hit then hit, hitSlot, hitOn = v, s, on end
-        if v >= raiseHp then
-          if M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0 then
-            brokenLethal = s
-          else
-            local eta, pct = etaOf(8 + s * 2)
-            if eta ~= nil and (lethalEta == nil or eta < lethalEta) then
-              lethalEta, lethalSlot, lethalPct = eta, s, pct
-            end
+      if v ~= nil and (hit == nil or v < hit) then hit, hitSlot, hitOn = v, s, on end
+      -- the slot is lethal to the raise on its worst there, not its smallest
+      -- hit (#508 review): fix_k0_s5 read "smallest hit 114 (slot 0 on entity
+      -- 0) ... no lethal slot is due to act" while the same slot had killed
+      -- entity 3 from 844 (M.raiseLethal)
+      local _, lethal = M.raiseLethal(L, e, raiseHp, raiseTake)
+      if lethal then
+        if M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0 then
+          brokenLethal = s
+        else
+          local eta, pct = etaOf(8 + s * 2)
+          if eta ~= nil and (lethalEta == nil or eta < lethalEta) then
+            lethalEta, lethalSlot, lethalPct = eta, s, pct
           end
         end
       end
     end
   end
   local o = { maxhp = maxhp, power = M.itemPower(BATTLE.FENIX_DOWN), smallestHit = hit,
-              zombie = status1Has(e, M.ST1_ZOMBIE), roundCost = self:roundPriceFor(e) }
-  local detail = ""
+              zombie = status1Has(e, M.ST1_ZOMBIE), roundCost = self:roundPriceFor(e, nil, raiseHp) }
+  local detail, fracNote = "", ""
+  -- (#508: what the bar leaves out -- each fraction the living have landed,
+  -- priced on the raise's HP instead of the HP it was measured on)
+  for s = 0, 5 do
+    local L = self.hitLedger[s]
+    if L and L.fracAtks and monAlive(s) then
+      for atk in pairs(L.fracAtks) do
+        local r = (M.sym("MagicProp") & 0x3FFFFF) + atk * 14
+        fracNote = fracNote .. string.format("; slot %d's fraction $%02X takes %s of the raise, not what it "
+          .. "took off full HP", s, atk, tostring(M.fixedTake(function(i) return M.readRomByte(r + i) end,
+          raiseHp, maxhp)))
+      end
+    end
+  end
   -- (the kill and the top-up race, whenever the raise does not survive
   -- alone: its hit or its round reaches the raise's HP, M.raiseDecision)
   if math.max(hit or 0, o.roundCost or 0) >= raiseHp then
@@ -10268,7 +10414,7 @@ function Driver:raiseOk(e, actor)
     -- round, an X-Potion where a Potion does not)
     local topUp = 0
     do
-      local it = M.itemChoice({ hp = raiseHp, maxhp = maxhp, roundCost = self:roundPriceFor(e),
+      local it = M.itemChoice({ hp = raiseHp, maxhp = maxhp, roundCost = self:roundPriceFor(e, nil, raiseHp),
         owed = true, items = self:bagHeals(e, raiseHp) })
       topUp = it and it.restore or 0
     end
@@ -10328,7 +10474,7 @@ function Driver:raiseOk(e, actor)
     if o.wipe == nil and why ~= nil then detail = detail .. "; wipe: no -- " .. why end
   end
   local _, ok, why, needsTopUp = M.raiseDecision(o)
-  return ok, raiseHp, hit, hitSlot, hitOn, why .. detail, needsTopUp
+  return ok, raiseHp, hit, hitSlot, hitOn, why .. detail .. fracNote, needsTopUp
 end
 
 -- what one enemy round costs member e over a full gauge of its own (a
@@ -10337,8 +10483,10 @@ end
 -- read provisionally, the typical action for repeats; `measured` leaves out
 -- an unseen enemy's price from its script (#367), so only what the enemy
 -- has landed counts
-function Driver:roundPriceFor(e, measured)
-  local window, enemies, fallback = self:roundEnemies(e, measured)
+-- `raiseHp` prices it for e raised to that HP (raiseOk, #508): each slot's
+-- worst is M.raiseWorst, its ordinary damage and its fractions of raiseHp
+function Driver:roundPriceFor(e, measured, raiseHp)
+  local window, enemies, fallback = self:roundEnemies(e, measured, raiseHp)
   if window == nil then return nil end
   return (M.roundCost({ window = window, enemies = enemies, fallback = fallback }))
 end
@@ -10346,19 +10494,27 @@ end
 -- M.roundCost's input for member e: its window (a full gauge of its own, in
 -- ticks), the living enemies' gauges and prices on e, and the fallback
 -- price; nil when e has no gauge
-function Driver:roundEnemies(e, measured)
+function Driver:roundEnemies(e, measured, raiseHp)
   -- (a member with no gauge of its own -- the constant reads 0 or $FFFF --
   -- has no window, but the enemies' prices on it still count: a standing
   -- member the wipe reading must still see go down, #395 review)
   local const = M.readWord(BATTLE.ATB_CONST + e * 2)
   local window = (const ~= 0 and const ~= 0xFFFF) and math.ceil(0xFF00 / const) or nil
   local fallback = nil
+  -- (raiseHp: a fraction priced on the raise's HP, M.raiseWorst)
+  local maxHp = M.readWord(0x3C1C + e * 2)
+  local function takeOf(atk, hp)
+    local r = (M.sym("MagicProp") & 0x3FFFFF) + atk * 14
+    return M.fixedTake(function(i) return M.readRomByte(r + i) end, hp, maxHp)
+  end
   for s2 = 0, 5 do
     local L = self.hitLedger[s2]
-    if L and L.max and (fallback == nil or L.max > fallback) then fallback = L.max end
+    local v = L and L.max
+    if raiseHp ~= nil then v = M.raiseWorst(L, nil, raiseHp, takeOf) end
+    if v and (fallback == nil or v > fallback) then fallback = v end
   end
   local openBy = {}
-  for oslot, ods in pairs(self:openDrops()) do
+  for oslot, ods in pairs(self:openDrops(raiseHp ~= nil)) do
     local o = {}
     for _, d in ipairs(ods) do o[d.e] = (o[d.e] or 0) + d.drop end
     openBy[oslot] = o
@@ -10369,6 +10525,7 @@ function Driver:roundEnemies(e, measured)
     if monAlive(s2) then
       local L = self.hitLedger[s2]
       local worst = L and L.maxOn and L.maxOn[e] or (L and L.max) or nil
+      if raiseHp ~= nil then worst = M.raiseWorst(L, e, raiseHp, takeOf) end
       local open = openBy[s2]
       if open ~= nil then
         local v = open[e]
@@ -12208,6 +12365,19 @@ function Driver:makePlanRules(actor)
   if self.parkDropN < 3 and not kept and cmdRow(actor, BATTLE.CMD_ITEM) ~= nil and self.opts.items ~= false then
     local order = { actor }
     for e = 0, 3 do if e ~= actor then order[#order + 1] = e end end
+    -- The zombies among the allies take their places in landing order, the
+    -- longest-standing first: in entity order a zombie at entity 3 waited a
+    -- whole battle while two later ones at entities 1 and 2 took both
+    -- Revivifies and it killed CELES meanwhile (tomb_zombie at 63e0f747:
+    -- "actor=0 cure entity 1's Zombie" at f723 over entity 3, Zombied since
+    -- f+5, whose cure had gone down with its carrier; the battle won with
+    -- "char 9 +0 (due 0)").  Everyone else keeps entity order.
+    M.zombieOrder(order, function(e)
+      if not (status1Has(e, M.ST1_ZOMBIE) and not status1Has(e, 0x80) and self.opts.zombieCure ~= false) then
+        return nil
+      end
+      return self.statusSaid[e .. ":Zombie:at"] or -1
+    end)
     for _, e in ipairs(order) do
       -- a zombie reads 0 HP without the Wound bit, and is a patient here
       -- (unless opts.zombieCure = false: then the line is the driver before #263)
@@ -13636,8 +13806,11 @@ function Driver:makePlanRules(actor)
     -- down to the deepest level the pool covers; spellCell has already
     -- proved the unboosted price, so the step-down cannot fail here.
     local cb, cmp, cwhy = 0, cost, nil
-    if cell ~= nil and mg.boost ~= false and boost > 0 then
-      cb, cmp, cwhy = castBoost(actor, mg.spell, cost, boost)
+    -- opts.magic[id].maxBoost = n caps the cast's boost at n points (#507: TERRA's Fire at Chadarnook stops at
+    -- Fire 3, 2 BP, short of the Ultima fold at 3)
+    local want = mg.maxBoost and math.min(boost, mg.maxBoost) or boost
+    if cell ~= nil and mg.boost ~= false and want > 0 then
+      cb, cmp, cwhy = castBoost(actor, mg.spell, cost, want)
     end
     if cell ~= nil then
       M.log(string.format("[%s] actor=%d cast $%02X, cell %d, %d MP of %d%s",
@@ -17995,6 +18168,7 @@ function Driver:watchStatuses()
           if self.statusSaid[key] ~= "on" then
             self.statusSaid[key] = "on"
             self.statusSaid[key .. ":n"] = (self.statusSaid[key .. ":n"] or 0) + 1
+            self.statusSaid[key .. ":at"] = self.battleTick   -- this landing's tick (the cure line's zombie order)
             local what
             if name == "Stop" or name == "Frozen" then
               local own = M.readByte(BATTLE.MENU) ~= 0 and (M.readByte(BATTLE.ACTOR) & 3) == e

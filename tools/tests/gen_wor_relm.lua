@@ -47,9 +47,14 @@ local BOSS_SPECIES = { [GODDESS_SP] = true, [DEMON_SP] = true }
 -- Phantasm), fire (TERRA's natural Fire, CYAN's Ifrit) toward Fire 2 and 3,
 -- CELES on Runic for its Bolt 2 and 3, CYAN's SwdTech; TERRA's Trance at
 -- three points.  Pearl stays out: the goddess absorbs holy (the cast guard
--- refuses it)
+-- refuses it).  TERRA's Fire stops at Fire 3 (maxBoost 2): at 3 BP it
+-- folds into Ultima, which took 5,262 off the fire-weak demon where Fire 3
+-- took 9,364 a cast, and a charmed TERRA's Ultima falls on the whole party:
+-- the v0.38 save's wipe at shift 0 was her Ultima queued on the demon, the
+-- demon gone and the goddess's Charm on her before it ran, all three dead
+-- from full HP (#507, build/attempts/wt/v039-chadarnook/)
 local FIRE = 0x00
-local BOSS_FIGHT = { runic = true, bushido = true, magic = { [0] = { spell = FIRE } }, nuke = { FIRE },
+local BOSS_FIGHT = { runic = true, bushido = true, magic = { [0] = { spell = FIRE, maxBoost = 2 } }, nuke = { FIRE },
   trance = true, focus = { { species = DEMON_SP } } }
 -- STRAGO's kit on the plains (#388): Aqua Rake as the nuke (water: the Reach
 -- Frog's... and the Spek Tors'), Pearl Wind as the party heal, Dischord on
