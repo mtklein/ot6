@@ -13664,8 +13664,11 @@ function Driver:makePlanRules(actor)
     -- down to the deepest level the pool covers; spellCell has already
     -- proved the unboosted price, so the step-down cannot fail here.
     local cb, cmp, cwhy = 0, cost, nil
-    if cell ~= nil and mg.boost ~= false and boost > 0 then
-      cb, cmp, cwhy = castBoost(actor, mg.spell, cost, boost)
+    -- opts.magic[id].maxBoost = n caps the cast's boost at n points (#507: TERRA's Fire at Chadarnook stops at
+    -- Fire 3, 2 BP, short of the Ultima fold at 3)
+    local want = mg.maxBoost and math.min(boost, mg.maxBoost) or boost
+    if cell ~= nil and mg.boost ~= false and want > 0 then
+      cb, cmp, cwhy = castBoost(actor, mg.spell, cost, want)
     end
     if cell ~= nil then
       M.log(string.format("[%s] actor=%d cast $%02X, cell %d, %d MP of %d%s",
