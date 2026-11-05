@@ -37,7 +37,7 @@ local BEFORE = { CELES, RELM, CYAN, TERRA }
 -- the wagers after the Striker (route-wor-colosseum.md section 2): what the bag holds that the Colosseum trades up
 -- into gear the party wears, each against an opponent the fighter beats (the labs' measured rates there)
 local STRIKER, STRATO = 0x29, 0x31
-local ECONOMIZER, RIBBON = 0xCE, 0xCA
+local ECONOMIZER, RIBBON, GENJI = 0xCE, 0xCA, 0xD1
 local WAGERS = {
   { 0x05, "the Assassin for a SwordBreaker, LOCKE's blade (vs Test Rider)" },
   { 0x2A, "the Stunner for CYAN's second Strato (vs Test Rider)" },
@@ -265,9 +265,19 @@ H.run({ maxFrames = 1600000 }, {
   H.dressRelics({ { SHADOW, "SHADOW" }, { CELES, "CELES" }, { CYAN, "CYAN" }, { TERRA, "TERRA" } },
     { tag = "relics with SHADOW" }),
   -- the Colosseum's Strato makes CYAN's pair: the gear policy leaves a Genji Glove's two hands to the kit
-  -- (#434), so the kit puts it in his second hand, over the Aura
+  -- (#434), so the kit puts it in his second hand, over the Aura.  Only a Genji Glove opens that hand to a
+  -- weapon: without one it is his shield's slot, the game's list there offers no Strato, and the kit's A
+  -- presses are refused (#507: '4 A presses ... not taken' when the relic dress gave him none)
   H.lazy(function()
+    local genji = H.readByte(c(CYAN, 0x23)) == GENJI or H.readByte(c(CYAN, 0x24)) == GENJI
     if H.invCountOf(STRATO) > 0 and H.readByte(c(CYAN, 0x1F)) == STRATO and H.readByte(c(CYAN, 0x20)) ~= STRATO then
+      if not genji then
+        return H.call(function()
+          H.log(string.format("[kit] CYAN's second Strato: he wears no Genji Glove (relics $%02X $%02X), so his "
+            .. "second hand is a shield's; the Strato stays in the bag", H.readByte(c(CYAN, 0x23)),
+            H.readByte(c(CYAN, 0x24))))
+        end)
+      end
       return H.equipKit(CYAN, { { 1, STRATO } }, { tag = "CYAN: the Colosseum's Strato in his second hand" })
     end
     return H.call(function() H.log("[kit] CYAN's second Strato: not in the bag, or worn") end)
