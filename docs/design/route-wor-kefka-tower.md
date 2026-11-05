@@ -216,7 +216,64 @@ line.)
 
 ## 7. Measured
 
-(Filled in as the labs come back.)
+### 7.1 The seating on 334
+
+`lab_tower_split.lua` from `wor-desert-v1` (sha256 4b173cb7, main's
+capture, byte for byte the tracked save), each group seated as party 1 and
+walked on its lap by the north-west landing for 10 battles, after K = 0, 6
+or 12 encounters used up by the next group, at seed shifts 0 and 7; tallied
+by `tools/tower_tally.py --by-arm` (`seat3_tally.txt`). Three plans: M
+(section 4), N (TERRA and CELES each carry three of the bench, the four
+other strong together: CYAN, SHADOW, RELM, STRAGO, no cure), O (M with the
+two mages swapped).
+
+On the designed rows (`seat3/`, ROM 50cc0ef3), every group won all 60 of
+its battles:
+
+| group | members | battles | deaths | Fenix | Potions |
+|---|---|---|---|---|---|
+| M1 | TERRA, RELM, EDGAR, SETZER | 60/60 | 5 (EDGAR 2, TERRA 2, SETZER 1) | 5 | 19 |
+| M2 | CELES, STRAGO, LOCKE, MOG | 60/60 | 6 (LOCKE 5, MOG 1) | 6 | 4 |
+| M3 | CYAN, SHADOW, SABIN, GOGO | 60/60 | 1 (SABIN) | 1 | 4 |
+| N1 | TERRA, GOGO, SABIN, SETZER | 60/60 | 3 | 3 | 6 |
+| N2 | CELES, LOCKE, MOG, UMARO | 60/60 | 7 | 7 | 2 |
+| N3 | CYAN, SHADOW, RELM, STRAGO | 60/60 | 2 | 2 | **350** |
+| O1 | TERRA, STRAGO, EDGAR, SETZER | 60/60 | 5 | 5 | 15 |
+| O2 | CELES, RELM, LOCKE, MOG | 60/60 | 7 | 7 | 7 |
+
+Quoted: "M1: 6 runs, 0 FAIL; battles {'won': 60}; distinct keys 51; deaths
+{'EDGAR': 2, 'TERRA': 2, 'SETZER': 1}"; "M2: 6 runs, 0 FAIL; battles
+{'won': 60}; distinct keys 49; deaths {'LOCKE': 5, 'MOG': 1}"; "M3: 6 runs,
+0 FAIL; battles {'won': 60}; distinct keys 49; deaths {'SABIN': 1}"; "N3:
+... spent potion 350 fenix 2".
+
+- **Plan M holds**: 180 of 180 battles, 12 deaths. N3, the four strong with
+  no cure, wins too but drinks the bag (350 Potions over its six runs: the
+  care with no cure to cast), which the one bag of three parties cannot
+  pay. So every party keeps a cure.
+- **The rows decide the first map.** The same plans on the generated floor
+  (six shields on everything; `seat2/`, ROM f442a80f, main's; the batch
+  stopped at 17 of 36 runs when the rows landed): M1 50 of 50 with 24
+  deaths (TERRA 9), M2 lost 2 of 6 runs ("M2: 6 runs, 2 FAIL; battles
+  {'won': 42, 'lost': 2}"; a wipe in 272: "formation 272 lost after 19899
+  ticks; CELES L63 0/5539, STRAGO L52 0/3975, LOCKE L41 0/2653, MOG L39
+  0/2423"). With three shields the GtBehemoth breaks before its Meteors
+  pile up.
+- `seat1/` was the first try, measuring each group in its own party's seat:
+  party 3's lap from (56,22) runs onto the ladder's push-back tile (56,24)
+  and every party-3 arm timed out ("navTo: timeout after 20000 walk
+  frames"); kept, not counted.
+
+### 7.2 The factory leg
+
+`gen_wor_kt_factory` as a lab from the same capture (`probe/f2`.. `f8`):
+f2-f7 found the walk (339's top door is reached from below the crane tile
+(57,44); 339's foot leads only to 296), f8 and `cap/c1` passed it: "PASS
+(frame 32802) attempts=1/1"; "party 3: 4 battle(s), 4 won, 0 lost; XP
+CYAN +16032, SHADOW +16032, SABIN +6300, GOGO +16032; spent $F0 x2". SABIN
+(L39, 2,552 HP) fell twice to the Dueller's one action from full ("[death]
+f+2227 entity 2 char 5 from 2552/2552 by slot 0 cmd $0C atk $94 (ONE
+ACTION from >= 80%)").
 
 ## 8. Not done
 
