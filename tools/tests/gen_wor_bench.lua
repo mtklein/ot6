@@ -76,7 +76,10 @@ local function pickPair()
   end
   return PAIR
 end
-local function pairDone() return lv(PAIR[1]) >= GOALS[PAIR[1]] or lv(PAIR[2]) >= GOALS[PAIR[2]] end
+-- a rotation runs until both of its pair stand at their goals: the one who gets there first rides along (a
+-- rotation that ended at the first goal re-seated the other for one or two battles more, and four runs of six in
+-- the sweep ran out of rotations with one trainee a level short, bsweep/b_k0_s20 and three more)
+local function pairDone() return lv(PAIR[1]) >= GOALS[PAIR[1]] and lv(PAIR[2]) >= GOALS[PAIR[2]] end
 local function inGroup(group)
   return function(x, y) return H.worldPassable(x, y) and H.worldEncounterGroup(x, y, x, y) == group end
 end
