@@ -246,7 +246,7 @@ checkLib("a fallen member's window at command select with nobody queued is held 
     return step(L, CMD) == nil and step(L, 0x01) == nil
   end)
 checkLib("a transitional state ($01) gets no button",
-  'return nil, "hold"   -- a transitional state passes on its own', 'return "b", "hold"', function(L)
+  'return nil, "transit"   -- a transitional state passes on its own', 'return "b", "transit"', function(L)
     return step(L, 0x01) == nil
   end)
 checkLib("with members queued, X hands the window to the queue's front (the smallest position)",
@@ -371,6 +371,92 @@ checkLib("kitBattle: a standing member's window is steered as before, another me
     scriptedFrame(0, CMD, 3)
     local pressed = drive(L, L.kitBattle({ { who = LOCKE, defend = true } }, {}), 40)
     return has(pressed, "right")
+  end)
+
+checkLib("kitBattle: a self-target entry whose window closed under its fallen member is not done",
+  "if M.actorDown({ s1 = M.readByte(0x3EE4 + p0.seat * 2), hp = M.readWord(0x3BF4 + p0.seat * 2) }) then",
+  "if false then", function(L)
+    -- LOCKE's A opens the entry (p.opened, p.seat), then he falls and the window closes
+    scriptedFrame(0, CMD, 3)
+    local plan = { { who = LOCKE, cmd = 0x00, self = true } }
+    local opened = false
+    drive(L, L.kitBattle(plan, {}), 30, function(f)
+      if f == 5 then
+        opened = plan[1].opened == true and plan[1].seat == 0
+        mem[MENU] = 0; mem[ST1] = 0x80; word(HP, 0)
+      end
+    end)
+    return opened and #L.vars.kit == 0 and plan[1].opened == nil and plan[1].seat == nil
+  end)
+checkLib("kitBattle: an entry its member had opened is reset when he falls at target select (not done, k stays)",
+  "p.opened, p.seat, p.presses, p.lPresses, p.tookBack, aim = nil, nil, nil, nil, nil, nil", "aim = nil", function(L)
+    scriptedFrame(0, CMD, 3)
+    local plan = { { who = LOCKE, cmd = 0x00 } }
+    local opened = false
+    local pressed = drive(L, L.kitBattle(plan, {}), 30, function(f)
+      if f == 5 then
+        opened = plan[1].opened == true
+        mem[MSTATE] = 0x38; mem[ST1] = 0x80; word(HP, 0)
+      end
+    end)
+    return opened and plan[1].opened == nil and plan[1].seat == nil and #L.vars.kit == 0 and has(pressed, "b")
+  end)
+checkLib("setzerBattle: SETZER's in-progress aim is dropped when he falls at target select",
+  "p.aim, p.presses, p.lPresses = nil, nil, nil", "local _ = nil", function(L)
+    scriptedFrame(1, 0x38, 3)
+    mem[0x7B7D], mem[0x7B7E] = 0x01, 0x00     -- the target cursor on the party: a walk, not a confirm
+    local plan = { { row = 0x59 } }
+    local aimed = false
+    drive(L, noCare(L).setzerBattle(plan, {}), 30, function(f)
+      if f == 5 then
+        aimed = plan[1].aim ~= nil
+        mem[ST1 + 2] = 0x80; word(HP + 2, 0)
+      end
+    end)
+    return aimed and plan[1].aim == nil and said("actor=1 is down")
+  end)
+checkLib("kitBattle: the log names what the gate does, not the transitional state it first saw ($01, then X)",
+  'if why ~= "transit" and why ~= h.why and why ~= "cap" then', 'if h.why == nil and why ~= "cap" then', function(L)
+    -- fix_battle_jackpot's case: first seen at $01, then handed on with X at $05
+    scriptedFrame(0, 0x01, 0)
+    mem[0x4002] = 0x00
+    local pressed = drive(L, L.kitBattle({}, {}), 40, function(f) if f == 6 then mem[MSTATE] = CMD end end)
+    return has(pressed, "x") and said("handing the window on (X) to actor 1's")
+      and not said("waiting for the engine to close it")
+  end)
+checkLib("kitBattle: a window that closes and reopens on the fallen member starts a fresh hold (no cap across them)",
+  "downHold = {}   -- (a reopened", "local _ = {}   -- (a reopened", function(L)
+    scriptedFrame(0, CMD, 0)
+    local cap = L.DOWN_HOLD_CAP
+    local pressed = drive(L, L.kitBattle({}, {}), cap + 400, function(f)
+      if f == cap - 200 then mem[MENU] = 0 end           -- closed for 10 frames (under the 120-frame gap)
+      if f == cap - 190 then mem[MENU] = 1 end
+    end)
+    return #pressed == 0
+  end)
+checkLib("setzerBattle: a window that closes and reopens on the fallen member starts a fresh hold",
+  "Z.down = {}   -- (a reopened", "local _ = {}   -- (a reopened", function(L)
+    scriptedFrame(0, CMD, 0)
+    local cap = L.DOWN_HOLD_CAP
+    local pressed = drive(L, noCare(L).setzerBattle({ { row = 0x59 } }, {}), cap + 400, function(f)
+      if f == cap - 200 then mem[MENU] = 0 end
+      if f == cap - 190 then mem[MENU] = 1 end
+    end)
+    return #pressed == 0
+  end)
+checkLib("Driver:button: a capped hold's RIGHT opens the Def. window and the cap confirms it (A), not B",
+  'and M.downWindow(self.downHold, actor, st, self.tag) == "a" then', "and false then", function(L)
+    local D = L.newFightDriver("gate", {}).driver
+    L.frame = 5000
+    fallenFrame()
+    D.menuStreak = 10
+    D.downHold = { actor = 0, since = 5000 - L.DOWN_HOLD_CAP - 10, last = 4999 }
+    local r1 = D:button(0)
+    L.frame = 5001
+    mem[MSTATE] = 0x27
+    local r2 = D:button(0)
+    return r1 ~= nil and r1[1] == "right" and r2 ~= nil and r2[1] == "a"
+      and said("Defending for it so the window closes")
   end)
 
 print = rawPrint

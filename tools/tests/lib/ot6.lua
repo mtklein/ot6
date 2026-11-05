@@ -6879,7 +6879,7 @@ for _, s in ipairs(BATTLE.ST_TRANSITIONAL) do BATTLE.KNOWN_ST[s] = true end
 -- o = { actor, st, queue = { [e] = $4001+e }, held (frames on this
 -- window), spun (a Slot spin's first A landed) }.  Returns the button
 -- (nil: press nothing), why ("hand-on", "hold", "back-out", "spin",
--- "cap"), and the member X hands the window to.
+-- "cap", "transit"), and the member X hands the window to.
 M.DOWN_HOLD_CAP = 1800
 function M.downStep(o)
   local st, q = o.st, o.queue or {}
@@ -6899,27 +6899,30 @@ function M.downStep(o)
      or st == BATTLE.ST_SLOT or st == BATTLE.ST_TOOLS or st == BATTLE.ST_THROW then
     return "b", "back-out"
   end
-  return nil, "hold"   -- a transitional state passes on its own
+  return nil, "transit"   -- a transitional state passes on its own
 end
 
 -- M.downStep read off RAM for the window open now: nil when its member
 -- (`actor`, a party slot) stands; else the button to press this pulse, or
 -- false to press nothing.  h is the caller's own table, the hold's state
--- (which member, since when); a gap of over 120 frames between two looks
--- starts a new hold.  Logs once a hold, and again at the cap.
+-- (which member, since when); the caller empties it when the menu closes
+-- (a reopened window gets a fresh cap), and a gap of over 120 frames
+-- between two looks also starts a new hold.  Logs each time what it does
+-- changes (a transitional state, which presses nothing, says nothing: the
+-- first look is often the window's $01, before its X or hold is known).
 function M.downWindow(h, actor, st, tag)
   local s1, hp = M.readByte(BATTLE.ST1 + actor * 2), M.readWord(0x3BF4 + actor * 2)
   if not M.actorDown({ s1 = s1, hp = hp }) then return nil end
   if h.actor ~= actor or M.frame - (h.last or -1e9) > 120 then
-    h.actor, h.since, h.said, h.capSaid = actor, M.frame, nil, nil
+    h.actor, h.since, h.why, h.capped = actor, M.frame, nil, nil
   end
   h.last = M.frame
   local q = {}
   for e = 0, 3 do q[e] = M.readByte(0x4001 + e) end
   local btn, why, behind = M.downStep({ actor = actor, st = st, queue = q, held = M.frame - h.since,
     spun = st == BATTLE.ST_SLOT and M.readByte(BATTLE.SLOT_PRESS1) ~= 0 })
-  if not h.said then
-    h.said = true
+  if why == "cap" then h.capped = true end
+  if why ~= "transit" and why ~= h.why and why ~= "cap" then
     M.log(string.format("[%s] actor=%d is down (STATUS1 $%02X, HP %d) with its command window open (state $%02X) -- "
       .. "not planning: %s (#510)", tag or "fight", actor, s1, hp, st,
       why == "hand-on" and string.format("handing the window on (X) to actor %d's, queued behind it", behind)
@@ -6927,12 +6930,12 @@ function M.downWindow(h, actor, st, tag)
       or why == "spin" and "finishing the Slot spin it had started (A)"
       or "waiting for the engine to close it"))
   end
-  if why == "cap" and not h.capSaid then
-    h.capSaid = true
+  if why == "cap" and h.why ~= "cap" then
     M.log(string.format("[%s] actor=%d's window has stood %d frames since it fell (f%d) and the engine has not closed "
       .. "it -- Defending for it so the window closes (M.DOWN_HOLD_CAP, #511)", tag or "fight", actor,
       M.frame - h.since, h.since))
   end
+  if why ~= "transit" then h.why = why end
   return btn or false
 end
 
@@ -14576,7 +14579,7 @@ function Driver:button(actor)
   -- walk to at $05) is still good once the window is gone.
   -- (the one exception: the Def. window this driver opened for a fallen
   -- member whose window outstood M.DOWN_HOLD_CAP, where M.downWindow says A)
-  if st == BATTLE.ST_DEF and self.downHold and self.downHold.capSaid and self.downHold.actor == actor
+  if st == BATTLE.ST_DEF and self.downHold and self.downHold.capped and self.downHold.actor == actor
      and M.downWindow(self.downHold, actor, st, self.tag) == "a" then
     return { "a" }
   end
@@ -16059,6 +16062,7 @@ function M.setzerBattle(plan, opts)
     close()
     if M.readByte(MENU) == 0 then
       care.reset(); careActor = nil
+      Z.down = {}   -- (a reopened window's hold starts afresh, with a fresh cap)
       -- the engine's own count of enemies still in the fight ($3A77): a
       -- petrified body that keeps its HP is out of it, as the battle's end
       -- test (`lda $3a77`) has it
@@ -16482,6 +16486,7 @@ function M.kitBattle(plan, opts)
       end
     end
     if M.readByte(MENU) == 0 then
+      downHold = {}   -- (a reopened window's hold starts afresh, with a fresh cap)
       if M.readByte(0x3A77) == 0 then pulse("a") else M.setPad({}) end
       return
     end
