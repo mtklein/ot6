@@ -311,7 +311,26 @@ H.run({ maxFrames = 2400000 }, {
   walk(46, 16, "party 2 onto (46,16): the passage back to the west side ($02AA clear)"),
   H.waitUntil(function() return sw(0x02AA) == 0 and settled() end, 1200, "$02AA clear", 1),
   door(46, 10, MAP_CAVE, "party 2: -> 315 (46,22)"),
+  -- the walk west crosses the spike field (36-44, 9-11), which hurts about
+  -- 400 HP a member a tile stepped while its plate (39,15) is not held
+  -- (split-party.md section 1): walked unheld, party 2 came off it near 1 HP
+  -- and met the cave's fights there (#504: "CELES L49 2460/3595" before,
+  -- "460/3595" at 313 (29,13), then a wipe).  So party 2 waits on 315
+  -- (46,22) while party 1 comes up by the jumps to (42,23) and holds the
+  -- plate (11 steps, no spike: route_data field-path 315 42 23 39 15), then
+  -- crosses with the field down, and party 1 steps off for the save point
+  H.switchParty(1),
+  door(43, 12, MAP_CAVE, "party 1: the jumps -> 315 (42,23)"),
+  hold(39, 15, 0x02D1, "party 1 holds the spike field's plate (39,15)"),
+  H.switchParty(2),
+  H.call(function()
+    H.assertEq(sw(0x02D1), 1, "the spike field (36-44, 9-11) is down ($02D1, party 1 on (39,15)) as party 2 crosses")
+    say("spikes", "party 2 crosses with the field down")
+  end),
   door(29, 18, MAP_DEEP, "party 2: -> 313 (29,13)"),
+  H.call(function()
+    H.assertEq(sw(0x02D1), 1, "the spike field stayed down ($02D1) while party 2 crossed")
+  end),
   door(23, 7, MAP_CAVE, "party 2: -> 315 (23,12)"),
   -- the lava: on (19,10), facing up, A (_cc2a1f)
   walk(19, 10, "party 2 onto the lava switch (19,10)"),
@@ -330,7 +349,7 @@ H.run({ maxFrames = 2400000 }, {
   H.call(function() say("route", "the lava drained ($02D0)") end),
   walk(20, 11, "party 2 off the lava switch"),
   H.switchParty(1),
-  door(43, 12, MAP_CAVE, "party 1: the jumps -> 315 (42,23)"),
+  walk(42, 23, "party 1 off the plate, back to (42,23)"),
   H.saveState("wor_phoenix_north.mss"),
 
   -- ---- 5. the save point ----------------------------------------------------------

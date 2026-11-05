@@ -305,3 +305,114 @@ an X-Zone. On $155 both arms' deaths are Battle on MOG and RELM, plus
 one Bio on UMARO in the fix. The one wipe in each arm is Doom Gaze on the flight at K = 4,
 shift 5 (key be10-g01CF, Doom on three members), the same in both
 arms.
+
+## 11. Doom Gaze's Doom (v0.39, #504)
+
+Section 10's one wipe, key be10-g01CF, came from Doom. Doom Gaze's script
+(`AIScript::_285`) opens with L5 Doom, then cycles {Battle, Doom, Ice 3},
+{Doom, Aero, Aero}, {nothing, Escape, Escape} until it escapes. Doom and
+L5 Doom set Wound at any HP. The four flew with one guard against it,
+RELM's Memento Ring, and the bag held the Safety Bit (both ItemProp +6
+$C2). Doom felled TERRA "from 3591/3591", then CELES and STRAGO; RELM fell
+to a Battle at 1599 HP. Today's library on that boot (`lab/old.sh`, K 4,
+shift 5) replays it death for death (`old_base_k4_s5`).
+
+**The Death guards, measured and dropped.** One answer a player has is to
+put the Death guards on before the flights. The leg tried that: it ran the
+relic plan against `H.FIGHT_THREATS.doomgaze` (STATUS1 $80) before boarding.
+The Safety Bit went to TERRA, the four's Life caster, and the Memento Ring
+stayed on RELM ("[kit] Death guard $DC on TERRA for the flights; knows Life
+($30)"). The four's own relics went back on once the cave split them.
+
+The sweep from main's capture, below, measured both arms. Neither wiped. In
+72 meetings Doom never killed TERRA or RELM while they wore the guards. But
+Doom Gaze aims its Dooms at the members it can kill, so the guards only
+moved the deaths. Doom deaths went from 15 (TERRA 1, CELES 8, STRAGO 6) to
+22 (CELES 7, STRAGO 15), and all Doom Gaze deaths went from 23 to 38. The
+original 1-in-32 wipe could not be reproduced from the current line: the
+base wiped 0 of 72. So the dress, and the swap-back that existed only to
+undo it, were dropped (be2bc208).
+
+Two relic-plan fixes from that work stay, because they hold whatever the
+fight:
+
+Step 4 of the relic plan used to break ties between leftovers by item id.
+Against Wound alone, the Ribbon and a Star Pendant both cover nothing, so
+TERRA's second slot took the Star Pendant and the Ribbon stayed in the bag.
+Among leftovers the threats rank alike, step 4 now takes the one with the
+wider total cover (`H.relicFillBetter`), so TERRA wears the Ribbon and the
+Safety Bit. `field_relicspare` case 4 checks it, and with the id order put
+back the case goes red.
+
+On the tree rebased onto #505, step 4b put the spare Ribbon over RELM's
+Memento Ring, and Doom killed her (`merged_k0_s0`: "Ribbon $CA goes to RELM's
+slot 5 (over relic $DB ...) (step 4b)", "[death] f+2969 entity 2 char 8 ...
+atk $0D"). A relic that guards a threatened status the Ribbon does not now
+counts as threat-critical (`cl.ribbonless`, set only when threats are
+named). `H.ribbonMayDisplace`, and with it 4b and the regroups'
+`H.ribbonMayGoOver`, never puts a Ribbon over one. `field_relicspare` case
+5 checks it, and with the clause switched off the case goes red. Both are
+library changes that reach every leg's dressing. The `replay.txt` line
+records a replay still owed; it has not run.
+
+**The spike field.** Party 2's walk from 315 (46,22) to (29,18) crosses
+the spike field (36-44, 9-11). With its plate (39,15) unheld, each tile
+stepped costs about 400 HP a member (split-party.md section 1).
+
+- Before the walk: "CELES L49 2460/3595, RELM L46 2117/3221".
+- At 313 (29,13), after it: "460/3595, 117/3221" (`fix2_k3_s2`).
+- On the base, 59 of 72 runs opened a cave battle with a member at 1 HP.
+- The fix arms lost four such fights, on keys won elsewhere from normal HP
+  (be70-g0156 in `base_k3_s10`; beC4-g0150 in `base_k4_s6`).
+
+The cave is built to be crossed with the plate held, and the leg now does
+that. Party 2 waits on 315 (46,22). Party 1 comes up by the jumps to
+(42,23) and holds (39,15): 11 steps, no spike (`route_data.py field-path
+315 42 23 39 15`). That route does not need the lava drained. Party 2
+crosses with the field down; `$02D1` is asserted set before and after the
+crossing. Party 1 then walks back to (42,23) for the save point. With the
+plate step cut out, the assertion goes red ("the spike field (36-44, 9-11)
+is down ($02D1, party 1 on (39,15)) as party 2 crosses: got 0 ($0), want 1
+($1)", `mutplate`). In `dbg4`, CELES reached 313 (29,13) at 3723/3723.
+
+**The sweeps.** Every arm booted main's graph capture of `wor-thamasa-v1`.
+`ninja` built it in a clone at main 7298a849 and again at 2451c2cf; both made
+fd14a9de, the same bytes as the tracked save ("checkpoint drift
+wor-thamasa-v1: none"). Each arm ran K 0-5 x shifts 0, 1, 2, 4, 5, 6, 8, 9,
+10, 12, 13, 14. The base is main 7298a849 (`base5_*`). `fix5_*` is 2451c2cf,
+with the Death guards and the plate. `fix6_*` is be2bc208, the plate
+without the guards: what the leg now plays.
+
+| | base | guards + plate | plate (now) |
+|---|---|---|---|
+| runs passed | 72 of 72 | 72 of 72 | 72 of 72 |
+| cave battles opened with a member at 1 HP | 42 (0 lost) | 0 | 0 |
+| Potions at the save point (lowest, median, highest) | 50, 70, 97 | 58, 83, 96 | 50, 82, 97 |
+| Doom Gaze keys won; meetings won | 40 of 40; 72 of 72 | 38 of 38; 72 of 72 | 40 of 40; 72 of 72 |
+| Doom Gaze deaths, wipes | 23, 0 | 38, 0 | 23, 0 |
+| Doom deaths (TERRA/CELES/STRAGO/RELM) | 15 (1/8/6/0) | 22 (0/7/15/0) | 15 (1/8/6/0) |
+| other deaths | 8 (Battle: RELM 7, CELES 1) | 16 (Battle: RELM 10, CELES 2; Aero: CELES 2; Ice 3: STRAGO 2) | 8 (as the base) |
+
+Without the guards the flights are the base's: the same 40 keys and the
+same deaths. Each of the leg's other fights won every distinct key in every
+arm (`fight_report_base5_fix5.txt`, `fight_report_base5_fix6.txt`).
+
+| formation | keys won, base / now | deaths a fight, base / now |
+|---|---|---|
+| $152 | 19 / 31 | 0.63 / 0.45 |
+| $150 | 44 / 52 | 0.05 / 0.08 |
+| $151 | 59 / 59 | 0.02 / 0.00 |
+| $157 | 33 / 37 | 0.12 / 0.03 |
+| $153 | 48 / 53 | 0.19 / 0.09 |
+| $156 | 34 / 38 | 0.12 / 0.00 |
+| $155 | 35 / 32 | 0.69 / 0.00 |
+| $154 | 11 / 12 | 0.00 / 0.00 |
+
+The earlier sweeps (`base4_*`/`fix4_*`, from fc5cbe8d before #505) read the
+same way for the plate: 59 cave battles opened at 1 HP on the base against
+0 on the fix.
+
+Open: Doom still kills members: 15 Doom deaths in 72 meetings, mostly CELES and STRAGO. When
+someone is Doomed, the driver refuses the Fenix Down because the raised
+member could not survive the next hit ("402 HP ... does not clear the 1622
+hit"). That refusal is being filed separately.

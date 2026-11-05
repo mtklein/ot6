@@ -7972,9 +7972,18 @@ M.ARC_THREATS = {
 -- _316-_318): Bio (power 53, Bio-sized hits of 525-535) and Poison are
 -- magic and inflict Poison (STATUS1 $04); their Battle hits run 57-122;
 -- Entwine's and the Special's Slow is STATUS3, which no relic guards.
+-- "doomgaze": formation $1CF in the air, AIScript _285 (ai_script.asm): L5
+-- Doom once, then {Battle, Doom, Ice 3}, {Doom, Aero, Aero}, {nothing,
+-- Escape, Escape} round and round until it escapes.  Doom and L5 Doom
+-- inflict Wound (STATUS1 $80) whatever the HP; the Safety Bit and the
+-- Memento Ring guard it (ItemProp +6 $C2).  #504: Doom felled TERRA,
+-- CELES and STRAGO at full HP on key be10-g01CF while RELM, in the
+-- Memento Ring, fell only to a Battle
+-- (build/attempts/wt/v038-phoenix-152/lab/logs/base_k4_s5.run.log.gz).
 M.FIGHT_THREATS = {
   dullahan = { s1 = 0x00, s2 = 0x00, magic = true, boss = true },
   tentacles = { s1 = 0x04, s2 = 0x00, magic = true, boss = true },
+  doomgaze = { s1 = 0x80, s2 = 0x00 },
 }
 local RELIC_NAMES = {
   [0xB0] = "Goggles", [0xB1] = "Star Pendant", [0xB2] = "Peace Ring", [0xB3] = "Amulet",
@@ -8000,7 +8009,7 @@ local RELIC_EFFECT_OFFS = { 5, 8, 9, 10, 11, 12, 13, 16, 17, 25, 26 }
 -- the relic's class under the rule above: rank, affinity, and the statuses
 -- it covers -- of `threats` ({ s1 = STATUS1 mask, s2 = STATUS2 mask }, the
 -- statuses the coming fights inflict) when given, else of all of them
-function M.relicClass(id, threats)
+function M.relicClassRaw(id, threats)
   if id == 0xFF or (itemProp(id, 0) & 7) ~= 5 then return nil end
   local p1, p2 = itemProp(id, 6), itemProp(id, 7)
   local cover = threats and (popcount(p1 & (threats.s1 or 0)) + popcount(p2 & (threats.s2 or 0)))
@@ -8066,12 +8075,44 @@ end
 function M.eggMayDisplace(cl)
   return cl ~= nil and not cl.hands and cl.aff ~= "ward" and cl.aff ~= "behind"
 end
+-- The class, plus `ribbonless`: of the threatened statuses (only when the
+-- caller names threats), how many this relic guards that a Ribbon does not
+-- (#504 review: against Doom Gaze's Wound the Memento Ring and the Safety
+-- Bit guard what the Ribbon cannot).
+function M.relicClass(id, threats)
+  local cl = M.relicClassRaw(id, threats)
+  if cl and threats then
+    local r1, r2 = itemProp(RIBBON_ID, 6), itemProp(RIBBON_ID, 7)
+    cl.ribbonless = popcount(itemProp(id, 6) & (threats.s1 or 0) & ~r1)
+      + popcount(itemProp(id, 7) & (threats.s2 or 0) & ~r2)
+  elseif cl then
+    cl.ribbonless = 0
+  end
+  return cl
+end
 -- Step 4b's class test, the same classes: a Ribbon left in the bag goes over
 -- a guard, a spare ward or an acting relic, never a two-weapon relic, a ward
 -- or the Exp. Egg (#495).  A function of its own so field_relicspare's mutants
 -- can switch it (#499).
+-- A relic guarding a threatened status the Ribbon does not (cl.ribbonless,
+-- set only when the caller names threats) is threat-critical, as step 3b
+-- holds for the Egg: the Ribbon never goes over it (#504 review: 4b put the
+-- spare Ribbon over RELM's Memento Ring armed against Doom Gaze's Wound, and
+-- Doom then killed her).
 function M.ribbonMayDisplace(cl)
-  return cl ~= nil and not cl.hands and cl.aff ~= "ward" and cl.aff ~= "behind"
+  return cl ~= nil and not cl.hands and cl.aff ~= "ward" and cl.aff ~= "behind" and (cl.ribbonless or 0) == 0
+end
+-- Step 4's choice between two leftovers the threats rank alike (the same
+-- rank and threatened cover): x replaces best when it covers more of all the
+-- statuses (#504 review: against Doom Gaze's Wound alone the Ribbon and a
+-- Star Pendant both cover nothing, and the id order put the Star Pendant on
+-- TERRA and left her Ribbon in the bag).  A function of its own so
+-- field_relicspare's mutant can switch it.
+function M.relicFillBetter(x, best, threats)
+  local cx, cb = M.relicClass(x, threats), M.relicClass(best, threats)
+  if cx == nil or cb == nil or cx.rank ~= cb.rank or cx.cover ~= cb.cover then return false end
+  local ax, ab = M.relicClass(x), M.relicClass(best)
+  return (ax and ax.cover or 0) > (ab and ab.cover or 0)
 end
 function M.relicPlan(members, opts)
   opts = opts or {}
@@ -8397,7 +8438,8 @@ function M.relicPlan(members, opts)
           local held = id ~= 0xFF and (count[id] or 0) >= 1 and not second(id) and id or nil
           id = nil
           for _, x in ipairs(order) do
-            if id == nil and count[x] > 0 and wearsItem(m.ch, x) and not (boss and egg(x)) and not second(x) then
+            if count[x] > 0 and wearsItem(m.ch, x) and not (boss and egg(x)) and not second(x)
+               and (id == nil or M.relicFillBetter(x, id, opts.threats)) then
               id = x
             end
           end
