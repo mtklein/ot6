@@ -172,6 +172,26 @@ check("the ordinary worst stands over a smaller fraction (467 over Demi's 145 of
     return H.raiseWorst(L, 2, 291, takeOf) == 467
   end)
 
+-- ---- the lethal slot ---------------------------------------------------------
+-- fix_k0_s5's slot 0 (build/attempts/wt/v039-raise-rule/lab/px13): a fraction
+-- ($E7) took entity 3 1687 -> 844, an ordinary action killed it from 844, and
+-- an ordinary hit of 114 landed on entity 0.  Its smallest hit is the 114;
+-- its worst on entity 3 is the 844, which kills a raise to 304.
+local function k0s5()
+  local L = H.ledgerCommit(nil, { cmd = 0x02, party = 0x8 },
+    { { e = 3, drop = 843, last = 1687, hp = 844, frac = 0xE7 } })
+  L = H.ledgerCommit(L, { cmd = 0x00, party = 0x8 }, { { e = 3, drop = 844, last = 844, hp = 0 } })
+  return H.ledgerCommit(L, { cmd = 0x00, party = 0x1 }, { { e = 0, drop = 114, last = 3000, hp = 2886 } })
+end
+check("a slot is lethal to a raise on its worst there (844 on a 304 raise), not its smallest hit (114)",
+  "raiseLethal", "M.raiseWorst(L, e, raiseHp, takeOf)", "(L.on[e] or L.min)",
+  function()
+    local L = k0s5()
+    local w, lethal = H.raiseLethal(L, 3, 304, takeOf)
+    local _, quartrOnly = H.raiseLethal(quartr(), 3, 402, takeOf)   -- 301 of 402: not lethal
+    return L.min == 114 and w == 844 and lethal == true and quartrOnly == false
+  end)
+
 -- ---- the decision ------------------------------------------------------------
 -- the Quartr alone: the raise to 402 survives a round of it (one action, 301)
 do

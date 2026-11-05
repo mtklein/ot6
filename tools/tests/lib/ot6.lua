@@ -7662,6 +7662,18 @@ function M.raiseWorst(L, e, raiseHp, takeOf)
   return w
 end
 
+-- Whether a slot is lethal to a raise to `raiseHp` (#508 review): its worst
+-- on the raised member as M.raiseWorst prices it (the ordinary worst there,
+-- else on anybody, killing blows included, and each fraction on the raise's
+-- HP), not its smallest hit.  raiseOk races the gauges of the lethal slots
+-- against the top-up; reading the smallest hit, a slot that had killed
+-- entity 3 from 844 read "smallest hit 114 ... no lethal slot is due to act"
+-- (fix_k0_s5).  Returns the worst and whether it reaches raiseHp.
+function M.raiseLethal(L, e, raiseHp, takeOf)
+  local w = M.raiseWorst(L, e, raiseHp, takeOf)
+  return w, w ~= nil and w >= raiseHp
+end
+
 -- What a chain of counters takes off a member at `hp` (#503 review): one
 -- action that lands on several bodies draws each one's counter, and the
 -- engine queues them from the highest slot down (CheckRetal: `ldx #$12`,
@@ -10292,6 +10304,10 @@ function Driver:raiseOk(e, actor)
   -- the pair from 405/424 at f+9681, two raises were planned at f+9993
   -- against an empty ledger, and the floor was only committed after.
   -- (and a monster's turn still open: its earlier actions' drops)
+  local function raiseTake(atk, hp)
+    local r = (M.sym("MagicProp") & 0x3FFFFF) + atk * 14
+    return M.fixedTake(function(i) return M.readRomByte(r + i) end, hp, maxhp)
+  end
   local openLs = {}
   for oslot, ods in pairs(self:openDrops(true)) do
     local base = self.hitLedger[oslot] or { on = {} }
@@ -10299,6 +10315,15 @@ function Driver:raiseOk(e, actor)
     for k, v in pairs(base.on) do openL.on[k] = v end
     openL.lbOn, openL.lb, openL.lbE = {}, base.lb, base.lbE
     for k, v in pairs(base.lbOn or {}) do openL.lbOn[k] = v end
+    -- (the raise's worst, M.raiseLethal: the ordinary worst with the open drops in it)
+    openL.ordMaxOn, openL.ordMax, openL.fracAtks = {}, base.ordMax, base.fracAtks
+    for k, v in pairs(base.ordMaxOn or {}) do openL.ordMaxOn[k] = v end
+    local openOn = {}
+    for _, d in ipairs(ods) do openOn[d.e] = (openOn[d.e] or 0) + d.drop end
+    for k, v in pairs(openOn) do
+      if openL.ordMaxOn[k] == nil or v > openL.ordMaxOn[k] then openL.ordMaxOn[k] = v end
+      if openL.ordMax == nil or v > openL.ordMax then openL.ordMax = v end
+    end
     for _, d in ipairs(ods) do
       if d.hp == 0 then
         if openL.lbOn[d.e] == nil or d.drop > openL.lbOn[d.e] then openL.lbOn[d.e] = d.drop end
@@ -10319,16 +10344,19 @@ function Driver:raiseOk(e, actor)
       -- only killing blows from this slot: the largest is a floor on its hit
       if v == nil and L.lbOn ~= nil then v, on = L.lbOn[e], e end
       if v == nil then v, on = L.lb, L.lbE end
-      if v ~= nil then
-        if hit == nil or v < hit then hit, hitSlot, hitOn = v, s, on end
-        if v >= raiseHp then
-          if M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0 then
-            brokenLethal = s
-          else
-            local eta, pct = etaOf(8 + s * 2)
-            if eta ~= nil and (lethalEta == nil or eta < lethalEta) then
-              lethalEta, lethalSlot, lethalPct = eta, s, pct
-            end
+      if v ~= nil and (hit == nil or v < hit) then hit, hitSlot, hitOn = v, s, on end
+      -- the slot is lethal to the raise on its worst there, not its smallest
+      -- hit (#508 review): fix_k0_s5 read "smallest hit 114 (slot 0 on entity
+      -- 0) ... no lethal slot is due to act" while the same slot had killed
+      -- entity 3 from 844 (M.raiseLethal)
+      local _, lethal = M.raiseLethal(L, e, raiseHp, raiseTake)
+      if lethal then
+        if M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0 then
+          brokenLethal = s
+        else
+          local eta, pct = etaOf(8 + s * 2)
+          if eta ~= nil and (lethalEta == nil or eta < lethalEta) then
+            lethalEta, lethalSlot, lethalPct = eta, s, pct
           end
         end
       end
