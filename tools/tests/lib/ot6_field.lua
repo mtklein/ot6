@@ -88,7 +88,10 @@ end
 local function wipeCanary(tag, soft)
   local n, said = 0, false
   return function()
-    n = M.partyWiped() and n + 1 or 0
+    -- a Colosseum battle's loss ($3A97 set) is a lost wager, not a wipe (the
+    -- run canary's reading, lib/ot6.lua)
+    local colosseum = M.battleLoadStarted() and M.readByte(0x3A97) ~= 0
+    n = (M.partyWiped() and not colosseum) and n + 1 or 0
     if n < 300 then return false end
     -- in battle with LoseBattle's bit ($3ebc bit 0) clear, a queued Life 3
     -- revive can still land (the run's canary waits 1800 frames there:

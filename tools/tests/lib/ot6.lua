@@ -21632,7 +21632,14 @@ function M.run(opts, steps)
       canaryInGame = true
     end
     if M.battleLoadStarted() and M.frame % 30 == 0 then sampleBattle() end
-    if canaryInGame and M.partyWipedInBattle and M.partyWipedInBattle() then
+    -- A Colosseum battle's loss ($3A97 set: InitParty's `dec $3a97` for
+    -- formations $23E/$23F) is a lost wager, not a game over: CheckBattleEnd
+    -- calls LoseBattle with the colosseum mode's $FF (no "Annihilated"
+    -- message), and the field takes the party back to the Colosseum with the
+    -- fighter down.  So the wipe watch stands aside for it; the GameOver-read
+    -- and TitleScreen watches above still see a real game over.
+    if canaryInGame and M.partyWipedInBattle and M.partyWipedInBattle()
+       and M.readByte(0x3A97) == 0 then
       wipeN = wipeN + 1
       if not wipeLatched and wipeN >= WIPE_FRAMES
          and ((M.readByte(0x3ebc) & 0x01) ~= 0 or wipeN >= WIPE_FRAMES_UNLOST) then
