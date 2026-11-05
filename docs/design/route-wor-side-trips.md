@@ -71,7 +71,7 @@ frontier nothing downstream replays: the legs feed Kefka's Tower, which no
 leg plays yet, so the XP and gil they add reach no tracked checkpoint but
 their own.
 
-**What they do downstream.** Kefka's Tower boots `wor-desert-v1` instead of
+**What they do downstream.** The bench's training (`wor_bench`, docs/design/route-wor-tower-prep.md) and then Kefka's Tower boot from `wor-desert-v1` instead of
 `wor-colosseum-v1`. They raise the four Kefka's Tower would seat first:
 SHADOW from L43 and CYAN from L44 to L52-54, CELES and TERRA from L54 to
 L61-62, and they add about 210,000 GP (55,000 on the plain and in the forest,
