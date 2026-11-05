@@ -60,7 +60,7 @@ local function allDone()
   return true
 end
 -- the two who still need the most
-local PAIR = nil
+local PAIR, UNDER = nil, {}
 local function pickPair()
   local t = {}
   for _, ch in ipairs(TRAINEES) do if lv(ch) < GOALS[ch] then t[#t + 1] = ch end end
@@ -74,12 +74,22 @@ local function pickPair()
     end
     PAIR[2] = best
   end
+  UNDER = {}
+  for _, ch in ipairs(PAIR) do UNDER[ch] = lv(ch) < GOALS[ch] end
   return PAIR
 end
--- a rotation runs until both of its pair stand at their goals: the one who gets there first rides along (a
--- rotation that ended at the first goal re-seated the other for one or two battles more, and four runs of six in
--- the sweep ran out of rotations with one trainee a level short, bsweep/b_k0_s20 and three more)
-local function pairDone() return lv(PAIR[1]) >= GOALS[PAIR[1]] and lv(PAIR[2]) >= GOALS[PAIR[2]] end
+-- a rotation ends when one of the pair who sat under its goal reaches it, and the next rotation re-pairs.  A rider
+-- (seated beside the last trainee, already at its goal) does not end it: counting the rider ended every rotation
+-- at once, and four runs of six in the first sweep spent their last rotations on 0 battles with one trainee a
+-- level short (bsweep/b_k2_s0: "rotation 7: 0 battles" .. "rotation 12: 0 battles", MOG L39/40).  Waiting for
+-- both instead let the quicker one run on (SETZER, whose Exp. Egg doubles his share, to L50 beside SABIN: 81
+-- battles where 63 did, bsweep2)
+local function pairDone()
+  for _, ch in ipairs(PAIR) do
+    if UNDER[ch] and lv(ch) >= GOALS[ch] then return true end
+  end
+  return false
+end
 local function inGroup(group)
   return function(x, y) return H.worldPassable(x, y) and H.worldEncounterGroup(x, y, x, y) == group end
 end
