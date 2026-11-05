@@ -10336,7 +10336,7 @@ function Driver:raiseOk(e, actor)
   end
   local o = { maxhp = maxhp, power = M.itemPower(BATTLE.FENIX_DOWN), smallestHit = hit,
               zombie = status1Has(e, M.ST1_ZOMBIE), roundCost = self:roundPriceFor(e, nil, raiseHp) }
-  local detail = ""
+  local detail, fracNote = "", ""
   -- (#508: what the bar leaves out -- each fraction the living have landed,
   -- priced on the raise's HP instead of the HP it was measured on)
   for s = 0, 5 do
@@ -10344,7 +10344,7 @@ function Driver:raiseOk(e, actor)
     if L and L.fracAtks and monAlive(s) then
       for atk in pairs(L.fracAtks) do
         local r = (M.sym("MagicProp") & 0x3FFFFF) + atk * 14
-        detail = detail .. string.format("; slot %d's fraction $%02X takes %s of the raise, not what it "
+        fracNote = fracNote .. string.format("; slot %d's fraction $%02X takes %s of the raise, not what it "
           .. "took off full HP", s, atk, tostring(M.fixedTake(function(i) return M.readRomByte(r + i) end,
           raiseHp, maxhp)))
       end
@@ -10431,7 +10431,7 @@ function Driver:raiseOk(e, actor)
     if o.wipe == nil and why ~= nil then detail = detail .. "; wipe: no -- " .. why end
   end
   local _, ok, why, needsTopUp = M.raiseDecision(o)
-  return ok, raiseHp, hit, hitSlot, hitOn, why .. detail, needsTopUp
+  return ok, raiseHp, hit, hitSlot, hitOn, why .. detail .. fracNote, needsTopUp
 end
 
 -- what one enemy round costs member e over a full gauge of its own (a
