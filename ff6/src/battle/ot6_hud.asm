@@ -1634,8 +1634,10 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 ; terminates.  unlisted species use the 2 + level/8 formula and carry no
 ; class weakness. elemental rows are not here: vanilla element bits stay in
 ; monster data.
-;   - guardian/tritoch: multiple records each, and WoB story order cannot
-;     tell them apart from here, so all are drawn shieldless for the WoB.
+;   - guardian/tritoch: multiple records each.  guardian's $0111 (battle
+;     75) is drawn shieldless; $0112 is kefka's tower's guardian (battle
+;     140; battle 76, its other group, is never called) and has a real row
+;     (the kefka's tower block).
 ;     tritoch's $0144 is the World of Ruin's (only battle 119 reaches it)
 ;     and has a real row (the narshe block).
 ;
@@ -2788,11 +2790,127 @@ Ot6ShieldTbl:
         .byte   6, OT6_PIERCE|OT6_BLUDG ; brachosaur: the same hide on a
                                 ;   46050-hp body; a break holds its turns,
                                 ;   ultima among them.  ice vanilla
+        ; ---- the world of ruin: kefka's tower (route-wor-kefka-tower.md
+        ; section 3) ---------------------------------------------------------
+        ; Three parties, each a carrier beside the bench.  The tower is two
+        ; places: the empire's factory (maps 292, 352, 409, 410, 329, 355:
+        ; the machines, weak to bolt and water vanilla) and its ruins (the
+        ; beasts, the dead and the court).  The machines turn the blades: a
+        ; point or a blow finds their joints, so the bench's spears, clubs
+        ; and knives carry there, and the carriers' blades want Bolt.  The
+        ; statues are magic made stone: each takes the brush or the cards
+        ; and one other hand, and the three together ask for every hand.
+        ; Vanilla elements stay.
+        ; map 334, 287, 303, 338, 339: the tower's first floors
+        .word   $0084
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; brontaur: a horned beast's hide,
+                                ;   as the dinosaurs'.  ice vanilla
+        .word   $00b7
+        .byte   3, OT6_SLASH|OT6_SPECIAL ; evil oscar: a cursed flower; cut
+                                ;   it or a brush.  fire vanilla; absorbs
+                                ;   every other element
+        .word   $0080
+        .byte   2, OT6_SLASH|OT6_PIERCE ; vectaur: a soft insect body in a
+                                ;   pack of four.  ice|water vanilla
+        .word   $00e0
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; gtbehemoth: horn and bone, as the
+                                ;   srbehemoth's; three, so the break can
+                                ;   hold its meteor (the tyranosaur's count)
+        ; map 304, 354, 331: the court and the dead
+        .word   $000d
+        .byte   3, OT6_BLUDG|OT6_SPECIAL ; dark force: a floating curse.
+                                ;   holy vanilla
+        .word   $00bd
+        .byte   3, OT6_SLASH|OT6_PIERCE ; outsider: a knife-thrower; steel
+                                ;   answers steel.  holy vanilla
+        .word   $006a
+        .byte   3, OT6_SLASH|OT6_SPECIAL ; madam: a sorceress.  poison
+                                ;   vanilla
+        .word   $0007
+        .byte   3, OT6_SLASH|OT6_BLUDG ; retainer: a knight in plate.
+                                ;   poison vanilla
+        .word   $00c1
+        .byte   2, OT6_SLASH|OT6_SPECIAL ; hemophyte: a blood plant
+        .word   $00fb
+        .byte   3, OT6_SLASH|OT6_PIERCE ; veteran: an old soldier
+        .word   $00f9
+        .byte   3, OT6_BLUDG|OT6_SPECIAL ; didalos: a bone demon.  fire|holy
+                                ;   vanilla; absorbs poison
+        .word   $0016
+        .byte   4, OT6_PIERCE|OT6_BLUDG ; steroidite: a brute's hide.  holy
+                                ;   vanilla
+        .word   $0056
+        .byte   1, OT6_SLASH|OT6_BLUDG ; mover: 120 hp; the break is the
+                                ;   kill.  absorbs poison
+        ; map 294, 295, 293: the beasts of the ruins
+        .word   $0025
+        .byte   4, OT6_PIERCE|OT6_SPECIAL ; doom drgn: a dark dragon; the
+                                ;   point or the brush.  no weakness vanilla
+        .word   $00e4
+        .byte   3, OT6_BLUDG|OT6_SPECIAL ; vectagoyle: a stone gargoyle;
+                                ;   crush it.  no weakness vanilla
+        .word   $009b
+        .byte   3, OT6_SLASH|OT6_PIERCE ; land worm: a soft body.  ice
+                                ;   vanilla; absorbs earth
+        ; the factory: the machines (bolt|water vanilla on every one)
+        .word   $00fd
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; ironhitman
+        .word   $00d9
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; dueller
+        .word   $00ea
+        .byte   4, OT6_PIERCE|OT6_BLUDG ; fortis: a walking tank
+        .word   $00ed
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; junk
+        .word   $00f6
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; innoc
+        .word   $0105
+        .byte   4, OT6_PIERCE|OT6_BLUDG ; prometheus
+        .word   $00fc
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; sky base
+        .word   $00a1
+        .byte   4, OT6_PIERCE|OT6_BLUDG ; scullion: 27000 hp
+        ; the bosses
+        .word   $010c
+        .byte   6, OT6_PIERCE|OT6_BLUDG ; inferno (event battle 114, map
+                                ;   410): the factory's engine.  bolt
+                                ;   vanilla; absorbs fire
+        .word   $0142
+        .byte   3, OT6_SLASH|OT6_PIERCE ; striker: inferno's arm.  fire
+                                ;   vanilla; absorbs ice
+        .word   $0141
+        .byte   3, OT6_SLASH|OT6_BLUDG ; rough: inferno's other arm.  ice
+                                ;   vanilla; absorbs bolt
+        .word   $0112
+        .byte   10, OT6_PIERCE|OT6_BLUDG ; guardian (event battle 140, map
+                                ;   291; met nowhere else: battle 76 is
+                                ;   never called): the palace's machine,
+                                ;   fought at last.  bolt|water vanilla
+        .word   $0127
+        .byte   10, OT6_SLASH|OT6_SPECIAL ; doom (event battle 98): the
+                                ;   demon statue.  holy vanilla; absorbs
+                                ;   ice|poison
+        .word   $0128
+        .byte   8, OT6_PIERCE|OT6_SPECIAL ; goddess (event battle 99): no
+                                ;   weakness vanilla; absorbs bolt|holy
+        .word   $0129
+        .byte   8, OT6_BLUDG|OT6_SPECIAL ; poltrgeist (event battle 100): a
+                                ;   ghost in stone.  poison vanilla;
+                                ;   absorbs fire|wind
+        .word   $017d
+        .byte   10, OT6_SLASH|OT6_PIERCE ; atma (event battle 112, map 331):
+                                ;   the atmaweapon's row, the rematch.
+                                ;   no weakness vanilla; absorbs five
+        .word   $0150
+        .byte   6, OT6_SLASH|OT6_PIERCE ; gold drgn (event battle 135, map
+                                ;   335): a storm dragon's scales.  water
+                                ;   vanilla; absorbs bolt
+        .word   $0151
+        .byte   6, OT6_BLUDG|OT6_SPECIAL ; skull drgn (event battle 136, map
+                                ;   354): bone and a curse.  fire|holy
+                                ;   vanilla; absorbs poison
         ; scripted set-pieces: no gauge drawn
         .word   $0111
-        .byte   0, $00          ; guardian
-        .word   $0112
-        .byte   0, $00          ; guardian
+        .byte   0, $00          ; guardian (the wob's: battle 75)
         .word   $0114
         .byte   0, $00          ; tritoch
         .word   $0115

@@ -95,6 +95,10 @@ TITLES = {
     "wor-colosseum-v1": "By Maranda, after the Colosseum (Shadow joins)",
     "wor-dino-v1": "By the dinosaur forest, after the grind there",
     "wor-desert-v1": "By Maranda, after the Cactrot desert (before Kefka's Tower)",
+    "wor-kt-factory-v1": "Kefka's Tower, the factory's save point (before Inferno)",
+    "wor-kt-inferno-v1": "Kefka's Tower, the factory's save point (after Inferno)",
+    "wor-kt-atma-v1": "Kefka's Tower, behind Atma",
+    "wor-kt-guardian-v1": "Kefka's Tower, behind Guardian (before the statues)",
 }
 
 README = """\

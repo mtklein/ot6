@@ -1023,6 +1023,10 @@ function M.navTo(txIn, tyIn, opts)
   local calm = 0            -- consecutive settled frames on the goal tile
   local battN, dlgN, lostN = 0, 0, 0   -- debounce counters (see below)
   local noPathN, pause = 0, 0          -- no-path retry state
+  -- opts.fleeSpecies, as worldNavTo's: a list of formation species words, or a function read at each battle's open
+  -- and every 30 frames after, returning the list; a battle whose formation holds one is run from, the rest fought
+  -- (Kefka's Tower's two Doom Dragons, gen_wor_kt_guardian)
+  local fleeSt = { set = {}, from = nil }
   -- built for "tactical" and for "flee": the flee branch falls back to it
   -- once M.FLEE_CAP frames pass without the formation releasing the party
   --
@@ -1150,8 +1154,17 @@ function M.navTo(txIn, tyIn, opts)
           return
         end
         owed, owedN = true, 0
-        if wantsFlee(opts.playBattles) then
-          flee(battN)
+        if opts.fleeSpecies then
+          if battN == 3 then fleeSt.from = nil end
+          if fleeSt.from == nil and (battN - 3) % 30 == 0 then
+            fleeSt.set = {}
+            local list = type(opts.fleeSpecies) == "function" and opts.fleeSpecies() or opts.fleeSpecies
+            for _, w in ipairs(list or {}) do fleeSt.set[w] = true end
+            if next(fleeSt.set) and M.formationHas(fleeSt.set) then fleeSt.from = battN end
+          end
+        end
+        if wantsFlee(opts.playBattles) or (flee and fleeSt.from ~= nil) then
+          flee(fleeSt.from and (battN - fleeSt.from + 3) or battN)
           return
         end
         if tactical then tactical.frame(); return end
@@ -9617,8 +9630,10 @@ function M.ribbonsOnSeated(opts)
       return M.seqStep(steps)
     end),
     M.call(function()
+      -- opts.noRegroup: a Ribbon handed between split parties (Kefka's Tower's spread), no cabin regroup behind it
       local note = M.ribbonsRegroupNote
       M.ribbonsRegroupNote = nil
+      if opts.noRegroup then note = { prev = {} } end
       M.assertEq(note ~= nil, true, tag .. ": the cabin's Ribbon step (H.ribbonsOffLeavers) ran before this regroup")
       local active = M.readByte(0x1A6D) & 0x07
       for _, ch in ipairs(note.prev) do
@@ -11409,4 +11424,152 @@ function M.worLegKit(env)
     inParty = inParty, partyCount = partyCount, landNear = landNear, talkNpc = talkNpc,
     pressUp = pressUp, objOn = objOn, kohlingenStop = kohlingenStop,
   }
+end
+
+-- M.kefkaTowerKit(K, fight): Kefka's Tower's walking pieces, for its legs (docs/design/route-wor-kefka-tower.md
+-- sections 1-2), on a worLegKit K (its map, settled and say):
+--   links, avoid  the tower's tile events that carry a party, by map ({ x, y, move, tx, ty }: entering (x, y)
+--                 moving `move` lands on (tx, ty)), and the tiles a walk never steps on;
+--   walk(x, y, what [, arrive])   navLinks over the floor and the links, the avoid tiles kept off;
+--   door(x, y, dst, what)         through an exit to map dst; an exit tile the floor's BFS does not enter (334
+--                                 (48,36): the doorway's own tile reads impassable) is pressed into from beside;
+--   chest(cx, cy, bit, what)      a chest from whichever side of it the party reaches, a line when none is;
+--   reachDump(tx, ty, what)       with the global KT_DEBUG (a lab's), the walking party's reach drawn in the log.
+-- Ladders (_cc1008.._cc1046): one column carries a party the way it was entered, the column beside it pushes a
+-- party entering the wrong way back a tile (avoided).  The six crane tiles of 334 (_cc0fc3/_cc0fd4/_cc0fe5,
+-- _ca03ba/_ca03c9/_ca03d8) ride the party out of the tower on A only, so they are walked over (334 (57,44) is the
+-- only way down the east side) and no chest or talk is made from one.
+function M.kefkaTowerKit(K, fight)
+  local T = {}
+  T.links = {
+    [334] = {
+      { 6, 20, "down", 6, 22 }, { 7, 21, "up", 7, 19 }, { 16, 42, "down", 16, 45 }, { 11, 50, "up", 11, 44 },
+      { 55, 24, "down", 55, 29 }, { 56, 28, "up", 56, 23 }, { 34, 51, "up", 34, 49 }, { 39, 43, "up", 39, 41 },
+    },
+    -- the hop at (8,14), entered facing up (_cc1398): a jump through 410 (36,46) to (48,24)
+    [410] = { { 8, 14, "up", 48, 24 } },
+    -- the climbs (_cc1803 up 2 facing up, _cc1815 down 2 facing down)
+    [409] = { { 5, 12, "up", 5, 10 }, { 8, 11, "up", 8, 9 }, { 5, 10, "down", 5, 12 }, { 8, 9, "down", 8, 11 } },
+    [355] = { { 64, 10, "up", 64, 8 }, { 64, 8, "down", 64, 10 } },
+    [303] = { { 7, 16, "down", 7, 19 }, { 12, 19, "up", 12, 16 } },
+    [287] = { { 36, 28, "down", 36, 30 } },
+  }
+  -- the exits that lead to another part of the same map (route_data's same-map links), entered from any side
+  for m, exits in pairs({
+    [354] = { { 87, 31, 67, 44 }, { 67, 45, 87, 32 } },
+    [338] = { { 5, 52, 58, 33 }, { 58, 34, 5, 54 } },
+  }) do
+    T.links[m] = T.links[m] or {}
+    for _, e in ipairs(exits) do
+      for _, d in ipairs({ "up", "down", "left", "right" }) do
+        T.links[m][#T.links[m] + 1] = { e[1], e[2], d, e[3], e[4] }
+      end
+    end
+  end
+  T.avoid = {
+    [334] = { { 6, 21 }, { 7, 20 }, { 16, 44 }, { 11, 45 }, { 55, 28 }, { 56, 24 }, { 34, 50 }, { 39, 42 } },
+    [410] = { { 31, 18 } },                          -- Inferno's trigger (_cc1872)
+    [303] = { { 7, 18 }, { 12, 17 } },
+    [287] = { { 36, 29 } },
+  }
+  local function L() return T.links[K.map()] or {} end
+  -- Inferno's trigger is kept off only while he stands ($00BD, _cc1872): after him the walk west from the save
+  -- point crosses it (gen_wor_kt_guardian's first play: "neither the exit (29,28) nor a side of it is reachable
+  -- from (37,17)")
+  local function A()
+    if K.map() == 410 and K.sw(0x00BD) == 1 then return {} end
+    return T.avoid[K.map()]
+  end
+  function T.walk(x, y, what, arrive)
+    return M.seqStep({
+      M.lazy(function()
+        return M.navLinks(x, y, L(), { what = what, maxFrames = 12000, playBattles = "tactical", fight = fight,
+          avoid = A(), arrive = arrive })
+      end),
+      M.call(function() K.say("route", what) end),
+    })
+  end
+  function T.reachDump(tx, ty, what)
+    if not rawget(_G, "KT_DEBUG") then return M.call(function() end) end
+    return M.call(function()
+      local set = {}
+      for _, z in ipairs({ false, 0, 1, 2, 3 }) do
+        for k in pairs(M.bfsReach(nil, nil, z or nil, L(), nil, nil, A())) do set[k] = true end
+      end
+      local x0, y0 = M.fieldX(), M.fieldY()
+      M.log(string.format("[reach] %s: map %d from (%d,%d), target (%d,%d) %s", what, K.map(), x0, y0, tx, ty,
+        set[(ty << 8) | tx] and "REACHED" or "not reached"))
+      for y = 0, 63 do
+        local row = {}
+        for x = 0, 95 do
+          row[#row + 1] = (x == x0 and y == y0) and "@" or (x == tx and y == ty) and "X"
+            or set[(y << 8) | x] and "#" or "."
+        end
+        local s = table.concat(row)
+        if s:find("[#@X]") then M.log(string.format("[reach] %2d %s", y, s)) end
+      end
+    end)
+  end
+  local SIDES = { { 0, 1, "up" }, { -1, 0, "right" }, { 1, 0, "left" }, { 0, -1, "down" } }
+  function T.door(x, y, dst, what)
+    local function arrived() return K.map() == dst end
+    return M.seqStep({
+      T.reachDump(x, y, what),
+      M.lazy(function()
+        if M.bfsReach(nil, nil, nil, L(), x, y, A()) then return T.walk(x, y, what, arrived) end
+        for _, o in ipairs(SIDES) do
+          if M.bfsReach(nil, nil, nil, L(), x + o[1], y + o[2], A()) then
+            return M.seqStep({
+              T.walk(x + o[1], y + o[2], what .. ": beside it", arrived),
+              M.driveUntil(arrived, 600, { M.hold({ o[3] }), M.waitFrames(2) }, what .. ": pressing " .. o[3]),
+              M.release(),
+            })
+          end
+        end
+        error(string.format("%s: neither the exit (%d,%d) nor a side of it is reachable from (%d,%d)", what, x, y,
+          M.fieldX(), M.fieldY()), 0)
+      end),
+      M.waitUntil(function() return K.map() == dst and K.settled() end, 1200, what .. ": on map " .. dst, 1),
+      M.call(function() K.say("route", what) end),
+    })
+  end
+  -- a boss the party touches (an NPC standing on (x, y) of map mapId): the talk and the fight, until done() reads
+  -- true.  A random battle can open on the step the talk takes (gen_wor_kt_atma's first graph play: "battle $1AA
+  -- WON ... killed s0:$007 s1:$007 s2:$00D" in place of Atma, the talk's wait satisfied by it), so the talk is made
+  -- again while the boss still stands, at most four times.
+  function T.touchBoss(x, y, mapId, done, what, bossFight, tries)
+    tries = tries or 0
+    return M.lazy(function()
+      if done() then return M.call(function() K.say("boss", what .. " beaten") end) end
+      M.assertEq(tries < 4, true, what .. ": the talk opened its fight within four tries")
+      local o = nil
+      for ob = 0x10, 0x3F do
+        if M.objX(ob) == x and M.objY(ob) == y then o = ob; break end
+      end
+      M.assertEq(o ~= nil, true, string.format("%s's object stands on %d (%d,%d)", what, mapId, x, y))
+      return M.seqStep({
+        M.talkToObj(o, what, nil, function() return M.battleLoadStarted() end),
+        M.advanceStory(function() return not M.battleLoadStarted() and K.map() == mapId and K.settled() end, 300000,
+          { playBattles = "tactical", fight = bossFight }),
+        T.touchBoss(x, y, mapId, done, what, bossFight, tries + 1),
+      })
+    end)
+  end
+  function T.chest(cx, cy, bit, what)
+    return M.lazy(function()
+      if M.chestOpen(bit) then return M.logStep(string.format("[chest] %s: already open", what)) end
+      for _, o in ipairs(SIDES) do
+        if M.bfsReach(nil, nil, nil, L(), cx + o[1], cy + o[2], A()) then
+          return M.seqStep({
+            T.walk(cx + o[1], cy + o[2], what .. ": beside it"),
+            M.openChest({ stand = { cx + o[1], cy + o[2] }, face = o[3], bit = bit, what = what,
+              nav = { fight = fight, playBattles = "tactical" } }),
+          })
+        end
+      end
+      return M.logStep(string.format("[chest] %s (%d,%d): no side of it is reachable from (%d,%d)", what, cx, cy,
+        M.fieldX(), M.fieldY()))
+    end)
+  end
+  return T
 end
