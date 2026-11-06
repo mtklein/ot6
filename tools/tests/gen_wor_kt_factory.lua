@@ -30,6 +30,9 @@ local MACHINES = { [0x0FD] = true, [0x0D9] = true, [0x0EA] = true, [0x0ED] = tru
   [0x0FC] = true, [0x0A1] = true }
 local FIRE, ICE, BOLT = 0x00, 0x01, 0x02
 local FIGHT = {}
+-- the Sky Base first (gen_wor_kt_guardian's reason: its Doom, L.5 Doom and Blaster are Death; it is in the
+-- factory's formation 398 beside two Duellers)
+FIGHT.focusFirst = { [0x0FC] = true }
 FIGHT.nuke = function()
   if H.formationHas({ [OSCAR] = true }) then return { FIRE } end
   if H.formationHas(MACHINES) then return { BOLT } end
