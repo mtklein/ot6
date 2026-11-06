@@ -4,7 +4,8 @@
 -- plate), then party 2 north through the chamber's middle and its north door, 291, 287, to 334's north: the Ribbon
 -- (29,29), put on at once (H.ribbonsOnSeated: the Back Gauge gives way); its bench levels on that floor (T.trainLap:
 -- the tower's own encounters, the owner's direction); dressed against the statue's fire (H.elementDress) and Wall
--- Rings on the members named below (its Stop is reflectable, and a stopped member draws Blaster); the Poltergeist
+-- Rings on the members named below (its Stop is reflectable, and a stopped member draws Blaster), a bludgeon in
+-- STRAGO's hands (a second key for its break); the Poltergeist
 -- (334 (30,16): event battle 100, a game over when lost: the runner retries from the save); the Ribbon handed on
 -- through the bag for party 1 (gen_wor_kt_goddess puts it on); through (30,11) to 412, and Save on 412's save point
 -- (82,47): the `wor-kt-poltergeist-v1` battery.  412's save point stands above 411's middle plate: party 2's place
@@ -126,6 +127,17 @@ H.run({ maxFrames = 3000000 }, {
   H.fieldCare({ threshold = 1.0, tag = "before dressing for the Poltergeist" }),
   H.elementDress(FIRE_ELEMENT, { tag = "dress against the Poltergeist's fire" }),
   wallRings("Wall Rings for the Poltergeist"),
+  -- a key for the break (section 6.2): the statue keys the blow and the cards, and in party 2 only LOCKE's Wing Edge
+  -- holds one, so STRAGO trades his Imp Halberd (pierce) for the strongest bludgeon in the bag: the Pearl Rod, the
+  -- Gravity Rod, the Punisher, the Morning Star.  Asserted: one of them goes on (the bag's rods are the factory's
+  -- and the line's own buys; a run without one would meet the statue with one key-holder)
+  H.equipKit(7, { { 0, 0x39 }, { 0, 0x3A }, { 0, 0x3B }, { 0, 0x46 } },
+    { tag = "a bludgeon for STRAGO", ladder = true, optional = true }),
+  H.call(function()
+    local w = H.readByte(0x1600 + 37 * 7 + 0x1F)
+    H.assertEq(w == 0x39 or w == 0x3A or w == 0x3B or w == 0x46, true,
+      string.format("STRAGO holds a bludgeon for the Poltergeist (hand $%02X)", w))
+  end),
   H.absorbSafeArms(nil, { POLTERGEIST }, { tag = "arms for the Poltergeist" }),
   H.fieldCare({ threshold = 1.0, tag = "before the Poltergeist" }),
   H.call(function() say("boss", "party 2 before the Poltergeist: " .. H.partiesLine()) end),
