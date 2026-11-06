@@ -21,9 +21,15 @@ into `ff6/src/event/event_main.asm` unless a file is named.
 1. **The tower is three closed lanes until the parties open them for each
    other.** Each party lands in its own corner of map 334 and can reach only
    its own rooms until another party throws a switch for it (section 2).
-2. **Every species the tower deals is met nowhere else.** No pool or event
-   battle outside the tower deals any of its 34 species, so its rows move
-   no earlier fight (section 3).
+2. **Almost every species the tower deals is met nowhere else.** No pool or
+   event battle outside the tower deals any of its 34 species, with one
+   exception: the Colosseum (`ColosseumProp`, ff6/src/menu/colosseum.asm)
+   deals 21 of them as opponents (Brontaur, Dark Force, Didalos, Doom
+   Drgn, Dueller, Evil Oscar, Fortis, GtBehemoth, Hemophyte, Innoc,
+   IronHitman, Land Worm, Madam, Outsider, Retainer, Scullion, Sky Base,
+   Steroidite, Vectagoyle, Vectaur, Veteran). Their new rows move those
+   Colosseum fights too; the wagers the line makes there are untouched
+   (section 3).
 3. **The Guardian the tower fights is its own record.** Battle 140 is
    Guardian `$112`; battle 76, the only other group that deals it, is never
    called. `$112` gets a real row; the World of Balance's `$111` (battle 75)
@@ -176,6 +182,9 @@ The lessons:
 | Gold Drgn `$150` (battle 135) | 62 / 32,400 | weak water; absorbs bolt | 6 | slash, pierce |
 | Skull Drgn `$151` (battle 136) | 62 / 32,800 | weak fire, holy; absorbs poison | 6 | bludgeon, special |
 
+Inferno's arms are not machines: Striker and Rough take the blade (slash)
+as well as the point or the blow, where the machines never do.
+
 The GtBehemoth's three is the Tyranosaur's count (route-wor-side-trips.md
 finding 3): a break that comes before its second Meteor. Atma keeps the
 AtmaWeapon's pair (the World of Balance's `$117`, slash and pierce): the
@@ -200,7 +209,8 @@ LOCKE 41, SABIN 39, MOG 38, UMARO 37, EDGAR 34, GAU and SETZER 32.
 #496 measured the tower's first map (334, formations 271, 272 and 329): a
 physical carrier with a cure (TERRA, CELES) carries any two of the bench;
 RELM and STRAGO, who know no cure, carry nobody; formation 329's Meteor is
-the killer (git show 6866fa97:docs/design/route-wor-tower-prep.md).
+the killer (that doc is deleted; `git show
+6866fa97:docs/design/route-wor-tower-prep.md` has it).
 
 The seating (plan M), two strong and two of the bench in every party, a
 cure in every party:
@@ -379,8 +389,9 @@ ACTION from >= 80%)").
 **The line on this ROM** (px13, `graph/line.log`, `graph/graph2.log`): the
 rows move the line's play from power-on (a ROM change reshuffles every
 draw): the graph's `wor-desert-v1` is 5bc1ce44, "366 byte(s) differ" from
-main's tracked save ("SABIN level: fresh 38, tracked 39", "CELES level:
-fresh 62, tracked 63"). The tower's four legs then play on the graph
+main's tracked save ("checkpoint drift wor-desert-v1: 366 byte(s) differ
+from the fresh capture (build/checkpoints/wor-desert-v1)", `graph2.log`).
+The tower's four legs then play on the graph
 (`graph2.log`): "generate wor_kt_inferno ... PASS (frame 12893)
 attempts=1/3", "generate wor_kt_atma ... PASS (frame 23000) attempts=1/3",
 "generate wor_kt_guardian ... PASS (frame 99903) attempts=1/3" (the factory
@@ -392,8 +403,10 @@ step Atma's talk took, so the leg went on without him (`T.touchBoss` talks
 again while the boss stands); and Inferno's trigger, kept off the walks
 while he stood, kept party 3 on the factory's save point after him.
 
-The bench by Guardian's save (`audit_levels.txt`): EDGAR 34 -> 36, SETZER
-33 -> 35, LOCKE 41 -> 42, SABIN 39 -> 40, MOG 39 -> 40, GOGO 45 -> 46.
+The bench by Guardian's save (`audit_levels.txt`), levels from before
+party 1's training by its landing existed (the leg of 7.4 on, EDGAR and
+SETZER stand at L40 or more there): EDGAR 34 -> 36, SETZER 33 -> 35, LOCKE
+41 -> 42, SABIN 39 -> 40, MOG 39 -> 40, GOGO 45 -> 46.
 
 **Sweeps from the graph's captures** (`sweep/`, each leg from the capture
 before it, seed shifts 0, 1, 4, 5, 8, 9, 12, 13, one attempt each;
@@ -472,7 +485,13 @@ target were not taken"), from the graph's capture (`final/`,
 "leg: 24 runs, 24 PASS"; with K = 2, 4 x 8 shifts, "burn: 16 runs, 16
 PASS"; formation 413 "met 16, won 16, distinct keys 11" and "met 13, won
 13, distinct keys 13"; formation 428 "met 16, won 16" and "met 13, won 13";
-the two Doom Dragons met once and run from; "Skull Drgn: won 40, lost 0",
+the two Doom Dragons met and run from in 8 of the 40 runs (`final/leg_s14`,
+`leg_s17`, `leg_s19`, `leg_s20`, `burn_k2_s0`, `burn_k2_s8`, `burn_k4_s5`,
+`burn_k4_s9`, each "[run] two Doom Dragons in 295: running"), twice without
+getting away: `leg_s17` and `burn_k4_s9` both read "flee: no release after
+1800 frames; fighting this formation out", the cap on a run's wait, and
+fought the pair out; in `burn_k4_s9` a member died (SETZER, "status1=$80") and
+the run still passed; "Skull Drgn: won 40, lost 0",
 "Gold Drgn: won 40, lost 0", "Guardian: won 40, lost 0; distinct keys 27".
 
 The graph's play (`graph/graph6.log`): "PASS (frame 238691) attempts=1/3",
@@ -506,6 +525,8 @@ the factory, Inferno and Atma keys "none".
   the other two on their plates.
 - **The machines' hall for party 1.** Formation 413 (Sky Base, four
   IronHitmen) in 352 wiped party 1 in 2 of 8 sweeps of `gen_wor_kt_guardian`
-  (7.3).
+  before the training and the wards (7.3, 7.4); with them it is "met 16,
+  won 16, distinct keys 11" in the final grid (7.5), so it is no longer
+  open.
 - **The Gauntlet and the Nutkin Suit** (296, off 339's foot) are left on the
   middle path; a branch leg could fetch them.

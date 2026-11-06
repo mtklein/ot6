@@ -21,7 +21,7 @@
 -- Run (px13; the capture, never the tracked save):
 --   OT6_SRAM_CHECKPOINT=build/checkpoints/wor-desert-v1 OT6_RETRIES=1 OT6_SEED_SHIFT=0 \
 --     tools/tests/run.sh tools/tests/lab_tower_split.lua
--- and tally with tools/tower_tally.py.  docs/design/route-wor-tower-prep.md has what it measured.
+-- and tally with tools/tower_tally.py.  docs/design/route-wor-kefka-tower.md 7.1 has what it measured.
 -- @manual a lab: the tower's first map, one party of a three-party split (#496)
 -- @checkpoint wor-desert-v1
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1

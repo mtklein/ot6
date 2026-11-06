@@ -2,7 +2,7 @@
 -- `wor-desert-v1` battery (SHADOW, CELES, CYAN and TERRA beside the Falcon by Maranda), check what the plan
 -- depends on, fly to the tower (world (137,198): LandAirship's VehicleEvent_04 -> EnterKefkasTower), seat the
 -- three groups `party_menu 3` offers (section 4's seating), dress each party, then walk party 3 from its landing
--- (334 (56,22)) down the east ladder, through 339 (in at its foot, (39,57)) to the factory (410), over the hop at (8,14) to the factory's
+-- (334 (56,22)) down the east ladder, through 339 (in at its top door, (36,14)) to the factory (410), over the hop at (8,14) to the factory's
 -- save point (37,17), beside Inferno (event battle 114), and Save there with the three parties in the tower: the
 -- `wor-kt-factory-v1` battery, Inferno's retry point.  Parties 1 and 2 stand where the tower set them down.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
@@ -87,8 +87,22 @@ local function ribbonsSpread(depth)
       if n == 0 and taker == nil then taker = p end
     end
     if donor == nil or taker == nil or depth >= 3 then
-      return H.logStep(string.format("[ribbons] Ribbons by party: %d, %d, %d", #ribbonWearers(1), #ribbonWearers(2),
-        #ribbonWearers(3)))
+      return H.seqStep({
+        H.logStep(string.format("[ribbons] Ribbons by party: %d, %d, %d", #ribbonWearers(1), #ribbonWearers(2),
+          #ribbonWearers(3))),
+        H.call(function()
+          for p = 1, 3 do
+            H.assertEq(#ribbonWearers(p) >= 1, true, string.format("a Ribbon in every party: party %d wears %d", p,
+              #ribbonWearers(p)))
+          end
+          for _, ch in ipairs({ GAU, UMARO }) do
+            for s = 4, 5 do
+              H.assertEq(H.readByte(0x1600 + 37 * ch + 0x1F + s) == RIBBON, false,
+                NAMES[ch] .. " (left on the Falcon at the split) wears no Ribbon")
+            end
+          end
+        end),
+      })
     end
     local w = ribbonWearers(donor)
     local give = w[#w]

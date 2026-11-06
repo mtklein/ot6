@@ -9633,7 +9633,10 @@ function M.ribbonsOnSeated(opts)
       -- opts.noRegroup: a Ribbon handed between split parties (Kefka's Tower's spread), no cabin regroup behind it
       local note = M.ribbonsRegroupNote
       M.ribbonsRegroupNote = nil
-      if opts.noRegroup then note = { prev = {} } end
+      if opts.noRegroup then
+        M.assertEq(note, nil, tag .. ": no cabin regroup note is pending for a Ribbon handed between split parties")
+        note = { prev = {} }
+      end
       M.assertEq(note ~= nil, true, tag .. ": the cabin's Ribbon step (H.ribbonsOffLeavers) ran before this regroup")
       local active = M.readByte(0x1A6D) & 0x07
       for _, ch in ipairs(note.prev) do
@@ -11555,7 +11558,8 @@ function M.kefkaTowerKit(K, fight)
       })
     end)
   end
-  function T.chest(cx, cy, bit, what)
+  -- required: the leg needs this chest (an assertion when no side of it is reachable); an optional chest logs it
+  function T.chest(cx, cy, bit, what, required)
     return M.lazy(function()
       if M.chestOpen(bit) then return M.logStep(string.format("[chest] %s: already open", what)) end
       for _, o in ipairs(SIDES) do
@@ -11566,6 +11570,10 @@ function M.kefkaTowerKit(K, fight)
               nav = { fight = fight, playBattles = "tactical" } }),
           })
         end
+      end
+      if required then
+        error(string.format("[chest] %s (%d,%d): the leg requires it, and no side of it is reachable from (%d,%d)",
+          what, cx, cy, M.fieldX(), M.fieldY()), 0)
       end
       return M.logStep(string.format("[chest] %s (%d,%d): no side of it is reachable from (%d,%d)", what, cx, cy,
         M.fieldX(), M.fieldY()))

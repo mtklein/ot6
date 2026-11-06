@@ -20,17 +20,17 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 local NAMES = H.SPLIT_NAMES
 local CELES, RIBBON, WALL_RING = 6, 0xCA, 0xBB
-local EDGAR, RELM, SETZER = 4, 8, 9
+local EDGAR, RELM, SETZER, GAU, UMARO = 4, 8, 9, 11, 13
 local BARRIER_RING, MEMENTO_RING = 0xB7, 0xDB
--- a ward from the bag onto a relic slot that holds no Exp. Egg, Ribbon or Genji Glove (slot 5 when slot 4 does);
--- a line when the bag holds none
+-- a ward from the bag onto a relic slot that holds no Exp. Egg, Ribbon or Genji Glove (slot 5 when slot 4 does).
+-- A hard input (#480, asserted at the leg's boot: wardsHeld): the bag holds it, or the wearer wears it already
 local KEEP_RELIC = { [0xE4] = true, [0xCA] = true, [0xD1] = true }
 local function ward(ch, item, what)
   return H.lazy(function()
     for s = 4, 5 do
       if H.readByte(0x1600 + 37 * ch + 0x1F + s) == item then return H.logStep("[ward] " .. what .. ": worn already") end
     end
-    if H.invCountOf(item) < 1 then return H.logStep("[ward] " .. what .. ": none in the bag") end
+    H.assertEq(H.invCountOf(item) >= 1, true, "[ward] " .. what .. ": the bag holds one (the boot asserted it)")
     H.assertEq(H.relicMenuRefuses(ch), false, what .. ": the wearer stands (the Relic menu refuses a fallen member)")
     local slot = KEEP_RELIC[H.readByte(0x1600 + 37 * ch + 0x23)] and 5 or 4
     return H.seqStep({
@@ -40,6 +40,32 @@ local function ward(ch, item, what)
       end),
     })
   end)
+end
+-- the wards party 1's lane takes and where each comes from upstream: the Barrier Rings from Figaro Castle's kit
+-- (gen_fc_landing's TERRA kit) and the Albrook relic shop (route-wor-sabin.md, shop 51), the Memento Ring from
+-- Thamasa's chest (gen_wor_gau: 349 (56,16), $0E3)
+local WARDS = { { EDGAR, BARRIER_RING, "Barrier Ring" }, { SETZER, BARRIER_RING, "Barrier Ring" },
+  { RELM, MEMENTO_RING, "Memento Ring" } }
+local function wears(ch, item)
+  for s = 4, 5 do
+    if H.readByte(0x1600 + 37 * ch + 0x1F + s) == item then return true end
+  end
+  return false
+end
+-- every ward is worn by its wearer already, or the bag holds one for each ward still to go on
+local function wardsHeld()
+  local need, name = {}, {}
+  for _, w in ipairs(WARDS) do
+    name[w[2]] = w[3]
+    if not wears(w[1], w[2]) then need[w[2]] = (need[w[2]] or 0) + 1 end
+  end
+  for item, n in pairs(need) do
+    H.assertEq(H.invCountOf(item) >= n, true, string.format("the bag holds %d %s(s) for party 1's lane (it holds %d; "
+      .. "upstream sources at WARDS)", n, name[item], H.invCountOf(item)))
+  end
+  H.log(string.format("[deps] wards: Barrier Rings in the bag %d, Memento Rings %d; EDGAR %s, SETZER %s, RELM %s",
+    H.invCountOf(BARRIER_RING), H.invCountOf(MEMENTO_RING), wears(EDGAR, BARRIER_RING) and "wears one" or "none",
+    wears(SETZER, BARRIER_RING) and "wears one" or "none", wears(RELM, MEMENTO_RING) and "wears one" or "none"))
 end
 local GUARDIAN_SAVE = { 12, 12 }
 local SKULL, GOLD, GUARDIAN = 0x151, 0x150, 0x112
@@ -102,7 +128,7 @@ local function trainParty1()
     H.driveUntil(function()
       local calm = not H.battleLoadStarted() and H.hasControl() and H.tileAligned()
       return calm and (#low() == 0 or #H.outcomes - n0 >= TRAIN_BATTLES)
-    end, 4000000, {
+    end, 2900000, {
       H.navTo(function() return lap[wp][1] end, function() return lap[wp][2] end,
         { maxFrames = 20000, playBattles = "tactical", fight = FIGHT }),
       H.call(function() wp = wp % 2 + 1 end),
@@ -152,6 +178,11 @@ H.run({ maxFrames = 3000000 }, {
     H.assertEq(string.format("%d (%d,%d)", m1, x1, y1), "334 (9,16)", "party 1 on its landing (gen_wor_kt_factory)")
     H.assertEq(string.format("%d (%d,%d)", m3, x3, y3), "410 (37,17)",
       "party 3 on the factory's save point (gen_wor_kt_inferno)")
+    wardsHeld()
+    -- GAU and UMARO stayed on the Falcon at the split (gen_wor_kt_factory): neither wears a Ribbon
+    for _, ch in ipairs({ GAU, UMARO }) do
+      H.assertEq(wears(ch, RIBBON), false, NAMES[ch] .. " (left on the Falcon at the split) wears no Ribbon")
+    end
   end),
   -- @@setup-end
 
@@ -185,7 +216,7 @@ H.run({ maxFrames = 3000000 }, {
   chest(11, 39, 0x0D9, "Force Shld (334 (11,39))"),
   chest(5, 51, 0x0DA, "Force Armor (334 (5,51))"),
   door(17, 50, 292, "party 2: 334 (17,50) -> 292 (89,7)"),
-  chest(89, 12, 0x0D8, "Ribbon (292 (89,12))"),
+  chest(89, 12, 0x0D8, "Ribbon (292 (89,12))", true),
   -- on at once, as a player does: party 2 wore one, and three Innocs muddled CELES and LOCKE into killing themselves
   -- and MOG in the chamber (hall5/ult_k0_s8: "entity 0 char 6 from 5539/5539 by entity 0 char 6 ... (a MUDDLED
   -- member's action)")
@@ -193,12 +224,9 @@ H.run({ maxFrames = 3000000 }, {
   -- Glove and Wall Ring, LOCKE's Hero Ring and Back Guard, MOG's Hyper Wrist and Black Belt), and a muddled CELES
   -- killed herself (hall6/leg_s8), so the Ribbon goes over CELES's Wall Ring, the carrier's
   H.lazy(function()
-    if H.invCountOf(RIBBON) < 1 or H.partyOfChar(CELES) ~= 2 then
-      return H.logStep("[ribbons] no Ribbon in the bag for CELES, or CELES not in party 2")
-    end
-    for s = 4, 5 do
-      if H.readByte(0x1600 + 37 * CELES + 0x1F + s) == RIBBON then return H.logStep("[ribbons] CELES wears one") end
-    end
+    H.assertEq(H.partyOfChar(CELES), 2, "CELES is in party 2 (the 292 Ribbon's wearer)")
+    if wears(CELES, RIBBON) then return H.logStep("[ribbons] CELES wears one") end
+    H.assertEq(H.invCountOf(RIBBON) >= 1, true, "the bag holds the 292 Ribbon for CELES (the chest above)")
     local slot = H.readByte(0x1600 + 37 * CELES + 0x24) == WALL_RING and 5 or 4
     return H.seqStep({
       H.keepGear(CELES, "the 292 Ribbon onto CELES", H.equipKit(CELES, { { slot, RIBBON } },
@@ -302,8 +330,11 @@ H.run({ maxFrames = 3000000 }, {
   H.absorbSafeArms(nil, { GUARDIAN }, { tag = "arms for Guardian" }),
   H.fieldCare({ threshold = 1.0, tag = "before Guardian" }),
   H.call(function() say("boss", "before Guardian") end),
-  H.navTo(12, 14, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
-    arrive = function() return H.battleLoadStarted() or (H.fieldX() == 12 and H.fieldY() == 14) end }),
+  -- the walk fights a random on the way as usual; only Guardian's own battle (his species in the formation) ends it
+  H.navTo(12, 14, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, spare = { GUARDIAN },
+    arrive = function()
+      return (H.battleLoadStarted() and H.formationHas({ [GUARDIAN] = true })) or (H.fieldX() == 12 and H.fieldY() == 14)
+    end }),
   H.advanceStory(function() return sw(0x00BC) == 1 and map() == 291 and settled() end, 300000,
     { playBattles = "tactical", fight = BOSS_FIGHT }),
   H.call(function() say("boss", "Guardian beaten") end),

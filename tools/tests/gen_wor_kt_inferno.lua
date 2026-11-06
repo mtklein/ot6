@@ -12,9 +12,9 @@ local FACTORY_SAVE = { 37, 17 }
 local INFERNO_TILE = { 31, 18 }
 local INFERNO, STRIKER, ROUGH = 0x10C, 0x142, 0x141
 local FIGHT = {}
--- Inferno is a machine weak to bolt; its arms are not (Striker absorbs ice, Rough absorbs bolt), so a player who
--- knows the fight casts Bolt while Inferno stands and leaves the arms to the blades (KT_BOSS_FIGHT, a lab's global,
--- overrides it)
+-- No boss policy: the fight is the stock tactical one (KT_BOSS_FIGHT, a lab's global, overrides it).  Inferno takes
+-- bolt and its arms do not (Striker absorbs ice, Rough absorbs bolt), but the arms are slashable, unlike the
+-- machines, and absorbSafeArms keeps the weapons off what they absorb
 local BOSS_FIGHT = KT_BOSS_FIGHT or {}
 H.NAV_REFIRE_HOLD = true
 H.careThreshold = 1.0
@@ -43,8 +43,12 @@ H.run({ maxFrames = 1200000 }, {
   H.absorbSafeArms(nil, { INFERNO, STRIKER, ROUGH }, { tag = "arms for Inferno" }),
   H.fieldCare({ threshold = 1.0, tag = "before Inferno" }),
   H.call(function() say("boss", "party 3 before Inferno: " .. H.partiesLine()) end),
+  -- the walk fights a random on the way as usual; only Inferno's own battle (his species in the formation) ends it
   H.navTo(INFERNO_TILE[1], INFERNO_TILE[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
-    arrive = function() return H.battleLoadStarted() or (H.fieldX() == 31 and H.fieldY() == 18) end }),
+    spare = { INFERNO },
+    arrive = function()
+      return (H.battleLoadStarted() and H.formationHas({ [INFERNO] = true })) or (H.fieldX() == 31 and H.fieldY() == 18)
+    end }),
   H.advanceStory(function() return sw(0x00BD) == 1 and map() == MAP_FACTORY and settled() end, 300000,
     { playBattles = "tactical", fight = BOSS_FIGHT }),
   H.call(function() say("boss", "Inferno beaten") end),

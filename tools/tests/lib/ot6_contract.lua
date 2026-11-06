@@ -2614,6 +2614,8 @@ M.contracts["wor-kt-guardian-v1"] = {
     { 0x0080, 1, "337's locked door open (_cc14cd)" },
     { 0x0067, 1, "the chamber's north door open (_cc15f8)" },
     { 0x00BC, 1, "Guardian beaten (_cc1827)" },
+    { 0x06B3, 0, "the Gold Dragon beaten: its show-switch clear (_cc18d9)" },
+    { 0x06B4, 0, "the Skull Dragon beaten: its show-switch clear (_cc1906)" },
   },
   party = M.contracts["wor-kt-factory-v1"].party,
   parties = { [1] = { map = 355, x = 43, y = 6 }, [3] = { map = 355, x = 35, y = 6 } },
