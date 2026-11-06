@@ -490,6 +490,37 @@ floor while a Zombie stands, where the driver's Revivify cures it:
 deaths a run on the lap (81 in 206 battles) is heavy Fenix use for random
 battles; EDGAR and SETZER come to it at L41-42 beside TERRA L66.
 
+### 6.4 The three legs played, and their negatives
+
+From the graph's `wor-kt-doom-v1` capture, each leg as the graph's edge
+plays it (`leg.sh`, px13, `legs/`): "PASS (frame 262683) attempts=1/3"
+(`wor-kt-poltergeist-v1`, sha256 9f275805), "PASS (frame 257694)
+attempts=1/3" (`wor-kt-goddess-v1`, d549cbaf), "PASS (frame 2315)
+attempts=1/3" (`wor-kt-plates-v1`, 3fa7f7f5). The Goddess from this
+Poltergeist capture: "Goddess: 9 runs; won 9, lost 0, not reached 0;
+distinct keys won 9, lost 0; deaths in the fight 16" (`tally_gf.txt`); one
+run (`p6/gf_goddess_k6_s6`) failed the save's assert on EDGAR at 0 HP
+without the Wound bit (the battle's Revivify cured his Zombie and left him
+there; the Fenix Down and Life refused): the care now heals such a member,
+and the rerun passed (`p7/gf2_goddess_k6_s6`, "char 0 cast $2D on char 4:
+0 -> 953 hp").
+
+Negatives (`neg/`, `negs.sh`, `negs2.sh`, lab-only batteries edited by
+`make_negative.py`), each red at its assert: "STRAGO holds a bludgeon for
+the Poltergeist (hand $24)" (the bag's four bludgeons emptied); "the
+Poltergeist not yet fought ($0074)"; party 2 off 337 (8,6), "contract
+wor-kt-doom-v1 (entry) VIOLATED -- 1 field(s) differ: party 2 stands at x:
+expected 8, read 7"; "a Ribbon in the bag for party 1"; "the Goddess not yet
+fought ($0073)"; "no plate of 411 held yet ($02C6)". `gen_wor_kt_gauntlet`:
+"296's two chests still shut: got true" (the Nutkin Suit's bit set), and
+party 1 walking, "contract wor-kt-inferno-v1 (entry) VIOLATED ... the
+walking party ($1A6D): expected 3, read 1". `T.trainLap`
+(`neg_trainlap.lua`): "a lap tile the floor reaches from 355 (39,19): got
+false" (the floor's reach mutated to nothing), "every member at L99 within
+1 battles ... got 4", "a random battle within 1 steps of the lap (1 since
+the last)". Its step bound is now the map's own (`K.worstSteps`, the hunt's
+bound: "a battle within 162 steps" on 334).
+
 ## 7. Measured
 
 ### 7.1 The seating on 334
