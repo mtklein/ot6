@@ -244,6 +244,9 @@ section 7.
 | `gen_wor_kt_atma` | `wor-kt-inferno-v1` | `wor-kt-atma-v1` | party 2 north through 338 to 331, Atma (battle 112), Save on the save point behind him |
 | `gen_wor_kt_guardian` | `wor-kt-atma-v1` | `wor-kt-guardian-v1` | party 3: the sparkle, the Skull Dragon, the east plate; party 2: the hole, 409, the 292 switch and Ribbon, the Gold Dragon, the west plate (the locked door opens); party 1's lane to the chamber; the weights and the chamber's plates; party 2 to Guardian (battle 140), Save on his save point (291 (12,12)) |
 | `gen_wor_kt_doom` | `wor-kt-guardian-v1` | `wor-kt-doom-v1` | party 2 back through the chamber's south door to 337 (8,6): the cell doors open, and it stays there; party 3 down the west column and lane to 355 below Doom, its bench trained to L46 on that floor (`T.trainLap`), dressed against his ice (`H.elementDress`), Doom (battle 98), Save on his save point (355 (64,11)) |
+| `gen_wor_kt_poltergeist` | `wor-kt-doom-v1` | `wor-kt-poltergeist-v1` | party 2 from 337 (8,6) north through the chamber's middle, 291 and 287 to 334's north; the Ribbon (29,29) on LOCKE over the Back Gauge; the bench to L50 on that floor; dressed against fire, Wall Rings on STRAGO and MOG, a bludgeon (the Pearl Rod) for STRAGO; the Poltergeist (battle 100); the Ribbon off LOCKE into the bag for party 1; through (30,11) to 412, Save on its save point (82,47) |
+| `gen_wor_kt_goddess` | `wor-kt-poltergeist-v1` | `wor-kt-goddess-v1` | party 1 puts on party 2's Ribbon (its second), down the east column to 337's east cell and into 355's east lane, its bench to L46 there; on through 291's east room to 354; dressed against bolts; the Goddess (battle 99); a battle on her floor if her Overcast left a Zombie; Save on her save point (354 (12,31)) with party 1 standing |
+| `gen_wor_kt_plates` | `wor-kt-goddess-v1` | `wor-kt-plates-v1` | party 1 north to 411's right plate (115,42), party 3 up the ladder to its left plate (103,43); party 2 Saves on 412's save point: two plate bits set, Kefka's boot (#274) |
 
 The factory hall's two chests (the Gauntlet, the Nutkin Suit) are reached
 from 296, the dead end off 339's foot (the same treasure bits): the middle
@@ -400,6 +403,123 @@ What the labs found:
   355's east lane wiped it during training in 2 of 9 and 3 of 9 runs. The
   element dress failed on EDGAR ("equip options: 4 A presses on the target
   were not taken", the Force Armor) in 5 of 9 runs and is not used.
+
+### 6.2 The Poltergeist from Doom's save (#273, third part)
+
+Labbed by the leg itself (`gen_wor_kt_poltergeist` with a prelude of lab
+globals, `lab.sh`) from the graph's `wor-kt-doom-v1` capture (sha256
+8e91c280, the tracked save byte for byte), the lap's K more battles
+(`KT_BURN`) x seed shifts, tallied by `stattally.py` (evidence
+`build/attempts/wt/v039-kefka-tower-3/`, `tally_*.txt`). Every arm: the
+334 Ribbon on LOCKE, the bench to L50 on 334's north (42-49 battles), the
+fire dress, and the driver's Reflect guard (below).
+
+| arm | lever | runs | won | distinct keys won / lost | deaths in the fight |
+|---|---|---|---|---|---|
+| `w2` (`p1`, `p2/w2b`, `p3/w2c`) | Wall Rings on STRAGO and MOG | 18 | 16 | 13 / 2 | 28 |
+| `w3` (`p1`) | + LOCKE | 9 | 8 | 8 / 1 | 16 |
+| `w4` (`p3`) | all four (CELES's Ribbon gives way) | 15 | 10 | 7 / 5 | 41 |
+| `l53` (`p4`) | `w2`, the bench to L53 (62-66 battles) | 12 | 11 | 11 / 1 | 17 |
+| `s6` (`p4`, ROM 15bc78f1) | `w2`, its shields 8 -> 6 | 12 | 11 | 8 / 1 | 15 |
+| **`kb`** (`p5`) | `w2` + the Pearl Rod in STRAGO's hands (a second key) | 15 | **15** | **12 / 0** | 15 |
+
+Quoted: "Poltrgeist: 18 runs; won 16, lost 2, not reached 0; distinct keys
+won 13, lost 2; deaths in the fight 28" (`tally_w2all.txt`); "Poltrgeist:
+15 runs; won 10, lost 5 ... distinct keys won 7, lost 5" (`tally_w4.txt`);
+"Poltrgeist: 12 runs; won 11, lost 1 ... distinct keys won 11, lost 1"
+(`tally_l53.txt`); "Poltrgeist: 12 runs; won 11, lost 1 ... distinct keys
+won 8, lost 1" (`tally_s6.txt`).
+
+- **Cures had been feeding it.** With Wall Rings on, CELES's Cure on a
+  ringed member bounced onto the statue ("[heal-watch] cure $2D on entity 2:
+  no rise inside the watch", `v039-kefka-tower-2/a4/pwt50_polt_k0_s0`); the
+  driver now casts no cure on a member under Reflect and no party cure
+  while one is seated ("no party cure: entity 1 wears Reflect and a cure
+  that reaches it bounces onto the enemy", 22 times in `p1/w2_*` (its party-cure lines; 32 counting the single-target ones)), and the
+  bag serves them.
+- **The Stop is still the killer where it lands on an unringed member.**
+  `p2/w2b_polt_k0_s1` (key be9C): LOCKE stopped at f+435, Blaster at
+  f+2142, stopped again at f+19111, Blaster at f+19623 ("[death] f+19623
+  entity 2 char 1 from 465/3727 by slot 0 cmd $0C atk $B1"). The other
+  `w2` loss (`p3/w2c_polt_k0_s4`, beA4) is attrition: Wave Cannon, Fire 3
+  and Meteo. More Wall Rings lose more (`w4`): every Fire 3 counter then
+  bounces back onto the statue, which absorbs fire.
+- **The shields do not decide it.** The statue keys the blow and the cards;
+  in party 2 only LOCKE's Wing Edge holds one, and LOCKE mostly Mugs
+  ("LOCKE Mug at", "KEYED: Fight at 1 BP lands 2 chip(s) on slot 0's 8
+  shield(s)" once or twice a fight), so the statue rarely breaks: be9C
+  played the same 19,903 ticks with six shields as with eight
+  ("monhp=s0:44130/sh6" near the end), and `s6` lost the same key. The
+  shield count stays 8 (no ROM change).
+- **A second key settles it** (`kb`, the leg's play): STRAGO trades his
+  Imp Halberd (pierce) for the bag's Pearl Rod (bludgeon), "[a bludgeon for
+  STRAGO (gear)] slot 0 <- $39", and the party keys the statue 12-16 times
+  a fight ("KEYED" lines in `p5/kb_polt_k0_s0`, `k3_s4`) where `w2` keyed
+  it once or twice: "Poltrgeist: 15 runs; won 15, lost 0, not reached 0;
+  distinct keys won 12, lost 0; deaths in the fight 15; ... ticks
+  14042-22664" (`tally_kb.txt`). STRAGO's own options (#512) were not
+  needed.
+
+### 6.3 The Goddess from the Poltergeist's save
+
+`gen_wor_kt_goddess` labbed from the leg's own `wor-kt-poltergeist-v1`
+capture (sha256 08caf1f9, `legs/gen_wor_kt_poltergeist_s0`: "PASS (frame
+256199) attempts=1/3"), party 1 wearing party 2's Ribbon (its second: "Ribbon
+$CA from the bag onto EDGAR's slot 4 (over $B7, rank 0)"), the bench to L46,
+the bolt dress, K = 0, 3, 6 x shifts 0, 2, 6:
+
+| arm | the lap | the Goddess | distinct keys | deaths in the fight | deaths on the lap |
+|---|---|---|---|---|---|
+| `g355` (`p2`) | 355's east lane, 19-27 battles | won 9 of 9 | 8 | 18 | 81 |
+| `g354` (`p2`) | 354 below her, 20-25 battles | won 9 of 9 | 9 | 8 | 115 |
+
+Quoted: "Goddess: 9 runs; won 9, lost 0, not reached 0; distinct keys won 8,
+lost 0; deaths in the fight 18; lap battles 206, deaths before the statue
+81" (`tally_g355.txt`); "... won 9, lost 0 ... distinct keys won 9 ...
+lap battles 201, deaths before the statue 115" (`tally_g354.txt`). The
+element dress now goes on (the care revives first, with Life where the
+split's reserve holds the Fenix Downs), and nobody wiped training.
+
+Nine of the eighteen failed at the save's assert, not the fight: her
+Overcast turns a member who falls into a Zombie, and the field menu refuses
+Revivify on one ("c9 0/3230 hp: zombie: revivify 57 in the bag, floor 0,
+refused", `p2/g355_goddess_k0_s0`). The leg now meets one battle on her
+floor while a Zombie stands, where the driver's Revivify cures it:
+`p3/g355z` 6 of 6 PASS (K 0, 3 and 6 by shifts 0 and
+2). The lane is 355's: fewer deaths on the lap. A tuning note: about four
+deaths a run on the lap (81 in 206 battles) is heavy Fenix use for random
+battles; EDGAR and SETZER come to it at L41-42 beside TERRA L66.
+
+### 6.4 The three legs played, and their negatives
+
+From the graph's `wor-kt-doom-v1` capture, each leg as the graph's edge
+plays it (`leg.sh`, px13, `legs/`): "PASS (frame 262683) attempts=1/3"
+(`wor-kt-poltergeist-v1`, sha256 9f275805), "PASS (frame 257694)
+attempts=1/3" (`wor-kt-goddess-v1`, d549cbaf), "PASS (frame 2315)
+attempts=1/3" (`wor-kt-plates-v1`, 3fa7f7f5). The Goddess from this
+Poltergeist capture: "Goddess: 9 runs; won 9, lost 0, not reached 0;
+distinct keys won 9, lost 0; deaths in the fight 16" (`tally_gf.txt`); one
+run (`p6/gf_goddess_k6_s6`) failed the save's assert on EDGAR at 0 HP
+without the Wound bit (the battle's Revivify cured his Zombie and left him
+there; the Fenix Down and Life refused): the care now heals such a member,
+and the rerun passed (`p7/gf2_goddess_k6_s6`, "char 0 cast $2D on char 4:
+0 -> 953 hp").
+
+Negatives (`neg/`, `negs.sh`, `negs2.sh`, lab-only batteries edited by
+`make_negative.py`), each red at its assert: "STRAGO holds a bludgeon for
+the Poltergeist (hand $24)" (the bag's four bludgeons emptied); "the
+Poltergeist not yet fought ($0074)"; party 2 off 337 (8,6), "contract
+wor-kt-doom-v1 (entry) VIOLATED -- 1 field(s) differ: party 2 stands at x:
+expected 8, read 7"; "a Ribbon in the bag for party 1"; "the Goddess not yet
+fought ($0073)"; "no plate of 411 held yet ($02C6)". `gen_wor_kt_gauntlet`:
+"296's two chests still shut: got true" (the Nutkin Suit's bit set), and
+party 1 walking, "contract wor-kt-inferno-v1 (entry) VIOLATED ... the
+walking party ($1A6D): expected 3, read 1". `T.trainLap`
+(`neg_trainlap.lua`): "a lap tile the floor reaches from 355 (39,19): got
+false" (the floor's reach mutated to nothing), "every member at L99 within
+1 battles ... got 4", "a random battle within 1 steps of the lap (1 since
+the last)". Its step bound is now the map's own (`K.worstSteps`, the hunt's
+bound: "a battle within 162 steps" on 334).
 
 ## 7. Measured
 
@@ -578,23 +698,15 @@ the factory, Inferno and Atma keys "none".
 
 ## 8. Not done
 
-- **The Poltergeist and the Goddess** (section 6.1): neither passes every
-  draw yet. The chain was played once on the graph's captures (drafts in
-  `scripts/drafts/`, the chain's order Poltergeist, Doom, Goddess, plates):
-  the Poltergeist leg "PASS (frame 134324) attempts=2/3" (attempt 1 a wipe
-  in "formation 0129"), the Goddess "PASS (frame 136451) attempts=2/3"
-  (attempt 1 wiped training on 354, "formation 00BD 00BD FFFF 006A"), and
-  the convergence leg "PASS (frame 2314) attempts=1/3": party 1 onto 411's
-  right plate ("held ($02C6)"), party 3 onto the left ("held ($02CE)"),
-  party 2 saved on 412's save point with both bits still set. The plate
-  bits stay set once stepped on (`_cc193f` sets, only the tower's exit
-  `_cc0f7d` clears), so the convergence cut works as designed. The
-  Goddess's save held TERRA and SETZER at 0 HP: party 1's share of the
-  Fenix Downs (the split's budget) was spent on 354's randoms.
-  The next legs boot `wor-kt-doom-v1`: party 2 goes on from 337 (8,6), north
-  through the chamber (the drafted Poltergeist leg's walk from there), the
-  Goddess's leg is party 1's, and the convergence is the drafted
-  `gen_wor_kt_plates`.
+- **Kefka** (#274) boots `wor-kt-plates-v1`: party 2 on 412's save point
+  with parties 1 and 3 on 411's plates. The plate bits stay set once stepped
+  on (`_cc193f` sets, only the tower's exit `_cc0f7d` clears), so party 2's
+  step from 412 (82,45) to 411's middle plate (109,40) starts FinalBattle.
+- **Party 1's lap deaths** (6.3): about four deaths a run training in 355's
+  east lane. The owner's direction was that the bench levels in the tower;
+  EDGAR and SETZER arrive at L41-42. More training by party 1's landing in
+  `gen_wor_kt_guardian` (334, plan M's measured floor) would replay from
+  Guardian on; not done.
 - **An older lever, worse** (`swap1`, kept): SETZER and GOGO swapped
   (party 1 TERRA, RELM, EDGAR, GOGO; party 3 CYAN, SHADOW, SABIN, SETZER),
   the chamber in the other order (party 1 west to Doom, party 2 east to the

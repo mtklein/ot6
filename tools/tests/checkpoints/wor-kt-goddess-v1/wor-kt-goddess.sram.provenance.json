@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "cdcf316f524b14b3fc7f6354ff3dbf6a0e36b20e039555ed69d091fcbe31c0a5",
+  "generator_sig": "84bfff4db63f2603e26b97fef29557323ce2fd8c301f5a1f26ac064c3700b2f0 gen_wor_kt_goddess build/checkpoints/wor-kt-poltergeist-v1/manifest.json build/checkpoints/wor-kt-poltergeist-v1/wor-kt-poltergeist.sram",
+  "ancestors": [
+    {
+      "path": "build/checkpoints/wor-kt-poltergeist-v1/manifest.json",
+      "sha256": "244b59c632cc059bd92b352bb6ed96093b6e83c7a48f87d826a27e9eafab9767"
+    }
+  ]
+}

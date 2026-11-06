@@ -4039,6 +4039,7 @@ local CARE_MAGIC_GATE = 0x7a                  -- zSkillsTextColor[1] = Magic
 local CARE_TONIC, CARE_POTION, CARE_FENIX = 0xE8, 0xE9, 0xF0
 local CARE_ANTIDOTE, CARE_SOFT, CARE_REMEDY = 0xF2, 0xF4, 0xF5
 local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
+CARE_CURES.life = 0x30                         -- Life (a revive cast where no Fenix Down is free; ipairs skips it)
 -- The MP side (#231, docs/design/supply.md).  A Tincture is +50 MP for
 -- 1500 and works anywhere; a Tent is the whole party's both pools for
 -- 1200 and works only where the item list offers it: on a save point
@@ -5067,6 +5068,18 @@ local function careKernel(opts)
          and not failed[key(w)] then
         return w
       end
+      -- no Fenix Down the bag can give (none, or the split's reserve keeps
+      -- the rest for the other parties): Life from a member who knows it,
+      -- where the caller casts (#273: party 1 below the Goddess stood with
+      -- EDGAR down and "fenix 16 in the bag" held for parties 2 and 3, TERRA
+      -- knowing Life, and the Equip menu then refused him: "equip options:
+      -- 4 A presses on the target were not taken")
+      if M.charHp(c) == 0 and (M.charStatus1(c) & 0x02) == 0 and useMagic then
+        for _, k in ipairs(careParty()) do
+          local wl = { kind = "cast", char = c, caster = k, spell = CARE_CURES.life, why = "revive" }
+          if k ~= c and canCast(k, CARE_CURES.life) and not failed[key(wl)] then return wl end
+        end
+      end
     end
     for _, c in ipairs(careParty()) do
       local w = pickStatusCure(c)
@@ -5080,7 +5093,10 @@ local function careKernel(opts)
       -- A petrified or zombie member is refused by CheckCanUseItem
       -- (item.asm:2249-2258) and by the spell check (field_menu.asm:3076
       -- -3081) alike, so proposing anything for them only burns attempts.
-      if hp > 0 and mx > 0 and hp < mx and hp < mx * thresh
+      -- A member at 0 HP without the Wound bit (a Zombie the battle's
+      -- Revivify cured: #273, "c4 0/3475 hp ... status1 00", the Fenix
+      -- Down and Life refused) is not dead to the game: a heal lifts him.
+      if (hp > 0 or (M.charStatus1(c) & 0x80) == 0) and mx > 0 and hp < mx and hp < mx * thresh
          and (M.charStatus1(c) & 0xC2) == 0 then
         hurt[#hurt + 1] = { c = c, r = hp / mx }
       end
@@ -7105,6 +7121,11 @@ function M.equipKit(charId, items, opts)
     M.call(function()
       local partyByte = M.readByte(0x1850 + charId)
       M.assertEq(partyByte & 0x07, M.readByte(0x1A6D) & 0x07, tag .. ": character is in the active party")
+      -- the Equip and Relic menus refuse a member who is down, petrified or a zombie: the character select
+      -- takes no A for them (#273: the Goddess's element dress on EDGAR at 0 HP, "equip options: 4 A presses
+      -- on the target were not taken"); the caller revives first (M.fieldCare) or leaves them out
+      M.assertEq(M.relicMenuRefuses(charId), false, string.format("%s: char %d is up for the Equip menu (HP %d, "
+        .. "status1 $%02X)", tag, charId, M.charHp(charId), M.charStatus1(charId)))
       pos = (partyByte >> 3) & 0x03
       doneSlot = {}
       M.log(string.format("[%s] char=%d row=%d before=%s", tag, charId, pos, six()))
@@ -7625,7 +7646,12 @@ function M.elementDress(mask, opts)
   return M.lazy(function()
     local steps, taken = {}, {}
     for _, c in ipairs(seated()) do
-      if c <= 13 then
+      if c <= 13 and M.relicMenuRefuses(c) then
+        -- the Equip menu refuses a fallen member (M.equipKit): the care before the dress revives where the bag
+        -- or a Life allows, and a member it could not revive goes into the fight as he stands
+        M.log(string.format("[%s] %s is down (HP %d, status1 $%02X): the Equip menu refuses him; not dressed", tag,
+          GEAR_NAMES[c] or tostring(c), M.charHp(c), M.charStatus1(c)))
+      elseif c <= 13 then
         local kit = {}
         for slot = 1, 3 do
           if not (slot == 1 and leftHand(c) ~= "shield") then
@@ -9632,6 +9658,25 @@ end
 function M.ribbonMayGoOver(cl)
   return M.ribbonMayDisplace(cl) and cl.rank <= 1
 end
+-- The class a bag Ribbon reads a worn relic by: M.relicClass, and for a
+-- relic it leaves unclassed whose only effect is on how battles open
+-- (ItemProp +10 bits $01/$02: the Gale Hairpin's first strikes, the Back
+-- Gauge's guard against back and pincer attacks), no status guarded, no
+-- other effect byte set, a guard (rank 1): it guards no member against
+-- anything.  #273: in Kefka's Tower party 2 wore the Back Gauge on LOCKE and
+-- acting relics on the rest, so the Ribbon of 334 stayed in the bag ("no
+-- seated member can take the bag's Ribbon") before the Poltergeist.
+function M.ribbonSeatClass(id, threats)
+  local cl = M.relicClass(id, threats)
+  if cl ~= nil or id == 0xFF or (itemProp(id, 0) & 7) ~= 5 then return cl end
+  if (itemProp(id, 6) | itemProp(id, 7)) ~= 0 or (itemProp(id, 10) & ~0x03) ~= 0 or itemProp(id, 10) == 0 then
+    return nil
+  end
+  for _, off in ipairs(RELIC_EFFECT_OFFS) do
+    if off ~= 10 and itemProp(id, off) ~= 0 then return nil end
+  end
+  return { rank = 1, aff = "guard", cover = 0, ribbonless = 0 }
+end
 -- The seated member and slot a bag Ribbon goes to: among the seated members
 -- who can wear one, lack one and are not down, a slot that is empty or holds
 -- a relic M.ribbonMayGoOver allows (classed against `threats`, the caller's,
@@ -9646,7 +9691,7 @@ function M.ribbonSeat(threats)
       local sp = spellsLearned(ch)
       for s = 4, 5 do
         local cur = charByte(ch, 0x1F + s)
-        local cl = cur ~= 0xFF and M.relicClass(cur, threats) or nil
+        local cl = cur ~= 0xFF and M.ribbonSeatClass(cur, threats) or nil
         local rank = cur == 0xFF and -1 or (M.ribbonMayGoOver(cl) and cl.rank or nil)
         if rank and (best == nil or rank < best.rank or (rank == best.rank and sp > best.spells)) then
           best = { ch = ch, name = M.SPLIT_NAMES[ch], slot = s, cur = cur, rank = rank, spells = sp, order = i }
@@ -9709,7 +9754,7 @@ function M.ribbonsOnSeated(opts)
         if ch <= 13 and not has and wearsItem(ch, RIBBON_ID) and not M.relicMenuRefuses(ch) then
           for s = 4, 5 do
             local cur = charByte(ch, 0x1F + s)
-            M.assertEq(cur ~= 0xFF and not M.ribbonMayGoOver(M.relicClass(cur, opts.threats)), true, string.format(
+            M.assertEq(cur ~= 0xFF and not M.ribbonMayGoOver(M.ribbonSeatClass(cur, opts.threats)), true, string.format(
               "%s: with %d Ribbon(s) in the bag, %s's relic slot %d ($%02X) is one a Ribbon may not take", tag, n,
               M.SPLIT_NAMES[ch], s, cur))
           end
@@ -11479,7 +11524,7 @@ function M.worLegKit(env)
     supplies = supplies, say = say, kitLine = kitLine, walkInto = walkInto, outToWorld = outToWorld,
     enterFrom = enterFrom, board = board, regroup = regroup, liftOff = liftOff, watches = watches,
     walk = walk, chestAt = chestAt, monsterBox = monsterBox, doomLine = doomLine, pace = pace, hunt = hunt, huntLine = huntLine, worldHunt = worldHunt,
-    objLine = objLine,
+    objLine = objLine, worstSteps = worstSteps,
     inParty = inParty, partyCount = partyCount, landNear = landNear, talkNpc = talkNpc,
     pressUp = pressUp, objOn = objOn, kohlingenStop = kohlingenStop,
   }
@@ -11617,12 +11662,15 @@ function M.kefkaTowerKit(K, fight)
   -- the walking party levels on its lane's own floor before a statue (the owner: the bench levels in the tower): a
   -- lap between the tile it stands on and the first of (x, y-2), (x, y+2), (x-2, y), (x+2, y), then the four
   -- neighbours, that the floor reaches, the walker fighting what comes and the care after each battle, until every
-  -- member stands at `level` (and opts.min battles are fought: a lab's encounter history), at most opts.cap battles
-  -- (default 60).  Asserts the level at the end: a lane whose floor cannot raise the party fails here, not at the
-  -- statue.
+  -- member stands at `level` (and opts.min battles are fought; opts.burn battles more once the level stands: a
+  -- lab's encounter history), at most opts.cap battles (default 60).  Asserts the level at the end: a lane whose
+  -- floor cannot raise the party fails here, not at the statue.  The steps between two battles are bounded by the
+  -- map's own rate (K.worstSteps, the hunt's bound: the most steps to a random battle over every encounter counter,
+  -- with and without a Charm Bangle; opts.stepCap overrides it, a mutant's lever), and the lap's walk keeps off the
+  -- map's push-back tiles (T.avoid).
   function T.trainLap(what, level, opts)
     opts = opts or {}
-    local cap, min = opts.cap or 60, opts.min or 0
+    local cap, min, burn = opts.cap or 60, opts.min or 0, opts.burn or 0
     local P, Q, n0, wp = nil, nil, 0, 1
     local function low()
       local t = {}
@@ -11646,27 +11694,31 @@ function M.kefkaTowerKit(K, fight)
           if Q == nil and M.bfsReach(nil, nil, nil, L(), x + d[1], y + d[2], A()) then Q = { x + d[1], y + d[2] } end
         end
         M.assertEq(Q ~= nil, true, string.format("%s: a lap tile the floor reaches from %d (%d,%d)", what, m, x, y))
-        K.say("train", string.format("%s: lap %d (%d,%d) <-> (%d,%d) until L%d (at least %d, at most %d battles): %s",
-          what, m, x, y, Q[1], Q[2], level, min, cap, levels()))
+        P.cap = opts.stepCap or K.worstSteps(m)
+        M.assertEq(P.cap ~= nil, true, string.format("%s: map %d rolls random battles", what, m))
+        K.say("train", string.format("%s: lap %d (%d,%d) <-> (%d,%d) until L%d (at least %d, at most %d battles, %d "
+          .. "more once there; a battle within %d steps): %s", what, m, x, y, Q[1], Q[2], level, min, cap, burn, P.cap,
+          levels()))
       end),
       M.driveUntil(function()
         local calm = not M.battleLoadStarted() and M.hasControl() and M.tileAligned()
         local n = #M.outcomes - n0
-        return calm and ((n >= min and #low() == 0) or n >= cap)
+        if P.at == nil and n >= min and #low() == 0 then P.at = n end
+        return calm and ((P.at ~= nil and n >= P.at + burn) or n >= cap)
       end, 6000000, {
         -- a lap of two tiles with no encounter repeats the last lap's frames, and the no-progress watchdog reads
-        -- novelty (the hunt's rule, K.hunt): declared per step, and the steps between two battles bounded (the
-        -- map's rate gives a battle within a few dozen; gen_wor_kt_doom's first play tripped the watchdog 2,300
-        -- frames into a dry stretch, the same one at every retry: a seed shift does not re-draw encounters)
+        -- novelty (the hunt's rule, K.hunt): declared per step, and the steps between two battles bounded (a seed
+        -- shift does not re-draw encounters: gen_wor_kt_doom's first play tripped the watchdog 2,300 frames into
+        -- a dry stretch, the same one at every retry)
         M.call(function()
           if #M.outcomes ~= (P.seen or -1) then P.seen, P.steps = #M.outcomes, 0 end
-          M.assertEq(P.steps < (opts.stepCap or 400), true, string.format("%s: a random battle within %d steps of "
-            .. "the lap (%d since the last)", what, opts.stepCap or 400, P.steps))
+          M.assertEq(P.steps < P.cap, true, string.format("%s: a random battle within %d steps of the lap (%d since "
+            .. "the last)", what, P.cap, P.steps))
           M.watchQuiet(600, P.quietSaid == nil and "the lap walks the same two tiles" or nil)
           P.quietSaid = true
         end),
         M.navTo(function() return (wp == 1 and P or Q)[1] end, function() return (wp == 1 and P or Q)[2] end,
-          { maxFrames = 20000, playBattles = "tactical", fight = fight }),
+          { maxFrames = 20000, playBattles = "tactical", fight = fight, avoid = A() }),
         M.call(function()
           M.assertEq(K.map(), P.m, what .. ": the lap stays on its map")
           wp = wp % 2 + 1

@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "1d4e7643a69620dac0224add82cf1463118bc2b8a814686e715672348e91fcf6",
+  "generator_sig": "6e171017925f5213d2fd11e1693895a04f491fbf7935c42f3a2d34e0ce5f4f07 gen_wor_kt_plates build/checkpoints/wor-kt-goddess-v1/manifest.json build/checkpoints/wor-kt-goddess-v1/wor-kt-goddess.sram",
+  "ancestors": [
+    {
+      "path": "build/checkpoints/wor-kt-goddess-v1/manifest.json",
+      "sha256": "052d9a2fef8faa7983433d9ee2ca62b82624aafcbe6fdd52fe81510b5be13fc9"
+    }
+  ]
+}

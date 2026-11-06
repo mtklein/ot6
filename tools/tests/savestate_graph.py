@@ -1331,10 +1331,38 @@ STATES = [
     # opens the cell doors (337 (8,6)) and stays there; party 3 down the west
     # lane, its bench levelled below Doom, dressed against his ice, Doom
     # (event battle 98), and Save there: the `wor-kt-doom-v1` checkpoint
-    # (docs/design/route-wor-kefka-tower.md).  A cut; saves= until a leg
-    # boots it.  Re-cut by checkpoint_drift.py --recut.
+    # (docs/design/route-wor-kefka-tower.md).  A cut.  wor_kt_poltergeist
+    # below boots its checkpoint.  Re-cut by checkpoint_drift.py --recut.
     S("wor_kt_doom", gen="gen_wor_kt_doom", prev="wor_kt_guardian",
-      checkpoint="wor-kt-guardian-v1", saves="wor-kt-doom-v1", timeout=7200),
+      checkpoint="wor-kt-guardian-v1", timeout=7200),
+
+    # wor-kt-doom-v1 -> 412's save point (82,47): party 2 from 337 (8,6)
+    # north through the chamber to 334's north (the Ribbon), its bench
+    # levelled on that floor, dressed against the statue's fire and Wall
+    # Rings on two members, the Poltergeist (event battle 100), the Ribbon
+    # into the bag for party 1, and Save on 412's save point: the
+    # `wor-kt-poltergeist-v1` checkpoint (docs/design/route-wor-kefka-
+    # tower.md).  A cut.  wor_kt_goddess below boots its checkpoint.
+    # Re-cut by checkpoint_drift.py --recut.
+    S("wor_kt_poltergeist", gen="gen_wor_kt_poltergeist", prev="wor_kt_doom",
+      checkpoint="wor-kt-doom-v1", timeout=7200),
+
+    # wor-kt-poltergeist-v1 -> the Goddess's save point, map 354 (12,31):
+    # party 1 puts on party 2's Ribbon, goes down the east lane, its bench
+    # levelled there, dressed against her bolts, the Goddess (event battle
+    # 99), and Save there: the `wor-kt-goddess-v1` checkpoint (docs/design/
+    # route-wor-kefka-tower.md).  A cut.  wor_kt_plates below boots its
+    # checkpoint.  Re-cut by checkpoint_drift.py --recut.
+    S("wor_kt_goddess", gen="gen_wor_kt_goddess", prev="wor_kt_poltergeist",
+      checkpoint="wor-kt-poltergeist-v1", timeout=7200),
+
+    # wor-kt-goddess-v1 -> 412's save point (82,47) again: party 1 onto
+    # 411's right plate, party 3 onto its left, and party 2 Saves on 412's
+    # save point: the `wor-kt-plates-v1` checkpoint, Kefka's boot (#274;
+    # docs/design/route-wor-kefka-tower.md).  A cut; saves= until a leg
+    # boots it.  Re-cut by checkpoint_drift.py --recut.
+    S("wor_kt_plates", gen="gen_wor_kt_plates", prev="wor_kt_goddess",
+      checkpoint="wor-kt-goddess-v1", saves="wor-kt-plates-v1", timeout=7200),
 
 ]
 

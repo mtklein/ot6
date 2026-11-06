@@ -11135,8 +11135,10 @@ function Driver:raceCandidates(actor, st)
             what = string.format("item $%02X on entity %d", h.id, e) }
         end
       end
+      -- a cure on a Reflect bearer bounces onto the enemy: the rules refuse it (makePlanRules), and so does the race
+      local reflects = (M.readByte(0x3EF8 + e * 2) & 0x80) ~= 0
       for _, h in ipairs(a.heals or {}) do
-        if h.cast and st.careCasts then
+        if h.cast and st.careCasts and not (reflects and M.spellReflectable(h.spell)) then
           c[#c + 1] = { kind = "heal", target = e, restore = h.restore, cost = h.cost, spell = h.spell,
             mp = h.mp,
             what = string.format("cast $%02X on entity %d", h.spell, e) }
@@ -13514,6 +13516,25 @@ function Driver:makePlanRules(actor)
         .. "cure that reaches it is damage", self.tag or "fight", actor, zombieSeated)
       if said ~= self.healSaid then self.healSaid = said; M.log(said) end
     end
+    -- A cure cast on a member under Reflect (a Wall Ring: status 3 bit 7,
+    -- $3EF8 + 2e) bounces off onto the enemy (#273: CELES's Cure on the
+    -- wall-ringed bench healed the Poltergeist, "[heal-watch] cure $2D on
+    -- entity 2: no rise inside the watch"; build/attempts/wt/v039-kefka-
+    -- tower-2/a4/pwt50_polt_k0_s0).  A party cure reaches every seated
+    -- member, so one Reflect bearer turns its share into the enemy's heal:
+    -- with one seated, the cure goes single-target to members without it,
+    -- and the bag serves the rest.
+    local reflectSeated = nil
+    for e = 0, 3 do
+      if maxOf(e) > 0 and hpNow[e] > 0 and (M.readByte(0x3EF8 + e * 2) & 0x80) ~= 0 then
+        reflectSeated = reflectSeated or e
+      end
+    end
+    if cureRow ~= nil and #cands >= 2 and reflectSeated ~= nil and zombieSeated == nil then
+      local said = string.format("[%s] actor=%d no party cure: entity %d wears Reflect and a "
+        .. "cure that reaches it bounces onto the enemy", self.tag or "fight", actor, reflectSeated)
+      if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+    end
     -- STRAGO's Pearl Wind (#388, opts.strago.pearlWind): his party heal, as
     -- much HP to each member as he has standing, for no boost, ahead of a
     -- boosted party cure when he is the one deciding and stands above half
@@ -13529,7 +13550,8 @@ function Driver:makePlanRules(actor)
                          reason = "party_hurt_lore" }, "Pearl Wind")
       end
     end
-    if cureRow ~= nil and #cands >= 2 and zombieSeated == nil and not self:tranceDue(actor) then
+    if cureRow ~= nil and #cands >= 2 and zombieSeated == nil and reflectSeated == nil
+       and not self:tranceDue(actor) then
       local spell = (type(self.opts.cure) == "table" and self.opts.cure or BATTLE.CURES)[1]
       local cell, cellMp = spellCell(actor, spell, true)
       local bank = M.readByte(BATTLE.BP + actor * 2)
@@ -13612,6 +13634,14 @@ function Driver:makePlanRules(actor)
               .. "(%d of %d, floor %d): $%02X would breach it -- the bag instead",
               self.tag or "fight", actor, M.readWord(BATTLE.CURMP + actor * 2),
               M.readWord(BATTLE.MAXMP + actor * 2), floorMp, spell)
+            if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+            cell = nil
+          end
+          if cell ~= nil and (M.readByte(0x3EF8 + c.e * 2) & 0x80) ~= 0 and M.spellReflectable(spell) then
+            -- a cure on a Reflect bearer bounces onto the enemy (the party cure's note above): the bag instead
+            local said = string.format("[%s] actor=%d no cure on entity %d (%d/%d): it wears Reflect and "
+              .. "$%02X would bounce onto the enemy -- the bag instead", self.tag or "fight", actor, c.e, c.hp,
+              c.maxhp, spell)
             if said ~= self.healSaid then self.healSaid = said; M.log(said) end
             cell = nil
           end
