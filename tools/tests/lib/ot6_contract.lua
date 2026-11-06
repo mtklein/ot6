@@ -2650,6 +2650,81 @@ M.contracts["wor-kt-doom-v1"] = {
   },
 }
 
+-- The switches every tower save after Doom's holds (wor-kt-doom-v1's) and
+-- `more`, a fresh list for each contract below
+M.ktAfterDoom = function(more)
+  local t = {}
+  for _, sw in ipairs(M.contracts["wor-kt-doom-v1"].switches) do t[#t + 1] = sw end
+  for _, sw in ipairs(more) do t[#t + 1] = sw end
+  return t
+end
+
+-- wor-kt-poltergeist-v1: Kefka's Tower, 412's save point (82,47), after
+-- the Poltergeist (event battle 100: $0074, _cc174f): party 2 walking there
+-- (from 337 (8,6), north through the chamber); party 1 on the chamber's east
+-- plate, party 3 on Doom's save point as wor-kt-doom-v1 left them
+-- (docs/design/route-wor-kefka-tower.md sections 2 and 5).  No timer.
+M.contracts["wor-kt-poltergeist-v1"] = {
+  slot = 3,
+  field = { map = 412, x = 82, y = 47 },
+  switches = M.ktAfterDoom({
+    { 0x0074, 1, "the Poltergeist beaten (_cc174f)" },
+  }),
+  party = M.contracts["wor-kt-factory-v1"].party,
+  parties = { [1] = { map = 355, x = 43, y = 6 }, [3] = { map = 355, x = 64, y = 11 } },
+  walking = 2,
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
+-- wor-kt-goddess-v1: Kefka's Tower, the Goddess's save point, map 354
+-- (12,31), after the Goddess (event battle 99: $0073, _cc1716): party 1
+-- walking there, party 2 on 412's save point, party 3 on Doom's (docs/design/
+-- route-wor-kefka-tower.md sections 2 and 5).  No timer.
+M.contracts["wor-kt-goddess-v1"] = {
+  slot = 3,
+  field = { map = 354, x = 12, y = 31 },
+  switches = M.ktAfterDoom({
+    { 0x0074, 1, "the Poltergeist beaten (_cc174f)" },
+    { 0x0073, 1, "the Goddess beaten (_cc1716)" },
+  }),
+  party = M.contracts["wor-kt-factory-v1"].party,
+  parties = { [2] = { map = 412, x = 82, y = 47 }, [3] = { map = 355, x = 64, y = 11 } },
+  walking = 1,
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
+-- wor-kt-plates-v1: Kefka's Tower, 412's save point (82,47) again, the
+-- three statues beaten, party 1 on 411's right plate (115,42) and party 3 on
+-- its left (103,43), each holding its bit (_cc193f: $02C6, $02CE; only the
+-- tower's exit, _cc0f7d, clears them), party 2 walking on the save point,
+-- its bit ($02CA) clear: the third party's step onto the middle plate starts
+-- FinalBattle (#274), and Kefka's fight boots from here (docs/design/
+-- route-wor-kefka-tower.md sections 2 and 5).  No timer.
+M.contracts["wor-kt-plates-v1"] = {
+  slot = 3,
+  field = { map = 412, x = 82, y = 47 },
+  switches = M.ktAfterDoom({
+    { 0x0074, 1, "the Poltergeist beaten (_cc174f)" },
+    { 0x0073, 1, "the Goddess beaten (_cc1716)" },
+    { 0x02C6, 1, "party 1 on a plate of 411 (_cc193f)" },
+    { 0x02CE, 1, "party 3 on a plate of 411 (_cc193f)" },
+    { 0x02CA, 0, "party 2 not yet on a plate of 411: its step starts FinalBattle" },
+  }),
+  party = M.contracts["wor-kt-factory-v1"].party,
+  parties = { [1] = { map = 411, x = 115, y = 42 }, [3] = { map = 411, x = 103, y = 43 } },
+  walking = 2,
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- wor-dino-v1: the World of Ruin map, on foot on the Falcon's tile by the
 -- dinosaur forest north of Gau's father's house (195,46), after the grind
 -- there (world group 54) until the four stood at Kefka's Tower's target
