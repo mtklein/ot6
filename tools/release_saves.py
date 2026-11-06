@@ -99,6 +99,7 @@ TITLES = {
     "wor-kt-inferno-v1": "Kefka's Tower, the factory's save point (after Inferno)",
     "wor-kt-atma-v1": "Kefka's Tower, behind Atma",
     "wor-kt-guardian-v1": "Kefka's Tower, behind Guardian (before the statues)",
+    "wor-kt-doom-v1": "Kefka's Tower, after Doom",
 }
 
 README = """\
