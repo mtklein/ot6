@@ -269,6 +269,32 @@ of 11 won where it was reached, 2 deaths, 8 distinct keys, 5,474-8,738 ticks
 (`skull1`; the twelfth run is `inf5`'s Inferno loss, key be5C, replayed:
 the labs share the leg's play up to the boss).
 
+**Guardian** (battle 140; party 2 from the chamber's middle): 11 of 11
+won where reached, 0 deaths, 8 distinct keys, 6,400-7,185 ticks (`guard1`,
+the whole first half of the tower played in front of it from
+`wor-desert-v1`, probe `c3`).
+
+**The statues are the tower's hard fights** (`stat1`, the same play on to
+each lane's statue; `bosstally.py`, `stat1_tally.txt`):
+
+| boss | party | met | won | lost | distinct keys | deaths | ticks |
+|---|---|---|---|---|---|---|---|
+| Poltergeist (battle 100) | 2 (CELES, STRAGO, LOCKE, MOG) | 11 | 6 | 5 | 9 | 23 in the six won | 23,339-32,977 won |
+| Doom (battle 98) | 3 (CYAN, SHADOW, SABIN, GOGO) | 6 | 3 | 3 | 4 | 15 in the five with an outcome line | 11,261-17,485 won |
+| Goddess (battle 99) | 1 (TERRA, RELM, EDGAR, SETZER) | 3 | 1 | 2 | 3 | 5 in the two with an outcome line | 10,634 won |
+
+A run ends at its first loss, so each statue is met only where the ones
+before it were won. The tally counts outcome lines ("Poltrgeist: won 6,
+lost 1; distinct keys 6; deaths 23; ticks 19920-32977"; "Doom: won 3, lost
+2"; "Goddess: won 1, lost 1"); the other losses are wipes the game ended
+before an outcome line, read from each run's wipe context ("the last battle
+up (f204180) was formation 0129 ... a6:0/5691 bp1 a7:727/3975 bp0 a1:0/2766
+bp2 a10:0/2533"; Doom's "formation 0127", the Goddess's "formation 0128").
+The Poltergeist is attrition (three or four deaths in every win,
+23,000-33,000 ticks) and a coin flip; Doom is a coin flip (N. Cross freezes
+two members, "entity 2 char 5 is under FROZEN"; SHADOW "died holding 5
+BP"); the Goddess won once in three. These are labs before the statues join the line (section 8).
+
 **Why the Ribbon moves.** With the three Ribbons as the line wore them
 (TERRA's, CYAN's, SHADOW's), party 2 had none, and on its first map three
 Evil Oscars' Sour Mouth (Dark, Poison, Imp, Mute, Muddle, Sleep) wiped it
@@ -341,4 +367,25 @@ ACTION from >= 80%)").
 
 ## 8. Not done
 
-(Filled in at the end of the arc's work.)
+- **The statues.** Routed and walked (probe `st1`, `stat1`): party 2 from
+  Guardian back to the chamber, through its south door to 337 (8,6) (the
+  cell doors), north again, 287, the Ribbon (334 (29,29)), the Poltergeist,
+  412; party 3 the west lane (the west cell's door, 355's west column, 291's
+  west room) to Doom; party 1 the east lane to the Goddess. Each is a coin
+  flip for its party (section 6). Levers to measure next: the lane each
+  party takes (it follows the order the weights fall; with SETZER and GOGO
+  swapped between parties 1 and 3, party 3 would hold the brush and cards
+  and party 1 could take the west column, so TERRA's party would meet Doom),
+  the bench's levels by then (the tower's randoms pay 2,800-5,800 a member),
+  the statues' shield counts (10, 8, 8), and the driver's choices against
+  them (Doom's N. Cross; the Poltergeist absorbs fire and wind).
+- **The convergence.** 411's three end plates (`_cc193f`): two parties on
+  their plates, the third's step runs `FinalBattle`, which is #274's. The
+  last cut of this arc would be the third party on 412's save point with
+  the other two on their plates.
+- **The legs after the factory on the graph.** `gen_wor_kt_inferno`,
+  `gen_wor_kt_atma` and `gen_wor_kt_guardian` are written and their play is
+  the labs' (sections 6, 7); each joins the graph once the leg before it has
+  a capture on this ROM.
+- **The Gauntlet and the Nutkin Suit** (296, off 339's foot) are left on the
+  middle path; a branch leg could fetch them.
