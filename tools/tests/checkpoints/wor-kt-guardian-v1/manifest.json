@@ -1,0 +1,15 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-kt-guardian.sram",
+  "slot": 3,
+  "milestone": "wor-kt-guardian",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 291,
+      "x": 12,
+      "y": 12
+    }
+  }
+}
