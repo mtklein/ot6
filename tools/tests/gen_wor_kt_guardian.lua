@@ -43,21 +43,16 @@ local map, sw, settled, say, watches = K.map, K.sw, K.settled, K.say, K.watches
 local T = H.kefkaTowerKit(K, FIGHT)
 local walk, door, chest = T.walk, T.door, T.chest
 
--- a boss touched as an NPC: from two tiles below it, the care, absorb-safe arms, the talk, the fight
-local function npcBoss(x, y, species, mapId, what)
+-- a boss touched as an NPC: from two tiles below it, the care, absorb-safe arms, the talk and the fight until its
+-- show-switch reads clear (the dragon's event clears it after the fight: _cc18d9 $06B3, _cc1906 $06B4; lib
+-- T.touchBoss: a random battle can open on the talk's step)
+local function npcBoss(x, y, species, mapId, shown, what)
   return H.seqStep({
     walk(x, y + 2, what .. ": two tiles below it"),
     H.absorbSafeArms(nil, { species }, { tag = "arms for " .. what }),
     H.fieldCare({ threshold = 1.0, tag = "before " .. what }),
     H.call(function() say("boss", "before " .. what) end),
-    H.lazy(function()
-      local o = K.objOn(x, y)
-      H.assertEq(o ~= nil, true, string.format("%s's object stands on %d (%d,%d)", what, mapId, x, y))
-      return H.talkToObj(o, what, nil, function() return H.battleLoadStarted() end)
-    end),
-    H.advanceStory(function() return not H.battleLoadStarted() and map() == mapId and settled() end, 300000,
-      { playBattles = "tactical", fight = BOSS_FIGHT }),
-    H.call(function() say("boss", what .. " beaten") end),
+    T.touchBoss(x, y, mapId, function() return sw(shown) == 0 end, what, BOSS_FIGHT),
   })
 end
 -- a weight in a chamber cell: facing down, A, until its switch reads set
@@ -102,7 +97,7 @@ H.run({ maxFrames = 3000000 }, {
   H.call(function() say("route", "the door (334 (30,50)) opened for party 1 ($007F)") end),
   door(37, 51, 293, "party 3: 334 (37,51) -> 293 (52,14)"),
   door(52, 2, 354, "party 3: 293 (52,2) -> 354 (82,42)"),
-  npcBoss(82, 33, SKULL, 354, "the Skull Dragon (354 NPC_2)"),
+  npcBoss(82, 33, SKULL, 354, 0x06B4, "the Skull Dragon (354 NPC_2)"),
   door(63, 41, 337, "party 3: 354 (63,41) -> 337 (11,27)"),
   walk(12, 12, "party 3 onto the east plate (337 (12,12))"),
   H.waitUntil(function() return sw(0x02CC) == 1 and settled() end, 1200, "the east plate held ($02CC)", 1),
@@ -123,7 +118,7 @@ H.run({ maxFrames = 3000000 }, {
   door(90, 7, 334, "party 2: 292 (90,7) -> 334 (18,50)"),
   door(23, 47, 294, "party 2: 334 (23,47) -> 294 (52,14)"),
   door(52, 2, 335, "party 2: 294 (52,2) -> 335 (82,42)"),
-  npcBoss(82, 33, GOLD, 335, "the Gold Dragon (335 NPC_1)"),
+  npcBoss(82, 33, GOLD, 335, 0x06B3, "the Gold Dragon (335 NPC_1)"),
   door(77, 31, 354, "party 2: 335 (77,31) -> 354 (51,44)"),
   door(55, 41, 337, "party 2: 354 (55,41) -> 337 (5,27)"),
   walk(4, 12, "party 2 onto the west plate (337 (4,12))"),

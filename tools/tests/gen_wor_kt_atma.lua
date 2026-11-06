@@ -56,9 +56,7 @@ H.run({ maxFrames = 1200000 }, {
   H.absorbSafeArms(nil, { ATMA }, { tag = "arms for Atma" }),
   H.fieldCare({ threshold = 1.0, tag = "before Atma" }),
   H.call(function() say("boss", "party 2 before Atma") end),
-  H.talkToObj(0x10, "Atma (331 NPC_1)", nil, function() return H.battleLoadStarted() end),
-  H.advanceStory(function() return not H.battleLoadStarted() and map() == MAP_331 and settled() end, 300000,
-    { playBattles = "tactical", fight = BOSS_FIGHT }),
+  T.touchBoss(76, 51, MAP_331, function() return sw(0x06BE) == 1 end, "Atma (331 NPC_1)", BOSS_FIGHT),
   H.call(function()
     H.assertEq(sw(0x06BE), 1, "Atma beaten: the save point behind him shown ($06BE, _cc18b4)")
     say("boss", "Atma beaten")

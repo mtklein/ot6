@@ -11514,6 +11514,28 @@ function M.kefkaTowerKit(K, fight)
       M.call(function() K.say("route", what) end),
     })
   end
+  -- a boss the party touches (an NPC standing on (x, y) of map mapId): the talk and the fight, until done() reads
+  -- true.  A random battle can open on the step the talk takes (gen_wor_kt_atma's first graph play: "battle $1AA
+  -- WON ... killed s0:$007 s1:$007 s2:$00D" in place of Atma, the talk's wait satisfied by it), so the talk is made
+  -- again while the boss still stands, at most four times.
+  function T.touchBoss(x, y, mapId, done, what, bossFight, tries)
+    tries = tries or 0
+    return M.lazy(function()
+      if done() then return M.call(function() K.say("boss", what .. " beaten") end) end
+      M.assertEq(tries < 4, true, what .. ": the talk opened its fight within four tries")
+      local o = nil
+      for ob = 0x10, 0x3F do
+        if M.objX(ob) == x and M.objY(ob) == y then o = ob; break end
+      end
+      M.assertEq(o ~= nil, true, string.format("%s's object stands on %d (%d,%d)", what, mapId, x, y))
+      return M.seqStep({
+        M.talkToObj(o, what, nil, function() return M.battleLoadStarted() end),
+        M.advanceStory(function() return not M.battleLoadStarted() and K.map() == mapId and K.settled() end, 300000,
+          { playBattles = "tactical", fight = bossFight }),
+        T.touchBoss(x, y, mapId, done, what, bossFight, tries + 1),
+      })
+    end)
+  end
   function T.chest(cx, cy, bit, what)
     return M.lazy(function()
       if M.chestOpen(bit) then return M.logStep(string.format("[chest] %s: already open", what)) end
