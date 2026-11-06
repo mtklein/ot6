@@ -435,7 +435,7 @@ won 8, lost 1" (`tally_s6.txt`).
   no rise inside the watch", `v039-kefka-tower-2/a4/pwt50_polt_k0_s0`); the
   driver now casts no cure on a member under Reflect and no party cure
   while one is seated ("no party cure: entity 1 wears Reflect and a cure
-  that reaches it bounces onto the enemy", 32 times in `p1/w2_*`), and the
+  that reaches it bounces onto the enemy", 22 times in `p1/w2_*` (its party-cure lines; 32 counting the single-target ones)), and the
   bag serves them.
 - **The Stop is still the killer where it lands on an unringed member.**
   `p2/w2b_polt_k0_s1` (key be9C): LOCKE stopped at f+435, Blaster at
@@ -480,12 +480,12 @@ lap battles 201, deaths before the statue 115" (`tally_g354.txt`). The
 element dress now goes on (the care revives first, with Life where the
 split's reserve holds the Fenix Downs), and nobody wiped training.
 
-Six of the eighteen failed at the save's assert, not the fight: her
+Nine of the eighteen failed at the save's assert, not the fight: her
 Overcast turns a member who falls into a Zombie, and the field menu refuses
 Revivify on one ("c9 0/3230 hp: zombie: revivify 57 in the bag, floor 0,
 refused", `p2/g355_goddess_k0_s0`). The leg now meets one battle on her
 floor while a Zombie stands, where the driver's Revivify cures it:
-`p3/g355z` 6 of 6 PASS (the same keys as `g355`'s K 0 and 3, shifts 0 and
+`p3/g355z` 6 of 6 PASS (K 0, 3 and 6 by shifts 0 and
 2). The lane is 355's: fewer deaths on the lap. A tuning note: about four
 deaths a run on the lap (81 in 206 battles) is heavy Fenix use for random
 battles; EDGAR and SETZER come to it at L41-42 beside TERRA L66.

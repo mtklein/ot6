@@ -11135,8 +11135,10 @@ function Driver:raceCandidates(actor, st)
             what = string.format("item $%02X on entity %d", h.id, e) }
         end
       end
+      -- a cure on a Reflect bearer bounces onto the enemy: the rules refuse it (makePlanRules), and so does the race
+      local reflects = (M.readByte(0x3EF8 + e * 2) & 0x80) ~= 0
       for _, h in ipairs(a.heals or {}) do
-        if h.cast and st.careCasts then
+        if h.cast and st.careCasts and not (reflects and M.spellReflectable(h.spell)) then
           c[#c + 1] = { kind = "heal", target = e, restore = h.restore, cost = h.cost, spell = h.spell,
             mp = h.mp,
             what = string.format("cast $%02X on entity %d", h.spell, e) }
