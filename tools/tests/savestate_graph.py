@@ -1309,6 +1309,14 @@ STATES = [
     S("wor_kt_atma", gen="gen_wor_kt_atma", prev="wor_kt_inferno",
       checkpoint="wor-kt-inferno-v1", timeout=7200),
 
+    # wor-kt-inferno-v1 -> 296, a branch beside wor_kt_atma: party 3 out of
+    # the factory's hall to its west column, round by 334's east side to
+    # 339's foot and the dead end 296, and the two chests there (the Nutkin
+    # Suit, the Gauntlet) that the middle path leaves
+    # (docs/design/route-wor-kefka-tower.md section 5).  Nothing boots it.
+    S("wor_kt_gauntlet", gen="gen_wor_kt_gauntlet", prev="wor_kt_inferno",
+      checkpoint="wor-kt-inferno-v1"),
+
     # wor-kt-atma-v1 -> Guardian's save point, map 291 (12,12): party 3 to
     # the Skull Dragon and the east plate, party 2 to the Gold Dragon and the
     # west plate, party 1's lane to the chamber, the weights and the
