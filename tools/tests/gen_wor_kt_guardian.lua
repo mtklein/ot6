@@ -31,6 +31,7 @@ local function ward(ch, item, what)
       if H.readByte(0x1600 + 37 * ch + 0x1F + s) == item then return H.logStep("[ward] " .. what .. ": worn already") end
     end
     if H.invCountOf(item) < 1 then return H.logStep("[ward] " .. what .. ": none in the bag") end
+    H.assertEq(H.relicMenuRefuses(ch), false, what .. ": the wearer stands (the Relic menu refuses a fallen member)")
     local slot = KEEP_RELIC[H.readByte(0x1600 + 37 * ch + 0x23)] and 5 or 4
     return H.seqStep({
       H.keepGear(ch, what, H.equipKit(ch, { { slot, item } }, { tag = what })),
@@ -232,6 +233,9 @@ H.run({ maxFrames = 3000000 }, {
   -- Memento Ring (a Death guard; RELM and SHADOW wear it) on RELM against the Sky Base's Doom, L.5 Doom and Blaster
   -- in 352.  The arms one at a time (route-wor-kefka-tower.md 7.5): the back row was already set for both; the
   -- Barrier Rings 20 of 24; with the Memento Ring 22 of 24, formation 413 "met 17, won 17"
+  -- the care first: the training can end on a battle a member fell in, and the Relic menu refuses a fallen member
+  -- (final/leg_s14: "EDGAR L40 0/2543", then "equip options: 4 A presses on the target were not taken")
+  H.fieldCare({ threshold = 1.0, tag = "party 1 after its training" }),
   ward(EDGAR, BARRIER_RING, "a Barrier Ring on EDGAR"),
   ward(SETZER, BARRIER_RING, "a Barrier Ring on SETZER"),
   ward(RELM, MEMENTO_RING, "the Memento Ring on RELM"),
