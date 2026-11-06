@@ -11441,6 +11441,18 @@ function M.kefkaTowerKit(K, fight)
     [303] = { { 7, 16, "down", 7, 19 }, { 12, 19, "up", 12, 16 } },
     [287] = { { 36, 28, "down", 36, 30 } },
   }
+  -- the exits that lead to another part of the same map (route_data's same-map links), entered from any side
+  for m, exits in pairs({
+    [354] = { { 87, 31, 67, 44 }, { 67, 45, 87, 32 } },
+    [338] = { { 5, 52, 58, 33 }, { 58, 34, 5, 54 } },
+  }) do
+    T.links[m] = T.links[m] or {}
+    for _, e in ipairs(exits) do
+      for _, d in ipairs({ "up", "down", "left", "right" }) do
+        T.links[m][#T.links[m] + 1] = { e[1], e[2], d, e[3], e[4] }
+      end
+    end
+  end
   T.avoid = {
     [334] = { { 6, 21 }, { 7, 20 }, { 16, 44 }, { 11, 45 }, { 55, 28 }, { 56, 24 }, { 34, 50 }, { 39, 42 } },
     [410] = { { 31, 18 } },                          -- Inferno's trigger (_cc1872)

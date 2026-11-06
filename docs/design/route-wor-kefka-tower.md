@@ -243,6 +243,18 @@ chip(s) on slot 1's 1 shield(s)").
 spread `atma1` won it in all 11 runs that reached it. A save point stands
 behind him, so the line fights him: a player meets him on party 2's way.
 
+**The Gold Dragon** (battle 135, map 335; party 2 after Atma, the hole, 409,
+334's south-west, the 292 switch and its Ribbon): 12 of 12 won, 0 deaths,
+8 distinct keys, 3,680-3,880 ticks (`gold1`). Short: party 2 holds both its
+keys (CELES's blade, MOG's spear) and STRAGO's Aqua Rake its water
+weakness. A tuning note: it may be too easy for an eighth dragon.
+
+**The Skull Dragon** (battle 136, map 354; party 3 after Inferno, 293, the
+sparkle that opens party 1's door, the Rainbow Brsh and the Megalixir): 11
+of 11 won where it was reached, 2 deaths, 8 distinct keys, 5,474-8,738 ticks
+(`skull1`; the twelfth run is `inf5`'s Inferno loss, key be5C, replayed:
+the labs share the leg's play up to the boss).
+
 **Why the Ribbon moves.** With the three Ribbons as the line wore them
 (TERRA's, CYAN's, SHADOW's), party 2 had none, and on its first map three
 Evil Oscars' Sour Mouth (Dark, Poison, Imp, Mute, Muddle, Sleep) wiped it
