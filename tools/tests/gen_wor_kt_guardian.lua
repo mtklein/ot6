@@ -164,6 +164,10 @@ H.run({ maxFrames = 3000000 }, {
   chest(5, 51, 0x0DA, "Force Armor (334 (5,51))"),
   door(17, 50, 292, "party 2: 334 (17,50) -> 292 (89,7)"),
   chest(89, 12, 0x0D8, "Ribbon (292 (89,12))"),
+  -- on at once, as a player does: party 2 wore one, and three Innocs muddled CELES and LOCKE into killing themselves
+  -- and MOG in the chamber (hall5/ult_k0_s8: "entity 0 char 6 from 5539/5539 by entity 0 char 6 ... (a MUDDLED
+  -- member's action)")
+  H.ribbonsOnSeated({ tag = "the 292 Ribbon onto party 2", noRegroup = true }),
   walk(87, 12, "party 2 onto the switch (292 (87,12)): party 1's passage"),
   H.waitUntil(function() return sw(0x0062) == 1 and settled() end, 1200, "the passage opened ($0062)", 1),
   door(90, 7, 334, "party 2: 292 (90,7) -> 334 (18,50)"),
