@@ -28,9 +28,18 @@ into `ff6/src/event/event_main.asm` unless a file is named.
    Guardian `$112`; battle 76, the only other group that deals it, is never
    called. `$112` gets a real row; the World of Balance's `$111` (battle 75)
    stays without a gauge.
-4. **Party 3's walk to the factory works end to end** (section 5): from the
-   landing, past the crane tile, into 339 from its top door, the factory,
-   the hop, and the save point beside Inferno.
+4. **The line plays the tower to Guardian's save point** on the graph, four
+   cuts (section 5): the factory, Inferno, Atma, Guardian; the Gold and
+   Skull Dragons on the way. Inferno, Atma, both dragons and Guardian are
+   not coin flips (8 of 8 or 11 of 12 and better across draws, section 6).
+5. **The chamber's columns set the lanes**: the order the weights fall puts
+   party 1 east (the Goddess), party 3 west (Doom), party 2 the middle
+   (Guardian, the Poltergeist).
+6. **The three statues are coin flips** for the parties that reach them
+   (the Poltergeist 6 of 11, Doom 3 of 6, the Goddess 1 of 3): the next
+   labs, before they join the line.
+7. **A Ribbon in every party.** The line arrives with three, two of them in
+   party 3; party 2, with none, wiped to the Evil Oscars' Sour Mouth.
 
 ## 1. Into the tower
 
@@ -365,6 +374,47 @@ CYAN +16032, SHADOW +16032, SABIN +6300, GOGO +16032; spent $F0 x2". SABIN
 f+2227 entity 2 char 5 from 2552/2552 by slot 0 cmd $0C atk $94 (ONE
 ACTION from >= 80%)").
 
+### 7.3 The graph's own play, sweeps and negatives
+
+**The line on this ROM** (px13, `graph/line.log`, `graph/graph2.log`): the
+rows move the line's play from power-on (a ROM change reshuffles every
+draw): the graph's `wor-desert-v1` is 5bc1ce44, "366 byte(s) differ" from
+main's tracked save ("SABIN level: fresh 38, tracked 39", "CELES level:
+fresh 62, tracked 63"). The tower's four legs then play on the graph
+(`graph2.log`): "generate wor_kt_inferno ... PASS (frame 12893)
+attempts=1/3", "generate wor_kt_atma ... PASS (frame 23000) attempts=1/3",
+"generate wor_kt_guardian ... PASS (frame 99903) attempts=1/3" (the factory
+"PASS (frame 36814) attempts=1/3", `chain.log`), and "checkpoint drift
+wor-kt-factory-v1: none", "... wor-kt-inferno-v1: none", "...
+wor-kt-atma-v1: none", "... wor-kt-guardian-v1: none". The first plays
+found two defects, fixed in the library: a random battle opened on the
+step Atma's talk took, so the leg went on without him (`T.touchBoss` talks
+again while the boss stands); and Inferno's trigger, kept off the walks
+while he stood, kept party 3 on the factory's save point after him.
+
+The bench by Guardian's save (`audit_levels.txt`): EDGAR 34 -> 36, SETZER
+33 -> 35, LOCKE 41 -> 42, SABIN 39 -> 40, MOG 39 -> 40, GOGO 45 -> 46.
+
+**Sweeps from the graph's captures** (`sweep/`, each leg from the capture
+before it, seed shifts 0, 1, 4, 5, 8, 9, 12, 13, one attempt each;
+`sweep_tally.txt`): `gen_wor_kt_factory` 8 of 8, `gen_wor_kt_inferno` 8 of 8
+("Inferno: won 8, lost 0; distinct keys 8; deaths 7"), `gen_wor_kt_atma` 8
+of 8, `gen_wor_kt_guardian` 6 of 8 ("Skull Drgn: won 8 ... Gold Drgn: won 8
+... Guardian: won 6, lost 0; distinct keys 6"). Both losses were party 1 in
+the machines' hall (352), formation 413, Sky Base with four IronHitmen
+("formation 00FC FFFF 00FD 00FD 00FD 00FD; seats ... a0:0/5535 bp0 a8:0/5475
+bp1 a4:0/2008 bp1 a9:1611/1902"): the line retries a wipe from the leg's
+boot, but two in eight is a lab (section 8).
+
+**Negatives** (#480; `negs.log`, lab batteries from the graph's captures,
+`make_negative.py`): SABIN unrecruited, "[deps] recruited mask $BFDF;
+missing: SABIN" and "assertEq failed: every member the tower's seating names
+is recruited"; 1,000 GP, "gil for a top-up at Kohlingen: 1000 GP, the floor
+60000"; Inferno marked beaten in the factory's save, "contract
+wor-kt-factory-v1 (entry) VIOLATED ... switch $00BD (Inferno not yet fought
+(_cc1872)): expected 0, read 1". The positive is the graph's play:
+"[deps] recruited mask $BFFF; missing: none".
+
 ## 8. Not done
 
 - **The statues.** Routed and walked (probe `st1`, `stat1`): party 2 from
@@ -390,9 +440,8 @@ ACTION from >= 80%)").
   their plates, the third's step runs `FinalBattle`, which is #274's. The
   last cut of this arc would be the third party on 412's save point with
   the other two on their plates.
-- **The legs after the factory on the graph.** `gen_wor_kt_inferno`,
-  `gen_wor_kt_atma` and `gen_wor_kt_guardian` are written and their play is
-  the labs' (sections 6, 7); each joins the graph once the leg before it has
-  a capture on this ROM.
+- **The machines' hall for party 1.** Formation 413 (Sky Base, four
+  IronHitmen) in 352 wiped party 1 in 2 of 8 sweeps of `gen_wor_kt_guardian`
+  (7.3).
 - **The Gauntlet and the Nutkin Suit** (296, off 339's foot) are left on the
   middle path; a branch leg could fetch them.
