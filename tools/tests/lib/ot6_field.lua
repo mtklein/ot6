@@ -11460,7 +11460,13 @@ function M.kefkaTowerKit(K, fight)
     [287] = { { 36, 29 } },
   }
   local function L() return T.links[K.map()] or {} end
-  local function A() return T.avoid[K.map()] end
+  -- Inferno's trigger is kept off only while he stands ($00BD, _cc1872): after him the walk west from the save
+  -- point crosses it (gen_wor_kt_guardian's first play: "neither the exit (29,28) nor a side of it is reachable
+  -- from (37,17)")
+  local function A()
+    if K.map() == 410 and K.sw(0x00BD) == 1 then return {} end
+    return T.avoid[K.map()]
+  end
   function T.walk(x, y, what, arrive)
     return M.seqStep({
       M.lazy(function()
