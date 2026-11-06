@@ -61,6 +61,48 @@ local function stoneFor()
   end
   return nil
 end
+-- a Ribbon in every party (guidelines: Ribbons are worth going out of one's way for).  The three the line holds
+-- are worn by TERRA, CYAN and SHADOW, which seats two in party 3 and none in party 2, and party 2's first map
+-- deals the Evil Oscar's Sour Mouth (Dark, Poison, Imp, Mute, Muddle, Sleep): without one it wiped there (lab
+-- atma1/atma_s16: "formation 00B7 00B7 00B7 ... a6:0/5539 ... a1:0/2653 a10:0/2315").  So a party wearing two
+-- hands one over (the Relic menu's Remove, the last wearer in its roster), and the party wearing none puts it on
+-- (ribbonsOnSeated's seat), until no party has none while another has two.
+local RIBBON = 0xCA
+local function ribbonWearers(p)
+  local w = {}
+  for _, ch in ipairs(H.partyRoster(p)) do
+    for s = 4, 5 do
+      if H.readByte(0x1600 + 37 * ch + 0x1F + s) == RIBBON then w[#w + 1] = { ch = ch, slot = s } end
+    end
+  end
+  return w
+end
+local function ribbonsSpread(depth)
+  depth = depth or 0
+  return H.lazy(function()
+    local donor, taker = nil, nil
+    for p = 1, 3 do
+      local n = #ribbonWearers(p)
+      if n >= 2 and donor == nil then donor = p end
+      if n == 0 and taker == nil then taker = p end
+    end
+    if donor == nil or taker == nil or depth >= 3 then
+      return H.logStep(string.format("[ribbons] Ribbons by party: %d, %d, %d", #ribbonWearers(1), #ribbonWearers(2),
+        #ribbonWearers(3)))
+    end
+    local w = ribbonWearers(donor)
+    local give = w[#w]
+    H.log(string.format("[ribbons] party %d wears %d, party %d none: %s hands slot %d's Ribbon over", donor, #w, taker,
+      NAMES[give.ch], give.slot))
+    return H.seqStep({
+      H.switchParty(donor, { tag = "Ribbon from party " .. donor }),
+      H.unequipRelics(give.ch, { give.slot }, { tag = "Ribbon off " .. NAMES[give.ch] }),
+      H.switchParty(taker, { tag = "Ribbon to party " .. taker }),
+      H.ribbonsOnSeated({ tag = "the Ribbon onto party " .. taker }),
+      ribbonsSpread(depth + 1),
+    })
+  end)
+end
 local function dressParty(p)
   local steps = { H.switchParty(p, { tag = "dress party " .. p }) }
   for i = 1, 4 do
@@ -140,6 +182,7 @@ H.run({ maxFrames = 2400000 }, {
   end),
   -- one bag for three parties: party 3 walks first and furthest in this leg
   H.splitBegin({ shares = { [1] = 1, [2] = 1, [3] = 2 } }),
+  ribbonsSpread(),
   dressParty(1),
   dressParty(2),
   dressParty(3),
