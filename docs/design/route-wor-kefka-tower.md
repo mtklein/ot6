@@ -415,6 +415,46 @@ wor-kt-factory-v1 (entry) VIOLATED ... switch $00BD (Inferno not yet fought
 (_cc1872)): expected 0, read 1". The positive is the graph's play:
 "[deps] recruited mask $BFFF; missing: none".
 
+### 7.4 Party 1's lane (the hall labs)
+
+The sweep's two losses (7.3) were party 1 in 352, so `gen_wor_kt_guardian`
+was labbed from the graph's `wor-kt-atma-v1` capture with K = 0, 2, 4
+encounters used up by party 1 by its landing first (`mkburn.py`) x 8 seed
+shifts (`hall*/`, `halltally.py`, `bosstally.py`):
+
+| lab | the leg | runs PASS | formation 428 won | the losses |
+|---|---|---|---|---|
+| `hall` base | as 7.3 | 13 of 24 | - | 428 (Outsiders and a Madam, 304) 7, 413 (Sky Base, IronHitmen, 352) 2, 425, 329 |
+| `hall` new | the Sky Base killed first | 12 of 24 | - | the same: "formation 413 met 9, won 6" against base's "met 9, won 7" |
+| `hall2` | party 1 trained by its landing to L40 | 14 of 24 | 7 of 17 | 428 10; 413 "met 7, won 7" |
+| `hall3` | + the Madam killed first | 12 of 24 | 5 of 17 | every hit on her draws her Meteor: "partyhp=4627,4664,1508,1432 roundcost=1213,1156,1146,1108" |
+| `hall4` | Pearl on the Outsiders (weak to holy) | 12 of 24 | 6 of 17 | 428 11 |
+| `hall4` l45 | Pearl, trained to L45 | 15 of 24 | 8 of 14 | 428 6, the Doom Dragons 2 |
+| `hall5` | Ultima, Pearl, Fire on 428; Ultima on the Doom Dragons; L40 | 22 of 24 | 17 of 17 | three Innocs muddled party 2 in the chamber (its second Ribbon still in the bag); the Doom Dragons |
+| `hall6` | + the 292 Ribbon put on | 28 of 32 | 22 of 22 | ribbonsOnSeated would not move a relic for it ("no seated member can take the bag's Ribbon"): the Innocs 2; the Doom Dragons 2 |
+| `hall7` | + the 292 Ribbon over CELES's Wall Ring (the leg at 8bc55a1a) | 25 of 32 | 23 of 23 | the Doom Dragons (formation 226, 295) 5; formation 413 2 (one key twice) |
+
+`hall7`: the leg itself at shifts 0-15, "leg: 16 runs, 13 PASS"; with K =
+2, 4, "burn: 16 runs, 12 PASS"; the bosses "Skull Drgn: won 32, lost 0",
+"Gold Drgn: won 32, lost 0", "Guardian: won 25, lost 0". The training:
+"party 1 after 23 battles by its landing: TERRA L65, RELM L57, EDGAR L41,
+SETZER L40". The opt `focusFirst` (a kill order held while a species
+stands) went into the driver for the Sky Base and the Madam and out again:
+it helped neither.
+
+The graph's play of this leg (`graph/graph3.log`): "generate wor_kt_guardian
+... PASS (frame 239051) attempts=1/3", "checkpoint drift wor-kt-guardian-v1:
+75 byte(s) differ", re-cut, then "none"; the other three tower keys
+"none".
+
+**What is left on this lane**: the two Doom Dragons in 295 (S. Cross on the
+whole party, then Melt and Mind Slap; 18,008 HP each, 8,500 XP) and the
+Sky Base's Death in 352 wipe party 1 in about one run in five across the
+draws. Levers not yet tried: a Memento Ring (in the bag) or Safety Bit
+against the Sky Base's Death; the back row for EDGAR and SETZER; Shell
+before 295; a different seat for EDGAR and SETZER, the two weakest, on the
+hardest random lane.
+
 ## 8. Not done
 
 - **The statues.** Routed and walked (probe `st1`, `stat1`): party 2 from
