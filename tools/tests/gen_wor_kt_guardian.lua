@@ -25,14 +25,16 @@ local SKULL, GOLD, GUARDIAN = 0x151, 0x150, 0x112
 local VECTAUR, BRONTAUR, OSCAR = 0x080, 0x084, 0x0B7
 local MACHINES = { [0x0FD] = true, [0x0D9] = true, [0x0EA] = true, [0x0ED] = true, [0x0F6] = true, [0x105] = true,
   [0x0FC] = true, [0x0A1] = true }
-local FIRE, ICE, BOLT = 0x00, 0x01, 0x02
+local FIRE, ICE, BOLT, PEARL = 0x00, 0x01, 0x02, 0x0E
+local OUTSIDER = 0x0BD
 local FIGHT = {}
--- the Madam first while she stands: she casts Cure 3 and Life 3 on the Outsiders beside her (formation 428, 304
--- and 354), whose thrown blades took party 1 down while she healed them: with party 1 trained to L40 it still
--- wiped there in 10 of 24 runs (hall2: "wipe in 00BD 00BD FFFF 006A FFFF FFFF"; "entity 1 char 8 from 1106/5820
--- by slot 0 cmd $08 atk $28")
-FIGHT.focusFirst = { [0x06A] = true }
+-- formation 428 (the Madam with two Outsiders, 304 and 354): the Outsiders' thrown blades take a member of the
+-- bench a throw, and the Madam heals and raises them and answers every hit on her with Meteor.  The Outsiders are
+-- weak to holy, so whoever holds Pearl (SETZER's Unicorn) casts it while one stands (hall3: the Madam killed first,
+-- the party took her Meteor on every hit, "partyhp=4627,4664,1508,1432 roundcost=1213,1156,1146,1108", and formation
+-- 428 was won 4 of 12)
 FIGHT.nuke = function()
+  if H.formationHas({ [OUTSIDER] = true }) then return { PEARL } end
   if H.formationHas({ [OSCAR] = true }) then return { FIRE } end
   if H.formationHas(MACHINES) then return { BOLT } end
   if H.formationHas({ [VECTAUR] = true, [BRONTAUR] = true }) then return { ICE } end

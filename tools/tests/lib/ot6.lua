@@ -7990,25 +7990,8 @@ end
 -- The kill order in force: the authored one (opts.focus) where a
 -- generator wrote one, else the one readParts planned from the
 -- formation's own scripts (#189), else nil (the engine's default cursor).
--- The authored kill order: opts.focus as written, else opts.focusFirst ({ [species] = true }), a kill order that
--- holds only while one of those species stands in the formation (Kefka's Tower's Sky Base, whose Death spells and
--- Death counter, and the Madam, who heals and raises the Outsiders beside her: gen_wor_kt_guardian), so every other
--- fight keeps the chip and finish aims.
-function Driver:authoredFocus()
-  if self.opts.focus then return self.opts.focus end
-  local fs = self.opts.focusFirst
-  if fs then
-    for s = 0, 5 do
-      local sp = M.readWord(M.FORMATION + s * 2)
-      if fs[sp] and monAlive(s) then return { { species = sp } } end
-    end
-  end
-  return nil
-end
-
 function Driver:focusList()
-  local authored = self:authoredFocus()
-  if authored then return authored end
+  if self.opts.focus then return self.opts.focus end
   if self.parts then return self.parts.focus end
   -- the last-stand focus holds while a counted counter body stands beside
   -- a plain one (readLastStand, lastStandFocus)
@@ -8151,7 +8134,7 @@ end
 --     choice here, so the tie is left to the engine and nothing churns.
 -- Otherwise the strictly-best slot, lowest on a tie.
 function Driver:chipAim(actor, boost)
-  if self.opts.aim == false or self:authoredFocus() or self.parts then return nil end
+  if self.opts.aim == false or self.opts.focus or self.parts then return nil end
   if self.lastStand and self:focusList() ~= nil then return nil end
   if livingMonsters() < 2 then return nil end
   local best, bestSlot, worst = -1, nil, nil
@@ -14019,7 +14002,7 @@ function Driver:makePlanRules(actor)
              row = cmdRow(actor, BATTLE.CMD_SWDTECH), boostLeft = 0 }
   end
   -- a kill this turn goes ahead of the key on another body (#325)
-  if not (self:authoredFocus() or self.parts or (self.lastStand and self:focusList() ~= nil))
+  if not (self.opts.focus or self.parts or (self.lastStand and self:focusList() ~= nil))
      and cmdRow(actor, BATTLE.CMD_FIGHT) ~= nil then
     local fin = self:finishAim(actor, boost)
     if fin ~= nil then
