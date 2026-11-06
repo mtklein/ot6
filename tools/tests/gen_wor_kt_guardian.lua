@@ -20,6 +20,26 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 local NAMES = H.SPLIT_NAMES
 local CELES, RIBBON, WALL_RING = 6, 0xCA, 0xBB
+local EDGAR, RELM, SETZER = 4, 8, 9
+local BARRIER_RING, MEMENTO_RING = 0xB7, 0xDB
+-- a ward from the bag onto a relic slot that holds no Exp. Egg, Ribbon or Genji Glove (slot 5 when slot 4 does);
+-- a line when the bag holds none
+local KEEP_RELIC = { [0xE4] = true, [0xCA] = true, [0xD1] = true }
+local function ward(ch, item, what)
+  return H.lazy(function()
+    for s = 4, 5 do
+      if H.readByte(0x1600 + 37 * ch + 0x1F + s) == item then return H.logStep("[ward] " .. what .. ": worn already") end
+    end
+    if H.invCountOf(item) < 1 then return H.logStep("[ward] " .. what .. ": none in the bag") end
+    local slot = KEEP_RELIC[H.readByte(0x1600 + 37 * ch + 0x23)] and 5 or 4
+    return H.seqStep({
+      H.keepGear(ch, what, H.equipKit(ch, { { slot, item } }, { tag = what })),
+      H.call(function()
+        H.assertEq(H.readByte(0x1600 + 37 * ch + 0x1F + slot), item, what .. ": on")
+      end),
+    })
+  end)
+end
 local GUARDIAN_SAVE = { 12, 12 }
 local SKULL, GOLD, GUARDIAN = 0x151, 0x150, 0x112
 -- the tower's species whose vanilla weakness a player who knows the tower reads (gen_wor_kt_factory's)
@@ -207,6 +227,14 @@ H.run({ maxFrames = 3000000 }, {
   -- 303, 304 and the machines' hall, wiped it in 11 of 24 runs at EDGAR L34, SETZER L33; the bench under L40 is the
   -- liability, #496), as the owner plays it: the bench levels in the tower
   trainParty1(),
+  -- wards for party 1's lane, from the bag, as a player dresses for it: a Barrier Ring (auto Shell) on EDGAR and
+  -- SETZER, the two with the least HP (S. Cross and Flare Star are magic: MagicProp +2 bit $01 clear), and the
+  -- Memento Ring (a Death guard; RELM and SHADOW wear it) on RELM against the Sky Base's Doom, L.5 Doom and Blaster
+  -- in 352.  The arms one at a time (route-wor-kefka-tower.md 7.5): the back row was already set for both; the
+  -- Barrier Rings 20 of 24; with the Memento Ring 22 of 24, formation 413 "met 17, won 17"
+  ward(EDGAR, BARRIER_RING, "a Barrier Ring on EDGAR"),
+  ward(SETZER, BARRIER_RING, "a Barrier Ring on SETZER"),
+  ward(RELM, MEMENTO_RING, "the Memento Ring on RELM"),
   door(18, 20, 303, "party 1: 334 (18,20) -> 303 (14,14)"),
   door(21, 19, 304, "party 1: 303 (21,19) -> 304 (40,45)"),
   chest(33, 35, 0x0D7, "Fixed Dice (304 (33,35))"),
@@ -214,7 +242,23 @@ H.run({ maxFrames = 3000000 }, {
   door(7, 48, 292, "party 1: 334 (7,48) -> 292 (81,7)"),
   door(85, 19, 352, "party 1: 292 (85,19) -> 352 (3,28)"),
   door(31, 27, 295, "party 1: 352 (31,27) -> 295 (52,57)"),
-  door(57, 55, 334, "party 1: 295 (57,55) -> 334 (27,53)"),
+  -- the two Doom Dragons (formation 226) beat party 1 whatever it wore: 0 of 4 with the rows, 0 of 3 with the
+  -- Barrier Rings, 2 of 4 with the Memento Ring too (gear_rows, gear_shell, gear_death); S. Cross and Flare Star on
+  -- the whole party take the bench.  A player runs from a random the party cannot win (the Brachosaur's precedent,
+  -- route-wor-side-trips.md finding 4); the single Doom Dragon is fought
+  H.navTo(57, 55, { maxFrames = 20000, playBattles = "tactical", fight = FIGHT,
+    fleeSpecies = function()
+      local n = 0
+      for s = 0, 5 do if H.readWord(0x57C0 + s * 2) == DOOM_DRGN then n = n + 1 end end
+      if n >= 2 then
+        H.log("[run] two Doom Dragons in 295: running")
+        return { DOOM_DRGN }
+      end
+      return {}
+    end,
+    arrive = function() return map() == 334 end }),
+  H.waitUntil(function() return map() == 334 and settled() end, 1200, "party 1: 295 (57,55) -> 334 (27,53)", 1),
+  H.call(function() say("route", "party 1: 295 (57,55) -> 334 (27,53)") end),
   chest(23, 41, 0x0DC, "Tack Star (334 (23,41))"),
   door(29, 36, 337, "party 1: 334 (29,36) -> 337 (8,29)"),
   door(8, 11, 355, "party 1: 337 (8,11) -> the chamber, 355 (39,19)"),
