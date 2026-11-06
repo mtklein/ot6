@@ -27,6 +27,11 @@ local MACHINES = { [0x0FD] = true, [0x0D9] = true, [0x0EA] = true, [0x0ED] = tru
   [0x0FC] = true, [0x0A1] = true }
 local FIRE, ICE, BOLT = 0x00, 0x01, 0x02
 local FIGHT = {}
+-- the Madam first while she stands: she casts Cure 3 and Life 3 on the Outsiders beside her (formation 428, 304
+-- and 354), whose thrown blades took party 1 down while she healed them: with party 1 trained to L40 it still
+-- wiped there in 10 of 24 runs (hall2: "wipe in 00BD 00BD FFFF 006A FFFF FFFF"; "entity 1 char 8 from 1106/5820
+-- by slot 0 cmd $08 atk $28")
+FIGHT.focusFirst = { [0x06A] = true }
 FIGHT.nuke = function()
   if H.formationHas({ [OSCAR] = true }) then return { FIRE } end
   if H.formationHas(MACHINES) then return { BOLT } end
