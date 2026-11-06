@@ -11435,10 +11435,17 @@ function M.kefkaTowerKit(K, fight)
     },
     -- the hop at (8,14), entered facing up (_cc1398): a jump through 410 (36,46) to (48,24)
     [410] = { { 8, 14, "up", 48, 24 } },
+    -- the climbs (_cc1803 up 2 facing up, _cc1815 down 2 facing down)
+    [409] = { { 5, 12, "up", 5, 10 }, { 8, 11, "up", 8, 9 }, { 5, 10, "down", 5, 12 }, { 8, 9, "down", 8, 11 } },
+    [355] = { { 64, 10, "up", 64, 8 }, { 64, 8, "down", 64, 10 } },
+    [303] = { { 7, 16, "down", 7, 19 }, { 12, 19, "up", 12, 16 } },
+    [287] = { { 36, 28, "down", 36, 30 } },
   }
   T.avoid = {
     [334] = { { 6, 21 }, { 7, 20 }, { 16, 44 }, { 11, 45 }, { 55, 28 }, { 56, 24 }, { 34, 50 }, { 39, 42 } },
     [410] = { { 31, 18 } },                          -- Inferno's trigger (_cc1872)
+    [303] = { { 7, 18 }, { 12, 17 } },
+    [287] = { { 36, 29 } },
   }
   local function L() return T.links[K.map()] or {} end
   local function A() return T.avoid[K.map()] end
