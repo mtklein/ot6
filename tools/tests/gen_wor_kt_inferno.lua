@@ -38,10 +38,13 @@ H.run({ maxFrames = 1200000 }, {
 
   -- @@stage inferno
   H.splitBegin({ shares = { [1] = 1, [2] = 1, [3] = 2 } }),
+  -- Inferno absorbs fire (SABIN's Fire Knuckle healed it: the absorb guard's refusal, lab inf2): each hand holding
+  -- a weapon one of the three absorbs takes the bag's strongest one none does, as a player re-arms for a known boss
+  H.absorbSafeArms(nil, { INFERNO, STRIKER, ROUGH }, { tag = "arms for Inferno" }),
   H.fieldCare({ threshold = 1.0, tag = "before Inferno" }),
   H.call(function() say("boss", "party 3 before Inferno: " .. H.partiesLine()) end),
   H.navTo(INFERNO_TILE[1], INFERNO_TILE[2], { maxFrames = 6000, playBattles = "tactical", fight = FIGHT,
-    arrive = function() return H.battleLoadStarted() or not H.hasControl() end }),
+    arrive = function() return H.battleLoadStarted() or (H.fieldX() == 31 and H.fieldY() == 18) end }),
   H.advanceStory(function() return sw(0x00BD) == 1 and map() == MAP_FACTORY and settled() end, 300000,
     { playBattles = "tactical", fight = BOSS_FIGHT }),
   H.call(function() say("boss", "Inferno beaten") end),

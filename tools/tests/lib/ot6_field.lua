@@ -11410,3 +11410,104 @@ function M.worLegKit(env)
     pressUp = pressUp, objOn = objOn, kohlingenStop = kohlingenStop,
   }
 end
+
+-- M.kefkaTowerKit(K, fight): Kefka's Tower's walking pieces, for its legs (docs/design/route-wor-kefka-tower.md
+-- sections 1-2), on a worLegKit K (its map, settled and say):
+--   links, avoid  the tower's tile events that carry a party, by map ({ x, y, move, tx, ty }: entering (x, y)
+--                 moving `move` lands on (tx, ty)), and the tiles a walk never steps on;
+--   walk(x, y, what [, arrive])   navLinks over the floor and the links, the avoid tiles kept off;
+--   door(x, y, dst, what)         through an exit to map dst; an exit tile the floor's BFS does not enter (334
+--                                 (48,36): the doorway's own tile reads impassable) is pressed into from beside;
+--   chest(cx, cy, bit, what)      a chest from whichever side of it the party reaches, a line when none is;
+--   reachDump(tx, ty, what)       with the global KT_DEBUG (a lab's), the walking party's reach drawn in the log.
+-- Ladders (_cc1008.._cc1046): one column carries a party the way it was entered, the column beside it pushes a
+-- party entering the wrong way back a tile (avoided).  The six crane tiles of 334 (_cc0fc3/_cc0fd4/_cc0fe5,
+-- _ca03ba/_ca03c9/_ca03d8) ride the party out of the tower on A only, so they are walked over (334 (57,44) is the
+-- only way down the east side) and no chest or talk is made from one.
+function M.kefkaTowerKit(K, fight)
+  local T = {}
+  T.links = {
+    [334] = {
+      { 6, 20, "down", 6, 22 }, { 7, 21, "up", 7, 19 }, { 16, 42, "down", 16, 45 }, { 11, 50, "up", 11, 44 },
+      { 55, 24, "down", 55, 29 }, { 56, 28, "up", 56, 23 }, { 34, 51, "up", 34, 49 }, { 39, 43, "up", 39, 41 },
+    },
+    -- the hop at (8,14), entered facing up (_cc1398): a jump through 410 (36,46) to (48,24)
+    [410] = { { 8, 14, "up", 48, 24 } },
+  }
+  T.avoid = {
+    [334] = { { 6, 21 }, { 7, 20 }, { 16, 44 }, { 11, 45 }, { 55, 28 }, { 56, 24 }, { 34, 50 }, { 39, 42 } },
+    [410] = { { 31, 18 } },                          -- Inferno's trigger (_cc1872)
+  }
+  local function L() return T.links[K.map()] or {} end
+  local function A() return T.avoid[K.map()] end
+  function T.walk(x, y, what, arrive)
+    return M.seqStep({
+      M.lazy(function()
+        return M.navLinks(x, y, L(), { what = what, maxFrames = 12000, playBattles = "tactical", fight = fight,
+          avoid = A(), arrive = arrive })
+      end),
+      M.call(function() K.say("route", what) end),
+    })
+  end
+  function T.reachDump(tx, ty, what)
+    if not rawget(_G, "KT_DEBUG") then return M.call(function() end) end
+    return M.call(function()
+      local set = {}
+      for _, z in ipairs({ false, 0, 1, 2, 3 }) do
+        for k in pairs(M.bfsReach(nil, nil, z or nil, L(), nil, nil, A())) do set[k] = true end
+      end
+      local x0, y0 = M.fieldX(), M.fieldY()
+      M.log(string.format("[reach] %s: map %d from (%d,%d), target (%d,%d) %s", what, K.map(), x0, y0, tx, ty,
+        set[(ty << 8) | tx] and "REACHED" or "not reached"))
+      for y = 0, 63 do
+        local row = {}
+        for x = 0, 95 do
+          row[#row + 1] = (x == x0 and y == y0) and "@" or (x == tx and y == ty) and "X"
+            or set[(y << 8) | x] and "#" or "."
+        end
+        local s = table.concat(row)
+        if s:find("[#@X]") then M.log(string.format("[reach] %2d %s", y, s)) end
+      end
+    end)
+  end
+  local SIDES = { { 0, 1, "up" }, { -1, 0, "right" }, { 1, 0, "left" }, { 0, -1, "down" } }
+  function T.door(x, y, dst, what)
+    local function arrived() return K.map() == dst end
+    return M.seqStep({
+      T.reachDump(x, y, what),
+      M.lazy(function()
+        if M.bfsReach(nil, nil, nil, L(), x, y, A()) then return T.walk(x, y, what, arrived) end
+        for _, o in ipairs(SIDES) do
+          if M.bfsReach(nil, nil, nil, L(), x + o[1], y + o[2], A()) then
+            return M.seqStep({
+              T.walk(x + o[1], y + o[2], what .. ": beside it", arrived),
+              M.driveUntil(arrived, 600, { M.hold({ o[3] }), M.waitFrames(2) }, what .. ": pressing " .. o[3]),
+              M.release(),
+            })
+          end
+        end
+        error(string.format("%s: neither the exit (%d,%d) nor a side of it is reachable from (%d,%d)", what, x, y,
+          M.fieldX(), M.fieldY()), 0)
+      end),
+      M.waitUntil(function() return K.map() == dst and K.settled() end, 1200, what .. ": on map " .. dst, 1),
+      M.call(function() K.say("route", what) end),
+    })
+  end
+  function T.chest(cx, cy, bit, what)
+    return M.lazy(function()
+      if M.chestOpen(bit) then return M.logStep(string.format("[chest] %s: already open", what)) end
+      for _, o in ipairs(SIDES) do
+        if M.bfsReach(nil, nil, nil, L(), cx + o[1], cy + o[2], A()) then
+          return M.seqStep({
+            T.walk(cx + o[1], cy + o[2], what .. ": beside it"),
+            M.openChest({ stand = { cx + o[1], cy + o[2] }, face = o[3], bit = bit, what = what,
+              nav = { fight = fight, playBattles = "tactical" } }),
+          })
+        end
+      end
+      return M.logStep(string.format("[chest] %s (%d,%d): no side of it is reachable from (%d,%d)", what, cx, cy,
+        M.fieldX(), M.fieldY()))
+    end)
+  end
+  return T
+end

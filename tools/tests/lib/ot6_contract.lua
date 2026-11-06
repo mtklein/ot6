@@ -2572,6 +2572,30 @@ M.contracts["wor-kt-inferno-v1"] = {
   },
 }
 
+-- wor-kt-atma-v1: Kefka's Tower, the save point behind Atma, map 331
+-- (76,51), after Atma (event battle 112: the save point shown, $06BE,
+-- _cc18b4): party 2 walking there, party 3 on the factory's save point after
+-- Inferno, party 1 on its landing (docs/design/route-wor-kefka-tower.md
+-- section 6).  No timer.
+M.contracts["wor-kt-atma-v1"] = {
+  slot = 3,
+  field = { map = 331, x = 76, y = 51 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x01CE, 1, "party switching on (EnterKefkasTower)" },
+    { 0x02BE, 1, "inside Kefka's Tower (EnterKefkasTower; cleared by _cc0f7d)" },
+    { 0x00BD, 1, "Inferno beaten (_cc1872)" },
+    { 0x06BE, 1, "Atma beaten: the save point behind him shown (_cc18b4)" },
+  },
+  party = M.contracts["wor-kt-factory-v1"].party,
+  parties = { [1] = { map = 334, x = 9, y = 16 }, [3] = { map = 410, x = 37, y = 17 } },
+  walking = 2,
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- wor-dino-v1: the World of Ruin map, on foot on the Falcon's tile by the
 -- dinosaur forest north of Gau's father's house (195,46), after the grind
 -- there (world group 54) until the four stood at Kefka's Tower's target

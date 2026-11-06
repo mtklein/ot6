@@ -42,103 +42,12 @@ H.NAV_REFIRE_HOLD = true
 H.careThreshold = 1.0
 H.careMagic, H.careCastFirst = true, true
 
--- the tower's tile events that carry a party (event_main.asm _cc1008.._cc1046: a ladder's column carries the party
--- the way it was entered; the column beside it pushes a party entering the wrong way back one); a link is
--- { x, y, move, tx, ty }: entering (x, y) moving `move` lands on (tx, ty)
-local LINKS = {
-  [MAP_TOWER] = {
-    { 6, 20, "down", 6, 22 }, { 7, 21, "up", 7, 19 }, { 16, 42, "down", 16, 45 }, { 11, 50, "up", 11, 44 },
-    { 55, 24, "down", 55, 29 }, { 56, 28, "up", 56, 23 }, { 34, 51, "up", 34, 49 }, { 39, 43, "up", 39, 41 },
-  },
-  -- the hop at (8,14), entered facing up (_cc1398): a jump through 410 (36,46) to (48,24)
-  [MAP_FACTORY] = { { 8, 14, "up", 48, 24 } },
-}
--- the ladders' push-back tiles.  The six tiles that ride the crane out of the tower (EnterKefkasTower's crane:
--- _cc0fc3/_cc0fd4/_cc0fe5 and _ca03ba/_ca03c9/_ca03d8, the party back on the Falcon's deck) fire only on A held
--- there, so they are walked over, not avoided (334 (57,44) is the only way down the east side), and no chest or
--- talk is made from one
-local AVOID = {
-  [MAP_TOWER] = { { 6, 21 }, { 7, 20 }, { 16, 44 }, { 11, 45 }, { 55, 28 }, { 56, 24 }, { 34, 50 }, { 39, 42 } },
-  [MAP_FACTORY] = { { 31, 18 } },                    -- Inferno's trigger
-}
-
-local K = H.worLegKit({ fight = FIGHT, links = LINKS, names = NAMES })
+-- the tower's walking pieces (lib M.kefkaTowerKit: its ladders and hop as links, the push-back tiles kept off, the
+-- crane tiles walked over and never pressed A on)
+local K = H.worLegKit({ fight = FIGHT, links = {}, names = NAMES })
 local map, sw, settled, say, board, watches = K.map, K.sw, K.settled, K.say, K.board, K.watches
-
-local function walk(x, y, what, arrive)
-  return H.seqStep({
-    H.lazy(function()
-      return H.navLinks(x, y, LINKS[map()] or {}, { what = what, maxFrames = 12000, playBattles = "tactical",
-        fight = FIGHT, avoid = AVOID[map()], arrive = arrive })
-    end),
-    H.call(function() say("route", what) end),
-  })
-end
--- KT_DEBUG (a lab's global): the walking party's reach on the live map, drawn ('#' reached, '@' the party, 'X' the
--- target), for planning the tower's walks
-local function reachDump(tx, ty, what)
-  if not KT_DEBUG then return H.call(function() end) end
-  return H.call(function()
-    local set = {}
-    for _, z in ipairs({ false, 0, 1, 2, 3 }) do
-      for k in pairs(H.bfsReach(nil, nil, z or nil, LINKS[map()] or {}, nil, nil, AVOID[map()])) do set[k] = true end
-    end
-    local x0, y0 = H.fieldX(), H.fieldY()
-    H.log(string.format("[reach] %s: map %d from (%d,%d), target (%d,%d) %s", what, map(), x0, y0, tx, ty,
-      set[(ty << 8) | tx] and "REACHED" or "not reached"))
-    for y = 0, 63 do
-      local row = {}
-      for x = 0, 95 do
-        row[#row + 1] = (x == x0 and y == y0) and "@" or (x == tx and y == ty) and "X"
-          or set[(y << 8) | x] and "#" or "."
-      end
-      local s = table.concat(row)
-      if s:find("[#@X]") then H.log(string.format("[reach] %2d %s", y, s)) end
-    end
-  end)
-end
--- through an exit to another map: onto (x, y) until the map reads dst
--- An exit tile the floor's BFS does not enter (334 (48,36): the doorway's own tile reads impassable) is taken from
--- the reached tile beside it, pressing toward it.
-local function door(x, y, dst, what)
-  local function arrived() return map() == dst end
-  return H.seqStep({
-    reachDump(x, y, what),
-    H.lazy(function()
-      if H.bfsReach(nil, nil, nil, LINKS[map()] or {}, x, y, AVOID[map()]) then return walk(x, y, what, arrived) end
-      for _, o in ipairs({ { 0, 1, "up" }, { -1, 0, "right" }, { 1, 0, "left" }, { 0, -1, "down" } }) do
-        if H.bfsReach(nil, nil, nil, LINKS[map()] or {}, x + o[1], y + o[2], AVOID[map()]) then
-          return H.seqStep({
-            walk(x + o[1], y + o[2], what .. ": beside it", arrived),
-            H.driveUntil(arrived, 600, { H.hold({ o[3] }), H.waitFrames(2) }, what .. ": pressing " .. o[3]),
-            H.release(),
-          })
-        end
-      end
-      error(string.format("%s: neither the exit (%d,%d) nor a side of it is reachable from (%d,%d)", what, x, y,
-        H.fieldX(), H.fieldY()), 0)
-    end),
-    H.waitUntil(function() return map() == dst and settled() end, 1200, what .. ": on map " .. dst, 1),
-    H.call(function() say("route", what) end),
-  })
-end
--- a chest from whichever side of it the party can reach; a line when none is
-local function chest(cx, cy, bit, what)
-  return H.lazy(function()
-    if H.chestOpen(bit) then return H.logStep(string.format("[chest] %s: already open", what)) end
-    for _, o in ipairs({ { 0, 1, "up" }, { -1, 0, "right" }, { 1, 0, "left" }, { 0, -1, "down" } }) do
-      if H.bfsReach(nil, nil, nil, LINKS[map()] or {}, cx + o[1], cy + o[2], AVOID[map()]) then
-        return H.seqStep({
-          walk(cx + o[1], cy + o[2], what .. ": beside it"),
-          H.openChest({ stand = { cx + o[1], cy + o[2] }, face = o[3], bit = bit, what = what,
-            nav = { fight = FIGHT, playBattles = "tactical" } }),
-        })
-      end
-    end
-    return H.logStep(string.format("[chest] %s (%d,%d): no side of it is reachable from (%d,%d)", what, cx, cy,
-      H.fieldX(), H.fieldY()))
-  end)
-end
+local T = H.kefkaTowerKit(K, FIGHT)
+local walk, door, chest = T.walk, T.door, T.chest
 
 -- each party's kit once it walks: the relics in the bag, and a stone for each member who wears none (UMARO and GOGO
 -- take none), from the owned stones no one wears, the healing ones first (gen_wor_phoenix's)
