@@ -379,6 +379,13 @@ ACTION from >= 80%)").
   the bench's levels by then (the tower's randoms pay 2,800-5,800 a member),
   the statues' shield counts (10, 8, 8), and the driver's choices against
   them (Doom's N. Cross; the Poltergeist absorbs fire and wind).
+  One lever was tried and is worse (`swap1`, kept): SETZER and GOGO swapped
+  (party 1 TERRA, RELM, EDGAR, GOGO; party 3 CYAN, SHADOW, SABIN, SETZER),
+  the chamber in the other order (party 1 west to Doom, party 2 east to the
+  Goddess, party 3 the middle to Guardian and the Poltergeist). Party 3
+  without GOGO lost Inferno in 6 of 12 runs ("Inferno: won 6, lost 5" with
+  one wipe before an outcome line; wipe contexts "formation 010C"), and the
+  Poltergeist wiped it in all 5 runs that reached it ("formation 0129").
 - **The convergence.** 411's three end plates (`_cc193f`): two parties on
   their plates, the third's step runs `FinalBattle`, which is #274's. The
   last cut of this arc would be the third party on 412's save point with
