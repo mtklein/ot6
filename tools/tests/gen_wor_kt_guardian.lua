@@ -26,15 +26,17 @@ local VECTAUR, BRONTAUR, OSCAR = 0x080, 0x084, 0x0B7
 local MACHINES = { [0x0FD] = true, [0x0D9] = true, [0x0EA] = true, [0x0ED] = true, [0x0F6] = true, [0x105] = true,
   [0x0FC] = true, [0x0A1] = true }
 local FIRE, ICE, BOLT, PEARL = 0x00, 0x01, 0x02, 0x0E
-local OUTSIDER = 0x0BD
+local OUTSIDER, DOOM_DRGN, ULTIMA = 0x0BD, 0x025, 0x14
 local FIGHT = {}
 -- formation 428 (the Madam with two Outsiders, 304 and 354): the Outsiders' thrown blades take a member of the
 -- bench a throw, and the Madam heals and raises them and answers every hit on her with Meteor.  The Outsiders are
 -- weak to holy, so whoever holds Pearl (SETZER's Unicorn) casts it while one stands (hall3: the Madam killed first,
 -- the party took her Meteor on every hit, "partyhp=4627,4664,1508,1432 roundcost=1213,1156,1146,1108", and formation
--- 428 was won 4 of 12)
+-- 428 was won 4 of 12).  Pearl alone won it 5 of 13 (hall4), so RELM's Ultima (Ragnarok) goes first, Pearl next,
+-- TERRA's Fire after; the same Ultima on the Doom Dragons of 295, which wiped party 1 too (hall4: "wipe in 0025 0025")
 FIGHT.nuke = function()
-  if H.formationHas({ [OUTSIDER] = true }) then return { PEARL } end
+  if H.formationHas({ [OUTSIDER] = true }) then return { ULTIMA, PEARL, FIRE } end
+  if H.formationHas({ [DOOM_DRGN] = true }) then return { ULTIMA, FIRE } end
   if H.formationHas({ [OSCAR] = true }) then return { FIRE } end
   if H.formationHas(MACHINES) then return { BOLT } end
   if H.formationHas({ [VECTAUR] = true, [BRONTAUR] = true }) then return { ICE } end
