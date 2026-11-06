@@ -136,14 +136,15 @@ def selftest():
         print(f"  {'pass' if cond else 'FAIL'} {label}")
         ok = ok and cond
     states = sn.load(ROOT)
-    three = ["wor-colosseum-v1", "wor-dino-v1", "wor-desert-v1", "wor-kt-factory-v1"]
+    three = ["wor-colosseum-v1", "wor-dino-v1", "wor-desert-v1", "wor-kt-factory-v1",
+             "wor-kt-inferno-v1", "wor-kt-atma-v1", "wor-kt-guardian-v1"]
     for leg in ("wor_colosseum", "gen_wor_colosseum", "wor_colosseum_in"):
         h, keys = downstream(states, leg)
         check(f"{leg}: exactly {', '.join(three)}", keys == three)
-    check("...through the prev= chain: wor_dino, wor_desert and wor_kt_factory replay",
-          {"wor_colosseum", "wor_dino", "wor_desert", "wor_kt_factory"} <= set(h))
-    _, keys = downstream(states, "wor_kt_factory")
-    check("the last leg feeds only its own saves= key", keys == ["wor-kt-factory-v1"])
+    check("...through the prev= chain: wor_dino, wor_desert and the tower's legs replay",
+          {"wor_colosseum", "wor_dino", "wor_desert", "wor_kt_factory", "wor_kt_guardian"} <= set(h))
+    _, keys = downstream(states, "wor_kt_guardian")
+    check("the last leg feeds only its own saves= key", keys == ["wor-kt-guardian-v1"])
     h, keys = downstream(states, "wor_thamasa_plain")
     check("a branch leg that nothing boots feeds no tracked key", keys == [])
     _, keys = downstream(states, "wor_gogo")
@@ -170,8 +171,8 @@ def selftest():
     check("an unknown leg is refused, not answered with an empty set", raised)
     # negative control: a deliberately wrong expectation must go red
     _, keys = downstream(states, "wor_colosseum")
-    check("negative control: an expectation without wor-kt-factory-v1 does not "
-          "match", keys != three[:3])
+    check("negative control: an expectation without wor-kt-guardian-v1 does not "
+          "match", keys != three[:6])
     check("negative control: an expectation with a branch leg's key does not "
           "match", keys != three + ["wor-thamasa-v1"])
     print("downstream selftest:", "ok" if ok else "FAILED")

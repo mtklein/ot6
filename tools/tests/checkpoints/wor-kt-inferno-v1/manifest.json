@@ -11,5 +11,18 @@
       "x": 37,
       "y": 17
     }
+  },
+  "size": 32768,
+  "sha256": "29ab943fbc4c39d4b4288e66e81f8b0834cb77d78c5724a59d4b9debf2fa8f29",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "29ab943fbc4c39d4b4288e66e81f8b0834cb77d78c5724a59d4b9debf2fa8f29",
+    "generator_sig": "00bdf426846c79899eb0c781dfdc7524c1fb19f53710eae0c5451e91b4f00728 gen_wor_kt_inferno build/checkpoints/wor-kt-factory-v1/manifest.json build/checkpoints/wor-kt-factory-v1/wor-kt-factory.sram",
+    "ancestors": [
+      {
+        "path": "build/checkpoints/wor-kt-factory-v1/manifest.json",
+        "sha256": "7d18ccdcd74cfe4765ddc991cbbba9bda5fc8d5810d208adc379de0468d50ba5"
+      }
+    ]
   }
 }

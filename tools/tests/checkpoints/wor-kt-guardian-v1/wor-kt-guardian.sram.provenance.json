@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "f0ec48a4ab3970a7fc934a07b239dd34f8b390f1d1bd0cfb06c6e3b6a584529b",
+  "generator_sig": "2491855d90b7ee4d8afd50b8ea8af1ffe2670b901e6e64fba5a36cd1f89ca216 gen_wor_kt_guardian build/checkpoints/wor-kt-atma-v1/manifest.json build/checkpoints/wor-kt-atma-v1/wor-kt-atma.sram",
+  "ancestors": [
+    {
+      "path": "build/checkpoints/wor-kt-atma-v1/manifest.json",
+      "sha256": "6fa683b810e24c5089dcdc658c674d828561560190f1da3635e8337f7f1b065b"
+    }
+  ]
+}
