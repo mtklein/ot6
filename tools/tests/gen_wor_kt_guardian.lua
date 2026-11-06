@@ -27,11 +27,6 @@ local MACHINES = { [0x0FD] = true, [0x0D9] = true, [0x0EA] = true, [0x0ED] = tru
   [0x0FC] = true, [0x0A1] = true }
 local FIRE, ICE, BOLT = 0x00, 0x01, 0x02
 local FIGHT = {}
--- the Sky Base first, as a player who knows the factory kills it: its script is L.5 Doom and Doom, and its counter
--- Blaster, all Death; while it stood it killed members from full HP one action at a time and wiped party 1 in 352
--- (formation 413, Sky Base with four IronHitmen: sweep guardian_s8, s13: "entity 1 char 8 from 5475/5475 by slot 0
--- cmd $0C atk $94 (ONE ACTION from >= 80%)").  The IronHitmen fall to the boosted Bolt that hits them all.
-FIGHT.focusFirst = { [0x0FC] = true }
 FIGHT.nuke = function()
   if H.formationHas({ [OSCAR] = true }) then return { FIRE } end
   if H.formationHas(MACHINES) then return { BOLT } end
