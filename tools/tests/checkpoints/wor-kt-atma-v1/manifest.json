@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-kt-atma.sram",
+  "slot": 3,
+  "milestone": "wor-kt-atma",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 331,
+      "x": 76,
+      "y": 51
+    }
+  },
+  "size": 32768,
+  "sha256": "6084a263d42b848a6a5f1dccef7a85ec668ee1811a710c96fabe7dbe985463e1",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "6084a263d42b848a6a5f1dccef7a85ec668ee1811a710c96fabe7dbe985463e1",
+    "generator_sig": "747187a3f7765171ac9b5cd243b738d4045899764255864698bce974d4eb5242 gen_wor_kt_atma build/checkpoints/wor-kt-inferno-v1/manifest.json build/checkpoints/wor-kt-inferno-v1/wor-kt-inferno.sram",
+    "ancestors": [
+      {
+        "path": "build/checkpoints/wor-kt-inferno-v1/manifest.json",
+        "sha256": "584a563d1442119176a0bcce7cf8036f89108f4f6ff5d15ee320c7c7e465cda3"
+      }
+    ]
+  }
+}

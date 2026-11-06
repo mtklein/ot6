@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v2",
-  "payload_sha256": "47e91ebea8ffee5d49ade256cae098c99477f45acc3972514fc652feee578a57",
-  "generator_sig": "5a09ee5918b5d5e75bc74bc0751ac5fe6ecd644cc006db6ae303c3741a026534 gen_sabin_trench",
+  "payload_sha256": "fcf6c3b85e25898b6c76525dc1f8211eba39de7decc3dc383b375f376c232db8",
+  "generator_sig": "5e13dbabd3be833b7e793349e6ad858dd03a98689324835d85a65a56a0f5410c gen_sabin_trench",
   "ancestors": [
     {
       "path": "build/states/gau_joined.stamp",
-      "sha256": "d9c81e810154a9022741986dbbf244be90dd7cf8be4d77f71fa57c5cbc30a009"
+      "sha256": "5e2b28d2e933dd869e13d97c03e52d8e21956cbd15908feddf75246e65c6754e"
     }
   ]
 }
