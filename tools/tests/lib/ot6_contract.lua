@@ -2596,6 +2596,34 @@ M.contracts["wor-kt-atma-v1"] = {
   },
 }
 
+-- wor-kt-guardian-v1: Kefka's Tower, Guardian's save point, map 291
+-- (12,12), after Guardian (event battle 140: $00BC, _cc1827): party 2
+-- walking there, party 1 on the chamber's east plate (355 (43,6)), party 3
+-- on its west plate (355 (35,6)); both dragons beaten, the locked door and
+-- the chamber's north door open (docs/design/route-wor-kefka-tower.md
+-- sections 2 and 5).  No timer.
+M.contracts["wor-kt-guardian-v1"] = {
+  slot = 3,
+  field = { map = 291, x = 12, y = 12 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x01CE, 1, "party switching on (EnterKefkasTower)" },
+    { 0x02BE, 1, "inside Kefka's Tower (EnterKefkasTower; cleared by _cc0f7d)" },
+    { 0x00BD, 1, "Inferno beaten (_cc1872)" },
+    { 0x06BE, 1, "Atma beaten (_cc18b4)" },
+    { 0x0080, 1, "337's locked door open (_cc14cd)" },
+    { 0x0067, 1, "the chamber's north door open (_cc15f8)" },
+    { 0x00BC, 1, "Guardian beaten (_cc1827)" },
+  },
+  party = M.contracts["wor-kt-factory-v1"].party,
+  parties = { [1] = { map = 355, x = 43, y = 6 }, [3] = { map = 355, x = 35, y = 6 } },
+  walking = 2,
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- wor-dino-v1: the World of Ruin map, on foot on the Falcon's tile by the
 -- dinosaur forest north of Gau's father's house (195,46), after the grind
 -- there (world group 54) until the four stood at Kefka's Tower's target
