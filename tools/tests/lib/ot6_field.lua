@@ -1023,6 +1023,10 @@ function M.navTo(txIn, tyIn, opts)
   local calm = 0            -- consecutive settled frames on the goal tile
   local battN, dlgN, lostN = 0, 0, 0   -- debounce counters (see below)
   local noPathN, pause = 0, 0          -- no-path retry state
+  -- opts.fleeSpecies, as worldNavTo's: a list of formation species words, or a function read at each battle's open
+  -- and every 30 frames after, returning the list; a battle whose formation holds one is run from, the rest fought
+  -- (Kefka's Tower's two Doom Dragons, gen_wor_kt_guardian)
+  local fleeSt = { set = {}, from = nil }
   -- built for "tactical" and for "flee": the flee branch falls back to it
   -- once M.FLEE_CAP frames pass without the formation releasing the party
   --
@@ -1150,8 +1154,17 @@ function M.navTo(txIn, tyIn, opts)
           return
         end
         owed, owedN = true, 0
-        if wantsFlee(opts.playBattles) then
-          flee(battN)
+        if opts.fleeSpecies then
+          if battN == 3 then fleeSt.from = nil end
+          if fleeSt.from == nil and (battN - 3) % 30 == 0 then
+            fleeSt.set = {}
+            local list = type(opts.fleeSpecies) == "function" and opts.fleeSpecies() or opts.fleeSpecies
+            for _, w in ipairs(list or {}) do fleeSt.set[w] = true end
+            if next(fleeSt.set) and M.formationHas(fleeSt.set) then fleeSt.from = battN end
+          end
+        end
+        if wantsFlee(opts.playBattles) or (flee and fleeSt.from ~= nil) then
+          flee(fleeSt.from and (battN - fleeSt.from + 3) or battN)
           return
         end
         if tactical then tactical.frame(); return end
