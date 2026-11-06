@@ -447,13 +447,37 @@ The graph's play of this leg (`graph/graph3.log`): "generate wor_kt_guardian
 75 byte(s) differ", re-cut, then "none"; the other three tower keys
 "none".
 
-**What is left on this lane**: the two Doom Dragons in 295 (S. Cross on the
-whole party, then Melt and Mind Slap; 18,008 HP each, 8,500 XP) and the
-Sky Base's Death in 352 wipe party 1 in about one run in five across the
-draws. Levers not yet tried: a Memento Ring (in the bag) or Safety Bit
-against the Sky Base's Death; the back row for EDGAR and SETZER; Shell
-before 295; a different seat for EDGAR and SETZER, the two weakest, on the
-hardest random lane.
+### 7.5 The wards, one at a time, and the run
+
+The same grid (K = 0, 2, 4 x 8 shifts, from the graph's `wor-kt-atma-v1`),
+each arm adding one lever to the one before (`gear_*`, `mkarm.py`,
+`mkflee.py`; `gear_<arm>_413.txt`, `_226.txt`):
+
+| arm | the lever | runs PASS | 413 | 226 (two Doom Dragons) |
+|---|---|---|---|---|
+| `rows` | EDGAR and SETZER to the back row: already there ("[party 1: EDGAR and SETZER to the back row] already set") | 19 of 24 | won 16 of 17 | won 0 of 4 |
+| `shell` | a Barrier Ring (auto Shell) on EDGAR and SETZER: S. Cross and Flare Star are magic (MagicProp +2 bit $01 clear) | 20 of 24 | won 16 of 17 | won 0 of 3 |
+| `death` | + the bag's Memento Ring (a Death guard) on RELM | 22 of 24 | "met 17, won 17" | won 2 of 4 |
+| `run` | + party 1 runs from the two Doom Dragons (the single one is fought) | 24 of 24 | "met 17, won 17" | run from at 4 distinct keys: "battle $0E2 PARTY LEFT after 30 ticks" |
+
+The two Doom Dragons beat party 1 whatever it wore, as the Brachosaur beat
+the forest's party (route-wor-side-trips.md finding 4), and a player runs
+from them. `navTo` takes `fleeSpecies` now, as `worldNavTo` did.
+
+**The leg at 7f4e9f9d** (the wards, the run, and the care before the wards:
+`final_a/leg_s14` had EDGAR fall in the training's last battle, "EDGAR L40
+0/2543", and the Relic menu refused him: "equip options: 4 A presses on the
+target were not taken"), from the graph's capture (`final/`,
+`final_tally_*.txt`, `final_bosses.txt`): the leg itself at shifts 0-23,
+"leg: 24 runs, 24 PASS"; with K = 2, 4 x 8 shifts, "burn: 16 runs, 16
+PASS"; formation 413 "met 16, won 16, distinct keys 11" and "met 13, won
+13, distinct keys 13"; formation 428 "met 16, won 16" and "met 13, won 13";
+the two Doom Dragons met once and run from; "Skull Drgn: won 40, lost 0",
+"Gold Drgn: won 40, lost 0", "Guardian: won 40, lost 0; distinct keys 27".
+
+The graph's play (`graph/graph6.log`): "PASS (frame 238691) attempts=1/3",
+"checkpoint drift wor-kt-guardian-v1: 33 byte(s) differ", re-cut, "none";
+the factory, Inferno and Atma keys "none".
 
 ## 8. Not done
 
