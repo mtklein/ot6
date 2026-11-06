@@ -43,6 +43,48 @@ local map, sw, settled, say, watches = K.map, K.sw, K.settled, K.say, K.watches
 local T = H.kefkaTowerKit(K, FIGHT)
 local walk, door, chest = T.walk, T.door, T.chest
 
+-- party 1's training: a two-tile lap by its landing (334 (9,16)-(9,19); lab_tower_split's lap, where plan M's party 1
+-- won 60 of 60 under the rows: section 7.1), the walker fighting what comes and the care after each battle, until
+-- every member of party 1 stands at TRAIN_LEVEL, at most TRAIN_BATTLES battles
+local TRAIN_LEVEL, TRAIN_BATTLES = 40, 40
+local function trainParty1()
+  local lap, wp, n0 = { { 9, 16 }, { 9, 19 } }, 1, 0
+  local function low()
+    local t = {}
+    for _, ch in ipairs(H.partyRoster(1)) do
+      if H.readByte(0x1600 + 37 * ch + 8) < TRAIN_LEVEL then t[#t + 1] = NAMES[ch] end
+    end
+    return t
+  end
+  local function levels()
+    local t = {}
+    for _, ch in ipairs(H.partyRoster(1)) do
+      t[#t + 1] = string.format("%s L%d", NAMES[ch], H.readByte(0x1600 + 37 * ch + 8))
+    end
+    return table.concat(t, ", ")
+  end
+  return H.seqStep({
+    H.call(function()
+      n0 = #H.outcomes
+      say("train", "party 1 before its lane: " .. levels())
+    end),
+    H.driveUntil(function()
+      local calm = not H.battleLoadStarted() and H.hasControl() and H.tileAligned()
+      return calm and (#low() == 0 or #H.outcomes - n0 >= TRAIN_BATTLES)
+    end, 4000000, {
+      H.navTo(function() return lap[wp][1] end, function() return lap[wp][2] end,
+        { maxFrames = 20000, playBattles = "tactical", fight = FIGHT }),
+      H.call(function() wp = wp % 2 + 1 end),
+      H.cond(function() return not H.battleLoadStarted() end, { H.fieldCare({ tag = "care on party 1's lap" }) }, {}),
+    }, "party 1's training by its landing"),
+    H.call(function()
+      say("train", string.format("party 1 after %d battles by its landing: %s", #H.outcomes - n0, levels()))
+      H.assertEq(#low(), 0, string.format("party 1 stands at L%d within %d battles by its landing", TRAIN_LEVEL,
+        TRAIN_BATTLES))
+    end),
+  })
+end
+
 -- a boss touched as an NPC: from two tiles below it, the care, absorb-safe arms, the talk and the fight until its
 -- show-switch reads clear (the dragon's event clears it after the fight: _cc18d9 $06B3, _cc1906 $06B4; lib
 -- T.touchBoss: a random battle can open on the talk's step)
@@ -129,6 +171,10 @@ H.run({ maxFrames = 3000000 }, {
   -- ---- 3. party 1's lane to the chamber ---------------------------------------------------------------------
   -- @@stage lane
   H.switchParty(1),
+  -- party 1's two of the bench level by its landing first, on 334's own pool (route-wor-kefka-tower.md 7.4: its lane,
+  -- 303, 304 and the machines' hall, wiped it in 11 of 24 runs at EDGAR L34, SETZER L33; the bench under L40 is the
+  -- liability, #496), as the owner plays it: the bench levels in the tower
+  trainParty1(),
   door(18, 20, 303, "party 1: 334 (18,20) -> 303 (14,14)"),
   door(21, 19, 304, "party 1: 303 (21,19) -> 304 (40,45)"),
   chest(33, 35, 0x0D7, "Fixed Dice (304 (33,35))"),
