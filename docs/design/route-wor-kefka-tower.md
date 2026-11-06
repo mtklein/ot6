@@ -80,9 +80,21 @@ evidence). Each landing is a closed region until a switch opens it:
 | 334 (34,53) left + A, (33,54) up + A | the door (30,50), 334's south to its middle, for party 1 | set (`$007F`) |
 | 337 (4,12), (12,12) | set `$02C8` (party 2's bit) and `$02CC` (party 3's) whoever stands there; both set opens the locked door (8,11) for good | held, then set (`$0080`) |
 | 337 the weights (4,7), (12,7), A | knock the walls through so the plate rooms reach the corridor; refused while the plate under them is held | set |
-| 355 the chamber's three plates | all three parties on them at once: the north door (to Guardian) and the south doors | north set; south toggles each time |
+| 355 (35,9), (43,9) | each shuts the gate between its column and the middle (`_cc1598`, `_cc15b2`): the chamber is three columns joined only along row 9, so a party that steps on one is shut in that column | set (`$0065`, `$0066`) |
+| 355 the chamber's three plates (35,6), (39,9), (43,6) | one in each column; all three parties on them at once: the north door (to Guardian) and the south doors | north set; south toggles each time |
 | 337 (8,6) | the cell doors (2,4), (14,4) to the west and east lanes | set (`$00D0`) |
 | 411 (103,43), (109,40), (115,42) | each walking party sets its own bit; all three set: `FinalBattle` (:926), Kefka | held |
+
+**The chamber's order.** Each column holds one party, and the weights set
+who goes where: the first party into the chamber takes a column and drops
+its weight, which frees the party in the plate room below it; that one
+comes up and takes the other column and its weight; the last takes the
+middle. The route: party 1 east (the east weight frees party 3), party 3
+west (the west weight frees party 2), party 2 the middle (probe `c3`; `c2`
+was party 1 shut in the west column, "neither the exit (43,18) nor a side
+of it is reachable from (35,9)"). The west cell's door to the west lane
+(2,4) and the east's (14,4) open from 337 (8,6) (`$00D0`), which only the
+middle party reaches, through the chamber's south door.
 
 **From the chamber**, three lanes, each behind a statue, each ending on one
 of 411's three plates:
@@ -186,9 +198,9 @@ cure in every party:
 
 | party | members (L) | cure | lane |
 |---|---|---|---|
-| 1 | TERRA 63, RELM 53, EDGAR 34, SETZER 32 | TERRA's Cure, Life | the north-west, the machines' hall; Guardian and the Poltergeist |
-| 2 | CELES 63, STRAGO 51, LOCKE 41, MOG 38 | CELES's Cure | the long way west: Atma, the Gold Dragon; the Goddess |
-| 3 | CYAN 53, SHADOW 53, SABIN 39, GOGO 44 | SABIN's (Starlet) | the factory: Inferno, the Skull Dragon; Doom |
+| 1 | TERRA 63, RELM 53, EDGAR 34, SETZER 32 | TERRA's Cure, Life | the north-west, the machines' hall; the east column, the Goddess |
+| 2 | CELES 63, STRAGO 51, LOCKE 41, MOG 38 | CELES's Cure | the long way west: Atma, the Gold Dragon; the middle, Guardian and the Poltergeist |
+| 3 | CYAN 53, SHADOW 53, SABIN 39, GOGO 44 | SABIN's (Starlet) | the factory: Inferno, the Skull Dragon; the west column, Doom |
 
 GAU (no weapon; #496's casualty) and UMARO sit out. Party 3's keys are
 slash and pierce only, so it takes Doom (slash) or the Goddess (pierce), not
@@ -204,6 +216,8 @@ section 7.
 |---|---|---|---|
 | `gen_wor_kt_factory` | `wor-desert-v1` | `wor-kt-factory-v1` | the Falcon to the tower, the three groups, each party dressed, party 3 down the east side, into 339 by its top door (334 (52,47)), the factory (410), the hop at (8,14) into its hall, Save on the factory's save point (37,17) beside Inferno |
 | `gen_wor_kt_inferno` | `wor-kt-factory-v1` | `wor-kt-inferno-v1` | Inferno (battle 114), Save again on the factory's save point |
+| `gen_wor_kt_atma` | `wor-kt-inferno-v1` | `wor-kt-atma-v1` | party 2 north through 338 to 331, Atma (battle 112), Save on the save point behind him |
+| `gen_wor_kt_guardian` | `wor-kt-atma-v1` | `wor-kt-guardian-v1` | party 3: the sparkle, the Skull Dragon, the east plate; party 2: the hole, 409, the 292 switch and Ribbon, the Gold Dragon, the west plate (the locked door opens); party 1's lane to the chamber; the weights and the chamber's plates; party 2 to Guardian (battle 140), Save on his save point (291 (12,12)) |
 
 The factory hall's two chests (the Gauntlet, the Nutkin Suit) are reached
 from 296, the dead end off 339's foot (the same treasure bits): the middle
