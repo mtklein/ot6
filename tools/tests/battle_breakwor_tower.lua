@@ -63,16 +63,20 @@ local EVENTS = { 98, 99, 100, 112, 114, 135, 136, 140 }
 -- pool groups and event battles each meets, the class keys its weapons hold and the elements its spells, skeans
 -- and lores reach at wor-desert-v1.  A species keys a party when either meets it.
 --   party 1: TERRA (a blade; Fire, Ice, Bolt), RELM (a rod), EDGAR (a knife), SETZER (cards): the north-west,
---            303, 304, 292, the machines' hall 352, 295; Guardian and the Poltergeist after the chamber
+--            303, 304, 292, the machines' hall 352, 295; the chamber's east column, the Goddess (354)
 --   party 2: CELES (a blade; Ice), STRAGO (a rod; Aqua Rake), LOCKE (the Wing Edge), MOG (a spear): 338, 331
---            (Atma), 329, 409, 292, 294, 335 (the Gold Dragon), 354; the Goddess
+--            (Atma), 329, 409, 292, 294, 335 (the Gold Dragon), 354; the chamber's middle, Guardian (291), 287,
+--            the Poltergeist (334)
 --   party 3: CYAN (katanas), SHADOW (the Striker; his skeans fire, water, bolt), SABIN (claws; fire, holy), GOGO (a
---            knife): 339, the factory 410 (Inferno), 296, 293, 354 (the Skull Dragon); Doom
+--            knife): 339, the factory 410 (Inferno), 296, 293, 354 (the Skull Dragon); the chamber's west
+--            column, Doom (355)
+-- The chamber's gate switches shut each column behind the party that enters it, so the order the weights fall
+-- in sets the lanes (route-wor-kefka-tower.md section 2): party 1 east, party 3 west, party 2 the middle.
 local LANES = TOWER_LANES or {
-  { "party 1", SLASH | BLUDG | PIERCE | SPECIAL, FIRE | ICE | BOLT, { 208, 209, 210, 211, 212, 213, 220, 221 },
-    { 140, 100 } },
+  { "party 1", SLASH | BLUDG | PIERCE | SPECIAL, FIRE | ICE | BOLT, { 208, 209, 210, 211, 212, 213, 220, 221,
+    226 }, { 99 } },
   { "party 2", SLASH | BLUDG | PIERCE, ICE | WATER, { 208, 211, 214, 215, 216, 217, 218, 226, 227, 220, 221 },
-    { 112, 135, 99 } },
+    { 112, 135, 140, 100 } },
   { "party 3", SLASH | PIERCE, FIRE | BOLT | WATER | HOLY, { 208, 222, 223, 224, 225, 226, 220, 221 },
     { 114, 136, 98 } },
 }
