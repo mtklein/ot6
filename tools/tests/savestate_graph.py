@@ -1322,10 +1322,19 @@ STATES = [
     # west plate, party 1's lane to the chamber, the weights and the
     # chamber's plates, Guardian (event battle 140), and Save there with the
     # parties spread through the tower: the `wor-kt-guardian-v1` checkpoint
+    # (docs/design/route-wor-kefka-tower.md).  A cut.  wor_kt_doom below
+    # boots its checkpoint.  Re-cut by checkpoint_drift.py --recut.
+    S("wor_kt_guardian", gen="gen_wor_kt_guardian", prev="wor_kt_atma",
+      checkpoint="wor-kt-atma-v1", timeout=7200),
+
+    # wor-kt-guardian-v1 -> Doom's save point, map 355 (64,11): party 2
+    # opens the cell doors (337 (8,6)) and stays there; party 3 down the west
+    # lane, its bench levelled below Doom, dressed against his ice, Doom
+    # (event battle 98), and Save there: the `wor-kt-doom-v1` checkpoint
     # (docs/design/route-wor-kefka-tower.md).  A cut; saves= until a leg
     # boots it.  Re-cut by checkpoint_drift.py --recut.
-    S("wor_kt_guardian", gen="gen_wor_kt_guardian", prev="wor_kt_atma",
-      checkpoint="wor-kt-atma-v1", saves="wor-kt-guardian-v1", timeout=7200),
+    S("wor_kt_doom", gen="gen_wor_kt_doom", prev="wor_kt_guardian",
+      checkpoint="wor-kt-guardian-v1", saves="wor-kt-doom-v1", timeout=7200),
 
 ]
 

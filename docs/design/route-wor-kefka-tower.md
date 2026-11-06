@@ -11,7 +11,8 @@ there is no training leg before the tower (#496's `gen_wor_bench` was
 reverted at cb302e15); each party is a carrier beside the bench, and the
 bench levels in the tower.
 
-Evidence is under `build/attempts/wt/v039-kefka-tower/`. Line numbers are
+Evidence is under `build/attempts/wt/v039-kefka-tower/` (the statues and the
+Gauntlet branch: `build/attempts/wt/v039-kefka-tower-2/`). Line numbers are
 into `ff6/src/event/event_main.asm` unless a file is named.
 
 ---
@@ -34,16 +35,21 @@ into `ff6/src/event/event_main.asm` unless a file is named.
    Guardian `$112`; battle 76, the only other group that deals it, is never
    called. `$112` gets a real row; the World of Balance's `$111` (battle 75)
    stays without a gauge.
-4. **The line plays the tower to Guardian's save point** on the graph, four
-   cuts (section 5): the factory, Inferno, Atma, Guardian; the Gold and
-   Skull Dragons on the way. Inferno, Atma, both dragons and Guardian are
-   not coin flips (8 of 8 or 11 of 12 and better across draws, section 6).
+4. **The line plays the tower to Doom's save point** on the graph, five
+   cuts (section 5): the factory, Inferno, Atma, Guardian, Doom; the Gold and
+   Skull Dragons on the way. Inferno, Atma, both dragons, Guardian and Doom
+   are not coin flips (8 of 8 or 11 of 12 and better across draws, section
+   6).
 5. **The chamber's columns set the lanes**: the order the weights fall puts
    party 1 east (the Goddess), party 3 west (Doom), party 2 the middle
    (Guardian, the Poltergeist).
-6. **The three statues are coin flips** for the parties that reach them
-   (the Poltergeist 6 of 11, Doom 3 of 6, the Goddess 1 of 3): the next
-   labs, before they join the line.
+6. **The statues want the bench levelled in the tower first.** At the
+   bench's own levels (L40-46) from Guardian's save, Doom won 10 of 16 and
+   the Poltergeist 2 of 16. Twenty-odd of each lane's own random battles
+   (the bench to L46) and a dress against Doom's ice make Doom 9 of 9 (8
+   distinct keys), and the leg 7 of 7. The Poltergeist (party 2) and the
+   Goddess (party 1) stay short of every draw: about 7 or 8 of 9 at L46-50
+   (section 6.1), and party 1's lane randoms wipe it while it trains.
 7. **A Ribbon in every party.** The line arrives with three, two of them in
    party 3; party 2, with none, wiped to the Evil Oscars' Sour Mouth.
 
@@ -237,10 +243,15 @@ section 7.
 | `gen_wor_kt_inferno` | `wor-kt-factory-v1` | `wor-kt-inferno-v1` | Inferno (battle 114), Save again on the factory's save point |
 | `gen_wor_kt_atma` | `wor-kt-inferno-v1` | `wor-kt-atma-v1` | party 2 north through 338 to 331, Atma (battle 112), Save on the save point behind him |
 | `gen_wor_kt_guardian` | `wor-kt-atma-v1` | `wor-kt-guardian-v1` | party 3: the sparkle, the Skull Dragon, the east plate; party 2: the hole, 409, the 292 switch and Ribbon, the Gold Dragon, the west plate (the locked door opens); party 1's lane to the chamber; the weights and the chamber's plates; party 2 to Guardian (battle 140), Save on his save point (291 (12,12)) |
+| `gen_wor_kt_doom` | `wor-kt-guardian-v1` | `wor-kt-doom-v1` | party 2 back through the chamber's south door to 337 (8,6): the cell doors open, and it stays there; party 3 down the west column and lane to 355 below Doom, its bench trained to L46 on that floor (`T.trainLap`), dressed against his ice (`H.elementDress`), Doom (battle 98), Save on his save point (355 (64,11)) |
 
 The factory hall's two chests (the Gauntlet, the Nutkin Suit) are reached
 from 296, the dead end off 339's foot (the same treasure bits): the middle
-path leaves them.
+path leaves them, and the branch `gen_wor_kt_gauntlet` (from
+`wor-kt-inferno-v1`, nothing boots it) fetches them: party 3 steps on the
+hall's tile 410 (43,23) (`_cc13c6`), which carries it back to the factory's
+west column (6,17), then 339's top door, 334's east side, 339's foot
+(334 (48,36)) and 296. 8 of 8 across seed shifts (`gt0`, `gtsw`).
 
 ## 6. The bosses
 
@@ -322,6 +333,70 @@ bp1 a1:0/2653 bp1 a10:0/2315"). The split now hands one over: "[ribbons]
 party 3 wears 2, party 2 none: SHADOW hands slot 4's Ribbon over", "Ribbon
 $CA from the bag onto STRAGO's slot 4", "Ribbons by party: 1, 1, 1"
 (`probe/f10`). Party 2 picks up a second Ribbon in 292.
+
+### 6.1 The statues from Guardian's save (#273, second part)
+
+Labbed from the graph's `wor-kt-guardian-v1` capture (sha256 6e295e91, the
+tracked save byte for byte) by `lab_statue.lua` (evidence
+`build/attempts/wt/v039-kefka-tower-2/`, `scripts/`): party 2 opens the cell
+doors, then one lane's party laps two tiles of its own floor until its
+bench reaches the level (`KT_TRAIN`), then K more battles (K = 0, 3, 6: the
+encounter history moves past the training's), then the statue; three seed
+shifts (0, 2, 6) each. Tallied by `stattally.py` (`tallies.txt`): a loss
+before the outcome line is the game's own game over, counted from the
+statue's last battle key.
+
+| arm | lever | Doom (party 3) | Poltergeist (party 2) | Goddess (party 1) |
+|---|---|---|---|---|
+| `b0` | none: the bench at L40-46 | won 10, lost 6 (6 and 4 keys) | won 2, lost 14 (1 and 6 keys) | won 10, lost 2 (8 and 1) |
+| `a2 t46` | the bench to L46 on the lane | won 8, lost 1 | won 7, lost 2 | won 6, lost 1, 2 wiped training on 354 |
+| `a2 td` | + dressed against the statue's element | **won 9 of 9, 8 keys, 5 deaths** | (with the Wall Rings' bug below) won 4, lost 5 | the dress refused (below), 7 not reached |
+| `a3 pw46` | Poltergeist: + four Wall Rings | | won 7, lost 2 | |
+| `a3 pwt46` | + Wall Rings, the fire dress, the wards | | won 7, lost 2 | |
+| `a3 g46` | Goddess: the lap on 355's east lane | | | won 6, lost 3 |
+| `a4 pt50` | the bench to L50 | | won 7, lost 2 | |
+| `a4 pwt50` | L50 + Wall Rings, fire dress, wards | | won 8, lost 1 | |
+| `a4 g50` | Goddess: L50 on 355's east lane | | | won 4, lost 1, 3 wiped training |
+
+The line's leg (`dsw/`, `legs/gen_wor_kt_doom_s0`): "Doom: won 7, lost 0;
+distinct keys 4; deaths 0" across seed shifts 0-12; the graph-style run
+"PASS (frame 102213) attempts=1/3", "party 3 below Doom: after 17 battles:
+CYAN L57, SHADOW L57, SABIN L46, GOGO L50". The dress: "SHADOW slot 1 $64 ->
+$61" (the Ice Shld, which absorbs ice), "GOGO slot 1 $62 -> $60" (the Flame
+Shld, which nulls it).
+
+Negatives (`neg/`, `negs.sh`, lab batteries edited from the capture): the
+cell doors already open, "assertEq failed: the cell doors still shut
+($00D0): this leg opens them: got 1"; party 3 off its plate, "contract
+wor-kt-guardian-v1 (entry) VIOLATED -- 1 field(s) differ: party 3 stands at
+x: expected 35, read 36"; party 1 off its plate, "... party 1 stands at x:
+expected 43, read 42".
+
+What the labs found:
+
+- **Doom** kills with Ice 3, N. Cross and Absolute 0, then (below half)
+  physical Battle and Special under Image and Haste (ai_script.asm `_295`).
+  The bench at L46 and the ice dress settle it.
+- **The Poltergeist** answers every hit with a third of a chance of Fire 3
+  and counts hits to Wave Cannon; below half it casts Flare Star and S.
+  Cross (fire), Meteo, Aero. Its Stop is the killer: any member Stopped
+  draws Blaster, which kills outright (`if_status_set ..., STOP: BLASTER`);
+  the Ribbon does not ward Stop. Wall Rings bounce the Stop (a reflectable
+  spell) and stop every Blaster, but they bounce the Fire 3 counters back
+  onto the statue, which absorbs fire and heals by about 1,000 a bounce:
+  the fight then drags (11,904-46,573 ticks at L50) and attrition takes the
+  loss. The 334 Ribbon stays in the bag: `ribbonsOnSeated` keeps every relic
+  party 2 wears ("no seated member can take the bag's Ribbon"). STRAGO's
+  nuke lore (`nukeLore = { 22 }`, GrandTrain) was never planned (`pg0`):
+  the tactical driver's race plans his Fight.
+- **The Goddess** answers a Fight with Love Token and every hit with Bolt 2,
+  casts Overcast (Condemned on the party) every eighth, and Bolt 3, Flash
+  Rain, Quasar below half. Party 1 (TERRA, RELM, EDGAR, SETZER) holds one
+  Ribbon; its lane's randoms are its worst enemy: formation 428 (the Madam
+  and her Outsiders) on 354 and formation 400 (three Innocs, Muddle) on
+  355's east lane wiped it during training in 2 of 9 and 3 of 9 runs. The
+  element dress failed on EDGAR ("equip options: 4 A presses on the target
+  were not taken", the Force Armor) in 5 of 9 runs and is not used.
 
 ## 7. Measured
 
@@ -500,33 +575,32 @@ the factory, Inferno and Atma keys "none".
 
 ## 8. Not done
 
-- **The statues.** Routed and walked (probe `st1`, `stat1`): party 2 from
-  Guardian back to the chamber, through its south door to 337 (8,6) (the
-  cell doors), north again, 287, the Ribbon (334 (29,29)), the Poltergeist,
-  412; party 3 the west lane (the west cell's door, 355's west column, 291's
-  west room) to Doom; party 1 the east lane to the Goddess. Each is a coin
-  flip for its party (section 6). Levers to measure next: the lane each
-  party takes (it follows the order the weights fall; with SETZER and GOGO
-  swapped between parties 1 and 3, party 3 would hold the brush and cards
-  and party 1 could take the west column, so TERRA's party would meet Doom),
-  the bench's levels by then (the tower's randoms pay 2,800-5,800 a member),
-  the statues' shield counts (10, 8, 8), and the driver's choices against
-  them (Doom's N. Cross; the Poltergeist absorbs fire and wind).
-  One lever was tried and is worse (`swap1`, kept): SETZER and GOGO swapped
+- **The Poltergeist and the Goddess** (section 6.1): neither passes every
+  draw yet. The chain was played once on the graph's captures (drafts in
+  `scripts/drafts/`, the chain's order Poltergeist, Doom, Goddess, plates):
+  the Poltergeist leg "PASS (frame 134324) attempts=2/3" (attempt 1 a wipe
+  in "formation 0129"), the Goddess "PASS (frame 136451) attempts=2/3"
+  (attempt 1 wiped training on 354, "formation 00BD 00BD FFFF 006A"), and
+  the convergence leg "PASS (frame 2314) attempts=1/3": party 1 onto 411's
+  right plate ("held ($02C6)"), party 3 onto the left ("held ($02CE)"),
+  party 2 saved on 412's save point with both bits still set. The plate
+  bits stay set once stepped on (`_cc193f` sets, only the tower's exit
+  `_cc0f7d` clears), so the convergence cut works as designed. The
+  Goddess's save held TERRA and SETZER at 0 HP: party 1's share of the
+  Fenix Downs (the split's budget) was spent on 354's randoms.
+  The next legs boot `wor-kt-doom-v1`: party 2 goes on from 337 (8,6), north
+  through the chamber (the drafted Poltergeist leg's walk from there), the
+  Goddess's leg is party 1's, and the convergence is the drafted
+  `gen_wor_kt_plates`.
+- **An older lever, worse** (`swap1`, kept): SETZER and GOGO swapped
   (party 1 TERRA, RELM, EDGAR, GOGO; party 3 CYAN, SHADOW, SABIN, SETZER),
   the chamber in the other order (party 1 west to Doom, party 2 east to the
   Goddess, party 3 the middle to Guardian and the Poltergeist). Party 3
   without GOGO lost Inferno in 6 of 12 runs ("Inferno: won 6, lost 5" with
   one wipe before an outcome line; wipe contexts "formation 010C"), and the
   Poltergeist wiped it in all 5 runs that reached it ("formation 0129").
-- **The convergence.** 411's three end plates (`_cc193f`): two parties on
-  their plates, the third's step runs `FinalBattle`, which is #274's. The
-  last cut of this arc would be the third party on 412's save point with
-  the other two on their plates.
 - **The machines' hall for party 1.** Formation 413 (Sky Base, four
   IronHitmen) in 352 wiped party 1 in 2 of 8 sweeps of `gen_wor_kt_guardian`
   before the training and the wards (7.3, 7.4); with them it is "met 16,
   won 16, distinct keys 11" in the final grid (7.5), so it is no longer
   open.
-- **The Gauntlet and the Nutkin Suit** (296, off 339's foot) are left on the
-  middle path; a branch leg could fetch them.

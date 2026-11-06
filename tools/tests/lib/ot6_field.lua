@@ -7597,6 +7597,62 @@ function M.gearDress(opts)
   end)
 end
 
+-- M.elementDress(mask, opts): dress the seated members against a boss whose
+-- damage comes in the elements of `mask` (ItemProp's bit order: fire, ice,
+-- bolt, poison, wind, pearl, earth, water), as a player who has read the
+-- boss does: for each member, the shield slot (unless a two-weapon relic
+-- holds that hand), the helmet and the armor take the bag piece that covers
+-- the mask best (an element it absorbs 3, nulls 2, halves 1, is weak to -3;
+-- ItemProp +22, +23, +15, +24), its defense and magic defense the
+-- tie-break, wherever it covers more than what is worn.  One Equip session
+-- per member who changes.  (#273: Doom's Ice 3, N. Cross and Absolute 0)
+function M.elementDress(mask, opts)
+  opts = opts or {}
+  local tag = opts.tag or "element dress"
+  local function cover(id)
+    if id == nil or id == 0xFF then return 0 end
+    local s = 0
+    for b = 0, 7 do
+      if (mask >> b) & 1 == 1 then
+        if (gearByte(id, 22) >> b) & 1 == 1 then s = s + 3
+        elseif (gearByte(id, 23) >> b) & 1 == 1 then s = s + 2
+        elseif (gearByte(id, 15) >> b) & 1 == 1 then s = s + 1 end
+        if (gearByte(id, 24) >> b) & 1 == 1 then s = s - 3 end
+      end
+    end
+    return s * 1000 + gearByte(id, 20) + gearByte(id, 21)
+  end
+  return M.lazy(function()
+    local steps, taken = {}, {}
+    for _, c in ipairs(seated()) do
+      if c <= 13 then
+        local kit = {}
+        for slot = 1, 3 do
+          if not (slot == 1 and leftHand(c) ~= "shield") then
+            local worn = gearWorn(c, slot)
+            local best, bs = nil, cover(worn)
+            for id = 0, 0xFE do
+              if M.invCountOf(id) - (taken[id] or 0) > 0 and gearType(id) == GEAR_SLOT_TYPE[slot] and wearable(c, id)
+                 and cover(id) > bs then
+                best, bs = id, cover(id)
+              end
+            end
+            if best and bs // 1000 > cover(worn) // 1000 then
+              kit[#kit + 1] = { slot, best }
+              taken[best] = (taken[best] or 0) + 1
+              M.log(string.format("[%s] %s slot %d $%02X -> $%02X (cover %d -> %d)", tag, GEAR_NAMES[c] or tostring(c),
+                slot, worn, best, cover(worn) // 1000, bs // 1000))
+            end
+          end
+        end
+        if #kit > 0 then steps[#steps + 1] = M.equipKit(c, kit, { tag = tag .. ": " .. (GEAR_NAMES[c] or c) }) end
+      end
+    end
+    if #steps == 0 then return M.logStep("[" .. tag .. "] nothing in the bag covers better") end
+    return M.seqStep(steps)
+  end)
+end
+
 -- The towns' weapon and armor counters, decoded from the ROM's data
 -- (route_data.py `map`: the town map's short entrances, the shop map's
 -- shopkeeper NPC and the shop_menu its event runs, event_main.asm).  Each
@@ -11557,6 +11613,73 @@ function M.kefkaTowerKit(K, fight)
         T.touchBoss(x, y, mapId, done, what, bossFight, tries + 1),
       })
     end)
+  end
+  -- the walking party levels on its lane's own floor before a statue (the owner: the bench levels in the tower): a
+  -- lap between the tile it stands on and the first of (x, y-2), (x, y+2), (x-2, y), (x+2, y), then the four
+  -- neighbours, that the floor reaches, the walker fighting what comes and the care after each battle, until every
+  -- member stands at `level` (and opts.min battles are fought: a lab's encounter history), at most opts.cap battles
+  -- (default 60).  Asserts the level at the end: a lane whose floor cannot raise the party fails here, not at the
+  -- statue.
+  function T.trainLap(what, level, opts)
+    opts = opts or {}
+    local cap, min = opts.cap or 60, opts.min or 0
+    local P, Q, n0, wp = nil, nil, 0, 1
+    local function low()
+      local t = {}
+      for _, ch in ipairs(M.partyRoster(M.activeParty())) do
+        if M.readByte(0x1600 + 37 * ch + 8) < level then t[#t + 1] = M.SPLIT_NAMES[ch] end
+      end
+      return t
+    end
+    local function levels()
+      local t = {}
+      for _, ch in ipairs(M.partyRoster(M.activeParty())) do
+        t[#t + 1] = string.format("%s L%d", M.SPLIT_NAMES[ch], M.readByte(0x1600 + 37 * ch + 8))
+      end
+      return table.concat(t, ", ")
+    end
+    return M.seqStep({
+      M.call(function()
+        local m, x, y = K.map(), M.fieldX(), M.fieldY()
+        P, Q, n0, wp = { x, y, m = m }, nil, #M.outcomes, 2
+        for _, d in ipairs({ { 0, -2 }, { 0, 2 }, { -2, 0 }, { 2, 0 }, { 0, -1 }, { 0, 1 }, { -1, 0 }, { 1, 0 } }) do
+          if Q == nil and M.bfsReach(nil, nil, nil, L(), x + d[1], y + d[2], A()) then Q = { x + d[1], y + d[2] } end
+        end
+        M.assertEq(Q ~= nil, true, string.format("%s: a lap tile the floor reaches from %d (%d,%d)", what, m, x, y))
+        K.say("train", string.format("%s: lap %d (%d,%d) <-> (%d,%d) until L%d (at least %d, at most %d battles): %s",
+          what, m, x, y, Q[1], Q[2], level, min, cap, levels()))
+      end),
+      M.driveUntil(function()
+        local calm = not M.battleLoadStarted() and M.hasControl() and M.tileAligned()
+        local n = #M.outcomes - n0
+        return calm and ((n >= min and #low() == 0) or n >= cap)
+      end, 6000000, {
+        -- a lap of two tiles with no encounter repeats the last lap's frames, and the no-progress watchdog reads
+        -- novelty (the hunt's rule, K.hunt): declared per step, and the steps between two battles bounded (the
+        -- map's rate gives a battle within a few dozen; gen_wor_kt_doom's first play tripped the watchdog 2,300
+        -- frames into a dry stretch, the same one at every retry: a seed shift does not re-draw encounters)
+        M.call(function()
+          if #M.outcomes ~= (P.seen or -1) then P.seen, P.steps = #M.outcomes, 0 end
+          M.assertEq(P.steps < (opts.stepCap or 400), true, string.format("%s: a random battle within %d steps of "
+            .. "the lap (%d since the last)", what, opts.stepCap or 400, P.steps))
+          M.watchQuiet(600, P.quietSaid == nil and "the lap walks the same two tiles" or nil)
+          P.quietSaid = true
+        end),
+        M.navTo(function() return (wp == 1 and P or Q)[1] end, function() return (wp == 1 and P or Q)[2] end,
+          { maxFrames = 20000, playBattles = "tactical", fight = fight }),
+        M.call(function()
+          M.assertEq(K.map(), P.m, what .. ": the lap stays on its map")
+          wp = wp % 2 + 1
+          P.steps = (P.steps or 0) + 1
+        end),
+        M.cond(function() return not M.battleLoadStarted() end, { M.fieldCare({ tag = "care on the lap" }) }, {}),
+      }, what),
+      M.call(function()
+        K.say("train", string.format("%s: after %d battles: %s", what, #M.outcomes - n0, levels()))
+        M.assertEq(#low(), 0, string.format("%s: every member at L%d within %d battles (below: %s)", what, level, cap,
+          table.concat(low(), ", ")))
+      end),
+    })
   end
   -- required: the leg needs this chest (an assertion when no side of it is reachable); an optional chest logs it
   function T.chest(cx, cy, bit, what, required)

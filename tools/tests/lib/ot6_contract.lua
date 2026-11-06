@@ -2626,6 +2626,30 @@ M.contracts["wor-kt-guardian-v1"] = {
   },
 }
 
+-- wor-kt-doom-v1: Kefka's Tower, Doom's save point, map 355 (64,11), after
+-- Doom (event battle 98: $0072, _cc16d6): party 3 walking there; party 2 on
+-- 337 (8,6), where it opened the cell doors ($00D0, _cc16ac); party 1 on
+-- the chamber's east plate as wor-kt-guardian-v1 left it (docs/design/
+-- route-wor-kefka-tower.md sections 2 and 5).  No timer.
+M.contracts["wor-kt-doom-v1"] = {
+  slot = 3,
+  field = { map = 355, x = 64, y = 11 },
+  switches = (function()
+    local t = {}
+    for _, sw in ipairs(M.contracts["wor-kt-guardian-v1"].switches) do t[#t + 1] = sw end
+    t[#t + 1] = { 0x00D0, 1, "the cell doors open (337 (8,6), _cc16ac)" }
+    t[#t + 1] = { 0x0072, 1, "Doom beaten (_cc16d6)" }
+    return t
+  end)(),
+  party = M.contracts["wor-kt-factory-v1"].party,
+  parties = { [1] = { map = 355, x = 43, y = 6 }, [2] = { map = 337, x = 8, y = 6 } },
+  walking = 3,
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- wor-dino-v1: the World of Ruin map, on foot on the Falcon's tile by the
 -- dinosaur forest north of Gau's father's house (195,46), after the grind
 -- there (world group 54) until the four stood at Kefka's Tower's target
