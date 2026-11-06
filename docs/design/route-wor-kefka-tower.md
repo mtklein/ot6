@@ -211,8 +211,46 @@ path leaves them.
 
 ## 6. The bosses
 
-(Each is labbed across draws from the graph's capture before it joins the
-line.)
+Until the graph captures `wor-kt-factory-v1` on this ROM (a replay from
+power-on, section 8), each boss is labbed from the graph's `wor-desert-v1`
+capture with the factory leg's own play in front of it
+(`mkinferno.py`, `mkatma.py`, `mkgold.py` in the evidence: the leg up to its
+save, then the boss instead), at twelve seed shifts (0, 1, 4, 5, ... 20, 21).
+A shift moves the in-battle RNG of every battle on the way, so the boss is
+met at different frames; distinct keys are counted (`$be` at the open with
+the formation). Fought by the default driver (boost-Fight, the break
+keyed), each party's hands made absorb-safe first (`H.absorbSafeArms`: SABIN's
+Fire Knuckle healed Inferno, lab `inf2`: "char 5's L-hand item $57 (fire) is
+ABSORBED by slot 0 species $010C").
+
+**Inferno** (battle 114: Inferno, Striker, Rough; party 3, CYAN, SHADOW,
+SABIN, GOGO). Not attrition, not a coin flip:
+
+| lab | the kit | won | distinct keys | deaths | ticks |
+|---|---|---|---|---|---|
+| `inf3` | two Ribbons in party 3 | 12 of 12 | 9 | 2 | 6,896-13,702 |
+| `inf5` | the spread: SHADOW's Ribbon to party 2 | 11 of 12 | 9 | 7 | 8,189-13,046 |
+
+`inf5`'s loss (`inf_s8`, key be5C) was a Petrify wipe: Delta Hit stoned
+SABIN ("entity 2 char 5 is under PETRIFY"), then CYAN and GOGO fell, and
+the game ends with SHADOW (no Ribbon now) standing stoned or alone. A loss
+in twelve is a line in the retry inventory; the Ribbon is worth more in
+party 2 (below). The break lands ("actor=0 KEYED: Fight at 0 BP lands 2
+chip(s) on slot 1's 1 shield(s)").
+
+**Atma** (battle 112, optional; party 2, CELES, STRAGO, LOCKE, MOG): 12 of
+12 won, 0 deaths, 8 distinct keys, 6,331-8,224 ticks (`atma3`); before the
+spread `atma1` won it in all 11 runs that reached it. A save point stands
+behind him, so the line fights him: a player meets him on party 2's way.
+
+**Why the Ribbon moves.** With the three Ribbons as the line wore them
+(TERRA's, CYAN's, SHADOW's), party 2 had none, and on its first map three
+Evil Oscars' Sour Mouth (Dark, Poison, Imp, Mute, Muddle, Sleep) wiped it
+(`atma1/atma_s16`: "formation 00B7 00B7 00B7 ... a6:0/5539 bp2 a7:449/3844
+bp1 a1:0/2653 bp1 a10:0/2315"). The split now hands one over: "[ribbons]
+party 3 wears 2, party 2 none: SHADOW hands slot 4's Ribbon over", "Ribbon
+$CA from the bag onto STRAGO's slot 4", "Ribbons by party: 1, 1, 1"
+(`probe/f10`). Party 2 picks up a second Ribbon in 292.
 
 ## 7. Measured
 
