@@ -233,5 +233,6 @@
 222	map 334 Kefka's Tower, Megalixir (48,48) -- on the tower's line (#273)
 226	map 410 Kefka's Tower, Hero Ring (10,17) -- on the tower's line (#273)
 241	map 410 Kefka's Tower, Aegis Shld (7,42) -- on the tower's line (#273)
+242	map 334 Kefka's Tower, Ribbon (29,29) -- on the tower's line (gen_wor_kt_poltergeist, #273)
 225	map 410 Kefka's Tower, Nutkin Suit (38,12; opened in 296, which shares the bits) -- a branch (gen_wor_kt_gauntlet, #273)
 235	map 410 Kefka's Tower, Gauntlet (49,12; opened in 296) -- a branch (gen_wor_kt_gauntlet, #273)

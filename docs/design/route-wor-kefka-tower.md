@@ -667,23 +667,15 @@ the factory, Inferno and Atma keys "none".
 
 ## 8. Not done
 
-- **The Poltergeist and the Goddess** (section 6.1): neither passes every
-  draw yet. The chain was played once on the graph's captures (drafts in
-  `scripts/drafts/`, the chain's order Poltergeist, Doom, Goddess, plates):
-  the Poltergeist leg "PASS (frame 134324) attempts=2/3" (attempt 1 a wipe
-  in "formation 0129"), the Goddess "PASS (frame 136451) attempts=2/3"
-  (attempt 1 wiped training on 354, "formation 00BD 00BD FFFF 006A"), and
-  the convergence leg "PASS (frame 2314) attempts=1/3": party 1 onto 411's
-  right plate ("held ($02C6)"), party 3 onto the left ("held ($02CE)"),
-  party 2 saved on 412's save point with both bits still set. The plate
-  bits stay set once stepped on (`_cc193f` sets, only the tower's exit
-  `_cc0f7d` clears), so the convergence cut works as designed. The
-  Goddess's save held TERRA and SETZER at 0 HP: party 1's share of the
-  Fenix Downs (the split's budget) was spent on 354's randoms.
-  The next legs boot `wor-kt-doom-v1`: party 2 goes on from 337 (8,6), north
-  through the chamber (the drafted Poltergeist leg's walk from there), the
-  Goddess's leg is party 1's, and the convergence is the drafted
-  `gen_wor_kt_plates`.
+- **Kefka** (#274) boots `wor-kt-plates-v1`: party 2 on 412's save point
+  with parties 1 and 3 on 411's plates. The plate bits stay set once stepped
+  on (`_cc193f` sets, only the tower's exit `_cc0f7d` clears), so party 2's
+  step from 412 (82,45) to 411's middle plate (109,40) starts FinalBattle.
+- **Party 1's lap deaths** (6.3): about four deaths a run training in 355's
+  east lane. The owner's direction was that the bench levels in the tower;
+  EDGAR and SETZER arrive at L41-42. More training by party 1's landing in
+  `gen_wor_kt_guardian` (334, plan M's measured floor) would replay from
+  Guardian on; not done.
 - **An older lever, worse** (`swap1`, kept): SETZER and GOGO swapped
   (party 1 TERRA, RELM, EDGAR, GOGO; party 3 CYAN, SHADOW, SABIN, SETZER),
   the chamber in the other order (party 1 west to Doom, party 2 east to the

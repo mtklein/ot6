@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-kt-poltergeist.sram",
+  "slot": 3,
+  "milestone": "wor-kt-poltergeist",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 412,
+      "x": 82,
+      "y": 47
+    }
+  },
+  "size": 32768,
+  "sha256": "9f275805018b92e839d56271f9d80860c520f6c0f947369a330592c8ad0d04f0",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "9f275805018b92e839d56271f9d80860c520f6c0f947369a330592c8ad0d04f0",
+    "generator_sig": "78f6b6a64f23674da9803f2fd368a2813139be8876afedc07acaa71cfb061802 gen_wor_kt_poltergeist build/checkpoints/wor-kt-doom-v1/manifest.json build/checkpoints/wor-kt-doom-v1/wor-kt-doom.sram",
+    "ancestors": [
+      {
+        "path": "build/checkpoints/wor-kt-doom-v1/manifest.json",
+        "sha256": "67e8268980638d70a4fd776d80c4c3acdf428f9b4d446f869a46b1ad186c7ed2"
+      }
+    ]
+  }
+}

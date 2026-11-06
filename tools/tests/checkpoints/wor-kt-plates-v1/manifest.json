@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-kt-plates.sram",
+  "slot": 3,
+  "milestone": "wor-kt-plates",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 412,
+      "x": 82,
+      "y": 47
+    }
+  },
+  "size": 32768,
+  "sha256": "3fa7f7f58e92a0ddcdeaf3d24bde116d43d7d13dd975fc9266aeb6009464c8ea",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "3fa7f7f58e92a0ddcdeaf3d24bde116d43d7d13dd975fc9266aeb6009464c8ea",
+    "generator_sig": "474661b002be2584e363e773cee702e86ae4843995182fa25d4e8db7a68da1cb gen_wor_kt_plates build/checkpoints/wor-kt-goddess-v1/manifest.json build/checkpoints/wor-kt-goddess-v1/wor-kt-goddess.sram",
+    "ancestors": [
+      {
+        "path": "build/checkpoints/wor-kt-goddess-v1/manifest.json",
+        "sha256": "0339f83868167c1caf3c64bad0d5e401f494c53566d9cf69d9b5eb2727fa7dd4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-kt-goddess.sram",
+  "slot": 3,
+  "milestone": "wor-kt-goddess",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "field": {
+      "map": 354,
+      "x": 12,
+      "y": 31
+    }
+  },
+  "size": 32768,
+  "sha256": "d549cbafc31249498c6c1cbdc9b45a9fcedfcdbd097177f87f1e03d4f5ab899d",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "d549cbafc31249498c6c1cbdc9b45a9fcedfcdbd097177f87f1e03d4f5ab899d",
+    "generator_sig": "b8ca3335dd95765dcd82dd05fb3ef16ed615b20cf50398fa3b21088d04d296f1 gen_wor_kt_goddess build/checkpoints/wor-kt-poltergeist-v1/manifest.json build/checkpoints/wor-kt-poltergeist-v1/wor-kt-poltergeist.sram",
+    "ancestors": [
+      {
+        "path": "build/checkpoints/wor-kt-poltergeist-v1/manifest.json",
+        "sha256": "4d3e22b48c791bec70edf9c73ab5e704512c8c281adc0ec55e8dccab8115cf09"
+      }
+    ]
+  }
+}

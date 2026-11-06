@@ -137,15 +137,17 @@ def selftest():
         ok = ok and cond
     states = sn.load(ROOT)
     three = ["wor-colosseum-v1", "wor-dino-v1", "wor-desert-v1", "wor-kt-factory-v1",
-             "wor-kt-inferno-v1", "wor-kt-atma-v1", "wor-kt-guardian-v1", "wor-kt-doom-v1"]
+             "wor-kt-inferno-v1", "wor-kt-atma-v1", "wor-kt-guardian-v1", "wor-kt-doom-v1",
+             "wor-kt-poltergeist-v1", "wor-kt-goddess-v1", "wor-kt-plates-v1"]
     for leg in ("wor_colosseum", "gen_wor_colosseum", "wor_colosseum_in"):
         h, keys = downstream(states, leg)
         check(f"{leg}: exactly {', '.join(three)}", keys == three)
     check("...through the prev= chain: wor_dino, wor_desert and the tower's legs replay",
-          {"wor_colosseum", "wor_dino", "wor_desert", "wor_kt_factory", "wor_kt_guardian", "wor_kt_doom"}
+          {"wor_colosseum", "wor_dino", "wor_desert", "wor_kt_factory", "wor_kt_guardian", "wor_kt_doom",
+           "wor_kt_plates"}
           <= set(h))
-    _, keys = downstream(states, "wor_kt_doom")
-    check("the last leg feeds only its own saves= key", keys == ["wor-kt-doom-v1"])
+    _, keys = downstream(states, "wor_kt_plates")
+    check("the last leg feeds only its own saves= key", keys == ["wor-kt-plates-v1"])
     h, keys = downstream(states, "wor_thamasa_plain")
     check("a branch leg that nothing boots feeds no tracked key", keys == [])
     _, keys = downstream(states, "wor_gogo")

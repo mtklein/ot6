@@ -100,6 +100,9 @@ TITLES = {
     "wor-kt-atma-v1": "Kefka's Tower, behind Atma",
     "wor-kt-guardian-v1": "Kefka's Tower, behind Guardian (before the statues)",
     "wor-kt-doom-v1": "Kefka's Tower, after Doom",
+    "wor-kt-poltergeist-v1": "Kefka's Tower, after the Poltergeist",
+    "wor-kt-goddess-v1": "Kefka's Tower, after the Goddess",
+    "wor-kt-plates-v1": "Kefka's Tower, two parties on the plates (before Kefka)",
 }
 
 README = """\

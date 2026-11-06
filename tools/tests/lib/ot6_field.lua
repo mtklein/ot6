@@ -5093,7 +5093,10 @@ local function careKernel(opts)
       -- A petrified or zombie member is refused by CheckCanUseItem
       -- (item.asm:2249-2258) and by the spell check (field_menu.asm:3076
       -- -3081) alike, so proposing anything for them only burns attempts.
-      if hp > 0 and mx > 0 and hp < mx and hp < mx * thresh
+      -- A member at 0 HP without the Wound bit (a Zombie the battle's
+      -- Revivify cured: #273, "c4 0/3475 hp ... status1 00", the Fenix
+      -- Down and Life refused) is not dead to the game: a heal lifts him.
+      if (hp > 0 or (M.charStatus1(c) & 0x80) == 0) and mx > 0 and hp < mx and hp < mx * thresh
          and (M.charStatus1(c) & 0xC2) == 0 then
         hurt[#hurt + 1] = { c = c, r = hp / mx }
       end
