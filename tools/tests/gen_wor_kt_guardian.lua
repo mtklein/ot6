@@ -19,6 +19,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local NAMES = H.SPLIT_NAMES
+local CELES, RIBBON, WALL_RING = 6, 0xCA, 0xBB
 local GUARDIAN_SAVE = { 12, 12 }
 local SKULL, GOLD, GUARDIAN = 0x151, 0x150, 0x112
 -- the tower's species whose vanilla weakness a player who knows the tower reads (gen_wor_kt_factory's)
@@ -167,7 +168,25 @@ H.run({ maxFrames = 3000000 }, {
   -- on at once, as a player does: party 2 wore one, and three Innocs muddled CELES and LOCKE into killing themselves
   -- and MOG in the chamber (hall5/ult_k0_s8: "entity 0 char 6 from 5539/5539 by entity 0 char 6 ... (a MUDDLED
   -- member's action)")
-  H.ribbonsOnSeated({ tag = "the 292 Ribbon onto party 2", noRegroup = true }),
+  -- ribbonsOnSeated keeps every relic party 2 wears ("no seated member can take the bag's Ribbon": CELES's Genji
+  -- Glove and Wall Ring, LOCKE's Hero Ring and Back Guard, MOG's Hyper Wrist and Black Belt), and a muddled CELES
+  -- killed herself (hall6/leg_s8), so the Ribbon goes over CELES's Wall Ring, the carrier's
+  H.lazy(function()
+    if H.invCountOf(RIBBON) < 1 or H.partyOfChar(CELES) ~= 2 then
+      return H.logStep("[ribbons] no Ribbon in the bag for CELES, or CELES not in party 2")
+    end
+    for s = 4, 5 do
+      if H.readByte(0x1600 + 37 * CELES + 0x1F + s) == RIBBON then return H.logStep("[ribbons] CELES wears one") end
+    end
+    local slot = H.readByte(0x1600 + 37 * CELES + 0x24) == WALL_RING and 5 or 4
+    return H.seqStep({
+      H.keepGear(CELES, "the 292 Ribbon onto CELES", H.equipKit(CELES, { { slot, RIBBON } },
+        { tag = "the 292 Ribbon onto CELES" })),
+      H.call(function()
+        H.assertEq(H.readByte(0x1600 + 37 * CELES + 0x1F + slot), RIBBON, "CELES wears the 292 Ribbon")
+      end),
+    })
+  end),
   walk(87, 12, "party 2 onto the switch (292 (87,12)): party 1's passage"),
   H.waitUntil(function() return sw(0x0062) == 1 and settled() end, 1200, "the passage opened ($0062)", 1),
   door(90, 7, 334, "party 2: 292 (90,7) -> 334 (18,50)"),
