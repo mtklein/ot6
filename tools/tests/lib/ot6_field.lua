@@ -9617,8 +9617,10 @@ function M.ribbonsOnSeated(opts)
       return M.seqStep(steps)
     end),
     M.call(function()
+      -- opts.noRegroup: a Ribbon handed between split parties (Kefka's Tower's spread), no cabin regroup behind it
       local note = M.ribbonsRegroupNote
       M.ribbonsRegroupNote = nil
+      if opts.noRegroup then note = { prev = {} } end
       M.assertEq(note ~= nil, true, tag .. ": the cabin's Ribbon step (H.ribbonsOffLeavers) ran before this regroup")
       local active = M.readByte(0x1A6D) & 0x07
       for _, ch in ipairs(note.prev) do

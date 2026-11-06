@@ -98,7 +98,7 @@ local function ribbonsSpread(depth)
       H.switchParty(donor, { tag = "Ribbon from party " .. donor }),
       H.unequipRelics(give.ch, { give.slot }, { tag = "Ribbon off " .. NAMES[give.ch] }),
       H.switchParty(taker, { tag = "Ribbon to party " .. taker }),
-      H.ribbonsOnSeated({ tag = "the Ribbon onto party " .. taker }),
+      H.ribbonsOnSeated({ tag = "the Ribbon onto party " .. taker, noRegroup = true }),
       ribbonsSpread(depth + 1),
     })
   end)
