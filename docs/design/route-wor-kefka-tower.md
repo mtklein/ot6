@@ -387,8 +387,11 @@ What the labs found:
   the fight then drags (11,904-46,573 ticks at L50) and attrition takes the
   loss. The 334 Ribbon stays in the bag: `ribbonsOnSeated` keeps every relic
   party 2 wears ("no seated member can take the bag's Ribbon"). STRAGO's
-  nuke lore (`nukeLore = { 22 }`, GrandTrain) was never planned (`pg0`):
-  the tactical driver's race plans his Fight.
+  nuke lore (`nukeLore = { 22 }`, GrandTrain) was never planned (`pg0`),
+  and his Pearl Wind (`strago = { pearlWind = true }`, `a5 pwpt50`) was
+  never cast: `a5` played the very fights of `a4 pwt50` (the same keys and
+  ticks, "won 8, lost 1"), so the boss fight's opts did not reach his
+  turns; worth a driver look before the next Poltergeist lab.
 - **The Goddess** answers a Fight with Love Token and every hit with Bolt 2,
   casts Overcast (Condemned on the party) every eighth, and Bolt 3, Flash
   Rain, Quasar below half. Party 1 (TERRA, RELM, EDGAR, SETZER) holds one
