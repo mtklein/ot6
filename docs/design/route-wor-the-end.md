@@ -213,18 +213,68 @@ plate of 411 ...): expected 0, read 1". The positive is the leg's play: "ok:
 the three parties before Kefka: who stands = every member" (`p3`).
 `T.standing` is the one helper the three statue legs call too.
 
+### 5.1 The bag, the order and Kefka's shields (second round)
+
+**The bag.** gen_wor_kt_factory's Kohlingen stop now stocks the tower and
+Kefka: Fenix Downs to 40, Potions to 99 (the first play stocked 20 and
+reached Kefka with 6). The tower's legs were replayed in order on this tree
+from the graph's `wor-desert-v1` (sha256 3876df9e), each from the leg before
+(`chain.sh`, `seal.py`, `chain.log`): every leg "PASS ... attempts=1/3", the
+factory "bought 15 x $F0", and Kefka's boot reached with "potion=85
+tincture=40 fenix=15". gen_wor_kefka asserts the floor at its boot (10 Fenix
+Downs, 40 Potions); the graph's v0.39 capture is its negative: "the bag for
+Kefka: 6 Fenix Downs (floor 10) and 86 Potions (floor 40), stocked at
+Kohlingen by gen_wor_kt_factory: got false" (`neg/neg_kefka_bag`).
+
+**Two driver levers, off** (on the v0.39 capture, the Girl first): the
+ruin rule (`opts.ruin`: three or more members inside their round reopen the
+round's care for every actor, a party cure ahead of a raise), "Kefka's
+battle: 24 runs; won 16, lost 8, other 0; distinct opening keys won 11, lost
+8" (`tally_r.txt`); with a care stop at each tier's end as well
+(`KEFKA_TIER_CARE`: the last body under a quarter of its HP, heal at 90%, no
+press), "won 17, lost 7 ... won 12, lost 7" (`tally_rt.txt`). The Girl first
+alone was 20 of 24.
+
+**The order** (the owner's six arms; from the stocked chain's
+`wor-kt-plates-v1`, the Girl first, the same K x shift grid):
+
+| arm | order | runs won | opening keys won / lost | tier 1 lost | tier 2 lost | tier 3 lost | Kefka lost (keys) |
+|---|---|---|---|---|---|---|---|
+| `os` | strongest first (the leg's) | **18 of 24** | 16 / 5 | 0 | 0 | 2 | 4 (4) |
+| `ob` | as recruited in the World of Balance | 14 of 24 | 14 / 8 | 0 | 0 | 6 | 4 (4) |
+| `ow` | weakest first | 5 of 24 | 4 / 17 | 3 | 7 | 7 | 2 (2) |
+| `orr` | as recruited in the World of Ruin | 7 of 24 | 7 / 15 | 3 | 0 | 13 | 1 (1) |
+| `om` | strong and carried alternating | 6 of 24 | 5 / 16 | 3 | 0 | 7 | 8 (6) |
+| `ox` | a seeded shuffle (Python `random.Random(274)`: SETZER, SHADOW, EDGAR, GOGO, MOG, LOCKE, RELM, TERRA, CELES, SABIN, STRAGO, CYAN) | 3 of 24 | 3 / 18 | 0 | 13 | 6 | 2 (2) |
+
+Quoted (`tally_<arm>.txt`): "Kefka's battle: 24 runs; won 18, lost 6, other
+0; distinct opening keys won 16, lost 5" (`os`); "won 14, lost 10 ... won
+14, lost 8" (`ob`); "won 5, lost 19 ... won 4, lost 17" (`ow`); "won 7, lost
+17 ... won 7, lost 15" (`orr`); "won 6, lost 18 ... won 5, lost 16" (`om`);
+"won 3, lost 21 ... won 3, lost 18" (`ox`). None passes every draw; the
+strongest first is the best by far and stays.
+
+**Kefka at 16 shields** (`k16`, a ROM arm, ccf835ca, the strongest first):
+the first three tiers play exactly as `os` (their rows did not change), and
+Kefka loses more: "4 Kefka: won 15, lost 7; distinct keys won 15, lost 7"
+against `os`'s "4 Kefka: won 18, lost 4; distinct keys won 18, lost 4";
+"Kefka's battle: 24 runs; won 15, lost 9" (`tally_k16.txt`). The row stays
+at 12 until the fight passes every draw at 12.
+
 ## 6. Not done
 
-- **Every draw.** The leg wins 20 of 24 runs of the grid (opening keys: 14
+- **Every draw.** The leg wins 18 of 24 runs on the stocked chain (5.1; 20 of 24 on the v0.39 capture, opening keys: 14
   won, 4 lost); the line retries a loss from its boot (`attempts=1/3`). The losses
   are attrition carried across tiers and Kefka's Fallen One answered one
   care turn a round. Levers not yet tried: a care stop between tiers (heal
   before the last body of a tier dies), the order (who starts and who comes
   in), and the supplies (below).
-- **Supplies.** The line reaches Kefka with 6 Fenix Downs, 4 Tonics, 86
-  Potions and no Elixir (`wor-kt-plates-v1`): the factory leg's Kohlingen
-  stop brings Fenix Downs to 20, and the tower spends 14. The band before a
-  boss gauntlet is about the level, capped at 20.
+- **Kefka at 16 shields**, the owner's want, once the fight passes every draw at
+  12 (5.1).
+- **The Fallen One answer.** The losses left in `os` are Kefka's (Goner on a
+  party Fallen One left at 1 HP) and the third tier's. Neither the ruin rule
+  nor a care stop between tiers helped; what a player does there (a party
+  cure, then raises, before the next swing) is a driver change still to find.
 - **STRAGO's options** (#512): his nuke lore never reaches his turns
   (`v039-kefka-tower-2/pg0`: "actor=1 char=7 plan=fight" every turn, no lore
   line at all, so a rule ahead of the nuke repertoire decides first); not

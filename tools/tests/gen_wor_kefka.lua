@@ -22,6 +22,7 @@ local KEFKA = 0x12A
 local TIERS = { [0x01D7] = "the arms and the face", [0x0200] = "the four figures", [0x0201] = "the lady and the "
   .. "sleeper", [0x0202] = "Kefka" }
 local GIRL = 0x15E
+local FENIX_FLOOR = 10
 local FIGHT = {}
 -- the fight's options (a lab's KEFKA_FIGHT overrides them): in the third tier the Girl is killed first, as a player
 -- who knows the fight does.  Her Pearl Wind heals the Sleep back to full (lab g_k0_s8, the stock policy:
@@ -72,8 +73,10 @@ local function hpMax(ch) return H.charMaxHp(ch) end
 -- The order (KEFKA_ORDER, a lab's, overrides it): the twelve members of the three parties, the highest level first
 -- (the most HP first among equals), as a player puts the strongest in front: the first four start the fight, and
 -- the rest come in, in this order, for the members who fall
+-- A lab's KEFKA_ORDER is a list of ids, or "weak" (the same sort, weakest first) or "mix" (strongest, weakest,
+-- second strongest, second weakest, ...: the strong carrying the bench, as the tower's parties)
 local function orderFor()
-  if KEFKA_ORDER then return KEFKA_ORDER end
+  if type(KEFKA_ORDER) == "table" then return KEFKA_ORDER end
   local all = {}
   for _, p in ipairs({ 1, 2, 3 }) do
     for _, ch in ipairs(H.partyRoster(p)) do all[#all + 1] = ch end
@@ -83,6 +86,19 @@ local function orderFor()
     if hpMax(a) ~= hpMax(b) then return hpMax(a) > hpMax(b) end
     return a < b
   end)
+  if KEFKA_ORDER == "weak" then
+    local r = {}
+    for i = #all, 1, -1 do r[#r + 1] = all[i] end
+    return r
+  elseif KEFKA_ORDER == "mix" then
+    local r, i, j = {}, 1, #all
+    while i <= j do
+      r[#r + 1] = all[i]
+      if j > i then r[#r + 1] = all[j] end
+      i, j = i + 1, j - 1
+    end
+    return r
+  end
   return all
 end
 
@@ -220,6 +236,11 @@ H.run({ maxFrames = 1500000 }, {
     local n = 0
     for _, p in ipairs({ 1, 2, 3 }) do n = n + #H.partyRoster(p) end
     H.assertEq(n, 12, "twelve members in the three parties (gen_wor_kt_factory's seating)")
+    -- the bag (no shop past Kohlingen: gen_wor_kt_factory's stop stocks 40 Fenix Downs and 99 Potions for the tower
+    -- and Kefka; the first play, which stocked 20, reached here with 6)
+    H.assertEq(H.invCountOf(0xF0) >= FENIX_FLOOR and H.invCountOf(0xE9) >= 40, true, string.format(
+      "the bag for Kefka: %d Fenix Downs (floor %d) and %d Potions (floor 40), stocked at Kohlingen by "
+      .. "gen_wor_kt_factory", H.invCountOf(0xF0), FENIX_FLOOR, H.invCountOf(0xE9)))
     H.assertEq(string.format("%d %d %d", sw(0x02C6), sw(0x02CA), sw(0x02CE)), "1 0 1",
       "parties 1 and 3 hold their plates, party 2 not yet ($02C6, $02CA, $02CE; gen_wor_kt_plates)")
   end),
