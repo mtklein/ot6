@@ -34,6 +34,12 @@ Evidence is under `build/attempts/wt/v040-the-end/`. Line numbers are into
    heals it to full) takes the leg from 17 to 20 of 24 runs across the grid
    (section 5); the rest are attrition carried from tier to tier and
    Kefka's Fallen One, not yet every draw.
+5. **Life 2, boosted cures and two stones answer Fallen One.** Reviving the
+   fallen with Life at one point (full HP), curing the member in danger with
+   Cure at one or two points, and Phoenix and Kirin on STRAGO and LOCKE take
+   the stocked chain's grid from 18 to 23 of 24 runs (20 of 24 on a second
+   grid); the third tier is never lost again, and what loses is Kefka after
+   his first break (5.2).
 
 ## 1. The climb
 
@@ -128,9 +134,11 @@ leg asserts all twelve stand (`T.standing`).
 
 ## 4. The leg and the line's end
 
-`gen_wor_kefka` boots `wor-kt-plates-v1` and plays to "The End": the care,
-the plate, the order menu, the battle (the tactical driver, the Girl
-killed first in the third tier), the ending. It asserts the staff roll and then The End by the code
+`gen_wor_kefka` boots `wor-kt-plates-v1` and plays to "The End": Phoenix on
+STRAGO and Kirin on LOCKE (party 2's, walking at the boot), the care, the
+plate, the order menu, the battle (the tactical driver, the Girl killed
+first in the third tier, the fallen revived with Life 2 and the member in
+danger cured at a boost: 5.2), the ending. It asserts the staff roll and then The End by the code
 the game runs (exec watches on `EndingAirshipScene2_ext` and `TheEnd_ext`)
 and saves its last state, `wor_kefka.mss`, there. No save point follows
 Kefka, so the line ends on that savestate rather than a battery: the graph's
@@ -139,7 +147,9 @@ now that a leg boots it.
 
 What the leg depends on (#480): the entry contract (the statues beaten,
 parties 1 and 3 on their plates, party 2 on 412's save point), twelve
-members in the three parties, and the three standing after the care.
+members in the three parties, the bag's floor, Phoenix and Kirin owned and
+worn by nobody with STRAGO and LOCKE in party 2, and the three standing
+after the care.
 
 ## 5. Measured
 
@@ -261,20 +271,103 @@ against `os`'s "4 Kefka: won 18, lost 4; distinct keys won 18, lost 4";
 "Kefka's battle: 24 runs; won 15, lost 9" (`tally_k16.txt`). The row stays
 at 12 until the fight passes every draw at 12.
 
+### 5.2 The heals that answer Fallen One (third round)
+
+Evidence is under `build/attempts/wt/v040-the-end-2/` (`tally_<arm>.txt`,
+`lab/`, `pre/`, `jobs_<arm>.txt`), every arm on the stocked chain's
+`wor-kt-plates-v1` (sha256 44ff430f) and the rows' ROM (7f1aba0d), px13,
+the same K x shift grid as 5.1 (grid A: shifts 0, 1, 4, 5, 8, 9, 12, 13);
+some arms also on grid B (shifts 2, 3, 6, 7, 10, 11, 14, 15), the same K.
+
+**What the losses were.** Every Kefka loss in `os` has the same shape:
+Fallen One opens his tier and leaves the four at 1 HP; the first break takes
+him from about 52,000 to between 4,000 and 26,000 while he loses his turns;
+the break ends with the four still at 1 HP (a Potion puts back 250, a Fenix
+Down raises at an eighth, and a cure on a Wall Ring wearer bounces); then
+below 32,640 his cycle opens with Goner, and his counters, HyperDrive below
+30,080 and Ultima below 10,240, take whoever is left (`os_k4_s0`: Goner at
+4,468 HP, "from 834/4672 ... atk $DE"). His HP when the party fell:
+4,311 to 26,310 across the later arms' losses.
+
+**What the party had.** No Elixir or Megalixir (the bag at the boot: 85
+Potions, 15 Fenix Downs, 40 Tinctures, no X-Potion); Life known to TERRA and
+to SHADOW through Sraphim, Cure to TERRA, CELES and SHADOW; Phoenix (Life)
+and Kirin (Cure, Regen) owned and worn by nobody. Life at one point is Life
+2 (full HP on the fallen) and at two Life 3 (status 4's reraise, not
+reflected); Cure at one point is Cure 2 and at two Cure 3, several times the
+plain cast's 965 the care lines price.
+
+| arm | the lever | runs won | opening keys won / lost | tier 3 lost | Kefka lost (keys) |
+|---|---|---|---|---|---|
+| `os` | the leg before (5.1) | 18 of 24 | 16 / 5 | 2 | 4 (4) |
+| `l3` | Life 3 on each member through Kefka's tier and below half the Sleep's HP (the bank unchecked: cast at one point) | 11 of 24 | 11 / 10 | 2 | 11 (10) |
+| `l3b` | `l3`, the bank holding two points | 16 of 24 | 15 / 7 | 2 | 6 (6) |
+| `l3c` | Life 3 only with Kefka under 60% | 18 of 24 | 16 / 5 | 2 | 4 (4) |
+| `lr` | Life 2 on the fallen (`lifeRaise`) | 18 of 24 | 15 / 5 | 0 | 6 (5) |
+| `lrbc` | `lr` + Cure at one or two points on the member under 40%, not in a break (`boostCure`) | 21 of 24 | 20 / 3 | 0 | 3 (2) |
+| `lrbt` | `lrbc`, the break's last quarter open to the cure | 21 of 24 | 20 / 3 | 0 | 3 (2) |
+| `lrbn` | `lrbc`, the cure in breaks too | 21 of 24 | 18 / 3 | 0 | 3 (3) |
+| **`lrbs`** | **`lrbc` + Phoenix on STRAGO, Kirin on LOCKE** | **23 of 24** | 18 / 1 | 0 | 1 (1) |
+| `lrbsB` | `lrbs` on grid B | 20 of 24 | 15 / 4 | 0 | 4 (4) |
+| `lrbw` | `lrbs` with RELM's and STRAGO's Wall Rings off | 17 of 24 | 16 / 7 | 0 | 7 (7) |
+| `lrb6`, `lrb6B` | `lrbs`, the cure under 60% | 22, 21 of 24 | 17 / 2, 16 / 3 | 0, 0 | 2, 3 |
+| `ph`, `phB` | `lrbs` + the break's hold (`phaseHold`: a first break stops at 42,000 and its turns go to heals) | 22, 20 of 24 | 17 / 2, 15 / 4 | 0, 0 | 2, 4 |
+| `dflt`, `dfltB` | the leg as committed (`lrbs`'s levers) | 23, 20 of 24 | 18 / 1, 15 / 4 | 0, 0 | 1, 4 |
+
+Quoted: "Kefka's battle: 24 runs; won 11, lost 13, other 0; distinct opening
+keys won 11, lost 10" (`l3`); "won 16, lost 8 ... won 15, lost 7" (`l3b`);
+"won 18, lost 6 ... won 16, lost 5" (`l3c`); "won 18, lost 6 ... won 15,
+lost 5" and "3 lady+sleeper: won 24, lost 0" (`lr`); "won 21, lost 3 ... won
+20, lost 3" (`lrbc`, `lrbt`); "won 21, lost 3 ... won 18, lost 3" (`lrbn`);
+"won 23, lost 1, other 0; distinct opening keys won 18, lost 1" and "4 Kefka:
+won 23, lost 1; distinct keys won 18, lost 1" (`lrbs`, `dflt`); "won 20, lost
+4 ... won 15, lost 4" (`lrbsB`, `dfltB`); "won 17, lost 7 ... won 16, lost 7"
+(`lrbw`); "won 22, lost 2 ... won 17, lost 2", "won 21, lost 3 ... won 16,
+lost 3" (`lrb6`, `lrb6B`); "won 22, lost 2 ... won 17, lost 2", "won 20, lost
+4 ... won 15, lost 4" (`ph`, `phB`). The first two tiers were never lost.
+
+- **Life 3 costs the race.** Two points a cast, from TERRA's or SHADOW's
+  bank, is two points not spent breaking Kefka; the first cut went at one
+  point when the bank held one (Life 2, which does nothing to the living:
+  "wanted 2, the bank holds 1: going at 1", `l3_k4_s13`). Gated under 60% it
+  was cast twice in 24 runs. The ward stays in the driver (`buffVs` takes
+  Life at two points), off.
+- **Life 2 ends the third tier's losses**: a fallen member back at full HP
+  for one point ("CELES 6155/6155" after "Life at 1 BP (Life 2) on fallen
+  entity 1", `lr_k0_s5`), and the Sleep's attrition never took a tier again
+  in any arm after it.
+- **Boosted cures and two more casters** carry Kefka's tier: 42 members fell
+  in it across `lrbc`'s grid, 21 in `lrbs`'s. The leg keeps both, and the
+  stones (`gen_wor_kefka`: `STONES`; the boot asserts them owned and unworn).
+- **The Wall Rings stay** (`lrbw`): with them off the cures reach RELM and
+  STRAGO, and Kefka's Fire 3, Ice 3 and Bolt 3 reach the party.
+- **The break's hold** does not help: the hits already queued when the hold
+  begins take him past it (the break opened at 48,408 and the hold met him at
+  29,518, `ph_k4_s12`), and a window's heals are a Potion or two and one
+  cure.
+- **What still loses** (`dflt`, `dfltB`): five of 48, all Kefka's, after the
+  first break: Goner and HyperDrive on members at 1 HP (the Wall Ring
+  wearers, whom only a Potion reaches, and members whose banks the break
+  emptied), or his Ultima answering the last hits below 10,240.
+
+The line's own play under the committed leg: "[end] 24 cinematics, the last
+airship scene at f151316, The End at f152030", "PASS (frame 152633)
+attempts=1/1" (`end1`).
+
 ## 6. Not done
 
-- **Every draw.** The leg wins 18 of 24 runs on the stocked chain (5.1; 20 of 24 on the v0.39 capture, opening keys: 14
-  won, 4 lost); the line retries a loss from its boot (`attempts=1/3`). The losses
-  are attrition carried across tiers and Kefka's Fallen One answered one
-  care turn a round. Tried and not enough: the supplies, a care stop
-  between tiers, the ruin rule, the six orders (5.1).
+- **Every draw.** The leg wins 23 of 24 runs on grid A and 20 of 24 on grid
+  B (5.2; the leg before: 18 of 24); every loss is Kefka's, after his first
+  break, on members at 1 HP (Goner, HyperDrive) or to his Ultima below 10,240.
+  The line retries a loss from its boot (`attempts=1/3`). Tried and not
+  enough besides 5.1's: Life 3 (`l3`, `l3b`, `l3c`), the Wall Rings off
+  (`lrbw`), a higher cure line (`lrb6`), the break's hold (`ph`).
 - **Kefka at 16 shields**, the owner's want, once the fight passes every draw at
   12 (5.1).
-- **The Fallen One answer.** The losses left in `os` are Kefka's (Goner on a
-  party Fallen One left at 1 HP) and the third tier's. Neither the ruin rule
-  nor a care stop between tiers helped; what a player does there (a party
-  cure, then raises, before the next swing) is a driver change still to find.
+- **What a player does next**: heal the Wall Ring wearers, whom no cure
+  reaches (a Potion's 250 is all they get), and keep a point in the curers'
+  banks through a break; or more damage in the first break. Neither is built.
 - **STRAGO's options** (#512): his nuke lore never reaches his turns
   (`v039-kefka-tower-2/pg0`: "actor=1 char=7 plan=fight" every turn, no lore
-  line at all, so a rule ahead of the nuke repertoire decides first); not
-  investigated further here.
+  line at all, so a rule ahead of the nuke repertoire decides first); Kefka's
+  fight sets no nuke lore, so it does not touch this leg; not investigated.
