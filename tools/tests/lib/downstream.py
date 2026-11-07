@@ -144,10 +144,13 @@ def selftest():
         check(f"{leg}: exactly {', '.join(three)}", keys == three)
     check("...through the prev= chain: wor_dino, wor_desert and the tower's legs replay",
           {"wor_colosseum", "wor_dino", "wor_desert", "wor_kt_factory", "wor_kt_guardian", "wor_kt_doom",
-           "wor_kt_plates"}
+           "wor_kt_plates", "wor_kefka"}
           <= set(h))
-    _, keys = downstream(states, "wor_kt_plates")
-    check("the last leg feeds only its own saves= key", keys == ["wor-kt-plates-v1"])
+    h, keys = downstream(states, "wor_kt_plates")
+    check("the plates leg feeds only its own key, and Kefka's leg replays", keys == ["wor-kt-plates-v1"]
+          and "wor_kefka" in h)
+    _, keys = downstream(states, "wor_kefka")
+    check("the last leg feeds no tracked key", keys == [])
     h, keys = downstream(states, "wor_thamasa_plain")
     check("a branch leg that nothing boots feeds no tracked key", keys == [])
     _, keys = downstream(states, "wor_gogo")

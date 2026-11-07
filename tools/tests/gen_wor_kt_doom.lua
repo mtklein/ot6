@@ -82,6 +82,7 @@ H.run({ maxFrames = 3000000 }, {
   H.elementDress(ICE_ELEMENT, { tag = "dress against Doom's ice" }),
   H.absorbSafeArms(nil, { DOOM }, { tag = "arms for Doom" }),
   H.fieldCare({ threshold = 1.0, tag = "before Doom" }),
+  T.standing("party 3 before Doom"),
   H.call(function() say("boss", "party 3 before Doom: " .. H.partiesLine()) end),
   H.navTo(64, 12, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, spare = { DOOM },
     arrive = function()

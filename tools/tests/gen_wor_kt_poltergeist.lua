@@ -96,6 +96,21 @@ H.run({ maxFrames = 3000000 }, {
     H.assertEq(string.format("%d (%d,%d)", m2, x2, y2), "337 (8,6)", "party 2 on 337 (8,6), where it opened the cell "
       .. "doors (gen_wor_kt_doom)")
     H.assertEq(sw(0x0074), 0, "the Poltergeist not yet fought ($0074)")
+    -- the hard inputs from the bag (#513): a bludgeon STRAGO can hold (the factory's rods and the line's own buys)
+    -- and a Wall Ring for each member of WALLS, in the bag or already worn
+    local rods = 0
+    for _, id in ipairs({ 0x39, 0x3A, 0x3B, 0x46 }) do
+      rods = rods + H.invCountOf(id) + ((H.readByte(0x1600 + 37 * 7 + 0x1F) == id) and 1 or 0)
+    end
+    H.assertEq(rods >= 1, true, "a bludgeon for STRAGO in the bag or his hands (the Pearl Rod, the Gravity Rod, the "
+      .. "Punisher, the Morning Star; gen_wor_kt_factory and the line's buys)")
+    local need, rings = 0, H.invCountOf(WALL_RING)
+    for ch in pairs(WALLS) do
+      need = need + 1
+      if wears(ch, WALL_RING) then rings = rings + 1 end
+    end
+    H.assertEq(rings >= need, true, string.format("a Wall Ring for each of the %d members who wear one for the "
+      .. "Poltergeist, in the bag or worn (%d)", need, rings))
   end),
   -- @@setup-end
 
@@ -140,6 +155,7 @@ H.run({ maxFrames = 3000000 }, {
   end),
   H.absorbSafeArms(nil, { POLTERGEIST }, { tag = "arms for the Poltergeist" }),
   H.fieldCare({ threshold = 1.0, tag = "before the Poltergeist" }),
+  T.standing("party 2 before the Poltergeist"),
   H.call(function() say("boss", "party 2 before the Poltergeist: " .. H.partiesLine()) end),
   H.navTo(30, 16, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, spare = { POLTERGEIST },
     avoid = T.avoid[334],

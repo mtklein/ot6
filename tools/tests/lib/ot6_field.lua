@@ -11641,6 +11641,23 @@ function M.kefkaTowerKit(K, fight)
   -- true.  A random battle can open on the step the talk takes (gen_wor_kt_atma's first graph play: "battle $1AA
   -- WON ... killed s0:$007 s1:$007 s2:$00D" in place of Atma, the talk's wait satisfied by it), so the talk is made
   -- again while the boss still stands, at most four times.
+  -- every member of the given parties (default the walking one) stands: HP above 0, no Wound, Petrify or Zombie
+  -- (#513: the care before a statue revives the fallen, and the dress skips a fallen member with a log line, so a
+  -- care that could not revive would otherwise meet the boss a member short)
+  function T.standing(what, parties)
+    return M.call(function()
+      local down = {}
+      for _, p in ipairs(parties or { M.activeParty() }) do
+        for _, ch in ipairs(M.partyRoster(p)) do
+          if M.charHp(ch) == 0 or (M.charStatus1(ch) & 0xC2) ~= 0 then
+            down[#down + 1] = string.format("%s %d/%d status $%02X", M.SPLIT_NAMES[ch], M.charHp(ch),
+              M.charMaxHp(ch), M.charStatus1(ch))
+          end
+        end
+      end
+      M.assertEq(#down == 0 and "every member" or table.concat(down, ", "), "every member", what .. ": who stands")
+    end)
+  end
   function T.touchBoss(x, y, mapId, done, what, bossFight, tries)
     tries = tries or 0
     return M.lazy(function()

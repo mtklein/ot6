@@ -91,6 +91,7 @@ H.run({ maxFrames = 3000000 }, {
   H.elementDress(BOLT_ELEMENT, { tag = "dress against the Goddess's bolts" }),
   H.absorbSafeArms(nil, { GODDESS }, { tag = "arms for the Goddess" }),
   H.fieldCare({ threshold = 1.0, tag = "before the Goddess" }),
+  T.standing("party 1 before the Goddess"),
   H.call(function() say("boss", "party 1 before the Goddess: " .. H.partiesLine()) end),
   -- her trigger spans 354 (11..13,32) (_cc1716)
   H.navTo(12, 32, { maxFrames = 6000, playBattles = "tactical", fight = FIGHT, spare = { GODDESS },
