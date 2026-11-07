@@ -37,6 +37,15 @@ if not KEFKA_STOCK then
     return nil
   end
 end
+-- Kefka's Fallen One opens his tier and leaves every member at 1 HP, and his Goner, HyperDrive and Ultima follow
+-- (route-wor-the-end.md 5.2): the party revives its fallen with Life at one point (Life 2: full HP, where a Fenix Down
+-- gives an eighth) and heals the member in danger with Cure at one or two points (Cure 2, Cure 3) outside a break
+-- window, as a player who knows the fight does.  The grid: 18 of 24 runs with neither, 23 of 24 with both and the
+-- stones below (lab lrbs)
+if not KEFKA_FIGHT and not KEFKA_STOCK then
+  BOSS_FIGHT.lifeRaise = true
+  BOSS_FIGHT.boostCure = { below = 0.4, notBroken = true }
+end
 -- KEFKA_RUIN (an arm): the driver's ruin rule (opts.ruin): with three or more members inside their round (Kefka's
 -- Fallen One), every actor may care, a party cure ahead of a raise
 if KEFKA_RUIN then BOSS_FIGHT.ruin = true end
@@ -58,6 +67,12 @@ if KEFKA_TIER_CARE then
   BOSS_FIGHT.healPercent = function() return tierEnding() and 90 or 55 end
   BOSS_FIGHT.press = function() if tierEnding() then return false end return nil end
 end
+-- Two stones the line carries unworn go on party 2 before the climb: Phoenix (Life) on STRAGO, in Palidor's place
+-- (Float, Slow), and Kirin (Cure, Regen) on LOCKE, in Shiva's (Ice, Osmose, Shell): two more members who can raise
+-- the fallen at full HP and cure at a boost (TERRA, CELES and SHADOW the others).  Lab lrbs: Kefka's tier lost 1 of
+-- 24 with them against 3 of 24 without (lrbc), the members who fell in it 21 against 42
+local STRAGO, LOCKE, PHOENIX, KIRIN = 7, 1, 26, 17
+local STONES = { { STRAGO, PHOENIX }, { LOCKE, KIRIN } }
 H.NAV_REFIRE_HOLD = true
 H.careThreshold = 1.0
 H.careMagic, H.careCastFirst = true, true
@@ -241,12 +256,45 @@ H.run({ maxFrames = 1500000 }, {
     H.assertEq(H.invCountOf(0xF0) >= FENIX_FLOOR and H.invCountOf(0xE9) >= 40, true, string.format(
       "the bag for Kefka: %d Fenix Downs (floor %d) and %d Potions (floor 40), stocked at Kohlingen by "
       .. "gen_wor_kt_factory", H.invCountOf(0xF0), FENIX_FLOOR, H.invCountOf(0xE9)))
+    -- the stones for Kefka: each owned ($1A69 bits), worn by nobody else, its wearer in party 2
+    for _, pe in ipairs(KEFKA_STONES or STONES) do
+      local ch, e = pe[1], pe[2]
+      local worn = nil
+      for c = 0, 15 do
+        if c ~= ch and H.readByte(0x1600 + 37 * c + 0x1E) == e then worn = c end
+      end
+      local inTwo = false
+      for _, c in ipairs(H.partyRoster(2)) do if c == ch then inTwo = true end end
+      H.assertEq((H.readByte(0x1A69 + (e >> 3)) >> (e & 7)) & 1 == 1 and worn == nil and inTwo, true,
+        string.format("stone %d for %s: owned, unworn (worn by %s), %s in party 2", e, NAMES[ch], tostring(worn),
+          NAMES[ch]))
+    end
     H.assertEq(string.format("%d %d %d", sw(0x02C6), sw(0x02CA), sw(0x02CE)), "1 0 1",
       "parties 1 and 3 hold their plates, party 2 not yet ($02C6, $02CA, $02CE; gen_wor_kt_plates)")
   end),
   -- @@setup-end
 
   -- @@stage care
+  -- the stones for Kefka (STONES; a lab's KEFKA_STONES replaces them), party 2's, walking at the boot
+  H.lazy(function()
+    local steps = { H.call(function() end) }
+    for _, pe in ipairs(KEFKA_STONES or STONES) do
+      local ch, e = pe[1], pe[2]
+      steps[#steps + 1] = H.equipEsper(function() return (H.readByte(0x1850 + ch) >> 3) & 3 end, e,
+        { tag = string.format("stone %d -> %s (party 2)", e, NAMES[ch]) })
+    end
+    return H.seqStep(steps)
+  end),
+  -- KEFKA_UNRING (a lab's): { { char, relic slot, party }, ... } to take off (the Wall Rings); splitCare walks
+  -- party 2 again after
+  H.lazy(function()
+    local steps = { H.call(function() end) }
+    for _, u in ipairs(KEFKA_UNRING or {}) do
+      steps[#steps + 1] = H.switchParty(u[3], { tag = "unring: party " .. u[3] })
+      steps[#steps + 1] = H.unequipRelics(u[1], { u[2] }, { tag = "unring " .. NAMES[u[1]] })
+    end
+    return H.seqStep(steps)
+  end),
   -- each party's care before the last step, party 2 walking again after
   H.splitCare({ threshold = 1.0, tag = "before Kefka", back = 2 }),
   T.standing("the three parties before Kefka", { 1, 2, 3 }),

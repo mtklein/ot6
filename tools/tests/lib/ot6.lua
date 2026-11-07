@@ -11989,8 +11989,13 @@ function Driver:boostCurePlan(actor, plan)
   local over = Driver.BUFF_OVER[plan.kind] or (plan.kind == "item" and (plan.item == 0xE9 or plan.item == 0xE8))
     or (plan.kind == "heal" and (plan.boostLeft or 0) == 0)
   if not over then return plan end
+  -- (breakTail: the break's last ticks, its count at or under this, are the party's to heal in before the body
+  -- acts again: Kefka's break ended on four members at 1 HP and his Ultima took them, lrbc_k4_s8)
   if o.notBroken then
-    for s = 0, 5 do if monAlive(s) and M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0 then return plan end end
+    for s = 0, 5 do
+      local t = monAlive(s) and M.readByte(BATTLE.BRK_TICKS + s * 2) or 0
+      if t ~= 0 and t > (o.breakTail or 0) then return plan end
+    end
   end
   local row, bank = cmdRow(actor, BATTLE.CMD_MAGIC), M.readByte(BATTLE.BP + actor * 2)
   if row == nil or bank < 1 or spellCell(actor, 0x2D, true) == nil then return plan end
