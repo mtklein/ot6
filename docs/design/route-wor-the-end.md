@@ -266,9 +266,8 @@ at 12 until the fight passes every draw at 12.
 - **Every draw.** The leg wins 18 of 24 runs on the stocked chain (5.1; 20 of 24 on the v0.39 capture, opening keys: 14
   won, 4 lost); the line retries a loss from its boot (`attempts=1/3`). The losses
   are attrition carried across tiers and Kefka's Fallen One answered one
-  care turn a round. Levers not yet tried: a care stop between tiers (heal
-  before the last body of a tier dies), the order (who starts and who comes
-  in), and the supplies (below).
+  care turn a round. Tried and not enough: the supplies, a care stop
+  between tiers, the ruin rule, the six orders (5.1).
 - **Kefka at 16 shields**, the owner's want, once the fight passes every draw at
   12 (5.1).
 - **The Fallen One answer.** The losses left in `os` are Kefka's (Goner on a
