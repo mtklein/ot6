@@ -1,0 +1,301 @@
+-- gen_wor_kefka.lua -- Kefka and the ending (docs/design/route-wor-the-end.md): Continue the `wor-kt-plates-v1`
+-- battery (party 2 on 412's save point, (82,47); parties 1 and 3 on 411's right and left plates), then
+--   the care: each party in turn (H.splitCare), as a player does before the last step;
+--   party 2 down from 412 (82,45) to 411 and onto the middle plate (109,40): with all three plates held it starts
+--     FinalBattle (event_main.asm FinalBattle), the climb to Kefka;
+--   the order menu (order_menu, menu type $08, final_order.asm): the twelve members of the three parties in the
+--     order they join the fight, the first four starting it (ORDER below);
+--   battle 101: four formations in one battle (battle_main.asm FinalBattleIDTbl: 471 the arms and the face, 512
+--     the four figures, 513 the lady and the sleeper, 514 Kefka); between formations the fallen leave and the next
+--     members of the order take their places (the end-of-battle special event $06), and a party that falls whole
+--     inside one is a game over (_ca5ea9: the runner retries from the save);
+--   the ending (GameEnding): its cinematics (event command $ba, EndingCutscene_ext: each character's scene, then
+--     the staff roll over the Falcon's flight), the last airship scene ($bf, EndingAirshipScene2_ext), the last
+--     cinematic (ending 32) and "The End" ($bb, TheEnd_ext): asserted in that order, and the line's last state
+--     saved there.
+-- No save point follows Kefka, so the line ends on a savestate rather than a battery.
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+local H = dofile("tools/tests/lib/ot6.lua")
+
+local NAMES = H.SPLIT_NAMES
+local KEFKA = 0x12A
+local TIERS = { [0x01D7] = "the arms and the face", [0x0200] = "the four figures", [0x0201] = "the lady and the "
+  .. "sleeper", [0x0202] = "Kefka" }
+local GIRL = 0x15E
+local FIGHT = {}
+-- the fight's options (a lab's KEFKA_FIGHT overrides them).  KEFKA_GIRL_FIRST (a lab's arm): in the third tier the
+-- Girl is killed first, as a player who knows the fight does: her Pearl Wind heals the Sleep back to full (lab
+-- g_k0_s8: "s3:40000/40000" again and again while the party hit it), and alone she only revives it with Life 2
+-- (AIScript::_350); elsewhere the driver's own kill order (focusList: the formation's parts) stands
+local BOSS_FIGHT = KEFKA_FIGHT or {}
+if KEFKA_GIRL_FIRST then
+  BOSS_FIGHT.focus = function()
+    -- (the formation in play, $11E0: the formation words keep the earlier tiers' bodies in their slots)
+    if H.battleLoadStarted() and H.readWord(0x11E0) == 0x0201 then return { { species = GIRL } } end
+    return nil
+  end
+end
+H.NAV_REFIRE_HOLD = true
+H.careThreshold = 1.0
+H.careMagic, H.careCastFirst = true, true
+
+local K = H.worLegKit({ fight = FIGHT, links = {}, names = NAMES })
+local map, sw, settled, say, watches = K.map, K.sw, K.settled, K.say, K.watches
+local T = H.kefkaTowerKit(K, FIGHT)
+local walk, door = T.walk, T.door
+
+local function lv(ch) return H.readByte(0x1600 + 37 * ch + 8) end
+local function hpMax(ch) return H.charMaxHp(ch) end
+local WALL_RING = 0xBB
+local function relic(ch, s) return H.readByte(0x1600 + 37 * ch + 0x1F + s) end
+
+-- KEFKA_WALLS_OFF (a lab's arm): the Wall Rings the tower's statues called for come off before Kefka, each party in
+-- turn, and the Relic planner fills the slots from the bag (H.dressRelics).  Kefka's Fallen One leaves every member
+-- at 1 HP, and with a Wall Ring seated the driver casts no party cure (a cure that reaches a Reflect bounces onto the
+-- enemy): lab g_k2_s0, "actor=1 no party cure: entity 2 wears Reflect", TERRA's single Cures one a turn, and the
+-- party fell to Kefka
+local function wallsOff(p)
+  return H.seqStep({
+    H.switchParty(p, { tag = "the Wall Rings off, party " .. p }),
+    H.lazy(function()
+      local steps, m = {}, {}
+      for _, ch in ipairs(H.partyRoster(p)) do
+        m[#m + 1] = { ch, NAMES[ch] }
+        for _, s in ipairs({ 4, 5 }) do
+          if relic(ch, s) == WALL_RING then
+            local label = string.format("the Wall Ring off %s (slot %d) for Kefka", NAMES[ch], s)
+            steps[#steps + 1] = H.keepGear(ch, label, H.unequipRelics(ch, { s }, { tag = label }))
+          end
+        end
+      end
+      if #steps == 0 then return H.logStep(string.format("[kefka] party %d wears no Wall Ring", p)) end
+      steps[#steps + 1] = H.dressRelics(m, { tag = "relics for Kefka, party " .. p })
+      steps[#steps + 1] = H.call(function()
+        for _, ch in ipairs(H.partyRoster(p)) do
+          H.assertEq(relic(ch, 4) ~= WALL_RING and relic(ch, 5) ~= WALL_RING, true, NAMES[ch]
+            .. " wears no Wall Ring for Kefka")
+        end
+      end)
+      return H.seqStep(steps)
+    end),
+  })
+end
+
+-- The order (KEFKA_ORDER, a lab's, overrides it): the twelve members of the three parties, the highest level first
+-- (the most HP first among equals), as a player puts the strongest in front: the first four start the fight, and
+-- the rest come in, in this order, for the members who fall
+local function orderFor()
+  if KEFKA_ORDER then return KEFKA_ORDER end
+  local all = {}
+  for _, p in ipairs({ 1, 2, 3 }) do
+    for _, ch in ipairs(H.partyRoster(p)) do all[#all + 1] = ch end
+  end
+  table.sort(all, function(a, b)
+    if lv(a) ~= lv(b) then return lv(a) > lv(b) end
+    if hpMax(a) ~= hpMax(b) then return hpMax(a) > hpMax(b) end
+    return a < b
+  end)
+  return all
+end
+
+-- what the run watches by the code it runs: the order menu's frame handler, each formation the battle loads after
+-- the first, the ending's cinematics, the last airship scene and "The End"
+local E = { menu = nil, falcon = nil, theEnd = nil, tiers = {}, endings = {} }
+local function names(list)
+  local t = {}
+  for _, ch in ipairs(list) do t[#t + 1] = NAMES[ch] or string.format("$%02X", ch) end
+  return table.concat(t, ", ")
+end
+local function seated()
+  local t = {}
+  for i = 0, 3 do
+    local ch = H.readByte(0x3ED8 + 2 * i)
+    if ch ~= 0xFF then
+      t[#t + 1] = string.format("%s %d/%d", NAMES[ch] or string.format("$%02X", ch), H.readWord(0x3BF4 + 2 * i),
+        H.readWord(0x3C1C + 2 * i))
+    end
+  end
+  return table.concat(t, ", ")
+end
+local function observers()
+  return H.call(function()
+    local m74 = H.sym("MenuState_74")
+    emu.addMemoryCallback(function() E.menu = H.frame end, emu.callbackType.exec, m74, m74)
+    local ec = H.sym("EndingCutscene_ext")
+    emu.addMemoryCallback(function()
+      local n = H.readByte(0x0201)
+      E.endings[#E.endings + 1] = { n = n, frame = H.frame, falcon = E.falcon ~= nil }
+      H.log(string.format("[end] f%d ending cinematic %d", H.frame, n))
+    end, emu.callbackType.exec, ec, ec)
+    local fa = H.sym("EndingAirshipScene2_ext")
+    emu.addMemoryCallback(function()
+      if not E.falcon then E.falcon = H.frame; H.log(string.format("[end] f%d the last airship scene", H.frame)) end
+    end, emu.callbackType.exec, fa, fa)
+    local te = H.sym("TheEnd_ext")
+    emu.addMemoryCallback(function()
+      if not E.theEnd then E.theEnd = H.frame; H.log(string.format("[end] f%d The End", H.frame)) end
+    end, emu.callbackType.exec, te, te)
+    -- each formation's start: the battle's first, and each CheckFinalBattle chains to (RestartBattle)
+    local rb = H.sym("RestartBattle")
+    emu.addMemoryCallback(function()
+      local f = H.readWord(0x11E0)
+      if not TIERS[f] then return end
+      E.tiers[#E.tiers + 1] = { f = f, frame = H.frame }
+      -- the outcomes said before Kefka's formation loads (the driver names a tier's outcome by the formation the
+      -- battle has already moved on to: "battle $202 WON ... killed s2:$15E s3:$15F" is the third tier's)
+      if f == 0x0202 then E.kefkaN = #H.outcomes end
+      H.log(string.format("[tier] f%d formation $%04X (%s) begins; standing: %s", H.frame, f, TIERS[f] or "?",
+        seated()))
+    end, emu.callbackType.exec, rb, rb)
+  end)
+end
+
+-- The order menu (final_order.asm): $4B is the cursor (0 "reset", 1-12 the list, 13 "end"), $4A how many are
+-- picked, $7E9D8A+i the list's characters, $0205+k the k-th pick.  Each pick walks the cursor to the member and
+-- presses A; with every member picked, START closes the menu (FillFinalOrder adds nobody then).  A pick that went
+-- wrong is taken back with B.  Reads and presses only.
+local function orderMenu()
+  local order, phase, committed = nil, 0, nil
+  local function live() return E.menu ~= nil and H.frame - E.menu <= 2 end
+  local function picks()
+    local t = {}
+    for k = 0, H.readByte(0x4A) - 1 do t[#t + 1] = H.readByte(0x0205 + k) end
+    return t
+  end
+  return H.seqStep({
+    H.waitUntil(live, 60000, "the order menu open"),
+    H.call(function()
+      order = orderFor()
+      local list = {}
+      for i = 0, 11 do
+        local ch = H.readByte(0x7E9D8A + i)
+        if ch ~= 0xFF then list[#list + 1] = ch end
+      end
+      H.log("[order] the menu lists: " .. names(list))
+      H.log("[order] the order: " .. names(order))
+      H.assertEq(#list, #order, "the order names every member the menu lists")
+    end),
+    H.driveUntil(function() return committed ~= nil and not live() end, 20000, {
+      H.call(function()
+        phase = (phase + 1) % 8
+        local function tap(b) H.setPad(phase < 3 and { b } or {}) end
+        if not live() or committed then H.setPad({}); return end
+        local got = picks()
+        for k, ch in ipairs(got) do
+          if order[k] ~= ch then tap("b"); return end
+        end
+        if #got >= #order then committed = H.frame; H.setPad({ "start" }); return end
+        local want, tgt = order[#got + 1], nil
+        for i = 0, 11 do if H.readByte(0x7E9D8A + i) == want then tgt = i + 1 end end
+        if not tgt then error("the order menu does not list " .. tostring(NAMES[want]), 0) end
+        local cur = H.readByte(0x4B)
+        if cur < tgt then tap("down") elseif cur > tgt then tap("up") else tap("a") end
+      end),
+    }, "the order picked"),
+    H.call(function()
+      local t = {}
+      for k = 0, 11 do t[#t + 1] = H.readByte(0x0205 + k) end
+      H.log("[order] committed: " .. names(t))
+      for k, ch in ipairs(order) do
+        H.assertEq(t[k], ch, string.format("the order's member %d", k))
+      end
+    end),
+  })
+end
+
+-- the ending rides on its own: no input but the dialogs'.  Its cinematics change little of what the heartbeat
+-- samples, so the event pointer ($E5-$E7) or the world module's script pointer ($EA-$ED) moving is said as
+-- progress
+local function ending(pred, frames, what)
+  local last = nil
+  return H.driveUntil(pred, frames, {
+    H.call(function()
+      local p = H.readByte(0xEA) | (H.readByte(0xEB) << 8) | (H.readByte(0xEC) << 16) | (H.readByte(0xED) << 24)
+      local e = H.readByte(0xE5) | (H.readByte(0xE6) << 8) | (H.readByte(0xE7) << 16)
+      local key = p * 16777216 + e
+      if key ~= last then last = key; H.progress("ending") end
+      H.setPad(H.dialogWaiting() and (H.frame % 8 < 3) and { "a" } or {})
+    end),
+  }, what)
+end
+
+H.run({ maxFrames = 1500000 }, {
+  H.bootCheckpoint("wor-kt-plates-v1"),
+  watches(),
+  observers(),
+  -- ---- 0. what the plan depends on (#480) -------------------------------------------------------------------
+  -- The entry contract holds the story (the statues beaten, parties 1 and 3 on their plates, party 2 on 412's
+  -- save point).  Asserted here: the three parties hold twelve members (the order menu lists those in a party),
+  -- and Kefka not yet beaten (the plates still held).
+  H.call(function()
+    say("tower", "boot")
+    local n = 0
+    for _, p in ipairs({ 1, 2, 3 }) do n = n + #H.partyRoster(p) end
+    H.assertEq(n, 12, "twelve members in the three parties (gen_wor_kt_factory's seating)")
+    H.assertEq(string.format("%d %d %d", sw(0x02C6), sw(0x02CA), sw(0x02CE)), "1 0 1",
+      "parties 1 and 3 hold their plates, party 2 not yet ($02C6, $02CA, $02CE; gen_wor_kt_plates)")
+  end),
+  -- @@setup-end
+
+  -- @@stage care
+  -- each party's care before the last step, party 2 walking again after
+  H.splitCare({ threshold = 1.0, tag = "before Kefka", back = 2 }),
+  H.cond(function() return KEFKA_WALLS_OFF end, { wallsOff(1), wallsOff(3), wallsOff(2) }, {}),
+  T.standing("the three parties before Kefka", { 1, 2, 3 }),
+  H.call(function() say("boss", "before Kefka: " .. H.partiesLine()) end),
+
+  -- @@stage climb
+  -- a lab's K (KEFKA_BURN): party 2 down to 334's north (412 and 411 deal no random battles) for K more battles
+  -- first, its care, and back up, so the fight meets another encounter history; the line's own play has none
+  H.cond(function() return (KEFKA_BURN or 0) > 0 end, {
+    door(82, 50, 334, "party 2: 412 (82,50) -> 334 (a lab's K)"),
+    H.lazy(function() return T.trainLap("party 2 on 334's north (a lab's K)", 0, { burn = KEFKA_BURN }) end),
+    H.fieldCare({ threshold = 1.0, tag = "after the lab's K" }),
+    door(30, 11, 412, "party 2: 334 (30,11) -> 412 (82,49)"),
+    H.lazy(function() return H.splitCare({ threshold = 1.0, tag = "before Kefka, after the lab's K", back = 2 }) end),
+  }, {}),
+  door(82, 45, 411, "party 2: 412 (82,45) -> 411"),
+  walk(109, 40, "party 2 onto 411's middle plate (109,40)", function()
+    return map() ~= 411 or H.eventRunning() or (H.fieldX() == 109 and H.fieldY() == 40)
+  end),
+  H.advanceStory(function() return E.menu ~= nil and H.frame - E.menu <= 2 end, 60000, {}),
+  orderMenu(),
+
+  -- @@stage kefka
+  -- the ride ends at Kefka's [outcome] line, a win with a kill said after his formation loaded (between two
+  -- formations the driver says a won outcome with no kill: "battle $202 WON after 40 ticks (no end reading ...):
+  -- killed none"): after it the ending rearranges the party (char_party), and the wipe watch would read its empty
+  -- seats as a wipe (lab p1: "THE PARTY IS WIPED" 2,600 frames after Kefka's "battle $202 WON")
+  H.advanceStory(function()
+    local o = H.lastOutcome
+    return E.kefkaN ~= nil and #H.outcomes > E.kefkaN and o.kind == "won" and #o.kills > 0
+  end, 1200000, { playBattles = "tactical", fight = BOSS_FIGHT, care = false }),
+  H.call(function()
+    H.assertEq(#E.tiers >= 4 and E.tiers[#E.tiers].f == 0x0202, true, "the battle moved through the tiers to "
+      .. "Kefka's ([tier] lines)")
+    say("boss", "Kefka beaten")
+  end),
+
+  -- @@stage ending
+  -- (KEFKA_UNTIL = "won", a lab's: the run ends at Kefka's [outcome] line instead of riding the ending)
+  H.cond(function() return KEFKA_UNTIL == "won" end, {
+    H.logStep("[lab] Kefka beaten; the run stops before the ending (KEFKA_UNTIL)"),
+  }, {
+    ending(function() return E.theEnd ~= nil end, 400000, "The End"),
+    H.waitFrames(600),
+    H.call(function()
+      H.screenshot("the_end")
+      -- the ending's own order (event_main.asm GameEnding): its cinematics, the last airship scene, ending 32, The
+      -- End.  The cinematics before the airship scene are the characters' scenes and the staff roll's pages
+      local before, last = 0, E.endings[#E.endings]
+      for _, e in ipairs(E.endings) do if not e.falcon then before = before + 1 end end
+      H.assertEq(before >= 10 and E.falcon ~= nil and last ~= nil and last.falcon and last.n == 32
+        and E.theEnd > last.frame, true, string.format("the ending's cinematics (%d before the last airship scene), "
+        .. "the airship scene, ending 32, then The End (event commands $ba, $bf, $ba, $bb)", before))
+      H.log(string.format("[end] %d cinematics, the last airship scene at f%d, The End at f%d", #E.endings,
+        E.falcon, E.theEnd))
+    end),
+    H.saveState("wor_kefka.mss"),
+    H.logStep(function() return "wor_kefka generated: The End" end),
+  }),
+})
