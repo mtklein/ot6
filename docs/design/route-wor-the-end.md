@@ -40,6 +40,11 @@ Evidence is under `build/attempts/wt/v040-the-end/`. Line numbers are into
    the stocked chain's grid from 18 to 23 of 24 runs (20 of 24 on a second
    grid); the third tier is never lost again, and what loses is Kefka after
    his first break (5.2).
+6. **The Megalixir and the curers' last point win every draw.** The tower's
+   Megalixir, saved for Kefka (owner, 2026-11-07) and drunk when Fallen One
+   leaves the party at 1 HP, and the curers keeping one point through his
+   break, win 48 of 48 runs of both grids, every distinct key (5.3). At 16
+   shields he still wins 4 of 48, so his row stays at 12.
 
 ## 1. The climb
 
@@ -138,7 +143,9 @@ leg asserts all twelve stand (`T.standing`).
 STRAGO and Kirin on LOCKE (party 2's, walking at the boot), the care, the
 plate, the order menu, the battle (the tactical driver, the Girl killed
 first in the third tier, the fallen revived with Life 2 and the member in
-danger cured at a boost: 5.2), the ending. It asserts the staff roll and then The End by the code
+danger cured at a boost: 5.2; the Megalixir when Fallen One leaves the
+party at 1 HP and the curers keeping a point through his break: 5.3), the
+ending. It asserts the staff roll and then The End by the code
 the game runs (exec watches on `EndingAirshipScene2_ext` and `TheEnd_ext`)
 and saves its last state, `wor_kefka.mss`, there. No save point follows
 Kefka, so the line ends on that savestate rather than a battery: the graph's
@@ -147,7 +154,7 @@ now that a leg boots it.
 
 What the leg depends on (#480): the entry contract (the statues beaten,
 parties 1 and 3 on their plates, party 2 on 412's save point), twelve
-members in the three parties, the bag's floor, Phoenix and Kirin owned and
+members in the three parties, the bag's floor and its Megalixir, Phoenix and Kirin owned and
 worn by nobody with STRAGO and LOCKE in party 2, and the three standing
 after the care.
 
@@ -354,19 +361,101 @@ The line's own play under the committed leg: "[end] 24 cinematics, the last
 airship scene at f151316, The End at f152030", "PASS (frame 152633)
 attempts=1/1" (`end1`).
 
+### 5.3 The Megalixir and the curers' last point (fourth round)
+
+Evidence is under `build/attempts/wt/v040-the-end-3/` (`tally_<arm>.txt`,
+`lab/`, `pre/`, `jobs_*.txt`, `chain.log`), px13, the rows' ROM (7f1aba0d),
+both grids (A: shifts 0, 1, 4, 5, 8, 9, 12, 13; B: 2, 3, 6, 7, 10, 11, 14,
+15; K = 0, 2, 4), 48 runs an arm.
+
+**What the losses were** (5.2's `dflt`, `dfltB`). Fallen One is Kefka's
+opener whenever he stands at 32,640 HP or more (`AIScript::_298`), and it
+sets HP to 1 (special effect $40, `TargetEffect_40`). After it the members
+at 1 HP died to his Battle and Special before any break, or the break's burst
+left every bank empty, and HyperDrive (every hit under 30,080), Goner (each
+cycle under 32,640) and Ultima (hits under 10,240) took them (`dflt_k0_s8`:
+TERRA at 0 BP through the window, then "not curing entity 0 (2944/6309):
+$2D restores 965"; `fostB_k0_s6`: Ultima on four members, three at 1 HP,
+with Kefka at 10,149).
+
+**The bag.** The tower's Megalixir (chest bit 222) was opened in
+gen_wor_kt_guardian and drunk in its battle 13 ("party item $EF: 2 members
+inside their round"). The owner's ruling: Megalixirs are saved for Kefka's
+fight and used there. The driver spends a Megalixir only in a fight whose
+options say `opts.megalixir` (`M.MEGALIXIR`: the care lines and the care
+race's bag), and gen_wor_kefka's opens it only while Kefka stands (the first
+cut let the care lines drink it in the battle's first formation,
+`void/m_k0_s0_megalixir_tier1`) and drinks it when three seated members
+stand under 30% of their HP. The tower from gen_wor_kt_guardian on was
+replayed in order under the rule (`chain.sh`, from the stocked chain's
+wor-kt-atma-v1, sha256 665d7330): "c_guardian ... PASS (frame 243499)
+attempts=1/3" through "c_plates ... PASS (frame 2315) attempts=1/3"
+(`chain.log`), the plates' capture sha256 1648cc80. gen_wor_kt_guardian
+without the Megalixir across shifts 1-15 (`lab/gd_s*`): 15 of 15 PASS, no
+Megalixir drunk. The leg asserts the Megalixir at its boot; red on the
+capture before the rule (`lab/negmega`): "a Megalixir in the bag for Kefka
+(0), saved since gen_wor_kt_guardian's chest: got false, want true".
+
+| arm | the lever (on 5.2's leg) | boot | runs won (A + B) | Kefka lost (keys) | tier 3 lost |
+|---|---|---|---|---|---|
+| `dflt` (5.2) | the leg before | 44ff430f | 23 + 20 | 5 (4) | 0 |
+| `fo` | Fallen One out of the hit ledger (`TO_ONE_OUT`) | 44ff430f | 23 + 21 | 4 (4) | 0 |
+| `st` | Starlet on RELM (from SABIN), summoned as care (`careSummon`), Phoenix's Rebirth on two fallen | 44ff430f | 21 + 21 | 6 (6) | 0 |
+| `fost` | `fo` + `st` | 44ff430f | 23 + 22 | 3 (3) | 0 |
+| `fsrb` | `fost` + the curers' last point (`reserveBank`) | 44ff430f | 24 + 23 | 1 (1) | 0 |
+| `fssf` | `fost` + CELES's Safe on the party (`buffVs`) | 44ff430f | 19 + 18 | 11 (11) | 0 |
+| `m` | the Megalixir | 1648cc80 | 23 + 24 | 1 (1) | 0 |
+| `mf` | `m` + `fsrb`'s levers | 1648cc80 | 22 + 23 | 1 (1) | 2 |
+| `mfm` | `mf` + Mute cured on RELM (`muteCure`) | 1648cc80 | 21 + 22 | 2 (2) | 3 |
+| `mr` | `m` + `fo` + the curers' last point | 1648cc80 | 24 + 24 | 0 | 0 |
+| **`mrb`** | **`m` + the curers' last point** | 1648cc80 | **24 + 24** | 0 | 0 |
+| **`d3`** | **the leg as committed (`mrb`'s levers)** | 1648cc80 | **24 + 24** | 0 | 0 |
+| `k16` | `d3`, Kefka at 16 shields (ROM ccf835ca) | 1648cc80 | 22 + 22 | 4 (3) | 0 |
+
+Quoted (`tally_<arm>.txt`): "Kefka's battle: 24 runs; won 23, lost 1, other
+0; distinct opening keys won 19, lost 1" and "won 21, lost 3 ... won 16,
+lost 3" (`fo`, `foB`); "won 21, lost 3 ... won 17, lost 3", "won 21, lost 3
+... won 19, lost 3" (`st`, `stB`); "won 23, lost 1 ... won 19, lost 1", "won
+22, lost 2 ... won 19, lost 2" (`fost`, `fostB`); "won 24, lost 0 ... won 20,
+lost 0", "won 23, lost 1 ... won 20, lost 1" (`fsrb`, `fsrbB`); "won 19, lost
+5 ... won 17, lost 5", "won 18, lost 6 ... won 17, lost 6" (`fssf`,
+`fssfB`); "won 23, lost 1 ... won 21, lost 1", "won 24, lost 0 ... won 23,
+lost 0" (`m`, `mB`); "won 22, lost 2 ... won 18, lost 2", "won 23, lost 1
+... won 19, lost 1" (`mf`, `mfB`); "won 21, lost 3 ... won 17, lost 3", "won
+22, lost 2 ... won 18, lost 2" (`mfm`, `mfmB`); "won 24, lost 0 ... won 22,
+lost 0", "won 24, lost 0 ... won 23, lost 0" (`mr`, `mrB`, and the same for
+`mrb`, `mrbB`, `d3`, `d3B`, whose tiers read "4 Kefka: won 24, lost 0;
+distinct keys won 17, lost 0" and "won 24, lost 0; distinct keys won 20,
+lost 0", every tier "lost 0"); "won 22, lost 2 ... won 21, lost 2" twice
+(`k16`, `k16B`: "4 Kefka: won 22, lost 2; distinct keys won 16, lost 2",
+"... won 19, lost 2").
+
+- **The Megalixir** after Fallen One puts the four back at full HP and MP
+  ("actor=0 Megalixir on the party: 4 seated members under 30% of their HP,
+  in place of its fight", then "e0:6313/6313 ... e3:4940/4940",
+  `m_k2_s0`). Its one loss: the break took him to 6,381, and the Goner and
+  Meteor block and Ultima met a party whose banks the burst had emptied.
+- **The curers' last point**: while Kefka is Broken, TERRA, CELES, SHADOW,
+  LOCKE (Kirin) and STRAGO (Phoenix) attack at a boost that leaves one
+  point, so a boosted Cure or Life 2 is there when the window ends
+  (`opts.reserveBank`). Alone it took the old boot from 45 to 47 of 48
+  (`fost` to `fsrb`); with the Megalixir, 48 of 48.
+- **Not kept**: Fallen One out of the hit ledger (it priced every later
+  round at full HP and refused Fenix Downs, but fixing it moved nothing
+  measurable: `mr` = `mrb`); Starlet on RELM summoned as care (the summon
+  reaches the Wall Ring wearers, about 1,800 each from RELM, but RELM
+  without Ragnarok loses third tiers, `mf`, and came to Kefka Muted so she
+  could not summon, "magic row nil" in `dg_k4_s5`; curing her Mute, `mfm`,
+  did no better); CELES's Safe (its turns cost more than it saves).
+- **Kefka at 16 shields** (`k16`): the first three tiers play as `d3`; he
+  wins 4 of 48 runs on 3 distinct keys (be4C twice, beB8, be0C), so his row
+  stays at 12.
+
 ## 6. Not done
 
-- **Every draw.** The leg wins 23 of 24 runs on grid A and 20 of 24 on grid
-  B (5.2; the leg before: 18 of 24); every loss is Kefka's, after his first
-  break, on members at 1 HP (Goner, HyperDrive) or to his Ultima below 10,240.
-  The line retries a loss from its boot (`attempts=1/3`). Tried and not
-  enough besides 5.1's: Life 3 (`l3`, `l3b`, `l3c`), the Wall Rings off
-  (`lrbw`), a higher cure line (`lrb6`), the break's hold (`ph`).
-- **Kefka at 16 shields**, the owner's want, once the fight passes every draw at
-  12 (5.1).
-- **What a player does next**: heal the Wall Ring wearers, whom no cure
-  reaches (a Potion's 250 is all they get), and keep a point in the curers'
-  banks through a break; or more damage in the first break. Neither is built.
+- **Every draw at 16 shields.** At 12 the leg wins every draw of both grids
+  (5.3); at 16, the owner's want, Kefka wins 4 of 48 (`k16`), so the row
+  stays at 12 until a lever closes those.
 - **STRAGO's options** (#512): his nuke lore never reaches his turns
   (`v039-kefka-tower-2/pg0`: "actor=1 char=7 plan=fight" every turn, no lore
   line at all, so a rule ahead of the nuke repertoire decides first); Kefka's
