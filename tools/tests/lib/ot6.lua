@@ -11669,6 +11669,8 @@ function Driver:makePlan(actor)
   plan = self:healWeaponPlan(actor, plan)
   plan = self:coverPlan(actor, plan)
   plan = self:buffPlan(actor, plan)
+  plan = self:lifeRaisePlan(actor, plan)
+  plan = self:boostCurePlan(actor, plan)
   plan = self:zingerPlan(actor, plan)
   plan = self:studyHoldPlan(actor, plan)
   plan = self:policyPlan(actor, plan)
@@ -11886,13 +11888,22 @@ end
 -- rules chose stands)
 Driver.BUFF_OVER = { fight = true, skill = true, magic = true, lore = true, tools = true, mimic = true,
   summon = true, throw = true, runic = true, slot = true, morph = true, magitek = true, rage = true }
-Driver.BUFF_STATUS = { [0x25] = { 0x3EF8, 0x20 }, [0x1C] = { 0x3EF8, 0x40 }, [0x1F] = { 0x3EF8, 0x08 } }
+-- Life at two points is Life 3 (#274): status 4's RERAISE ($3EF9 bit 2), the member rising once when it falls.  It
+-- is cast at its boost (the actor's bank must hold it), and it does not rebound (MagicProp byte 3 bit 1, set on the
+-- Life family), so a member in Reflect takes it.  A list's `below` (a fraction) waits until the listed body stands
+-- at or under that share of its HP.
+Driver.BUFF_STATUS = { [0x25] = { 0x3EF8, 0x20 }, [0x1C] = { 0x3EF8, 0x40 }, [0x1F] = { 0x3EF8, 0x08 },
+  [0x30] = { 0x3EF9, 0x04, boost = 2, unreflected = true } }
 function Driver:buffPlan(actor, plan)
   local bv = self.opts.buffVs
   if bv == nil or BUFF_OFF or plan == nil or not Driver.BUFF_OVER[plan.kind] or plan.buff then return plan end
   local spells = nil
   for s = 0, 5 do
     local sp = monAlive(s) and bv[M.readWord(0x57C0 + s * 2)]
+    if sp and sp.below then
+      local hp, mx = M.readWord(0x3BF4 + 8 + s * 2), M.readWord(0x3C1C + 8 + s * 2)
+      if mx == 0 or hp > mx * sp.below then sp = nil end
+    end
     if sp and spells == nil then spells = sp end
   end
   if spells == nil then return plan end
@@ -11900,7 +11911,15 @@ function Driver:buffPlan(actor, plan)
   if row == nil then return plan end
   self.buffAt = self.buffAt or {}
   for _, spell in ipairs(spells) do
-    local st = Driver.BUFF_STATUS[spell]
+    local st, boost = Driver.BUFF_STATUS[spell], 0
+    -- the bank must hold the points now (castBoost prices the cast, not the bank: the first cut went at one point,
+    -- Life 2, which does nothing to the living: build/attempts/wt/v040-the-end-2/lab/l3_k4_s13, "wanted 2, the bank
+    -- holds 1: going at 1")
+    if st and st.boost and spellCell(actor, spell, true) ~= nil then
+      local b = M.readByte(BATTLE.BP + actor * 2) >= st.boost
+        and castBoost(actor, spell, select(2, spellCell(actor, spell, true)), st.boost, 0) or nil
+      if b == nil or b < st.boost then st = nil else boost = st.boost end
+    end
     if st and spellCell(actor, spell, true) ~= nil then
       -- the frailest first (the smallest max HP: the member a round fells soonest)
       local order = { 0, 1, 2, 3 }
@@ -11913,19 +11932,84 @@ function Driver:buffPlan(actor, plan)
         local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
         local key = spell * 4 + e
         if mx > 0 and mx ~= 0xFFFF and hp > 0 and (M.readByte(st[1] + e * 2) & st[2]) == 0
-           and (M.readByte(0x3EF8 + e * 2) & 0x80) == 0 and M.frame - (self.buffAt[key] or -100000) > 900 then
+           and (st.unreflected or (M.readByte(0x3EF8 + e * 2) & 0x80) == 0)
+           and M.frame - (self.buffAt[key] or -100000) > 900 then
           self.buffAt[key] = M.frame
           M.buffs = M.buffs or {}
           M.buffs[#M.buffs + 1] = { actor = actor, spell = spell, target = e, frame = M.frame }
-          M.log(string.format("[%s] actor=%d ward $%02X on entity %d (a listed caster stands): in place of its %s",
-            self.tag or "fight", actor, spell, e, plan.kind))
-          return { kind = "magic", spell = spell, row = row, boostLeft = 0, ally = true, target = e, buff = true,
+          M.log(string.format("[%s] actor=%d ward $%02X%s on entity %d (a listed caster stands): in place of its %s",
+            self.tag or "fight", actor, spell, boost > 0 and string.format(" at %d BP", boost) or "", e, plan.kind))
+          return { kind = "magic", spell = spell, row = row, boostLeft = boost, ally = true, target = e, buff = true,
                    vetoOk = true, reason = "ward" }
         end
       end
     end
   end
   return plan
+end
+
+-- Life at one point is Life 2 (#274; magicite.md "Life 3 is Life's third tier"): it revives a fallen member at full
+-- HP, where a Fenix Down revives at an eighth.  opts.lifeRaise: an actor whose Magic list holds Life, with a point in
+-- the bank, casts it on a seated fallen member in place of an attack or a Fenix Down (the item care block's raises
+-- are item-only).  Kefka's Fallen One leaves every member at 1 HP and his Goner follows within a cycle: a member
+-- raised at an eighth or topped up by a Potion falls to it (build/attempts/wt/v040-the-end/lab/os_k4_s0: "from
+-- 834/4672 ... atk $DE").  Not on a member Petrified, a Zombie or seized, nor twice inside 600 frames.
+function Driver:lifeRaisePlan(actor, plan)
+  if not self.opts.lifeRaise or plan == nil or plan.buff then return plan end
+  if not (Driver.BUFF_OVER[plan.kind] or (plan.kind == "item" and plan.item == BATTLE.FENIX_DOWN)) then return plan end
+  local row = cmdRow(actor, BATTLE.CMD_MAGIC)
+  if row == nil or spellCell(actor, 0x30, true) == nil or M.readByte(BATTLE.BP + actor * 2) < 1 then return plan end
+  local b = castBoost(actor, 0x30, select(2, spellCell(actor, 0x30, true)), 1, 0)
+  if b == nil or b < 1 then return plan end
+  self.lifeAt = self.lifeAt or {}
+  for e = 0, 3 do
+    local mx, s1 = M.readWord(0x3C1C + e * 2), M.readByte(0x3EE4 + e * 2)
+    if e ~= actor and mx > 0 and mx ~= 0xFFFF and M.readWord(0x3BF4 + e * 2) == 0 and (s1 & 0x80) ~= 0
+       and (s1 & 0x42) == 0 and not M.seized(e) and M.frame - (self.lifeAt[e] or -100000) > 600 then
+      self.lifeAt[e] = M.frame
+      M.log(string.format("[%s] actor=%d Life at 1 BP (Life 2) on fallen entity %d (full HP): in place of its %s",
+        self.tag or "fight", actor, e, plan.kind == "item" and "Fenix Down" or plan.kind))
+      return { kind = "magic", spell = 0x30, row = row, boostLeft = 1, ally = true, target = e, buff = true,
+               vetoOk = true, reason = "life_raise" }
+    end
+  end
+  return plan
+end
+
+-- A boosted Cure on the member in danger (#274): Cure folds to Cure 2 at one point and Cure 3 at two (Ot6FoldTbl),
+-- several times the plain cast the care lines price (TERRA's +965), and the care block casts single-target cures
+-- unboosted.  opts.boostCure = { below = fraction, notBroken = bool }: an actor whose Magic list holds Cure, with a
+-- point in the bank, casts it at up to two points on the seated member lowest under `below` of its max HP (none in
+-- Reflect: a cure bounces), in place of an attack or a plain Potion or cure; with notBroken, not while a monster is
+-- Broken (it loses its turns then, and the window is the party's to hit).  Kefka's Fallen One leaves every member
+-- at 1 HP and his Goner follows; Potions put back 250.
+function Driver:boostCurePlan(actor, plan)
+  local o = self.opts.boostCure
+  if not o or plan == nil or plan.buff or plan.all then return plan end
+  local over = Driver.BUFF_OVER[plan.kind] or (plan.kind == "item" and (plan.item == 0xE9 or plan.item == 0xE8))
+    or (plan.kind == "heal" and (plan.boostLeft or 0) == 0)
+  if not over then return plan end
+  if o.notBroken then
+    for s = 0, 5 do if monAlive(s) and M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0 then return plan end end
+  end
+  local row, bank = cmdRow(actor, BATTLE.CMD_MAGIC), M.readByte(BATTLE.BP + actor * 2)
+  if row == nil or bank < 1 or spellCell(actor, 0x2D, true) == nil then return plan end
+  local b = castBoost(actor, 0x2D, select(2, spellCell(actor, 0x2D, true)), math.min(bank, 2), 0)
+  if b == nil or b < 1 then return plan end
+  self.cureAt = self.cureAt or {}
+  local low, lowFrac = nil, o.below or 0.4
+  for e = 0, 3 do
+    local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+    if mx > 0 and mx ~= 0xFFFF and hp > 0 and hp / mx < lowFrac and (M.readByte(0x3EF8 + e * 2) & 0x80) == 0
+       and (M.readByte(0x3EE4 + e * 2) & 0x02) == 0 and M.frame - (self.cureAt[e] or -100000) > 600 then
+      low, lowFrac = e, hp / mx
+    end
+  end
+  if low == nil then return plan end
+  self.cureAt[low] = M.frame
+  M.log(string.format("[%s] actor=%d Cure at %d BP on entity %d (%d/%d): in place of its %s", self.tag or "fight",
+    actor, b, low, M.readWord(0x3BF4 + low * 2), M.readWord(0x3C1C + low * 2), plan.kind))
+  return { kind = "heal", spell = 0x2D, target = low, row = row, boostLeft = b, buff = true, reason = "boost_cure" }
 end
 
 -- Wrexsoul's Zinger (#271): its first turn (AIScript _290) hides it inside a
