@@ -12121,8 +12121,15 @@ function Driver:careSummonPlan(actor, plan)
   end
   local row = cmdRow(actor, BATTLE.CMD_MAGIC)
   local cost = M.readRomByte((M.sym("MagicProp") & 0x3FFFFF) + (0x36 + stone) * 14 + 5)
-  if row == nil or (M.readWord(0x3F2E) & M.readWord(0x3018 + actor * 2)) ~= 0
-     or M.readWord(BATTLE.CURMP + actor * 2) < cost then
+  local used = (M.readWord(0x3F2E) & M.readWord(0x3018 + actor * 2)) ~= 0
+  local mp = M.readWord(BATTLE.CURMP + actor * 2)
+  if row == nil or used or mp < cost then
+    local key = string.format("caresummon:%d:%s:%s", actor, tostring(row == nil), tostring(used))
+    if not self.statusSaid[key] then
+      self.statusSaid[key] = true
+      M.log(string.format("[%s] actor=%d cannot summon esper $%02X as care: magic row %s, the battle's summon %s, "
+        .. "%d MP of %d", self.tag or "fight", actor, stone, tostring(row), used and "spent" or "unspent", mp, cost))
+    end
     return plan
   end
   local low, dead = 0, 0
