@@ -10064,6 +10064,11 @@ function Driver:cureFor(e)
     if cmd == BATTLE.CMD_MAGIC then magic = true
     elseif cmd ~= BATTLE.CMD_ITEM and cmd ~= 0xFF then other = true end
   end
+  -- (#274) opts.muteCure = { [char] = true }: a member whose Magic carries the party's care (a care summon, a boosted
+  -- Cure) is cured of Mute though it has other verbs: RELM, Starlet's summoner, came into Kefka's tier Muted from the
+  -- third and never summoned ("magic row nil", v040-the-end-3/lab/dg_k4_s5)
+  local mc = self.opts.muteCure
+  if mc and mc[M.readByte(0x3ED8 + e * 2)] then other = false end
   if (M.readByte(BATTLE.ST2 + e * 2) & M.ST2_MUTE) ~= 0 and magic and not other then
     return M.statusCure({ byte = 2, bit = M.ST2_MUTE,
       has = function(item) return self:battInvIdx(item) ~= nil end }), "Mute"
