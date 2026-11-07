@@ -58,27 +58,6 @@ elseif not KEFKA_STOCK then BOSS_FIGHT.megalixir = { n = 3, below = 0.3, vs = KE
 local CURERS = { [0] = true, [6] = true, [3] = true, [1] = true, [7] = true }
 if KEFKA_RESERVE ~= nil then BOSS_FIGHT.reserveBank = KEFKA_RESERVE or nil
 elseif not KEFKA_FIGHT and not KEFKA_STOCK then BOSS_FIGHT.reserveBank = { chars = CURERS, n = 1, vs = KEFKA } end
--- KEFKA_RUIN (an arm): the driver's ruin rule (opts.ruin): with three or more members inside their round (Kefka's
--- Fallen One), every actor may care, a party cure ahead of a raise
-if KEFKA_RUIN then BOSS_FIGHT.ruin = true end
--- KEFKA_TIER_CARE (an arm): a tier's last body below a quarter of its HP, the party heals up before it dies: HP
--- carries into the next tier (the third tier lost twice on a party a long second tier had worn down, f_k4_s8 and
--- f_k4_s13).  The heal threshold rises to 90% and the press rule (attack when a break would end it) holds off
-local function tierEnding()
-  if not H.battleLoadStarted() then return false end
-  local f = H.readWord(0x11E0)
-  if f ~= 0x01D7 and f ~= 0x0200 and f ~= 0x0201 then return false end
-  local n, last = 0, nil
-  for s = 0, 5 do
-    local hp = H.readWord(0x3BFC + 2 * s)
-    if hp > 0 and hp ~= 0xFFFF then n, last = n + 1, s end
-  end
-  return n == 1 and H.readWord(0x3BFC + 2 * last) * 4 <= H.readWord(0x3C24 + 2 * last)
-end
-if KEFKA_TIER_CARE then
-  BOSS_FIGHT.healPercent = function() return tierEnding() and 90 or 55 end
-  BOSS_FIGHT.press = function() if tierEnding() then return false end return nil end
-end
 -- Two stones the line carries unworn go on party 2 before the climb: Phoenix (Life) on STRAGO, in Palidor's place
 -- (Float, Slow), and Kirin (Cure, Regen) on LOCKE, in Shiva's (Ice, Osmose, Shell): two more members who can raise
 -- the fallen at full HP and cure at a boost (TERRA, CELES and SHADOW the others).  Lab lrbs: Kefka's tier lost 1 of

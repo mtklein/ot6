@@ -40,10 +40,13 @@ Evidence is under `build/attempts/wt/v040-the-end/`. Line numbers are into
    the stocked chain's grid from 18 to 23 of 24 runs (20 of 24 on a second
    grid); the third tier is never lost again, and what loses is Kefka after
    his first break (5.2).
-6. **The Megalixir and the curers' last point win every draw.** The tower's
-   Megalixir, saved for Kefka (owner, 2026-11-07) and drunk when Fallen One
-   leaves the party at 1 HP, and the curers keeping one point through his
-   break, win 48 of 48 runs of both grids, every distinct key (5.3). At 16
+6. **The Megalixir and the curers' last point win every draw measured.** The
+   tower's Megalixir, saved for Kefka (owner, 2026-11-07) and drunk when
+   Fallen One leaves the party at 1 HP, and the curers keeping one point
+   through his break, win 48 of 48 runs of both grids (5.3). The grids share
+   fights (`d3_k0_s12` and `d3B_k0_s11` are one, opening key be4C): together
+   they hold 32 distinct opening keys and 29 distinct Kefka keys
+   (`build/attempts/wt/v040-the-end-4/union_keys.txt`). At 16
    shields he still wins 4 of 48, so his row stays at 12.
 
 ## 1. The climb
@@ -243,7 +246,8 @@ Downs, 40 Potions); the graph's v0.39 capture is its negative: "the bag for
 Kefka: 6 Fenix Downs (floor 10) and 86 Potions (floor 40), stocked at
 Kohlingen by gen_wor_kt_factory: got false" (`neg/neg_kefka_bag`).
 
-**Two driver levers, off** (on the v0.39 capture, the Girl first): the
+**Two driver levers, measured and removed** (on the v0.39 capture, the
+Girl first; v040-the-end-4 took them out of the code): the
 ruin rule (`opts.ruin`: three or more members inside their round reopen the
 round's care for every actor, a party cure ahead of a raise), "Kefka's
 battle: 24 runs; won 16, lost 8, other 0; distinct opening keys won 11, lost
@@ -337,8 +341,8 @@ lost 3" (`lrb6`, `lrb6B`); "won 22, lost 2 ... won 17, lost 2", "won 20, lost
   bank, is two points not spent breaking Kefka; the first cut went at one
   point when the bank held one (Life 2, which does nothing to the living:
   "wanted 2, the bank holds 1: going at 1", `l3_k4_s13`). Gated under 60% it
-  was cast twice in 24 runs. The ward stays in the driver (`buffVs` takes
-  Life at two points), off.
+  was cast twice in 24 runs. The ward (`buffVs` taking Life at two points)
+  was taken out of the driver after the measurement (v040-the-end-4).
 - **Life 2 ends the third tier's losses**: a fallen member back at full HP
   for one point ("CELES 6155/6155" after "Life at 1 BP (Life 2) on fallen
   entity 1", `lr_k0_s5`), and the Sleep's attrition never took a tier again
@@ -351,7 +355,8 @@ lost 3" (`lrb6`, `lrb6B`); "won 22, lost 2 ... won 17, lost 2", "won 20, lost
 - **The break's hold** does not help: the hits already queued when the hold
   begins take him past it (the break opened at 48,408 and the hold met him at
   29,518, `ph_k4_s12`), and a window's heals are a Potion or two and one
-  cure.
+  cure. `opts.phaseHold` and the cure's break tail (`lrbt`'s
+  `breakTail`) were taken out of the driver (v040-the-end-4).
 - **What still loses** (`dflt`, `dfltB`): five of 48, all Kefka's, after the
   first break: Goner and HyperDrive on members at 1 HP (the Wall Ring
   wearers, whom only a Potion reaches, and members whose banks the break
@@ -424,7 +429,10 @@ lost 0" (`m`, `mB`); "won 22, lost 2 ... won 18, lost 2", "won 23, lost 1
 ... won 19, lost 1" (`mf`, `mfB`); "won 21, lost 3 ... won 17, lost 3", "won
 22, lost 2 ... won 18, lost 2" (`mfm`, `mfmB`); "won 24, lost 0 ... won 22,
 lost 0", "won 24, lost 0 ... won 23, lost 0" (`mr`, `mrB`, and the same for
-`mrb`, `mrbB`, `d3`, `d3B`, whose tiers read "4 Kefka: won 24, lost 0;
+`mrb`, `mrbB`, `d3`, `d3B`; on this case-insensitive disk `mrb`'s tally
+overwrote `tally_mrB.txt`, so the two are retallied from `lab/` as
+`v040-the-end-4/tally_mr_gridB.txt` and `tally_mrb_gridA.txt`; `d3`'s and
+`d3B`'s tiers read "4 Kefka: won 24, lost 0;
 distinct keys won 17, lost 0" and "won 24, lost 0; distinct keys won 20,
 lost 0", every tier "lost 0"); "won 22, lost 2 ... won 21, lost 2" twice
 (`k16`, `k16B`: "4 Kefka: won 22, lost 2; distinct keys won 16, lost 2",
