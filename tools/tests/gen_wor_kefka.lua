@@ -50,7 +50,7 @@ end
 -- party drinks it when three members stand under 30% of their HP (Fallen One leaves all four at 1); the care lines
 -- may reach for it too.  KEFKA_MEGALIXIR (a lab's) replaces the trigger, false turns it off
 if KEFKA_MEGALIXIR ~= nil then BOSS_FIGHT.megalixir = KEFKA_MEGALIXIR or nil
-elseif not KEFKA_STOCK then BOSS_FIGHT.megalixir = { n = 3, below = 0.3 } end
+elseif not KEFKA_STOCK then BOSS_FIGHT.megalixir = { n = 3, below = 0.3, vs = KEFKA } end
 -- KEFKA_RUIN (an arm): the driver's ruin rule (opts.ruin): with three or more members inside their round (Kefka's
 -- Fallen One), every actor may care, a party cure ahead of a raise
 if KEFKA_RUIN then BOSS_FIGHT.ruin = true end

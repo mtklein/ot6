@@ -7482,7 +7482,7 @@ function Driver:bagHeals(e, hp, all)
   local list, seen = {}, {}
   for i = 0, 251 do
     local id = M.readByte(BATTLE.BATTINV + i * 5)
-    if id ~= 0xFF and not seen[id] and (id ~= M.MEGALIXIR or self.opts.megalixir) then
+    if id ~= 0xFF and not seen[id] and (id ~= M.MEGALIXIR or self:megalixirOpen()) then
       local p = M.itemProps(id)
       if (p & M.ITEM_HP) ~= 0 and (p & M.ITEM_CURES) == 0 and M.itemBattleUsable(id)
          and M.itemAllAllies(id) == (all == true) and self:battInvIdx(id) ~= nil then
@@ -10764,7 +10764,7 @@ function Driver:raceState(actor, R)
   st.bag, st.pendingHeal, st.pendingRaise = {}, self.healQueued or {}, self.raiseQueued or {}
   for i = 0, 251 do
     local id = M.readByte(BATTLE.BATTINV + i * 5)
-    if id ~= 0xFF and (id ~= M.MEGALIXIR or self.opts.megalixir) then
+    if id ~= 0xFF and (id ~= M.MEGALIXIR or self:megalixirOpen()) then
       st.bag[id] = (st.bag[id] or 0) + M.readByte(BATTLE.BATTINV + i * 5 + 3)
     end
   end
@@ -12117,10 +12117,19 @@ end
 -- opts.megalixir = { n = count, below = fraction }: with `n` seated members standing under `below` of their max HP
 -- (Kefka's Fallen One leaves all four at 1 HP), an actor with the Item row drinks the bag's Megalixir on the party in
 -- place of whatever it planned; one in flight is not doubled.  The option also opens the bag's Megalixir to the
--- care lines (M.MEGALIXIR, Driver:bagHeals), which no other fight's options do.
+-- care lines (M.MEGALIXIR, Driver:bagHeals), which no other fight's options do.  `vs` (a species): only while a body
+-- of it stands -- Kefka's battle is four formations, and the care lines drank it in the first ("party item $EF: 2
+-- members inside their round", v040-the-end-3/lab/m_k0_s0, before Kefka loaded).
+function Driver:megalixirOpen()
+  local o = self.opts.megalixir
+  if not o then return false end
+  if type(o) ~= "table" or not o.vs then return true end
+  for s = 0, 5 do if monAlive(s) and M.readWord(0x57C0 + s * 2) == o.vs then return true end end
+  return false
+end
 function Driver:megalixirPlan(actor, plan)
   local o = self.opts.megalixir
-  if type(o) ~= "table" or plan == nil or plan.buff then return plan end
+  if type(o) ~= "table" or plan == nil or plan.buff or not self:megalixirOpen() then return plan end
   local row, idx = cmdRow(actor, BATTLE.CMD_ITEM), self:battInvIdx(M.MEGALIXIR)
   if row == nil or idx == nil or M.frame - (self.megalixirAt or -100000) < 900 then return plan end
   local low, first = 0, nil
