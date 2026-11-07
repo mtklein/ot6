@@ -12653,6 +12653,30 @@ function Driver:makePlanRules(actor)
       end
     end
   end
+  -- ...and so does a party in ruin (opts.ruin, #274): three or more seated members standing inside their round.
+  -- Kefka's Fallen One leaves every member at 1 HP, and with the round's care turn spent on one Potion the others
+  -- attacked at 1 HP until his Goner or Ultima took them ("SPEND (attack): 1/6542 is inside one round of death ...
+  -- the round's care turn went to actor 3", build/attempts/wt/v040-the-end/lab/wg_k0_s0).  In ruin every actor
+  -- may care, and an actor who can cast a party cure casts it before any raise (self.ruinCureFirst).
+  self.ruinCureFirst = false
+  if self.opts.ruin and (cureRow ~= nil or row ~= nil) then
+    local inside, reflect = 0, false
+    for e = 0, 3 do
+      local hp, maxhp, cost = hpNow[e], maxOf(e), price[e] or 0
+      if hp > 0 and maxhp > 0 and cost > 0 and hp <= cost then inside = inside + 1 end
+      if hp > 0 and maxhp > 0 and (M.readByte(0x3EF8 + e * 2) & 0x80) ~= 0 then reflect = true end
+    end
+    if inside >= 3 then
+      self.ruinCureFirst = cureRow ~= nil and not reflect and M.readByte(BATTLE.BP + actor * 2) >= 1
+      if not careOpen then
+        careOpen = true
+        local said = string.format("[%s] actor=%d: %d members inside their round -- the round's care budget "
+          .. "(actor %d's) reopens (ruin)%s", self.tag or "fight", actor, inside, self.careActor,
+          self.ruinCureFirst and "; a party cure first" or "")
+        if said ~= self.healSaid then self.healSaid = said; M.log(said) end
+      end
+    end
+  end
   if (row ~= nil or cureRow ~= nil) and totalMon > 200 and self.parkDropN < 3
      and not careOpen then
     local said = string.format("[%s] actor=%d: this round's care turn "
@@ -13325,7 +13349,7 @@ function Driver:makePlanRules(actor)
             .. "Fenix Down on them is confirmed (tick %d) and has not landed", self.tag or "fight",
             actor, e, queued.by, queued.tick)
           if said ~= self.healSaid then self.healSaid = said; M.log(said) end
-        elseif maxOf(e) > 0 and hpNow[e] == 0 and not liftOnly
+        elseif maxOf(e) > 0 and hpNow[e] == 0 and not liftOnly and not self.ruinCureFirst
            and self:battInvIdx(BATTLE.FENIX_DOWN) then
           local ok, raiseHp, hit, hitSlot, hitOn, why, needsTopUp = self:raiseOk(e, actor)
           -- the last one standing whose last three actions took nothing

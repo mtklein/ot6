@@ -36,6 +36,27 @@ if not KEFKA_STOCK then
     return nil
   end
 end
+-- KEFKA_RUIN (an arm): the driver's ruin rule (opts.ruin): with three or more members inside their round (Kefka's
+-- Fallen One), every actor may care, a party cure ahead of a raise
+if KEFKA_RUIN then BOSS_FIGHT.ruin = true end
+-- KEFKA_TIER_CARE (an arm): a tier's last body below a quarter of its HP, the party heals up before it dies: HP
+-- carries into the next tier (the third tier lost twice on a party a long second tier had worn down, f_k4_s8 and
+-- f_k4_s13).  The heal threshold rises to 90% and the press rule (attack when a break would end it) holds off
+local function tierEnding()
+  if not H.battleLoadStarted() then return false end
+  local f = H.readWord(0x11E0)
+  if f ~= 0x01D7 and f ~= 0x0200 and f ~= 0x0201 then return false end
+  local n, last = 0, nil
+  for s = 0, 5 do
+    local hp = H.readWord(0x3BFC + 2 * s)
+    if hp > 0 and hp ~= 0xFFFF then n, last = n + 1, s end
+  end
+  return n == 1 and H.readWord(0x3BFC + 2 * last) * 4 <= H.readWord(0x3C24 + 2 * last)
+end
+if KEFKA_TIER_CARE then
+  BOSS_FIGHT.healPercent = function() return tierEnding() and 90 or 55 end
+  BOSS_FIGHT.press = function() if tierEnding() then return false end return nil end
+end
 H.NAV_REFIRE_HOLD = true
 H.careThreshold = 1.0
 H.careMagic, H.careCastFirst = true, true

@@ -11434,7 +11434,11 @@ function M.worLegKit(env)
   -- Fenix Downs about the level, capped at 20; Remedies for the dream's Petrify and Sap), and its weapon and armor
   -- counters are the gear stop (M.gearStop, #434).  The town's south edge returns the party to the world.
   local MAP_KOHLINGEN, MAP_KSTORE, KOHLINGEN_DOOR, SHOP_KITEMS = 189, 194, { 38, 45 }, 67
-  local function kohlingenStop(what)
+  -- opts.fenix: the Fenix Downs to stock (default the level, capped at 20: the band); opts.potions: the Potions
+  -- (default careStockPotions's band, 30 spent ahead).  A stop before a gauntlet with no shop in it (Kefka's Tower
+  -- and Kefka, #274) stocks for the whole of it
+  local function kohlingenStop(what, opts)
+    opts = opts or {}
     return M.seqStep({
       M.waitUntil(function() return M.airshipControl() end, 3000, what .. ": the pilot's controls", 5),
       landNear(KOHLINGEN_DOOR[1], KOHLINGEN_DOOR[2], what .. ": the Falcon down by Kohlingen"),
@@ -11445,11 +11449,11 @@ function M.worLegKit(env)
       M.crossDoor(11, 11, MAP_KSTORE, 12, 39, what .. ": Kohlingen's store 189 (11,11) -> 194", { fight = FIGHT }),
       M.shopTalk(19, 35, what .. ": Kohlingen's item counter", { fight = FIGHT }),
       M.call(function() M.assertEq(M.shopId(), SHOP_KITEMS, "the counter opened shop 67 ($0201)") end),
-      M.buyItem(POTION, function() return math.max(0, M.careStockPotions(M.activeTopLevel(), { spend = 30 })
-        - M.invCountOf(POTION)) end, "POTION to the band"),
+      M.buyItem(POTION, function() return math.max(0, (opts.potions or M.careStockPotions(M.activeTopLevel(),
+        { spend = 30 })) - M.invCountOf(POTION)) end, "POTION to the band"),
       M.buyItem(REMEDY, function() return math.max(0, 20 - M.invCountOf(REMEDY)) end, "REMEDY to 20"),
-      M.buyItem(FENIX, function() return math.max(0, math.min(20, M.activeTopLevel()) - M.invCountOf(FENIX)) end,
-        "FENIX DOWN to the level, capped at 20"),
+      M.buyItem(FENIX, function() return math.max(0, (opts.fenix or math.min(20, M.activeTopLevel()))
+        - M.invCountOf(FENIX)) end, "FENIX DOWN to the level, capped at 20 (or the stop's own count)"),
       M.shopClose(what .. ": Kohlingen's item counter"),
       M.bagArrange({ POTION, FENIX, REMEDY, TINCTURE }, { tag = what .. ": bag: combat items on top" }),
       M.call(function() say("shop", what .. ": Kohlingen") end),
