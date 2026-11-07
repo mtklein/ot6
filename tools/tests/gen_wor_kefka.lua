@@ -23,12 +23,13 @@ local TIERS = { [0x01D7] = "the arms and the face", [0x0200] = "the four figures
   .. "sleeper", [0x0202] = "Kefka" }
 local GIRL = 0x15E
 local FIGHT = {}
--- the fight's options (a lab's KEFKA_FIGHT overrides them).  KEFKA_GIRL_FIRST (a lab's arm): in the third tier the
--- Girl is killed first, as a player who knows the fight does: her Pearl Wind heals the Sleep back to full (lab
--- g_k0_s8: "s3:40000/40000" again and again while the party hit it), and alone she only revives it with Life 2
--- (AIScript::_350); elsewhere the driver's own kill order (focusList: the formation's parts) stands
+-- the fight's options (a lab's KEFKA_FIGHT overrides them): in the third tier the Girl is killed first, as a player
+-- who knows the fight does.  Her Pearl Wind heals the Sleep back to full (lab g_k0_s8, the stock policy:
+-- "s3:40000/40000" again and again while the party hit it, and the tier lost), and alone she only revives it with
+-- Life 2 (AIScript::_350).  Elsewhere the driver's own kill order (focusList: the formation's parts) stands.
+-- route-wor-the-end.md section 5: the stock policy won 17 of 24 runs of the grid, this one 20 of 24
 local BOSS_FIGHT = KEFKA_FIGHT or {}
-if KEFKA_GIRL_FIRST then
+if not KEFKA_STOCK then
   BOSS_FIGHT.focus = function()
     -- (the formation in play, $11E0: the formation words keep the earlier tiers' bodies in their slots)
     if H.battleLoadStarted() and H.readWord(0x11E0) == 0x0201 then return { { species = GIRL } } end
@@ -46,40 +47,6 @@ local walk, door = T.walk, T.door
 
 local function lv(ch) return H.readByte(0x1600 + 37 * ch + 8) end
 local function hpMax(ch) return H.charMaxHp(ch) end
-local WALL_RING = 0xBB
-local function relic(ch, s) return H.readByte(0x1600 + 37 * ch + 0x1F + s) end
-
--- KEFKA_WALLS_OFF (a lab's arm): the Wall Rings the tower's statues called for come off before Kefka, each party in
--- turn, and the Relic planner fills the slots from the bag (H.dressRelics).  Kefka's Fallen One leaves every member
--- at 1 HP, and with a Wall Ring seated the driver casts no party cure (a cure that reaches a Reflect bounces onto the
--- enemy): lab g_k2_s0, "actor=1 no party cure: entity 2 wears Reflect", TERRA's single Cures one a turn, and the
--- party fell to Kefka
-local function wallsOff(p)
-  return H.seqStep({
-    H.switchParty(p, { tag = "the Wall Rings off, party " .. p }),
-    H.lazy(function()
-      local steps, m = {}, {}
-      for _, ch in ipairs(H.partyRoster(p)) do
-        m[#m + 1] = { ch, NAMES[ch] }
-        for _, s in ipairs({ 4, 5 }) do
-          if relic(ch, s) == WALL_RING then
-            local label = string.format("the Wall Ring off %s (slot %d) for Kefka", NAMES[ch], s)
-            steps[#steps + 1] = H.keepGear(ch, label, H.unequipRelics(ch, { s }, { tag = label }))
-          end
-        end
-      end
-      if #steps == 0 then return H.logStep(string.format("[kefka] party %d wears no Wall Ring", p)) end
-      steps[#steps + 1] = H.dressRelics(m, { tag = "relics for Kefka, party " .. p })
-      steps[#steps + 1] = H.call(function()
-        for _, ch in ipairs(H.partyRoster(p)) do
-          H.assertEq(relic(ch, 4) ~= WALL_RING and relic(ch, 5) ~= WALL_RING, true, NAMES[ch]
-            .. " wears no Wall Ring for Kefka")
-        end
-      end)
-      return H.seqStep(steps)
-    end),
-  })
-end
 
 -- The order (KEFKA_ORDER, a lab's, overrides it): the twelve members of the three parties, the highest level first
 -- (the most HP first among equals), as a player puts the strongest in front: the first four start the fight, and
@@ -240,7 +207,6 @@ H.run({ maxFrames = 1500000 }, {
   -- @@stage care
   -- each party's care before the last step, party 2 walking again after
   H.splitCare({ threshold = 1.0, tag = "before Kefka", back = 2 }),
-  H.cond(function() return KEFKA_WALLS_OFF end, { wallsOff(1), wallsOff(3), wallsOff(2) }, {}),
   T.standing("the three parties before Kefka", { 1, 2, 3 }),
   H.call(function() say("boss", "before Kefka: " .. H.partiesLine()) end),
 
