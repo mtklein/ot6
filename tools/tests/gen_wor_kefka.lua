@@ -49,6 +49,10 @@ end
 -- KEFKA_RUIN (an arm): the driver's ruin rule (opts.ruin): with three or more members inside their round (Kefka's
 -- Fallen One), every actor may care, a party cure ahead of a raise
 if KEFKA_RUIN then BOSS_FIGHT.ruin = true end
+-- KEFKA_CARESUMMON (an arm): the driver's opts.careSummon (a summon as care: Starlet's party heal, Phoenix's Rebirth)
+if KEFKA_CARESUMMON then BOSS_FIGHT.careSummon = KEFKA_CARESUMMON end
+-- KEFKA_TO_ONE_OUT (an arm): Fallen One (special effect $40, HP to 1) kept out of the hit ledger (H.TO_ONE_OUT)
+if KEFKA_TO_ONE_OUT then H.TO_ONE_OUT = true end
 -- KEFKA_TIER_CARE (an arm): a tier's last body below a quarter of its HP, the party heals up before it dies: HP
 -- carries into the next tier (the third tier lost twice on a party a long second tier had worn down, f_k4_s8 and
 -- f_k4_s13).  The heal threshold rises to 90% and the press rule (attack when a break would end it) holds off
@@ -292,6 +296,18 @@ H.run({ maxFrames = 1500000 }, {
     for _, u in ipairs(KEFKA_UNRING or {}) do
       steps[#steps + 1] = H.switchParty(u[3], { tag = "unring: party " .. u[3] })
       steps[#steps + 1] = H.unequipRelics(u[1], { u[2] }, { tag = "unring " .. NAMES[u[1]] })
+    end
+    return H.seqStep(steps)
+  end),
+  -- KEFKA_ESPERS (a lab's): { { party, char, esper }, ... } equipped in order, each party walked to (the stone's
+  -- owner must stand in the walking party to free it: H.equipEsper); splitCare walks party 2 again after
+  H.lazy(function()
+    local steps = { H.call(function() end) }
+    for _, u in ipairs(KEFKA_ESPERS or {}) do
+      local p, ch, e = u[1], u[2], u[3]
+      steps[#steps + 1] = H.switchParty(p, { tag = "stone: party " .. p })
+      steps[#steps + 1] = H.equipEsper(function() return (H.readByte(0x1850 + ch) >> 3) & 3 end, e,
+        { tag = string.format("stone %d -> %s (party %d)", e, NAMES[ch], p) })
     end
     return H.seqStep(steps)
   end),
