@@ -11681,6 +11681,7 @@ function Driver:makePlan(actor)
   plan = self:careSummonPlan(actor, plan)
   plan = self:lifeRaisePlan(actor, plan)
   plan = self:boostCurePlan(actor, plan)
+  plan = self:reserveBankPlan(actor, plan)
   plan = self:zingerPlan(actor, plan)
   plan = self:studyHoldPlan(actor, plan)
   plan = self:policyPlan(actor, plan)
@@ -12073,6 +12074,30 @@ function Driver:boostCurePlanWith(actor, plan, o)
   M.log(string.format("[%s] actor=%d Cure at %d BP on entity %d (%d/%d): in place of its %s", self.tag or "fight",
     actor, b, low, M.readWord(0x3BF4 + low * 2), M.readWord(0x3C1C + low * 2), plan.kind))
   return { kind = "heal", spell = 0x2D, target = low, row = row, boostLeft = b, buff = true, reason = "boost_cure" }
+end
+
+-- The curers' last point (#274): Kefka's break burst spent every bank, and when it ended the members Fallen One left
+-- at 1 HP had no boosted Cure or Life 2 to answer his Goner and HyperDrive (v040-the-end-2/lab/dflt_k0_s8: TERRA at 0
+-- BP through the window, then "not curing entity 0 (2944/6309): $2D restores 965").  opts.reserveBank = { chars =
+-- { [char] = true }, n = points, vs = species }: a listed character's attack, while a body of species `vs` is Broken,
+-- goes at a boost that leaves `n` points in its bank.
+function Driver:reserveBankPlan(actor, plan)
+  local rb = self.opts.reserveBank
+  if not rb or plan == nil or plan.buff or plan.ally or not Driver.BUFF_OVER[plan.kind] then return plan end
+  if (plan.boostLeft or 0) == 0 or not rb.chars[M.readByte(0x3ED8 + actor * 2)] then return plan end
+  local broken = false
+  for s = 0, 5 do
+    if monAlive(s) and (not rb.vs or M.readWord(0x57C0 + s * 2) == rb.vs)
+       and M.readByte(BATTLE.BRK_TICKS + s * 2) ~= 0 then broken = true end
+  end
+  if not broken then return plan end
+  local bank = M.readByte(BATTLE.BP + actor * 2)
+  local keep = math.max(0, math.min(plan.boostLeft, bank - (rb.n or 1)))
+  if keep == plan.boostLeft then return plan end
+  M.log(string.format("[%s] actor=%d keeps %d BP for care: its %s at %d BP, not %d", self.tag or "fight", actor,
+    bank - keep, plan.kind, keep, plan.boostLeft))
+  plan.boostLeft = keep
+  return plan
 end
 
 -- A summon as care (#274): Starlet's party heal ($4F) and Phoenix's Rebirth ($50, the fallen raised) reach every

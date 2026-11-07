@@ -51,6 +51,8 @@ end
 if KEFKA_RUIN then BOSS_FIGHT.ruin = true end
 -- KEFKA_CARESUMMON (an arm): the driver's opts.careSummon (a summon as care: Starlet's party heal, Phoenix's Rebirth)
 if KEFKA_CARESUMMON then BOSS_FIGHT.careSummon = KEFKA_CARESUMMON end
+-- KEFKA_RESERVE (an arm): the driver's opts.reserveBank (the curers keep a point through Kefka's break)
+if KEFKA_RESERVE then BOSS_FIGHT.reserveBank = KEFKA_RESERVE end
 -- KEFKA_TO_ONE_OUT (an arm): Fallen One (special effect $40, HP to 1) kept out of the hit ledger (H.TO_ONE_OUT)
 if KEFKA_TO_ONE_OUT then H.TO_ONE_OUT = true end
 -- KEFKA_TIER_CARE (an arm): a tier's last body below a quarter of its HP, the party heals up before it dies: HP
