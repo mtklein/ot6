@@ -1719,9 +1719,13 @@ def weekly_quota():
     limits.  Returns {"percent", "resets_at", "session_percent",
     "session_resets_at"}."""
     exe = shutil.which("claude") or "/opt/homebrew/bin/claude"
+    # Without the CLAUDE* variables of the session that started live.py: a
+    # child of a session reports no limits once that session moves on (the
+    # banner read "16 hrs old" on 2026-11-07 while a clean run read 75%).
+    env = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE")}
     r = subprocess.run([exe, "-p", "/usage", "--output-format", "stream-json",
                         "--verbose"], cwd=ROOT, capture_output=True, text=True,
-                       timeout=90, stdin=subprocess.DEVNULL)
+                       timeout=90, stdin=subprocess.DEVNULL, env=env)
     for line in r.stdout.splitlines():
         try:
             j = json.loads(line)
