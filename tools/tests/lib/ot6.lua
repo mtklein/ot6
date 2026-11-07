@@ -10069,11 +10069,6 @@ function Driver:cureFor(e)
     if cmd == BATTLE.CMD_MAGIC then magic = true
     elseif cmd ~= BATTLE.CMD_ITEM and cmd ~= 0xFF then other = true end
   end
-  -- (#274) opts.muteCure = { [char] = true }: a member whose Magic carries the party's care (a care summon, a boosted
-  -- Cure) is cured of Mute though it has other verbs: RELM, Starlet's summoner, came into Kefka's tier Muted from the
-  -- third and never summoned ("magic row nil", v040-the-end-3/lab/dg_k4_s5)
-  local mc = self.opts.muteCure
-  if mc and mc[M.readByte(0x3ED8 + e * 2)] then other = false end
   if (M.readByte(BATTLE.ST2 + e * 2) & M.ST2_MUTE) ~= 0 and magic and not other then
     return M.statusCure({ byte = 2, bit = M.ST2_MUTE,
       has = function(item) return self:battInvIdx(item) ~= nil end }), "Mute"
@@ -10153,14 +10148,6 @@ function M.statusDrop(was, now, cmd, atk, was2, now2, slot)
   end
   if cmd == 0x02 and atk ~= nil and atk < 0x100
      and M.readRomByte((M.sym("MagicProp") & 0x3FFFFF) + atk * 14 + 6) == 0 then
-    return true
-  end
-  -- (#274, M.TO_ONE_OUT) special effect $40 sets the target's HP to 1 (TargetEffect_40, Fallen One): it never kills,
-  -- and what it takes is whatever the member stood at, so it is no hit a round or a raise must clear.  In the ledger
-  -- Kefka's Fallen One priced every later round at the member's full HP ("a round costs 12616 ... s0 2x6308") and
-  -- refused every Fenix Down ("the living enemy's smallest hit 6308"; v040-the-end-2/lab/dflt_k0_s8)
-  if M.TO_ONE_OUT and atk ~= nil and atk < 0xEE
-     and M.readRomByte((M.sym("MagicProp") & 0x3FFFFF) + atk * 14 + 9) == 0x40 then
     return true
   end
   return false
@@ -11691,7 +11678,6 @@ function Driver:makePlan(actor)
   plan = self:buffPlan(actor, plan)
   plan = self:phaseHoldPlan(actor, plan)
   plan = self:megalixirPlan(actor, plan)
-  plan = self:careSummonPlan(actor, plan)
   plan = self:lifeRaisePlan(actor, plan)
   plan = self:boostCurePlan(actor, plan)
   plan = self:reserveBankPlan(actor, plan)
@@ -12143,55 +12129,6 @@ function Driver:megalixirPlan(actor, plan)
     .. "its %s", self.tag or "fight", actor, low, math.floor((o.below or 0.3) * 100), plan.kind))
   return { kind = "item", item = M.MEGALIXIR, target = first, row = row, idx = idx, all = true, auto = true,
            buff = true, reason = "megalixir" }
-end
-
--- A summon as care (#274): Starlet's party heal ($4F) and Phoenix's Rebirth ($50, the fallen raised) reach every
--- member, the Wall Ring wearers too (a summon is never reflected), where a cure on a wearer bounces and a Potion puts
--- back 250.  opts.careSummon = { [esper] = { below = fraction, n = count } or { fallen = count }, vs = species }: an
--- actor wearing a listed stone, its once-a-battle summon unspent ($3F2E) and the MP to pay, summons it in place of
--- whatever it planned when `n` seated members stand under `below` of their max HP (or `fallen` lie dead), while a
--- body of species `vs` stands (the battle's last formation: one summon a battle).  Kefka's Fallen One leaves all
--- four at 1 HP (build/attempts/wt/v040-the-end-2/lab/dflt_k0_s8: RELM and STRAGO, the wearers, stayed at 1 HP until
--- Goner and HyperDrive took them).
-function Driver:careSummonPlan(actor, plan)
-  local cs = self.opts.careSummon
-  if not cs or plan == nil or plan.buff then return plan end
-  local stone = M.readByte(0x3344 + actor * 2)
-  local o = stone ~= 0xFF and cs[stone]
-  if not o then return plan end
-  if cs.vs then
-    local up = false
-    for s = 0, 5 do if monAlive(s) and M.readWord(0x57C0 + s * 2) == cs.vs then up = true end end
-    if not up then return plan end
-  end
-  local row = cmdRow(actor, BATTLE.CMD_MAGIC)
-  local cost = M.readRomByte((M.sym("MagicProp") & 0x3FFFFF) + (0x36 + stone) * 14 + 5)
-  local used = (M.readWord(0x3F2E) & M.readWord(0x3018 + actor * 2)) ~= 0
-  local mp = M.readWord(BATTLE.CURMP + actor * 2)
-  if row == nil or used or mp < cost then
-    local key = string.format("caresummon:%d:%s:%s", actor, tostring(row == nil), tostring(used))
-    if not self.statusSaid[key] then
-      self.statusSaid[key] = true
-      M.log(string.format("[%s] actor=%d cannot summon esper $%02X as care: magic row %s, the battle's summon %s, "
-        .. "%d MP of %d", self.tag or "fight", actor, stone, tostring(row), used and "spent" or "unspent", mp, cost))
-    end
-    return plan
-  end
-  local low, dead = 0, 0
-  for e = 0, 3 do
-    local hp, mx, s1 = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2), M.readByte(0x3EE4 + e * 2)
-    if mx > 0 and mx ~= 0xFFFF then
-      if hp == 0 and (s1 & 0x80) ~= 0 and (s1 & 0x42) == 0 then dead = dead + 1
-      elseif hp > 0 and hp / mx < (o.below or 0) then low = low + 1 end
-    end
-  end
-  if not ((o.n and low >= o.n) or (o.fallen and dead >= o.fallen)) then return plan end
-  M.log(string.format("[%s] actor=%d summons esper $%02X as care (%d under %d%%, %d fallen; %d MP): in place of its "
-    .. "%s", self.tag or "fight", actor, stone, low, math.floor((o.below or 0) * 100), dead, cost, plan.kind))
-  -- (target: the summon's window lights the party itself, all and auto confirm it as it stands; the actor's own
-  -- seat stands in for the target the party-side steer reads)
-  return { kind = "summon", row = row, ally = true, all = true, auto = true, target = actor, buff = true,
-           vetoOk = true, reason = "care_summon" }
 end
 
 -- Wrexsoul's Zinger (#271): its first turn (AIScript _290) hides it inside a

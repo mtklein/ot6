@@ -51,19 +51,16 @@ end
 -- may reach for it too.  KEFKA_MEGALIXIR (a lab's) replaces the trigger, false turns it off
 if KEFKA_MEGALIXIR ~= nil then BOSS_FIGHT.megalixir = KEFKA_MEGALIXIR or nil
 elseif not KEFKA_STOCK then BOSS_FIGHT.megalixir = { n = 3, below = 0.3, vs = KEFKA } end
+-- The curers keep their last point through Kefka's break (opts.reserveBank): the break's burst emptied every bank,
+-- and when it ended no boosted Cure or Life 2 answered his Goner, HyperDrive and Ultima.  The members who cast Cure
+-- or Life (TERRA, CELES, SHADOW; LOCKE and STRAGO by the stones) attack at a boost that leaves one point.  With the
+-- Megalixir, 48 of 48 runs of both grids (route-wor-the-end.md 5.3, lab mrb); the Megalixir alone 47 of 48 (m)
+local CURERS = { [0] = true, [6] = true, [3] = true, [1] = true, [7] = true }
+if KEFKA_RESERVE ~= nil then BOSS_FIGHT.reserveBank = KEFKA_RESERVE or nil
+elseif not KEFKA_FIGHT and not KEFKA_STOCK then BOSS_FIGHT.reserveBank = { chars = CURERS, n = 1, vs = KEFKA } end
 -- KEFKA_RUIN (an arm): the driver's ruin rule (opts.ruin): with three or more members inside their round (Kefka's
 -- Fallen One), every actor may care, a party cure ahead of a raise
 if KEFKA_RUIN then BOSS_FIGHT.ruin = true end
--- KEFKA_CARESUMMON (an arm): the driver's opts.careSummon (a summon as care: Starlet's party heal, Phoenix's Rebirth)
-if KEFKA_CARESUMMON then BOSS_FIGHT.careSummon = KEFKA_CARESUMMON end
--- KEFKA_RESERVE (an arm): the driver's opts.reserveBank (the curers keep a point through Kefka's break)
-if KEFKA_RESERVE then BOSS_FIGHT.reserveBank = KEFKA_RESERVE end
--- KEFKA_BUFFVS (an arm): the driver's opts.buffVs (wards: CELES's Safe against Kefka's Battle and Special)
-if KEFKA_BUFFVS then BOSS_FIGHT.buffVs = KEFKA_BUFFVS end
--- KEFKA_MUTECURE (an arm): the driver's opts.muteCure (Mute cured on the members whose Magic carries the care)
-if KEFKA_MUTECURE then BOSS_FIGHT.muteCure = KEFKA_MUTECURE end
--- KEFKA_TO_ONE_OUT (an arm): Fallen One (special effect $40, HP to 1) kept out of the hit ledger (H.TO_ONE_OUT)
-if KEFKA_TO_ONE_OUT then H.TO_ONE_OUT = true end
 -- KEFKA_TIER_CARE (an arm): a tier's last body below a quarter of its HP, the party heals up before it dies: HP
 -- carries into the next tier (the third tier lost twice on a party a long second tier had worn down, f_k4_s8 and
 -- f_k4_s13).  The heal threshold rises to 90% and the press rule (attack when a break would end it) holds off
@@ -273,10 +270,8 @@ H.run({ maxFrames = 1500000 }, {
       .. "gen_wor_kt_factory", H.invCountOf(0xF0), FENIX_FLOOR, H.invCountOf(0xE9)))
     -- the Megalixir, saved for this fight (the tower's chest, bit 222, opened in gen_wor_kt_guardian; no fight before
     -- this one spends it: H.MEGALIXIR)
-    if not KEFKA_NO_MEGALIXIR_ASSERT then
-      H.assertEq(H.invCountOf(H.MEGALIXIR) >= 1, true, string.format("a Megalixir in the bag for Kefka (%d), "
-        .. "saved since gen_wor_kt_guardian's chest", H.invCountOf(H.MEGALIXIR)))
-    end
+    H.assertEq(H.invCountOf(H.MEGALIXIR) >= 1, true, string.format("a Megalixir in the bag for Kefka (%d), "
+      .. "saved since gen_wor_kt_guardian's chest", H.invCountOf(H.MEGALIXIR)))
     -- the stones for Kefka: each owned ($1A69 bits), worn by nobody else, its wearer in party 2
     for _, pe in ipairs(KEFKA_STONES or STONES) do
       local ch, e = pe[1], pe[2]
@@ -313,18 +308,6 @@ H.run({ maxFrames = 1500000 }, {
     for _, u in ipairs(KEFKA_UNRING or {}) do
       steps[#steps + 1] = H.switchParty(u[3], { tag = "unring: party " .. u[3] })
       steps[#steps + 1] = H.unequipRelics(u[1], { u[2] }, { tag = "unring " .. NAMES[u[1]] })
-    end
-    return H.seqStep(steps)
-  end),
-  -- KEFKA_ESPERS (a lab's): { { party, char, esper }, ... } equipped in order, each party walked to (the stone's
-  -- owner must stand in the walking party to free it: H.equipEsper); splitCare walks party 2 again after
-  H.lazy(function()
-    local steps = { H.call(function() end) }
-    for _, u in ipairs(KEFKA_ESPERS or {}) do
-      local p, ch, e = u[1], u[2], u[3]
-      steps[#steps + 1] = H.switchParty(p, { tag = "stone: party " .. p })
-      steps[#steps + 1] = H.equipEsper(function() return (H.readByte(0x1850 + ch) >> 3) & 3 end, e,
-        { tag = string.format("stone %d -> %s (party %d)", e, NAMES[ch], p) })
     end
     return H.seqStep(steps)
   end),
