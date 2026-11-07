@@ -46,6 +46,11 @@ if not KEFKA_FIGHT and not KEFKA_STOCK then
   BOSS_FIGHT.lifeRaise = true
   BOSS_FIGHT.boostCure = { below = 0.4, notBroken = true }
 end
+-- The Megalixir is Kefka's (owner, 2026-11-07): the driver spends it in no other fight (H.MEGALIXIR), and here the
+-- party drinks it when three members stand under 30% of their HP (Fallen One leaves all four at 1); the care lines
+-- may reach for it too.  KEFKA_MEGALIXIR (a lab's) replaces the trigger, false turns it off
+if KEFKA_MEGALIXIR ~= nil then BOSS_FIGHT.megalixir = KEFKA_MEGALIXIR or nil
+elseif not KEFKA_STOCK then BOSS_FIGHT.megalixir = { n = 3, below = 0.3 } end
 -- KEFKA_RUIN (an arm): the driver's ruin rule (opts.ruin): with three or more members inside their round (Kefka's
 -- Fallen One), every actor may care, a party cure ahead of a raise
 if KEFKA_RUIN then BOSS_FIGHT.ruin = true end
@@ -266,6 +271,12 @@ H.run({ maxFrames = 1500000 }, {
     H.assertEq(H.invCountOf(0xF0) >= FENIX_FLOOR and H.invCountOf(0xE9) >= 40, true, string.format(
       "the bag for Kefka: %d Fenix Downs (floor %d) and %d Potions (floor 40), stocked at Kohlingen by "
       .. "gen_wor_kt_factory", H.invCountOf(0xF0), FENIX_FLOOR, H.invCountOf(0xE9)))
+    -- the Megalixir, saved for this fight (the tower's chest, bit 222, opened in gen_wor_kt_guardian; no fight before
+    -- this one spends it: H.MEGALIXIR)
+    if not KEFKA_NO_MEGALIXIR_ASSERT then
+      H.assertEq(H.invCountOf(H.MEGALIXIR) >= 1, true, string.format("a Megalixir in the bag for Kefka (%d), "
+        .. "saved since gen_wor_kt_guardian's chest", H.invCountOf(H.MEGALIXIR)))
+    end
     -- the stones for Kefka: each owned ($1A69 bits), worn by nobody else, its wearer in party 2
     for _, pe in ipairs(KEFKA_STONES or STONES) do
       local ch, e = pe[1], pe[2]

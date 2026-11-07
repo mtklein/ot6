@@ -7462,6 +7462,11 @@ end
 -- whole party (Megalixir) instead of the single-target ones.  A flat item
 -- restores what itemRestoreOf says (measured, else its power); a fraction
 -- item the share of max HP it gives, up to what e is missing.
+-- The Megalixir is Kefka's (owner, 2026-11-07): no fight spends it but one whose options say opts.megalixir
+-- (gen_wor_kefka's), here and in the care race's bag.  The tower's one (chest bit 222) went to battle 13, group 329,
+-- in gen_wor_kt_guardian ("party item $EF: 2 members inside their round"), and Kefka's Fallen One then left the whole
+-- party at 1 HP with no Elixir or Megalixir in the bag.
+M.MEGALIXIR = 0xEF
 function Driver:bagHeals(e, hp, all)
   local function member(p)
     return { hp = M.readWord(0x3BF4 + p * 2), maxhp = M.readWord(0x3C1C + p * 2),
@@ -7477,7 +7482,7 @@ function Driver:bagHeals(e, hp, all)
   local list, seen = {}, {}
   for i = 0, 251 do
     local id = M.readByte(BATTLE.BATTINV + i * 5)
-    if id ~= 0xFF and not seen[id] then
+    if id ~= 0xFF and not seen[id] and (id ~= M.MEGALIXIR or self.opts.megalixir) then
       local p = M.itemProps(id)
       if (p & M.ITEM_HP) ~= 0 and (p & M.ITEM_CURES) == 0 and M.itemBattleUsable(id)
          and M.itemAllAllies(id) == (all == true) and self:battInvIdx(id) ~= nil then
@@ -10759,7 +10764,9 @@ function Driver:raceState(actor, R)
   st.bag, st.pendingHeal, st.pendingRaise = {}, self.healQueued or {}, self.raiseQueued or {}
   for i = 0, 251 do
     local id = M.readByte(BATTLE.BATTINV + i * 5)
-    if id ~= 0xFF then st.bag[id] = (st.bag[id] or 0) + M.readByte(BATTLE.BATTINV + i * 5 + 3) end
+    if id ~= 0xFF and (id ~= M.MEGALIXIR or self.opts.megalixir) then
+      st.bag[id] = (st.bag[id] or 0) + M.readByte(BATTLE.BATTINV + i * 5 + 3)
+    end
   end
   local slot = self:pressTarget()
   if slot == nil then
@@ -11683,6 +11690,7 @@ function Driver:makePlan(actor)
   plan = self:coverPlan(actor, plan)
   plan = self:buffPlan(actor, plan)
   plan = self:phaseHoldPlan(actor, plan)
+  plan = self:megalixirPlan(actor, plan)
   plan = self:careSummonPlan(actor, plan)
   plan = self:lifeRaisePlan(actor, plan)
   plan = self:boostCurePlan(actor, plan)
@@ -12103,6 +12111,29 @@ function Driver:reserveBankPlan(actor, plan)
     bank - keep, plan.kind, keep, plan.boostLeft))
   plan.boostLeft = keep
   return plan
+end
+
+-- Kefka's Megalixir turn (#274; owner, 2026-11-07: the Megalixir is saved for Kefka's fight and used there).
+-- opts.megalixir = { n = count, below = fraction }: with `n` seated members standing under `below` of their max HP
+-- (Kefka's Fallen One leaves all four at 1 HP), an actor with the Item row drinks the bag's Megalixir on the party in
+-- place of whatever it planned; one in flight is not doubled.  The option also opens the bag's Megalixir to the
+-- care lines (M.MEGALIXIR, Driver:bagHeals), which no other fight's options do.
+function Driver:megalixirPlan(actor, plan)
+  local o = self.opts.megalixir
+  if type(o) ~= "table" or plan == nil or plan.buff then return plan end
+  local row, idx = cmdRow(actor, BATTLE.CMD_ITEM), self:battInvIdx(M.MEGALIXIR)
+  if row == nil or idx == nil or M.frame - (self.megalixirAt or -100000) < 900 then return plan end
+  local low, first = 0, nil
+  for e = 0, 3 do
+    local hp, mx = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+    if mx > 0 and mx ~= 0xFFFF and hp > 0 and hp / mx < (o.below or 0.3) then low, first = low + 1, first or e end
+  end
+  if low < (o.n or 3) then return plan end
+  self.megalixirAt = M.frame
+  M.log(string.format("[%s] actor=%d Megalixir on the party: %d seated members under %d%% of their HP, in place of "
+    .. "its %s", self.tag or "fight", actor, low, math.floor((o.below or 0.3) * 100), plan.kind))
+  return { kind = "item", item = M.MEGALIXIR, target = first, row = row, idx = idx, all = true, auto = true,
+           buff = true, reason = "megalixir" }
 end
 
 -- A summon as care (#274): Starlet's party heal ($4F) and Phoenix's Rebirth ($50, the fallen raised) reach every
