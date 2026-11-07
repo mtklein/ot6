@@ -12136,8 +12136,10 @@ function Driver:careSummonPlan(actor, plan)
   if not ((o.n and low >= o.n) or (o.fallen and dead >= o.fallen)) then return plan end
   M.log(string.format("[%s] actor=%d summons esper $%02X as care (%d under %d%%, %d fallen; %d MP): in place of its "
     .. "%s", self.tag or "fight", actor, stone, low, math.floor((o.below or 0) * 100), dead, cost, plan.kind))
-  return { kind = "summon", row = row, ally = true, all = true, auto = true, buff = true, vetoOk = true,
-           reason = "care_summon" }
+  -- (target: the summon's window lights the party itself, all and auto confirm it as it stands; the actor's own
+  -- seat stands in for the target the party-side steer reads)
+  return { kind = "summon", row = row, ally = true, all = true, auto = true, target = actor, buff = true,
+           vetoOk = true, reason = "care_summon" }
 end
 
 -- Wrexsoul's Zinger (#271): its first turn (AIScript _290) hides it inside a
